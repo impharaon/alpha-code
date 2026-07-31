@@ -205,7 +205,7 @@ const CAPABILITY_RE = /^[a-z][a-z0-9.-]{0,95}$/
 const HEX64_RE = /^[0-9a-f]{64}$/
 const ENV_NAME_RE = /^[A-Z_][A-Z0-9_]{0,127}$/
 const HEADER_NAME_RE = /^[A-Za-z0-9-]{1,128}$/
-const OAUTH_SCOPE_RE = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/
+const PREREQUISITE_ID_RE = /^[a-z][a-z0-9-]{0,63}$/
 const CONNECTION_HANDLER_RE = /^[a-z][a-z0-9-]{0,63}$/
 // eslint-disable-next-line no-control-regex
 const CONTROL_RE = /[\x00-\x1f\x7f]/
@@ -794,82 +794,111 @@ function decodeMcpRemotePayload(value: unknown): PackageProfilePayloadDecodeV1 {
     ENV_NAME_RE,
     errors,
   )
-  const auth = decodeString(behavior.auth, "payload.behavior.auth", errors, { max: 32 })
-  if (auth && !MCP_REMOTE_AUTH_VALUES.includes(auth))
-    errors.push(`payload.behavior.auth: expected one of [${MCP_REMOTE_AUTH_VALUES.join(", ")}]`)
-  const oauth = decodeMcpRemoteOAuth(behavior, auth, errors)
-  const connectionHandlerId = decodeMcpRemoteConnectionHandler(behavior, auth, errors)
+  const auth = decodeMcpRemoteAuth(behavior.auth, errors)
+  if (auth && auth !== "none" && headersTemplate)
+    checkMcpRemoteAuthInvariantsV1(auth, headersTemplate, requiredSecrets, errors)
   if (errors.length || !url || !headersTemplate || !auth) return { ok: false, errors }
-  const base = { url, headersTemplate, requiredSecrets }
-  if (auth === "oauth" && oauth)
-    return {
-      ok: true,
-      payload: {
-        schema: "alpha.host-extension-package.payload.mcp-remote.v1",
-        behavior: { ...base, auth: "oauth", oauth },
-      },
-    }
-  if (auth === "connection" && connectionHandlerId)
-    return {
-      ok: true,
-      payload: {
-        schema: "alpha.host-extension-package.payload.mcp-remote.v1",
-        behavior: { ...base, auth: "connection", connectionHandlerId },
-      },
-    }
   return {
     ok: true,
     payload: {
       schema: "alpha.host-extension-package.payload.mcp-remote.v1",
-      behavior: { ...base, auth: "none" },
+      behavior: { url, headersTemplate, requiredSecrets, auth },
     },
   }
 }
 
-function decodeMcpRemoteOAuth(
-  behavior: Record<string, unknown>,
-  auth: string | undefined,
-  errors: string[],
-): { scopes: string[] } | undefined {
-  const present = Object.hasOwn(behavior, "oauth")
-  if (auth !== "oauth") {
-    if (present) errors.push('payload.behavior.oauth: refused unless auth is "oauth"')
+function decodeMcpRemoteAuth(value: unknown, errors: string[]): McpRemoteAuthV1 | undefined {
+  if (value === "none") return "none"
+  if (!isObject(value)) {
+    errors.push('payload.behavior.auth: required "none" or an authorization object')
     return
   }
-  if (!present || !isObject(behavior.oauth)) {
-    errors.push('payload.behavior.oauth: required object when auth is "oauth"')
+  const kind = decodeString(value.kind, "payload.behavior.auth.kind", errors, { max: 32 })
+  if (!kind) return
+  if (kind !== "mcp-oauth" && kind !== "alpha-connection") {
+    errors.push(`payload.behavior.auth.kind: expected one of [${MCP_REMOTE_AUTH_KINDS.join(", ")}]`)
     return
   }
-  rejectUnknownKeys(behavior.oauth, MCP_REMOTE_OAUTH_KEYS, "payload.behavior.oauth", errors)
+  rejectUnknownKeys(
+    value,
+    kind === "mcp-oauth" ? MCP_OAUTH_AUTH_KEYS : ALPHA_CONNECTION_AUTH_KEYS,
+    "payload.behavior.auth",
+    errors,
+  )
+  const prerequisiteId = decodeString(
+    value.prerequisiteId,
+    "payload.behavior.auth.prerequisiteId",
+    errors,
+    { max: 64, pattern: PREREQUISITE_ID_RE },
+  )
+  if (typeof value.required !== "boolean")
+    errors.push("payload.behavior.auth.required: required boolean")
+  const hasLabel = Object.hasOwn(value, "label")
+  const label = hasLabel
+    ? decodeString(value.label, "payload.behavior.auth.label", errors, { max: 120 })
+    : undefined
+  if (!prerequisiteId || typeof value.required !== "boolean" || (hasLabel && !label)) return
+  if (kind === "mcp-oauth")
+    return { kind, prerequisiteId, required: value.required, ...(label ? { label } : {}) }
+  const connectionHandlerId = decodeString(
+    value.connectionHandlerId,
+    "payload.behavior.auth.connectionHandlerId",
+    errors,
+    { max: 64, pattern: CONNECTION_HANDLER_RE },
+  )
+  if (!connectionHandlerId) return
   return {
-    scopes: decodeSortedStringArray(
-      behavior.oauth.scopes,
-      "payload.behavior.oauth.scopes",
-      OAUTH_SCOPE_RE,
-      errors,
-    ),
+    kind,
+    prerequisiteId,
+    required: value.required,
+    connectionHandlerId,
+    ...(label ? { label } : {}),
   }
 }
 
-function decodeMcpRemoteConnectionHandler(
-  behavior: Record<string, unknown>,
-  auth: string | undefined,
+/**
+ * Cross-field invariants the payload decoder owns outright. Main must not restate them: a rule
+ * enforced in two places is a rule that drifts, and the second copy is always the one that forgets
+ * a case.
+ *
+ * 1. `mcp-oauth` forbids an `Authorization` header template, case-insensitively. Token injection
+ *    belongs to the engine's token store; a publisher shipping its own `Authorization` template is
+ *    routing around it. HTTP header names are case-insensitive, so `authorization` is the same
+ *    bypass spelled differently and must fail the same way.
+ * 2. A component's prerequisites must stay distinguishable to the person approving them. The
+ *    authorization prerequisite is compared against the secret prerequisites after folding case
+ *    and `_`/`-`, because `A_KEY` and `a-key` render as the same row in the approval list even
+ *    though they are different byte strings.
+ *
+ * Note what is deliberately *not* here: `auth !== "none"` does not exempt `requiredSecrets`. OAuth
+ * plus an extra API key is a legitimate shape, and both prerequisites must be collected.
+ */
+function checkMcpRemoteAuthInvariantsV1(
+  auth: Exclude<McpRemoteAuthV1, "none">,
+  headersTemplate: Record<string, string>,
+  requiredSecrets: string[],
   errors: string[],
-): string | undefined {
-  const present = Object.hasOwn(behavior, "connectionHandlerId")
-  if (auth !== "connection") {
-    if (present)
-      errors.push('payload.behavior.connectionHandlerId: refused unless auth is "connection"')
-    return
-  }
-  if (!present) {
-    errors.push('payload.behavior.connectionHandlerId: required when auth is "connection"')
-    return
-  }
-  return decodeString(behavior.connectionHandlerId, "payload.behavior.connectionHandlerId", errors, {
-    max: 64,
-    pattern: CONNECTION_HANDLER_RE,
-  })
+): void {
+  if (auth.kind === "mcp-oauth")
+    Object.keys(headersTemplate)
+      .filter((header) => header.toLowerCase() === "authorization")
+      .forEach((header) =>
+        errors.push(
+          `payload.behavior.headersTemplate: "${header}" is refused when auth.kind is "mcp-oauth" — the engine owns token injection`,
+        ),
+      )
+  const folded = foldPrerequisiteTokenV1(auth.prerequisiteId)
+  requiredSecrets
+    .filter((variable) => foldPrerequisiteTokenV1(variable) === folded)
+    .forEach((variable) =>
+      errors.push(
+        `payload.behavior.auth.prerequisiteId: "${auth.prerequisiteId}" collides with requiredSecrets entry "${variable}" after case/separator folding`,
+      ),
+    )
+}
+
+function foldPrerequisiteTokenV1(token: string): string {
+  return token.toLowerCase().replaceAll("_", "-")
 }
 
 function decodePayloadRoot(

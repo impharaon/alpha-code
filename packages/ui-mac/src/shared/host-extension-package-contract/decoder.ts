@@ -290,11 +290,14 @@ export function derivePayloadCapabilitiesV1(payload: PackageProfilePayloadV1): P
     payload.behavior.requiredSecrets.length
   )
     capabilities.push("alpha.secret-prerequisite.v1")
-  if (payload.schema === "alpha.host-extension-package.payload.mcp-remote.v1") {
-    if (payload.behavior.auth === "oauth") capabilities.push("alpha.mcp-oauth.v1")
-    if (payload.behavior.auth === "connection") capabilities.push("alpha.connection.v1")
+  if (
+    payload.schema === "alpha.host-extension-package.payload.mcp-remote.v1" &&
+    payload.behavior.auth !== "none"
+  ) {
+    if (payload.behavior.auth.kind === "mcp-oauth") capabilities.push("alpha.mcp-oauth.v1")
+    if (payload.behavior.auth.kind === "alpha-connection") capabilities.push("alpha.connection.v1")
   }
-  return capabilities.sort()
+  return [...new Set(capabilities)].sort()
 }
 
 function decodeEnvelopeObject(value: unknown): PackageEnvelopeHeaderDecodeV1 {

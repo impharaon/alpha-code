@@ -97,15 +97,16 @@ const mcpLocalPayload = () => ({
 })
 
 const mcpRemotePayload = (
-  auth: Record<string, unknown> = { auth: "none" },
+  auth: unknown = "none",
   requiredSecrets: string[] = [],
+  headersTemplate: Record<string, string> = {},
 ) => ({
   schema: "alpha.host-extension-package.payload.mcp-remote.v1",
   behavior: {
     url: "https://mcp.example.invalid/service",
-    headersTemplate: {},
+    headersTemplate,
     requiredSecrets,
-    ...auth,
+    auth,
   },
 })
 
@@ -115,14 +116,30 @@ export function decoderCorpusBytesV1(): Uint8Array {
     single("agent-v1", "agent", [], agentPayload("agent")),
     single("mcp-local-v1", "mcp-local", ["alpha.secret-prerequisite.v1"], mcpLocalPayload()),
     single("mcp-remote-v1", "mcp-remote", [], mcpRemotePayload()),
-    single("mcp-remote-oauth-v1", "mcp-remote", ["alpha.mcp-oauth.v1"], mcpRemotePayload({
-      auth: "oauth",
-      oauth: { scopes: ["mcp.read", "mcp.write"] },
-    })),
-    single("mcp-remote-connection-v1", "mcp-remote", ["alpha.connection.v1"], mcpRemotePayload({
-      auth: "connection",
-      connectionHandlerId: "alpha-example",
-    })),
+    // OAuth 与 Connection 都携带一条额外 secret:auth 不豁免 requiredSecrets(rev3 不变量 5),
+    // 两个 capability 必须同时出现在派生结果里。
+    single(
+      "mcp-remote-oauth-v1",
+      "mcp-remote",
+      ["alpha.mcp-oauth.v1", "alpha.secret-prerequisite.v1"],
+      mcpRemotePayload(
+        { kind: "mcp-oauth", prerequisiteId: "example-oauth", required: true },
+        ["TENANT_ID"],
+        { "X-Tenant": "{TENANT_ID}" },
+      ),
+    ),
+    single(
+      "mcp-remote-connection-v1",
+      "mcp-remote",
+      ["alpha.connection.v1"],
+      mcpRemotePayload({
+        kind: "alpha-connection",
+        prerequisiteId: "example-connection",
+        required: true,
+        connectionHandlerId: "alpha-example",
+        label: "Alpha Example Connection",
+      }),
+    ),
   ]
 
   // 单组件负向:profile / capability / 缺 profileId。

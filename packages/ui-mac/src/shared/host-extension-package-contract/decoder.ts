@@ -74,25 +74,36 @@ export type McpLocalPayloadV1 = {
   behavior: { command: string[]; environment: Record<string, string>; requiredSecrets: string[] }
 }
 
-export type McpRemoteAuthV1 = "none" | "oauth" | "connection"
-
-type McpRemoteBehaviorBaseV1 = {
-  url: string
-  headersTemplate: Record<string, string>
-  requiredSecrets: string[]
-}
-
 /**
  * The remote-MCP authorization shape is frozen here, not merely tokenised. A capability token by
  * itself only says that some authorization exists; it does not say which bytes a producer may ship,
  * so a later ticket could invent its own field names and this decoder would wave them through.
- * Each arm below is exclusive: `oauth` and `connectionHandlerId` are refused unless their own
- * `auth` value selected them.
+ *
+ * `auth` is therefore a discriminated union rather than a bare enum: each arm names its own
+ * required fields and refuses unknown ones, so there is exactly one legal spelling per kind.
+ *
+ * `connectionHandlerId`'s **grammar** lives here and nowhere else. Main is only ever allowed to
+ * look the finished id up in a static allowlist — never to re-derive meaning from its prefix,
+ * segments, or namespace. That is the `#737` discipline: one place decides what a token may look
+ * like, and everyone downstream consumes that decision instead of re-implementing it.
  */
-export type McpRemoteBehaviorV1 =
-  | (McpRemoteBehaviorBaseV1 & { auth: "none" })
-  | (McpRemoteBehaviorBaseV1 & { auth: "oauth"; oauth: { scopes: string[] } })
-  | (McpRemoteBehaviorBaseV1 & { auth: "connection"; connectionHandlerId: string })
+export type McpRemoteAuthV1 =
+  | "none"
+  | { kind: "mcp-oauth"; prerequisiteId: string; required: boolean; label?: string }
+  | {
+      kind: "alpha-connection"
+      prerequisiteId: string
+      required: boolean
+      connectionHandlerId: string
+      label?: string
+    }
+
+export type McpRemoteBehaviorV1 = {
+  url: string
+  headersTemplate: Record<string, string>
+  requiredSecrets: string[]
+  auth: McpRemoteAuthV1
+}
 
 export type McpRemotePayloadV1 = {
   schema: "alpha.host-extension-package.payload.mcp-remote.v1"
@@ -176,16 +187,16 @@ const PAYLOAD_REF_KEYS = new Set(["sha256", "bytes", "mediaType", "url"])
 const PAYLOAD_KEYS = new Set(["schema", "behavior"])
 const MARKDOWN_BEHAVIOR_KEYS = new Set(["targetDir", "asset"])
 const MCP_LOCAL_BEHAVIOR_KEYS = new Set(["command", "environment", "requiredSecrets"])
-const MCP_REMOTE_BEHAVIOR_KEYS = new Set([
-  "url",
-  "headersTemplate",
-  "requiredSecrets",
-  "auth",
-  "oauth",
+const MCP_REMOTE_BEHAVIOR_KEYS = new Set(["url", "headersTemplate", "requiredSecrets", "auth"])
+const MCP_REMOTE_AUTH_KINDS = ["alpha-connection", "mcp-oauth"] as const
+const MCP_OAUTH_AUTH_KEYS = new Set(["kind", "prerequisiteId", "required", "label"])
+const ALPHA_CONNECTION_AUTH_KEYS = new Set([
+  "kind",
+  "prerequisiteId",
+  "required",
   "connectionHandlerId",
+  "label",
 ])
-const MCP_REMOTE_OAUTH_KEYS = new Set(["scopes"])
-const MCP_REMOTE_AUTH_VALUES: readonly string[] = ["none", "oauth", "connection"]
 
 const PACKAGE_ID_RE = /^[a-z][a-z0-9-]{0,31}:[a-z0-9][a-z0-9._-]{0,127}$/
 const VERSION_RE = /^[0-9A-Za-z][0-9A-Za-z._-]{0,63}$/

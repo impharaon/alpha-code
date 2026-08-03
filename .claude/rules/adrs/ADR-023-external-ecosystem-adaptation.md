@@ -55,3 +55,36 @@ related: [ADR-014, ADR-002, REQ-032, REQ-033, REQ-034, REQ-035]
 仍需发版 A 的仅剩:出厂预置资产本体更新(vendored)、验签公钥更换(重大事件,见 catalog-publish.md)、catalog schema 演进(新 kind/字段;C 上架新形态前须确认存量 app 兼容 —— 向后兼容纪律)。
 
 **后果**:✅ 上架/撤架单侧动作、机械守卫,不再依赖人肉双写;✅ 快照与已发布产物字节一致,diff/审计一一对应;⚠️ 内置底座含 remote-only 条目(断网时这类条目安装诚实失败,与联网用户断网行为一致);⚠️ schema 演进成为 A/C 之间唯一需要协调发布的耦合点(C 保持向后兼容或版本闸)。
+
+## 事实修订(2026-07-30 —— OpenAI Plugin 已形成正式外部套件格式)
+
+本修订只纠正本 ADR 背景中的过时生态事实,不改变「安装期转换、拒绝运行时模拟」
+这一核心决策。
+
+- 上文“Codex 无插件体系”是 **2026-07-05 当时的核查快照**,不再代表当前事实。
+  OpenAI 现已把 Plugin 定义为 ChatGPT 与 Codex 共用的可发现、安装和发布套件;
+  每个套件以 `.codex-plugin/plugin.json` 为入口,可组合 skills、MCP server、
+  `.app.json` 连接映射、可选 lifecycle hooks 与展示资产。权威来源:
+  [Plugin architecture](https://developers.openai.com/plugins/concepts/plugins)、
+  [Package your plugin](https://developers.openai.com/plugins/build/plugins)。
+- 因此“Codex Plugin”不得再被笼统归类为“异构引擎代码插件”。它首先是一个
+  **外部套件/分发格式**:其中 Skill 与 MCP 等声明式组件可转换为 Alpha 原生组件;
+  lifecycle hook、宿主专属 UI 或其它依赖 OpenAI 宿主语义的部分必须逐项给出
+  `mapped / review-required / blocked` 结论,不能因为包名叫 Plugin 就整包拒绝,
+  也不能因为目录能读取就谎称完全兼容。
+- Claude Code Plugin 同样是外部套件格式,其 skills、agents、commands 与 MCP
+  可逐项转换;hooks、LSP、monitors、themes 等只有在 Alpha 存在等价宿主原语时
+  才可映射。两种外部套件都不是 `@opencode-ai/plugin`。后者仍是 Alpha Runtime
+  真正加载的 JS Hook/Tool ABI,只接受与该 ABI 兼容、经过既有代码安装安全门的
+  OpenCode 插件。
+- 面向 Alpha Catalog 的推荐路径是:在 alpha-web intake/publish 阶段解析外部包,
+  生成 Alpha 原生条目与兼容性报告;alpha-code 安装时重新验签、校验、授权并执行
+  原生事务。用户从本地文件或 URL 直接导入时,同一纯转换器才在 alpha-code
+  本地运行。两条路径都属于“安装前转换”,都不在运行时模拟外部宿主。
+- 当前只交付了部分原语与导入接缝,尚未交付任意 OpenAI/Claude Plugin 的整包转换。
+  完整实现仍由
+  [REQ-034 / alpha-code#215](https://github.com/jinjunnn/alpha-code/issues/215)
+  约束;页面与文档必须如实区分“当前可安装”与“目标兼容路径”。
+
+作者声明、Catalog、执行 Manifest、页面、认证和“何时无需更新 app”的详细边界见
+[`docs/architecture/external-package-ingestion.md`](../../../docs/architecture/external-package-ingestion.md)。

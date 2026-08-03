@@ -153,7 +153,7 @@ export const dict = {
   "alpha.ext.importAgentDone": "Agent \"{name}\" imported — available from the next message",
   "alpha.ext.importAgentMapNote": "Every field is mapped explicitly; \"not mapped\" fields are never silently rewritten (configure manually after install).",
   "alpha.ext.mapping.notMapped": "Not mapped",
-  "alpha.ext.compatNote": "Compatibility: MCP connectors and skills (SKILL.md) are cross-ecosystem and install directly; agents need field conversion (previewed on import); code plugins from other engines (e.g. Codex plugins) cannot be installed — look for an MCP equivalent. Upstream-ecosystem plugins import via npm.",
+  "alpha.ext.compatNote": "Compatibility: MCP connectors and skills (SKILL.md) can already map directly; agents require a previewed field conversion. OpenAI/Codex and Claude Code Plugins are external package formats whose target path is pre-install conversion into native Alpha skills, agents, MCP components, and more; whole-package conversion is not available yet. Host-specific hooks or code are never presented as compatible; JS plugins that truly implement the OpenCode ABI still install from npm or curated assets.",
   "alpha.builtin.note": "Upstream built-ins governance: hide = removed from UI; disable = unavailable to the model too; override = replace the built-in with an alpha template/prompt. A denied skill still shows in the slash menu (engine behavior) but execution is blocked and hits an honest placeholder.",
   "alpha.builtin.denylist": "Denylist",
   "alpha.builtin.allowlist": "Allowlist",

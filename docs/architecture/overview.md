@@ -4,7 +4,7 @@ kind: architecture
 status: active
 owners:
   - alpha-code maintainers
-last_reviewed: 2026-07-20
+last_reviewed: 2026-07-30
 review_after: 2027-01-13
 ---
 
@@ -13,8 +13,7 @@ review_after: 2027-01-13
 ## Ownership
 
 `alpha-code` owns the installed desktop application and local trust boundary.
-It does not own the cloud gateway, public account/billing surface, or external
-Claude Code distribution.
+It does not own the cloud gateway or public account/billing surface.
 
 | Surface | Owner |
 |---|---|
@@ -24,7 +23,9 @@ Claude Code distribution.
 | Local engine and synchronized upstream packages | governed fork integration |
 | Model gateway, cloud jobs, metering | `alpha-platform` |
 | Public identity/account/billing UX | `alpha-web` |
-| Claude Code plugin packaging | `alpha-code-plugin` |
+
+`alpha-code-plugin` is a separate outbound project and is not part of Alpha's
+extension ingestion, Catalog, Bundle installer, or runtime compatibility path.
 
 ## Runtime boundary
 
@@ -37,6 +38,12 @@ Alpha cloud calls cross explicit authenticated contracts owned by
 `alpha-platform`; public account and identity flows cross contracts owned by
 `alpha-web`. Credentials stay in their owning trust domain and must not be
 placed in tracked documentation.
+
+External OpenAI/Claude Plugin packages enter Alpha through install-before-runtime
+conversion into native components; executable OpenCode plugins use the
+`@opencode-ai/plugin` ABI. The package, Catalog, page, authentication, and
+no-app-update boundaries are defined in
+[`external-package-ingestion.md`](external-package-ingestion.md).
 
 ## Sources of truth
 

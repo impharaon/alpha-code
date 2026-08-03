@@ -152,7 +152,7 @@ export const dict = {
   "alpha.ext.importAgentDone": "Agent「{name}」已导入,下一条消息即可用",
   "alpha.ext.importAgentMapNote": "映射逐项显式声明;标「不映射」的字段不会被静默改写(装后可在治理/设置中手动配置)。",
   "alpha.ext.mapping.notMapped": "不映射",
-  "alpha.ext.compatNote": "兼容性边界:MCP 连接器与技能(SKILL.md)跨生态通用可直装;Agent 需字段转换(导入时预览);异构引擎的代码插件(如 Codex 插件)无法直装 —— 请找同能力的 MCP 版本。上游生态插件经 npm 导入。",
+  "alpha.ext.compatNote": "兼容性边界:MCP 连接器与技能(SKILL.md)当前可直接映射;Agent 需字段转换并预览。OpenAI/Codex 与 Claude Code Plugin 是外部套件格式,目标路径是安装前拆解为 Alpha 原生 Skill/Agent/MCP 等组件;完整套件转换尚未开放。宿主专属 hooks/代码不会被假装兼容;真正兼容 OpenCode ABI 的 JS 插件仍经 npm 或精选资产安装。",
   "alpha.builtin.note": "内置(上游)能力治理:隐藏 = 界面不显示;禁用 = 连模型也不可用;重写 = 以 alpha 模板/提示词覆盖同名内置。技能禁用后斜杠菜单仍会列出(引擎行为),但执行被拦、命中占位说明 —— 如实呈现,不假装彻底移除。",
   "alpha.builtin.denylist": "黑名单模式",
   "alpha.builtin.allowlist": "白名单模式",

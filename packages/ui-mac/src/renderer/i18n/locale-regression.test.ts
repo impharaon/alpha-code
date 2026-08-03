@@ -69,6 +69,8 @@ const visibleOpencodeAllowlist = {
   "desktop.cli.installed.message": "cli-command",
   // This is the real upstream-compatible configuration path written by the shipped app.
   "alpha.ext.confirmNote": "config-path",
+  // Compatibility copy must distinguish the executable OpenCode plugin ABI from external packages.
+  "alpha.ext.compatNote": "plugin-abi",
 } as const
 
 describe("locale regression gate", () => {
@@ -147,6 +149,9 @@ describe("locale regression gate", () => {
     ).flatMap((item) => item.tokens.map((token) => ({ file: item.file, token })))
 
     expect(occurrences).toEqual([
+      // These name the real executable plugin ABI, not Alpha's product identity.
+      { file: "i18n/en.ts", token: "OpenCode" },
+      { file: "i18n/zh.ts", token: "OpenCode" },
       // Historical verification names the real third-party macOS bundle that is no longer redistributed.
       { file: "extensions/alpha-catalog.json", token: "OpenCodeNotifier.app" },
     ])

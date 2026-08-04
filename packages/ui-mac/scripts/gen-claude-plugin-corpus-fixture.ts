@@ -6,8 +6,9 @@
  * **夹具复制进仓、不依赖本机路径** —— 否则那道闸只在写它的人的机器上是真的。
  *
  * 导出规则(每一条都为了让判定面**逐字保真**,同时不把第三方内容整个搬进仓):
- *   · `SKILL.md`、`.claude-plugin/plugin.json` 与 `.mcp.json` —— **逐字保留**。它们是解析器、
- *     引用扫描与**规模测量**真正读的输入;换成手写复刻就是「替别人写文法」,判定面立刻变成自证。
+ *   · `SKILL.md`、`.claude-plugin/plugin.json`、`.mcp.json` 与插件根 `agents/` 树内的 Markdown
+ *     —— **逐字保留**。它们是解析器、引用扫描与**规模测量**真正读的输入;换成手写复刻就是
+ *     「替别人写文法」,判定面立刻变成自证。skill 自己携带的 `agents/` 不算插件级 agent。
  *   · 其余文件 —— **占位**,只保留 `size` 与 `mode`。判定只用到它们的**存在性、名字、
  *     可执行位与体积**(引用 resolve / exec 位 / 10MB 帽),用不到内容。
  *
@@ -50,6 +51,23 @@ function main(): void {
   const roots = fs.readdirSync(corpusRoot).filter((n) => !n.endsWith(".bak")).sort()
   const entries: Entry[] = []
 
+  const isPluginLevelAgent = (abs: string, name: string): boolean => {
+    if (!name.endsWith(".md")) return false
+    let dir = path.dirname(abs)
+    while (dir !== corpusRoot) {
+      if (
+        path.basename(dir) === "agents" &&
+        fs.existsSync(path.join(path.dirname(dir), ".claude-plugin", "plugin.json"))
+      ) {
+        return true
+      }
+      const parent = path.dirname(dir)
+      if (parent === dir) return false
+      dir = parent
+    }
+    return false
+  }
+
   const walk = (absDir: string, relDir: string): void => {
     const dirents = fs.readdirSync(absDir, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1))
     for (const dirent of dirents) {
@@ -64,7 +82,7 @@ function main(): void {
       if (!dirent.isFile()) continue
       const st = fs.lstatSync(abs)
       const mode = st.mode & 0o777
-      if (VERBATIM.has(dirent.name)) {
+      if (VERBATIM.has(dirent.name) || isPluginLevelAgent(abs, dirent.name)) {
         // 「逐字保留」必须是**真的**,不是名义上的:`readFileSync(..., "utf8")` 对非法 UTF-8
         // 会静默塞 U+FFFD,于是夹具里躺着一份**看起来像原文**的赝品。往返比一次字节,
         // 不等就当场停 —— 让这份语料悄悄失真,正是本文件要修的那类缺陷。
@@ -72,6 +90,10 @@ function main(): void {
         const text = raw.toString("utf8")
         if (!Buffer.from(text, "utf8").equals(raw)) {
           console.error(`逐字保留失真(非 UTF-8 字节):${rel}`)
+          process.exit(1)
+        }
+        if (raw.includes(0)) {
+          console.error(`逐字保留拒绝 NUL 字节:${rel}`)
           process.exit(1)
         }
         entries.push({ path: rel, mode, text })
@@ -84,7 +106,7 @@ function main(): void {
     schema: "claude-plugin-corpus-fixture/v1",
     source: "~/.claude/plugins/marketplaces (excluding *.bak)",
     note:
-      "SKILL.md、plugin.json 与 .mcp.json 逐字保留;其余文件只留 size/mode 占位(判定只用到存在性/名字/可执行位/体积)。" +
+      "SKILL.md、plugin.json、.mcp.json 与插件根下 agents/**/*.md 逐字保留;其余文件只留 size/mode 占位(判定只用到存在性/名字/可执行位/体积)。" +
       "由 packages/ui-mac/scripts/gen-claude-plugin-corpus-fixture.ts 生成,不要手改。",
     roots,
     entries,

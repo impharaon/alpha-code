@@ -46,8 +46,12 @@ const sha = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("he
 const canonicalBytes = (value: unknown) => new TextEncoder().encode(`${JSON.stringify(value, null, 2)}\n`)
 const utf8 = (text: string) => new TextEncoder().encode(text)
 
-function commandFixture(name = COMMAND_NAME, componentId = COMPONENT_ID, packageId = PACKAGE_ID) {
-  const template = utf8(TEMPLATE_MD)
+function commandFixture(
+  name = COMMAND_NAME,
+  componentId = COMPONENT_ID,
+  packageId = PACKAGE_ID,
+  template = utf8(TEMPLATE_MD),
+) {
   const payload = {
     schema: "alpha.host-extension-package.payload.command.v1",
     behavior: {
@@ -251,36 +255,54 @@ describe("#840 engine visibility —— 判据是引擎真的读它的那条路"
     300_000,
   )
 
-  test("R1-1:保留名 command 组件(init)⇒ 整包在资产下载之前具名拒绝", async () => {
-    const fixture = commandFixture("init", "command:init", "package:command-reserved")
+  test("R1-1:三个保留名 command 组件 ⇒ 整包在资产下载之前具名拒绝", async () => {
     let assetFetches = 0
-    const admit = createPackageAdmissionCoordinator({
-      loadVerifiedCatalog: async () => ({
-        source: "remote",
-        catalog: { version: "1", entries: [{}], packages: [fixture.envelope] },
-        snapshotDigest,
-      }),
-      root: () => root,
-      userDataPath: userData,
-      casBaseRoot: () => userData,
-      environment: () => "dev",
-      installability: { fetchPayload: async (ref) => fixture.payloadByDigest.get(ref.sha256)! },
-      fetchAsset: async (ref) => {
-        assetFetches++
-        return fixture.assetByDigest.get(ref.sha256)!
-      },
-      transaction: runExtensionTransaction,
-    })
-    const outcome = await admit({
-      catalogId: "package:command-reserved",
-      scope: { scope: "global" as const },
-      attemptId: "attempt-reserved-init",
-    })
-    expect(outcome.ok).toBe(false)
-    if (!outcome.ok) {
-      expect(outcome.reason).toContain("reserved")
-      expect(outcome.reason).toContain("R1-1")
+    for (const name of ["init", "review", "customize-opencode"]) {
+      const fixture = commandFixture(name, `command:${name}`, `package:command-reserved-${name}`)
+      const admit = createPackageAdmissionCoordinator({
+        loadVerifiedCatalog: async () => ({
+          source: "remote",
+          catalog: { version: "1", entries: [{}], packages: [fixture.envelope] },
+          snapshotDigest,
+        }),
+        root: () => root,
+        userDataPath: userData,
+        casBaseRoot: () => userData,
+        environment: () => "dev",
+        installability: { fetchPayload: async (ref) => fixture.payloadByDigest.get(ref.sha256)! },
+        fetchAsset: async (ref) => {
+          assetFetches++
+          return fixture.assetByDigest.get(ref.sha256)!
+        },
+        transaction: runExtensionTransaction,
+      })
+      const outcome = await admit({
+        catalogId: fixture.envelope.prelude.packageId,
+        scope: { scope: "global" as const },
+        attemptId: `attempt-reserved-${name}`,
+      })
+      expect(outcome.ok).toBe(false)
+      if (!outcome.ok) {
+        expect(outcome.reason).toContain("reserved")
+        expect(outcome.reason).toContain("R1-1")
+      }
     }
     expect(assetFetches).toBe(0)
+  })
+
+  test("签名 template 不是合法 UTF-8 ⇒ 资产摘要通过后仍 fail-closed", async () => {
+    const fixture = commandFixture(
+      "invalid-utf8",
+      "command:invalid-utf8",
+      "package:command-invalid-utf8",
+      Uint8Array.from([0x66, 0x80, 0x6f]),
+    )
+    const outcome = await coordinatorFor(fixture)({
+      catalogId: fixture.envelope.prelude.packageId,
+      scope: { scope: "global" as const },
+      attemptId: "attempt-invalid-utf8",
+    })
+    expect(outcome.ok).toBe(false)
+    if (!outcome.ok) expect(outcome.reason).toContain("command template is not valid UTF-8")
   })
 })

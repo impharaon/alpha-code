@@ -620,10 +620,21 @@ async function resolvePreparedPackage(
     const commandTemplate = commandBehavior ? await fetchVerified(commandBehavior.template) : undefined
     if (commandBehavior && !commandTemplate)
       return { ok: false, reason: "package admission: package asset unavailable or failed integrity", package: view }
+    let commandTemplateText: string | undefined
+    if (commandTemplate) {
+      try {
+        // `text/markdown` is a text contract, not an arbitrary byte bag. Buffer.toString("utf8")
+        // silently replaces malformed sequences with U+FFFD; that would make the live command
+        // differ from the signed asset while every digest check stayed green. Refuse instead.
+        commandTemplateText = new TextDecoder("utf-8", { fatal: true }).decode(commandTemplate)
+      } catch {
+        return { ok: false, reason: "package admission: command template is not valid UTF-8", package: view }
+      }
+    }
     const commandEntry =
-      commandBehavior && commandTemplate
+      commandBehavior && commandTemplateText !== undefined
         ? {
-            template: commandTemplate.toString("utf8"),
+            template: commandTemplateText,
             ...(commandBehavior.description !== undefined ? { description: commandBehavior.description } : {}),
             ...(commandBehavior.agent !== undefined ? { agent: commandBehavior.agent } : {}),
             ...(commandBehavior.model !== undefined ? { model: commandBehavior.model } : {}),

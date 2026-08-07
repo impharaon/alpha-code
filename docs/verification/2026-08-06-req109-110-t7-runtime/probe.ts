@@ -21,7 +21,9 @@ type Scenario = {
   waitForRefreshEnd?: boolean
   screenshot?: boolean
   hotReloads?: number
+  modelSetProbe?: boolean
   activeStream?: boolean
+  idleRenewal?: boolean
   longSessionRotations?: number
 }
 
@@ -40,6 +42,26 @@ type RunResult = {
   auth?: unknown
   unavailableVisible?: boolean
   readyRetryMs?: number
+  rotationReadyMs?: number
+  modelSet?: {
+    firstEventCount: number | null
+    firstCount: number
+    firstSha256: string
+    hotCount: number
+    hotSha256: string
+    equal: boolean
+    accountRequests: number
+    bearerRequests: number
+  }
+  idleContinuity?: {
+    sameComposer: boolean
+    draftPreserved: boolean
+    syncingVisible: boolean
+    maxLayoutDeltaPx: number
+    layoutStable: boolean
+    observations: number
+    sessionID: string
+  }
   interruption?: { seen: boolean; draftPreserved: boolean; sessionID?: string }
   postRotationTurn?: { status: number; credentialGeneration: string; noOldToken: boolean }
   secretHygiene: {
@@ -49,6 +71,9 @@ type RunResult = {
     tokenInProcessEnv: boolean
     tokenInAuthState: boolean
     tokenInRendererSurface: boolean
+    byokKeyInTimeline: boolean
+    byokKeyInAuthState: boolean
+    byokKeyInRendererSurface: boolean
   }
   events: TimelineRecord[]
 }
@@ -64,6 +89,7 @@ const APPEND_RESULTS = process.env.ALPHA_T7_APPEND === "1"
 const KEEP_FAILED_ROOT = process.env.ALPHA_T7_KEEP_FAILED === "1"
 const CDP_PORT = 9222
 const REFRESH_TOKEN = "synthetic-refresh-token"
+const SYNTHETIC_BYOK_KEY = "synthetic-deepseek-key"
 const DRAFT = "draft survives token rotation"
 const MAX_WAIT_MS = 25_000
 
@@ -108,7 +134,7 @@ const scenarios: Scenario[] = [
     screenshot: true,
   },
   { id: "invalid-401", samples: 1, auth: "expired", refresh: { delayMs: 20, status: 401 }, waitForRefreshEnd: true },
-  { id: "byok-only", samples: 1, auth: "none", screenshot: true },
+  { id: "byok-only", samples: 5, auth: "none", screenshot: true, modelSetProbe: true },
   { id: "hot-renderer", samples: 1, auth: "ready", hotReloads: 5 },
   {
     id: "long-session-two-ttl",
@@ -116,6 +142,14 @@ const scenarios: Scenario[] = [
     auth: "ready",
     refresh: { delayMs: 50, status: 200 },
     longSessionRotations: 2,
+  },
+  {
+    id: "idle-renewal-continuity",
+    samples: 1,
+    auth: "ready",
+    refresh: { delayMs: 50, status: 200 },
+    idleRenewal: true,
+    screenshot: true,
   },
   {
     id: "active-stream-rotation",
@@ -231,8 +265,24 @@ const loopback = Bun.serve({
         )
       return Response.json(tokenResponse(`renewed-${current?.sample ?? 0}-${current?.refreshCount ?? 0}`))
     }
-    if (url.pathname === "/v1/models") return Response.json(catalog)
-    if (url.pathname === "/v1/account/summary") return Response.json(accountSummary)
+    if (url.pathname === "/v1/models") {
+      serverFacts.push({
+        scenario: current?.scenario,
+        sample: current?.sample,
+        request: "catalog",
+        credentialGeneration: credentialGeneration(request),
+      })
+      return Response.json(catalog)
+    }
+    if (url.pathname === "/v1/account/summary") {
+      serverFacts.push({
+        scenario: current?.scenario,
+        sample: current?.sample,
+        request: "account",
+        credentialGeneration: credentialGeneration(request),
+      })
+      return Response.json(accountSummary)
+    }
     if (url.pathname.endsWith("/chat/completions") && request.method === "POST") {
       const body = (await request.json().catch(() => ({}))) as {
         messages?: Array<{ role?: string; content?: unknown }>
@@ -294,8 +344,16 @@ function authPayload(kind: "expired" | "ready") {
   const expiresAt =
     kind === "expired"
       ? now - 1_000
-      : now + (current?.scenario === "active-stream-rotation" || longSession ? 31_000 : 900_000)
-  const lifetimeMs = current?.scenario === "active-stream-rotation" ? 60_000 : longSession ? 45_000 : 900_000
+      : now +
+        (current?.scenario === "active-stream-rotation" || current?.scenario === "idle-renewal-continuity" || longSession
+          ? 31_000
+          : 900_000)
+  const lifetimeMs =
+    current?.scenario === "active-stream-rotation" || current?.scenario === "idle-renewal-continuity"
+      ? 60_000
+      : longSession
+        ? 45_000
+        : 900_000
   return {
     v: 1,
     plain: JSON.stringify({
@@ -440,6 +498,20 @@ function percentile95(values: number[]) {
   return sorted[Math.max(0, Math.ceil(sorted.length * 0.95) - 1)]
 }
 
+function modelSetFingerprint(value: unknown) {
+  const body = value && typeof value === "object" ? (value as { data?: unknown }).data : undefined
+  const nested = body && typeof body === "object" ? (body as { data?: unknown }).data : undefined
+  const models = (Array.isArray(value) ? value : Array.isArray(body) ? body : Array.isArray(nested) ? nested : []) as Array<{
+    id?: unknown
+    providerID?: unknown
+  }>
+  const identities = models.map((model) => `${String(model.providerID ?? "")}/${String(model.id ?? "")}`).sort()
+  return {
+    count: identities.length,
+    sha256: createHash("sha256").update(JSON.stringify(identities)).digest("hex"),
+  }
+}
+
 async function stopOwned(
   proc: ReturnType<typeof Bun.spawn>,
   appPid: number | undefined,
@@ -498,6 +570,7 @@ async function runOne(scenario: Scenario, sample: number): Promise<RunResult> {
       ALPHA_ACCOUNT_URL: BASE,
       ALPHA_CLOUD_URL: BASE,
       ALPHA_MCP_URL: `${BASE}/mcp`,
+      ...(scenario.modelSetProbe ? { DEEPSEEK_API_KEY: SYNTHETIC_BYOK_KEY } : {}),
       NO_PROXY: "127.0.0.1,localhost",
       no_proxy: "127.0.0.1,localhost",
     },
@@ -558,6 +631,46 @@ async function runOne(scenario: Scenario, sample: number): Promise<RunResult> {
       }
     })
 
+    let modelSet: RunResult["modelSet"]
+    if (scenario.modelSetProbe) {
+      const init = await cdp.eval<{ url: string; username: string | null; password: string | null }>(
+        "window.api.awaitInitialization()",
+      )
+      const first = modelSetFingerprint(await engineCall(init, "GET", "/api/model"))
+      const before = readTimeline(appRoot)
+      const mounts = before.filter((event) => event.name === "renderer.root.mount").length
+      const modelEnds = before.filter((event) => event.name === "renderer.home.model_list.end").length
+      await cdp.eval("location.reload()")
+      cdp.close()
+      cdp = await connectCdp()
+      const hotEvents = await waitFor(() => {
+        const next = readTimeline(appRoot)
+        return next.filter((event) => event.name === "renderer.root.mount").length > mounts &&
+          next.filter((event) => event.name === "renderer.home.model_list.end").length > modelEnds
+          ? next
+          : undefined
+      })
+      const hotInit = await cdp.eval<{ url: string; username: string | null; password: string | null }>(
+        "window.api.awaitInitialization()",
+      )
+      const hot = modelSetFingerprint(await engineCall(hotInit, "GET", "/api/model"))
+      modelSet = {
+        firstEventCount:
+          typeof ready.count === "number"
+            ? ready.count
+            : typeof hotEvents.filter((event) => event.name === "renderer.home.model_list.end").at(-1)?.count === "number"
+              ? Number(hotEvents.filter((event) => event.name === "renderer.home.model_list.end").at(-1)?.count)
+              : null,
+        firstCount: first.count,
+        firstSha256: first.sha256,
+        hotCount: hot.count,
+        hotSha256: hot.sha256,
+        equal: first.count === hot.count && first.sha256 === hot.sha256,
+        accountRequests: 0,
+        bearerRequests: 0,
+      }
+    }
+
     if (scenario.waitForRefreshEnd) {
       await waitFor(
         () => {
@@ -568,8 +681,120 @@ async function runOne(scenario: Scenario, sample: number): Promise<RunResult> {
       )
     }
 
+    let idleContinuity: RunResult["idleContinuity"]
     let interruption: RunResult["interruption"]
     let postRotationTurn: RunResult["postRotationTurn"]
+    if (scenario.idleRenewal) {
+      const init = await cdp.eval<{ url: string; username: string | null; password: string | null }>(
+        "window.api.awaitInitialization()",
+      )
+      const providers = (await engineCall(init, "GET", "/config/providers")) as {
+        providers: Array<{ id: string; options?: { baseURL?: string }; models?: Record<string, { id?: string }> }>
+      }
+      const provider = providers.providers.find((item) => String(item.options?.baseURL ?? "").startsWith(`${BASE}/v1`))
+      const model = Object.values(provider?.models ?? {}).find((item) => item.id)
+      if (!provider || !model?.id) throw new Error("synthetic platform provider/model missing")
+      const session = (await engineCall(init, "POST", "/session", { title: "#858 idle renewal continuity" })) as {
+        id: string
+      }
+      const href = `/server/${Buffer.from("sidecar").toString("base64url")}/session/${encodeURIComponent(session.id)}`
+      await cdp.eval(
+        `(() => { const a = document.createElement('a'); a.href = ${JSON.stringify(href)}; a.hidden = true; document.body.append(a); a.click(); a.remove(); return true })()`,
+      )
+      await waitFor(async () => {
+        try {
+          return (
+            (await cdp!.eval<boolean>(`Boolean(document.querySelector('[data-alpha-composer="session"] textarea'))`)) ||
+            undefined
+          )
+        } catch {
+          return undefined
+        }
+      }, 10_000)
+      await cdp.eval(
+        `(() => {
+          const textarea = document.querySelector('[data-alpha-composer="session"] textarea');
+          if (!textarea) return false;
+          const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
+          setter.call(textarea, ${JSON.stringify(DRAFT)});
+          textarea.dispatchEvent(new Event('input', { bubbles: true }));
+          return true;
+        })()`,
+      )
+      await waitFor(
+        () => readTimeline(appRoot).find((event) => event.name === "main.auth.refresh.start"),
+        45_000,
+      )
+      await cdp.eval(
+        `(() => {
+          const textarea = document.querySelector('[data-alpha-composer="session"] textarea');
+          if (!textarea) return false;
+          const initial = textarea.getBoundingClientRect();
+          const state = {
+            textarea,
+            initial: { x: initial.x, y: initial.y, width: initial.width, height: initial.height },
+            sameComposer: true,
+            syncingVisible: false,
+            maxLayoutDeltaPx: 0,
+            observations: 0,
+          };
+          const sample = () => {
+            const current = document.querySelector('[data-alpha-composer="session"] textarea');
+            const rect = textarea.getBoundingClientRect();
+            state.sameComposer &&= current === textarea && textarea.isConnected;
+            state.syncingVisible ||= document.body.innerText.includes('Syncing…') || document.body.innerText.includes('正在同步…');
+            state.maxLayoutDeltaPx = Math.max(
+              state.maxLayoutDeltaPx,
+              Math.abs(rect.x - state.initial.x),
+              Math.abs(rect.y - state.initial.y),
+              Math.abs(rect.width - state.initial.width),
+              Math.abs(rect.height - state.initial.height),
+            );
+            state.observations++;
+          };
+          state.sample = sample;
+          state.observer = new MutationObserver(sample);
+          state.observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+          state.interval = setInterval(sample, 16);
+          sample();
+          window.__alphaT7Continuity = state;
+          return true;
+        })()`,
+      )
+      await waitFor(
+        () =>
+          readTimeline(appRoot).find(
+            (event) =>
+              event.name === "main.sidecar.generation.emit" && event.reason === "token-only" && event.phase === "ready",
+          ),
+        20_000,
+      )
+      await sleep(250)
+      const observed = await cdp.eval<{
+        sameComposer: boolean
+        syncingVisible: boolean
+        maxLayoutDeltaPx: number
+        observations: number
+        draftPreserved: boolean
+      }>(`(() => {
+        const state = window.__alphaT7Continuity;
+        state.sample();
+        clearInterval(state.interval);
+        state.observer.disconnect();
+        return {
+          sameComposer: state.sameComposer,
+          syncingVisible: state.syncingVisible,
+          maxLayoutDeltaPx: state.maxLayoutDeltaPx,
+          observations: state.observations,
+          draftPreserved: state.textarea.value === ${JSON.stringify(DRAFT)},
+        };
+      })()`)
+      idleContinuity = {
+        ...observed,
+        layoutStable: observed.maxLayoutDeltaPx <= 1,
+        sessionID: session.id,
+      }
+    }
     if (scenario.activeStream) {
       const init = await cdp.eval<{ url: string; username: string | null; password: string | null }>(
         "window.api.awaitInitialization()",
@@ -696,6 +921,9 @@ async function runOne(scenario: Scenario, sample: number): Promise<RunResult> {
     const events = readTimeline(appRoot)
     const refreshStart = events.find((event) => event.name === "main.auth.refresh.start")
     const refreshEnd = events.find((event) => event.name === "main.auth.refresh.end")
+    const rotationRequested = events.find(
+      (event) => event.name === "main.auth.rotation" && event.reason === "renewal" && event.outcome === "requested",
+    )
     const readyEvents = events.filter(
       (event) => event.name === "main.sidecar.generation.emit" && event.phase === "ready",
     )
@@ -705,6 +933,14 @@ async function runOne(scenario: Scenario, sample: number): Promise<RunResult> {
       : undefined
     const rawTimeline = timelineFile(appRoot) ? readFileSync(timelineFile(appRoot)!, "utf8") : ""
     const authFile = join(appRoot, "desktop", "alpha-auth.json")
+    if (modelSet) {
+      const facts = serverFacts.filter((fact) => fact.scenario === scenario.id && fact.sample === sample)
+      modelSet.accountRequests = facts.filter((fact) => fact.request === "account").length
+      modelSet.bearerRequests = facts.filter(
+        (fact) =>
+          (fact.request === "account" || fact.request === "catalog") && fact.credentialGeneration !== "missing",
+      ).length
+    }
     const result: RunResult = {
       scenario: scenario.id,
       sample,
@@ -722,6 +958,9 @@ async function runOne(scenario: Scenario, sample: number): Promise<RunResult> {
       auth,
       unavailableVisible,
       readyRetryMs: retryAfterReady && tokenReady ? retryAfterReady.t - tokenReady.t : undefined,
+      rotationReadyMs: rotationRequested && tokenReady ? tokenReady.t - rotationRequested.t : undefined,
+      modelSet,
+      idleContinuity,
       interruption,
       postRotationTurn,
       secretHygiene: {
@@ -741,6 +980,9 @@ async function runOne(scenario: Scenario, sample: number): Promise<RunResult> {
         tokenInRendererSurface: [jwt("model.invoke", "seed"), REFRESH_TOKEN].some((secret) =>
           rendererSurface.includes(secret),
         ),
+        byokKeyInTimeline: rawTimeline.includes(SYNTHETIC_BYOK_KEY),
+        byokKeyInAuthState: JSON.stringify(auth).includes(SYNTHETIC_BYOK_KEY),
+        byokKeyInRendererSurface: rendererSurface.includes(SYNTHETIC_BYOK_KEY),
       },
       events: events.filter((event) =>
         [
@@ -786,6 +1028,7 @@ async function runOne(scenario: Scenario, sample: number): Promise<RunResult> {
             .join("\n")
             .replace(/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, "[REDACTED_JWT]")
             .replaceAll(REFRESH_TOKEN, "[REDACTED_REFRESH_TOKEN]")
+            .replaceAll(SYNTHETIC_BYOK_KEY, "[REDACTED_SYNTHETIC_BYOK_KEY]")
           console.error(`[diagnostic] ${name}\n${tail}`)
         }
       }

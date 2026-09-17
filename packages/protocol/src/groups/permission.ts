@@ -4,9 +4,10 @@ import { Permission } from "@opencode-ai/schema/permission"
 import { PermissionSaved } from "@opencode-ai/schema/permission-saved"
 import { Project } from "@opencode-ai/schema/project"
 import { Session } from "@opencode-ai/schema/session"
+import { ToolPolicyInventoryV1 } from "@opencode-ai/schema/alpha-tool-inventory"
 import { Context, Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup, HttpApiMiddleware, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
-import { ConflictError, PermissionNotFoundError, SessionNotFoundError } from "../errors"
+import { ConflictError, PermissionNotFoundError, ServiceUnavailableError, SessionNotFoundError } from "../errors"
 import { LocationQuery, locationQueryOpenApi } from "./location"
 
 export const makePermissionGroup = <
@@ -54,6 +55,22 @@ export const makePermissionGroup = <
           identifier: "v2.permission.saved.remove",
           summary: "Remove saved permission",
           description: "Remove a saved permission by ID.",
+        }),
+      ),
+    )
+    // REQ-131 / #1130(路线 B 探针):live tool policy inventory 的只读出口。挂在 location 中间件
+    // 之前 ⇒ 走与 permission.saved.list 相同的 location 解析(x-opencode-directory / location[directory])。
+    // 引擎侧未接线时 503(fail-closed),不返回空清单。
+    .add(
+      HttpApiEndpoint.get("permission.tool-inventory.list", "/api/permission/tool-inventory", {
+        success: Schema.Struct({ data: ToolPolicyInventoryV1 }),
+        error: ServiceUnavailableError,
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "v2.permission.tool-inventory.list",
+          summary: "List tool policy inventory",
+          description:
+            "Live tool inventory (builtin / plugin / host / MCP) with effective policy state for the location's engine instance.",
         }),
       ),
     )

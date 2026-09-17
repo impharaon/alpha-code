@@ -19,7 +19,9 @@
 // 返回值先过 `parseToolPolicyInventory`(schema decode)再交出:引擎侧形状漂移 loud fail,
 // 不让 Settings 拿到解释不了的对象。
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { AlphaToolInventory as CoreInventory } from "@opencode-ai/core/permission/alpha-tool-inventory"
 import { Context, Effect, Layer } from "effect"
+import { InstanceStore } from "@/project/instance-store"
 import { canonicalToolIdentity, type ToolAuthority, type ToolIdentity } from "@opencode-ai/schema/tool-identity"
 import {
   classifyTool,
@@ -244,5 +246,29 @@ export const node = LayerNode.make({
   layer,
   deps: [ToolRegistry.node, MCP.node, Config.node, AlphaToolPolicy.node],
 })
+
+// ── #1130 路线 B 探针:core 侧标签(`@opencode/v2/AlphaToolInventory`)的实现 ──────────────
+// v2 permission handler(packages/server,ADR-033 收编)通过 core 标签取 inventory;它跑在
+// location 中间件下、没有 InstanceRef,所以这里按 directory 用 InstanceStore.provide 注入实例
+// 上下文再跑本文件的 list()。与上游 plugin/pty-environment.ts 对 PtyEnvironment 的做法同形。
+export const bridge = Layer.effect(
+  CoreInventory.Service,
+  Effect.gen(function* () {
+    const instances = yield* InstanceStore.Service
+    const inventory = yield* Service
+    return CoreInventory.Service.of({
+      list: Effect.fn("AlphaToolInventory.bridge.list")(function* (input) {
+        return yield* instances.provide({ directory: input.directory }, inventory.list())
+      }),
+    })
+  }),
+)
+
+/**
+ * 供 `app` 组里某个已收编的顶层 node 合成暴露(探针宿主 = SessionPrompt.node,见 session/prompt.ts)。
+ * 输出 = core 标签;依赖 = 本 node 的四个依赖 + InstanceStore。
+ * 不能在这里造 node 挂进 server.ts 的 `app` 组 —— 那是上游文件(不在 ADR-033 名单里)。
+ */
+export const exposed = bridge.pipe(Layer.provide(layer))
 
 export * as AlphaToolInventory from "./alpha-tool-inventory"

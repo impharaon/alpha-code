@@ -35,6 +35,8 @@ import { Tool } from "@/tool/tool"
 import { Permission } from "@/permission"
 import { AlphaToolPolicy } from "@/permission/alpha-tool-policy"
 import { AlphaToolPolicyGate } from "@/permission/alpha-tool-policy-gate"
+import { AlphaToolInventory } from "@/permission/alpha-tool-inventory"
+import { InstanceStore } from "@/project/instance-store"
 import { SessionStatus } from "./status"
 import { LLM } from "./llm"
 import { Shell } from "@opencode-ai/core/shell"
@@ -1641,9 +1643,19 @@ const argsRegex = /(?:\[Image\s+\d+\]|"[^"]*"|'[^']*'|[^\s"']+)/gi
 const placeholderRegex = /\$(\d+)/g
 const quoteTrimRegex = /^["']|["']$/g
 
+// ── #1130 路线 B 探针:把 core 标签 `@opencode/v2/AlphaToolInventory` 从这个顶层 node 合成暴露 ──
+// v2 handlers 能看见的上下文只有两种来源:core 的 location services(location-services.ts,上游)
+// 与 httpapi/server.ts `app` 组的**顶层**成员(LayerNode.compile 对依赖用 Layer.provide、只对顶层用
+// provideMerge)。两处都是上游文件;本文件是 `app` 组顶层成员里已收编(#1011)且依赖面已含
+// ToolRegistry / MCP / Config / AlphaToolPolicy 的那个,所以探针把合成放在这里。
+// Layer.suspend 是必需的:tool/registry → tool/task → session/prompt → alpha-tool-inventory → tool/registry
+// 构成 ESM 环,顶层直接取 `AlphaToolInventory.exposed` 在 inventory 先被加载时会撞 TDZ。
 export const node = LayerNode.make({
   service: Service,
-  layer: layer,
+  layer: Layer.mergeAll(
+    layer,
+    Layer.suspend(() => AlphaToolInventory.exposed),
+  ),
   deps: [
     SessionStatus.node,
     Session.node,
@@ -1672,6 +1684,7 @@ export const node = LayerNode.make({
     EventV2Bridge.node,
     RuntimeFlags.node,
     Database.node,
+    InstanceStore.node,
   ],
 })
 

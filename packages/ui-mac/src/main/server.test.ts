@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events"
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join, parse, resolve } from "node:path"
+import { mockElectron } from "../../test-component/electron-mock"
 
 class FakeChild extends EventEmitter {
   stdout = new EventEmitter()
@@ -21,7 +22,7 @@ class FakeChild extends EventEmitter {
 const appEvents = new EventEmitter()
 const forkCalls: Array<{ file: string; args: string[]; options: Record<string, unknown> }> = []
 
-mock.module("electron", () => ({
+mockElectron(() => ({
   app: {
     isPackaged: false,
     on: appEvents.on.bind(appEvents),

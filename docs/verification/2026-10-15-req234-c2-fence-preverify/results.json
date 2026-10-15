@@ -1,0 +1,2455 @@
+{
+  "summary": {
+    "passed": true
+  },
+  "run": "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo",
+  "profiles": {
+    "original": "(version 1)\n(allow default)\n(deny file-write*)\n(allow file-write*\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/code-puppy\")                                  ; W1\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod\")                          ; W2\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop\")                             ; W3\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.local/share/opencode\")               ; W4\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.cache/opencode\")               ; W5\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode\")               ; W6\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.npm\")                                ; W7\n  (regex #\"^/Users/tide/app/alpha-code/\\.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/\\.zsh_history\")                       ; W8\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.zsh_sessions\")                       ; W10\n  (regex #\"^/Users/tide/app/alpha-code/\\.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/\\.zcompdump\")                         ; W19\n  (subpath \"/private/tmp\")                               ; W11\n  (subpath \"/private/var/folders\")                       ; W12\n  (literal \"/dev/null\") (literal \"/dev/stdout\") (literal \"/dev/stderr\")   ; W13\n  (literal \"/dev/tty\") (regex #\"^/dev/fd/\")              ; W14\n  (literal \"/dev/ptmx\") (regex #\"^/dev/ttys\")            ; W15\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode\")                           ; W16\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Caches/bun\")                  ; W17\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.cache/bun\")                       ; W18\n)\n(deny network*)                                          ; N1 出网默认全拒(含 DNS 的 unix socket,Q2)\n(allow network-bind (local ip \"localhost:*\"))             ; N2 sidecar 自己的 HTTP 服务器要 bind\n(allow network-inbound (local ip \"localhost:*\"))          ; N3 …还要 accept —— 缺它 listen() EPERM(Q1.1)\n(allow network-outbound (remote ip \"localhost:18402\"))     ; N4 唯一出口:loopback 上的策略代理(main 进程内)\n",
+    "restricted": "(version 1)\n(allow default)\n(deny file-write*)\n(allow file-write*\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/code-puppy\")                                  ; W1\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod\")                          ; W2\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop\")                             ; W3\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.local/share/opencode\")               ; W4\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.cache/opencode\")               ; W5\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode\")               ; W6\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.npm\")                                ; W7\n  (regex #\"^/Users/tide/app/alpha-code/\\.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/\\.zsh_history\")                       ; W8\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.zsh_sessions\")                       ; W10\n  (regex #\"^/Users/tide/app/alpha-code/\\.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/\\.zcompdump\")                         ; W19\n  (subpath \"/private/tmp\")                               ; W11\n  (subpath \"/private/var/folders\")                       ; W12\n  (literal \"/dev/null\") (literal \"/dev/stdout\") (literal \"/dev/stderr\")   ; W13\n  (literal \"/dev/tty\") (regex #\"^/dev/fd/\")              ; W14\n  (literal \"/dev/ptmx\") (regex #\"^/dev/ttys\")            ; W15\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode\")                           ; W16\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Caches/bun\")                  ; W17\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.cache/bun\")                       ; W18\n)\n(deny file-write* (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/alpha.jsonc\"))\n(deny file-write* (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugin\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugins\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugin\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugins\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins\"))\n(deny network*)                                          ; N1 出网默认全拒(含 DNS 的 unix socket,Q2)\n(allow network-bind (local ip \"localhost:*\"))             ; N2 sidecar 自己的 HTTP 服务器要 bind\n(allow network-inbound (local ip \"localhost:*\"))          ; N3 …还要 accept —— 缺它 listen() EPERM(Q1.1)\n(allow network-outbound (remote ip \"localhost:18402\"))     ; N4 唯一出口:loopback 上的策略代理(main 进程内)\n"
+  },
+  "output": [
+    {
+      "name": "compile-two-denies",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/usr/bin/true"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "original-echo:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo probe >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/alpha.jsonc"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-echo:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo probe >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/alpha.jsonc"
+      ],
+      "status": 1,
+      "stdout": "",
+      "stderr": "--: /Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/alpha.jsonc: Operation not permitted"
+    },
+    {
+      "name": "original-echo:.opencode/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo probe >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugin/x.js"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-echo:.opencode/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo probe >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugin/x.js"
+      ],
+      "status": 1,
+      "stdout": "",
+      "stderr": "--: /Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugin/x.js: Operation not permitted"
+    },
+    {
+      "name": "original-echo:.opencode/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo probe >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugins/x.js"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-echo:.opencode/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo probe >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugins/x.js"
+      ],
+      "status": 1,
+      "stdout": "",
+      "stderr": "--: /Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugins/x.js: Operation not permitted"
+    },
+    {
+      "name": "original-echo:.config/opencode/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo probe >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugin/x.js"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-echo:.config/opencode/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo probe >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugin/x.js"
+      ],
+      "status": 1,
+      "stdout": "",
+      "stderr": "--: /Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugin/x.js: Operation not permitted"
+    },
+    {
+      "name": "original-echo:.config/opencode/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo probe >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugins/x.js"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-echo:.config/opencode/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo probe >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugins/x.js"
+      ],
+      "status": 1,
+      "stdout": "",
+      "stderr": "--: /Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugins/x.js: Operation not permitted"
+    },
+    {
+      "name": "original-echo:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo probe >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-echo:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo probe >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js"
+      ],
+      "status": 1,
+      "stdout": "",
+      "stderr": "--: /Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js: Operation not permitted"
+    },
+    {
+      "name": "original-echo:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo probe >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-echo:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo probe >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js"
+      ],
+      "status": 1,
+      "stdout": "",
+      "stderr": "--: /Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js: Operation not permitted"
+    },
+    {
+      "name": "original-append:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "append",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"append\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-append:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "append",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"append\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"open\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-create:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "create",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"create\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-create:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "create",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"create\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"open\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-truncate:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "truncate",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"truncate\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-truncate:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "truncate",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"truncate\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"open\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-unlink:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "unlink",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"unlink\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-unlink:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "unlink",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"unlink\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"unlink\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-rename:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "rename",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"rename\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-rename:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "rename",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"rename\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"rename\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-append:.opencode/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "append",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"append\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-append:.opencode/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "append",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"append\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"open\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-create:.opencode/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "create",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"create\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-create:.opencode/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "create",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"create\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"open\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-truncate:.opencode/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "truncate",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"truncate\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-truncate:.opencode/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "truncate",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"truncate\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"open\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-unlink:.opencode/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "unlink",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"unlink\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-unlink:.opencode/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "unlink",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"unlink\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"unlink\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-rename:.opencode/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "rename",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"rename\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-rename:.opencode/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "rename",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"rename\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"rename\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-append:.opencode/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "append",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"append\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-append:.opencode/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "append",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"append\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"open\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-create:.opencode/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "create",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"create\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-create:.opencode/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "create",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"create\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"open\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-truncate:.opencode/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "truncate",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"truncate\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-truncate:.opencode/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "truncate",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"truncate\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"open\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-unlink:.opencode/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "unlink",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"unlink\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-unlink:.opencode/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "unlink",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"unlink\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"unlink\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-rename:.opencode/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "rename",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"rename\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-rename:.opencode/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "rename",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"rename\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"rename\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-append:.config/opencode/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "append",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"append\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-append:.config/opencode/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "append",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"append\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"open\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-create:.config/opencode/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "create",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"create\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-create:.config/opencode/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "create",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"create\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"open\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-truncate:.config/opencode/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "truncate",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"truncate\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-truncate:.config/opencode/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "truncate",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"truncate\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"open\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-unlink:.config/opencode/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "unlink",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"unlink\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-unlink:.config/opencode/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "unlink",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"unlink\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"unlink\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-rename:.config/opencode/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "rename",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"rename\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-rename:.config/opencode/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "rename",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"rename\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"rename\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-append:.config/opencode/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "append",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"append\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-append:.config/opencode/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "append",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"append\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"open\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-create:.config/opencode/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "create",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"create\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-create:.config/opencode/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "create",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"create\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"open\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-truncate:.config/opencode/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "truncate",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"truncate\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-truncate:.config/opencode/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "truncate",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"truncate\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"open\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-unlink:.config/opencode/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "unlink",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"unlink\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-unlink:.config/opencode/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "unlink",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"unlink\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"unlink\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-rename:.config/opencode/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "rename",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"rename\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-rename:.config/opencode/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "rename",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"rename\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"rename\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-append:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "append",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"append\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-append:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "append",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"append\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"open\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "create",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"create\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "create",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"create\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"open\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-truncate:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "truncate",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"truncate\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-truncate:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "truncate",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"truncate\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"open\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-unlink:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "unlink",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"unlink\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-unlink:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "unlink",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"unlink\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"unlink\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-rename:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "rename",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"rename\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-rename:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "rename",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"rename\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"rename\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-append:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "append",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"append\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-append:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "append",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"append\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"open\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "create",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"create\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "create",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"create\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"open\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-truncate:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "truncate",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"truncate\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-truncate:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "truncate",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"truncate\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"open\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-unlink:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "unlink",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"unlink\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-unlink:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "unlink",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"unlink\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"unlink\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-rename:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "rename",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"rename\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-rename:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "rename",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/replacement.tmp"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"rename\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"rename\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-mkdir:.opencode/plugin",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "mkdir",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugin"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"mkdir\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-mkdir:.opencode/plugin",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "mkdir",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugin"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"mkdir\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"mkdir\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-mkdir:.opencode/plugins",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "mkdir",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugins"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"mkdir\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-mkdir:.opencode/plugins",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "mkdir",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugins"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"mkdir\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"mkdir\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-mkdir:.config/opencode/plugin",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "mkdir",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugin"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"mkdir\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-mkdir:.config/opencode/plugin",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "mkdir",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugin"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"mkdir\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"mkdir\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-mkdir:.config/opencode/plugins",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "mkdir",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugins"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"mkdir\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-mkdir:.config/opencode/plugins",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "mkdir",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugins"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"mkdir\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"mkdir\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-mkdir:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "mkdir",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"mkdir\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-mkdir:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "mkdir",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"mkdir\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"mkdir\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-mkdir:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "mkdir",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"mkdir\",\"code\":\"OK\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-mkdir:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "mkdir",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"mkdir\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"mkdir\"}",
+      "stderr": ""
+    },
+    {
+      "name": "original-allow:W1",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/code-puppy/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-allow:W1",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/code-puppy/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "original-allow:W2",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/skills/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-allow:W2",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/skills/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "original-allow:literal-sibling",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/alpha.jsonc.bak"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-allow:literal-sibling",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/alpha.jsonc.bak"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "original-allow:W3",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/opencode/locks/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-allow:W3",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/opencode/locks/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "original-allow:W4",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.local/share/opencode/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-allow:W4",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.local/share/opencode/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "original-allow:W5",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.cache/opencode/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-allow:W5",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.cache/opencode/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "original-allow:W6",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/node_modules/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-allow:W6",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/node_modules/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "original-allow:W7",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.npm/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-allow:W7",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.npm/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "original-allow:W8",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.zsh_history.new"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-allow:W8",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.zsh_history.new"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "original-allow:W10",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.zsh_sessions/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-allow:W10",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.zsh_sessions/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "original-allow:W11",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/private/tmp/alpha-1530-215huw/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-allow:W11",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/private/tmp/alpha-1530-215huw/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "original-allow:W12",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/private/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/alpha-1530-cgoEN4/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-allow:W12",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/private/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/alpha-1530-cgoEN4/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "original-allow:W16",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/opencode.jsonc"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-allow:W16",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/opencode.jsonc"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "original-allow:W17",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Caches/bun/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-allow:W17",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Caches/bun/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "original-allow:W18",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.cache/bun/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-allow:W18",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.cache/bun/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "original-allow:W19",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.zcompdump-probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-allow:W19",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.zcompdump-probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "original-allow:config-sibling-0",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/opencode.json"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-allow:config-sibling-0",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/opencode.json"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "original-allow:plugin-prefix-sibling-0",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugins-extra/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-allow:plugin-prefix-sibling-0",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugins-extra/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "original-allow:config-sibling-1",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/opencode.json"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-allow:config-sibling-1",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/opencode.json"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "original-allow:plugin-prefix-sibling-1",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugins-extra/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-allow:plugin-prefix-sibling-1",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugins-extra/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "original-allow:config-sibling-2",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-allow:config-sibling-2",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "original-allow:plugin-prefix-sibling-2",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins-extra/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-allow:plugin-prefix-sibling-2",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo control >> \"$1\"",
+        "--",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins-extra/probe"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "original-read-protected",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/cat",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js"
+      ],
+      "status": 0,
+      "stdout": "sentinel\n// sentinel\n// sentinel\n// sentinel\n// sentinel\n// sentinel\n// sentinel",
+      "stderr": ""
+    },
+    {
+      "name": "original-allow:W13",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/bin/sh",
+        "-c",
+        "echo null >/dev/null; echo stdout >/dev/stdout; echo stderr >/dev/stderr"
+      ],
+      "status": 0,
+      "stdout": "stdout",
+      "stderr": "stderr"
+    },
+    {
+      "name": "original-allow:W14-W15",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/usr/bin/script",
+        "-q",
+        "/dev/null",
+        "/bin/sh",
+        "-c",
+        "echo tty >/dev/tty; echo fd >/dev/fd/1"
+      ],
+      "status": 0,
+      "stdout": "^D\b\btty\r\nfd",
+      "stderr": ""
+    },
+    {
+      "name": "original-allow:N2-N3-listen",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "-e",
+        "const server = require(\"node:net\").createServer(); server.listen(0, \"127.0.0.1\", () => { console.log(\"listen OK\"); server.close() })"
+      ],
+      "status": 0,
+      "stdout": "listen OK",
+      "stderr": ""
+    },
+    {
+      "name": "original-allow:N4-connect",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/usr/bin/nc",
+        "-z",
+        "-w",
+        "1",
+        "127.0.0.1",
+        "18402"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": "Connection to 127.0.0.1 port 18402 [tcp/*] succeeded!"
+    },
+    {
+      "name": "original-outside-denied",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/original.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "create",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/outside"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"create\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"open\"}",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-read-protected",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/cat",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.opencode/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/.config/opencode/plugins/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x.js",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x.js"
+      ],
+      "status": 0,
+      "stdout": "sentinel\n// sentinel\n// sentinel\n// sentinel\n// sentinel\n// sentinel\n// sentinel",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-allow:W13",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/bin/sh",
+        "-c",
+        "echo null >/dev/null; echo stdout >/dev/stdout; echo stderr >/dev/stderr"
+      ],
+      "status": 0,
+      "stdout": "stdout",
+      "stderr": "stderr"
+    },
+    {
+      "name": "two-denies-allow:W14-W15",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/usr/bin/script",
+        "-q",
+        "/dev/null",
+        "/bin/sh",
+        "-c",
+        "echo tty >/dev/tty; echo fd >/dev/fd/1"
+      ],
+      "status": 0,
+      "stdout": "^D\b\btty\r\nfd",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-allow:N2-N3-listen",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "-e",
+        "const server = require(\"node:net\").createServer(); server.listen(0, \"127.0.0.1\", () => { console.log(\"listen OK\"); server.close() })"
+      ],
+      "status": 0,
+      "stdout": "listen OK",
+      "stderr": ""
+    },
+    {
+      "name": "two-denies-allow:N4-connect",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/usr/bin/nc",
+        "-z",
+        "-w",
+        "1",
+        "127.0.0.1",
+        "18402"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": "Connection to 127.0.0.1 port 18402 [tcp/*] succeeded!"
+    },
+    {
+      "name": "two-denies-outside-denied",
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-f",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/restricted.sb",
+        "/Users/tide/.bun/bin/bun",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fs-probe.mjs",
+        "create",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/home/outside"
+      ],
+      "status": 0,
+      "stdout": "{\"action\":\"create\",\"code\":\"EPERM\",\"errno\":-1,\"syscall\":\"open\"}",
+      "stderr": ""
+    },
+    {
+      "name": "unfenced-electron-main",
+      "command": [
+        "/Users/tide/app/alpha-code/node_modules/.bun/electron@42.3.3+759ce506b1ed1a42/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/main-probe.cjs",
+        "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-7OZQPo/main-input.json"
+      ],
+      "status": 0,
+      "stdout": "{\"processType\":\"browser\",\"electron\":\"42.3.3\",\"append\":7,\"configApply\":\"OK\",\"configRestore\":\"OK\",\"catalogId\":\"mcp:markitdown\"}",
+      "stderr": ""
+    }
+  ]
+}

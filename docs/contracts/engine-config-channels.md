@@ -4,8 +4,8 @@ kind: contract
 status: active
 owners:
   - alpha-code maintainers
-last_reviewed: 2026-09-17
-review_after: 2026-12-17
+last_reviewed: 2026-10-16
+review_after: 2027-01-16
 ---
 
 # 引擎配置通道契约(v1/v2 双代)
@@ -29,24 +29,26 @@ review_after: 2026-12-17
 
 ## alpha 的注入方案:单一真源、双投影
 
-sidecar fork 时(`packages/ui-mac/src/main/sidecar.ts` → `prepareSidecarEnv` 调用
-`packages/ui-mac/src/main/alpha-config-injection.ts` 的 `injectAlphaConfig`;#607 把注入
-组合体从 sidecar.ts 抽出成独立模块,**只为让它可被测试真实执行** —— sidecar.ts 的首个
-import 是 bun 未实现的 `node:module` registerHooks,顶层还有 `getParentPort()`),
-同一个 config 对象(平台 provider + BYOK 节点 + 权限 + MCP + disabled 覆盖,源自
-`alpha-models.json` + live allowlist + 钥匙串)一次产出、两路投影:
+主程序 `server.ts` 在同步密钥文件并构造 sidecar env 后、fork 前,调用
+`engine-config-materialize.ts` 的 `materializeEngineConfig`。模型配置来自同一个
+`buildAlphaModelConfig`(平台 provider + BYOK / 自定义节点,源自 `alpha-models.json`、
+live allowlist 与主程序保存的凭据引用)。两代配置分别交给各自的原生入口:
 
-1. **v1**:`OPENCODE_CONFIG_CONTENT = JSON.stringify(config)`(原行为,密钥经
-   `{file:}` 引用,fork 前由 main `syncSecretFiles` 物化)。
-2. **v2**:`materializeV2EngineConfig` 物化 `<userData>/alpha-engine-config/`:
-   - `opencode.json` ← alpha.jsonc 原样拷贝(用户自定义节点;先加载);
-   - `opencode.jsonc` ← 注入配置的 `{ $schema, model, provider }` 子集,
+1. **v1**:主程序在 alpha.jsonc 缺席时 seed `{$schema}`,并把 `OPENCODE_CONFIG`
+   写入传给子进程的 env。fork 后 sidecar 的 `injectAlphaConfig` 组合模型、权限、MCP
+   等配置,写出 `OPENCODE_CONFIG_CONTENT = JSON.stringify(config)`;密钥仍经
+   `{file:}` 引用,fork 前由 main `syncSecretFiles` 物化。
+2. **v2**:主程序物化 `<userData>/alpha-engine-config/`:
+   - `opencode.json` ← alpha.jsonc 去掉 `provider` 键后的拷贝(先加载);
+   - `opencode.jsonc` ← 模型配置的 `{ $schema, model, provider }` 子集,
      **剥除 apiKey**(v2 无变量解析,catalog 可用性判定走 no-integration 路径
      也不需要 key);后加载,压过用户同名项;
-   - 设 `OPENCODE_CONFIG_DIR` 指向该目录。桥失败不自吞(#613 R1):picker 只经 v2
-     目录读模型,丢 v2 = alpha/BYOK 模型全灰(票面事故症状),不是可忽略的局部降级
-     —— 桥内不设 catch,抛错经 `injectAlphaConfig` 外层 catch 以 `{ok:false}` 上报。
-     桥排在 v1 env 写出**之后**,抛错不撤销已就位的 v1 注入(顺序由反向闸门锁死)。
+   - 把 `OPENCODE_CONFIG_DIR` 写入传给子进程的 env,指向该目录。
+
+seed 或 v2 投影写入失败即抛错,由 `server.ts` 记录原因并拒绝 fork,不把半成品交给引擎。
+sidecar 不再写 seed / v2 投影;主程序物化时只更新待传递的 env,不改主程序自身的
+`process.env`。原有 `ALPHA_JSONC_TRUTH_DISABLE` / `ALPHA_LEGACY_INSTALL_ROOT`
+逃生语义保持不变。
 
 v2 catalog 的配置文件就位不等于每个 directory 的内存 catalog 已经收敛。`PluginInternal`
 在后台依次装载 models.dev、provider、用户配置与 variant transform;中途读取曾把 6,132 行

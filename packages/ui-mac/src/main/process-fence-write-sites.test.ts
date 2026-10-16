@@ -152,6 +152,7 @@ test("AC3 已存在目录 recursive mkdir;macOS 生产围栏允许同一操作�
     const profile = renderProcessFenceProfile({ workspaces: [workspace], alphaGlobalRoot: global, userDataPath: userData, stateHome: userData, roots, egressProxyPort: 4443 })
     const pkg = dirname(createRequire(import.meta.url).resolve("electron/package.json"))
     const electron = join(pkg, "dist", readFileSync(join(pkg, "path.txt"), "utf8").trim())
+    if (!existsSync(electron)) throw new Error(`electron binary missing at ${electron}(本次测量作废)`)
     const run = (target: string) => Bun.spawnSync(["/usr/bin/sandbox-exec", "-p", profile, electron, "-e", 'require("node:fs").mkdirSync(process.argv[1], {recursive:true})', target], { env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } })
     targets.forEach((target) => expect(run(target).exitCode).toBe(0))
     const outside = join(root, "outside")

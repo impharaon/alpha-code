@@ -598,8 +598,8 @@ describe("createSidecarEnv — container-valued vars", () => {
   // undefined in bun 1.3.14 — and behind it sidecar.ts:84 calls getParentPort() at top level, which
   // throws outside a utility process. No test in this repo imports sidecar.ts for that reason.
   test("forwards the env INPUTS alpha's injection reads (not a gate on the injection succeeding)", () => {
-    // injectAlphaConfig sets OPENCODE_CONFIG itself (sidecar.ts:170) and materializeV2EngineConfig
-    // sets OPENCODE_CONFIG_DIR; both are PATHS, not secret containers. Closing exactly one channel
+    // Main materializeEngineConfig sets OPENCODE_CONFIG and OPENCODE_CONFIG_DIR before fork;
+    // both are PATHS, not secret containers. Closing exactly one channel
     // must not close the family.
     const env = createSidecarEnv({
       OPENCODE_CONFIG: "/Users/u/.alpha/alpha.jsonc",

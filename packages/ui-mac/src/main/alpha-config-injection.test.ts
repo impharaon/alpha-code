@@ -174,14 +174,15 @@ function assertInjectedFacts(content: string | undefined, userDataPath: string):
 function materializeInMain() {
   const env: Record<string, string> = process.env.OPENCODE_MODELS_PATH ? { OPENCODE_MODELS_PATH: process.env.OPENCODE_MODELS_PATH } : {}
   materializeEngineConfig(userData, buildAlphaModelConfig(userData), env)
+  for (const key of ["OPENCODE_CONFIG", "OPENCODE_CONFIG_DIR", "OPENCODE_MODELS_PATH"]) delete process.env[key]
   Object.assign(process.env, env)
 }
 
 // Baseline is the actual pre-migration implementation, not a hand-written projection fixture.
 // It runs only against this suite's isolated paths and synthetic credentials.
-test("AC1 I4′ main 与 df79ab0ec sidecar 的三文件逐字节、三键逐值相同;seed 只补缺席", async () => {
+test("AC1 I4′ main 与 763d37186 sidecar 的三文件逐字节、三键逐值相同;seed 只补缺席", async () => {
   givenLoggedInWithByok()
-  const baseline = Bun.spawnSync(["git", "show", "df79ab0ec:packages/ui-mac/src/main/alpha-config-injection.ts"], { cwd: import.meta.dir })
+  const baseline = Bun.spawnSync(["git", "show", "763d37186:packages/ui-mac/src/main/alpha-config-injection.ts"], { cwd: import.meta.dir })
   expect(baseline.exitCode).toBe(0)
   const module = path.join(tmp, "baseline.ts")
   fs.symlinkSync(path.resolve(import.meta.dir, "../../node_modules"), path.join(tmp, "node_modules"), "dir")

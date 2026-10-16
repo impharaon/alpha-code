@@ -1,0 +1,5 @@
+{
+  "stdout": "",
+  "stderr": "App threw an error during load\nError [ERR_MODULE_NOT_FOUND]: Cannot find package 'jsonc-parser' imported from /Users/tide/app/alpha-code/.worktrees/256-evidence/docs/verification/2026-10-15-aw256-connector-evidence/.tmp-run-wrG1nT/install.mjs\n    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:301:9)\n    at packageResolve (node:internal/modules/esm/resolve:776:81)\n    at moduleResolve (node:internal/modules/esm/resolve:867:18)\n    at defaultResolve (node:internal/modules/esm/resolve:1000:11)\n    at #cachedDefaultResolve (node:internal/modules/esm/loader:697:20)\n    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:714:38)\n    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:746:52)\n    at #resolve (node:internal/modules/esm/loader:679:17)\n    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:599:35)\n    at ModuleJob.syncLink (node:internal/modules/esm/module_job:162:33)\n",
+  "status": 143
+}

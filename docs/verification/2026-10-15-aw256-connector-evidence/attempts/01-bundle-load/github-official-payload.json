@@ -1,0 +1,16 @@
+{
+  "behavior": {
+    "auth": "none",
+    "headersTemplate": {
+      "Authorization": "Bearer {GITHUB_PERSONAL_ACCESS_TOKEN}",
+      "X-MCP-Readonly": "true",
+      "X-MCP-Toolsets": "repos"
+    },
+    "officialRecipe": "github-remote-v1",
+    "requiredSecrets": [
+      "GITHUB_PERSONAL_ACCESS_TOKEN"
+    ],
+    "url": "https://api.githubcopilot.com/mcp/"
+  },
+  "schema": "alpha.host-extension-package.payload.mcp-remote.v1"
+}

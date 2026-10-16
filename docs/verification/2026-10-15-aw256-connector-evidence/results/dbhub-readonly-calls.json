@@ -1,0 +1,51 @@
+{
+  "startedAt": "2026-10-16T02:15:51.175Z",
+  "serverInfo": {
+    "name": "DBHub MCP Server",
+    "version": "1.5.0"
+  },
+  "calls": [
+    {
+      "request": {
+        "method": "tools/call",
+        "params": {
+          "name": "execute_sql",
+          "arguments": {
+            "sql": "SELECT 1 AS aw256_ok"
+          }
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\n  \"success\": true,\n  \"data\": {\n    \"statements\": [\n      {\n        \"sql\": \"SELECT 1 AS aw256_ok\",\n        \"rows\": [\n          {\n            \"aw256_ok\": 1\n          }\n        ],\n        \"count\": 1\n      }\n    ],\n    \"source_id\": \"default\"\n  }\n}"
+          }
+        ]
+      },
+      "elapsedMs": 3
+    },
+    {
+      "request": {
+        "method": "tools/call",
+        "params": {
+          "name": "execute_sql",
+          "arguments": {
+            "sql": "CREATE TABLE aw256_should_not_exist(id INTEGER)"
+          }
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\n  \"success\": false,\n  \"error\": \"Read-only mode is enabled. Only the following SQL operations are allowed: select, with, explain, pragma\",\n  \"code\": \"READONLY_VIOLATION\"\n}"
+          }
+        ],
+        "isError": true
+      },
+      "elapsedMs": 1
+    }
+  ],
+  "elapsedMs": 67472
+}

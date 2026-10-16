@@ -1,0 +1,66 @@
+{
+  "package:github-official": {
+    "version": "1.0.0",
+    "digest": "60033458d9658bd728d6e6738dbeb32c158afdd5cc53c1df67e68522073cee35",
+    "install": "pass",
+    "use": "pass",
+    "method": "package-install",
+    "verifiedAt": "2026-10-16",
+    "logSha256": "4023fd59a710a9244f185739a58962be05ea0211d4fd23d38030aa2e8c40d51c",
+    "installationEvidence": {
+      "repo": "jinjunnn/alpha-code",
+      "hostCommit": "18254b877a0eb72141bdec1b35b86b46639c855e",
+      "hostVersion": "0.1.20",
+      "file": "docs/verification/2026-10-15-aw256-connector-evidence/results/install.json",
+      "sha256": "b4131b8517e3cbd9a0cf6e426c5f2150e0a93cd94015045c1f5b64eee9768528",
+      "method": "runCatalogInstallWithPackagePreflight; real Electron safeStorage; grants.secrets; committed receipt"
+    },
+    "runtimeEvidence": {
+      "method": "tools/call",
+      "serverInfo": {
+        "name": "github-mcp-server",
+        "version": "github-mcp-server/remote-c91af86fab613fa50f4f34159186e6a61e89c381"
+      },
+      "file": "docs/verification/2026-10-15-aw256-connector-evidence/results/github-official-calls.json",
+      "elapsedMs": 3253,
+      "repository": "github/github-mcp-server",
+      "query": "repo:github/github-mcp-server"
+    }
+  },
+  "package:dbhub-readonly": {
+    "version": "1.0.0",
+    "digest": "2e66496db945f20d588bd818143500a38fdefd6dd329ff79ca70ec7bef42d298",
+    "install": "pass",
+    "use": "pass",
+    "method": "package-install",
+    "verifiedAt": "2026-10-16",
+    "logSha256": "d85afd5cbb8b6544b58183542fbdf902e9350ceacd7aeae56a768122d2564866",
+    "installationEvidence": {
+      "repo": "jinjunnn/alpha-code",
+      "hostCommit": "18254b877a0eb72141bdec1b35b86b46639c855e",
+      "hostVersion": "0.1.20",
+      "file": "docs/verification/2026-10-15-aw256-connector-evidence/results/install.json",
+      "sha256": "b4131b8517e3cbd9a0cf6e426c5f2150e0a93cd94015045c1f5b64eee9768528",
+      "method": "runCatalogInstallWithPackagePreflight; real Electron safeStorage; grants.secrets; committed receipt"
+    },
+    "runtimeEvidence": {
+      "method": "tools/call",
+      "serverInfo": {
+        "name": "DBHub MCP Server",
+        "version": "1.5.0"
+      },
+      "file": "docs/verification/2026-10-15-aw256-connector-evidence/results/dbhub-readonly-calls.json",
+      "elapsedMs": 67472,
+      "serverVersion": "1.5.0",
+      "select": "SELECT 1 AS aw256_ok",
+      "result": [
+        {
+          "aw256_ok": 1
+        }
+      ],
+      "write": "CREATE TABLE aw256_should_not_exist(id INTEGER)",
+      "writeError": "READONLY_VIOLATION",
+      "tableCreated": false
+    }
+  }
+}

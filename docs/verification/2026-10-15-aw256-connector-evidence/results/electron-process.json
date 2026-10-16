@@ -1,0 +1,5 @@
+{
+  "stdout": "",
+  "stderr": "[ext-transaction] tx-committed {\"txId\":\"tx-mvac5qe8-37148c2a\",\"items\":[\"mcp--github-official@gen-000000-000000\"]}\n[ext-transaction] tx-committed {\"txId\":\"tx-mvac5qkv-474af8b8\",\"items\":[\"mcp--dbhub-readonly@gen-000000-000000\"]}\n[29471:1015/221658.684568:ERROR:content/browser/network_service_instance_impl.cc:703] Network service crashed or was terminated, restarting service.\n",
+  "status": 0
+}

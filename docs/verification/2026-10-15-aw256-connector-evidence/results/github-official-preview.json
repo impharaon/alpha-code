@@ -1,0 +1,120 @@
+{
+  "compatibilityReport": {
+    "findings": [
+      {
+        "code": "alpha.profile.mcp-remote.v1.mapped",
+        "disposition": "mapped",
+        "path": "$.root.component"
+      }
+    ],
+    "hostContract": {
+      "artifactPath": "packages/ui-mac/src/shared/host-extension-package-contract",
+      "artifactSha256": "485f1de9f56b866431f87ce4b7956b73fb65d650c3b8abddd7dd4279c91326ab",
+      "commit": "133f463d93664269db0cf91f1c1ff7d7887d6bf9",
+      "repo": "jinjunnn/alpha-code"
+    },
+    "inputSha256": "5a108060bff225d7f0180d56b5f6b293dabd345b109535ccf13a20bbcacd7006",
+    "packageId": "package:github-official",
+    "schema": "alpha.package-compatibility-report.v1",
+    "verdict": "compatible",
+    "version": "1.0.0"
+  },
+  "envelope": {
+    "capabilities": [
+      "alpha.official-connectors.v1",
+      "alpha.secret-prerequisite.v1"
+    ],
+    "components": [
+      {
+        "capabilities": [
+          "alpha.official-connectors.v1",
+          "alpha.secret-prerequisite.v1"
+        ],
+        "dependencies": [],
+        "id": "mcp:github-official",
+        "payloadRef": {
+          "bytes": 429,
+          "mediaType": "application/vnd.alpha.host-extension-package.mcp-remote.v1+json",
+          "sha256": "1fc0f27012ab19a53eace30fe4cfe05c8ae65c02f46809745509a5cc544d7582",
+          "url": "https://codepuppy.cn/catalog/assets/mcp.github-official/1.0.0/alpha-package/1fc0f27012ab19a53eace30fe4cfe05c8ae65c02f46809745509a5cc544d7582.json"
+        },
+        "profileId": "mcp-remote",
+        "profileVersion": 1,
+        "required": true
+      }
+    ],
+    "prelude": {
+      "packageId": "package:github-official",
+      "version": "1.0.0"
+    },
+    "presentation": {
+      "description": "让助手查找 GitHub 仓库、阅读代码和查看提交记录，只读访问。需要你自己的 GitHub 令牌，建议只读的 fine-grained 令牌；请在安装窗口填写。目前仅 macOS 可安装。",
+      "displayName": "GitHub（官方）"
+    },
+    "root": "mcp:github-official",
+    "schema": "alpha.host-extension-package.v1"
+  },
+  "normalizedRecord": {
+    "components": [
+      {
+        "assetDirectory": "catalog-src/assets/mcp.github-official/1.0.0",
+        "assetManifestSha256": null,
+        "capabilities": [
+          "alpha.official-connectors.v1",
+          "alpha.secret-prerequisite.v1"
+        ],
+        "dependencies": [],
+        "id": "mcp:github-official",
+        "payloadRef": {
+          "bytes": 429,
+          "mediaType": "application/vnd.alpha.host-extension-package.mcp-remote.v1+json",
+          "sha256": "1fc0f27012ab19a53eace30fe4cfe05c8ae65c02f46809745509a5cc544d7582",
+          "url": "https://codepuppy.cn/catalog/assets/mcp.github-official/1.0.0/alpha-package/1fc0f27012ab19a53eace30fe4cfe05c8ae65c02f46809745509a5cc544d7582.json"
+        },
+        "profileId": "mcp-remote",
+        "profileVersion": 1,
+        "required": true,
+        "version": "1.0.0"
+      }
+    ],
+    "root": {
+      "compatibility": {
+        "reportSha256": "c110a8f77e58ab1ef4f4027e2d54a25d91e25a545a53a7ea83e66b780c748f43",
+        "verdict": "compatible"
+      },
+      "componentId": "mcp:github-official",
+      "declarationSha256": "5a108060bff225d7f0180d56b5f6b293dabd345b109535ccf13a20bbcacd7006",
+      "packageId": "package:github-official",
+      "presentation": {
+        "description": "让助手查找 GitHub 仓库、阅读代码和查看提交记录，只读访问。需要你自己的 GitHub 令牌，建议只读的 fine-grained 令牌；请在安装窗口填写。目前仅 macOS 可安装。",
+        "displayName": "GitHub（官方）"
+      },
+      "source": {
+        "kind": "alpha-native",
+        "publisher": "official",
+        "redistributable": true
+      },
+      "version": "1.0.0"
+    },
+    "schema": "alpha.normalized-package-build-record.v1"
+  },
+  "payloads": {
+    "mcp:github-official": {
+      "behavior": {
+        "auth": "none",
+        "headersTemplate": {
+          "Authorization": "Bearer {GITHUB_PERSONAL_ACCESS_TOKEN}",
+          "X-MCP-Readonly": "true",
+          "X-MCP-Toolsets": "repos"
+        },
+        "officialRecipe": "github-remote-v1",
+        "requiredSecrets": [
+          "GITHUB_PERSONAL_ACCESS_TOKEN"
+        ],
+        "url": "https://api.githubcopilot.com/mcp/"
+      },
+      "schema": "alpha.host-extension-package.payload.mcp-remote.v1"
+    }
+  },
+  "schema": "alpha.package-declaration.preview.v1"
+}

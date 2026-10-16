@@ -1,0 +1,23 @@
+{
+  "checkedAt": "2026-10-16T02:17:06.257Z",
+  "status": "pass",
+  "baselineWithoutNewRecords": "Error: CATALOG READY REJECTED:\n  - package:github-official@1.0.0: unverified install/minimal use (handshake is insufficient): 待 owner 发版后用自己的 PAT 真实调用一次\n  - package:dbhub-readonly@1.0.0: unverified install/minimal use (handshake is insufficient): 真实配方进程查询/拒写已验证；目录 package 安装尚待实测",
+  "declarationCommit": "c44c61d1c9c4131b60026e9b1009b6cc6fe56791",
+  "entries": 29,
+  "packages": 3,
+  "candidateIds": [
+    "package:github-official",
+    "package:dbhub-readonly"
+  ],
+  "activeAdvisories": [],
+  "checks": [
+    "assertCompiledPackageCurated(stable=true)",
+    "assertPackagesReadyForStable",
+    "assertCurationsNotExpired",
+    "loadEstablishedAdvisoryState(signature/schema/expiry/snapshot/HEAD)",
+    "assertCatalogReady(full published catalog + two candidates)"
+  ],
+  "runtimeRecordsSha256": "304302f22e77c1679194ee722ac462a83dd88b928963ba95f36563d2a37407fd",
+  "publicationStateChanged": false,
+  "note": "Production gates called read-only; temporary evidence overlay only. build-catalog --check itself creates a publish lock, so it is not run against the frozen worktree."
+}

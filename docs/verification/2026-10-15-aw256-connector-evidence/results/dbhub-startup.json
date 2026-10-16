@@ -1,0 +1,21 @@
+{
+  "nodeVersion": "v22.22.3",
+  "command": [
+    "/Users/tide/.hermes/node/bin/node",
+    "/Users/tide/.hermes/node/lib/node_modules/npm/bin/npx-cli.js",
+    "-y",
+    "@bytebase/dbhub@1.5.0",
+    "--transport",
+    "stdio",
+    "--config",
+    "/Users/tide/app/alpha-code/.worktrees/256-evidence/docs/verification/2026-10-15-aw256-connector-evidence/.tmp-run-46IWPZ/state/connector-config/dev/dbhub-readonly/v-dc4067f4d22ec619/dbhub.toml"
+  ],
+  "cwd": "/Users/tide/app/alpha-code/.worktrees/256-evidence/docs/verification/2026-10-15-aw256-connector-evidence/.tmp-run-46IWPZ/state/connector-config/dev/dbhub-readonly/v-dc4067f4d22ec619/work",
+  "fence": "production renderProcessFenceProfile via sandbox-exec; no database network permission",
+  "toml": "[[sources]]\nid = \"default\"\ndsn = \"${DSN}\"\n\n[[tools]]\nname = \"execute_sql\"\nsource = \"default\"\nreadonly = true\n",
+  "tomlSha256": "ace7ddf2b25dc883ed759335034ddf09186c852f102dc79af9de0c443f44e905",
+  "environment": {
+    "DSN": "[file reference resolved only in DBHub child environment]",
+    "npm_config_offline": "true"
+  }
+}

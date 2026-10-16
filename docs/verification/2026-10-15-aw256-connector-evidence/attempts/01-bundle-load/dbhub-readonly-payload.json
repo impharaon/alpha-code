@@ -1,0 +1,17 @@
+{
+  "behavior": {
+    "command": [
+      "npx",
+      "-y",
+      "@bytebase/dbhub@1.5.0",
+      "--transport",
+      "stdio"
+    ],
+    "environment": {},
+    "officialRecipe": "dbhub-readonly-v1",
+    "requiredSecrets": [
+      "DSN"
+    ]
+  },
+  "schema": "alpha.host-extension-package.payload.mcp-local.v1"
+}

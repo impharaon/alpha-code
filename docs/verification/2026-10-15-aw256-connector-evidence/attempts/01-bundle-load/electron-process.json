@@ -1,0 +1,5 @@
+{
+  "stdout": "",
+  "stderr": "App threw an error during load\nError: Cannot find module './impl/format'\nRequire stack:\n- /Users/tide/app/alpha-code/.worktrees/256-evidence/docs/verification/2026-10-15-aw256-connector-evidence/.tmp-run-39TfFL/install.mjs\n    at node:internal/modules/cjs/loader:1483:15\n    at Module._resolveFilename (node:electron/js2c/browser_init:2:139374)\n    at wrapResolveFilename (node:internal/modules/cjs/loader:1056:27)\n    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1080:10)\n    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1101:12)\n    at node:internal/modules/cjs/loader:1269:25\n    at Module._load (node:electron/js2c/node_init:2:18095)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:262:19)\n    at Module.require (node:internal/modules/cjs/loader:1583:12)\n    at require (node:internal/modules/helpers:153:16)\n",
+  "status": 0
+}

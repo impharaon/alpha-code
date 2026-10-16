@@ -1,0 +1,34 @@
+{
+  "serverInfo": {
+    "name": "DBHub MCP Server",
+    "version": "1.5.0"
+  },
+  "result": {
+    "tools": [
+      {
+        "name": "execute_sql",
+        "description": "Execute SQL queries on the sqlite database [READ-ONLY MODE]",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "sql": {
+              "type": "string",
+              "description": "SQL to execute (multiple statements separated by ;)"
+            }
+          },
+          "required": [
+            "sql"
+          ],
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        },
+        "annotations": {
+          "title": "Execute SQL (sqlite)",
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": false,
+          "openWorldHint": false
+        }
+      }
+    ]
+  }
+}

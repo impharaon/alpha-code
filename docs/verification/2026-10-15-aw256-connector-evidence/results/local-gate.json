@@ -1,0 +1,40 @@
+{
+  "command": "gate run",
+  "checkedCommit": "97535536a0175e3087e3da009b4665fa60b05d4b",
+  "status": "incomplete; known environment failures; stopped before unrelated credential checks",
+  "exitCode": 143,
+  "lastStage": "9/14 worktree bootstrap",
+  "stopReason": "Stage 11 calls verify-byok-catalog.ts, whose resolveKey reads provider credentials from environment and userData files. Stopped this gate and its child tree before stage 10/11 to honor the explicit prohibition on reading other secrets.",
+  "byokCredentialStageEntered": false,
+  "passed": [
+    "upstream edit guard",
+    "frontend pin/patch round-trip",
+    "tracked-file NUL check",
+    "six package typechecks",
+    "62 contracts-consumer tests",
+    "295 ext tests",
+    "seed assets",
+    "README relative links"
+  ],
+  "uiMacTests": {
+    "pass": 5663,
+    "fail": 3,
+    "files": 410,
+    "elapsedSeconds": 584.46
+  },
+  "failures": [
+    {
+      "file": "packages/ui-mac/src/main/process-fence-apply.test.ts",
+      "reason": "ENOENT: worktree electron package path.txt (dist is absent)"
+    },
+    {
+      "file": "packages/ui-mac/src/main/process-fence-wiring.test.ts",
+      "tests": 2,
+      "reason": "native module missing: packages/ui-mac/native/alpha-fence/build/alpha_fence.node"
+    }
+  ],
+  "repeatedGateFiles": "The two native-module wiring failures also reproduced in the explicit gate-file run.",
+  "notClaimed": "No full repository gate pass or GitHub check signoff. Later stages were not run.",
+  "requiredFollowup": "Orchestrator must prepare the missing runtime artifacts and resolve authorization for the broader gate credential checks before rerunning the full gate.",
+  "connectorEvidence": "Both real connector installs/calls and the alpha-web publication admission functions passed separately; see curation-gate.json."
+}

@@ -1,0 +1,311 @@
+{
+  "summary": {
+    "profile": "alpha",
+    "repositories": 5,
+    "errors": 35,
+    "warnings": 0
+  },
+  "results": [
+    {
+      "repository": "jinjunnn/alpha-work",
+      "path": "/Users/tide/app/alpha-code/.worktrees/256-evidence/docs/verification/2026-10-15-aw256-connector-evidence/.tmp-doc-check-v60itwgt/alpha-work",
+      "branch": "win-release-contract",
+      "dirty": true,
+      "tracked_markdown": 109,
+      "changelogs": [],
+      "findings": []
+    },
+    {
+      "repository": "jinjunnn/alpha-code",
+      "path": "/Users/tide/app/alpha-code/.worktrees/256-evidence/docs/verification/2026-10-15-aw256-connector-evidence/.tmp-doc-check-v60itwgt/alpha-code",
+      "branch": "verify/256-connector-evidence",
+      "dirty": true,
+      "tracked_markdown": 535,
+      "changelogs": [
+        ".opencode/command/changelog.md",
+        "CHANGELOG.md",
+        "packages/console/app/src/lib/changelog.ts",
+        "packages/console/app/src/routes/changelog.json.ts",
+        "packages/ui/src/assets/icons/file-types/changelog.svg",
+        "script/changelog.ts"
+      ],
+      "findings": [
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/README.md",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/capture-log.txt",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-approval-dark.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-approval-light.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-fold-collapsed-dark.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-fold-collapsed-light.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-fold-expanded-dark.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-fold-expanded-light.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-fold-search-detail-light.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-fold-step-detail-dark.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-fold-step-detail-light.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-live-running-dark.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-live-running-light.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-live-waiting-dark.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-live-waiting-light.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-menu-model-dark.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-menu-model-light.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-menu-perm-dark.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-menu-perm-light.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-provenance-light.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-toast-tooltip-light.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-compare-dark.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-compare-light.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-end-dark.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-end-light.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-expand-dark.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-expand-light.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-live-dark.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-live-light.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-overlays-dark.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-overlays-light.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-rules-dark.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-rules-light.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-steps-dark.png",
+          "message": "non-canonical docs role root: evidence"
+        },
+        {
+          "level": "error",
+          "code": "layout.role-alias",
+          "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-steps-light.png",
+          "message": "non-canonical docs role root: evidence"
+        }
+      ]
+    },
+    {
+      "repository": "jinjunnn/alpha-platform",
+      "path": "/Users/tide/app/alpha-code/.worktrees/256-evidence/docs/verification/2026-10-15-aw256-connector-evidence/.tmp-doc-check-v60itwgt/alpha-platform",
+      "branch": "main",
+      "dirty": false,
+      "tracked_markdown": 123,
+      "changelogs": [],
+      "findings": []
+    },
+    {
+      "repository": "jinjunnn/alpha-web",
+      "path": "/Users/tide/app/alpha-code/.worktrees/256-evidence/docs/verification/2026-10-15-aw256-connector-evidence/.tmp-doc-check-v60itwgt/alpha-web",
+      "branch": "win-download-notice",
+      "dirty": false,
+      "tracked_markdown": 91,
+      "changelogs": [],
+      "findings": []
+    },
+    {
+      "repository": "jinjunnn/alpha-code-plugin",
+      "path": "/Users/tide/app/alpha-code/.worktrees/256-evidence/docs/verification/2026-10-15-aw256-connector-evidence/.tmp-doc-check-v60itwgt/alpha-code-plugin",
+      "branch": "main",
+      "dirty": false,
+      "tracked_markdown": 8,
+      "changelogs": [],
+      "findings": []
+    }
+  ],
+  "exitCode": 1,
+  "baselinePaths": [
+    "docs/evidence/2026-10-10-req229-230-visual/README.md",
+    "docs/evidence/2026-10-10-req229-230-visual/capture-log.txt",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/app-approval-dark.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/app-approval-light.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/app-fold-collapsed-dark.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/app-fold-collapsed-light.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/app-fold-expanded-dark.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/app-fold-expanded-light.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/app-fold-search-detail-light.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/app-fold-step-detail-dark.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/app-fold-step-detail-light.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/app-live-running-dark.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/app-live-running-light.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/app-live-waiting-dark.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/app-live-waiting-light.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/app-menu-model-dark.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/app-menu-model-light.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/app-menu-perm-dark.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/app-menu-perm-light.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/app-provenance-light.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/app-toast-tooltip-light.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/frame-compare-dark.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/frame-compare-light.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/frame-end-dark.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/frame-end-light.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/frame-expand-dark.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/frame-expand-light.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/frame-live-dark.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/frame-live-light.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/frame-overlays-dark.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/frame-overlays-light.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/frame-rules-dark.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/frame-rules-light.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/frame-steps-dark.png",
+    "docs/evidence/2026-10-10-req229-230-visual/shots/frame-steps-light.png"
+  ]
+}

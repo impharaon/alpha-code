@@ -1,0 +1,305 @@
+{
+  "startedAt": "2026-10-16T02:14:02.292Z",
+  "hostVersion": "0.1.20",
+  "hostCommit": "18254b877a0eb72141bdec1b35b86b46639c855e",
+  "declarationCommit": "c44c61d1c9c4131b60026e9b1009b6cc6fe56791",
+  "bunVersion": "1.3.14",
+  "packages": [
+    {
+      "name": "github-official",
+      "packageId": "package:github-official",
+      "version": "1.0.0",
+      "digest": "60033458d9658bd728d6e6738dbeb32c158afdd5cc53c1df67e68522073cee35",
+      "payloadSha256": "1fc0f27012ab19a53eace30fe4cfe05c8ae65c02f46809745509a5cc544d7582",
+      "payloadBytes": 429
+    },
+    {
+      "name": "dbhub-readonly",
+      "packageId": "package:dbhub-readonly",
+      "version": "1.0.0",
+      "digest": "2e66496db945f20d588bd818143500a38fdefd6dd329ff79ca70ec7bef42d298",
+      "payloadSha256": "349bdddf84b69691cc8a18198e8279022eb26242f6820037a66c53305af464ac",
+      "payloadBytes": 313
+    }
+  ],
+  "encryption": {
+    "backend": "Electron safeStorage",
+    "available": true,
+    "electron": "42.3.3"
+  },
+  "candidates": [
+    {
+      "name": "github-official",
+      "installed": {
+        "ok": true,
+        "kind": "mcp",
+        "name": "github-official",
+        "manifestDigest": "sha256:e00681b1ff0736ba2af03aef634e32b057152d23ff0a0005d91f902a8ec21a34",
+        "installed": [
+          "mcp:github-official"
+        ],
+        "skipped": [],
+        "activateMcp": [],
+        "installedDisabled": true
+      },
+      "installedReceipt": {
+        "schemaVersion": 2,
+        "id": "mcp:github-official",
+        "name": "github-official",
+        "kind": "mcp",
+        "environment": "dev",
+        "scope": {
+          "kind": "global"
+        },
+        "version": "1.0.0",
+        "manifestDigest": "sha256:e00681b1ff0736ba2af03aef634e32b057152d23ff0a0005d91f902a8ec21a34",
+        "payloadDigest": "sha256:1fc0f27012ab19a53eace30fe4cfe05c8ae65c02f46809745509a5cc544d7582",
+        "grantDigest": "sha256:7779aa34acaabed7f28871de0bbb5a5bdcf08f8f5875c846b9ae4bfbacd55bbc",
+        "desiredState": "disabled",
+        "generation": 1,
+        "origin": "catalog",
+        "configKey": "mcp.github-official",
+        "transaction": {
+          "id": "tx-mvac3hr6-fb43b087",
+          "state": "committed"
+        },
+        "installedAt": "2026-10-16T02:14:02.654Z"
+      },
+      "receipt": {
+        "schemaVersion": 2,
+        "id": "mcp:github-official",
+        "name": "github-official",
+        "kind": "mcp",
+        "environment": "dev",
+        "scope": {
+          "kind": "global"
+        },
+        "version": "1.0.0",
+        "manifestDigest": "sha256:e00681b1ff0736ba2af03aef634e32b057152d23ff0a0005d91f902a8ec21a34",
+        "payloadDigest": "sha256:1fc0f27012ab19a53eace30fe4cfe05c8ae65c02f46809745509a5cc544d7582",
+        "grantDigest": "sha256:7779aa34acaabed7f28871de0bbb5a5bdcf08f8f5875c846b9ae4bfbacd55bbc",
+        "desiredState": "enabled",
+        "generation": 1,
+        "origin": "catalog",
+        "configKey": "mcp.github-official",
+        "transaction": {
+          "id": "tx-mvac3hr6-fb43b087",
+          "state": "committed"
+        },
+        "installedAt": "2026-10-16T02:14:02.654Z",
+        "updatedAt": "2026-10-16T02:14:02.846Z"
+      },
+      "grant": {
+        "v": 1,
+        "key": "mcp--github-official",
+        "capabilities": [
+          "alpha.official-connectors.v1",
+          "alpha.secret-prerequisite.v1"
+        ],
+        "manifestDigest": "sha256:e00681b1ff0736ba2af03aef634e32b057152d23ff0a0005d91f902a8ec21a34",
+        "txId": "tx-mvac3hr6-fb43b087",
+        "grantedAt": "2026-10-16T02:14:02.807Z"
+      },
+      "elapsedMs": 210
+    },
+    {
+      "name": "dbhub-readonly",
+      "installed": {
+        "ok": true,
+        "kind": "mcp",
+        "name": "dbhub-readonly",
+        "manifestDigest": "sha256:249999e7de9763522f793878e804e2d2116b61ad4a70ce0ca14e62bd14d644de",
+        "installed": [
+          "mcp:dbhub-readonly"
+        ],
+        "skipped": [],
+        "activateMcp": [],
+        "installedDisabled": true
+      },
+      "installedReceipt": {
+        "schemaVersion": 2,
+        "id": "mcp:dbhub-readonly",
+        "name": "dbhub-readonly",
+        "kind": "mcp",
+        "environment": "dev",
+        "scope": {
+          "kind": "global"
+        },
+        "version": "1.0.0",
+        "manifestDigest": "sha256:249999e7de9763522f793878e804e2d2116b61ad4a70ce0ca14e62bd14d644de",
+        "payloadDigest": "sha256:349bdddf84b69691cc8a18198e8279022eb26242f6820037a66c53305af464ac",
+        "grantDigest": "sha256:91312f359ff33d226746232b435644886841ba9e1afe6e6933369562b6716621",
+        "desiredState": "disabled",
+        "generation": 1,
+        "origin": "catalog",
+        "configKey": "mcp.dbhub-readonly",
+        "transaction": {
+          "id": "tx-mvac3hy8-144f2249",
+          "state": "committed"
+        },
+        "installedAt": "2026-10-16T02:14:02.895Z"
+      },
+      "receipt": {
+        "schemaVersion": 2,
+        "id": "mcp:dbhub-readonly",
+        "name": "dbhub-readonly",
+        "kind": "mcp",
+        "environment": "dev",
+        "scope": {
+          "kind": "global"
+        },
+        "version": "1.0.0",
+        "manifestDigest": "sha256:249999e7de9763522f793878e804e2d2116b61ad4a70ce0ca14e62bd14d644de",
+        "payloadDigest": "sha256:349bdddf84b69691cc8a18198e8279022eb26242f6820037a66c53305af464ac",
+        "grantDigest": "sha256:91312f359ff33d226746232b435644886841ba9e1afe6e6933369562b6716621",
+        "desiredState": "enabled",
+        "generation": 1,
+        "origin": "catalog",
+        "configKey": "mcp.dbhub-readonly",
+        "transaction": {
+          "id": "tx-mvac3hy8-144f2249",
+          "state": "committed"
+        },
+        "installedAt": "2026-10-16T02:14:02.895Z",
+        "updatedAt": "2026-10-16T02:14:03.092Z"
+      },
+      "grant": {
+        "v": 1,
+        "key": "mcp--dbhub-readonly",
+        "capabilities": [
+          "alpha.official-connectors.v1",
+          "alpha.secret-prerequisite.v1"
+        ],
+        "manifestDigest": "sha256:249999e7de9763522f793878e804e2d2116b61ad4a70ce0ca14e62bd14d644de",
+        "txId": "tx-mvac3hy8-144f2249",
+        "grantedAt": "2026-10-16T02:14:03.040Z"
+      },
+      "elapsedMs": 261
+    }
+  ],
+  "ledger": {
+    "v": 3,
+    "receipts": [
+      {
+        "id": "mcp:github-official",
+        "name": "github-official",
+        "type": "mcp",
+        "scope": "global",
+        "version": "1.0.0",
+        "payloadDigest": "sha256:1fc0f27012ab19a53eace30fe4cfe05c8ae65c02f46809745509a5cc544d7582",
+        "installedAt": "2026-10-16T02:14:02.654Z",
+        "origin": "catalog",
+        "configKey": "mcp.github-official"
+      },
+      {
+        "id": "mcp:dbhub-readonly",
+        "name": "dbhub-readonly",
+        "type": "mcp",
+        "scope": "global",
+        "version": "1.0.0",
+        "payloadDigest": "sha256:349bdddf84b69691cc8a18198e8279022eb26242f6820037a66c53305af464ac",
+        "installedAt": "2026-10-16T02:14:02.895Z",
+        "origin": "catalog",
+        "configKey": "mcp.dbhub-readonly"
+      }
+    ],
+    "records": [
+      {
+        "schemaVersion": 2,
+        "id": "mcp:github-official",
+        "name": "github-official",
+        "kind": "mcp",
+        "environment": "dev",
+        "scope": {
+          "kind": "global"
+        },
+        "version": "1.0.0",
+        "manifestDigest": "sha256:e00681b1ff0736ba2af03aef634e32b057152d23ff0a0005d91f902a8ec21a34",
+        "payloadDigest": "sha256:1fc0f27012ab19a53eace30fe4cfe05c8ae65c02f46809745509a5cc544d7582",
+        "grantDigest": "sha256:7779aa34acaabed7f28871de0bbb5a5bdcf08f8f5875c846b9ae4bfbacd55bbc",
+        "desiredState": "enabled",
+        "generation": 1,
+        "origin": "catalog",
+        "configKey": "mcp.github-official",
+        "transaction": {
+          "id": "tx-mvac3hr6-fb43b087",
+          "state": "committed"
+        },
+        "installedAt": "2026-10-16T02:14:02.654Z",
+        "updatedAt": "2026-10-16T02:14:02.846Z"
+      },
+      {
+        "schemaVersion": 2,
+        "id": "mcp:dbhub-readonly",
+        "name": "dbhub-readonly",
+        "kind": "mcp",
+        "environment": "dev",
+        "scope": {
+          "kind": "global"
+        },
+        "version": "1.0.0",
+        "manifestDigest": "sha256:249999e7de9763522f793878e804e2d2116b61ad4a70ce0ca14e62bd14d644de",
+        "payloadDigest": "sha256:349bdddf84b69691cc8a18198e8279022eb26242f6820037a66c53305af464ac",
+        "grantDigest": "sha256:91312f359ff33d226746232b435644886841ba9e1afe6e6933369562b6716621",
+        "desiredState": "enabled",
+        "generation": 1,
+        "origin": "catalog",
+        "configKey": "mcp.dbhub-readonly",
+        "transaction": {
+          "id": "tx-mvac3hy8-144f2249",
+          "state": "committed"
+        },
+        "installedAt": "2026-10-16T02:14:02.895Z",
+        "updatedAt": "2026-10-16T02:14:03.092Z"
+      }
+    ],
+    "packageGraphs": [
+      {
+        "packageId": "package:github-official",
+        "envelopeDigest": "sha256:e60c16cac20a3789700d21cd4bc5345101d25daa91e07562f3d5d520534facad",
+        "installedGraphDigest": "sha256:4952a2f4948d44dae20912d5c56f19da5da08f5544fba70c780774fe4ce8feda",
+        "root": {
+          "componentId": "mcp:github-official",
+          "kind": "mcp",
+          "name": "github-official",
+          "required": true,
+          "manifestDigest": "sha256:e00681b1ff0736ba2af03aef634e32b057152d23ff0a0005d91f902a8ec21a34"
+        },
+        "children": []
+      },
+      {
+        "packageId": "package:dbhub-readonly",
+        "envelopeDigest": "sha256:b65e2b20da5186a187e5acd58db998050a292331bdecc568a5127466bbb43767",
+        "installedGraphDigest": "sha256:c0f9b1368f8d0a06e0e68578252bf028954834783a3752caedea774d8f3b041b",
+        "root": {
+          "componentId": "mcp:dbhub-readonly",
+          "kind": "mcp",
+          "name": "dbhub-readonly",
+          "required": true,
+          "manifestDigest": "sha256:249999e7de9763522f793878e804e2d2116b61ad4a70ce0ca14e62bd14d644de"
+        },
+        "children": []
+      }
+    ],
+    "claims": [
+      {
+        "kind": "mcp",
+        "name": "github-official",
+        "owners": [
+          "bundle:package:github-official@sha256:e00681b1ff0736ba2af03aef634e32b057152d23ff0a0005d91f902a8ec21a34"
+        ]
+      },
+      {
+        "kind": "mcp",
+        "name": "dbhub-readonly",
+        "owners": [
+          "bundle:package:dbhub-readonly@sha256:249999e7de9763522f793878e804e2d2116b61ad4a70ce0ca14e62bd14d644de"
+        ]
+      }
+    ]
+  },
+  "persistedStateSecretScan": {
+    "files": 14,
+    "pass": true
+  }
+}

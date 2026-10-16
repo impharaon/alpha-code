@@ -1,0 +1,20 @@
+{
+  "type": "local",
+  "timeout": 60000,
+  "command": [
+    "/Users/tide/.hermes/node/bin/node",
+    "/Users/tide/.hermes/node/lib/node_modules/npm/bin/npx-cli.js",
+    "-y",
+    "@bytebase/dbhub@1.5.0",
+    "--transport",
+    "stdio",
+    "--config",
+    "/Users/tide/app/alpha-code/.worktrees/256-evidence/docs/verification/2026-10-15-aw256-connector-evidence/.tmp-run-w0ghXO/state/connector-config/dev/dbhub-readonly/v-c3bff151e798f320/dbhub.toml"
+  ],
+  "cwd": "/Users/tide/app/alpha-code/.worktrees/256-evidence/docs/verification/2026-10-15-aw256-connector-evidence/.tmp-run-w0ghXO/state/connector-config/dev/dbhub-readonly/v-c3bff151e798f320/work",
+  "environment": {
+    "DSN": "{file:/private/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/alpha-connectors-501-5fc95773a7ad73b9/21388-a7237516-0846-4971-a58b-b8df6336a500/dbhub-readonly/v-c3bff151e798f320/DSN}",
+    "PATH": "/Users/tide/.hermes/node/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/tide/.hermes/node/bin:/Users/tide/.antigravity-ide/antigravity-ide/bin:/Users/tide/.bun/bin:/Users/tide/app/trader/.venv/bin:/Users/tide/.antigravity/antigravity/bin:/Users/tide/development/flutter/bin:/Users/tide/.local/bin:/Users/tide/.local/bin:/Users/tide/development/flutter/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/opt/pmk/env/global/bin:/Library/Apple/usr/bin:/opt/homebrew/bin:/Users/tide/.codex/tmp/arg0/codex-arg0239eKO:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/tide/.hermes/node/bin:/Users/tide/.antigravity-ide/antigravity-ide/bin:/Users/tide/.bun/bin:/Users/tide/app/trader/.venv/bin:/Users/tide/.antigravity/antigravity/bin:/Users/tide/development/flutter/bin:/Users/tide/.local/bin:/opt/homebrew/sbin"
+  },
+  "enabled": true
+}

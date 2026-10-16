@@ -1,0 +1,125 @@
+{
+  "ok": false,
+  "stage": "authorize",
+  "reason": "package admission: exact package plan requires confirmation",
+  "authorization": [
+    {
+      "key": "mcp--dbhub-readonly",
+      "previous": null,
+      "requested": [
+        "alpha.official-connectors.v1",
+        "alpha.secret-prerequisite.v1"
+      ],
+      "added": [
+        "alpha.official-connectors.v1",
+        "alpha.secret-prerequisite.v1"
+      ],
+      "removed": [],
+      "requiresConfirmation": true
+    }
+  ],
+  "packageAuthorization": {
+    "attemptId": "aw256-dbhub-readonly",
+    "binding": {
+      "snapshotDigest": "283ced1fc1f0684e376bc583cd62a3dbcc879a2790c9f40b50dea70a58893c2d",
+      "envelopeDigest": "b65e2b20da5186a187e5acd58db998050a292331bdecc568a5127466bbb43767",
+      "graphDigest": "c7b9e51d2d96df6d79e30ea752f35c2bdb09d2f69fce7aa1b42e61589508d5ea",
+      "itemDigests": {
+        "mcp:dbhub-readonly": "249999e7de9763522f793878e804e2d2116b61ad4a70ce0ca14e62bd14d644de"
+      },
+      "capabilityDigest": "b104afa462bfec2eccc58dae754b96be37a80d4b4d02420ebed5875e1cd857b9"
+    },
+    "plan": {
+      "packageId": "package:dbhub-readonly",
+      "version": "1.0.0",
+      "scope": {
+        "scope": "global"
+      },
+      "items": [
+        {
+          "included": true,
+          "componentId": "mcp:dbhub-readonly",
+          "role": "root",
+          "required": true,
+          "key": "mcp--dbhub-readonly",
+          "kind": "mcp",
+          "name": "dbhub-readonly",
+          "manifestDigest": "sha256:249999e7de9763522f793878e804e2d2116b61ad4a70ce0ca14e62bd14d644de",
+          "payloadDigest": "sha256:349bdddf84b69691cc8a18198e8279022eb26242f6820037a66c53305af464ac",
+          "capabilities": [
+            "alpha.official-connectors.v1",
+            "alpha.secret-prerequisite.v1"
+          ],
+          "prerequisites": [
+            {
+              "prerequisiteId": "mcp:dbhub-readonly#DSN",
+              "label": "DSN",
+              "required": true
+            }
+          ],
+          "operations": [
+            "write-secret-version",
+            "update-config",
+            "write-install-record",
+            "write-capability-grant"
+          ]
+        }
+      ]
+    },
+    "items": [
+      {
+        "key": "mcp--dbhub-readonly",
+        "previous": null,
+        "requested": [
+          "alpha.official-connectors.v1",
+          "alpha.secret-prerequisite.v1"
+        ],
+        "added": [
+          "alpha.official-connectors.v1",
+          "alpha.secret-prerequisite.v1"
+        ],
+        "removed": [],
+        "requiresConfirmation": true
+      }
+    ],
+    "update": {
+      "operation": "install",
+      "packageId": "package:dbhub-readonly",
+      "versionBefore": null,
+      "versionAfter": "1.0.0",
+      "graphBeforeDigest": null,
+      "graphAfterDigest": "sha256:c0f9b1368f8d0a06e0e68578252bf028954834783a3752caedea774d8f3b041b",
+      "ownerChanged": false,
+      "components": [
+        {
+          "componentId": "mcp:dbhub-readonly",
+          "kind": "mcp",
+          "name": "dbhub-readonly",
+          "key": "mcp--dbhub-readonly",
+          "change": "added",
+          "requiredBefore": null,
+          "requiredAfter": true,
+          "prerequisiteIds": [
+            "mcp:dbhub-readonly#DSN"
+          ],
+          "capabilities": {
+            "key": "mcp--dbhub-readonly",
+            "previous": null,
+            "requested": [
+              "alpha.official-connectors.v1",
+              "alpha.secret-prerequisite.v1"
+            ],
+            "added": [
+              "alpha.official-connectors.v1",
+              "alpha.secret-prerequisite.v1"
+            ],
+            "removed": [],
+            "requiresConfirmation": true
+          }
+        }
+      ],
+      "claims": [],
+      "capabilityExpansion": true
+    }
+  }
+}

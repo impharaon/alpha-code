@@ -1,0 +1,227 @@
+{
+  "repository": "jinjunnn/alpha-code",
+  "path": "/Users/tide/app/alpha-code/.worktrees/1533-live",
+  "branch": "verify/1533-live-price-note",
+  "dirty": true,
+  "tracked_markdown": 534,
+  "changelogs": [
+    ".opencode/command/changelog.md",
+    "CHANGELOG.md",
+    "packages/console/app/src/lib/changelog.ts",
+    "packages/console/app/src/routes/changelog.json.ts",
+    "packages/ui/src/assets/icons/file-types/changelog.svg",
+    "script/changelog.ts"
+  ],
+  "findings": [
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/README.md",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/capture-log.txt",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-approval-dark.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-approval-light.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-fold-collapsed-dark.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-fold-collapsed-light.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-fold-expanded-dark.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-fold-expanded-light.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-fold-search-detail-light.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-fold-step-detail-dark.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-fold-step-detail-light.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-live-running-dark.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-live-running-light.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-live-waiting-dark.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-live-waiting-light.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-menu-model-dark.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-menu-model-light.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-menu-perm-dark.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-menu-perm-light.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-provenance-light.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/app-toast-tooltip-light.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-compare-dark.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-compare-light.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-end-dark.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-end-light.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-expand-dark.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-expand-light.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-live-dark.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-live-light.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-overlays-dark.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-overlays-light.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-rules-dark.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-rules-light.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-steps-dark.png",
+      "message": "non-canonical docs role root: evidence"
+    },
+    {
+      "level": "error",
+      "code": "layout.role-alias",
+      "path": "docs/evidence/2026-10-10-req229-230-visual/shots/frame-steps-light.png",
+      "message": "non-canonical docs role root: evidence"
+    }
+  ]
+}

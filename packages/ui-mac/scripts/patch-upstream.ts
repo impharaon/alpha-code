@@ -12,6 +12,152 @@ import type { Plugin } from "vite"
 // Inline `style={{ width: ... }}` computed in JS is exactly such a case.
 
 const PATCHES: Record<string, ReadonlyArray<readonly [string, string]>> = {
+  // #1542: upstream provider dialogs save through the existing main IPC. The four
+  // unsupported upstream fields stay outside ProviderInput; do not silently discard them.
+  "app/src/components/dialog-custom-provider.tsx": [
+    [
+      `      if ((await serverSDK().protocol) !== "v1") throw new Error(language.t("provider.custom.unavailable"))
+      const disabledProviders = serverSync().data.config.disabled_providers ?? []
+      const nextDisabled = disabledProviders.filter((id) => id !== result.providerID)
+
+      if (result.key) {
+        await serverSDK().client.auth.set({
+          providerID: result.providerID,
+          auth: {
+            type: "api",
+            key: result.key,
+          },
+        })
+      }
+
+      await serverSync().updateConfig({
+        provider: { [result.providerID]: result.config },
+        disabled_providers: nextDisabled,
+      })
+`,
+      `      if (!result.key || result.config.env?.length || result.config.options.headers ||
+          Object.entries(result.config.models).some(([id, model]) => model.name !== id))
+        throw new Error(language.t("provider.custom.alphaUnsupported"))
+      const saved = await window.api.providers.add({
+        id: result.providerID,
+        name: result.name,
+        compat: "openai",
+        baseURL: result.config.options.baseURL,
+        apiKey: result.key,
+        models: Object.keys(result.config.models),
+      })
+      if (!saved.ok) throw new Error(saved.reason)
+`,
+    ],
+    [
+      "      form,",
+      "      form: { ...form, models: form.models.map((model) => ({ ...model, name: model.id })) },",
+    ],
+    [
+      `                <div class="flex-1">
+                  <TextField
+                    label={language.t("provider.custom.models.name.label")}
+                    hideLabel
+                    placeholder={language.t("provider.custom.models.name.placeholder")}
+                    value={m.name}
+                    onChange={(v) => setModel(i(), "name", v)}
+                    validationState={m.err.name ? "invalid" : undefined}
+                    error={m.err.name}
+                  />
+                </div>
+`,
+      "",
+    ],
+    [
+      `        <div class="flex flex-col gap-3">
+          <label class="text-12-medium text-text-weak">{language.t("provider.custom.headers.label")}</label>
+          <For each={form.headers}>
+            {(h, i) => (
+              <div class="flex gap-2 items-start" data-row={h.row}>
+                <div class="flex-1">
+                  <TextField
+                    label={language.t("provider.custom.headers.key.label")}
+                    hideLabel
+                    placeholder={language.t("provider.custom.headers.key.placeholder")}
+                    value={h.key}
+                    onChange={(v) => setHeader(i(), "key", v)}
+                    validationState={h.err.key ? "invalid" : undefined}
+                    error={h.err.key}
+                  />
+                </div>
+                <div class="flex-1">
+                  <TextField
+                    label={language.t("provider.custom.headers.value.label")}
+                    hideLabel
+                    placeholder={language.t("provider.custom.headers.value.placeholder")}
+                    value={h.value}
+                    onChange={(v) => setHeader(i(), "value", v)}
+                    validationState={h.err.value ? "invalid" : undefined}
+                    error={h.err.value}
+                  />
+                </div>
+                <IconButton
+                  type="button"
+                  icon="trash"
+                  variant="ghost"
+                  class="mt-1.5"
+                  onClick={() => removeHeader(i())}
+                  disabled={form.headers.length <= 1}
+                  aria-label={language.t("provider.custom.headers.remove")}
+                />
+              </div>
+            )}
+          </For>
+          <Button type="button" size="small" variant="ghost" icon="plus-small" onClick={addHeader} class="self-start">
+            {language.t("provider.custom.headers.add")}
+          </Button>
+        </div>
+`,
+      `        <p role="note">{language.t("provider.custom.alphaUnsupported")}</p>
+`,
+    ],
+    [
+      "description={language.t(\"provider.custom.field.apiKey.description\")}",
+      "description={language.t(\"provider.custom.alphaUnsupported\")}",
+    ],
+  ],
+
+  "app/src/components/dialog-connect-provider.tsx": [
+    [
+      `      await serverSDK().api.integration.connect.key({
+        integrationID: props.provider,
+        location: location(),
+        key: apiKey,
+      })
+`,
+      `      const catalog = await window.api.models.catalog()
+      const preset = catalog.byokProviders.find((provider) => \`\${provider.id}-byok\` === props.provider)
+      const saved = await window.api.providers.setKey(preset?.id ?? props.provider, apiKey)
+      if (!saved.ok) {
+        setFormStore("error", saved.reason)
+        return
+      }
+`,
+    ],
+  ],
+
+  "app/src/i18n/en.ts": [
+    [
+      "  \"provider.custom.unavailable\": \"Custom providers are unavailable on this server\",",
+      `  "provider.custom.unavailable": "Custom providers are unavailable on this server",
+  "provider.custom.alphaUnsupported": "Custom headers, model display names, {env:} references and empty API keys are not supported. Enter a key and model IDs.",`,
+    ],
+  ],
+
+  "app/src/i18n/zh.ts": [
+    [
+      "  \"provider.custom.unavailable\": \"此服务器上无法使用自定义提供商\",",
+      `  "provider.custom.unavailable": "此服务器上无法使用自定义提供商",
+  "provider.custom.alphaUnsupported": "暂不支持自定义请求头、模型显示名、{env:} 引用或空 API Key。请填写密钥与模型 ID。",`,
+    ],
+  ],
+
+
   // The new v2 composer moved image preview opening out of prompt-input.tsx and dropped the explicit
   // hosted-dialog option. ui-mac supplies the canonical Alpha Dialog host, so keep this active v2
   // entrypoint on the same host as the legacy composer without modifying the frozen app source.

@@ -1,0 +1,3 @@
+{
+  "stderr": "npm error code ENOTCACHED\nnpm error request to https://registry.npmjs.org/@bytebase%2fdbhub failed: cache mode is 'only-if-cached' but no cached response is available.\nnpm error Log files were not written due to an error writing to the directory: /Users/tide/app/alpha-code/.worktrees/256-evidence/docs/verification/2026-10-15-aw256-connector-evidence/.tmp-run-w0ghXO/npm-cache/_logs\nnpm error You can rerun the command with `--loglevel=verbose` to see the logs in your terminal\n"
+}

@@ -1,0 +1,10 @@
+{
+  "command": "validate",
+  "compatibilityReportSha256": "5cab6ed201403b0391a9d1b3f0032ceee96be33fe867e58e7634f0741b5ba4e8",
+  "declarationSha256": "a9cf2012cc237d5548065ee7fa99c5bf79cdbd3ffee2500620639c7286a357fb",
+  "ok": true,
+  "packageId": "package:dbhub-readonly",
+  "schema": "alpha.package-declaration.cli-result.v1",
+  "verdict": "compatible",
+  "version": "1.0.0"
+}

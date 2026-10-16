@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "kind": "mcp",
+  "name": "github-official",
+  "manifestDigest": "sha256:e00681b1ff0736ba2af03aef634e32b057152d23ff0a0005d91f902a8ec21a34",
+  "installed": [
+    "mcp:github-official"
+  ],
+  "skipped": [],
+  "activateMcp": [],
+  "installedDisabled": true
+}

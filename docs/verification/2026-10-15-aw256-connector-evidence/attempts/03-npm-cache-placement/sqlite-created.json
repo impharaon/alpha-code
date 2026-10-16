@@ -1,0 +1,7 @@
+{
+  "source": "fresh bun:sqlite database; no imported data or fabricated provider response",
+  "initialization": "PRAGMA user_version = 256",
+  "path": "/Users/tide/app/alpha-code/.worktrees/256-evidence/docs/verification/2026-10-15-aw256-connector-evidence/.tmp-run-w0ghXO/database/aw256.db",
+  "bytes": 4096,
+  "sha256": "e0a5a1c84e6347690d5794c9d6659b16569bd36c2a823fdc1166b802ea6867a1"
+}

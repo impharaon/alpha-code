@@ -1,0 +1,125 @@
+{
+  "ok": false,
+  "stage": "authorize",
+  "reason": "package admission: exact package plan requires confirmation",
+  "authorization": [
+    {
+      "key": "mcp--github-official",
+      "previous": null,
+      "requested": [
+        "alpha.official-connectors.v1",
+        "alpha.secret-prerequisite.v1"
+      ],
+      "added": [
+        "alpha.official-connectors.v1",
+        "alpha.secret-prerequisite.v1"
+      ],
+      "removed": [],
+      "requiresConfirmation": true
+    }
+  ],
+  "packageAuthorization": {
+    "attemptId": "aw256-github-official",
+    "binding": {
+      "snapshotDigest": "f60814408fe56ec6bc4dddb280b30776060ec656ca1dd41fb9a83c0bec842880",
+      "envelopeDigest": "e60c16cac20a3789700d21cd4bc5345101d25daa91e07562f3d5d520534facad",
+      "graphDigest": "6ae8baff320eb37c498316bde12562f2cf40eaef3fbe6616c1c0d2a8eb0306a9",
+      "itemDigests": {
+        "mcp:github-official": "e00681b1ff0736ba2af03aef634e32b057152d23ff0a0005d91f902a8ec21a34"
+      },
+      "capabilityDigest": "95e985ff093e9b28b4692dd49cdc5f5da1f51be763e150234d5f7f1269f9f15e"
+    },
+    "plan": {
+      "packageId": "package:github-official",
+      "version": "1.0.0",
+      "scope": {
+        "scope": "global"
+      },
+      "items": [
+        {
+          "included": true,
+          "componentId": "mcp:github-official",
+          "role": "root",
+          "required": true,
+          "key": "mcp--github-official",
+          "kind": "mcp",
+          "name": "github-official",
+          "manifestDigest": "sha256:e00681b1ff0736ba2af03aef634e32b057152d23ff0a0005d91f902a8ec21a34",
+          "payloadDigest": "sha256:1fc0f27012ab19a53eace30fe4cfe05c8ae65c02f46809745509a5cc544d7582",
+          "capabilities": [
+            "alpha.official-connectors.v1",
+            "alpha.secret-prerequisite.v1"
+          ],
+          "prerequisites": [
+            {
+              "prerequisiteId": "mcp:github-official#GITHUB_PERSONAL_ACCESS_TOKEN",
+              "label": "GITHUB_PERSONAL_ACCESS_TOKEN",
+              "required": true
+            }
+          ],
+          "operations": [
+            "write-secret-version",
+            "update-config",
+            "write-install-record",
+            "write-capability-grant"
+          ]
+        }
+      ]
+    },
+    "items": [
+      {
+        "key": "mcp--github-official",
+        "previous": null,
+        "requested": [
+          "alpha.official-connectors.v1",
+          "alpha.secret-prerequisite.v1"
+        ],
+        "added": [
+          "alpha.official-connectors.v1",
+          "alpha.secret-prerequisite.v1"
+        ],
+        "removed": [],
+        "requiresConfirmation": true
+      }
+    ],
+    "update": {
+      "operation": "install",
+      "packageId": "package:github-official",
+      "versionBefore": null,
+      "versionAfter": "1.0.0",
+      "graphBeforeDigest": null,
+      "graphAfterDigest": "sha256:4952a2f4948d44dae20912d5c56f19da5da08f5544fba70c780774fe4ce8feda",
+      "ownerChanged": false,
+      "components": [
+        {
+          "componentId": "mcp:github-official",
+          "kind": "mcp",
+          "name": "github-official",
+          "key": "mcp--github-official",
+          "change": "added",
+          "requiredBefore": null,
+          "requiredAfter": true,
+          "prerequisiteIds": [
+            "mcp:github-official#GITHUB_PERSONAL_ACCESS_TOKEN"
+          ],
+          "capabilities": {
+            "key": "mcp--github-official",
+            "previous": null,
+            "requested": [
+              "alpha.official-connectors.v1",
+              "alpha.secret-prerequisite.v1"
+            ],
+            "added": [
+              "alpha.official-connectors.v1",
+              "alpha.secret-prerequisite.v1"
+            ],
+            "removed": [],
+            "requiresConfirmation": true
+          }
+        }
+      ],
+      "claims": [],
+      "capabilityExpansion": true
+    }
+  }
+}

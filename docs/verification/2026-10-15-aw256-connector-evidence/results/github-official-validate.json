@@ -1,0 +1,10 @@
+{
+  "command": "validate",
+  "compatibilityReportSha256": "c110a8f77e58ab1ef4f4027e2d54a25d91e25a545a53a7ea83e66b780c748f43",
+  "declarationSha256": "5a108060bff225d7f0180d56b5f6b293dabd345b109535ccf13a20bbcacd7006",
+  "ok": true,
+  "packageId": "package:github-official",
+  "schema": "alpha.package-declaration.cli-result.v1",
+  "verdict": "compatible",
+  "version": "1.0.0"
+}

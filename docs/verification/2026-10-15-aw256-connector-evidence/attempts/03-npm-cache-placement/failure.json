@@ -1,0 +1,3 @@
+{
+  "message": "AssertionError [ERR_ASSERTION]: live MCP process failed; see sanitized live evidence\n\n1 !== 0\n"
+}

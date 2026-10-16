@@ -1,0 +1,121 @@
+{
+  "compatibilityReport": {
+    "findings": [
+      {
+        "code": "alpha.profile.mcp-local.v1.mapped",
+        "disposition": "mapped",
+        "path": "$.root.component"
+      }
+    ],
+    "hostContract": {
+      "artifactPath": "packages/ui-mac/src/shared/host-extension-package-contract",
+      "artifactSha256": "485f1de9f56b866431f87ce4b7956b73fb65d650c3b8abddd7dd4279c91326ab",
+      "commit": "133f463d93664269db0cf91f1c1ff7d7887d6bf9",
+      "repo": "jinjunnn/alpha-code"
+    },
+    "inputSha256": "a9cf2012cc237d5548065ee7fa99c5bf79cdbd3ffee2500620639c7286a357fb",
+    "packageId": "package:dbhub-readonly",
+    "schema": "alpha.package-compatibility-report.v1",
+    "verdict": "compatible",
+    "version": "1.0.0"
+  },
+  "envelope": {
+    "capabilities": [
+      "alpha.official-connectors.v1",
+      "alpha.secret-prerequisite.v1"
+    ],
+    "components": [
+      {
+        "capabilities": [
+          "alpha.official-connectors.v1",
+          "alpha.secret-prerequisite.v1"
+        ],
+        "dependencies": [],
+        "id": "mcp:dbhub-readonly",
+        "payloadRef": {
+          "bytes": 313,
+          "mediaType": "application/vnd.alpha.host-extension-package.mcp-local.v1+json",
+          "sha256": "349bdddf84b69691cc8a18198e8279022eb26242f6820037a66c53305af464ac",
+          "url": "https://codepuppy.cn/catalog/assets/mcp.dbhub-readonly/1.0.0/alpha-package/349bdddf84b69691cc8a18198e8279022eb26242f6820037a66c53305af464ac.json"
+        },
+        "profileId": "mcp-local",
+        "profileVersion": 1,
+        "required": true
+      }
+    ],
+    "prelude": {
+      "packageId": "package:dbhub-readonly",
+      "version": "1.0.0"
+    },
+    "presentation": {
+      "description": "让助手查询你电脑上的数据库，只支持本机 SQLite 数据库文件，只读，不会修改数据。安装前请准备已有的数据库文件，并安装 Node.js 22.5 或更高版本；在安装窗口填写以 sqlite:// 开头的文件地址。目前仅 macOS 可安装。",
+      "displayName": "数据库（本机 SQLite，只读）"
+    },
+    "root": "mcp:dbhub-readonly",
+    "schema": "alpha.host-extension-package.v1"
+  },
+  "normalizedRecord": {
+    "components": [
+      {
+        "assetDirectory": "catalog-src/assets/mcp.dbhub-readonly/1.0.0",
+        "assetManifestSha256": null,
+        "capabilities": [
+          "alpha.official-connectors.v1",
+          "alpha.secret-prerequisite.v1"
+        ],
+        "dependencies": [],
+        "id": "mcp:dbhub-readonly",
+        "payloadRef": {
+          "bytes": 313,
+          "mediaType": "application/vnd.alpha.host-extension-package.mcp-local.v1+json",
+          "sha256": "349bdddf84b69691cc8a18198e8279022eb26242f6820037a66c53305af464ac",
+          "url": "https://codepuppy.cn/catalog/assets/mcp.dbhub-readonly/1.0.0/alpha-package/349bdddf84b69691cc8a18198e8279022eb26242f6820037a66c53305af464ac.json"
+        },
+        "profileId": "mcp-local",
+        "profileVersion": 1,
+        "required": true,
+        "version": "1.0.0"
+      }
+    ],
+    "root": {
+      "compatibility": {
+        "reportSha256": "5cab6ed201403b0391a9d1b3f0032ceee96be33fe867e58e7634f0741b5ba4e8",
+        "verdict": "compatible"
+      },
+      "componentId": "mcp:dbhub-readonly",
+      "declarationSha256": "a9cf2012cc237d5548065ee7fa99c5bf79cdbd3ffee2500620639c7286a357fb",
+      "packageId": "package:dbhub-readonly",
+      "presentation": {
+        "description": "让助手查询你电脑上的数据库，只支持本机 SQLite 数据库文件，只读，不会修改数据。安装前请准备已有的数据库文件，并安装 Node.js 22.5 或更高版本；在安装窗口填写以 sqlite:// 开头的文件地址。目前仅 macOS 可安装。",
+        "displayName": "数据库（本机 SQLite，只读）"
+      },
+      "source": {
+        "kind": "alpha-native",
+        "publisher": "official",
+        "redistributable": true
+      },
+      "version": "1.0.0"
+    },
+    "schema": "alpha.normalized-package-build-record.v1"
+  },
+  "payloads": {
+    "mcp:dbhub-readonly": {
+      "behavior": {
+        "command": [
+          "npx",
+          "-y",
+          "@bytebase/dbhub@1.5.0",
+          "--transport",
+          "stdio"
+        ],
+        "environment": {},
+        "officialRecipe": "dbhub-readonly-v1",
+        "requiredSecrets": [
+          "DSN"
+        ]
+      },
+      "schema": "alpha.host-extension-package.payload.mcp-local.v1"
+    }
+  },
+  "schema": "alpha.package-declaration.preview.v1"
+}

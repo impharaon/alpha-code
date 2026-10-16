@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "kind": "mcp",
+  "name": "dbhub-readonly",
+  "manifestDigest": "sha256:249999e7de9763522f793878e804e2d2116b61ad4a70ce0ca14e62bd14d644de",
+  "installed": [
+    "mcp:dbhub-readonly"
+  ],
+  "skipped": [],
+  "activateMcp": [],
+  "installedDisabled": true
+}

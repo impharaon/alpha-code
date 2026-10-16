@@ -1,0 +1,11 @@
+{
+  "type": "remote",
+  "url": "https://api.githubcopilot.com/mcp/",
+  "oauth": false,
+  "headers": {
+    "Authorization": "Bearer {file:/private/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/alpha-connectors-501-5fc95773a7ad73b9/21388-a7237516-0846-4971-a58b-b8df6336a500/github-official/v-9121504ee2b83fa2/GITHUB_PERSONAL_ACCESS_TOKEN}",
+    "X-MCP-Toolsets": "repos",
+    "X-MCP-Readonly": "true"
+  },
+  "enabled": true
+}

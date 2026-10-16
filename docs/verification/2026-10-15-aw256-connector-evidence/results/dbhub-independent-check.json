@@ -1,0 +1,5 @@
+{
+  "query": "SELECT name FROM sqlite_master WHERE name='aw256_should_not_exist'",
+  "rows": [],
+  "databaseSha256": "e0a5a1c84e6347690d5794c9d6659b16569bd36c2a823fdc1166b802ea6867a1"
+}

@@ -38,3 +38,57 @@ bun docs/verification/2026-10-15-req234-c2-fence-preverify/preverify.ts
 main 写盘边界未受影响；未做定制中心 UI 重装/真实 MCP 连接，也未做 dispose 后 ext→MCP 顺序、同名覆盖等第二步判据；不能据此宣称安装唯一通路已完成。
 检查：`git diff --cached --check` 通过；文档合同检查仅报基点已有 `docs/evidence/` 目录的 35 项布局错误，本次目录零发现，未越界修复。
 按派发要求在第一步停下，等待编排器核验后续派。
+
+## 第三步:目录身份 / 硬链 / 原子交换的 seatbelt 语义(修订方案的地面真相)
+
+2026-10-15,为 [修订方案](../../design/2026-10-15-req234-c2-revised-plan.md) §1.3 补的实测。基点 `d6da03544`(工作树带未提交草稿;
+探针把草稿加进 profile 的 `(deny file-write* (…))` 行剥掉后得到 **head 臂**,其余三臂都从同一份生产 planner 输出派生)。
+macOS 26.3.1 arm64、Bun 1.3.14、`/usr/bin/sandbox-exec`;隔离 HOME 在本目录临时树内(位于 `/Users`,不落入 W11/W12);
+不读用户配置或密钥。脚本 [dir-identity-probe.ts](dir-identity-probe.ts)(辅助 [fs-probe2.mjs](fs-probe2.mjs)、
+[syscall-probe.py](syscall-probe.py)),完整矩阵与四份 profile 在 [dir-identity-results.json](dir-identity-results.json)。
+
+R1 审计后扩展(审计 ①②③④):加入 auth.json / installs.json 文件、`{tool,tools}` 自动执行目录、`<dataHome>/opencode` 目录身份、`G/ext-tx` 真源,
+以及「工作区祖先」反例臂。
+
+```sh
+PROBE_PYTHON=/Users/tide/app/trader/.venv/bin/python3 bun docs/verification/2026-10-15-req234-c2-fence-preverify/dir-identity-probe.ts
+# rc=0;rows=656 scenarios=163 failures=0;RESULT: all expectations hold
+```
+
+四臂:`head`(HEAD profile)· `draft`(head + 草稿两行)· `cand`(head + 完整 deny 集:**13 文件 literal**〔11 旧 + `<dataHome>/opencode/auth.json` + `<G>/installs.json`〕
++ **12 subpath**〔`{HO,XO,D}/{plugin,plugins,tool,tools}`〕+ **6 目录身份 literal**〔D、`~/.opencode`、`<XDG>/opencode`、`<G>`、`<U>`、`<dataHome>/opencode`〕
++ **C2-T**〔`(subpath <G>/ext-tx)`〕)· `cand-ws`(cand + 工作区根 `<home>/wsroot` 且其孙目录 `wsroot/xdg/opencode` 受身份保护 —— 模拟 XDG 选进工作区)。
+上一轮的 `candlink` 臂(file-link)已证零差别,本轮去掉。G/U/HO/XO/D 含义同方案 §1.3。每行一次 `sandbox-exec`,每场景前重建整棵树。
+
+| 场景(节选;完整 163 条见 results) | head | draft | cand | cand-ws |
+| --- | --- | --- | --- | --- |
+| 13 配置文件 × append/create/rename-over/unlink/symlink/hardlink-out/renamex/openat(含 auth.json、installs.json) | OK | 只 alpha.jsonc EPERM | EPERM | EPERM |
+| `mv <dir> <ws>/stolen`、`ln -s`、`mkdir`、`rmdir`、`renameat` 顶替 D/HO/XO/G/U/`<dataHome>/opencode` | OK | OK | **EPERM** | EPERM |
+| `mv U G/stash`、`mv G U/stash`(把 allow 根搬进另一个可写根) | **OK** | **OK** | EPERM | EPERM |
+| `{HO,XO,D}/{plugin,plugins,tool,tools}` 建 `.js` / 软链目录(12 个,审计 ②) | OK | 仅 plugin EPERM | **EPERM** | EPERM |
+| `G/ext-tx` 建 journal/staging 文件、改名目录;`G/installs.json` 写(审计 ④) | OK | OK | **EPERM** | EPERM |
+| **工作区祖先**:`mv wsroot/xdg wsroot/xdg.old`(`xdg/opencode` 受保护,`xdg` 不受)(审计 ③) | EPERM | EPERM | EPERM | **OK(携带 opencode)** |
+| 同上 child:`mv wsroot/xdg/opencode x` | — | — | — | EPERM |
+| `<dataHome>/opencode` 之内写 log/db/repos、所有受保护目录 `mkdir -p`(已存在) | OK | OK | **OK** | OK |
+
+读法:
+- 文件 literal **挡住** append/create/rename/unlink/symlink/硬链出去/`renamex_np`/`openat`/`..`;目录 identity literal **挡住** rename/symlink/mkdir/rmdir/renameat。
+  auth.json、installs.json 与旧 11 文件同形;tool/tools 与 plugin/plugins 同形;`<dataHome>/opencode` 与其它目录身份同形,**而其内的 log/db/repos 仍可写**(审计 ①)。
+- **工作区祖先(审计 ③)**:只保护目录自身、而它的**父目录是可写工作区**时,改名父目录可整体携带子目录 —— cand-ws 臂 `mv wsroot/xdg …` = **OK**(opencode 一起走);
+  cand 臂(wsroot 非工作区)同一操作 EPERM。⇒ 修法是 `selectWorkspaceUnion` 排除「受保护目录祖先/自身」的候选(方案 §2.1 机制 2),不是再加 deny。子目录自身改名四臂皆 EPERM。
+- 兼容性:已存在目录上的 recursive `mkdir -p` 不触 deny(内核先回 EEXIST),`core/global.ts:35-43`、`alpha-config-injection.ts:123` 这类不会红;真引擎臂由方案 I5′ 兜底。
+
+## 第四步:事务恢复回滚把攻击者 preImage 写回 `alpha.jsonc`(审计 ④,攻击确认)
+
+脚本 [journal-rollback-probe.ts](journal-rollback-probe.ts)。用真生产事务引擎 `runExtensionTransaction` crash 出一份合法 journal+staging(mid-switch,两个 config item),
+再做在围栏内(W2)可做的两个写:覆盖链首 staged `config-0.pre` = 攻击 JSON、把该项 `preDigest` 改成其哈希;然后在**生产恢复参数**(无 probe、`pidAlive:()=>false`、`commitReceipt`)下
+`recoverExtensionTransactions`。
+
+```sh
+bun docs/verification/2026-10-15-req234-c2-fence-preverify/journal-rollback-probe.ts
+# {"recoveryOk":true,"reportAction":"rolled-back","journalState":"rolled-back","attackerLanded":true}
+# RESULT: ATTACK CONFIRMED — recovery wrote attacker preimage into alpha.jsonc
+```
+
+`readStagedConfigImage` 只拿 staged 字节比 journal 自带的 `preDigest`(`ext-config-tx.ts:164`),两者都在 W2 ⇒ 校验挡不住;回滚链在 live==`nextDigest` 时写回链首 preImage
+(`ext-transaction.ts:2731-2744`)。此路**独立于**账本(installs.json)路径。⇒ C2-T(`G/ext-tx` + `G/installs.json`)是必须保护(方案 §3.2 I7′)。

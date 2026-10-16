@@ -1,0 +1,3305 @@
+{
+  "generatedAt": "2026-10-16T02:45:48.355Z",
+  "roots": {
+    "home": "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home",
+    "G": "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/alpha-code-state/env/prod",
+    "U": "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop",
+    "D": "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+    "HO": "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.opencode",
+    "XO": "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.config/opencode",
+    "DH": "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.local/share/opencode",
+    "workspace": "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/code-puppy",
+    "wsroot": "/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/wsroot"
+  },
+  "python": "/Users/tide/app/trader/.venv/bin/python3",
+  "bun": "/Users/tide/.bun/bin/bun",
+  "profiles": {
+    "head": "(version 1)\n(allow default)\n(deny file-write*)\n(allow file-write*\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/code-puppy\")                                  ; W1\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/alpha-code-state/env/prod\")                          ; W2\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop\")                             ; W3\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.local/share/opencode\")               ; W4\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.cache/opencode\")               ; W5\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.config/opencode\")               ; W6\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.npm\")                                ; W7\n  (regex #\"^/Users/tide/app/alpha-code/\\.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/\\.zsh_history\")                       ; W8\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.zsh_sessions\")                       ; W10\n  (regex #\"^/Users/tide/app/alpha-code/\\.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/\\.zcompdump\")                         ; W19\n  (subpath \"/private/tmp\")                               ; W11\n  (subpath \"/private/var/folders\")                       ; W12\n  (literal \"/dev/null\") (literal \"/dev/stdout\") (literal \"/dev/stderr\")   ; W13\n  (literal \"/dev/tty\") (regex #\"^/dev/fd/\")              ; W14\n  (literal \"/dev/ptmx\") (regex #\"^/dev/ttys\")            ; W15\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.opencode\")                           ; W16\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Caches/bun\")                  ; W17\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.cache/bun\")                       ; W18\n)\n(deny network*)                                          ; N1 出网默认全拒(含 DNS 的 unix socket,Q2)\n(allow network-bind (local ip \"localhost:*\"))             ; N2 sidecar 自己的 HTTP 服务器要 bind\n(allow network-inbound (local ip \"localhost:*\"))          ; N3 …还要 accept —— 缺它 listen() EPERM(Q1.1)\n(allow network-outbound (remote ip \"localhost:24569\"))     ; N4 唯一出口:loopback 上的策略代理(main 进程内)\n",
+    "draft": "(version 1)\n(allow default)\n(deny file-write*)\n(allow file-write*\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/code-puppy\")                                  ; W1\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/alpha-code-state/env/prod\")                          ; W2\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop\")                             ; W3\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.local/share/opencode\")               ; W4\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.cache/opencode\")               ; W5\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.config/opencode\")               ; W6\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.npm\")                                ; W7\n  (regex #\"^/Users/tide/app/alpha-code/\\.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/\\.zsh_history\")                       ; W8\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.zsh_sessions\")                       ; W10\n  (regex #\"^/Users/tide/app/alpha-code/\\.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/\\.zcompdump\")                         ; W19\n  (subpath \"/private/tmp\")                               ; W11\n  (subpath \"/private/var/folders\")                       ; W12\n  (literal \"/dev/null\") (literal \"/dev/stdout\") (literal \"/dev/stderr\")   ; W13\n  (literal \"/dev/tty\") (regex #\"^/dev/fd/\")              ; W14\n  (literal \"/dev/ptmx\") (regex #\"^/dev/ttys\")            ; W15\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.opencode\")                           ; W16\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Caches/bun\")                  ; W17\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.cache/bun\")                       ; W18\n)\n(deny file-write* (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/alpha-code-state/env/prod/alpha.jsonc\"))\n(deny file-write* (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.opencode/plugin\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.opencode/plugins\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.config/opencode/plugin\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.config/opencode/plugins\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins\"))\n(deny network*)                                          ; N1 出网默认全拒(含 DNS 的 unix socket,Q2)\n(allow network-bind (local ip \"localhost:*\"))             ; N2 sidecar 自己的 HTTP 服务器要 bind\n(allow network-inbound (local ip \"localhost:*\"))          ; N3 …还要 accept —— 缺它 listen() EPERM(Q1.1)\n(allow network-outbound (remote ip \"localhost:24569\"))     ; N4 唯一出口:loopback 上的策略代理(main 进程内)\n",
+    "cand": "(version 1)\n(allow default)\n(deny file-write*)\n(allow file-write*\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/code-puppy\")                                  ; W1\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/alpha-code-state/env/prod\")                          ; W2\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop\")                             ; W3\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.local/share/opencode\")               ; W4\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.cache/opencode\")               ; W5\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.config/opencode\")               ; W6\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.npm\")                                ; W7\n  (regex #\"^/Users/tide/app/alpha-code/\\.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/\\.zsh_history\")                       ; W8\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.zsh_sessions\")                       ; W10\n  (regex #\"^/Users/tide/app/alpha-code/\\.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/\\.zcompdump\")                         ; W19\n  (subpath \"/private/tmp\")                               ; W11\n  (subpath \"/private/var/folders\")                       ; W12\n  (literal \"/dev/null\") (literal \"/dev/stdout\") (literal \"/dev/stderr\")   ; W13\n  (literal \"/dev/tty\") (regex #\"^/dev/fd/\")              ; W14\n  (literal \"/dev/ptmx\") (regex #\"^/dev/ttys\")            ; W15\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.opencode\")                           ; W16\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Caches/bun\")                  ; W17\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.cache/bun\")                       ; W18\n)\n(deny file-write* (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/alpha-code-state/env/prod/alpha.jsonc\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.opencode/opencode.json\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.opencode/opencode.jsonc\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.config/opencode/config.json\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.config/opencode/opencode.json\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.config/opencode/opencode.jsonc\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.config/opencode/config\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/config\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.local/share/opencode/auth.json\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/alpha-code-state/env/prod/installs.json\"))\n(deny file-write* (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.opencode/plugin\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.opencode/plugins\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.config/opencode/plugin\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.config/opencode/plugins\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.opencode/tool\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.opencode/tools\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.config/opencode/tool\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.config/opencode/tools\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/tool\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/tools\"))\n(deny file-write* (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.opencode\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.config/opencode\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/alpha-code-state/env/prod\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.local/share/opencode\"))\n(deny file-write* (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/alpha-code-state/env/prod/ext-tx\"))\n(deny network*)                                          ; N1 出网默认全拒(含 DNS 的 unix socket,Q2)\n(allow network-bind (local ip \"localhost:*\"))             ; N2 sidecar 自己的 HTTP 服务器要 bind\n(allow network-inbound (local ip \"localhost:*\"))          ; N3 …还要 accept —— 缺它 listen() EPERM(Q1.1)\n(allow network-outbound (remote ip \"localhost:24569\"))     ; N4 唯一出口:loopback 上的策略代理(main 进程内)\n",
+    "cand-ws": "(version 1)\n(allow default)\n(deny file-write*)\n(allow file-write*\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/code-puppy\")                                  ; W1\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/alpha-code-state/env/prod\")                          ; W2\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop\")                             ; W3\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.local/share/opencode\")               ; W4\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.cache/opencode\")               ; W5\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.config/opencode\")               ; W6\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.npm\")                                ; W7\n  (regex #\"^/Users/tide/app/alpha-code/\\.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/\\.zsh_history\")                       ; W8\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.zsh_sessions\")                       ; W10\n  (regex #\"^/Users/tide/app/alpha-code/\\.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/\\.zcompdump\")                         ; W19\n  (subpath \"/private/tmp\")                               ; W11\n  (subpath \"/private/var/folders\")                       ; W12\n  (literal \"/dev/null\") (literal \"/dev/stdout\") (literal \"/dev/stderr\")   ; W13\n  (literal \"/dev/tty\") (regex #\"^/dev/fd/\")              ; W14\n  (literal \"/dev/ptmx\") (regex #\"^/dev/ttys\")            ; W15\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.opencode\")                           ; W16\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Caches/bun\")                  ; W17\n  (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.cache/bun\")                       ; W18\n)\n(deny file-write* (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/alpha-code-state/env/prod/alpha.jsonc\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.opencode/opencode.json\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.opencode/opencode.jsonc\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.config/opencode/config.json\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.config/opencode/opencode.json\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.config/opencode/opencode.jsonc\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.config/opencode/config\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/config\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.local/share/opencode/auth.json\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/alpha-code-state/env/prod/installs.json\"))\n(deny file-write* (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.opencode/plugin\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.opencode/plugins\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.config/opencode/plugin\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.config/opencode/plugins\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.opencode/tool\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.opencode/tools\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.config/opencode/tool\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.config/opencode/tools\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/tool\") (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config/tools\"))\n(deny file-write* (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop/alpha-engine-config\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.opencode\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.config/opencode\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/alpha-code-state/env/prod\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/ai.opencode.desktop\") (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/.local/share/opencode\"))\n(deny file-write* (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/Library/Application Support/alpha-code-state/env/prod/ext-tx\"))\n(allow file-write* (subpath \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/wsroot\"))\n(deny file-write* (literal \"/Users/tide/app/alpha-code/.worktrees/1530-config-fence/docs/verification/2026-10-15-req234-c2-fence-preverify/fixture-TShidV/home/wsroot/xdg/opencode\"))\n(deny network*)                                          ; N1 出网默认全拒(含 DNS 的 unix socket,Q2)\n(allow network-bind (local ip \"localhost:*\"))             ; N2 sidecar 自己的 HTTP 服务器要 bind\n(allow network-inbound (local ip \"localhost:*\"))          ; N3 …还要 accept —— 缺它 listen() EPERM(Q1.1)\n(allow network-outbound (remote ip \"localhost:24569\"))     ; N4 唯一出口:loopback 上的策略代理(main 进程内)\n"
+  },
+  "rows": [
+    {
+      "id": "compile",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "compile",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "compile",
+      "arm": "cand",
+      "code": "OK"
+    },
+    {
+      "id": "compile",
+      "arm": "cand-ws",
+      "code": "OK"
+    },
+    {
+      "id": "file-append:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-append:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "draft",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-append:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-append:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-create:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "draft",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-rename-over:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "draft",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-symlink-into-place:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "draft",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-hardlink-out:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "draft",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-renamex-swap:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "draft",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-openat:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "draft",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:Library/Application Support/alpha-code-state/env/prod/alpha.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-append:.opencode/opencode.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-append:.opencode/opencode.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-append:.opencode/opencode.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-append:.opencode/opencode.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:.opencode/opencode.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-create:.opencode/opencode.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-create:.opencode/opencode.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:.opencode/opencode.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:.opencode/opencode.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-rename-over:.opencode/opencode.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-rename-over:.opencode/opencode.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:.opencode/opencode.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:.opencode/opencode.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-symlink-into-place:.opencode/opencode.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-symlink-into-place:.opencode/opencode.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:.opencode/opencode.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:.opencode/opencode.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-hardlink-out:.opencode/opencode.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-hardlink-out:.opencode/opencode.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:.opencode/opencode.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:.opencode/opencode.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-renamex-swap:.opencode/opencode.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-renamex-swap:.opencode/opencode.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:.opencode/opencode.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:.opencode/opencode.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-openat:.opencode/opencode.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-openat:.opencode/opencode.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:.opencode/opencode.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-append:.opencode/opencode.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-append:.opencode/opencode.jsonc",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-append:.opencode/opencode.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-append:.opencode/opencode.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:.opencode/opencode.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-create:.opencode/opencode.jsonc",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-create:.opencode/opencode.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:.opencode/opencode.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:.opencode/opencode.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-rename-over:.opencode/opencode.jsonc",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-rename-over:.opencode/opencode.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:.opencode/opencode.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:.opencode/opencode.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-symlink-into-place:.opencode/opencode.jsonc",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-symlink-into-place:.opencode/opencode.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:.opencode/opencode.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:.opencode/opencode.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-hardlink-out:.opencode/opencode.jsonc",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-hardlink-out:.opencode/opencode.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:.opencode/opencode.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:.opencode/opencode.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-renamex-swap:.opencode/opencode.jsonc",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-renamex-swap:.opencode/opencode.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:.opencode/opencode.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:.opencode/opencode.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-openat:.opencode/opencode.jsonc",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-openat:.opencode/opencode.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:.opencode/opencode.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-append:.config/opencode/config.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-append:.config/opencode/config.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-append:.config/opencode/config.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-append:.config/opencode/config.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:.config/opencode/config.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-create:.config/opencode/config.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-create:.config/opencode/config.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:.config/opencode/config.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:.config/opencode/config.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-rename-over:.config/opencode/config.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-rename-over:.config/opencode/config.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:.config/opencode/config.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:.config/opencode/config.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-symlink-into-place:.config/opencode/config.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-symlink-into-place:.config/opencode/config.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:.config/opencode/config.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:.config/opencode/config.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-hardlink-out:.config/opencode/config.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-hardlink-out:.config/opencode/config.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:.config/opencode/config.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:.config/opencode/config.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-renamex-swap:.config/opencode/config.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-renamex-swap:.config/opencode/config.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:.config/opencode/config.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:.config/opencode/config.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-openat:.config/opencode/config.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-openat:.config/opencode/config.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:.config/opencode/config.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-append:.config/opencode/opencode.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-append:.config/opencode/opencode.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-append:.config/opencode/opencode.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-append:.config/opencode/opencode.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:.config/opencode/opencode.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-create:.config/opencode/opencode.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-create:.config/opencode/opencode.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:.config/opencode/opencode.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:.config/opencode/opencode.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-rename-over:.config/opencode/opencode.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-rename-over:.config/opencode/opencode.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:.config/opencode/opencode.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:.config/opencode/opencode.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-symlink-into-place:.config/opencode/opencode.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-symlink-into-place:.config/opencode/opencode.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:.config/opencode/opencode.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:.config/opencode/opencode.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-hardlink-out:.config/opencode/opencode.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-hardlink-out:.config/opencode/opencode.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:.config/opencode/opencode.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:.config/opencode/opencode.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-renamex-swap:.config/opencode/opencode.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-renamex-swap:.config/opencode/opencode.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:.config/opencode/opencode.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:.config/opencode/opencode.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-openat:.config/opencode/opencode.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-openat:.config/opencode/opencode.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:.config/opencode/opencode.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-append:.config/opencode/opencode.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-append:.config/opencode/opencode.jsonc",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-append:.config/opencode/opencode.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-append:.config/opencode/opencode.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:.config/opencode/opencode.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-create:.config/opencode/opencode.jsonc",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-create:.config/opencode/opencode.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:.config/opencode/opencode.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:.config/opencode/opencode.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-rename-over:.config/opencode/opencode.jsonc",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-rename-over:.config/opencode/opencode.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:.config/opencode/opencode.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:.config/opencode/opencode.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-symlink-into-place:.config/opencode/opencode.jsonc",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-symlink-into-place:.config/opencode/opencode.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:.config/opencode/opencode.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:.config/opencode/opencode.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-hardlink-out:.config/opencode/opencode.jsonc",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-hardlink-out:.config/opencode/opencode.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:.config/opencode/opencode.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:.config/opencode/opencode.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-renamex-swap:.config/opencode/opencode.jsonc",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-renamex-swap:.config/opencode/opencode.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:.config/opencode/opencode.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:.config/opencode/opencode.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-openat:.config/opencode/opencode.jsonc",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-openat:.config/opencode/opencode.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:.config/opencode/opencode.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-append:.config/opencode/config",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-append:.config/opencode/config",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-append:.config/opencode/config",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-append:.config/opencode/config",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:.config/opencode/config",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-create:.config/opencode/config",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-create:.config/opencode/config",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:.config/opencode/config",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:.config/opencode/config",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-rename-over:.config/opencode/config",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-rename-over:.config/opencode/config",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:.config/opencode/config",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:.config/opencode/config",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-symlink-into-place:.config/opencode/config",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-symlink-into-place:.config/opencode/config",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:.config/opencode/config",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:.config/opencode/config",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-hardlink-out:.config/opencode/config",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-hardlink-out:.config/opencode/config",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:.config/opencode/config",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:.config/opencode/config",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-renamex-swap:.config/opencode/config",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-renamex-swap:.config/opencode/config",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:.config/opencode/config",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:.config/opencode/config",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-openat:.config/opencode/config",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-openat:.config/opencode/config",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:.config/opencode/config",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-append:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-append:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-append:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-append:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-rename-over:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-rename-over:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-symlink-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-symlink-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-hardlink-out:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-hardlink-out:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-renamex-swap:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-renamex-swap:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-openat:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-openat:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-append:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-append:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-append:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-append:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-rename-over:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-rename-over:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-symlink-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-symlink-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-hardlink-out:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-hardlink-out:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-renamex-swap:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-renamex-swap:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-openat:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-openat:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-append:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-append:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-append:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-append:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-rename-over:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-rename-over:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-symlink-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-symlink-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-hardlink-out:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-hardlink-out:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-renamex-swap:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-renamex-swap:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-openat:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-openat:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-append:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-append:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-append:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-append:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-rename-over:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-rename-over:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-symlink-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-symlink-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-hardlink-out:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-hardlink-out:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-renamex-swap:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-renamex-swap:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-openat:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-openat:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:Library/Application Support/ai.opencode.desktop/alpha-engine-config/config",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-append:.local/share/opencode/auth.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-append:.local/share/opencode/auth.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-append:.local/share/opencode/auth.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-append:.local/share/opencode/auth.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:.local/share/opencode/auth.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-create:.local/share/opencode/auth.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-create:.local/share/opencode/auth.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:.local/share/opencode/auth.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:.local/share/opencode/auth.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-rename-over:.local/share/opencode/auth.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-rename-over:.local/share/opencode/auth.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:.local/share/opencode/auth.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:.local/share/opencode/auth.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-symlink-into-place:.local/share/opencode/auth.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-symlink-into-place:.local/share/opencode/auth.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:.local/share/opencode/auth.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:.local/share/opencode/auth.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-hardlink-out:.local/share/opencode/auth.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-hardlink-out:.local/share/opencode/auth.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:.local/share/opencode/auth.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:.local/share/opencode/auth.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-renamex-swap:.local/share/opencode/auth.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-renamex-swap:.local/share/opencode/auth.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:.local/share/opencode/auth.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:.local/share/opencode/auth.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-openat:.local/share/opencode/auth.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-openat:.local/share/opencode/auth.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:.local/share/opencode/auth.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-append:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-append:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-append:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-append:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-create:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-create:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-create:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-rename-over:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-rename-over:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-rename-over:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-symlink-into-place:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-symlink-into-place:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-symlink-into-place:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-hardlink-out:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-hardlink-out:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-hardlink-out:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-renamex-swap:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-renamex-swap:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-renamex-swap:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "file-openat:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "file-openat:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "file-openat:Library/Application Support/alpha-code-state/env/prod/installs.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-rename-away:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rename-away:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rename-away:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-rename-away:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-symlink-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-symlink-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-symlink-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-symlink-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-mkdir-absent:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdir-absent:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdir-absent:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-mkdir-absent:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-rmdir-emptied:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rmdir-emptied:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rmdir-emptied:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-rmdir-emptied:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-renameat-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-renameat-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-renameat-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-renameat-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-mkdirp-existing:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdirp-existing:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdirp-existing:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "cand",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdirp-existing:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "cand-ws",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rename-away:.opencode",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rename-away:.opencode",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rename-away:.opencode",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-rename-away:.opencode",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-symlink-into-place:.opencode",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-symlink-into-place:.opencode",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-symlink-into-place:.opencode",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-symlink-into-place:.opencode",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-mkdir-absent:.opencode",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdir-absent:.opencode",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdir-absent:.opencode",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-mkdir-absent:.opencode",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-rmdir-emptied:.opencode",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rmdir-emptied:.opencode",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rmdir-emptied:.opencode",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-rmdir-emptied:.opencode",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-renameat-into-place:.opencode",
+      "arm": "head",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-renameat-into-place:.opencode",
+      "arm": "draft",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-renameat-into-place:.opencode",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-renameat-into-place:.opencode",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-mkdirp-existing:.opencode",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdirp-existing:.opencode",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdirp-existing:.opencode",
+      "arm": "cand",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdirp-existing:.opencode",
+      "arm": "cand-ws",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rename-away:.config/opencode",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rename-away:.config/opencode",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rename-away:.config/opencode",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-rename-away:.config/opencode",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-symlink-into-place:.config/opencode",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-symlink-into-place:.config/opencode",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-symlink-into-place:.config/opencode",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-symlink-into-place:.config/opencode",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-mkdir-absent:.config/opencode",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdir-absent:.config/opencode",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdir-absent:.config/opencode",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-mkdir-absent:.config/opencode",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-rmdir-emptied:.config/opencode",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rmdir-emptied:.config/opencode",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rmdir-emptied:.config/opencode",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-rmdir-emptied:.config/opencode",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-renameat-into-place:.config/opencode",
+      "arm": "head",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-renameat-into-place:.config/opencode",
+      "arm": "draft",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-renameat-into-place:.config/opencode",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-renameat-into-place:.config/opencode",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-mkdirp-existing:.config/opencode",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdirp-existing:.config/opencode",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdirp-existing:.config/opencode",
+      "arm": "cand",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdirp-existing:.config/opencode",
+      "arm": "cand-ws",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rename-away:Library/Application Support/alpha-code-state/env/prod",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rename-away:Library/Application Support/alpha-code-state/env/prod",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rename-away:Library/Application Support/alpha-code-state/env/prod",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-rename-away:Library/Application Support/alpha-code-state/env/prod",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-symlink-into-place:Library/Application Support/alpha-code-state/env/prod",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-symlink-into-place:Library/Application Support/alpha-code-state/env/prod",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-symlink-into-place:Library/Application Support/alpha-code-state/env/prod",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-symlink-into-place:Library/Application Support/alpha-code-state/env/prod",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-mkdir-absent:Library/Application Support/alpha-code-state/env/prod",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdir-absent:Library/Application Support/alpha-code-state/env/prod",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdir-absent:Library/Application Support/alpha-code-state/env/prod",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-mkdir-absent:Library/Application Support/alpha-code-state/env/prod",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-rmdir-emptied:Library/Application Support/alpha-code-state/env/prod",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rmdir-emptied:Library/Application Support/alpha-code-state/env/prod",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rmdir-emptied:Library/Application Support/alpha-code-state/env/prod",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-rmdir-emptied:Library/Application Support/alpha-code-state/env/prod",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-renameat-into-place:Library/Application Support/alpha-code-state/env/prod",
+      "arm": "head",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-renameat-into-place:Library/Application Support/alpha-code-state/env/prod",
+      "arm": "draft",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-renameat-into-place:Library/Application Support/alpha-code-state/env/prod",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-renameat-into-place:Library/Application Support/alpha-code-state/env/prod",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-mkdirp-existing:Library/Application Support/alpha-code-state/env/prod",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdirp-existing:Library/Application Support/alpha-code-state/env/prod",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdirp-existing:Library/Application Support/alpha-code-state/env/prod",
+      "arm": "cand",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdirp-existing:Library/Application Support/alpha-code-state/env/prod",
+      "arm": "cand-ws",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rename-away:Library/Application Support/ai.opencode.desktop",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rename-away:Library/Application Support/ai.opencode.desktop",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rename-away:Library/Application Support/ai.opencode.desktop",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-rename-away:Library/Application Support/ai.opencode.desktop",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-symlink-into-place:Library/Application Support/ai.opencode.desktop",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-symlink-into-place:Library/Application Support/ai.opencode.desktop",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-symlink-into-place:Library/Application Support/ai.opencode.desktop",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-symlink-into-place:Library/Application Support/ai.opencode.desktop",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-mkdir-absent:Library/Application Support/ai.opencode.desktop",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdir-absent:Library/Application Support/ai.opencode.desktop",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdir-absent:Library/Application Support/ai.opencode.desktop",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-mkdir-absent:Library/Application Support/ai.opencode.desktop",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-rmdir-emptied:Library/Application Support/ai.opencode.desktop",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rmdir-emptied:Library/Application Support/ai.opencode.desktop",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rmdir-emptied:Library/Application Support/ai.opencode.desktop",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-rmdir-emptied:Library/Application Support/ai.opencode.desktop",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-renameat-into-place:Library/Application Support/ai.opencode.desktop",
+      "arm": "head",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-renameat-into-place:Library/Application Support/ai.opencode.desktop",
+      "arm": "draft",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-renameat-into-place:Library/Application Support/ai.opencode.desktop",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-renameat-into-place:Library/Application Support/ai.opencode.desktop",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-mkdirp-existing:Library/Application Support/ai.opencode.desktop",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdirp-existing:Library/Application Support/ai.opencode.desktop",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdirp-existing:Library/Application Support/ai.opencode.desktop",
+      "arm": "cand",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdirp-existing:Library/Application Support/ai.opencode.desktop",
+      "arm": "cand-ws",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rename-away:.local/share/opencode",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rename-away:.local/share/opencode",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rename-away:.local/share/opencode",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-rename-away:.local/share/opencode",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-symlink-into-place:.local/share/opencode",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-symlink-into-place:.local/share/opencode",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-symlink-into-place:.local/share/opencode",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-symlink-into-place:.local/share/opencode",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-mkdir-absent:.local/share/opencode",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdir-absent:.local/share/opencode",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdir-absent:.local/share/opencode",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-mkdir-absent:.local/share/opencode",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-rmdir-emptied:.local/share/opencode",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rmdir-emptied:.local/share/opencode",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rmdir-emptied:.local/share/opencode",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-rmdir-emptied:.local/share/opencode",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-renameat-into-place:.local/share/opencode",
+      "arm": "head",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-renameat-into-place:.local/share/opencode",
+      "arm": "draft",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-renameat-into-place:.local/share/opencode",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-renameat-into-place:.local/share/opencode",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-mkdirp-existing:.local/share/opencode",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdirp-existing:.local/share/opencode",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdirp-existing:.local/share/opencode",
+      "arm": "cand",
+      "code": "OK"
+    },
+    {
+      "id": "dir-mkdirp-existing:.local/share/opencode",
+      "arm": "cand-ws",
+      "code": "OK"
+    },
+    {
+      "id": "allow-inside-dataHome:.local/share/opencode/log/x",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "allow-inside-dataHome:.local/share/opencode/log/x",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "allow-inside-dataHome:.local/share/opencode/log/x",
+      "arm": "cand",
+      "code": "OK"
+    },
+    {
+      "id": "allow-inside-dataHome:.local/share/opencode/log/x",
+      "arm": "cand-ws",
+      "code": "OK"
+    },
+    {
+      "id": "allow-inside-dataHome:.local/share/opencode/x.db",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "allow-inside-dataHome:.local/share/opencode/x.db",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "allow-inside-dataHome:.local/share/opencode/x.db",
+      "arm": "cand",
+      "code": "OK"
+    },
+    {
+      "id": "allow-inside-dataHome:.local/share/opencode/x.db",
+      "arm": "cand-ws",
+      "code": "OK"
+    },
+    {
+      "id": "allow-inside-dataHome:.local/share/opencode/repos/x",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "allow-inside-dataHome:.local/share/opencode/repos/x",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "allow-inside-dataHome:.local/share/opencode/repos/x",
+      "arm": "cand",
+      "code": "OK"
+    },
+    {
+      "id": "allow-inside-dataHome:.local/share/opencode/repos/x",
+      "arm": "cand-ws",
+      "code": "OK"
+    },
+    {
+      "id": "allow-inside-dataHome:.local/share/opencode/x.db-wal",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "allow-inside-dataHome:.local/share/opencode/x.db-wal",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "allow-inside-dataHome:.local/share/opencode/x.db-wal",
+      "arm": "cand",
+      "code": "OK"
+    },
+    {
+      "id": "allow-inside-dataHome:.local/share/opencode/x.db-wal",
+      "arm": "cand-ws",
+      "code": "OK"
+    },
+    {
+      "id": "auto-create:.opencode/plugin/x2.js",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "auto-create:.opencode/plugin/x2.js",
+      "arm": "draft",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:.opencode/plugin/x2.js",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:.opencode/plugin/x2.js",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:.opencode/plugin",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "auto-dir-symlink:.opencode/plugin",
+      "arm": "draft",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:.opencode/plugin",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:.opencode/plugin",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:.opencode/plugins/x2.js",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "auto-create:.opencode/plugins/x2.js",
+      "arm": "draft",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:.opencode/plugins/x2.js",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:.opencode/plugins/x2.js",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:.opencode/plugins",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "auto-dir-symlink:.opencode/plugins",
+      "arm": "draft",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:.opencode/plugins",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:.opencode/plugins",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:.config/opencode/plugin/x2.js",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "auto-create:.config/opencode/plugin/x2.js",
+      "arm": "draft",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:.config/opencode/plugin/x2.js",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:.config/opencode/plugin/x2.js",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:.config/opencode/plugin",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "auto-dir-symlink:.config/opencode/plugin",
+      "arm": "draft",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:.config/opencode/plugin",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:.config/opencode/plugin",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:.config/opencode/plugins/x2.js",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "auto-create:.config/opencode/plugins/x2.js",
+      "arm": "draft",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:.config/opencode/plugins/x2.js",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:.config/opencode/plugins/x2.js",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:.config/opencode/plugins",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "auto-dir-symlink:.config/opencode/plugins",
+      "arm": "draft",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:.config/opencode/plugins",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:.config/opencode/plugins",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x2.js",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "auto-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x2.js",
+      "arm": "draft",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x2.js",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin/x2.js",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "auto-dir-symlink:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin",
+      "arm": "draft",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugin",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x2.js",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "auto-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x2.js",
+      "arm": "draft",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x2.js",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins/x2.js",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "auto-dir-symlink:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins",
+      "arm": "draft",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:Library/Application Support/ai.opencode.desktop/alpha-engine-config/plugins",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:.opencode/tool/x2.js",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "auto-create:.opencode/tool/x2.js",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "auto-create:.opencode/tool/x2.js",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:.opencode/tool/x2.js",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:.opencode/tool",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "auto-dir-symlink:.opencode/tool",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "auto-dir-symlink:.opencode/tool",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:.opencode/tool",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:.opencode/tools/x2.js",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "auto-create:.opencode/tools/x2.js",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "auto-create:.opencode/tools/x2.js",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:.opencode/tools/x2.js",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:.opencode/tools",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "auto-dir-symlink:.opencode/tools",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "auto-dir-symlink:.opencode/tools",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:.opencode/tools",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:.config/opencode/tool/x2.js",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "auto-create:.config/opencode/tool/x2.js",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "auto-create:.config/opencode/tool/x2.js",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:.config/opencode/tool/x2.js",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:.config/opencode/tool",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "auto-dir-symlink:.config/opencode/tool",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "auto-dir-symlink:.config/opencode/tool",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:.config/opencode/tool",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:.config/opencode/tools/x2.js",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "auto-create:.config/opencode/tools/x2.js",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "auto-create:.config/opencode/tools/x2.js",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:.config/opencode/tools/x2.js",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:.config/opencode/tools",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "auto-dir-symlink:.config/opencode/tools",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "auto-dir-symlink:.config/opencode/tools",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:.config/opencode/tools",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/tool/x2.js",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "auto-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/tool/x2.js",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "auto-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/tool/x2.js",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/tool/x2.js",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:Library/Application Support/ai.opencode.desktop/alpha-engine-config/tool",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "auto-dir-symlink:Library/Application Support/ai.opencode.desktop/alpha-engine-config/tool",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "auto-dir-symlink:Library/Application Support/ai.opencode.desktop/alpha-engine-config/tool",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:Library/Application Support/ai.opencode.desktop/alpha-engine-config/tool",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/tools/x2.js",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "auto-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/tools/x2.js",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "auto-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/tools/x2.js",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-create:Library/Application Support/ai.opencode.desktop/alpha-engine-config/tools/x2.js",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:Library/Application Support/ai.opencode.desktop/alpha-engine-config/tools",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "auto-dir-symlink:Library/Application Support/ai.opencode.desktop/alpha-engine-config/tools",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "auto-dir-symlink:Library/Application Support/ai.opencode.desktop/alpha-engine-config/tools",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "auto-dir-symlink:Library/Application Support/ai.opencode.desktop/alpha-engine-config/tools",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "extTx-create-journal:Library/Application Support/alpha-code-state/env/prod/ext-tx/journal/evil.json",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "extTx-create-journal:Library/Application Support/alpha-code-state/env/prod/ext-tx/journal/evil.json",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "extTx-create-journal:Library/Application Support/alpha-code-state/env/prod/ext-tx/journal/evil.json",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "extTx-create-journal:Library/Application Support/alpha-code-state/env/prod/ext-tx/journal/evil.json",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "extTx-create-staging:Library/Application Support/alpha-code-state/env/prod/ext-tx/staging/x/config-0.pre",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "extTx-create-staging:Library/Application Support/alpha-code-state/env/prod/ext-tx/staging/x/config-0.pre",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "extTx-create-staging:Library/Application Support/alpha-code-state/env/prod/ext-tx/staging/x/config-0.pre",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "extTx-create-staging:Library/Application Support/alpha-code-state/env/prod/ext-tx/staging/x/config-0.pre",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "extTx-rename-away:Library/Application Support/alpha-code-state/env/prod/ext-tx",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "extTx-rename-away:Library/Application Support/alpha-code-state/env/prod/ext-tx",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "extTx-rename-away:Library/Application Support/alpha-code-state/env/prod/ext-tx",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "extTx-rename-away:Library/Application Support/alpha-code-state/env/prod/ext-tx",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-rename-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rename-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rename-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-rename-into-place:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-rename-into-place:.opencode",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rename-into-place:.opencode",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "dir-rename-into-place:.opencode",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "dir-rename-into-place:.opencode",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "root-move-into-other-root:Library/Application Support/ai.opencode.desktop->Library/Application Support/alpha-code-state/env/prod/stash",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "id": "root-move-into-other-root:Library/Application Support/ai.opencode.desktop->Library/Application Support/alpha-code-state/env/prod/stash",
+      "arm": "draft",
+      "code": "OK"
+    },
+    {
+      "id": "root-move-into-other-root:Library/Application Support/ai.opencode.desktop->Library/Application Support/alpha-code-state/env/prod/stash",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "root-move-into-other-root:Library/Application Support/ai.opencode.desktop->Library/Application Support/alpha-code-state/env/prod/stash",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    },
+    {
+      "id": "ancestor-parent-rename:wsroot/xdg (child wsroot/xdg/opencode is identity-protected)",
+      "arm": "head",
+      "code": "EPERM"
+    },
+    {
+      "id": "ancestor-parent-rename:wsroot/xdg (child wsroot/xdg/opencode is identity-protected)",
+      "arm": "draft",
+      "code": "EPERM"
+    },
+    {
+      "id": "ancestor-parent-rename:wsroot/xdg (child wsroot/xdg/opencode is identity-protected)",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "ancestor-parent-rename:wsroot/xdg (child wsroot/xdg/opencode is identity-protected)",
+      "arm": "cand-ws",
+      "code": "OK"
+    },
+    {
+      "id": "ancestor-child-still-denied:wsroot/xdg/opencode",
+      "arm": "head",
+      "code": "EPERM"
+    },
+    {
+      "id": "ancestor-child-still-denied:wsroot/xdg/opencode",
+      "arm": "draft",
+      "code": "EPERM"
+    },
+    {
+      "id": "ancestor-child-still-denied:wsroot/xdg/opencode",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "id": "ancestor-child-still-denied:wsroot/xdg/opencode",
+      "arm": "cand-ws",
+      "code": "EPERM"
+    }
+  ],
+  "failures": []
+}

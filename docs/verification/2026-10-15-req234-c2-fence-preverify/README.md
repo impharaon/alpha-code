@@ -74,15 +74,14 @@ PROBE_PYTHON=/Users/tide/app/trader/.venv/bin/python3 bun docs/verification/2026
 读法:
 - 文件 literal **挡住** append/create/rename/unlink/symlink/硬链出去/`renamex_np`/`openat`/`..`;目录 identity literal **挡住** rename/symlink/mkdir/rmdir/renameat。
   auth.json、installs.json 与旧 11 文件同形;tool/tools 与 plugin/plugins 同形;`<dataHome>/opencode` 与其它目录身份同形,**而其内的 log/db/repos 仍可写**(审计 ①)。
-- **工作区祖先(审计 ③)**:只保护目录自身、而它的**父目录是可写工作区**时,改名父目录可整体携带子目录 —— cand-ws 臂 `mv wsroot/xdg …` = **OK**(opencode 一起走);
-  cand 臂(wsroot 非工作区)同一操作 EPERM。⇒ 修法是 `selectWorkspaceUnion` 排除「受保护目录祖先/自身」的候选(方案 §2.1 机制 2),不是再加 deny。子目录自身改名四臂皆 EPERM。
+- **工作区祖先(审计 ③;R1 演示的是「有这个口」)**:只保护目录自身、而它的**父目录是可写工作区**时,改名父目录可整体携带子目录 —— cand-ws 臂 `mv wsroot/xdg …` = **OK**(opencode 一起走)。
+  **修法在 R2 改定**:不是「`selectWorkspaceUnion` 排除祖先候选」(那会把 `XDG_CONFIG_HOME=<ws>/.config` 下的默认工作区也剔除、拒绝 fork),而是**锁住可写祖先目录的身份**,见第五步与方案 §2.1 机制 2。子目录自身改名四臂皆 EPERM。
 - 兼容性:已存在目录上的 recursive `mkdir -p` 不触 deny(内核先回 EEXIST),`core/global.ts:35-43`、`alpha-config-injection.ts:123` 这类不会红;真引擎臂由方案 I5′ 兜底。
 
 ## 第四步:事务恢复回滚把攻击者 preImage 写回 `alpha.jsonc`(审计 ④,攻击确认)
 
 脚本 [journal-rollback-probe.ts](journal-rollback-probe.ts)。用真生产事务引擎 `runExtensionTransaction` crash 出一份合法 journal+staging(mid-switch,两个 config item),
-再做在围栏内(W2)可做的两个写:覆盖链首 staged `config-0.pre` = 攻击 JSON、把该项 `preDigest` 改成其哈希;然后在**生产恢复参数**(无 probe、`pidAlive:()=>false`、`commitReceipt`)下
-`recoverExtensionTransactions`。
+再做在围栏内(W2)可做的两个写:覆盖链首 staged `config-0.pre` = 攻击 JSON、把该项 `preDigest` 改成其哈希;然后跑 `recoverExtensionTransactions`。
 
 ```sh
 bun docs/verification/2026-10-15-req234-c2-fence-preverify/journal-rollback-probe.ts
@@ -90,5 +89,24 @@ bun docs/verification/2026-10-15-req234-c2-fence-preverify/journal-rollback-prob
 # RESULT: ATTACK CONFIRMED — recovery wrote attacker preimage into alpha.jsonc
 ```
 
+**恢复参数(R2 finding 6 订正)**:`journal-rollback-probe.ts` 传 `{ commitReceipt, pidAlive, log }`,是**该回滚分支的等价参数**,不是「生产全集」——
+生产(`ext-ipc.ts:725-745`)还提供 `probe` 与 `receiptCommitted`。等价理由:journal item_0 翻转、item_1 未翻转 ⇒ `allFlipped=false`(`ext-transaction.ts:2545`)⇒
+不进 `allFlipped && probe && commitReceipt` 前向分支(`:2547`),`probe` 改不了结果;无 receipt 项 ⇒ `receiptCommitted` 返回 false(确证未 durable ⇒ 允许回滚)。
+[journal-rollback-equiv-probe.ts](journal-rollback-equiv-probe.ts) 带真 `probe`+`receiptCommitted` 重跑,`attackerLanded:true` 仍成立。
+
 `readStagedConfigImage` 只拿 staged 字节比 journal 自带的 `preDigest`(`ext-config-tx.ts:164`),两者都在 W2 ⇒ 校验挡不住;回滚链在 live==`nextDigest` 时写回链首 preImage
 (`ext-transaction.ts:2731-2744`)。此路**独立于**账本(installs.json)路径。⇒ C2-T(`G/ext-tx` + `G/installs.json`)是必须保护(方案 §3.2 I7′)。
+
+## 第五步:可写祖先身份锁(R2 findings 1 & 2)
+
+脚本 [writable-ancestor-probe.ts](writable-ancestor-probe.ts)。实现拟议助手 `writableAncestorIdentities(实际渲染的 W1–W19 allow 根, 受保护目标)`,在三个 XDG 拓扑 ×{head,cand}下验证。
+
+```sh
+bun docs/verification/2026-10-15-req234-c2-fence-preverify/writable-ancestor-probe.ts
+# helper: default -> empty (XDG under HOME); xdg-data-under-U -> U/xdg; xdg-config-under-ws -> <ws>/.config
+# rows=28 failures=0; RESULT: all expectations hold
+```
+
+- **finding 1**(`XDG_DATA_HOME=U/xdg`,dataHome 落进 W3=U):助手产出 `U/xdg`;cand 下 `mv U/xdg …` EPERM、head 下 OK(反例);`auth.json` 写 EPERM;`U` 普通文件写仍 OK。
+- **finding 2**(`XDG_CONFIG_HOME=<ws>/.config`,落进默认工作区 W1):助手产出 `<ws>/.config`;cand 下 `mv <ws>/.config …` EPERM;**而默认工作区仍被选中、`<ws>/probe.txt` 可写**(不改 `selectWorkspaceUnion`,不拒 fork)。
+- 机制:锁的是「可写根之内、受保护目标之上」的中间目录身份,从**实际 allow 根**派生(不是写死清单)。默认拓扑产出空集,零额外 deny。

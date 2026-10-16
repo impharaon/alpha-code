@@ -1,0 +1,180 @@
+{
+  "observedAt": "2026-10-16T03:36:59.830Z",
+  "sourceCommit": "763d37186c96230d219625767be52ea5f82d912d",
+  "hostVersion": "0.1.20",
+  "catalogVersion": "2026-10-15.3",
+  "source": "remote",
+  "via": "channel-stable",
+  "signature": "PASS: built-in Ed25519 trust → coherent snapshot → stable → catalog; payload SHA-256 + byte length + cloud@1 decoder",
+  "builtinPublicKey": "MCowBQYDK2VwAyEAqBBmG0mbZ3tZF7Vt8VEWhgm1RQdF2boFU5uUTSmsgHI=",
+  "snapshotDigest": "742ed3dbc0523d66d13e13269667c47098859e607820f91baa095b5c8118b0be",
+  "resolverSourceSha256": "043363f3482515a8f7db3f0213ed7a5c178ab7901c08633e0aa09cef28a45505",
+  "requests": [
+    {
+      "url": "https://codepuppy.cn/catalog/assets/cloud.html/1.0.0/alpha-package/05f6eb58942bc7b5f5fc68fc5882c735d343d4e04b519f93afa45130e1792cda.json",
+      "status": 200,
+      "bytes": 690,
+      "sha256": "05f6eb58942bc7b5f5fc68fc5882c735d343d4e04b519f93afa45130e1792cda"
+    },
+    {
+      "url": "https://codepuppy.cn/catalog/assets/cloud.image/1.0.0/alpha-package/622e0c902a349ce2cc9066d1d19026354bde8b51fbca615cd61606f360041143.json",
+      "status": 200,
+      "bytes": 695,
+      "sha256": "622e0c902a349ce2cc9066d1d19026354bde8b51fbca615cd61606f360041143"
+    },
+    {
+      "url": "https://codepuppy.cn/catalog/assets/mcp.dbhub-readonly/1.0.0/alpha-package/349bdddf84b69691cc8a18198e8279022eb26242f6820037a66c53305af464ac.json",
+      "status": 200,
+      "bytes": 313,
+      "sha256": "349bdddf84b69691cc8a18198e8279022eb26242f6820037a66c53305af464ac"
+    },
+    {
+      "url": "https://codepuppy.cn/catalog/assets/mcp.github-official/1.0.0/alpha-package/1fc0f27012ab19a53eace30fe4cfe05c8ae65c02f46809745509a5cc544d7582.json",
+      "status": 200,
+      "bytes": 429,
+      "sha256": "1fc0f27012ab19a53eace30fe4cfe05c8ae65c02f46809745509a5cc544d7582"
+    },
+    {
+      "url": "https://codepuppy.cn/catalog/assets/skill.alpha-first/1.0.0/alpha-package/495b415b54f2821efd267a7f0199ef8662e144aaa640efb3cf12b00386db45dc.json",
+      "status": 200,
+      "bytes": 624,
+      "sha256": "495b415b54f2821efd267a7f0199ef8662e144aaa640efb3cf12b00386db45dc"
+    },
+    {
+      "url": "https://codepuppy.cn/catalog/v1/channels/advisories.json",
+      "status": 200,
+      "bytes": 244,
+      "sha256": "f719dc0de07e31ff5184f2ce8bded8dfc036d05f87f577853bdddf33689b99a0"
+    },
+    {
+      "url": "https://codepuppy.cn/catalog/v1/channels/advisories.json.sig",
+      "status": 200,
+      "bytes": 88,
+      "sha256": "dea3326680dab9086a38b0aa17e1e55deefa850ded9d3fef068fa3c84ae88cb6"
+    },
+    {
+      "url": "https://codepuppy.cn/catalog/v1/channels/snapshot.json",
+      "status": 200,
+      "bytes": 884,
+      "sha256": "742ed3dbc0523d66d13e13269667c47098859e607820f91baa095b5c8118b0be"
+    },
+    {
+      "url": "https://codepuppy.cn/catalog/v1/channels/snapshot.json.sig",
+      "status": 200,
+      "bytes": 88,
+      "sha256": "e604c9bdc40ceb1ed9cd2eac2a55b1e954c775db9d3ff6fb5f002ac1fd15d45d"
+    },
+    {
+      "url": "https://codepuppy.cn/catalog/v1/channels/stable.json",
+      "status": 200,
+      "bytes": 584,
+      "sha256": "a207a6683a8be7d379282497a293d757ccf854da4ff1e54cd2c7c5ad54c826d0"
+    },
+    {
+      "url": "https://codepuppy.cn/catalog/v1/channels/stable.json.sig",
+      "status": 200,
+      "bytes": 88,
+      "sha256": "79f76718a4119f5809197b1d2e5abb6a629894b08da72d56ffcce7e4b3e7aa86"
+    },
+    {
+      "url": "https://codepuppy.cn/catalog/v1/channels/trust.json",
+      "status": 200,
+      "bytes": 513,
+      "sha256": "d5f5c3f61da8ab3dcfb1383cb492b19c42be95b1d9ca189d1c59dc60221cab53"
+    },
+    {
+      "url": "https://codepuppy.cn/catalog/v1/channels/trust.json.sig",
+      "status": 200,
+      "bytes": 88,
+      "sha256": "b8a59a1bdb8c53bba0b1a08c0268b5a3b87a919279d7a5dc6e68de079de05d9f"
+    },
+    {
+      "url": "https://codepuppy.cn/catalog/v1/releases/2026-10-15.3/catalog.json",
+      "status": 200,
+      "bytes": 91908,
+      "sha256": "aaf22dbea2308f7cb2937654ab3848923a57837392ab014e6d37f61db1f10dbd"
+    },
+    {
+      "url": "https://codepuppy.cn/catalog/v1/releases/2026-10-15.3/catalog.json.sig",
+      "status": 200,
+      "bytes": 88,
+      "sha256": "5d3b07c9bed2c211f76edeae00a61d6178fd8ba6eb2bdfa3e24e31da46a2833d"
+    }
+  ],
+  "priced": [
+    {
+      "id": "cloud:html",
+      "holdUsd": 1,
+      "payloadSha256": "05f6eb58942bc7b5f5fc68fc5882c735d343d4e04b519f93afa45130e1792cda",
+      "payloadBytes": 690,
+      "queryRowId": "package:cloud-html",
+      "priceNote": "预留 US$1.00,按实际用量结算;失败时已产生的费用仍会结算。",
+      "componentRowPresent": false
+    },
+    {
+      "id": "cloud:image",
+      "holdUsd": 0.3,
+      "payloadSha256": "622e0c902a349ce2cc9066d1d19026354bde8b51fbca615cd61606f360041143",
+      "payloadBytes": 695,
+      "queryRowId": "package:cloud-image",
+      "priceNote": "预留 US$0.30,按实际用量结算;失败时已产生的费用仍会结算。",
+      "componentRowPresent": false
+    }
+  ],
+  "missing": [
+    "cloud:code-review",
+    "cloud:docs",
+    "cloud:excel",
+    "cloud:powerpoint",
+    "cloud:research",
+    "cloud:word"
+  ],
+  "missingNotice": "本目录尚未提供价格说明;费用以服务端为准",
+  "queries": [
+    {
+      "query": "cloud:html",
+      "output": "No matching entries."
+    },
+    {
+      "query": "cloud:image",
+      "output": "No matching entries."
+    },
+    {
+      "query": "package:cloud-html",
+      "output": "{\"id\":\"package:cloud-html\",\"scope\":\"not installed\",\"name\":\"云端网页生成\",\"type\":\"package\",\"description\":\"描述页面内容与样式，云端生成可下载的 HTML 网页。\",\"installed\":false,\"enabled\":false,\"state\":\"not-installed\",\"authorization\":\"none\",\"priceNote\":\"预留 US$1.00,按实际用量结算;失败时已产生的费用仍会结算。\"}"
+    },
+    {
+      "query": "package:cloud-image",
+      "output": "{\"id\":\"package:cloud-image\",\"scope\":\"not installed\",\"name\":\"云端图片生成\",\"type\":\"package\",\"description\":\"描述画面内容与风格，云端生成可下载的 PNG 图片。\",\"installed\":false,\"enabled\":false,\"state\":\"not-installed\",\"authorization\":\"none\",\"priceNote\":\"预留 US$0.30,按实际用量结算;失败时已产生的费用仍会结算。\"}"
+    },
+    {
+      "query": "cloud",
+      "output": "{\"id\":\"cloud:code-review\",\"scope\":\"not installed\",\"name\":\"云端代码审查（code-review）\",\"type\":\"cloud\",\"description\":\"将 Git 代码改动交给云端检查正确性、安全、性能和风格；必要时会联网查证依赖库行为和已知漏洞（CVE）。只发送代码改动，不上传整个仓库。结果保存到本地 .code-puppy/runs。\",\"installed\":false,\"enabled\":false,\"state\":\"not-installed\",\"authorization\":\"platform-login\"}\n{\"id\":\"cloud:docs\",\"scope\":\"not installed\",\"name\":\"云端开发文档生成（docs）\",\"type\":\"cloud\",\"description\":\"提供代码片段，让云端先拟大纲，再生成 README、API 说明等文档。结果保存到本地 .code-puppy/runs。\",\"installed\":false,\"enabled\":false,\"state\":\"not-installed\",\"authorization\":\"platform-login\"}\n{\"id\":\"cloud:excel\",\"scope\":\"not installed\",\"name\":\"云端 Excel\",\"type\":\"cloud\",\"description\":\"提供数据和要求，在云端生成用于整理数据或统计的 Excel 表格。完成后可下载 .xlsx 文件。\",\"installed\":false,\"enabled\":false,\"state\":\"not-installed\",\"authorization\":\"platform-login\"}\n{\"id\":\"cloud:powerpoint\",\"scope\":\"not installed\",\"name\":\"云端 PowerPoint\",\"type\":\"cloud\",\"description\":\"提供主题和要求，在云端生成用于汇报或讲解的 PowerPoint 演示文稿。完成后可下载 .pptx 文件。\",\"installed\":false,\"enabled\":false,\"state\":\"not-installed\",\"authorization\":\"platform-login\"}\n{\"id\":\"cloud:research\",\"scope\":\"not installed\",\"name\":\"云端深度调研（research）\",\"type\":\"cloud\",\"description\":\"提供调研问题，云端会分解问题、联网检索，并整理带来源的回答。结果保存到本地 .code-puppy/runs。\",\"installed\":false,\"enabled\":false,\"state\":\"not-installed\",\"authorization\":\"platform-login\"}\n{\"id\":\"cloud:word\",\"scope\":\"not installed\",\"name\":\"云端 Word\",\"type\":\"cloud\",\"description\":\"提供内容和要求，在云端生成报告、方案或说明文档。完成后可下载 .docx 文件。\",\"installed\":false,\"enabled\":false,\"state\":\"not-installed\",\"authorization\":\"platform-login\"}\n{\"id\":\"package:cloud-html\",\"scope\":\"not installed\",\"name\":\"云端网页生成\",\"type\":\"package\",\"description\":\"描述页面内容与样式，云端生成可下载的 HTML 网页。\",\"installed\":false,\"enabled\":false,\"state\":\"not-installed\",\"authorization\":\"none\",\"priceNote\":\"预留 US$1.00,按实际用量结算;失败时已产生的费用仍会结算。\"}\n{\"id\":\"package:cloud-image\",\"scope\":\"not installed\",\"name\":\"云端图片生成\",\"type\":\"package\",\"description\":\"描述画面内容与风格，云端生成可下载的 PNG 图片。\",\"installed\":false,\"enabled\":false,\"state\":\"not-installed\",\"authorization\":\"none\",\"priceNote\":\"预留 US$0.30,按实际用量结算;失败时已产生的费用仍会结算。\"}\n本目录尚未提供价格说明;费用以服务端为准"
+    }
+  ],
+  "assertions": {
+    "packagePriceNotesMatchHoldUsd": true,
+    "pricedOnlyQueriesHaveNoMissingNotice": true,
+    "realUnpricedCloudEntriesHaveOneTrailingMissingNotice": true,
+    "requestedComponentRowsPresent": false
+  }
+}
+210 |       requestedComponentRowsPresent: priced.every((item) => item.componentRowPresent),
+211 |     },
+212 |   }
+213 |   await Bun.write(join(import.meta.dir, "output.json"), JSON.stringify(output, null, 2) + "\n")
+214 |   console.log(JSON.stringify(output, null, 2))
+215 |   assert.ok(
+               ^
+AssertionError: BLOCKED: cloud:html / cloud:image are package components, absent as uninstalled catalog rows; exact component queries have no matches
+ generatedMessage: false,
+     actual: false,
+   expected: true,
+   operator: "==",
+       code: "ERR_ASSERTION"
+
+      at /Users/tide/app/alpha-code/.worktrees/1533-live/docs/verification/2026-10-16-ac1533-live-price-note/verify.ts:215:10
+
+Bun v1.3.14 (macOS arm64)
+
+exitCode=1

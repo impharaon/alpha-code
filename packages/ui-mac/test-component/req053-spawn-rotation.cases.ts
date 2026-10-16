@@ -74,7 +74,7 @@ let xdgDataHome = ""
 /** 两个期望的日志根 —— **独立字面量**,不是从 serverLogRoots() 抄回来的。 */
 let expectedLogDirs: string[] = []
 const savedEnv: Record<string, string | undefined> = {}
-const ENV_KEYS = ["XDG_DATA_HOME", "ALPHA_SECRETS_DISABLE", "SHELL"] as const
+const ENV_KEYS = ["ALPHA_GLOBAL_DIR", "XDG_DATA_HOME", "ALPHA_SECRETS_DISABLE", "SHELL"] as const
 
 /** 稀疏地造一个精确尺寸的大文件:头尾各一个可辨识 marker,中间空洞。 */
 function seedSizedFile(file: string, size: number, tag: string) {
@@ -115,6 +115,7 @@ beforeEach(() => {
   for (const key of ENV_KEYS) savedEnv[key] = process.env[key]
   scratch = realpathSync(mkdtempSync(join(tmpdir(), "req053-rotation-")))
   userDataPath = join(scratch, "user-data")
+  process.env.ALPHA_GLOBAL_DIR = join(scratch, "alpha-code-state", "env", "dev")
   xdgDataHome = join(scratch, "xdg-data")
   mkdirSync(userDataPath, { recursive: true })
   mkdirSync(xdgDataHome, { recursive: true })

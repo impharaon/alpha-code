@@ -425,6 +425,9 @@ test("@alpha-code/ext 不受影响:引擎侧接缝走 OPENCODE_CONFIG_CONTENT,�
   // 生产注入面(`injectAlphaConfig`)在 sidecar 里跑,这里只需证明它**不经过**被封死的那条路:
   // 它把 alpha 自己的 ext 绝对路径合进 env 通道的对象,磁盘上的 alpha.jsonc 一个字节都不写。
   const { injectAlphaConfig } = await import("../src/main/alpha-config-injection")
+  const { materializeEngineConfig } = await import("../src/main/engine-config-materialize")
+  const { buildAlphaModelConfig } = await import("../src/main/alpha-models")
+  materializeEngineConfig(userData, buildAlphaModelConfig(userData), {})
   const extPath = join(tmp, "alpha-ext", "index.js")
   mkdirSync(join(tmp, "alpha-ext"), { recursive: true })
   writeFileSync(extPath, "export default {}\n")
@@ -435,7 +438,7 @@ test("@alpha-code/ext 不受影响:引擎侧接缝走 OPENCODE_CONFIG_CONTENT,�
   const envConfig = JSON.parse(process.env.OPENCODE_CONFIG_CONTENT!) as { plugin?: unknown[] }
   // ① alpha 自有 ext 确实进了引擎会读的那份配置(env 通道);
   expect(envConfig.plugin).toEqual([extPath])
-  // ② 而磁盘上的 `alpha.jsonc` 里没有它 —— 注入只 seed 了一个 `{$schema}`。
+  // ② 而磁盘上的 `alpha.jsonc` 里没有它 —— main 已 seed 一个 `{$schema}`,sidecar 注入不写盘。
   //    咽喉若误伤这条接缝,①会红;咽喉若其实拦不住磁盘写,②会红。
   expect(readConfigStrict().plugin).toBeUndefined()
   if (prevContent === undefined) delete process.env.OPENCODE_CONFIG_CONTENT

@@ -38,12 +38,13 @@ const {
 
 let scratch = ""
 const savedEnv: Record<string, string | undefined> = {}
-const ENV_KEYS = ["XDG_DATA_HOME", "ALPHA_SECRETS_DISABLE", "SHELL"] as const
+const ENV_KEYS = ["ALPHA_GLOBAL_DIR", "XDG_DATA_HOME", "ALPHA_SECRETS_DISABLE", "SHELL"] as const
 
 beforeEach(() => {
   for (const key of ENV_KEYS) savedEnv[key] = process.env[key]
   scratch = realpathSync(mkdtempSync(join(tmpdir(), "req053-throat-")))
   userDataPath = join(scratch, "user-data")
+  process.env.ALPHA_GLOBAL_DIR = join(scratch, "alpha-code-state", "env", "dev")
   mkdirSync(userDataPath, { recursive: true })
   process.env.XDG_DATA_HOME = join(scratch, "xdg-data")
   mkdirSync(process.env.XDG_DATA_HOME, { recursive: true })

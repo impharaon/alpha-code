@@ -61,7 +61,8 @@ const saved: Record<string, string | undefined> = {}
 beforeEach(() => {
   userDataPath = mkdtempSync(join(tmpdir(), "alpha-sidecar-wiring-"))
   resetDanglingSweepLatchForTests()
-  for (const key of ["SHELL", "ALPHA_SECRETS_DISABLE"]) saved[key] = process.env[key]
+  for (const key of ["ALPHA_GLOBAL_DIR", "SHELL", "ALPHA_SECRETS_DISABLE"]) saved[key] = process.env[key]
+  process.env.ALPHA_GLOBAL_DIR = join(userDataPath, "alpha-code-state", "env", "dev")
   process.env.SHELL = "nu"
   process.env.ALPHA_SECRETS_DISABLE = "1"
 })

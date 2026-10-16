@@ -114,7 +114,7 @@ class DeafChild extends EventEmitter {
 
 let userDataPath = ""
 const savedEnv: Record<string, string | undefined> = {}
-const managedEnv = ["SHELL", "ALPHA_SECRETS_DISABLE", "ALPHA_CLOUD_MCP_URL", "ALPHA_CLOUD_TOKEN"] as const
+const managedEnv = ["ALPHA_GLOBAL_DIR", "SHELL", "ALPHA_SECRETS_DISABLE", "ALPHA_CLOUD_MCP_URL", "ALPHA_CLOUD_TOKEN"] as const
 
 beforeEach(() => {
   userDataPath = mkdtempSync(join(tmpdir(), "sidecar-stop-"))
@@ -123,6 +123,7 @@ beforeEach(() => {
     savedEnv[key] = process.env[key]
     delete process.env[key]
   }
+  process.env.ALPHA_GLOBAL_DIR = join(userDataPath, "alpha-code-state", "env", "dev")
   process.env.SHELL = "nu"
   process.env.ALPHA_SECRETS_DISABLE = "1"
 })

@@ -97,7 +97,7 @@ class RecordingChild extends EventEmitter {
 
 let userDataPath = ""
 const savedEnv: Record<string, string | undefined> = {}
-const managedEnv = ["SHELL", "ALPHA_SECRETS_DISABLE", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy", "ALL_PROXY", "all_proxy"] as const
+const managedEnv = ["ALPHA_GLOBAL_DIR", "SHELL", "ALPHA_SECRETS_DISABLE", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy", "ALL_PROXY", "all_proxy"] as const
 
 beforeEach(() => {
   userDataPath = mkdtempSync(join(tmpdir(), "fence-wiring-"))
@@ -106,6 +106,7 @@ beforeEach(() => {
     savedEnv[key] = process.env[key]
     delete process.env[key]
   }
+  process.env.ALPHA_GLOBAL_DIR = join(userDataPath, "alpha-code-state", "env", "dev")
   process.env.SHELL = "nu"
   process.env.ALPHA_SECRETS_DISABLE = "1"
 })

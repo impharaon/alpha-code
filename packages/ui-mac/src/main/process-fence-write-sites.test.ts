@@ -8,10 +8,14 @@
 // 不得有 index.ts(main 进程)或任何测试文件。
 
 import { describe, expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
-import { resolve } from "node:path"
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs"
+import { homedir } from "node:os"
+import { createRequire } from "node:module"
+import { renderProcessFenceProfile, resolveEngineRoots } from "./process-fence-profile"
+import { dirname, join, resolve } from "node:path"
 import {
   FS_WRITE_APIS,
+  relativeImportClosure,
   diffLedger,
   isValidRoot,
   parseLedger,
@@ -111,4 +115,49 @@ describe("控制臂:扫描器测得出已知的坏", () => {
       expect(FS_WRITE_APIS.has(api), api).toBe(true)
     expect(FS_WRITE_APIS.has("readFileSync")).toBe(false)
   })
+})
+
+
+test("AC1 I3′ 围栏闭包不含投影写模块,生产可达入口只有 server.ts / index.ts", () => {
+  expect(sidecarSourceFiles(repoRoot)).not.toContain("packages/ui-mac/src/main/engine-config-materialize.ts")
+  const references = readdirSync(import.meta.dir)
+    .filter((file) => file.endsWith(".ts") && !file.endsWith(".test.ts") && file !== "engine-config-materialize.ts")
+    .filter((file) => relativeImportClosure(join(import.meta.dir, file)).includes(join(import.meta.dir, "engine-config-materialize.ts")))
+  expect(references).toEqual(["index.ts", "server.ts"])
+})
+
+test("AC1 I3′ seed / userCopy / v2 / models 四个旧写点签名全部消失", () => {
+  const signatures = [
+    "writeFileSync\ttruth", "writeFileSync\tuserCopy", 'writeFileSync\tpath.join(dir, "opencode.jsonc")', "writeFileSync\tmodelsPath",
+  ].map((signature) => `packages/ui-mac/src/main/alpha-config-injection.ts\t${signature}`)
+  for (const sites of [scanRepository(repoRoot), parseLedger(readFileSync(ledgerPath, "utf8"))]) {
+    const actual = sites.map(signatureOf)
+    signatures.forEach((signature) => expect(actual).not.toContain(signature))
+    expect(actual).toContain("packages/ui-mac/src/main/alpha-config-injection.ts\tmkdirSync\tuserDataPath")
+  }
+})
+
+test("AC3 已存在目录 recursive mkdir;macOS 生产围栏允许同一操作且拒绝越界新建", () => {
+  const root = realpathSync(mkdtempSync(join(homedir(), ".ac1542-mkdir-")))
+  try {
+    const userData = join(root, "userData")
+    const global = join(root, "global")
+    const workspace = join(root, "workspace")
+    const roots = resolveEngineRoots({}, join(root, "home"))
+    const targets = [userData, global, workspace, join(roots.configHome, "opencode"), join(roots.dataHome, "opencode"), join(roots.cacheHome, "opencode")]
+    targets.forEach((dir) => mkdirSync(dir, { recursive: true }))
+    targets.forEach((dir) => expect(mkdirSync(dir, { recursive: true })).toBeUndefined())
+    // The no-op is portable; the production seatbelt control is macOS-only.
+    if (process.platform !== "darwin") return
+    const profile = renderProcessFenceProfile({ workspaces: [workspace], alphaGlobalRoot: global, userDataPath: userData, stateHome: userData, roots, egressProxyPort: 4443 })
+    const pkg = dirname(createRequire(import.meta.url).resolve("electron/package.json"))
+    const electron = join(pkg, "dist", readFileSync(join(pkg, "path.txt"), "utf8").trim())
+    const run = (target: string) => Bun.spawnSync(["/usr/bin/sandbox-exec", "-p", profile, electron, "-e", 'require("node:fs").mkdirSync(process.argv[1], {recursive:true})', target], { env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } })
+    targets.forEach((target) => expect(run(target).exitCode).toBe(0))
+    const outside = join(root, "outside")
+    expect(run(outside).exitCode).not.toBe(0)
+    expect(existsSync(outside)).toBe(false)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })

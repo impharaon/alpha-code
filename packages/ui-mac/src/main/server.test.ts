@@ -113,11 +113,12 @@ beforeEach(() => {
   forkCalls.length = 0
   resetDanglingSweepLatchForTests()
   creditDanglingSweepForSpawn()
-  userDataPath = mkdtempSync(join(tmpdir(), "server-scratch-cwd-"))
+  userDataPath = realpathSync(mkdtempSync(join(tmpdir(), "server-scratch-cwd-")))
   for (const key of managedEnv) {
     savedEnv[key] = process.env[key]
     delete process.env[key]
   }
+  process.env.ALPHA_GLOBAL_DIR = join(userDataPath, "alpha-code-state", "env", "dev")
   process.env.SHELL = "nu"
   process.env.ALPHA_SECRETS_DISABLE = "1"
 })
@@ -179,6 +180,36 @@ const allFlagsOff = Object.fromEntries(keylessWebSearchFlags.map((key) => [key, 
 function keylessFlagsOf(env: Record<string, string | undefined>) {
   return Object.fromEntries(keylessWebSearchFlags.map((key) => [key, env[key]]))
 }
+
+test("AC1 fork 接线:seed / 三投影已写好,三个 env 键只交给 child", async () => {
+  const inherited = [process.env.OPENCODE_CONFIG, process.env.OPENCODE_CONFIG_DIR, process.env.OPENCODE_MODELS_PATH]
+  const result = await spawnLocalServer("127.0.0.1", 4096, "password", {
+    userDataPath, healthCheck: async () => true, planFence: fakePlanFence,
+    fork: ((file, args, options) => {
+      const env = options.env!
+      expect(env.OPENCODE_CONFIG).toBe(join(process.env.ALPHA_GLOBAL_DIR!, "alpha.jsonc"))
+      expect(env.OPENCODE_CONFIG_DIR).toBe(join(userDataPath, "alpha-engine-config"))
+      expect(env.OPENCODE_MODELS_PATH).toBe(join(userDataPath, "alpha-engine-config", "models.json"))
+      for (const path of [env.OPENCODE_CONFIG, join(env.OPENCODE_CONFIG_DIR!, "opencode.json"), join(env.OPENCODE_CONFIG_DIR!, "opencode.jsonc"), env.OPENCODE_MODELS_PATH])
+        expect(JSON.parse(readFileSync(path!, "utf8"))).toBeObject()
+      return fakeFork(file, args, options)
+    }) as typeof fakeFork,
+  })
+  await result.health.wait
+  await result.listener.stop()
+  expect([process.env.OPENCODE_CONFIG, process.env.OPENCODE_CONFIG_DIR, process.env.OPENCODE_MODELS_PATH]).toEqual(inherited)
+})
+
+test.each(["seed", "projection"])("AC1 %s 失败拒 fork", async (kind) => {
+  mkdirSync(process.env.ALPHA_GLOBAL_DIR!, { recursive: true })
+  if (kind === "seed") writeFileSync(join(userDataPath, "blocked"), "")
+  if (kind === "seed") process.env.ALPHA_GLOBAL_DIR = join(userDataPath, "blocked", "root")
+  if (kind === "projection") writeFileSync(join(userDataPath, "alpha-engine-config"), "")
+  await expect(spawnLocalServer("127.0.0.1", 4096, "password", {
+    userDataPath, healthCheck: async () => true, planFence: fakePlanFence, fork: fakeFork,
+  })).rejects.toThrow("engine config materialization failed — sidecar fork refused")
+  expect(forkCalls).toHaveLength(0)
+})
 
 describe("web search sovereignty at sidecar fork (#621)", () => {
   // `#1411`(REQ-1414 CODE-1,owner 2026-09-23 裁决)—— 这两条以前断言的是相反的事:

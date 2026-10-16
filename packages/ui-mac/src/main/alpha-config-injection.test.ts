@@ -35,6 +35,8 @@ import * as os from "node:os"
 import * as path from "node:path"
 import { ALPHA_V2_CATALOG_READY_PROVIDER_ID } from "../shared/alpha-config"
 import { injectAlphaConfig } from "./alpha-config-injection"
+import { materializeEngineConfig } from "./engine-config-materialize"
+import { buildAlphaModelConfig } from "./alpha-models"
 import { secretFilePath } from "./alpha-secret-files"
 import { writeMcpServerTruth } from "./mcp-server-truth-write"
 import {
@@ -169,10 +171,55 @@ function assertInjectedFacts(content: string | undefined, userDataPath: string):
   expect(content).not.toContain(BYOK_KEY)
 }
 
+function materializeInMain() {
+  const env: Record<string, string> = process.env.OPENCODE_MODELS_PATH ? { OPENCODE_MODELS_PATH: process.env.OPENCODE_MODELS_PATH } : {}
+  materializeEngineConfig(userData, buildAlphaModelConfig(userData), env)
+  Object.assign(process.env, env)
+}
+
+// Baseline is the actual pre-migration implementation, not a hand-written projection fixture.
+// It runs only against this suite's isolated paths and synthetic credentials.
+test("AC1 I4′ main 与 df79ab0ec sidecar 的三文件逐字节、三键逐值相同;seed 只补缺席", async () => {
+  givenLoggedInWithByok()
+  const baseline = Bun.spawnSync(["git", "show", "df79ab0ec:packages/ui-mac/src/main/alpha-config-injection.ts"], { cwd: import.meta.dir })
+  expect(baseline.exitCode).toBe(0)
+  const module = path.join(tmp, "baseline.ts")
+  fs.symlinkSync(path.resolve(import.meta.dir, "../../node_modules"), path.join(tmp, "node_modules"), "dir")
+  fs.writeFileSync(module, baseline.stdout.toString().replace(/from "(\.\.?\/[^"]+)"/g, (_, specifier) => `from "${path.resolve(import.meta.dir, specifier)}"`))
+  const old = await import(module)
+  const keys = ["OPENCODE_CONFIG", "OPENCODE_CONFIG_DIR", "OPENCODE_MODELS_PATH"]
+  const files = ["opencode.json", "opencode.jsonc", "models.json"]
+  for (const truth of [undefined, '{"instructions":["keep.md"],"provider":{"ignored":{"name":"ignored"}}}', "invalid json"]) {
+    const target = path.join(process.env.ALPHA_GLOBAL_DIR!, "alpha.jsonc")
+    fs.rmSync(target, { force: true })
+    if (truth !== undefined) fs.writeFileSync(target, truth)
+    delete process.env.OPENCODE_CONFIG_CONTENT
+    keys.forEach((key) => delete process.env[key])
+    expect(old.injectAlphaConfig(userData, undefined, "stable")).toEqual({ ok: true })
+    const env = Object.fromEntries(keys.map((key) => [key, process.env[key]]))
+    const bytes = files.map((file) => {
+      const target = path.join(userData, "alpha-engine-config", file)
+      return fs.existsSync(target) ? fs.readFileSync(target, "utf8") : undefined
+    })
+    const seed = fs.readFileSync(target, "utf8")
+    fs.rmSync(path.join(userData, "alpha-engine-config"), { recursive: true })
+    if (truth === undefined) fs.rmSync(target)
+    const next: Record<string, string> = {}
+    materializeEngineConfig(userData, buildAlphaModelConfig(userData), next)
+    expect(next).toEqual(env)
+    expect(fs.readFileSync(target, "utf8")).toBe(seed)
+    files.forEach((file, index) => {
+      const target = path.join(userData, "alpha-engine-config", file)
+      expect(fs.existsSync(target) ? fs.readFileSync(target, "utf8") : undefined).toBe(bytes[index])
+    })
+  }
+})
+
 describe("injectAlphaConfig —— 注入组合体的执行级闸门(#607)", () => {
   test("正向闸门:生产 composition 跑通,content 携带 model/enabled_providers/provider/三个 alpha agent/{file:} ref", () => {
     givenLoggedInWithByok()
 
+    materializeInMain()
     const result = injectAlphaConfig(userData, undefined, "stable")
 
     // #613:成功路径返回 ok —— sidecar 据此不在 ready IPC 上挂 injectionFailure。
@@ -286,6 +333,7 @@ describe("injectAlphaConfig —— 注入组合体的执行级闸门(#607)", () 
       JSON.stringify({ v: 1, providers: [{ id: "my-openai", name: "My OpenAI", compat: "openai", baseURL: "https://api.openai.com/v1", models: ["gpt-5.4"] }] }),
     )
 
+    materializeInMain()
     expect(injectAlphaConfig(userData, undefined, "stable")).toEqual({ ok: true })
     // ① content
     const content = JSON.parse(process.env.OPENCODE_CONFIG_CONTENT!) as { enabled_providers: string[]; provider: Record<string, unknown> }
@@ -318,6 +366,7 @@ describe("injectAlphaConfig —— 注入组合体的执行级闸门(#607)", () 
     process.env.ALPHA_MODELS_DISABLE = "1"
     process.env.OPENCODE_MODELS_PATH = "/operator/upstream-models.json"
 
+    materializeInMain()
     expect(injectAlphaConfig(userData, undefined, "stable")).toEqual({ ok: true })
     expect(process.env.OPENCODE_MODELS_PATH).toBe("/operator/upstream-models.json")
     expect(fs.existsSync(path.join(userData, "alpha-engine-config", "models.json"))).toBe(false)
@@ -360,40 +409,16 @@ describe("injectAlphaConfig —— 注入组合体的执行级闸门(#607)", () 
     expect(() => assertInjectedFacts(process.env.OPENCODE_CONFIG_CONTENT, brokenUserData)).toThrow()
   })
 
-  // #613 R1 Blocker 1 反向闸门:v1 全部成功、只有 v2 桥失败 —— 这条真实失败路径曾被
-  // materializeV2EngineConfig 的自吞 catch 报成 {ok:true}。权威契约(engine-config-channels.md):
-  // picker 只经 v2 目录读模型,丢 v2 = alpha/BYOK 模型全灰 = 票面事故症状,
-  // 「只损失 v2 目录」不是可忽略的局部降级。把那层自吞 catch 加回去,断言①当场转红。
-  test("#613 反向闸门:v2 桥失败必须以 ok:false 离开进程,且不得撤销已写出的 v1 注入", () => {
+  test("AC1 投影失败抛给 main;sidecar 注入不再写 seed / v2 文件或三个 env 键", () => {
     givenLoggedInWithByok()
-    // 真实故障、零模块/依赖 mock(仅拦截日志 sink):v2 桥的目标目录位置被一个普通文件占住 →
-    // 生产代码 `fs.mkdirSync(<userData>/alpha-engine-config, { recursive: true })` 抛 EEXIST。
-    // 走到桥时上方 v1 注入(OPENCODE_CONFIG / OPENCODE_CONFIG_CONTENT)已全部完成 —— 正是 R1 实证的路径。
     fs.writeFileSync(path.join(userData, "alpha-engine-config"), "")
-
-    const warned: string[] = []
-    const originalWarn = console.warn
-    console.warn = (...args: unknown[]) => {
-      warned.push(args.map((a) => String(a)).join(" "))
-    }
-    let result: ReturnType<typeof injectAlphaConfig>
-    try {
-      result = injectAlphaConfig(userData, undefined, "stable")
-    } finally {
-      console.warn = originalWarn
-    }
-
-    // ① 失败以结构化结果离开进程(→ ready IPC 的 injectionFailure → "injection-failed" 终态)。
-    expect(result.ok).toBe(false)
-    // ①′ 错误信息自证抛点(fs 错误自带路径),main 的 error 日志无需猜是哪层死的。
-    if (!result.ok) expect(result.error.message).toContain("alpha-engine-config")
-    // ② 失败出声(外层 catch 的 warn;桥内不再有自己的静音 console.error)。
-    expect(warned.some((w) => w.includes("failed to inject alpha config"))).toBe(true)
-    // ③ 顺序锁:桥排在 content 写出之后,失败不得撤销已就位的 v1 注入 ——
-    //    把 materializeV2EngineConfig 挪到 content 写出之前,本断言体当场转红。
+    expect(() => materializeInMain()).toThrow("alpha-engine-config")
+    fs.rmSync(path.join(process.env.ALPHA_GLOBAL_DIR!, "alpha.jsonc"))
+    expect(injectAlphaConfig(userData, undefined, "stable")).toEqual({ ok: true })
     assertInjectedFacts(process.env.OPENCODE_CONFIG_CONTENT, userData)
-    // ④ 半成品目录不得被指为权威:OPENCODE_CONFIG_DIR 保持未设置。
-    expect(process.env.OPENCODE_CONFIG_DIR).toBeUndefined()
+    expect(fs.existsSync(path.join(process.env.ALPHA_GLOBAL_DIR!, "alpha.jsonc"))).toBe(false)
+    for (const key of ["OPENCODE_CONFIG", "OPENCODE_CONFIG_DIR", "OPENCODE_MODELS_PATH"])
+      expect(process.env[key]).toBeUndefined()
   })
 
   // #613 接线锚(R1 后收窄):sidecar.ts 无法被 bun import(首个 import 即 registerHooks,

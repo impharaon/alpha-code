@@ -28,17 +28,24 @@ owner 2026-10-15 批准重做方案,方向原话见票面评论:「全局设置�
 | §三 S1 ②「ext 在每次重建时重构 `cfg.mcp`」 | 依赖上一条 | 删除;围栏成为唯一机制,fork 时注入照旧 |
 | §四 C2 第一步「两条 deny 能拒掉这些路径」 | 通过([README](../verification/2026-10-15-req234-c2-fence-preverify/README.md)),但 A-file 被「父目录整体替换」证伪为完整防线([stage2-options §3](../verification/2026-10-15-req234-c2-fence-preverify/stage2-options.md)) | deny 集扩成「文件 + 插件目录 + **目录身份**」三类 |
 | I1 ①–⑦ | ②④⑤⑥ 以 ext 重构为前提 | 重写为 I1′–I7′(§3.2) |
-| I10「C2 对围栏的改动只有一条针对 `alpha.jsonc` 的 deny」 | 不再成立 | 重写为 I6′:**五条** deny 行、allow 行逐 token 不变 |
+| I10「C2 对围栏的改动只有一条针对 `alpha.jsonc` 的 deny」 | 不再成立 | 重写为 I6′:**四条** deny 行、allow 行逐 token 不变 |
 | 2.8 I 回退方案(本机 MCP 真源文件) | 不需要 | 仍否决(§2.3) |
 
 **本版(R1 审计后修订)**:Codex gpt-6-astra 只读审 R1 判 REVISE-THEN-PROCEED,7 条全部接受,逐条并入 ——
 ① wellknown 的本地来源(`data:` URL)把 `auth.json` 也变成配置注入面 → 纳入 C2-F/C2-I(§1.1a);
 ② 全局 `{tool,tools}/` 六个自动执行目录漏了 → 并入 C2-P(§1.1 末);
-③ C2-I 没覆盖**可写祖先**,工作区可选成 `~/.config` → 加 `selectWorkspaceUnion` 祖先排除(§1.3、§2.1);
+③ C2-I 没覆盖**可写祖先**,工作区可选成 `~/.config` → 锁相关祖先目录身份(§1.3、§2.1);
 ④ 事务恢复回滚把攻击者 staged preImage 写回 `alpha.jsonc` **已实测确认** → C2-T 从可选升为**必须**(§1.4、§3.2 I7′);
 ⑤ 自定义 provider 对话框先存后 PATCH、候选规则下 500 → 接到 main 保存通路(§4);
 ⑥ 登记簿证不了 I3′ → 投影函数**固定搬进 main-only 文件**、断言闭包与接线(§3.2 I3′);
-⑦ R1 项目 `plugin[]` 升级路径使「唯一通路」不能宣称 → 交付承诺收窄,项目插件单列 owner 裁决(§六)。
+⑦ R1 项目 `plugin[]` 升级路径使「唯一通路」不能宣称 → 交付承诺收窄,项目插件去留交 owner(§六)。
+
+**本版(R2 审计后修订)**:R2 判 ①②④⑥⑦ FIXED、③⑤ NOT-FIXED + 4 Major/2 Minor,按规则直接修(不再复审)——
+③-a「工作区非唯一可写祖先入口」:`XDG_DATA_HOME=U/xdg` 下 W3 仍可搬走 `U/xdg` → 改为**按实际 W1–W19 可写根派生受保护目标的可写祖先身份并锁住**,不碰 `selectWorkspaceUnion`(§2.1 机制 2,实测 [writable-ancestor-probe.ts](../verification/2026-10-15-req234-c2-fence-preverify/writable-ancestor-probe.ts));
+③-b「祖先排除会剔除 `XDG_CONFIG_HOME=<ws>/.config` 下的默认工作区、拒绝 fork」:同一改法**保留工作区写权限、只锁祖先目录身份**(正例已测);
+⑤「`providers.add` 非旧契约等价」+「普通 provider 连接也写 auth.json」:C2-a 把**两条** provider 保存入口都接到 alpha main IPC(preset/platform → `providers.setKey`,自定义 → `providers.add`),自定义表单的四个上游字段差异如实登记(§4);
+Minor:新增 deny 统一为**四条**;回滚探针改称「该分支的等价参数」并补 [journal-rollback-equiv-probe.ts](../verification/2026-10-15-req234-c2-fence-preverify/journal-rollback-equiv-probe.ts)(带 `probe`+`receiptCommitted` 仍成立)。
+owner 2026-10-16 就 §六裁决**不关(默认)**。
 
 ## 一、只读勘破补充
 
@@ -138,7 +145,9 @@ sidecar 的启动顺序:`installProcessFence` → `prepareSidecarEnv`(= `injectA
 4. **插件目录与工具目录同治**(审计 ②):`{HO,XO,D}/{plugin,plugins,tool,tools}` 共 12 个 subpath,cand 下建文件 / 软链目录均 EPERM。
 5. **可写祖先(审计 ③)**:cand 保护 `<dir>` 身份,但若其**父目录**是可写工作区则可被整体改名携带。实测 cand-ws 臂(wsroot 为 W1)`mv wsroot/xdg wsroot/xdg.old`
    = **OK**(xdg 本身未被 identity 保护,携带受保护子目录 opencode 一起走);cand 臂(wsroot 非工作区)同一操作 = EPERM(默认拒)。⇒ 修法不是再加一层 deny(父目录链到 HOME),
-   而是 `selectWorkspaceUnion` 排除「是任一受保护目录祖先/自身」的候选(§2.1),与它今天排除 appStateRoot(`related()`,`process-fence-profile.ts:372`)同一机制。子目录 opencode 自身改名四臂皆 EPERM(身份仍在)。
+   而是**锁住受保护目标的可写祖先目录身份**(§2.1 机制 2):从实际渲染的 W1–W19 可写根出发,把每个处于「某可写根之内、某受保护目标之上」的中间目录也加进 C2-I 的 identity literal。
+   **不改 `selectWorkspaceUnion`** —— R1 曾想「把这类候选从工作区里排除」,R2 证伪:`XDG_CONFIG_HOME=<ws>/.config` 时默认工作区自己就是祖先,排除它会让 `process-fence-plan.ts:111` 拒绝 fork(finding ③-b)。
+   锁祖先身份则让工作区照常可写、只有 `.config` / `.config/opencode` 这两层目录改名被拒(实测 [writable-ancestor-probe.ts](../verification/2026-10-15-req234-c2-fence-preverify/writable-ancestor-probe.ts):`XDG_DATA_HOME=U/xdg` 锁 `U/xdg`、`XDG_CONFIG_HOME=<ws>/.config` 锁 `<ws>/.config`,两者工作区/`U` 普通写仍 OK)。子目录自身改名四臂皆 EPERM。
 6. C2-T 的 `G/ext-tx`(subpath)与 `G/installs.json`(literal)在 cand 下写/建/改名均 EPERM(审计 ④ 的防线;攻击确认见 §1.4)。
 7. 若硬链在围栏**外**已存在,围栏内经链写入会改动受保护内容(四臂皆如此)—— 残余 §3.4 R5;main 从不建硬链。
 
@@ -151,7 +160,7 @@ owner 方向要求「只能由围栏外的主程序写」——那么 main 写�
 | IPC `installCatalog` → 事务(`ext-ipc.ts:1183-1240`,基线 1.1) | 已验签 catalog + renderer grants | 否(缓存读回重验,基线 F10) |
 | boot reconcile `engine-config-truth-boot.ts:132-148` → `planConfigMerge`(`engine-config-truth.ts:294-314`,**复制 legacy 的 `mcp`/agent/command/permission/provider**,existing 优先;经 `isAlphaOwnedConfig` 门,`:165`) | `~/.opencode/opencode.jsonc`(`:61-63`)、`<XDG>/opencode/opencode.jsonc`(`:48-54`,main 进程无 `OPENCODE_CONFIG_DIR`) | **今天在**(W16 / W6)——围栏内写 `~/.opencode/opencode.jsonc` 的 MCP 会在下次启动被 main 洗进 `alpha.jsonc`;本方案的 deny 集把这两处关掉 |
 | 账本投影 `ext-install-planner.ts:3461-3514`(`computeEnableProjectionEdit`:mcp 只翻 `enabled`;叶缺席 ⇒ 「cannot enable」不写) | `G/installs.json`(`alpha-installs.ts:7,20`) | **在**(W2)——伪造只能把已存在的本地 MCP 叶重新 `enabled:true`,注不进 `command` |
-| 事务恢复 `recoverExtensionTransactions(alphaGlobalRoot(), …)`(`ext-ipc.ts:799`;每次写前 `withRecoveredWrite`):journal `G/ext-tx/journal/*.json`、staging `G/ext-tx/staging`(`ext-transaction.ts:422-434`);config 项回滚链 `:2731-2744` → `restoreConfigImage`(`ext-config-tx.ts:129-150`):**当 live digest === nextDigest 时把 staged preImage 写回 target** | `G/ext-tx/**` | **在**(W2)——**已实测确认**(审计 ④,[journal-rollback-probe.ts](../verification/2026-10-15-req234-c2-fence-preverify/journal-rollback-probe.ts)):用真生产事务引擎 crash 出一份合法 journal+staging,再做 attacker 的两个 W2 写(覆盖 `config-0.pre` = 攻击 JSON、把该项 `preDigest` 改成其哈希),在**生产恢复参数**(无 probe、`pidAlive:()=>false`、`commitReceipt`)下跑 `recoverExtensionTransactions` → `alpha.jsonc` 被写成攻击内容(`attackerLanded:true`,state `rolled-back`)。`readStagedConfigImage` 只拿 staged 字节比 journal 自带的 `preDigest`,两者都在 W2 ⇒ 校验挡不住。此路**独立于账本**路径。⇒ C2-T 必须 |
+| 事务恢复 `recoverExtensionTransactions(alphaGlobalRoot(), …)`(`ext-ipc.ts:799`;每次写前 `withRecoveredWrite`):journal `G/ext-tx/journal/*.json`、staging `G/ext-tx/staging`(`ext-transaction.ts:422-434`);config 项回滚链 `:2731-2744` → `restoreConfigImage`(`ext-config-tx.ts:129-150`):**当 live digest === nextDigest 时把 staged preImage 写回 target** | `G/ext-tx/**` | **在**(W2)——**已实测确认**(审计 ④,[journal-rollback-probe.ts](../verification/2026-10-15-req234-c2-fence-preverify/journal-rollback-probe.ts)):用真生产事务引擎 crash 出一份合法 journal+staging,再做 attacker 的两个 W2 写(覆盖 `config-0.pre` = 攻击 JSON、把该项 `preDigest` 改成其哈希),在**该回滚分支的等价参数**下跑 `recoverExtensionTransactions` → `alpha.jsonc` 被写成攻击内容(`attackerLanded:true`,state `rolled-back`)。「等价」见 finding 6:journal item_0 翻转、item_1 未翻转 ⇒ `allFlipped=false`(`:2545`)⇒ 永不进入 `allFlipped && probe && commitReceipt` 前向分支(`:2547`),`probe` 改不了结果;无 receipt 项 ⇒ `receiptCommitted` 返回 false(确证未 durable ⇒ 允许回滚)。带真 `probe`+`receiptCommitted` 重跑仍成立([journal-rollback-equiv-probe.ts](../verification/2026-10-15-req234-c2-fence-preverify/journal-rollback-equiv-probe.ts),生产接线 `ext-ipc.ts:725-745`)。`readStagedConfigImage` 只拿 staged 字节比 journal 自带的 `preDigest`,两者都在 W2 ⇒ 校验挡不住。此路**独立于账本**路径。⇒ C2-T 必须 |
 | `persistMcp`(`ext-config.ts:542-570`)、策略编辑、`alpha-migrate`(需 `ALPHA_MIGRATE_ENABLE=1`) | IPC / env | 否 |
 
 ### 1.5 其它事实
@@ -180,8 +189,10 @@ owner 方向要求「只能由围栏外的主程序写」——那么 main 写�
 
 ### 2.1 机制(五件事)
 
+> R2 修订:机制 2 由「workspace 排除」改为「可写祖先身份锁」;机制 3 增补第二条 provider 入口。
+
 **(1) deny 集 = 四类,从一个常量表派生**(`process-fence-profile.ts` 新增 `CONFIG_FENCE_TARGETS`,渲染在 allow 块之后、`(deny network*)` 之前,
-与草稿同一插槽 `:173-174`,五条 `deny` 行):
+与草稿同一插槽 `:173-174`,**四条** `deny` 行;C2-I 那一条还含「可写祖先」literal,见机制 2):
 
 ```
 (deny file-write* (literal "<G>/alpha.jsonc")
@@ -195,21 +206,29 @@ owner 方向要求「只能由围栏外的主程序写」——那么 main 写�
                   (subpath "<HO>/tool") (subpath "<HO>/tools") (subpath "<XO>/tool") (subpath "<XO>/tools")
                   (subpath "<D>/tool")  (subpath "<D>/tools"))                                   ; 审计② plugin+tool ← C2-P
 (deny file-write* (literal "<D>") (literal "<HO>") (literal "<XO>") (literal "<G>") (literal "<U>")
-                  (literal "<dataHome>/opencode"))                                               ; 审计① ← C2-I 目录身份
+                  (literal "<dataHome>/opencode")
+                  <writableAncestorIdentities(allowRoots, targets) 的结果,见机制 2>)                ; 审计①③ ← C2-I 目录身份 + 可写祖先
 (deny file-write* (subpath "<G>/ext-tx"))                                                        ; 审计④(C2-T 目录半) ← C2-T
 ```
 
 `<…>` 由 planner 的 roots 代入,与 `:155-170` 的 allow 行同源。`XO` 的四个文件在 D 已设时不参与合并(§1.1),仍列入:D 缺席(逃生阀)时它们是来源,
 且 `mcp-default-deny.ts:18,43` 枚举它们。
 
-**(2) `selectWorkspaceUnion` 排除受保护目录的祖先/自身(审计 ③)**:`process-fence-profile.ts:350` 今天只排除 `/`、HOME、HOME 祖先与 appStateRoot-related
-(`related()`);新增:候选若 `related()` 任一受保护目录(C2-I 的六个)则排除并记原因。理由见 §1.3 第 5 条 —— 工作区是**唯一**能让受保护目录的父目录变可写的入口
-(固定 allow 根 W2–W19 的父目录是 `~/Library` / HOME,本就不可写)。`related` 已覆盖「候选是祖先(contains)/同一/在其内」三种;自定义 XDG 落进工作区同形。
+**(2) 锁住可写祖先身份(审计 ③,替代 R1 的 workspace 排除)**:新助手 `writableAncestorIdentities(writableRoots, targets)`
+(`process-fence-profile.ts`)—— 输入是**实际渲染的 W1–W19 allow 子路径**与 C2-F/P/I/T 的受保护目标;对每个目标,找到包住它的那个 allow 根,
+把「在该根之内、在该目标之上」的每一层中间目录都加进 C2-I 的 identity literal。默认拓扑(XDG 在 HOME 下、不可写)它返回空;
+`XDG_DATA_HOME=U/xdg`(dataHome 落进 W3=U)返回 `U/xdg`;`XDG_CONFIG_HOME=<ws>/.config`(落进 W1 工作区)返回 `<ws>/.config`。
+**`selectWorkspaceUnion` 一行不改** —— R1 的「把这类候选排除」被 R2 证伪(finding ③-b:默认工作区被剔除会让 `process-fence-plan.ts:111` 拒绝 fork)。
+身份锁让工作区/`U` 普通写照常 OK、只有那一两层目录改名被拒(实测 [writable-ancestor-probe.ts](../verification/2026-10-15-req234-c2-fence-preverify/writable-ancestor-probe.ts),三拓扑 × head/cand,0 违例)。
 
 **(3) 写者迁移**(§四):`{$schema}` seed 与 `materializeV2EngineConfig`(含 `D/models.json`)**搬进新文件 `engine-config-materialize.ts`(main-only,sidecar 不 import)**,
 由 main 的 `spawnLocalServer` 在 `syncSecretFiles` 之后、`planProductionFence` 之前调用(`server.ts:535-561` 之间);`OPENCODE_CONFIG`、`OPENCODE_CONFIG_DIR`、
-`OPENCODE_MODELS_PATH` 由 main 放进 `sidecarEnv`;sidecar 的 `injectAlphaConfig` 不再写盘、不再设这三个键。另外(审计 ⑤)上游自定义 provider 对话框
-(`dialog-custom-provider.tsx`,packages/app roundtrip)的保存从 `auth.set`+`PATCH /global/config` 改走 alpha 已有的 `providers.add` main 通路。
+`OPENCODE_MODELS_PATH` 由 main 放进 `sidecarEnv`;sidecar 的 `injectAlphaConfig` 不再写盘、不再设这三个键。另外(审计 ⑤④)**两条** provider 保存入口
+(都是 packages/app roundtrip,都经引擎 `auth.set` 写 `auth.json`/经 `PATCH /global/config` 写 `D`)改走 alpha 已有的 main IPC(`provider-ipc.ts`:`registerProviderIpcHandlers`):
+preset/platform 连接(`dialog-connect-provider.tsx:824` 的 `integration.connect.key` → `server-compat.ts:400` 的 `auth.set`)→ `providers.setKey`(key→keychain);
+自定义服务(`dialog-custom-provider.tsx`)→ `providers.add`(定义→真源 `custom-providers/<env>.json`)。**字段差异如实登记**(finding ③,§4):
+alpha 的 `ProviderInput`/真源没有上游自定义表单的 headers、per-model 显示名、`{env:}` 引用,且 `validateProviderInput`(`ext-config.ts:1198`)要求 key 非空 ——
+这是 alpha 既有 `AddProvider`(ADR-016,产品里真正的自定义入口)的行为,不是本票引入的回退;owner 要恢复那四项另开 feature REQ。
 投影/seed 失败 ⇒ **拒绝 fork**(`server.ts:502-509,556-561` 同一 fail-closed 路径),比今天的「起来后报 injection-failed」更严,可回滚。
 
 **(4) ext 不动**:HEAD 的 `config` 钩子(`ext/plugin.ts:154-241`)保持原样;`mcp-default-deny.ts` / `mcp-server-truth.ts` 留在 ui-mac main,
@@ -222,7 +241,7 @@ fork 时注入(远程真源、账本禁用、XDG 默认拒)照旧。草稿里迁
 ### 2.2 为什么这是最简的正确解
 
 - 围栏之后,围栏内**还能写**的配置来源只剩:项目作用域(§3.3)、进程内 JS 改 env / 调 `mcp.add`(§3.4 R2)。全局 MCP 表的每个文件来源都只有 main
-  与用户编辑器能写 —— 于是 ext 重构、顺序保证、真源文件三样东西都不再需要;实现面从「ext + main + 事务」缩回「profile 五行 + 搬一个函数 + 一处工作区排除」。
+  与用户编辑器能写 —— 于是 ext 重构、顺序保证、真源文件三样东西都不再需要;实现面从「ext + main + 事务」缩回「profile 四行(含派生的祖先身份)+ 搬一个函数 + 两条 provider 入口改走 main IPC」。
 - 不动上游、不动 IPC、不动消息族、不动确认框。
 
 ### 2.3 被否决的替代
@@ -235,7 +254,8 @@ fork 时注入(远程真源、账本禁用、XDG 默认拒)照旧。草稿里迁
 | ext 重构作为纵深 | 保留草稿的 `rebuildMcpConfig` 当第二道 | 已知在第二轮重建被绕过的层只提供假安心;审计方会问它守什么;删 |
 | I(基线 2.8) | 本机 MCP 真源文件 + 事务新 action | 全套事务/恢复/存量/读取改动换来的不变量,几行 deny 就能得到;且它不管 `~/.opencode` / D 的同名覆盖、也不管 wellknown/journal 两路 |
 | 整个 `injectAlphaConfig` 搬 main | 把 CONTENT 计算也搬出去 | 它直接读写 `process.env`(`:91,94,474`),在 main 跑两代 fork 会把上一代 CONTENT 当 `existing` 累积;要改成传 env 对象 = 重写 650 行;投影只依赖两样输入(§1.2),搬投影就够 |
-| `OPENCODE_DISABLE_PROJECT_CONFIG=1` | 顺手关掉项目 `opencode.json(c)` 与 `.opencode/`(`config.ts:425`、`paths.ts:27` 同一开关) | 同时关掉用户自己的项目配置,是产品决定;基线 S5 已登记为 out-of-scope;单列 owner 裁决(§六),不并入 |
+| `selectWorkspaceUnion` 排除受保护目录的祖先候选(R1 做法) | 不让祖先目录进工作区 | **R2 证伪**:`XDG_CONFIG_HOME=<ws>/.config` 时默认工作区自己是祖先 → 被剔除 → 无候选时 `process-fence-plan.ts:111` 拒绝 fork;改为只锁祖先目录身份(机制 2) |
+| `OPENCODE_DISABLE_PROJECT_CONFIG=1` | 顺手关掉项目 `opencode.json(c)` 与 `.opencode/`(`config.ts:425`、`paths.ts:27` 同一开关) | 同时关掉用户自己的项目配置,是产品决定;基线 S5 已登记为 out-of-scope;owner 已就此裁决不关(§六),不并入 |
 | `OPENCODE_AUTH_CONTENT={}`(让引擎不读 auth.json)杀 wellknown | main 设该 env | 能杀 wellknown 文件来源,但改变引擎读 auth.json 的行为、且不保护 auth.json 作为其它潜在来源;deny 文件与 C2-F 其余条目同形、读仍放行、只收紧写 —— 与 owner「只能主程序写」方向一致,更小更一致。采 deny |
 | `(deny file-link …)` | 对文件再加 file-link 规则 | 上一轮实测零差别(文件 literal 已拒 `link(2)`) |
 | 让 `PATCH /global/config` 继续可写 | 给围栏开 D 文件的口或让 main 代写该 PATCH | 开口重开洞;而该 API 在 ui-mac 唯一可达消费者(自定义 provider 对话框)已由审计 ⑤ 接到 alpha 的 `providers.add` main 通路(§1.2、§4)⇒ 不需要让 PATCH 可写 |
@@ -249,12 +269,12 @@ fork 时注入(远程真源、账本禁用、XDG 默认拒)照旧。草稿里迁
 | B1 | 围栏内直接写 13 个全局配置文件(含 auth.json、installs.json;append / 截断 / 新建 / unlink / rename-over / 软链占位) | 除 alpha.jsonc 外全可写 | EPERM | C2-F(实测) |
 | B2 | 替换 / 搬走 / 软链顶替 D、HO、XO、G、U、`<dataHome>/opencode`(含 `renameat`、`rmdir`) | 可(实测) | EPERM | C2-I(实测) |
 | B3 | 把 allow 根搬进另一可写根再软链回来,写经解析后的路径 | 可(实测) | 搬不动 ⇒ 到不了 | C2-I 含 allow 根本身(实测) |
-| B3′ | 把受保护目录的**可写父目录**(工作区选进来的 `~/.config` / 自定义 XDG)整体改名,携带受保护子目录 | 可(实测 cand-ws 臂) | 父目录不进工作区 ⇒ 默认拒 | `selectWorkspaceUnion` 祖先排除(实测 cand 臂 EPERM;审计 ③) |
+| B3′ | 把受保护目录的**可写父目录**(`XDG_DATA_HOME=U/xdg` 落进 W3、或 `XDG_CONFIG_HOME=<ws>/.config` 落进 W1)整体改名,携带受保护子目录 | 可(实测 head 臂) | EPERM | 可写祖先身份锁(`writableAncestorIdentities`,实测 cand 臂;审计 ③) |
 | B4 | 硬链受保护文件到可写名后经链写 | 可 | `link(2)` EPERM | C2-F(实测);围栏外预存链 = R5 |
 | B5 | `renamex_np(RENAME_SWAP)` / `exchangedata` / `openat(dirfd)` / `..` 路径 | 可 | EPERM | C2-F / C2-I(实测) |
 | B6 | 往 12 个自动加载目录 `{HO,XO,D}/{plugin,plugins,tool,tools}` 放 `.js`、建/软链目录、硬链进来 | 可 | EPERM | C2-P(实测;tool/tools = 审计 ②) |
 | B7 | 全局配置文件里写 `plugin[]` 指向工作区 `.js` | 可(加载侧无闸,§1.5) | 文件写不了 | C2-F;项目来源见 B12 |
-| B8 | `PATCH /global/config`(写 D 文件)/ `auth.set`(写 auth.json) | 围栏外 renderer 可;围栏内连不上 HTTP,进程内 JS 可 | 写 ⇒ EPERM(500) | C2-F;可达消费者(自定义 provider 对话框)已接 main(审计 ⑤,§1.2) |
+| B8 | `PATCH /global/config`(写 D 文件)/ `auth.set`(写 auth.json):自定义 provider 对话框 **与** preset/platform「连接」(`integration.connect.key`→`server-compat.ts:400`) | 围栏外 renderer 可;围栏内连不上 HTTP,进程内 JS 可 | 写 ⇒ EPERM(500) | C2-F;**两条**可达消费者都接 alpha main IPC(审计 ⑤④:`providers.add` / `providers.setKey`,§1.2、§4) |
 | B8′ | 围栏内写 `auth.json` 的 `type:"wellknown"` 条目(`key` = `data:` 本地 URL)让引擎合并攻击配置 | 可(实测:data: fetch 本地 200) | 文件写不了 | C2-F(auth.json 文件)+ C2-I(`<dataHome>/opencode` 目录);审计 ① |
 | B9 | `PATCH /config`(写 `<instance dir>/config.json`) | 项目目录 W1,可写 | 不变 | 项目作用域(§3.3) |
 | B10 | 运行时 `mcp.add` | 进程内 JS 可;不持久 | 不变 | R2(S6/S12 类) |
@@ -292,15 +312,17 @@ fork 时注入(远程真源、账本禁用、XDG 默认拒)照旧。草稿里迁
   判据:`materializeV2EngineConfig` 保持同一函数、只换调用方;测试用 HEAD 的调用形态与新调用形态各跑一次比对(`alpha-config-injection.test.ts`)。
 - **I5′ 真引擎在候选 profile 下启动**:fresh 隔离 HOME(无 `~/.config/opencode`、无 `~/.opencode`)+ 生产 planner + 候选 profile + 真 ext ⇒ 引擎起来、
   `GET /config` 200、`GET /mcp` 200、D 下 `npm install` 结果与 head 臂相同、`D/models.json` 在场;判据:`process-fence-engine.test.ts` 加一臂。
-- **I6′ 可写集只收紧,外部耦合有 tripwire**:(a) 渲染出的 allow 行与 N1–N4 与 HEAD 逐 token 相同,新增**恰好五行** deny(`process-fence-profile.test.ts`
+- **I6′ 可写集只收紧,外部耦合有 tripwire**:(a) 渲染出的 allow 行与 N1–N4 与 HEAD 逐 token 相同,新增**恰好四行** deny(`process-fence-profile.test.ts`
   逐行断言);(b) 上游「读配置文件 / 从目录 `import()` 代码」的常量 ⊆ `CONFIG_FENCE_TARGETS` —— **两条独立 tripwire**(表驱动矩阵发现不了漏表项,审计 ②):
   ① 配置文件名与目录(`config.ts:147`、`:277-281`、`:445`;`paths.ts:26-39`;`core/config.ts:142`);② **自动执行目录**:`tool/registry.ts:203-205` 的
   `{tool,tools}` glob 与 `config/plugin.ts:19-29` 的 `{plugin,plugins}` glob、`config.directories()` 的根集,以及 `auth/index.ts:10` 的 auth.json 路径 + `config.ts:375` 的 wellknown 装载。
   测试读源码文本比对(与 `settings-surface-ratchet.test.ts` 同形制),上游加一个全局文件名 / 新 glob 目录 ⇒ 红。
 - **I7′ main 写 `alpha.jsonc` 的文件输入不在围栏可写集**(审计 ④,**必须**):`G/ext-tx`(C2-T subpath)与 `G/installs.json`(C2-F literal)在 deny 集,§1.4 表里每条输入
   要么在 deny 集、要么在 appState 根外、要么来自 IPC;判据同 I1′ 的表驱动矩阵(含 extTx 建 journal/staging、installs.json 写 ⇒ EPERM,实测)。恢复/账本路径本身跑在 **main**(围栏外),不受影响。
-- **I8′ 工作区不含受保护目录的祖先/自身**(审计 ③):`selectWorkspaceUnion` 的输出里没有任何条目 `related()` 六个受保护目录之一;判据:`process-fence-profile` 单测喂一组含
-  `~/.config`、`<appData>`、自定义 XDG 父目录的候选,断言全被排除并给原因;变异 = 去掉新排除 ⇒ 该候选进 W1 ⇒ 配套的 fence 臂(cand-ws)`mv <父目录> x` 变 OK ⇒ 红(实测反例在 dir-identity-probe)。
+- **I8′ 受保护目标的可写祖先被锁、而工作区照常可写**(审计 ③,替代 R1 的 workspace 排除):`writableAncestorIdentities(renderedAllowRoots, targets)` 的每个结果都进 C2-I;
+  判据(`writable-ancestor-probe` 固化,三拓扑 × head/cand):① `XDG_DATA_HOME=U/xdg` ⇒ 结果含 `U/xdg`,cand 下 `mv U/xdg …` EPERM、head 下 OK(反例);
+  ② `XDG_CONFIG_HOME=<ws>/.config` ⇒ 结果含 `<ws>/.config`,cand 下 `mv <ws>/.config …` EPERM;**正例**:两拓扑下默认工作区仍被 `selectWorkspaceUnion` 选中(profile 含其 W1 subpath、planner 不拒 fork)、工作区与 `U` 的普通文件写 OK;
+  变异 = 从 C2-I 去掉祖先结果 ⇒ ① 的 `mv U/xdg` 变 OK ⇒ 红。`selectWorkspaceUnion` 不在本不变量的改动面内(保持原样)。
 
 ### 3.3 项目作用域来源的边界(本票 out-of-scope,但要说清)
 
@@ -313,14 +335,14 @@ fork 时注入(远程真源、账本禁用、XDG 默认拒)照旧。草稿里迁
   可改 `process.env.OPENCODE_CONFIG_CONTENT`(`config.ts:487` 动态读)或调 `mcp.add` ⇒ 下一次全局 dispose 后**所有**实例拿到攻击者 MCP。
   前提是用户打开了该项目(目录在 W1)。这与基线 S6「项目插件经一次性信任门后以引擎权限运行」同类,区别是上游 `plugin[]` **没有**信任门。
 - 一键关法存在且只有一个开关:`OPENCODE_DISABLE_PROJECT_CONFIG=1` 同时关掉 `config.ts:425` 与 `paths.ts:27`(项目 `opencode.json(c)` 与 `.opencode/`,含其 `plugin(s)`/`tool(s)`),
-  `.code-puppy` 路径不受影响(ext 自己合并)。代价是用户自己的项目 `opencode.json` 失效。这是产品决定 ⇒ **单列 owner 裁决(§六)**,不在本票;本方案的所有 AC 不依赖它。
-- **因此本票不能宣称「确认框是唯一安装通路」**(审计 ⑦):R1 是方案自己承认的全局影响路径。交付承诺收窄为「**受保护的全局文件与目录在围栏内写不进、换不掉**」(§五、§六)。
+  `.code-puppy` 路径不受影响(ext 自己合并)。代价是用户自己的项目 `opencode.json` 失效。这是产品决定 ⇒ **owner 已裁决不关(§六)**,不在本票;本方案的所有 AC 不依赖它。
+- **因此本票不宣称「确认框是唯一安装通路」**(审计 ⑦;owner 2026-10-16 裁决不关):R1 是方案自己承认的全局影响路径。交付承诺收窄为「**受保护的全局文件与目录在围栏内写不进、换不掉**」(§五、§六)。
 
 ### 3.4 残余风险(如实登记)
 
 | # | 残余 | 说明 |
 | --- | --- | --- |
-| R1 | 项目 `plugin[]` / `tool(s)` ⇒ 进程内代码 ⇒ 全局升级 | §3.3;本票**收窄交付承诺**(§六),是否关闭单列 owner 裁决 |
+| R1 | 项目 `plugin[]` / `tool(s)` ⇒ 进程内代码 ⇒ 全局升级 | §3.3;本票**收窄交付承诺**(§六);owner 2026-10-16 裁决**不关**(信任项目即信任其插件代码) |
 | R2 | sidecar 进程内 JS(ext、受信项目插件、R1 的代码、codemode)可改 env / 调 `mcp.add` / 调进程内 `app.fetch` | 信任门后等同引擎权限(基线 S6 / S12),不承诺 |
 | R5 | 围栏外预先存在的硬链 | main 从不建;用户自建不承诺 |
 | R6 | well-known **远程 URL** / 组织 / managed / MDM 来源 | 系统或网络级,非本票(本地 `data:` wellknown 已由 C2-F 堵 auth.json) |
@@ -338,7 +360,9 @@ fork 时注入(远程真源、账本禁用、XDG 默认拒)照旧。草稿里迁
 | --- | --- | --- | --- |
 | `{$schema}` seed(`alpha-config-injection.ts:85-92`)+ v2 投影 `materializeV2EngineConfig`(`:593-647`,含 `D/models.json`) | **搬进新文件 `engine-config-materialize.ts`(main-only)**,main `spawnLocalServer` 在 `syncSecretFiles` 之后调用;输入 = `alphaJsoncWithoutProviders()` + main 已有的 `buildAlphaModelConfig(userDataPath)`;`OPENCODE_CONFIG`/`OPENCODE_CONFIG_DIR`/`OPENCODE_MODELS_PATH` 进 `sidecarEnv`;sidecar `injectAlphaConfig` 删写盘与三处 `process.env` 赋值 | 不变:同一字面量/同一「缺席才写」;三文件字节相同、三键相同、仍 fork 时一次性 | I3′(闭包不含该文件 + tsv 删四行 + 接线)、I4′(字节比对)、I5′;`models-catalog-v2.wiring.cases.ts`(自己设 `OPENCODE_CONFIG_DIR`,`:168`)照跑 |
 | 投影/seed 失败 | 拒绝 fork(fail-closed) | 从「引擎起来 + injection-failed 终态」变「这一代被拒」;症状同类(模型全灰) | 单测:注入失败 ⇒ `spawnLocalServer` 抛且不 fork(与 secrets sync 用例同形) |
-| 自定义 provider 对话框保存(审计 ⑤:`dialog-custom-provider.tsx:138-152` 的 `auth.set`+`updateConfig`) | 改走 alpha 已有的 `providers.add` main 通路(key→keychain,定义→`custom-providers/<env>.json` 真源,围栏外);`packages/app` roundtrip(ADR-034) | 不变:保存成功=已连接;不再先乐观显示再 500 | 组件用例(与 `model-picker-add` 的 `providers.add` 用例同源);提交 → 真源文件、不再触 auth.json / `PATCH /global/config` |
+| 自定义 provider 对话框保存(审计 ⑤:`dialog-custom-provider.tsx:138-152` 的 `auth.set`+`updateConfig`) | 改走 `providers.add` main 通路(key→keychain,定义→`custom-providers/<env>.json` 真源,围栏外);`packages/app` roundtrip(ADR-034) | **有限行为变化**(见下) | 组件用例;提交 → 真源文件、不再触 auth.json / `PATCH /global/config` |
+| preset/platform provider「连接」(审计 ④:`dialog-connect-provider.tsx:824` 的 `integration.connect.key` → `server-compat.ts:400` 的 `auth.set`) | 改走 `providers.setKey(id,key)` main 通路(key→keychain);`packages/app` roundtrip | 不变:连接成功=已保存密钥;不再写引擎 `auth.json`(围栏内会 EPERM) | 组件用例:连接提交只调 `providers.setKey`、不触 `auth.set` |
+| **自定义表单字段差异**(审计 ③) | 用 alpha `ProviderInput`/真源的字段集(id/name/compat/baseURL/apiKey/models[]/imageInput) | **变化**:上游自定义表单的 `headers`、per-model 显示名、`{env:VAR}` 引用、空 key 四项不被 `providers.add` 支持(`ext-config.ts:1198` 要 key 非空)——但这是 alpha 产品**既有** `AddProvider`(ADR-016)的字段集,非本票回退 | 如实登记;恢复这四项 = 另开 feature REQ(扩 `ProviderInput`+真源 schema+`validateProviderInput`),不在本票 |
 | `auth.json`(引擎 `auth.set`,`control.ts:17`) | 不单独迁:上条把唯一可达写者接到 main 后,围栏内无合法 auth.json 写者;引擎仍读它(读放行) | 不变(alpha 密钥本走 keychain+`{file:}`,auth.json 正常为空) | C2-F(写 EPERM);§1.2 |
 | 引擎自写(`$schema` 回写、TOML 迁移) | 不迁 | 本就静默 catch;TOML 迁移在 D 下永远不会完成(D 由 main 写,不会有 `config`) | 无 |
 | `mkdirSync(userDataPath)` 四处、`alpha-identity.md`、`<dataHome>/opencode` 的 log/db | 不迁 | 不变(目录内写放行,§1.3 第 1 条) | I1′ 目录内写臂;I5′ |
@@ -354,24 +378,24 @@ fork 时注入(远程真源、账本禁用、XDG 默认拒)照旧。草稿里迁
 - **边界(文件)**:新 `packages/ui-mac/src/main/engine-config-materialize.ts`(main-only:seed + `materializeV2EngineConfig`,从 `alpha-config-injection.ts` 搬出)、
   `server.ts`(`spawnLocalServer` 调它 + 设三个 env 键 + 失败拒 fork)、`alpha-config-injection.ts`(删 `:85-92` 写盘、`:475` 调用、三处 `process.env` 赋值)、
   `alpha-config-injection.test.ts`、`scripts/process-fence-write-sites.tsv`(重生)、`process-fence-write-sites.test.ts`(I3′ 的三条构造性断言)、`server.test.ts`(拒 fork + 接线用例)、
-  **`dialog-custom-provider.tsx`(packages/app roundtrip,审计 ⑤:保存改走 `providers.add`)+ `patch-upstream.ts`**。
+  **两条 provider 保存入口(packages/app roundtrip,审计 ⑤④):`dialog-custom-provider.tsx` → `providers.add`、`dialog-connect-provider.tsx`(`:824` 连接提交)→ `providers.setKey`;`patch-upstream.ts` 同步**。provider main IPC(`provider-ipc.ts`)已存在,不新增。
 - **AC**:AC1 I3′(写者由构造离开围栏:闭包不含新文件 + tsv 删四行 + 接线断言,**明确允许已存在目录 recursive mkdir**);AC2 I4′(三文件三键与 HEAD 逐字节/逐值相同);
-  AC3 投影失败 ⇒ 拒 fork 且日志点名;AC4 自定义 provider 对话框保存只经 `providers.add` main 通路、不触 auth.json / `PATCH /global/config`(组件用例)。
-- **不做**:围栏规则、ext、`CONFIG_FENCE_TARGETS`(归 C2-b)。
-- **退出条件**:AC1–AC4 绿;`bun test src`、typecheck、north-star、frontend roundtrip 绿;真机 dev 启动后模型选择器 + 自定义 provider 保存与改前一致(owner 一眼)。
+  AC3 投影失败 ⇒ 拒 fork 且日志点名;AC4 **两条** provider 入口都只经 alpha main IPC(`providers.add` / `providers.setKey`)、不触 `auth.set` / `PATCH /global/config`(组件用例),自定义表单字段差异按 §4 登记。
+- **不做**:围栏规则、ext、`CONFIG_FENCE_TARGETS`(归 C2-b)、恢复上游自定义表单的四项字段(feature REQ)。
+- **退出条件**:AC1–AC4 绿;`bun test src`、typecheck、north-star、frontend roundtrip 绿;真机 dev 启动后模型选择器 + 两条 provider 保存与改前一致(owner 一眼)。
 - **证据**:L0 门 + 上述用例。
 
 ### C2-b `[CODE]` 围栏收紧出全局配置位置的文件、目录身份、自动执行目录与恢复/账本真源(`#1530`,L)
 
 - **第零步已完成(写进票面)**:审计 ④ 的 journal 回滚攻击**已实测确认**(§1.4,[journal-rollback-probe.ts](../verification/2026-10-15-req234-c2-fence-preverify/journal-rollback-probe.ts)),
   所以 C2-T(`G/ext-tx` + `G/installs.json`)是**必须**项,不是条件项。
-- **边界(文件)**:`process-fence-profile.ts`(`CONFIG_FENCE_TARGETS` 常量表 + 五行渲染;`selectWorkspaceUnion` 的祖先排除,审计 ③)、
-  `process-fence-profile.test.ts`(I6′ a 两条 tripwire + I8′ 工作区排除)、新 `process-fence-config.test.ts`(I1′/I7′ 表驱动矩阵,复用 `dir-identity-probe.ts` 的场景与
+- **边界(文件)**:`process-fence-profile.ts`(`CONFIG_FENCE_TARGETS` 常量表 + 四行渲染 + 新助手 `writableAncestorIdentities`,审计 ③;**`selectWorkspaceUnion` 不改**)、
+  `process-fence-profile.test.ts`(I6′ a 两条 tripwire + I8′ 可写祖先身份锁 + 工作区仍可写的正例)、新 `process-fence-config.test.ts`(I1′/I7′ 表驱动矩阵,复用 `dir-identity-probe.ts` 的场景与
   `fs-probe2.mjs` / `syscall-probe.py` 形制)、`mcp-config-rebuild.test.ts` + `test-fixtures/process-fence/mcp-config-{main,observe}.ts`(I2′,从草稿精简)、
-  `process-fence-engine.test.ts`(I5′ 一臂)、`process-fence-plan.ts`(把受保护目录集传给 `selectWorkspaceUnion`)、
+  `process-fence-engine.test.ts`(I5′ 一臂)、`process-fence-plan.ts`(把实际 allow 根与受保护目标集传给 `writableAncestorIdentities`,渲染进 profile)、
   `docs/architecture/2026-09-09-req159-process-fence.md`(可写集文档加「其中只读的位置」一节)、`scripts/gate-files.tsv`(登记 darwin-only 测试)。
-- **AC**:AC5 I1′(C2-F/P/I/T 全路径 EPERM、目录内写 OK);AC6 I2′(端到端同名覆盖反例);AC7 I5′(真引擎在候选 profile 下起);AC8 I6′(五行 + 两条 tripwire);
-  AC9 I7′(ext-tx/installs 写 EPERM);AC10 I8′(工作区排除受保护目录祖先)。
+- **AC**:AC5 I1′(C2-F/P/I/T 全路径 EPERM、目录内写 OK);AC6 I2′(端到端同名覆盖反例);AC7 I5′(真引擎在候选 profile 下起);AC8 I6′(四行 + 两条 tripwire);
+  AC9 I7′(ext-tx/installs 写 EPERM);AC10 I8′(可写祖先身份锁 + XDG-under-U/under-ws 反例 + 默认工作区正常启动与可写正例)。
 - **不做**:ext 改动、项目作用域、`OPENCODE_DISABLE_PROJECT_CONFIG`、`packages/app`、上游。
 - **退出条件**:AC 全绿;真机:围栏内 `echo >> alpha.jsonc`、`mv alpha-engine-config x`、建 `~/.opencode/tool/x.js`、建 `G/ext-tx/journal/x.json` 均 EPERM;
   定制中心重装一次本地 MCP 后行为与改前一致;**交付承诺收窄为「受保护的全局文件与目录在围栏内写不进、换不掉」**(§六,不宣称「唯一通路」)。
@@ -380,27 +404,24 @@ fork 时注入(远程真源、账本禁用、XDG 默认拒)照旧。草稿里迁
 ### 草稿处置(worktree 未提交物)
 
 保留并改造:`server.ts` 的 seed 搬迁(改成调用新 `engine-config-materialize.ts`)、`alpha-config-injection.ts` 删写盘、`mcp-config-rebuild.test.ts` 与两个 fixture(去变异臂)、
-`process-fence-config.test.ts`(改为表驱动)、`process-fence-profile.ts` 的插槽位置(两行 → 五行)。**废弃**:`mcp-default-deny.ts` / `mcp-server-truth.ts` 迁入 ext 的 rename、
+`process-fence-config.test.ts`(改为表驱动)、`process-fence-profile.ts` 的插槽位置(两行 → 四行)。**废弃**:`mcp-default-deny.ts` / `mcp-server-truth.ts` 迁入 ext 的 rename、
 `packages/ext/package.json` 与 `bun.lock` 的 `jsonc-parser` 声明、`ext/plugin.ts` 的 `rebuildMcpConfig`、`mcp-server-truth.test.ts` 改动。
 
-## 六、需 owner 裁决:是否关闭项目插件的全局升级路径(审计 ⑦)
+## 六、项目插件的全局升级路径:owner 已裁决不关(2026-10-16)
 
 **这是什么**:用户信任一个项目后,该项目里的 `.opencode/plugin(s)`(上游,无信任门)或 `.code-puppy/plugins`(ext,有信任门)里的 `.js` 会被引擎以同等权限
 在进程内执行;它可以改进程内的 `OPENCODE_CONFIG_CONTENT` 或调 `mcp.add`,在下一次全局 dispose 后影响**所有**目录的实例(R1)。前提是用户打开并信任了该项目。
-这意味着本票交付后,我们能诚实宣称的是「**受保护的全局文件与目录在围栏内写不进、换不掉**」,而**不是**「确认框是唯一安装通路」。
 
-**选项与代价**(都不在本票实现):
-- **A 不动(默认)**:维持今天行为。代价:对外措辞只能用收窄版;项目插件升级路径对信任了项目的用户长期开着。可逆,零改动。
-- **B 关上游项目配置**:`OPENCODE_DISABLE_PROJECT_CONFIG=1`。代价:同时关掉用户自己的项目 `opencode.json(c)` 与 `.opencode/`(agent/command/技能也没了),
-  是产品行为改变;`.code-puppy` 不受影响。可逆(去掉 env)。
-- **C 给上游项目 `plugin(s)/tool(s)` 补信任门**:把 `.code-puppy` 那套 consent 扩到上游项目目录。代价:`UPSTREAM_PATHS` 下的改动(ADR-029 另立票),工作量大。
+**owner 裁决(2026-10-16,原话)**:「- 不关（默认）」。
 
-**建议**:A(本票按 A 交付、措辞收窄),B/C 作为独立 DECIDE,由 owner 定是否要把「唯一通路」做实。**不拖**:这条只影响对外措辞的强弱,不挡 C2-a/C2-b 合并与部署。
+**含义**:信任项目即信任其插件代码,维持现状,不动项目配置加载、不给上游项目目录补信任门、**不开新票**。因此本票对外**只承诺**「**受保护的全局配置文件与目录在围栏内写不进、换不掉**」,**不宣称**「安装只能经确认框 / 确认框是唯一安装通路」。这条不挡 C2-a/C2-b 的合并与部署。
+
+(当初列出的备选 B「`OPENCODE_DISABLE_PROJECT_CONFIG=1` 关上游项目配置」、C「给上游项目目录补信任门(`UPSTREAM_PATHS` 改动)」均已被此裁决否掉,不实施。)
 
 ## 七、仍是推断、没跑过的断言
 
-1. ~~R3 的 journal 植入在真实恢复路径上到得了~~ —— **已实测确认**(§1.4,`attackerLanded:true`),从本节移除。
-2. `~/.config`、`~/Library/Application Support` 作**工作区祖先**时的改名携带已实测(cand-ws 臂);作**非工作区**时由默认 deny 拒 —— 后者随 I1′/I8′ 矩阵再固化。
+1. ~~R3 的 journal 植入在真实恢复路径上到得了~~ —— **已实测确认**,带 `probe`+`receiptCommitted` 的等价参数也成立(§1.4,`journal-rollback-equiv-probe.ts`),从本节移除。
+2. ~~可写祖先搬移~~ —— 已实测(`writable-ancestor-probe.ts` 三拓扑):XDG 落进 W3/W1 时祖先身份锁住改名、工作区仍可写、默认工作区仍启动;`writableAncestorIdentities` 从实际 allow 根派生,C2-b 固化为判据。
 3. 真引擎在 C2-I 下 `npm install` 到 D / HO / XO 不会对目录本身做 `chmod` / `utimes`(I5′ 实跑即证;红了就是 I5′ 该红)。探针已证目录内普通写与 recursive mkdir 不受影响。
 4. main 在 fork 前算的 `buildAlphaModelConfig` 与 sidecar 当时算的逐字节相同 —— `server.ts:188-189` 已断言「同一函数、同一 userDataPath、密钥文件刚落定」,
    I4′ 用同一进程两种调用形态比对,不覆盖「两个进程 env 不同」这一维;两个进程的 `ALPHA_*` 输入由 allowlist 保证同值(`sidecar-env.ts:58-66`)。

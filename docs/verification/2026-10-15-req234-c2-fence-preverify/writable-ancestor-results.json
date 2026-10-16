@@ -1,0 +1,187 @@
+{
+  "generatedAt": "2026-10-16T03:27:29.652Z",
+  "helperOut": {
+    "default": [
+      "Library/Application Support/ai.opencode.desktop/alpha-engine-config"
+    ],
+    "xdg-data-under-U": [
+      "Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "Library/Application Support/ai.opencode.desktop/xdg"
+    ],
+    "xdg-config-under-ws": [
+      "Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "code-puppy/.config"
+    ]
+  },
+  "rows": [
+    {
+      "topo": "default",
+      "id": "ancestor-rename:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "topo": "default",
+      "id": "ancestor-rename:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "topo": "default",
+      "id": "auth.json-write",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "topo": "default",
+      "id": "auth.json-write",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "topo": "default",
+      "id": "workspace-write",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "topo": "default",
+      "id": "workspace-write",
+      "arm": "cand",
+      "code": "OK"
+    },
+    {
+      "topo": "default",
+      "id": "userData-ordinary-write",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "topo": "default",
+      "id": "userData-ordinary-write",
+      "arm": "cand",
+      "code": "OK"
+    },
+    {
+      "topo": "xdg-data-under-U",
+      "id": "ancestor-rename:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "topo": "xdg-data-under-U",
+      "id": "ancestor-rename:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "topo": "xdg-data-under-U",
+      "id": "ancestor-rename:Library/Application Support/ai.opencode.desktop/xdg",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "topo": "xdg-data-under-U",
+      "id": "ancestor-rename:Library/Application Support/ai.opencode.desktop/xdg",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "topo": "xdg-data-under-U",
+      "id": "auth.json-write",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "topo": "xdg-data-under-U",
+      "id": "auth.json-write",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "topo": "xdg-data-under-U",
+      "id": "workspace-write",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "topo": "xdg-data-under-U",
+      "id": "workspace-write",
+      "arm": "cand",
+      "code": "OK"
+    },
+    {
+      "topo": "xdg-data-under-U",
+      "id": "userData-ordinary-write",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "topo": "xdg-data-under-U",
+      "id": "userData-ordinary-write",
+      "arm": "cand",
+      "code": "OK"
+    },
+    {
+      "topo": "xdg-config-under-ws",
+      "id": "ancestor-rename:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "topo": "xdg-config-under-ws",
+      "id": "ancestor-rename:Library/Application Support/ai.opencode.desktop/alpha-engine-config",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "topo": "xdg-config-under-ws",
+      "id": "ancestor-rename:code-puppy/.config",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "topo": "xdg-config-under-ws",
+      "id": "ancestor-rename:code-puppy/.config",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "topo": "xdg-config-under-ws",
+      "id": "auth.json-write",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "topo": "xdg-config-under-ws",
+      "id": "auth.json-write",
+      "arm": "cand",
+      "code": "EPERM"
+    },
+    {
+      "topo": "xdg-config-under-ws",
+      "id": "workspace-write",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "topo": "xdg-config-under-ws",
+      "id": "workspace-write",
+      "arm": "cand",
+      "code": "OK"
+    },
+    {
+      "topo": "xdg-config-under-ws",
+      "id": "userData-ordinary-write",
+      "arm": "head",
+      "code": "OK"
+    },
+    {
+      "topo": "xdg-config-under-ws",
+      "id": "userData-ordinary-write",
+      "arm": "cand",
+      "code": "OK"
+    }
+  ],
+  "failures": []
+}

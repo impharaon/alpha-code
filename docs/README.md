@@ -11,7 +11,7 @@ accepted contracts. Follow the [Alpha Documentation Contract](https://github.com
 | -------------------------------------------------------------------- | -------------------------------------------------------------------- |
 | System structure and upstream boundary                               | [`architecture/`](architecture/)                                     |
 | Code Puppy product authority, token renewal, independent MCP startup, and upstream takeover design | [`design/codepuppy-runtime-authority.md`](design/codepuppy-runtime-authority.md) |
-| REQ-236 T20 方案基线:App 三个进程各怎么联网(没有在线判断;引擎出网只经本机出网代理,代理直连拨号)、网页读取/搜索本地与云端两条腿在 0.1.22 的真实状态(`#1414` 代码齐、证据缺四格)、owner 日志实测「CONNECT 200 之后零回应」与它被归成普通超时;选定让出网代理按层交出状态码、main 与界面按同一份分类说出具名原因,以及给生命周期 lane 的两条接口要求 | [`design/req236-network-diagnosis.md`](design/req236-network-diagnosis.md) |
+| REQ-236 T20 方案基线:App 三个进程各怎么联网(没有在线判断;引擎出网只经本机出网代理,代理直连拨号)、网页读取/搜索本地与云端两条腿在 0.1.22 的真实状态(`#1414` 代码齐、AC1/AC2 证据未齐)、owner 日志实测「CONNECT 200 之后零回应」与它被归成普通超时;选定让出网代理按层交出状态码、在引擎与 main 的结算边界(信息丢失前)取层并一路带到上屏文案,15 s 静默隧道兜底,以及对生命周期 #2 / delivery lane 的接口依赖(含 Codex 方案审 R1 处置表) | [`design/req236-network-diagnosis.md`](design/req236-network-diagnosis.md) |
 | Host extension package contract/host decision boundary               | [`architecture/host-extension-package-contract-boundary.md`](architecture/host-extension-package-contract-boundary.md) |
 | Alpha Connection record lifetime and handler allowlist               | [`architecture/alpha-connection-lifetime.md`](architecture/alpha-connection-lifetime.md) |
 | Package MCP OAuth ownership boundary (engine protocol / main attempt) | [`architecture/package-mcp-oauth-boundary.md`](architecture/package-mcp-oauth-boundary.md) |

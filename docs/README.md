@@ -11,6 +11,7 @@ accepted contracts. Follow the [Alpha Documentation Contract](https://github.com
 | -------------------------------------------------------------------- | -------------------------------------------------------------------- |
 | System structure and upstream boundary                               | [`architecture/`](architecture/)                                     |
 | Code Puppy product authority, token renewal, independent MCP startup, and upstream takeover design | [`design/codepuppy-runtime-authority.md`](design/codepuppy-runtime-authority.md) |
+| REQ-236 T01–T04/§2.4 baseline: real boundaries of the three run-permission tiers (incl. the sub-task bypass), "always allow" by grant kind, approvals bound to post-hook args and current binding, cloud tool provenance under the real injected shape, controlled config fields and project-config override paths | [`design/req236-permissions-and-provenance.md`](design/req236-permissions-and-provenance.md) |
 | Host extension package contract/host decision boundary               | [`architecture/host-extension-package-contract-boundary.md`](architecture/host-extension-package-contract-boundary.md) |
 | Alpha Connection record lifetime and handler allowlist               | [`architecture/alpha-connection-lifetime.md`](architecture/alpha-connection-lifetime.md) |
 | Package MCP OAuth ownership boundary (engine protocol / main attempt) | [`architecture/package-mcp-oauth-boundary.md`](architecture/package-mcp-oauth-boundary.md) |

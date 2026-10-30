@@ -11,6 +11,7 @@ accepted contracts. Follow the [Alpha Documentation Contract](https://github.com
 | -------------------------------------------------------------------- | -------------------------------------------------------------------- |
 | System structure and upstream boundary                               | [`architecture/`](architecture/)                                     |
 | Code Puppy product authority, token renewal, independent MCP startup, and upstream takeover design | [`design/codepuppy-runtime-authority.md`](design/codepuppy-runtime-authority.md) |
+| REQ-236 引擎生命周期方案基线:续期热应用凭据而不重启引擎(实测正式版每 10 分钟一次 token-only 换代)、MCP 逐服务后台启动与失败归因(`spawn uv ENOENT` 实为陈旧实例目录)、Office/PDF 随包运行环境、上游同步遵守接管清单;子票切分与冻结接口 | [`design/req236-engine-lifecycle.md`](design/req236-engine-lifecycle.md) |
 | Host extension package contract/host decision boundary               | [`architecture/host-extension-package-contract-boundary.md`](architecture/host-extension-package-contract-boundary.md) |
 | Alpha Connection record lifetime and handler allowlist               | [`architecture/alpha-connection-lifetime.md`](architecture/alpha-connection-lifetime.md) |
 | Package MCP OAuth ownership boundary (engine protocol / main attempt) | [`architecture/package-mcp-oauth-boundary.md`](architecture/package-mcp-oauth-boundary.md) |

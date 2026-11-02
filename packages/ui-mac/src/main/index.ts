@@ -166,10 +166,12 @@ import {
 } from "./sidecar-lifecycle"
 import { armBootGenerationTerminal, createSidecarGenerationState, type SidecarGenerationState } from "./sidecar-generation"
 
+// Electron 应用名 = macOS 钥匙串 safeStorage 条目名的来源(`<应用名> Safe Storage` / `<应用名> Key`)。
+// 存量条目由 keychain-name-migration.ts 从旧名改到这里的名字(#1571);dev 不迁移。
 const APP_NAMES: Record<string, string> = {
-  dev: "alpha-code",
-  beta: "alpha-code Beta",
-  prod: "alpha-code",
+  dev: "Code Puppy Dev",
+  beta: "Code Puppy Beta",
+  prod: "Code Puppy",
 }
 const APP_IDS: Record<string, string> = {
   dev: "ai.opencode.desktop.dev",
@@ -457,7 +459,8 @@ const main = Effect.gen(function* () {
     process.env.CODEPUPPY_OPENCODE_HOME = join(root, "opencode-home")
     return root
   })()
-  app.setName(app.isPackaged ? APP_NAMES[CHANNEL] : "alpha-code")
+  const electronAppName = app.isPackaged ? APP_NAMES[CHANNEL] : APP_NAMES.dev
+  app.setName(electronAppName)
   app.setAppUserModelId(appId)
   // B15: surface the MIT attribution in the native About panel (opencode is MIT — its copyright +
   // permission notice must ship with the app; full text in resources/NOTICE.txt).
@@ -541,8 +544,11 @@ const main = Effect.gen(function* () {
   // PACKAGED build so the real-data (logged-in) UI can be screenshot-audited via CDP.
   if (!app.isPackaged || process.env.CODEPUPPY_CDP === "1") app.commandLine.appendSwitch("remote-debugging-port", "9222")
 
+  // 失锁必须在 ready 前 `app.exit(0)`,不能 `app.quit()`(#1571 第 0b 步实测):quit 退出前 Chromium 仍会查
+  // 钥匙串,按新应用名查不到就新建一条随机秘密的目标条目,之后的改名迁移被「目标已存在」永久挡住;
+  // exit(0) 一次钥匙串调用都不发生。顺序由 keychain-boot-order.test.ts 判。
   if (!app.requestSingleInstanceLock()) {
-    app.quit()
+    app.exit(0)
     return
   }
 

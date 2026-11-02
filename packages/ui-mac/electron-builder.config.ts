@@ -52,12 +52,13 @@ const shouldSign = isCI || process.env.CODEPUPPY_SIGN === "1"
 // sign time (see docs/runbooks/distribution.md / ~/.alpha-code-signing/signing.env), not baked into config.
 
 // Own bundle identity (com.tide.*, matching tideapp's convention) — NOT opencode's ai.opencode.desktop.
-// Changing this from the old id is a deliberate one-time reset of the app's stored data (accepted:
-// project FILES on disk are unaffected; only session history + recent-project list + login reset).
-const APP_IDS = {
-  dev: "com.tide.alphacode.dev",
-  beta: "com.tide.alphacode.beta",
-  prod: "com.tide.alphacode",
+// userData is NOT keyed on it (main/index.ts APP_IDS is). Changing it resets macOS privacy (TCC) grants and
+// Squirrel cannot auto-update across identifiers, so the release that changes it is a manual install
+// (#1571, docs/runbooks/distribution.md). scripts/install-local.ts imports this map.
+export const APP_IDS = {
+  dev: "com.tide.codepuppy.dev",
+  beta: "com.tide.codepuppy.beta",
+  prod: "com.tide.codepuppy",
 } as const
 
 // #1496:mac 只出**一个**目标架构(`CODEPUPPY_TARGET_ARCH=arm64|x64`,缺省宿主架构)。arm64 与 x64 各跑一轮
@@ -253,7 +254,7 @@ export function getConfig(target: Channel = channel) {
         ...base,
         appId,
         productName: "Code Puppy",
-        rpm: { packageName: "alpha-code" },
+        rpm: { packageName: "codepuppy" },
       }
     }
     case "beta": {
@@ -265,7 +266,7 @@ export function getConfig(target: Channel = channel) {
         // Own public release repo (jinjunnn/alpha-code) — NOT anomalyco/opencode, which would auto-
         // download upstream OpenCode over alpha (B9). `beta` channel = pre-release feed.
         publish: { provider: "github", owner: "jinjunnn", repo: "alpha-code", channel: "beta" },
-        rpm: { packageName: "alpha-code-beta" },
+        rpm: { packageName: "codepuppy-beta" },
       }
     }
     case "prod": {
@@ -278,7 +279,7 @@ export function getConfig(target: Channel = channel) {
         // which would auto-download upstream OpenCode over alpha). `latest` = stable feed.
         publish: { provider: "github", owner: "jinjunnn", repo: "alpha-code", channel: "latest" },
         deb: { fpm: [legacyDesktopEntryFpm] },
-        rpm: { packageName: "alpha-code", fpm: [legacyDesktopEntryFpm] },
+        rpm: { packageName: "codepuppy", fpm: [legacyDesktopEntryFpm] },
       }
     }
   }

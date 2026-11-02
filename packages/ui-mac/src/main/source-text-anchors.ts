@@ -204,6 +204,11 @@ export const DOWNGRADED_ANCHORS: Record<string, SourceTextEntry> = {
     evidence: "#1394",
     lines: 4,
   },
+  "packages/ui-mac/src/main/keychain-boot-order.test.ts": {
+    why: "`#1571` AC3 末句 / 第 0b 步⑥:用 TypeScript AST 判 index.ts 的失锁分支恰为 ready 前 `app.exit(0); return`,且失锁判断之前执行到的代码(模块顶层可执行语句 + main 里排在它前面的语句)不引用 safeStorage / session / net / BrowserWindow / cookies / initAuthEnv / initByokKeys;同文件三条变异副本证明判据会红。主语是运行期顺序、算子是源码结构,所以是锚。两个不会让它变红的变异:①失锁之前调用的某个函数(如 useEnvProxy)在函数体里去碰 session —— 判据不追调用链;②点名清单之外的某个 Electron API 在 ready 前触发了钥匙串查找。运行面证据是完整包在隔离钥匙串里的启动实测。",
+    evidence: "#1571",
+    lines: 1,
+  },
 }
 
 /**

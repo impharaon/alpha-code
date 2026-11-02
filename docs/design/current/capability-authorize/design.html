@@ -25,7 +25,7 @@
 <div class="proto-rel">
   <b>与上一稿的关系</b> — 基线 = <code>2026-07-04-extension-hub-v3-universal.md</code>(approved-direction)+
   <code>2026-07-04-ext-hub-m2</code> 原型:视觉语言零改动(tokens / Dialog / Button / 确认框 body 全部沿用规格原文)。
-  本稿新增 = 引擎 <code>stage="authorize"</code> 返回后的授权视图 <code>.alpha-ext-authz</code>(唯一新增 CSS 家族):
+  本稿新增 = 引擎 <code>stage="authorize"</code> 返回后的授权视图 <code>.codepuppy-ext-authz</code>(唯一新增 CSS 家族):
   MCP/plugin/bundle 作为既有确认框的<b>第二阶段</b>原地切换,skill 直装时独立弹出。整集确认、无逐能力开关(引擎防 TOCTOU 语义)。
   规格与证据见同目录 <code>design.md</code>。
 </div>
@@ -59,30 +59,30 @@ function capRow(id, kind, ref){ // kind: new | granted | removed
   const muted = kind !== "new" ? " data-muted" : "";
   const nm = kind === "removed" ? `<s>${c.nm}</s>` : c.nm;
   const chip = {new:"新增",granted:"已授权",removed:"将收回"}[kind];
-  const risk = (kind === "new" && c.tier === "high") ? `<span class="alpha-ext-authz-chip" data-kind="risk">高风险</span>` : "";
-  return `<div class="alpha-ext-authz-cap"${muted}>
-    <span class="alpha-ext-authz-ic" data-tier="${kind==="new"?c.tier:"low"}">${c.ic}</span>
-    <span class="alpha-ext-authz-nm"><b>${nm}${ref||""}</b><small>${c.ds}</small></span>
-    <span class="alpha-ext-authz-id">${id}</span>${risk}
-    <span class="alpha-ext-authz-chip" data-kind="${kind}">${chip}</span>
+  const risk = (kind === "new" && c.tier === "high") ? `<span class="codepuppy-ext-authz-chip" data-kind="risk">高风险</span>` : "";
+  return `<div class="codepuppy-ext-authz-cap"${muted}>
+    <span class="codepuppy-ext-authz-ic" data-tier="${kind==="new"?c.tier:"low"}">${c.ic}</span>
+    <span class="codepuppy-ext-authz-nm"><b>${nm}${ref||""}</b><small>${c.ds}</small></span>
+    <span class="codepuppy-ext-authz-id">${id}</span>${risk}
+    <span class="codepuppy-ext-authz-chip" data-kind="${kind}">${chip}</span>
   </div>`;
 }
 function authzBody(sc){
   let rows = "", risky = false;
   if (sc.items){ // bundle
     for (const it of sc.items){
-      rows += `<div class="alpha-ext-authz-item"><span class="alpha-ext-install-ic" style="background:${it.color}">${it.badge}</span>${it.name}</div>`;
+      rows += `<div class="codepuppy-ext-authz-item"><span class="codepuppy-ext-install-ic" style="background:${it.color}">${it.badge}</span>${it.name}</div>`;
       for (const id of it.caps){ rows += capRow(id,"new"); if (CAPS[id].tier==="high") risky = true; }
     }
-    rows += `<div class="alpha-ext-authz-rest">其余 ${sc.rest} 项能力无变化,无需确认<span class="note-ref">4</span></div>`;
+    rows += `<div class="codepuppy-ext-authz-rest">其余 ${sc.rest} 项能力无变化,无需确认<span class="note-ref">4</span></div>`;
   } else {
     for (const [id,kind] of sc.caps){ rows += capRow(id,kind, kind==="new"&&sc.refNew?`<span class="note-ref">${sc.refNew}</span>`:""); if (kind==="new"&&CAPS[id].tier==="high") risky = true; }
   }
-  return `<div class="alpha-ext-authz enter">
-    <p class="alpha-ext-authz-intro">${sc.intro}</p>
-    <div class="alpha-ext-authz-box">${rows}</div>
-    ${risky?`<p class="alpha-ext-confirm-risk">${RISK}<span class="note-ref">2</span></p>`:""}
-    <p class="alpha-ext-confirm-note">${NOTE}<span class="note-ref">3</span></p>
+  return `<div class="codepuppy-ext-authz enter">
+    <p class="codepuppy-ext-authz-intro">${sc.intro}</p>
+    <div class="codepuppy-ext-authz-box">${rows}</div>
+    ${risky?`<p class="codepuppy-ext-confirm-risk">${RISK}<span class="note-ref">2</span></p>`:""}
+    <p class="codepuppy-ext-confirm-note">${NOTE}<span class="note-ref">3</span></p>
   </div>`;
 }
 
@@ -102,7 +102,7 @@ const SCENARIOS = {
     caps:[["process:spawn","new"],["engine:config","new"]],
     notes:[
       ["1","<b>两阶段同框</b>:第一阶段 = 既有安装确认框(清单 + 密钥采集,现产品原样);点「确认安装」→ 按钮 loading(首驱)→ 引擎返回 authorize → <b>同一 Dialog body 原地切换</b>为授权视图(横向滑入,<code>--a-dur-base</code>),标题随之改为「授权能力」。不连环弹两个框。"],
-      ["2","高风险能力(<code>process:spawn</code>/<code>engine:plugin</code>)icon 用 warning 色 + 「高风险」chip;并复用既有 <code>.alpha-ext-confirm-risk</code> ⚠ 行。中低风险保持中性,不加色(house 克制)。"],
+      ["2","高风险能力(<code>process:spawn</code>/<code>engine:plugin</code>)icon 用 warning 色 + 「高风险」chip;并复用既有 <code>.codepuppy-ext-confirm-risk</code> ⚠ 行。中低风险保持中性,不加色(house 克制)。"],
       ["5","取消在任一阶段都零副作用;第二阶段不设「返回」——授权即最后一问。"]
     ]},
   s3:{ title:"能力变更需确认", cta:"授权并更新", toast:"已更新「网页抓取」 · 已生效", refNew:1,
@@ -147,19 +147,19 @@ function dialogHtml(sc, phase){
   const isP1 = sc.twoPhase && phase === 1;
   const title = isP1 ? sc.title1 : sc.title;
   const body = isP1 ? `
-    <div class="alpha-ext-confirm">
-      <div class="alpha-ext-confirm-meta"><span class="alpha-ext-install-ic" style="background:#0ea5e9">M</span>
-        <span class="alpha-ext-confirm-type">MCP · 本地<span class="note-ref">1</span></span></div>
-      <p class="alpha-ext-confirm-desc">Issue/PR 查询与操作。安装后立即连接,无需重启。</p>
-      <div class="alpha-ext-install-box">
-        <div class="alpha-ext-install-row"><span class="alpha-ext-install-ic" style="background:#0ea5e9">M</span>
-          <span class="alpha-ext-install-nm">github-mcp 服务进程</span><span class="alpha-ext-install-k">mcp</span></div>
-        <div class="alpha-ext-install-row"><span class="alpha-ext-install-ic" style="background:#64748b">C</span>
-          <span class="alpha-ext-install-nm">engine.mcp.github 配置项</span><span class="alpha-ext-install-k">config</span></div>
+    <div class="codepuppy-ext-confirm">
+      <div class="codepuppy-ext-confirm-meta"><span class="codepuppy-ext-install-ic" style="background:#0ea5e9">M</span>
+        <span class="codepuppy-ext-confirm-type">MCP · 本地<span class="note-ref">1</span></span></div>
+      <p class="codepuppy-ext-confirm-desc">Issue/PR 查询与操作。安装后立即连接,无需重启。</p>
+      <div class="codepuppy-ext-install-box">
+        <div class="codepuppy-ext-install-row"><span class="codepuppy-ext-install-ic" style="background:#0ea5e9">M</span>
+          <span class="codepuppy-ext-install-nm">github-mcp 服务进程</span><span class="codepuppy-ext-install-k">mcp</span></div>
+        <div class="codepuppy-ext-install-row"><span class="codepuppy-ext-install-ic" style="background:#64748b">C</span>
+          <span class="codepuppy-ext-install-nm">engine.mcp.github 配置项</span><span class="codepuppy-ext-install-k">config</span></div>
       </div>
-      <div class="alpha-ext-key-field"><span class="alpha-ext-key-name">GITHUB_TOKEN</span>
-        <input class="alpha-ext-key-input" type="password" value="ghp_····················" readonly /></div>
-      <p class="alpha-ext-confirm-note">密钥密文落盘 userData/alpha-secrets,配置只存文件引用。</p>
+      <div class="codepuppy-ext-key-field"><span class="codepuppy-ext-key-name">GITHUB_TOKEN</span>
+        <input class="codepuppy-ext-key-input" type="password" value="ghp_····················" readonly /></div>
+      <p class="codepuppy-ext-confirm-note">密钥密文落盘 userData/codepuppy-secrets,配置只存文件引用。</p>
     </div>`
     : authzBody(sc);
   const cta = isP1 ? sc.cta1 : sc.cta;

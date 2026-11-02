@@ -26,7 +26,7 @@ review_after: 2026-12-09
 | --- | --- |
 | 宿主 | macOS **26.3.1**(build 25D2128),Darwin 25.3.0 arm64,xnu-12377.91.3 |
 | 仓 | `alpha-code@8a8e1e56d`(= 当时的 `origin/alpha`),worktree `.worktrees/ac-1317`,由 `bash scripts/worktree-bootstrap.sh ac-1317 -b recon/1317-multi-workspace --base origin/alpha` 建(`4729 packages installed [9.51s]`) |
-| 被测引擎(§2、§3.2) | `bun run packages/opencode/src/index.ts serve`(**dev 树、bun 运行时**,未装 `@alpha-code/ext`)—— 与 §3.1 的出货实机不是同一形态,见 §6 |
+| 被测引擎(§2、§3.2) | `bun run packages/opencode/src/index.ts serve`(**dev 树、bun 运行时**,未装 `@codepuppy/ext`)—— 与 §3.1 的出货实机不是同一形态,见 §6 |
 | 出货实机(§3.1) | `/Applications/Code Puppy.app`;结构性 respawn 那一份样本来自 `version: '0.1.9', packaged: true` 的真实运行日志;并存的 0.1.11 日志用于对照 |
 | 判据 | **探针文件到底落没落盘**(`ls` / `wc -l` 实读)、**进程还在不在**(`pgrep` 实读)。HTTP 码、exit code、stderr 只作旁证 |
 | 对照臂 | 每条"没落盘"都配一条**同一探针、同一路径、只去掉围栏**的正样本臂;每个 `pgrep` 判据先用一个**已知在跑**的同形进程自证抓得到 |
@@ -156,7 +156,7 @@ N = 5
 三条要在实现票里守住的:
 
 - **`~/Alpha` 恒在集合里**。它是 ADR-025 的默认对话目录,而 renderer 重载后的启动草稿
-  **恒落在它上面**(`alpha-sidebar.tsx:686-692` `resolveDraftTarget`,实测见 §3.1)—— 它不在集合里
+  **恒落在它上面**(`codepuppy-sidebar.tsx:686-692` `resolveDraftTarget`,实测见 §3.1)—— 它不在集合里
   就等于"每次重启后落地即不可写"。
 - **集合是单调收集、按上限裁剪**,不是"上次会话的那一个"。上面第 5 条是一个 `$TMPDIR` 下的旧测试目录:
   集合会**带着历史垃圾单调增长**,所以裁剪规则(按 `tabs` 的最近使用序取前 K)必须和封顶一起定。
@@ -176,7 +176,7 @@ N = 5
 
 日志:`~/Library/Application Support/ai.opencode.desktop/logs/20260903T034019/startup-timeline.log`
 (`app starting { version: '0.1.9', packaged: true }`;起因是 token 续期拿到 `invalid-grant` → 登出 →
-`alpha-auth.ts:513` 的 `respawnSidecar("structural")`)。逐格:
+`codepuppy-auth.ts:513` 的 `respawnSidecar("structural")`)。逐格:
 
 | 时刻 | 标记 | 距起点 |
 | --- | --- | --- |
@@ -196,7 +196,7 @@ N = 5
    (`sidecar-lifecycle.ts:5-7`),`index.ts:1479` 执行 `mainWindow.webContents.reload()`。
 2. **落地点不是你刚才那一页,是默认工作区的一条新草稿。** 重载后启动路径重跑
    `startDraft("launch")`,而 `resolveDraftTarget` 在本地 sidecar 上**一律先取默认对话目录**
-   (`alpha-sidebar.tsx:686-692`,ADR-025 2026-07-28 修订:"未显式选择目录时一律落默认对话目录,
+   (`codepuppy-sidebar.tsx:686-692`,ADR-025 2026-07-28 修订:"未显式选择目录时一律落默认对话目录,
    不再『上次使用优先』")。实测那一格正是 `outcome=default-workspace`。
    **⇒ 如果 respawn 的触发器是"用户打开了新文件夹",那么这个动作会把用户从新文件夹弹回 `~/Alpha`。**
    这不是可以调参的性能问题,是触发器与落地逻辑**方向相反**。
@@ -254,7 +254,7 @@ BYOK 改键、provider 变更、崩溃自愈、catalog 看门狗。把"打开新
    估算字节封顶**(§2.2)。来源与解析复用 `catalog-liveness.ts:246-274` 那份,不另写一份。
    **`#1394`(2026-09-22)修订**:集合的**形状与顺序**不变,但计划器不再直接读 `opencode.global.dat` —— 那份文件在 W3 之下,
    被围栏的引擎树写得了(`#1390` 第一步只护住了状态根)。清单的权威副本改为 main 独占的真源文件
-   `<appData>/alpha-code-state/fence-workspaces/<env>.json`,首次启动从 store 播种一次、之后只经 renderer → IPC → main 更新
+   `<appData>/codepuppy-state/fence-workspaces/<env>.json`,首次启动从 store 播种一次、之后只经 renderer → IPC → main 更新
    (§8 第 5c 条)。
 2. **不把"打开新目录"接成 respawn 触发器。** 理由是 §3.1 第 2 条:那个动作会把用户弹回 `~/Alpha`,
    与它自己的目的相反;§3.2 的三条损失是附加代价,不是主要理由。
@@ -317,10 +317,10 @@ $ grep -c "ws5" opencode.log        # 反向对照:放行的那个
 **判据 = 在目标工作区里真写一次再删掉,由被围栏的引擎执行。** 触发点是"这个目录成为当前工作区"
 这一刻,而不是第一次工具写盘的时刻。出口只有三个,都已定位:
 
-- `packages/ui-mac/src/renderer/alpha-ui/workspace-chip.tsx:103-110` —— 原生目录选择器选中后
-  `props.onSelect(picked)`(首页 `AlphaHome.tsx:186`、新对话页 `alpha-new-session.tsx:153` 共用);
+- `packages/ui-mac/src/renderer/codepuppy-ui/workspace-chip.tsx:103-110` —— 原生目录选择器选中后
+  `props.onSelect(picked)`(首页 `CodePuppyHome.tsx:186`、新对话页 `codepuppy-new-session.tsx:153` 共用);
 - `packages/app/src/pages/layout/deep-links.ts:79/83` —— `openProject(directory, …)`;
-- 启动时的 `resolveDraftTarget`(`alpha-sidebar.tsx:681-693`)落定的那个目录。
+- 启动时的 `resolveDraftTarget`(`codepuppy-sidebar.tsx:681-693`)落定的那个目录。
 
 呈现的最低要求(具体文案与视觉归披露面那张票,基线 §五 子票 4 / I4):
 
@@ -335,7 +335,7 @@ $ grep -c "ws5" opencode.log        # 反向对照:放行的那个
 
 ## 6. 本轮的未验证(如实记账)
 
-- **§2 与 §3.2 跑的是 dev 树 + bun 运行时的引擎,没装 `@alpha-code/ext`。** 与 §8.3 的 F2 合成臂
+- **§2 与 §3.2 跑的是 dev 树 + bun 运行时的引擎,没装 `@codepuppy/ext`。** 与 §8.3 的 F2 合成臂
   形态不同;基线 U3(node + 打包产物 + 围栏)仍未合成,本票不闭合它。
 - **带 renderer 重载的 respawn 只有 n=1 个样本**(2026-09-03,packaged 0.1.9)。fork 那一半有 46 条,
   重载那一半没有。按"时序结论需 ≥3 轮采样"的纪律,§3.1 的 10.087 s 应读作**一个真实观测**,
@@ -374,8 +374,8 @@ $ grep -c "ws5" opencode.log        # 反向对照:放行的那个
 | 3 | 只认 `server === "sidecar"` 的 tab | 与 `catalog-liveness.ts` 同一判据;wsl:/ssh:/URL 的目录属于别的引擎 |
 | 4 | 只收绝对路径且盘上存在的目录;不代建 | §2.3:集合带着历史垃圾单调增长(本机就有一条 `$TMPDIR` 下的旧测试目录);不存在的路径编得过但白占字节;ADR-025「绝不代建」 |
 | 5 | 排除 `/`、HOME、HOME 的任何祖先 | §4 表「把 `$HOME` 整个放行」那一行:与围栏目的直接冲突,不定价。用户真把家目录当项目开 ⇒ 走披露面 |
-| 5b | 排除与应用状态根 `<appData>/alpha-code-state` **相关**(同一路径 / 在它之内 / 包含它)的候选;先 `realpathSync.native` 再比(`#1390`,2026-09-21) | 候选当时来自 `opencode.global.dat`,它在 W3 之下 —— 被围栏的引擎树自己写得了;一条伪造 draft 记录就能在下次启动把 `~/Library/Application Support` 放进可写集,围栏自己的状态从此可写。词法比较在 APFS 上会漏大小写变形与软链。第一步只护状态根;第二步(5c)落地后本条留作第二道闸 |
-| 5c | 候选**从哪来**:main 独占的真源 `<appData>/alpha-code-state/fence-workspaces/<env>.json`(与 env 根、`cas/` 同级,不在任何可写根之下);首次启动从 store 播种一次(日志一行),之后只经 renderer → `store-set` IPC → main 更新;boot 时「store 里有、真源里没有」的目录本会话检疫,renderer 原样写回也进不了;缺失 / 坏 ⇒ 只剩 `~/code-puppy` 并出声(`#1394`,2026-09-22) | `~/.ssh`、`~/Library/LaunchAgents` 一类主目录下的目录仍能被 5b 之外的同一手法点名 —— 修法不是再加排除规则(枚举永远漏),是让围栏的输入不再是围栏可写的文件。检疫是因为 renderer 会把从 store 恢复的伪造 tab 整份经合法 IPC 写回,不检疫等于把洞推迟一次重启。判据:`process-fence-workspaces.test.ts`、`process-fence-wiring.test.ts` 的 `#1394` 端到端(生产计划器) |
+| 5b | 排除与应用状态根 `<appData>/codepuppy-state` **相关**(同一路径 / 在它之内 / 包含它)的候选;先 `realpathSync.native` 再比(`#1390`,2026-09-21) | 候选当时来自 `opencode.global.dat`,它在 W3 之下 —— 被围栏的引擎树自己写得了;一条伪造 draft 记录就能在下次启动把 `~/Library/Application Support` 放进可写集,围栏自己的状态从此可写。词法比较在 APFS 上会漏大小写变形与软链。第一步只护状态根;第二步(5c)落地后本条留作第二道闸 |
+| 5c | 候选**从哪来**:main 独占的真源 `<appData>/codepuppy-state/fence-workspaces/<env>.json`(与 env 根、`cas/` 同级,不在任何可写根之下);首次启动从 store 播种一次(日志一行),之后只经 renderer → `store-set` IPC → main 更新;boot 时「store 里有、真源里没有」的目录本会话检疫,renderer 原样写回也进不了;缺失 / 坏 ⇒ 只剩 `~/code-puppy` 并出声(`#1394`,2026-09-22) | `~/.ssh`、`~/Library/LaunchAgents` 一类主目录下的目录仍能被 5b 之外的同一手法点名 —— 修法不是再加排除规则(枚举永远漏),是让围栏的输入不再是围栏可写的文件。检疫是因为 renderer 会把从 store 恢复的伪造 tab 整份经合法 IPC 写回,不检疫等于把洞推迟一次重启。判据:`process-fence-workspaces.test.ts`、`process-fence-wiring.test.ts` 的 `#1394` 端到端(生产计划器) |
 | 6 | 去重后取前 **K = 32** | 本机 99 个 tab 收敛成 5 个目录(§2.3),32 是 6 倍余量。K 不是字节上限,只让下一条的循环有界、日志可读 |
 | 7 | **字节上限用真编译器判**:main 在 fork 前 `sandbox-exec -f <profile> /usr/bin/true`,失败 ⇒ 从尾部丢一个再试;只剩 `~/code-puppy` 仍失败 ⇒ 抛(拒绝 fork) | §2.2 / §6:65 535 那道墙的单位没有精确刻画,不许靠算。实测:400 条互不相同的 220 字符路径 119 ms 撞墙;1 200 条只差尾号的 200 字符路径**编得过**(共享前缀被折叠)—— 本票第一版的「已知的坏」就因此判成了假绿 |
 

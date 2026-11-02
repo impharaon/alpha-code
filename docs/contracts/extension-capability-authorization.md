@@ -142,7 +142,7 @@ current、不写 config/receipt/grants/授权收据;已验证载荷可能留在�
 
 ## 7. 确认 UI 承诺(已批设计)
 
-- 宿主复用 `alpha-ui/Dialog`:有安装前确认框的类型(MCP/plugin/bundle)authorize 作为
+- 宿主复用 `codepuppy-ui/Dialog`:有安装前确认框的类型(MCP/plugin/bundle)authorize 作为
   **同框第二阶段**原地切换;skill 直装/更新扩权独立弹出。
 - 差异三分层(新增/已授权/将收回);仅 `engine:plugin`、`process:spawn` 标高风险;
   未知 capability 原样展示(前向兼容)。主按钮场景化(授权并安装/授权并更新)。
@@ -157,7 +157,7 @@ current、不写 config/receipt/grants/授权收据;已验证载荷可能留在�
 逐子项;**#378 退出条件组:mcp/plugin-vendored/plugin-npm/cloud 首装 `stage="authorize"`
 生产入口各一 + 重驱落 grant、cloud 卸载双清、cloud 重装 desiredState 继承、plugin 更新
 失败旧版继续健康、MCP 密钥版本化轮换/busy 不毁旧值/authorize 暂停零明文残留**)、
-`alpha-mcp-secrets.test.ts`(版本化写硬化/纯替换/引用收集/锁内 GC 宽限与引用对账)、
+`codepuppy-mcp-secrets.test.ts`(版本化写硬化/纯替换/引用收集/锁内 GC 宽限与引用对账)、
 `ext-transaction-config.test.ts`(config target 前向圈禁)、
 `ext-skill-generations.test.ts`(适配层判别分支)、
 `ext-authz-wiring.test.ts`(renderer 承接合同)、`ext-transaction.test.ts`
@@ -170,7 +170,7 @@ snapshot 两条入口执行 package preview、四组 binding、main 重取重验
 
 ## 9. MCP 密钥版本化布局(#378,Codex 裁决 Q1)
 
-- 布局:`<userData>/alpha-mcp-secrets/<server>/<verId>/<VAR>`(verId = `v-<hex16>`(64 位随机,排他 mkdir 认领,GC 判别接受 8-16 位 hex),每次安装
+- 布局:`<userData>/codepuppy-mcp-secrets/<server>/<verId>/<VAR>`(verId = `v-<hex16>`(64 位随机,排他 mkdir 认领,GC 判别接受 8-16 位 hex),每次安装
   尝试全新目录);durable config 只携带对应 `{file:}` 引用。**只增不覆盖** —— 旧版本文件被
   旧 config 引用,直至新 config 提交前必须原样可读;固定路径覆盖写与整目录快照/恢复
   (会删掉并发写方的新版本)已废除。
@@ -189,7 +189,7 @@ snapshot 两条入口执行 package preview、四组 binding、main 重取重验
   事务共用同一版本化原语,skip 语义(已有引用/空值)保持未策展既有 posture。
 - catalog MCP 提交成功后不再从 `ext-install-planner`/preload 回传可执行 config 或 secret
   真值。`#1529`(REQ-234 C1)起,`ext-ipc` 安装体提交成功后**不在当前回答里重载**:它经
-  `reload-coordinator` 记一笔重载请求并经 sidecar parentPort 发 `alpha.reload.request`,由 ext
+  `reload-coordinator` 记一笔重载请求并经 sidecar parentPort 发 `codepuppy.reload.request`,由 ext
   调度器在同一引擎实例上所有会话空闲时重建实例(`ConfigVariable` 照旧在 engine 装载期解析
   `{file:}`);preload result 不再携带任何连接状态(只剩 `ok/kind/name/manifestDigest` 等公开
   字段)。装上没有、能不能用,由 main 的三档视图(`ext-hub-view`,`hub-view.ts`)按
@@ -201,7 +201,7 @@ snapshot 两条入口执行 package preview、四组 binding、main 重取重验
   component/profile 派生；renderer 提交只能携带短生命周期的
   `{prerequisiteId,value}`。main 重验 signed snapshot/Envelope/item/capability binding 后，
   既有 transaction 授权终闸先执行；随后 prepared populate 才把值写入
-  `<userData>/alpha-mcp-secrets/<server>/<verId>/<VAR>`，probe 通过后才切 config 与落账。
+  `<userData>/codepuppy-mcp-secrets/<server>/<verId>/<VAR>`，probe 通过后才切 config 与落账。
   持久/结果形状不记录值或值 digest；cancel、undeclared、tamper、stale、replay 均在
   transaction 或 secret 写入前 fail closed。`codepuppy.secret-prerequisite.v1` 因而已在
   Phase 1 main/IPC 入口兑现；renderer 的 attempt/preview/密钥采集入口由

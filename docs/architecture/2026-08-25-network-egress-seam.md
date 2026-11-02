@@ -158,8 +158,8 @@ https://1.1.1.1/             → 301   ← 纯 raw-IP,无 DNS 也通
 | 类别 | 目的地 | 出处(代码或实测) |
 | --- | --- | --- |
 | 引擎:模型目录 | `models.dev:443` | `packages/core/src/models-dev.ts:154`(`OPENCODE_MODELS_URL` 可覆写) |
-| 引擎:平台(gateway/catalog/auth) | `alphacodeone.com:443`、`account.alphacodeone.com:443` | `packages/ui-mac/src/shared/alpha-config.ts:24,32`、`catalog-curation.ts:25`、`alpha-auth.ts:290` |
-| 引擎:BYOK 模型 | 各 provider 的 `baseURL`(catalog 定义,直连不走 gateway) | `packages/ui-mac/src/main/alpha-models.ts:61-77` |
+| 引擎:平台(gateway/catalog/auth) | `alphacodeone.com:443`、`account.alphacodeone.com:443` | `packages/ui-mac/src/shared/codepuppy-config.ts:24,32`、`catalog-curation.ts:25`、`codepuppy-auth.ts:290` |
+| 引擎:BYOK 模型 | 各 provider 的 `baseURL`(catalog 定义,直连不走 gateway) | `packages/ui-mac/src/main/codepuppy-models.ts:61-77` |
 | 引擎:远程 MCP | 用户配置的任意 URL(Streamable HTTP / SSE) | `packages/opencode/src/mcp/index.ts:294,301,884`(SDK transport → 进程内全局 fetch) |
 | 子进程:包管理 | `registry.npmjs.org:443`(npm/bun)、`pypi.org:443` + `files.pythonhosted.org:443`(uv) | E13 实测 CONNECT 日志(§4.2) |
 | 子进程:git | `github.com:443`(本仓 remote 实拍为 https 形态);用户仓可能 `*:22`(ssh) | `git remote -v` + E13 |
@@ -177,7 +177,7 @@ https://1.1.1.1/             → 301   ← 纯 raw-IP,无 DNS 也通
 > 注册表** `packages/ui-mac/src/main/network-egress-registry.ts`(REQ-137 AC2 的「单一权威」),本表
 > 不再是第二份清单。落地时逐条对着当天的代码坐标复核,三处与上表原文不同,均以代码为准并在注册表
 > 抬头写明出处:①模型目录默认源今天是 `models.opencode.ai:443`(`packages/core/src/models-dev.ts:160`),
-> 不是 `models.dev`;②平台族已迁域,注册表从 `shared/alpha-config.ts` 的 `ALPHA_ENDPOINTS` 派生
+> 不是 `models.dev`;②平台族已迁域,注册表从 `shared/codepuppy-config.ts` 的 `CODEPUPPY_ENDPOINTS` 派生
 > (web / platform / account / cloud 四条),不自持域名;③LSP 静态枚举多出 `www.eclipse.org:443`
 > (`lsp/server.ts:1207`)。动态类别(BYOK baseURL、远程 MCP URL)与 ssh `*:22` **不在**初值里;
 > `#1334` Q4 拍到的 `release-assets.githubusercontent.com` 与 Q3 语料的 `example.com` 当时也不在,交 `#1073` 裁。

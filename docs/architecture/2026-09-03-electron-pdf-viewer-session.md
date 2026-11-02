@@ -40,16 +40,16 @@ frame 树是这里最有价值的一个信号,因为它把"装载到哪一步"�
 
 ## 成因一:off-the-record profile 不装载扩展
 
-`session.fromPartition("alpha-rail-preview-<id>")` —— 没有 `persist:` 前缀 —— 在 Electron 里
+`session.fromPartition("codepuppy-rail-preview-<id>")` —— 没有 `persist:` 前缀 —— 在 Electron 里
 是**内存态(OTR)profile**。Chromium 不在 OTR profile 里启用内建扩展,PDF viewer 是其中之一。
 
 同一份配置(同一个自定义协议、同一组 deny handler、`plugins: true`),只改分区形态:
 
 | 分区形态 | 非暗像素 | frame 数 | 结果 |
 | --- | --- | --- | --- |
-| `alpha-rail-preview-<id>`(内存) | 0.0% | 2 | 深色空白 |
+| `codepuppy-rail-preview-<id>`(内存) | 0.0% | 2 | 深色空白 |
 | `persist:alpha-rail-preview-probe`(落盘,固定名) | 93.6% | 3 | 页面正常 |
-| `persist:alpha-rail-preview-<id>`(落盘,一次性名) | 93.6% | 3 | 页面正常 |
+| `persist:codepuppy-rail-preview-<id>`(落盘,一次性名) | 93.6% | 3 | 页面正常 |
 | 默认 session | 93.6% | 3 | 页面正常 |
 
 内存分区下 Chromium 自己也会在 console 里说一句
@@ -62,7 +62,7 @@ frame 树是这里最有价值的一个信号,因为它把"装载到哪一步"�
 - **不是 webRequest 白名单**(把过滤器整个换成放行,内存分区仍然 0% / 2 frame);
 - **不是自定义协议的 privileges**(补上 `secure` / `supportFetchAPI` / `stream` / `corsEnabled`
   之后,内存分区仍然 0% / 2 frame);
-- **不是自定义协议本身**(默认 session 用同一个 `alpha-artifact-preview://` 协议正常渲染)。
+- **不是自定义协议本身**(默认 session 用同一个 `codepuppy-artifact-preview://` 协议正常渲染)。
 
 ## 成因二:viewer 的界面整个住在 `chrome://resources/`
 
@@ -88,7 +88,7 @@ PDF viewer 的 UI 是 Lit 组件 + mojo 绑定拼出来的,这些资源编译在
 
 ## 落盘的代价怎么还
 
-`persist:` 意味着 `<userData>/Partitions/alpha-rail-preview-<previewId>/` 真的会被建出来。
+`persist:` 意味着 `<userData>/Partitions/codepuppy-rail-preview-<previewId>/` 真的会被建出来。
 分区名仍是一次性的(每个 preview 独一份,互不寻址),隔离面一条不改;新增的只有清理:
 
 - `closeRecord` 里 `clearStorageData()` 之后删掉该分区目录;

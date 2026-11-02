@@ -198,7 +198,7 @@
     <div class="turnfoot-wait"><svg class="pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14"/></svg><span role="status"><b>等你回答</b><span class="sep" aria-hidden="true"></span><span class="hint">生成已暂停,到输入框上方的提问卡回答</span></span></div>
 
   </div></div>
-  <div class="note"><b>回合脚行 · 一槽两面</b>:活跃回合的<b>最后一行</b>,新到的正文 / 思考块 / 工具卡都插在它之前;随内容滚动,不悬浮。<b>运行面</b> = 与中断行同族的安静行:7px 强调色脉冲点(顶栏状态胶囊同一动效)+「正在生成」+ 从这条用户消息发出算起的计时 <span class="mono">m:ss</span>;首个字未到 / 正文流式 / 思考中未吐字 / 工具执行中 / 自动重试,<b>不换字不换形</b> —— 卡说这一步,脚行说这一轮。<b>等你面</b> = 与自动重试卡同族的琥珀底小卡:静止暂停符号 + 主句 + 去向,计时收起,无按钮;等你批准与等你回答<b>共用这一面,只有文案不同</b>。<b>消失</b>:回合到达任一结局的同一帧移除,该位置由结局接管(完成 → 回合脚注,脚行最后一格的计时即脚注里的时长;停止 → 中断行;出错 → 回合级错误卡;跑完零正文 → 空回合行);回合结束时仍在运行态的工具卡必须同帧收口。<b>无障碍</b>:文字部分 <span class="mono">role="status"</span>,整轮只在出现 / 轮到你 / 你动完手三个时刻改字;计时在 status 之外且 <span class="mono">aria-hidden</span>,减弱动效时脉冲静止、计时照走。钩子 <span class="mono">data-alpha-timeline-row="turn-running"</span> · <span class="mono">data-face="running"|"waiting"</span> · <span class="mono">data-wait="approval"|"question"</span>。增量稿与逐条理由:<a href="../../2026-09-22-1399-turn-running-indicator/design.md">2026-09-22-1399-turn-running-indicator/</a>。</div>
+  <div class="note"><b>回合脚行 · 一槽两面</b>:活跃回合的<b>最后一行</b>,新到的正文 / 思考块 / 工具卡都插在它之前;随内容滚动,不悬浮。<b>运行面</b> = 与中断行同族的安静行:7px 强调色脉冲点(顶栏状态胶囊同一动效)+「正在生成」+ 从这条用户消息发出算起的计时 <span class="mono">m:ss</span>;首个字未到 / 正文流式 / 思考中未吐字 / 工具执行中 / 自动重试,<b>不换字不换形</b> —— 卡说这一步,脚行说这一轮。<b>等你面</b> = 与自动重试卡同族的琥珀底小卡:静止暂停符号 + 主句 + 去向,计时收起,无按钮;等你批准与等你回答<b>共用这一面,只有文案不同</b>。<b>消失</b>:回合到达任一结局的同一帧移除,该位置由结局接管(完成 → 回合脚注,脚行最后一格的计时即脚注里的时长;停止 → 中断行;出错 → 回合级错误卡;跑完零正文 → 空回合行);回合结束时仍在运行态的工具卡必须同帧收口。<b>无障碍</b>:文字部分 <span class="mono">role="status"</span>,整轮只在出现 / 轮到你 / 你动完手三个时刻改字;计时在 status 之外且 <span class="mono">aria-hidden</span>,减弱动效时脉冲静止、计时照走。钩子 <span class="mono">data-codepuppy-timeline-row="turn-running"</span> · <span class="mono">data-face="running"|"waiting"</span> · <span class="mono">data-wait="approval"|"question"</span>。增量稿与逐条理由:<a href="../../2026-09-22-1399-turn-running-indicator/design.md">2026-09-22-1399-turn-running-indicator/</a>。</div>
 
   <!-- ════════════════ TOOLS ════════════════ -->
   <div class="sec-kicker" id="tools" style="margin-top:40px">③ 工具卡:通用外壳 + 4 态</div>
@@ -270,7 +270,7 @@ admission · 阈值边界 …<span class="cur"></span></div></div></div>
 <span style="color:var(--a-text-disabled)">前 2 行预览 · 全文 96 行 → 「在面板打开」</span></pre></div></div>
 
     <!-- edit compact diff -->
-    <div class="tc open" data-toggle><div class="tc-head"><span class="tc-ico edit"><svg class="ic sm" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span><div class="tc-tt"><b>编辑</b><span class="tgt">alpha-audit-test.txt</span><span class="path">/tmp/</span></div><span class="stat"><span class="add">+1</span><span class="del">−1</span></span><span class="openp"><svg class="ic" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14L21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>在面板打开</span><svg class="ic sm tc-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+    <div class="tc open" data-toggle><div class="tc-head"><span class="tc-ico edit"><svg class="ic sm" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span><div class="tc-tt"><b>编辑</b><span class="tgt">codepuppy-audit-test.txt</span><span class="path">/tmp/</span></div><span class="stat"><span class="add">+1</span><span class="del">−1</span></span><span class="openp"><svg class="ic" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14L21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>在面板打开</span><svg class="ic sm tc-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
       <div class="tc-body"><div class="diff"><div class="dl del"><span class="gut">2</span><span class="sign">−</span><span>line two</span></div><div class="dl add"><span class="gut">2</span><span class="sign">+</span><span>hello world</span></div></div></div></div>
 
     <!-- apply_patch 多文件 (TL-23): 每文件 新增/修改/删除 标 + 改动徽 -->
@@ -378,7 +378,7 @@ admission · 阈值边界 …<span class="cur"></span></div></div></div>
     <div class="diffsum open" data-diffsum><div class="diffsum-head"><span class="gi"><svg class="ic sm" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="9" r="2.4"/><path d="M6 8.4v7.2M18 11.4a6 6 0 0 1-6 6H8.4"/></svg></span><b>本回合改动 · 3 个文件</b><span class="stat" style="margin-left:8px"><span class="add">+105</span><span class="del">−5</span></span><svg class="ic sm chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
       <div class="diffsum-body">
         <div class="dfrow"><svg class="fic ic" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg><span class="fn"><span class="dir">/ </span>AGENTS.md</span><span class="stat" style="margin-left:auto"><span class="add">+96</span></span><span class="openp"><svg class="ic" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14L21 3"/></svg></span></div>
-        <div class="dfrow"><svg class="fic ic" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg><span class="fn"><span class="dir">alpha-ui/ </span>button.css</span><span class="stat" style="margin-left:auto"><span class="add">+8</span><span class="del">−2</span></span><span class="openp"><svg class="ic" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14L21 3"/></svg></span></div>
+        <div class="dfrow"><svg class="fic ic" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg><span class="fn"><span class="dir">codepuppy-ui/ </span>button.css</span><span class="stat" style="margin-left:auto"><span class="add">+8</span><span class="del">−2</span></span><span class="openp"><svg class="ic" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14L21 3"/></svg></span></div>
       </div></div>
 
     <!-- compaction -->
@@ -1001,7 +1001,7 @@ rendering chunks (12/31)...</div></div>
   <div id="dev-bundled">
     <div class="pf-tag">Code Puppy 内置 · 扩展自带的工具</div>
     <div class="pf-detail" style="margin:0"><div class="pf-detail-foot" style="border-top:0"><span>Code Puppy 内置 · 本机</span><span class="pf-grow"></span><a href="#developer-details">⌄ 开发者详情</a></div>
-      <div class="prov-dev" style="padding:0 12px 10px">plugin:%2FApplications%2FCode Puppy.app%2FContents%2FResources%2Falpha-ext%2Fplugin.js:alpha_cloud_access<br>technical-id: alpha_cloud_access<br>authority: alpha-bundled · plugin:alpha-ext · sha256:5873d53028c643604bc3f4d4c6904d58<br>location: local<br>origin: /Applications/Code Puppy.app/Contents/Resources/alpha-ext/plugin.js</div></div>
+      <div class="prov-dev" style="padding:0 12px 10px">plugin:%2FApplications%2FCode Puppy.app%2FContents%2FResources%2Falpha-ext%2Fplugin.js:alpha_cloud_access<br>technical-id: alpha_cloud_access<br>authority: alpha-bundled · plugin:codepuppy-ext · sha256:5873d53028c643604bc3f4d4c6904d58<br>location: local<br>origin: /Applications/Code Puppy.app/Contents/Resources/codepuppy-ext/plugin.js</div></div>
   </div>
   <div id="dev-bundled-doc">
     <div class="pf-tag">Code Puppy 内置 · 文档工具</div>
@@ -1011,7 +1011,7 @@ rendering chunks (12/31)...</div></div>
   <div id="dev-project-plugin">
     <div class="pf-tag">第三方 · 项目插件</div>
     <div class="pf-detail" style="margin:0"><div class="pf-detail-foot" style="border-top:0"><span>第三方 · 本机</span><span class="pf-grow"></span><a href="#developer-details">⌄ 开发者详情</a></div>
-      <div class="prov-dev" style="padding:0 12px 10px">plugin:%2FApplications%2FCode Puppy.app%2FContents%2FResources%2Falpha-ext%2Fplugin.js:lint_project<br>technical-id: lint_project<br>authority: not-asserted<br>location: local<br>origin: /Applications/Code Puppy.app/Contents/Resources/alpha-ext/plugin.js</div></div>
+      <div class="prov-dev" style="padding:0 12px 10px">plugin:%2FApplications%2FCode Puppy.app%2FContents%2FResources%2Falpha-ext%2Fplugin.js:lint_project<br>technical-id: lint_project<br>authority: not-asserted<br>location: local<br>origin: /Applications/Code Puppy.app/Contents/Resources/codepuppy-ext/plugin.js</div></div>
   </div>
   <div id="dev-history">
     <div class="pf-tag">更新之前的记录</div>
@@ -1023,7 +1023,7 @@ rendering chunks (12/31)...</div></div>
 
 <div class="note warn" id="source-location-diff"><b>与批准稿的差异(按代码画,不回头改代码)</b>:
   ① 随应用安装的工具没有「检查云端登录」这类中文动作名:行上写「Code Puppy 内置」+ 工具原名(如 <code>alpha_cloud_access</code>、<code>read_docx</code>),与还没有展示规则的内置工具同一写法。中文名归命名迁移 alpha-code#1568。<br>
-  ② 开发者详情里的技术名是现行代码的名字(<code>alpha-bundled</code>、<code>plugin:alpha-ext</code>、安装目录 <code>alpha-ext</code>、<code>alpha_cloud_access</code>),不是批准稿按命名规范推出的 <code>codepuppy-*</code> 新名;改名同归 alpha-code#1568。<br>
+  ② 开发者详情里的技术名是现行代码的名字(<code>alpha-bundled</code>、<code>plugin:codepuppy-ext</code>、安装目录 <code>codepuppy-ext</code>、<code>alpha_cloud_access</code>),不是批准稿按命名规范推出的 <code>codepuppy-*</code> 新名;改名同归 alpha-code#1568。<br>
   ③ 随应用安装的文档工具(Word / Excel / PDF / PowerPoint)同样显示「Code Puppy 内置」,批准稿只画了扩展自带的工具;本节补了它的步骤行与开发者详情(<code>#dev-bundled-doc</code>)。<br>
   ④ 「来源 · 位置」是详情的最后一行(在详情内容、报错与诊断之后),开发者详情的开关在同一行右侧;批准稿把它和「复制输出」画在同一行。
 </div>

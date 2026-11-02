@@ -34,19 +34,19 @@ SyntaxError: Missing 'default' export in module '…/electron@42.3.3…/electron
 **第二步:`mock.module("electron", …)` 的导出名集合由进程里第一个被实例化的工厂钉死。**
 `bun test src` 把 382 个文件跑在同一个进程里。先跑的那个工厂决定名字集合,后来的工厂只更新
 这些名字的**值**,新名字静默丢掉(同一条机制此前已记在
-`packages/ui-mac/src/main/alpha-keychain-backend.ts` 的头注里)。于是:第一个工厂不给 `default`
+`packages/ui-mac/src/main/codepuppy-keychain-backend.ts` 的头注里)。于是:第一个工厂不给 `default`
 ⇒ 后面任何 import 面走得到 electron 的模块在**链接期**就抛 ⇒ 整份文件夭折。
 
 **最小复现与反证**(两条都实跑):
 
 ```
-bun test src/main/alpha-surfaces.test.ts src/main/process-fence-wiring.test.ts
-  → 12 pass / 1 error        # alpha-surfaces 的工厂先被实例化,它没有 default
-（给 alpha-surfaces 的工厂补上 default 之后,同一条命令）
+bun test src/main/codepuppy-surfaces.test.ts src/main/process-fence-wiring.test.ts
+  → 12 pass / 1 error        # codepuppy-surfaces 的工厂先被实例化,它没有 default
+（给 codepuppy-surfaces 的工厂补上 default 之后,同一条命令）
   → 16 pass / 0 fail
 ```
 
-`alpha-surfaces.test.ts` 与这三个文件**毫无关系** —— 这是这个缺陷最难归因的地方:成败取决于
+`codepuppy-surfaces.test.ts` 与这三个文件**毫无关系** —— 这是这个缺陷最难归因的地方:成败取决于
 哪个无关测试文件的 electron mock 先跑。
 
 **两条平台变体是同一个根因的两面。** macOS 缺的是 `default`;ubuntu CI(run `35806141587`)报的是

@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>alpha-ui · Living Styleguide</title>
+<title>codepuppy-ui · Living Styleguide</title>
 <style>
 /* ============================================================================
  * SOURCE OF TRUTH — verbatim copy of
- *   packages/ui-mac/src/renderer/alpha-ui/tokens.css
+ *   packages/ui-mac/src/renderer/codepuppy-ui/tokens.css
  * The tokens.css in code remains authoritative; this is a mirror for the gallery.
  * ==========================================================================*/
 
@@ -153,7 +153,7 @@
 
 /* ── Dark theme ─────────────────────────────────────────────────────────── */
 /* Keyed off opencode's `document.documentElement.dataset.colorScheme` (= data-color-scheme),
- * set by @opencode-ai/ui's theme context — so alpha-ui follows the app's light/dark toggle. */
+ * set by @opencode-ai/ui's theme context — so codepuppy-ui follows the app's light/dark toggle. */
 :root[data-color-scheme="dark"] {
   /* ── Neutral spine (dark) — cool graphite ────────────────────────────── */
   --a-bg-canvas: #0a0b0d;
@@ -255,11 +255,11 @@
 }
 
 /* ============================================================================
- * COMPONENT CSS — verbatim from alpha-ui/*.css (only the local @import lines,
+ * COMPONENT CSS — verbatim from codepuppy-ui/*.css (only the local @import lines,
  * which pull tokens.css, were dropped since the token layer is inlined above).
  * ==========================================================================*/
 
-/* ── alpha-ui/base.css ───────────────────────────────────────────────────── */
+/* ── codepuppy-ui/base.css ───────────────────────────────────────────────────── */
 .a-ui,
 .a-ui * {
   box-sizing: border-box;
@@ -361,7 +361,7 @@
   .a-rise { animation: none; }
 }
 
-/* ── alpha-ui/button.css ─────────────────────────────────────────────────── */
+/* ── codepuppy-ui/button.css ─────────────────────────────────────────────────── */
 .a-btn {
   --_h: 30px;
   --_px: var(--a-space-3);
@@ -473,7 +473,7 @@
   }
 }
 
-/* ── alpha-ui/input.css ──────────────────────────────────────────────────── */
+/* ── codepuppy-ui/input.css ──────────────────────────────────────────────────── */
 .a-field {
   --_h: 32px;
   display: inline-flex;
@@ -535,7 +535,7 @@
   cursor: default;
 }
 
-/* ── alpha-ui/dialog.css ─────────────────────────────────────────────────── */
+/* ── codepuppy-ui/dialog.css ─────────────────────────────────────────────────── */
 .a-dialog-root {
   position: fixed;
   inset: 0;
@@ -639,7 +639,7 @@
   }
 }
 
-/* ── alpha-ui/toast.css ──────────────────────────────────────────────────── */
+/* ── codepuppy-ui/toast.css ──────────────────────────────────────────────────── */
 .a-toast-viewport {
   position: fixed;
   right: var(--a-space-4);
@@ -690,7 +690,7 @@
 .a-toast-x:hover { background: var(--a-bg-muted); color: var(--a-text); }
 @media (prefers-reduced-motion: reduce) { .a-toast { animation: none; } }
 
-/* ── alpha-ui/tooltip.css ────────────────────────────────────────────────── */
+/* ── codepuppy-ui/tooltip.css ────────────────────────────────────────────────── */
 .a-tip-wrap {
   position: relative;
   display: inline-flex;
@@ -724,7 +724,7 @@
 }
 @media (prefers-reduced-motion: reduce) { .a-tip { transition: none; } }
 
-/* ── alpha-ui/banner.css ─────────────────────────────────────────────────── */
+/* ── codepuppy-ui/banner.css ─────────────────────────────────────────────────── */
 .a-banner {
   display: flex;
   align-items: center;
@@ -1229,7 +1229,7 @@ section.doc { margin-bottom: var(--a-space-12); scroll-margin-top: calc(52px + v
 <header class="topbar">
   <span class="brand">
     <span class="mark">α</span>
-    alpha-ui
+    codepuppy-ui
     <small>living styleguide</small>
   </span>
   <span class="spacer"></span>
@@ -1260,7 +1260,7 @@ section.doc { margin-bottom: var(--a-space-12); scroll-margin-top: calc(52px + v
 
   <main>
     <div class="hero a-grain a-glow a-rise">
-      <h1>Cool Graphite / Porcelain — the alpha-ui design system</h1>
+      <h1>Cool Graphite / Porcelain — the codepuppy-ui design system</h1>
       <p>
         A living styleguide, rendered straight from the real tokens and component CSS. The neutral
         spine is a cool, slate-tinted porcelain (light) / graphite (dark); a single restrained indigo
@@ -1273,8 +1273,8 @@ section.doc { margin-bottom: var(--a-space-12); scroll-margin-top: calc(52px + v
         single source of truth;</b> this file is a generated mirror. If they disagree, the code wins.
       </p>
       <div class="src">
-        <code>packages/ui-mac/src/renderer/alpha-ui/tokens.css</code>
-        <code>alpha-ui/base.css · button · input · dialog · toast · tooltip · banner</code>
+        <code>packages/ui-mac/src/renderer/codepuppy-ui/tokens.css</code>
+        <code>codepuppy-ui/base.css · button · input · dialog · toast · tooltip · banner</code>
       </div>
     </div>
 
@@ -1396,7 +1396,7 @@ section.doc { margin-bottom: var(--a-space-12); scroll-margin-top: calc(52px + v
         <p>The canonical action control. Variants: <b>primary</b> (indigo fill), <b>secondary</b> (bordered, default), <b>ghost</b> (text), <b>danger</b>. Sizes sm&nbsp;/&nbsp;md&nbsp;/&nbsp;lg. Hover / active states below are the component's own rules, re-stated with the same tokens so all states show at once; the live row reacts to real interaction.</p>
       </div>
 
-      <div class="subhead"><h3>Variants &amp; states</h3><span class="rule"></span><span class="file">alpha-ui/button.css</span></div>
+      <div class="subhead"><h3>Variants &amp; states</h3><span class="rule"></span><span class="file">codepuppy-ui/button.css</span></div>
       <div class="demo a-ui">
         <div class="col" style="gap:var(--a-space-5)">
           <div class="row">
@@ -1449,7 +1449,7 @@ section.doc { margin-bottom: var(--a-space-12); scroll-margin-top: calc(52px + v
         <h2>Input</h2>
         <p>The canonical single-line field, with an optional leading icon slot. Focus lifts the fill to <code class="mono">--a-surface</code>, switches the border to accent, and adds the focus ring.</p>
       </div>
-      <div class="subhead"><h3>States</h3><span class="rule"></span><span class="file">alpha-ui/input.css</span></div>
+      <div class="subhead"><h3>States</h3><span class="rule"></span><span class="file">codepuppy-ui/input.css</span></div>
       <div class="demo a-ui">
         <div class="col" style="gap:var(--a-space-4);max-width:320px">
           <div class="statecap" style="align-items:stretch">
@@ -1488,7 +1488,7 @@ section.doc { margin-bottom: var(--a-space-12); scroll-margin-top: calc(52px + v
         <h2>Dialog</h2>
         <p>The canonical modal: scrim + blurred backdrop, a raised surface with the 2xl radius, overlay shadow and glass edge-light, and a header / body / footer contract. The real component is a fixed full-screen overlay; this is a contained mock of the panel (sizes <code class="mono">sm</code> 420 · <code class="mono">md</code> 560 · <code class="mono">lg</code> 880).</p>
       </div>
-      <div class="subhead"><h3>Panel mock</h3><span class="rule"></span><span class="file">alpha-ui/dialog.css</span></div>
+      <div class="subhead"><h3>Panel mock</h3><span class="rule"></span><span class="file">codepuppy-ui/dialog.css</span></div>
       <div class="dialog-stage a-ui">
         <div class="a-dialog-backdrop"></div>
         <div class="a-dialog-panel" data-size="sm" role="dialog" aria-modal="true" aria-label="Install extension">
@@ -1518,7 +1518,7 @@ section.doc { margin-bottom: var(--a-space-12); scroll-margin-top: calc(52px + v
         <h2>Toast</h2>
         <p>Transient feedback in a fixed bottom-right viewport (shown here in flow). A colored dot marks the kind; a bold title over a muted detail line; a dismiss control.</p>
       </div>
-      <div class="subhead"><h3>Kinds</h3><span class="rule"></span><span class="file">alpha-ui/toast.css</span></div>
+      <div class="subhead"><h3>Kinds</h3><span class="rule"></span><span class="file">codepuppy-ui/toast.css</span></div>
       <div class="demo a-ui">
         <div class="toast-stack">
           <div class="a-toast" data-kind="success" role="status">
@@ -1548,7 +1548,7 @@ section.doc { margin-bottom: var(--a-space-12); scroll-margin-top: calc(52px + v
         <h2>Tooltip</h2>
         <p>CSS-only hover/focus label — inverted (text-colored background on canvas-colored text), four placements. Shown forced-visible below so all placements read at once; the last example is live on hover/focus.</p>
       </div>
-      <div class="subhead"><h3>Placements</h3><span class="rule"></span><span class="file">alpha-ui/tooltip.css</span></div>
+      <div class="subhead"><h3>Placements</h3><span class="rule"></span><span class="file">codepuppy-ui/tooltip.css</span></div>
       <div class="demo a-ui tip-static">
         <div class="row" style="gap:var(--a-space-12);justify-content:center">
           <span class="a-tip-wrap"><span class="tip-anchor">top</span><span class="a-tip" role="tooltip" data-placement="top">Tooltip · top</span></span>
@@ -1572,7 +1572,7 @@ section.doc { margin-bottom: var(--a-space-12); scroll-margin-top: calc(52px + v
         <h2>Banner</h2>
         <p>Persistent / blocking status — the counterpart to Toast's transient feedback. Four kinds, a tinted <code class="mono">-subtle</code> fill with a 30% semantic border (via <code class="mono">color-mix</code>), and an optional inline action.</p>
       </div>
-      <div class="subhead"><h3>Kinds</h3><span class="rule"></span><span class="file">alpha-ui/banner.css</span></div>
+      <div class="subhead"><h3>Kinds</h3><span class="rule"></span><span class="file">codepuppy-ui/banner.css</span></div>
       <div class="demo a-ui">
         <div class="col" style="max-width:520px">
           <div class="a-banner info">
@@ -1600,7 +1600,7 @@ section.doc { margin-bottom: var(--a-space-12); scroll-margin-top: calc(52px + v
     </section>
 
     <div class="foot">
-      Generated from <code class="mono">alpha-ui/tokens.css</code> + <code class="mono">alpha-ui/*.css</code>. Self-contained: no external fonts, scripts, or assets. The <code class="mono">tokens.css</code> in code is authoritative.
+      Generated from <code class="mono">codepuppy-ui/tokens.css</code> + <code class="mono">codepuppy-ui/*.css</code>. Self-contained: no external fonts, scripts, or assets. The <code class="mono">tokens.css</code> in code is authoritative.
     </div>
   </main>
 </div>

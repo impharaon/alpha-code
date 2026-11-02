@@ -11,7 +11,7 @@ review_after: 2027-01-16
 # Color system — 用色宪法
 
 Cool graphite / porcelain neutral spine + one restrained indigo accent. Values
-below mirror [`tokens.css`](../../../packages/ui-mac/src/renderer/alpha-ui/tokens.css),
+below mirror [`tokens.css`](../../../packages/ui-mac/src/renderer/codepuppy-ui/tokens.css),
 which is the source of truth (light `:root`, dark `:root[data-color-scheme="dark"]`).
 Use the semantic **role**, never a raw hex.
 

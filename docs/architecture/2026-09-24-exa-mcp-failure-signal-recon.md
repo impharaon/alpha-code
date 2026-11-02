@@ -105,7 +105,7 @@ D 与 C 的文案**不是同一串**。共同前缀到 `… at https://dashboard
 
 > 2026-09-26 补:第二行 `packages/core` 那一格已由 `alpha-code#1449` 收口 —— `packages/core/src/tool/websearch.ts`
 > 现在读 `isError`、非 2xx 走状态映射而不是 `filterStatusOk`,判据在
-> `packages/core/test/alpha-websearch-failure.test.ts`(负载就是本目录的 `results/arms.json`)。
+> `packages/core/test/codepuppy-websearch-failure.test.ts`(负载就是本目录的 `results/arms.json`)。
 > 第一行(D 那一种)不变:仍无结构化信号,仍归 `#1445`。
 
 ## 已经是对的那两半
@@ -210,8 +210,8 @@ D 与 C 的文案**不是同一串**。共同前缀到 `… at https://dashboard
 ## 2026-09-27 落地:重写后的三条 AC 各钉一道闸,判决一行没改
 
 原 AC1 作废之后(票面 2026-09-26 评论),三条新 AC 由两份同名同形的闸门文件钉住:
-`packages/opencode/test/tool/alpha-websearch-nokey-outcomes.test.ts`(legacy 传输 + 叶子)与
-`packages/core/test/alpha-websearch-nokey-outcomes.test.ts`(V2 core 传输 + 真 `ToolRegistry` settle)。
+`packages/opencode/test/tool/codepuppy-websearch-nokey-outcomes.test.ts`(legacy 传输 + 叶子)与
+`packages/core/test/codepuppy-websearch-nokey-outcomes.test.ts`(V2 core 传输 + 真 `ToolRegistry` settle)。
 负载一律读本文引用的实抓件(`ticket-payload.json` / `arms.json` / `live-shapes.json` / `vendor-source-excerpts.txt`),
 夹具自检钉住,不手拼。
 
@@ -233,7 +233,7 @@ D 与 C 的文案**不是同一串**。共同前缀到 `… at https://dashboard
 ### AC2 —— 信封结构记录:只记录、不判决
 
 两份传输各加一个纯函数 `envelopeShape(tool, status, headers, body)`,在每次响应到手后写一条
-`Effect.logInfo("websearch envelope", …)`(缺省开着;`ALPHA_WEBSEARCH_ENVELOPE_DIAG=0` 关),字段:
+`Effect.logInfo("websearch envelope", …)`(缺省开着;`CODEPUPPY_WEBSEARCH_ENVELOPE_DIAG=0` 关),字段:
 `status` / `jsonrpc`(result | error | unparsed)/ `isError` / `structuredContent`(present | absent)/ `contentBlocks` /
 `contentMetaKeys`(`content[0]._meta` 的键名)/ `resultMetaKeys` / `textLength` / 四个限流头。**不含正文**。
 `call()` / `callMcp()` 里没有一个分支读它。D 的记录样本:
@@ -268,6 +268,6 @@ D 与 C 的文案**不是同一串**。共同前缀到 `… at https://dashboard
 ### 主动没做的
 
 - **条目形状闸**(按 `Title:`/`URL:` 行判成功):票面明写是 owner 的偏好裁决,未裁,不做。
-- `ALPHA_WEBSEARCH_ENVELOPE_DIAG` **没有**登进 `sidecar-env.ts` 白名单:它是关诊断的开关,不是运行判决;打包实例要关
-  可走 `ALPHA_ENV_ALLOWLIST_EXTRA`。两包各写一份的名字也没加跨包逐字一致闸(`cloud-web-search.test.ts` 那种)——
+- `CODEPUPPY_WEBSEARCH_ENVELOPE_DIAG` **没有**登进 `sidecar-env.ts` 白名单:它是关诊断的开关,不是运行判决;打包实例要关
+  可走 `CODEPUPPY_ENV_ALLOWLIST_EXTRA`。两包各写一份的名字也没加跨包逐字一致闸(`cloud-web-search.test.ts` 那种)——
   两份记录漂开的后果只是日志字段不同,不是判决不同。

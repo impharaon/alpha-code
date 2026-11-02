@@ -28,11 +28,11 @@ journal 收敛到终态;收敛不了的**如实保留**,绝不静默终态化(#3
 ## `prepared` 面:事务根之外的受限资源(REQ-128 #712)
 
 带密钥前置的 MCP 安装会在**授权终闸之后、任何 live switch 之前**写一个版本化密钥目录
-`<userData>/alpha-mcp-secrets/<server>/<verId>/`(0700,内含 0600 密钥文件)。它在事务根之外,
+`<userData>/codepuppy-mcp-secrets/<server>/<verId>/`(0700,内含 0600 密钥文件)。它在事务根之外,
 因此不受 staging/generation 那套回滚原语管辖;journal 的 `prepared` 数组记录它的**类型化身份**:
 
 ```json
-"prepared": [{ "kind": "mcp-secret-version", "store": "alpha-mcp-secrets", "server": "<name>", "version": "v-<hex>" }]
+"prepared": [{ "kind": "mcp-secret-version", "store": "codepuppy-mcp-secrets", "server": "<name>", "version": "v-<hex>" }]
 ```
 
 - **只有身份**。journal / 账本 / 授权收据 / 日志里都不会出现密钥明文、明文摘要,也不会出现任何
@@ -40,7 +40,7 @@ journal 收敛到终态;收敛不了的**如实保留**,绝不静默终态化(#3
   即被拒。密钥的绝对路径只出现在 live config 的 `{file:}` 引用里(那是它的引用通道)。
 - **释放时机**:journal 收敛为 `aborted` / `rolled-back` 时释放一次;前滚为 `committed` 时
   **绝不**释放(那时 live config 已经指向它)。
-- **释放前复核引用**:合并视图(主 `alpha.jsonc` + 全部 retained legacy 源)只要仍引用该版本
+- **释放前复核引用**:合并视图(主 `codepuppy.jsonc` + 全部 retained legacy 源)只要仍引用该版本
   目录内**任一**文件,或任一来源不可读 / 任一引用路径的文件系统身份不可判,就一律保留,并在
   `[req100-tx-recovery]` 日志里如实报出(`still referenced by the merged config view` /
   具体的读取失败原因)。**这类保留不阻断 journal 终态化** —— 残留此刻不被任何 live config 引用,
@@ -144,7 +144,7 @@ seed plugin 的载荷是同一事务里的 file items,落点 = 内容寻址目�
 `plugins/<name>@<digest16>`(#352 的随机后缀 stager 不用于 seed;无锁外 staging → 无 tmp
 目录残留)。残留识别与处置:
 
-- **孤儿判定**:目录不被当前 `alpha.jsonc` `plugin[]`、账本 `configKey`,**以及全部 legacy
+- **孤儿判定**:目录不被当前 `codepuppy.jsonc` `plugin[]`、账本 `configKey`,**以及全部 legacy
   配置源**(`~/.opencode/opencode.jsonc` 与 XDG 用户配置的 `plugin[]` —— 引擎会合并加载这些
   历史位置)引用才算孤儿(来源只有两类:replace 提交成功后旧目录 GC 失败 warning 留下的旧
   目录;回滚后未收干净的空壳子目录),可安全删除;只查主配置会把 legacy 源仍在加载的插件当
@@ -157,12 +157,12 @@ seed plugin 的载荷是同一事务里的 file items,落点 = 内容寻址目�
 ## MCP 密钥版本目录的残留形态(REQ-100 #378)
 
 单装/未策展 MCP 的密钥自 #378 起写入版本化布局
-`<userData>/alpha-mcp-secrets/<server>/<verId>/<VAR>`(verId = `v-<hex16>`(接受 8-16 位 hex 存量),只增不覆盖;
+`<userData>/codepuppy-mcp-secrets/<server>/<verId>/<VAR>`(verId = `v-<hex16>`(接受 8-16 位 hex 存量),只增不覆盖;
 完整合同见 `docs/contracts/extension-capability-authorization.md` §9)。残留识别与处置:
 
 - **孤儿判定**:版本目录内没有任何文件被 `mcp.<server>` leaf 的 `{file:}` 引用即孤儿 ——
   **引用对账必须覆盖主配置与全部 retained legacy 源**(`~/.opencode/opencode.jsonc`、XDG
-  `opencode.jsonc`;引擎会合并它们,r9:只看当前 `alpha.jsonc` 会误删 legacy 仍在用的密钥)。
+  `opencode.jsonc`;引擎会合并它们,r9:只看当前 `codepuppy.jsonc` 会误删 legacy 仍在用的密钥)。
   来源:安装失败/authorize 暂停清理失败、崩溃于提交前、提交后旧版本 GC 失败 warning。安装
   成功路径会在配置写锁内自动 GC(全源未引用 + mtime 超 10 分钟宽限),一般无需人工;要手工
   收时先逐源核对引用,再删未引用版本目录。**宽限期内的新目录不要删**——可能是「文件已写、

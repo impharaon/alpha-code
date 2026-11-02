@@ -29,13 +29,13 @@ ui-mac 侧咽喉:[`packages/ui-mac/src/main/config-injection-throat.test.ts`](..
 - 计量单位是 **UTF-8 字节**,只此一种;字节 → token 的换算与编码器有关,仓内没有分词器,**未实测**,
   库存不打印 token 数(§4)。
 - ui-mac 经 `cfg.instructions` 写进的两份 `.md` 在同一份登记簿里(`#1296`,§8):登记簿直接 import ui-mac
-  那两个**零依赖**的内容模块;identity 随能力探测变长,对 `AlphaCapabilities` 的每个布尔组合跑生产
-  `buildAlphaIdentity` 各登记一行(4 行,327–729 B),behavior 一行(2,757 B);ui-mac 侧的咽喉跑真
-  `injectAlphaConfig`。
+  那两个**零依赖**的内容模块;identity 随能力探测变长,对 `CodePuppyCapabilities` 的每个布尔组合跑生产
+  `buildCodePuppyIdentity` 各登记一行(4 行,327–729 B),behavior 一行(2,757 B);ui-mac 侧的咽喉跑真
+  `injectCodePuppyConfig`。
 - ui-mac 经 `cfg.agent.<name>.{prompt,description}` 写进的三个 alpha agent 的字(`#1299`,§9)同样在同一份
-  登记簿里(6 行,1,427 B):同一个方向(ext import ui-mac 的零依赖内容模块 `alpha-agents.ts`),ui-mac 侧的
-  咽喉跑真 `injectAlphaConfig`,把 `cfg.agent` 下每个新写入的字符串叶子分成「登记文字」「引擎动词」「点名」三类。
-- ui-mac 侧的咽喉自 `#1305` 起是**一道**,罩**整份** `OPENCODE_CONFIG_CONTENT`(§10):跑真 `injectAlphaConfig`,
+  登记簿里(6 行,1,427 B):同一个方向(ext import ui-mac 的零依赖内容模块 `codepuppy-agents.ts`),ui-mac 侧的
+  咽喉跑真 `injectCodePuppyConfig`,把 `cfg.agent` 下每个新写入的字符串叶子分成「登记文字」「引擎动词」「点名」三类。
+- ui-mac 侧的咽喉自 `#1305` 起是**一道**,罩**整份** `OPENCODE_CONFIG_CONTENT`(§10):跑真 `injectCodePuppyConfig`,
   hook 之后新写入 / 改动的每个字符串叶子按来源排除用户的字之后,必须是登记文字 / 登记簿声明的引用 / 引擎动词三者之一,
   其余点名 —— 判据从「盯住已知的 N 个键」换成「咽喉在不在、对未知默认拒不拒」;`#1296` / `#1299` 那两道按键的判据已并入。
   ui-mac 写进 `cfg.$schema` / `plugin` / `enabled_providers` / `model` / `provider` / `mcp` 的东西在登记簿里**声明为引用**
@@ -45,7 +45,7 @@ ui-mac 侧咽喉:[`packages/ui-mac/src/main/config-injection-throat.test.ts`](..
 
 插件能碰引擎的**全部**方式是 [`packages/plugin/src/index.ts`](../../packages/plugin/src/index.ts)
 的 `export interface Hooks`(21 个键)。登记簿的 `HOOK_CONTEXT_CLASS` 给每个键分类;测试从源码解析
-接口键集与分类键集比对(上游新增钩子、这边没分类 ⇒ 红),再取真 `AlphaExt` 返回的钩子对象,要求
+接口键集与分类键集比对(上游新增钩子、这边没分类 ⇒ 红),再取真 `CodePuppyExt` 返回的钩子对象,要求
 「实现了 ∧ 分类为 context」的集合逐字等于本文件设了咽喉的集合。
 
 | Hooks 键 | 分类 | alpha 实现? | 咽喉 |
@@ -69,9 +69,9 @@ ui-mac 侧咽喉:[`packages/ui-mac/src/main/config-injection-throat.test.ts`](..
 
 | 写入点 | cfg 键 / hook 输出 | 引擎消费点 | 登记项 |
 | --- | --- | --- | --- |
-| ui-mac [`alpha-config-injection.ts`](../../packages/ui-mac/src/main/alpha-config-injection.ts) 的 `addInstruction`(主进程写引擎配置,`#1296`) | `cfg.instructions[]`(两份落盘文件 `alpha-identity.md` / `alpha-behavior.md` 的绝对路径) | `session/instruction.ts:135-150` 按路径读盘 → `Instruction.system()` 每份加一行 `Instructions from: <path>` → `llm/request.ts:63-70` 与底座 / agent prompt 拼成同一个 system 串 | 1 条 text(behavior)+ 4 条 text(identity 每种能力形状一条) |
-| ui-mac [`alpha-config-injection.ts`](../../packages/ui-mac/src/main/alpha-config-injection.ts) 的四处 `config.agent = { …(config.agent ?? {}), … }`(主进程写引擎配置,`#1299`;`#1413` 加第四处;字住 [`alpha-agents.ts`](../../packages/ui-mac/src/main/alpha-agents.ts)) | `cfg.agent.alpha-automation\|alpha-readonly\|alpha-automation-standard.{prompt,description}` + `cfg.agent.alpha-ask.description`(`alpha-ask` **刻意无 prompt**:有就顶掉底座,而它的语义是「默认档 + 多问一句」;同一对象里的 `mode` / `permission` / `hidden` 是动词与布尔,不是字) | prompt:`agent/agent.ts:277-278` → `llm/request.ts:64` **整段顶替**底座(与 ext 的 `agent.general\|explore\|docs.prompt` 同一格);description:task 工具的 subagent 清单(三个都 `hidden:true`,只影响可见列表) | 3 条 text(prompt,sink=system)+ 4 条 text(description,sink=agent-description);登记簿按「有什么登记什么」(`uiMacAgentFragmentIds`),没有 prompt 的 agent 不占 prompt 那格 |
-| [`alpha-prompts.ts`](../../packages/ext/src/alpha-prompts.ts) `applyPromptTakeover` | `cfg.command.init|review.{template,description}`、`cfg.agent.general|explore|docs.prompt`、`cfg.agent.docs.description` | `command/index.ts:98`(template 成为用户回合);`agent/agent.ts:277-278` → `llm/request.ts:64`(agent prompt **整段顶替**底座);task 工具的 subagent 清单读 description | 8 条 text |
+| ui-mac [`codepuppy-config-injection.ts`](../../packages/ui-mac/src/main/codepuppy-config-injection.ts) 的 `addInstruction`(主进程写引擎配置,`#1296`) | `cfg.instructions[]`(两份落盘文件 `codepuppy-identity.md` / `codepuppy-behavior.md` 的绝对路径) | `session/instruction.ts:135-150` 按路径读盘 → `Instruction.system()` 每份加一行 `Instructions from: <path>` → `llm/request.ts:63-70` 与底座 / agent prompt 拼成同一个 system 串 | 1 条 text(behavior)+ 4 条 text(identity 每种能力形状一条) |
+| ui-mac [`codepuppy-config-injection.ts`](../../packages/ui-mac/src/main/codepuppy-config-injection.ts) 的四处 `config.agent = { …(config.agent ?? {}), … }`(主进程写引擎配置,`#1299`;`#1413` 加第四处;字住 [`codepuppy-agents.ts`](../../packages/ui-mac/src/main/codepuppy-agents.ts)) | `cfg.agent.alpha-automation\|alpha-readonly\|alpha-automation-standard.{prompt,description}` + `cfg.agent.alpha-ask.description`(`alpha-ask` **刻意无 prompt**:有就顶掉底座,而它的语义是「默认档 + 多问一句」;同一对象里的 `mode` / `permission` / `hidden` 是动词与布尔,不是字) | prompt:`agent/agent.ts:277-278` → `llm/request.ts:64` **整段顶替**底座(与 ext 的 `agent.general\|explore\|docs.prompt` 同一格);description:task 工具的 subagent 清单(三个都 `hidden:true`,只影响可见列表) | 3 条 text(prompt,sink=system)+ 4 条 text(description,sink=agent-description);登记簿按「有什么登记什么」(`uiMacAgentFragmentIds`),没有 prompt 的 agent 不占 prompt 那格 |
+| [`codepuppy-prompts.ts`](../../packages/ext/src/codepuppy-prompts.ts) `applyPromptTakeover` | `cfg.command.init|review.{template,description}`、`cfg.agent.general|explore|docs.prompt`、`cfg.agent.docs.description` | `command/index.ts:98`(template 成为用户回合);`agent/agent.ts:277-278` → `llm/request.ts:64`(agent prompt **整段顶替**底座);task 工具的 subagent 清单读 description | 8 条 text |
 | [`prompt-rebrand.ts`](../../packages/ext/src/prompt-rebrand.ts) `rebrandSystem`,经 `plugin.ts` 的 `experimental.chat.system.transform` | `output.system[]` 子串替换 | `llm/request.ts:62-70`(底座 + environment + instructions 已 join 成一串再触发本钩子) | 12 条 rebrand(量 `to`,`from` 是上游原文不计) |
 | [`factory-deny.ts`](../../packages/ext/src/factory-deny.ts) `applyFactoryDeny` | `cfg.command[<被禁技能>].{description,template}` | 同 command | 1 条 text + 1 条 template(`{name}` 单占位符) |
 | [`plugin.ts`](../../packages/ext/src/plugin.ts) 四个 `tool()` | `hooks.tool.*.description` + 每个参数的 `describe()` | `tool/registry.ts:161`(逐字进每次请求的工具表) | 11 条 text |
@@ -95,9 +95,9 @@ server 定义,main 经 env 交来)。它们让引擎去别处装东西,装进来
 - 上限按类给天花板,每条仍显式写自己的数:rebrand ≤ 512 B,description 类 ≤ 1 KiB,prompt / template
   正文 ≤ 8 KiB,identity 说明 ≤ 1 KiB(`CAP_IDENTITY`:按设计要小、每个会话每个模型都带;最大形状
   729 B = 71%,再加一行能力事实仍在顶内)。2026-09-08 最满的是 `tool.alpha_register.description` 776 B(76%)、
-  `instruction.alpha-identity+websearch+cloudDispatch` 729 B(71%)与 `command.review.template` 4,672 B(57%)。
-- 文字住哪里:大段 prose 留在各自的内容模块(`alpha-prompts.ts`、`prompt-rebrand.ts` 的 `REBRAND_RULES`,
-  以及 ui-mac 的 `alpha-behavior.ts` / `alpha-identity.ts` / `alpha-agents.ts`),登记簿 import 它们并声明上限;
+  `instruction.codepuppy-identity+websearch+cloudDispatch` 729 B(71%)与 `command.review.template` 4,672 B(57%)。
+- 文字住哪里:大段 prose 留在各自的内容模块(`codepuppy-prompts.ts`、`prompt-rebrand.ts` 的 `REBRAND_RULES`,
+  以及 ui-mac 的 `codepuppy-behavior.ts` / `codepuppy-identity.ts` / `codepuppy-agents.ts`),登记簿 import 它们并声明上限;
   短的操作性文字(工具表、被禁技能占位)住在登记簿里,`plugin.ts` / `factory-deny.ts` 从登记簿取。规则:
   **登记簿只 import 内容模块,消费者只 import 登记簿**,没有环。`REBRAND_RULES` 与登记簿的 rebrand 集合 1:1
   由测试钉住(多一条少一条都红);ui-mac 那三个内容模块必须保持**零 import / require**,也由测试钉住(§8)。
@@ -108,7 +108,7 @@ server 定义,main 经 env 交来)。它们让引擎去别处装东西,装进来
   (消息含 id / 实测 / 上限)。`plugin.ts` import 登记簿 ⇒ 超限片段让整个 ext 装不上;上游
   `packages/opencode/src/plugin/index.ts:237` 记 `failed to load plugin` 后继续。这是响亮的,但也意味着
   沙箱围栏、websearch 主权闸一起缺席 —— 所以这个状态在出货代码里**到不了**:ext 单测(AC2 边界用例 +
-  「每条都在上限内」)、库存快照测试、alpha-check 第 [12/12] 步三道门都先红。
+  「每条都在上限内」)、库存快照测试、codepuppy-check 第 [12/12] 步三道门都先红。
 - 模板的渲染结果超限在 `renderTemplate` 处抛,落在 config hook 里 ⇒ `plugin.ts` 外层 `catch` loud 记录、
   `merged=false`、MCP 归属倒向 `UNVERIFIED`(fail-closed),不裁剪。
 - 单位:UTF-8 字节(`TextEncoder().encode(s).byteLength`),测试钉了 64/65 边界与「中中」= 6 B ≠ 2 字符。
@@ -118,7 +118,7 @@ server 定义,main 经 env 交来)。它们让引擎去别处装东西,装进来
 
 `bun packages/ext/scripts/context-injection-inventory.ts --check` 打印全部片段(id / kind / sink / 实测字节 /
 上限 / 利用率)、总量、引用清单、载上下文的钩子清单,并与仓内快照逐字节比对;不一致 exit 1 并打逐行 diff。
-alpha-check 第 [12/12] 步跑它(本地专属,不进 `CI_STEPS`;判据在 CI 由 `bun test (ext)` 的快照测试承担)。
+codepuppy-check 第 [12/12] 步跑它(本地专属,不进 `CI_STEPS`;判据在 CI 由 `bun test (ext)` 的快照测试承担)。
 改了任何片段或上限 ⇒ `--write` 重生快照 ⇒ 评审在 PR diff 里看到哪一段变了多少字节 —— 票面要杀的
 「事后没人分得清是哪一次加的」就靠这条棘轮。
 
@@ -126,10 +126,10 @@ alpha-check 第 [12/12] 步跑它(本地专属,不进 `CI_STEPS`;判据在 CI �
 
 | 通路 | 为什么不在 | 实测 |
 | --- | --- | --- |
-| REQ-063:用户经导入门放进 `<alpha-root>/instructions/*.md` 的字,ui-mac 同样推进 `cfg.instructions` | 用户的字,不是 alpha 的。ui-mac 咽喉按**文件所在目录**排除,不按 pointer 放行 —— `/instructions` 若成为登记簿的 pointer 引用,ext 那边「往 instructions 塞东西即红」的已知的坏就失效 | — |
-| ui-mac 写进 `cfg.agent.<name>` 的 `mode` / `permission.**` / `hidden`,以及 `applyWebSearchDenies` 往每个 agent 钉的 `websearch: "deny"`、`injectDisabledOverrides` 写的 `disable: true` | 引擎动词(`ask\|allow\|deny`、`subagent\|primary\|all`)与布尔,不是字。ui-mac 整份 config 咽喉把它们与字分开判(顶层 `cfg.permission.**` 同此):动词集合与引擎源码字面量逐字锁死,槽里出现不是动词的字符串即点名(§9 / §10) | 2026-09-08 跑真 `injectAlphaConfig`(默认 env):`cfg.agent` 下 78 个叶子 = 字 6 + `mode` 3 + `permission.**` 66 + 布尔 3;动词值只有 `primary` / `allow` / `deny` |
-| 项目 `.code-puppy/plugins/*.js` 与 `alpha.jsonc` 合并进的 agent/command/mcp | 用户的字,不是 alpha 的;config 咽喉只看 hook **新写入**的叶子 | — |
-| ui-mac 写进 `cfg.$schema` / `cfg.plugin` / `cfg.enabled_providers` / `cfg.model` / `cfg.provider` / `cfg.mcp` 的东西(`alpha-config-injection.ts`、`alpha-models.ts`、`cloud-sidecar-config.ts`、`mcp-default-deny.ts`、`ext-disabled-injection.ts`) | schema URL / bundle 路径 / 模型菜单 / server 定义 / `{file:}` 密钥引用 —— 与 ext 的四类引用同性质,不带 alpha 的字。`#1305` 起在登记簿里**声明为引用**(`ref.schema` / `ref.plugin` / `ref.enabled_providers` / `ref.model` / `ref.provider` / `ref.mcp`),ui-mac 整份 config 咽喉按引用子树放行、其余点名(§10)。`cfg.permission` 下 ui-mac 写的只有动词(`applyWebSearchDenies`),按上一行判;`cfg.skills` 由 `engine-config-truth.ts` 写进 **`alpha.jsonc` 文件通道**,不进 `OPENCODE_CONFIG_CONTENT` | 2026-09-08 两轴交叉枚举 ui-mac `src/main` 非测试文件:所有 `config.<key> =` / `config[<k>] =` 写入点 + 所有接 `config` 形参的导出函数(`#1305` 回报);全栈 env 跑真注入,九个顶层键全部被写到、零点名 |
+| REQ-063:用户经导入门放进 `<codepuppy-root>/instructions/*.md` 的字,ui-mac 同样推进 `cfg.instructions` | 用户的字,不是 alpha 的。ui-mac 咽喉按**文件所在目录**排除,不按 pointer 放行 —— `/instructions` 若成为登记簿的 pointer 引用,ext 那边「往 instructions 塞东西即红」的已知的坏就失效 | — |
+| ui-mac 写进 `cfg.agent.<name>` 的 `mode` / `permission.**` / `hidden`,以及 `applyWebSearchDenies` 往每个 agent 钉的 `websearch: "deny"`、`injectDisabledOverrides` 写的 `disable: true` | 引擎动词(`ask\|allow\|deny`、`subagent\|primary\|all`)与布尔,不是字。ui-mac 整份 config 咽喉把它们与字分开判(顶层 `cfg.permission.**` 同此):动词集合与引擎源码字面量逐字锁死,槽里出现不是动词的字符串即点名(§9 / §10) | 2026-09-08 跑真 `injectCodePuppyConfig`(默认 env):`cfg.agent` 下 78 个叶子 = 字 6 + `mode` 3 + `permission.**` 66 + 布尔 3;动词值只有 `primary` / `allow` / `deny` |
+| 项目 `.code-puppy/plugins/*.js` 与 `codepuppy.jsonc` 合并进的 agent/command/mcp | 用户的字,不是 alpha 的;config 咽喉只看 hook **新写入**的叶子 | — |
+| ui-mac 写进 `cfg.$schema` / `cfg.plugin` / `cfg.enabled_providers` / `cfg.model` / `cfg.provider` / `cfg.mcp` 的东西(`codepuppy-config-injection.ts`、`codepuppy-models.ts`、`cloud-sidecar-config.ts`、`mcp-default-deny.ts`、`ext-disabled-injection.ts`) | schema URL / bundle 路径 / 模型菜单 / server 定义 / `{file:}` 密钥引用 —— 与 ext 的四类引用同性质,不带 alpha 的字。`#1305` 起在登记簿里**声明为引用**(`ref.schema` / `ref.plugin` / `ref.enabled_providers` / `ref.model` / `ref.provider` / `ref.mcp`),ui-mac 整份 config 咽喉按引用子树放行、其余点名(§10)。`cfg.permission` 下 ui-mac 写的只有动词(`applyWebSearchDenies`),按上一行判;`cfg.skills` 由 `engine-config-truth.ts` 写进 **`codepuppy.jsonc` 文件通道**,不进 `OPENCODE_CONFIG_CONTENT` | 2026-09-08 两轴交叉枚举 ui-mac `src/main` 非测试文件:所有 `config.<key> =` / `config[<k>] =` 写入点 + 所有接 `config` 形参的导出函数(`#1305` 回报);全栈 env 跑真注入,九个顶层键全部被写到、零点名 |
 | skills 正文、MCP 工具表 | 别人的字;alpha 只注入路径 / server 定义(§2 引用) | — |
 | `experimental.session.compacting` | 分类为 context,alpha 未实现;票面 out of scope | — |
 
@@ -147,33 +147,33 @@ alpha-check 第 [12/12] 步跑它(本地专属,不进 `CI_STEPS`;判据在 CI �
 
 **共享方式**:方向是 **ext → ui-mac 内容模块**,不是反过来。
 [`context-injection.ts`](../../packages/ext/src/context-injection.ts) 经相对路径 import
-`packages/ui-mac/src/main/alpha-behavior.ts`(一个字符串)与 `alpha-identity.ts`(两个纯函数)。
+`packages/ui-mac/src/main/codepuppy-behavior.ts`(一个字符串)与 `codepuppy-identity.ts`(两个纯函数)。
 两个文件**零 import / require**,所以 ext 的自包含 bundle 把它们内联进引擎侧不会拖进 main 世界
 (ADR-006 的前提;`context-injection.test.ts` ③e 钉住这一点,2026-09-08 实测 `dist/plugin.js` 833,824 B,
 含 behavior 标题与 identity 首句各 1 处、`electron` 0 处)。ui-mac **生产代码不 import 登记簿**,照旧写自己的
 常量;ui-mac 侧的咽喉是测试文件,它像本目录其它测试一样经相对路径 import ext。
-没选的两条路:给 ui-mac 加 `@alpha-code/ext` 子路径依赖(要动 `exports` / vite `externalizeDeps` / `bun.lock`,
-且 ui-mac main bundle 会内联 ext 全部提示词);把两份内容模块搬进 ext(brand-guard 坐标、`alpha-behavior.test.ts`、
+没选的两条路:给 ui-mac 加 `@codepuppy/ext` 子路径依赖(要动 `exports` / vite `externalizeDeps` / `bun.lock`,
+且 ui-mac main bundle 会内联 ext 全部提示词);把两份内容模块搬进 ext(brand-guard 坐标、`codepuppy-behavior.test.ts`、
 ADR-015 引用全要跟着搬,冲突面大)。
 
 **identity 的形状域**:正文是 caps 的函数,登记簿不登记「函数」,登记它**能写出的每一种形状**。
-域 = `AlphaCapabilities` 的键集,写成 `Record<keyof Required<AlphaCapabilities>, true>` 的常量 ——
+域 = `CodePuppyCapabilities` 的键集,写成 `Record<keyof Required<CodePuppyCapabilities>, true>` 的常量 ——
 ui-mac 加一个能力字段而这里没扩域,ext typecheck 当场红(变异实测:加 `extraCapMutation?: boolean`
-⇒ `error TS2741 … required in type 'Record<keyof AlphaCapabilities, true>'`)。每个布尔组合跑一次**生产**
-`buildAlphaIdentity`,各登记一条 `text`,id 后缀列出打开的能力键(`instruction.alpha-identity+websearch+cloudDispatch`)。
+⇒ `error TS2741 … required in type 'Record<keyof CodePuppyCapabilities, true>'`)。每个布尔组合跑一次**生产**
+`buildCodePuppyIdentity`,各登记一条 `text`,id 后缀列出打开的能力键(`instruction.codepuppy-identity+websearch+cloudDispatch`)。
 
 **咽喉**(`#1305` 起并入 [`config-injection-throat.test.ts`](../../packages/ui-mac/src/main/config-injection-throat.test.ts),§10;
-对 `/instructions/<i>` 的判法不变):跑真 `injectAlphaConfig`,取 `OPENCODE_CONFIG_CONTENT.instructions[]` 里 hook **新推进**的每个路径,读盘,
+对 `/instructions/<i>` 的判法不变):跑真 `injectCodePuppyConfig`,取 `OPENCODE_CONFIG_CONTENT.instructions[]` 里 hook **新推进**的每个路径,读盘,
 正文必须逐字等于某条 `sink=instruction` 的登记文字(`explainInstructionBody`)。用户的字按**来源**排除:
-继承的 instructions 不判、REQ-063 导入目录按文件所在目录放行。8 组 env(`ALPHA_WEBSEARCH_DISABLE` ×
+继承的 instructions 不判、REQ-063 导入目录按文件所在目录放行。8 组 env(`CODEPUPPY_WEBSEARCH_DISABLE` ×
 `OPENCODE_ENABLE_EXA` × 代付)跑出的 identity 形状集合与登记簿变体集合**双向**相等、正文逐字 ——
 登记簿多一条生产写不出的形状、生产写出一条没登记的形状,都红。每个判据带已知的坏:多推一个未登记文件、
 路径不存在、落盘正文多一个字节。
 
 **变异实证**(2026-09-08,每次都还原并复绿):
-- 生产多加一行 `addInstruction("alpha-extra.md", …)` ⇒ 咽喉 0 pass / 6 fail,点名 `/instructions/2`
+- 生产多加一行 `addInstruction("codepuppy-extra.md", …)` ⇒ 咽喉 0 pass / 6 fail,点名 `/instructions/2`
   `body not registered`;
-- `ALPHA_BEHAVIOR_MD` 撑到 8,997 B ⇒ `--check` exit 1(`"instruction.alpha-behavior" is 8997 bytes, over its
+- `CODEPUPPY_BEHAVIOR_MD` 撑到 8,997 B ⇒ `--check` exit 1(`"instruction.codepuppy-behavior" is 8997 bytes, over its
   declared limit of 8192 bytes`),ext 单测与 ui-mac 咽喉都在 import 时以 `ContextBudgetError` 整文件红。
 
 **失败语义的代价**:ui-mac 生产路径本身不量字节;某段超限时先红的是三道门(ext 单测、快照、`[12/12]`)
@@ -182,22 +182,22 @@ ui-mac 加一个能力字段而这里没扩域,ext typecheck 当场红(变异实
 
 ## 9. ui-mac agent 通路怎么进同一份登记簿(`#1299`)
 
-**通路**:[`alpha-config-injection.ts`](../../packages/ui-mac/src/main/alpha-config-injection.ts) 四处
+**通路**:[`codepuppy-config-injection.ts`](../../packages/ui-mac/src/main/codepuppy-config-injection.ts) 四处
 `config.agent = { …(config.agent ?? {}), "<name>": { description, hidden, mode, prompt?, permission } }`
-(`alpha-automation` / `alpha-readonly` / `alpha-automation-standard` / `alpha-ask`;前两个 automation 受 `ALPHA_AUTOMATION_DISABLE`,
-`alpha-readonly` 受 `ALPHA_READONLY_DISABLE`,`alpha-ask`(`#1413`,composer「请求审批」的载体)无逃生 env、**无 prompt**,只写 description)。prompt 在 `llm/request.ts:64` **整段顶替**底座提示词 —— 与 ext 的
-`agent.general|explore|docs.prompt` 同一格,description 进 subagent 清单。2026-09-08 跑真 `injectAlphaConfig`
+(`alpha-automation` / `alpha-readonly` / `alpha-automation-standard` / `alpha-ask`;前两个 automation 受 `CODEPUPPY_AUTOMATION_DISABLE`,
+`alpha-readonly` 受 `CODEPUPPY_READONLY_DISABLE`,`alpha-ask`(`#1413`,composer「请求审批」的载体)无逃生 env、**无 prompt**,只写 description)。prompt 在 `llm/request.ts:64` **整段顶替**底座提示词 —— 与 ext 的
+`agent.general|explore|docs.prompt` 同一格,description 进 subagent 清单。2026-09-08 跑真 `injectCodePuppyConfig`
 实测 **1,427 B**:prompt 391 / 296 / 441,description 93 / 108 / 98(把字面量抽进内容模块前后各量一次,逐字节相同)。
 
-**共享方式**:与 §8 同一个方向。六段字从 `alpha-config-injection.ts` 的内联字面量抽进零依赖的
-[`alpha-agents.ts`](../../packages/ui-mac/src/main/alpha-agents.ts)(一个 `as const` 对象 `ALPHA_AGENT_TEXT`),
+**共享方式**:与 §8 同一个方向。六段字从 `codepuppy-config-injection.ts` 的内联字面量抽进零依赖的
+[`codepuppy-agents.ts`](../../packages/ui-mac/src/main/codepuppy-agents.ts)(一个 `as const` 对象 `CODEPUPPY_AGENT_TEXT`),
 生产代码只取常量、不 import ext;登记簿 import 它,按名字各登记 `agent.<name>.prompt`(sink=system,8 KiB)与
 `agent.<name>.description`(sink=agent-description,1 KiB)。③e 的零依赖钉子扩到第三个文件;实测 ext bundle
 `dist/plugin.js` 836,505 B(`#1296` 时 833,824 B),含 agent prompt 首句 2 处、readonly 首句 1 处、`electron` 0 处、
-假针 0 处、NUL 0 个(grep 没被 NUL 弄瞎)。permission / mode / hidden 仍留在 `alpha-config-injection.ts` —— 它们不是字。
+假针 0 处、NUL 0 个(grep 没被 NUL 弄瞎)。permission / mode / hidden 仍留在 `codepuppy-config-injection.ts` —— 它们不是字。
 
 **咽喉**(`#1305` 起并入 [`config-injection-throat.test.ts`](../../packages/ui-mac/src/main/config-injection-throat.test.ts),§10;
-对 `cfg.agent` 叶子的判法不变):跑真 `injectAlphaConfig`,取 `OPENCODE_CONFIG_CONTENT.agent` 下 hook **新写入或改动**的每个字符串叶子
+对 `cfg.agent` 叶子的判法不变):跑真 `injectCodePuppyConfig`,取 `OPENCODE_CONFIG_CONTENT.agent` 下 hook **新写入或改动**的每个字符串叶子
 (JSON Pointer,`/` 与 `~` 按 RFC 6901 转义 —— `permission.bash["*/rm *"]` 的 pointer 是 `…/bash/*~1rm *`),分三类:
 
 | 叶子 | 判据 | 解释不了时 |
@@ -208,7 +208,7 @@ ui-mac 加一个能力字段而这里没扩域,ext typecheck 当场红(变异实
 
 用户的字不判:继承的 `OPENCODE_CONFIG_CONTENT.agent` 里没被 hook 动过的叶子不看;被生产动过的(kill-switch 下
 `applyWebSearchDenies` 往每个 agent 钉的 `websearch: "deny"`)走动词那条路。双向锁:生产写出的 agent 名集合 ==
-`ALPHA_AGENT_TEXT` 键集(默认 env),解释出的 id 集合 == 登记簿的六条;两个逃生门各拿掉对应 agent 后仍零无解释。
+`CODEPUPPY_AGENT_TEXT` 键集(默认 env),解释出的 id 集合 == 登记簿的六条;两个逃生门各拿掉对应 agent 后仍零无解释。
 每个判据带已知的坏:多一个未登记 agent(点名 prompt 与 description 两条)、已登记 agent 多一个未登记字段、登记的
 prompt 多一个字节(只点那一条,其余五段照常解释)、串格、`mode` / `permission.edit` / 嵌套 `permission.bash["*/rm *"]`
 里塞字(三条一起点名)。
@@ -217,12 +217,12 @@ prompt 多一个字节(只点那一条,其余五段照常解释)、串格、`mod
 不自行扩大」,按键的咽喉先把已知的三条钉死,再由收口票换判据形态。
 
 **变异实证**(2026-09-08,每次都还原并复绿;完整输出在 `#1299` PR 正文):
-- M1:生产 `alpha-config-injection.ts` 多加一处 `config.agent = { …, "alpha-sneaky": { description, hidden, mode, prompt } }`
+- M1:生产 `codepuppy-config-injection.ts` 多加一处 `config.agent = { …, "alpha-sneaky": { description, hidden, mode, prompt } }`
   ⇒ 咽喉 **1 pass / 6 fail**(跑真注入的 6 条全红;drift 锁那条不跑注入,照常绿),输出里
   `"pointer": "/agent/alpha-sneaky/prompt"` ×4、`"pointer": "/agent/alpha-sneaky/description"` ×4、
   `"reason": "text not registered"` ×8;同一时刻 `--check` 仍 rc 0(登记簿没动,库存不该红 —— 抓这条的是咽喉,
   与 `#1296` 的分工相同);`git checkout --` 还原 ⇒ 7 pass / 0 fail。
-- M2:`alpha-agents.ts` 把 `alpha-readonly` 的 prompt 撑到 8,296 B ⇒ `--check` rc 1:
+- M2:`codepuppy-agents.ts` 把 `alpha-readonly` 的 prompt 撑到 8,296 B ⇒ `--check` rc 1:
   `context injection "agent.alpha-readonly.prompt" is 8296 bytes, over its declared limit of 8192 bytes`;
   ext 单测 0 pass / 1 fail、ui-mac agent 咽喉 0 pass / 1 fail(均在 import 时 `ContextBudgetError`);还原 ⇒ rc 0。
 
@@ -234,7 +234,7 @@ prompt 多一个字节(只点那一条,其余五段照常解释)、串格、`mod
 其余点名 —— 「你还能找到别的绕法吗」(无限)变成「咽喉在不在、对未知默认拒不拒」(有限,一次变异判完)。
 
 **判官**([`config-injection-throat.test.ts`](../../packages/ui-mac/src/main/config-injection-throat.test.ts),13 条,
-`#1296` 的 6 条与 `#1299` 的 7 条已并入、原文件删除):跑真 `injectAlphaConfig`(生产 composition,零模块 mock,真临时盘),
+`#1296` 的 6 条与 `#1299` 的 7 条已并入、原文件删除):跑真 `injectCodePuppyConfig`(生产 composition,零模块 mock,真临时盘),
 取 hook 之后**新写入或改动**的每个字符串叶子(JSON Pointer,RFC 6901 转义),按下表顺序判:
 
 | 叶子 | 单一权威 | 解释不了时 |
@@ -266,8 +266,8 @@ prompt 多一个字节(只点那一条,其余五段照常解释)、串格、`mod
 prompt 多一字节 / 串格、动词槽塞字(agent mode / permission.edit / 嵌套 `bash["*/rm *"]` / 顶层 `permission.websearch`)。
 
 **变异实证**(2026-09-08,每次都还原并复绿;完整输出在 `#1305` PR 正文):
-- M1(对未知默认拒):生产 `alpha-config-injection.ts` 在写出 `OPENCODE_CONFIG_CONTENT` 之前多写一处
-  `config.command = { …, "alpha-sneaky": { template: <prose>, description: ALPHA_BEHAVIOR_MD } }` —— 判官从没见过的键
+- M1(对未知默认拒):生产 `codepuppy-config-injection.ts` 在写出 `OPENCODE_CONFIG_CONTENT` 之前多写一处
+  `config.command = { …, "alpha-sneaky": { template: <prose>, description: CODEPUPPY_BEHAVIOR_MD } }` —— 判官从没见过的键
   ⇒ 咽喉 **2 pass / 11 fail**:跑真注入的 11 条全部点名 `/command/alpha-sneaky/template` 与 `/command/alpha-sneaky/description`
   (`unexplained string leaf`,登记过的 behavior 正文也不放行);只剩 drift 锁与「已知的坏 ⓪」两条不受影响;还原 ⇒ 13 pass / 0 fail。
 - M2(引用漂移):登记簿抹掉 `ref.provider` ⇒ **12 pass / 1 fail**,全栈 env 那条点名 **47 个**叶子,全部在 `/provider/**` 下
@@ -276,7 +276,7 @@ prompt 多一字节 / 串格、动词槽塞字(agent mode / permission.edit / �
 - M3(引擎动词漂移):`permission.ts:5` 的字面量改成 `["ask", "allow", "deny", "defer"]` ⇒ drift 锁当场红
   (`Expected to contain: "Literals([\"ask\", \"allow\", \"deny\"])"`),**12 pass / 1 fail**;还原 ⇒ 13 / 0。
 
-**不判的**(如实):`materializeV2EngineConfig` 写给 picker 的 v2 目录(`<userData>/alpha-engine-config/opencode.jsonc` /
+**不判的**(如实):`materializeV2EngineConfig` 写给 picker 的 v2 目录(`<userData>/codepuppy-engine-config/opencode.jsonc` /
 `models.json`)是同一对象的投影(`$schema` / `model` / `provider` 剥掉 apiKey)外加固定的 readiness marker
 (`name: "Alpha catalog readiness marker"`、`release_date: "1970-01-01"`),只供 `/api/model` 列目录,不进模型上下文。
-`alpha.jsonc` 文件通道(`OPENCODE_CONFIG`)是用户 / ext 安装面写的,不是 ui-mac 主进程往对话里塞的字。
+`codepuppy.jsonc` 文件通道(`OPENCODE_CONFIG`)是用户 / ext 安装面写的,不是 ui-mac 主进程往对话里塞的字。

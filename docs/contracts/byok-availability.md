@@ -24,7 +24,7 @@ KEY 的直连模型全体变灰。本契约把它拆成两个**互不推导**的
 
 | 输入 | 真源 | 读取通道 |
 | --- | --- | --- |
-| 本机已应用 BYOK 目录 | `<userData>/alpha-applied-catalog.json` 的 `byok`(fork 前钉住:已下载的远程 BYOK 目录与安装包首启引导取版本高者;见下文「目录主权」) | `models-catalog` IPC(main-only) |
+| 本机已应用 BYOK 目录 | `<userData>/codepuppy-applied-catalog.json` 的 `byok`(fork 前钉住:已下载的远程 BYOK 目录与安装包首启引导取版本高者;见下文「目录主权」) | `models-catalog` IPC(main-only) |
 | 本地 KEY 状态 | alpha 加密钥匙库 / `keyEnv`(Key 名只认 App 内置适配器表 `byok-adapters.ts`)/ `opencode.jsonc` inline | `providers-key-status` IPC(main-only) |
 
 「本机已应用 BYOK 目录」在读取时是本机文件,不是一次在线判断:拉取失败、平台不可达、未登录都只意味着继续用已采纳的
@@ -36,7 +36,7 @@ KEY 的直连模型全体变灰。本契约把它拆成两个**互不推导**的
 - 登录态(`auth.getState()`、`platformStatus`);
 - 账户额度 / 会员 entitlement(`account.summary()`);
 - 平台连通性(gateway `/v1/models` 是否可达、是否 401、是否契约不兼容);
-- 平台 live allowlist(`<userData>/alpha-live-models.json`);
+- 平台 live allowlist(`<userData>/codepuppy-live-models.json`);
 - 引擎模型清单(`model.list` 的内容、`listState`、`readyListEpoch`)。
 
 ## 谓词 2 —— 当前可执行
@@ -72,7 +72,7 @@ KEY 的直连模型全体变灰。本契约把它拆成两个**互不推导**的
 - `not-ready` 的用户可见文案只能说「正在读取模型状态」,不得断言引擎有没有加载某个模型。
 
 支撑这条的实现侧不变量(由本仓自己维持,不是假设):`engineModelRefs` 的写入**早于**
-`setModelChainState("ready")`(`alpha-composer.tsx` 全文件唯一一处 `ready` 转换;链重跑先切
+`setModelChainState("ready")`(`codepuppy-composer.tsx` 全文件唯一一处 `ready` 转换;链重跑先切
 `loading` 再清空清单)⇒ 只要链是 `ready`,清单就是本次真实加载的结果。
 
 **执行失败不得反向改写谓词 1(硬约束)**:引擎恢复后回报的清单里没有某个本地 BYOK 节点,
@@ -119,12 +119,12 @@ BYOK 目录 = **远程发布 → 本机校验采纳 → 钉住应用**;安装包
 **拉取失败从不移除条目**(REQ-237 `#1556`,方案 `docs/design/req236-catalog-and-model.md` §2.3;REQ-237 Scope 第 4 条的落实):
 
 - **远程发布**:alpha-platform 网关 `GET /v1/byok-catalog`(ByokCatalogV1,schema 在本仓
-  `packages/alpha-contracts-consumer/vendor/alpha-platform-model-catalog/contracts/v1/byok-catalog.schema.json`)。
+  `packages/codepuppy-contracts-consumer/vendor/alpha-platform-model-catalog/contracts/v1/byok-catalog.schema.json`)。
   拉取**从不带凭据**,结构上无法按账户收窄;网关端点也不读凭据、账户或 edition。
 - **本机校验采纳**(`catalog-refresher.ts` `adoptByokCatalog`):信封不合 schema 即整份拒绝;`catalog_version` 不高于
   本机已有版本(LKG 与首启引导取高者)不采纳;App 适配器表里没有的 provider 跳过;档位选项键越界的文档不采纳。
-  通过才原子写 `<userData>/alpha-byok-catalog.json`(已下载);拉取失败、校验失败、未登录都不写,已有条目不减。
-- **钉住应用**:每次 fork 前与平台快照一起钉进 `alpha-applied-catalog.json`;picker 与引擎配置只读钉住的那份。
+  通过才原子写 `<userData>/codepuppy-byok-catalog.json`(已下载);拉取失败、校验失败、未登录都不写,已有条目不减。
+- **钉住应用**:每次 fork 前与平台快照一起钉进 `codepuppy-applied-catalog.json`;picker 与引擎配置只读钉住的那份。
   已下载 ≠ 已应用:新目录在下一次引擎换代时生效。
 - **可执行字段不在远程数据里**:端点 `baseURL`、Key 名 `keyEnv`、协议适配器 `compat` 只来自 App 内置适配器表
   (`packages/ui-mac/src/main/byok-adapters.ts`);远程文档出现这些字段即整份拒绝,远程目录也就**不能**重定向用户的 Key,
@@ -140,8 +140,8 @@ BYOK 目录 = **远程发布 → 本机校验采纳 → 钉住应用**;安装包
 平台侧的任何失败都**只损失平台段**:
 
 - `models-catalog` IPC 的目录读取路径不引用任何平台拉取状态。平台目录契约不兼容经
-  `reportContractFailure` 走独立通道上报(`alpha-contract-health` IPC +
-  `alpha-contract-failure` 推送 → renderer `a-contract-failure` 面),**不得**让整个
+  `reportContractFailure` 走独立通道上报(`codepuppy-contract-health` IPC +
+  `codepuppy-contract-failure` 推送 → renderer `a-contract-failure` 面),**不得**让整个
   `models-catalog` 失败 —— 那会连本地 BYOK 一起阵亡。
 - 平台不可达 / 缓存缺失 / 缓存损坏 / **旧代缓存** → 平台段回退 last-known;没有 last-known 时平台段为空
   (`liveSync.status` 如实标 `cache` / `static`,picker 写「平台模型清单尚未获取」,`#1556` 起不再回退任何随包平台清单),
@@ -149,7 +149,7 @@ BYOK 目录 = **远程发布 → 本机校验采纳 → 钉住应用**;安装包
   拉取失败同样只损失 BYOK 目录的新鲜度,已应用条目不减。
 - **失败域隔离 ≠ 失败静默**(#1084,#987 CHOICE=A / DECIDE #1078)。刷新失败只损失那一份目录的新鲜度,
   但它必须**说出来**:`syncLiveAllowlist`(平台)与 BYOK 刷新轮的每一条出路都经 `reportCatalogRefresh(doc, code)` 落到
-  `alpha-catalog-health` IPC + `alpha-catalog-failure` 推送,两份目录**各一格**(`{ platform, byok }`,`#1556`):
+  `codepuppy-catalog-health` IPC + `codepuppy-catalog-failure` 推送,两份目录**各一格**(`{ platform, byok }`,`#1556`):
   一份成功只清它自己那一格,另一份的失败仍可见。renderer 的 `CatalogFailureBanner` 以 warning 横幅
   (`.a-catalog-failure`)呈现失败的那一份及其稳定分类码。
   此前分类码只到 `fetchPlatformModels()` 的返回值为止 —— 三个刷新入口(启动、登录后 respawn 前、
@@ -167,18 +167,18 @@ BYOK 目录 = **远程发布 → 本机校验采纳 → 钉住应用**;安装包
 
 | 契约条款 | 代码 |
 | --- | --- |
-| 谓词 1 的行派生(`availability` = picker 可选择性) | `packages/ui-mac/src/renderer/alpha-ui/model-picker-core.ts` |
-| row-aware 选择门 + 跳过引擎清单 membership | `packages/ui-mac/src/renderer/alpha-ui/alpha-composer-model.tsx` |
-| home 恢复中的内存写豁免 / `canSend` 不豁免 | `packages/ui-mac/src/renderer/alpha-ui/alpha-composer.tsx` |
-| 谓词 2 的发送门约束(`byok-not-registered`) | `model-default-core.ts`(`preflightBlockReason`)+ `alpha-composer.tsx`(`canSend` / `submit` / 行内说明) |
-| 禁止引擎清单反向撤销已选本地 BYOK | `packages/ui-mac/src/renderer/alpha-ui/model-default-core.ts`(`checkSelectedModel`) |
+| 谓词 1 的行派生(`availability` = picker 可选择性) | `packages/ui-mac/src/renderer/codepuppy-ui/model-picker-core.ts` |
+| row-aware 选择门 + 跳过引擎清单 membership | `packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-composer-model.tsx` |
+| home 恢复中的内存写豁免 / `canSend` 不豁免 | `packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-composer.tsx` |
+| 谓词 2 的发送门约束(`byok-not-registered`) | `model-default-core.ts`(`preflightBlockReason`)+ `codepuppy-composer.tsx`(`canSend` / `submit` / 行内说明) |
+| 禁止引擎清单反向撤销已选本地 BYOK | `packages/ui-mac/src/renderer/codepuppy-ui/model-default-core.ts`(`checkSelectedModel`) |
 | 目录主权:BYOK 目录拉取(不带凭据)与采纳规则 | `packages/ui-mac/src/main/catalog-refresher.ts`(`adoptByokCatalog`) |
-| BYOK 已下载 / 已应用文件、首启引导取高者 | `packages/ui-mac/src/main/alpha-live-allowlist.ts` |
+| BYOK 已下载 / 已应用文件、首启引导取高者 | `packages/ui-mac/src/main/codepuppy-live-allowlist.ts` |
 | 端点 / Key 名 / 协议适配器 / 保留 id 的唯一来源 | `packages/ui-mac/src/main/byok-adapters.ts` |
-| 失败域隔离(平台段) | `packages/ui-mac/src/main/alpha-platform-models.ts` |
-| 刷新失败的用户可观察出口 | `packages/ui-mac/src/main/alpha-catalog-health.ts` + `renderer/alpha-ui/Banner.tsx`(`CatalogFailureBanner`) |
-| 注入不受 allowlist 收窄 | `packages/ui-mac/src/main/alpha-models.ts` |
-| 缓存不含 BYOK 策略面 | `packages/ui-mac/src/main/alpha-live-allowlist.ts` |
+| 失败域隔离(平台段) | `packages/ui-mac/src/main/codepuppy-platform-models.ts` |
+| 刷新失败的用户可观察出口 | `packages/ui-mac/src/main/codepuppy-catalog-health.ts` + `renderer/codepuppy-ui/Banner.tsx`(`CatalogFailureBanner`) |
+| 注入不受 allowlist 收窄 | `packages/ui-mac/src/main/codepuppy-models.ts` |
+| 缓存不含 BYOK 策略面 | `packages/ui-mac/src/main/codepuppy-live-allowlist.ts` |
 
 ## 回归闸门
 
@@ -187,25 +187,25 @@ BYOK 目录 = **远程发布 → 本机校验采纳 → 钉住应用**;安装包
 
 | 条款 | 层次 | 闸门 |
 | --- | --- | --- |
-| 未登录 + KEY 已配置 → 可选,非「正在同步」 | 行派生 + 点击层 | `model-picker-core.test.ts`、`test-component/alpha-composer-model.cases.ts` |
+| 未登录 + KEY 已配置 → 可选,非「正在同步」 | 行派生 + 点击层 | `model-picker-core.test.ts`、`test-component/codepuppy-composer-model.cases.ts` |
 | `listState === "recovering"` → 可选,行内「引擎重启中」 | 行派生 + 点击层 | 同上 |
 | 引擎清单缺 `<id>-byok`(或标 disabled/deprecated)→ 行仍可选 | 行派生 + 点击层 | 同上 |
-| 引擎恢复后清单仍缺该节点 → 已选的本地 BYOK **不被撤销/挂起** | **父层 reconciliation** | `model-default-core.test.ts`(纯核豁免)、`test-component/alpha-composer-model.cases.ts`(真链两轮 reconciliation) |
-| 引擎 ready 但清单缺该节点 → 发送门关闭 + 如实告知(且不撤销选择) | **父层发送门** | `model-default-core.test.ts`(纯核 `byok-not-registered`)、`test-component/alpha-composer-model.cases.ts`(真链:选择保留 + `send.disabled` + 常驻说明) |
+| 引擎恢复后清单仍缺该节点 → 已选的本地 BYOK **不被撤销/挂起** | **父层 reconciliation** | `model-default-core.test.ts`(纯核豁免)、`test-component/codepuppy-composer-model.cases.ts`(真链两轮 reconciliation) |
+| 引擎 ready 但清单缺该节点 → 发送门关闭 + 如实告知(且不撤销选择) | **父层发送门** | `model-default-core.test.ts`(纯核 `byok-not-registered`)、`test-component/codepuppy-composer-model.cases.ts`(真链:选择保留 + `send.disabled` + 常驻说明) |
 | 引擎**成功返回空清单**且链仍进 ready → 同样关闭发送门 | **父层发送门** | 同上两处(纯核 + 真链各一例) |
-| **Enter 键**(唯一能绕过 disabled 按钮的入口)→ 零 `startChat`,并如实告知 | **父层发送门** | `test-component/alpha-composer-model.cases.ts` |
-| **冷启动窗口**(链未 ready + 清单为空)按 Enter → 零 `startChat`,且**不谎称**引擎没加载该模型 | **判据自身**(`engineFactsReady` 必填 ⇒ `not-ready`) | `model-default-core.test.ts`(纯核三例)、`test-component/alpha-composer-model.cases.ts`(真链:`list` 永不 settle + Enter) |
-| 清单**含**该节点 → 发送门照常打开(不得过度收紧) | **父层发送门** | `test-component/alpha-composer-model.cases.ts` |
-| home 选择不得 supersede 在跑的模型链 / 账户链 | **父层生命周期** | `test-component/alpha-composer-model.cases.ts`(链恢复自愈 + 账户链存活 → `platformPermission` 回 ready) |
-| live allowlist 排除某供应商 / 平台不可达 → 仍在目录与注入中 | main | `alpha-models.test.ts`、`alpha-platform-catalog.cases.ts` |
-| 平台目录 contract-incompatible → 本地 BYOK 仍返回 | main | `alpha-platform-catalog.cases.ts` |
+| **Enter 键**(唯一能绕过 disabled 按钮的入口)→ 零 `startChat`,并如实告知 | **父层发送门** | `test-component/codepuppy-composer-model.cases.ts` |
+| **冷启动窗口**(链未 ready + 清单为空)按 Enter → 零 `startChat`,且**不谎称**引擎没加载该模型 | **判据自身**(`engineFactsReady` 必填 ⇒ `not-ready`) | `model-default-core.test.ts`(纯核三例)、`test-component/codepuppy-composer-model.cases.ts`(真链:`list` 永不 settle + Enter) |
+| 清单**含**该节点 → 发送门照常打开(不得过度收紧) | **父层发送门** | `test-component/codepuppy-composer-model.cases.ts` |
+| home 选择不得 supersede 在跑的模型链 / 账户链 | **父层生命周期** | `test-component/codepuppy-composer-model.cases.ts`(链恢复自愈 + 账户链存活 → `platformPermission` 回 ready) |
+| live allowlist 排除某供应商 / 平台不可达 → 仍在目录与注入中 | main | `codepuppy-models.test.ts`、`codepuppy-platform-catalog.cases.ts` |
+| 平台目录 contract-incompatible → 本地 BYOK 仍返回 | main | `codepuppy-platform-catalog.cases.ts` |
 | 平台目录刷新失败 → 分类码到达 renderer(不被吞掉),成功刷新清空 | main + renderer | `models-catalog-v2.wiring.cases.ts`、`test-component/catalog-failure-banner.cases.ts` |
 | 两份目录的刷新结局分别保存:一份成功不抹掉另一份的失败 | main + renderer | `catalog-refresher.cases.ts`(`#1556` AC6)、`test-component/catalog-failure-banner.cases.ts` |
 | BYOK 目录采纳规则 1–5;带 baseURL / keyEnv / compat 的文档被拒 | main | `byok-catalog-adopt.cases.ts` |
 | BYOK 拉取不带凭据;失败 / 校验失败 / 未登录不减少已应用条目 | main | `catalog-refresher.cases.ts`(`#1556` AC4) |
-| BYOK 端点 / Key 名 / npm 只来自适配器表;远程目录不能新增放行主机 | main | `alpha-models.test.ts`、`network-egress-derived.test.ts` |
+| BYOK 端点 / Key 名 / npm 只来自适配器表;远程目录不能新增放行主机 | main | `codepuppy-models.test.ts`、`network-egress-derived.test.ts` |
 | 迁移前已存的 Key 仍物化、注入并真发出请求,密钥文件不被清理分支删 | main + 真引擎 | `byok-key-migration.test.ts` |
-| session recovering 下点击 → 零 `switchModel`,不呈现为已切换,行置灰且文案不说「可先选择」 | 点击层 + 呈现 | `test-component/alpha-composer-model.cases.ts` |
+| session recovering 下点击 → 零 `switchModel`,不呈现为已切换,行置灰且文案不说「可先选择」 | 点击层 + 呈现 | `test-component/codepuppy-composer-model.cases.ts` |
 | home 选中后发送门仍关闭 | 点击层 + 发送门 | 同上 |
 
 相关:引擎两代配置面见 [`engine-config-channels.md`](engine-config-channels.md);平台目录

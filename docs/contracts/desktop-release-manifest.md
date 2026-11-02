@@ -18,7 +18,7 @@ updater 事实。必需事实缺失或不一致时 producer **拒绝产出 manif
 - 生产端逻辑:`packages/ui-mac/src/main/release-manifest.ts`(纯裁决,负向测试
   `release-manifest.test.ts`)+ `packages/ui-mac/src/main/release-sbom.ts`(SBOM)。
 - CLI:`packages/ui-mac/scripts/release-manifest.ts`(keygen / produce / verify)。
-- Windows CI 硬门:`.github/workflows/alpha-windows-build.yml` +
+- Windows CI 硬门:`.github/workflows/codepuppy-windows-build.yml` +
   `packages/ui-mac/scripts/verify-windows-signing.ts`。
 - 发版流程接线:[../runbooks/distribution.md](../runbooks/distribution.md) §1。
 
@@ -26,8 +26,8 @@ updater 事实。必需事实缺失或不一致时 producer **拒绝产出 manif
 
 | 文件 | 内容 |
 | --- | --- |
-| `alpha-release-manifest.json` | manifest 本体(schema `codepuppy.release.manifest.v1`),随 GitHub Release 上传 |
-| `alpha-release-manifest.json.sig` | 对 manifest **精确字节**的 ed25519 签名,base64 |
+| `codepuppy-release-manifest.json` | manifest 本体(schema `codepuppy.release.manifest.v1`),随 GitHub Release 上传 |
+| `codepuppy-release-manifest.json.sig` | 对 manifest **精确字节**的 ed25519 签名,base64 |
 | `alpha-code-<version>-sbom.cdx.json` | CycloneDX 1.6 SBOM,从**打包产物的 app.asar** 枚举 |
 | `desktop-release-manifest.trust.json`(本目录) | 信任根:签名公钥集 + 已撤销 manifest 列表,消费方 vendor 它 |
 
@@ -90,9 +90,9 @@ unsigned before linking it and must not claim automatic updates.
 
 dev 渠道:签名不强制,但事实必须**完整如实记录**(dev 包不发布;发布链只认 beta/prod)。
 
-## 6. Windows signing facts(`alpha.release.windows-signing-facts.v1`)
+## 6. Windows signing facts(`codepuppy.release.windows-signing-facts.v1`)
 
-`alpha-windows-build.yml` 打包后由 pwsh 从最终 `.exe` 采集
+`codepuppy-windows-build.yml` 打包后由 pwsh 从最终 `.exe` 采集
 (`Get-AuthenticodeSignature` + `Get-FileHash`),写
 `windows-signing-facts.json`:`{schema, channel, collectedAt, artifacts[{filename, sha256,
 status, signed, publisher, thumbprint}]}`。同 workflow 内

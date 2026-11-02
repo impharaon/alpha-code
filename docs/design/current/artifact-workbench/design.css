@@ -158,7 +158,7 @@ td code { font-size:var(--a-text-2xs);background:var(--a-bg-muted);border:1px so
 .windowbar .dots i { display:block;width:9px;height:9px;border-radius:50%;background:var(--a-border-strong); }
 .windowbar .title { margin:auto; }
 
-/* 产物工作台帧内骨架(现役 alpha-wb-* / a-wb-* 的稿内等价物) */
+/* 产物工作台帧内骨架(现役 codepuppy-wb-* / a-wb-* 的稿内等价物) */
 .wb { display:grid;grid-template-columns:188px 292px minmax(0,1fr);min-height:560px;background:var(--a-bg-canvas); }
 .wb-col { padding:12px;border-right:1px solid var(--a-border-faint);display:flex;flex-direction:column;gap:8px;min-width:0; }
 .wb-col:last-child { border-right:0;padding:12px 18px; }

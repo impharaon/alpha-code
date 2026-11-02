@@ -21,7 +21,7 @@ Recovery, never the upstream leaf.
 
 Alpha swaps an upstream page through the typed `AppSurfaces` seam
 (`home` / `newSession` / `session`), whose ids live in
-`packages/ui-mac/src/shared/alpha-surfaces.ts`:
+`packages/ui-mac/src/shared/codepuppy-surfaces.ts`:
 
 - Each route composes **exactly one** surface, resolved from the route manifest
   by `renderer/route-composition.ts`. There is no release state, no env or pin
@@ -56,13 +56,13 @@ surface instead — `settings-reskin.css`, `dialog-reskin.css`, and
 Net-new surfaces with no upstream equivalent render as a full-page Portal over
 the shell: Extension Hub (`extensions/extension-hub.tsx`), Automations
 (`automations/automation-panel.tsx`), Artifact Workbench
-(`alpha-ui/artifact-workbench/`). These own their own layout and use the token
+(`codepuppy-ui/artifact-workbench/`). These own their own layout and use the token
 system directly.
 
 ## Recovery boundary
 
 Alpha surfaces are wrapped so a fatal error degrades instead of white-screening:
-`alpha-ui/surface-boundary.tsx` admits the crash once (stable crashID → one
+`codepuppy-ui/surface-boundary.tsx` admits the crash once (stable crashID → one
 process-local incident) into **Alpha Recovery** — no reload, no legacy swap —
 and `main/db-safety-boot.ts` handles Electron-side boot recovery / DB safety.
 Design every alpha surface assuming it may be the thing that failed — provide an

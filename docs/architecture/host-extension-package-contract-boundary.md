@@ -41,15 +41,15 @@ The inventory was taken at base `bbff1ea8` with four independent axes:
 The byte axis mattered when this inventory was taken, and the reason it mattered
 has since been removed at the source. At `bbff1ea8` a normal text-mode search
 reported the 16 files described in the original incident, while `rg -a` reported
-two more production files: `alpha-builtin-policy.ts` and `ext-manifest-v2.ts`.
+two more production files: `codepuppy-builtin-policy.ts` and `ext-manifest-v2.ts`.
 Both contained literal NUL bytes outside the name rule, so a text-mode tool
 classified them as binary and silently omitted them — the inventory is complete
 only because the byte axis was run.
 
 `#760` closed that hole as a gate rather than a cleanup.
 `scripts/assert-no-nul-bytes.py` scans every version-controlled file and fails on
-any literal NUL; it runs as step `[2/4]` of `scripts/alpha-check.sh` (the
-pre-push hook) and is mirrored in `alpha-ci`'s `upstream-guard` job. The 13
+any literal NUL; it runs as step `[2/4]` of `scripts/codepuppy-check.sh` (the
+pre-push hook) and is mirrored in `codepuppy-ci`'s `upstream-guard` job. The 13
 pre-existing occurrences across 9 files were rewritten to the `\u0000` escape,
 which is byte-identical at runtime and visible to a plain `grep`.
 
@@ -96,17 +96,17 @@ marker, not a package-ID prefix.
 The raw-byte axis finds the same base token language in 18 production files.
 Seventeen instances govern extension names or an extension name embedded in an
 asset key. They are one host-owned representation rule and should consume one
-host predicate. `alpha-automations.ts` governs a persisted automation task ID;
+host predicate. `codepuppy-automations.ts` governs a persisted automation task ID;
 it is a separate constraint that merely has the same current spelling and must
 not be coupled to extension naming.
 
 | Location at `bbff1ea8` | Observed input/use | Package-contract shadow? | Disposition |
 | --- | --- | --- | --- |
-| `src/main/alpha-bridge.ts:28` | bridged extension name | No; local extension representation | Consume the host extension-name predicate |
-| `src/main/alpha-builtin-policy.ts:68` | governed built-in agent/skill name | No; local extension representation | Consume the host extension-name predicate |
-| `src/main/alpha-installs.ts:21` | installed extension receipt name | No; local extension representation | Consume the host extension-name predicate |
-| `src/main/alpha-mcp-secrets.ts:18` | MCP server directory | No; secret-store/filesystem constraint | Consume the host extension-name predicate |
-| `src/main/alpha-migrate.ts:19,197` | migrated extension name and `skills/<name>` asset key | No; migration/filesystem constraint | Consume the host predicate for the name segment |
+| `src/main/codepuppy-bridge.ts:28` | bridged extension name | No; local extension representation | Consume the host extension-name predicate |
+| `src/main/codepuppy-builtin-policy.ts:68` | governed built-in agent/skill name | No; local extension representation | Consume the host extension-name predicate |
+| `src/main/codepuppy-installs.ts:21` | installed extension receipt name | No; local extension representation | Consume the host extension-name predicate |
+| `src/main/codepuppy-mcp-secrets.ts:18` | MCP server directory | No; secret-store/filesystem constraint | Consume the host extension-name predicate |
+| `src/main/codepuppy-migrate.ts:19,197` | migrated extension name and `skills/<name>` asset key | No; migration/filesystem constraint | Consume the host predicate for the name segment |
 | `src/main/ext-agent-install.ts:36` | agent install/config name | No; local extension representation | Consume the host extension-name predicate |
 | `src/main/ext-config.ts:44,1125` | MCP/agent/provider/plugin config key | No; local config representation | Consume the host extension-name predicate, including the inline plugin check |
 | `src/main/ext-fs-installer.ts:32,271-273` | extension name and skill/agent/plugin asset keys | No; filesystem and packaged-asset representation | Consume the host predicate for each name segment |
@@ -119,7 +119,7 @@ not be coupled to extension naming.
 | `src/main/ext-skill-generations.ts:36` | skill generation name | No; generation-store representation | Consume the host extension-name predicate |
 | `src/main/package-admission.ts:54` | decoded component suffix before local install | No; local extension representation | Move the decision to installability and consume the host predicate there |
 | `src/shared/package-secret-prerequisite.ts:71` | decoded MCP suffix before secret-store projection | No; secret-store/filesystem constraint | Consume the host extension-name predicate while preserving the MCP-specific observable refusal |
-| `src/main/alpha-automations.ts:14` | persisted automation task ID | No; automation storage contract | Keep independent; equal syntax is not shared authority |
+| `src/main/codepuppy-automations.ts:14` | persisted automation task ID | No; automation storage contract | Keep independent; equal syntax is not shared authority |
 
 ## Observed behavior and reachability
 

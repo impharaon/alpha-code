@@ -21,7 +21,7 @@ review_after: 2027-01-30
   (`packages/gateway/src/byok-catalog.json`,经 `GET /v1/byok-catalog` 发布,ByokCatalogV1)。**从不按账户 / edition 收窄**,
   拉取不带凭据。决定 Key 发去哪的三样东西 —— 端点 `baseURL`、Key 名 `keyEnv`、协议适配器 `compat` —— **只在安装包里**
   (`packages/ui-mac/src/main/byok-adapters.ts`),远程目录带这些字段会被整份拒绝;远程目录里 App 不认识的 provider 会被跳过。
-  安装包里的 `packages/ui-mac/src/main/alpha-models.json` 只留一份同形的**首启引导**(`byokCatalog`)。
+  安装包里的 `packages/ui-mac/src/main/codepuppy-models.json` 只留一份同形的**首启引导**(`byokCatalog`)。
 
 **刷新与生效**(`catalog-refresher.ts`):刷新点 = 启动、登录身份变化(只拉平台那份)、每 30 分钟、手动重试;
 失败保留上次拿到的版本,两份清单的失败分别提示。**已下载 ≠ 已应用**:新清单下载好以后,要等引擎下一次启动
@@ -58,7 +58,7 @@ review_after: 2027-01-30
    过一张本地档位表,它对本地没收录的线上模型一律显示成最便宜的一档
    (claude-fable-5 真实 输入 71.4× / 输出 178.6×,当时显示「标准 ×1」)。
    `src/shared/platform-pricing-authority-ratchet.test.ts` 会拦住它回来。
-6. (可选)要换 picker 的**平台默认模型**,改 `alpha-models.json` 顶层
+6. (可选)要换 picker 的**平台默认模型**,改 `codepuppy-models.json` 顶层
    `defaultPlatformModel`(裸 model id)。它是唯一的旋钮:声明缺席或该 id 不在
    生效目录中,app 就不自动默认任何平台模型 —— 不会替你挑一个便宜的。
 7. 验证:部署后等一个刷新点(或重启 app)→ 引擎下次启动后,picker 代理节点组出现新模型、名称与档位是 `display`
@@ -78,7 +78,7 @@ review_after: 2027-01-30
      更高的文档;要撤一次坏发布,就再发一个更高的版本,不要回退版本号。
    - **不要**写 `baseURL` / `keyEnv` / `compat` / `npm`:schema 不允许,网关装载失败;即使发出去,桌面端也会整份拒绝。
    - 档位表的 wire 形状按 `@ai-sdk/openai-compatible` 写,直连节点能原样复用的前提是每个
-     BYOK 适配器都是 `compat: "openai"`(alpha-models 套件钉着)。**显式关闭档**写
+     BYOK 适配器都是 `compat: "openai"`(codepuppy-models 套件钉着)。**显式关闭档**写
        `{ "thinking": { "type": "disabled" } }`,值必须逐字 `disabled`:智谱 2026-09-06 实打,
        `type` 写错(如 `bogus`)会被上游**静默忽略并继续思考,HTTP 仍 200** —— 所以「上游返回 200」
        不是受理证据,`reasoning_content` 有没有才是(勘破记录见
@@ -98,13 +98,13 @@ review_after: 2027-01-30
      `model: deepseek-flash`,带 32×32 PNG data URI 的图片请求 ⇒ 200,回答 "Red",223 入 / 23 出 ⇒ 目录改为能看图
      (alpha-platform#565,`catalog_version` 2)。OpenRouter 上的 `deepseek/deepseek-v4-flash` 仍只收文字(2026-09-24 实测),两者不是同一个入口。
 2. 新模型 id 上游认不认:有该家 key 时跑 `bun packages/ui-mac/scripts/verify-byok-catalog.ts`(#1281;它查的是
-   安装包里的首启引导与适配器表的端点 —— 要验刚加的 id,临时把它加进本机 `alpha-models.json` 的 `byokCatalog` 再跑,
+   安装包里的首启引导与适配器表的端点 —— 要验刚加的 id,临时把它加进本机 `codepuppy-models.json` 的 `byokCatalog` 再跑,
    别提交);没 key 时它会把 id 列进「本次未验证」,不会假装绿。
 3. alpha-platform 网关 `bun test`(`byok-catalog.test.ts` 校验 schema、无凭据可读、不读 edition)→ 部署 gateway。
 4. 验证:`curl -sS https://<gateway>/v1/byok-catalog` 不带凭据返回新版本 → 等一个刷新点(或重启 app)→ 引擎下次启动后
    BYOK 组出现新模型(该 provider 已配 key 即亮)→ 选中发一条消息。BYOK 不经网关、不产生平台计费;模型能不能用取决于
    用户自己的 key 权限(preview 类模型可能需要上游侧开通,如阿里 Token Plan)。
-5. 下次发 App 时可以把安装包首启引导(`alpha-models.json` 的 `byokCatalog`)更新成当时线上那份(同内容、同版本):
+5. 下次发 App 时可以把安装包首启引导(`codepuppy-models.json` 的 `byokCatalog`)更新成当时线上那份(同内容、同版本):
    新装用户第一次启动、还没拉到远程目录前看到的就是它。版本**高于**本机已采纳的远程版本时首启引导胜出。
 
 ## 仍需要发 App(`ship:mac`)的情形

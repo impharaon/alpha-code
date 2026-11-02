@@ -11,7 +11,7 @@ review_after: 2027-01-16
 # Design principles — 设计宪法
 
 Distilled from `tokens.css`, the cool-graphite visual system, and the shipped
-alpha-ui surfaces. These are the non-negotiables; a design that breaks one is
+codepuppy-ui surfaces. These are the non-negotiables; a design that breaks one is
 wrong until the principle is explicitly changed here first.
 
 ## Register
@@ -34,7 +34,7 @@ loudest thing on screen. If a surface feels busy or "designed", it is off-brand.
    Neither mode is an afterthought recolor of the other.
 4. **System font stack.** `-apple-system` / SF Pro (`--a-font-sans`). Native
    reads more premium than a webfont here. **Never import Inter** or bundle fonts.
-5. **Tokens are the only styling primitive.** alpha-ui components consume
+5. **Tokens are the only styling primitive.** codepuppy-ui components consume
    **only** `--a-*` variables — zero hardcoded colors, spacing, radii, or
    durations. New value → add a token in `tokens.css` ([`tokens.md`](tokens.md)),
    never inline it.

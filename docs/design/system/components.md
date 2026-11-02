@@ -10,14 +10,14 @@ review_after: 2027-01-16
 
 # Component library
 
-alpha's own components live in `packages/ui-mac/src/renderer/alpha-ui/` and
+alpha's own components live in `packages/ui-mac/src/renderer/codepuppy-ui/` and
 consume only `--a-*` tokens. This is the catalog; the **rendered** states in
 light + dark are in [`gallery.html`](gallery.html), and the CSS/TSX listed are
 the authority for exact behavior.
 
 ## Primitives
 
-| Component | Source (`alpha-ui/`) | Role | States |
+| Component | Source (`codepuppy-ui/`) | Role | States |
 | --- | --- | --- | --- |
 | **Button** | `Button.tsx` + `button.css` | actions | default · hover · active · disabled · focus-ring; variants: neutral, accent-fill (`--a-accent-solid`), send (`--a-send`) |
 | **Input** | `Input.tsx` + `input.css` | text entry | default · hover · focus-within (`--a-ring-focus`) · disabled · sm size · icon slot (no error/validation state yet) |
@@ -25,15 +25,15 @@ the authority for exact behavior.
 | **Toast** | `Toast.tsx` + `toast.css` | overlay notice (transient by default) | kinds: `info` / `success` / `error` (**no `warning`** — that's Banner-only); `ToastViewport`, `--a-z-toast`; auto-dismisses after 4 s unless `duration <= 0`, which pins it until the viewer closes it (`data-persistent`, `#771` — used by the extension IPC warning chokepoint) |
 | **Tooltip** | `Tooltip.tsx` + `tooltip.css` | hover hint | positioned popover, four placements |
 | **Banner** | `Banner.tsx` + `banner.css` | inline persistent notice | `info` / `success` / `warning` / `error`, with inline actions |
-| **Base** | `base.css` | element resets / shared primitives for alpha-ui | — |
+| **Base** | `base.css` | element resets / shared primitives for codepuppy-ui | — |
 
 > Verify exact variants/states against the component CSS and `gallery.html`
 > before relying on them — the table names the axes, the code is authoritative.
 
 ## Composition surfaces (page-level, not primitives)
 
-`alpha-composer.tsx` + `alpha-composer.css` / `composer-shell.css` (the input
-surface), `AlphaHome.tsx` + `home.css`, `AlphaOnboarding.tsx` + `onboarding.css`.
+`codepuppy-composer.tsx` + `codepuppy-composer.css` / `composer-shell.css` (the input
+surface), `CodePuppyHome.tsx` + `home.css`, `CodePuppyOnboarding.tsx` + `onboarding.css`.
 These compose the primitives above; see [`../PAGE-MAP.md`](../PAGE-MAP.md) for the
 surface each belongs to.
 
@@ -49,7 +49,7 @@ retired this way (REQ-090, REQ-125).
 
 ## Adding a component
 
-1. New file under `alpha-ui/`, styled with `--a-*` only (add tokens in
+1. New file under `codepuppy-ui/`, styled with `--a-*` only (add tokens in
    [`tokens.md`](tokens.md)/`tokens.css` first if needed).
 2. Light + dark, visible focus, `prefers-reduced-motion` respected.
 3. Add a row here and a swatch (all states) to `gallery.html`.

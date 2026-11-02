@@ -135,7 +135,7 @@ grant for the active project; a different project or an `always` request
 without `save` resources fails closed.
 
 Alpha regenerates the legacy JavaScript SDK through
-`bun ./scripts/generate-alpha-sdk.ts`. That alpha-owned entry point runs the
+`bun ./scripts/generate-codepuppy-sdk.ts`. That codepuppy-owned entry point runs the
 unchanged upstream generator, then applies a loud-fail post-generation step so
 the generated `once` and `reject` arms retain `never` grant fields.
 

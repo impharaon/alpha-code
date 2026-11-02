@@ -61,7 +61,7 @@ rollout 是**状态**不是 flag day——上游路径一直可达,直到 alpha 
    alpha 设计系统([`components.md`](components.md))尚缺的 primitive(Select/Menu/
    Tabs/Table/Checkbox/Radio/Switch/Combobox/Popover…),按"解锁最多面替换"排序,
    **先出设计稿(`frontend-design` skill,基于现状增量)再实现**,补进
-   `alpha-ui/` + [`components.md`](components.md) + [`gallery.html`](gallery.html)。
+   `codepuppy-ui/` + [`components.md`](components.md) + [`gallery.html`](gallery.html)。
    一个 primitive 落地即在明暗双主题、可见焦点、`prefers-reduced-motion` 三态齐备
    (承 [`components.md`](components.md) §Adding a component)。
 2. **再批量替换面**。primitive 就位后,替一个面 = **组合已有积木**,而不是从零。
@@ -94,7 +94,7 @@ rollout 是**状态**不是 flag day——上游路径一直可达,直到 alpha 
 | 替换方法论(本文) | `docs/design/system/replacing-opencode.md` | 持久框架 |
 | 每面 current/target 终态 | `frontend-surface-manifest.ts`(`target`)+ [`../PAGE-MAP.md`](../PAGE-MAP.md) | 持久设计意图,带测试 |
 | 活稿设计 | [`../current/`](../current/)`<page>/design.html` | 可编辑活稿 |
-| 组件库缺口/新增 | [`components.md`](components.md) + [`gallery.html`](gallery.html) + `alpha-ui/` | 设计系统资产 |
+| 组件库缺口/新增 | [`components.md`](components.md) + [`gallery.html`](gallery.html) + `codepuppy-ui/` | 设计系统资产 |
 | **先替谁、排期、优先级、进度** | **GitHub Issues + Alpha Delivery Project** | **活的交付状态,不进 Markdown** |
 
 方向承 ADR-016(前端接管)/ADR-027(AppSurfaces seam)/ADR-029(主权阶梯)/

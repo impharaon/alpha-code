@@ -124,7 +124,7 @@ GET https://alpha-cloud.tidelabs.click/.well-known/oauth-protected-resource → 
 | 过滤点 | 坐标 | 生效时刻 | 能不能被顶掉 |
 | --- | --- | --- | --- |
 | `Permission.disabled`(工具表可见性) | `packages/opencode/src/session/llm/request.ts:234-244` | **每次 LLM 请求** | 能 —— agent wildcard / session permission / `approved` 都排在后面 |
-| `AlphaToolPolicy` 目录闸 | `request.ts:155`(`snapshotCatalogDenied`) | 每次 LLM 请求 | deny 不可被 session grant 撬开 |
+| `CodePuppyToolPolicy` 目录闸 | `request.ts:155`(`snapshotCatalogDenied`) | 每次 LLM 请求 | deny 不可被 session grant 撬开 |
 | `user.tools[k] !== false` | `request.ts:243` | 每次 LLM 请求 | 用户自己的开关 |
 | ext 的 `tool.execute.before` | `packages/ext/src/cloud-websearch-kill.ts:291-298` | **执行那一刻**,早于 `ctx.ask` | 不能(抛错即 die) |
 
@@ -190,7 +190,7 @@ async factory awaited => true
 
 ### 3.1 票面那条坐标是错的,先更正
 
-票面写「闸门 `registry.ts` 的 `webSearchEnabled()`,判据 `ALPHA_CLOUD_TOKEN` + `ALPHA_CLOUD_MCP_URL`」。
+票面写「闸门 `registry.ts` 的 `webSearchEnabled()`,判据 `CODEPUPPY_CLOUD_TOKEN` + `CODEPUPPY_CLOUD_MCP_URL`」。
 实读 `packages/opencode/src/tool/registry.ts:63-70`:
 
 ```ts
@@ -212,18 +212,18 @@ export function webSearchEnabled(providerID: ProviderV2.ID, flags = { exa: false
 ```
 [main 进程,每次 fork 前]
   server.ts:321  applyWebSearchSovereignty(userDataPath)
-    :323  killSwitch    = Boolean(ALPHA_WEBSEARCH_DISABLE)
-    :327  platformPays  = Boolean(ALPHA_CLOUD_MCP_URL) && hasSecretFile(userData,"ALPHA_MCP_TOKEN")
-    killSwitch            ⇒ ALPHA_CLOUD_WEBSEARCH_DENY=1
-    killSwitch||platformPays ⇒ 4 个 keyless flag 覆盖写 "0" + ALPHA_LOCAL_WEBSEARCH_DENY=1
+    :323  killSwitch    = Boolean(CODEPUPPY_WEBSEARCH_DISABLE)
+    :327  platformPays  = Boolean(CODEPUPPY_CLOUD_MCP_URL) && hasSecretFile(userData,"CODEPUPPY_MCP_TOKEN")
+    killSwitch            ⇒ CODEPUPPY_CLOUD_WEBSEARCH_DENY=1
+    killSwitch||platformPays ⇒ 4 个 keyless flag 覆盖写 "0" + CODEPUPPY_LOCAL_WEBSEARCH_DENY=1
     否则                  ⇒ 删除两个 DENY、还原 keyless 基线、OPENCODE_ENABLE_EXA ??= "1"
 
 [注入面,同一次 fork]
-  alpha-config-injection.ts:100  platformPays(**第二次算同一个判据**,注释明写「不许各算各的」)
-  alpha-config-injection.ts:373 → cloud-web-search.ts:173 applyWebSearchDenies ⇒ permission deny 注入
+  codepuppy-config-injection.ts:100  platformPays(**第二次算同一个判据**,注释明写「不许各算各的」)
+  codepuppy-config-injection.ts:373 → cloud-web-search.ts:173 applyWebSearchDenies ⇒ permission deny 注入
                                  (注释 :168-171 自陈「不是主权保证,只是可用性」)
-  alpha-config-injection.ts:303-312 + cloud-sidecar-config.ts:33-49 materializeCloudMcpConfig
-      platformPays  ⇒ {type:remote, url, enabled:true, headers.Authorization:"Bearer {file:…ALPHA_MCP_TOKEN}"}
+  codepuppy-config-injection.ts:303-312 + cloud-sidecar-config.ts:33-49 materializeCloudMcpConfig
+      platformPays  ⇒ {type:remote, url, enabled:true, headers.Authorization:"Bearer {file:…CODEPUPPY_MCP_TOKEN}"}
       不代付        ⇒ {type:remote, url, enabled:false}     ← 云腿整条关掉
       killSwitch    ⇒ WITHHELD_CLOUD_MCP(url=http://127.0.0.1:1)  ← 云腿整条关掉
 
@@ -238,7 +238,7 @@ export function webSearchEnabled(providerID: ProviderV2.ID, flags = { exa: false
   ext/src/cloud-websearch-kill.ts:291-298      tool.execute.before,对任何 MCP server 上的 web search 形态生效
 ```
 
-逃生开关 `ALPHA_WEBSEARCH_DISABLE=1` 属实(`server.ts:323`、`alpha-config-injection.ts:103`,
+逃生开关 `CODEPUPPY_WEBSEARCH_DISABLE=1` 属实(`server.ts:323`、`codepuppy-config-injection.ts:103`,
 并在 `sidecar-env.ts:66` 的白名单里)。
 
 被拒时模型收到的原话(`packages/core/src/tool/websearch.ts:46-47`):
@@ -256,12 +256,12 @@ export function webSearchEnabled(providerID: ProviderV2.ID, flags = { exa: false
 
 | 本文原话 | 今天 | 坐标 |
 | --- | --- | --- |
-| `server.ts:327 platformPays = Boolean(ALPHA_CLOUD_MCP_URL) && hasSecretFile(userData,"ALPHA_MCP_TOKEN")` | **main 的主权闸不再算 `platformPays`**:`applyWebSearchSovereignty()` 不再接 `userDataPath`,函数体里只剩 `killSwitch` 一个判据 | `packages/ui-mac/src/main/server.ts:356-357` |
-| `killSwitch\|\|platformPays ⇒ 4 个 keyless flag 覆盖写 "0" + ALPHA_LOCAL_WEBSEARCH_DENY=1` | **只有 `killSwitch`** ⇒ 4 个 keyless flag 覆盖写 `"0"` + `ALPHA_LOCAL_WEBSEARCH_DENY=1`;否则**删除**它。`ALPHA_CLOUD_WEBSEARCH_DENY` 同样只由 `killSwitch` 置位、否则删除 | `server.ts:362-373` |
+| `server.ts:327 platformPays = Boolean(CODEPUPPY_CLOUD_MCP_URL) && hasSecretFile(userData,"CODEPUPPY_MCP_TOKEN")` | **main 的主权闸不再算 `platformPays`**:`applyWebSearchSovereignty()` 不再接 `userDataPath`,函数体里只剩 `killSwitch` 一个判据 | `packages/ui-mac/src/main/server.ts:356-357` |
+| `killSwitch\|\|platformPays ⇒ 4 个 keyless flag 覆盖写 "0" + CODEPUPPY_LOCAL_WEBSEARCH_DENY=1` | **只有 `killSwitch`** ⇒ 4 个 keyless flag 覆盖写 `"0"` + `CODEPUPPY_LOCAL_WEBSEARCH_DENY=1`;否则**删除**它。`CODEPUPPY_CLOUD_WEBSEARCH_DENY` 同样只由 `killSwitch` 置位、否则删除 | `server.ts:362-373` |
 
 ⇒ **两个 DENY 信号今天都只有 kill-switch 一个来源,代付态一个都不置位**(真 fork 判据:
 `packages/ui-mac/src/main/server.test.ts` 的「登录代付:两条腿同时在模型工具表里」)。
-`platformPays` 判据本身还在,但只剩注入面那一份(`alpha-config-injection.ts:102`,不再是「第二次算同一个判据」),
+`platformPays` 判据本身还在,但只剩注入面那一份(`codepuppy-config-injection.ts:102`,不再是「第二次算同一个判据」),
 它只决定**云腿装不装、装成什么形状**(本节第二段与 §6 第 2 行仍然成立);§4.2 判据 A 的 `server.ts:327`
 坐标、§6 第 1 行「登录(判据 A)+ kill-switch」里的「登录」那一半,随之作废。
 
@@ -291,7 +291,7 @@ $ cd packages/ui-mac && bun test src/main/websearch-copies.test.ts
 排除 `*.test.ts`,并带一根故意不存在的负针):
 
 ```
-packages scanned: alpha-contracts-consumer app cli client codemode console containers core desktop docs
+packages scanned: codepuppy-contracts-consumer app cli client codemode console containers core desktop docs
   effect-drizzle-sqlite effect-sqlite-node enterprise ext function http-recorder httpapi-codegen identity
   llm opencode plugin protocol schema script sdk sdk-next server session-ui slack stats storybook tui ui ui-mac web
 source files scanned: 2490
@@ -349,28 +349,28 @@ cloud_web_search (cloud-mcp.ts:255)
   闸拦住(`worker.ts:242` 注释)。
 
 **⇒ 「这次调用有没有额度」只有在调用发生时才有答案,而且答案来自 account 服务的一次 reservation。
-本地无论如何造不出一个权威的 allow**(`packages/opencode/src/permission/alpha-tool-policy.ts:100-101`
+本地无论如何造不出一个权威的 allow**(`packages/opencode/src/permission/codepuppy-tool-policy.ts:100-101`
 的注释就是这么写的)。
 
 ### 4.2 桌面侧今天有的是三份**互不相同**的近似值
 
 | # | 判据 | 坐标 | 在哪个进程 | 什么时候可得 | 它其实在说什么 |
 | --- | --- | --- | --- | --- | --- |
-| A | `platformPays` = `ALPHA_CLOUD_MCP_URL` && 有 `ALPHA_MCP_TOKEN` 密钥文件 | `server.ts:327` / `alpha-config-injection.ts:100` | main | **每次 fork 前**(注册/注入时可得) | 「登录了」,**不是**「有额度」 |
-| B | `summaryUsable` = `plan.status === "active" \|\| balanceFen > 0` | `alpha-composer.tsx:997-1001` | **renderer** | 账户 summary 拉回之后 | 「能不能用平台代理模型」 |
-| C | `caps.entitlement`(`"allow" \| "deny" \| "missing"`) | `alpha-tool-policy.ts:100-101, 137-138` | sidecar | —— | **服务端 entitlement,但今天没有任何生产调用点传它** |
+| A | `platformPays` = `CODEPUPPY_CLOUD_MCP_URL` && 有 `CODEPUPPY_MCP_TOKEN` 密钥文件 | `server.ts:327` / `codepuppy-config-injection.ts:100` | main | **每次 fork 前**(注册/注入时可得) | 「登录了」,**不是**「有额度」 |
+| B | `summaryUsable` = `plan.status === "active" \|\| balanceFen > 0` | `codepuppy-composer.tsx:997-1001` | **renderer** | 账户 summary 拉回之后 | 「能不能用平台代理模型」 |
+| C | `caps.entitlement`(`"allow" \| "deny" \| "missing"`) | `codepuppy-tool-policy.ts:100-101, 137-138` | sidecar | —— | **服务端 entitlement,但今天没有任何生产调用点传它** |
 
 C 是本次勘破里最值得写下来的一格:**`entitlement` 这个 cap 已经设计好、已经有 disabled 分支
-(`:137-138`),但生产唯一的调用路径 `alpha-tool-policy-gate.ts:70-89` 的 `foldRulesetCap`
+(`:137-138`),但生产唯一的调用路径 `codepuppy-tool-policy-gate.ts:70-89` 的 `foldRulesetCap`
 只产出 `{hardDeny}`**,`resolve(subject, caps)` 的 `caps.entitlement` 恒 `undefined`。
 两条轴查过(符号 `entitlement` 全仓非测试命中 = 上表那几行;`caps: {` 全仓非测试命中 = 唯一一处
-`alpha-tool-policy.ts:261`)。⇒ **`cap-entitlement` 今天是死分支。**
+`codepuppy-tool-policy.ts:261`)。⇒ **`cap-entitlement` 今天是死分支。**
 
 ### 4.3 账户信号到不了 sidecar
 
 `packages/ui-mac/src/main/sidecar-env.ts:30-95` 的白名单里,与账户有关的只有三个布尔:
-`ALPHA_WEBSEARCH_DISABLE`(`:66`)、`ALPHA_LOCAL_WEBSEARCH_DENY`(`:70`)、
-`ALPHA_CLOUD_WEBSEARCH_DENY`(`:73`)。**没有任何余额 / 套餐 / entitlement 通道**,
+`CODEPUPPY_WEBSEARCH_DISABLE`(`:66`)、`CODEPUPPY_LOCAL_WEBSEARCH_DENY`(`:70`)、
+`CODEPUPPY_CLOUD_WEBSEARCH_DENY`(`:73`)。**没有任何余额 / 套餐 / entitlement 通道**,
 而前两个编码的是判据 A(登录),不是额度。
 
 ---
@@ -389,10 +389,10 @@ C 是本次勘破里最值得写下来的一格:**`entitlement` 这个 cap 已�
 
 **今天已经有两条路会触发这个全关**,不是假想:
 
-1. `platformPays === false`(登出 / 缺 `ALPHA_MCP_TOKEN` 密钥文件)⇒
+1. `platformPays === false`(登出 / 缺 `CODEPUPPY_MCP_TOKEN` 密钥文件)⇒
    `materializeCloudMcpConfig(url, undefined)` 产出 `enabled:false`
    (`packages/ui-mac/src/main/cloud-sidecar-config.ts:33-41`);
-2. `ALPHA_WEBSEARCH_DISABLE=1` ⇒ 写 `WITHHELD_CLOUD_MCP`(`url=http://127.0.0.1:1`,
+2. `CODEPUPPY_WEBSEARCH_DISABLE=1` ⇒ 写 `WITHHELD_CLOUD_MCP`(`url=http://127.0.0.1:1`,
    `cloud-web-search.ts:75-80`)—— 注释 `:71-73` 自陈这是「诚实降级,连兄弟工具一起损失」。
 
 也就是说:**「一个 kill-switch 关掉一个具名能力」这条 ADR-009 B2 的承诺,在云腿上今天不成立**
@@ -407,13 +407,13 @@ C 是本次勘破里最值得写下来的一格:**`entitlement` 这个 cap 已�
 | # | 决定者 | 坐标 | 它替用户决定的是 | 判据 | 风险形态 |
 | --- | --- | --- | --- | --- | --- |
 | 1 | `applyWebSearchSovereignty` | `ui-mac/src/main/server.ts:321-350` | 本地 keyless 腿开不开 | 登录(判据 A)+ kill-switch | 今天这条就是「登录即关本地」的执行点 |
-| 2 | `injectAlphaConfig` 里的第二次 `platformPays` | `ui-mac/src/main/alpha-config-injection.ts:100` | 云 server 装不装、装成什么形状 | 同判据 A | 同一判据**两处各算一遍**(注释自陈风险) |
-| 3 | `applyWebSearchDenies` | `ui-mac/src/main/cloud-web-search.ts:173-203`,调用点 `alpha-config-injection.ts:373` | 两个 web search 工具在模型工具表里可不可见 | 同判据 A + kill-switch | 注释 `:168-171` 自陈「不是主权保证,只是可用性」 |
+| 2 | `injectCodePuppyConfig` 里的第二次 `platformPays` | `ui-mac/src/main/codepuppy-config-injection.ts:100` | 云 server 装不装、装成什么形状 | 同判据 A | 同一判据**两处各算一遍**(注释自陈风险) |
+| 3 | `applyWebSearchDenies` | `ui-mac/src/main/cloud-web-search.ts:173-203`,调用点 `codepuppy-config-injection.ts:373` | 两个 web search 工具在模型工具表里可不可见 | 同判据 A + kill-switch | 注释 `:168-171` 自陈「不是主权保证,只是可用性」 |
 | 4 | `webSearchEnabled` | `opencode/src/tool/registry.ts:63-70, 335-338` | 本地 `websearch` 注不注册给这一轮的模型 | **providerID / Exa / Parallel flag** | 与账户完全无关;`OPENCODE_EXPERIMENTAL=1` 会让它恒真(ADR-009 `:93` 记着) |
 | 5 | ext `tool.execute.before` | `ext/src/cloud-websearch-kill.ts:263-298` | 任何 MCP server 上「看起来像 web search」的工具能不能执行 | 工具 id 词元启发式 + server 归属 | 词表 `:148-163` 自陈「非穷尽」 |
-| 6 | **`buildAlphaCapabilities`** | `ui-mac/src/main/alpha-identity.ts:17-26` | **直接在系统提示里告诉模型「web search 可用」** | `!websearchDisabled && (OPENCODE_ENABLE_EXA !== "0" \|\| cloudDispatch)` | **第四处各算各的**;它写进提示词,和真闸不同源 ⇒ 可以「提示说有、调用被拒」 |
+| 6 | **`buildCodePuppyCapabilities`** | `ui-mac/src/main/codepuppy-identity.ts:17-26` | **直接在系统提示里告诉模型「web search 可用」** | `!websearchDisabled && (OPENCODE_ENABLE_EXA !== "0" \|\| cloudDispatch)` | **第四处各算各的**;它写进提示词,和真闸不同源 ⇒ 可以「提示说有、调用被拒」 |
 | 7 | `resolveTools` | `opencode/src/session/llm/request.ts:231-245` | 每轮模型工具表的最终三路并集 | user.tools ∪ Permission.disabled ∪ policyDenied | 唯一一个**每轮重算、覆盖全部工具**的点 |
-| 8 | **模型默认解析链** | `ui-mac/src/renderer/alpha-ui/model-default-core.ts:6, 29, 64, 82` | 默认给用户选哪个模型 | `loggedIn` **且** `accountUsable`(判据 B) | **同形先例**:文件头 `:6` 逐字记着上一次的用户报障正是「只看 logged-in,不看账户 entitlement」 |
+| 8 | **模型默认解析链** | `ui-mac/src/renderer/codepuppy-ui/model-default-core.ts:6, 29, 64, 82` | 默认给用户选哪个模型 | `loggedIn` **且** `accountUsable`(判据 B) | **同形先例**:文件头 `:6` 逐字记着上一次的用户报障正是「只看 logged-in,不看账户 entitlement」 |
 | 9 | gateway failover | `gateway/src/lib/failover.ts:15-56` | 上游 provider 之间选路 | 402 / 429+insufficient_quota / 403 | 不同轴(provider 选路),但它证明**服务端已有一套「按额度改路」的既有词汇** |
 
 **第 8 条值得单独读一遍**:同一个产品里,「按账户选路」这件事已经被做过一次,
@@ -509,7 +509,7 @@ Worker 出网 ⇒ **抓取源 IP 变成我方基础设施**。`isBlockedHost` �
 
 | ADR-009 的原话 | 坐标 | 代码实际 | 坐标 |
 | --- | --- | --- | --- |
-| B1 判据 = `ALPHA_CLOUD_MCP_URL` + **`ALPHA_CLOUD_TOKEN`** 密钥文件;「`ALPHA_CLOUD_TOKEN` 仍然是 B1 的判据」 | `ADR-009:30-32, 61` | `ALPHA_CLOUD_MCP_URL` + **`ALPHA_MCP_TOKEN`** 密钥文件(`#1195` 换轴) | `server.ts:327`、`alpha-config-injection.ts:100` |
+| B1 判据 = `CODEPUPPY_CLOUD_MCP_URL` + **`CODEPUPPY_CLOUD_TOKEN`** 密钥文件;「`CODEPUPPY_CLOUD_TOKEN` 仍然是 B1 的判据」 | `ADR-009:30-32, 61` | `CODEPUPPY_CLOUD_MCP_URL` + **`CODEPUPPY_MCP_TOKEN`** 密钥文件(`#1195` 换轴) | `server.ts:327`、`codepuppy-config-injection.ts:100` |
 | 2026-08-03 就地修订:云 MCP 走标准 MCP OAuth,定义里「没有任何凭证通道 —— 没有 `headers.Authorization`、没有 `{file:…}` 引用」 | `ADR-009:22-29` | 代付态写 `headers:{Authorization:"Bearer {file:…}"}`、`oauth:false` | `cloud-sidecar-config.ts:42-48` |
 
 这不是本文要修的东西(勘破不改文档),但**它是 AC3 的真实起点**:要改的不只是 B1/B2 的决策实质,
@@ -530,7 +530,7 @@ Worker 出网 ⇒ **抓取源 IP 变成我方基础设施**。`isBlockedHost` �
    「更正 1」字面冲突,必须实测才能收口。
 5. **无额度账户的端到端现场** —— 我没有一个零余额的真账户,§4.1 那条链是读代码 + 读契约得到的,
    不是跑出来的。402 的**实际 wire body**(`code` 字段到底出不出现)因此未验。
-6. **`ALPHA_WEBSEARCH_DISABLE=1` 下六个工具真的全消失** —— §5 是读三处代码推出来的结论
+6. **`CODEPUPPY_WEBSEARCH_DISABLE=1` 下六个工具真的全消失** —— §5 是读三处代码推出来的结论
    (`materializeCloudMcpConfig` / `WITHHELD_CLOUD_MCP` / `MCP.create`),没有跑一个装载实例复验。
 
 ---

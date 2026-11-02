@@ -32,7 +32,7 @@
       <h2>一套输入框，三层模型，登录即解锁代理节点</h2>
       <p class="lede">首页与对话页共用<strong>同一个 composer</strong>(纯白、柔和阴影、克制图标);模型选择重做成三层 —— <strong>代理节点(alpha-platform,登录解锁)</strong> · <strong>国内直连(填 Key 即用)</strong> · <strong>自定义节点(Base URL + Key + 自定义模型/等级/effort,即 OpenRouter 场景)</strong>。新增 <strong>effort</strong> 与 <strong>权限(全部批准/请求审批/只读,alpha-code#1413 起三档各自发不同请求)</strong> 两个控件,均挂在 opencode 已有的真实接缝上。</p>
     </div>
-    <div class="note"><b>顶部可切换</b>四种账号态「会员 / 仅余额 / 余额不足 / 未登录」,实时观察代理节点的<strong>开放 / 软锁 / 硬锁</strong>差异,以及「浅色 / 深色」。所有颜色取自 <span class="mono">alpha-ui/tokens.css</span> 真值。</div>
+    <div class="note"><b>顶部可切换</b>四种账号态「会员 / 仅余额 / 余额不足 / 未登录」,实时观察代理节点的<strong>开放 / 软锁 / 硬锁</strong>差异,以及「浅色 / 深色」。所有颜色取自 <span class="mono">codepuppy-ui/tokens.css</span> 真值。</div>
   </section>
 
   <!-- ============ 1 HOME ============ -->
@@ -113,7 +113,7 @@
             <div class="msg user"><div class="who">你</div><div class="bubble"><span class="conn-chip"><span class="d" style="background:#24292f">GH</span>GitHub</span>帮我检查一下 PR #12</div></div>
             <div class="tool-chip" title="点开看全文"><span class="tico" style="background:#f6821f">CF</span><b>技能 · cloudflare</b><span class="meta">已加载 · 全文折叠</span><svg class="ic sm chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
             <div class="msg user"><div class="who">你</div><div class="bubble">把首页输入框和对话框统一成一套,并加上 effort 选择。</div></div>
-            <div class="msg ai"><div class="who">ALPHA · Opus 4.8 · 高</div><div class="bubble">好的。两处共用同一个 <code>Composer</code> 组件,工具栏含 <code>+</code>、权限、模型、effort、发送。effort 映射到模型的 <code>variants</code>(low/medium/high/xhigh)。我先在 <code>alpha-ui/</code> 下新增组件,不改 opencode 源码。</div></div>
+            <div class="msg ai"><div class="who">ALPHA · Opus 4.8 · 高</div><div class="bubble">好的。两处共用同一个 <code>Composer</code> 组件,工具栏含 <code>+</code>、权限、模型、effort、发送。effort 映射到模型的 <code>variants</code>(low/medium/high/xhigh)。我先在 <code>codepuppy-ui/</code> 下新增组件,不改 opencode 源码。</div></div>
             <div class="perm-card">
               <div class="ph"><svg class="ic sm" viewBox="0 0 24 24" style="color:var(--a-warning)"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/></svg>请求审批 · 工具执行</div>
               <div class="pb">即将运行:<code>bun --cwd packages/ui-mac run typecheck</code></div>
@@ -219,7 +219,7 @@
         <b>词表没同步下来或读不到时不拦也不提示</b> —— 没做过的检查不摆出一个做过的样子;
         不出现「违规」「禁止」这类定性词,也不说命中了哪个词(那是把词表一格一格喂给想绕过的人);
         <span class="mono">role="alert"</span>,不新增可聚焦元素,颜色不承载信息;判据钩子
-        <span class="mono">data-alpha-composer-blocked</span>。定时自动化命中时<b>不产生任何界面元素</b>,
+        <span class="mono">data-codepuppy-composer-blocked</span>。定时自动化命中时<b>不产生任何界面元素</b>,
         按既有失败形态记进那次运行的 <span class="mono">status.json</span>。
         <br/><b>诚实边界</b>:这道拦截跑在用户自己的电脑上、可被绕过,<b>不是安全边界</b>;复核与留证的权威在服务端上传入库时。这段话不进界面。</div>
     </div>
@@ -310,7 +310,7 @@
         <div class="note"><b>计价倍数(REQ-127 #679 改写)</b>:代理模型的计价由网关 <span class="mono">GET /v1/models</span> 下发,形状是<strong>每个模型两个倍数</strong>(输入 / 输出),相对基准模型的未缓存 token 单价 —— <strong>不是</strong>「旗舰/高级/标准 + 单一 ×N」那种档位表,本地也不再保存任何价格。原稿那句是明确的错误设计主张:折叠成一个 scalar 对输入或输出至少有一侧必然错(claude-fable-5 是 输入 71.4× / 输出 178.6×)。没有可信数据时行内明说「计价信息暂不可用」,绝不合成一个便宜的数字。</div>
         <div class="note"><b>推理点(蓝点)</b>:标记该模型支持 effort(来自 <span class="mono">model.variants</span>);只有带点的模型,effort 控件才可用。</div>
         <div class="note warn"><b>四种账号态</b>(顶部切换,对接 <span class="mono">/v1/account/summary</span>):① <strong>会员</strong> 额度充足直接用;② <strong>仅余额</strong> 未订阅、按钱包余额按量扣;③ <strong>余额不足</strong> 软锁,提示充值/订阅;④ <strong>未登录</strong> 硬锁,提示登录。代理段随账号态变,<strong>国内直连 / 自定义始终可用</strong>(BYOK 不受影响)。</div>
-        <div class="note"><b>实现说明</b>:数据来自 <span class="mono">useProviders()/useModels()</span>;代理段需在 <span class="mono">alpha-models.ts</span> 把当前单个 <span class="mono">alpha-default</span> 扩成<strong>带等级的多模型注册</strong>(已知小缺口,属构建项)。弹层为新增 alpha 组件,替换现 <span class="mono">dialog-select-model.tsx</span> 的观感。</div>
+        <div class="note"><b>实现说明</b>:数据来自 <span class="mono">useProviders()/useModels()</span>;代理段需在 <span class="mono">codepuppy-models.ts</span> 把当前单个 <span class="mono">alpha-default</span> 扩成<strong>带等级的多模型注册</strong>(已知小缺口,属构建项)。弹层为新增 alpha 组件,替换现 <span class="mono">dialog-select-model.tsx</span> 的观感。</div>
       </div>
     </div>
   </section>
@@ -426,7 +426,7 @@
           <div class="pb">agent 想运行命令:<code>rm -rf node_modules &amp;&amp; bun install</code></div>
           <div class="pa"><button class="btn-primary">允许一次</button><button class="btn-ghost">总是允许此类</button><button class="btn-ghost">拒绝</button></div>
         </div>
-        <div class="note"><b>映射(alpha-code#1413 落地形状)</b>:三档都是<strong>每条消息自带的 agent 字段</strong>,不写会话 / 项目配置 —— 全部批准 → 不带 agent(引擎默认 <span class="mono">build</span>,新会话默认档;它就是此前默认档的真实行为);请求审批 → <span class="mono">agent:"alpha-ask"</span>(主进程注入的 hidden agent = build + <span class="mono">edit</span>/<span class="mono">bash</span> 改 <span class="mono">ask</span>,不多不少,无 prompt);只读 → <span class="mono">agent:"alpha-readonly"</span>(<span class="mono">edit</span>/<span class="mono">bash</span> deny)。请求审批与只读都压过手选的计划 / 第三方主档(chip 置灰并点名是哪一档压的)。按钮 → SDK <span class="mono">permission.respond({response:"once|always|reject"})</span>。<b>诚实的边界</b>:「全部批准」取消的只是逐次审批那一层 —— 工作区外路径、<span class="mono">*.env</span> 读取、doom loop、非内置工具出厂仍会问;进程围栏 / 出网围栏 / 发送前拦截 / 组织下发的 deny 与本档无关。判据:<span class="mono">packages/opencode/test/permission/alpha-composer-tiers.test.ts</span>(引擎层真问 / 真放行 / 真拒)+ <span class="mono">composer-state.test.ts</span>(三份请求体逐字节不同)+ <span class="mono">shell-commands.test.ts</span>(真壳逐档点选)。</div>
+        <div class="note"><b>映射(alpha-code#1413 落地形状)</b>:三档都是<strong>每条消息自带的 agent 字段</strong>,不写会话 / 项目配置 —— 全部批准 → 不带 agent(引擎默认 <span class="mono">build</span>,新会话默认档;它就是此前默认档的真实行为);请求审批 → <span class="mono">agent:"alpha-ask"</span>(主进程注入的 hidden agent = build + <span class="mono">edit</span>/<span class="mono">bash</span> 改 <span class="mono">ask</span>,不多不少,无 prompt);只读 → <span class="mono">agent:"alpha-readonly"</span>(<span class="mono">edit</span>/<span class="mono">bash</span> deny)。请求审批与只读都压过手选的计划 / 第三方主档(chip 置灰并点名是哪一档压的)。按钮 → SDK <span class="mono">permission.respond({response:"once|always|reject"})</span>。<b>诚实的边界</b>:「全部批准」取消的只是逐次审批那一层 —— 工作区外路径、<span class="mono">*.env</span> 读取、doom loop、非内置工具出厂仍会问;进程围栏 / 出网围栏 / 发送前拦截 / 组织下发的 deny 与本档无关。判据:<span class="mono">packages/opencode/test/permission/codepuppy-composer-tiers.test.ts</span>(引擎层真问 / 真放行 / 真拒)+ <span class="mono">composer-state.test.ts</span>(三份请求体逐字节不同)+ <span class="mono">shell-commands.test.ts</span>(真壳逐档点选)。</div>
       </div>
     </div>
   </section>
@@ -443,7 +443,7 @@
         <div class="composer">
           <div class="ctx-chips">
             <span class="ctx-chip"><span class="fi">TS</span>Button.tsx<span class="x"><svg class="ic sm" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></span></span>
-            <span class="ctx-chip"><span class="fi" style="background:var(--a-bg-inset);color:var(--a-text-secondary)"><svg class="ic sm" viewBox="0 0 24 24" style="width:10px;height:10px"><path d="M3 7l2-3h5l2 3h7v11H3z"/></svg></span>alpha-ui/<span class="x"><svg class="ic sm" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></span></span>
+            <span class="ctx-chip"><span class="fi" style="background:var(--a-bg-inset);color:var(--a-text-secondary)"><svg class="ic sm" viewBox="0 0 24 24" style="width:10px;height:10px"><path d="M3 7l2-3h5l2 3h7v11H3z"/></svg></span>codepuppy-ui/<span class="x"><svg class="ic sm" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></span></span>
             <span class="ctx-thumb"><span class="x"><svg class="ic" viewBox="0 0 24 24" style="width:9px;height:9px;stroke-width:2.4"><path d="M6 6l12 12M18 6L6 18"/></svg></span></span>
           </div>
           <div class="input">给这些文件加 loading 态…</div>
@@ -470,7 +470,7 @@
         <div class="pop up static" style="width:100%">
           <div class="menu-label">@ 引用</div>
           <div class="menu-item"><svg class="ic" viewBox="0 0 24 24"><path d="M9.5 2a4.5 4.5 0 0 0-4.3 5.8A4 4 0 0 0 6 15.5a4 4 0 0 0 7 1 4 4 0 0 0 7-1 4 4 0 0 0 .8-7.7A4.5 4.5 0 0 0 12 3.3 4.5 4.5 0 0 0 9.5 2z"/></svg>General<span class="src-tag">agent</span></div>
-          <div class="menu-item"><svg class="ic" viewBox="0 0 24 24"><path d="M14.5 4h-9A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V9.5z"/><path d="M14 4v5h6"/></svg><span class="dim">alpha-ui/</span>Button.tsx</div>
+          <div class="menu-item"><svg class="ic" viewBox="0 0 24 24"><path d="M14.5 4h-9A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V9.5z"/><path d="M14 4v5h6"/></svg><span class="dim">codepuppy-ui/</span>Button.tsx</div>
           <div class="menu-item"><svg class="ic" viewBox="0 0 24 24"><path d="M14.5 4h-9A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V9.5z"/><path d="M14 4v5h6"/></svg><span class="dim">main/</span>server.ts</div>
         </div>
       </div>

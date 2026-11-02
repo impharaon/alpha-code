@@ -742,7 +742,7 @@ html[data-theme="dark"] .tok-k{color:#c4b5fd}html[data-theme="dark"] .tok-s{colo
 .pf-table td:first-child{white-space:nowrap;color:var(--a-text);font-weight:var(--a-weight-medium)}
 .pf-grow{flex:1}
 
-/* ── 工具批准面板 · 按现行代码画(alpha-ui/PermissionDialog.tsx + permission-dialog.css;2026-10-31 并入,锚 #approval-states)── */
+/* ── 工具批准面板 · 按现行代码画(codepuppy-ui/PermissionDialog.tsx + permission-dialog.css;2026-10-31 并入,锚 #approval-states)── */
 .pc-stage{padding:22px;background:var(--a-bg-subtle)}
 .pc-panel{max-width:600px;margin:0 auto;background:var(--a-surface-raised);border:1px solid var(--a-border-faint);border-radius:var(--a-radius-lg);box-shadow:var(--a-shadow-md);color:var(--a-text)}
 .pc-hd{display:flex;align-items:center;gap:8px;padding:12px 14px 0;font-size:var(--a-text-sm);font-weight:var(--a-weight-semibold)}
@@ -781,7 +781,7 @@ html[data-theme="dark"] .tok-k{color:#c4b5fd}html[data-theme="dark"] .tok-s{colo
 .note.warn{border-left-color:var(--a-warning)}
 
 /* ── ⑨ 读取 · 回复失败 · 脚注(2026-10-30 已批增量,按已出货代码并入)── */
-/* 用户消息脚注的档位色点:值同 packages/ui-mac/src/renderer/alpha-ui/tokens.css 的 --a-perm-* */
+/* 用户消息脚注的档位色点:值同 packages/ui-mac/src/renderer/codepuppy-ui/tokens.css 的 --a-perm-* */
 :root{--a-perm-allow:#4f46e5;--a-perm-ask:#18181b;--a-perm-readonly:#166534}
 html[data-theme="dark"]{--a-perm-allow:#818cf8;--a-perm-ask:#fafafa;--a-perm-readonly:#4ade80}
 .umeta .pdot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:5px;vertical-align:1px;background:var(--a-text-tertiary)}

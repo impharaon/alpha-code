@@ -15,7 +15,7 @@ review_after: 2027-03-17
 裁决落在 [ADR-045](../../.claude/rules/adrs/ADR-045-memory-injection-seam.md);本文只放**地面真相**:
 在 `origin/alpha` `8eb092b73`(2026-09-11)这棵树上,装着的这一版引擎给插件留了哪些能把文本送进
 模型 system 段的口子、各自今天的真实行为、以及一份把前提钉在仓里的探针
-([`packages/opencode/test/session/alpha-427-memory-seam-probe.test.ts`](../../packages/opencode/test/session/alpha-427-memory-seam-probe.test.ts),
+([`packages/opencode/test/session/codepuppy-427-memory-seam-probe.test.ts`](../../packages/opencode/test/session/codepuppy-427-memory-seam-probe.test.ts),
 登记在 `scripts/gate-files.tsv`,精确 3 条)。
 
 ## 结论
@@ -108,18 +108,18 @@ request.ts:109   system.map → ModelMessage{ role:"system" }                   
 - 让 `cfg.instructions` 直接指向 `~/code-puppy/Memory/<project>/*.md`(不渲染):每步会把该目录**全部**
   文件原样带进去,没有任何地方能执行 AC4 的「数量与长度有上限」—— 上游 `Instruction.system()` 不设上限,
   唯一能设上限的是**alpha 写文件的那一刻**,而 Memory 的写手不只 alpha(用户在 Finder 里、模型经
-  `alpha-workspace` 技能都能写)。
+  `codepuppy-workspace` 技能都能写)。
 - 用相对模式让引擎从工作区向上 `globUp`(例如 `.code-puppy/memory-context.md`):派生物会落进**用户的项目
   目录**,且 `OPENCODE_DISABLE_PROJECT_CONFIG` 一开就改从全局目录找。按实例推**绝对路径**没有这两条代价。
 
 ## 4. 探针实测
 
-`packages/opencode/test/session/alpha-427-memory-seam-probe.test.ts`(alpha 自有,`north-star:alpha-owned`;
+`packages/opencode/test/session/codepuppy-427-memory-seam-probe.test.ts`(alpha 自有,`north-star:codepuppy-owned`;
 形状照上游 `test/plugin/trigger.test.ts`:真 `Config`、真 `Plugin` 装载、`file://` 插件、临时 instance;
 **不 mock Config** —— mock 了就测不出「钩子改的和 Instruction 读的是不是同一个对象」)。
 
 ```
-$ cd packages/opencode && bun test test/session/alpha-427-memory-seam-probe.test.ts
+$ cd packages/opencode && bun test test/session/codepuppy-427-memory-seam-probe.test.ts
 bun test v1.3.14 (0d9b296a)
  3 pass
  0 fail
@@ -129,16 +129,16 @@ Ran 3 tests across 1 file. [2.72s]
 
 | 条 | 断言 | 它测出什么 |
 | --- | --- | --- |
-| ① 稳定接缝 | 插件 `config` 钩子把 `<instance>/alpha-memory-context/project-a.md` 推进 `cfg.instructions`;`plugin.init()` 后 `Instruction.system()` 恰好 1 段含针,且以 `Instructions from: <path>\n` 开头;假针 0 命中;`rm` 文件后再调 ⇒ 0 段;写回后再调 ⇒ 又是 1 段 | 钩子与 Instruction 读同一份 cfg;每次调用重读;删即失效不需要任何失效机制 |
+| ① 稳定接缝 | 插件 `config` 钩子把 `<instance>/codepuppy-memory-context/project-a.md` 推进 `cfg.instructions`;`plugin.init()` 后 `Instruction.system()` 恰好 1 段含针,且以 `Instructions from: <path>\n` 开头;假针 0 命中;`rm` 文件后再调 ⇒ 0 段;写回后再调 ⇒ 又是 1 段 | 钩子与 Instruction 读同一份 cfg;每次调用重读;删即失效不需要任何失效机制 |
 | ① 对照(已知的坏) | 同一份文件、插件**没有** `config` 钩子 ⇒ 0 段含针 | 接缝是钩子,不是文件名 / 目录位置;判官看得见「没接」 |
-| ② 退路 | 插件实现 `experimental.chat.system.transform`,`plugin.trigger(hook, { sessionID, model }, { system:["base prompt"] })` ⇒ `["base prompt", <针>, "seen-session:ses_alpha427probe"]` | 钩子在装着的版本里仍在;input 仍带 `sessionID`(形参与 `request.ts:74` 逐字同形,上游拿掉它先在 typecheck 红);改写落地 |
+| ② 退路 | 插件实现 `experimental.chat.system.transform`,`plugin.trigger(hook, { sessionID, model }, { system:["base prompt"] })` ⇒ `["base prompt", <针>, "seen-session:ses_codepuppy427probe"]` | 钩子在装着的版本里仍在;input 仍带 `sessionID`(形参与 `request.ts:74` 逐字同形,上游拿掉它先在 typecheck 红);改写落地 |
 
 上游自己的 `test/plugin/trigger.test.ts`(同一棵树、同一命令)`2 pass / 0 fail / Ran 2 tests across 1 file [3.33s]`,
 与探针 ② 互为对照。
 
-同一机制的登记闸:`bash scripts/bun-test-floor.sh "=3" packages/opencode test/session/alpha-427-memory-seam-probe.test.ts`
+同一机制的登记闸:`bash scripts/bun-test-floor.sh "=3" packages/opencode test/session/codepuppy-427-memory-seam-probe.test.ts`
 → `bun exit=0 · 实际通过 3 条 · 登记精确条数 3`。全量 `packages/opencode` 测试**不在** alpha 门里
-(`alpha-ci.yml:306`),所以这个文件只有登记进 `scripts/gate-files.tsv` 才真的会被跑 —— 已登记。
+(`codepuppy-ci.yml:306`),所以这个文件只有登记进 `scripts/gate-files.tsv` 才真的会被跑 —— 已登记。
 
 **没测的**(如实):探针停在 `Instruction.system()` 的返回值,没有往下走到 `request.ts` 的 join 与
 provider 请求 —— 那一段是 `#425` wiring test 的对象(父需求 AC4 证据表已把它派给 `#425`);没测子代理
@@ -178,8 +178,8 @@ $ git log origin/dev -S'config.instructions'              -- packages/opencode/s
 
 ## 7. 未覆盖面(诚实登记)
 
-- `Instructions from: <path>` 这行前缀会把 `<alphaGlobalRoot>` 下的绝对路径暴露给模型。先例已存在
-  (`alpha-identity.md` / `alpha-behavior.md` 住在 userData,路径同样进 system),不算新面。
+- `Instructions from: <path>` 这行前缀会把 `<codepuppyGlobalRoot>` 下的绝对路径暴露给模型。先例已存在
+  (`codepuppy-identity.md` / `codepuppy-behavior.md` 住在 userData,路径同样进 system),不算新面。
 - v2 迁移之后(ADR-036 §3 三条齐备并另立 ADR)本文 §2 整段失效,Memory 的落点应改为 `SystemContext.Source`
   (那时才重新面对 Registry 的 L0/L2/L3 问题)。ADR-045 把那一格写成 proposed。
 - [[ADR-002]] 后果第 3 条「上下文注入目前只有 `experimental.chat.{system,messages}.transform`」自本文起

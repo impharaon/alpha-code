@@ -23,11 +23,11 @@ review_after: 2026-12-06
 
 | 票面前提 | 地面真相 |
 | --- | --- |
-| 「一行**无条件**的开关,不是配置项」 | `ecosystem-import.ts:28-32` 是 `??=` **set-if-unset**,shell 显式 `OPENCODE_DISABLE_EXTERNAL_SKILLS=0` 优先;`ALPHA_ECOSYSTEM_INHERIT=1` 整机逃生。更重要的是 ADR-024 §2/§3 设计的**同意门已经上线**(§2 列三条入口),「不装载」从来不是终态,「未经确认不装载」才是 |
+| 「一行**无条件**的开关,不是配置项」 | `ecosystem-import.ts:28-32` 是 `??=` **set-if-unset**,shell 显式 `OPENCODE_DISABLE_EXTERNAL_SKILLS=0` 优先;`CODEPUPPY_ECOSYSTEM_INHERIT=1` 整机逃生。更重要的是 ADR-024 §2/§3 设计的**同意门已经上线**(§2 列三条入口),「不装载」从来不是终态,「未经确认不装载」才是 |
 | 「owner 现成的技能对这里一点用都没有」 | 这台机器上迁移门已弹过 **4 次**(§1.4):2026-07-19 prod 环境 owner 选「导入」,14 个技能 + CLAUDE.md 进了原生根;当前 dev(2026-07-23)与当前 prod(2026-08-07)owner 选了「**不导入**」。「不可用」是 owner 在门上按的那个键,不是产品结构上关死的;要用,走重导入,**零代码** |
 | 「打开就能立刻用上质量类技能」 | 本机 `~/.claude/skills` 只有 **7** 个,全是流程/治理技能(`dev-loop`、`requirement-management`、`owner-decision`…),**没有一个是产出物质量/中文排版技能**;真正的 17 个用户技能住在 `~/.config/opencode/skills`(引擎原生生态位,**本来就开着**,`config/paths.ts` 经 `skill/index.ts:205-208` 扫描)。打开外部目录对 REQ-154 的收益 ≈ 0 |
 
-对 REQ-154 的含义:质量指导由出厂技能 + `alpha-behavior` 承担(`#1240` / `#1242`),票面本来的默认路线成立。
+对 REQ-154 的含义:质量指导由出厂技能 + `codepuppy-behavior` 承担(`#1240` / `#1242`),票面本来的默认路线成立。
 
 ## 1. 那行 flag 的出处(票面证据 1)
 
@@ -46,7 +46,7 @@ $ git log origin/alpha --format='%h %ad %s' --date=short \
 ADR-024 从落笔起没有修订过。它的裁决五条,与本票直接相关的三条:
 
 1. **默认拒绝继承**:sidecar env 注入 `OPENCODE_DISABLE_EXTERNAL_SKILLS=1` + `OPENCODE_DISABLE_CLAUDE_CODE_PROMPT=1`,
-   set-if-unset;`ALPHA_ECOSYSTEM_INHERIT=1` 不注入。
+   set-if-unset;`CODEPUPPY_ECOSYSTEM_INHERIT=1` 不注入。
 2. **consent = 安装期转换导入,不是重开继承**(与 ADR-023「不做运行时模拟层」一脉):产物是原生资产,快照语义,重导入是唯一更新通道。
 3. **全局一次性迁移门是发布闸**:首启检测 `~/.claude/skills`、`~/.agents/skills`、`~/.claude/CLAUDE.md` 非空就弹,不导入则 loud 明示从此不可见。
 
@@ -56,7 +56,7 @@ ADR-024 从落笔起没有修订过。它的裁决五条,与本票直接相关�
 
 | 角色 | 坐标 | 形态 |
 | --- | --- | --- |
-| 写 | `packages/ui-mac/src/main/ecosystem-import.ts:28-32` `applyEcosystemDefaultDeny` | `env.OPENCODE_DISABLE_EXTERNAL_SKILLS ??= "1"`;`ALPHA_ECOSYSTEM_INHERIT === "1"` 直接 return |
+| 写 | `packages/ui-mac/src/main/ecosystem-import.ts:28-32` `applyEcosystemDefaultDeny` | `env.OPENCODE_DISABLE_EXTERNAL_SKILLS ??= "1"`;`CODEPUPPY_ECOSYSTEM_INHERIT === "1"` 直接 return |
 | 调用点 | `packages/ui-mac/src/main/server.ts:224`(sidecar env 装配) | 注释逐字引用 ADR-024 §5 |
 | 读 | 上游 `packages/opencode/src/effect/runtime-flags.ts:21` | `disableExternalSkills: bool("OPENCODE_DISABLE_EXTERNAL_SKILLS")` |
 | 消费 | 上游 `packages/opencode/src/skill/index.ts:185-203` | 为真时跳过 `.claude` / `.agents` 两个外部根与向上走查;`config.directories()` 与 `skills.paths` 不受影响 |
@@ -67,7 +67,7 @@ ADR-024 从落笔起没有修订过。它的裁决五条,与本票直接相关�
 | 入口 | 坐标 | 触发 | 落点 |
 | --- | --- | --- | --- |
 | 全局一次性迁移门 | `ecosystem-gate.ts:27-89`,由 `index.ts:1351-1355` 在窗口就绪后 fire-and-forget | 无 marker 且 `~/.claude/skills`、`~/.agents/skills`、`~/.claude/CLAUDE.md` 任一非空 | 「导入」→ `importExternalSkills(…, {scope:"global"}, installGlobal)` 走 `#390` 的 CAS 事务安装器(`ext-ipc.ts:778-779`);CLAUDE.md → `<root>/instructions/imported-claude-code.md` |
-| 项目打开门 | `ext-ipc.ts:593-632` | 打开的项目里有 `.claude/skills`、`.agents/skills` 或 `CLAUDE.md`,且 `prefs.json` 无版本化决策 | 技能 → `<project>/.code-puppy/skills/`,`alpha.jsonc` 注册 `skills.paths`;CLAUDE.md → `AGENTS.md`(已存在则不动,C28) |
+| 项目打开门 | `ext-ipc.ts:593-632` | 打开的项目里有 `.claude/skills`、`.agents/skills` 或 `CLAUDE.md`,且 `prefs.json` 无版本化决策 | 技能 → `<project>/.code-puppy/skills/`,`codepuppy.jsonc` 注册 `skills.paths`;CLAUDE.md → `AGENTS.md`(已存在则不动,C28) |
 | 会话内重导入 | 出厂技能 `resources/factory-skills/integrate-project/SKILL.md`(`FACTORY_SKILL_IDS`,`factory-skills.ts:33`) | 用户说「导入外部技能」 | 同一条转换管线;这是快照更新的唯一交互通道 |
 
 2026-07-08 真机批(`docs/audits/2026-07-08-g6-realmachine-batch/verify.md:35-40`)已验:`ps eww` 看到两 flag 到达引擎进程;
@@ -81,8 +81,8 @@ ADR-024 从落笔起没有修订过。它的裁决五条,与本票直接相关�
 | --- | --- | --- | --- |
 | `~/.alpha/`(退休根) | declined | 2026-07-08 | 首批真机验证那次 |
 | `~/.alpha/env/prod/` | **imported** | 2026-07-19 | 14 个技能(`agents-sdk`、`cloudflare`、`codex-review-watchdog`、`cross-repo-delivery`、`dev-loop`、`maintain-repository-docs`、`requirement-management`、`wrangler`…)+ `CLAUDE.md → ~/.alpha/instructions`,`skipped: []` |
-| `…/alpha-code-state/env/dev/`(**当前运行的环境**,基线 §1.8:2026-09-04 起 dev 渠道) | declined | 2026-07-23 | `skills/` 目录不存在,`installs.json` 空 |
-| `…/alpha-code-state/env/prod/` | declined | 2026-08-07 | |
+| `…/codepuppy-state/env/dev/`(**当前运行的环境**,基线 §1.8:2026-09-04 起 dev 渠道) | declined | 2026-07-23 | `skills/` 目录不存在,`installs.json` 空 |
+| `…/codepuppy-state/env/prod/` | declined | 2026-08-07 | |
 
 所以「技能对这里没用」的直接原因是当前 dev 根上 2026-07-23 那次「不导入」+ marker 防重弹;
 产品给的补救通道就是 §1.3 第三行,不需要任何代码改动。
@@ -172,7 +172,7 @@ const readonlyExternalDirectory = { "*": "ask", ...Object.fromEntries(whiteliste
 
 | 选项 | 安全 | 可回滚 | 收益 | 裁决 |
 | --- | --- | --- | --- | --- |
-| 1 维持关闭 | ADR-024 原样,§3 七类面全部由导入门承接 | 什么都没改;逃生口(`ALPHA_ECOSYSTEM_INHERIT=1`、`OPENCODE_DISABLE_EXTERNAL_SKILLS=0`)与三条同意入口本来就在 | owner 要用外部技能:会话里说「导入外部技能」(global scope),或删当前环境根的 `ecosystem-import.json` 重启再弹;两者都不改代码、不动 `~/.claude` | **选** |
+| 1 维持关闭 | ADR-024 原样,§3 七类面全部由导入门承接 | 什么都没改;逃生口(`CODEPUPPY_ECOSYSTEM_INHERIT=1`、`OPENCODE_DISABLE_EXTERNAL_SKILLS=0`)与三条同意入口本来就在 | owner 要用外部技能:会话里说「导入外部技能」(global scope),或删当前环境根的 `ecosystem-import.json` 重启再弹;两者都不改代码、不动 `~/.claude` | **选** |
 | 2 有限打开 | 等价于重做导入门,且是运行时形态(ADR-023 §2 否决的那种) | 新增第二份真源,回滚要清两处 | 与选项 1 相同(内容一样进上下文) | 否 |
 | 3 完全打开 | §3 七类面裸露;§2.3 让符号链接直接变成免审读取范围 | 一行 env 可回滚,但期间进入过上下文的内容回不了 | 本机 `~/.claude/skills` 7 个流程技能,零质量类技能;收益 ≈ 0 | 否 |
 
@@ -205,7 +205,7 @@ git show origin/alpha:packages/opencode/src/agent/agent.ts | sed -n 101,116p
 
 # 本机 marker(只读)
 find ~ -maxdepth 6 -name ecosystem-import.json -not -path '*/node_modules/*'
-cat "$HOME/Library/Application Support/alpha-code-state/env/dev/ecosystem-import.json"
+cat "$HOME/Library/Application Support/codepuppy-state/env/dev/ecosystem-import.json"
 
 # 本机外部技能存量(只读):7 个,全部 name+description 齐全,0 个 symlink
 ls ~/.claude/skills; ls ~/.config/opencode/skills | wc -l   # 7 / 17

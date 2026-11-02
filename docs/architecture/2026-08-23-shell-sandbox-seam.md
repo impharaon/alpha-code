@@ -101,7 +101,7 @@ args(wrapper)  ≡ args(/bin/zsh)        ← 逐字节相同
 
 ```sh
 #!/bin/sh
-exec /usr/bin/sandbox-exec -f "$ALPHA_SB_PROFILE" -D WORKDIR="$(pwd)" "$ALPHA_REAL_SHELL" "$@"
+exec /usr/bin/sandbox-exec -f "$CODEPUPPY_SB_PROFILE" -D WORKDIR="$(pwd)" "$CODEPUPPY_REAL_SHELL" "$@"
 ```
 
 ### 2.5 `sandbox-exec` 在 Darwin 25.3 可用，逃逸语料 4/4 拦住
@@ -205,9 +205,9 @@ Alpha 无处注入 ⇒ **C3 必须收编其中一个热文件**（`north-star-gu
 - ~~未验证：Electron utilityProcess 内的行为。~~ **2026-08-26 在打包产物上实跑，结论一致**
   （[`#1076`](https://github.com/jinjunnn/alpha-code/issues/1076)，取证见
   [`docs/verification/2026-08-26-req138-1076-packaged-sandbox/`](../verification/2026-08-26-req138-1076-packaged-sandbox/README.md)）。
-  prod 频道打包、`app.isPackaged=true` 的 sidecar 里：`cfg.shell` 指向 `ALPHA_GLOBAL_DIR/bin/zsh`，
+  prod 频道打包、`app.isPackaged=true` 的 sidecar 里：`cfg.shell` 指向 `CODEPUPPY_GLOBAL_DIR/bin/zsh`，
   该文件内容与 `WRAPPER_SCRIPT` 逐字相同；§2.5 的 7 条语料**全部落不了盘**，同一套语料在
-  **只把 wrapper 那一行换成 `exec "$ALPHA_REAL_SHELL" "$@"`** 的打包副本上**全部落盘**；
+  **只把 wrapper 那一行换成 `exec "$CODEPUPPY_REAL_SHELL" "$@"`** 的打包副本上**全部落盘**；
   §2.8 误伤集 9/9 通过，两臂逐格相同。两种 argv 形状各跑，各 2 轮，每轮 29 pass / 0 fail。
   该轮留下的两小块，**2026-08-26 由 [`#1144`](https://github.com/jinjunnn/alpha-code/issues/1144)
   各推进一步**（取证见
@@ -251,7 +251,7 @@ Alpha 无处注入 ⇒ **C3 必须收编其中一个热文件**（`north-star-gu
   有控制终端时它会打印 `Password:` 并阻塞读 `/dev/tty`（stdin 给 pipe 也拦不住），
   无围栏对照臂会真的把它 exec 起来，把 `bun test` 挂死。
 - ~~未验证：会写盘的 rc 脚本。~~ **2026-08-26 实跑**（同上目录 §6）。用产品自带的
-  `ALPHA_ENV_ALLOWLIST_EXTRA=ZDOTDIR` 把引擎自己那条 `source "${ZDOTDIR:-$HOME}/.zshrc"`
+  `CODEPUPPY_ENV_ALLOWLIST_EXTRA=ZDOTDIR` 把引擎自己那条 `source "${ZDOTDIR:-$HOME}/.zshrc"`
   指到一份**故意会写盘**的 rc 上（`compinit -d` 写 `.zcompdump` + 历史式追加 + 一个 marker，
   三处写全在可写闭集外）。三句结论：
   1. **rc 照常跑到最后一行**（它 export 的变量在命令里读得到）；写被拒**不中断** rc，
@@ -279,19 +279,19 @@ Alpha 无处注入 ⇒ **C3 必须收编其中一个热文件**（`north-star-gu
 C1 选定后，文件轴按下述落地。此节校正 §2.4 里那处 spike 用的 `<userData>/bin`
 路径假设——它在 spike 里成立，但**不是**实现的落点：
 
-- **wrapper 与 profile 落在 `ALPHA_GLOBAL_DIR` 下**，即
-  `ALPHA_GLOBAL_DIR/bin/<真 shell 的 basename>` 与
-  `ALPHA_GLOBAL_DIR/sandbox/alpha-shell.sb`，**不落 `<userData>`**。原因是结构性的：
-  C1 的 `config(cfg)` hook 跑在 `@alpha-code/ext` 包内，而 `app.getPath("userData")`
+- **wrapper 与 profile 落在 `CODEPUPPY_GLOBAL_DIR` 下**，即
+  `CODEPUPPY_GLOBAL_DIR/bin/<真 shell 的 basename>` 与
+  `CODEPUPPY_GLOBAL_DIR/sandbox/alpha-shell.sb`，**不落 `<userData>`**。原因是结构性的：
+  C1 的 `config(cfg)` hook 跑在 `@codepuppy/ext` 包内，而 `app.getPath("userData")`
   只在 Electron **main** 里拿得到；`ext` 手上唯一能解析并 canonical 校验的 alpha 自有
-  可写根就是 `ALPHA_GLOBAL_DIR`（`= <appData>/alpha-code-state/env/<environment>`，
-  已被 `requireAlphaGlobalRoot()` 校验）。走它 = 保持 ext-only、收编 0；要落
+  可写根就是 `CODEPUPPY_GLOBAL_DIR`（`= <appData>/codepuppy-state/env/<environment>`，
+  已被 `requireCodePuppyGlobalRoot()` 校验）。走它 = 保持 ext-only、收编 0；要落
   `<userData>` 反而得把路径经 sidecar-env 白名单从 main 透传过来，扩面且多改文件。
 - **可写闭集（I2）= §2.5 那份**，登记为 `packages/ext/src/shell-sandbox.ts` 的
   `SEATBELT_PROFILE` 常量（单一权威；新增前缀改这里，`alpha-sandbox-seam.test.ts`
   逐 token 全等挡住拓宽）。
 - **fail-closed（I1）**：wrapper/profile 装不上时 `cfg.shell` 被顶成 deny stub
-  （`ALPHA_GLOBAL_DIR/bin/alpha-shell-denied`，可读拒绝 + exit 78），deny stub 也落不下
+  （`CODEPUPPY_GLOBAL_DIR/bin/alpha-shell-denied`，可读拒绝 + exit 78），deny stub 也落不下
   时退到 `/usr/bin/false`——**任何情况都不回落裸 shell**。
 - **§5 未验证项的状态**：§2.5/§2.6 的正反语料已实现为 darwin-only 单测
   （`alpha-sandbox-escape.test.ts`，真 `sandbox-exec`，CI/ubuntu 上 skip、本机 macOS 真跑），

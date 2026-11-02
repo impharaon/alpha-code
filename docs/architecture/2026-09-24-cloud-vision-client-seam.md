@@ -23,19 +23,19 @@ review_after: 2027-03-24
 
 | 问题 | 地面真相 | 坐标 |
 | --- | --- | --- |
-| 引擎访问云端用的是哪份凭据 | 登录铸的 `mcp_access` token,以 `{file:…ALPHA_MCP_TOKEN}` 引用装进云 MCP 定义的 `headers.Authorization`;ui-mac 每次 fork 把这份定义经 `ALPHA_CLOUD_MCP_DEF` 交给 ext,ext 的 `installCloudMcp()` 已经在解析那个 `{file:}` | `packages/ui-mac/src/main/alpha-config-injection.ts:386-391`、`cloud-sidecar-config.ts`、`packages/ext/src/cloud-websearch-kill.ts` `resolveFileRefs` |
+| 引擎访问云端用的是哪份凭据 | 登录铸的 `mcp_access` token,以 `{file:…CODEPUPPY_MCP_TOKEN}` 引用装进云 MCP 定义的 `headers.Authorization`;ui-mac 每次 fork 把这份定义经 `CODEPUPPY_CLOUD_MCP_DEF` 交给 ext,ext 的 `installCloudMcp()` 已经在解析那个 `{file:}` | `packages/ui-mac/src/main/codepuppy-config-injection.ts:386-391`、`cloud-sidecar-config.ts`、`packages/ext/src/cloud-websearch-kill.ts` `resolveFileRefs` |
 | gateway 的识图路由收不收这份凭据 | 收。`POST /v1/tools/vision` 是封印路由,`authTenant` 对**这一条**额外带 `FORWARDED_MCP_AUTH_OPTS`,动作判定额外接受 `cloud.dispatch`;云 MCP 的 `cloud_vision` 本身也只是把调用方的 Authorization **原样转发**到同一条路由 | alpha-platform `packages/gateway/src/worker.ts` visionHandler、`cloud-mcp.ts` mount(`cloud_vision`) |
-| 主机从哪来 | `ALPHA_BASE_URL` = `<platform>/v1`(`alpha-auth.ts:301`),platform 就是 gateway 主机(`shared/alpha-config.ts:30`);识图 URL = 它的 origin + `/v1/tools/vision` | `packages/ext/src/cloud-vision.ts` `cloudVisionEndpoint` |
+| 主机从哪来 | `CODEPUPPY_BASE_URL` = `<platform>/v1`(`codepuppy-auth.ts:301`),platform 就是 gateway 主机(`shared/codepuppy-config.ts:30`);识图 URL = 它的 origin + `/v1/tools/vision` | `packages/ext/src/cloud-vision.ts` `cloudVisionEndpoint` |
 | 凭据何时读 | **每次调用现读文件**(令牌续期会重写文件;引擎装配置时只解析一次,ext 比它新) | `cloudVisionAccess` |
 
-结论:自动转写用的**就是**引擎经 MCP 访问云端的那份凭据,不另铸、不回退到 `ALPHA_CLOUD_TOKEN` / `ALPHA_API_KEY`。
+结论:自动转写用的**就是**引擎经 MCP 访问云端的那份凭据,不另铸、不回退到 `CODEPUPPY_CLOUD_TOKEN` / `CODEPUPPY_API_KEY`。
 
-「云端是否可用」与 `alpha-code#1411` / PR `#1442` 同一根轴(`platformPays = ALPHA_CLOUD_MCP_URL && ALPHA_MCP_TOKEN 密钥文件在场`;
+「云端是否可用」与 `alpha-code#1411` / PR `#1442` 同一根轴(`platformPays = CODEPUPPY_CLOUD_MCP_URL && CODEPUPPY_MCP_TOKEN 密钥文件在场`;
 桌面侧「登录+有额度」与「登录+无额度」不可区分,额度只在调用时以 402 出面):
 
 | 状态 | 判据 | 用户看到的话(登记项,见 §4) |
 | --- | --- | --- |
-| 未登录 / BYOK | `ALPHA_BASE_URL` 或 `ALPHA_CLOUD_MCP_DEF` 缺席,或定义不带 `headers.Authorization`(密钥文件缺席时 ui-mac 给的 `enabled:false` 形状) | 尚未登录 Code Puppy 账号(**不出网**) |
+| 未登录 / BYOK | `CODEPUPPY_BASE_URL` 或 `CODEPUPPY_CLOUD_MCP_DEF` 缺席,或定义不带 `headers.Authorization`(密钥文件缺席时 ui-mac 给的 `enabled:false` 形状) | 尚未登录 Code Puppy 账号(**不出网**) |
 | 凭据文件读不到 | `{file:}` 解析抛 | 登录凭据无效或已过期(**不出网**) |
 | 401 / 403 | gateway | 同上 |
 | 402 | gateway preauth | 账户额度不足 |
@@ -70,7 +70,7 @@ Model;`chat.message` 只给 `{providerID, modelID}`,经 `client.provider.list()`
    读到过的(路径 / 文件名)图 —— Read 那一步走的就是引擎自己的权限判定;没读过的路径得到一句「先用 Read 读它」的工具错误。
 3. **压缩用引擎自己那份 photon(同一个 patched 包、同一份 wasm)**,不引第二套图像库、不调 `sips`。ext 是自包含 bundle
    (ADR-006),wasm 经 `with { type: "file" }` 随 bundle 落到 `dist/`,electron-builder 把 `*.wasm` 与 `plugin.js` 一起
-   复制到 `<resources>/alpha-ext/`。实测(2026-09-24):Bun.build 产物在系统 Node 22.22 与 Electron 42.3.3 的内嵌
+   复制到 `<resources>/codepuppy-ext/`。实测(2026-09-24):Bun.build 产物在系统 Node 22.22 与 Electron 42.3.3 的内嵌
    Node 24.15 下同样跑通(3000×2000 → 1280×853 JPEG,FF D8);纯噪声 3000×2000 在长边 1280 下靠低质量档就能进 256 KiB。
 
 ### 3a. m4 的地面真相(2026-09-24 探针,AI SDK 层)
@@ -98,7 +98,7 @@ Model;`chat.message` 只给 `{providerID, modelID}`,经 `client.provider.list()`
 
 | 判据 | 在哪 |
 | --- | --- |
-| 看不了图 ⇒ 转写且只调一次(哈希去重、同消息两张同图一次、在途去重);体恒为 `{image,mime,model:"qwen",fallback_on_refusal:false}`;bearer 是云 MCP 那份;能看图 ⇒ 零调用 parts 逐字不变 | [`cloud-vision.test.ts`](../../packages/ext/src/cloud-vision.test.ts)(真 AlphaExt 钩子 + 真 HTTP 到桩 gateway + 真 photon) |
+| 看不了图 ⇒ 转写且只调一次(哈希去重、同消息两张同图一次、在途去重);体恒为 `{image,mime,model:"qwen",fallback_on_refusal:false}`;bearer 是云 MCP 那份;能看图 ⇒ 零调用 parts 逐字不变 | [`cloud-vision.test.ts`](../../packages/ext/src/cloud-vision.test.ts)(真 CodePuppyExt 钩子 + 真 HTTP 到桩 gateway + 真 photon) |
 | `tool.execute.before` 原地改写(同一 args 对象)、引用解析、找不到即抛、别的工具不动、base64 本体也压;**追问帧整包 ≤ 262144**(一张按直打上限压完落在 196–256 KiB 的图 + 2000 字 question,按 SDK 帧形序列化)| 同上 |
 | `content_refused`:自动转写那条路的失败块;追问那条路从引擎真 `McpCatalog.convertTool` 的抛错出发(isError ⇒ throw ⇒ 部件 `status:"error"`)⇒ 回放副本换成登记句;云端不可用十一格(402 / 401 / 429 / 502 / 504 / 413 / 三种未登录 / 凭据文件 / 连不上),未登录三格**不出网** | 同上 |
 | Read 附件转写 + 按路径追问;messages.transform 剔图 + 登记簿重建;**重启后同图不再计费**(新实例经 SDK 恢复 / 经 messages.transform 恢复两条路,存下来的图换成缩过的小图仍命中);无标记的历史不恢复正文(反向臂);m4 两半;定界符替换;system.transform 两句逐字 | 同上 |
@@ -114,4 +114,4 @@ Model;`chat.message` 只给 `{providerID, modelID}`,经 `client.provider.list()`
 - 子会话(task 工具起的)有自己的 sessionID,看不到父会话的图。
 - `chat.message` 里的识图是同步等的(线上默认档约 10 s/张,多张并行):用户这条消息要等识图回来才落库 —— 与上游 `!file`
   读文件的行为同形,没有另开异步通道。
-- 打包版真机(打包 `.app` 里 wasm 真的落到 `<resources>/alpha-ext/`、真模型真 gateway)没有在本票跑,归 REQ-228 的 VERIFY 子票。
+- 打包版真机(打包 `.app` 里 wasm 真的落到 `<resources>/codepuppy-ext/`、真模型真 gateway)没有在本票跑,归 REQ-228 的 VERIFY 子票。

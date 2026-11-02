@@ -16,7 +16,7 @@ review_after: 2026-10-15
 
 ## 1. 通道路由(main-owned,冻结快照)
 
-- 通道 = 冻结环境快照的 `registryChannel`(`alpha-environment.ts`:prod→`stable`、
+- 通道 = 冻结环境快照的 `registryChannel`(`codepuppy-environment.ts`:prod→`stable`、
   beta→`preview`、dev→`dev`),启动期一次解析,运行期不可变;renderer 无输入权
   (唯一 IPC `ext-remote-catalog` 不收参数)。
 - `refreshRemoteCatalog(userDataPath, channel, deps?)` 的 `channel` **必填无缺省** ——

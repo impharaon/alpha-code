@@ -1,4 +1,4 @@
-  /* ── alpha-ui tokens(与 packages/ui-mac tokens.css 逐值一致,mockup 保真)── */
+  /* ── codepuppy-ui tokens(与 packages/ui-mac tokens.css 逐值一致,mockup 保真)── */
   :root {
     --a-bg-canvas:#ffffff; --a-bg-subtle:#f6f7f9; --a-bg-muted:#eceef1;
     --a-surface:#ffffff; --a-border-faint:#eef0f3; --a-border:#e4e6ea; --a-border-strong:#ced2d9;

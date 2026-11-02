@@ -35,10 +35,10 @@ except an explicit user disconnect may remove one.**
 
 | Fact | Where |
 | --- | --- |
-| Store location | `<userData>/alpha-connections/records.json` (0600, atomic whole-file write) |
-| Independence guard | `assertAlphaConnectionStoreIndependenceV1` in `packages/ui-mac/src/main/alpha-connection-store.ts` |
-| Only deletion path | `removeAlphaConnectionRecordV1`, reached only from the coordinator's `disconnect` |
-| Uninstall behaviour | `releaseAlphaConnectionBindingsV1` — drops the component from `packageBindings`, keeps the record |
+| Store location | `<userData>/codepuppy-connections/records.json` (0600, atomic whole-file write) |
+| Independence guard | `assertCodePuppyConnectionStoreIndependenceV1` in `packages/ui-mac/src/main/codepuppy-connection-store.ts` |
+| Only deletion path | `removeCodePuppyConnectionRecordV1`, reached only from the coordinator's `disconnect` |
+| Uninstall behaviour | `releaseCodePuppyConnectionBindingsV1` — drops the component from `packageBindings`, keeps the record |
 
 The guard refuses every read and write when the resolved store directory is
 inside the extension root. That is not defensive decoration: a store under that
@@ -57,7 +57,7 @@ unavailable rather than pretending to work.
 (`^[a-z][a-z0-9-]{0,63}$`, frozen in
 `shared/host-extension-package-contract/decoder.ts`). Main's only permitted
 operation on that string is an exact-key lookup in the static allowlist
-`ALPHA_CONNECTION_HANDLERS_V1`. No prefix test, no namespace split, no "ids
+`CODEPUPPY_CONNECTION_HANDLERS_V1`. No prefix test, no namespace split, no "ids
 shaped like this are ours".
 
 This is the class documented in
@@ -74,7 +74,7 @@ package resolves that way — that is the shipped fail-closed default, not a stu
 
 A handler is App code, but it speaks to a third party, so what it returns is
 decoded through an exact key allowlist
-(`decodeAlphaConnectionResultV1`) before any of it reaches a record. Unknown keys
+(`decodeCodePuppyConnectionResultV1`) before any of it reaches a record. Unknown keys
 are refused rather than dropped: dropping would let a handler ship a credential
 that this build happens not to persist and a later one does. The record can carry
 a service id, an account label, a reuse key and an expiry, and there is no field
@@ -82,7 +82,7 @@ in it for a token.
 
 ## Evidence
 
-`packages/ui-mac/src/main/package-alpha-connection.test.ts`, registered in
+`packages/ui-mac/src/main/package-codepuppy-connection.test.ts`, registered in
 `scripts/gate-files.tsv`. It pins the production allowlist as an exact key set,
 asserts the unknown-handler answer costs zero handler calls, drives the real
 admission coordinator to prove a required connection that is not ready reaches

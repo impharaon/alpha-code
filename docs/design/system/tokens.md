@@ -11,10 +11,10 @@ review_after: 2027-01-16
 # Design tokens
 
 Every token is a CSS custom property named `--a-<category>-<role>`, defined in
-[`tokens.css`](../../../packages/ui-mac/src/renderer/alpha-ui/tokens.css) — the
+[`tokens.css`](../../../packages/ui-mac/src/renderer/codepuppy-ui/tokens.css) — the
 source of truth. This is the index; colors are detailed in [`color.md`](color.md).
 
-**Rule:** alpha-ui components style with `var(--a-*)` only. A value that isn't a
+**Rule:** codepuppy-ui components style with `var(--a-*)` only. A value that isn't a
 token yet gets **added to `tokens.css`** (in all of `:root`, the dark block, and
 the `prefers-color-scheme` block if color) — never inlined at the call site.
 
@@ -51,6 +51,6 @@ Drafts: [`2026-10-30-req236-image-card/`](../2026-10-30-req236-image-card/frame.
 ## Theming
 
 Dark is keyed off `document.documentElement.dataset.colorScheme`
-(`data-color-scheme`), set by `@opencode-ai/ui`'s theme context — so alpha-ui
+(`data-color-scheme`), set by `@opencode-ai/ui`'s theme context — so codepuppy-ui
 follows the app's light/dark toggle. `prefers-color-scheme` applies only when the
 app hasn't pinned a scheme. Do not add a parallel dark mechanism.

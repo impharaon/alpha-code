@@ -6,7 +6,7 @@
 ## 载体
 - **`frontend-pin.lock`** — 被跟随的上游 SHA(`pin=<sha>`)。`packages/{app,ui}` 恒等于 pin 的上游态 +
   下述补丁。
-- **`alpha-patches/alpha-frontend.patch`** — alpha 前端定制相对 pin 的**完整 delta**(单文件,**唯一 SOT**)。
+- **`codepuppy-patches/codepuppy-frontend.patch`** — alpha 前端定制相对 pin 的**完整 delta**(单文件,**唯一 SOT**)。
   内容 = AppSurfaces typed surface seam(ADR-027)+ Settings/Recovery/Permission seam + `./surface/session`
   窄导出等。**改前端 seam = 改 `packages/{app,ui}` 后重生此补丁**(见下),不要手改本文件。
   **必须用 `git diff --binary` 生成**:`packages/app/vendor/*.tgz` 这类二进制在 pin 里不存在、却被
@@ -15,8 +15,8 @@
   context 行本就是「一个空格」,不是尾随空白(其描述内容的空白由 `packages/{app,ui}` 源头受检)。
 
 ## 日常 sync(自动,只进引擎)
-`sync-upstream.yml` 每次 sync 合并上游 dev 后,`apply_alpha_frontend_delta` 把 `packages/{app,ui}` 还原为
-`pin + alpha-frontend.patch`。补丁 3-way apply 失败(pin 与补丁漂移)→ loud-fail 阻断 sync,提示跑月更 bump。
+`sync-upstream.yml` 每次 sync 合并上游 dev 后,`apply_codepuppy_frontend_delta` 把 `packages/{app,ui}` 还原为
+`pin + codepuppy-frontend.patch`。补丁 3-way apply 失败(pin 与补丁漂移)→ loud-fail 阻断 sync,提示跑月更 bump。
 
 ## 月更 bump(升 pin,人门禁)—— 流程
 每月一次(或需要上游新前端修复时手动)把 pin 升到近期上游。
@@ -32,7 +32,7 @@ cd "$(git rev-parse --show-toplevel)"
 NEWPIN=$(git rev-parse upstream/dev)   # 或换成一个近期稳定上游 SHA
 git checkout "$NEWPIN" -- packages/app packages/ui
 echo "pin=$NEWPIN # $(date +%F)" > frontend/frontend-pin.lock
-git apply --3way --whitespace=nowarn frontend/alpha-patches/alpha-frontend.patch
+git apply --3way --whitespace=nowarn frontend/codepuppy-patches/codepuppy-frontend.patch
 ```
 
 **pin 必须写在 apply 之前**:`git checkout "$NEWPIN"` 之后树已经是新 pin 的上游态,lock 就该说这件事。
@@ -81,7 +81,7 @@ bun run --cwd packages/ext typecheck        # 0 错
 
 判据是「pin + 补丁重建出来的 `packages/{app,ui}` == **HEAD** 里的那两棵树」,由
 [`scripts/assert-frontend-patch-roundtrip.sh`](../scripts/assert-frontend-patch-roundtrip.sh) 执行。
-那个脚本同时是 `scripts/alpha-check.sh` 的第 `[2/10]` 步与 alpha-ci `upstream-guard` job 的一步 ——
+那个脚本同时是 `scripts/codepuppy-check.sh` 的第 `[2/10]` 步与 codepuppy-ci `upstream-guard` job 的一步 ——
 **这里跑的和门禁跑的是同一份字节**,不是两份会各自漂移的副本。`--binary` 不可省(见「载体」)。
 
 **补丁必须与源码改动进同一个提交**:判据锚在 HEAD(日常 sync 与上面块 1 重建的正是 HEAD 那棵树),
@@ -92,7 +92,7 @@ set -e
 cd "$(git rev-parse --show-toplevel)"
 PIN="$(sed -n 's/^pin=\([0-9a-f]\{7,40\}\).*/\1/p' frontend/frontend-pin.lock)"
 [ -n "$PIN" ] || { echo "frontend/frontend-pin.lock 缺 pin=<sha>"; exit 1; }
-git diff --binary "$PIN" -- packages/app packages/ui > frontend/alpha-patches/alpha-frontend.patch
+git diff --binary "$PIN" -- packages/app packages/ui > frontend/codepuppy-patches/codepuppy-frontend.patch
 # 提交范围必须钉死在这四条路径上:`git commit` **不带 pathspec 提交的是整个 index**,
 # 你手上任何无关的已暂存改动都会被裹进这条署名 chore(frontend) 的提交里 —— 月更 bump 走
 # 块 1→5 时,块 1 的 `git checkout $NEWPIN -- …` 就已经在 index 里留了东西。
@@ -102,9 +102,9 @@ git diff --binary "$PIN" -- packages/app packages/ui > frontend/alpha-patches/al
 # 干净树上这四条路径无改动时 `git commit` 以 1 退出("nothing to commit"),`set -e` 会让它在
 # 跑到最后那行自检**之前**中止 —— 所以先问一句有没有东西要提交;不用 `|| true` 吞掉 commit 的
 # 失败,那样真正的提交失败(钩子拒绝、pathspec 打错)也会被读成「没什么要提交」。
-if [ -n "$(git status --porcelain -- packages/app packages/ui frontend/alpha-patches/alpha-frontend.patch frontend/frontend-pin.lock)" ]; then
-  git add packages/app packages/ui frontend/alpha-patches/alpha-frontend.patch frontend/frontend-pin.lock
-  git commit --only packages/app packages/ui frontend/alpha-patches/alpha-frontend.patch frontend/frontend-pin.lock \
+if [ -n "$(git status --porcelain -- packages/app packages/ui frontend/codepuppy-patches/codepuppy-frontend.patch frontend/frontend-pin.lock)" ]; then
+  git add packages/app packages/ui frontend/codepuppy-patches/codepuppy-frontend.patch frontend/frontend-pin.lock
+  git commit --only packages/app packages/ui frontend/codepuppy-patches/codepuppy-frontend.patch frontend/frontend-pin.lock \
     -m "chore(frontend): regenerate alpha frontend SOT patch"
 else
   echo "  (这四条路径与 HEAD 一致,没有要提交的东西 —— 直接跑自检)"

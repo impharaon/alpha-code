@@ -1,0 +1,18 @@
+# 旧名例外登记表 —— alpha-code#1570
+#
+# 第一方路径上**每一处**仍然写着旧品牌名(alpha / code-puppy 一族)的命中的**唯一**清单。
+# 判官:packages/ui-mac/src/main/old-name-scan.test.ts,**双向**比对:
+#   · 扫描命中不在表里 ⇒ 红(新写进来的旧名被拦住)
+#   · 表里的行扫不到 ⇒ 红(旧名清掉而登记没删,表项不会变成僵尸)
+# 扫描面、旧名判据与范围排除写在判官文件抬头,不在这里另抄。
+#
+# 每行四列,TAB 分隔:<文件> <行号> <类别> <理由>
+# 类别(命名规范 governance/codepuppy-naming-standard.md §5 的固定枚举,外加 pending):
+#   historical        历史事实,或记录历史事实的注释
+#   third-party       第三方名称
+#   user-content      用户内容、测试夹具里模拟的用户内容
+#   upstream          上游 OpenCode 未接管的标识
+#   migration-source  一次性迁移代码里用来识别旧名的常量;随迁移代码一起删除
+#   retired-guard     认出已退役旧路径并拒绝使用它的守卫字符串
+#   external-anchor   外部注册或别的仓定义的名字(GitHub 仓库名、Cloudflare 资源、别的仓的契约取值)
+#   pending           由在途票接手改名的旧名;理由里必须写接手票号,接手票合入后「登记 ⊆ 命中」会逼它删行

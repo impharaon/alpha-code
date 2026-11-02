@@ -38,7 +38,7 @@ const classificationGateIsNotADud: MustBeEmpty<Unclassified<Exclude<ProvidedKey,
 void classificationGateIsNotADud
 
 // 反向:preload 删掉某个能力后,登记表里不许留僵尸条目(单向的表会变成僵尸,见
-// scripts/alpha-path-residue.tsv 抬头同一条理由)。
+// scripts/old-name-exceptions.tsv 抬头同一条理由)。
 const noZombieAbsentEntries: MustBeEmpty<Exclude<AbsentOnPurposeKey, keyof ElectronAPI>> = true
 void noZombieAbsentEntries
 

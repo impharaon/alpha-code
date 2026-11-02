@@ -1,6 +1,6 @@
 import {
   decodePackageEnvelopeHeaderV1,
-  type AlphaPackageEnvelopeV1,
+  type CodePuppyPackageEnvelopeV1,
   type PackageComponentSkipReasonV1,
   type PackageProfilePayloadDecodeV1,
   type PackageProfilePayloadV1,
@@ -14,7 +14,7 @@ import {
 
 export type SyntheticDecoderEffectsV1<Plan> = {
   fetchPayload: (
-    envelope: AlphaPackageEnvelopeV1,
+    envelope: CodePuppyPackageEnvelopeV1,
     component: PackageSupportedComponentV1,
   ) => Promise<Uint8Array>
   decodePayload: (
@@ -42,7 +42,7 @@ export type SyntheticDecoderResultV1<Plan> =
   | {
       ok: true
       status: "accepted"
-      envelope: AlphaPackageEnvelopeV1
+      envelope: CodePuppyPackageEnvelopeV1
       /** Root first, then every supported leaf in envelope order. */
       components: SyntheticComponentResultV1<Plan>[]
       /** Curated components this host cannot serve. They reach no effect at all. */
@@ -59,7 +59,7 @@ export type SyntheticDecoderResultV1<Plan> =
        * returns the header decode result verbatim; omitting it made the published type narrower
        * than the runtime shape.
        */
-      presentation?: AlphaPackageEnvelopeV1["presentation"]
+      presentation?: CodePuppyPackageEnvelopeV1["presentation"]
     }
 
 /**

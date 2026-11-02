@@ -13,7 +13,7 @@
 //        · cloud 例外恒 enabled(无本地运行面,receipts-only,UI 无启停开关 —— 默认关是
 //          无法启用的死态;Codex r1 Major 2)
 //        · 非目录 intake(imported/created/…)= enabled(用户显式选择的自有内容)
-//        · 目录安装 source==="alpha"(Alpha 自产)= enabled;其余一律 disabled —— 含
+//        · 目录安装 source==="codepuppy"(Code Puppy 自产)= enabled;其余一律 disabled —— 含
 //          "official":官方出品 ≠ 我们审过,供应链语义按第三方(owner 拍板 Q1 = A)
 //   3. factory 注入零安装不落账,天然绕过。
 // activationPolicy 只能来自 decodeEntryCuration 采信后的 curation(合同 §7.1 行 5);
@@ -65,5 +65,5 @@ export function initialDesiredState(intake: FreshIntakeFacts): "enabled" | "disa
   // 的 origin 逐字相同。排在下面那条「非目录 intake = enabled」之前,否则永远轮不到它。
   if (intake.localPackage === true) return "disabled"
   if (intake.origin !== "catalog") return "enabled"
-  return intake.source === "alpha" ? "enabled" : "disabled"
+  return intake.source === "codepuppy" ? "enabled" : "disabled"
 }

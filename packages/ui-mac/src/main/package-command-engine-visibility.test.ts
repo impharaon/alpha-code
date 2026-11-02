@@ -18,7 +18,7 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import type { AlphaPackageEnvelopeV1 } from "../shared/host-extension-package-contract/decoder"
+import type { CodePuppyPackageEnvelopeV1 } from "../shared/host-extension-package-contract/decoder"
 import type { PackageAdmissionPreviewV1 } from "../shared/package-admission"
 import { createPackageAdmissionCoordinator } from "./package-admission"
 import { removeCommandEntry } from "./ext-config"
@@ -66,7 +66,7 @@ function commandFixture(
     },
   }
   const payloadBytes = canonicalBytes(payload)
-  const envelope: AlphaPackageEnvelopeV1 = {
+  const envelope: CodePuppyPackageEnvelopeV1 = {
     schema: "codepuppy.host-extension-package.v1",
     prelude: { packageId, version: "1.0.0" },
     presentation: { displayName: "command probe", description: "req840 engine visibility fixture" },

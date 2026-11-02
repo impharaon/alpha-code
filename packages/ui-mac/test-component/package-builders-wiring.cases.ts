@@ -33,7 +33,7 @@ const secretCanary = "REQ128_705_WIRING_SECRET_4a71c9"
 const agentPayload = {
   schema: "codepuppy.host-extension-package.payload.agent.v1",
   behavior: {
-    targetDir: "alpha-agents",
+    targetDir: "codepuppy-agents",
     asset: {
       sha256: sha(agentAssetBytes),
       bytes: agentAssetBytes.byteLength,

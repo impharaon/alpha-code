@@ -17,7 +17,7 @@
 import { createHash } from "node:crypto"
 import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
-import type { AlphaPackageEnvelopeV1 } from "../src/shared/host-extension-package-contract/decoder"
+import type { CodePuppyPackageEnvelopeV1 } from "../src/shared/host-extension-package-contract/decoder"
 
 export const PLUGIN_KIT_PACKAGE_ID = "package:plugin-kit"
 export const PLUGIN_KIT_VERSION = "1.0.0"
@@ -65,7 +65,7 @@ const markdownPayload = (schema: string, targetDir: string, asset: Uint8Array, u
 const skillPayloadOf = (asset: Uint8Array, url: string) => ({
   schema: "codepuppy.host-extension-package.payload.skill.v1",
   behavior: {
-    targetDir: "alpha-skills",
+    targetDir: "codepuppy-skills",
     files: [{ path: "SKILL.md", sha256: sha(asset), bytes: asset.byteLength, url }],
   },
 })
@@ -100,12 +100,12 @@ const componentOf = (
     sha256: sha(payloadBytes),
     bytes: payloadBytes.byteLength,
     mediaType: `application/vnd.codepuppy.host-extension-package.${profileId}.v1+json`,
-    url: `https://alphacodeone.com/catalog/assets/${id.replace(":", ".")}/1.0.0/alpha-package/payload.json`,
+    url: `https://alphacodeone.com/catalog/assets/${id.replace(":", ".")}/1.0.0/codepuppy-package/payload.json`,
   },
 })
 
 export type PluginKitFixture = {
-  envelope: AlphaPackageEnvelopeV1
+  envelope: CodePuppyPackageEnvelopeV1
   /** payloadRef.sha256 → 字节(`evaluatePackageForHost` 的 payload 取用)。 */
   payloadByDigest: Map<string, Uint8Array>
   /** 资产 url → 字节(admission 的资产取用)。 */
@@ -139,7 +139,7 @@ export function pluginKitFixture(options?: {
 
   const agentPayload = markdownPayload(
     "codepuppy.host-extension-package.payload.agent.v1",
-    "alpha-agents",
+    "codepuppy-agents",
     agentAsset,
     "https://alphacodeone.com/catalog/assets/agent.plugin-kit-root/1.0.0/AGENT.md",
   )
@@ -207,7 +207,7 @@ export function pluginKitFixture(options?: {
     root: ROOT_AGENT_ID,
     components,
     capabilities: [...new Set(components.flatMap((component) => component.capabilities))].sort(),
-  } as unknown as AlphaPackageEnvelopeV1
+  } as unknown as CodePuppyPackageEnvelopeV1
 
   return {
     envelope,

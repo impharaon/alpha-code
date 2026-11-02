@@ -1,4 +1,4 @@
-// alpha 自有(住在上游包目录里,`origin/dev` 从来没有过这条路径;basename `alpha-` 满足
+// Code Puppy 自有(住在上游包目录里,`origin/dev` 从来没有过这条路径;basename `codepuppy-` 满足
 // ADR-043 谓词的因子②)。north-star:codepuppy-owned
 //
 // `#793` 桌面半场:让**根上用 `oneOf`/`anyOf` 表达分支**的 MCP 工具,广播给模型的 schema 自洽。

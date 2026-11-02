@@ -6,7 +6,7 @@
 import type { CatalogPackageViewV1 } from "../../shared/catalog-package-view"
 
 export type CatalogType = "mcp" | "skill" | "plugin" | "bundle" | "agent" | "cloud"
-export type CatalogSource = "official" | "community" | "alpha" | "user"
+export type CatalogSource = "official" | "community" | "codepuppy" | "user"
 
 /** opencode ConfigV2.MCP.Local — the object passed to sdk.mcp.add for a local (stdio) server. */
 export interface McpLocalConfig {
@@ -43,7 +43,7 @@ export interface SkillInstallSpec {
   source: "builtin" | "remote"
   builtinAssetKey?: string
   remoteIndexUrl?: string
-  targetDir: "alpha-skills" | "global"
+  targetDir: "codepuppy-skills" | "global"
   /** Unverified claim carried from the catalog — surfaced as 「待核实」 on the detail page (D5). */
   _verify?: string
 }

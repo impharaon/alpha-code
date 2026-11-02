@@ -84,7 +84,7 @@ describe("REQ-133 Alpha Office connector registry and stdio safety", () => {
   const config = (format: "word" | "excel" | "powerpoint" | "pdf") => ({
     type: "local",
     command: codepuppyOfficeInstallCommand(format).map((argument) =>
-      argument.replace("{alphaResources}", resources).replace("{workspace}", workspace),
+      argument.replace("{codepuppyResources}", resources).replace("{workspace}", workspace),
     ),
   })
 
@@ -98,8 +98,8 @@ describe("REQ-133 Alpha Office connector registry and stdio safety", () => {
     // #1564 AC1:随包解释器(isolated、不写字节码)+ 随包 server,没有 uv、没有首次下载;四种格式只差格式名。
     for (const format of ["word", "excel", "powerpoint", "pdf"] as const)
       expect(codepuppyOfficeInstallCommand(format)).toEqual([
-        "{alphaResources}/office-runtime/bin/python3", "-I", "-B",
-        "{alphaResources}/office-mcp/server.py", format, "{workspace}",
+        "{codepuppyResources}/office-runtime/bin/python3", "-I", "-B",
+        "{codepuppyResources}/office-mcp/server.py", format, "{workspace}",
       ])
   })
 
@@ -110,7 +110,7 @@ describe("REQ-133 Alpha Office connector registry and stdio safety", () => {
       const marked = {
         ...server,
         command: codepuppyOfficeInstallCommand(connector.format).map((argument) =>
-          argument.replace("{alphaResources}", resources),
+          argument.replace("{codepuppyResources}", resources),
         ),
       }
       expect(checkCodePuppyOfficeMcpSafety(connector.name, marked, WORKSPACE_MARKER, resources)).toEqual({ ok: true })
@@ -131,7 +131,7 @@ describe("REQ-133 Alpha Office connector registry and stdio safety", () => {
           {
             ...config(connector.format),
             command: codepuppyOfficeInstallCommand(connector.format).map((argument) =>
-              argument.replace("{alphaResources}", resources).replace("{workspace}", "prefix-{workspace}"),
+              argument.replace("{codepuppyResources}", resources).replace("{workspace}", "prefix-{workspace}"),
             ),
           },
           "prefix-{workspace}",

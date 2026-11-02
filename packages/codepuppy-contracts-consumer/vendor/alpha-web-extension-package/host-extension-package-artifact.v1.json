@@ -1,26 +1,26 @@
 {
   "artifactPath": "packages/ui-mac/src/shared/host-extension-package-contract",
-  "artifactSha256": "6aabd15c98de1f6111dc7b2079b693b5921f5b8df90437317835b6db000eb8ea",
+  "artifactSha256": "0af4d2fbf62755e3510c7dba1ddca381d1b436e2903d47c5261a21ed91873437",
   "files": [
     {
-      "bytes": 20435,
+      "bytes": 20455,
       "path": "CONTRACT.md",
-      "sha256": "f9b9d978bf0938146ed7693f8cafc99f7f3c570ddb6d7b9fd8ab3b7cd15d61f0"
+      "sha256": "dea5eeecd9ead5ea98d9f2bf4a595c40cabf584ab27e0cc653a42675ca857e06"
     },
     {
-      "bytes": 5714,
-      "path": "alpha-package-envelope-v1.schema.json",
-      "sha256": "b60e1014fe442f4c1ad420fee2c3bb34122c1634925de8dcbdd3ac51bbb5eeea"
+      "bytes": 5726,
+      "path": "codepuppy-package-envelope-v1.schema.json",
+      "sha256": "908866b35633401763c88e24ddf9cd193e884b0503a73ad3d6fe2aee3736d0d3"
     },
     {
-      "bytes": 71489,
+      "bytes": 71585,
       "path": "decoder.ts",
-      "sha256": "437ec350058c4a24384fe9e2305e5e4507318afcc73944afe4a870dce861636e"
+      "sha256": "9ba24567222a81881e5be91925bfa175330cb295e50c5e60e9684219e1ebd2f8"
     },
     {
-      "bytes": 20410,
+      "bytes": 20434,
       "path": "generate-artifact.ts",
-      "sha256": "91320364b98d811614b6d6cff7895a1416706732079c00c2fe74c1d0e257634e"
+      "sha256": "b72f493103ce877b5fb55e9af5015e01d587d227c6dc49904bf2c9bd76472d73"
     },
     {
       "bytes": 2505,
@@ -28,9 +28,9 @@
       "sha256": "d17f4cbbf0bae0fd7acd71e2f792c0b05a25b01f472d63d963ac5cb903493005"
     },
     {
-      "bytes": 1373,
+      "bytes": 1377,
       "path": "profiles/agent.v1.schema.json",
-      "sha256": "7de342050c3a2a4648ebeb28eb00d34be2d5aa89b620b00028161864d17434e6"
+      "sha256": "62302d50dde171814d556681b040d0ff89522d651913822ee405cb5b9fb81b30"
     },
     {
       "bytes": 4237,
@@ -48,14 +48,14 @@
       "sha256": "161c4be64020bff0b9d2a5c55ae1320d30d1320f436553d5f26eef1351571d32"
     },
     {
-      "bytes": 3257,
+      "bytes": 3261,
       "path": "profiles/mcp-remote.v1.schema.json",
-      "sha256": "306c79db18576e3df7271a6321999bf854d496e62591fec880996e1ea7a11f16"
+      "sha256": "4f78b77c5fd575a64cd3ffd5ac0422c47f38b84c15a3a6942b3b30a1d6be9d81"
     },
     {
-      "bytes": 1546,
+      "bytes": 1550,
       "path": "profiles/skill.v1.schema.json",
-      "sha256": "150b075d847a5f8fa2506f823dca066a567c4ea244828e6bbdc38131a752b55c"
+      "sha256": "1845eba12abc3c1da7c084307c8e145d36768b15ac249600814932a7c8931195"
     },
     {
       "bytes": 5461,
@@ -63,14 +63,14 @@
       "sha256": "2329726b063a39d1d0a310f68fc72179114f46b09101f5eaa48c0e1ec2a8dc9a"
     },
     {
-      "bytes": 5109,
+      "bytes": 5125,
       "path": "synthetic-decoder.ts",
-      "sha256": "0b285fa5bd765d59a6a58f60b5c6b9c71024ff251309bb719d56fb3920fd3fc0"
+      "sha256": "8a316b97066b180fcb3b286e67936137ad3bd5fd0327340f625804383d4c1db0"
     },
     {
-      "bytes": 39317,
+      "bytes": 39357,
       "path": "testvectors/decoder-corpus.v1.json",
-      "sha256": "d87c2d05951b4da1e9e493bbdbb65c88efbaf3ed300912c65d8ad15ac2e63e7d"
+      "sha256": "e7d1ebb47215073377e4d4876caf56899360ce92fce90d7807d1cf8b2a8dee38"
     }
   ],
   "schema": "codepuppy.host-extension-package.artifact.v1"

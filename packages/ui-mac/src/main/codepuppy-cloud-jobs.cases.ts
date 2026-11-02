@@ -23,7 +23,7 @@ const purposeOf = (bearer: string): string => bearer.replace(/^Bearer tok\./, ""
 /** 每次 getAccessToken 请求的 purpose(按调用序)。用于判「有没有多要 / 要了通配」。 */
 const requested: RoutePurpose[] = []
 /** 每次出网请求的 (path, bearer, body)。body 用于断言重试的每一发带的是**同一个**幂等键。 */
-const wire: Array<{ path: string; bearer: string; body?: string }> = []
+const wire: Array<{ path: string; bearer: string; body?: string; headers?: Record<string, string> }> = []
 /** #400 注入的瞬态失败队列:每元素消费一次 —— "network" 抛(超时/断连形态),数字回该 HTTP 状态,
  *  对象回该状态 + 指定 body(#940:平台分类拒绝形态 `{ error, code }`)。 */
 const transientFailures: Array<"network" | "reset" | "dns" | number | { status: number; body: string }> = []
@@ -124,8 +124,9 @@ const bodyFor = (path: string): string =>
 globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
   const url = new URL(typeof input === "string" ? input : input.toString())
   const path = url.pathname
-  const bearer = String((init?.headers as Record<string, string> | undefined)?.authorization ?? "")
-  wire.push({ path, bearer, ...(typeof init?.body === "string" ? { body: init.body } : {}) })
+  const headers = (init?.headers as Record<string, string> | undefined) ?? {}
+  const bearer = String(headers.authorization ?? "")
+  wire.push({ path, bearer, headers, ...(typeof init?.body === "string" ? { body: init.body } : {}) })
   const injected = transientFailures.shift()
   if (injected === "network") throw new TypeError("fetch failed (injected transient)")
   // #1551 AC7:Node/undici 的真实形状 —— TypeError("fetch failed") + cause.code。
@@ -303,6 +304,15 @@ test("上传派发撞上分类拒绝 ⇒ 用户拿到的是平台的 code,不是
   expect(await jobs.dispatchExplicitCloudUpload(UPLOAD_INPUT)).toEqual({ error: "upload_reserved_input" })
   // 400 是判权/契约回答,不重试:恰好一次出网。
   expect(wire.length).toBe(1)
+})
+
+// alpha-web#283 AC6:同意凭据只走新请求头 —— 平台(alpha-platform#568)只认 x-codepuppy-upload-consent,旧头不并发。
+test("上传派发的同意凭据走 x-codepuppy-upload-consent,不再带旧品牌请求头", async () => {
+  wire.length = 0
+  await jobs.dispatchExplicitCloudUpload(UPLOAD_INPUT)
+  expect(wire.length).toBe(1)
+  expect(lastWire().headers?.["x-codepuppy-upload-consent"]).toBe(UPLOAD_INPUT.uploadConsent)
+  expect(Object.keys(lastWire().headers ?? {}).filter((name) => name.startsWith("x-alpha-"))).toEqual([])
 })
 
 test("对照臂:平台 400 无 code(或形状不认识)⇒ 保持 http-400,不猜", async () => {

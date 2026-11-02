@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { afterAll, expect, mock, test } from "bun:test"
 import type {
-  AlphaPackageEnvelopeV1,
+  CodePuppyPackageEnvelopeV1,
   PackageProfilePayloadV1,
 } from "../src/shared/host-extension-package-contract/decoder"
 import type { PackageAdmissionPreviewV1 } from "../src/shared/package-admission"
@@ -52,7 +52,7 @@ const envelope = {
     },
   ],
   capabilities: ["codepuppy.secret-prerequisite.v1"],
-} as unknown as AlphaPackageEnvelopeV1
+} as unknown as CodePuppyPackageEnvelopeV1
 const snapshotDigest = "6".repeat(64)
 const secretCanary = "REQ128_IPC_SECRET_64c3b7"
 let payloadFetches = 0

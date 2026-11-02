@@ -17,7 +17,7 @@ const copy = [
   ["packages/ui-mac/src/main/ext-fs-installer.ts", "if (!dir) return { ok: false, reason: \"refused: path escapes Code Puppy root\" }", 2],
   ["packages/ui-mac/src/main/ext-fs-installer.ts", "if (!destDir) return { ok: false, reason: \"refused: path escapes Code Puppy root\" }", 3],
   ["packages/ui-mac/src/main/ext-fs-installer.ts", "if (!candidate) return { ok: false, reason: \"refused: path escapes Code Puppy root\" }", 1],
-  ["packages/ui-mac/src/main/ext-install-planner.ts", "return { ok: false, reason: \"{alphaResources} is reserved for the bundled Code Puppy Office server entrypoints — refused\" }", 1],
+  ["packages/ui-mac/src/main/ext-install-planner.ts", "return { ok: false, reason: \"{codepuppyResources} is reserved for the bundled Code Puppy Office server entrypoints — refused\" }", 1],
   ["packages/ui-mac/src/main/ext-install-planner.ts", "reason: `entry ${entry.id} installs an engine plugin — Code Puppy no longer installs executable plugins into the engine (ADR-040); refusing`,", 1],
   ["packages/ui-mac/src/main/ext-install-planner.ts", "reason: `asset ${asset.id} is an engine plugin — Code Puppy no longer installs executable plugins into the engine (ADR-040); refusing`,", 1],
   ["packages/ui-mac/src/main/ext-mcp-policy.ts", "if (!connector) return { ok: false, reason: \"unknown Code Puppy Office connector mode (REQ-133 fail-closed)\" }", 1],

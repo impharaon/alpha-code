@@ -179,11 +179,11 @@
           "additionalProperties": false,
           "properties": {
             "kind": {
-              "const": "alpha-native"
+              "const": "codepuppy-native"
             },
             "publisher": {
               "enum": [
-                "alpha",
+                "codepuppy",
                 "official",
                 "community"
               ]

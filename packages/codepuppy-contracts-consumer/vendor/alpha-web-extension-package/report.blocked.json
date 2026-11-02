@@ -8,11 +8,11 @@
   ],
   "hostContract": {
     "artifactPath": "packages/ui-mac/src/shared/host-extension-package-contract",
-    "artifactSha256": "6aabd15c98de1f6111dc7b2079b693b5921f5b8df90437317835b6db000eb8ea",
-    "commit": "59d64b18522770d081294c784d22d3970f1ac358",
+    "artifactSha256": "0af4d2fbf62755e3510c7dba1ddca381d1b436e2903d47c5261a21ed91873437",
+    "commit": "e77cb02f3f8ecd42969333682fcaa4ceff16f27e",
     "repo": "jinjunnn/alpha-code"
   },
-  "inputSha256": "623f371b81804a0033be50dd651bee3c4c19dd95b56dbbeda2f2b6b877d0d8ee",
+  "inputSha256": "2755ce416842f8174c06b5e0b90f37653ce927de7c19497c3a5584157ea0568a",
   "packageId": "package:generic-remote-mcp",
   "schema": "codepuppy.package-compatibility-report.v1",
   "verdict": "blocked",

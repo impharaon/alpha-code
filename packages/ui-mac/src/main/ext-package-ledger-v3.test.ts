@@ -60,7 +60,7 @@ const claim = (kind: string, name: string, owners: string[]): PackageClaimV1 =>
 
 describe("REQ-128 #706 — package id 文法不是本模块发明的", () => {
   test("轴一:与合同 schema 的 pattern 逐字相同(prelude.packageId 与组件 id 同一条)", async () => {
-    const schema = (await Bun.file(resolve(CONTRACT_DIR, "alpha-package-envelope-v1.schema.json")).json()) as {
+    const schema = (await Bun.file(resolve(CONTRACT_DIR, "codepuppy-package-envelope-v1.schema.json")).json()) as {
       properties: {
         prelude: { properties: { packageId: { pattern: string } } }
         components: { items: { properties: { id: { pattern: string } } } }

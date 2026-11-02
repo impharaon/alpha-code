@@ -25,14 +25,14 @@ export type PresentRow = { labelKey: I18nKey; valueKeys?: I18nKey[]; value?: str
 
 // ── 值域 → i18n key(作者/甄选/分发/运行面/支持;未知值如实落 unknown,不猜)──────────────────
 
-/** 作者维:catalog source / user / unknown。sourceLabel 只覆盖 official/community/alpha,此处补 user/unknown。 */
+/** 作者维:catalog source / user / unknown。sourceLabel 只覆盖 official/community/codepuppy,此处补 user/unknown。 */
 export function authoredLabelKey(authored: string): I18nKey {
   switch (authored) {
     case "official":
       return "codepuppy.ext.partyOfficial"
     case "community":
       return "codepuppy.ext.partyCommunity"
-    case "alpha":
+    case "codepuppy":
       return "codepuppy.ext.partyCodePuppy"
     case "user":
       return "codepuppy.ext.partyUser"
@@ -41,9 +41,9 @@ export function authoredLabelKey(authored: string): I18nKey {
   }
 }
 
-/** 甄选维:alpha(经 Alpha 策展)/ 其余(未经甄选,自装)。 */
+/** 甄选维:codepuppy(经 Code Puppy 策展)/ 其余(未经甄选,自装)。 */
 export function curatedLabelKey(curated: string): I18nKey {
-  return curated === "alpha" ? "codepuppy.ext.curatedCodePuppy" : "codepuppy.ext.curatedUser"
+  return curated === "codepuppy" ? "codepuppy.ext.curatedCodePuppy" : "codepuppy.ext.curatedUser"
 }
 
 // 闭集维度用 Record 查表(Record<union, …> 键缺失即编译错,穷举保障与 switch 等价且免 consistent-return)。

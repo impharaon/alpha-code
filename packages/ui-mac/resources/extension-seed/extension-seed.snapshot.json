@@ -1,8 +1,8 @@
 {
   "v": 1,
-  "catalogVersion": "2026-11-01.1",
-  "lockSha256": "d1218a80fe0c866fa7ef42d3bb4fcee8b0f876c529f0e2f000d0d6eef7b4e13a",
-  "noticeSha256": "8ac4cc1d0ffb8e068888acdfefb36787c2b0d9bbefd382277a8bfb7dc5321211",
+  "catalogVersion": "2026-11-02.3",
+  "lockSha256": "b87de404ed545d585c6cbd6ec15c33ad526e1d124647e0e3f5db4ef73e50332f",
+  "noticeSha256": "98353e41fe27fd639fba3bbc248ca53baf8742db906e852ac6a631b6aaeab442",
   "blobCount": 98,
   "blobBytes": 5670569,
   "source": "alpha-web-checkout",

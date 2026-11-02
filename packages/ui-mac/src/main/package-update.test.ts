@@ -15,7 +15,7 @@ import { mkdirSync, mkdtempSync, existsSync, readFileSync, rmSync } from "node:f
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import type { AlphaPackageEnvelopeV1, PackageProfilePayloadV1 } from "../shared/host-extension-package-contract/decoder"
+import type { CodePuppyPackageEnvelopeV1, PackageProfilePayloadV1 } from "../shared/host-extension-package-contract/decoder"
 import type { PackageAdmissionPreviewV1 } from "../shared/package-admission"
 import { createPackageAdmissionCoordinator } from "./package-admission"
 import { bundleOwner } from "./ext-package-ledger-v3"
@@ -74,10 +74,10 @@ const sha = (bytes: Uint8Array): string => createHash("sha256").update(bytes).di
 const utf8 = (text: string): Uint8Array => new TextEncoder().encode(text)
 const payloadBytes = (payload: PackageProfilePayloadV1): Uint8Array => utf8(`${JSON.stringify(payload, null, 2)}\n`)
 
-type Corpus = { envelope: AlphaPackageEnvelopeV1; payloads: Record<string, PackageProfilePayloadV1> }
+type Corpus = { envelope: CodePuppyPackageEnvelopeV1; payloads: Record<string, PackageProfilePayloadV1> }
 
 type Generation = {
-  envelope: AlphaPackageEnvelopeV1
+  envelope: CodePuppyPackageEnvelopeV1
   payloadByDigest: Map<string, Uint8Array>
   assetByDigest: Map<string, Uint8Array>
 }

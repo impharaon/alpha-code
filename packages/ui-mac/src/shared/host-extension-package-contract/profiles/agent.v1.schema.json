@@ -22,7 +22,7 @@
       "properties": {
         "targetDir": {
           "enum": [
-            "alpha-agents",
+            "codepuppy-agents",
             "global"
           ]
         },

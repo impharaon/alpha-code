@@ -235,7 +235,7 @@ body[data-codepuppy-sidebar="open"] .codepuppy-ext-page {
   color: var(--a-warning);
   background: var(--a-warning-subtle);
 }
-.codepuppy-ext-chip[data-source="alpha"] {
+.codepuppy-ext-chip[data-source="codepuppy"] {
   color: var(--a-accent);
   background: var(--a-accent-subtle);
 }

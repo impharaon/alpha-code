@@ -267,7 +267,7 @@ child 为什么能活过它的 package —— 在
 
 | 键 | 形状 | 说明 |
 | --- | --- | --- |
-| `packageId` | 文法见宿主合同 `alpha-package-envelope-v1.schema.json` | 身份。**禁止从前缀反推结构**(`#737`) |
+| `packageId` | 文法见宿主合同 `codepuppy-package-envelope-v1.schema.json` | 身份。**禁止从前缀反推结构**(`#737`) |
 | `envelopeDigest` | `sha256:<64 hex>` | catalog 安装 = 已验签信封摘要;本地 Claude 插件包 = 本机对规范化载荷算的摘要。**格式相同、语义不同,不要拿它读 provenance**(provenance 只有 child record 的 `origin`) |
 | `displayName` | 可选,非空、≤128、单行 | **只管显示**,缺席合法(存量图),没有任何判定读它 |
 | `installedGraphDigest` | `sha256:<64 hex>` | 账本的**篡改闸**,也是 `graphBeforeDigest` / `graphAfterDigest` 携带的值 |

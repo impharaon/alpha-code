@@ -58,14 +58,14 @@ const excelEntry = {
   name: "codepuppy-excel",
   displayName: "Excel 表格读写",
   description: "读写 .xlsx",
-  source: "alpha",
+  source: "codepuppy",
   category: "office",
   license: "MIT",
   version: "1.0.0",
   installSpec: {
     kind: "mcp",
     mcpType: "local",
-    command: ["uv", "run", "--no-project", "--with", "openpyxl==3.1.5", "{alphaResources}/office-mcp/server.py", "excel", "{workspace}"],
+    command: ["uv", "run", "--no-project", "--with", "openpyxl==3.1.5", "{codepuppyResources}/office-mcp/server.py", "excel", "{workspace}"],
   },
 } as never
 
@@ -76,14 +76,14 @@ const wordEntry = {
   name: "codepuppy-word",
   displayName: "Word 文档读写",
   description: "读写 .docx",
-  source: "alpha",
+  source: "codepuppy",
   category: "office",
   license: "MIT",
   version: "1.0.0",
   installSpec: {
     kind: "mcp",
     mcpType: "local",
-    command: ["uv", "run", "--no-project", "--with", "python-docx==1.2.0", "{alphaResources}/office-mcp/server.py", "word", "{workspace}"],
+    command: ["uv", "run", "--no-project", "--with", "python-docx==1.2.0", "{codepuppyResources}/office-mcp/server.py", "word", "{workspace}"],
     requiredEnvVars: [],
     runtimeDep: ["uv"],
   },

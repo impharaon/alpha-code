@@ -102,7 +102,7 @@ function fixtureOf(): Fixture {
       ? {
           schema: "codepuppy.host-extension-package.payload.agent.v1",
           behavior: {
-            targetDir: "alpha-agents",
+            targetDir: "codepuppy-agents",
             asset: {
               sha256: sha(assets.get(url)!),
               bytes: assets.get(url)!.byteLength,
@@ -114,7 +114,7 @@ function fixtureOf(): Fixture {
       : {
           schema: "codepuppy.host-extension-package.payload.skill.v1",
           behavior: {
-            targetDir: "alpha-skills",
+            targetDir: "codepuppy-skills",
             files: [
               {
                 path: "SKILL.md",

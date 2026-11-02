@@ -51,7 +51,7 @@ export type ArtifactVerificationStatus = "verified" | "unverified" | "pending" |
 
 export interface ArtifactVerification {
   status: ArtifactVerificationStatus;
-  // MIME 鉴别器标识 + 版本(detectedMime 的出处;如 "alpha-magic/1")。缺省 = 未做 magic 检测。
+  // MIME 鉴别器标识 + 版本(detectedMime 的出处;如 "codepuppy-magic/1")。缺省 = 未做 magic 检测。
   detector?: string;
   // ISO-8601;digest 计算时刻(产出端回收时)。
   verifiedAt?: string;
@@ -118,7 +118,7 @@ export interface ArtifactMetaInput {
   size?: number;
   sha256?: string;       // 产出端回收时算得(→ verified)
   detectedMime?: string; // 产出端 magic 检测(→ detectedMime)
-  detector?: string;     // 检测器标识(缺省 "alpha-magic/1" 当 detectedMime 存在)
+  detector?: string;     // 检测器标识(缺省 "codepuppy-magic/1" 当 detectedMime 存在)
 }
 
 export function artifactFingerprint(a: ArtifactMetaInput): string {
@@ -166,7 +166,7 @@ export function deriveArtifactDescriptors(
       contentRef: { kind: "http-stream", url: `${base}/${id}/content`, auth: "bearer" },
       verification: {
         status: verified ? "verified" : "unverified",
-        ...(a.detectedMime ? { detector: a.detector ?? "alpha-magic/1" } : {}),
+        ...(a.detectedMime ? { detector: a.detector ?? "codepuppy-magic/1" } : {}),
         ...(verified && opts.createdAt ? { verifiedAt: opts.createdAt } : {}),
       },
       provenance: {

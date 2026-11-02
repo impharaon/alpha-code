@@ -68,8 +68,8 @@ function base() {
 function officeCommand(format: CodePuppyOfficeFormat, server: string, workspace: string = WORKSPACE_MARKER) {
   const resources = server.slice(0, -"/office-mcp/server.py".length)
   return codepuppyOfficeInstallCommand(format).map((argument) => {
-    if (argument === "{alphaResources}/office-runtime/bin/python3") return join(resources, "office-runtime", "bin", "python3")
-    if (argument === "{alphaResources}/office-mcp/server.py") return server
+    if (argument === "{codepuppyResources}/office-runtime/bin/python3") return join(resources, "office-runtime", "bin", "python3")
+    if (argument === "{codepuppyResources}/office-mcp/server.py") return server
     if (argument === WORKSPACE_MARKER) return workspace
     return argument
   })

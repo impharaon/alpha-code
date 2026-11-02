@@ -61,12 +61,12 @@ const ENTRIES = [
     name: "codepuppy-word",
     displayName: "Word 文档读写",
     description: "读取 .docx 的正文和结构，也能新建或改写文档。",
-    source: "alpha",
+    source: "codepuppy",
     category: "office",
     installSpec: {
       kind: "mcp",
       mcpType: "local",
-      command: ["uv", "run", "--no-project", "--with", "python-docx==1.2.0", "{alphaResources}/office-mcp/server.py", "word", "{workspace}"],
+      command: ["uv", "run", "--no-project", "--with", "python-docx==1.2.0", "{codepuppyResources}/office-mcp/server.py", "word", "{workspace}"],
       requiredEnvVars: [],
       runtimeDep: ["uv"],
     },
@@ -79,16 +79,16 @@ const ENTRIES = [
     description: "writes",
     source: "official",
     category: "writing",
-    installSpec: { kind: "skill", source: "builtin", builtinAssetKey: "writer", targetDir: "alpha-skills" },
+    installSpec: { kind: "skill", source: "builtin", builtinAssetKey: "writer", targetDir: "codepuppy-skills" },
   },
 ]
 
 // 审计 R1 Major 2:签名包(main 评估过的 CatalogPackageViewV1,随 remoteCatalog 进 renderer 的 catalog().packages)
 const PACKAGE_VIEW = {
-  catalogId: "package:alpha-first",
+  catalogId: "package:codepuppy-first",
   verdict: "compatible",
   action: { kind: "install", enabled: true, reasonCode: "package-compatible" },
-  components: [{ componentId: "skill:alpha-first", role: "root", required: true, included: true, skipReasonCode: null }],
+  components: [{ componentId: "skill:codepuppy-first", role: "root", required: true, included: true, skipReasonCode: null }],
   prerequisites: { status: "ready", items: [] },
   presentation: { displayName: "Code Puppy install check", description: "checks a package install", version: "1.0.0" },
 }
@@ -96,18 +96,18 @@ const PACKAGE_PREVIEW = {
   attemptId: "admission-attempt-1",
   binding: { snapshotDigest: "s".repeat(64), envelopeDigest: "e".repeat(64), graphDigest: "g".repeat(64) },
   plan: {
-    packageId: "package:alpha-first",
+    packageId: "package:codepuppy-first",
     version: "1.0.0",
     scope: { scope: "global" },
     items: [
       {
         included: true,
-        componentId: "skill:alpha-first",
+        componentId: "skill:codepuppy-first",
         role: "root",
         required: true,
-        key: "skill:alpha-first",
+        key: "skill:codepuppy-first",
         kind: "skill",
-        name: "alpha-first",
+        name: "codepuppy-first",
         manifestDigest: "m",
         payloadDigest: "p",
         capabilities: ["fs:read"],
@@ -116,7 +116,7 @@ const PACKAGE_PREVIEW = {
       },
     ],
   },
-  items: [{ key: "skill:alpha-first", previous: null, requested: ["fs:read"], added: ["fs:read"], removed: [], requiresConfirmation: true }],
+  items: [{ key: "skill:codepuppy-first", previous: null, requested: ["fs:read"], added: ["fs:read"], removed: [], requiresConfirmation: true }],
   update: { operation: "install", components: [] },
 }
 
@@ -304,23 +304,23 @@ describe("HubInstallWatcher:定制中心自己的确认框,先记阶段再回审
 
   // 审计 R1 Major 2:签名包也走定制中心**同一个**确认控制器(package 预览 + 授权 + 前置条件输入),出站是 installCatalogIntent
   // 那唯一一个出口;两次驱动都带 hubRequestId(首驱只取预览,main 不落定;确认后的那一趟由 main 记 committed)。
-  test("包:agent 请求 package:alpha-first ⇒ 先取预览再弹包确认框 ⇒ 确认 ⇒ 带授权与 hubRequestId 的第二趟 ⇒ once", async () => {
-    installScript = [{ ok: false, stage: "authorize", reason: "authorization required", packageAuthorization: PACKAGE_PREVIEW }, { ok: true, kind: "skill", name: "alpha-first" }]
+  test("包:agent 请求 package:codepuppy-first ⇒ 先取预览再弹包确认框 ⇒ 确认 ⇒ 带授权与 hubRequestId 的第二趟 ⇒ once", async () => {
+    installScript = [{ ok: false, stage: "authorize", reason: "authorization required", packageAuthorization: PACKAGE_PREVIEW }, { ok: true, kind: "skill", name: "codepuppy-first" }]
     mount()
     await flush()
-    runtime.ask(hubRequest("package:alpha-first", "req_hub_watcher_08"))
-    await until(() => !!document.querySelector("[data-package-authorization='package:alpha-first']"), "the package confirm box")
-    expect(document.querySelector("[data-plan-component='skill:alpha-first']")).not.toBeNull()
-    expect(intents[0]).toMatchObject({ catalogId: "package:alpha-first", hubRequestId: "req_hub_watcher_08", scope: { scope: "global" } })
+    runtime.ask(hubRequest("package:codepuppy-first", "req_hub_watcher_08"))
+    await until(() => !!document.querySelector("[data-package-authorization='package:codepuppy-first']"), "the package confirm box")
+    expect(document.querySelector("[data-plan-component='skill:codepuppy-first']")).not.toBeNull()
+    expect(intents[0]).toMatchObject({ catalogId: "package:codepuppy-first", hubRequestId: "req_hub_watcher_08", scope: { scope: "global" } })
     expect(intents[0]!.authorization).toBeUndefined()
     expect(replies()).toEqual([])
     button(zh["codepuppy.ext.confirmInstall"])!.click()
     await until(() => replies().length > 0, "the reply")
     expect(intents[1]).toMatchObject({
-      catalogId: "package:alpha-first",
+      catalogId: "package:codepuppy-first",
       attemptId: "admission-attempt-1",
       hubRequestId: "req_hub_watcher_08",
-      authorization: { confirmed: { "skill:alpha-first": ["fs:read"] }, binding: PACKAGE_PREVIEW.binding },
+      authorization: { confirmed: { "skill:codepuppy-first": ["fs:read"] }, binding: PACKAGE_PREVIEW.binding },
     })
     expect(timeline()).toEqual(["stage:confirming", "install", "stage:submitted", "install", "reply:once"])
     expect(stages.get("req_hub_watcher_08")).toMatchObject({ stage: "committed" })
@@ -413,10 +413,10 @@ const CELLS: Cell[] = [
     phase: "starting",
     event: "安装落定(包的取预览首驱直接落定)",
     run: async () => {
-      installScript = [{ ok: true, kind: "skill", name: "alpha-first" }]
+      installScript = [{ ok: true, kind: "skill", name: "codepuppy-first" }]
       mount()
       await flush()
-      runtime.ask(hubRequest("package:alpha-first", "req_cell_starting_settled"))
+      runtime.ask(hubRequest("package:codepuppy-first", "req_cell_starting_settled"))
       await until(() => replies().length > 0, "the reply")
       expect(timeline()).toEqual(["stage:confirming", "install", "reply:once"])
       expect(stages.get("req_cell_starting_settled")).toMatchObject({ stage: "committed" })
@@ -546,9 +546,9 @@ const CELLS: Cell[] = [
     run: async () => {
       installScript = [
         { ok: false, stage: "authorize", reason: "authorization required", packageAuthorization: PACKAGE_PREVIEW },
-        { ok: true, kind: "skill", name: "alpha-first" },
+        { ok: true, kind: "skill", name: "codepuppy-first" },
       ]
-      await openBox("package:alpha-first", "req_cell_executing_cancel_package")
+      await openBox("package:codepuppy-first", "req_cell_executing_cancel_package")
       const release = hold("submitted")
       button(zh["codepuppy.ext.confirmInstall"])!.click()
       await flush(4)

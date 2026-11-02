@@ -1,12 +1,12 @@
 {
   "schema": "codepuppy.extension-seed.lock.v1",
   "channel": "stable",
-  "catalogVersion": "2026-11-01.1",
+  "catalogVersion": "2026-11-02.3",
   "catalog": {
-    "sha256": "13833e777cecf1fa3f4257ab80869474ca185e23b78a89432b20379c6df9f36a",
-    "bytes": 86003,
-    "url": "https://codepuppy.cn/catalog/v1/releases/2026-11-01.1/catalog.json",
-    "sigUrl": "https://codepuppy.cn/catalog/v1/releases/2026-11-01.1/catalog.json.sig"
+    "sha256": "9389c090c2adab432985d4f7d2bd819ac72143f55c81d47fdf754bb62af1beb5",
+    "bytes": 86289,
+    "url": "https://codepuppy.cn/catalog/v1/releases/2026-11-02.3/catalog.json",
+    "sigUrl": "https://codepuppy.cn/catalog/v1/releases/2026-11-02.3/catalog.json.sig"
   },
   "supportedPlatforms": [
     "darwin-arm64",
@@ -26,7 +26,7 @@
       "type": "agent",
       "version": "1.0.0",
       "license": "MIT",
-      "source": "alpha",
+      "source": "codepuppy",
       "redistributable": true,
       "platforms": [
         "*"
@@ -632,7 +632,7 @@
       "type": "skill",
       "version": "1.0.0",
       "license": "MIT",
-      "source": "alpha",
+      "source": "codepuppy",
       "redistributable": true,
       "platforms": [
         "*"

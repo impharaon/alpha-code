@@ -1,5 +1,5 @@
 // REQ-128 production wiring gate. Since snapshot 2026-08-25.2 (ac#1132) the shipped bundled
-// Catalog carries its first real package instance (package:alpha-first); the bottom test pins that
+// Catalog carries its first real package instance (package:codepuppy-first); the bottom test pins that
 // premise against the real bytes. The packages below remain explicit host-owned constructions that
 // reuse the pinned alpha-web corpus's identity — a reachability harness for every path the single
 // real instance does not reach (blocked verdicts, skips, admission failures).
@@ -12,7 +12,7 @@ import { resolve } from "node:path"
 import { describe, expect, test } from "bun:test"
 import bundledCatalog from "../renderer/extensions/codepuppy-catalog.json"
 import { CATALOG_PACKAGE_REASON_CODES, type CatalogPackageViewV1 } from "../shared/catalog-package-view"
-import type { AlphaPackageEnvelopeV1, PackageProfilePayloadV1 } from "../shared/host-extension-package-contract/decoder"
+import type { CodePuppyPackageEnvelopeV1, PackageProfilePayloadV1 } from "../shared/host-extension-package-contract/decoder"
 import {
   evaluatePackageForHost,
   runCatalogInstallWithPackagePreflight,
@@ -39,7 +39,7 @@ const artifact = resolve(import.meta.dir, "../../../codepuppy-contracts-consumer
  */
 const vendoredProducerPackage = async (file: string) => {
   const compiled = (await Bun.file(resolve(artifact, file)).json()) as {
-    envelope: AlphaPackageEnvelopeV1
+    envelope: CodePuppyPackageEnvelopeV1
     payloads: Record<string, unknown>
     normalizedRecord: { root: { compatibility: { verdict: string } } }
   }
@@ -97,12 +97,12 @@ const producerPackage = async () => {
       },
     ],
     capabilities: ["codepuppy.secret-prerequisite.v1"],
-  } as unknown as AlphaPackageEnvelopeV1
+  } as unknown as CodePuppyPackageEnvelopeV1
   return { envelope, bytes }
 }
 
 // 变参:detail 那条闸必须能分辨「按 id 查找」与「恒取第一个」——单条夹具下两者不可分辨。
-const rawResult = (...envelopes: AlphaPackageEnvelopeV1[]): RemoteCatalogResult => ({
+const rawResult = (...envelopes: CodePuppyPackageEnvelopeV1[]): RemoteCatalogResult => ({
   source: "remote",
   catalog: { version: "2026-07-30", entries: [{}], packages: envelopes },
   version: "2026-07-30",
@@ -133,7 +133,7 @@ describe("package installability production wiring", () => {
     const calls: string[] = []
     const evaluator: PackageEvaluator = async (input, deps) => {
       calls.push("evaluatePackageForHost")
-      const id = (input as AlphaPackageEnvelopeV1).prelude?.packageId
+      const id = (input as CodePuppyPackageEnvelopeV1).prelude?.packageId
       return evaluatePackageForHost(input, {
         ...deps,
         fetchPayload: async () => payloadFor.get(id) ?? bytes,
@@ -515,8 +515,8 @@ describe("package installability production wiring", () => {
     const shape = validateCatalogPackageShape(bundledCatalog)
     if (!shape.ok) throw new Error(`bundled catalog failed the production shape gate: ${shape.error}`)
     expect(shape.packages.map((item) => `${item.prelude.packageId}@${item.prelude.version}`)).toEqual([
-      "package:alpha-first@1.0.0",
       "package:cloud-image@1.0.0",
+      "package:codepuppy-first@1.0.1",
       "package:dbhub-readonly@1.0.0",
       "package:github-official@1.0.0",
     ])

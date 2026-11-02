@@ -11,14 +11,14 @@ review_after: 2027-01-26
 # HostExtensionPackageV1
 
 This directory is the host-owned contract artifact for
-`AlphaPackageEnvelopeV1`. A consumer pins the repository commit, artifact path,
+`CodePuppyPackageEnvelopeV1`. A consumer pins the repository commit, artifact path,
 and aggregate `artifactSha256`, then verifies the paths, byte counts, and
 per-file SHA-256 values in
 `host-extension-package-artifact.v1.json`.
 
 ## Envelope
 
-`alpha-package-envelope-v1.schema.json` defines a bounded, shallow header. A
+`codepuppy-package-envelope-v1.schema.json` defines a bounded, shallow header. A
 package carries `1..32` components and names exactly one of them in the
 required `root` field. Each component carries only identity, required/optional
 disposition, its dependency list, profile gate data, compiler-derived
@@ -51,7 +51,7 @@ whitespace, and one trailing LF:
 `listing` is an optional envelope section carrying what a storefront needs to
 show before someone installs: who publishes this, what it does at length, what
 it looks like, and where its policies live. **Its field set is defined once, in
-`$defs.listing` of `alpha-package-envelope-v1.schema.json`, and nowhere else.**
+`$defs.listing` of `codepuppy-package-envelope-v1.schema.json`, and nowhere else.**
 The decoder imports that schema and derives its rule table from it at load time,
 so this document deliberately does not restate the field list — a prose copy
 would be the second authority the schema exists to prevent. Adding a field is a
@@ -277,14 +277,14 @@ kind.
 | --- | --- | --- | --- |
 | `"none"` | — | — | — |
 | `{kind: "mcp-oauth"}` | `prerequisiteId`, `required` | `label` | `codepuppy.mcp-oauth.v1` |
-| `{kind: "alpha-connection"}` | `prerequisiteId`, `required`, `connectionHandlerId` | `label` | `codepuppy.connection.v1` |
+| `{kind: "codepuppy-connection"}` | `prerequisiteId`, `required`, `connectionHandlerId` | `label` | `codepuppy.connection.v1` |
 
 `prerequisiteId` and `connectionHandlerId` both match `^[a-z][a-z0-9-]{0,63}$`.
 
 Five cross-field invariants belong to the decoder, and main must not restate
 them:
 
-1. `alpha-connection` requires `connectionHandlerId` (enforced by the schema).
+1. `codepuppy-connection` requires `connectionHandlerId` (enforced by the schema).
 2. `mcp-oauth` forbids an `Authorization` entry in `headersTemplate`,
    case-insensitively. Token injection belongs to the engine's token store, so a
    publisher shipping its own `Authorization` template is routing around it —

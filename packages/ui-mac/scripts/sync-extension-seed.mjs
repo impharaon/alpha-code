@@ -192,7 +192,7 @@ for (const asset of lock.assets ?? []) {
   if (JSON.stringify(entryPlatforms) !== JSON.stringify(lockPlatforms))
     die(`§2: "${asset.id}" platforms ${JSON.stringify(lockPlatforms)} ≠ payload ${JSON.stringify(entryPlatforms)}`)
   if (!SEED_LICENSE_ALLOWLIST.has(asset.license)) die(`S7: "${asset.id}" license ${asset.license} not in allowlist`)
-  if (asset.source !== "alpha" && (!Array.isArray(asset.licenseFiles) || asset.licenseFiles.length === 0))
+  if (asset.source !== "codepuppy" && (!Array.isArray(asset.licenseFiles) || asset.licenseFiles.length === 0))
     die(`S8: third-party "${asset.id}" without license text files`)
   if (!lockPlatforms.includes("*") && !lockPlatforms.some((p) => supported.has(p)))
     die(`S9: "${asset.id}" platforms disjoint from supportedPlatforms`)

@@ -160,7 +160,7 @@ describe("HostExtensionPackageV1 artifact", () => {
 
   test("schemas are strict, payload-ref-only, and bind every registered profile exactly", async () => {
     const envelope = (await Bun.file(
-      resolve(import.meta.dir, "alpha-package-envelope-v1.schema.json"),
+      resolve(import.meta.dir, "codepuppy-package-envelope-v1.schema.json"),
     ).json()) as Record<string, unknown>
     const properties = envelope.properties as Record<string, Record<string, unknown>>
     const component = ((properties.components.items as Record<string, unknown>).properties ??
@@ -205,7 +205,7 @@ describe("HostExtensionPackageV1 artifact", () => {
    *  字面量。挡的是「抬了 registry 忘了抬 schema」—— 宿主收得下 33 个,发布端 schema 却在 17 个就拒。 */
   test("the published envelope schema derives both component bounds from the registry", async () => {
     const envelope = (await Bun.file(
-      resolve(import.meta.dir, "alpha-package-envelope-v1.schema.json"),
+      resolve(import.meta.dir, "codepuppy-package-envelope-v1.schema.json"),
     ).json()) as {
       properties: {
         components: {
@@ -239,7 +239,7 @@ describe("HostExtensionPackageV1 artifact", () => {
    */
   test("the capability grammar is byte-identical in the decoder and the published envelope schema", async () => {
     const envelope = (await Bun.file(
-      resolve(import.meta.dir, "alpha-package-envelope-v1.schema.json"),
+      resolve(import.meta.dir, "codepuppy-package-envelope-v1.schema.json"),
     ).json()) as { $defs?: { capabilities?: { items?: { pattern?: string } } } }
     const published = envelope.$defs?.capabilities?.items?.pattern
     expect(published).toBe(PACKAGE_CAPABILITY_GRAMMAR_V1.source)
@@ -359,7 +359,7 @@ describe("HostExtensionPackageV1 artifact", () => {
    */
   test("the listing field set comes from the published schema and nowhere else", async () => {
     const envelope = (await Bun.file(
-      resolve(import.meta.dir, "alpha-package-envelope-v1.schema.json"),
+      resolve(import.meta.dir, "codepuppy-package-envelope-v1.schema.json"),
     ).json()) as {
       required: string[]
       properties: Record<string, { $ref?: string }>

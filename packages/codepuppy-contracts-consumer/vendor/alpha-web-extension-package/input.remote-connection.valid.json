@@ -9,7 +9,7 @@
       "behavior": {
         "auth": {
           "connectionHandlerId": "generic-handler",
-          "kind": "alpha-connection",
+          "kind": "codepuppy-connection",
           "prerequisiteId": "generic-connection",
           "required": false
         },
@@ -29,7 +29,7 @@
   },
   "schema": "codepuppy.package-declaration.v1",
   "source": {
-    "kind": "alpha-native",
+    "kind": "codepuppy-native",
     "publisher": "official",
     "redistributable": true
   },

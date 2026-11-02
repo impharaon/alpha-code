@@ -12,7 +12,6 @@ import { spawnSync } from "node:child_process"
 import { randomBytes } from "node:crypto"
 import { readlinkSync } from "node:fs"
 import { basename, dirname, join } from "node:path"
-import { applyEdits, parseTree, type Edit, type JSONPath, type Node, type ParseError } from "jsonc-parser"
 import { defaultCodePuppyBaseRoot } from "./codepuppy-environment"
 import { readLedger } from "./codepuppy-installs"
 import { grantKeyFor, readCapabilityGrant } from "./ext-capability-grants"
@@ -42,6 +41,7 @@ import {
 } from "./naming-migration-map"
 import { isModelSelectionStore, rewriteModelSelections } from "./naming-migration-model-selection"
 import { sqliteBinary } from "./platform"
+import { editJsonText } from "./project-hidden-dir-migration"
 import { USER_DATA_LAYOUT, type UserDataItem } from "./user-data-layout"
 
 export type { NamingMigrationJournal } from "./naming-migration-journal"
@@ -447,36 +447,6 @@ function defaultExecutableOf(pid: number): string | undefined {
   const proc = spawnSync("/bin/ps", ["-o", "comm=", "-p", String(pid)], { encoding: "utf8" })
   const out = proc.status === 0 ? proc.stdout.trim() : ""
   return out || undefined
-}
-
-// ── JSON(C) 精确改写:只替换命中的键 / 字符串值的那几个字节,注释与格式原样 ───────────────────
-
-export function editJsonText(
-  text: string,
-  edits: { key?: (path: JSONPath, key: string) => string | undefined; value?: (path: JSONPath, value: string) => string | undefined },
-): string {
-  const errors: ParseError[] = []
-  const root = parseTree(text, errors, { allowTrailingComma: true })
-  if (!root || errors.length > 0) throw new Error("file is not parseable JSON")
-  const out: Edit[] = []
-  const walk = (node: Node, path: JSONPath) => {
-    if (node.type === "object")
-      for (const property of node.children ?? []) {
-        const [keyNode, valueNode] = property.children ?? []
-        if (!keyNode) continue
-        const key = String(keyNode.value)
-        const renamed = edits.key?.(path, key)
-        if (renamed !== undefined && renamed !== key) out.push({ offset: keyNode.offset, length: keyNode.length, content: JSON.stringify(renamed) })
-        if (valueNode) walk(valueNode, [...path, key])
-      }
-    if (node.type === "array") (node.children ?? []).forEach((child, index) => walk(child, [...path, index]))
-    if (node.type === "string") {
-      const next = edits.value?.(path, String(node.value))
-      if (next !== undefined && next !== node.value) out.push({ offset: node.offset, length: node.length, content: JSON.stringify(next) })
-    }
-  }
-  walk(root, [])
-  return applyEdits(text, out)
 }
 
 function lookup(pairs: ReadonlyArray<readonly [string, string]>, value: string): string | undefined {

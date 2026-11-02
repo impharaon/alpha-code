@@ -100,6 +100,8 @@ function checkRuntime(tool: string): Promise<{ ok: boolean }> {
   })
 }
 
+const hiddenDirConflictsShown = new Set<string>()
+
 /** registryChannel:冻结环境快照的 registry 通道(REQ-098 #302),由 composition root(index.ts)
  *  注入 —— IPC handler 与 planner 的 catalog 拉取共用同一份,类型必填(无缺省可静默回落 stable)。 */
 export function registerExtIpcHandlers(
@@ -523,7 +525,14 @@ export function registerExtIpcHandlers(
   // 不落决策 + 返回 denied,下次仍会弹。
   ipcMain.handle("ext-trust-check", projectIpcHandler(
     homeDir,
-    (reason) => ({ prompted: false, granted: false, reason }),
+    (reason, code) => {
+      // #1569 AC7:项目里新旧两个隐藏目录并存 —— 不合并、不读旧目录;本会话对同一个项目只说一次
+      if (code === "hidden-dir-conflict" && !hiddenDirConflictsShown.has(reason)) {
+        hiddenDirConflictsShown.add(reason)
+        void dialog.showMessageBox({ type: "warning", message: "这个项目里新旧两个 Code Puppy 目录同时存在", detail: reason })
+      }
+      return { prompted: false, granted: false, reason }
+    },
     async (event: IpcMainInvokeEvent, project) => {
     const directory = project.projectDir
     // #356:project 账本 v1→v2 adoption —— 必须在下面两个早退(无 executable / 已有信任决策)

@@ -13,6 +13,7 @@
 // 判据本身在 `src/main/codepuppy-names-export.test.ts`(随 ui-mac 全量门跑)。
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
+import { VISION_MARKER } from "../../ext/src/cloud-vision-hooks"
 import { TOOL_TEXT } from "../../ext/src/context-injection"
 import { McpCatalog } from "../../opencode/src/mcp/catalog"
 import { ToolClass } from "../../schema/src/codepuppy-tool-policy"
@@ -21,6 +22,8 @@ import { CODEPUPPY_AGENT_TEXT } from "../src/main/codepuppy-agents"
 import catalog from "../src/main/codepuppy-models.json"
 import { CLOUD_MCP_SERVER_NAME } from "../src/main/cloud-web-search"
 import { CLOUD_MCP_TOOLS } from "../src/main/fixtures/cloud-mcp-tools"
+import { PROVIDER_KEYCHAIN_MARKER } from "../src/main/engine-config-truth"
+import { FACTORY_SKILL_IDS } from "../src/main/factory-skills"
 import { CODEPUPPY_OFFICE_CONNECTORS } from "../src/shared/office-advisories"
 
 export type CodepuppyNames = {
@@ -62,6 +65,15 @@ export function exportCodepuppyNames(): CodepuppyNames {
       ...officeFunctions,
     ],
   }
+}
+
+/**
+ * 持久化取值(alpha-code#1569 方案 R8):写进用户盘 / 设置 / 会话库、升级后还要从那里读回来的名字。
+ * 原则:#1570 改了值的,由升级迁移(src/main/naming-migration-map.ts)把旧值映射过来;不该改值的保留旧值,
+ * 并在旧名例外登记表里登记。防漏判据在 src/main/naming-migration-wiring.test.ts。
+ */
+export function exportCodepuppyPersistedValues(): string[] {
+  return [PROVIDER_KEYCHAIN_MARKER, ...Object.keys(CODEPUPPY_AGENT_TEXT), ...FACTORY_SKILL_IDS, catalog.platformProvider.id, VISION_MARKER]
 }
 
 /** 违例清单;空 = 三条全部成立。每条点名层与名字。 */

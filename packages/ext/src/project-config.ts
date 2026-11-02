@@ -8,6 +8,11 @@
 import { lstatSync, realpathSync } from "node:fs"
 import { homedir } from "node:os"
 import { isAbsolute, join, normalize, relative, resolve } from "node:path"
+import { PROJECT_HIDDEN_DIR } from "../../ui-mac/src/shared/project-hidden-dir"
+
+// #1569 AC7:旧项目隐藏目录。改名由 main 在解析项目时做;sidecar 这边只判不写 —— 旧目录还在就不认项目根,
+// 免得在 main 迁完之前往新目录里写东西,造成「新旧并存」。
+const LEGACY_PROJECT_HIDDEN_DIR = ".code-puppy"
 
 export type ProjectDirectoryIdentity =
   | { status: "project"; directory: string; root: string }
@@ -38,7 +43,9 @@ export function projectDirectoryIdentity(directory: string, homeDir: string = ho
     }
   })()
   if (!retired.ok) return { status: "unknown", reason: "retired global root identity cannot be confirmed" }
-  const root = join(candidate, ".code-puppy")
+  const root = join(candidate, PROJECT_HIDDEN_DIR)
+  if (isRealDirectory(join(candidate, LEGACY_PROJECT_HIDDEN_DIR)))
+    return { status: "unknown", reason: "project still has the legacy hidden directory; the app migrates it when it opens the project" }
   if (sameOrInside(candidate, retired.path) || related(root, retiredLexical) || related(root, retired.path))
     return { status: "retired-home", reason: "project alpha root is related to the retired global root" }
 
@@ -242,4 +249,12 @@ export function stripJsonc(text: string): string {
   }
   // 尾逗号:`,` 后跟(空白)`}` 或 `]`
   return out.replace(/,(\s*[}\]])/g, "$1")
+}
+
+function isRealDirectory(path: string): boolean {
+  try {
+    return lstatSync(path).isDirectory()
+  } catch {
+    return false
+  }
 }

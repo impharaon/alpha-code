@@ -15,6 +15,7 @@ import type { ArtifactDownloadOutcome } from "./codepuppy-artifact-download"
 import { validateArtifactDescriptor, type ArtifactDescriptor } from "../shared/cloud-artifact-descriptor"
 import { parsePrefs, type ProjectPrefs } from "./codepuppy-cloud-consent"
 import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
+import { adoptLegacyProjectHiddenDir } from "./project-hidden-dir-migration"
 
 /** REQ-236(#1551):一次交付里没落成的那一段 —— 列表、某件下载、或某件登记。 */
 export type CloudRunSaveFailure = { scope: "list" | "download" | "register"; artifactId?: string; code: string; detail?: string }
@@ -113,7 +114,7 @@ export function reserveArtifactSavedName(
 export type ProjectCodePuppyRootResolution =
   | { status: "project"; projectDir: string; root: string }
   | { status: "retired-home"; reason: string }
-  | { status: "unknown"; reason: string }
+  | { status: "unknown"; reason: string; code?: "hidden-dir-conflict" | "hidden-dir-pending" }
 
 /** main 项目入口的统一三态身份：返回 canonical project + 已验证 `.code-puppy` endpoint。 */
 export function resolveProjectCodePuppyRoot(projectDir: string, homeDir: string = os.homedir()): ProjectCodePuppyRootResolution {
@@ -144,6 +145,10 @@ export function resolveProjectCodePuppyRoot(projectDir: string, homeDir: string 
   const root = path.join(project, PROJECT_HIDDEN_DIR)
   if (sameOrInside(project, retired.path) || related(root, retiredLexical) || related(root, retired.path))
     return { status: "retired-home", reason: "project Code Puppy root is related to the retired global root" }
+
+  // #1569 AC7:旧隐藏目录 `.code-puppy` 在这里改名并补完子步骤(prod/beta 的 main);冲突或未迁完 ⇒ 不认这个项目根
+  const adopted = adoptLegacyProjectHiddenDir(project)
+  if (adopted.kind === "conflict" || adopted.kind === "pending") return { status: "unknown", reason: adopted.reason, code: `hidden-dir-${adopted.kind}` }
 
   try {
     const stat = fs.lstatSync(root)

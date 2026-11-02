@@ -19,6 +19,7 @@ import { saveCloudRun } from "./codepuppy-workdir"
 import { mirrorRunArtifacts } from "./codepuppy-user-workspace"
 import { getLogger } from "./logging"
 import { getStore } from "./store"
+import { CLOUD_SCHEDULE_LAST_PULL_KEY } from "./store-keys"
 import { cloudScheduleEnvelopeFor, cloudScheduleRegistrationFor } from "./cloud-schedule-config"
 
 // 与 codepuppy-cloud-jobs 同一 authed 通道(bearer 不进 renderer)。为避免循环依赖,这里复制其极简
@@ -133,7 +134,7 @@ export async function listCloudSchedules(): Promise<CloudScheduleView[] | null> 
   return isErr(r) ? null : r.schedules
 }
 
-const LAST_PULL_KEY = "codepuppyCloudScheduleLastPull"
+const LAST_PULL_KEY = CLOUD_SCHEDULE_LAST_PULL_KEY
 
 // codex M1:拉取单飞(startup 与面板 cloudSync 可能并发)—— 复用在飞 promise,不重入。
 let pullInflight: Promise<{ pulled: number } | { error: string }> | null = null

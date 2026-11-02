@@ -14,8 +14,9 @@ import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
 import { isExtensionName } from "../shared/extension-name"
+import { USER_DATA_LAYOUT } from "./user-data-layout"
 
-const MCP_SECRET_DIR = "codepuppy-mcp-secrets"
+const MCP_SECRET_DIR = USER_DATA_LAYOUT.mcpSecrets
 const SAFE_VAR = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/
 // #378(Codex 裁决 Q1):版本目录名与 server/VAR 名字空间互斥(extension name 无 "v-" 前缀约束,
 // 但 SAFE_VAR 不允许 "-",且版本目录固定 v- 前缀 + hex),GC 枚举据此判别三类条目。

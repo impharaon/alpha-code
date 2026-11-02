@@ -31,6 +31,7 @@ import { writeFileAtomicSync } from "./ext-atomic-fs"
 import type { ByokCatalogV1 } from "@codepuppy/contracts-consumer"
 import type { PlatformModel, PlatformModelDisplay, PricingMultiplier } from "../shared/codepuppy-model-types"
 import catalog from "./codepuppy-models.json"
+import { USER_DATA_LAYOUT } from "./user-data-layout"
 
 /** 快照里的一行:全部字段都是远端权威(`#1556`:展示与能力字段随 V3 `display` 一起进快照)。 */
 export type CatalogSnapshotModel = {
@@ -52,7 +53,7 @@ export type CatalogSnapshot = {
   models: CatalogSnapshotModel[]
 }
 
-const FILE = "codepuppy-live-models.json"
+const FILE = USER_DATA_LAYOUT.liveModels
 
 export function liveAllowlistPath(userDataPath: string): string {
   return path.join(userDataPath, FILE)
@@ -132,7 +133,7 @@ export function writeCatalogSnapshot(userDataPath: string, snapshot: CatalogSnap
 // (方案 §2.3 规则 5:App 升级带来更高的随包版本时随包胜出)。拉取失败 / 校验失败 / 未登录都不写 LKG,
 // 所以已有条目从不因失败而减少(I5)。
 
-const BYOK_FILE = "codepuppy-byok-catalog.json"
+const BYOK_FILE = USER_DATA_LAYOUT.byokCatalog
 const BUNDLED_BYOK = (catalog as unknown as { byokCatalog: ByokCatalogV1 }).byokCatalog
 
 export function byokCatalogPath(userDataPath: string): string {
@@ -199,7 +200,7 @@ export function downloadedByokCatalog(userDataPath: string): ByokCatalogChoice {
 // 所以 main 在每次 fork 前(spawnLocalServer,紧接密钥文件之后)把当刻的 LKG 钉成这份文件,两个读者
 // **只读它**;刷新器只写 LKG,从不写它。写失败 ⇒ 抛出,调用方按密钥文件写失败同样拒绝本次 fork。
 
-const APPLIED_FILE = "codepuppy-applied-catalog.json"
+const APPLIED_FILE = USER_DATA_LAYOUT.appliedCatalog
 
 export type AppliedCatalog = {
   /** 钉住它的那一代 sidecar(诊断用)。 */

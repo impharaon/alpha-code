@@ -4,6 +4,10 @@ export const RENDERER_SETTINGS_KEY = "settings.v3"
 export const DEFAULT_SERVER_URL_KEY = "defaultServerUrl"
 export const WSL_SERVERS_KEY = "wslServers"
 export const PINCH_ZOOM_ENABLED_KEY = "pinchZoomEnabled"
+// opencode.settings 里的三个一次性标记;升级迁移(naming-migration.ts)把旧名键改到这里的新名。
+export const CLOUD_SCHEDULE_LAST_PULL_KEY = "codepuppyCloudScheduleLastPull"
+export const NEW_LAYOUT_SEEDED_KEY = "codepuppyNewLayoutSeeded"
+export const CUSTOM_AGENTS_SEEDED_KEY = "codepuppyCustomAgentsSeeded"
 
 export const GENERIC_SETTINGS_ACCESS_ERROR =
   "default.dat/settings.v3 is reserved for the typed Settings adapter"

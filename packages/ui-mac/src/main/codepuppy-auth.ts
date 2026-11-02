@@ -36,6 +36,7 @@ import { parseAccessTokenIdentity } from "./codepuppy-auth-identity"
 import { errorOutcome, markStartupTimeline } from "./startup-timeline"
 import type { HotApplyOutcome } from "./codepuppy-secret-files"
 import type { SidecarRespawnTrigger } from "./sidecar-lifecycle"
+import { USER_DATA_LAYOUT } from "./user-data-layout"
 
 export { parseAccessTokenIdentity } from "./codepuppy-auth-identity"
 
@@ -131,7 +132,7 @@ const AUTH_ENV_PURPOSES = [
 // 不并认。回调地址由路由清单派生(`codepuppy://auth/callback`),打包协议声明取同一份清单。
 const CLIENT_ID = "codepuppy"
 const REDIRECT_URI = deepLinkFor.authCallback()
-const AUTH_FILE = "codepuppy-auth.json"
+const AUTH_FILE = USER_DATA_LAYOUT.auth
 
 // Endpoints come from the resolver (codepuppy-endpoints.ts): env override > userData pin > login discovery
 // > shared/codepuppy-config default. webBase = alpha-web (C, identity/login/token).
@@ -474,7 +475,7 @@ function base64url(buf: Buffer) {
 // PKCE(verifier+state)落盘,使其跨「app 冷启动/重启」存活:授权回调若把 app 从未运行状态
 // 唤醒(macOS open-url 冷启动),内存里的 pkce 为空会误判 state mismatch。文件短命、单次、用后即删。
 function pkceFilePath() {
-  return join(userDataPath, "codepuppy-pkce.json")
+  return join(userDataPath, USER_DATA_LAYOUT.pkce)
 }
 function savePkce(p: { verifier: string; state: string }) {
   try {

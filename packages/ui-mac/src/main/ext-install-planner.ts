@@ -51,7 +51,7 @@ import {
   type TxPlanItem,
   type TxStage,
 } from "./ext-transaction"
-import { capabilityGrantPath, isSafeCapability, type CapabilityDiff } from "./ext-capability-grants"
+import { capabilityGrantPath, grantKeyFor, isSafeCapability, type CapabilityDiff } from "./ext-capability-grants"
 import { agentConfigItemKey, agentInstallKey, installAgentFromCas, recoveryReceiptInputs } from "./ext-agent-install"
 // #705:plugin 载荷 file 探针与 agent/skill 探针同住 ext-health-probe-router —— 组合点只有一份。
 import { collectMcpFileRefPaths, isAbsenceError, newMcpSecretVersionId, pathIdentity, resolveMcpRefPath, substituteMcpSecretRefsPure } from "./codepuppy-mcp-secrets"
@@ -823,7 +823,7 @@ type BundleChildPlan =
   | { status: "skip"; id: string; reason: string }
   | { status: "fatal"; id: string; reason: string }
 
-const bundleKeyFor = (kind: string, name: string): string => `${kind}--${name}`
+const bundleKeyFor = grantKeyFor
 
 /**
  * 把一个 bundle 子条目分类为原子事务里的一项。首期(REQ-100 #311)支持 skill(generation)+ 无密钥

@@ -7,6 +7,7 @@ import {
   withPackageBindingV1,
   type ConnectionRecordV1,
 } from "../shared/package-codepuppy-connection"
+import { USER_DATA_LAYOUT } from "./user-data-layout"
 
 /**
  * The main-owned `ConnectionRecordV1` repository.
@@ -23,7 +24,7 @@ import {
  * guard is not decoration: the natural, tempting place to put this file is next to the ledger, and
  * a store under the extension root is silently destroyed the first time a user uninstalls anything.
  */
-const CONNECTION_DIR = "codepuppy-connections"
+const CONNECTION_DIR = USER_DATA_LAYOUT.connections
 const CONNECTION_FILE = "records.json"
 const ENVELOPE_KEYS = new Set(["v", "records"])
 const MAX_RECORDS = 64

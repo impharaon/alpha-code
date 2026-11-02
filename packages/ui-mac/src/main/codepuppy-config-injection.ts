@@ -43,6 +43,7 @@ import { readMcpServerRecords } from "./mcp-server-records"
 import { materializeCloudMcpConfig } from "./cloud-sidecar-config"
 import type { ChannelName } from "./catalog-channels"
 import { CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID } from "../shared/codepuppy-config"
+import { USER_DATA_LAYOUT } from "./user-data-layout"
 
 // Inject alpha-code's customizations into opencode via OPENCODE_CONFIG_CONTENT. This env var is
 // MERGED with the user's global/project config — it does NOT replace it (opencode config.ts
@@ -156,11 +157,11 @@ export function injectCodePuppyConfig(
           cloudWebSearch: !deniedByGate(CLOUD_WEB_SEARCH_TOOL_ID) && cloudMcpEnabled,
           cloudDispatch,
         })
-        addInstruction("codepuppy-identity.md", buildCodePuppyIdentity(caps))
+        addInstruction(USER_DATA_LAYOUT.identity, buildCodePuppyIdentity(caps))
       }
 
       // Tier-3 behavioral tuning (ADR-015), independently gated. See codepuppy-behavior.ts for the drift caveat.
-      if (wantBehavior) addInstruction("codepuppy-behavior.md", CODEPUPPY_BEHAVIOR_MD)
+      if (wantBehavior) addInstruction(USER_DATA_LAYOUT.behavior, CODEPUPPY_BEHAVIOR_MD)
 
       config.instructions = instructions
     }
@@ -610,7 +611,7 @@ function materializeV2EngineConfig(
   config: { model?: unknown; enabled_providers?: unknown; provider?: unknown },
   governedModels: boolean,
 ) {
-  const dir = path.join(userDataPath, "codepuppy-engine-config")
+  const dir = path.join(userDataPath, USER_DATA_LAYOUT.engineConfig)
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
   const userCopy = path.join(dir, "opencode.json")
   const stripped = codepuppyJsoncWithoutProviders()

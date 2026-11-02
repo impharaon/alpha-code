@@ -364,7 +364,7 @@ export function parseLedger(text: string): LedgerRow[] {
 // ── 处置合法性需要的两个仓库事实 ───────────────────────────────────────────────────────
 // 与 scripts/north-star-guard.sh 同一套判据(整包 carve-out + ADR-043 的自报家门),这里只做
 // 不需要 git 的那一半(不查 origin/dev):方向是过报 —— 上游镜像里没有、又没自报家门的文件,这里
-// 判为「不是 alpha 自有」,于是它拿不到 keep / load-sensitive 之外的任何处置也不会被误放行。
+// 判为「不是 Code Puppy 自有」,于是它拿不到 keep / load-sensitive 之外的任何处置也不会被误放行。
 export const CODEPUPPY_OWNED_PACKAGES = ["ext", "ui-mac", "codepuppy-contracts-consumer"] as const
 export const CODEPUPPY_OWNED_MARKER = "north-star:codepuppy-owned"
 /** 每个 PR 都会跑到的套件根(codepuppy-check 第 [5/14] 步的四条命令 + [6/14] 登记簿点名)。 */
@@ -407,7 +407,7 @@ export type LedgerContext = {
  * 一行登记的处置合不合法。规则(默认拒):
  *   keep            真正在测性能/时序契约,reason 必须写清余量与它守住的失败签名(≥ 40 字符)。
  *   load-sensitive  负载敏感档,**只许**给不在每 PR 套件里的文件(test-live/ 之类,单独命令跑)。
- *   upstream        上游文件,本仓不改(north-star)。**只许**给不是 alpha 自有的文件。
+ *   upstream        上游文件,本仓不改(north-star)。**只许**给不是 Code Puppy 自有的文件。
  *   not-elapsed     扫描器过报:被约束的不是耗时。reason 写清它是什么(≥ 20 字符)。
  *   rewrite 不是合法的登记值:改写 = 那条断言不再存在 = 不该有这一行(留痕写在抬头注释里)。
  */
@@ -421,7 +421,7 @@ export function dispositionError(row: LedgerRow, ctx: LedgerContext): string | u
     return "load-sensitive 只许给每 PR 套件之外的文件(PER_PR_GATE_PREFIXES 之外且不在 gate-files.tsv 里);在套件里的要么改写要么搬出去"
   if (row.disposition === "upstream") {
     const content = ctx.read(row.file) ?? ""
-    if (isCodePuppyOwned(row.file, content)) return "upstream 只许给不是 alpha 自有的文件(不在 ext/ui-mac/codepuppy-contracts-consumer,basename 不以 codepuppy- 开头,正文无 north-star:codepuppy-owned)"
+    if (isCodePuppyOwned(row.file, content)) return "upstream 只许给不是 Code Puppy 自有的文件(不在 ext/ui-mac/codepuppy-contracts-consumer,basename 不以 codepuppy- 开头,正文无 north-star:codepuppy-owned)"
   }
   return undefined
 }

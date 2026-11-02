@@ -177,7 +177,7 @@ export function checkCodePuppyOfficeMcpSafety(
   name: string,
   server: Record<string, unknown>,
   workspace?: string,
-  alphaResources?: string,
+  codepuppyResources?: string,
 ): OfficeSafetyVerdict {
   const command = Array.isArray(server.command) ? (server.command as unknown[]).filter((argument): argument is string => typeof argument === "string") : []
   const connector = codepuppyOfficeConnector(name, command)
@@ -185,16 +185,16 @@ export function checkCodePuppyOfficeMcpSafety(
   if (server.type !== "local" || ["url", "host", "port", "transport"].some((key) => key in server)) {
     return { ok: false, reason: `${connector.name} only allows local stdio; remote transport is refused (REQ-133)` }
   }
-  if (!workspace || !alphaResources || (workspace !== WORKSPACE_MARKER && !isAbsolutePath(workspace)) || !isAbsolutePath(alphaResources)) {
+  if (!workspace || !codepuppyResources || (workspace !== WORKSPACE_MARKER && !isAbsolutePath(workspace)) || !isAbsolutePath(codepuppyResources)) {
     return { ok: false, reason: `${connector.name} requires the workspace marker or absolute managed workspace plus an absolute Code Puppy resource root (REQ-134)` }
   }
-  if (hasTraversal(workspace) || hasTraversal(alphaResources)) {
+  if (hasTraversal(workspace) || hasTraversal(codepuppyResources)) {
     return { ok: false, reason: `${connector.name} path contains traversal segments (REQ-133)` }
   }
   const expected = codepuppyOfficeInstallCommand(connector.format).map((argument) =>
     argument
       .split("{alphaResources}")
-      .join(normalizeSlashes(alphaResources).replace(/\/+$/, ""))
+      .join(normalizeSlashes(codepuppyResources).replace(/\/+$/, ""))
       .split(WORKSPACE_MARKER)
       .join(workspace),
   )

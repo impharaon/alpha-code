@@ -73,7 +73,7 @@ describe("aggregateInventory(纯函数核心)", () => {
     expect(row.availability.state).toBe("catalog")
     expect(row.activation).toBe("not-installed")
     expect(row.ownership.authored).toBe("alpha")
-    expect(row.ownership.supportTier).toBe("alpha")
+    expect(row.ownership.supportTier).toBe("codepuppy")
     expect(view.catalogVersion).toBe("9.9.9")
   })
 

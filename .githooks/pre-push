@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# alpha pre-push hook — enforce local-first (docs/runbooks/ci.md §6).
+# Code Puppy pre-push hook — enforce local-first (docs/runbooks/ci.md §6).
 # DEFAULT-ON since 2026-07-05 (REQ-015): scripts/codepuppy-check.sh re-arms
 #   `git config core.hooksPath .githooks` whenever it has drifted, because husky's `prepare`
 #   resets it back to .husky/_ after each `bun install` — and that upstream hook's
@@ -15,7 +15,7 @@ repository_root="$(git rev-parse --show-toplevel)"
 # .git/config. Ask Git for its own complete repository-local set; never maintain a second list.
 repository_local_git_env="$(git rev-parse --local-env-vars)" || exit 1
 if [ -z "$repository_local_git_env" ]; then
-  echo "alpha pre-push: git reported no repository-local environment variables; refusing an unsafe run" >&2
+  echo "codepuppy pre-push: git reported no repository-local environment variables; refusing an unsafe run" >&2
   exit 1
 fi
 while IFS= read -r name; do

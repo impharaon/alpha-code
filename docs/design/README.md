@@ -17,7 +17,7 @@ files decide *design intent*, not runtime truth.
 
 Start at **[`PAGE-MAP.md`](PAGE-MAP.md)** — it lists every real product surface,
 whether that surface is still inherited from upstream opencode or has been
-alpha-ized, and where its current design lives.
+codepuppy-ized, and where its current design lives.
 
 ## The three layers
 

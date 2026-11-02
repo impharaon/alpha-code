@@ -76,7 +76,7 @@ svg { display:block; }
   background:color-mix(in srgb,var(--a-surface) 91%,transparent); backdrop-filter:blur(14px);
 }
 .reviewbrand { display:flex;align-items:center;gap:10px;min-width:0;font-weight:var(--a-weight-semibold); }
-.alpha-mark { display:grid;place-items:center;width:26px;height:26px;flex:none;color:#fff;background:var(--a-accent-solid);border-radius:8px;font-weight:700; }
+.codepuppy-mark { display:grid;place-items:center;width:26px;height:26px;flex:none;color:#fff;background:var(--a-accent-solid);border-radius:8px;font-weight:700; }
 .reviewbrand small { color:var(--a-text-tertiary);font-weight:var(--a-weight-normal); }
 .reviewnav { display:flex;align-items:center;gap:2px;overflow-x:auto;scrollbar-width:none; }
 .reviewnav::-webkit-scrollbar { display:none; }

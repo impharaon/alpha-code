@@ -11,7 +11,7 @@ review_after: 2027-01-16
 # Composition patterns
 
 How alpha surfaces attach to an app whose shell it inherited from opencode.
-alpha-code is a fork: `packages/ui-mac` (the Electron app) is alpha-authored and
+alpha-code is a fork: `packages/ui-mac` (the Electron app) is codepuppy-authored and
 mounts upstream `@opencode-ai/app`, then replaces or overlays pieces. The
 upstream leaf remains reachable only as a **boot-time escape valve** (env/pin →
 `legacy`); there is no runtime fallback — a crashed alpha surface enters Alpha
@@ -51,7 +51,7 @@ must not grow into a logic fork; when behavior must change, promote to a seam
 surface instead — `settings-reskin.css`, `dialog-reskin.css`, and
 `timeline-reskin.css` were all retired this way (REQ-090, REQ-125).
 
-## Full-page overlay (alpha-new surface)
+## Full-page overlay (codepuppy-new surface)
 
 Net-new surfaces with no upstream equivalent render as a full-page Portal over
 the shell: Extension Hub (`extensions/extension-hub.tsx`), Automations

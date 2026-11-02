@@ -58,19 +58,19 @@ function applyCodePuppyOfficeWorkspacePolicy(name: string, server: Record<string
   )
   if (!connector) return { ok: false, reason: "unknown Code Puppy Office connector mode (REQ-133 fail-closed)" }
   try {
-    const alphaResources = fs.realpathSync(resourcesRoot())
-    const serverPath = fs.realpathSync(path.join(alphaResources, "office-mcp", "server.py"))
-    if (path.relative(alphaResources, serverPath).startsWith(`..${path.sep}`)) {
+    const codepuppyResources = fs.realpathSync(resourcesRoot())
+    const serverPath = fs.realpathSync(path.join(codepuppyResources, "office-mcp", "server.py"))
+    if (path.relative(codepuppyResources, serverPath).startsWith(`..${path.sep}`)) {
       return { ok: false, reason: `${connector.name} bundled server escaped Code Puppy resources (REQ-133)` }
     }
     server.command = codepuppyOfficeInstallCommand(connector.format).map((argument) =>
       argument === CODEPUPPY_OFFICE_SERVER_SLOT
         ? serverPath
         : argument === CODEPUPPY_OFFICE_PYTHON_SLOT
-          ? path.join(alphaResources, "office-runtime", "bin", "python3")
+          ? path.join(codepuppyResources, "office-runtime", "bin", "python3")
           : argument,
     )
-    const safety = checkCodePuppyOfficeMcpSafety(name, server, WORKSPACE_MARKER, alphaResources)
+    const safety = checkCodePuppyOfficeMcpSafety(name, server, WORKSPACE_MARKER, codepuppyResources)
     if (!safety.ok) return safety
     // REQ-105 (#319) fail-closed: an Alpha Office install never persists without the content
     // address of the bytes it will execute. readFileSync failing here lands in the same catch as a
@@ -85,10 +85,10 @@ function applyCodePuppyOfficeWorkspacePolicy(name: string, server: Record<string
  *  resolves inside Alpha's resources — the same two paths the write policy puts into the command. */
 export function officeRuntimeReadiness(codepuppyResourcesRoot: string = resourcesRoot()): OfficeRuntimeReadiness {
   try {
-    const alphaResources = fs.realpathSync(codepuppyResourcesRoot)
-    const serverPath = fs.realpathSync(path.join(alphaResources, "office-mcp", "server.py"))
-    if (path.relative(alphaResources, serverPath).startsWith(`..${path.sep}`)) return { ok: false, reason: "office-runtime-missing" }
-    fs.accessSync(path.join(alphaResources, "office-runtime", "bin", "python3"), fs.constants.X_OK)
+    const codepuppyResources = fs.realpathSync(codepuppyResourcesRoot)
+    const serverPath = fs.realpathSync(path.join(codepuppyResources, "office-mcp", "server.py"))
+    if (path.relative(codepuppyResources, serverPath).startsWith(`..${path.sep}`)) return { ok: false, reason: "office-runtime-missing" }
+    fs.accessSync(path.join(codepuppyResources, "office-runtime", "bin", "python3"), fs.constants.X_OK)
     return { ok: true }
   } catch {
     return { ok: false, reason: "office-runtime-missing" }

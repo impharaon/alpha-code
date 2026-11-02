@@ -592,7 +592,6 @@ export const dict = {
   "codepuppy.ext.cloudInputHint": "Leaving this page stops automatic saving",
   "codepuppy.ext.cloudPickResults": "Choose a results folder",
   "codepuppy.ext.cloudStart": "Start task",
-  "codepuppy.ext.cloudDispatchHint": "Takes the selected project's git diff (falls back to the last commit on a clean worktree), runs the ADR-021 checks, then dispatches; on completion artifacts flow back to <project>/{{dir}}/runs/. Leaving this page keeps the job running in the cloud but stops the automatic flow-back.",
   "codepuppy.ext.cloudDispatchPick": "Pick a project & dispatch",
   "codepuppy.ext.cloudDispatching": "Sending…",
   "codepuppy.ext.cloudRunning": "Running in the cloud…",

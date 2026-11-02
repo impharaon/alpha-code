@@ -1511,3 +1511,7 @@ writeAlphaProviders	writeCodePuppyProviders
 vnd.alpha.remote-asset	vnd.codepuppy.remote-asset
 alpha_vision	codepuppy_vision
 alpha-code-signing	codepuppy-signing
+alpha-ized	codepuppy-ized
+alpha-new	codepuppy-new
+alpha-vs-opencode	codepuppy-vs-opencode
+alpha-authored	codepuppy-authored

@@ -30,7 +30,7 @@ alpha-code 是 opencode 的 fork:`packages/ui-mac`(Electron 壳,alpha 自有)挂
 opencode(纯上游,零改)
   → reskin(CSS 重贴皮,lineage=partial)          只改样子,不碰逻辑/DOM 结构
   → takeover / injection(注入上游锚点,lineage=hybrid)  改行为,注入稳定锚点,不 fork 上游组件
-  → seam surface(AppSurfaces 接管,lineage=alpha-ized)   完全自有渲染,唯一组合
+  → seam surface(AppSurfaces 接管,lineage=codepuppy-ized)   完全自有渲染,唯一组合
 ```
 
 规则(承 [`patterns.md`](patterns.md)):**reskin 不得长成逻辑 fork**;当一个面必须

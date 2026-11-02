@@ -133,7 +133,7 @@ docs/architecture/2026-09-08-derived-process-spawn-paths.md	658	external-anchor	
 docs/architecture/2026-09-08-derived-process-spawn-paths.md	713	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-09-08-derived-process-spawn-paths.md	727	pending	项目隐藏目录 .code-puppy / PROJECT_HIDDEN_DIR 的取值,接手票 #1569(连同本机迁移一起改)
 docs/architecture/2026-09-08-derived-process-spawn-paths.md	728	pending	项目隐藏目录 .code-puppy / PROJECT_HIDDEN_DIR 的取值,接手票 #1569(连同本机迁移一起改)
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	839	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	839	historical	带日期的调研记录里引用的当时探针输出(文件名),记录的是当时的名字
 docs/architecture/2026-09-08-derived-process-spawn-paths.md	856	historical	带日期的调研 / 决策记录,记录的是当时的名字
 docs/architecture/2026-09-08-derived-process-spawn-paths.md	868	pending	项目隐藏目录 .code-puppy / PROJECT_HIDDEN_DIR 的取值,接手票 #1569(连同本机迁移一起改)
 docs/architecture/2026-09-08-derived-process-spawn-paths.md	871	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
@@ -449,40 +449,15 @@ docs/contracts/tool-policy.md	6	external-anchor	GitHub 仓库名 alpha-code / al
 docs/contracts/tool-policy.md	13	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/PAGE-MAP.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/PAGE-MAP.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/design/PAGE-MAP.md	14	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
-docs/design/PAGE-MAP.md	36	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
-docs/design/PAGE-MAP.md	37	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
-docs/design/PAGE-MAP.md	42	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
-docs/design/PAGE-MAP.md	49	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
-docs/design/PAGE-MAP.md	50	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
-docs/design/PAGE-MAP.md	51	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
-docs/design/PAGE-MAP.md	52	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
-docs/design/PAGE-MAP.md	53	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
-docs/design/PAGE-MAP.md	54	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
-docs/design/PAGE-MAP.md	55	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
-docs/design/PAGE-MAP.md	56	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
-docs/design/PAGE-MAP.md	57	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
-docs/design/PAGE-MAP.md	58	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
-docs/design/PAGE-MAP.md	59	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
-docs/design/PAGE-MAP.md	60	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
-docs/design/PAGE-MAP.md	61	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
 docs/design/PAGE-MAP.md	62	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
 docs/design/PAGE-MAP.md	63	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
 docs/design/PAGE-MAP.md	64	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
 docs/design/PAGE-MAP.md	65	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
-docs/design/PAGE-MAP.md	66	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
-docs/design/PAGE-MAP.md	67	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
-docs/design/PAGE-MAP.md	68	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
-docs/design/PAGE-MAP.md	81	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
-docs/design/PAGE-MAP.md	82	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
-docs/design/PAGE-MAP.md	83	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
 docs/design/README.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/README.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/README.md	13	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/design/README.md	20	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
 docs/design/README.md	120	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
 docs/design/README.md	123	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
-docs/design/current/README.md	20	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
 docs/design/current/artifact-workbench/components.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/current/artifact-workbench/design.css	2	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
 docs/design/current/artifact-workbench/design.css	79	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
@@ -578,12 +553,10 @@ docs/design/system/color.md	6	external-anchor	GitHub 仓库名 alpha-code / alph
 docs/design/system/components.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/system/contributing.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/system/patterns.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/design/system/patterns.md	14	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
-docs/design/system/patterns.md	54	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
+docs/design/system/patterns.md	14	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/system/principles.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/system/replacing-opencode.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/system/replacing-opencode.md	13	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/design/system/replacing-opencode.md	33	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
 docs/design/system/tokens.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/runbooks/artifact-quota-reservation-recovery.md	14	pending	项目隐藏目录 .code-puppy / PROJECT_HIDDEN_DIR 的取值,接手票 #1569(连同本机迁移一起改)
 docs/runbooks/artifact-quota-reservation-recovery.md	43	pending	项目隐藏目录 .code-puppy / PROJECT_HIDDEN_DIR 的取值,接手票 #1569(连同本机迁移一起改)

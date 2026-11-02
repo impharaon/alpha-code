@@ -178,7 +178,7 @@ export function distributionChannelForCatalogEntry(entry: OwnershipCatalogEntryL
 
 /** 支持等级 ← 来源(catalog source / seed asset source 共用):alpha/official/community/其余=user。 */
 export function supportTierForSource(source: string | undefined): SupportTier {
-  // 入参 source 的取值 "alpha" 是 alpha-web 目录条目的字段值(跨仓,随 alpha-web#283 切换);返回的支持等级是桌面内部值
+  // 入参 source 的取值 "alpha" 是网站目录条目的字段值(跨仓,三端同窗切换时由网站一侧先改);返回的支持等级是桌面内部值
   if (source === "alpha") return "codepuppy"
   if (source === "official") return "curated"
   if (source === "community") return "community"

@@ -1048,11 +1048,11 @@ describe("auth 订阅单点接线", () => {
       .map((file) => file.path)
       .sort()
     expect(wired).toEqual([
+      "automations/automation-panel.tsx",
       "codepuppy-ui/CodePuppyOnboarding.tsx",
       "codepuppy-ui/codepuppy-composer-model.tsx",
       "codepuppy-ui/codepuppy-composer.tsx",
       "codepuppy-ui/permission-watcher.tsx",
-      "automations/automation-panel.tsx",
       "extensions/extension-hub.tsx",
       "sidebar/codepuppy-sidebar.tsx",
     ])

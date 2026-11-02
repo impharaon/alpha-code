@@ -31,12 +31,12 @@ const THROAT_FILE = "platform-error-code.ts"
 
 /** 经咽喉的出口枚举(轴②钉死)。新增出口 ⇒ 这里红 ⇒ 显式登记,不许静默接入。 */
 const ENUMERATED_MEMBERS = [
+  "catalog-refresher.ts", // `#1556`:BYOK 预置目录拉取的拒绝同样经咽喉分类
   "codepuppy-account-request.ts",
   "codepuppy-artifact-download.ts",
   "codepuppy-cloud-jobs.ts",
   "codepuppy-cloud-schedules.ts",
   "codepuppy-platform-models.ts",
-  "catalog-refresher.ts", // `#1556`:BYOK 预置目录拉取的拒绝同样经咽喉分类
 ]
 
 /** 递归枚举 src/main 生产源(测试与用例文件被 tsconfig 排除在 typecheck 外,也不在本闸辖区)。 */

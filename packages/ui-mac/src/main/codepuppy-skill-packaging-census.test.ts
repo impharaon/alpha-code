@@ -110,8 +110,8 @@ describe("#1250 随包技能资产的可达性普查", () => {
     // 而不是被一条「每个都至少一条通道」的存在性断言吸收掉。
     expect(table).toEqual([
       "factory-skills/agent-creator → factory",
-      "factory-skills/codepuppy-workspace → factory",
       "factory-skills/cloud-capabilities → factory",
+      "factory-skills/codepuppy-workspace → factory",
       "factory-skills/customize-codepuppy → factory",
       "factory-skills/integrate-project → factory",
       "factory-skills/office-docs → factory",

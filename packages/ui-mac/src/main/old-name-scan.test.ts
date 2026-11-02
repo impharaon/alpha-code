@@ -246,8 +246,11 @@ describe("旧名扫描门 (#1570)", () => {
     for (const row of ROWS) {
       expect(CATEGORIES.has(row.category), `${REGISTRY}:${row.n} 类别 "${row.category}" 不在固定枚举里`).toBe(true)
       expect(row.reason.trim().length, `${REGISTRY}:${row.n} 理由为空或过短`).toBeGreaterThan(5)
-      if (row.category === "pending")
+      if (row.category === "pending") {
         expect(/#[0-9]+/.test(row.reason), `${REGISTRY}:${row.n} pending 必须写接手票号`).toBe(true)
+        // pending 指向的必须是**别的**在途票:本票(#1570)自己没改完的旧名不是「有人接手」,是没做完。
+        expect(/(^|[^A-Za-z0-9-])#1570(?![0-9])/.test(row.reason), `${REGISTRY}:${row.n} pending 不许指向本票 #1570`).toBe(false)
+      }
     }
     expect(ROW_KEYS.size, "登记表里有重复的 文件:行号").toBe(ROWS.length)
   })

@@ -115,6 +115,38 @@ describe("迁移接线顺序 (ac#1571 §5.3 / AC3 / AC6 / R21-3)", () => {
   })
 })
 
+// ── 别名闸 ────────────────────────────────────────────────────────────────────────────────
+// 上面两组判据按标识符名认「会碰钥匙串 / Cookie 库的代码」。`import { session as s } from "electron"` 之后
+// 写 `s.defaultSession`,名字就对不上了 —— 所以点名的标识符在 index.ts 的任何 import 里都不许起别名
+// (命名空间 / 默认导入不用管:`electron.session` 里的 `session` 照样是被认出的属性名)。
+const WATCHED_NAMES = new Set([...BEFORE_RENAME_FORBIDDEN, ...COOKIE_LOADERS])
+
+describe("点名标识符不许经 import 起别名 (ac#1571)", () => {
+  test("生产 index.ts:electron 与其它模块的 import 里,点名标识符都没有 as 别名", () => {
+    expect(aliasViolations(INDEX_SOURCE)).toEqual([])
+  })
+
+  test("变异副本:`BrowserWindow as Win` / `session as s` ⇒ 报违例", () => {
+    const electronImport = 'import { app, BrowserWindow, dialog, ipcMain, powerMonitor } from "electron"\n'
+    const window = replaceOnce(INDEX_SOURCE, electronImport, electronImport.replace("BrowserWindow,", "BrowserWindow as Win,"))
+    expect(aliasViolations(window).join("\n")).toContain("BrowserWindow as Win")
+    const session = replaceOnce(INDEX_SOURCE, electronImport, electronImport.replace("powerMonitor }", "powerMonitor, session as s }"))
+    expect(aliasViolations(session).join("\n")).toContain("session as s")
+  })
+})
+
+function aliasViolations(source: string): string[] {
+  const file = ts.createSourceFile("index.ts", source, ts.ScriptTarget.Latest, true)
+  return file.statements.flatMap((statement) => {
+    if (!ts.isImportDeclaration(statement)) return []
+    const bindings = statement.importClause?.namedBindings
+    if (!bindings || !ts.isNamedImports(bindings)) return []
+    return bindings.elements
+      .filter((element) => element.propertyName && WATCHED_NAMES.has(element.propertyName.text))
+      .map((element) => `${statement.moduleSpecifier.getText(file)} 里 ${element.propertyName!.text} as ${element.name.text}:别名会让顺序判据认不出它`)
+  })
+}
+
 function migrationOrderViolations(source: string): string[] {
   const file = ts.createSourceFile("index.ts", source, ts.ScriptTarget.Latest, true)
   const mainBody = findMainBody(file)

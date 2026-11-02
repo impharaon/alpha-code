@@ -22,6 +22,7 @@
 //   · 别的仓产物的逐字节副本:`vendor/`(带锁校验)、`resources/extension-seed/`(seed 锁)、
 //     随包签名目录快照 `codepuppy-catalog.json` 及其 meta、各处 `testvectors/`(契约测试向量,由生产方生成,
 //     例如 `src/main/testvectors/` 是 alpha-web 只读镜像,见该目录 SOURCE.md)。改它们的字节 = 破坏锁或签名;旧名由各自的生产方改。
+//   · 改名工具自己的输入:映射表、本登记表、改名脚本(按定义写满旧名)。
 //   · 历史存档不在「现行文档」里:`docs/verification`、`docs/audits`、`docs/evidence`、
 //     `docs/archive`、`docs/retrospectives`、`docs/design/` 下带日期的历史稿、ADR、CHANGELOG。
 //
@@ -31,13 +32,15 @@
 import { readFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { describe, expect, test } from "bun:test"
+import { isCodePuppyOwned } from "./wall-clock-assertions"
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..", "..", "..")
 const REGISTRY = "scripts/old-name-exceptions.tsv"
 
 /**
  * 旧名判据。前九支逐字取自方案 §1.3 的 P(`sk-alpha-` 与 `code-puppy` 两支随 owner 裁决 D4 / F5 加入);
- * 第十支 `.alpha` 承接被取代的 `#1206` 门 —— 不收它,`~/.alpha` / `<proj>/.alpha` 这类退役根写法就从此无人拦。
+ * 第十支 `.alpha` 承接被取代的 `#1206` 门 —— 不收它,`~/.alpha` / `<proj>/.alpha` 这类退役根写法就从此无人拦;
+ * 它要求 `.alpha` 前面不是标识符字符,否则 CSS 里表示透明度的 `.chip.alpha` 这类类名也会被判成旧名。
  */
 const OLD_NAME = new RegExp(
   [
@@ -50,7 +53,7 @@ const OLD_NAME = new RegExp(
     '"alpha\\.[a-z]',
     "sk-alpha-",
     "code-puppy",
-    "\\.alpha([^-A-Za-z0-9_]|$)",
+    "(^|[^A-Za-z0-9_])\\.alpha([^-A-Za-z0-9_]|$)",
   ].join("|"),
 )
 
@@ -96,6 +99,7 @@ const ORDINARY = [
   "process.env.CODEPUPPY_GLOBAL_DIR",
   't("codepuppy.timeline.cloud.dispatch")',
   "codepuppy_access",
+  ".swatch .chip.alpha { opacity: 0.4 }",
 ]
 
 function selfTestFailures(): string[] {
@@ -118,7 +122,7 @@ function gitLines(args: string[]): string[] {
 /** 自有包清单消费 north-star 守卫的 `--print-jurisdiction`,不在这里另抄一份。 */
 const OWNED_PACKAGES = (() => {
   const row = gitLines(["bash", "scripts/north-star-guard.sh", "--print-jurisdiction"]).find((line) =>
-    /^(CODEPUPPY|ALPHA)_OWNED_PACKAGES\t/.test(line),
+    line.startsWith("CODEPUPPY_OWNED_PACKAGES\t"),
   )
   if (!row) throw new Error("north-star-guard.sh --print-jurisdiction 没有给出 CODEPUPPY_OWNED_PACKAGES —— 扫描面无从确定")
   return row.split("\t")[1]!.split(" ").filter(Boolean)
@@ -139,7 +143,6 @@ const CURRENT_DOCS = [
   /^ALPHA\.md$/,
   /^CLAUDE\.md$/,
 ]
-const MARKERS = ["north-star:alpha-owned", "north-star:codepuppy-owned"]
 
 const ALL_LISTED = [...new Set(gitLines(["git", "ls-files", "--cached", "--others", "--exclude-standard"]))]
 
@@ -152,16 +155,11 @@ function readText(path: string): string | undefined {
   }
 }
 
-/** north-star 谓词的「自报家门」因子:basename 前缀或文件里的 marker(新旧两种都认,随 north-star 守卫)。 */
-function declaresOwned(path: string): boolean {
-  const base = path.slice(path.lastIndexOf("/") + 1)
-  if (base.startsWith("alpha-") || base.startsWith("codepuppy-")) return true
-  const text = readText(path)
-  return text !== undefined && MARKERS.some((marker) => text.includes(marker))
-}
+/** 改名工具自己的输入:映射表与登记表按定义满纸旧名,改名脚本的说明也一样 —— 逐行登记它们不增加任何信息。 */
+const RENAME_TOOLING = new Set(["scripts/codepuppy-rename-map.tsv", "scripts/codepuppy-rename.ts", REGISTRY])
 
 function inScope(path: string): boolean {
-  if (IS_TEST_CODE.test(path)) return false
+  if (IS_TEST_CODE.test(path) || RENAME_TOOLING.has(path)) return false
   if (BYTE_COPIES.some((re) => re.test(path))) return false
   if (path.startsWith("scripts/") || path.startsWith(".github/")) return true
   if (CURRENT_DOCS.some((re) => re.test(path))) return true
@@ -170,7 +168,9 @@ function inScope(path: string): boolean {
   if (OWNED_PACKAGES.includes(pkg)) return true
   // ADR-034 roundtrip 包(app / ui)由补丁回环门管,不是第一方文件
   if (pkg === "app" || pkg === "ui") return false
-  return declaresOwned(path)
+  // 住在上游包里的自有文件:north-star 谓词的「自报家门」因子(前缀或 marker),消费 wall-clock-assertions.ts
+  // 已有的那一份 —— 不在这里再写一份。因子①(origin/dev 里查不到)刻意不查:对扫描而言多扫只会过报。
+  return isCodePuppyOwned(path, readText(path) ?? "")
 }
 
 const SCANNED = ALL_LISTED.filter(inScope)
@@ -213,7 +213,8 @@ describe("旧名扫描门 (#1570)", () => {
 
   test("扫描面来自 git 与 north-star 守卫,且规模合理(近乎空集不得静默放行)", () => {
     expect(ALL_LISTED.length).toBeGreaterThan(5_000)
-    expect(SCANNED.length).toBeGreaterThan(3_000)
+    // 2026-11-02 实测 1046 个(ui-mac 约 780 + 现行文档 + scripts / .github + 住在上游包里的自有文件)
+    expect(SCANNED.length).toBeGreaterThan(900)
     expect(SCANNED.some((path) => IS_TEST_CODE.test(path))).toBe(false)
     expect(OWNED_PACKAGES).toContain("codepuppy-contracts-consumer")
     for (const prefix of [
@@ -254,7 +255,8 @@ describe("旧名扫描门 (#1570)", () => {
   test("方向 A —— 每一处扫描命中都登记在册(新写进来的旧名会被拦住)", () => {
     expect(SELF_TEST, "自检未过,本次测量作废").toEqual([])
     const unregistered = HITS.filter((h) => !ROW_KEYS.has(`${h.path}:${h.line}`)).map(
-      (h) => `${h.path}:${h.line}: ${h.text.trim()}`,
+      // 行文只取前 120 个字符:bun 会把超长字符串从中间截断,连坐标一起截掉。
+      (h) => `${h.path}:${h.line}: ${h.text.trim().slice(0, 120)}`,
     )
     expect(
       unregistered,

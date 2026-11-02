@@ -71,7 +71,7 @@ export function runtimeSurfaceLabelKey(surface: RuntimeSurface): I18nKey {
 }
 
 const SUPPORT_TIER_KEYS: Record<SupportTier, I18nKey> = {
-  alpha: "codepuppy.ext.tierCodePuppy",
+  codepuppy: "codepuppy.ext.tierCodePuppy",
   curated: "codepuppy.ext.tierCurated",
   community: "codepuppy.ext.tierCommunity",
   user: "codepuppy.ext.tierUser",

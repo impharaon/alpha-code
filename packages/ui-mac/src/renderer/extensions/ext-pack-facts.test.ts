@@ -60,7 +60,7 @@ describe("derivePackFacts(#396 纯派生)", () => {
 
   test("空套件:全零 + 空集(不抛、不造)", () => {
     const facts = derivePackFacts([])
-    expect(facts).toEqual({ knownBytes: 0, unknownSizeCount: 0, secrets: [], secretFreeCount: 0, surfaces: [], lowestTier: "alpha", caps: [] })
+    expect(facts).toEqual({ knownBytes: 0, unknownSizeCount: 0, secrets: [], secretFreeCount: 0, surfaces: [], lowestTier: "codepuppy", caps: [] })
   })
 })
 

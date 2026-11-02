@@ -29,7 +29,7 @@ export type RuntimeSurface = (typeof RUNTIME_SURFACES)[number]
 
 /** 支持等级:谁为这个条目的可用性负责。 */
 export const SUPPORT_TIERS = [
-  "alpha", // Alpha 自产自支持
+  "codepuppy", // Code Puppy 自产自支持
   "curated", // 官方上游 + Alpha 策展支持
   "community", // 社区来源,Alpha 只做策展面
   "user", // 用户自装/自负(无策展支持面)
@@ -178,7 +178,8 @@ export function distributionChannelForCatalogEntry(entry: OwnershipCatalogEntryL
 
 /** 支持等级 ← 来源(catalog source / seed asset source 共用):alpha/official/community/其余=user。 */
 export function supportTierForSource(source: string | undefined): SupportTier {
-  if (source === "alpha") return "alpha"
+  // 入参 source 的取值 "alpha" 是 alpha-web 目录条目的字段值(跨仓,随 alpha-web#283 切换);返回的支持等级是桌面内部值
+  if (source === "alpha") return "codepuppy"
   if (source === "official") return "curated"
   if (source === "community") return "community"
   return "user"

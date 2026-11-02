@@ -456,7 +456,7 @@ const CN_MIRROR_ENV: Record<string, string> = {
 export function deriveMcpConfig(
   spec: McpInstallSpec,
   grants: InstallGrants,
-  alphaResources = resourcesRoot(),
+  codepuppyResources = resourcesRoot(),
   catalogId?: string,
 ): { ok: true; config: Record<string, unknown>; secretVars: string[] } | { ok: false; reason: string } {
   const declared = new Set(spec.requiredEnvVars ?? [])
@@ -498,7 +498,7 @@ export function deriveMcpConfig(
   ) {
     return { ok: false, reason: "{alphaResources} is reserved for the bundled Code Puppy Office server entrypoints — refused" }
   }
-  const cmd = command.map((argument) => argument.split("{alphaResources}").join(alphaResources))
+  const cmd = command.map((argument) => argument.split("{alphaResources}").join(codepuppyResources))
   const environment = { ...(grants.cnMirror ? CN_MIRROR_ENV : {}), ...subst }
   return {
     ok: true,

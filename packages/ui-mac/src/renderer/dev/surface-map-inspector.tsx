@@ -25,7 +25,7 @@ import {
 import "./surface-map-inspector.css"
 
 const lineageLabel = (lineage: FrontendSurfaceLineage) => {
-  if (lineage === "alpha") return t("codepuppy.brand.short")
+  if (lineage === "codepuppy") return t("codepuppy.brand.short")
   if (lineage === "opencode") return t("codepuppy.surfaceMap.upstream")
   return t("codepuppy.surfaceMap.hybrid")
 }
@@ -159,11 +159,11 @@ export default function SurfaceMapInspector() {
                 <button
                   type="button"
                   class="a-smap-stat"
-                  data-lineage="alpha"
-                  aria-pressed={lineage() === "alpha"}
-                  onClick={() => setLineage(lineage() === "alpha" ? "all" : "alpha")}
+                  data-lineage="codepuppy"
+                  aria-pressed={lineage() === "codepuppy"}
+                  onClick={() => setLineage(lineage() === "codepuppy" ? "all" : "codepuppy")}
                 >
-                  <span>{t("codepuppy.brand.short")}</span><strong>{counts("alpha")}</strong><small>{t("codepuppy.surfaceMap.owned")}</small>
+                  <span>{t("codepuppy.brand.short")}</span><strong>{counts("codepuppy")}</strong><small>{t("codepuppy.surfaceMap.owned")}</small>
                 </button>
                 <button
                   type="button"

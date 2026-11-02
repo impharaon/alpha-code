@@ -8,11 +8,11 @@
 //     1 pass / 2 fail / 5 expect() calls / Ran 3 tests across 1 file. [45.00ms]
 // 纯函数那条(扫描器标定)照常 pass,而两条走真 HTTP 的用例双双停在
 //     expect(status.job_id).toBe("job_scrub1113a")   Received: undefined
-// —— `job_id` 为 undefined 意味着 alpha-cloud-jobs 的 `authed()` 回了错误信封。夹具是**本进程
+// —— `job_id` 为 undefined 意味着 codepuppy-cloud-jobs 的 `authed()` 回了错误信封。夹具是**本进程
 // 自己起的** `Bun.serve`(canned 路由固定、401 不可能、schema 是编译进包的常量),所以
 // contract-incompatible / unauthorized / 404 都到不了 ⇒ 只剩 catch 分支的 `{ error: "network" }`:
 // **对 loopback 那一跳,响应根本没形成**。而状态读那一跳生产里就是 maxAttempts = 1
-// (alpha-cloud-jobs.ts:100),一次瞬态失败即定案。
+// (codepuppy-cloud-jobs.ts:100),一次瞬态失败即定案。
 //
 // 正向指认(不是排除法收尾):把 cases 文件里的 origin 提前 `stop(true)`,人为让响应形不成,
 // 复跑的签名与红那次逐项吻合 —— `1 pass / 2 fail / 5 expect() calls`、两条都停在同一个
@@ -134,7 +134,7 @@ test("#1294 有界重试:恒定的坏三次全败、派生失败可辨识、瞬�
   try {
     runChildWithBoundedRetry({
       label: "反向判据②(预期内的坏)",
-      cmd: [join(tmpdir(), "alpha-1294-no-such-binary"), "test"],
+      cmd: [join(tmpdir(), "codepuppy-1294-no-such-binary"), "test"],
       cwd,
       mustContain: [" 3 pass"],
     })
@@ -148,7 +148,7 @@ test("#1294 有界重试:恒定的坏三次全败、派生失败可辨识、瞬�
   expect(spawnMessage).toContain("ENOENT")
 
   // ── 臂 ③:瞬态的坏(第一次失败、第二次绿)—— 必须回绿,并且那一次失败必须留痕 ──────────
-  const marker = join(tmpdir(), `alpha-1294-transient-${crypto.randomUUID()}`)
+  const marker = join(tmpdir(), `codepuppy-1294-transient-${crypto.randomUUID()}`)
   const script =
     `if [ -e "${marker}" ]; then echo " 3 pass"; echo " 0 fail"; ` +
     `else : > "${marker}"; echo "transient failure injected by #1294 判据" >&2; exit 1; fi`

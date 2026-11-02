@@ -27,7 +27,7 @@
 //   503 dial-failed       登记了但域名解析不了(ENOTFOUND / EAI_AGAIN / EAI_NONAME)
 //   502 dial-failed       登记了但拒连 / 不可达(ECONNREFUSED / EHOSTUNREACH …)
 //   504 dial-failed       登记了但拨号超时(dialTimeoutMs 内既不通也不拒)
-// 三种 dial-failed 都**不是**策略拒绝,别混。`#1572`:它们按层用不同状态码(@opencode-ai/schema/alpha-net-failure 的
+// 三种 dial-failed 都**不是**策略拒绝,别混。`#1572`:它们按层用不同状态码(@opencode-ai/schema/codepuppy-net-failure 的
 // EGRESS_DIAL_FAILURE_STATUS)—— node 的 undici 把 CONNECT 的非 200 正文丢掉、只留状态码,状态码本身就得把层分开。
 // 拒绝体带可识别前缀:bun 的 fetch 会把代理的 403 当目标响应返回(§4.2),正文是应用侧唯一的归因线索。
 //
@@ -42,7 +42,7 @@
 
 import * as http from "node:http"
 import * as net from "node:net"
-import { classifyNetFailure, EGRESS_DIAL_FAILURE_STATUS } from "@opencode-ai/schema/alpha-net-failure"
+import { classifyNetFailure, EGRESS_DIAL_FAILURE_STATUS } from "@opencode-ai/schema/codepuppy-net-failure"
 import { egressDenialLine } from "../shared/egress-denial"
 import { isEgressAuthorizedForSidecar } from "./network-egress-derived"
 import { requestUserEgressGrant, type EgressGrantOutcome } from "./network-egress-grants"
@@ -218,7 +218,7 @@ function writeDenial(socket: net.Socket, status: number, body: string): void {
     "Content-Type: text/plain; charset=utf-8",
     `Content-Length: ${Buffer.byteLength(body)}`,
     "Connection: close",
-    "Proxy-Agent: alpha-egress-policy",
+    "Proxy-Agent: codepuppy-egress-policy",
     "",
     "",
   ].join("\r\n")
@@ -243,7 +243,7 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
     // 明文 HTTP 的绝对 URI 形式(`GET http://host/ …`)—— 本代理不做明文转发,fail-closed。
     log({ event: "egress.connect", id: ++seq, at: new Date().toISOString(), method: req.method ?? "", authority: req.url ?? "", verdict: "deny", reason: "method-not-connect", status: 405 })
     const body = denialBody("method-not-connect", `${req.method ?? ""} ${req.url ?? ""}`)
-    res.writeHead(405, { "Content-Type": "text/plain; charset=utf-8", "Content-Length": Buffer.byteLength(body), Connection: "close", Allow: "CONNECT", "Proxy-Agent": "alpha-egress-policy" })
+    res.writeHead(405, { "Content-Type": "text/plain; charset=utf-8", "Content-Length": Buffer.byteLength(body), Connection: "close", Allow: "CONNECT", "Proxy-Agent": "codepuppy-egress-policy" })
     // `Connection: close` 是给客户端看的;实际把连接收掉这件事不交给运行时的 keep-alive 策略(bun 实测不关)。
     res.end(body, () => res.socket?.end())
   })
@@ -303,7 +303,7 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
         const remote = upstream.remoteAddress
         const fakeIp = isFakeIp(remote)
         log({ event: "egress.connect", id, at: new Date().toISOString(), method: "CONNECT", authority, host: parsed.host, port: parsed.port, verdict: "allow", status: 200, remote, fakeIp })
-        clientSocket.write("HTTP/1.1 200 Connection Established\r\nProxy-Agent: alpha-egress-policy\r\n\r\n")
+        clientSocket.write("HTTP/1.1 200 Connection Established\r\nProxy-Agent: codepuppy-egress-policy\r\n\r\n")
         const openedAt = Date.now()
         // 字节计数自己数(bun 的 http 连接 socket 上 bytesRead/bytesWritten 实测恒 0)。
         let bytesUp = head.length

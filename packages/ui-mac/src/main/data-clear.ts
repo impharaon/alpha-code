@@ -19,7 +19,7 @@ export type ClearLevel = "credentials" | "data"
 
 export type ClearRoots = {
   userData: string
-  alphaGlobal: string // alphaGlobalRoot() —— frozen current environment root
+  codepuppyGlobal: string // codepuppyGlobalRoot() —— frozen current environment root
   opencodeHome: string // opencodeHomeDir() —— ~/.opencode(只摘自有链,不作删除根)
   engineData: string // XDG …/opencode(共享面,须 opt-in)
 }
@@ -52,12 +52,12 @@ export type ManifestItem = {
 }
 
 export const CREDENTIAL_ITEMS: ManifestItem[] = [
-  { id: "alpha-auth", root: "userData", rel: "alpha-auth.json", desc: "平台登录 token(safeStorage 加密)" },
-  { id: "alpha-pkce", root: "userData", rel: "alpha-pkce.json", desc: "登录握手临时凭证(PKCE)" },
-  { id: "byok-keys", root: "userData", rel: "alpha-byok-keys.json", desc: "BYOK 密钥库(safeStorage 加密)" },
-  { id: "secret-files", root: "userData", rel: "alpha-secrets", desc: "密钥文件通道(A6 {file:})" },
-  { id: "mcp-secrets", root: "userData", rel: "alpha-mcp-secrets", desc: "连接器密钥({file:} 通道)" },
-  { id: "alpha-env", root: "userData", rel: "alpha.env", desc: "手写密钥 env 文件(alpha.env)" },
+  { id: "codepuppy-auth", root: "userData", rel: "codepuppy-auth.json", desc: "平台登录 token(safeStorage 加密)" },
+  { id: "codepuppy-pkce", root: "userData", rel: "codepuppy-pkce.json", desc: "登录握手临时凭证(PKCE)" },
+  { id: "byok-keys", root: "userData", rel: "codepuppy-byok-keys.json", desc: "BYOK 密钥库(safeStorage 加密)" },
+  { id: "secret-files", root: "userData", rel: "codepuppy-secrets", desc: "密钥文件通道(A6 {file:})" },
+  { id: "mcp-secrets", root: "userData", rel: "codepuppy-mcp-secrets", desc: "连接器密钥({file:} 通道)" },
+  { id: "codepuppy-env", root: "userData", rel: "codepuppy.env", desc: "手写密钥 env 文件(codepuppy.env)" },
   { id: "engine-auth", root: "engineData", rel: "auth.json", desc: "引擎凭证存储(与 opencode CLI 共享)", shared: true },
   // #752:MCP 服务的 OAuth 令牌。引擎写在 Global.Path.data/mcp-auth.json
   // (packages/opencode/src/mcp/auth.ts),而 Global.Path.data = xdg-basedir 的 xdgData + "/opencode"
@@ -123,15 +123,15 @@ function resolveLinkTarget(fs: FsDeps, linkPath: string): string | null {
  * 判据 = 链目标解析进当前环境根(realpath 优先,目标已失效时退回字面解析)。真实文件/目录、
  * 目标在别处的链,一律不入列。
  */
-export function findAlphaOwnedLinks(fs: FsDeps, opencodeHome: string, alphaGlobal: string): string[] {
-  const alphaResolved = fs.realpath(alphaGlobal) ?? path.normalize(alphaGlobal)
+export function findCodePuppyOwnedLinks(fs: FsDeps, opencodeHome: string, codepuppyGlobal: string): string[] {
+  const codepuppyResolved = fs.realpath(codepuppyGlobal) ?? path.normalize(codepuppyGlobal)
   const owned: string[] = []
   const isOwnedLink = (p: string): boolean => {
     const info = fs.lstat(p)
     if (!info?.isSymlink) return false
     const target = fs.realpath(p) ?? resolveLinkTarget(fs, p)
     if (!target) return false
-    return isInside(target, alphaResolved) || target === alphaResolved
+    return isInside(target, codepuppyResolved) || target === codepuppyResolved
   }
   for (const entry of safeReaddir(fs, opencodeHome)) {
     const level1 = path.join(opencodeHome, entry)
@@ -178,13 +178,13 @@ export function planClear(fs: FsDeps, level: ClearLevel, roots: ClearRoots): Cle
       bytes: sizeOf(fs, path.join(roots.userData, child)),
     })
   }
-  const alphaRoot: ManifestItem = {
-    id: "alpha-global",
-    root: "alphaGlobal",
+  const codepuppyRoot: ManifestItem = {
+    id: "codepuppy-global",
+    root: "codepuppyGlobal",
     rel: ".",
     desc: "当前环境的全局安装物与自动化",
   }
-  push({ ...alphaRoot })
+  push({ ...codepuppyRoot })
   const engineRoot: ManifestItem = {
     id: "engine-data",
     root: "engineData",
@@ -197,7 +197,7 @@ export function planClear(fs: FsDeps, level: ClearLevel, roots: ClearRoots): Cle
   // logs 目录排全批最后删:其余项的逐项结果先落 main.log,留痕窗口最大化
   items.sort((a, b) => Number(a.id === "userdata:logs") - Number(b.id === "userdata:logs"))
 
-  const bridgeLinks = findAlphaOwnedLinks(fs, roots.opencodeHome, roots.alphaGlobal)
+  const bridgeLinks = findCodePuppyOwnedLinks(fs, roots.opencodeHome, roots.codepuppyGlobal)
   return { items, bridgeLinks, totalBytes: items.reduce((n, i) => n + i.bytes, 0) }
 }
 
@@ -213,11 +213,11 @@ export function executeClear(
   roots: ClearRoots,
   opts: { includeShared: boolean },
 ): ClearResultItem[] {
-  const alphaInfo = fs.lstat(roots.alphaGlobal)
-  const alphaCanonical = fs.realpath(roots.alphaGlobal)
-  if (!alphaInfo?.isDir || alphaInfo.isSymlink || alphaCanonical !== path.normalize(roots.alphaGlobal))
+  const codepuppyInfo = fs.lstat(roots.codepuppyGlobal)
+  const codepuppyCanonical = fs.realpath(roots.codepuppyGlobal)
+  if (!codepuppyInfo?.isDir || codepuppyInfo.isSymlink || codepuppyCanonical !== path.normalize(roots.codepuppyGlobal))
     throw new Error("current alpha root identity cannot be confirmed — clear refused")
-  const guards = [roots.userData, roots.alphaGlobal, roots.engineData].map((r) => fs.realpath(r) ?? path.normalize(r))
+  const guards = [roots.userData, roots.codepuppyGlobal, roots.engineData].map((r) => fs.realpath(r) ?? path.normalize(r))
   const results: ClearResultItem[] = []
 
   for (const item of plan.items) {

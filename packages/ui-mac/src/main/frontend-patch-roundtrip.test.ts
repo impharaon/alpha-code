@@ -9,7 +9,7 @@
 // 为什么判据必须长这样:
 //   · **不断言脚本源码文本。** 「grep 到脚本里写着 write-tree」在本仓是点名过的假闸门形态
 //     (脚本被换成 `exit 0` 时它照样绿)。这里起**真的 git 仓**、造**真的漂移**、跑
-//     **生产的那份脚本**(scripts/assert-frontend-patch-roundtrip.sh,CI 与本地 alpha-check.sh
+//     **生产的那份脚本**(scripts/assert-frontend-patch-roundtrip.sh,CI 与本地 codepuppy-check.sh
 //     调用的就是它),断言它**真的点名了那个文件**、真的以约定的码退出。
 //   · **不只断言「漂移就红」。** 一个「永远红」的实现能满足那一条,所以有两条对照组:一致态
 //     必须 exit 0(下面第一条),以及漂移之后**重生补丁就回绿**(第三条)。
@@ -68,17 +68,17 @@ function commitAll(repo: string, message: string): string {
 }
 
 const LOCK = "frontend/frontend-pin.lock"
-const PATCH = "frontend/alpha-patches/alpha-frontend.patch"
+const PATCH = "frontend/codepuppy-patches/codepuppy-frontend.patch"
 
 /** 上游 pin 里就有的文件(alpha 会改它)。 */
 const UPSTREAM_LEAF = "packages/app/src/context/terminal.tsx"
 /** alpha 自己加的 seam(只存在于补丁里)。 */
-const ALPHA_SEAM = "packages/app/src/surface/alpha-seam.ts"
+const CODEPUPPY_SEAM = "packages/app/src/surface/codepuppy-seam.ts"
 /** alpha 加的 **二进制**:真实世界里是 packages/session-ui 以 `file:` 直接依赖的 vendored tgz。 */
-const ALPHA_VENDORED = "packages/app/vendor/alpha-client-1.0.0.tgz"
+const CODEPUPPY_VENDORED = "packages/app/vendor/codepuppy-client-1.0.0.tgz"
 /** packages/ui 半场 —— 生产脚本枚举写成只有 packages/app 时,只有它会红。 */
 const UI_LEAF = "packages/ui/src/button.tsx"
-const ALPHA_UI = "packages/ui/src/alpha-overlay.ts"
+const CODEPUPPY_UI = "packages/ui/src/codepuppy-overlay.ts"
 
 /** 二进制内容(含不可打印字节)——只写进临时夹具目录,不进本仓。 */
 const VENDORED_BYTES = new Uint8Array([0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xca, 0x48])
@@ -98,12 +98,12 @@ function regeneratePatch(repo: string, pin: string) {
  *
  *   pin 提交        packages/{app,ui} = 纯上游态(没有 alpha seam、没有 vendored tgz)
  *   alpha 提交      改上游叶 + 加 seam + 加二进制 + 改/加 ui  ⇒ 补丁 = 两者之差
- *   SOT 提交        frontend/{frontend-pin.lock, alpha-patches/alpha-frontend.patch}
+ *   SOT 提交        frontend/{frontend-pin.lock, codepuppy-patches/codepuppy-frontend.patch}
  *
  * frontend/ 在 packages/{app,ui} 之外 ⇒ 提交它不改变被比较的两棵树。
  */
 function fixture(): { repo: string; pin: string } {
-  const repo = mkdtempSync(join(tmpdir(), "alpha-roundtrip-"))
+  const repo = mkdtempSync(join(tmpdir(), "codepuppy-roundtrip-"))
   git(repo, ["init", "-q", "-b", "alpha"])
   write(repo, UPSTREAM_LEAF, "export const terminal = 1\n")
   write(repo, "packages/app/src/app.tsx", "export const app = 1\n")
@@ -111,9 +111,9 @@ function fixture(): { repo: string; pin: string } {
   const pin = commitAll(repo, "upstream pin")
 
   write(repo, UPSTREAM_LEAF, "export const terminal = 2 // alpha seam\n")
-  write(repo, ALPHA_SEAM, "export const seam = 1\n")
-  write(repo, ALPHA_VENDORED, VENDORED_BYTES)
-  write(repo, ALPHA_UI, "export const overlay = 1\n")
+  write(repo, CODEPUPPY_SEAM, "export const seam = 1\n")
+  write(repo, CODEPUPPY_VENDORED, VENDORED_BYTES)
+  write(repo, CODEPUPPY_UI, "export const overlay = 1\n")
   commitAll(repo, "alpha frontend delta")
 
   write(repo, LOCK, `pin=${pin} # fixture\n`)
@@ -168,20 +168,20 @@ describe("#976 packages/{app,ui} round-trip 判据的行为", () => {
 
   test("committed 一个补丁里没有的新文件(含二进制)⇒ exit 1 且点名 —— f420fe2bb 那次真实事故的形状", () => {
     const { repo } = fixture()
-    write(repo, "packages/app/vendor/alpha-client-2.0.0.tgz", VENDORED_BYTES)
+    write(repo, "packages/app/vendor/codepuppy-client-2.0.0.tgz", VENDORED_BYTES)
     commitAll(repo, "add a vendored binary without regenerating the patch")
     const run = runGate(repo)
     expect(run.exitCode, `新增文件不被点名 —— 2026-07-24 丢 vendored tgz 的那一类原样复活:\n${run.output}`).toBe(1)
-    expect(run.output).toContain("packages/app/vendor/alpha-client-2.0.0.tgz")
+    expect(run.output).toContain("packages/app/vendor/codepuppy-client-2.0.0.tgz")
   })
 
   test("删掉一个补丁里有的文件、补丁没跟 ⇒ exit 1 且点名(只比双方交集的实现在这条上是绿的)", () => {
     const { repo } = fixture()
-    rmSync(join(repo, ALPHA_SEAM))
+    rmSync(join(repo, CODEPUPPY_SEAM))
     commitAll(repo, "delete an alpha seam without regenerating the patch")
     const run = runGate(repo)
     expect(run.exitCode, `删除方向没被抓到:\n${run.output}`).toBe(1)
-    expect(run.output).toContain(ALPHA_SEAM)
+    expect(run.output).toContain(CODEPUPPY_SEAM)
   })
 
   test("只改文件模式(chmod +x,内容一字不变)⇒ exit 1 —— 杀「逐个比内容哈希」的实现", () => {
@@ -197,13 +197,13 @@ describe("#976 packages/{app,ui} round-trip 判据的行为", () => {
 
   test("漂移只落在 packages/ui(app 侧完全一致)⇒ exit 1 且点名 ui 路径 —— 枚举漏是九形态④", () => {
     const { repo } = fixture()
-    write(repo, ALPHA_UI, "export const overlay = 2\n")
+    write(repo, CODEPUPPY_UI, "export const overlay = 2\n")
     commitAll(repo, "ui-only drift")
     const run = runGate(repo)
     // 现行 bun-test-app.sh 的树轴就只 `-- packages/app`;把生产脚本的枚举缩成只有 app,
     // 全部用例里**只有这一条**会红。
     expect(run.exitCode, `packages/ui 半场没被枚举进来:\n${run.output}`).toBe(1)
-    expect(run.output).toContain(ALPHA_UI)
+    expect(run.output).toContain(CODEPUPPY_UI)
   })
 
   test("补丁在 pin 上贴不上 ⇒ exit 1,且措辞与「内容漂移」可区分(两种红的处置不同)", () => {
@@ -256,7 +256,7 @@ describe("#976 packages/{app,ui} round-trip 判据的行为", () => {
     commitAll(repo, "point the lock at an unreachable object")
     const run = runGate(repo, { ROUNDTRIP_REQUIRE_PIN: "1" })
     // CI 自己控制 checkout 深度(upstream-guard 是 fetch-depth: 0),取不到 pin = 接线坏了。
-    // 缺这一条,alpha-ci 会重蹈 bun-test-app.sh 那半边门「CI 里恒未比对」的覆辙(`#976` 勘破:
+    // 缺这一条,codepuppy-ci 会重蹈 bun-test-app.sh 那半边门「CI 里恒未比对」的覆辙(`#976` 勘破:
     // CI 日志原文「未比对:pin 849c2598 的对象本地取不到(浅克隆/未 fetch)」)。
     expect(run.exitCode, `CI 档没有硬红 —— 那半边门在 CI 里等于不存在:\n${run.output}`).toBe(1)
   })
@@ -274,7 +274,7 @@ describe("#976 packages/{app,ui} round-trip 判据的行为", () => {
   test("pin 里根本没有 packages/ui ⇒ 「测量作废」,而不是给出一个看似有意义的漂移清单", () => {
     const { repo } = fixture()
     // lock 指向一个真实存在、却不含前端包的提交(真实形状:bump 时把 pin 写成了别的 sha)。
-    const orphan = mkdtempSync(join(tmpdir(), "alpha-roundtrip-orphan-"))
+    const orphan = mkdtempSync(join(tmpdir(), "codepuppy-roundtrip-orphan-"))
     rmSync(orphan, { recursive: true, force: true })
     write(repo, "docs/unrelated.md", "not a frontend commit\n")
     const unrelated = commitAll(repo, "a commit without packages/ui")
@@ -291,21 +291,21 @@ describe("#976 packages/{app,ui} round-trip 判据的行为", () => {
 
 // ── 生产接线 ────────────────────────────────────────────────────────────────────
 //
-// ⚠️ **诚实边界**:下面这一条断言的是 `scripts/alpha-check.sh` 的**源码文本**,按本仓定义它是
+// ⚠️ **诚实边界**:下面这一条断言的是 `scripts/codepuppy-check.sh` 的**源码文本**,按本仓定义它是
 // **减速带**,不是闸门 —— 有人把调用行改成 `bash scripts/assert-frontend-patch-roundtrip.sh || true`
 // 时它照样绿。留着它的理由是:本 portfolio 的合并路径是「本地判绿 ⇒ gh pr merge --admin」,
-// **CI 那一格是被绕过的那道**,所以 alpha-check.sh 里那行调用才是真闸;而上面十三条用例是
-// `Bun.spawn` 直接跑脚本本体,**一条都不经过 alpha-check.sh** ⇒ 删掉那行调用,上面全绿、
-// local-gate-parity 全绿(它只比 CI_STEPS ↔ alpha-ci.yml)、gate-files 全绿 —— 本地那道门已经
+// **CI 那一格是被绕过的那道**,所以 codepuppy-check.sh 里那行调用才是真闸;而上面十三条用例是
+// `Bun.spawn` 直接跑脚本本体,**一条都不经过 codepuppy-check.sh** ⇒ 删掉那行调用,上面全绿、
+// local-gate-parity 全绿(它只比 CI_STEPS ↔ codepuppy-ci.yml)、gate-files 全绿 —— 本地那道门已经
 // 不存在而无人知晓(失效形态⑧:没测生产接线)。同形先例与同样的诚实边界见
 // packages/ui-mac/src/main/local-gate-parity.test.ts。
 describe("#976 生产接线(减速带,不是闸门)", () => {
-  test("alpha-check.sh 真的调用了这个脚本", () => {
-    const script = readFileSync(resolve(REPO_ROOT, "scripts/alpha-check.sh"), "utf8")
+  test("codepuppy-check.sh 真的调用了这个脚本", () => {
+    const script = readFileSync(resolve(REPO_ROOT, "scripts/codepuppy-check.sh"), "utf8")
     expect(existsSync(SCRIPT), "生产脚本不在了").toBe(true)
     expect(
       script.includes("bash scripts/assert-frontend-patch-roundtrip.sh"),
-      "scripts/alpha-check.sh 没有调用 scripts/assert-frontend-patch-roundtrip.sh —— 本地那道门不存在了,而 CI 那一格在 --admin 合并路径下是被绕过的那道",
+      "scripts/codepuppy-check.sh 没有调用 scripts/assert-frontend-patch-roundtrip.sh —— 本地那道门不存在了,而 CI 那一格在 --admin 合并路径下是被绕过的那道",
     ).toBe(true)
   })
 

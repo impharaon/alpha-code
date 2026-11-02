@@ -7,12 +7,12 @@
 //
 // 这道闸删掉会失去什么:V1→V2 硬切就只剩类型与 fixture 层的证据,而 ADR-039 §4 明确说那不够 ——
 // 判据必须从真实 IPC 用户入口出发。子进程里有一条**持久 negative gate**(V1 响应 → 无 basis、
-// 无 pricing、contract-health 亮),把 alpha-platform-models.ts 的 decodeJsonContract 改回
+// 无 pricing、contract-health 亮),把 codepuppy-platform-models.ts 的 decodeJsonContract 改回
 // ModelCatalogV1 会让本闸变红;2026-07-29 实测过一次(docs/verification/2026-07-29-req127-681-v2-cutover/)。
 // 子进程里还有一条:本仓提交给平台 cutover gate 的 consumer pin 必须**经生产入口跑通全链** ——
 // schema 不表达「倍数落在 0.1 网格」,只验 schema 会让平台闸接受一份 Desktop 实际跑不动的 pin。
-// #1084 起还多一组:平台拒绝的分类码必须到达 renderer 的两个口子(alpha-catalog-health invoke +
-// alpha-catalog-failure 推送),且下一次成功刷新会清空它 —— 删掉 syncLiveAllowlist 里的
+// #1084 起还多一组:平台拒绝的分类码必须到达 renderer 的两个口子(codepuppy-catalog-health invoke +
+// codepuppy-catalog-failure 推送),且下一次成功刷新会清空它 —— 删掉 syncLiveAllowlist 里的
 // reportCatalogRefresh 上报,本闸变红(2026-08-23 实测 4 fail / 清空那条单独 1 fail)。
 import { expect, test } from "bun:test"
 import { join } from "node:path"

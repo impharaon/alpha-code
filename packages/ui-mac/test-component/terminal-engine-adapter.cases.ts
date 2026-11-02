@@ -137,11 +137,11 @@ Bun.plugin({
   },
 })
 
-const adapter = await import("../src/renderer/alpha-ui/session-rail/terminal/terminal-engine-adapter")
+const adapter = await import("../src/renderer/codepuppy-ui/session-rail/terminal/terminal-engine-adapter")
 // #579:环境段的端到端取证要挂真面板(真适配器 → 真投影 → 真 DOM),故一并加载面板与
 // 身份校验器 —— 必须排在 Bun.plugin 注册之后(它们的 tsx 要过 solid dom 变换)。
-const railPanel = await import("../src/renderer/alpha-ui/session-rail/terminal/terminal-rail-panel")
-const workspaceCore = await import("../src/renderer/alpha-ui/session-workspace/session-workspace-core")
+const railPanel = await import("../src/renderer/codepuppy-ui/session-rail/terminal/terminal-rail-panel")
+const workspaceCore = await import("../src/renderer/codepuppy-ui/session-workspace/session-workspace-core")
 const disposers: Array<() => void> = []
 
 afterEach(() => {
@@ -172,10 +172,10 @@ const snapshot = {
 function mountEngineOutput(instanceID: string) {
   const host = document.createElement("div")
   document.body.append(host)
-  let channel: ReturnType<ReturnType<typeof adapter.useAlphaTerminalEngineChannel>>
+  let channel: ReturnType<ReturnType<typeof adapter.useCodePuppyTerminalEngineChannel>>
   disposers.push(
     solidWeb.render(() => {
-      const accessor = adapter.useAlphaTerminalEngineChannel(() => snapshot)
+      const accessor = adapter.useCodePuppyTerminalEngineChannel(() => snapshot)
       channel = accessor()
       return channel!.EngineOutput({ instanceID }) as never
     }, host),
@@ -194,7 +194,7 @@ function mountRailPanel() {
   document.body.append(host)
   disposers.push(
     solidWeb.render(() => {
-      const accessor = adapter.useAlphaTerminalEngineChannel(() => snapshot)
+      const accessor = adapter.useCodePuppyTerminalEngineChannel(() => snapshot)
       return railPanel.TerminalRailPanel({
         channel: accessor(),
         accepts: (identity) => workspaceCore.sameSessionIdentity(identity, snapshot.identity),
@@ -370,15 +370,15 @@ describe("REQ-125 #554 keep-alive × autoFocus one-shot, two-phase remount (audi
     const host = mountRailPanel()
     await flush()
 
-    const foot = host.querySelector<HTMLElement>("[data-alpha-terminal-foot]")!
-    const env = foot.querySelector<HTMLElement>("[data-alpha-terminal-foot-env]")
+    const foot = host.querySelector<HTMLElement>("[data-codepuppy-terminal-foot]")!
+    const env = foot.querySelector<HTMLElement>("[data-codepuppy-terminal-foot-env]")
     expect(env).not.toBeNull()
     // 恰好等于,不是 toContain:整条脚条扫描在「zsh 混进尺寸段」时也绿(粗一格)。
     expect(env!.textContent).toBe("zsh")
 
     // 已批稿钉死的次序:运行状态 · 环境 · 尺寸(design.html:374)。
     const children = Array.from(foot.children)
-    const stateIndex = children.indexOf(foot.querySelector("[data-alpha-terminal-foot-state]")!)
+    const stateIndex = children.indexOf(foot.querySelector("[data-codepuppy-terminal-foot-state]")!)
     const envIndex = children.indexOf(env!)
     const sizeIndex = children.indexOf(foot.querySelector(".a-term-foot-size")!)
     expect(stateIndex).toBeGreaterThanOrEqual(0)
@@ -389,8 +389,8 @@ describe("REQ-125 #554 keep-alive × autoFocus one-shot, two-phase remount (audi
     // 抓的是「shell 恒为真值」的伪造实现。
     currentEngine.setAll([{ id: "pty_1", title: "终端 1", titleNumber: 1, cols: 80, rows: 24 }])
     await flush()
-    expect(foot.querySelector("[data-alpha-terminal-foot-env]")).toBeNull()
-    expect(foot.querySelector("[data-alpha-terminal-foot-state]")).not.toBeNull()
+    expect(foot.querySelector("[data-codepuppy-terminal-foot-env]")).toBeNull()
+    expect(foot.querySelector("[data-codepuppy-terminal-foot-state]")).not.toBeNull()
     expect(foot.querySelector(".a-term-foot-size")!.textContent).toBe("80×24")
   })
 })

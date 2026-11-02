@@ -5,7 +5,7 @@
 // `LegacyServerLayout` 之下,一次「新对话」会先挂起上游自己的左栏与会话叶,再被新对话页替换;
 // owner 报的「点新对话闪烁、最左侧闪出不该出现的内容」就是这一帧。
 //
-// 闸门挂**真实 alpha 壳**(上游 provider 链 + 真实路由树 + 生产 AlphaSidebar + 生产 alpha 会话
+// 闸门挂**真实 alpha 壳**(上游 provider 链 + 真实路由树 + 生产 CodePuppySidebar + 生产 alpha 会话
 // 工作区 / 新对话页),点**真实**侧栏按钮,判据是 MutationObserver 记下的**真实挂载序列**。
 // 第一条用例是控制组:直接进 legacy admission 路由,断言两个"不该出现"的 DOM **确实会出现** ——
 // 没有它,后面所有「从未出现」都可能只是选择器写错了的空绿(基线 §3 不变量 7)。
@@ -34,7 +34,7 @@ const appSrc = join(import.meta.dir, "../../../../app/src")
 // `@opencode-ai/app` 会解析出两条不同的绝对路径 → 同一个 context 出现两份实例 →
 // `usePlatform` 在自己的 provider 里也报 "must be used within a context provider"。
 // 钉到 worktree 内的同一份源码即消歧(普通 checkout 下本就是同一份)。
-const runtimeDirectory = mkdtempSync(join(tmpdir(), "alpha-start-draft-"))
+const runtimeDirectory = mkdtempSync(join(tmpdir(), "codepuppy-start-draft-"))
 await build({
   configFile: false,
   logLevel: "silent",
@@ -110,10 +110,10 @@ async function waitFor(check: () => boolean, label: string) {
   throw new Error(`等不到:${label}`)
 }
 
-async function mountShell(connection?: Parameters<typeof runtime.AlphaShell>[0]["connection"]) {
+async function mountShell(connection?: Parameters<typeof runtime.CodePuppyShell>[0]["connection"]) {
   const host = document.createElement("div")
   document.body.append(host)
-  disposers.push(runtime.render(() => runtime.AlphaShell({ connection }), host))
+  disposers.push(runtime.render(() => runtime.CodePuppyShell({ connection }), host))
   await settle()
   // 挂载期的水合噪音不该算进"这一次点击做了什么"(存储本身已按用例隔离,见 runtime 的
   // harnessStorage 抬头,tabs 每次都从空起步)。
@@ -121,7 +121,7 @@ async function mountShell(connection?: Parameters<typeof runtime.AlphaShell>[0][
 }
 
 /** 生产侧栏上那个「新对话」按钮本体。 */
-const newChatButton = () => document.querySelector<HTMLButtonElement>("[data-alpha-sidebar-nav='new-chat']")
+const newChatButton = () => document.querySelector<HTMLButtonElement>("[data-codepuppy-sidebar-nav='new-chat']")
 const toastTitles = () => Array.from(document.querySelectorAll(".a-toast b")).map((el) => el.textContent)
 
 describe("控制组:legacy admission 路由确实会挂起两套壳(记录仪与选择器都是活的)", () => {
@@ -215,7 +215,7 @@ describe("REQ-126 AC5:{server, directory} 同源 + 默认对话目录先供给",
     expect(runtime.draftTabs()).toHaveLength(0)
     expect(runtime.recorded()).not.toContain("new-session")
     expect(runtime.routerHref()).not.toStartWith("/new-session")
-    expect(toastTitles()).toContain(zh["alpha.sidebar.newChatWorkspaceFailed"])
+    expect(toastTitles()).toContain(zh["codepuppy.sidebar.newChatWorkspaceFailed"])
   })
 
   test("loopback 的 http 连接(SSH 隧道/远端反代)同样 fail-closed —— 它只是看起来像本机", async () => {
@@ -229,7 +229,7 @@ describe("REQ-126 AC5:{server, directory} 同源 + 默认对话目录先供给",
 
     expect(runtime.ensureCalls).toEqual([])
     expect(runtime.draftTabs()).toHaveLength(0)
-    expect(toastTitles()).toContain(zh["alpha.sidebar.newChatNoWorkspace"])
+    expect(toastTitles()).toContain(zh["codepuppy.sidebar.newChatNoWorkspace"])
   })
 
   test("WSL server 上没有已知项目 → fail-closed:不建 draft,更不把宿主机 ~/Alpha 配上去", async () => {
@@ -241,7 +241,7 @@ describe("REQ-126 AC5:{server, directory} 同源 + 默认对话目录先供给",
 
     expect(runtime.ensureCalls).toEqual([])
     expect(runtime.draftTabs()).toHaveLength(0)
-    expect(toastTitles()).toContain(zh["alpha.sidebar.newChatNoWorkspace"])
+    expect(toastTitles()).toContain(zh["codepuppy.sidebar.newChatNoWorkspace"])
   })
 
   test("WSL server 上有已知项目 → 用该 server 自己的目录,server 身份跟着它", async () => {

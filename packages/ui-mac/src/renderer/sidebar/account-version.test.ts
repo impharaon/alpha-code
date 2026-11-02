@@ -1,5 +1,5 @@
 // ac#1187:账户浮层版本行的组件端闸门入口。真实判据在
-// packages/ui-mac/test-component/account-version.cases.ts —— 生产 AlphaSidebar + 真路由 +
+// packages/ui-mac/test-component/account-version.cases.ts —— 生产 CodePuppySidebar + 真路由 +
 // 真点击,断言浮层 DOM 里出现 preload 桥给的哨兵版本号(登录/登出两分支)。
 // 起子进程同 overlay-close.test.ts:cases 里的 mock.module 会污染同进程其它测试文件。
 

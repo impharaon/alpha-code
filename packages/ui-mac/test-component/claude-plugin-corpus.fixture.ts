@@ -24,7 +24,7 @@ export function loadCorpusFixture(): CorpusFixture {
 /** 摊开语料到一个临时目录,返回根路径与清理句柄。调用方 finally 必须 cleanup()。 */
 export function materializeCorpus(): { root: string; roots: string[]; cleanup: () => void } {
   const fixture = loadCorpusFixture()
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "alpha-claude-corpus-"))
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-claude-corpus-"))
   for (const entry of fixture.entries) {
     const abs = path.join(root, entry.path)
     fs.mkdirSync(path.dirname(abs), { recursive: true })

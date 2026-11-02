@@ -2,7 +2,7 @@
 //
 // 与 process-fence-apply.test.ts 的分工:那边跑的是四类**创建原语**(Electron 的 node 里 dlopen);这边跑的是
 // 四类**真消费方** —— 引擎的 shell 工具端点、`POST /pty`(缺省 + 带 command)、`POST /mcp` 经 MCP SDK 起真
-// stdio server、装了 `@alpha-code/ext` 的引擎本身 —— 与勘破 §8.3 F2 臂同一条工作负载,差别是围栏不再靠外部
+// stdio server、装了 `@codepuppy/ext` 的引擎本身 —— 与勘破 §8.3 F2 臂同一条工作负载,差别是围栏不再靠外部
 // `sandbox-exec`,而是**生产的原生模块在引擎进程装载任何模块之前 `sandbox_init`**(bun --preload,与出货
 // sidecar「import 引擎前自打 seatbelt」同一顺序、同一 SPI);profile 由**生产的 planProcessFence** 渲染 +
 // 真 sandbox-exec 试编译。
@@ -42,7 +42,7 @@ import { planProcessFence } from "./process-fence-plan"
 // api() 超时时把「哪条调用、等了多久、代理记录、引擎日志尾」一起抛出 —— 一句裸 TimeoutError 会让下一个人再去查一遍不存在的缺陷。
 import { startEgressPolicyProxy, type EgressLogRecord, type EgressProxyHandle } from "./network-egress-proxy"
 import { sidecarEgressProxyEnv } from "./sidecar-env"
-import { buildReloadRequest } from "./alpha-sidecar-messages"
+import { buildReloadRequest } from "./codepuppy-sidecar-messages"
 import { attachmentAbsolutePath } from "../shared/attachment-path"
 import { explainAttachmentBlock } from "../../../ext/src/context-injection"
 
@@ -86,11 +86,11 @@ describeDarwin("REQ-159 真引擎 + 真 ext 在进程围栏下:四类真消费�
     ws = join(iso, "ws")
     esc = join(iso, "esc")
     userData = join(iso, "userData")
-    globalRoot = join(iso, "alpha-code-state", "env", "dev")
+    globalRoot = join(iso, "codepuppy-state", "env", "dev")
     for (const d of [home, ws, esc, userData, globalRoot, join(userData, "engine-scratch-cwd")]) mkdirSync(d, { recursive: true })
     spawnSync("git", ["init", "-q"], { cwd: ws })
     // ③ 生产 .node(现编,烤 buildId)与生产计划器(真试编译)。
-    addon = buildFenceAddon({ out: join(iso, "resources", "alpha-fence", "alpha_fence.node"), buildId: `ac1321-engine-${Date.now()}` }).out
+    addon = buildFenceAddon({ out: join(iso, "resources", "codepuppy-fence", "codepuppy_fence.node"), buildId: `ac1321-engine-${Date.now()}` }).out
     const plan = planProcessFence(
       {
         userDataPath: userData,
@@ -100,9 +100,9 @@ describeDarwin("REQ-159 真引擎 + 真 ext 在进程围栏下:四类真消费�
       },
       {
         homeDir: () => home,
-        alphaGlobalRoot: () => globalRoot,
+        codepuppyGlobalRoot: () => globalRoot,
         // `#1390`:状态根 = globalRoot 的父目录的父目录;realpath 用生产同一个(realpathSync.native)
-        appStateRoot: () => join(iso, "alpha-code-state"),
+        appStateRoot: () => join(iso, "codepuppy-state"),
         realpath: (p) => realpathSync.native(p),
         defaultWorkspace: () => ws,
         readWorkspaces: () => [],
@@ -161,12 +161,12 @@ describeDarwin("REQ-159 真引擎 + 真 ext 在进程围栏下:四类真消费�
       OPENCODE_SERVER_USERNAME: "opencode",
       OPENCODE_SERVER_PASSWORD: PASSWORD,
       OPENCODE_CONFIG: configPath,
-      OPENCODE_CONFIG_DIR: join(userData, "alpha-engine-config"),
+      OPENCODE_CONFIG_DIR: join(userData, "codepuppy-engine-config"),
       OPENCODE_DISABLE_MODELS_FETCH: "1",
       OPENCODE_DISABLE_PROJECT_CONFIG: "1",
-      ALPHA_GLOBAL_DIR: globalRoot,
-      ALPHA_SECRETS_DISABLE: "1",
-      ...(arm === "fenced" ? { ALPHA1321_FENCE_ADDON: addon, ALPHA1321_FENCE_PROFILE: profileFile } : {}),
+      CODEPUPPY_GLOBAL_DIR: globalRoot,
+      CODEPUPPY_SECRETS_DISABLE: "1",
+      ...(arm === "fenced" ? { CODEPUPPY1321_FENCE_ADDON: addon, CODEPUPPY1321_FENCE_PROFILE: profileFile } : {}),
     }
     // flag 必须在 `run` 之后 —— `bun --preload X run Y` 在 bun 1.3.x 打印 usage 后静默退出 0(仓内 CLAUDE.md 记的坑,本文件第一版就踩了)。
     const preloads = [...(arm === "fenced" ? [join(fixtures, "engine-fence-preload.ts")] : []), ...(extra.preloads ?? [])]
@@ -249,7 +249,7 @@ describeDarwin("REQ-159 真引擎 + 真 ext 在进程围栏下:四类真消费�
 
     // MCP stdio:引擎经 MCP SDK(cross-spawn)起真 server,server 起来第一件事写两处。
     const mcp = await api(engine, "POST", "/mcp", {
-      name: "alpha1321probe",
+      name: "codepuppy1321probe",
       config: { type: "local", command: ["node", join(fixtures, "mcp-probe.mjs"), ws, esc, arm], enabled: true },
     })
     const config = await api(engine, "GET", "/config")
@@ -297,7 +297,7 @@ describeDarwin("REQ-159 真引擎 + 真 ext 在进程围栏下:四类真消费�
     expect(fenced!.shellOutput).toMatch(/operation not permitted/i)
     expect(fenced!.shellOutput).toContain("done") // 命令跑到了最后一句 ⇒ 不是 exit 71 零执行
     expect(fenced!.shellOutput).not.toContain("sandbox_apply")
-    // REQ-138 那层若还在,GET /config 的 shell 会指向 <alphaGlobalRoot>/bin/<shell>
+    // REQ-138 那层若还在,GET /config 的 shell 会指向 <codepuppyGlobalRoot>/bin/<shell>
     expect(String(fenced!.configShell ?? "")).not.toContain(join(globalRoot, "bin"))
     expect(String(bare!.configShell ?? "")).not.toContain(join(globalRoot, "bin"))
   })
@@ -310,7 +310,7 @@ describeDarwin("REQ-159 真引擎 + 真 ext 在进程围栏下:四类真消费�
 
   // ── REQ-234 `#1531`(审计 R1 Major 1):ext 重载调度器在**围栏 + 引擎已监听**下能不能问到引擎 ───────────────────────────
   // 引擎一监听,递给插件的 input.client 就改走 TCP 连 Server.url;围栏的网络行只放行出网代理端口(N4)。两臂同一条驱动:
-  // 经 node IPC 接成的 parentPort 发一条 main 形状的 alpha.reload.request(与出货 sidecar 收到的同一族消息),读 ext 回的 report。
+  // 经 node IPC 接成的 parentPort 发一条 main 形状的 codepuppy.reload.request(与出货 sidecar 收到的同一族消息),读 ext 回的 report。
   //   对照臂:没有进程内交接 ⇒ 调度器只能用 input.client(TCP)⇒ 围栏拒掉 ⇒ 查不到 ⇒ 零 dispose、报 waiting —— 先证明这条红真的存在;
   //   被测臂:按出货 sidecar 的做法挂上进程内 app.fetch(in-process-engine.ts 交接点)⇒ 调度器问得到 ⇒ dispose ⇒ 报 reloaded。
   async function reloadViaParentPort(engine: Engine, generation: number) {
@@ -318,7 +318,7 @@ describeDarwin("REQ-159 真引擎 + 真 ext 在进程围栏下:四类真消费�
     expect(project.status, `project/current ${JSON.stringify(project.json).slice(0, 300)}`).toBe(200)
     const reports: Array<{ generation?: number; outcome?: string; error?: string; directories?: string[] }> = []
     engine.proc.on("message", (message) => {
-      if ((message as { type?: string }).type === "alpha.reload.report") reports.push(message as (typeof reports)[number])
+      if ((message as { type?: string }).type === "codepuppy.reload.report") reports.push(message as (typeof reports)[number])
     })
     engine.proc.send!(buildReloadRequest({ generation, scope: "global", items: [], reason: "#1531 fenced reload probe" }))
     const deadline = Date.now() + 30_000
@@ -349,7 +349,7 @@ describeDarwin("REQ-159 真引擎 + 真 ext 在进程围栏下:四类真消费�
     })
     expect(engine.log.join("")).toContain("engine-fence-preload: fence applied")
     const reports = await reloadViaParentPort(engine, 2)
-    expect(reports[0], engine.log.join("").slice(-2000)).toEqual({ type: "alpha.reload.report", generation: 2, scope: "global", outcome: "reloaded", directories: [ws] })
+    expect(reports[0], engine.log.join("").slice(-2000)).toEqual({ type: "codepuppy.reload.report", generation: 2, scope: "global", outcome: "reloaded", directories: [ws] })
     engine.proc.kill("SIGTERM")
   }, 180_000)
 

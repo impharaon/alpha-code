@@ -1,6 +1,6 @@
 // Unit tests for the skill/agent installer (REQ-018 T2 rework). Rejection paths (name/asset-key
 // guards) return before disk I/O. Accept paths are now fully testable off-device: the alpha truth
-// root and engine bridge root honor ALPHA_GLOBAL_DIR / ALPHA_OPENCODE_HOME test inputs, so real
+// root and engine bridge root honor CODEPUPPY_GLOBAL_DIR / CODEPUPPY_OPENCODE_HOME test inputs, so real
 // writes land in throwaway temp dirs — we assert truth files, bridge symlinks AND receipts.
 
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
@@ -22,27 +22,27 @@ mockElectron(() => ({
 }))
 
 const { agentInstallPresent, collectBuiltinAgentPayload, collectVendoredPluginPayload, installBuiltinSkill, removeFsInstall, resourcesRoot, stageVendoredPluginVersioned, writeAgent, writeSkill } = await import("./ext-fs-installer")
-const { addReceipt, readLedger } = await import("./alpha-installs")
+const { addReceipt, readLedger } = await import("./codepuppy-installs")
 
 let base = ""
-let alphaDir = ""
+let codepuppyDir = ""
 let opencodeDir = ""
-const prevAlpha = process.env.ALPHA_GLOBAL_DIR
-const prevHome = process.env.ALPHA_OPENCODE_HOME
+const prevCodePuppy = process.env.CODEPUPPY_GLOBAL_DIR
+const prevHome = process.env.CODEPUPPY_OPENCODE_HOME
 
 beforeEach(() => {
-  base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "alpha-installer-")))
-  alphaDir = path.join(base, "alpha-code-state", "env", "dev")
+  base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-installer-")))
+  codepuppyDir = path.join(base, "codepuppy-state", "env", "dev")
   opencodeDir = path.join(base, ".opencode")
-  fs.mkdirSync(alphaDir, { recursive: true })
-  process.env.ALPHA_GLOBAL_DIR = alphaDir
-  process.env.ALPHA_OPENCODE_HOME = opencodeDir
+  fs.mkdirSync(codepuppyDir, { recursive: true })
+  process.env.CODEPUPPY_GLOBAL_DIR = codepuppyDir
+  process.env.CODEPUPPY_OPENCODE_HOME = opencodeDir
 })
 afterEach(() => {
-  if (prevAlpha === undefined) delete process.env.ALPHA_GLOBAL_DIR
-  else process.env.ALPHA_GLOBAL_DIR = prevAlpha
-  if (prevHome === undefined) delete process.env.ALPHA_OPENCODE_HOME
-  else process.env.ALPHA_OPENCODE_HOME = prevHome
+  if (prevCodePuppy === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+  else process.env.CODEPUPPY_GLOBAL_DIR = prevCodePuppy
+  if (prevHome === undefined) delete process.env.CODEPUPPY_OPENCODE_HOME
+  else process.env.CODEPUPPY_OPENCODE_HOME = prevHome
   fs.rmSync(base, { recursive: true, force: true })
 })
 
@@ -51,7 +51,7 @@ describe("writeSkill / writeAgent — name validation blocks traversal (no disk 
     "writeSkill rejects unsafe name %p",
     (name) => {
       expect(writeSkill(name, "d", "b")).toEqual({ ok: false, reason: "invalid skill name" })
-      expect(fs.existsSync(path.join(alphaDir, "skills"))).toBe(false)
+      expect(fs.existsSync(path.join(codepuppyDir, "skills"))).toBe(false)
     },
   )
 
@@ -64,12 +64,12 @@ describe("writeSkill — global scope writes truth + bridge + receipt", () => {
   test("SKILL.md lands in current-environment skills (engine sees it via skills.paths)", () => {
     const r = writeSkill("my-skill", "does things", "# body")
     expect(r.ok).toBe(true)
-    const truth = path.join(alphaDir, "skills", "my-skill", "SKILL.md")
+    const truth = path.join(codepuppyDir, "skills", "my-skill", "SKILL.md")
     expect(fs.readFileSync(truth, "utf8")).toContain("does things")
-    // T3(REQ-059):skills 桥退役 —— 真源即可,引擎经 alpha.jsonc skills.paths 发现;.opencode 内零 alpha 痕迹
+    // T3(REQ-059):skills 桥退役 —— 真源即可,引擎经 codepuppy.jsonc skills.paths 发现;.opencode 内零 alpha 痕迹
     expect(fs.existsSync(path.join(opencodeDir, "skills"))).toBe(false)
     // receipt
-    const { receipts } = readLedger(alphaDir)
+    const { receipts } = readLedger(codepuppyDir)
     expect(receipts).toHaveLength(1)
     expect(receipts[0]).toMatchObject({ id: "user:my-skill", type: "skill", scope: "global", origin: "created" })
     expect(receipts[0]!.files!.length).toBeGreaterThan(0)
@@ -78,21 +78,21 @@ describe("writeSkill — global scope writes truth + bridge + receipt", () => {
   test("#354:catalog meta 不再在 installer 层落 v1(账本所有权归 planner v2 upsert)", () => {
     const r = writeSkill("cat-skill", "d", "b", { scope: "global" }, { catalogId: "skill:cat-skill", version: "2026-07-03.1" })
     expect(r.ok).toBe(true)
-    const { receipts } = readLedger(alphaDir)
+    const { receipts } = readLedger(codepuppyDir)
     expect(receipts).toHaveLength(0) // eager v1 已下线;v1 视图由 planner upsert 的 toV1Receipt 锁步派生
   })
 })
 
 describe("writeAgent — global scope", () => {
-  test("T3b:agent md 落当前环境 agents + alpha.jsonc 条目;零 .opencode 桥", () => {
+  test("T3b:agent md 落当前环境 agents + codepuppy.jsonc 条目;零 .opencode 桥", () => {
     const r = writeAgent("helper", "---\ndescription: h\nmode: subagent\n---\nsystem")
     expect(r.ok).toBe(true)
-    expect(fs.readFileSync(path.join(alphaDir, "agents", "helper.md"), "utf8")).toContain("system")
-    // 桥退役:引擎经 alpha.jsonc 的 agent.<name> 条目见到(G1 通道),.opencode 内零 alpha 痕迹
+    expect(fs.readFileSync(path.join(codepuppyDir, "agents", "helper.md"), "utf8")).toContain("system")
+    // 桥退役:引擎经 codepuppy.jsonc 的 agent.<name> 条目见到(G1 通道),.opencode 内零 alpha 痕迹
     expect(fs.existsSync(path.join(opencodeDir, "agents"))).toBe(false)
-    const cfg = JSON.parse(fs.readFileSync(path.join(alphaDir, "alpha.jsonc"), "utf8"))
+    const cfg = JSON.parse(fs.readFileSync(path.join(codepuppyDir, "codepuppy.jsonc"), "utf8"))
     expect(cfg.agent.helper).toMatchObject({ description: "h", mode: "subagent", prompt: "system" })
-    const { receipts } = readLedger(alphaDir)
+    const { receipts } = readLedger(codepuppyDir)
     expect(receipts[0]).toMatchObject({ type: "agent", name: "helper" })
   })
 
@@ -100,15 +100,15 @@ describe("writeAgent — global scope", () => {
     const r = writeAgent("bad", "---\ndescription: d\nmystery_key: x\n---\nbody")
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.reason).toContain("mystery_key")
-    expect(fs.existsSync(path.join(alphaDir, "agents", "bad.md"))).toBe(false)
+    expect(fs.existsSync(path.join(codepuppyDir, "agents", "bad.md"))).toBe(false)
   })
 
-  test("T3b:removeFsInstall 净除 alpha.jsonc 条目 + md", () => {
+  test("T3b:removeFsInstall 净除 codepuppy.jsonc 条目 + md", () => {
     expect(writeAgent("gone", "---\ndescription: d\n---\nbody").ok).toBe(true)
     const r = removeFsInstall("agent", "gone")
     expect(r.ok).toBe(true)
-    expect(fs.existsSync(path.join(alphaDir, "agents", "gone.md"))).toBe(false)
-    const cfg = JSON.parse(fs.readFileSync(path.join(alphaDir, "alpha.jsonc"), "utf8"))
+    expect(fs.existsSync(path.join(codepuppyDir, "agents", "gone.md"))).toBe(false)
+    const cfg = JSON.parse(fs.readFileSync(path.join(codepuppyDir, "codepuppy.jsonc"), "utf8"))
     expect(cfg.agent?.gone).toBeUndefined()
   })
 })
@@ -126,7 +126,7 @@ describe("project scope", () => {
     const { receipts } = readLedger(path.join(projectDir, ".code-puppy"))
     expect(receipts[0]).toMatchObject({ scope: "project", name: "proj-skill" })
     // global ledger untouched
-    expect(readLedger(alphaDir).receipts).toHaveLength(0)
+    expect(readLedger(codepuppyDir).receipts).toHaveLength(0)
   })
 
   test("invalid project dir fails honestly", () => {
@@ -157,9 +157,9 @@ describe("installBuiltinSkill — name + asset-key guards", () => {
     // safe-refactor ships in repo resources/skills (E1b)
     const r = installBuiltinSkill("skills/safe-refactor", "safe-refactor", { scope: "global" }, { catalogId: "skill:safe-refactor" })
     expect(r.ok).toBe(true)
-    expect(fs.existsSync(path.join(alphaDir, "skills", "safe-refactor", "SKILL.md"))).toBe(true)
+    expect(fs.existsSync(path.join(codepuppyDir, "skills", "safe-refactor", "SKILL.md"))).toBe(true)
     expect(fs.existsSync(path.join(opencodeDir, "skills"))).toBe(false) // T3:skills 桥退役
-    const { receipts } = readLedger(alphaDir)
+    const { receipts } = readLedger(codepuppyDir)
     expect(receipts).toHaveLength(0) // #354:catalog 的账本所有权归 planner,installer 层零 v1 写
   })
 })
@@ -170,7 +170,7 @@ describe("installBuiltinSkill — name + asset-key guards", () => {
 describe("removeFsInstall — deletes truth and unbridges; the ledger is NOT its business (T6 / #706)", () => {
   test("uninstalling a skill removes truth dir and .opencode item, and leaves the ledger untouched", () => {
     writeSkill("gone-skill", "d", "b")
-    addReceipt(alphaDir, {
+    addReceipt(codepuppyDir, {
       id: "skill:gone-skill",
       name: "gone-skill",
       type: "skill",
@@ -178,20 +178,20 @@ describe("removeFsInstall — deletes truth and unbridges; the ledger is NOT its
       installedAt: new Date().toISOString(),
       origin: "catalog",
     })
-    const before = fs.readFileSync(path.join(alphaDir, "installs.json"), "utf8")
-    expect(fs.existsSync(path.join(alphaDir, "skills", "gone-skill", "SKILL.md"))).toBe(true)
+    const before = fs.readFileSync(path.join(codepuppyDir, "installs.json"), "utf8")
+    expect(fs.existsSync(path.join(codepuppyDir, "skills", "gone-skill", "SKILL.md"))).toBe(true)
     const r = removeFsInstall("skill", "gone-skill")
     expect(r.ok).toBe(true)
-    expect(fs.existsSync(path.join(alphaDir, "skills", "gone-skill"))).toBe(false)
+    expect(fs.existsSync(path.join(codepuppyDir, "skills", "gone-skill"))).toBe(false)
     expect(fs.existsSync(path.join(opencodeDir, "skills", "gone-skill"))).toBe(false)
     // 账本字节零改动 —— 把内层副作用接回来会让这一行立刻变红。
-    expect(fs.readFileSync(path.join(alphaDir, "installs.json"), "utf8")).toBe(before)
-    expect(readLedger(alphaDir).receipts.some((x) => x.name === "gone-skill")).toBe(true)
+    expect(fs.readFileSync(path.join(codepuppyDir, "installs.json"), "utf8")).toBe(before)
+    expect(readLedger(codepuppyDir).receipts.some((x) => x.name === "gone-skill")).toBe(true)
   })
 
   test("uninstalling an agent removes the md and leaves the ledger untouched", () => {
     writeAgent("gone-agent", "---\ndescription: d\n---\nsys")
-    addReceipt(alphaDir, {
+    addReceipt(codepuppyDir, {
       id: "agent:gone-agent",
       name: "gone-agent",
       type: "agent",
@@ -199,12 +199,12 @@ describe("removeFsInstall — deletes truth and unbridges; the ledger is NOT its
       installedAt: new Date().toISOString(),
       origin: "catalog",
     })
-    const before = fs.readFileSync(path.join(alphaDir, "installs.json"), "utf8")
+    const before = fs.readFileSync(path.join(codepuppyDir, "installs.json"), "utf8")
     const r = removeFsInstall("agent", "gone-agent")
     expect(r.ok).toBe(true)
-    expect(fs.existsSync(path.join(alphaDir, "agents", "gone-agent.md"))).toBe(false)
-    expect(fs.readFileSync(path.join(alphaDir, "installs.json"), "utf8")).toBe(before)
-    expect(readLedger(alphaDir).receipts.some((x) => x.name === "gone-agent")).toBe(true)
+    expect(fs.existsSync(path.join(codepuppyDir, "agents", "gone-agent.md"))).toBe(false)
+    expect(fs.readFileSync(path.join(codepuppyDir, "installs.json"), "utf8")).toBe(before)
+    expect(readLedger(codepuppyDir).receipts.some((x) => x.name === "gone-agent")).toBe(true)
   })
 
   test("uninstalling a missing item is idempotent success", () => {
@@ -244,23 +244,23 @@ describe("collectBuiltinAgentPayload — #361 随包 agent 载荷收集(只读;C
     expect(r.files[0]!.path).toBe("code-reviewer.md")
     const bundled = fs.readFileSync(path.join(resourcesRoot(), "agents", "code-reviewer.md"))
     expect(r.files[0]!.data.equals(bundled)).toBe(true)
-    expect(fs.readdirSync(alphaDir)).toEqual([]) // 收集不落任何安装副作用
+    expect(fs.readdirSync(codepuppyDir)).toEqual([]) // 收集不落任何安装副作用
   })
 })
 
-describe("ALPHA_LEGACY_INSTALL_ROOT=1 escape hatch", () => {
+describe("CODEPUPPY_LEGACY_INSTALL_ROOT=1 escape hatch", () => {
   test("writes the old XDG root, no bridge, no receipt", () => {
     const legacyRoot = path.join(base, "xdg-opencode")
     process.env.OPENCODE_CONFIG_DIR = legacyRoot
-    process.env.ALPHA_LEGACY_INSTALL_ROOT = "1"
+    process.env.CODEPUPPY_LEGACY_INSTALL_ROOT = "1"
     try {
       const r = writeSkill("legacy-skill", "d", "b")
       expect(r.ok).toBe(true)
       expect(fs.existsSync(path.join(legacyRoot, "skills", "legacy-skill", "SKILL.md"))).toBe(true)
-      expect(fs.existsSync(path.join(alphaDir, "skills"))).toBe(false)
-      expect(readLedger(alphaDir).receipts).toHaveLength(0)
+      expect(fs.existsSync(path.join(codepuppyDir, "skills"))).toBe(false)
+      expect(readLedger(codepuppyDir).receipts).toHaveLength(0)
     } finally {
-      delete process.env.ALPHA_LEGACY_INSTALL_ROOT
+      delete process.env.CODEPUPPY_LEGACY_INSTALL_ROOT
       delete process.env.OPENCODE_CONFIG_DIR
     }
   })
@@ -273,19 +273,19 @@ describe("uncurated fs installs land v2 records (#306)", () => {
     const { findRecordV2 } = await import("./ext-receipt-v2")
     const r = writeAgent("imp-agent", "---\ndescription: d\nmode: subagent\n---\nsys", undefined, undefined, "imported")
     expect(r.ok).toBe(true)
-    const rec = findRecordV2(alphaDir, "agent", "imp-agent")
+    const rec = findRecordV2(codepuppyDir, "agent", "imp-agent")
     expect(rec?.id).toBe("user:imp-agent")
     expect(rec?.origin).toBe("imported")
     expect(rec?.manifestDigest).toBeUndefined()
     // 派生 v1 receipt 同键在账(降级可读)
-    expect(readLedger(alphaDir).receipts.some((x) => x.name === "imp-agent" && x.type === "agent")).toBe(true)
+    expect(readLedger(codepuppyDir).receipts.some((x) => x.name === "imp-agent" && x.type === "agent")).toBe(true)
   })
 
   test("writeAgent 落账被 catalog 同键拒绝 → fail-closed 补偿(md 与 config 条目都不留)", async () => {
     const { upsertRecordV2 } = await import("./ext-receipt-v2")
     // 预置同键 catalog record(模拟 catalog agent 在账)
     expect(
-      upsertRecordV2(alphaDir, {
+      upsertRecordV2(codepuppyDir, {
         id: "agent:pm",
         name: "pm",
         kind: "agent",
@@ -299,7 +299,7 @@ describe("uncurated fs installs land v2 records (#306)", () => {
     const r = writeAgent("pm", "---\ndescription: d\nmode: subagent\n---\nsys", undefined, undefined, "imported")
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.reason).toContain("catalog install")
-    expect(fs.existsSync(path.join(alphaDir, "agents", "pm.md"))).toBe(false) // 补偿:md 已撤
+    expect(fs.existsSync(path.join(codepuppyDir, "agents", "pm.md"))).toBe(false) // 补偿:md 已撤
   })
 })
 
@@ -308,16 +308,16 @@ describe("agentInstallPresent (REQ-100 #354)", () => {
   test("md 在场 / 手工配置项在场 / 语法损坏配置 → 一律 true;全净 → false", () => {
     expect(agentInstallPresent("helper", { scope: "global" })).toBe(false)
     // 手工 agent.<name> 配置(无 md、无账)= 既有安装事实,覆盖它会造成用户数据丢失。
-    fs.mkdirSync(alphaDir, { recursive: true })
-    fs.writeFileSync(path.join(alphaDir, "alpha.jsonc"), JSON.stringify({ agent: { helper: { prompt: "hand written" } } }))
+    fs.mkdirSync(codepuppyDir, { recursive: true })
+    fs.writeFileSync(path.join(codepuppyDir, "codepuppy.jsonc"), JSON.stringify({ agent: { helper: { prompt: "hand written" } } }))
     expect(agentInstallPresent("helper", { scope: "global" })).toBe(true)
     // 语法损坏 → fail-closed 在场。
-    fs.writeFileSync(path.join(alphaDir, "alpha.jsonc"), '{ "agent": { broken')
+    fs.writeFileSync(path.join(codepuppyDir, "codepuppy.jsonc"), '{ "agent": { broken')
     expect(agentInstallPresent("helper", { scope: "global" })).toBe(true)
     // md 在场(无配置项)。
-    fs.writeFileSync(path.join(alphaDir, "alpha.jsonc"), "{}")
-    fs.mkdirSync(path.join(alphaDir, "agents"), { recursive: true })
-    fs.writeFileSync(path.join(alphaDir, "agents", "helper.md"), "---\ndescription: d\n---\nbody")
+    fs.writeFileSync(path.join(codepuppyDir, "codepuppy.jsonc"), "{}")
+    fs.mkdirSync(path.join(codepuppyDir, "agents"), { recursive: true })
+    fs.writeFileSync(path.join(codepuppyDir, "agents", "helper.md"), "---\ndescription: d\n---\nbody")
     expect(agentInstallPresent("helper", { scope: "global" })).toBe(true)
   })
 })

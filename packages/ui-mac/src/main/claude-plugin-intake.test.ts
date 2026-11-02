@@ -487,11 +487,11 @@ describe("owner 裁决 D 重名", () => {
   test("包内两个目录解析出同一个 name ⇒ **两个都跳过**(不挑赢家)", () => {
     const root = tmp("dupname")
     writeManifest(root, "dupname")
-    writeSkill(path.join(root, "skills", "alpha-dir"), "same-name")
+    writeSkill(path.join(root, "skills", "codepuppy-dir"), "same-name")
     writeSkill(path.join(root, "skills", "beta-dir"), "same-name")
     writeSkill(path.join(root, "skills", "unique"), "unique")
     const preview = previewLocalClaudePlugin(root)
-    expect(codesOf(preview, "alpha-dir")).toEqual(["name-collision-in-package"])
+    expect(codesOf(preview, "codepuppy-dir")).toEqual(["name-collision-in-package"])
     expect(codesOf(preview, "beta-dir")).toEqual(["name-collision-in-package"])
     expect(preview.installableCount).toBe(1)
     fs.rmSync(root, { recursive: true, force: true })

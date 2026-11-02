@@ -252,7 +252,7 @@ async function handle(sock: net.Socket, req: Req, bodyText: string) {
       s.writtenAtAbort.push(sent)
     }
     bodyDone = true
-    if (process.env.ALPHA_402_ORIGIN_DEBUG)
+    if (process.env.CODEPUPPY_402_ORIGIN_DEBUG)
       process.stderr.write(`[origin] probe=${id} sent=${sent}/${bodyBytes} aborted=${aborted} destroyed=${sock.destroyed}\n`)
     sock.end()
   }

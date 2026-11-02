@@ -8,8 +8,8 @@
 // 逻辑逐字搬移自 ext-ipc.ts(#355/#378/#395 各裁决注释原样保留),仅 userDataPath/globalRoot/
 // environment/recordUncuratedInstall 收进 deps。
 
-import { claimMcpSecretVersionDir, fileifyMcpSecretsVersioned, isFileRef, newMcpSecretVersionId, removeMcpSecretVersionDir } from "./alpha-mcp-secrets"
-import type { AppEnvironment } from "./alpha-environment"
+import { claimMcpSecretVersionDir, fileifyMcpSecretsVersioned, isFileRef, newMcpSecretVersionId, removeMcpSecretVersionDir } from "./codepuppy-mcp-secrets"
+import type { AppEnvironment } from "./codepuppy-environment"
 import { gcMcpSecretsAgainstConfig, readMcpLeaf, restoreMcpLeaf } from "./ext-config"
 import { persistMcpWithPolicy } from "./ext-mcp-policy"
 import { recordUncuratedInstall } from "./ext-uncurated-record"

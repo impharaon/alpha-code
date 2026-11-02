@@ -1,5 +1,5 @@
 // REQ-123(#1176)—— xlsx 表格呈现组件用例(真 Solid + happy-dom 挂载)。
-// 驱动器:src/renderer/alpha-ui/artifact-workbench/renderers/xlsx-view.test.ts(子进程绿判据)。
+// 驱动器:src/renderer/codepuppy-ui/artifact-workbench/renderers/xlsx-view.test.ts(子进程绿判据)。
 // 模型来自真实生成器夹具(xlsxwriter,共享串 + 数值 + 多 sheet + 缓存公式);
 // 字节 → 文档在 buildXlsxWorkbook 内部走 #1174 的 parseOoxmlContentPart,与生产同一条路。
 
@@ -36,14 +36,14 @@ Bun.plugin({
   },
 })
 
-const model = await import("../src/renderer/alpha-ui/artifact-workbench/renderers/xlsx-model")
-const viewModule = await import("../src/renderer/alpha-ui/artifact-workbench/renderers/xlsx-view")
+const model = await import("../src/renderer/codepuppy-ui/artifact-workbench/renderers/xlsx-model")
+const viewModule = await import("../src/renderer/codepuppy-ui/artifact-workbench/renderers/xlsx-view")
 const { XlsxWorkbookView } = viewModule as unknown as {
-  XlsxWorkbookView: (props: { workbook: import("../src/renderer/alpha-ui/artifact-workbench/renderers/xlsx-model").XlsxWorkbook }) => unknown
+  XlsxWorkbookView: (props: { workbook: import("../src/renderer/codepuppy-ui/artifact-workbench/renderers/xlsx-model").XlsxWorkbook }) => unknown
 }
 
 function loadFixtureParts(generator: string): Map<string, Uint8Array> {
-  const root = resolve(import.meta.dir, "../src/renderer/alpha-ui/artifact-workbench/renderers/fixtures/xlsx", generator)
+  const root = resolve(import.meta.dir, "../src/renderer/codepuppy-ui/artifact-workbench/renderers/fixtures/xlsx", generator)
   const parts = new Map<string, Uint8Array>()
   const walk = (dir: string, prefix: string) => {
     for (const entry of readdirSync(dir)) {
@@ -97,8 +97,8 @@ describe("REQ-123 AC2 xlsx view real Solid mount", () => {
     const host = mount(() => XlsxWorkbookView({ workbook: buildFixtureWorkbook() }))
     await flush()
 
-    const tabs = Array.from(host.querySelectorAll("[data-alpha-xlsx-tab]"))
-    expect(tabs.map((el) => el.getAttribute("data-alpha-xlsx-tab"))).toEqual(["Overview", "数据"])
+    const tabs = Array.from(host.querySelectorAll("[data-codepuppy-xlsx-tab]"))
+    expect(tabs.map((el) => el.getAttribute("data-codepuppy-xlsx-tab"))).toEqual(["Overview", "数据"])
     expect(tabs[0]!.getAttribute("aria-selected")).toBe("true")
 
     const texts = tdTexts(host)
@@ -120,7 +120,7 @@ describe("REQ-123 AC2 xlsx view real Solid mount", () => {
   test("切换到第二张表:内容换成该表的,首表内容退场(只渲染第一 sheet 的实现在此变红)", async () => {
     const host = mount(() => XlsxWorkbookView({ workbook: buildFixtureWorkbook() }))
     await flush()
-    const secondTab = host.querySelector('[data-alpha-xlsx-tab="数据"]') as HTMLButtonElement
+    const secondTab = host.querySelector('[data-codepuppy-xlsx-tab="数据"]') as HTMLButtonElement
     secondTab.click()
     await flush()
 
@@ -135,13 +135,13 @@ describe("REQ-123 AC2 xlsx view real Solid mount", () => {
   test("tablist 键盘巡航:→ 移到第二张表并切换内容(W3C Tabs Pattern 接线)", async () => {
     const host = mount(() => XlsxWorkbookView({ workbook: buildFixtureWorkbook() }))
     await flush()
-    const firstTab = host.querySelector('[data-alpha-xlsx-tab="Overview"]') as HTMLButtonElement
+    const firstTab = host.querySelector('[data-codepuppy-xlsx-tab="Overview"]') as HTMLButtonElement
     // roving tabindex:恰好一个落点在 Tab 序列里。
-    const tabs = Array.from(host.querySelectorAll("[data-alpha-xlsx-tab]"))
+    const tabs = Array.from(host.querySelectorAll("[data-codepuppy-xlsx-tab]"))
     expect(tabs.map((el) => el.getAttribute("tabindex"))).toEqual(["0", "-1"])
     firstTab.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true }))
     await flush()
-    const secondTab = host.querySelector('[data-alpha-xlsx-tab="数据"]')
+    const secondTab = host.querySelector('[data-codepuppy-xlsx-tab="数据"]')
     expect(secondTab?.getAttribute("aria-selected")).toBe("true")
     expect(tdTexts(host).includes("华东")).toBe(true)
   })
@@ -180,7 +180,7 @@ describe("REQ-123 AC2 xlsx view real Solid mount", () => {
     }
     const host = mount(() => XlsxWorkbookView({ workbook }))
     await flush()
-    const brokenTab = host.querySelector('[data-alpha-xlsx-tab="Broken"]') as HTMLButtonElement
+    const brokenTab = host.querySelector('[data-codepuppy-xlsx-tab="Broken"]') as HTMLButtonElement
     expect(brokenTab).not.toBeNull()
     brokenTab.click()
     await flush()

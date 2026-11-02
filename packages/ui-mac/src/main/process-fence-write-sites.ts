@@ -166,7 +166,7 @@ export const signatureOf = (s: { file: string; api: string; firstArg: string }) 
  *   · 一个或多个 W-id(`W2+W6+W1`):写落在可写集这些行之下;
  *   · `arg`:路径来自调用方(通用 helper),具体根登记在调用方那一行;
  *   · `main-only`:这处代码住在 sidecar 的 import 闭包里,但**只有 main 进程会执行到它**(今天唯一的例子是
- *     alpha-environment.ts 的 initAlphaEnvironment 拓扑创建;server.ts:380 明写 sidecar 从不 init 它)。
+ *     codepuppy-environment.ts 的 initCodePuppyEnvironment 拓扑创建;server.ts:380 明写 sidecar 从不 init 它)。
  *     这是一个可达性声明,评审对着调用点核;不许拿它给真会在 sidecar 里跑的写入点开豁免。
  */
 export function isValidRoot(root: string): boolean {

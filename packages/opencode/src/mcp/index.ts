@@ -58,11 +58,11 @@ import {
   governedMcpEvidence,
   isGovernedMcpEntry,
 } from "@opencode-ai/plugin/alpha-cloud-authority"
-import { declaredFirstPartyTools } from "./alpha-first-party-mcp"
-import { canonicalJsonDigest } from "@/permission/alpha-tool-policy-store"
+import { declaredFirstPartyTools } from "./codepuppy-first-party-mcp"
+import { canonicalJsonDigest } from "@/permission/codepuppy-tool-policy-store"
 // #1572: the layered network classifier (REQ-236 network baseline §2.2 N1) and the engine's egress-proxy path judgment
 // live in one module; this file consumes both and keeps no copy of either.
-import { classifyNetFailure, engineNetFailurePath } from "@opencode-ai/schema/alpha-net-failure"
+import { classifyNetFailure, engineNetFailurePath } from "@opencode-ai/schema/codepuppy-net-failure"
 import { ToolAliasLedger, type ToolAuthority, type ToolIdentity } from "@opencode-ai/schema/tool-identity"
 
 const DEFAULT_TIMEOUT = 30_000
@@ -522,7 +522,7 @@ const layer = Layer.effect(
       }
 
       const requestInit = mcp.headers ? { headers: mcp.headers } : undefined
-      // REQ-236 `#1562`:alpha 治理的云连接器每次请求现读 ALPHA_CLOUD_MCP_DEF 里引用的凭据文件(续期热应用,
+      // REQ-236 `#1562`:alpha 治理的云连接器每次请求现读 CODEPUPPY_CLOUD_MCP_DEF 里引用的凭据文件(续期热应用,
       // 引擎不重启);读不到就以认证错误失败,不用已装载条目里的旧字面量。其它条目不传 fetch,行为不变。
       const fetch = isGovernedMcpEntry(key, mcp, process.env)
         ? governedCredentialFetch(process.env, (file) => readFile(file, "utf8"), (input, init) => globalThis.fetch(input, init))

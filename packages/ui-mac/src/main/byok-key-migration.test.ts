@@ -5,15 +5,15 @@
 // syncSecretFiles 的清理分支会把「不在 wanted 集」的既有密钥文件删掉 ⇒ 已配好的直连全部不可执行。
 //
 // 这里照生产 fork 的顺序走一遍(index.ts 启动 → server.ts spawnLocalServer):
-//   钥匙串里一把**真实存储格式**的 Key(alpha-byok-keys.json `{v:1, enc}`,与 persist() 写出的同形)
-//   → initByokKeys → injectByokKeysIntoEnv → syncSecretFiles → pinAppliedCatalog → buildAlphaModelConfig
+//   钥匙串里一把**真实存储格式**的 Key(codepuppy-byok-keys.json `{v:1, enc}`,与 persist() 写出的同形)
+//   → initByokKeys → injectByokKeysIntoEnv → syncSecretFiles → pinAppliedCatalog → buildCodePuppyModelConfig
 //   → 真引擎(packages/opencode/src/index.ts run,与打包 sidecar 同一份请求装配)发一次请求,
 // 断言:引擎配置里有这个 provider、`{file:}` 指向的文件在、本地桩收到的鉴权头就是这把 Key;迁移前就在盘上的
 // 密钥文件在前后两次 fork 里都没被清理分支删掉。只把生产配置里该 provider 的 baseURL 改指本地桩
-// (alpha-reasoning-badge-parity.test.ts 同款);其余全是生产函数。
+// (codepuppy-reasoning-badge-parity.test.ts 同款);其余全是生产函数。
 //
-// 先红后绿:把 alpha-secret-files.ts 的 secretEnvVars 改回只含平台三项(BYOK 读者没迁好时的效果),第一条断言
-// 「removed 不含 DEEPSEEK_API_KEY」转红;把 alpha-byok-keys.ts 的 keyEnvFor 改成返回 undefined,物化那一步转红。
+// 先红后绿:把 codepuppy-secret-files.ts 的 secretEnvVars 改回只含平台三项(BYOK 读者没迁好时的效果),第一条断言
+// 「removed 不含 DEEPSEEK_API_KEY」转红;把 codepuppy-byok-keys.ts 的 keyEnvFor 改成返回 undefined,物化那一步转红。
 
 import { afterAll, beforeAll, expect, mock, test } from "bun:test"
 import * as fs from "node:fs"
@@ -25,7 +25,7 @@ const flip = (input: Uint8Array): Buffer => {
   for (let i = 0; i < input.length; i++) out[i] = input[i]! ^ 0x5a
   return out
 }
-mock.module("./alpha-keychain-backend", () => ({
+mock.module("./codepuppy-keychain-backend", () => ({
   keychainBackend: () => ({
     isEncryptionAvailable: () => true,
     encryptString: (value: string) => flip(Buffer.from(value, "utf8")),
@@ -37,12 +37,12 @@ mock.module("./logging", () => ({
   write: () => {},
   rotateServerLogs: () => {},
 }))
-const { clearByokKeys, getByokKey, initByokKeys, injectByokKeysIntoEnv } = await import("./alpha-byok-keys")
-const { secretFilePath, secretFileRef, syncSecretFiles } = await import("./alpha-secret-files")
-const { pinAppliedCatalog, writeByokCatalogLkg } = await import("./alpha-live-allowlist")
-const { buildAlphaModelConfig, getModelCatalog } = await import("./alpha-models")
-const { buildModelPickerRows } = await import("../renderer/alpha-ui/model-picker-core")
-const bundled = (await import("./alpha-models.json")).default.byokCatalog
+const { clearByokKeys, getByokKey, initByokKeys, injectByokKeysIntoEnv } = await import("./codepuppy-byok-keys")
+const { secretFilePath, secretFileRef, syncSecretFiles } = await import("./codepuppy-secret-files")
+const { pinAppliedCatalog, writeByokCatalogLkg } = await import("./codepuppy-live-allowlist")
+const { buildCodePuppyModelConfig, getModelCatalog } = await import("./codepuppy-models")
+const { buildModelPickerRows } = await import("../renderer/codepuppy-ui/model-picker-core")
+const bundled = (await import("./codepuppy-models.json")).default.byokCatalog
 
 const repoRoot = path.resolve(import.meta.dir, "../../../..")
 const engineEntry = path.resolve(repoRoot, "packages/opencode/src/index.ts")
@@ -52,7 +52,7 @@ const PATH_AT_LOAD = process.env.PATH ?? ""
 
 // 刻意不像真密钥的测试值;它只出现在本进程起的本地桩上。
 const STORED_KEY = "test-stored-key-not-real-Zq81-1556"
-const MANAGED = ["DEEPSEEK_API_KEY", "ALPHA_MODELS_DISABLE", "ALPHA_BASE_URL", "ALPHA_DEFAULT_MODEL", "ALPHA_GLOBAL_DIR", "OPENCODE_CONFIG_DIR"]
+const MANAGED = ["DEEPSEEK_API_KEY", "CODEPUPPY_MODELS_DISABLE", "CODEPUPPY_BASE_URL", "CODEPUPPY_DEFAULT_MODEL", "CODEPUPPY_GLOBAL_DIR", "OPENCODE_CONFIG_DIR"]
 const saved: Record<string, string | undefined> = {}
 let root = ""
 let userData = ""
@@ -79,8 +79,8 @@ beforeAll(() => {
   root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "byok-key-migration-")))
   userData = path.join(root, "userdata")
   fs.mkdirSync(userData, { recursive: true })
-  process.env.ALPHA_GLOBAL_DIR = path.join(root, "alpha-global", "alpha-code-state", "env", "dev")
-  fs.mkdirSync(process.env.ALPHA_GLOBAL_DIR, { recursive: true })
+  process.env.CODEPUPPY_GLOBAL_DIR = path.join(root, "codepuppy-global", "codepuppy-state", "env", "dev")
+  fs.mkdirSync(process.env.CODEPUPPY_GLOBAL_DIR, { recursive: true })
   process.env.OPENCODE_CONFIG_DIR = path.join(root, "config-dir")
   fs.mkdirSync(process.env.OPENCODE_CONFIG_DIR, { recursive: true })
   server = Bun.serve({
@@ -110,7 +110,7 @@ afterAll(() => {
 test("`#1556` AC5:迁移前已存的 BYOK Key → 物化为密钥文件、注入引擎配置、真引擎请求带上它;既有密钥文件两次 fork 都不被删", async () => {
   // ① 迁移前的盘面:钥匙串金库(persist() 写出的形状)+ 上一版 fork 留下的密钥文件。
   fs.writeFileSync(
-    path.join(userData, "alpha-byok-keys.json"),
+    path.join(userData, "codepuppy-byok-keys.json"),
     JSON.stringify({ v: 1, enc: flip(Buffer.from(JSON.stringify({ deepseek: STORED_KEY }), "utf8")).toString("base64") }),
     { mode: 0o600 },
   )
@@ -134,7 +134,7 @@ test("`#1556` AC5:迁移前已存的 BYOK Key → 物化为密钥文件、注入
     pinAppliedCatalog(userData, generation)
   }
 
-  const config = buildAlphaModelConfig(userData)!
+  const config = buildCodePuppyModelConfig(userData)!
   expect(config.enabled_providers).toContain("deepseek-byok")
   const node = config.provider["deepseek-byok"] as { options: { baseURL: string; apiKey: string }; models: Record<string, unknown> }
   expect(node.options.apiKey).toBe(secretFileRef(userData, "DEEPSEEK_API_KEY"))
@@ -173,7 +173,7 @@ test("`#1556` AC7(本地代理):远程目录新增的模型 → 钉住 → picke
   }).find((candidate) => candidate.key === `deepseek:${added}`)
   expect(row).toMatchObject({ availability: "available", model: { id: added, providerID: "deepseek-byok", name: "DeepSeek V5 Preview" } })
 
-  const config = buildAlphaModelConfig(userData)!
+  const config = buildCodePuppyModelConfig(userData)!
   expect(Object.keys((config.provider["deepseek-byok"] as { models: Record<string, unknown> }).models)).toContain(added)
   const before = seen.length
   const { rc, log, completions } = await engineRequest(config, added, before)
@@ -182,8 +182,8 @@ test("`#1556` AC7(本地代理):远程目录新增的模型 → 钉住 → picke
   for (const entry of completions) expect(entry.authorization).toBe(`Bearer ${STORED_KEY}`)
 }, 120_000)
 
-/** 一次真引擎 `run`(alpha-reasoning-badge-parity.test.ts 同款隔离):deepseek-byok 的端点改指本地桩,返回桩收到的补全请求。 */
-async function engineRequest(config: NonNullable<ReturnType<typeof buildAlphaModelConfig>>, model: string, from = 0) {
+/** 一次真引擎 `run`(codepuppy-reasoning-badge-parity.test.ts 同款隔离):deepseek-byok 的端点改指本地桩,返回桩收到的补全请求。 */
+async function engineRequest(config: NonNullable<ReturnType<typeof buildCodePuppyModelConfig>>, model: string, from = 0) {
   const node = config.provider["deepseek-byok"] as { options: { baseURL: string } }
   node.options.baseURL = `http://127.0.0.1:${server!.port}/byok/v1`
   const dir = fs.mkdtempSync(path.join(root, "run-"))
@@ -205,7 +205,7 @@ async function engineRequest(config: NonNullable<ReturnType<typeof buildAlphaMod
       NO_PROXY: "127.0.0.1,localhost",
       no_proxy: "127.0.0.1,localhost",
       NO_COLOR: "1",
-      ALPHA_GLOBAL_DIR: process.env.ALPHA_GLOBAL_DIR!,
+      CODEPUPPY_GLOBAL_DIR: process.env.CODEPUPPY_GLOBAL_DIR!,
       OPENCODE_CONFIG: configPath,
       OPENCODE_DISABLE_PROJECT_CONFIG: "1",
       OPENCODE_MODELS_PATH: modelsFixture,

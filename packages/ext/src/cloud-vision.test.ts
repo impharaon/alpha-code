@@ -1,4 +1,4 @@
-// cloud-vision.test.ts —— `#1419`(REQ-228 §2-B)走生产路径:**真 AlphaExt 的钩子**(不是单独 new 一份 hooks)
+// cloud-vision.test.ts —— `#1419`(REQ-228 §2-B)走生产路径:**真 CodePuppyExt 的钩子**(不是单独 new 一份 hooks)
 // + **真 HTTP** 到一个记录请求的桩 gateway(Bun.serve,127.0.0.1)+ 真 photon 压缩。桩的只有 gateway 那一端。
 // 期望值全是独立字面量:文案逐字抄自票面 / 基线,不从 renderWrapper / renderTemplate 派生 —— 文案改了这里要一起改,
 // 那正是想要的红。凭据来源与「云端是否可用」的判据见 cloud-vision.ts 文件头。
@@ -22,12 +22,12 @@ type Recorded = { path: string; authorization: string | null; body: Record<strin
 type Reply = { status: number; body: unknown }
 
 const SANITIZE = [
-  "ALPHA_GLOBAL_DIR",
-  "ALPHA_BASE_URL",
-  "ALPHA_FACTORY_SKILL_DIRS",
-  "ALPHA_FACTORY_DENY_SKILLS",
-  "ALPHA_PROMPT_REBRAND_DISABLE",
-  "ALPHA_EXT_VERBOSE",
+  "CODEPUPPY_GLOBAL_DIR",
+  "CODEPUPPY_BASE_URL",
+  "CODEPUPPY_FACTORY_SKILL_DIRS",
+  "CODEPUPPY_FACTORY_DENY_SKILLS",
+  "CODEPUPPY_PROMPT_REBRAND_DISABLE",
+  "CODEPUPPY_EXT_VERBOSE",
   CLOUD_MCP_ARM_ENV,
   CLOUD_MCP_DEF_ENV,
   CLOUD_MCP_SERVER_ENV,
@@ -102,18 +102,18 @@ beforeAll(async () => {
 afterAll(() => server.stop(true))
 
 beforeEach(() => {
-  root = realpathSync(mkdtempSync(join(tmpdir(), "alpha-ext-vision-")))
+  root = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-vision-")))
   mkdirSync(join(root, "global", "env", "dev"), { recursive: true })
   mkdirSync(join(root, "project"), { recursive: true })
   for (const k of SANITIZE) {
     saved.set(k, process.env[k])
     delete process.env[k]
   }
-  process.env.ALPHA_GLOBAL_DIR = join(root, "global", "env", "dev")
+  process.env.CODEPUPPY_GLOBAL_DIR = join(root, "global", "env", "dev")
   tokenFile = join(root, "mcp-token")
   writeFileSync(tokenFile, "tok-vision-123\n")
   // 与 ui-mac 每次 fork 写的三样同形:平台 base(gateway 主机 + /v1)、云 server 名、带 {file:} 凭据的云 MCP 定义
-  process.env.ALPHA_BASE_URL = `http://127.0.0.1:${server.port}/v1`
+  process.env.CODEPUPPY_BASE_URL = `http://127.0.0.1:${server.port}/v1`
   process.env[CLOUD_MCP_SERVER_ENV] = "codepuppy"
   process.env[CLOUD_MCP_DEF_ENV] = JSON.stringify({ type: "remote", url: "https://cloud.invalid/mcp", enabled: true, headers: { Authorization: `Bearer {file:${tokenFile}}` }, oauth: false })
   requests = []
@@ -129,10 +129,10 @@ afterEach(() => {
 })
 
 type Message = { info: Record<string, unknown>; parts: unknown[] }
-/** 真 AlphaExt;`history` = 引擎 `client.session.messages()` 会答的会话历史(缺省空)。 */
+/** 真 CodePuppyExt;`history` = 引擎 `client.session.messages()` 会答的会话历史(缺省空)。 */
 async function loadHooks(history: Message[] = []): Promise<Hooks> {
-  const { AlphaExt } = await import("./plugin")
-  return (await AlphaExt({
+  const { CodePuppyExt } = await import("./plugin")
+  return (await CodePuppyExt({
     directory: join(root, "project"),
     worktree: join(root, "project"),
     client: {
@@ -140,7 +140,7 @@ async function loadHooks(history: Message[] = []): Promise<Hooks> {
       provider: { list: async () => PROVIDER_LIST },
       session: { messages: async () => ({ data: history }) },
     },
-  } as unknown as Parameters<typeof AlphaExt>[0])) as unknown as Hooks
+  } as unknown as Parameters<typeof CodePuppyExt>[0])) as unknown as Hooks
 }
 
 const dataUrl = (bytes: Uint8Array, mime = "image/png") => `data:${mime};base64,${Buffer.from(bytes).toString("base64")}`
@@ -374,9 +374,9 @@ describe("云端不可用 ⇒ 说得出原因的话(与 #1411 同一根轴:云 M
       text: "〔图片 #1 a.png 未能识别:云端识图不可用 —— 尚未登录 Code Puppy 账号〕",
     },
     {
-      name: "未登录:没有 ALPHA_BASE_URL(BYOK 态)⇒ 不出网",
+      name: "未登录:没有 CODEPUPPY_BASE_URL(BYOK 态)⇒ 不出网",
       setup: () => {
-        delete process.env.ALPHA_BASE_URL
+        delete process.env.CODEPUPPY_BASE_URL
       },
       calls: 0,
       text: "〔图片 #1 a.png 未能识别:云端识图不可用 —— 尚未登录 Code Puppy 账号〕",
@@ -392,7 +392,7 @@ describe("云端不可用 ⇒ 说得出原因的话(与 #1411 同一根轴:云 M
     {
       name: "连不上(loopback 上没人听的端口)⇒ 网络",
       setup: () => {
-        process.env.ALPHA_BASE_URL = "http://127.0.0.1:1/v1"
+        process.env.CODEPUPPY_BASE_URL = "http://127.0.0.1:1/v1"
       },
       calls: 0,
       text: "〔图片 #1 a.png 未能识别:连不上云端识图服务,请检查网络〕",

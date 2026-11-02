@@ -88,7 +88,7 @@ const GATE_NAME_TOKENS =
 
 /** 本 CI 五步真正会跑到的测试范围 —— 范围外的文件(如上游 opencode 测试)不归本闸管。 */
 const IN_SCOPE = [
-  "packages/alpha-contracts-consumer/src/",
+  "packages/codepuppy-contracts-consumer/src/",
   "packages/ext/src/",
   "packages/ui-mac/src/",
   "packages/opencode/test/tool/alpha-",
@@ -105,9 +105,9 @@ const IN_SCOPE = [
 const NOT_GATES: Record<string, string> = {
   "packages/ui-mac/src/main/ext-bundle-lock.test.ts":
     "REQ-100 bundle 锁的**功能**单测(互斥/争用/死 pid/心跳超时)。删掉是 bundle-lock 这个功能少测了,不是某条仓库级保证消失。",
-  "packages/ui-mac/src/main/alpha-auth-clock.test.ts":
+  "packages/ui-mac/src/main/codepuppy-auth-clock.test.ts":
     "只是文件名里的 'clock' 撞上了 'lock'。内容是刷新时机的纯逻辑单测,与闸门无关。",
-  // `#893` 移除 `renderer/alpha-ui/model-contract.test.ts`:它同时登记在 gate-files.tsv 里(两处
+  // `#893` 移除 `renderer/codepuppy-ui/model-contract.test.ts`:它同时登记在 gate-files.tsv 里(两处
   // 自相矛盾)。裁决 = **它是闸门**,本表的条目已过期。理由:那条注释写于它还只是
   // `createModelContract` 输入→输出单测的年代;`#857`/`#882`/`#881` 之后它断言的是**自己模块
   // 之外**的东西 —— 引擎侧的目录就绪协议(`catalog.updated` 唤醒、兜底轮询闩死在 250ms、
@@ -159,18 +159,18 @@ function manifestRows(): Row[] {
  * 这是「发现绊线」的出口 —— 不是豁免后门:写在这里等于公开声明「这条保证今天没有 CI 在跑」。
  */
 const REFERENCED_BUT_UNREGISTERED: Record<string, string> = {
-  "packages/opencode/test/tool/alpha-mcp-websearch-gate.test.ts":
+  "packages/opencode/test/tool/codepuppy-mcp-websearch-gate.test.ts":
     "真委派(通用 Remote MCP 钳制点的证据),但 owner 明确指示不在本 PR 纳入 CI;纳入与否在 #649 评估(23s 耗时 + Bun.serve 超时告警需先定性)。",
-  "packages/opencode/test/mcp/alpha-cloud-mcp-multisource.test.ts":
+  "packages/opencode/test/mcp/codepuppy-cloud-mcp-multisource.test.ts":
     "真委派(云 MCP 多源继承的真实 lifecycle 断言),纳入与否同样在 #649 评估。",
-  "packages/opencode/test/mcp/alpha-cloud-mcp-revival.test.ts":
+  "packages/opencode/test/mcp/codepuppy-cloud-mcp-revival.test.ts":
     "真委派(云 MCP 复活路径的真实 lifecycle 断言),纳入与否同样在 #649 评估。",
   "packages/core/test/tool-websearch.test.ts":
-    "上游测试文件。alpha-websearch-sovereignty 的抬头只是说明自己的 harness 与它**同源**,不是把判据委派给它;packages/core 是上游包,该文件由 north-star 守卫保护。",
+    "上游测试文件。codepuppy-websearch-sovereignty 的抬头只是说明自己的 harness 与它**同源**,不是把判据委派给它;packages/core 是上游包,该文件由 north-star 守卫保护。",
   "packages/opencode/test/tool/websearch.test.ts":
-    "上游测试文件,不是 alpha 的闸门 —— alpha 刻意不接管它(见 alpha-ci.yml 的 ADR-035 注释),它由 north-star 守卫保护不被 alpha 改动。",
+    "上游测试文件,不是 alpha 的闸门 —— alpha 刻意不接管它(见 codepuppy-ci.yml 的 ADR-035 注释),它由 north-star 守卫保护不被 alpha 改动。",
   "packages/opencode/test/plugin/trigger.test.ts":
-    "上游测试文件。ADR-045/#427 的探针 alpha-427-memory-seam-probe.test.ts 只是说明自己的 harness 与它**同形**(真 Config、file:// 插件、临时 instance)并拿它当退路 ② 的对照,不把判据委派给它;它由 north-star 守卫保护不被 alpha 改动。",
+    "上游测试文件。ADR-045/#427 的探针 codepuppy-427-memory-seam-probe.test.ts 只是说明自己的 harness 与它**同形**(真 Config、file:// 插件、临时 instance)并拿它当退路 ② 的对照,不把判据委派给它;它由 north-star 守卫保护不被 alpha 改动。",
 }
 
 const ALL_TESTS = gitListedTests()
@@ -613,7 +613,7 @@ describe("闸门文件登记簿完备性 (#647)", () => {
     ).toHaveLength(1)
     expect(sourceTextReadLines('const index = read("index.ts")')).toHaveLength(1)
     expect(
-      sourceTextReadLines('const banner = await Bun.file(resolve(import.meta.dir, "../alpha-ui/Banner.tsx")).text()'),
+      sourceTextReadLines('const banner = await Bun.file(resolve(import.meta.dir, "../codepuppy-ui/Banner.tsx")).text()'),
     ).toHaveLength(1)
     // 反例①:整行注释 —— 注释里举例说明不算(少了这一步,一句解释性抬头就能把自己算进来)。
     expect(sourceTextReadLines('  // const source = readFileSync(join(import.meta.dir, "index.ts"), "utf8")')).toEqual([])

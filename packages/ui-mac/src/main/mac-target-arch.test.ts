@@ -69,7 +69,7 @@ function fixture(opts: {
   packages: { name: string; cpu: TargetArch; binaries: Record<string, Buffer> }[]
   officeRuntime?: Partial<Record<TargetArch, Record<string, Buffer>>>
 }): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "alpha-target-arch-"))
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-target-arch-"))
   tmpDirs.push(dir)
   fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "ui-mac-fixture" }))
   fs.mkdirSync(path.join(dir, "out", "main", "chunks"), { recursive: true })
@@ -111,7 +111,7 @@ function goodPackages(arch: TargetArch): FixturePackage[] {
 }
 
 describe("resolveTargetArch", () => {
-  test("显式 ALPHA_TARGET_ARCH 压过宿主架构", () => {
+  test("显式 CODEPUPPY_TARGET_ARCH 压过宿主架构", () => {
     expect(resolveTargetArch({ [TARGET_ARCH_ENV]: "x64" }, "arm64")).toBe("x64")
     expect(resolveTargetArch({ [TARGET_ARCH_ENV]: "arm64" }, "x64")).toBe("arm64")
   })
@@ -216,7 +216,7 @@ describe("assertMacTargetArch(beforePack 的核对)", () => {
     test(`${target}:目标未设、宿主是 ${wrong} ⇒ 拒绝(不许按宿主架构打跨架构包)`, () => {
       const dir = fixture({ bundled: [nodePtyPackage("darwin", target)], packages: goodPackages(target) })
       expect(() => assertMacTargetArch({ packingArch: target, packageDir: dir, env: {}, hostArch: wrong })).toThrow(
-        /正在打 .* 包,但 ALPHA_TARGET_ARCH 解析为/,
+        /正在打 .* 包,但 CODEPUPPY_TARGET_ARCH 解析为/,
       )
     })
 
@@ -289,13 +289,13 @@ describe("mergeMacFeeds(latest-mac.yml 两架构合并)", () => {
       [
         `version: ${version}`,
         "files:",
-        `  - url: code-puppy-mac-${arch}.zip`,
+        `  - url: codepuppy-mac-${arch}.zip`,
         `    sha512: ${arch}zip`,
         "    size: 10",
-        `  - url: code-puppy-mac-${arch}.dmg`,
+        `  - url: codepuppy-mac-${arch}.dmg`,
         `    sha512: ${arch}dmg`,
         "    size: 20",
-        `path: code-puppy-mac-${arch}.zip`,
+        `path: codepuppy-mac-${arch}.zip`,
         `releaseDate: '2026-10-10T00:00:0${arch === "x64" ? 1 : 0}.000Z'`,
       ].join("\n"),
     )
@@ -304,10 +304,10 @@ describe("mergeMacFeeds(latest-mac.yml 两架构合并)", () => {
     const merged = parse(serialize(mergeMacFeeds(feed("arm64"), feed("x64"))))
     expect(merged.version).toBe("0.1.19")
     expect(merged.files.map((f) => f.url)).toEqual([
-      "code-puppy-mac-arm64.zip",
-      "code-puppy-mac-arm64.dmg",
-      "code-puppy-mac-x64.zip",
-      "code-puppy-mac-x64.dmg",
+      "codepuppy-mac-arm64.zip",
+      "codepuppy-mac-arm64.dmg",
+      "codepuppy-mac-x64.zip",
+      "codepuppy-mac-x64.dmg",
     ])
   })
   test("版本不一致 ⇒ 拒绝", () => {

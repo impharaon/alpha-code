@@ -1,7 +1,7 @@
 // REQ-096(#188):隔离 HTML preview host 单测(electron 打桩,与 main 侧其它打桩单测同款)。
 //
 // `#907` 起本文件登记进 scripts/gate-files.tsv(精确 24 条),并被
-// src/renderer/alpha-ui/artifact-html-preview/artifact-html-preview.test.ts 的 delegates_to 点名:
+// src/renderer/codepuppy-ui/artifact-html-preview/artifact-html-preview.test.ts 的 delegates_to 点名:
 // 下面五条拦截策略(无 preload / 权限三面全拒 + 下载拦截 / webRequest 零网络 / 导航面全拒 /
 // 非白名单扩展 403)是隔离预览的安全承重墙,改预览 UI 时一条都不许放宽,删掉其中任何一条用例
 // 登记簿即红。原抬头点名的那份打桩范例是**写法**参照、不是判据委派 —— 措辞里带上它会被登记簿的
@@ -338,7 +338,7 @@ describe("窗口与 session 硬化(隔离矩阵)", () => {
     const [a, b] = FakeBrowserWindow.instances
     const pa = String(a!.opts.webPreferences.partition)
     const pb = String(b!.opts.webPreferences.partition)
-    expect(pa.startsWith("alpha-html-preview-")).toBe(true)
+    expect(pa.startsWith("codepuppy-html-preview-")).toBe(true)
     expect(pa.startsWith("persist:")).toBe(false)
     expect(pa).not.toBe(pb)
     expect(sessions[0]!.partition).toBe(pa)

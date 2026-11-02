@@ -189,7 +189,7 @@ let fetchedUrls: string[] = []
 let hangSignal: AbortSignal | undefined
 let transactionCalls = 0
 
-const previousRoot = process.env.ALPHA_GLOBAL_DIR
+const previousRoot = process.env.CODEPUPPY_GLOBAL_DIR
 const realFetch = globalThis.fetch
 
 const fakeFetch = (async (input: string | URL | Request, init?: RequestInit) => {
@@ -226,7 +226,7 @@ beforeEach(() => {
   root = join(tmp, "root")
   userData = join(tmp, "user-data")
   mkdirSync(root, { recursive: true })
-  process.env.ALPHA_GLOBAL_DIR = root
+  process.env.CODEPUPPY_GLOBAL_DIR = root
   fixture = fixtureOf()
   override = undefined
   fetchedUrls = []
@@ -237,8 +237,8 @@ beforeEach(() => {
 
 afterEach(() => {
   globalThis.fetch = realFetch
-  if (previousRoot === undefined) delete process.env.ALPHA_GLOBAL_DIR
-  else process.env.ALPHA_GLOBAL_DIR = previousRoot
+  if (previousRoot === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+  else process.env.CODEPUPPY_GLOBAL_DIR = previousRoot
   rmSync(tmp, { recursive: true, force: true })
 })
 

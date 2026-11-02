@@ -2,10 +2,10 @@ import { describe, expect, test } from "bun:test"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import {
-  ALPHA_CONFIG_TOP_KEYS,
-  alphaGlobalRoot,
+  CODEPUPPY_CONFIG_TOP_KEYS,
+  codepuppyGlobalRoot,
   ensureSkillsPath,
-  isAlphaOwnedConfig,
+  isCodePuppyOwnedConfig,
   isFactoryResourcePath,
   isJunkOnlyDir,
   OPENCODE_JUNK_ENTRIES,
@@ -15,18 +15,18 @@ import {
   stripFactoryBuiltinPolicyLeaves,
 } from "./engine-config-truth"
 
-test("alphaGlobalRoot 无 main 快照时拒绝缺失、相对与退休根", () => {
-  const saved = process.env.ALPHA_GLOBAL_DIR
+test("codepuppyGlobalRoot 无 main 快照时拒绝缺失、相对与退休根", () => {
+  const saved = process.env.CODEPUPPY_GLOBAL_DIR
   try {
-    delete process.env.ALPHA_GLOBAL_DIR
-    expect(() => alphaGlobalRoot()).toThrow()
-    process.env.ALPHA_GLOBAL_DIR = "relative/root"
-    expect(() => alphaGlobalRoot()).toThrow()
-    process.env.ALPHA_GLOBAL_DIR = join(homedir(), ".alpha")
-    expect(() => alphaGlobalRoot()).toThrow()
+    delete process.env.CODEPUPPY_GLOBAL_DIR
+    expect(() => codepuppyGlobalRoot()).toThrow()
+    process.env.CODEPUPPY_GLOBAL_DIR = "relative/root"
+    expect(() => codepuppyGlobalRoot()).toThrow()
+    process.env.CODEPUPPY_GLOBAL_DIR = join(homedir(), ".alpha")
+    expect(() => codepuppyGlobalRoot()).toThrow()
   } finally {
-    if (saved === undefined) delete process.env.ALPHA_GLOBAL_DIR
-    else process.env.ALPHA_GLOBAL_DIR = saved
+    if (saved === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+    else process.env.CODEPUPPY_GLOBAL_DIR = saved
   }
 })
 
@@ -106,14 +106,14 @@ describe("rewriteFactorySkillPaths — REQ-065 T1(每启动重写出厂组)", ()
 const mcpNames = (...n: string[]) => new Set(n)
 const pluginKeys = (...n: string[]) => new Set(n)
 
-describe("isAlphaOwnedConfig", () => {
+describe("isCodePuppyOwnedConfig", () => {
   test("empty / undefined parsed = owned no-op", () => {
-    expect(isAlphaOwnedConfig({ parsed: undefined, receiptMcpNames: mcpNames(), receiptPluginKeys: pluginKeys() }).owned).toBe(true)
-    expect(isAlphaOwnedConfig({ parsed: {}, receiptMcpNames: mcpNames(), receiptPluginKeys: pluginKeys() }).owned).toBe(true)
+    expect(isCodePuppyOwnedConfig({ parsed: undefined, receiptMcpNames: mcpNames(), receiptPluginKeys: pluginKeys() }).owned).toBe(true)
+    expect(isCodePuppyOwnedConfig({ parsed: {}, receiptMcpNames: mcpNames(), receiptPluginKeys: pluginKeys() }).owned).toBe(true)
   })
 
-  test("all-alpha config (mcp in receipts + governance) = owned", () => {
-    const v = isAlphaOwnedConfig({
+  test("all-codepuppy config (mcp in receipts + governance) = owned", () => {
+    const v = isCodePuppyOwnedConfig({
       parsed: {
         $schema: "https://opencode.ai/config.json",
         mcp: { markitdown: { type: "local" }, fetch: { type: "local" } },
@@ -128,7 +128,7 @@ describe("isAlphaOwnedConfig", () => {
   })
 
   test("stray top-level key (user-authored) = NOT owned, bail-out", () => {
-    const v = isAlphaOwnedConfig({
+    const v = isCodePuppyOwnedConfig({
       parsed: { mcp: {}, keybinds: { leader: "ctrl+x" } },
       receiptMcpNames: mcpNames(),
       receiptPluginKeys: pluginKeys(),
@@ -138,7 +138,7 @@ describe("isAlphaOwnedConfig", () => {
   })
 
   test("mcp not in receipts = STILL owned (.opencode is alpha territory), surfaced as unaccounted", () => {
-    const v = isAlphaOwnedConfig({
+    const v = isCodePuppyOwnedConfig({
       parsed: { mcp: { markitdown: { type: "local" }, myOwnServer: { type: "remote" } } },
       receiptMcpNames: mcpNames("markitdown"),
       receiptPluginKeys: pluginKeys(),
@@ -152,9 +152,9 @@ describe("isAlphaOwnedConfig", () => {
 
   test("top-key whitelist covers the alpha write domains", () => {
     for (const k of ["$schema", "mcp", "plugin", "agent", "permission", "command", "provider"]) {
-      expect(ALPHA_CONFIG_TOP_KEYS.has(k)).toBe(true)
+      expect(CODEPUPPY_CONFIG_TOP_KEYS.has(k)).toBe(true)
     }
-    expect(ALPHA_CONFIG_TOP_KEYS.has("keybinds")).toBe(false)
+    expect(CODEPUPPY_CONFIG_TOP_KEYS.has("keybinds")).toBe(false)
   })
 })
 
@@ -247,7 +247,7 @@ describe("planConfigMerge", () => {
     expect(p.merged.plugin).toBeUndefined()
   })
 
-  // `#1359`(REQ-226 AC7 字面):lift 不得把 pre-#1343 的明文密钥搬进 alpha.jsonc。断言分两条 ——
+  // `#1359`(REQ-226 AC7 字面):lift 不得把 pre-#1343 的明文密钥搬进 codepuppy.jsonc。断言分两条 ——
   // 「字段是标记」与「原值一个字节都不在」是两件事:只断前者会被「写了标记、又把原值挪进块里
   // 另一个键」这类错误实现满足。
   test("legacy provider 块的明文密钥 lift 后换成钥匙串标记,原值不出现在计划里", () => {

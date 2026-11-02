@@ -6,9 +6,9 @@
 // 出网放行集合的前两个半场都要求「目的地有一个围栏外的真源」。`webfetch` 的 URL 与 `bash` 里命令自带的
 // 目的地由模型在调用那一刻产生,**没有配置来源**(`#1414` §3),于是整类被拒 —— 实测 `en.wikipedia.org` /
 // `example.com` / `raw.githubusercontent.com` 全 403,而同一批里静态表内的 `github.com` 取回 576 KB。
-// 本文件给「用户点的那一下」一个引擎写不到的家:`<appData>/alpha-code-state/egress-grants/<env>.json`,
+// 本文件给「用户点的那一下」一个引擎写不到的家:`<appData>/codepuppy-state/egress-grants/<env>.json`,
 // 与三个 env 根、`cas/`、`fence-workspaces/`、`custom-providers/`、`mcp-servers/` 同级 —— 父目录是
-// alpha-environment.ts 冻结快照的 `casBaseRoot`;可写集的固定行没有一行罩得住它(判据:egress-grant-truth.test.ts
+// codepuppy-environment.ts 冻结快照的 `casBaseRoot`;可写集的固定行没有一行罩得住它(判据:egress-grant-truth.test.ts
 // 对着生产渲染的 profile 逐行枚举)。放在任何一个可写根下 = 围栏内的代码可以给自己批准出网(confused deputy)。
 //
 // ── 形状 ─────────────────────────────────────────────────────────────────────
@@ -26,7 +26,7 @@
 // 写在 egress-grant-truth-write.ts。electron-free。
 
 import { resolve } from "node:path"
-import type { AppEnvironment } from "./alpha-environment"
+import type { AppEnvironment } from "./codepuppy-environment"
 
 export const EGRESS_GRANTS_DIRNAME = "egress-grants"
 export const EGRESS_GRANT_TRUTH_VERSION = 1

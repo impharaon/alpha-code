@@ -22,7 +22,7 @@ import {
   claimMcpSecretVersionDir,
   mcpSecretVersionedRef,
   writeMcpSecretVersioned,
-} from "./alpha-mcp-secrets"
+} from "./codepuppy-mcp-secrets"
 import { readCommandLeafStrict, readMcpLeafStrict, validateServer } from "./ext-config"
 import { agentConfigItemKey } from "./ext-agent-install"
 import { populateFromCas } from "./ext-cas"
@@ -107,20 +107,20 @@ export function buildDepartingChildConfigItemsV1(input: {
       items.push({
         key: `${agentConfigItemKey(child.name)}--departing`,
         action: "config",
-        config: { target: join(input.root, "alpha.jsonc"), edits: [{ keyPath: ["agent", child.name], value: undefined }] },
+        config: { target: join(input.root, "codepuppy.jsonc"), edits: [{ keyPath: ["agent", child.name], value: undefined }] },
       })
     else if (child.kind === "mcp")
       items.push({
         key: `mcp--${child.name}--departing`,
         action: "config",
-        config: { target: join(input.root, "alpha.jsonc"), edits: [{ keyPath: ["mcp", child.name], value: undefined }] },
+        config: { target: join(input.root, "codepuppy.jsonc"), edits: [{ keyPath: ["mcp", child.name], value: undefined }] },
       })
     else if (child.kind === "command")
       // `#840`:command 的生效面就是这一格 config 叶 —— 离场即删,与安装侧 keyPath 逐字同源。
       items.push({
         key: `command--${child.name}--departing`,
         action: "config",
-        config: { target: join(input.root, "alpha.jsonc"), edits: [{ keyPath: ["command", child.name], value: undefined }] },
+        config: { target: join(input.root, "codepuppy.jsonc"), edits: [{ keyPath: ["command", child.name], value: undefined }] },
       })
   }
   return items
@@ -224,7 +224,7 @@ export function buildAgentTxItems(input: AgentTxBuildInputV1): PackageTxBuildRes
       key: agentConfigItemKey(input.name),
       action: "config",
       config: {
-        target: join(input.root, "alpha.jsonc"),
+        target: join(input.root, "codepuppy.jsonc"),
         edits: [
           {
             keyPath: ["agent", input.name],
@@ -247,7 +247,7 @@ export function buildAgentTxItems(input: AgentTxBuildInputV1): PackageTxBuildRes
 }
 
 /**
- * `#840` command:单 config item —— 生效面就是 `alpha.jsonc` 的 `command.<name>` 叶
+ * `#840` command:单 config item —— 生效面就是 `codepuppy.jsonc` 的 `command.<name>` 叶
  * (引擎经 `OPENCODE_CONFIG` 读到、`GET /command` 原样列出,已真机实证)。无盘上实物、
  * 无密钥、无 prepared resource;fresh 闸与锁内 precondition 与 MCP builder 同构
  * (未登记 live 叶不认领不覆盖 —— 治理路写的 builtin 覆盖叶 `command.init/review` 是
@@ -274,7 +274,7 @@ export function buildCommandTxItems(input: CommandTxBuildInputV1): PackageTxBuil
       key: input.key,
       action: "config",
       config: {
-        target: join(input.root, "alpha.jsonc"),
+        target: join(input.root, "codepuppy.jsonc"),
         edits: [{ keyPath: ["command", input.name], value: commandEntry }],
       },
       manifestDigest: input.manifestDigest,
@@ -385,7 +385,7 @@ export function buildMcpTxItems(input: McpTxBuildInputV1): PackageTxBuildResultV
       key: input.key,
       action: "config",
       config: {
-        target: join(input.root, "alpha.jsonc"),
+        target: join(input.root, "codepuppy.jsonc"),
         edits: [
           {
             keyPath: ["mcp", input.name],
@@ -409,7 +409,7 @@ export function buildMcpTxItems(input: McpTxBuildInputV1): PackageTxBuildResultV
     ? {
         descriptor: {
           kind: "mcp-secret-version",
-          store: official ? "official-connectors" : "alpha-mcp-secrets",
+          store: official ? "official-connectors" : "codepuppy-mcp-secrets",
           server: input.prerequisite.server,
           version: secretVersion,
         },

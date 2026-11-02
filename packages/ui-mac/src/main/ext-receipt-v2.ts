@@ -1,12 +1,12 @@
 // InstallRecordV2 (receipt v2) — REQ-099 Phase 1 / ADR-028 §4/§5.
 //
-// Storage: the SAME `<root>/installs.json` as the v1 ledger (alpha-installs.ts), upgraded to a
+// Storage: the SAME `<root>/installs.json` as the v1 ledger (codepuppy-installs.ts), upgraded to a
 // dual-format file `{ v: 2, receipts: InstallReceipt[], records: InstallRecordV2[] }`:
 //   · records[]  — the v2 truth (environment / scope identity / digests / generation chain /
 //                  desired state / transaction seam);
 //   · receipts[] — the v1-compatible view, kept in lockstep for the SAME (kind, name) so a
 //                  rolled-back (older) build still sees every install (AC#6: upgrade & rollback
-//                  lose nothing). alpha-installs.writeLedger carries records[] through opaquely.
+//                  lose nothing). codepuppy-installs.writeLedger carries records[] through opaquely.
 //
 // v1 compat policy (explicit, AC#6): v1-only receipts stay readable and operable (read-only
 // compat — paths re-derived by kind+name exactly as today); migrateV1Ledger() converts them to
@@ -24,9 +24,9 @@ import * as fs from "node:fs"
 import * as path from "node:path"
 import type { InstallReceipt, InstallReceiptOrigin, InstallReceiptType } from "../preload/types"
 import { isExtensionName } from "../shared/extension-name"
-import type { AppEnvironment } from "./alpha-environment"
+import type { AppEnvironment } from "./codepuppy-environment"
 import { canonicalJson, sha256Hex } from "./ext-manifest-v2"
-import { validateReceipt } from "./alpha-installs"
+import { validateReceipt } from "./codepuppy-installs"
 import { writeFileAtomicSync } from "./ext-atomic-fs"
 import {
   LEGACY_PROTECTED_OWNER,
@@ -586,7 +586,7 @@ function quarantineCorrupt(root: string): string | null {
 const SKILLS_ENABLED_FILE = "skills-enabled.json"
 
 /** `<root>/skills-enabled.json` —— main 用真 decodeRecordV2 派生的 skill 允许集;
- *  @alpha-code/ext 的注入门只读此文件(缺失/损坏 = fail-closed 不注入)。 */
+ *  @codepuppy/ext 的注入门只读此文件(缺失/损坏 = fail-closed 不注入)。 */
 export function skillsEnabledPath(root: string): string {
   return path.join(root, SKILLS_ENABLED_FILE)
 }

@@ -36,7 +36,7 @@ describe("Catalog 浅壳解析：新增同级键与空 entries", () => {
 })
 
 async function signedCache(catalog: unknown): Promise<string> {
-  const root = mkdtempSync(resolve(tmpdir(), "alpha-catalog-shell-"))
+  const root = mkdtempSync(resolve(tmpdir(), "codepuppy-catalog-shell-"))
   roots.push(root)
   const body = JSON.stringify(catalog)
   await Bun.write(

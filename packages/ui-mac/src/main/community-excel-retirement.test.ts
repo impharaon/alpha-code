@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { parse } from "jsonc-parser"
 import type { InstallReceipt } from "../preload/types"
-import { addReceipt } from "./alpha-installs"
+import { addReceipt } from "./codepuppy-installs"
 import { retireCommunityExcelAfterRecovery } from "./community-excel-retirement"
 import { tryAcquireBundleLock } from "./ext-bundle-lock"
 import { bundleOwner, computeInstalledGraphDigest, LEGACY_PROTECTED_OWNER } from "./ext-package-ledger-v3"
@@ -35,43 +35,43 @@ let base = ""
 let root = ""
 let opencodeHome = ""
 let xdgConfig = ""
-const previousRoot = process.env.ALPHA_GLOBAL_DIR
-const previousOpencodeHome = process.env.ALPHA_OPENCODE_HOME
+const previousRoot = process.env.CODEPUPPY_GLOBAL_DIR
+const previousOpencodeHome = process.env.CODEPUPPY_OPENCODE_HOME
 const previousXdg = process.env.OPENCODE_CONFIG_DIR
-const previousTruthDisable = process.env.ALPHA_JSONC_TRUTH_DISABLE
-const previousLegacyRoot = process.env.ALPHA_LEGACY_INSTALL_ROOT
+const previousTruthDisable = process.env.CODEPUPPY_JSONC_TRUTH_DISABLE
+const previousLegacyRoot = process.env.CODEPUPPY_LEGACY_INSTALL_ROOT
 const installedAt = "2026-08-17T00:00:00.000Z"
 
 beforeEach(() => {
-  base = mkdtempSync(join(tmpdir(), "alpha-community-excel-retirement-"))
-  root = join(base, "alpha-state")
+  base = mkdtempSync(join(tmpdir(), "codepuppy-community-excel-retirement-"))
+  root = join(base, "codepuppy-state")
   opencodeHome = join(base, "opencode-home")
   xdgConfig = join(base, "xdg-opencode")
   mkdirSync(root, { recursive: true })
   mkdirSync(opencodeHome, { recursive: true })
   mkdirSync(xdgConfig, { recursive: true })
-  process.env.ALPHA_GLOBAL_DIR = root
-  process.env.ALPHA_OPENCODE_HOME = opencodeHome
+  process.env.CODEPUPPY_GLOBAL_DIR = root
+  process.env.CODEPUPPY_OPENCODE_HOME = opencodeHome
   process.env.OPENCODE_CONFIG_DIR = xdgConfig
-  delete process.env.ALPHA_JSONC_TRUTH_DISABLE
-  delete process.env.ALPHA_LEGACY_INSTALL_ROOT
+  delete process.env.CODEPUPPY_JSONC_TRUTH_DISABLE
+  delete process.env.CODEPUPPY_LEGACY_INSTALL_ROOT
 })
 
 afterEach(() => {
-  if (previousRoot === undefined) delete process.env.ALPHA_GLOBAL_DIR
-  else process.env.ALPHA_GLOBAL_DIR = previousRoot
-  if (previousOpencodeHome === undefined) delete process.env.ALPHA_OPENCODE_HOME
-  else process.env.ALPHA_OPENCODE_HOME = previousOpencodeHome
+  if (previousRoot === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+  else process.env.CODEPUPPY_GLOBAL_DIR = previousRoot
+  if (previousOpencodeHome === undefined) delete process.env.CODEPUPPY_OPENCODE_HOME
+  else process.env.CODEPUPPY_OPENCODE_HOME = previousOpencodeHome
   if (previousXdg === undefined) delete process.env.OPENCODE_CONFIG_DIR
   else process.env.OPENCODE_CONFIG_DIR = previousXdg
-  if (previousTruthDisable === undefined) delete process.env.ALPHA_JSONC_TRUTH_DISABLE
-  else process.env.ALPHA_JSONC_TRUTH_DISABLE = previousTruthDisable
-  if (previousLegacyRoot === undefined) delete process.env.ALPHA_LEGACY_INSTALL_ROOT
-  else process.env.ALPHA_LEGACY_INSTALL_ROOT = previousLegacyRoot
+  if (previousTruthDisable === undefined) delete process.env.CODEPUPPY_JSONC_TRUTH_DISABLE
+  else process.env.CODEPUPPY_JSONC_TRUTH_DISABLE = previousTruthDisable
+  if (previousLegacyRoot === undefined) delete process.env.CODEPUPPY_LEGACY_INSTALL_ROOT
+  else process.env.CODEPUPPY_LEGACY_INSTALL_ROOT = previousLegacyRoot
   rmSync(base, { recursive: true, force: true })
 })
 
-const configPath = () => join(root, "alpha.jsonc")
+const configPath = () => join(root, "codepuppy.jsonc")
 const homeConfigPath = () => join(opencodeHome, "opencode.jsonc")
 const xdgConfigPath = () => join(xdgConfig, "opencode.jsonc")
 const ledgerPath = () => join(root, "installs.json")
@@ -144,7 +144,7 @@ describe("retireCommunityExcelAfterRecovery", () => {
     expect(readLedgerV2(root, { sideEffectFree: true }).v1Only).toHaveLength(0)
   })
 
-  test("missing alpha.jsonc removes the receipt without creating a config file", async () => {
+  test("missing codepuppy.jsonc removes the receipt without creating a config file", async () => {
     expect(upsertRecordV2(root, record("excel-mcp-server", "mcp:excel")).ok).toBe(true)
 
     expect(await retireCommunityExcelAfterRecovery(Promise.resolve())).toEqual({
@@ -219,7 +219,7 @@ describe("retireCommunityExcelAfterRecovery", () => {
     expect(readFileSync(ledgerPath(), "utf8")).toBe(ledgerAfterFirst)
   })
 
-  test("malformed alpha.jsonc is retained with its receipt and returns an explicit failure", async () => {
+  test("malformed codepuppy.jsonc is retained with its receipt and returns an explicit failure", async () => {
     const malformed = '{ "mcp": { "excel-mcp-server":'
     writeConfig(malformed)
     expect(upsertRecordV2(root, record("excel-mcp-server", "mcp:excel")).ok).toBe(true)
@@ -340,7 +340,7 @@ describe("retireCommunityExcelAfterRecovery", () => {
     expect(config.mcp["keep-mcp"]).toEqual({ type: "local", command: ["uvx", "keep-mcp"] })
   })
 
-  test("removes the live leaf from a retained ~/.opencode copy without creating alpha.jsonc", async () => {
+  test("removes the live leaf from a retained ~/.opencode copy without creating codepuppy.jsonc", async () => {
     writeFileSync(
       homeConfigPath(),
       '{ "mcp": { "excel-mcp-server": { "type": "local" }, "keep": { "type": "remote" } } }\n',
@@ -359,8 +359,8 @@ describe("retireCommunityExcelAfterRecovery", () => {
     expect(home.mcp.keep).toEqual({ type: "remote" })
   })
 
-  test("removes the same leaf from both the live alpha.jsonc and a retained home copy", async () => {
-    writeConfig('{ "mcp": { "excel-mcp-server": { "type": "local" }, "alpha-keep": { "type": "remote" } } }\n')
+  test("removes the same leaf from both the live codepuppy.jsonc and a retained home copy", async () => {
+    writeConfig('{ "mcp": { "excel-mcp-server": { "type": "local" }, "codepuppy-keep": { "type": "remote" } } }\n')
     writeFileSync(
       homeConfigPath(),
       '{ "mcp": { "excel-mcp-server": { "type": "local" }, "home-keep": { "type": "remote" } } }\n',
@@ -376,13 +376,13 @@ describe("retireCommunityExcelAfterRecovery", () => {
     const live = parse(readFileSync(configPath(), "utf8")) as Record<string, Record<string, unknown>>
     const home = parse(readFileSync(homeConfigPath(), "utf8")) as Record<string, Record<string, unknown>>
     expect(live.mcp["excel-mcp-server"]).toBeUndefined()
-    expect(live.mcp["alpha-keep"]).toEqual({ type: "remote" })
+    expect(live.mcp["codepuppy-keep"]).toEqual({ type: "remote" })
     expect(home.mcp["excel-mcp-server"]).toBeUndefined()
     expect(home.mcp["home-keep"]).toEqual({ type: "remote" })
   })
 
-  test("ALPHA_JSONC_TRUTH_DISABLE tears down the home file the escape hatch actually consumes", async () => {
-    process.env.ALPHA_JSONC_TRUTH_DISABLE = "1"
+  test("CODEPUPPY_JSONC_TRUTH_DISABLE tears down the home file the escape hatch actually consumes", async () => {
+    process.env.CODEPUPPY_JSONC_TRUTH_DISABLE = "1"
     writeFileSync(homeConfigPath(), '{ "mcp": { "excel-mcp-server": { "type": "local" } } }\n')
     expect(upsertRecordV2(root, record("excel-mcp-server", "mcp:excel")).ok).toBe(true)
 

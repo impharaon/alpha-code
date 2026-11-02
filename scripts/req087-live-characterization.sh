@@ -6,7 +6,7 @@
 # (vite dev)+ 真实 Chromium(Playwright channel "chrome")+ 真实 PTY/SSE/权限机;
 # 唯一脚本化的是模型 token 端点(OpenAI-compatible SSE fixture)。
 #
-# 不在 alpha-check 权威门内(依赖本机 Chrome 与较长运行时),与 engine-smoke.sh 同级:
+# 不在 codepuppy-check 权威门内(依赖本机 Chrome 与较长运行时),与 engine-smoke.sh 同级:
 # 按需/发布前人工执行,红 = legacy 行为面漂移,进入 REQ-088 前必须排查。
 #
 # 本地:bash scripts/req087-live-characterization.sh(需已 bun install)

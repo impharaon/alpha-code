@@ -3,9 +3,9 @@ import { createStore } from "solid-js/store"
 import { render } from "solid-js/web"
 import { MarkedProvider } from "../../../ui/src/context/marked"
 import { setLocale } from "../../src/renderer/i18n"
-import { SessionTimelineView } from "../../src/renderer/alpha-ui/session-timeline/session-timeline-view"
-import type { TimelineRow } from "../../src/renderer/alpha-ui/session-timeline/timeline-model"
-import "../../src/renderer/alpha-ui/session-timeline/session-timeline.css"
+import { SessionTimelineView } from "../../src/renderer/codepuppy-ui/session-timeline/session-timeline-view"
+import type { TimelineRow } from "../../src/renderer/codepuppy-ui/session-timeline/timeline-model"
+import "../../src/renderer/codepuppy-ui/session-timeline/session-timeline.css"
 import { materializeTimelineBenchmarkFixture, timelineBenchmarkFixture, timelineBenchmarkStreamRowKey } from "./fixture"
 import type {
   TimelineBenchmarkApi,
@@ -44,7 +44,7 @@ const api: TimelineBenchmarkApi = {
   runStreaming,
   runHistoryLoad,
 }
-window.__alphaTimelineBenchmark = api
+window.__codepuppyTimelineBenchmark = api
 
 function App() {
   onMount(() => {
@@ -55,7 +55,7 @@ function App() {
       <SessionTimelineView
         rows={rows()}
         ready={true}
-        epoch="sidecar:/fixture:ses_alpha_timeline_benchmark"
+        epoch="sidecar:/fixture:ses_codepuppy_timeline_benchmark"
         emptyTitle="Alpha timeline benchmark"
         history={history}
         onLoadOlder={loadOlder}
@@ -71,7 +71,7 @@ async function waitForTimelineReady(resolve: (value: TimelineReadyResult) => voi
   while (performance.now() < deadline) {
     await nextFrame()
     const scroller = timelineScroller()
-    const mountedRows = document.querySelectorAll("[data-alpha-timeline-row]").length
+    const mountedRows = document.querySelectorAll("[data-codepuppy-timeline-row]").length
     const markdown = document.querySelector('[data-component="markdown"] [data-markdown-block]')
     if (scroller && mountedRows === rows().length && markdown) {
       await nextFrame()
@@ -211,7 +211,7 @@ function requireTimelineScroller() {
 
 function firstVisibleRow(scroller: HTMLElement) {
   const top = scroller.getBoundingClientRect().top
-  return [...document.querySelectorAll<HTMLElement>("[data-alpha-timeline-row]")]
+  return [...document.querySelectorAll<HTMLElement>("[data-codepuppy-timeline-row]")]
     .map((element) => ({ element, offset: element.getBoundingClientRect().top - top }))
     .find((entry) => entry.element.getBoundingClientRect().bottom > top)
 }

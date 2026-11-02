@@ -31,7 +31,7 @@ Bun.plugin({
   },
 })
 
-const runtime = await import("../src/renderer/alpha-ui/session-rail/files/files-test-runtime")
+const runtime = await import("../src/renderer/codepuppy-ui/session-rail/files/files-test-runtime")
 const disposers: Array<() => void> = []
 
 afterEach(() => {
@@ -85,10 +85,10 @@ describe("REQ-125 C3 files panel real Solid mount", () => {
   test("tree renders the root, lazy-loads directories, and opening a file adds a session tab", async () => {
     const harness = runtime.createFilesHarness({
       listDir: (path) => {
-        if (path === "") return Promise.resolve([dir("alpha-ui"), file("README.md")])
+        if (path === "") return Promise.resolve([dir("codepuppy-ui"), file("README.md")])
         // Windows server shape: backslash separators; must canonicalize, not vanish.
-        if (path === "alpha-ui")
-          return Promise.resolve([{ name: "button.css", path: "alpha-ui\\button.css", type: "file", ignored: false }])
+        if (path === "codepuppy-ui")
+          return Promise.resolve([{ name: "button.css", path: "codepuppy-ui\\button.css", type: "file", ignored: false }])
         return Promise.resolve([])
       },
     })
@@ -96,33 +96,33 @@ describe("REQ-125 C3 files panel real Solid mount", () => {
     await flushTimers()
 
     expect(harness.calls.listDir).toEqual([""])
-    expect(host.querySelector("[data-alpha-srf-dir='alpha-ui']")).not.toBeNull()
-    expect(host.querySelector("[data-alpha-srf-file='README.md']")).not.toBeNull()
-    expect(host.querySelector("[data-alpha-srf-file='alpha-ui/button.css']")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-srf-dir='codepuppy-ui']")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-srf-file='README.md']")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-srf-file='codepuppy-ui/button.css']")).toBeNull()
 
-    const dirRow = host.querySelector<HTMLButtonElement>("[data-alpha-srf-dir='alpha-ui']")!
+    const dirRow = host.querySelector<HTMLButtonElement>("[data-codepuppy-srf-dir='codepuppy-ui']")!
     dirRow.click()
     await flushTimers()
-    expect(harness.calls.listDir).toEqual(["", "alpha-ui"])
+    expect(harness.calls.listDir).toEqual(["", "codepuppy-ui"])
     expect(dirRow.getAttribute("aria-expanded")).toBe("true")
     expect(dirRow.classList.contains("a-srf-row--open")).toBe(true)
-    const child = host.querySelector("[data-alpha-srf-file='alpha-ui/button.css']")
+    const child = host.querySelector("[data-codepuppy-srf-file='codepuppy-ui/button.css']")
     expect(child).not.toBeNull()
     expect(child!.closest(".a-srf-indent")).not.toBeNull()
 
-    const readme = host.querySelector<HTMLButtonElement>("[data-alpha-srf-file='README.md']")!
+    const readme = host.querySelector<HTMLButtonElement>("[data-codepuppy-srf-file='README.md']")!
     readme.click()
     await flush()
     expect(harness.calls.open).toEqual(["file://README.md"])
     expect(readme.classList.contains("a-srf-row--selected")).toBe(true)
     expect(readme.getAttribute("aria-current")).toBe("true")
-    const opentab = host.querySelector("[data-alpha-srf-opentab='README.md']")
+    const opentab = host.querySelector("[data-codepuppy-srf-opentab='README.md']")
     expect(opentab).not.toBeNull()
     expect(opentab!.classList.contains("a-srf-opentab--on")).toBe(true)
 
     dirRow.click()
     await flush()
-    expect(host.querySelector("[data-alpha-srf-file='alpha-ui/button.css']")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-srf-file='codepuppy-ui/button.css']")).toBeNull()
   })
 
   test("opened group renders shared tabs, keeps the active pill, closes per tab, drops hostile tabs", async () => {
@@ -132,19 +132,19 @@ describe("REQ-125 C3 files panel real Solid mount", () => {
     const host = mount(harness.View)
     await flushTimers()
 
-    const rows = host.querySelectorAll("[data-alpha-srf-opentab]")
+    const rows = host.querySelectorAll("[data-codepuppy-srf-opentab]")
     expect(rows).toHaveLength(2)
-    expect(host.querySelector("[data-alpha-srf-opentab='a.ts']")!.classList.contains("a-srf-opentab--on")).toBe(true)
+    expect(host.querySelector("[data-codepuppy-srf-opentab='a.ts']")!.classList.contains("a-srf-opentab--on")).toBe(true)
 
-    host.querySelector<HTMLButtonElement>("[data-alpha-srf-opentab='b.ts'] .a-srf-opentab-main")!.click()
+    host.querySelector<HTMLButtonElement>("[data-codepuppy-srf-opentab='b.ts'] .a-srf-opentab-main")!.click()
     await flush()
     expect(harness.calls.setActive).toEqual(["file://b.ts"])
-    expect(host.querySelector("[data-alpha-srf-opentab='b.ts']")!.classList.contains("a-srf-opentab--on")).toBe(true)
+    expect(host.querySelector("[data-codepuppy-srf-opentab='b.ts']")!.classList.contains("a-srf-opentab--on")).toBe(true)
 
-    host.querySelector<HTMLButtonElement>("[data-alpha-srf-opentab='a.ts'] .a-srf-opentab-close")!.click()
+    host.querySelector<HTMLButtonElement>("[data-codepuppy-srf-opentab='a.ts'] .a-srf-opentab-close")!.click()
     await flush()
     expect(harness.calls.close).toEqual(["file://a.ts"])
-    expect(host.querySelector("[data-alpha-srf-opentab='a.ts']")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-srf-opentab='a.ts']")).toBeNull()
   })
 
   test("session-changed files carry the review badge and jump to review instead of opening", async () => {
@@ -155,18 +155,18 @@ describe("REQ-125 C3 files panel real Solid mount", () => {
     const host = mount(harness.View)
     await flushTimers()
 
-    const changed = host.querySelector<HTMLButtonElement>("[data-alpha-srf-file='button.css']")!
+    const changed = host.querySelector<HTMLButtonElement>("[data-codepuppy-srf-file='button.css']")!
     const badge = changed.querySelector(".a-srf-badge")!
     expect(badge.getAttribute("data-kind")).toBe("modified")
     expect(badge.textContent).toBe("修改")
-    expect(host.querySelector("[data-alpha-srf-file='input.css'] .a-srf-badge")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-srf-file='input.css'] .a-srf-badge")).toBeNull()
 
     changed.click()
     await flush()
     expect(harness.calls.jumpToReview).toEqual(["button.css"])
     expect(harness.calls.open).toEqual([])
 
-    host.querySelector<HTMLButtonElement>("[data-alpha-srf-file='input.css']")!.click()
+    host.querySelector<HTMLButtonElement>("[data-codepuppy-srf-file='input.css']")!.click()
     await flush()
     expect(harness.calls.jumpToReview).toEqual(["button.css"])
     expect(harness.calls.open).toEqual(["file://input.css"])
@@ -192,12 +192,12 @@ describe("REQ-125 C3 files panel real Solid mount", () => {
     await flushTimers()
     expect(harness.calls.findFiles).toEqual(["but"])
 
-    pending.get("but")!.resolve(["button.css", "/etc/passwd", "/tmp/workspace/alpha-ui/button.css"])
+    pending.get("but")!.resolve(["button.css", "/etc/passwd", "/tmp/workspace/codepuppy-ui/button.css"])
     await flushTimers()
-    expect(host.querySelector("[data-alpha-srf-results]")).not.toBeNull()
-    expect(host.querySelector("[data-alpha-srf-file='button.css']")).not.toBeNull()
-    expect(host.querySelector("[data-alpha-srf-file='alpha-ui/button.css']")).not.toBeNull()
-    expect(host.querySelectorAll("[data-alpha-srf-results] [data-alpha-srf-file]")).toHaveLength(2)
+    expect(host.querySelector("[data-codepuppy-srf-results]")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-srf-file='button.css']")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-srf-file='codepuppy-ui/button.css']")).not.toBeNull()
+    expect(host.querySelectorAll("[data-codepuppy-srf-results] [data-codepuppy-srf-file]")).toHaveLength(2)
 
     // A newer query aborts the previous one; a late stale resolution must not repaint.
     input.value = "x"
@@ -209,7 +209,7 @@ describe("REQ-125 C3 files panel real Solid mount", () => {
     expect(signals.get("x")!.aborted).toBe(true)
     pending.get("x")!.resolve(["stale.ts"])
     await flushTimers()
-    expect(host.querySelector("[data-alpha-srf-file='stale.ts']")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-srf-file='stale.ts']")).toBeNull()
 
     pending.get("xy")!.resolve([])
     await flushTimers()
@@ -218,8 +218,8 @@ describe("REQ-125 C3 files panel real Solid mount", () => {
     input.value = ""
     input.dispatchEvent(new Event("input", { bubbles: true }))
     await flushTimers()
-    expect(host.querySelector("[data-alpha-srf-results]")).toBeNull()
-    expect(host.querySelector("[data-alpha-srf-tree]")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-srf-results]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-srf-tree]")).not.toBeNull()
   })
 
   test("async results are dropped once the session identity moved on (I8)", async () => {
@@ -231,7 +231,7 @@ describe("REQ-125 C3 files panel real Solid mount", () => {
     harness.setStillCurrent(false)
     root.resolve([file("late.ts")])
     await flushTimers()
-    expect(host.querySelector("[data-alpha-srf-file='late.ts']")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-srf-file='late.ts']")).toBeNull()
     expect(host.querySelector(".a-srf-loading")).not.toBeNull()
   })
 
@@ -252,17 +252,17 @@ describe("REQ-125 C3 files panel real Solid mount", () => {
 
     // Root: 5 entries, per-level cap 3 → 3 rows + hint "3 / 5".
     expect(host.querySelectorAll(".a-srf-tree > .a-srf-item > .a-srf-row")).toHaveLength(3)
-    const rootHint = host.querySelector("[data-alpha-srf-truncated='']")
+    const rootHint = host.querySelector("[data-codepuppy-srf-truncated='']")
     expect(rootHint).not.toBeNull()
     expect(rootHint!.textContent).toContain("3 / 5")
     expect(rootHint!.textContent).toContain("过滤")
 
     // Child level: total cap 5 leaves a budget of 2 → 2 rows + hint "2 / 4".
-    host.querySelector<HTMLButtonElement>("[data-alpha-srf-dir='big']")!.click()
+    host.querySelector<HTMLButtonElement>("[data-codepuppy-srf-dir='big']")!.click()
     await flushTimers()
-    const childRows = host.querySelectorAll(".a-srf-indent [data-alpha-srf-file]")
+    const childRows = host.querySelectorAll(".a-srf-indent [data-codepuppy-srf-file]")
     expect(childRows).toHaveLength(2)
-    const childHint = host.querySelector("[data-alpha-srf-truncated='big']")
+    const childHint = host.querySelector("[data-codepuppy-srf-truncated='big']")
     expect(childHint).not.toBeNull()
     expect(childHint!.textContent).toContain("2 / 4")
   })
@@ -270,7 +270,7 @@ describe("REQ-125 C3 files panel real Solid mount", () => {
   test("C21 AC2: rows claim list semantics only and stay operable by Tab + Enter alone", async () => {
     const harness = runtime.createFilesHarness({
       listDir: (path) =>
-        path === "" ? Promise.resolve([dir("alpha-ui"), file("README.md")]) : Promise.resolve([file("alpha-ui/a.ts")]),
+        path === "" ? Promise.resolve([dir("codepuppy-ui"), file("README.md")]) : Promise.resolve([file("codepuppy-ui/a.ts")]),
     })
     const host = mount(harness.View)
     await flushTimers()
@@ -291,7 +291,7 @@ describe("REQ-125 C3 files panel real Solid mount", () => {
       expect(row.parentElement?.getAttribute("role")).toBe("listitem")
     })
 
-    const readme = host.querySelector<HTMLButtonElement>("[data-alpha-srf-file='README.md']")!
+    const readme = host.querySelector<HTMLButtonElement>("[data-codepuppy-srf-file='README.md']")!
     readme.focus()
     expect(document.activeElement).toBe(readme)
     readme.click() // 原生 button:Enter/Space 由浏览器转成 click,行为与此一致。
@@ -300,7 +300,7 @@ describe("REQ-125 C3 files panel real Solid mount", () => {
     expect(readme.getAttribute("aria-current")).toBe("true")
 
     // 展开态仍向 AT 暴露(目录行的 aria-expanded 不因降级消失)。
-    const dirRow = host.querySelector<HTMLButtonElement>("[data-alpha-srf-dir='alpha-ui']")!
+    const dirRow = host.querySelector<HTMLButtonElement>("[data-codepuppy-srf-dir='codepuppy-ui']")!
     expect(dirRow.getAttribute("aria-expanded")).toBe("false")
     dirRow.click()
     await flushTimers()
@@ -320,22 +320,22 @@ describe("REQ-125 C3 files panel real Solid mount", () => {
     const host = mount(shell.Shell)
     await flush()
 
-    const tab = (kind: string) => host.querySelector<HTMLButtonElement>(`[data-alpha-session-rail-tab='${kind}']`)!
+    const tab = (kind: string) => host.querySelector<HTMLButtonElement>(`[data-codepuppy-session-rail-tab='${kind}']`)!
     expect(tab("review").classList.contains("a-swk-rail-tab--on")).toBe(true)
     expect(tab("files")).not.toBeNull()
     expect(tab("terminal")).not.toBeNull()
-    expect(host.querySelector("[data-alpha-session-rail-panel-host='review']")).not.toBeNull()
-    expect(host.querySelector("[data-alpha-session-rail-panel-host='files']")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-session-rail-panel-host='review']")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-session-rail-panel-host='files']")).toBeNull()
 
     tab("files").click()
     await flush()
-    expect(host.querySelector("[data-alpha-session-rail-panel='files']")).not.toBeNull()
-    const filesHost = host.querySelector("[data-alpha-session-rail-panel-host='files']")!
+    expect(host.querySelector("[data-codepuppy-session-rail-panel='files']")).not.toBeNull()
+    const filesHost = host.querySelector("[data-codepuppy-session-rail-panel-host='files']")!
     expect(filesHost.querySelector("[data-fake-files-panel]")).not.toBeNull()
     expect(filesHost.classList.contains("a-swk-rail-panel--hidden")).toBe(false)
     expect(
       host
-        .querySelector("[data-alpha-session-rail-panel-host='review']")!
+        .querySelector("[data-codepuppy-session-rail-panel-host='review']")!
         .classList.contains("a-swk-rail-panel--hidden"),
     ).toBe(true)
 
@@ -346,20 +346,20 @@ describe("REQ-125 C3 files panel real Solid mount", () => {
     // files stays mounted (state preserved), merely hidden
     expect(
       host
-        .querySelector("[data-alpha-session-rail-panel-host='files']")!
+        .querySelector("[data-codepuppy-session-rail-panel-host='files']")!
         .classList.contains("a-swk-rail-panel--hidden"),
     ).toBe(true)
 
     host.querySelector<HTMLButtonElement>(".a-swk-rail-close")!.click()
     await flush()
-    expect(host.querySelector("[data-alpha-session-rail-host]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-session-rail-host]")).toBeNull()
 
     // Reopen via the topbar rail toggle: visited panels were reset, review (last panel) is active.
     const topbarButtons = host.querySelectorAll<HTMLButtonElement>(".a-swk-panel-button")
     topbarButtons[1]!.click()
     await flush()
-    expect(host.querySelector("[data-alpha-session-rail-panel='review']")).not.toBeNull()
-    expect(host.querySelector("[data-alpha-session-rail-panel-host='files']")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-session-rail-panel='review']")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-session-rail-panel-host='files']")).toBeNull()
   })
 
   test("review target is identity-bound and cleared on session switch (I8)", async () => {
@@ -368,7 +368,7 @@ describe("REQ-125 C3 files panel real Solid mount", () => {
     await flush()
 
     // Session A mints a target — it carries A's identity triple.
-    host.querySelector<HTMLButtonElement>("[data-alpha-session-rail-tab='files']")!.click()
+    host.querySelector<HTMLButtonElement>("[data-codepuppy-session-rail-tab='files']")!.click()
     await flush()
     shell.rail()!.jumpToReview("a.ts")
     await flush()

@@ -2,9 +2,9 @@
 // sync-catalog-snapshot — REQ-046:A 内置 catalog = C 已发布产物的字节级快照,禁手编。
 //
 // 拍板(2026-07-06):C 仓 catalog-src 是 agent/skill/command/mcp/plugin 条目的唯一作者真源;
-// A 内置 alpha-catalog.json 只是离线回退底座,由本脚本从已发布端点快照生成(发版 runbook 步骤,
-// 见 docs/runbooks/distribution.md)。守卫 = alpha-catalog.test.ts 的快照断言(文件 sha256 必须与
-// alpha-catalog.snapshot.json meta 一致)—— 手编 catalog 不跑本脚本即红。
+// A 内置 codepuppy-catalog.json 只是离线回退底座,由本脚本从已发布端点快照生成(发版 runbook 步骤,
+// 见 docs/runbooks/distribution.md)。守卫 = codepuppy-catalog.test.ts 的快照断言(文件 sha256 必须与
+// codepuppy-catalog.snapshot.json meta 一致)—— 手编 catalog 不跑本脚本即红。
 //
 // 流程:fetch catalog.json + .sig → ed25519 验签(公钥单源:从 remote-catalog.ts 提取,不复制常量)
 //   → 形状 sanity → 版本单调(不接受回退,防误快照旧产物)→ 字节原样写入 + meta 落盘。
@@ -18,8 +18,8 @@ import { fileURLToPath } from "node:url"
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const extDir = path.resolve(here, "../src/renderer/extensions")
-const catalogPath = path.join(extDir, "alpha-catalog.json")
-const metaPath = path.join(extDir, "alpha-catalog.snapshot.json")
+const catalogPath = path.join(extDir, "codepuppy-catalog.json")
+const metaPath = path.join(extDir, "codepuppy-catalog.snapshot.json")
 // REQ-101-A 后公钥常量移居 catalog-channels.ts(remote-catalog 只是别名引用)——单源提取跟随移居
 // (REQ-102-A 修复:原 remote-catalog.ts 正则已抓不到常量,脚本会在提钥处 die)。
 const catalogChannelsTs = path.resolve(here, "../src/main/catalog-channels.ts")
@@ -105,7 +105,7 @@ fs.writeFileSync(
       sha256: createHash("sha256").update(body).digest("hex"),
       source,
       fetchedAt: new Date().toISOString(),
-      _note: "由 scripts/sync-catalog-snapshot.mjs 生成;alpha-catalog.json 禁手编(REQ-046),上架/撤架唯一动作在 alpha-web catalog-src。",
+      _note: "由 scripts/sync-catalog-snapshot.mjs 生成;codepuppy-catalog.json 禁手编(REQ-046),上架/撤架唯一动作在 alpha-web catalog-src。",
     },
     null,
     2,

@@ -2,9 +2,9 @@
 //
 // 「真引擎」= 本仓 `packages/opencode/src/index.ts serve`(与打包 sidecar 同一份 v1 请求装配:provider.ts 的 SDK 缓存
 // → session/llm/request.ts 触发 `chat.headers` → streamText);「真 ext」= `packages/ext/src/plugin.ts` 经配置
-// `plugin` 装进引擎(与 sidecar 注入同一个入口,钩子同一份);配置由**生产** `buildAlphaModelConfig` 生成(平台
-// provider 的 apiKey 是占位值),只把 `ALPHA_BASE_URL` 指到本进程起的假网关;凭据文件由**生产**
-// `syncSecretFiles`(fork 时)与 `applyPlatformCredentialsHot`(续期时)写。引用 `ALPHA_PLATFORM_AUTH_REF` 由生产
+// `plugin` 装进引擎(与 sidecar 注入同一个入口,钩子同一份);配置由**生产** `buildCodePuppyModelConfig` 生成(平台
+// provider 的 apiKey 是占位值),只把 `CODEPUPPY_BASE_URL` 指到本进程起的假网关;凭据文件由**生产**
+// `syncSecretFiles`(fork 时)与 `applyPlatformCredentialsHot`(续期时)写。引用 `CODEPUPPY_PLATFORM_AUTH_REF` 由生产
 // `secretFileRef` 给出,与 server.ts 在 fork 时置的那一份同形。
 //
 // 一个引擎进程里连发三条消息,中间换文件 / 删文件 —— 只有「同一个进程、不重启」才证明 SDK 缓存不再握旧令牌:
@@ -19,9 +19,9 @@ import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
 import { pathToFileURL } from "node:url"
-import { PLATFORM_API_KEY_PLACEHOLDER, buildAlphaModelConfig } from "./alpha-models"
-import { applyPlatformCredentialsHot, secretFilePath, secretFileRef, syncSecretFiles } from "./alpha-secret-files"
-import { pinAppliedCatalog, writeCatalogSnapshot } from "./alpha-live-allowlist"
+import { PLATFORM_API_KEY_PLACEHOLDER, buildCodePuppyModelConfig } from "./codepuppy-models"
+import { applyPlatformCredentialsHot, secretFilePath, secretFileRef, syncSecretFiles } from "./codepuppy-secret-files"
+import { pinAppliedCatalog, writeCatalogSnapshot } from "./codepuppy-live-allowlist"
 
 const repoRoot = path.resolve(import.meta.dir, "../../../..")
 const engineEntry = path.resolve(repoRoot, "packages/opencode/src/index.ts")
@@ -30,7 +30,7 @@ const modelsFixture = path.resolve(repoRoot, "packages/opencode/test/tool/fixtur
 /** 平台目录的真样本:上游 V3 producer fixture(`#1556` 起平台段只来自已应用快照,没有随包回落)。 */
 const V3_PRODUCER = path.resolve(
   repoRoot,
-  "packages/alpha-contracts-consumer/vendor/alpha-platform-model-catalog/contracts/v3/fixtures/producer/model-catalog.json",
+  "packages/codepuppy-contracts-consumer/vendor/alpha-platform-model-catalog/contracts/v3/fixtures/producer/model-catalog.json",
 )
 /** 全量并跑时有测试文件会改写 `process.env.PATH`:引擎子进程用绝对 bun 路径 + 装载期 PATH 快照。 */
 const BUN_EXEC = process.execPath
@@ -39,7 +39,7 @@ const PATH_AT_LOAD = process.env.PATH ?? ""
 const TOKEN_A = "SENTINEL-HOT-APPLY-TOKEN-A-6c1f0e"
 const TOKEN_B = "SENTINEL-HOT-APPLY-TOKEN-B-93ad27"
 
-const MANAGED = ["ALPHA_MODELS_DISABLE", "ALPHA_BASE_URL", "ALPHA_DEFAULT_MODEL", "ALPHA_GLOBAL_DIR"]
+const MANAGED = ["CODEPUPPY_MODELS_DISABLE", "CODEPUPPY_BASE_URL", "CODEPUPPY_DEFAULT_MODEL", "CODEPUPPY_GLOBAL_DIR"]
 const saved: Record<string, string | undefined> = {}
 
 let root = ""
@@ -68,10 +68,10 @@ beforeAll(() => {
     saved[key] = process.env[key]
     delete process.env[key]
   }
-  root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "alpha-token-hot-apply-")))
+  root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-token-hot-apply-")))
   userData = path.join(root, "userdata")
-  process.env.ALPHA_GLOBAL_DIR = path.join(root, "alpha-global", "alpha-code-state", "env", "dev")
-  fs.mkdirSync(process.env.ALPHA_GLOBAL_DIR, { recursive: true })
+  process.env.CODEPUPPY_GLOBAL_DIR = path.join(root, "codepuppy-global", "codepuppy-state", "env", "dev")
+  fs.mkdirSync(process.env.CODEPUPPY_GLOBAL_DIR, { recursive: true })
   // 生产刷新器 + fork 同一条路:写 LKG 快照,再钉成已应用目录(平台 provider 的模型清单读这一份)。
   const rows = (JSON.parse(fs.readFileSync(V3_PRODUCER, "utf8")) as { value: { data: Array<Record<string, any>> } }).value.data
   writeCatalogSnapshot(userData, {
@@ -97,7 +97,7 @@ beforeAll(() => {
       return new Response(sse("ok"), { headers: { "content-type": "text/event-stream", "cache-control": "no-cache" } })
     },
   })
-  process.env.ALPHA_BASE_URL = `http://127.0.0.1:${gateway.port}/v1`
+  process.env.CODEPUPPY_BASE_URL = `http://127.0.0.1:${gateway.port}/v1`
 })
 
 afterAll(() => {
@@ -116,8 +116,8 @@ async function startEngine(tag: string, withExt: boolean): Promise<Engine> {
   const dir = path.join(root, "runs", tag)
   for (const sub of ["home", "xdg-config", "xdg-data", "xdg-cache", "xdg-state", "proj"])
     fs.mkdirSync(path.join(dir, sub), { recursive: true })
-  const cfg = buildAlphaModelConfig(userData)
-  if (!cfg?.provider.codepuppy) throw new Error("生产 buildAlphaModelConfig 没给出平台 provider —— 凭据文件或 ALPHA_BASE_URL 缺席?")
+  const cfg = buildCodePuppyModelConfig(userData)
+  if (!cfg?.provider.codepuppy) throw new Error("生产 buildCodePuppyModelConfig 没给出平台 provider —— 凭据文件或 CODEPUPPY_BASE_URL 缺席?")
   const configPath = path.join(dir, "config.json")
   fs.writeFileSync(configPath, JSON.stringify({ ...cfg, ...(withExt ? { plugin: [pathToFileURL(extEntry).href] } : {}) }))
   const port = 4600 + Math.floor(Math.random() * 3000)
@@ -136,9 +136,9 @@ async function startEngine(tag: string, withExt: boolean): Promise<Engine> {
       NO_PROXY: "127.0.0.1,localhost",
       no_proxy: "127.0.0.1,localhost",
       NO_COLOR: "1",
-      ALPHA_BASE_URL: process.env.ALPHA_BASE_URL!,
-      ALPHA_GLOBAL_DIR: process.env.ALPHA_GLOBAL_DIR!,
-      ALPHA_PLATFORM_AUTH_REF: secretFileRef(userData, "ALPHA_API_KEY"),
+      CODEPUPPY_BASE_URL: process.env.CODEPUPPY_BASE_URL!,
+      CODEPUPPY_GLOBAL_DIR: process.env.CODEPUPPY_GLOBAL_DIR!,
+      CODEPUPPY_PLATFORM_AUTH_REF: secretFileRef(userData, "CODEPUPPY_API_KEY"),
       OPENCODE_CONFIG: configPath,
       OPENCODE_DISABLE_PROJECT_CONFIG: "1",
       OPENCODE_MODELS_PATH: modelsFixture,
@@ -204,7 +204,7 @@ describe("REQ-236 #1562 续期热应用:同一个引擎进程里换凭据文件"
     "换文件后下一请求带新令牌;删文件后请求在发出前以 ProviderAuthError 失败、网关零请求;令牌不进引擎输出",
     async () => {
       // fork 时:生产 syncSecretFiles 物化令牌 A,记录 fork 时的凭据集合(server.ts 同形)。
-      const forked = new Set(syncSecretFiles(userData, { ALPHA_API_KEY: TOKEN_A }).written)
+      const forked = new Set(syncSecretFiles(userData, { CODEPUPPY_API_KEY: TOKEN_A }).written)
       const engine = await startEngine("hot", true)
       try {
         const session = await call(engine, "/session", {})
@@ -216,17 +216,17 @@ describe("REQ-236 #1562 续期热应用:同一个引擎进程里换凭据文件"
         expect(new Set(first.headers)).toEqual(new Set([`Bearer ${TOKEN_A}`]))
 
         // 续期:生产热应用把令牌 B 原子写进同一份文件;引擎不重启。
-        expect(applyPlatformCredentialsHot(userData, { ALPHA_API_KEY: TOKEN_B }, forked)).toBe("applied")
-        expect(fs.readFileSync(secretFilePath(userData, "ALPHA_API_KEY"), "utf8")).toBe(TOKEN_B)
+        expect(applyPlatformCredentialsHot(userData, { CODEPUPPY_API_KEY: TOKEN_B }, forked)).toBe("applied")
+        expect(fs.readFileSync(secretFilePath(userData, "CODEPUPPY_API_KEY"), "utf8")).toBe(TOKEN_B)
         const second = await prompt(engine, sessionID)
         expect(second.error).toBeUndefined()
         expect(second.headers.length).toBeGreaterThan(0)
         expect(new Set(second.headers)).toEqual(new Set([`Bearer ${TOKEN_B}`]))
 
         // 读不到:请求在发出前被拒,且不回落 SDK 缓存或配置里的任何值。
-        // 「这个认证错误不进引擎的退避重试」由 opencode/test/session/alpha-platform-credential-error.test.ts 用生产
+        // 「这个认证错误不进引擎的退避重试」由 opencode/test/session/codepuppy-platform-credential-error.test.ts 用生产
         // retryable() 判(不用墙钟上界)。
-        fs.rmSync(secretFilePath(userData, "ALPHA_API_KEY"))
+        fs.rmSync(secretFilePath(userData, "CODEPUPPY_API_KEY"))
         const third = await prompt(engine, sessionID)
         expect(third.error?.name).toBe("ProviderAuthError")
         expect(third.headers).toEqual([])
@@ -247,7 +247,7 @@ describe("REQ-236 #1562 续期热应用:同一个引擎进程里换凭据文件"
   test(
     "反向臂:去掉 ext 钩子 ⇒ 请求带的是占位值,被网关拒(令牌确实只来自钩子)",
     async () => {
-      syncSecretFiles(userData, { ALPHA_API_KEY: TOKEN_A })
+      syncSecretFiles(userData, { CODEPUPPY_API_KEY: TOKEN_A })
       const engine = await startEngine("no-ext", false)
       try {
         const session = await call(engine, "/session", {})

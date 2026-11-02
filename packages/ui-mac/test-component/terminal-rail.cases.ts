@@ -27,7 +27,7 @@ Bun.plugin({
   },
 })
 
-const runtime = await import("../src/renderer/alpha-ui/session-rail/terminal/terminal-rail-test-runtime")
+const runtime = await import("../src/renderer/codepuppy-ui/session-rail/terminal/terminal-rail-test-runtime")
 const disposers: Array<() => void> = []
 
 beforeEach(() => {
@@ -56,7 +56,7 @@ function mount(component: () => unknown) {
   return host
 }
 
-const tab = (host: HTMLElement, id: string) => host.querySelector<HTMLElement>(`[data-alpha-terminal-tab="${id}"]`)
+const tab = (host: HTMLElement, id: string) => host.querySelector<HTMLElement>(`[data-codepuppy-terminal-tab="${id}"]`)
 const tabButton = (host: HTMLElement, id: string) => tab(host, id)?.querySelector<HTMLButtonElement>("[role='tab']")
 const key = (name: string, init: KeyboardEventInit = {}) =>
   new KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true, ...init })
@@ -66,23 +66,23 @@ describe("REQ-125 terminal rail panel real Solid mount", () => {
     const host = mount(() => runtime.TerminalRailHarness())
     await flush()
 
-    expect(host.querySelectorAll("[data-alpha-terminal-tab]")).toHaveLength(2)
+    expect(host.querySelectorAll("[data-codepuppy-terminal-tab]")).toHaveLength(2)
     expect(tabButton(host, "pty_1")?.getAttribute("aria-selected")).toBe("true")
     expect(tabButton(host, "pty_2")?.getAttribute("aria-selected")).toBe("false")
 
     // 运行指示:仅在跑的实例带呼吸点;面板根暴露「任一在跑」供右栏 tab 层消费。
     expect(tab(host, "pty_1")?.querySelector(".a-term-rundot")).not.toBeNull()
     expect(tab(host, "pty_2")?.querySelector(".a-term-rundot")).toBeNull()
-    expect(host.querySelector("[data-alpha-terminal-panel]")?.getAttribute("data-alpha-terminal-any-running")).toBe(
+    expect(host.querySelector("[data-codepuppy-terminal-panel]")?.getAttribute("data-codepuppy-terminal-any-running")).toBe(
       "true",
     )
 
     // 引擎输出:激活实例挂进输出区外框;脚条 = 运行中 · zsh · 80×24。
     expect(
-      host.querySelector("[data-alpha-terminal-output] [data-alpha-terminal-engine-output='pty_1']"),
+      host.querySelector("[data-codepuppy-terminal-output] [data-codepuppy-terminal-engine-output='pty_1']"),
     ).not.toBeNull()
-    const foot = host.querySelector<HTMLElement>("[data-alpha-terminal-foot]")!
-    expect(foot.querySelector("[data-alpha-terminal-foot-state]")?.getAttribute("data-alpha-terminal-foot-state")).toBe(
+    const foot = host.querySelector<HTMLElement>("[data-codepuppy-terminal-foot]")!
+    expect(foot.querySelector("[data-codepuppy-terminal-foot-state]")?.getAttribute("data-codepuppy-terminal-foot-state")).toBe(
       "running",
     )
     expect(foot.textContent).toContain("运行中")
@@ -96,7 +96,7 @@ describe("REQ-125 terminal rail panel real Solid mount", () => {
     await flush()
     expect(tab(host, "pty_1")?.querySelector(".a-term-rundot")).toBeNull()
     expect(
-      host.querySelector("[data-alpha-terminal-panel]")?.getAttribute("data-alpha-terminal-any-running"),
+      host.querySelector("[data-codepuppy-terminal-panel]")?.getAttribute("data-codepuppy-terminal-any-running"),
     ).toBeNull()
   })
 
@@ -152,8 +152,8 @@ describe("REQ-125 terminal rail panel real Solid mount", () => {
     // 形态(tab 是 tablist 的 required-owned,不是「只能拥有」):它退出 Tab 序列,键盘入口是
     // 页签上的 Delete。所以这里断言的是「新建按钮在外」,不是「tablist 子树里只有 tab」。
     const tablist = host.querySelector<HTMLElement>("[role='tablist']")!
-    expect(tablist.querySelector("[data-alpha-terminal-new]")).toBeNull()
-    expect(host.querySelector("[data-alpha-terminal-new]")).not.toBeNull()
+    expect(tablist.querySelector("[data-codepuppy-terminal-new]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-terminal-new]")).not.toBeNull()
 
     // 关闭按钮退出 Tab 序列:N 个实例不得产生 N+1 个停靠点。
     // 断言比的是 id 而不是元素本身:元素数组一旦不等,深比对要打印整棵 happy-dom 树。
@@ -161,7 +161,7 @@ describe("REQ-125 terminal rail panel real Solid mount", () => {
       .filter((element) => element.tabIndex === 0)
       .map((element) => element.id || element.className)
     expect(stops).toEqual([tabButton(host, "pty_1")!.id])
-    expect(host.querySelector<HTMLElement>("[data-alpha-terminal-close='pty_1']")?.tabIndex).toBe(-1)
+    expect(host.querySelector<HTMLElement>("[data-codepuppy-terminal-close='pty_1']")?.tabIndex).toBe(-1)
 
     // 键盘关闭走页签上的 Delete(APG 可删除页签的键),焦点交给存活的相邻页签 ——
     // 被删元素带着焦点消失会把焦点丢回 <body>,键盘用户得从头 Tab 回来。
@@ -178,8 +178,8 @@ describe("REQ-125 terminal rail panel real Solid mount", () => {
     const last = key("Delete")
     tabButton(host, "pty_2")!.dispatchEvent(last)
     await flush()
-    expect(host.querySelector("[data-alpha-terminal-empty]")).not.toBeNull()
-    expect(document.activeElement).toBe(host.querySelector("[data-alpha-terminal-new]"))
+    expect(host.querySelector("[data-codepuppy-terminal-empty]")).not.toBeNull()
+    expect(document.activeElement).toBe(host.querySelector("[data-codepuppy-terminal-new]"))
   })
 
   test("switching tabs goes through the channel and remounts the engine output", async () => {
@@ -193,13 +193,13 @@ describe("REQ-125 terminal rail panel real Solid mount", () => {
     expect(tabButton(host, "pty_2")?.getAttribute("aria-selected")).toBe("true")
     expect(tabButton(host, "pty_1")?.getAttribute("aria-selected")).toBe("false")
     expect(
-      host.querySelector("[data-alpha-terminal-output] [data-alpha-terminal-engine-output='pty_2']"),
+      host.querySelector("[data-codepuppy-terminal-output] [data-codepuppy-terminal-engine-output='pty_2']"),
     ).not.toBeNull()
-    expect(host.querySelector("[data-alpha-terminal-engine-output='pty_1']")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-terminal-engine-output='pty_1']")).toBeNull()
     expect(
       host
-        .querySelector("[data-alpha-terminal-foot] [data-alpha-terminal-foot-state]")
-        ?.getAttribute("data-alpha-terminal-foot-state"),
+        .querySelector("[data-codepuppy-terminal-foot] [data-codepuppy-terminal-foot-state]")
+        ?.getAttribute("data-codepuppy-terminal-foot-state"),
     ).toBe("idle")
   })
 
@@ -210,8 +210,8 @@ describe("REQ-125 terminal rail panel real Solid mount", () => {
     expect(runtime.channelCalls).toEqual([])
     expect(
       host
-        .querySelector("[data-alpha-terminal-engine-output='pty_1']")
-        ?.getAttribute("data-alpha-terminal-focus-consumed"),
+        .querySelector("[data-codepuppy-terminal-engine-output='pty_1']")
+        ?.getAttribute("data-codepuppy-terminal-focus-consumed"),
     ).toBeNull()
 
     tabButton(host, "pty_2")!.click()
@@ -224,8 +224,8 @@ describe("REQ-125 terminal rail panel real Solid mount", () => {
     expect(runtime.channelCalls).toContain("focusConsumed:pty_2")
     expect(
       host
-        .querySelector("[data-alpha-terminal-engine-output='pty_2']")
-        ?.getAttribute("data-alpha-terminal-focus-consumed"),
+        .querySelector("[data-codepuppy-terminal-engine-output='pty_2']")
+        ?.getAttribute("data-codepuppy-terminal-focus-consumed"),
     ).toBe("true")
   })
 
@@ -236,16 +236,16 @@ describe("REQ-125 terminal rail panel real Solid mount", () => {
     host.querySelector<HTMLButtonElement>(".a-term-add")!.click()
     await flush()
     expect(runtime.channelCalls).toContain("create")
-    expect(host.querySelectorAll("[data-alpha-terminal-tab]")).toHaveLength(3)
+    expect(host.querySelectorAll("[data-codepuppy-terminal-tab]")).toHaveLength(3)
     expect(tabButton(host, "pty_3")?.getAttribute("aria-selected")).toBe("true")
 
-    host.querySelector<HTMLButtonElement>("[data-alpha-terminal-close='pty_3']")!.click()
+    host.querySelector<HTMLButtonElement>("[data-codepuppy-terminal-close='pty_3']")!.click()
     await flush()
     expect(runtime.channelCalls).toContain("close:pty_3")
-    expect(host.querySelectorAll("[data-alpha-terminal-tab]")).toHaveLength(2)
+    expect(host.querySelectorAll("[data-codepuppy-terminal-tab]")).toHaveLength(2)
     expect(tabButton(host, "pty_1")?.getAttribute("aria-selected")).toBe("true")
     expect(
-      host.querySelector("[data-alpha-terminal-output] [data-alpha-terminal-engine-output='pty_1']"),
+      host.querySelector("[data-codepuppy-terminal-output] [data-codepuppy-terminal-engine-output='pty_1']"),
     ).not.toBeNull()
   })
 
@@ -256,7 +256,7 @@ describe("REQ-125 terminal rail panel real Solid mount", () => {
 
     expect(tabButton(host, "pty_1")?.getAttribute("aria-selected")).toBe("true")
     expect(
-      host.querySelector("[data-alpha-terminal-output] [data-alpha-terminal-engine-output='pty_1']"),
+      host.querySelector("[data-codepuppy-terminal-output] [data-codepuppy-terminal-engine-output='pty_1']"),
     ).not.toBeNull()
   })
 
@@ -266,55 +266,55 @@ describe("REQ-125 terminal rail panel real Solid mount", () => {
     const host = mount(() => runtime.TerminalRailHarness())
     await flush()
 
-    expect(host.querySelector("[data-alpha-terminal-empty]")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-terminal-empty]")).not.toBeNull()
     expect(host.querySelector("[role='tablist']")).toBeNull()
-    expect(host.querySelector("[data-alpha-terminal-empty]")?.textContent).toContain("还没有终端")
+    expect(host.querySelector("[data-codepuppy-terminal-empty]")?.textContent).toContain("还没有终端")
 
-    const create = host.querySelector<HTMLButtonElement>("[data-alpha-terminal-empty] [data-alpha-terminal-new]")!
+    const create = host.querySelector<HTMLButtonElement>("[data-codepuppy-terminal-empty] [data-codepuppy-terminal-new]")!
     expect(create.disabled).toBe(false)
     create.click()
     await flush()
     expect(runtime.channelCalls).toContain("create")
-    expect(host.querySelectorAll("[data-alpha-terminal-tab]")).toHaveLength(1)
+    expect(host.querySelectorAll("[data-codepuppy-terminal-tab]")).toHaveLength(1)
   })
 
   test("without an engine channel the panel fails closed to the empty state", async () => {
     const host = mount(() => runtime.TerminalRailHarnessWithoutEngine())
     await flush()
 
-    expect(host.querySelector("[data-alpha-terminal-empty]")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-terminal-empty]")).not.toBeNull()
     expect(host.querySelector("[role='tablist']")).toBeNull()
-    expect(host.querySelector("[data-alpha-terminal-output]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-terminal-output]")).toBeNull()
     expect(host.querySelector(".a-term-rundot")).toBeNull()
     expect(
-      host.querySelector<HTMLButtonElement>("[data-alpha-terminal-empty] [data-alpha-terminal-new]")?.disabled,
+      host.querySelector<HTMLButtonElement>("[data-codepuppy-terminal-empty] [data-codepuppy-terminal-new]")?.disabled,
     ).toBe(true)
   })
 
   test("same-directory session switch rejects the stale channel until re-projection (I8)", async () => {
     const host = mount(() => runtime.TerminalRailHarness())
     await flush()
-    expect(host.querySelectorAll("[data-alpha-terminal-tab]")).toHaveLength(2)
+    expect(host.querySelectorAll("[data-codepuppy-terminal-tab]")).toHaveLength(2)
 
     // 同 workspace(serverKey+directory 不变)切到另一会话:旧 channel 身份不再被 live.accepts
     // 接受 → 面板即刻按 channel 缺席处理(空态 + 新建禁用),旧投影不得继续渲染。
     runtime.setTerminalLiveSession("ses_b")
     await flush()
-    expect(host.querySelector("[data-alpha-terminal-empty]")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-terminal-empty]")).not.toBeNull()
     expect(host.querySelector("[role='tablist']")).toBeNull()
-    expect(host.querySelector("[data-alpha-terminal-output]")).toBeNull()
-    expect(host.querySelector("[data-alpha-terminal-engine-output='pty_1']")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-terminal-output]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-terminal-engine-output='pty_1']")).toBeNull()
     expect(
-      host.querySelector<HTMLButtonElement>("[data-alpha-terminal-empty] [data-alpha-terminal-new]")?.disabled,
+      host.querySelector<HTMLButtonElement>("[data-codepuppy-terminal-empty] [data-codepuppy-terminal-new]")?.disabled,
     ).toBe(true)
 
     // 适配器按新会话身份重投影 → 面板恢复实例形态(workspace 级 PTY 状态共享)。
     runtime.projectTerminalChannel("ses_b")
     await flush()
-    expect(host.querySelector("[data-alpha-terminal-empty]")).toBeNull()
-    expect(host.querySelectorAll("[data-alpha-terminal-tab]")).toHaveLength(2)
+    expect(host.querySelector("[data-codepuppy-terminal-empty]")).toBeNull()
+    expect(host.querySelectorAll("[data-codepuppy-terminal-tab]")).toHaveLength(2)
     expect(
-      host.querySelector("[data-alpha-terminal-output] [data-alpha-terminal-engine-output='pty_1']"),
+      host.querySelector("[data-codepuppy-terminal-output] [data-codepuppy-terminal-engine-output='pty_1']"),
     ).not.toBeNull()
   })
 
@@ -323,16 +323,16 @@ describe("REQ-125 terminal rail panel real Solid mount", () => {
     const host = mount(() => runtime.TerminalRailHarness())
     await flush()
 
-    expect(host.querySelector("[data-alpha-terminal-empty]")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-terminal-empty]")).not.toBeNull()
     expect(
-      host.querySelector<HTMLButtonElement>("[data-alpha-terminal-empty] [data-alpha-terminal-new]")?.disabled,
+      host.querySelector<HTMLButtonElement>("[data-codepuppy-terminal-empty] [data-codepuppy-terminal-new]")?.disabled,
     ).toBe(true)
 
     // 引擎就绪后无需重挂:同一面板切换到实例形态。
     runtime.setTerminalChannelReady(true)
     await flush()
-    expect(host.querySelector("[data-alpha-terminal-empty]")).toBeNull()
-    expect(host.querySelectorAll("[data-alpha-terminal-tab]")).toHaveLength(2)
+    expect(host.querySelector("[data-codepuppy-terminal-empty]")).toBeNull()
+    expect(host.querySelectorAll("[data-codepuppy-terminal-tab]")).toHaveLength(2)
   })
 })
 
@@ -344,13 +344,13 @@ describe("REQ-159 #1322 sandbox disclosure on the terminal face (AC1)", () => {
     const host = mount(() => runtime.TerminalRailHarness())
     await flush()
 
-    const foot = host.querySelector<HTMLElement>("[data-alpha-terminal-foot]")!
-    const item = foot.querySelector<HTMLElement>("[data-alpha-terminal-foot-sandbox]")
+    const foot = host.querySelector<HTMLElement>("[data-codepuppy-terminal-foot]")!
+    const item = foot.querySelector<HTMLElement>("[data-codepuppy-terminal-foot-sandbox]")
     expect(item).not.toBeNull()
     // 位置:env 之后、size 之前(设计 §3.1)。按脚条直接子元素的顺序判,不按字符串。
     const children = [...foot.children]
-    const env = children.findIndex((el) => el.hasAttribute("data-alpha-terminal-foot-env"))
-    const sandbox = children.findIndex((el) => el.hasAttribute("data-alpha-terminal-foot-sandbox"))
+    const env = children.findIndex((el) => el.hasAttribute("data-codepuppy-terminal-foot-env"))
+    const sandbox = children.findIndex((el) => el.hasAttribute("data-codepuppy-terminal-foot-sandbox"))
     const size = children.findIndex((el) => el.classList.contains("a-term-foot-size"))
     expect(env).toBeGreaterThanOrEqual(0)
     expect(sandbox).toBeGreaterThan(env)
@@ -376,14 +376,14 @@ describe("REQ-159 #1322 sandbox disclosure on the terminal face (AC1)", () => {
     const host = mount(() => runtime.TerminalRailHarness())
     await flush()
 
-    const empty = host.querySelector<HTMLElement>("[data-alpha-terminal-empty]")!
-    const notice = empty.querySelector<HTMLElement>("[data-alpha-terminal-empty-sandbox]")
+    const empty = host.querySelector<HTMLElement>("[data-codepuppy-terminal-empty]")!
+    const notice = empty.querySelector<HTMLElement>("[data-codepuppy-terminal-empty-sandbox]")
     expect(notice).not.toBeNull()
     expect(notice!.textContent).toContain("沙箱已开启 —— 终端里你自己的配置可能有一部分不生效。")
     const children = [...empty.children]
-    const body = children.findIndex((el) => el.tagName === "P" && !el.hasAttribute("data-alpha-terminal-empty-sandbox"))
-    const line = children.findIndex((el) => el.hasAttribute("data-alpha-terminal-empty-sandbox"))
-    const button = children.findIndex((el) => el.hasAttribute("data-alpha-terminal-new"))
+    const body = children.findIndex((el) => el.tagName === "P" && !el.hasAttribute("data-codepuppy-terminal-empty-sandbox"))
+    const line = children.findIndex((el) => el.hasAttribute("data-codepuppy-terminal-empty-sandbox"))
+    const button = children.findIndex((el) => el.hasAttribute("data-codepuppy-terminal-new"))
     expect(line).toBeGreaterThan(body)
     expect(button).toBeGreaterThan(line)
   })
@@ -393,27 +393,27 @@ describe("REQ-159 #1322 sandbox disclosure on the terminal face (AC1)", () => {
     runtime.setTerminalSandbox(false)
     const host = mount(() => runtime.TerminalRailHarness())
     await flush()
-    expect(host.querySelector("[data-alpha-terminal-foot]")).not.toBeNull()
-    expect(host.querySelector("[data-alpha-terminal-foot-sandbox]")).toBeNull()
-    expect(host.querySelector("[data-alpha-terminal-empty-sandbox]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-terminal-foot]")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-terminal-foot-sandbox]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-terminal-empty-sandbox]")).toBeNull()
 
     // 状态驱动,不是一次性渲染:信号翻真即出现、翻假即消失。
     runtime.setTerminalSandbox(true)
     await flush()
-    expect(host.querySelector("[data-alpha-terminal-foot-sandbox]")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-terminal-foot-sandbox]")).not.toBeNull()
     runtime.setTerminalSandbox(false)
     await flush()
-    expect(host.querySelector("[data-alpha-terminal-foot-sandbox]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-terminal-foot-sandbox]")).toBeNull()
 
     // prop 缺席(与 sandbox 未接线的宿主同形):同样不出现 —— 空态与脚条两处都是。
     const bare = mount(() => runtime.TerminalRailHarnessWithoutSandboxProp())
     await flush()
-    expect(bare.querySelector("[data-alpha-terminal-foot]")).not.toBeNull()
-    expect(bare.querySelector("[data-alpha-terminal-foot-sandbox]")).toBeNull()
+    expect(bare.querySelector("[data-codepuppy-terminal-foot]")).not.toBeNull()
+    expect(bare.querySelector("[data-codepuppy-terminal-foot-sandbox]")).toBeNull()
     runtime.setTerminalInstances([])
     runtime.setTerminalActiveID(undefined)
     await flush()
-    expect(bare.querySelector("[data-alpha-terminal-empty]")).not.toBeNull()
-    expect(bare.querySelector("[data-alpha-terminal-empty-sandbox]")).toBeNull()
+    expect(bare.querySelector("[data-codepuppy-terminal-empty]")).not.toBeNull()
+    expect(bare.querySelector("[data-codepuppy-terminal-empty-sandbox]")).toBeNull()
   })
 })

@@ -1,9 +1,9 @@
-import type { RenewalResult } from "./alpha-auth"
-import { MIN_USABLE_TOKEN_LIFETIME_MS, refreshDueAt } from "./alpha-auth-clock"
+import type { RenewalResult } from "./codepuppy-auth"
+import { MIN_USABLE_TOKEN_LIFETIME_MS, refreshDueAt } from "./codepuppy-auth-clock"
 
 export const BOOT_RENEWAL_GRACE_MS = 1_200
 // 调度器的唤醒地板 = 「可用寿命」的下界,同一个常量派生,两者不可能漂移
-// (alpha-auth-clock.MIN_USABLE_TOKEN_LIFETIME_MS 的注释解释了为什么是同一个数)。
+// (codepuppy-auth-clock.MIN_USABLE_TOKEN_LIFETIME_MS 的注释解释了为什么是同一个数)。
 export const AUTH_RENEWAL_MIN_INTERVAL_MS = MIN_USABLE_TOKEN_LIFETIME_MS
 /** #600 B3:上一次续期「成功但结果不可用」时的降频节奏(≈一个 token TTL)。按 30s 最小间隔
  *  重刷会把一个给不出可用有效期的签发端变成永久重刷循环;降频续跑既不进无定时器终局,
@@ -36,7 +36,7 @@ export async function awaitBootRenewalGrace(
 
 export type AuthRenewalTiming = {
   active: boolean
-  /** 凭证身份(alpha-auth 的 tokenGeneration:登录/续期/登出/恢复都推进)。
+  /** 凭证身份(codepuppy-auth 的 tokenGeneration:登录/续期/登出/恢复都推进)。
    *  R3 Minor1:降级与「过期后已尝试」的记账一律按它判定 —— **不得用 expiresAt 代理**,
    *  换账号完全可能拿到相同的绝对到期时刻。必填,少给一个生产者就编译不过。 */
   generation: number
@@ -83,11 +83,11 @@ export function degradedRenewalDelayMs(
 //
 // 依赖的不变量与各自的强制手段(③″1;每条后面括号里是「什么变异会让它转红」):
 //  ① `timing.expiresAt` 有两个来源,**强度不同**,不要混为一谈:
-//     (a) **网络响应**写入的,经 alpha-auth.usableExpiresAt(hasUsableLifetime)验证过余量
+//     (a) **网络响应**写入的,经 codepuppy-auth.usableExpiresAt(hasUsableLifetime)验证过余量
 //         —— 登录与续期两个提交点都走它;
 //     (b) **持久化来源恢复**的(load() 直接接受落盘字段),本次 load **不做**余量验证,
 //         只在读取时过 isTokenExpired 的过期性检查:未来时刻的 expiresAt 直接按 ready 处理
-//         (既有契约,alpha-auth.cases.ts 有闸门),未知/已过期才 fail-closed 成 recovering。
+//         (既有契约,codepuppy-auth.cases.ts 有闸门),未知/已过期才 fail-closed 成 recovering。
 //     本判据只对 (a) 声称"已验证还有余量";(b) 只声称"做过过期性检查"。
 //     (变异:把 usableExpiresAt 换回 `expires_in ? ... : undefined` → cases.ts 的 6 种
 //      不可用 expires_in 用例转红[实测 3 个用例红];把 isTokenExpired 的 fail-closed 去掉

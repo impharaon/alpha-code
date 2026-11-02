@@ -24,15 +24,15 @@ export type OfficeHostOutcome =
 
 declare global {
   interface Window {
-    __alphaOfficeOutcome?: OfficeHostOutcome
+    __codepuppyOfficeOutcome?: OfficeHostOutcome
   }
 }
 
 const root = document.getElementById("root") as HTMLDivElement
 
 function settle(outcome: OfficeHostOutcome) {
-  window.__alphaOfficeOutcome = outcome
-  document.documentElement.setAttribute("data-alpha-office-status", outcome.status)
+  window.__codepuppyOfficeOutcome = outcome
+  document.documentElement.setAttribute("data-codepuppy-office-status", outcome.status)
 }
 
 async function documentBytes(): Promise<Uint8Array> {
@@ -45,7 +45,7 @@ async function documentBytes(): Promise<Uint8Array> {
 async function renderDocx(bytes: Uint8Array): Promise<string> {
   const { renderAsync } = await import("docx-preview")
   await renderAsync(new Blob([bytes as BlobPart]), root, undefined, {
-    className: "alpha-docx",
+    className: "codepuppy-docx",
     inWrapper: true,
     breakPages: true,
     renderHeaders: true,
@@ -102,7 +102,7 @@ async function main() {
     return
   }
   // 高度链要在渲染**之前**定下来:表格载体按容器的确定高度算 canvas 尺寸(见 host.html)。
-  document.documentElement.setAttribute("data-alpha-office-kind", subtype)
+  document.documentElement.setAttribute("data-codepuppy-office-kind", subtype)
   try {
     const bytes = await documentBytes()
     const detail = await RENDERERS[subtype](bytes)

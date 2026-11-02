@@ -1,0 +1,17 @@
+// #727:Cloud job 客户端 action 选择闸门。真断言在 codepuppy-cloud-jobs.cases.ts ——
+// 子进程跑(cloud-ipc.test.ts 同款),因为 mock.module("./codepuppy-auth" 等) 会污染同进程的其它测试文件。
+import { expect, test } from "bun:test"
+import { join } from "node:path"
+
+test("cloud job action-selection cases run green in an isolated child process", () => {
+  const result = Bun.spawnSync({
+    cmd: [process.execPath, "test", join(import.meta.dir, "codepuppy-cloud-jobs.cases.ts")],
+    cwd: join(import.meta.dir, "../.."),
+    env: process.env,
+  })
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`
+  if (result.exitCode !== 0) throw new Error(output)
+  // `#1572`:请求出口的网络失败带 netLayer 且日志带层名(13 → 14)。
+  expect(output).toContain(" 14 pass")
+  expect(output).toContain(" 0 fail")
+})

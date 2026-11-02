@@ -23,8 +23,8 @@
     "build": "electron-vite build",
     "preview": "bun ./scripts/launch.ts preview",
     "package:mac": "ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/ electron-builder --mac --config electron-builder.config.ts",
-    "build:mac-x64": "ALPHA_TARGET_ARCH=x64 bun run build",
-    "package:mac-x64": "ALPHA_TARGET_ARCH=x64 ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/ electron-builder --mac --x64 --config electron-builder.config.ts",
+    "build:mac-x64": "CODEPUPPY_TARGET_ARCH=x64 bun run build",
+    "package:mac-x64": "CODEPUPPY_TARGET_ARCH=x64 ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/ electron-builder --mac --x64 --config electron-builder.config.ts",
     "merge:latest-mac": "bun ./scripts/merge-latest-mac-yml.ts",
     "package:win": "ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/ electron-builder --win --x64 --publish never --config electron-builder.config.ts",
     "install:local": "bun ./scripts/install-local.ts",
@@ -32,7 +32,7 @@
     "ship:windows": "bun run build && bun run package:win"
   },
   "dependencies": {
-    "@alpha-code/contracts-consumer": "workspace:*",
+    "@codepuppy/contracts-consumer": "workspace:*",
     "@file-viewer/pptx": "3.0.0",
     "@file-viewer/renderer-spreadsheet": "3.0.0",
     "@zip.js/zip.js": "2.7.62",

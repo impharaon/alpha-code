@@ -12,16 +12,16 @@ import * as fs from "node:fs"
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { isAbsolute, join, relative } from "node:path"
-import { environmentMutableRoot } from "./alpha-environment"
+import { environmentMutableRoot } from "./codepuppy-environment"
 import { customProviderTruthPath, readCustomProviderTruth, type CustomProviderRecord } from "./custom-provider-truth"
 import { writeCustomProviderTruth } from "./custom-provider-truth-write"
 import { WRITABLE_ROOT_IDS, renderProcessFenceProfile, type ProcessFenceProfileInput } from "./process-fence-profile"
 
 const HOME = "/Users/alpha"
-/** 默认 base:alpha-environment.ts defaultAlphaBaseRoot(<appData>/alpha-code-state)。 */
-const DEFAULT_STATE_ROOT = `${HOME}/Library/Application Support/alpha-code-state`
-/** dev 态 ALPHA_ENV_BASE_DIR 可改 base —— 真源跟着**实际** base 走,不是默认常量(基线 I2)。 */
-const OVERRIDE_STATE_ROOT = `${HOME}/dev/alpha-base`
+/** 默认 base:codepuppy-environment.ts defaultCodePuppyBaseRoot(<appData>/codepuppy-state)。 */
+const DEFAULT_STATE_ROOT = `${HOME}/Library/Application Support/codepuppy-state`
+/** dev 态 CODEPUPPY_ENV_BASE_DIR 可改 base —— 真源跟着**实际** base 走,不是默认常量(基线 I2)。 */
+const OVERRIDE_STATE_ROOT = `${HOME}/dev/codepuppy-base`
 const USER_DATA = `${HOME}/Library/Application Support/ai.opencode.desktop`
 
 function withTemp<T>(run: (dir: string) => T): T {
@@ -69,7 +69,7 @@ const describeRule = (r: Rule) => `${r.id} ${r.kind} ${r.value}`
 const profileFor = (stateRoot: string, env: "prod" | "dev", over: Partial<ProcessFenceProfileInput> = {}) =>
   renderProcessFenceProfile({
     workspaces: [`${HOME}/code-puppy`, `${HOME}/app/alpha-code`],
-    alphaGlobalRoot: environmentMutableRoot(env, stateRoot),
+    codepuppyGlobalRoot: environmentMutableRoot(env, stateRoot),
     userDataPath: USER_DATA,
     stateHome: USER_DATA,
     roots: { home: HOME, dataHome: `${HOME}/.local/share`, cacheHome: `${HOME}/.cache`, configHome: `${HOME}/.config` },
@@ -82,9 +82,9 @@ const FIXED_ROW_IDS = ["W2", "W3", "W4", "W5", "W6", "W7", "W8", "W10", "W11", "
 
 describe("真源位置(I2):<casBaseRoot>/custom-providers/<env>.json 不在可写集任何固定行之下", () => {
   test("路径 = <casBaseRoot>/custom-providers/<env>.json;与三个 env 根、cas/、fence-workspaces/ 同级(相对每个都以 .. 开头)", () => {
-    expect(customProviderTruthPath(DEFAULT_STATE_ROOT, "prod")).toBe("/Users/alpha/Library/Application Support/alpha-code-state/custom-providers/prod.json")
-    expect(customProviderTruthPath(DEFAULT_STATE_ROOT, "beta")).toBe("/Users/alpha/Library/Application Support/alpha-code-state/custom-providers/beta.json")
-    expect(customProviderTruthPath(OVERRIDE_STATE_ROOT, "dev")).toBe("/Users/alpha/dev/alpha-base/custom-providers/dev.json")
+    expect(customProviderTruthPath(DEFAULT_STATE_ROOT, "prod")).toBe("/Users/alpha/Library/Application Support/codepuppy-state/custom-providers/prod.json")
+    expect(customProviderTruthPath(DEFAULT_STATE_ROOT, "beta")).toBe("/Users/alpha/Library/Application Support/codepuppy-state/custom-providers/beta.json")
+    expect(customProviderTruthPath(OVERRIDE_STATE_ROOT, "dev")).toBe("/Users/alpha/dev/codepuppy-base/custom-providers/dev.json")
     for (const env of ["prod", "beta", "dev"] as const) {
       const truth = customProviderTruthPath(DEFAULT_STATE_ROOT, env)
       for (const sibling of [environmentMutableRoot(env, DEFAULT_STATE_ROOT), join(DEFAULT_STATE_ROOT, "cas"), join(DEFAULT_STATE_ROOT, "fence-workspaces")]) {
@@ -115,8 +115,8 @@ describe("真源位置(I2):<casBaseRoot>/custom-providers/<env>.json 不在可�
         const dir = join(stateRoot, "custom-providers")
         expect(rules.filter((r) => covers(r, truth)).map(describeRule), `truth file ${truth}`).toEqual([])
         expect(rules.filter((r) => covers(r, dir)).map(describeRule), `truth dir ${dir}`).toEqual([])
-        // 对照:同一批规则里 W2 确实罩着 alpha.jsonc 的家(手段不是对什么都答「没覆盖」)
-        expect(rules.filter((r) => covers(r, join(environmentMutableRoot(env, stateRoot), "alpha.jsonc"))).map(describeRule)).toEqual([
+        // 对照:同一批规则里 W2 确实罩着 codepuppy.jsonc 的家(手段不是对什么都答「没覆盖」)
+        expect(rules.filter((r) => covers(r, join(environmentMutableRoot(env, stateRoot), "codepuppy.jsonc"))).map(describeRule)).toEqual([
           `W2 subpath ${environmentMutableRoot(env, stateRoot)}`,
         ])
       }
@@ -130,12 +130,12 @@ describe("真源位置(I2):<casBaseRoot>/custom-providers/<env>.json 不在可�
     const offenders = (p: string) => fileWriteRules(p).filter((r) => r.id !== "W1" && covers(r, truth)).map(describeRule)
     expect(offenders(profile)).toEqual([])
     expect(offenders(inject(`  (subpath "${DEFAULT_STATE_ROOT}")   ; W2`))).toEqual([`W2 subpath ${DEFAULT_STATE_ROOT}`])
-    expect(offenders(inject(`  (subpath "/users/alpha/library/application support/alpha-code-state/custom-providers")   ; W3`))).toEqual([
-      "W3 subpath /users/alpha/library/application support/alpha-code-state/custom-providers",
+    expect(offenders(inject(`  (subpath "/users/alpha/library/application support/codepuppy-state/custom-providers")   ; W3`))).toEqual([
+      "W3 subpath /users/alpha/library/application support/codepuppy-state/custom-providers",
     ])
     expect(offenders(inject(`  (regex #"^/Users/alpha/Library")   ; W8`))).toEqual(["W8 regex ^/Users/alpha/Library"])
     expect(offenders(inject(`  (literal "${truth}")   ; W13`))).toEqual([`W13 literal ${truth}`])
-    // 字符串前缀不算覆盖:`alpha-code-state-2` 不是 `alpha-code-state` 的子路径(按段比,不是 startsWith)
+    // 字符串前缀不算覆盖:`codepuppy-state-2` 不是 `codepuppy-state` 的子路径(按段比,不是 startsWith)
     expect(offenders(inject(`  (subpath "${DEFAULT_STATE_ROOT}-2")   ; W2`))).toEqual([])
     expect(() => fileWriteRules(inject(`  (subpath "${DEFAULT_STATE_ROOT}")`))).toThrow("without a W-id")
     expect(() => fileWriteRules(inject(`  (allow-something "${DEFAULT_STATE_ROOT}")   ; W2`))).toThrow("no parsable rule")

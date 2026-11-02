@@ -19,7 +19,7 @@ is the way to refresh after the external directory changes).
    - global: `~/.claude/skills/`, `~/.agents/skills/`, `~/.claude/CLAUDE.md`
 2. **Preview** — show the user the exact list (names + source paths) and what each maps to:
    - skill → `<project>/.code-puppy/skills/<name>/` (or
-     `$ALPHA_GLOBAL_DIR/skills/<name>/` for global; use only the absolute value supplied by alpha)
+     `$CODEPUPPY_GLOBAL_DIR/skills/<name>/` for global; use only the absolute value supplied by alpha)
    - `CLAUDE.md` → `AGENTS.md` (the engine's native instruction file)
    Anything that does not map (e.g. `.claude/commands`, `.claude/agents`, hook scripts) must be
    listed as **not importable** — say so plainly, never silently drop it.
@@ -39,5 +39,5 @@ is the way to refresh after the external directory changes).
 - Never modify the source `.claude`/`.agents` directories — import is copy-only.
 - Never create a `.opencode` directory or a `.mcp.json` file.
 - If the user wants the old inherit-everything behavior instead, tell them about the
-  `ALPHA_ECOSYSTEM_INHERIT=1` escape hatch (machine-wide, restores upstream behavior; alpha then
+  `CODEPUPPY_ECOSYSTEM_INHERIT=1` escape hatch (machine-wide, restores upstream behavior; alpha then
   stops detecting and prompting).

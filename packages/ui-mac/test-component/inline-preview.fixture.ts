@@ -1,7 +1,7 @@
 // #1503: read part fields copied from the two D4 attachment-metadata records and
 // their read-only DB rows (prt_0ccf4dd94001twC8GHZUtQ7WN3 / prt_0ccf4de3a001hMv3czcFDxal3u).
 // All identifiers/text are synthetic; PNGs are locally generated 32x32 red/blue swatches.
-import producer from "../../alpha-contracts-consumer/vendor/alpha-platform/contracts/v1/fixtures/producer/artifact-list.json"
+import producer from "../../codepuppy-contracts-consumer/vendor/alpha-platform/contracts/v1/fixtures/producer/artifact-list.json"
 
 export const previewPngs = [
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAKklEQVR4nGO4I6dLU8QwasGoBaMWjFowasGoBaMWjFowasGoBaMWDBULACuKnD2ir9opAAAAAElFTkSuQmCC",

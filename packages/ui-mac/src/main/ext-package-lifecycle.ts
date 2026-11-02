@@ -40,7 +40,7 @@ export type PackageChildKindV1 = "skill" | "agent" | "cloud" | "command" | "mcp"
  * 在它之前,同一件事被三处各写一遍三元,而三处都以 `else → "mcp"` 收尾
  * (`package-admission.ts` 的 kind、同文件的 builder 分派、本模块的 key 派生)。后果不是
  * 「少认一个 profile」,是**认错**:一个新登记的 profile 会被静默当成 MCP 装进
- * `alpha.jsonc` 的 `mcp` 段,而卸载侧(`ext-package-uninstall.ts`)是 fail-closed 的
+ * `codepuppy.jsonc` 的 `mcp` 段,而卸载侧(`ext-package-uninstall.ts`)是 fail-closed 的
  * ⇒ **装得上、卸不掉**。两处调用点上的 `as "skill" | "agent" | "mcp"` 强转让编译器也看不见。
  *
  * 因此这张表的判据有两条,缺一条都是假闸:

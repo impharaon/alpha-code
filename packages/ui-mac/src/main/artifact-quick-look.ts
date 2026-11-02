@@ -16,7 +16,7 @@ import {
 } from "node:fs"
 import { tmpdir } from "node:os"
 import { basename, isAbsolute, join, relative } from "node:path"
-import { isSafeRunId, safeResolveInAlpha } from "./alpha-workdir"
+import { isSafeRunId, safeResolveInCodePuppy } from "./codepuppy-workdir"
 import { isSafeSavedPath, readArtifactManifest } from "./artifact-manifest"
 import {
   OOXML_LIMITS,
@@ -89,8 +89,8 @@ export async function previewRunArtifactQuickLook(
     return refused("ARTIFACT_STATE_BLOCKED", entry.local.state)
   if (!isSafeSavedPath(entry.local.savedPath)) return refused("ARTIFACT_PATH_REJECTED")
 
-  const runDir = safeResolveInAlpha(identity.directory, "runs", identity.runId)
-  const target = safeResolveInAlpha(
+  const runDir = safeResolveInCodePuppy(identity.directory, "runs", identity.runId)
+  const target = safeResolveInCodePuppy(
     identity.directory,
     "runs",
     identity.runId,
@@ -134,7 +134,7 @@ export async function previewRunArtifactQuickLook(
       )
 
     passedStructure = true
-    copyDir = mkdtempSync(join(tmpdir(), "alpha-artifact-quick-look-"))
+    copyDir = mkdtempSync(join(tmpdir(), "codepuppy-artifact-quick-look-"))
     const copy = join(copyDir, basename(entry.local.savedPath))
     writeFileSync(copy, bytes, { flag: "wx", mode: 0o600 })
     previewFile(copy)

@@ -35,19 +35,19 @@ const TOKEN_CANARY = "REQ128_MCP_OAUTH_TOKEN_4f1c9a"
 let tmp = ""
 let root = ""
 let userData = ""
-const previousRoot = process.env.ALPHA_GLOBAL_DIR
+const previousRoot = process.env.CODEPUPPY_GLOBAL_DIR
 
 beforeEach(() => {
   tmp = mkdtempSync(join(tmpdir(), "package-mcp-oauth-"))
   root = join(tmp, "root")
   userData = join(tmp, "user-data")
   mkdirSync(root, { recursive: true })
-  process.env.ALPHA_GLOBAL_DIR = root
+  process.env.CODEPUPPY_GLOBAL_DIR = root
 })
 
 afterEach(() => {
-  if (previousRoot === undefined) delete process.env.ALPHA_GLOBAL_DIR
-  else process.env.ALPHA_GLOBAL_DIR = previousRoot
+  if (previousRoot === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+  else process.env.CODEPUPPY_GLOBAL_DIR = previousRoot
   rmSync(tmp, { recursive: true, force: true })
 })
 
@@ -271,8 +271,8 @@ function uninstallInstallers(calls: string[]): PackageArtifactInstallersV1 {
       calls.push(`removeMcpSecretsStrict:${name}`)
       return { ok: true }
     },
-    releaseAlphaConnectionBindings: (componentId) => {
-      calls.push(`releaseAlphaConnectionBindings:${componentId}`)
+    releaseCodePuppyConnectionBindings: (componentId) => {
+      calls.push(`releaseCodePuppyConnectionBindings:${componentId}`)
       return { ok: true }
     },
     removeInstallGrants: (_root, keys) => {
@@ -604,10 +604,10 @@ describe("admission asks the engine, and required OAuth gates the installer", ()
     expect(transactionCalls).toBe(1)
     expect(fake.calls).toEqual([`add:${SERVICE_ID}:${SIGNED_URL}`])
     // The durable config binds the signed URL — the same binding the engine's token store enforces.
-    const config = JSON.parse(readFileSync(join(root, "alpha.jsonc"), "utf8"))
+    const config = JSON.parse(readFileSync(join(root, "codepuppy.jsonc"), "utf8"))
     expect(config.mcp[SERVICE_ID].url).toBe(SIGNED_URL)
     // No token byte reaches the ledger or the config.
-    for (const file of ["alpha.jsonc", "installs.json"])
+    for (const file of ["codepuppy.jsonc", "installs.json"])
       expect(readFileSync(join(root, file), "utf8")).not.toContain(TOKEN_CANARY)
   })
 
@@ -638,7 +638,7 @@ describe("admission asks the engine, and required OAuth gates the installer", ()
     const { outcome, transactionCalls } = await install({ envelope, bytes, engine: fake.engine, attemptId: "attempt-optional" })
     expect(outcome).toMatchObject({ ok: true, kind: "mcp", mcpOauthUnavailable: true, activateMcp: [] })
     expect(transactionCalls).toBe(1)
-    const config = JSON.parse(readFileSync(join(root, "alpha.jsonc"), "utf8"))
+    const config = JSON.parse(readFileSync(join(root, "codepuppy.jsonc"), "utf8"))
     expect(config.mcp[SERVICE_ID].enabled).toBe(false)
   })
 })

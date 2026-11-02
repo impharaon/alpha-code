@@ -1,6 +1,6 @@
 // `#928` —— 跑门不许泄漏探针 worktree 的**行为闸**。
 //
-// 这道门守的是什么(大白话):`scripts/alpha-check.sh` 第 [8/9] 步会在**共享主 checkout** 里
+// 这道门守的是什么(大白话):`scripts/codepuppy-check.sh` 第 [8/9] 步会在**共享主 checkout** 里
 // 真建三棵探针 worktree、真跑 `bun install`(装好一棵 2.8 GB),跑完必须清干净。实测
 // 2026-08-11:一晚四条 lane 跑五次门,留下 **4 棵 6.3 GB**;另一次三跑剩三棵 8 GB。泄漏体是
 // **注册在案的** worktree:`git worktree list` 越来越长,`git worktree prune` 清不掉(prune 只
@@ -24,7 +24,7 @@
 //   · **不断言「代码里有 trap」**。本票恰恰证明了有 trap 也可以不跑 —— 那种断言是本仓点名过的
 //     假闸门。这里断言的是**可观察结果**:跑完之后 `git worktree list` 里一条 `wtboot-probe-*`
 //     都不剩、盘上也没有对应目录、共享 `core.hooksPath` 还是跑之前那个值。
-//   · **真跑生产脚本**。B 组把 `scripts/assert-worktree-bootstrap.sh`(alpha-check 第 [8/9] 步
+//   · **真跑生产脚本**。B 组把 `scripts/assert-worktree-bootstrap.sh`(codepuppy-check 第 [8/9] 步
 //     跑的就是它)整条跑完,只是跑在一个完全隔离的小 git 仓里(0.4s)。清扫被摘掉、被换成
 //     `true`、或调用点被删掉,B 组当场红 —— A 组单独测清扫本体是不够的,那是「没测生产接线」。
 //   · **清过头和不清一样坏**,所以反向的两条与正向同等重量:并发 lane 的探针树正活着,把它删掉
@@ -118,7 +118,7 @@ function initFixture(opts: {
    */
   rootScripts?: Record<string, string>
 }) {
-  const root = mkdtempSync(join(tmpdir(), "alpha928-"))
+  const root = mkdtempSync(join(tmpdir(), "codepuppy928-"))
   TEMP_ROOTS.push(root)
   const home = join(root, "home")
   const repo = join(root, "repo")
@@ -303,13 +303,13 @@ describe("scripts/worktree-probe-sweep.sh —— 清掉无主残骸,且**只**�
   })
 })
 
-describe("生产接线:真跑 scripts/assert-worktree-bootstrap.sh(alpha-check 第 [8/9] 步)", () => {
+describe("生产接线:真跑 scripts/assert-worktree-bootstrap.sh(codepuppy-check 第 [8/9] 步)", () => {
   test("脚本中途失败:跑完零探针残留,且共享 core.hooksPath 还是跑之前那个值", () => {
     const { home, repo } = initFixture({ hooksPath: ".lane-928-hooks", typecheckScript: "exit 3" })
     addWorktree(repo, home, "wtboot-probe-999996-3077-pos") // 上一轮被 KILL 留下的
     addWorktree(repo, home, "lane-620-continue") // 别人的 lane
 
-    const r = run(repo, ["bash", "scripts/assert-worktree-bootstrap.sh"], home, { ALPHA_WT_PROBE_NESTED: "1" })
+    const r = run(repo, ["bash", "scripts/assert-worktree-bootstrap.sh"], home, { CODEPUPPY_WT_PROBE_NESTED: "1" })
     // 夹具仓里能力判据当然失守 —— 这正是「脚本中途失败」那条退出路径。
     expect(r.code).not.toBe(0)
 
@@ -326,7 +326,7 @@ describe("生产接线:真跑 scripts/assert-worktree-bootstrap.sh(alpha-check �
 
     const proc = Bun.spawn(["bash", "scripts/assert-worktree-bootstrap.sh"], {
       cwd: repo,
-      env: { ...gitEnv(home), ALPHA_WT_PROBE_NESTED: "1" },
+      env: { ...gitEnv(home), CODEPUPPY_WT_PROBE_NESTED: "1" },
       stdout: "ignore",
       stderr: "ignore",
     })
@@ -365,7 +365,7 @@ describe("生产接线:真跑 scripts/assert-worktree-bootstrap.sh(alpha-check �
 
     const proc = Bun.spawn(["bash", "scripts/assert-worktree-bootstrap.sh"], {
       cwd: repo,
-      env: { ...gitEnv(home), ALPHA_WT_PROBE_NESTED: "1" },
+      env: { ...gitEnv(home), CODEPUPPY_WT_PROBE_NESTED: "1" },
       stdout: "ignore",
       stderr: "ignore",
     })
@@ -403,7 +403,7 @@ describe("生产接线:真跑 scripts/assert-worktree-bootstrap.sh(alpha-check �
 
     const proc = Bun.spawn(["bash", "scripts/assert-worktree-bootstrap.sh"], {
       cwd: repo,
-      env: { ...gitEnv(home), ALPHA_WT_PROBE_NESTED: "1" },
+      env: { ...gitEnv(home), CODEPUPPY_WT_PROBE_NESTED: "1" },
       stdout: "pipe",
       stderr: "ignore",
     })
@@ -477,7 +477,7 @@ describe("生产接线:真跑 scripts/assert-worktree-bootstrap.sh(alpha-check �
 // ── `#941` —— 可达性判别依据:网络半通不通不许硬红,恒 'network' 仍必须硬红 ──────────────
 //
 // 2026-08-11 夜实测(票面):同一分支几分钟内,[6/6](a) 一次硬红(「明明可达,判别依据却说
-// 'network'」⇒ alpha-check 整体 ❌)、一次落降级档 —— 而同一时刻 `curl registry.npmjs.org`
+// 'network'」⇒ codepuppy-check 整体 ❌)、一次落降级档 —— 而同一时刻 `curl registry.npmjs.org`
 // http=200(一次 0.9s、一次 7.2s),同窗 git fetch 撞 SSL_ERROR_SYSCALL、gh 两次 EOF。
 // 判别依据的探测是**单发** curl(--max-time 8,零重试),两个独立调用点相隔几秒采样同一个事实,
 // 代理抖动时各落矛盾一侧 ⇒ 健康仓库被判「判据失守」(exit 1)⇒ 训练人 `--no-verify`(`#754`)。
@@ -535,7 +535,7 @@ describe("可达性判别依据(#941):半通不通降级,恒 'network' 硬红", 
       FLAKY_STATE: join(fx.root, "curl-calls.n"),
       FLAKY_SEQ: seq,
       FLAKY_DEFAULT: dflt,
-      ALPHA_WT_PROBE_NESTED: "1",
+      CODEPUPPY_WT_PROBE_NESTED: "1",
     }
   }
 

@@ -1,0 +1,106 @@
+import { describe, expect, test } from "bun:test"
+import { parseRoute } from "../../../shared/route-manifest"
+import { sameSessionIdentity, sessionLiveSnapshotOf } from "./session-workspace-core"
+import { t } from "../../i18n"
+
+describe("REQ-125 C1a typed live session context", () => {
+  test("v2 target route plus typed sync record resolves the real server/directory/session triple", () => {
+    expect(
+      sessionLiveSnapshotOf({
+        route: parseRoute("/server/c2lkZWNhcg/session/ses_0123456789abcdef"),
+        providerServerKey: "sidecar",
+        session: {
+          id: "ses_0123456789abcdef",
+          directory: "/Users/tide/app/alpha-work",
+          title: "整理架构说明",
+        },
+        status: { type: "idle" },
+      }),
+    ).toEqual({
+      identity: {
+        serverKey: "sidecar",
+        directory: "/Users/tide/app/alpha-work",
+        sessionID: "ses_0123456789abcdef",
+      },
+      project: "alpha-work",
+      title: "整理架构说明",
+      activity: "idle",
+    })
+  })
+
+  test("legacy route remains readable while the canonical route is v2", () => {
+    expect(
+      sessionLiveSnapshotOf({
+        route: parseRoute("/L3RtcC9wcm9q/session/ses_1"),
+        providerServerKey: "sidecar",
+        status: { type: "busy" },
+      }),
+    ).toMatchObject({
+      identity: { serverKey: "sidecar", directory: "/tmp/proj", sessionID: "ses_1" },
+      project: "proj",
+      // #1589 AC1:会话记录未读到时不拿会话编号顶替标题,界面显示「对话」。
+      title: "",
+      activity: "running",
+    })
+  })
+
+  test("#1589 AC1:未生成标题的会话与侧栏同显示「新对话」,普通标题原样", () => {
+    const route = parseRoute("/server/c2lkZWNhcg/session/ses_1")
+    const titleOf = (title: string) =>
+      sessionLiveSnapshotOf({ route, providerServerKey: "sidecar", session: { id: "ses_1", directory: "/tmp/proj", title } })
+        ?.title
+    expect(titleOf("New session - 2026-09-21T06:29:08.485Z")).toBe(t("codepuppy.sidebar.newChat"))
+    expect(titleOf("Untitled")).toBe(t("codepuppy.sidebar.newChat"))
+    expect(titleOf("整理架构说明")).toBe("整理架构说明")
+  })
+
+  test("status projection has exactly idle and running UI states", () => {
+    const route = parseRoute("/server/c2lkZWNhcg/session/ses_1")
+    const session = { id: "ses_1", directory: "/tmp/proj", title: "Session" }
+    expect(sessionLiveSnapshotOf({ route, providerServerKey: "sidecar", session })?.activity).toBe("idle")
+    expect(
+      sessionLiveSnapshotOf({ route, providerServerKey: "sidecar", session, status: { type: "retry" } })?.activity,
+    ).toBe("running")
+    expect(
+      sessionLiveSnapshotOf({ route, providerServerKey: "sidecar", session, status: { type: "busy" } })?.activity,
+    ).toBe("running")
+    // `#1588` AC4:运行中的那一种是自动重试 —— 顶栏据此写「正在重试」;生成中不带这一格。
+    expect(sessionLiveSnapshotOf({ route, providerServerKey: "sidecar", session, status: { type: "retry" } })?.retrying).toBe(true)
+    expect(sessionLiveSnapshotOf({ route, providerServerKey: "sidecar", session, status: { type: "busy" } })?.retrying).toBeUndefined()
+  })
+})
+
+describe("REQ-125 C1a I8 session switch isolation", () => {
+  const active = {
+    serverKey: "sidecar",
+    directory: "/tmp/next",
+    sessionID: "ses_next",
+  }
+
+  test("all three identity fields must match before an async result is accepted", () => {
+    expect(sameSessionIdentity(active, { ...active })).toBe(true)
+    expect(sameSessionIdentity(active, { ...active, serverKey: "remote" })).toBe(false)
+    expect(sameSessionIdentity(active, { ...active, directory: "/tmp/previous" })).toBe(false)
+    expect(sameSessionIdentity(active, { ...active, sessionID: "ses_previous" })).toBe(false)
+    expect(sameSessionIdentity(active, undefined)).toBe(false)
+  })
+
+  test("late records from the previous route/provider cannot populate the next session", () => {
+    const nextRoute = parseRoute("/server/c2lkZWNhcg/session/ses_next")
+    expect(
+      sessionLiveSnapshotOf({
+        route: nextRoute,
+        providerServerKey: "sidecar",
+        session: { id: "ses_previous", directory: "/tmp/previous", title: "Previous" },
+      }),
+    ).toBeUndefined()
+    expect(
+      sessionLiveSnapshotOf({
+        route: nextRoute,
+        providerServerKey: "remote",
+        session: { id: "ses_next", directory: "/tmp/next", title: "Next" },
+      }),
+    ).toBeUndefined()
+    expect(sessionLiveSnapshotOf({ route: nextRoute, providerServerKey: "sidecar" })).toBeUndefined()
+  })
+})

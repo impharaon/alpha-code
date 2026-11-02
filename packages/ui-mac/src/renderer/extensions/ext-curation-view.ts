@@ -23,27 +23,27 @@ export const SHELF_ORDER: readonly CurationTier[] = ["core", "precache", "connec
 
 /** tier → 货架 chip 文案 key(用户语言:核心/精选/接入/实验室)。 */
 export const SHELF_CHIP_KEYS: Record<CurationTier, string> = {
-  core: "alpha.ext.shelfCore",
-  precache: "alpha.ext.shelfPrecache",
-  connector: "alpha.ext.shelfConnector",
-  labs: "alpha.ext.shelfLabs",
+  core: "codepuppy.ext.shelfCore",
+  precache: "codepuppy.ext.shelfPrecache",
+  connector: "codepuppy.ext.shelfConnector",
+  labs: "codepuppy.ext.shelfLabs",
 }
 
 /** tier → 货架标题/副标题 key(推荐页组头)。 */
 export const SHELF_TITLE_KEYS: Record<CurationTier, { title: string; sub: string }> = {
-  core: { title: "alpha.ext.shelfCoreTitle", sub: "alpha.ext.shelfCoreSub" },
-  precache: { title: "alpha.ext.shelfPrecacheTitle", sub: "alpha.ext.shelfPrecacheSub" },
-  connector: { title: "alpha.ext.shelfConnectorTitle", sub: "alpha.ext.shelfConnectorSub" },
-  labs: { title: "alpha.ext.shelfLabsTitle", sub: "alpha.ext.shelfLabsSub" },
+  core: { title: "codepuppy.ext.shelfCoreTitle", sub: "codepuppy.ext.shelfCoreSub" },
+  precache: { title: "codepuppy.ext.shelfPrecacheTitle", sub: "codepuppy.ext.shelfPrecacheSub" },
+  connector: { title: "codepuppy.ext.shelfConnectorTitle", sub: "codepuppy.ext.shelfConnectorSub" },
+  labs: { title: "codepuppy.ext.shelfLabsTitle", sub: "codepuppy.ext.shelfLabsSub" },
 }
 
 /** 甄选能力 token → 用户语言 key(intake 观察面词汇;未知 token 返回 null → 原样 mono 展示)。 */
 export const CAPABILITY_LABEL_KEYS: Record<string, string> = {
-  "fs:read": "alpha.ext.capFsRead",
-  "fs:write": "alpha.ext.capFsWrite",
-  "net:http": "alpha.ext.capNetHttp",
-  "env:read": "alpha.ext.capEnvRead",
-  "proc:spawn": "alpha.ext.capProcSpawn",
+  "fs:read": "codepuppy.ext.capFsRead",
+  "fs:write": "codepuppy.ext.capFsWrite",
+  "net:http": "codepuppy.ext.capNetHttp",
+  "env:read": "codepuppy.ext.capEnvRead",
+  "proc:spawn": "codepuppy.ext.capProcSpawn",
 }
 
 /** 整目录解码一次(fail-closed;Map 键 = entry.id)。 */
@@ -140,7 +140,7 @@ export function formatBytesApprox(bytes: number): string {
   return `${bytes} B`
 }
 
-export type ConfirmNoteKey = "alpha.ext.confirmNote" | "alpha.ext.confirmNoteDefaultOff" | "alpha.ext.confirmNoteUnreviewed"
+export type ConfirmNoteKey = "codepuppy.ext.confirmNote" | "codepuppy.ext.confirmNoteDefaultOff" | "codepuppy.ext.confirmNoteUnreviewed"
 
 /**
  * #1595 AC1:添加确认框的那一句。装好后是不是关着的,由 main 落账同一个分类器决定
@@ -157,8 +157,8 @@ export function confirmNoteKey(entry: CatalogEntry, catalog: Catalog, nowIso: st
       kind: entry.type,
       ...curationActivationFacts(status, nowIso),
     }) === "disabled"
-  if (!disabled) return "alpha.ext.confirmNote"
-  return status.kind === "curated" ? "alpha.ext.confirmNoteDefaultOff" : "alpha.ext.confirmNoteUnreviewed"
+  if (!disabled) return "codepuppy.ext.confirmNote"
+  return status.kind === "curated" ? "codepuppy.ext.confirmNoteDefaultOff" : "codepuppy.ext.confirmNoteUnreviewed"
 }
 
 /**
@@ -167,5 +167,5 @@ export function confirmNoteKey(entry: CatalogEntry, catalog: Catalog, nowIso: st
  */
 export function packageConfirmNoteKey(componentKinds: readonly string[]): ConfirmNoteKey {
   const anyDisabled = componentKinds.some((kind) => initialDesiredState({ origin: "catalog", kind }) === "disabled")
-  return anyDisabled ? "alpha.ext.confirmNoteUnreviewed" : "alpha.ext.confirmNote"
+  return anyDisabled ? "codepuppy.ext.confirmNoteUnreviewed" : "codepuppy.ext.confirmNote"
 }

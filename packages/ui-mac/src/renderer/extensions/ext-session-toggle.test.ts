@@ -19,12 +19,12 @@ const DIR_B = "/proj/b"
 
 describe("开关状态机(grant 在场 = 开;连接真伪单独如实呈现)", () => {
   test("无 grant → off(muted,「每次会话单独开启」);grant + 连接成功 → on(ok,「本次会话已启用」)", () => {
-    expect(sessionToggleView(undefined, undefined)).toEqual({ on: false, textKey: "alpha.ext.sessionOffRow", tone: "muted" })
-    expect(sessionToggleView(grant("mcp:labs1", DIR_A), "connected")).toEqual({ on: true, textKey: "alpha.ext.sessionOnRow", tone: "ok" })
+    expect(sessionToggleView(undefined, undefined)).toEqual({ on: false, textKey: "codepuppy.ext.sessionOffRow", tone: "muted" })
+    expect(sessionToggleView(grant("mcp:labs1", DIR_A), "connected")).toEqual({ on: true, textKey: "codepuppy.ext.sessionOnRow", tone: "ok" })
   })
 
   test("grant 在场但连接失败 → 开关亮 + warn + 如实提示(绝不把已授权谎报成已连接)", () => {
-    expect(sessionToggleView(grant("mcp:labs1", DIR_A), "failed")).toEqual({ on: true, textKey: "alpha.ext.sessionOnNoLink", tone: "warn" })
+    expect(sessionToggleView(grant("mcp:labs1", DIR_A), "failed")).toEqual({ on: true, textKey: "codepuppy.ext.sessionOnNoLink", tone: "warn" })
   })
 
   test("会话结束回落:grant 集清空(main 事件驱动)⇒ 同一入参路径回 off —— 开关归位、行保留", () => {
@@ -33,7 +33,7 @@ describe("开关状态机(grant 在场 = 开;连接真伪单独如实呈现)", (
     const afterEnded: SessionGrantWire[] = [] // onSessionGrantsEnded → store 清空
     expect(sessionToggleView(findSessionGrant(afterEnded, "mcp:labs1", DIR_A), undefined)).toEqual({
       on: false,
-      textKey: "alpha.ext.sessionOffRow",
+      textKey: "codepuppy.ext.sessionOffRow",
       tone: "muted",
     })
   })
@@ -51,7 +51,7 @@ describe("connect 结果 → 连接真伪(r1 Major:SDK throwOnError:false 的 {e
     expect(connectOutcome({ error: { status: 404 } })).toBe(false)
     const g = grant("mcp:labs1", DIR_A)
     const link = connectOutcome({ error: { status: 404 } }) ? ("connected" as const) : ("failed" as const)
-    expect(sessionToggleView(g, link)).toEqual({ on: true, textKey: "alpha.ext.sessionOnNoLink", tone: "warn" })
+    expect(sessionToggleView(g, link)).toEqual({ on: true, textKey: "codepuppy.ext.sessionOnNoLink", tone: "warn" })
   })
 
   test("成功(有结果且无 error)→ true;空结果/缺失 → false(fail-closed)", () => {
@@ -68,14 +68,14 @@ describe("拒绝码 → UI 路由(按机器码,不解析 reason)", () => {
     expect(sessionRefusalRoute("session-grant-kind-unsupported")).toEqual({
       kind: "toast",
       tone: "info",
-      textKey: "alpha.ext.sessionKindUnsupportedToast",
+      textKey: "codepuppy.ext.sessionKindUnsupportedToast",
     })
     expect(sessionRefusalRoute("session-grant-refused")).toEqual({
       kind: "toast",
       tone: "error",
-      textKey: "alpha.ext.sessionRefusedToast",
+      textKey: "codepuppy.ext.sessionRefusedToast",
     })
-    expect(sessionRefusalRoute(undefined)).toEqual({ kind: "toast", tone: "error", textKey: "alpha.ext.sessionRefusedToast" })
+    expect(sessionRefusalRoute(undefined)).toEqual({ kind: "toast", tone: "error", textKey: "codepuppy.ext.sessionRefusedToast" })
   })
 })
 

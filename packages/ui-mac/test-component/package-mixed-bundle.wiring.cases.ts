@@ -207,31 +207,31 @@ mock.module("../src/main/ext-transaction", () => ({
 const { readBundleAuthorizationReceipt, resolveLiveGenerationDir } = realTransactionModule
 // `#828`:generation 的 live 目录派生只此**一份**(生产的解析器 + 生产的 key 文法)。
 const { skillGenerationKey } = await import("../src/main/ext-skill-generations")
-const { initAlphaEnvironment, getAlphaEnvironment } = await import("../src/main/alpha-environment")
+const { initCodePuppyEnvironment, getCodePuppyEnvironment } = await import("../src/main/codepuppy-environment")
 const { registerExtIpcHandlers } = await import("../src/main/ext-ipc")
 
-delete process.env.ALPHA_GLOBAL_DIR
-initAlphaEnvironment({
+delete process.env.CODEPUPPY_GLOBAL_DIR
+initCodePuppyEnvironment({
   isPackaged: false,
   channel: "dev",
   appDataDir: tmp,
-  baseRoot: join(tmp, "alpha-code-state"),
+  baseRoot: join(tmp, "codepuppy-state"),
   homeDir: join(tmp, "home"),
 })
-const { alphaSidecar } = registerExtIpcHandlers(
+const { codepuppySidecar } = registerExtIpcHandlers(
   userData,
   "dev",
   async () => ({ url: "http://127.0.0.1:39121", username: "opencode", password: "route-password" }),
   join(tmp, "home"),
 )
-alphaSidecar.attach((message) => void reloadRequests.push(message as Record<string, unknown>))
+codepuppySidecar.attach((message) => void reloadRequests.push(message as Record<string, unknown>))
 
 afterAll(() => {
   globalThis.fetch = originalFetch
   rmSync(tmp, { recursive: true, force: true })
 })
 
-const root = () => getAlphaEnvironment().mutableRoot
+const root = () => getCodePuppyEnvironment().mutableRoot
 
 /** 每个用例一块干净盘面(全局根 + userData),但**共用**已注册的生产 handler。 */
 function resetDisk() {
@@ -330,7 +330,7 @@ const ledger = (): Ledger => {
 
 const configText = () => {
   try {
-    return readFileSync(join(root(), "alpha.jsonc"), "utf8")
+    return readFileSync(join(root(), "codepuppy.jsonc"), "utf8")
   } catch {
     return ""
   }
@@ -338,7 +338,7 @@ const configText = () => {
 
 const secretVersions = () => {
   try {
-    return readdirSync(join(userData, "alpha-mcp-secrets", "generic-bundle-remote"))
+    return readdirSync(join(userData, "codepuppy-mcp-secrets", "generic-bundle-remote"))
   } catch {
     return []
   }
@@ -502,8 +502,8 @@ test("the production ext-install-catalog channel activates a mixed Bundle in one
   expect(Object.keys(result as object)).not.toContain("activateMcp")
   // `#1529`:整包一次提交 ⇒ 恰好一次重载请求(global,交给 ext 调度器等会话空闲),不按组件各来一次
   // (「无 double load」的下界);main 自己一次 dispose 都不做。
-  expect(reloadRequests.filter((m) => m.type === "alpha.reload.request")).toHaveLength(1)
-  expect(reloadRequests[0]).toMatchObject({ type: "alpha.reload.request", scope: "global" })
+  expect(reloadRequests.filter((m) => m.type === "codepuppy.reload.request")).toHaveLength(1)
+  expect(reloadRequests[0]).toMatchObject({ type: "codepuppy.reload.request", scope: "global" })
 
   // ── 一次事务、一份 mutation。
   const journals = readdirSync(join(root(), "ext-tx", "journal"))
@@ -566,7 +566,7 @@ test("the production ext-install-catalog channel activates a mixed Bundle in one
 
   // 密钥:一个版本目录、明文只在那一个 0600 文件里,config 只引用它。
   expect(secretVersions()).toHaveLength(1)
-  const secretFile = join(userData, "alpha-mcp-secrets", "generic-bundle-remote", secretVersions()[0]!, "C_TOKEN")
+  const secretFile = join(userData, "codepuppy-mcp-secrets", "generic-bundle-remote", secretVersions()[0]!, "C_TOKEN")
   expect(readFileSync(secretFile, "utf8")).toBe(secretCanary)
   expect(configText()).toContain(`{file:${secretFile}}`)
   expect(configText()).not.toContain(secretCanary)
@@ -695,8 +695,8 @@ test("named production faults leave the disk entirely old", async () => {
   // 那种夹具会安静地变成「什么都没注入」。
   resetDisk()
   fixture = mixedBundleFixture()
-  mkdirSync(join(userData, "alpha-mcp-secrets"), { recursive: true })
-  writeFileSync(join(userData, "alpha-mcp-secrets", "generic-bundle-remote"), "not a directory\n")
+  mkdirSync(join(userData, "codepuppy-mcp-secrets"), { recursive: true })
+  writeFileSync(join(userData, "codepuppy-mcp-secrets", "generic-bundle-remote"), "not a directory\n")
   const secretFault = await installBundle("mixed-bundle-secret", grants())
   expect(secretFault.result).toMatchObject({ ok: false })
   expect(expectAllOldOrAllNew("secret populate fault")).toBe("old")
@@ -706,7 +706,7 @@ test("named production faults leave the disk entirely old", async () => {
   resetDisk()
   fixture = mixedBundleFixture()
   writeFileSync(
-    join(root(), "alpha.jsonc"),
+    join(root(), "codepuppy.jsonc"),
     `${JSON.stringify({ mcp: { "generic-bundle-remote": { type: "remote", url: "https://hand.written/" } } }, null, 2)}\n`,
   )
   const handwritten = configText()
@@ -766,7 +766,7 @@ test("every TX_CRASH_POINT converges through the real ext-ipc recovery to all-ol
     if (outcomes[point] === "old") expect(versions, `crash at ${point}: secret orphan`).toEqual([])
     else {
       expect(versions, `crash at ${point}`).toHaveLength(1)
-      expect(configText()).toContain(join(userData, "alpha-mcp-secrets", "generic-bundle-remote", versions[0]!, "C_TOKEN"))
+      expect(configText()).toContain(join(userData, "codepuppy-mcp-secrets", "generic-bundle-remote", versions[0]!, "C_TOKEN"))
     }
     expect(logLines.join("\n"), `crash at ${point}: 明文不得进日志`).not.toContain(secretCanary)
   }
@@ -786,7 +786,7 @@ test("every TX_CRASH_POINT converges through the real ext-ipc recovery to all-ol
 // ── `#817`:签名 package child 在**生产启停通道**上拨开(用户竖线的最后一跳)────────────────────
 //
 // 判据是三个生效面的**盘面结果**,不是 resolver 的返回值:skill = 派生允许集文件(引擎注入门
-// 消费的那份)、agent = alpha.jsonc 的 `disable` 键、mcp = `enabled:false` 键。把启停解析改回
+// 消费的那份)、agent = codepuppy.jsonc 的 `disable` 键、mcp = `enabled:false` 键。把启停解析改回
 // legacy `entries[]`(package child 从来不在那张表里)⇒ enable 一律被拒 ⇒ 这三处盘面不变 ⇒ 红。
 test("`#817` signed package children flip on through the production ext-set-install-state channel; catalog drift stays fail-closed", async () => {
   resetDisk()
@@ -796,7 +796,7 @@ test("`#817` signed package children flip on through the production ext-set-inst
 
   const setState = handlers.get("ext-set-install-state")
   if (!setState) throw new Error("ext-set-install-state handler was not registered")
-  const cfg = () => JSON.parse(readFileSync(join(root(), "alpha.jsonc"), "utf8")) as Record<string, any>
+  const cfg = () => JSON.parse(readFileSync(join(root(), "codepuppy.jsonc"), "utf8")) as Record<string, any>
   const allow = () => JSON.parse(readFileSync(join(root(), "skills-enabled.json"), "utf8")) as unknown
 
   // 安装后 skill / agent / mcp 三类可启停 child 均 disabled(catalog 首装缺省)—— #817 报的现场。

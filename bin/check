@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-exec bash scripts/alpha-check.sh
+exec bash scripts/codepuppy-check.sh

@@ -7,7 +7,7 @@ import { createMemo, createSignal, For, onCleanup, Show } from "solid-js"
 import { useNavigate } from "@solidjs/router"
 import { Portal } from "solid-js/web"
 import { t } from "../i18n"
-import { pushToast } from "../alpha-ui/Toast"
+import { pushToast } from "../codepuppy-ui/Toast"
 import type { AuthState } from "../../preload/types"
 import type { AutomationRunRecord, AutomationSchedule, AutomationTask } from "../../shared/automation-types"
 import { AUTOMATION_DEFAULTS } from "../../shared/automation-types"
@@ -64,22 +64,22 @@ function fromForm(form: ScheduleForm): AutomationSchedule | { error: string } {
   const timeOk = Number.isFinite(h) && Number.isFinite(m) && h >= 0 && h <= 23 && m >= 0 && m <= 59
   switch (form.kind) {
     case "daily":
-      if (!timeOk) return { error: t("alpha.auto.errTime") }
+      if (!timeOk) return { error: t("codepuppy.auto.errTime") }
       return { kind: "cron", expr: `${m} ${h} * * *` }
     case "weekly":
-      if (!timeOk) return { error: t("alpha.auto.errTime") }
-      if (form.dows.length === 0) return { error: t("alpha.auto.errDow") }
+      if (!timeOk) return { error: t("codepuppy.auto.errTime") }
+      if (form.dows.length === 0) return { error: t("codepuppy.auto.errDow") }
       return { kind: "cron", expr: `${m} ${h} * * ${[...form.dows].sort().join(",")}` }
     case "monthly":
-      if (!timeOk) return { error: t("alpha.auto.errTime") }
-      if (form.dom < 1 || form.dom > 31) return { error: t("alpha.auto.errDom") }
+      if (!timeOk) return { error: t("codepuppy.auto.errTime") }
+      if (form.dom < 1 || form.dom > 31) return { error: t("codepuppy.auto.errDom") }
       return { kind: "cron", expr: `${m} ${h} ${form.dom} * *` }
     case "interval":
       if (!Number.isFinite(form.everyMinutes) || form.everyMinutes < AUTOMATION_DEFAULTS.minIntervalMinutes)
-        return { error: t("alpha.auto.errInterval", { min: AUTOMATION_DEFAULTS.minIntervalMinutes }) }
+        return { error: t("codepuppy.auto.errInterval", { min: AUTOMATION_DEFAULTS.minIntervalMinutes }) }
       return { kind: "interval", everyMinutes: Math.round(form.everyMinutes) }
     case "cron":
-      if (!isValidCron(form.cronExpr)) return { error: t("alpha.auto.errCron") }
+      if (!isValidCron(form.cronExpr)) return { error: t("codepuppy.auto.errCron") }
       return { kind: "cron", expr: form.cronExpr.trim() }
   }
 }
@@ -92,14 +92,14 @@ function fmtNext(ts: number | null): string {
   const today = new Date()
   const sameDay = d.toDateString() === today.toDateString()
   const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`
-  return sameDay ? `${t("alpha.auto.today")} ${hm}` : `${d.getMonth() + 1}/${d.getDate()} ${hm}`
+  return sameDay ? `${t("codepuppy.auto.today")} ${hm}` : `${d.getMonth() + 1}/${d.getDate()} ${hm}`
 }
 
 function statusDot(r: AutomationRunRecord | undefined): { cls: string; label: string } {
-  if (!r) return { cls: "idle", label: t("alpha.auto.neverRan") }
-  if (r.status === "ok") return { cls: "ok", label: t("alpha.auto.lastOk") }
-  if (r.status === "skipped-overlap" || r.status === "skipped-cap") return { cls: "skip", label: t("alpha.auto.lastSkipped") }
-  return { cls: "err", label: r.status === "timeout" ? t("alpha.auto.lastTimeout") : t("alpha.auto.lastFailed") }
+  if (!r) return { cls: "idle", label: t("codepuppy.auto.neverRan") }
+  if (r.status === "ok") return { cls: "ok", label: t("codepuppy.auto.lastOk") }
+  if (r.status === "skipped-overlap" || r.status === "skipped-cap") return { cls: "skip", label: t("codepuppy.auto.lastSkipped") }
+  return { cls: "err", label: r.status === "timeout" ? t("codepuppy.auto.lastTimeout") : t("codepuppy.auto.lastFailed") }
 }
 
 export function AutomationPanel(props: {
@@ -182,7 +182,7 @@ export function AutomationPanel(props: {
   })
 
   const host = document.createElement("div")
-  host.setAttribute("data-alpha-automations", "")
+  host.setAttribute("data-codepuppy-automations", "")
   document.getElementById("root")?.appendChild(host)
   onCleanup(() => host.remove())
 
@@ -216,7 +216,7 @@ export function AutomationPanel(props: {
     const text = nlInput().trim()
     const parsed = parseAutomationText(text)
     setEditing(null)
-    setFName(parsed.prompt.slice(0, 24) || t("alpha.auto.untitled"))
+    setFName(parsed.prompt.slice(0, 24) || t("codepuppy.auto.untitled"))
     setFPrompt(parsed.prompt)
     setFDir("")
     fillDefaultDir()
@@ -224,8 +224,8 @@ export function AutomationPanel(props: {
     setParseNote(
       text
         ? parsed.schedule
-          ? t("alpha.auto.parsed", { desc: describeSchedule(parsed.schedule) })
-          : t("alpha.auto.parseFallback")
+          ? t("codepuppy.auto.parsed", { desc: describeSchedule(parsed.schedule) })
+          : t("codepuppy.auto.parseFallback")
         : "",
     )
     setFMaxMin(AUTOMATION_DEFAULTS.maxDurationMin)
@@ -240,8 +240,8 @@ export function AutomationPanel(props: {
   // standard 档(要写 Journal)在保存时照走既有确认门。
   const startDailyTemplate = () => {
     setEditing(null)
-    setFName(t("alpha.auto.tplDailyName"))
-    setFPrompt(t("alpha.auto.tplDailyPrompt"))
+    setFName(t("codepuppy.auto.tplDailyName"))
+    setFPrompt(t("codepuppy.auto.tplDailyPrompt"))
     setFDir("")
     fillDefaultDir()
     setFForm({ ...DEFAULT_FORM, kind: "daily", time: "21:00" })
@@ -270,7 +270,7 @@ export function AutomationPanel(props: {
   }
 
   const pickDir = async () => {
-    const picked = await window.api.openDirectoryPicker({ title: t("alpha.auto.pickProject") })
+    const picked = await window.api.openDirectoryPicker({ title: t("codepuppy.auto.pickProject") })
     const dir = Array.isArray(picked) ? picked[0] : picked
     if (dir) setFDir(dir)
   }
@@ -279,9 +279,9 @@ export function AutomationPanel(props: {
     setFErr("")
     const schedule = fromForm(fForm())
     if ("error" in schedule) return setFErr(schedule.error)
-    if (!fName().trim()) return setFErr(t("alpha.auto.errName"))
-    if (!fPrompt().trim()) return setFErr(t("alpha.auto.errPrompt"))
-    if (!fDir()) return setFErr(t("alpha.auto.errDir"))
+    if (!fName().trim()) return setFErr(t("codepuppy.auto.errName"))
+    if (!fPrompt().trim()) return setFErr(t("codepuppy.auto.errPrompt"))
+    if (!fDir()) return setFErr(t("codepuppy.auto.errDir"))
     const prev = editing()
     // A2:standard(可写)档启用确认 —— 无人值守可写可执行,风险显式(命令黑名单非穷尽)
     if (fProfile() === "standard" && prev?.permissionProfile !== "standard" && !standardAcked()) {
@@ -313,16 +313,16 @@ export function AutomationPanel(props: {
       // [#969] 拒绝带**结构槽** `code`(云端注册被拒 / 改本地时云端删除被拒 / [#1001] 本机校验或落盘
       // 失败)—— 换成人话再上屏。`reason` 是 main 的日志串(英文或半英半中),**永不上屏**:万一没带
       // code,说一句通用的保存失败。
-      if (!r.ok) return setFErr(r.code ? scheduleRefusalCopy(r.code, r.netLayer) : t("alpha.auto.saveFailed"))
-      pushToast({ kind: "success", title: t("alpha.auto.saved") })
+      if (!r.ok) return setFErr(r.code ? scheduleRefusalCopy(r.code, r.netLayer) : t("codepuppy.auto.saveFailed"))
+      pushToast({ kind: "success", title: t("codepuppy.auto.saved") })
       setNlInput("")
       await refresh()
       backToList()
     } catch {
       // save threw (IPC/main) — without this catch the rejection is silent (saving clears, nothing
       // written, no feedback). Surface it in the form error + a toast.
-      setFErr(t("alpha.auto.saveFailed"))
-      pushToast({ kind: "error", title: t("alpha.auto.saveFailed") })
+      setFErr(t("codepuppy.auto.saveFailed"))
+      pushToast({ kind: "error", title: t("codepuppy.auto.saveFailed") })
     } finally {
       setSaving(false)
     }
@@ -333,10 +333,10 @@ export function AutomationPanel(props: {
       const r = await window.api.automations.remove(id)
       // [#994] 云端没删掉时 main 返回 `{ ok:false, code }` 而不是抛出 —— 过去这里整个丢弃,用户
       // 回到列表看见那条还在、没有任何解释,而云端那条照常按时跑。原因换成人话放进提示里。
-      if (!r.ok) pushToast({ kind: "error", title: t("alpha.auto.removeFailed"), detail: r.code ? scheduleRefusalCopy(r.code, r.netLayer) : undefined })
+      if (!r.ok) pushToast({ kind: "error", title: t("codepuppy.auto.removeFailed"), detail: r.code ? scheduleRefusalCopy(r.code, r.netLayer) : undefined })
     } catch {
       // remove threw (IPC/main) → toast so a failed delete isn't silent
-      pushToast({ kind: "error", title: t("alpha.auto.removeFailed") })
+      pushToast({ kind: "error", title: t("codepuppy.auto.removeFailed") })
       return
     }
     await refresh()
@@ -349,7 +349,7 @@ export function AutomationPanel(props: {
     // IPC 照样能显示,所以这里**到得了**;如实提示,不挑一个 server 瞎跳(fail-closed)。
     const key = props.serverKey()
     if (!key) {
-      pushToast({ kind: "error", title: t("alpha.home.engineUnavailable") })
+      pushToast({ kind: "error", title: t("codepuppy.home.engineUnavailable") })
       return
     }
     setAutomationOpen(false)
@@ -361,30 +361,30 @@ export function AutomationPanel(props: {
   return (
     <Show when={openNow()}>
       <Portal mount={host}>
-        <div class="a-ui alpha-auto-page" role="region" aria-label={t("alpha.sidebar.automation")}>
-          <header class="alpha-auto-head">
-            <div class="alpha-auto-head-t">
+        <div class="a-ui codepuppy-auto-page" role="region" aria-label={t("codepuppy.sidebar.automation")}>
+          <header class="codepuppy-auto-head">
+            <div class="codepuppy-auto-head-t">
               <Show when={view() === "edit"}>
-                <button class="alpha-auto-crumb" onClick={backToList}>
-                  <Svg class="alpha-ic alpha-ic-sm" d="M14 6l-6 6 6 6" />
-                  {t("alpha.sidebar.automation")}
+                <button class="codepuppy-auto-crumb" onClick={backToList}>
+                  <Svg class="codepuppy-ic codepuppy-ic-sm" d="M14 6l-6 6 6 6" />
+                  {t("codepuppy.sidebar.automation")}
                 </button>
-                <span class="alpha-auto-crumb-sep">/</span>
+                <span class="codepuppy-auto-crumb-sep">/</span>
               </Show>
-              <h1>{view() === "edit" ? (editing() ? t("alpha.auto.editTitle") : t("alpha.auto.newTitle")) : t("alpha.sidebar.automation")}</h1>
+              <h1>{view() === "edit" ? (editing() ? t("codepuppy.auto.editTitle") : t("codepuppy.auto.newTitle")) : t("codepuppy.sidebar.automation")}</h1>
             </div>
-            <button class="alpha-auto-close" aria-label={t("alpha.ext.close")} onClick={() => setAutomationOpen(false)}>
+            <button class="codepuppy-auto-close" aria-label={t("codepuppy.ext.close")} onClick={() => setAutomationOpen(false)}>
               <Svg d="M6 6l12 12M18 6L6 18" />
             </button>
           </header>
 
-          <div class="alpha-auto-scroll">
-            <div class="alpha-auto-center">
+          <div class="codepuppy-auto-scroll">
+            <div class="codepuppy-auto-center">
               <Show when={view() === "list"}>
                 {/* 诚实边界 + 全局开关行 */}
-                <div class="alpha-auto-note">
-                  <span>{t("alpha.auto.offlineNote")}</span>
-                  <label class="alpha-auto-check">
+                <div class="codepuppy-auto-note">
+                  <span>{t("codepuppy.auto.offlineNote")}</span>
+                  <label class="codepuppy-auto-check">
                     <input
                       type="checkbox"
                       checked={loginItem()}
@@ -392,9 +392,9 @@ export function AutomationPanel(props: {
                         void window.api.automations.loginItem(e.currentTarget.checked).then((r) => setLoginItem(r.openAtLogin))
                       }}
                     />
-                    {t("alpha.auto.loginItem")}
+                    {t("codepuppy.auto.loginItem")}
                   </label>
-                  <label class="alpha-auto-check">
+                  <label class="codepuppy-auto-check">
                     <input
                       type="checkbox"
                       checked={pausedAll()}
@@ -402,72 +402,72 @@ export function AutomationPanel(props: {
                         void window.api.automations.pauseAll(e.currentTarget.checked).then(() => void refresh())
                       }}
                     />
-                    {t("alpha.auto.pauseAll")}
+                    {t("codepuppy.auto.pauseAll")}
                   </label>
                 </div>
                 <Show when={authState().status === "logged-in" && authState().mode === "platform"}>
-                  <p class="alpha-auto-hint">{t("alpha.auto.platformCost")}</p>
+                  <p class="codepuppy-auto-hint">{t("codepuppy.auto.platformCost")}</p>
                 </Show>
 
                 {/* 一句话新建 */}
-                <div class="alpha-auto-new">
+                <div class="codepuppy-auto-new">
                   <input
-                    class="alpha-auto-nl"
-                    placeholder={t("alpha.auto.nlPlaceholder")}
+                    class="codepuppy-auto-nl"
+                    placeholder={t("codepuppy.auto.nlPlaceholder")}
                     value={nlInput()}
                     onInput={(e) => setNlInput(e.currentTarget.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && nlInput().trim()) startCreate()
                     }}
                   />
-                  <button class="alpha-ext-add" data-variant="primary" onClick={startCreate}>
-                    {t("alpha.auto.create")}
+                  <button class="codepuppy-ext-add" data-variant="primary" onClick={startCreate}>
+                    {t("codepuppy.auto.create")}
                   </button>
                 </div>
 
                 {/* REQ-071 T2:每日总结模板(预填表单,保存/启用仍由用户显式完成) */}
-                <button class="alpha-auto-example" onClick={startDailyTemplate}>
-                  {t("alpha.auto.tplDaily")}
+                <button class="codepuppy-auto-example" onClick={startDailyTemplate}>
+                  {t("codepuppy.auto.tplDaily")}
                 </button>
 
                 <Show
                   when={tasks().length > 0}
                   fallback={
-                    <div class="alpha-auto-empty">
-                      <b>{t("alpha.auto.emptyTitle")}</b>
-                      <p>{t("alpha.auto.emptySub")}</p>
-                      <button class="alpha-auto-example" onClick={() => setNlInput(t("alpha.auto.exampleText"))}>
-                        {t("alpha.auto.exampleText")}
+                    <div class="codepuppy-auto-empty">
+                      <b>{t("codepuppy.auto.emptyTitle")}</b>
+                      <p>{t("codepuppy.auto.emptySub")}</p>
+                      <button class="codepuppy-auto-example" onClick={() => setNlInput(t("codepuppy.auto.exampleText"))}>
+                        {t("codepuppy.auto.exampleText")}
                       </button>
                     </div>
                   }
                 >
-                  <div class="alpha-auto-list" data-paused={pausedAll() ? "" : undefined}>
+                  <div class="codepuppy-auto-list" data-paused={pausedAll() ? "" : undefined}>
                     <For each={tasks()}>
                       {(task) => {
                         const dot = () => statusDot(task.lastRun)
                         return (
-                          <div class="alpha-auto-row" data-clickable="" onClick={() => startEdit(task)}>
-                            <span class="alpha-auto-dot" data-st={task.running ? "run" : dot().cls} title={dot().label} />
-                            <div class="alpha-auto-row-body">
-                              <div class="alpha-auto-row-nm">
+                          <div class="codepuppy-auto-row" data-clickable="" onClick={() => startEdit(task)}>
+                            <span class="codepuppy-auto-dot" data-st={task.running ? "run" : dot().cls} title={dot().label} />
+                            <div class="codepuppy-auto-row-body">
+                              <div class="codepuppy-auto-row-nm">
                                 <b>{task.name}</b>
-                                <span class="alpha-auto-pill">{describeSchedule(task.schedule)}</span>
-                                <span class="alpha-auto-pill" data-muted="">
+                                <span class="codepuppy-auto-pill">{describeSchedule(task.schedule)}</span>
+                                <span class="codepuppy-auto-pill" data-muted="">
                                   {projectName(task.target.projectDir)}
                                 </span>
                                 <Show when={task.execution === "cloud"}>
-                                  <span class="alpha-auto-pill">☁ {t("alpha.auto.execCloud")}</span>
+                                  <span class="codepuppy-auto-pill">☁ {t("codepuppy.auto.execCloud")}</span>
                                 </Show>
                               </div>
-                              <div class="alpha-auto-row-st">
+                              <div class="codepuppy-auto-row-st">
                                 {task.running
-                                  ? t("alpha.auto.runningNow")
+                                  ? t("codepuppy.auto.runningNow")
                                   : task.enabled && !pausedAll()
-                                    ? `${t("alpha.auto.next")} ${fmtNext(task.nextFireAt)}`
+                                    ? `${t("codepuppy.auto.next")} ${fmtNext(task.nextFireAt)}`
                                     : task.disabledReason === "consecutive_failures"
-                                      ? t("alpha.auto.disabledBreaker", { n: AUTOMATION_DEFAULTS.failureBreaker })
-                                      : t("alpha.auto.disabled")}
+                                      ? t("codepuppy.auto.disabledBreaker", { n: AUTOMATION_DEFAULTS.failureBreaker })
+                                      : t("codepuppy.auto.disabled")}
                                 <Show when={task.cloudScheduleId && cloudStates().get(task.cloudScheduleId!)?.disabled_reason}>
                                   {(reason) => (
                                     <>
@@ -486,14 +486,14 @@ export function AutomationPanel(props: {
                               </div>
                             </div>
                             <button
-                              class="alpha-ext-inline-cta"
+                              class="codepuppy-ext-inline-cta"
                               disabled={task.running || runNowBusy() === task.id}
-                              data-alpha-auto-run-now={task.id}
+                              data-codepuppy-auto-run-now={task.id}
                               // [#1592 AC2] 云端任务的手动运行其实在本机执行(平台没有立即触发接口)—— 如实标注,行为不变。
                               title={
                                 task.execution === "cloud"
-                                  ? t("alpha.auto.runNowLocalHint")
-                                  : t("alpha.auto.runNowHint", { cap: AUTOMATION_DEFAULTS.dailyRunCap })
+                                  ? t("codepuppy.auto.runNowLocalHint")
+                                  : t("codepuppy.auto.runNowHint", { cap: AUTOMATION_DEFAULTS.dailyRunCap })
                               }
                               onClick={(e) => {
                                 e.stopPropagation()
@@ -501,7 +501,7 @@ export function AutomationPanel(props: {
                                 void window.api.automations
                                   .runNow(task.id)
                                   .then((r) => {
-                                    if (!r.ok) pushToast({ kind: "error", title: automationActionCopy(r.code) ?? t("alpha.auto.runNowFailed") })
+                                    if (!r.ok) pushToast({ kind: "error", title: automationActionCopy(r.code) ?? t("codepuppy.auto.runNowFailed") })
                                   })
                                   .finally(() => {
                                     setRunNowBusy(null)
@@ -510,21 +510,21 @@ export function AutomationPanel(props: {
                               }}
                             >
                               {runNowBusy() === task.id
-                                ? t("alpha.auto.runNowBusy")
+                                ? t("codepuppy.auto.runNowBusy")
                                 : task.execution === "cloud"
-                                  ? t("alpha.auto.runNowLocal")
-                                  : t("alpha.auto.runNow")}
+                                  ? t("codepuppy.auto.runNowLocal")
+                                  : t("codepuppy.auto.runNow")}
                             </button>
                             <button
-                              class="alpha-ext-sw"
+                              class="codepuppy-ext-sw"
                               data-on={task.enabled ? "" : undefined}
-                              aria-label={task.enabled ? t("alpha.ext.enabled") : t("alpha.ext.disabled")}
+                              aria-label={task.enabled ? t("codepuppy.ext.enabled") : t("codepuppy.ext.disabled")}
                               onClick={(e) => {
                                 e.stopPropagation()
                                 void window.api.automations.toggle(task.id, !task.enabled).then((r) => {
                                   // [#994] 云端没停掉/没开起来:开关随 refresh 回到原状态,并说明原因(不再静默弹回)。
                                   if (!r.ok)
-                                    pushToast({ kind: "error", title: t("alpha.auto.toggleFailed"), detail: r.code ? scheduleRefusalCopy(r.code, r.netLayer) : undefined })
+                                    pushToast({ kind: "error", title: t("codepuppy.auto.toggleFailed"), detail: r.code ? scheduleRefusalCopy(r.code, r.netLayer) : undefined })
                                   void refresh()
                                 })
                               }}
@@ -539,56 +539,56 @@ export function AutomationPanel(props: {
 
               <Show when={view() === "edit"}>
                 <Show when={parseNote()}>
-                  <p class="alpha-auto-hint">
+                  <p class="codepuppy-auto-hint">
                     {parseNote()}
                     {/* A2:规则解析失败 → 用户显式点「用 AI 解析」(需先选项目;临时会话一次抽取即删) */}
-                    <Show when={parseNote() === t("alpha.auto.parseFallback") && !editing()}>
+                    <Show when={parseNote() === t("codepuppy.auto.parseFallback") && !editing()}>
                       {" "}
                       <button
-                        class="alpha-ext-inline-cta"
+                        class="codepuppy-ext-inline-cta"
                         disabled={llmBusy() || !fDir()}
-                        title={fDir() ? undefined : t("alpha.auto.llmNeedsDir")}
+                        title={fDir() ? undefined : t("codepuppy.auto.llmNeedsDir")}
                         onClick={() => {
                           if (llmBusy()) return
                           setLlmBusy(true)
                           void window.api.automations
                             .nlLlm(nlInput().trim(), fDir())
                             .then((r) => {
-                              if (!r.ok) return setFErr(automationActionCopy(r.code) ?? t("alpha.auto.parseErrUnavailable"))
+                              if (!r.ok) return setFErr(automationActionCopy(r.code) ?? t("codepuppy.auto.parseErrUnavailable"))
                               setFName(r.name)
                               setFPrompt(r.prompt)
                               setFForm(toForm(r.schedule))
-                              setParseNote(t("alpha.auto.parsedLlm", { desc: describeSchedule(r.schedule) }))
+                              setParseNote(t("codepuppy.auto.parsedLlm", { desc: describeSchedule(r.schedule) }))
                               setFErr("")
                             })
                             .finally(() => setLlmBusy(false))
                         }}
                       >
-                        {llmBusy() ? t("alpha.auto.llmParsing") : t("alpha.auto.llmParse")}
+                        {llmBusy() ? t("codepuppy.auto.llmParsing") : t("codepuppy.auto.llmParse")}
                       </button>
                     </Show>
                   </p>
                 </Show>
-                <div class="alpha-auto-form">
-                  <label class="alpha-auto-field">
-                    <span>{t("alpha.auto.fName")}</span>
-                    <input class="alpha-auto-input" value={fName()} onInput={(e) => setFName(e.currentTarget.value)} />
+                <div class="codepuppy-auto-form">
+                  <label class="codepuppy-auto-field">
+                    <span>{t("codepuppy.auto.fName")}</span>
+                    <input class="codepuppy-auto-input" value={fName()} onInput={(e) => setFName(e.currentTarget.value)} />
                   </label>
 
-                  <div class="alpha-auto-field">
-                    <span>{t("alpha.auto.fSchedule")}</span>
-                    <div class="alpha-auto-seg">
+                  <div class="codepuppy-auto-field">
+                    <span>{t("codepuppy.auto.fSchedule")}</span>
+                    <div class="codepuppy-auto-seg">
                       <For each={["daily", "weekly", "monthly", "interval", "cron"] as FormKind[]}>
                         {(k) => (
                           <button data-on={fForm().kind === k ? "" : undefined} onClick={() => setFForm({ ...fForm(), kind: k })}>
-                            {t(`alpha.auto.kind.${k}` as never)}
+                            {t(`codepuppy.auto.kind.${k}` as never)}
                           </button>
                         )}
                       </For>
                     </div>
-                    <div class="alpha-auto-schedrow">
+                    <div class="codepuppy-auto-schedrow">
                       <Show when={fForm().kind === "weekly"}>
-                        <div class="alpha-auto-dows">
+                        <div class="codepuppy-auto-dows">
                           <For each={[1, 2, 3, 4, 5, 6, 0]}>
                             {(d) => (
                               <button
@@ -605,10 +605,10 @@ export function AutomationPanel(props: {
                         </div>
                       </Show>
                       <Show when={fForm().kind === "monthly"}>
-                        <label class="alpha-auto-mini">
-                          {t("alpha.auto.fDom")}
+                        <label class="codepuppy-auto-mini">
+                          {t("codepuppy.auto.fDom")}
                           <input
-                            class="alpha-auto-input"
+                            class="codepuppy-auto-input"
                             type="number"
                             min="1"
                             max="31"
@@ -618,10 +618,10 @@ export function AutomationPanel(props: {
                         </label>
                       </Show>
                       <Show when={["daily", "weekly", "monthly"].includes(fForm().kind)}>
-                        <label class="alpha-auto-mini">
-                          {t("alpha.auto.fTime")}
+                        <label class="codepuppy-auto-mini">
+                          {t("codepuppy.auto.fTime")}
                           <input
-                            class="alpha-auto-input"
+                            class="codepuppy-auto-input"
                             type="time"
                             value={fForm().time}
                             onInput={(e) => setFForm({ ...fForm(), time: e.currentTarget.value })}
@@ -629,21 +629,21 @@ export function AutomationPanel(props: {
                         </label>
                       </Show>
                       <Show when={fForm().kind === "interval"}>
-                        <label class="alpha-auto-mini">
-                          {t("alpha.auto.fEvery")}
+                        <label class="codepuppy-auto-mini">
+                          {t("codepuppy.auto.fEvery")}
                           <input
-                            class="alpha-auto-input"
+                            class="codepuppy-auto-input"
                             type="number"
                             min={AUTOMATION_DEFAULTS.minIntervalMinutes}
                             value={fForm().everyMinutes}
                             onInput={(e) => setFForm({ ...fForm(), everyMinutes: parseInt(e.currentTarget.value, 10) || 0 })}
                           />
-                          {t("alpha.auto.fMinutes")}
+                          {t("codepuppy.auto.fMinutes")}
                         </label>
                       </Show>
                       <Show when={fForm().kind === "cron"}>
                         <input
-                          class="alpha-auto-input alpha-mono"
+                          class="codepuppy-auto-input codepuppy-mono"
                           placeholder="0 9 * * 1-5"
                           value={fForm().cronExpr}
                           onInput={(e) => setFForm({ ...fForm(), cronExpr: e.currentTarget.value })}
@@ -651,54 +651,54 @@ export function AutomationPanel(props: {
                       </Show>
                     </div>
                     <Show when={fForm().kind === "cron"}>
-                      <p class="alpha-auto-preview">{t("alpha.auto.cronFormat")}</p>
+                      <p class="codepuppy-auto-preview">{t("codepuppy.auto.cronFormat")}</p>
                     </Show>
-                    <p class="alpha-auto-preview">
+                    <p class="codepuppy-auto-preview">
                       {(() => {
                         const s = fromForm(fForm())
-                        return "error" in s ? s.error : t("alpha.auto.schedPreview", { desc: describeSchedule(s) })
+                        return "error" in s ? s.error : t("codepuppy.auto.schedPreview", { desc: describeSchedule(s) })
                       })()}
                     </p>
                   </div>
 
-                  <label class="alpha-auto-field">
-                    <span>{t("alpha.auto.fProject")}</span>
-                    <div class="alpha-auto-dirrow">
-                      <code class="alpha-auto-dir">{fDir() || t("alpha.auto.noDir")}</code>
-                      <button class="alpha-ext-add" onClick={() => void pickDir()}>
-                        {t("alpha.auto.pickDir")}
+                  <label class="codepuppy-auto-field">
+                    <span>{t("codepuppy.auto.fProject")}</span>
+                    <div class="codepuppy-auto-dirrow">
+                      <code class="codepuppy-auto-dir">{fDir() || t("codepuppy.auto.noDir")}</code>
+                      <button class="codepuppy-ext-add" onClick={() => void pickDir()}>
+                        {t("codepuppy.auto.pickDir")}
                       </button>
                     </div>
                   </label>
 
-                  <label class="alpha-auto-field">
-                    <span>{t("alpha.auto.fPrompt")}</span>
+                  <label class="codepuppy-auto-field">
+                    <span>{t("codepuppy.auto.fPrompt")}</span>
                     <textarea
-                      class="alpha-auto-input alpha-auto-textarea"
+                      class="codepuppy-auto-input codepuppy-auto-textarea"
                       value={fPrompt()}
                       onInput={(e) => setFPrompt(e.currentTarget.value)}
                     />
                   </label>
 
-                  <div class="alpha-auto-field">
-                    <span>{t("alpha.auto.fExecution")}</span>
-                    <div class="alpha-auto-seg">
+                  <div class="codepuppy-auto-field">
+                    <span>{t("codepuppy.auto.fExecution")}</span>
+                    <div class="codepuppy-auto-seg">
                       <button data-on={fExec() === "local" ? "" : undefined} onClick={() => setFExec("local")}>
-                        {t("alpha.auto.execLocal")}
+                        {t("codepuppy.auto.execLocal")}
                       </button>
                       <button
                         data-on={fExec() === "cloud" ? "" : undefined}
                         disabled={!accountSignedIn()}
                         onClick={() => setFExec("cloud")}
                       >
-                        {t("alpha.auto.execCloud")}
+                        {t("codepuppy.auto.execCloud")}
                       </button>
                     </div>
                     <Show when={!accountSignedIn()}>
-                      <p class="alpha-auto-preview" data-alpha-auto-cloud-locked>
-                        {t("alpha.auto.cloudNeedsLogin")} ·{" "}
-                        <button class="alpha-ext-inline-cta" onClick={() => void window.api.auth.start()}>
-                          {t("alpha.auth.signIn")}
+                      <p class="codepuppy-auto-preview" data-codepuppy-auto-cloud-locked>
+                        {t("codepuppy.auto.cloudNeedsLogin")} ·{" "}
+                        <button class="codepuppy-ext-inline-cta" onClick={() => void window.api.auth.start()}>
+                          {t("codepuppy.auth.signIn")}
                         </button>
                       </p>
                     </Show>
@@ -707,54 +707,54 @@ export function AutomationPanel(props: {
                   {/* A3 / [#1592 AC3]:云端只带名称、周期与执行内容 —— 权限、单次最长、通知它都不看,选云端时
                       收起这三项,换成四行运行条件(数据边界 ADR-021,强制展示);切回本机时原值仍在信号里。 */}
                   <Show when={fExec() === "cloud"}>
-                    <div class="alpha-auto-cloud-note" data-alpha-auto-cloud-note>
-                      <b>{t("alpha.auto.cloudRunTitle")}</b>
-                      <span>{t("alpha.auto.cloudRunOffline")}</span>
-                      <span>{t("alpha.auto.cloudRunData")}</span>
-                      <span>{t("alpha.auto.cloudRunResults")}</span>
-                      <span>{t("alpha.auto.cloudRunLimit")}</span>
+                    <div class="codepuppy-auto-cloud-note" data-codepuppy-auto-cloud-note>
+                      <b>{t("codepuppy.auto.cloudRunTitle")}</b>
+                      <span>{t("codepuppy.auto.cloudRunOffline")}</span>
+                      <span>{t("codepuppy.auto.cloudRunData")}</span>
+                      <span>{t("codepuppy.auto.cloudRunResults")}</span>
+                      <span>{t("codepuppy.auto.cloudRunLimit")}</span>
                     </div>
                   </Show>
                   <Show when={fExec() === "local"}>
-                    <div class="alpha-auto-inline" data-alpha-auto-local-fields>
-                      <div class="alpha-auto-field">
-                        <span>{t("alpha.auto.fPermission")}</span>
-                        <div class="alpha-auto-seg">
+                    <div class="codepuppy-auto-inline" data-codepuppy-auto-local-fields>
+                      <div class="codepuppy-auto-field">
+                        <span>{t("codepuppy.auto.fPermission")}</span>
+                        <div class="codepuppy-auto-seg">
                           <button data-on={fProfile() === "readonly" ? "" : undefined} onClick={() => setProfile("readonly")}>
-                            {t("alpha.auto.permReadonly")}
+                            {t("codepuppy.auto.permReadonly")}
                           </button>
                           <button data-on={fProfile() === "standard" ? "" : undefined} onClick={() => setProfile("standard")}>
-                            {t("alpha.auto.permStandard")}
+                            {t("codepuppy.auto.permStandard")}
                           </button>
                         </div>
-                        <p class="alpha-auto-preview">
-                          {fProfile() === "standard" ? t("alpha.auto.permStandardNote") : t("alpha.auto.permNote")}
+                        <p class="codepuppy-auto-preview">
+                          {fProfile() === "standard" ? t("codepuppy.auto.permStandardNote") : t("codepuppy.auto.permNote")}
                         </p>
                       </div>
-                      <label class="alpha-auto-mini">
-                        {t("alpha.auto.fMaxMin")}
+                      <label class="codepuppy-auto-mini">
+                        {t("codepuppy.auto.fMaxMin")}
                         <input
-                          class="alpha-auto-input"
+                          class="codepuppy-auto-input"
                           type="number"
                           min="1"
                           max="120"
                           value={fMaxMin()}
                           onInput={(e) => setFMaxMin(parseInt(e.currentTarget.value, 10) || AUTOMATION_DEFAULTS.maxDurationMin)}
                         />
-                        {t("alpha.auto.fMinutes")}
+                        {t("codepuppy.auto.fMinutes")}
                       </label>
-                      <label class="alpha-auto-check">
+                      <label class="codepuppy-auto-check">
                         <input type="checkbox" checked={fNotify()} onChange={(e) => setFNotify(e.currentTarget.checked)} />
-                        {t("alpha.auto.fNotify")}
+                        {t("codepuppy.auto.fNotify")}
                       </label>
                     </div>
                   </Show>
 
                   <Show when={standardConfirmOpen()}>
-                    <div class="alpha-auto-confirm" role="alertdialog" data-alpha-auto-standard-confirm>
-                      <span>{t("alpha.auto.standardConfirm")}</span>
+                    <div class="codepuppy-auto-confirm" role="alertdialog" data-codepuppy-auto-standard-confirm>
+                      <span>{t("codepuppy.auto.standardConfirm")}</span>
                       <button
-                        class="alpha-ext-add"
+                        class="codepuppy-ext-add"
                         data-variant="primary"
                         onClick={() => {
                           setStandardAcked(true)
@@ -762,30 +762,30 @@ export function AutomationPanel(props: {
                           void save()
                         }}
                       >
-                        {t("alpha.auto.standardConfirmOk")}
+                        {t("codepuppy.auto.standardConfirmOk")}
                       </button>
-                      <button class="alpha-ext-add" onClick={() => setProfile("readonly")}>
-                        {t("alpha.auto.standardConfirmRevert")}
+                      <button class="codepuppy-ext-add" onClick={() => setProfile("readonly")}>
+                        {t("codepuppy.auto.standardConfirmRevert")}
                       </button>
                     </div>
                   </Show>
 
                   <Show when={authState().status === "logged-in" && authState().mode === "platform"}>
-                    <p class="alpha-auto-hint">{t("alpha.auto.platformCost")}</p>
+                    <p class="codepuppy-auto-hint">{t("codepuppy.auto.platformCost")}</p>
                   </Show>
                   <Show when={fErr()}>
-                    <p class="alpha-auto-err">{fErr()}</p>
+                    <p class="codepuppy-auto-err">{fErr()}</p>
                   </Show>
-                  <div class="alpha-auto-actions">
-                    <button class="alpha-ext-add" data-variant="primary" disabled={saving()} onClick={() => void save()}>
-                      {saving() ? t("alpha.auto.saving") : t("alpha.auto.save")}
+                  <div class="codepuppy-auto-actions">
+                    <button class="codepuppy-ext-add" data-variant="primary" disabled={saving()} onClick={() => void save()}>
+                      {saving() ? t("codepuppy.auto.saving") : t("codepuppy.auto.save")}
                     </button>
-                    <button class="alpha-ext-add" onClick={backToList}>
-                      {t("alpha.ext.cancel")}
+                    <button class="codepuppy-ext-add" onClick={backToList}>
+                      {t("codepuppy.ext.cancel")}
                     </button>
                     <Show when={editing()}>
-                      <button class="alpha-ext-add" data-variant="danger" onClick={() => void remove(editing()!.id)}>
-                        {t("alpha.auto.delete")}
+                      <button class="codepuppy-ext-add" data-variant="danger" onClick={() => void remove(editing()!.id)}>
+                        {t("codepuppy.auto.delete")}
                       </button>
                     </Show>
                   </div>
@@ -793,30 +793,30 @@ export function AutomationPanel(props: {
 
                 {/* 运行历史(编辑既有任务时;A1.7:时间/结果/摘要 + 回跳会话 + run 产物) */}
                 <Show when={editing() && (editing()!.history?.length ?? 0) > 0}>
-                  <div class="alpha-auto-hist">
-                    <h3>{t("alpha.auto.history")}</h3>
+                  <div class="codepuppy-auto-hist">
+                    <h3>{t("codepuppy.auto.history")}</h3>
                     <For each={editing()!.history}>
                       {(rec) => {
                         const dot = statusDot(rec)
                         const d = new Date(rec.at)
                         return (
-                          <div class="alpha-auto-hist-row">
-                            <span class="alpha-auto-dot" data-st={dot.cls} />
-                            <span class="alpha-auto-hist-t">
+                          <div class="codepuppy-auto-hist-row">
+                            <span class="codepuppy-auto-dot" data-st={dot.cls} />
+                            <span class="codepuppy-auto-hist-t">
                               {d.getMonth() + 1}/{d.getDate()} {pad(d.getHours())}:{pad(d.getMinutes())}
                             </span>
-                            <span class="alpha-auto-hist-s">{dot.label}</span>
-                            <span class="alpha-auto-hist-sum" title={rec.summary}>
+                            <span class="codepuppy-auto-hist-s">{dot.label}</span>
+                            <span class="codepuppy-auto-hist-sum" title={rec.summary}>
                               {rec.summary ?? ""}
                             </span>
                             <Show when={rec.sessionID}>
-                              <button class="alpha-ext-link" onClick={() => openSession(editing()!, rec)}>
-                                {t("alpha.auto.openSession")}
+                              <button class="codepuppy-ext-link" onClick={() => openSession(editing()!, rec)}>
+                                {t("codepuppy.auto.openSession")}
                               </button>
                             </Show>
                             <Show when={rec.runDir}>
-                              <button class="alpha-ext-link" onClick={() => void window.api.openPath(rec.runDir!)}>
-                                {t("alpha.auto.openRun")}
+                              <button class="codepuppy-ext-link" onClick={() => void window.api.openPath(rec.runDir!)}>
+                                {t("codepuppy.auto.openRun")}
                               </button>
                             </Show>
                           </div>

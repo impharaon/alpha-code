@@ -16,7 +16,7 @@
 // 真的拒得动已知的坏形状(历史上那份缺省注入),再拿它判现在的好。
 //
 // mock.module 会污染同进程其它测试文件 ⇒ 真断言放这里,由 cloud-dispatch-gate.test.ts
-// 在隔离子进程里跑(alpha-cloud-jobs.cases.ts / cloud-ipc.test.ts 同款)。
+// 在隔离子进程里跑(codepuppy-cloud-jobs.cases.ts / cloud-ipc.test.ts 同款)。
 
 import { expect, mock, test } from "bun:test"
 import type { CloudJobEnvelope } from "../preload/types"
@@ -27,10 +27,10 @@ const JOB = "job_gate_0001"
 /** 桌面在 #918 之前每次派发都会补上的那四条(现已删除;元判据用它证明假平台拒得动)。 */
 const HISTORICAL_INJECTED_DENIED_PATHS = [".env*", "*.pem", ".alpha/", ".git/"]
 
-mock.module("./alpha-auth", () => ({ getAccessToken: () => "tok.cloud.dispatch" }))
-mock.module("./alpha-endpoints", () => ({ resolveEndpoints: () => ({ cloud: BASE }) }))
+mock.module("./codepuppy-auth", () => ({ getAccessToken: () => "tok.cloud.dispatch" }))
+mock.module("./codepuppy-endpoints", () => ({ resolveEndpoints: () => ({ cloud: BASE }) }))
 mock.module("./logging", () => ({ getLogger: () => ({ log: () => {}, warn: () => {}, error: () => {} }) }))
-mock.module("./alpha-contract-health", () => ({ reportContractFailure: () => {} }))
+mock.module("./codepuppy-contract-health", () => ({ reportContractFailure: () => {} }))
 
 // ── 假平台:alpha-platform@9cf67bd 的规则复述 ───────────────────────────────────────────
 type WireConstraints = { allowed_tools?: string[]; denied_paths?: string[]; network?: string }
@@ -118,7 +118,7 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
   )
 }) as typeof fetch
 
-const jobs = await import("./alpha-cloud-jobs")
+const jobs = await import("./codepuppy-cloud-jobs")
 
 const accepted = (kind: string) => ({
   schema_version: 1,

@@ -2,7 +2,7 @@
 // + [#994] `automations-delete` / `automations-toggle` 的 `code` 透传
 // + [#1001] `automations-save` 本机失败时的本地结构码。
 // 真断言在 automation-ipc-delete.cases.ts(走真实注册的生产 handler)——
-// 子进程跑(alpha-cloud-schedules.test.ts 同款),因为 mock.module 会污染同进程的其它测试文件。
+// 子进程跑(codepuppy-cloud-schedules.test.ts 同款),因为 mock.module 会污染同进程的其它测试文件。
 import { expect, test } from "bun:test"
 import { join } from "node:path"
 

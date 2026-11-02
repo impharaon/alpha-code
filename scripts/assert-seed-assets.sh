@@ -6,10 +6,10 @@
 # vendored agent, no builtin skills) or LICENSE-NON-COMPLIANT (missing NOTICE.txt, B15) —
 # and neither typecheck nor unit tests catch it. This guard fails loud instead.
 #
-# Source-tracked assets ONLY. Build outputs (packages/ext/dist → alpha-ext/) are produced by the
+# Source-tracked assets ONLY. Build outputs (packages/ext/dist → codepuppy-ext/) are produced by the
 # build step, not committed, so they are asserted by the build itself, not here.
 #
-# Used by alpha-ci (seed-assets job) and safe to call from the release pipeline (package:mac) too.
+# Used by codepuppy-ci (seed-assets job) and safe to call from the release pipeline (package:mac) too.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -31,7 +31,7 @@ need_dir() { { [ -d "$1" ] && [ -n "$(ls -A "$1" 2>/dev/null)" ]; } || miss "$1"
 need_dir "$res/skills"                    # builtin skills (installable via 定制中心)
 need_file "$res/skills/skill-creator/SKILL.md"       # REQ-036 出厂技能(skills.paths 原位引用)
 # 出厂技能基线(REQ-082 时点 = 7 件,与 factory-skills.ts FACTORY_SKILL_IDS 一致;skill-creator 在上面)
-for fs in agent-creator customize-code-puppy integrate-project alpha-workspace cloud-capabilities office-docs; do
+for fs in agent-creator customize-codepuppy integrate-project codepuppy-workspace cloud-capabilities office-docs; do
   need_file "$res/factory-skills/$fs/SKILL.md"
 done
 need_file "$res/agents/code-reviewer.md"  # REQ-023 vendored agent (zero-network install)
@@ -49,7 +49,7 @@ done
 # 离线 seed(内置 catalog 快照)或出厂 office-docs 技能的推荐面。社区 Excel 不再有审计锁定安装路径:
 # Desktop 的随包退役事实必须在场,出厂技能必须明说不可安装。签名快照在 alpha-web#155
 # 落地前可以如实保留 mcp:excel 字节;快照只能由 sync-catalog-snapshot.mjs 刷新,本守卫不改写它。
-seed_catalog="$root/packages/ui-mac/src/renderer/extensions/alpha-catalog.json"
+seed_catalog="$root/packages/ui-mac/src/renderer/extensions/codepuppy-catalog.json"
 office_skill="$res/factory-skills/office-docs/SKILL.md"
 advisories_ts="$root/packages/ui-mac/src/shared/office-advisories.ts"
 need_file "$seed_catalog"

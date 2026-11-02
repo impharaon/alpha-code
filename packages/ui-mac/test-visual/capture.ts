@@ -17,7 +17,7 @@ const HEIGHT = 860
 type Scene = { name: string; height?: number; act?: (page: Page) => Promise<void>; dark?: boolean }
 
 const openFold = async (page: Page) => {
-  await page.click("[data-alpha-timeline-row='process'] .a-tl-pf-sum")
+  await page.click("[data-codepuppy-timeline-row='process'] .a-tl-pf-sum")
   await page.waitForTimeout(250)
 }
 const scenes: Scene[] = [
@@ -32,7 +32,7 @@ const scenes: Scene[] = [
       // 打开网页 2 次(失败)合并行 → 展开成每项一行 → 再点一项看详情(失败详情:人话在上、原文在下)。
       await page.locator(".a-tl-pf-step").filter({ hasText: "打开网页" }).first().click()
       await page.waitForTimeout(200)
-      await page.locator("[data-alpha-process-step='tool-item']").first().click()
+      await page.locator("[data-codepuppy-process-step='tool-item']").first().click()
       await page.waitForTimeout(250)
     },
   },
@@ -44,7 +44,7 @@ const scenes: Scene[] = [
       // 搜索 4 次 合并行 → 每项一行 → 第一项的搜索结果详情。
       await page.locator(".a-tl-pf-step").filter({ hasText: "搜索 4 次" }).first().click()
       await page.waitForTimeout(200)
-      await page.locator("[data-alpha-process-step='tool-item']").first().click()
+      await page.locator("[data-codepuppy-process-step='tool-item']").first().click()
       await page.waitForTimeout(250)
     },
   },
@@ -112,7 +112,7 @@ try {
             ariaModal: document.querySelectorAll("[aria-modal='true']").length,
             timelineTopHitIsTimeline: !!hit && tl.contains(hit),
             panelRect: rect && { top: Math.round(rect.top), bottom: Math.round(rect.bottom), left: Math.round(rect.left), width: Math.round(rect.width) },
-            composerTop: Math.round(document.querySelector("[data-alpha-composer='session']")?.getBoundingClientRect().top ?? -1),
+            composerTop: Math.round(document.querySelector("[data-codepuppy-composer='session']")?.getBoundingClientRect().top ?? -1),
             timelineScrollable: !!scroller,
           }
         })

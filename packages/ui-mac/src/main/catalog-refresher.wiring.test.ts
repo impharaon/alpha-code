@@ -4,7 +4,7 @@
 // spawnLocalServer 仍完成 fork」与 dev 桩下续期的 startup-timeline 间隔;这里只钉三处接线不回退:
 //   1. doRespawnSidecar 体内不再等任何远端目录(修前是 `await syncLiveAllowlist(...)`,续期平均白等 4.0s);
 //   2. 启动与身份变化经 requestCatalogRefresh 触发,且不 await;
-//   3. spawnLocalServer 在 fork 前钉住已应用目录,且排在出网放行派生(读 buildAlphaModelConfig)之前。
+//   3. spawnLocalServer 在 fork 前钉住已应用目录,且排在出网放行派生(读 buildCodePuppyModelConfig)之前。
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"

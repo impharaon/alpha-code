@@ -55,7 +55,7 @@ export type ApplyProcessFenceDeps = {
 export const OUTSIDE_PROBE_DIR = "/private/var/tmp"
 
 export function loadFenceAddon(addonPath: string, dlopen: ApplyProcessFenceDeps["dlopen"] = (m, f) => process.dlopen(m, f)): FenceAddon {
-  if (!existsSync(addonPath)) throw new ProcessFenceError(`native module missing at ${addonPath}(预期 prebuild/predev 已构建;打包态 = extraResources alpha-fence/)`)
+  if (!existsSync(addonPath)) throw new ProcessFenceError(`native module missing at ${addonPath}(预期 prebuild/predev 已构建;打包态 = extraResources codepuppy-fence/)`)
   const module: { exports: unknown } = { exports: {} }
   try {
     dlopen(module, addonPath)
@@ -84,7 +84,7 @@ export function applyProcessFence(input: ProcessFenceStartInput, deps: ApplyProc
   const stamp = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
   // ③ 集合外必须写不进。写进了 = 围栏是空的 —— 删掉探针,拒绝启动。
-  const outside = join(deps.outsideDir ?? OUTSIDE_PROBE_DIR, `alpha-fence-probe-${stamp}`)
+  const outside = join(deps.outsideDir ?? OUTSIDE_PROBE_DIR, `codepuppy-fence-probe-${stamp}`)
   let landedOutside = false
   try {
     writeFile(outside, "probe")
@@ -99,7 +99,7 @@ export function applyProcessFence(input: ProcessFenceStartInput, deps: ApplyProc
     throw new ProcessFenceError(`sandbox_init returned 0 but a write outside the writable set landed (${outside}) — the fence is void, refusing to start the engine`)
   }
   // ④ 集合内必须写得进(否则引擎起来也干不了活,而且 health 会 200)。
-  const inside = join(deps.insideDir ?? process.cwd(), `alpha-fence-probe-${stamp}`)
+  const inside = join(deps.insideDir ?? process.cwd(), `codepuppy-fence-probe-${stamp}`)
   try {
     writeFile(inside, "probe")
     remove(inside)
@@ -109,26 +109,26 @@ export function applyProcessFence(input: ProcessFenceStartInput, deps: ApplyProc
   return { buildId: addon.buildId, libsandbox: addon.libsandbox, profileBytes: Buffer.byteLength(input.profile) }
 }
 
-// ── main 侧:原生模块路径解析(与 alpha-ext-plugin.ts 同法)────────────────────────
+// ── main 侧:原生模块路径解析(与 codepuppy-ext-plugin.ts 同法)────────────────────────
 export type FenceAddonResolveInput = {
   packaged: boolean
-  /** process.resourcesPath(打包后 extraResources 落点 <resources>/alpha-fence/alpha_fence.node) */
+  /** process.resourcesPath(打包后 extraResources 落点 <resources>/codepuppy-fence/codepuppy_fence.node) */
   resourcesPath: string
   /** 调用方模块目录(dev 下 = packages/ui-mac/out/main) */
   moduleDir: string
   exists: (p: string) => boolean
 }
 
-export const FENCE_ADDON_RESOURCE_DIR = "alpha-fence"
-export const FENCE_ADDON_FILENAME = "alpha_fence.node"
+export const FENCE_ADDON_RESOURCE_DIR = "codepuppy-fence"
+export const FENCE_ADDON_FILENAME = "codepuppy_fence.node"
 
 /** 解析不到即抛(fail-closed):没有模块就没有围栏,而没有围栏的引擎不许起。 */
 export function resolveFenceAddonPath(input: FenceAddonResolveInput): string {
   const path = input.packaged
     ? join(input.resourcesPath, FENCE_ADDON_RESOURCE_DIR, FENCE_ADDON_FILENAME)
-    : // dev:out/main → ui-mac → native/alpha-fence/build/alpha_fence.node(scripts/build-fence-addon.ts 的产物)
-      join(input.moduleDir, "..", "..", "native", "alpha-fence", "build", FENCE_ADDON_FILENAME)
+    : // dev:out/main → ui-mac → native/codepuppy-fence/build/codepuppy_fence.node(scripts/build-fence-addon.ts 的产物)
+      join(input.moduleDir, "..", "..", "native", "codepuppy-fence", "build", FENCE_ADDON_FILENAME)
   if (!input.exists(path))
-    throw new ProcessFenceError(`native module missing at ${path}(预期 prebuild/predev 已跑 scripts/build-fence-addon.ts;打包态 = extraResources alpha-fence/)`)
+    throw new ProcessFenceError(`native module missing at ${path}(预期 prebuild/predev 已跑 scripts/build-fence-addon.ts;打包态 = extraResources codepuppy-fence/)`)
   return path
 }

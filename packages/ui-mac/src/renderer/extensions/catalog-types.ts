@@ -1,5 +1,5 @@
 // Shared types for the Extension Hub (定制中心). Pure types — no runtime, no opencode imports.
-// Mirrors resources/alpha-catalog.json. The MCP config shape matches opencode's
+// Mirrors resources/codepuppy-catalog.json. The MCP config shape matches opencode's
 // ConfigV2.MCP (packages/core/src/config/mcp.ts): the discriminant is "local" | "remote"
 // (NOT stdio/sse), local carries `command`+`environment`, remote carries `url`+`headers`.
 
@@ -140,7 +140,7 @@ export interface Catalog {
   packages?: CatalogPackageViewV1[]
 }
 
-/** ac#1136(REQ-128):随包 `alpha-catalog.json` 的**诚实 wire 形状** —— 已签名 release 的逐字
+/** ac#1136(REQ-128):随包 `codepuppy-catalog.json` 的**诚实 wire 形状** —— 已签名 release 的逐字
  *  镜像。`packages` 存在时是 raw `codepuppy.host-extension-package.v1` envelope(payloadRef 含 URL),
  *  **不是** `CatalogPackageViewV1`,故声明为 `unknown[]`:唯一采信入口 = main 侧
  *  package-installability 的解码器(resolveVerifiedPackageV1 / evaluateCatalogPackagesForHost)。

@@ -1,9 +1,9 @@
-// 自动化 IPC(REQ-021 A1)。薄 handler:CRUD 落 alpha-automations、变更后 rearm、
+// 自动化 IPC(REQ-021 A1)。薄 handler:CRUD 落 codepuppy-automations、变更后 rearm、
 // 「登录时启动」走 app.set/getLoginItemSettings(A1.3 配套设置项)。校验在存储层(loud)。
 
 import { app, ipcMain, type IpcMainInvokeEvent } from "electron"
 import { getLogger } from "./logging"
-import { ensureUserWorkspaceDir } from "./alpha-user-workspace"
+import { ensureUserWorkspaceDir } from "./codepuppy-user-workspace"
 import type { AutomationTask } from "../shared/automation-types"
 import {
   deleteAutomation,
@@ -12,10 +12,10 @@ import {
   readAutomationState,
   saveAutomation,
   writeAutomationState,
-} from "./alpha-automations"
+} from "./codepuppy-automations"
 import { getPlannedFireAt, isAutomationRunning, rearmAutomations, runAutomationNow } from "./automation-scheduler"
 import { llmParseAutomation } from "./automation-llm"
-import { deleteCloudSchedule, listCloudSchedules, pullCloudScheduleRuns, setCloudScheduleEnabled, upsertCloudSchedule } from "./alpha-cloud-schedules"
+import { deleteCloudSchedule, listCloudSchedules, pullCloudScheduleRuns, setCloudScheduleEnabled, upsertCloudSchedule } from "./codepuppy-cloud-schedules"
 
 export function registerAutomationIpcHandlers() {
   ipcMain.handle("automations-list", () => ({
@@ -56,7 +56,7 @@ export function registerAutomationIpcHandlers() {
     if (prev?.cloudScheduleId) {
       const del = await deleteCloudSchedule(prev.cloudScheduleId)
       // [#969] 「云档改本地」这一跳的失败也走 automations-save 的返回值 → 面板同一行
-      // `.alpha-auto-err`。它与上面的注册失败是同一个用户可观察面,所以同样带 code。
+      // `.codepuppy-auto-err`。它与上面的注册失败是同一个用户可观察面,所以同样带 code。
       if (!del.ok) return { ok: false as const, reason: del.reason, code: del.code, netLayer: del.netLayer }
       delete task.cloudScheduleId
     }

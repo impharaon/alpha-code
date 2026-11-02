@@ -13,9 +13,9 @@
 import { t } from "../i18n"
 
 export function cloudDisabledReasonCopy(reason: string): string {
-  if (reason === "consecutive_failures") return t("alpha.auto.cloudDisabledFailures")
-  if (reason === "stuck_job") return t("alpha.auto.cloudDisabledStuck")
-  if (reason === "execution_grant_missing") return t("alpha.auto.cloudDisabledGrantMissing")
-  if (reason === "execution_grant_expired") return t("alpha.auto.cloudDisabledGrantExpired")
-  return t("alpha.auto.cloudDisabledUnknown", { reason })
+  if (reason === "consecutive_failures") return t("codepuppy.auto.cloudDisabledFailures")
+  if (reason === "stuck_job") return t("codepuppy.auto.cloudDisabledStuck")
+  if (reason === "execution_grant_missing") return t("codepuppy.auto.cloudDisabledGrantMissing")
+  if (reason === "execution_grant_expired") return t("codepuppy.auto.cloudDisabledGrantExpired")
+  return t("codepuppy.auto.cloudDisabledUnknown", { reason })
 }

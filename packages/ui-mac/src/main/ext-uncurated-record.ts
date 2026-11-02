@@ -9,11 +9,11 @@
 //     或 v1 receipt,或 skill 的 generation store 在盘,一律拒绝:未策展不得顶替 catalog 安装,
 //     否则卸载按 store 存在性走代际删除,会拆掉 catalog 代际、留下 flat 孤儿。
 
-import { findReceipt } from "./alpha-installs"
+import { findReceipt } from "./codepuppy-installs"
 import { hasSkillGeneration } from "./ext-skill-generations"
 import { lookupForUninstall, upsertRecordV2, type LedgerV2Write, type ScopeIdentity } from "./ext-receipt-v2"
 import { nextDesiredState } from "./ext-install-policy"
-import type { AppEnvironment } from "./alpha-environment"
+import type { AppEnvironment } from "./codepuppy-environment"
 import type { InstallReceiptOrigin, InstallReceiptType } from "../preload/types"
 
 export type UncuratedOrigin = Exclude<InstallReceiptOrigin, "catalog">

@@ -1,6 +1,6 @@
 import { Location } from "@opencode-ai/core/location"
 import { PermissionV2 } from "@opencode-ai/core/permission"
-import { AlphaToolPolicyApi } from "@opencode-ai/core/permission/alpha-tool-policy-api"
+import { CodePuppyToolPolicyApi } from "@opencode-ai/core/permission/codepuppy-tool-policy-api"
 import { PermissionSaved } from "@opencode-ai/core/permission/saved"
 import { Effect, Option } from "effect"
 import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
@@ -27,18 +27,18 @@ function conflictingRequest(id: PermissionV2.ID) {
 // R 一变,上游 `packages/server/src/routes.ts` 与 `packages/cli/.../serve.ts` 的 `toWebHandler`/`serve`
 // 约束当场红 —— 那两处不在收编名单里。没接线的宿主(standalone server)拿到的是 503,不是空清单。
 const toolPolicyApi = Effect.gen(function* () {
-  const api = yield* Effect.serviceOption(AlphaToolPolicyApi.Service)
+  const api = yield* Effect.serviceOption(CodePuppyToolPolicyApi.Service)
   if (Option.isNone(api)) {
     return yield* new ServiceUnavailableError({
       message: "tool policy api is not wired into this server",
-      service: AlphaToolPolicyApi.Service.key,
+      service: CodePuppyToolPolicyApi.Service.key,
     })
   }
   return api.value
 })
 
 // 写侧错误逐型映射:quarantined ⇒ 409(先 reset);io ⇒ 500。不解析 message。
-function toolPolicyWriteFailure(error: AlphaToolPolicyApi.WriteError) {
+function toolPolicyWriteFailure(error: CodePuppyToolPolicyApi.WriteError) {
   return error.kind === "quarantined"
     ? new ConflictError({ resource: "tool-policy-document", message: error.message })
     : new UnknownError({ message: error.message })

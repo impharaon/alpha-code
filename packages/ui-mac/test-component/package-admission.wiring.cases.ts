@@ -126,19 +126,19 @@ const originalFetch = globalThis.fetch
 globalThis.fetch = (async (_input: string | URL | Request, init?: RequestInit) => {
   payloadFetches++
   expect(init?.redirect).toBe("error")
-  if (payloadFetches === 2) expect(existsSync(join(userData, "alpha-mcp-secrets"))).toBe(false)
+  if (payloadFetches === 2) expect(existsSync(join(userData, "codepuppy-mcp-secrets"))).toBe(false)
   return new Response(payloadBytes, { status: 200 })
 }) as typeof fetch
 
-const { initAlphaEnvironment, getAlphaEnvironment } = await import("../src/main/alpha-environment")
+const { initCodePuppyEnvironment, getCodePuppyEnvironment } = await import("../src/main/codepuppy-environment")
 const { registerExtIpcHandlers } = await import("../src/main/ext-ipc")
 
-delete process.env.ALPHA_GLOBAL_DIR
-initAlphaEnvironment({
+delete process.env.CODEPUPPY_GLOBAL_DIR
+initCodePuppyEnvironment({
   isPackaged: false,
   channel: "dev",
   appDataDir: tmp,
-  baseRoot: join(tmp, "alpha-code-state"),
+  baseRoot: join(tmp, "codepuppy-state"),
   homeDir: join(tmp, "home"),
 })
 registerExtIpcHandlers(
@@ -214,7 +214,7 @@ test("real ext-install-catalog IPC binds preview, revalidates, then commits thro
   })
   expect(JSON.stringify(preview.packageAuthorization.plan)).not.toContain(secretCanary)
   expect(payloadFetches).toBe(1)
-  expect(existsSync(join(userData, "alpha-mcp-secrets"))).toBe(false)
+  expect(existsSync(join(userData, "codepuppy-mcp-secrets"))).toBe(false)
 
   const result = await install(
     { sender: { id: 1 } },
@@ -236,14 +236,14 @@ test("real ext-install-catalog IPC binds preview, revalidates, then commits thro
   expect(JSON.stringify(result)).not.toContain(secretCanary)
   expect(payloadFetches).toBe(2)
 
-  const serverDir = join(userData, "alpha-mcp-secrets", "generic-remote")
+  const serverDir = join(userData, "codepuppy-mcp-secrets", "generic-remote")
   const versions = readdirSync(serverDir)
   expect(versions).toHaveLength(1)
   const secretFile = join(serverDir, versions[0]!, "A_KEY")
   expect(readFileSync(secretFile, "utf8")).toBe(secretCanary)
   expect(statSync(secretFile).mode & 0o777).toBe(0o600)
-  const root = getAlphaEnvironment().mutableRoot
-  const config = readFileSync(join(root, "alpha.jsonc"), "utf8")
+  const root = getCodePuppyEnvironment().mutableRoot
+  const config = readFileSync(join(root, "codepuppy.jsonc"), "utf8")
   expect(config).toContain(`{file:${secretFile}}`)
   expect(config).not.toContain(secretCanary)
   expect(existsSync(join(root, "installs.json"))).toBe(true)

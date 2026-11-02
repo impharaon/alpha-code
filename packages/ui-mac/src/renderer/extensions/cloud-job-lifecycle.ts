@@ -7,8 +7,8 @@ import { onCleanup } from "solid-js"
 import { t } from "../i18n"
 import type { CloudDispatchResult, CloudJobEnvelope } from "../../preload/types"
 import { failureCodeFromEvent, failureCopy } from "./cloud-failure-copy"
-import type { NetFailureLayer } from "@opencode-ai/schema/alpha-net-failure"
-import { netFailureCopy } from "../alpha-ui/net-failure-copy"
+import type { NetFailureLayer } from "@opencode-ai/schema/codepuppy-net-failure"
+import { netFailureCopy } from "../codepuppy-ui/net-failure-copy"
 
 export type CloudJobPhase = "idle" | "dispatching" | "running" | "done" | "failed"
 // #400(REQ-109 AC4 桌面半场)取消子状态。"cancelling" 只在拿到服务端可判定结果
@@ -29,7 +29,7 @@ export type CloudJobState = {
   files: string[]
 }
 
-// [#918] 云端拒收带分类码(main 的 alpha-cloud-jobs 只透传 `code` 槽)。两条会真实发生在
+// [#918] 云端拒收带分类码(main 的 codepuppy-cloud-jobs 只透传 `code` 槽)。两条会真实发生在
 // 用户面前的,给出诚实说明而不是把一个裸码贴在错误行里 —— 前者告诉用户「要的限制强制不了」,
 // 后者告诉用户「作业没送出去,因为送出去也是白跑」。其它码只影响显示，保留原始返回值供诊断。
 // REQ-235:目录描述的能力与平台注册表不同步时(签名目录比注册表新或旧),平台拒收为
@@ -37,18 +37,18 @@ export type CloudJobState = {
 // `#1572`:`network` 且 main 认得出卡在哪一层(`netLayer`)时说那一层;认不出保持原文案。
 export function dispatchError(
   code: string,
-  fallback: Parameters<typeof t>[0] = "alpha.ext.cloudUnknownSend",
+  fallback: Parameters<typeof t>[0] = "codepuppy.ext.cloudUnknownSend",
   netLayer?: NetFailureLayer,
 ): string {
   const failure = failureCopy(code)
   if (failure) return failure.text
-  if (code === "no-cloud-endpoint") return t("alpha.ext.cloudErrEndpoint")
-  if (code === "network") return netLayer ? netFailureCopy(netLayer) : t("alpha.ext.cloudErrNetwork")
-  if (code === "denied_paths_unenforceable_for_execution_form") return t("alpha.ext.cloudErrDeniedPaths")
-  if (code === "tools-not-declared") return t("alpha.ext.cloudErrToolsUndeclared")
-  if (code === "pipeline_input_invalid" || code === "unknown_pipeline_kind") return t("alpha.ext.cloudErrRequirementsChanged")
-  if (code.startsWith("envelope-too-large:")) return t("alpha.ext.cloudEnvelopeLarge")
-  if (code.startsWith("secrets-detected:")) return t("alpha.ext.cloudSecretsDetected", { fields: code.slice("secrets-detected: ".length).split(" —— ")[0] })
+  if (code === "no-cloud-endpoint") return t("codepuppy.ext.cloudErrEndpoint")
+  if (code === "network") return netLayer ? netFailureCopy(netLayer) : t("codepuppy.ext.cloudErrNetwork")
+  if (code === "denied_paths_unenforceable_for_execution_form") return t("codepuppy.ext.cloudErrDeniedPaths")
+  if (code === "tools-not-declared") return t("codepuppy.ext.cloudErrToolsUndeclared")
+  if (code === "pipeline_input_invalid" || code === "unknown_pipeline_kind") return t("codepuppy.ext.cloudErrRequirementsChanged")
+  if (code.startsWith("envelope-too-large:")) return t("codepuppy.ext.cloudEnvelopeLarge")
+  if (code.startsWith("secrets-detected:")) return t("codepuppy.ext.cloudSecretsDetected", { fields: code.slice("secrets-detected: ".length).split(" —— ")[0] })
   return t(fallback)
 }
 
@@ -93,13 +93,13 @@ export function createCloudJobLifecycle(input: {
       }
       if (terminal !== "job.completed") {
         const failure = failureCopy(reason ?? "")
-        setState({ err: failure?.text ?? t("alpha.ext.cloudRunFailed"), errAction: failure?.action ?? null })
+        setState({ err: failure?.text ?? t("codepuppy.ext.cloudRunFailed"), errAction: failure?.action ?? null })
         return
       }
-      if (incomplete) setState({ err: t("alpha.ext.cloudSaveFailed") })
+      if (incomplete) setState({ err: t("codepuppy.ext.cloudSaveFailed") })
       return
     }
-    setState({ phase: "failed", err: t("alpha.ext.cloudSaveFailed"), errAction: null })
+    setState({ phase: "failed", err: t("codepuppy.ext.cloudSaveFailed"), errAction: null })
   }
 
   const beginJob = async (
@@ -144,14 +144,14 @@ export function createCloudJobLifecycle(input: {
     setState({ cancel: "requesting", err: "", errAction: null })
     const result = await window.api.cloud.cancel(state.jobId)
     if ("error" in result) {
-      setState({ cancel: "none", err: dispatchError(result.error, "alpha.ext.cloudUnknownCancel"), errAction: failureCopy(result.error)?.action ?? null })
+      setState({ cancel: "none", err: dispatchError(result.error, "codepuppy.ext.cloudUnknownCancel"), errAction: failureCopy(result.error)?.action ?? null })
       return
     }
     if (result.accepted || result.status === "cancelling" || result.status === "cancelled") {
       setState({ cancel: "cancelling" })
       return
     }
-    setState({ cancel: "rejected", err: t("alpha.ext.cloudCancelRejected") })
+    setState({ cancel: "rejected", err: t("codepuppy.ext.cloudCancelRejected") })
   }
 
   return { beginJob, cancelJob }

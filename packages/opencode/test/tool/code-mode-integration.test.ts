@@ -2,8 +2,8 @@ import { beforeAll, describe, expect, test } from "bun:test"
 import { CodeModeTool, describeCatalog } from "@/tool/code-mode"
 import { McpCatalog } from "@/mcp/catalog"
 import { Permission } from "@/permission"
-import { inMemoryToolPolicyLayer } from "../fixture/alpha-tool-policy"
-import { callToolVia } from "../fixture/alpha-mcp-call-tool"
+import { inMemoryToolPolicyLayer } from "../fixture/codepuppy-tool-policy"
+import { callToolVia } from "../fixture/codepuppy-mcp-call-tool"
 import { Agent } from "@/agent/agent"
 import { MCP } from "@/mcp"
 import { Plugin } from "@/plugin"
@@ -150,7 +150,7 @@ async function buildTool() {
   }
 
   const layer = Layer.mergeAll(
-    // #1129:identity ask 经 Permission 引擎(AlphaToolPolicyGate.confirm),探头从 ctx.ask 移到这里。
+    // #1129:identity ask 经 Permission 引擎(CodePuppyToolPolicyGate.confirm),探头从 ctx.ask 移到这里。
     Layer.mock(Permission.Service, {
       ask: ((req: { permission: string }) => Effect.sync(() => void askLog.push(req.permission))) as Permission.Interface["ask"],
     }),
@@ -314,7 +314,7 @@ describe("code mode integration (real MCP server)", () => {
   })
 
   test("asks permission for each MCP call, keyed by canonical identity", async () => {
-    // #1129:ask 经 Permission 引擎(AlphaToolPolicyGate.confirm),探头在共享 Permission mock 上。
+    // #1129:ask 经 Permission 引擎(CodePuppyToolPolicyGate.confirm),探头在共享 Permission mock 上。
     askLog.length = 0
     await Effect.runPromise(
       tool.execute(

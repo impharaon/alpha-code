@@ -12,7 +12,7 @@
 import { readFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { describe, expect, test } from "bun:test"
-import { ALPHA_ENDPOINTS } from "../shared/alpha-config"
+import { CODEPUPPY_ENDPOINTS } from "../shared/codepuppy-config"
 import { EGRESS_REGISTRY, egressKey, isEgressAuthorized } from "./network-egress-registry"
 
 /** 勘破 §2.2 的清单,按今日代码坐标校正(见注册表抬头逐条说明)。独立锚,不 import 被测对象。 */
@@ -81,10 +81,10 @@ describe("AC2 注册表:初值与形状", () => {
     }
   })
 
-  test("平台四族的 host 跟着 shared/alpha-config 的 ALPHA_ENDPOINTS 走(注册表不自持第二份平台域名)", () => {
-    for (const url of [ALPHA_ENDPOINTS.web, ALPHA_ENDPOINTS.platform, ALPHA_ENDPOINTS.account, ALPHA_ENDPOINTS.cloud]) {
+  test("平台四族的 host 跟着 shared/codepuppy-config 的 CODEPUPPY_ENDPOINTS 走(注册表不自持第二份平台域名)", () => {
+    for (const url of [CODEPUPPY_ENDPOINTS.web, CODEPUPPY_ENDPOINTS.platform, CODEPUPPY_ENDPOINTS.account, CODEPUPPY_ENDPOINTS.cloud]) {
       const host = new URL(url).hostname.toLowerCase()
-      expect(isEgressAuthorized(host, 443), `${host}:443 should follow ALPHA_ENDPOINTS`).toBe(true)
+      expect(isEgressAuthorized(host, 443), `${host}:443 should follow CODEPUPPY_ENDPOINTS`).toBe(true)
     }
   })
 })

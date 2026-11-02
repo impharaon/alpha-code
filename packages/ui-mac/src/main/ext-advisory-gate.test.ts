@@ -212,7 +212,7 @@ describe("#315 生产链 wiring:refresh 落盘 → makeAdvisoryGate 真信任链
     expect(r.source).toBe("remote")
 
     // ② 账本里放一条 disabled 的 catalog 来源 v2 record(全局 scope)
-    const globalRoot = path.join(dir, "alpha-root")
+    const globalRoot = path.join(dir, "codepuppy-root")
     fs.mkdirSync(globalRoot, { recursive: true })
     const up = upsertRecordV2(globalRoot, {
       id: "skill:demo",

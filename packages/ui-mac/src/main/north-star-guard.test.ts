@@ -7,7 +7,7 @@
 // 为什么判据必须长这样:
 //   · **不断言脚本源码文本。** 「grep 到脚本里写着 origin/alpha」在本仓是点名过的**假闸门**
 //     形态 —— 守卫被整段注释掉时它照样绿。这里起**真的 git 仓**、造**真的上游改动**、跑
-//     **生产的那份脚本**(scripts/north-star-guard.sh,CI 与本地 alpha-check.sh 调用的
+//     **生产的那份脚本**(scripts/north-star-guard.sh,CI 与本地 codepuppy-check.sh 调用的
 //     就是它),断言它**真的点名了那个文件**、真的以非零退出。
 //   · **不只断言「改上游就红」。** 一个「永远红」的错误实现能满足那一条,所以另有两条反向:
 //     只改 alpha 自有文件必须绿、exclude 表里的收编文件必须不被点名。
@@ -90,67 +90,67 @@ const UPSTREAM_FILE = "packages/core/src/upstream-leaf.ts"
 /** ADR-033 §1 白名单里的被接管文件 —— 改它是**有意的收编**,守卫必须放行。 */
 const TAKEN_OVER_FILE = "packages/core/src/permission.ts"
 /** alpha 自有包 —— 守卫的范围之外。 */
-const ALPHA_FILE = "packages/ui-mac/src/main/alpha-owned.ts"
+const CODEPUPPY_FILE = "packages/ui-mac/src/main/codepuppy-owned.ts"
 /**
  * **只落在 dev 窗口、不落在 alpha 窗口**的那个上游文件:它在 alpha 自己的历史里被改过
  * (真实世界里 = 三周 289 个提交里的任何一次收编/同步),而当前分支一个字没碰它。
  */
-const ALPHA_SIDE_DRIFT = "packages/core/src/upstream-drift.ts"
+const CODEPUPPY_SIDE_DRIFT = "packages/core/src/upstream-drift.ts"
 
 // ── `#1085` 的夹具:UPSTREAM_PATHS 里住着的 alpha 自有文件 ────────────────────────
 // 谓词 = ①路径不在上游镜像 origin/dev 里 ∧ ②自报家门(alpha-* 命名 或 文件里写着 marker)。
 // 下面五个常量各钉谓词的一格,**两个因子各自的反例都在里面** —— 只有这样才杀得掉
 // 「只看 dev 出身」与「只看命名」这两个各自都能让上面全部用例变绿的错误实现。
 /** alpha 自有 + alpha-* 命名:落进 origin/alpha 之后改它必须绿(这张票要修的那个形状)。 */
-const ALPHA_OWNED_NAMED = "packages/core/test/alpha-owned-leaf.test.ts"
+const CODEPUPPY_OWNED_NAMED = "packages/core/test/codepuppy-owned-leaf.test.ts"
 /** alpha 自有 + 名字不合约定,靠文件里的 marker 自报家门(migration / tool-identity.ts 那一类)。 */
-const ALPHA_OWNED_MARKED = "packages/core/src/marked-alpha-leaf.ts"
+const CODEPUPPY_OWNED_MARKED = "packages/core/src/marked-codepuppy-leaf.ts"
 /** alpha 自有,但**没有**自报家门:因子②不成立 ⇒ 必须红(杀「只看 dev 出身」)。 */
-const ALPHA_OWNED_BARE = "packages/core/src/bare-alpha-leaf.ts"
+const CODEPUPPY_OWNED_BARE = "packages/core/src/bare-codepuppy-leaf.ts"
 /** **真上游**文件,名字却是 alpha-*:因子①不成立 ⇒ 必须红(杀「只看命名」)。 */
-const UPSTREAM_ALPHA_NAMED = "packages/core/src/alpha-upstream-trap.ts"
-/** 守卫认的 marker token —— 与 scripts/north-star-guard.sh 的 ALPHA_OWNED_MARKER 同字面。 */
-const OWNED_MARKER = "north-star:alpha-owned"
+const UPSTREAM_CODEPUPPY_NAMED = "packages/core/src/codepuppy-upstream-trap.ts"
+/** 守卫认的 marker token —— 与 scripts/north-star-guard.sh 的 CODEPUPPY_OWNED_MARKER 同字面。 */
+const OWNED_MARKER = "north-star:codepuppy-owned"
 
 /**
  * 夹具形状 —— 真实世界的缩比:
  *
  *   seed ──► dev    (上游镜像继续前进)
- *      └──► alpha   (alpha 自己改过 ALPHA_SIDE_DRIFT)
+ *      └──► alpha   (alpha 自己改过 CODEPUPPY_SIDE_DRIFT)
  *              └──► feature   (本次 PR 的分支,从 alpha 切出)
  *
  * `origin/alpha...HEAD` 只看得见 feature 自己的改动;`origin/dev...HEAD` 的分叉点退到 seed,
- * 于是把 alpha 侧的 ALPHA_SIDE_DRIFT 一起算进来。
+ * 于是把 alpha 侧的 CODEPUPPY_SIDE_DRIFT 一起算进来。
  */
 function forkFixture() {
-  const origin = mkdtempSync(join(tmpdir(), "alpha-north-star-origin-"))
+  const origin = mkdtempSync(join(tmpdir(), "codepuppy-north-star-origin-"))
   git(origin, ["init", "-q", "-b", "alpha"])
   commit(origin, "seed", {
     [UPSTREAM_FILE]: "export const leaf = 1\n",
     [TAKEN_OVER_FILE]: "export const permission = 1\n",
-    [ALPHA_SIDE_DRIFT]: "export const drift = 1\n",
+    [CODEPUPPY_SIDE_DRIFT]: "export const drift = 1\n",
     // seed 在分叉之前 ⇒ 这一条**也在 dev 里**,于是它是货真价实的上游文件,名字只是碰巧
     // 长得像 alpha 自有的。谓词的因子①必须据此否掉它。
-    [UPSTREAM_ALPHA_NAMED]: "export const trap = 1\n",
+    [UPSTREAM_CODEPUPPY_NAMED]: "export const trap = 1\n",
   })
   git(origin, ["checkout", "-q", "-b", "dev"])
   commit(origin, "upstream mirror moves on", { "packages/core/src/dev-only.ts": "export const devOnly = 1\n" })
   git(origin, ["checkout", "-q", "alpha"])
   commit(origin, "alpha takes over an upstream leaf (ADR-style)", {
-    [ALPHA_SIDE_DRIFT]: "export const drift = 2\n",
-    // `#1247`:ALPHA_FILE 住在 alpha 自有包 packages/ui-mac 下,它必须**只**落在 alpha 侧 ——
+    [CODEPUPPY_SIDE_DRIFT]: "export const drift = 2\n",
+    // `#1247`:CODEPUPPY_FILE 住在 alpha 自有包 packages/ui-mac 下,它必须**只**落在 alpha 侧 ——
     // 原来它在 seed 里,于是夹具的 dev 分支也有 `packages/ui-mac/`,而真实世界里 origin/dev
-    // 根本没有这条路径(2026-09-06 实测)。守卫新增的 ALPHA_OWNED_PACKAGES 自检正是拿镜像
+    // 根本没有这条路径(2026-09-06 实测)。守卫新增的 CODEPUPPY_OWNED_PACKAGES 自检正是拿镜像
     // 验这一点,夹具不修就会在一个**现实中不存在**的状态上恒红。
-    [ALPHA_FILE]: "export const alphaOwned = 1\n",
+    [CODEPUPPY_FILE]: "export const codepuppyOwned = 1\n",
     // 这三条只落在 alpha 上 ⇒ origin/dev 里查不到它们(= 因子①成立)。它们已经在基准里,
     // 所以 feature 分支再碰一下就是 `M` —— 正是 `#971` 说的「落地那一次绿、以后每一次红」。
-    [ALPHA_OWNED_NAMED]: "export const ownedByName = 1\n",
-    [ALPHA_OWNED_MARKED]: `// ${OWNED_MARKER}\nexport const ownedByMarker = 1\n`,
-    [ALPHA_OWNED_BARE]: "export const bare = 1\n",
+    [CODEPUPPY_OWNED_NAMED]: "export const ownedByName = 1\n",
+    [CODEPUPPY_OWNED_MARKED]: `// ${OWNED_MARKER}\nexport const ownedByMarker = 1\n`,
+    [CODEPUPPY_OWNED_BARE]: "export const bare = 1\n",
   })
 
-  const work = mkdtempSync(join(tmpdir(), "alpha-north-star-work-"))
+  const work = mkdtempSync(join(tmpdir(), "codepuppy-north-star-work-"))
   const result = Bun.spawnSync(["git", "clone", "-q", origin, work], { env: { ...GIT_ENV } })
   if (result.exitCode !== 0) throw new Error(`git clone 失败:${result.stderr.toString()}`)
   git(work, ["checkout", "-q", "-b", "feature", "origin/alpha"])
@@ -177,7 +177,7 @@ const STALE_DAYS = 45
 function degradedFixture(staleDepth: number) {
   const staleDay = daysAgo(STALE_DAYS)
   const recentDay = daysAgo(1)
-  const origin = mkdtempSync(join(tmpdir(), "alpha-north-star-stale-origin-"))
+  const origin = mkdtempSync(join(tmpdir(), "codepuppy-north-star-stale-origin-"))
   git(origin, ["init", "-q", "-b", "alpha"])
   const seed = commit(
     origin,
@@ -185,7 +185,7 @@ function degradedFixture(staleDepth: number) {
     {
       [UPSTREAM_FILE]: "export const leaf = 1\n",
       [TAKEN_OVER_FILE]: "export const permission = 1\n",
-      [ALPHA_FILE]: "export const alphaOwned = 1\n",
+      [CODEPUPPY_FILE]: "export const codepuppyOwned = 1\n",
     },
     onDay(staleDay),
   )
@@ -193,7 +193,7 @@ function degradedFixture(staleDepth: number) {
     commit(
       origin,
       `alpha moves on (${n})`,
-      { [`packages/ui-mac/src/main/alpha-move-${n}.ts`]: `export const move = ${n}\n` },
+      { [`packages/ui-mac/src/main/codepuppy-move-${n}.ts`]: `export const move = ${n}\n` },
       onDay(recentDay),
     ),
   )
@@ -201,7 +201,7 @@ function degradedFixture(staleDepth: number) {
   const days = [staleDay, recentDay, recentDay, recentDay]
   const at = history.length - 1 - staleDepth
 
-  const work = mkdtempSync(join(tmpdir(), "alpha-north-star-stale-work-"))
+  const work = mkdtempSync(join(tmpdir(), "codepuppy-north-star-stale-work-"))
   const cloned = Bun.spawnSync(["git", "clone", "-q", origin, work], { env: { ...GIT_ENV } })
   if (cloned.exitCode !== 0) throw new Error(`git clone 失败:${cloned.stderr.toString()}`)
   git(work, ["checkout", "-q", "-b", "feature", "origin/alpha"])
@@ -257,8 +257,8 @@ describe("#889 north-star 守卫的行为", () => {
 
   test("只改 alpha 自有文件 ⇒ 绿(否则「守卫恒红」这个错误实现也能满足上面两条)", () => {
     const { work } = forkFixture()
-    commit(work, "alpha-owned change", { [ALPHA_FILE]: "export const alphaOwned = 2\n" })
-    write(work, { [ALPHA_FILE]: "export const alphaOwned = 3\n" })
+    commit(work, "codepuppy-owned change", { [CODEPUPPY_FILE]: "export const codepuppyOwned = 2\n" })
+    write(work, { [CODEPUPPY_FILE]: "export const codepuppyOwned = 3\n" })
     const run = runGuard(work)
     expect(run.exitCode, `一次纯 alpha 改动被判成破北极星 —— 恒红的门等于没有门:\n${run.output}`).toBe(0)
   })
@@ -275,29 +275,29 @@ describe("#889 north-star 守卫的行为", () => {
 
   test("基准是 origin/alpha:只落在 dev 窗口里的上游改动不许被点名(还原成 origin/dev 即红)", () => {
     const { work } = forkFixture()
-    commit(work, "an ordinary alpha-side change", { [ALPHA_FILE]: "export const alphaOwned = 2\n" })
+    commit(work, "an ordinary codepuppy-side change", { [CODEPUPPY_FILE]: "export const codepuppyOwned = 2\n" })
 
     // ── 控制组:先证明这个夹具**测得出已知的坏** ────────────────────────────────
     // 只跑生产脚本、只断言「没点名」是不够的:夹具若根本没造出 dev/alpha 分叉,那条断言会
     // 空对空地绿。所以把生产脚本原样复制一份、只把基准换成 origin/dev 跑一遍。
-    const mutated = join(mkdtempSync(join(tmpdir(), "alpha-north-star-ctl-")), "guard-on-dev.sh")
+    const mutated = join(mkdtempSync(join(tmpdir(), "codepuppy-north-star-ctl-")), "guard-on-dev.sh")
     writeFileSync(mutated, readFileSync(GUARD, "utf8").replaceAll("origin/alpha", "origin/dev"))
     const onDev = runGuard(work, mutated)
     expect(onDev.exitCode, `控制组没红 —— 夹具没造出 dev/alpha 的分叉,本条判据测不到目标:\n${onDev.output}`).not.toBe(0)
     expect(onDev.output, `控制组红了但没点名 alpha 侧的上游改动 —— 本次测量作废:\n${onDev.output}`).toContain(
-      ALPHA_SIDE_DRIFT,
+      CODEPUPPY_SIDE_DRIFT,
     )
 
     // ── 生产:同一棵树、同一个分支,基准换成目标分支后必须干净 ──────────────────
     const run = runGuard(work)
     expect(run.exitCode, `守卫把 alpha 自己历史里的上游改动算成了本分支的:\n${run.output}`).toBe(0)
     expect(run.output, `守卫点名了一个本分支没碰过的文件(基准退回 origin/dev 了):\n${run.output}`).not.toContain(
-      ALPHA_SIDE_DRIFT,
+      CODEPUPPY_SIDE_DRIFT,
     )
   })
 
   test("基准 ref 取不到时 fail-closed:非零 + 说「作废」,不是静默放行", () => {
-    const solo = mkdtempSync(join(tmpdir(), "alpha-north-star-solo-"))
+    const solo = mkdtempSync(join(tmpdir(), "codepuppy-north-star-solo-"))
     git(solo, ["init", "-q", "-b", "feature"])
     commit(solo, "no remote at all", { [UPSTREAM_FILE]: "export const leaf = 1\n" })
     const run = runGuard(solo)
@@ -310,7 +310,7 @@ describe("#889 north-star 守卫的行为", () => {
   test("上游路径下**新增**文件不被点名 —— `--diff-filter=DMR` 的明写边界,不是漏网", () => {
     const { work } = forkFixture()
     commit(work, "add a new file under an upstream package", {
-      "packages/core/src/brand-new-alpha-leaf.ts": "export const added = 1\n",
+      "packages/core/src/brand-new-codepuppy-leaf.ts": "export const added = 1\n",
     })
     const run = runGuard(work)
     // 这是**刻意**的:fork-sync 冲突来自 M/D/R,新增文件不冲突;ADR-035 与 ADR-038 都明写
@@ -330,50 +330,50 @@ describe("#889 north-star 守卫的行为", () => {
 //
 // 判据为什么长这样:谓词是两个因子的**合取**,所以两个因子各自都要有一条**反例**用例 ——
 // 「只看 dev 出身」和「只看命名」这两个错误实现,各自都能让正向那两条绿。反例在这里:
-// ALPHA_OWNED_BARE(dev 里没有、但没自报家门 ⇒ 红)与 UPSTREAM_ALPHA_NAMED(名字是 alpha-*、
+// CODEPUPPY_OWNED_BARE(dev 里没有、但没自报家门 ⇒ 红)与 UPSTREAM_CODEPUPPY_NAMED(名字是 alpha-*、
 // 但 dev 里有 ⇒ 红)。另外两条守的是这道门最容易被绕开的两个形状:把 marker 抄进真上游文件、
 // 以及把上游文件**改名**成 alpha-*(后者带控制组,证明夹具测得出已知的坏)。
 describe("#1085 alpha 自有文件的结构性谓词", () => {
   test("alpha-* 命名的自有文件被改 ⇒ 绿,且输出把它点成 alpha 自有(豁免不许是静默的)", () => {
     const { work } = forkFixture()
-    commit(work, "extend an alpha-owned gate that lives under an upstream package", {
-      [ALPHA_OWNED_NAMED]: "export const ownedByName = 2\n",
+    commit(work, "extend an codepuppy-owned gate that lives under an upstream package", {
+      [CODEPUPPY_OWNED_NAMED]: "export const ownedByName = 2\n",
     })
     const run = runGuard(work)
     expect(run.exitCode, `alpha 自有闸门被判成破北极星 —— 这正是 #971 的缺陷:\n${run.output}`).toBe(0)
     // 一次静默的放行与一次没跑的门在输出上长得一模一样。豁免必须说出来,否则「今天绿」没有确定含义。
-    expect(run.output, `豁免了却一个字都没说 —— 静默放行:\n${run.output}`).toContain(ALPHA_OWNED_NAMED)
+    expect(run.output, `豁免了却一个字都没说 —— 静默放行:\n${run.output}`).toContain(CODEPUPPY_OWNED_NAMED)
   })
 
   test("名字不合约定、靠文件里的 marker 自报家门 ⇒ 绿(migration / tool-identity.ts 那一类)", () => {
     const { work } = forkFixture()
-    commit(work, "edit an alpha-owned file that cannot follow the alpha-* naming", {
-      [ALPHA_OWNED_MARKED]: `// ${OWNED_MARKER}\nexport const ownedByMarker = 2\n`,
+    commit(work, "edit an codepuppy-owned file that cannot follow the alpha-* naming", {
+      [CODEPUPPY_OWNED_MARKED]: `// ${OWNED_MARKER}\nexport const ownedByMarker = 2\n`,
     })
     const run = runGuard(work)
     expect(run.exitCode, `带 marker 的 alpha 自有文件被判成破北极星:\n${run.output}`).toBe(0)
-    expect(run.output).toContain(ALPHA_OWNED_MARKED)
+    expect(run.output).toContain(CODEPUPPY_OWNED_MARKED)
   })
 
   test("dev 里没有、但没自报家门 ⇒ 红(杀掉「只看 origin/dev 出身」的实现)", () => {
     const { work } = forkFixture()
-    commit(work, "edit an unmarked file that upstream never had", { [ALPHA_OWNED_BARE]: "export const bare = 2\n" })
+    commit(work, "edit an unmarked file that upstream never had", { [CODEPUPPY_OWNED_BARE]: "export const bare = 2\n" })
     const run = runGuard(work)
     // 因子①单独成立不够:origin/dev 是个会陈旧的 ref,fetch 失败的窗口里上游新增又被 sync 合进
     // alpha 的文件,在本地 dev 里同样「查不到」。只认出身的实现会把那种**真上游**文件放行。
     expect(run.exitCode, `只凭「dev 里没有」就放行了 —— 陈旧镜像会让真上游文件走同一条路:\n${run.output}`).not.toBe(0)
-    expect(run.output).toContain(ALPHA_OWNED_BARE)
+    expect(run.output).toContain(CODEPUPPY_OWNED_BARE)
     expect(run.output, `红了却没告诉人怎么办(命名 / marker):\n${run.output}`).toContain(OWNED_MARKER)
   })
 
   test("真上游文件、名字却叫 alpha-* ⇒ 红(杀掉「只看命名」的实现)", () => {
     const { work } = forkFixture()
-    commit(work, "touch an upstream file that happens to be alpha-named", {
-      [UPSTREAM_ALPHA_NAMED]: "export const trap = 999\n",
+    commit(work, "touch an upstream file that happens to be codepuppy-named", {
+      [UPSTREAM_CODEPUPPY_NAMED]: "export const trap = 999\n",
     })
     const run = runGuard(work)
     expect(run.exitCode, `一个 dev 里就有的文件靠名字拿到了豁免:\n${run.output}`).not.toBe(0)
-    expect(run.output).toContain(UPSTREAM_ALPHA_NAMED)
+    expect(run.output).toContain(UPSTREAM_CODEPUPPY_NAMED)
   })
 
   test("把 marker 抄进一个真上游文件 ⇒ 仍然红(自报家门不是可伪造的通行证)", () => {
@@ -390,7 +390,7 @@ describe("#1085 alpha 自有文件的结构性谓词", () => {
 
   test("把上游文件改名成 alpha-* ⇒ 红且点名**旧**路径(--no-renames;去掉它即漏)", () => {
     const { work } = forkFixture()
-    const renamed = "packages/core/src/alpha-renamed-leaf.ts"
+    const renamed = "packages/core/src/codepuppy-renamed-leaf.ts"
     git(work, ["mv", UPSTREAM_FILE, renamed])
     git(work, ["commit", "-q", "-m", "rename an upstream file into the alpha naming convention"])
 
@@ -398,7 +398,7 @@ describe("#1085 alpha 自有文件的结构性谓词", () => {
     // 默认开着的改名检测把这次改动压成一条 `R`,而 `--name-only` 对 `R` 只印目的路径 ——
     // 目的路径在 dev 里没有、又叫 alpha-*,两个因子全中 ⇒ 被当成 alpha 自有放行,而上游那条
     // 路径其实已经消失。把 `--no-renames` 拿掉的复制品必须绿,否则本条测的不是它要测的东西。
-    const mutated = join(mkdtempSync(join(tmpdir(), "alpha-north-star-rename-ctl-")), "guard-with-renames.sh")
+    const mutated = join(mkdtempSync(join(tmpdir(), "codepuppy-north-star-rename-ctl-")), "guard-with-renames.sh")
     writeFileSync(mutated, readFileSync(GUARD, "utf8").replaceAll("--no-renames ", ""))
     const withRenames = runGuard(work, mutated)
     expect(withRenames.exitCode, `控制组没绿 —— 这个夹具测不到 --no-renames 要防的那个形状:\n${withRenames.output}`).toBe(0)
@@ -418,15 +418,15 @@ describe("#1085 alpha 自有文件的结构性谓词", () => {
     // 「今天绿明天红」的不可复现门,而恰恰是本 ADR 要消灭的那种。小夹具测不到它,所以这里
     // 的文件必须真的大到会触发 SIGPIPE。
     const big = `// ${OWNED_MARKER}\n${"// ".repeat(4) + "x".repeat(60) + "\n"}`.padEnd(4_000_000, "// filler\n")
-    commit(work, "edit a large alpha-owned file whose marker sits at the top", { [ALPHA_OWNED_MARKED]: big })
+    commit(work, "edit a large codepuppy-owned file whose marker sits at the top", { [CODEPUPPY_OWNED_MARKED]: big })
     const run = runGuard(work)
     expect(run.exitCode, `大文件里的 marker 没被读出来(多半是管道 + pipefail 吃了 SIGPIPE):\n${run.output}`).toBe(0)
-    expect(run.output).toContain(ALPHA_OWNED_MARKED)
+    expect(run.output).toContain(CODEPUPPY_OWNED_MARKED)
   })
 
   test("上游镜像 ref 取不到 ⇒ 豁免整体停用(fail-closed),且自报这一跑量的是什么", () => {
     const { work } = forkFixture()
-    commit(work, "extend an alpha-owned gate", { [ALPHA_OWNED_NAMED]: "export const ownedByName = 3\n" })
+    commit(work, "extend an codepuppy-owned gate", { [CODEPUPPY_OWNED_NAMED]: "export const ownedByName = 3\n" })
     // 镜像没了:remote-tracking ref 删掉 + fetch 一定失败(本地路径 ⇒ 立即 fatal,不碰网络)。
     git(work, ["update-ref", "-d", "refs/remotes/origin/dev"])
     git(work, ["remote", "set-url", "origin", `${work}-vanished`])
@@ -528,7 +528,7 @@ describe("#913 fetch 失败降级时,基准的身份与年龄必须可读", () =
 //   · 夹具的上游镜像里放一个守卫**从没听说过**的包(`brand-new-upstream-pkg`)。它钉的正是
 //     「上游明天加一个包,谁会变红」—— 枚举式辖区对它默认放行。
 //   · **carve-out 也要有反向判据**。`app`/`ui` 不被本门点名是**有意**的(ADR-034:那两个包是
-//     `frontend/frontend-pin.lock` 的 pin + `frontend/alpha-patches/alpha-frontend.patch` 的投影,
+//     `frontend/frontend-pin.lock` 的 pin + `frontend/codepuppy-patches/codepuppy-frontend.patch` 的投影,
 //     由 `scripts/assert-frontend-patch-roundtrip.sh` 用 **tree sha 逐字节**判,比本门更强;
 //     本门若也盖它们,每一次合法的 seam 变更都会被判成破北极星 ⇒ 恒红门 ⇒ `--no-verify`)。
 //     没有控制组的话,一个「辖区根本没生效」的实现也能满足「app/ui 不被点名」。
@@ -539,7 +539,7 @@ describe("#913 fetch 失败降级时,基准的身份与年龄必须可读", () =
 /** ADR-034 pin+补丁 roundtrip 覆盖的前端包 —— 本门刻意不盖(理由见上)。 */
 const ROUNDTRIP_PACKAGES = ["app", "ui"]
 /** alpha 自有的 workspace 包 —— `origin/dev` 里根本没有这三条路径(2026-09-06 实测)。 */
-const ALPHA_OWNED_PACKAGES = ["ext", "ui-mac", "alpha-contracts-consumer"]
+const CODEPUPPY_OWNED_PACKAGES = ["ext", "ui-mac", "codepuppy-contracts-consumer"]
 /** `#1247` 之前的辖区,控制组用 —— 逐字来自被本票替换掉的那一行。 */
 const PRE_1247_JURISDICTION =
   "packages/opencode packages/core packages/server packages/tui packages/sdk packages/protocol packages/schema packages/client"
@@ -559,7 +559,7 @@ const leafOf = (pkg: string) => `packages/${pkg}/src/leaf.ts`
  * 这正是「整包 carve-out」这一层必须存在的理由,逐文件谓词接不住它们)。
  */
 function allPackagesFixture() {
-  const origin = mkdtempSync(join(tmpdir(), "alpha-north-star-pkgs-origin-"))
+  const origin = mkdtempSync(join(tmpdir(), "codepuppy-north-star-pkgs-origin-"))
   git(origin, ["init", "-q", "-b", "alpha"])
   const seeded: Record<string, string> = {}
   for (const pkg of MIRROR_PACKAGES) seeded[leafOf(pkg)] = "export const leaf = 1\n"
@@ -567,11 +567,11 @@ function allPackagesFixture() {
   git(origin, ["checkout", "-q", "-b", "dev"])
   commit(origin, "upstream mirror moves on", { "packages/core/src/dev-only.ts": "export const devOnly = 1\n" })
   git(origin, ["checkout", "-q", "alpha"])
-  const alphaOnly: Record<string, string> = {}
-  for (const pkg of ALPHA_OWNED_PACKAGES) alphaOnly[leafOf(pkg)] = "export const leaf = 1\n"
-  commit(origin, "alpha adds its own workspace packages", alphaOnly)
+  const codepuppyOnly: Record<string, string> = {}
+  for (const pkg of CODEPUPPY_OWNED_PACKAGES) codepuppyOnly[leafOf(pkg)] = "export const leaf = 1\n"
+  commit(origin, "alpha adds its own workspace packages", codepuppyOnly)
 
-  const work = mkdtempSync(join(tmpdir(), "alpha-north-star-pkgs-work-"))
+  const work = mkdtempSync(join(tmpdir(), "codepuppy-north-star-pkgs-work-"))
   const cloned = Bun.spawnSync(["git", "clone", "-q", origin, work], { env: { ...GIT_ENV } })
   if (cloned.exitCode !== 0) throw new Error(`git clone 失败:${cloned.stderr.toString()}`)
   git(work, ["checkout", "-q", "-b", "feature", "origin/alpha"])
@@ -583,7 +583,7 @@ function allPackagesFixture() {
  * 改动为空即抛:一个什么都没改的「控制组」会和生产跑出一样的结果,然后空对空地绿。
  */
 function mutatedGuard(tag: string, edit: (src: string) => string): string {
-  const path = join(mkdtempSync(join(tmpdir(), `alpha-north-star-${tag}-`)), "guard.sh")
+  const path = join(mkdtempSync(join(tmpdir(), `codepuppy-north-star-${tag}-`)), "guard.sh")
   const before = readFileSync(GUARD, "utf8")
   const after = edit(before)
   if (after === before) throw new Error(`控制组没能改动生产脚本(${tag})—— 本次测量作废`)
@@ -632,8 +632,8 @@ describe("#1247 辖区覆盖上游镜像里的每一个包", () => {
   test("alpha 自有包整包豁免 ⇒ 绿(控制组:抹掉 carve-out 即红且点名)", () => {
     const { work } = allPackagesFixture()
     const edits: Record<string, string> = {}
-    for (const pkg of ALPHA_OWNED_PACKAGES) edits[leafOf(pkg)] = "export const leaf = 2\n"
-    commit(work, "edit the alpha-owned workspace packages", edits)
+    for (const pkg of CODEPUPPY_OWNED_PACKAGES) edits[leafOf(pkg)] = "export const leaf = 2\n"
+    commit(work, "edit the codepuppy-owned workspace packages", edits)
 
     const run = runGuard(work)
     expect(run.exitCode, `改 alpha 自有包被判成破北极星 —— 恒红的门等于没有门:\n${run.output}`).toBe(0)
@@ -642,10 +642,10 @@ describe("#1247 辖区覆盖上游镜像里的每一个包", () => {
     // ADR-043 的逐文件谓词接不住 —— 所以「整包豁免」这一层不是冗余。
     const without = runGuard(
       work,
-      mutatedGuard("no-alpha-pkgs", (s) => s.replace(/^ALPHA_OWNED_PACKAGES="[^"]*"$/m, 'ALPHA_OWNED_PACKAGES=""')),
+      mutatedGuard("no-codepuppy-pkgs", (s) => s.replace(/^CODEPUPPY_OWNED_PACKAGES="[^"]*"$/m, 'CODEPUPPY_OWNED_PACKAGES=""')),
     )
     expect(without.exitCode, `抹掉 carve-out 之后还是绿 —— 上面那条绿不是 carve-out 挣来的:\n${without.output}`).not.toBe(0)
-    for (const pkg of ALPHA_OWNED_PACKAGES) {
+    for (const pkg of CODEPUPPY_OWNED_PACKAGES) {
       expect(without.output, `控制组没点名 packages/${pkg}:\n${without.output}`).toContain(leafOf(pkg))
     }
   })
@@ -680,10 +680,10 @@ describe("#1247 辖区覆盖上游镜像里的每一个包", () => {
 
     const forged = runGuard(
       work,
-      mutatedGuard("forged-owner", (s) => s.replace(/^ALPHA_OWNED_PACKAGES="([^"]*)"$/m, 'ALPHA_OWNED_PACKAGES="$1 plugin"')),
+      mutatedGuard("forged-owner", (s) => s.replace(/^CODEPUPPY_OWNED_PACKAGES="([^"]*)"$/m, 'CODEPUPPY_OWNED_PACKAGES="$1 plugin"')),
     )
     expect(forged.exitCode, `一行配置就把整个上游包移出了辖区:\n${forged.output}`).not.toBe(0)
-    expect(forged.output, `红了,但没说清问题出在那条声明上:\n${forged.output}`).toContain("ALPHA_OWNED_PACKAGES")
+    expect(forged.output, `红了,但没说清问题出在那条声明上:\n${forged.output}`).toContain("CODEPUPPY_OWNED_PACKAGES")
     expect(forged.output, `红了,但没点名是哪个包被冒领了:\n${forged.output}`).toContain("packages/plugin")
   })
 })

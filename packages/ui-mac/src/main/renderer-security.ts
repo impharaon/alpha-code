@@ -1,5 +1,5 @@
 // C24 renderer 安全策略的纯逻辑半边(electron-free,可单测):CORS 放宽范围判定 + CSP 文本。
-// 注入时机(app.isPackaged / 平台闸 / ALPHA_CSP_DISABLE)在 windows.ts。
+// 注入时机(app.isPackaged / 平台闸 / CODEPUPPY_CSP_DISABLE)在 windows.ts。
 //
 // 背景:此前对**所有**响应强注 `ACAO:*` → renderer 可读任意跨域响应,构成 token/会话数据 exfil
 // 通道(册 §7b);收敛为「回环(sidecar HTTP/SSE/PTY)才放宽」。
@@ -7,7 +7,7 @@
 // #898(SEC):win32 此前额外短路成 `platform === "win32" || isLoopbackUrl(url)` —— 短路项在前,
 // 意味着 win32 上**任何** URL(含恶意页面/被顶替扩展代码指向的任意跨域站点)都会拿到
 // `Access-Control-Allow-Origin: *`,loopback 判据形同虚设。收窄为:main 进程持有的内存态
-// registered-origin 集合(见 AlphaOriginRegistry)——只有 main 真正启动并验证过的确切 Alpha
+// registered-origin 集合(见 CodePuppyOriginRegistry)——只有 main 真正启动并验证过的确切 Alpha
 // 服务 origin(按 generation 登记)才在有效期内命中;未注册的 origin 一律默认拒绝。registry
 // 实例只存活在 main 进程模块闭包内,从不经 preload/contextBridge/IPC 暴露写入口,renderer 与
 // 扩展代码结构上无法自行注册。darwin 分支的回环判据逐字节不变。
@@ -30,13 +30,13 @@ export function isLoopbackUrl(value: string): boolean {
  * 「同一 origin(端口复用)已被新一代服务重新 register 过」的条目 —— 新 register 直接覆盖 Map
  * 条目为新 generation,旧 generation 的迟到 revoke 天然比对不上而失效。
  */
-export type AlphaOriginRegistry = {
+export type CodePuppyOriginRegistry = {
   register(origin: string, generation: number): void
   revoke(origin: string, generation: number): void
   isRegistered(origin: string): boolean
 }
 
-export function createAlphaOriginRegistry(): AlphaOriginRegistry {
+export function createCodePuppyOriginRegistry(): CodePuppyOriginRegistry {
   const origins = new Map<string, number>()
   return {
     register(origin, generation) {
@@ -54,7 +54,7 @@ export function createAlphaOriginRegistry(): AlphaOriginRegistry {
 export function corsRelaxAllowed(
   url: string,
   platform: NodeJS.Platform = process.platform,
-  registry?: Pick<AlphaOriginRegistry, "isRegistered">,
+  registry?: Pick<CodePuppyOriginRegistry, "isRegistered">,
 ): boolean {
   if (isLoopbackUrl(url)) return true
   // #898:win32 不再对任意 URL 短路放行 —— 只有 main 登记过的确切 origin(非回环)才放宽。

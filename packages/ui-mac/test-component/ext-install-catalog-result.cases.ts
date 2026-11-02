@@ -117,18 +117,18 @@ mock.module("../src/main/ext-mcp-activation", () => ({
   probeProjectMcpActivation: async () => "unverifiable" as const,
 }))
 
-const { initAlphaEnvironment } = await import("../src/main/alpha-environment")
+const { initCodePuppyEnvironment } = await import("../src/main/codepuppy-environment")
 const { registerExtIpcHandlers } = await import("../src/main/ext-ipc")
 
-delete process.env.ALPHA_GLOBAL_DIR
-initAlphaEnvironment({
+delete process.env.CODEPUPPY_GLOBAL_DIR
+initCodePuppyEnvironment({
   isPackaged: false,
   channel: "dev",
   appDataDir: root,
-  baseRoot: join(root, "alpha-code-state"),
+  baseRoot: join(root, "codepuppy-state"),
   homeDir: join(root, "home"),
 })
-const { alphaSidecar } = registerExtIpcHandlers(
+const { codepuppySidecar } = registerExtIpcHandlers(
   join(root, "user-data"),
   "dev",
   async () => ({
@@ -140,7 +140,7 @@ const { alphaSidecar } = registerExtIpcHandlers(
 )
 // `#1529`:像 server.ts 在 sidecar ready 时那样接上发送口 —— 装完之后发往 ext 的东西都落在这里。
 const toSidecar: Array<Record<string, unknown>> = []
-alphaSidecar.attach((message) => void toSidecar.push(message as Record<string, unknown>))
+codepuppySidecar.attach((message) => void toSidecar.push(message as Record<string, unknown>))
 
 afterAll(() => {
   rmSync(root, { recursive: true, force: true })
@@ -192,7 +192,7 @@ test("真实 ext-install-catalog 返回值只含公开状态且不回显 canary"
   expect(JSON.stringify(result)).not.toContain(canary)
   // `#1529`:提交成功之后是**请 ext 重载**(global,带这一项),而不是在这里 dispose。
   expect(toSidecar.at(-1)).toMatchObject({
-    type: "alpha.reload.request",
+    type: "codepuppy.reload.request",
     scope: "global",
     items: [{ id: entry.id, scope: "global" }],
   })
@@ -280,7 +280,7 @@ test("默认关的真实 catalog MCP:提前返回分支同样只含公开状态�
 
 // ── REQ-234 `#1529` ─────────────────────────────────────────────────────────────────────────
 // 下面两条走的是**真** registerExtIpcHandlers 交出来的两个入口:定制中心的 `ext-hub-view` IPC 与 parentPort 的
-// `alpha.*` 分发。把其中一个改成自己算一份(或把会话字段带进状态计算),I4 这条就红。
+// `codepuppy.*` 分发。把其中一个改成自己算一份(或把会话字段带进状态计算),I4 这条就红。
 
 const directory = join(root, "workspace")
 
@@ -290,8 +290,8 @@ test("#1529 I4:同一目录,定制中心(IPC)与 agent(parentPort)读到逐行�
   const fromHub = (await hubView({ sender: { id: 1 } }, directory)) as { rows: Array<Record<string, unknown>> }
   const replies: Array<Record<string, unknown>> = []
   expect(
-    alphaSidecar.receive(
-      { type: "alpha.hub.view.request", id: 41, directory, sessionID: "ses_x", agent: "build" },
+    codepuppySidecar.receive(
+      { type: "codepuppy.hub.view.request", id: 41, directory, sessionID: "ses_x", agent: "build" },
       (message) => void replies.push(message as Record<string, unknown>),
     ),
   ).toBe(true)
@@ -325,17 +325,17 @@ test("#1529 I9:确认框记的阶段 + 带 hubRequestId 的安装 ⇒ main 记 c
   expect(first.stage).toBe("authorize")
   const query = (id: number) => {
     const replies: Array<Record<string, unknown>> = []
-    alphaSidecar.receive({ type: "alpha.hub.request.request", id, requestId }, (m) => void replies.push(m as Record<string, unknown>))
+    codepuppySidecar.receive({ type: "codepuppy.hub.request.request", id, requestId }, (m) => void replies.push(m as Record<string, unknown>))
     return replies[0]
   }
-  expect(query(51)).toEqual({ type: "alpha.hub.request.reply", id: 51, record: { requestId, catalogId: agentEntry.id, stage: "submitted" } })
+  expect(query(51)).toEqual({ type: "codepuppy.hub.request.reply", id: 51, record: { requestId, catalogId: agentEntry.id, stage: "submitted" } })
   const confirmed = Object.fromEntries(
     first.authorization.filter((d) => d.requiresConfirmation).map((d) => [d.key, d.requested]),
   )
   const result = (await install({ sender: { id: 1 } }, { ...intent, authorization: { confirmed } })) as { ok?: boolean }
   expect(result.ok, JSON.stringify(result)).toBe(true)
   expect(query(52)).toEqual({
-    type: "alpha.hub.request.reply",
+    type: "codepuppy.hub.request.reply",
     id: 52,
     record: { requestId, catalogId: agentEntry.id, stage: "committed", scope: "global" },
   })
@@ -365,7 +365,7 @@ test("#1531:项目作用域安装 ⇒ 发往 ext 的是 { scope:{ directory }, i
   const result = await installTwice({ catalogId: projectEntry.id, scope: { scope: "project", projectDir } })
   expect(result.ok, JSON.stringify(result)).toBe(true)
   expect(toSidecar.at(-1)).toMatchObject({
-    type: "alpha.reload.request",
+    type: "codepuppy.reload.request",
     scope: { directory: projectDir },
     items: [{ id: projectEntry.id, scope: "project" }],
   })
@@ -386,7 +386,7 @@ test("#1531 金丝雀:agent 安装的密钥只落在 main 的密钥文件里,工
     {
       postMessage: (message) => {
         wire.push(message)
-        alphaSidecar.receive(message, (reply) => {
+        codepuppySidecar.receive(message, (reply) => {
           wire.push(reply)
           for (const listener of listeners) listener({ data: reply })
         })
@@ -405,9 +405,9 @@ test("#1531 金丝雀:agent 安装的密钥只落在 main 的密钥文件里,工
     abort: new AbortController().signal,
     metadata: () => {},
     // 守望者:先记阶段再出站,框里填的密钥只进 install 意图的 grants。
-    ask: async (input: { metadata: { alphaHub: { catalogId: string; requestId: string } } }) => {
+    ask: async (input: { metadata: { codepuppyHub: { catalogId: string; requestId: string } } }) => {
       asks.push(input)
-      const { catalogId, requestId } = input.metadata.alphaHub
+      const { catalogId, requestId } = input.metadata.codepuppyHub
       expect(await stage({ sender: { id: 1 } }, { requestId, stage: "confirming", catalogId })).toEqual({ ok: true })
       expect(await stage({ sender: { id: 1 } }, { requestId, stage: "submitted" })).toEqual({ ok: true })
       const result = await installTwice({ catalogId, scope: { scope: "global" }, grants: { secrets: { DSN: value } }, hubRequestId: requestId })
@@ -418,7 +418,7 @@ test("#1531 金丝雀:agent 安装的密钥只落在 main 的密钥文件里,工
   const result = (await createHubTools(bridge).codepuppy_hub_install.execute(args, ctx as never)) as { output: string; metadata: unknown }
   expect(result.output.split("\n")[0]).toBe("installed; available")
   for (const surface of [args, result, asks, wire, toSidecar]) expect(JSON.stringify(surface)).not.toContain(value)
-  expect(wire.some((m) => (m as { type?: string }).type === "alpha.hub.request.reply")).toBe(true)
+  expect(wire.some((m) => (m as { type?: string }).type === "codepuppy.hub.request.reply")).toBe(true)
 
   // 对照组:main 落盘的密钥文件里看得见它
   const hits: string[] = []

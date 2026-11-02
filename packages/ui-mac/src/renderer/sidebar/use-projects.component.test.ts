@@ -4,7 +4,7 @@ import path from "node:path"
 // #594/#577:use-projects 的 generation 恢复语义(有界自探 / failed 终态 / provisional
 // 刷新 / replay 单调性 / composer 链唤醒 / 真实「立即重试」按钮)需要真实 Solid 客户端
 // 构建 + happy-dom,与其他测试缓存的 server 条件导出互斥,故与
-// alpha-composer-model.component.test.ts 同构地在独立进程运行。
+// codepuppy-composer-model.component.test.ts 同构地在独立进程运行。
 // REQ-126 CODE-C(#656)追加 2 例:①`ensureDefaultWorkspace` 必须如实回报 `{ok:false}` ——
 // 侧栏的「ensure 失败就不建 draft」全靠这个返回值,而这条 IPC 不 throw,try/catch 看不见它;
 // ②默认目录**查询**失败不得连坐普通项目的会话创建(两次 IPC 的失败必须分开处理)。

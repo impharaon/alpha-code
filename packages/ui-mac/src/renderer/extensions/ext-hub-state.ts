@@ -1,6 +1,6 @@
 // Session-transient open/close state for the Extension Hub (定制中心) overlay. A module-level
 // signal — there is a single hub — mirroring sidebar-state.ts. Deliberately NOT persisted: the
-// hub always starts closed on launch. Imported by alpha-sidebar.tsx (the toggle button) and
+// hub always starts closed on launch. Imported by codepuppy-sidebar.tsx (the toggle button) and
 // renderer/index.tsx (to drive <ExtensionHub open=…/>).
 
 import { createSignal } from "solid-js"

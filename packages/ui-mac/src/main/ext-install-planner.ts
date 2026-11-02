@@ -28,14 +28,14 @@ import type { InstallReceiptType } from "../preload/types"
 import type { CatalogEntry, McpInstallSpec } from "../renderer/extensions/catalog-types"
 import { isExtensionName } from "../shared/extension-name"
 import {
-  ALPHA_OFFICE_CONNECTORS,
-  alphaOfficeInstallCommand,
-  isAlphaOfficeMcp,
+  CODEPUPPY_OFFICE_CONNECTORS,
+  codepuppyOfficeInstallCommand,
+  isCodePuppyOfficeMcp,
   isWorkspacePolicyMcp,
   retiredCommunityOfficeFor,
 } from "../shared/office-advisories"
-import { tryGetAlphaEnvironment, type AppEnvironment } from "./alpha-environment"
-import { alphaRoot } from "./alpha-workdir"
+import { tryGetCodePuppyEnvironment, type AppEnvironment } from "./codepuppy-environment"
+import { codepuppyRoot } from "./codepuppy-workdir"
 import type { AdvisoryGate } from "./ext-advisory-gate"
 import { readGenerationReceiptSnapshot } from "./ext-transaction"
 import { tryAcquireBundleLock } from "./ext-bundle-lock"
@@ -54,7 +54,7 @@ import {
 import { capabilityGrantPath, isSafeCapability, type CapabilityDiff } from "./ext-capability-grants"
 import { agentConfigItemKey, agentInstallKey, installAgentFromCas, recoveryReceiptInputs } from "./ext-agent-install"
 // #705:plugin 载荷 file 探针与 agent/skill 探针同住 ext-health-probe-router —— 组合点只有一份。
-import { collectMcpFileRefPaths, isAbsenceError, newMcpSecretVersionId, pathIdentity, resolveMcpRefPath, substituteMcpSecretRefsPure } from "./alpha-mcp-secrets"
+import { collectMcpFileRefPaths, isAbsenceError, newMcpSecretVersionId, pathIdentity, resolveMcpRefPath, substituteMcpSecretRefsPure } from "./codepuppy-mcp-secrets"
 
 /** `{file:<abs>}` 引用 → 文件路径(非引用形状 = null;#378 r1 锁内在场门与失败清理共用)。 */
 function mcpRefPathOf(ref: string): string | null {
@@ -90,14 +90,14 @@ function resolvePluginEntryPath(entry: unknown, configDir: string): string | nul
   return path.resolve(configDir, p)
 }
 
-/** #378 r7(Major):escape-hatch 环境(ALPHA_JSONC_TRUTH_DISABLE / ALPHA_LEGACY_INSTALL_ROOT)
- *  把引擎配置真源路由到事务根之外 —— config action 圈禁只能写 <root>/alpha.jsonc,照常提交会
+/** #378 r7(Major):escape-hatch 环境(CODEPUPPY_JSONC_TRUTH_DISABLE / CODEPUPPY_LEGACY_INSTALL_ROOT)
+ *  把引擎配置真源路由到事务根之外 —— config action 圈禁只能写 <root>/codepuppy.jsonc,照常提交会
  *  「账本记 active、引擎读不到」谎报成功。诚实 fail-closed:真源不在根内即拒。 */
 function configTruthInRootGate(root: string, truthPath: string): { ok: true } | { ok: false; reason: string } {
-  if (path.resolve(truthPath) === path.resolve(path.join(root, "alpha.jsonc"))) return { ok: true }
+  if (path.resolve(truthPath) === path.resolve(path.join(root, "codepuppy.jsonc"))) return { ok: true }
   return {
     ok: false,
-    reason: `engine config truth is routed to "${truthPath}" (escape-hatch env) — transactional single-install writes <root>/alpha.jsonc only; refusing to record an install the engine cannot see`,
+    reason: `engine config truth is routed to "${truthPath}" (escape-hatch env) — transactional single-install writes <root>/codepuppy.jsonc only; refusing to record an install the engine cannot see`,
   }
 }
 
@@ -113,8 +113,8 @@ function projectMcpWriteIdentityGate(
   } catch {
     return { ok: false, reason: "project MCP root identity changed before commit — refused" }
   }
-  if (path.resolve(target) !== path.resolve(path.join(root, "alpha.jsonc")))
-    return { ok: false, reason: "project MCP config target is not D/.code-puppy/alpha.jsonc — refused" }
+  if (path.resolve(target) !== path.resolve(path.join(root, "codepuppy.jsonc")))
+    return { ok: false, reason: "project MCP config target is not D/.code-puppy/codepuppy.jsonc — refused" }
   return { ok: true }
 }
 
@@ -142,7 +142,7 @@ import {
 import { nextDesiredState } from "./ext-install-policy"
 import { readSessionGrantIdsSync, type SessionGrantOracle } from "./ext-curation-policy"
 import type { ChannelName } from "./catalog-channels"
-import { findReceipt } from "./alpha-installs"
+import { findReceipt } from "./codepuppy-installs"
 import {
   aggregateFilesDigest,
   computeManifestDigest,
@@ -474,8 +474,8 @@ export function deriveMcpConfig(
   const subst: Record<string, string> = { ...(grants.env ?? {}), ...(grants.secrets ?? {}) }
   // #1564:四个第一方 Office 条目的命令只由 main 模板产生 —— 卡片上的命令(今天的 uv 形态、清理后的新形态或
   // 干脆没有)不校验也不消费,中国镜像 env 也不加(随包运行时不下载任何东西)。写策略随后把两个资源槽解析成本 bundle。
-  const office = ALPHA_OFFICE_CONNECTORS.find((connector) => connector.catalogId === catalogId)
-  if (office) return { ok: true, config: { type: "local", command: alphaOfficeInstallCommand(office.format) }, secretVars: [] }
+  const office = CODEPUPPY_OFFICE_CONNECTORS.find((connector) => connector.catalogId === catalogId)
+  if (office) return { ok: true, config: { type: "local", command: codepuppyOfficeInstallCommand(office.format) }, secretVars: [] }
   if (spec.mcpType === "remote") {
     if (typeof spec.url !== "string" || !spec.url) return { ok: false, reason: "catalog entry has no url" }
     let headers: Record<string, string> | undefined
@@ -491,10 +491,10 @@ export function deriveMcpConfig(
   }
   const command = spec.command ?? []
   if (command.length === 0) return { ok: false, reason: "catalog entry has no command" }
-  const alphaResourceArgs = command.filter((argument) => argument.includes("{alphaResources}"))
+  const codepuppyResourceArgs = command.filter((argument) => argument.includes("{alphaResources}"))
   if (
-    alphaResourceArgs.length > 0 &&
-    (alphaResourceArgs.length !== 1 || alphaResourceArgs[0] !== "{alphaResources}/office-mcp/server.py" || !isAlphaOfficeMcp("", { type: "local", command }))
+    codepuppyResourceArgs.length > 0 &&
+    (codepuppyResourceArgs.length !== 1 || codepuppyResourceArgs[0] !== "{alphaResources}/office-mcp/server.py" || !isCodePuppyOfficeMcp("", { type: "local", command }))
   ) {
     return { ok: false, reason: "{alphaResources} is reserved for the bundled Code Puppy Office server entrypoints — refused" }
   }
@@ -546,7 +546,7 @@ export type PlannerInstallers = {
   /** #346:journaled MCP 卸载的 in-lock 原语 —— 仅删配置副本(主+legacy),零账本副作用,
    *  失败如实返回(legacy 不可读也算失败)。**只在 uninstallExtensionTransaction 锁内调用**。 */
   removeMcpConfigInLock(name: string): ConfigOutcome
-  /** REQ-136:project MCP 的 root-parametric in-lock 删除原语。只删 `<root>/alpha.jsonc`
+  /** REQ-136:project MCP 的 root-parametric in-lock 删除原语。只删 `<root>/codepuppy.jsonc`
    *  的目标 leaf；不触碰 global/legacy 配置、密钥或连接绑定。 */
   removeProjectMcpConfigInLock(root: string, name: string): ConfigOutcome
   /** #346:严格密钥吊销 —— 失败可观察(journal 据此保持非终态);目录缺失 = 幂等成功。
@@ -556,7 +556,7 @@ export type PlannerInstallers = {
    *  连接是共享的、且真实副作用在 provider 那边,所以「最后一个绑定消失」不是删除条件 ——
    *  它只是「当前没有已安装的包在用」。释放失败不阻断卸载(陈旧绑定只会让连接被多留一会儿,
    *  那是安全的方向);删除只有显式 disconnect 一条路。 */
-  releaseAlphaConnectionBindings(componentId: string): { ok: true } | { ok: false; reason: string }
+  releaseCodePuppyConnectionBindings(componentId: string): { ok: true } | { ok: false; reason: string }
   /** #378(Codex 裁决 Q5):npm plugin 跨配置源(主 + legacy XDG)同 base 严格检查 —— 任一侧
    *  在场都不是 fresh;任一侧不可读即拒(不能当不存在)。计划前与锁内 precondition 双调。 */
   findPluginBaseConflictStrict(pkg: string): { ok: true; existing: { spec: string; source: "main" | "legacy" } | undefined } | { ok: false; reason: string }
@@ -805,7 +805,7 @@ function resolveScope(
   if (kind !== "mcp") return { ok: false, reason: PROJECT_INSTALL_UNSUPPORTED_REASON }
   const identity = projectScopeIdentity(scope.projectDir)
   if (!identity.ok) return { ok: false, reason: `fail closed: ${identity.reason}` }
-  const root = alphaRoot(identity.scope.projectPath)
+  const root = codepuppyRoot(identity.scope.projectPath)
   if (!root) return { ok: false, reason: `fail closed: invalid project root: ${scope.projectDir}` }
   return {
     ok: true,
@@ -919,7 +919,7 @@ async function classifyBundleChild(
   if (entry.type === "mcp") {
     const spec = entry.installSpec
     if (spec?.kind !== "mcp") return { status: "fatal", id, reason: "mcp entry has no mcp installSpec" }
-    // r11 Major:bundle MCP child 与单装同一真源门 —— escape-hatch 路由下写 root/alpha.jsonc
+    // r11 Major:bundle MCP child 与单装同一真源门 —— escape-hatch 路由下写 root/codepuppy.jsonc
     // 会「账本记 active、引擎读不到」。fatal(required 子项拒整单,与单装一致 fail-closed)。
     const bundleTruth = configTruthInRootGate(deps.globalRoot(), deps.installers.mcpConfigTruthPath())
     if (!bundleTruth.ok) return { status: "fatal", id, reason: bundleTruth.reason }
@@ -953,9 +953,9 @@ async function classifyBundleChild(
       id,
       item: {
         key,
-        // config target 锚定事务根(= 当前环境 alpha.jsonc;与 staging 同卷,原子替换)。
+        // config target 锚定事务根(= 当前环境 codepuppy.jsonc;与 staging 同卷,原子替换)。
         action: "config",
-        config: { target: path.join(deps.globalRoot(), "alpha.jsonc"), edits: [{ keyPath: ["mcp", entry.name], value: baseRecord.desiredState === "disabled" ? { ...derived.config, enabled: false } : derived.config }] },
+        config: { target: path.join(deps.globalRoot(), "codepuppy.jsonc"), edits: [{ keyPath: ["mcp", entry.name], value: baseRecord.desiredState === "disabled" ? { ...derived.config, enabled: false } : derived.config }] },
         manifestDigest,
         capabilities: decoded.manifest.capabilities,
       },
@@ -1274,7 +1274,7 @@ export async function installCatalog(rawIntent: unknown, deps: PlannerDeps): Pro
       return { ok: false, reason: "workspace-policy MCP is not project-installable — refused" }
     }
     const mcpRoot = scope.root(deps)
-    const mcpConfigTarget = path.join(mcpRoot, "alpha.jsonc")
+    const mcpConfigTarget = path.join(mcpRoot, "codepuppy.jsonc")
     // r7 Major:escape-hatch 环境下引擎配置真源不在事务根 → fail-closed 拒(不写账谎报 active)。
     // Project discovery is the existing per-instance D/.code-puppy hook, not the process-wide global
     // truth path. Consulting that global path here would reject D or, worse, redirect D into it.
@@ -1693,7 +1693,7 @@ export async function installCatalog(rawIntent: unknown, deps: PlannerDeps): Pro
       return { ok: false, reason: `agent asset must contain exactly one file (got ${promoted.specs.length}) — refused` }
     }
     const agentRoot = scope.root(deps)
-    const agentConfigTarget = path.join(agentRoot, "alpha.jsonc")
+    const agentConfigTarget = path.join(agentRoot, "codepuppy.jsonc")
     const agentGen = await installAgentFromCas(agentRoot, {
       name: entry.name,
       id: entry.id,
@@ -1998,7 +1998,7 @@ export async function installUncuratedAgentImport(
   if (name.includes("--"))
     return { ok: false, reason: `agent name "${name}" contains "--" — ambiguous with the transaction key scheme; refused` }
   const root = deps.globalRoot()
-  const configTarget = path.join(root, "alpha.jsonc")
+  const configTarget = path.join(root, "codepuppy.jsonc")
   const pre = agentFreshGate(root, name, configTarget, "import")
   if (!pre.ok) return pre
   // 与 flat writeAgent 同款换行归一;installAgentFromCas 从 CAS 字节重解析(agentMdToEntry fail-closed)。
@@ -2269,7 +2269,7 @@ async function installSeedAsset(intent: SeedInstallIntent, deps: PlannerDeps): P
       rollback("agent seed asset must contain exactly one file")
       return { ok: false, reason: `agent seed asset must contain exactly one file (got ${promoted.files.length}) — refused` }
     }
-    const configTarget = path.join(installRoot, "alpha.jsonc")
+    const configTarget = path.join(installRoot, "codepuppy.jsonc")
     const agentGen = await installAgentFromCas(installRoot, {
       name: entry.name,
       id: entry.id,
@@ -2388,7 +2388,7 @@ async function installSeedMcp(args: {
     rollback("entry has no mcp installSpec")
     return { ok: false, reason: "entry has no mcp installSpec" }
   }
-  // #378 r7 Major:真源路由门(seed MCP 同样只写 <root>/alpha.jsonc)。
+  // #378 r7 Major:真源路由门(seed MCP 同样只写 <root>/codepuppy.jsonc)。
   if (intent.scope.scope === "global") {
     const seedMcpTruth = configTruthInRootGate(root, deps.installers.mcpConfigTruthPath())
     if (!seedMcpTruth.ok) {
@@ -2427,7 +2427,7 @@ async function installSeedMcp(args: {
     rollback(valid.reason)
     return { ok: false, reason: `seed MCP config failed validation: ${valid.reason} — refused` }
   }
-  const configTarget = path.join(root, "alpha.jsonc")
+  const configTarget = path.join(root, "codepuppy.jsonc")
   const projectMcp = scope.kind === "project"
   const now = deps.now?.() ?? new Date().toISOString()
   // #397 r3:纯计算;session-grant 归位 = receipt 写点例外标记,drift 基线取计划期观测 prior 态。
@@ -2555,7 +2555,7 @@ export async function uninstallByKey(rawIntent: unknown, deps: PlannerDeps): Pro
       return { ok: false, reason: `kind "${intent.type}" cannot be project-scoped` }
     const identity = projectScopeIdentity(intent.projectDir)
     if (!identity.ok) return { ok: false, reason: `fail closed: ${identity.reason}` }
-    const projectRoot = alphaRoot(identity.scope.projectPath)
+    const projectRoot = codepuppyRoot(identity.scope.projectPath)
     if (!projectRoot) return { ok: false, reason: `fail closed: invalid project root: ${intent.projectDir}` }
     root = projectRoot
     target = { scope: "project", projectDir: identity.scope.projectPath }
@@ -2643,7 +2643,7 @@ export async function uninstallByKey(rawIntent: unknown, deps: PlannerDeps): Pro
     // 反序会复现 #351 规避的「配置在、密钥毁」)。任一步失败 = journal 保持 uninstalling,
     // recoverExtensionTransactions 经 uninstallArtifacts seam 幂等前滚 —— 绝不谎报卸载完成。
     if (intent.scope === "project") {
-      const identity = projectMcpWriteIdentityGate(root, path.join(root, "alpha.jsonc"))
+      const identity = projectMcpWriteIdentityGate(root, path.join(root, "codepuppy.jsonc"))
       if (!identity.ok) {
         rollback(identity.reason)
         return identity
@@ -2659,7 +2659,7 @@ export async function uninstallByKey(rawIntent: unknown, deps: PlannerDeps): Pro
           // deliberately unreachable from this branch.
           const cfg = deps.installers.removeProjectMcpConfigInLock(root, intent.name)
           if (!cfg.ok) throw new Error(cfg.reason)
-          const identity = projectMcpWriteIdentityGate(root, path.join(root, "alpha.jsonc"))
+          const identity = projectMcpWriteIdentityGate(root, path.join(root, "codepuppy.jsonc"))
           if (!identity.ok) throw new Error(identity.reason)
           const grants = removeInstallGrants(root, [`mcp--${intent.name}`])
           if (!grants.ok) throw new Error(grants.reason)
@@ -2677,11 +2677,11 @@ export async function uninstallByKey(rawIntent: unknown, deps: PlannerDeps): Pro
         // Alpha Connection 不是。它是共享的、跨安装的,真实撤销发生在 provider 侧。所以这里
         // **只释放绑定**,而且**不抛错**:释放失败最多让连接看起来还被人用着(保守方向),
         // 而抛错会把一个成功的卸载卡在 uninstalling 上。
-        deps.installers.releaseAlphaConnectionBindings(`mcp:${intent.name}`)
+        deps.installers.releaseCodePuppyConnectionBindings(`mcp:${intent.name}`)
       },
       commitLedger: () => {
         if (intent.scope === "project") {
-          const identity = projectMcpWriteIdentityGate(root, path.join(root, "alpha.jsonc"))
+          const identity = projectMcpWriteIdentityGate(root, path.join(root, "codepuppy.jsonc"))
           if (!identity.ok) throw new Error(identity.reason)
         }
         const rm = removeRecordV2(root, "mcp", intent.name)
@@ -2986,7 +2986,7 @@ export async function setInstallStateByKey(
     if (!LEGACY_PROJECT_MANAGEABLE_KINDS.has(intent.type)) return { ok: false, reason: `kind "${intent.type}" cannot be project-scoped` }
     const identity = projectScopeIdentity(intent.projectDir)
     if (!identity.ok) return { ok: false, reason: `fail closed: ${identity.reason}` }
-    const projectRoot = alphaRoot(identity.scope.projectPath)
+    const projectRoot = codepuppyRoot(identity.scope.projectPath)
     if (!projectRoot) return { ok: false, reason: `fail closed: invalid project root: ${intent.projectDir}` }
     root = projectRoot
   } else {
@@ -3055,21 +3055,21 @@ export async function setInstallStateByKey(
   // (Codex r3 Blocker):disable → config 先(运行立即禁用,即便账本随后失败也已禁);enable → 账本
   // 先(账本写失败即止,不动 config → 保持 disabled)。config apply 抛错则回滚已翻的账本(错误路径原子)。
   if (intent.scope === "project" && intent.type === "mcp") {
-    const identity = projectMcpWriteIdentityGate(root, path.join(root, "alpha.jsonc"))
+    const identity = projectMcpWriteIdentityGate(root, path.join(root, "codepuppy.jsonc"))
     if (!identity.ok) return identity
   }
   const held = tryAcquireBundleLock(root, { txId: `set-state-${randomUUID()}` })
   if (!held.ok) return { ok: false, reason: `ledger busy: ${held.reason} — retry after the in-flight transaction` }
   try {
     if (intent.scope === "project" && intent.type === "mcp") {
-      const identity = projectMcpWriteIdentityGate(root, path.join(root, "alpha.jsonc"))
+      const identity = projectMcpWriteIdentityGate(root, path.join(root, "codepuppy.jsonc"))
       if (!identity.ok) return identity
     }
     const record = findRecordV2(root, intent.type, intent.name)
     if (!record) return { ok: false, reason: `no v2 record for ${intent.type}:${intent.name} in this scope — fail closed (v1-only installs have no desired-state channel)` }
     // Codex r12 Major3:command/bundle 无禁用生效面(引擎 config.command/bundle 无 disable 键,alpha 无
     // 投影/注入面)—— 翻 desiredState 会谎报「已禁用」而 command 仍可执行。有生效面的仅 mcp/agent(注入)、
-    // plugin(alpha.jsonc plugin[])、skill(允许集);cloud 无本地运行面(UI 本就不给开关)。一律拒。
+    // plugin(codepuppy.jsonc plugin[])、skill(允许集);cloud 无本地运行面(UI 本就不给开关)。一律拒。
     if (record.kind === "command" || record.kind === "bundle" || record.kind === "cloud")
       return { ok: false, reason: `${record.kind} "${record.name}" has no enable/disable surface — refusing to flip desired state (would misreport)` }
     if (record.scope.kind === "project") {
@@ -3195,7 +3195,7 @@ export async function setInstallStateByKey(
     // config edit 预计算(不写盘;image 校验含 jsonc 合法性)。skill = 无 config 面。
     let configApply: (() => void) | null = null
     if (hasConfig) {
-      const target = path.join(root, "alpha.jsonc")
+      const target = path.join(root, "codepuppy.jsonc")
       let text: string
       try {
         text = fs.readFileSync(target, "utf8")
@@ -3205,19 +3205,19 @@ export async function setInstallStateByKey(
         if (!isAbsenceError(error))
           return {
             ok: false,
-            reason: `${record.kind} ${record.name}: alpha.jsonc unreadable (${(error as NodeJS.ErrnoException).code ?? String(error)}) — fail closed, enable state unchanged`,
+            reason: `${record.kind} ${record.name}: codepuppy.jsonc unreadable (${(error as NodeJS.ErrnoException).code ?? String(error)}) — fail closed, enable state unchanged`,
           }
         // config 确证缺席:disable = 投影本就不在(成功,仅翻账本);enable = 无生效面重建(拒)。
-        if (intent.state === "enabled") return { ok: false, reason: `${record.kind} ${record.name}: alpha.jsonc absent — cannot enable (reinstall to repair)` }
+        if (intent.state === "enabled") return { ok: false, reason: `${record.kind} ${record.name}: codepuppy.jsonc absent — cannot enable (reinstall to repair)` }
         text = ""
       }
       {
         // #395(r11 pivot):mcp/agent 的 disable 权威由 sidecar 注入 OPENCODE_CONFIG_CONTENT 保证
-        // (引擎最后加载,mergeDeep 压过一切 in-scope 源),不再逐源探测 legacy 残留。alpha.jsonc 投影
-        // 仍写(consistency;plugin 的 disable = 从 plugin[] 移除,alpha.jsonc 是其唯一生效面)。
+        // (引擎最后加载,mergeDeep 压过一切 in-scope 源),不再逐源探测 legacy 残留。codepuppy.jsonc 投影
+        // 仍写(consistency;plugin 的 disable = 从 plugin[] 移除,codepuppy.jsonc 是其唯一生效面)。
         const errors: ParseError[] = []
         const cfg = text !== "" ? parse(text, errors) : {}
-        if (text !== "" && errors.length > 0) return { ok: false, reason: `alpha.jsonc is not valid jsonc — refusing to change enable state (fail closed)` }
+        if (text !== "" && errors.length > 0) return { ok: false, reason: `codepuppy.jsonc is not valid jsonc — refusing to change enable state (fail closed)` }
         const proj = computeEnableProjectionEdit(isObj(cfg) ? cfg : {}, root, record, intent.state, remoteMcpTruthNames())
         if (!proj.ok) return proj
         if (proj.edit) {
@@ -3275,7 +3275,7 @@ function pluginBaseOf(spec: string): string {
 
 /** `#1381`:真源里的远程 MCP 名字(启停投影用;每次调用读一遍,坏了出一行原因并当作空)。没有环境根(纯单测)⇒ 空集,不出声 —— 与 server.ts 同一口径。 */
 function remoteMcpTruthNames(): ReadonlySet<string> {
-  if (!(tryGetAlphaEnvironment() || process.env.ALPHA_GLOBAL_DIR)) return new Set()
+  if (!(tryGetCodePuppyEnvironment() || process.env.CODEPUPPY_GLOBAL_DIR)) return new Set()
   return new Set(readMcpServerRecords((line) => console.error(line)).map((server) => server.name))
 }
 
@@ -3284,7 +3284,7 @@ function computeEnableProjectionEdit(
   root: string,
   record: InstallRecordV2,
   state: DesiredState,
-  /** `#1381`:真源里的远程 MCP 名字 —— 它们在 alpha.jsonc 里没有叶,启停不投影 config(见函数体)。 */
+  /** `#1381`:真源里的远程 MCP 名字 —— 它们在 codepuppy.jsonc 里没有叶,启停不投影 config(见函数体)。 */
   remoteMcpNames: ReadonlySet<string>,
 ): { ok: true; edit?: ConfigEdit } | { ok: false; reason: string } {
   const disable = state === "disabled"
@@ -3315,7 +3315,7 @@ function computeEnableProjectionEdit(
     }
     const matches = (x: unknown): boolean => matchesIn(x, root)
     if (disable) {
-      // 本函数只算主 alpha.jsonc 的禁用投影(移除条目)。引擎额外合并的 legacy/XDG 源(plugin[] concat、
+      // 本函数只算主 codepuppy.jsonc 的禁用投影(移除条目)。引擎额外合并的 legacy/XDG 源(plugin[] concat、
       // mcp/agent 深合并覆盖)由调用方经 legacyEnableResidueStrict 统一 fail-closed 探测(Codex r6 B1 →
       // r7 B1/M1/M3 收敛到一处,不再在此逐源比对)。
       const next = arr.filter((x) => !matches(x))
@@ -3340,7 +3340,7 @@ function computeEnableProjectionEdit(
   const map = cfgObj[record.kind]
   const leaf = isObj(map) ? map[record.name] : undefined
   if (!isObj(leaf)) {
-    // `#1381`:远程 MCP 的记录住在真源(mcp-servers/<env>.json),alpha.jsonc 里没有它的叶 —— 启停只翻账本,生效面是 sidecar 注入
+    // `#1381`:远程 MCP 的记录住在真源(mcp-servers/<env>.json),codepuppy.jsonc 里没有它的叶 —— 启停只翻账本,生效面是 sidecar 注入
     // (disable:injectDisabledOverrides 压 enabled:false;enable:注入面从真源发出完整条目)。两个方向都没有 config edit。
     // 真源坏了 / 位置未知 ⇒ 名单读成空 ⇒ enable 照旧按「缺生效面」拒(fail closed),disable 照旧只翻账本。
     if (record.kind === "mcp" && remoteMcpNames.has(record.name)) return { ok: true }
@@ -3354,7 +3354,7 @@ function computeEnableProjectionEdit(
   return { ok: true, edit: { keyPath: [record.kind, record.name], value: Object.fromEntries(Object.entries(leaf).filter(([k]) => k !== field)) } }
 }
 
-// ── #395 startup reconcile:账本 desiredState → alpha.jsonc 权威重投影 ─────────────────────────────
+// ── #395 startup reconcile:账本 desiredState → codepuppy.jsonc 权威重投影 ─────────────────────────────
 
 export type BootReconcileOutcome = {
   /** false = reconcile 整体未完成(skipped 带因,config 保持原样);true 时 warnings 仍可能非空(单条跳过)。 */
@@ -3365,22 +3365,22 @@ export type BootReconcileOutcome = {
   skipped?: string
   /** 非空 = 有本应禁用的项未能保证不被引擎加载 —— 调用方(index.ts)须 fail-closed 阻断 sidecar。
    *  r11 pivot 后:mcp/agent 由 sidecar 主权注入(OPENCODE_CONFIG_CONTENT)保证,唯 **plugin 无法从
-   *  alpha.jsonc plugin[] 落盘移除**(config 写失败/读不出/非法 jsonc)、**账本损坏/不可读**(注入会拿到
+   *  codepuppy.jsonc plugin[] 落盘移除**(config 写失败/读不出/非法 jsonc)、**账本损坏/不可读**(注入会拿到
    *  空 records,Codex r12 B2)、skills 陈旧允许集入此列。enable 失败只记 warning(功能缺失非安全洞)。 */
   enforcementGap?: string[]
 }
 
 /** 主进程启动 reconcile(引擎首次 fork 读 config 之前调用)。r11 pivot:mcp/agent 的 disable 由 sidecar
  *  `injectDisabledOverrides` 注入 OPENCODE_CONFIG_CONTENT 权威保证(引擎最后加载 override),本函数对
- *  mcp/agent 只做 alpha.jsonc consistency 投影;**plugin** 的 disable 生效面 = 从 alpha.jsonc `plugin[]`
+ *  mcp/agent 只做 codepuppy.jsonc consistency 投影;**plugin** 的 disable 生效面 = 从 codepuppy.jsonc `plugin[]`
  *  移除(无用户=无他源),是 enforcementGap 的唯一 config 面。skills 派生允许集自愈同锁内做。
  *  边界(全部 loud,不 throw;gap = fail-closed 阻断 sidecar):
  *    · 锁忙(真持有)→ skip 非 gap(在途事务自保一致)。
  *    · **账本损坏/不可读(probeLedgerForWrite 非 ok)→ gap**(注入落空,Codex r12 B2)。
- *    · alpha.jsonc ENOENT/ENOTDIR = 缺席:plugin 天然不在 plugin[](安全);enabled 缺生效面 warning。
+ *    · codepuppy.jsonc ENOENT/ENOTDIR = 缺席:plugin 天然不在 plugin[](安全);enabled 缺生效面 warning。
  *      其余读错(EACCES/EIO)/非法 jsonc → plugin disable 无法落盘 → gap;config 不动。
  *    · 单条 enable 缺生效面 / plugin 身份不可判 → warning + 跳过该条,不 abort 其余。
- *  project-scope 记录不在此对账(引擎启动只读 global alpha.jsonc;项目残留由 set-state/更新路径自愈)。 */
+ *  project-scope 记录不在此对账(引擎启动只读 global codepuppy.jsonc;项目残留由 set-state/更新路径自愈)。 */
 export function reconcileDesiredStateAtBoot(
   root: string,
   opts: {
@@ -3461,11 +3461,11 @@ export function reconcileDesiredStateAtBoot(
       (r) => r.scope.kind === "global" && (r.kind === "mcp" || r.kind === "agent" || r.kind === "plugin"),
     )
     // #395(r11 pivot):mcp/agent disable 由 sidecar 主权注入保证;唯 **plugin** disable 生效面 =
-    // 从 alpha.jsonc plugin[] 移除(无用户 = 无他源),故 enforcementGap 只在 plugin disable 无法落盘时置位。
+    // 从 codepuppy.jsonc plugin[] 移除(无用户 = 无他源),故 enforcementGap 只在 plugin disable 无法落盘时置位。
     // #397:session-grant 已在本函数开头归位进账本(readLedgerV2 此处读的已是合法态)。
     const disabledPlugins = configBacked.filter((r) => r.desiredState === "disabled" && r.kind === "plugin")
     if (configBacked.length === 0) return done({ ok: true, applied, warnings })
-    const target = path.join(root, "alpha.jsonc")
+    const target = path.join(root, "codepuppy.jsonc")
     let text: string
     try {
       text = fs.readFileSync(target, "utf8")
@@ -3475,19 +3475,19 @@ export function reconcileDesiredStateAtBoot(
         // config 缺席:disabled plugin 天然不在 plugin[](安全);mcp/agent 注入保证;enabled 缺生效面 warning。
         for (const r of configBacked)
           if (r.desiredState === "enabled")
-            warnings.push(`${r.kind} ${r.name}: ledger says enabled but alpha.jsonc is absent — no effect surface (reinstall to repair)`)
+            warnings.push(`${r.kind} ${r.name}: ledger says enabled but codepuppy.jsonc is absent — no effect surface (reinstall to repair)`)
         return done({ ok: true, applied, warnings })
       }
-      for (const r of disabledPlugins) gap.push(`plugin ${r.name}: alpha.jsonc unreadable (${code ?? String(error)}) — cannot remove from plugin[]`)
-      return done({ ok: false, applied, warnings, skipped: `alpha.jsonc unreadable (${code ?? String(error)}) — fail closed, config untouched` })
+      for (const r of disabledPlugins) gap.push(`plugin ${r.name}: codepuppy.jsonc unreadable (${code ?? String(error)}) — cannot remove from plugin[]`)
+      return done({ ok: false, applied, warnings, skipped: `codepuppy.jsonc unreadable (${code ?? String(error)}) — fail closed, config untouched` })
     }
     const parseErrors: ParseError[] = []
     const cfg = parse(text, parseErrors)
     if (parseErrors.length > 0) {
-      for (const r of disabledPlugins) gap.push(`plugin ${r.name}: alpha.jsonc not valid jsonc — cannot remove from plugin[]`)
-      return done({ ok: false, applied, warnings, skipped: "alpha.jsonc is not valid jsonc — fail closed, config untouched" })
+      for (const r of disabledPlugins) gap.push(`plugin ${r.name}: codepuppy.jsonc not valid jsonc — cannot remove from plugin[]`)
+      return done({ ok: false, applied, warnings, skipped: "codepuppy.jsonc is not valid jsonc — fail closed, config untouched" })
     }
-    // r6 B1:plugin[] 是引擎 concat 合并,从 alpha.jsonc 移除挡不住 legacy/XDG 源同名条目被 concat
+    // r6 B1:plugin[] 是引擎 concat 合并,从 codepuppy.jsonc 移除挡不住 legacy/XDG 源同名条目被 concat
     // 加载 — disable 必须确认这些源无同名残留。仅当存在 disabled plugin 才读;读不出 = 无法确认。
     // legacy/XDG 探测已统一进下方循环的 legacyEnableResidueStrict(覆盖 plugin/mcp/agent,r7 B1/M3)。
     // 工作副本上逐条累积(多条 plugin 记录共享 plugin[] 键路径,后算必须看见先算的结果);

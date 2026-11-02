@@ -1,10 +1,10 @@
 // Extension Hub file installer (main process) — REQ-018 T2 rework. User-authored / catalog skills
 // and agents now land in the ALPHA truth root (`<current-environment-root>/{skills,agents}` for global scope,
 // `<project>/.code-puppy/...` for project scope) and reach the engine through the `.opencode` symlink
-// bridge (alpha-bridge.ts, REQ-004-validated). Every successful install writes a receipt
-// (alpha-installs.ts) recording the exact files it owns, so installed-state/uninstall/update work.
+// bridge (codepuppy-bridge.ts, REQ-004-validated). Every successful install writes a receipt
+// (codepuppy-installs.ts) recording the exact files it owns, so installed-state/uninstall/update work.
 // Legacy behavior (writing the shared XDG config dir) is gone — migration of old installs is T3
-// (`ALPHA_LEGACY_INSTALL_ROOT=1` keeps the old root for escape).
+// (`CODEPUPPY_LEGACY_INSTALL_ROOT=1` keeps the old root for escape).
 //
 // Security unchanged (ADR-014 §8): names validated, every path confined to its root via the
 // realpath anti-escape walk; asset keys confined to resources/skills.
@@ -15,14 +15,14 @@ import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
 import { fileURLToPath } from "node:url"
-import { opencodeHomeDir, unbridgeItem } from "./alpha-bridge"
+import { opencodeHomeDir, unbridgeItem } from "./codepuppy-bridge"
 import { agentMdToEntry } from "./agent-md-entry"
 import { persistAgentEntry, readAgentEntry, readAgentEntryStrict, removeAgentEntry } from "./ext-config"
-import { alphaGlobalRoot } from "./alpha-installs"
-import { tryGetAlphaEnvironment } from "./alpha-environment"
+import { codepuppyGlobalRoot } from "./codepuppy-installs"
+import { tryGetCodePuppyEnvironment } from "./codepuppy-environment"
 import { projectScopeIdentity, type ScopeIdentity } from "./ext-receipt-v2"
 import { checkUncuratedConflict, recordUncuratedInstall, type UncuratedOrigin } from "./ext-uncurated-record"
-import { alphaRoot, ensureAlphaScaffold } from "./alpha-workdir"
+import { codepuppyRoot, ensureCodePuppyScaffold } from "./codepuppy-workdir"
 import type { InstallMeta, InstallReceipt, InstallTarget } from "../preload/types"
 import { parseSkillFrontmatter, validGitUrl } from "./ext-import-validate"
 import { collectSkillPayloadFromDir } from "./ext-skill-generations"
@@ -40,7 +40,7 @@ function opencodeConfigDir(): string {
 
 // REQ-018 逃生阀:置 1 回到旧行为(写共享 XDG 根,不桥接、不记账)。
 function legacyRootActive(): boolean {
-  return process.env.ALPHA_LEGACY_INSTALL_ROOT === "1"
+  return process.env.CODEPUPPY_LEGACY_INSTALL_ROOT === "1"
 }
 
 // Resolve a target inside `root` and assert (via realpath of the existing ancestor) that it can't
@@ -70,20 +70,20 @@ function safeResolveUnder(root: string, ...segments: string[]): string | null {
 
 // identity:REQ-099 #306 —— 未策展落账要携带安装时点的 scope identity(project = realpath+hash,
 // 不是只有 label;Codex 裁决风险点),resolveRoots 一次算好随 Roots 传递。
-type Roots = { alphaDir: string; opencodeDir: string; scope: "global" | "project"; identity: ScopeIdentity }
+type Roots = { codepuppyDir: string; opencodeDir: string; scope: "global" | "project"; identity: ScopeIdentity }
 
 function resolveRoots(target: InstallTarget | undefined): Roots | { error: string } {
   const t = target ?? { scope: "global" as const }
   if (t.scope === "global") {
-    return { alphaDir: alphaGlobalRoot(), opencodeDir: opencodeHomeDir(), scope: "global", identity: { kind: "global" } }
+    return { codepuppyDir: codepuppyGlobalRoot(), opencodeDir: opencodeHomeDir(), scope: "global", identity: { kind: "global" } }
   }
   if (typeof t.projectDir !== "string") return { error: "invalid project directory" }
-  const root = alphaRoot(t.projectDir)
+  const root = codepuppyRoot(t.projectDir)
   if (!root) return { error: `invalid project directory: ${t.projectDir}` }
-  if (!ensureAlphaScaffold(t.projectDir)) return { error: "failed to prepare .code-puppy" }
+  if (!ensureCodePuppyScaffold(t.projectDir)) return { error: "failed to prepare .code-puppy" }
   const identity = projectScopeIdentity(t.projectDir)
   if (!identity.ok) return { error: `fail closed: ${identity.reason}` }
-  return { alphaDir: root, opencodeDir: path.join(t.projectDir, ".opencode"), scope: "project", identity: identity.scope }
+  return { codepuppyDir: root, opencodeDir: path.join(t.projectDir, ".opencode"), scope: "project", identity: identity.scope }
 }
 
 type LedgerOutcome = { ok: true; warning?: string; projectionLag?: string } | { ok: false; reason: string }
@@ -98,11 +98,11 @@ function recordReceipt(
 ): LedgerOutcome {
   if (entry.meta?.catalogId) return { ok: true }
   const origin = (entry.origin ?? "created") as UncuratedOrigin
-  const w = recordUncuratedInstall(roots.alphaDir, {
+  const w = recordUncuratedInstall(roots.codepuppyDir, {
     kind: entry.type,
     name: entry.name,
     origin,
-    environment: tryGetAlphaEnvironment()?.environment ?? "prod",
+    environment: tryGetCodePuppyEnvironment()?.environment ?? "prod",
     scope: roots.identity,
     files: entry.files,
   })
@@ -151,11 +151,11 @@ export function writeSkill(
   }
   const roots = resolveRoots(target)
   if ("error" in roots) return { ok: false, reason: roots.error }
-  const dir = safeResolveUnder(roots.alphaDir, "skills", name)
+  const dir = safeResolveUnder(roots.codepuppyDir, "skills", name)
   if (!dir) return { ok: false, reason: "refused: path escapes Code Puppy root" }
   // Codex review #355:未策展写盘前先过冲突预检 —— 不许先覆盖再被拒(那会毁掉既有 flat 内容)。
   if (!meta?.catalogId) {
-    const conflict = checkUncuratedConflict(roots.alphaDir, "skill", name)
+    const conflict = checkUncuratedConflict(roots.codepuppyDir, "skill", name)
     if (!conflict.ok) return conflict
   }
   const mdPath = path.join(dir, "SKILL.md")
@@ -167,7 +167,7 @@ export function writeSkill(
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : "failed to write skill" }
   }
-  // T3(REQ-059):skills 桥退役 —— 当前环境 skills/<name> 就位即可,引擎经 alpha.jsonc 的
+  // T3(REQ-059):skills 桥退役 —— 当前环境 skills/<name> 就位即可,引擎经 codepuppy.jsonc 的
   // skills.paths 发现,不再往 .opencode 建桥(不变量:.opencode 内零 alpha 痕迹)。
   const files = [dir]
   const ledger = recordReceipt(roots, { name, type: "skill", files, meta })
@@ -190,9 +190,9 @@ export function writeSkill(
 }
 
 /** Write an agent definition (caller composes the markdown) into the alpha truth root + config entry + receipt.
- *  REQ-059 T3b 桥退役:引擎经 alpha.jsonc 的 `agent.<name>` 条目(md 先过 agentMdToEntry 转换,fail-closed)
+ *  REQ-059 T3b 桥退役:引擎经 codepuppy.jsonc 的 `agent.<name>` 条目(md 先过 agentMdToEntry 转换,fail-closed)
  *  见到 agent,不再造 `.opencode` 桥(不变量:任何层级零 `.opencode`)。md 文件仍写盘 = 内容真源/人读;
- *  编辑文件不生效(诚实边界:改 agent 走重装/hub)。项目 target 同构(条目写 <proj>/.code-puppy/alpha.jsonc)。 */
+ *  编辑文件不生效(诚实边界:改 agent 走重装/hub)。项目 target 同构(条目写 <proj>/.code-puppy/codepuppy.jsonc)。 */
 export function writeAgent(name: string, content: string, target?: InstallTarget, meta?: InstallMeta, origin?: InstallReceipt["origin"]): FsResult {
   if (!isExtensionName(name)) return { ok: false, reason: "invalid agent name" }
   const normalized = content.endsWith("\n") ? content : `${content}\n`
@@ -209,13 +209,13 @@ export function writeAgent(name: string, content: string, target?: InstallTarget
   if ("error" in roots) return { ok: false, reason: roots.error }
   // Codex review #355:未策展写盘前冲突预检(不许先覆盖同名 md/条目再被拒)。
   if (!meta?.catalogId) {
-    const conflict = checkUncuratedConflict(roots.alphaDir, "agent", name)
+    const conflict = checkUncuratedConflict(roots.codepuppyDir, "agent", name)
     if (!conflict.ok) return conflict
   }
-  const dir = safeResolveUnder(roots.alphaDir, "agents")
+  const dir = safeResolveUnder(roots.codepuppyDir, "agents")
   if (!dir) return { ok: false, reason: "refused: path escapes Code Puppy root" }
   const file = path.join(dir, `${name}.md`)
-  const entryTarget = roots.scope === "project" ? path.join(roots.alphaDir, "alpha.jsonc") : undefined
+  const entryTarget = roots.scope === "project" ? path.join(roots.codepuppyDir, "codepuppy.jsonc") : undefined
   // 覆盖场景(更新)的 before-image:失败时按快照复原旧 md/旧条目,不再「撤新 = 毁旧」。
   const prevMd = fs.existsSync(file) ? fs.readFileSync(file) : null
   const prevEntry = readAgentEntry(name, entryTarget)
@@ -323,7 +323,7 @@ export function installBuiltinSkill(
   }
   const roots = resolveRoots(target)
   if ("error" in roots) return { ok: false, reason: roots.error }
-  const destDir = safeResolveUnder(roots.alphaDir, "skills", name)
+  const destDir = safeResolveUnder(roots.codepuppyDir, "skills", name)
   if (!destDir) return { ok: false, reason: "refused: path escapes Code Puppy root" }
   try {
     fs.mkdirSync(destDir, { recursive: true })
@@ -356,7 +356,7 @@ export function installRemoteSkill(
   if (fm.name !== name) return { ok: false, reason: `frontmatter name "${fm.name}" ≠ catalog entry name "${name}" — refusing to install (name spoofing guard)` }
   const roots = resolveRoots(target)
   if ("error" in roots) return { ok: false, reason: roots.error }
-  const destDir = safeResolveUnder(roots.alphaDir, "skills", name)
+  const destDir = safeResolveUnder(roots.codepuppyDir, "skills", name)
   if (!destDir) return { ok: false, reason: "refused: path escapes Code Puppy root" }
   try {
     fs.mkdirSync(destDir, { recursive: true })
@@ -382,19 +382,19 @@ export function installRemoteSkill(
 // Resolve roots WITHOUT scaffolding — for uninstall (never create dirs we're about to delete from).
 function resolveRootsReadonly(target: InstallTarget | undefined): Roots | { error: string } {
   const t = target ?? { scope: "global" as const }
-  if (t.scope === "global") return { alphaDir: alphaGlobalRoot(), opencodeDir: opencodeHomeDir(), scope: "global", identity: { kind: "global" } }
+  if (t.scope === "global") return { codepuppyDir: codepuppyGlobalRoot(), opencodeDir: opencodeHomeDir(), scope: "global", identity: { kind: "global" } }
   if (typeof t.projectDir !== "string") return { error: "invalid project directory" }
-  const root = alphaRoot(t.projectDir)
+  const root = codepuppyRoot(t.projectDir)
   if (!root) return { error: `invalid project directory: ${t.projectDir}` }
   const identity = projectScopeIdentity(t.projectDir)
   if (!identity.ok) return { error: `fail closed: ${identity.reason}` }
-  return { alphaDir: root, opencodeDir: path.join(t.projectDir, ".opencode"), scope: "project", identity: identity.scope }
+  return { codepuppyDir: root, opencodeDir: path.join(t.projectDir, ".opencode"), scope: "project", identity: identity.scope }
 }
 
 /**
  * Uninstall a skill/agent: remove its truth dir/file under .code-puppy and unbridge its .opencode link.
  * REQ-128 `#706`:**不动账本** —— 去账只归外层单点提交。Legacy installs
- * (ALPHA_LEGACY_INSTALL_ROOT era, no bridge/receipt) are removed from the old XDG root by name.
+ * (CODEPUPPY_LEGACY_INSTALL_ROOT era, no bridge/receipt) are removed from the old XDG root by name.
  * Missing target = already-gone success (idempotent).
  */
 /**
@@ -430,13 +430,13 @@ function removeFsInstallImpl(type: "skill" | "agent", name: string, target: Inst
   const roots = resolveRootsReadonly(target)
   if ("error" in roots) return removed.length ? { ok: true, files: removed } : { ok: false, reason: roots.error }
   const kind = type === "skill" ? "skills" : "agents"
-  const truth = type === "skill" ? path.join(roots.alphaDir, "skills", name) : path.join(roots.alphaDir, "agents", `${name}.md`)
-  // REQ-059 T3b:agent 条目净除(alpha.jsonc 的 agent.<name>;存量桥装的 agent 无条目 → no-op 幂等)。
+  const truth = type === "skill" ? path.join(roots.codepuppyDir, "skills", name) : path.join(roots.codepuppyDir, "agents", `${name}.md`)
+  // REQ-059 T3b:agent 条目净除(codepuppy.jsonc 的 agent.<name>;存量桥装的 agent 无条目 → no-op 幂等)。
   // Codex review #351:配置删除(可因配置写锁 busy 失败)必须在删内容文件**之前**——否则 busy 会把
   // 操作报失败却已不可逆地拆掉真源文件(半拆态)。
   // filesOnly:配置那一半已由调用方以事务 config item 的形式处理(见 removeFsInstallFilesOnly)。
   if (type === "agent" && !filesOnly) {
-    const entryTarget = roots.scope === "project" ? path.join(roots.alphaDir, "alpha.jsonc") : undefined
+    const entryTarget = roots.scope === "project" ? path.join(roots.codepuppyDir, "codepuppy.jsonc") : undefined
     const r = removeAgentEntry(name, entryTarget)
     if (!r.ok) return { ok: false, reason: `agent config entry removal failed: ${r.reason}` }
   }
@@ -445,7 +445,7 @@ function removeFsInstallImpl(type: "skill" | "agent", name: string, target: Inst
       fs.rmSync(truth, { recursive: true, force: true })
       removed.push(truth)
     }
-    unbridgeItem(roots.alphaDir, roots.opencodeDir, kind, name).removed.forEach((r) => removed.push(r))
+    unbridgeItem(roots.codepuppyDir, roots.opencodeDir, kind, name).removed.forEach((r) => removed.push(r))
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : "failed to remove" }
   }
@@ -626,7 +626,7 @@ export async function cloneSkillGitToTmp(
   url: string,
 ): Promise<{ ok: true; srcDir: string; cleanup: () => void } | { ok: false; reason: string }> {
   if (!validGitUrl(url)) return { ok: false, reason: "仅支持 https Git 地址" }
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "alpha-import-git-"))
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-import-git-"))
   const cleanup = () => {
     try {
       fs.rmSync(tmp, { recursive: true, force: true })
@@ -701,11 +701,11 @@ export function importSkillFolder(
   const name = fm.name
   const roots = resolveRoots(target)
   if ("error" in roots) return { ok: false, reason: roots.error }
-  const destDir = safeResolveUnder(roots.alphaDir, "skills", name)
+  const destDir = safeResolveUnder(roots.codepuppyDir, "skills", name)
   if (!destDir) return { ok: false, reason: "refused: path escapes Code Puppy root" }
   if (fs.existsSync(destDir)) return { ok: false, reason: `同名技能已存在(${name}),请先卸载再导入` }
   // Codex review #355:复制前过账本冲突预检(catalog 同键/generation store)——省掉复制后再拒的补偿。
-  const conflict = checkUncuratedConflict(roots.alphaDir, "skill", name)
+  const conflict = checkUncuratedConflict(roots.codepuppyDir, "skill", name)
   if (!conflict.ok) return conflict
   const listed = collectImportFiles(real)
   if (!listed.ok) return listed
@@ -739,7 +739,7 @@ export function importSkillFolder(
 /** 导入 Git 仓库技能:https-only 浅克隆到临时目录 → 定位 SKILL.md(根或唯一子目录)→ 走文件夹导入。 */
 export async function importSkillGit(url: string, target?: InstallTarget): Promise<FsResult & { name?: string; warning?: string; projectionLag?: string }> {
   if (!validGitUrl(url)) return { ok: false, reason: "仅支持 https Git 地址" }
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "alpha-import-git-"))
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-import-git-"))
   try {
     // #335 review r1 Blocker:allowlist 校验的 URL 若被 git 配置改写就形同虚设 ——
     // 全局/系统 gitconfig 的 `url.<base>.insteadOf` 能把 github.com URL 重写到内网,
@@ -795,13 +795,13 @@ export function agentInstallPresent(name: string, target?: InstallTarget): boole
   if (!isExtensionName(name)) return true
   const roots = resolveRoots(target)
   if ("error" in roots) return true
-  const dir = safeResolveUnder(roots.alphaDir, "agents")
+  const dir = safeResolveUnder(roots.codepuppyDir, "agents")
   if (!dir) return true
   if (fs.existsSync(path.join(dir, `${name}.md`))) return true
   // review #379 Blocker:md 缺席不代表不在场 —— 手工 `agent.<name>` 配置(无 md、无账)同样是
   // 既有安装事实,writeAgent 会覆盖它、失败补偿 removeFsInstall 会删掉它 = 用户数据丢失。
   // 配置项检查走 strict(不可读/语法损坏按在场处理,fail-closed);target 派生与 writeAgent 同源。
-  const entryTarget = roots.scope === "project" ? path.join(roots.alphaDir, "alpha.jsonc") : undefined
+  const entryTarget = roots.scope === "project" ? path.join(roots.codepuppyDir, "codepuppy.jsonc") : undefined
   const entry = readAgentEntryStrict(name, entryTarget)
   if (!entry.ok) return true
   return entry.present
@@ -911,14 +911,14 @@ export function stageVendoredPluginVersioned(
   // 碰撞/预占时会覆盖既有目录、失败清理再整树误删。非递归 mkdir EEXIST 换名重试;清理只删
   // 自己认领到的目录。
   try {
-    fs.mkdirSync(path.join(alphaGlobalRoot(), "plugins"), { recursive: true })
+    fs.mkdirSync(path.join(codepuppyGlobalRoot(), "plugins"), { recursive: true })
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : "failed to prepare plugins root" }
   }
   let destDir: string | null = null
   for (let attempt = 0; attempt < 3 && destDir === null; attempt++) {
     const versioned = `${name}@${crypto.randomBytes(4).toString("hex")}`
-    const candidate = safeResolveUnder(alphaGlobalRoot(), "plugins", versioned)
+    const candidate = safeResolveUnder(codepuppyGlobalRoot(), "plugins", versioned)
     if (!candidate) return { ok: false, reason: "refused: path escapes Code Puppy root" }
     try {
       fs.mkdirSync(candidate) // 非递归:已存在 = EEXIST,绝不复用他人目录

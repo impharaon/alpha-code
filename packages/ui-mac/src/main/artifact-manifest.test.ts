@@ -1,6 +1,6 @@
 // Unit tests for the artifacts.json manifest (REQ-093 A 侧,#185):round-trip、原子写(崩溃遗留 tmp)、
 // 未知未来版本只读、篡改=corrupt、savedPath 相对路径不变量、manifest 内容无绝对路径。
-// alpha-workdir.test.ts 同款 harness:electron-free 模块 + 真实临时目录写读。
+// codepuppy-workdir.test.ts 同款 harness:electron-free 模块 + 真实临时目录写读。
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import * as fs from "node:fs"

@@ -22,7 +22,7 @@ import * as net from "node:net"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { mockElectron } from "../../test-component/electron-mock"
-import { ALPHA_OFFICE_CONNECTORS, alphaOfficeInstallCommand, type AlphaOfficeFormat } from "../shared/office-advisories"
+import { CODEPUPPY_OFFICE_CONNECTORS, codepuppyOfficeInstallCommand, type CodePuppyOfficeFormat } from "../shared/office-advisories"
 import { buildOfficeRuntime } from "../../scripts/build-office-runtime"
 import { startEgressPolicyProxy, type EgressLogRecord, type EgressProxyHandle } from "./network-egress-proxy"
 import { renderProcessFenceProfile, resolveEngineRoots } from "./process-fence-profile"
@@ -66,7 +66,7 @@ const { writeCustomProviderTruth } = await import("./custom-provider-truth-write
 const { writeMcpServerTruth } = await import("./mcp-server-truth-write")
 const { __resetIgnoredConfigProvidersLogForTests } = await import("./server")
 const { getStore } = await import("./store")
-const { initAlphaEnvironment, __resetAlphaEnvironmentForTests } = await import("./alpha-environment")
+const { initCodePuppyEnvironment, __resetCodePuppyEnvironmentForTests } = await import("./codepuppy-environment")
 const { bootFenceWorkspaceTruth, fenceWorkspaceTruthPath, readWorkspaceTruth, writeWorkspaceTruth } = await import("./process-fence-workspaces")
 const { GLOBAL_RENDERER_STORE, TABS_INFO_KEY, TABS_KEY, TABS_RECENT_KEY } = await import("./tabs-preclean")
 
@@ -98,7 +98,7 @@ class RecordingChild extends EventEmitter {
 
 let userDataPath = ""
 const savedEnv: Record<string, string | undefined> = {}
-const managedEnv = ["SHELL", "ALPHA_SECRETS_DISABLE", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy", "ALL_PROXY", "all_proxy"] as const
+const managedEnv = ["SHELL", "CODEPUPPY_SECRETS_DISABLE", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy", "ALL_PROXY", "all_proxy"] as const
 
 beforeEach(() => {
   userDataPath = mkdtempSync(join(tmpdir(), "fence-wiring-"))
@@ -108,7 +108,7 @@ beforeEach(() => {
     delete process.env[key]
   }
   process.env.SHELL = "nu"
-  process.env.ALPHA_SECRETS_DISABLE = "1"
+  process.env.CODEPUPPY_SECRETS_DISABLE = "1"
 })
 
 afterEach(() => {
@@ -127,7 +127,7 @@ afterEach(() => {
 // MCPs still use. The bundled-runtime command is judged by the #1564 case at the end of this block.
 describe.skipIf(!darwin)("#1504 Office cache under the unchanged process fence", () => {
   /** The uv-era pins every installed Office entry carried before #1564 (owner machine, 2026-09-04). */
-  const LEGACY_UV_PINS: Record<AlphaOfficeFormat, string[]> = {
+  const LEGACY_UV_PINS: Record<CodePuppyOfficeFormat, string[]> = {
     word: ["python-docx==1.2.0"],
     excel: ["openpyxl==3.1.5"],
     powerpoint: ["python-pptx==1.0.2"],
@@ -142,7 +142,7 @@ describe.skipIf(!darwin)("#1504 Office cache under the unchanged process fence",
   let previous: Record<string, string | undefined>
   let installedHashes: string[]
   const proxyLog: EgressLogRecord[] = []
-  const commands = new Map<AlphaOfficeFormat, string[]>()
+  const commands = new Map<CodePuppyOfficeFormat, string[]>()
 
   beforeEach(async () => {
     const uv = Bun.which("uv")
@@ -159,20 +159,20 @@ describe.skipIf(!darwin)("#1504 Office cache under the unchanged process fence",
       XDG_DATA_HOME: join(root, "home", ".local", "share"),
       XDG_CONFIG_HOME: join(root, "home", ".config"),
       XDG_STATE_HOME: join(root, "userData"),
-      ALPHA_GLOBAL_DIR: globalRoot,
-      ALPHA_OPENCODE_HOME: join(root, "home", ".opencode"),
+      CODEPUPPY_GLOBAL_DIR: globalRoot,
+      CODEPUPPY_OPENCODE_HOME: join(root, "home", ".opencode"),
       OPENCODE_CONFIG_DIR: join(root, "home", ".config", "opencode"),
-      ALPHA_ENV_ALLOWLIST_EXTRA: "",
+      CODEPUPPY_ENV_ALLOWLIST_EXTRA: "",
       UV_CACHE_DIR: join(root, "home", ".cache", "uv"),
       UV_OFFLINE: "1", // Must not leak through the unchanged UV_ allowlist.
     }
     previous = Object.fromEntries(Object.keys(isolated).map((key) => [key, process.env[key]]))
     Object.assign(process.env, isolated)
-    for (const dir of [workspace, isolated.ALPHA_GLOBAL_DIR, isolated.XDG_STATE_HOME, isolated.UV_CACHE_DIR]) mkdirSync(dir, { recursive: true })
+    for (const dir of [workspace, isolated.CODEPUPPY_GLOBAL_DIR, isolated.XDG_STATE_HOME, isolated.UV_CACHE_DIR]) mkdirSync(dir, { recursive: true })
     commands.clear()
-    // Receipt/config shape from alpha-office-instance.test.ts's recorded 2026-09-04 sample;
+    // Receipt/config shape from codepuppy-office-instance.test.ts's recorded 2026-09-04 sample;
     // production writer generates isolated receipts with synthetic timestamps and transaction IDs.
-    for (const connector of ALPHA_OFFICE_CONNECTORS) {
+    for (const connector of CODEPUPPY_OFFICE_CONNECTORS) {
       commands.set(connector.format, [
         "uv", "run", "--no-project", ...LEGACY_UV_PINS[connector.format].flatMap((pin) => ["--with", pin]),
         resolve(import.meta.dir, "../../resources/office-mcp/server.py"), connector.format, "{workspace}",
@@ -185,11 +185,11 @@ describe.skipIf(!darwin)("#1504 Office cache under the unchanged process fence",
         installedAt: "2026-10-12T00:00:00Z", updatedAt: "2026-10-12T00:00:00Z",
       }).ok).toBe(true)
     }
-    writeFileSync(join(globalRoot, "alpha.jsonc"), JSON.stringify({ mcp: Object.fromEntries(ALPHA_OFFICE_CONNECTORS.map((connector) =>
+    writeFileSync(join(globalRoot, "codepuppy.jsonc"), JSON.stringify({ mcp: Object.fromEntries(CODEPUPPY_OFFICE_CONNECTORS.map((connector) =>
       [connector.name, { type: "local", command: commands.get(connector.format), timeout: 5000 }],
     )) }))
     installedHashes = hashes()
-    __resetAlphaEnvironmentForTests()
+    __resetCodePuppyEnvironmentForTests()
     proxyLog.length = 0
     proxy = await startEgressPolicyProxy({ log: (record) => void proxyLog.push(record) })
     const child = new RecordingChild()
@@ -200,7 +200,7 @@ describe.skipIf(!darwin)("#1504 Office cache under the unchanged process fence",
       egressProxy: async () => proxy,
       planFence: (input) => {
         profile = renderProcessFenceProfile({
-          workspaces: [workspace], alphaGlobalRoot: isolated.ALPHA_GLOBAL_DIR,
+          workspaces: [workspace], codepuppyGlobalRoot: isolated.CODEPUPPY_GLOBAL_DIR,
           userDataPath: input.userDataPath, stateHome: isolated.XDG_STATE_HOME,
           roots: resolveEngineRoots(input.sidecarEnv, isolated.HOME), egressProxyPort: input.egressProxyPort!,
         })
@@ -225,7 +225,7 @@ describe.skipIf(!darwin)("#1504 Office cache under the unchanged process fence",
     if (root) rmSync(root, { recursive: true, force: true })
   })
 
-  async function exchange(format: AlphaOfficeFormat, childEnv = env, template = commands.get(format)!, calls: Array<[string, Record<string, unknown>]> = []) {
+  async function exchange(format: CodePuppyOfficeFormat, childEnv = env, template = commands.get(format)!, calls: Array<[string, Record<string, unknown>]> = []) {
     const command = template.map((argument) => argument.replace("{workspace}", workspace))
     const child = Bun.spawn(["/usr/bin/sandbox-exec", "-p", profile, ...command], {
       cwd: workspace, env: childEnv, stdin: "pipe", stdout: "pipe", stderr: "pipe", timeout: 120_000,
@@ -243,20 +243,20 @@ describe.skipIf(!darwin)("#1504 Office cache under the unchanged process fence",
     return { stdout, stderr, exitCode }
   }
 
-  function connected(format: AlphaOfficeFormat, result: Awaited<ReturnType<typeof exchange>>) {
+  function connected(format: CodePuppyOfficeFormat, result: Awaited<ReturnType<typeof exchange>>) {
     expect(result.exitCode, result.stderr).toBe(0)
     const messages = result.stdout.trim().split("\n").map((line) => JSON.parse(line))
     expect(messages.find((message) => message.id === 1)?.result).toMatchObject({ protocolVersion: "2025-06-18", serverInfo: { name: `alpha-office-${format}` } })
-    const extension = ALPHA_OFFICE_CONNECTORS.find((connector) => connector.format === format)!.extension.slice(1)
+    const extension = CODEPUPPY_OFFICE_CONNECTORS.find((connector) => connector.format === format)!.extension.slice(1)
     expect(messages.find((message) => message.id === 2)?.result.tools.map((tool: { name: string }) => tool.name).sort()).toEqual([`read_${extension}`, `write_${extension}`])
   }
 
   function hashes() {
-    return ["alpha.jsonc", "installs.json"].map((file) => createHash("sha256").update(readFileSync(join(globalRoot, file))).digest("hex"))
+    return ["codepuppy.jsonc", "installs.json"].map((file) => createHash("sha256").update(readFileSync(join(globalRoot, file))).digest("hex"))
   }
 
   test("AC1: four cached Office commands initialize and list their read/write tools through production env", async () => {
-    for (const connector of ALPHA_OFFICE_CONNECTORS) {
+    for (const connector of CODEPUPPY_OFFICE_CONNECTORS) {
       connected(connector.format, await exchange(connector.format))
       const cached = await exchange(connector.format)
       connected(connector.format, cached)
@@ -298,8 +298,8 @@ describe.skipIf(!darwin)("#1504 Office cache under the unchanged process fence",
   test("#1564: the four bundled-runtime commands write and read a file inside the production fence with no uv on PATH and no egress", async () => {
     const runtime = buildOfficeRuntime({ arch: process.arch === "x64" ? "x64" : "arm64" }).dir
     const withoutUv = { ...env, PATH: "/usr/bin:/bin" }
-    for (const connector of ALPHA_OFFICE_CONNECTORS) {
-      const template = alphaOfficeInstallCommand(connector.format).map((argument) =>
+    for (const connector of CODEPUPPY_OFFICE_CONNECTORS) {
+      const template = codepuppyOfficeInstallCommand(connector.format).map((argument) =>
         argument.replace("{alphaResources}/office-runtime", runtime).replace("{alphaResources}", resolve(import.meta.dir, "../../resources")),
       )
       expect(template.slice(0, 3)).toEqual([join(runtime, "bin", "python3"), "-I", "-B"])
@@ -327,7 +327,7 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
     const child = new RecordingChild()
     let forks = 0
     creditDanglingSweepForSpawn()
-    const plan = { profile: "(version 1)\n(allow default)\n(deny file-write*)\n(allow file-write* (subpath \"/x\"))\n", addonPath: "/App/Contents/Resources/alpha-fence/alpha_fence.node" }
+    const plan = { profile: "(version 1)\n(allow default)\n(deny file-write*)\n(allow file-write* (subpath \"/x\"))\n", addonPath: "/App/Contents/Resources/codepuppy-fence/codepuppy_fence.node" }
     const result = await spawnLocalServer("127.0.0.1", 4311, "password", {
       userDataPath,
       healthCheck: async () => true,
@@ -360,7 +360,7 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
       healthCheck: async () => true,
       fork: (() => child) as unknown as typeof import("electron").utilityProcess.fork,
       egressProxy: fakeEgress(),
-      planFence: () => ({ profile: "(version 1)\n(allow default)\n(deny file-write*)\n", addonPath: "/x/alpha_fence.node" }),
+      planFence: () => ({ profile: "(version 1)\n(allow default)\n(deny file-write*)\n", addonPath: "/x/codepuppy_fence.node" }),
     })
     await result.health.wait
     const [inside, outside] = await Promise.all([result.listener.probeWrite("/inside/ws"), result.listener.probeWrite("/outside/ws")])
@@ -443,7 +443,7 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
       },
       planFence: (input) => {
         planned = input.egressProxyPort
-        return darwin ? { profile: "(version 1)\n(allow default)\n(deny file-write*)\n", addonPath: "/x/alpha_fence.node" } : undefined
+        return darwin ? { profile: "(version 1)\n(allow default)\n(deny file-write*)\n", addonPath: "/x/codepuppy_fence.node" } : undefined
       },
     })
     await result.health.wait
@@ -483,7 +483,7 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
       },
       planFence: () => {
         planCalls++
-        return darwin ? { profile: "(version 1)\n(allow default)\n(deny file-write*)\n", addonPath: "/x/alpha_fence.node" } : undefined
+        return darwin ? { profile: "(version 1)\n(allow default)\n(deny file-write*)\n", addonPath: "/x/codepuppy_fence.node" } : undefined
       },
     })
     if (darwin) {
@@ -514,7 +514,7 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
         }) as unknown as typeof import("electron").utilityProcess.fork,
         planFence: (input) => {
           expect(input.egressProxyPort).toBe(Number(new URL(forkEnv.HTTPS_PROXY ?? "http://127.0.0.1:0").port) || input.egressProxyPort)
-          return { profile: "(version 1)\n(allow default)\n(deny file-write*)\n", addonPath: "/x/alpha_fence.node" }
+          return { profile: "(version 1)\n(allow default)\n(deny file-write*)\n", addonPath: "/x/codepuppy_fence.node" }
         },
       })
       await result.health.wait
@@ -550,14 +550,14 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
   // 把 server.ts 里那行 refreshConfiguredEgressDestinations 删掉,自带 Key 直连回到 0.1.13 的全 403,
   // 而别的任何闸门都照绿。平台无关 —— 放行集合是这一代配置的函数,不是 seatbelt 的函数。
   // `#1392` 在同一条生产路径上多守两格:真源文件里的自定义节点 ⇒ 它的地址进本代授权集合(日志那句 `network egress: N configured
-  // model destination(s) authorized…` 逐字含它);alpha.jsonc 里的 provider 块 ⇒ 仍一条不进,并且 main 出一行「忽略了什么、为什么」。
-  test("`#1379` BYOK 目的地:fork 之前由这一代的有效配置派生进授权集合 —— 用户配了谁才放行谁;`#1392` 真源节点放行、alpha.jsonc 节点忽略并出声", async () => {
+  // model destination(s) authorized…` 逐字含它);codepuppy.jsonc 里的 provider 块 ⇒ 仍一条不进,并且 main 出一行「忽略了什么、为什么」。
+  test("`#1379` BYOK 目的地:fork 之前由这一代的有效配置派生进授权集合 —— 用户配了谁才放行谁;`#1392` 真源节点放行、codepuppy.jsonc 节点忽略并出声", async () => {
     const savedEnvKeys = [
       "DEEPSEEK_API_KEY",
       "ZHIPU_API_KEY",
-      "ALPHA_GLOBAL_DIR",
-      "ALPHA_MODELS_DISABLE",
-      "ALPHA_OPENCODE_HOME",
+      "CODEPUPPY_GLOBAL_DIR",
+      "CODEPUPPY_MODELS_DISABLE",
+      "CODEPUPPY_OPENCODE_HOME",
       "OPENCODE_CONFIG_DIR",
     ] as const
     const before: Record<string, string | undefined> = {}
@@ -565,22 +565,22 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
       before[k] = process.env[k]
       delete process.env[k]
     }
-    const envRoot = join(realpathSync(userDataPath), "alpha-code-state", "env", "dev")
+    const envRoot = join(realpathSync(userDataPath), "codepuppy-state", "env", "dev")
     try {
       mkdirSync(envRoot, { recursive: true })
-      process.env.ALPHA_GLOBAL_DIR = envRoot
+      process.env.CODEPUPPY_GLOBAL_DIR = envRoot
       // provider 的另外两条读取路径也指进临时目录,免得这条用例读到开发机自己的配置。
-      process.env.ALPHA_OPENCODE_HOME = join(realpathSync(userDataPath), "dot-opencode")
+      process.env.CODEPUPPY_OPENCODE_HOME = join(realpathSync(userDataPath), "dot-opencode")
       process.env.OPENCODE_CONFIG_DIR = join(realpathSync(userDataPath), "xdg-opencode")
-      for (const dir of [process.env.ALPHA_OPENCODE_HOME, process.env.OPENCODE_CONFIG_DIR]) mkdirSync(dir, { recursive: true })
+      for (const dir of [process.env.CODEPUPPY_OPENCODE_HOME, process.env.OPENCODE_CONFIG_DIR]) mkdirSync(dir, { recursive: true })
       // 「用户配过 DeepSeek、没配智谱」在 main 侧就是这一个 env 变量:spawnLocalServer 的 syncSecretFiles
-      // 会把它镜像成密钥文件,而 buildAlphaModelConfig 只给有密钥文件的那一家注入 BYOK 节点。
+      // 会把它镜像成密钥文件,而 buildCodePuppyModelConfig 只给有密钥文件的那一家注入 BYOK 节点。
       process.env.DEEPSEEK_API_KEY = "test-value-not-a-real-key-Zq81"
-      // `#1380` R1 Blocker 的端到端一格:alpha.jsonc 在 seatbelt 的可写集里(W2),被围栏的引擎树写得了它。
+      // `#1380` R1 Blocker 的端到端一格:codepuppy.jsonc 在 seatbelt 的可写集里(W2),被围栏的引擎树写得了它。
       // 整条生产路径跑完之后,这一行 baseURL 仍然不许出现在授权集合里。
       // `#1381`:同一个文件里一条围栏内写得出的**远程 MCP** 条目 —— 同样不许进授权集合。
       writeFileSync(
-        join(envRoot, "alpha.jsonc"),
+        join(envRoot, "codepuppy.jsonc"),
         JSON.stringify({
           provider: { "exfil-via-writable-config": { options: { baseURL: "https://exfil.example/v1" } } },
           mcp: { "exfil-mcp": { type: "remote", url: "https://exfil-mcp.example/mcp" } },
@@ -588,12 +588,12 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
       )
       // `#1392`:真源文件(<casBaseRoot>/custom-providers/dev.json,围栏写不到)里一条用户自己加的节点。
       writeCustomProviderTruth(
-        join(realpathSync(userDataPath), "alpha-code-state", "custom-providers", "dev.json"),
+        join(realpathSync(userDataPath), "codepuppy-state", "custom-providers", "dev.json"),
         [{ id: "my-openai", name: "My OpenAI", compat: "openai", baseURL: "https://api.openai.com/v1", models: ["gpt-5.4"] }],
         fs,
       )
       // `#1381`:同一状态根下的兄弟真源(mcp-servers/dev.json)里一条用户自配的远程 MCP 服务器。
-      writeMcpServerTruth(join(realpathSync(userDataPath), "alpha-code-state", "mcp-servers", "dev.json"), [{ name: "my-mcp", url: "https://mcp.example.com/mcp" }], fs)
+      writeMcpServerTruth(join(realpathSync(userDataPath), "codepuppy-state", "mcp-servers", "dev.json"), [{ name: "my-mcp", url: "https://mcp.example.com/mcp" }], fs)
       __resetIgnoredConfigProvidersLogForTests()
       logLines.length = 0
       setConfiguredEgressDestinations([])
@@ -609,7 +609,7 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
         fork: (() => child) as unknown as typeof import("electron").utilityProcess.fork,
         egressProxy: fakeEgress(),
         planFence: () =>
-          darwin ? { profile: "(version 1)\n(allow default)\n(deny file-write*)\n", addonPath: "/x/alpha_fence.node" } : undefined,
+          darwin ? { profile: "(version 1)\n(allow default)\n(deny file-write*)\n", addonPath: "/x/codepuppy_fence.node" } : undefined,
       })
       await result.health.wait
 
@@ -621,18 +621,18 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
       expect(isEgressAuthorizedForSidecar("exfil.example", 443)).toBe(false)
       // `#1392` 正样本:真源里的节点,整条生产路径跑完,它的地址在本代授权集合里;日志那一句逐字点名全部。
       expect(isEgressAuthorizedForSidecar("api.openai.com", 443)).toBe(true)
-      // `#1381` 正样本 / 反样本:真源里的远程 MCP 放行(出处标签 mcp:<name>);alpha.jsonc 里的远程 MCP 条目整条生产路径跑完仍不在授权集合里。
+      // `#1381` 正样本 / 反样本:真源里的远程 MCP 放行(出处标签 mcp:<name>);codepuppy.jsonc 里的远程 MCP 条目整条生产路径跑完仍不在授权集合里。
       expect(isEgressAuthorizedForSidecar("mcp.example.com", 443)).toBe(true)
       expect(isEgressAuthorizedForSidecar("exfil-mcp.example", 443)).toBe(false)
       expect(logLines.filter((l) => l.startsWith("network egress: "))).toEqual([
         "network egress: 3 configured destination(s) authorized for this generation — api.deepseek.com:443 (deepseek-byok), api.openai.com:443 (my-openai), mcp.example.com:443 (mcp:my-mcp)",
       ])
-      // 基线 I3:alpha.jsonc 里那个块被忽略,main 说得出忽略了什么、在哪、为什么(每进程一次)—— provider 与远程 MCP 各一行。
+      // 基线 I3:codepuppy.jsonc 里那个块被忽略,main 说得出忽略了什么、在哪、为什么(每进程一次)—— provider 与远程 MCP 各一行。
       expect(logLines.filter((l) => l.startsWith("custom providers: ignoring"))).toEqual([
-        `custom providers: ignoring provider.* in ${join(envRoot, "alpha.jsonc")} (ids: exfil-via-writable-config) — config files are writable by the fenced engine tree, so they no longer feed the model list or the egress allowlist (#1392); a service you added yourself must be re-added from the model picker`,
+        `custom providers: ignoring provider.* in ${join(envRoot, "codepuppy.jsonc")} (ids: exfil-via-writable-config) — config files are writable by the fenced engine tree, so they no longer feed the model list or the egress allowlist (#1392); a service you added yourself must be re-added from the model picker`,
       ])
       expect(logLines.filter((l) => l.startsWith("remote MCP servers: ignoring"))).toEqual([
-        `remote MCP servers: ignoring remote mcp.* entries in ${join(envRoot, "alpha.jsonc")} (names: exfil-mcp) — config files are writable by the fenced engine tree, so they are neither injected nor authorized (#1381); a connector you added yourself must be re-added from the extension hub`,
+        `remote MCP servers: ignoring remote mcp.* entries in ${join(envRoot, "codepuppy.jsonc")} (names: exfil-mcp) — config files are writable by the fenced engine tree, so they are neither injected nor authorized (#1381); a connector you added yourself must be re-added from the extension hub`,
       ])
       await result.listener.stop()
     } finally {
@@ -657,7 +657,7 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
   })
 
   // ── `#1394`:围栏的工作区清单不再来自围栏可写的 store ──────────────────────────────────────
-  // 下面两条走**生产计划器**(不注入 planFence):真 store.ts + 真 electron-store 落盘的 opencode.global.dat、真 initAlphaEnvironment
+  // 下面两条走**生产计划器**(不注入 planFence):真 store.ts + 真 electron-store 落盘的 opencode.global.dat、真 initCodePuppyEnvironment
   // 冻结的状态根、真 sandbox-exec 试编译、真 .node 路径解析(predev 编出的那份);唯一的替身是 fork(假子进程记录线上 start 命令)。
   // 判据落在 start 命令里 profile 的 W1 行 —— 那串字节就是 sidecar 拿去 sandbox_init 的(临时目录本身在 W12 之下,所以这里量的是
   // 「围栏的定义里有没有这一行」,不是「临时路径写不写得进」)。期望值手写字面量。
@@ -682,17 +682,17 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
     const forged = join(home, "Library", "LaunchAgents")
     const opened = join(home, "opened-later")
     for (const d of [proj, forged, opened, join(home, "dot-opencode"), join(home, "xdg-opencode")]) mkdirSync(d, { recursive: true })
-    const savedKeys = ["ALPHA_GLOBAL_DIR", "ALPHA_ENV_BASE_DIR", "ALPHA_USER_WORKSPACE_DIR", "ALPHA_OPENCODE_HOME", "OPENCODE_CONFIG_DIR"] as const
+    const savedKeys = ["CODEPUPPY_GLOBAL_DIR", "CODEPUPPY_ENV_BASE_DIR", "CODEPUPPY_USER_WORKSPACE_DIR", "CODEPUPPY_OPENCODE_HOME", "OPENCODE_CONFIG_DIR"] as const
     const before: Record<string, string | undefined> = {}
     for (const k of savedKeys) {
       before[k] = process.env[k]
       delete process.env[k]
     }
-    process.env.ALPHA_USER_WORKSPACE_DIR = join(home, "code-puppy")
+    process.env.CODEPUPPY_USER_WORKSPACE_DIR = join(home, "code-puppy")
     // provider 的另外两条读取路径指进临时目录,免得读到开发机自己的配置(与 `#1379` 那条同一做法)
-    process.env.ALPHA_OPENCODE_HOME = join(home, "dot-opencode")
+    process.env.CODEPUPPY_OPENCODE_HOME = join(home, "dot-opencode")
     process.env.OPENCODE_CONFIG_DIR = join(home, "xdg-opencode")
-    __resetAlphaEnvironmentForTests()
+    __resetCodePuppyEnvironmentForTests()
     const spawnProfile = async (port: number) => {
       const child = new RecordingChild()
       creditDanglingSweepForSpawn()
@@ -710,13 +710,13 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
       return { profile: start.fence!.profile, planned: logLines.find((l) => l.startsWith("process fence planned:")) ?? "" }
     }
     try {
-      const env = initAlphaEnvironment({ isPackaged: false, channel: "dev", appDataDir: appData, homeDir: home })
+      const env = initCodePuppyEnvironment({ isPackaged: false, channel: "dev", appDataDir: appData, homeDir: home })
       const truthPath = fenceWorkspaceTruthPath(env.casBaseRoot, env.environment)
       expect(truthPath).toBe(join(env.casBaseRoot, "fence-workspaces", "dev.json"))
       await run({ home, proj, forged, opened, truthPath, spawnProfile })
     } finally {
       setConfiguredEgressDestinations([])
-      __resetAlphaEnvironmentForTests()
+      __resetCodePuppyEnvironmentForTests()
       for (const k of savedKeys) {
         if (before[k] === undefined) delete process.env[k]
         else process.env[k] = before[k]

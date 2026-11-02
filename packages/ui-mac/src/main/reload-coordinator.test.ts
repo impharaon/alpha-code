@@ -1,6 +1,6 @@
 // REQ-234 `#1529`(基线 §2.6):main 是重载的请求方与记录方 —— generation 记录、sidecar ready 时重发、报告决定「待重载」原因。
 import { describe, expect, test } from "bun:test"
-import type { ReloadRequestMessage } from "./alpha-sidecar-messages"
+import type { ReloadRequestMessage } from "./codepuppy-sidecar-messages"
 import { createReloadCoordinator } from "./reload-coordinator"
 
 function setup() {
@@ -20,8 +20,8 @@ describe("reload-coordinator", () => {
     })
     expect(coordinator.request({ scope: { directory: "/p" }, items: [], reason: "user: reload now", force: true })).toEqual({ generation: 2 })
     expect(sent).toEqual([
-      { type: "alpha.reload.request", generation: 1, scope: "global", items: [{ id: "skill:writer", scope: "global" }], reason: "installed skill writer" },
-      { type: "alpha.reload.request", generation: 2, scope: { directory: "/p" }, items: [], reason: "user: reload now", force: true },
+      { type: "codepuppy.reload.request", generation: 1, scope: "global", items: [{ id: "skill:writer", scope: "global" }], reason: "installed skill writer" },
+      { type: "codepuppy.reload.request", generation: 2, scope: { directory: "/p" }, items: [], reason: "user: reload now", force: true },
     ])
     expect(changes()).toBe(3)
   })
@@ -34,7 +34,7 @@ describe("reload-coordinator", () => {
     expect(coordinator.pendingFor("/p")).toEqual({ code: "reload-waiting", detail: "engine not running" })
     coordinator.attach(post)
     expect(sent.map((m) => m.generation)).toEqual([1, 2])
-    coordinator.receiveReport({ type: "alpha.reload.report", generation: 2, scope: { directory: "/p" }, outcome: "reloaded", directories: ["/p"] })
+    coordinator.receiveReport({ type: "codepuppy.reload.report", generation: 2, scope: { directory: "/p" }, outcome: "reloaded", directories: ["/p"] })
     const second: ReloadRequestMessage[] = []
     coordinator.attach((m) => void second.push(m))
     expect(second.map((m) => m.generation)).toEqual([1])
@@ -47,9 +47,9 @@ describe("reload-coordinator", () => {
     coordinator.request({ scope: { directory: "/p" }, items: [], reason: "x" })
     expect(coordinator.pendingFor("/p")).toEqual({ code: "reload-waiting", detail: "queued" })
     expect(coordinator.pendingFor("/q")).toBeUndefined()
-    coordinator.receiveReport({ type: "alpha.reload.report", generation: 1, scope: { directory: "/p" }, outcome: "waiting", directories: ["/p"], error: "2 session(s) busy" })
+    coordinator.receiveReport({ type: "codepuppy.reload.report", generation: 1, scope: { directory: "/p" }, outcome: "waiting", directories: ["/p"], error: "2 session(s) busy" })
     expect(coordinator.pendingFor("/p")).toEqual({ code: "reload-waiting", detail: "2 session(s) busy" })
-    coordinator.receiveReport({ type: "alpha.reload.report", generation: 1, scope: { directory: "/p" }, outcome: "failed", directories: ["/p"], error: "dispose refused" })
+    coordinator.receiveReport({ type: "codepuppy.reload.report", generation: 1, scope: { directory: "/p" }, outcome: "failed", directories: ["/p"], error: "dispose refused" })
     expect(coordinator.pendingFor("/p")).toEqual({ code: "reload-failed", detail: "dispose refused" })
     coordinator.request({ scope: "global", items: [], reason: "y" })
     expect(coordinator.pendingFor("/q")).toEqual({ code: "reload-waiting", detail: "queued" })
@@ -59,10 +59,10 @@ describe("reload-coordinator", () => {
     const { coordinator, post } = setup()
     coordinator.attach(post)
     coordinator.request({ scope: { directory: "/p" }, items: [], reason: "a" })
-    coordinator.receiveReport({ type: "alpha.reload.report", generation: 1, scope: { directory: "/p" }, outcome: "failed", directories: ["/p"], error: "boom" })
+    coordinator.receiveReport({ type: "codepuppy.reload.report", generation: 1, scope: { directory: "/p" }, outcome: "failed", directories: ["/p"], error: "boom" })
     coordinator.request({ scope: "global", items: [], reason: "b" })
     coordinator.request({ scope: { directory: "/q" }, items: [], reason: "c" })
-    coordinator.receiveReport({ type: "alpha.reload.report", generation: 2, scope: "global", outcome: "reloaded", directories: ["/p", "/q"] })
+    coordinator.receiveReport({ type: "codepuppy.reload.report", generation: 2, scope: "global", outcome: "reloaded", directories: ["/p", "/q"] })
     expect(coordinator.pendingFor("/p")).toBeUndefined()
     expect(coordinator.pendingFor("/q")).toEqual({ code: "reload-waiting", detail: "queued" })
   })
@@ -72,7 +72,7 @@ describe("reload-coordinator", () => {
     coordinator.attach(post)
     coordinator.request({ scope: "global", items: [], reason: "a" })
     coordinator.request({ scope: { directory: "/p" }, items: [], reason: "b" })
-    coordinator.receiveReport({ type: "alpha.reload.report", generation: 2, scope: { directory: "/p" }, outcome: "reloaded", directories: ["/p"] })
+    coordinator.receiveReport({ type: "codepuppy.reload.report", generation: 2, scope: { directory: "/p" }, outcome: "reloaded", directories: ["/p"] })
     expect(coordinator.pendingFor("/q")).toEqual({ code: "reload-waiting", detail: "queued" })
   })
 
@@ -80,7 +80,7 @@ describe("reload-coordinator", () => {
     const { coordinator, post } = setup()
     const detachOld = coordinator.attach(post)
     coordinator.request({ scope: "global", items: [], reason: "a" })
-    coordinator.receiveReport({ type: "alpha.reload.report", generation: 1, scope: "global", outcome: "failed", directories: [], error: "x" })
+    coordinator.receiveReport({ type: "codepuppy.reload.report", generation: 1, scope: "global", outcome: "failed", directories: [], error: "x" })
     detachOld("sidecar exited with code 1")
     expect(coordinator.pendingFor("/p")).toEqual({ code: "reload-waiting", detail: "sidecar exited with code 1" })
     const fresh: ReloadRequestMessage[] = []
@@ -94,7 +94,7 @@ describe("reload-coordinator", () => {
     const { coordinator, post, logs } = setup()
     coordinator.attach(post)
     coordinator.request({ scope: "global", items: [], reason: "a" })
-    coordinator.receiveReport({ type: "alpha.reload.report", generation: 99, scope: "global", outcome: "reloaded", directories: [] })
+    coordinator.receiveReport({ type: "codepuppy.reload.report", generation: 99, scope: "global", outcome: "reloaded", directories: [] })
     expect(coordinator.pendingFor("/p")).toEqual({ code: "reload-waiting", detail: "queued" })
     expect(logs.some((line) => line.includes("unknown generation 99"))).toBe(true)
   })

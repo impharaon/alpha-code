@@ -206,19 +206,19 @@ describe("控制臂:处置合法性(默认拒)", () => {
     for (const file of [
       "packages/ui-mac/src/main/synthetic.test.ts",
       "packages/ext/src/synthetic.test.ts",
-      "packages/alpha-contracts-consumer/src/synthetic.test.ts",
+      "packages/codepuppy-contracts-consumer/src/synthetic.test.ts",
       "packages/ui-mac/test-component/synthetic.cases.ts",
       "packages/llm/test/auth-fail-closed.test.ts",
     ])
       expect(dispositionError(row({ file, disposition: "load-sensitive", reason: "负载敏感" }), repoContext), file).toContain("load-sensitive")
   })
 
-  test("upstream 不许给 alpha 自有文件:alpha 三包 / alpha- 前缀 / 正文带 north-star:alpha-owned", () => {
-    const ctx: LedgerContext = { ...repoContext, read: (file) => (file.endsWith("marked.test.ts") ? "// north-star:alpha-owned\n" : "") }
+  test("upstream 不许给 alpha 自有文件:alpha 三包 / alpha- 前缀 / 正文带 north-star:codepuppy-owned", () => {
+    const ctx: LedgerContext = { ...repoContext, read: (file) => (file.endsWith("marked.test.ts") ? "// north-star:codepuppy-owned\n" : "") }
     for (const file of [
       "packages/ui-mac/src/main/synthetic.test.ts",
       "packages/ext/src/synthetic.test.ts",
-      "packages/opencode/test/tool/alpha-synthetic.test.ts",
+      "packages/opencode/test/tool/codepuppy-synthetic.test.ts",
       "packages/core/test/marked.test.ts",
     ])
       expect(dispositionError(row({ file, disposition: "upstream", reason: "上游" }), ctx), file).toContain("upstream")
@@ -233,7 +233,7 @@ describe("控制臂:处置合法性(默认拒)", () => {
 })
 
 describe("反向夹具:临时仓里新增一条墙钟上界断言,棘轮必须响并点名 file:line;登记了不存在的必须报 stale", () => {
-  const fixture = mkdtempSync(join(tmpdir(), "alpha-wallclock-fixture-"))
+  const fixture = mkdtempSync(join(tmpdir(), "codepuppy-wallclock-fixture-"))
   afterAll(() => rmSync(fixture, { recursive: true, force: true }))
 
   test("新增未登记 ⇒ unregistered 恰好那一条;登记簿多一行 ⇒ stale 恰好那一行", () => {

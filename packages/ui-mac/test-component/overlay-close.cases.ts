@@ -1,7 +1,7 @@
 // REQ-126 AC2(#655)覆盖层随导航关闭 —— **运行时**参数化闸门。
 //
 // 判据形制(方案基线 §3 不变量 7 / §4 序 2 指定):挂**真实**覆盖层宿主(生产 ExtensionHub /
-// AutomationPanel)与**真实**侧栏(生产 AlphaSidebar),路由是真的 @solidjs/router,断言
+// AutomationPanel)与**真实**侧栏(生产 CodePuppySidebar),路由是真的 @solidjs/router,断言
 // 「覆盖层的 DOM 从 document 里消失」。刻意**不**断言 extHubOpen()/automationOpen() 的值:
 // 信号可以被任何别处顺手置位,只有 DOM 才是用户看见的那个东西。更不断言源码文本。
 //
@@ -26,7 +26,7 @@ import presetTypescript from "@babel/preset-typescript"
 import { GlobalRegistrator } from "@happy-dom/global-registrator"
 import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import presetSolid from "babel-preset-solid"
-import type { AlphaProject, AlphaProjectsApi } from "../src/renderer/sidebar/use-projects"
+import type { CodePuppyProject, CodePuppyProjectsApi } from "../src/renderer/sidebar/use-projects"
 import { dict as zh } from "../src/renderer/i18n/zh"
 
 GlobalRegistrator.register()
@@ -65,7 +65,7 @@ mock.module("@opencode-ai/ui/theme/context", () => ({
 // useTabs / useServer 是 REQ-126 CODE-C 起侧栏建 draft 用的上游 authority(同属 ADR-016 借用面)。
 // 本闸门不测"建出什么 draft",只测"点下去覆盖层当场消失",所以给最小替身;`newDraft` 故意**保持
 // 未决**,与「点项目行的 +」那格同理 —— 立即 resolve 会把「关闭写在 await 之后」的缺陷藏掉。
-mock.module("../src/renderer/alpha-ui/providers", () => ({
+mock.module("../src/renderer/codepuppy-ui/providers", () => ({
   // `register` 是侧栏挂载期真会调的(REQ-126 AC7 的壳级命令注册);这里的替身只需存在,
   // 注册本身的真实判据在 src/renderer/sidebar/shell-commands.test.ts(真实命令总线)。
   useCommand: () => ({ options: [], register: () => {}, trigger: () => {}, show: () => {}, hide: () => {} }),
@@ -134,8 +134,8 @@ const DIR = "/Users/tester/proj-a"
 const CURRENT_SESSION = "ses-current"
 const OTHER_SESSION = "ses-other"
 
-function makeProjects(overrides?: { createSession?: () => Promise<string | undefined> }): AlphaProjectsApi {
-  const project: AlphaProject = {
+function makeProjects(overrides?: { createSession?: () => Promise<string | undefined> }): CodePuppyProjectsApi {
+  const project: CodePuppyProject = {
     id: "prj-a",
     worktree: DIR,
     name: "proj-a",
@@ -156,14 +156,14 @@ function makeProjects(overrides?: { createSession?: () => Promise<string | undef
     shareSession: async () => undefined,
     deleteSession: async () => true,
     copySession: async () => undefined,
-  } as unknown as AlphaProjectsApi
+  } as unknown as CodePuppyProjectsApi
 }
 
 // —— 已登记的全页覆盖层。新增一个却不加进这里 = 本闸门漏掉它(方案基线 S2 明说:防漏靠
 //    测试而非架构)。navLabel 是侧栏里打开它的那个 nav 项。 ——————————————————————
 const OVERLAYS = [
-  { name: "定制中心 ExtensionHub", navLabel: zh["alpha.sidebar.plugins"], host: "[data-alpha-ext-hub]", page: ".alpha-ext-page" },
-  { name: "自动化 AutomationPanel", navLabel: zh["alpha.sidebar.automation"], host: "[data-alpha-automations]", page: ".alpha-auto-page" },
+  { name: "定制中心 ExtensionHub", navLabel: zh["codepuppy.sidebar.plugins"], host: "[data-codepuppy-ext-hub]", page: ".codepuppy-ext-page" },
+  { name: "自动化 AutomationPanel", navLabel: zh["codepuppy.sidebar.automation"], host: "[data-codepuppy-automations]", page: ".codepuppy-auto-page" },
 ] as const
 
 const disposers: Array<() => void> = []
@@ -222,7 +222,7 @@ function query<T extends Element>(selector: string): T {
 }
 
 function navItem(label: string): HTMLElement {
-  for (const el of document.querySelectorAll<HTMLElement>(".alpha-sidebar-nav .alpha-sidebar-nav-item")) {
+  for (const el of document.querySelectorAll<HTMLElement>(".codepuppy-sidebar-nav .codepuppy-sidebar-nav-item")) {
     if ((el.textContent ?? "").includes(label)) return el
   }
   throw new Error(`侧栏 nav 项未找到:${label}`)
@@ -256,10 +256,10 @@ const NAVIGATIONS: Array<{
   act: (history: ReturnType<typeof runtime.createMemoryHistory>) => void
 }> = [
   // 主轨:侧栏点击。第一格是本票的核心缺口 —— 目标 == 当前路由,URL 一个字符都不变。
-  { name: "点当前正在看的那个会话(URL 不变)", track: "click", act: () => click(query(`a.alpha-session[href="${CURRENT_HREF}"]`)) },
-  { name: "点另一个会话", track: "click", act: () => click(query(`a.alpha-session[href="${OTHER_HREF}"]`)) },
-  { name: "点「新对话」", track: "click", act: () => click(navItem(zh["alpha.sidebar.newChat"])) },
-  { name: "点首页(品牌区)", track: "click", act: () => click(query(".alpha-sidebar-brand-mark")) },
+  { name: "点当前正在看的那个会话(URL 不变)", track: "click", act: () => click(query(`a.codepuppy-session[href="${CURRENT_HREF}"]`)) },
+  { name: "点另一个会话", track: "click", act: () => click(query(`a.codepuppy-session[href="${OTHER_HREF}"]`)) },
+  { name: "点「新对话」", track: "click", act: () => click(navItem(zh["codepuppy.sidebar.newChat"])) },
+  { name: "点首页(品牌区)", track: "click", act: () => click(query(".codepuppy-sidebar-brand-mark")) },
   // 会话创建**保持未决**:生产 startChat 的导航在 `await createSession(...)` 之后,而真实创建是
   // 多个 await(use-projects.ts:294-307)。用立即 resolve 的桩会把「关闭发生在 await 之后」这个
   // 缺陷藏掉(#655 审计 Major 就是这么漏的)——所以这一格断言的是**点下去当场就关**,不等 resolve。
@@ -267,7 +267,7 @@ const NAVIGATIONS: Array<{
     name: "点项目行的新对话「+」(会话创建未决 → 必须当场关,不等结果)",
     track: "click",
     projects: { createSession: () => new Promise<string | undefined>(() => {}) },
-    act: () => click(query(".alpha-project-add")),
+    act: () => click(query(".codepuppy-project-add")),
   },
   // 兜底轨:不经侧栏点击(深链、程序化导航、自动化面板内「回跳会话」)。
   { name: "程序化导航到首页(深链/面板内回跳)", track: "route", act: (history) => history.set({ value: hrefFor.home() }) },

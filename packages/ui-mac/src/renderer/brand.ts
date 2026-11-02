@@ -3,9 +3,9 @@
 // 2026-06-23 rebrand: pivoted from the orange squircle to a black/white mark
 // (the `<A>` code-bracket icon). The product now reads as a monochrome system
 // with ONE restrained accent (indigo) for primary actions / selection / links —
-// see ADR-008/ADR-007 (in-app re-skin) and theme-alpha.ts.
+// see ADR-008/ADR-007 (in-app re-skin) and theme-codepuppy.ts.
 //
-// Consumed by: theme-alpha.ts (the Alpha theme), logo-alpha.tsx (the in-app mark).
+// Consumed by: theme-codepuppy.ts (the Alpha theme), logo-codepuppy.tsx (the in-app mark).
 // Keep these in sync with the app icon so theme accent / mark / icon read as one brand.
 export const BRAND = {
   /** The single restrained accent — primary buttons, selection, links (light mode). */

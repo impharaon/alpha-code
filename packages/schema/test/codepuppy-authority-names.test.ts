@@ -2,7 +2,7 @@
 // schema 与两份 SDK 生成类型逐字一致。删掉或回退 schema 里的任一取值、或只改其中一份生成物,这里当场红。
 import { describe, expect, test } from "bun:test"
 import { Schema } from "effect"
-import { ToolClass } from "../src/alpha-tool-policy"
+import { ToolClass } from "../src/codepuppy-tool-policy"
 import { ToolAuthority, ToolDisplaySnapshotV1 } from "../src/tool-identity"
 
 const DIGEST = `sha256:${"a".repeat(64)}`

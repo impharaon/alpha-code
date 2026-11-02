@@ -1,5 +1,5 @@
 import { officialConnectorPrerequisite } from "./official-connector-recipes"
-import { alphaGlobalRoot } from "./engine-config-truth"
+import { codepuppyGlobalRoot } from "./engine-config-truth"
 import { createHash } from "node:crypto"
 import { isAbsolute } from "node:path"
 import type {
@@ -31,14 +31,14 @@ import {
 } from "../shared/package-secret-prerequisite"
 import {
   decodePackageConnectionPrerequisiteProfileV1,
-  type AlphaConnectionHandlerTableV1,
+  type CodePuppyConnectionHandlerTableV1,
   type PackageConnectionPrerequisiteProfileV1,
-} from "../shared/package-alpha-connection"
+} from "../shared/package-codepuppy-connection"
 import {
   decodePackageMcpOauthPrerequisiteProfileV1,
   type PackageMcpOauthPrerequisiteProfileV1,
 } from "../shared/package-mcp-oauth"
-import { lookupAlphaConnectionHandlerV1, ALPHA_CONNECTION_HANDLERS_V1 } from "./alpha-connection-handlers"
+import { lookupCodePuppyConnectionHandlerV1, CODEPUPPY_CONNECTION_HANDLERS_V1 } from "./codepuppy-connection-handlers"
 import { canonicalJson, sha256Hex } from "./ext-manifest-v2"
 
 const ATTEMPT_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/
@@ -50,7 +50,7 @@ const ACTION_BY_REASON = {
     kind: "resolve-prerequisite",
     enabled: true,
   },
-  "package-host-update-required": { kind: "update-alpha", enabled: true },
+  "package-host-update-required": { kind: "update-codepuppy", enabled: true },
   "package-invalid": { kind: "none", enabled: false },
   "package-payload-unavailable": { kind: "none", enabled: false },
   "package-payload-integrity": { kind: "none", enabled: false },
@@ -65,7 +65,7 @@ export type PackageInstallabilityDeps = {
   decodePayload?: typeof decodePackageProfilePayloadV1
   decodeSecretPrerequisite?: typeof decodePackageSecretPrerequisiteProfileV1
   /** The static Alpha Connection allowlist. Production default is the compiled-in table. */
-  connectionHandlers?: AlphaConnectionHandlerTableV1
+  connectionHandlers?: CodePuppyConnectionHandlerTableV1
   accepted?: (facts: PackageAcceptedFactsV1) => void
 }
 
@@ -328,7 +328,7 @@ export async function evaluatePackageForHost(
       const name = decoded.payload.behavior.officialRecipe === "github-remote-v1" ? "github-official" : "dbhub-readonly"
       if (supported.length !== 1 || component.id !== `mcp:${name}` || header.envelope.prelude.packageId !== `package:${name}`)
         return refuse("package-payload-invalid")
-      try { officialConnectorPrerequisite(name, alphaGlobalRoot()) } catch { return refuse("package-prerequisite-invalid") }
+      try { officialConnectorPrerequisite(name, codepuppyGlobalRoot()) } catch { return refuse("package-prerequisite-invalid") }
     }
 
     const prerequisite = (deps.decodeSecretPrerequisite ?? decodePackageSecretPrerequisiteProfileV1)(
@@ -344,13 +344,13 @@ export async function evaluatePackageForHost(
     // auth/browser window opens, before anything reaches the connection store, before the install
     // button is enabled. It is *not* before every outbound call: that one payload request has
     // already gone out, and if it had failed the user would see `package-payload-unavailable`
-    // instead. `package-alpha-connection.test.ts` pins the verdict and that fetch count at exactly
+    // instead. `package-codepuppy-connection.test.ts` pins the verdict and that fetch count at exactly
     // one. The lookup itself is a table hit and nothing else: main never reads structure out of the
     // id (`#737` discipline).
     const connection = decodePackageConnectionPrerequisiteProfileV1(component, decoded.payload)
     const unknownHandler = connection.items.find(
       (item) =>
-        !lookupAlphaConnectionHandlerV1(item.handlerId, deps.connectionHandlers ?? ALPHA_CONNECTION_HANDLERS_V1).ok,
+        !lookupCodePuppyConnectionHandlerV1(item.handlerId, deps.connectionHandlers ?? CODEPUPPY_CONNECTION_HANDLERS_V1).ok,
     )
     if (unknownHandler)
       return view(

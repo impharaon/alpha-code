@@ -1,22 +1,22 @@
 // REQ-088 T3/T4 live-comparison web host(Issue alpha-code#181)。
 //
 // 目的:在与 C2 legacy 基线**同一运行态**(vite dev web + 真 serve 引擎 + 真 Chromium)下,
-// 让 adapter(AlphaSessionWorkspace)与 legacy(上游默认叶)可以在同一 host 内由双闸翻转对比。
+// 让 adapter(CodePuppySessionWorkspace)与 legacy(上游默认叶)可以在同一 host 内由双闸翻转对比。
 //
 // 通道合法性(spike §4 结论的 web 侧对应):
 //   - 冻结的 packages/app/src/entry.tsx 挂 AppInterface 时**不传 surfaces**,因此「web 运行态注入
 //     alpha surface」在冻结入口上不存在 —— 不改冻结文件的唯一合法通道是:本 host(alpha 自有文件)
 //     用 @opencode-ai/app 包根**公开导出**(AppInterface/AppBaseProviders/PlatformProvider/
 //     ServerConnection,与 ui-mac renderer/index.tsx 同一消费面)自行挂载,并经公开 `surfaces`
-//     prop 注入真 AlphaSessionWorkspace(REQ-088 T2 正式组件,含 chrome/CrossServerGuard/
-//     SurfaceBoundary/C1 窄导出叶)。窄导出消费点不变(仍是 alpha-session-workspace.tsx)。
+//     prop 注入真 CodePuppySessionWorkspace(REQ-088 T2 正式组件,含 chrome/CrossServerGuard/
+//     SurfaceBoundary/C1 窄导出叶)。窄导出消费点不变(仍是 codepuppy-session-workspace.tsx)。
 //   - 除 surfaces 注入与末尾注明的两处偏差外,本文件逐段复刻冻结 entry.tsx 的 web Platform 与
 //     挂载参数(defaultServer/canonicalLocalServer/servers/disableHealthCheck),保证 legacy 半边
 //     行为与 C2 基线运行态一致。
 //
 // 双闸语义(与生产一致,「加载时解析一次、不热切换」):
-//   - localStorage["ALPHA_SESSION_SPIKE"]="1"(harness 在 adapter 模式经 addInitScript 预置)
-//     ⇒ alphaSessionWorkspaceSurface() 返回组件 ⇒ surfaces.session 注入;
+//   - localStorage["CODEPUPPY_SESSION_SPIKE"]="1"(harness 在 adapter 模式经 addInitScript 预置)
+//     ⇒ codepuppySessionWorkspaceSurface() 返回组件 ⇒ surfaces.session 注入;
 //   - 闸关 ⇒ 工厂返回 undefined ⇒ surfaces.session 未注入 ⇒ seam 走上游默认叶(严格零变化)。
 //   历史注记:这套双闸描述的是 REQ-087/088 采集期的形态。生产侧的发布态开关(主进程
 //   env-override / userData pin)已在 REQ-089 硬切中删除——今天每条路由恒组合它唯一的 Alpha 叶,
@@ -39,7 +39,7 @@ import {
   ServerConnection,
 } from "@opencode-ai/app"
 import { handleNotificationClick } from "@opencode-ai/app"
-import { alphaSessionWorkspaceSurface } from "../../../src/renderer/alpha-ui/session-workspace/alpha-session-workspace"
+import { codepuppySessionWorkspaceSurface } from "../../../src/renderer/codepuppy-ui/session-workspace/codepuppy-session-workspace"
 
 // SurfaceBoundary fatal fallback 的 preload 触点兜底(见头注释)。
 ;(window as unknown as { api?: object }).api ??= {}
@@ -154,7 +154,7 @@ if (root instanceof HTMLElement) {
   }
   // 与 ui-mac renderer/index.tsx surfaceComponents 同语义:挂载前一次性解析;闸关 ⇒ 不注入。
   const surfaces: AppSurfaces = {}
-  const sessionSurface = alphaSessionWorkspaceSurface()
+  const sessionSurface = codepuppySessionWorkspaceSurface()
   if (sessionSurface) surfaces.session = sessionSurface
   render(
     () => (

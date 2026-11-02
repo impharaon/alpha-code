@@ -5,9 +5,9 @@ import {
   buildHubRequestReply,
   buildHubViewReply,
   buildReloadRequest,
-  parseAlphaSidecarInbound,
+  parseCodePuppySidecarInbound,
   type HubView,
-} from "../../ui-mac/src/main/alpha-sidecar-messages"
+} from "../../ui-mac/src/main/codepuppy-sidecar-messages"
 import { createHubBridge, type HubPort } from "./hub-bridge"
 
 function fakePort() {
@@ -27,8 +27,8 @@ describe("hub-bridge", () => {
     const { port, sent, deliver } = fakePort()
     const bridge = createHubBridge(port, { log: () => {} })
     const pending = bridge.view({ directory: "/work/a", sessionID: "ses_1", agent: "build", query: "pdf" })
-    const request = parseAlphaSidecarInbound(sent[0])
-    expect(request).toEqual({ type: "alpha.hub.view.request", id: 1, directory: "/work/a", sessionID: "ses_1", agent: "build", query: "pdf" })
+    const request = parseCodePuppySidecarInbound(sent[0])
+    expect(request).toEqual({ type: "codepuppy.hub.view.request", id: 1, directory: "/work/a", sessionID: "ses_1", agent: "build", query: "pdf" })
     deliver(buildHubViewReply(1, { view }))
     expect(await pending).toEqual({ ok: true, view })
   })
@@ -39,8 +39,8 @@ describe("hub-bridge", () => {
     const first = bridge.request("req_aaaaaaaa")
     const second = bridge.request("req_bbbbbbbb")
     expect(sent).toEqual([
-      { type: "alpha.hub.request.request", id: 1, requestId: "req_aaaaaaaa" },
-      { type: "alpha.hub.request.request", id: 2, requestId: "req_bbbbbbbb" },
+      { type: "codepuppy.hub.request.request", id: 1, requestId: "req_aaaaaaaa" },
+      { type: "codepuppy.hub.request.request", id: 2, requestId: "req_bbbbbbbb" },
     ])
     deliver(buildHubRequestReply(2, { error: "boom" }))
     deliver(buildHubRequestReply(1, { record: null }))
@@ -55,7 +55,7 @@ describe("hub-bridge", () => {
     const pending = bridge.view({ directory: "/work/a" })
     deliver({ type: "write-probe-result", id: 1, outcome: "writable" })
     deliver(buildHubViewReply(99, { view }))
-    deliver({ type: "alpha.hub.view.reply", id: 1, view: { directory: "/work/a", rows: [{ id: "x" }], warnings: [] } })
+    deliver({ type: "codepuppy.hub.view.reply", id: 1, view: { directory: "/work/a", rows: [{ id: "x" }], warnings: [] } })
     expect(await pending).toMatchObject({ ok: false, reason: "error" })
     expect(lines.some((line) => line.includes("malformed reply"))).toBe(true)
     expect(lines.some((line) => line.includes("for no pending request"))).toBe(true)
@@ -75,14 +75,14 @@ describe("hub-bridge", () => {
     const { port, sent, deliver } = fakePort()
     const bridge = createHubBridge(port, { log: () => {} })
     deliver(buildReloadRequest({ generation: 1, scope: "global", items: [], reason: "early" }))
-    deliver({ type: "alpha.reload.request", generation: 2, scope: "everywhere", items: [], reason: "bad" })
+    deliver({ type: "codepuppy.reload.request", generation: 2, scope: "everywhere", items: [], reason: "bad" })
     const got: number[] = []
     bridge.onReloadRequest((message) => void got.push(message.generation))
     deliver(buildReloadRequest({ generation: 3, scope: { directory: "/w" }, items: [], reason: "late", force: true }))
     expect(got).toEqual([1, 3])
     bridge.report({ generation: 3, scope: { directory: "/w" }, outcome: "waiting", directories: ["/w"], error: "1 session(s) busy" })
-    expect(parseAlphaSidecarInbound(sent.at(-1))).toEqual({
-      type: "alpha.reload.report",
+    expect(parseCodePuppySidecarInbound(sent.at(-1))).toEqual({
+      type: "codepuppy.reload.report",
       generation: 3,
       scope: { directory: "/w" },
       outcome: "waiting",

@@ -22,7 +22,7 @@ import {
   type LocalPackageInstallDepsV1,
   type LocalPackagePayloadV1,
 } from "./claude-plugin-install"
-import { addReceipt } from "./alpha-installs"
+import { addReceipt } from "./codepuppy-installs"
 import { casBlobPath } from "./ext-cas"
 import {
   removeInstallGrants,
@@ -74,8 +74,8 @@ let pluginDir = ""
 let deps: LocalPackageInstallDepsV1
 
 beforeEach(() => {
-  tmp = fs.mkdtempSync(path.join(os.tmpdir(), "alpha-local-pkg-"))
-  root = path.join(tmp, "alpha-root")
+  tmp = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-local-pkg-"))
+  root = path.join(tmp, "codepuppy-root")
   casBase = path.join(tmp, "cas-base")
   pluginDir = path.join(tmp, "tide-plugin")
   fs.mkdirSync(root, { recursive: true })
@@ -195,7 +195,7 @@ function artifactInstallers(calls: string[]): PackageArtifactInstallersV1 {
     },
     removeMcpConfig: () => ({ ok: true }),
     removeMcpSecretsStrict: () => ({ ok: true }),
-    releaseAlphaConnectionBindings: () => ({ ok: true }),
+    releaseCodePuppyConnectionBindings: () => ({ ok: true }),
     // 授权账清除走**生产那一个**函数(ext-store 下的 grants.json 是事务拥有的路径)。
     removeInstallGrants,
     removePluginPath: (name, absJsPath) => {
@@ -220,11 +220,11 @@ function plannerDeps(calls: string[]): PlannerDeps {
     readMcpLeafStrict: refuse("readMcpLeafStrict"),
     removeMcpConfigInLock: (): ConfigOutcome => ({ ok: true }),
     removeMcpSecretsStrict: () => ({ ok: true }),
-    releaseAlphaConnectionBindings: () => ({ ok: true }),
+    releaseCodePuppyConnectionBindings: () => ({ ok: true }),
     findPluginBaseConflictStrict: refuse("findPluginBaseConflictStrict"),
     readPluginArrayStrict: refuse("readPluginArrayStrict"),
     readLegacyPluginArrayStrict: refuse("readLegacyPluginArrayStrict"),
-    mcpConfigTruthPath: () => path.join(root, "alpha.jsonc"),
+    mcpConfigTruthPath: () => path.join(root, "codepuppy.jsonc"),
     stageVendoredPluginVersioned: refuse("stageVendoredPluginVersioned"),
     removePlugin: (): ConfigOutcome => ({ ok: true }),
     collectVendoredPluginPayload: refuse("collectVendoredPluginPayload"),

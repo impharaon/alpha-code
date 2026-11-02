@@ -5,8 +5,8 @@ import type { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { Agent } from "@/agent/agent"
 import { MCP } from "@/mcp"
 import { Permission } from "@/permission"
-import { inMemoryToolPolicyLayer } from "../fixture/alpha-tool-policy"
-import { callToolVia } from "../fixture/alpha-mcp-call-tool"
+import { inMemoryToolPolicyLayer } from "../fixture/codepuppy-tool-policy"
+import { callToolVia } from "../fixture/codepuppy-mcp-call-tool"
 import { Plugin } from "@/plugin"
 import { Session } from "@/session/session"
 import { Tool } from "@/tool/tool"
@@ -45,7 +45,7 @@ function harness(input: {
   servers: string[]
   permission?: PermissionV1.Rule[]
   trigger?: Plugin.Interface["trigger"]
-  /** #1129:E4 identity 闸经 AlphaToolPolicyGate(decide → 钩子 → confirm)走 Permission.Service(不再经 ctx.ask)。 */
+  /** #1129:E4 identity 闸经 CodePuppyToolPolicyGate(decide → 钩子 → confirm)走 Permission.Service(不再经 ctx.ask)。 */
   ask?: (req: { permission: string }) => Effect.Effect<void>
 }) {
   const mcpTools = Object.fromEntries(
@@ -240,7 +240,7 @@ describe("code mode execute", () => {
     const tools: Record<string, MCP.McpTool> = {}
     const filler = "a searchable description of this operation that consumes catalog budget ".repeat(3)
     for (let i = 0; i < 150; i++) {
-      tools[`alpha_op_${i}`] = {
+      tools[`codepuppy_op_${i}`] = {
         def: {
           name: `op_${i}`,
           description: `${filler}${i}`,
@@ -403,7 +403,7 @@ describe("code mode execute", () => {
   })
 
   test("asks permission before each child tool call", async () => {
-    // #1129:identity ask 经 Permission 引擎(AlphaToolPolicyGate.confirm),探头随之从 ctx.ask 移过去。
+    // #1129:identity ask 经 Permission 引擎(CodePuppyToolPolicyGate.confirm),探头随之从 ctx.ask 移过去。
     const asked: string[] = []
     const ok = () => ({ content: [{ type: "text", text: "ok" }] })
     const tool = await build({ a_tool: mcpTool("tool", ok), b_tool: mcpTool("tool", ok) }, undefined, undefined, undefined, (req) =>

@@ -23,7 +23,7 @@ export function findSessionGrant(
  *  on-no-link     → 开关亮但连接未成功:warn 点 + 如实提示(绝不把「已授权」谎报成「已连接」) */
 export type SessionToggleView = {
   on: boolean
-  textKey: "alpha.ext.sessionOffRow" | "alpha.ext.sessionOnRow" | "alpha.ext.sessionOnNoLink"
+  textKey: "codepuppy.ext.sessionOffRow" | "codepuppy.ext.sessionOnRow" | "codepuppy.ext.sessionOnNoLink"
   tone: "ok" | "warn" | "muted"
 }
 
@@ -31,24 +31,24 @@ export function sessionToggleView(
   grant: SessionGrantWire | undefined,
   link: "connected" | "failed" | undefined,
 ): SessionToggleView {
-  if (!grant) return { on: false, textKey: "alpha.ext.sessionOffRow", tone: "muted" }
-  if (link === "failed") return { on: true, textKey: "alpha.ext.sessionOnNoLink", tone: "warn" }
-  return { on: true, textKey: "alpha.ext.sessionOnRow", tone: "ok" }
+  if (!grant) return { on: false, textKey: "codepuppy.ext.sessionOffRow", tone: "muted" }
+  if (link === "failed") return { on: true, textKey: "codepuppy.ext.sessionOnNoLink", tone: "warn" }
+  return { on: true, textKey: "codepuppy.ext.sessionOnRow", tone: "ok" }
 }
 
 /** main 拒绝码 → UI 路由(#397 纪律:按机器码路由,不解析 reason;用户语言、零开发术语)。
  *  expired-review = 既有确认对话框(携 confirmExpiredReview 重试);其余 toast。 */
 export type SessionRefusalRoute =
   | { kind: "expired-confirm" }
-  | { kind: "toast"; tone: "info" | "error"; textKey: "alpha.ext.sessionKindUnsupportedToast" | "alpha.ext.sessionRefusedToast" }
+  | { kind: "toast"; tone: "info" | "error"; textKey: "codepuppy.ext.sessionKindUnsupportedToast" | "codepuppy.ext.sessionRefusedToast" }
 
 export function sessionRefusalRoute(code: SessionGrantRefusalCode | undefined): SessionRefusalRoute {
   if (code === "expired-review-confirmation-required") return { kind: "expired-confirm" }
   if (code === "session-grant-kind-unsupported")
-    return { kind: "toast", tone: "info", textKey: "alpha.ext.sessionKindUnsupportedToast" }
+    return { kind: "toast", tone: "info", textKey: "codepuppy.ext.sessionKindUnsupportedToast" }
   // 泛拒(未装/身份失配/advisory/目录不可核实…):main reason 已是固定安全文案,UI 统一给
   // 用户语言泛化提示(细节在 main 日志,不进 UI —— 零开发术语)。
-  return { kind: "toast", tone: "error", textKey: "alpha.ext.sessionRefusedToast" }
+  return { kind: "toast", tone: "error", textKey: "codepuppy.ext.sessionRefusedToast" }
 }
 
 /** SDK 调用结果 → 连接真伪(r1 Major:SDK v2 client 默认 throwOnError:false —— 404 等 HTTP

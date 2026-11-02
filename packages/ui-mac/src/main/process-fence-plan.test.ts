@@ -10,10 +10,10 @@ const describeDarwin = process.platform === "darwin" ? describe : describe.skip
 
 const HOME = "/Users/alpha"
 const USER_DATA = `${HOME}/Library/Application Support/ai.opencode.desktop`
-const GLOBAL = `${HOME}/Library/Application Support/alpha-code-state/env/prod`
+const GLOBAL = `${HOME}/Library/Application Support/codepuppy-state/env/prod`
 /** `#1390`:应用状态根 = GLOBAL 的父目录的父目录(三个 env 根与 CAS 的父)。 */
-const STATE_ROOT = `${HOME}/Library/Application Support/alpha-code-state`
-const ADDON = "/App/Contents/Resources/alpha-fence/alpha_fence.node"
+const STATE_ROOT = `${HOME}/Library/Application Support/codepuppy-state`
+const ADDON = "/App/Contents/Resources/codepuppy-fence/codepuppy_fence.node"
 
 function harness(overrides: Partial<PlanProcessFenceDeps> = {}, existing = new Set<string>([ADDON])) {
   const made: string[] = []
@@ -21,7 +21,7 @@ function harness(overrides: Partial<PlanProcessFenceDeps> = {}, existing = new S
   const dirs = new Set([`${HOME}/code-puppy`, `${HOME}/proj-a`, `${HOME}/proj-b`])
   const deps: PlanProcessFenceDeps = {
     homeDir: () => HOME,
-    alphaGlobalRoot: () => GLOBAL,
+    codepuppyGlobalRoot: () => GLOBAL,
     appStateRoot: () => STATE_ROOT,
     // 假盘上的路径不在盘上;这里用恒等让并集走词法比较(真 realpath 的判据在 process-fence-profile.test.ts ④)
     realpath: (p) => p,
@@ -72,7 +72,7 @@ describeDarwin("planProcessFence", () => {
   })
 
   test("`#1394` 真源拿不到(缺失 / 解析失败):不炸,并集退到默认工作区(fail-closed,不是「什么都可写」),日志点名原因", () => {
-    for (const reason of ["workspace truth absent: /AS/alpha-code-state/fence-workspaces/prod.json", "workspace truth /AS/alpha-code-state/fence-workspaces/prod.json: not JSON (Unexpected token)"]) {
+    for (const reason of ["workspace truth absent: /AS/codepuppy-state/fence-workspaces/prod.json", "workspace truth /AS/codepuppy-state/fence-workspaces/prod.json: not JSON (Unexpected token)"]) {
       const h = harness({
         readWorkspaces: () => {
           throw new Error(reason)
@@ -139,17 +139,17 @@ describeDarwin("planProcessFence", () => {
       {
         directory: "/Users/alpha/Library/Application Support",
         reason:
-          "related to the app state root /Users/alpha/Library/Application Support/alpha-code-state (same path, inside it, or contains it) — the fence's own state must never be a workspace (#1390)",
+          "related to the app state root /Users/alpha/Library/Application Support/codepuppy-state (same path, inside it, or contains it) — the fence's own state must never be a workspace (#1390)",
       },
     ])
     const planned = h.logs.find((l) => l.startsWith("process fence planned:"))
     expect(planned).toContain("workspaces=1 (candidates=2, excluded=1, dropped=0)")
-    expect(planned).toContain("— excluded: /Users/alpha/Library/Application Support (related to the app state root /Users/alpha/Library/Application Support/alpha-code-state")
+    expect(planned).toContain("— excluded: /Users/alpha/Library/Application Support (related to the app state root /Users/alpha/Library/Application Support/codepuppy-state")
   })
 
-  test("dev 形态:addonPath 解析到 native/alpha-fence/build/(相对 out/main)", () => {
-    const h = harness({}, new Set(["/repo/packages/ui-mac/native/alpha-fence/build/alpha_fence.node"]))
-    h.input.addon = { packaged: false, resourcesPath: "/unused", moduleDir: "/repo/packages/ui-mac/out/main", exists: (p) => p === "/repo/packages/ui-mac/native/alpha-fence/build/alpha_fence.node" }
-    expect(planProcessFence(h.input, h.deps).addonPath).toBe("/repo/packages/ui-mac/native/alpha-fence/build/alpha_fence.node")
+  test("dev 形态:addonPath 解析到 native/codepuppy-fence/build/(相对 out/main)", () => {
+    const h = harness({}, new Set(["/repo/packages/ui-mac/native/codepuppy-fence/build/codepuppy_fence.node"]))
+    h.input.addon = { packaged: false, resourcesPath: "/unused", moduleDir: "/repo/packages/ui-mac/out/main", exists: (p) => p === "/repo/packages/ui-mac/native/codepuppy-fence/build/codepuppy_fence.node" }
+    expect(planProcessFence(h.input, h.deps).addonPath).toBe("/repo/packages/ui-mac/native/codepuppy-fence/build/codepuppy_fence.node")
   })
 })

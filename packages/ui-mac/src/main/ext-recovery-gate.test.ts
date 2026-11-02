@@ -190,7 +190,7 @@ describe("withRecoveredWrite — 准入判据", () => {
         createdAt: "2026-08-18T00:00:00.000Z",
         updatedAt: "2026-08-18T00:00:00.000Z",
         prepared: [
-          { kind: "mcp-secret-version", store: "alpha-mcp-secrets", server: "demo", version: "v-deadbeefcafe" },
+          { kind: "mcp-secret-version", store: "codepuppy-mcp-secrets", server: "demo", version: "v-deadbeefcafe" },
         ],
         items: [
           {
@@ -199,7 +199,7 @@ describe("withRecoveredWrite — 准入判据", () => {
             genId: "gen-000000-000000",
             files: [],
             config: {
-              target: path.join(projectRoot, "alpha.jsonc"),
+              target: path.join(projectRoot, "codepuppy.jsonc"),
               slot: 0,
               preDigest: "a".repeat(64),
               nextDigest: "b".repeat(64),
@@ -269,8 +269,8 @@ describe("withRecoveredWrite — 准入判据", () => {
     project = fs.realpathSync(project)
     const projectRoot = path.join(project, ".code-puppy")
     fs.mkdirSync(globalRoot, { recursive: true })
-    const projectConfig = path.join(projectRoot, "alpha.jsonc")
-    const globalConfig = path.join(globalRoot, "alpha.jsonc")
+    const projectConfig = path.join(projectRoot, "codepuppy.jsonc")
+    const globalConfig = path.join(globalRoot, "codepuppy.jsonc")
     fs.writeFileSync(projectConfig, JSON.stringify({ mcp: { demo: { type: "local", command: ["npx", "project"] } } }, null, 2))
     fs.writeFileSync(globalConfig, JSON.stringify({ mcp: { demo: { type: "local", command: ["npx", "global"] } } }, null, 4) + "\n")
     const globalBefore = fs.readFileSync(globalConfig, "utf8")

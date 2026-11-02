@@ -16,7 +16,7 @@ import { extensionError, catalogDescription, iconFor, iconForRow, PackageLogo, s
 import { ExtGrantedCapRow } from "./ext-authz"
 import { inventoryRowFor, inventoryInstallRow, ownershipRows, trustRows, runtimeSurfaceLabelKey, supportTierLabelKey, type PresentRow } from "./ext-inventory-present"
 import { derivePackFacts, formatPackBytes } from "./ext-pack-facts"
-import { isAlphaOfficeCatalogId, officeAdvisoryFor, retiredCommunityOfficeFor, type OfficeAdvisory } from "../../shared/office-advisories"
+import { isCodePuppyOfficeCatalogId, officeAdvisoryFor, retiredCommunityOfficeFor, type OfficeAdvisory } from "../../shared/office-advisories"
 import { receiptArtifactFacts } from "../../shared/receipt-artifact-facts"
 // #397 PR-B:策展呈现(签名摘要真源;curated 整段切换,uncurated 走旧真源,两真源不混排)。
 import { CAPABILITY_LABEL_KEYS, SHELF_CHIP_KEYS, curatedOf, foldDomains, isArchived, isExpired, isSessionGrant } from "./ext-curation-view"
@@ -41,13 +41,13 @@ export type DetailTarget =
 
 // mcp.cloud 的 4 个工具(B 侧 MCP facade;alpha-platform docs/contracts/cloud-jobs-v1.md)。
 // 引擎无 tools 查询路由 → 与 MCP 条目一样用精选元数据展示(REQ-019 T3 同约束)。
-// #1595 AC3:行首是自然语言名 —— 取对话里工具卡同一份命名(`alpha.timeline.cloud.*`,
+// #1595 AC3:行首是自然语言名 —— 取对话里工具卡同一份命名(`codepuppy.timeline.cloud.*`,
 // tool-card-model.ts 的标题表),技术名只进「开发者详情」。
 const CLOUD_TOOLS = [
-  { name: "dispatch", titleKey: "alpha.timeline.cloud.dispatch", key: "alpha.ext.cloudToolDispatch" },
-  { name: "status", titleKey: "alpha.timeline.cloud.status", key: "alpha.ext.cloudToolStatus" },
-  { name: "await", titleKey: "alpha.timeline.cloud.await", key: "alpha.ext.cloudToolAwait" },
-  { name: "artifacts", titleKey: "alpha.timeline.cloud.artifacts", key: "alpha.ext.cloudToolArtifacts" },
+  { name: "dispatch", titleKey: "codepuppy.timeline.cloud.dispatch", key: "codepuppy.ext.cloudToolDispatch" },
+  { name: "status", titleKey: "codepuppy.timeline.cloud.status", key: "codepuppy.ext.cloudToolStatus" },
+  { name: "await", titleKey: "codepuppy.timeline.cloud.await", key: "codepuppy.ext.cloudToolAwait" },
+  { name: "artifacts", titleKey: "codepuppy.timeline.cloud.artifacts", key: "codepuppy.ext.cloudToolArtifacts" },
 ] as const
 
 function mcpSpec(e: CatalogEntry): McpInstallSpec | undefined {
@@ -83,8 +83,8 @@ function hostOf(url: string | undefined): string {
 }
 
 const Section = (p: { title: string; children: JSX.Element }) => (
-  <section class="alpha-ext-dsec">
-    <h3 class="alpha-ext-dsec-t">{p.title}</h3>
+  <section class="codepuppy-ext-dsec">
+    <h3 class="codepuppy-ext-dsec-t">{p.title}</h3>
     {p.children}
   </section>
 )
@@ -95,9 +95,9 @@ export function cloudMaxRunMinutes(seconds: number): number {
 }
 
 const FactRow = (p: { label: string; children: JSX.Element }) => (
-  <div class="alpha-ext-dfact">
-    <span class="alpha-ext-dfact-l">{p.label}</span>
-    <span class="alpha-ext-dfact-v">{p.children}</span>
+  <div class="codepuppy-ext-dfact">
+    <span class="codepuppy-ext-dfact-l">{p.label}</span>
+    <span class="codepuppy-ext-dfact-v">{p.children}</span>
   </div>
 )
 
@@ -162,10 +162,10 @@ export function ExtensionDetail(props: {
     const presentation = () => packagePresentation(view())
     const sourceKey =
       source === "remote"
-        ? "alpha.ext.packageSourceRemote"
+        ? "codepuppy.ext.packageSourceRemote"
         : source === "cache"
-          ? "alpha.ext.packageSourceCache"
-          : "alpha.ext.packageSourceBuiltin"
+          ? "codepuppy.ext.packageSourceCache"
+          : "codepuppy.ext.packageSourceBuiltin"
     // `#698`:这个包在本机装没装 —— main 从**它自己的账本图**回答;renderer 不推断、不缓存。
     const [installed, { refetch: refetchInstalled }] = createResource(
       () => initial.catalogId,
@@ -189,7 +189,7 @@ export function ExtensionDetail(props: {
         if (!result.ok) {
           // 失败就说失败。`ok` 之外的任何东西都不许被读成「已移除」——「空操作 + ok」正是
           // `#706` review 抓到的那种谎报(Hub 只看 ok)。
-          setPackageError(extensionError(result.reason, "alpha.ext.error.removePackage"))
+          setPackageError(extensionError(result.reason, "codepuppy.ext.error.removePackage"))
           return
         }
         setRetained(result.retained.map((entry) => ({ kind: entry.kind, name: entry.name, reasonCode: entry.reasonCode })))
@@ -212,9 +212,9 @@ export function ExtensionDetail(props: {
     const listingLinks = () =>
       (
         [
-          ["websiteUrl", "alpha.ext.packageWebsite"],
-          ["privacyPolicyUrl", "alpha.ext.packagePrivacyPolicy"],
-          ["termsOfServiceUrl", "alpha.ext.packageTerms"],
+          ["websiteUrl", "codepuppy.ext.packageWebsite"],
+          ["privacyPolicyUrl", "codepuppy.ext.packagePrivacyPolicy"],
+          ["termsOfServiceUrl", "codepuppy.ext.packageTerms"],
         ] as const
       ).flatMap(([field, labelKey]) => {
         const href = listingText(field)
@@ -229,47 +229,47 @@ export function ExtensionDetail(props: {
     }
 
     return (
-      <div class="alpha-ext-detail" data-package-detail={view().catalogId}>
-        <nav class="alpha-ext-crumbs" aria-label={t("alpha.ext.back")}>
-          <button class="alpha-ext-crumb-link" onClick={() => props.onBack()}>
-            <Svg class="alpha-ic alpha-ic-sm" d="M14 6l-6 6 6 6" />
+      <div class="codepuppy-ext-detail" data-package-detail={view().catalogId}>
+        <nav class="codepuppy-ext-crumbs" aria-label={t("codepuppy.ext.back")}>
+          <button class="codepuppy-ext-crumb-link" onClick={() => props.onBack()}>
+            <Svg class="codepuppy-ic codepuppy-ic-sm" d="M14 6l-6 6 6 6" />
             {props.crumb}
           </button>
-          <span class="alpha-ext-crumb-sep">/</span>
-          <span class="alpha-ext-crumb-cur">{view().presentation.displayName}</span>
+          <span class="codepuppy-ext-crumb-sep">/</span>
+          <span class="codepuppy-ext-crumb-cur">{view().presentation.displayName}</span>
         </nav>
 
-        <header class="alpha-ext-dhead">
+        <header class="codepuppy-ext-dhead">
           {/* `#1287`:发布者签名的 logo 与品牌色。两者都缺时回落到原来的首字母 + 主题色 ——
               **回落是常态**,已发布的条目一个 listing 都没有。 */}
           <span
-            class="alpha-ext-dhead-ic"
+            class="codepuppy-ext-dhead-ic"
             style={{ background: listingText("brandColor") ?? "var(--a-accent-solid)" }}
           >
             <PackageLogo listing={view().listing} fallback={view().presentation.displayName} />
           </span>
-          <div class="alpha-ext-dhead-body">
-            <div class="alpha-ext-dhead-t">
+          <div class="codepuppy-ext-dhead-body">
+            <div class="codepuppy-ext-dhead-t">
               <h2>{view().presentation.displayName}</h2>
-              <span class="alpha-ext-chip" data-source="alpha">{t(sourceKey)}</span>
-              <span class="alpha-ext-type-pill">{t("alpha.ext.packageType")}</span>
+              <span class="codepuppy-ext-chip" data-source="alpha">{t(sourceKey)}</span>
+              <span class="codepuppy-ext-type-pill">{t("codepuppy.ext.packageType")}</span>
             </div>
-            <div class="alpha-ext-dhead-meta">
-              <code class="alpha-ext-dhead-id">{view().catalogId}</code>
+            <div class="codepuppy-ext-dhead-meta">
+              <code class="codepuppy-ext-dhead-id">{view().catalogId}</code>
               <span>
-                {t("alpha.ext.detailVersion")} {view().presentation.version}
+                {t("codepuppy.ext.detailVersion")} {view().presentation.version}
               </span>
               <Show when={listingText("developerName")}>
                 {(developer) => (
                   <span data-package-developer="">
-                    {t("alpha.ext.packageDeveloper")} {developer()}
+                    {t("codepuppy.ext.packageDeveloper")} {developer()}
                   </span>
                 )}
               </Show>
               <Show when={listingText("category")}>
                 {(category) => (
                   <span data-package-category="">
-                    {t("alpha.ext.packageCategory")} {category()}
+                    {t("codepuppy.ext.packageCategory")} {category()}
                   </span>
                 )}
               </Show>
@@ -277,11 +277,11 @@ export function ExtensionDetail(props: {
           </div>
         </header>
 
-        <Section title={t("alpha.ext.detailAbout")}>
-          <p class="alpha-ext-dabout">{view().presentation.description}</p>
+        <Section title={t("codepuppy.ext.detailAbout")}>
+          <p class="codepuppy-ext-dabout">{view().presentation.description}</p>
           <Show when={listingText("longDescription")}>
             {(long) => (
-              <p class="alpha-ext-dabout" data-package-long-description="">
+              <p class="codepuppy-ext-dabout" data-package-long-description="">
                 {long()}
               </p>
             )}
@@ -291,12 +291,12 @@ export function ExtensionDetail(props: {
         {/* `#1287`:截图 / 用法示例 / 政策链接。每一段都只在发布者真的填了的时候出现 ——
             空段位比没有更糟(用户读到一个「暂无」也要花一次注意力)。 */}
         <Show when={listingList("screenshots").length > 0}>
-          <Section title={t("alpha.ext.packageScreenshots")}>
-            <div class="alpha-ext-package-shots">
+          <Section title={t("codepuppy.ext.packageScreenshots")}>
+            <div class="codepuppy-ext-package-shots">
               <For each={listingList("screenshots")}>
                 {(shot) => (
                   <img
-                    class="alpha-ext-package-shot"
+                    class="codepuppy-ext-package-shot"
                     data-package-screenshot=""
                     src={shot}
                     alt=""
@@ -309,11 +309,11 @@ export function ExtensionDetail(props: {
         </Show>
 
         <Show when={listingList("defaultPrompt").length > 0}>
-          <Section title={t("alpha.ext.packagePrompts")}>
-            <div class="alpha-ext-dtools">
+          <Section title={t("codepuppy.ext.packagePrompts")}>
+            <div class="codepuppy-ext-dtools">
               <For each={listingList("defaultPrompt")}>
                 {(prompt) => (
-                  <div class="alpha-ext-dtool" data-package-prompt="">
+                  <div class="codepuppy-ext-dtool" data-package-prompt="">
                     <code>{prompt}</code>
                   </div>
                 )}
@@ -323,7 +323,7 @@ export function ExtensionDetail(props: {
         </Show>
 
         <Show when={listingLinks().length > 0}>
-          <Section title={t("alpha.ext.packageLinks")}>
+          <Section title={t("codepuppy.ext.packageLinks")}>
             <For each={listingLinks()}>
               {(link) => (
                 <FactRow label={t(link.labelKey)}>
@@ -339,9 +339,9 @@ export function ExtensionDetail(props: {
           </Section>
         </Show>
 
-        <Section title={t("alpha.ext.packageInstallability")}>
-          <FactRow label={t("alpha.ext.packageInstallability")}>
-            <span class="alpha-ext-package-state" data-verdict={view().verdict}>
+        <Section title={t("codepuppy.ext.packageInstallability")}>
+          <FactRow label={t("codepuppy.ext.packageInstallability")}>
+            <span class="codepuppy-ext-package-state" data-verdict={view().verdict}>
               {t(presentation().verdictKey)}
             </span>
           </FactRow>
@@ -351,7 +351,7 @@ export function ExtensionDetail(props: {
             派发不要求已安装,只看 cloudReady(恢复中同样禁用,只是理由不同)。 */}
         <Show when={view().cloud}>
           {(cloud) => (
-            <Section title={t("alpha.ext.cloudPipelines")}>
+            <Section title={t("codepuppy.ext.cloudPipelines")}>
               <CloudFormBox
                 cloud={cloud()}
                 ready={props.cloudReady?.() ?? false}
@@ -361,7 +361,7 @@ export function ExtensionDetail(props: {
           )}
         </Show>
 
-        <Section title={t("alpha.ext.packageComponentsTitle")}>
+        <Section title={t("codepuppy.ext.packageComponentsTitle")}>
           {/* `#697` 第 5 跳:逐组件一行(root + 各 leaf),被跳过的组件带**具名原因**。
               以前这里写死一行「包名 · 版本」—— 安全视图早就带着 components[] 与 skipReasonCode,
               而用户在任何一步都看不到「这个包里有一件东西不会被装」。 */}
@@ -370,22 +370,22 @@ export function ExtensionDetail(props: {
               const shown = packageComponentPresentation(component)
               return (
                 <div
-                  class="alpha-ext-package-component"
+                  class="codepuppy-ext-package-component"
                   data-package-component={component.componentId}
                   data-included={component.included ? "true" : "false"}
                 >
                   <FactRow label={t(shown.roleKey as never)}>
-                    <code class="alpha-ext-package-component-id">{component.componentId}</code>
-                    <span class="alpha-ext-package-component-req" data-required={component.required ? "true" : "false"}>
+                    <code class="codepuppy-ext-package-component-id">{component.componentId}</code>
+                    <span class="codepuppy-ext-package-component-req" data-required={component.required ? "true" : "false"}>
                       {t(shown.requirementKey as never)}
                     </span>
-                    <span class="alpha-ext-package-component-state" data-included={component.included ? "true" : "false"}>
+                    <span class="codepuppy-ext-package-component-state" data-included={component.included ? "true" : "false"}>
                       {t(shown.stateKey as never)}
                     </span>
                   </FactRow>
                   <Show when={shown.skipReasonKey}>
                     {(reasonKey) => (
-                      <p class="alpha-ext-package-component-why" data-skip-reason={component.skipReasonCode}>
+                      <p class="codepuppy-ext-package-component-why" data-skip-reason={component.skipReasonCode}>
                         {t(reasonKey() as never)}
                       </p>
                     )}
@@ -394,19 +394,19 @@ export function ExtensionDetail(props: {
               )
             }}
           </For>
-          <FactRow label={t("alpha.ext.packagePrerequisiteStatus")}>
-            <span class="alpha-ext-package-state" data-prerequisite={view().prerequisites.status}>
+          <FactRow label={t("codepuppy.ext.packagePrerequisiteStatus")}>
+            <span class="codepuppy-ext-package-state" data-prerequisite={view().prerequisites.status}>
               {t(presentation().prerequisiteKey)}
             </span>
           </FactRow>
           <Show when={view().prerequisites.items.length > 0}>
-            <div class="alpha-ext-dtools">
+            <div class="codepuppy-ext-dtools">
               <For each={view().prerequisites.items}>
                 {(item) => (
-                  <div class="alpha-ext-dtool">
+                  <div class="codepuppy-ext-dtool">
                     <code>{item.label}</code>
                     <Show when={item.required}>
-                      <span>{t("alpha.ext.packageRequired")}</span>
+                      <span>{t("codepuppy.ext.packageRequired")}</span>
                     </Show>
                   </div>
                 )}
@@ -415,14 +415,14 @@ export function ExtensionDetail(props: {
           </Show>
         </Section>
 
-        <Section title={t("alpha.ext.packageReasonTitle")}>
-          <p class="alpha-ext-dboundary">{t(presentation().reasonKey)}</p>
+        <Section title={t("codepuppy.ext.packageReasonTitle")}>
+          <p class="codepuppy-ext-dboundary">{t(presentation().reasonKey)}</p>
         </Section>
 
-        <Section title={t("alpha.ext.packageActions")}>
-          <div class="alpha-ext-dsub">
+        <Section title={t("codepuppy.ext.packageActions")}>
+          <div class="codepuppy-ext-dsub">
             <button
-              class="alpha-ext-add"
+              class="codepuppy-ext-add"
               data-variant={view().action.kind === "install" ? "primary" : undefined}
               data-size="lg"
               disabled={!view().action.enabled || props.busy() === view().catalogId}
@@ -435,20 +435,20 @@ export function ExtensionDetail(props: {
                 指向的地方并不存在,用户装完一个扩展包就再也删不掉它。 */}
             <Show when={(() => { const state = installed(); return !!state && "installed" in state && state.installed })()}>
               <button
-                class="alpha-ext-add"
+                class="codepuppy-ext-add"
                 data-variant="danger"
                 data-size="lg"
                 data-package-uninstall={view().catalogId}
                 disabled={removing()}
                 onClick={() => void removePackage()}
               >
-                {t("alpha.ext.packageActionUninstall")}
+                {t("codepuppy.ext.packageActionUninstall")}
               </button>
             </Show>
             {/* 「留下来的部件」必须说得出理由 —— 用户点了「移除」却发现某个技能还在,而系统
                 说不出为什么,那和一个 bug 没有区别。 */}
             <Show when={retained().length > 0}>
-              <ul class="alpha-ext-package-retained">
+              <ul class="codepuppy-ext-package-retained">
                 <For each={retained()}>
                   {(entry) => (
                     <li data-package-retained={`${entry.kind}:${entry.name}`} data-retained-reason={entry.reasonCode ?? ""}>
@@ -461,15 +461,15 @@ export function ExtensionDetail(props: {
             </Show>
             {/* `#784` G20:账本已改完但引擎没重载成功 —— 说「待重载」,不说「已移除」。 */}
             <Show when={reloadPending()}>
-              <p class="alpha-ext-card-err" data-reload-pending="" role="status">
-                {t("alpha.ext.packageRemovedPendingReload")}
+              <p class="codepuppy-ext-card-err" data-reload-pending="" role="status">
+                {t("codepuppy.ext.packageRemovedPendingReload")}
               </p>
             </Show>
             <Show when={packageError()}>
-              {(error) => <p class="alpha-ext-card-err" role="alert">{error()}</p>}
+              {(error) => <p class="codepuppy-ext-card-err" role="alert">{error()}</p>}
             </Show>
             <Show when={props.errorFor?.(view().catalogId)}>
-              {(error) => <p class="alpha-ext-card-err" role="alert">{error()}</p>}
+              {(error) => <p class="codepuppy-ext-card-err" role="alert">{error()}</p>}
             </Show>
           </div>
         </Section>
@@ -588,26 +588,26 @@ export function ExtensionDetail(props: {
     if (!c) return base
     const supportKey =
       c.review.supportTier === "full"
-        ? ("alpha.ext.supportFull" as const)
+        ? ("codepuppy.ext.supportFull" as const)
         : c.review.supportTier === "best-effort"
-          ? ("alpha.ext.supportBestEffort" as const)
+          ? ("codepuppy.ext.supportBestEffort" as const)
           : c.review.supportTier === "community"
-            ? ("alpha.ext.supportCommunity" as const)
-            : ("alpha.ext.supportNone" as const)
+            ? ("codepuppy.ext.supportCommunity" as const)
+            : ("codepuppy.ext.supportNone" as const)
     const out: PresentRow[] = []
     for (const r of base) {
-      if (r.labelKey === "alpha.ext.ownCurated") {
-        out.push({ labelKey: "alpha.ext.ownCurated", value: t("alpha.ext.ownCuratedReviewed", { date: c.review.reviewedAt.slice(0, 10) }) })
-        if (c.review.upstreamStatus === "archived") out.push({ labelKey: "alpha.ext.ownUpstream", valueKeys: ["alpha.ext.upstreamArchived"] })
+      if (r.labelKey === "codepuppy.ext.ownCurated") {
+        out.push({ labelKey: "codepuppy.ext.ownCurated", value: t("codepuppy.ext.ownCuratedReviewed", { date: c.review.reviewedAt.slice(0, 10) }) })
+        if (c.review.upstreamStatus === "archived") out.push({ labelKey: "codepuppy.ext.ownUpstream", valueKeys: ["codepuppy.ext.upstreamArchived"] })
         else if (c.review.upstreamStatus === "unmaintained")
-          out.push({ labelKey: "alpha.ext.ownUpstream", valueKeys: ["alpha.ext.upstreamUnmaintained"] })
-      } else if (r.labelKey === "alpha.ext.ownSupport") {
-        out.push({ labelKey: "alpha.ext.ownSupport", valueKeys: [supportKey] })
+          out.push({ labelKey: "codepuppy.ext.ownUpstream", valueKeys: ["codepuppy.ext.upstreamUnmaintained"] })
+      } else if (r.labelKey === "codepuppy.ext.ownSupport") {
+        out.push({ labelKey: "codepuppy.ext.ownSupport", valueKeys: [supportKey] })
       } else {
         out.push(r)
       }
     }
-    out.push({ labelKey: "alpha.ext.ownReviewBefore", value: t("alpha.ext.reviewValidUntil", { date: c.review.reviewBefore.slice(0, 10) }) })
+    out.push({ labelKey: "codepuppy.ext.ownReviewBefore", value: t("codepuppy.ext.reviewValidUntil", { date: c.review.reviewBefore.slice(0, 10) }) })
     return out
   }
 
@@ -616,7 +616,7 @@ export function ExtensionDetail(props: {
   // #397:curated 条目的依赖供集改读甄选摘要(需要什么 = 签名真源;有没有 = 本地 which 实测)。
   // #1564 AC3:四个第一方 Office 条目的运行环境随应用自带 —— 读 main 的随包运行时事实,不读卡片 / 甄选
   // 摘要里的 runtimeDep(uv)。
-  const officeEntry = createMemo(() => isAlphaOfficeCatalogId(entry()?.id))
+  const officeEntry = createMemo(() => isCodePuppyOfficeCatalogId(entry()?.id))
   const [officeRuntime] = createResource(() => (officeEntry() ? entry()!.id : undefined), () => extIpc.officeRuntime())
   const officeRuntimeState = () => (officeRuntime.loading || !officeRuntime() ? "checking" : officeRuntime()!.ok ? "ok" : "missing")
   const runtimeDepList = createMemo((): string[] => {
@@ -667,12 +667,12 @@ export function ExtensionDetail(props: {
     if (isCloudConnector()) {
       return {
         ic: iconForRow(undefined, "cloud", "云"),
-        title: t("alpha.ext.cloudConnectorTitle"),
+        title: t("codepuppy.ext.cloudConnectorTitle"),
         name: "codepuppy",
         source: "alpha" as const,
         type: "mcp",
         license: undefined,
-        desc: t("alpha.ext.cloudConnectorDesc"),
+        desc: t("codepuppy.ext.cloudConnectorDesc"),
       }
     }
     const a = agent()!
@@ -683,7 +683,7 @@ export function ExtensionDetail(props: {
       source: undefined,
       type: "agent",
       license: undefined,
-      desc: a.description ?? t("alpha.ext.agentNoDesc"),
+      desc: a.description ?? t("codepuppy.ext.agentNoDesc"),
     }
   })
 
@@ -704,7 +704,7 @@ export function ExtensionDetail(props: {
   })
   // 能力来源标注:≤2 个子项列名(连接符走 i18n,Codex r1 Minor),更多收敛为计数。
   const packFromLabel = (names: string[]) =>
-    names.length > 2 ? t("alpha.ext.packCapFromMany", { n: names.length }) : names.join(t("alpha.ext.packCapFromSep"))
+    names.length > 2 ? t("codepuppy.ext.packCapFromMany", { n: names.length }) : names.join(t("codepuppy.ext.packCapFromSep"))
 
   // PresentRow[] → FactRow 列表(值为 i18n key 数组则逐个 t() 后「 · 」拼接,或字面值直出)。
   const FactRows = (p: { rows: PresentRow[] }) => (
@@ -718,79 +718,79 @@ export function ExtensionDetail(props: {
   )
 
   return (
-    <div class="alpha-ext-detail">
+    <div class="codepuppy-ext-detail">
       {/* 面包屑(横向层级,用户拍板取代返回键/左栏):类目 / 条目名;首级可点 = 返回列表 */}
-      <nav class="alpha-ext-crumbs" aria-label={t("alpha.ext.back")}>
-        <button class="alpha-ext-crumb-link" onClick={() => props.onBack()}>
-          <Svg class="alpha-ic alpha-ic-sm" d="M14 6l-6 6 6 6" />
+      <nav class="codepuppy-ext-crumbs" aria-label={t("codepuppy.ext.back")}>
+        <button class="codepuppy-ext-crumb-link" onClick={() => props.onBack()}>
+          <Svg class="codepuppy-ic codepuppy-ic-sm" d="M14 6l-6 6 6 6" />
           {props.crumb}
         </button>
-        <span class="alpha-ext-crumb-sep">/</span>
-        <span class="alpha-ext-crumb-cur">{header().title}</span>
+        <span class="codepuppy-ext-crumb-sep">/</span>
+        <span class="codepuppy-ext-crumb-cur">{header().title}</span>
       </nav>
 
       {/* ── generic header:icon · 名称 · 来源 · 类型 · 许可证 · 版本 · 待核实 ── */}
-      <header class="alpha-ext-dhead">
-        <span class="alpha-ext-dhead-ic" style={{ background: header().ic.color }}>
+      <header class="codepuppy-ext-dhead">
+        <span class="codepuppy-ext-dhead-ic" style={{ background: header().ic.color }}>
           {header().ic.glyph}
         </span>
-        <div class="alpha-ext-dhead-body">
-          <div class="alpha-ext-dhead-t">
+        <div class="codepuppy-ext-dhead-body">
+          <div class="codepuppy-ext-dhead-t">
             <h2>{header().title}</h2>
             {/* #397:分级 chip(四色货架,与列表同词) + 归档/过期事实 chip */}
             <Show when={curated()}>
               {(c) => (
-                <span class="alpha-ext-chip" data-shelf={c().tier}>
+                <span class="codepuppy-ext-chip" data-shelf={c().tier}>
                   {t(SHELF_CHIP_KEYS[c().tier] as never)}
                 </span>
               )}
             </Show>
             <Show when={header().source}>
-              <span class="alpha-ext-chip" data-source={header().source}>
+              <span class="codepuppy-ext-chip" data-source={header().source}>
                 {sourceLabel(header().source!)}
               </span>
             </Show>
-            <span class="alpha-ext-type-pill">{typeLabel(header().type as CatalogEntry["type"])}</span>
+            <span class="codepuppy-ext-type-pill">{typeLabel(header().type as CatalogEntry["type"])}</span>
             <Show when={archivedNow()}>
-              <span class="alpha-ext-verify-chip" data-archived="">{t("alpha.ext.shelfArchivedChip")}</span>
+              <span class="codepuppy-ext-verify-chip" data-archived="">{t("codepuppy.ext.shelfArchivedChip")}</span>
             </Show>
             <Show when={expiredNow()}>
-              <span class="alpha-ext-verify-chip" data-archived="">{t("alpha.ext.reviewExpiredChip")}</span>
+              <span class="codepuppy-ext-verify-chip" data-archived="">{t("codepuppy.ext.reviewExpiredChip")}</span>
             </Show>
             <Show when={entry() && verifyText(entry()!)}>
-              <span class="alpha-ext-verify-chip">{t("alpha.ext.verifyPending")}</span>
+              <span class="codepuppy-ext-verify-chip">{t("codepuppy.ext.verifyPending")}</span>
             </Show>
             <Show when={!archivedNow() && entry() && advisoryOf(entry()!)}>
-              <span class="alpha-ext-verify-chip" data-archived="">{t("alpha.ext.advArchivedUnsupported")}</span>
+              <span class="codepuppy-ext-verify-chip" data-archived="">{t("codepuppy.ext.advArchivedUnsupported")}</span>
             </Show>
             <Show when={retiredNow()}>
-              <span class="alpha-ext-verify-chip" data-archived="">{t("alpha.ext.retiredCommunityChip")}</span>
+              <span class="codepuppy-ext-verify-chip" data-archived="">{t("codepuppy.ext.retiredCommunityChip")}</span>
             </Show>
           </div>
-          <div class="alpha-ext-dhead-meta">
-            <code class="alpha-ext-dhead-id">{header().name}</code>
+          <div class="codepuppy-ext-dhead-meta">
+            <code class="codepuppy-ext-dhead-id">{header().name}</code>
             <Show when={header().license}>
               <span>
-                {t("alpha.ext.detailLicense")} {header().license}
+                {t("codepuppy.ext.detailLicense")} {header().license}
               </span>
             </Show>
             <Show when={entry()}>
               <span>
-                {t("alpha.ext.detailVersion")} {receipt()?.version ?? props.catalogVersion}
+                {t("codepuppy.ext.detailVersion")} {receipt()?.version ?? props.catalogVersion}
               </span>
             </Show>
             {/* REQ-105(#319):已安装项必须能说出它执行的是哪一份字节。没记就说「未记录」——
                 空着或拿 catalog 的数字顶上,就是把未验证的东西说成已审计(AC5)。 */}
             <Show when={installed()}>
               <span data-artifact-digest={artifactFacts().digest ?? ""}>
-                {t("alpha.ext.detailArtifactDigest")}{" "}
-                <code class="alpha-ext-dhead-id" title={artifactFacts().digest ?? undefined}>
-                  {artifactFacts().digestShort ?? t("alpha.ext.detailArtifactDigestUnrecorded")}
+                {t("codepuppy.ext.detailArtifactDigest")}{" "}
+                <code class="codepuppy-ext-dhead-id" title={artifactFacts().digest ?? undefined}>
+                  {artifactFacts().digestShort ?? t("codepuppy.ext.detailArtifactDigestUnrecorded")}
                 </code>
               </span>
             </Show>
             <Show when={installed()}>
-              <span class="alpha-ext-dhead-installed">✓ {t("alpha.ext.installed")}</span>
+              <span class="codepuppy-ext-dhead-installed">✓ {t("codepuppy.ext.installed")}</span>
             </Show>
             <Show when={hubState()}>
               {(hs) => (
@@ -804,7 +804,7 @@ export function ExtensionDetail(props: {
         </div>
         {/* 主操作在头部右侧(2026-07-04 定稿,参照 ChatGPT 插件详情页模式);
             plugin 的安装从这里过风险确认框(Q2),skill 直装(Q1),其余确认框。 */}
-        <div class="alpha-ext-dhead-act">
+        <div class="codepuppy-ext-dhead-act">
           <Show when={entry()}>
             {(e) => (
               <>
@@ -815,29 +815,29 @@ export function ExtensionDetail(props: {
                     when={!archivedNow() && !retiredNow()}
                     fallback={
                       <button
-                        class="alpha-ext-add"
+                        class="codepuppy-ext-add"
                         data-size="lg"
                         disabled
-                        title={t(retiredNow() ? "alpha.ext.retiredCommunityNoInstallHint" : "alpha.ext.archivedNoInstallHint")}
+                        title={t(retiredNow() ? "codepuppy.ext.retiredCommunityNoInstallHint" : "codepuppy.ext.archivedNoInstallHint")}
                       >
-                        {t(retiredNow() ? "alpha.ext.retiredCommunityNoInstall" : "alpha.ext.archivedNoInstall")}
+                        {t(retiredNow() ? "codepuppy.ext.retiredCommunityNoInstall" : "codepuppy.ext.archivedNoInstall")}
                       </button>
                     }
                   >
                     <button
-                      class="alpha-ext-add"
+                      class="codepuppy-ext-add"
                       data-variant="primary"
                       data-size="lg"
                       disabled={props.busy() === e().id || (e().type === "cloud" && !cloudReady())}
                       onClick={() => props.onInstall(e())}
                     >
                       {props.busy() === e().id
-                        ? t("alpha.ext.adding")
+                        ? t("codepuppy.ext.adding")
                         : e().type === "plugin"
-                          ? t("alpha.ext.installPluginBtn")
+                          ? t("codepuppy.ext.installPluginBtn")
                           : e().type === "cloud"
-                            ? t("alpha.ext.enableCloud")
-                            : t("alpha.ext.add")}
+                            ? t("codepuppy.ext.enableCloud")
+                            : t("codepuppy.ext.add")}
                     </button>
                   </Show>
                 </Show>
@@ -845,12 +845,12 @@ export function ExtensionDetail(props: {
                     #408 PR-C 起改渲染真实**会话开关**(琥珀;与已装行同一状态机与处理器,见下方)。 */}
                 <Show when={e().type === "mcp" && installed() && sessionGrantNow()}>
                   <button
-                    class="alpha-ext-sw"
+                    class="codepuppy-ext-sw"
                     data-session=""
                     data-on={props.sessionViewFor(e().id).on ? "" : undefined}
                     disabled={props.sessionBusyFor(e().id) || !props.sessionAvailable()}
-                    title={!props.sessionAvailable() ? t("alpha.ext.sessionNeedsProject") : undefined}
-                    aria-label={props.sessionViewFor(e().id).on ? t("alpha.ext.sessionOnRow") : t("alpha.ext.sessionOffRow")}
+                    title={!props.sessionAvailable() ? t("codepuppy.ext.sessionNeedsProject") : undefined}
+                    aria-label={props.sessionViewFor(e().id).on ? t("codepuppy.ext.sessionOnRow") : t("codepuppy.ext.sessionOffRow")}
                     onClick={() =>
                       void props.onSessionToggle({ catalogId: e().id, name: e().name, on: !props.sessionViewFor(e().id).on })
                     }
@@ -868,9 +868,9 @@ export function ExtensionDetail(props: {
                     const on = () => (liveUnreceipted() ? !!mcpLive()?.connected : govActivation() !== "disabled")
                     return (
                       <button
-                        class="alpha-ext-sw"
+                        class="codepuppy-ext-sw"
                         data-on={on() ? "" : undefined}
-                        aria-label={on() ? t("alpha.ext.enabled") : t("alpha.ext.disabled")}
+                        aria-label={on() ? t("codepuppy.ext.enabled") : t("codepuppy.ext.disabled")}
                         disabled={!rc}
                         onClick={() =>
                           rc &&
@@ -892,9 +892,9 @@ export function ExtensionDetail(props: {
           </Show>
           <Show when={hubState()?.reloadNow}>
             <button
-              class="alpha-ext-add"
+              class="codepuppy-ext-add"
               data-hub-reload-now=""
-              title={t("alpha.ext.hubReloadNowHint")}
+              title={t("codepuppy.ext.hubReloadNowHint")}
               disabled={reloadBusy()}
               onClick={async () => {
                 setReloadBusy(true)
@@ -906,61 +906,61 @@ export function ExtensionDetail(props: {
                 }
               }}
             >
-              {t("alpha.ext.hubReloadNow")}
+              {t("codepuppy.ext.hubReloadNow")}
             </button>
           </Show>
           <Show when={installed() && receipt()}>
-            <button class="alpha-ext-add" data-variant="danger" onClick={() => props.onUninstall(receipt()!)}>
-              {t("alpha.ext.remove")}
+            <button class="codepuppy-ext-add" data-variant="danger" onClick={() => props.onUninstall(receipt()!)}>
+              {t("codepuppy.ext.remove")}
             </button>
           </Show>
         </div>
       </header>
       <Show when={reloadRefused()}>
-        <p class="alpha-ext-card-err" role="alert">{t("alpha.ext.hubReloadNowRefused")}</p>
+        <p class="codepuppy-ext-card-err" role="alert">{t("codepuppy.ext.hubReloadNowRefused")}</p>
       </Show>
 
       {/* B11:安装失败行内(与卡片错误同源),不裸 toast */}
       <Show when={entry() && props.errorFor?.(entry()!.id)}>
-        <p class="alpha-ext-card-err">{props.errorFor!(entry()!.id)}</p>
+        <p class="codepuppy-ext-card-err">{props.errorFor!(entry()!.id)}</p>
       </Show>
 
       {/* #397:归档 / 复审过期的如实警示(v6 稿;已装不强拆,时钟仅用于过期比较) */}
       <Show when={archivedNow()}>
-        <div class="alpha-ext-verify-note" data-archived="" role="alert">
-          <p>{t("alpha.ext.archivedDetailWarn")}</p>
+        <div class="codepuppy-ext-verify-note" data-archived="" role="alert">
+          <p>{t("codepuppy.ext.archivedDetailWarn")}</p>
         </div>
       </Show>
       <Show when={!archivedNow() && expiredNow()}>
-        <div class="alpha-ext-verify-note" data-archived="" role="alert">
-          <p>{t("alpha.ext.expiredDetailWarn", { date: curated()!.review.reviewBefore.slice(0, 10) })}</p>
+        <div class="codepuppy-ext-verify-note" data-archived="" role="alert">
+          <p>{t("codepuppy.ext.expiredDetailWarn", { date: curated()!.review.reviewBefore.slice(0, 10) })}</p>
         </div>
       </Show>
 
       {/* ── 简介 ── */}
-      <Section title={t("alpha.ext.detailAbout")}>
+      <Section title={t("codepuppy.ext.detailAbout")}>
         {/* #1595 AC2:云端任务的描述就是首屏「做什么」那一行,这里不再重复。 */}
         <Show when={!(entry() && cloudSpec(entry()!))}>
-          <p class="alpha-ext-dabout">{header().desc}</p>
+          <p class="codepuppy-ext-dabout">{header().desc}</p>
         </Show>
         {/* REQ-105(#197):归档警示 —— 已装用户的诚实处置指引(禁用/卸载/替代);永不静默删除。 */}
         <Show when={entry() && advisoryOf(entry()!)}>
           {(adv) => (
-            <div class="alpha-ext-verify-note" data-archived="" role="alert">
-              <b>{t("alpha.ext.advArchivedTitle")}</b>
-              <p>{t("alpha.ext.advArchivedDetail", { date: adv().archivedAt })}</p>
+            <div class="codepuppy-ext-verify-note" data-archived="" role="alert">
+              <b>{t("codepuppy.ext.advArchivedTitle")}</b>
+              <p>{t("codepuppy.ext.advArchivedDetail", { date: adv().archivedAt })}</p>
             </div>
           )}
         </Show>
         <Show when={retiredNow()}>
-          <div class="alpha-ext-verify-note" data-archived="" role="alert">
-            <b>{t("alpha.ext.retiredCommunityTitle")}</b>
-            <p>{t("alpha.ext.retiredCommunityBody")}</p>
+          <div class="codepuppy-ext-verify-note" data-archived="" role="alert">
+            <b>{t("codepuppy.ext.retiredCommunityTitle")}</b>
+            <p>{t("codepuppy.ext.retiredCommunityBody")}</p>
           </div>
         </Show>
         <Show when={entry() && verifyText(entry()!)}>
-          <div class="alpha-ext-verify-note">
-            <b>{t("alpha.ext.verifyNoteTitle")}</b>
+          <div class="codepuppy-ext-verify-note">
+            <b>{t("codepuppy.ext.verifyNoteTitle")}</b>
             <p>{verifyText(entry()!)}</p>
           </div>
         </Show>
@@ -971,12 +971,12 @@ export function ExtensionDetail(props: {
           subtitle 标注来源子项。 ── */}
       <Show when={packFacts()}>
         {(pack) => (
-          <Section title={t("alpha.ext.packFactsTitle")}>
+          <Section title={t("codepuppy.ext.packFactsTitle")}>
             <Show
               when={pack().missing === 0}
               fallback={
-                <p class="alpha-ext-dnote" data-err="">
-                  {t("alpha.ext.packFactsIncomplete", { n: pack().missing })}
+                <p class="codepuppy-ext-dnote" data-err="">
+                  {t("codepuppy.ext.packFactsIncomplete", { n: pack().missing })}
                 </p>
               }
             >
@@ -984,38 +984,38 @@ export function ExtensionDetail(props: {
                 const pf = () => pack().facts
                 return (
                   <>
-                    <FactRow label={t("alpha.ext.packSize")}>
+                    <FactRow label={t("codepuppy.ext.packSize")}>
                       <Show when={pf().unknownSizeCount > 0} fallback={formatPackBytes(pf().knownBytes)}>
                         ≥ {formatPackBytes(pf().knownBytes)}{" "}
-                        <span class="alpha-ext-type-pill">
-                          {pf().unknownSizeCount === 1 ? t("alpha.ext.packSizeUnknownOne") : t("alpha.ext.packSizeUnknown", { n: pf().unknownSizeCount })}
+                        <span class="codepuppy-ext-type-pill">
+                          {pf().unknownSizeCount === 1 ? t("codepuppy.ext.packSizeUnknownOne") : t("codepuppy.ext.packSizeUnknown", { n: pf().unknownSizeCount })}
                         </span>
                       </Show>
                     </FactRow>
-                    <FactRow label={t("alpha.ext.packSecrets")}>
-                      <Show when={pf().secrets.length > 0} fallback={t("alpha.ext.packNoSecrets")}>
-                        <span class="alpha-ext-dcode">{pf().secrets.join(" · ")}</span>
+                    <FactRow label={t("codepuppy.ext.packSecrets")}>
+                      <Show when={pf().secrets.length > 0} fallback={t("codepuppy.ext.packNoSecrets")}>
+                        <span class="codepuppy-ext-dcode">{pf().secrets.join(" · ")}</span>
                         <Show when={pf().secretFreeCount > 0}>
                           {" · "}
-                          {pf().secretFreeCount === 1 ? t("alpha.ext.packSecretsRestOne") : t("alpha.ext.packSecretsRest", { n: pf().secretFreeCount })}
+                          {pf().secretFreeCount === 1 ? t("codepuppy.ext.packSecretsRestOne") : t("codepuppy.ext.packSecretsRest", { n: pf().secretFreeCount })}
                         </Show>
                       </Show>
                     </FactRow>
-                    <FactRow label={t("alpha.ext.packSurfaces")}>
+                    <FactRow label={t("codepuppy.ext.packSurfaces")}>
                       {pf().surfaces.map((s) => t(runtimeSurfaceLabelKey(s))).join(" · ")}
                     </FactRow>
-                    <FactRow label={t("alpha.ext.packSupport")}>
-                      {t("alpha.ext.packSupportLowest", { tier: t(supportTierLabelKey(pf().lowestTier)) })}
+                    <FactRow label={t("codepuppy.ext.packSupport")}>
+                      {t("codepuppy.ext.packSupportLowest", { tier: t(supportTierLabelKey(pf().lowestTier)) })}
                     </FactRow>
-                    <p class="alpha-ext-dsec-t" style={{ margin: "12px 0 8px" }}>
-                      {t("alpha.ext.packCapsTitle")}
+                    <p class="codepuppy-ext-dsec-t" style={{ margin: "12px 0 8px" }}>
+                      {t("codepuppy.ext.packCapsTitle")}
                     </p>
-                    <div class="alpha-ext-authz-box">
+                    <div class="codepuppy-ext-authz-box">
                       <For each={pf().caps}>
-                        {(row) => <ExtGrantedCapRow cap={row.cap} subtitle={t("alpha.ext.packCapFrom", { names: packFromLabel(row.from) })} />}
+                        {(row) => <ExtGrantedCapRow cap={row.cap} subtitle={t("codepuppy.ext.packCapFrom", { names: packFromLabel(row.from) })} />}
                       </For>
                     </div>
-                    <p class="alpha-ext-dnote">{t("alpha.ext.packFactsNote")}</p>
+                    <p class="codepuppy-ext-dnote">{t("codepuppy.ext.packFactsNote")}</p>
                   </>
                 )
               })()}
@@ -1033,34 +1033,34 @@ export function ExtensionDetail(props: {
               <Show when={mcpSpec(e())}>
                 {(spec) => (
                   <>
-                    <FactRow label={t("alpha.ext.detailTransport")}>
-                      {spec().mcpType === "remote" ? t("alpha.ext.transportRemote") : t("alpha.ext.transportLocal")}
+                    <FactRow label={t("codepuppy.ext.detailTransport")}>
+                      {spec().mcpType === "remote" ? t("codepuppy.ext.transportRemote") : t("codepuppy.ext.transportLocal")}
                     </FactRow>
                     <Show when={spec().command?.length}>
-                      <FactRow label={t("alpha.ext.detailCommand")}>
-                        <code class="alpha-ext-dcode">{spec().command!.join(" ")}</code>
+                      <FactRow label={t("codepuppy.ext.detailCommand")}>
+                        <code class="codepuppy-ext-dcode">{spec().command!.join(" ")}</code>
                       </FactRow>
                     </Show>
                     <Show when={spec().url}>
-                      <FactRow label={t("alpha.ext.detailEndpoint")}>
-                        <code class="alpha-ext-dcode">{spec().url}</code>
+                      <FactRow label={t("codepuppy.ext.detailEndpoint")}>
+                        <code class="codepuppy-ext-dcode">{spec().url}</code>
                       </FactRow>
                     </Show>
-                    <FactRow label={t("alpha.ext.detailScope")}>{t("alpha.ext.scopeGlobal")}</FactRow>
+                    <FactRow label={t("codepuppy.ext.detailScope")}>{t("codepuppy.ext.scopeGlobal")}</FactRow>
                     <Show when={(e().tools ?? []).length > 0}>
-                      <div class="alpha-ext-dsub">
-                        <div class="alpha-ext-dsub-t">{t("alpha.ext.detailTools")}</div>
-                        <div class="alpha-ext-dtools">
+                      <div class="codepuppy-ext-dsub">
+                        <div class="codepuppy-ext-dsub-t">{t("codepuppy.ext.detailTools")}</div>
+                        <div class="codepuppy-ext-dtools">
                           <For each={e().tools}>
                             {(tool) => (
-                              <div class="alpha-ext-dtool">
+                              <div class="codepuppy-ext-dtool">
                                 <code>{tool.name}</code>
                                 <span>{tool.description}</span>
                               </div>
                             )}
                           </For>
                         </div>
-                        <p class="alpha-ext-dnote">{t("alpha.ext.toolsHint")}</p>
+                        <p class="codepuppy-ext-dnote">{t("codepuppy.ext.toolsHint")}</p>
                       </div>
                     </Show>
                   </>
@@ -1070,21 +1070,21 @@ export function ExtensionDetail(props: {
               <Show when={skillSpec(e())}>
                 {(spec) => (
                   <>
-                    <FactRow label={t("alpha.ext.detailInstallDir")}>{t("alpha.ext.scopeGlobal")}</FactRow>
-                    <FactRow label={t("alpha.ext.detailTrigger")}>{catalogDescription(e())}</FactRow>
-                    <Show when={spec().builtinAssetKey} fallback={<p class="alpha-ext-dnote">{t("alpha.ext.skillDocMissing")}</p>}>
-                      <div class="alpha-ext-dsub">
-                        <div class="alpha-ext-dsub-t">{t("alpha.ext.detailSkillDoc")}</div>
-                        <Show when={!skillDoc.loading} fallback={<p class="alpha-ext-dnote">{t("alpha.ext.loading")}</p>}>
+                    <FactRow label={t("codepuppy.ext.detailInstallDir")}>{t("codepuppy.ext.scopeGlobal")}</FactRow>
+                    <FactRow label={t("codepuppy.ext.detailTrigger")}>{catalogDescription(e())}</FactRow>
+                    <Show when={spec().builtinAssetKey} fallback={<p class="codepuppy-ext-dnote">{t("codepuppy.ext.skillDocMissing")}</p>}>
+                      <div class="codepuppy-ext-dsub">
+                        <div class="codepuppy-ext-dsub-t">{t("codepuppy.ext.detailSkillDoc")}</div>
+                        <Show when={!skillDoc.loading} fallback={<p class="codepuppy-ext-dnote">{t("codepuppy.ext.loading")}</p>}>
                           <Show
                             when={skillDoc()?.ok && skillDoc()}
                             fallback={
-                              <p class="alpha-ext-dnote" data-err="">
-                                {t((skillDoc() as { reason?: string } | undefined)?.reason === "技能内容未随此版本打包" ? "alpha.ext.skillDocMissing" : "alpha.ext.skillDocReadFailed")}
+                              <p class="codepuppy-ext-dnote" data-err="">
+                                {t((skillDoc() as { reason?: string } | undefined)?.reason === "技能内容未随此版本打包" ? "codepuppy.ext.skillDocMissing" : "codepuppy.ext.skillDocReadFailed")}
                               </p>
                             }
                           >
-                            {(doc) => <pre class="alpha-ext-ddoc">{(doc() as { content: string }).content}</pre>}
+                            {(doc) => <pre class="codepuppy-ext-ddoc">{(doc() as { content: string }).content}</pre>}
                           </Show>
                         </Show>
                       </div>
@@ -1096,19 +1096,19 @@ export function ExtensionDetail(props: {
               <Show when={pluginSpec(e())}>
                 {(spec) => (
                   <>
-                    <FactRow label={t("alpha.ext.detailPackage")}>
-                      <code class="alpha-ext-dcode">
+                    <FactRow label={t("codepuppy.ext.detailPackage")}>
+                      <code class="codepuppy-ext-dcode">
                         {spec().package}
                         {spec().version ? `@${spec().version}` : ""}
                       </code>
                     </FactRow>
                     <Show when={(e().hooks ?? []).length > 0}>
-                      <div class="alpha-ext-dsub">
-                        <div class="alpha-ext-dsub-t">{t("alpha.ext.detailHooks")}</div>
-                        <div class="alpha-ext-dtools">
+                      <div class="codepuppy-ext-dsub">
+                        <div class="codepuppy-ext-dsub-t">{t("codepuppy.ext.detailHooks")}</div>
+                        <div class="codepuppy-ext-dtools">
                           <For each={e().hooks}>
                             {(h) => (
-                              <div class="alpha-ext-dtool">
+                              <div class="codepuppy-ext-dtool">
                                 <code>{h.name}</code>
                                 <span>{h.description}</span>
                               </div>
@@ -1117,34 +1117,34 @@ export function ExtensionDetail(props: {
                         </div>
                       </div>
                     </Show>
-                    <div class="alpha-ext-dsub">
-                      <div class="alpha-ext-dsub-t">{t("alpha.ext.detailRisk")}</div>
-                      <p class="alpha-ext-dboundary">{t("alpha.ext.pluginRisk")}</p>
-                      <p class="alpha-ext-dnote">{t("alpha.ext.pluginEffect")}</p>
+                    <div class="codepuppy-ext-dsub">
+                      <div class="codepuppy-ext-dsub-t">{t("codepuppy.ext.detailRisk")}</div>
+                      <p class="codepuppy-ext-dboundary">{t("codepuppy.ext.pluginRisk")}</p>
+                      <p class="codepuppy-ext-dnote">{t("codepuppy.ext.pluginEffect")}</p>
                     </div>
                     {/* D4 拍板:「插件 ≠ 套件」澄清 */}
-                    <div class="alpha-ext-verify-note" data-info="">
-                      <b>{t("alpha.ext.pluginVsBundleTitle")}</b>
-                      <p>{t("alpha.ext.pluginVsBundle")}</p>
+                    <div class="codepuppy-ext-verify-note" data-info="">
+                      <b>{t("codepuppy.ext.pluginVsBundleTitle")}</b>
+                      <p>{t("codepuppy.ext.pluginVsBundle")}</p>
                     </div>
                   </>
                 )}
               </Show>
               {/* Agent 条目(REQ-023):安装位置 + md 资产预览(含权限档 frontmatter,详情页先行档) */}
               <Show when={e().installSpec?.kind === "agent"}>
-                <FactRow label={t("alpha.ext.detailInstallDir")}>{t("alpha.ext.scopeGlobal")}</FactRow>
-                <div class="alpha-ext-dsub">
-                  <div class="alpha-ext-dsub-t">{t("alpha.ext.detailAgentDoc")}</div>
-                  <Show when={!skillDoc.loading} fallback={<p class="alpha-ext-dnote">{t("alpha.ext.loading")}</p>}>
+                <FactRow label={t("codepuppy.ext.detailInstallDir")}>{t("codepuppy.ext.scopeGlobal")}</FactRow>
+                <div class="codepuppy-ext-dsub">
+                  <div class="codepuppy-ext-dsub-t">{t("codepuppy.ext.detailAgentDoc")}</div>
+                  <Show when={!skillDoc.loading} fallback={<p class="codepuppy-ext-dnote">{t("codepuppy.ext.loading")}</p>}>
                     <Show
                       when={skillDoc()?.ok && skillDoc()}
                       fallback={
-                        <p class="alpha-ext-dnote" data-err="">
-                          {t(!skillDoc() || (skillDoc() as { reason?: string }).reason === "技能内容未随此版本打包" ? "alpha.ext.agentDocMissing" : "alpha.ext.agentDocReadFailed")}
+                        <p class="codepuppy-ext-dnote" data-err="">
+                          {t(!skillDoc() || (skillDoc() as { reason?: string }).reason === "技能内容未随此版本打包" ? "codepuppy.ext.agentDocMissing" : "codepuppy.ext.agentDocReadFailed")}
                         </p>
                       }
                     >
-                      {(doc) => <pre class="alpha-ext-ddoc">{(doc() as { content: string }).content}</pre>}
+                      {(doc) => <pre class="codepuppy-ext-ddoc">{(doc() as { content: string }).content}</pre>}
                     </Show>
                   </Show>
                 </div>
@@ -1157,33 +1157,33 @@ export function ExtensionDetail(props: {
                     `${b.max_iter} iter · ${b.max_tokens.toLocaleString()} tokens · ${b.max_wall_clock_sec}s`
                   return (
                     <>
-                      <div data-alpha-cloud-task-facts>
-                        <FactRow label={t("alpha.ext.cloudWhat")}>{catalogDescription(e())}</FactRow>
-                        <FactRow label={t("alpha.ext.cloudMaxRun")}>
-                          {t("alpha.ext.cloudMaxRunValue", { min: cloudMaxRunMinutes(spec().budgetDefaults.max_wall_clock_sec) })}
+                      <div data-codepuppy-cloud-task-facts>
+                        <FactRow label={t("codepuppy.ext.cloudWhat")}>{catalogDescription(e())}</FactRow>
+                        <FactRow label={t("codepuppy.ext.cloudMaxRun")}>
+                          {t("codepuppy.ext.cloudMaxRunValue", { min: cloudMaxRunMinutes(spec().budgetDefaults.max_wall_clock_sec) })}
                         </FactRow>
-                        <FactRow label={t("alpha.ext.cloudSends")}>
-                          <ul class="alpha-ext-dlist">
+                        <FactRow label={t("codepuppy.ext.cloudSends")}>
+                          <ul class="codepuppy-ext-dlist">
                             <For each={spec().upstreamData}>{(line) => <li>{line}</li>}</For>
                           </ul>
                         </FactRow>
-                        <FactRow label={t("alpha.ext.cloudResult")}>{t("alpha.ext.cloudResultValue")}</FactRow>
-                        <FactRow label={t("alpha.ext.cloudCost")}>{t("alpha.ext.cloudCostValue")}</FactRow>
+                        <FactRow label={t("codepuppy.ext.cloudResult")}>{t("codepuppy.ext.cloudResultValue")}</FactRow>
+                        <FactRow label={t("codepuppy.ext.cloudCost")}>{t("codepuppy.ext.cloudCostValue")}</FactRow>
                       </div>
-                      <details class="alpha-ext-dprompt" data-alpha-cloud-task-dev>
-                        <summary>{t("alpha.timeline.devDetails")}</summary>
-                        <FactRow label={t("alpha.ext.cloudPipelineKind")}>
-                          <code class="alpha-ext-dcode">{spec().pipelineKind}</code>
+                      <details class="codepuppy-ext-dprompt" data-codepuppy-cloud-task-dev>
+                        <summary>{t("codepuppy.timeline.devDetails")}</summary>
+                        <FactRow label={t("codepuppy.ext.cloudPipelineKind")}>
+                          <code class="codepuppy-ext-dcode">{spec().pipelineKind}</code>
                         </FactRow>
-                        <FactRow label={t("alpha.ext.cloudTier")}>{spec().tier}</FactRow>
-                        <FactRow label={t("alpha.ext.cloudBudget")}>{fmtBudget(spec().budgetDefaults)}</FactRow>
-                        <FactRow label={t("alpha.ext.cloudBudgetLimits")}>{fmtBudget(spec().budgetLimits)}</FactRow>
-                        <div class="alpha-ext-dsub">
-                          <div class="alpha-ext-dsub-t">{t("alpha.ext.cloudInputContract")}</div>
-                          <div class="alpha-ext-dtools">
+                        <FactRow label={t("codepuppy.ext.cloudTier")}>{spec().tier}</FactRow>
+                        <FactRow label={t("codepuppy.ext.cloudBudget")}>{fmtBudget(spec().budgetDefaults)}</FactRow>
+                        <FactRow label={t("codepuppy.ext.cloudBudgetLimits")}>{fmtBudget(spec().budgetLimits)}</FactRow>
+                        <div class="codepuppy-ext-dsub">
+                          <div class="codepuppy-ext-dsub-t">{t("codepuppy.ext.cloudInputContract")}</div>
+                          <div class="codepuppy-ext-dtools">
                             <For each={spec().inputContract}>
                               {(f) => (
-                                <div class="alpha-ext-dtool">
+                                <div class="codepuppy-ext-dtool">
                                   <code>
                                     {f.field}
                                     {f.required ? " *" : ""}
@@ -1195,13 +1195,13 @@ export function ExtensionDetail(props: {
                           </div>
                         </div>
                       </details>
-                      <p class="alpha-ext-dnote">{t("alpha.ext.cloudEnableNote")}</p>
+                      <p class="codepuppy-ext-dnote">{t("codepuppy.ext.cloudEnableNote")}</p>
                       {/* `#624`:恢复中也禁用,但理由不同 —— 不能说「需登录」。 */}
                       <Show when={!cloudReady()}>
-                        <p class="alpha-ext-dnote" data-err="">
+                        <p class="codepuppy-ext-dnote" data-err="">
                           {cloudRecovering()
-                            ? t("alpha.ext.cloudRecoveringNote")
-                            : t("alpha.ext.cloudNeedPlatformNote")}
+                            ? t("codepuppy.ext.cloudRecoveringNote")
+                            : t("codepuppy.ext.cloudNeedPlatformNote")}
                         </p>
                       </Show>
                       <CloudDispatchBox entryId={e().id} spec={spec()} ready={cloudReady()} recovering={cloudRecovering()} />
@@ -1211,7 +1211,7 @@ export function ExtensionDetail(props: {
               </Show>
               {/* 套件:组合清单(序号 + 逐项状态 + 未装项行内安装 = 逐项重试,T3) */}
               <Show when={e().type === "bundle"}>
-                <div class="alpha-ext-dbundle">
+                <div class="codepuppy-ext-dbundle">
                   <For each={(e().bundleItems ?? []).slice().sort((a, b) => a.installOrder - b.installOrder)}>
                     {(it, idx) => {
                       const sub = props.byId(it.catalogEntryId)
@@ -1221,7 +1221,7 @@ export function ExtensionDetail(props: {
                       const subRetired = () => isRetiredCommunityOffice(sub)
                       return (
                         <div
-                          class="alpha-ext-dbundle-row"
+                          class="codepuppy-ext-dbundle-row"
                           role="button"
                           tabindex="0"
                           onClick={() => props.onOpenEntry(sub)}
@@ -1232,36 +1232,36 @@ export function ExtensionDetail(props: {
                             }
                           }}
                         >
-                          <span class="alpha-ext-dbundle-n">{idx() + 1}</span>
-                          <span class="alpha-ext-install-ic" style={{ background: ic.color }}>
+                          <span class="codepuppy-ext-dbundle-n">{idx() + 1}</span>
+                          <span class="codepuppy-ext-install-ic" style={{ background: ic.color }}>
                             {ic.glyph}
                           </span>
-                          <span class="alpha-ext-install-nm">{sub.displayName}</span>
+                          <span class="codepuppy-ext-install-nm">{sub.displayName}</span>
                           <Show when={it.optional}>
-                            <span class="alpha-ext-install-opt">{t("alpha.ext.optional")}</span>
+                            <span class="codepuppy-ext-install-opt">{t("codepuppy.ext.optional")}</span>
                           </Show>
-                          <span class="alpha-ext-install-k">{typeLabel(sub.type)}</span>
+                          <span class="codepuppy-ext-install-k">{typeLabel(sub.type)}</span>
                           <Show
                             when={subInstalled()}
                             fallback={
                               <button
-                                class="alpha-ext-add"
+                                class="codepuppy-ext-add"
                                 disabled={props.busy() === sub.id || subRetired()}
-                                title={subRetired() ? t("alpha.ext.retiredCommunityNoInstallHint") : undefined}
+                                title={subRetired() ? t("codepuppy.ext.retiredCommunityNoInstallHint") : undefined}
                                 onClick={(ev) => {
                                   ev.stopPropagation()
                                   props.onInstall(sub)
                                 }}
                               >
                                 {subRetired()
-                                  ? t("alpha.ext.retiredCommunityNoInstall")
+                                  ? t("codepuppy.ext.retiredCommunityNoInstall")
                                   : props.busy() === sub.id
-                                    ? t("alpha.ext.adding")
-                                    : t("alpha.ext.add")}
+                                    ? t("codepuppy.ext.adding")
+                                    : t("codepuppy.ext.add")}
                               </button>
                             }
                           >
-                            <span class="alpha-ext-dhead-installed">✓</span>
+                            <span class="codepuppy-ext-dhead-installed">✓</span>
                           </Show>
                         </div>
                       )
@@ -1276,32 +1276,32 @@ export function ExtensionDetail(props: {
         <Show when={agent()}>
           {(a) => (
             <>
-              <FactRow label={t("alpha.ext.detailMode")}>{a().mode}</FactRow>
-              <FactRow label={t("alpha.ext.detailSource")}>
-                {a().native ? t("alpha.ext.agentBuiltinNote") : t("alpha.ext.agentSelf")}
+              <FactRow label={t("codepuppy.ext.detailMode")}>{a().mode}</FactRow>
+              <FactRow label={t("codepuppy.ext.detailSource")}>
+                {a().native ? t("codepuppy.ext.agentBuiltinNote") : t("codepuppy.ext.agentSelf")}
               </FactRow>
               <Show when={a().model}>
-                <FactRow label={t("alpha.ext.detailModel")}>
-                  <code class="alpha-ext-dcode">
+                <FactRow label={t("codepuppy.ext.detailModel")}>
+                  <code class="codepuppy-ext-dcode">
                     {a().model!.providerID}/{a().model!.modelID}
                   </code>
                 </FactRow>
               </Show>
               <Show when={a().variant}>
-                <FactRow label={t("alpha.ext.detailVariant")}>{a().variant}</FactRow>
+                <FactRow label={t("codepuppy.ext.detailVariant")}>{a().variant}</FactRow>
               </Show>
-              <div class="alpha-ext-dsub">
-                <div class="alpha-ext-dsub-t">{t("alpha.ext.detailPermission")}</div>
+              <div class="codepuppy-ext-dsub">
+                <div class="codepuppy-ext-dsub-t">{t("codepuppy.ext.detailPermission")}</div>
                 {/* v2 SDK PermissionRuleset = Array<PermissionRule>(运行时已证);Array.isArray
                     防御 v1/未来形状漂移 —— 形状不符时诚实落到「随引擎默认」而非崩。 */}
                 <Show
                   when={Array.isArray(a().permission) && (a().permission ?? []).length > 0}
-                  fallback={<p class="alpha-ext-dnote">{t("alpha.ext.permissionDefault")}</p>}
+                  fallback={<p class="codepuppy-ext-dnote">{t("codepuppy.ext.permissionDefault")}</p>}
                 >
-                  <div class="alpha-ext-dtools">
+                  <div class="codepuppy-ext-dtools">
                     <For each={(a().permission ?? []).slice(0, 10)}>
                       {(rule) => (
-                        <div class="alpha-ext-dtool">
+                        <div class="codepuppy-ext-dtool">
                           <code>
                             {rule.permission}
                             {rule.pattern && rule.pattern !== "*" ? ` (${rule.pattern})` : ""}
@@ -1312,14 +1312,14 @@ export function ExtensionDetail(props: {
                     </For>
                   </div>
                   <Show when={(a().permission ?? []).length > 10}>
-                    <p class="alpha-ext-dnote">+{(a().permission ?? []).length - 10}</p>
+                    <p class="codepuppy-ext-dnote">+{(a().permission ?? []).length - 10}</p>
                   </Show>
                 </Show>
               </div>
               <Show when={a().prompt}>
-                <details class="alpha-ext-dprompt">
-                  <summary>{t("alpha.ext.detailPrompt")}</summary>
-                  <pre class="alpha-ext-ddoc">{a().prompt}</pre>
+                <details class="codepuppy-ext-dprompt">
+                  <summary>{t("codepuppy.ext.detailPrompt")}</summary>
+                  <pre class="codepuppy-ext-ddoc">{a().prompt}</pre>
                 </details>
               </Show>
             </>
@@ -1328,52 +1328,52 @@ export function ExtensionDetail(props: {
         {/* 云连接器(REQ-020 T3):实时连接状态 + 4 工具 + 注入说明(非安装项,mcp.cloud 由
             sidecar 在 platform 登录态注入 —— 未点亮时不装「即将可用」,说清为什么灰) */}
         <Show when={isCloudConnector()}>
-          <FactRow label={t("alpha.ext.cloudConnStatus")}>
+          <FactRow label={t("codepuppy.ext.cloudConnStatus")}>
             <Show
               when={cloudReady()}
               fallback={
-                <span class="alpha-ext-cloudst" data-st={cloudRecovering() ? "idle" : "off"}>
-                  {cloudRecovering() ? t("alpha.ext.cloudConnRecovering") : t("alpha.ext.cloudConnNeedLogin")}
+                <span class="codepuppy-ext-cloudst" data-st={cloudRecovering() ? "idle" : "off"}>
+                  {cloudRecovering() ? t("codepuppy.ext.cloudConnRecovering") : t("codepuppy.ext.cloudConnNeedLogin")}
                 </span>
               }
             >
-              <span class="alpha-ext-cloudst" data-st={cloudLive()?.connected ? "on" : "idle"}>
-                {cloudLive()?.connected ? t("alpha.ext.cloudConnConnected") : t("alpha.ext.cloudConnDisconnected")}
+              <span class="codepuppy-ext-cloudst" data-st={cloudLive()?.connected ? "on" : "idle"}>
+                {cloudLive()?.connected ? t("codepuppy.ext.cloudConnConnected") : t("codepuppy.ext.cloudConnDisconnected")}
               </span>
             </Show>
           </FactRow>
-          <FactRow label={t("alpha.ext.detailTransport")}>{t("alpha.ext.transportRemote")}</FactRow>
+          <FactRow label={t("codepuppy.ext.detailTransport")}>{t("codepuppy.ext.transportRemote")}</FactRow>
           <Show when={!cloudReady() && props.onLogin}>
-            <div class="alpha-ext-dsub">
-              <button class="alpha-ext-add" data-variant="primary" onClick={() => props.onLogin!()}>
-                {t("alpha.auth.signIn")}
+            <div class="codepuppy-ext-dsub">
+              <button class="codepuppy-ext-add" data-variant="primary" onClick={() => props.onLogin!()}>
+                {t("codepuppy.auth.signIn")}
               </button>
             </div>
           </Show>
-          <div class="alpha-ext-dsub" data-alpha-cloud-tools>
-            <div class="alpha-ext-dsub-t">{t("alpha.ext.detailTools")}</div>
-            <div class="alpha-ext-dtools">
+          <div class="codepuppy-ext-dsub" data-codepuppy-cloud-tools>
+            <div class="codepuppy-ext-dsub-t">{t("codepuppy.ext.detailTools")}</div>
+            <div class="codepuppy-ext-dtools">
               <For each={CLOUD_TOOLS}>
                 {(tool) => (
-                  <div class="alpha-ext-dtool">
+                  <div class="codepuppy-ext-dtool">
                     <b>{t(tool.titleKey)}</b>
                     <span>{t(tool.key)}</span>
                   </div>
                 )}
               </For>
             </div>
-            <p class="alpha-ext-dnote">{t("alpha.ext.toolsHint")}</p>
+            <p class="codepuppy-ext-dnote">{t("codepuppy.ext.toolsHint")}</p>
           </div>
-          <div class="alpha-ext-verify-note" data-info="">
-            <b>{t("alpha.ext.cloudInjectTitle")}</b>
-            <p>{t("alpha.ext.cloudInjectNote")}</p>
+          <div class="codepuppy-ext-verify-note" data-info="">
+            <b>{t("codepuppy.ext.cloudInjectTitle")}</b>
+            <p>{t("codepuppy.ext.cloudInjectNote")}</p>
           </div>
-          <details class="alpha-ext-dprompt" data-alpha-cloud-tools-dev>
-            <summary>{t("alpha.timeline.devDetails")}</summary>
-            <div class="alpha-ext-dtools">
+          <details class="codepuppy-ext-dprompt" data-codepuppy-cloud-tools-dev>
+            <summary>{t("codepuppy.timeline.devDetails")}</summary>
+            <div class="codepuppy-ext-dtools">
               <For each={CLOUD_TOOLS}>
                 {(tool) => (
-                  <div class="alpha-ext-dtool">
+                  <div class="codepuppy-ext-dtool">
                     <code>{`codepuppy:${tool.name}`}</code>
                     <span>{t(tool.titleKey)}</span>
                   </div>
@@ -1387,25 +1387,25 @@ export function ExtensionDetail(props: {
       {/* ── 数据边界(T2 基线:remote=目的 host,local=仅本机;REQ-020:云条目/连接器引 ADR-021)
           #397:curated 整段真源切换 —— 能力面(用户语言 pills,未知 token 原样)+ 域名清单
           (≤6 全列,>6 折叠);签名摘要是展示真源,不重算替换。uncurated 走旧真源不混排。 ── */}
-      <Section title={t("alpha.ext.detailBoundary")}>
+      <Section title={t("codepuppy.ext.detailBoundary")}>
         <Show
           when={curated()}
           fallback={
-            <p class="alpha-ext-dboundary">
+            <p class="codepuppy-ext-dboundary">
               <Show
                 when={entry()}
-                fallback={isCloudConnector() ? t("alpha.ext.boundaryCloud") : t("alpha.ext.boundaryLocalOnly")}
+                fallback={isCloudConnector() ? t("codepuppy.ext.boundaryCloud") : t("codepuppy.ext.boundaryLocalOnly")}
               >
                 {(e) => {
                   const spec = mcpSpec(e())
-                  if (spec?.mcpType === "remote") return t("alpha.ext.boundaryRemote", { host: hostOf(spec.url) })
+                  if (spec?.mcpType === "remote") return t("codepuppy.ext.boundaryRemote", { host: hostOf(spec.url) })
                   // 本地命令型 MCP 不等于「不出网」——进程在本机跑,但可能按其功能访问外部服务
                   // (如 GitHub 连接器访问 github.com)。逐条目的地列举归 T4;这里只做诚实概述。
-                  if (spec) return t("alpha.ext.boundaryLocalCmd")
-                  if (e().type === "plugin") return t("alpha.ext.boundaryPluginProc")
-                  if (e().type === "bundle") return t("alpha.ext.boundaryBundle")
-                  if (e().type === "cloud") return t("alpha.ext.boundaryCloud")
-                  return t("alpha.ext.boundaryLocalOnly")
+                  if (spec) return t("codepuppy.ext.boundaryLocalCmd")
+                  if (e().type === "plugin") return t("codepuppy.ext.boundaryPluginProc")
+                  if (e().type === "bundle") return t("codepuppy.ext.boundaryBundle")
+                  if (e().type === "cloud") return t("codepuppy.ext.boundaryCloud")
+                  return t("codepuppy.ext.boundaryLocalOnly")
                 }}
               </Show>
             </p>
@@ -1418,31 +1418,31 @@ export function ExtensionDetail(props: {
               <>
                 <Show
                   when={c().summaries.capabilities.length > 0 || c().summaries.networkDomains.length > 0}
-                  fallback={<p class="alpha-ext-dnote">{t("alpha.ext.boundaryNone")}</p>}
+                  fallback={<p class="codepuppy-ext-dnote">{t("codepuppy.ext.boundaryNone")}</p>}
                 >
                   <Show when={c().summaries.capabilities.length > 0}>
-                    <div class="alpha-ext-dpills">
+                    <div class="codepuppy-ext-dpills">
                       <For each={c().summaries.capabilities}>
                         {(cap) => {
                           const key = CAPABILITY_LABEL_KEYS[cap]
-                          return <span class="alpha-ext-meta">{key ? t(key as never) : <code>{cap}</code>}</span>
+                          return <span class="codepuppy-ext-meta">{key ? t(key as never) : <code>{cap}</code>}</span>
                         }}
                       </For>
                     </div>
                   </Show>
                   <Show when={c().summaries.networkDomains.length > 0}>
-                    <p class="alpha-ext-dnote">{t("alpha.ext.boundaryDomainsIntro", { count: String(c().summaries.networkDomains.length) })}</p>
-                    <div class="alpha-ext-domlist">
+                    <p class="codepuppy-ext-dnote">{t("codepuppy.ext.boundaryDomainsIntro", { count: String(c().summaries.networkDomains.length) })}</p>
+                    <div class="codepuppy-ext-domlist">
                       {(domainsOpen() ? c().summaries.networkDomains : domains().shown).join(" · ")}
                       <Show when={domains().folded && !domainsOpen()}>
                         {" "}
-                        <button class="alpha-ext-ghostbtn" onClick={() => setDomainsOpen(true)}>
-                          {t("alpha.ext.domainsShowAll", { count: String(domains().total) })}
+                        <button class="codepuppy-ext-ghostbtn" onClick={() => setDomainsOpen(true)}>
+                          {t("codepuppy.ext.domainsShowAll", { count: String(domains().total) })}
                         </button>
                       </Show>
                     </div>
                   </Show>
-                  <p class="alpha-ext-dnote">{t("alpha.ext.boundaryDomainsNote")}</p>
+                  <p class="codepuppy-ext-dnote">{t("codepuppy.ext.boundaryDomainsNote")}</p>
                 </Show>
               </>
             )
@@ -1452,27 +1452,27 @@ export function ExtensionDetail(props: {
 
       {/* ── 运行时依赖(T4:进页即实时 which 检测;缺失给安装指引,不等点「添加」才发现) ── */}
       <Show when={entry()}>
-        <Section title={t("alpha.ext.detailRuntime")}>
+        <Section title={t("codepuppy.ext.detailRuntime")}>
           {/* #397:curated 供集 = 甄选摘要(需要什么);✓/✗ 仍是本地 which 实测(有没有)。 */}
           <Show
             when={runtimeDepList().length > 0}
             fallback={
-              <Show when={officeEntry()} fallback={<p class="alpha-ext-dnote">{t("alpha.ext.noRuntimeDeps")}</p>}>
-                <div class="alpha-ext-dpills">
-                  <span class="alpha-ext-meta" data-dep={officeRuntimeState()}>
-                    {t("alpha.ext.officeRuntime")}
-                    {officeRuntimeState() === "checking" ? ` · ${t("alpha.ext.depChecking")}` : officeRuntimeState() === "ok" ? " ✓" : ` ✗ ${t("alpha.ext.depMissing")}`}
+              <Show when={officeEntry()} fallback={<p class="codepuppy-ext-dnote">{t("codepuppy.ext.noRuntimeDeps")}</p>}>
+                <div class="codepuppy-ext-dpills">
+                  <span class="codepuppy-ext-meta" data-dep={officeRuntimeState()}>
+                    {t("codepuppy.ext.officeRuntime")}
+                    {officeRuntimeState() === "checking" ? ` · ${t("codepuppy.ext.depChecking")}` : officeRuntimeState() === "ok" ? " ✓" : ` ✗ ${t("codepuppy.ext.depMissing")}`}
                   </span>
                 </div>
                 <Show when={officeRuntimeState() === "missing"}>
-                  <div class="alpha-ext-verify-note">
-                    <p>{t("alpha.ext.officeRuntimeMissing")}</p>
+                  <div class="codepuppy-ext-verify-note">
+                    <p>{t("codepuppy.ext.officeRuntimeMissing")}</p>
                   </div>
                 </Show>
               </Show>
             }
           >
-            <div class="alpha-ext-dpills">
+            <div class="codepuppy-ext-dpills">
               <For each={runtimeDepList()}>
                 {(dep) => {
                   const state = () => {
@@ -1481,21 +1481,21 @@ export function ExtensionDetail(props: {
                     return hit ? (hit.ok ? "ok" : "missing") : "checking"
                   }
                   return (
-                    <span class="alpha-ext-meta" data-dep={state()}>
+                    <span class="codepuppy-ext-meta" data-dep={state()}>
                       {dep}
-                      {state() === "checking" ? ` · ${t("alpha.ext.depChecking")}` : state() === "ok" ? " ✓" : ` ✗ ${t("alpha.ext.depMissing")}`}
+                      {state() === "checking" ? ` · ${t("codepuppy.ext.depChecking")}` : state() === "ok" ? " ✓" : ` ✗ ${t("codepuppy.ext.depMissing")}`}
                     </span>
                   )
                 }}
               </For>
             </div>
             <Show when={!depCheck.loading && (depCheck() ?? []).some((r) => !r.ok)}>
-              <div class="alpha-ext-verify-note">
-                <b>{t("alpha.ext.depMissingTitle")}</b>
+              <div class="codepuppy-ext-verify-note">
+                <b>{t("codepuppy.ext.depMissingTitle")}</b>
                 <For each={(depCheck() ?? []).filter((r) => !r.ok)}>
                   {(r) => (
                     <p>
-                      {t("alpha.ext.depGuide", { dep: r.dep })} <code class="alpha-ext-dcode">{DEP_GUIDE[r.dep] ?? `brew install ${r.dep}`}</code>
+                      {t("codepuppy.ext.depGuide", { dep: r.dep })} <code class="codepuppy-ext-dcode">{DEP_GUIDE[r.dep] ?? `brew install ${r.dep}`}</code>
                     </p>
                   )}
                 </For>
@@ -1503,32 +1503,32 @@ export function ExtensionDetail(props: {
             </Show>
           </Show>
           <Show when={entry()?.id === "mcp:playwright"}>
-            <div class="alpha-ext-verify-note" data-info="">
-              <p>{t("alpha.ext.playwrightRuntimeNote")}</p>
+            <div class="codepuppy-ext-verify-note" data-info="">
+              <p>{t("codepuppy.ext.playwrightRuntimeNote")}</p>
             </div>
           </Show>
         </Section>
 
         {/* ── 所需密钥(#397:curated 改读甄选摘要 —— 名称 + 来源标注;永不显示值)── */}
-        <Section title={t("alpha.ext.detailSecrets")}>
+        <Section title={t("codepuppy.ext.detailSecrets")}>
           <Show
             when={curated()}
             fallback={
               <Show
                 when={(mcpSpec(entry()!)?.requiredEnvVars ?? []).length > 0}
-                fallback={<p class="alpha-ext-dnote">{t("alpha.ext.noSecrets")}</p>}
+                fallback={<p class="codepuppy-ext-dnote">{t("codepuppy.ext.noSecrets")}</p>}
               >
-                <div class="alpha-ext-dpills">
+                <div class="codepuppy-ext-dpills">
                   <For each={mcpSpec(entry()!)!.requiredEnvVars}>
                     {(v) => (
-                      <span class="alpha-ext-meta">
+                      <span class="codepuppy-ext-meta">
                         <LockIc />
                         {v}
                       </span>
                     )}
                   </For>
                 </div>
-                <p class="alpha-ext-dnote">{t("alpha.ext.keyHint")}</p>
+                <p class="codepuppy-ext-dnote">{t("codepuppy.ext.keyHint")}</p>
               </Show>
             }
           >
@@ -1540,33 +1540,33 @@ export function ExtensionDetail(props: {
               return (
                 <Show
                   when={c().summaries.requiredSecrets.length > 0}
-                  fallback={<p class="alpha-ext-dnote">{t("alpha.ext.noSecrets")}</p>}
+                  fallback={<p class="codepuppy-ext-dnote">{t("codepuppy.ext.noSecrets")}</p>}
                 >
                   <Show when={envSecrets().length > 0}>
-                    <div class="alpha-ext-dpills">
+                    <div class="codepuppy-ext-dpills">
                       <For each={envSecrets()}>
                         {(s) => (
-                          <span class="alpha-ext-meta">
+                          <span class="codepuppy-ext-meta">
                             <LockIc />
                             {s.name}
                           </span>
                         )}
                       </For>
                     </div>
-                    <p class="alpha-ext-dnote">{t("alpha.ext.secretsFromEnvNote")}</p>
+                    <p class="codepuppy-ext-dnote">{t("codepuppy.ext.secretsFromEnvNote")}</p>
                   </Show>
                   <Show when={connSecrets().length > 0}>
-                    <div class="alpha-ext-dpills">
+                    <div class="codepuppy-ext-dpills">
                       <For each={connSecrets()}>
                         {(s) => (
-                          <span class="alpha-ext-meta">
+                          <span class="codepuppy-ext-meta">
                             <LockIc />
                             {s.name}
                           </span>
                         )}
                       </For>
                     </div>
-                    <p class="alpha-ext-dnote">{t("alpha.ext.secretsFromConnNote")}</p>
+                    <p class="codepuppy-ext-dnote">{t("codepuppy.ext.secretsFromConnNote")}</p>
                   </Show>
                 </Show>
               )
@@ -1576,18 +1576,18 @@ export function ExtensionDetail(props: {
 
         {/* ── #397:fail-closed 的一行如实上报(仅 invalid 态渲染;无 curation = 正常未分级,零说明)── */}
         <Show when={cst().kind === "invalid"}>
-          <Section title={t("alpha.ext.gradeFailTitle")}>
-            <p class="alpha-ext-dnote">{t("alpha.ext.gradeFailBody")}</p>
+          <Section title={t("codepuppy.ext.gradeFailTitle")}>
+            <p class="codepuppy-ext-dnote">{t("codepuppy.ext.gradeFailBody")}</p>
           </Section>
         </Show>
 
         {/* ── #397→#408:实验室条目的「启用方式」(session-grant 语义讲人话;会话开关已落地,
             文案改为现实 —— 已装态还给当前会话状态一行,与开关状态机同真源)── */}
         <Show when={sessionGrantNow()}>
-          <Section title={t("alpha.ext.labsHowTitle")}>
-            <p class="alpha-ext-dnote">{t("alpha.ext.labsHowBody")}</p>
+          <Section title={t("codepuppy.ext.labsHowTitle")}>
+            <p class="codepuppy-ext-dnote">{t("codepuppy.ext.labsHowBody")}</p>
             <Show when={entry() && entry()!.type === "mcp" && installed()}>
-              <p class="alpha-ext-dnote">{t(props.sessionViewFor(entry()!.id).textKey)}</p>
+              <p class="codepuppy-ext-dnote">{t(props.sessionViewFor(entry()!.id).textKey)}</p>
             </Show>
           </Section>
         </Show>
@@ -1599,9 +1599,9 @@ export function ExtensionDetail(props: {
       <Show when={govRow()}>
         {(row) => (
           <>
-            <Section title={t("alpha.ext.ownTitle")}>
+            <Section title={t("codepuppy.ext.ownTitle")}>
               <FactRows rows={detailOwnershipRows(row().ownership)} />
-              <p class="alpha-ext-dnote">{t(row().ownership.curated === "alpha" ? "alpha.ext.ownNote" : "alpha.ext.ownNoteSelfAdded")}</p>
+              <p class="codepuppy-ext-dnote">{t(row().ownership.curated === "alpha" ? "codepuppy.ext.ownNote" : "codepuppy.ext.ownNoteSelfAdded")}</p>
             </Section>
             {/* ── #392 已授权能力段:#348 授权账(ext-store/<key>/grants.json)的被动查询面。对安装行渲染
                 (grant 只随 committed 安装存在);无记录 = 如实空态,绝不回填按类型派生的"本应请求"
@@ -1611,27 +1611,27 @@ export function ExtensionDetail(props: {
                 门精确到 mcp:bundle 的 installed() 是"必选子项全装"的派生真(自身无账本行),授权
                 记录属于各子项,bundle 详情不得冒出误导性的"无授权记录"。 ── */}
             <Show when={row().scope !== null || (entry()?.type === "mcp" && installed())}>
-              <Section title={t("alpha.ext.grantedTitle")}>
+              <Section title={t("codepuppy.ext.grantedTitle")}>
                 <Show
                   when={row().granted}
                   fallback={
-                    <div class="alpha-ext-authz-box">
-                      <p class="alpha-ext-authz-empty">{t("alpha.ext.grantedEmpty")}</p>
+                    <div class="codepuppy-ext-authz-box">
+                      <p class="codepuppy-ext-authz-empty">{t("codepuppy.ext.grantedEmpty")}</p>
                     </div>
                   }
                 >
                   {(g) => (
                     <>
-                      <div class="alpha-ext-authz-box">
+                      <div class="codepuppy-ext-authz-box">
                         <Show
                           when={g().capabilities.length > 0}
-                          fallback={<p class="alpha-ext-authz-empty">{t("alpha.ext.grantedNone")}</p>}
+                          fallback={<p class="codepuppy-ext-authz-empty">{t("codepuppy.ext.grantedNone")}</p>}
                         >
                           <For each={g().capabilities}>{(cap) => <ExtGrantedCapRow cap={cap} />}</For>
                         </Show>
                       </div>
-                      <p class="alpha-ext-dnote">
-                        {t("alpha.ext.grantedMeta", { date: g().grantedAt.slice(0, 10) })}
+                      <p class="codepuppy-ext-dnote">
+                        {t("codepuppy.ext.grantedMeta", { date: g().grantedAt.slice(0, 10) })}
                       </p>
                     </>
                   )}
@@ -1639,7 +1639,7 @@ export function ExtensionDetail(props: {
               </Section>
             </Show>
             {/* ── 来源与签名段:信任链就近呈现(签名通道 + 分发 + 目录版本;发布钥不在读面 → 省略)── */}
-            <Section title={t("alpha.ext.trustTitle")}>
+            <Section title={t("codepuppy.ext.trustTitle")}>
               <FactRows
                 rows={trustRows(
                   row().ownership,
@@ -1647,7 +1647,7 @@ export function ExtensionDetail(props: {
                   props.governance?.()?.catalogVersion ?? null,
                 )}
               />
-              <p class="alpha-ext-dnote">{t("alpha.ext.trustNote")}</p>
+              <p class="codepuppy-ext-dnote">{t("codepuppy.ext.trustNote")}</p>
             </Section>
           </>
         )}
@@ -1656,25 +1656,25 @@ export function ExtensionDetail(props: {
       {/* ── #397 改动三:「组件与来源」段(置段尾:数据按需拉取、不参与任何判定,合同 §7.3)——
           逐 blob 独立校验态 + 失败 loud + 重试;绝不整段消失或静默留白。 ── */}
       <Show when={curated()}>
-        <Section title={t("alpha.ext.sbomTitle")}>
-          <div class="alpha-ext-sbomrow">
-            <span class="alpha-ext-sbomst" data-tone={sbomBlob.loading ? undefined : sbomBlob()?.ok ? "ok" : "err"}>
+        <Section title={t("codepuppy.ext.sbomTitle")}>
+          <div class="codepuppy-ext-sbomrow">
+            <span class="codepuppy-ext-sbomst" data-tone={sbomBlob.loading ? undefined : sbomBlob()?.ok ? "ok" : "err"}>
               {sbomBlob.loading ? "…" : sbomBlob()?.ok ? "✓" : "!"}
             </span>
-            <div class="alpha-ext-sbombd">
-              <Show when={!sbomBlob.loading} fallback={<b>{t("alpha.ext.blobLoading")}</b>}>
+            <div class="codepuppy-ext-sbombd">
+              <Show when={!sbomBlob.loading} fallback={<b>{t("codepuppy.ext.blobLoading")}</b>}>
                 <Show
                   when={sbomBlob()?.ok}
                   fallback={
                     <>
-                      <b>{t("alpha.ext.sbomLoadFail")}</b>
-                      <small>{t("alpha.ext.blobFailNote")}</small>
+                      <b>{t("codepuppy.ext.sbomLoadFail")}</b>
+                      <small>{t("codepuppy.ext.blobFailNote")}</small>
                     </>
                   }
                 >
                   <b>
-                    {t("alpha.ext.sbomRowComponents")} · {t("alpha.ext.sbomComponentsCount", { count: String(sbomComponents().length) })} ·{" "}
-                    {t("alpha.ext.sbomVerified")}
+                    {t("codepuppy.ext.sbomRowComponents")} · {t("codepuppy.ext.sbomComponentsCount", { count: String(sbomComponents().length) })} ·{" "}
+                    {t("codepuppy.ext.sbomVerified")}
                   </b>
                   <Show when={sbomComponents().length > 0}>
                     <small>
@@ -1688,38 +1688,38 @@ export function ExtensionDetail(props: {
               when={!sbomBlob.loading && sbomBlob()?.ok && sbomComponents().length > 3}
               fallback={
                 <Show when={!sbomBlob.loading && sbomBlob() && !sbomBlob()!.ok}>
-                  <button class="alpha-ext-ghostbtn" onClick={() => void refetchSbom()}>
-                    {t("alpha.ext.blobRetry")}
+                  <button class="codepuppy-ext-ghostbtn" onClick={() => void refetchSbom()}>
+                    {t("codepuppy.ext.blobRetry")}
                   </button>
                 </Show>
               }
             >
-              <button class="alpha-ext-ghostbtn" onClick={() => setSbomOpen(!sbomOpen())}>
-                {sbomOpen() ? t("alpha.ext.sbomCollapse") : t("alpha.ext.sbomExpand")}
+              <button class="codepuppy-ext-ghostbtn" onClick={() => setSbomOpen(!sbomOpen())}>
+                {sbomOpen() ? t("codepuppy.ext.sbomCollapse") : t("codepuppy.ext.sbomExpand")}
               </button>
             </Show>
           </div>
-          <div class="alpha-ext-sbomrow">
-            <span class="alpha-ext-sbomst" data-tone={provBlob.loading ? undefined : provBlob()?.ok ? "ok" : "err"}>
+          <div class="codepuppy-ext-sbomrow">
+            <span class="codepuppy-ext-sbomst" data-tone={provBlob.loading ? undefined : provBlob()?.ok ? "ok" : "err"}>
               {provBlob.loading ? "…" : provBlob()?.ok ? "✓" : "!"}
             </span>
-            <div class="alpha-ext-sbombd">
-              <Show when={!provBlob.loading} fallback={<b>{t("alpha.ext.blobLoading")}</b>}>
+            <div class="codepuppy-ext-sbombd">
+              <Show when={!provBlob.loading} fallback={<b>{t("codepuppy.ext.blobLoading")}</b>}>
                 <Show
                   when={provFacts()}
                   fallback={
                     <>
-                      <b>{t("alpha.ext.provLoadFail")}</b>
-                      <small>{t("alpha.ext.blobFailNote")}</small>
+                      <b>{t("codepuppy.ext.provLoadFail")}</b>
+                      <small>{t("codepuppy.ext.blobFailNote")}</small>
                     </>
                   }
                 >
                   {(p) => (
                     <>
                       <b>
-                        {t("alpha.ext.provRowTitle")} · {t("alpha.ext.sbomVerified")}
+                        {t("codepuppy.ext.provRowTitle")} · {t("codepuppy.ext.sbomVerified")}
                       </b>
-                      <small class="alpha-ext-sbommono">
+                      <small class="codepuppy-ext-sbommono">
                         {p().locator} · {p().resolved.length > 24 ? `${p().resolved.slice(0, 24)}…` : p().resolved}
                       </small>
                     </>
@@ -1728,12 +1728,12 @@ export function ExtensionDetail(props: {
               </Show>
             </div>
             <Show when={!provBlob.loading && provBlob() && !provBlob()!.ok}>
-              <button class="alpha-ext-ghostbtn" onClick={() => void refetchProv()}>
-                {t("alpha.ext.blobRetry")}
+              <button class="codepuppy-ext-ghostbtn" onClick={() => void refetchProv()}>
+                {t("codepuppy.ext.blobRetry")}
               </button>
             </Show>
           </div>
-          <p class="alpha-ext-dnote">{t("alpha.ext.sbomNote")}</p>
+          <p class="codepuppy-ext-dnote">{t("codepuppy.ext.sbomNote")}</p>
         </Section>
       </Show>
 

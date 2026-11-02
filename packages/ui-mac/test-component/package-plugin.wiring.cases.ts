@@ -10,7 +10,7 @@
 //      里同时出现四个 builder 的特征 item;表对了而分派仍是 `else → mcp` 的实现在这里必红);
 //   ② **file item key 恰是 `plugin--<name>--f<i>`**(否则 `ext-health-probe-router.ts:40-41`
 //      fail-closed 拒掉整次安装);
-//   ③ **经生产 install 真写盘后**,读回真实 `alpha.jsonc`,断言 `plugin[]` 里那一条是 managed
+//   ③ **经生产 install 真写盘后**,读回真实 `codepuppy.jsonc`,断言 `plugin[]` 里那一条是 managed
 //      wrapper 的**精确绝对路径**、满足目录圈禁、且**不存在**任何同名的 legacy/npm 条目;
 //   ④ 整包卸载后**四条一起**:目录 / `plugin[]` / grants / **账本记录**。第四条走**生产卸载后
 //      重读账本**,不断言中间那份 mutation 的 `graphAfter === null`(那是自己拼等价链)。
@@ -142,19 +142,19 @@ mock.module("../src/main/ext-transaction", () => ({
   },
 }))
 
-const { initAlphaEnvironment, getAlphaEnvironment } = await import("../src/main/alpha-environment")
+const { initCodePuppyEnvironment, getCodePuppyEnvironment } = await import("../src/main/codepuppy-environment")
 const { registerExtIpcHandlers } = await import("../src/main/ext-ipc")
 const { setDesiredStateV2, upsertRecordsV2 } = await import("../src/main/ext-receipt-v2")
 const { decodePackageEnvelopeHeaderV1 } = await import(
   "../src/shared/host-extension-package-contract/decoder"
 )
 
-delete process.env.ALPHA_GLOBAL_DIR
-initAlphaEnvironment({
+delete process.env.CODEPUPPY_GLOBAL_DIR
+initCodePuppyEnvironment({
   isPackaged: false,
   channel: "dev",
   appDataDir: tmp,
-  baseRoot: join(tmp, "alpha-code-state"),
+  baseRoot: join(tmp, "codepuppy-state"),
   homeDir: join(tmp, "home"),
 })
 registerExtIpcHandlers(
@@ -169,7 +169,7 @@ afterAll(() => {
   rmSync(tmp, { recursive: true, force: true })
 })
 
-const root = () => getAlphaEnvironment().mutableRoot
+const root = () => getCodePuppyEnvironment().mutableRoot
 
 function resetDisk() {
   for (const dir of [root(), userData]) {
@@ -213,24 +213,24 @@ type Ledger = {
   claims?: Array<{ kind: string; name: string; owners: string[] }>
 }
 
-const configPath = () => join(root(), "alpha.jsonc")
+const configPath = () => join(root(), "codepuppy.jsonc")
 const ledgerPath = () => join(root(), "installs.json")
 const grantPath = (key: string) => join(root(), "ext-store", key, "grants.json")
 
 // ── 观测手段本身不许有盲区 ────────────────────────────────────────────────────────────────────
 //
 // 这三个读法此前都是 `try { … } catch { 返回空 }`,于是「正确清空」与「**整个文件被删掉/写坏**」
-// 折叠成同一个观察结果:一个卸载时顺手把 `alpha.jsonc` 删了、把 `installs.json` 重置了的实现,
+// 折叠成同一个观察结果:一个卸载时顺手把 `codepuppy.jsonc` 删了、把 `installs.json` 重置了的实现,
 // 四条清零断言仍然全绿。**读不出来是失败,不是「空」** —— 下面一律严格读,读不出就抛。
 
-/** 严格读 `alpha.jsonc`:文件必须在、必须是合法 jsonc、根必须是对象。 */
+/** 严格读 `codepuppy.jsonc`:文件必须在、必须是合法 jsonc、根必须是对象。 */
 function readConfigStrict(): Record<string, unknown> {
   const text = readFileSync(configPath(), "utf8") // 缺席 ⇒ 抛(ENOENT)
   const errors: ParseError[] = []
   const parsed: unknown = parse(text, errors)
-  if (errors.length > 0) throw new Error(`alpha.jsonc is not valid jsonc (${errors.length} syntax error(s))`)
+  if (errors.length > 0) throw new Error(`codepuppy.jsonc is not valid jsonc (${errors.length} syntax error(s))`)
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
-    throw new Error("alpha.jsonc root is not an object")
+    throw new Error("codepuppy.jsonc root is not an object")
   return parsed as Record<string, unknown>
 }
 
@@ -238,7 +238,7 @@ function readConfigStrict(): Record<string, unknown> {
 function pluginArrayStrict(): unknown[] {
   const value = readConfigStrict().plugin
   if (!Array.isArray(value))
-    throw new Error(`alpha.jsonc "plugin" is ${JSON.stringify(value) ?? "undefined"}, expected an array`)
+    throw new Error(`codepuppy.jsonc "plugin" is ${JSON.stringify(value) ?? "undefined"}, expected an array`)
   return value
 }
 
@@ -264,7 +264,7 @@ function grantOf(key: string): { capabilities?: string[] } {
 // 卸载**之前**在 config 与账本里各放一件**与本包无关**的东西,卸载**之后**断言它们逐字还在。
 // 一个把整份配置或整本账本推倒重写的实现,会连这两件一起抹掉。
 
-const CONFIG_SENTINEL_KEY = "alphaTestUnrelatedSetting"
+const CONFIG_SENTINEL_KEY = "codepuppyTestUnrelatedSetting"
 const CONFIG_SENTINEL_VALUE = "req128-809-untouched"
 const LEDGER_SENTINEL_NAME = "req128-809-unrelated-agent"
 
@@ -415,27 +415,27 @@ test("对照:同一个包去掉 plugin 组件后照常装成 —— 四个 profi
     expect(item.config?.edits[0]?.keyPath, name).toEqual(["mcp", name])
   }
   expect(new Set([skillItem.key, agentFile.key, keyed.get("mcp--plugin-kit-local")!.key, keyed.get("mcp--plugin-kit-remote")!.key]).size).toBe(4)
-  // 一条 plugin item 都没有,写盘后的 `alpha.jsonc` 里也没有 `plugin` 键。
+  // 一条 plugin item 都没有,写盘后的 `codepuppy.jsonc` 里也没有 `plugin` 键。
   expect(items.filter((item) => item.key.startsWith("plugin--"))).toHaveLength(0)
   expect(readConfigStrict().plugin).toBeUndefined()
 })
 
-test("@alpha-code/ext 不受影响:引擎侧接缝走 OPENCODE_CONFIG_CONTENT,与磁盘 plugin[] 无关", async () => {
+test("@codepuppy/ext 不受影响:引擎侧接缝走 OPENCODE_CONFIG_CONTENT,与磁盘 plugin[] 无关", async () => {
   resetDisk()
-  // 生产注入面(`injectAlphaConfig`)在 sidecar 里跑,这里只需证明它**不经过**被封死的那条路:
-  // 它把 alpha 自己的 ext 绝对路径合进 env 通道的对象,磁盘上的 alpha.jsonc 一个字节都不写。
-  const { injectAlphaConfig } = await import("../src/main/alpha-config-injection")
-  const extPath = join(tmp, "alpha-ext", "index.js")
-  mkdirSync(join(tmp, "alpha-ext"), { recursive: true })
+  // 生产注入面(`injectCodePuppyConfig`)在 sidecar 里跑,这里只需证明它**不经过**被封死的那条路:
+  // 它把 alpha 自己的 ext 绝对路径合进 env 通道的对象,磁盘上的 codepuppy.jsonc 一个字节都不写。
+  const { injectCodePuppyConfig } = await import("../src/main/codepuppy-config-injection")
+  const extPath = join(tmp, "codepuppy-ext", "index.js")
+  mkdirSync(join(tmp, "codepuppy-ext"), { recursive: true })
   writeFileSync(extPath, "export default {}\n")
   const prevContent = process.env.OPENCODE_CONFIG_CONTENT
   delete process.env.OPENCODE_CONFIG_CONTENT
-  const injected = injectAlphaConfig(userData, extPath, "dev")
+  const injected = injectCodePuppyConfig(userData, extPath, "dev")
   expect(injected.ok).toBe(true)
   const envConfig = JSON.parse(process.env.OPENCODE_CONFIG_CONTENT!) as { plugin?: unknown[] }
   // ① alpha 自有 ext 确实进了引擎会读的那份配置(env 通道);
   expect(envConfig.plugin).toEqual([extPath])
-  // ② 而磁盘上的 `alpha.jsonc` 里没有它 —— 注入只 seed 了一个 `{$schema}`。
+  // ② 而磁盘上的 `codepuppy.jsonc` 里没有它 —— 注入只 seed 了一个 `{$schema}`。
   //    咽喉若误伤这条接缝,①会红;咽喉若其实拦不住磁盘写,②会红。
   expect(readConfigStrict().plugin).toBeUndefined()
   if (prevContent === undefined) delete process.env.OPENCODE_CONFIG_CONTENT

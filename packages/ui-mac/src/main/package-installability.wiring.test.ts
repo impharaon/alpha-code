@@ -10,7 +10,7 @@
 import { createHash } from "node:crypto"
 import { resolve } from "node:path"
 import { describe, expect, test } from "bun:test"
-import bundledCatalog from "../renderer/extensions/alpha-catalog.json"
+import bundledCatalog from "../renderer/extensions/codepuppy-catalog.json"
 import { CATALOG_PACKAGE_REASON_CODES, type CatalogPackageViewV1 } from "../shared/catalog-package-view"
 import type { AlphaPackageEnvelopeV1, PackageProfilePayloadV1 } from "../shared/host-extension-package-contract/decoder"
 import {
@@ -26,7 +26,7 @@ import {
   type RemoteCatalogResult,
 } from "./remote-catalog"
 
-const artifact = resolve(import.meta.dir, "../../../alpha-contracts-consumer/vendor/alpha-web-extension-package")
+const artifact = resolve(import.meta.dir, "../../../codepuppy-contracts-consumer/vendor/alpha-web-extension-package")
 
 /**
  * The pinned producer output exactly as vendored — envelope and component payloads both.
@@ -263,7 +263,7 @@ describe("package installability production wiring", () => {
       package: {
         verdict: "update-required",
         action: {
-          kind: "update-alpha",
+          kind: "update-codepuppy",
           reasonCode: "package-host-update-required",
         },
       },

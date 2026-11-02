@@ -16,8 +16,8 @@ import * as os from "node:os"
 import { join } from "node:path"
 import type { AutomationTask } from "../shared/automation-types"
 
-const ROOT = fs.mkdtempSync(join(os.tmpdir(), "alpha-1353-"))
-const PROJECT = fs.mkdtempSync(join(os.tmpdir(), "alpha-1353-project-"))
+const ROOT = fs.mkdtempSync(join(os.tmpdir(), "codepuppy-1353-"))
+const PROJECT = fs.mkdtempSync(join(os.tmpdir(), "codepuppy-1353-project-"))
 
 /** 引擎侧被调用过什么。断言的核心是它**空着**。 */
 const engine: { created: unknown[]; prompted: unknown[]; down: boolean } = { created: [], prompted: [], down: false }
@@ -33,9 +33,9 @@ mock.module("electron", () => ({
   powerMonitor: { on: () => {} },
 }))
 mock.module("./logging", () => ({ getLogger: () => ({ log: () => {}, warn: () => {}, error: () => {} }) }))
-mock.module("./alpha-installs", () => ({ alphaGlobalRoot: () => ROOT }))
-mock.module("./alpha-user-workspace", () => ({ saveVisibleOutputs: () => {} }))
-mock.module("./alpha-workdir", () => ({
+mock.module("./codepuppy-installs", () => ({ codepuppyGlobalRoot: () => ROOT }))
+mock.module("./codepuppy-user-workspace", () => ({ saveVisibleOutputs: () => {} }))
+mock.module("./codepuppy-workdir", () => ({
   writeRunFiles: (_dir: string, runId: string, files: Record<string, string>) => {
     runFiles.push({ runId, files })
     return { ok: true as const, dir: join(ROOT, "runs", runId) }
@@ -62,7 +62,7 @@ mock.module("@opencode-ai/sdk/v2/client", () => ({
 const { initModerationKeywords, resetModerationKeywordsForTests, MODERATION_BLOCKED_REASON } = await import(
   "./moderation-keywords"
 )
-const { saveAutomation, getAutomation, readAutomationState, writeAutomationState } = await import("./alpha-automations")
+const { saveAutomation, getAutomation, readAutomationState, writeAutomationState } = await import("./codepuppy-automations")
 const { startAutomationScheduler, runAutomationNow } = await import("./automation-scheduler")
 const { initAutomationLlm, llmParseAutomation } = await import("./automation-llm")
 

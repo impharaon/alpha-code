@@ -1,12 +1,12 @@
 // factory-deny — REQ-067(用户拍板 2026-07-08,与 REQ-065 修订同一口径):上游默认禁项**零明文**。
 //
 // customize-opencode 这类「上游自带、alpha 出厂即禁」的技能,禁用是产品内置行为,不该以
-// `permission.skill.<n>: "deny"` 明文出现在用户配置(`<current-environment-root>/alpha.jsonc`)里 —— 用户配置只放
+// `permission.skill.<n>: "deny"` 明文出现在用户配置(`<current-environment-root>/codepuppy.jsonc`)里 —— 用户配置只放
 // 用户自己的东西。机制与出厂技能路径(factory-paths.ts)同构:main 算好 effective 名单
-// (#1522 customize-opencode 永久禁用)→ `ALPHA_FACTORY_DENY_SKILLS`(JSON 数组)→ 本模块在
+// (#1522 customize-opencode 永久禁用)→ `CODEPUPPY_FACTORY_DENY_SKILLS`(JSON 数组)→ 本模块在
 // config hook 里内存注入:
 //   - `permission.skill.<n> = "deny"`(弃用技能覆盖用户配置,其余 set-if-absent);
-//   - 同名占位 command(弃用技能强制指路 /customize-code-puppy,其余 set-if-absent)。
+//   - 同名占位 command(弃用技能强制指路 /customize-codepuppy,其余 set-if-absent)。
 // 斜杠菜单的隐藏由 renderer 读 gov-read 的 factoryDenied 完成(REQ-066 过滤同源)。
 //
 // REQ-157 `#1284`:占位 command 的 description / template 是 alpha 的字、会进模型上下文(template 在用户

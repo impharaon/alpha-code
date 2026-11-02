@@ -12,7 +12,7 @@
 //     可审计路径)。
 //   * RETIRED_COMMUNITY_OFFICE_CONNECTORS / retiredCommunityOfficeFor —— 新安装/重新激活的
 //     随包静态拒绝事实。它不复用 archived keep-installed 语义。
-//   * ALPHA_OFFICE_CONNECTORS / checkAlphaOfficeMcpSafety —— four Alpha-authored bundled stdio
+//   * CODEPUPPY_OFFICE_CONNECTORS / checkCodePuppyOfficeMcpSafety —— four Alpha-authored bundled stdio
 //     entrypoints, exact dependency pins, and the shared workspace-policy membership for REQ-133.
 //
 // 远程签名 advisory 通道是 REQ-101 的未来工作;本表是其之前的最小诚实路径(随包静态数据)。
@@ -67,14 +67,14 @@ export const RETIRED_COMMUNITY_OFFICE_CONNECTORS: readonly RetiredCommunityOffic
   },
 ] as const
 
-export type AlphaOfficeFormat = "word" | "excel" | "powerpoint" | "pdf"
+export type CodePuppyOfficeFormat = "word" | "excel" | "powerpoint" | "pdf"
 export const WORKSPACE_MARKER = "{workspace}"
 
 /** REQ-133 first-party Office MCP facts. This is the single code-side authority consumed by the
  *  planner, write policy, tests, and factory skill; the signed web catalog remains the card source.
  *  #1564: the Python packages these formats need are pinned once, in resources/office-runtime/
  *  (requirements.in + per-arch hashed locks), and ship inside the app. */
-export const ALPHA_OFFICE_CONNECTORS = [
+export const CODEPUPPY_OFFICE_CONNECTORS = [
   {
     catalogId: "mcp:codepuppy-word",
     name: "codepuppy-word",
@@ -102,28 +102,28 @@ export const ALPHA_OFFICE_CONNECTORS = [
 ] as const satisfies ReadonlyArray<{
   catalogId: string
   name: string
-  format: AlphaOfficeFormat
+  format: CodePuppyOfficeFormat
   extension: string
 }>
 
 /** #1564: the app-bundled interpreter and the shared server, as `{alphaResources}`-relative slots. */
-export const ALPHA_OFFICE_PYTHON_SLOT = "{alphaResources}/office-runtime/bin/python3"
-export const ALPHA_OFFICE_SERVER_SLOT = "{alphaResources}/office-mcp/server.py"
+export const CODEPUPPY_OFFICE_PYTHON_SLOT = "{alphaResources}/office-runtime/bin/python3"
+export const CODEPUPPY_OFFICE_SERVER_SLOT = "{alphaResources}/office-mcp/server.py"
 
 /** The only command the four first-party Office entries run (#1564 AC1): the app-bundled Python in
  *  isolated mode (`-I`: no user site / PYTHON* env; `-B`: never writes bytecode into the bundle), no uv,
  *  no first-run download. Main owns both substitutions; catalog card commands are not consumed. */
-export function alphaOfficeInstallCommand(format: AlphaOfficeFormat): string[] {
-  if (!ALPHA_OFFICE_CONNECTORS.some((candidate) => candidate.format === format)) throw new Error(`unknown Alpha Office format: ${format}`)
-  return [ALPHA_OFFICE_PYTHON_SLOT, "-I", "-B", ALPHA_OFFICE_SERVER_SLOT, format, WORKSPACE_MARKER]
+export function codepuppyOfficeInstallCommand(format: CodePuppyOfficeFormat): string[] {
+  if (!CODEPUPPY_OFFICE_CONNECTORS.some((candidate) => candidate.format === format)) throw new Error(`unknown Alpha Office format: ${format}`)
+  return [CODEPUPPY_OFFICE_PYTHON_SLOT, "-I", "-B", CODEPUPPY_OFFICE_SERVER_SLOT, format, WORKSPACE_MARKER]
 }
 
 /** #1564 AC3: main's fact about the app-bundled Office runtime. Install entry points and the detail page
  *  read it for the four first-party catalog ids instead of the card's `runtimeDep` (uv). */
 export type OfficeRuntimeReadiness = { ok: true } | { ok: false; reason: "office-runtime-missing" }
 
-export function isAlphaOfficeCatalogId(id: string | undefined): boolean {
-  return ALPHA_OFFICE_CONNECTORS.some((connector) => connector.catalogId === id)
+export function isCodePuppyOfficeCatalogId(id: string | undefined): boolean {
+  return CODEPUPPY_OFFICE_CONNECTORS.some((connector) => connector.catalogId === id)
 }
 
 /** 按 catalog id / 安装名匹配 advisory(receipts.id、receipts.name、live MCP server 名都可传)。 */
@@ -146,16 +146,16 @@ export function retiredCommunityOfficeFor(
 
 export type OfficeSafetyVerdict = { ok: true } | { ok: false; reason: string }
 
-const ALPHA_OFFICE_BANNED_ENV = new Set(["HOST", "PORT", "MCP_HOST", "MCP_PORT", "MCP_TRANSPORT", "FASTMCP_HOST", "FASTMCP_PORT"])
+const CODEPUPPY_OFFICE_BANNED_ENV = new Set(["HOST", "PORT", "MCP_HOST", "MCP_PORT", "MCP_TRANSPORT", "FASTMCP_HOST", "FASTMCP_PORT"])
 // #1564: the bundled runtime downloads nothing, so the uv-era package-index variables are no longer allowed.
-const ALPHA_OFFICE_ALLOWED_ENV = new Set(["npm_config_registry"])
+const CODEPUPPY_OFFICE_ALLOWED_ENV = new Set(["npm_config_registry"])
 
-function alphaOfficeConnector(name: string, command: readonly string[]) {
-  const named = ALPHA_OFFICE_CONNECTORS.find((connector) => connector.name === name)
+function codepuppyOfficeConnector(name: string, command: readonly string[]) {
+  const named = CODEPUPPY_OFFICE_CONNECTORS.find((connector) => connector.name === name)
   if (named) return named
   const script = command.findIndex((argument) => normalizeSlashes(argument).endsWith("/office-mcp/server.py"))
   if (script < 0) return undefined
-  return ALPHA_OFFICE_CONNECTORS.find((connector) => command[script + 1] === connector.format)
+  return CODEPUPPY_OFFICE_CONNECTORS.find((connector) => command[script + 1] === connector.format)
 }
 
 /** 纯字符串路径检查(shared 模块不引 node:path,renderer 亦可用)。 */
@@ -173,14 +173,14 @@ function isAbsolutePath(p: string): boolean {
 }
 
 /** REQ-133 persistence gate: only the exact Alpha-authored bundled stdio command may be durable. */
-export function checkAlphaOfficeMcpSafety(
+export function checkCodePuppyOfficeMcpSafety(
   name: string,
   server: Record<string, unknown>,
   workspace?: string,
   alphaResources?: string,
 ): OfficeSafetyVerdict {
   const command = Array.isArray(server.command) ? (server.command as unknown[]).filter((argument): argument is string => typeof argument === "string") : []
-  const connector = alphaOfficeConnector(name, command)
+  const connector = codepuppyOfficeConnector(name, command)
   if (!connector) return { ok: true }
   if (server.type !== "local" || ["url", "host", "port", "transport"].some((key) => key in server)) {
     return { ok: false, reason: `${connector.name} only allows local stdio; remote transport is refused (REQ-133)` }
@@ -191,7 +191,7 @@ export function checkAlphaOfficeMcpSafety(
   if (hasTraversal(workspace) || hasTraversal(alphaResources)) {
     return { ok: false, reason: `${connector.name} path contains traversal segments (REQ-133)` }
   }
-  const expected = alphaOfficeInstallCommand(connector.format).map((argument) =>
+  const expected = codepuppyOfficeInstallCommand(connector.format).map((argument) =>
     argument
       .split("{alphaResources}")
       .join(normalizeSlashes(alphaResources).replace(/\/+$/, ""))
@@ -206,7 +206,7 @@ export function checkAlphaOfficeMcpSafety(
       ? (server.environment as Record<string, unknown>)
       : {}
   for (const [key, value] of Object.entries(env)) {
-    if (!ALPHA_OFFICE_ALLOWED_ENV.has(key) || ALPHA_OFFICE_BANNED_ENV.has(key.toUpperCase()) || (typeof value === "string" && value.includes("0.0.0.0"))) {
+    if (!CODEPUPPY_OFFICE_ALLOWED_ENV.has(key) || CODEPUPPY_OFFICE_BANNED_ENV.has(key.toUpperCase()) || (typeof value === "string" && value.includes("0.0.0.0"))) {
       return { ok: false, reason: `${connector.name} unapproved runtime environment is refused (REQ-133)` }
     }
   }
@@ -214,9 +214,9 @@ export function checkAlphaOfficeMcpSafety(
 }
 
 /** First-party Office recognition by stable name or bundled script + format entrypoint. */
-export function isAlphaOfficeMcp(name: string, server: Record<string, unknown>): boolean {
+export function isCodePuppyOfficeMcp(name: string, server: Record<string, unknown>): boolean {
   const command = Array.isArray(server.command) ? (server.command as unknown[]).filter((argument): argument is string => typeof argument === "string") : []
-  return alphaOfficeConnector(name, command) !== undefined
+  return codepuppyOfficeConnector(name, command) !== undefined
 }
 
 /** Main write-policy recognition for the retired connector. Exact name and package command matching
@@ -251,5 +251,5 @@ export function isRetiredOfficeMcp(name: string, server: Record<string, unknown>
 
 /** Planner/persistence registry for first-party workspace-scoped Office MCPs. */
 export function isWorkspacePolicyMcp(name: string, server: Record<string, unknown>): boolean {
-  return isAlphaOfficeMcp(name, server)
+  return isCodePuppyOfficeMcp(name, server)
 }

@@ -1,4 +1,4 @@
-// REQ-100 #311:alpha.jsonc 配置事务适配器 —— journaled、可回滚、digest 校验 fail-closed。
+// REQ-100 #311:codepuppy.jsonc 配置事务适配器 —— journaled、可回滚、digest 校验 fail-closed。
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import * as crypto from "node:crypto"
@@ -16,8 +16,8 @@ import {
 let root: string
 let target: string
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), "alpha-configtx-"))
-  target = path.join(root, "alpha.jsonc")
+  root = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-configtx-"))
+  target = path.join(root, "codepuppy.jsonc")
 })
 afterEach(() => {
   fs.rmSync(root, { recursive: true, force: true })

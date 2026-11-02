@@ -21,7 +21,7 @@ export function ImagePreview(props: ImagePreviewProps) {
         title={props.alt ?? i18n.t("ui.imagePreview.alt")}
         size="large"
       >
-        <div data-component="image-preview" data-alpha-hosted="">
+        <div data-component="image-preview" data-codepuppy-hosted="">
           <div data-slot="image-preview-body">
             <img src={props.src} alt={props.alt ?? i18n.t("ui.imagePreview.alt")} data-slot="image-preview-image" />
           </div>

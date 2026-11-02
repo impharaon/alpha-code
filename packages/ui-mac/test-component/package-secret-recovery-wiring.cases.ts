@@ -136,19 +136,19 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
   throw new Error(`unexpected fetch: ${url}`)
 }) as typeof fetch
 
-const { initAlphaEnvironment, getAlphaEnvironment } = await import("../src/main/alpha-environment")
+const { initCodePuppyEnvironment, getCodePuppyEnvironment } = await import("../src/main/codepuppy-environment")
 const { registerExtIpcHandlers } = await import("../src/main/ext-ipc")
 const { claimMcpSecretVersionDir, newMcpSecretVersionId, writeMcpSecretVersioned } = await import(
-  "../src/main/alpha-mcp-secrets"
+  "../src/main/codepuppy-mcp-secrets"
 )
 const { readTransactionJournal } = await import("../src/main/ext-transaction")
 
-delete process.env.ALPHA_GLOBAL_DIR
-initAlphaEnvironment({
+delete process.env.CODEPUPPY_GLOBAL_DIR
+initCodePuppyEnvironment({
   isPackaged: false,
   channel: "dev",
   appDataDir: tmp,
-  baseRoot: join(tmp, "alpha-code-state"),
+  baseRoot: join(tmp, "codepuppy-state"),
   homeDir: join(tmp, "home"),
 })
 registerExtIpcHandlers(
@@ -187,10 +187,10 @@ async function install(attemptId: string, secrets: Record<string, string>) {
   )
 }
 
-const serverDir = () => join(userData, "alpha-mcp-secrets", "recovery-mcp")
+const serverDir = () => join(userData, "codepuppy-mcp-secrets", "recovery-mcp")
 
 test("the production recovery wiring releases a crashed transaction's prepared secret version and spares the live one", async () => {
-  const root = getAlphaEnvironment().mutableRoot
+  const root = getCodePuppyEnvironment().mutableRoot
 
   // ── ① 先真装一次:得到一个**被 live config 引用**的版本(它绝不许被删)。
   const installed = await install("recovery-mcp-1", { "mcp:recovery-mcp#A_KEY": liveSecret })
@@ -199,7 +199,7 @@ test("the production recovery wiring releases a crashed transaction's prepared s
   expect(liveVersion).toBeTruthy()
   const liveFile = join(serverDir(), liveVersion!, "A_KEY")
   expect(readFileSync(liveFile, "utf8")).toBe(liveSecret)
-  expect(readFileSync(join(root, "alpha.jsonc"), "utf8")).toContain(`{file:${liveFile}}`)
+  expect(readFileSync(join(root, "codepuppy.jsonc"), "utf8")).toContain(`{file:${liveFile}}`)
 
   // ── ② 造出「崩在 populate 之后、提交之前」的盘面:受限版本已在盘上,journal 记着它的身份,
   //      而 live config 从未指向它。用的是生产 store API,不是手捏目录。
@@ -225,14 +225,14 @@ test("the production recovery wiring releases a crashed transaction's prepared s
         action: "config",
         genId: "gen-000000-000000",
         files: [],
-        config: { target: join(root, "alpha.jsonc"), slot: 0, preDigest: "0".repeat(64), nextDigest: "1".repeat(64) },
+        config: { target: join(root, "codepuppy.jsonc"), slot: 0, preDigest: "0".repeat(64), nextDigest: "1".repeat(64) },
       },
     ],
     // live 那条排在**第一位**,孤儿排第二 —— 「只处理第一条」会把孤儿留下,「不做引用复核」
     // 会把还在用的密钥删掉。两种削弱各被一条断言杀死。
     prepared: [
-      { kind: "mcp-secret-version", store: "alpha-mcp-secrets", server: "recovery-mcp", version: liveVersion },
-      { kind: "mcp-secret-version", store: "alpha-mcp-secrets", server: "recovery-mcp", version: orphanVersion },
+      { kind: "mcp-secret-version", store: "codepuppy-mcp-secrets", server: "recovery-mcp", version: liveVersion },
+      { kind: "mcp-secret-version", store: "codepuppy-mcp-secrets", server: "recovery-mcp", version: orphanVersion },
     ],
   }
   const journalDir = join(root, "ext-tx", "journal")
@@ -242,7 +242,7 @@ test("the production recovery wiring releases a crashed transaction's prepared s
   // ── ③ 触发**生产**恢复:受闸写通道的每一次调用都先经 recoveryGate.withRecoveredWrite。
   //      这里刻意只走**预览**那一轮 —— 它不写 config,所以下面「live 引用没变」是干净的判据。
   logLines.length = 0
-  const configBefore = readFileSync(join(root, "alpha.jsonc"), "utf8")
+  const configBefore = readFileSync(join(root, "codepuppy.jsonc"), "utf8")
   const previewHandler = handlers.get("ext-install-catalog")!
   const previewAfterCrash = await previewHandler(
     { sender: { id: 1 } },
@@ -257,7 +257,7 @@ test("the production recovery wiring releases a crashed transaction's prepared s
   expect(existsSync(join(serverDir(), orphanVersion))).toBe(false)
   expect(existsSync(orphanFile)).toBe(false)
   expect(readFileSync(liveFile, "utf8")).toBe(liveSecret)
-  expect(readFileSync(join(root, "alpha.jsonc"), "utf8")).toBe(configBefore)
+  expect(readFileSync(join(root, "codepuppy.jsonc"), "utf8")).toBe(configBefore)
   expect(configBefore).toContain(`{file:${liveFile}}`)
 
   // ⑤ 「仍被引用」是被如实上报的,不是静默吞掉。

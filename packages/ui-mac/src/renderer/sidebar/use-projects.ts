@@ -24,8 +24,8 @@ import {
   subscribeRuntimeRecovery,
 } from "../runtime-recovery"
 import { markStartupTimeline } from "../startup-timeline"
-import { nextEngineRetryDelay } from "../alpha-ui/model-picker-logic"
-import { tierAgent, v1CommandModelFields, v1PromptModelFields, type PermMode } from "../alpha-ui/composer-state"
+import { nextEngineRetryDelay } from "../codepuppy-ui/model-picker-logic"
+import { tierAgent, v1CommandModelFields, v1PromptModelFields, type PermMode } from "../codepuppy-ui/composer-state"
 
 export interface ServerInfo {
   baseUrl: string
@@ -33,7 +33,7 @@ export interface ServerInfo {
   password?: string
 }
 
-export interface AlphaSession {
+export interface CodePuppySession {
   id: string
   title: string
   directory: string
@@ -41,7 +41,7 @@ export interface AlphaSession {
   updated: number
 }
 
-export interface AlphaProject {
+export interface CodePuppyProject {
   id: string
   worktree: string
   name: string
@@ -50,19 +50,19 @@ export interface AlphaProject {
   /** All directories whose sessions belong to this project: [worktree, ...sandboxes]. opencode
    *  scopes a project's sessions across these (see home.tsx `directories()`), so we must too. */
   directories: string[]
-  sessions: AlphaSession[]
+  sessions: CodePuppySession[]
   /** Sessions have been fetched at least once. */
   loaded: boolean
 }
 
-export interface AlphaProjectsStore {
-  projects: AlphaProject[]
+export interface CodePuppyProjectsStore {
+  projects: CodePuppyProject[]
   ready: boolean
   error: boolean
 }
 
-export interface AlphaProjectsApi {
-  store: AlphaProjectsStore
+export interface CodePuppyProjectsApi {
+  store: CodePuppyProjectsStore
   /** Re-fetch the project list + each project's sessions. Backs the sidebar's error-retry (B11). */
   reload(): Promise<void>
   /** Eagerly create a real session in a project directory and return its id (or undefined on
@@ -73,7 +73,7 @@ export interface AlphaProjectsApi {
   /** Create a session AND send the first message (the home composer's submit). `extraParts` are
    *  additional prompt parts (agent/file mentions from the home @ menu, upstream
    *  build-request-parts shapes) appended after the text part (REQ-038). `opts`(REQ-055)是
-   *  AlphaComposer 的显式提交参数(Model.Ref/agent),未选不传 = 引擎默认。
+   *  CodePuppyComposer 的显式提交参数(Model.Ref/agent),未选不传 = 引擎默认。
    *  REQ-085(#259):`existingSessionID` 存在时跳过 `session.create`,直接对该会话重投递首条
    *  消息 —— 供调用方在"session 已建成但消息没发出去"后原地重试,不再每次重试都新建一个孤儿
    *  session。`onSessionCreated` 在**真正新建**的那一刻同步回报新 id(即使随后投递失败也会被
@@ -120,7 +120,7 @@ function authHeaders(info: ServerInfo): Record<string, string> | undefined {
   return { Authorization: `Basic ${token}` }
 }
 
-function toSession(raw: any): AlphaSession | undefined {
+function toSession(raw: any): CodePuppySession | undefined {
   if (!raw || typeof raw.id !== "string") return undefined
   // Only top-level conversations belong in the sidebar; sub-agent/child sessions are
   // rendered inside their parent's view, matching opencode's sortedRootSessions.
@@ -135,7 +135,7 @@ function toSession(raw: any): AlphaSession | undefined {
   }
 }
 
-function sortSessions(list: AlphaSession[]): AlphaSession[] {
+function sortSessions(list: CodePuppySession[]): CodePuppySession[] {
   return [...list].sort((a, b) => b.updated - a.updated)
 }
 
@@ -146,15 +146,15 @@ type ConnectReason = "bridge-absent" | "runtime-ready" | "generation-event" | "b
 const GLOBAL_WORKTREE = "/"
 const GLOBAL_SESSION_PAGE_SIZE = 200
 
-export function useAlphaProjects(
+export function useCodePuppyProjects(
   server: Accessor<ServerInfo | undefined>,
   // #594 测试注入口:自探节奏与探测器。生产走默认(/global/health + 1s/2s/4s/8s 封顶退避)。
   probeOverrides?: {
     delayFor?: (attempt: number) => number
     probe?: (info: ServerInfo) => Promise<boolean>
   },
-): AlphaProjectsApi {
-  const [store, setStore] = createStore<AlphaProjectsStore>({ projects: [], ready: false, error: false })
+): CodePuppyProjectsApi {
+  const [store, setStore] = createStore<CodePuppyProjectsStore>({ projects: [], ready: false, error: false })
 
   // The active read client + a generation token. Imperative actions (createSession) use the
   // current client; async store writes bail if a newer effect run has superseded them.
@@ -185,13 +185,13 @@ export function useAlphaProjects(
       // anyway), shrinking the payload for projects with many sub-agent sessions (A3).
       const { data, error } = await c.session.list({ directory: worktree, scope: "project", roots: true } as any)
       if (gen !== generation || error || !data) return
-      const sessions = sortSessions((data as any[]).map(toSession).filter(Boolean) as AlphaSession[])
+      const sessions = sortSessions((data as any[]).map(toSession).filter(Boolean) as CodePuppySession[])
       const i = worktreeIndex(worktree)
       if (i < 0) return
       setStore(
         "projects",
         i,
-        produce((p: AlphaProject) => {
+        produce((p: CodePuppyProject) => {
           p.sessions = sessions
           p.loaded = true
         }),
@@ -210,7 +210,7 @@ export function useAlphaProjects(
     const c = client
     if (!c) return
     const gen = generation
-    const sessions: AlphaSession[] = []
+    const sessions: CodePuppySession[] = []
     const seenCursors = new Set<number>()
     let cursor: number | undefined
     try {
@@ -240,7 +240,7 @@ export function useAlphaProjects(
       setStore(
         "projects",
         i,
-        produce((p: AlphaProject) => {
+        produce((p: CodePuppyProject) => {
           p.sessions = sortSessions(sessions)
           p.loaded = true
         }),
@@ -275,7 +275,7 @@ export function useAlphaProjects(
       // Reconcile: keep existing session lists for projects that persist, add new ones.
       setStore("projects", (prev) => {
         const byID = new Map(prev.map((p) => [p.id, p]))
-        return incoming.map((raw): AlphaProject => {
+        return incoming.map((raw): CodePuppyProject => {
           const existing = byID.get(raw.id)
           return {
             id: raw.id,
@@ -349,7 +349,7 @@ export function useAlphaProjects(
     setStore(
       "projects",
       i,
-      produce((p: AlphaProject) => {
+      produce((p: CodePuppyProject) => {
         const idx = p.sessions.findIndex((s) => s.id === session.id)
         if (idx >= 0) p.sessions[idx] = session
         else p.sessions.push(session)
@@ -363,7 +363,7 @@ export function useAlphaProjects(
       setStore(
         "projects",
         i,
-        produce((p: AlphaProject) => {
+        produce((p: CodePuppyProject) => {
           p.sessions = p.sessions.filter((s) => s.id !== id)
         }),
       )
@@ -381,7 +381,7 @@ export function useAlphaProjects(
   // REQ-071/ADR-025 lazy 供给:目标是默认工作目录 ~/Alpha 时先建它。
   //
   // REQ-126 不变量 5(#656):这条 IPC **不 throw** —— 失败返回 `{ ok:false }`(main/ipc.ts 的
-  // alpha-workspace-ensure)。旧实现只有 try/catch、连返回值都不看,于是"目录没建成"这件事在渲染侧
+  // codepuppy-workspace-ensure)。旧实现只有 try/catch、连返回值都不看,于是"目录没建成"这件事在渲染侧
   // 完全不可见;而引擎侧并没有兜底 —— `session.create` 不做目录存在性校验(opencode 直接拿路由目录
   // 组装并发布 session),照样会建出一个开在不存在目录上的坏会话。
   //
@@ -467,7 +467,7 @@ export function useAlphaProjects(
       if (opts?.existingSessionID) {
         id = opts.existingSessionID
       } else {
-        // 同上:供给失败不建会话,由 AlphaComposer 的 `alpha.composer.sendFailed` toast 呈现。
+        // 同上:供给失败不建会话,由 CodePuppyComposer 的 `codepuppy.composer.sendFailed` toast 呈现。
         if (!(await ensureDefaultWorkspace(worktree))) return undefined
         const { data, error } = await c.session.create({
           directory: worktree,

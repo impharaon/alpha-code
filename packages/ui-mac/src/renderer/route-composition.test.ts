@@ -4,12 +4,12 @@ import { ROUTE_MANIFEST, type RouteId } from "../shared/route-manifest"
 import { composeRoutes, type RouteSurfaceId } from "./route-composition"
 
 const mounts = {
-  home: { owner: "alpha.home" },
-  newSession: { owner: "alpha.new-session" },
-  session: { owner: "alpha.session" },
-  settings: { owner: "alpha.settings" },
-  dialog: { owner: "alpha.dialog" },
-  recovery: { owner: "alpha.recovery" },
+  home: { owner: "codepuppy.home" },
+  newSession: { owner: "codepuppy.new-session" },
+  session: { owner: "codepuppy.session" },
+  settings: { owner: "codepuppy.settings" },
+  dialog: { owner: "codepuppy.dialog" },
+  recovery: { owner: "codepuppy.recovery" },
 } as const
 
 const expectedSurfaces = {
@@ -62,7 +62,7 @@ describe("manifest-derived production route composition", () => {
     // Each leaf is mounted unconditionally from the composition — no release gate can reappear
     // between the manifest and the seam.
     expect(entry).toContain(
-      "[productionRoutes.home.surface]: productionRoutes.home.mount(alphaProjects, projectsServerKey)",
+      "[productionRoutes.home.surface]: productionRoutes.home.mount(codepuppyProjects, projectsServerKey)",
     )
     expect(entry).toContain('[productionRoutes["new-session"].surface]: productionRoutes["new-session"].mount(')
     // #891:两个新会话入口叶拿的 serverKey 必须是**这份 store 连着的 server**(由 store 自己的
@@ -72,7 +72,7 @@ describe("manifest-derived production route composition", () => {
     expect(entry).toMatch(
       /const projectsServerKey = createMemo\(\(\) => \{\s*const baseUrl = sidebarServer\(\)\?\.baseUrl/,
     )
-    expect(entry).toContain("[productionRoutes.session.surface]: productionRoutes.session.mount(alphaProjects)")
+    expect(entry).toContain("[productionRoutes.session.surface]: productionRoutes.session.mount(codepuppyProjects)")
     expect(entry).toContain("<SettingsSurface />")
     expect(entry).toContain("dialogHost={productionRoutes.dialog.mount}")
     expect(entry).toContain("<RecoverySurface />")

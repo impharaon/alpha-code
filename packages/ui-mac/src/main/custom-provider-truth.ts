@@ -1,36 +1,36 @@
 // `#1391`(`#1383` 基线 §四 子票 1)—— 自定义节点记录的**真源**:读端。只有 main 写(custom-provider-truth-write.ts),任何进程可读。
 //
 // ── 为什么要有这份文件 ──────────────────────────────────────────────────────────
-// 用户在模型选择器里「添加自定义节点」配好的服务地址,`#1392` 之前落在 `<alphaGlobalRoot>/alpha.jsonc`(ext-config.ts 当年的
+// 用户在模型选择器里「添加自定义节点」配好的服务地址,`#1392` 之前落在 `<codepuppyGlobalRoot>/codepuppy.jsonc`(ext-config.ts 当年的
 // persistProvider,已退场)—— 那是可写根 W2,**被围栏的引擎树自己写得了**;出网围栏因此不敢从配置文件派生放行集合(network-egress-derived.ts 文件头),
-// 这个功能实际是坏的。本文件给它一个引擎写不到的家:`<appData>/alpha-code-state/custom-providers/<env>.json`,与三个 env 根、
-// `cas/`、`fence-workspaces/` 同级 —— 父目录是 alpha-environment.ts 冻结快照的 `casBaseRoot`;W2 只放行 `env/<env>`,W3 是
+// 这个功能实际是坏的。本文件给它一个引擎写不到的家:`<appData>/codepuppy-state/custom-providers/<env>.json`,与三个 env 根、
+// `cas/`、`fence-workspaces/` 同级 —— 父目录是 codepuppy-environment.ts 冻结快照的 `casBaseRoot`;W2 只放行 `env/<env>`,W3 是
 // `<userData>`(另一棵树),其余固定行都不覆盖它(custom-provider-truth.test.ts 对着生产渲染的 profile 逐行枚举 W-id 断言;
 // custom-provider-truth-fence.test.ts 交给真 sandbox-exec 裁;W1 是运行时成员,由 `#1390` 的规则 5b 兜住)。
 //
 // ── 形状 ─────────────────────────────────────────────────────────────────────
 // `{ "v": 1, "providers": [{ "id", "name", "compat": "openai" | "anthropic", "baseURL", "models": ["…"], "imageInput"?: ["…"] }] }`。
 // `imageInput`(REQ-228 `#1420`,可选):用户**显式声明**能看图的模型 id,必须是 `models` 的非空无重复子集;缺席 = 一个都看不了。
-// 自定义节点指向任意地址,同名 ≠ 同一个模型,所以这里不拿 models.dev 猜 —— 只有用户说了才算(alpha-models.ts 注入为 modalities.input)。
-// **密钥不进这里**:仍在 `#1343` 的钥匙串库(alpha-byok-keys.ts,按 provider id 存)。
+// 自定义节点指向任意地址,同名 ≠ 同一个模型,所以这里不拿 models.dev 猜 —— 只有用户说了才算(codepuppy-models.ts 注入为 modalities.input)。
+// **密钥不进这里**:仍在 `#1343` 的钥匙串库(codepuppy-byok-keys.ts,按 provider id 存)。
 // 读:**严格** —— 缺失 = 「没有记录」(ok,空清单;用户没加过节点是正常状态,不出声);解析失败 / 版本不认识 / 字段不合法 /
 // 同 id 重复 / 多余的键 ⇒ 「没问出来」(ok:false),**不是空记录**,并经注入的 log 出一行原因(`#1387`:静默的失败路径事后
 // 无法与「一切正常」区分)。不猜、不修、不改写。字段判据只问「是不是这个形状」;地址准入(https / loopback)是添加时与出网
 // 同源的那一份(基线 I4,`#1393`),这里不抄第二份。
 //
 // ── 读与写为什么拆成两个文件(基线 §四 子票 1 的实现约束,审计 m3)────────────────────
-// alpha-models.ts / ext-config.ts / alpha-environment.ts 都在 sidecar 的 import 闭包里(process-fence-write-sites.ts
+// codepuppy-models.ts / ext-config.ts / codepuppy-environment.ts 都在 sidecar 的 import 闭包里(process-fence-write-sites.ts
 // sidecarSourceFiles);将来注入面从这里读(`#1392`),本文件就跟着进闭包。写入点若也在这里,写盘登记簿只能给它填 `main-only`
 // 这个**文字标签**,测试查不出它是否真的只有 main 执行。所以本文件**零写盘**(连 node:fs 都不 import,读也经注入的 fs);
 // 写在 custom-provider-truth-write.ts,它不进闭包由 custom-provider-truth-write.test.ts 对着生产的闭包工具实测。
 //
 // `#1391` 只落存储层;`#1392` 接上消费者:注入面 / enabled_providers / fork 前的密钥物化经 custom-provider-records.ts(生产读取绑定,
-// 含 sidecar 侧的位置解析)从这里取,添加 / 删除在 provider-lifecycle.ts,添加时的地址准入与出网同源(`#1393` 并入),旧 alpha.jsonc
+// 含 sidecar 侧的位置解析)从这里取,添加 / 删除在 provider-lifecycle.ts,添加时的地址准入与出网同源(`#1393` 并入),旧 codepuppy.jsonc
 // 记录只记一行日志忽略(server.ts)。electron-free。
 
 import { resolve } from "node:path"
-import type { ProviderInput } from "../shared/alpha-model-types"
-import type { AppEnvironment } from "./alpha-environment"
+import type { ProviderInput } from "../shared/codepuppy-model-types"
+import type { AppEnvironment } from "./codepuppy-environment"
 
 export const CUSTOM_PROVIDERS_DIRNAME = "custom-providers"
 export const CUSTOM_PROVIDER_TRUTH_VERSION = 1

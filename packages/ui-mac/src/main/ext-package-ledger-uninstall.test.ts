@@ -29,7 +29,7 @@ import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
-import { addReceipt, readLedger } from "./alpha-installs"
+import { addReceipt, readLedger } from "./codepuppy-installs"
 import {
   bundleOwner,
   computeInstalledGraphDigest,
@@ -226,14 +226,14 @@ function makeDeps(calls: Calls): PlannerDeps {
     },
     // #704:卸载路径会释放该组件的 Alpha Connection 绑定(共享 connection 本身保留)。
     // 记进 calls 账而不是 refuse —— 这是卸载的正当动作,不是 install-only。
-    releaseAlphaConnectionBindings: (componentId: string) => {
-      calls.push(`releaseAlphaConnectionBindings:${componentId}`)
+    releaseCodePuppyConnectionBindings: (componentId: string) => {
+      calls.push(`releaseCodePuppyConnectionBindings:${componentId}`)
       return { ok: true }
     },
     findPluginBaseConflictStrict: refuse("findPluginBaseConflictStrict"),
     readPluginArrayStrict: refuse("readPluginArrayStrict"),
     readLegacyPluginArrayStrict: refuse("readLegacyPluginArrayStrict"),
-    mcpConfigTruthPath: () => path.join(root, "alpha.jsonc"),
+    mcpConfigTruthPath: () => path.join(root, "codepuppy.jsonc"),
     stageVendoredPluginVersioned: refuse("stageVendoredPluginVersioned"),
     removePlugin: (pkg: string): ConfigOutcome => {
       calls.push(`removePlugin:${pkg}`)
@@ -453,7 +453,7 @@ describe("REQ-128 #706 —— 真实卸载:**只有** Bundle owner(用户从没�
 })
 
 describe("REQ-128 #706 —— 只有一次 mutation:v:2 账本上的内层副作用探测器", () => {
-  // V3 未激活时,`alpha-installs` 的 v1 写器不会被 `refuseIfV3` 挡住 —— 于是「内层 removeReceipt
+  // V3 未激活时,`codepuppy-installs` 的 v1 写器不会被 `refuseIfV3` 挡住 —— 于是「内层 removeReceipt
   // 有没有被接回来」在这里是**可见的**:它会多出一次 rename。v:3 夹具上测不出这一条(v1 写器被
   // 拒在写之前),所以这个探测器必须留在 v:2 上。
   for (const { kind, name } of SOLO) {

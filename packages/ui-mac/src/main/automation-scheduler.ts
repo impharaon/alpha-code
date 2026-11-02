@@ -5,7 +5,7 @@
 //
 // 执行链只走 SDK(ADR-002):session.create(标题「⏱ 自动化 · <name>」)→ session.prompt
 // (agent=codepuppy-automation readonly 档,阻塞到回复完成)→ 最终回复落 report.md + status.json
-// 进目标项目 .code-puppy/runs/auto-<id>-<ts>/(alpha-workdir 守卫)。超 maxDurationMin 中断(abort)。
+// 进目标项目 .code-puppy/runs/auto-<id>-<ts>/(codepuppy-workdir 守卫)。超 maxDurationMin 中断(abort)。
 
 import { join } from "node:path"
 import { BrowserWindow, Notification, powerMonitor } from "electron"
@@ -14,9 +14,9 @@ import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
 import type { AutomationEvent, AutomationRunNowErrorCode, AutomationRunRecord, AutomationTask } from "../shared/automation-types"
 import { AUTOMATION_DEFAULTS } from "../shared/automation-types"
 import { rescheduleAfterGap, shouldTripBreaker } from "../shared/automation-schedule"
-import { getAutomation, listAutomations, readAutomationState, saveAutomation, writeAutomationState } from "./alpha-automations"
-import { writeRunFiles } from "./alpha-workdir"
-import { saveVisibleOutputs } from "./alpha-user-workspace"
+import { getAutomation, listAutomations, readAutomationState, saveAutomation, writeAutomationState } from "./codepuppy-automations"
+import { writeRunFiles } from "./codepuppy-workdir"
+import { saveVisibleOutputs } from "./codepuppy-user-workspace"
 import { getLogger } from "./logging"
 import { moderationBlocks, MODERATION_BLOCKED_REASON } from "./moderation-keywords"
 

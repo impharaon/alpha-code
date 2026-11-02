@@ -32,19 +32,19 @@ const canonicalBytes = (value: unknown) => new TextEncoder().encode(`${JSON.stri
 let tmp = ""
 let root = ""
 let userData = ""
-const previousRoot = process.env.ALPHA_GLOBAL_DIR
+const previousRoot = process.env.CODEPUPPY_GLOBAL_DIR
 
 beforeEach(() => {
   tmp = mkdtempSync(join(tmpdir(), "req128-705-parity-"))
   root = join(tmp, "root")
   userData = join(tmp, "user-data")
   mkdirSync(root, { recursive: true })
-  process.env.ALPHA_GLOBAL_DIR = root
+  process.env.CODEPUPPY_GLOBAL_DIR = root
 })
 
 afterEach(() => {
-  if (previousRoot === undefined) delete process.env.ALPHA_GLOBAL_DIR
-  else process.env.ALPHA_GLOBAL_DIR = previousRoot
+  if (previousRoot === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+  else process.env.CODEPUPPY_GLOBAL_DIR = previousRoot
   rmSync(tmp, { recursive: true, force: true })
 })
 
@@ -274,7 +274,7 @@ describe("REQ-128 #705 single-install builder parity", () => {
     expect(config.capabilities).toBeUndefined()
     expect(config.receipt).toBeUndefined()
     expect(config.config).toEqual({
-      target: join(root, "alpha.jsonc"),
+      target: join(root, "codepuppy.jsonc"),
       edits: [
         {
           keyPath: ["agent", "demo"],
@@ -307,16 +307,16 @@ describe("REQ-128 #705 single-install builder parity", () => {
     ])
     // 计划里的 prepared 面 = **只有身份**。多一个字段(files/明文/摘要)引擎 validatePlan 就拒。
     expect(plan.prepared).toEqual([
-      { kind: "mcp-secret-version", store: "alpha-mcp-secrets", server: "demo", version: SECRET_VERSION },
+      { kind: "mcp-secret-version", store: "codepuppy-mcp-secrets", server: "demo", version: SECRET_VERSION },
     ])
     expect(plan.items).toHaveLength(1)
     const item = plan.items[0]!
     expect(item.key).toBe("mcp--demo")
     expect(item.action).toBe("config")
     expect(item.capabilities).toEqual(["codepuppy.secret-prerequisite.v1"])
-    const secretFile = join(userData, "alpha-mcp-secrets", "demo", SECRET_VERSION, "A_KEY")
+    const secretFile = join(userData, "codepuppy-mcp-secrets", "demo", SECRET_VERSION, "A_KEY")
     expect(item.config).toEqual({
-      target: join(root, "alpha.jsonc"),
+      target: join(root, "codepuppy.jsonc"),
       edits: [
         {
           keyPath: ["mcp", "demo"],
@@ -335,7 +335,7 @@ describe("REQ-128 #705 single-install builder parity", () => {
     hooks.populatePrepared!()
     expect(hooks.probePrepared!()).toEqual({ healthy: true, reason: "prepared secret file is missing" })
     expect(readFileSync(secretFile, "utf8")).toBe("PARITY_SECRET_VALUE")
-    expect(readdirSync(join(userData, "alpha-mcp-secrets", "demo"))).toEqual([SECRET_VERSION])
+    expect(readdirSync(join(userData, "codepuppy-mcp-secrets", "demo"))).toEqual([SECRET_VERSION])
     expect(hooks.precondition!()).toEqual({ ok: true })
     // 计划与账本模板都不得携带密钥明文。
     expect(JSON.stringify(plan)).not.toContain("PARITY_SECRET_VALUE")
@@ -443,7 +443,7 @@ describe("REQ-128 #705 single-install builder parity", () => {
           {
             key: "mcp--inert",
             action: "config",
-            config: { target: join(root, "alpha.jsonc"), edits: [{ keyPath: ["mcp", "inert"], value: { type: "local", command: ["demo"] } }] },
+            config: { target: join(root, "codepuppy.jsonc"), edits: [{ keyPath: ["mcp", "inert"], value: { type: "local", command: ["demo"] } }] },
             capabilities: [],
           },
         ],

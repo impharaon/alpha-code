@@ -40,7 +40,7 @@
 //   并把「漏扫」本身做成可观测 —— 见下面 "覆盖面" 一组。
 //
 // 缺陷本身的**行为**闸(真读多 chunk / 硬限仍是硬限)在
-// `packages/opencode/test/tool/alpha-websearch-failure.test.ts` 的 "#647" 一组,那里断言的是
+// `packages/opencode/test/tool/codepuppy-websearch-failure.test.ts` 的 "#647" 一组,那里断言的是
 // 可观测结果(字节数、上游被 cancel、pull 次数),不是源码文本。两者缺一不可。
 
 import { readFileSync } from "node:fs"

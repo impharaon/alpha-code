@@ -14,7 +14,7 @@ import * as fs from "node:fs"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { isAbsolute, join, relative, resolve } from "node:path"
-import { environmentMutableRoot } from "./alpha-environment"
+import { environmentMutableRoot } from "./codepuppy-environment"
 import { customProviderTruthPath } from "./custom-provider-truth"
 import { mcpServerTruthPath, readMcpServerTruth, type McpServerRecord } from "./mcp-server-truth"
 import { writeMcpServerTruth } from "./mcp-server-truth-write"
@@ -23,8 +23,8 @@ import { renderProcessFenceProfile, type ProcessFenceProfileInput } from "./proc
 
 const repoRoot = resolve(import.meta.dir, "../../../..")
 const HOME = "/Users/alpha"
-const DEFAULT_STATE_ROOT = `${HOME}/Library/Application Support/alpha-code-state`
-const OVERRIDE_STATE_ROOT = `${HOME}/dev/alpha-base`
+const DEFAULT_STATE_ROOT = `${HOME}/Library/Application Support/codepuppy-state`
+const OVERRIDE_STATE_ROOT = `${HOME}/dev/codepuppy-base`
 const USER_DATA = `${HOME}/Library/Application Support/ai.opencode.desktop`
 
 function withTemp<T>(run: (dir: string) => T): T {
@@ -72,7 +72,7 @@ const describeRule = (r: Rule) => `${r.id} ${r.kind} ${r.value}`
 const profileFor = (stateRoot: string, env: "prod" | "dev", over: Partial<ProcessFenceProfileInput> = {}) =>
   renderProcessFenceProfile({
     workspaces: [`${HOME}/code-puppy`, `${HOME}/app/alpha-code`],
-    alphaGlobalRoot: environmentMutableRoot(env, stateRoot),
+    codepuppyGlobalRoot: environmentMutableRoot(env, stateRoot),
     userDataPath: USER_DATA,
     stateHome: USER_DATA,
     roots: { home: HOME, dataHome: `${HOME}/.local/share`, cacheHome: `${HOME}/.cache`, configHome: `${HOME}/.config` },
@@ -82,9 +82,9 @@ const profileFor = (stateRoot: string, env: "prod" | "dev", over: Partial<Proces
 
 describe("真源位置(I2):<casBaseRoot>/mcp-servers/<env>.json 不在可写集任何固定行之下", () => {
   test("路径 = <casBaseRoot>/mcp-servers/<env>.json;与三个 env 根、cas/、fence-workspaces/、custom-providers/ 同级(相对每个都以 .. 开头)", () => {
-    expect(mcpServerTruthPath(DEFAULT_STATE_ROOT, "prod")).toBe("/Users/alpha/Library/Application Support/alpha-code-state/mcp-servers/prod.json")
-    expect(mcpServerTruthPath(DEFAULT_STATE_ROOT, "beta")).toBe("/Users/alpha/Library/Application Support/alpha-code-state/mcp-servers/beta.json")
-    expect(mcpServerTruthPath(OVERRIDE_STATE_ROOT, "dev")).toBe("/Users/alpha/dev/alpha-base/mcp-servers/dev.json")
+    expect(mcpServerTruthPath(DEFAULT_STATE_ROOT, "prod")).toBe("/Users/alpha/Library/Application Support/codepuppy-state/mcp-servers/prod.json")
+    expect(mcpServerTruthPath(DEFAULT_STATE_ROOT, "beta")).toBe("/Users/alpha/Library/Application Support/codepuppy-state/mcp-servers/beta.json")
+    expect(mcpServerTruthPath(OVERRIDE_STATE_ROOT, "dev")).toBe("/Users/alpha/dev/codepuppy-base/mcp-servers/dev.json")
     for (const env of ["prod", "beta", "dev"] as const) {
       const truth = mcpServerTruthPath(DEFAULT_STATE_ROOT, env)
       for (const sibling of [
@@ -100,7 +100,7 @@ describe("真源位置(I2):<casBaseRoot>/mcp-servers/<env>.json 不在可写集�
     }
   })
 
-  test("默认 base 与覆盖 base、两种 XDG_STATE_HOME 形态:没有任何固定行覆盖真源文件或它的目录(逐条规则,W1 除外);对照:W2 罩着 alpha.jsonc", () => {
+  test("默认 base 与覆盖 base、两种 XDG_STATE_HOME 形态:没有任何固定行覆盖真源文件或它的目录(逐条规则,W1 除外);对照:W2 罩着 codepuppy.jsonc", () => {
     for (const [stateRoot, env] of [
       [DEFAULT_STATE_ROOT, "prod"],
       [OVERRIDE_STATE_ROOT, "dev"],
@@ -112,7 +112,7 @@ describe("真源位置(I2):<casBaseRoot>/mcp-servers/<env>.json 不在可写集�
         const dir = join(stateRoot, "mcp-servers")
         expect(rules.filter((r) => covers(r, truth)).map(describeRule), `truth file ${truth}`).toEqual([])
         expect(rules.filter((r) => covers(r, dir)).map(describeRule), `truth dir ${dir}`).toEqual([])
-        expect(rules.filter((r) => covers(r, join(environmentMutableRoot(env, stateRoot), "alpha.jsonc"))).map(describeRule)).toEqual([
+        expect(rules.filter((r) => covers(r, join(environmentMutableRoot(env, stateRoot), "codepuppy.jsonc"))).map(describeRule)).toEqual([
           `W2 subpath ${environmentMutableRoot(env, stateRoot)}`,
         ])
       }
@@ -260,9 +260,9 @@ describe("原子写:字节固定、无残留、失败不留半截、坏记录不
 // ── 闭包 ─────────────────────────────────────────────────────────────────────
 
 describe("写模块与 main 侧读改写模块不在 sidecar 的 import 闭包里;读端与生产读取绑定在(生产的闭包工具实测)", () => {
-  test("sidecarSourceFiles 含 mcp-server-truth / mcp-server-records / alpha-config-injection(集合是活的),不含 -write / -lifecycle / ext-config / ext-install-planner", () => {
+  test("sidecarSourceFiles 含 mcp-server-truth / mcp-server-records / codepuppy-config-injection(集合是活的),不含 -write / -lifecycle / ext-config / ext-install-planner", () => {
     const files = sidecarSourceFiles(repoRoot)
-    expect(files).toContain("packages/ui-mac/src/main/alpha-config-injection.ts")
+    expect(files).toContain("packages/ui-mac/src/main/codepuppy-config-injection.ts")
     expect(files).toContain("packages/ui-mac/src/main/mcp-server-truth.ts")
     expect(files).toContain("packages/ui-mac/src/main/mcp-server-records.ts")
     expect(files).not.toContain("packages/ui-mac/src/main/mcp-server-truth-write.ts")

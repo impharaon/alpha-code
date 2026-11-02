@@ -1,6 +1,6 @@
 import { existsSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import { writeChunksChecked } from "./alpha-artifact-download"
+import { writeChunksChecked } from "./codepuppy-artifact-download"
 import {
   finalizeArtifactWithQuota,
   initializeArtifactQuotaEnvironment,

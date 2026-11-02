@@ -4,7 +4,7 @@
 # copy, but happy-dom's navigator makes detectLocale() fall to "en" (#475 externalised
 # the strings to t(...)). Setting the env here — one producer — is consumed by the single
 # detectLocale() override, covering both the inlined per-bundle i18n instances and the
-# subprocess in alpha-composer-model.component.test.ts (it inherits process.env).
+# subprocess in codepuppy-composer-model.component.test.ts (it inherits process.env).
 preload = ["./scripts/test-preload.ts"]
 
 # alpha-code#1558:选择器 / 输入框的品牌图标经上游 ProviderIcon 引用 `provider-icons/sprite.svg`。生产构建(vite)把

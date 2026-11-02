@@ -30,7 +30,7 @@ mock.module("../src/main/store", () => ({
 const { spawnLocalServer } = await import("../src/main/server")
 // REQ-159 `#1321`:生产 spawnLocalServer 在 fork 前做围栏计划(真 store / 真 sandbox-exec / 真原生模块路径);
 // 本文件的假子进程不跑 sidecar.ts,注入一个替身计划 —— 围栏本身的判据在 src/main/process-fence-*.test.ts。
-const fakePlanFence = () => ({ profile: "(version 1)\n(allow default)\n(deny file-write*)\n", addonPath: "/nonexistent/alpha_fence.node" })
+const fakePlanFence = () => ({ profile: "(version 1)\n(allow default)\n(deny file-write*)\n", addonPath: "/nonexistent/codepuppy_fence.node" })
 const {
   creditDanglingSweepForSpawn,
   resetDanglingSweepLatchForTests,
@@ -38,7 +38,7 @@ const {
 
 let scratch = ""
 const savedEnv: Record<string, string | undefined> = {}
-const ENV_KEYS = ["XDG_DATA_HOME", "ALPHA_SECRETS_DISABLE", "SHELL"] as const
+const ENV_KEYS = ["XDG_DATA_HOME", "CODEPUPPY_SECRETS_DISABLE", "SHELL"] as const
 
 beforeEach(() => {
   for (const key of ENV_KEYS) savedEnv[key] = process.env[key]
@@ -47,7 +47,7 @@ beforeEach(() => {
   mkdirSync(userDataPath, { recursive: true })
   process.env.XDG_DATA_HOME = join(scratch, "xdg-data")
   mkdirSync(process.env.XDG_DATA_HOME, { recursive: true })
-  process.env.ALPHA_SECRETS_DISABLE = "1"
+  process.env.CODEPUPPY_SECRETS_DISABLE = "1"
   process.env.SHELL = "nu"
   resetDanglingSweepLatchForTests()
 })

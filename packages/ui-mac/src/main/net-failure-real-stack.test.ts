@@ -4,11 +4,11 @@
 //   · 真出网代理(生产 startEgressPolicyProxy;授权 / 拨号为测试注入,只认本文件的几个名字),env 由生产 sidecarEgressProxyEnv 给出;
 //   · 真 webfetch 入口:一个本机 OpenAI 兼容替身让模型一次调用五个 webfetch,引擎照常执行、照常结算、照常落库,
 //     本文件再经引擎 HTTP API 读回**持久化的工具记录**。
-// 五种靶 ⇒ metadata.alphaNetFailure.layer:代理 403 ⇒ policy、`.invalid` ⇒ dns(503)、拒连 ⇒ tcp(502)、拨号黑洞 ⇒ tcp(504)、
+// 五种靶 ⇒ metadata.codepuppyNetFailure.layer:代理 403 ⇒ policy、`.invalid` ⇒ dns(503)、拒连 ⇒ tcp(502)、拨号黑洞 ⇒ tcp(504)、
 // 隧道开了上游只收不回 ⇒ tls-silent(undici 目标 TLS connector 10 s 先到,代理的 15 s 兜底还没到)。
 // main 臂:同一 Electron node 不设代理直连只收不回的监听 ⇒ 生产分类模块按 main 路径说 connect-timeout(不是 tls-silent)。
 //
-// 删掉 processor.ts failToolCall 里的取层 ⇒ 五条记录都没有 alphaNetFailure;把出网代理的 503/504 改回 502 ⇒ dns 那条变 tcp;
+// 删掉 processor.ts failToolCall 里的取层 ⇒ 五条记录都没有 codepuppyNetFailure;把出网代理的 503/504 改回 502 ⇒ dns 那条变 tcp;
 // 把分类模块里「经出网代理」的握手判定去掉 ⇒ silent 那条变 connect-timeout。
 // darwin-only(Electron 运行时与 node_modules 里那份 Electron 的 RunAsNode fuse);darwin 上缺运行时即 throw「本次测量作废」,
 // 非 darwin 自报 skip,由 scripts/gate-files.tsv 按 [平台:darwin] 登记。
@@ -205,7 +205,7 @@ describeDarwin("`#1572` AC4 真栈:Electron 内嵌 node + 真出网代理 + 真 
     })
     const messages = (await api("GET", `/session/${session.id}/message`)) as Array<{ parts: Array<{ type: string } & Partial<ToolRecord>> }>
     records = messages.flatMap((m) => m.parts).filter((p): p is { type: string } & ToolRecord => p.type === "tool" && p.tool === "webfetch")
-    console.log(`[#1572 真栈] ${records.map((r) => `${r.state.input.url?.split("/")[2]} → ${r.state.status} ${JSON.stringify(r.state.metadata?.alphaNetFailure)}`).join(" | ")}`)
+    console.log(`[#1572 真栈] ${records.map((r) => `${r.state.input.url?.split("/")[2]} → ${r.state.status} ${JSON.stringify(r.state.metadata?.codepuppyNetFailure)}`).join(" | ")}`)
   }, 120_000)
 
   afterAll(async () => {
@@ -233,21 +233,21 @@ describeDarwin("`#1572` AC4 真栈:Electron 内嵌 node + 真出网代理 + 真 
     )
   })
 
-  test("持久化记录的 metadata.alphaNetFailure:policy / dns / tcp / tcp / tls-silent", () => {
-    expect(recordFor(TARGETS.policy).state.metadata?.alphaNetFailure).toEqual({ layer: "policy", code: "403" })
-    expect(recordFor(TARGETS.dns).state.metadata?.alphaNetFailure).toEqual({ layer: "dns", code: "503" })
-    expect(recordFor(TARGETS.refused).state.metadata?.alphaNetFailure).toEqual({ layer: "tcp", code: "502" })
-    expect(recordFor(TARGETS.blackhole).state.metadata?.alphaNetFailure).toEqual({ layer: "tcp", code: "504" })
-    expect(recordFor(TARGETS.silent).state.metadata?.alphaNetFailure).toEqual({ layer: "tls-silent", code: "UND_ERR_CONNECT_TIMEOUT" })
+  test("持久化记录的 metadata.codepuppyNetFailure:policy / dns / tcp / tcp / tls-silent", () => {
+    expect(recordFor(TARGETS.policy).state.metadata?.codepuppyNetFailure).toEqual({ layer: "policy", code: "403" })
+    expect(recordFor(TARGETS.dns).state.metadata?.codepuppyNetFailure).toEqual({ layer: "dns", code: "503" })
+    expect(recordFor(TARGETS.refused).state.metadata?.codepuppyNetFailure).toEqual({ layer: "tcp", code: "502" })
+    expect(recordFor(TARGETS.blackhole).state.metadata?.codepuppyNetFailure).toEqual({ layer: "tcp", code: "504" })
+    expect(recordFor(TARGETS.silent).state.metadata?.codepuppyNetFailure).toEqual({ layer: "tls-silent", code: "UND_ERR_CONNECT_TIMEOUT" })
     // 握手静默是客户端先超时(undici 10 s),不是代理的 15 s 兜底:隧道零回音地关掉,没有 tunnel-silent。
     expect(proxyLog.some((r) => r.event === "egress.tunnel-silent")).toBe(false)
   })
 
-  test("AC6:落库的层只有层名与错误码,URL 查询里的令牌不进 alphaNetFailure", () => {
+  test("AC6:落库的层只有层名与错误码,URL 查询里的令牌不进 codepuppyNetFailure", () => {
     expect(records.some((r) => r.state.input.url?.includes("SECRET-NEEDLE-1572"))).toBe(true) // 针必在
     for (const record of records) {
-      const stored = JSON.stringify(record.state.metadata?.alphaNetFailure)
-      expect(Object.keys(record.state.metadata?.alphaNetFailure as object).sort()).toEqual(["code", "layer"])
+      const stored = JSON.stringify(record.state.metadata?.codepuppyNetFailure)
+      expect(Object.keys(record.state.metadata?.codepuppyNetFailure as object).sort()).toEqual(["code", "layer"])
       expect(stored).not.toContain("SECRET-NEEDLE-1572")
     }
   })

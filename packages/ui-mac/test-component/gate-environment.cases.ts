@@ -25,7 +25,7 @@ test("默认超时被咽喉抬过 5s —— 这条用例没有自己的超时声
 // `os.platform()` 是 host 的真实平台(钉桩只动 `process.platform`,不动它)——
 // 于是这条用例在两种 host 上验的是两件不同的事,而且它**自己说出来**验的是哪一件:
 //   · host 就是发布平台(开发机 darwin):`pinShippedPlatform()` 应当是 no-op —— 弱断言;
-//   · host 不是发布平台(alpha-ci 的 ubuntu):它必须真的把平台钉住 —— 这才是本条存在的理由。
+//   · host 不是发布平台(codepuppy-ci 的 ubuntu):它必须真的把平台钉住 —— 这才是本条存在的理由。
 // 不打印这一行,本地看到「绿」会以为平台那一半验过了。测不到就说测不到。
 test("pinShippedPlatform 在非发布平台上真的钉住,在发布平台上是 no-op", () => {
   const host = os.platform()

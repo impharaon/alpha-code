@@ -77,12 +77,12 @@ describe("AC4② 扩展不可读/不可触其它命名空间设置(ext-config �
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ext-gov-boundaries-"))
     const prev = {
       cfg: process.env.OPENCODE_CONFIG_DIR,
-      home: process.env.ALPHA_OPENCODE_HOME,
-      alpha: process.env.ALPHA_GLOBAL_DIR,
+      home: process.env.CODEPUPPY_OPENCODE_HOME,
+      alpha: process.env.CODEPUPPY_GLOBAL_DIR,
     }
     process.env.OPENCODE_CONFIG_DIR = path.join(tmp, "xdg")
-    process.env.ALPHA_OPENCODE_HOME = path.join(tmp, "home")
-    process.env.ALPHA_GLOBAL_DIR = path.join(tmp, "alpha")
+    process.env.CODEPUPPY_OPENCODE_HOME = path.join(tmp, "home")
+    process.env.CODEPUPPY_GLOBAL_DIR = path.join(tmp, "alpha")
     try {
       // 预置「其它命名空间」:另一个 mcp 叶 + 一个携密顶键(合法 V1 键之外的内容不需要 —— 这里
       // 用 mcp.other 的 environment 值当「邻居的秘密」)。
@@ -93,7 +93,7 @@ describe("AC4② 扩展不可读/不可触其它命名空间设置(ext-config �
           environment: { OTHER_SECRET: "s3cr3t-neighbor" },
         }).ok,
       ).toBe(true)
-      const cfgPath = path.join(tmp, "alpha", "alpha.jsonc")
+      const cfgPath = path.join(tmp, "alpha", "codepuppy.jsonc")
       const otherLeafBefore = (JSON.parse(fs.readFileSync(cfgPath, "utf8")) as { mcp: Record<string, unknown> }).mcp
         .other
 
@@ -116,10 +116,10 @@ describe("AC4② 扩展不可读/不可触其它命名空间设置(ext-config �
     } finally {
       if (prev.cfg === undefined) delete process.env.OPENCODE_CONFIG_DIR
       else process.env.OPENCODE_CONFIG_DIR = prev.cfg
-      if (prev.home === undefined) delete process.env.ALPHA_OPENCODE_HOME
-      else process.env.ALPHA_OPENCODE_HOME = prev.home
-      if (prev.alpha === undefined) delete process.env.ALPHA_GLOBAL_DIR
-      else process.env.ALPHA_GLOBAL_DIR = prev.alpha
+      if (prev.home === undefined) delete process.env.CODEPUPPY_OPENCODE_HOME
+      else process.env.CODEPUPPY_OPENCODE_HOME = prev.home
+      if (prev.alpha === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+      else process.env.CODEPUPPY_GLOBAL_DIR = prev.alpha
       fs.rmSync(tmp, { recursive: true, force: true })
     }
   })

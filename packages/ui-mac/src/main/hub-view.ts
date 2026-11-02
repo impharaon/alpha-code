@@ -1,6 +1,6 @@
 // REQ-234 `#1529`(基线 §2.2 / §2.5,不变量 I4)—— 「已安装 / 待重载 / 可用」的**唯一权威**。
 //
-// 定制中心(经 IPC `ext-hub-view`)与 agent 工具(经 parentPort `alpha.hub.view.request`)读的都是本模块对同一个
+// 定制中心(经 IPC `ext-hub-view`)与 agent 工具(经 parentPort `codepuppy.hub.view.request`)读的都是本模块对同一个
 // `(id, scope, directory)` **即时**算出的同一档:没有缓存、没有中间文件,账本被谁改了下一次查询自然读到。
 //
 // 视图 = 已验 catalog 的可安装视图(installableCatalogEntries)∪ 该目录的安装行(ext-inventory:global 账本 + 该项目账本)。
@@ -38,16 +38,16 @@ import {
   AGENT_NOTE_UNVERIFIED,
   buildHubRequestReply,
   buildHubViewReply,
-  isAlphaSidecarMessage,
+  isCodePuppySidecarMessage,
   isHubRequestId,
-  parseAlphaSidecarInbound,
-  type AlphaSidecarOutbound,
+  parseCodePuppySidecarInbound,
+  type CodePuppySidecarOutbound,
   type HubRequestRecord,
   type HubRequestStage,
   type HubStateReason,
   type HubView,
   type HubViewRow,
-} from "./alpha-sidecar-messages"
+} from "./codepuppy-sidecar-messages"
 import { CLOUD_MCP_SERVER_NAME } from "./cloud-web-search"
 import { collectInventory, type InventoryCatalogInput, type InventoryRow } from "./ext-inventory"
 import { type McpVerification, verifyInstalledMcp } from "./ext-mcp-activation"
@@ -518,25 +518,25 @@ export function createHubRequestStages(deps: { log: (line: string) => void }): H
   }
 }
 
-// ── parentPort 上 `alpha.*` 的 main 侧分发(I6)──────────────────────────────────────────────────
+// ── parentPort 上 `codepuppy.*` 的 main 侧分发(I6)──────────────────────────────────────────────────
 //
 // server.ts 在 `child.on("message")` 旁挂这一个入口(与 writeProbes.receive 并列)。只做三件事:只读视图、只读阶段、
 // 记录重载报告。是本族但形状不对 ⇒ 丢弃 + 记一行;不是本族 ⇒ 返回 false,原样交还给别的接收者。
 // 回复发不出去(sidecar 已退出)⇒ 记一行,不抛:ext 侧的请求簿记会按超时 / 子进程退出答「无法判断」。
 
-export type AlphaSidecarHost = {
-  receive(message: unknown, post: (message: AlphaSidecarOutbound) => void): boolean
+export type CodePuppySidecarHost = {
+  receive(message: unknown, post: (message: CodePuppySidecarOutbound) => void): boolean
   /** sidecar ready:返回该次连接的断开函数(只断开自己那一次,晚到的旧 exit 不会断开新连接)。 */
-  attach(post: (message: AlphaSidecarOutbound) => void): (reason: string) => void
+  attach(post: (message: CodePuppySidecarOutbound) => void): (reason: string) => void
 }
 
-export function createAlphaSidecarHost(deps: {
+export function createCodePuppySidecarHost(deps: {
   view: HubViewService
   requests: HubRequestStages
   reloads: ReloadCoordinator
   log: (line: string) => void
-}): AlphaSidecarHost {
-  const reply = (post: (message: AlphaSidecarOutbound) => void, message: AlphaSidecarOutbound) => {
+}): CodePuppySidecarHost {
+  const reply = (post: (message: CodePuppySidecarOutbound) => void, message: CodePuppySidecarOutbound) => {
     try {
       post(message)
     } catch (error) {
@@ -545,20 +545,20 @@ export function createAlphaSidecarHost(deps: {
   }
   return {
     receive(message, post) {
-      if (!isAlphaSidecarMessage(message)) return false
-      const inbound = parseAlphaSidecarInbound(message)
+      if (!isCodePuppySidecarMessage(message)) return false
+      const inbound = parseCodePuppySidecarInbound(message)
       if (!inbound) {
         deps.log(`alpha sidecar: dropped malformed or unknown message type=${String((message as { type: unknown }).type).slice(0, 80)}`)
         return true
       }
-      if (inbound.type === "alpha.hub.view.request") {
+      if (inbound.type === "codepuppy.hub.view.request") {
         deps.view.viewForAgent(inbound).then(
           (view) => reply(post, buildHubViewReply(inbound.id, { view })),
           (error) => reply(post, buildHubViewReply(inbound.id, { error: error instanceof Error ? error.message : String(error) })),
         )
         return true
       }
-      if (inbound.type === "alpha.hub.request.request") {
+      if (inbound.type === "codepuppy.hub.request.request") {
         reply(post, buildHubRequestReply(inbound.id, { record: deps.requests.get(inbound.requestId) }))
         return true
       }

@@ -11,7 +11,7 @@
 //
 // 变异自证(2026-08-29,见 PR):把 index.ts 的 APP_IDS.prod 改一个字符 → 本文件当场红;还原后绿。
 //
-// [ac#1186] `alpha.brand.short` 补进 ②:改名那轮漏了它,工作区弹层的默认工作区因此仍显示「Alpha」。
+// [ac#1186] `codepuppy.brand.short` 补进 ②:改名那轮漏了它,工作区弹层的默认工作区因此仍显示「Alpha」。
 // 取 `Code Puppy`(与 product 同口径 —— `code-puppy`/`codepuppy` 在本仓只做域名与标识符,不做展示名)。
 
 import { describe, expect, test } from "bun:test"
@@ -39,7 +39,7 @@ describe("AC5 身份面冻结 — 五组字面量逐字未变", () => {
     expect(src).toContain('prod: "com.tide.alphacode",')
   })
   test("更新 feed owner/repo/channel 映射", () => {
-    const src = read("packages/ui-mac/src/main/alpha-environment.ts")
+    const src = read("packages/ui-mac/src/main/codepuppy-environment.ts")
     expect(src).toContain('export const UPDATE_FEED_OWNER = "jinjunnn"')
     expect(src).toContain('export const UPDATE_FEED_REPO = "alpha-code"')
     expect(src).toContain('if (env === "prod") return "latest"')
@@ -51,7 +51,7 @@ describe("AC5 身份面冻结 — 五组字面量逐字未变", () => {
     expect(src).toContain('{ id: "auth", value: "codepuppy" }')
   })
   test("OAuth CLIENT_ID(wire 标识,非展示名)", () => {
-    expect(read("packages/ui-mac/src/main/alpha-auth.ts")).toContain('const CLIENT_ID = "codepuppy"')
+    expect(read("packages/ui-mac/src/main/codepuppy-auth.ts")).toContain('const CLIENT_ID = "codepuppy"')
   })
 })
 
@@ -70,30 +70,30 @@ describe("AC1 展示面坐标 — ui-mac 自有面显示 Code Puppy", () => {
   })
   test("i18n 品牌键 en(product / short / wordmark)", () => {
     const src = read("packages/ui-mac/src/renderer/i18n/en.ts")
-    expect(src).toContain('"alpha.brand.product": "Code Puppy",')
-    expect(src).toContain('"alpha.brand.short": "Code Puppy",')
-    expect(src).toContain('"alpha.brand.wordmark": "CODE PUPPY",')
+    expect(src).toContain('"codepuppy.brand.product": "Code Puppy",')
+    expect(src).toContain('"codepuppy.brand.short": "Code Puppy",')
+    expect(src).toContain('"codepuppy.brand.wordmark": "CODE PUPPY",')
   })
   test("i18n 品牌键 zh(product / short / wordmark)", () => {
     const src = read("packages/ui-mac/src/renderer/i18n/zh.ts")
-    expect(src).toContain('"alpha.brand.product": "Code Puppy",')
-    expect(src).toContain('"alpha.brand.short": "Code Puppy",')
-    expect(src).toContain('"alpha.brand.wordmark": "CODE PUPPY",')
+    expect(src).toContain('"codepuppy.brand.product": "Code Puppy",')
+    expect(src).toContain('"codepuppy.brand.short": "Code Puppy",')
+    expect(src).toContain('"codepuppy.brand.wordmark": "CODE PUPPY",')
   })
   test("i18n en 其余品牌文案五处", () => {
     const src = read("packages/ui-mac/src/renderer/i18n/en.ts")
     expect(src).toContain("You are already using the latest version of Code Puppy")
     expect(src).toContain("Version {{version}} of Code Puppy has been downloaded")
-    expect(src).toContain('"alpha.auto.loginItem": "Launch Code Puppy at login",')
-    expect(src).toContain('"alpha.onboarding.title": "Welcome to Code Puppy",')
+    expect(src).toContain('"codepuppy.auto.loginItem": "Launch Code Puppy at login",')
+    expect(src).toContain('"codepuppy.onboarding.title": "Welcome to Code Puppy",')
     expect(src).toContain("created by a newer Code Puppy version")
   })
   test("i18n zh 其余品牌文案五处", () => {
     const src = read("packages/ui-mac/src/renderer/i18n/zh.ts")
     expect(src).toContain("你已经在使用最新版本的 Code Puppy")
     expect(src).toContain("已下载 Code Puppy {{version}} 版本")
-    expect(src).toContain('"alpha.auto.loginItem": "登录时启动 Code Puppy",')
-    expect(src).toContain('"alpha.onboarding.title": "欢迎来到 Code Puppy",')
+    expect(src).toContain('"codepuppy.auto.loginItem": "登录时启动 Code Puppy",')
+    expect(src).toContain('"codepuppy.onboarding.title": "欢迎来到 Code Puppy",')
     expect(src).toContain("此数据由更新版本的 Code Puppy 创建")
   })
   test("i18n zht updater 两处([ac#1198] REQ-139 残留:zht 漏网,与 zh/en 同句同型)", () => {
@@ -160,45 +160,45 @@ describe("AC2 上游 renderer 转写 — brand-i18n to 侧为 Code Puppy(覆盖�
 })
 
 describe("AC3 提示词与技能文案 — 模型上下文里的品牌串", () => {
-  test("身份注入(alpha-identity.ts)", () => {
-    const src = read("packages/ui-mac/src/main/alpha-identity.ts")
+  test("身份注入(codepuppy-identity.ts)", () => {
+    const src = read("packages/ui-mac/src/main/codepuppy-identity.ts")
     expect(src).toContain('"# Code Puppy",')
     expect(src).toContain("You are running inside **Code Puppy**, a macOS coding agent.")
     expect(src).toContain('refer to yourself as "Code Puppy"')
   })
   test("行为指引 + 自动化执行器 prompt", () => {
-    expect(read("packages/ui-mac/src/main/alpha-behavior.ts")).toContain("# Code Puppy response guidance")
-    // REQ-157 `#1299`:三个 alpha agent 的 prompt/description 从 alpha-config-injection.ts 抽进零依赖的 alpha-agents.ts
+    expect(read("packages/ui-mac/src/main/codepuppy-behavior.ts")).toContain("# Code Puppy response guidance")
+    // REQ-157 `#1299`:三个 alpha agent 的 prompt/description 从 codepuppy-config-injection.ts 抽进零依赖的 codepuppy-agents.ts
     // (登记簿 import 它声明上限),坐标跟着搬;生产文件里不再内联这段字(0 处),字只住内容模块(2 处)。
-    const agents = read("packages/ui-mac/src/main/alpha-agents.ts")
+    const agents = read("packages/ui-mac/src/main/codepuppy-agents.ts")
     expect(agents.split("你是 Code Puppy 的自动化任务执行器").length - 1).toBe(2)
-    expect(read("packages/ui-mac/src/main/alpha-config-injection.ts").split("你是 Code Puppy 的自动化任务执行器").length - 1).toBe(0)
+    expect(read("packages/ui-mac/src/main/codepuppy-config-injection.ts").split("你是 Code Puppy 的自动化任务执行器").length - 1).toBe(0)
   })
-  test("子代理提示词(ext/alpha-prompts.ts 四处)", () => {
-    const src = read("packages/ext/src/alpha-prompts.ts")
+  test("子代理提示词(ext/codepuppy-prompts.ts 四处)", () => {
+    const src = read("packages/ext/src/codepuppy-prompts.ts")
     expect(src).toContain("coding-agent sessions in Code Puppy avoid mistakes")
     expect(src).toContain("(Code Puppy's per-project extensions:")
     expect(src).toContain("You are a general-purpose task agent inside Code Puppy.")
     expect(src).toContain("You are Code Puppy's codebase exploration agent")
   })
   test("拒答模板两处", () => {
-    expect(read("packages/ui-mac/src/main/alpha-builtin-policy.ts")).toContain("定制 Code Puppy 请改用 /customize-code-puppy")
+    expect(read("packages/ui-mac/src/main/codepuppy-builtin-policy.ts")).toContain("定制 Code Puppy 请改用 /customize-codepuppy")
     // REQ-157 `#1284`:ext 侧拒答模板搬进 context-injection 登记簿(factory-deny.ts 经 renderTemplate 取用),坐标跟着搬。
-    expect(read("packages/ext/src/context-injection.ts")).toContain("定制 Code Puppy 请改用 /customize-code-puppy")
+    expect(read("packages/ext/src/context-injection.ts")).toContain("定制 Code Puppy 请改用 /customize-codepuppy")
   })
   test("出厂技能六份 + upstream-sync 文案", () => {
     for (const f of [
       "packages/ui-mac/resources/factory-skills/agent-creator/SKILL.md",
-      "packages/ui-mac/resources/factory-skills/alpha-workspace/SKILL.md",
+      "packages/ui-mac/resources/factory-skills/codepuppy-workspace/SKILL.md",
       "packages/ui-mac/resources/factory-skills/cloud-capabilities/SKILL.md",
       "packages/ui-mac/resources/factory-skills/integrate-project/SKILL.md",
-      "packages/ui-mac/resources/factory-skills/customize-code-puppy/SKILL.md",
+      "packages/ui-mac/resources/factory-skills/customize-codepuppy/SKILL.md",
       "packages/ui-mac/resources/factory-skills/office-docs/SKILL.md",
       "packages/ui-mac/resources/skills/alpha-upstream-sync/SKILL.md",
     ]) {
       expect(read(f).includes("Code Puppy")).toBe(true)
     }
-    expect(read("packages/ui-mac/resources/factory-skills/customize-code-puppy/SKILL.md")).toContain("# Customize Code Puppy")
+    expect(read("packages/ui-mac/resources/factory-skills/customize-codepuppy/SKILL.md")).toContain("# Customize Code Puppy")
     // repo 名是身份不是展示:sync 指令仍指向 jinjunnn/alpha-code
     expect(read("packages/ui-mac/resources/skills/alpha-upstream-sync/SKILL.md")).toContain("gh repo sync jinjunnn/alpha-code")
   })

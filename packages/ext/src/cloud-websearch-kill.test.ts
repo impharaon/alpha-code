@@ -19,13 +19,13 @@ import {
   webSearchToolDenial,
 } from "./cloud-websearch-kill"
 
-/** alpha 自己写的那份云 server 定义的端点身份(注入面经 ALPHA_CLOUD_MCP_DEF 过河)。 */
+/** alpha 自己写的那份云 server 定义的端点身份(注入面经 CODEPUPPY_CLOUD_MCP_DEF 过河)。 */
 const CLOUD_URL = "https://cloud.example/mcp"
 const CLOUD_DEF = JSON.stringify({
   type: "remote",
   url: CLOUD_URL,
   enabled: true,
-  headers: { Authorization: "Bearer {file:/tmp/alpha-cloud-token}" },
+  headers: { Authorization: "Bearer {file:/tmp/codepuppy-cloud-token}" },
   oauth: false,
 })
 
@@ -54,7 +54,7 @@ const LOCAL_DENY_ONLY = {
 /**
  * 平台代付、无 kill-switch 的**今天**的真实形状(`#1411` / [[ADR-046]] D1 / D6):两个 deny 信号
  * 都缺席,云 server 的身份通道照常在场 —— 注入面在代付态置位 SERVER + DEF 并删掉 ARM
- * (`ui-mac/src/main/alpha-config-injection.ts:388-418`)。
+ * (`ui-mac/src/main/codepuppy-config-injection.ts:388-418`)。
  */
 const PLATFORM_PAYS = {
   [CLOUD_MCP_SERVER_ENV]: "cloud",
@@ -449,9 +449,9 @@ describe("上游次序前提(#1574:decide 早于 trigger,trigger 早于 confirm,
     expect(gate).toBeGreaterThanOrEqual(0)
     const registerFn = body.indexOf("const register =", gate)
     expect(registerFn).toBeGreaterThan(gate)
-    const decide = body.indexOf("AlphaToolPolicyGate.decide(", gate)
+    const decide = body.indexOf("CodePuppyToolPolicyGate.decide(", gate)
     const trigger = body.indexOf('"tool.execute.before"', gate)
-    const confirm = body.indexOf("AlphaToolPolicyGate.confirm(", gate)
+    const confirm = body.indexOf("CodePuppyToolPolicyGate.confirm(", gate)
     const impl = body.indexOf("execute.call(value, args, options)", gate)
     expect(decide).toBeGreaterThan(gate)
     expect(trigger).toBeGreaterThan(decide)
@@ -460,7 +460,7 @@ describe("上游次序前提(#1574:decide 早于 trigger,trigger 早于 confirm,
     expect(impl).toBeLessThan(registerFn)
     expect(body.indexOf("identityGate(value, display)", registerFn)).toBeGreaterThan(registerFn)
     // ①b gate 模块内部:confirm 里恰有一次 permission.ask(单一问询点;findLast 组合在其中)。
-    const gateBody = readFileSync(join(repoRoot, "packages/opencode/src/permission/alpha-tool-policy-gate.ts"), "utf8")
+    const gateBody = readFileSync(join(repoRoot, "packages/opencode/src/permission/codepuppy-tool-policy-gate.ts"), "utf8")
     const confirmFn = gateBody.indexOf("export const confirm")
     expect(confirmFn).toBeGreaterThanOrEqual(0)
     const gateAsk = gateBody.indexOf("input.permission.ask(", confirmFn)
@@ -473,16 +473,16 @@ describe("上游次序前提(#1574:decide 早于 trigger,trigger 早于 confirm,
     const transport = body.indexOf("Effect.promise(() => execute(args, opts))", loop)
     expect(transport).toBeGreaterThan(loop)
     const loopBody = body.slice(loop, transport)
-    for (const stale of ['"tool.execute.before"', "ctx.ask(", "AlphaToolPolicyGate."]) expect(loopBody).not.toContain(stale)
+    for (const stale of ['"tool.execute.before"', "ctx.ask(", "CodePuppyToolPolicyGate."]) expect(loopBody).not.toContain(stale)
   })
 
   test("code-mode 链:invokeChildTool 里 decide → trigger → confirm → callTool", () => {
     const body = readFileSync(join(repoRoot, "packages/opencode/src/tool/code-mode.ts"), "utf8")
     const fn = body.indexOf("invokeChildTool = Effect.fn")
     expect(fn).toBeGreaterThanOrEqual(0)
-    const decide = body.indexOf("AlphaToolPolicyGate.decide(", fn)
+    const decide = body.indexOf("CodePuppyToolPolicyGate.decide(", fn)
     const trigger = body.indexOf('"tool.execute.before"', fn)
-    const confirm = body.indexOf("AlphaToolPolicyGate.confirm(", fn)
+    const confirm = body.indexOf("CodePuppyToolPolicyGate.confirm(", fn)
     const callTool = body.indexOf(".callTool(", fn)
     expect(decide).toBeGreaterThan(fn)
     expect(trigger).toBeGreaterThan(decide)
@@ -506,14 +506,14 @@ describe("上游次序前提(#1574:decide 早于 trigger,trigger 早于 confirm,
 // ─────────────────────────────────────────────────────────────────────────────
 // #223 R4:ext 装载握手。上一轮的 fail-closed 判据是 main 侧「ext bundle 路径存不存在」——
 // R4 给出三条路径仍在、钩子却不存在的真实情形。下面每一条都真跑一遍:走的是**真实的**
-// `AlphaExt`(动态 import 本包源码,与引擎装它的方式同款)与真实的失败模块,不是替身。
+// `CodePuppyExt`(动态 import 本包源码,与引擎装它的方式同款)与真实的失败模块,不是替身。
 //
 // R5 收紧:握手的产物从「翻开一个 enabled:false 的条目」改成「把定义装进配置」——
 // `enabled:false` 会被 `/mcp/:name/connect` 无条件复制成 `enabled:true`(R5 Major 回归)。
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("installCloudMcp 单元判据", () => {
-  const tokenFile = join(tmpdir(), `alpha-ext-token-${process.pid}`)
+  const tokenFile = join(tmpdir(), `codepuppy-ext-token-${process.pid}`)
   // `#733` B1(审计 Blocker):alpha 治理的云 server **走标准 MCP OAuth**,定义里没有任何凭证通道。
   // 这个夹具从前是 `headers.Authorization + oauth:false`,于是即便本文件全绿,
   // 「最终写回的那一份不许带静态 bearer」这条 AC **一个闸都没有** ——
@@ -631,20 +631,20 @@ describe("ext 缺席三态:云 MCP 定义根本不进配置(#223 R4→R5 云 kil
   })
 
   beforeEach(() => {
-    savedRoot = process.env.ALPHA_GLOBAL_DIR
+    savedRoot = process.env.CODEPUPPY_GLOBAL_DIR
     savedArm = process.env[CLOUD_MCP_ARM_ENV]
     savedDef = process.env[CLOUD_MCP_DEF_ENV]
-    root = realpathSync(mkdtempSync(join(tmpdir(), "alpha-ext-arm-")))
-    process.env.ALPHA_GLOBAL_DIR = root
-    tokenFile = join(root, "ALPHA_CLOUD_TOKEN")
+    root = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-arm-")))
+    process.env.CODEPUPPY_GLOBAL_DIR = root
+    tokenFile = join(root, "CODEPUPPY_CLOUD_TOKEN")
     writeFileSync(tokenFile, "tok-live\n")
-    // main 侧 injectAlphaConfig 在 kill-switch 下置位的握手通道(定义只在 env 里托管)。
+    // main 侧 injectCodePuppyConfig 在 kill-switch 下置位的握手通道(定义只在 env 里托管)。
     process.env[CLOUD_MCP_ARM_ENV] = "cloud"
     process.env[CLOUD_MCP_DEF_ENV] = JSON.stringify(cloudDef())
   })
   afterEach(() => {
-    if (savedRoot === undefined) delete process.env.ALPHA_GLOBAL_DIR
-    else process.env.ALPHA_GLOBAL_DIR = savedRoot
+    if (savedRoot === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+    else process.env.CODEPUPPY_GLOBAL_DIR = savedRoot
     if (savedArm === undefined) delete process.env[CLOUD_MCP_ARM_ENV]
     else process.env[CLOUD_MCP_ARM_ENV] = savedArm
     if (savedDef === undefined) delete process.env[CLOUD_MCP_DEF_ENV]
@@ -654,11 +654,11 @@ describe("ext 缺席三态:云 MCP 定义根本不进配置(#223 R4→R5 云 kil
   /**
    * 注入面在 kill-switch 下写出的配置(#223 R6 Major 后的真实形状):真定义不进配置,写的是
    * 一份**中和条目** —— `ui-mac/src/main/cloud-web-search.ts` 的 `WITHHELD_CLOUD_MCP`。它存在的
-   * 唯一理由是压过继承来源(global / alpha.jsonc / 项目)里的同名定义;URL 不可解析、enabled:false。
+   * 唯一理由是压过继承来源(global / codepuppy.jsonc / 项目)里的同名定义;URL 不可解析、enabled:false。
    */
   const WITHHELD = {
     type: "remote",
-    url: "http://127.0.0.1:1/alpha-cloud-withheld",
+    url: "http://127.0.0.1:1/codepuppy-cloud-withheld",
     enabled: false,
     oauth: false,
   } as const
@@ -679,7 +679,7 @@ describe("ext 缺席三态:云 MCP 定义根本不进配置(#223 R4→R5 云 kil
   /**
    * 引擎装载外部插件 + 派发 config 钩子的判定形状(`opencode/src/plugin/index.ts`)。
    * 三个前提各由下面 "上游前提(装载路径)" 一组对源码锁住,`pure` 的真实解析由
-   * `packages/opencode/test/tool/alpha-websearch-failure.test.ts` 用真 RuntimeFlags 断言。
+   * `packages/opencode/test/tool/codepuppy-websearch-failure.test.ts` 用真 RuntimeFlags 断言。
    */
   async function engineLoadAndConfigure(
     cfg: unknown,
@@ -755,7 +755,7 @@ describe("ext 缺席三态:云 MCP 定义根本不进配置(#223 R4→R5 云 kil
 
   test("③ 插件初始化抛错(log-and-continue)⇒ 配置里只剩中和条目", async () => {
     const failing = join(root, "init-throws.mjs")
-    writeFileSync(failing, 'export default async () => { throw new Error("AlphaExt init failed") }\n')
+    writeFileSync(failing, 'export default async () => { throw new Error("CodePuppyExt init failed") }\n')
     const cfg = injectedConfig()
 
     const hooks = await engineLoadAndConfigure(cfg, {
@@ -768,8 +768,8 @@ describe("ext 缺席三态:云 MCP 定义根本不进配置(#223 R4→R5 云 kil
   })
 
   // ext 缺席 ⇒ 配置里没有可复活的定义,只有一个连不上任何东西的中和条目。`MCP.connect()` 的
-  // 复活路径与多源继承由 `packages/opencode/test/mcp/alpha-cloud-mcp-revival.test.ts` 与
-  // `packages/opencode/test/mcp/alpha-cloud-mcp-multisource.test.ts` 用真实 MCP lifecycle + HTTP 断言。
+  // 复活路径与多源继承由 `packages/opencode/test/mcp/codepuppy-cloud-mcp-revival.test.ts` 与
+  // `packages/opencode/test/mcp/codepuppy-cloud-mcp-multisource.test.ts` 用真实 MCP lifecycle + HTTP 断言。
   test("ext 缺席时配置里连一个真 URL / Authorization 头都不存在(R5 Major:热连无物可连)", async () => {
     const cfg = injectedConfig()
     await engineLoadAndConfigure(cfg, { pure: true, specs: [realExt] })
@@ -795,7 +795,7 @@ describe("ext 缺席三态:云 MCP 定义根本不进配置(#223 R4→R5 云 kil
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-// #223 R7 Blocker:治理归属是**每个 AlphaExt 实例**的状态,不是模块状态。
+// #223 R7 Blocker:治理归属是**每个 CodePuppyExt 实例**的状态,不是模块状态。
 //
 // 插件模块由 Bun 动态 import **缓存**(一个进程只有一份模块),而 Plugin / MCP 状态按 directory
 // 建实例 —— 快照存在模块级 `let` 上时,后跑的实例会把先跑的实例的归属覆盖掉。R7 的只读探针实测:
@@ -803,7 +803,7 @@ describe("ext 缺席三态:云 MCP 定义根本不进配置(#223 R4→R5 云 kil
 // A 的**同一个** alpha 云工具立刻被误拒 —— 一个项目改变了另一个项目权威云工具的可用性,违反本票
 // 对治理云 server 的保证与 AC4「不误杀」。
 //
-// 下面这条跑的是**真的** `AlphaExt`:同一个(被缓存的)模块 import 两次、各带自己的 directory,
+// 下面这条跑的是**真的** `CodePuppyExt`:同一个(被缓存的)模块 import 两次、各带自己的 directory,
 // 与引擎并存两个项目实例同款。判据 = B 的 foreign server 改不动 A 的判决,两个方向都验。
 // ─────────────────────────────────────────────────────────────────────────────
 describe("跨实例隔离:治理归属按实例闭包,不串扰(#223 R7 Blocker)", () => {
@@ -818,12 +818,12 @@ describe("跨实例隔离:治理归属按实例闭包,不串扰(#223 R7 Blocker)
   const FOREIGN = { type: "remote", url: "https://attacker.example/mcp" } as const
 
   beforeEach(() => {
-    for (const key of ["ALPHA_GLOBAL_DIR", LOCAL_WEBSEARCH_DENY_ENV, CLOUD_MCP_SERVER_ENV, CLOUD_MCP_DEF_ENV])
+    for (const key of ["CODEPUPPY_GLOBAL_DIR", LOCAL_WEBSEARCH_DENY_ENV, CLOUD_MCP_SERVER_ENV, CLOUD_MCP_DEF_ENV])
       saved[key] = process.env[key]
-    root = realpathSync(mkdtempSync(join(tmpdir(), "alpha-ext-xtalk-")))
-    dirA = realpathSync(mkdtempSync(join(tmpdir(), "alpha-ext-projA-")))
-    dirB = realpathSync(mkdtempSync(join(tmpdir(), "alpha-ext-projB-")))
-    process.env.ALPHA_GLOBAL_DIR = root
+    root = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-xtalk-")))
+    dirA = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-projA-")))
+    dirB = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-projB-")))
+    process.env.CODEPUPPY_GLOBAL_DIR = root
     // 平台代付(无 kill-switch):治理云工具是权威通道,必须放行;第三方 web search 一律关。
     process.env[LOCAL_WEBSEARCH_DENY_ENV] = "1"
     process.env[CLOUD_MCP_SERVER_ENV] = "cloud"

@@ -93,7 +93,7 @@ mock.module("@opencode-ai/session-ui/markdown", () => ({
 
 // ── #589 真闸门的假环境(审计 R1 Blocker:旧闸门只断言测试桩,没执行生产 handler)──
 // typed hooks/路由/live context 以受控假件供给,生产绑定层(session-timeline.tsx 的
-// AlphaSessionTimeline)原样执行;闸门在 SDK 层观察真实请求参数。本 cases 文件由
+// CodePuppySessionTimeline)原样执行;闸门在 SDK 层观察真实请求参数。本 cases 文件由
 // session-timeline.test.ts spawn 在独立 bun 子进程运行,module mock 不泄漏进主进程。
 const BINDING_SESSION_ID = "ses_live"
 const sdkPromptCalls: unknown[] = []
@@ -148,8 +148,8 @@ mock.module("@opencode-ai/app", () => ({
   }),
 }))
 mock.module("@solidjs/router", () => ({ useNavigate: () => () => {} }))
-mock.module("../src/renderer/alpha-ui/session-workspace/alpha-session-workspace", () => ({
-  useAlphaSessionLiveContext: () => ({
+mock.module("../src/renderer/codepuppy-ui/session-workspace/codepuppy-session-workspace", () => ({
+  useCodePuppySessionLiveContext: () => ({
     current: () => ({
       identity: { serverKey: "sidecar", directory: "/tmp/workspace", sessionID: BINDING_SESSION_ID },
       title: "整理架构说明",
@@ -175,13 +175,13 @@ Bun.plugin({
   },
 })
 
-const runtime = await import("../src/renderer/alpha-ui/session-timeline/session-timeline-test-runtime")
-const model = await import("../src/renderer/alpha-ui/session-timeline/timeline-model")
-const binding = await import("../src/renderer/alpha-ui/session-timeline/session-timeline")
+const runtime = await import("../src/renderer/codepuppy-ui/session-timeline/session-timeline-test-runtime")
+const model = await import("../src/renderer/codepuppy-ui/session-timeline/timeline-model")
+const binding = await import("../src/renderer/codepuppy-ui/session-timeline/session-timeline")
 const previewFixture = await import("./inline-preview.fixture")
-const previewShell = await import("../src/renderer/alpha-ui/session-workspace/session-workspace-shell")
-const previewFiles = await import("../src/renderer/alpha-ui/session-rail/files/session-rail-files")
-const previewArtifacts = await import("../src/renderer/alpha-ui/session-rail/artifacts/session-rail-artifacts")
+const previewShell = await import("../src/renderer/codepuppy-ui/session-workspace/session-workspace-shell")
+const previewFiles = await import("../src/renderer/codepuppy-ui/session-rail/files/session-rail-files")
+const previewArtifacts = await import("../src/renderer/codepuppy-ui/session-rail/artifacts/session-rail-artifacts")
 const i18n = await import("../src/renderer/i18n")
 
 const disposers: Array<() => void> = []
@@ -234,10 +234,10 @@ async function openStep(item: Element) {
 /** 打开工作过程 + 每个合并组 + 每个条目的详情(安全断言要看到全部可见内容)。 */
 async function openAll(host: Element) {
   await openProcess(host)
-  for (const group of host.querySelectorAll<HTMLButtonElement>("[data-alpha-process-step='toolgroup'][aria-expanded='false']"))
+  for (const group of host.querySelectorAll<HTMLButtonElement>("[data-codepuppy-process-step='toolgroup'][aria-expanded='false']"))
     group.click()
   await flush()
-  for (const item of host.querySelectorAll("[data-alpha-tool-card]")) await openStep(item)
+  for (const item of host.querySelectorAll("[data-codepuppy-tool-card]")) await openStep(item)
 }
 
 type Fixture = Parameters<typeof model.projectTimelineRows>[0]
@@ -360,12 +360,12 @@ describe("REQ-125 C5 会话内空态", () => {
     const host = mount()
     await flush()
 
-    const empty = host.querySelector("[data-alpha-timeline-empty]")
+    const empty = host.querySelector("[data-codepuppy-timeline-empty]")
     expect(empty).not.toBeNull()
     expect(empty!.textContent).toContain("整理架构说明")
     expect(empty!.textContent).toContain("在下方输入框说点什么")
     expect(host.querySelector("[role='log']")).not.toBeNull()
-    expect(host.querySelectorAll("[data-alpha-timeline-row]")).toHaveLength(0)
+    expect(host.querySelectorAll("[data-codepuppy-timeline-row]")).toHaveLength(0)
   })
 
   test("未就绪(首次同步中)不渲染空态", async () => {
@@ -373,7 +373,7 @@ describe("REQ-125 C5 会话内空态", () => {
     runtime.setTimelineReady(false)
     await flush()
 
-    expect(host.querySelector("[data-alpha-timeline-empty]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-timeline-empty]")).toBeNull()
   })
 
   test("有行时空态消失", async () => {
@@ -381,7 +381,7 @@ describe("REQ-125 C5 会话内空态", () => {
     runtime.setTimelineRows(conversationRows())
     await flush()
 
-    expect(host.querySelector("[data-alpha-timeline-empty]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-timeline-empty]")).toBeNull()
   })
 })
 
@@ -391,8 +391,8 @@ describe("REQ-125 C5 行 → DOM:文本类组件", () => {
     runtime.setTimelineRows(conversationRows())
     await flush()
 
-    const kinds = [...host.querySelectorAll("[data-alpha-timeline-row]")].map((el) =>
-      el.getAttribute("data-alpha-timeline-row"),
+    const kinds = [...host.querySelectorAll("[data-codepuppy-timeline-row]")].map((el) =>
+      el.getAttribute("data-codepuppy-timeline-row"),
     )
     expect(kinds).toEqual(["user", "process", "markdown", "footnote", "turn", "user"])
 
@@ -409,23 +409,23 @@ describe("REQ-125 C5 行 → DOM:文本类组件", () => {
     expect(comment.textContent).toContain("第 42 行")
     expect(comment.textContent).toContain("焦点环别再隐藏")
 
-    const markdown = host.querySelector("[data-alpha-timeline-row='markdown'] [data-md-stub]")!
+    const markdown = host.querySelector("[data-codepuppy-timeline-row='markdown'] [data-md-stub]")!
     expect(markdown.textContent).toBe("**发现**:结构完好")
 
     // 历史回合的工作过程默认收起:回答前只有这一行;点开后每步一行。
-    const process = host.querySelector("[data-alpha-timeline-row='process']")!
+    const process = host.querySelector("[data-codepuppy-timeline-row='process']")!
     expect(process.querySelector(".a-tl-pf-list")).toBeNull()
     await openProcess(host)
-    const steps = [...process.querySelectorAll("[data-alpha-process-step]")].map((el) =>
-      el.getAttribute("data-alpha-process-step"),
+    const steps = [...process.querySelectorAll("[data-codepuppy-process-step]")].map((el) =>
+      el.getAttribute("data-codepuppy-process-step"),
     )
     expect(steps).toEqual(["reasoning", "tool"])
-    const toolCard = process.querySelector("[data-alpha-tool-card]")!
+    const toolCard = process.querySelector("[data-codepuppy-tool-card]")!
     expect(toolCard.getAttribute("data-tool")).toBe("bash")
     expect(toolCard.getAttribute("data-status")).toBe("running")
     expect(toolCard.textContent).toContain("运行中")
 
-    expect(host.querySelector("[data-alpha-timeline-row='turn']")!.textContent).toContain("新一轮")
+    expect(host.querySelector("[data-codepuppy-timeline-row='turn']")!.textContent).toContain("新一轮")
   })
 
   test("#862 用户脚注投影可读名,复制原文并发编辑重发 intent;handler 缺席时编辑钮消失", async () => {
@@ -439,7 +439,7 @@ describe("REQ-125 C5 行 → DOM:文本类组件", () => {
     runtime.setTimelineRows(conversationRows())
     await flush()
 
-    const first = host.querySelector<HTMLElement>("[data-alpha-timeline-row='user']")!
+    const first = host.querySelector<HTMLElement>("[data-codepuppy-timeline-row='user']")!
     const meta = first.querySelector<HTMLElement>(".a-tl-user-meta")!
     // `#1588` AC5:第一方模式 build 写档名「全部批准」,不再写内部代号「发往 Build」。
     expect(meta.textContent).toContain("全部批准")
@@ -469,7 +469,7 @@ describe("REQ-125 C5 行 → DOM:文本类组件", () => {
     await flush()
     await openProcess(host)
 
-    const head = host.querySelector<HTMLButtonElement>("[data-alpha-process-step='reasoning']")!
+    const head = host.querySelector<HTMLButtonElement>("[data-codepuppy-process-step='reasoning']")!
     expect(head.getAttribute("aria-expanded")).toBe("false")
     expect(head.querySelector(".a-tl-pf-v")!.textContent).toBe("思考 6 秒")
     expect(head.querySelector(".a-tl-pf-o")!.textContent).toBe("规划探查顺序")
@@ -489,7 +489,7 @@ describe("REQ-125 C5 行 → DOM:文本类组件", () => {
     await flush()
     await openProcess(host)
 
-    const head = host.querySelector<HTMLButtonElement>("[data-alpha-process-step='reasoning']")!
+    const head = host.querySelector<HTMLButtonElement>("[data-codepuppy-process-step='reasoning']")!
     expect(head.querySelector(".a-tl-pf-v")!.textContent).toBe("思考 6 秒")
     expect(head.querySelector(".a-tl-pf-o")).toBeNull()
     expect(head.textContent).not.toContain("先列目录")
@@ -503,7 +503,7 @@ describe("REQ-125 C5 行 → DOM:文本类组件", () => {
     await flush()
     await openProcess(host)
 
-    const head = host.querySelector<HTMLButtonElement>("[data-alpha-process-step='reasoning']")!
+    const head = host.querySelector<HTMLButtonElement>("[data-codepuppy-process-step='reasoning']")!
     expect(head.querySelector(".a-tl-pf-o")!.textContent).toBe("规划探查顺序")
     expect(head.querySelector(".a-tl-pf-v")!.textContent).toBe("思考")
   })
@@ -513,15 +513,15 @@ describe("REQ-125 C5 行 → DOM:文本类组件", () => {
     runtime.setTimelineRows(conversationRows("busy"))
     await flush()
 
-    expect(host.querySelector("[data-alpha-timeline-row='markdown'][data-streaming='true']")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-timeline-row='markdown'][data-streaming='true']")).not.toBeNull()
     expect(host.querySelector(".a-tl-cursor")).not.toBeNull()
     // `#1474`:回答开始输出 ⇒ 工作过程收成一行摘要,带脉冲点、继续计时。
     const sum = host.querySelector<HTMLButtonElement>(".a-tl-pf-sum")!
     expect(sum.getAttribute("aria-expanded")).toBe("false")
     expect(sum.querySelector(".a-tl-pf-pulse")).not.toBeNull()
-    expect(sum.querySelector("[data-alpha-process-segment='elapsed']")).not.toBeNull()
+    expect(sum.querySelector("[data-codepuppy-process-segment='elapsed']")).not.toBeNull()
     await openProcess(host)
-    const thinking = host.querySelector("[data-alpha-process-step='reasoning'][data-streaming='true']")!
+    const thinking = host.querySelector("[data-codepuppy-process-step='reasoning'][data-streaming='true']")!
     expect(thinking.querySelector(".a-tl-pf-v")!.textContent).toBe("正在思考…")
     expect(thinking.querySelector(".a-tl-pf-o")).toBeNull()
 
@@ -543,9 +543,9 @@ describe("REQ-125 C5 行 → DOM:文本类组件", () => {
     )
     await flush()
     // `#1474`:首个 part 未到这一格是工作过程的实时标题「正在思考」,不再是胶囊或回合脚行。
-    expect(host.querySelector("[data-alpha-timeline-row='thinking']")).toBeNull()
-    expect(host.querySelector("[data-alpha-timeline-row='turn-running']")).toBeNull()
-    expect(host.querySelector("[data-alpha-timeline-row='process'] [data-alpha-process-title]")!.textContent).toBe(
+    expect(host.querySelector("[data-codepuppy-timeline-row='thinking']")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-timeline-row='turn-running']")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-timeline-row='process'] [data-codepuppy-process-title]")!.textContent).toBe(
       "正在思考",
     )
     expect(host.querySelector(".a-tl-cursor")).toBeNull()
@@ -567,7 +567,7 @@ describe("REQ-125 C5 历史分页驻点", () => {
     runtime.setTimelineHistory({ more: true, loading: true })
     await flush()
     expect(host.querySelector(".a-tl-history-button")).toBeNull()
-    expect(host.querySelector("[data-alpha-timeline-history]")!.getAttribute("data-loading")).toBe("true")
+    expect(host.querySelector("[data-codepuppy-timeline-history]")!.getAttribute("data-loading")).toBe("true")
   })
 
   test("没有更早分页时不渲染历史驻点", async () => {
@@ -575,7 +575,7 @@ describe("REQ-125 C5 历史分页驻点", () => {
     runtime.setTimelineRows(conversationRows())
     await flush()
 
-    expect(host.querySelector("[data-alpha-timeline-history]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-timeline-history]")).toBeNull()
   })
 })
 
@@ -595,7 +595,7 @@ describe("REQ-125 C5 Major-3:连续锚定(settling)", () => {
     )
 
     const scrollEl = host.querySelector(".a-tl-scroll") as HTMLElement
-    const anchorRow = host.querySelector("[data-alpha-timeline-row]") as HTMLElement
+    const anchorRow = host.querySelector("[data-codepuppy-timeline-row]") as HTMLElement
     const geometry = { rowBase: 10 }
     scrollEl.getBoundingClientRect = () => rectOf(0, 600)
     anchorRow.getBoundingClientRect = () => rectOf(geometry.rowBase - scrollEl.scrollTop, 20)
@@ -749,7 +749,7 @@ describe("REQ-125 C5 Major-1:Markdown 引擎窗口化", () => {
     runtime.setTimelineRows(twoMarkdownRows())
     await flush()
 
-    const mdRows = [...host.querySelectorAll("[data-alpha-timeline-row='markdown']")]
+    const mdRows = [...host.querySelectorAll("[data-codepuppy-timeline-row='markdown']")]
     expect(mdRows).toHaveLength(2)
     expect(host.querySelectorAll("[data-md-stub]")).toHaveLength(0)
     expect(host.querySelectorAll(".a-tl-md-deferred")).toHaveLength(2)
@@ -891,7 +891,7 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     await flush()
 
     // 回合在跑:工作过程默认展开(实时区);正在跑的命令不整张展开,行下露最后几行输出(`#1474`)。
-    const card = host.querySelector("[data-alpha-tool-card][data-tool='bash']")!
+    const card = host.querySelector("[data-codepuppy-tool-card][data-tool='bash']")!
     expect(card.getAttribute("data-status")).toBe("running")
     expect(card.getAttribute("data-open")).toBeNull()
     expect(card.querySelector(".a-tl-pf-v")!.textContent).toBe("运行")
@@ -900,7 +900,7 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     expect(card.querySelector(".a-tc-term")).toBeNull()
     // 手动点开:今天的终端卡正文(命令 + 流式输出 + 块状光标),尾巴让位给完整输出。
     await openStep(card)
-    expect(card.querySelector("[data-alpha-process-tail]")).toBeNull()
+    expect(card.querySelector("[data-codepuppy-process-tail]")).toBeNull()
     const term = card.querySelector(".a-tc-term")!
     expect(term.textContent).toContain("$ bun test src")
     expect(term.textContent).toContain("✓ one")
@@ -911,7 +911,7 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     // 流式增行:同一 store proxy 的 delta,不重建条目 DOM。
     setState("metadata", { output: "✓ one\n✓ two\n" } as never)
     await flush()
-    expect(host.querySelector("[data-alpha-tool-card][data-tool='bash']")).toBe(cardBefore)
+    expect(host.querySelector("[data-codepuppy-tool-card][data-tool='bash']")).toBe(cardBefore)
     expect(card.querySelector(".a-tc-term")!.textContent).toContain("✓ two")
 
     // 完成:成功不挂状态(不再写「退出 0」),光标消失;回合结束后工作过程收起;
@@ -921,9 +921,9 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     setState("output" as never, "✓ one\n✓ two\n2 pass" as never)
     runtime.setTimelineRows(assistantFixture([toolPartFixture("prt_b1", "bash", state as never)], "idle"))
     await flush()
-    expect(host.querySelector("[data-alpha-tool-card][data-tool='bash']")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-tool-card][data-tool='bash']")).toBeNull()
     await openProcess(host)
-    const done = host.querySelector("[data-alpha-tool-card][data-tool='bash']")!
+    const done = host.querySelector("[data-codepuppy-tool-card][data-tool='bash']")!
     expect(done.getAttribute("data-status")).toBe("success")
     expect(done.getAttribute("data-open")).toBe("true")
     expect(done.textContent).not.toContain("退出 0")
@@ -985,30 +985,30 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     // 详情全部打开:即便如此,输入 / 输出 / 错误也一个字都不进 DOM。
     await openAll(host)
 
-    const mcpCard = host.querySelector("[data-alpha-tool-card][data-category='mcp']")!
+    const mcpCard = host.querySelector("[data-codepuppy-tool-card][data-category='mcp']")!
     // `#1475` AC5:第三方步骤行 = 插头图标 + 服务名 + 工具名(不再写来源分类)。
     expect(mcpCard.querySelector(".a-tl-pf-v")!.textContent).toBe("context7")
-    expect(mcpCard.querySelector("[data-alpha-step-source='mcp']")).not.toBeNull()
+    expect(mcpCard.querySelector("[data-codepuppy-step-source='mcp']")).not.toBeNull()
     expect(mcpCard.querySelector(".a-tl-pf-o")!.textContent).toBe("resolve-library-id")
     expect(mcpCard.querySelector(".a-tc-out")).toBeNull()
     expect(mcpCard.textContent).not.toContain("raw output text")
     expect(mcpCard.textContent).not.toContain("solid")
 
-    const legacy = host.querySelector("[data-alpha-tool-card][data-category='unknown']")!
+    const legacy = host.querySelector("[data-codepuppy-tool-card][data-category='unknown']")!
     // #1576:无快照按第三方处理 —— 只有问号图标 + 名称,不再写「来源不明」这第四类。
     expect(legacy.querySelector(".a-tl-pf-v")).toBeNull()
     expect(legacy.querySelector(".a-tl-pf-o")!.textContent).toBe("cloud_dispatch")
-    expect(legacy.querySelector("[data-alpha-step-source='unknown']")).not.toBeNull()
+    expect(legacy.querySelector("[data-codepuppy-step-source='unknown']")).not.toBeNull()
     expect(legacy.getAttribute("data-status")).toBe("error")
-    expect(legacy.querySelector("[data-alpha-step-failure]")!.textContent).toBe("没成功")
+    expect(legacy.querySelector("[data-codepuppy-step-failure]")!.textContent).toBe("没成功")
     expect(legacy.querySelector(".a-tc-err")).toBeNull()
     expect(legacy.textContent).not.toContain("ENOTREACHABLE")
 
-    const impostor = host.querySelector("[data-alpha-tool-card][data-category='plugin']")!
+    const impostor = host.querySelector("[data-codepuppy-tool-card][data-category='plugin']")!
     expect(impostor.getAttribute("data-kind")).toBe("unknown")
     // #1576:插件一律「第三方插件」,包名只进开发者详情。
     expect(impostor.querySelector(".a-tl-pf-v")!.textContent).toBe("第三方插件")
-    expect(impostor.querySelector("[data-alpha-step-source='plugin']")).not.toBeNull()
+    expect(impostor.querySelector("[data-codepuppy-step-source='plugin']")).not.toBeNull()
     expect(impostor.textContent).not.toContain("curl")
     expect(impostor.textContent).not.toContain("uid=0(root)")
     expect(impostor.querySelector(".a-tc-term")).toBeNull()
@@ -1052,23 +1052,23 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
 
     // 完成态 web search(design ⑧):图标 + 搜索 + "query";来源徽标与「完成」都不再常驻。
     // `#1475`:本机搜索与云端搜索同一个写法;动作名本身不再另挂「云端」。
-    const search = host.querySelector("[data-alpha-tool-card][data-tool='codepuppy_web_search']")!
+    const search = host.querySelector("[data-codepuppy-tool-card][data-tool='codepuppy_web_search']")!
     expect(search.getAttribute("data-kind")).toBe("cloud")
     expect(search.getAttribute("data-category")).toBe("codepuppy-cloud")
     expect(search.querySelector(".a-tl-pf-v")!.textContent).toBe("搜索")
-    expect(search.querySelector("[data-alpha-step-source]")).toBeNull()
+    expect(search.querySelector("[data-codepuppy-step-source]")).toBeNull()
     expect(search.querySelector(".a-tl-pf-o")!.textContent).toBe("alpha-code e7 部署证据")
-    expect(search.querySelector("[data-alpha-source-badge]")).toBeNull()
+    expect(search.querySelector("[data-codepuppy-source-badge]")).toBeNull()
     expect(search.querySelector(".a-tl-pf-end")!.textContent).not.toContain("完成")
-    expect(search.querySelector("[data-alpha-dev-details]")).toBeNull()
+    expect(search.querySelector("[data-codepuppy-dev-details]")).toBeNull()
     // T8:步骤行拿不到任何一层技术 id;它们只活在详情底部默认折叠的开发者详情里。
     const headText = search.querySelector(".a-tl-pf-step")!.textContent!
     expect(headText).not.toContain("codepuppy_web_search")
     expect(headText).not.toContain("cloud_web_search")
     await openStep(search)
-    const detail = search.querySelector("[data-alpha-step-detail]")!
-    expect(detail.lastElementChild!.hasAttribute("data-alpha-dev-details")).toBe(true)
-    const dev = search.querySelector<HTMLDetailsElement>("[data-alpha-dev-details]")!
+    const detail = search.querySelector("[data-codepuppy-step-detail]")!
+    expect(detail.lastElementChild!.hasAttribute("data-codepuppy-dev-details")).toBe(true)
+    const dev = search.querySelector<HTMLDetailsElement>("[data-codepuppy-dev-details]")!
     expect(dev.open).toBe(false)
     expect(dev.querySelector("summary")!.textContent).toBe("开发者详情")
     expect(dev.querySelector(".a-tc-dev-body")!.textContent).toContain("codepuppy_web_search")
@@ -1079,11 +1079,11 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     expect(links).toEqual(["https://docs.example.org/deploy", "https://blog.example.net/e7"])
 
     // 运行态 await:同一形态的语义标题 + 关键目标 + 运行中;绝不显示拼接 id。
-    const awaiting = host.querySelector("[data-alpha-tool-card][data-tool='codepuppy_await']")!
+    const awaiting = host.querySelector("[data-codepuppy-tool-card][data-tool='codepuppy_await']")!
     expect(awaiting.getAttribute("data-status")).toBe("running")
     expect(awaiting.querySelector(".a-tl-pf-v")!.textContent).toBe("等待云端任务")
     expect(awaiting.querySelector(".a-tl-pf-o")!.textContent).toBe("run_77bd")
-    expect(awaiting.querySelector("[data-alpha-source-badge]")).toBeNull()
+    expect(awaiting.querySelector("[data-codepuppy-source-badge]")).toBeNull()
     expect(awaiting.querySelector(".a-tl-pf-end")!.textContent).toContain("运行中")
     expect(awaiting.querySelector(".a-tl-pf-step")!.textContent).not.toContain("codepuppy_await")
   })
@@ -1149,40 +1149,40 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     await flush()
     await openAll(host)
     // design ⑧ 改了 #4:常驻来源徽标整体退场(第三方行内来源的写法归 #1475)。
-    expect(host.querySelector("[data-alpha-source-badge]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-source-badge]")).toBeNull()
 
-    const builtinCard = host.querySelector("[data-alpha-tool-card][data-category='builtin']")!
+    const builtinCard = host.querySelector("[data-codepuppy-tool-card][data-category='builtin']")!
     // 防冒充:我方步骤行永远不写来源分类。
     expect(builtinCard.querySelector(".a-tl-pf-v")!.textContent).toBe("运行")
-    expect(builtinCard.querySelector("[data-alpha-safe-card]")).toBeNull()
+    expect(builtinCard.querySelector("[data-codepuppy-safe-card]")).toBeNull()
 
-    const mcpCard = host.querySelector("[data-alpha-tool-card][data-category='mcp']")!
+    const mcpCard = host.querySelector("[data-codepuppy-tool-card][data-category='mcp']")!
     expect(mcpCard.querySelector(".a-tl-pf-v")!.textContent).toBe("context7")
-    const mcpSafe = mcpCard.querySelector("[data-alpha-safe-card]")!
+    const mcpSafe = mcpCard.querySelector("[data-codepuppy-safe-card]")!
     // `#1475` AC5:常驻的「详情未展示」挪进详情,改成一句写出来源的人话。
     expect(mcpSafe.textContent).toBe("这个工具来自第三方(context7),我们不显示它收到和返回的内容。")
 
-    const unknownCard = host.querySelector("[data-alpha-tool-card][data-category='unknown']")!
+    const unknownCard = host.querySelector("[data-codepuppy-tool-card][data-category='unknown']")!
     // #1576:无快照按第三方说,来源只有三类。
     expect(unknownCard.querySelector(".a-tl-pf-v")).toBeNull()
-    const unknownSafe = unknownCard.querySelector("[data-alpha-safe-card]")!
+    const unknownSafe = unknownCard.querySelector("[data-codepuppy-safe-card]")!
     expect(unknownSafe.textContent).toBe("这个工具来自第三方,我们不显示它收到和返回的内容。")
     // 失败只写「没成功」(行尾),不显示错误原文。
-    expect(unknownCard.querySelector("[data-alpha-step-failure]")!.textContent).toBe("没成功")
+    expect(unknownCard.querySelector("[data-codepuppy-step-failure]")!.textContent).toBe("没成功")
     expect(unknownCard.textContent).not.toContain("boom-secret")
     // 无快照 ⇒ 无开发者详情(没有可信 identity 可陈列)。
-    expect(unknownCard.querySelector("[data-alpha-dev-details]")).toBeNull()
+    expect(unknownCard.querySelector("[data-codepuppy-dev-details]")).toBeNull()
 
-    const pluginCard = host.querySelector("[data-alpha-tool-card][data-category='plugin']")!
+    const pluginCard = host.querySelector("[data-codepuppy-tool-card][data-category='plugin']")!
     // #1576:插件不写包名;包名只在开发者详情。
     expect(pluginCard.querySelector(".a-tl-pf-v")!.textContent).toBe("第三方插件")
-    expect(pluginCard.querySelector("[data-alpha-step-source='plugin']")).not.toBeNull()
-    expect(pluginCard.querySelector("[data-alpha-safe-card]")!.textContent).toBe(
+    expect(pluginCard.querySelector("[data-codepuppy-step-source='plugin']")).not.toBeNull()
+    expect(pluginCard.querySelector("[data-codepuppy-safe-card]")!.textContent).toBe(
       "这个工具来自第三方插件,我们不显示它收到和返回的内容。",
     )
     expect(pluginCard.querySelector(".a-tl-pf-step")!.textContent).not.toContain("sample-plugin")
     // 降级卡的开发者详情仍保留排障能力(AC4):快照在场即陈列,默认折叠。
-    const pluginDev = pluginCard.querySelector<HTMLDetailsElement>("[data-alpha-dev-details]")!
+    const pluginDev = pluginCard.querySelector<HTMLDetailsElement>("[data-codepuppy-dev-details]")!
     expect(pluginDev.open).toBe(false)
     expect(pluginDev.textContent).toContain("plugin:sample-plugin:bash")
   })
@@ -1227,9 +1227,9 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     )
     await flush()
     await openAll(host)
-    const item = (id: string) => host.querySelector(`[data-alpha-tool-card][data-tool='${id}']`)!
-    const endOf = (el: Element) => el.querySelector(":scope > .a-tl-pf-step [data-alpha-step-location]")?.textContent
-    const footOf = (el: Element) => el.querySelector("[data-alpha-step-provenance]")!.textContent
+    const item = (id: string) => host.querySelector(`[data-codepuppy-tool-card][data-tool='${id}']`)!
+    const endOf = (el: Element) => el.querySelector(":scope > .a-tl-pf-step [data-codepuppy-step-location]")?.textContent
+    const footOf = (el: Element) => el.querySelector("[data-codepuppy-step-provenance]")!.textContent
 
     const own = item("bash")
     expect(endOf(own)).toBeUndefined()
@@ -1248,19 +1248,19 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     expect(footOf(plug)).toBe("第三方 · 本机")
     // 插件路径不进正常界面,只进开发者详情。
     expect(plug.querySelector(".a-tl-pf-step")!.textContent).not.toContain("plugin.js")
-    expect(plug.querySelector("[data-alpha-step-provenance]")!.textContent).not.toContain("plugin.js")
+    expect(plug.querySelector("[data-codepuppy-step-provenance]")!.textContent).not.toContain("plugin.js")
 
     // AC6:开发者详情保留 identity、authority 种类、bindingId、evidenceDigest 与 location(插件另有 origin)。
-    const cloudDev = cloud.querySelector("[data-alpha-dev-details] .a-tc-dev-body")!.textContent!
+    const cloudDev = cloud.querySelector("[data-codepuppy-dev-details] .a-tc-dev-body")!.textContent!
     for (const needle of ["mcp:codepuppy:dispatch", "codepuppy-cloud", "mcp:codepuppy", `sha256:${"a".repeat(25)}`, "location: remote · cloud.example"])
       expect({ needle, present: cloudDev.includes(needle) }).toEqual({ needle, present: true })
-    const plugDev = plug.querySelector("[data-alpha-dev-details] .a-tc-dev-body")!.textContent!
+    const plugDev = plug.querySelector("[data-codepuppy-dev-details] .a-tc-dev-body")!.textContent!
     expect(plugDev).toContain("location: local")
     expect(plugDev).toContain("origin: /Applications/Code Puppy.app/x/plugin.js")
     // 开发者详情仍是详情的最后一项。
-    expect(cloud.querySelector("[data-alpha-step-detail]")!.lastElementChild!.hasAttribute("data-alpha-dev-details")).toBe(true)
+    expect(cloud.querySelector("[data-codepuppy-step-detail]")!.lastElementChild!.hasAttribute("data-codepuppy-dev-details")).toBe(true)
     // 每个内置步骤都有位置 ⇒ 列表底部没有「内置步骤位置未知」。
-    expect(host.querySelector("[data-alpha-builtin-location-unknown]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-builtin-location-unknown]")).toBeNull()
   })
 
   test("#1576 旧记录:内置步骤不逐行写位置,列表底部一句「内置步骤位置未知」;非内置缺位置逐行写「位置未知」", async () => {
@@ -1289,13 +1289,13 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     )
     await flush()
     await openAll(host)
-    const read = host.querySelector("[data-alpha-tool-card][data-tool='read']")!
-    expect(read.querySelector(":scope > .a-tl-pf-step [data-alpha-step-location]")).toBeNull()
-    expect(read.querySelector("[data-alpha-step-provenance]")!.textContent).toBe("Code Puppy 内置 · 位置未知")
-    const notion = host.querySelector("[data-alpha-tool-card][data-tool='notion_search_pages']")!
-    expect(notion.querySelector(":scope > .a-tl-pf-step [data-alpha-step-location]")!.textContent).toBe("位置未知")
-    expect(notion.querySelector("[data-alpha-dev-details] .a-tc-dev-body")!.textContent).toContain("location: —")
-    const foot = host.querySelectorAll("[data-alpha-builtin-location-unknown]")
+    const read = host.querySelector("[data-codepuppy-tool-card][data-tool='read']")!
+    expect(read.querySelector(":scope > .a-tl-pf-step [data-codepuppy-step-location]")).toBeNull()
+    expect(read.querySelector("[data-codepuppy-step-provenance]")!.textContent).toBe("Code Puppy 内置 · 位置未知")
+    const notion = host.querySelector("[data-codepuppy-tool-card][data-tool='notion_search_pages']")!
+    expect(notion.querySelector(":scope > .a-tl-pf-step [data-codepuppy-step-location]")!.textContent).toBe("位置未知")
+    expect(notion.querySelector("[data-codepuppy-dev-details] .a-tc-dev-body")!.textContent).toContain("location: —")
+    const foot = host.querySelectorAll("[data-codepuppy-builtin-location-unknown]")
     expect(foot).toHaveLength(1)
     expect(foot[0]!.textContent).toBe("内置步骤位置未知")
     expect(foot[0]!.parentElement!.lastElementChild).toBe(foot[0]!)
@@ -1338,28 +1338,28 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     await flush()
     await openProcess(host)
 
-    const timeoutCard = host.querySelector("[data-alpha-tool-card][data-tool='codepuppy_web_search']")!
+    const timeoutCard = host.querySelector("[data-codepuppy-tool-card][data-tool='codepuppy_web_search']")!
     expect(timeoutCard.getAttribute("data-status")).toBe("error")
     // 步骤行尾就写「没等到你批准」,不用点开也读得出来;详情里再给完整的人话。
-    expect(timeoutCard.querySelector("[data-alpha-step-failure]")!.textContent).toBe("没等到你批准")
+    expect(timeoutCard.querySelector("[data-codepuppy-step-failure]")!.textContent).toBe("没等到你批准")
     await openAll(host)
-    const timeoutSafe = timeoutCard.querySelector("[data-alpha-safe-card]")!
+    const timeoutSafe = timeoutCard.querySelector("[data-codepuppy-safe-card]")!
     // 可辨识原因:包含「已超时」与「未获批准」两类词,替换回通用失败文案即红(#1214 AC2 变异判据)。
     expect(timeoutSafe.textContent).toContain("审批已超时,未获批准")
     expect(timeoutSafe.textContent).toContain("重新发起会再次询问")
     expect(timeoutSafe.textContent).not.toContain("错误详情已隐藏")
-    expect(timeoutSafe.querySelector("[data-alpha-ask-timeout]")).not.toBeNull()
+    expect(timeoutSafe.querySelector("[data-codepuppy-ask-timeout]")).not.toBeNull()
     // 错误原文与请求内容零字符进 DOM(#587 AC2 纪律不变)。canonical identity 出现在
     // 默认折叠的开发者详情里是 #587 AC4 的既有特性,不算错误原文泄漏,故不以它作针。
     expect(timeoutCard.textContent).not.toContain("常见原因")
     expect(timeoutCard.textContent).not.toContain("没有**被放行")
     expect(timeoutCard.textContent).not.toContain("秘密查询词")
 
-    const genericCard = host.querySelector("[data-alpha-tool-card][data-tool='context7_resolve-library-id']")!
-    const genericSafe = genericCard.querySelector("[data-alpha-safe-card]")!
+    const genericCard = host.querySelector("[data-codepuppy-tool-card][data-tool='context7_resolve-library-id']")!
+    const genericSafe = genericCard.querySelector("[data-codepuppy-safe-card]")!
     expect(genericSafe.textContent).toBe("这个工具来自第三方(context7),我们不显示它收到和返回的内容。")
-    expect(genericCard.querySelector("[data-alpha-step-failure]")!.textContent).toBe("没成功")
-    expect(genericSafe.querySelector("[data-alpha-ask-timeout]")).toBeNull()
+    expect(genericCard.querySelector("[data-codepuppy-step-failure]")!.textContent).toBe("没成功")
+    expect(genericSafe.querySelector("[data-codepuppy-ask-timeout]")).toBeNull()
     expect(genericCard.textContent).not.toContain("ENOTREACHABLE")
   })
 
@@ -1380,7 +1380,7 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     await flush()
     await openProcess(host)
 
-    const card = host.querySelector("[data-alpha-tool-card][data-tool='list']")!
+    const card = host.querySelector("[data-codepuppy-tool-card][data-tool='list']")!
     // 步骤行:路径折叠 home 前缀(基线明令不显示带用户名的 home 前缀);成功不挂状态,
     // 计数只在详情 footer 里说一次(design §6「每样信息只出现一次」)。
     expect(card.querySelector(".a-tl-pf-o")!.textContent).toBe("~/proj/site")
@@ -1389,7 +1389,7 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
 
     // 详情:网格分类渲染,目录先于文件各带图标,footer 写计数。
     await openStep(card)
-    const grid = card.querySelector("[data-alpha-dir-grid]")!
+    const grid = card.querySelector("[data-codepuppy-dir-grid]")!
     const dirs = [...grid.querySelectorAll(".a-tc-dir-item[data-entry='dir']")].map((node) => node.textContent)
     const files = [...grid.querySelectorAll(".a-tc-dir-item[data-entry='file']")].map((node) => node.textContent)
     expect(dirs).toEqual(["assets", "src"])
@@ -1417,11 +1417,11 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     await flush()
     await openProcess(host)
 
-    const card = host.querySelector("[data-alpha-tool-card][data-tool='list']")!
+    const card = host.querySelector("[data-codepuppy-tool-card][data-tool='list']")!
     expect(card.querySelector(".a-tl-pf-end")!.textContent).toBe("")
     await openStep(card)
 
-    const grid = card.querySelector("[data-alpha-dir-grid]")!
+    const grid = card.querySelector("[data-codepuppy-dir-grid]")!
     // 先证明这不是空卡/未截断卡:首项在、末项(mod-62.ts)被帽掉 —— 判据不依赖帽的具体数值。
     expect(grid.textContent).toContain("mod-0.ts")
     expect(grid.textContent).not.toContain("mod-62.ts")
@@ -1477,12 +1477,12 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     await openProcess(host)
 
     // 用户可观察结果:铸出来的是目录网格(列目录语义),不是 read 文件详情。
-    const card = host.querySelector("[data-alpha-tool-card][data-tool='read']")!
+    const card = host.querySelector("[data-codepuppy-tool-card][data-tool='read']")!
     expect(card.querySelector(".a-tl-pf-v")!.textContent).toBe("列出目录")
     expect(card.querySelector(".a-tl-pf-o")!.textContent).toBe("~/lab/ops-kit")
     expect(card.textContent).not.toContain("/Users/")
     await openStep(card)
-    const grid = card.querySelector("[data-alpha-dir-grid]")!
+    const grid = card.querySelector("[data-codepuppy-dir-grid]")!
     const dirs = [...grid.querySelectorAll(".a-tc-dir-item[data-entry='dir']")].map((node) => node.textContent)
     const files = [...grid.querySelectorAll(".a-tc-dir-item[data-entry='file']")].map((node) => node.textContent)
     expect(dirs).toEqual(["hooks", "vendor", "workers"])
@@ -1523,9 +1523,9 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     await flush()
     await openAll(host)
 
-    const card = host.querySelector("[data-alpha-tool-card][data-tool='read']")!
+    const card = host.querySelector("[data-codepuppy-tool-card][data-tool='read']")!
     expect(card.querySelector(".a-tl-pf-v")!.textContent).toBe("读取")
-    expect(card.querySelector("[data-alpha-dir-grid]")).toBeNull()
+    expect(card.querySelector("[data-codepuppy-dir-grid]")).toBeNull()
     expect(card.textContent).not.toContain("项")
   })
 
@@ -1552,11 +1552,11 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     await flush()
     await openProcess(host)
 
-    const card = host.querySelector("[data-alpha-tool-card][data-tool='grep']")!
+    const card = host.querySelector("[data-codepuppy-tool-card][data-tool='grep']")!
     // 成功不挂状态:「2 处命中」不再上步骤行,命中内容在详情里。
     expect(card.querySelector(".a-tl-pf-end")!.textContent).toBe("")
     await openStep(card)
-    const body = card.querySelector("[data-alpha-grep-body]")!
+    const body = card.querySelector("[data-codepuppy-grep-body]")!
     // 文件行分色 + 路径脱敏(home 前缀折叠)。
     expect(body.querySelector(".a-tc-grep-file")!.textContent).toBe("~/proj/wrangler.toml")
     expect(body.textContent).not.toContain("/Users/")
@@ -1581,9 +1581,9 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     )
     await flush()
     await openAll(host)
-    const hiddenCard = host.querySelector("[data-alpha-tool-card][data-tool='grep']")!
-    expect(hiddenCard.querySelector("[data-alpha-step-detail] [data-alpha-details-hidden]")!.textContent).toBe("详情已隐藏")
-    expect(hiddenCard.querySelector("[data-alpha-grep-body]")).toBeNull()
+    const hiddenCard = host.querySelector("[data-codepuppy-tool-card][data-tool='grep']")!
+    expect(hiddenCard.querySelector("[data-codepuppy-step-detail] [data-codepuppy-details-hidden]")!.textContent).toBe("详情已隐藏")
+    expect(hiddenCard.querySelector("[data-codepuppy-grep-body]")).toBeNull()
     expect(hiddenCard.textContent).not.toContain("vault.ts")
   })
 
@@ -1609,7 +1609,7 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     await flush()
     await openProcess(host)
 
-    const card = host.querySelector("[data-alpha-tool-card][data-tool='websearch']")!
+    const card = host.querySelector("[data-codepuppy-tool-card][data-tool='websearch']")!
     // 步骤行:query 目标;成功不挂「N 条结果」;供应商名(Exa)不在基线白名单,任何位置都不显示。
     expect(card.querySelector(".a-tl-pf-o")!.textContent).toBe("solid-js loading a11y")
     expect(card.querySelector(".a-tl-pf-end")!.textContent).toBe("")
@@ -1665,7 +1665,7 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     await flush()
     await openProcess(host)
 
-    const card = host.querySelector("[data-alpha-tool-card][data-tool='websearch']")!
+    const card = host.querySelector("[data-codepuppy-tool-card][data-tool='websearch']")!
     await openStep(card)
 
     const links = card.querySelector(".a-tc-links")!
@@ -1727,10 +1727,10 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     await flush()
     await openProcess(host)
 
-    const failed = host.querySelector("[data-alpha-tool-card][data-tool='grep']")!
+    const failed = host.querySelector("[data-codepuppy-tool-card][data-tool='grep']")!
     // 失败不自动展开(design ⑦「中途某步失败,回合成功 —— 不自动展开」);行尾用人话。
     expect(failed.getAttribute("data-open")).toBeNull()
-    expect(failed.querySelector("[data-alpha-step-failure]")!.textContent).toBe("没成功")
+    expect(failed.querySelector("[data-codepuppy-step-failure]")!.textContent).toBe("没成功")
     expect(failed.querySelector(".a-tl-pf-step")!.getAttribute("data-tone")).toBe("warn")
     expect(failed.textContent).not.toContain("ENOTREACHABLE")
     await openAll(host)
@@ -1740,10 +1740,10 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     expect(failed.querySelector(".a-tc-err-head")!.textContent).toContain("工具执行失败")
     expect(failed.querySelector(".a-tc-err-code")).toBeNull()
 
-    const bigError = host.querySelector("[data-alpha-tool-card][data-tool='bash']")!
+    const bigError = host.querySelector("[data-codepuppy-tool-card][data-tool='bash']")!
     expect(bigError.getAttribute("data-status")).toBe("error")
     expect(bigError.querySelector(".a-tc-err-head")!.textContent).toContain("工具执行失败")
-    const bigCopy = bigError.querySelector<HTMLButtonElement>("[data-alpha-tool-error-copy]")!
+    const bigCopy = bigError.querySelector<HTMLButtonElement>("[data-codepuppy-tool-error-copy]")!
     bigCopy.click()
     await flush()
     // 复制的是有界错误体(redactor 截断回退到安全切点,≤ 4000 字符)。
@@ -1754,10 +1754,10 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
 
     // R3 Blocker 反例:网关味最浓的 task 错误(代理 baseURL/模型 ID/Not Found)
     // 也是同一张通用错误卡 —— 标题「工具执行失败」、无代码副标、复制钮可触发。
-    const taskFail = host.querySelector("[data-alpha-tool-card][data-tool='task'][data-status='error']")!
+    const taskFail = host.querySelector("[data-codepuppy-tool-card][data-tool='task'][data-status='error']")!
     expect(taskFail.querySelector(".a-tc-err-head")!.textContent).toContain("工具执行失败")
     expect(taskFail.querySelector(".a-tc-err-code")).toBeNull()
-    const copy = taskFail.querySelector<HTMLButtonElement>("[data-alpha-tool-error-copy]")!
+    const copy = taskFail.querySelector<HTMLButtonElement>("[data-codepuppy-tool-error-copy]")!
     expect(copy.getAttribute("aria-label")).toBe("复制错误信息")
     copy.click()
     await flush()
@@ -1766,20 +1766,20 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
 
     // R3 Blocker 反例:webfetch 的 502 Bad Gateway(标准 HTTP 原因短语自带
     // gateway 字样)同样是通用标题,不编造代码副标。
-    const fetchFail = host.querySelector("[data-alpha-tool-card][data-tool='webfetch'][data-status='error']")!
+    const fetchFail = host.querySelector("[data-codepuppy-tool-card][data-tool='webfetch'][data-status='error']")!
     expect(fetchFail.querySelector(".a-tc-err-head")!.textContent).toContain("工具执行失败")
     expect(fetchFail.querySelector(".a-tc-err-code")).toBeNull()
 
     // #879 AC5:credential span 已替换,DOM 与剪贴板都拿不到 raw 值。
-    const editFail = host.querySelector("[data-alpha-tool-card][data-tool='edit'][data-status='error']")!
+    const editFail = host.querySelector("[data-codepuppy-tool-card][data-tool='edit'][data-status='error']")!
     expect(editFail.querySelector(".a-tc-error-body")!.textContent).toContain("[已隐藏]")
     expect(editFail.textContent).not.toContain("tok1234567890abc")
-    editFail.querySelector<HTMLButtonElement>("[data-alpha-tool-error-copy]")!.click()
+    editFail.querySelector<HTMLButtonElement>("[data-codepuppy-tool-error-copy]")!.click()
     await flush()
     expect(copied[2]).toBe("denied: Authorization: [已隐藏] (401)")
   })
 
-  // `#1572` AC5:引擎写进 ToolPart metadata 的 `alphaNetFailure` ⇒ 在原错误文字之上加一句,主机名取自调用的 URL
+  // `#1572` AC5:引擎写进 ToolPart metadata 的 `codepuppyNetFailure` ⇒ 在原错误文字之上加一句,主机名取自调用的 URL
   // (只要主机名,查询串里的令牌不进 DOM);认不出的(没有层 / 层名不认识)整块逐字不变、不多一行。
   test("工具卡:webfetch 经出网代理失败且认出了层 ⇒ 原错误之上加一句分层文案;认不出 ⇒ 逐字不变", async () => {
     const host = mount()
@@ -1790,14 +1790,14 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
           status: "error",
           input: { url: "https://docs.example.test/page?token=SECRET-NEEDLE-1572" },
           error: "webfetch failed: tls",
-          metadata: { alphaNetFailure: { layer: "tls-silent", code: "UND_ERR_CONNECT_TIMEOUT" } },
+          metadata: { codepuppyNetFailure: { layer: "tls-silent", code: "UND_ERR_CONNECT_TIMEOUT" } },
           time: { start: 0, end: 1 },
         }),
         toolPartFixture("prt_n2", "grep", {
           status: "error",
           input: { pattern: "x" },
           error: raw,
-          metadata: { alphaNetFailure: { layer: "transport", code: "x" } },
+          metadata: { codepuppyNetFailure: { layer: "transport", code: "x" } },
           time: { start: 0, end: 1 },
         }),
       ]),
@@ -1806,18 +1806,18 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     await openProcess(host)
     await openAll(host)
 
-    const layered = host.querySelector("[data-alpha-tool-card][data-tool='webfetch'][data-status='error']")!
-    const line = layered.querySelector("[data-alpha-net-layer]")!
-    expect(line.getAttribute("data-alpha-net-layer")).toBe("tls-silent")
-    expect(line.textContent).toBe(zhDict["alpha.net.tlsSilent"].replace("{{host}}", "docs.example.test"))
+    const layered = host.querySelector("[data-codepuppy-tool-card][data-tool='webfetch'][data-status='error']")!
+    const line = layered.querySelector("[data-codepuppy-net-layer]")!
+    expect(line.getAttribute("data-codepuppy-net-layer")).toBe("tls-silent")
+    expect(line.textContent).toBe(zhDict["codepuppy.net.tlsSilent"].replace("{{host}}", "docs.example.test"))
     expect(line.textContent).not.toContain("SECRET-NEEDLE-1572")
     // 原错误文字仍在,分层那一句在它之上。
     expect(layered.querySelector(".a-tc-error-body")!.textContent).toContain("webfetch failed: tls")
     const order = Array.from(layered.querySelector(".a-tc-err")!.children).map((node) => node.className)
     expect(order.indexOf("a-tc-net")).toBeLessThan(order.indexOf("a-tc-error-body"))
 
-    const unrecognised = host.querySelector("[data-alpha-tool-card][data-tool='grep'][data-status='error']")!
-    expect(unrecognised.querySelector("[data-alpha-net-layer]")).toBeNull()
+    const unrecognised = host.querySelector("[data-codepuppy-tool-card][data-tool='grep'][data-status='error']")!
+    expect(unrecognised.querySelector("[data-codepuppy-net-layer]")).toBeNull()
     expect(unrecognised.querySelector(".a-tc-error-body")!.textContent).toContain(raw)
   })
 
@@ -1827,7 +1827,7 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
       assistantFixture([
         toolPartFixture("prt_e1", "edit", {
           status: "completed",
-          input: { filePath: "/tmp/alpha-audit-test.txt" },
+          input: { filePath: "/tmp/codepuppy-audit-test.txt" },
           output: "ok",
           title: "t",
           metadata: {
@@ -1863,7 +1863,7 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     await openProcess(host)
 
     // 改动增删数是内容不是状态:留在步骤行尾。
-    const edit = host.querySelector("[data-alpha-tool-card][data-kind='edit']")!
+    const edit = host.querySelector("[data-codepuppy-tool-card][data-kind='edit']")!
     expect(edit.querySelector(".a-tl-pf-end")!.textContent).toContain("+1")
     expect(edit.querySelector(".a-tl-pf-end")!.textContent).toContain("−1")
     await openStep(edit)
@@ -1871,13 +1871,13 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     expect(diffKinds).toEqual(["context", "del", "add"])
     expect(edit.querySelector(".a-tc-diff-line[data-kind='add']")!.textContent).toContain("hello world")
 
-    const write = host.querySelector("[data-alpha-tool-card][data-kind='write']")!
+    const write = host.querySelector("[data-codepuppy-tool-card][data-kind='write']")!
     expect(write.querySelector(".a-tl-pf-end")!.textContent).toContain("+4")
     await openStep(write)
     expect(write.querySelector(".a-tc-out")!.textContent).toContain("# AGENTS.md")
     expect(write.querySelector(".a-tc-write-note")!.textContent).toContain("4")
 
-    const patch = host.querySelector("[data-alpha-tool-card][data-kind='apply_patch']")!
+    const patch = host.querySelector("[data-codepuppy-tool-card][data-kind='apply_patch']")!
     await openStep(patch)
     const badges = [...patch.querySelectorAll(".a-tc-badge")].map((el) => el.getAttribute("data-badge"))
     expect(badges).toEqual(["add", "delete"])
@@ -1897,7 +1897,7 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     runtime.setTimelineRows(assistantFixture([taskPart], "busy"))
     await flush()
 
-    const card = host.querySelector("[data-alpha-tool-card][data-kind='task']")!
+    const card = host.querySelector("[data-codepuppy-tool-card][data-kind='task']")!
     expect(card.querySelector(".a-tl-pf-v")!.textContent).toBe("子任务")
     expect(card.querySelector(".a-tl-pf-o")!.textContent).toBe("校验 AGENTS.md")
     expect(card.querySelector(".a-tl-pf-end")!.textContent).toContain("运行中")
@@ -1947,20 +1947,20 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     await flush()
     await openProcess(host)
 
-    const read = host.querySelector("[data-alpha-tool-card][data-kind='read']")!
+    const read = host.querySelector("[data-codepuppy-tool-card][data-kind='read']")!
     await openStep(read)
     const readBadges = [...read.querySelectorAll(".a-tc-badge")].map((el) => el.getAttribute("data-badge"))
     expect(readBadges).toEqual(["read", "read"])
     expect(read.querySelector(".a-tc-badge")!.textContent).toBe("读取")
 
-    const write = host.querySelector("[data-alpha-tool-card][data-kind='write']")!
+    const write = host.querySelector("[data-codepuppy-tool-card][data-kind='write']")!
     await openStep(write)
     const writeBadge = write.querySelector(".a-tc-badge[data-badge='write']")!
     expect(writeBadge.textContent).toBe("写入")
     expect(write.textContent).toContain("NOTES.md")
 
     // 已完成的步骤详情不常驻(用户显式展开仍可用,内容仍有界)。
-    const bash = host.querySelector("[data-alpha-tool-card][data-tool='bash']")!
+    const bash = host.querySelector("[data-codepuppy-tool-card][data-tool='bash']")!
     expect(bash.getAttribute("data-open")).toBeNull()
     expect(bash.querySelector(".a-tc-term")).toBeNull()
     await openStep(bash)
@@ -1991,21 +1991,21 @@ describe("REQ-125 C6 折叠组/错误/重试/媒体/产物行", () => {
     await flush()
     await openProcess(host)
 
-    const group = host.querySelector("[data-alpha-process-group]")!
-    const line = group.querySelector<HTMLButtonElement>("[data-alpha-process-step='toolgroup']")!
+    const group = host.querySelector("[data-codepuppy-process-group]")!
+    const line = group.querySelector<HTMLButtonElement>("[data-codepuppy-process-step='toolgroup']")!
     // `#1475`:合并后的读取按文件数说。
     expect(line.querySelector(".a-tl-pf-v")!.textContent).toBe("读取 2 个文件")
     expect(line.querySelector(".a-tl-pf-o")!.textContent).toBe("README.md")
     expect(group.querySelector(".a-tl-pf-sublist")).toBeNull()
     line.click()
     await flush()
-    const items = [...group.querySelectorAll("[data-alpha-tool-card]")]
+    const items = [...group.querySelectorAll("[data-codepuppy-tool-card]")]
     expect(items.map((item) => item.querySelector(".a-tl-pf-o")!.textContent)).toEqual(["README.md", "AGENTS.md"])
-    expect(group.querySelector("[data-alpha-step-detail]")).toBeNull()
+    expect(group.querySelector("[data-codepuppy-step-detail]")).toBeNull()
     await openStep(items[1]!)
-    expect(items[1]!.querySelector("[data-alpha-step-detail]")).not.toBeNull()
+    expect(items[1]!.querySelector("[data-codepuppy-step-detail]")).not.toBeNull()
     // 不同类的 grep 不并进来,自己一行。
-    expect(host.querySelector("[data-alpha-tool-card][data-kind='grep']")!.closest("[data-alpha-process-group]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-tool-card][data-kind='grep']")!.closest("[data-codepuppy-process-group]")).toBeNull()
   })
 
   // ── #934 Minor-2:AC5「详情已隐藏」确定标记的**渲染接线**判据 ──────────────────
@@ -2014,8 +2014,8 @@ describe("REQ-125 C6 折叠组/错误/重试/媒体/产物行", () => {
   // contextRow.targetHidden 各有单测),而把渲染层任一 `<Show when={…Hidden}>` 删掉、
   // 或写成 `<Show when={…target}>`,provenance gates 与整包地板**全绿** —— 用户看到的
   // 却是「目标凭空消失」,正是 AC5 要关掉的那个洞。
-  // 站点集合用两条互相独立的检索轴交叉枚举(属性 `data-alpha-details-hidden` 与 i18n 键
-  // `alpha.timeline.detailsHidden`),tool-cards.tsx + process-fold.tsx 的站点 —— 本条逐处钉在 DOM 上。
+  // 站点集合用两条互相独立的检索轴交叉枚举(属性 `data-codepuppy-details-hidden` 与 i18n 键
+  // `codepuppy.timeline.detailsHidden`),tool-cards.tsx + process-fold.tsx 的站点 —— 本条逐处钉在 DOM 上。
   test("#934 AC5 确定标记的渲染接线:六处脱敏失败站点各出「详情已隐藏」、零原文泄漏;干净输入零标记", async () => {
     const host = mount()
     // 单项帽 TOOL_ITEM_MAX_CHARS=400:不间断 token 超帽 ⇒ 安全切点回看窗内无空白 ⇒ 整字段清空。
@@ -2033,8 +2033,8 @@ describe("REQ-125 C6 折叠组/错误/重试/媒体/产物行", () => {
         time: { start: 0, end: 1 },
         ...over,
       })
-    const cardOf = (kind: string) => host.querySelector(`[data-alpha-tool-card][data-kind='${kind}']`)!
-    const markersIn = (el: Element) => [...el.querySelectorAll("[data-alpha-details-hidden]")]
+    const cardOf = (kind: string) => host.querySelector(`[data-codepuppy-tool-card][data-kind='${kind}']`)!
+    const markersIn = (el: Element) => [...el.querySelectorAll("[data-codepuppy-details-hidden]")]
 
     // 顺序有讲究:连续同类已完成的步骤才合并 —— 末尾两个 read 合成一组,其余各自一步。
     runtime.setTimelineRows(
@@ -2053,7 +2053,7 @@ describe("REQ-125 C6 折叠组/错误/重试/媒体/产物行", () => {
 
     // ① 步骤行的目标凭空消失 ⇒ 出确定标记(而不是一片空白)。
     const search = cardOf("websearch")
-    expect(search.querySelector(".a-tl-pf-o:not([data-alpha-details-hidden])")).toBeNull()
+    expect(search.querySelector(".a-tl-pf-o:not([data-codepuppy-details-hidden])")).toBeNull()
     expect(markersIn(search).map((el) => el.textContent)).toEqual(["详情已隐藏"])
 
     // ② 次级细节(grep include)失败,而目标(pattern)干净 —— 两处标记站点在此分得开。
@@ -2062,21 +2062,21 @@ describe("REQ-125 C6 折叠组/错误/重试/媒体/产物行", () => {
     expect(markersIn(grep).map((el) => el.textContent)).toEqual(["详情已隐藏"])
 
     // ③ task 的 agent chip 不凭空消失(详情顶部的事实行)。
-    expect(cardOf("task").querySelector(".a-tc-agent[data-alpha-details-hidden]")!.textContent).toContain("详情已隐藏")
+    expect(cardOf("task").querySelector(".a-tc-agent[data-codepuppy-details-hidden]")!.textContent).toContain("详情已隐藏")
 
     // ④ bash 命令说明副行。
-    expect(cardOf("bash").querySelector(".a-tc-subdesc[data-alpha-details-hidden]")!.textContent).toBe("详情已隐藏")
+    expect(cardOf("bash").querySelector(".a-tc-subdesc[data-codepuppy-details-hidden]")!.textContent).toBe("详情已隐藏")
 
     // ⑤ 整个输出体隐藏(diff 超帽):确定标记,无 raw 旁路。
-    expect(cardOf("edit").querySelector(".a-tc-out[data-alpha-details-hidden]")!.textContent).toBe("详情已隐藏")
+    expect(cardOf("edit").querySelector(".a-tc-out[data-codepuppy-details-hidden]")!.textContent).toBe("详情已隐藏")
 
     // ⑥ 合并组:第一项目标没了 ⇒ 组行与该项各说一次「详情已隐藏」,相邻的干净项照常显示目标。
-    const group = host.querySelector("[data-alpha-process-group]")!
-    const groupLine = group.querySelector("[data-alpha-process-step='toolgroup']")!
-    expect(groupLine.querySelector("[data-alpha-details-hidden]")!.textContent).toBe("详情已隐藏")
-    const items = [...group.querySelectorAll("[data-alpha-tool-card]")]
+    const group = host.querySelector("[data-codepuppy-process-group]")!
+    const groupLine = group.querySelector("[data-codepuppy-process-step='toolgroup']")!
+    expect(groupLine.querySelector("[data-codepuppy-details-hidden]")!.textContent).toBe("详情已隐藏")
+    const items = [...group.querySelectorAll("[data-codepuppy-tool-card]")]
     expect(items).toHaveLength(2)
-    expect(items[0]!.querySelector(".a-tl-pf-step [data-alpha-details-hidden]")!.textContent).toBe("详情已隐藏")
+    expect(items[0]!.querySelector(".a-tl-pf-step [data-codepuppy-details-hidden]")!.textContent).toBe("详情已隐藏")
     expect(items[1]!.querySelector(".a-tl-pf-o")!.textContent).toBe("README.md")
 
     // 每处站点各一个标记(组行另有一个),且被隐藏的原文一个字符都没进 DOM。
@@ -2106,8 +2106,8 @@ describe("REQ-125 C6 折叠组/错误/重试/媒体/产物行", () => {
     expect(cardOf("bash").querySelector(".a-tl-pf-o")!.textContent).toBe("跑一遍单元测试")
     expect(cardOf("bash").querySelector(".a-tc-subdesc")).toBeNull()
     expect(cardOf("bash").querySelector(".a-tc-term")!.textContent!.startsWith("$ bun test src")).toBe(true)
-    const cleanGroup = host.querySelector("[data-alpha-process-group]")!
-    expect(cleanGroup.querySelector("[data-alpha-tool-card] .a-tl-pf-o")!.textContent).toBe("AGENTS.md")
+    const cleanGroup = host.querySelector("[data-codepuppy-process-group]")!
+    expect(cleanGroup.querySelector("[data-codepuppy-tool-card] .a-tl-pf-o")!.textContent).toBe("AGENTS.md")
   })
 
   test("回合级错误卡:全宽纯文本无动作,与工具级错误卡分离;自动重试写进工作过程标题(第 N 次 · 原因)", async () => {
@@ -2149,7 +2149,7 @@ describe("REQ-125 C6 折叠组/错误/重试/媒体/产物行", () => {
     )
     await flush()
 
-    const err = host.querySelector("[data-alpha-timeline-row='turn-error']")!
+    const err = host.querySelector("[data-codepuppy-timeline-row='turn-error']")!
     expect(err.getAttribute("role")).toBe("alert")
     expect(err.textContent).toContain("这轮回复没有完成")
     expect(err.textContent).toContain("请求频率达到上限")
@@ -2158,11 +2158,11 @@ describe("REQ-125 C6 折叠组/错误/重试/媒体/产物行", () => {
     expect(err.querySelector("button")).toBeNull()
 
     // `#1474`:重试不再另挂一张卡,写进工作过程的实时标题(不与运行行并存)。
-    expect(host.querySelector("[data-alpha-timeline-row='retry']")).toBeNull()
-    const process = host.querySelector("[data-alpha-timeline-row='process']")!
+    expect(host.querySelector("[data-codepuppy-timeline-row='retry']")).toBeNull()
+    const process = host.querySelector("[data-codepuppy-timeline-row='process']")!
     expect(process.getAttribute("data-face")).toBe("retry")
-    expect(process.querySelector("[data-alpha-process-title]")!.textContent).toBe("正在重试 · 第 2 次")
-    expect(process.querySelector("[data-alpha-process-retry-reason]")!.textContent).toBe("gateway 429")
+    expect(process.querySelector("[data-codepuppy-process-title]")!.textContent).toBe("正在重试 · 第 2 次")
+    expect(process.querySelector("[data-codepuppy-process-retry-reason]")!.textContent).toBe("gateway 429")
     expect(process.querySelectorAll(".a-tl-pf-pulse")).toHaveLength(0)
   })
 
@@ -2209,7 +2209,7 @@ describe("REQ-125 C6 折叠组/错误/重试/媒体/产物行", () => {
     )
     await flush()
 
-    const err = host.querySelector("[data-alpha-timeline-row='turn-error']")!
+    const err = host.querySelector("[data-codepuppy-timeline-row='turn-error']")!
     const text = err.textContent ?? ""
     expect(text).toContain("这台电脑上的网络策略拦下了这次请求")
     expect(text).toContain("api.deepseek.com:443")
@@ -2226,7 +2226,7 @@ describe("REQ-125 C6 折叠组/错误/重试/媒体/产物行", () => {
       errorRowFor("Forbidden", "alpha egress policy: [::1]:11434 denied (reason=unregistered) — blocked by this app's local egress policy\n"),
     )
     await flush()
-    expect(host.querySelector("[data-alpha-timeline-row='turn-error']")!.textContent).toContain("[::1]:11434")
+    expect(host.querySelector("[data-codepuppy-timeline-row='turn-error']")!.textContent).toContain("[::1]:11434")
   })
 
   test("回合级错误卡控制臂:不是围栏拒绝的失败,卡上一个字都不变(含带同一前缀的 dial-failed)", async () => {
@@ -2240,7 +2240,7 @@ describe("REQ-125 C6 折叠组/错误/重试/媒体/产物行", () => {
     ]) {
       runtime.setTimelineRows(errorRowFor(message))
       await flush()
-      const text = host.querySelector("[data-alpha-timeline-row='turn-error']")!.textContent ?? ""
+      const text = host.querySelector("[data-codepuppy-timeline-row='turn-error']")!.textContent ?? ""
       expect({ message, shown: text.includes(message) }).toEqual({ message, shown: true })
       expect({ message, misattributed: text.includes("这台电脑上的网络策略拦下了这次请求") }).toEqual({
         message,
@@ -2253,26 +2253,26 @@ describe("REQ-125 C6 折叠组/错误/重试/媒体/产物行", () => {
   // 认不出的(没有 metadata / 层名不认识 / http)一个字都不变。期望值从字典原文代入「对方服务器」(回合级拿不到主机名)。
   test("回合级错误卡:引擎认出了卡在哪一层 ⇒ 说那一层;没拿到任何应答 ⇒ 说连接中途断开;认不出 ⇒ 原文案逐字不变", async () => {
     const host = mount()
-    const turnText = () => host.querySelector("[data-alpha-timeline-row='turn-error']")!.textContent ?? ""
+    const turnText = () => host.querySelector("[data-codepuppy-timeline-row='turn-error']")!.textContent ?? ""
     const raw = "Cannot connect to API: Request was cancelled."
 
-    runtime.setTimelineRows(errorRowFor(raw, undefined, { alphaNetLayer: "dns", alphaNetCode: "503" }))
+    runtime.setTimelineRows(errorRowFor(raw, undefined, { codepuppyNetLayer: "dns", codepuppyNetCode: "503" }))
     await flush()
-    expect(turnText()).toContain(zhDict["alpha.net.dns"].replace("{{host}}", zhDict["alpha.net.hostFallback"]))
+    expect(turnText()).toContain(zhDict["codepuppy.net.dns"].replace("{{host}}", zhDict["codepuppy.net.hostFallback"]))
     expect(turnText()).toContain("解析不了")
     expect(turnText()).not.toContain(raw)
-    expect(host.querySelector("[data-alpha-timeline-row='turn-error'] .a-turn-err-code")!.textContent).toBe("APIError")
+    expect(host.querySelector("[data-codepuppy-timeline-row='turn-error'] .a-turn-err-code")!.textContent).toBe("APIError")
 
-    runtime.setTimelineRows(errorRowFor(raw, undefined, { alphaNetCode: "unattributed" }))
+    runtime.setTimelineRows(errorRowFor(raw, undefined, { codepuppyNetCode: "unattributed" }))
     await flush()
-    expect(turnText()).toContain(zhDict["alpha.net.unattributed"])
+    expect(turnText()).toContain(zhDict["codepuppy.net.unattributed"])
     expect(turnText()).not.toContain(raw)
 
-    for (const metadata of [undefined, { alphaNetLayer: "transport", alphaNetCode: "x" }, { alphaNetLayer: "http", alphaNetCode: "400" }]) {
+    for (const metadata of [undefined, { codepuppyNetLayer: "transport", codepuppyNetCode: "x" }, { codepuppyNetLayer: "http", codepuppyNetCode: "400" }]) {
       runtime.setTimelineRows(errorRowFor(raw, undefined, metadata))
       await flush()
       expect({ metadata, shown: turnText().includes(raw) }).toEqual({ metadata, shown: true })
-      expect({ metadata, layered: turnText().includes(zhDict["alpha.net.unattributed"]) }).toEqual({ metadata, layered: false })
+      expect({ metadata, layered: turnText().includes(zhDict["codepuppy.net.unattributed"]) }).toEqual({ metadata, layered: false })
     }
   })
 
@@ -2294,7 +2294,7 @@ describe("REQ-125 C6 折叠组/错误/重试/媒体/产物行", () => {
     )
     await flush()
 
-    const media = host.querySelector("[data-alpha-timeline-row='media']")!
+    const media = host.querySelector("[data-codepuppy-timeline-row='media']")!
     expect(media.querySelector(".a-media-thumb img")).not.toBeNull()
     expect(media.textContent).toContain("界面截图.png")
     expect(media.textContent).toContain("PNG")
@@ -2305,8 +2305,8 @@ describe("REQ-125 C6 折叠组/错误/重试/媒体/产物行", () => {
 
     runtime.setTimelineIntentsEnabled(false)
     await flush()
-    expect(host.querySelector("[data-alpha-timeline-row='media'] button")).toBeNull()
-    expect(host.querySelector("[data-alpha-timeline-row='media'] .a-media-row")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-timeline-row='media'] button")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-timeline-row='media'] .a-media-row")).not.toBeNull()
   })
 
   test("产物链接行:§⑥ 可预览强调/不可预览中性,点击仍发 focusArtifact(runId+name)", async () => {
@@ -2341,7 +2341,7 @@ describe("REQ-125 C6 折叠组/错误/重试/媒体/产物行", () => {
     )
     await flush()
 
-    const rows = host.querySelector("[data-alpha-timeline-row='artifacts']")!
+    const rows = host.querySelector("[data-codepuppy-timeline-row='artifacts']")!
     expect(rows.getAttribute("role")).toBe("list")
     const links = [...rows.querySelectorAll(".a-artrow")]
     expect(links.map((el) => el.textContent)).toEqual(["营收对比图.png", "数据底表.parquet"])
@@ -2395,7 +2395,7 @@ describe("REQ-125 C6 折叠组/错误/重试/媒体/产物行", () => {
     )
     await flush()
 
-    const links = [...host.querySelectorAll("[data-alpha-timeline-row='artifacts'] .a-artrow")]
+    const links = [...host.querySelectorAll("[data-codepuppy-timeline-row='artifacts'] .a-artrow")]
     expect(links.map((el) => el.textContent)).toEqual(["概要.md", "明细.csv", "季度分析.md"])
     ;(links[2] as HTMLButtonElement).click()
     expect(runtime.getIntentLog().focusArtifact).toEqual([
@@ -2417,7 +2417,7 @@ describe("#568 回合末富脚注(A6/A7)", () => {
     runtime.setTimelineRows(conversationRows())
     await flush()
 
-    const footnote = host.querySelector("[data-alpha-timeline-row='footnote']")!
+    const footnote = host.querySelector("[data-codepuppy-timeline-row='footnote']")!
     expect(footnote).not.toBeNull()
     expect(footnote.querySelector(".a-tl-fn-agent")!.textContent).toContain("build")
     expect(footnote.textContent).toContain("deepseek-reasoner")
@@ -2434,7 +2434,7 @@ describe("#568 回合末富脚注(A6/A7)", () => {
     // 流式回合(assistant 未完成)不出脚注。
     runtime.setTimelineRows(conversationRows("busy"))
     await flush()
-    expect(host.querySelector("[data-alpha-timeline-row='footnote']")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-timeline-row='footnote']")).toBeNull()
   })
 })
 
@@ -2465,19 +2465,19 @@ describe("#568 「在面板打开」pill(T8)", () => {
     await flush()
     await openAll(host)
 
-    const write = host.querySelector("[data-alpha-tool-card][data-kind='write']")!
+    const write = host.querySelector("[data-codepuppy-tool-card][data-kind='write']")!
     const pill = write.querySelector<HTMLButtonElement>(".a-tc-openp")!
     expect(pill.textContent).toContain("在面板打开")
     pill.click()
     expect(runtime.getIntentLog().openFile).toEqual([{ path: "/repo/AGENTS.md" }])
-    expect(host.querySelector("[data-alpha-tool-card][data-kind='read'] .a-tc-openp")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-tool-card][data-kind='read'] .a-tc-openp")).toBeNull()
 
     // fail-closed:openFile handler 缺席 → pill 消失,步骤行与详情照常。
     runtime.setTimelineIntentsEnabled(false)
     await flush()
     expect(host.querySelector(".a-tc-openp")).toBeNull()
     expect(write.querySelector(".a-tl-pf-step")).not.toBeNull()
-    expect(write.querySelector("[data-alpha-step-detail]")).not.toBeNull()
+    expect(write.querySelector("[data-codepuppy-step-detail]")).not.toBeNull()
   })
 })
 
@@ -2556,7 +2556,7 @@ describe("#568 斜杠命令 chip(消费可选 typed 接口)", () => {
     })
   }
 
-  const chipOf = (host: HTMLElement) => host.querySelector("[data-alpha-timeline-slash] .a-tl-cmd-chip")!
+  const chipOf = (host: HTMLElement) => host.querySelector("[data-codepuppy-timeline-slash] .a-tl-cmd-chip")!
 
   test("E3 技能 chip(生产常态 button 形:引擎带展开提示词):data-source=skill、星形图标、「运行技能 ·」文案", async () => {
     const host = mount()
@@ -2566,7 +2566,7 @@ describe("#568 斜杠命令 chip(消费可选 typed 接口)", () => {
     await flush()
     // 判据钉在 **button** 分支上(视图 :592-606):真实斜杠发送后引擎给用户消息带展开文本,
     // chip 就是这个带「查看展开提示词」的 button —— 删掉它那行 data-source,本条当场红。
-    const chip = host.querySelector<HTMLButtonElement>("[data-alpha-timeline-slash] button.a-tl-cmd-chip")!
+    const chip = host.querySelector<HTMLButtonElement>("[data-codepuppy-timeline-slash] button.a-tl-cmd-chip")!
     expect(chip).not.toBeNull()
     expect(chip.getAttribute("data-source")).toBe("skill")
     expect(chip.querySelector(".a-tl-cmd-slash svg")).not.toBeNull()
@@ -2622,7 +2622,7 @@ describe("#568 斜杠命令 chip(消费可选 typed 接口)", () => {
     runtime.setTimelineRows(slashRows(true))
     await flush()
 
-    const cmd = host.querySelector("[data-alpha-timeline-slash]")!
+    const cmd = host.querySelector("[data-codepuppy-timeline-slash]")!
     expect(cmd).not.toBeNull()
     const chip = cmd.querySelector<HTMLButtonElement>("button.a-tl-cmd-chip")!
     expect(chip.querySelector(".a-tl-cmd-name")!.textContent).toBe("review")
@@ -2640,7 +2640,7 @@ describe("#568 斜杠命令 chip(消费可选 typed 接口)", () => {
 
     runtime.setTimelineRows(slashRows(false))
     await flush()
-    expect(host.querySelector("[data-alpha-timeline-slash]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-timeline-slash]")).toBeNull()
     expect(host.querySelector(".a-tl-bubble")!.textContent).toContain("expanded prompt body")
   })
 })
@@ -2697,7 +2697,7 @@ describe("#568 本回合改动汇总(S2)", () => {
           summary: {
             diffs: [
               { file: "AGENTS.md", additions: 96, deletions: 0 },
-              { file: "alpha-ui/button.css", additions: 8, deletions: 2 },
+              { file: "codepuppy-ui/button.css", additions: 8, deletions: 2 },
             ],
           },
         },
@@ -2714,7 +2714,7 @@ describe("#568 本回合改动汇总(S2)", () => {
     runtime.setTimelineRows(diffsumRows())
     await flush()
 
-    const diffsum = host.querySelector("[data-alpha-timeline-row='diffsum']")!
+    const diffsum = host.querySelector("[data-codepuppy-timeline-row='diffsum']")!
     const head = diffsum.querySelector<HTMLButtonElement>(".a-diffsum-head")!
     expect(head.textContent).toContain("本回合改动 · 2 个文件")
     expect(head.textContent).toContain("+104")
@@ -2739,7 +2739,7 @@ describe("#568 本回合改动汇总(S2)", () => {
 
 describe("#568 终局接线:C7 斜杠登记 → chip 渲染(端到端)", () => {
   test("recordSessionSlashOrigin 登记经 sessionSlashOriginsFor 供给投影,chip 按稿渲染;他会话身份零供给", async () => {
-    const slash = await import("../src/renderer/alpha-ui/session-workspace/session-slash-origin")
+    const slash = await import("../src/renderer/codepuppy-ui/session-workspace/session-slash-origin")
     slash.resetSessionSlashOrigins()
     const identity = { serverKey: "sidecar", directory: "/tmp/workspace", sessionID: "ses_1" }
     slash.recordSessionSlashOrigin({
@@ -2788,7 +2788,7 @@ describe("#568 终局接线:C7 斜杠登记 → chip 渲染(端到端)", () => {
     )
     await flush()
 
-    const chip = host.querySelector("[data-alpha-timeline-slash] .a-tl-cmd-chip")!
+    const chip = host.querySelector("[data-codepuppy-timeline-slash] .a-tl-cmd-chip")!
     expect(chip).not.toBeNull()
     expect(chip.querySelector(".a-tl-cmd-name")!.textContent).toBe("review")
     expect(chip.querySelector(".a-tl-cmd-args")!.textContent).toBe("pr 12")
@@ -2959,7 +2959,7 @@ describe("#589 中断态:左对齐安静行 + 继续生成", () => {
     runtime.setTimelineRows(interruptedRows())
     await flush()
 
-    const row = host.querySelector("[data-alpha-timeline-row='divider'][data-label='interrupted']")!
+    const row = host.querySelector("[data-codepuppy-timeline-row='divider'][data-label='interrupted']")!
     expect(row).not.toBeNull()
     expect(row.classList.contains("a-tl-interrupted")).toBe(true)
     expect(row.querySelector(".a-tl-divider-pill")).toBeNull()
@@ -2982,7 +2982,7 @@ describe("#589 中断态:左对齐安静行 + 继续生成", () => {
     runtime.setTimelineRows(compactionRows())
     await flush()
 
-    const row = host.querySelector("[data-alpha-timeline-row='divider'][data-label='compaction']")!
+    const row = host.querySelector("[data-codepuppy-timeline-row='divider'][data-label='compaction']")!
     expect(row.classList.contains("a-tl-divider")).toBe(true)
     const pill = row.querySelector<HTMLButtonElement>("button.a-tl-divider-pill")!
     expect(pill.type).toBe("button")
@@ -2991,18 +2991,18 @@ describe("#589 中断态:左对齐安静行 + 继续生成", () => {
     expect(pill.getAttribute("aria-expanded")).toBe("false")
     expect(pill.querySelector(".a-tl-compaction-icon")).not.toBeNull()
     expect(pill.querySelector(".a-tl-compaction-chevron")).not.toBeNull()
-    expect(host.querySelector("[data-alpha-compaction-summary]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-compaction-summary]")).toBeNull()
 
     pill.click()
     await flush()
     expect(pill.getAttribute("aria-expanded")).toBe("true")
     expect(row.getAttribute("data-expanded")).toBe("true")
-    expect(host.querySelector("[data-alpha-compaction-summary]")!.textContent).toContain("已确认安全边界")
+    expect(host.querySelector("[data-codepuppy-compaction-summary]")!.textContent).toContain("已确认安全边界")
 
     pill.click()
     await flush()
     expect(pill.getAttribute("aria-expanded")).toBe("false")
-    expect(host.querySelector("[data-alpha-compaction-summary]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-compaction-summary]")).toBeNull()
     expect(host.querySelector(".a-tl-int-continue")).toBeNull()
   })
 
@@ -3021,7 +3021,7 @@ describe("#589 中断态:左对齐安静行 + 继续生成", () => {
     expect(pill.hasAttribute("aria-expanded")).toBe(false)
     expect(pill.querySelector(".a-tl-compaction-icon")).not.toBeNull()
     expect(pill.querySelector(".a-tl-compaction-chevron")).toBeNull()
-    expect(host.querySelector("[data-alpha-compaction-summary]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-compaction-summary]")).toBeNull()
   })
 })
 
@@ -3066,7 +3066,7 @@ describe("#589 真实继续生成闸门(生产绑定层挂载,SDK 层观察)", (
   function mountBinding() {
     const host = document.createElement("div")
     document.body.append(host)
-    disposers.push(solidWeb.render(() => binding.AlphaSessionTimeline(), host))
+    disposers.push(solidWeb.render(() => binding.CodePuppySessionTimeline(), host))
     return host
   }
 
@@ -3174,7 +3174,7 @@ describe("#589 真实继续生成闸门(生产绑定层挂载,SDK 层观察)", (
   }
 
   const bubbleTexts = (host: Element) =>
-    [...host.querySelectorAll("[data-alpha-timeline-row='user'] .a-tl-bubble")].map((node) => node.textContent)
+    [...host.querySelectorAll("[data-codepuppy-timeline-row='user'] .a-tl-bubble")].map((node) => node.textContent)
 
   test("#620 续钮发出的那条回到时间线时:零新增用户气泡,也不留孤立的回合分隔行", async () => {
     primeInterruptedBinding()
@@ -3193,7 +3193,7 @@ describe("#589 真实继续生成闸门(生产绑定层挂载,SDK 层观察)", (
     // 时间线上「用户说过的话」仍然只有开局那一句;续写不冒充用户发言。
     expect(bubbleTexts(after)).toEqual(["开始"])
     // 气泡没了,分隔行也不许剩下(否则用户看到一条孤零零的「新回合」)。
-    expect(after.querySelectorAll("[data-alpha-timeline-row='turn']")).toHaveLength(0)
+    expect(after.querySelectorAll("[data-codepuppy-timeline-row='turn']")).toHaveLength(0)
   })
 
   test("#620 反向控制:同一条回声路径上,用户自己发的第二条照旧出气泡 + 回合分隔", async () => {
@@ -3206,7 +3206,7 @@ describe("#589 真实继续生成闸门(生产绑定层挂载,SDK 层观察)", (
     await settle()
 
     expect(bubbleTexts(after)).toEqual(["开始", "顺带把 README 也改了"])
-    expect(after.querySelectorAll("[data-alpha-timeline-row='turn']")).toHaveLength(1)
+    expect(after.querySelectorAll("[data-codepuppy-timeline-row='turn']")).toHaveLength(1)
   })
 })
 
@@ -3250,7 +3250,7 @@ describe("#591 富脚注:provider 图标 + 效率段", () => {
     runtime.setTimelineRows(footnoteRows({ input: 1000, output: 2100, reasoning: 100, cache: { read: 3000, write: 0 } }))
     await flush()
 
-    const footnote = host.querySelector("[data-alpha-timeline-row='footnote']")!
+    const footnote = host.querySelector("[data-codepuppy-timeline-row='footnote']")!
     expect(footnote.querySelector(".a-tl-fn-prov")!.textContent).toBe("D")
     expect(footnote.querySelector(".a-tl-fn-agent")!.textContent).toContain("build")
     expect(footnote.textContent).toContain("deepseek-reasoner")
@@ -3267,7 +3267,7 @@ describe("#591 富脚注:provider 图标 + 效率段", () => {
 
     runtime.setTimelineRows(footnoteRows({ input: 1000, output: 2100, reasoning: 100, cache: { read: 0, write: 0 } }))
     await flush()
-    const plain = host.querySelector("[data-alpha-timeline-row='footnote']")!
+    const plain = host.querySelector("[data-codepuppy-timeline-row='footnote']")!
     expect([...plain.querySelectorAll(".a-tl-fn-item")].some((el) => el.textContent === "高")).toBe(false)
     expect(plain.querySelector(".a-tl-fn-prov")).not.toBeNull()
   })
@@ -3334,8 +3334,8 @@ describe("#1474 进行中的工作过程:实时标题 / 最近两步 / 已等 / 
   const running = (start = Date.now() - 2_000) => ({ status: "running", title: "q", time: { start } })
   const done = { status: "completed", output: "", title: "q", metadata: {}, time: { start: 0, end: 1_000 } }
   const answerRows = () => liveTurn({ parts: [say("prt_t1", "正文已经在吐了")] })
-  const processOf = (host: HTMLElement) => host.querySelector<HTMLElement>("[data-alpha-timeline-row='process']")
-  const titleOf = (host: HTMLElement) => processOf(host)?.querySelector("[data-alpha-process-title]")?.textContent
+  const processOf = (host: HTMLElement) => host.querySelector<HTMLElement>("[data-codepuppy-timeline-row='process']")
+  const titleOf = (host: HTMLElement) => processOf(host)?.querySelector("[data-codepuppy-process-title]")?.textContent
   const liveLines = (host: HTMLElement) =>
     [...processOf(host)!.querySelectorAll(".a-tl-pf-list > * > .a-tl-pf-step, .a-tl-pf-list > .a-tl-pf-step")].map(
       (line) => line.querySelector(".a-tl-pf-v")!.textContent,
@@ -3347,14 +3347,14 @@ describe("#1474 进行中的工作过程:实时标题 / 最近两步 / 已等 / 
     await flush()
 
     const row = processOf(host)!
-    expect(host.querySelector("[data-alpha-timeline-row='turn-running']")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-timeline-row='turn-running']")).toBeNull()
     expect(row.getAttribute("data-face")).toBe("running")
     expect(row.nextElementSibling).toBeNull()
     const sum = row.querySelector<HTMLButtonElement>(".a-tl-pf-sum")!
     expect(sum.getAttribute("aria-expanded")).toBe("true")
     expect(titleOf(host)).toBe("正在思考")
     expect(sum.querySelector(".a-tl-pf-pulse")!.getAttribute("aria-hidden")).toBe("true")
-    const time = sum.querySelector("[data-alpha-process-segment='elapsed']")!
+    const time = sum.querySelector("[data-codepuppy-process-segment='elapsed']")!
     expect(time.getAttribute("aria-hidden")).toBe("true")
     // 一步都还没有:不写「第 N 步」,只有计时;起点 = 用户消息 time.created(65 秒前)。
     expect(time.textContent).toMatch(/^1:0[5-9]$/)
@@ -3369,20 +3369,20 @@ describe("#1474 进行中的工作过程:实时标题 / 最近两步 / 已等 / 
     runtime.setTimelineRows(liveTurn({ parts }))
     await flush()
     expect(titleOf(host)).toBe("正在思考")
-    expect(processOf(host)!.querySelector("[data-alpha-process-reasoning-title]")).toBeNull()
+    expect(processOf(host)!.querySelector("[data-codepuppy-process-reasoning-title]")).toBeNull()
     expect(processOf(host)!.textContent).not.toContain("criteria nesting")
 
     // 小标题还没写完(没换行):不露半截。
     runtime.setTimelineRows(liveTurn({ parts: [reasoning("prt_r1", "**核对字段", { start: Date.now() - 2_000 })] }))
     await flush()
-    expect(processOf(host)!.querySelector("[data-alpha-process-reasoning-title]")).toBeNull()
+    expect(processOf(host)!.querySelector("[data-codepuppy-process-reasoning-title]")).toBeNull()
 
     runtime.setTimelineRows(
       liveTurn({ parts: [reasoning("prt_r1", "**核对字段表**\n\nThe docs say criteria are flat", { start: Date.now() - 2_000 })] }),
     )
     await flush()
     expect(titleOf(host)).toBe("正在思考")
-    expect(processOf(host)!.querySelector("[data-alpha-process-reasoning-title]")!.textContent).toBe("核对字段表")
+    expect(processOf(host)!.querySelector("[data-codepuppy-process-reasoning-title]")!.textContent).toBe("核对字段表")
     expect(processOf(host)!.textContent).not.toContain("criteria are flat")
   })
 
@@ -3396,9 +3396,9 @@ describe("#1474 进行中的工作过程:实时标题 / 最近两步 / 已等 / 
     await flush()
 
     expect(titleOf(host)).toBe("正在搜索 4 个问题")
-    expect(processOf(host)!.querySelector("[data-alpha-process-segment='elapsed']")!.textContent).toMatch(/^第 2 步 · 1:0[5-9]$/)
+    expect(processOf(host)!.querySelector("[data-codepuppy-process-segment='elapsed']")!.textContent).toMatch(/^第 2 步 · 1:0[5-9]$/)
     expect(liveLines(host)).toEqual(["思考 2 秒", "搜索", "搜索", "搜索", "搜索"])
-    expect(processOf(host)!.querySelectorAll("[data-alpha-process-step='tool'] .a-tl-pf-spin")).toHaveLength(4)
+    expect(processOf(host)!.querySelectorAll("[data-codepuppy-process-step='tool'] .a-tl-pf-spin")).toHaveLength(4)
 
     // 只剩一个在跑:标题回到单数;已结束的三个并成一行。
     runtime.setTimelineRows(
@@ -3425,15 +3425,15 @@ describe("#1474 进行中的工作过程:实时标题 / 最近两步 / 已等 / 
     runtime.setTimelineRows(liveTurn({ parts }))
     await flush()
 
-    const more = processOf(host)!.querySelector<HTMLButtonElement>("[data-alpha-process-more]")!
+    const more = processOf(host)!.querySelector<HTMLButtonElement>("[data-codepuppy-process-more]")!
     expect(more.textContent).toBe("前面还有 3 步")
     expect(liveLines(host)).toEqual(["打开网页", "思考 4 秒", "搜索", "搜索"])
     // 第 N 步:已结束 5 步 + 正在跑的这一步(并行的两个算同一步)。
-    expect(processOf(host)!.querySelector("[data-alpha-process-segment='elapsed']")!.textContent).toMatch(/^第 6 步 · /)
+    expect(processOf(host)!.querySelector("[data-codepuppy-process-segment='elapsed']")!.textContent).toMatch(/^第 6 步 · /)
 
     more.click()
     await flush()
-    expect(processOf(host)!.querySelector("[data-alpha-process-more]")).toBeNull()
+    expect(processOf(host)!.querySelector("[data-codepuppy-process-more]")).toBeNull()
     expect(liveLines(host)).toEqual(["思考 2 秒", "搜索", "思考 3 秒", "打开网页", "思考 4 秒", "搜索", "搜索"])
   })
 
@@ -3451,9 +3451,9 @@ describe("#1474 进行中的工作过程:实时标题 / 最近两步 / 已等 / 
     runtime.setTimelineRows(liveTurn({ parts: [slow, fast, bashRunning] }))
     await flush()
 
-    const items = [...processOf(host)!.querySelectorAll("[data-alpha-tool-card]")]
-    expect(items[0]!.querySelector("[data-alpha-step-waited]")!.textContent).toBe("已等 2:10")
-    expect(items[1]!.querySelector("[data-alpha-step-waited]")).toBeNull()
+    const items = [...processOf(host)!.querySelectorAll("[data-codepuppy-tool-card]")]
+    expect(items[0]!.querySelector("[data-codepuppy-step-waited]")!.textContent).toBe("已等 2:10")
+    expect(items[1]!.querySelector("[data-codepuppy-step-waited]")).toBeNull()
     expect(items[1]!.querySelector(".a-tl-pf-end")!.textContent).toContain("运行中")
     expect([...items[2]!.querySelectorAll(".a-tl-pf-tail-line")].map((line) => line.textContent)).toEqual([
       "line 2",
@@ -3461,7 +3461,7 @@ describe("#1474 进行中的工作过程:实时标题 / 最近两步 / 已等 / 
       "line 4",
     ])
     // 搜索不是命令:没有尾巴。
-    expect(items[0]!.querySelector("[data-alpha-process-tail]")).toBeNull()
+    expect(items[0]!.querySelector("[data-codepuppy-process-tail]")).toBeNull()
 
     runtime.setTimelineRows(
       liveTurn({
@@ -3469,7 +3469,7 @@ describe("#1474 进行中的工作过程:实时标题 / 最近两步 / 已等 / 
       }),
     )
     await flush()
-    expect(processOf(host)!.querySelector("[data-alpha-process-tail]")).toBeNull()
+    expect(processOf(host)!.querySelector("[data-codepuppy-process-tail]")).toBeNull()
   })
 
   test("回答第一个字出现 ⇒ 自动收成一行(脉冲点 + 继续计时);回答之后又调工具 ⇒ 那段文字移入过程成为过渡话,实时标题恢复", async () => {
@@ -3484,11 +3484,11 @@ describe("#1474 进行中的工作过程:实时标题 / 最近两步 / 已等 / 
     await flush()
     const sum = processOf(host)!.querySelector(".a-tl-pf-sum")!
     expect(sum.getAttribute("aria-expanded")).toBe("false")
-    expect(sum.querySelector("[data-alpha-process-title]")).toBeNull()
-    expect([...sum.querySelectorAll("[data-alpha-process-segment]")].map((el) => el.textContent)[0]).toBe("搜索 2 次")
-    expect(sum.querySelector("[data-alpha-process-segment='elapsed']")!.textContent).toMatch(/^1:0[5-9]$/)
+    expect(sum.querySelector("[data-codepuppy-process-title]")).toBeNull()
+    expect([...sum.querySelectorAll("[data-codepuppy-process-segment]")].map((el) => el.textContent)[0]).toBe("搜索 2 次")
+    expect(sum.querySelector("[data-codepuppy-process-segment='elapsed']")!.textContent).toMatch(/^1:0[5-9]$/)
     expect(sum.querySelector(".a-tl-pf-pulse")).not.toBeNull()
-    expect(host.querySelector("[data-alpha-timeline-row='markdown']")!.textContent).toContain("字段表")
+    expect(host.querySelector("[data-codepuppy-timeline-row='markdown']")!.textContent).toContain("字段表")
 
     runtime.setTimelineRows(
       liveTurn({
@@ -3501,10 +3501,10 @@ describe("#1474 进行中的工作过程:实时标题 / 最近两步 / 已等 / 
       }),
     )
     await flush()
-    expect(host.querySelector("[data-alpha-timeline-row='markdown']")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-timeline-row='markdown']")).toBeNull()
     expect(processOf(host)!.querySelector(".a-tl-pf-sum")!.getAttribute("aria-expanded")).toBe("true")
     expect(titleOf(host)).toBe("正在打开网页")
-    expect(processOf(host)!.querySelector("[data-alpha-process-step='say']")!.textContent).toContain("字段表")
+    expect(processOf(host)!.querySelector("[data-codepuppy-process-step='say']")!.textContent).toContain("字段表")
   })
 
   test("手动开或关过之后,本回合内系统不再替你开关", async () => {
@@ -3549,18 +3549,18 @@ describe("#1474 进行中的工作过程:实时标题 / 最近两步 / 已等 / 
     expect(row.querySelector(".a-tl-pf-hint")!.textContent).toBe("生成已暂停,到审批窗口里选择")
     expect(status.textContent).toBe("等待你的决定 生成已暂停,到审批窗口里选择")
     expect(row.querySelector(".a-tl-pf-sum .a-tl-pf-pulse")).toBeNull()
-    expect(row.querySelector(".a-tl-pf-sum [data-alpha-process-segment='elapsed']")).toBeNull()
+    expect(row.querySelector(".a-tl-pf-sum [data-codepuppy-process-segment='elapsed']")).toBeNull()
     expect(row.querySelector(".a-tl-pf-pause")!.getAttribute("aria-hidden")).toBe("true")
-    const waiting = row.querySelector("[data-alpha-process-step='tool']")!
+    const waiting = row.querySelector("[data-codepuppy-process-step='tool']")!
     expect(waiting.getAttribute("data-tone")).toBe("wait")
-    expect(waiting.querySelector("[data-alpha-step-waiting]")!.textContent).toBe("等你批准")
+    expect(waiting.querySelector("[data-codepuppy-step-waiting]")!.textContent).toBe("等你批准")
 
     runtime.setTimelineTurnWait("question")
     await flush()
     expect(row.getAttribute("data-wait")).toBe("question")
     expect(titleOf(host)).toBe("等你回答")
     expect(status.textContent).toBe("等你回答 生成已暂停,到输入框上方的提问卡回答")
-    expect(row.querySelector("[data-alpha-process-step='tool']")!.getAttribute("data-tone")).toBe("run")
+    expect(row.querySelector("[data-codepuppy-process-step='tool']")!.getAttribute("data-tone")).toBe("run")
 
     runtime.setTimelineTurnWait(undefined)
     await flush()
@@ -3590,9 +3590,9 @@ describe("#1474 进行中的工作过程:实时标题 / 最近两步 / 已等 / 
     const status = row.querySelector("[role='status']")!
     const heard: string[] = [status.textContent ?? ""]
 
-    const before = row.querySelector("[data-alpha-process-segment='elapsed']")!.textContent
+    const before = row.querySelector("[data-codepuppy-process-segment='elapsed']")!.textContent
     await new Promise((resolve) => setTimeout(resolve, 1_100))
-    const after = row.querySelector("[data-alpha-process-segment='elapsed']")!.textContent
+    const after = row.querySelector("[data-codepuppy-process-segment='elapsed']")!.textContent
     expect(before).toMatch(/^1:0[5-9]$/)
     expect(after).not.toBe(before)
     heard.push(status.textContent ?? "")
@@ -3613,11 +3613,11 @@ describe("#1474 进行中的工作过程:实时标题 / 最近两步 / 已等 / 
     const host = mount()
     runtime.setTimelineRows(liveTurn({ status: "retry", retry: { attempt: 3, message: "rate limited" } }))
     await flush()
-    expect(host.querySelector("[data-alpha-timeline-row='retry']")).toBeNull()
-    expect(host.querySelectorAll("[data-alpha-timeline-row='process']")).toHaveLength(1)
+    expect(host.querySelector("[data-codepuppy-timeline-row='retry']")).toBeNull()
+    expect(host.querySelectorAll("[data-codepuppy-timeline-row='process']")).toHaveLength(1)
     expect(processOf(host)!.getAttribute("data-face")).toBe("retry")
     expect(titleOf(host)).toBe("正在重试 · 第 3 次")
-    expect(processOf(host)!.querySelector("[data-alpha-process-retry-reason]")!.textContent).toBe("rate limited")
+    expect(processOf(host)!.querySelector("[data-codepuppy-process-retry-reason]")!.textContent).toBe("rate limited")
     expect(processOf(host)!.querySelector("[role='status']")!.textContent).toBe("正在重试 · 第 3 次")
 
     runtime.setTimelineRows(liveTurn({}))
@@ -3638,7 +3638,7 @@ describe("#1474 进行中的工作过程:实时标题 / 最近两步 / 已等 / 
     )
     await flush()
     expect(live()).toBeNull()
-    expect(host.querySelector("[data-alpha-timeline-row='footnote']")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-timeline-row='footnote']")).not.toBeNull()
 
     runtime.setTimelineRows(answerRows())
     await flush()
@@ -3652,7 +3652,7 @@ describe("#1474 进行中的工作过程:实时标题 / 最近两步 / 已等 / 
     )
     await flush()
     expect(live()).toBeNull()
-    expect(host.querySelector("[data-alpha-timeline-row='divider'][data-label='interrupted']")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-timeline-row='divider'][data-label='interrupted']")).not.toBeNull()
 
     runtime.setTimelineRows(answerRows())
     await flush()
@@ -3661,14 +3661,14 @@ describe("#1474 进行中的工作过程:实时标题 / 最近两步 / 已等 / 
     )
     await flush()
     expect(live()).toBeNull()
-    expect(host.querySelector("[data-alpha-timeline-row='turn-error']")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-timeline-row='turn-error']")).not.toBeNull()
 
     runtime.setTimelineRows(answerRows())
     await flush()
     runtime.setTimelineRows(liveTurn({ status: "idle", assistant: { finish: "unknown", time: { created: 10, completed: 20 } } }))
     await flush()
     expect(live()).toBeNull()
-    expect(host.querySelector("[data-alpha-timeline-row='empty-turn']")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-timeline-row='empty-turn']")).not.toBeNull()
 
     // 有步骤的回合结束:工作过程留成一行摘要,用时定格、不再脉冲。
     runtime.setTimelineRows(
@@ -3696,26 +3696,26 @@ describe("#1473 工作过程折叠(design ⑧ #process-fold)", () => {
 
   test("回答之前恰好一行工作过程:摘要 = 动作计数 · 琥珀色的不顺 · 整轮用时;回答完整在外面", async () => {
     const host = await mountResearch()
-    const kinds = [...host.querySelectorAll("[data-alpha-timeline-row]")].map((el) =>
-      el.getAttribute("data-alpha-timeline-row"),
+    const kinds = [...host.querySelectorAll("[data-codepuppy-timeline-row]")].map((el) =>
+      el.getAttribute("data-codepuppy-timeline-row"),
     )
     expect(kinds).toEqual(["user", "process", "markdown", "footnote"])
 
     const summary = host.querySelector<HTMLButtonElement>(".a-tl-pf-sum")!
     expect(summary.getAttribute("aria-expanded")).toBe("false")
-    const segments = [...summary.querySelectorAll("[data-alpha-process-segment]")].map((el) => el.textContent)
+    const segments = [...summary.querySelectorAll("[data-codepuppy-process-segment]")].map((el) => el.textContent)
     expect(segments).toEqual(["搜索 16 次", "2 步没成功", "3 分 27 秒"])
     expect(summary.querySelector(".a-tl-pf-warn")!.textContent).toBe("2 步没成功")
     // 思考次数不进摘要;收起时一个步骤、一张卡、一个来源徽标都不在 DOM 里。
     expect(summary.textContent).not.toContain("思考")
-    expect(host.querySelector("[data-alpha-process-step]")).toBeNull()
-    expect(host.querySelector("[data-alpha-tool-card]")).toBeNull()
-    expect(host.querySelector("[data-alpha-source-badge]")).toBeNull()
-    expect(host.querySelector("[data-alpha-timeline-row='markdown'] [data-md-stub]")!.textContent).toContain(
+    expect(host.querySelector("[data-codepuppy-process-step]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-tool-card]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-source-badge]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-timeline-row='markdown'] [data-md-stub]")!.textContent).toContain(
       "criteria 本身不能嵌套",
     )
     // 用时只在摘要里说一次,脚注不再写。
-    expect(host.querySelector("[data-alpha-timeline-row='footnote']")!.textContent).not.toContain("秒")
+    expect(host.querySelector("[data-codepuppy-timeline-row='footnote']")!.textContent).not.toContain("秒")
   })
 
   test("展开后 12 行;合并行点开每项一行,再点一项看该类已有的卡片正文;成功不挂状态", async () => {
@@ -3757,29 +3757,29 @@ describe("#1473 工作过程折叠(design ⑧ #process-fold)", () => {
     )
     firstSearch.click()
     await flush()
-    const group = firstSearch.closest("[data-alpha-process-group]")!
-    const items = [...group.querySelectorAll("[data-alpha-tool-card]")]
+    const group = firstSearch.closest("[data-codepuppy-process-group]")!
+    const items = [...group.querySelectorAll("[data-codepuppy-tool-card]")]
     expect(items).toHaveLength(4)
-    expect(group.querySelector("[data-alpha-step-detail]")).toBeNull()
+    expect(group.querySelector("[data-codepuppy-step-detail]")).toBeNull()
 
     // 再点一项:复用今天搜索卡的富链接正文;「开发者详情」只在详情底部且默认折叠。
     items[0]!.querySelector<HTMLButtonElement>(".a-tl-pf-step")!.click()
     await flush()
-    const detail = items[0]!.querySelector("[data-alpha-step-detail]")!
+    const detail = items[0]!.querySelector("[data-codepuppy-step-detail]")!
     expect([...detail.querySelectorAll(".a-tc-wr")].map((link) => link.getAttribute("href"))).toEqual([
       "https://docs.typesafe.ai/api",
       "https://docs.typesafe.ai/primitives/choice",
     ])
     const dev = detail.lastElementChild as HTMLDetailsElement
-    expect(dev.hasAttribute("data-alpha-dev-details")).toBe(true)
+    expect(dev.hasAttribute("data-codepuppy-dev-details")).toBe(true)
     expect(dev.open).toBe(false)
 
     // 失败的那组:展开后每项一行写人话原因(打开网页失败 =「没打开」,`#1475`);点开看到错误正文。
     ;(lines[3] as HTMLButtonElement).click()
     await flush()
-    const fetchGroup = lines[3]!.closest("[data-alpha-process-group]")!
-    const fetches = [...fetchGroup.querySelectorAll("[data-alpha-tool-card]")]
-    expect(fetches.map((item) => item.querySelector("[data-alpha-step-failure]")!.textContent)).toEqual([
+    const fetchGroup = lines[3]!.closest("[data-codepuppy-process-group]")!
+    const fetches = [...fetchGroup.querySelectorAll("[data-codepuppy-tool-card]")]
+    expect(fetches.map((item) => item.querySelector("[data-codepuppy-step-failure]")!.textContent)).toEqual([
       "没打开",
       "没打开",
     ])
@@ -3843,7 +3843,7 @@ describe("#1475 步骤行:动作名 · 对象 · 行尾 / 行内来源 / 提问 
     )
     await flush()
     await openProcess(host)
-    const lines = [...host.querySelectorAll("[data-alpha-tool-card]")].map(lineText)
+    const lines = [...host.querySelectorAll("[data-codepuppy-tool-card]")].map(lineText)
     expect(lines).toEqual([
       { verb: "读取", object: "message.ts", end: "" },
       { verb: "查找文件", object: "**/*.spec.ts", end: "没找到" },
@@ -3857,8 +3857,8 @@ describe("#1475 步骤行:动作名 · 对象 · 行尾 / 行内来源 / 提问 
       { verb: "写入", object: "criteria.md", end: "+3" },
     ])
     // 我方步骤永远不带来源标记(插头 / 拼图 / 问号)。
-    expect(host.querySelector("[data-alpha-step-source]")).toBeNull()
-    expect(host.querySelector("[data-alpha-step-origin]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-step-source]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-step-origin]")).toBeNull()
   })
 
   test("防冒充:第三方 MCP / 插件起名「read」「bash」,步骤行仍是来源图标 + 服务名 + 工具名;输入输出零字符", async () => {
@@ -3902,20 +3902,20 @@ describe("#1475 步骤行:动作名 · 对象 · 行尾 / 行内来源 / 提问 
     )
     await flush()
     await openAll(host)
-    const [own, mcpItem, pluginItem] = [...host.querySelectorAll("[data-alpha-tool-card]")]
+    const [own, mcpItem, pluginItem] = [...host.querySelectorAll("[data-codepuppy-tool-card]")]
     expect(lineText(own!)).toEqual({ verb: "读取", object: "README.md", end: "" })
-    expect(own!.querySelector("[data-alpha-step-source]")).toBeNull()
+    expect(own!.querySelector("[data-codepuppy-step-source]")).toBeNull()
 
-    expect(mcpItem!.querySelector("[data-alpha-step-source]")!.getAttribute("data-alpha-step-source")).toBe("mcp")
+    expect(mcpItem!.querySelector("[data-codepuppy-step-source]")!.getAttribute("data-codepuppy-step-source")).toBe("mcp")
     // #1576:快照没有 location ⇒ 非内置步骤行尾写「位置未知」。
     expect(lineText(mcpItem!)).toEqual({ verb: "fs-srv", object: "read", end: "位置未知" })
-    expect(mcpItem!.querySelector("[data-alpha-safe-card]")!.textContent).toBe(
+    expect(mcpItem!.querySelector("[data-codepuppy-safe-card]")!.textContent).toBe(
       "这个工具来自第三方(fs-srv),我们不显示它收到和返回的内容。",
     )
     // 开发者详情仍在详情底部、默认折叠。
-    expect(mcpItem!.querySelector<HTMLDetailsElement>("[data-alpha-dev-details]")!.open).toBe(false)
+    expect(mcpItem!.querySelector<HTMLDetailsElement>("[data-codepuppy-dev-details]")!.open).toBe(false)
 
-    expect(pluginItem!.querySelector("[data-alpha-step-source]")!.getAttribute("data-alpha-step-source")).toBe("plugin")
+    expect(pluginItem!.querySelector("[data-codepuppy-step-source]")!.getAttribute("data-codepuppy-step-source")).toBe("plugin")
     expect(lineText(pluginItem!)).toEqual({ verb: "第三方插件", object: "bash", end: "位置未知没成功" })
     expect(pluginItem!.querySelector(".a-tc-term")).toBeNull()
     expect(pluginItem!.querySelector(".a-tc-err")).toBeNull()
@@ -3964,22 +3964,22 @@ describe("#1475 步骤行:动作名 · 对象 · 行尾 / 行内来源 / 提问 
     )
     await flush()
     await openAll(host)
-    const [asked, spoof] = [...host.querySelectorAll("[data-alpha-tool-card]")]
+    const [asked, spoof] = [...host.querySelectorAll("[data-codepuppy-tool-card]")]
     expect(asked!.getAttribute("data-kind")).toBe("question")
     expect(lineText(asked!)).toEqual({ verb: "问了你", object: "导出成哪种格式?", end: "你选了 Word 文档" })
-    const options = [...asked!.querySelectorAll("[data-alpha-question-detail] .a-tc-qa-opt")]
+    const options = [...asked!.querySelectorAll("[data-codepuppy-question-detail] .a-tc-qa-opt")]
     expect(options.map((el) => [el.textContent, el.getAttribute("data-selected")])).toEqual([
       ["Word 文档", "true"],
       ["PDF", null],
       ["Markdown", null],
     ])
     // 不再是空卡:不出降级说明。
-    expect(asked!.querySelector("[data-alpha-safe-card]")).toBeNull()
+    expect(asked!.querySelector("[data-codepuppy-safe-card]")).toBeNull()
 
     // 冒名的插件 question:来源标记 + 名称,问题与回答一个字都不显示。
     expect(spoof!.getAttribute("data-kind")).toBe("unknown")
     expect(lineText(spoof!)).toEqual({ verb: "第三方插件", object: "question", end: "位置未知" })
-    expect(spoof!.querySelector("[data-alpha-question-detail]")).toBeNull()
+    expect(spoof!.querySelector("[data-codepuppy-question-detail]")).toBeNull()
     expect(spoof!.textContent).not.toContain("导出成哪种格式")
   })
 
@@ -4007,16 +4007,16 @@ describe("#1475 步骤行:动作名 · 对象 · 行尾 / 行内来源 / 提问 
     )
     await flush()
     await openAll(host)
-    const [bash, fetch] = [...host.querySelectorAll("[data-alpha-tool-card]")]
+    const [bash, fetch] = [...host.querySelectorAll("[data-codepuppy-tool-card]")]
     expect(lineText(bash!)).toEqual({ verb: "运行", object: "清理构建目录", end: "没等到你批准" })
-    const note = bash!.querySelector("[data-alpha-ask-timeout-card]")!
-    expect(note.querySelector("[data-alpha-ask-timeout]")!.textContent).toBe("审批已超时,未获批准")
+    const note = bash!.querySelector("[data-codepuppy-ask-timeout-card]")!
+    expect(note.querySelector("[data-codepuppy-ask-timeout]")!.textContent).toBe("审批已超时,未获批准")
     expect(bash!.querySelector(".a-tc-err")).toBeNull()
     expect(bash!.textContent).not.toContain("常见原因")
     expect(bash!.textContent).not.toContain("没有**被放行")
     // 对照:普通失败不冒充审批超时;打开网页失败写「没打开」,错误正文照旧在详情里。
     expect(lineText(fetch!)).toEqual({ verb: "打开网页", object: "docs.example.org/api", end: "没打开" })
-    expect(fetch!.querySelector("[data-alpha-ask-timeout-card]")).toBeNull()
+    expect(fetch!.querySelector("[data-codepuppy-ask-timeout-card]")).toBeNull()
     expect(fetch!.querySelector(".a-tc-error-body")!.textContent).toContain("Transport error")
   })
 })
@@ -4038,7 +4038,7 @@ function mountInlinePreview(parts: unknown[]) {
   document.body.append(host)
   disposers.push(solidWeb.render(() => solid.createComponent(previewShell.SessionWorkspaceShell, {
     live,
-    timeline: (rail) => solid.createComponent(binding.AlphaSessionTimeline, { rail }),
+    timeline: (rail) => solid.createComponent(binding.CodePuppySessionTimeline, { rail }),
     panels: {
       files: (rail) => solid.createComponent(previewFiles.SessionRailFiles, { live, rail }),
       artifacts: (rail) => solid.createComponent(previewArtifacts.SessionRailArtifacts, { live, rail }),
@@ -4063,26 +4063,26 @@ test("AC1 #1503: closed rail shows each same-name PNG from its clicked media row
   expect(rows).toHaveLength(2)
   for (const index of [0, 1]) {
     host.querySelector<HTMLButtonElement>(".a-swk-rail-close")!.click()
-    expect(host.querySelector("[data-alpha-session-rail-host]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-session-rail-host]")).toBeNull()
     rows[index].focus()
     rows[index].click()
     await settlePreview()
-    expect(host.querySelector("[data-alpha-session-rail-panel='files']")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-session-rail-panel='files']")).not.toBeNull()
     expect(host.querySelector(".a-fv-name")!.textContent).toBe("image/png")
-    expect(host.querySelector<HTMLImageElement>("[data-alpha-fv-image] img")!.src).toBe(previewFixture.previewPngs[index])
-    expect(host.querySelector("[data-alpha-file-viewer]")!.getAttribute("data-alpha-file-viewer")).toBe(`prt_image_${index}`)
-    expect(host.querySelector("[data-alpha-fv-kebab]")).toBeNull()
-    expect(host.querySelector("[data-alpha-boundary]")).toBeNull()
-    host.querySelector("[data-alpha-file-viewer]")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))
+    expect(host.querySelector<HTMLImageElement>("[data-codepuppy-fv-image] img")!.src).toBe(previewFixture.previewPngs[index])
+    expect(host.querySelector("[data-codepuppy-file-viewer]")!.getAttribute("data-codepuppy-file-viewer")).toBe(`prt_image_${index}`)
+    expect(host.querySelector("[data-codepuppy-fv-kebab]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-boundary]")).toBeNull()
+    host.querySelector("[data-codepuppy-file-viewer]")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))
     expect(document.activeElement).toBe(rows[index])
   }
   rows[0].click()
   await settlePreview()
-  host.querySelector("[data-alpha-fv-image] img")!.dispatchEvent(new Event("error"))
-  expect(host.querySelector("[data-alpha-fv-image] img")).toBeNull()
+  host.querySelector("[data-codepuppy-fv-image] img")!.dispatchEvent(new Event("error"))
+  expect(host.querySelector("[data-codepuppy-fv-image] img")).toBeNull()
   rows[1].click()
   await settlePreview()
-  expect(host.querySelector<HTMLImageElement>("[data-alpha-fv-image] img")!.src).toBe(previewFixture.previewPngs[1])
+  expect(host.querySelector<HTMLImageElement>("[data-codepuppy-fv-image] img")!.src).toBe(previewFixture.previewPngs[1])
   delete (window as never as Record<string, unknown>).api
 })
 
@@ -4134,7 +4134,7 @@ test.each(["image", "document"])("AC2 #1503: cloud %s click previews the selecte
     const descriptor = runs[index].response.artifacts[selected]
     // REQ-236 #1552 AC5: the run id left the bar for the folded technical details; the bar still names the run it shows.
     expect(host.querySelector("[data-artifacts-runbar]")!.getAttribute("data-artifacts-run")).toBe(runs[index].runId) // selectedRunId
-    expect(host.querySelector(`[data-artifact-card='${descriptor.id}']`)!.closest(".alpha-wb-card")!.hasAttribute("data-active")).toBe(true) // selectedKey
+    expect(host.querySelector(`[data-artifact-card='${descriptor.id}']`)!.closest(".codepuppy-wb-card")!.hasAttribute("data-active")).toBe(true) // selectedKey
     expect(reads).toContain(`${runs[index].runId}:${descriptor.id}`)
     if (kind === "image") {
       const image = host.querySelector<HTMLImageElement>(".a-wb-image img")!
@@ -4257,7 +4257,7 @@ describe("REQ-236 #1552 生图卡", () => {
     runtime.setTimelineRows(assistantFixture([accepted()]))
     await settleCard()
     expect(card(host).getAttribute("data-cloud-image")).toBe("running")
-    expect(host.querySelector("[data-cloud-image-state]")!.textContent).toContain(i18n.t("alpha.timeline.image.state.running"))
+    expect(host.querySelector("[data-cloud-image-state]")!.textContent).toContain(i18n.t("codepuppy.timeline.image.state.running"))
     expect(host.querySelector("[data-cloud-image-elapsed]")!.textContent).toMatch(/^0:4\d$/)
     expect(api.calls.getRunState).toBe(1)
     expect(api.calls.track).toEqual([])
@@ -4267,7 +4267,7 @@ describe("REQ-236 #1552 生图卡", () => {
     await settleCard()
     expect(card(host).getAttribute("data-cloud-image")).toBe("saved")
     expect(host.querySelector("[data-cloud-image-pic] img")).not.toBeNull()
-    expect(host.querySelector("[data-cloud-image-state]")!.textContent).toBe(i18n.t("alpha.timeline.image.done"))
+    expect(host.querySelector("[data-cloud-image-state]")!.textContent).toBe(i18n.t("codepuppy.timeline.image.done"))
   })
 
   test("重载后宿主没跟过:本机已核验 ⇒ 直接出图且不联网(不 trackRun);本机没有 ⇒ trackRun 且不带归属", async () => {
@@ -4301,7 +4301,7 @@ describe("REQ-236 #1552 生图卡", () => {
     await settleCard()
     expect(card(host).getAttribute("data-cloud-image")).toBe("undelivered")
     expect(host.querySelector("[data-cloud-image-notice]")!.textContent).toContain(
-      i18n.t("alpha.timeline.image.undelivered.network.title"),
+      i18n.t("codepuppy.timeline.image.undelivered.network.title"),
     )
     const retry = host.querySelector<HTMLButtonElement>("[data-cloud-image-retry]")!
     retry.click()
@@ -4334,7 +4334,7 @@ describe("REQ-236 #1552 生图卡", () => {
     await settleCard()
     expect(card(host).getAttribute("data-cloud-image")).toBe("refused")
     expect(host.querySelector("[data-cloud-image-notice]")!.textContent).toContain(
-      i18n.t("alpha.timeline.image.refused.allowance.title"),
+      i18n.t("codepuppy.timeline.image.refused.allowance.title"),
     )
     host.querySelector<HTMLButtonElement>("[data-cloud-image-billing]")!.click()
     expect(api.calls.billing).toEqual(["recharge"])
@@ -4346,7 +4346,7 @@ describe("REQ-236 #1552 生图卡", () => {
     await settleCard()
     expect(api.calls.save).toBe(1)
     expect(host.querySelector("[data-cloud-image-receipt='bad']")!.textContent).toContain(
-      i18n.t("alpha.timeline.image.saveMismatch"),
+      i18n.t("codepuppy.timeline.image.saveMismatch"),
     )
   })
 })
@@ -4364,14 +4364,14 @@ async function settleCard() {
 describe("#1588 AC1 对话读取:读取中 / 失败 / 重试发出新请求(生产绑定层挂载,批准稿 #conv-loading)", () => {
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
   const readRow = (host: Element, state: "loading" | "failed") =>
-    host.querySelector<HTMLElement>(`[data-alpha-timeline-read='${state}']`)
+    host.querySelector<HTMLElement>(`[data-codepuppy-timeline-read='${state}']`)
 
   function mountUnread(readDeadlineMs?: number) {
     delete bindingData.message[BINDING_SESSION_ID]
     bindingSyncCalls.length = 0
     const host = document.createElement("div")
     document.body.append(host)
-    disposers.push(solidWeb.render(() => binding.AlphaSessionTimeline({ readDeadlineMs }), host))
+    disposers.push(solidWeb.render(() => binding.CodePuppySessionTimeline({ readDeadlineMs }), host))
     return host
   }
 
@@ -4390,7 +4390,7 @@ describe("#1588 AC1 对话读取:读取中 / 失败 / 重试发出新请求(生�
     const loading = readRow(host, "loading")!
     expect(loading.getAttribute("role")).toBe("status")
     expect(loading.textContent).toBe("正在读取对话…")
-    expect(host.querySelector("[data-alpha-timeline-empty]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-timeline-empty]")).toBeNull()
   })
 
   test("读取被拒 → 「对话读取失败」+「重试」", async () => {
@@ -4444,7 +4444,7 @@ describe("#1588 AC2 往上翻加载更早消息失败(批准稿 #conv-loading)",
     await new Promise((resolve) => setTimeout(resolve, 0))
     await flush()
     expect(runtime.getLoadOlderCalls()).toBe(1)
-    const failed = host.querySelector<HTMLElement>("[data-alpha-timeline-history-failed]")!
+    const failed = host.querySelector<HTMLElement>("[data-codepuppy-timeline-history-failed]")!
     expect(failed.getAttribute("role")).toBe("alert")
     expect(failed.textContent).toBe("更早的消息加载失败重试")
     expect(failed.querySelector(".a-tl-int-dot")).not.toBeNull()
@@ -4455,7 +4455,7 @@ describe("#1588 AC2 往上翻加载更早消息失败(批准稿 #conv-loading)",
     await new Promise((resolve) => setTimeout(resolve, 0))
     await flush()
     expect(runtime.getLoadOlderCalls()).toBe(2)
-    expect(host.querySelector("[data-alpha-timeline-history-failed]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-timeline-history-failed]")).toBeNull()
     expect(host.querySelector(".a-tl-history-button")!.textContent).toBe("加载更早的消息")
   })
 })
@@ -4491,8 +4491,8 @@ describe("#1588 AC3 回合错误卡:五类按错误名与状态码认,标题与�
     })
   }
 
-  const card = (host: Element) => host.querySelector<HTMLElement>("[data-alpha-timeline-row='turn-error']")!
-  const buttons = (host: Element) => [...card(host).querySelectorAll<HTMLButtonElement>("[data-alpha-turn-error-actions] button")]
+  const card = (host: Element) => host.querySelector<HTMLElement>("[data-codepuppy-timeline-row='turn-error']")!
+  const buttons = (host: Element) => [...card(host).querySelectorAll<HTMLButtonElement>("[data-codepuppy-turn-error-actions] button")]
   /** 卡上除「开发者详情」之外用户直接看得到的文字。 */
   const visibleText = (host: Element) => {
     const clone = card(host).cloneNode(true) as HTMLElement
@@ -4524,7 +4524,7 @@ describe("#1588 AC3 回合错误卡:五类按错误名与状态码认,标题与�
       // 错误名、状态码与服务原话只在卡内「开发者详情」(默认折叠)。
       const message = String(item.error.data.message)
       expect({ label, leaked: [item.error.name, message].filter((text) => visibleText(host).includes(text)) }).toEqual({ label, leaked: [] })
-      const details = card(host).querySelector<HTMLDetailsElement>("details[data-alpha-dev-details]")!
+      const details = card(host).querySelector<HTMLDetailsElement>("details[data-codepuppy-dev-details]")!
       expect(details.open).toBe(false)
       expect(details.querySelector("summary")!.textContent).toBe("开发者详情")
       expect(details.textContent).toContain(item.error.name)
@@ -4556,7 +4556,7 @@ describe("#1588 AC3 回合错误卡:五类按错误名与状态码认,标题与�
     runtime.setTimelineRows(causeRows(table[0]!.error))
     await flush()
     expect(card(host).querySelector("b")!.textContent).toBe("余额或会员不足")
-    expect(card(host).querySelector("[data-alpha-turn-error-actions]")).toBeNull()
+    expect(card(host).querySelector("[data-codepuppy-turn-error-actions]")).toBeNull()
 
     for (const error of [
       { name: "APIError", data: { message: "Cannot connect to API: Request was cancelled.", isRetryable: false } },
@@ -4612,7 +4612,7 @@ describe("#1588 AC5 用户消息脚注:第一方模式写档名与色点,自建�
     const host = mount()
     runtime.setTimelineRows(userRowsWithAgents(agents))
     await flush()
-    const metas = [...host.querySelectorAll<HTMLElement>("[data-alpha-timeline-row='user'] .a-tl-user-meta > span:first-child")]
+    const metas = [...host.querySelectorAll<HTMLElement>("[data-codepuppy-timeline-row='user'] .a-tl-user-meta > span:first-child")]
     const shown = metas.map((meta) => ({
       head: (meta.textContent ?? "").split(" · ")[0],
       tier: meta.querySelector(".a-tl-user-mode")?.getAttribute("data-tier") ?? null,

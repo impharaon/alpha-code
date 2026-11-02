@@ -1,16 +1,16 @@
 // REQ-234 `#1531`:agent 的三个定制中心工具(hub-tools.ts)。
 //   I2 参数只有字符串标识(键集合精确相等,没有任何密钥形状的字段);
-//   I3 确认框一定会出现:钉子在真 AlphaExt 的 config 钩子里、在末位、自动化 agent 是 deny;拿掉钉子 ⇒ ask 直接放行 ⇒
+//   I3 确认框一定会出现:钉子在真 CodePuppyExt 的 config 钩子里、在末位、自动化 agent 是 deny;拿掉钉子 ⇒ ask 直接放行 ⇒
 //      查不到记录 ⇒「not installed: no confirmation box ran」(工具自己装不了任何东西);
 //   I7 always: [];
 //   I9 结局以 main 记录的 requestId 阶段为准:submitted / committed 之后醒来(期限到 / reject 回执)不报「用户拒绝」。
 // 真 Permission.ask 那一半(默认配置下引擎真的发布请求;回复 always 不抵消下一次)在
-// packages/opencode/test/permission/alpha-hub-install-ask.test.ts。
+// packages/opencode/test/permission/codepuppy-hub-install-ask.test.ts。
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { HubRequestRecord, HubView, HubViewRow } from "../../ui-mac/src/main/alpha-sidecar-messages"
+import type { HubRequestRecord, HubView, HubViewRow } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
 import type { HubBridge } from "./hub-bridge"
 import { createHubTools, HUB_INSTALL_OUTCOME, HUB_NEXT_MESSAGE_HINT, HUB_PRICE_NOTE_MISSING, pinHubInstallPermission } from "./hub-tools"
 
@@ -101,17 +101,17 @@ describe("I3:确认框一定会出现(钉子)", () => {
     expect(stringy.permission).toEqual({ "*": "allow", codepuppy_hub_install: "ask" })
   })
 
-  const SANITIZE = ["ALPHA_GLOBAL_DIR", "ALPHA_FACTORY_SKILL_DIRS", "ALPHA_FACTORY_DENY_SKILLS"] as const
+  const SANITIZE = ["CODEPUPPY_GLOBAL_DIR", "CODEPUPPY_FACTORY_SKILL_DIRS", "CODEPUPPY_FACTORY_DENY_SKILLS"] as const
   const saved = new Map<string, string | undefined>()
   let root = ""
   beforeEach(() => {
     for (const k of SANITIZE) saved.set(k, process.env[k])
     for (const k of SANITIZE) delete process.env[k]
-    root = realpathSync(mkdtempSync(join(tmpdir(), "alpha-hub-pin-")))
-    const global = join(root, "alpha-code-state", "env", "dev")
+    root = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-hub-pin-")))
+    const global = join(root, "codepuppy-state", "env", "dev")
     mkdirSync(global, { recursive: true })
     mkdirSync(join(root, "project"), { recursive: true })
-    process.env.ALPHA_GLOBAL_DIR = global
+    process.env.CODEPUPPY_GLOBAL_DIR = global
   })
   afterEach(() => {
     for (const k of SANITIZE) {
@@ -122,13 +122,13 @@ describe("I3:确认框一定会出现(钉子)", () => {
     rmSync(root, { recursive: true, force: true })
   })
 
-  test("真 AlphaExt 的 config 钩子钉住它(在 finally 里:项目配置读不了的 early return 也照钉);工具表里有三个工具", async () => {
-    const { AlphaExt } = await import("./plugin")
-    const hooks = (await AlphaExt({
+  test("真 CodePuppyExt 的 config 钩子钉住它(在 finally 里:项目配置读不了的 early return 也照钉);工具表里有三个工具", async () => {
+    const { CodePuppyExt } = await import("./plugin")
+    const hooks = (await CodePuppyExt({
       directory: join(root, "project"),
       worktree: join(root, "project"),
       client: { instance: { dispose: async () => {} }, provider: { list: async () => ({ data: { all: [] } }) } },
-    } as unknown as Parameters<typeof AlphaExt>[0])) as unknown as {
+    } as unknown as Parameters<typeof CodePuppyExt>[0])) as unknown as {
       config: (cfg: unknown) => Promise<void>
       tool: Record<string, unknown>
     }
@@ -139,8 +139,8 @@ describe("I3:确认框一定会出现(钉子)", () => {
     expect(Object.entries(agents.mine!.permission).at(-1)).toEqual(["codepuppy_hub_install", "ask"])
     for (const name of ["codepuppy_hub_search", "codepuppy_hub_install", "codepuppy_hub_status"]) expect(Object.keys(hooks.tool)).toContain(name)
 
-    // 项目配置读不了(alpha.jsonc 是个目录 ⇒ 读失败分支)⇒ try 体后半段整段跳过(提示词接管没跑 = 走的确实是那条分支),钉子照钉
-    mkdirSync(join(root, "project", ".code-puppy", "alpha.jsonc"), { recursive: true })
+    // 项目配置读不了(codepuppy.jsonc 是个目录 ⇒ 读失败分支)⇒ try 体后半段整段跳过(提示词接管没跑 = 走的确实是那条分支),钉子照钉
+    mkdirSync(join(root, "project", ".code-puppy", "codepuppy.jsonc"), { recursive: true })
     const broken: Record<string, unknown> = { permission: { "*": "allow" } }
     await hooks.config(broken)
     expect((broken.agent as Record<string, unknown> | undefined)?.general).toBeUndefined()
@@ -153,12 +153,12 @@ describe("I3:确认框一定会出现(钉子)", () => {
     const out = outputOf(await createHubTools(bridge).codepuppy_hub_install.execute({ catalogId: "mcp:github" }, ctx))
     expect(out.split("\n")[0]).toBe(HUB_INSTALL_OUTCOME.noBox)
     expect(asks).toHaveLength(1)
-    // I7 + 运输形状:always 恒空;metadata 只有 alphaHub 的 catalogId 与 requestId;查的正是这一次的 requestId
+    // I7 + 运输形状:always 恒空;metadata 只有 codepuppyHub 的 catalogId 与 requestId;查的正是这一次的 requestId
     expect(asks[0]).toEqual({
       permission: "codepuppy_hub_install",
       patterns: ["mcp:github"],
       always: [],
-      metadata: { alphaHub: { catalogId: "mcp:github", requestId: calls.request[0] } },
+      metadata: { codepuppyHub: { catalogId: "mcp:github", requestId: calls.request[0] } },
     })
     expect(calls.request[0]).toMatch(/^[A-Za-z0-9_-]{8,64}$/)
   })

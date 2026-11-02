@@ -8,17 +8,17 @@
 //
 // ── 勘破(2026-10-10,`origin/alpha`)—— 两份清单今天的差集,以及差异是不是有意的 ──────
 // 过滤表(3 条):`bun.lock`(整行)、`packages/app/`(前缀)、`packages/ui/`(前缀)。
-// 守卫:辖区 `packages`;carve-out ① ALPHA_OWNED_PACKAGES = ext ui-mac alpha-contracts-consumer;
+// 守卫:辖区 `packages`;carve-out ① CODEPUPPY_OWNED_PACKAGES = ext ui-mac codepuppy-contracts-consumer;
 //       carve-out ② ROUNDTRIP_PACKAGES = app ui;收编白名单 UPSTREAM_EXCLUDES 48 条。
 //   · `packages/app/` `packages/ui/` == ROUNDTRIP_PACKAGES —— **同一个事实的两份副本**。两边的
-//     理由都是 ADR-034:这两棵树由 pin + SOT 补丁投影,冲突由 apply_alpha_frontend_delta 整体
+//     理由都是 ADR-034:这两棵树由 pin + SOT 补丁投影,冲突由 apply_codepuppy_frontend_delta 整体
 //     重写解决,所以对 sync 是预期冲突、对守卫是让给 roundtrip 门的 carve-out。
 //   · `bun.lock` 不在守卫辖区内(辖区只到 `packages/`),守卫根本不判它 —— 它是 ADR-004 后果①
 //     登记的结构性例外,sync 用 `--theirs` + 重生 lockfile 处理。不矛盾。
 //   · 48 条收编白名单**全部不在**过滤表里 —— **有意的**。收编文件是 alpha 改过的上游文件,
 //     上游一改它们就是真冲突,需要人按 ADR 逐条合并;过滤掉它们等于让 sync 自动选一边、静默丢掉
 //     一侧的改动。所以它们必须落在「意外」里让同步中止。
-//   · ALPHA_OWNED_PACKAGES 不在过滤表里 —— 也对:上游没有这三个包,合并不可能在它们上冲突。
+//   · CODEPUPPY_OWNED_PACKAGES 不在过滤表里 —— 也对:上游没有这三个包,合并不可能在它们上冲突。
 // ⇒ 结论:两份不该字面相同。正确关系是三条,本文件逐条断言:
 //   ① 过滤表里 `packages/` 下的条目 == ROUNDTRIP_PACKAGES(集合相等,前缀形 `packages/<p>/`);
 //   ② 过滤表里 `packages/` 外的条目必须落在守卫辖区外(守卫不判它 ⇒ 两边不会给出相反结论);

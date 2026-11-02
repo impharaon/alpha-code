@@ -13,7 +13,7 @@
 //
 // 分工:本模块是纯逻辑(可 typecheck、可负向测试);真实字节的枚举与哈希、codesign/spctl/
 // stapler 的执行在 scripts/release-manifest.ts;Windows Authenticode 事实由
-// .github/workflows/alpha-windows-build.yml 的 pwsh 步骤采集成 facts JSON,
+// .github/workflows/codepuppy-windows-build.yml 的 pwsh 步骤采集成 facts JSON,
 // scripts/verify-windows-signing.ts 在 CI 上执行 evaluateWindowsSigning 作硬门。
 
 import { createHash, createPublicKey, createPrivateKey, sign as edSign, verify as edVerify } from "node:crypto"
@@ -22,7 +22,7 @@ import { createHash, createPublicKey, createPrivateKey, sign as edSign, verify a
 
 export const RELEASE_MANIFEST_SCHEMA = "codepuppy.release.manifest.v1"
 export const RELEASE_TRUST_SCHEMA = "codepuppy.release-manifest.trust.v1"
-export const WINDOWS_SIGNING_FACTS_SCHEMA = "alpha.release.windows-signing-facts.v1"
+export const WINDOWS_SIGNING_FACTS_SCHEMA = "codepuppy.release.windows-signing-facts.v1"
 
 /** Apple Developer ID team(Beijing yuanyuji;docs/runbooks/distribution.md §0)。 */
 export const APPLE_TEAM_ID = "RQX6X6A635"

@@ -20,8 +20,8 @@ import {
   type DurableAtomicWriteOptions,
 } from "./settings-durable-writer"
 import {
-  ALPHA_SETTINGS_DEFAULTS,
-  type AlphaSettings,
+  CODEPUPPY_SETTINGS_DEFAULTS,
+  type CodePuppySettings,
   type ExtensionStorageResult,
   type ExtensionStorageSnapshot,
   type SettingsAuthority,
@@ -204,7 +204,7 @@ function writeFailure(current: CurrentSettings): SettingsWriteResult {
   return { ok: false, code: "write-failed" }
 }
 
-function decodeSettings(value: unknown, allowMissing: boolean): AlphaSettings | undefined {
+function decodeSettings(value: unknown, allowMissing: boolean): CodePuppySettings | undefined {
   const root = object(value)
   if (!root || !keysAllowed(root, ["general", "appearance", "keybinds", "permissions", "notifications", "sounds"]))
     return
@@ -214,13 +214,13 @@ function decodeSettings(value: unknown, allowMissing: boolean): AlphaSettings | 
   const permissions = decodeBooleans(
     root.permissions,
     ["autoApprove"],
-    ALPHA_SETTINGS_DEFAULTS.permissions,
+    CODEPUPPY_SETTINGS_DEFAULTS.permissions,
     allowMissing,
   )
   const notifications = decodeBooleans(
     root.notifications,
     ["agent", "permissions", "errors"],
-    ALPHA_SETTINGS_DEFAULTS.notifications,
+    CODEPUPPY_SETTINGS_DEFAULTS.notifications,
     allowMissing,
   )
   const sounds = decodeSounds(root.sounds, allowMissing)
@@ -239,7 +239,7 @@ function decodeSettings(value: unknown, allowMissing: boolean): AlphaSettings | 
   }
 }
 
-function decodeGeneral(value: unknown, allowMissing: boolean): AlphaSettings["general"] | undefined {
+function decodeGeneral(value: unknown, allowMissing: boolean): CodePuppySettings["general"] | undefined {
   const source = group(value, allowMissing)
   const keys = [
     "autoSave",
@@ -273,14 +273,14 @@ function decodeGeneral(value: unknown, allowMissing: boolean): AlphaSettings["ge
         key !== "newInterfaceNoticeDismissed" &&
         key !== "shouldDisplayTabsToast",
     ),
-    ALPHA_SETTINGS_DEFAULTS.general,
+    CODEPUPPY_SETTINGS_DEFAULTS.general,
     allowMissing,
   )
-  const followup = stringValue(source, "followup", ALPHA_SETTINGS_DEFAULTS.general.followup, allowMissing)
+  const followup = stringValue(source, "followup", CODEPUPPY_SETTINGS_DEFAULTS.general.followup, allowMissing)
   const mobileTitlebarPosition = stringValue(
     source,
     "mobileTitlebarPosition",
-    ALPHA_SETTINGS_DEFAULTS.general.mobileTitlebarPosition,
+    CODEPUPPY_SETTINGS_DEFAULTS.general.mobileTitlebarPosition,
     allowMissing,
   )
   if (!booleans || followup === INVALID || (followup !== "queue" && followup !== "steer")) return
@@ -322,13 +322,13 @@ function decodeGeneral(value: unknown, allowMissing: boolean): AlphaSettings["ge
   }
 }
 
-function decodeAppearance(value: unknown, allowMissing: boolean): AlphaSettings["appearance"] | undefined {
+function decodeAppearance(value: unknown, allowMissing: boolean): CodePuppySettings["appearance"] | undefined {
   const source = group(value, allowMissing)
   if (!source || !keysAllowed(source, ["fontSize", "mono", "sans", "terminal"])) return
-  const fontSize = numberValue(source, "fontSize", ALPHA_SETTINGS_DEFAULTS.appearance.fontSize, allowMissing)
-  const mono = stringValue(source, "mono", ALPHA_SETTINGS_DEFAULTS.appearance.mono, allowMissing)
-  const sans = stringValue(source, "sans", ALPHA_SETTINGS_DEFAULTS.appearance.sans, allowMissing)
-  const terminal = stringValue(source, "terminal", ALPHA_SETTINGS_DEFAULTS.appearance.terminal, allowMissing)
+  const fontSize = numberValue(source, "fontSize", CODEPUPPY_SETTINGS_DEFAULTS.appearance.fontSize, allowMissing)
+  const mono = stringValue(source, "mono", CODEPUPPY_SETTINGS_DEFAULTS.appearance.mono, allowMissing)
+  const sans = stringValue(source, "sans", CODEPUPPY_SETTINGS_DEFAULTS.appearance.sans, allowMissing)
+  const terminal = stringValue(source, "terminal", CODEPUPPY_SETTINGS_DEFAULTS.appearance.terminal, allowMissing)
   if (fontSize === INVALID || fontSize < 8 || fontSize > 72) return
   if (mono === INVALID || sans === INVALID || terminal === INVALID) return
   if ([mono, sans, terminal].some((font) => font.length > MAX_FONT_CHARS)) return
@@ -351,7 +351,7 @@ function decodeKeybinds(value: unknown, allowMissing: boolean): Record<string, s
   return Object.fromEntries(Object.entries(source) as Array<[string, string]>)
 }
 
-function decodeSounds(value: unknown, allowMissing: boolean): AlphaSettings["sounds"] | undefined {
+function decodeSounds(value: unknown, allowMissing: boolean): CodePuppySettings["sounds"] | undefined {
   const source = group(value, allowMissing)
   if (
     !source ||
@@ -361,12 +361,12 @@ function decodeSounds(value: unknown, allowMissing: boolean): AlphaSettings["sou
   const enabled = decodeBooleans(
     source,
     ["agentEnabled", "permissionsEnabled", "errorsEnabled"],
-    ALPHA_SETTINGS_DEFAULTS.sounds,
+    CODEPUPPY_SETTINGS_DEFAULTS.sounds,
     allowMissing,
   )
-  const agent = stringValue(source, "agent", ALPHA_SETTINGS_DEFAULTS.sounds.agent, allowMissing)
-  const permissions = stringValue(source, "permissions", ALPHA_SETTINGS_DEFAULTS.sounds.permissions, allowMissing)
-  const errors = stringValue(source, "errors", ALPHA_SETTINGS_DEFAULTS.sounds.errors, allowMissing)
+  const agent = stringValue(source, "agent", CODEPUPPY_SETTINGS_DEFAULTS.sounds.agent, allowMissing)
+  const permissions = stringValue(source, "permissions", CODEPUPPY_SETTINGS_DEFAULTS.sounds.permissions, allowMissing)
+  const errors = stringValue(source, "errors", CODEPUPPY_SETTINGS_DEFAULTS.sounds.errors, allowMissing)
   if (!enabled || agent === INVALID || permissions === INVALID || errors === INVALID) return
   if ([agent, permissions, errors].some((id) => id.length > MAX_SOUND_ID_CHARS || !/^[a-z0-9-]+$/.test(id))) return
   return {

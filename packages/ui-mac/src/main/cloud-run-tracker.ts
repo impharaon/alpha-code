@@ -12,8 +12,8 @@
 //   · I8 每个交付绑定启动时的登录身份代:状态回包、SSE 帧、下载开始、退避醒来都先比对,变了即丢弃;
 //     onAuthChanged 在身份代变化时 abort 在途下载、退订 SSE。同一账户的普通续期身份代不变,交付照常。
 
-import { terminalEventName } from "./alpha-cloud-events-core"
-import { saveCloudRun, type CloudRunManifest, type SaveRunDeps } from "./alpha-workdir"
+import { terminalEventName } from "./codepuppy-cloud-events-core"
+import { saveCloudRun, type CloudRunManifest, type SaveRunDeps } from "./codepuppy-workdir"
 import { readArtifactManifest, type ArtifactRunOrigin } from "./artifact-manifest"
 import { recordRunOrigin, verifyArtifact } from "./artifact-service"
 import type { CloudArtifactList, CloudJobEvent, CloudJobPublicStatus, CloudJobStatus, CloudResult } from "../preload/types"
@@ -189,7 +189,7 @@ export function createCloudRunTracker(deps: CloudRunTrackerDeps) {
   function untilTerminal(task: Task): Promise<{ code?: string; woken?: true }> {
     return new Promise((resolve) => {
       let finished = false
-      // 退订后已读出的帧仍可能交来一次(alpha-cloud-events 只置 stopped);只认第一次,免得清掉下一轮等待的 wake。
+      // 退订后已读出的帧仍可能交来一次(codepuppy-cloud-events 只置 stopped);只认第一次,免得清掉下一轮等待的 wake。
       const finish = (result: { code?: string; woken?: true }) => {
         if (finished) return
         finished = true
@@ -278,7 +278,7 @@ function jobOf(status: CloudJobStatus): CloudRunState["job"] {
   return { status: status.status, ...(code ? { code } : {}) }
 }
 
-// alpha-cloud-events 的 error 帧:{ status: 401 | 404 } 或 { reason }。
+// codepuppy-cloud-events 的 error 帧:{ status: 401 | 404 } 或 { reason }。
 function sseErrorCode(data: unknown): string {
   const record = data && typeof data === "object" ? (data as { status?: unknown; reason?: unknown }) : {}
   if (record.status === 401) return "unauthorized"

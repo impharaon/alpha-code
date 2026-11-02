@@ -17,8 +17,8 @@ import type { Agent } from "@/agent/agent"
 import type { MessageV2 } from "./message-v2"
 import { Plugin } from "@/plugin"
 import { Permission } from "@/permission"
-import { AlphaToolPolicy } from "@/permission/alpha-tool-policy"
-import { AlphaToolPolicyGate } from "@/permission/alpha-tool-policy-gate"
+import { CodePuppyToolPolicy } from "@/permission/codepuppy-tool-policy"
+import { CodePuppyToolPolicyGate } from "@/permission/codepuppy-tool-policy-gate"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { EventV2 } from "@opencode-ai/core/event"
 import { Wildcard } from "@/util/wildcard"
@@ -91,7 +91,7 @@ const live: Layer.Layer<
   | Provider.Service
   | Plugin.Service
   | Permission.Service
-  | AlphaToolPolicy.Service
+  | CodePuppyToolPolicy.Service
   | EventV2Bridge.Service
   | LLMClientService
   | RuntimeFlags.Service
@@ -103,7 +103,7 @@ const live: Layer.Layer<
     const provider = yield* Provider.Service
     const plugin = yield* Plugin.Service
     const perm = yield* Permission.Service
-    const toolPolicy = yield* AlphaToolPolicy.Service
+    const toolPolicy = yield* CodePuppyToolPolicy.Service
     const events = yield* EventV2Bridge.Service
     const llmClient = yield* LLMClient.Service
     const flags = yield* RuntimeFlags.Service
@@ -177,7 +177,7 @@ const live: Layer.Layer<
         // 文档轴动作按当轮 snapshot 求值(§6 允许);subject 刻意不带 binding digest ——
         // service/tool 层 enabled 记录会按 binding-changed 降为 ask ⇒ 不预批(fail-closed,
         // 至多多问);executor 侧 identityGate 仍带真 digest 逐次重读,不多拦真实调用。
-        const docActions = yield* AlphaToolPolicyGate.snapshotDocActions(
+        const docActions = yield* CodePuppyToolPolicyGate.snapshotDocActions(
           toolPolicy,
           Object.entries(prepared.tools).flatMap(([technicalId, item]) => {
             const display = getToolDisplay(item)
@@ -445,7 +445,7 @@ export const node = LayerNode.make({
     Provider.node,
     Plugin.node,
     Permission.node,
-    AlphaToolPolicy.node,
+    CodePuppyToolPolicy.node,
     EventV2Bridge.node,
     llmClient,
     RuntimeFlags.node,

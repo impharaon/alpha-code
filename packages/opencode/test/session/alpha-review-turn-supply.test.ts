@@ -28,7 +28,7 @@ import { testEffect } from "../lib/effect"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 // The alpha review surface's data entry point (dependency-free renderer module).
-import { turnDiffsOf } from "../../../ui-mac/src/renderer/alpha-ui/session-rail/review/review-turn-diffs"
+import { turnDiffsOf } from "../../../ui-mac/src/renderer/codepuppy-ui/session-rail/review/review-turn-diffs"
 
 const it = testEffect(
   LayerNode.compile(
@@ -44,7 +44,7 @@ const it = testEffect(
 
 const tokens = { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } }
 
-const user = Effect.fn("alphaReviewSupply.user")(function* (sessionID: SessionID) {
+const user = Effect.fn("codepuppyReviewSupply.user")(function* (sessionID: SessionID) {
   const session = yield* Session.Service
   return yield* session.updateMessage({
     id: MessageID.ascending(),
@@ -56,7 +56,7 @@ const user = Effect.fn("alphaReviewSupply.user")(function* (sessionID: SessionID
   })
 })
 
-const assistant = Effect.fn("alphaReviewSupply.assistant")(function* (
+const assistant = Effect.fn("codepuppyReviewSupply.assistant")(function* (
   sessionID: SessionID,
   parentID: MessageID,
   dir: string,
@@ -80,7 +80,7 @@ const assistant = Effect.fn("alphaReviewSupply.assistant")(function* (
 })
 
 /** A real turn: snapshot → optional edit → snapshot, recorded as step parts. */
-const turn = Effect.fn("alphaReviewSupply.turn")(function* (
+const turn = Effect.fn("codepuppyReviewSupply.turn")(function* (
   sessionID: SessionID,
   dir: string,
   edit?: () => Promise<void>,

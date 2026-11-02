@@ -11,38 +11,38 @@ import { applyBuiltinPolicyEdits, configHealth, ignoredConfigProviderBlocks, ign
 import { classifyBaseUrl, egressDestinationFromBaseUrl } from "./network-egress-derived"
 import { readMcpServerTruth } from "./mcp-server-truth"
 import { writeMcpServerTruth } from "./mcp-server-truth-write"
-import type { ProviderInput } from "../shared/alpha-model-types"
-import { newMcpSecretVersionId, writeMcpSecretVersioned } from "./alpha-mcp-secrets"
+import type { ProviderInput } from "../shared/codepuppy-model-types"
+import { newMcpSecretVersionId, writeMcpSecretVersioned } from "./codepuppy-mcp-secrets"
 import { tryAcquireBundleLock } from "./ext-bundle-lock"
-import { addReceipt, findReceipt, readLedger } from "./alpha-installs"
+import { addReceipt, findReceipt, readLedger } from "./codepuppy-installs"
 import { upsertRecordV2 } from "./ext-receipt-v2"
 
-// REQ-018 T2: mcp/plugin persistence targets the alpha-owned ~/.opencode/opencode.jsonc
-// (ALPHA_OPENCODE_HOME-overridable); provider persistence stays on the shared XDG config
-// (OPENCODE_CONFIG_DIR); receipts land under ALPHA_GLOBAL_DIR. All three are temp dirs here.
+// REQ-018 T2: mcp/plugin persistence targets the codepuppy-owned ~/.opencode/opencode.jsonc
+// (CODEPUPPY_OPENCODE_HOME-overridable); provider persistence stays on the shared XDG config
+// (OPENCODE_CONFIG_DIR); receipts land under CODEPUPPY_GLOBAL_DIR. All three are temp dirs here.
 let tmp = ""
 let homeTmp = ""
-let alphaTmp = ""
+let codepuppyTmp = ""
 const prevConfigDir = process.env.OPENCODE_CONFIG_DIR
-const prevHome = process.env.ALPHA_OPENCODE_HOME
-const prevAlpha = process.env.ALPHA_GLOBAL_DIR
+const prevHome = process.env.CODEPUPPY_OPENCODE_HOME
+const prevCodePuppy = process.env.CODEPUPPY_GLOBAL_DIR
 
 beforeEach(() => {
-  tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "alpha-extcfg-"))) // 环境根解析会 realpath,期望值与它同一形态
+  tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-extcfg-"))) // 环境根解析会 realpath,期望值与它同一形态
   homeTmp = path.join(tmp, "opencode-home")
   // `#1381`:环境根按生产形状 <base>/env/<env> 造 —— 远程 MCP 真源的位置由它逆映射(<base>/mcp-servers/<env>.json)。
-  alphaTmp = path.join(tmp, "alpha-code-state", "env", "dev")
+  codepuppyTmp = path.join(tmp, "codepuppy-state", "env", "dev")
   process.env.OPENCODE_CONFIG_DIR = tmp
-  process.env.ALPHA_OPENCODE_HOME = homeTmp
-  process.env.ALPHA_GLOBAL_DIR = alphaTmp
+  process.env.CODEPUPPY_OPENCODE_HOME = homeTmp
+  process.env.CODEPUPPY_GLOBAL_DIR = codepuppyTmp
 })
 afterEach(() => {
   if (prevConfigDir === undefined) delete process.env.OPENCODE_CONFIG_DIR
   else process.env.OPENCODE_CONFIG_DIR = prevConfigDir
-  if (prevHome === undefined) delete process.env.ALPHA_OPENCODE_HOME
-  else process.env.ALPHA_OPENCODE_HOME = prevHome
-  if (prevAlpha === undefined) delete process.env.ALPHA_GLOBAL_DIR
-  else process.env.ALPHA_GLOBAL_DIR = prevAlpha
+  if (prevHome === undefined) delete process.env.CODEPUPPY_OPENCODE_HOME
+  else process.env.CODEPUPPY_OPENCODE_HOME = prevHome
+  if (prevCodePuppy === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+  else process.env.CODEPUPPY_GLOBAL_DIR = prevCodePuppy
   try {
     fs.rmSync(tmp, { recursive: true, force: true })
   } catch {
@@ -50,29 +50,29 @@ afterEach(() => {
   }
 })
 
-// REQ-059: mcp/plugin AND provider now all land in the single alpha truth ~/.alpha/alpha.jsonc.
-function readAlphaConfig(): Record<string, any> {
-  return JSON.parse(fs.readFileSync(path.join(alphaTmp, "alpha.jsonc"), "utf8"))
+// REQ-059: mcp/plugin AND provider now all land in the single alpha truth ~/.alpha/codepuppy.jsonc.
+function readCodePuppyConfig(): Record<string, any> {
+  return JSON.parse(fs.readFileSync(path.join(codepuppyTmp, "codepuppy.jsonc"), "utf8"))
 }
 // mcp/plugin
 function readConfig(): Record<string, any> {
-  return readAlphaConfig()
+  return readCodePuppyConfig()
 }
 // provider (was shared XDG; REQ-059 moved into the alpha truth)
 function readUserConfig(): Record<string, any> {
-  return readAlphaConfig()
+  return readCodePuppyConfig()
 }
 
-function writeAlphaConfig(value: unknown): void {
-  fs.mkdirSync(alphaTmp, { recursive: true })
-  fs.writeFileSync(path.join(alphaTmp, "alpha.jsonc"), JSON.stringify(value, null, 2))
+function writeCodePuppyConfig(value: unknown): void {
+  fs.mkdirSync(codepuppyTmp, { recursive: true })
+  fs.writeFileSync(path.join(codepuppyTmp, "codepuppy.jsonc"), JSON.stringify(value, null, 2))
 }
 
 describe("main boot wiring", () => {
   // 分类与「这处锚守不住什么」登记在 ./source-text-anchors.ts(`#968` 第 ⑤ 层机械校验)。
   test("ANCHOR (not a gate): main boot awaits recovered community Excel retirement before first fork", () => {
     const source = fs.readFileSync(path.join(import.meta.dir, "index.ts"), "utf8")
-    const recovery = source.indexOf("  const { ledgerReady: extLedgerReady, ecosystemGlobalSkillInstaller, alphaSidecar }")
+    const recovery = source.indexOf("  const { ledgerReady: extLedgerReady, ecosystemGlobalSkillInstaller, codepuppySidecar }")
     const retirement = source.indexOf("    : retireCommunityExcelAfterRecovery(extLedgerReady)")
     const retirementAwait = source.indexOf("    const communityExcel = yield* Effect.promise(() => communityExcelRetirement)")
     const firstFork = source.indexOf("spawnLocalServer(hostname, port, password")
@@ -129,8 +129,8 @@ describe("persistMcp — field/command RCE guards (C2)", () => {
   })
 })
 
-/** `#1381`:远程 MCP 真源文件(与 alpha.jsonc 同一状态根下的兄弟,围栏写不到)。 */
-const mcpTruthFile = () => path.join(tmp, "alpha-code-state", "mcp-servers", "dev.json")
+/** `#1381`:远程 MCP 真源文件(与 codepuppy.jsonc 同一状态根下的兄弟,围栏写不到)。 */
+const mcpTruthFile = () => path.join(tmp, "codepuppy-state", "mcp-servers", "dev.json")
 const readMcpTruth = () => readMcpServerTruth(mcpTruthFile(), { ...fs, log: () => {} })
 const mcpTruthNames = () => {
   const read = readMcpTruth()
@@ -164,7 +164,7 @@ describe("persistMcp — url guards(`#1381` 基线 I4:添加时的地址准入�
       expect(mcpTruthNames()).toEqual([]) // 拒了就一个字不落盘(文件缺失 ⇒ 空清单)
     } else {
       expect(mcpTruthNames()).toEqual(["srv"])
-      expect(fs.existsSync(path.join(alphaTmp, "alpha.jsonc")) ? readConfig().mcp?.srv : undefined).toBeUndefined()
+      expect(fs.existsSync(path.join(codepuppyTmp, "codepuppy.jsonc")) ? readConfig().mcp?.srv : undefined).toBeUndefined()
     }
   })
 })
@@ -196,18 +196,18 @@ describe("persistMcp — accept paths write mcp[name]", () => {
     expect(readConfig().mcp.playwright.command).toEqual(["npx", "-y", "@playwright/mcp"])
   })
 
-  test("`#1381` valid https remote server persists —— to the main-only truth file, byte-exact; alpha.jsonc gets no mcp leaf", () => {
+  test("`#1381` valid https remote server persists —— to the main-only truth file, byte-exact; codepuppy.jsonc gets no mcp leaf", () => {
     const r = persistMcp("remote", { type: "remote", url: "https://api.example.com/mcp", headers: { Auth: "t" } })
     expect(r).toEqual({ ok: true })
     expect(fs.readFileSync(mcpTruthFile(), "utf8")).toBe('{"v":1,"servers":[{"name":"remote","url":"https://api.example.com/mcp","headers":{"Auth":"t"}}]}\n')
-    expect(fs.existsSync(path.join(alphaTmp, "alpha.jsonc")) ? readConfig().mcp : undefined).toBeUndefined()
+    expect(fs.existsSync(path.join(codepuppyTmp, "codepuppy.jsonc")) ? readConfig().mcp : undefined).toBeUndefined()
   })
 
   test("`#1381` loopback http is refused at add time, with the same code the egress fence gives; nothing is written", () => {
     const r = persistMcp("dev", { type: "remote", url: "http://localhost:8080/mcp" })
     expect(r).toEqual({ ok: false, reason: "the server URL points at this machine (localhost / 127.0.0.1); local addresses are not supported", code: "loopback" })
     expect(fs.existsSync(mcpTruthFile())).toBe(false)
-    expect(fs.existsSync(path.join(alphaTmp, "alpha.jsonc"))).toBe(false)
+    expect(fs.existsSync(path.join(codepuppyTmp, "codepuppy.jsonc"))).toBe(false)
   })
 
   test("removeMcp round-trips without corrupting config", () => {
@@ -223,8 +223,8 @@ describe("persistMcp — accept paths write mcp[name]", () => {
     persistMcp("demo", { type: "local", command: ["npx", "-y", "demo-mcp"] }, { catalogId: "mcp:demo", version: "1.0.0" })
     // #354:eager v1 已下线(账本所有权归 planner v2 upsert)——receipt 由测试自建,断言意图不变:
     // in-lock 原语只删配置、零账本副作用。
-    addReceipt(alphaTmp, { id: "mcp:demo", name: "demo", type: "mcp", scope: "global", installedAt: new Date().toISOString(), origin: "catalog", configKey: "mcp.demo" })
-    const held = tryAcquireBundleLock(alphaTmp, { txId: "tx-uninstall-346" })
+    addReceipt(codepuppyTmp, { id: "mcp:demo", name: "demo", type: "mcp", scope: "global", installedAt: new Date().toISOString(), origin: "catalog", configKey: "mcp.demo" })
+    const held = tryAcquireBundleLock(codepuppyTmp, { txId: "tx-uninstall-346" })
     expect(held.ok).toBe(true)
     if (!held.ok) return
     try {
@@ -235,7 +235,7 @@ describe("persistMcp — accept paths write mcp[name]", () => {
     }
     expect(readConfig().mcp?.demo).toBeUndefined()
     // 零账本副作用:receipt 仍在(账本删除只归事务 commitLedger,ledger-second 边界)
-    expect(findReceipt(alphaTmp, "mcp", "demo")).not.toBeNull()
+    expect(findReceipt(codepuppyTmp, "mcp", "demo")).not.toBeNull()
   })
 
   test("#346 removeMcpConfigInLock:legacy 文件可读但不可解析(malformed JSONC)→ fail-closed(review #374:jsonc-parser 不抛异常)", () => {
@@ -249,7 +249,7 @@ describe("persistMcp — accept paths write mcp[name]", () => {
 
   test("#346 removeMcpConfigInLock:legacy 文件存在但不可读 → fail-closed(不吞错继续)", () => {
     persistMcp("demo", { type: "local", command: ["npx", "-y", "demo-mcp"] })
-    // legacy 路径之一:ALPHA_OPENCODE_HOME 下的旧 config(legacyConfigPaths 经 opencodeHomeDir 派生)
+    // legacy 路径之一:CODEPUPPY_OPENCODE_HOME 下的旧 config(legacyConfigPaths 经 opencodeHomeDir 派生)
     fs.mkdirSync(homeTmp, { recursive: true })
     const legacyFile = path.join(homeTmp, "opencode.jsonc")
     fs.writeFileSync(legacyFile, JSON.stringify({ mcp: { demo: { type: "local" } } }))
@@ -263,14 +263,14 @@ describe("persistMcp — accept paths write mcp[name]", () => {
     }
   })
 
-  test("REQ-136 project remove edits only D/alpha.jsonc; global same-name bytes stay exact and replay is idempotent", () => {
+  test("REQ-136 project remove edits only D/codepuppy.jsonc; global same-name bytes stay exact and replay is idempotent", () => {
     expect(persistMcp("demo", { type: "local", command: ["npx", "global-demo"] }).ok).toBe(true)
-    const globalFile = path.join(alphaTmp, "alpha.jsonc")
+    const globalFile = path.join(codepuppyTmp, "codepuppy.jsonc")
     const globalBefore = fs.readFileSync(globalFile, "utf8")
     const project = path.join(tmp, "project-remove")
     fs.mkdirSync(path.join(project, ".code-puppy"), { recursive: true })
     const projectRoot = path.join(fs.realpathSync(project), ".code-puppy")
-    const projectFile = path.join(projectRoot, "alpha.jsonc")
+    const projectFile = path.join(projectRoot, "codepuppy.jsonc")
     fs.writeFileSync(
       projectFile,
       '{\n  // project-owned config\n  "mcp": {\n    "demo": { "type": "local", "command": ["npx", "project-demo"] },\n    "keep": { "type": "local", "command": ["bun", "keep"] }\n  }\n}\n',
@@ -293,29 +293,29 @@ describe("persistMcp — accept paths write mcp[name]", () => {
     const project = path.join(tmp, "project-global-remove")
     fs.mkdirSync(path.join(project, ".code-puppy"), { recursive: true })
     const projectRoot = path.join(fs.realpathSync(project), ".code-puppy")
-    const projectFile = path.join(projectRoot, "alpha.jsonc")
+    const projectFile = path.join(projectRoot, "codepuppy.jsonc")
     fs.writeFileSync(projectFile, JSON.stringify({ mcp: { demo: { type: "local", command: ["npx", "project-demo"] } } }, null, 4) + "\n")
     const projectBefore = fs.readFileSync(projectFile, "utf8")
 
     expect(removeMcpConfigInLock("demo")).toEqual({ ok: true })
     expect(fs.readFileSync(projectFile, "utf8")).toBe(projectBefore)
-    expect(readAlphaConfig().mcp?.demo).toBeUndefined()
+    expect(readCodePuppyConfig().mcp?.demo).toBeUndefined()
 
     const emptyProject = path.join(tmp, "project-empty")
     fs.mkdirSync(path.join(emptyProject, ".code-puppy"), { recursive: true })
     const emptyRoot = path.join(fs.realpathSync(emptyProject), ".code-puppy")
     expect(removeProjectMcpConfigInLock(emptyRoot, "demo")).toEqual({ ok: true })
-    expect(fs.existsSync(path.join(emptyRoot, "alpha.jsonc"))).toBe(false)
+    expect(fs.existsSync(path.join(emptyRoot, "codepuppy.jsonc"))).toBe(false)
   })
 
   test("REQ-136 malformed project config fails closed without touching global bytes", () => {
     expect(persistMcp("demo", { type: "local", command: ["npx", "global-demo"] }).ok).toBe(true)
-    const globalFile = path.join(alphaTmp, "alpha.jsonc")
+    const globalFile = path.join(codepuppyTmp, "codepuppy.jsonc")
     const globalBefore = fs.readFileSync(globalFile, "utf8")
     const project = path.join(tmp, "project-malformed")
     fs.mkdirSync(path.join(project, ".code-puppy"), { recursive: true })
     const projectRoot = path.join(fs.realpathSync(project), ".code-puppy")
-    const projectFile = path.join(projectRoot, "alpha.jsonc")
+    const projectFile = path.join(projectRoot, "codepuppy.jsonc")
     fs.writeFileSync(projectFile, '{"mcp":{"demo":')
     const projectBefore = fs.readFileSync(projectFile, "utf8")
 
@@ -325,26 +325,26 @@ describe("persistMcp — accept paths write mcp[name]", () => {
     expect(fs.readFileSync(globalFile, "utf8")).toBe(globalBefore)
   })
 
-  test("REQ-136 project remove rejects an alpha.jsonc symlink without reading through it", () => {
+  test("REQ-136 project remove rejects an codepuppy.jsonc symlink without reading through it", () => {
     const project = path.join(tmp, "project-config-symlink")
     const projectRoot = path.join(project, ".code-puppy")
     fs.mkdirSync(projectRoot, { recursive: true })
     const outside = path.join(tmp, "outside-alpha.jsonc")
     const outsideBefore = JSON.stringify({ mcp: { demo: { type: "local", command: ["npx", "outside"] } } })
     fs.writeFileSync(outside, outsideBefore)
-    fs.symlinkSync(outside, path.join(projectRoot, "alpha.jsonc"))
+    fs.symlinkSync(outside, path.join(projectRoot, "codepuppy.jsonc"))
 
     const result = removeProjectMcpConfigInLock(path.join(fs.realpathSync(project), ".code-puppy"), "demo")
     expect(result.ok).toBe(false)
     expect(fs.readFileSync(outside, "utf8")).toBe(outsideBefore)
-    expect(fs.lstatSync(path.join(projectRoot, "alpha.jsonc")).isSymbolicLink()).toBe(true)
+    expect(fs.lstatSync(path.join(projectRoot, "codepuppy.jsonc")).isSymbolicLink()).toBe(true)
   })
 
   test("REQ-136 project remove never uses legacy predictable scratch paths", () => {
     const project = path.join(tmp, "project-scratch-symlink")
     const projectRoot = path.join(project, ".code-puppy")
     fs.mkdirSync(projectRoot, { recursive: true })
-    const projectFile = path.join(projectRoot, "alpha.jsonc")
+    const projectFile = path.join(projectRoot, "codepuppy.jsonc")
     const projectBefore = JSON.stringify({ mcp: { demo: { type: "local", command: ["npx", "project"] } } })
     fs.writeFileSync(projectFile, projectBefore)
     const outside = path.join(tmp, "outside-scratch")
@@ -362,7 +362,7 @@ describe("persistMcp — accept paths write mcp[name]", () => {
     const project = path.join(tmp, "project-store-symlink")
     const projectRoot = path.join(project, ".code-puppy")
     fs.mkdirSync(projectRoot, { recursive: true })
-    const projectFile = path.join(projectRoot, "alpha.jsonc")
+    const projectFile = path.join(projectRoot, "codepuppy.jsonc")
     const projectBefore = JSON.stringify({ mcp: { demo: { type: "local", command: ["npx", "project"] } } })
     fs.writeFileSync(projectFile, projectBefore)
     const outsideStore = path.join(tmp, "outside-store")
@@ -386,28 +386,28 @@ describe("persistMcp — accept paths write mcp[name]", () => {
 describe("receipts on persist/remove (T6)", () => {
   test("#354:persistMcp 不再 eager 落 v1(账本所有权归 planner v2 upsert);removeMcp 仍清 legacy receipt", () => {
     expect(persistMcp("markitdown", { type: "local", command: ["uvx", "markitdown-mcp"] }, { catalogId: "mcp:markitdown", version: "1" }).ok).toBe(true)
-    expect(readLedger(alphaTmp).receipts.find((x) => x.type === "mcp" && x.name === "markitdown")).toBeUndefined()
+    expect(readLedger(codepuppyTmp).receipts.find((x) => x.type === "mcp" && x.name === "markitdown")).toBeUndefined()
     // REQ-128 `#706`:配置写器**不再**碰账本。原先内层 removeReceipt 走 v1 物理写器,会把
     // 账本重写成 v:2 并抹掉 V3 的 packageGraphs/claims;去账只归外层单点提交。
-    addReceipt(alphaTmp, { id: "mcp:markitdown", name: "markitdown", type: "mcp", scope: "global", installedAt: new Date().toISOString(), origin: "catalog", configKey: "mcp.markitdown" })
-    const before = fs.readFileSync(path.join(alphaTmp, "installs.json"), "utf8")
+    addReceipt(codepuppyTmp, { id: "mcp:markitdown", name: "markitdown", type: "mcp", scope: "global", installedAt: new Date().toISOString(), origin: "catalog", configKey: "mcp.markitdown" })
+    const before = fs.readFileSync(path.join(codepuppyTmp, "installs.json"), "utf8")
     expect(removeMcp("markitdown").ok).toBe(true)
-    expect(fs.readFileSync(path.join(alphaTmp, "installs.json"), "utf8")).toBe(before) // 账本字节零改动
-    expect(readLedger(alphaTmp).receipts.find((x) => x.name === "markitdown")).toBeDefined()
+    expect(fs.readFileSync(path.join(codepuppyTmp, "installs.json"), "utf8")).toBe(before) // 账本字节零改动
+    expect(readLedger(codepuppyTmp).receipts.find((x) => x.name === "markitdown")).toBeDefined()
   })
 
   test("removePlugin 撤 config[] 且账本字节零改动(ADR-040 后前像由直接预置 config 造)", () => {
-    fs.mkdirSync(alphaTmp, { recursive: true })
-    fs.writeFileSync(path.join(alphaTmp, "alpha.jsonc"), JSON.stringify({ plugin: ["opencode-notify@0.3.1"] }, null, 2))
+    fs.mkdirSync(codepuppyTmp, { recursive: true })
+    fs.writeFileSync(path.join(codepuppyTmp, "codepuppy.jsonc"), JSON.stringify({ plugin: ["opencode-notify@0.3.1"] }, null, 2))
     expect(readConfig().plugin).toContain("opencode-notify@0.3.1")
-    expect(readLedger(alphaTmp).receipts.some((x) => x.type === "plugin")).toBe(false)
-    addReceipt(alphaTmp, { id: "plugin:opencode-notify", name: "opencode-notify", type: "plugin", scope: "global", installedAt: new Date().toISOString(), origin: "catalog", configKey: "plugin:opencode-notify@0.3.1" })
-    const before = fs.readFileSync(path.join(alphaTmp, "installs.json"), "utf8")
+    expect(readLedger(codepuppyTmp).receipts.some((x) => x.type === "plugin")).toBe(false)
+    addReceipt(codepuppyTmp, { id: "plugin:opencode-notify", name: "opencode-notify", type: "plugin", scope: "global", installedAt: new Date().toISOString(), origin: "catalog", configKey: "plugin:opencode-notify@0.3.1" })
+    const before = fs.readFileSync(path.join(codepuppyTmp, "installs.json"), "utf8")
     expect(removePlugin("opencode-notify@0.3.1").ok).toBe(true)
     expect(readConfig().plugin ?? []).not.toContain("opencode-notify@0.3.1")
     // REQ-128 `#706`:同上 —— 撤 config[] 与去账彻底分家,账本字节零改动。
-    expect(fs.readFileSync(path.join(alphaTmp, "installs.json"), "utf8")).toBe(before)
-    expect(readLedger(alphaTmp).receipts.some((x) => x.type === "plugin")).toBe(true)
+    expect(fs.readFileSync(path.join(codepuppyTmp, "installs.json"), "utf8")).toBe(before)
+    expect(readLedger(codepuppyTmp).receipts.some((x) => x.type === "plugin")).toBe(true)
   })
 
   test("removePlugin on an absent package is a no-op success", () => {
@@ -415,18 +415,18 @@ describe("receipts on persist/remove (T6)", () => {
   })
 })
 
-// ── REQ-100 #342:配置写锁 —— 所有 alpha-owned 写方与扩展事务共享环境级 bundle 锁 ──────────────
+// ── REQ-100 #342:配置写锁 —— 所有 codepuppy-owned 写方与扩展事务共享环境级 bundle 锁 ──────────────
 
 describe("config write lock — serialized with the extension bundle lock (REQ-100 #342)", () => {
   test("事务在途(锁被持有)→ 写方如实 busy 拒绝,零写入;释放后同一调用成功", () => {
-    const held = tryAcquireBundleLock(alphaTmp, { txId: "tx-in-flight" })
+    const held = tryAcquireBundleLock(codepuppyTmp, { txId: "tx-in-flight" })
     expect(held.ok).toBe(true)
     if (!held.ok) return
     const server = { type: "local", command: ["npx", "-y", "demo-mcp"] }
     const mcp = persistMcp("demo", server)
     expect(mcp.ok).toBe(false)
     if (!mcp.ok) expect(mcp.reason).toContain("config busy")
-    expect(fs.existsSync(path.join(alphaTmp, "alpha.jsonc"))).toBe(false) // 拒后零写入
+    expect(fs.existsSync(path.join(codepuppyTmp, "codepuppy.jsonc"))).toBe(false) // 拒后零写入
     held.lock.release()
     expect(persistMcp("demo", server).ok).toBe(true)
     expect(readConfig().mcp.demo).toBeDefined()
@@ -434,7 +434,7 @@ describe("config write lock — serialized with the extension bundle lock (REQ-1
 
   test("锁被持有时删除路径同样拒绝(update/uninstall 写方全在锁面内)", () => {
     expect(persistMcp("demo", { type: "local", command: ["npx", "-y", "demo-mcp"] }).ok).toBe(true)
-    const held = tryAcquireBundleLock(alphaTmp, { txId: "tx-in-flight-2" })
+    const held = tryAcquireBundleLock(codepuppyTmp, { txId: "tx-in-flight-2" })
     expect(held.ok).toBe(true)
     if (!held.ok) return
     const r = removeMcp("demo")
@@ -446,7 +446,7 @@ describe("config write lock — serialized with the extension bundle lock (REQ-1
 
   test("写方成功后锁已释放(不留残锁阻塞后续事务)", () => {
     expect(persistMcp("demo", { type: "local", command: ["npx", "-y", "demo-mcp"] }).ok).toBe(true)
-    const acquire = tryAcquireBundleLock(alphaTmp, { txId: "after-write" })
+    const acquire = tryAcquireBundleLock(codepuppyTmp, { txId: "after-write" })
     expect(acquire.ok).toBe(true) // 写方 finally 释放,事务可立即获取
     if (acquire.ok) acquire.lock.release()
   })
@@ -454,24 +454,24 @@ describe("config write lock — serialized with the extension bundle lock (REQ-1
 
 // ── #354(review #379):strict 读的真实实现 —— jsonc 容错解析必须收 ParseError ────────────────────
 describe("readMcpLeafStrict / readAgentEntryStrict (REQ-100 #354)", () => {
-  const cfgPath = () => path.join(alphaTmp, "alpha.jsonc")
+  const cfgPath = () => path.join(codepuppyTmp, "codepuppy.jsonc")
   test("缺失文件 = 合法空前像;健康文件返回精确叶子", () => {
     expect(readMcpLeafStrict("demo")).toEqual({ ok: true, value: undefined })
-    fs.mkdirSync(alphaTmp, { recursive: true })
+    fs.mkdirSync(codepuppyTmp, { recursive: true })
     fs.writeFileSync(cfgPath(), JSON.stringify({ mcp: { demo: { type: "local", command: ["npx"] } } }))
     const r = readMcpLeafStrict("demo")
     expect(r.ok).toBe(true)
     if (r.ok) expect(r.value).toEqual({ type: "local", command: ["npx"] })
   })
   test("语法损坏(jsonc-parser 容错不抛错)→ strict 拒绝,绝不当作「叶不存在」", () => {
-    fs.mkdirSync(alphaTmp, { recursive: true })
+    fs.mkdirSync(codepuppyTmp, { recursive: true })
     fs.writeFileSync(cfgPath(), '{ "mcp": { broken')
     const r = readMcpLeafStrict("demo")
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.reason).toContain("unparseable")
   })
   test("readAgentEntryStrict:手工 agent 条目在场可见;语法损坏拒绝(fail-closed)", () => {
-    fs.mkdirSync(alphaTmp, { recursive: true })
+    fs.mkdirSync(codepuppyTmp, { recursive: true })
     fs.writeFileSync(cfgPath(), JSON.stringify({ agent: { helper: { prompt: "hand written" } } }))
     const ok = readAgentEntryStrict("helper")
     expect(ok).toEqual({ ok: true, present: true })
@@ -482,10 +482,10 @@ describe("readMcpLeafStrict / readAgentEntryStrict (REQ-100 #354)", () => {
 })
 
 describe("readPluginArrayStrict (REQ-099 #352)", () => {
-  const cfgPath = () => path.join(alphaTmp, "alpha.jsonc")
+  const cfgPath = () => path.join(codepuppyTmp, "codepuppy.jsonc")
   test("缺失 = 空数组;字符串数组原样;非字符串成员/非数组/语法损坏一律拒(替换基底必须可信)", () => {
     expect(readPluginArrayStrict()).toEqual({ ok: true, value: [] })
-    fs.mkdirSync(alphaTmp, { recursive: true })
+    fs.mkdirSync(codepuppyTmp, { recursive: true })
     fs.writeFileSync(cfgPath(), JSON.stringify({ plugin: ["a@1", "b@2"] }))
     expect(readPluginArrayStrict()).toEqual({ ok: true, value: ["a@1", "b@2"] })
     fs.writeFileSync(cfgPath(), JSON.stringify({ plugin: ["a@1", { bad: true }] }))
@@ -499,12 +499,12 @@ describe("readPluginArrayStrict (REQ-099 #352)", () => {
 
 // ── #378 r9/r10:removePluginPath 真实现回归(此前只有 planner fake 覆盖)────────────────────────
 describe("removePluginPath — 主+legacy 全源净除,引擎语义匹配,strict fail-closed(#378 r9/r10)", () => {
-  const mainCfg = () => path.join(alphaTmp, "alpha.jsonc")
+  const mainCfg = () => path.join(codepuppyTmp, "codepuppy.jsonc")
   const homeCfg = () => path.join(homeTmp, "opencode.jsonc")
-  const jsOf = (dir: string) => path.join(alphaTmp, "plugins", dir, "plugin.js")
+  const jsOf = (dir: string) => path.join(codepuppyTmp, "plugins", dir, "plugin.js")
 
   test("元组/相对/file:// 等价条目全部净除;主 + legacy(home)同扫", () => {
-    fs.mkdirSync(alphaTmp, { recursive: true })
+    fs.mkdirSync(codepuppyTmp, { recursive: true })
     fs.mkdirSync(homeTmp, { recursive: true })
     const target = jsOf("vp@aaaa")
     fs.writeFileSync(mainCfg(), JSON.stringify({ plugin: [[target, { lazy: true }], "keep-pkg@1.0.0"] }))
@@ -523,10 +523,10 @@ describe("removePluginPath — 主+legacy 全源净除,引擎语义匹配,strict
   // 字节零改动的钉子;这一条补上 vendored-path 那支 —— 少了它,把内层 `removeReceipt` 接回
   // `removePluginPathUnlocked` 一处,整仓没有任何测试会红。
   test("REQ-128 #706:撤 vendored plugin 路径条目与账本彻底分家 —— installs.json 字节零改动", () => {
-    fs.mkdirSync(alphaTmp, { recursive: true })
+    fs.mkdirSync(codepuppyTmp, { recursive: true })
     const target = jsOf("vp@cccc")
     fs.writeFileSync(mainCfg(), JSON.stringify({ plugin: [target] }))
-    addReceipt(alphaTmp, {
+    addReceipt(codepuppyTmp, {
       id: "plugin:vp",
       name: "vp",
       type: "plugin",
@@ -535,14 +535,14 @@ describe("removePluginPath — 主+legacy 全源净除,引擎语义匹配,strict
       origin: "catalog",
       configKey: `plugin-path:${target}`,
     })
-    const before = fs.readFileSync(path.join(alphaTmp, "installs.json"), "utf8")
+    const before = fs.readFileSync(path.join(codepuppyTmp, "installs.json"), "utf8")
     expect(removePluginPath("vp", target).ok).toBe(true)
-    expect(fs.readFileSync(path.join(alphaTmp, "installs.json"), "utf8")).toBe(before)
-    expect(readLedger(alphaTmp).receipts.some((x) => x.name === "vp")).toBe(true)
+    expect(fs.readFileSync(path.join(codepuppyTmp, "installs.json"), "utf8")).toBe(before)
+    expect(readLedger(codepuppyTmp).receipts.some((x) => x.name === "vp")).toBe(true)
   })
 
   test("语法损坏 / 非对象根 / plugin 非数组 → fail-closed 拒(不删条目也不谎报成功)", () => {
-    fs.mkdirSync(alphaTmp, { recursive: true })
+    fs.mkdirSync(codepuppyTmp, { recursive: true })
     const target = jsOf("vp@bbbb")
     fs.writeFileSync(mainCfg(), '{ "plugin": [broken')
     expect(removePluginPath("vp", target).ok).toBe(false)
@@ -554,14 +554,14 @@ describe("removePluginPath — 主+legacy 全源净除,引擎语义匹配,strict
 })
 
 // ── O4 钉测:幽灵删除不砖事务(S50 真机白捡)─────────────────────────────────────────────
-// 现场:materialized 旧账指向的叶子不在当前真源 alpha.jsonc(REQ-059 迁真源后账实分离)。
+// 现场:materialized 旧账指向的叶子不在当前真源 codepuppy.jsonc(REQ-059 迁真源后账实分离)。
 // jsonc-parser 对父路径缺失的删除会 throw "Can not delete in empty document" → 修前一个
 // 幽灵键砖死整笔 apply(治理面永久失败)。修后:幽灵删除 = 跳过,其余编辑照常落盘。
 describe("applyBuiltinPolicyEdits — 幽灵删除跳过(O4)", () => {
-  const target = () => path.join(alphaTmp, "alpha.jsonc")
+  const target = () => path.join(codepuppyTmp, "codepuppy.jsonc")
 
   test("删除父路径不存在的叶子:跳过不 throw,同笔写入照常生效", () => {
-    fs.mkdirSync(alphaTmp, { recursive: true })
+    fs.mkdirSync(codepuppyTmp, { recursive: true })
     fs.writeFileSync(target(), JSON.stringify({ theme: "dark", agent: { explore: { disable: true } } }, null, 2))
     const r = applyBuiltinPolicyEdits([
       { path: ["permission", "skill", "*"], value: undefined }, // 顶键 permission 整链缺失
@@ -582,7 +582,7 @@ describe("applyBuiltinPolicyEdits — 幽灵删除跳过(O4)", () => {
   })
 
   test("父对象在、叶子缺:同样跳过;真实存在的叶子照常删除", () => {
-    fs.mkdirSync(alphaTmp, { recursive: true })
+    fs.mkdirSync(codepuppyTmp, { recursive: true })
     fs.writeFileSync(target(), JSON.stringify({ agent: { plan: { hidden: true }, explore: { temperature: 0.5 } } }, null, 2))
     const r = applyBuiltinPolicyEdits([
       { path: ["agent", "plan", "disable"], value: undefined }, // 父在叶缺 → 跳过
@@ -606,7 +606,7 @@ describe("applyBuiltinPolicyEdits — 幽灵删除跳过(O4)", () => {
 // ── #395(Codex r5):未策展重加接入同一投影 —— disabled 记录不得被 persist 写「正常叶」复活 ────
 describe("#395 persistMcp — 账本 disabled 投影(重加不复活)", () => {
   const record = (kind: "mcp" | "plugin", name: string, desiredState: "enabled" | "disabled", configKey: string) => {
-    const w = upsertRecordV2(alphaTmp, {
+    const w = upsertRecordV2(codepuppyTmp, {
       id: `user:${name}`,
       name,
       kind,
@@ -654,7 +654,7 @@ describe("releasePreparedMcpSecretVersion — #712 合并引用视图", () => {
   let decoyFile = ""
 
   beforeEach(() => {
-    userData = path.join(alphaTmp, "user-data")
+    userData = path.join(codepuppyTmp, "user-data")
     vid = newMcpSecretVersionId()
     // 目标版本目录里放**两个**密钥文件,而 config 只引用**非首个**的那一个 ——
     // 「只看目录里第一个文件」的削弱必须转红(readdir 序 A_DECOY 在前)。
@@ -665,12 +665,12 @@ describe("releasePreparedMcpSecretVersion — #712 合并引用视图", () => {
       const written = writeMcpSecretVersioned(userData, server, vid, name, value)
       if (!written.ok) throw new Error(written.reason)
     }
-    file = path.join(userData, "alpha-mcp-secrets", server, vid, "Z_TOK")
+    file = path.join(userData, "codepuppy-mcp-secrets", server, vid, "Z_TOK")
     // 另一个版本目录:引用集里恒排在目标之前,且必须**始终**零接触。
     const decoyVid = newMcpSecretVersionId()
     const decoy = writeMcpSecretVersioned(userData, server, decoyVid, "TOK", "OTHER_VERSION")
     if (!decoy.ok) throw new Error(decoy.reason)
-    decoyFile = path.join(userData, "alpha-mcp-secrets", server, decoyVid, "TOK")
+    decoyFile = path.join(userData, "codepuppy-mcp-secrets", server, decoyVid, "TOK")
   })
 
   const writeRaw = (target: string, text: string) => {
@@ -685,7 +685,7 @@ describe("releasePreparedMcpSecretVersion — #712 合并引用视图", () => {
       [server]: {
         type: "remote",
         url: "https://x.invalid",
-        environment: { OTHER_VERSION: `{file:${decoyFile}}`, UNRELATED: `{file:${path.join(alphaTmp, "unrelated")}}` },
+        environment: { OTHER_VERSION: `{file:${decoyFile}}`, UNRELATED: `{file:${path.join(codepuppyTmp, "unrelated")}}` },
         headers: Object.fromEntries(refs.map((ref, i) => [`X-Auth-${i}`, `Bearer {file:${ref}}`])),
       },
     },
@@ -698,7 +698,7 @@ describe("releasePreparedMcpSecretVersion — #712 合并引用视图", () => {
   })
 
   test("主 leaf 引用集里含它(非首位)→ 保留", () => {
-    writeAlphaConfig(leaf(path.join(alphaTmp, "not-a-secret"), file))
+    writeCodePuppyConfig(leaf(path.join(codepuppyTmp, "not-a-secret"), file))
     expect(releasePreparedMcpSecretVersion(userData, server, vid)).toEqual({ ok: true, state: "referenced" })
     expect(fs.existsSync(file)).toBe(true)
   })
@@ -708,19 +708,19 @@ describe("releasePreparedMcpSecretVersion — #712 合并引用视图", () => {
     // 相对段从真实 home 走到临时目录。判据不变 —— 不展开 `~` 就命不中,活密钥当场被删。
     const fromHome = `~/${path.relative(os.homedir(), file)}`
     expect(fromHome.startsWith("~/")).toBe(true)
-    writeAlphaConfig(leaf(path.join(alphaTmp, "not-a-secret"), fromHome))
+    writeCodePuppyConfig(leaf(path.join(codepuppyTmp, "not-a-secret"), fromHome))
     expect(releasePreparedMcpSecretVersion(userData, server, vid)).toEqual({ ok: true, state: "referenced" })
     expect(fs.existsSync(file)).toBe(true)
   })
 
   test("主 leaf 用 `./` 相对形态引用 → 按 config 文件所在目录解析,保留", () => {
-    writeAlphaConfig(leaf(path.join(alphaTmp, "not-a-secret"), `./${path.relative(alphaTmp, file)}`))
+    writeCodePuppyConfig(leaf(path.join(codepuppyTmp, "not-a-secret"), `./${path.relative(codepuppyTmp, file)}`))
     expect(releasePreparedMcpSecretVersion(userData, server, vid)).toEqual({ ok: true, state: "referenced" })
     expect(fs.existsSync(file)).toBe(true)
   })
 
   test("只有 retained legacy 源引用它(主 leaf 在场但不引用)→ 保留", () => {
-    writeAlphaConfig(leaf(path.join(alphaTmp, "not-a-secret")))
+    writeCodePuppyConfig(leaf(path.join(codepuppyTmp, "not-a-secret")))
     writeLegacy(leaf(path.join(homeTmp, "not-a-secret"), file))
     expect(releasePreparedMcpSecretVersion(userData, server, vid)).toEqual({ ok: true, state: "referenced" })
     expect(fs.existsSync(file)).toBe(true)
@@ -733,9 +733,9 @@ describe("releasePreparedMcpSecretVersion — #712 合并引用视图", () => {
   })
 
   test("symlink 别名引用 → realpath 命中,保留", () => {
-    const alias = path.join(alphaTmp, "alias-TOK")
+    const alias = path.join(codepuppyTmp, "alias-TOK")
     fs.symlinkSync(file, alias)
-    writeAlphaConfig(leaf(path.join(alphaTmp, "not-a-secret"), alias))
+    writeCodePuppyConfig(leaf(path.join(codepuppyTmp, "not-a-secret"), alias))
     expect(releasePreparedMcpSecretVersion(userData, server, vid)).toEqual({ ok: true, state: "referenced" })
     expect(fs.existsSync(file)).toBe(true)
   })
@@ -744,7 +744,7 @@ describe("releasePreparedMcpSecretVersion — #712 合并引用视图", () => {
     [
       "legacy 源语法损坏",
       () => {
-        writeAlphaConfig(leaf(path.join(alphaTmp, "not-a-secret")))
+        writeCodePuppyConfig(leaf(path.join(codepuppyTmp, "not-a-secret")))
         writeRaw(legacyPath(), '{ "mcp": { "relmcp": { "type": "remote" ')
       },
       "legacy config unparseable",
@@ -753,7 +753,7 @@ describe("releasePreparedMcpSecretVersion — #712 合并引用视图", () => {
       "主配置语法损坏",
       () => {
         writeLegacy({})
-        writeRaw(path.join(alphaTmp, "alpha.jsonc"), '{ "mcp": { "relmcp": { "type": "remote"  // 少一个括号\n')
+        writeRaw(path.join(codepuppyTmp, "codepuppy.jsonc"), '{ "mcp": { "relmcp": { "type": "remote"  // 少一个括号\n')
       },
       "unparseable",
     ],
@@ -761,14 +761,14 @@ describe("releasePreparedMcpSecretVersion — #712 合并引用视图", () => {
       "主 leaf 形状异常(数组)",
       () => {
         writeLegacy({})
-        writeAlphaConfig({ mcp: { [server]: ["not", "an", "object"] } })
+        writeCodePuppyConfig({ mcp: { [server]: ["not", "an", "object"] } })
       },
       "unexpected shape",
     ],
     [
       "legacy 源的 mcp 键形状异常",
       () => {
-        writeAlphaConfig(leaf(path.join(alphaTmp, "not-a-secret")))
+        writeCodePuppyConfig(leaf(path.join(codepuppyTmp, "not-a-secret")))
         writeLegacy({ mcp: ["not", "an", "object"] })
       },
       "unexpected shape",
@@ -786,19 +786,19 @@ describe("releasePreparedMcpSecretVersion — #712 合并引用视图", () => {
     const other = newMcpSecretVersionId()
     const otherWritten = writeMcpSecretVersioned(userData, server, other, "TOK", "SECOND_ORPHAN")
     if (!otherWritten.ok) throw new Error(otherWritten.reason)
-    const otherFile = path.join(userData, "alpha-mcp-secrets", server, other, "TOK")
+    const otherFile = path.join(userData, "codepuppy-mcp-secrets", server, other, "TOK")
     // 主 leaf 引用目标版本,不引用另外两个 —— 一批里同时有「必须保留」「必须删」「必须拒」。
-    writeAlphaConfig(leaf(path.join(alphaTmp, "not-a-secret"), file))
+    writeCodePuppyConfig(leaf(path.join(codepuppyTmp, "not-a-secret"), file))
     expect(() =>
       releasePreparedTxResources(userData, [
         // 合法且未被引用 → 应删(排在第一位:违规项不占首位)
-        { kind: "mcp-secret-version", store: "alpha-mcp-secrets", server, version: other },
+        { kind: "mcp-secret-version", store: "codepuppy-mcp-secrets", server, version: other },
         // 未登记 kind → 拒(不猜别人的布局)
-        { kind: "ssh-key", store: "alpha-mcp-secrets", server, version: other } as never,
+        { kind: "ssh-key", store: "codepuppy-mcp-secrets", server, version: other } as never,
         // 未登记 store → 拒
         { kind: "mcp-secret-version", store: "somewhere-else", server, version: other } as never,
         // 合法但仍被引用 → 保留并如实抛出
-        { kind: "mcp-secret-version", store: "alpha-mcp-secrets", server, version: vid },
+        { kind: "mcp-secret-version", store: "codepuppy-mcp-secrets", server, version: vid },
       ]),
     ).toThrow(/no release seam.*no release seam.*still referenced/s)
     expect(fs.existsSync(otherFile)).toBe(false) // 批里合法的那条真的删了
@@ -806,10 +806,10 @@ describe("releasePreparedMcpSecretVersion — #712 合并引用视图", () => {
     expect(fs.existsSync(decoyFile)).toBe(true)
 
     // 引用撤掉后再释放同一条 → 真的删,且不抛。
-    writeAlphaConfig({})
+    writeCodePuppyConfig({})
     expect(() =>
       releasePreparedTxResources(userData, [
-        { kind: "mcp-secret-version", store: "alpha-mcp-secrets", server, version: vid },
+        { kind: "mcp-secret-version", store: "codepuppy-mcp-secrets", server, version: vid },
       ]),
     ).not.toThrow()
     expect(fs.existsSync(file)).toBe(false)
@@ -831,7 +831,7 @@ describe("validateProviderInput — #1392: address admission is the egress class
     apiKey: SECRET,
     models: ["m-1", " m-2 "],
   })
-  const alphaJsonc = () => path.join(alphaTmp, "alpha.jsonc")
+  const codepuppyJsonc = () => path.join(codepuppyTmp, "codepuppy.jsonc")
 
   test("I4: ids reserved by the catalog are refused (display id, `<id>-byok` engine id, platform id); nothing is written anywhere", () => {
     for (const id of ["deepseek", "deepseek-byok", "codepuppy"]) {
@@ -839,7 +839,7 @@ describe("validateProviderInput — #1392: address admission is the egress class
       expect(result.ok).toBe(false)
       if (!result.ok) expect(result.reason).toMatch(/reserved/)
     }
-    expect(fs.existsSync(alphaJsonc())).toBe(false)
+    expect(fs.existsSync(codepuppyJsonc())).toBe(false)
     expect(fs.existsSync(path.join(tmp, "opencode.jsonc"))).toBe(false)
   })
 
@@ -887,18 +887,18 @@ describe("validateProviderInput — #1392: address admission is the egress class
     // 人话原文兜底(renderer 用 code 换成用户语言);loopback 那条必须点名「本机」
     const loopback = validateProviderInput({ ...input(), baseURL: "http://localhost:11434" })
     expect(loopback).toEqual({ ok: false, code: "loopback", reason: "the base URL points at this machine (localhost / 127.0.0.1); local services are not supported" })
-    expect(fs.existsSync(alphaJsonc())).toBe(false)
+    expect(fs.existsSync(codepuppyJsonc())).toBe(false)
   })
 
   test("ignoredConfigProviderBlocks (基线 I3): names the provider ids in each config file that carries any — for the log line only", () => {
     expect(ignoredConfigProviderBlocks()).toEqual([])
-    writeAlphaConfig({ provider: { "old-node": { options: { baseURL: "https://old.invalid/v1" } }, another: {} } })
+    writeCodePuppyConfig({ provider: { "old-node": { options: { baseURL: "https://old.invalid/v1" } }, another: {} } })
     fs.writeFileSync(path.join(tmp, "opencode.jsonc"), JSON.stringify({ provider: { xdgnode: {} } }))
     fs.mkdirSync(homeTmp, { recursive: true })
     fs.writeFileSync(path.join(homeTmp, "opencode.jsonc"), "{not json") // 坏文件:跳过,不抛
-    // alpha.jsonc 的路径经 resolveAlphaGlobalRoot 归一(realpath);XDG 那条按 OPENCODE_CONFIG_DIR 原样。
+    // codepuppy.jsonc 的路径经 resolveCodePuppyGlobalRoot 归一(realpath);XDG 那条按 OPENCODE_CONFIG_DIR 原样。
     expect(ignoredConfigProviderBlocks()).toEqual([
-      { file: fs.realpathSync(alphaJsonc()), ids: ["old-node", "another"] },
+      { file: fs.realpathSync(codepuppyJsonc()), ids: ["old-node", "another"] },
       { file: path.join(tmp, "opencode.jsonc"), ids: ["xdgnode"] },
     ])
   })
@@ -906,7 +906,7 @@ describe("validateProviderInput — #1392: address admission is the egress class
 
 describe("readConfiguredProviderKeys — AC7: classification only, the value never comes back", () => {
   test("marker / legacy plaintext / {file:} / {env:} → keychain-marker / legacy-plaintext / user-ref / user-ref; absent / blank / non-string → not in the map", () => {
-    writeAlphaConfig({
+    writeCodePuppyConfig({
       provider: {
         marked: { options: { apiKey: PROVIDER_KEYCHAIN_MARKER } },
         legacy: { options: { apiKey: "legacy-plain-value-Ab12" } },
@@ -929,8 +929,8 @@ describe("readConfiguredProviderKeys — AC7: classification only, the value nev
     expect(JSON.stringify([...kinds])).not.toContain("legacy-plain-value-Ab12")
   })
 
-  test("the primary alpha.jsonc wins over a legacy XDG copy for the same id; the fallback only fills unseen ids", () => {
-    writeAlphaConfig({ provider: { a: { options: { apiKey: PROVIDER_KEYCHAIN_MARKER } } } })
+  test("the primary codepuppy.jsonc wins over a legacy XDG copy for the same id; the fallback only fills unseen ids", () => {
+    writeCodePuppyConfig({ provider: { a: { options: { apiKey: PROVIDER_KEYCHAIN_MARKER } } } })
     fs.writeFileSync(
       path.join(tmp, "opencode.jsonc"),
       JSON.stringify({
@@ -949,8 +949,8 @@ describe("#1381 远程 MCP 的记录住在真源:写、读前像、失败补偿�
   const REMOTE = { type: "remote", url: "https://mcp.example.com/mcp" }
   const LOCAL = { type: "local", command: ["npx", "-y", "some-mcp"] }
 
-  test("重加即替换:alpha.jsonc(主)与 ~/.opencode(legacy)里同名的远程副本被清掉,真源里只剩这一条", () => {
-    writeAlphaConfig({ mcp: { srv: { type: "remote", url: "https://old.example/mcp" }, keep: LOCAL } })
+  test("重加即替换:codepuppy.jsonc(主)与 ~/.opencode(legacy)里同名的远程副本被清掉,真源里只剩这一条", () => {
+    writeCodePuppyConfig({ mcp: { srv: { type: "remote", url: "https://old.example/mcp" }, keep: LOCAL } })
     fs.mkdirSync(homeTmp, { recursive: true })
     fs.writeFileSync(path.join(homeTmp, "opencode.jsonc"), JSON.stringify({ mcp: { srv: { type: "remote", url: "https://older.example/mcp" } } }))
     expect(persistMcp("srv", REMOTE)).toEqual({ ok: true })
@@ -962,10 +962,10 @@ describe("#1381 远程 MCP 的记录住在真源:写、读前像、失败补偿�
     expect(readMcpTruth()).toEqual({ ok: true, absent: false, servers: [{ name: "srv", url: "https://mcp2.example.com/mcp" }] })
   })
 
-  test("readMcpLeaf:真源记录投影成 {type:\"remote\",url,headers?} 叶;alpha.jsonc 里单独躺着的远程叶读成「没有」(基线 I3);本地叶照旧", () => {
+  test("readMcpLeaf:真源记录投影成 {type:\"remote\",url,headers?} 叶;codepuppy.jsonc 里单独躺着的远程叶读成「没有」(基线 I3);本地叶照旧", () => {
     expect(persistMcp("srv", { ...REMOTE, headers: { A: "b" } })).toEqual({ ok: true })
     expect(readMcpLeaf("srv")).toEqual({ type: "remote", url: "https://mcp.example.com/mcp", headers: { A: "b" } })
-    writeAlphaConfig({ mcp: { stale: { type: "remote", url: "https://stale.example/mcp" }, loc: LOCAL } })
+    writeCodePuppyConfig({ mcp: { stale: { type: "remote", url: "https://stale.example/mcp" }, loc: LOCAL } })
     expect(readMcpLeaf("stale")).toBeUndefined()
     expect(readMcpLeaf("loc")).toEqual(LOCAL)
   })
@@ -987,7 +987,7 @@ describe("#1381 远程 MCP 的记录住在真源:写、读前像、失败补偿�
     expect(persistMcp("b", { ...REMOTE, url: "https://b.example/mcp" })).toEqual({ ok: true })
     expect(removeMcp("a")).toEqual({ ok: true })
     expect(mcpTruthNames()).toEqual(["b"])
-    const held = tryAcquireBundleLock(alphaTmp, { txId: "tx-1381" })
+    const held = tryAcquireBundleLock(codepuppyTmp, { txId: "tx-1381" })
     if (!held.ok) throw new Error(held.reason)
     try {
       expect(removeMcpConfigInLock("b")).toEqual({ ok: true })
@@ -1010,7 +1010,7 @@ describe("#1381 远程 MCP 的记录住在真源:写、读前像、失败补偿�
     expectRefused(persistMcp("loc", LOCAL))
     expectRefused(removeMcp("srv"))
     expect(fs.readFileSync(mcpTruthFile(), "utf8")).toBe('{"v":1,"servers":"nope"}')
-    expect(fs.existsSync(path.join(alphaTmp, "alpha.jsonc"))).toBe(false)
+    expect(fs.existsSync(path.join(codepuppyTmp, "codepuppy.jsonc"))).toBe(false)
   })
 
   test("远程条目带真源不装的键(oauth / timeout / enabled)⇒ 拒,不静默丢;名字 cloud ⇒ 拒(平台云 MCP 的名字)", () => {
@@ -1020,7 +1020,7 @@ describe("#1381 远程 MCP 的记录住在真源:写、读前像、失败补偿�
     expect(fs.existsSync(mcpTruthFile())).toBe(false)
   })
 
-  test("同名改成本地 ⇒ 真源记录让位、alpha.jsonc 得到本地叶(账本键 mcp.<name> 是同一个)", () => {
+  test("同名改成本地 ⇒ 真源记录让位、codepuppy.jsonc 得到本地叶(账本键 mcp.<name> 是同一个)", () => {
     expect(persistMcp("srv", REMOTE)).toEqual({ ok: true })
     expect(persistMcp("srv", LOCAL)).toEqual({ ok: true })
     expect(mcpTruthNames()).toEqual([])
@@ -1029,11 +1029,11 @@ describe("#1381 远程 MCP 的记录住在真源:写、读前像、失败补偿�
 
   test("ignoredConfigRemoteMcpEntries(基线 I3):点名主 + legacy 配置文件里的远程条目名字,本地条目不算 —— 只服务日志", () => {
     expect(ignoredConfigRemoteMcpEntries()).toEqual([])
-    writeAlphaConfig({ mcp: { r1: { type: "remote", url: "https://r1.example/mcp" }, l1: LOCAL, r2: { type: "remote", url: "https://r2.example/mcp" } } })
+    writeCodePuppyConfig({ mcp: { r1: { type: "remote", url: "https://r1.example/mcp" }, l1: LOCAL, r2: { type: "remote", url: "https://r2.example/mcp" } } })
     fs.mkdirSync(homeTmp, { recursive: true })
     fs.writeFileSync(path.join(homeTmp, "opencode.jsonc"), JSON.stringify({ mcp: { legacy: { type: "remote", url: "https://legacy.example/mcp" }, l2: LOCAL } }))
     expect(ignoredConfigRemoteMcpEntries()).toEqual([
-      { file: path.join(alphaTmp, "alpha.jsonc"), names: ["r1", "r2"] },
+      { file: path.join(codepuppyTmp, "codepuppy.jsonc"), names: ["r1", "r2"] },
       { file: path.join(homeTmp, "opencode.jsonc"), names: ["legacy"] },
     ])
     // 真源记录不在这份清单里(它不是「被忽略的」)

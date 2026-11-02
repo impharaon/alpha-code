@@ -12,7 +12,7 @@
 //
 // 诚实声明(闸门不假装比自己强):这是源码级绊线,不是运行时安全边界 —— 故意绕(把
 // res.status 存进变量再拼)能骗过轴①;它防的是「顺手又写一个压平出口」这类真实发生过
-// 两次的失效,不防蓄意。行为判据由 platform-error-code.test.ts 与 alpha-cloud-jobs.cases.ts
+// 两次的失效,不防蓄意。行为判据由 platform-error-code.test.ts 与 codepuppy-cloud-jobs.cases.ts
 // 的真实调用链承担。
 import { describe, expect, test } from "bun:test"
 import { readFileSync, readdirSync } from "node:fs"
@@ -31,11 +31,11 @@ const THROAT_FILE = "platform-error-code.ts"
 
 /** 经咽喉的出口枚举(轴②钉死)。新增出口 ⇒ 这里红 ⇒ 显式登记,不许静默接入。 */
 const ENUMERATED_MEMBERS = [
-  "alpha-account-request.ts",
-  "alpha-artifact-download.ts",
-  "alpha-cloud-jobs.ts",
-  "alpha-cloud-schedules.ts",
-  "alpha-platform-models.ts",
+  "codepuppy-account-request.ts",
+  "codepuppy-artifact-download.ts",
+  "codepuppy-cloud-jobs.ts",
+  "codepuppy-cloud-schedules.ts",
+  "codepuppy-platform-models.ts",
   "catalog-refresher.ts", // `#1556`:BYOK 预置目录拉取的拒绝同样经咽喉分类
 ]
 
@@ -71,7 +71,7 @@ describe("platform error code throat — enumeration gate (#940)", () => {
     expect(mintsRawHttpStatus("if (!response.ok) return { error: `http-" + "${response.status}` }")).toBe(true)
     // authed() 在 #918 之前的原文变体。
     expect(mintsRawHttpStatus("const fallback = `http-" + "${res.status}`")).toBe(true)
-    // alpha-artifact-download.ts 的类型位写法 —— 已知的非成员,不许误伤。
+    // codepuppy-artifact-download.ts 的类型位写法 —— 已知的非成员,不许误伤。
     expect(mintsRawHttpStatus("| `http-" + "${number}`")).toBe(false)
     // 字符串字面量比较(deleteCloudSchedule 的 404 容忍)—— 不是铸造,不许误伤。
     expect(mintsRawHttpStatus('r.error !== "http-404"')).toBe(false)

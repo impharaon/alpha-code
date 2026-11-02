@@ -4,7 +4,7 @@ import { Provider } from "@/provider/provider"
 import { ProviderTransform } from "@/provider/transform"
 import { MCP } from "@/mcp"
 import { McpCatalog } from "@/mcp/catalog"
-import { repairBranchedRootSchema } from "@/mcp/alpha-branched-input-schema"
+import { repairBranchedRootSchema } from "@/mcp/codepuppy-branched-input-schema"
 import { Permission } from "@/permission"
 import { Tool } from "@/tool/tool"
 import { ToolJsonSchema } from "@/tool/json-schema"
@@ -25,8 +25,8 @@ import { ModelV2 } from "@opencode-ai/core/model"
 import { isRecord } from "@/util/record"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ToolAliasLedger, type ToolDisplaySnapshotV1, type ToolLocation } from "@opencode-ai/schema/tool-identity"
-import { AlphaToolPolicy, mcpBindingDigest } from "@/permission/alpha-tool-policy"
-import { AlphaToolPolicyGate } from "@/permission/alpha-tool-policy-gate"
+import { CodePuppyToolPolicy, mcpBindingDigest } from "@/permission/codepuppy-tool-policy"
+import { CodePuppyToolPolicyGate } from "@/permission/codepuppy-tool-policy-gate"
 import { attachToolDisplay } from "./tool-display"
 
 const MCP_RESOURCE_TOOLS = {
@@ -59,7 +59,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   const plugin = yield* Plugin.Service
   const permission = yield* Permission.Service
   const registry = yield* ToolRegistry.Service
-  const toolPolicy = yield* AlphaToolPolicy.Service
+  const toolPolicy = yield* CodePuppyToolPolicy.Service
   const mcp = yield* MCP.Service
   const truncate = yield* Truncate.Service
   const flags = yield* RuntimeFlags.Service
@@ -68,7 +68,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   // #1129 / #724 §6(E1/E2/E3)—— 所有来源共用的执行闸,包在公共 register() 上。
   // REQ-236 C2(#1574,方案 §2.5):wrapper 里依次是 decide → `tool.execute.before` 钩子 → confirm →
   // 实现本体,五个分支共用,次序是结构性的(各分支的实现体里不再触发 before 钩子):
-  // · decide:两条轴在 alpha-tool-policy-gate 里按 §4 合成 —— ruleset 轴(config/agent/session 的
+  // · decide:两条轴在 codepuppy-tool-policy-gate 里按 §4 合成 —— ruleset 轴(config/agent/session 的
   //   identity 规则,#1121/#1135)deny 折进 cap;**策略文档轴**(managed/entitlement cap → 用户
   //   selector(binding guard)→ 四类默认)在**每次调用时重读**。deny ⇒ 具名响亮拒绝、零 hook/零副作用。
   // · 钩子可原地改 args;confirm 按**钩子之后**的 args 问(一次调用恰好一问),批准返回后再 decide 一次 ——
@@ -79,7 +79,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   // 当前 binding(§5)也在调用时重新派生:mcp = 生效配置 entry 的去秘密 digest
   // (rebind 后与记录里的 digest 不等 ⇒ enabled 降回 ask),plugin = 本装载代 digest,
   // builtin/host = 应用常量。
-  const currentSubject = (display: ToolDisplaySnapshotV1): Effect.Effect<AlphaToolPolicyGate.GateSubject> =>
+  const currentSubject = (display: ToolDisplaySnapshotV1): Effect.Effect<CodePuppyToolPolicyGate.GateSubject> =>
     Effect.gen(function* () {
       const identity = display.identity
       if (identity.source === "mcp") {
@@ -89,15 +89,15 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
           authority: facts?.authority ?? { kind: "not-asserted" as const },
           bindingDigest: facts?.entry ? mcpBindingDigest(identity.origin, facts.entry) : undefined,
           // #1285:远端 MCP 的目的地就是它的 transport(去秘密),随身份轴那一问一起送到审批面。
-          transport: AlphaToolPolicyGate.mcpTransportFact(facts?.entry),
+          transport: CodePuppyToolPolicyGate.mcpTransportFact(facts?.entry),
           // #1617:执行位置与下面注册给时间线的是同一份派生,随身份轴那一问送到审批卡。
-          location: AlphaToolPolicyGate.mcpLocation(facts?.entry),
+          location: CodePuppyToolPolicyGate.mcpLocation(facts?.entry),
         }
       }
       if (identity.source === "plugin") {
         return { identity, authority: display.authority, bindingDigest: yield* registry.pluginBinding(identity.origin) }
       }
-      return AlphaToolPolicyGate.builtinSubject(identity, display.authority)
+      return CodePuppyToolPolicyGate.builtinSubject(identity, display.authority)
     })
   const identityGate = (value: AITool, display: ToolDisplaySnapshotV1): AITool => {
     const execute = value.execute
@@ -113,13 +113,13 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                 subject: currentSubject(display),
                 ruleset: Permission.merge(input.agent.permission, input.session.permission ?? []),
               }
-              const decision = yield* AlphaToolPolicyGate.decide(gate)
+              const decision = yield* CodePuppyToolPolicyGate.decide(gate)
               yield* plugin.trigger(
                 "tool.execute.before",
                 { tool: display.technicalId, sessionID: input.session.id, callID: options.toolCallId },
                 { args },
               )
-              yield* AlphaToolPolicyGate.confirm(decision, {
+              yield* CodePuppyToolPolicyGate.confirm(decision, {
                 ...gate,
                 permission,
                 sessionID: input.session.id,
@@ -507,7 +507,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     // `#793`:`convertTool` 无条件给根戴上 `additionalProperties:false`,而根上的这顶帽子
     // 看不见 `oneOf`/`anyOf` 分支里的字段 ⇒ 分支型 MCP 工具广播给模型的是一份自相矛盾的
     // schema(根禁一切字段、分支各要求 5 个),模型只能发 `{}`。这里是 MCP 工具广播 schema
-    // 的唯一生产咽喉,修在这一层;理由与刻意不做的事见 mcp/alpha-branched-input-schema.ts。
+    // 的唯一生产咽喉,修在这一层;理由与刻意不做的事见 mcp/codepuppy-branched-input-schema.ts。
     const schema = repairBranchedRootSchema(
       yield* Effect.promise(() => Promise.resolve(asSchema(item.inputSchema).jsonSchema)),
     )
@@ -601,7 +601,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
         }),
       )
     const facts = mcp.bindingFacts ? yield* mcp.bindingFacts(origin) : undefined
-    const location = AlphaToolPolicyGate.mcpLocation(facts?.entry)
+    const location = CodePuppyToolPolicyGate.mcpLocation(facts?.entry)
     register(key, item, {
       identity: entry.identity,
       technicalId: key,

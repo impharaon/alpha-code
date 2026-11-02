@@ -10,7 +10,7 @@
 //   升级会员|充值。
 // 期望值全部是独立字面量,不 import 被测 i18n 字典(锚点不能来自被测对象自己)。
 //
-// 挂载走生产组合体(OverlayCloseHarness:真 AlphaSidebar + 真 @solidjs/router),打开浮层走
+// 挂载走生产组合体(OverlayCloseHarness:真 CodePuppySidebar + 真 @solidjs/router),打开浮层走
 // 真实点击。替身面与 overlay-close.cases.ts 同因同法:上游 ui 装饰件 / SDK 传输层 / preload
 // 桥,不含被测语义。子进程运行(src/renderer/sidebar/account-quadrant.test.ts spawn):
 // mock.module 会污染同进程。
@@ -19,7 +19,7 @@ import presetTypescript from "@babel/preset-typescript"
 import { GlobalRegistrator } from "@happy-dom/global-registrator"
 import { afterAll, afterEach, beforeEach, expect, mock, test } from "bun:test"
 import presetSolid from "babel-preset-solid"
-import type { AlphaProject, AlphaProjectsApi } from "../src/renderer/sidebar/use-projects"
+import type { CodePuppyProject, CodePuppyProjectsApi } from "../src/renderer/sidebar/use-projects"
 import type { AccountSummary } from "../src/preload/types"
 
 GlobalRegistrator.register()
@@ -52,7 +52,7 @@ mock.module("@opencode-ai/ui/v2/project-avatar-v2", () => ({ ProjectAvatar: () =
 mock.module("@opencode-ai/ui/theme/context", () => ({
   useTheme: () => ({ colorScheme: () => "dark", setColorScheme: () => {} }),
 }))
-mock.module("../src/renderer/alpha-ui/providers", () => ({
+mock.module("../src/renderer/codepuppy-ui/providers", () => ({
   useCommand: () => ({ options: [], register: () => {}, trigger: () => {}, show: () => {}, hide: () => {} }),
   ServerConnection: { key: () => "sidecar", Key: { make: (value: string) => value } },
   useTabs: () => ({
@@ -98,7 +98,7 @@ type Expected = {
   chip: string
   chipPro: boolean
   footerSub: string
-  rows: Record<string, string> // 行标签 → 期望值(取 .alpha-acct-v 或 .alpha-acct-pending 的文本)
+  rows: Record<string, string> // 行标签 → 期望值(取 .codepuppy-acct-v 或 .codepuppy-acct-pending 的文本)
   ctas: string[]
 }
 
@@ -220,8 +220,8 @@ const { hrefFor } = await import("../src/shared/route-manifest")
 
 const DIR = "/Users/tester/proj-a"
 
-function makeProjects(): AlphaProjectsApi {
-  const project: AlphaProject = {
+function makeProjects(): CodePuppyProjectsApi {
+  const project: CodePuppyProject = {
     id: "prj-a",
     worktree: DIR,
     name: "proj-a",
@@ -239,7 +239,7 @@ function makeProjects(): AlphaProjectsApi {
     shareSession: async () => undefined,
     deleteSession: async () => true,
     copySession: async () => undefined,
-  } as unknown as AlphaProjectsApi
+  } as unknown as CodePuppyProjectsApi
 }
 
 const disposers: Array<() => void> = []
@@ -280,10 +280,10 @@ function click(el: Element) {
 
 function readRows(pop: Element): Record<string, string> {
   const rows: Record<string, string> = {}
-  for (const row of pop.querySelectorAll(".alpha-acct-row")) {
-    const k = row.querySelector(".alpha-acct-k")?.textContent?.trim() ?? "(无标签)"
-    const v = row.querySelector(".alpha-acct-v")?.textContent?.trim()
-    const pending = row.querySelector(".alpha-acct-pending")?.textContent?.trim()
+  for (const row of pop.querySelectorAll(".codepuppy-acct-row")) {
+    const k = row.querySelector(".codepuppy-acct-k")?.textContent?.trim() ?? "(无标签)"
+    const v = row.querySelector(".codepuppy-acct-v")?.textContent?.trim()
+    const pending = row.querySelector(".codepuppy-acct-pending")?.textContent?.trim()
     rows[k] = v ?? pending ?? (row.querySelector("svg") ? "<sparkline>" : "(空)")
   }
   return rows
@@ -293,15 +293,15 @@ for (const { name, summary, expected } of CASES) {
   test(name, async () => {
     currentSummary = summary
     await mount()
-    const trigger = document.querySelector(".alpha-sidebar-account")
+    const trigger = document.querySelector(".codepuppy-sidebar-account")
     expect(trigger).not.toBeNull()
-    expect(document.querySelector(".alpha-sidebar-account-sub")?.textContent?.trim()).toBe(expected.footerSub)
+    expect(document.querySelector(".codepuppy-sidebar-account-sub")?.textContent?.trim()).toBe(expected.footerSub)
     click(trigger!)
     await flush()
-    const pop = document.querySelector(".alpha-acct-pop")
+    const pop = document.querySelector(".codepuppy-acct-pop")
     expect(pop).not.toBeNull()
 
-    const chip = pop!.querySelector(".alpha-acct-plan")
+    const chip = pop!.querySelector(".codepuppy-acct-plan")
     expect(chip?.textContent?.trim()).toBe(expected.chip)
     expect(chip?.hasAttribute("data-pro")).toBe(expected.chipPro)
 
@@ -318,7 +318,7 @@ for (const { name, summary, expected } of CASES) {
       expect(JSON.stringify(rows)).not.toContain("按量计费")
     }
 
-    const ctas = [...pop!.querySelectorAll(".alpha-acct-btn")].map((b) => b.textContent?.trim())
+    const ctas = [...pop!.querySelectorAll(".codepuppy-acct-btn")].map((b) => b.textContent?.trim())
     expect(ctas).toEqual(expected.ctas)
   })
 }

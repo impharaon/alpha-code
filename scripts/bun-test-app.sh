@@ -20,8 +20,8 @@
 # 两层判据(与 gate-files.tsv 的「地板管灾难、点名管单点」同构):
 #   [a] 整包:exit 0 且 pass ≥ FLOOR(`#647`:bun 对「跑 0 条」退出 0,只看退出码会在
 #       suite 被清空时全绿)。
-#   [b] alpha 判据文件逐个点名重跑:文件清单**运行时**从 frontend/alpha-patches/
-#       alpha-frontend.patch(ADR-034 唯一 SOT)解析,不手抄 —— 手抄的清单会漂;
+#   [b] alpha 判据文件逐个点名重跑:文件清单**运行时**从 frontend/codepuppy-patches/
+#       codepuppy-frontend.patch(ADR-034 唯一 SOT)解析,不手抄 —— 手抄的清单会漂;
 #       文件从补丁退场(= 还原成纯上游)则自然退出清单(登记表行随之删,反向核对钉住)。
 #       判据(#946 R1)= 每个文件**单独**重跑:恰好匹配 1 个文件(删掉/改名 ⇒ 红;
 #       整包地板 600 对 626−13 这种量级抓不到)且 pass **恰好等于**脚本内登记的精确条数
@@ -39,12 +39,12 @@ set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 WORKDIR="packages/app"
-PATCH="frontend/alpha-patches/alpha-frontend.patch"
+PATCH="frontend/codepuppy-patches/codepuppy-frontend.patch"
 # 地板语义与 ui-mac 的 3000/3085 同款:抓灾难性丢失,刻意留大余量(当前 CI=1 实测 623)。
 FLOOR=600
 # 每条用例默认超时与 bun-test-floor.sh 同一个环境咽喉(`#777`):慢机器上 5s 默认值
 # 会让机器速度替断言下判决。
-ALPHA_TEST_TIMEOUT_MS="${ALPHA_TEST_TIMEOUT_MS:-120000}"
+CODEPUPPY_TEST_TIMEOUT_MS="${CODEPUPPY_TEST_TIMEOUT_MS:-120000}"
 
 log="$(mktemp)"
 trap 'rm -f "$log"' EXIT
@@ -53,7 +53,7 @@ run_bun_test() {
   # CI=1 的理由见抬头;--conditions=solid 与 --preload 与上游 package.json 的 test:unit 同款
   # (pin e11dbd020 起上游自己加了 --conditions=solid:少了它,solid-js/web 解析到 server 构建,
   # 十余个上游测试文件在加载期就死于 `Export named 'use' not found`)。
-  (cd "$WORKDIR" && CI=1 bun test --conditions=solid --timeout "$ALPHA_TEST_TIMEOUT_MS" --preload ./happydom.ts "$@") >"$log" 2>&1
+  (cd "$WORKDIR" && CI=1 bun test --conditions=solid --timeout "$CODEPUPPY_TEST_TIMEOUT_MS" --preload ./happydom.ts "$@") >"$log" 2>&1
 }
 
 summarize() {
@@ -109,7 +109,7 @@ if [ -z "$delta_tests" ]; then
   exit 0
 fi
 # `#946` R1(对抗审计 Minor):清单的唯一来源是补丁,而**「补丁与树同步」在本仓没有任何自动判据**
-# —— round-trip 只写在 frontend/README.md 的月更 runbook 里,不在 alpha-check、也不在 CI。
+# —— round-trip 只写在 frontend/README.md 的月更 runbook 里,不在 codepuppy-check、也不在 CI。
 # 于是有一条 fail-open 的路:删掉一个 alpha 判据文件,再按 runbook 重生补丁(那本来就是改
 # packages/app 之后的规定动作)⇒ 清单从 4 缩到 3、实际文件也是 3 ⇒ 两边相等,全绿,
 # 证据只剩一个 43 文件的巨型补丁 diff 靠人眼看。反方向(改了树忘了重生)是 fail-closed 的,可接受。

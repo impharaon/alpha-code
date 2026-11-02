@@ -1,20 +1,20 @@
 // REQ-237 `#1555` —— 远程目录刷新器的行为判据(AC2 触发点 / AC3 单飞与身份仲裁 / AC6 接口形状)。
 // `#1556` 起刷新器管两份文档:平台目录 V3(下文 `requests`)与 BYOK 预置目录 v1(下文 `byokRequests`);
-// 文末两组是 `#1556` AC4(BYOK 拉取不带凭据、失败不减条目)与 AC6(alpha-catalog-health 按文档分别保存)。
+// 文末两组是 `#1556` AC4(BYOK 拉取不带凭据、失败不减条目)与 AC6(codepuppy-catalog-health 按文档分别保存)。
 //
-// 子进程运行(catalog-refresher.test.ts spawn):刷新器经 alpha-auth / alpha-catalog-health / logging 拖入 electron,
+// 子进程运行(catalog-refresher.test.ts spawn):刷新器经 codepuppy-auth / codepuppy-catalog-health / logging 拖入 electron,
 // mock.module 在同一进程内会泄漏到别的测试文件。刷新器有模块级状态(在途轮次、身份基线、30 分钟定时器),
 // 所以每条用例结束前都让在途那一轮落定,下一条从空闲开始。
 //
 // 被测入口只有生产导出 requestCatalogRefresh / onDownloadedCatalogChanged;网络层是本文件的 fetch 桩,
 // 按 URL 路径分到两个数组,响应体取上游 producer fixture 的 `value`(不手写替身)。补试用的超时 = fetch 以 `TimeoutError` 拒绝 ——
-// 与 AbortSignal.timeout 到期时 fetch 抛出的错误同名,生产代码按 `error.name` 分类(alpha-platform-models.ts)。
+// 与 AbortSignal.timeout 到期时 fetch 抛出的错误同名,生产代码按 `error.name` 分类(codepuppy-platform-models.ts)。
 
 import { afterEach, describe, expect, mock, test } from "bun:test"
 import { existsSync, mkdtempSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import bundledCatalog from "./alpha-models.json"
+import bundledCatalog from "./codepuppy-models.json"
 
 const userData = mkdtempSync(join(tmpdir(), "catalog-refresher-"))
 let identity: string | undefined = "account-a"
@@ -62,8 +62,8 @@ mock.module("./logging", () => ({
   serverLogRoots: () => [],
   rotateServerLogs: () => {},
 }))
-mock.module("./alpha-endpoints", () => ({ resolveEndpoints: () => ({ platform: "https://gateway.test" }) }))
-mock.module("./alpha-auth", () => ({
+mock.module("./codepuppy-endpoints", () => ({ resolveEndpoints: () => ({ platform: "https://gateway.test" }) }))
+mock.module("./codepuppy-auth", () => ({
   getAccessToken: () => (identity ? `token-${identity}${tokenSuffix}` : undefined),
   isStoredTokenExpired: () => tokenExpired,
   getAuthIdentityTag: () => {
@@ -82,11 +82,11 @@ globalThis.setInterval = ((callback: () => void, ms: number) => {
 
 const { onDownloadedCatalogChanged, requestCatalogRefresh } = await import("./catalog-refresher")
 const { appliedCatalogPath, byokCatalogPath, liveAllowlistPath, pinAppliedCatalog, readAppliedByokCatalog } = await import(
-  "./alpha-live-allowlist"
+  "./codepuppy-live-allowlist"
 )
-const { getCatalogFailure } = await import("./alpha-catalog-health")
+const { getCatalogFailure } = await import("./codepuppy-catalog-health")
 
-const VENDOR = join(import.meta.dir, "../../../alpha-contracts-consumer/vendor/alpha-platform-model-catalog/contracts")
+const VENDOR = join(import.meta.dir, "../../../codepuppy-contracts-consumer/vendor/alpha-platform-model-catalog/contracts")
 const catalogV3 = (): any => structuredClone(JSON.parse(readFileSync(join(VENDOR, "v3/fixtures/producer/model-catalog.json"), "utf8")).value)
 const byokV1 = (): any => structuredClone(JSON.parse(readFileSync(join(VENDOR, "v1/fixtures/producer/byok-catalog.json"), "utf8")).value)
 
@@ -386,9 +386,9 @@ describe("`#1556` AC4:BYOK 目录拉取不带凭据,失败不减条目", () => {
   })
 })
 
-// ── `#1556` AC6:alpha-catalog-health 按文档分别保存 —— 一份成功只清它自己那一格 ──────────────────────
+// ── `#1556` AC6:codepuppy-catalog-health 按文档分别保存 —— 一份成功只清它自己那一格 ──────────────────────
 // 此前 health 只有一个 failure,`reportCatalogRefresh(null)` 整个清空:前两种顺序在旧码上红(另一份的失败被抹掉)。
-describe("`#1556` AC6:alpha-catalog-health 两份目录各一格", () => {
+describe("`#1556` AC6:codepuppy-catalog-health 两份目录各一格", () => {
   const settleBoth = async (platform: Response, byok: Response) => {
     const p = requests.length
     const b = byokRequests.length

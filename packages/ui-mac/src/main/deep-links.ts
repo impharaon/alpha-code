@@ -7,7 +7,7 @@
 
 import { webContents, type WebContents } from "electron"
 import { createDeepLinkQueue, trackRendererLifecycle } from "./deep-link-queue"
-import { handleAuthDeepLink } from "./alpha-auth"
+import { handleAuthDeepLink } from "./codepuppy-auth"
 
 export const deepLinks = createDeepLinkQueue({
   consumeAuth: (url) => handleAuthDeepLink(url),

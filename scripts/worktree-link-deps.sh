@@ -14,7 +14,7 @@
 #   ② worktree 往 `node_modules` 里写的缓存(tsbuildinfo/.ts-dist)会落进主 checkout。
 #
 # 修法:每个包的 `node_modules` 建成**真目录**,第三方依赖逐条软链到主 checkout(省磁盘),
-# 而工作区自有包(@opencode-ai/*、@alpha-code/*)指回**本 worktree** 的 packages。
+# 而工作区自有包(@opencode-ai/*、@codepuppy/*)指回**本 worktree** 的 packages。
 #
 # 用法: bash scripts/worktree-link-deps.sh <worktree-path> [main-checkout-path]
 #       路径可以是相对的(见下)。

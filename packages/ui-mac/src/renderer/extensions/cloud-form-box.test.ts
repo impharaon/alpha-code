@@ -19,7 +19,7 @@ import type { CloudBehaviorV1, CloudPayloadV1 } from "../../shared/host-extensio
 import { HOST_EXTENSION_PACKAGE_CORPUS } from "../../shared/host-extension-package-contract/generate-artifact"
 import { dict as zh } from "../i18n/zh"
 
-const directory = mkdtempSync(join(tmpdir(), "alpha-cloud-form-render-"))
+const directory = mkdtempSync(join(tmpdir(), "codepuppy-cloud-form-render-"))
 await build({
   configFile: false,
   logLevel: "silent",
@@ -57,7 +57,7 @@ const described = () =>
   structuredClone((corpus.cases.find((item) => item.name === "cloud-v1")!.components[0]!.payload as CloudPayloadV1).behavior)
 
 // Server shapes come from the pinned producer corpus, not a handwritten HTTP payload.
-const producer = join(import.meta.dir, "../../../../alpha-contracts-consumer/vendor/alpha-platform/contracts/v1/fixtures/producer")
+const producer = join(import.meta.dir, "../../../../codepuppy-contracts-consumer/vendor/alpha-platform/contracts/v1/fixtures/producer")
 const accepted = (await Bun.file(join(producer, "cloud-job-accepted.json")).json()).value
 const status = (await Bun.file(join(producer, "cloud-job-status.json")).json()).value
 
@@ -174,7 +174,7 @@ describe("REQ-235 cloud form rendered from the catalog description", () => {
     expect(document.querySelector('[data-cloud-field="format"]')).toBeNull()
     expect(Array.from(document.querySelectorAll<HTMLInputElement>("input, textarea"), (node) => node.value)).not.toContain("html")
     expect(document.querySelector("[data-cloud-upstream]")?.textContent).toBe("Sends the request, title and style you enter.")
-    expect(document.querySelector("[data-cloud-hold]")?.textContent).toBe(zh["alpha.ext.cloudHold"].replace("{{usd}}", "1.00"))
+    expect(document.querySelector("[data-cloud-hold]")?.textContent).toBe(zh["codepuppy.ext.cloudHold"].replace("{{usd}}", "1.00"))
   })
 
   test("gating follows required, trimmed minChars, a required select without default, and readiness", () => {
@@ -201,10 +201,10 @@ describe("REQ-235 cloud form rendered from the catalog description", () => {
     mount({ ready: false })
     fill("prompt", "Make a page")
     expect(submit().disabled).toBe(true)
-    expect(document.body.textContent).toContain(zh["alpha.ext.cloudNeedPlatformNote"])
+    expect(document.body.textContent).toContain(zh["codepuppy.ext.cloudNeedPlatformNote"])
     document.body.replaceChildren()
     mount({ ready: false, recovering: true })
-    expect(document.body.textContent).toContain(zh["alpha.ext.cloudRecoveringNote"])
+    expect(document.body.textContent).toContain(zh["codepuppy.ext.cloudRecoveringNote"])
   })
 
   test("dispatch sends the exact envelope: fixed merged, no budget, keys = fields ∪ fixed, no presentation text", async () => {
@@ -242,7 +242,7 @@ describe("REQ-235 cloud form rendered from the catalog description", () => {
     await flush()
     expect(harness.envelopes).toEqual([])
     expect(submit().disabled).toBe(false)
-    expect(submit().textContent).toBe(zh["alpha.ext.cloudStart"])
+    expect(submit().textContent).toBe(zh["codepuppy.ext.cloudStart"])
   })
 
   test("the shared lifecycle reads the result, saves the exact envelope, lists artifacts and offers cancel", async () => {
@@ -251,27 +251,27 @@ describe("REQ-235 cloud form rendered from the catalog description", () => {
     submit().click()
     await flush()
     expect(document.querySelector("[data-cancel-job]")).not.toBeNull()
-    expect(document.body.textContent).toContain(zh["alpha.ext.cloudRunning"])
+    expect(document.body.textContent).toContain(zh["codepuppy.ext.cloudRunning"])
     harness.send("job.completed")
     await flush()
     expect(harness.statusCalls).toEqual([accepted.job_id])
     expect(harness.saves).toEqual([["/synthetic/results", accepted.job_id, harness.envelopes[0]]])
     expect(document.querySelector("[data-cloud-result]")?.textContent).toBe("Generated summary")
     expect(Array.from(document.querySelectorAll("[data-cloud-file]"), (node) => node.textContent)).toEqual(["artifacts/output.html"])
-    expect(document.body.textContent).toContain(zh["alpha.ext.cloudDone"])
+    expect(document.body.textContent).toContain(zh["codepuppy.ext.cloudDone"])
   })
 
   test.each([
-    ["pipeline_input_invalid", zh["alpha.ext.cloudErrRequirementsChanged"], null],
-    ["unknown_pipeline_kind", zh["alpha.ext.cloudErrRequirementsChanged"], null],
-    ["account_wallet_insufficient", zh["alpha.ext.cloudErrWallet"], "recharge"],
-    ["account_allowance_exhausted", zh["alpha.ext.cloudErrAllowance"], "overflow"],
+    ["pipeline_input_invalid", zh["codepuppy.ext.cloudErrRequirementsChanged"], null],
+    ["unknown_pipeline_kind", zh["codepuppy.ext.cloudErrRequirementsChanged"], null],
+    ["account_wallet_insufficient", zh["codepuppy.ext.cloudErrWallet"], "recharge"],
+    ["account_allowance_exhausted", zh["codepuppy.ext.cloudErrAllowance"], "overflow"],
   ] as const)("dispatch refusal %s reaches the user in plain words", async (code, message, action) => {
     const harness = mount({ error: code })
     fill("prompt", "Page")
     submit().click()
     await flush()
-    expect(document.querySelector(".alpha-ext-card-err")?.textContent).toBe(message)
+    expect(document.querySelector(".codepuppy-ext-card-err")?.textContent).toBe(message)
     expect(document.body.textContent).not.toContain(code)
     const button = document.querySelector<HTMLButtonElement>("[data-cloud-error-action]")
     if (!action) {
@@ -290,16 +290,16 @@ describe("REQ-235 cloud form rendered from the catalog description", () => {
     fill("prompt", "Page")
     submit().click()
     await flush()
-    expect(document.querySelector(".alpha-ext-card-err")?.textContent).toBe(
-      zh["alpha.net.tlsSilent"].replace("{{host}}", zh["alpha.net.hostFallback"]),
+    expect(document.querySelector(".codepuppy-ext-card-err")?.textContent).toBe(
+      zh["codepuppy.net.tlsSilent"].replace("{{host}}", zh["codepuppy.net.hostFallback"]),
     )
-    expect(document.body.textContent).not.toContain(zh["alpha.ext.cloudErrNetwork"])
+    expect(document.body.textContent).not.toContain(zh["codepuppy.ext.cloudErrNetwork"])
 
     document.body.replaceChildren()
     mount({ error: "network" })
     fill("prompt", "Page")
     submit().click()
     await flush()
-    expect(document.querySelector(".alpha-ext-card-err")?.textContent).toBe(zh["alpha.ext.cloudErrNetwork"])
+    expect(document.querySelector(".codepuppy-ext-card-err")?.textContent).toBe(zh["codepuppy.ext.cloudErrNetwork"])
   })
 })

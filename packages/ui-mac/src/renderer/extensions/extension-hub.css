@@ -1,18 +1,18 @@
-/* Extension Hub (定制中心) — full PAGE on the alpha-ui design system.
+/* Extension Hub (定制中心) — full PAGE on the codepuppy-ui design system.
  * Approved redesign 2026-06-26 (docs/design/2026-06-26-hub-settings-redesign): sticky centered tab
  * bar → centered max-width column (880) → responsive card grid (container-query 2↔1 col). Covers the
  * content area (right of the sidebar); only mounted while open so it can't eat clicks. */
-@import "../alpha-ui/tokens.css";
-@import "../alpha-ui/base.css";
+@import "../codepuppy-ui/tokens.css";
+@import "../codepuppy-ui/base.css";
 
-[data-alpha-ext-hub] {
+[data-codepuppy-ext-hub] {
   position: fixed;
   inset: 0;
   z-index: 25;
   pointer-events: none; /* empty host never intercepts; the page below re-enables it */
 }
 
-.alpha-ext-page {
+.codepuppy-ext-page {
   position: fixed;
   top: var(--a-home-top, 40px); /* leave opencode's titlebar (window controls) intact */
   left: 0;
@@ -26,8 +26,8 @@
   pointer-events: auto;
   animation: a-ext-in var(--a-dur-base) var(--a-ease-out);
 }
-body[data-alpha-sidebar="open"] .alpha-ext-page {
-  left: var(--alpha-sidebar-w, 260px);
+body[data-codepuppy-sidebar="open"] .codepuppy-ext-page {
+  left: var(--codepuppy-sidebar-w, 260px);
 }
 @keyframes a-ext-in {
   from {
@@ -37,26 +37,26 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
 }
 
 /* shared inline-icon sizing (paths carry stroke=currentColor) */
-.alpha-ic {
+.codepuppy-ic {
   width: 16px;
   height: 16px;
   display: block;
   flex: 0 0 auto;
 }
-.alpha-ic-sm {
+.codepuppy-ic-sm {
   width: 14px;
   height: 14px;
 }
-.alpha-ic-xs {
+.codepuppy-ic-xs {
   width: 11px;
   height: 11px;
 }
-.alpha-mono {
+.codepuppy-mono {
   font-family: var(--a-font-mono);
 }
 
 /* ── Sticky, centered horizontal tab bar + close(2026-07-04 拍板:横向导航定稿) ── */
-.alpha-ext-tabs {
+.codepuppy-ext-tabs {
   position: sticky;
   top: 0;
   z-index: 4;
@@ -67,7 +67,7 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   background: color-mix(in srgb, var(--a-bg-canvas) 88%, transparent);
   backdrop-filter: blur(12px);
 }
-.alpha-ext-tabs-inner {
+.codepuppy-ext-tabs-inner {
   display: flex;
   gap: 2px;
   width: 100%;
@@ -75,10 +75,10 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   overflow-x: auto;
   scrollbar-width: none;
 }
-.alpha-ext-tabs-inner::-webkit-scrollbar {
+.codepuppy-ext-tabs-inner::-webkit-scrollbar {
   display: none;
 }
-.alpha-ext-tab {
+.codepuppy-ext-tab {
   padding: 13px 11px 11px;
   border: none;
   background: transparent;
@@ -92,14 +92,14 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   white-space: nowrap;
   transition: color var(--a-dur-fast) var(--a-ease-out);
 }
-.alpha-ext-tab:hover {
+.codepuppy-ext-tab:hover {
   color: var(--a-text-secondary);
 }
-.alpha-ext-tab[data-active] {
+.codepuppy-ext-tab[data-active] {
   color: var(--a-text);
   border-bottom-color: var(--a-accent);
 }
-.alpha-ext-close {
+.codepuppy-ext-close {
   position: absolute;
   top: 8px;
   right: 14px;
@@ -115,30 +115,30 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   cursor: pointer;
   transition: background var(--a-dur-fast) var(--a-ease-out), color var(--a-dur-fast) var(--a-ease-out);
 }
-.alpha-ext-close:hover {
+.codepuppy-ext-close:hover {
   background: var(--a-bg-muted);
   color: var(--a-text);
 }
 
 /* ── Scroll body + centered column (container query drives the grid) ─────────── */
-.alpha-ext-scroll {
+.codepuppy-ext-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   padding: 30px 24px 56px;
   container-type: inline-size;
 }
-.alpha-ext-center {
+.codepuppy-ext-center {
   max-width: 880px;
   margin-inline: auto;
 }
 
-.alpha-ext-title {
+.codepuppy-ext-title {
   font-size: var(--a-text-2xl);
   font-weight: var(--a-weight-bold);
   letter-spacing: var(--a-tracking-tight);
 }
-.alpha-ext-sub {
+.codepuppy-ext-sub {
   margin: 6px 0 0;
   color: var(--a-text-secondary);
   font-size: var(--a-text-md);
@@ -147,7 +147,7 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
 }
 
 /* ── Search ─────────────────────────────────────────────────────────────────── */
-.alpha-ext-search {
+.codepuppy-ext-search {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -161,16 +161,16 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   transition: border-color var(--a-dur-fast) var(--a-ease-out), background var(--a-dur-fast) var(--a-ease-out),
     box-shadow var(--a-dur-fast) var(--a-ease-out);
 }
-.alpha-ext-search:focus-within {
+.codepuppy-ext-search:focus-within {
   background: var(--a-surface);
   border-color: var(--a-accent);
   box-shadow: var(--a-ring-focus);
 }
-.alpha-ext-search-ic {
+.codepuppy-ext-search-ic {
   color: var(--a-text-tertiary);
   display: flex;
 }
-.alpha-ext-search input {
+.codepuppy-ext-search input {
   flex: 1;
   min-width: 0;
   border: none;
@@ -180,29 +180,29 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   font-size: var(--a-text-md);
   outline: none;
 }
-.alpha-ext-search input::placeholder {
+.codepuppy-ext-search input::placeholder {
   color: var(--a-text-tertiary);
 }
 
 /* ── Section header (overline + optional link) ──────────────────────────────── */
-.alpha-ext-secrow {
+.codepuppy-ext-secrow {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin: 28px 0 12px;
 }
-.alpha-ext-overline {
+.codepuppy-ext-overline {
   font-size: var(--a-text-2xs);
   font-weight: var(--a-weight-semibold);
   letter-spacing: var(--a-tracking-wide);
   text-transform: uppercase;
   color: var(--a-text-tertiary);
 }
-.alpha-ext-overline b {
+.codepuppy-ext-overline b {
   color: var(--a-text-secondary);
   font-weight: var(--a-weight-semibold);
 }
-.alpha-ext-link {
+.codepuppy-ext-link {
   border: none;
   background: transparent;
   color: var(--a-accent);
@@ -211,12 +211,12 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   font-weight: var(--a-weight-medium);
   cursor: pointer;
 }
-.alpha-ext-link:hover {
+.codepuppy-ext-link:hover {
   text-decoration: underline;
 }
 
 /* ── Source chips (official=blue · alpha=indigo · community=amber) ──────────── */
-.alpha-ext-chip {
+.codepuppy-ext-chip {
   flex: 0 0 auto;
   font-size: var(--a-text-2xs);
   font-weight: var(--a-weight-semibold);
@@ -227,32 +227,32 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   background: var(--a-bg-muted);
   white-space: nowrap;
 }
-.alpha-ext-chip[data-source="official"] {
+.codepuppy-ext-chip[data-source="official"] {
   color: var(--a-info);
   background: color-mix(in srgb, var(--a-info) 14%, transparent);
 }
-.alpha-ext-chip[data-source="community"] {
+.codepuppy-ext-chip[data-source="community"] {
   color: var(--a-warning);
   background: var(--a-warning-subtle);
 }
-.alpha-ext-chip[data-source="alpha"] {
+.codepuppy-ext-chip[data-source="alpha"] {
   color: var(--a-accent);
   background: var(--a-accent-subtle);
 }
 
 /* ── Card grid (responsive via container query) ─────────────────────────────── */
-.alpha-ext-grid {
+.codepuppy-ext-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 @container (max-width: 620px) {
-  .alpha-ext-grid {
+  .codepuppy-ext-grid {
     grid-template-columns: 1fr;
   }
 }
 
-.alpha-ext-meta {
+.codepuppy-ext-meta {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -266,7 +266,7 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   white-space: nowrap;
 }
 
-.alpha-ext-package-state {
+.codepuppy-ext-package-state {
   display: inline-flex;
   align-items: center;
   min-height: 21px;
@@ -278,23 +278,23 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   font-weight: var(--a-weight-semibold);
   white-space: nowrap;
 }
-.alpha-ext-package-state[data-verdict="compatible"],
-.alpha-ext-package-state[data-prerequisite="ready"] {
+.codepuppy-ext-package-state[data-verdict="compatible"],
+.codepuppy-ext-package-state[data-prerequisite="ready"] {
   background: var(--a-success-subtle);
   color: var(--a-success);
 }
-.alpha-ext-package-state[data-verdict="update-required"],
-.alpha-ext-package-state[data-prerequisite="required-action"] {
+.codepuppy-ext-package-state[data-verdict="update-required"],
+.codepuppy-ext-package-state[data-prerequisite="required-action"] {
   background: color-mix(in srgb, var(--a-warning) 14%, transparent);
   color: var(--a-warning);
 }
-.alpha-ext-package-state[data-verdict="blocked"] {
+.codepuppy-ext-package-state[data-verdict="blocked"] {
   background: color-mix(in srgb, var(--a-error) 12%, transparent);
   color: var(--a-error);
 }
 
 /* ── Add / action button ────────────────────────────────────────────────────── */
-.alpha-ext-add {
+.codepuppy-ext-add {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -311,33 +311,33 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   cursor: pointer;
   transition: background var(--a-dur-fast) var(--a-ease-out), border-color var(--a-dur-fast) var(--a-ease-out);
 }
-.alpha-ext-add:hover:not(:disabled) {
+.codepuppy-ext-add:hover:not(:disabled) {
   background: var(--a-bg-muted);
   border-color: var(--a-border-strong);
 }
-.alpha-ext-add:disabled {
+.codepuppy-ext-add:disabled {
   cursor: default;
 }
-.alpha-ext-add[data-variant="primary"] {
+.codepuppy-ext-add[data-variant="primary"] {
   border-color: transparent;
   background: var(--a-accent-solid);
   color: var(--a-text-on-accent);
   box-shadow: var(--a-shadow-xs);
 }
-.alpha-ext-add[data-variant="primary"]:hover:not(:disabled) {
+.codepuppy-ext-add[data-variant="primary"]:hover:not(:disabled) {
   background: var(--a-accent-solid-hover);
 }
-.alpha-ext-add[data-variant="primary"]:disabled {
+.codepuppy-ext-add[data-variant="primary"]:disabled {
   opacity: 0.5;
 }
-.alpha-ext-add[data-variant="installed"] {
+.codepuppy-ext-add[data-variant="installed"] {
   border-color: transparent;
   background: var(--a-success-subtle);
   color: var(--a-success);
 }
 
 /* ── Featured bundle hero rows ──────────────────────────────────────────────── */
-.alpha-ext-kit {
+.codepuppy-ext-kit {
   display: flex;
   align-items: center;
   gap: 14px;
@@ -349,11 +349,11 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   margin-bottom: 10px;
   transition: border-color var(--a-dur-fast) var(--a-ease-out), box-shadow var(--a-dur-fast) var(--a-ease-out);
 }
-.alpha-ext-kit:hover {
+.codepuppy-ext-kit:hover {
   border-color: var(--a-border-strong);
   box-shadow: var(--a-shadow-sm);
 }
-.alpha-ext-kit-ic {
+.codepuppy-ext-kit-ic {
   width: 42px;
   height: 42px;
   border-radius: var(--a-radius-lg);
@@ -365,20 +365,20 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   flex: none;
   box-shadow: var(--a-shadow-xs);
 }
-.alpha-ext-kit-body {
+.codepuppy-ext-kit-body {
   min-width: 0;
   flex: 1;
 }
-.alpha-ext-kit-ttl {
+.codepuppy-ext-kit-ttl {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.alpha-ext-kit-ttl b {
+.codepuppy-ext-kit-ttl b {
   font-size: var(--a-text-md);
   font-weight: var(--a-weight-semibold);
 }
-.alpha-ext-kit-desc {
+.codepuppy-ext-kit-desc {
   font-size: var(--a-text-sm);
   color: var(--a-text-secondary);
   margin-top: 3px;
@@ -388,7 +388,7 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
 }
 
 /* ── Empty state ────────────────────────────────────────────────────────────── */
-.alpha-ext-empty-state {
+.codepuppy-ext-empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -396,7 +396,7 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   gap: 7px;
   padding: 56px 20px;
 }
-.alpha-ext-empty-ic {
+.codepuppy-ext-empty-ic {
   width: 52px;
   height: 52px;
   border-radius: var(--a-radius-xl);
@@ -406,27 +406,27 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   place-items: center;
   margin-bottom: 6px;
 }
-.alpha-ext-empty-state b {
+.codepuppy-ext-empty-state b {
   font-size: var(--a-text-md);
   font-weight: var(--a-weight-semibold);
 }
-.alpha-ext-empty-state p {
+.codepuppy-ext-empty-state p {
   font-size: var(--a-text-sm);
   color: var(--a-text-tertiary);
   margin: 0;
   max-width: 42ch;
 }
-.alpha-ext-empty-state .alpha-ext-add {
+.codepuppy-ext-empty-state .codepuppy-ext-add {
   margin-top: 8px;
 }
 
 /* ── Installed manage list ──────────────────────────────────────────────────── */
-.alpha-ext-manage {
+.codepuppy-ext-manage {
   display: flex;
   flex-direction: column;
   gap: 9px;
 }
-.alpha-ext-man {
+.codepuppy-ext-man {
   display: flex;
   align-items: center;
   gap: 13px;
@@ -437,16 +437,16 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   box-shadow: var(--a-edge-light);
 }
 
-.alpha-ext-man-body {
+.codepuppy-ext-man-body {
   min-width: 0;
   flex: 1;
 }
-.alpha-ext-man-nm {
+.codepuppy-ext-man-nm {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.alpha-ext-man-nm b {
+.codepuppy-ext-man-nm b {
   font-size: var(--a-text-md);
   font-weight: var(--a-weight-medium);
   overflow: hidden;
@@ -454,7 +454,7 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   white-space: nowrap;
 }
 /* T6:全类型已安装列表的类型 pill + 版本号 */
-.alpha-ext-type-pill {
+.codepuppy-ext-type-pill {
   flex: none;
   font-size: 10.5px;
   font-weight: var(--a-weight-medium);
@@ -466,7 +466,7 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
 }
 
 /* T3:存量迁移条 */
-.alpha-ext-migrate {
+.codepuppy-ext-migrate {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -477,18 +477,18 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   border: 1px solid var(--a-border-faint);
   border-radius: 10px;
 }
-.alpha-ext-migrate-t {
+.codepuppy-ext-migrate-t {
   font-size: var(--a-text-md);
   font-weight: var(--a-weight-medium);
 }
-.alpha-ext-migrate-sub {
+.codepuppy-ext-migrate-sub {
   font-size: var(--a-text-sm);
   color: var(--a-text-secondary);
   line-height: var(--a-leading-snug);
 }
 
 /* T7:Agent tab callout 内的「创建 Agent」内联入口 */
-.alpha-ext-inline-cta {
+.codepuppy-ext-inline-cta {
   margin-left: 8px;
   font-size: inherit;
   font-weight: var(--a-weight-medium);
@@ -498,10 +498,10 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   padding: 0;
   cursor: pointer;
 }
-.alpha-ext-inline-cta:hover {
+.codepuppy-ext-inline-cta:hover {
   text-decoration: underline;
 }
-.alpha-ext-man-st {
+.codepuppy-ext-man-st {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -511,7 +511,7 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
 }
 
 /* REQ-103(#195):已安装 scope 分组小标题(全局 / 本项目,AC5 同名并存的分区)。 */
-.alpha-ext-scopeh {
+.codepuppy-ext-scopeh {
   margin: 18px 0 8px;
   font-size: var(--a-text-2xs);
   font-weight: var(--a-weight-semibold);
@@ -519,16 +519,16 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   text-transform: uppercase;
   color: var(--a-text-tertiary);
 }
-.alpha-ext-scopeh:first-of-type {
+.codepuppy-ext-scopeh:first-of-type {
   margin-top: 4px;
 }
 /* #307:组头行内的只读徽标与空态说明行(设计稿 2026-07-17 改动一;项目组只读+卸载,ADR-030)。 */
-.alpha-ext-scopeh .alpha-ext-type-pill {
+.codepuppy-ext-scopeh .codepuppy-ext-type-pill {
   margin-left: 8px;
   text-transform: none;
   letter-spacing: normal;
 }
-.alpha-ext-man-empty {
+.codepuppy-ext-man-empty {
   padding: 14px 15px;
   border: 1px dashed var(--a-border);
   border-radius: var(--a-radius-lg);
@@ -538,7 +538,7 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
 }
 
 /* ── Toggle switch (manage rows) ────────────────────────────────────────────── */
-.alpha-ext-sw {
+.codepuppy-ext-sw {
   width: 36px;
   height: 21px;
   border-radius: var(--a-radius-full);
@@ -550,7 +550,7 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   cursor: pointer;
   transition: background var(--a-dur-fast) var(--a-ease-out);
 }
-.alpha-ext-sw::after {
+.codepuppy-ext-sw::after {
   content: "";
   position: absolute;
   top: 2px;
@@ -562,25 +562,25 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   box-shadow: var(--a-shadow-xs);
   transition: left var(--a-dur-fast) var(--a-ease-out);
 }
-.alpha-ext-sw[data-on] {
+.codepuppy-ext-sw[data-on] {
   background: var(--a-accent-solid);
 }
-.alpha-ext-sw[data-on]::after {
+.codepuppy-ext-sw[data-on]::after {
   left: 17px;
 }
 /* #408:实验室会话开关(琥珀,v6 稿改动四 .sw.session)—— 开态区别于持久开关的品牌色;
    禁用态(home/new-session 无 instance 上下文)沿用按钮通用降透明。 */
-.alpha-ext-sw[data-session][data-on] {
+.codepuppy-ext-sw[data-session][data-on] {
   background: var(--a-warning);
 }
-.alpha-ext-sw[data-session]:disabled {
+.codepuppy-ext-sw[data-session]:disabled {
   opacity: 0.5;
   cursor: default;
 }
 
 /* ── Create / import form ───────────────────────────────────────────────────── */
 
-.alpha-ext-seg {
+.codepuppy-ext-seg {
   display: inline-flex;
   padding: 3px;
   background: var(--a-bg-muted);
@@ -588,7 +588,7 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   gap: 2px;
   margin-bottom: 18px;
 }
-.alpha-ext-seg button {
+.codepuppy-ext-seg button {
   border: none;
   background: transparent;
   color: var(--a-text-secondary);
@@ -599,27 +599,27 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   border-radius: var(--a-radius-sm);
   cursor: pointer;
 }
-.alpha-ext-seg button[data-on] {
+.codepuppy-ext-seg button[data-on] {
   background: var(--a-surface);
   color: var(--a-text);
   box-shadow: var(--a-shadow-xs);
 }
-.alpha-ext-field {
+.codepuppy-ext-field {
   display: block;
   margin-bottom: 15px;
 }
-.alpha-ext-flabel {
+.codepuppy-ext-flabel {
   display: block;
   font-size: var(--a-text-sm);
   font-weight: var(--a-weight-medium);
   margin-bottom: 6px;
 }
-.alpha-ext-opt {
+.codepuppy-ext-opt {
   color: var(--a-text-tertiary);
   font-weight: var(--a-weight-normal);
   margin-left: 6px;
 }
-.alpha-ext-input {
+.codepuppy-ext-input {
   width: 100%;
   height: 36px;
   padding: 0 12px;
@@ -632,24 +632,24 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   outline: none;
   box-sizing: border-box;
 }
-.alpha-ext-input:focus {
+.codepuppy-ext-input:focus {
   border-color: var(--a-accent);
   box-shadow: var(--a-ring-focus);
 }
-.alpha-ext-textarea {
+.codepuppy-ext-textarea {
   height: 120px;
   padding: 10px 12px;
   resize: vertical;
   line-height: var(--a-leading-snug);
 }
-.alpha-ext-import {
+.codepuppy-ext-import {
   margin-top: 30px;
   padding-top: 8px;
   border-top: 1px solid var(--a-border-faint);
 }
 
 /* ── Toast ──────────────────────────────────────────────────────────────────── */
-.alpha-ext-toast {
+.codepuppy-ext-toast {
   position: fixed;
   left: 50%;
   bottom: 24px;
@@ -665,42 +665,42 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
 }
 
 /* ── Install-confirm dialog body (inside the alpha Dialog) ──────────────────── */
-.alpha-ext-confirm {
+.codepuppy-ext-confirm {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-.alpha-ext-confirm-meta {
+.codepuppy-ext-confirm-meta {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.alpha-ext-confirm-type {
+.codepuppy-ext-confirm-type {
   font-size: var(--a-text-sm);
   color: var(--a-text-tertiary);
 }
-.alpha-ext-confirm-desc {
+.codepuppy-ext-confirm-desc {
   margin: 0;
   font-size: var(--a-text-base);
   line-height: var(--a-leading-normal);
   color: var(--a-text-secondary);
 }
-.alpha-ext-install-box {
+.codepuppy-ext-install-box {
   border: 1px solid var(--a-border-faint);
   border-radius: var(--a-radius-lg);
   overflow: hidden;
 }
-.alpha-ext-install-row {
+.codepuppy-ext-install-row {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 11px 14px;
   font-size: var(--a-text-sm);
 }
-.alpha-ext-install-row + .alpha-ext-install-row {
+.codepuppy-ext-install-row + .codepuppy-ext-install-row {
   border-top: 1px solid var(--a-border-faint);
 }
-.alpha-ext-install-ic {
+.codepuppy-ext-install-ic {
   width: 22px;
   height: 22px;
   border-radius: 6px;
@@ -711,25 +711,25 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   color: #fff;
   flex: none;
 }
-.alpha-ext-install-nm {
+.codepuppy-ext-install-nm {
   font-weight: var(--a-weight-medium);
 }
-.alpha-ext-install-opt {
+.codepuppy-ext-install-opt {
   font-size: var(--a-text-2xs);
   color: var(--a-text-tertiary);
 }
-.alpha-ext-install-k {
+.codepuppy-ext-install-k {
   margin-left: auto;
   font-size: var(--a-text-2xs);
   color: var(--a-text-tertiary);
   text-transform: uppercase;
   letter-spacing: var(--a-tracking-wide);
 }
-.alpha-ext-confirm-line {
+.codepuppy-ext-confirm-line {
   font-size: var(--a-text-sm);
   color: var(--a-text-secondary);
 }
-.alpha-ext-confirm-line code {
+.codepuppy-ext-confirm-line code {
   font-family: var(--a-font-mono);
   font-size: 11.5px;
   background: var(--a-bg-muted);
@@ -738,7 +738,7 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   border-radius: 5px;
   color: var(--a-text);
 }
-.alpha-ext-confirm-note {
+.codepuppy-ext-confirm-note {
   font-size: var(--a-text-xs);
   color: var(--a-text-tertiary);
   margin: 0;
@@ -746,23 +746,23 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
 }
 
 /* T5:确认弹窗内的 requiredEnvVars 密钥采集(密文输入)。 */
-.alpha-ext-confirm-keys {
+.codepuppy-ext-confirm-keys {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.alpha-ext-key-field {
+.codepuppy-ext-key-field {
   display: flex;
   flex-direction: column;
   gap: 3px;
 }
-.alpha-ext-key-name {
+.codepuppy-ext-key-name {
   font-family: var(--a-font-mono);
   font-size: 11.5px;
   color: var(--a-text-secondary);
   overflow-wrap: anywhere;
 }
-.alpha-ext-key-input {
+.codepuppy-ext-key-input {
   width: 100%;
   box-sizing: border-box;
   font-size: var(--a-text-sm);
@@ -773,11 +773,11 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   border-radius: 6px;
   color: var(--a-text);
 }
-.alpha-ext-key-input:focus {
+.codepuppy-ext-key-input:focus {
   outline: none;
   border-color: var(--a-accent);
 }
-.alpha-ext-key-hint {
+.codepuppy-ext-key-hint {
   font-size: var(--a-text-xs);
   color: var(--a-text-tertiary);
   margin: 0;
@@ -785,24 +785,24 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
 }
 
 /* ── REQ-019 T2:详情页(hub 内二级页) ─────────────────────────────────────── */
-.alpha-ext-kit[data-clickable],
-.alpha-ext-man[data-clickable] {
+.codepuppy-ext-kit[data-clickable],
+.codepuppy-ext-man[data-clickable] {
   cursor: pointer;
 }
-.alpha-ext-detail {
+.codepuppy-ext-detail {
   display: flex;
   flex-direction: column;
   gap: 22px;
   animation: a-ext-in var(--a-dur-base) var(--a-ease-out);
 }
 /* 面包屑(2026-07-04 拍板:「‹ 类目名 / 条目名」,首级可点 = 返回列表) */
-.alpha-ext-crumbs {
+.codepuppy-ext-crumbs {
   display: flex;
   align-items: center;
   gap: 7px;
   font-size: var(--a-text-sm);
 }
-.alpha-ext-crumb-link {
+.codepuppy-ext-crumb-link {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -817,38 +817,38 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   cursor: pointer;
   transition: background var(--a-dur-fast) var(--a-ease-out), color var(--a-dur-fast) var(--a-ease-out);
 }
-.alpha-ext-crumb-link:hover {
+.codepuppy-ext-crumb-link:hover {
   background: var(--a-bg-muted);
   color: var(--a-text);
 }
-.alpha-ext-crumb-sep {
+.codepuppy-ext-crumb-sep {
   color: var(--a-text-disabled);
 }
-.alpha-ext-crumb-cur {
+.codepuppy-ext-crumb-cur {
   color: var(--a-text-tertiary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.alpha-ext-dhead {
+.codepuppy-ext-dhead {
   display: flex;
   align-items: flex-start;
   gap: 14px;
 }
 /* 详情页头部右侧主操作区(2026-07-04 定稿,参照 ChatGPT 插件详情页) */
-.alpha-ext-dhead-act {
+.codepuppy-ext-dhead-act {
   flex: none;
   display: flex;
   align-items: center;
   gap: 10px;
   padding-top: 4px;
 }
-.alpha-ext-add[data-size="lg"] {
+.codepuppy-ext-add[data-size="lg"] {
   height: 34px;
   padding: 0 16px;
   font-size: var(--a-text-sm);
 }
-.alpha-ext-dhead-ic {
+.codepuppy-ext-dhead-ic {
   width: 52px;
   height: 52px;
   border-radius: 14px;
@@ -859,25 +859,25 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   font-weight: var(--a-weight-bold);
   flex: none;
 }
-.alpha-ext-dhead-body {
+.codepuppy-ext-dhead-body {
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 5px;
 }
-.alpha-ext-dhead-t {
+.codepuppy-ext-dhead-t {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
 }
-.alpha-ext-dhead-t h2 {
+.codepuppy-ext-dhead-t h2 {
   margin: 0;
   font-size: var(--a-text-xl);
   font-weight: var(--a-weight-bold);
   line-height: 1.2;
 }
-.alpha-ext-dhead-meta {
+.codepuppy-ext-dhead-meta {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -885,18 +885,18 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   font-size: var(--a-text-sm);
   color: var(--a-text-tertiary);
 }
-.alpha-ext-dhead-id {
+.codepuppy-ext-dhead-id {
   font-family: var(--a-font-mono);
   font-size: 11.5px;
   background: var(--a-bg-muted);
   border-radius: 5px;
   padding: 1px 6px;
 }
-.alpha-ext-dhead-installed {
+.codepuppy-ext-dhead-installed {
   color: var(--a-success);
   font-weight: var(--a-weight-medium);
 }
-.alpha-ext-verify-chip {
+.codepuppy-ext-verify-chip {
   font-size: 11px;
   font-weight: var(--a-weight-medium);
   color: var(--a-warning, #b45309);
@@ -904,7 +904,7 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   border-radius: 999px;
   padding: 2px 8px;
 }
-.alpha-ext-verify-note {
+.codepuppy-ext-verify-note {
   margin-top: 10px;
   padding: 10px 12px;
   border-radius: 10px;
@@ -913,36 +913,36 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   font-size: var(--a-text-sm);
   line-height: var(--a-leading-snug);
 }
-.alpha-ext-verify-note b {
+.codepuppy-ext-verify-note b {
   display: block;
   margin-bottom: 3px;
   color: var(--a-warning, #b45309);
   font-size: var(--a-text-xs);
 }
-.alpha-ext-verify-note p {
+.codepuppy-ext-verify-note p {
   margin: 0;
   color: var(--a-text-secondary);
 }
 /* REQ-105(#197):archived advisory 变体 —— 归档/不再维护用错误色区分「待核实」的警示黄 */
-.alpha-ext-verify-chip[data-archived] {
+.codepuppy-ext-verify-chip[data-archived] {
   color: var(--a-error);
   background: color-mix(in srgb, var(--a-error) 14%, transparent);
 }
-.alpha-ext-verify-note[data-archived] {
+.codepuppy-ext-verify-note[data-archived] {
   background: color-mix(in srgb, var(--a-error) 8%, transparent);
   border-color: color-mix(in srgb, var(--a-error) 25%, transparent);
 }
-.alpha-ext-verify-note[data-archived] b {
+.codepuppy-ext-verify-note[data-archived] b {
   color: var(--a-error);
 }
-.alpha-ext-dsec {
+.codepuppy-ext-dsec {
   border-top: 1px solid var(--a-border-faint);
   padding-top: 16px;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
-.alpha-ext-dsec-t {
+.codepuppy-ext-dsec-t {
   margin: 0;
   font-size: 11px;
   font-weight: var(--a-weight-medium);
@@ -950,57 +950,57 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   text-transform: uppercase;
   color: var(--a-text-tertiary);
 }
-.alpha-ext-dabout {
+.codepuppy-ext-dabout {
   margin: 0;
   font-size: var(--a-text-md);
   line-height: var(--a-leading-normal);
   color: var(--a-text-secondary);
 }
-.alpha-ext-dfact {
+.codepuppy-ext-dfact {
   display: flex;
   align-items: baseline;
   gap: 12px;
   font-size: var(--a-text-sm);
 }
-.alpha-ext-dfact-l {
+.codepuppy-ext-dfact-l {
   flex: 0 0 96px;
   color: var(--a-text-tertiary);
 }
-.alpha-ext-dfact-v {
+.codepuppy-ext-dfact-v {
   min-width: 0;
   color: var(--a-text);
   overflow-wrap: anywhere;
 }
-.alpha-ext-dcode {
+.codepuppy-ext-dcode {
   font-family: var(--a-font-mono);
   font-size: 11.5px;
   background: var(--a-bg-muted);
   border-radius: 5px;
   padding: 2px 6px;
 }
-.alpha-ext-dnote {
+.codepuppy-ext-dnote {
   margin: 0;
   font-size: var(--a-text-sm);
   color: var(--a-text-tertiary);
   line-height: var(--a-leading-snug);
 }
-.alpha-ext-dboundary {
+.codepuppy-ext-dboundary {
   margin: 0;
   font-size: var(--a-text-sm);
   color: var(--a-text-secondary);
   line-height: var(--a-leading-snug);
 }
-.alpha-ext-dpills {
+.codepuppy-ext-dpills {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
 }
-.alpha-ext-dbundle {
+.codepuppy-ext-dbundle {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
-.alpha-ext-dbundle-row {
+.codepuppy-ext-dbundle-row {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -1016,26 +1016,26 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   cursor: pointer;
   transition: background var(--a-dur-fast) var(--a-ease-out), border-color var(--a-dur-fast) var(--a-ease-out);
 }
-.alpha-ext-dbundle-row:hover {
+.codepuppy-ext-dbundle-row:hover {
   background: var(--a-bg-muted);
   border-color: var(--a-border);
 }
-.alpha-ext-add[data-variant="danger"] {
+.codepuppy-ext-add[data-variant="danger"] {
   color: var(--a-error);
   border-color: color-mix(in srgb, var(--a-error) 35%, transparent);
 }
-.alpha-ext-add[data-variant="danger"]:hover:not(:disabled) {
+.codepuppy-ext-add[data-variant="danger"]:hover:not(:disabled) {
   background: color-mix(in srgb, var(--a-error) 8%, transparent);
 }
 
 /* 有更新分组标题(琥珀)+ 插件确认框风险行 */
-.alpha-ext-overline[data-warn] {
+.codepuppy-ext-overline[data-warn] {
   color: var(--a-warning);
 }
-.alpha-ext-overline[data-warn] b {
+.codepuppy-ext-overline[data-warn] b {
   color: var(--a-warning);
 }
-.alpha-ext-confirm-risk {
+.codepuppy-ext-confirm-risk {
   margin: 10px 0 0;
   font-size: var(--a-text-sm);
   color: var(--a-warning);
@@ -1043,13 +1043,13 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
 }
 
 /* REQ-136 #1017:MCP install scope (Global / Current project) */
-.alpha-ext-install-scope {
+.codepuppy-ext-install-scope {
   margin: 12px 0 0;
   padding: 0;
   border: 0;
   min-width: 0;
 }
-.alpha-ext-install-scope legend {
+.codepuppy-ext-install-scope legend {
   padding: 0;
   font-size: 11px;
   font-weight: var(--a-weight-medium);
@@ -1057,13 +1057,13 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   text-transform: uppercase;
   color: var(--a-text-tertiary);
 }
-.alpha-ext-install-scope-options {
+.codepuppy-ext-install-scope-options {
   margin-top: 8px;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.alpha-ext-install-scope-option {
+.codepuppy-ext-install-scope-option {
   display: flex;
   align-items: flex-start;
   gap: 10px;
@@ -1073,60 +1073,60 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   background: var(--a-bg-subtle);
   cursor: pointer;
 }
-.alpha-ext-install-scope-option[data-selected] {
+.codepuppy-ext-install-scope-option[data-selected] {
   border-color: color-mix(in srgb, var(--a-accent) 45%, var(--a-border-faint));
   background: color-mix(in srgb, var(--a-accent) 6%, var(--a-bg-subtle));
 }
-.alpha-ext-install-scope-option[data-disabled] {
+.codepuppy-ext-install-scope-option[data-disabled] {
   opacity: 0.55;
   cursor: not-allowed;
 }
-.alpha-ext-install-scope-option input {
+.codepuppy-ext-install-scope-option input {
   margin-top: 2px;
   flex: 0 0 auto;
 }
-.alpha-ext-install-scope-option span {
+.codepuppy-ext-install-scope-option span {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
 }
-.alpha-ext-install-scope-option b {
+.codepuppy-ext-install-scope-option b {
   font-size: var(--a-text-sm);
   color: var(--a-text-primary);
 }
-.alpha-ext-install-scope-option small {
+.codepuppy-ext-install-scope-option small {
   font-size: 11.5px;
   line-height: var(--a-leading-snug);
   color: var(--a-text-tertiary);
 }
 
 /* ── REQ-019 T3:详情页类型专属区块 ─────────────────────────────────────────── */
-.alpha-ext-dsub {
+.codepuppy-ext-dsub {
   margin-top: 14px;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.alpha-ext-dsub-t {
+.codepuppy-ext-dsub-t {
   font-size: 11px;
   font-weight: var(--a-weight-medium);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--a-text-tertiary);
 }
-.alpha-ext-dtools {
+.codepuppy-ext-dtools {
   display: flex;
   flex-direction: column;
   gap: 5px;
 }
-.alpha-ext-dtool {
+.codepuppy-ext-dtool {
   display: flex;
   align-items: baseline;
   gap: 10px;
   font-size: var(--a-text-sm);
 }
-.alpha-ext-dtool code {
+.codepuppy-ext-dtool code {
   flex: 0 1 auto;
   min-width: 0;
   max-width: 100%;
@@ -1137,23 +1137,23 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   padding: 1px 6px;
   overflow-wrap: anywhere; /* 超长 pattern(如 external_directory 绝对路径)换行,不许横向撑破 */
 }
-.alpha-ext-dtool span {
+.codepuppy-ext-dtool span {
   color: var(--a-text-tertiary);
   min-width: 0;
 }
 /* #1595:云连接器工具行首是自然语言名(技术名进「开发者详情」)。 */
-.alpha-ext-dtool b {
+.codepuppy-ext-dtool b {
   flex: 0 0 auto;
   font-weight: var(--a-weight-medium, 500);
   color: var(--a-text);
 }
-.alpha-ext-dtool span[data-action="deny"] {
+.codepuppy-ext-dtool span[data-action="deny"] {
   color: var(--a-error);
 }
-.alpha-ext-dtool span[data-action="allow"] {
+.codepuppy-ext-dtool span[data-action="allow"] {
   color: var(--a-success);
 }
-.alpha-ext-ddoc {
+.codepuppy-ext-ddoc {
   margin: 0;
   max-height: 320px;
   overflow: auto;
@@ -1168,23 +1168,23 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.alpha-ext-dprompt {
+.codepuppy-ext-dprompt {
   margin-top: 14px;
 }
-.alpha-ext-dprompt summary {
+.codepuppy-ext-dprompt summary {
   cursor: pointer;
   font-size: var(--a-text-sm);
   font-weight: var(--a-weight-medium);
   color: var(--a-text-secondary);
   padding: 4px 0;
 }
-.alpha-ext-dprompt summary:hover {
+.codepuppy-ext-dprompt summary:hover {
   color: var(--a-text);
 }
-.alpha-ext-dprompt[open] summary {
+.codepuppy-ext-dprompt[open] summary {
   margin-bottom: 8px;
 }
-.alpha-ext-dbundle-n {
+.codepuppy-ext-dbundle-n {
   flex: none;
   width: 18px;
   font-family: var(--a-font-mono);
@@ -1192,33 +1192,33 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   color: var(--a-text-disabled);
   text-align: right;
 }
-.alpha-ext-dnote[data-err] {
+.codepuppy-ext-dnote[data-err] {
   color: var(--a-error);
 }
-.alpha-ext-verify-note[data-info] {
+.codepuppy-ext-verify-note[data-info] {
   background: var(--a-accent-subtle);
   border-color: color-mix(in srgb, var(--a-accent) 25%, transparent);
 }
-.alpha-ext-verify-note[data-info] b {
+.codepuppy-ext-verify-note[data-info] b {
   color: var(--a-accent);
 }
-.alpha-ext-dbundle-row .alpha-ext-add {
+.codepuppy-ext-dbundle-row .codepuppy-ext-add {
   margin-left: 4px;
 }
 
 /* ── REQ-019 T4/T5:实时依赖状态 + 更新通道 ─────────────────────────────────── */
-.alpha-ext-meta[data-dep="ok"] {
+.codepuppy-ext-meta[data-dep="ok"] {
   color: var(--a-success);
   background: var(--a-success-subtle);
 }
-.alpha-ext-meta[data-dep="missing"] {
+.codepuppy-ext-meta[data-dep="missing"] {
   color: var(--a-error);
   background: var(--a-error-subtle);
 }
-.alpha-ext-man-st[data-err] {
+.codepuppy-ext-man-st[data-err] {
   color: var(--a-error);
 }
-.alpha-ext-updbtn {
+.codepuppy-ext-updbtn {
   display: inline-flex;
   align-items: center;
   height: 28px;
@@ -1233,13 +1233,13 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   cursor: pointer;
   flex: none;
 }
-.alpha-ext-updbtn:disabled {
+.codepuppy-ext-updbtn:disabled {
   opacity: 0.6;
   cursor: default;
 }
 
 /* ── REQ-019 T6:导入反馈 ───────────────────────────────────────────────────── */
-.alpha-ext-import-err {
+.codepuppy-ext-import-err {
   margin: 10px 0 0;
   font-size: var(--a-text-sm);
   color: var(--a-error);
@@ -1248,27 +1248,27 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
 
 /* ── T7:筛选 chips / 卡片行内错误 / 骨架屏 ─────────────────────────────────── */
 
-.alpha-ext-card-err {
+.codepuppy-ext-card-err {
   margin: 8px 0 0;
   font-size: var(--a-text-xs);
   color: var(--a-error);
   line-height: var(--a-leading-snug);
 }
-.alpha-ext-skel-row {
+.codepuppy-ext-skel-row {
   height: 62px;
   border-radius: var(--a-radius-lg);
   margin-bottom: 9px;
   background: linear-gradient(90deg, var(--a-bg-muted) 25%, var(--a-bg-inset) 50%, var(--a-bg-muted) 75%);
   background-size: 200% 100%;
-  animation: alpha-ext-skl 1.4s linear infinite;
+  animation: codepuppy-ext-skl 1.4s linear infinite;
 }
-@keyframes alpha-ext-skl {
+@keyframes codepuppy-ext-skl {
   to {
     background-position: -200% 0;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .alpha-ext-skel-row {
+  .codepuppy-ext-skel-row {
     animation: none;
   }
 }
@@ -1279,57 +1279,57 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   opacity: 0.55;
 }
 /* 连接状态字(on=已连接 / idle=注入未连 / off=未注入) */
-.alpha-ext-cloudst {
+.codepuppy-ext-cloudst {
   font-weight: var(--a-weight-medium);
 }
-.alpha-ext-cloudst[data-st="on"] {
+.codepuppy-ext-cloudst[data-st="on"] {
   color: var(--a-success, #2f9e63);
 }
-.alpha-ext-cloudst[data-st="idle"] {
+.codepuppy-ext-cloudst[data-st="idle"] {
   color: var(--a-text-secondary);
 }
-.alpha-ext-cloudst[data-st="off"] {
+.codepuppy-ext-cloudst[data-st="off"] {
   color: var(--a-text-secondary);
 }
 /* dsub 是 stretch 列容器 —— 内嵌按钮(连接器详情登录 CTA)不拉通栏 */
-.alpha-ext-dsub > .alpha-ext-add {
+.codepuppy-ext-dsub > .codepuppy-ext-add {
   align-self: flex-start;
 }
 /* code-review 派发盒:按钮 + 进度/来源 meta 一行 */
-.alpha-ext-cloudrun {
+.codepuppy-ext-cloudrun {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
   margin-top: 6px;
 }
-.alpha-ext-cloudrun .alpha-ext-meta[data-live] {
+.codepuppy-ext-cloudrun .codepuppy-ext-meta[data-live] {
   color: var(--a-text-secondary);
   font-variant-numeric: tabular-nums;
 }
 /* 上行数据明细列表(详情页) */
-.alpha-ext-dlist {
+.codepuppy-ext-dlist {
   margin: 4px 0 0;
   padding-left: 18px;
   font-size: var(--a-text-sm);
   color: var(--a-text-secondary);
   line-height: var(--a-leading-normal);
 }
-.alpha-ext-dlist li {
+.codepuppy-ext-dlist li {
   margin-bottom: 2px;
 }
-.alpha-ext-dnote[data-ok] {
+.codepuppy-ext-dnote[data-ok] {
   color: var(--a-success, #2f9e63);
 }
 
 /* ── REQ-037 治理面板(内置·上游) ─────────────────────────────────────────── */
-.alpha-gov .alpha-gov-mode {
+.codepuppy-gov .codepuppy-gov-mode {
   display: inline-flex;
   gap: 4px;
   margin-left: 10px;
 }
-.alpha-gov .alpha-gov-mode button,
-.alpha-gov .alpha-gov-acts button {
+.codepuppy-gov .codepuppy-gov-mode button,
+.codepuppy-gov .codepuppy-gov-acts button {
   border: 1px solid var(--a-border);
   background: var(--a-surface);
   border-radius: var(--a-radius-md);
@@ -1337,85 +1337,85 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   font-size: var(--a-text-xs);
   color: var(--a-text-secondary);
 }
-.alpha-gov .alpha-gov-mode button[data-on],
-.alpha-gov .alpha-gov-acts button:hover {
+.codepuppy-gov .codepuppy-gov-mode button[data-on],
+.codepuppy-gov .codepuppy-gov-acts button:hover {
   border-color: var(--a-accent);
   color: var(--a-accent);
 }
-.alpha-gov .alpha-gov-acts {
+.codepuppy-gov .codepuppy-gov-acts {
   display: inline-flex;
   gap: 6px;
   margin-left: auto;
 }
-.alpha-gov [data-gov-dim] .alpha-ext-man-name {
+.codepuppy-gov [data-gov-dim] .codepuppy-ext-man-name {
   opacity: 0.55;
 }
-.alpha-gov .alpha-gov-prot {
+.codepuppy-gov .codepuppy-gov-prot {
   margin-left: auto;
   font-size: var(--a-text-xs);
   color: var(--a-text-tertiary);
   cursor: help;
 }
-.alpha-gov .alpha-ext-chip[data-warn] {
+.codepuppy-gov .codepuppy-ext-chip[data-warn] {
   color: var(--a-warning);
   border-color: var(--a-warning);
 }
-.alpha-gov .alpha-gov-editor {
+.codepuppy-gov .codepuppy-gov-editor {
   margin-top: 10px;
   padding: 12px;
   border: 1px solid var(--a-border);
   border-radius: var(--a-radius-lg);
   background: var(--a-surface);
 }
-.alpha-gov .alpha-gov-editor textarea {
+.codepuppy-gov .codepuppy-gov-editor textarea {
   min-height: 120px;
   width: 100%;
   margin: 8px 0;
 }
 
-/* ── #348:能力授权确认视图 .alpha-ext-authz(stage="authorize";设计稿
+/* ── #348:能力授权确认视图 .codepuppy-ext-authz(stage="authorize";设计稿
       docs/design/2026-07-15-capability-authorize-dialog,视觉零改动:全部 --a-* token)────── */
-.alpha-ext-authz {
+.codepuppy-ext-authz {
   display: flex;
   flex-direction: column;
   gap: 12px;
   /* 两阶段原地切换的滑入;--a-dur-* 在 prefers-reduced-motion 下为 0(tokens.css)。 */
-  animation: alpha-ext-authz-in var(--a-dur-base) var(--a-ease-out);
+  animation: codepuppy-ext-authz-in var(--a-dur-base) var(--a-ease-out);
 }
-@keyframes alpha-ext-authz-in {
+@keyframes codepuppy-ext-authz-in {
   from {
     opacity: 0;
     transform: translateX(14px);
   }
 }
-.alpha-ext-authz-intro {
+.codepuppy-ext-authz-intro {
   margin: 0;
   font-size: var(--a-text-base);
   line-height: var(--a-leading-normal);
   color: var(--a-text-secondary);
 }
-.alpha-ext-authz-box {
+.codepuppy-ext-authz-box {
   border: 1px solid var(--a-border-faint);
   border-radius: var(--a-radius-lg);
   overflow: hidden;
 }
-.alpha-ext-authz-cap {
+.codepuppy-ext-authz-cap {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
   font-size: var(--a-text-sm);
 }
-.alpha-ext-authz-cap + .alpha-ext-authz-cap,
-.alpha-ext-authz-item + .alpha-ext-authz-cap,
-.alpha-ext-authz-cap + .alpha-ext-authz-item,
-.alpha-ext-authz-item + .alpha-ext-authz-item {
+.codepuppy-ext-authz-cap + .codepuppy-ext-authz-cap,
+.codepuppy-ext-authz-item + .codepuppy-ext-authz-cap,
+.codepuppy-ext-authz-cap + .codepuppy-ext-authz-item,
+.codepuppy-ext-authz-item + .codepuppy-ext-authz-item {
   border-top: 1px solid var(--a-border-faint);
 }
-.alpha-ext-authz-cap[data-muted] {
+.codepuppy-ext-authz-cap[data-muted] {
   opacity: 0.62;
 }
-.alpha-ext-authz-ic {
+.codepuppy-ext-authz-ic {
   width: 22px;
   height: 22px;
   border-radius: 6px;
@@ -1425,29 +1425,29 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   background: var(--a-bg-muted);
   color: var(--a-text-secondary);
 }
-.alpha-ext-authz-ic[data-tier="high"] {
+.codepuppy-ext-authz-ic[data-tier="high"] {
   background: var(--a-warning-subtle);
   color: var(--a-warning);
 }
-.alpha-ext-authz-ic svg {
+.codepuppy-ext-authz-ic svg {
   width: 13px;
   height: 13px;
 }
-.alpha-ext-authz-nm {
+.codepuppy-ext-authz-nm {
   display: flex;
   flex-direction: column;
   gap: 1px;
   min-width: 0;
 }
-.alpha-ext-authz-nm b {
+.codepuppy-ext-authz-nm b {
   font-weight: var(--a-weight-medium);
   font-size: var(--a-text-sm);
 }
-.alpha-ext-authz-nm small {
+.codepuppy-ext-authz-nm small {
   font-size: var(--a-text-2xs);
   color: var(--a-text-tertiary);
 }
-.alpha-ext-authz-id {
+.codepuppy-ext-authz-id {
   margin-left: auto;
   font-family: var(--a-font-mono);
   font-size: 10.5px;
@@ -1459,14 +1459,14 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   flex: none;
 }
 /* #392:详情页「已授权能力」空态(无授权记录 / 未请求任何能力)—— 同框内如实一行。 */
-.alpha-ext-authz-empty {
+.codepuppy-ext-authz-empty {
   margin: 0;
   padding: 11px 14px;
   font-size: var(--a-text-sm);
   color: var(--a-text-tertiary);
   line-height: var(--a-leading-snug);
 }
-.alpha-ext-authz-chip {
+.codepuppy-ext-authz-chip {
   flex: none;
   font-size: var(--a-text-2xs);
   font-weight: var(--a-weight-medium);
@@ -1474,20 +1474,20 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   border-radius: var(--a-radius-full);
   letter-spacing: var(--a-tracking-wide);
 }
-.alpha-ext-authz-chip[data-kind="new"],
-.alpha-ext-authz-chip[data-kind="risk"] {
+.codepuppy-ext-authz-chip[data-kind="new"],
+.codepuppy-ext-authz-chip[data-kind="risk"] {
   background: var(--a-warning-subtle);
   color: var(--a-warning);
 }
-.alpha-ext-authz-chip[data-kind="granted"] {
+.codepuppy-ext-authz-chip[data-kind="granted"] {
   background: var(--a-bg-muted);
   color: var(--a-text-tertiary);
 }
-.alpha-ext-authz-chip[data-kind="removed"] {
+.codepuppy-ext-authz-chip[data-kind="removed"] {
   background: var(--a-success-subtle);
   color: var(--a-success);
 }
-.alpha-ext-authz-item {
+.codepuppy-ext-authz-item {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1497,7 +1497,7 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   font-weight: var(--a-weight-medium);
   color: var(--a-text-secondary);
 }
-.alpha-ext-authz-rest {
+.codepuppy-ext-authz-rest {
   padding: 9px 14px;
   font-size: var(--a-text-xs);
   color: var(--a-text-tertiary);
@@ -1508,32 +1508,32 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
 /* ── #397 PR-B:四级货架与策展呈现(v6 已批稿;tokens 全读设计系统,零硬编码色)────────────── */
 
 /* 货架身份 chip:核心=success、精选=accent、接入=info、实验室=warning —— 四色即四货架 */
-.alpha-ext-chip[data-shelf="core"] {
+.codepuppy-ext-chip[data-shelf="core"] {
   background: var(--a-success-subtle);
   color: var(--a-success);
 }
-.alpha-ext-chip[data-shelf="precache"] {
+.codepuppy-ext-chip[data-shelf="precache"] {
   background: var(--a-accent-subtle);
   color: var(--a-accent);
 }
-.alpha-ext-chip[data-shelf="connector"] {
+.codepuppy-ext-chip[data-shelf="connector"] {
   background: var(--a-info-subtle);
   color: var(--a-info);
 }
-.alpha-ext-chip[data-shelf="labs"] {
+.codepuppy-ext-chip[data-shelf="labs"] {
   background: var(--a-warning-subtle);
   color: var(--a-warning);
 }
 
 /* 未分级卡的 ghost 安装按钮(可装但不促装) */
-.alpha-ext-add[data-variant="ghost"] {
+.codepuppy-ext-add[data-variant="ghost"] {
   background: transparent;
   color: var(--a-text-secondary);
   border: 1px solid var(--a-border);
 }
 
 /* 详情页:域名清单(mono,折叠展开) */
-.alpha-ext-domlist {
+.codepuppy-ext-domlist {
   margin-top: 8px;
   border: 1px solid var(--a-border-faint);
   border-radius: var(--a-radius-md);
@@ -1546,7 +1546,7 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
 }
 
 /* 详情页:组件与来源 row(校验态图标 + 摘要 + 动作) */
-.alpha-ext-sbomrow {
+.codepuppy-ext-sbomrow {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1557,7 +1557,7 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   font-size: var(--a-text-sm);
   background: var(--a-surface);
 }
-.alpha-ext-sbomst {
+.codepuppy-ext-sbomst {
   width: 20px;
   height: 20px;
   border-radius: 6px;
@@ -1569,22 +1569,22 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   background: var(--a-bg-muted);
   color: var(--a-text-tertiary);
 }
-.alpha-ext-sbomst[data-tone="ok"] {
+.codepuppy-ext-sbomst[data-tone="ok"] {
   background: var(--a-success-subtle);
   color: var(--a-success);
 }
-.alpha-ext-sbomst[data-tone="err"] {
+.codepuppy-ext-sbomst[data-tone="err"] {
   background: var(--a-error-subtle);
   color: var(--a-error);
 }
-.alpha-ext-sbombd {
+.codepuppy-ext-sbombd {
   min-width: 0;
   flex: 1;
 }
-.alpha-ext-sbombd b {
+.codepuppy-ext-sbombd b {
   font-weight: var(--a-weight-medium);
 }
-.alpha-ext-sbombd small {
+.codepuppy-ext-sbombd small {
   display: block;
   color: var(--a-text-tertiary);
   font-size: var(--a-text-2xs);
@@ -1592,12 +1592,12 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.alpha-ext-sbommono {
+.codepuppy-ext-sbommono {
   font-family: var(--a-font-mono);
 }
 
 /* 轻量 ghost 按钮(展开/重试;组件与来源 row 与域名折叠共用) */
-.alpha-ext-ghostbtn {
+.codepuppy-ext-ghostbtn {
   border: 1px solid var(--a-border);
   background: transparent;
   color: var(--a-text-secondary);
@@ -1608,14 +1608,14 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   cursor: pointer;
   flex: none;
 }
-.alpha-ext-ghostbtn:hover {
+.codepuppy-ext-ghostbtn:hover {
   background: var(--a-overlay-hover);
 }
 
 /* ── REQ-128 Phase 3 `#784`:单独移除被拒的行内呈现 ─────────────────────────────────────── */
 
 /* 第 8 跳:单独移除被拒 —— 拒绝 + 正确的下一步,留在行上而不是只飞一条 toast。 */
-.alpha-ext-man-refusal {
+.codepuppy-ext-man-refusal {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1623,50 +1623,50 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   flex-wrap: wrap;
 }
 /* 预览屏里「不会安装」的条目压暗 —— 语气是陈述不是报错。 */
-.alpha-ext-man[data-dim] {
+.codepuppy-ext-man[data-dim] {
   opacity: 0.72;
 }
 
 /* ── `#1287` 上架呈现段 ─────────────────────────────────────────────────────────
    发布者签名的 logo / 截图 / 开发者行。整段可缺 —— 今天已发布的条目一个都没有,
    下面每一条规则的默认态就是「这些元素根本不存在」。 */
-.alpha-ext-logo {
+.codepuppy-ext-logo {
   width: 100%;
   height: 100%;
   object-fit: cover;
   border-radius: inherit;
   display: block;
 }
-/* 深色 logo 的切换判据**逐字取自** `alpha-ui/tokens.css` 的那一对选择器(应用钉死的
+/* 深色 logo 的切换判据**逐字取自** `codepuppy-ui/tokens.css` 的那一对选择器(应用钉死的
    data-color-scheme 优先,没钉死时跟随系统)。在 JS 里重算一遍「现在算不算深色」会是
    同一条规则的第二个真源,而且不会跟着用户中途换主题更新。 */
-.alpha-ext-logo[data-package-logo="dark"] {
+.codepuppy-ext-logo[data-package-logo="dark"] {
   display: none;
 }
-:root[data-color-scheme="dark"] .alpha-ext-logo[data-package-logo="dark"] {
+:root[data-color-scheme="dark"] .codepuppy-ext-logo[data-package-logo="dark"] {
   display: block;
 }
-:root[data-color-scheme="dark"] .alpha-ext-logo[data-package-logo="light"][data-has-dark] {
+:root[data-color-scheme="dark"] .codepuppy-ext-logo[data-package-logo="light"][data-has-dark] {
   display: none;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-color-scheme="light"]):not([data-color-scheme="dark"])
-    .alpha-ext-logo[data-package-logo="dark"] {
+    .codepuppy-ext-logo[data-package-logo="dark"] {
     display: block;
   }
   :root:not([data-color-scheme="light"]):not([data-color-scheme="dark"])
-    .alpha-ext-logo[data-package-logo="light"][data-has-dark] {
+    .codepuppy-ext-logo[data-package-logo="light"][data-has-dark] {
     display: none;
   }
 }
 /* 截图条:横向滚动,单张有界 —— 发布者给多大都不许把详情页撑开。 */
-.alpha-ext-package-shots {
+.codepuppy-ext-package-shots {
   display: flex;
   gap: 10px;
   overflow-x: auto;
   padding-bottom: 4px;
 }
-.alpha-ext-package-shot {
+.codepuppy-ext-package-shot {
   height: 180px;
   width: auto;
   max-width: 100%;
@@ -1678,30 +1678,30 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
 }
 
 /* ── `#1594` 三页结构(REQ-236 批准稿 `docs/design/2026-10-30-req236-ux-config-pages/frame.html#hub`)──
-   页头 = 标题 + 一行副标题 + 本页搜索 +「添加 ▾」;列表行复用 `.alpha-ext-kit`(批准稿 `.kit`)放进双列
-   `.alpha-ext-grid`;「添加 ▾」与行上的「…」是同一种下拉(批准稿 `.set-card` + `--a-shadow-lg`)。 */
-.alpha-ext-pagehd {
+   页头 = 标题 + 一行副标题 + 本页搜索 +「添加 ▾」;列表行复用 `.codepuppy-ext-kit`(批准稿 `.kit`)放进双列
+   `.codepuppy-ext-grid`;「添加 ▾」与行上的「…」是同一种下拉(批准稿 `.set-card` + `--a-shadow-lg`)。 */
+.codepuppy-ext-pagehd {
   display: flex;
   align-items: flex-start;
   gap: 10px;
   margin-bottom: 4px;
 }
-.alpha-ext-pagehd-t {
+.codepuppy-ext-pagehd-t {
   flex: 1;
   min-width: 0;
 }
-.alpha-ext-pagehd .alpha-ext-search {
+.codepuppy-ext-pagehd .codepuppy-ext-search {
   margin: 0;
   height: 34px;
   width: 180px;
   flex: none;
 }
-.alpha-ext-pagehd .alpha-ext-more > .alpha-ext-add {
+.codepuppy-ext-pagehd .codepuppy-ext-more > .codepuppy-ext-add {
   height: 34px;
   padding: 0 14px;
   font-size: var(--a-text-sm);
 }
-.alpha-ext-grid > .alpha-ext-kit {
+.codepuppy-ext-grid > .codepuppy-ext-kit {
   margin-bottom: 0;
   min-width: 0;
   gap: 14px;
@@ -1711,27 +1711,27 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   background: var(--a-surface);
   box-shadow: var(--a-edge-light);
 }
-.alpha-ext-kit[data-clickable] {
+.codepuppy-ext-kit[data-clickable] {
   cursor: pointer;
 }
-.alpha-ext-kit-ttl b {
+.codepuppy-ext-kit-ttl b {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.alpha-ext-kit-desc[data-err] {
+.codepuppy-ext-kit-desc[data-err] {
   color: var(--a-error);
 }
-.alpha-ext-kit .alpha-ext-card-err,
-.alpha-ext-kit .alpha-ext-man-refusal {
+.codepuppy-ext-kit .codepuppy-ext-card-err,
+.codepuppy-ext-kit .codepuppy-ext-man-refusal {
   margin: 6px 0 0;
 }
-.alpha-ext-more {
+.codepuppy-ext-more {
   position: relative;
   flex: none;
 }
-.alpha-ext-menu {
+.codepuppy-ext-menu {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
@@ -1745,7 +1745,7 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   box-shadow: var(--a-shadow-lg);
   overflow: hidden;
 }
-.alpha-ext-menu-item {
+.codepuppy-ext-menu-item {
   padding: 11px 15px;
   border: none;
   border-bottom: 1px solid var(--a-border-faint);
@@ -1758,21 +1758,21 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   white-space: nowrap;
   cursor: pointer;
 }
-.alpha-ext-menu-item:last-child {
+.codepuppy-ext-menu-item:last-child {
   border-bottom: none;
 }
-.alpha-ext-menu-item:hover:not(:disabled) {
+.codepuppy-ext-menu-item:hover:not(:disabled) {
   background: var(--a-bg-muted);
 }
-.alpha-ext-menu-item:disabled {
+.codepuppy-ext-menu-item:disabled {
   color: var(--a-text-disabled);
   cursor: default;
 }
-.alpha-ext-menu-item[data-variant="danger"] {
+.codepuppy-ext-menu-item[data-variant="danger"] {
   color: var(--a-error);
 }
 /* 技能 / 助手页的「推荐 / 系统」分段(批准稿 `.form-types`) */
-.alpha-ext-seg {
+.codepuppy-ext-seg {
   display: inline-flex;
   gap: 2px;
   margin: 26px 0 4px;
@@ -1780,7 +1780,7 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   border-radius: var(--a-radius-md);
   background: var(--a-bg-muted);
 }
-.alpha-ext-seg button {
+.codepuppy-ext-seg button {
   padding: 6px 16px;
   border: none;
   border-radius: 6px;
@@ -1791,22 +1791,22 @@ body[data-alpha-sidebar="open"] .alpha-ext-page {
   font-weight: var(--a-weight-medium);
   cursor: pointer;
 }
-.alpha-ext-seg button[data-on] {
+.codepuppy-ext-seg button[data-on] {
   background: var(--a-surface);
   color: var(--a-text);
   box-shadow: var(--a-shadow-xs);
 }
-.alpha-gov-bar {
+.codepuppy-gov-bar {
   display: flex;
   align-items: center;
   gap: 8px;
   margin: 14px 0 12px;
   font-size: var(--a-text-sm);
 }
-.alpha-gov .alpha-gov-bar .alpha-gov-mode {
+.codepuppy-gov .codepuppy-gov-bar .codepuppy-gov-mode {
   margin-left: 0;
 }
-.alpha-gov .alpha-ext-grid + .alpha-gov-editor,
-.alpha-ext-grid + .alpha-gov {
+.codepuppy-gov .codepuppy-ext-grid + .codepuppy-gov-editor,
+.codepuppy-ext-grid + .codepuppy-gov {
   margin-top: 12px;
 }

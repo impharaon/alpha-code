@@ -4,8 +4,8 @@ import { createHash } from "node:crypto"
 import { existsSync, readFileSync, realpathSync } from "node:fs"
 import { userInfo, tmpdir } from "node:os"
 import { isAbsolute, join, sep } from "node:path"
-import { environmentFromMutableRoot } from "./alpha-environment"
-import { keychainBackend } from "./alpha-keychain-backend"
+import { environmentFromMutableRoot } from "./codepuppy-environment"
+import { keychainBackend } from "./codepuppy-keychain-backend"
 
 // Source: DBHub v1.5.0 CLI migration template and https://dbhub.ai/config/toml .
 export const DBHUB_READONLY_TOML =
@@ -52,7 +52,7 @@ export function officialRuntimeParent(root: string) {
   }
   const parent = join(
     temp,
-    `alpha-connectors-${process.getuid?.()}-${createHash("sha256").update(root).digest("hex").slice(0, 16)}`,
+    `codepuppy-connectors-${process.getuid?.()}-${createHash("sha256").update(root).digest("hex").slice(0, 16)}`,
   )
   return parent
 }

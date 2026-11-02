@@ -93,7 +93,7 @@ export type RunWorkspaceWriteProbeDeps = {
  */
 export function runWorkspaceWriteProbe(directory: string, deps: RunWorkspaceWriteProbeDeps = {}): WorkspaceWriteProbeResult {
   const stamp = deps.stamp ?? (() => `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`)
-  const file = join(directory, `.alpha-write-probe-${stamp()}`)
+  const file = join(directory, `.codepuppy-write-probe-${stamp()}`)
   const writeFile = deps.writeFile ?? ((p, data) => writeFileSync(p, data, { flag: "wx" }))
   const remove = deps.remove ?? ((p) => rmSync(p, { force: true }))
   try {

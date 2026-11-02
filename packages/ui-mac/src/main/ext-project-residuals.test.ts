@@ -200,13 +200,13 @@ describe("detectProjectCatalogResiduals — 只读报告", () => {
     expect(findRecordV2(root, "skill", "misplaced-skill")).not.toBeNull()
   })
 
-  test("M3 回归:无账面依据的 agent 文件与 alpha.jsonc agent 条目 → 只报告", () => {
+  test("M3 回归:无账面依据的 agent 文件与 codepuppy.jsonc agent 条目 → 只报告", () => {
     const proj = makeProject("orphan-agent")
     const root = seedRecord(proj, "backed", "agent") // 有账的不算 orphan
     fs.mkdirSync(path.join(root, "agents"), { recursive: true })
     fs.writeFileSync(path.join(root, "agents", "backed.md"), "x")
     fs.writeFileSync(path.join(root, "agents", "stray.md"), "x")
-    fs.writeFileSync(path.join(root, "alpha.jsonc"), JSON.stringify({ agent: { backed: {}, "config-stray": {} } }))
+    fs.writeFileSync(path.join(root, "codepuppy.jsonc"), JSON.stringify({ agent: { backed: {}, "config-stray": {} } }))
     const r = detectProjectCatalogResiduals(proj)
     expect(r.ok).toBe(true)
     if (!r.ok) return

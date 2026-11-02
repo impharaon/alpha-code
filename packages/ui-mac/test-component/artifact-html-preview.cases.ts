@@ -3,7 +3,7 @@
 // 为什么必须真挂载:本票的缺陷形态正是「main 侧有导出、renderer 无调用点」—— 一个只读源码字符串
 // 的断言(`expect(source).toContain(".status(")`)对「调了但渲染不出来」「渲染了但计数是假的」
 // 「没点也复制了」三种回归全部照绿。判据因此从**渲染出来的 DOM** 与**假 bridge 上真实发生的调用**
-// 取,不从源码取。宿主 wiring 见 ../src/renderer/alpha-ui/artifact-html-preview/artifact-html-preview.test.ts。
+// 取,不从源码取。宿主 wiring 见 ../src/renderer/codepuppy-ui/artifact-html-preview/artifact-html-preview.test.ts。
 
 import { transformAsync } from "@babel/core"
 import presetTypescript from "@babel/preset-typescript"
@@ -36,7 +36,7 @@ Bun.plugin({
   },
 })
 
-const { ArtifactHtmlPreview } = await import("../src/renderer/alpha-ui/artifact-html-preview/ArtifactHtmlPreview")
+const { ArtifactHtmlPreview } = await import("../src/renderer/codepuppy-ui/artifact-html-preview/ArtifactHtmlPreview")
 const { HTML_PREVIEW_MAX_BLOCKED_ENTRIES } = await import("../src/shared/html-preview")
 
 // ---- 假 bridge(记录每一次调用;绝不代替生产逻辑做任何判断)----
@@ -170,7 +170,7 @@ describe("#907 blocked resources are surfaced honestly", () => {
     const note = host.querySelector(".a-html-preview-blocked-note")!.textContent ?? ""
     expect(note.length).toBeGreaterThan(20)
     // 措辞若退化成 key 原样(缺 i18n 条目),用户读到的就是一个开发者标识符。
-    expect(note).not.toContain("alpha.htmlPreview")
+    expect(note).not.toContain("codepuppy.htmlPreview")
   })
 })
 

@@ -77,7 +77,7 @@ describe("layout deep links", () => {
   })
 
   test("drains pending deliveries once", () => {
-    const target = { __alphaDeepLinks: [openProject] } as unknown as Window
+    const target = { __codepuppyDeepLinks: [openProject] } as unknown as Window
 
     expect(drainPendingDeepLinks(target)).toEqual([openProject])
     expect(drainPendingDeepLinks(target)).toEqual([])
@@ -86,7 +86,7 @@ describe("layout deep links", () => {
   test("a layout remount finds nothing to replay", () => {
     // Mount and remount both consume by draining, so the buffer cannot serve the same delivery
     // twice — the timing the shell's payload-free event exists to make impossible.
-    const target = { __alphaDeepLinks: [newSessionWithPrompt] } as unknown as Window
+    const target = { __codepuppyDeepLinks: [newSessionWithPrompt] } as unknown as Window
     const acted: string[] = []
     const handlers = {
       openProject: () => {},

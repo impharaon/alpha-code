@@ -101,7 +101,7 @@ class DeafChild extends EventEmitter {
 
 let userDataPath = ""
 const savedEnv: Record<string, string | undefined> = {}
-const managedEnv = ["SHELL", "ALPHA_SECRETS_DISABLE", "ALPHA_CLOUD_MCP_URL", "ALPHA_CLOUD_TOKEN"] as const
+const managedEnv = ["SHELL", "CODEPUPPY_SECRETS_DISABLE", "CODEPUPPY_CLOUD_MCP_URL", "CODEPUPPY_CLOUD_TOKEN"] as const
 
 beforeEach(() => {
   userDataPath = mkdtempSync(join(tmpdir(), "sidecar-stop-"))
@@ -111,7 +111,7 @@ beforeEach(() => {
     delete process.env[key]
   }
   process.env.SHELL = "nu"
-  process.env.ALPHA_SECRETS_DISABLE = "1"
+  process.env.CODEPUPPY_SECRETS_DISABLE = "1"
 })
 
 afterEach(() => {
@@ -130,7 +130,7 @@ async function spawn(child: SidecarChild | DeafChild, port: number) {
     healthCheck: async () => true,
     fork: (() => child) as unknown as typeof import("electron").utilityProcess.fork,
     // REQ-159 `#1321`:围栏计划替身(本文件的假子进程不跑 sidecar.ts;围栏判据在 process-fence-*.test.ts)。
-    planFence: () => ({ profile: "(version 1)\n(allow default)\n(deny file-write*)\n", addonPath: "/nonexistent/alpha_fence.node" }),
+    planFence: () => ({ profile: "(version 1)\n(allow default)\n(deny file-write*)\n", addonPath: "/nonexistent/codepuppy_fence.node" }),
   })
   await result.health.wait
   return result

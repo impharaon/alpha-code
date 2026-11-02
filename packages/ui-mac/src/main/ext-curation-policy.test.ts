@@ -15,7 +15,7 @@ const curation = (catalogId: string, version: string, over: Partial<{ tier: stri
   deliveryMode: "installable",
   review: {
     reviewedAt: "2026-07-01T00:00:00Z",
-    reviewedBy: "alpha-review",
+    reviewedBy: "codepuppy-review",
     upstreamStatus: "active",
     supportTier: "best-effort",
     reviewBefore: "2027-07-01T00:00:00Z",

@@ -1,6 +1,6 @@
 ---
 name: agent-creator
-description: Create a new opencode agent (subagent or primary) from a natural-language description, and know the alpha-specific registration + hot-reload steps for ANY created extension. Use when the user asks to create/add/build an agent, a reviewer/researcher persona, or a recurring role — and ALSO after creating a skill (e.g. via skill-creator) to place it where the engine discovers it and make it take effect without restarting.
+description: Create a new opencode agent (subagent or primary) from a natural-language description, and know the codepuppy-specific registration + hot-reload steps for ANY created extension. Use when the user asks to create/add/build an agent, a reviewer/researcher persona, or a recurring role — and ALSO after creating a skill (e.g. via skill-creator) to place it where the engine discovers it and make it take effect without restarting.
 license: MIT (Code Puppy original)
 ---
 
@@ -11,7 +11,7 @@ requirement into a precisely-tuned agent specification.
 
 **Golden rule (REQ-060)**: everything you create in a project lives under `<project>/.code-puppy/` —
 **never create `.opencode` anywhere** (no directories, no files, no links). Registration goes
-through the `codepuppy_register` tool, which validates and writes the project's `.code-puppy/alpha.jsonc`
+through the `codepuppy_register` tool, which validates and writes the project's `.code-puppy/codepuppy.jsonc`
 for you and schedules the reload — do not hand-edit config files.
 
 ## Workflow
@@ -39,7 +39,7 @@ for you and schedules the reload — do not hand-edit config files.
    - `entry`: a JSON object string with the fields you designed, e.g.
      `{"description":"…","mode":"subagent","prompt":"…","permission":{"edit":"deny","bash":"deny","read":{"*":"allow","*.env*":"deny"}}}`
    - Allowed entry fields: description, prompt, mode, model, temperature, top_p, permission,
-     hidden, disable, tools, color. The tool validates, writes `<project>/.code-puppy/alpha.jsonc`
+     hidden, disable, tools, color. The tool validates, writes `<project>/.code-puppy/codepuppy.jsonc`
      atomically, and schedules a reload — the agent is usable from the **next message in this same
      session**, no app restart. Do NOT write any agent file yourself and do NOT create `.opencode`.
 4. **Global agent (only when the user says "所有项目/全局")**: session-created agents are
@@ -62,12 +62,12 @@ for you and schedules the reload — do not hand-edit config files.
 
 ## Creating SKILLS (alpha specifics — use together with skill-creator)
 
-skill-creator teaches the generic methodology; these are the alpha-specific rules it doesn't know:
+skill-creator teaches the generic methodology; these are the codepuppy-specific rules it doesn't know:
 
 - **Project skill (default)**: write `<project>/.code-puppy/skills/<name>/SKILL.md`, then call
   `codepuppy_register` with `type: "skill"` (no name/entry needed — it registers the skills path once).
   Never write into `.opencode`.
-- **Global (only when asked)**: write `$ALPHA_GLOBAL_DIR/skills/<name>/SKILL.md` — the desktop
+- **Global (only when asked)**: write `$CODEPUPPY_GLOBAL_DIR/skills/<name>/SKILL.md` — the desktop
   process supplies this absolute, canonical current-environment root and the engine discovers the
   directory natively (no registration needed). Never synthesize, replace, or redirect this value;
   the retired `$HOME/.alpha` root is not a fallback.

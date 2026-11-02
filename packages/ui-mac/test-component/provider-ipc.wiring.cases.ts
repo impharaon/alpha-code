@@ -1,15 +1,15 @@
 // provider-ipc wiring (REQ-226 `#1343`, R1 audit finding 1 + R2 blocker) — run by src/main/provider-ipc.wiring.test.ts
 // in a SUBPROCESS, because `mock.module("electron")` is process-global (same reason as app-version-ipc.wiring).
-// It lives in test-component/ (like alpha-composer-model.cases.ts) because it sets ALPHA_GLOBAL_DIR to a temp
-// root and alpha-environment.test.ts forbids that assignment in any non-test file under src/main.
+// It lives in test-component/ (like codepuppy-composer-model.cases.ts) because it sets CODEPUPPY_GLOBAL_DIR to a temp
+// root and codepuppy-environment.test.ts forbids that assignment in any non-test file under src/main.
 //
 // What is under test is the real IPC handler chain: `providers-set-key` → provider-lifecycle → the real
-// alpha-byok-keys store (only its one-function keychain seam is faked) → the real ext-config writer on temp
+// codepuppy-byok-keys store (only its one-function keychain seam is faked) → the real ext-config writer on temp
 // config files. R1: a catalog id whose config block still carries a pre-#1343 inline plaintext key is
 // `needs-reentry` (configured:false), so the picker never offers "remove" and a plain setKey never touched
 // config — the plaintext would stay forever; re-entering the key must retire it. R2 (the regression the first
 // fix introduced): retiring the whole `provider.<id>` block threw `Can not delete in empty document` when
-// alpha.jsonc had no `provider` key at all (opencode-CLI user, plaintext only in the XDG copy) — so the key
+// codepuppy.jsonc had no `provider` key at all (opencode-CLI user, plaintext only in the XDG copy) — so the key
 // never reached the store — and would have deleted the user's hand-written npm / baseURL / models. Only the
 // `options.apiKey` LEAF may go, and only from files that actually carry it. Red-first: on the first-fix chain
 // ① ③ ④ ⑥ fail; on the pre-fix chain (`setByokKey` alone) ① ③ ④ fail.
@@ -37,7 +37,7 @@ mock.module("electron", () => ({
     },
   },
 }))
-mock.module("../src/main/alpha-keychain-backend", () => ({
+mock.module("../src/main/codepuppy-keychain-backend", () => ({
   keychainBackend: () => ({
     isEncryptionAvailable: () => true,
     encryptString: (value: string) => Buffer.from(value, "utf8"),
@@ -51,7 +51,7 @@ mock.module("../src/main/logging", () => ({
 }))
 
 const { registerProviderIpcHandlers } = await import("../src/main/provider-ipc")
-const { clearByokKeys, getByokKey, initByokKeys, setByokKeyDeps } = await import("../src/main/alpha-byok-keys")
+const { clearByokKeys, getByokKey, initByokKeys, setByokKeyDeps } = await import("../src/main/codepuppy-byok-keys")
 const { setProviderLifecycleDeps } = await import("../src/main/provider-lifecycle")
 registerProviderIpcHandlers()
 
@@ -64,14 +64,14 @@ const setKey = (id: string, key: string) => invoke<Result>("providers-set-key", 
 // Deliberately non-key-shaped test values (never real credentials).
 const LEGACY = "legacy-plain-value-Ab12"
 const SECRET = "test-value-not-a-real-key-Zq81"
-const MANAGED = ["ALPHA_GLOBAL_DIR", "OPENCODE_CONFIG_DIR", "DEEPSEEK_API_KEY"]
+const MANAGED = ["CODEPUPPY_GLOBAL_DIR", "OPENCODE_CONFIG_DIR", "DEEPSEEK_API_KEY"]
 const saved: Record<string, string | undefined> = {}
 let tmp = ""
 let userData = ""
 let notified = 0
 let refreshes = 0
 
-const primary = () => path.join(process.env.ALPHA_GLOBAL_DIR!, "alpha.jsonc")
+const primary = () => path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "codepuppy.jsonc")
 const legacyCopy = () => path.join(tmp, "opencode.jsonc") // the user's own opencode CLI config (XDG read path)
 const writeProviders = (file: string, provider: Record<string, unknown>) => {
   fs.mkdirSync(path.dirname(file), { recursive: true })
@@ -85,11 +85,11 @@ beforeEach(() => {
     saved[k] = process.env[k]
     delete process.env[k]
   }
-  tmp = fs.mkdtempSync(path.join(os.tmpdir(), "alpha-provider-ipc-"))
-  process.env.ALPHA_GLOBAL_DIR = path.join(fs.realpathSync(tmp), "alpha-code-state", "env", "dev")
-  fs.mkdirSync(process.env.ALPHA_GLOBAL_DIR, { recursive: true })
+  tmp = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-provider-ipc-"))
+  process.env.CODEPUPPY_GLOBAL_DIR = path.join(fs.realpathSync(tmp), "codepuppy-state", "env", "dev")
+  fs.mkdirSync(process.env.CODEPUPPY_GLOBAL_DIR, { recursive: true })
   process.env.OPENCODE_CONFIG_DIR = tmp
-  userData = fs.mkdtempSync(path.join(os.tmpdir(), "alpha-provider-ipc-userdata-"))
+  userData = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-provider-ipc-userdata-"))
   notified = 0
   refreshes = 0
   clearByokKeys()
@@ -114,7 +114,7 @@ afterEach(() => {
 })
 
 describe("providers-set-key — re-entering a key retires ONLY the legacy plaintext leaf (R1 finding 1 / R2 blocker)", () => {
-  test("① audit scenario: alpha.jsonc is only {$schema}, the plaintext lives in the user's CLI copy ⇒ key stored, that apiKey leaf gone, everything else identical, status keychain", () => {
+  test("① audit scenario: codepuppy.jsonc is only {$schema}, the plaintext lives in the user's CLI copy ⇒ key stored, that apiKey leaf gone, everything else identical, status keychain", () => {
     const schemaOnly = '{\n  "$schema": "https://opencode.ai/config.json"\n}\n'
     fs.mkdirSync(path.dirname(primary()), { recursive: true })
     fs.writeFileSync(primary(), schemaOnly)
@@ -178,7 +178,7 @@ describe("providers-set-key — re-entering a key retires ONLY the legacy plaint
   test("④ config lock busy while retiring the leaf: refused as busy, key NOT stored, file untouched, no respawn; after release the same call succeeds and only the leaf is gone", () => {
     writeProviders(primary(), { deepseek: { options: { baseURL: "https://api.deepseek.com/v1", apiKey: LEGACY } } })
     const before = fs.readFileSync(primary(), "utf8")
-    const held = tryAcquireBundleLock(process.env.ALPHA_GLOBAL_DIR!, { txId: "tx-in-flight" })
+    const held = tryAcquireBundleLock(process.env.CODEPUPPY_GLOBAL_DIR!, { txId: "tx-in-flight" })
     expect(held.ok).toBe(true)
     if (!held.ok) return
     try {
@@ -195,10 +195,10 @@ describe("providers-set-key — re-entering a key retires ONLY the legacy plaint
     expect(providersIn(primary()).deepseek).toEqual({ options: { baseURL: "https://api.deepseek.com/v1" } })
   })
 
-  // `#1392`:providers-add / providers-remove 走真源文件(<casBaseRoot>/custom-providers/<env>.json),alpha.jsonc 不参与 ——
-  // 即使 alpha.jsonc 里躺着同名旧块,添加与删除都不碰它(基线 I3:旧记录只忽略 + 一行日志,server.ts)。
-  test("⑤ providers-add writes the truth file, providers-remove goes store → truth → refresh; alpha.jsonc is never written", async () => {
-    const truth = path.join(fs.realpathSync(tmp), "alpha-code-state", "custom-providers", "dev.json")
+  // `#1392`:providers-add / providers-remove 走真源文件(<casBaseRoot>/custom-providers/<env>.json),codepuppy.jsonc 不参与 ——
+  // 即使 codepuppy.jsonc 里躺着同名旧块,添加与删除都不碰它(基线 I3:旧记录只忽略 + 一行日志,server.ts)。
+  test("⑤ providers-add writes the truth file, providers-remove goes store → truth → refresh; codepuppy.jsonc is never written", async () => {
+    const truth = path.join(fs.realpathSync(tmp), "codepuppy-state", "custom-providers", "dev.json")
     const old = { "my-endpoint": { options: { baseURL: "https://stale.invalid/v1", apiKey: "alpha-keychain" } } }
     writeProviders(primary(), old)
     const before = fs.readFileSync(primary(), "utf8")
@@ -216,7 +216,7 @@ describe("providers-set-key — re-entering a key retires ONLY the legacy plaint
     expect(refreshes).toBe(2)
   })
 
-  test("⑥ alpha's marker block in alpha.jsonc + a plaintext leaf for the same id in the user's CLI copy: marker file byte-identical, the CLI copy's leaf retired", () => {
+  test("⑥ alpha's marker block in codepuppy.jsonc + a plaintext leaf for the same id in the user's CLI copy: marker file byte-identical, the CLI copy's leaf retired", () => {
     writeProviders(primary(), { "my-endpoint": { options: { baseURL: "https://x.invalid/v1", apiKey: "alpha-keychain" } } })
     writeProviders(legacyCopy(), { "my-endpoint": { options: { baseURL: "https://cli.invalid/v1", apiKey: LEGACY } } })
     const before = fs.readFileSync(primary(), "utf8")

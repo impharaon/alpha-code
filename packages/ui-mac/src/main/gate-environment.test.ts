@@ -7,7 +7,7 @@
 //           起的子进程全是这个形状。声明在 `packages/ui-mac/scripts/test-preload.ts`
 //           (`setDefaultTimeout`),因为 host 自己拼 argv,传不进 CLI flag。
 //   形状 B:多文件运行 —— CI 的三条 test 步、`assert-gate-files.sh` 的 77 次点名、
-//           `alpha-check.sh` 的 [4/9] 全是这个形状。声明在 `scripts/bun-test-floor.sh`
+//           `codepuppy-check.sh` 的 [4/9] 全是这个形状。声明在 `scripts/bun-test-floor.sh`
 //           (`bun test --timeout`),因为**这才是所有闸门运行的唯一入口**。
 //
 // 为什么需要它:本包有 31 条 host 用例在子进程里跑整套 `.cases.ts`(粒度是每条 `test(...)`
@@ -34,7 +34,7 @@ const SLOW = path.resolve(UI_MAC, "test-component/gate-environment.cases.ts")
 const FIRST = path.resolve(UI_MAC, "test-component/gate-environment-first.cases.ts")
 
 // `#777` 实测:形状 B 要经 `bash scripts/bun-test-floor.sh`,而那个脚本里写的是裸 `bun`。
-// 在 alpha-ci 上第一版直接挂在 `bun-test-floor.sh: line 55: bun: command not found` ——
+// 在 codepuppy-ci 上第一版直接挂在 `bun-test-floor.sh: line 55: bun: command not found` ——
 // 从 bun 进程 spawn 出去的 bash 拿到的 PATH 里没有 runner 装的那个 bun。
 // 把**正在跑本测试的那个 bun**所在目录前置进 PATH:既修好,也保证父子跑的是同一个二进制。
 const BUN_DIR = path.dirname(process.execPath)
@@ -58,11 +58,11 @@ test(
     expect(solo.output).toMatch(/Ran 2 tests across 1 file/)
     expect(solo.output).toMatch(/\b2 pass\b/)
     expect(solo.output).toMatch(/\b0 fail\b/)
-    // 子进程必须**自陈**平台那一半这次到底跑没跑到 —— 开发机(darwin)跑不到,alpha-ci 跑得到。
+    // 子进程必须**自陈**平台那一半这次到底跑没跑到 —— 开发机(darwin)跑不到,codepuppy-ci 跑得到。
     expect(solo.output).toMatch(/\[gate-environment\] host=/)
     // 并且要**转述到本次运行的输出里**:子进程的 stdout 被 host 吃进变量,只有失败时才抛出来 ——
     // 于是「降级了什么」这句话在绿的那一次反而看不见,而那正是需要它的时候(`#777` 实测:
-    // 第一版在 alpha-ci 全绿的 run 里 grep 不到任何一行自陈)。
+    // 第一版在 codepuppy-ci 全绿的 run 里 grep 不到任何一行自陈)。
     for (const line of solo.output.split("\n")) {
       if (/\[gate-environment\] host=|PLATFORM SIMULATED/.test(line)) console.log(`  ↳ ${line.trim()}`)
     }

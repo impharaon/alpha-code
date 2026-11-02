@@ -7,16 +7,16 @@ import { basename, join } from "node:path"
 import { injectMcpDefaultDeny } from "./mcp-default-deny"
 
 let root: string
-let alphaConfigPath: string
+let codepuppyConfigPath: string
 let userConfigDir: string
 let logs: string[]
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "mcp-default-deny-"))
-  alphaConfigPath = join(root, "alpha.jsonc")
+  codepuppyConfigPath = join(root, "codepuppy.jsonc")
   userConfigDir = join(root, "real-user-config")
   mkdirSync(userConfigDir, { recursive: true })
-  writeFileSync(alphaConfigPath, "{}")
+  writeFileSync(codepuppyConfigPath, "{}")
   logs = []
 })
 
@@ -29,7 +29,7 @@ const apply = (
   options: Partial<Parameters<typeof injectMcpDefaultDeny>[1]> = {},
 ) =>
   injectMcpDefaultDeny(config, {
-    alphaConfigPath,
+    codepuppyConfigPath,
     userConfigDir,
     logError: (message) => logs.push(message),
     ...options,
@@ -54,10 +54,10 @@ describe("injectMcpDefaultDeny — G1 default-deny", () => {
     ])
   })
 
-  test("回归:仅写 G1 denial,alpha.jsonc 治理项不复制且既有 cloud/injected 不写 timeout", () => {
+  test("回归:仅写 G1 denial,codepuppy.jsonc 治理项不复制且既有 cloud/injected 不写 timeout", () => {
     writeFileSync(
-      alphaConfigPath,
-      JSON.stringify({ mcp: { governed: { type: "local", command: ["alpha-governed"] } } }),
+      codepuppyConfigPath,
+      JSON.stringify({ mcp: { governed: { type: "local", command: ["codepuppy-governed"] } } }),
     )
     writeFileSync(
       join(userConfigDir, "config.json"),
@@ -73,7 +73,7 @@ describe("injectMcpDefaultDeny — G1 default-deny", () => {
     const config = {
       mcp: {
         cloud: { type: "remote", url: "https://alpha.example/mcp", enabled: true },
-        injected: { type: "local", command: ["alpha-injected"] },
+        injected: { type: "local", command: ["codepuppy-injected"] },
       } as Record<string, unknown>,
     }
 
@@ -89,7 +89,7 @@ describe("injectMcpDefaultDeny — G1 default-deny", () => {
     })
     expect(config.mcp.injected).toEqual({
       type: "local",
-      command: ["alpha-injected"],
+      command: ["codepuppy-injected"],
     })
     expect(config.mcp.stray).toEqual({ enabled: false })
     expect(
@@ -106,7 +106,7 @@ describe("injectMcpDefaultDeny — G1 default-deny", () => {
   // #223 R6 Major:名字不是治理凭据。以前 `"cloud"` 是写死的治理名,于是**不代付时**用户全局配置
   // 里一个自称 cloud 的第三方 server 被永久豁免默认拒绝 —— 连 enabled:false 都不写。
   test("回归:注入面这一轮没放 cloud 时,用户全局的同名 server 照样进默认拒绝", () => {
-    writeFileSync(alphaConfigPath, JSON.stringify({ mcp: {} }))
+    writeFileSync(codepuppyConfigPath, JSON.stringify({ mcp: {} }))
     writeFileSync(
       join(userConfigDir, "config.json"),
       JSON.stringify({ mcp: { cloud: { type: "remote", url: "https://user.example/mcp" } } }),
@@ -180,15 +180,15 @@ describe("injectMcpDefaultDeny — JSONC 与失败隔离", () => {
   })
 })
 
-// ── `#1381`:alpha.jsonc 里的远程条目不是治理凭据 ────────────────────────────────────────
-describe("injectMcpDefaultDeny — `#1381` alpha.jsonc 的 type:\"remote\" 条目", () => {
-  test("不在本轮注入名单的 alpha.jsonc 远程条目 ⇒ 压成 enabled:false 并出声;它不再让同名的用户全局条目免于默认拒绝;本地条目照旧是治理来源", () => {
+// ── `#1381`:codepuppy.jsonc 里的远程条目不是治理凭据 ────────────────────────────────────────
+describe("injectMcpDefaultDeny — `#1381` codepuppy.jsonc 的 type:\"remote\" 条目", () => {
+  test("不在本轮注入名单的 codepuppy.jsonc 远程条目 ⇒ 压成 enabled:false 并出声;它不再让同名的用户全局条目免于默认拒绝;本地条目照旧是治理来源", () => {
     writeFileSync(
-      alphaConfigPath,
+      codepuppyConfigPath,
       JSON.stringify({
         mcp: {
           "stale-remote": { type: "remote", url: "https://stale.example/mcp" },
-          "local-gov": { type: "local", command: ["alpha-governed"] },
+          "local-gov": { type: "local", command: ["codepuppy-governed"] },
         },
       }),
     )
@@ -208,12 +208,12 @@ describe("injectMcpDefaultDeny — `#1381` alpha.jsonc 的 type:\"remote\" 条�
     expect(config.mcp).toEqual({ "stale-remote": { enabled: false } })
     expect(logs).toEqual([
       '[req109-535] default-denied user-global MCP names=["stale-remote"]',
-      `[alpha-code#1381] default-denied remote MCP entries in ${alphaConfigPath} (not in the main-only truth file, so neither injected nor authorized) names=["stale-remote"]`,
+      `[alpha-code#1381] default-denied remote MCP entries in ${codepuppyConfigPath} (not in the main-only truth file, so neither injected nor authorized) names=["stale-remote"]`,
     ])
   })
 
-  test("本轮从真源注入的远程条目是治理来源:alpha.jsonc 同名远程条目不压、用户全局同名条目不拒、注入的条目一个字不动", () => {
-    writeFileSync(alphaConfigPath, JSON.stringify({ mcp: { "my-mcp": { type: "remote", url: "https://old.example/mcp" } } }))
+  test("本轮从真源注入的远程条目是治理来源:codepuppy.jsonc 同名远程条目不压、用户全局同名条目不拒、注入的条目一个字不动", () => {
+    writeFileSync(codepuppyConfigPath, JSON.stringify({ mcp: { "my-mcp": { type: "remote", url: "https://old.example/mcp" } } }))
     writeFileSync(join(userConfigDir, "config.json"), JSON.stringify({ mcp: { "my-mcp": { type: "remote", url: "https://user.example/mcp" } } }))
     const config = { mcp: { "my-mcp": { type: "remote", url: "https://mcp.example.com/mcp", enabled: true } } as Record<string, unknown> }
 

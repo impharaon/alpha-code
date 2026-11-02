@@ -1,5 +1,5 @@
-// REQ-236 AC1 / AC2(原子写)/ AC4(`#1562`)—— 续期热应用的生产链:真 alpha-auth(refreshTokens → doRefresh →
-// applyCredentials)+ 真 alpha-secret-files(syncSecretFiles 记 fork 集合、applyPlatformCredentialsHot 原子写)+ 真
+// REQ-236 AC1 / AC2(原子写)/ AC4(`#1562`)—— 续期热应用的生产链:真 codepuppy-auth(refreshTokens → doRefresh →
+// applyCredentials)+ 真 codepuppy-secret-files(syncSecretFiles 记 fork 集合、applyPlatformCredentialsHot 原子写)+ 真
 // sidecar-lifecycle(createSidecarRespawnQueue、armRespawnGenerationTerminal)。index.ts 结构上进不了 bun,
 // doRespawnSidecar 里「先捕获代 → fork → 健康终态后才 markTokenGenerationApplied(捕获代)」那一行 glue 在下面照抄,
 // 形状由 sidecar-lifecycle.test.ts 的 ANCHOR 钉住。终态上界用生产同一个数(index.ts 的 20000)。
@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, mock, test, vi } from "bun:tes
 import * as fs from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { RoutePurpose } from "@alpha-code/contracts-consumer"
+import type { RoutePurpose } from "@codepuppy/contracts-consumer"
 import type { SidecarGenerationState } from "../preload/types"
 
 const logged: string[] = []
@@ -58,16 +58,16 @@ mock.module("./logging", () => ({
 }))
 
 const { getAuthState, getTokenGeneration, initAuthEnv, markTokenGenerationApplied, refreshTokens, setAuthDeps } = await import(
-  "./alpha-auth"
+  "./codepuppy-auth"
 )
 const { applyPlatformCredentialsHot, secretFilePath, syncSecretFiles, writeSecretFileAtomic } = await import(
-  "./alpha-secret-files"
+  "./codepuppy-secret-files"
 )
 const { armRespawnGenerationTerminal, createSidecarRespawnQueue, planUnhealthyForkRetry } = await import("./sidecar-lifecycle")
 const { initialSelfHealState, noteSpawn } = await import("./sidecar-self-heal")
 
 const PURPOSES = ["model.invoke", "cloud.dispatch", "cloud.read", "artifact.read", "account.read"] as const
-const MANAGED_ENV = ["ALPHA_API_KEY", "ALPHA_CLOUD_TOKEN", "ALPHA_MCP_TOKEN", "ALPHA_BASE_URL", "ALPHA_CLOUD_MCP_URL", "DEV_PLATFORM_TOKEN"]
+const MANAGED_ENV = ["CODEPUPPY_API_KEY", "CODEPUPPY_CLOUD_TOKEN", "CODEPUPPY_MCP_TOKEN", "CODEPUPPY_BASE_URL", "CODEPUPPY_CLOUD_MCP_URL", "DEV_PLATFORM_TOKEN"]
 /** index.ts doRespawnSidecar 传给 armRespawnGenerationTerminal 的终态上界。 */
 const RESPAWN_TERMINAL_MS = 20_000
 const ROTATION_WAIT_MS = 10_000
@@ -108,7 +108,7 @@ function loginAndFork(withMcp: boolean) {
   const mcp = withMcp ? "SENTINEL-MCP-BOOT-77e1" : undefined
   if (mcp) issued.push(mcp)
   fs.writeFileSync(
-    join(dataPath, "alpha-auth.json"),
+    join(dataPath, "codepuppy-auth.json"),
     JSON.stringify({
       v: 1,
       plain: JSON.stringify({
@@ -157,7 +157,7 @@ const flush = async (ticks = 50) => {
 }
 
 beforeEach(() => {
-  dataPath = fs.mkdtempSync(join(tmpdir(), "alpha-hot-apply-"))
+  dataPath = fs.mkdtempSync(join(tmpdir(), "codepuppy-hot-apply-"))
   respawns = []
   pushed = []
   issued = []
@@ -197,8 +197,8 @@ describe("AC1 同身份普通续期热应用,不重启引擎", () => {
       const renewal = serveRenewal(round, true)
       const result = await refreshTokens()
       expect(result).toMatchObject({ outcome: "refreshed", applied: true })
-      expect(readSecret("ALPHA_API_KEY")).toBe(renewal.tokens["model.invoke"])
-      expect(readSecret("ALPHA_MCP_TOKEN")).toBe(renewal.mcp)
+      expect(readSecret("CODEPUPPY_API_KEY")).toBe(renewal.tokens["model.invoke"])
+      expect(readSecret("CODEPUPPY_MCP_TOKEN")).toBe(renewal.mcp)
       expect(getAuthState().platformStatus).toBe("ready")
     }
     expect(respawns).toEqual([])
@@ -264,12 +264,12 @@ describe("AC4 凭据在场性改变或热写失败 ⇒ structural,只认捕获�
   test("热写失败(凭据目录不可写)⇒ 同样走 credential-change 重启,不报已应用", async () => {
     const forked = loginAndFork(true)
     const harness = structuralHarness(forked, [() => Promise.resolve({ health: { wait: Promise.resolve("ok") } })])
-    fs.chmodSync(join(dataPath, "alpha-secrets"), 0o500)
+    fs.chmodSync(join(dataPath, "codepuppy-secrets"), 0o500)
     try {
       serveRenewal("SENTINEL-WRITE-FAIL", true)
       expect(await refreshTokens()).toMatchObject({ outcome: "refreshed", applied: true })
     } finally {
-      fs.chmodSync(join(dataPath, "alpha-secrets"), 0o700)
+      fs.chmodSync(join(dataPath, "codepuppy-secrets"), 0o700)
     }
     expect(respawns).toEqual(["credential-change"])
     expect(harness.terminals.map((state) => state.status)).toEqual(["ready"])
@@ -387,13 +387,13 @@ describe("AC2 凭据文件原子替换", () => {
   `
 
   async function race(write: (dir: string, name: string, value: string) => void) {
-    const dir = join(dataPath, "alpha-secrets")
+    const dir = join(dataPath, "codepuppy-secrets")
     fs.mkdirSync(dir, { recursive: true })
-    write(dir, "ALPHA_API_KEY", A)
-    const reader = Bun.spawn([process.execPath, "-e", READER, join(dir, "ALPHA_API_KEY")], { stdout: "pipe", stderr: "pipe" })
+    write(dir, "CODEPUPPY_API_KEY", A)
+    const reader = Bun.spawn([process.execPath, "-e", READER, join(dir, "CODEPUPPY_API_KEY")], { stdout: "pipe", stderr: "pipe" })
     const end = Date.now() + 1500
     for (let index = 0; Date.now() < end; index++) {
-      write(dir, "ALPHA_API_KEY", index % 2 === 0 ? B : A)
+      write(dir, "CODEPUPPY_API_KEY", index % 2 === 0 ? B : A)
       if (index % 20 === 0) await new Promise((resolve) => setTimeout(resolve, 0))
     }
     const output = await new Response(reader.stdout).text()

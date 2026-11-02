@@ -3,15 +3,15 @@
 // 咽喉的完备性不靠「我列了四个注入点」这种散文,靠一条派生链,每一环都是可执行断言:
 //   ① `packages/plugin/src/index.ts` 的 `Hooks` 接口 = 插件能碰引擎的**全部**方式(单一权威)。
 //      从源码解析它的键集,与登记簿的 HOOK_CONTEXT_CLASS 键集比对 —— 上游加钩子、我们漏分类,即红。
-//   ② 真 AlphaExt 实现了的钩子里,分类为「载上下文」的那几个,集合必须逐字等于本文件设了咽喉的
+//   ② 真 CodePuppyExt 实现了的钩子里,分类为「载上下文」的那几个,集合必须逐字等于本文件设了咽喉的
 //      那几个 —— alpha 明天多实现一个 messages.transform 而没写咽喉,即红。
 //   ③ 每个咽喉:跑**真钩子**,把它送出去的每一个字符串与登记簿比对;并在同一测试里用一个
 //      **已知的坏**(包一层真钩子再多塞一段)证明判官看得见 —— 「先证明手段能测出已知的坏」。
 //
 // ui-mac 经 cfg.instructions 写的两份 .md(`#1296`)与经 cfg.agent.* 写的三个 agent 的字(`#1299`)也在同一份登记簿里;
-// ui-mac 侧的咽喉(跑真 injectAlphaConfig、罩整份 config)在 packages/ui-mac/src/main/config-injection-throat.test.ts(`#1305`),
+// ui-mac 侧的咽喉(跑真 injectCodePuppyConfig、罩整份 config)在 packages/ui-mac/src/main/config-injection-throat.test.ts(`#1305`),
 // 本文件只钉登记形状、判官与跨包前提(③e / ③f)。
-// 已知不覆盖:项目自己的 plugins / alpha.jsonc(用户的字);skills 正文与 MCP 工具表(别人的字)。
+// 已知不覆盖:项目自己的 plugins / codepuppy.jsonc(用户的字);skills 正文与 MCP 工具表(别人的字)。
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs"
@@ -49,9 +49,9 @@ import {
   VISION_TOOL_REFUSED_TEXT,
 } from "./context-injection"
 import { REBRAND_RULES } from "./prompt-rebrand"
-import { ALPHA_AGENT_TEXT } from "../../ui-mac/src/main/alpha-agents"
-import { ALPHA_BEHAVIOR_MD } from "../../ui-mac/src/main/alpha-behavior"
-import { buildAlphaIdentity } from "../../ui-mac/src/main/alpha-identity"
+import { CODEPUPPY_AGENT_TEXT } from "../../ui-mac/src/main/codepuppy-agents"
+import { CODEPUPPY_BEHAVIOR_MD } from "../../ui-mac/src/main/codepuppy-behavior"
+import { buildCodePuppyIdentity } from "../../ui-mac/src/main/codepuppy-identity"
 import { CLOUD_MCP_ARM_ENV, CLOUD_MCP_DEF_ENV, CLOUD_MCP_SERVER_ENV } from "./cloud-websearch-kill"
 import { ATTACHMENT_METADATA_KEY } from "../../ui-mac/src/shared/attachment-path"
 
@@ -90,16 +90,16 @@ describe("① 通路枚举派生自 packages/plugin 的 Hooks 接口", () => {
   })
 })
 
-// ── 真 AlphaExt 的装载夹具(与 platform-output-cap.test.ts 同形)────────────────────────
+// ── 真 CodePuppyExt 的装载夹具(与 platform-output-cap.test.ts 同形)────────────────────────
 
 const SANITIZE = [
-  "ALPHA_FACTORY_SKILL_DIRS",
-  "ALPHA_FACTORY_DENY_SKILLS",
-  "ALPHA_PROMPT_REBRAND_DISABLE",
-  "ALPHA_EXT_VERBOSE",
-  "ALPHA_GLOBAL_DIR",
+  "CODEPUPPY_FACTORY_SKILL_DIRS",
+  "CODEPUPPY_FACTORY_DENY_SKILLS",
+  "CODEPUPPY_PROMPT_REBRAND_DISABLE",
+  "CODEPUPPY_EXT_VERBOSE",
+  "CODEPUPPY_GLOBAL_DIR",
   // `#1419`:云端识图的三个输入 —— 没有它们时 system.transform 走「云端不可用」那一句,chat.message 走失败块。
-  "ALPHA_BASE_URL",
+  "CODEPUPPY_BASE_URL",
   CLOUD_MCP_ARM_ENV,
   CLOUD_MCP_DEF_ENV,
   CLOUD_MCP_SERVER_ENV,
@@ -110,7 +110,7 @@ let root = ""
 const saved = new Map<string, string | undefined>()
 
 beforeEach(() => {
-  root = realpathSync(mkdtempSync(join(tmpdir(), "alpha-ext-ctxinj-")))
+  root = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-ctxinj-")))
   const global = join(root, "global", "env", "dev")
   mkdirSync(global, { recursive: true })
   mkdirSync(join(root, "project"), { recursive: true })
@@ -118,7 +118,7 @@ beforeEach(() => {
     saved.set(k, process.env[k])
     delete process.env[k]
   }
-  process.env.ALPHA_GLOBAL_DIR = global
+  process.env.CODEPUPPY_GLOBAL_DIR = global
 })
 afterEach(() => {
   for (const k of SANITIZE) {
@@ -139,15 +139,15 @@ const PROVIDER_LIST = {
 }
 
 async function loadHooks(): Promise<Hooks> {
-  const { AlphaExt } = await import("./plugin")
-  return (await AlphaExt({
+  const { CodePuppyExt } = await import("./plugin")
+  return (await CodePuppyExt({
     directory: join(root, "project"),
     worktree: join(root, "project"),
     client: { instance: { dispose: async () => {} }, provider: { list: async () => PROVIDER_LIST } },
-  } as unknown as Parameters<typeof AlphaExt>[0])) as unknown as Hooks
+  } as unknown as Parameters<typeof CodePuppyExt>[0])) as unknown as Hooks
 }
 
-/** 本文件为之设了咽喉的钩子。② 要求它与「真 AlphaExt 实现且分类为 context」的集合逐字相等。 */
+/** 本文件为之设了咽喉的钩子。② 要求它与「真 CodePuppyExt 实现且分类为 context」的集合逐字相等。 */
 const THROATED = [
   "chat.message",
   "config",
@@ -204,15 +204,15 @@ describe("③a config 咽喉:hook 写进 cfg 的每个字符串都必须由登�
       expect(leaves.map((l) => l.pointer)).toContain(p)
     expect(unexplainedDelta(before, after)).toEqual([])
   })
-  test("#1522 AC3:弃用占位只指向 /customize-code-puppy,不提供恢复路径", async () => {
+  test("#1522 AC3:弃用占位只指向 /customize-codepuppy,不提供恢复路径", async () => {
     const dir = join(root, "factory-skills")
     mkdirSync(dir, { recursive: true })
-    process.env.ALPHA_FACTORY_DENY_SKILLS = JSON.stringify(["customize-opencode"])
-    process.env.ALPHA_FACTORY_SKILL_DIRS = JSON.stringify([dir])
+    process.env.CODEPUPPY_FACTORY_DENY_SKILLS = JSON.stringify(["customize-opencode"])
+    process.env.CODEPUPPY_FACTORY_SKILL_DIRS = JSON.stringify([dir])
     const { before, after } = await runConfig({})
     const command = (after.command as Record<string, { description: string; template: string }>)["customize-opencode"]
-    expect(command.description).toBe("(已弃用)请使用 /customize-code-puppy")
-    expect(command.template).toBe("该技能(customize-opencode)已弃用。定制 Code Puppy 请改用 /customize-code-puppy。")
+    expect(command.description).toBe("(已弃用)请使用 /customize-codepuppy")
+    expect(command.template).toBe("该技能(customize-opencode)已弃用。定制 Code Puppy 请改用 /customize-codepuppy。")
     const pointers = stringLeaves(after).map((l) => l.pointer)
     expect(pointers).toContain("/command/customize-opencode/template")
     expect(pointers).toContain("/command/customize-opencode/description")
@@ -348,10 +348,10 @@ describe("③b system.transform 咽喉:输出 == 输入 + 登记过的替换,一
     expect(unexplainedSystem(input, offline)).toEqual([])
     expect(offline.length).toBe(2)
     expect(offline[1]).toBe(VISION_SYSTEM_NOTE_OFFLINE_TEXT)
-    // 云端可用:ALPHA_BASE_URL + 云 MCP 定义(带 {file:} 凭据,文件在场)+ server 名
+    // 云端可用:CODEPUPPY_BASE_URL + 云 MCP 定义(带 {file:} 凭据,文件在场)+ server 名
     const token = join(root, "mcp-token")
     writeFileSync(token, "tok-throat\n")
-    process.env.ALPHA_BASE_URL = "https://gateway.invalid/v1"
+    process.env.CODEPUPPY_BASE_URL = "https://gateway.invalid/v1"
     process.env[CLOUD_MCP_SERVER_ENV] = "codepuppy"
     process.env[CLOUD_MCP_DEF_ENV] = JSON.stringify({ type: "remote", url: "https://cloud.invalid/mcp", enabled: true, headers: { Authorization: `Bearer {file:${token}}` }, oauth: false })
     const online = await runSystem(input, BLIND)
@@ -400,7 +400,7 @@ function unexplainedTools(tools: ToolMap): string[] {
 }
 
 describe("③c 工具表咽喉:每个 description 都是登记项,登记项也不许有实际没有的工具", () => {
-  test("真 AlphaExt 的工具:零无解释;且 TOOL_TEXT 的键集 == 实际工具名", async () => {
+  test("真 CodePuppyExt 的工具:零无解释;且 TOOL_TEXT 的键集 == 实际工具名", async () => {
     const hooks = await loadHooks()
     const tools = hooks.tool as ToolMap
     expect(Object.keys(tools).sort()).toEqual(Object.keys(TOOL_TEXT).sort())
@@ -417,7 +417,7 @@ describe("③c 工具表咽喉:每个 description 都是登记项,登记项也�
       logged_in: false, state: "logged-out", cloud_tools_enabled: false,
       login_hint: "在 CodePuppy 左侧栏账户区点「登录」,或打开定制中心的云端页点登录;登录完成后下一条消息起云端工具可用。",
     })
-    process.env.ALPHA_BASE_URL = "https://gateway.invalid/v1"
+    process.env.CODEPUPPY_BASE_URL = "https://gateway.invalid/v1"
     const { materializeCloudMcpConfig } = await import("../../ui-mac/src/main/cloud-sidecar-config")
     // The real desktop producer; an existing directory makes a file-content read throw.
     process.env[CLOUD_MCP_DEF_ENV] = JSON.stringify(materializeCloudMcpConfig("https://cloud.invalid/mcp", `{file:${root}}`))
@@ -659,17 +659,17 @@ describe("③h messages.transform 咽喉:只剔不加(外加两句登记的替�
 })
 
 // ── ③e instructions 通路(`#1296`):ui-mac 写 cfg.instructions 的两份文件 ────────────────
-// 真注入的咽喉在 ui-mac 那边(config-injection-throat.test.ts 跑真 injectAlphaConfig,8 组 env 矩阵
+// 真注入的咽喉在 ui-mac 那边(config-injection-throat.test.ts 跑真 injectCodePuppyConfig,8 组 env 矩阵
 // 与这里登记的形状集合双向比对)。这里钉三件登记簿自己的事:登记形状、判官能测出已知的坏、
 // 跨包 import 的前提(ui-mac 那两个内容模块零依赖)仍然成立。
 
 const DEPENDENCY_LINE = /^\s*import\b|\brequire\(|^\s*export\s.*\sfrom\s/
 
 describe("③e instructions 通路:登记形状 + 判官 + 跨包前提", () => {
-  test("登记了 behavior 1 条 + identity 2^|AlphaCapabilities| 条,全在 sink=instruction;变体 id 可反推 caps、正文 = 生产 buildAlphaIdentity(caps)、两两不同", () => {
+  test("登记了 behavior 1 条 + identity 2^|CodePuppyCapabilities| 条,全在 sink=instruction;变体 id 可反推 caps、正文 = 生产 buildCodePuppyIdentity(caps)、两两不同", () => {
     const rows = CONTEXT_INJECTIONS.filter((f): f is Extract<typeof f, { kind: "text" }> => f.kind === "text" && f.sink === "instruction")
     const behavior = rows.find((f) => f.id === BEHAVIOR_FRAGMENT_ID)
-    expect(behavior?.text).toBe(ALPHA_BEHAVIOR_MD)
+    expect(behavior?.text).toBe(CODEPUPPY_BEHAVIOR_MD)
     const identity = rows.filter((f) => f.id.startsWith(IDENTITY_FRAGMENT_ID))
     const capKeys = Object.keys(identityCapsFromId(IDENTITY_FRAGMENT_ID) ?? {})
     expect(capKeys.length).toBeGreaterThanOrEqual(2)
@@ -677,20 +677,20 @@ describe("③e instructions 通路:登记形状 + 判官 + 跨包前提", () => 
     for (const f of identity) {
       const caps = identityCapsFromId(f.id)
       expect(caps, f.id).toBeDefined()
-      expect(f.text, f.id).toBe(buildAlphaIdentity(caps))
+      expect(f.text, f.id).toBe(buildCodePuppyIdentity(caps))
     }
     expect(new Set(identity.map((f) => f.text)).size).toBe(identity.length)
     expect(rows.length).toBe(identity.length + 1)
   })
   test("判官 explainInstructionBody:逐字命中;已知的坏 —— 一字节之差 / 少一字节 / 其它 sink 的登记文字 / 空串 都不解释", () => {
-    expect(explainInstructionBody(ALPHA_BEHAVIOR_MD)).toEqual({ ok: true, id: BEHAVIOR_FRAGMENT_ID, kind: "text" })
-    expect(explainInstructionBody(buildAlphaIdentity({ websearch: true, cloudDispatch: false }))).toEqual({
+    expect(explainInstructionBody(CODEPUPPY_BEHAVIOR_MD)).toEqual({ ok: true, id: BEHAVIOR_FRAGMENT_ID, kind: "text" })
+    expect(explainInstructionBody(buildCodePuppyIdentity({ websearch: true, cloudDispatch: false }))).toEqual({
       ok: true,
       id: `${IDENTITY_FRAGMENT_ID}+websearch`,
       kind: "text",
     })
-    expect(explainInstructionBody(ALPHA_BEHAVIOR_MD + "!").ok).toBe(false)
-    expect(explainInstructionBody(ALPHA_BEHAVIOR_MD.slice(0, -1)).ok).toBe(false)
+    expect(explainInstructionBody(CODEPUPPY_BEHAVIOR_MD + "!").ok).toBe(false)
+    expect(explainInstructionBody(CODEPUPPY_BEHAVIOR_MD.slice(0, -1)).ok).toBe(false)
     // agent prompt 是登记过的字,但它的 sink 是 system(顶替底座),不是 instruction 文件 —— 不许串格解释
     expect(explainInstructionBody(contextText("agent.general.prompt")).ok).toBe(false)
     expect(explainInstructionBody("").ok).toBe(false)
@@ -701,7 +701,7 @@ describe("③e instructions 通路:登记形状 + 判官 + 跨包前提", () => 
     // 先证明手段能测出已知的坏:三种依赖写法各抓一行,普通 export 不误抓
     expect(['import * as fs from "node:fs"', 'const x = require("electron")', 'export { a } from "./b"'].filter((l) => DEPENDENCY_LINE.test(l))).toHaveLength(3)
     expect(["export function f() {}", "export const X = 1", 'const s = "from here"'].filter((l) => DEPENDENCY_LINE.test(l))).toHaveLength(0)
-    for (const f of ["alpha-behavior.ts", "alpha-identity.ts", "alpha-agents.ts"]) {
+    for (const f of ["codepuppy-behavior.ts", "codepuppy-identity.ts", "codepuppy-agents.ts"]) {
       const src = readFileSync(join(REPO_ROOT, "packages", "ui-mac", "src", "main", f), "utf8")
       expect(src.length).toBeGreaterThan(100)
       expect(src.split("\n").filter((l) => DEPENDENCY_LINE.test(l)), `${f} 引入了依赖`).toEqual([])
@@ -710,17 +710,17 @@ describe("③e instructions 通路:登记形状 + 判官 + 跨包前提", () => 
 })
 
 // ── ③f agent 通路(`#1299`):ui-mac 写 cfg.agent.<name>.{prompt,description} 的三个 alpha agent ──────
-// 真注入的咽喉在 ui-mac 那边(config-injection-throat.test.ts 跑真 injectAlphaConfig,cfg.agent 下每个新写入的
+// 真注入的咽喉在 ui-mac 那边(config-injection-throat.test.ts 跑真 injectCodePuppyConfig,cfg.agent 下每个新写入的
 // 字符串叶子过判官,并与这里的登记集合双向比对)。这里只钉登记形状与判官 explainAgentText 的已知的坏。
 
 describe("③f agent 通路:登记形状 + 判官 explainAgentText", () => {
-  test("ui-mac 的每个 agent 登记 description(sink=agent-description),有 prompt 的再登记 prompt(sink=system),正文 = ALPHA_AGENT_TEXT 逐字;名字集合 = 内容模块键集;没有 prompt 的不许凭空多出一格", () => {
-    expect([...UI_MAC_AGENT_NAMES].sort()).toEqual(Object.keys(ALPHA_AGENT_TEXT).sort())
+  test("ui-mac 的每个 agent 登记 description(sink=agent-description),有 prompt 的再登记 prompt(sink=system),正文 = CODEPUPPY_AGENT_TEXT 逐字;名字集合 = 内容模块键集;没有 prompt 的不许凭空多出一格", () => {
+    expect([...UI_MAC_AGENT_NAMES].sort()).toEqual(Object.keys(CODEPUPPY_AGENT_TEXT).sort())
     expect(UI_MAC_AGENT_NAMES.length).toBeGreaterThanOrEqual(3)
     let withPrompt = 0
     let withoutPrompt = 0
     for (const name of UI_MAC_AGENT_NAMES) {
-      const text: { prompt?: string; description: string } = ALPHA_AGENT_TEXT[name]
+      const text: { prompt?: string; description: string } = CODEPUPPY_AGENT_TEXT[name]
       const prompt = CONTEXT_INJECTIONS.find((f) => f.id === uiMacAgentFragmentId(name, "prompt"))
       const description = CONTEXT_INJECTIONS.find((f) => f.id === uiMacAgentFragmentId(name, "description"))
       expect(description?.kind, name).toBe("text")
@@ -747,26 +747,26 @@ describe("③f agent 通路:登记形状 + 判官 explainAgentText", () => {
     expect(withoutPrompt).toBeGreaterThanOrEqual(1)
     // 所有字两两不同(否则「集合相等」可能是同一段字登记了多次)
     const texts = UI_MAC_AGENT_NAMES.flatMap((n) => {
-      const text: { prompt?: string; description: string } = ALPHA_AGENT_TEXT[n]
+      const text: { prompt?: string; description: string } = CODEPUPPY_AGENT_TEXT[n]
       return text.prompt === undefined ? [text.description] : [text.prompt, text.description]
     })
     expect(new Set(texts).size).toBe(texts.length)
   })
   test("判官 explainAgentText:逐字命中对应 sink;已知的坏 —— 一字节之差 / 串格(description 当 prompt、instruction 文件当 prompt)/ 空串 都不解释", () => {
     const name = UI_MAC_AGENT_NAMES[0]!
-    expect(explainAgentText("prompt", ALPHA_AGENT_TEXT[name].prompt)).toEqual({ ok: true, id: uiMacAgentFragmentId(name, "prompt"), kind: "text" })
-    expect(explainAgentText("description", ALPHA_AGENT_TEXT[name].description)).toEqual({
+    expect(explainAgentText("prompt", CODEPUPPY_AGENT_TEXT[name].prompt)).toEqual({ ok: true, id: uiMacAgentFragmentId(name, "prompt"), kind: "text" })
+    expect(explainAgentText("description", CODEPUPPY_AGENT_TEXT[name].description)).toEqual({
       ok: true,
       id: uiMacAgentFragmentId(name, "description"),
       kind: "text",
     })
     // ext 自己的 agent prompt 也是 sink=system 的登记文字 —— 同一格,判官同样认(不是按 id 前缀认的)
     expect(explainAgentText("prompt", contextText("agent.general.prompt"))).toEqual({ ok: true, id: "agent.general.prompt", kind: "text" })
-    expect(explainAgentText("prompt", ALPHA_AGENT_TEXT[name].prompt + "!").ok).toBe(false)
-    expect(explainAgentText("prompt", ALPHA_AGENT_TEXT[name].prompt.slice(0, -1)).ok).toBe(false)
-    expect(explainAgentText("prompt", ALPHA_AGENT_TEXT[name].description).ok).toBe(false)
-    expect(explainAgentText("description", ALPHA_AGENT_TEXT[name].prompt).ok).toBe(false)
-    expect(explainAgentText("prompt", ALPHA_BEHAVIOR_MD).ok).toBe(false)
+    expect(explainAgentText("prompt", CODEPUPPY_AGENT_TEXT[name].prompt + "!").ok).toBe(false)
+    expect(explainAgentText("prompt", CODEPUPPY_AGENT_TEXT[name].prompt.slice(0, -1)).ok).toBe(false)
+    expect(explainAgentText("prompt", CODEPUPPY_AGENT_TEXT[name].description).ok).toBe(false)
+    expect(explainAgentText("description", CODEPUPPY_AGENT_TEXT[name].prompt).ok).toBe(false)
+    expect(explainAgentText("prompt", CODEPUPPY_BEHAVIOR_MD).ok).toBe(false)
     expect(explainAgentText("prompt", "").ok).toBe(false)
     expect(explainAgentText("description", "").ok).toBe(false)
   })
@@ -820,7 +820,7 @@ describe("AC2 上限:登记时超限即抛,不裁剪;计量单位是 UTF-8 字�
 
 // ── AC3:库存快照 ───────────────────────────────────────────────────────────────
 
-describe("AC3 库存:一处列全,快照逐字节比对(alpha-check 第 [12/12] 步打印同一份)", () => {
+describe("AC3 库存:一处列全,快照逐字节比对(codepuppy-check 第 [12/12] 步打印同一份)", () => {
   test("快照在位,且与 renderInventory() 逐字节相同 —— 改了任何片段就得重生快照并让评审读 diff", () => {
     expect(existsSync(SNAPSHOT), `快照缺失:${SNAPSHOT} —— 跑 bun packages/ext/scripts/context-injection-inventory.ts --write`).toBe(true)
     const expected = readFileSync(SNAPSHOT, "utf8")

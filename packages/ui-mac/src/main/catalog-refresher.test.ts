@@ -1,5 +1,5 @@
 // REQ-237 `#1555` —— 远程目录刷新器的子进程宿主(AC2 触发点 / AC3 单飞与身份仲裁 / AC6 接口形状);`#1556` 加
-// BYOK 文档的 AC4(拉取不带凭据、失败不减条目)与 AC6(alpha-catalog-health 按文档分别保存)。
+// BYOK 文档的 AC4(拉取不带凭据、失败不减条目)与 AC6(codepuppy-catalog-health 按文档分别保存)。
 // 判据在 catalog-refresher.cases.ts:它必须 mock electron,而 bun 的 mock.module 在同一进程内会泄漏到
 // 后续测试文件,故整体隔离。本文件钉住子进程用例的精确条数 —— 少一条 = 有判据被删。
 import { expect, test } from "bun:test"

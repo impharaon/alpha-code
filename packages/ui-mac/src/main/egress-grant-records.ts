@@ -1,8 +1,8 @@
 // `#1412` —— 用户批准的出网目的地真源的**生产读写绑定**:把严格读端(egress-grant-truth.ts)与原子写端
 // (egress-grant-truth-write.ts)接到真实的文件系统与「这个进程知道的环境根」上。与 mcp-server-records.ts 同形。
 //
-// 真源在哪:`<casBaseRoot>/egress-grants/<env>.json`;「状态根 + 环境名」由 alpha-environment.ts 的
-// resolveAlphaStateBase 给出(main 走冻结快照;形状不对 ⇒ 位置未知 ⇒ 什么都不装载、什么都不落盘,并出一行原因)。
+// 真源在哪:`<casBaseRoot>/egress-grants/<env>.json`;「状态根 + 环境名」由 codepuppy-environment.ts 的
+// resolveCodePuppyStateBase 给出(main 走冻结快照;形状不对 ⇒ 位置未知 ⇒ 什么都不装载、什么都不落盘,并出一行原因)。
 //
 // 读不到 ≠ 没有:缺失 = 用户没批准过任何目的地(绝大多数用户的正常状态,零日志)。解析失败 / 形状不对 /
 // 位置未知 ⇒ 空清单**并**出一行原因,消费者据此什么都不放行 —— 与「没有记录」在**行为**上相同(仍 403),
@@ -11,7 +11,7 @@
 // 本文件 import 写端,因此**不得**进 sidecar 的 import 闭包(判据同写端)。只有 main 调它。
 
 import { readFileSync, mkdirSync, writeFileSync, renameSync, rmSync } from "node:fs"
-import { resolveAlphaStateBase, type AppEnvironment } from "./alpha-environment"
+import { resolveCodePuppyStateBase, type AppEnvironment } from "./codepuppy-environment"
 import { egressGrantTruthPath, readEgressGrantTruth, type EgressGrantRecord } from "./egress-grant-truth"
 import { writeEgressGrantTruth } from "./egress-grant-truth-write"
 
@@ -19,7 +19,7 @@ export type EgressGrantTruthLocation = { ok: true; path: string; casBaseRoot: st
 
 /** 真源文件的位置。形状不对 ⇒ ok:false,不猜。 */
 export function resolveEgressGrantTruthLocation(): EgressGrantTruthLocation {
-  const base = resolveAlphaStateBase("egress grant truth")
+  const base = resolveCodePuppyStateBase("egress grant truth")
   if (!base.ok) return base
   return { ok: true, path: egressGrantTruthPath(base.casBaseRoot, base.environment), casBaseRoot: base.casBaseRoot, environment: base.environment }
 }

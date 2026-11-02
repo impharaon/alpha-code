@@ -2,7 +2,7 @@
 //
 // 痛点:preferAppEnv 在启动关键路径上**同步** spawn 登录 shell(-il 5s 超时,失败再 -l 5s,最坏 ~10s)
 // —— 用户 .zshrc 慢(nvm/brew/conda)时黑屏等待。
-// 修法:上次成功探测结果缓存到 <userData>/alpha-shell-env.json;命中 → 0ms 套用 + **后台异步**真探测
+// 修法:上次成功探测结果缓存到 <userData>/codepuppy-shell-env.json;命中 → 0ms 套用 + **后台异步**真探测
 // (成功后更新缓存、并按「真 export 永远赢」语义套用差异,新值下次 fork 生效);未命中(首启/换 shell)
 // → 保持同步探测(fork 前没有 PATH 等 shell env,MCP 子进程会拿到 launchd 的贫瘠 PATH,宁可首启慢一次)。
 // 缓存按 shell 路径键控:用户换默认 shell → 缓存失效走同步路径。
@@ -12,7 +12,7 @@ import * as fs from "node:fs"
 import * as path from "node:path"
 import { isNushell, minimalProbeEnv, parseShellEnv } from "./shell-env"
 
-const FILE = "alpha-shell-env.json"
+const FILE = "codepuppy-shell-env.json"
 const PROBE_TIMEOUT = 5_000
 
 type ShellEnvCacheLog = (message: string, extra?: Record<string, unknown>) => void
@@ -22,16 +22,16 @@ type ShellEnvCacheLog = (message: string, extra?: Record<string, unknown>) => vo
 // 主修在探针侧(minimalProbeEnv,毒进不来);本 blocklist 专治**存量已毒化**的缓存文件:
 // 修复版首启即剥离危险键,随后干净再探测会整份重写缓存完成自愈。
 const SESSION_CONTROL_KEYS = [
-  "ALPHA_GLOBAL_DIR",
-  "ALPHA_ENV_BASE_DIR",
-  "ALPHA_OPENCODE_HOME",
+  "CODEPUPPY_GLOBAL_DIR",
+  "CODEPUPPY_ENV_BASE_DIR",
+  "CODEPUPPY_OPENCODE_HOME",
   "OPENCODE_CONFIG_DIR",
-  "OPENCODE_CONFIG", // REQ-059:alpha 每 fork 设它指向当前环境 alpha.jsonc —— 不得被 shell env 缓存跨会话污染
+  "OPENCODE_CONFIG", // REQ-059:alpha 每 fork 设它指向当前环境 codepuppy.jsonc —— 不得被 shell env 缓存跨会话污染
   "OPENCODE_DB",
-  "ALPHA_MIGRATE_ENABLE",
-  "ALPHA_JSONC_TRUTH_DISABLE",
-  "ALPHA_CDP",
-  "ALPHA_LEGACY_INSTALL_ROOT",
+  "CODEPUPPY_MIGRATE_ENABLE",
+  "CODEPUPPY_JSONC_TRUTH_DISABLE",
+  "CODEPUPPY_CDP",
+  "CODEPUPPY_LEGACY_INSTALL_ROOT",
   "OPENCODE_TEST_ONBOARDING",
 ] as const
 

@@ -1,8 +1,8 @@
 // alpha cloud jobs IPC (main process). Mirrors account-ipc.ts: thin handlers dispatching/polling cloud
-// jobs on the alpha-platform (B) `cloud` worker using the main-held JWT (alpha-cloud-jobs.ts). The
+// jobs on the alpha-platform (B) `cloud` worker using the main-held JWT (codepuppy-cloud-jobs.ts). The
 // renderer receives only the resolved result, never the token.
 //
-// 阶段二:+ artifact 列表/下载(alpha-cloud-jobs)+ SSE 进度订阅(alpha-cloud-events)。SSE 事件经
+// 阶段二:+ artifact 列表/下载(codepuppy-cloud-jobs)+ SSE 进度订阅(codepuppy-cloud-events)。SSE 事件经
 // event.sender.send("cloud-job-event", …) 推给对应 renderer;订阅按 (webContents, jobId) 记账,窗口销毁自动清。
 
 import { finalizeArtifactWithQuota, registerDownloadedArtifact, registeredArtifactNameOwner } from "./artifact-service"
@@ -11,29 +11,29 @@ import { BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent, type Op
 import { execFile } from "node:child_process"
 import * as fs from "node:fs"
 import * as path from "node:path"
-import { dispatchCloudJob, dispatchExplicitCloudUpload, getCloudJobStatus, cancelCloudJob, listCloudArtifacts, downloadCloudArtifactTo } from "./alpha-cloud-jobs"
-import { isTerminalCloudEvent, subscribeCloudJobEvents } from "./alpha-cloud-events"
-import { backoffMs } from "./alpha-cloud-events-core"
+import { dispatchCloudJob, dispatchExplicitCloudUpload, getCloudJobStatus, cancelCloudJob, listCloudArtifacts, downloadCloudArtifactTo } from "./codepuppy-cloud-jobs"
+import { isTerminalCloudEvent, subscribeCloudJobEvents } from "./codepuppy-cloud-events"
+import { backoffMs } from "./codepuppy-cloud-events-core"
 import { createCloudRunTracker, type CloudRunOrigin } from "./cloud-run-tracker"
 // #420(REQ-115):云任务 completed / failed 终态 → 系统通知的唯一咽喉(去重、取消不通知都在里面)。
 import { noticeFromCloudEvent, noticeFromCloudStatus, notifyCloudJobFinished } from "./cloud-job-notify"
 import {
-  ensureAlphaScaffold,
+  ensureCodePuppyScaffold,
   isSafeRunId,
   reserveArtifactSavedName,
-  safeResolveInAlpha,
+  safeResolveInCodePuppy,
   sanitizeArtifactName,
   saveCloudRun,
   type CloudRunManifest,
   type SaveRunDeps,
-} from "./alpha-workdir"
-import { mirrorRunArtifacts } from "./alpha-user-workspace"
+} from "./codepuppy-workdir"
+import { mirrorRunArtifacts } from "./codepuppy-user-workspace"
 import { getLogger } from "./logging"
 import type { CloudJobEnvelope, CloudUploadIntent } from "../preload/types"
-import { getAccessTokenIdentity, getAuthIdentityEpoch, getAuthIdentityTag } from "./alpha-auth"
-import { requestUploadConsent } from "./alpha-web-upload-consent"
-import { assertSafeUploadResult, createMainUploadService } from "./alpha-upload"
-import { resolveEndpoints } from "./alpha-endpoints"
+import { getAccessTokenIdentity, getAuthIdentityEpoch, getAuthIdentityTag } from "./codepuppy-auth"
+import { requestUploadConsent } from "./codepuppy-web-upload-consent"
+import { assertSafeUploadResult, createMainUploadService } from "./codepuppy-upload"
+import { resolveEndpoints } from "./codepuppy-endpoints"
 
 // REQ-020 T4(ADR-021 §1 diff-only):hub 的 code-review dispatch 入口只送 diff,不送全库。
 // 工作树有变更 → `git diff HEAD`(含 staged);干净 → 回退最近一次 commit 的 diff(e2e 常在干净树上跑)。
@@ -205,7 +205,7 @@ export function registerCloudIpcHandlers() {
 
   // REQ-092:descriptor-only IPC —— renderer 只送 descriptor(或旧部署 meta),main 流式写入
   // <directory>/.code-puppy/runs/<runId>/artifacts/(ADR-019 守卫复用:isSafeRunId + sanitizeArtifactName +
-  // safeResolveInAlpha)。进度经 "cloud-artifact-progress" 推回发起窗口;字节永不过 IPC。
+  // safeResolveInCodePuppy)。进度经 "cloud-artifact-progress" 推回发起窗口;字节永不过 IPC。
   ipcMain.handle("cloud-artifact-download", async (e: IpcMainInvokeEvent, directory: string, runId: string, artifact: unknown) => {
     if (typeof directory !== "string" || !directory || typeof runId !== "string" || !isSafeRunId(runId))
       return { ok: false, error: "invalid-request" }
@@ -214,9 +214,9 @@ export function registerCloudIpcHandlers() {
     if (!artifactId) return { ok: false, error: "invalid-artifact" }
     // #1551 AC5:同一 run 只有一个协调者 —— 宿主交付在途时,面板手动下载让路。
     if (tracker.isDelivering(directory, runId)) return { ok: false, error: "already-downloading" }
-    if (!ensureAlphaScaffold(directory)) return { ok: false, error: "invalid-directory" }
+    if (!ensureCodePuppyScaffold(directory)) return { ok: false, error: "invalid-directory" }
     const desiredName = sanitizeArtifactName(typeof a?.name === "string" ? a.name : undefined, `artifact-${artifactId}`)
-    const artifactsDir = safeResolveInAlpha(directory, "runs", runId, "artifacts")
+    const artifactsDir = safeResolveInCodePuppy(directory, "runs", runId, "artifacts")
     if (!artifactsDir) return { ok: false, error: "unsafe-path" }
     // #901: 折叠比较(NFC + toLowerCase)预约名字,挡住与既有产物只差大小写的静默覆盖——
     // 每次读盘决定,跨"分开下载"的多次 IPC 调用成立,不是单次内存 set。
@@ -227,7 +227,7 @@ export function registerCloudIpcHandlers() {
       const owner = registeredArtifactNameOwner(directory, runId, candidate)
       return owner !== undefined && owner !== artifactId
     })
-    const target = safeResolveInAlpha(directory, "runs", runId, "artifacts", name)
+    const target = safeResolveInCodePuppy(directory, "runs", runId, "artifacts", name)
     if (!target) return { ok: false, error: "unsafe-path" }
     const wc = e.sender
     const key = `${wc.id}:${artifactId}`

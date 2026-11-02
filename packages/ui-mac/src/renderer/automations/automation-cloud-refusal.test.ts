@@ -5,7 +5,7 @@
 // `#955` 只修 main 侧、票被关掉而症状仍在,就是这个形状。
 //
 // 判据挂在**生产 AutomationPanel** 上(harness 见同目录的 -test-runtime.tsx),动作是真实 DOM
-// 点击,断言是 `.alpha-auto-err` 的 textContent。刻意不断言信号值、更不断言源码文本。
+// 点击,断言是 `.codepuppy-auto-err` 的 textContent。刻意不断言信号值、更不断言源码文本。
 //
 // 每格自带前提自检:点保存**之前**先确认表单真在云端档、错误行不在场;点完确认 save 真被调用
 // 过一次且入参 `execution === "cloud"`。少了这一步,「保存按钮 disabled / 表单校验先行早返」
@@ -30,7 +30,7 @@ import type * as Runtime from "./automation-refusal-test-runtime"
 import { dict as en } from "../i18n/en"
 import { dict as zh } from "../i18n/zh"
 
-const runtimeDirectory = mkdtempSync(join(tmpdir(), "alpha-969-refusal-"))
+const runtimeDirectory = mkdtempSync(join(tmpdir(), "codepuppy-969-refusal-"))
 await build({
   configFile: false,
   logLevel: "silent",
@@ -59,7 +59,7 @@ const disposers: Array<() => void> = []
 // 这三张表是**手写**的,刻意不从 schedule-refusal-copy.ts import、也不从它派生:期望值取自被测
 // 对象自己 = 自指等价链,一起改错就一起自洽(`ap#188` / `ap#197` 实测两次)。
 // 平台侧的登记在 alpha-platform `packages/gateway/src/lib/schedules.ts` 的 SCHEDULE_REFUSAL_CODES
-// 与 `docs/contracts/cloud-jobs-v1.md`;桌面自铸的 kebab 码在 alpha-cloud-schedules.ts。
+// 与 `docs/contracts/cloud-jobs-v1.md`;桌面自铸的 kebab 码在 codepuppy-cloud-schedules.ts。
 
 /** 桌面**到得了**、因而必须给人话的码。 */
 const MAPPED_CODES = [
@@ -90,17 +90,17 @@ const DELIBERATELY_UNMAPPED_CODES = [
 
 /** 这些 i18n 键的文案质量由本文件守;与上表的映射码一一对应(顺序无关)。 */
 const COPY_KEYS = [
-  "alpha.auto.cloudErrLimitReached",
-  "alpha.auto.cloudErrNameInvalid",
-  "alpha.auto.cloudErrCronInvalid",
-  "alpha.auto.cloudErrIntervalTooTight",
-  "alpha.auto.cloudErrEnvelopeTooLarge",
-  "alpha.auto.cloudErrRateLimited",
-  "alpha.auto.cloudErrTenantRateLimited",
-  "alpha.auto.cloudErrFormUnsupported",
-  "alpha.ext.cloudErrAuth",
-  "alpha.ext.cloudErrEndpoint",
-  "alpha.ext.cloudErrNetwork",
+  "codepuppy.auto.cloudErrLimitReached",
+  "codepuppy.auto.cloudErrNameInvalid",
+  "codepuppy.auto.cloudErrCronInvalid",
+  "codepuppy.auto.cloudErrIntervalTooTight",
+  "codepuppy.auto.cloudErrEnvelopeTooLarge",
+  "codepuppy.auto.cloudErrRateLimited",
+  "codepuppy.auto.cloudErrTenantRateLimited",
+  "codepuppy.auto.cloudErrFormUnsupported",
+  "codepuppy.ext.cloudErrAuth",
+  "codepuppy.ext.cloudErrEndpoint",
+  "codepuppy.ext.cloudErrNetwork",
 ] as const
 
 beforeEach(() => {
@@ -134,13 +134,13 @@ function click(el: Element) {
 
 /** 按可见文字找按钮(执行档的两个 seg 按钮没有别的标识)。 */
 function buttonByText(text: string): HTMLButtonElement {
-  for (const el of document.querySelectorAll<HTMLButtonElement>(".alpha-auto-seg button")) {
+  for (const el of document.querySelectorAll<HTMLButtonElement>(".codepuppy-auto-seg button")) {
     if ((el.textContent ?? "").trim() === text) return el
   }
   throw new Error(`未找到按钮:${text}`)
 }
 
-const errorLine = () => document.querySelector(".alpha-auto-err")?.textContent ?? null
+const errorLine = () => document.querySelector(".codepuppy-auto-err")?.textContent ?? null
 
 /**
  * 走一遍真实用户路径:开面板 → 一句话新建 → 切到云端档(或留在本地档)→ 点保存。
@@ -152,13 +152,13 @@ async function saveAsCloudTask(execution: "cloud" | "local" = "cloud"): Promise<
   runtime.openPanel()
   await flush()
 
-  const nl = query<HTMLInputElement>(".alpha-auto-nl")
+  const nl = query<HTMLInputElement>(".codepuppy-auto-nl")
   nl.value = "每天 9 点检查本项目未处理的 TODO 并生成清单"
   nl.dispatchEvent(new Event("input", { bubbles: true }))
-  click(query(".alpha-auto-new .alpha-ext-add[data-variant='primary']"))
+  click(query(".codepuppy-auto-new .codepuppy-ext-add[data-variant='primary']"))
   await flush()
 
-  const execLabel = zh[execution === "cloud" ? "alpha.auto.execCloud" : "alpha.auto.execLocal"]
+  const execLabel = zh[execution === "cloud" ? "codepuppy.auto.execCloud" : "codepuppy.auto.execLocal"]
   click(buttonByText(execLabel))
   await flush()
 
@@ -167,7 +167,7 @@ async function saveAsCloudTask(execution: "cloud" | "local" = "cloud"): Promise<
   // 前提自检 ②:点保存之前错误行不在场(否则「错误行不含裸码」可能测的是上一格的残留)。
   expect(errorLine(), "点保存之前错误行就已经在了").toBeNull()
 
-  click(query(".alpha-auto-actions .alpha-ext-add[data-variant='primary']"))
+  click(query(".codepuppy-auto-actions .codepuppy-ext-add[data-variant='primary']"))
   await flush()
 
   // 前提自检 ③:保存真的被调用过一次,且入参确实是云档(表单早返会让它一次都不调)。
@@ -197,8 +197,8 @@ describe("[#969] 云档拒绝到达用户的那一跳", () => {
     await saveAsCloudTask()
     const second = errorLine()
 
-    expect(first).toBe(zh["alpha.auto.cloudErrLimitReached"])
-    expect(second).toBe(zh["alpha.auto.cloudErrCronInvalid"])
+    expect(first).toBe(zh["codepuppy.auto.cloudErrLimitReached"])
+    expect(second).toBe(zh["codepuppy.auto.cloudErrCronInvalid"])
     // 两段必须不等 —— 只断一个码杀不掉「所有码返回同一句」的实现。
     expect(first).not.toBe(second)
     for (const text of [first, second]) {
@@ -215,7 +215,7 @@ describe("[#969] 云档拒绝到达用户的那一跳", () => {
     const text = errorLine() ?? ""
     expect(text).toContain(code)
     // 走的是回落模板,不是任何一条人话文案。
-    expect(text).toBe(zh["alpha.auto.cloudErrUnknown"].replace("{{code}}", code))
+    expect(text).toBe(zh["codepuppy.auto.cloudErrUnknown"].replace("{{code}}", code))
     for (const key of COPY_KEYS) expect(text).not.toBe(zh[key])
   })
 
@@ -223,7 +223,7 @@ describe("[#969] 云档拒绝到达用户的那一跳", () => {
     runtime.queueSaveResult({ ok: false, reason: "云端注册失败:not-authenticated", code: "not-authenticated" })
     await saveAsCloudTask()
 
-    expect(errorLine()).toBe(zh["alpha.ext.cloudErrAuth"])
+    expect(errorLine()).toBe(zh["codepuppy.ext.cloudErrAuth"])
     expect(errorLine()).not.toContain("not-authenticated")
   })
 
@@ -235,7 +235,7 @@ describe("[#969] 云档拒绝到达用户的那一跳", () => {
     runtime.queueSaveResult({ ok: false, reason: "云端删除失败:network", code: "network" })
     await saveAsCloudTask()
 
-    expect(errorLine()).toBe(zh["alpha.ext.cloudErrNetwork"])
+    expect(errorLine()).toBe(zh["codepuppy.ext.cloudErrNetwork"])
     expect(errorLine()).not.toContain("云端删除失败")
   })
 
@@ -245,14 +245,14 @@ describe("[#969] 云档拒绝到达用户的那一跳", () => {
     runtime.queueSaveResult({ ok: false, reason: "invalid name" })
     await saveAsCloudTask()
 
-    expect(errorLine()).toBe(zh["alpha.auto.saveFailed"])
+    expect(errorLine()).toBe(zh["codepuppy.auto.saveFailed"])
     expect(errorLine()).not.toContain("invalid")
   })
 })
 
 describe("[#969] 映射表的边界与文案质量", () => {
   test("该给人话的码逐个都不落到回落模板上", () => {
-    const fallbackOf = (code: string) => zh["alpha.auto.cloudErrUnknown"].replace("{{code}}", code)
+    const fallbackOf = (code: string) => zh["codepuppy.auto.cloudErrUnknown"].replace("{{code}}", code)
     for (const code of MAPPED_CODES) {
       const copy = runtime.scheduleRefusalCopy(code)
       expect(copy, `${code} 没有人话文案`).not.toBe(fallbackOf(code))
@@ -267,7 +267,7 @@ describe("[#969] 映射表的边界与文案质量", () => {
     for (const code of DELIBERATELY_UNMAPPED_CODES) {
       const copy = runtime.scheduleRefusalCopy(code)
       expect(copy, `${code} 被映射了 —— 桌面信封结构上发不出它,那是死分支`).toBe(
-        zh["alpha.auto.cloudErrUnknown"].replace("{{code}}", code),
+        zh["codepuppy.auto.cloudErrUnknown"].replace("{{code}}", code),
       )
       expect(copy).toContain(code)
     }
@@ -306,10 +306,10 @@ describe("[#969] 映射表的边界与文案质量", () => {
 // 值 → 期望文案键的对应也是手写的独立锚点。
 
 const DISABLED_REASON_COPY_KEYS = {
-  consecutive_failures: "alpha.auto.cloudDisabledFailures",
-  stuck_job: "alpha.auto.cloudDisabledStuck",
-  execution_grant_missing: "alpha.auto.cloudDisabledGrantMissing",
-  execution_grant_expired: "alpha.auto.cloudDisabledGrantExpired",
+  consecutive_failures: "codepuppy.auto.cloudDisabledFailures",
+  stuck_job: "codepuppy.auto.cloudDisabledStuck",
+  execution_grant_missing: "codepuppy.auto.cloudDisabledGrantMissing",
+  execution_grant_expired: "codepuppy.auto.cloudDisabledGrantExpired",
 } as const
 
 /** 平台今天不写、但设计稿里提过的一个值 —— 拿它当「面板不认识的理由」最贴近真实。 */
@@ -349,9 +349,9 @@ async function rowStatusFor(disabledReason: string): Promise<string> {
   runtime.openPanel()
   await flush()
 
-  expect(document.querySelectorAll(".alpha-auto-row").length, "列表行没渲染出来").toBe(1)
+  expect(document.querySelectorAll(".codepuppy-auto-row").length, "列表行没渲染出来").toBe(1)
   expect(runtime.cloudSyncCalls(), "云端回读一次都没被调用 —— 后面的断言会空绿").toBeGreaterThan(0)
-  return query(".alpha-auto-row-st").textContent ?? ""
+  return query(".codepuppy-auto-row-st").textContent ?? ""
 }
 
 describe("[#778] 云端停用理由逐个说清「发生了什么、该做什么」", () => {
@@ -361,7 +361,7 @@ describe("[#778] 云端停用理由逐个说清「发生了什么、该做什么
       const text = await rowStatusFor(reason)
       expect(zh[key], `zh 缺 ${key}`).toBeTruthy()
       expect(text, `${reason} 没有渲染成它自己那一句`).toContain(zh[key])
-      expect(text, `${reason} 落进了兜底`).not.toContain(zh["alpha.auto.cloudDisabledUnknown"].split("{{")[0]!)
+      expect(text, `${reason} 落进了兜底`).not.toContain(zh["codepuppy.auto.cloudDisabledUnknown"].split("{{")[0]!)
       // 理由的原始标识符不上屏(用户读到的是人话,不是 execution_grant_expired)。
       expect(text).not.toContain(reason)
       seen.set(reason, zh[key])
@@ -371,12 +371,12 @@ describe("[#778] 云端停用理由逐个说清「发生了什么、该做什么
 
   test("不认识的理由走明确的兜底,带出原始理由,且不与任何已知理由的文案混淆", async () => {
     const text = await rowStatusFor(UNKNOWN_DISABLED_REASON)
-    expect(text).toContain(zh["alpha.auto.cloudDisabledUnknown"].replace("{{reason}}", UNKNOWN_DISABLED_REASON))
+    expect(text).toContain(zh["codepuppy.auto.cloudDisabledUnknown"].replace("{{reason}}", UNKNOWN_DISABLED_REASON))
     for (const key of Object.values(DISABLED_REASON_COPY_KEYS)) expect(text).not.toContain(zh[key])
   })
 
   test("文案质量:en/zh 都有、互不相同、没有开发标识符;两种授权失效都提示关掉再打开开关", () => {
-    const keys = [...Object.values(DISABLED_REASON_COPY_KEYS), "alpha.auto.cloudDisabledUnknown"] as const
+    const keys = [...Object.values(DISABLED_REASON_COPY_KEYS), "codepuppy.auto.cloudDisabledUnknown"] as const
     for (const [locale, dict, reenable] of [
       ["en", en, "off and on again"],
       ["zh", zh, "关掉再打开开关"],
@@ -392,8 +392,8 @@ describe("[#778] 云端停用理由逐个说清「发生了什么、该做什么
         seen.add(copy)
       }
       expect(seen.size, `${locale} 有重复文案`).toBe(keys.length)
-      expect(runtime.t("alpha.auto.cloudDisabledGrantMissing")).toContain(reenable)
-      expect(runtime.t("alpha.auto.cloudDisabledGrantExpired")).toContain(reenable)
+      expect(runtime.t("codepuppy.auto.cloudDisabledGrantMissing")).toContain(reenable)
+      expect(runtime.t("codepuppy.auto.cloudDisabledGrantExpired")).toContain(reenable)
     }
     runtime.setLocale("zh")
   })
@@ -414,7 +414,7 @@ async function renderListWith(task: Runtime.ListedTask): Promise<void> {
   for (const x of document.querySelectorAll(".a-toast-x")) click(x)
   await flush()
   expect(document.querySelectorAll(".a-toast").length, "动作之前就已经有 toast 了").toBe(0)
-  expect(document.querySelectorAll(".alpha-auto-row").length, "列表行没渲染出来").toBe(1)
+  expect(document.querySelectorAll(".codepuppy-auto-row").length, "列表行没渲染出来").toBe(1)
 }
 
 const errorToasts = () =>
@@ -428,41 +428,41 @@ describe("[#994] 删除 / 开关在云端失败时给出说明", () => {
     runtime.queueRemoveResult({ ok: false, reason: "云端删除失败:network", code: "network" })
     await renderListWith(cloudTask("auto-994-del", "sched_994_del"))
 
-    click(query(".alpha-auto-row"))
+    click(query(".codepuppy-auto-row"))
     await flush()
-    click(query(".alpha-auto-actions .alpha-ext-add[data-variant='danger']"))
+    click(query(".codepuppy-auto-actions .codepuppy-ext-add[data-variant='danger']"))
     await flush()
 
     // 前提自检:删除真的发出去了(否则「没有 toast」与「有 toast」都可能是空测)。
     expect(runtime.removeCalls()).toEqual(["auto-994-del"])
-    expect(errorToasts()).toEqual([{ title: zh["alpha.auto.removeFailed"], detail: zh["alpha.ext.cloudErrNetwork"] }])
+    expect(errorToasts()).toEqual([{ title: zh["codepuppy.auto.removeFailed"], detail: zh["codepuppy.ext.cloudErrNetwork"] }])
     expect(document.body.textContent).not.toContain("云端删除失败")
     // 回到列表,那一条还在。
-    expect(document.querySelectorAll(".alpha-auto-row").length).toBe(1)
-    expect(query(".alpha-auto-row").textContent).toContain("云端任务 auto-994-del")
+    expect(document.querySelectorAll(".codepuppy-auto-row").length).toBe(1)
+    expect(query(".codepuppy-auto-row").textContent).toContain("云端任务 auto-994-del")
   })
 
   test("开关被云端拒绝 ⇒ 弹出说明原因的错误提示,开关保持原状态", async () => {
     runtime.queueToggleResult({ ok: false, reason: "云端状态更新失败:not-authenticated", code: "not-authenticated" })
     await renderListWith(cloudTask("auto-994-sw", "sched_994_sw"))
-    expect(query(".alpha-auto-row .alpha-ext-sw").getAttribute("data-on"), "开关起始不是开").toBe("")
+    expect(query(".codepuppy-auto-row .codepuppy-ext-sw").getAttribute("data-on"), "开关起始不是开").toBe("")
 
-    click(query(".alpha-auto-row .alpha-ext-sw"))
+    click(query(".codepuppy-auto-row .codepuppy-ext-sw"))
     await flush()
 
     expect(runtime.toggleCalls()).toEqual([["auto-994-sw", false]])
-    expect(errorToasts()).toEqual([{ title: zh["alpha.auto.toggleFailed"], detail: zh["alpha.ext.cloudErrAuth"] }])
+    expect(errorToasts()).toEqual([{ title: zh["codepuppy.auto.toggleFailed"], detail: zh["codepuppy.ext.cloudErrAuth"] }])
     expect(document.body.textContent).not.toContain("not-authenticated")
-    expect(query(".alpha-auto-row .alpha-ext-sw").getAttribute("data-on")).toBe("")
+    expect(query(".codepuppy-auto-row .codepuppy-ext-sw").getAttribute("data-on")).toBe("")
   })
 
   test("对照:删除与开关都成功时不弹错误提示(证明上面两格的 toast 不是恒在)", async () => {
     await renderListWith(cloudTask("auto-994-ok", "sched_994_ok"))
-    click(query(".alpha-auto-row .alpha-ext-sw"))
+    click(query(".codepuppy-auto-row .codepuppy-ext-sw"))
     await flush()
-    click(query(".alpha-auto-row"))
+    click(query(".codepuppy-auto-row"))
     await flush()
-    click(query(".alpha-auto-actions .alpha-ext-add[data-variant='danger']"))
+    click(query(".codepuppy-auto-actions .codepuppy-ext-add[data-variant='danger']"))
     await flush()
 
     expect(runtime.toggleCalls().length).toBe(1)
@@ -476,8 +476,8 @@ describe("[#994] 删除 / 开关在云端失败时给出说明", () => {
       ["zh", zh],
     ] as const) {
       runtime.setLocale(locale)
-      expect(runtime.t("alpha.auto.toggleFailed")).not.toBe("alpha.auto.toggleFailed")
-      expect(runtime.t("alpha.auto.toggleFailed")).toBe(dict["alpha.auto.toggleFailed"])
+      expect(runtime.t("codepuppy.auto.toggleFailed")).not.toBe("codepuppy.auto.toggleFailed")
+      expect(runtime.t("codepuppy.auto.toggleFailed")).toBe(dict["codepuppy.auto.toggleFailed"])
     }
     runtime.setLocale("zh")
   })
@@ -486,50 +486,50 @@ describe("[#994] 删除 / 开关在云端失败时给出说明", () => {
 // ── [#1001] 保存时本机失败:错误行给当前语言的人话 ─────────────────────────────────────
 //
 // 本地结构码是手写的独立锚点(不从 shared/automation-types 或被测模块取)。它们由 main 的存储层
-// 校验铸出(alpha-automations.ts),与平台 snake 码、桌面传输 kebab 码结构上不相交。
+// 校验铸出(codepuppy-automations.ts),与平台 snake 码、桌面传输 kebab 码结构上不相交。
 
 const LOCAL_STORE_CODE_KEYS = {
-  "automation-invalid": "alpha.auto.localErrInvalid",
-  "automation-name-invalid": "alpha.auto.localErrName",
-  "automation-prompt-invalid": "alpha.auto.localErrPrompt",
-  "automation-project-dir-invalid": "alpha.auto.localErrProjectDir",
-  "automation-schedule-invalid": "alpha.auto.localErrSchedule",
-  "automation-duration-invalid": "alpha.auto.localErrDuration",
-  "automation-storage-failed": "alpha.auto.localErrStorage",
+  "automation-invalid": "codepuppy.auto.localErrInvalid",
+  "automation-name-invalid": "codepuppy.auto.localErrName",
+  "automation-prompt-invalid": "codepuppy.auto.localErrPrompt",
+  "automation-project-dir-invalid": "codepuppy.auto.localErrProjectDir",
+  "automation-schedule-invalid": "codepuppy.auto.localErrSchedule",
+  "automation-duration-invalid": "codepuppy.auto.localErrDuration",
+  "automation-storage-failed": "codepuppy.auto.localErrStorage",
 } as const
 
 // ── `#1572` AC5:`network` 且 main 认出卡在哪一层(`netLayer`)⇒ 三个动作都说那一层的那一句 ──────────
 // 没有 netLayer 的 `network` 逐字不变,由上面「云档改本地时云端删除被拒」与 [#994] 删除那一格守着(仍断 cloudErrNetwork)。
 // 期望值是字典原文代入「对方服务器」:日程走 main 直连,界面拿不到云服务的主机名。
-const layered = (key: "alpha.net.dns" | "alpha.net.tcp" | "alpha.net.tlsSilent") => zh[key].replace("{{host}}", zh["alpha.net.hostFallback"])
+const layered = (key: "codepuppy.net.dns" | "codepuppy.net.tcp" | "codepuppy.net.tlsSilent") => zh[key].replace("{{host}}", zh["codepuppy.net.hostFallback"])
 
 describe("`#1572` 日程保存 / 删除 / 开关的联网失败说出卡在哪一层", () => {
   test("保存:network + netLayer:dns ⇒ 错误行说「解析不了」,不是泛化的网络错误", async () => {
     runtime.queueSaveResult({ ok: false, reason: "云端注册失败:network", code: "network", netLayer: "dns" })
     await saveAsCloudTask()
     expect(errorLine()).toContain("解析不了")
-    expect(errorLine()).toBe(layered("alpha.net.dns"))
-    expect(errorLine()).not.toBe(zh["alpha.ext.cloudErrNetwork"])
+    expect(errorLine()).toBe(layered("codepuppy.net.dns"))
+    expect(errorLine()).not.toBe(zh["codepuppy.ext.cloudErrNetwork"])
   })
 
   test("删除:network + netLayer:tcp ⇒ 提示说「连不上」", async () => {
     runtime.queueRemoveResult({ ok: false, reason: "云端删除失败:network", code: "network", netLayer: "tcp" })
     await renderListWith(cloudTask("auto-1572-del", "sched_1572_del"))
-    click(query(".alpha-auto-row"))
+    click(query(".codepuppy-auto-row"))
     await flush()
-    click(query(".alpha-auto-actions .alpha-ext-add[data-variant='danger']"))
+    click(query(".codepuppy-auto-actions .codepuppy-ext-add[data-variant='danger']"))
     await flush()
     expect(runtime.removeCalls()).toEqual(["auto-1572-del"])
-    expect(errorToasts()).toEqual([{ title: zh["alpha.auto.removeFailed"], detail: layered("alpha.net.tcp") }])
+    expect(errorToasts()).toEqual([{ title: zh["codepuppy.auto.removeFailed"], detail: layered("codepuppy.net.tcp") }])
   })
 
   test("开关:network + netLayer:tls-silent ⇒ 提示说加密握手没有回应", async () => {
     runtime.queueToggleResult({ ok: false, reason: "云端状态更新失败:network", code: "network", netLayer: "tls-silent" })
     await renderListWith(cloudTask("auto-1572-sw", "sched_1572_sw"))
-    click(query(".alpha-auto-row .alpha-ext-sw"))
+    click(query(".codepuppy-auto-row .codepuppy-ext-sw"))
     await flush()
     expect(runtime.toggleCalls()).toEqual([["auto-1572-sw", false]])
-    expect(errorToasts()).toEqual([{ title: zh["alpha.auto.toggleFailed"], detail: layered("alpha.net.tlsSilent") }])
+    expect(errorToasts()).toEqual([{ title: zh["codepuppy.auto.toggleFailed"], detail: layered("codepuppy.net.tlsSilent") }])
   })
 })
 
@@ -538,7 +538,7 @@ describe("[#1001] 保存时本机失败给人话", () => {
     runtime.queueSaveResult({ ok: false, reason: "projectDir not a directory", code: "automation-project-dir-invalid" })
     await saveAsCloudTask("local")
 
-    expect(errorLine()).toBe(zh["alpha.auto.localErrProjectDir"])
+    expect(errorLine()).toBe(zh["codepuppy.auto.localErrProjectDir"])
     expect(errorLine()).not.toContain("projectDir")
   })
 
@@ -546,13 +546,13 @@ describe("[#1001] 保存时本机失败给人话", () => {
     runtime.queueSaveResult({ ok: false, reason: "invalid name(云端注册已回滚)", code: "automation-name-invalid" })
     await saveAsCloudTask("cloud")
 
-    expect(errorLine()).toBe(zh["alpha.auto.localErrName"])
+    expect(errorLine()).toBe(zh["codepuppy.auto.localErrName"])
     expect(errorLine()).not.toContain("invalid")
     expect(errorLine()).not.toContain("云端注册已回滚")
   })
 
   test("每个本地结构码逐个有自己的人话:不落回落模板、不含码、两两不同", () => {
-    const fallbackOf = (code: string) => zh["alpha.auto.cloudErrUnknown"].replace("{{code}}", code)
+    const fallbackOf = (code: string) => zh["codepuppy.auto.cloudErrUnknown"].replace("{{code}}", code)
     const copies = new Set<string>()
     for (const [code, key] of Object.entries(LOCAL_STORE_CODE_KEYS)) {
       const copy = runtime.scheduleRefusalCopy(code)
@@ -592,12 +592,12 @@ async function openCreateForm(text = "每天 9 点检查本项目未处理的 TO
   disposers.push(runtime.render(() => runtime.AutomationRefusalHarness(), query<HTMLElement>("#root")))
   runtime.openPanel()
   await flush()
-  const nl = query<HTMLInputElement>(".alpha-auto-nl")
+  const nl = query<HTMLInputElement>(".codepuppy-auto-nl")
   nl.value = text
   nl.dispatchEvent(new Event("input", { bubbles: true }))
-  click(query(".alpha-auto-new .alpha-ext-add[data-variant='primary']"))
+  click(query(".codepuppy-auto-new .codepuppy-ext-add[data-variant='primary']"))
   await flush()
-  expect(document.querySelector(".alpha-auto-form") !== null, "表单没出来").toBe(true)
+  expect(document.querySelector(".codepuppy-auto-form") !== null, "表单没出来").toBe(true)
 }
 
 const hasCjk = (text: string) => /[㐀-鿿]/.test(text)
@@ -607,9 +607,9 @@ function localTask(id: string): Runtime.ListedTask {
 }
 
 describe("#1592 AC1:「用 AI 解析」的结果显示解析出的周期,占位符全是双花括号", () => {
-  test("alpha.auto.* 的占位符只用 {{x}},且中英集合逐键相等", () => {
+  test("codepuppy.auto.* 的占位符只用 {{x}},且中英集合逐键相等", () => {
     const placeholders = (copy: string) => [...copy.matchAll(/\{\{(\w+)\}\}/g)].map((match) => match[1]).sort()
-    const keys = Object.keys(zh).filter((key) => key.startsWith("alpha.auto.")) as Array<keyof typeof zh>
+    const keys = Object.keys(zh).filter((key) => key.startsWith("codepuppy.auto.")) as Array<keyof typeof zh>
     expect(keys.length).toBeGreaterThan(50)
     for (const key of keys) {
       for (const copy of [zh[key], en[key as keyof typeof en]]) {
@@ -625,15 +625,15 @@ describe("#1592 AC1:「用 AI 解析」的结果显示解析出的周期,占位�
     runtime.queueNlLlmResult({ ok: true, name: "周报", schedule: { kind: "cron", expr: "0 9 * * 1" }, prompt: "写周报" })
     // 确定性规则解析不出周期的一句话,才会露出「用 AI 解析」。
     await openCreateForm("饭点前提醒我写周报")
-    const llm = [...document.querySelectorAll<HTMLButtonElement>(".alpha-auto-hint .alpha-ext-inline-cta")].find(
-      (b) => b.textContent === zh["alpha.auto.llmParse"],
+    const llm = [...document.querySelectorAll<HTMLButtonElement>(".codepuppy-auto-hint .codepuppy-ext-inline-cta")].find(
+      (b) => b.textContent === zh["codepuppy.auto.llmParse"],
     )
     expect(llm !== undefined, "「用 AI 解析」按钮不在").toBe(true)
     expect(llm!.disabled, "项目目录没填上,按钮还是禁用的").toBe(false)
     click(llm!)
     await flush()
 
-    const hint = query(".alpha-auto-hint").textContent ?? ""
+    const hint = query(".codepuppy-auto-hint").textContent ?? ""
     expect(hint.startsWith("已识别:")).toBe(true)
     expect(hint.length).toBeGreaterThan("已识别:".length)
     expect(hint).not.toContain("{")
@@ -647,8 +647,8 @@ describe("#1592 AC2:云端任务的手动运行如实标为「在本机试跑」
     runtime.openPanel()
     await flush()
 
-    const local = query<HTMLButtonElement>("[data-alpha-auto-run-now='auto-local']")
-    const cloud = query<HTMLButtonElement>("[data-alpha-auto-run-now='auto-cloud']")
+    const local = query<HTMLButtonElement>("[data-codepuppy-auto-run-now='auto-local']")
+    const cloud = query<HTMLButtonElement>("[data-codepuppy-auto-run-now='auto-cloud']")
     expect(local.textContent).toBe("立即运行")
     expect(local.title).toBe("跑一次,计入每日 24 次上限")
     expect(cloud.textContent).toBe("在本机试跑")
@@ -665,27 +665,27 @@ describe("#1592 AC2:云端任务的手动运行如实标为「在本机试跑」
 describe("#1592 AC3:选「云端」时收起云端不看的三项,换成四行运行条件", () => {
   test("云端 ⇒ 权限 / 单次最长 / 通知不显示,四行条件出现;切回本机 ⇒ 三项连同原值回来", async () => {
     await openCreateForm()
-    const maxMin = query<HTMLInputElement>("[data-alpha-auto-local-fields] input[type='number']")
+    const maxMin = query<HTMLInputElement>("[data-codepuppy-auto-local-fields] input[type='number']")
     maxMin.value = "42"
     maxMin.dispatchEvent(new Event("input", { bubbles: true }))
-    const notify = query<HTMLInputElement>("[data-alpha-auto-local-fields] input[type='checkbox']")
+    const notify = query<HTMLInputElement>("[data-codepuppy-auto-local-fields] input[type='checkbox']")
     notify.click()
     await flush()
     expect(notify.checked).toBe(false)
 
-    click(buttonByText(zh["alpha.auto.execCloud"]))
+    click(buttonByText(zh["codepuppy.auto.execCloud"]))
     await flush()
-    expect(document.querySelector("[data-alpha-auto-local-fields]") === null).toBe(true)
-    const note = query("[data-alpha-auto-cloud-note]").textContent ?? ""
+    expect(document.querySelector("[data-codepuppy-auto-local-fields]") === null).toBe(true)
+    const note = query("[data-codepuppy-auto-cloud-note]").textContent ?? ""
     for (const line of ["云端运行", "应用关着也按时运行", "只发送执行内容,不读项目文件", "结果在下次打开应用时存入项目", "单次运行有时长上限"]) {
       expect(note).toContain(line)
     }
 
-    click(buttonByText(zh["alpha.auto.execLocal"]))
+    click(buttonByText(zh["codepuppy.auto.execLocal"]))
     await flush()
-    expect(document.querySelector("[data-alpha-auto-cloud-note]") === null).toBe(true)
-    expect(query<HTMLInputElement>("[data-alpha-auto-local-fields] input[type='number']").value).toBe("42")
-    expect(query<HTMLInputElement>("[data-alpha-auto-local-fields] input[type='checkbox']").checked).toBe(false)
+    expect(document.querySelector("[data-codepuppy-auto-cloud-note]") === null).toBe(true)
+    expect(query<HTMLInputElement>("[data-codepuppy-auto-local-fields] input[type='number']").value).toBe("42")
+    expect(query<HTMLInputElement>("[data-codepuppy-auto-local-fields] input[type='checkbox']").checked).toBe(false)
   })
 })
 
@@ -694,11 +694,11 @@ describe("#1592 AC4:「云端」按 Code Puppy 账户登录状态可选,不按�
     runtime.setAuth({ status: "logged-out", mode: "byok" })
     await openCreateForm()
 
-    expect(buttonByText(zh["alpha.auto.execCloud"]).disabled).toBe(true)
-    click(buttonByText(zh["alpha.auto.execCloud"]))
+    expect(buttonByText(zh["codepuppy.auto.execCloud"]).disabled).toBe(true)
+    click(buttonByText(zh["codepuppy.auto.execCloud"]))
     await flush()
-    expect(buttonByText(zh["alpha.auto.execLocal"]).getAttribute("data-on")).toBe("")
-    const locked = query("[data-alpha-auto-cloud-locked]")
+    expect(buttonByText(zh["codepuppy.auto.execLocal"]).getAttribute("data-on")).toBe("")
+    const locked = query("[data-codepuppy-auto-cloud-locked]")
     expect(locked.textContent).toContain("需登录 Code Puppy 账户")
     click(locked.querySelector("button")!)
     await flush()
@@ -709,11 +709,11 @@ describe("#1592 AC4:「云端」按 Code Puppy 账户登录状态可选,不按�
     runtime.setAuth({ status: "logged-in", mode: "byok", platformStatus: "ready" })
     await openCreateForm()
 
-    expect(buttonByText(zh["alpha.auto.execCloud"]).disabled).toBe(false)
-    expect(document.querySelector("[data-alpha-auto-cloud-locked]") === null).toBe(true)
-    click(buttonByText(zh["alpha.auto.execCloud"]))
+    expect(buttonByText(zh["codepuppy.auto.execCloud"]).disabled).toBe(false)
+    expect(document.querySelector("[data-codepuppy-auto-cloud-locked]") === null).toBe(true)
+    click(buttonByText(zh["codepuppy.auto.execCloud"]))
     await flush()
-    expect(buttonByText(zh["alpha.auto.execCloud"]).getAttribute("data-on")).toBe("")
+    expect(buttonByText(zh["codepuppy.auto.execCloud"]).getAttribute("data-on")).toBe("")
   })
 })
 
@@ -727,12 +727,12 @@ describe("#1592 AC5:改成「可改文件」的确认在表单内完成,不弹�
     }) as typeof window.confirm
     try {
       await openCreateForm()
-      click(buttonByText(zh["alpha.auto.permStandard"]))
+      click(buttonByText(zh["codepuppy.auto.permStandard"]))
       await flush()
-      click(query(".alpha-auto-actions .alpha-ext-add[data-variant='primary']"))
+      click(query(".codepuppy-auto-actions .codepuppy-ext-add[data-variant='primary']"))
       await flush()
 
-      const row = query("[data-alpha-auto-standard-confirm]")
+      const row = query("[data-codepuppy-auto-standard-confirm]")
       expect(row.textContent).toContain("无人值守时可改文件、运行命令")
       expect(runtime.saveCalls()).toHaveLength(0)
 
@@ -749,16 +749,16 @@ describe("#1592 AC5:改成「可改文件」的确认在表单内完成,不弹�
 
   test("点「改回只读」⇒ 权限回到只读,确认行收起,不保存", async () => {
     await openCreateForm()
-    click(buttonByText(zh["alpha.auto.permStandard"]))
+    click(buttonByText(zh["codepuppy.auto.permStandard"]))
     await flush()
-    click(query(".alpha-auto-actions .alpha-ext-add[data-variant='primary']"))
+    click(query(".codepuppy-auto-actions .codepuppy-ext-add[data-variant='primary']"))
     await flush()
 
-    const revert = [...query("[data-alpha-auto-standard-confirm]").querySelectorAll("button")].find((b) => b.textContent === "改回只读")!
+    const revert = [...query("[data-codepuppy-auto-standard-confirm]").querySelectorAll("button")].find((b) => b.textContent === "改回只读")!
     click(revert)
     await flush()
-    expect(document.querySelector("[data-alpha-auto-standard-confirm]") === null).toBe(true)
-    expect(buttonByText(zh["alpha.auto.permReadonly"]).getAttribute("data-on")).toBe("")
+    expect(document.querySelector("[data-codepuppy-auto-standard-confirm]") === null).toBe(true)
+    expect(buttonByText(zh["codepuppy.auto.permReadonly"]).getAttribute("data-on")).toBe("")
     expect(runtime.saveCalls()).toHaveLength(0)
   })
 })
@@ -767,7 +767,7 @@ describe("#1592 AC6:立即运行与 AI 解析的失败按结构码出文案,原�
   test("立即运行被拒 ⇒ toast 是码对应的人话,不是 main 的原因串", async () => {
     runtime.queueRunNowResult({ ok: false, code: "automation-run-daily-cap", reason: "daily run cap reached (24/day)" })
     await renderListWith(localTask("auto-cap"))
-    click(query("[data-alpha-auto-run-now='auto-cap']"))
+    click(query("[data-codepuppy-auto-run-now='auto-cap']"))
     await flush()
     expect(errorToasts().map((toast) => toast.title)).toEqual(["今日已达 24 次上限"])
     expect(document.body.textContent).not.toContain("daily run cap")
@@ -780,8 +780,8 @@ describe("#1592 AC6:立即运行与 AI 解析的失败按结构码出文案,原�
       reason: "模型返回的结构不合法(缺 name/schedule/prompt 或周期过密)",
     })
     await openCreateForm("饭点前提醒我写周报")
-    const llm = [...document.querySelectorAll<HTMLButtonElement>(".alpha-auto-hint .alpha-ext-inline-cta")].find(
-      (b) => b.textContent === zh["alpha.auto.llmParse"],
+    const llm = [...document.querySelectorAll<HTMLButtonElement>(".codepuppy-auto-hint .codepuppy-ext-inline-cta")].find(
+      (b) => b.textContent === zh["codepuppy.auto.llmParse"],
     )!
     click(llm)
     await flush()
@@ -797,7 +797,7 @@ describe("#1592 AC6:立即运行与 AI 解析的失败按结构码出文案,原�
     runtime.openPanel()
     await flush()
 
-    const [knownRow, unknownRow] = [...document.querySelectorAll(".alpha-auto-row-st")].map((el) => el.textContent ?? "")
+    const [knownRow, unknownRow] = [...document.querySelectorAll(".codepuppy-auto-row-st")].map((el) => el.textContent ?? "")
     expect(knownRow).toContain("上次失败 · 应用未就绪,本次未运行")
     expect(knownRow).not.toContain("scheduler")
     expect(unknownRow).toContain("上次失败")
@@ -834,41 +834,41 @@ describe("#1592 AC6:立即运行与 AI 解析的失败按结构码出文案,原�
 describe("#1592 AC7:其余文字与批准稿文案对照表(自动化部分)一致", () => {
   test("zh 文案逐条对照", () => {
     const expected: Partial<Record<keyof typeof zh, string>> = {
-      "alpha.auto.offlineNote": "应用关着时,本机任务不运行",
-      "alpha.auto.platformCost": "本机任务消耗平台额度",
-      "alpha.auto.kind.cron": "自定义",
-      "alpha.auto.cronFormat": "格式:分 时 日 月 周",
-      "alpha.auto.fPrompt": "执行内容",
-      "alpha.auto.fPermission": "权限",
-      "alpha.auto.permStandard": "可改文件",
-      "alpha.auto.execLocal": "本机",
-      "alpha.auto.permNote": "只读:不改文件、不运行命令",
-      "alpha.auto.permStandardNote": "可改文件、运行命令,拦截危险命令",
-      "alpha.auto.standardConfirm": "无人值守时可改文件、运行命令",
-      "alpha.auto.standardConfirmOk": "确定",
-      "alpha.auto.standardConfirmRevert": "改回只读",
-      "alpha.auto.cloudRunTitle": "云端运行",
-      "alpha.auto.cloudNeedsLogin": "需登录 Code Puppy 账户",
-      "alpha.auto.runNow": "立即运行",
-      "alpha.auto.runErrNotFound": "任务已删除",
-      "alpha.auto.runErrBusy": "另一个任务在运行",
-      "alpha.auto.runErrDailyCap": "今日已达 {{cap}} 次上限",
-      "alpha.auto.llmNeedsDir": "先选择项目",
-      "alpha.auto.parsedLlm": "已识别:{{desc}}",
-      "alpha.auto.parseErrUnavailable": "AI 暂不可用",
-      "alpha.auto.parseErrBlocked": "内容未通过安全审核",
-      "alpha.auto.openRun": "打开结果",
-      "alpha.auto.tplDaily": "每日总结模板",
-      "alpha.auto.disabledBreaker": "连续失败 {{n}} 次,已停用",
-      "alpha.auto.cloudErrFormUnsupported": "云端不支持此间隔,请改用本机",
-      "alpha.auto.saving": "保存中…",
-      "alpha.auto.runReasonNotReady": "应用未就绪,本次未运行",
+      "codepuppy.auto.offlineNote": "应用关着时,本机任务不运行",
+      "codepuppy.auto.platformCost": "本机任务消耗平台额度",
+      "codepuppy.auto.kind.cron": "自定义",
+      "codepuppy.auto.cronFormat": "格式:分 时 日 月 周",
+      "codepuppy.auto.fPrompt": "执行内容",
+      "codepuppy.auto.fPermission": "权限",
+      "codepuppy.auto.permStandard": "可改文件",
+      "codepuppy.auto.execLocal": "本机",
+      "codepuppy.auto.permNote": "只读:不改文件、不运行命令",
+      "codepuppy.auto.permStandardNote": "可改文件、运行命令,拦截危险命令",
+      "codepuppy.auto.standardConfirm": "无人值守时可改文件、运行命令",
+      "codepuppy.auto.standardConfirmOk": "确定",
+      "codepuppy.auto.standardConfirmRevert": "改回只读",
+      "codepuppy.auto.cloudRunTitle": "云端运行",
+      "codepuppy.auto.cloudNeedsLogin": "需登录 Code Puppy 账户",
+      "codepuppy.auto.runNow": "立即运行",
+      "codepuppy.auto.runErrNotFound": "任务已删除",
+      "codepuppy.auto.runErrBusy": "另一个任务在运行",
+      "codepuppy.auto.runErrDailyCap": "今日已达 {{cap}} 次上限",
+      "codepuppy.auto.llmNeedsDir": "先选择项目",
+      "codepuppy.auto.parsedLlm": "已识别:{{desc}}",
+      "codepuppy.auto.parseErrUnavailable": "AI 暂不可用",
+      "codepuppy.auto.parseErrBlocked": "内容未通过安全审核",
+      "codepuppy.auto.openRun": "打开结果",
+      "codepuppy.auto.tplDaily": "每日总结模板",
+      "codepuppy.auto.disabledBreaker": "连续失败 {{n}} 次,已停用",
+      "codepuppy.auto.cloudErrFormUnsupported": "云端不支持此间隔,请改用本机",
+      "codepuppy.auto.saving": "保存中…",
+      "codepuppy.auto.runReasonNotReady": "应用未就绪,本次未运行",
     }
     for (const [key, value] of Object.entries(expected)) expect(zh[key as keyof typeof zh], key).toBe(value)
   })
 
   test("云端说明不复述平台的数值上限(轮数 / token / 分钟)", () => {
-    const cloudKeys = Object.keys(zh).filter((key) => key.startsWith("alpha.auto.cloudRun")) as Array<keyof typeof zh>
+    const cloudKeys = Object.keys(zh).filter((key) => key.startsWith("codepuppy.auto.cloudRun")) as Array<keyof typeof zh>
     expect(cloudKeys.length).toBe(5)
     for (const key of cloudKeys) {
       for (const copy of [zh[key], en[key as keyof typeof en]]) expect(copy, key).not.toMatch(/\d|token/i)

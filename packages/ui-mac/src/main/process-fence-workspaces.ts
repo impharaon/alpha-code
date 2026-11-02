@@ -8,7 +8,7 @@
 // 主目录下别的目录仍能被同一手法点名。本文件关掉这条:**围栏的输入不再是围栏可写的文件**。
 //
 // ── 真源在哪、长什么样 ──────────────────────────────────────────────────────────
-// `<appData>/alpha-code-state/fence-workspaces/<env>.json`。父目录 `<appData>/alpha-code-state` 是 alpha-environment.ts 冻结快照的
+// `<appData>/codepuppy-state/fence-workspaces/<env>.json`。父目录 `<appData>/codepuppy-state` 是 codepuppy-environment.ts 冻结快照的
 // `casBaseRoot`,三个 env 根与 `cas/` 的父目录:W2 只放行它之下的 `env/<env>`,W3 是 `<userData>`(另一棵树),其余 17 行都不覆盖它
 // (`#1383` 基线 §1.1/§1.2 逐行核过;W1 那一行由 `#1390` 的规则 5b 兜住:与状态根相关的候选一律不进可写集)。`cas/` 已经是
 // 「main 写、引擎只读」的先例,这里是同一形状。按 env 分文件:prod / beta / dev 的 tab store 本来就各在各的 `<userData>`。
@@ -36,7 +36,7 @@
 // (process-fence-write-sites.test.ts 的集合自证会点名)。
 
 import { dirname, isAbsolute, resolve } from "node:path"
-import type { AppEnvironment } from "./alpha-environment"
+import type { AppEnvironment } from "./codepuppy-environment"
 import { workspaceCandidatesFromStore, type WorkspaceUnionSources } from "./process-fence-profile"
 import { GLOBAL_RENDERER_STORE, TABS_INFO_KEY, TABS_KEY, TABS_RECENT_KEY } from "./tabs-preclean"
 
@@ -106,7 +106,7 @@ export function readWorkspaceTruthOrThrow(path: string, fs: WorkspaceTruthReadFs
 
 let tmpSeq = 0
 
-/** 原子写:临时文件 + rename;父目录不在就建(`fence-workspaces/` 本身不在 alpha-environment 的拓扑预检里)。 */
+/** 原子写:临时文件 + rename;父目录不在就建(`fence-workspaces/` 本身不在 codepuppy-environment 的拓扑预检里)。 */
 export function writeWorkspaceTruth(path: string, workspaces: readonly string[], fs: WorkspaceTruthWriteFs): void {
   fs.mkdirSync(dirname(path), { recursive: true })
   const tmp = `${path}.${process.pid}.${++tmpSeq}.tmp`

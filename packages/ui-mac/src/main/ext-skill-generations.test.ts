@@ -34,7 +34,7 @@ import {
 let root: string
 let casBase: string
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), "alpha-skillgen-"))
+  root = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-skillgen-"))
   casBase = path.join(root, "cas-base")
 })
 afterEach(() => {

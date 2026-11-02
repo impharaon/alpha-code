@@ -9,7 +9,7 @@ import type { TitlebarTheme } from "../preload/types"
 import { trackDeepLinkRenderer } from "./deep-links"
 import { exportDebugLogs, write as writeLog } from "./logging"
 import { cspPlatformEligible } from "./platform"
-import { corsRelaxAllowed, createAlphaOriginRegistry, RENDERER_CSP } from "./renderer-security"
+import { corsRelaxAllowed, createCodePuppyOriginRegistry, RENDERER_CSP } from "./renderer-security"
 import { HTML_PREVIEW_SCHEME } from "../shared/html-preview"
 import { safeErrorName, safeRouteLabel } from "./renderer-diagnostic-redaction"
 import { getStore } from "./store"
@@ -35,9 +35,9 @@ const jsCallStacksDocumentPolicy = "include-js-call-stacks-in-crash-reports"
 
 // C24:CORS 放宽收敛 + 打包态 CSP(纯逻辑在 renderer-security.ts)。CSP 仅打包态注入(dev 的
 // vite/HMR 需要宽松环境);平台资格经 seam(darwin 原状 + win32 纳入,ADR-026 §5 加固面对齐;
-// WSL 非回环地址风险与真机批验证注记见 platform/index.cspPlatformEligible);逃生 ALPHA_CSP_DISABLE=1。
+// WSL 非回环地址风险与真机批验证注记见 platform/index.cspPlatformEligible);逃生 CODEPUPPY_CSP_DISABLE=1。
 const rendererCsp = RENDERER_CSP
-const shouldInjectCsp = () => app.isPackaged && cspPlatformEligible() && process.env.ALPHA_CSP_DISABLE !== "1"
+const shouldInjectCsp = () => app.isPackaged && cspPlatformEligible() && process.env.CODEPUPPY_CSP_DISABLE !== "1"
 
 // #898(SEC):唯一的 registered-origin 集合实例,只活在本模块闭包里 —— 从不经 preload/ipc.ts
 // 暴露写入口,renderer/扩展代码结构上无法自行注册。当前没有任何调用方往里 register(内嵌
@@ -45,7 +45,7 @@ const shouldInjectCsp = () => app.isPackaged && cspPlatformEligible() && process
 // 即是默认拒:win32 上未注册的非回环 origin 不再拿到 ACAO。将来若出现需要放宽的非回环
 // Alpha 服务(例如真正的 WSL 远端地址),由该服务自己的启动/健康检查/退出路径调用
 // registry.register/revoke,不得走 IPC 让 renderer 决定放行谁。
-const alphaOriginRegistry = createAlphaOriginRegistry()
+const codepuppyOriginRegistry = createCodePuppyOriginRegistry()
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -60,7 +60,7 @@ protocol.registerSchemesAsPrivileged([
   // 全应用只允许调用一次,故在此挂载;仅 standard(host/相对路径解析必需)—— 不给 secure、
   // 不给 supportFetchAPI,能力面最小化。handler 本体按 preview session 注册于 html-preview-host.ts。
   // `supportFetchAPI`(#1229):Office 宿主页要用同源 fetch 把文档字节当**数据**取回来,
-  // 没有它会被拒为 `URL scheme "alpha-artifact-preview" is not supported`。
+  // 没有它会被拒为 `URL scheme "codepuppy-artifact-preview" is not supported`。
   // 已实测这不放宽 HTML 产物那条路 —— 那份 CSP 的裸 `sandbox` 在 fetch 之前就把脚本整个禁掉了
   // (控制台 `Blocked script execution … because the document's frame is sandboxed`),
   // 恶意 HTML 连发起 fetch 的机会都没有。仍然不给 secure。
@@ -218,7 +218,7 @@ export function createMainWindow() {
 
   win.webContents.session.webRequest.onBeforeSendHeaders((details, callback) => {
     const { requestHeaders } = details
-    if (corsRelaxAllowed(details.url, process.platform, alphaOriginRegistry))
+    if (corsRelaxAllowed(details.url, process.platform, codepuppyOriginRegistry))
       upsertKeyValue(requestHeaders, "Access-Control-Allow-Origin", ["*"])
     callback({ requestHeaders })
   })
@@ -240,15 +240,15 @@ export function createMainWindow() {
   })
 
   // alpha-code dev verification hook (env-gated, no effect in normal use):
-  // ALPHA_SHOT=<png> captures the rendered window after ALPHA_SHOT_DELAY ms then quits.
-  if (process.env.ALPHA_SHOT) {
+  // CODEPUPPY_SHOT=<png> captures the rendered window after CODEPUPPY_SHOT_DELAY ms then quits.
+  if (process.env.CODEPUPPY_SHOT) {
     setTimeout(
       async () => {
         try {
           const { writeFile } = await import("node:fs/promises")
           // optional: click the "open project" button so we capture the populated
-          // project view (the picker is short-circuited by ALPHA_OPEN_DIR).
-          if (process.env.ALPHA_OPEN_DIR) {
+          // project view (the picker is short-circuited by CODEPUPPY_OPEN_DIR).
+          if (process.env.CODEPUPPY_OPEN_DIR) {
             const r = await win.webContents
               .executeJavaScript(
                 `(()=>{
@@ -261,7 +261,7 @@ export function createMainWindow() {
               })()`,
               )
               .catch((e) => "err:" + e.message)
-            console.log("[alpha-open] folder-add:", JSON.stringify(r))
+            console.log("[codepuppy-open] folder-add:", JSON.stringify(r))
             await new Promise((res) => setTimeout(res, 5000))
             // then start a new session to land on the chat composer
             const r2 = await win.webContents
@@ -269,13 +269,13 @@ export function createMainWindow() {
                 `(()=>{const b=[...document.querySelectorAll('button,[role=button],a')].find(e=>/新建会话|new\\s*session/i.test(e.textContent||''));if(b){b.click();return 'clicked '+(e=>e.textContent.trim().slice(0,12))(b)}return 'no-new-session'})()`,
               )
               .catch((e) => "err:" + e.message)
-            console.log("[alpha-open] new-session:", JSON.stringify(r2))
+            console.log("[codepuppy-open] new-session:", JSON.stringify(r2))
             await new Promise((res) => setTimeout(res, 5000))
           }
           // optional: click a button by visible text before capture (e.g. open the Extension Hub),
           // so we can screenshot a surface that needs one interaction. Env-gated, no normal effect.
-          if (process.env.ALPHA_SHOT_CLICK) {
-            const want = process.env.ALPHA_SHOT_CLICK
+          if (process.env.CODEPUPPY_SHOT_CLICK) {
+            const want = process.env.CODEPUPPY_SHOT_CLICK
             const clicked = await win.webContents
               .executeJavaScript(
                 `(()=>{const want=${JSON.stringify(want)};` +
@@ -284,32 +284,32 @@ export function createMainWindow() {
                   `if(el){el.click();return 'clicked:'+want}return 'notfound:'+want})()`,
               )
               .catch((e) => "err:" + e.message)
-            console.log("[alpha-shot] click:", JSON.stringify(clicked))
+            console.log("[codepuppy-shot] click:", JSON.stringify(clicked))
             await new Promise((res) => setTimeout(res, 1800))
           }
           // optional: force the color scheme (light|dark) before capture, so dev verification can
-          // shoot both modes deterministically without toggling the OS appearance. alpha-ui tokens
+          // shoot both modes deterministically without toggling the OS appearance. codepuppy-ui tokens
           // and opencode's CSS both key off documentElement[data-color-scheme]. Env-gated, no normal effect.
-          if (process.env.ALPHA_SHOT_SCHEME) {
+          if (process.env.CODEPUPPY_SHOT_SCHEME) {
             await win.webContents
               .executeJavaScript(
-                `document.documentElement.dataset.colorScheme=${JSON.stringify(process.env.ALPHA_SHOT_SCHEME)};` +
+                `document.documentElement.dataset.colorScheme=${JSON.stringify(process.env.CODEPUPPY_SHOT_SCHEME)};` +
                   `getComputedStyle(document.documentElement).getPropertyValue('--a-bg-subtle');`,
               )
               .catch((e) => "err:" + e.message)
             await new Promise((res) => setTimeout(res, 700))
           }
           const img = await win.webContents.capturePage()
-          await writeFile(process.env.ALPHA_SHOT as string, img.toPNG())
-          console.log("[alpha-shot]", process.env.ALPHA_SHOT, JSON.stringify(img.getSize()))
+          await writeFile(process.env.CODEPUPPY_SHOT as string, img.toPNG())
+          console.log("[codepuppy-shot]", process.env.CODEPUPPY_SHOT, JSON.stringify(img.getSize()))
         } catch (e) {
-          console.error("[alpha-shot] failed", e)
+          console.error("[codepuppy-shot] failed", e)
         } finally {
           const { app } = await import("electron")
           app.exit(0)
         }
       },
-      Number(process.env.ALPHA_SHOT_DELAY ?? 18000),
+      Number(process.env.CODEPUPPY_SHOT_DELAY ?? 18000),
     )
   }
 
@@ -562,7 +562,7 @@ function isTrustedRendererUrl(value?: string) {
 }
 
 function addRendererHeaders(value: string, headers: Record<string, any>) {
-  if (corsRelaxAllowed(value, process.platform, alphaOriginRegistry)) {
+  if (corsRelaxAllowed(value, process.platform, codepuppyOriginRegistry)) {
     upsertKeyValue(headers, "Access-Control-Allow-Origin", ["*"])
     upsertKeyValue(headers, "Access-Control-Allow-Headers", ["*"])
   }

@@ -2,7 +2,7 @@
 // 用户全局 opencode 配置是外部输入面。sidecar fork 时只枚举引擎真实的 XDG 全局目录,
 // 把不在 alpha 治理集的 mcp 以 lone `{enabled:false}` 写进末序 OPENCODE_CONFIG_CONTENT;
 // 治理内 server 不复制、不改写。项目配置面、上游 MCP 实现均不动。
-// `#1381`:alpha.jsonc 自己的 `type:"remote"` 条目同样压成 `{enabled:false}`(除非它正是本轮从真源注入的名字)——
+// `#1381`:codepuppy.jsonc 自己的 `type:"remote"` 条目同样压成 `{enabled:false}`(除非它正是本轮从真源注入的名字)——
 // 见函数体内的说明。
 //
 // `OPENCODE_CONFIG_DIR` 会在同一 fork 尾部被 v2 bridge 改指 alpha 自有目录,不能拿它做枚举
@@ -22,10 +22,10 @@ type Config = { mcp?: Record<string, unknown> }
 export function injectMcpDefaultDeny(
   config: Config,
   options: {
-    alphaConfigPath: string
+    codepuppyConfigPath: string
     /** 仅测试/隔离注入;生产缺省严格镜像 Global.Path.config,绝不看 OPENCODE_CONFIG_DIR。 */
     userConfigDir?: string
-    /** 本轮 injectAlphaConfig 新放入 config.mcp 的名称;不得把继承 env 当成治理来源。 */
+    /** 本轮 injectCodePuppyConfig 新放入 config.mcp 的名称;不得把继承 env 当成治理来源。 */
     injectedMcpNames?: Iterable<string>
     /** 仅测试注入;生产固定同步读盘,与 sidecar fork 注入时序一致。 */
     readFile?: (file: string) => string
@@ -35,8 +35,8 @@ export function injectMcpDefaultDeny(
   const logError = options.logError ?? ((message: string) => console.error(message))
   try {
     const readFile = options.readFile ?? ((file: string) => readFileSync(file, "utf8"))
-    const alpha = readConfig(options.alphaConfigPath, "alpha", readFile, logError)
-    const alphaMcp = asRecord(alpha?.mcp)
+    const alpha = readConfig(options.codepuppyConfigPath, "alpha", readFile, logError)
+    const codepuppyMcp = asRecord(alpha?.mcp)
     const userConfigDir =
       options.userConfigDir ??
       join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "opencode")
@@ -48,20 +48,20 @@ export function injectMcpDefaultDeny(
         result[name] = { ...asRecord(result[name]), ...asRecord(leaf) }
         return result
       }, Object.create(null) as Record<string, unknown>)
-    // #223 R6 Major:治理集只认「alpha.jsonc 里真有的」与「本轮注入面真放进去的」。以前这里写死
+    // #223 R6 Major:治理集只认「codepuppy.jsonc 里真有的」与「本轮注入面真放进去的」。以前这里写死
     // 一个 `"cloud"` 字面量,于是**不代付时**用户全局配置里一个叫 cloud 的第三方 server 被永久
     // 当成治理来源、连 enabled:false 都不写 —— 名字不是治理凭据。代付两条分支下注入面都会把
     // cloud 放进 injectedMcpNames(kill-switch 下放的是中和条目),治理语义因此不变。
-    // `#1381`(`#1383` 基线 I1 / I3):alpha.jsonc 里的 `type:"remote"` 条目**也不是治理凭据** —— 那个文件在围栏的可写集里(W2),
+    // `#1381`(`#1383` 基线 I1 / I3):codepuppy.jsonc 里的 `type:"remote"` 条目**也不是治理凭据** —— 那个文件在围栏的可写集里(W2),
     // 被围栏的引擎树自己写得了;远程 MCP 的记录自本票起住在 main 才写得了的真源(mcp-server-truth.ts),由注入面放进
-    // injectedMcpNames。治理集因此 = alpha.jsonc 里的**非远程**条目 ∪ 本轮注入的名字;alpha.jsonc 里不在注入名单的远程条目
+    // injectedMcpNames。治理集因此 = codepuppy.jsonc 里的**非远程**条目 ∪ 本轮注入的名字;codepuppy.jsonc 里不在注入名单的远程条目
     // 本身也压成 `enabled:false` —— 引擎原生仍会合并 OPENCODE_CONFIG,不压它就会去连(只是被围栏 403),而它不该被当成
-    // 已治理的连接器启用。本地条目一字不动:它们不需要出网授权,仍是 alpha.jsonc 的正当居民。
+    // 已治理的连接器启用。本地条目一字不动:它们不需要出网授权,仍是 codepuppy.jsonc 的正当居民。
     const injected = new Set(options.injectedMcpNames ?? [])
-    const alphaRemote = Object.entries(alphaMcp)
+    const codepuppyRemote = Object.entries(codepuppyMcp)
       .filter(([, leaf]) => asRecord(leaf).type === "remote")
       .map(([name]) => name)
-    const governed = new Set([...Object.keys(alphaMcp).filter((name) => !alphaRemote.includes(name)), ...injected])
+    const governed = new Set([...Object.keys(codepuppyMcp).filter((name) => !codepuppyRemote.includes(name)), ...injected])
     const denied = Object.keys(globalMcp)
       .filter((name) => !governed.has(name))
       .sort()
@@ -70,11 +70,11 @@ export function injectMcpDefaultDeny(
     if (denied.length)
       logError(`[req109-535] default-denied user-global MCP names=${JSON.stringify(denied)}`)
 
-    const deniedRemote = alphaRemote.filter((name) => !injected.has(name)).sort()
+    const deniedRemote = codepuppyRemote.filter((name) => !injected.has(name)).sort()
     deniedRemote.forEach((name) => setLeaf(config, name, "enabled", false))
     if (deniedRemote.length)
       logError(
-        `[alpha-code#1381] default-denied remote MCP entries in ${options.alphaConfigPath} (not in the main-only truth file, so neither injected nor authorized) names=${JSON.stringify(deniedRemote)}`,
+        `[alpha-code#1381] default-denied remote MCP entries in ${options.codepuppyConfigPath} (not in the main-only truth file, so neither injected nor authorized) names=${JSON.stringify(deniedRemote)}`,
       )
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code

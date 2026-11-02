@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
-import { addReceipt, removeReceipt } from "./alpha-installs"
+import { addReceipt, removeReceipt } from "./codepuppy-installs"
 import type { InstallReceipt } from "../preload/types"
 import { sha256Hex } from "./ext-manifest-v2"
 import {
@@ -156,7 +156,7 @@ describe("dual-format ledger — generation chain & v1 view lockstep (AC#6)", ()
     expect(raw.receipts).toHaveLength(1)
   })
 
-  test("v1 write path (alpha-installs) carries records[] through — v1 ops never erase v2 truth", () => {
+  test("v1 write path (codepuppy-installs) carries records[] through — v1 ops never erase v2 truth", () => {
     upsertRecordV2(root, upsertInput())
     // 旧代码路径写 v1 receipt(另一个 key)
     addReceipt(root, v1Receipt({ id: "user:legacy", name: "legacy", type: "skill", configKey: undefined, origin: "created" }))
@@ -340,12 +340,12 @@ describe("v1 → v2 explicit migration (AC#6)", () => {
 
   test("project ledger binds identity to the CURRENT project dir", () => {
     const proj = path.join(root, "proj")
-    const alphaDir = path.join(proj, ".alpha")
-    fs.mkdirSync(alphaDir, { recursive: true })
-    addReceipt(alphaDir, v1Receipt({ scope: "project", type: "skill", name: "psk", id: "skill:psk", configKey: undefined }))
-    const r = migrateV1Ledger(alphaDir, "prod", proj)
+    const codepuppyDir = path.join(proj, ".alpha")
+    fs.mkdirSync(codepuppyDir, { recursive: true })
+    addReceipt(codepuppyDir, v1Receipt({ scope: "project", type: "skill", name: "psk", id: "skill:psk", configKey: undefined }))
+    const r = migrateV1Ledger(codepuppyDir, "prod", proj)
     expect(r.ok).toBe(true)
-    const rec = findRecordV2(alphaDir, "skill", "psk")
+    const rec = findRecordV2(codepuppyDir, "skill", "psk")
     expect(rec?.scope.kind).toBe("project")
     if (rec?.scope.kind === "project") expect(rec.scope.projectPath).toBe(fs.realpathSync(proj))
   })

@@ -6,7 +6,7 @@
 // 短暂挂载的 legacy layout)上的命令注册一起蒸发 —— 上游 `run()` 对未注册 id **静默返回**,于是
 // 菜单里一串项目按下去什么都不发生,也不报错。
 //
-// 处置只有三条路:alpha 承接(在壳里注册,见 alpha-sidebar.tsx 的 `alpha.shell` 注册块)、
+// 处置只有三条路:alpha 承接(在壳里注册,见 codepuppy-sidebar.tsx 的 `codepuppy.shell` 注册块)、
 // 明确退休(从这里删掉,菜单上不再出现)、或本次恢复。本模块承载「退休」那一列,并且是**纯数据**
 // (不 import electron),所以主进程的发布面与渲染进程的运行时闸门读的是同一份事实。
 //
@@ -46,7 +46,7 @@ export const RETIRED_MENU_COMMANDS: ReadonlySet<string> = new Set([
 ])
 
 /** 该 platform 下 alpha 实际发布的菜单(退休项已剔除,分隔符已收拢)。 */
-export function alphaDesktopMenu(platform: DesktopMenuPlatform): DesktopMenu[] {
+export function codepuppyDesktopMenu(platform: DesktopMenuPlatform): DesktopMenu[] {
   const menus: DesktopMenu[] = []
   for (const menu of DESKTOP_MENU) {
     if (!desktopMenuVisible(menu, platform)) continue
@@ -69,7 +69,7 @@ export function alphaDesktopMenu(platform: DesktopMenuPlatform): DesktopMenu[] {
 /** alpha 发布面上仍然存在的命令 id 全集 —— 渲染进程闸门按它逐个要求「真注册且可触发」。 */
 export function publishedMenuCommands(platform: DesktopMenuPlatform): string[] {
   const ids = new Set<string>()
-  for (const menu of alphaDesktopMenu(platform)) {
+  for (const menu of codepuppyDesktopMenu(platform)) {
     for (const entry of menu.items ?? []) {
       if (entry.type === "item" && entry.command) ids.add(entry.command)
     }

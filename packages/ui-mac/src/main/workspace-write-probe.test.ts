@@ -74,17 +74,17 @@ describe("runWorkspaceWriteProbe —— 真文件系统 + 注入失败", () => {
 
     const leftover = runWorkspaceWriteProbe("/ws", { writeFile: () => {}, remove: () => { throw errno("EBUSY") }, stamp: () => "stamp" })
     expect(leftover.outcome).toBe("writable")
-    expect(leftover.detail).toContain("/ws/.alpha-write-probe-stamp")
+    expect(leftover.detail).toContain("/ws/.codepuppy-write-probe-stamp")
   })
 
   test("探针文件名带唯一戳且用 wx 打开:同名已存在算失败(unknown),永远不覆盖用户文件", () => {
     const dir = mkdtempSync(join(tmpdir(), "ac1322-probe-wx-"))
     try {
-      writeFileSync(join(dir, ".alpha-write-probe-fixed"), "user data")
+      writeFileSync(join(dir, ".codepuppy-write-probe-fixed"), "user data")
       const result = runWorkspaceWriteProbe(dir, { stamp: () => "fixed" })
       expect(result.outcome).toBe("unknown")
       expect(result.detail).toMatch(/^write EEXIST/)
-      expect(readdirSync(dir)).toEqual([".alpha-write-probe-fixed"])
+      expect(readdirSync(dir)).toEqual([".codepuppy-write-probe-fixed"])
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

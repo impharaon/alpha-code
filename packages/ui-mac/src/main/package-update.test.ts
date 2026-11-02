@@ -40,32 +40,32 @@ import type { PackageArtifactRemovalV1 } from "./ext-package-uninstall"
 
 const corpus = resolve(
   import.meta.dir,
-  "../../../alpha-contracts-consumer/vendor/alpha-web-extension-package/expected.bundle.compiled.json",
+  "../../../codepuppy-contracts-consumer/vendor/alpha-web-extension-package/expected.bundle.compiled.json",
 )
 const snapshotDigest = "9".repeat(64)
 
 let tmp = ""
 let root = ""
 let userData = ""
-const previousRoot = process.env.ALPHA_GLOBAL_DIR
+const previousRoot = process.env.CODEPUPPY_GLOBAL_DIR
 
 beforeEach(() => {
   tmp = mkdtempSync(join(tmpdir(), "req128-698-update-"))
   root = join(tmp, "root")
   userData = join(tmp, "user-data")
   mkdirSync(root, { recursive: true })
-  process.env.ALPHA_GLOBAL_DIR = root
+  process.env.CODEPUPPY_GLOBAL_DIR = root
 })
 
 afterEach(() => {
-  if (previousRoot === undefined) delete process.env.ALPHA_GLOBAL_DIR
-  else process.env.ALPHA_GLOBAL_DIR = previousRoot
+  if (previousRoot === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+  else process.env.CODEPUPPY_GLOBAL_DIR = previousRoot
   rmSync(tmp, { recursive: true, force: true })
 })
 
 /** live 配置里还有没有这个 mcp 叶 —— 「离场组件还能不能跑」的直接观测点。 */
 const mcpConfigKeys = (): string[] => {
-  const file = join(root, "alpha.jsonc")
+  const file = join(root, "codepuppy.jsonc")
   if (!existsSync(file)) return []
   return Object.keys((JSON.parse(readFileSync(file, "utf8")) as { mcp?: Record<string, unknown> }).mcp ?? {})
 }
@@ -604,7 +604,7 @@ const productionInstallers = (): PackageArtifactInstallersV1 => ({
   removeFsInstall,
   removeMcpConfig: (name) => withConfigWriteLock(() => removeMcpConfigInLock(name)),
   removeMcpSecretsStrict: () => ({ ok: true as const }),
-  releaseAlphaConnectionBindings: () => ({ ok: true as const }),
+  releaseCodePuppyConnectionBindings: () => ({ ok: true as const }),
   removeInstallGrants,
   // `#809`:与 `ext-ipc.ts` 同源 —— managed plugin 的 `plugin[]` 摘除走生产写器。
   removePluginPath,

@@ -26,9 +26,9 @@ rl.on("line", (line) => {
     return
   }
   if (msg.method === "initialize")
-    send({ jsonrpc: "2.0", id: msg.id, result: { protocolVersion: msg.params?.protocolVersion ?? "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "alpha1321probe", version: "0.0.0" } } })
+    send({ jsonrpc: "2.0", id: msg.id, result: { protocolVersion: msg.params?.protocolVersion ?? "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "codepuppy1321probe", version: "0.0.0" } } })
   else if (msg.method === "tools/list")
-    send({ jsonrpc: "2.0", id: msg.id, result: { tools: [{ name: "alpha1321_report", description: JSON.stringify(report), inputSchema: { type: "object", properties: {} } }] } })
+    send({ jsonrpc: "2.0", id: msg.id, result: { tools: [{ name: "codepuppy1321_report", description: JSON.stringify(report), inputSchema: { type: "object", properties: {} } }] } })
   else if (msg.method === "ping") send({ jsonrpc: "2.0", id: msg.id, result: {} })
   else if (msg.id !== undefined) send({ jsonrpc: "2.0", id: msg.id, error: { code: -32601, message: `unsupported: ${msg.method}` } })
 })

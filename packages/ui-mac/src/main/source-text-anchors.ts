@@ -94,22 +94,22 @@ export type SourceTextEntry = {
  * 每个条目对应的文件必须真的带上 `ANCHOR (not a gate): ` 标题前缀(第 ⑤ 层机械校验)。
  */
 export const DOWNGRADED_ANCHORS: Record<string, SourceTextEntry> = {
-  "packages/ui-mac/src/main/alpha-config-injection.test.ts": {
+  "packages/ui-mac/src/main/codepuppy-config-injection.test.ts": {
     why: "锚 sidecar.ts 里 ready 上报的取值与调用顺序。sidecar.ts 顶层就跑 registerHooks / getParentPort(),import 即副作用 ⇒ 没有单测驱动得了它。两个不会让它变红的变异:①在 postMessage 那一行之前把 injection 整个覆盖成空对象(被比较的文本逐字未变);②给 start() 加一条早退 return,ready 一次都不发。",
     evidence: "#613",
     lines: 1,
   },
-  "packages/ui-mac/src/main/alpha-sidecar-wiring.test.ts": {
-    why: "`#1531` 那一条锚 sidecar.ts 里「引擎 import → 进程内交接(publishInProcessEngine)→ ext 预载开始 → await 预载 → ready 上报」的下标先后,外加上游 plugin/shared.ts 解析路径插件的 URL 形状(pathToFileURL(file).href)—— 两边同一个 URL 才是同一个模块记录。两个不会让它变红的变异:①把预载的 import 换成另一个指向同一文件但带查询串的 URL(文本里那一段仍在,模块却装出第二份,监听挂在没人用的那份上);②在 await extPreload 之前加一条早退 return。sidecar.ts 顶层有副作用,import 不得;同文件另两条(真 spawnLocalServer + 假子进程)是行为判据。`#1578` 第 3 处读 server.ts:写 sidecar env 随包扩展清单的那一句,键名必须等于引擎 alpha-bundled-plugin.ts 的 EXT_BUNDLED_MANIFEST_ENV、值指向 bundled-tools.json —— 任一侧改名(一个字母)即红,这一半主语是跨包逐字一致。守不住的:①那一句被包进恒假分支或 ext.path 永远为空(键从不写,文本仍在);②main 写对了但 sidecar 之后又把这个键剥掉。行为判据要走 spawnLocalServer 看 fork env,而 dev 下 ext.path 依赖未入库的 packages/ext/dist,门不保证它在。",
+  "packages/ui-mac/src/main/codepuppy-sidecar-wiring.test.ts": {
+    why: "`#1531` 那一条锚 sidecar.ts 里「引擎 import → 进程内交接(publishInProcessEngine)→ ext 预载开始 → await 预载 → ready 上报」的下标先后,外加上游 plugin/shared.ts 解析路径插件的 URL 形状(pathToFileURL(file).href)—— 两边同一个 URL 才是同一个模块记录。两个不会让它变红的变异:①把预载的 import 换成另一个指向同一文件但带查询串的 URL(文本里那一段仍在,模块却装出第二份,监听挂在没人用的那份上);②在 await extPreload 之前加一条早退 return。sidecar.ts 顶层有副作用,import 不得;同文件另两条(真 spawnLocalServer + 假子进程)是行为判据。`#1578` 第 3 处读 server.ts:写 sidecar env 随包扩展清单的那一句,键名必须等于引擎 codepuppy-bundled-plugin.ts 的 EXT_BUNDLED_MANIFEST_ENV、值指向 bundled-tools.json —— 任一侧改名(一个字母)即红,这一半主语是跨包逐字一致。守不住的:①那一句被包进恒假分支或 ext.path 永远为空(键从不写,文本仍在);②main 写对了但 sidecar 之后又把这个键剥掉。行为判据要走 spawnLocalServer 看 fork env,而 dev 下 ext.path 依赖未入库的 packages/ext/dist,门不保证它在。",
     evidence: "#1531",
     lines: 3,
   },
-  "packages/ui-mac/src/main/alpha-contract-health.test.ts": {
+  "packages/ui-mac/src/main/codepuppy-contract-health.test.ts": {
     why: "锚的是 renderer 三个文件里「那几个标识符在不在」。它证不了 banner 真的渲染、也证不了 role=alert 真的可达。两个不会让它变红的变异:①把 <ContractFailureBanner /> 挪进一个恒假分支;②把 providers 里的订阅回调改成不更新状态。真判据要走组件测试道(本文件今天没有)。",
     evidence: "#224",
     lines: 3,
   },
-  "packages/ui-mac/src/main/alpha-root-retirement.test.ts": {
+  "packages/ui-mac/src/main/codepuppy-root-retirement.test.ts": {
     why: "3 处里 2 处(全树扫描退休 sentinel/alias)是**负全称**,文本就是被守的产物;第 3 处是锚 —— index.ts 里 bootEnforcementGap 的赋值 / 判定 / spawn 三段下标先后。两个不会让它变红的变异:①把 if (bootEnforcementGap) 整块删掉(赋值那句仍在,而断言只比下标);②把 gap 判定改成永远取到空值。index.ts 结构上进不了 bun(见本文件抬头)。",
     evidence: "#428",
     lines: 3,
@@ -144,8 +144,8 @@ export const DOWNGRADED_ANCHORS: Record<string, SourceTextEntry> = {
     evidence: "#551",
     lines: 1,
   },
-  "packages/ui-mac/src/main/alpha-office-instance.test.ts": {
-    why: "锚 index.ts 里 Office 实例 reconcile 排在 marker reconcile 之前、且在第一次 spawnLocalServer( 之前 —— 比的是 indexOf 下标。两个不会让它变红的变异:①把 reconcileAlphaOfficeInstalls 的函数体改成直接 return(调用文本仍在);②让它算出收养结果却不写账本/配置。index.ts 结构上进不了 bun;收养/重锚/幂等/回滚的行为判据在同文件其余用例里(它们跑的是模块本体)。",
+  "packages/ui-mac/src/main/codepuppy-office-instance.test.ts": {
+    why: "锚 index.ts 里 Office 实例 reconcile 排在 marker reconcile 之前、且在第一次 spawnLocalServer( 之前 —— 比的是 indexOf 下标。两个不会让它变红的变异:①把 reconcileCodePuppyOfficeInstalls 的函数体改成直接 return(调用文本仍在);②让它算出收养结果却不写账本/配置。index.ts 结构上进不了 bun;收养/重锚/幂等/回滚的行为判据在同文件其余用例里(它们跑的是模块本体)。",
     evidence: "#1244",
     lines: 1,
   },
@@ -223,13 +223,13 @@ export const KEPT_SOURCE_TEXT_READS: Record<string, SourceTextEntry> = {
     evidence: "#1031",
     lines: 2,
   },
-  "packages/ui-mac/src/main/alpha-environment.test.ts": {
+  "packages/ui-mac/src/main/codepuppy-environment.test.ts": {
     why: "两处在同一条 grep 守卫里:main 侧 handler 必须零参数、preload 侧 invoke 必须不带参数,且两侧都**不得**出现任何环境写面通道名。主语是负全称(「不存在第二个写面」)—— 没有比源码文本更细的粒度能表达「全仓没有」。",
     evidence: "#239",
     lines: 2,
   },
   "packages/ui-mac/src/main/brand-guard.test.ts": {
-    why: "ac#1160 REQ-139 品牌守卫,两半主语都是文本本身:①AC5 身份面五组字面量(APP_IDS/APP_NAMES+setName/bundle id/更新 feed/URL schemes+CLIENT_ID)的**逐字冻结** —— 被守的正是「声明文本一个字符都没变」(变了 = 钥匙串项名/userData 目录/OAuth wire 标识换名,存量破坏),值断言表达不了「连写法都不许动」;index.ts/electron-builder.config.ts 在 bun 侧也结构上 import 不了。②AC1/AC3 展示面有限坐标清单的声明式字面量(productName/i18n 品牌键/窗口标题/提示词 to 串),以及 REQ-148 的安装器协议描述、钥匙串清理指引、生态迁移对话框与扩展工具说明,逐点断言只展示 Code Puppy —— 显示串就是声明,文本即产物。守不住:文本在而消费链断掉(如 wordmark 键没人读)不红,那一半由 L2 packaged 视觉取证(REQ-139 VERIFY 票)兜。第 25 处([ac#1198])是同型展示面文本闸:zht.ts updater 两句的值断言(REQ-139 zht 漏网,与 zh/en 同句同型);REQ-148 新增四处同型文本读取,精确计数随之升至 29。第 30 处([ac#1211])是安装器展示名文本闸:install-local.ts 的 PRODUCT_NAMES 声明与 Cmd+Space 提示逐字断言,配同形态负断言堵旧名 —— 该脚本只在本机装机路径上跑,不进发布件,值断言够不着它(没有可 import 的运行时导出),而装出来的 bundle 名一旦回退旧名,Finder/Spotlight 里就又叫 alpha-code。守不住:脚本文本对而 electron-builder 的 productName 另行漂移不红,那一半由本文件既有的 AC5 身份面冻结兜。第 31 处([ac#1299])是 AC3 自动化执行器 prompt 那条的坐标搬家:三个 alpha agent 的 prompt/description 从 alpha-config-injection.ts 抽进零依赖的 alpha-agents.ts(登记簿 import 它),原来的 2 处计数改读新文件,并加一条同形态负断言钉住生产文件里 0 处 —— 主语仍是「品牌串住在哪份文本里」,与既有 AC3 各条同型。[ac#1321] 减 1 处(31 → 30):REQ-138 的 shell-sandbox.ts 连同它 deny stub 里那句 `Code Puppy: shell sandbox unavailable` 一起拆掉了(围栏上移到引擎进程,装不上是引擎不起而不是一条 shell 提示),那一处品牌串读取随文件消失,不是漏掉。",
+    why: "ac#1160 REQ-139 品牌守卫,两半主语都是文本本身:①AC5 身份面五组字面量(APP_IDS/APP_NAMES+setName/bundle id/更新 feed/URL schemes+CLIENT_ID)的**逐字冻结** —— 被守的正是「声明文本一个字符都没变」(变了 = 钥匙串项名/userData 目录/OAuth wire 标识换名,存量破坏),值断言表达不了「连写法都不许动」;index.ts/electron-builder.config.ts 在 bun 侧也结构上 import 不了。②AC1/AC3 展示面有限坐标清单的声明式字面量(productName/i18n 品牌键/窗口标题/提示词 to 串),以及 REQ-148 的安装器协议描述、钥匙串清理指引、生态迁移对话框与扩展工具说明,逐点断言只展示 Code Puppy —— 显示串就是声明,文本即产物。守不住:文本在而消费链断掉(如 wordmark 键没人读)不红,那一半由 L2 packaged 视觉取证(REQ-139 VERIFY 票)兜。第 25 处([ac#1198])是同型展示面文本闸:zht.ts updater 两句的值断言(REQ-139 zht 漏网,与 zh/en 同句同型);REQ-148 新增四处同型文本读取,精确计数随之升至 29。第 30 处([ac#1211])是安装器展示名文本闸:install-local.ts 的 PRODUCT_NAMES 声明与 Cmd+Space 提示逐字断言,配同形态负断言堵旧名 —— 该脚本只在本机装机路径上跑,不进发布件,值断言够不着它(没有可 import 的运行时导出),而装出来的 bundle 名一旦回退旧名,Finder/Spotlight 里就又叫 alpha-code。守不住:脚本文本对而 electron-builder 的 productName 另行漂移不红,那一半由本文件既有的 AC5 身份面冻结兜。第 31 处([ac#1299])是 AC3 自动化执行器 prompt 那条的坐标搬家:三个 alpha agent 的 prompt/description 从 codepuppy-config-injection.ts 抽进零依赖的 codepuppy-agents.ts(登记簿 import 它),原来的 2 处计数改读新文件,并加一条同形态负断言钉住生产文件里 0 处 —— 主语仍是「品牌串住在哪份文本里」,与既有 AC3 各条同型。[ac#1321] 减 1 处(31 → 30):REQ-138 的 shell-sandbox.ts 连同它 deny stub 里那句 `Code Puppy: shell sandbox unavailable` 一起拆掉了(围栏上移到引擎进程,装不上是引擎不起而不是一条 shell 提示),那一处品牌串读取随文件消失,不是漏掉。",
     evidence: "#1160",
     lines: 30,
   },

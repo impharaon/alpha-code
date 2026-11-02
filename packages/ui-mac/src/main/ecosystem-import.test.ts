@@ -12,7 +12,7 @@ import {
   importGlobalClaudeMd,
   importProjectClaudeMd,
   registerProjectSkillsPath,
-  listAlphaInstructionFiles,
+  listCodePuppyInstructionFiles,
   readGlobalGateMarker,
   withExternalImportDecision,
   writeGlobalGateMarker,
@@ -20,15 +20,15 @@ import {
 
 let tmp: string
 const savedEnv: Record<string, string | undefined> = {}
-const ENV_KEYS = ["ALPHA_ECOSYSTEM_INHERIT", "OPENCODE_DISABLE_EXTERNAL_SKILLS", "OPENCODE_DISABLE_CLAUDE_CODE_PROMPT", "ALPHA_GLOBAL_DIR"]
+const ENV_KEYS = ["CODEPUPPY_ECOSYSTEM_INHERIT", "OPENCODE_DISABLE_EXTERNAL_SKILLS", "OPENCODE_DISABLE_CLAUDE_CODE_PROMPT", "CODEPUPPY_GLOBAL_DIR"]
 
 beforeEach(() => {
-  tmp = fs.mkdtempSync(path.join(os.tmpdir(), "alpha-eco-"))
+  tmp = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-eco-"))
   for (const k of ENV_KEYS) {
     savedEnv[k] = process.env[k]
     delete process.env[k]
   }
-  process.env.ALPHA_GLOBAL_DIR = path.join(tmp, ".code-puppy")
+  process.env.CODEPUPPY_GLOBAL_DIR = path.join(tmp, ".code-puppy")
 })
 afterEach(() => {
   for (const k of ENV_KEYS) {
@@ -58,8 +58,8 @@ describe("applyEcosystemDefaultDeny — T1(set-if-unset + 逃生)", () => {
     expect(env.OPENCODE_DISABLE_EXTERNAL_SKILLS).toBe("0") // 用户显式恢复继承,尊重
     expect(env.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT).toBe("1")
   })
-  test("ALPHA_ECOSYSTEM_INHERIT=1 → 不注入任何 flag(整机恢复上游行为)", () => {
-    const env: NodeJS.ProcessEnv = { ALPHA_ECOSYSTEM_INHERIT: "1" }
+  test("CODEPUPPY_ECOSYSTEM_INHERIT=1 → 不注入任何 flag(整机恢复上游行为)", () => {
+    const env: NodeJS.ProcessEnv = { CODEPUPPY_ECOSYSTEM_INHERIT: "1" }
     applyEcosystemDefaultDeny(env)
     expect(env.OPENCODE_DISABLE_EXTERNAL_SKILLS).toBeUndefined()
     expect(env.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT).toBeUndefined()
@@ -141,7 +141,7 @@ describe("转换导入 — 快照 + 溯源 + 不碰源", () => {
     fs.writeFileSync(path.join(home, ".claude", "CLAUDE.md"), "# global\n")
     const dest = importGlobalClaudeMd(path.join(home, ".claude", "CLAUDE.md"))
     expect(fs.readFileSync(dest, "utf8")).toBe("# global\n")
-    expect(listAlphaInstructionFiles()).toEqual([dest])
+    expect(listCodePuppyInstructionFiles()).toEqual([dest])
   })
 })
 
@@ -162,25 +162,25 @@ describe("记账 — 项目 prefs 版本化 + 全局 marker 一次性", () => {
 })
 
 describe("registerProjectSkillsPath — 项目 skills 注册(2026-07-08 真机缺口回归锁)", () => {
-  test("项目导入 ≥1 技能 → 自动写项目 alpha.jsonc 的 skills.paths(引擎发现链)", async () => {
+  test("项目导入 ≥1 技能 → 自动写项目 codepuppy.jsonc 的 skills.paths(引擎发现链)", async () => {
     const proj = path.join(tmp, "proj-reg")
     mkSkill(proj, ".claude", "demo")
     const r = await importExternalSkills(detectExternal(proj, "project").skills, { scope: "project", projectDir: proj })
     expect(r.importedSkills).toEqual(["demo"])
-    const cfg = JSON.parse(fs.readFileSync(path.join(proj, ".code-puppy", "alpha.jsonc"), "utf8"))
+    const cfg = JSON.parse(fs.readFileSync(path.join(proj, ".code-puppy", "codepuppy.jsonc"), "utf8"))
     expect(cfg.skills.paths).toEqual(["./.code-puppy/skills"])
   })
   test("幂等 + 既有配置(含注释 JSONC)保留", () => {
     const proj = path.join(tmp, "proj-reg2")
     fs.mkdirSync(path.join(proj, ".code-puppy"), { recursive: true })
-    fs.writeFileSync(path.join(proj, ".code-puppy", "alpha.jsonc"), '{\n  // user comment\n  "mcp": { "x": { "type": "remote", "url": "https://e" } },\n  "skills": { "paths": ["./.code-puppy/skills"] }\n}\n')
+    fs.writeFileSync(path.join(proj, ".code-puppy", "codepuppy.jsonc"), '{\n  // user comment\n  "mcp": { "x": { "type": "remote", "url": "https://e" } },\n  "skills": { "paths": ["./.code-puppy/skills"] }\n}\n')
     registerProjectSkillsPath(proj) // 已含 → no-op(文件不被重写破坏注释)
-    expect(fs.readFileSync(path.join(proj, ".code-puppy", "alpha.jsonc"), "utf8")).toContain("user comment")
+    expect(fs.readFileSync(path.join(proj, ".code-puppy", "codepuppy.jsonc"), "utf8")).toContain("user comment")
     const proj3 = path.join(tmp, "proj-reg3")
     fs.mkdirSync(path.join(proj3, ".code-puppy"), { recursive: true })
-    fs.writeFileSync(path.join(proj3, ".code-puppy", "alpha.jsonc"), '{ "mcp": { "x": { "type": "remote", "url": "https://e" } } }')
+    fs.writeFileSync(path.join(proj3, ".code-puppy", "codepuppy.jsonc"), '{ "mcp": { "x": { "type": "remote", "url": "https://e" } } }')
     registerProjectSkillsPath(proj3)
-    const cfg3 = JSON.parse(fs.readFileSync(path.join(proj3, ".code-puppy", "alpha.jsonc"), "utf8"))
+    const cfg3 = JSON.parse(fs.readFileSync(path.join(proj3, ".code-puppy", "codepuppy.jsonc"), "utf8"))
     expect(cfg3.mcp.x.url).toBe("https://e") // 既有条目保留
     expect(cfg3.skills.paths).toEqual(["./.code-puppy/skills"])
   })

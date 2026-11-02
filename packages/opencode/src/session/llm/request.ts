@@ -4,8 +4,8 @@ import { SessionV1 } from "@opencode-ai/core/v1/session"
 import type { RuntimeFlags } from "@/effect/runtime-flags"
 import { InstanceState } from "@/effect/instance-state"
 import { Permission } from "@/permission"
-import type { AlphaToolPolicy } from "@/permission/alpha-tool-policy"
-import { AlphaToolPolicyGate } from "@/permission/alpha-tool-policy-gate"
+import type { CodePuppyToolPolicy } from "@/permission/codepuppy-tool-policy"
+import { CodePuppyToolPolicyGate } from "@/permission/codepuppy-tool-policy-gate"
 import { attachToolDisplay, getToolDisplay } from "../tool-display"
 import type { Agent } from "@/agent/agent"
 import type { MessageV2 } from "../message-v2"
@@ -34,7 +34,7 @@ type PrepareInput = {
   readonly provider: Provider.Info
   readonly auth: Auth.Info | undefined
   readonly plugin: Plugin.Interface
-  readonly toolPolicy: AlphaToolPolicy.Interface
+  readonly toolPolicy: CodePuppyToolPolicy.Interface
   readonly flags: RuntimeFlags.Info
   readonly isWorkflow: boolean
 }
@@ -152,7 +152,7 @@ export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: Pre
   // #1129 / #724 §6:目录闸的第二条轴 —— 策略**文档轴**按当轮 snapshot 判 deny
   // (「disabled:目录不广告;ask 照旧广告」)。ruleset 轴的既有过滤在 resolveTools 里原样保留;
   // 两轴对 deny 取并集。`host::StructuredOutput` 的 sentinel 豁免在 gate 里(exact canonical)。
-  const policyDenied = yield* AlphaToolPolicyGate.snapshotCatalogDenied(
+  const policyDenied = yield* CodePuppyToolPolicyGate.snapshotCatalogDenied(
     input.toolPolicy,
     Object.entries(input.tools).map(([technicalId, item]) => {
       const display = getToolDisplay(item)

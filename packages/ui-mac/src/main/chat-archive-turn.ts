@@ -29,7 +29,7 @@
 //
 // ── 附件 ────────────────────────────────────────────────────────────────────────────────────
 // 「附件」= composer 那条通道产出的 FilePart:`url` 是 `data:<mime>;base64,…`
-// (`packages/ui-mac/src/renderer/alpha-ui/composer-attachments-core.ts:17`)。`@` 引用的项目文件是
+// (`packages/ui-mac/src/renderer/codepuppy-ui/composer-attachments-core.ts:17`)。`@` 引用的项目文件是
 // `file://` 一类的**引用**而不是随消息上传的字节,不在这条线上;引擎自己也把 `text/plain` 与目录
 // FilePart 折成文本(`packages/opencode/src/session/message-v2.ts:212`)。
 // mime 白名单是服务端 `ALLOWED_ATTACHMENT_MIME` 的那五个,这里按契约**独立**写一遍字面量

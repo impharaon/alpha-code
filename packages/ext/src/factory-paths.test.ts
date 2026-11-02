@@ -1,9 +1,9 @@
-// REQ-065 修订 — 出厂技能路径内存注入(alpha.jsonc 零系统路径;用户拍板 2026-07-08)。
+// REQ-065 修订 — 出厂技能路径内存注入(codepuppy.jsonc 零系统路径;用户拍板 2026-07-08)。
 
 import { describe, expect, test } from "bun:test"
 import { injectFactorySkillPaths } from "./factory-paths"
 
-const DIRS = ["/App.app/Contents/Resources/skills/skill-creator", "/App.app/Contents/Resources/factory-skills/customize-code-puppy"]
+const DIRS = ["/App.app/Contents/Resources/skills/skill-creator", "/App.app/Contents/Resources/factory-skills/customize-codepuppy"]
 
 describe("injectFactorySkillPaths — env → cfg.skills.paths 内存注入", () => {
   test("注入到既有 skills.paths 之后(用户条目在前,不动)", () => {

@@ -1,7 +1,7 @@
 // engine-plugin-seal — ADR-040 §决策三 的执行面:**往磁盘 `plugin[]` 加元素一律拒**。
 //
 // 为什么这是一道咽喉而不是一张黑名单:
-//   `alpha.jsonc` 的 `plugin[]` 是引擎把**任意第三方 JS 拉进自己进程、以同等权限执行**的通道。
+//   `codepuppy.jsonc` 的 `plugin[]` 是引擎把**任意第三方 JS 拉进自己进程、以同等权限执行**的通道。
 //   ADR-040 裁定 Alpha 不再提供这个能力,于是「哪些安装路径允许写它」这个问题的答案是**一个都没有**。
 //   一个答案为空集的许可表,写成「逐个调用点判断」就是黑名单:枚举对新成员默认放行,而新成员
 //   (下一条安装路径、下一个 builder、下一次 rebase 带进来的调用点)必然会出现。
@@ -11,13 +11,13 @@
 // **允许什么**:移除、清空、重排、以及完全不碰 `plugin[]` 的写(mcp / provider / agent / 治理键)。
 //   卸载臂、启停投影的 disable 臂、dangling 清扫都落在这一侧 —— 它们是**减法**,是清理方向。
 //
-// **Alpha 自有 ext 接缝不受影响,因为它根本不写盘**:`alpha-config-injection.ts` 只把
-//   `@alpha-code/ext` 的绝对路径合进内存里的 `OPENCODE_CONFIG_CONTENT`(env 通道),
-//   `alpha.jsonc` 那一侧它只在文件缺席时 seed 一个 `{$schema}`。这就是为什么本咽喉可以做成
+// **Alpha 自有 ext 接缝不受影响,因为它根本不写盘**:`codepuppy-config-injection.ts` 只把
+//   `@codepuppy/ext` 的绝对路径合进内存里的 `OPENCODE_CONFIG_CONTENT`(env 通道),
+//   `codepuppy.jsonc` 那一侧它只在文件缺席时 seed 一个 `{$schema}`。这就是为什么本咽喉可以做成
 //   「一律拒」而不需要留任何合法加法通道(ADR-040 实读依据四)。
 //
 // **`#825` 交付时留着的那个已知边界,`#832` 已经关掉**:boot 期把 legacy `~/.opencode/opencode.jsonc`
-//   的 `plugin[]` 并进 `alpha.jsonc` 的整文件写。当时它不经过本咽喉,而且每次启动都跑。
+//   的 `plugin[]` 并进 `codepuppy.jsonc` 的整文件写。当时它不经过本咽喉,而且每次启动都跑。
 //   处置不是给它开豁免口(豁免口会让这道闸看起来完整而实际留门),是两件事一起做:
 //   ①`planConfigMerge` 里那条并集删掉 —— 「迁移用户自己的旧配置」不改变「这是一段以引擎同等权限
 //   执行的第三方 JS」这个事实;②那次整文件写盘改调 `ext-config` 的原子提交点,于是它**也**过闸。
@@ -30,13 +30,13 @@
 //
 // **本咽喉不是唯一的守门人,别照着这句话推「凡写引擎 config 必过这里」**(实读枚举过,那是假的)。
 // 四条不过本闸的写,以及**各自真正靠的是哪道闸** —— 这一栏比路径本身重要:
-//   · `ext-config.ts` 的 `applyBuiltinPolicyEditsUnlocked`:自己的 tmp+rename 写同一个 `alpha.jsonc`。
+//   · `ext-config.ts` 的 `applyBuiltinPolicyEditsUnlocked`:自己的 tmp+rename 写同一个 `codepuppy.jsonc`。
 //     靠 `builtinPolicyPathAllowed` 这道**具名路径白名单**(只放 `agent` / `permission.skill` /
 //     `command` 三个域的叶子,`plugin` 结构上不是合法首段,且在任何字节落盘之前逐条判);
-//   · `alpha-config-injection`:只在真源**缺席**时 seed 字面量 `{$schema}`,内容里没有 `plugin` 键;
-//   · `alpha-migrate` 的 legacy 臂:目标是 legacy `opencode.jsonc`,且只做减法,还要 `ALPHA_MIGRATE_ENABLE=1`;
+//   · `codepuppy-config-injection`:只在真源**缺席**时 seed 字面量 `{$schema}`,内容里没有 `plugin` 键;
+//   · `codepuppy-migrate` 的 legacy 臂:目标是 legacy `opencode.jsonc`,且只做减法,还要 `CODEPUPPY_MIGRATE_ENABLE=1`;
 //   · **`ecosystem-import.ts` 的 `registerProjectSkillsPath`(`#832` 审计补的第四条,这条最值得记住)**:
-//     整文件 `JSON.stringify` + tmp+rename 写**项目级** `<proj>/.code-puppy/alpha.jsonc` —— 与上面三条不同,
+//     整文件 `JSON.stringify` + tmp+rename 写**项目级** `<proj>/.code-puppy/codepuppy.jsonc` —— 与上面三条不同,
 //     **它自己没有任何路径白名单**;今天只写 `skills.paths` 是「它恰好只写这个」,不是被谁挡着。
 //     真正挡住 `plugin` 的闸**在另一个包里**:`packages/ext/src/project-config.ts` 的 `mergeProjectConfig`
 //     只合 `mcp`(信任门)/ `agent` / `command` / `skills.paths`,`plugin` 结构性不合。同族还有
@@ -85,7 +85,7 @@ function entriesOf(read: Extract<PluginKeyRead, { ok: true }>): { ok: true; entr
 }
 
 /**
- * 一次 `alpha.jsonc`(或任何引擎 config 文件)的整文本写入是否被 ADR-040 放行。
+ * 一次 `codepuppy.jsonc`(或任何引擎 config 文件)的整文本写入是否被 ADR-040 放行。
  *
  * `beforeText` = 写之前的 live 文本(文件缺席传 `"{}"` 或 `""`),`afterText` = 即将落盘的文本。
  * 判据是**元素级**的:`after` 的 `plugin[]` 每个成员都必须能在 `before` 的 `plugin[]` 里找到一份

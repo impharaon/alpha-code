@@ -56,10 +56,10 @@ describeDarwin("REQ-137 #1337 强制半场 —— 真 .node / 真 seatbelt / 真
   beforeAll(async () => {
     scratch = mkdtempSync(join(tmpdir(), "ac1337-net-"))
     buildId = `ac1337-test-${Date.now()}`
-    addon = buildFenceAddon({ out: join(scratch, "build", "alpha_fence.node"), buildId }).out
+    addon = buildFenceAddon({ out: join(scratch, "build", "codepuppy_fence.node"), buildId }).out
     ws = mkdtempSync(join(homedir(), ".ac1337-ws-"))
     const userData = join(scratch, "userData")
-    const globalRoot = join(scratch, "alpha-code-state", "env", "dev")
+    const globalRoot = join(scratch, "codepuppy-state", "env", "dev")
     mkdirSync(userData, { recursive: true })
     mkdirSync(globalRoot, { recursive: true })
 
@@ -86,7 +86,7 @@ describeDarwin("REQ-137 #1337 强制半场 —— 真 .node / 真 seatbelt / 真
       profileFile,
       renderProcessFenceProfile({
         workspaces: [ws],
-        alphaGlobalRoot: globalRoot,
+        codepuppyGlobalRoot: globalRoot,
         userDataPath: userData,
         stateHome: userData,
         roots: resolveEngineRoots({}, homedir()),

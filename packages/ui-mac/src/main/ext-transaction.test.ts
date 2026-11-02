@@ -8,7 +8,7 @@ import * as crypto from "node:crypto"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
-import { environmentMutableRoot } from "./alpha-environment"
+import { environmentMutableRoot } from "./codepuppy-environment"
 import { bundleLockPath, tryAcquireBundleLock } from "./ext-bundle-lock"
 import { capabilityGrantPath, readCapabilityGrant } from "./ext-capability-grants"
 import {
@@ -47,7 +47,7 @@ afterEach(() => {
 
 // ── fixtures & helpers ───────────────────────────────────────────────────────────────────────
 
-const V1 = { "SKILL.md": "v1 skill body", "assets/a.txt": "alpha-1" }
+const V1 = { "SKILL.md": "v1 skill body", "assets/a.txt": "codepuppy-1" }
 const V2 = { "SKILL.md": "v2 skill body", "assets/b.txt": "beta-2" } // a.txt 在 V2 消失 → AC3 残留检验
 
 const noop = () => {}

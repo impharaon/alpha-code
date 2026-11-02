@@ -1,0 +1,157 @@
+/* Alpha polish for opencode's v2 composer surface — CSS only, via stable data-component hooks.
+ * The FULL alpha composer rebuild (usage ring, effort, premium toolbar, model selector) is Phase 1;
+ * this interim pass lifts the existing v2 composer to alpha depth/edges so it stops reading "v2-gray".
+ * COUPLING (cosmetic; re-point on upstream rename): prompt-input-v2. */
+@import "./tokens.css";
+@import "./composer-shell.css"; /* shell visuals shared with the home composer (REQ-038 目标④) */
+
+[data-component="prompt-input-v2"] {
+  /* Shell visuals (bg/border/radius/shadow/focus) come from composer-shell.css — the single source
+   * shared with CodePuppyHome's .a-comp. Session-only layout below:
+   * Cap the docked composer to the SAME reading-measure column as the conversation content
+   * (820px) and centre it, so the input box lines up with the messages above instead of
+   * spanning full width (#17). Auto-fits narrow windows. */
+  max-width: 820px !important;
+  margin-inline: auto !important;
+}
+
+/* --- toolbar: premium icon buttons + brand-indigo send -----------------------------------------
+ * Stable hooks (verified live via CDP): [data-action="prompt-submit"] = the send button;
+ * [data-slot="icon-button"] = +/attach; [data-slot="button"] = the model chip.
+ * COUPLING (cosmetic): re-point on upstream rename of these slots/actions. */
+
+/* Send → alpha brand indigo affordance (user-approved). Enabled = indigo, disabled = muted track.
+ * Sized to 32px circle to match CodePuppyHome's .a-comp-send exactly (was opencode's size-7 = 28px). */
+[data-action="prompt-submit"] {
+  width: 32px !important;
+  height: 32px !important;
+  flex: none !important;
+  background: var(--a-send) !important;
+  color: var(--a-text-on-accent) !important;
+  border-radius: var(--a-radius-full) !important;
+  transition:
+    background var(--a-dur-fast) var(--a-ease-out),
+    transform var(--a-dur-fast) var(--a-ease-out) !important;
+}
+[data-action="prompt-submit"]:hover:not(:disabled) {
+  background: var(--a-send-hover) !important;
+}
+[data-action="prompt-submit"]:active:not(:disabled) {
+  background: var(--a-send-hover) !important;
+  transform: scale(0.94) !important;
+}
+[data-action="prompt-submit"]:disabled {
+  background: var(--a-bg-inset) !important;
+  color: var(--a-text-disabled) !important;
+}
+[data-action="prompt-submit"] svg {
+  color: currentColor !important;
+}
+/* The send icon: opencode renders a chunky FILLED arrow (#opencode-icon-arrow-up); CodePuppyHome's send uses
+ * a clean STROKED arrow (composer-controls ArrowUp). Swap to the stroked arrow for one consistent send
+ * glyph. Scoped via :has() to the arrow-up state ONLY, so the STOP icon shown during generation (a
+ * different sprite on the same button) is left untouched. */
+[data-action="prompt-submit"]:has(use[href="#opencode-icon-arrow-up"]) {
+  display: inline-grid !important;
+  place-items: center !important;
+}
+/* Upstream wraps the sprite svg in a <div>; hiding only the svg leaves that wrapper as a grid item,
+ * which pushed ::after (the alpha arrow) onto a SECOND grid row — the glyph rendered below the 32px
+ * circle and got clipped by the composer edge (the user-reported "发送按钮被裁切", REQ-038 验收⑥).
+ * Stack every child AND ::after into the same 1/1 cell so the arrow always centres. */
+[data-action="prompt-submit"]:has(use[href="#opencode-icon-arrow-up"]) > *,
+[data-action="prompt-submit"]:has(use[href="#opencode-icon-arrow-up"])::after {
+  grid-area: 1 / 1;
+}
+[data-action="prompt-submit"]:has(use[href="#opencode-icon-arrow-up"]) svg {
+  display: none !important;
+}
+[data-action="prompt-submit"]:has(use[href="#opencode-icon-arrow-up"])::after {
+  content: "";
+  width: 17px;
+  height: 17px;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 19V5M5 12l7-7 7 7'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 19V5M5 12l7-7 7 7'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+
+/* +/attach icon buttons → soft alpha hover (never the send button). */
+[data-component="prompt-input-v2"] [data-slot="icon-button"]:not([data-action="prompt-submit"]):hover {
+  background: var(--a-bg-muted) !important;
+  border-radius: var(--a-radius-md) !important;
+}
+
+/* Model chip → soft alpha hover + rounded. */
+[data-component="prompt-input-v2"] [data-slot="button"]:hover {
+  background: var(--a-bg-muted) !important;
+  border-radius: var(--a-radius-md) !important;
+}
+
+[data-action="prompt-model"] {
+  border-radius: var(--a-radius-md) !important;
+}
+
+/* Injected alpha chips (权限 + effort) inside opencode's in-session composer toolbar — keep them
+ * vertically centred among opencode's own controls. The host is display:contents so these flow in
+ * the toolbar's flex row. See composer-inject.tsx. */
+.a-comp-inject-chip {
+  align-self: center;
+  display: inline-flex;
+}
+
+/* Hide opencode's native "+" attach button — the alpha AddButton (same + menu as home) is injected in
+ * its place so the "+" interaction is identical on both surfaces (#31). file.attach still works via
+ * the menu's 文件与文件夹 (command, not the button). order:0 keeps the injected add at the far left. */
+[data-component="prompt-input-v2"] [data-action="prompt-attach"] {
+  display: none !important;
+}
+[data-codepuppy-composer-inject="add"] {
+  order: 0 !important;
+}
+
+/* Hide opencode's native reasoning-effort/variant select — alpha injects its own EffortChip
+ * (composer-controls EffortChip → .a-comp-eff "高") in its place. Without this the composer showed
+ * effort TWICE: native "High" (capitalize of "high") + alpha "高" — the double-effort bug the user
+ * kept hitting. COUPLING (cosmetic): [data-component=prompt-variant-control] = opencode's effort select;
+ * re-point on upstream rename. The alpha EffortChip remains the single effort control. */
+[data-component="prompt-input-v2"] [data-component="prompt-variant-control"] {
+  display: none !important;
+}
+
+/* Match CodePuppyHome's split toolbar: [+ · 权限] LEFT, [模型 · effort · 发送] RIGHT.
+ * opencode nests the model button inside a flex-1 left-group (so margin-left:auto on the button itself
+ * is inert). We push the model's WRAPPER right (the flex child that directly holds prompt-model —
+ * verified live: moves it ~750px right) and order the injected chips around it. 权限 stays left (order
+ * 1), the model wrapper floats right (order 2 + margin-left:auto), effort follows it (order 3); the
+ * native send button sits outside the left-group on the far right already.
+ * COUPLING (cosmetic): prompt-model action + the left-group being flex; re-point on upstream rename. */
+[data-component="prompt-input-v2"] :has(> [data-action="prompt-model"]) {
+  /* No margin-left:auto here — the usage host (order 2) owns the single auto-margin so the right
+   * cluster [usage · model · effort] stays together with no gap between the ring and the model. */
+  order: 3 !important;
+}
+/* Order the injected HOSTS (real inline-flex items): + add (0) · 权限 (1) on the left; then the right
+ * cluster starts at the usage ring (2, owns the auto-margin) · model wrapper (3) · effort (4). */
+[data-codepuppy-composer-inject="perm"] {
+  order: 1 !important;
+}
+[data-codepuppy-composer-inject="usage"] {
+  order: 2 !important;
+  margin-left: auto !important;
+}
+[data-codepuppy-composer-inject="effort"] {
+  order: 4 !important;
+}
+
+/* Slash menu (REQ-038b,用户拍板「两处用同一个弹框」): the in-session slash popover is now the
+ * ALPHA menu — composer-slash-inject.tsx portals the SAME component the home composer uses into the
+ * composer box. upstream's own popover is suppressed entirely (its state machine still runs; the
+ * inject swallows menu keys in capture phase so the hidden popover can't double-select).
+ * COUPLING: [data-slash-id] identifies upstream's popover (only it has DIRECT such children). */
+:has(> [data-slash-id]) {
+  display: none !important;
+}
+/* (The injected menu itself is Portaled to <body> with a fixed anchor — the composer box clips
+ * overflow, so an in-tree absolute menu would be invisible. See composer-slash-inject.tsx.) */

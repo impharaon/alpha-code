@@ -18,8 +18,8 @@
 import { randomBytes } from "node:crypto"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
-import type { AppEnvironment } from "./alpha-environment"
-import { alphaRoot } from "./alpha-workdir"
+import type { AppEnvironment } from "./codepuppy-environment"
+import { codepuppyRoot } from "./codepuppy-workdir"
 import { tryAcquireBundleLock } from "./ext-bundle-lock"
 import { migrateV1Ledger, projectScopeIdentity } from "./ext-receipt-v2"
 import type { RecoveryGate } from "./ext-recovery-gate"
@@ -38,7 +38,7 @@ export async function adoptProjectLedger(
   const identity = projectScopeIdentity(projectDir)
   if (!identity.ok) return { ok: false, transient: false, reason: `fail closed: ${identity.reason}` }
   const projectPath = identity.scope.projectPath
-  const root = alphaRoot(projectPath)
+  const root = codepuppyRoot(projectPath)
   if (!root) return { ok: false, transient: false, reason: `invalid project root: ${projectDir}` }
   // 无账本 = 无可收编:零写入直接返回(gate/锁会在 .code-puppy 里落地 lock/journal 目录 ——
   // 不给没有 .code-puppy 存量的项目制造写副作用)。幂等,存量出现后下次触发自然收编。

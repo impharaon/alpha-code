@@ -1,8 +1,8 @@
 // REQ-234 `#1529`(基线 §2.6)—— main 侧的重载**请求方与记录方**。执行者只有一个:ext 进程内的调度器(C3)。
 //
 // main 在这里做三件事,不多:
-//   · 分配 generation、记下「谁、为什么、对哪个作用域」要重载,经 parentPort 发 `alpha.reload.request`;
-//   · 收 `alpha.reload.report`,记结局(reloaded / failed / waiting);
+//   · 分配 generation、记下「谁、为什么、对哪个作用域」要重载,经 parentPort 发 `codepuppy.reload.request`;
+//   · 收 `codepuppy.reload.report`,记结局(reloaded / failed / waiting);
 //   · sidecar ready 时把仍未 reloaded 的 generation **原样重发**(幂等;ext 的队列随进程消失)。
 // 状态不持久化:main 重启 ⇒ 记录清空,hub-view 的即时核验说了算(§2.5)。
 //
@@ -20,7 +20,7 @@ import {
   type ReloadReportMessage,
   type ReloadRequestMessage,
   type ReloadScope,
-} from "./alpha-sidecar-messages"
+} from "./codepuppy-sidecar-messages"
 
 export type ReloadRequestInput = { scope: ReloadScope; items: ReloadItem[]; reason: string; force?: boolean }
 

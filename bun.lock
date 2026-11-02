@@ -27,8 +27,8 @@
         "turbo": "2.10.2",
       },
     },
-    "packages/alpha-contracts-consumer": {
-      "name": "@alpha-code/contracts-consumer",
+    "packages/codepuppy-contracts-consumer": {
+      "name": "@codepuppy/contracts-consumer",
       "version": "0.0.0",
       "dependencies": {
         "ajv": "8.20.0",
@@ -508,11 +508,11 @@
       },
     },
     "packages/ext": {
-      "name": "@alpha-code/ext",
+      "name": "@codepuppy/ext",
       "version": "0.0.0",
       "dependencies": {
         "@ai-sdk/provider": "3.0.16",
-        "@alpha-code/contracts-consumer": "workspace:*",
+        "@codepuppy/contracts-consumer": "workspace:*",
         "@opencode-ai/plugin": "workspace:*",
         "@silvia-odwyer/photon-node": "0.3.4",
       },
@@ -1039,7 +1039,7 @@
       "name": "ui-mac",
       "version": "0.1.24",
       "dependencies": {
-        "@alpha-code/contracts-consumer": "workspace:*",
+        "@codepuppy/contracts-consumer": "workspace:*",
         "@file-viewer/pptx": "3.0.0",
         "@file-viewer/renderer-spreadsheet": "3.0.0",
         "@zip.js/zip.js": "2.7.62",
@@ -1307,9 +1307,9 @@
 
     "@alloc/quick-lru": ["@alloc/quick-lru@5.2.0", "", {}, "sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw=="],
 
-    "@alpha-code/contracts-consumer": ["@alpha-code/contracts-consumer@workspace:packages/alpha-contracts-consumer"],
+    "@codepuppy/contracts-consumer": ["@codepuppy/contracts-consumer@workspace:packages/codepuppy-contracts-consumer"],
 
-    "@alpha-code/ext": ["@alpha-code/ext@workspace:packages/ext"],
+    "@codepuppy/ext": ["@codepuppy/ext@workspace:packages/ext"],
 
     "@ampproject/remapping": ["@ampproject/remapping@2.3.0", "", { "dependencies": { "@jridgewell/gen-mapping": "^0.3.5", "@jridgewell/trace-mapping": "^0.3.24" } }, "sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw=="],
 

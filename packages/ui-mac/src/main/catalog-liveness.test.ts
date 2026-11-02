@@ -232,7 +232,7 @@ describe("catalog-liveness 探针目录解析(#564 R2)", () => {
 })
 
 describe("catalog-liveness probe(真执行,fetch 注入)", () => {
-  const opts = { url: "http://127.0.0.1:41234", password: "pw-564", directory: "/tmp/alpha-workspace" }
+  const opts = { url: "http://127.0.0.1:41234", password: "pw-564", directory: "/tmp/codepuppy-workspace" }
 
   test("请求形状:打真实 base 的 marker 端点、带 location[directory] 与 Basic auth", async () => {
     let seen: Request | undefined
@@ -248,8 +248,8 @@ describe("catalog-liveness probe(真执行,fetch 注入)", () => {
     expect(url.origin).toBe("http://127.0.0.1:41234")
     // marker id 用独立字面量锚定(就绪的唯一证明,docs/architecture/2026-08-10 勘破),
     // 不 import 生产常量 —— 改错常量必须在这里红。
-    expect(url.pathname).toBe("/api/provider/alpha-internal-catalog-ready")
-    expect(url.searchParams.get("location[directory]")).toBe("/tmp/alpha-workspace")
+    expect(url.pathname).toBe("/api/provider/codepuppy-internal-catalog-ready")
+    expect(url.searchParams.get("location[directory]")).toBe("/tmp/codepuppy-workspace")
     expect(seen!.headers.get("authorization")).toBe(`Basic ${Buffer.from("opencode:pw-564").toString("base64")}`)
   })
 
@@ -360,7 +360,7 @@ describe("catalog-liveness 巡查器安装(#1098)", () => {
 // ⑥ R1 Blocker:武装前判探针目录存在(不存在 = 观测面不可用,不武装、绝不代建),
 //    且 indeterminate 弃权在 kill 分支**之前**被消费(弃权路径上不得出现 current.kill());
 // ⑦ R2 Major:探针目录来自首屏解析(resolveCatalogProbeDirectory 唯一消费点),解析不出 /
-//    不在盘上才回退默认工作区 —— 探针本体**不得**再打 alphaUserWorkspaceDir()(那正是
+//    不在盘上才回退默认工作区 —— 探针本体**不得**再打 codepuppyUserWorkspaceDir()(那正是
 //    「只观测最廉价目录」的回归形状);
 // ⑧ R2 Minor:探针 promise 链尾必须有 .catch(回调体任一抛出不得成为 main 的 unhandled
 //    rejection),且 catch 内复位 probeInFlight(否则 probeCatalogMarker 意外 reject 会让
@@ -390,12 +390,12 @@ test("ANCHOR (not a gate): #564 看门狗武装/停表/裁决消费必须留在 
   expect(armBody).toContain("current.kill()")
   expect(armBody).toContain("recoveryService.register")
 
-  // ⑦ 探针目录:首屏解析唯一消费点;probe 打解析结果;唯一的 alphaUserWorkspaceDir() 出现在
+  // ⑦ 探针目录:首屏解析唯一消费点;probe 打解析结果;唯一的 codepuppyUserWorkspaceDir() 出现在
   //    回退表达式里(probe 本体直呼它 = 回归到只观测最廉价目录,必须在这里红)。
   expect(source.split("resolveCatalogProbeDirectory(").length - 1).toBe(1)
   expect(armBody).toContain("probeCatalogMarker({ url, password, directory: probeDirectory })")
-  expect(armBody).toContain("existsSync(userDirectory) ? userDirectory : alphaUserWorkspaceDir()")
-  expect(armBody.split("alphaUserWorkspaceDir()").length - 1).toBe(1)
+  expect(armBody).toContain("existsSync(userDirectory) ? userDirectory : codepuppyUserWorkspaceDir()")
+  expect(armBody.split("codepuppyUserWorkspaceDir()").length - 1).toBe(1)
 
   // ⑥ 目录存在守卫:武装体内、armCatalogLiveness 之前(守卫失效 = 全新安装 60s 杀健康引擎)。
   const guardAt = armBody.indexOf("if (!existsSync(probeDirectory))")

@@ -3,8 +3,8 @@
 // 为什么在这里:续期每十分钟换一次令牌。以前令牌经平台 provider 的 `options.apiKey = {file:…}` 在引擎装配置时
 // 被替换成字面量,再被 provider.ts 的 SDK 缓存按 options 哈希留住 —— 文件改了引擎也不读,只能重启引擎换血
 // (owner 机器上四小时 25 次)。现在注入面只给平台 provider 一个固定的非凭据占位 apiKey
-// (ui-mac `alpha-models.ts` PLATFORM_API_KEY_PLACEHOLDER),真凭据由本钩子每次请求从
-// `ALPHA_PLATFORM_AUTH_REF`(main 在 fork 时置成 `{file:<userData>/alpha-secrets/ALPHA_API_KEY}`)指向的文件读出,
+// (ui-mac `codepuppy-models.ts` PLATFORM_API_KEY_PLACEHOLDER),真凭据由本钩子每次请求从
+// `CODEPUPPY_PLATFORM_AUTH_REF`(main 在 fork 时置成 `{file:<userData>/codepuppy-secrets/CODEPUPPY_API_KEY}`)指向的文件读出,
 // 写成请求级 `authorization`。按装着的版本实读:请求级头最后合并(`opencode/src/session/llm/request.ts`),
 // `@ai-sdk/provider-utils` 小写归一且后写者赢 ⇒ 盖过 SDK 由占位 apiKey 生成的配置头;同一请求的 SDK 重试复用这份头。
 //
@@ -19,7 +19,7 @@ import { LoadAPIKeyError } from "@ai-sdk/provider"
 import { FILE_REF } from "@opencode-ai/plugin/alpha-cloud-authority"
 import { isPlatformProvider } from "./platform-output-cap"
 
-export const PLATFORM_AUTH_REF_ENV = "ALPHA_PLATFORM_AUTH_REF"
+export const PLATFORM_AUTH_REF_ENV = "CODEPUPPY_PLATFORM_AUTH_REF"
 
 /** 平台代理节点 ⇒ `Bearer <现读的凭据>`;其它节点 ⇒ undefined(不动请求头)。读不到即抛 `LoadAPIKeyError`。 */
 export function platformCredentialHeader(input: {
@@ -27,7 +27,7 @@ export function platformCredentialHeader(input: {
   env: Record<string, string | undefined>
   readFile?: (path: string) => string
 }): string | undefined {
-  if (!isPlatformProvider({ providerBaseURL: input.providerBaseURL, alphaBaseURL: input.env.ALPHA_BASE_URL })) return undefined
+  if (!isPlatformProvider({ providerBaseURL: input.providerBaseURL, codepuppyBaseURL: input.env.CODEPUPPY_BASE_URL })) return undefined
   const token = readCredential(input.env[PLATFORM_AUTH_REF_ENV], input.readFile ?? ((path) => readFileSync(path, "utf8")))
   if (!token)
     throw new LoadAPIKeyError({

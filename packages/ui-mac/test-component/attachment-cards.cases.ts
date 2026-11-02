@@ -10,7 +10,7 @@
 // 把 TimelineAttachments 的 onReadAgain 按钮去掉 ⇒ 第三条转红。
 //
 // 独立进程运行(`mock.module("solid-js", …)` 会污染同进程其它测试文件)。宿主:
-// src/renderer/alpha-ui/attachment-cards.component.test.ts。
+// src/renderer/codepuppy-ui/attachment-cards.component.test.ts。
 import { afterEach, describe, expect, mock, test } from "bun:test"
 import { transformAsync } from "@babel/core"
 import presetTypescript from "@babel/preset-typescript"
@@ -44,10 +44,10 @@ Bun.plugin({
 })
 
 const { setLocale } = await import("../src/renderer/i18n")
-const { ComposerAttachmentStrip, TimelineAttachments } = await import("../src/renderer/alpha-ui/attachment-cards")
-const { imageRouteOf } = await import("../src/renderer/alpha-ui/composer-attachments-core")
-type ComposerAttachment = import("../src/renderer/alpha-ui/composer-attachments-core").ComposerAttachment
-type TimelineAttachment = import("../src/renderer/alpha-ui/session-timeline/timeline-attachments").TimelineAttachment
+const { ComposerAttachmentStrip, TimelineAttachments } = await import("../src/renderer/codepuppy-ui/attachment-cards")
+const { imageRouteOf } = await import("../src/renderer/codepuppy-ui/composer-attachments-core")
+type ComposerAttachment = import("../src/renderer/codepuppy-ui/composer-attachments-core").ComposerAttachment
+type TimelineAttachment = import("../src/renderer/codepuppy-ui/session-timeline/timeline-attachments").TimelineAttachment
 setLocale("zh")
 
 const disposers: Array<() => void> = []
@@ -84,19 +84,19 @@ describe("输入框附件条", () => {
     )
     await flush()
     const card = (name: string) => [...host.querySelectorAll(".a-comp-att")].find((el) => el.textContent?.includes(name))!
-    expect(card("复盘.docx").textContent).toContain(zh["alpha.attach.routeLocal"])
+    expect(card("复盘.docx").textContent).toContain(zh["codepuppy.attach.routeLocal"])
     expect(card("复盘.docx").textContent).toContain("1.8 MB")
-    expect(card("纪要.md").textContent).toContain(zh["alpha.attach.routeInline"])
+    expect(card("纪要.md").textContent).toContain(zh["codepuppy.attach.routeInline"])
     expect(host.querySelectorAll(".a-att-thumb .a-att-thumb-route")).toHaveLength(2)
     const line = () => host.querySelector(".a-att-image-route")!
     const expectLine = (key: keyof typeof zh) => expect(line().textContent).toBe(zh[key].replace("{{count}}", "2"))
-    expectLine("alpha.attach.imageNative")
+    expectLine("codepuppy.attach.imageNative")
     setRoute(imageRouteOf({ image: false, loggedIn: true }))
-    expectLine("alpha.attach.imageCloud")
+    expectLine("codepuppy.attach.imageCloud")
     setRoute(imageRouteOf({ image: false, loggedIn: false }))
-    expectLine("alpha.attach.imageNone")
+    expectLine("codepuppy.attach.imageNone")
     setRoute(imageRouteOf({ image: undefined, loggedIn: true }))
-    expectLine("alpha.attach.imageUnknown")
+    expectLine("codepuppy.attach.imageUnknown")
     expect(line().getAttribute("data-route")).toBe("unknown")
   })
 
@@ -120,18 +120,18 @@ describe("输入框附件条", () => {
     )
     await flush()
     const card = (name: string) => [...host.querySelectorAll(".a-comp-att")].find((el) => el.textContent?.includes(name))!
-    expect(card("素材包.zip").textContent).toContain(zh["alpha.attach.failType"])
-    expect(card("扫描件合集.pdf").textContent).toContain(zh["alpha.attach.failDocumentSize"].replace("{{size}}", "20 MB"))
+    expect(card("素材包.zip").textContent).toContain(zh["codepuppy.attach.failType"])
+    expect(card("扫描件合集.pdf").textContent).toContain(zh["codepuppy.attach.failDocumentSize"].replace("{{size}}", "20 MB"))
     expect(card("素材包.zip").querySelector(".a-att-link")).toBeNull()
-    expect(card("年度审计报告.pdf").textContent).toContain(zh["alpha.attach.failStage"])
+    expect(card("年度审计报告.pdf").textContent).toContain(zh["codepuppy.attach.failStage"])
     card("年度审计报告.pdf").querySelector<HTMLButtonElement>(".a-att-link")!.click()
     card("素材包.zip").querySelector<HTMLButtonElement>(".a-comp-att-x")!.click()
     expect([retried, removed]).toEqual([["s"], ["z"]])
-    expect(host.textContent).toContain(zh["alpha.attach.reading"])
-    expect(host.querySelector("[role=list]")!.getAttribute("aria-label")).toBe(zh["alpha.attach.list"].replace("{{count}}", "4"))
+    expect(host.textContent).toContain(zh["codepuppy.attach.reading"])
+    expect(host.querySelector("[role=list]")!.getAttribute("aria-label")).toBe(zh["codepuppy.attach.list"].replace("{{count}}", "4"))
 
     const thumb = host.querySelector<HTMLButtonElement>(".a-att-thumb")!
-    expect(thumb.getAttribute("aria-label")).toBe(zh["alpha.attach.open"].replace("{{name}}", "首页截图.png"))
+    expect(thumb.getAttribute("aria-label")).toBe(zh["codepuppy.attach.open"].replace("{{name}}", "首页截图.png"))
     thumb.click()
     await flush()
     expect(host.querySelector(".a-att-lightbox")?.textContent).toContain("首页截图.png")
@@ -156,14 +156,14 @@ describe("用户消息里的附件", () => {
     const host = mount(() => createComponent(TimelineAttachments, { attachments: items, onReadAgain: (a: TimelineAttachment) => asked.push(a.staged!.name) }))
     await flush()
     const card = (name: string) => [...host.querySelectorAll(".a-tl-attach")].find((el) => el.textContent?.includes(name))!
-    expect(card("复盘.docx").textContent).toContain(`${zh["alpha.attach.readDone"]} · 1.8 MB`)
-    expect(card("扫描版合同.pdf").textContent).toContain(zh["alpha.attach.readEmpty"])
-    expect(card("渠道.xlsx").textContent).toContain(zh["alpha.attach.readFailedNotRunning"])
-    expect(card("纪要.md").textContent).toContain(zh["alpha.attach.readSent"])
+    expect(card("复盘.docx").textContent).toContain(`${zh["codepuppy.attach.readDone"]} · 1.8 MB`)
+    expect(card("扫描版合同.pdf").textContent).toContain(zh["codepuppy.attach.readEmpty"])
+    expect(card("渠道.xlsx").textContent).toContain(zh["codepuppy.attach.readFailedNotRunning"])
+    expect(card("纪要.md").textContent).toContain(zh["codepuppy.attach.readSent"])
     expect(card("复盘.docx").querySelector(".a-att-link")).toBeNull()
     expect(card("纪要.md").querySelector(".a-att-link")).toBeNull()
-    expect(card("渠道.xlsx").querySelector(".a-att-link")!.textContent).toBe(zh["alpha.attach.readAgain"])
-    expect(card("需求.docx").querySelector(".a-att-link")!.textContent).toBe(zh["alpha.attach.askToRead"])
+    expect(card("渠道.xlsx").querySelector(".a-att-link")!.textContent).toBe(zh["codepuppy.attach.readAgain"])
+    expect(card("需求.docx").querySelector(".a-att-link")!.textContent).toBe(zh["codepuppy.attach.askToRead"])
     card("渠道.xlsx").querySelector<HTMLButtonElement>(".a-att-link")!.click()
     card("需求.docx").querySelector<HTMLButtonElement>(".a-att-link")!.click()
     expect(asked).toEqual(["渠道.xlsx", "需求.docx"])

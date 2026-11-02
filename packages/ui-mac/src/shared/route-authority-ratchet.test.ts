@@ -133,7 +133,7 @@ function violationsFor(file: SourceFile) {
   // route fall back to an upstream leaf (env override / userData pin / crash fallback) is gone
   // and must not grow back.
   if (
-    /\bSURFACE_RELEASE_STATES\b|\bALPHA_SURFACE_(?:HOME|NEW_SESSION|SESSION)\b|\balpha-surfaces-resolve\b/.test(source)
+    /\bSURFACE_RELEASE_STATES\b|\bCODEPUPPY_SURFACE_(?:HOME|NEW_SESSION|SESSION)\b|\balpha-surfaces-resolve\b/.test(source)
   ) {
     violations.push({ path, rule: "removed legacy surface release flag" })
   }

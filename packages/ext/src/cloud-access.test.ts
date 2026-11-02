@@ -6,11 +6,11 @@ import { cloudAccessState } from "./cloud-access"
 import { CLOUD_MCP_DEF_ENV } from "./cloud-websearch-kill"
 import { materializeCloudMcpConfig } from "../../ui-mac/src/main/cloud-sidecar-config"
 
-const root = realpathSync(mkdtempSync(join(tmpdir(), "alpha-cloud-access-")))
+const root = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-cloud-access-")))
 afterAll(() => rmSync(root, { recursive: true, force: true }))
 // Real desktop definition producer; only the endpoint/path contents are synthetic.
 const env = (reference?: string) => ({
-  ALPHA_BASE_URL: "https://gateway.invalid/v1",
+  CODEPUPPY_BASE_URL: "https://gateway.invalid/v1",
   [CLOUD_MCP_DEF_ENV]: JSON.stringify(materializeCloudMcpConfig("https://cloud.invalid/mcp", reference)),
 })
 
@@ -21,7 +21,7 @@ describe("REQ-232 AC1 local cloud access", () => {
       env(),
       { ...env(), [CLOUD_MCP_DEF_ENV]: "{" },
       { ...env(), [CLOUD_MCP_DEF_ENV]: "null" },
-      { ...env("{file:/unused}"), ALPHA_BASE_URL: undefined },
+      { ...env("{file:/unused}"), CODEPUPPY_BASE_URL: undefined },
     ]
     inputs.forEach((input) => {
       const state = cloudAccessState(input, () => {

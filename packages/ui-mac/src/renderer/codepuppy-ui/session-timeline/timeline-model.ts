@@ -1,0 +1,1511 @@
+// REQ-125 C5/C6 — alpha 时间线行模型(纯投影,零 DOM、零上游组件)。
+//
+// 输入 = SDK typed 通道的地面真相(serverSync().session.data 的 message/part/session_status),
+// 输出 = 视图可直接 <For> 的行数组。设计:
+//   · 行对象只承载「结构」(kind/key/引用),内容(text/时长/工具状态)由视图经 solid store
+//     proxy 反应式读取 —— 流式 delta 不重建行 DOM;
+//   · reuseTimelineRows 以 key+rev+proxy 同一性做行复用,保证 <For> 的引用稳定;
+//   · `#1473`(REQ-229 AC1–AC3):每个回合的思考 / 工具调用 / 过渡话(后面还有工具调用的 text)
+//     投影成**一个** process 行(有序步骤;连续、同类、同来源、都已结束的步骤合成一组),
+//     回答 = 最后一次工具调用之后的 text;助手侧 file part → media 预览行;完成的第一方
+//     cloud facade 工具(identity 判定)→ artifacts 产物链接行 —— 二者都挂在回答之后;REQ-236 `#1552`:
+//     第一方云端生图派发 → cloudImage 生图卡(同位,同回合取代同一任务的产物链接行);
+//   · 回合级错误(非中断)→ turnError 行;session_status=retry → 工作过程实时标题写重试(`#1474`,不再另挂重试行);
+//   · 未知 part 类型 fail-closed:不渲染、不猜测(subtask 同上游 v1/v2 一致不渲染);
+//   · I7 有界:boundedText 把超大文本截断后才交给渲染管线(sanitizer/Shiki 不吃整串)。
+import type {
+  AssistantMessage,
+  FilePart,
+  Message,
+  Part,
+  ReasoningPart,
+  TextPart,
+  ToolPart,
+  UserMessage,
+} from "@opencode-ai/sdk/v2/client"
+import { egressPolicyDenialOf } from "../../../shared/egress-denial"
+import { isNetFailureLayer, type NetFailureLayer } from "@opencode-ai/schema/codepuppy-net-failure"
+import { isCloudFacadeToolPart } from "../cloud-facade-identity"
+import type { CodePuppySessionIdentity } from "../session-workspace/session-workspace-core"
+import { toolCardDispatchOf, toolTitleKeyOf } from "./cards/tool-card-model"
+import { attachmentRev, timelineAttachmentsOf, type TimelineAttachment, type TimelineAttachmentContext } from "./timeline-attachments"
+
+export type { TimelineAttachment, TimelineAttachmentRead } from "./timeline-attachments"
+
+/** I7 资源耗尽面:单块内容进渲染管线前的硬上限(字符)。 */
+export const MARKDOWN_MAX_CHARS = 60_000
+export const USER_TEXT_MAX_CHARS = 20_000
+export const REASONING_MAX_CHARS = 20_000
+export const REASONING_SUMMARY_MAX_CHARS = 120
+export const TURN_ERROR_MAX_CHARS = 4_000
+export const RETRY_MESSAGE_MAX_CHARS = 500
+
+export function boundedText(text: string, max: number): { text: string; truncated: boolean } {
+  if (text.length <= max) return { text, truncated: false }
+  return { text: text.slice(0, max), truncated: true }
+}
+
+/**
+ * 折叠头只消费 reasoning 起始行里的显式标题形态。普通正文不做首句猜测，
+ * 中段 Markdown 也不回溯匹配，避免把原始思维链提升到常显标题；标题本身在
+ * 进入 DOM 前收窄字段帽。
+ */
+export function reasoningSummary(text: string): string | undefined {
+  const markdown = text.slice(0, REASONING_MAX_CHARS).replace(/\r\n?/g, "\n").trimStart()
+  const clean = (value: string) => {
+    const summary = value
+      .replace(/<[^>]+>/g, " ")
+      .replace(/`([^`]+)`/g, "$1")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/[*_~]+/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+    return summary ? summary.slice(0, REASONING_SUMMARY_MAX_CHARS) : undefined
+  }
+
+  const html = markdown.match(/^<h([1-6])[^>]*>([\s\S]*?)<\/h\1>[ \t]*(?:\n|$)/i)
+  if (html?.[2]) {
+    const summary = clean(html[2])
+    if (summary) return summary
+  }
+
+  const atx = markdown.match(/^#{1,6}[ \t]+(.+?)(?:[ \t]+#+[ \t]*)?[ \t]*(?:\n|$)/)
+  if (atx?.[1]) {
+    const summary = clean(atx[1])
+    if (summary) return summary
+  }
+
+  const strong = markdown.match(/^(?:\*\*(.+?)\*\*|__(.+?)__)[ \t]*(?:\n|$)/)
+  const strongText = strong?.[1] ?? strong?.[2]
+  if (strongText) return clean(strongText)
+}
+
+export interface TimelineSegment {
+  text: string
+  kind?: "file" | "agent" | "resource"
+  /** 连接器段(resource)的来源名 = ResourceSource.clientName;其余形态诚实缺席。 */
+  label?: string
+}
+
+/** 连接器来源名的字段帽(I7)。 */
+export const MENTION_LABEL_MAX_CHARS = 60
+
+export interface TimelineComment {
+  partID: string
+  path: string
+  comment: string
+  startLine?: number
+  endLine?: number
+}
+
+/** 产物链接行的一条链接(名字来自完成态 cloud 工具输出,fail-closed:解析不出即无行)。 */
+export interface TimelineArtifactLink {
+  runId: string
+  name: string
+  /**
+   * `#906`:产物的稳定标识(平台 descriptor id)。产物面板按 descriptor id / card key 匹配
+   * (两者同一货币),名字**从不**是匹配键 —— 只递名字等于永不命中、静默选中该 run 的第一个
+   * 产物。契约输出(ArtifactListV1 / CloudJobStatusV1)的 artifacts 项就是完整 descriptor,
+   * 所以生产路径恒有 id;仅字符串降级形态缺席(那时按 fail-closed 处理:面板打开、不改选中)。
+   */
+  id?: string
+}
+
+/** 媒体预览行的数据快照(写一次:工具附件/顶层 file part 在完成后不再变)。 */
+export interface TimelineMediaSource {
+  /** 产生它的 part(顶层 file part 自身,或所属 tool part)。 */
+  partID: string
+  name: string
+  mime: string
+  url: string
+}
+
+// ── 斜杠命令 chip 的 typed 数据源(C7 session-slash-origin 登记;缺席零渲染) ──
+/**
+ * send 时 composer 捕获的一条命令来源登记(C7 SessionSlashOrigin 的消费面投影):
+ * assistantMessageID 缺席(send 响应未带)= 对不上任何回合,该登记不出 chip。
+ */
+export interface TimelineSlashOrigin {
+  /** send 响应捕获的 assistant messageID(用于对齐所属回合)。 */
+  assistantMessageID?: string
+  command: string
+  arguments?: string
+  /** 引擎注册方声明的来源(E3/E4 chip 分型);缺席/非法 → chip 回通用形,不猜。 */
+  source?: "command" | "mcp" | "skill"
+}
+
+/** C7 的供给接口(sessionSlashOriginsFor);workspace 装配传入,缺席零渲染。 */
+export type SessionSlashOriginsFor = (identity: CodePuppySessionIdentity) => readonly TimelineSlashOrigin[]
+
+/** 斜杠登记的字段帽与扫描预算(I7)。 */
+export const SLASH_COMMAND_MAX_CHARS = 200
+export const SLASH_ARGUMENTS_MAX_CHARS = 400
+export const SLASH_ORIGINS_SCAN_MAX = 100
+
+/** 回合末富脚注(A6/A7)的数据快照;缺字段诚实缺席。 */
+export interface TimelineFootnote {
+  /** provider 图标的来源(providerID);缺席即无图标。 */
+  provider?: string
+  agent?: string
+  model?: string
+  /** input+output+reasoning 合计;非有限或 ≤0 → 缺席。 */
+  tokens?: number
+  // `#1473`:用时已移到工作过程摘要(整轮用时)。这里原来的「N 秒」只量最后一条助手消息,
+  // 与整轮计时同名不同量,故不再出现在脚注里。
+  /** 效率段:本回合提示词的缓存命中率(0–100 整数);无缓存读取即缺席(见 footnoteOf)。 */
+  cacheHit?: number
+  /** #1560(REQ-236 §2.8):实际执行的模型与本回合用户消息记下的所选模型不一致时 = 实际执行的 modelID;
+   *  一致(或用户消息没记模型)即缺席 —— 不新增常驻显示。 */
+  actualModel?: string
+}
+
+/** 本回合改动汇总(S2)的一行;file = 服务端 git 相对路径(review 面板同一货币)。 */
+export interface TimelineTurnDiffFile {
+  file: string
+  additions: number
+  deletions: number
+}
+
+export const TURN_DIFF_FILES_MAX = 24
+export const TURN_DIFF_SCAN_MAX = 200
+const TURN_DIFF_FILE_MAX_CHARS = 400
+const FOOTNOTE_FIELD_MAX_CHARS = 120
+
+/** `#1473` 工作过程里的一步(合并组也是一步;展开后每项一行)。 */
+export type TimelineProcessStep =
+  | { kind: "reasoning"; key: string; parts: ReasoningPart[]; streaming: boolean }
+  | { kind: "tool"; key: string; parts: ToolPart[] }
+  | { kind: "say"; key: string; part: TextPart }
+
+export type TimelineRow =
+  | { kind: "turn"; key: string; rev: string; userMessageID: string; createdAt: number }
+  | {
+      kind: "user"
+      key: string
+      rev: string
+      message: UserMessage
+      text: string
+      /** 复制/编辑使用原始正文；渲染仍只消费上限内的 text。 */
+      copyText: () => string
+      truncated: boolean
+      segments: TimelineSegment[]
+      attachments: TimelineAttachment[]
+      comments: TimelineComment[]
+      /** 斜杠命令来源(C7 可选供给;缺席 = 普通气泡)。 */
+      slash?: { command: string; arguments?: string; source?: "command" | "mcp" | "skill" }
+    }
+  | { kind: "markdown"; key: string; rev: string; part: TextPart; streaming: boolean }
+  | {
+      /**
+       * `#1473` 工作过程行:一个回合里回答之前的全部思考、工具调用与过渡话(有序步骤)。
+       * 回答、媒体、产物、错误、中断、脚注、本回合改动都不在这里。
+       */
+      kind: "process"
+      key: string
+      rev: string
+      userMessageID: string
+      steps: TimelineProcessStep[]
+      /**
+       * 回合仍在跑(session_status 非 idle)。`#1474` 起工作过程在回合开始即出现、与回合同寿命
+       * (取代原回合脚行与只在首 part 前出现的思考胶囊):活跃回合即使还没有任何步骤也出这一行。
+       */
+      active: boolean
+      /** `#1474` 实时计时起点 = 用户消息 time.created(不是行挂载时刻:中途重开会话显示真实已过时长)。 */
+      startedAt: number
+      /** `#1474` 活跃回合里回答已经开始输出(最后一次工具之后有文字)⇒ 工作过程自动收成一行。 */
+      answering: boolean
+      /** `#1474` session_status=retry 的载荷:实时标题写「正在重试 · 第 N 次 · 原因」(不再另挂重试卡)。 */
+      retry?: { attempt: number; message: string }
+      /** 回合失败(回合错误卡在外面)⇒ 摘要不写「哪里不顺」。 */
+      turnFailed: boolean
+      /** 整轮用时 = 用户消息创建 → 最后一条助手消息完成;未完成 / 时钟异常 → 缺席。 */
+      durationMs?: number
+    }
+  | { kind: "media"; key: string; rev: string; media: TimelineMediaSource }
+  | { kind: "artifacts"; key: string; rev: string; partID: string; links: TimelineArtifactLink[] }
+  /** REQ-236 `#1552`:第一方云端生图派发 → 生图卡(挂在回答之后,同回合取代同一任务的产物链接行)。 */
+  | { kind: "cloudImage"; key: string; rev: string; image: TimelineCloudImage }
+  | {
+      kind: "turnError"
+      key: string
+      rev: string
+      userMessageID: string
+      name: string
+      message: string
+      /** `#1382`:这次失败是**这台电脑上的出网策略**拒的,带上被拒的目的地。缺席 = 普通失败,文案不变。 */
+      egressDenied?: { authority: string }
+      /** `#1572`:引擎结算时认出的网络层(`http` 不在此列 —— 那一层沿用原文案)。缺席 = 认不出,文案不变。 */
+      netLayer?: NetFailureLayer
+      /** `#1572`:模型请求一个 HTTP 应答都没拿到、层又认不出(引擎记 `codepuppyNetCode: "unattributed"`)。 */
+      netUnattributed?: true
+      /** `#1588`:按错误名与状态码认出的五类原因之一;缺席 = 认不出,呈现不变。 */
+      cause?: TurnErrorCause
+      /** `#1588`:服务回的状态码(只进「开发者详情」)。 */
+      statusCode?: number
+    }
+  | {
+      kind: "divider"
+      key: string
+      rev: string
+      userMessageID: string
+      label: "compaction"
+      /** 引擎已生成的 compaction assistant summary;视图默认折叠,不在此生成或猜测内容。 */
+      summaryParts: TextPart[]
+    }
+  | { kind: "divider"; key: string; rev: string; userMessageID: string; label: "interrupted" }
+  | { kind: "divider"; key: string; rev: string; userMessageID: string; label: "emptyTurn" }
+  | {
+      kind: "footnote"
+      key: string
+      rev: string
+      userMessageID: string
+      footnote: TimelineFootnote
+      /** 复制正文(该回合全部助手 text part;调用时从数据面取,不预存大字符串)。 */
+      copyText: () => string
+    }
+  | {
+      kind: "diffsum"
+      key: string
+      rev: string
+      userMessageID: string
+      files: TimelineTurnDiffFile[]
+      additions: number
+      deletions: number
+      truncated: boolean
+    }
+
+/**
+ * `#1399`:活跃回合在等你 —— 等你批准(审批弹窗)或等你回答(输入框上方的提问卡)。缺席 = 运行面。
+ * `#1474` 起由工作过程的实时标题消费(原回合脚行并入工作过程)。
+ */
+export type TimelineTurnWait = "approval" | "question"
+
+/** `#1588` 回合错误卡认得出的五类原因(批准稿 frame.html#turn-error 的表)。 */
+export type TurnErrorCause = "billing" | "auth" | "rateLimit" | "contextOverflow" | "outputLength"
+
+/**
+ * `#1588`:只看错误名与状态码,不读消息文本。402 余额/会员;401 / 403 / ProviderAuthError 登录凭据;429 频率;
+ * ContextOverflowError 对话超长;MessageOutputLengthError 回答到顶。其余 = undefined(呈现不变)。
+ */
+export function turnErrorCauseOf(name: string, statusCode: number | undefined): TurnErrorCause | undefined {
+  if (name === "ContextOverflowError") return "contextOverflow"
+  if (name === "MessageOutputLengthError") return "outputLength"
+  if (name === "ProviderAuthError" || statusCode === 401 || statusCode === 403) return "auth"
+  if (statusCode === 402) return "billing"
+  if (statusCode === 429) return "rateLimit"
+  return undefined
+}
+
+/** `#1399` 回合脚行计时:m:ss,整秒向下取整,分钟不进位到小时;负值(时钟偏斜)钉 0:00。 */
+export function formatTurnElapsed(elapsedMs: number): string {
+  const total = Math.max(0, Math.floor(elapsedMs / 1000))
+  const minutes = Math.floor(total / 60)
+  const seconds = total % 60
+  return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`
+}
+
+export interface TimelineProjectionInput {
+  messages: readonly Message[]
+  partsOf: (messageID: string) => readonly Part[]
+  /** session_status[sessionID].type;缺省视为 "idle"。 */
+  status: string
+  /** session_status[sessionID] 为 retry 时的载荷(attempt/message);`#1474` 起由工作过程的实时标题消费。 */
+  retry?: { attempt: number; message: string }
+  /** 斜杠命令来源登记(C7 可选供给;缺席 = 不出 chip,fail-closed)。 */
+  slashOrigins?: readonly TimelineSlashOrigin[]
+  /** REQ-236 `#1553`:附件读取结果的输入 —— 会话实例目录与本机读取工具的逐服务状态(缺席 = 不下「已读取 / 失败」结论)。 */
+  attachments?: TimelineAttachmentContext
+}
+
+/** 被 dock/审批面接管、时间线不渲染的**宿主内建**工具(identity 判定;别名不是准入)。 */
+const HIDDEN_TOOLS = new Set(["todowrite"])
+
+const COMMENT_NOTE_RE =
+  /^The user made the following comment regarding (this file|line (\d+)|lines (\d+) through (\d+)) of (.+?): ([\s\S]+)$/
+
+/** 与上游 send 侧约定一致的评论载体:synthetic text part + opencodeComment metadata(或字面 note)。 */
+export function commentOf(part: Part): TimelineComment | undefined {
+  if (part.type !== "text" || !part.synthetic) return undefined
+  const meta = (part.metadata as { opencodeComment?: unknown } | undefined)?.opencodeComment
+  if (meta && typeof meta === "object") {
+    const path = (meta as { path?: unknown }).path
+    const comment = (meta as { comment?: unknown }).comment
+    if (typeof path === "string" && typeof comment === "string") {
+      const selection = (meta as { selection?: { startLine?: unknown; endLine?: unknown } }).selection
+      const startLine = Number(selection?.startLine)
+      const endLine = Number(selection?.endLine)
+      return {
+        partID: part.id,
+        path,
+        comment,
+        startLine: Number.isFinite(startLine) ? startLine : undefined,
+        endLine: Number.isFinite(endLine) ? endLine : undefined,
+      }
+    }
+  }
+  const match = part.text?.match(COMMENT_NOTE_RE)
+  if (!match) return undefined
+  const start = match[2] ? Number(match[2]) : match[3] ? Number(match[3]) : undefined
+  const end = match[2] ? Number(match[2]) : match[4] ? Number(match[4]) : undefined
+  return { partID: part.id, path: match[5]!, comment: match[6]!, startLine: start, endLine: end }
+}
+
+/** 按 file/agent part 的 source 区间把用户文本切成提及片段(区间越界/重叠即忽略,fail-closed)。 */
+export function segmentUserText(
+  text: string,
+  spans: readonly { start: number; end: number; kind: "file" | "agent" | "resource"; label?: string }[],
+): TimelineSegment[] {
+  const ordered = [...spans]
+    .filter((span) => Number.isFinite(span.start) && Number.isFinite(span.end))
+    .filter((span) => span.start >= 0 && span.end > span.start && span.end <= text.length)
+    .sort((a, b) => a.start - b.start)
+  const result: TimelineSegment[] = []
+  let cursor = 0
+  for (const span of ordered) {
+    if (span.start < cursor) continue
+    if (span.start > cursor) result.push({ text: text.slice(cursor, span.start) })
+    result.push({
+      text: text.slice(span.start, span.end),
+      kind: span.kind,
+      ...(span.label ? { label: span.label } : {}),
+    })
+    cursor = span.end
+  }
+  if (cursor < text.length) result.push({ text: text.slice(cursor) })
+  return result
+}
+
+function mentionSpans(parts: readonly Part[]) {
+  const spans: { start: number; end: number; kind: "file" | "agent" | "resource"; label?: string }[] = []
+  for (const part of parts) {
+    if (part.type === "file" && !part.url.startsWith("data:")) {
+      const source = part.source
+      const textSource = source?.text
+      if (!textSource || textSource.start === undefined || textSource.end === undefined) continue
+      const span = { start: textSource.start, end: textSource.end }
+      // 连接器提及(MCP 资源):来源名 = clientName;名字缺席则退回普通文件提及(fail-closed,
+      // 不出没有名字的 chip)。
+      //
+      // 上游数据面缺口登记(#588,审计 R1):这条 resource 分支当前在生产不可达 ——
+      // ① Alpha composer 只支持 file/agent 提及,V2 PromptInput 没有携带 clientName/uri 的
+      //    resource 身份;② 旧 V1 路径收到 resource part 后,在 packages/opencode/src/session/
+      //    prompt.ts(resolveUserPart,source.type==="resource" 分支,~L703)把原 part 替换成
+      //    synthetic text/blob part,不保留 source.type==="resource" 的原件。
+      // 按 #588 票面「上游数据面缺失则登记并保证组件可由模型构造」履约:本分支由模型可
+      // 构造性契约与组件/单元测试覆盖;上游补齐 resource part 持久化后无需改动即生效。
+      // 不在此伪造数据面、不改上游(跨票边界)。
+      if (source.type === "resource" && typeof source.clientName === "string" && source.clientName.length > 0)
+        spans.push({ ...span, kind: "resource", label: source.clientName.slice(0, MENTION_LABEL_MAX_CHARS) })
+      else spans.push({ ...span, kind: "file" })
+      continue
+    }
+    if (part.type === "agent" && part.source)
+      spans.push({ start: part.source.start, end: part.source.end, kind: "agent" })
+  }
+  return spans
+}
+
+/**
+ * #934:「从时间线隐藏」是第一方特权,只有引擎铸造的 builtin identity 才能命中 ——
+ * 第三方(plugin/MCP)或无快照历史行,不论把工具叫什么名字都照常渲染(fail-closed
+ * 方向 = 可见:静默执行才是这里要关的洞)。category==="builtin" 只能由
+ * toolCardDispatchOf 对合法快照(source ∈ {builtin, builtin-v2})铸出,别名不参与。
+ */
+function builtinIdentityNameOf(part: ToolPart): string | undefined {
+  const dispatch = toolCardDispatchOf(part)
+  return dispatch.category === "builtin" ? dispatch.name : undefined
+}
+
+function renderableToolPart(part: ToolPart) {
+  const builtinName = builtinIdentityNameOf(part)
+  if (builtinName !== undefined && HIDDEN_TOOLS.has(builtinName)) return false
+  // question 的 pending/running 渲染在 composer dock(C7 领域),时间线只保留已回答的
+  // 记录;这条接管同样只属于 builtin identity 的 question(#934,与 HIDDEN_TOOLS 同闸)。
+  if (builtinName === "question") return part.state.status !== "pending" && part.state.status !== "running"
+  return true
+}
+
+// ── `#1473` 工作过程:合并规则 + 摘要(纯函数,视图与测试共用) ───────────────
+/** I7:单个合并组的成员上限;超长连续段切成多组。 */
+export const PROCESS_GROUP_MAX = 24
+/** 一步(或合并组的最长一步)超过这个时长才在行尾写出用时(design §2)。 */
+export const PROCESS_STEP_DURATION_MIN_MS = 10_000
+/** 摘要里最多列几类动作(按次数排)。 */
+export const PROCESS_SUMMARY_ACTIONS_MAX = 3
+
+/**
+ * 工具步骤的合并键。「同类」= identity 分派出的 kind(#934:别名不参与),「同来源」=
+ * 来源分类;metadata-only(第三方 / 插件 / 无快照)与云端工具再带上被动净化的名称与
+ * origin —— 两个不同的第三方工具、云端的「派发」与「查状态」不会被合成一行。
+ */
+export function toolStepMergeKeyOf(part: ToolPart): string {
+  const dispatch = toolCardDispatchOf(part)
+  const named = dispatch.metadataOnly || dispatch.kind === "cloud"
+  return [dispatch.kind, dispatch.category, named ? dispatch.name : "", named ? (dispatch.origin ?? "") : ""].join(
+    "\u0000",
+  )
+}
+
+/** 已结束 = 完成或失败;等待 / 运行中的步骤永不合并。 */
+export function toolStepFinished(part: ToolPart): boolean {
+  return part.state.status === "completed" || part.state.status === "error"
+}
+
+/** 工具这一步花了多久;非结束态或时间非法 → 缺席。 */
+export function toolStepDurationMs(part: ToolPart): number | undefined {
+  if (part.state.status !== "completed" && part.state.status !== "error") return undefined
+  const time = part.state.time as { start?: unknown; end?: unknown } | undefined
+  const start = time?.start
+  const end = time?.end
+  if (typeof start !== "number" || typeof end !== "number" || !Number.isFinite(start) || !Number.isFinite(end))
+    return undefined
+  return end >= start ? end - start : undefined
+}
+
+/** 一组思考合计多久(只算有起止的段)。 */
+export function reasoningStepDurationMs(parts: readonly ReasoningPart[]): number | undefined {
+  let total = 0
+  let known = false
+  for (const part of parts) {
+    const start = part.time?.start
+    const end = part.time?.end
+    if (typeof start !== "number" || typeof end !== "number" || end < start) continue
+    total += end - start
+    known = true
+  }
+  return known ? total : undefined
+}
+
+/** 过程投影的输入单元(回合内按出现顺序)。 */
+export type ProcessItem =
+  | { type: "reasoning"; part: ReasoningPart; streaming: boolean }
+  | { type: "tool"; part: ToolPart }
+  | { type: "say"; part: TextPart }
+
+/**
+ * 把回合内回答之前的条目合成步骤:连续、同类、同来源、都已结束的工具合成一组;
+ * 连续、都已结束的思考合成一组;思考不与工具合并;过渡话独占一步并切断合并;
+ * 运行中的步骤永不合并(它前后的步骤也不与它合)。
+ */
+export function buildProcessSteps(items: readonly ProcessItem[]): TimelineProcessStep[] {
+  const steps: TimelineProcessStep[] = []
+  let open: { step: TimelineProcessStep; mergeKey: string } | undefined
+  for (const item of items) {
+    if (item.type === "say") {
+      open = undefined
+      steps.push({ kind: "say", key: `say:${item.part.id}`, part: item.part })
+      continue
+    }
+    if (item.type === "reasoning") {
+      const finished = !item.streaming && typeof item.part.time?.end === "number"
+      if (
+        finished &&
+        open?.step.kind === "reasoning" &&
+        open.mergeKey === "reasoning" &&
+        open.step.parts.length < PROCESS_GROUP_MAX
+      ) {
+        open.step.parts.push(item.part)
+        continue
+      }
+      const step: TimelineProcessStep = {
+        kind: "reasoning",
+        key: `reason:${item.part.id}`,
+        parts: [item.part],
+        streaming: item.streaming,
+      }
+      steps.push(step)
+      open = finished ? { step, mergeKey: "reasoning" } : undefined
+      continue
+    }
+    const finished = toolStepFinished(item.part)
+    const mergeKey = finished ? `tool\u0000${toolStepMergeKeyOf(item.part)}` : undefined
+    if (
+      mergeKey !== undefined &&
+      open?.step.kind === "tool" &&
+      open.mergeKey === mergeKey &&
+      open.step.parts.length < PROCESS_GROUP_MAX
+    ) {
+      open.step.parts.push(item.part)
+      continue
+    }
+    const step: TimelineProcessStep = { kind: "tool", key: `tool:${item.part.id}`, parts: [item.part] }
+    steps.push(step)
+    open = mergeKey !== undefined ? { step, mergeKey } : undefined
+  }
+  return steps
+}
+
+/** 摘要里的一类动作:动词(i18n key)或被动净化的名称 + 成功次数。 */
+export interface ProcessSummaryAction {
+  key: string
+  titleKey?: string
+  name: string
+  count: number
+}
+
+export interface ProcessSummary {
+  /** 成功的动作,按次数排,最多 PROCESS_SUMMARY_ACTIONS_MAX 类;思考不进。 */
+  actions: ProcessSummaryAction[]
+  /** 失败的工具调用次数(含审批超时)。 */
+  failed: number
+  /** 思考合计时长(只在没有任何动作时作为摘要)。 */
+  reasoningMs?: number
+  reasoningCount: number
+}
+
+export function processSummaryOf(steps: readonly TimelineProcessStep[]): ProcessSummary {
+  const actions = new Map<string, ProcessSummaryAction & { order: number }>()
+  let failed = 0
+  let reasoningMs: number | undefined
+  let reasoningCount = 0
+  for (const step of steps) {
+    if (step.kind === "reasoning") {
+      reasoningCount += step.parts.length
+      const ms = reasoningStepDurationMs(step.parts)
+      if (ms !== undefined) reasoningMs = (reasoningMs ?? 0) + ms
+      continue
+    }
+    if (step.kind !== "tool") continue
+    for (const part of step.parts) {
+      if (part.state.status === "error") {
+        failed += 1
+        continue
+      }
+      if (part.state.status !== "completed") continue
+      const dispatch = toolCardDispatchOf(part)
+      const key = toolStepMergeKeyOf(part)
+      const existing = actions.get(key)
+      if (existing) existing.count += 1
+      else
+        actions.set(key, {
+          key,
+          titleKey: dispatch.metadataOnly ? undefined : toolTitleKeyOf(dispatch),
+          name: dispatch.name,
+          count: 1,
+          order: actions.size,
+        })
+    }
+  }
+  const ranked = [...actions.values()]
+    .sort((a, b) => b.count - a.count || a.order - b.order)
+    .slice(0, PROCESS_SUMMARY_ACTIONS_MAX)
+    .map(({ order: _order, ...action }) => action)
+  return { actions: ranked, failed, reasoningMs, reasoningCount }
+}
+
+/** 整轮用时:用户消息创建 → 最后一条助手消息完成。最后一条未完成 / 数值异常 → 缺席。 */
+export function turnDurationOf(user: UserMessage, assistants: readonly AssistantMessage[]): number | undefined {
+  const last = assistants.at(-1)
+  const completed = last?.time.completed
+  const created = user.time.created
+  if (typeof completed !== "number" || !Number.isFinite(completed) || !Number.isFinite(created)) return undefined
+  return completed >= created ? completed - created : undefined
+}
+
+/** 用时拆成分 / 秒(整秒向下取整;视图负责文案)。 */
+export function splitDuration(ms: number): { minutes: number; seconds: number } {
+  const total = Math.max(0, Math.floor(ms / 1000))
+  return { minutes: Math.floor(total / 60), seconds: total % 60 }
+}
+
+// ── 媒体预览行:工具附件是生产上图片/PDF 的真实通道(processor 完成时写入
+// ToolStateCompleted.attachments;顶层 file part 仅用户消息/兜底)。──────────
+export const TOOL_ATTACHMENTS_MAX = 6
+/** 附件数组的总迭代预算(含非法项)—— 与 cards 列表扫描同一双约束纪律。 */
+export const TOOL_ATTACHMENTS_SCAN_MAX = 50
+const MEDIA_NAME_MAX = 200
+
+/** 防御读取完成态工具附件(I2):非法条目丢弃;数量与迭代均有界(I7)。 */
+export function toolMediaOf(part: ToolPart): TimelineMediaSource[] {
+  if (part.state.status !== "completed") return []
+  const attachments = part.state.attachments
+  if (!Array.isArray(attachments)) return []
+  const result: TimelineMediaSource[] = []
+  for (let index = 0; index < attachments.length; index += 1) {
+    if (index >= TOOL_ATTACHMENTS_SCAN_MAX || result.length >= TOOL_ATTACHMENTS_MAX) break
+    const item = attachments[index]
+    if (typeof item !== "object" || item === null) continue
+    const record = item as { id?: unknown; mime?: unknown; url?: unknown; filename?: unknown }
+    if (typeof record.mime !== "string" || !record.mime) continue
+    if (typeof record.url !== "string" || !record.url) continue
+    const filename = typeof record.filename === "string" ? record.filename.trim() : ""
+    result.push({
+      partID: typeof record.id === "string" && record.id ? record.id : part.id,
+      name: (filename || record.mime).slice(0, MEDIA_NAME_MAX),
+      mime: record.mime,
+      url: record.url,
+    })
+  }
+  return result
+}
+
+export function mediaSourceOfFilePart(part: FilePart): TimelineMediaSource {
+  return {
+    partID: part.id,
+    name: (part.filename?.trim() || part.mime).slice(0, MEDIA_NAME_MAX),
+    mime: part.mime,
+    url: part.url,
+  }
+}
+
+// ── 产物链接行(§⑥):完成态云 facade 工具输出里的产物名 → 链接行 ─────────────
+// #879 审计 R-final:准入是 identity 判定,不是 `cloud_` 别名前缀。判定本体在
+// cloud-facade-identity.ts(#934 起与 run-watcher 共用同一枚铸币),铸币依据与
+// 「不比对 authority」的审计裁决也钉在那里。
+// fail-closed:identity 缺失(历史行)/形状非法 一律无产物行。
+export const ARTIFACT_LINKS_MAX = 12
+const ARTIFACT_OUTPUT_PARSE_MAX = 100_000
+/** `#906`:id 进 DOM 前的字段帽(平台 id 形如 `art_job_x_0_deadbeef`,远短于此)。 */
+const ARTIFACT_ID_MAX_CHARS = 200
+const artifactLinksCache = new WeakMap<object, { output: string; links: TimelineArtifactLink[] }>()
+
+function parseArtifactLinks(output: string): TimelineArtifactLink[] {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(output)
+  } catch {
+    return []
+  }
+  if (typeof parsed !== "object" || parsed === null) return []
+  const record = parsed as { job_id?: unknown; status?: unknown; artifacts?: unknown }
+  if (typeof record.job_id !== "string" || !record.job_id) return []
+  if (record.status !== "completed") return []
+  if (!Array.isArray(record.artifacts)) return []
+  const links: TimelineArtifactLink[] = []
+  for (const item of record.artifacts) {
+    if (links.length >= ARTIFACT_LINKS_MAX) break
+    if (typeof item === "string" && item) {
+      links.push({ runId: record.job_id, name: item })
+      continue
+    }
+    if (typeof item === "object" && item !== null) {
+      const name = (item as { name?: unknown }).name
+      if (typeof name !== "string" || !name) continue
+      // `#906`:descriptor id 是产物面板唯一认得的匹配键,必须一路带到 intent。
+      const id = (item as { id?: unknown }).id
+      const stable = typeof id === "string" && id.length > 0 && id.length <= ARTIFACT_ID_MAX_CHARS ? id : undefined
+      links.push(stable ? { runId: record.job_id, name, id: stable } : { runId: record.job_id, name })
+    }
+  }
+  return links
+}
+
+/** fail-closed:identity 非第一方 cloud facade/未完成/输出超限/解析不出 artifacts 名字 → 空(不出行)。 */
+export function artifactLinksOf(part: ToolPart): TimelineArtifactLink[] {
+  if (!isCloudFacadeToolPart(part)) return []
+  if (part.state.status !== "completed") return []
+  const output = part.state.output
+  if (typeof output !== "string" || output.length === 0 || output.length > ARTIFACT_OUTPUT_PARSE_MAX) return []
+  const cached = artifactLinksCache.get(part)
+  if (cached && cached.output === output) return cached.links
+  const links = parseArtifactLinks(output)
+  artifactLinksCache.set(part, { output, links })
+  return links
+}
+
+// ── REQ-236 `#1552` 生图卡(方案 §2.4):派发调用的事实 → 卡片状态 ─────────────────
+// 准入 = 与产物行同一枚铸币(isCloudFacadeToolPart)+ 远端名 cloud_dispatch + input.kind 精确为
+// image-generation;kind 写错的那次调用不出卡、不猜「它本来想画图」,由通用工具卡照常显示失败。
+// 状态只来自三类事实:这次调用的状态(part)、云端任务状态与交付结论(宿主 tracker 的 cloud-run-state)、
+// 本机核验(manifest + sha256 复核)。模型说的话不参与任何判定。
+export const CLOUD_IMAGE_KIND = "image-generation"
+const CLOUD_IMAGE_PROMPT_MAX_CHARS = 4_000
+const CLOUD_IMAGE_ERROR_MAX_CHARS = 2_000
+
+/** 受理前被拒的原因(决定文案与有没有「去充值」);码取自这次调用的错误原文里平台给的稳定码。 */
+export type CloudImageRefusal = "allowance" | "wallet" | "suspended" | "rate" | "too-long" | "network" | "other"
+
+export type TimelineCloudImageCall =
+  | { phase: "submitting" }
+  | { phase: "refused"; refusal: CloudImageRefusal; error: string }
+  /** acceptedAt = 派发调用完成(= 受理)的时刻;计时起点。 */
+  | { phase: "accepted"; runId: string; acceptedAt?: number }
+
+export interface TimelineCloudImage {
+  partID: string
+  prompt: string
+  call: TimelineCloudImageCall
+}
+
+const REFUSAL_BY_CODE: Record<string, CloudImageRefusal> = {
+  account_allowance_exhausted: "allowance",
+  account_wallet_insufficient: "wallet",
+  account_suspended: "suspended",
+  account_admission_rate_exceeded: "rate",
+  pipeline_input_invalid: "too-long",
+}
+
+/**
+ * 错误原文 → 拒绝原因。平台拒绝时 MCP 把响应体(JSON,带 `code`)原样作为错误文本;解析不出任何 JSON
+ * 对象 = 请求没有送到云端(连不上 / 超时)。
+ */
+export function cloudImageRefusalOf(error: string): CloudImageRefusal {
+  const start = error.indexOf("{")
+  const end = error.lastIndexOf("}")
+  if (start < 0 || end <= start) return "network"
+  let body: unknown
+  try {
+    body = JSON.parse(error.slice(start, end + 1))
+  } catch {
+    return "network"
+  }
+  if (typeof body !== "object" || body === null) return "network"
+  const code = (body as { code?: unknown }).code
+  return (typeof code === "string" && REFUSAL_BY_CODE[code]) || "other"
+}
+
+/** 受理回执(CloudJobAcceptedV1:schema_version 1、status queued、job_id)→ job_id。与 run-watcher 同一形判据。 */
+function acceptedJobIdOf(output: unknown): string | undefined {
+  if (typeof output !== "string" || output.length > ARTIFACT_OUTPUT_PARSE_MAX) return undefined
+  let accepted: unknown
+  try {
+    accepted = JSON.parse(output)
+  } catch {
+    return undefined
+  }
+  if (typeof accepted !== "object" || accepted === null) return undefined
+  const record = accepted as { schema_version?: unknown; status?: unknown; job_id?: unknown }
+  if (record.schema_version !== 1 || record.status !== "queued") return undefined
+  return typeof record.job_id === "string" && record.job_id.length > 0 && record.job_id.length <= ARTIFACT_ID_MAX_CHARS
+    ? record.job_id
+    : undefined
+}
+
+/** fail-closed:非第一方 facade / 不是 cloud_dispatch / kind 不精确 → 不出卡。 */
+export function cloudImageOf(part: ToolPart): TimelineCloudImage | undefined {
+  if (!isCloudFacadeToolPart(part)) return undefined
+  if ((part.display as { identity?: { name?: unknown } } | undefined)?.identity?.name !== "dispatch") return undefined
+  const input = part.state.input as { kind?: unknown; input?: { prompt?: unknown } } | undefined
+  if (input?.kind !== CLOUD_IMAGE_KIND) return undefined
+  const rawPrompt = input.input && typeof input.input.prompt === "string" ? input.input.prompt.trim() : ""
+  const prompt = rawPrompt.slice(0, CLOUD_IMAGE_PROMPT_MAX_CHARS)
+  const state = part.state
+  if (state.status === "pending" || state.status === "running")
+    return { partID: part.id, prompt, call: { phase: "submitting" } }
+  if (state.status === "error") {
+    const error = typeof state.error === "string" ? state.error.slice(0, CLOUD_IMAGE_ERROR_MAX_CHARS) : ""
+    return { partID: part.id, prompt, call: { phase: "refused", refusal: cloudImageRefusalOf(error), error } }
+  }
+  const runId = acceptedJobIdOf(state.output)
+  // 调用完成但输出不是受理回执:没有任务可跟,按「云端没有接受这次请求」如实呈现。
+  if (!runId) return { partID: part.id, prompt, call: { phase: "refused", refusal: "other", error: "" } }
+  const end = (state.time as { end?: unknown } | undefined)?.end
+  return {
+    partID: part.id,
+    prompt,
+    call: { phase: "accepted", runId, ...(typeof end === "number" && Number.isFinite(end) ? { acceptedAt: end } : {}) },
+  }
+}
+
+/** 宿主 tracker 广播的交付快照(cloud-run-state,#1551 冻结面)里卡片读的那几项。 */
+export interface CloudImageRunFacts {
+  job: { status: string; code?: string }
+  delivery: { status: "pending" | "downloading" | "saved" | "failed"; failure?: { scope: string; code: string } }
+}
+
+export type CloudImageJobFailure = "safety" | "region" | "upstream" | "artifact" | "other"
+export type CloudImageDeliveryFailure = "network" | "incomplete" | "auth" | "gone" | "full" | "register" | "other"
+
+/** 卡片的显示态(方案 §2.4 的状态全集;批准稿 ①–⑨)。 */
+export type CloudImageView =
+  | { state: "submitting" }
+  | { state: "refused"; refusal: CloudImageRefusal; billing: boolean }
+  | { state: "queued"; since?: number }
+  | { state: "running"; since?: number }
+  | { state: "saving" }
+  | { state: "saved" }
+  | { state: "failed"; reason: CloudImageJobFailure }
+  | { state: "cancelled" }
+  | { state: "undelivered"; reason: CloudImageDeliveryFailure; retryable: boolean }
+
+const JOB_FAILURE_BY_CODE: Record<string, CloudImageJobFailure> = {
+  image_safety_rejected: "safety",
+  image_region_rejected: "region",
+  image_upstream_failed: "upstream",
+  image_backend_unavailable: "upstream",
+  image_artifact_failed: "artifact",
+}
+
+function deliveryFailureOf(failure: CloudImageRunFacts["delivery"]["failure"]): CloudImageDeliveryFailure {
+  if (!failure) return "other"
+  const code = failure.code
+  if (code === "network" || code === "retryable" || /^http-5\d\d$/.test(code)) return "network"
+  if (code === "unauthorized" || code === "forbidden") return "auth"
+  if (code === "not-found") return "gone"
+  if (code === "over-limit") return "full"
+  if (failure.scope === "register") return "register"
+  if (failure.scope === "verify" || code === "sha256-mismatch" || code === "unverifiable" || code === "size-mismatch")
+    return "incomplete"
+  return "other"
+}
+
+/**
+ * 调用事实 + tracker 快照 + 本机核验 → 显示态。`localVerified` = 本机 manifest 里这次的产物全部现盘
+ * sha256 复核通过(或 tracker 已判 saved 之后读到的已核验条目)—— 它是最强的事实,直接出图。
+ */
+export function cloudImageViewOf(
+  call: TimelineCloudImageCall,
+  run: CloudImageRunFacts | null | undefined,
+  localVerified: boolean,
+): CloudImageView {
+  if (call.phase === "submitting") return { state: "submitting" }
+  if (call.phase === "refused")
+    return {
+      state: "refused",
+      refusal: call.refusal,
+      billing: call.refusal === "allowance" || call.refusal === "wallet",
+    }
+  if (localVerified) return { state: "saved" }
+  const since = call.acceptedAt
+  // 受理回执本身就是「排队中」这一事实;宿主还没给出任务状态之前停在这里。
+  if (!run) return { state: "queued", since }
+  const job = run.job.status
+  if (job === "failed") return { state: "failed", reason: JOB_FAILURE_BY_CODE[run.job.code ?? ""] ?? "other" }
+  if (job === "cancelled" || job === "cancelling") return { state: "cancelled" }
+  if (run.delivery.status === "saved") return { state: "saved" }
+  if (run.delivery.status === "failed") {
+    const reason = deliveryFailureOf(run.delivery.failure)
+    return { state: "undelivered", reason, retryable: reason !== "gone" && reason !== "full" }
+  }
+  if (job === "completed") return { state: "saving" }
+  if (job === "running") return { state: "running", since }
+  return { state: "queued", since }
+}
+
+// ── 回合末富脚注(A6):数据源 = 已消费的 SDK 助手消息元数据 ──────────────────
+function cappedField(value: unknown, max = FOOTNOTE_FIELD_MAX_CHARS): string | undefined {
+  if (typeof value !== "string" || value.length === 0) return undefined
+  return value.length > max ? value.slice(0, max) : value
+}
+
+/**
+ * 回合末脚注:只认「回合尾态 = 成功完成」——回合**最后一个**助手消息必须已完成且
+ * 无错误,否则无脚注;不回溯早先的完成助手(成功→流式、成功→失败序列一律零脚注,
+ * 旧指标不得与未终结/失败内容混用;复制动作随行同门)。字段独立诚实缺席(I2)。
+ */
+/**
+ * REQ-160 AC3(`#1318` / `#1325`)—— 「助手回合跑完了,却一个字都没回」。
+ *
+ * 四条**同时**成立才算(票面 §Scope,owner 2026-09-11 复述确认):
+ *   ① 回合已结束(有 `finish`,且不是被用户中止 —— 那是中断行的辖区);
+ *   ② `finish` 为 `unknown`;
+ *   ③ 这一回合没有渲染出任何可见正文(投影层的 `emitted === 0`);
+ *   ④ `tokens.output === 0`。
+ *
+ * **少一条都不算。** 尤其 ③:`finish=unknown` 但有正文的回合**不是**这一类(票面 Non-goals
+ * 明写),把它算进来会把正常回复标成异常。
+ *
+ * 这是**启发式**:存储里没有 error、也没有任何内容安全枚举(票面 §Context)。所以呈现层只
+ * 陈述确知的事实,原因以可能性给出 —— 见设计稿 2026-09-11-req160-empty-turn-row §4。
+ */
+export function isEmptyUnknownTurn(assistant: AssistantMessage, emitted: number): boolean {
+  if (emitted > 0) return false
+  if (assistant.error) return false // 被中止 / 真错误各有自己的行
+  const finish = (assistant as { finish?: unknown }).finish
+  if (finish !== "unknown") return false
+  const tokens = (assistant as { tokens?: { output?: unknown } }).tokens
+  return typeof tokens === "object" && tokens !== null && tokens.output === 0
+}
+
+export function footnoteOf(
+  assistants: readonly AssistantMessage[],
+  selected?: UserMessage["model"],
+): TimelineFootnote | undefined {
+  const source = assistants.at(-1)
+  if (!source || typeof source.time.completed !== "number" || source.error) return undefined
+  const footnote: TimelineFootnote = {}
+  footnote.provider = cappedField(source.providerID)
+  footnote.agent = cappedField(source.agent)
+  footnote.model = cappedField(source.modelID)
+  if (selected && (selected.providerID !== source.providerID || selected.modelID !== source.modelID))
+    footnote.actualModel = footnote.model
+  const tokens = source.tokens
+  if (typeof tokens === "object" && tokens !== null) {
+    const total = [tokens.input, tokens.output, tokens.reasoning]
+      .filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0)
+      .reduce((sum, value) => sum + value, 0)
+    if (total > 0) footnote.tokens = total
+    // 效率段:本回合提示词的缓存命中率 = cache.read /(cache.read + cache.write + input)。
+    // 分母是完整提示词:session.ts getUsage 已把 tokens.input 规范化为「非缓存输入」
+    // (inputTokens − cacheRead − cacheWrite),read/write/input 三段互斥 —— 分母漏掉
+    // write 会把档位系统性算高(审计 R1 Blocker:input=500/read=200/write=300 曾显示
+    // 29%「中」,真实 200/1000=20%「低」)。cache.read 为 0 时无法区分「模型不支持缓存」
+    // 与「首轮冷启动」,一律缺席 —— 不拿零值装成「效率低」。
+    const cached = tokens.cache?.read
+    if (typeof cached === "number" && Number.isFinite(cached) && cached > 0) {
+      const nonCached = (value: unknown) => (typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0)
+      const prompt = cached + nonCached(tokens.cache?.write) + nonCached(tokens.input)
+      footnote.cacheHit = Math.round((cached / prompt) * 100)
+    }
+  }
+  return footnote
+}
+
+/** 复制正文:该回合全部助手的非 synthetic text part,按顺序以空行连接。 */
+export function turnCopyText(
+  assistants: readonly AssistantMessage[],
+  partsOf: (messageID: string) => readonly Part[],
+): string {
+  const blocks: string[] = []
+  for (const assistant of assistants) {
+    for (const part of partsOf(assistant.id)) {
+      if (part.type !== "text" || part.synthetic) continue
+      const text = part.text?.trim()
+      if (text) blocks.push(text)
+    }
+  }
+  return blocks.join("\n\n")
+}
+
+// ── 本回合改动汇总(S2):数据源 = userMessage.summary.diffs(服务端回合后写入) ──
+/** 非负有限数才合法;其余(含缺失/NaN/负数)= 畸形,整条丢弃(审计 minor)。 */
+function diffCountOf(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return undefined
+  return Math.floor(value)
+}
+
+/**
+ * I2/I7 防御读取:畸形条目**整条丢弃**——超长文件名不截断(截断会指向另一个路径)、
+ * 非法 ±行数不改写为 0(不伪造统计);项数帽 + 扫描预算;无合法行 → undefined。
+ */
+export function turnDiffsOf(message: UserMessage): {
+  files: TimelineTurnDiffFile[]
+  additions: number
+  deletions: number
+  truncated: boolean
+} | undefined {
+  const diffs = message.summary?.diffs
+  if (!Array.isArray(diffs) || diffs.length === 0) return undefined
+  const files: TimelineTurnDiffFile[] = []
+  let truncated = false
+  for (let index = 0; index < diffs.length; index += 1) {
+    if (index >= TURN_DIFF_SCAN_MAX || files.length >= TURN_DIFF_FILES_MAX) {
+      truncated = true
+      break
+    }
+    const item = diffs[index]
+    if (typeof item !== "object" || item === null) continue
+    const record = item as { file?: unknown; additions?: unknown; deletions?: unknown }
+    if (typeof record.file !== "string" || record.file.length === 0) continue
+    if (record.file.length > TURN_DIFF_FILE_MAX_CHARS) continue
+    const additions = diffCountOf(record.additions)
+    const deletions = diffCountOf(record.deletions)
+    if (additions === undefined || deletions === undefined) continue
+    files.push({ file: record.file, additions, deletions })
+  }
+  if (files.length === 0) return undefined
+  return {
+    files,
+    additions: files.reduce((sum, row) => sum + row.additions, 0),
+    deletions: files.reduce((sum, row) => sum + row.deletions, 0),
+    truncated,
+  }
+}
+
+// ── 面板联动的路径纪律(I1,审计 Major-2) ───────────────────────────────────
+const DRIVE_LETTER_RE = /^[A-Za-z]:/
+
+/**
+ * 把「在面板打开」目标证明为安全的 workspace-relative 路径(review 面板货币):
+ * 只接受 ①位于 identity.directory 之下的绝对路径(剥前缀)②本就相对的路径;
+ * 归一(\→/)后不得残留 ".."/"."/空段/盘符/绝对残留。无法证明 → undefined,
+ * 消费侧零动作(pill/diffsum 同门;不把工作区外的路径递进 jumpToReview)。
+ */
+export function reviewPathOf(path: string, directory: string): string | undefined {
+  const normalized = path.replaceAll("\\", "/")
+  const root = directory.replaceAll("\\", "/").replace(/\/+$/, "")
+  let relative: string | undefined
+  if (root && normalized.startsWith(`${root}/`)) relative = normalized.slice(root.length + 1)
+  else if (!normalized.startsWith("/") && !DRIVE_LETTER_RE.test(normalized)) relative = normalized
+  if (!relative) return undefined
+  if (DRIVE_LETTER_RE.test(relative)) return undefined
+  const segments = relative.split("/")
+  if (segments.some((segment) => segment.length === 0 || segment === "." || segment === "..")) return undefined
+  return relative
+}
+
+// ── 斜杠命令 chip:登记按 assistant messageID 对齐所属回合 ───────────────────
+/** fail-closed:登记缺席/字段非法/对不上回合 → undefined(不出 chip)。 */
+export function slashOriginForTurn(
+  origins: readonly TimelineSlashOrigin[] | undefined,
+  assistantIDs: ReadonlySet<string>,
+): { command: string; arguments?: string; source?: "command" | "mcp" | "skill" } | undefined {
+  if (!Array.isArray(origins)) return undefined
+  for (let index = 0; index < origins.length && index < SLASH_ORIGINS_SCAN_MAX; index += 1) {
+    const item = origins[index]
+    if (typeof item !== "object" || item === null) continue
+    const record = item as { assistantMessageID?: unknown; command?: unknown; arguments?: unknown; source?: unknown }
+    if (typeof record.assistantMessageID !== "string" || !assistantIDs.has(record.assistantMessageID)) continue
+    if (typeof record.command !== "string" || record.command.length === 0) continue
+    const args = typeof record.arguments === "string" && record.arguments.length > 0 ? record.arguments : undefined
+    // E3/E4:来源只认注册方声明的三个字面量;其余值一律按缺席处理(通用 chip,不猜)。
+    const source =
+      record.source === "command" || record.source === "mcp" || record.source === "skill" ? record.source : undefined
+    return {
+      command: record.command.slice(0, SLASH_COMMAND_MAX_CHARS),
+      arguments: args?.slice(0, SLASH_ARGUMENTS_MAX_CHARS),
+      ...(source ? { source } : {}),
+    }
+  }
+  return undefined
+}
+
+/**
+ * 回合级错误(排除中断):读第一个出错助手消息的 name+message,均有界(I7)。
+ *
+ * `#1382` 另读一格:这次失败是不是**这台电脑上的出网围栏**拒的。实测(bun fetch → @ai-sdk/openai
+ * 与 @ai-sdk/anthropic 各一臂 → `ProviderError.parseAPICallError`)两处都拿得到同一份拒绝正文:
+ *   `data.message`      = `Forbidden: alpha egress policy: <authority> denied (reason=unregistered) — …`
+ *   `data.responseBody` = 原始正文(逐字)
+ * 两处都读,是因为 `message` 那一份由上游的 `message()` 启发式拼出来(它只在 SDK 给的 message
+ * 恰好等于状态短语时才把 responseBody 接上去);`responseBody` 则是逐字透传,不依赖那条启发式。
+ * 判据细到 `reason=unregistered`:502 `dial-failed` 的正文带同一个前缀,但那是**真的连不上**,
+ * 说成「被策略拦下」会把人引去查放行名单(见 shared/egress-denial.ts 的第 2 条纪律)。
+ */
+export function turnErrorOf(
+  assistants: readonly AssistantMessage[],
+): {
+  name: string
+  message: string
+  egressDenied?: { authority: string }
+  netLayer?: NetFailureLayer
+  netUnattributed?: true
+  cause?: TurnErrorCause
+  statusCode?: number
+} | undefined {
+  const failed = assistants.find((message) => message.error && message.error.name !== "MessageAbortedError")
+  if (!failed?.error) return undefined
+  const data = (
+    failed.error as {
+      data?: { message?: unknown; responseBody?: unknown; statusCode?: unknown; metadata?: Record<string, unknown> }
+    }
+  ).data
+  const raw = typeof data?.message === "string" ? data.message : ""
+  const body = typeof data?.responseBody === "string" ? data.responseBody : ""
+  const egressDenied = egressPolicyDenialOf(raw) ?? egressPolicyDenialOf(body)
+  // `#1572`:引擎在 processor.ts 结算 APIError 时写进 metadata 的层(只认九个层名;`http` 沿用原文案)。
+  const layer = data?.metadata?.codepuppyNetLayer
+  const netLayer = isNetFailureLayer(layer) && layer !== "http" ? layer : undefined
+  const netUnattributed = layer === undefined && data?.metadata?.codepuppyNetCode === "unattributed"
+  const statusCode = typeof data?.statusCode === "number" ? data.statusCode : undefined
+  // `#1588`:围栏拒绝(`#1382`)与分层联网失败(`#1572`)先认,保持它们的呈现 —— 围栏拒绝本身就是 403。
+  const cause =
+    egressDenied || netLayer || netUnattributed ? undefined : turnErrorCauseOf(failed.error.name, statusCode)
+  return {
+    name: failed.error.name,
+    message: boundedText(raw, TURN_ERROR_MAX_CHARS).text,
+    ...(egressDenied ? { egressDenied } : {}),
+    ...(netLayer ? { netLayer } : {}),
+    ...(netUnattributed ? { netUnattributed: true as const } : {}),
+    ...(cause ? { cause } : {}),
+    ...(statusCode !== undefined ? { statusCode } : {}),
+  }
+}
+
+export function projectTimelineRows(input: TimelineProjectionInput): TimelineRow[] {
+  const rows: TimelineRow[] = []
+  const users: UserMessage[] = []
+  const assistantsByParent = new Map<string, AssistantMessage[]>()
+
+  for (const message of input.messages) {
+    if (message.role === "user") {
+      users.push(message)
+      continue
+    }
+    const existing = assistantsByParent.get(message.parentID)
+    if (existing) existing.push(message)
+    else assistantsByParent.set(message.parentID, [message])
+  }
+
+  const streamingAssistant =
+    input.status === "busy"
+      ? [...input.messages]
+          .reverse()
+          .find(
+            (message): message is AssistantMessage =>
+              message.role === "assistant" && typeof message.time.completed !== "number",
+          )
+      : undefined
+  const activeUserID =
+    (streamingAssistant && users.some((user) => user.id === streamingAssistant.parentID)
+      ? streamingAssistant.parentID
+      : undefined) ?? (input.status !== "idle" ? users.at(-1)?.id : undefined)
+
+  // REQ-236 `#1553`:「已读取」看的是**同一会话**的读取调用 —— 只在真有暂存附件时才把全会话的工具 part 收一遍。
+  let tools: Part[] | undefined
+  const sessionTools = () =>
+    (tools ??= input.messages.flatMap((message) =>
+      message.role === "assistant" ? input.partsOf(message.id).filter((part) => part.type === "tool") : [],
+    ))
+
+  users.forEach((userMessage, index) => {
+    const userParts = input.partsOf(userMessage.id)
+    const textPart = userParts.find((part): part is TextPart => part.type === "text" && !part.synthetic)
+    const rawText = textPart?.text ?? ""
+    const { text, truncated } = boundedText(rawText, USER_TEXT_MAX_CHARS)
+    const segments = segmentUserText(text, mentionSpans(userParts))
+    const attachments = timelineAttachmentsOf(userParts, () => ({
+      ...input.attachments,
+      tools: sessionTools(),
+      turnActive: userMessage.id === activeUserID,
+    }))
+    const comments = userParts.flatMap((part) => commentOf(part) ?? [])
+    const turnAssistants = assistantsByParent.get(userMessage.id) ?? []
+    const slash = slashOriginForTurn(input.slashOrigins, new Set(turnAssistants.map((message) => message.id)))
+
+    // 用户气泡是否渲染 —— 回合分隔行跟着它走(#620)。分隔行原来在此之前**无条件** push,
+    // 于是没有气泡的回合(如「继续生成」发出的 synthetic 续写)会在时间线上留下一条
+    // 孤零零的「时间 · 新回合」。分隔行的语义是「上一段到此为止,下面是你新说的话」,
+    // 没有那句话就没有可分隔的东西;该回合的助手输出照常渲染。
+    const userVisible = Boolean(text || attachments.length > 0 || comments.length > 0 || slash)
+
+    if (index > 0 && userVisible)
+      rows.push({
+        kind: "turn",
+        key: `turn:${userMessage.id}`,
+        rev: String(userMessage.time.created),
+        userMessageID: userMessage.id,
+        createdAt: userMessage.time.created,
+      })
+
+    if (userVisible)
+      rows.push({
+        kind: "user",
+        key: `user:${userMessage.id}`,
+        rev: [
+          text,
+          String(truncated),
+          segments.map((segment) => `${segment.kind ?? "t"}:${segment.text.length}:${segment.label ?? ""}`).join(","),
+          attachments.map(attachmentRev).join(","),
+          comments.map((comment) => comment.partID).join(","),
+          slash ? `${slash.command}\u0000${slash.arguments ?? ""}\u0000${slash.source ?? ""}` : "",
+        ].join("§"),
+        message: userMessage,
+        text,
+        copyText: () => rawText,
+        truncated,
+        segments,
+        attachments,
+        comments,
+        slash,
+      })
+
+    const compacted = userParts.some((part) => part.type === "compaction")
+    const compactionSummaryParts = compacted
+      ? turnAssistants.flatMap((assistant) =>
+          assistant.summary && typeof assistant.time.completed === "number"
+            ? input
+                .partsOf(assistant.id)
+                .filter((part): part is TextPart => part.type === "text" && !!part.text?.trim())
+            : [],
+        )
+      : []
+
+    if (compacted)
+      rows.push({
+        kind: "divider",
+        key: `compaction:${userMessage.id}`,
+        rev: `compaction:${compactionSummaryParts.map((part) => part.id).join(",")}`,
+        userMessageID: userMessage.id,
+        label: "compaction",
+        summaryParts: compactionSummaryParts,
+      })
+
+    // `#1473`:先按出现顺序收集回合内条目,再裁定「哪段文字是回答」,最后一次性出行。
+    // 媒体 / 产物 / 中断 / 空回合行随条目收进 trailing,挂在回答之后(design §4)。
+    type TurnItem =
+      | { type: "reasoning"; part: ReasoningPart; streaming: boolean }
+      | { type: "text"; part: TextPart; streaming: boolean }
+      | { type: "tool"; part: ToolPart }
+    const items: TurnItem[] = []
+    const trailing: TimelineRow[] = []
+    let emitted = 0
+    const assistants = turnAssistants
+
+    // REQ-236 `#1552`:本回合生图卡跟住的任务 —— 它们的产物链接行由卡片取代(图已经在卡里)。
+    const imageRuns = new Set<string>()
+    const pushToolTrailing = (part: ToolPart) => {
+      const image = cloudImageOf(part)
+      if (image) {
+        const call = image.call
+        if (call.phase === "accepted") imageRuns.add(call.runId)
+        trailing.push({
+          kind: "cloudImage",
+          key: `cloudImage:${part.id}`,
+          rev: [
+            call.phase,
+            call.phase === "accepted" ? `${call.runId}/${call.acceptedAt ?? ""}` : "",
+            call.phase === "refused" ? `${call.refusal}/${call.error}` : "",
+            image.prompt,
+          ].join("§"),
+          image,
+        })
+      }
+      const links = artifactLinksOf(part)
+      if (links.length > 0)
+        trailing.push({
+          kind: "artifacts",
+          key: `artifacts:${part.id}`,
+          rev: links.map((link) => `${link.runId}/${link.id ?? ""}/${link.name}`).join("|"),
+          partID: part.id,
+          links,
+        })
+      // 工具附件(生产上图片/PDF 的真实通道)→ 媒体预览行。
+      // #587 审计 R-final:媒体行与卡同一条 identity 分派闸 —— metadata-only 降级
+      // (第三方 MCP/plugin/快照缺失或非法)的 part,其附件(远端可控的 data: URL 与
+      // 文件名)不得绕过降级卡在主时间线渲染。fail-closed:降级即零媒体行。
+      if (toolCardDispatchOf(part).metadataOnly) return
+      toolMediaOf(part).forEach((media, index) => {
+        trailing.push({
+          kind: "media",
+          key: `media:${part.id}:${index}`,
+          rev: `${media.mime}§${media.name}§${media.url.length}`,
+          media,
+        })
+      })
+    }
+
+    for (const assistant of assistants) {
+      const parts = input.partsOf(assistant.id)
+      // compaction assistant 的完成态 text 已收进上方分隔行作为「保留要点」;不再当普通助手正文
+      // 重复摊开。其内部 reasoning 也不进入普通时间线,错误仍由回合级错误行呈现。
+      const compactionSummary = compacted && assistant.summary === true
+      const streamingHere = streamingAssistant?.id === assistant.id
+      const lastVisible = streamingHere
+        ? [...parts]
+            .reverse()
+            .find(
+              (part) =>
+                (part.type === "text" && !!part.text?.trim()) ||
+                (part.type === "reasoning" && !!part.text?.trim()) ||
+                (part.type === "tool" && renderableToolPart(part)) ||
+                part.type === "file",
+            )
+        : undefined
+      for (const part of parts) {
+        switch (part.type) {
+          case "text": {
+            if (!part.text?.trim()) continue
+            if (compactionSummary) continue
+            items.push({ type: "text", part, streaming: streamingHere && lastVisible === part })
+            emitted += 1
+            continue
+          }
+          case "reasoning": {
+            if (!part.text?.trim()) continue
+            if (compactionSummary) continue
+            items.push({ type: "reasoning", part, streaming: streamingHere && part.time.end === undefined })
+            emitted += 1
+            continue
+          }
+          case "tool": {
+            if (!renderableToolPart(part)) continue
+            items.push({ type: "tool", part })
+            pushToolTrailing(part)
+            emitted += 1
+            continue
+          }
+          case "file": {
+            const media = mediaSourceOfFilePart(part)
+            trailing.push({
+              kind: "media",
+              key: `part:${part.id}`,
+              rev: `${media.mime}§${media.name}§${media.url.length}`,
+              media,
+            })
+            emitted += 1
+            continue
+          }
+          default:
+            // agent/snapshot/subtask/retry/compaction 等非文本流 part:无视觉合同,fail-closed
+            // 不渲染(subtask 与上游 v1/v2 行为一致;重试由 session_status 驱动)。
+            continue
+        }
+      }
+      if (assistant.error?.name === "MessageAbortedError")
+        trailing.push({
+          kind: "divider",
+          key: `interrupted:${assistant.id}`,
+          rev: "interrupted",
+          userMessageID: userMessage.id,
+          label: "interrupted",
+        })
+      else if (isEmptyUnknownTurn(assistant, emitted))
+        trailing.push({
+          kind: "divider",
+          key: `emptyTurn:${assistant.id}`,
+          rev: "emptyTurn",
+          userMessageID: userMessage.id,
+          label: "emptyTurn",
+        })
+    }
+
+    // 回答 = 最后一次工具调用之后的文字;没有时把最后一段过渡话提出来当回答;
+    // 一个字都没有时什么也不提(空回合判定沿用上面的 emitted 计数,不受影响)。
+    let lastTool = -1
+    items.forEach((item, index) => {
+      if (item.type === "tool") lastTool = index
+    })
+    const turnActive = userMessage.id === activeUserID && input.status !== "idle"
+    const answer = new Set<number>()
+    items.forEach((item, index) => {
+      if (item.type === "text" && index > lastTool) answer.add(index)
+    })
+    // `#1474`:「把最后一段过渡话提为回答」只属于结束态(design §4)。回合还在跑时,工具之前的文字
+    // 就是过渡话 —— 提前提成回答会让工作过程在工具还在跑时被误判为「回答已开始」而收起。
+    if (answer.size === 0 && !turnActive) {
+      for (let index = lastTool - 1; index >= 0; index -= 1) {
+        if (items[index]!.type !== "text") continue
+        answer.add(index)
+        break
+      }
+    }
+    const processItems: ProcessItem[] = []
+    items.forEach((item, index) => {
+      if (answer.has(index)) return
+      if (item.type === "text") processItems.push({ type: "say", part: item.part })
+      else processItems.push(item)
+    })
+    const steps = buildProcessSteps(processItems)
+    const turnError = turnErrorOf(assistants)
+    // `#1474`:活跃回合从开始就出工作过程(与回合同寿命);结束后只在有步骤时保留。
+    if (steps.length > 0 || turnActive) {
+      const durationMs = turnActive ? undefined : turnDurationOf(userMessage, assistants)
+      const answering = turnActive && answer.size > 0
+      const retry =
+        turnActive && input.status === "retry" && input.retry
+          ? {
+              attempt: input.retry.attempt,
+              message: boundedText(input.retry.message, RETRY_MESSAGE_MAX_CHARS).text,
+            }
+          : undefined
+      rows.push({
+        kind: "process",
+        key: `process:${userMessage.id}`,
+        rev: [
+          steps.map(processStepRevOf).join("|"),
+          String(turnActive),
+          String(answering),
+          retry ? `${retry.attempt}\u0000${retry.message}` : "",
+          String(!!turnError),
+          durationMs ?? "",
+        ].join("§"),
+        userMessageID: userMessage.id,
+        steps,
+        active: turnActive,
+        startedAt: userMessage.time.created,
+        answering,
+        ...(retry ? { retry } : {}),
+        turnFailed: !!turnError,
+        ...(durationMs !== undefined ? { durationMs } : {}),
+      })
+    }
+    items.forEach((item, index) => {
+      if (!answer.has(index) || item.type !== "text") return
+      rows.push({
+        kind: "markdown",
+        key: `md:${item.part.id}`,
+        rev: String(item.streaming),
+        part: item.part,
+        streaming: item.streaming,
+      })
+    })
+    rows.push(
+      ...trailing.filter(
+        (row) => !(row.kind === "artifacts" && row.links.every((link) => imageRuns.has(link.runId))),
+      ),
+    )
+
+    // 回合末富脚注(A6):只在回合尾态成功完成且有可见内容时出行;当前活跃回合
+    // (busy/retry 等非 idle)尾态未定,一律不出(审计 Major-1)。
+    const footnote = emitted > 0 && !turnActive ? footnoteOf(assistants, userMessage.model) : undefined
+    if (footnote)
+      rows.push({
+        kind: "footnote",
+        key: `footnote:${userMessage.id}`,
+        rev: [
+          footnote.provider ?? "",
+          footnote.agent ?? "",
+          footnote.model ?? "",
+          footnote.cacheHit ?? "",
+          footnote.tokens ?? "",
+          footnote.actualModel ?? "",
+        ].join("§"),
+        userMessageID: userMessage.id,
+        footnote,
+        copyText: () => turnCopyText(assistants, input.partsOf),
+      })
+
+    // 本回合改动汇总(S2):userMessage.summary.diffs 解析出合法行才出行(fail-closed)。
+    const turnDiffs = turnDiffsOf(userMessage)
+    if (turnDiffs)
+      rows.push({
+        kind: "diffsum",
+        key: `diffsum:${userMessage.id}`,
+        rev: [
+          turnDiffs.files.map((row) => `${row.file}:${row.additions}/${row.deletions}`).join(","),
+          String(turnDiffs.truncated),
+        ].join("§"),
+        userMessageID: userMessage.id,
+        files: turnDiffs.files,
+        additions: turnDiffs.additions,
+        deletions: turnDiffs.deletions,
+        truncated: turnDiffs.truncated,
+      })
+
+    if (turnError)
+      rows.push({
+        kind: "turnError",
+        key: `turn-error:${userMessage.id}`,
+        rev: `${turnError.name}§${turnError.message}§${turnError.egressDenied?.authority ?? ""}§${turnError.netLayer ?? (turnError.netUnattributed ? "unattributed" : "")}§${turnError.cause ?? ""}§${turnError.statusCode ?? ""}`,
+        userMessageID: userMessage.id,
+        name: turnError.name,
+        message: turnError.message,
+        ...(turnError.egressDenied ? { egressDenied: turnError.egressDenied } : {}),
+        ...(turnError.netLayer ? { netLayer: turnError.netLayer } : {}),
+        ...(turnError.netUnattributed ? { netUnattributed: true as const } : {}),
+        ...(turnError.cause ? { cause: turnError.cause } : {}),
+        ...(turnError.statusCode !== undefined ? { statusCode: turnError.statusCode } : {}),
+      })
+  })
+
+  return rows
+}
+
+/** process 行的 rev:步骤结构 + 每个 part 的结束态(状态翻转才换行对象;流式文字不换)。 */
+function processStepRevOf(step: TimelineProcessStep): string {
+  if (step.kind === "say") return `say:${step.part.id}`
+  if (step.kind === "reasoning")
+    return `reason:${step.streaming}:${step.parts.map((part) => `${part.id}/${part.time?.end !== undefined}`).join(",")}`
+  return `tool:${step.parts.map((part) => `${part.id}/${part.state.status}`).join(",")}`
+}
+
+function sameProcessSteps(a: readonly TimelineProcessStep[], b: readonly TimelineProcessStep[]): boolean {
+  if (a.length !== b.length) return false
+  return a.every((step, index) => {
+    const other = b[index]!
+    if (step.kind !== other.kind) return false
+    if (step.kind === "say" && other.kind === "say") return step.part === other.part
+    const left = (step as { parts: readonly unknown[] }).parts
+    const right = (other as { parts: readonly unknown[] }).parts
+    return left.length === right.length && left.every((part, at) => part === right[at])
+  })
+}
+
+/** 行复用:key+kind+rev 相同且承载的 store proxy 同一 → 保留旧行对象(<For> 引用稳定,流式不重建 DOM)。 */
+export function reuseTimelineRows(previous: readonly TimelineRow[] | undefined, next: TimelineRow[]): TimelineRow[] {
+  if (!previous || previous.length === 0) return next
+  const byKey = new Map(previous.map((row) => [row.key, row] as const))
+  let reused = 0
+  const result = next.map((row) => {
+    const before = byKey.get(row.key)
+    if (!before || before.kind !== row.kind || before.rev !== row.rev) return row
+    if ("part" in before && "part" in row && before.part !== row.part) return row
+    if (before.kind === "user" && row.kind === "user" && before.message !== row.message) return row
+    if (before.kind === "process" && row.kind === "process" && !sameProcessSteps(before.steps, row.steps)) return row
+    reused += 1
+    return before
+  })
+  if (reused === next.length && previous.length === next.length) return previous as TimelineRow[]
+  return result
+}

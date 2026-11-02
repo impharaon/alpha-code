@@ -11,11 +11,11 @@ export default defineConfig({
   root: fileURLToPath(new URL(".", import.meta.url)),
   plugins: [
     {
-      // composer 的 `./providers` 借上游 command 上下文 —— 与 alpha-composer-model.cases.ts 同一处桩。
-      name: "alpha-visual:providers-stub",
+      // composer 的 `./providers` 借上游 command 上下文 —— 与 codepuppy-composer-model.cases.ts 同一处桩。
+      name: "codepuppy-visual:providers-stub",
       enforce: "pre",
       resolveId(id, importer) {
-        if (id === "./providers" && importer?.includes("/alpha-ui/alpha-composer")) return providersStub
+        if (id === "./providers" && importer?.includes("/codepuppy-ui/codepuppy-composer")) return providersStub
       },
     },
     solidPlugin(),

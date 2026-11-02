@@ -1,4 +1,4 @@
-// REQ-160 `#1324` —— 上报器的**生产路径**判据(注入 fetch,照 alpha-web-upload-consent 那条接缝的做法)。
+// REQ-160 `#1324` —— 上报器的**生产路径**判据(注入 fetch,照 codepuppy-web-upload-consent 那条接缝的做法)。
 //
 // 为什么这些用例必须驱动 `createChatArchiveUploader(...)` 而不是它下面的纯函数:
 // 本仓实测过「断言内层纯函数 ⇒ 落在分流层的绕过照样绿」。429 那条尤其如此 —— 把

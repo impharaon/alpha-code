@@ -12,10 +12,10 @@ import { setDefaultTimeout } from "bun:test"
 
 // ── ① UI 语言 ────────────────────────────────────────────────────────────────
 // Consumed by src/renderer/i18n/index.ts detectLocale(), which prefers an explicit
-// ALPHA_UI_LOCALE over navigator sniffing. `||=` respects an override the caller already
+// CODEPUPPY_UI_LOCALE over navigator sniffing. `||=` respects an override the caller already
 // exported (e.g. to run the suite in another locale). Child processes spawned by tests
-// (alpha-composer-model.component.test.ts) inherit this via process.env.
-process.env.ALPHA_UI_LOCALE ||= "zh"
+// (codepuppy-composer-model.component.test.ts) inherit this via process.env.
+process.env.CODEPUPPY_UI_LOCALE ||= "zh"
 
 // ── ② 每条用例的默认超时(**只管单文件运行**,权威在 scripts/bun-test-floor.sh)────────
 // bun 默认 5000ms,对「在子进程里跑一整套 `.cases.ts`」的 host 用例来说,那不是超时,
@@ -39,11 +39,11 @@ setDefaultTimeout(120_000)
 // ── ③ 平台:**只检测 + 自陈,不改** ────────────────────────────────────────────
 // 本产品 ship 的桌面平台是 darwin + win32(ADR-026;`ext-install-planner.ts` 的
 // `synthesizeManifest` 把 `compatibility.platforms` 写死成 `["darwin","win32"]`)。
-// alpha-ci 的 runner 是 ubuntu ⇒ 凡是走到生产平台闸的用例,在写盘前就被拒:
+// codepuppy-ci 的 runner 是 ubuntu ⇒ 凡是走到生产平台闸的用例,在写盘前就被拒:
 //   `platform linux not supported by this entry — refusing before any disk write`
 // 它们量到的是「runner 不是我们发布的平台」,不是它们存在的理由。
 //
-// ⚠️ 本票**试过**在这里全局钉 `process.platform = "darwin"`,在 alpha-ci 上实测**炸得更狠**:
+// ⚠️ 本票**试过**在这里全局钉 `process.platform = "darwin"`,在 codepuppy-ci 上实测**炸得更狠**:
 // 14 个 renderer 测试文件整片挂在
 //   `error: Cannot find module @rollup/rollup-darwin-x64`
 // —— vite/rollup 按 `process.platform` 选原生可选依赖,而 linux runner 上装的是 linux 那份。
@@ -57,7 +57,7 @@ setDefaultTimeout(120_000)
 export const SHIPPED_PLATFORMS = ["darwin", "win32"] as const
 if (!(SHIPPED_PLATFORMS as readonly string[]).includes(process.platform)) {
   console.log(
-    `[alpha-test-env] host platform "${process.platform}" is not one this product ships on ` +
+    `[codepuppy-test-env] host platform "${process.platform}" is not one this product ships on ` +
       `(${SHIPPED_PLATFORMS.join("/")}). PLATFORM DEGRADED this run: any gate that reaches a production ` +
       `platform check refuses before doing anything, and measures the runner instead of the behaviour. ` +
       `Such gates must opt in via pinShippedPlatform() (test-component/pin-shipped-platform.ts).`,

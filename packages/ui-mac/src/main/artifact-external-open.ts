@@ -17,7 +17,7 @@ import {
 } from "node:fs"
 import { tmpdir } from "node:os"
 import { basename, isAbsolute, join, normalize, relative } from "node:path"
-import { isSafeRunId, safeResolveInAlpha } from "./alpha-workdir"
+import { isSafeRunId, safeResolveInCodePuppy } from "./codepuppy-workdir"
 import { isSafeSavedPath, readArtifactManifest } from "./artifact-manifest"
 import {
   OOXML_LIMITS,
@@ -55,8 +55,8 @@ export async function openRunArtifactExternal(
     return refused("ARTIFACT_STATE_BLOCKED", entry.local.state)
   if (!isSafeSavedPath(entry.local.savedPath)) return refused("ARTIFACT_PATH_REJECTED")
 
-  const runDir = safeResolveInAlpha(projectDir, "runs", runId)
-  const target = safeResolveInAlpha(projectDir, "runs", runId, ...entry.local.savedPath.split("/"))
+  const runDir = safeResolveInCodePuppy(projectDir, "runs", runId)
+  const target = safeResolveInCodePuppy(projectDir, "runs", runId, ...entry.local.savedPath.split("/"))
   if (!runDir || !target) return refused("ARTIFACT_PATH_REJECTED")
 
   let source = -1
@@ -95,7 +95,7 @@ export async function openRunArtifactExternal(
         return refused("OOXML_REJECTED", detection.status === "detected" ? "OOXML_CLAIM_CONFLICT" : detection.code)
     }
 
-    copyDir = mkdtempSync(join(tmpdir(), "alpha-artifact-open-"))
+    copyDir = mkdtempSync(join(tmpdir(), "codepuppy-artifact-open-"))
     const copy = join(copyDir, basename(entry.local.savedPath))
     if (bytes) writeFileSync(copy, bytes, { flag: "wx", mode: 0o600 })
     else copyFileDescriptor(source, copy, sourceStat.size)

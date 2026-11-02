@@ -22,8 +22,8 @@ only where they changed:
 - `git diff <old-dev>..<new-dev> -- packages/sdk/openapi.json packages/plugin/src/index.ts`
 
 ## 3. Re-validate prompt/agent overrides — the silent-drift check (ADR-015)
-alpha layers behavior on top of opencode's base prompt via *new* files (`alpha-behavior.md`,
-`alpha-identity.ts`, `.opencode/agent/*.md`). Drift here produces NO git conflict, so the file-diff
+alpha layers behavior on top of opencode's base prompt via *new* files (`codepuppy-behavior.md`,
+`codepuppy-identity.ts`, `.opencode/agent/*.md`). Drift here produces NO git conflict, so the file-diff
 guard is blind to it. Run:
 - `git diff <old-dev>..<new-dev> -- packages/opencode/src/session/prompt packages/opencode/src/agent`
 

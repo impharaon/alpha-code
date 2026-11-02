@@ -1,5 +1,5 @@
 // REQ-096(alpha-code#188)—— 隔离 HTML artifact preview 的跨运行时契约。main(html-preview-host)
-// 与 renderer(alpha-ui/artifact-html-preview)两个世界都要用(ADR-006),故与 ephemeral-server-url.ts
+// 与 renderer(codepuppy-ui/artifact-html-preview)两个世界都要用(ADR-006),故与 ephemeral-server-url.ts
 // 同风格落 shared:纯函数/常量,零 electron、零 node 依赖。
 //
 // host 本体、session/window 硬化与一次性 token 生命周期都在 src/main/html-preview-host.ts;
@@ -9,7 +9,7 @@ import type { ArtifactDescriptor } from "./cloud-artifact-descriptor"
 
 /** 一次性静态 host 的自定义协议名。仅注册 `standard: true`(host/相对路径解析需要);
  *  不给 secure、不给 supportFetchAPI —— 能力面越窄越好(REQ-096 交付 3/4)。 */
-export const HTML_PREVIEW_SCHEME = "alpha-artifact-preview"
+export const HTML_PREVIEW_SCHEME = "codepuppy-artifact-preview"
 
 /** 并发预览上限(REQ-096 生命周期约束的礼貌上限;超限拒绝而非静默 LRU 关窗)。 */
 export const HTML_PREVIEW_MAX_CONCURRENT = 3

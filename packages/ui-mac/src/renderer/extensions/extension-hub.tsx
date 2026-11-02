@@ -1,5 +1,5 @@
 // The Extension Hub (定制中心) — a full PAGE (not a modal) covering the content area, rendered as a
-// sibling of <AlphaSidebar> inside AppInterface (renderer/index.tsx) via a dedicated Portal host on
+// sibling of <CodePuppySidebar> inside AppInterface (renderer/index.tsx) via a dedicated Portal host on
 // #root. Only mounted while open, so it can never intercept background clicks. Browsable items come
 // from the bundled catalog; install status + actions go through useExtensions (receipts ⨝ SDK truth
 // + thin persist IPC).
@@ -26,10 +26,10 @@ import { subscribeAuthState } from "../auth-recovery"
 import { BuiltinControlsPanel } from "./builtin-controls-panel"
 import { catalog, catalogSource, entryVersion, refreshCatalog } from "./catalog-source"
 import { installableCatalogEntries, installableCatalogPackages } from "./catalog-installable-view"
-import { Dialog } from "../alpha-ui/Dialog"
-import { Button } from "../alpha-ui/Button"
-import { pushToast } from "../alpha-ui/Toast"
-import { Banner } from "../alpha-ui/Banner"
+import { Dialog } from "../codepuppy-ui/Dialog"
+import { Button } from "../codepuppy-ui/Button"
+import { pushToast } from "../codepuppy-ui/Toast"
+import { Banner } from "../codepuppy-ui/Banner"
 import type { ServerInfo } from "../sidebar/use-projects"
 import {
   DEFAULT_CATALOG_INSTALL_SCOPE,
@@ -48,15 +48,15 @@ import {
 } from "./use-extensions"
 import { ExtStandaloneAuthzDialog } from "./ext-authz"
 import { createInstallConfirm, InstallConfirmBody, InstallConfirmFooter } from "./install-confirm"
-import type { ProviderAddressRejection } from "../../shared/alpha-model-types"
+import type { ProviderAddressRejection } from "../../shared/codepuppy-model-types"
 
 /** `#1381`:远程连接器地址被拒的类别 → 文案键(类别本身来自 main,与出网围栏同一个函数)。 */
 const MCP_ADDRESS_REJECTION_KEY = {
-  "invalid-url": "alpha.ext.customMcpAddress.invalidUrl",
-  "not-https": "alpha.ext.customMcpAddress.notHttps",
-  loopback: "alpha.ext.customMcpAddress.loopback",
-  "host-shape": "alpha.ext.customMcpAddress.hostShape",
-  port: "alpha.ext.customMcpAddress.port",
+  "invalid-url": "codepuppy.ext.customMcpAddress.invalidUrl",
+  "not-https": "codepuppy.ext.customMcpAddress.notHttps",
+  loopback: "codepuppy.ext.customMcpAddress.loopback",
+  "host-shape": "codepuppy.ext.customMcpAddress.hostShape",
+  port: "codepuppy.ext.customMcpAddress.port",
 } as const satisfies Record<ProviderAddressRejection, string>
 import type { AuthorizationConfirmationWire, CapabilityDiffWire } from "../../shared/ext-capability-authorization"
 import type { Catalog, CatalogEntry, InstalledState } from "./catalog-types"
@@ -93,9 +93,9 @@ type ManageRow = {
 
 // `#1594`:三个页签(批准稿 `#hub-tabs`)。每页的副标题、搜索占位,以及「已安装」组收哪几类安装物。
 const TABS: { key: HubSection; labelKey: string; subKey: string; searchKey: string }[] = [
-  { key: "connectors", labelKey: "alpha.ext.tabConnectors", subKey: "alpha.ext.connectorsSub", searchKey: "alpha.ext.searchConnectors" },
-  { key: "skills", labelKey: "alpha.ext.tabSkills", subKey: "alpha.ext.skillsSub", searchKey: "alpha.ext.searchSkills" },
-  { key: "agents", labelKey: "alpha.ext.tabAgents", subKey: "alpha.ext.agentsSub", searchKey: "alpha.ext.searchAgents" },
+  { key: "connectors", labelKey: "codepuppy.ext.tabConnectors", subKey: "codepuppy.ext.connectorsSub", searchKey: "codepuppy.ext.searchConnectors" },
+  { key: "skills", labelKey: "codepuppy.ext.tabSkills", subKey: "codepuppy.ext.skillsSub", searchKey: "codepuppy.ext.searchSkills" },
+  { key: "agents", labelKey: "codepuppy.ext.tabAgents", subKey: "codepuppy.ext.agentsSub", searchKey: "codepuppy.ext.searchAgents" },
 ]
 /** 一条安装物在哪一页的「已安装」组里:技能与命令进技能页,助手进助手页,其余(连接器、插件、套件、云)进连接器页。 */
 function pageOfType(type: InstallReceiptType): HubSection {
@@ -109,17 +109,17 @@ const CAT_ORDER = ["dev", "office", "research", "china-office", "design", "other
 function catLabel(cat: string): string {
   switch (cat) {
     case "dev":
-      return t("alpha.ext.cat.dev")
+      return t("codepuppy.ext.cat.dev")
     case "office":
-      return t("alpha.ext.cat.office")
+      return t("codepuppy.ext.cat.office")
     case "research":
-      return t("alpha.ext.cat.research")
+      return t("codepuppy.ext.cat.research")
     case "china-office":
-      return t("alpha.ext.cat.china-office")
+      return t("codepuppy.ext.cat.china-office")
     case "design":
-      return t("alpha.ext.cat.design")
+      return t("codepuppy.ext.cat.design")
     default:
-      return t("alpha.ext.cat.other")
+      return t("codepuppy.ext.cat.other")
   }
 }
 
@@ -139,14 +139,14 @@ function versionLess(a: string, b: string): boolean {
 // (id 由 `shared/package-secret-prerequisite.ts` 以「组件 id#变量名」生成,安装确认框按同一 id 给填写说明);
 // 其余前置项的 label 就是确认框里那一格的名字,照它说。
 const PREREQUISITE_NEED_KEYS: Record<string, string> = {
-  "mcp:github-official#GITHUB_PERSONAL_ACCESS_TOKEN": "alpha.ext.needGithubToken",
-  "mcp:dbhub-readonly#DSN": "alpha.ext.needDatabaseFile",
+  "mcp:github-official#GITHUB_PERSONAL_ACCESS_TOKEN": "codepuppy.ext.needGithubToken",
+  "mcp:dbhub-readonly#DSN": "codepuppy.ext.needDatabaseFile",
 }
 function prerequisiteNeedText(view: CatalogPackageViewV1): string {
   return view.prerequisites.items
     .map((item) => {
       const key = PREREQUISITE_NEED_KEYS[item.prerequisiteId]
-      return key ? t(key as never) : t("alpha.ext.needItem", { item: item.label })
+      return key ? t(key as never) : t("codepuppy.ext.needItem", { item: item.label })
     })
     .join(" · ")
 }
@@ -222,8 +222,8 @@ export function ExtensionHub(props: {
   onCleanup(subscribeAuthState(setAuthState))
   // 「人在平台上」——**身份轴**,不含凭证是否可用。只驱动**文案分支**,绝不单独放行能力。
   const onPlatform = () => authState().status === "logged-in" && authState().mode === "platform"
-  // `#624`:平台凭证正在恢复。`platformStatus` 只在登录态出现(main/alpha-auth.ts deriveState),
-  // 故 `?? "ready"` 的缺席分支恒被 `onPlatform()` 先挡掉,与 alpha-composer.tsx:1110 同约定。
+  // `#624`:平台凭证正在恢复。`platformStatus` 只在登录态出现(main/codepuppy-auth.ts deriveState),
+  // 故 `?? "ready"` 的缺席分支恒被 `onPlatform()` 先挡掉,与 codepuppy-composer.tsx:1110 同约定。
   const cloudRecovering = () => onPlatform() && (authState().platformStatus ?? "ready") === "recovering"
   // `#624`:**能力放行**判据 —— 恢复中 fail-close。此前只看 status+mode,recovering 照样放行。
   //
@@ -232,11 +232,11 @@ export function ExtensionHub(props: {
   //     可用」——app 自己已经不信这份凭证了。
   //  ② 这个谓词放行的不是展示,是本渲染进程**权限最高**的两个动作:云派发(ADR-021 的代码
   //     出境 + 平台计费)与 enableCloud。
-  //  ③ main **不会**替我们兜底:`getAccessToken`(alpha-auth.ts)只校验 token 的 purpose 声明、
-  //     不看有效期,`alpha-cloud-jobs.ts` 的 `authed()` 只判 token **在不在**。所以过期那一支里,
+  //  ③ main **不会**替我们兜底:`getAccessToken`(codepuppy-auth.ts)只校验 token 的 purpose 声明、
+  //     不看有效期,`codepuppy-cloud-jobs.ts` 的 `authed()` 只判 token **在不在**。所以过期那一支里,
   //     本谓词是「把 diff 发给平台」与用户之间的**唯一**一道闸 —— 放行的结果是代码先出境、
   //     再收 401,而不是拦下来。
-  //  ④ 同一信号的其余**放行型**消费者早已 fail-close(alpha-composer.tsx:911/1110,以及同目录
+  //  ④ 同一信号的其余**放行型**消费者早已 fail-close(codepuppy-composer.tsx:911/1110,以及同目录
   //     下 composer 的模型链姊妹件里 loadSummary 的 recovering 短路 —— 那个模块名不写全,
   //     REQ-090 的纯文本棘轮(takeover-adapter-coexistence.test.ts)按 token 计命中,
   //     一句引用会被它记成「又一个挂载点」)。本谓词 2026-07-06 写成,`platformStatus` 2026-07-24 才
@@ -274,7 +274,7 @@ export function ExtensionHub(props: {
   })
   const finishEnable = async (args: { receipt: InstallReceipt; type: string; name: string }, r: ActionResult): Promise<void> => {
     if (!r.ok) {
-      pushToast({ kind: "error", title: extensionError(r.reason, "alpha.ext.error.enable") })
+      pushToast({ kind: "error", title: extensionError(r.reason, "codepuppy.ext.error.enable") })
       return
     }
     let mcPending = false
@@ -282,7 +282,7 @@ export function ExtensionHub(props: {
       const mc = await ext.setMcpConnected(args.name, true)
       mcPending = mc.reason === "reload-pending"
     }
-    if (r.reason === "reload-pending" || mcPending) pushToast({ kind: "info", title: t("alpha.ext.statePendingReload") })
+    if (r.reason === "reload-pending" || mcPending) pushToast({ kind: "info", title: t("codepuppy.ext.statePendingReload") })
     await refetchGovernance()
   }
   const proceedExpiredEnable = async (): Promise<void> => {
@@ -317,12 +317,12 @@ export function ExtensionHub(props: {
       return
     }
     // grant ok ≠ 已连接:连接未成功如实提示(状态行同步 warn 态,可关闭后重试)。
-    if (!r.connected) pushToast({ kind: "info", title: t("alpha.ext.sessionOnNoLink") })
+    if (!r.connected) pushToast({ kind: "info", title: t("codepuppy.ext.sessionOnNoLink") })
   }
   const runSessionToggle = async (args: { catalogId: string; name: string; on: boolean }): Promise<void> => {
     const dir = sessionDirectory()
     if (!dir) {
-      pushToast({ kind: "info", title: t("alpha.ext.sessionNeedsProject") })
+      pushToast({ kind: "info", title: t("codepuppy.ext.sessionNeedsProject") })
       return
     }
     if (sessionBusy()) return
@@ -335,7 +335,7 @@ export function ExtensionHub(props: {
     }
   }
   // #408:会话结束事件(sidecar 停止/崩溃)→ 开关已由数据层归位,此处如实提示(v6:行保留、开关归位)。
-  onCleanup(extIpc.onSessionGrantsEnded(() => pushToast({ kind: "info", title: t("alpha.ext.sessionEndedToast") })))
+  onCleanup(extIpc.onSessionGrantsEnded(() => pushToast({ kind: "info", title: t("codepuppy.ext.sessionEndedToast") })))
   const runStateToggle = async (args: {
     receipt: InstallReceipt
     type: string
@@ -346,7 +346,7 @@ export function ExtensionHub(props: {
   }): Promise<void> => {
     if (args.liveUnreceipted && args.type === "mcp") {
       const mc = await ext.setMcpConnected(args.name, !args.mcpConnected)
-      if (mc.reason === "reload-pending") pushToast({ kind: "info", title: t("alpha.ext.statePendingReload") })
+      if (mc.reason === "reload-pending") pushToast({ kind: "info", title: t("codepuppy.ext.statePendingReload") })
       return
     }
     const next = args.currentlyOn ? "disabled" : "enabled"
@@ -359,14 +359,14 @@ export function ExtensionHub(props: {
         return
       }
       if (code === "session-grant-persistent-enable") {
-        pushToast({ kind: "info", title: t("alpha.ext.sessionOnlyRefused") })
+        pushToast({ kind: "info", title: t("codepuppy.ext.sessionOnlyRefused") })
         return
       }
       if (code === "curation-unverifiable") {
-        pushToast({ kind: "error", title: t("alpha.ext.curationUnverifiable") })
+        pushToast({ kind: "error", title: t("codepuppy.ext.curationUnverifiable") })
         return
       }
-      pushToast({ kind: "error", title: extensionError(r.reason, "alpha.ext.error.toggle") })
+      pushToast({ kind: "error", title: extensionError(r.reason, "codepuppy.ext.error.toggle") })
       return
     }
     let mcPending = false
@@ -374,7 +374,7 @@ export function ExtensionHub(props: {
       const mc = await ext.setMcpConnected(args.name, next === "enabled")
       mcPending = mc.reason === "reload-pending"
     }
-    if (r.reason === "reload-pending" || mcPending) pushToast({ kind: "info", title: t("alpha.ext.statePendingReload") })
+    if (r.reason === "reload-pending" || mcPending) pushToast({ kind: "info", title: t("codepuppy.ext.statePendingReload") })
     await refetchGovernance()
     // `#784`:包卡上的「未启用」由包图投影的 `desiredState` 画出,而它不在 governance 的
     // 指纹里 —— 不显式重取,开关拨完包卡不变,用户会以为没生效。
@@ -414,17 +414,17 @@ export function ExtensionHub(props: {
     installPackage: (intent) => ext.installCatalogIntent(intent),
     onPackageSettled: async (pending, result) => {
       if (!result) {
-        setErrFor(pending.view.catalogId, t("alpha.ext.error.installUnknown"))
+        setErrFor(pending.view.catalogId, t("codepuppy.ext.error.installUnknown"))
         return pending.view
       }
       if (!result.ok) {
         if ("package" in result) rememberPackageView(result.package)
-        setErrFor(pending.view.catalogId, extensionError(result.reason, "alpha.ext.error.confirmPackage"))
+        setErrFor(pending.view.catalogId, extensionError(result.reason, "codepuppy.ext.error.confirmPackage"))
         return "package" in result ? result.package : pending.view
       }
       // `#698` 在这里手写过一行 warning 呈现 —— `#765` 之后它归 `extIpc`(IPC 包装层),对任何具名 warning 默认生效。
       // `#810`:引擎重扫失败是**另一件事**,`extIpc` 不知道它 —— 如实说「要重载」。
-      if (result.reloadPending) flash(t("alpha.ext.addedPendingReload"))
+      if (result.reloadPending) flash(t("codepuppy.ext.addedPendingReload"))
       const latest = await extIpc.packageDetail(pending.view.catalogId)
       if (latest) rememberPackageView(latest)
       return latest ?? pending.view
@@ -433,7 +433,7 @@ export function ExtensionHub(props: {
   const { confirming, openInstallConfirmation, authz, setAuthz, confirmBusy, authzBusy, cancelAuthz, confirmAuthz, openPackage, closePackageAuthz } = confirm
   // REQ-036:创建表单已移除(创建走技能:skill-creator/agent-creator 出厂注入),原表单 state 随之下线。
   // T3:存量迁移候选(旧 XDG 根里、名字匹配 catalog 的 alpha 安装物)。仅当主进程门控开启
-  // (ALPHA_MIGRATE_ENABLE=1,A6 真机验证后)且有候选时显示迁移条。
+  // (CODEPUPPY_MIGRATE_ENABLE=1,A6 真机验证后)且有候选时显示迁移条。
   const [migrateCandidates, setMigrateCandidates] = createSignal<CatalogEntry[]>([])
   const [migrating, setMigrating] = createSignal(false)
   // T6:导入状态。importDialog = git 输入弹窗;importBusy/importErr 行内反馈(B11)。
@@ -504,8 +504,8 @@ export function ExtensionHub(props: {
       }
       // ↓ 非插件目录:**逐字不变**的既有行为(成功 toast / 失败行内红字)。
       // #336 r1:projectionLag = 本次未注入(重启自愈)—— 不得宣称「当场生效」。
-      if (r.ok) flash(t(r.projectionLag ? "alpha.ext.importedPendingRestart" : "alpha.ext.imported", { name: r.name ?? "" }), "success")
-      else if (!r.canceled) setImportErr(extensionError(r.reason, "alpha.ext.error.importFolder"))
+      if (r.ok) flash(t(r.projectionLag ? "codepuppy.ext.importedPendingRestart" : "codepuppy.ext.imported", { name: r.name ?? "" }), "success")
+      else if (!r.canceled) setImportErr(extensionError(r.reason, "codepuppy.ext.error.importFolder"))
     } finally {
       setImportBusy(false)
     }
@@ -527,7 +527,7 @@ export function ExtensionHub(props: {
     }
     const released = await ext.localPluginCancel(current.previewId)
     if (!released.ok) {
-      setLocalPluginErr(released.reasonCode === "install-in-flight" ? t("alpha.ext.error.cancelBusy") : extensionError(released.reason, "alpha.ext.error.cancelUnknown", released.reasonCode))
+      setLocalPluginErr(released.reasonCode === "install-in-flight" ? t("codepuppy.ext.error.cancelBusy") : extensionError(released.reason, "codepuppy.ext.error.cancelUnknown", released.reasonCode))
       return
     }
     setLocalPlugin(null)
@@ -543,7 +543,7 @@ export function ExtensionHub(props: {
       if (!r.ok) {
         // 「预览过期」「安装中途失败」对用户是同一件事:**一个都没装,盘上没有半成品**。
         // 措辞里不许出现「已装了 N 个」这种中间态。
-        setLocalPluginErr(extensionError(r.reason, "alpha.ext.error.localInstall", r.code))
+        setLocalPluginErr(extensionError(r.reason, "codepuppy.ext.error.localInstall", r.code))
         return
       }
       setLocalPlugin(null)
@@ -556,8 +556,8 @@ export function ExtensionHub(props: {
       await refetchPackages()
       flash(
         r.reason === "reload-pending"
-          ? t("alpha.ext.localPackageInstalledPendingReload", { count: String(r.installed.length) })
-          : t("alpha.ext.localPackageInstalled", { count: String(r.installed.length) }),
+          ? t("codepuppy.ext.localPackageInstalledPendingReload", { count: String(r.installed.length) })
+          : t("codepuppy.ext.localPackageInstalled", { count: String(r.installed.length) }),
         r.reason === "reload-pending" ? "info" : "success",
       )
     } finally {
@@ -578,7 +578,7 @@ export function ExtensionHub(props: {
       if (!r.ok) {
         // AC:移除失败**必须显示失败**。`ok` 之外的任何东西都不许被读成「已移除」——
         // 包**仍然留在列表里**,错误就在卡上。
-        setPackErr((prev) => ({ ...prev, [packageId]: extensionError(r.reason, "alpha.ext.error.removePackage") }))
+        setPackErr((prev) => ({ ...prev, [packageId]: extensionError(r.reason, "codepuppy.ext.error.removePackage") }))
         return
       }
       // 留下来的部件必须说得出理由:用户点了移除却发现某个技能还在、而系统说不出为什么,
@@ -587,7 +587,7 @@ export function ExtensionHub(props: {
       setPackRemoval(retained.length > 0 ? { packageId, label, retained } : null)
       await refetchPackages()
       flash(
-        r.reloadPending ? t("alpha.ext.packageRemovedPendingReload") : t("alpha.ext.packageRemoved"),
+        r.reloadPending ? t("codepuppy.ext.packageRemovedPendingReload") : t("codepuppy.ext.packageRemoved"),
         r.reloadPending ? "info" : "success",
       )
     } finally {
@@ -605,13 +605,13 @@ export function ExtensionHub(props: {
       if (r.ok) {
         // #336 r1:projectionLag = 本次未注入(重启自愈)—— 不得宣称「当场生效」。
         flash(
-          t(r.projectionLag ? "alpha.ext.importedPendingRestart" : "alpha.ext.imported", { name: (r as { name?: string }).name ?? "" }),
+          t(r.projectionLag ? "codepuppy.ext.importedPendingRestart" : "codepuppy.ext.imported", { name: (r as { name?: string }).name ?? "" }),
           "success",
         )
         setImportDialog(null)
         setImportInput("")
       } else {
-        setImportErr(extensionError(r.reason, "alpha.ext.error.importGit"))
+        setImportErr(extensionError(r.reason, "codepuppy.ext.error.importGit"))
       }
     } finally {
       setImportBusy(false)
@@ -639,7 +639,7 @@ export function ExtensionHub(props: {
     setBusy(view.catalogId)
     try {
       if (view.verdict !== "compatible") {
-        if (view.action.kind === "update-alpha") await window.api.updater.check()
+        if (view.action.kind === "update-codepuppy") await window.api.updater.check()
         const latest = await extIpc.packageDetail(view.catalogId)
         if (latest) rememberPackageView(latest)
         return latest ?? view
@@ -661,16 +661,16 @@ export function ExtensionHub(props: {
         const preview = result.packageAuthorization
         return await new Promise<CatalogPackageViewV1>((finish) => openPackage({ view, preview, finish }))
       }
-      if (!result.ok) setErrFor(view.catalogId, extensionError(result.reason, "alpha.ext.error.installPackage"))
+      if (!result.ok) setErrFor(view.catalogId, extensionError(result.reason, "codepuppy.ext.error.installPackage"))
       // `#810`:引擎重扫失败 ⇒ 如实说「要重载」。今天 admission 的首驱恒走 authorize 臂,
       // 所以这条臂到不了;留着是因为它一旦到得了,缺这一行用户读到的就是一句谎话。
-      if (result.ok && result.reloadPending) flash(t("alpha.ext.addedPendingReload"))
+      if (result.ok && result.reloadPending) flash(t("codepuppy.ext.addedPendingReload"))
       const latest =
         !result.ok && "package" in result ? result.package : await extIpc.packageDetail(view.catalogId)
       if (latest) rememberPackageView(latest)
       return latest ?? view
     } catch (error) {
-      setErrFor(view.catalogId, t("alpha.ext.error.installUnknown"))
+      setErrFor(view.catalogId, t("codepuppy.ext.error.installUnknown"))
       return view
     } finally {
       setBusy(null)
@@ -678,7 +678,7 @@ export function ExtensionHub(props: {
   }
   const sectionLabel = () => {
     const tab = TABS.find((x) => x.key === section())
-    return tab ? t(tab.labelKey as never) : t("alpha.ext.hub")
+    return tab ? t(tab.labelKey as never) : t("codepuppy.ext.hub")
   }
 
   // The component stays mounted across open/close (only the Portal content is gated), so
@@ -716,14 +716,14 @@ export function ExtensionHub(props: {
       if (!r.ok) {
         // `#1381`:地址被拒(main 与出网围栏同一个判据)时按类别用用户的语言说;其余原样。
         const addressCode = "addressCode" in r ? r.addressCode : undefined
-        setCmErr(addressCode ? t(MCP_ADDRESS_REJECTION_KEY[addressCode]) : extensionError(r.reason, "alpha.ext.error.addConnector"))
+        setCmErr(addressCode ? t(MCP_ADDRESS_REJECTION_KEY[addressCode]) : extensionError(r.reason, "codepuppy.ext.error.addConnector"))
         return
       }
       setCustomMcpOpen(false)
       setCmName(""); setCmCommand(""); setCmUrl(""); setCmEnv(""); setCmSecrets("")
       // #395(Codex r10 M5):重加已 disabled 的自定义 MCP —— 落盘成功但不激活连接,如实提示。
       flash(
-        r.reason === "installed-disabled" ? t("alpha.ext.installedDisabled") : r.reason === "slow" ? t("alpha.ext.customMcpSlow") : t("alpha.ext.customMcpDone"),
+        r.reason === "installed-disabled" ? t("codepuppy.ext.installedDisabled") : r.reason === "slow" ? t("codepuppy.ext.customMcpSlow") : t("codepuppy.ext.customMcpDone"),
         "success",
       )
     } finally {
@@ -733,13 +733,13 @@ export function ExtensionHub(props: {
   async function runPickAgentFile() {
     setAgentErr("")
     // openFilePicker 返回 { token, files }(授权注册表);preview 经 token 读(codex H1/M2)
-    const picked = await window.api.openFilePicker({ title: t("alpha.ext.importAgentPick"), extensions: ["md"] })
+    const picked = await window.api.openFilePicker({ title: t("codepuppy.ext.importAgentPick"), extensions: ["md"] })
     if (!picked || !picked.files?.length) return
     setAgentBusy(true)
     try {
       const r = await extIpc.importAgentPreview(picked.token, picked.files[0].path)
       if (!r.ok) {
-        setAgentErr(extensionError(r.reason, "alpha.ext.error.previewAgent"))
+        setAgentErr(extensionError(r.reason, "codepuppy.ext.error.previewAgent"))
         return
       }
       setAgentPreview(r)
@@ -754,22 +754,22 @@ export function ExtensionHub(props: {
     try {
       const r = await extIpc.importAgentConfirm(pv.previewId)
       if (!r.ok) {
-        setAgentErr(extensionError(r.reason, "alpha.ext.error.importAgent"))
+        setAgentErr(extensionError(r.reason, "codepuppy.ext.error.importAgent"))
         return
       }
       setAgentPreview(null)
       await ext.requestEngineReload("imported agent")
       void ext.reloadAgents()
-      flash(t("alpha.ext.importAgentDone", { name: pv.name }), "success")
+      flash(t("codepuppy.ext.importAgentDone", { name: pv.name }), "success")
     } finally {
       setAgentBusy(false)
     }
   }
 
-  // Dedicated Portal host inside #root (mirrors alpha-sidebar.tsx), kept out of <body> so it stays
+  // Dedicated Portal host inside #root (mirrors codepuppy-sidebar.tsx), kept out of <body> so it stays
   // inside opencode's drag-region system and keeps position:fixed working.
   const host = document.createElement("div")
-  host.setAttribute("data-alpha-ext-hub", "")
+  host.setAttribute("data-codepuppy-ext-hub", "")
   document.getElementById("root")?.appendChild(host)
   onCleanup(() => host.remove())
 
@@ -957,7 +957,7 @@ export function ExtensionHub(props: {
 
   // B11:收编进全局 pushToast(一处定义,各处复用)—— toast 只报成功,失败走行内。
   const flash = (msg: string, kind: "info" | "success" | "error" = "info") => pushToast({ kind, title: msg })
-  const comingSoon = () => flash(t("alpha.ext.comingSoon"))
+  const comingSoon = () => flash(t("codepuppy.ext.comingSoon"))
 
   // ── `#733`(REQ-130):`needs_auth` 的用户可见补救入口 ───────────────────────────────────
   //
@@ -972,7 +972,7 @@ export function ExtensionHub(props: {
   const [authBusy, setAuthBusy] = createSignal<string | null>(null)
   const McpNeedsAuthAction = (cp: { name: string }) => (
     <button
-      class="alpha-ext-updbtn"
+      class="codepuppy-ext-updbtn"
       data-mcp-authorize={cp.name}
       disabled={authBusy() === cp.name}
       onClick={(ev) => {
@@ -983,11 +983,11 @@ export function ExtensionHub(props: {
           .authenticateMcp(cp.name)
           // 成败都如实说:`authenticateMcp` 已经在数据层复查过重读回来的状态,
           // 「HTTP 调通了」不算成功。
-          .then((r) => flash(r.ok ? t("alpha.ext.mcpAuthDone") : t("alpha.ext.mcpAuthFailed"), r.ok ? "success" : "error"))
+          .then((r) => flash(r.ok ? t("codepuppy.ext.mcpAuthDone") : t("codepuppy.ext.mcpAuthFailed"), r.ok ? "success" : "error"))
           .finally(() => setAuthBusy(null))
       }}
     >
-      {authBusy() === cp.name ? t("alpha.ext.mcpAuthorizing") : t("alpha.ext.mcpAuthorize")}
+      {authBusy() === cp.name ? t("codepuppy.ext.mcpAuthorizing") : t("codepuppy.ext.mcpAuthorize")}
     </button>
   )
 
@@ -1012,12 +1012,12 @@ export function ExtensionHub(props: {
     try {
       const res = await ext.updateEntry(target)
       // `#765`:具名 warning 不在这里呈现 —— `extIpc` 在 IPC 包装层已经呈现过。
-      if (res.ok) flash(t("alpha.ext.updated"), "success")
+      if (res.ok) flash(t("codepuppy.ext.updated"), "success")
       else if (isAuthzRequired(res)) {
         // #348:扩权 → 授权框(mode=update,场景化文案);调用方据返回值中止批量循环。
         setAuthz({ entry: target, mode: "update", host: "standalone", diffs: res.authorization })
         return "authz"
-      } else setUpdErr((prev) => ({ ...prev, [r.id]: extensionError(res.reason, "alpha.ext.error.update") }))
+      } else setUpdErr((prev) => ({ ...prev, [r.id]: extensionError(res.reason, "codepuppy.ext.error.update") }))
     } finally {
       setUpdBusy(null)
     }
@@ -1039,11 +1039,11 @@ export function ExtensionHub(props: {
       const res = await ext.updateEntry(target, authorization)
       if (res.ok) {
         // `#765`:同 runUpdateOne —— warning 归 `extIpc`,这里只报「已更新」。
-        flash(t("alpha.ext.updated"), "success")
+        flash(t("codepuppy.ext.updated"), "success")
         return null
       }
       if (isAuthzRequired(res)) return res.authorization
-      setUpdErr((prev) => ({ ...prev, [target.id]: extensionError(res.reason, "alpha.ext.error.update") }))
+      setUpdErr((prev) => ({ ...prev, [target.id]: extensionError(res.reason, "codepuppy.ext.error.update") }))
       return null
     } finally {
       setUpdBusy(null)
@@ -1073,12 +1073,12 @@ export function ExtensionHub(props: {
   ): Promise<ActionResult> => {
     if (!skipCheck) {
       const rc = await ext.checkRuntime(e)
-      if (!rc.ok) return { ok: false, reason: "reason" in rc ? rc.reason : t("alpha.ext.runtimeMissing", { tool: rc.missing }) }
+      if (!rc.ok) return { ok: false, reason: "reason" in rc ? rc.reason : t("codepuppy.ext.runtimeMissing", { tool: rc.missing }) }
     }
     return ext.addMcp(e, undefined, secrets, authorization, scope, selectedProjectDir)
   }
 
-  // Bundle = alpha-defined manifest: fan out to install each referenced entry by its own type
+  // Bundle = codepuppy-defined manifest: fan out to install each referenced entry by its own type
   // (ADR-014 §2). Required items count toward failure; optional ones don't.
   const installBundle = async (e: CatalogEntry, authorization?: AuthorizationConfirmationWire): Promise<ActionResult> => {
     // REQ-100 #311:bundle = 一次 main-owned 原子事务(required 全提交或全回滚),renderer 只发一次
@@ -1090,10 +1090,10 @@ export function ExtensionHub(props: {
     if (!r.ok) return r
     const okCount = r.installed?.length ?? 0
     const skippedCount = r.skipped?.length ?? 0
-    if (skippedCount > 0) setErrFor(e.id, t("alpha.ext.bundlePartialFail", { ok: okCount, fail: skippedCount }))
+    if (skippedCount > 0) setErrFor(e.id, t("codepuppy.ext.bundlePartialFail", { ok: okCount, fail: skippedCount }))
     // `#810`:重扫没成功就**不许**说「已添加」——同一句成功行改说「要重载」。
-    else if (r.reloadPending) flash(t("alpha.ext.metaItems", { count: okCount }) + " · " + t("alpha.ext.addedPendingReload"), "success")
-    else flash(t("alpha.ext.metaItems", { count: okCount }) + " · " + t("alpha.ext.added"), "success")
+    else if (r.reloadPending) flash(t("codepuppy.ext.metaItems", { count: okCount }) + " · " + t("codepuppy.ext.addedPendingReload"), "success")
+    else flash(t("codepuppy.ext.metaItems", { count: okCount }) + " · " + t("codepuppy.ext.added"), "success")
     // 具名 warning 原样带出去(数据保真);**呈现**已由 `extIpc` 在上面那次调用里做完(`#765`)。
     return { ok: true, ...(r.reloadPending ? { reason: "reload-pending" } : {}), ...(r.warning ? { warning: r.warning } : {}) }
   }
@@ -1114,7 +1114,7 @@ export function ExtensionHub(props: {
     // authorize 拦截:diff 上抛给授权框;其余失败保持行内(B11)。
     const failOr = (res: ActionResult): CapabilityDiffWire[] | null => {
       if (isAuthzRequired(res)) return res.authorization
-      setErrFor(e.id, extensionError(res.reason, "alpha.ext.error.install"))
+      setErrFor(e.id, extensionError(res.reason, "codepuppy.ext.error.install"))
       return null
     }
     // #395:第三方 fresh 安装默认关 —— 成功文案如实说「已安装但未启用」,不暗示立即可用
@@ -1128,8 +1128,8 @@ export function ExtensionHub(props: {
         kind: e.type,
         ...curationActivationFacts(statusOf(e.id), nowIso()),
       }) === "disabled"
-    const addedFlash = (fallbackKey: "alpha.ext.added" | "alpha.ext.addedLive" | "alpha.ext.pluginRestart") =>
-      flash(willBeDisabled ? t("alpha.ext.addedDisabled") : t(fallbackKey), "success")
+    const addedFlash = (fallbackKey: "codepuppy.ext.added" | "codepuppy.ext.addedLive" | "codepuppy.ext.pluginRestart") =>
+      flash(willBeDisabled ? t("codepuppy.ext.addedDisabled") : t(fallbackKey), "success")
     try {
       if (scope === "project" && e.type !== "mcp")
         return failOr({ ok: false, reason: "project-scope-mcp-only" })
@@ -1140,7 +1140,7 @@ export function ExtensionHub(props: {
         setStageFor(e.id, "checking")
         const rc = await ext.checkRuntime(e)
         if (!rc.ok) {
-          setErrFor(e.id, "reason" in rc ? t("alpha.ext.officeRuntimeMissing") : t("alpha.ext.runtimeMissing", { tool: rc.missing }))
+          setErrFor(e.id, "reason" in rc ? t("codepuppy.ext.officeRuntimeMissing") : t("codepuppy.ext.runtimeMissing", { tool: rc.missing }))
           return null
         }
         setStageFor(e.id, "installing")
@@ -1148,7 +1148,7 @@ export function ExtensionHub(props: {
         if (!res.ok) {
           // hook 返回稳定 reason code,文案在这一层映射(hook 不持有 i18n)。
           if (res.reason === "connect-failed") {
-            setErrFor(e.id, t("alpha.ext.mcpConnectFailed"))
+            setErrFor(e.id, t("codepuppy.ext.mcpConnectFailed"))
             return null
           }
           if (res.reason?.startsWith("project-scope-")) {
@@ -1157,8 +1157,8 @@ export function ExtensionHub(props: {
               t(
                 res.reason === "project-scope-missing-current-project" ||
                   res.reason === "project-scope-current-project-changed"
-                  ? "alpha.ext.installScopeProjectLost"
-                  : "alpha.ext.installScopeProjectUnavailable",
+                  ? "codepuppy.ext.installScopeProjectLost"
+                  : "codepuppy.ext.installScopeProjectUnavailable",
               ),
             )
             return null
@@ -1171,30 +1171,30 @@ export function ExtensionHub(props: {
           return null
         }
         // #395(Codex r8 M4):第三方 MCP 默认关 —— 装成功但未激活连接,如实提示「已装未启用」。
-        if (res.reason === "installed-disabled") flash(t("alpha.ext.installedDisabled"))
+        if (res.reason === "installed-disabled") flash(t("codepuppy.ext.installedDisabled"))
         // #696:main 侧引擎重载有上界(5s/5s/10s),超时落 reload-pending —— 如实说"要重启",
         // 不要报"已添加"。skill/agent 分支早有这条映射,catalog MCP 此前走不到该状态。
-        else if (res.reason === "reload-pending") flash(t("alpha.ext.addedPendingReload"))
-        else if (res.reason === "slow") flash(t("alpha.ext.installSlow"))
-        else addedFlash("alpha.ext.added")
+        else if (res.reason === "reload-pending") flash(t("codepuppy.ext.addedPendingReload"))
+        else if (res.reason === "slow") flash(t("codepuppy.ext.installSlow"))
+        else addedFlash("codepuppy.ext.added")
       } else if (e.type === "skill") {
         setStageFor(e.id, "installing")
         const res = await ext.installSkill(e, authorization)
         if (!res.ok) return failOr(res)
         // REQ-234 `#1529`:重载交给 ext 调度器(等会话空闲),「可以使用」只在该行显示可用之后才成立 —— 这里只说已添加。
-        if (res.reason === "reload-pending") flash(t("alpha.ext.addedPendingReload"))
-        else addedFlash("alpha.ext.added")
+        if (res.reason === "reload-pending") flash(t("codepuppy.ext.addedPendingReload"))
+        else addedFlash("codepuppy.ext.added")
       } else if (e.type === "agent") {
         setStageFor(e.id, "installing")
         const res = await ext.installAgentEntry(e, authorization)
         if (!res.ok) return failOr(res)
-        if (res.reason === "reload-pending") flash(t("alpha.ext.addedPendingReload"))
-        else addedFlash("alpha.ext.added")
+        if (res.reason === "reload-pending") flash(t("codepuppy.ext.addedPendingReload"))
+        else addedFlash("codepuppy.ext.added")
       } else if (e.type === "plugin") {
         setStageFor(e.id, "installing")
         const res = await ext.installPlugin(e, authorization)
         if (!res.ok) return failOr(res)
-        addedFlash("alpha.ext.pluginRestart")
+        addedFlash("codepuppy.ext.pluginRestart")
       } else if (e.type === "bundle") {
         setStageFor(e.id, "installing")
         const res = await installBundle(e, authorization)
@@ -1204,7 +1204,7 @@ export function ExtensionHub(props: {
         setStageFor(e.id, "installing")
         const res = await ext.enableCloud(e, authorization)
         if (!res.ok) return failOr(res)
-        flash(t("alpha.ext.cloudEnabled"), "success")
+        flash(t("codepuppy.ext.cloudEnabled"), "success")
       }
       return null
     } finally {
@@ -1225,7 +1225,7 @@ export function ExtensionHub(props: {
   //   mcp / bundle → 确认框(密钥采集 / 组合清单)。
   const stageInstall = (e: CatalogEntry) => {
     if (retiredCommunityOfficeFor({ id: e.id, name: e.name })) {
-      setErrFor(e.id, t("alpha.ext.retiredCommunityNoInstallHint"))
+      setErrFor(e.id, t("codepuppy.ext.retiredCommunityNoInstallHint"))
       return
     }
     if (e.type === "skill") return void addDirect(e)
@@ -1238,7 +1238,7 @@ export function ExtensionHub(props: {
   // (the user has just seen the hooks/risk sections); skill stays direct; the rest confirm.
   const stageInstallFromDetail = (e: CatalogEntry) => {
     if (retiredCommunityOfficeFor({ id: e.id, name: e.name })) {
-      setErrFor(e.id, t("alpha.ext.retiredCommunityNoInstallHint"))
+      setErrFor(e.id, t("codepuppy.ext.retiredCommunityNoInstallHint"))
       return
     }
     // 用户已在详情页看过内容/权限:skill/agent 直装;cloud 直启用(上行明细刚看过);
@@ -1263,15 +1263,15 @@ export function ExtensionHub(props: {
     const owner = packageOwnerOf().get(rowKey)
     if (!res.ok && owner) {
       setRowRefusal((prev) => ({ ...prev, [rowKey]: owner.packageId }))
-      flash(t("alpha.ext.componentOwnedByPackage", { pack: owner.label }), "error")
+      flash(t("codepuppy.ext.componentOwnedByPackage", { pack: owner.label }), "error")
       return
     }
     flash(
       res.ok
         ? res.reason === "reload-pending"
-          ? t("alpha.ext.statePendingReload")
-          : t("alpha.ext.removed")
-        : extensionError(res.reason, "alpha.ext.error.remove"),
+          ? t("codepuppy.ext.statePendingReload")
+          : t("codepuppy.ext.removed")
+        : extensionError(res.reason, "codepuppy.ext.error.remove"),
       res.ok ? (res.reason === "reload-pending" ? "info" : "success") : "error",
     )
     if (res.ok) await refetchPackages()
@@ -1349,7 +1349,7 @@ export function ExtensionHub(props: {
         await extIpc.removeLegacy(e.type as "skill" | "mcp" | "plugin", legacyName)
         ok++
       }
-      flash(fail ? `${t("alpha.ext.migrated", { count: ok })} · ${t("alpha.ext.migrateFailedCount", { count: fail })}` : t("alpha.ext.migrated", { count: ok }), fail ? "error" : "success")
+      flash(fail ? `${t("codepuppy.ext.migrated", { count: ok })} · ${t("codepuppy.ext.migrateFailedCount", { count: fail })}` : t("codepuppy.ext.migrated", { count: ok }), fail ? "error" : "success")
       await scanMigration()
     } finally {
       setMigrating(false)
@@ -1358,8 +1358,8 @@ export function ExtensionHub(props: {
 
   // ── reusable pieces ─────────────────────────────────────────────────────────────────────────
   const SecRow = (cp: { label: string; count?: number; warn?: boolean; actionLabel?: string; onAction?: () => void }) => (
-    <div class="alpha-ext-secrow">
-      <span class="alpha-ext-overline" data-warn={cp.warn ? "" : undefined}>
+    <div class="codepuppy-ext-secrow">
+      <span class="codepuppy-ext-overline" data-warn={cp.warn ? "" : undefined}>
         {cp.label}
         <Show when={cp.count !== undefined}>
           {" · "}
@@ -1367,7 +1367,7 @@ export function ExtensionHub(props: {
         </Show>
       </span>
       <Show when={cp.actionLabel && cp.onAction}>
-        <button class="alpha-ext-link" onClick={() => cp.onAction!()}>
+        <button class="codepuppy-ext-link" onClick={() => cp.onAction!()}>
           {cp.actionLabel}
         </button>
       </Show>
@@ -1386,40 +1386,40 @@ export function ExtensionHub(props: {
     const retiredNow = () => retiredCommunityOfficeFor({ id: e.id, name: e.name }) !== undefined
     return (
       <div
-        class="alpha-ext-kit alpha-ext-card"
+        class="codepuppy-ext-kit codepuppy-ext-card"
         data-clickable=""
         data-entry={e.id}
         data-dim={cp.dim ? "" : undefined}
         onClick={() => openEntryDetail(e)}
       >
-        <span class="alpha-ext-kit-ic" style={{ background: ic.color }}>
+        <span class="codepuppy-ext-kit-ic" style={{ background: ic.color }}>
           {ic.glyph}
         </span>
-        <div class="alpha-ext-kit-body">
-          <div class="alpha-ext-kit-ttl">
+        <div class="codepuppy-ext-kit-body">
+          <div class="codepuppy-ext-kit-ttl">
             <b title={e.name}>{e.displayName}</b>
           </div>
-          <div class="alpha-ext-kit-desc">{catalogDescription(e)}</div>
+          <div class="codepuppy-ext-kit-desc">{catalogDescription(e)}</div>
           {/* B11:失败行内,不裸 toast */}
           <Show when={cardErr()[e.id]}>
-            <p class="alpha-ext-card-err">{cardErr()[e.id]}</p>
+            <p class="codepuppy-ext-card-err">{cardErr()[e.id]}</p>
           </Show>
         </div>
         <Show
           when={!archivedNow() && !retiredNow()}
           fallback={
             <button
-              class="alpha-ext-add"
+              class="codepuppy-ext-add"
               disabled
-              title={t(retiredNow() ? "alpha.ext.retiredCommunityNoInstallHint" : "alpha.ext.archivedNoInstallHint")}
+              title={t(retiredNow() ? "codepuppy.ext.retiredCommunityNoInstallHint" : "codepuppy.ext.archivedNoInstallHint")}
               onClick={(ev) => ev.stopPropagation()}
             >
-              {t(retiredNow() ? "alpha.ext.retiredCommunityNoInstall" : "alpha.ext.archivedNoInstall")}
+              {t(retiredNow() ? "codepuppy.ext.retiredCommunityNoInstall" : "codepuppy.ext.archivedNoInstall")}
             </button>
           }
         >
           <button
-            class="alpha-ext-add"
+            class="codepuppy-ext-add"
             data-variant={cst().kind === "curated" ? "primary" : "ghost"}
             disabled={isBusy()}
             onClick={(ev) => {
@@ -1428,12 +1428,12 @@ export function ExtensionHub(props: {
             }}
           >
             {stage()[e.id] === "checking"
-              ? t("alpha.ext.stageChecking")
+              ? t("codepuppy.ext.stageChecking")
               : stage()[e.id] === "installing" || isBusy()
-                ? t("alpha.ext.stageInstalling")
+                ? t("codepuppy.ext.stageInstalling")
                 : e.type === "cloud"
-                  ? t("alpha.ext.enableCloud")
-                  : t("alpha.ext.add")}
+                  ? t("codepuppy.ext.enableCloud")
+                  : t("codepuppy.ext.add")}
           </button>
         </Show>
       </div>
@@ -1441,7 +1441,7 @@ export function ExtensionHub(props: {
   }
 
   const Grid = (cp: { items: CatalogEntry[]; group: string }) => (
-    <div class="alpha-ext-grid" data-group={cp.group}>
+    <div class="codepuppy-ext-grid" data-group={cp.group}>
       <For each={cp.items}>{(e) => <EntryRow e={e} />}</For>
     </div>
   )
@@ -1453,7 +1453,7 @@ export function ExtensionHub(props: {
     const needsSetup = () => view().action.kind === "resolve-prerequisite"
     return (
       <div
-        class="alpha-ext-kit"
+        class="codepuppy-ext-kit"
         data-clickable=""
         data-package-card={view().catalogId}
         data-prerequisite={view().prerequisites.status}
@@ -1462,24 +1462,24 @@ export function ExtensionHub(props: {
       >
         {/* `#1287`:发布者签名的 logo 与品牌色;两者都缺就是首字母 + 主题色。 */}
         <span
-          class="alpha-ext-kit-ic"
+          class="codepuppy-ext-kit-ic"
           style={{ background: packageListingTextV1(view().listing, "brandColor") ?? "var(--a-accent-solid)" }}
         >
           <PackageLogo listing={view().listing} fallback={view().presentation.displayName} />
         </span>
-        <div class="alpha-ext-kit-body">
-          <div class="alpha-ext-kit-ttl">
+        <div class="codepuppy-ext-kit-body">
+          <div class="codepuppy-ext-kit-ttl">
             <b title={view().catalogId}>{view().presentation.displayName}</b>
           </div>
-          <div class="alpha-ext-kit-desc" data-package-need={needsSetup() ? "" : undefined}>
+          <div class="codepuppy-ext-kit-desc" data-package-need={needsSetup() ? "" : undefined}>
             {needsSetup() ? prerequisiteNeedText(view()) : view().presentation.description}
           </div>
           <Show when={cardErr()[view().catalogId]}>
-            <p class="alpha-ext-card-err" role="alert">{cardErr()[view().catalogId]}</p>
+            <p class="codepuppy-ext-card-err" role="alert">{cardErr()[view().catalogId]}</p>
           </Show>
         </div>
         <button
-          class="alpha-ext-add"
+          class="codepuppy-ext-add"
           data-variant={needsSetup() ? "ghost" : "primary"}
           disabled={!view().action.enabled || busy() === view().catalogId}
           onClick={(event) => {
@@ -1487,7 +1487,7 @@ export function ExtensionHub(props: {
             void runPackageAction(view())
           }}
         >
-          {needsSetup() ? t("alpha.ext.rowSetup") : t("alpha.ext.add")}
+          {needsSetup() ? t("codepuppy.ext.rowSetup") : t("codepuppy.ext.add")}
         </button>
       </div>
     )
@@ -1498,17 +1498,17 @@ export function ExtensionHub(props: {
     const a = cp.a
     const ic = iconForRow(undefined, "agent", a.name)
     return (
-      <div class="alpha-ext-kit" data-clickable="" data-own-agent={a.name} onClick={() => openAgentDetail(a)}>
-        <span class="alpha-ext-kit-ic" style={{ background: ic.color }}>
+      <div class="codepuppy-ext-kit" data-clickable="" data-own-agent={a.name} onClick={() => openAgentDetail(a)}>
+        <span class="codepuppy-ext-kit-ic" style={{ background: ic.color }}>
           {ic.glyph}
         </span>
-        <div class="alpha-ext-kit-body">
-          <div class="alpha-ext-kit-ttl">
+        <div class="codepuppy-ext-kit-body">
+          <div class="codepuppy-ext-kit-ttl">
             <b title={a.name}>{a.name}</b>
           </div>
-          <div class="alpha-ext-kit-desc">{a.description ?? t("alpha.ext.agentNoDesc")}</div>
+          <div class="codepuppy-ext-kit-desc">{a.description ?? t("codepuppy.ext.agentNoDesc")}</div>
         </div>
-        <MoreMenu id={`agent:${a.name}`} items={[{ key: "settings", label: t("alpha.ext.rowSetup"), onSelect: () => openAgentDetail(a) }]} />
+        <MoreMenu id={`agent:${a.name}`} items={[{ key: "settings", label: t("codepuppy.ext.rowSetup"), onSelect: () => openAgentDetail(a) }]} />
       </div>
     )
   }
@@ -1519,31 +1519,31 @@ export function ExtensionHub(props: {
     const ic = iconForRow(entry(), "skill", cp.name)
     return (
       <div
-        class="alpha-ext-kit"
+        class="codepuppy-ext-kit"
         data-clickable={entry() ? "" : undefined}
         data-factory-skill={cp.name}
         onClick={() => entry() && openEntryDetail(entry()!)}
       >
-        <span class="alpha-ext-kit-ic" style={{ background: ic.color }}>
+        <span class="codepuppy-ext-kit-ic" style={{ background: ic.color }}>
           {ic.glyph}
         </span>
-        <div class="alpha-ext-kit-body">
-          <div class="alpha-ext-kit-ttl">
+        <div class="codepuppy-ext-kit-body">
+          <div class="codepuppy-ext-kit-ttl">
             <b title={cp.name}>{entry()?.displayName ?? cp.name}</b>
           </div>
-          <div class="alpha-ext-kit-desc">{entry() ? catalogDescription(entry()!) : t("alpha.ext.factoryBuiltin")}</div>
+          <div class="codepuppy-ext-kit-desc">{entry() ? catalogDescription(entry()!) : t("codepuppy.ext.factoryBuiltin")}</div>
         </div>
         <Show when={entry()}>
-          {(e) => <MoreMenu id={`factory:${cp.name}`} items={[{ key: "settings", label: t("alpha.ext.rowSetup"), onSelect: () => openEntryDetail(e()) }]} />}
+          {(e) => <MoreMenu id={`factory:${cp.name}`} items={[{ key: "settings", label: t("codepuppy.ext.rowSetup"), onSelect: () => openEntryDetail(e()) }]} />}
         </Show>
       </div>
     )
   }
 
   const EmptyState = (cp: { title: string; sub?: string; action?: JSX.Element }) => (
-    <div class="alpha-ext-empty-state">
-      <span class="alpha-ext-empty-ic">
-        <svg class="alpha-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ width: "24px", height: "24px" }}>
+    <div class="codepuppy-ext-empty-state">
+      <span class="codepuppy-ext-empty-ic">
+        <svg class="codepuppy-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ width: "24px", height: "24px" }}>
           <rect x="3" y="7" width="18" height="13" rx="2" stroke="currentColor" stroke-width="1.6" />
           <path d="M8 7V5a4 4 0 0 1 8 0v2" stroke="currentColor" stroke-width="1.6" />
         </svg>
@@ -1577,23 +1577,23 @@ export function ExtensionHub(props: {
     const ic = iconForRow(undefined, "bundle", packLabel(pack))
     return (
       // 来源**只从 child record 的 `origin` 读**(基线 §8 纪律 2),行上不显示,留作身份属性。
-      <div class="alpha-ext-kit" data-installed-package={pack.packageId} data-package-origin={pack.origin ?? ""}>
-        <span class="alpha-ext-kit-ic" style={{ background: ic.color }}>
+      <div class="codepuppy-ext-kit" data-installed-package={pack.packageId} data-package-origin={pack.origin ?? ""}>
+        <span class="codepuppy-ext-kit-ic" style={{ background: ic.color }}>
           {ic.glyph}
         </span>
-        <div class="alpha-ext-kit-body">
-          <div class="alpha-ext-kit-ttl">
+        <div class="codepuppy-ext-kit-body">
+          <div class="codepuppy-ext-kit-ttl">
             <b data-package-label={pack.packageId}>{packLabel(pack)}</b>
           </div>
           {/* 裁决 B 的必然连带:装完默认全关 ⇒ 不说下一步,用户按完确认拿不到任何东西。有任意一个开了就换成计数。 */}
-          <div class="alpha-ext-kit-desc">
+          <div class="codepuppy-ext-kit-desc">
             {enabledCount() === 0
-              ? t("alpha.ext.packageAllOffRow", { count: String(pack.components.length) })
-              : `${t("alpha.ext.packageSkillCount", { count: String(pack.components.length) })} · ${t("alpha.ext.packageSomeEnabled", { count: String(enabledCount()) })}`}
+              ? t("codepuppy.ext.packageAllOffRow", { count: String(pack.components.length) })
+              : `${t("codepuppy.ext.packageSkillCount", { count: String(pack.components.length) })} · ${t("codepuppy.ext.packageSomeEnabled", { count: String(enabledCount()) })}`}
           </div>
           <Show when={packErr()[pack.packageId]}>
             {(error) => (
-              <p class="alpha-ext-card-err" data-package-error={pack.packageId} role="alert">
+              <p class="codepuppy-ext-card-err" data-package-error={pack.packageId} role="alert">
                 {error()}
               </p>
             )}
@@ -1604,7 +1604,7 @@ export function ExtensionHub(props: {
           items={[
             {
               key: "remove-package",
-              label: packBusy() === pack.packageId ? t("alpha.ext.packageRemoving") : t("alpha.ext.packageActionUninstall"),
+              label: packBusy() === pack.packageId ? t("codepuppy.ext.packageRemoving") : t("codepuppy.ext.packageActionUninstall"),
               danger: true,
               disabled: packBusy() === pack.packageId,
               onSelect: () => void runRemovePackage(pack.packageId),
@@ -1620,9 +1620,9 @@ export function ExtensionHub(props: {
     <>
       <Show when={packRemoval()}>
         {(removal) => (
-          <div class="alpha-ext-verify-note" data-package-removal={removal().packageId} role="status">
-            <b>{t("alpha.ext.packageRemovedWithRetained", { pack: removal().label, count: String(removal().retained.length) })}</b>
-            <ul class="alpha-ext-package-retained">
+          <div class="codepuppy-ext-verify-note" data-package-removal={removal().packageId} role="status">
+            <b>{t("codepuppy.ext.packageRemovedWithRetained", { pack: removal().label, count: String(removal().retained.length) })}</b>
+            <ul class="codepuppy-ext-package-retained">
               <For each={removal().retained}>
                 {(entry) => (
                   <li data-package-retained={`${entry.kind}:${entry.name}`} data-retained-reason={entry.reasonCode ?? ""}>
@@ -1632,18 +1632,18 @@ export function ExtensionHub(props: {
                 )}
               </For>
             </ul>
-            <button class="alpha-ext-updbtn" data-dismiss-removal="" onClick={() => setPackRemoval(null)}>
-              {t("alpha.ext.gotIt")}
+            <button class="codepuppy-ext-updbtn" data-dismiss-removal="" onClick={() => setPackRemoval(null)}>
+              {t("codepuppy.ext.gotIt")}
             </button>
           </div>
         )}
       </Show>
       <Show when={packagesUnreadable()}>
-        <div class="alpha-ext-verify-note" data-packages-unreadable="" role="alert">
-          <b>{t("alpha.ext.packagesUnreadableTitle")}</b>
+        <div class="codepuppy-ext-verify-note" data-packages-unreadable="" role="alert">
+          <b>{t("codepuppy.ext.packagesUnreadableTitle")}</b>
           <p>{(installedPackages() as { reason: string }).reason}</p>
-          <button class="alpha-ext-updbtn" onClick={() => void refetchPackages()}>
-            {t("alpha.ext.retry")}
+          <button class="codepuppy-ext-updbtn" onClick={() => void refetchPackages()}>
+            {t("codepuppy.ext.retry")}
           </button>
         </div>
       </Show>
@@ -1713,8 +1713,8 @@ export function ExtensionHub(props: {
         : undefined,
     )
     const activationText = () => {
-      if (row.type !== "mcp") return desiredOn() ? t("alpha.ext.installed") : t("alpha.ext.notOn")
-      return row.mcp?.connected ? t("alpha.ext.enabledLive") : t("alpha.ext.disabled")
+      if (row.type !== "mcp") return desiredOn() ? t("codepuppy.ext.installed") : t("codepuppy.ext.notOn")
+      return row.mcp?.connected ? t("codepuppy.ext.enabledLive") : t("codepuppy.ext.disabled")
     }
     const isUpdatable = () =>
       updatable().some((r) => r.id === row.receipt.id && r.name === row.name && r.scope === row.receipt.scope)
@@ -1726,12 +1726,12 @@ export function ExtensionHub(props: {
       setReloadBusy(true)
       try {
         const ok = await ext.refreshEngine(row.receipt.scope === "project" ? projectDir() : undefined)
-        if (!ok) flash(t("alpha.ext.hubReloadNowRefused"), "error")
+        if (!ok) flash(t("codepuppy.ext.hubReloadNowRefused"), "error")
       } finally {
         setReloadBusy(false)
       }
     }
-    // #395:开关只给**有禁用生效面**的类型 —— mcp/agent(主权注入)、plugin(alpha.jsonc plugin[])、skill(允许集)。
+    // #395:开关只给**有禁用生效面**的类型 —— mcp/agent(主权注入)、plugin(codepuppy.jsonc plugin[])、skill(允许集)。
     // Codex r12 Major3:command/bundle 无生效面,cloud 无本地运行面;project 收据只读(Codex r1 M2 + #307);
     // #397:session-grant 行不给持久开关(main 闸拒持久启用)。
     const hasToggle = () =>
@@ -1743,27 +1743,27 @@ export function ExtensionHub(props: {
     // 一行状态:取最要紧的那一件。
     const line = (): { text: string; err?: boolean; hub?: string; detail?: string } => {
       if (row.type === "mcp" && row.mcp?.error)
-        return { text: row.mcp.repair === "reinstall-app" ? t("alpha.ext.officeRuntimeMissing") : row.mcp.error, err: true }
+        return { text: row.mcp.repair === "reinstall-app" ? t("codepuppy.ext.officeRuntimeMissing") : row.mcp.error, err: true }
       // `#733`:`needs_auth` 不是「未连接」——它是一个用户能自己修好的状态。
-      if (row.type === "mcp" && row.mcp?.needsAuth) return { text: t("alpha.ext.mcpNeedsAuth") }
+      if (row.type === "mcp" && row.mcp?.needsAuth) return { text: t("codepuppy.ext.mcpNeedsAuth") }
       if (rowSessionGrant())
-        return { text: row.type === "mcp" ? t(rowSessionView().textKey) : t("alpha.ext.sessionKindUnsupportedRow") }
+        return { text: row.type === "mcp" ? t(rowSessionView().textKey) : t("codepuppy.ext.sessionKindUnsupportedRow") }
       const hs = hubState()
       const hubText = hs ? (hs.reasonKey ? `${t(hs.textKey)} · ${t(hs.reasonKey)}` : t(hs.textKey)) : ""
       // #395:账本 disabled 的诚实呈现(未完成审核的扩展装上默认关闭)。`#1529`:停用也要一次重载才生效 ——
       // 还没生效时两件事一起说,「立即生效」照给。
       if (!desiredOn())
         return hs && hs.reloadNow
-          ? { text: `${t("alpha.ext.notOn")} · ${hubText}`, hub: hs.state, detail: hs.detail }
-          : { text: t("alpha.ext.notOn") }
+          ? { text: `${t("codepuppy.ext.notOn")} · ${hubText}`, hub: hs.state, detail: hs.detail }
+          : { text: t("codepuppy.ext.notOn") }
       if (hs && hs.state !== "available") return { text: hubText, hub: hs.state, detail: hs.detail }
       const hp = health()
       if (hp && hp.tone === "warn") return { text: t(hp.textKey) }
       // `#1563`:还在后台启动(准备中)不是「已停用」。
-      if (row.mcp?.pending) return { text: t("alpha.ext.hubReasonNotLoaded") }
+      if (row.mcp?.pending) return { text: t("codepuppy.ext.hubReasonNotLoaded") }
       // REQ-105:上游归档(禁自动更新);REQ-135:已退役的社区 Office 连接器。
-      if (officeAdvisoryFor({ id: row.receipt.id, name: row.name })) return { text: t("alpha.ext.advArchivedUnsupported") }
-      if (retiredCommunityOfficeFor({ id: row.receipt.id, name: row.name })) return { text: t("alpha.ext.retiredCommunityChip") }
+      if (officeAdvisoryFor({ id: row.receipt.id, name: row.name })) return { text: t("codepuppy.ext.advArchivedUnsupported") }
+      if (retiredCommunityOfficeFor({ id: row.receipt.id, name: row.name })) return { text: t("codepuppy.ext.retiredCommunityChip") }
       if (row.entry) return { text: catalogDescription(row.entry), hub: hs?.state }
       return { text: hs ? t(hs.textKey) : activationText(), hub: hs?.state }
     }
@@ -1778,53 +1778,53 @@ export function ExtensionHub(props: {
     // 「开启」已经是行上的那颗按钮时,菜单里不再重复一遍(移除、设置照常在菜单里)。
     const menuItems = () => [
       ...(hasToggle() && attention() !== "enable"
-        ? [{ key: isOn() ? "disable" : "enable", label: isOn() ? t("alpha.ext.turnOff") : t("alpha.ext.turnOn"), disabled: stateBusy[0](), onSelect: () => void toggleState() }]
+        ? [{ key: isOn() ? "disable" : "enable", label: isOn() ? t("codepuppy.ext.turnOff") : t("codepuppy.ext.turnOn"), disabled: stateBusy[0](), onSelect: () => void toggleState() }]
         : []),
-      { key: "remove", label: t("alpha.ext.remove"), danger: true, onSelect: () => void onUninstall(row.receipt) },
-      ...(clickable() ? [{ key: "settings", label: t("alpha.ext.rowSetup"), onSelect: openRow }] : []),
+      { key: "remove", label: t("codepuppy.ext.remove"), danger: true, onSelect: () => void onUninstall(row.receipt) },
+      ...(clickable() ? [{ key: "settings", label: t("codepuppy.ext.rowSetup"), onSelect: openRow }] : []),
     ]
     return (
       <div
-        class="alpha-ext-kit"
+        class="codepuppy-ext-kit"
         data-installed-row={rowKey}
         data-clickable={clickable() ? "" : undefined}
         onClick={() => clickable() && openRow()}
       >
-        <span class="alpha-ext-kit-ic" style={{ background: ic.color }}>
+        <span class="codepuppy-ext-kit-ic" style={{ background: ic.color }}>
           {ic.glyph}
         </span>
-        <div class="alpha-ext-kit-body">
-          <div class="alpha-ext-kit-ttl">
+        <div class="codepuppy-ext-kit-body">
+          <div class="codepuppy-ext-kit-ttl">
             <b title={row.name}>{row.displayName}</b>
           </div>
           {/* REQ-136:项目行的状态只消费 main 给的项目范围判定(name-only 的全局实时状态不许串进来)。 */}
           <Show
             when={projectMcpView()}
             fallback={
-              <div class="alpha-ext-kit-desc" data-err={line().err ? "" : undefined} data-hub-state={line().hub} title={line().detail}>
+              <div class="codepuppy-ext-kit-desc" data-err={line().err ? "" : undefined} data-hub-state={line().hub} title={line().detail}>
                 {line().text}
               </div>
             }
           >
             {(project) => (
-              <div class="alpha-ext-kit-desc" data-project-mcp-state={project().state}>
+              <div class="codepuppy-ext-kit-desc" data-project-mcp-state={project().state}>
                 {t(project().textKey)}
               </div>
             )}
           </Show>
           <Show when={updErr()[row.receipt.id]}>
-            <p class="alpha-ext-card-err">{updErr()[row.receipt.id]}</p>
+            <p class="codepuppy-ext-card-err">{updErr()[row.receipt.id]}</p>
           </Show>
           {/* `#784` 第 8 跳:单独移除被拒 ⇒ **明确拒绝 + 指向正确动作**(移除整个扩展包,在连接器页)。
               单独**停用**仍然合法,不能单独**移除**而已。 */}
           <Show when={rowRefusal()[rowKey]}>
             {(packageId) => (
-              <div class="alpha-ext-man-refusal" data-row-refusal={rowKey} role="alert">
-                <div class="alpha-ext-man-st" data-err="">
-                  {t("alpha.ext.componentOwnedByPackage", { pack: packageOwnerOf().get(rowKey)?.label ?? packageId() })}
+              <div class="codepuppy-ext-man-refusal" data-row-refusal={rowKey} role="alert">
+                <div class="codepuppy-ext-man-st" data-err="">
+                  {t("codepuppy.ext.componentOwnedByPackage", { pack: packageOwnerOf().get(rowKey)?.label ?? packageId() })}
                 </div>
                 <button
-                  class="alpha-ext-updbtn"
+                  class="codepuppy-ext-updbtn"
                   data-goto-package={packageId()}
                   onClick={(ev) => {
                     ev.stopPropagation()
@@ -1832,7 +1832,7 @@ export function ExtensionHub(props: {
                     gotoSection("connectors")
                   }}
                 >
-                  {t("alpha.ext.removeWholePackage")}
+                  {t("codepuppy.ext.removeWholePackage")}
                 </button>
               </div>
             )}
@@ -1849,21 +1849,21 @@ export function ExtensionHub(props: {
                   home/new-session 无 instance 上下文 → 禁用 + 如实提示(main 要求绝对 directory,fail-closed)。 */}
               <Show when={kind() === "session"}>
                 <button
-                  class="alpha-ext-add"
+                  class="codepuppy-ext-add"
                   data-session-toggle={rowSessionView().on ? "on" : "off"}
                   disabled={sessionBusy() === row.receipt.id || !sessionDirectory()}
-                  title={!sessionDirectory() ? t("alpha.ext.sessionNeedsProject") : undefined}
+                  title={!sessionDirectory() ? t("codepuppy.ext.sessionNeedsProject") : undefined}
                   onClick={(ev) => {
                     ev.stopPropagation()
                     void runSessionToggle({ catalogId: row.receipt.id, name: row.name, on: !rowSessionView().on })
                   }}
                 >
-                  {rowSessionView().on ? t("alpha.ext.close") : t("alpha.ext.turnOn")}
+                  {rowSessionView().on ? t("codepuppy.ext.close") : t("codepuppy.ext.turnOn")}
                 </button>
               </Show>
               <Show when={kind() === "enable"}>
                 <button
-                  class="alpha-ext-add"
+                  class="codepuppy-ext-add"
                   data-enable-row={rowKey}
                   disabled={stateBusy[0]()}
                   onClick={(ev) => {
@@ -1871,28 +1871,28 @@ export function ExtensionHub(props: {
                     void toggleState()
                   }}
                 >
-                  {t("alpha.ext.turnOn")}
+                  {t("codepuppy.ext.turnOn")}
                 </button>
               </Show>
               {/* REQ-234 `#1529`:待生效的行给一个显式「立即生效」—— 唯一会跳过「等对话空闲」的入口,悬停说清代价。 */}
               <Show when={kind() === "reload"}>
                 <button
-                  class="alpha-ext-add"
+                  class="codepuppy-ext-add"
                   data-hub-reload-now=""
-                  title={t("alpha.ext.hubReloadNowHint")}
+                  title={t("codepuppy.ext.hubReloadNowHint")}
                   disabled={reloadBusy()}
                   onClick={(ev) => {
                     ev.stopPropagation()
                     void reloadNow()
                   }}
                 >
-                  {t("alpha.ext.hubReloadNow")}
+                  {t("codepuppy.ext.hubReloadNow")}
                 </button>
               </Show>
               {/* REQ-103:审查更新(复用既有 runUpdate —— MCP 走确认框重装,其余原子更新) */}
               <Show when={kind() === "update"}>
                 <button
-                  class="alpha-ext-add"
+                  class="codepuppy-ext-add"
                   data-update-row={rowKey}
                   disabled={updBusy() === row.receipt.id}
                   onClick={(ev) => {
@@ -1900,7 +1900,7 @@ export function ExtensionHub(props: {
                     void runUpdate(row.receipt)
                   }}
                 >
-                  {updBusy() === row.receipt.id ? t("alpha.ext.adding") : t("alpha.ext.reviewUpdate")}
+                  {updBusy() === row.receipt.id ? t("codepuppy.ext.adding") : t("codepuppy.ext.reviewUpdate")}
                 </button>
               </Show>
             </>
@@ -1916,19 +1916,19 @@ export function ExtensionHub(props: {
   // 平台云连接器(非目录条目,点开专属详情)。批准稿:已登录平台时在「已安装」组,否则在「Code Puppy 云」组首行,
   // 动作是「登录」或「切换到平台模式」。
   const CloudConnectorRow = () => (
-    <div class="alpha-ext-kit" data-clickable="" data-cloud-connector="" onClick={() => setDetail({ kind: "cloud-connector" })}>
-      <span class="alpha-ext-kit-ic" style={{ background: "#5c7cbf" }}>
+    <div class="codepuppy-ext-kit" data-clickable="" data-cloud-connector="" onClick={() => setDetail({ kind: "cloud-connector" })}>
+      <span class="codepuppy-ext-kit-ic" style={{ background: "#5c7cbf" }}>
         云
       </span>
-      <div class="alpha-ext-kit-body">
-        <div class="alpha-ext-kit-ttl">
-          <b>{t("alpha.ext.cloudConnectorTitle")}</b>
+      <div class="codepuppy-ext-kit-body">
+        <div class="codepuppy-ext-kit-ttl">
+          <b>{t("codepuppy.ext.cloudConnectorTitle")}</b>
         </div>
-        <div class="alpha-ext-kit-desc">
+        <div class="codepuppy-ext-kit-desc">
           {/* `#733`:云连接器是用户看这条状态的**主要**地方 —— `needs_auth` 在这里也必须说成「需要重新登录」并给出动作。
               `#624`:恢复中不能说「需登录平台模式」—— 用户已登录。 */}
           <span
-            class="alpha-ext-cloudst"
+            class="codepuppy-ext-cloudst"
             data-st={
               cloudReady()
                 ? cloudLive()?.needsAuth
@@ -1943,13 +1943,13 @@ export function ExtensionHub(props: {
           >
             {cloudReady()
               ? cloudLive()?.needsAuth
-                ? t("alpha.ext.mcpNeedsAuth")
+                ? t("codepuppy.ext.mcpNeedsAuth")
                 : cloudLive()?.connected
-                  ? t("alpha.ext.cloudConnConnected")
-                  : t("alpha.ext.cloudConnDisconnected")
+                  ? t("codepuppy.ext.cloudConnConnected")
+                  : t("codepuppy.ext.cloudConnDisconnected")
               : cloudRecovering()
-                ? t("alpha.ext.cloudConnRecovering")
-                : t("alpha.ext.cloudConnNeedLogin")}
+                ? t("codepuppy.ext.cloudConnRecovering")
+                : t("codepuppy.ext.cloudConnNeedLogin")}
           </span>
         </div>
       </div>
@@ -1963,26 +1963,26 @@ export function ExtensionHub(props: {
               when={authState().status !== "logged-in"}
               fallback={
                 <button
-                  class="alpha-ext-add"
+                  class="codepuppy-ext-add"
                   data-variant="primary"
                   onClick={(ev) => {
                     ev.stopPropagation()
                     void window.api.auth.setMode("platform")
                   }}
                 >
-                  {t("alpha.ext.cloudSwitchMode")}
+                  {t("codepuppy.ext.cloudSwitchMode")}
                 </button>
               }
             >
               <button
-                class="alpha-ext-add"
+                class="codepuppy-ext-add"
                 data-variant="primary"
                 onClick={(ev) => {
                   ev.stopPropagation()
                   void window.api.auth.start()
                 }}
               >
-                {t("alpha.ext.cloudLoginCta")}
+                {t("codepuppy.ext.cloudLoginCta")}
               </button>
             </Show>
           </Show>
@@ -1993,7 +1993,7 @@ export function ExtensionHub(props: {
           fallback={
             <MoreMenu
               id="cloud-connector"
-              items={[{ key: "settings", label: t("alpha.ext.rowSetup"), onSelect: () => setDetail({ kind: "cloud-connector" }) }]}
+              items={[{ key: "settings", label: t("codepuppy.ext.rowSetup"), onSelect: () => setDetail({ kind: "cloud-connector" }) }]}
             />
           }
         >
@@ -2014,13 +2014,13 @@ export function ExtensionHub(props: {
     )
   })
   const factorySkillNames = createMemo(() => ext.factorySkills().filter((name) => matchesAgent({ name })))
-  const cloudConnectorMatches = () => matchesAgent({ name: t("alpha.ext.cloudConnectorTitle") })
+  const cloudConnectorMatches = () => matchesAgent({ name: t("codepuppy.ext.cloudConnectorTitle") })
   // 「添加 ▾」(批准稿 `#hub-add`,取代「导入」页签):每一项打开的都是原来那个导入窗口,窗口本身不改。
   const addItems = (): MoreMenuItem[] => [
-    { key: "folder", label: t("alpha.ext.importFolder"), disabled: importBusy(), onSelect: () => void runImportFolder() },
+    { key: "folder", label: t("codepuppy.ext.importFolder"), disabled: importBusy(), onSelect: () => void runImportFolder() },
     {
       key: "git",
-      label: t("alpha.ext.importGit"),
+      label: t("codepuppy.ext.importGit"),
       disabled: importBusy(),
       onSelect: () => {
         setImportErr("")
@@ -2030,67 +2030,67 @@ export function ExtensionHub(props: {
     },
     {
       key: "custom-connector",
-      label: t("alpha.ext.customMcp"),
+      label: t("codepuppy.ext.customMcp"),
       disabled: cmBusy(),
       onSelect: () => {
         setCmErr("")
         setCustomMcpOpen(true)
       },
     },
-    { key: "agent", label: t("alpha.ext.importAgent"), disabled: agentBusy(), onSelect: () => void runPickAgentFile() },
+    { key: "agent", label: t("codepuppy.ext.importAgent"), disabled: agentBusy(), onSelect: () => void runPickAgentFile() },
   ]
   const InstalledHead = () => (
     <SecRow
-      label={t("alpha.ext.tabInstalled")}
-      actionLabel={pageHasUpdates() ? t("alpha.ext.updateAll") : undefined}
+      label={t("codepuppy.ext.tabInstalled")}
+      actionLabel={pageHasUpdates() ? t("codepuppy.ext.updateAll") : undefined}
       onAction={() => void runUpdateAll()}
     />
   )
   const ProjectGroup = () => (
     <Show when={projectDir() && installedPage().project.length > 0}>
-      <div class="alpha-ext-scopeh">
-        {t("alpha.ext.scopeProjectGroup")} · {projectLabel(projectDir()!)}
+      <div class="codepuppy-ext-scopeh">
+        {t("codepuppy.ext.scopeProjectGroup")} · {projectLabel(projectDir()!)}
       </div>
-      <div class="alpha-ext-grid" data-group="project">
+      <div class="codepuppy-ext-grid" data-group="project">
         <For each={installedPage().project}>{(row) => <InstalledRow row={row} />}</For>
       </div>
     </Show>
   )
   const Skeleton = () => (
     <Show when={!ext.store.ready && installedAll().length === 0}>
-      <div class="alpha-ext-grid" aria-hidden="true">
-        <div class="alpha-ext-skel-row" />
-        <div class="alpha-ext-skel-row" />
+      <div class="codepuppy-ext-grid" aria-hidden="true">
+        <div class="codepuppy-ext-skel-row" />
+        <div class="codepuppy-ext-skel-row" />
       </div>
     </Show>
   )
   const Segments = () => (
-    <div class="alpha-ext-seg" role="tablist">
+    <div class="codepuppy-ext-seg" role="tablist">
       <button role="tab" data-segment="recommended" data-on={segment() === "recommended" ? "" : undefined} onClick={() => setSegment("recommended")}>
-        {t("alpha.ext.tabFeatured")}
+        {t("codepuppy.ext.tabFeatured")}
       </button>
       <button role="tab" data-segment="system" data-on={segment() === "system" ? "" : undefined} onClick={() => setSegment("system")}>
-        {t("alpha.ext.segSystem")}
+        {t("codepuppy.ext.segSystem")}
       </button>
     </div>
   )
   const NoMatches = (cp: { when: boolean }) => (
     <Show when={searching() && cp.when}>
-      <EmptyState title={t("alpha.ext.noResults")} />
+      <EmptyState title={t("codepuppy.ext.noResults")} />
     </Show>
   )
 
   return (
     <Show when={props.open()}>
       <Portal mount={host}>
-        <div class="a-ui alpha-ext-page" role="region" aria-label={t("alpha.ext.hub")}>
+        <div class="a-ui codepuppy-ext-page" role="region" aria-label={t("codepuppy.ext.hub")}>
           {/* ░░ HORIZONTAL TAB BAR(批准稿 `#hub-tabs`:连接器 / 技能 / 助手) ░░ */}
-          <nav class="alpha-ext-tabs">
-            <div class="alpha-ext-tabs-inner">
+          <nav class="codepuppy-ext-tabs">
+            <div class="codepuppy-ext-tabs-inner">
               <For each={TABS}>
                 {(item) => (
                   <button
-                    class="alpha-ext-tab"
+                    class="codepuppy-ext-tab"
                     data-tab={item.key}
                     data-active={section() === item.key ? "" : undefined}
                     onClick={() => gotoSection(item.key)}
@@ -2102,24 +2102,24 @@ export function ExtensionHub(props: {
             </div>
             <button
               ref={(element) => (hubCloseButton = element)}
-              class="alpha-ext-close"
-              title={t("alpha.ext.close")}
-              aria-label={t("alpha.ext.close")}
+              class="codepuppy-ext-close"
+              title={t("codepuppy.ext.close")}
+              aria-label={t("codepuppy.ext.close")}
               onClick={() => props.onClose()}
             >
               <Svg d="M6 6l12 12M18 6L6 18" />
             </button>
           </nav>
 
-          <div class="alpha-ext-scroll">
-            <div class="alpha-ext-center">
+          <div class="codepuppy-ext-scroll">
+            <div class="codepuppy-ext-center">
               {/* B11:mcp.status 整表读取失败此前静默空白(per-row error ≠ 整表失败) */}
               <Show when={ext.store.error}>
                 <Banner
                   kind="error"
-                  title={t("alpha.ext.loadFailed")}
-                  detail={t("alpha.ext.loadFailedDetail")}
-                  action={{ label: t("alpha.ext.retry"), onClick: () => void ext.refresh() }}
+                  title={t("codepuppy.ext.loadFailed")}
+                  detail={t("codepuppy.ext.loadFailedDetail")}
+                  action={{ label: t("codepuppy.ext.retry"), onClick: () => void ext.refresh() }}
                 />
               </Show>
 
@@ -2154,13 +2154,13 @@ export function ExtensionHub(props: {
                 }
               >
                 {/* 页头(批准稿 `#hub-connectors`):标题 + 一行副标题 + 本页搜索 +「添加 ▾」。 */}
-                <header class="alpha-ext-pagehd">
-                  <div class="alpha-ext-pagehd-t">
-                    <h1 class="alpha-ext-title">{t(currentTab().labelKey as never)}</h1>
-                    <p class="alpha-ext-sub">{t(currentTab().subKey as never)}</p>
+                <header class="codepuppy-ext-pagehd">
+                  <div class="codepuppy-ext-pagehd-t">
+                    <h1 class="codepuppy-ext-title">{t(currentTab().labelKey as never)}</h1>
+                    <p class="codepuppy-ext-sub">{t(currentTab().subKey as never)}</p>
                   </div>
-                  <div class="alpha-ext-search">
-                    <span class="alpha-ext-search-ic">
+                  <div class="codepuppy-ext-search">
+                    <span class="codepuppy-ext-search-ic">
                       <SearchIc />
                     </span>
                     <input
@@ -2170,35 +2170,35 @@ export function ExtensionHub(props: {
                       onInput={(ev) => setQuery(ev.currentTarget.value)}
                     />
                   </div>
-                  <MoreMenu id="add" trigger={`${t("alpha.ext.add")} ▾`} primary items={addItems()} />
+                  <MoreMenu id="add" trigger={`${t("codepuppy.ext.add")} ▾`} primary items={addItems()} />
                 </header>
                 {/* B11:导入失败行内呈现(文件夹 / 助手文件走这里;Git 与自定义连接器的失败落在各自窗口内) */}
                 <Show when={importErr() && !importDialog()}>
-                  <p class="alpha-ext-import-err">{importErr()}</p>
+                  <p class="codepuppy-ext-import-err">{importErr()}</p>
                 </Show>
                 <Show when={agentErr() && !agentPreview()}>
-                  <p class="alpha-ext-import-err">{agentErr()}</p>
+                  <p class="codepuppy-ext-import-err">{agentErr()}</p>
                 </Show>
                 <Show when={importBusy() && !importDialog()}>
-                  <p class="alpha-ext-dnote">{t("alpha.ext.importing")}</p>
+                  <p class="codepuppy-ext-dnote">{t("codepuppy.ext.importing")}</p>
                 </Show>
 
                 {/* ░░ 连接器 ░░ */}
                 <Show when={section() === "connectors"}>
                   {/* T3:存量迁移条(仅门控开启且检测到旧安装时;不碰用户自建内容) */}
                   <Show when={migrateCandidates().length > 0}>
-                    <div class="alpha-ext-migrate">
-                      <div class="alpha-ext-migrate-t">{t("alpha.ext.migrateTitle", { count: migrateCandidates().length })}</div>
-                      <div class="alpha-ext-migrate-sub">{t("alpha.ext.migrateSub")}</div>
-                      <button class="alpha-ext-add" data-variant="primary" disabled={migrating()} onClick={() => void runMigration()}>
-                        {migrating() ? t("alpha.ext.migrating") : t("alpha.ext.migrateAction")}
+                    <div class="codepuppy-ext-migrate">
+                      <div class="codepuppy-ext-migrate-t">{t("codepuppy.ext.migrateTitle", { count: migrateCandidates().length })}</div>
+                      <div class="codepuppy-ext-migrate-sub">{t("codepuppy.ext.migrateSub")}</div>
+                      <button class="codepuppy-ext-add" data-variant="primary" disabled={migrating()} onClick={() => void runMigration()}>
+                        {migrating() ? t("codepuppy.ext.migrating") : t("codepuppy.ext.migrateAction")}
                       </button>
                     </div>
                   </Show>
                   <InstalledHead />
                   <PackageFeedback />
                   <Skeleton />
-                  <div class="alpha-ext-grid" data-group="installed">
+                  <div class="codepuppy-ext-grid" data-group="installed">
                     <Show when={cloudReady() && cloudConnectorMatches()}>
                       <CloudConnectorRow />
                     </Show>
@@ -2218,7 +2218,7 @@ export function ExtensionHub(props: {
                       installedPage().project.length === 0
                     }
                   >
-                    <p class="alpha-ext-man-empty">{t("alpha.ext.empty")}</p>
+                    <p class="codepuppy-ext-man-empty">{t("codepuppy.ext.empty")}</p>
                   </Show>
                   <ProjectGroup />
                   <For each={connectorGroups()}>
@@ -2230,8 +2230,8 @@ export function ExtensionHub(props: {
                     )}
                   </For>
                   <Show when={browsablePackages().length > 0}>
-                    <SecRow label={t("alpha.ext.packageType")} />
-                    <div class="alpha-ext-grid" data-group="packages">
+                    <SecRow label={t("codepuppy.ext.packageType")} />
+                    <div class="codepuppy-ext-grid" data-group="packages">
                       <For each={browsablePackages()}>{(view) => <PackageRow view={view} />}</For>
                     </div>
                   </Show>
@@ -2239,8 +2239,8 @@ export function ExtensionHub(props: {
                   <Show
                     when={(!cloudReady() && cloudConnectorMatches()) || browsableCloud().length > 0 || browsableCloudPackages().length > 0}
                   >
-                    <SecRow label={t("alpha.ext.cat.cloud")} />
-                    <div class="alpha-ext-grid" data-group="cloud">
+                    <SecRow label={t("codepuppy.ext.cat.cloud")} />
+                    <div class="codepuppy-ext-grid" data-group="cloud">
                       <Show when={!cloudReady() && cloudConnectorMatches()}>
                         <CloudConnectorRow />
                       </Show>
@@ -2249,7 +2249,7 @@ export function ExtensionHub(props: {
                     </div>
                   </Show>
                   <Show when={browsable("bundle").length > 0}>
-                    <SecRow label={t("alpha.ext.tabBundles")} />
+                    <SecRow label={t("codepuppy.ext.tabBundles")} />
                     <Grid items={browsable("bundle")} group="bundles" />
                   </Show>
                   <NoMatches
@@ -2275,13 +2275,13 @@ export function ExtensionHub(props: {
                     when={installedPage().global.length > 0}
                     fallback={
                       <Show when={ext.store.ready && !searching()}>
-                        <p class="alpha-ext-man-empty">
-                          {ext.factorySkills().length > 0 ? t("alpha.ext.skillsEmptyHint") : t("alpha.ext.empty")}
+                        <p class="codepuppy-ext-man-empty">
+                          {ext.factorySkills().length > 0 ? t("codepuppy.ext.skillsEmptyHint") : t("codepuppy.ext.empty")}
                         </p>
                       </Show>
                     }
                   >
-                    <div class="alpha-ext-grid" data-group="installed">
+                    <div class="codepuppy-ext-grid" data-group="installed">
                       <For each={installedPage().global}>{(row) => <InstalledRow row={row} />}</For>
                     </div>
                   </Show>
@@ -2301,7 +2301,7 @@ export function ExtensionHub(props: {
                   {/* 「系统」= 应用自带的技能与内置命令(原「已安装 → 应用自带的功能」);隐藏 / 停用 / 自定义收进「…」。 */}
                   <Show when={segment() === "system"}>
                     <Show when={factorySkillNames().length > 0}>
-                      <div class="alpha-ext-grid" data-group="system">
+                      <div class="codepuppy-ext-grid" data-group="system">
                         <For each={factorySkillNames()}>{(name) => <FactorySkillRow name={name} />}</For>
                       </div>
                     </Show>
@@ -2323,13 +2323,13 @@ export function ExtensionHub(props: {
                     when={installedPage().global.length > 0 || ownAgentsUnreceipted().length > 0}
                     fallback={
                       <Show when={ext.store.ready && !searching()}>
-                        <p class="alpha-ext-man-empty">
-                          {ext.factorySkills().length > 0 ? t("alpha.ext.agentsEmptyHint") : t("alpha.ext.empty")}
+                        <p class="codepuppy-ext-man-empty">
+                          {ext.factorySkills().length > 0 ? t("codepuppy.ext.agentsEmptyHint") : t("codepuppy.ext.empty")}
                         </p>
                       </Show>
                     }
                   >
-                    <div class="alpha-ext-grid" data-group="installed">
+                    <div class="codepuppy-ext-grid" data-group="installed">
                       <For each={installedPage().global}>{(row) => <InstalledRow row={row} />}</For>
                       <For each={ownAgentsUnreceipted()}>{(a) => <AgentRow a={a} />}</For>
                     </div>
@@ -2367,16 +2367,16 @@ export function ExtensionHub(props: {
           onClose={() => setExpiredConfirm(null)}
           besideSidebar
           size="sm"
-          title={t("alpha.ext.expiredConfirmTitle")}
+          title={t("codepuppy.ext.expiredConfirmTitle")}
           restoreFocus={() => hubCloseButton}
-          description={<p class="alpha-ext-dnote">{t("alpha.ext.expiredConfirmBody", { date: expiredConfirmDate() })}</p>}
+          description={<p class="codepuppy-ext-dnote">{t("codepuppy.ext.expiredConfirmBody", { date: expiredConfirmDate() })}</p>}
           footer={
             <>
               <Button variant="ghost" autofocus onClick={() => setExpiredConfirm(null)}>
-                {t("alpha.ext.cancel")}
+                {t("codepuppy.ext.cancel")}
               </Button>
               <Button variant="primary" onClick={() => void proceedExpiredEnable()}>
-                {t("alpha.ext.expiredConfirmGo")}
+                {t("codepuppy.ext.expiredConfirmGo")}
               </Button>
             </>
           }
@@ -2423,25 +2423,25 @@ export function ExtensionHub(props: {
           }}
           besideSidebar
           size="sm"
-          title={t("alpha.ext.importGitTitle")}
+          title={t("codepuppy.ext.importGitTitle")}
           restoreFocus={() => hubCloseButton}
           footer={
             <>
               <Button variant="ghost" onClick={() => setImportDialog(null)}>
-                {t("alpha.ext.cancel")}
+                {t("codepuppy.ext.cancel")}
               </Button>
               <Button variant="primary" disabled={importBusy() || !importInput().trim()} onClick={() => void runImportDialog()}>
-                {importBusy() ? t("alpha.ext.importing") : t("alpha.ext.importGo")}
+                {importBusy() ? t("codepuppy.ext.importing") : t("codepuppy.ext.importGo")}
               </Button>
             </>
           }
         >
-          <div class="alpha-ext-confirm">
-            <p class="alpha-ext-confirm-desc">
-              {t("alpha.ext.importGitHint")}
+          <div class="codepuppy-ext-confirm">
+            <p class="codepuppy-ext-confirm-desc">
+              {t("codepuppy.ext.importGitHint")}
             </p>
             <input
-              class="alpha-ext-input alpha-mono"
+              class="codepuppy-ext-input codepuppy-mono"
               placeholder="https://github.com/user/skill-repo"
               value={importInput()}
               onInput={(ev) => setImportInput(ev.currentTarget.value)}
@@ -2450,7 +2450,7 @@ export function ExtensionHub(props: {
               }}
             />
             <Show when={importErr()}>
-              <p class="alpha-ext-import-err">{importErr()}</p>
+              <p class="codepuppy-ext-import-err">{importErr()}</p>
             </Show>
           </div>
         </Dialog>
@@ -2461,45 +2461,45 @@ export function ExtensionHub(props: {
           onClose={() => setCustomMcpOpen(false)}
           besideSidebar
           size="sm"
-          title={t("alpha.ext.customMcpTitle")}
+          title={t("codepuppy.ext.customMcpTitle")}
           restoreFocus={() => hubCloseButton}
           footer={
             <>
               <Button variant="ghost" onClick={() => setCustomMcpOpen(false)}>
-                {t("alpha.ext.cancel")}
+                {t("codepuppy.ext.cancel")}
               </Button>
               <Button variant="primary" disabled={cmBusy() || !cmName().trim()} onClick={() => void runAddCustomMcp()}>
-                {cmBusy() ? t("alpha.ext.importing") : t("alpha.ext.customMcpAdd")}
+                {cmBusy() ? t("codepuppy.ext.importing") : t("codepuppy.ext.customMcpAdd")}
               </Button>
             </>
           }
         >
-          <div class="alpha-ext-confirm">
-            <p class="alpha-ext-confirm-desc">{t("alpha.ext.customMcpHint")}</p>
-            <label class="alpha-ext-flabel">{t("alpha.ext.customMcpName")}
-              <input class="alpha-ext-input alpha-mono" value={cmName()} onInput={(e) => setCmName(e.currentTarget.value)} placeholder="my-connector" />
+          <div class="codepuppy-ext-confirm">
+            <p class="codepuppy-ext-confirm-desc">{t("codepuppy.ext.customMcpHint")}</p>
+            <label class="codepuppy-ext-flabel">{t("codepuppy.ext.customMcpName")}
+              <input class="codepuppy-ext-input codepuppy-mono" value={cmName()} onInput={(e) => setCmName(e.currentTarget.value)} placeholder="my-connector" />
             </label>
-            <div class="alpha-gov-mode" style={{ margin: "8px 0" }}>
-              <button data-on={cmType() === "local" ? "" : undefined} onClick={() => setCmType("local")}>{t("alpha.ext.customMcpTypeLocal")}</button>
-              <button data-on={cmType() === "remote" ? "" : undefined} onClick={() => setCmType("remote")}>{t("alpha.ext.customMcpTypeRemote")}</button>
+            <div class="codepuppy-gov-mode" style={{ margin: "8px 0" }}>
+              <button data-on={cmType() === "local" ? "" : undefined} onClick={() => setCmType("local")}>{t("codepuppy.ext.customMcpTypeLocal")}</button>
+              <button data-on={cmType() === "remote" ? "" : undefined} onClick={() => setCmType("remote")}>{t("codepuppy.ext.customMcpTypeRemote")}</button>
             </div>
             <Show when={cmType() === "local"} fallback={
-              <label class="alpha-ext-flabel">{t("alpha.ext.customMcpUrl")}
-                <input class="alpha-ext-input alpha-mono" value={cmUrl()} onInput={(e) => setCmUrl(e.currentTarget.value)} placeholder="https://mcp.example.com/sse" />
+              <label class="codepuppy-ext-flabel">{t("codepuppy.ext.customMcpUrl")}
+                <input class="codepuppy-ext-input codepuppy-mono" value={cmUrl()} onInput={(e) => setCmUrl(e.currentTarget.value)} placeholder="https://mcp.example.com/sse" />
               </label>
             }>
-              <label class="alpha-ext-flabel">{t("alpha.ext.customMcpCommand")}
-                <input class="alpha-ext-input alpha-mono" value={cmCommand()} onInput={(e) => setCmCommand(e.currentTarget.value)} placeholder="npx -y @some/mcp-server@1.0.0" />
+              <label class="codepuppy-ext-flabel">{t("codepuppy.ext.customMcpCommand")}
+                <input class="codepuppy-ext-input codepuppy-mono" value={cmCommand()} onInput={(e) => setCmCommand(e.currentTarget.value)} placeholder="npx -y @some/mcp-server@1.0.0" />
               </label>
             </Show>
-            <label class="alpha-ext-flabel">{t("alpha.ext.customMcpEnv")}
-              <textarea class="alpha-ext-input alpha-ext-textarea alpha-mono" rows="2" value={cmEnv()} onInput={(e) => setCmEnv(e.currentTarget.value)} />
+            <label class="codepuppy-ext-flabel">{t("codepuppy.ext.customMcpEnv")}
+              <textarea class="codepuppy-ext-input codepuppy-ext-textarea codepuppy-mono" rows="2" value={cmEnv()} onInput={(e) => setCmEnv(e.currentTarget.value)} />
             </label>
-            <label class="alpha-ext-flabel">{t("alpha.ext.customMcpSecrets")}
-              <textarea class="alpha-ext-input alpha-ext-textarea alpha-mono" rows="2" value={cmSecrets()} onInput={(e) => setCmSecrets(e.currentTarget.value)} />
+            <label class="codepuppy-ext-flabel">{t("codepuppy.ext.customMcpSecrets")}
+              <textarea class="codepuppy-ext-input codepuppy-ext-textarea codepuppy-mono" rows="2" value={cmSecrets()} onInput={(e) => setCmSecrets(e.currentTarget.value)} />
             </label>
             <Show when={cmErr()}>
-              <p class="alpha-ext-import-err">{cmErr()}</p>
+              <p class="codepuppy-ext-import-err">{cmErr()}</p>
             </Show>
           </div>
         </Dialog>
@@ -2515,7 +2515,7 @@ export function ExtensionHub(props: {
           onClose={() => void closeLocalPlugin()}
           besideSidebar
           size="lg"
-          title={t("alpha.ext.localPackageTitle")}
+          title={t("codepuppy.ext.localPackageTitle")}
           dismissible={!localPluginBusy()}
           restoreFocus={() => hubCloseButton}
           footer={
@@ -2523,7 +2523,7 @@ export function ExtensionHub(props: {
               {/* 安装在跑的时候「取消」**照样可点** —— 用户必须有一条出路,而 main 会如实告诉他
                   这次中止不了。把按钮禁掉等于把那条真话藏起来,用户只会以为界面卡死了。 */}
               <Button variant="ghost" onClick={() => void closeLocalPlugin()}>
-                {t("alpha.ext.cancel")}
+                {t("codepuppy.ext.cancel")}
               </Button>
               {/* 一个都装不上时**保留确认键但禁用**,并把原因写在键面上 —— 这一屏和能装的那一屏
                   是同一屏,不换成一个「知道了」把它伪装成提示框。 */}
@@ -2533,33 +2533,33 @@ export function ExtensionHub(props: {
                 onClick={() => void runConfirmLocalPlugin()}
               >
                 {localPluginBusy()
-                  ? t("alpha.ext.importing")
+                  ? t("codepuppy.ext.importing")
                   : localPlugin()?.previewId
-                    ? t("alpha.ext.localPackageConfirm", { count: String(localPlugin()?.preview.installableCount ?? 0) })
-                    : t("alpha.ext.localPackageNothingToInstall")}
+                    ? t("codepuppy.ext.localPackageConfirm", { count: String(localPlugin()?.preview.installableCount ?? 0) })
+                    : t("codepuppy.ext.localPackageNothingToInstall")}
               </Button>
             </>
           }
         >
           <Show when={localPlugin()}>
             {(pv) => (
-              <div class="alpha-ext-confirm" data-local-package-preview={pv().preview.packageId ?? ""}>
-                <p class="alpha-ext-confirm-desc">
+              <div class="codepuppy-ext-confirm" data-local-package-preview={pv().preview.packageId ?? ""}>
+                <p class="codepuppy-ext-confirm-desc">
                   <b>{pv().preview.name}</b> ·{" "}
-                  {pv().preview.version ? `v${pv().preview.version}` : t("alpha.ext.packageNoVersion")} ·{" "}
-                  {t("alpha.ext.localPackageFound", { count: String(pv().preview.limits.skillCandidates) })}
+                  {pv().preview.version ? `v${pv().preview.version}` : t("codepuppy.ext.packageNoVersion")} ·{" "}
+                  {t("codepuppy.ext.localPackageFound", { count: String(pv().preview.limits.skillCandidates) })}
                 </p>
                 {/* 这句话不是免责声明,是这个功能的实际保证水平。任何把它改写成
                     「已检查 / 已验证 / 安全」的措辞都是错的(基线 §8 纪律 3)。 */}
-                <p class="alpha-ext-verify-note" data-unreviewed="" role="note">
-                  {t("alpha.ext.localPackageUnreviewed")}
+                <p class="codepuppy-ext-verify-note" data-unreviewed="" role="note">
+                  {t("codepuppy.ext.localPackageUnreviewed")}
                 </p>
                 {/* `#784` R2:名字显示不了(超长 / 带特殊字符)⇒ 在**按确认之前**说清它会怎么显示。
                     它**不影响能不能装** —— 显示名是可选的、只管显示的;之前它能让整个事务在
                     落账那一刻回滚,那是「预览说能装、点了确认却失败」。 */}
                 <Show when={pv().preview.displayNameNotice}>
                   {(notice) => (
-                    <p class="alpha-ext-verify-note" data-display-name-notice="" role="note">
+                    <p class="codepuppy-ext-verify-note" data-display-name-notice="" role="note">
                       {notice()}
                     </p>
                   )}
@@ -2567,7 +2567,7 @@ export function ExtensionHub(props: {
                 {/* K19:重复导入必须在**按确认之前**说清。说得晚就从提示变成了失败。 */}
                 <Show when={pv().preview.duplicateImportNotice}>
                   {(notice) => (
-                    <p class="alpha-ext-verify-note" data-duplicate-import="" role="alert">
+                    <p class="codepuppy-ext-verify-note" data-duplicate-import="" role="alert">
                       {notice()}
                     </p>
                   )}
@@ -2575,24 +2575,24 @@ export function ExtensionHub(props: {
                 {/* 一个都装不上 / 结构不认识 / 超出单次导入上限 —— 三种终态共用这一条,
                     文字全部来自 main 的具名判定,不在这里重新措辞。 */}
                 <Show when={pv().preview.disposition === "blocked" || !pv().previewId}>
-                  <p class="alpha-ext-import-err" data-local-package-blocked={pv().preview.blockedReasonCode ?? pv().reasonCode ?? ""} role="alert">
-                    {extensionError(pv().headline, "alpha.ext.error.localInstall", pv().reasonCode ?? pv().preview.blockedReasonCode ?? undefined)}
+                  <p class="codepuppy-ext-import-err" data-local-package-blocked={pv().preview.blockedReasonCode ?? pv().reasonCode ?? ""} role="alert">
+                    {extensionError(pv().headline, "codepuppy.ext.error.localInstall", pv().reasonCode ?? pv().preview.blockedReasonCode ?? undefined)}
                   </p>
                 </Show>
 
                 <Show when={pv().preview.components.some((c) => c.disposition === "install")}>
                   <SecRow
-                    label={t("alpha.ext.localPackageWillInstall")}
+                    label={t("codepuppy.ext.localPackageWillInstall")}
                     count={pv().preview.components.filter((c) => c.disposition === "install").length}
                   />
-                  <div class="alpha-ext-manage">
+                  <div class="codepuppy-ext-manage">
                     <For each={pv().preview.components.filter((c) => c.disposition === "install")}>
                       {(component) => (
-                        <div class="alpha-ext-man" data-preview-component={component.dir} data-disposition="install">
-                          <div class="alpha-ext-man-body">
-                            <div class="alpha-ext-man-nm">
+                        <div class="codepuppy-ext-man" data-preview-component={component.dir} data-disposition="install">
+                          <div class="codepuppy-ext-man-body">
+                            <div class="codepuppy-ext-man-nm">
                               <b>{component.name}</b>
-                              <span class="alpha-ext-type-pill">{typeLabel("skill")}</span>
+                              <span class="codepuppy-ext-type-pill">{typeLabel("skill")}</span>
                             </div>
                           </div>
                         </div>
@@ -2603,19 +2603,19 @@ export function ExtensionHub(props: {
 
                 <Show when={pv().preview.components.some((c) => c.disposition === "skip")}>
                   <SecRow
-                    label={t("alpha.ext.localPackageWontInstall")}
+                    label={t("codepuppy.ext.localPackageWontInstall")}
                     count={pv().preview.components.filter((c) => c.disposition === "skip").length}
                   />
-                  <div class="alpha-ext-manage">
+                  <div class="codepuppy-ext-manage">
                     <For each={pv().preview.components.filter((c) => c.disposition === "skip")}>
                       {(component) => (
-                        <div class="alpha-ext-man" data-preview-component={component.dir} data-disposition="skip" data-dim="">
-                          <div class="alpha-ext-man-body">
-                            <div class="alpha-ext-man-nm">
+                        <div class="codepuppy-ext-man" data-preview-component={component.dir} data-disposition="skip" data-dim="">
+                          <div class="codepuppy-ext-man-body">
+                            <div class="codepuppy-ext-man-nm">
                               <b>{component.name}</b>
                               <For each={component.reasonCodes}>
                                 {(code) => (
-                                  <span class="alpha-ext-type-pill" data-off="" data-skip-reason={code}>
+                                  <span class="codepuppy-ext-type-pill" data-off="" data-skip-reason={code}>
                                     {code}
                                   </span>
                                 )}
@@ -2623,7 +2623,7 @@ export function ExtensionHub(props: {
                             </div>
                             {/* 逐条人话,与 reasonCodes 同序同长(main 给的,不折叠、不改写)。 */}
                             <For each={component.reasons}>
-                              {(reason) => <div class="alpha-ext-man-st">{reason}</div>}
+                              {(reason) => <div class="codepuppy-ext-man-st">{reason}</div>}
                             </For>
                           </div>
                         </div>
@@ -2633,16 +2633,16 @@ export function ExtensionHub(props: {
                 </Show>
 
                 <Show when={pv().preview.unsupportedLayouts.length > 0}>
-                  <SecRow label={t("alpha.ext.localPackageUnsupportedLayout")} count={pv().preview.unsupportedLayouts.length} />
-                  <div class="alpha-ext-manage">
+                  <SecRow label={t("codepuppy.ext.localPackageUnsupportedLayout")} count={pv().preview.unsupportedLayouts.length} />
+                  <div class="codepuppy-ext-manage">
                     <For each={pv().preview.unsupportedLayouts}>
                       {(issue) => (
-                        <div class="alpha-ext-man" data-unsupported-layout={issue.code} data-dim="">
-                          <div class="alpha-ext-man-body">
-                            <div class="alpha-ext-man-nm">
+                        <div class="codepuppy-ext-man" data-unsupported-layout={issue.code} data-dim="">
+                          <div class="codepuppy-ext-man-body">
+                            <div class="codepuppy-ext-man-nm">
                               <b>{issue.at || pv().preview.name}</b>
                             </div>
-                            <div class="alpha-ext-man-st">{issue.detail}</div>
+                            <div class="codepuppy-ext-man-st">{issue.detail}</div>
                           </div>
                         </div>
                       )}
@@ -2652,18 +2652,18 @@ export function ExtensionHub(props: {
 
                 <Show when={pv().preview.unsupportedComponentTypes.length > 0}>
                   <SecRow
-                    label={t("alpha.ext.localPackageUnsupportedTypes")}
+                    label={t("codepuppy.ext.localPackageUnsupportedTypes")}
                     count={pv().preview.unsupportedComponentTypes.length}
                   />
-                  <div class="alpha-ext-manage">
+                  <div class="codepuppy-ext-manage">
                     <For each={pv().preview.unsupportedComponentTypes}>
                       {(item) => (
-                        <div class="alpha-ext-man" data-unsupported-type={item.type} data-dim="">
-                          <div class="alpha-ext-man-body">
-                            <div class="alpha-ext-man-nm">
+                        <div class="codepuppy-ext-man" data-unsupported-type={item.type} data-dim="">
+                          <div class="codepuppy-ext-man-body">
+                            <div class="codepuppy-ext-man-nm">
                               <b>{item.at}</b>
                             </div>
-                            <div class="alpha-ext-man-st">{item.detail}</div>
+                            <div class="codepuppy-ext-man-st">{item.detail}</div>
                           </div>
                         </div>
                       )}
@@ -2672,11 +2672,11 @@ export function ExtensionHub(props: {
                 </Show>
 
                 <Show when={localPluginErr()}>
-                  <p class="alpha-ext-import-err" data-local-package-error="" role="alert">
+                  <p class="codepuppy-ext-import-err" data-local-package-error="" role="alert">
                     {localPluginErr()}
                   </p>
                 </Show>
-                <p class="alpha-ext-key-hint">{t("alpha.ext.localPackageCancelNote")}</p>
+                <p class="codepuppy-ext-key-hint">{t("codepuppy.ext.localPackageCancelNote")}</p>
               </div>
             )}
           </Show>
@@ -2688,41 +2688,41 @@ export function ExtensionHub(props: {
           onClose={() => setAgentPreview(null)}
           besideSidebar
           size="md"
-          title={t("alpha.ext.importAgentTitle")}
+          title={t("codepuppy.ext.importAgentTitle")}
           restoreFocus={() => hubCloseButton}
           footer={
             <>
               <Button variant="ghost" onClick={() => setAgentPreview(null)}>
-                {t("alpha.ext.cancel")}
+                {t("codepuppy.ext.cancel")}
               </Button>
               <Button variant="primary" disabled={agentBusy()} onClick={() => void runConfirmAgentImport()}>
-                {agentBusy() ? t("alpha.ext.importing") : t("alpha.ext.importAgentConfirm")}
+                {agentBusy() ? t("codepuppy.ext.importing") : t("codepuppy.ext.importAgentConfirm")}
               </Button>
             </>
           }
         >
           <Show when={agentPreview()}>
             {(pv) => (
-              <div class="alpha-ext-confirm">
-                <p class="alpha-ext-confirm-desc">
-                  <b>{pv().name}</b> · {t("alpha.ext.importAgentFormat")}:{pv().format}
+              <div class="codepuppy-ext-confirm">
+                <p class="codepuppy-ext-confirm-desc">
+                  <b>{pv().name}</b> · {t("codepuppy.ext.importAgentFormat")}:{pv().format}
                 </p>
-                <div class="alpha-ext-manage">
+                <div class="codepuppy-ext-manage">
                   <For each={pv().mapping}>
                     {(m) => (
-                      <div class="alpha-ext-man">
-                        <span class="alpha-ext-man-name">
+                      <div class="codepuppy-ext-man">
+                        <span class="codepuppy-ext-man-name">
                           {m.source}
-                          <span class="alpha-ext-chip">{m.target ?? t("alpha.ext.mapping.notMapped")}</span>
+                          <span class="codepuppy-ext-chip">{m.target ?? t("codepuppy.ext.mapping.notMapped")}</span>
                         </span>
                         <small style={{ "margin-left": "auto", opacity: 0.7, "max-width": "60%" }}>{m.note}</small>
                       </div>
                     )}
                   </For>
                 </div>
-                <p class="alpha-ext-key-hint">{t("alpha.ext.importAgentMapNote")}</p>
+                <p class="codepuppy-ext-key-hint">{t("codepuppy.ext.importAgentMapNote")}</p>
                 <Show when={agentErr()}>
-                  <p class="alpha-ext-import-err">{agentErr()}</p>
+                  <p class="codepuppy-ext-import-err">{agentErr()}</p>
                 </Show>
               </div>
             )}

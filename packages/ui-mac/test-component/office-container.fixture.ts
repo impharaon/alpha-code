@@ -13,7 +13,7 @@ import { join } from "node:path"
 
 const CONTAINERS = join(
   import.meta.dir,
-  "../src/renderer/alpha-ui/artifact-workbench/renderers/fixtures/office-containers",
+  "../src/renderer/codepuppy-ui/artifact-workbench/renderers/fixtures/office-containers",
 )
 
 /**

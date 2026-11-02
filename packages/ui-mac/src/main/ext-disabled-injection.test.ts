@@ -11,12 +11,12 @@ let root: string
 let saved: string | undefined
 beforeEach(() => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), "ext-inject-"))
-  saved = process.env.ALPHA_GLOBAL_DIR
-  process.env.ALPHA_GLOBAL_DIR = root
+  saved = process.env.CODEPUPPY_GLOBAL_DIR
+  process.env.CODEPUPPY_GLOBAL_DIR = root
 })
 afterEach(() => {
-  if (saved === undefined) delete process.env.ALPHA_GLOBAL_DIR
-  else process.env.ALPHA_GLOBAL_DIR = saved
+  if (saved === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+  else process.env.CODEPUPPY_GLOBAL_DIR = saved
   fs.rmSync(root, { recursive: true, force: true })
 })
 const record = (over: Partial<UpsertInput> & { name: string; kind: UpsertInput["kind"] }): void => {
@@ -72,7 +72,7 @@ describe("injectDisabledOverrides（主权注入）", () => {
     expect(config.mcp).toBeUndefined()
   })
 
-  test("账本不可读 → 跳过不抛(best-effort;alpha.jsonc 投影仍在)", () => {
+  test("账本不可读 → 跳过不抛(best-effort;codepuppy.jsonc 投影仍在)", () => {
     fs.writeFileSync(path.join(root, "installs.json"), "corrupt")
     const config: { mcp?: Record<string, unknown> } = { mcp: { keep: { type: "local" } } }
     expect(() => injectDisabledOverrides(config, { userDataPath: root, channel: "stable" })).not.toThrow()

@@ -7,26 +7,26 @@ import { fileURLToPath } from "node:url"
 // `import { app, utilityProcess } from "electron"`,而它让 server.ts 在 `bun test src` 全量里**链接期**就抛
 // (macOS:`Missing 'default' export in module …/electron/index.js`;ubuntu:`Export named 'utilityProcess'
 // not found`),于是 import 面能走到 ./server 的三个测试文件整份夭折、几十条断言一条没跑。
-// 机制与 alpha-keychain-backend.ts 头注记的同一条:bun 的 `mock.module("electron", …)` 把该模块的**导出名集合**
+// 机制与 codepuppy-keychain-backend.ts 头注记的同一条:bun 的 `mock.module("electron", …)` 把该模块的**导出名集合**
 // 钉死在测试进程里**第一个**被实例化的工厂上,后来的工厂只改值、静默丢掉新名字,而 bun 的文件顺序不是 CLI 顺序 ——
 // 于是具名导入的成败取决于**哪个无关测试文件的 electron mock 先跑**。命名空间导入不点名任何导出,恒能链接。
 import * as electronNs from "electron"
 import type { Details } from "electron"
-import { resolveExtPluginPath } from "./alpha-ext-plugin"
-import { getAuthIdentityTag } from "./alpha-auth"
+import { resolveExtPluginPath } from "./codepuppy-ext-plugin"
+import { getAuthIdentityTag } from "./codepuppy-auth"
 import { installationMachineId } from "./artifact-service"
-import { tryGetAlphaEnvironment } from "./alpha-environment"
+import { tryGetCodePuppyEnvironment } from "./codepuppy-environment"
 import { CLOUD_WEBSEARCH_DENY_ENV, LOCAL_WEBSEARCH_DENY_ENV } from "./cloud-web-search"
 import { applyEcosystemDefaultDeny } from "./ecosystem-import"
 import { resourcesRoot } from "./ext-fs-installer"
-import { secretFileRef, syncSecretFiles } from "./alpha-secret-files"
-import { customProviderSecretValues } from "./alpha-byok-keys"
+import { secretFileRef, syncSecretFiles } from "./codepuppy-secret-files"
+import { customProviderSecretValues } from "./codepuppy-byok-keys"
 import { ignoredConfigProviderBlocks, ignoredConfigRemoteMcpEntries } from "./ext-config"
 import { readCustomProviderRecords } from "./custom-provider-records"
 import { readMcpServerRecords } from "./mcp-server-records"
-import { buildAlphaModelConfig } from "./alpha-models"
-import { pinAppliedCatalog } from "./alpha-live-allowlist"
-import { loadAlphaSecrets } from "./alpha-secrets"
+import { buildCodePuppyModelConfig } from "./codepuppy-models"
+import { pinAppliedCatalog } from "./codepuppy-live-allowlist"
+import { loadCodePuppySecrets } from "./codepuppy-secrets"
 import { posixModesEffective } from "./platform"
 import { pollUntilHealthy } from "./health-poll"
 import { getLogger, rotateServerLogs, write } from "./logging"
@@ -38,9 +38,9 @@ import { DEFAULT_SERVER_URL_KEY } from "./store-keys"
 import { isEphemeralLocalServerUrl } from "../shared/ephemeral-server-url"
 import { ensureEngineScratchCwd } from "./engine-scratch-cwd"
 import { markStartupTimeline } from "./startup-timeline"
-import { alphaUserWorkspaceDir } from "./alpha-user-workspace"
+import { codepuppyUserWorkspaceDir } from "./codepuppy-user-workspace"
 import { SIDECAR_STOP_COMMAND } from "./sidecar-stop"
-import type { AlphaSidecarOutbound } from "./alpha-sidecar-messages"
+import type { CodePuppySidecarOutbound } from "./codepuppy-sidecar-messages"
 import { consumeDanglingSweepCredit } from "./dangling-sweep-latch"
 // REQ-159 `#1321`:进程围栏计划 —— fork 之前渲染 + 试编译可写集、解析原生模块路径,经 StartCommand 交给
 // sidecar 在 import 引擎之前 apply。计划做不出来 = 拒绝 fork(fail-closed,原因可读),不静默无围栏。
@@ -63,8 +63,8 @@ import { persistEgressGrantRecord, readEgressGrantRecords } from "./egress-grant
 import { askUserForEgressGrant } from "./egress-approval-dialog"
 // REQ-159 `#1322`:工作区写探针的 main 半场 —— 请求/应答簿记住在 workspace-write-probe.ts,这里只接线到子进程。
 import { createWriteProbeRequester, type WorkspaceWriteProbeResult } from "./workspace-write-probe"
-import { alphaGlobalRoot } from "./engine-config-truth"
-import { ensureUserWorkspaceDir } from "./alpha-user-workspace"
+import { codepuppyGlobalRoot } from "./engine-config-truth"
+import { ensureUserWorkspaceDir } from "./codepuppy-user-workspace"
 import { fenceWorkspaceTruthPath, readWorkspaceTruthOrThrow } from "./process-fence-workspaces"
 import { homedir } from "node:os"
 import { mkdirSync, readFileSync, realpathSync, statSync } from "node:fs"
@@ -112,7 +112,7 @@ type SpawnLocalServerOptions = {
   /**
    * REQ-159 `#1321`:围栏计划器。缺省 = 生产计划器(store 并集 + 真 sandbox-exec 试编译 + 原生模块解析);
    * 测试用假子进程时注入替身。返回 undefined 只允许在非 darwin(那里没有 seatbelt);darwin 上
-   * 生产计划器要么给出计划、要么抛出 —— 抛出 = 这一代 fork 被拒(与 alpha-secrets sync 失败同一条路)。
+   * 生产计划器要么给出计划、要么抛出 —— 抛出 = 这一代 fork 被拒(与 codepuppy-secrets sync 失败同一条路)。
    */
   planFence?: (input: { userDataPath: string; sidecarEnv: Record<string, string>; egressProxyPort: number | undefined }) => ProcessFenceStartInput | undefined
   /**
@@ -122,12 +122,12 @@ type SpawnLocalServerOptions = {
    */
   egressProxy?: () => Promise<{ port: number }>
   /**
-   * REQ-234 `#1529`:parentPort 上 `alpha.*` 窄消息的 main 侧接收者(hub-view.ts 的 createAlphaSidecarHost)。
+   * REQ-234 `#1529`:parentPort 上 `codepuppy.*` 窄消息的 main 侧接收者(hub-view.ts 的 createCodePuppySidecarHost)。
    * `receive` 与 writeProbes 并列挂在 `child.on("message")` 上;ready 之后 `attach`,子进程退出时调它返回的断开函数。
    */
-  alphaSidecar?: {
-    receive(message: unknown, post: (message: AlphaSidecarOutbound) => void): boolean
-    attach(post: (message: AlphaSidecarOutbound) => void): (reason: string) => void
+  codepuppySidecar?: {
+    receive(message: unknown, post: (message: CodePuppySidecarOutbound) => void): boolean
+    attach(post: (message: CodePuppySidecarOutbound) => void): (reason: string) => void
   }
 }
 
@@ -180,16 +180,16 @@ function ensureEgressPolicyProxy(): Promise<EgressProxyHandle> {
 
 // ── REQ-137 `#1379`:出网授权的动态半场,每代重算一次 ───────────────────────────────────
 // 静态表(network-egress-registry.ts)只装常量,装不下「用户配置了哪几家 BYOK」。放行集合因此从
-// **引擎真正会去连的那个值**派生 —— `buildAlphaModelConfig` 产出的那份 provider 表里的
-// `options.baseURL`。sidecar 那边 injectAlphaConfig 调的是**同一个函数、同一个 userDataPath**,
+// **引擎真正会去连的那个值**派生 —— `buildCodePuppyModelConfig` 产出的那份 provider 表里的
+// `options.baseURL`。sidecar 那边 injectCodePuppyConfig 调的是**同一个函数、同一个 userDataPath**,
 // 而密钥文件刚由上面那次 syncSecretFiles 落定 ⇒ 两边不可能分叉。必须排在 syncSecretFiles **之后**、
 // fork 之前:前者决定哪些 BYOK 节点存在,后者是这一代的起点。
 //
 // **输入只有这一个,配置文件刻意不读**(`#1380` R1 Blocker):provider 块住的那三条路径
-// (alpha.jsonc / `<XDG_CONFIG_HOME>/opencode` / `~/.opencode`)全在 seatbelt 的可写集里
+// (codepuppy.jsonc / `<XDG_CONFIG_HOME>/opencode` / `~/.opencode`)全在 seatbelt 的可写集里
 // (process-fence-profile.ts W2 / W6 / W16),也就是**被围栏的引擎树自己写得了**的地方。读它等于让引擎
 // 写一行 baseURL 就给自己铸一条出网通道(confused deputy)。而注入面里这三条路径只贡献 `enabled_providers`
-// 与 `options.apiKey`(alpha-models.ts 第 (3) 段),**从不贡献 baseURL** —— 判据在
+// 与 `options.apiKey`(codepuppy-models.ts 第 (3) 段),**从不贡献 baseURL** —— 判据在
 // network-egress-derived.test.ts 的 B1 那条(带对照臂)。
 // `#1392`(基线 I3):配置文件里既有的 provider 块从此被忽略(它们全在围栏的可写集里,不再参与注入面与放行集合)。
 // `#1381`:配置文件里既有的 `mcp.*` **远程**条目同样被忽略(sidecar 侧 mcp-default-deny.ts 把它们压成 enabled:false)。
@@ -197,7 +197,7 @@ function ensureEgressPolicyProxy(): Promise<EgressProxyHandle> {
 let ignoredConfigRecordsLogged = false
 function logIgnoredConfigRecordsOnce(): void {
   if (ignoredConfigRecordsLogged) return
-  if (!(tryGetAlphaEnvironment() || process.env.ALPHA_GLOBAL_DIR)) return // no environment root ⇒ no config file to speak of (unit-test forks); not latched
+  if (!(tryGetCodePuppyEnvironment() || process.env.CODEPUPPY_GLOBAL_DIR)) return // no environment root ⇒ no config file to speak of (unit-test forks); not latched
   let blocks: Array<{ file: string; ids: string[] }>
   let mcpEntries: Array<{ file: string; names: string[] }>
   try {
@@ -228,9 +228,9 @@ export function __resetIgnoredConfigProvidersLogForTests(): void {
 // mcp-servers/<env>.json)。两份经同一个准入函数派生,并成**一次**整份替换;日志一句点名全部,出处标签区分(`mcp:<name>`)。
 function refreshConfiguredEgressDestinations(userDataPath: string): void {
   try {
-    const mcpServers = tryGetAlphaEnvironment() || process.env.ALPHA_GLOBAL_DIR ? readMcpServerRecords((line) => getLogger()?.warn(line)) : []
+    const mcpServers = tryGetCodePuppyEnvironment() || process.env.CODEPUPPY_GLOBAL_DIR ? readMcpServerRecords((line) => getLogger()?.warn(line)) : []
     const accepted = setConfiguredEgressDestinations([
-      ...deriveEgressDestinations(buildAlphaModelConfig(userDataPath)?.provider),
+      ...deriveEgressDestinations(buildCodePuppyModelConfig(userDataPath)?.provider),
       ...deriveMcpEgressDestinations(mcpServers),
     ])
     getLogger()?.log(
@@ -262,23 +262,23 @@ function planProductionFence(input: { userDataPath: string; sidecarEnv: Record<s
     },
     {
       homeDir: homedir,
-      alphaGlobalRoot,
-      // `#1390`:应用状态根 = 冻结环境快照的 casBaseRoot(index.ts 在任何根消费方之前 initAlphaEnvironment,失败即 app.exit)。
-      // 没有快照就没有可信的状态根 ⇒ 不做计划(fail-closed,与别的计划失败同一条「拒 fork」路),不拿 ALPHA_GLOBAL_DIR 反推。
+      codepuppyGlobalRoot,
+      // `#1390`:应用状态根 = 冻结环境快照的 casBaseRoot(index.ts 在任何根消费方之前 initCodePuppyEnvironment,失败即 app.exit)。
+      // 没有快照就没有可信的状态根 ⇒ 不做计划(fail-closed,与别的计划失败同一条「拒 fork」路),不拿 CODEPUPPY_GLOBAL_DIR 反推。
       appStateRoot: () => {
-        const info = tryGetAlphaEnvironment()
+        const info = tryGetCodePuppyEnvironment()
         if (!info) throw new Error("process fence plan: alpha environment not initialized — the app state root is unknown, refusing to plan")
         return info.casBaseRoot
       },
       // `#1390`:必须是 `.native`(libc realpath(3),归一大小写);JS 版 realpathSync 在 Electron 内嵌 node 里只解软链。
       realpath: (p) => realpathSync.native(p),
       // `~/code-puppy` 是唯一允许 lazy 代建的目录(ADR-025);建不出来就让并集判它不存在 ⇒ planner 拒 fork。
-      defaultWorkspace: () => ensureUserWorkspaceDir() ?? alphaUserWorkspaceDir(),
-      // `#1394`:工作区清单从围栏写不到的真源读(<appData>/alpha-code-state/fence-workspaces/<env>.json,只有 main 写;
+      defaultWorkspace: () => ensureUserWorkspaceDir() ?? codepuppyUserWorkspaceDir(),
+      // `#1394`:工作区清单从围栏写不到的真源读(<appData>/codepuppy-state/fence-workspaces/<env>.json,只有 main 写;
       // index.ts 在首次 fork 之前播种 / 装载,ipc.ts 随 renderer 的 store-set 更新)。electron store 那份(opencode.global.dat)
       // 住在 W3 之下、被围栏的引擎树写得了,**从此不再喂给围栏**。缺失 / 坏 ⇒ 抛 ⇒ planner 退到默认工作区并出声。
       readWorkspaces: () => {
-        const info = tryGetAlphaEnvironment()
+        const info = tryGetCodePuppyEnvironment()
         if (!info) throw new Error("alpha environment not initialized — the workspace truth location is unknown")
         return readWorkspaceTruthOrThrow(fenceWorkspaceTruthPath(info.casBaseRoot, info.environment), { readFileSync })
       },
@@ -348,8 +348,8 @@ function captureKeylessWebSearchBaseline(source: Record<string, string | undefin
  * web search 的**本地腿**主权闸,**幂等**、可反复重算。唯一能关掉它的是 kill-switch。
  *
  * **`#1411`(REQ-1414 CODE-1,owner 2026-09-23 裁决)**:本函数此前还读一个「平台代付」判据
- * (`ALPHA_CLOUD_MCP_URL` + `ALPHA_MCP_TOKEN` 密钥文件),登录即把四个 keyless flag 覆盖写 `"0"` 并
- * 置位 `ALPHA_LOCAL_WEBSEARCH_DENY`(= ADR-009 B1「一登录就只走云端」)。那条边已被推翻:**账户
+ * (`CODEPUPPY_CLOUD_MCP_URL` + `CODEPUPPY_MCP_TOKEN` 密钥文件),登录即把四个 keyless flag 覆盖写 `"0"` 并
+ * 置位 `CODEPUPPY_LOCAL_WEBSEARCH_DENY`(= ADR-009 B1「一登录就只走云端」)。那条边已被推翻:**账户
  * 信号只决定云腿在不在** —— 本地腿 keyless、不花钱,是云腿 402 / 网络故障时唯一的退路。**本函数
  * 因此不再接 `userDataPath`**(代付判据住在那底下的密钥文件里,参数没了就没人能顺手读回来);
  * #621 那条时序(代付判据要等 `initAuthEnv`)也随之不再相干。真判据是 `server.test.ts` 的
@@ -360,10 +360,10 @@ function captureKeylessWebSearchBaseline(source: Record<string, string | undefin
  * (set-if-unset `OPENCODE_ENABLE_EXA=1`),否则一次 kill-switch 会把 keyless 永久哑掉到重启。
  */
 export function applyWebSearchSovereignty() {
-  const killSwitch = Boolean(process.env.ALPHA_WEBSEARCH_DISABLE)
+  const killSwitch = Boolean(process.env.CODEPUPPY_WEBSEARCH_DISABLE)
   // #223 R3:云侧判决与本地侧分开 —— 平台代付时云工具正是**权威**通道,只有 kill-switch 才关它。
   // 与本地那条同纪律:两个方向都写,判决由 main 在每次 fork 前同步落定,sidecar 只读不算。
-  // 不让 ext 直接读 `ALPHA_WEBSEARCH_DISABLE`:那样真值判定会在两个包里各写一份(main 用
+  // 不让 ext 直接读 `CODEPUPPY_WEBSEARCH_DISABLE`:那样真值判定会在两个包里各写一份(main 用
   // `Boolean(...)`,即 `"0"` 也算开),迟早漂移。
   if (killSwitch) process.env[CLOUD_WEBSEARCH_DENY_ENV] = "1"
   else delete process.env[CLOUD_WEBSEARCH_DENY_ENV]
@@ -401,8 +401,8 @@ export function preferAppEnv(userDataPath: string) {
       void probeShellEnvAsync(shell)
         .then((fresh) => {
           if (!fresh) return
-          // REQ-098 #301:新鲜异步探测结果同样要剥离会话级控制键(ALPHA_GLOBAL_DIR / OPENCODE_CONFIG_DIR
-          // / ALPHA_OPENCODE_HOME…),否则用户 rc 里的显式 export 会在环境冻结后覆盖 process.env,让根漂移
+          // REQ-098 #301:新鲜异步探测结果同样要剥离会话级控制键(CODEPUPPY_GLOBAL_DIR / OPENCODE_CONFIG_DIR
+          // / CODEPUPPY_OPENCODE_HOME…),否则用户 rc 里的显式 export 会在环境冻结后覆盖 process.env,让根漂移
           // 并随 fork 传进 sidecar。此前仅缓存读路径净化,fresh 路径漏网(与冻结快照形成双真源)。
           const { env: cleanFresh, stripped } = sanitizeCachedShellEnv(fresh)
           if (stripped.length > 0)
@@ -430,11 +430,11 @@ export function preferAppEnv(userDataPath: string) {
   // 用户的 Parallel flag 并默认打开 Exa,即首启就用错 provider。缓存命中路同一窗口。
   // 每次 preferAppEnv 重取(reset=true;单测逐例重置 env)。
   captureKeylessWebSearchBaseline(process.env, true)
-  // 2. Fill missing API keys (EXA_API_KEY, *_API_KEY, ...) from the alpha.env secrets file, so app
+  // 2. Fill missing API keys (EXA_API_KEY, *_API_KEY, ...) from the codepuppy.env secrets file, so app
   //    users never have to touch ~/.zshrc. Never overrides anything already set in step 1.
-  loadAlphaSecrets(userDataPath, logger)
+  loadCodePuppySecrets(userDataPath, logger)
   // 3. Desktop defaults. Logged-out/BYOK keeps keyless websearch available to every provider;
-  //    platform-pays makes cloud_web_search authoritative, while ALPHA_WEBSEARCH_DISABLE is a
+  //    platform-pays makes cloud_web_search authoritative, while CODEPUPPY_WEBSEARCH_DISABLE is a
   //    capability kill switch in every auth state. Both force-disable every specific Exa/Parallel
   //    flag, including values imported from the user's login shell.
   // B12 拍板(2026-07-05,S17 T5):实验 flag 改 set-if-unset —— 默认开(filewatcher 供「外部变更
@@ -445,7 +445,7 @@ export function preferAppEnv(userDataPath: string) {
   process.env.OPENCODE_EXPERIMENTAL_FILEWATCHER ??= "true"
   // REQ-063(ADR-024):外部生态继承 default-deny —— `.claude`/`.agents` skills 与 CLAUDE.md 不再
   // 静默进上下文(提示注入面 + 破坏单一真源心智)。set-if-unset:shell 显式 export 优先
-  // (B21 同款纪律);ALPHA_ECOSYSTEM_INHERIT=1 = 不注入两 flag,整机恢复上游继承且 alpha 不再
+  // (B21 同款纪律);CODEPUPPY_ECOSYSTEM_INHERIT=1 = 不注入两 flag,整机恢复上游继承且 alpha 不再
   // 检测/弹窗(ADR-024 §5)。同意后的进入通道 = 安装期转换导入真源根(ecosystem-import.ts,global/project 两条臂),非重开继承。
   applyEcosystemDefaultDeny(process.env)
   Object.assign(process.env, {
@@ -454,14 +454,14 @@ export function preferAppEnv(userDataPath: string) {
     // models.dev refresh times out / logs ERROR on CN networks; the bundled snapshot suffices. Default
     // off, env-overridable (set OPENCODE_DISABLE_MODELS_FETCH=0 to re-enable). (T1.7 / C4)
     OPENCODE_DISABLE_MODELS_FETCH: process.env.OPENCODE_DISABLE_MODELS_FETCH ?? "1",
-    ...(process.env.ALPHA_WEBSEARCH_DISABLE ? {} : { OPENCODE_ENABLE_EXA: process.env.OPENCODE_ENABLE_EXA ?? "1" }),
+    ...(process.env.CODEPUPPY_WEBSEARCH_DISABLE ? {} : { OPENCODE_ENABLE_EXA: process.env.OPENCODE_ENABLE_EXA ?? "1" }),
   })
   // `#1411` 起本闸只认 kill-switch(纯 env);两处都跑是因为 shell 探测/基线还原会改写那四个 flag。
   applyWebSearchSovereignty()
 }
 
 // REQ-236 §2.1-1(`#1562`):最近一次 fork 时写进 {file:} 通道的凭据名。续期热应用据它判「凭据在场性
-// 变没变」(alpha-secret-files.applyPlatformCredentialsHot);还没 fork 过 = undefined。
+// 变没变」(codepuppy-secret-files.applyPlatformCredentialsHot);还没 fork 过 = undefined。
 let forkedSecrets: ReadonlySet<string> | undefined
 
 export function forkedSecretNames(): ReadonlySet<string> | undefined {
@@ -486,23 +486,23 @@ export async function spawnLocalServer(
   try {
     // REQ-226 (`#1343`): off-catalog custom-provider keys go keychain store → key file directly (no env
     // hop): the set is "ids in the custom-provider TRUTH file ∩ ids in the store", named custom-provider--<id>.
-    // `#1392`: the ids come from `<appData>/alpha-code-state/custom-providers/<env>.json` (custom-provider-records.ts,
-    // the same reader the sidecar's buildAlphaModelConfig uses), never from alpha.jsonc. Without an alpha environment
+    // `#1392`: the ids come from `<appData>/codepuppy-state/custom-providers/<env>.json` (custom-provider-records.ts,
+    // the same reader the sidecar's buildCodePuppyModelConfig uses), never from codepuppy.jsonc. Without an alpha environment
     // root the truth location is unknown (unit-test forks) ⇒ nothing to materialize — same tolerance as the
     // registryChannel lookup further down.
     const customSecrets =
-      tryGetAlphaEnvironment() || process.env.ALPHA_GLOBAL_DIR
+      tryGetCodePuppyEnvironment() || process.env.CODEPUPPY_GLOBAL_DIR
         ? customProviderSecretValues(readCustomProviderRecords((line) => getLogger()?.warn(line)).map((record) => record.id))
         : {}
     logIgnoredConfigRecordsOnce()
     const sync = syncSecretFiles(options.userDataPath, process.env, customSecrets)
     forkedSecrets = new Set(sync.written)
-    getLogger()?.log(`alpha-secrets sync: wrote [${sync.written.join(", ")}] removed [${sync.removed.join(", ")}]`)
+    getLogger()?.log(`codepuppy-secrets sync: wrote [${sync.written.join(", ")}] removed [${sync.removed.join(", ")}]`)
     // REQ-076 T2(ADR-026 §5,C28 反 placebo):0600/0700 在 NTFS 近乎 no-op —— 密钥文件的
     // owner-only 保证在 Windows 缺位(icacls ACL 待 T3 拍板)。loud,不静默装样子。
     if (!posixModesEffective())
       getLogger()?.warn(
-        "alpha-secrets: POSIX 0600/0700 权限位在 Windows(NTFS)不生效 —— 密钥文件暂无 owner-only 保证(icacls ACL 待 REQ-076 T3 拍板)",
+        "codepuppy-secrets: POSIX 0600/0700 权限位在 Windows(NTFS)不生效 —— 密钥文件暂无 owner-only 保证(icacls ACL 待 REQ-076 T3 拍板)",
       )
   } catch (error) {
     // #223 对抗审计(2026-07-25):这里以前只 log 就继续 fork —— 登出时删不掉旧 token 文件的话,
@@ -510,12 +510,12 @@ export async function spawnLocalServer(
     // 工具;反向地,登录时写文件失败会静默回落 keyless。两者都破坏登录态迁移不变量。密钥文件是
     // fork 的前置条件而不是尽力而为的副作用 ⇒ fail closed:拒绝本次 fork,让两个调用点(boot /
     // respawn,index.ts)照既有路径发布 generation failed。
-    getLogger()?.error("alpha-secrets sync FAILED — refusing to fork the sidecar (fail closed)", error)
-    throw new Error(`alpha-secrets sync failed — sidecar fork refused: ${serializeError(error).message}`)
+    getLogger()?.error("codepuppy-secrets sync FAILED — refusing to fork the sidecar (fail closed)", error)
+    throw new Error(`codepuppy-secrets sync failed — sidecar fork refused: ${serializeError(error).message}`)
   }
 
   // REQ-237 `#1555`(方案 req236 §2.4):把当刻的已下载目录钉成「已应用目录」—— 引擎模型配置
-  // (buildAlphaModelConfig,含下面的出网放行派生)与 picker 只读这一份,刷新器在后台怎么改 LKG 都不会让
+  // (buildCodePuppyModelConfig,含下面的出网放行派生)与 picker 只读这一份,刷新器在后台怎么改 LKG 都不会让
   // 两边分叉。这里只读写本机文件,不碰网络:目录请求挂死不影响 fork。写失败与密钥文件同一条 fail-closed 路径。
   try {
     pinAppliedCatalog(options.userDataPath, options.generation ?? 0)
@@ -528,45 +528,45 @@ export async function spawnLocalServer(
   // 不再依赖 syncSecretFiles 的落盘结果;留在这里是因为它必须晚于 preferAppEnv 的基线还原。
   applyWebSearchSovereignty()
 
-  // B6(=G1):解析 @alpha-code/ext bundle 路径,经 StartCommand 传 sidecar(不走 env,免动 A6 白名单)。
-  // 缺文件 loud warn(anti-B11:否则表现为「codepuppy_ping 工具静默不在」);ALPHA_EXT_DISABLE=1 静默跳过。
+  // B6(=G1):解析 @codepuppy/ext bundle 路径,经 StartCommand 传 sidecar(不走 env,免动 A6 白名单)。
+  // 缺文件 loud warn(anti-B11:否则表现为「codepuppy_ping 工具静默不在」);CODEPUPPY_EXT_DISABLE=1 静默跳过。
   const ext = resolveExtPluginPath({
     packaged: electronNs.app.isPackaged,
     resourcesPath: process.resourcesPath,
     moduleDir: dirname(fileURLToPath(import.meta.url)),
-    disabled: process.env.ALPHA_EXT_DISABLE === "1",
+    disabled: process.env.CODEPUPPY_EXT_DISABLE === "1",
     exists: existsSync,
   })
-  if (ext.path) getLogger()?.log("alpha-ext: loading plugin bundle", { path: ext.path })
-  else if (ext.reason?.includes("ALPHA_EXT_DISABLE")) getLogger()?.log("alpha-ext: disabled by ALPHA_EXT_DISABLE")
-  else getLogger()?.warn(`alpha-ext: NOT loaded — ${ext.reason}`)
+  if (ext.path) getLogger()?.log("codepuppy-ext: loading plugin bundle", { path: ext.path })
+  else if (ext.reason?.includes("CODEPUPPY_EXT_DISABLE")) getLogger()?.log("codepuppy-ext: disabled by CODEPUPPY_EXT_DISABLE")
+  else getLogger()?.warn(`codepuppy-ext: NOT loaded — ${ext.reason}`)
 
   // REQ-065:出厂技能 reconcile 已上移至 boot(index.ts,truth reconcile 之前)—— skills.paths
-  // 直指 app 资源、alphaGlobalRoot() 不再落出厂链;fork 前无需重复(app 路径仅跨重启变化)。
+  // 直指 app 资源、codepuppyGlobalRoot() 不再落出厂链;fork 前无需重复(app 路径仅跨重启变化)。
 
   // REQ-159:围栏计划在 fork **之前**做(试编译失败 / 模块缺失 / 默认工作区不在 ⇒ 抛 ⇒ 这一代被拒,
-  // 与上面 alpha-secrets sync 失败同一条 fail-closed 路径)。env 先算好:计划要读的 XDG_* / HOME
+  // 与上面 codepuppy-secrets sync 失败同一条 fail-closed 路径)。env 先算好:计划要读的 XDG_* / HOME
   // 必须是 sidecar 将拿到的那一份,不是 main 自己的 process.env。
   // REQ-236 §2.1-4(`#1562`):平台模型请求的凭据只从这份文件现读(ext `chat.headers`),注入的 provider
   // 配置只有占位值。值是 `{file:}` 引用,不是凭据;经 sidecar env 白名单(sidecar-env.ts)进引擎进程。
-  process.env.ALPHA_PLATFORM_AUTH_REF = secretFileRef(options.userDataPath, "ALPHA_API_KEY")
+  process.env.CODEPUPPY_PLATFORM_AUTH_REF = secretFileRef(options.userDataPath, "CODEPUPPY_API_KEY")
   const sidecarEnv = createSidecarEnv()
   // uv's default ~/.cache/uv is outside the fence; keep Office dependencies under the existing W3 root.
   sidecarEnv.UV_CACHE_DIR = join(options.userDataPath, "uv-cache")
-  // #1565:引擎在四个文档工具连上之前,用这份随包清单给出它们的声明定义(packages/opencode/src/mcp/alpha-first-party-mcp.ts)。
+  // #1565:引擎在四个文档工具连上之前,用这份随包清单给出它们的声明定义(packages/opencode/src/mcp/codepuppy-first-party-mcp.ts)。
   // 与写策略(ext-mcp-policy)一样按资源根的 realpath 解析,配置里那四条命令才能逐 token 对上。路径不是秘密。
-  sidecarEnv.ALPHA_OFFICE_MCP_MANIFEST = join(realpathSync(resourcesRoot()), "office-mcp", "tools.json")
+  sidecarEnv.CODEPUPPY_OFFICE_MCP_MANIFEST = join(realpathSync(resourcesRoot()), "office-mcp", "tools.json")
   // REQ-236 `#1575`(方案 §2.4 第 4 条):工具策略按登录账户分区。引擎读它选分区,缺席 = anonymous(未登录)。
   // 值是「本安装随机标识 + 账户标记」的哈希,不是凭据:这个变量会被第三方 MCP / LSP / shell 子进程继承,混入安装标识后
   // 同一账户在另一台安装上是另一个值,不能据它跨安装关联。只由这里按当刻登录态写 —— 不进白名单,shell 导出的同名变量
-  // 选不了分区;账户或安装标识取不到都不写。登录、登出、换号都会重新 fork(alpha-auth 的 identity-change),fork 时写一次即可。
+  // 选不了分区;账户或安装标识取不到都不写。登录、登出、换号都会重新 fork(codepuppy-auth 的 identity-change),fork 时写一次即可。
   const policyAccount = getAuthIdentityTag()
   const installation = installationMachineId()
   if (policyAccount && installation)
-    sidecarEnv.ALPHA_POLICY_ACCOUNT = `acct:${createHash("sha256").update(`${installation}:${policyAccount}`).digest("hex")}`
+    sidecarEnv.CODEPUPPY_POLICY_ACCOUNT = `acct:${createHash("sha256").update(`${installation}:${policyAccount}`).digest("hex")}`
   // #1578 AC5:随包扩展插件的清单(ext 构建写在 plugin.js 旁边:模块 sha256 + 自有工具名)。引擎只信这条 env 指的那份,
-  // 不看被装载插件旁边有什么(packages/opencode/src/plugin/alpha-bundled-plugin.ts)。路径不是秘密。
-  if (ext.path) sidecarEnv.ALPHA_EXT_BUNDLED_MANIFEST = join(dirname(ext.path), "bundled-tools.json")
+  // 不看被装载插件旁边有什么(packages/opencode/src/plugin/codepuppy-bundled-plugin.ts)。路径不是秘密。
+  if (ext.path) sidecarEnv.CODEPUPPY_EXT_BUNDLED_MANIFEST = join(dirname(ext.path), "bundled-tools.json")
   // REQ-137 `#1379`:这一代的 BYOK 放行集合。平台无关(代理只在 darwin 起,但「放行集合 = 这一代的配置」
   // 这条不该长两个样子),排在密钥文件落定之后、fork 之前。
   refreshConfiguredEgressDestinations(options.userDataPath)
@@ -594,7 +594,7 @@ export async function spawnLocalServer(
 
   const sidecar = join(dirname(fileURLToPath(import.meta.url)), "sidecar.js")
   rotateServerLogs()
-  const runtimeGeneration = tryGetAlphaEnvironment() ? restoreCommittedOfficialConnectors() : []
+  const runtimeGeneration = tryGetCodePuppyEnvironment() ? restoreCommittedOfficialConnectors() : []
   const child = (() => {
     try {
       return (options.fork ?? electronNs.utilityProcess.fork)(sidecar, [], {
@@ -623,19 +623,19 @@ export async function spawnLocalServer(
   // REQ-159 `#1322`:探针请求簿。sidecar 收到 write-probe 命令即同步回一条 write-probe-result;这里按 id 对号。
   // 子进程退出 ⇒ 在途请求全部答 unknown(不是「拒绝」,也不是「可写」)。
   const writeProbes = createWriteProbeRequester((command) => child.postMessage(command))
-  // REQ-234 `#1529`:`alpha.*` 分发与探针应答并列;不是本族的消息原样交还(返回 false)。
-  const postAlpha = (message: AlphaSidecarOutbound) => child.postMessage(message)
+  // REQ-234 `#1529`:`codepuppy.*` 分发与探针应答并列;不是本族的消息原样交还(返回 false)。
+  const postCodePuppy = (message: CodePuppySidecarOutbound) => child.postMessage(message)
   child.on("message", (message: unknown) => {
     if (writeProbes.receive(message)) return
-    options.alphaSidecar?.receive(message, postAlpha)
+    options.codepuppySidecar?.receive(message, postCodePuppy)
   })
-  let detachAlpha: ((reason: string) => void) | undefined
+  let detachCodePuppy: ((reason: string) => void) | undefined
   child.once("exit", (code) => {
     clearOfficialConnectorRuntimeOnExit(runtimeGeneration)
     exited = true
     electronNs.app.off("child-process-gone", onProcessGone)
     writeProbes.close(`sidecar exited with code ${code}`)
-    detachAlpha?.(`sidecar exited with code ${code}`)
+    detachCodePuppy?.(`sidecar exited with code ${code}`)
     options.onExit?.(code)
     exit.resolve(code)
   })
@@ -700,9 +700,9 @@ export async function spawnLocalServer(
     child.on("exit", onExit)
     refreshTimeout()
     // #397:override 注入的 catalog 通道在 MAIN 侧从冻结快照取好随命令传入 —— sidecar 进程从不
-    // initAlphaEnvironment,自取必抛且曾整体炸掉 alpha 配置注入(2026-07-23)。boot 序保证 spawn 前
+    // initCodePuppyEnvironment,自取必抛且曾整体炸掉 alpha 配置注入(2026-07-23)。boot 序保证 spawn 前
     // 已 init;tryGet 仅为纯单测兜底(缺省 → sidecar loud 跳过 override 注入,boot reconcile 兜 fail-closed)。
-    const registryChannel = tryGetAlphaEnvironment()?.registryChannel
+    const registryChannel = tryGetCodePuppyEnvironment()?.registryChannel
     if (!registryChannel)
       getLogger()?.warn(
         "alpha environment not initialized at sidecar spawn — disabled-override injection will be skipped",
@@ -713,7 +713,7 @@ export async function spawnLocalServer(
       port,
       password,
       userDataPath: options.userDataPath,
-      initialDirectory: alphaUserWorkspaceDir(),
+      initialDirectory: codepuppyUserWorkspaceDir(),
       extPluginPath: ext.path,
       registryChannel,
       // REQ-159:profile 全文 + 模块路径。sidecar 在 import 引擎之前 apply;缺席(darwin)即拒绝启动。
@@ -724,7 +724,7 @@ export async function spawnLocalServer(
     throw error
   })
   // REQ-234 `#1529`:ready 之后接上重载请求的发送口(重发 main 记录里仍在途的 generation)。
-  if (!exited) detachAlpha = options.alphaSidecar?.attach(postAlpha)
+  if (!exited) detachCodePuppy = options.codepuppySidecar?.attach(postCodePuppy)
 
   const wait = (async () => {
     const url = `http://${hostname}:${port}`

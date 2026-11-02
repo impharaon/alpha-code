@@ -17,7 +17,7 @@ export const CATALOG_PACKAGE_REASON_CODES = [
 
 export type CatalogPackageReasonCodeV1 = (typeof CATALOG_PACKAGE_REASON_CODES)[number]
 export type CatalogPackageVerdictV1 = "compatible" | "update-required" | "blocked"
-export type CatalogPackageActionKindV1 = "install" | "update-alpha" | "resolve-prerequisite" | "none"
+export type CatalogPackageActionKindV1 = "install" | "update-codepuppy" | "resolve-prerequisite" | "none"
 
 export type CatalogPackageActionV1 = {
   kind: CatalogPackageActionKindV1

@@ -27,8 +27,8 @@ Bun.plugin({
   },
 })
 
-const runtime = await import("../src/renderer/alpha-ui/session-workspace/session-workspace-test-runtime")
-const terminalPanelModule = await import("../src/renderer/alpha-ui/session-rail/terminal/terminal-rail-panel")
+const runtime = await import("../src/renderer/codepuppy-ui/session-workspace/session-workspace-test-runtime")
+const terminalPanelModule = await import("../src/renderer/codepuppy-ui/session-rail/terminal/terminal-rail-panel")
 const disposers: Array<() => void> = []
 
 beforeEach(() => {
@@ -39,7 +39,7 @@ beforeEach(() => {
 
 afterEach(() => {
   // #905:崩溃探针是模块级全局信号,任一用例断言失败于复位前抛出都会漏到下一条用例。
-  window.__alphaCrashProbe?.(null)
+  window.__codepuppyCrashProbe?.(null)
   disposers
     .splice(0)
     .reverse()
@@ -83,21 +83,21 @@ describe("REQ-125 session workspace real Solid mount", () => {
     const host = mount()
     await flush()
 
-    expect(host.querySelectorAll("[data-alpha-session-workspace]")).toHaveLength(1)
-    expect(host.querySelectorAll("[data-alpha-session-workspace-topbar]")).toHaveLength(1)
+    expect(host.querySelectorAll("[data-codepuppy-session-workspace]")).toHaveLength(1)
+    expect(host.querySelectorAll("[data-codepuppy-session-workspace-topbar]")).toHaveLength(1)
     // #574 单一顶栏:会话工作区全 DOM 恰一个 header,且它就是拖拽条(topbar 标记落在
     // header 元素本身,session-workspace.css 以此承接 app-region: drag)。
     expect(document.querySelectorAll("header")).toHaveLength(1)
-    expect(host.querySelector("header")!.hasAttribute("data-alpha-session-workspace-topbar")).toBe(true)
-    expect(host.querySelector("[data-alpha-session-timeline-host]")).not.toBeNull()
-    expect(host.querySelector("[data-alpha-session-composer-dock]")).not.toBeNull()
-    expect(host.querySelector("[data-alpha-session-composer-host]")).not.toBeNull()
+    expect(host.querySelector("header")!.hasAttribute("data-codepuppy-session-workspace-topbar")).toBe(true)
+    expect(host.querySelector("[data-codepuppy-session-timeline-host]")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-session-composer-dock]")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-session-composer-host]")).not.toBeNull()
     // REQ-125 C7 直挂:composer 内容渲染在停靠位子树内(无 Portal 逃逸,body 下无游离节点)。
-    const composerStub = host.querySelector("[data-alpha-session-composer-stub]")
+    const composerStub = host.querySelector("[data-codepuppy-session-composer-stub]")
     expect(composerStub).not.toBeNull()
-    expect(composerStub!.closest("[data-alpha-session-composer-host]")).not.toBeNull()
-    expect(document.querySelectorAll("[data-alpha-session-composer-stub]")).toHaveLength(1)
-    expect(host.querySelector("[data-alpha-session-rail-host]")?.getAttribute("data-alpha-session-rail-panel")).toBe(
+    expect(composerStub!.closest("[data-codepuppy-session-composer-host]")).not.toBeNull()
+    expect(document.querySelectorAll("[data-codepuppy-session-composer-stub]")).toHaveLength(1)
+    expect(host.querySelector("[data-codepuppy-session-rail-host]")?.getAttribute("data-codepuppy-session-rail-panel")).toBe(
       "review",
     )
     expect(host.querySelector("[data-component]")).toBeNull()
@@ -111,16 +111,16 @@ describe("REQ-125 session workspace real Solid mount", () => {
     buttons[0]!.click()
     await flush()
     expect(buttons[0]!.getAttribute("aria-pressed")).toBe("true")
-    expect(host.querySelector("[data-alpha-session-rail-panel='terminal']")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-session-rail-panel='terminal']")).not.toBeNull()
 
     buttons[1]!.click()
     await flush()
-    expect(host.querySelector("[data-alpha-session-rail-host]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-session-rail-host]")).toBeNull()
     expect(buttons[1]!.getAttribute("aria-expanded")).toBe("false")
 
     buttons[1]!.click()
     await flush()
-    expect(host.querySelector("[data-alpha-session-rail-panel='terminal']")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-session-rail-panel='terminal']")).not.toBeNull()
   })
 
   test("terminal panel open/close hands focus through the channel (#554, upstream toggle semantics)", async () => {
@@ -144,7 +144,7 @@ describe("REQ-125 session workspace real Solid mount", () => {
     // 经右栏总开关重开(lastPanel = terminal):同样走请求端。
     buttons[1]!.click()
     await flush()
-    expect(host.querySelector("[data-alpha-session-rail-panel='terminal']")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-session-rail-panel='terminal']")).not.toBeNull()
     expect(runtime.terminalChannelCalls).toEqual(["requestFocus:pty_1", "cancelFocus", "requestFocus:pty_1"])
   })
 
@@ -153,7 +153,7 @@ describe("REQ-125 session workspace real Solid mount", () => {
   test("topbar status follows the timeline wait signal; idle renders no status", async () => {
     const host = mount()
     await flush()
-    const status = () => host.querySelector<HTMLElement>("[data-alpha-session-status]")
+    const status = () => host.querySelector<HTMLElement>("[data-codepuppy-session-status]")
     const running = (retrying?: true) =>
       runtime.setSessionWorkspaceSnapshot({
         identity: { serverKey: "sidecar", directory: "/tmp/workspace", sessionID: "ses_running" },
@@ -164,7 +164,7 @@ describe("REQ-125 session workspace real Solid mount", () => {
       })
 
     expect(status()).toBeNull()
-    expect(host.querySelector("[data-alpha-session-workspace-topbar]")!.textContent).not.toContain("空闲")
+    expect(host.querySelector("[data-codepuppy-session-workspace-topbar]")!.textContent).not.toContain("空闲")
     // 空闲时等待信号残留也不说(与时间线一致:只有活跃回合才「在等你」)。
     runtime.setSessionWorkspaceTurnWait("approval")
     await flush()
@@ -173,24 +173,24 @@ describe("REQ-125 session workspace real Solid mount", () => {
     running()
     runtime.setSessionWorkspaceTurnWait(undefined)
     await flush()
-    expect({ kind: status()!.dataset.alphaSessionStatus, text: status()!.textContent }).toEqual({ kind: "running", text: "正在生成" })
+    expect({ kind: status()!.dataset.codepuppySessionStatus, text: status()!.textContent }).toEqual({ kind: "running", text: "正在生成" })
 
     expect(status()!.classList.contains("a-swk-status--running")).toBe(true)
 
     runtime.setSessionWorkspaceTurnWait("approval")
     await flush()
-    expect({ kind: status()!.dataset.alphaSessionStatus, text: status()!.textContent }).toEqual({ kind: "approval", text: "等你批准" })
+    expect({ kind: status()!.dataset.codepuppySessionStatus, text: status()!.textContent }).toEqual({ kind: "approval", text: "等你批准" })
     // 批准稿 #conv-header:「等你」态是警示色(不是生成中的强调色)。
     expect([...status()!.classList].filter((name) => name.startsWith("a-swk-status--"))).toEqual(["a-swk-status--wait"])
 
     runtime.setSessionWorkspaceTurnWait("question")
     await flush()
-    expect({ kind: status()!.dataset.alphaSessionStatus, text: status()!.textContent }).toEqual({ kind: "question", text: "等你回答" })
+    expect({ kind: status()!.dataset.codepuppySessionStatus, text: status()!.textContent }).toEqual({ kind: "question", text: "等你回答" })
 
     runtime.setSessionWorkspaceTurnWait(undefined)
     running(true)
     await flush()
-    expect({ kind: status()!.dataset.alphaSessionStatus, text: status()!.textContent }).toEqual({ kind: "retry", text: "正在重试" })
+    expect({ kind: status()!.dataset.codepuppySessionStatus, text: status()!.textContent }).toEqual({ kind: "retry", text: "正在重试" })
     expect(status()!.getAttribute("role")).toBe("status")
   })
 
@@ -208,14 +208,14 @@ describe("REQ-125 session workspace real Solid mount", () => {
     })
     await flush()
     expect(avatar().textContent).toBe("")
-    expect(host.querySelector("[data-alpha-session-workspace-topbar]")!.textContent).not.toContain("α")
+    expect(host.querySelector("[data-codepuppy-session-workspace-topbar]")!.textContent).not.toContain("α")
   })
 
   test("tabs fail closed while a lane has not landed its renderer; terminal has a built-in fallback", async () => {
     const host = mountPartial({ review: () => "review-only" })
     await flush()
 
-    const tab = (kind: string) => host.querySelector<HTMLButtonElement>(`[data-alpha-session-rail-tab='${kind}']`)!
+    const tab = (kind: string) => host.querySelector<HTMLButtonElement>(`[data-codepuppy-session-rail-tab='${kind}']`)!
     expect(tab("review").disabled).toBe(false)
     expect(tab("files").disabled).toBe(true)
     expect(tab("artifacts").disabled).toBe(true)
@@ -226,37 +226,37 @@ describe("REQ-125 session workspace real Solid mount", () => {
 
     tab("artifacts").click()
     await flush()
-    expect(host.querySelector("[data-alpha-session-rail-host]")?.getAttribute("data-alpha-session-rail-panel")).toBe(
+    expect(host.querySelector("[data-codepuppy-session-rail-host]")?.getAttribute("data-codepuppy-session-rail-panel")).toBe(
       "review",
     )
 
     tab("terminal").click()
     await flush()
-    const terminalHost = host.querySelector("[data-alpha-session-rail-panel-host='terminal']")
+    const terminalHost = host.querySelector("[data-codepuppy-session-rail-panel-host='terminal']")
     expect(terminalHost).not.toBeNull()
-    expect(terminalHost!.querySelector("[data-alpha-terminal-panel]")).not.toBeNull()
+    expect(terminalHost!.querySelector("[data-codepuppy-terminal-panel]")).not.toBeNull()
   })
 
   test("review badge and terminal dot follow the rail meta channels, fail-closed by default", async () => {
     const host = mount()
     await flush()
-    const reviewTab = host.querySelector<HTMLButtonElement>("[data-alpha-session-rail-tab='review']")!
-    const terminalTab = host.querySelector<HTMLButtonElement>("[data-alpha-session-rail-tab='terminal']")!
+    const reviewTab = host.querySelector<HTMLButtonElement>("[data-codepuppy-session-rail-tab='review']")!
+    const terminalTab = host.querySelector<HTMLButtonElement>("[data-codepuppy-session-rail-tab='terminal']")!
 
-    expect(reviewTab.querySelector("[data-alpha-session-review-count]")).toBeNull()
-    expect(terminalTab.querySelector("[data-alpha-session-terminal-dot]")).toBeNull()
+    expect(reviewTab.querySelector("[data-codepuppy-session-review-count]")).toBeNull()
+    expect(terminalTab.querySelector("[data-codepuppy-session-terminal-dot]")).toBeNull()
 
     runtime.setSessionWorkspaceReviewCount(3)
     runtime.setSessionWorkspaceTerminalRunning(true)
     await flush()
-    expect(reviewTab.querySelector("[data-alpha-session-review-count]")!.textContent).toBe("3")
-    expect(terminalTab.querySelector("[data-alpha-session-terminal-dot]")).not.toBeNull()
+    expect(reviewTab.querySelector("[data-codepuppy-session-review-count]")!.textContent).toBe("3")
+    expect(terminalTab.querySelector("[data-codepuppy-session-terminal-dot]")).not.toBeNull()
 
     runtime.setSessionWorkspaceReviewCount(0)
     runtime.setSessionWorkspaceTerminalRunning(false)
     await flush()
-    expect(reviewTab.querySelector("[data-alpha-session-review-count]")).toBeNull()
-    expect(terminalTab.querySelector("[data-alpha-session-terminal-dot]")).toBeNull()
+    expect(reviewTab.querySelector("[data-codepuppy-session-review-count]")).toBeNull()
+    expect(terminalTab.querySelector("[data-codepuppy-session-terminal-dot]")).toBeNull()
   })
 
   test("terminal dot aggregates the publisher registry; concurrent panels never clobber each other", async () => {
@@ -264,7 +264,7 @@ describe("REQ-125 session workspace real Solid mount", () => {
     const host = mountPartial({ review: () => "review-only" })
     await flush()
     const dot = () =>
-      host.querySelector("[data-alpha-session-rail-tab='terminal'] [data-alpha-session-terminal-dot]")
+      host.querySelector("[data-codepuppy-session-rail-tab='terminal'] [data-codepuppy-session-terminal-dot]")
     expect(dot()).toBeNull()
 
     // Two real terminal panels publish concurrently (every renderer path mounts this same
@@ -316,8 +316,8 @@ describe("REQ-125 session workspace real Solid mount", () => {
   test("width grip drags past the retired 560 ceiling, up to workspace - 480", async () => {
     const host = mount()
     await flush()
-    const root = () => host.querySelector<HTMLElement>("[data-alpha-session-workspace]")!
-    const rail = () => host.querySelector<HTMLElement>("[data-alpha-session-rail-host]")!
+    const root = () => host.querySelector<HTMLElement>("[data-codepuppy-session-workspace]")!
+    const rail = () => host.querySelector<HTMLElement>("[data-codepuppy-session-rail-host]")!
     const grip = () => host.querySelector<HTMLElement>(".a-swk-rail-grip")!
     // Production measures `.a-swk-root`'s clientWidth on mount and on window resize; happy-dom
     // has no layout engine, so the case states the width the same way a real resize delivers it.
@@ -343,7 +343,7 @@ describe("REQ-125 session workspace real Solid mount", () => {
     expect(rail().style.width).toBe("720px")
     window.dispatchEvent(pointer("pointerup", 200))
     await flush()
-    expect(JSON.parse(localStorage.getItem("alpha-session-rail-widths-v1")!)).toEqual({ review: 720 })
+    expect(JSON.parse(localStorage.getItem("codepuppy-session-rail-widths-v1")!)).toEqual({ review: 720 })
 
     // Keyboard shares the same ceiling: widening at the ceiling is a no-op.
     grip().dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true, cancelable: true }))
@@ -354,8 +354,8 @@ describe("REQ-125 session workspace real Solid mount", () => {
   test("a narrowing window converges the display but never rewrites the remembered width", async () => {
     const host = mount()
     await flush()
-    const root = () => host.querySelector<HTMLElement>("[data-alpha-session-workspace]")!
-    const rail = () => host.querySelector<HTMLElement>("[data-alpha-session-rail-host]")!
+    const root = () => host.querySelector<HTMLElement>("[data-codepuppy-session-workspace]")!
+    const rail = () => host.querySelector<HTMLElement>("[data-codepuppy-session-rail-host]")!
     const grip = () => host.querySelector<HTMLElement>(".a-swk-rail-grip")!
     const setWorkspace = async (width: number) => {
       Object.defineProperty(root(), "clientWidth", { value: width, configurable: true })
@@ -374,7 +374,7 @@ describe("REQ-125 session workspace real Solid mount", () => {
     await setWorkspace(760)
     expect(rail().style.width).toBe("320px")
     expect(grip().getAttribute("aria-valuemax")).toBe("320")
-    expect(JSON.parse(localStorage.getItem("alpha-session-rail-widths-v1")!)).toEqual({ review: 720 })
+    expect(JSON.parse(localStorage.getItem("codepuppy-session-rail-widths-v1")!)).toEqual({ review: 720 })
 
     // Widening restores what the user chose — the memory was never touched.
     await setWorkspace(1500)
@@ -385,8 +385,8 @@ describe("REQ-125 session workspace real Solid mount", () => {
   test("rail width is remembered per panel and restored on tab switch", async () => {
     const host = mount()
     await flush()
-    const root = () => host.querySelector<HTMLElement>("[data-alpha-session-workspace]")!
-    const rail = () => host.querySelector<HTMLElement>("[data-alpha-session-rail-host]")!
+    const root = () => host.querySelector<HTMLElement>("[data-codepuppy-session-workspace]")!
+    const rail = () => host.querySelector<HTMLElement>("[data-codepuppy-session-rail-host]")!
     const grip = () => host.querySelector<HTMLElement>(".a-swk-rail-grip")!
     Object.defineProperty(root(), "clientWidth", { value: 1200, configurable: true })
     window.dispatchEvent(new Event("resize"))
@@ -399,7 +399,7 @@ describe("REQ-125 session workspace real Solid mount", () => {
     expect(rail().style.width).toBe("500px")
 
     // Per-panel memory: the files panel keeps its own width.
-    host.querySelector<HTMLButtonElement>("[data-alpha-session-rail-tab='files']")!.click()
+    host.querySelector<HTMLButtonElement>("[data-codepuppy-session-rail-tab='files']")!.click()
     await flush()
     expect(rail().style.width).toBe("400px")
 
@@ -407,10 +407,10 @@ describe("REQ-125 session workspace real Solid mount", () => {
     grip().dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true }))
     await flush()
     expect(rail().style.width).toBe("384px")
-    expect(JSON.parse(localStorage.getItem("alpha-session-rail-widths-v1")!)).toEqual({ review: 500, files: 384 })
+    expect(JSON.parse(localStorage.getItem("codepuppy-session-rail-widths-v1")!)).toEqual({ review: 500, files: 384 })
 
     // Back to review: remembered width is restored.
-    host.querySelector<HTMLButtonElement>("[data-alpha-session-rail-tab='review']")!.click()
+    host.querySelector<HTMLButtonElement>("[data-codepuppy-session-rail-tab='review']")!.click()
     await flush()
     expect(rail().style.width).toBe("500px")
   })
@@ -418,7 +418,7 @@ describe("REQ-125 session workspace real Solid mount", () => {
   test("arrow keys move between enabled tabs only", async () => {
     const host = mount()
     await flush()
-    const tab = (kind: string) => host.querySelector<HTMLButtonElement>(`[data-alpha-session-rail-tab='${kind}']`)!
+    const tab = (kind: string) => host.querySelector<HTMLButtonElement>(`[data-codepuppy-session-rail-tab='${kind}']`)!
 
     tab("review").dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true }))
     await flush()
@@ -505,7 +505,7 @@ describe("REQ-125 session workspace real Solid mount", () => {
   test("C21 AC2: the rail tablist roves on ←→ and keeps one Tab landing point", async () => {
     const host = mount()
     await flush()
-    const tab = (kind: string) => host.querySelector<HTMLButtonElement>(`[data-alpha-session-rail-tab='${kind}']`)!
+    const tab = (kind: string) => host.querySelector<HTMLButtonElement>(`[data-codepuppy-session-rail-tab='${kind}']`)!
     const key = (name: string, init: KeyboardEventInit = {}) =>
       new KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true, ...init })
 
@@ -534,10 +534,10 @@ describe("REQ-125 session workspace real Solid mount", () => {
     expect(tab("review").classList.contains("a-swk-rail-tab--on")).toBe(true)
 
     // 整条页签条在 Tab 序列里只占一个落点(禁用页签也不例外)。
-    const tabs = [...host.querySelectorAll<HTMLButtonElement>("[data-alpha-session-rail-tab]")]
+    const tabs = [...host.querySelectorAll<HTMLButtonElement>("[data-codepuppy-session-rail-tab]")]
     const landing = tabs
       .filter((element) => element.tabIndex === 0)
-      .map((element) => element.dataset.alphaSessionRailTab)
+      .map((element) => element.dataset.codepuppySessionRailTab)
     expect(landing).toEqual(["review"])
     expect(tabs.filter((element) => element.tabIndex === -1)).toHaveLength(tabs.length - 1)
 
@@ -552,21 +552,21 @@ describe("REQ-125 session workspace real Solid mount", () => {
   // #905:一个右栏面板渲染期抛错,只能降级它自己的区域 —— composer(含未发送草稿)与时间线
   // 骨架必须原样留在 DOM 里,失败区域要给出可点击的重载动作。把 session-workspace-shell.tsx
   // 的分区边界改回单一整页边界(或彻底移除)时,这条用例必崩:探针触发的 throw 不再被任何
-  // ErrorBoundary 拦下,会直接从 window.__alphaCrashProbe(...) 同步抛出,整条用例转红。
+  // ErrorBoundary 拦下,会直接从 window.__codepuppyCrashProbe(...) 同步抛出,整条用例转红。
   test("#905 a crashing rail panel degrades only that region — composer and timeline survive, reload action appears", async () => {
     const host = mount()
     await flush()
 
-    const composerStub = () => host.querySelector("[data-alpha-session-composer-stub]")
-    const timelineHost = () => host.querySelector("[data-alpha-session-timeline-host]")
-    const topbar = () => host.querySelector("[data-alpha-session-workspace-topbar]")
+    const composerStub = () => host.querySelector("[data-codepuppy-session-composer-stub]")
+    const timelineHost = () => host.querySelector("[data-codepuppy-session-timeline-host]")
+    const topbar = () => host.querySelector("[data-codepuppy-session-workspace-topbar]")
     const composerBefore = composerStub()
     const timelineBefore = timelineHost()
     expect(composerBefore).not.toBeNull()
     expect(timelineBefore).not.toBeNull()
 
     // Default lane is "review" and it is already mounted — crash it in place.
-    window.__alphaCrashProbe?.("SessionPanelReview")
+    window.__codepuppyCrashProbe?.("SessionPanelReview")
     await flush()
 
     // Composer, its (stub) draft node, timeline host, and topbar are the *same* DOM nodes —
@@ -576,15 +576,15 @@ describe("REQ-125 session workspace real Solid mount", () => {
     expect(topbar()).not.toBeNull()
 
     // The failed region itself shows a local reload action, scoped to that panel's host.
-    const reviewPanelHost = host.querySelector("[data-alpha-session-rail-panel-host='review']")!
+    const reviewPanelHost = host.querySelector("[data-codepuppy-session-rail-panel-host='review']")!
     expect(reviewPanelHost.querySelector("[data-harness-panel='review']")).toBeNull()
     const reloadButton = reviewPanelHost.querySelector<HTMLButtonElement>(".a-boundary-btn")
     expect(reloadButton).not.toBeNull()
 
     // Reload action recovers the region without touching the rest of the workspace. Clear the
-    // probe first — same discipline as the CDP recipe in alpha-boundary.tsx's own header comment
+    // probe first — same discipline as the CDP recipe in codepuppy-boundary.tsx's own header comment
     // (probe null, then click) — otherwise the remount would crash again on the same throw.
-    window.__alphaCrashProbe?.(null)
+    window.__codepuppyCrashProbe?.(null)
     reloadButton!.click()
     await flush()
     expect(reviewPanelHost.querySelector("[data-harness-panel='review']")).not.toBeNull()
@@ -596,13 +596,13 @@ describe("REQ-125 session workspace real Solid mount", () => {
 // 两臂:集合内工作区(readonly=false,今天的样子)无标记;集合外(被围栏的引擎明确回报写被拒)有标记。
 // 期望文案是设计稿文案表的**独立字面量**,不从 i18n dict 读回来。
 describe("REQ-159 #1322 workspace read-only disclosure on the topbar (AC2)", () => {
-  const pill = (host: HTMLElement) => host.querySelector<HTMLElement>("[data-alpha-workspace-readonly]")
-  const pop = (host: HTMLElement) => host.querySelector<HTMLElement>("[data-alpha-workspace-readonly-pop]")
+  const pill = (host: HTMLElement) => host.querySelector<HTMLElement>("[data-codepuppy-workspace-readonly]")
+  const pop = (host: HTMLElement) => host.querySelector<HTMLElement>("[data-codepuppy-workspace-readonly-pop]")
 
   test("inside the writable set (today's default): no pill, no popover", async () => {
     const host = mount()
     await flush()
-    expect(host.querySelector("[data-alpha-session-workspace-topbar]")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-session-workspace-topbar]")).not.toBeNull()
     expect(pill(host)).toBeNull()
     expect(pop(host)).toBeNull()
   })
@@ -620,14 +620,14 @@ describe("REQ-159 #1322 workspace read-only disclosure on the topbar (AC2)", () 
     runtime.setSessionWorkspaceReadonly(true)
     await flush()
 
-    const status = host.querySelector<HTMLElement>("[data-alpha-session-status]")!
+    const status = host.querySelector<HTMLElement>("[data-codepuppy-session-status]")!
     const badge = pill(host)
     expect(badge).not.toBeNull()
     expect(badge!.getAttribute("role")).toBe("status")
     expect(badge!.textContent?.trim()).toBe("只读")
     // 位置:状态胶囊之后、紧跟其后(同一个 header 里,状态胶囊的下一个兄弟就是它的宿主)。
     expect(status.nextElementSibling?.contains(badge!)).toBe(true)
-    expect(badge!.closest("header")?.hasAttribute("data-alpha-session-workspace-topbar")).toBe(true)
+    expect(badge!.closest("header")?.hasAttribute("data-codepuppy-session-workspace-topbar")).toBe(true)
     // 未开:弹层不在。
     expect(pop(host)).toBeNull()
 
@@ -647,7 +647,7 @@ describe("REQ-159 #1322 workspace read-only disclosure on the topbar (AC2)", () 
     badge!.click()
     await flush()
     expect(pop(host)).not.toBeNull()
-    const restart = pop(host)!.querySelector<HTMLButtonElement>("[data-alpha-workspace-readonly-restart]")!
+    const restart = pop(host)!.querySelector<HTMLButtonElement>("[data-codepuppy-workspace-readonly-restart]")!
     expect(restart.textContent?.trim()).toBe("重新启动 Code Puppy")
     expect(runtime.relaunchCalls).toHaveLength(0)
     restart.click()

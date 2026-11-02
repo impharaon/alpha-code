@@ -9,7 +9,7 @@ import {
   ownershipFromCatalogEntry,
   ownershipFromInstall,
   ownershipFromSeedAsset,
-  PARTY_ALPHA,
+  PARTY_CODEPUPPY,
   PARTY_UNKNOWN,
   PARTY_USER,
   RUNTIME_SURFACES,
@@ -68,7 +68,7 @@ describe("来源映射:catalog 条目(内置快照 bundled / signed channel remo
     )
     expect(dims).toEqual({
       authored: "official",
-      curated: PARTY_ALPHA,
+      curated: PARTY_CODEPUPPY,
       distributed: "engine-config",
       runtimeSurfaces: ["local-subprocess"],
       supportTier: "curated",
@@ -117,8 +117,8 @@ describe("来源映射:catalog 条目(内置快照 bundled / signed channel remo
     for (const source of ["official", "community", "user"]) {
       const dims = ownershipFromCatalogEntry({ type: "mcp", source, installSpec: { kind: "mcp", mcpType: "local" } }, "remote")
       expect(dims.authored).toBe(source)
-      expect(dims.authored).not.toBe(PARTY_ALPHA)
-      expect(dims.curated).toBe(PARTY_ALPHA)
+      expect(dims.authored).not.toBe(PARTY_CODEPUPPY)
+      expect(dims.curated).toBe(PARTY_CODEPUPPY)
     }
   })
 })
@@ -127,7 +127,7 @@ describe("来源映射:packaged seed(REQ-102)", () => {
   test("official seed 资产 → authored=official、curated=alpha、bundled、curated tier", () => {
     expect(ownershipFromSeedAsset({ type: "mcp", source: "official" })).toEqual({
       authored: "official",
-      curated: PARTY_ALPHA,
+      curated: PARTY_CODEPUPPY,
       distributed: "bundled",
       runtimeSurfaces: ["local-subprocess"],
       supportTier: "curated",
@@ -151,7 +151,7 @@ describe("来源映射:本地安装(receipts/records)", () => {
   test("catalog 安装但条目已从 catalog 消失 → 如实降级:authored=unknown、tier=user、curated 保留 alpha", () => {
     const dims = ownershipFromInstall({ id: "mcp:gone", kind: "mcp", origin: "catalog" })
     expect(dims.authored).toBe(PARTY_UNKNOWN)
-    expect(dims.curated).toBe(PARTY_ALPHA)
+    expect(dims.curated).toBe(PARTY_CODEPUPPY)
     expect(dims.supportTier).toBe("user")
     expect(dims.distributed).toBe("engine-config")
     expect(dims.runtimeSurfaces).toEqual(["local-subprocess"])

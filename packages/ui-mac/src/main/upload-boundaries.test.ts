@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { decodeContract } from "@alpha-code/contracts-consumer"
+import { decodeContract } from "@codepuppy/contracts-consumer"
 import type { AutomationTask } from "../shared/automation-types"
 import { cloudScheduleEnvelopeFor, cloudScheduleRegistrationFor } from "./cloud-schedule-config"
 import { materializeCloudMcpConfig } from "./cloud-sidecar-config"

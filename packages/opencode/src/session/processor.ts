@@ -28,7 +28,7 @@ import { Usage, type LLMEvent } from "@opencode-ai/llm"
 import { APICallError } from "ai"
 import { env } from "node:process"
 import { parseToolDisplaySnapshot, type ToolDisplaySnapshotV1 } from "@opencode-ai/schema/tool-identity"
-import { classifyNetFailure, engineNetFailurePath } from "@opencode-ai/schema/alpha-net-failure"
+import { classifyNetFailure, engineNetFailurePath } from "@opencode-ai/schema/codepuppy-net-failure"
 
 const DOOM_LOOP_THRESHOLD = 3
 export type Result = "compact" | "stop" | "continue"
@@ -132,9 +132,9 @@ const layer = Layer.effect(
       }
 
       // #1572 AC4: settle the network layer here, while `e` still carries its cause chain — `fromError` keeps only a
-      // top-level message. A model request that failed as APIError gets `alphaNetLayer` / `alphaNetCode` in its existing
+      // top-level message. A model request that failed as APIError gets `codepuppyNetLayer` / `codepuppyNetCode` in its existing
       // string metadata; an AI SDK call error that never got an HTTP answer and whose layer is not recognised gets
-      // `alphaNetCode: "unattributed"` alone (the turn card says the connection dropped, nothing more).
+      // `codepuppyNetCode: "unattributed"` alone (the turn card says the connection dropped, nothing more).
       const parse = (e: unknown) => {
         const error = MessageV2.fromError(e, {
           providerID: input.model.providerID,
@@ -146,8 +146,8 @@ const layer = Layer.effect(
         const noAnswer = APICallError.isInstance(e) && e.statusCode === undefined
         if (!net && !noAnswer) return error
         const tag: Record<string, string> = net
-          ? { alphaNetLayer: net.layer, alphaNetCode: net.code }
-          : { alphaNetCode: "unattributed" }
+          ? { codepuppyNetLayer: net.layer, codepuppyNetCode: net.code }
+          : { codepuppyNetCode: "unattributed" }
         return { ...error, data: { ...error.data, metadata: { ...error.data.metadata, ...tag } } }
       }
 
@@ -231,7 +231,7 @@ const layer = Layer.effect(
             input: match.part.state.input,
             error: errorMessage(error),
             // Keep metadata streamed while running so failures retain progress detail (e.g. execute's child calls).
-            metadata: net ? { ...match.part.state.metadata, alphaNetFailure: net } : match.part.state.metadata,
+            metadata: net ? { ...match.part.state.metadata, codepuppyNetFailure: net } : match.part.state.metadata,
             time: { start: match.part.state.time.start, end: Date.now() },
           },
         })

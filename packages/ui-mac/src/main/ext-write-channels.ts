@@ -19,7 +19,7 @@ import {
   type RetireJournalRequest,
 } from "./ext-journal-retire"
 import type { JournalRetireResult } from "../shared/ext-journal-admin"
-import { parseReloadScope } from "./alpha-sidecar-messages"
+import { parseReloadScope } from "./codepuppy-sidecar-messages"
 
 export type RootResolution = { ok: true; root: string } | { ok: false; reason: string }
 

@@ -48,19 +48,19 @@ const snapshotDigest = "5".repeat(64)
 let tmp = ""
 let root = ""
 let userData = ""
-const previousRoot = process.env.ALPHA_GLOBAL_DIR
+const previousRoot = process.env.CODEPUPPY_GLOBAL_DIR
 
 beforeEach(() => {
   tmp = mkdtempSync(join(tmpdir(), "req235-cloud-package-"))
   root = join(tmp, "root")
   userData = join(tmp, "user-data")
   mkdirSync(root, { recursive: true })
-  process.env.ALPHA_GLOBAL_DIR = root
+  process.env.CODEPUPPY_GLOBAL_DIR = root
 })
 
 afterEach(() => {
-  if (previousRoot === undefined) delete process.env.ALPHA_GLOBAL_DIR
-  else process.env.ALPHA_GLOBAL_DIR = previousRoot
+  if (previousRoot === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+  else process.env.CODEPUPPY_GLOBAL_DIR = previousRoot
   rmSync(tmp, { recursive: true, force: true })
 })
 
@@ -101,7 +101,7 @@ const refusingInstallers = (): PackageArtifactInstallersV1 => {
     removeMcpConfig: refuse("removeMcpConfig"),
     removeCommandConfig: refuse("removeCommandConfig"),
     removeMcpSecretsStrict: refuse("removeMcpSecretsStrict"),
-    releaseAlphaConnectionBindings: refuse("releaseAlphaConnectionBindings"),
+    releaseCodePuppyConnectionBindings: refuse("releaseCodePuppyConnectionBindings"),
     removeInstallGrants,
     removePluginPath: refuse("removePluginPath"),
   }
@@ -190,7 +190,7 @@ describe("REQ-235 cloud@1 package: authorization, receipts-only install, uninsta
     expect(record?.files ?? []).toEqual([])
     expect(record?.configKey).toBeUndefined()
     expect(readCapabilityGrant(root, grantKey)?.capabilities).toEqual(["cloud:dispatch"])
-    expect(existsSync(join(root, "alpha.jsonc"))).toBe(false)
+    expect(existsSync(join(root, "codepuppy.jsonc"))).toBe(false)
     const graphs = readPackageGraphs(root)
     expect(graphs.ok && graphs.packageGraphs.map((graph) => [graph.packageId, graph.root.kind, graph.root.name])).toEqual([
       [packageId, "cloud", componentName],

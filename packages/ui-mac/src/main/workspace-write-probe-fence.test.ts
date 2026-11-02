@@ -46,20 +46,20 @@ describeDarwin("AC3 真探针在真围栏下(真 .node / 真 seatbelt / 真子�
   beforeAll(() => {
     scratch = mkdtempSync(join(tmpdir(), "ac1322-fence-"))
     buildId = `ac1322-test-${Date.now()}`
-    addon = buildFenceAddon({ out: join(scratch, "build", "alpha_fence.node"), buildId }).out
+    addon = buildFenceAddon({ out: join(scratch, "build", "codepuppy_fence.node"), buildId }).out
     // 布局纪律(勘破 §7.4):ws 与 esc 都放真 HOME 之下 —— /private/tmp 与 $TMPDIR 在可写集里,放那儿「escape landed」只是布局问题。
     ws = mkdtempSync(join(homedir(), ".ac1322-ws-"))
     esc = mkdtempSync(join(homedir(), ".ac1322-esc-"))
     missing = join(scratch, "does-not-exist")
     const userData = join(scratch, "userData")
-    const globalRoot = join(scratch, "alpha-code-state", "env", "dev")
+    const globalRoot = join(scratch, "codepuppy-state", "env", "dev")
     mkdirSync(userData, { recursive: true })
     mkdirSync(globalRoot, { recursive: true })
     profileFile = join(scratch, "fence.sb")
     writeFileSync(
       profileFile,
       // `#1337`:生产 profile 含网络行;写探针不出网,给一个没人听的端口即可。
-      renderProcessFenceProfile({ workspaces: [ws], alphaGlobalRoot: globalRoot, userDataPath: userData, stateHome: userData, roots: resolveEngineRoots({}, homedir()), egressProxyPort: 4443 }),
+      renderProcessFenceProfile({ workspaces: [ws], codepuppyGlobalRoot: globalRoot, userDataPath: userData, stateHome: userData, roots: resolveEngineRoots({}, homedir()), egressProxyPort: 4443 }),
     )
   })
 
@@ -89,8 +89,8 @@ describeDarwin("AC3 真探针在真围栏下(真 .node / 真 seatbelt / 真子�
     expect(out.outside.detail).toMatch(/^write EPERM: /)
     expect(out.missing.outcome).toBe("unknown")
     expect(out.missing.detail).toMatch(/^write ENOENT/)
-    expect(readdirSync(ws).filter((f) => f.startsWith(".alpha-write-probe-"))).toEqual([])
-    expect(readdirSync(esc).filter((f) => f.startsWith(".alpha-write-probe-"))).toEqual([])
+    expect(readdirSync(ws).filter((f) => f.startsWith(".codepuppy-write-probe-"))).toEqual([])
+    expect(readdirSync(esc).filter((f) => f.startsWith(".codepuppy-write-probe-"))).toEqual([])
     expect(judgeWriteProbeCalibration({ inside: out.inside.outcome, outside: out.outside.outcome })).toEqual({ ok: true })
   })
 

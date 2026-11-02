@@ -21,10 +21,10 @@ const ZERO_TOLERANCE = ["preload/types.ts", "preload/index.ts"]
 
 /** main 传输面 + 契约镜像:词元行必须带 REQ-092 标注。 */
 const ANNOTATED = [
-  "main/alpha-cloud-jobs.ts",
+  "main/codepuppy-cloud-jobs.ts",
   "main/cloud-ipc.ts",
-  "main/alpha-workdir.ts",
-  "main/alpha-artifact-download.ts",
+  "main/codepuppy-workdir.ts",
+  "main/codepuppy-artifact-download.ts",
   "shared/cloud-artifact-descriptor.ts",
 ]
 

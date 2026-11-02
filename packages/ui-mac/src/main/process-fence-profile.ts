@@ -15,7 +15,7 @@
 // 嵌套 seatbelt 只在编译后策略完全相同时放行,否则 `sandbox_apply: Operation not permitted`、exit 71、
 // 零执行(§6.5;§8.4 经真引擎 → 真工具 → 真 wrapper 量到:HTTP 200 而零执行)。所以 ext 的
 // `wrapEngineShell`(cfg.shell → sandbox-exec wrapper)与本围栏**同一次变更**拆装(基线 I2)。
-// ext 不再碰 cfg.shell 的判据在 packages/ext/src/alpha-ext-no-shell-layer.test.ts。
+// ext 不再碰 cfg.shell 的判据在 packages/ext/src/codepuppy-ext-no-shell-layer.test.ts。
 //
 // ── 本文件只渲染字符串,不落盘、不读 store、不跑 sandbox-exec ──────────────────────────
 // 工作区并集的来源 / 试编译 / 落盘在 process-fence-plan.ts;试编译本体在 process-fence-compile.ts;
@@ -44,8 +44,8 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path"
  */
 export const WRITABLE_ROOT_IDS = {
   W1: "工作区(启动时并集,每个工作区一条 subpath)",
-  W2: "<alphaGlobalRoot> = <appData>/alpha-code-state/env/<env>",
-  W3: "<userDataPath>(含 alpha-engine-config/**、opencode/locks/**、engine-scratch-cwd)",
+  W2: "<codepuppyGlobalRoot> = <appData>/codepuppy-state/env/<env>",
+  W3: "<userDataPath>(含 codepuppy-engine-config/**、opencode/locks/**、engine-scratch-cwd)",
   W4: "<XDG_DATA_HOME>/opencode:上游引擎 log / *.db / -wal / -shm / repos",
   W5: "<XDG_CACHE_HOME>/opencode:bin / models.json / packages",
   W6: "<XDG_CONFIG_HOME>/opencode:第二份 provider 安装(勘破 §7.4 坑一)",
@@ -95,7 +95,7 @@ export function resolveEngineRoots(env: Record<string, string | undefined>, home
 export type ProcessFenceProfileInput = {
   /** W1:启动时并集,顺序即优先级(裁剪从尾部丢)。 */
   workspaces: readonly string[]
-  alphaGlobalRoot: string
+  codepuppyGlobalRoot: string
   userDataPath: string
   /**
    * 引擎的 state 根 —— sidecar.ts 把 XDG_STATE_HOME 设成 `process.env.XDG_STATE_HOME ?? userDataPath`,
@@ -136,7 +136,7 @@ function regexLiteral(p: string): string {
  */
 export function renderProcessFenceProfile(input: ProcessFenceProfileInput): string {
   const ws = input.workspaces.map((w, i) => assertSeatbeltSafePath(w, `workspace[${i}]`))
-  const alphaGlobalRoot = assertSeatbeltSafePath(input.alphaGlobalRoot, "alphaGlobalRoot")
+  const codepuppyGlobalRoot = assertSeatbeltSafePath(input.codepuppyGlobalRoot, "codepuppyGlobalRoot")
   const userDataPath = assertSeatbeltSafePath(input.userDataPath, "userDataPath")
   const home = assertSeatbeltSafePath(input.roots.home, "HOME")
   const dataHome = assertSeatbeltSafePath(input.roots.dataHome, "XDG_DATA_HOME")
@@ -152,7 +152,7 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
     "(deny file-write*)",
     "(allow file-write*",
     ...ws.map((w) => `  (subpath "${w}")                                  ; W1`),
-    `  (subpath "${alphaGlobalRoot}")                          ; W2`,
+    `  (subpath "${codepuppyGlobalRoot}")                          ; W2`,
     `  (subpath "${userDataPath}")                             ; W3`,
     ...(stateHome === userDataPath ? [] : [`  (subpath "${join(stateHome, "opencode")}")               ; W3 (XDG_STATE_HOME)`]),
     `  (subpath "${join(dataHome, "opencode")}")               ; W4`,
@@ -195,13 +195,13 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
 //      (本机真实读数里就有一条 `$TMPDIR` 下的旧测试目录),白占字节;不代建(ADR-025「绝不代建」)。
 //   5. 排除 `/`、HOME、HOME 的任何祖先。放行 HOME = 没有围栏(U2 §4 表「不定价」的那一行)。
 //      用户若真把家目录当项目打开,走披露面(基线 §五 子票 4),不靠放宽。
-//   5b. 排除与**应用状态根**(`<appData>/alpha-code-state`,三个 env 根与 CAS 的父目录)相关的候选:同一路径、
+//   5b. 排除与**应用状态根**(`<appData>/codepuppy-state`,三个 env 根与 CAS 的父目录)相关的候选:同一路径、
 //      在它之内、或包含它(`#1390`)。比较在 **realpath 之后**做(APFS 大小写不敏感,`~/LIBRARY/application support` 词法
 //      比不出来;软链同理);realpath 拿不到(ENOENT 等)退回词法比较,**不因此放行**。这是 `#1390` 的第一步:候选那时还来自
 //      `opencode.global.dat`(W3 之下,**被围栏的引擎树自己写得了**),一条伪造的 draft 记录就能在下次启动把
 //      `~/Library/Application Support` 放进可写集。第二步(`#1394`,见 5c)把清单本身搬出了围栏可写处;本条留着做第二道闸 ——
 //      真源就算被写坏,状态根也进不来。
-//   5c. 候选**从哪来**(`#1394`):不再是 store,而是 `<appData>/alpha-code-state/fence-workspaces/<env>.json` —— 与三个 env 根、
+//   5c. 候选**从哪来**(`#1394`):不再是 store,而是 `<appData>/codepuppy-state/fence-workspaces/<env>.json` —— 与三个 env 根、
 //      `cas/` 同级,不在任何可写根之下,只有 main 写(process-fence-workspaces.ts:首次启动从 store 播种一次,之后只经
 //      renderer → store-set IPC → main 更新;boot 时「store 里有、真源里没有」的目录本会话检疫,renderer 原样写回也进不了)。
 //      本函数只吃一个 `candidates` 列表,不知道也不该知道它从哪个文件来;`workspaceCandidatesFromStore` 留在本文件是给
@@ -228,13 +228,13 @@ export type WorkspaceUnionInput = {
    * (process-fence-workspaces.ts);**不是** store 的三个键。规则 4 / 5 / 5b 仍逐条过。
    */
   candidates: readonly string[]
-  /** `~/code-puppy`(alphaUserWorkspaceDir());调用方负责 ensureUserWorkspaceDir。 */
+  /** `~/code-puppy`(codepuppyUserWorkspaceDir());调用方负责 ensureUserWorkspaceDir。 */
   defaultWorkspace: string
   homeDir: string
   /** 盘上是否为目录(fs.statSync(p).isDirectory());调用方注入,便于测试。 */
   isDirectory: (p: string) => boolean
   /**
-   * `#1390`:应用状态根 `<appData>/alpha-code-state`(alpha-environment.ts 的 casBaseRoot —— 三个 env 根与 CAS 的父目录)。
+   * `#1390`:应用状态根 `<appData>/codepuppy-state`(codepuppy-environment.ts 的 casBaseRoot —— 三个 env 根与 CAS 的父目录)。
    * 与它相关的候选一律排除(规则 5b)。由 server.ts 从冻结的环境快照取来传入;本模块不解析它。
    */
   appStateRoot: string
@@ -329,7 +329,7 @@ function isAncestorOrSelf(ancestor: string, p: string): boolean {
   return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel))
 }
 
-/** 双向包含:同一路径、a 在 b 之内、或 b 在 a 之内(与 alpha-environment.ts 的 related 同一谓词)。 */
+/** 双向包含:同一路径、a 在 b 之内、或 b 在 a 之内(与 codepuppy-environment.ts 的 related 同一谓词)。 */
 function related(a: string, b: string): boolean {
   return isAncestorOrSelf(a, b) || isAncestorOrSelf(b, a)
 }

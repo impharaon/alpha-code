@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // REQ-157 `#1284` AC3:把 alpha 注入模型上下文的库存打出来,并与仓内快照逐字节比对。
 //
-//   bun packages/ext/scripts/context-injection-inventory.ts --check   # alpha-check 第 [12/12] 步;不一致 exit 1
+//   bun packages/ext/scripts/context-injection-inventory.ts --check   # codepuppy-check 第 [12/12] 步;不一致 exit 1
 //   bun packages/ext/scripts/context-injection-inventory.ts --write   # 改了片段之后重生快照,让评审读 diff
 //
 // 两种「红」:① 登记簿在 import 时就抛(某条片段超过声明上限,ContextBudgetError,见 src/context-injection.ts)

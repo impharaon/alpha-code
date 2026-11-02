@@ -57,7 +57,7 @@ const legalViews: CatalogPackageViewV1[] = [
     catalogId: "package:update",
     verdict: "update-required",
     action: {
-      kind: "update-alpha",
+      kind: "update-codepuppy",
       enabled: true,
       reasonCode: "package-host-update-required",
     },
@@ -84,7 +84,7 @@ describe("package safe-view presentation", () => {
       ["blocked", "compatible", "update-required"] satisfies CatalogPackageVerdictV1[],
     )
     expect([...new Set(legalViews.map((view) => view.action.kind))].sort()).toEqual(
-      ["install", "none", "resolve-prerequisite", "update-alpha"] satisfies CatalogPackageActionKindV1[],
+      ["install", "none", "resolve-prerequisite", "update-codepuppy"] satisfies CatalogPackageActionKindV1[],
     )
     expect([...new Set(legalViews.map((view) => view.action.reasonCode))].sort()).toEqual(
       [...CATALOG_PACKAGE_REASON_CODES].sort() satisfies CatalogPackageReasonCodeV1[],
@@ -96,34 +96,34 @@ describe("package safe-view presentation", () => {
 
     expect(legalViews.map(packagePresentation)).toEqual([
       {
-        verdictKey: "alpha.ext.packageVerdictCompatible",
-        actionKey: "alpha.ext.packageActionInstall",
-        reasonKey: "alpha.ext.packageReasonCompatible",
-        prerequisiteKey: "alpha.ext.packagePrerequisiteReady",
+        verdictKey: "codepuppy.ext.packageVerdictCompatible",
+        actionKey: "codepuppy.ext.packageActionInstall",
+        reasonKey: "codepuppy.ext.packageReasonCompatible",
+        prerequisiteKey: "codepuppy.ext.packagePrerequisiteReady",
       },
       {
-        verdictKey: "alpha.ext.packageVerdictCompatible",
-        actionKey: "alpha.ext.packageActionResolvePrerequisite",
-        reasonKey: "alpha.ext.packageReasonPrerequisiteRequired",
-        prerequisiteKey: "alpha.ext.packagePrerequisiteRequired",
+        verdictKey: "codepuppy.ext.packageVerdictCompatible",
+        actionKey: "codepuppy.ext.packageActionResolvePrerequisite",
+        reasonKey: "codepuppy.ext.packageReasonPrerequisiteRequired",
+        prerequisiteKey: "codepuppy.ext.packagePrerequisiteRequired",
       },
       {
-        verdictKey: "alpha.ext.packageVerdictUpdateRequired",
-        actionKey: "alpha.ext.packageActionUpdateAlpha",
-        reasonKey: "alpha.ext.packageReasonHostUpdateRequired",
-        prerequisiteKey: "alpha.ext.packagePrerequisiteReady",
+        verdictKey: "codepuppy.ext.packageVerdictUpdateRequired",
+        actionKey: "codepuppy.ext.packageActionUpdateCodePuppy",
+        reasonKey: "codepuppy.ext.packageReasonHostUpdateRequired",
+        prerequisiteKey: "codepuppy.ext.packagePrerequisiteReady",
       },
       ...blockedReasons.map((reason) => ({
-        verdictKey: "alpha.ext.packageVerdictBlocked" as const,
-        actionKey: "alpha.ext.packageActionNone" as const,
+        verdictKey: "codepuppy.ext.packageVerdictBlocked" as const,
+        actionKey: "codepuppy.ext.packageActionNone" as const,
         reasonKey: {
-          "package-invalid": "alpha.ext.packageReasonInvalid",
-          "package-payload-unavailable": "alpha.ext.packageReasonPayloadUnavailable",
-          "package-payload-integrity": "alpha.ext.packageReasonPayloadIntegrity",
-          "package-payload-invalid": "alpha.ext.packageReasonPayloadInvalid",
-          "package-prerequisite-invalid": "alpha.ext.packageReasonPrerequisiteInvalid",
+          "package-invalid": "codepuppy.ext.packageReasonInvalid",
+          "package-payload-unavailable": "codepuppy.ext.packageReasonPayloadUnavailable",
+          "package-payload-integrity": "codepuppy.ext.packageReasonPayloadIntegrity",
+          "package-payload-invalid": "codepuppy.ext.packageReasonPayloadInvalid",
+          "package-prerequisite-invalid": "codepuppy.ext.packageReasonPrerequisiteInvalid",
         }[reason],
-        prerequisiteKey: "alpha.ext.packagePrerequisiteReady" as const,
+        prerequisiteKey: "codepuppy.ext.packagePrerequisiteReady" as const,
       })),
     ])
   })
@@ -146,9 +146,9 @@ describe("package safe-view presentation", () => {
    *
    * 这条是补一个**实测存在**的假绿:此前只有 `packagePresentation` 的四张表被穷举,而
    * `packageSkipReasonKey` / `packageComponentPresentation` 一条都没进闸。审计方把 en 与 zh 里的
-   * `alpha.ext.packageSkipMediaTypeMismatch` **同时删掉**,这个文件与 locale key-parity 闸仍然
+   * `codepuppy.ext.packageSkipMediaTypeMismatch` **同时删掉**,这个文件与 locale key-parity 闸仍然
    * 11 pass / 0 fail —— 而 `renderer/i18n/index.ts` 的 `t()` 在缺翻译时**回退到 key 本身**,
-   * 于是用户会在详情页读到一行 `alpha.ext.packageSkipMediaTypeMismatch`。
+   * 于是用户会在详情页读到一行 `codepuppy.ext.packageSkipMediaTypeMismatch`。
    *
    * 判据必须是**遍历常量**,不是逐个手写断言:后者对「decoder 新增第四个 token」默认放行,
    * 正是「枚举对新成员默认放行」的形态。这里遍历 `PACKAGE_COMPONENT_SKIP_REASONS_V1` 与
@@ -202,15 +202,15 @@ describe("package safe-view presentation", () => {
     // 逐字钉住这一面**全部**会被渲染的 key。下界式的 `>= 8` 会留出余量,少一个仍然全绿;
     // 这里对新成员默认拒绝 —— 新增一个组件行维度或一个 skip token 都必须显式过这一条。
     expect([...new Set(keys)].sort()).toEqual([
-      "alpha.ext.packageComponentIncluded",
-      "alpha.ext.packageComponentLeaf",
-      "alpha.ext.packageComponentRoot",
-      "alpha.ext.packageComponentSkipped",
-      "alpha.ext.packageOptional",
-      "alpha.ext.packageRequired",
-      "alpha.ext.packageSkipCapabilityUnsupported",
-      "alpha.ext.packageSkipMediaTypeMismatch",
-      "alpha.ext.packageSkipProfileUnsupported",
+      "codepuppy.ext.packageComponentIncluded",
+      "codepuppy.ext.packageComponentLeaf",
+      "codepuppy.ext.packageComponentRoot",
+      "codepuppy.ext.packageComponentSkipped",
+      "codepuppy.ext.packageOptional",
+      "codepuppy.ext.packageRequired",
+      "codepuppy.ext.packageSkipCapabilityUnsupported",
+      "codepuppy.ext.packageSkipMediaTypeMismatch",
+      "codepuppy.ext.packageSkipProfileUnsupported",
     ])
 
     // ③ **存在且非空**,两个语种都要。`en[key]` 缺失时是 undefined —— 先判存在再 trim,
@@ -225,7 +225,7 @@ describe("package safe-view presentation", () => {
     })
     expect(
       missing,
-      "缺翻译时 t() 回退到 key 本身 —— 用户会读到一行 alpha.ext.* 而不是一句话",
+      "缺翻译时 t() 回退到 key 本身 —— 用户会读到一行 codepuppy.ext.* 而不是一句话",
     ).toEqual([])
   })
 
@@ -237,42 +237,42 @@ describe("package safe-view presentation", () => {
       ),
     ).text()
     const keys = [
-      "alpha.ext.back",
-      "alpha.ext.tabFeatured",
-      "alpha.ext.detailAbout",
-      "alpha.ext.detailVersion",
-      "alpha.ext.packageType",
-      "alpha.ext.packageSourceRemote",
-      "alpha.ext.packageInstallability",
-      "alpha.ext.packageVerdictCompatible",
-      "alpha.ext.packageVerdictUpdateRequired",
-      "alpha.ext.packageVerdictBlocked",
-      "alpha.ext.packageComponentsTitle",
-      "alpha.ext.packageComponent",
-      "alpha.ext.packagePrerequisiteStatus",
-      "alpha.ext.packagePrerequisiteReady",
-      "alpha.ext.packagePrerequisiteRequired",
-      "alpha.ext.packageRequired",
-      "alpha.ext.packageReasonTitle",
-      "alpha.ext.packageReasonCompatible",
-      "alpha.ext.packageReasonPrerequisiteRequired",
-      "alpha.ext.packageReasonHostUpdateRequired",
-      "alpha.ext.packageReasonInvalid",
-      "alpha.ext.packageReasonPayloadIntegrity",
-      "alpha.ext.packageActions",
-      "alpha.ext.packageActionInstall",
-      "alpha.ext.packageActionUpdateAlpha",
-      "alpha.ext.packageActionResolvePrerequisite",
-      "alpha.ext.packageActionNone",
-      "alpha.ext.confirmInstall",
-      "alpha.ext.cancel",
-      "alpha.ext.packageConfirmEnv",
-      "alpha.ext.packageKeyPlaceholder",
-      "alpha.ext.packageKeysRequired",
-      "alpha.ext.keyHint",
-      "alpha.ext.confirmNote",
-      "alpha.ext.authz.chipNew",
-      "alpha.ext.authz.note",
+      "codepuppy.ext.back",
+      "codepuppy.ext.tabFeatured",
+      "codepuppy.ext.detailAbout",
+      "codepuppy.ext.detailVersion",
+      "codepuppy.ext.packageType",
+      "codepuppy.ext.packageSourceRemote",
+      "codepuppy.ext.packageInstallability",
+      "codepuppy.ext.packageVerdictCompatible",
+      "codepuppy.ext.packageVerdictUpdateRequired",
+      "codepuppy.ext.packageVerdictBlocked",
+      "codepuppy.ext.packageComponentsTitle",
+      "codepuppy.ext.packageComponent",
+      "codepuppy.ext.packagePrerequisiteStatus",
+      "codepuppy.ext.packagePrerequisiteReady",
+      "codepuppy.ext.packagePrerequisiteRequired",
+      "codepuppy.ext.packageRequired",
+      "codepuppy.ext.packageReasonTitle",
+      "codepuppy.ext.packageReasonCompatible",
+      "codepuppy.ext.packageReasonPrerequisiteRequired",
+      "codepuppy.ext.packageReasonHostUpdateRequired",
+      "codepuppy.ext.packageReasonInvalid",
+      "codepuppy.ext.packageReasonPayloadIntegrity",
+      "codepuppy.ext.packageActions",
+      "codepuppy.ext.packageActionInstall",
+      "codepuppy.ext.packageActionUpdateCodePuppy",
+      "codepuppy.ext.packageActionResolvePrerequisite",
+      "codepuppy.ext.packageActionNone",
+      "codepuppy.ext.confirmInstall",
+      "codepuppy.ext.cancel",
+      "codepuppy.ext.packageConfirmEnv",
+      "codepuppy.ext.packageKeyPlaceholder",
+      "codepuppy.ext.packageKeysRequired",
+      "codepuppy.ext.keyHint",
+      "codepuppy.ext.confirmNote",
+      "codepuppy.ext.authz.chipNew",
+      "codepuppy.ext.authz.note",
     ] as const
     // 先钉非空,再钉漂移:下面那条是子串包含判据,而 `includes("")` 恒真 ——
     // 把任一 key 的值清空,漂移闸与 cases 里的同源断言(`toBe(zh[key])`,`"" === ""`)
@@ -288,8 +288,8 @@ describe("package safe-view presentation", () => {
     ).toEqual([])
     expect(
       [
-        zh["alpha.ext.confirmTitle"].replace("{{name}}", "${esc(view.name)}"),
-        zh["alpha.ext.authz.introFirst"].replace("{{name}}", "${esc(view.name)}"),
+        zh["codepuppy.ext.confirmTitle"].replace("{{name}}", "${esc(view.name)}"),
+        zh["codepuppy.ext.authz.introFirst"].replace("{{name}}", "${esc(view.name)}"),
       ].filter((copy) => !harness.includes(copy)),
       "visual harness interpolated Chinese copy must track zh.ts",
     ).toEqual([])

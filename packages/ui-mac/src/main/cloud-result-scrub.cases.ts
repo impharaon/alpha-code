@@ -5,9 +5,9 @@
 // 平台塞内联内容时 alpha-code 原样透传给 renderer;声明的防线 scrubInlineContent 全仓零调用点。
 // 「代码在,但没有被执行」—— 所以这道闸**驱动真的生产链**,不断言那个纯函数本身:
 //   registerCloudIpcHandlers() 注册的 cloud-status / cloud-artifacts handler
-//   → 真 alpha-cloud-jobs(不 mock)→ 真 decodeJsonContract → scrubInlineContent 接线
-//   → 对着本进程起的真 HTTP origin。替身只有宿主级三件:electron / logging / alpha-auth。
-// 把 alpha-cloud-jobs.ts 里那两处 scrubInlineContent(...) 摘掉,本文件必须红(#1113 PR 有摘线实测)。
+//   → 真 codepuppy-cloud-jobs(不 mock)→ 真 decodeJsonContract → scrubInlineContent 接线
+//   → 对着本进程起的真 HTTP origin。替身只有宿主级三件:electron / logging / codepuppy-auth。
+// 把 codepuppy-cloud-jobs.ts 里那两处 scrubInlineContent(...) 摘掉,本文件必须红(#1113 PR 有摘线实测)。
 //
 // 判据三面(单断言布尔可被错误实现满足,见 #402 README §「断言的粒度」):
 //   ① renderer 可见返回值整棵树扫描零发现(扫描器先用已知的坏标定,标不出坏则本轮作废);
@@ -45,7 +45,7 @@ mock.module("electron", () => ({
 mock.module("./logging", () => ({
   getLogger: () => ({ log: () => {}, warn: () => {}, error: () => {}, info: () => {}, debug: () => {} }),
 }))
-mock.module("./alpha-auth", () => ({
+mock.module("./codepuppy-auth", () => ({
   getAccessToken: () => "tok.gate1113",
   getAccessTokenIdentity: () => ({ ok: true, token: "tok.gate1113", tenantId: "t_gate", subject: "u_gate" }),
   // #1551:cloud-ipc 的交付 tracker 读身份代(本 harness 不跑交付,只需让 import 解析)。
@@ -63,7 +63,7 @@ const origin = Bun.serve({
     return new Response(body, { status: 200, headers: { "content-type": "application/json" } })
   },
 })
-process.env.ALPHA_CLOUD_URL = `http://127.0.0.1:${origin.port}`
+process.env.CODEPUPPY_CLOUD_URL = `http://127.0.0.1:${origin.port}`
 afterAll(() => origin.stop(true))
 
 const { registerCloudIpcHandlers } = await import("./cloud-ipc")
@@ -71,7 +71,7 @@ registerCloudIpcHandlers()
 
 // ---- 扫描器 ----
 // 内容前像:一段仅存在于本文件的 marker 字节的 base64 —— 命中即「产物内容抵达了公共视图」。
-const MARKER_B64 = Buffer.from("ALPHA-1113-artifact-content-marker: these bytes must never reach the renderer").toString("base64")
+const MARKER_B64 = Buffer.from("CODEPUPPY-1113-artifact-content-marker: these bytes must never reach the renderer").toString("base64")
 /** 与生产 STRIP_KEYS 同名单,但刻意**独立誊写**:被测对象改错名单时这里不跟着错。 */
 const CONTENT_KEYS = ["base64", "b64", "dataUrl", "data_url", "r2Key", "downloadPath"]
 /** 占位符独立字面量(不 import DATA_URL_PLACEHOLDER):锚点在被测对象之外。 */

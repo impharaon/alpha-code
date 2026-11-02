@@ -162,7 +162,7 @@ describe("REQ-160 #1324 —— 游标文件", () => {
 
   test("落盘失败不抛给调用方(上报是旁路,不阻断对话)", () => {
     // 不可写的 userData:把一个**普通文件**当作目录的父级 —— mkdirSync 必 ENOTDIR。
-    // 刻意不拿字面 NUL 构造坏路径:那会让整个文件对默认 grep 隐身(`#760`,alpha-check 第 [3/14] 步会红)。
+    // 刻意不拿字面 NUL 构造坏路径:那会让整个文件对默认 grep 隐身(`#760`,codepuppy-check 第 [3/14] 步会红)。
     const root = tempDir()
     writeFileSync(join(root, "not-a-dir"), "x", "utf8")
     const errors: unknown[] = []

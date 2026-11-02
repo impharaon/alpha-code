@@ -6,7 +6,7 @@
 // AC2:订阅一开始就回放 ready(= main 从持久化恢复后的投影,恢复逻辑在
 // src/main/updater-restore.test.ts),**不点任何东西**入口就可见,且点它调 install。
 //
-// 挂载走生产组合体(OverlayCloseHarness:真 AlphaSidebar + 真 @solidjs/router),交互走真实
+// 挂载走生产组合体(OverlayCloseHarness:真 CodePuppySidebar + 真 @solidjs/router),交互走真实
 // 点击。替身面与 account-version.cases.ts 同因同法:上游 ui 装饰件 / SDK 传输层 / preload 桥,
 // 不含被测语义 —— updater 的桥替身只做「捕获订阅回调 + 计数 check/install」,状态推送本身
 // 就是被测通路的输入端。子进程运行(src/renderer/sidebar/updater-surface.test.ts spawn):
@@ -18,7 +18,7 @@ import { GlobalRegistrator } from "@happy-dom/global-registrator"
 import { afterAll, afterEach, beforeEach, expect, mock, test } from "bun:test"
 import presetSolid from "babel-preset-solid"
 import type { UpdaterState } from "@opencode-ai/app/updater"
-import type { AlphaProject, AlphaProjectsApi } from "../src/renderer/sidebar/use-projects"
+import type { CodePuppyProject, CodePuppyProjectsApi } from "../src/renderer/sidebar/use-projects"
 
 GlobalRegistrator.register()
 const solid = await import("solid-js/dist/solid.js")
@@ -51,7 +51,7 @@ mock.module("@opencode-ai/ui/v2/project-avatar-v2", () => ({ ProjectAvatar: () =
 mock.module("@opencode-ai/ui/theme/context", () => ({
   useTheme: () => ({ colorScheme: () => "dark", setColorScheme: () => {} }),
 }))
-mock.module("../src/renderer/alpha-ui/providers", () => ({
+mock.module("../src/renderer/codepuppy-ui/providers", () => ({
   useCommand: () => ({ options: [], register: () => {}, trigger: () => {}, show: () => {}, hide: () => {} }),
   ServerConnection: { key: () => "sidecar", Key: { make: (value: string) => value } },
   useTabs: () => ({
@@ -126,8 +126,8 @@ const { hrefFor } = await import("../src/shared/route-manifest")
 
 const DIR = "/Users/tester/proj-a"
 
-function makeProjects(): AlphaProjectsApi {
-  const project: AlphaProject = {
+function makeProjects(): CodePuppyProjectsApi {
+  const project: CodePuppyProject = {
     id: "prj-a",
     worktree: DIR,
     name: "proj-a",
@@ -145,7 +145,7 @@ function makeProjects(): AlphaProjectsApi {
     shareSession: async () => undefined,
     deleteSession: async () => true,
     copySession: async () => undefined,
-  } as unknown as AlphaProjectsApi
+  } as unknown as CodePuppyProjectsApi
 }
 
 const disposers: Array<() => void> = []
@@ -194,23 +194,23 @@ async function push(state: UpdaterState) {
   await flush()
 }
 
-const note = () => document.querySelector(".alpha-updater-note")
+const note = () => document.querySelector(".codepuppy-updater-note")
 
 test("AC1:主动检查后,五个状态各有可见文案且互不相同(载荷哨兵逐字出现)", async () => {
   await mount()
   expect(note(), "初始(disabled)不应画更新条").toBeNull()
 
   // 真实交互:打开账户浮层 → 点「检查更新」
-  const trigger = document.querySelector(".alpha-sidebar-account")
+  const trigger = document.querySelector(".codepuppy-sidebar-account")
   expect(trigger, "侧栏账户入口未挂载").not.toBeNull()
   click(trigger!)
   await flush()
-  const row = document.querySelector('[data-alpha-acct-item="check-updates"]')
+  const row = document.querySelector('[data-codepuppy-acct-item="check-updates"]')
   expect(row, "浮层里没有「检查更新」项").not.toBeNull()
   click(row!)
   await flush()
   expect(checkCalls, "点「检查更新」应调 window.api.updater.check").toBe(1)
-  expect(document.querySelector(".alpha-acct-pop"), "点完应关掉浮层").toBeNull()
+  expect(document.querySelector(".codepuppy-acct-pop"), "点完应关掉浮层").toBeNull()
 
   const states: UpdaterState[] = [
     { status: "checking" },
@@ -228,7 +228,7 @@ test("AC1:主动检查后,五个状态各有可见文案且互不相同(载荷�
     const text = el!.textContent ?? ""
     expect(text.trim().length, `status=${state.status} 文案不应为空`).toBeGreaterThan(0)
     // t() 对缺 key 返回 key 本身 —— 裸 key 也「互不相同」,所以单独拦住
-    expect(text.includes("alpha.updater."), `status=${state.status} 渲染的是裸 i18n key:${text}`).toBe(false)
+    expect(text.includes("codepuppy.updater."), `status=${state.status} 渲染的是裸 i18n key:${text}`).toBe(false)
     copies.push(text)
   }
   expect(new Set(copies).size, `五个状态的文案必须互不相同:${copies.join(" | ")}`).toBe(states.length)
@@ -246,7 +246,7 @@ test("AC2:订阅回放 ready(重启恢复投影)→ 零交互即可见安装入�
   expect(el!.getAttribute("data-status")).toBe("ready")
   expect(el!.textContent ?? "").toContain(VERSION_SENTINEL)
 
-  const install = el!.querySelector(".alpha-updater-install")
+  const install = el!.querySelector(".codepuppy-updater-install")
   expect(install, "ready 态应有安装按钮").not.toBeNull()
   click(install!)
   await flush()

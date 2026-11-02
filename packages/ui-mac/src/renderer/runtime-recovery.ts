@@ -1,5 +1,5 @@
 import type { SidecarGenerationState } from "../preload/types"
-import { shouldApplySidecarState } from "./alpha-ui/model-recovery"
+import { shouldApplySidecarState } from "./codepuppy-ui/model-recovery"
 import { markStartupTimeline } from "./startup-timeline"
 
 export const RUNTIME_RECOVERY_EVENT = "alpha:runtime-recovery"

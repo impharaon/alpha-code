@@ -25,7 +25,7 @@ import { testEffect } from "../lib/effect"
 
 const it = testEffect(LayerNode.compile(MCP.node))
 
-const URL_ = "http://alpha-transport-retry.invalid/mcp"
+const URL_ = "http://codepuppy-transport-retry.invalid/mcp"
 const CONNECT_TIMEOUT_TEXT =
   "Connect Timeout Error (attempted address: alpha-cloud.tidelabs.click:443, timeout: 10000ms)"
 

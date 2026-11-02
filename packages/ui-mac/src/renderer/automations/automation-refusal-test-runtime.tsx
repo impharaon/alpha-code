@@ -2,7 +2,7 @@
 //
 // 挂的是**生产 AutomationPanel** 本体(零替身)+ 真 `@solidjs/router`。替身只剩最外围的
 // preload 桥 `window.api` —— renderer 侧一切 IPC 都从那里过,而 main 进程不在这个闸门里。
-// 于是判据能落在「`.alpha-auto-err` 里那串字符」这个**用户可观察结果**上,而不是某个信号的值
+// 于是判据能落在「`.codepuppy-auto-err` 里那串字符」这个**用户可观察结果**上,而不是某个信号的值
 // 或源码文本(后两者修前就能绿)。
 //
 // 形制沿用同目录之外的既有 harness(upload-consent / shell-commands):由测试文件用生产
@@ -15,7 +15,7 @@ import { MemoryRouter, Route } from "@solidjs/router"
 import { createSignal, type JSX } from "solid-js"
 import { render } from "solid-js/web"
 import { AutomationPanel } from "./automation-panel"
-import { ToastViewport } from "../alpha-ui/Toast"
+import { ToastViewport } from "../codepuppy-ui/Toast"
 import { setAutomationOpen } from "./automation-state"
 import { scheduleRefusalCopy } from "./schedule-refusal-copy"
 import { automationActionCopy } from "./schedule-refusal-copy"
@@ -23,7 +23,7 @@ import { setLocale, t } from "../i18n"
 import { resetAuthRecoveryForTests } from "../auth-recovery"
 import type { AuthState } from "../../preload/types"
 import type { AutomationTask } from "../../shared/automation-types"
-import type { NetFailureLayer } from "@opencode-ai/schema/alpha-net-failure"
+import type { NetFailureLayer } from "@opencode-ai/schema/codepuppy-net-failure"
 
 export { automationActionCopy, render, scheduleRefusalCopy, setLocale, t }
 
@@ -187,7 +187,7 @@ export function AutomationRefusalHarness(): JSX.Element {
   )
   return (
     <MemoryRouter root={Shell}>
-      <Route path="*" component={() => <main data-alpha-test-content />} />
+      <Route path="*" component={() => <main data-codepuppy-test-content />} />
     </MemoryRouter>
   )
 }

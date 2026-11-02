@@ -51,7 +51,7 @@ setLocale("en")
 const DIGEST = `sha256:${"ab12".repeat(16)}`
 const SHORT = "sha256:ab12ab12ab12…"
 
-/** 真实随包 Excel 卡片的形状(id/name/version/命令都照 `alpha-catalog.json` 里那条)。 */
+/** 真实随包 Excel 卡片的形状(id/name/version/命令都照 `codepuppy-catalog.json` 里那条)。 */
 const excelEntry = {
   id: "mcp:codepuppy-excel",
   type: "mcp",
@@ -69,7 +69,7 @@ const excelEntry = {
   },
 } as never
 
-/** #1564:alpha-web 签名目录里 Word 卡片的原样(`alpha-catalog.json`):仍写着 uv 命令与 runtimeDep ["uv"]。 */
+/** #1564:alpha-web 签名目录里 Word 卡片的原样(`codepuppy-catalog.json`):仍写着 uv 命令与 runtimeDep ["uv"]。 */
 const wordEntry = {
   id: "mcp:codepuppy-word",
   type: "mcp",
@@ -152,11 +152,11 @@ describe("REQ-105 #319 — the detail header states what the install actually ex
     )
     const text = host.textContent ?? ""
     // 版本仍然在(审计原文里的 1.0.0)……
-    expect(text).toContain(`${en["alpha.ext.detailVersion"]} 1.0.0`)
+    expect(text).toContain(`${en["codepuppy.ext.detailVersion"]} 1.0.0`)
     // ……但现在它旁边有一个能指认执行物的东西,而且是用户**看得到**的文本,不只是一个属性。
-    expect(text).toContain(en["alpha.ext.detailArtifactDigest"])
+    expect(text).toContain(en["codepuppy.ext.detailArtifactDigest"])
     expect(text).toContain(SHORT)
-    expect(text).not.toContain(en["alpha.ext.detailArtifactDigestUnrecorded"])
+    expect(text).not.toContain(en["codepuppy.ext.detailArtifactDigestUnrecorded"])
     // 完整值可复制/核对(title + data 属性),短形态只是显示。
     const node = digestNode(host)
     expect(node?.getAttribute("data-artifact-digest")).toBe(DIGEST)
@@ -169,8 +169,8 @@ describe("REQ-105 #319 — the detail header states what the install actually ex
       true,
     )
     const text = host.textContent ?? ""
-    expect(text).toContain(en["alpha.ext.detailArtifactDigest"])
-    expect(text).toContain(en["alpha.ext.detailArtifactDigestUnrecorded"])
+    expect(text).toContain(en["codepuppy.ext.detailArtifactDigest"])
+    expect(text).toContain(en["codepuppy.ext.detailArtifactDigestUnrecorded"])
     expect(text).not.toContain("sha256:")
     expect(digestNode(host)?.getAttribute("data-artifact-digest")).toBe("")
   })
@@ -181,14 +181,14 @@ describe("REQ-105 #319 — the detail header states what the install actually ex
       true,
     )
     const text = host.textContent ?? ""
-    expect(text).toContain(en["alpha.ext.detailArtifactDigestUnrecorded"])
+    expect(text).toContain(en["codepuppy.ext.detailArtifactDigestUnrecorded"])
     expect(text).not.toContain("deadbeef")
   })
 
   test("a not-installed entry shows no artifact-digest row at all", () => {
     const host = mountDetail([], false)
     expect(digestNode(host)).toBeNull()
-    expect(host.textContent ?? "").not.toContain(en["alpha.ext.detailArtifactDigest"])
+    expect(host.textContent ?? "").not.toContain(en["codepuppy.ext.detailArtifactDigest"])
   })
 })
 
@@ -203,18 +203,18 @@ describe("#1564 AC3 — the detail page's runtime section for a document tool", 
     officeRuntimeAnswer = { ok: true }
     const host = mountDetail([], false, wordEntry)
     await settle()
-    expect(runtimePills(host)).toEqual([["ok", `${en["alpha.ext.officeRuntime"]} ✓`]])
-    expect(host.textContent ?? "").not.toContain(en["alpha.ext.depMissingTitle"])
+    expect(runtimePills(host)).toEqual([["ok", `${en["codepuppy.ext.officeRuntime"]} ✓`]])
+    expect(host.textContent ?? "").not.toContain(en["codepuppy.ext.depMissingTitle"])
     expect([...host.querySelectorAll("code")].map((node) => node.textContent)).not.toContain("brew install uv")
-    expect(host.textContent ?? "").not.toContain(en["alpha.ext.officeRuntimeMissing"])
+    expect(host.textContent ?? "").not.toContain(en["codepuppy.ext.officeRuntimeMissing"])
   })
 
   test("bundled runtime missing ⇒ the named reason that says to reinstall Code Puppy", async () => {
     officeRuntimeAnswer = { ok: false, reason: "office-runtime-missing" }
     const host = mountDetail([], false, wordEntry)
     await settle()
-    expect(runtimePills(host)).toEqual([["missing", `${en["alpha.ext.officeRuntime"]} ✗ ${en["alpha.ext.depMissing"]}`]])
-    expect(host.textContent ?? "").toContain(en["alpha.ext.officeRuntimeMissing"])
+    expect(runtimePills(host)).toEqual([["missing", `${en["codepuppy.ext.officeRuntime"]} ✗ ${en["codepuppy.ext.depMissing"]}`]])
+    expect(host.textContent ?? "").toContain(en["codepuppy.ext.officeRuntimeMissing"])
     officeRuntimeAnswer = { ok: true }
   })
 })

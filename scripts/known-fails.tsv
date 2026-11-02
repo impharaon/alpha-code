@@ -1,7 +1,7 @@
 # base fail-set —— ui-mac 全量(`bun test src`)里**已知、被容忍**的红(#1086)。
 #
-# 消费方:scripts/bun-test-floor.sh(仅当 ALPHA_KNOWN_FAILS_FILE 置位;今天恰好两处 ——
-# alpha-check.sh 第 [5/10] 步的 ui-mac 全量,与 alpha-ci 的 `bun test (ui-mac)`,同一条命令)。
+# 消费方:scripts/bun-test-floor.sh(仅当 CODEPUPPY_KNOWN_FAILS_FILE 置位;今天恰好两处 ——
+# codepuppy-check.sh 第 [5/10] 步的 ui-mac 全量,与 codepuppy-ci 的 `bun test (ui-mac)`,同一条命令)。
 # 判官:scripts/known-fails-compare.py。语义:清单内的红放行;**清单外的红拦住并逐条点名**。
 #
 # ── 棘轮方向(#1086 AC4)────────────────────────────────────────────────────────

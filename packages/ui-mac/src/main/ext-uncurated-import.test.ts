@@ -19,9 +19,9 @@ let src: string
 let deps: UncuratedImportDeps
 
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), "alpha-uncurated-"))
+  root = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-uncurated-"))
   casBase = path.join(root, "cas-base")
-  src = fs.mkdtempSync(path.join(os.tmpdir(), "alpha-uncurated-src-"))
+  src = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-uncurated-src-"))
   deps = { globalRoot: () => root, casBaseRoot: () => casBase, environment: () => "prod" }
 })
 afterEach(() => {
@@ -83,7 +83,7 @@ describe("collectImportSkillPayload — 集中 import 校验 + byte-exact 载荷
 
   test("SKILL.md symlink 指向源目录外 → realpath 圈禁拒(review r1 Major 3)", () => {
     fs.mkdirSync(src, { recursive: true })
-    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "alpha-uncurated-outside-"))
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-uncurated-outside-"))
     fs.writeFileSync(path.join(outside, "secret.md"), "---\nname: demo\ndescription: x\n---\n\n越界内容\n")
     try {
       fs.symlinkSync(path.join(outside, "secret.md"), path.join(src, "SKILL.md"))
@@ -101,7 +101,7 @@ describe("collectImportSkillPayload — 集中 import 校验 + byte-exact 载荷
 
   test("普通文件 symlink 指向源目录外 → 不入载荷 / 圈禁拒(review r1 Major 3)", () => {
     mkSkillDir(src, "demo")
-    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "alpha-uncurated-outside2-"))
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-uncurated-outside2-"))
     fs.writeFileSync(path.join(outside, "secret.txt"), "越界字节")
     try {
       fs.symlinkSync(path.join(outside, "secret.txt"), path.join(src, "leak.txt"))
@@ -214,7 +214,7 @@ describe("installUncuratedSkillImport — global folder 导入走 CAS + generati
     const betaRoot = path.join(root, "env", "beta")
     fs.mkdirSync(betaRoot, { recursive: true })
     const betaDeps: UncuratedImportDeps = { globalRoot: () => betaRoot, casBaseRoot: () => casBase, environment: () => "beta" }
-    const src2 = fs.mkdtempSync(path.join(os.tmpdir(), "alpha-uncurated-src2-"))
+    const src2 = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-uncurated-src2-"))
     mkSkillDir(src2, "demo")
     const r2 = await installUncuratedSkillImport(src2, betaDeps, { origin: "imported" })
     fs.rmSync(src2, { recursive: true, force: true })
@@ -232,7 +232,7 @@ describe("installUncuratedAgentImport — imported agent 走 CAS + file/config �
     if (!r.ok) return
     expect(r.kind).toBe("agent")
     expect(fs.existsSync(path.join(root, "agents", "demo-agent.md"))).toBe(true)
-    const cfg: unknown = parseJsonc(fs.readFileSync(path.join(root, "alpha.jsonc"), "utf8"))
+    const cfg: unknown = parseJsonc(fs.readFileSync(path.join(root, "codepuppy.jsonc"), "utf8"))
     const agentMap = cfg && typeof cfg === "object" ? (cfg as { agent?: Record<string, unknown> }).agent : undefined
     expect(agentMap?.["demo-agent"]).toBeDefined()
     const rec = findRecordV2(root, "agent", "demo-agent")
@@ -272,7 +272,7 @@ describe("ecosystem-import 路由 wiring(#390)", () => {
   })
 
   test("project scope 不注入 installer → 维持 flat sanctioned 路径(installer 不被调)", async () => {
-    const proj = fs.mkdtempSync(path.join(os.tmpdir(), "alpha-uncurated-proj-"))
+    const proj = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-uncurated-proj-"))
     mkSkillDir(path.join(proj, "src-skill"), "projskill")
     let called = false
     const installer = async (dir: string, origin: "imported-claude" | "imported-agents") => {

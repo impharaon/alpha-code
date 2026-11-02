@@ -1,15 +1,15 @@
-// REQ-059 T2:启动 reconcile —— 存量引擎配置迁进当前环境 `alpha.jsonc`(copy-don't-delete)。
+// REQ-059 T2:启动 reconcile —— 存量引擎配置迁进当前环境 `codepuppy.jsonc`(copy-don't-delete)。
 //
 // 读 legacy(`~/.opencode/opencode.jsonc`,REQ-018 时代 mcp/plugin/治理键)+ XDG provider 域 →
-// 所有权判定(isAlphaOwnedConfig,越界/非账内 mcp = bail-out loud 不迁,保留原布局功能零损失)→
-// planConfigMerge(幂等 + existing 优先)→ 写 alpha.jsonc。**不删源**:`~/.opencode` 清理(拆桥 +
+// 所有权判定(isCodePuppyOwnedConfig,越界/非账内 mcp = bail-out loud 不迁,保留原布局功能零损失)→
+// planConfigMerge(幂等 + existing 优先)→ 写 codepuppy.jsonc。**不删源**:`~/.opencode` 清理(拆桥 +
 // 删目录)属 T3(桥退役),迁移期两处内容一致(merge 幂等),引擎从两处读无冲突。
 //
-// 逃生:ALPHA_JSONC_TRUTH_DISABLE=1 / ALPHA_LEGACY_INSTALL_ROOT=1 → 不迁(回旧行为,与 sidecar 注入
+// 逃生:CODEPUPPY_JSONC_TRUTH_DISABLE=1 / CODEPUPPY_LEGACY_INSTALL_ROOT=1 → 不迁(回旧行为,与 sidecar 注入
 // 及 ext-config 写入目标三侧一致)。启动早期(sidecar fork 前)调用一次;幂等,重复启动 no-op。
 //
 // ADR-040(`#832`):本模块**不再有自己的写盘原语**。它曾经 `writeFileSync(tmp)+rename` 写整个
-// `alpha.jsonc` —— 整文件写,`writeKeyUnlocked` / `prepareConfigTx` / `writeConfigLeafEditsUnlocked`
+// `codepuppy.jsonc` —— 整文件写,`writeKeyUnlocked` / `prepareConfigTx` / `writeConfigLeafEditsUnlocked`
 // 三道白名单一道都不过,于是「往引擎 `plugin[]` 里加东西」在这条路上是免检的(它每次启动都跑)。
 // 现在落盘经 `ext-config` 那个**已挂咽喉**的原子提交点:本函数将来无论新增什么注入步,只要写完
 // 之后 `plugin[]` 里多出写之前没有的元素,就在写盘那一刻被具名拒掉,不需要谁记得来这里登记。
@@ -20,23 +20,23 @@ import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
 import { parse } from "jsonc-parser"
-import { alphaGlobalRoot } from "./alpha-installs"
-import { opencodeHomeDir } from "./alpha-bridge"
-import { readLedger } from "./alpha-installs"
+import { codepuppyGlobalRoot } from "./codepuppy-installs"
+import { opencodeHomeDir } from "./codepuppy-bridge"
+import { readLedger } from "./codepuppy-installs"
 import { agentMdToEntry } from "./agent-md-entry"
 import { persistAgentEntry, writeConfigTextAtomic } from "./ext-config"
 import {
-  alphaJsoncPath,
-  alphaSkillsDir,
+  codepuppyJsoncPath,
+  codepuppySkillsDir,
   ensureSkillsPath,
-  isAlphaOwnedConfig,
+  isCodePuppyOwnedConfig,
   isJunkOnlyDir,
   planConfigMerge,
   rewriteFactorySkillPaths,
   stripFactoryBuiltinPolicyLeaves,
 } from "./engine-config-truth"
 import { FACTORY_SKILL_IDS } from "./factory-skills"
-import { FACTORY_DENIED_SKILLS } from "./alpha-builtin-policy"
+import { FACTORY_DENIED_SKILLS } from "./codepuppy-builtin-policy"
 
 type Logger = { log: (m: string, meta?: unknown) => void; warn: (m: string, meta?: unknown) => void }
 
@@ -76,7 +76,7 @@ type JsoncRead =
   | { status: "unreadable"; reason: string }
 
 /** #395(Codex r5)步骤4:读错误只容缺席(ENOENT/ENOTDIR)—— EACCES/EIO 等「读不出」≠「不存在」。
- *  truth 读不出还照写 = 以不完整基底重建 alpha.jsonc,会抹掉既有内容(含 disabled 投影键);
+ *  truth 读不出还照写 = 以不完整基底重建 codepuppy.jsonc,会抹掉既有内容(含 disabled 投影键);
  *  legacy/XDG 读不出当缺席 = 该迁的没迁还可能触发清理。非缺席错误一律显式上报,由调用方 fail-closed。
  *  (解析容忍度不变:jsonc-parser 容错解析,非对象/解析异常仍视作无内容 —— 与既有迁移语义一致。) */
 function readJsonc(file: string): JsoncRead {
@@ -99,7 +99,7 @@ function readJsonc(file: string): JsoncRead {
 }
 
 export type ReconcileOptions = {
-  /** REQ-065(修订):出厂路径已改内存注入(env → ext config hook),不再写入 alpha.jsonc。
+  /** REQ-065(修订):出厂路径已改内存注入(env → ext config hook),不再写入 codepuppy.jsonc。
    *  此参数现用于**剥离**历史版本写盘的出厂条目:传 [](reconcile 成功时的常态)= 只清不加;
    *  不传 = 不动该组(factory reconcile 失败时的保守态/测试兼容)。 */
   factorySkillDirs?: string[]
@@ -125,19 +125,19 @@ export function reconcileEngineConfigTruth(log?: Logger, opts?: ReconcileOptions
   // 退休桥断链与配置迁移完全独立：必须早于 escape hatch、truth 读失败、ownership bail-out 等
   // 任一提前返回。这里只 lstat/readlink 桥本身，不 realpath/读取/迁移退休目标。
   unlinkRetiredOpencodeBridges(opts?.retiredHomeDir ?? os.homedir(), log, opts?.retiredBridgeFs)
-  if (process.env.ALPHA_JSONC_TRUTH_DISABLE === "1" || process.env.ALPHA_LEGACY_INSTALL_ROOT === "1") {
-    return { skipped: true, reason: "escape hatch set (ALPHA_JSONC_TRUTH_DISABLE / ALPHA_LEGACY_INSTALL_ROOT)" }
+  if (process.env.CODEPUPPY_JSONC_TRUTH_DISABLE === "1" || process.env.CODEPUPPY_LEGACY_INSTALL_ROOT === "1") {
+    return { skipped: true, reason: "escape hatch set (CODEPUPPY_JSONC_TRUTH_DISABLE / CODEPUPPY_LEGACY_INSTALL_ROOT)" }
   }
-  const truth = alphaJsoncPath()
+  const truth = codepuppyJsoncPath()
   const legacyFile = legacyOpencodePath()
   const xdgFile = xdgConfigPath()
 
   const existingRead = readJsonc(truth)
   if (existingRead.status === "unreadable") {
-    // 步骤4(#395):truth 读不出(非缺席)→ 不写 —— 以不完整基底重建 alpha.jsonc 会抹掉既有
+    // 步骤4(#395):truth 读不出(非缺席)→ 不写 —— 以不完整基底重建 codepuppy.jsonc 会抹掉既有
     // 内容(含 disabled 投影键 = 禁用被复活)。fail-closed,本次启动跳过 reconcile。
-    log?.warn(`[req059] alpha.jsonc unreadable — reconcile fail-closed, config untouched: ${existingRead.reason}`)
-    return { skipped: true, reason: `alpha.jsonc unreadable (fail closed): ${existingRead.reason}` }
+    log?.warn(`[req059] codepuppy.jsonc unreadable — reconcile fail-closed, config untouched: ${existingRead.reason}`)
+    return { skipped: true, reason: `codepuppy.jsonc unreadable (fail closed): ${existingRead.reason}` }
   }
   const existing = existingRead.status === "ok" ? existingRead.value : undefined
   const legacyRead = readJsonc(legacyFile)
@@ -157,14 +157,14 @@ export function reconcileEngineConfigTruth(log?: Logger, opts?: ReconcileOptions
     log?.warn(`[req059] legacy ~/.opencode config unreadable — skipping MIGRATION (kept in place): ${legacyRead.reason}`)
     bailedOut = `legacy unreadable: ${legacyRead.reason}`
   } else if (legacy) {
-    const receipts = readLedger(alphaGlobalRoot()).receipts
+    const receipts = readLedger(codepuppyGlobalRoot()).receipts
     const receiptMcpNames = new Set(receipts.filter((r) => r.type === "mcp").map((r) => r.name))
     const receiptPluginKeys = new Set(
       receipts.filter((r) => r.type === "plugin").map((r) => r.configKey ?? r.name),
     )
-    const verdict = isAlphaOwnedConfig({ parsed: legacy, receiptMcpNames, receiptPluginKeys })
+    const verdict = isCodePuppyOwnedConfig({ parsed: legacy, receiptMcpNames, receiptPluginKeys })
     if (!verdict.owned) {
-      log?.warn(`[req059] legacy ~/.opencode config not alpha-owned — skipping MIGRATION (kept in place): ${verdict.reason}`)
+      log?.warn(`[req059] legacy ~/.opencode config not codepuppy-owned — skipping MIGRATION (kept in place): ${verdict.reason}`)
       bailedOut = verdict.reason
       legacyToMerge = undefined // don't migrate legacy content; skills.paths still injected below
     } else if (verdict.unaccountedMcp && verdict.unaccountedMcp.length > 0) {
@@ -182,8 +182,8 @@ export function reconcileEngineConfigTruth(log?: Logger, opts?: ReconcileOptions
   const plan = planConfigMerge(existing, legacyToMerge, xdgProvider)
   // T3:全局 skills 经 skills.paths(文件通道生效)发现当前环境 skills —— 恒定注入(非迁移物,独立于
   // ownership bail),使桥退役后引擎仍能发现**用户装的**技能。幂等。
-  const skillsAdded = ensureSkillsPath(plan.merged, alphaSkillsDir())
-  // REQ-065:出厂技能条目组重写 —— 直指 app 资源(不再经全局 skills 链中转;alphaGlobalRoot() 只承载
+  const skillsAdded = ensureSkillsPath(plan.merged, codepuppySkillsDir())
+  // REQ-065:出厂技能条目组重写 —— 直指 app 资源(不再经全局 skills 链中转;codepuppyGlobalRoot() 只承载
   // 用户自有内容)。每启动重写,跟随 app 安装路径/版本变化;stale 出厂路径按名单+布局判定移除。
   const factoryRewritten = opts?.factorySkillDirs
     ? rewriteFactorySkillPaths(plan.merged, opts.factorySkillDirs, FACTORY_SKILL_IDS)
@@ -205,7 +205,7 @@ export function reconcileEngineConfigTruth(log?: Logger, opts?: ReconcileOptions
     // 清理 `~/.opencode`(那一步的前提是「内容已经安全落到真源」,前提没成立就不能删源)。
     const written = writeConfigTextAtomic(truth, existingRead.text, JSON.stringify(plan.merged, null, 2) + "\n")
     if (!written.ok) {
-      log?.warn(`[req059] alpha.jsonc write refused during reconcile — config untouched`, { reason: written.reason })
+      log?.warn(`[req059] codepuppy.jsonc write refused during reconcile — config untouched`, { reason: written.reason })
       // 报的是**这次为什么一个字节都没写**(而不是更早那条 legacy 所有权 bail 的理由 —— 它已经
       // 各自 loud 过一遍了)。写不下去比「legacy 没迁」严重一档,报低的那条会让人查错方向。
       return { skipped: false, migrated: false, added: [], bailedOut: written.reason }
@@ -215,7 +215,7 @@ export function reconcileEngineConfigTruth(log?: Logger, opts?: ReconcileOptions
   }
 
   // Bail-out → leave ~/.opencode fully intact (legacy mcp/plugin still read by the engine). Only clean up
-  // when the legacy world is alpha-owned (or absent) so nothing user-authored is touched.
+  // when the legacy world is codepuppy-owned (or absent) so nothing user-authored is touched.
   if (bailedOut) return { skipped: false, migrated, added, bailedOut }
 
   // T3:migration/injection 落定后清理 ~/.opencode —— 拆自有链、删已迁配置,junk-only 则整目录删。
@@ -340,16 +340,16 @@ function isEnoent(error: unknown): boolean {
  */
 function cleanupOpencodeHome(log?: Logger): void {
   const dir = opencodeHomeDir()
-  const alphaRoot = alphaGlobalRoot()
+  const codepuppyRoot = codepuppyGlobalRoot()
   try {
     if (!fs.existsSync(dir)) return
   } catch {
     return
   }
-  // 0.(T3b)存量 agents 桥 → 条目化迁移 + 拆链:<current-environment-root>/agents/*.md → alpha.jsonc
+  // 0.(T3b)存量 agents 桥 → 条目化迁移 + 拆链:<current-environment-root>/agents/*.md → codepuppy.jsonc
   //    agent 条目;**全部成功才拆 agents 桥**(任一转换失败 → loud 保留桥 = 该 agent 继续经桥可见,
   //    诚实降级)。幂等:persistAgentEntry 覆盖写同值;无 agents 目录/无桥 → no-op。
-  migrateAgentBridges(dir, alphaRoot, log)
+  migrateAgentBridges(dir, codepuppyRoot, log)
   // 1. 拆 alpha 自有的类目 symlink(dir-link 指向当前环境的 <kind>)。用户真实目录/异源链不碰。
   //    skills = REQ-059 T3(skills.paths 文件通道接管);agents 由上一步全权处理(迁移成功才拆);
   //    commands = 防御性(无写入方,预留目录,若存在 alpha 链一并拆)。
@@ -360,7 +360,7 @@ function cleanupOpencodeHome(log?: Logger): void {
       if (st.isSymbolicLink()) {
         const target = fs.readlinkSync(p)
         const resolved = path.isAbsolute(target) ? target : path.resolve(dir, target)
-        if (resolved === path.join(alphaRoot, kind) || resolved.startsWith(alphaRoot + path.sep)) {
+        if (resolved === path.join(codepuppyRoot, kind) || resolved.startsWith(codepuppyRoot + path.sep)) {
           fs.unlinkSync(p)
           log?.log(`[req059] unbridged ~/.opencode/${kind} (pointed into current environment root)`)
         }
@@ -398,13 +398,13 @@ function cleanupOpencodeHome(log?: Logger): void {
 }
 
 /**
- * T3b:存量 agents 桥的条目化迁移。桥形态两种(alpha-bridge):目录级 dir-link
+ * T3b:存量 agents 桥的条目化迁移。桥形态两种(codepuppy-bridge):目录级 dir-link
  * `~/.opencode/agents → <current-environment-root>/agents`,或真实目录内的逐条目链。逐 md 转换写条目;
  * **全部成功才拆链**(部分失败 → 保留桥,loud;下次启动重试 —— persistAgentEntry 幂等)。
  */
-function migrateAgentBridges(opencodeDir: string, alphaRoot: string, log?: Logger): void {
+function migrateAgentBridges(opencodeDir: string, codepuppyRoot: string, log?: Logger): void {
   const bridged = path.join(opencodeDir, "agents")
-  const alphaAgents = path.join(alphaRoot, "agents")
+  const codepuppyAgents = path.join(codepuppyRoot, "agents")
   let form: "dir-link" | "item-links" | null = null
   const itemLinks: string[] = []
   try {
@@ -412,7 +412,7 @@ function migrateAgentBridges(opencodeDir: string, alphaRoot: string, log?: Logge
     if (st.isSymbolicLink()) {
       const target = fs.readlinkSync(bridged)
       const resolved = path.isAbsolute(target) ? target : path.resolve(opencodeDir, target)
-      if (resolved === alphaAgents || resolved.startsWith(alphaRoot + path.sep)) form = "dir-link"
+      if (resolved === codepuppyAgents || resolved.startsWith(codepuppyRoot + path.sep)) form = "dir-link"
     } else if (st.isDirectory()) {
       for (const f of fs.readdirSync(bridged)) {
         const p = path.join(bridged, f)
@@ -421,7 +421,7 @@ function migrateAgentBridges(opencodeDir: string, alphaRoot: string, log?: Logge
           if (!ls.isSymbolicLink()) continue
           const target = fs.readlinkSync(p)
           const resolved = path.isAbsolute(target) ? target : path.resolve(bridged, target)
-          if (resolved.startsWith(alphaRoot + path.sep)) itemLinks.push(p)
+          if (resolved.startsWith(codepuppyRoot + path.sep)) itemLinks.push(p)
         } catch {
           /* skip */
         }
@@ -433,10 +433,10 @@ function migrateAgentBridges(opencodeDir: string, alphaRoot: string, log?: Logge
   }
   if (!form) return
 
-  // 迁移:真源 md 全部转换成条目(alpha.jsonc);任一失败 → 保留桥 loud。
+  // 迁移:真源 md 全部转换成条目(codepuppy.jsonc);任一失败 → 保留桥 loud。
   let mds: string[] = []
   try {
-    mds = fs.existsSync(alphaAgents) ? fs.readdirSync(alphaAgents).filter((f) => f.endsWith(".md")) : []
+    mds = fs.existsSync(codepuppyAgents) ? fs.readdirSync(codepuppyAgents).filter((f) => f.endsWith(".md")) : []
   } catch {
     mds = []
   }
@@ -444,7 +444,7 @@ function migrateAgentBridges(opencodeDir: string, alphaRoot: string, log?: Logge
     const name = f.slice(0, -3)
     let content: string
     try {
-      content = fs.readFileSync(path.join(alphaAgents, f), "utf8")
+      content = fs.readFileSync(path.join(codepuppyAgents, f), "utf8")
     } catch (error) {
       log?.warn(`[req059-t3b] agent md unreadable — bridge kept`, { file: f, error: String(error) })
       return
@@ -468,7 +468,7 @@ function migrateAgentBridges(opencodeDir: string, alphaRoot: string, log?: Logge
       for (const p of itemLinks) fs.unlinkSync(p)
       if (fs.readdirSync(bridged).length === 0) fs.rmSync(bridged, { recursive: true, force: true })
     }
-    log?.log(`[req059-t3b] agents bridge retired (${mds.length} agent(s) migrated to alpha.jsonc entries)`)
+    log?.log(`[req059-t3b] agents bridge retired (${mds.length} agent(s) migrated to codepuppy.jsonc entries)`)
   } catch (error) {
     log?.warn(`[req059-t3b] agents bridge unlink failed`, { error: String(error) })
   }

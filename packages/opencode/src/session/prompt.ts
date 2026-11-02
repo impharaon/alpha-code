@@ -33,9 +33,9 @@ import { NamedError } from "@opencode-ai/core/util/error"
 import { SessionProcessor } from "./processor"
 import { Tool } from "@/tool/tool"
 import { Permission } from "@/permission"
-import { AlphaToolPolicy } from "@/permission/alpha-tool-policy"
-import { AlphaToolPolicyGate } from "@/permission/alpha-tool-policy-gate"
-import { AlphaToolInventory } from "@/permission/alpha-tool-inventory"
+import { CodePuppyToolPolicy } from "@/permission/codepuppy-tool-policy"
+import { CodePuppyToolPolicyGate } from "@/permission/codepuppy-tool-policy-gate"
+import { CodePuppyToolInventory } from "@/permission/codepuppy-tool-inventory"
 import { SessionStatus } from "./status"
 import { LLM } from "./llm"
 import { Shell } from "@opencode-ai/core/shell"
@@ -135,7 +135,7 @@ const layer = Layer.effect(
     const commands = yield* Command.Service
     const config = yield* Config.Service
     const permission = yield* Permission.Service
-    const toolPolicy = yield* AlphaToolPolicy.Service
+    const toolPolicy = yield* CodePuppyToolPolicy.Service
     const fsys = yield* FSUtil.Service
     const mcp = yield* MCP.Service
     const lsp = yield* LSP.Service
@@ -317,7 +317,7 @@ const layer = Layer.effect(
       // 下一条消息的 loop 又把它交回这里 —— 发起方已换成新消息的档位,旧子任务被重问或重派。
       const gate = {
         policy: toolPolicy,
-        subject: Effect.succeed(AlphaToolPolicyGate.builtinSubject(taskTool.identity, { kind: "not-asserted" })),
+        subject: Effect.succeed(CodePuppyToolPolicyGate.builtinSubject(taskTool.identity, { kind: "not-asserted" })),
         ruleset: taskRuleset,
       }
       const decision = yield* Effect.gen(function* () {
@@ -332,7 +332,7 @@ const layer = Layer.effect(
         // deny;身份轴同样要成立。在任何副作用(消息/part 持久化、plugin hook、subsession/Task execute)
         // 之前走与 E1-E4 同一个 gate 的 decide:ruleset 轴 + 策略**文档轴**(调用时重读;task 是 builtin 类,
         // binding 为应用常量)。deny ⇒ 具名拒绝(与上面同型,双保险);要问的那一问在钩子之后(#1574,见下)。
-        return yield* AlphaToolPolicyGate.decide(gate).pipe(Effect.orDie)
+        return yield* CodePuppyToolPolicyGate.decide(gate).pipe(Effect.orDie)
       }).pipe(
         Effect.catchCause((cause) => {
           const refusal = Cause.squash(cause)
@@ -421,7 +421,7 @@ const layer = Layer.effect(
       // 拒绝 / 复核不过 / 超时:这条 part 记成 error、助手消息以 error 收尾,再把拒绝抛给 loop ——
       // 与派出前的拒绝一样结束本轮,不留一条还在跑的子任务。挂起时用户停止(只有中断):与下面运行中
       // 子任务被中断同样收口成「Cancelled」,不写报错的助手消息。
-      yield* AlphaToolPolicyGate.confirm(decision, {
+      yield* CodePuppyToolPolicyGate.confirm(decision, {
         ...gate,
         permission,
         sessionID,
@@ -1378,7 +1378,7 @@ const layer = Layer.effect(
               messages: msgs,
               promptOps,
             }).pipe(
-              Effect.provideService(AlphaToolPolicy.Service, toolPolicy),
+              Effect.provideService(CodePuppyToolPolicy.Service, toolPolicy),
               Effect.provideService(Plugin.Service, plugin),
               Effect.provideService(Permission.Service, permission),
               Effect.provideService(ToolRegistry.Service, registry),
@@ -1760,21 +1760,21 @@ const argsRegex = /(?:\[Image\s+\d+\]|"[^"]*"|'[^']*'|[^\s"']+)/gi
 const placeholderRegex = /\$(\d+)/g
 const quoteTrimRegex = /^["']|["']$/g
 
-// ── #1130 路线 B:把 core 标签 `@opencode/v2/AlphaToolPolicyApi` 从这个顶层 node 合成暴露 ──
+// ── #1130 路线 B:把 core 标签 `@opencode/v2/CodePuppyToolPolicyApi` 从这个顶层 node 合成暴露 ──
 // v2 handlers 能看见的上下文只有两种来源:core 的 location services(location-services.ts,上游)
 // 与 httpapi/server.ts `app` 组的**顶层**成员(LayerNode.compile 对依赖用 Layer.provide、只对顶层用
 // provideMerge)。两处都是上游文件;本文件是 `app` 组顶层成员里已收编(ADR-033 / #1011)且依赖面
-// 已含 ToolRegistry / MCP / Config / AlphaToolPolicy 的那个,所以合成放在这里 —— **不新增 deps**
+// 已含 ToolRegistry / MCP / Config / CodePuppyToolPolicy 的那个,所以合成放在这里 —— **不新增 deps**
 // (InstanceStore 由 bridge 在请求时从上下文取;加进 deps 会让所有编译本 node 的测试被迫绑定
 // InstanceStore.bootstrapNode)。
-// Layer.suspend 是必需的:tool/registry → tool/task → session/prompt → alpha-tool-inventory → tool/registry
-// 构成 ESM 环,顶层直接取 `AlphaToolInventory.exposed` 在 inventory 先被加载时会撞 TDZ。
+// Layer.suspend 是必需的:tool/registry → tool/task → session/prompt → codepuppy-tool-inventory → tool/registry
+// 构成 ESM 环,顶层直接取 `CodePuppyToolInventory.exposed` 在 inventory 先被加载时会撞 TDZ。
 // 勘破与替代宿主的取舍见 docs/architecture/2026-09-17-tool-policy-transport-seam.md。
 export const node = LayerNode.make({
   service: Service,
   layer: Layer.mergeAll(
     layer,
-    Layer.suspend(() => AlphaToolInventory.exposed),
+    Layer.suspend(() => CodePuppyToolInventory.exposed),
   ),
   deps: [
     SessionStatus.node,
@@ -1787,7 +1787,7 @@ export const node = LayerNode.make({
     Command.node,
     Config.node,
     Permission.node,
-    AlphaToolPolicy.node,
+    CodePuppyToolPolicy.node,
     FSUtil.node,
     MCP.node,
     LSP.node,

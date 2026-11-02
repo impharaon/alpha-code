@@ -35,7 +35,7 @@ export const trialCompileProfile: TrialCompile & ((profile: string, deps?: Trial
 ) => {
   if (process.platform !== "darwin") return { ok: false, reason: "sandbox-exec is darwin-only" }
   const spawn = deps.spawn ?? spawnSync
-  const dir = mkdtempSync(join((deps.tmpdir ?? tmpdir)(), "alpha-fence-compile-"))
+  const dir = mkdtempSync(join((deps.tmpdir ?? tmpdir)(), "codepuppy-fence-compile-"))
   const file = join(dir, "profile.sb")
   try {
     writeFileSync(file, profile)

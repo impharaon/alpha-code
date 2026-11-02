@@ -7,7 +7,7 @@
 import { For, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { t } from "../i18n"
-import { CopyButton } from "../alpha-ui/CopyButton"
+import { CopyButton } from "../codepuppy-ui/CopyButton"
 import type { CloudJobEnvelope } from "../../preload/types"
 import type { CloudBehaviorV1, CloudFieldV1 } from "../../shared/host-extension-package-contract/decoder"
 import { failureCopy } from "./cloud-failure-copy"
@@ -57,7 +57,7 @@ export function CloudFormBox(props: { cloud: CloudBehaviorV1; ready: boolean; re
       ),
     }
     setState({ phase: "dispatching", err: "", errAction: null, savedDir: "", result: "", files: [] })
-    const picked = await window.api.openDirectoryPicker({ title: t("alpha.ext.cloudPickResults") })
+    const picked = await window.api.openDirectoryPicker({ title: t("codepuppy.ext.cloudPickResults") })
     const directory = Array.isArray(picked) ? picked[0] : picked
     if (!directory) {
       setState({ phase: "idle" })
@@ -79,19 +79,19 @@ export function CloudFormBox(props: { cloud: CloudBehaviorV1; ready: boolean; re
   }
 
   return (
-    <div class="alpha-ext-dsub" data-cloud-form={props.cloud.pipelineKind}>
-      <div class="alpha-ext-dsub-t">{t("alpha.ext.cloudDispatchTitle")}</div>
-      <p class="alpha-ext-dnote">{t("alpha.ext.cloudInputHint")}</p>
-      <div class="alpha-ext-dsub">
-        <div class="alpha-ext-dsub-t">{t("alpha.ext.cloudUpstream")}</div>
-        <ul class="alpha-ext-dlist" data-cloud-upstream="">
+    <div class="codepuppy-ext-dsub" data-cloud-form={props.cloud.pipelineKind}>
+      <div class="codepuppy-ext-dsub-t">{t("codepuppy.ext.cloudDispatchTitle")}</div>
+      <p class="codepuppy-ext-dnote">{t("codepuppy.ext.cloudInputHint")}</p>
+      <div class="codepuppy-ext-dsub">
+        <div class="codepuppy-ext-dsub-t">{t("codepuppy.ext.cloudUpstream")}</div>
+        <ul class="codepuppy-ext-dlist" data-cloud-upstream="">
           <For each={props.cloud.upstreamData}>{(line) => <li>{line}</li>}</For>
         </ul>
       </div>
-      <p class="alpha-ext-dnote" data-cloud-hold="">
-        {t("alpha.ext.cloudHold", { usd: props.cloud.holdUsd.toFixed(2) })}
+      <p class="codepuppy-ext-dnote" data-cloud-hold="">
+        {t("codepuppy.ext.cloudHold", { usd: props.cloud.holdUsd.toFixed(2) })}
       </p>
-      <div class="alpha-ext-cloudrun">
+      <div class="codepuppy-ext-cloudrun">
         <For each={props.cloud.fields}>
           {(field) => (
             <label style={{ width: "100%" }} data-cloud-field={field.name}>
@@ -99,7 +99,7 @@ export function CloudFormBox(props: { cloud: CloudBehaviorV1; ready: boolean; re
                 {field.label}
                 {field.required ? " *" : ""}
               </span>
-              <Show when={field.help}>{(help) => <span class="alpha-ext-meta" data-cloud-field-help="">{help()}</span>}</Show>
+              <Show when={field.help}>{(help) => <span class="codepuppy-ext-meta" data-cloud-field-help="">{help()}</span>}</Show>
               {field.control === "select" ? (
                 <select
                   aria-label={field.label}
@@ -120,7 +120,7 @@ export function CloudFormBox(props: { cloud: CloudBehaviorV1; ready: boolean; re
                 </select>
               ) : field.control === "textarea" ? (
                 <textarea
-                  class="alpha-ext-ddoc"
+                  class="codepuppy-ext-ddoc"
                   style={{ width: "100%" }}
                   rows={6}
                   aria-label={field.label}
@@ -144,53 +144,53 @@ export function CloudFormBox(props: { cloud: CloudBehaviorV1; ready: boolean; re
           )}
         </For>
         <button
-          class="alpha-ext-add"
+          class="codepuppy-ext-add"
           data-variant="primary"
           data-cloud-form-submit=""
           disabled={!props.ready || busy() || !props.cloud.fields.every(satisfied)}
           onClick={() => void run()}
         >
-          {t(state.phase === "dispatching" ? "alpha.ext.cloudDispatching" : state.phase === "running" ? "alpha.ext.cloudRunning" : "alpha.ext.cloudStart")}
+          {t(state.phase === "dispatching" ? "codepuppy.ext.cloudDispatching" : state.phase === "running" ? "codepuppy.ext.cloudRunning" : "codepuppy.ext.cloudStart")}
         </button>
         <Show when={!props.ready}>
-          <span class="alpha-ext-meta">
-            {props.recovering ? t("alpha.ext.cloudRecoveringNote") : t("alpha.ext.cloudNeedPlatformNote")}
+          <span class="codepuppy-ext-meta">
+            {props.recovering ? t("codepuppy.ext.cloudRecoveringNote") : t("codepuppy.ext.cloudNeedPlatformNote")}
           </span>
         </Show>
         <Show when={state.phase === "running"}>
-          <span class="alpha-ext-meta" data-live="">{t(state.step === "queued" ? "alpha.ext.cloudQueued" : state.step === "job.completed" ? "alpha.ext.cloudCompleted" : state.step === "job.failed" ? "alpha.ext.cloudFailed" : state.step === "job.cancelled" ? "alpha.ext.cloudCancelled" : "alpha.ext.cloudProgress")}</span>
+          <span class="codepuppy-ext-meta" data-live="">{t(state.step === "queued" ? "codepuppy.ext.cloudQueued" : state.step === "job.completed" ? "codepuppy.ext.cloudCompleted" : state.step === "job.failed" ? "codepuppy.ext.cloudFailed" : state.step === "job.cancelled" ? "codepuppy.ext.cloudCancelled" : "codepuppy.ext.cloudProgress")}</span>
         </Show>
         <Show when={state.phase === "running" && state.cancel !== "cancelling"}>
           <button
-            class="alpha-ext-add"
+            class="codepuppy-ext-add"
             data-cancel-job=""
             disabled={state.cancel === "requesting"}
             onClick={() => void lifecycle.cancelJob()}
           >
-            {t("alpha.ext.cloudCancel")}
+            {t("codepuppy.ext.cloudCancel")}
           </button>
         </Show>
         <Show when={state.phase === "running" && state.cancel === "cancelling"}>
-          <span class="alpha-ext-meta" data-live="" data-cancelling="">{t("alpha.ext.cloudCancelling")}</span>
+          <span class="codepuppy-ext-meta" data-live="" data-cancelling="">{t("codepuppy.ext.cloudCancelling")}</span>
         </Show>
       </div>
       <Show when={state.phase === "done"}>
-        <p class="alpha-ext-dnote" data-ok="">
-          ✓ {t("alpha.ext.cloudDone")} · <code class="alpha-ext-dcode">{state.savedDir}</code>
+        <p class="codepuppy-ext-dnote" data-ok="">
+          ✓ {t("codepuppy.ext.cloudDone")} · <code class="codepuppy-ext-dcode">{state.savedDir}</code>
         </p>
       </Show>
       <Show when={state.result}>
-        <pre class="alpha-ext-ddoc" data-cloud-result="">{state.result}</pre>
-        <CopyButton label={t("alpha.wb.copy")} text={() => state.result} dataAttr="data-copy-cloud-result" />
+        <pre class="codepuppy-ext-ddoc" data-cloud-result="">{state.result}</pre>
+        <CopyButton label={t("codepuppy.wb.copy")} text={() => state.result} dataAttr="data-copy-cloud-result" />
       </Show>
       <For each={state.files}>
-        {(file) => <button class="alpha-ext-add" data-cloud-file="" onClick={() => void window.api.openPath(`${state.savedDir}/${file}`)}>{file}</button>}
+        {(file) => <button class="codepuppy-ext-add" data-cloud-file="" onClick={() => void window.api.openPath(`${state.savedDir}/${file}`)}>{file}</button>}
       </For>
       <Show when={state.err}>
-        <p class="alpha-ext-card-err">{state.err}</p>
+        <p class="codepuppy-ext-card-err">{state.err}</p>
         <Show when={state.errAction}>
           {(action) => (
-            <button class="alpha-ext-add" data-cloud-error-action="" onClick={() => {
+            <button class="codepuppy-ext-add" data-cloud-error-action="" onClick={() => {
               const target = action()
               if (target === "login") {
                 void window.api.auth.start()
@@ -198,14 +198,14 @@ export function CloudFormBox(props: { cloud: CloudBehaviorV1; ready: boolean; re
               }
               void window.api.cloud.openBillingPage(target)
             }}>
-              {t(action() === "login" ? "alpha.ext.cloudGoLogin" : action() === "recharge" ? "alpha.ext.cloudGoRecharge" : "alpha.ext.cloudOpenOverflow")}
+              {t(action() === "login" ? "codepuppy.ext.cloudGoLogin" : action() === "recharge" ? "codepuppy.ext.cloudGoRecharge" : "codepuppy.ext.cloudOpenOverflow")}
             </button>
           )}
         </Show>
       </Show>
       <Show when={state.phase === "failed" && state.savedDir}>
-        <p class="alpha-ext-dnote">
-          {t("alpha.ext.cloudSaved")} <code class="alpha-ext-dcode">{state.savedDir}</code>
+        <p class="codepuppy-ext-dnote">
+          {t("codepuppy.ext.cloudSaved")} <code class="codepuppy-ext-dcode">{state.savedDir}</code>
         </p>
       </Show>
     </div>

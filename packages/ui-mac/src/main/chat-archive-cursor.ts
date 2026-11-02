@@ -1,5 +1,5 @@
 // REQ-160 `#1324` —— 上报游标:「哪些轮次已经有了终态」的唯一记录,以及**响应怎么归类**。
-// electron-free、root 参数化(与 alpha-installs / alpha-workdir 同测试性模式)。
+// electron-free、root 参数化(与 codepuppy-installs / codepuppy-workdir 同测试性模式)。
 //
 // ── 429 单开一格,这是本文件存在的主要理由 ──────────────────────────────────────────────────
 // 线契约(alpha-web `docs/contracts/chat-archive-upload.md` §Responses)对客户端只写了三句:
@@ -21,7 +21,7 @@
 // **拒绝的原因不在这一轮的内容里,所以这一轮不该为它背锅。**
 // 401 与 429 的差别只在处置:429 要按 `Retry-After` 等;401 在**同一次 idle 内重发毫无意义**
 // (手里还是那把过期钥匙),所以它的处置是「立刻停下这一趟、游标不动」,等下一次 idle ——
-// 那时续期调度器已经换好令牌。配套的省一次请求在 `alpha-auth.getArchiveAccessToken()`:
+// 那时续期调度器已经换好令牌。配套的省一次请求在 `codepuppy-auth.getArchiveAccessToken()`:
 // 令牌已过期时它直接返回 undefined,连这一发都不发。
 //
 // ── 未知状态码往哪一边倒 ────────────────────────────────────────────────────────────────────
@@ -44,11 +44,11 @@
 // R1 用的是进程内的 `getAuthIdentityEpoch()`,它只认得「本进程里发生过登入/登出」。R2 审计指出
 // 它漏掉一整类窗口:**B 登录之后,这个进程里一次可归档的 idle 都没发生过**(登录完就退出 /
 // 自动更新 / 崩溃),下一个进程的计数器从 0 起,于是盘上那份属于 A 的游标被新账号原样接手。
-// 所以判据必须**落盘**:游标文件里记一个跨刷新稳定的账号标记(`alpha-auth.getAuthIdentityTag()`,
+// 所以判据必须**落盘**:游标文件里记一个跨刷新稳定的账号标记(`codepuppy-auth.getAuthIdentityTag()`,
 // `account.read` 令牌 `sub` 的哈希),**开文件时就比**,不同即重铸。
 //
 // 两个坑,踩了都会反过来伤本账号:
-//   · **不能拿 `sessionId` 当标记** —— 它随每次刷新轮换(`alpha-auth.ts` refresh 分支),
+//   · **不能拿 `sessionId` 当标记** —— 它随每次刷新轮换(`codepuppy-auth.ts` refresh 分支),
 //     那样每 10 分钟就被判成换号一次,本账号的积压反复被清掉;
 //   · **标记为 `undefined`(登出)不重铸** —— 登出不是换号。重铸会把本账号还没上报的积压
 //     静默丢掉,而那正是「上报面故障期的积压」最需要活着的时刻。
@@ -120,7 +120,7 @@ function decodeState(raw: unknown, now: number): ChatArchiveCursorState {
 export function openChatArchiveCursor(deps: {
   userDataPath: string
   now?: () => number
-  /** `alpha-auth.getAuthIdentityTag()`。跨刷新稳定;`undefined` = 不知道是谁(登出),见抬头。 */
+  /** `codepuppy-auth.getAuthIdentityTag()`。跨刷新稳定;`undefined` = 不知道是谁(登出),见抬头。 */
   identityTag?: () => string | undefined
   onWriteError?: (error: unknown) => void
 }): ChatArchiveCursorStore {

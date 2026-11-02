@@ -1,30 +1,30 @@
-// REQ-059 全局层:alpha 引擎配置真源 = `<current-environment-root>/alpha.jsonc`(经 G1 = OPENCODE_CONFIG 注入,
-// sidecar 内 injectAlphaConfig 设 env;source T0 spike audits/2026-07-07-req059-060-t0-spike)。
+// REQ-059 全局层:alpha 引擎配置真源 = `<current-environment-root>/codepuppy.jsonc`(经 G1 = OPENCODE_CONFIG 注入,
+// sidecar 内 injectCodePuppyConfig 设 env;source T0 spike audits/2026-07-07-req059-060-t0-spike)。
 //
 // 本模块是 electron-free 纯逻辑核(单测覆盖),只做「判定 + 计划计算」,不落盘、不读环境:
-//   1. 路径常量派生(alpha.jsonc / legacy ~/.opencode / XDG);
+//   1. 路径常量派生(codepuppy.jsonc / legacy ~/.opencode / XDG);
 //   2. 存量所有权判定(一份 config 是否 alpha 自有、可整体安全迁移 —— 否则 bail-out loud);
 //   3. `~/.opencode` junk-only 判定(拆走 alpha 物后仅剩引擎 bootstrap 垃圾 → 整目录可删);
-//   4. 迁移合并计划(legacy jsonc + XDG provider → alpha.jsonc,copy-don't-delete + 幂等)。
+//   4. 迁移合并计划(legacy jsonc + XDG provider → codepuppy.jsonc,copy-don't-delete + 幂等)。
 // 运行时接线(sidecar 注入 / ext-config 写入切换 / reconcile 落盘)在各消费方,不在此。
 
 import path from "node:path"
-import { resolveAlphaGlobalRoot } from "./alpha-environment"
+import { resolveCodePuppyGlobalRoot } from "./codepuppy-environment"
 
-/** 当前环境 canonical mutable root；无快照时只接受已校验的派生 ALPHA_GLOBAL_DIR。 */
-export function alphaGlobalRoot(): string {
-  return resolveAlphaGlobalRoot()
+/** 当前环境 canonical mutable root；无快照时只接受已校验的派生 CODEPUPPY_GLOBAL_DIR。 */
+export function codepuppyGlobalRoot(): string {
+  return resolveCodePuppyGlobalRoot()
 }
 
 /** The single alpha engine-config truth file for the frozen current environment. alpha always writes `.jsonc`. */
-export function alphaJsoncPath(): string {
-  return path.join(alphaGlobalRoot(), "alpha.jsonc")
+export function codepuppyJsoncPath(): string {
+  return path.join(codepuppyGlobalRoot(), "codepuppy.jsonc")
 }
 
-/** Global factory/installed skills truth dir. Engine discovers it via `skills:[...]` in the alpha.jsonc
+/** Global factory/installed skills truth dir. Engine discovers it via `skills:[...]` in the codepuppy.jsonc
  *  FILE channel (factory-skills实测:env skills.paths 不生效、文件 config 生效 → G1 承载,桥退役 T3). */
-export function alphaSkillsDir(): string {
-  return path.join(alphaGlobalRoot(), "skills")
+export function codepuppySkillsDir(): string {
+  return path.join(codepuppyGlobalRoot(), "skills")
 }
 
 /**
@@ -45,7 +45,7 @@ export function ensureSkillsPath(config: Record<string, unknown>, skillsDir: str
 }
 
 /** REQ-065:一条 skills.paths 条目是否「出厂资源路径」—— alpha 资源布局段 + **出厂名单内**的
- *  basename 双重判定(同 isAlphaFactoryLink 精神;名单外的同布局路径视为用户自加,不动)。 */
+ *  basename 双重判定(同 isCodePuppyFactoryLink 精神;名单外的同布局路径视为用户自加,不动)。 */
 export function isFactoryResourcePath(p: string, factoryNames: readonly string[]): boolean {
   const norm = p.split("\\").join("/").replace(/\/+$/, "")
   const m = /\/(resources|Resources)\/(skills|factory-skills)\/([^/]+)$/.exec(norm)
@@ -79,7 +79,7 @@ export function rewriteFactorySkillPaths(
 }
 
 /**
- * REQ-067:剥离历史版本物化进 alpha.jsonc 的「出厂默认禁」明文(它们改由内存注入,用户配置零痕迹):
+ * REQ-067:剥离历史版本物化进 codepuppy.jsonc 的「出厂默认禁」明文(它们改由内存注入,用户配置零痕迹):
  *   - `permission.skill.<n> === "deny"`(n ∈ 出厂清单)→ 删;
  *   - 随之 permission.skill 只剩治理打底 `{"*": "allow"}`(引擎默认即 allow,冗余)→ 删整个 skill 键;
  *     permission 空 → 删 permission;
@@ -124,18 +124,18 @@ export function stripFactoryBuiltinPolicyLeaves(config: Record<string, unknown>,
 }
 
 /**
- * REQ-226 (`#1343`): the constant alpha writes to provider[<id>].options.apiKey in alpha.jsonc instead of the
+ * REQ-226 (`#1343`): the constant alpha writes to provider[<id>].options.apiKey in codepuppy.jsonc instead of the
  * key. It means "the key for this provider id lives in alpha's keychain store" and carries no key fragment,
  * no path and no id — the reference is the provider id itself. The engine never resolves it: at every fork
  * the sidecar overrides options.apiKey with a `{file:}` ref (key file present) or `""` (absent), see
- * alpha-models.ts. Durable config therefore never holds a value and never holds a `{file:}` path.
+ * codepuppy-models.ts. Durable config therefore never holds a value and never holds a `{file:}` path.
  *
  * Lives here (and not in ext-config, which re-exports it) because the lift planner below needs it and this
  * module is the electron-free core ext-config already depends on — importing the other way round is a cycle.
  */
 export const PROVIDER_KEYCHAIN_MARKER = "alpha-keychain"
 
-/** How a provider block's `options.apiKey` in alpha.jsonc is classified — the VALUE is never returned. */
+/** How a provider block's `options.apiKey` in codepuppy.jsonc is classified — the VALUE is never returned. */
 export type ProviderKeyKind = "keychain-marker" | "legacy-plaintext" | "user-ref"
 
 /** The one definition of what a provider block's `options.apiKey` is; the value itself is never kept. */
@@ -146,8 +146,8 @@ export function classifyProviderKey(value: unknown): ProviderKeyKind | undefined
   return "legacy-plaintext"
 }
 
-/** alpha 会写进 alpha.jsonc 的引擎 config 顶层域。存量文件顶层键越界 = 疑用户手写混入 → 不迁。 */
-export const ALPHA_CONFIG_TOP_KEYS = new Set([
+/** alpha 会写进 codepuppy.jsonc 的引擎 config 顶层域。存量文件顶层键越界 = 疑用户手写混入 → 不迁。 */
+export const CODEPUPPY_CONFIG_TOP_KEYS = new Set([
   "$schema",
   "mcp",
   "plugin",
@@ -191,20 +191,20 @@ export type OwnershipVerdict =
  * alpha 装的**,有无 receipt 只是记账完整性(早期装的 receipt 可能丢),**不是所有权问题**。
  *
  * 判定:
- *   ① 顶层键 ⊆ ALPHA_CONFIG_TOP_KEYS —— 唯一 bail-out 条件(挡住 keybinds/theme/model 等非 alpha 域
+ *   ① 顶层键 ⊆ CODEPUPPY_CONFIG_TOP_KEYS —— 唯一 bail-out 条件(挡住 keybinds/theme/model 等非 alpha 域
  *      = 疑用户手写混入);
  *   ② mcp 名不在 receiptMcpNames → **不 bail-out**,记入 unaccountedMcp 供调用方 loud 记账(记账自愈
  *      由迁移后重建 receipt 处理,不在此)。
  * 顶层键越界 → bail-out(保留原布局,功能零损失,品牌收敛该机暂缓 —— REQ-059 §风险)。
  */
-export function isAlphaOwnedConfig(input: OwnershipInput): OwnershipVerdict {
+export function isCodePuppyOwnedConfig(input: OwnershipInput): OwnershipVerdict {
   const obj = input.parsed
   if (!obj || typeof obj !== "object" || Array.isArray(obj)) {
     // 空/非对象:没有 alpha 物可迁,视作 owned(no-op 迁移),让 junk 判定决定目录去留。
     return { owned: true }
   }
   const topKeys = Object.keys(obj)
-  const stray = topKeys.filter((k) => !ALPHA_CONFIG_TOP_KEYS.has(k))
+  const stray = topKeys.filter((k) => !CODEPUPPY_CONFIG_TOP_KEYS.has(k))
   if (stray.length > 0) {
     return { owned: false, reason: `unrecognized top-level keys (user-authored?): ${stray.slice(0, 3).join(", ")}` }
   }
@@ -231,7 +231,7 @@ export function isJunkOnlyDir(entries: string[], configFileNames: string[] = ["o
 }
 
 export type MergePlan = {
-  /** 合并后的 alpha.jsonc 对象(alpha 既有为基,legacy/xdg 补 absent)。 */
+  /** 合并后的 codepuppy.jsonc 对象(alpha 既有为基,legacy/xdg 补 absent)。 */
   merged: Record<string, unknown>
   /** 相对 existing 是否有实际新增(false = 幂等 no-op,免写盘)。 */
   changed: boolean
@@ -242,10 +242,10 @@ export type MergePlan = {
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v)
 
 /**
- * REQ-226 AC7(`#1359`):搬进 alpha.jsonc 的 provider 块里,pre-#1343 的**内联明文密钥**换成
+ * REQ-226 AC7(`#1359`):搬进 codepuppy.jsonc 的 provider 块里,pre-#1343 的**内联明文密钥**换成
  * `PROVIDER_KEYCHAIN_MARKER` —— 不是删叶子,而是换成标记:两者在状态面都判 needs-reentry
- * (alpha-provider-status.ts:`configOnlyState`),在 sidecar 注入面都得到 `apiKey: ""`
- * (alpha-models.ts,K 类无密钥文件 / L 类同为空串),**用户可观察的行为逐字不变**,变的只是
+ * (codepuppy-provider-status.ts:`configOnlyState`),在 sidecar 注入面都得到 `apiKey: ""`
+ * (codepuppy-models.ts,K 类无密钥文件 / L 类同为空串),**用户可观察的行为逐字不变**,变的只是
  * 这个值不再被拷贝一份到真源。`{file:}` / `{env:}` 用户引用、标记本身、无 apiKey 的块原样穿过
  * (判别只有 `classifyProviderKey` 一处,`#1343` 定的那一份)。
  * 源对象不动(返回新对象):copy-don't-delete —— 退场源里的旧叶子是 `retireLegacyProviderKeys` 的事。
@@ -286,7 +286,7 @@ function mergeNamed(
  *
  * **`plugin[]` 刻意不在 merge 语义里(ADR-040,`#832`)**:合并 legacy 的 `plugin[]` 就是「把一段
  * 第三方 JS 装进引擎、以同等权限执行」,而 ADR-040 裁定 Alpha 不再提供这个能力 —— 它不因为
- * 「来源是用户自己的旧配置」而变成另一件事。existing(`alpha.jsonc` 里已有的条目)原样穿过
+ * 「来源是用户自己的旧配置」而变成另一件事。existing(`codepuppy.jsonc` 里已有的条目)原样穿过
  * 浅拷贝,本函数**既不加也不删**;删除归卸载侧(`removePlugin` / dangling 清扫)。
  * 想「顺手把这条并集加回来」的下一位:它加不回来 —— 落盘那一刻的咽喉会拒(`engine-plugin-seal.ts`),
  * 拒的后果是**整次 reconcile 不写盘**(skills.paths 注入一起停),不是只丢这一个键。

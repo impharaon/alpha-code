@@ -1,14 +1,14 @@
 // Persisted UI state for the alpha sidebar: whether the whole sidebar is shown, and which
 // projects are expanded to reveal their conversations. Stored in localStorage (synchronous,
-// available before first paint) under the `alpha.sidebar.*` namespace. These are plain Solid
+// available before first paint) under the `codepuppy.sidebar.*` namespace. These are plain Solid
 // atoms — there is a single sidebar, so module-level singletons are the simplest correct model.
 
 import { createSignal } from "solid-js"
 
-const COLLAPSED_KEY = "alpha.sidebar.collapsed"
-const EXPANDED_KEY = "alpha.sidebar.expanded"
-const HIDDEN_KEY = "alpha.sidebar.hidden"
-const VIEWED_KEY = "alpha.sidebar.viewed"
+const COLLAPSED_KEY = "codepuppy.sidebar.collapsed"
+const EXPANDED_KEY = "codepuppy.sidebar.expanded"
+const HIDDEN_KEY = "codepuppy.sidebar.hidden"
+const VIEWED_KEY = "codepuppy.sidebar.viewed"
 
 function readBool(key: string, fallback: boolean): boolean {
   try {

@@ -146,7 +146,7 @@ export const WebSearchTool = Tool.define(
             return yield* Effect.die(
               new ToolFailure({
                 message: LOCAL_WEBSEARCH_DENIED_MESSAGE,
-                metadata: { denied: "alpha-sovereignty", tool: "websearch" },
+                metadata: { denied: "codepuppy-sovereignty", tool: "websearch" },
               }),
             )
 

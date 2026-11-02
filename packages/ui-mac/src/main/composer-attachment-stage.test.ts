@@ -22,7 +22,7 @@ const STAGED = new RegExp(`^attachments/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9
 
 describe("stageComposerAttachment", () => {
   test("写进 <实例目录>/<隐藏目录>/attachments/<uuid>/<名字>;返回相对隐藏目录根的路径;隐藏目录自带 .gitignore", () => {
-    const project = temp("alpha-stage-")
+    const project = temp("codepuppy-stage-")
     const result = stageComposerAttachment(project, "季度复盘.docx", "word", bytes("docx-bytes"))
     expect(result.ok).toBe(true)
     if (!result.ok) return
@@ -39,7 +39,7 @@ describe("stageComposerAttachment", () => {
   })
 
   test("名字净化:去掉路径结构与控制字符,dotfile 回退,超长截断后仍以读取工具要求的扩展名结尾", () => {
-    const project = temp("alpha-stage-name-")
+    const project = temp("codepuppy-stage-name-")
     const name = (input: string, reader: "word" | "pdf" = "word") => {
       const result = stageComposerAttachment(project, input, reader, bytes("x"))
       if (!result.ok) throw new Error(result.reason)
@@ -56,15 +56,15 @@ describe("stageComposerAttachment", () => {
   })
 
   test("超过 20 MiB 拒绝,且不创建隐藏目录", () => {
-    const project = temp("alpha-stage-big-")
+    const project = temp("codepuppy-stage-big-")
     expect(stageComposerAttachment(project, "big.pdf", "pdf", new Uint8Array(MAX_ATTACHMENT_BYTES + 1))).toEqual({ ok: false, reason: "too-large" })
     expect(existsSync(join(project, PROJECT_HIDDEN_DIR))).toBe(false)
     expect(stageComposerAttachment(project, "edge.pdf", "pdf", new Uint8Array(MAX_ATTACHMENT_BYTES)).ok).toBe(true)
   })
 
   test("路径逃逸:attachments 被换成指向项目外的符号链接 ⇒ 失败,项目外零写入", () => {
-    const project = temp("alpha-stage-escape-")
-    const outside = temp("alpha-stage-outside-")
+    const project = temp("codepuppy-stage-escape-")
+    const outside = temp("codepuppy-stage-outside-")
     mkdirSync(join(project, PROJECT_HIDDEN_DIR))
     symlinkSync(outside, join(project, PROJECT_HIDDEN_DIR, "attachments"))
     expect(stageComposerAttachment(project, "a.docx", "word", bytes("x"))).toEqual({ ok: false, reason: "not-project" })
@@ -75,15 +75,15 @@ describe("stageComposerAttachment", () => {
     expect(stageComposerAttachment(homedir(), "a.docx", "word", bytes("x"))).toEqual({ ok: false, reason: "not-project" })
     expect(stageComposerAttachment("relative/dir", "a.docx", "word", bytes("x"))).toEqual({ ok: false, reason: "not-project" })
     expect(stageComposerAttachment("/", "a.docx", "word", bytes("x"))).toEqual({ ok: false, reason: "not-project" })
-    const project = temp("alpha-stage-link-")
-    const outside = temp("alpha-stage-link-out-")
+    const project = temp("codepuppy-stage-link-")
+    const outside = temp("codepuppy-stage-link-out-")
     symlinkSync(outside, join(project, PROJECT_HIDDEN_DIR))
     expect(stageComposerAttachment(project, "a.docx", "word", bytes("x"))).toEqual({ ok: false, reason: "not-project" })
     expect(readdirSync(outside)).toEqual([])
   })
 
   test("IPC 入参不合形状 ⇒ invalid(未知读取工具、非字节、非字符串)", () => {
-    const project = temp("alpha-stage-invalid-")
+    const project = temp("codepuppy-stage-invalid-")
     expect(stageComposerAttachment(project, "a.zip", "zip", bytes("x"))).toEqual({ ok: false, reason: "invalid" })
     expect(stageComposerAttachment(project, "a.docx", "toString", bytes("x"))).toEqual({ ok: false, reason: "invalid" })
     expect(stageComposerAttachment(project, "a.docx", "word", "not-bytes")).toEqual({ ok: false, reason: "invalid" })

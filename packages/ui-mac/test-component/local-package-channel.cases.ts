@@ -156,18 +156,18 @@ const manyFilesPlugin = writePlugin("many-files-plugin", (root) => {
     )
 })
 
-const { initAlphaEnvironment } = await import("../src/main/alpha-environment")
+const { initCodePuppyEnvironment } = await import("../src/main/codepuppy-environment")
 const { localPackagePreviews } = await import("../src/main/local-package-preview")
 const { LOCAL_PACKAGE_PREVIEW_MAX_BYTES, LOCAL_PACKAGE_PREVIEW_MAX_FILES } = await import("../src/main/local-package-preview")
 const { GATED_WRITE_CHANNELS, LOCAL_PACKAGE_READ_CHANNELS } = await import("../src/main/ext-write-channels")
 const { registerExtIpcHandlers } = await import("../src/main/ext-ipc")
 
-delete process.env.ALPHA_GLOBAL_DIR
-initAlphaEnvironment({
+delete process.env.CODEPUPPY_GLOBAL_DIR
+initCodePuppyEnvironment({
   isPackaged: false,
   channel: "dev",
   appDataDir: tmp,
-  baseRoot: join(tmp, "alpha-code-state"),
+  baseRoot: join(tmp, "codepuppy-state"),
   homeDir: join(tmp, "home"),
 })
 registerExtIpcHandlers(
@@ -178,7 +178,7 @@ registerExtIpcHandlers(
 )
 
 afterAll(() => {
-  delete process.env.ALPHA_OPEN_DIR
+  delete process.env.CODEPUPPY_OPEN_DIR
   rmSync(tmp, { recursive: true, force: true })
 })
 
@@ -190,11 +190,11 @@ const call = (channel: string, sender: IpcSender, ...args: unknown[]) => {
 
 /** 走**生产**入口签发一次预览:真 picker 短路 env → 真分流 → 真清点 → 真留字节。 */
 async function importFolder(dir: string, sender: IpcSender): Promise<Record<string, unknown>> {
-  process.env.ALPHA_OPEN_DIR = dir
+  process.env.CODEPUPPY_OPEN_DIR = dir
   try {
     return (await call(GATED_WRITE_CHANNELS.importSkillFolder, sender)) as Record<string, unknown>
   } finally {
-    delete process.env.ALPHA_OPEN_DIR
+    delete process.env.CODEPUPPY_OPEN_DIR
   }
 }
 
@@ -564,8 +564,8 @@ test("只读列表通道:空账本 ⇒ 空清单;**账本读不出来 ⇒ 说「
   const empty = (await call(LOCAL_PACKAGE_READ_CHANNELS.listInstalledPackages, { id: 1 })) as Record<string, unknown>
   expect(empty).toEqual({ ok: true, packages: [] })
 
-  const { getAlphaEnvironment } = await import("../src/main/alpha-environment")
-  const ledgerPath = join(getAlphaEnvironment().mutableRoot, "installs.json")
+  const { getCodePuppyEnvironment } = await import("../src/main/codepuppy-environment")
+  const ledgerPath = join(getCodePuppyEnvironment().mutableRoot, "installs.json")
   mkdirSync(join(ledgerPath, ".."), { recursive: true })
   writeFileSync(ledgerPath, "{ this is not json", "utf8")
   const broken = (await call(LOCAL_PACKAGE_READ_CHANNELS.listInstalledPackages, { id: 1 })) as Record<string, unknown>
@@ -581,7 +581,7 @@ test("只读列表通道:空账本 ⇒ 空清单;**账本读不出来 ⇒ 说「
   const brokenWire = JSON.stringify(broken)
   expect(brokenWire).not.toContain(tmp)
   expect(brokenWire).not.toContain(tmpReal)
-  expect(brokenWire).not.toContain(getAlphaEnvironment().mutableRoot)
+  expect(brokenWire).not.toContain(getCodePuppyEnvironment().mutableRoot)
   expect(brokenWire).not.toContain("installs.json")
   expect(brokenWire).not.toContain("/")
   rmSync(ledgerPath, { force: true })

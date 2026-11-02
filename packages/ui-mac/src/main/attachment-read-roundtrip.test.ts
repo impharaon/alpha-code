@@ -13,9 +13,9 @@ import type { Message, Part } from "@opencode-ai/sdk/v2/client"
 import { buildOfficeRuntime } from "../../scripts/build-office-runtime"
 import { attachmentInstruction } from "../../../ext/src/attachment-reader-hooks"
 import { mcpEngineToolId } from "../../../ext/src/cloud-websearch-kill"
-import { buildAttachmentParts } from "../renderer/alpha-ui/composer-attachments-core"
-import { projectTimelineRows } from "../renderer/alpha-ui/session-timeline/timeline-model"
-import { alphaOfficeInstallCommand, ALPHA_OFFICE_PYTHON_SLOT, ALPHA_OFFICE_SERVER_SLOT, WORKSPACE_MARKER, type AlphaOfficeFormat } from "../shared/office-advisories"
+import { buildAttachmentParts } from "../renderer/codepuppy-ui/composer-attachments-core"
+import { projectTimelineRows } from "../renderer/codepuppy-ui/session-timeline/timeline-model"
+import { codepuppyOfficeInstallCommand, CODEPUPPY_OFFICE_PYTHON_SLOT, CODEPUPPY_OFFICE_SERVER_SLOT, WORKSPACE_MARKER, type CodePuppyOfficeFormat } from "../shared/office-advisories"
 import { stageComposerAttachment } from "./composer-attachment-stage"
 
 const darwin = process.platform === "darwin"
@@ -26,7 +26,7 @@ let project = ""
 beforeAll(() => {
   if (!darwin) return
   python = join(buildOfficeRuntime({ arch: process.arch === "x64" ? "x64" : "arm64" }).dir, "bin", "python3")
-  project = realpathSync(mkdtempSync(join(tmpdir(), "alpha-attach-roundtrip-")))
+  project = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-attach-roundtrip-")))
 }, 900_000)
 afterAll(() => {
   if (project) rmSync(project, { recursive: true, force: true })
@@ -35,9 +35,9 @@ afterAll(() => {
 type Response = { id: number; result?: { content?: Array<{ text: string }>; isError?: boolean } }
 
 /** 生产模板的命令,workspace = 会话实例目录(引擎把 `{workspace}` 换成 InstanceState.directory)。 */
-async function callTool(format: AlphaOfficeFormat, name: string, args: Record<string, unknown>): Promise<Response["result"]> {
-  const command = alphaOfficeInstallCommand(format).map((argument) =>
-    argument === ALPHA_OFFICE_PYTHON_SLOT ? python : argument === ALPHA_OFFICE_SERVER_SLOT ? server : argument === WORKSPACE_MARKER ? project : argument,
+async function callTool(format: CodePuppyOfficeFormat, name: string, args: Record<string, unknown>): Promise<Response["result"]> {
+  const command = codepuppyOfficeInstallCommand(format).map((argument) =>
+    argument === CODEPUPPY_OFFICE_PYTHON_SLOT ? python : argument === CODEPUPPY_OFFICE_SERVER_SLOT ? server : argument === WORKSPACE_MARKER ? project : argument,
   )
   const child = Bun.spawn(command, { stdin: "pipe", stdout: "pipe", stderr: "pipe", env: { PATH: "/usr/bin:/bin", HOME: project, TMPDIR: project } })
   const requests = [

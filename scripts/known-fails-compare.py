@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """known-fails-compare — base fail-set 棘轮的判官(#1086)。
 
-被 scripts/bun-test-floor.sh 在 ALPHA_KNOWN_FAILS_FILE 置位时调用(今天只有两处:
-alpha-check.sh 第 [5/10] 步的 ui-mac 全量,与 alpha-ci `bun test (ui-mac)` —— 同一条命令)。
+被 scripts/bun-test-floor.sh 在 CODEPUPPY_KNOWN_FAILS_FILE 置位时调用(今天只有两处:
+codepuppy-check.sh 第 [5/10] 步的 ui-mac 全量,与 codepuppy-ci `bun test (ui-mac)` —— 同一条命令)。
 职责只有一个:回答「这次运行的红,是不是全部落在仓内那份静态清单里」。
 
   · 清单内的红 → 容忍(放行,但逐条打出来 + 附清单里的理由);

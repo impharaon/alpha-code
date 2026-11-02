@@ -11,15 +11,15 @@
 // ── 为什么不是「往表里补几个域名」──────────────────────────────────────────────────────
 // 补 DeepSeek 和智谱,下一个供应商照样 403;而「下一个供应商」恰恰是这条路的卖点。手写清单与缺陷同形。
 // 放行集合从**引擎真正会去连的那个值**派生 —— 有效配置里 `provider.<id>.options.baseURL`(回退字段
-// `api`;alpha-config-injection.ts:457-462 的 v2 桥读的就是这两个,判据与顺序也逐字照它)。
+// `api`;codepuppy-config-injection.ts:457-462 的 v2 桥读的就是这两个,判据与顺序也逐字照它)。
 //   谁写这个值:目录 BYOK 节点 = App 内置适配器表 byok-adapters.ts 的 `baseURL`(编译进包的常量;远程 BYOK 目录
-//               改不了它,`#1556`),且**只在密钥文件在场时**才注入(alpha-models.ts buildAlphaModelConfig 第 (1) 段 ——
+//               改不了它,`#1556`),且**只在密钥文件在场时**才注入(codepuppy-models.ts buildCodePuppyModelConfig 第 (1) 段 ——
 //               「用户配置过这一家」在这里就是一个文件在不在的问题)。
 //   谁读这个值:引擎(AI SDK)照它发请求 ⇒ 策略代理看到的那条 CONNECT authority 就是它的 `host:port`。
 // 同一个值两边读,结构上不可能分叉 —— 这是「不再手写清单」的全部意义,也是评审该盯的那一点。
 //
 // ── 唯一的输入是注入面,**配置文件不算数**(`#1380` R1 Blocker)────────────────────────
-// 动态半场只吃 `buildAlphaModelConfig(userDataPath).provider`。配置文件里的 provider 块(alpha.jsonc /
+// 动态半场只吃 `buildCodePuppyModelConfig(userDataPath).provider`。配置文件里的 provider 块(codepuppy.jsonc /
 // `<XDG_CONFIG_HOME>/opencode` / `~/.opencode`)**刻意不读** —— 那三条路径全在 seatbelt 的可写集里
 // (process-fence-profile.ts 的 W2 / W6 / W16),而可写集里的东西正是**被围栏的引擎树自己能写的**。
 // 读它 = 引擎树里任意一段代码(bash 工具、仓库自带 plugin、MCP stdio 子进程)写一行
@@ -27,8 +27,8 @@
 // 就给自己铸出一条出网通道,下一次 fork 后代理照放 —— 教科书式的 confused deputy,围栏对任意目的地开口。
 // 「有效配置」这个词在这里必须窄读成**围栏外的那一半**:catalog 是编译进包的常量,密钥文件由 main 在
 // fork 前 syncSecretFiles 收敛(不在 wanted 集合里的遗留文件当场扫掉),两者都不在引擎的可写集里。
-// `#1392` 起用户自己添加的自定义节点也在这一半里:它们的记录住在 `<appData>/alpha-code-state/custom-providers/<env>.json`
-// (`#1391` 真源,只有 main 写、不在任何可写根之下),注入面从那里发出完整块(alpha-models.ts 第 (3) 段)——
+// `#1392` 起用户自己添加的自定义节点也在这一半里:它们的记录住在 `<appData>/codepuppy-state/custom-providers/<env>.json`
+// (`#1391` 真源,只有 main 写、不在任何可写根之下),注入面从那里发出完整块(codepuppy-models.ts 第 (3) 段)——
 // 本模块**零改动**就把它们算进放行集合,因为它一直只读注入面。配置文件里的 provider 块从此对注入面与放行集合
 // 都不算数(基线 I1),判据在 custom-provider-derivation.test.ts(端到端,含真引擎清单)。
 // `#1381` 起用户自配的远程 MCP 服务器是同一半场的第二个成员:记录住在同一个状态根下的兄弟真源
@@ -53,7 +53,7 @@
 // `isEgressAuthorizedForSidecar` ⇒ 换代即生效,不必重启代理。
 // 进程内单例是刻意的:代理与 main 同进程,而放行集合与「这一代 sidecar 拿到的那份配置」一一对应。
 
-import type { ProviderAddressRejection } from "../shared/alpha-model-types"
+import type { ProviderAddressRejection } from "../shared/codepuppy-model-types"
 import { isUserGrantedEgressDestination } from "./network-egress-grants"
 import { isEgressAuthorized, isEgressHostShape, isLoopbackHost } from "./network-egress-registry"
 
@@ -109,7 +109,7 @@ export function egressDestinationFromBaseUrl(baseURL: unknown, providerId: strin
 }
 
 /**
- * 从一份有效配置的 `provider` 表派生目的地。字段选择与 alpha-config-injection.ts 的 v2 桥
+ * 从一份有效配置的 `provider` 表派生目的地。字段选择与 codepuppy-config-injection.ts 的 v2 桥
  * (`typeof options.baseURL === "string" ? … : typeof api === "string" ? … : undefined`)**逐字同源**:
  * `options.baseURL` **是字符串就赢**,回退到 `api` 的条件是它不是字符串,而**不是**「它派生失败」。
  * 这个区别有后果:`options.baseURL = "https://[::1]/v1"` 时 v2 桥选的是那个 v6 地址(引擎去连它),
@@ -131,7 +131,7 @@ export function deriveEgressDestinations(providers: unknown): ConfiguredEgressDe
 }
 
 /**
- * `#1381`:用户自配的**远程 MCP 服务器**的目的地 —— 输入是真源记录(mcp-server-records.ts,`<appData>/alpha-code-state/mcp-servers/<env>.json`,
+ * `#1381`:用户自配的**远程 MCP 服务器**的目的地 —— 输入是真源记录(mcp-server-records.ts,`<appData>/codepuppy-state/mcp-servers/<env>.json`,
  * 只有 main 写),与 provider 那一半走**同一个**准入函数、同一个登记调用(server.ts 把两份并成一份喂 setConfiguredEgressDestinations)。
  * 出处标签 `mcp:<name>`(`providerId` 是「派生出处 ①」的坐标,不是只给 provider 用的)。配置文件里的 `mcp.*` 远程条目**不算数**,
  * 理由与上面 provider 那一段逐字相同 —— 那三条路径全在围栏的可写集里。判据在 mcp-server-derivation.test.ts(端到端,含真引擎)。

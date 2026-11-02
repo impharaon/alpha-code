@@ -8,32 +8,32 @@ import type {
 import type { PackageComponentSkipReasonV1 } from "../../shared/host-extension-package-contract/decoder"
 
 const VERDICT_KEYS = {
-  compatible: "alpha.ext.packageVerdictCompatible",
-  "update-required": "alpha.ext.packageVerdictUpdateRequired",
-  blocked: "alpha.ext.packageVerdictBlocked",
+  compatible: "codepuppy.ext.packageVerdictCompatible",
+  "update-required": "codepuppy.ext.packageVerdictUpdateRequired",
+  blocked: "codepuppy.ext.packageVerdictBlocked",
 } as const satisfies Record<CatalogPackageVerdictV1, string>
 
 const ACTION_KEYS = {
-  install: "alpha.ext.packageActionInstall",
-  "update-alpha": "alpha.ext.packageActionUpdateAlpha",
-  "resolve-prerequisite": "alpha.ext.packageActionResolvePrerequisite",
-  none: "alpha.ext.packageActionNone",
+  install: "codepuppy.ext.packageActionInstall",
+  "update-codepuppy": "codepuppy.ext.packageActionUpdateCodePuppy",
+  "resolve-prerequisite": "codepuppy.ext.packageActionResolvePrerequisite",
+  none: "codepuppy.ext.packageActionNone",
 } as const satisfies Record<CatalogPackageActionKindV1, string>
 
 const REASON_KEYS = {
-  "package-compatible": "alpha.ext.packageReasonCompatible",
-  "package-prerequisite-required": "alpha.ext.packageReasonPrerequisiteRequired",
-  "package-host-update-required": "alpha.ext.packageReasonHostUpdateRequired",
-  "package-invalid": "alpha.ext.packageReasonInvalid",
-  "package-payload-unavailable": "alpha.ext.packageReasonPayloadUnavailable",
-  "package-payload-integrity": "alpha.ext.packageReasonPayloadIntegrity",
-  "package-payload-invalid": "alpha.ext.packageReasonPayloadInvalid",
-  "package-prerequisite-invalid": "alpha.ext.packageReasonPrerequisiteInvalid",
+  "package-compatible": "codepuppy.ext.packageReasonCompatible",
+  "package-prerequisite-required": "codepuppy.ext.packageReasonPrerequisiteRequired",
+  "package-host-update-required": "codepuppy.ext.packageReasonHostUpdateRequired",
+  "package-invalid": "codepuppy.ext.packageReasonInvalid",
+  "package-payload-unavailable": "codepuppy.ext.packageReasonPayloadUnavailable",
+  "package-payload-integrity": "codepuppy.ext.packageReasonPayloadIntegrity",
+  "package-payload-invalid": "codepuppy.ext.packageReasonPayloadInvalid",
+  "package-prerequisite-invalid": "codepuppy.ext.packageReasonPrerequisiteInvalid",
 } as const satisfies Record<CatalogPackageReasonCodeV1, string>
 
 const PREREQUISITE_KEYS = {
-  ready: "alpha.ext.packagePrerequisiteReady",
-  "required-action": "alpha.ext.packagePrerequisiteRequired",
+  ready: "codepuppy.ext.packagePrerequisiteReady",
+  "required-action": "codepuppy.ext.packagePrerequisiteRequired",
 } as const satisfies Record<CatalogPackageViewV1["prerequisites"]["status"], string>
 
 /**
@@ -41,16 +41,16 @@ const PREREQUISITE_KEYS = {
  * token 时**这里编译不过**,而不是让详情页悄悄显示一个空字符串或一段原始 token。
  */
 const SKIP_REASON_KEYS = {
-  "component-capability-unsupported": "alpha.ext.packageSkipCapabilityUnsupported",
-  "component-media-type-mismatch": "alpha.ext.packageSkipMediaTypeMismatch",
-  "component-profile-unsupported": "alpha.ext.packageSkipProfileUnsupported",
+  "component-capability-unsupported": "codepuppy.ext.packageSkipCapabilityUnsupported",
+  "component-media-type-mismatch": "codepuppy.ext.packageSkipMediaTypeMismatch",
+  "component-profile-unsupported": "codepuppy.ext.packageSkipProfileUnsupported",
 } as const satisfies Record<PackageComponentSkipReasonV1, string>
 
 export const packageSkipReasonKey = (reason: PackageComponentSkipReasonV1) => SKIP_REASON_KEYS[reason]
 
 const ROLE_KEYS = {
-  root: "alpha.ext.packageComponentRoot",
-  leaf: "alpha.ext.packageComponentLeaf",
+  root: "codepuppy.ext.packageComponentRoot",
+  leaf: "codepuppy.ext.packageComponentLeaf",
 } as const satisfies Record<CatalogPackageComponentV1["role"], string>
 
 /**
@@ -61,8 +61,8 @@ const ROLE_KEYS = {
 export function packageComponentPresentation(component: CatalogPackageComponentV1) {
   return {
     roleKey: ROLE_KEYS[component.role],
-    requirementKey: component.required ? "alpha.ext.packageRequired" : "alpha.ext.packageOptional",
-    stateKey: component.included ? "alpha.ext.packageComponentIncluded" : "alpha.ext.packageComponentSkipped",
+    requirementKey: component.required ? "codepuppy.ext.packageRequired" : "codepuppy.ext.packageOptional",
+    stateKey: component.included ? "codepuppy.ext.packageComponentIncluded" : "codepuppy.ext.packageComponentSkipped",
     skipReasonKey: component.skipReasonCode ? SKIP_REASON_KEYS[component.skipReasonCode] : undefined,
   }
 }
@@ -77,10 +77,10 @@ export function packageComponentPresentation(component: CatalogPackageComponentV
  * `ext-package-presentation.test.ts` 里那条穷举:它遍历本表并对每个 key 断言 en/zh 都存在且非空。
  */
 const RETAINED_REASON_KEYS = {
-  "shared-with-package": "alpha.ext.packageKeptShared",
-  "user-installed": "alpha.ext.packageKeptUserInstalled",
-  "legacy-protected": "alpha.ext.packageKeptLegacy",
-  unmanaged: "alpha.ext.packageKeptUnmanaged",
+  "shared-with-package": "codepuppy.ext.packageKeptShared",
+  "user-installed": "codepuppy.ext.packageKeptUserInstalled",
+  "legacy-protected": "codepuppy.ext.packageKeptLegacy",
+  unmanaged: "codepuppy.ext.packageKeptUnmanaged",
 } as const satisfies Record<"shared-with-package" | "user-installed" | "legacy-protected" | "unmanaged", string>
 
 export const PACKAGE_RETAINED_REASONS_V1 = ["shared-with-package", "user-installed", "legacy-protected", "unmanaged"] as const

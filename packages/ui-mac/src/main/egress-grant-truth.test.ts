@@ -2,7 +2,7 @@
 //   ① I3:真源路径 `<casBaseRoot>/egress-grants/<env>.json` 不在可写集任何**固定行**之下 —— 对着生产渲染的
 //      profile 枚举 `(allow file-write*` 块里每条规则的 W-id,默认 base / 覆盖 base / 两种 XDG_STATE_HOME 都过。
 //      这一条是整个方案的地基:放在可写根之下 = 围栏内的代码可以给自己批准出网(confused deputy)。
-//      对照臂:同一批规则里 W2 确实罩着 `alpha.jsonc` —— 证明这个手段判得出「覆盖」。
+//      对照臂:同一批规则里 W2 确实罩着 `codepuppy.jsonc` —— 证明这个手段判得出「覆盖」。
 //   ② I8 严格读:缺失 = 没批准过(ok、absent、空清单、零日志);坏 JSON / 版本不对 / grants 不是数组 /
 //      字段不合法 / 同一 host:port 重复 / 多余的键 ⇒ ok:false(**不是空数组**)且日志恰一行说得出原因。
 //   ③ 写:落盘字节固定字面量、无临时文件残留、原子(rename 中途抛 ⇒ 盘上仍是旧内容)、坏记录不落盘(连目录都不建)。
@@ -14,7 +14,7 @@ import * as fs from "node:fs"
 import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { isAbsolute, join, relative, resolve } from "node:path"
-import { environmentMutableRoot } from "./alpha-environment"
+import { environmentMutableRoot } from "./codepuppy-environment"
 import { egressGrantTruthPath, readEgressGrantTruth, type EgressGrantRecord } from "./egress-grant-truth"
 import { writeEgressGrantTruth } from "./egress-grant-truth-write"
 import { mcpServerTruthPath } from "./mcp-server-truth"
@@ -23,8 +23,8 @@ import { renderProcessFenceProfile, type ProcessFenceProfileInput } from "./proc
 
 const repoRoot = resolve(import.meta.dir, "../../../..")
 const HOME = "/Users/alpha"
-const DEFAULT_STATE_ROOT = `${HOME}/Library/Application Support/alpha-code-state`
-const OVERRIDE_STATE_ROOT = `${HOME}/dev/alpha-base`
+const DEFAULT_STATE_ROOT = `${HOME}/Library/Application Support/codepuppy-state`
+const OVERRIDE_STATE_ROOT = `${HOME}/dev/codepuppy-base`
 const USER_DATA = `${HOME}/Library/Application Support/ai.opencode.desktop`
 
 function withTemp<T>(run: (dir: string) => T): T {
@@ -72,7 +72,7 @@ const describeRule = (r: Rule) => `${r.id} ${r.kind} ${r.value}`
 const profileFor = (stateRoot: string, env: "prod" | "dev", over: Partial<ProcessFenceProfileInput> = {}) =>
   renderProcessFenceProfile({
     workspaces: [`${HOME}/code-puppy`, `${HOME}/app/alpha-code`],
-    alphaGlobalRoot: environmentMutableRoot(env, stateRoot),
+    codepuppyGlobalRoot: environmentMutableRoot(env, stateRoot),
     userDataPath: USER_DATA,
     stateHome: USER_DATA,
     roots: { home: HOME, dataHome: `${HOME}/.local/share`, cacheHome: `${HOME}/.cache`, configHome: `${HOME}/.config` },
@@ -82,9 +82,9 @@ const profileFor = (stateRoot: string, env: "prod" | "dev", over: Partial<Proces
 
 describe("真源位置(I3):<casBaseRoot>/egress-grants/<env>.json 不在可写集任何固定行之下", () => {
   test("路径 = <casBaseRoot>/egress-grants/<env>.json;与 env 根、mcp-servers/、cas/ 同级(相对每个都以 .. 开头)", () => {
-    expect(egressGrantTruthPath(DEFAULT_STATE_ROOT, "prod")).toBe("/Users/alpha/Library/Application Support/alpha-code-state/egress-grants/prod.json")
-    expect(egressGrantTruthPath(DEFAULT_STATE_ROOT, "beta")).toBe("/Users/alpha/Library/Application Support/alpha-code-state/egress-grants/beta.json")
-    expect(egressGrantTruthPath(OVERRIDE_STATE_ROOT, "dev")).toBe("/Users/alpha/dev/alpha-base/egress-grants/dev.json")
+    expect(egressGrantTruthPath(DEFAULT_STATE_ROOT, "prod")).toBe("/Users/alpha/Library/Application Support/codepuppy-state/egress-grants/prod.json")
+    expect(egressGrantTruthPath(DEFAULT_STATE_ROOT, "beta")).toBe("/Users/alpha/Library/Application Support/codepuppy-state/egress-grants/beta.json")
+    expect(egressGrantTruthPath(OVERRIDE_STATE_ROOT, "dev")).toBe("/Users/alpha/dev/codepuppy-base/egress-grants/dev.json")
     for (const env of ["prod", "beta", "dev"] as const) {
       const truth = egressGrantTruthPath(DEFAULT_STATE_ROOT, env)
       for (const sibling of [
@@ -101,7 +101,7 @@ describe("真源位置(I3):<casBaseRoot>/egress-grants/<env>.json 不在可写�
     }
   })
 
-  test("默认 base 与覆盖 base、两种 XDG_STATE_HOME:没有任何固定行覆盖真源文件或它的目录(W1 除外);对照:W2 罩着 alpha.jsonc", () => {
+  test("默认 base 与覆盖 base、两种 XDG_STATE_HOME:没有任何固定行覆盖真源文件或它的目录(W1 除外);对照:W2 罩着 codepuppy.jsonc", () => {
     for (const [stateRoot, env] of [
       [DEFAULT_STATE_ROOT, "prod"],
       [OVERRIDE_STATE_ROOT, "dev"],
@@ -113,7 +113,7 @@ describe("真源位置(I3):<casBaseRoot>/egress-grants/<env>.json 不在可写�
         const dir = join(stateRoot, "egress-grants")
         expect(rules.filter((r) => covers(r, truth)).map(describeRule), `truth file ${truth}`).toEqual([])
         expect(rules.filter((r) => covers(r, dir)).map(describeRule), `truth dir ${dir}`).toEqual([])
-        expect(rules.filter((r) => covers(r, join(environmentMutableRoot(env, stateRoot), "alpha.jsonc"))).map(describeRule)).toEqual([
+        expect(rules.filter((r) => covers(r, join(environmentMutableRoot(env, stateRoot), "codepuppy.jsonc"))).map(describeRule)).toEqual([
           `W2 subpath ${environmentMutableRoot(env, stateRoot)}`,
         ])
       }
@@ -241,7 +241,7 @@ describe("写端与生产绑定不在 sidecar 的 import 闭包里(生产的闭�
   test("sidecarSourceFiles 不含 egress-grant-truth-write / egress-grant-records / egress-approval-dialog", () => {
     const files = sidecarSourceFiles(repoRoot)
     // 集合是活的:先证明这个手段看得见东西,再断言它看不见我们关心的那几个
-    expect(files).toContain("packages/ui-mac/src/main/alpha-config-injection.ts")
+    expect(files).toContain("packages/ui-mac/src/main/codepuppy-config-injection.ts")
     expect(files).not.toContain("packages/ui-mac/src/main/egress-grant-truth-write.ts")
     expect(files).not.toContain("packages/ui-mac/src/main/egress-grant-records.ts")
     expect(files).not.toContain("packages/ui-mac/src/main/egress-approval-dialog.ts")

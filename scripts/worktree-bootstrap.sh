@@ -19,7 +19,7 @@
 #     都往**共享树**写构建产物 —— 本票要消灭的交叉污染换个地方发生。
 #   · `bun install`:exit 0 / 4694 packages / **9.5 秒**,随后 ui-mac typecheck **exit 0 / 0 条 / 3 秒**,
 #     `node_modules` 与 `.ts-dist` 都是 worktree 本地真目录,不与任何人共享。
-# 判据不写在这段散文里 —— 它在 `scripts/assert-worktree-bootstrap.sh`(alpha-check 第 [8/9] 步),
+# 判据不写在这段散文里 —— 它在 `scripts/assert-worktree-bootstrap.sh`(codepuppy-check 第 [8/9] 步),
 # 那里真建 worktree、真跑 typecheck,并且**先证明没 bootstrap 的树确实会红**再判 bootstrap 过的树绿。
 #
 # ── 为什么要救 `core.hooksPath`(`#916` 勘破,实测)──────────────────────────────────
@@ -50,7 +50,7 @@ usage() {
   --base <ref>    基线 ref(默认 origin/alpha)
 
 幂等:<name> 已经是一棵注册在案的 worktree 时跳过创建,重跑 `bun install`,
-      已就绪的 Electron 与 alpha-fence addon 不重复复制/编译
+      已就绪的 Electron 与 codepuppy-fence addon 不重复复制/编译
       (bun install 本身幂等;实测已装好的树重跑 3.5s / exit 0,不破坏它)。
 
 失败:任何一步失败都**非零退出并说清楚**。若 worktree 是**本次**创建的,失败时把它
@@ -213,10 +213,10 @@ set -m
       exit 1
     fi
   fi
-  if [ ! -f packages/ui-mac/native/alpha-fence/build/alpha_fence.node ]; then
-    echo "▶ 编译 alpha-fence 原生 addon"
+  if [ ! -f packages/ui-mac/native/codepuppy-fence/build/codepuppy_fence.node ]; then
+    echo "▶ 编译 codepuppy-fence 原生 addon"
     (cd packages/ui-mac && bun run scripts/build-fence-addon.ts) || {
-      echo "✗ alpha-fence 原生 addon 编译失败" >&2
+      echo "✗ codepuppy-fence 原生 addon 编译失败" >&2
       exit 1
     }
   fi
@@ -233,13 +233,13 @@ INSTALL_PID=""
 
 if [ "$INSTALL_RC" -eq 0 ]; then
   restore_hooks_path
-  echo "✓ .worktrees/$NAME 就绪 —— 在里面跑 bash scripts/alpha-check.sh 是可信结论,不必碰共享主 checkout"
+  echo "✓ .worktrees/$NAME 就绪 —— 在里面跑 bash scripts/codepuppy-check.sh 是可信结论,不必碰共享主 checkout"
   echo "$TARGET"
   exit 0
 fi
 
 restore_hooks_path
-echo "✗ worktree 依赖安装失败(rc=$INSTALL_RC,bun install / Electron / alpha-fence)——**依赖没装上**。" >&2
+echo "✗ worktree 依赖安装失败(rc=$INSTALL_RC,bun install / Electron / codepuppy-fence)——**依赖没装上**。" >&2
 echo "  不要在这棵树上跑 typecheck/测试:它会给出成千上万条与你的改动无关的 \`Cannot find module\` 假红," >&2
 echo "  而那些红看起来跟「基线既有」一模一样。" >&2
 if [ "$CREATED_HERE" -eq 1 ]; then

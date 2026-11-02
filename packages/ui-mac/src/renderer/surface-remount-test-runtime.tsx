@@ -8,13 +8,13 @@
 //
 // 挂的是**真实 alpha 壳**(与 start-draft-test-runtime 同一形态):上游
 // `PlatformProvider → AppBaseProviders → AppInterface`、真实 MemoryRouter 路由树、生产
-// `composeRoutes`、生产 `AlphaHome`/`AlphaComposer`/`useAlphaProjects`/`runtime-recovery`。
+// `composeRoutes`、生产 `CodePuppyHome`/`CodePuppyComposer`/`useCodePuppyProjects`/`runtime-recovery`。
 // `App()` 的响应图(sidecar/defaultServer 资源、servers/sidebarServer/effectiveDefaultServer/
 // projectsServerKey/surfaceComponents 五个 memo、keyed Show)**逐行照抄 renderer/index.tsx** ——
 // index.tsx 是 render() 入口无法直接 import,这份复刻是 harness 唯一不执行原文件的部分,
 // 判据文件里以源码锚点钉住原件形状(锚点变 = 本文件要跟着改)。
 //
-// 判据的可观察量**就是真机取证用的那一个**:生产 AlphaComposer `onMount` 里的
+// 判据的可观察量**就是真机取证用的那一个**:生产 CodePuppyComposer `onMount` 里的
 // `markStartupTimeline("renderer.composer.mount")`(经 window.api.startupTimeline 捕获),
 // 加 DOM 节点同一性与草稿文本 —— 不断言任何内层 memo 的值。
 //
@@ -39,21 +39,21 @@ import { MemoryRouter } from "@solidjs/router"
 import { createEffect, createMemo, createResource, createSignal, onCleanup, Show } from "solid-js"
 import { render } from "solid-js/web"
 import type { SidecarGenerationState } from "../preload/types"
-import { AlphaHome } from "./alpha-ui/AlphaHome"
-import { AlphaSidebar } from "./sidebar/alpha-sidebar"
-import { installHomeDraftDiscardNotice } from "./alpha-ui/home-draft-discard-notice"
-import { ToastViewport } from "./alpha-ui/Toast"
-import { AlphaNewSession } from "./alpha-ui/alpha-new-session"
-import { ContractHealthProvider } from "./alpha-ui/providers"
-import { alphaSessionWorkspaceSurface } from "./alpha-ui/session-workspace/alpha-session-workspace"
-import { SurfaceBoundary } from "./alpha-ui/surface-boundary"
-import { UpstreamDialogHost } from "./alpha-ui/UpstreamDialogHost"
+import { CodePuppyHome } from "./codepuppy-ui/CodePuppyHome"
+import { CodePuppySidebar } from "./sidebar/codepuppy-sidebar"
+import { installHomeDraftDiscardNotice } from "./codepuppy-ui/home-draft-discard-notice"
+import { ToastViewport } from "./codepuppy-ui/Toast"
+import { CodePuppyNewSession } from "./codepuppy-ui/codepuppy-new-session"
+import { ContractHealthProvider } from "./codepuppy-ui/providers"
+import { codepuppySessionWorkspaceSurface } from "./codepuppy-ui/session-workspace/codepuppy-session-workspace"
+import { SurfaceBoundary } from "./codepuppy-ui/surface-boundary"
+import { UpstreamDialogHost } from "./codepuppy-ui/UpstreamDialogHost"
 import { initializationData } from "./initialization"
 import { composeRoutes } from "./route-composition"
-import { type AlphaProjectsApi, useAlphaProjects } from "./sidebar/use-projects"
+import { type CodePuppyProjectsApi, useCodePuppyProjects } from "./sidebar/use-projects"
 import { availableStartupServer, readyWslConnections } from "./wsl/connections"
-import { resetLaunchDraftHandoff as resetHandoff } from "./alpha-ui/launch-draft-handoff"
-import { installShellBootTimeline } from "./alpha-ui/shell-boot-timeline"
+import { resetLaunchDraftHandoff as resetHandoff } from "./codepuppy-ui/launch-draft-handoff"
+import { installShellBootTimeline } from "./codepuppy-ui/shell-boot-timeline"
 
 export { render }
 // #1056:交接位是模块级单例 —— 用例必须操作**打包进本 runtime 的那一份**,
@@ -63,7 +63,7 @@ export {
   endLaunchDraftHandoff,
   launchDraftPending,
   resetLaunchDraftHandoff,
-} from "./alpha-ui/launch-draft-handoff"
+} from "./codepuppy-ui/launch-draft-handoff"
 
 export const SIDECAR_URL = "http://127.0.0.1:4096"
 export const PROJECT_DIRECTORY = "/repos/alpha-code"
@@ -187,7 +187,7 @@ const timeline: TimelineRecord[] = []
 export function timelineMarks(): TimelineRecord[] {
   return [...timeline]
 }
-/** 生产 AlphaComposer onMount 的 `renderer.composer.mount` 计数 —— 与真机取证同一个可观察量。 */
+/** 生产 CodePuppyComposer onMount 的 `renderer.composer.mount` 计数 —— 与真机取证同一个可观察量。 */
 export function composerMountCount(): number {
   return timeline.filter((mark) => mark.name === "renderer.composer.mount").length
 }
@@ -205,8 +205,8 @@ function ServerListProbe() {
   return null
 }
 
-// —— 生产 useAlphaProjects 的探出口(证明换血作用在活的数据层上)——————————————————
-let projectsApiRef: AlphaProjectsApi | undefined
+// —— 生产 useCodePuppyProjects 的探出口(证明换血作用在活的数据层上)——————————————————
+let projectsApiRef: CodePuppyProjectsApi | undefined
 export const projectsApi = () => projectsApiRef
 
 // —— preload / fetch 替身(start-draft harness 同口径)——————————————————————————
@@ -319,7 +319,7 @@ export function installPreloadStub() {
     // `#1557`:输入框与选择器读两份目录的刷新结局;缺省 Proxy 回 undefined 会让读 `.platform` 当场 throw。
     "models.refreshHealth": async () => ({ platform: null, byok: null }),
     "providers.keyStatus": async () => ({}),
-    // AlphaHome 的 useConfigHealth 走 extIpc.configHealth;缺省 Proxy 会回 undefined,
+    // CodePuppyHome 的 useConfigHealth 走 extIpc.configHealth;缺省 Proxy 会回 undefined,
     // `configHealth().broken` 当场 throw → 整个 home surface 被边界吞掉(实测)。
     "ext.configHealth": async () => ({ broken: false }),
   }
@@ -383,15 +383,15 @@ export function resetHarness() {
 // settings / recovery 的 mount 不进 AppInterface 的 surfaces(index.tsx 里它们作为 children
 // 挂载),不在本命题上 → 给最小替身;dialog 用生产 UpstreamDialogHost(经 AppBaseProviders)。
 const productionRoutes = composeRoutes({
-  home: (projects: AlphaProjectsApi, serverKey: () => string | undefined) => () => (
+  home: (projects: CodePuppyProjectsApi, serverKey: () => string | undefined) => () => (
     <SurfaceBoundary surface="home">
-      <AlphaHome projects={projects} serverKey={serverKey} />
+      <CodePuppyHome projects={projects} serverKey={serverKey} />
     </SurfaceBoundary>
   ),
   newSession:
-    (projects: AlphaProjectsApi, serverKey: () => string | undefined) => (props: DraftSurfaceProps) => (
+    (projects: CodePuppyProjectsApi, serverKey: () => string | undefined) => (props: DraftSurfaceProps) => (
       <SurfaceBoundary surface="newSession">
-        <AlphaNewSession
+        <CodePuppyNewSession
           projects={projects}
           serverKey={serverKey}
           draftId={props.draftId}
@@ -399,13 +399,13 @@ const productionRoutes = composeRoutes({
         />
       </SurfaceBoundary>
     ),
-  session: (projects: AlphaProjectsApi) => alphaSessionWorkspaceSurface(projects),
+  session: (projects: CodePuppyProjectsApi) => codepuppySessionWorkspaceSurface(projects),
   settings: () => null,
   dialog: UpstreamDialogHost,
   recovery: () => null,
 })
 
-export function AlphaSurfaceShell() {
+export function CodePuppySurfaceShell() {
   // —— 以下响应图逐行对应 renderer/index.tsx 的 render 闭包 + App()(资源在 App 外建、
   // App 闭包引用;locale/windowCount 之外的 alpha children 不在命题上,已裁)。————————
   const [windowCount] = createResource(() => window.api.getWindowCount())
@@ -457,10 +457,10 @@ export function AlphaSurfaceShell() {
     // 全在 home-draft-discard-notice.ts 里,这行只是接线;复刻少了它 = 行为测试测不到生产代码。
     installHomeDraftDiscardNotice(effectiveDefaultServer)
 
-    const alphaProjects = useAlphaProjects(sidebarServer)
-    projectsApiRef = alphaProjects
+    const codepuppyProjects = useCodePuppyProjects(sidebarServer)
+    projectsApiRef = codepuppyProjects
     onCleanup(() => {
-      if (projectsApiRef === alphaProjects) projectsApiRef = undefined
+      if (projectsApiRef === codepuppyProjects) projectsApiRef = undefined
     })
 
     const projectsServerKey = createMemo(() => {
@@ -471,12 +471,12 @@ export function AlphaSurfaceShell() {
     })
 
     const surfaceComponents = createMemo<AppSurfaces>(() => ({
-      [productionRoutes.home.surface]: productionRoutes.home.mount(alphaProjects, projectsServerKey),
+      [productionRoutes.home.surface]: productionRoutes.home.mount(codepuppyProjects, projectsServerKey),
       [productionRoutes["new-session"].surface]: productionRoutes["new-session"].mount(
-        alphaProjects,
+        codepuppyProjects,
         projectsServerKey,
       ),
-      [productionRoutes.session.surface]: productionRoutes.session.mount(alphaProjects),
+      [productionRoutes.session.surface]: productionRoutes.session.mount(codepuppyProjects),
     }))
 
     return (
@@ -494,7 +494,7 @@ export function AlphaSurfaceShell() {
             >
               <ServerListProbe />
               {/* #1056:生产侧栏本体(启动 draft 的唯一发起处)。默认不挂,见 setSidebarMounted。 */}
-              {sidebarMounted ? <AlphaSidebar projects={alphaProjects} serverKey={projectsServerKey} /> : null}
+              {sidebarMounted ? <CodePuppySidebar projects={codepuppyProjects} serverKey={projectsServerKey} /> : null}
               {/* #927:生产 ToastViewport 与原件同位(keyed 树内、AppInterface children)——
                   提示 push 发生在旧树 dispose 期间,判据必须证明它熬得过重挂本身:
                   viewport 随树重建,靠模块级 store 把这条重新渲染出来。 */}

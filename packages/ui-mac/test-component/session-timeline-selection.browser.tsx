@@ -2,8 +2,8 @@
 import { render } from "solid-js/web"
 import { MarkedProvider } from "../../ui/src/context/marked"
 import { setLocale } from "../src/renderer/i18n"
-import { SessionTimelineView } from "../src/renderer/alpha-ui/session-timeline/session-timeline-view"
-import { projectTimelineRows } from "../src/renderer/alpha-ui/session-timeline/timeline-model"
+import { SessionTimelineView } from "../src/renderer/codepuppy-ui/session-timeline/session-timeline-view"
+import { projectTimelineRows } from "../src/renderer/codepuppy-ui/session-timeline/timeline-model"
 import samples from "./session-timeline-selection.fixture.json"
 import "../../session-ui/src/components/markdown.css"
 

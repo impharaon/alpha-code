@@ -1,5 +1,5 @@
 {
-  "name": "@alpha-code/ext",
+  "name": "@codepuppy/ext",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@ai-sdk/provider": "3.0.16",
-    "@alpha-code/contracts-consumer": "workspace:*",
+    "@codepuppy/contracts-consumer": "workspace:*",
     "@opencode-ai/plugin": "workspace:*",
     "@silvia-odwyer/photon-node": "0.3.4"
   }

@@ -11,7 +11,7 @@ import { reconcileAuthSnapshot, resetAuthRecoveryForTests, subscribeAuthState } 
 // #612:定序覆盖全部 auth 形态(登录态轴)的四条退出条件 + R1 Blocker 复现见文末 describe。
 // 呈现序 ⊑ = 相对视图同身份(status/mode/email/plan)且仅把 platformStatus 收紧为 recovering;
 // 按 unresolved **形态**枚举分流呈现是 R1 Blocker(recovering 自带 logged-in/platform 身份,
-// AlphaOnboarding 凭 status、extension-hub cloudReady 凭 status+mode 放行,跨身份呈现即 fail-open)。
+// CodePuppyOnboarding 凭 status、extension-hub cloudReady 凭 status+mode 放行,跨身份呈现即 fail-open)。
 
 const drain = async () => {
   for (let index = 0; index < 20; index++) await Promise.resolve()
@@ -912,7 +912,7 @@ describe("#612 快照定序覆盖登录态轴", () => {
   })
 
   // R1 Blocker(reconcile 侧):recovering 只在 platformStatus 轴上「保守」,它的身份轴是
-  // logged-in/platform —— AlphaOnboarding 凭 status、extension-hub cloudReady 凭 status+mode
+  // logged-in/platform —— CodePuppyOnboarding 凭 status、extension-hub cloudReady 凭 status+mode
   // 放行,跨身份呈现它就是 fail-open,不是「不放行任何能力」。呈现序例外只认同身份收紧。
   test("R1 Blocker:视图 logged-out 时,跨身份的 logged-in/recovering 快照不得被呈现", async () => {
     vi.useFakeTimers()
@@ -1048,13 +1048,13 @@ describe("auth 订阅单点接线", () => {
       .map((file) => file.path)
       .sort()
     expect(wired).toEqual([
-      "alpha-ui/AlphaOnboarding.tsx",
-      "alpha-ui/alpha-composer-model.tsx",
-      "alpha-ui/alpha-composer.tsx",
-      "alpha-ui/permission-watcher.tsx",
+      "codepuppy-ui/CodePuppyOnboarding.tsx",
+      "codepuppy-ui/codepuppy-composer-model.tsx",
+      "codepuppy-ui/codepuppy-composer.tsx",
+      "codepuppy-ui/permission-watcher.tsx",
       "automations/automation-panel.tsx",
       "extensions/extension-hub.tsx",
-      "sidebar/alpha-sidebar.tsx",
+      "sidebar/codepuppy-sidebar.tsx",
     ])
   })
 
@@ -1065,7 +1065,7 @@ describe("auth 订阅单点接线", () => {
       .filter((file) => file.path !== "auth-recovery.ts" && flat(file.text).includes("api.auth.getState()"))
       .map((file) => file.path)
       .sort()
-    expect(readers).toEqual(["alpha-ui/alpha-composer-model.tsx", "alpha-ui/alpha-composer.tsx"])
+    expect(readers).toEqual(["codepuppy-ui/codepuppy-composer-model.tsx", "codepuppy-ui/codepuppy-composer.tsx"])
     // 只断言「文件里出现过这个名字」会被 import 行满足(空检查);锁的是**读到的那个值**流过判据。
     const applied = readers.map((path) => {
       const text = flat(sources.find((file) => file.path === path)!.text)

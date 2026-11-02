@@ -1,13 +1,13 @@
 // hub-bridge — REQ-234 `#1531`(基线 docs/design/2026-10-14-req234-hub-agent-install-baseline.md §2.2 / §2.6)。
 //
 // ext 这一侧的 parentPort 请求簿记:agent 的三个定制中心工具经它向 main 问「这个目录的三档视图」与「某次安装请求走到哪一步」,
-// main 经它把重载请求交给 ext 调度器、ext 经它把重载结局报回去。合同只有一份 —— ui-mac 的 alpha-sidecar-messages.ts
+// main 经它把重载请求交给 ext 调度器、ext 经它把重载结局报回去。合同只有一份 —— ui-mac 的 codepuppy-sidecar-messages.ts
 // (相对路径 import,与 context-injection.ts 引 ui-mac 内容模块同一先例;该文件不依赖 electron / node:fs)。
 //
 // 形制同 main 侧的 workspace-write-probe:请求带自增 id、应答按 id 结算、超时答「无法判断」。三条纪律:
 //   · 监听在**模块装载时**就挂上(createHubBridge 的同步部分)—— main 只在 sidecar ready 那一刻重发排队的重载代际,
 //     监听晚挂一步,那一批就丢了;
-//   · 只认 `alpha.*`,其余原样不理(sidecar.ts 的 start / stop / write-probe 照旧由它自己处理,两边互不改对方的分支);
+//   · 只认 `codepuppy.*`,其余原样不理(sidecar.ts 的 start / stop / write-probe 照旧由它自己处理,两边互不改对方的分支);
 //   · 应答形状不对 = 丢弃 + 记一行,请求按超时结算 —— 不带着半个视图去回答 agent。
 // 取不到 parentPort(CLI / 测试宿主)⇒ `available: false`,三个工具如实说「本宿主不可用」,不猜。
 
@@ -15,7 +15,7 @@ import {
   buildHubRequestQuery,
   buildHubViewRequest,
   buildReloadReport,
-  isAlphaSidecarMessage,
+  isCodePuppySidecarMessage,
   parseHubRequestReply,
   parseHubViewReply,
   parseReloadRequest,
@@ -24,7 +24,7 @@ import {
   type ReloadOutcome,
   type ReloadRequestMessage,
   type ReloadScope,
-} from "../../ui-mac/src/main/alpha-sidecar-messages"
+} from "../../ui-mac/src/main/codepuppy-sidecar-messages"
 
 /** Electron utilityProcess 的 `process.parentPort` 里本模块用到的那两样。 */
 export type HubPort = {
@@ -58,18 +58,18 @@ export function createHubBridge(
 
   port?.on("message", (event) => {
     const message = event?.data
-    if (!isAlphaSidecarMessage(message)) return
+    if (!isCodePuppySidecarMessage(message)) return
     const type = (message as { type: string }).type
-    if (type === "alpha.reload.request") {
+    if (type === "codepuppy.reload.request") {
       const parsed = parseReloadRequest(message)
-      if (!parsed) return log(`[@alpha-code/ext] hub bridge: dropped a malformed reload request`)
+      if (!parsed) return log(`[@codepuppy/ext] hub bridge: dropped a malformed reload request`)
       if (reloadHandler) return reloadHandler(parsed)
       early.push(parsed)
       return
     }
     const id = (message as { id?: unknown }).id
     const entry = typeof id === "number" ? pending.get(id) : undefined
-    if (!entry) return log(`[@alpha-code/ext] hub bridge: ${type.slice(0, 80)} for no pending request ignored`)
+    if (!entry) return log(`[@codepuppy/ext] hub bridge: ${type.slice(0, 80)} for no pending request ignored`)
     pending.delete(id as number)
     clearTimeout(entry.timer)
     entry.settle(message)
@@ -88,7 +88,7 @@ export function createHubBridge(
         settle: (message) => {
           const parsed = parse(message)
           if (parsed === undefined) {
-            log(`[@alpha-code/ext] hub bridge: dropped a malformed reply to request ${id}`)
+            log(`[@codepuppy/ext] hub bridge: dropped a malformed reply to request ${id}`)
             return resolve({ ok: false, reason: "error", detail: "the app sent a malformed answer" })
           }
           resolve(parsed)
@@ -99,7 +99,7 @@ export function createHubBridge(
       } catch (error) {
         pending.delete(id)
         clearTimeout(timer)
-        log(`[@alpha-code/ext] hub bridge: request ${id} could not be posted: ${error instanceof Error ? error.message : String(error)}`)
+        log(`[@codepuppy/ext] hub bridge: request ${id} could not be posted: ${error instanceof Error ? error.message : String(error)}`)
         resolve({ ok: false, reason: "unavailable", detail: "the app could not be reached" })
       }
     })
@@ -134,7 +134,7 @@ export function createHubBridge(
       try {
         port.postMessage(buildReloadReport(input))
       } catch (error) {
-        log(`[@alpha-code/ext] hub bridge: reload report for generation ${input.generation} could not be posted: ${error instanceof Error ? error.message : String(error)}`)
+        log(`[@codepuppy/ext] hub bridge: reload report for generation ${input.generation} could not be posted: ${error instanceof Error ? error.message : String(error)}`)
       }
     },
     onReloadRequest(handler) {

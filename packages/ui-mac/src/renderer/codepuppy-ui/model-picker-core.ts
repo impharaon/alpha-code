@@ -1,0 +1,291 @@
+import type { ModelRef, ModelV2Info } from "@opencode-ai/sdk/v2/client"
+import type { EffectiveCatalog, PricingMultiplier, ProviderKeyStatus } from "../../shared/codepuppy-model-types"
+import { byokEngineId, byokModelMeta, isByokEngineId } from "../../shared/codepuppy-model-types"
+import type { ComposerModel } from "./composer-state"
+import { t } from "../i18n"
+
+export type AccountState = "member" | "balance" | "empty" | "out" | "loading" | "recovering" | "unreachable" | "failed"
+export type ModelListState = "loading" | "recovering" | "ready" | "failed"
+export type KeyStatusState = "loading" | "ready" | "failed"
+export type ModelAvailability = "available" | "needs-login" | "needs-credit" | "needs-key" | "loading" | "unavailable"
+
+export type ModelPickerRow = {
+  key: string
+  group: "platform" | "byok"
+  model: ComposerModel
+  providerName: string
+  /** 品牌:平台行取已应用快照的 `display.brand`,BYOK 行取 BYOK 目录 provider 的 `brand`;自定义节点**不猜**,
+   *  恒缺省(= 中性图形)。不来自路由腿 `provider`(qwen 经 OpenRouter 路由,品牌仍是 qwen)。 */
+  brand?: string
+  /** #679:平台下发的双倍数,**只在平台组的行上出现**(BYOK / 自定义节点走用户自己的 KEY,
+   *  与代理计价无关)。缺失 = 平台段没有有效 V2/LKG,该行渲染「计价信息暂不可用」而不是数字。
+   *  客户端不做除法、不 rounding、不分桶、不折叠成单一 scalar —— 值就是平台原值。 */
+  pricing?: PricingMultiplier
+  reasoning: boolean
+  /** **picker 可选择性**,不是引擎执行证明(契约 docs/contracts/byok-availability.md)。 */
+  availability: ModelAvailability
+  reason?: string
+  /** REQ-109 #595:该行的可选择性完全由本地事实(本地目录 + 本地 KEY)决定,引擎清单
+   *  (`listState` / `model.list` 内容 / `readyListEpoch`)不得否定它。只有内置 BYOK 目录行带此标记;
+   *  平台代理行与从引擎清单派生的自定义节点行都不带。点击层据此跳过引擎清单 membership 检查。 */
+  engineIndependent?: true
+}
+
+/** alpha-code#1558:品牌 → 上游 `ProviderIcon` 图标集(`@opencode-ai/ui` provider-icons/sprite.svg)里的图形 id。
+ *  App 内固定小表(方案 req236 §2.6);新品牌要有自己的图标需要发版,表外品牌与自定义节点回落为图标组件自带的
+ *  通用图形 `synthetic`。不新增图形资源。 */
+const BRAND_ICONS = new Map([
+  ["anthropic", "anthropic"],
+  ["openai", "openai"],
+  ["deepseek", "deepseek"],
+  ["zhipu", "zhipuai"],
+  ["qwen", "alibaba"],
+  ["moonshot", "moonshotai"],
+  ["minimax", "minimax"],
+])
+export const NEUTRAL_BRAND_ICON = "synthetic"
+
+export function brandIconId(brand: string | undefined): string {
+  return (brand && BRAND_ICONS.get(brand)) || NEUTRAL_BRAND_ICON
+}
+
+/** 已选模型(输入框模型按钮)的品牌,与 picker 行同源:平台模型 → 快照 `brand`;直连 BYOK 节点 → 目录 provider
+ *  `brand`;其余(自定义节点、未选、目录未到)→ 缺省(中性图形)。 */
+export function modelBrandOf(model: ModelRef | null | undefined, catalog: EffectiveCatalog | null): string | undefined {
+  if (!model || !catalog) return undefined
+  if (model.providerID === catalog.platformProvider.id)
+    return catalog.platformModels.find((platform) => platform.id === model.id)?.brand
+  return catalog.byokProviders.find((provider) => byokEngineId(provider.id) === model.providerID)?.brand
+}
+
+/** 平台已把倍数 half-up 到一位小数(契约 docs/contracts,`isTrustedPair` 拒绝不落在 0.1 网格上的值),
+ *  所以 `toFixed(1)` 是**本地化**不是 rounding:它只决定 `1` 要不要写成 `1.0`,不会改变任何数值。 */
+const formatMultiplier = (value: number) => value.toFixed(1)
+
+/**
+ * #679:一行的**计价状态**,两态且只有两态。
+ *
+ *  · 平台组 + 有可信 pair → `输入 71.4× · 输出 178.6×`(双倍数,永不折叠成一个数);
+ *  · 平台组 + 无 pair     → `计价信息暂不可用`(不含任何数字与档位词)——「没有可信价格」必须
+ *    说出来,合成一个便宜的档位比不说更坏,那正是本票删掉的东西;
+ *  · 非平台组             → `null`。BYOK 与自定义节点用用户自己的 KEY 直连,代理倍数对它们
+ *    没有意义,给一个数字或给一句「暂不可用」都是在暗示它们参与代理计价。
+ */
+export function pricingStatusText(row: Pick<ModelPickerRow, "group" | "pricing">): string | null {
+  if (row.group !== "platform") return null
+  if (!row.pricing) return t("codepuppy.model.pricingUnavailable")
+  return t("codepuppy.model.pricingPair", {
+    input: formatMultiplier(row.pricing.input),
+    output: formatMultiplier(row.pricing.output),
+  })
+}
+
+export function modelRefOf(model: ComposerModel): ModelRef {
+  return {
+    id: model.id,
+    providerID: model.providerID,
+    ...(model.variant ? { variant: model.variant } : {}),
+  }
+}
+
+export function composerModelFromRef(ref: ModelRef, catalog: EffectiveCatalog | null): ComposerModel {
+  const platform =
+    catalog?.platformProvider.id === ref.providerID
+      ? catalog.platformModels.find((model) => model.id === ref.id)
+      : undefined
+  // REQ-153 #1266:直连 BYOK 节点的档位与 picker 行 / sidecar 注入同一份派生 —— 会话投影回来的 BYOK
+  // 模型此前恒 `variants: []`,进会话后档位 chip 又变回「不支持」。
+  const byok = catalog && isByokEngineId(ref.providerID) ? byokModelMeta(catalog, ref.providerID, ref.id) : undefined
+  return {
+    ...ref,
+    name: platform?.name ?? ref.id,
+    variants: Object.keys(platform?.variants ?? byok?.variants ?? {}),
+  }
+}
+
+export function withModelVariant(model: ComposerModel, variant: string | null): ComposerModel {
+  return {
+    ...model,
+    variant: variant && model.variants.includes(variant) ? variant : undefined,
+  }
+}
+
+export function buildModelPickerRows(input: {
+  catalog: EffectiveCatalog
+  models: readonly ModelV2Info[]
+  listState: ModelListState
+  keyStatusState: KeyStatusState
+  keyStatus: ProviderKeyStatus
+  accountState: AccountState
+  /** true = 会话内的 picker(换模型必须落到服务端 switchModel)。只影响 BYOK 行在引擎恢复中的
+   *  **文案诚实性**:home 可先选,session 不能 —— 不得让两者共用「可先选择」。 */
+  sessionScoped: boolean
+  query: string
+}): ModelPickerRow[] {
+  const actual = new Map(input.models.map((model) => [`${model.providerID}:${model.id}`, model]))
+  const query = input.query.trim().toLowerCase()
+  const matches = (row: ModelPickerRow) =>
+    !query || `${row.model.name} ${row.model.id} ${row.providerName} ${row.reason ?? ""}`.toLowerCase().includes(query)
+
+  // 登录前沿用既有 IA：统一登录入口由组件呈现，不铺一整组逐模型锁定行。
+  const platform = (input.accountState === "out" ? [] : input.catalog.platformModels).map((model): ModelPickerRow => {
+    const key = `${input.catalog.platformProvider.id}:${model.id}`
+    const availability = platformAvailability(input.accountState, input.listState, actual.get(key))
+    return {
+      key,
+      group: "platform",
+      model: {
+        id: model.id,
+        providerID: input.catalog.platformProvider.id,
+        name: model.name,
+        variants: model.variants ? Object.keys(model.variants) : [],
+      },
+      providerName: input.catalog.platformProvider.name,
+      brand: model.brand,
+      ...(model.pricing ? { pricing: model.pricing } : {}),
+      reasoning: !!model.reasoning,
+      availability: availability.kind,
+      reason: availability.reason,
+    }
+  })
+
+  const byok = input.catalog.byokProviders.flatMap((provider): ModelPickerRow[] => {
+    if (input.keyStatusState !== "ready") {
+      return [
+        {
+          key: `${provider.id}:key-status`,
+          group: "byok",
+          model: { id: provider.models[0] ?? "", providerID: provider.id, name: provider.name, variants: [] },
+          providerName: provider.name,
+          brand: provider.brand,
+          reasoning: false,
+          availability: input.keyStatusState === "loading" ? "loading" : "unavailable",
+          reason: input.keyStatusState === "loading" ? t("codepuppy.model.keyLoading") : t("codepuppy.model.keyFailed"),
+        },
+      ]
+    }
+    if (!(input.keyStatus[provider.id]?.configured ?? false)) {
+      return [
+        {
+          key: `${provider.id}:needs-key`,
+          group: "byok",
+          model: { id: provider.models[0] ?? "", providerID: provider.id, name: provider.name, variants: [] },
+          providerName: provider.name,
+          brand: provider.brand,
+          reasoning: false,
+          availability: "needs-key",
+          reason: t("codepuppy.model.keyMissing"),
+        },
+      ]
+    }
+    // REQ-109 #595:KEY 已配置 ⇒ 直接从本地目录派生可选行。**引擎不再是最终裁判** —— 不查
+    // `model.list`、不看 `listState`,后者最多提供「引擎重启中」文案。判据集封闭为
+    // {本地钥匙串, 本地目录}(契约 docs/contracts/byok-availability.md);登录态、账户额度、
+    // 平台连通、live allowlist、引擎清单内容一律不得否定它。
+    return provider.models.map((id): ModelPickerRow => {
+      // The engine injects BYOK nodes under `<id>-byok` (byokEngineId) to dodge the models.dev
+      // collision, so carry the engine id as the selectable model's providerID — inference must route
+      // to the injected node. Display id (provider.id) stays for keyStatus/brand/name/key above.
+      // REQ-153 #1236:name/reasoning 与 sidecar 注入(main/codepuppy-models.ts)同一个函数派生 —— 徽标
+      // 亮 ⇔ 引擎 capabilities.reasoning === true。
+      // REQ-153 #1266:variants 同源 —— 此前这里写死 `[]`,直连 deepseek-v4-pro / glm-5.2 亮着徽标
+      // 却一档都选不到,默认发出的请求零推理参数。
+      // REQ-153 #1267:BYOK-only id(如 glm-4.5-air)的徽标 / 档位来自目录自己的 `modelMeta` 槽,同一函数派生。
+      const engineID = byokEngineId(provider.id)
+      const meta = byokModelMeta(input.catalog, engineID, id)
+      return {
+        key: `${provider.id}:${id}`,
+        group: "byok",
+        model: { id, providerID: engineID, name: meta.name, variants: Object.keys(meta.variants ?? {}) },
+        providerName: provider.name,
+        brand: provider.brand,
+        reasoning: meta.reasoning,
+        availability: "available",
+        // 「当前可执行」是另一个谓词:引擎未 ready 时如实说明还要等什么,但不撤销可选择性。
+        // session 与 home 的可做之事不同,文案必须分开 —— 否则会出现「说可先选却点不了」。
+        ...(input.listState === "ready"
+          ? {}
+          : {
+              reason: input.sessionScoped
+                ? t("codepuppy.model.byokEngineRestartingSession")
+                : t("codepuppy.model.byokEngineRestarting"),
+            }),
+        engineIndependent: true,
+      }
+    })
+  })
+
+  const catalogProviderIDs = new Set([
+    input.catalog.platformProvider.id,
+    ...input.catalog.byokProviders.map((provider) => provider.id),
+  ])
+  // REQ-226 `#1343`:`needs-reentry` 的自定义节点(旧明文被压掉、或钥匙串里没有它的密钥)**保留在列表里**
+  // 但不可用,并说明怎么修(重新添加同名服务即可覆盖)。此前 `configured:false` = 整组行消失,用户看不出
+  // 「它还在、只是要重填」。没有编辑/删除自定义服务的 UI,重填 = 同名重新添加(slug 相同 ⇒ 整块覆盖)。
+  const custom =
+    input.keyStatusState === "ready" && input.listState !== "failed"
+      ? Object.entries(input.keyStatus)
+          .filter(
+            ([providerID, status]) =>
+              (status.configured || status.source === "needs-reentry") && !catalogProviderIDs.has(providerID),
+          )
+          .flatMap(([providerID, status]): ModelPickerRow[] =>
+            input.models
+              .filter((model) => model.providerID === providerID)
+              .map((model) => {
+                const reentry = status.source === "needs-reentry"
+                const available =
+                  !reentry && input.listState === "ready" && model.enabled && model.status !== "deprecated"
+                return {
+                  key: `${providerID}:${model.id}`,
+                  group: "byok",
+                  model: {
+                    id: model.id,
+                    providerID,
+                    name: model.name,
+                    variants: model.variants.map((variant) => variant.id),
+                  },
+                  providerName: providerID,
+                  reasoning: false,
+                  availability: available
+                    ? "available"
+                    : reentry
+                      ? "unavailable"
+                      : input.listState === "recovering"
+                        ? "loading"
+                        : "unavailable",
+                  reason: available
+                    ? undefined
+                    : reentry
+                      ? t("codepuppy.model.keyReentry")
+                      : input.listState === "recovering"
+                        ? t("codepuppy.model.syncing")
+                        : t("codepuppy.model.unavailable"),
+                }
+              }),
+          )
+      : []
+
+  return [...platform, ...byok, ...custom].filter(matches)
+}
+
+function platformAvailability(
+  account: AccountState,
+  list: ModelListState,
+  model: ModelV2Info | undefined,
+): { kind: ModelAvailability; reason?: string } {
+  if (account === "out") return { kind: "needs-login", reason: t("codepuppy.model.needsLogin") }
+  if (account === "empty") return { kind: "needs-credit", reason: t("codepuppy.model.needsCredit") }
+  if (account === "unreachable") return { kind: "loading", reason: t("codepuppy.model.serverUnreachable") }
+  if (account === "loading" || account === "recovering")
+    return {
+      kind: "loading",
+      reason: account === "recovering" ? t("codepuppy.model.syncing") : t("codepuppy.model.accountLoading"),
+    }
+  if (account === "failed") return { kind: "unavailable", reason: t("codepuppy.model.accountUnavailable") }
+  if (list === "loading") return { kind: "loading", reason: t("codepuppy.model.listLoading") }
+  if (list === "recovering") return { kind: "loading", reason: t("codepuppy.model.syncing") }
+  if (list === "failed") return { kind: "unavailable", reason: t("codepuppy.model.listUnavailable") }
+  if (!model?.enabled || model.status === "deprecated") return { kind: "unavailable", reason: t("codepuppy.model.unavailable") }
+  return { kind: "available" }
+}

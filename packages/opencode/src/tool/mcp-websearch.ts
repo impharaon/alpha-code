@@ -60,7 +60,7 @@ const FAILURE_LABEL: Record<Schema.Schema.Type<typeof FailureKind>, string> = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** 主权判决通道。名字在 core / opencode / ui-mac / ext 四个包各写一份(无共用依赖边)。 */
-export const LOCAL_WEBSEARCH_DENY_ENV = "ALPHA_LOCAL_WEBSEARCH_DENY"
+export const LOCAL_WEBSEARCH_DENY_ENV = "CODEPUPPY_LOCAL_WEBSEARCH_DENY"
 
 /** fail-closed:除「缺省 / 空串 / `"0"`」外的任何取值都判为 deny。 */
 export function localWebSearchDenied(env: Record<string, string | undefined> = process.env) {
@@ -96,7 +96,7 @@ export const LOCAL_WEBSEARCH_DENIED_MESSAGE =
  * the category, the HTTP status/code when there is one, and the upstream body as the cause — never
  * a fabricated "no results" success string.
  */
-export class WebSearchFailure extends Schema.TaggedErrorClass<WebSearchFailure>()("AlphaWebSearchFailure", {
+export class WebSearchFailure extends Schema.TaggedErrorClass<WebSearchFailure>()("CodePuppyWebSearchFailure", {
   kind: FailureKind,
   detail: Schema.String,
   status: Schema.optional(Schema.Number),
@@ -181,7 +181,7 @@ export const PARALLEL_URL = "https://search.parallel.ai/mcp"
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** 关掉信封记录的开关;缺省开着 —— 绊线不预先拉上就绊不到人(D 形态是间歇的,1/13)。 */
-export const WEBSEARCH_ENVELOPE_DIAG_ENV = "ALPHA_WEBSEARCH_ENVELOPE_DIAG"
+export const WEBSEARCH_ENVELOPE_DIAG_ENV = "CODEPUPPY_WEBSEARCH_ENVELOPE_DIAG"
 
 export function envelopeDiagEnabled(env: Record<string, string | undefined> = process.env) {
   return env[WEBSEARCH_ENVELOPE_DIAG_ENV] !== "0"

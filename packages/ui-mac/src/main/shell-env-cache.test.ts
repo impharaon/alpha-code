@@ -45,14 +45,14 @@ describe("shell env cache", () => {
     writeShellEnvCache(tmp, "/bin/zsh", {
       PATH: "/opt/homebrew/bin:/usr/bin",
       DEEPSEEK_API_KEY: "sk-user-real",
-      ALPHA_GLOBAL_DIR: "/tmp/claude-501/dead-session/m1-alpha-home",
-      ALPHA_ENV_BASE_DIR: "/tmp/claude-501/dead-session/state-base",
+      CODEPUPPY_GLOBAL_DIR: "/tmp/claude-501/dead-session/m1-codepuppy-home",
+      CODEPUPPY_ENV_BASE_DIR: "/tmp/claude-501/dead-session/state-base",
       OPENCODE_CONFIG_DIR: "/tmp/claude-501/dead-session/m1-legacy",
-      ALPHA_OPENCODE_HOME: "/tmp/claude-501/dead-session/m1-opencode-home",
-      ALPHA_MIGRATE_ENABLE: "1",
-      ALPHA_CDP: "1",
+      CODEPUPPY_OPENCODE_HOME: "/tmp/claude-501/dead-session/m1-opencode-home",
+      CODEPUPPY_MIGRATE_ENABLE: "1",
+      CODEPUPPY_CDP: "1",
       OPENCODE_DB: "/tmp/somewhere.db",
-      ALPHA_LEGACY_INSTALL_ROOT: "1",
+      CODEPUPPY_LEGACY_INSTALL_ROOT: "1",
       OPENCODE_TEST_ONBOARDING: "1",
     })
     expect(readShellEnvCache(tmp, "/bin/zsh")).toEqual({
@@ -62,7 +62,7 @@ describe("shell env cache", () => {
   })
 
   test("REQ-047 缓存只剩控制键 → 剥离后为空 = null(回退同步干净探测,不套用空集装成功)", () => {
-    writeShellEnvCache(tmp, "/bin/zsh", { ALPHA_CDP: "1", ALPHA_GLOBAL_DIR: "/tmp/x" })
+    writeShellEnvCache(tmp, "/bin/zsh", { CODEPUPPY_CDP: "1", CODEPUPPY_GLOBAL_DIR: "/tmp/x" })
     expect(readShellEnvCache(tmp, "/bin/zsh")).toBeNull()
   })
 
@@ -72,8 +72,8 @@ describe("shell env cache", () => {
     writeShellEnvCache(tmp, "/bin/zsh", {
       PATH: "/opt/req051-private/bin",
       DEEPSEEK_API_KEY: "sk-req051-credential-do-not-log",
-      ALPHA_GLOBAL_DIR: "/tmp/req051-control-value-do-not-log",
-      ALPHA_CDP: "req051-debug-value-do-not-log",
+      CODEPUPPY_GLOBAL_DIR: "/tmp/req051-control-value-do-not-log",
+      CODEPUPPY_CDP: "req051-debug-value-do-not-log",
     })
 
     expect(readShellEnvCache(tmp, "/bin/zsh", log)).toEqual({
@@ -87,7 +87,7 @@ describe("shell env cache", () => {
     expect(logs).toEqual([
       {
         message: "req047: stripped session-control keys from cached shell env",
-        extra: { stripped: ["ALPHA_GLOBAL_DIR", "ALPHA_CDP"] },
+        extra: { stripped: ["CODEPUPPY_GLOBAL_DIR", "CODEPUPPY_CDP"] },
       },
       {
         message: "req047: rebuilt shell env cache after successful probe",
@@ -96,8 +96,8 @@ describe("shell env cache", () => {
     ])
 
     const logged = JSON.stringify(logs)
-    expect(logged).toContain("ALPHA_GLOBAL_DIR")
-    expect(logged).toContain("ALPHA_CDP")
+    expect(logged).toContain("CODEPUPPY_GLOBAL_DIR")
+    expect(logged).toContain("CODEPUPPY_CDP")
     expect(logged).not.toContain("/opt/req051-private/bin")
     expect(logged).not.toContain("/usr/bin")
     expect(logged).not.toContain("sk-req051-credential-do-not-log")
@@ -108,9 +108,9 @@ describe("shell env cache", () => {
   })
 
   test("sanitizeCachedShellEnv 纯函数:stripped 列表如实、干净输入原样返回(不复制)", () => {
-    const dirty = sanitizeCachedShellEnv({ A: "1", ALPHA_CDP: "1", ALPHA_ENV_BASE_DIR: "/state", OPENCODE_CONFIG_DIR: "/x" })
+    const dirty = sanitizeCachedShellEnv({ A: "1", CODEPUPPY_CDP: "1", CODEPUPPY_ENV_BASE_DIR: "/state", OPENCODE_CONFIG_DIR: "/x" })
     expect(dirty.env).toEqual({ A: "1" })
-    expect(dirty.stripped.sort()).toEqual(["ALPHA_CDP", "ALPHA_ENV_BASE_DIR", "OPENCODE_CONFIG_DIR"])
+    expect(dirty.stripped.sort()).toEqual(["CODEPUPPY_CDP", "CODEPUPPY_ENV_BASE_DIR", "OPENCODE_CONFIG_DIR"])
     const clean = { PATH: "/usr/bin", MY_KEY: "v" }
     const r = sanitizeCachedShellEnv(clean)
     expect(r.env).toBe(clean)

@@ -7,8 +7,8 @@
 # 四条口径(Electron / 一臂一进程 / 标定过的独立裸 socket origin / 3 轮 + 离散度)缺一
 # ⇒ 打印「本次测量作废」退出 3,不给数字。详见 scripts/artifact-memory-gate/run.ts 抬头。
 #
-# 不在 alpha-check 权威门内(单轮 ~20s,依赖本机 electron 二进制),与 engine-smoke.sh /
-# req087-live-characterization.sh 同级:按需 / 改动传输路径(alpha-artifact-download.ts、
+# 不在 codepuppy-check 权威门内(单轮 ~20s,依赖本机 electron 二进制),与 engine-smoke.sh /
+# req087-live-characterization.sh 同级:按需 / 改动传输路径(codepuppy-artifact-download.ts、
 # artifact-service.ts 配额 finalizer)后 / 发布前人工执行。红 = 生产传输路径内存形态回退,
 # 合并前必须排查。
 #

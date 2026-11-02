@@ -20,14 +20,14 @@
 // 这条请求从 **Electron main** 发出,不在引擎围栏(`network-egress-registry.ts`)覆盖范围内 ——
 // 那道围栏只罩引擎 sidecar 那棵进程树,应用自身的联网本来就在其外(该文件抬头 + 勘破文档
 // §覆盖面声明 + `network-egress-disclosure.test.ts` 守着这句话)。目的地是
-// `ALPHA_ENDPOINTS.web`,注册表里那一行早就在(它是登录/令牌用的同一个主机)。
+// `CODEPUPPY_ENDPOINTS.web`,注册表里那一行早就在(它是登录/令牌用的同一个主机)。
 //
 // ── BYOK 照样上报 ───────────────────────────────────────────────────────────────────────────
 // `billing_path` 由服务端从 `provider_id` 派生(`codepuppy` → platform、`-byok` 后缀 → byok、其余
 // → custom),自定义 provider 也上报 —— 它们同样不经平台,所以服务端本来就没有留证。
 
-import { ALPHA_PATHS } from "../shared/alpha-config"
-import { backoffMs, parseFrame } from "./alpha-cloud-events-core"
+import { CODEPUPPY_PATHS } from "../shared/codepuppy-config"
+import { backoffMs, parseFrame } from "./codepuppy-cloud-events-core"
 import { buildTurns, billingPathFor, type ArchiveTurn, type EngineMessage } from "./chat-archive-turn"
 import { classifyArchiveResponse, type ChatArchiveCursorStore } from "./chat-archive-cursor"
 
@@ -219,7 +219,7 @@ export function createChatArchiveUploader(deps: ChatArchiveUploaderDeps): ChatAr
         meta?.filename ?? `attachment_${index}`,
       )
     })
-    return doFetch(`${deps.webBase().replace(/\/$/, "")}${ALPHA_PATHS.chatArchiveTurns}`, {
+    return doFetch(`${deps.webBase().replace(/\/$/, "")}${CODEPUPPY_PATHS.chatArchiveTurns}`, {
       method: "POST",
       // content-type 故意不设:要让 fetch 自己写 boundary。Content-Length 同理由 body 派生 ——
       // 缺了它服务端答 411 length_required。
@@ -294,7 +294,7 @@ export function createChatArchiveUploader(deps: ChatArchiveUploaderDeps): ChatAr
   }
 
   async function runIdle(sessionId: string, directory?: string): Promise<void> {
-    // 令牌缺席 = 未登录 / 签发端还没铸 / **已过期**(alpha-auth 的 getArchiveAccessToken 把过期
+    // 令牌缺席 = 未登录 / 签发端还没铸 / **已过期**(codepuppy-auth 的 getArchiveAccessToken 把过期
     // 当缺席)。三种都不上报、游标不动,等下一次 idle。
     const token = deps.token()
     if (!token) return

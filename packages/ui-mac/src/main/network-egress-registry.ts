@@ -18,9 +18,9 @@
 // 对着**今天树上的代码坐标**复核过再抄(全称命题跑一遍再写,不照散文立闸):
 //   · §2.2 写 `models.dev:443`(引 models-dev.ts:154);今天 `packages/core/src/models-dev.ts:160` 的默认源是
 //     `https://models.opencode.ai`(`OPENCODE_MODELS_URL` 可覆写)—— 登记的是代码里那个,不是散文里那个。
-//   · §2.2 写 `alphacodeone.com` / `account.alphacodeone.com`;平台域名已迁(shared/alpha-config.ts 的
-//     `ALPHA_ENDPOINTS`:codepuppy.cn / account.codepuppy.cn / alpha-gateway.tidelabs.click /
-//     alpha-cloud.tidelabs.click)。这四条**从 ALPHA_ENDPOINTS 派生**而不是再抄一份域名 —— 那个常量
+//   · §2.2 写 `alphacodeone.com` / `account.alphacodeone.com`;平台域名已迁(shared/codepuppy-config.ts 的
+//     `CODEPUPPY_ENDPOINTS`:codepuppy.cn / account.codepuppy.cn / alpha-gateway.tidelabs.click /
+//     alpha-cloud.tidelabs.click)。这四条**从 CODEPUPPY_ENDPOINTS 派生**而不是再抄一份域名 —— 那个常量
 //     本来就是「Change a domain HERE only」的唯一落点;本表只裁决「平台族是授权目的地」,不自持第二份域名。
 //   · LSP 自动下载那一行 §2.2 说的出处是「packages/opencode/src/lsp/*.ts 静态枚举」;今天枚举出五个 host
 //     (多了 `www.eclipse.org`,server.ts:1207 的 jdtls),按出处如实登记。
@@ -44,7 +44,7 @@
 // 结构性无意义,§2.1)、尾点形 `github.com.` 不归一(不在表里就是不在)。端口是键的一部分:
 // `github.com:443` 在表里不代表 `github.com:22` 在。
 
-import { ALPHA_ENDPOINTS } from "../shared/alpha-config"
+import { CODEPUPPY_ENDPOINTS } from "../shared/codepuppy-config"
 
 export type EgressDestination = {
   /** 小写 DNS 名或 IP 字面量;不带 scheme / path / 通配。 */
@@ -90,10 +90,10 @@ const https = (host: string, category: string, source: string): EgressDestinatio
 
 export const EGRESS_REGISTRY: readonly EgressDestination[] = Object.freeze([
   https("models.opencode.ai", "引擎:模型目录", "packages/core/src/models-dev.ts:160(§2.2 写 models.dev,以代码为准)"),
-  fromEndpoint(ALPHA_ENDPOINTS.web, "引擎:平台 web(登录 / token / 上传同意)", "packages/ui-mac/src/shared/alpha-config.ts ALPHA_ENDPOINTS.web"),
-  fromEndpoint(ALPHA_ENDPOINTS.platform, "引擎:平台 gateway(/v1 模型代理)", "packages/ui-mac/src/shared/alpha-config.ts ALPHA_ENDPOINTS.platform"),
-  fromEndpoint(ALPHA_ENDPOINTS.account, "引擎:平台 account(余额 / 会员 / 用量)", "packages/ui-mac/src/shared/alpha-config.ts ALPHA_ENDPOINTS.account"),
-  fromEndpoint(ALPHA_ENDPOINTS.cloud, "引擎:平台 cloud(云任务 + MCP facade)", "packages/ui-mac/src/shared/alpha-config.ts ALPHA_ENDPOINTS.cloud"),
+  fromEndpoint(CODEPUPPY_ENDPOINTS.web, "引擎:平台 web(登录 / token / 上传同意)", "packages/ui-mac/src/shared/codepuppy-config.ts CODEPUPPY_ENDPOINTS.web"),
+  fromEndpoint(CODEPUPPY_ENDPOINTS.platform, "引擎:平台 gateway(/v1 模型代理)", "packages/ui-mac/src/shared/codepuppy-config.ts CODEPUPPY_ENDPOINTS.platform"),
+  fromEndpoint(CODEPUPPY_ENDPOINTS.account, "引擎:平台 account(余额 / 会员 / 用量)", "packages/ui-mac/src/shared/codepuppy-config.ts CODEPUPPY_ENDPOINTS.account"),
+  fromEndpoint(CODEPUPPY_ENDPOINTS.cloud, "引擎:平台 cloud(云任务 + MCP facade)", "packages/ui-mac/src/shared/codepuppy-config.ts CODEPUPPY_ENDPOINTS.cloud"),
   https("registry.npmjs.org", "子进程:包管理(npm / bun;sidecar 内 @npmcli/arborist 装 provider)", "§2.2 E13 实测 CONNECT;#1334 Q1.3 provider 安装"),
   https("pypi.org", "子进程:包管理(uv)", "§2.2 E13 实测 CONNECT"),
   https("files.pythonhosted.org", "子进程:包管理(uv)", "§2.2 E13 实测 CONNECT"),
@@ -105,11 +105,11 @@ export const EGRESS_REGISTRY: readonly EgressDestination[] = Object.freeze([
   https("www.eclipse.org", "子进程:LSP 自动下载(jdtls)", "packages/opencode/src/lsp/server.ts:1207(§2.2 静态枚举漏列,按出处补)"),
   https("release-assets.githubusercontent.com", "子进程:GitHub release 资产下载(装工具 / 下二进制)", "#1334 Q4 choke 臂实拍(shell 工具子进程发起);#1073 owner 裁决二(2026-09-10)"),
   // `#1415` —— 本地 keyless `websearch` 的两个目的地。登出 / BYOK 态下这个工具**是广告给模型的**
-  // (`OPENCODE_ENABLE_EXA` 默认开,alpha-config-injection.ts:130 的 `keylessWebsearch`),而它的端点是
+  // (`OPENCODE_ENABLE_EXA` 默认开,codepuppy-config-injection.ts:130 的 `keylessWebsearch`),而它的端点是
   // **编译进包的源码常量** ⇒ 按本表抬头的定义,这正是「应用自己总会去连的地址」= 静态半场。
   // 实测(`#1414` 原生工具全表勘破 + 本票探针):两条在静态与动态两个半场都不在 ⇒ 真 CONNECT 403 ×2,
   // 于是那个按钮装着但**每一次都失败**。
-  // 登录代付态**一个字不变**:主权闸(`ALPHA_LOCAL_WEBSEARCH_DENY`)在两条传输 `call()` / `callMcp()`
+  // 登录代付态**一个字不变**:主权闸(`CODEPUPPY_LOCAL_WEBSEARCH_DENY`)在两条传输 `call()` / `callMcp()`
   // 构造请求**之前**就拒(零出网,判据 websearch-copies.test.ts),那一态下这两行永远不会被问到;
   // 云侧 `cloud_web_search` 的目的地是上面的平台四族,与本条无关。
   // **这两行不是第二份清单**:值的真源是下面 source 点名的两条传输,`network-egress-registry.test.ts`

@@ -1,6 +1,6 @@
 // ext-file-tx — REQ-102 #358:单文件落盘的 journaled 事务适配器(config action 的兄弟 action)。
 //
-// 背景:agent 是「单 md 文件 + alpha.jsonc `agent.<name>` 条目」的组合,不是文件树 generation
+// 背景:agent 是「单 md 文件 + codepuppy.jsonc `agent.<name>` 条目」的组合,不是文件树 generation
 // (无 current.json 指针/代数语义),也不是纯配置叶。要让 md 写盘与 config 叶在同一事务里全提交
 // 或全回滚,需要一个与 ext-config-tx 同构、但以**字节 + 缺席态**为前像的单文件动作。
 //

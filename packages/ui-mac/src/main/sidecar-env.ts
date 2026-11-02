@@ -1,9 +1,9 @@
 // A6: the sidecar env ALLOWLIST. Everything the sidecar's process.env contains is inherited verbatim
 // by every child it spawns — third-party MCP servers, LSP servers, and agent shell commands — via
 // upstream `{ ...process.env }` spreads we cannot edit (ADR-005). Default-deny is the only in-rule
-// fix: main forks the sidecar with ONLY the vars below. Secrets (ALPHA_API_KEY, ALPHA_CLOUD_TOKEN,
+// fix: main forks the sidecar with ONLY the vars below. Secrets (CODEPUPPY_API_KEY, CODEPUPPY_CLOUD_TOKEN,
 // BYOK *_API_KEY, DEV_PLATFORM_TOKEN, EXA_API_KEY, …) are simply not in the list; model keys reach
-// opencode through the {file:} channel instead (alpha-secret-files.ts).
+// opencode through the {file:} channel instead (codepuppy-secret-files.ts).
 //
 // Known, accepted behavior changes:
 //   - EXA_API_KEY is stripped → websearch falls back to the keyless public endpoint (rate-limited;
@@ -12,12 +12,12 @@
 //   - A user opencode.jsonc custom provider whose apiKey is "{env:MY_VAR}" no longer sees MY_VAR.
 //     Migrate the ref to "{file:...}"; a credential-shaped MY_VAR cannot be restored by the hatch.
 //   - Agent shell commands no longer see the user's full shell exports (the shell is spawned
-//     non-login with the sidecar env). That also means `echo $ALPHA_API_KEY` now prints nothing.
+//     non-login with the sidecar env). That also means `echo $CODEPUPPY_API_KEY` now prints nothing.
 //   - An OPENCODE_CONFIG_CONTENT exported by the launching shell is dropped (#603, see
 //     NEVER_INHERIT). Configure the engine through a config FILE instead (OPENCODE_CONFIG /
 //     OPENCODE_CONFIG_DIR / ~/.opencode/opencode.jsonc), all of which still pass.
 //
-// Escape hatch: ALPHA_ENV_ALLOWLIST_EXTRA="VAR1,VAR2" passes the named vars through verbatim. This
+// Escape hatch: CODEPUPPY_ENV_ALLOWLIST_EXTRA="VAR1,VAR2" passes the named vars through verbatim. This
 // re-opens child inheritance for exactly those vars — an explicit, per-var user decision. It is NOT
 // a secret hatch: names matching SECRETISH are vetoed even when listed (#603). The "no token in the
 // sidecar env" invariant is absolute and not user-waivable, because the blast radius is not the
@@ -27,7 +27,7 @@
 // DEBUG and LD_PRELOAD, which the old copy-everything implementation deleted case-by-case, now fall
 // out via default-deny like everything else.
 
-import { EGRESS_PROXY_MARKER_ENV } from "@opencode-ai/schema/alpha-net-failure"
+import { EGRESS_PROXY_MARKER_ENV } from "@opencode-ai/schema/codepuppy-net-failure"
 
 const EXACT = new Set([
   // POSIX/system basics the server, node, git and package managers need
@@ -53,52 +53,52 @@ const EXACT = new Set([
   "all_proxy",
   "no_proxy",
   // `#1572`:出网代理的决定者标记(值 = 出网代理 URL,非密钥)。只由下面的 sidecarEgressProxyEnv 写;
-  // 引擎据它判断代理变量是不是出网代理(@opencode-ai/schema/alpha-net-failure 的 engineNetFailurePath)。
+  // 引擎据它判断代理变量是不是出网代理(@opencode-ai/schema/codepuppy-net-failure 的 engineNetFailurePath)。
   EGRESS_PROXY_MARKER_ENV,
   // node runtime knobs (non-secret)
   "NODE_ENV",
   "NODE_OPTIONS",
   "NODE_EXTRA_CA_CERTS",
   "NODE_TLS_REJECT_UNAUTHORIZED",
-  // alpha non-secret controls the SIDECAR reads (injectAlphaConfig/buildAlphaModelConfig).
+  // alpha non-secret controls the SIDECAR reads (injectCodePuppyConfig/buildCodePuppyModelConfig).
   // NEVER add a token/key var here — that's what the {file:} channel is for (A6).
-  "ALPHA_BASE_URL",
+  "CODEPUPPY_BASE_URL",
   // REQ-236 `#1562`:平台模型凭据文件的 `{file:}` 引用(server.ts 在 fork 时置位)。是路径不是凭据 ——
   // ext 的 `chat.headers` 每次请求按它现读文件,续期热应用不必重启引擎。
-  "ALPHA_PLATFORM_AUTH_REF",
-  "ALPHA_CLOUD_MCP_URL",
-  "ALPHA_DEFAULT_MODEL",
-  "ALPHA_MODELS_DISABLE",
-  "ALPHA_IDENTITY_DISABLE",
-  "ALPHA_BEHAVIOR_DISABLE",
-  "ALPHA_WEBSEARCH_DISABLE",
+  "CODEPUPPY_PLATFORM_AUTH_REF",
+  "CODEPUPPY_CLOUD_MCP_URL",
+  "CODEPUPPY_DEFAULT_MODEL",
+  "CODEPUPPY_MODELS_DISABLE",
+  "CODEPUPPY_IDENTITY_DISABLE",
+  "CODEPUPPY_BEHAVIOR_DISABLE",
+  "CODEPUPPY_WEBSEARCH_DISABLE",
   // #223 R2:web search 主权判决(kill-switch 或平台代付)。sidecar 里的 websearch 工具读它做
   // **最终**拒绝 —— permission 规则(agent wildcard / 持久 session permission / approved)覆盖不了。
   // 非密钥:一个布尔判决,取值只有 1。
-  "ALPHA_LOCAL_WEBSEARCH_DENY",
-  // #223 R3:云侧同一条通道(kill-switch 才置位)。@alpha-code/ext 的 tool.execute.before 钩子读它,
+  "CODEPUPPY_LOCAL_WEBSEARCH_DENY",
+  // #223 R3:云侧同一条通道(kill-switch 才置位)。@codepuppy/ext 的 tool.execute.before 钩子读它,
   // 在 `ctx.ask` 之前拒掉 `cloud_web_search`(普通 MCP 与 code-mode 两条路都过这个钩子)——
   // 远端 MCP 没有 per-tool 的注册期过滤,permission deny 又能被后置 allow 顶掉。同为布尔判决,非密钥。
-  "ALPHA_CLOUD_WEBSEARCH_DENY",
+  "CODEPUPPY_CLOUD_WEBSEARCH_DENY",
   // REQ-062 路线A 逃生门(ext 插件在引擎进程内读:T1 转写 + T3/T6 内容接管一键回退)
-  "ALPHA_PROMPT_REBRAND_DISABLE",
+  "CODEPUPPY_PROMPT_REBRAND_DISABLE",
   // REQ-065 修订:出厂技能目录(main 启动时算好,ext config hook 内存注入 —— 不落用户配置文件)
-  "ALPHA_FACTORY_SKILL_DIRS",
+  "CODEPUPPY_FACTORY_SKILL_DIRS",
   // REQ-067:出厂默认禁项(− 用户解禁),同为内存注入、零明文
-  "ALPHA_FACTORY_DENY_SKILLS",
+  "CODEPUPPY_FACTORY_DENY_SKILLS",
   // REQ-098:环境 mutable root(main 启动时由唯一环境映射落定,路径非密钥)。sidecar 的
-  // injectAlphaConfig(alpha.jsonc 真源)与 @alpha-code/ext(全局根边界判定)必须与 main 同根,
+  // injectCodePuppyConfig(codepuppy.jsonc 真源)与 @codepuppy/ext(全局根边界判定)必须与 main 同根,
   // 否则引擎会读到另一环境的可变状态(AC#1 破)。
-  "ALPHA_GLOBAL_DIR",
+  "CODEPUPPY_GLOBAL_DIR",
   // REQ-059 / ADR-019 逃生阀。main 与 sidecar 必须同口径:main 侧读它们跳过 truth 迁移与
   // desired-state 投影(index.ts / engine-config-truth-boot.ts)并把 mcp/plugin/provider 写回
   // legacy 目标(ext-config.ts),sidecar 侧读它们跳过 OPENCODE_CONFIG 注入(sidecar.ts)。缺了这两项
   // 时 sidecar 收不到它们,于是 main 走 legacy 而 sidecar 照旧注入 —— 正是 req053 设计稿 §风险8
   // 「逃生舱错位」那一格,也让两个逃生阀在真出事故时按了没反应(#606)。布尔开关,非密钥。
-  "ALPHA_JSONC_TRUTH_DISABLE",
-  "ALPHA_LEGACY_INSTALL_ROOT",
+  "CODEPUPPY_JSONC_TRUTH_DISABLE",
+  "CODEPUPPY_LEGACY_INSTALL_ROOT",
   // the escape hatch itself, so the sidecar can surface it in diagnostics
-  "ALPHA_ENV_ALLOWLIST_EXTRA",
+  "CODEPUPPY_ENV_ALLOWLIST_EXTRA",
 ])
 
 // Prefix families that are config/infrastructure, not credentials. The SECRETISH veto below runs
@@ -113,7 +113,7 @@ const PREFIXES = ["OPENCODE_", "XDG_", "LC_", "ELECTRON_"]
 // allow rule, so the false-positive surface grew to all three paths. Two alternatives now, both /i:
 //
 //   1. `(^|_)WORD (_|$)` — the word is a whole `_`-delimited segment.
-//      ALPHA_API_KEY, AWS_SECRET_ACCESS_KEY, DB_PASSWORD, my_api_key, bare KEY, TOKEN_.
+//      CODEPUPPY_API_KEY, AWS_SECRET_ACCESS_KEY, DB_PASSWORD, my_api_key, bare KEY, TOKEN_.
 //   2. `WORD $`          — the name ENDS with the word, no separator required.
 //      APIKEY, MYKEY, GITHUBTOKEN, camelCase myApiKey. Rule 1 alone lets every one of those
 //      through, and the trailing segment is exactly where a real key name puts the word ("this var
@@ -234,7 +234,7 @@ export function isSecretish(name: string): boolean {
 // its name matches no SECRETISH word while the OPENCODE_ prefix would forward it verbatim (#603).
 // main must never forward one it inherited from the launching shell. This costs alpha nothing: main
 // never produces this var (the only writer in ui-mac/src is sidecar.ts:419, which runs AFTER fork,
-// inside the sidecar), and injectAlphaConfig already starts from a fresh skeleton when it is unset
+// inside the sidecar), and injectCodePuppyConfig already starts from a fresh skeleton when it is unset
 // (sidecar.ts:173-174) — that is the branch every normal boot already takes. The engine keeps its
 // file/dir config channels (OPENCODE_CONFIG, OPENCODE_CONFIG_DIR); only the inline-JSON-in-env
 // channel is closed, and a config blob holding a real secret belongs in the {file:} channel anyway.
@@ -250,7 +250,7 @@ const NEVER_INHERIT = new Set(["opencode_config_content"])
 
 export function createSidecarEnv(source: NodeJS.ProcessEnv = process.env): Record<string, string> {
   const extra = new Set(
-    (source.ALPHA_ENV_ALLOWLIST_EXTRA ?? "")
+    (source.CODEPUPPY_ENV_ALLOWLIST_EXTRA ?? "")
       .split(",")
       .map((name) => name.trim())
       .filter(Boolean),
@@ -289,7 +289,7 @@ export const SIDECAR_EGRESS_NO_PROXY = "127.0.0.1,localhost,::1"
 
 /**
  * 给定策略代理端口,返回要**覆盖**进 sidecar env 的八个代理变量(纯函数;server.ts 在 fork 前 Object.assign)。
- * `#1572`:另写决定者标记 ALPHA_EGRESS_PROXY(同一 URL)—— 引擎只在代理变量等于它时才把失败归到本机出网代理;
+ * `#1572`:另写决定者标记 CODEPUPPY_EGRESS_PROXY(同一 URL)—— 引擎只在代理变量等于它时才把失败归到本机出网代理;
  * 非 darwin 不调本函数,代理变量是用户自己的,没有这个标记。
  */
 export function sidecarEgressProxyEnv(port: number): Record<string, string> {

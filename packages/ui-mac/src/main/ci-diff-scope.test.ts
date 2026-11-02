@@ -1,6 +1,6 @@
-// `#717` —— alpha-ci `detect` 分类步的行为闸。
+// `#717` —— codepuppy-ci `detect` 分类步的行为闸。
 //
-// 这道门守的是什么(用大白话说):alpha-ci 里几乎每一步跑不跑,都由 `detect` 输出的
+// 这道门守的是什么(用大白话说):codepuppy-ci 里几乎每一步跑不跑,都由 `detect` 输出的
 // `code` 一个布尔值决定 —— upstream-guard / typecheck / test / seed-assets 的**全部**步骤
 // 都挂在 `needs.detect.outputs.code == 'true'` 上,docs gate 的入参就是它输出的 `md`。
 // 也就是说:这个分类器错一次,不是少测一个函数,是**当天所有闸门跑不跑被算错**。
@@ -29,7 +29,7 @@
 //   · **classify() 自己会在测不到时抛**(退出码非零 / 输出文件里没有 `code=`),而不是
 //     返回一个让断言空对空通过的值。观测手段自己也要有判据。
 //
-// 删掉本文件会失去什么:这个分类器就**再没有任何判据**。它不在本地 alpha-check.sh 的
+// 删掉本文件会失去什么:这个分类器就**再没有任何判据**。它不在本地 codepuppy-check.sh 的
 // 跑动范围里(本地一律跑全量,没有 docs-only 快路径),CI 上也只有它自己的输出可看。
 // 改坏它的人不会在任何地方变红,而后果是全部闸门的开关被算错。它因此登记在
 // scripts/gate-files.tsv 里,拿精确条数。
@@ -85,7 +85,7 @@ function commit(repo: string, message: string, files: Record<string, string>): s
  * 那个 .ts 也算进来。
  */
 function staleDocsBranchFixture() {
-  const repo = mkdtempSync(join(tmpdir(), "alpha-detect-repo-"))
+  const repo = mkdtempSync(join(tmpdir(), "codepuppy-detect-repo-"))
   git(repo, ["init", "-q", "-b", "alpha"])
   const seed = commit(repo, "seed", {
     "docs/seed.md": "# seed\n",
@@ -104,7 +104,7 @@ type Classification = { code: string; md: string; stdout: string }
 
 /** 跑**生产脚本本体**,把它写进 `$GITHUB_OUTPUT` 的实际值读回来。 */
 function classify(repo: string, env: Record<string, string>): Classification {
-  const outputFile = join(mkdtempSync(join(tmpdir(), "alpha-detect-out-")), "github-output")
+  const outputFile = join(mkdtempSync(join(tmpdir(), "codepuppy-detect-out-")), "github-output")
   writeFileSync(outputFile, "")
   const result = Bun.spawnSync(["bash", SCRIPT], {
     cwd: repo,

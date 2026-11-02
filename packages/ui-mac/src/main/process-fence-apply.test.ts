@@ -49,18 +49,18 @@ describeDarwin("REQ-159 process fence —— 真 .node / 真 seatbelt / Electron
   beforeAll(() => {
     scratch = mkdtempSync(join(tmpdir(), "ac1321-apply-"))
     buildId = `ac1321-test-${Date.now()}`
-    const built = buildFenceAddon({ out: join(scratch, "build", "alpha_fence.node"), buildId })
+    const built = buildFenceAddon({ out: join(scratch, "build", "codepuppy_fence.node"), buildId })
     addon = built.out
     ws = mkdtempSync(join(homedir(), ".ac1321-ws-"))
     esc = mkdtempSync(join(homedir(), ".ac1321-esc-"))
     userData = join(scratch, "userData")
-    globalRoot = join(scratch, "alpha-code-state", "env", "dev")
+    globalRoot = join(scratch, "codepuppy-state", "env", "dev")
     mkdirSync(userData, { recursive: true })
     mkdirSync(globalRoot, { recursive: true })
     // 生产渲染的 profile:W1 = 本测试的 ws;其余根 = 真 HOME 的 XDG 形状(生产形状)+ 临时 userData / globalRoot。
     const profile = renderProcessFenceProfile({
       workspaces: [ws],
-      alphaGlobalRoot: globalRoot,
+      codepuppyGlobalRoot: globalRoot,
       userDataPath: userData,
       stateHome: userData,
       roots: resolveEngineRoots({}, homedir()),
@@ -106,12 +106,12 @@ describeDarwin("REQ-159 process fence —— 真 .node / 真 seatbelt / Electron
     expect(assertFenceAddonSlices(addon).sort()).toEqual(["arm64", "x86_64"])
   })
   test("A2 判据测得出已知的坏:只编 arm64 的 thin 文件 ⇒ 点名缺 x86_64", () => {
-    const thin = buildFenceAddon({ out: join(scratch, "thin", "alpha_fence.node"), archs: ["arm64"], buildId: "thin" })
+    const thin = buildFenceAddon({ out: join(scratch, "thin", "codepuppy_fence.node"), archs: ["arm64"], buildId: "thin" })
     expect(() => assertFenceAddonSlices(thin.out)).toThrow(/missing arch slice\(s\) x86_64/)
     // 空壳:一个 fat 但不是 N-API 模块的文件也要红(lipo 过、nm 不过)
-    const shell = join(scratch, "shell", "alpha_fence.node")
+    const shell = join(scratch, "shell", "codepuppy_fence.node")
     mkdirSync(join(scratch, "shell"), { recursive: true })
-    const cc = spawnSync("clang", ["-shared", "-arch", "arm64", "-arch", "x86_64", "-o", shell, "-x", "c", "-"], { input: "int alpha_nothing(void){return 0;}", encoding: "utf8" })
+    const cc = spawnSync("clang", ["-shared", "-arch", "arm64", "-arch", "x86_64", "-o", shell, "-x", "c", "-"], { input: "int codepuppy_nothing(void){return 0;}", encoding: "utf8" })
     expect(cc.status, cc.stderr).toBe(0)
     expect(() => assertFenceAddonSlices(shell)).toThrow(/does not export _napi_register_module_v1/)
   })
@@ -178,7 +178,7 @@ describeDarwin("REQ-159 process fence —— 真 .node / 真 seatbelt / Electron
     if (!line) throw new Error(`apply-driver printed nothing (status ${res.status}); stderr: ${res.stderr}`)
     return { status: res.status, out: JSON.parse(line) as { ok: boolean; name?: string; message?: string; result?: { buildId: string; libsandbox: string; profileBytes: number } } }
   }
-  const goodProfile = () => renderProcessFenceProfile({ workspaces: [ws], alphaGlobalRoot: globalRoot, userDataPath: userData, stateHome: userData, roots: resolveEngineRoots({}, homedir()), egressProxyPort: 4443 })
+  const goodProfile = () => renderProcessFenceProfile({ workspaces: [ws], codepuppyGlobalRoot: globalRoot, userDataPath: userData, stateHome: userData, roots: resolveEngineRoots({}, homedir()), egressProxyPort: 4443 })
 
   test("D 正向:生产 profile ⇒ ok,回报 buildId / libsandbox / 字节数,进程退出 0", () => {
     const r = runApply(goodProfile())
@@ -204,18 +204,18 @@ describeDarwin("REQ-159 process fence —— 真 .node / 真 seatbelt / Electron
   })
 
   test("C3 模块文件不在 ⇒ 点名路径(打包漏 extraResources / 架构片缺失就是这一格)", () => {
-    const r = runApply(goodProfile(), { addon: join(scratch, "nope", "alpha_fence.node") })
+    const r = runApply(goodProfile(), { addon: join(scratch, "nope", "codepuppy_fence.node") })
     expect(r.status).toBe(2)
-    expect(r.out.message).toMatch(/native module missing at .*nope\/alpha_fence\.node/)
+    expect(r.out.message).toMatch(/native module missing at .*nope\/codepuppy_fence\.node/)
   })
 
   test("C4 围栏是空的(rc=0 但集合外仍写得进)⇒ 拒绝启动,并把探针删干净", () => {
     const voidProfile = goodProfile().replace(`(subpath "${ws}")`, `(subpath "${ws}") (subpath "${OUTSIDE_PROBE_DIR}")`)
-    const before = readdirSync(OUTSIDE_PROBE_DIR).filter((f) => f.startsWith("alpha-fence-probe-"))
+    const before = readdirSync(OUTSIDE_PROBE_DIR).filter((f) => f.startsWith("codepuppy-fence-probe-"))
     const r = runApply(voidProfile)
     expect(r.status).toBe(2)
     expect(r.out.message).toMatch(/a write outside the writable set landed .* the fence is void/)
-    expect(readdirSync(OUTSIDE_PROBE_DIR).filter((f) => f.startsWith("alpha-fence-probe-"))).toEqual(before)
+    expect(readdirSync(OUTSIDE_PROBE_DIR).filter((f) => f.startsWith("codepuppy-fence-probe-"))).toEqual(before)
   })
 
   test("C5 围栏太紧(cwd 写不进)⇒ 拒绝启动,说明是哪个目录", () => {

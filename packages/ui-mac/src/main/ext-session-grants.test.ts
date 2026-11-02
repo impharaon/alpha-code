@@ -33,7 +33,7 @@ const curation = (
   deliveryMode: "installable",
   review: {
     reviewedAt: over.reviewedAt ?? "2026-07-01T00:00:00Z",
-    reviewedBy: "alpha-review",
+    reviewedBy: "codepuppy-review",
     upstreamStatus: "active",
     supportTier: "best-effort",
     reviewBefore: over.reviewBefore ?? "2027-07-01T00:00:00Z",
@@ -389,9 +389,9 @@ describe("re-assert(global.disposed 后重校验)的 main 半场", () => {
 })
 
 describe("持久面零写(不变量)", () => {
-  test("grant 成功、各类拒绝、revoke 后:installs.json 与 alpha.jsonc 字节完全不变", async () => {
+  test("grant 成功、各类拒绝、revoke 后:installs.json 与 codepuppy.jsonc 字节完全不变", async () => {
     seedRecord()
-    const configPath = path.join(root, "alpha.jsonc")
+    const configPath = path.join(root, "codepuppy.jsonc")
     fs.writeFileSync(configPath, `{\n  // alpha config\n  "mcp": { "${NAME}": { "type": "local", "command": ["x"], "enabled": false } }\n}\n`)
     const ledgerPath = path.join(root, "installs.json")
     const ledgerBefore = fs.readFileSync(ledgerPath)

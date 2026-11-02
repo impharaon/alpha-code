@@ -5,37 +5,37 @@
 # 点不出根 = 新的写入根 = 要么给可写集加行(带实测),要么改代码。判据:process-fence-write-sites.test.ts。
 # 重生:bun packages/ui-mac/scripts/process-fence-write-sites.ts --write(只写签名,不改已填的根)。
 packages/ext/src/plugin.ts	mkdirSync	root	W1
-packages/ext/src/plugin.ts	renameSync	join(root, "alpha.jsonc.tmp")	W1
-packages/ext/src/plugin.ts	writeFileSync	join(root, "alpha.jsonc.tmp")	W1
-packages/ui-mac/src/main/alpha-config-injection.ts	mkdirSync	dir	W3
-packages/ui-mac/src/main/alpha-config-injection.ts	mkdirSync	path.dirname(truth)	W2
-packages/ui-mac/src/main/alpha-config-injection.ts	mkdirSync	userDataPath	W3
-packages/ui-mac/src/main/alpha-config-injection.ts	rmSync	modelsPath	W3
-packages/ui-mac/src/main/alpha-config-injection.ts	rmSync	userCopy	W3
-packages/ui-mac/src/main/alpha-config-injection.ts	writeFileSync	file	W3
-packages/ui-mac/src/main/alpha-config-injection.ts	writeFileSync	modelsPath	W3
-packages/ui-mac/src/main/alpha-config-injection.ts	writeFileSync	path.join(dir, "opencode.jsonc")	W3
-packages/ui-mac/src/main/alpha-config-injection.ts	writeFileSync	truth	W2
-packages/ui-mac/src/main/alpha-config-injection.ts	writeFileSync	userCopy	W3
-packages/ui-mac/src/main/alpha-environment.ts	mkdirSync	directory	main-only
-packages/ui-mac/src/main/alpha-environment.ts	rmdirSync	directory	main-only
-packages/ui-mac/src/main/alpha-installs.ts	mkdirSync	root	W2
-packages/ui-mac/src/main/alpha-installs.ts	renameSync	file	W2
-packages/ui-mac/src/main/alpha-live-allowlist.ts	mkdirSync	userDataPath	W3
-packages/ui-mac/src/main/alpha-secret-files.ts	chmodSync	dir	W3
-packages/ui-mac/src/main/alpha-secret-files.ts	chmodSync	temp	W3
-packages/ui-mac/src/main/alpha-secret-files.ts	mkdirSync	dir	W3
-packages/ui-mac/src/main/alpha-secret-files.ts	openSync	temp	W3
-packages/ui-mac/src/main/alpha-secret-files.ts	renameSync	temp	W3
-packages/ui-mac/src/main/alpha-secret-files.ts	rmSync	file	W3
-packages/ui-mac/src/main/alpha-secret-files.ts	rmSync	path.join(dir, leftover)	W3
-packages/ui-mac/src/main/alpha-secret-files.ts	rmSync	temp	W3
-packages/ui-mac/src/main/alpha-secret-files.ts	writeFileSync	fd	W3
-packages/ui-mac/src/main/alpha-workdir.ts	mkdirSync	artifactsDir	W1
-packages/ui-mac/src/main/alpha-workdir.ts	mkdirSync	dir	W1
-packages/ui-mac/src/main/alpha-workdir.ts	mkdirSync	root	W1
-packages/ui-mac/src/main/alpha-workdir.ts	renameSync	tmp	W1
-packages/ui-mac/src/main/alpha-workdir.ts	writeFileSync	tmp	W1
+packages/ext/src/plugin.ts	renameSync	join(root, "codepuppy.jsonc.tmp")	W1
+packages/ext/src/plugin.ts	writeFileSync	join(root, "codepuppy.jsonc.tmp")	W1
+packages/ui-mac/src/main/codepuppy-config-injection.ts	mkdirSync	dir	W3
+packages/ui-mac/src/main/codepuppy-config-injection.ts	mkdirSync	path.dirname(truth)	W2
+packages/ui-mac/src/main/codepuppy-config-injection.ts	mkdirSync	userDataPath	W3
+packages/ui-mac/src/main/codepuppy-config-injection.ts	rmSync	modelsPath	W3
+packages/ui-mac/src/main/codepuppy-config-injection.ts	rmSync	userCopy	W3
+packages/ui-mac/src/main/codepuppy-config-injection.ts	writeFileSync	file	W3
+packages/ui-mac/src/main/codepuppy-config-injection.ts	writeFileSync	modelsPath	W3
+packages/ui-mac/src/main/codepuppy-config-injection.ts	writeFileSync	path.join(dir, "opencode.jsonc")	W3
+packages/ui-mac/src/main/codepuppy-config-injection.ts	writeFileSync	truth	W2
+packages/ui-mac/src/main/codepuppy-config-injection.ts	writeFileSync	userCopy	W3
+packages/ui-mac/src/main/codepuppy-environment.ts	mkdirSync	directory	main-only
+packages/ui-mac/src/main/codepuppy-environment.ts	rmdirSync	directory	main-only
+packages/ui-mac/src/main/codepuppy-installs.ts	mkdirSync	root	W2
+packages/ui-mac/src/main/codepuppy-installs.ts	renameSync	file	W2
+packages/ui-mac/src/main/codepuppy-live-allowlist.ts	mkdirSync	userDataPath	W3
+packages/ui-mac/src/main/codepuppy-secret-files.ts	chmodSync	dir	W3
+packages/ui-mac/src/main/codepuppy-secret-files.ts	chmodSync	temp	W3
+packages/ui-mac/src/main/codepuppy-secret-files.ts	mkdirSync	dir	W3
+packages/ui-mac/src/main/codepuppy-secret-files.ts	openSync	temp	W3
+packages/ui-mac/src/main/codepuppy-secret-files.ts	renameSync	temp	W3
+packages/ui-mac/src/main/codepuppy-secret-files.ts	rmSync	file	W3
+packages/ui-mac/src/main/codepuppy-secret-files.ts	rmSync	path.join(dir, leftover)	W3
+packages/ui-mac/src/main/codepuppy-secret-files.ts	rmSync	temp	W3
+packages/ui-mac/src/main/codepuppy-secret-files.ts	writeFileSync	fd	W3
+packages/ui-mac/src/main/codepuppy-workdir.ts	mkdirSync	artifactsDir	W1
+packages/ui-mac/src/main/codepuppy-workdir.ts	mkdirSync	dir	W1
+packages/ui-mac/src/main/codepuppy-workdir.ts	mkdirSync	root	W1
+packages/ui-mac/src/main/codepuppy-workdir.ts	renameSync	tmp	W1
+packages/ui-mac/src/main/codepuppy-workdir.ts	writeFileSync	tmp	W1
 packages/ui-mac/src/main/catalog-channels.ts	mkdirSync	userDataPath	W3
 packages/ui-mac/src/main/catalog-channels.ts	renameSync	tmp	W3
 packages/ui-mac/src/main/catalog-channels.ts	writeFileSync	tmp	W3

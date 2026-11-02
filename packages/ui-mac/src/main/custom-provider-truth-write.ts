@@ -6,7 +6,7 @@
 // 旧内容,不是半截文件;临时文件收走,错误原样抛,由调用方决定怎么出声)。字节确定:固定键序、紧凑、末尾换行。
 // 与 process-fence-workspaces.ts 的 writeWorkspaceTruth 同形(同一个状态根下的兄弟真源)。
 //
-// 本票没有调用方:添加 / 删除自定义节点改写这里、准入与出网同源、旧 alpha.jsonc 记录的处置,都是 `#1393`。electron-free:fs 注入。
+// 本票没有调用方:添加 / 删除自定义节点改写这里、准入与出网同源、旧 codepuppy.jsonc 记录的处置,都是 `#1393`。electron-free:fs 注入。
 
 import { dirname } from "node:path"
 import {
@@ -25,7 +25,7 @@ export type CustomProviderTruthWriteFs = {
 
 let tmpSeq = 0
 
-/** 原子写(见文件头)。父目录 `custom-providers/` 不在 alpha-environment.ts 的拓扑预检里,不在就建。 */
+/** 原子写(见文件头)。父目录 `custom-providers/` 不在 codepuppy-environment.ts 的拓扑预检里,不在就建。 */
 export function writeCustomProviderTruth(path: string, providers: readonly CustomProviderRecord[], fs: CustomProviderTruthWriteFs): void {
   const bad = invalidCustomProviderList(providers)
   if (bad) throw new Error(`custom providers: refusing to write ${path} — ${bad}`)

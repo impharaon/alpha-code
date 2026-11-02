@@ -2,7 +2,7 @@
 //
 // 在它之前,同一件事被三处各写一遍三元,而三处都以 `else → "mcp"` 收尾。后果不是「少认一个
 // profile」而是**认错**:一个只在合同侧登记、宿主表没跟上的 profile 会被静默当成 MCP 装进
-// `alpha.jsonc` 的 `mcp` 段,卸载侧 fail-closed ⇒ **装得上、卸不掉**;而两个调用点上的
+// `codepuppy.jsonc` 的 `mcp` 段,卸载侧 fail-closed ⇒ **装得上、卸不掉**;而两个调用点上的
 // `as "skill" | "agent" | "mcp"` 强转让编译器也看不见。
 //
 // **A+B 两条都要,缺一条都是假闸:**

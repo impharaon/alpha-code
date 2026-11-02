@@ -1,0 +1,960 @@
+@import "./base.css";
+
+.codepuppy-settings-page {
+  position: fixed;
+  inset: 0;
+  z-index: var(--a-z-overlay);
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--a-bg-canvas);
+  color: var(--a-text);
+}
+
+.codepuppy-settings-head {
+  display: flex;
+  min-height: 68px;
+  align-items: center;
+  gap: var(--a-space-3);
+  /* #1550:设置页铺满整窗,macOS 红绿灯(windows.ts trafficLightPosition y:14)画在它上面,
+     此前把返回键压在灯下点不到。顶部留出与首页/定制中心/自动化同一个窗口按钮带
+     (`--a-home-top`,同一个回落值),这一条本身仍是拖拽区。 */
+  padding: var(--a-home-top, 40px) 22px 10px;
+  border-bottom: 1px solid var(--a-border-faint);
+  background: var(--a-bg-canvas);
+  -webkit-app-region: drag;
+}
+
+.codepuppy-settings-head > * {
+  -webkit-app-region: no-drag;
+}
+
+.codepuppy-settings-head h1 {
+  font-size: var(--a-text-xl);
+}
+
+.codepuppy-settings-head p {
+  margin: 3px 0 0;
+  color: var(--a-text-tertiary);
+  font-size: var(--a-text-xs);
+}
+
+.codepuppy-settings-back {
+  display: inline-grid;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  place-items: center;
+  border: 0;
+  border-radius: var(--a-radius-md);
+  background: transparent;
+  color: var(--a-text-secondary);
+  cursor: pointer;
+}
+
+.codepuppy-settings-back:hover {
+  background: var(--a-bg-muted);
+  color: var(--a-text);
+}
+
+.codepuppy-settings-back svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.codepuppy-settings-unsaved {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  padding: 5px 9px;
+  border: 1px solid color-mix(in srgb, var(--a-warning) 28%, transparent);
+  border-radius: var(--a-radius-full);
+  background: var(--a-warning-subtle);
+  color: var(--a-warning);
+  font-size: var(--a-text-xs);
+  font-weight: var(--a-weight-medium);
+}
+
+.codepuppy-settings-unsaved i,
+.codepuppy-settings-storage-status i {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: var(--a-radius-full);
+  background: currentcolor;
+}
+
+.codepuppy-settings-layout {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
+.codepuppy-settings-nav {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+  padding: var(--a-space-4) var(--a-space-3);
+  border-right: 1px solid var(--a-border-faint);
+  background: var(--a-bg-subtle);
+}
+
+.codepuppy-settings-nav button {
+  min-height: 44px;
+  padding: 0 var(--a-space-3);
+  border: 0;
+  border-radius: var(--a-radius-md);
+  background: transparent;
+  color: var(--a-text-secondary);
+  font: inherit;
+  font-size: var(--a-text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.codepuppy-settings-nav button:hover {
+  background: var(--a-overlay-hover);
+  color: var(--a-text);
+}
+
+.codepuppy-settings-nav button[aria-current="page"] {
+  background: var(--a-bg-muted);
+  color: var(--a-text);
+  font-weight: var(--a-weight-semibold);
+}
+
+.codepuppy-settings-main {
+  min-width: 0;
+  overflow: auto;
+  padding: var(--a-space-8) clamp(24px, 5vw, 64px) var(--a-space-16);
+}
+
+.codepuppy-settings-main > * {
+  width: min(760px, 100%);
+  margin-inline: auto;
+}
+
+.codepuppy-settings-main > .a-banner,
+.codepuppy-settings-main > div:has(> .a-banner) {
+  margin-bottom: var(--a-space-4);
+}
+
+.codepuppy-settings-loading {
+  padding: var(--a-space-8);
+  color: var(--a-text-tertiary);
+  text-align: center;
+}
+
+.codepuppy-settings-section-head {
+  display: flex;
+  min-height: 42px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--a-space-6);
+  margin-bottom: var(--a-space-6);
+}
+
+.codepuppy-settings-section-head h2 {
+  font-size: var(--a-text-xl);
+}
+
+.codepuppy-settings-section-head p {
+  margin: 6px 0 0;
+  color: var(--a-text-tertiary);
+  font-size: var(--a-text-sm);
+}
+
+.codepuppy-settings-group {
+  overflow: hidden;
+  margin-bottom: var(--a-space-6);
+  border: 1px solid var(--a-border-faint);
+  border-radius: var(--a-radius-lg);
+  background: var(--a-surface);
+  box-shadow: var(--a-shadow-xs);
+}
+
+.codepuppy-settings-group > h3 {
+  padding: 11px var(--a-space-4) 9px;
+  border-bottom: 1px solid var(--a-border-faint);
+  background: var(--a-bg-subtle);
+  color: var(--a-text-secondary);
+  font-size: var(--a-text-xs);
+  letter-spacing: var(--a-tracking-wide);
+  text-transform: uppercase;
+}
+
+.codepuppy-settings-row {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  gap: var(--a-space-4);
+  justify-content: space-between;
+  padding: 11px var(--a-space-4);
+}
+
+.codepuppy-settings-row + .codepuppy-settings-row {
+  border-top: 1px solid var(--a-border-faint);
+}
+
+.codepuppy-settings-row-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.codepuppy-settings-row-copy strong {
+  color: var(--a-text);
+  font-size: var(--a-text-sm);
+  font-weight: var(--a-weight-medium);
+}
+
+.codepuppy-settings-row-copy small {
+  color: var(--a-text-tertiary);
+  font-size: var(--a-text-xs);
+}
+
+.codepuppy-settings-row-copy code {
+  color: var(--a-text-secondary);
+}
+
+.codepuppy-settings-switch {
+  width: 38px;
+  height: 22px;
+  flex: none;
+  appearance: none;
+  border: 1px solid var(--a-border-strong);
+  border-radius: var(--a-radius-full);
+  background: var(--a-bg-inset);
+  cursor: pointer;
+  transition: background var(--a-dur-fast) var(--a-ease-out), border-color var(--a-dur-fast) var(--a-ease-out);
+}
+
+.codepuppy-settings-switch::before {
+  display: block;
+  width: 16px;
+  height: 16px;
+  margin: 2px;
+  border-radius: var(--a-radius-full);
+  background: var(--a-surface-raised);
+  box-shadow: var(--a-shadow-sm);
+  content: "";
+  transition: transform var(--a-dur-fast) var(--a-ease-out);
+}
+
+.codepuppy-settings-switch:checked {
+  border-color: var(--a-accent-solid);
+  background: var(--a-accent-solid);
+}
+
+.codepuppy-settings-switch:checked::before {
+  transform: translateX(16px);
+}
+
+.codepuppy-settings-switch:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.codepuppy-settings-number,
+.codepuppy-settings-shortcut {
+  height: 34px;
+  border: 1px solid var(--a-border);
+  border-radius: var(--a-radius-md);
+  background: var(--a-bg-subtle);
+  color: var(--a-text);
+  font: inherit;
+  font-size: var(--a-text-sm);
+}
+
+.codepuppy-settings-number {
+  width: 88px;
+  padding: 0 10px;
+}
+
+.codepuppy-settings-shortcut {
+  width: min(210px, 40vw);
+  padding: 0 var(--a-space-3);
+  font-family: var(--a-font-mono);
+  text-align: right;
+}
+
+/* #1593:默认组合的键帽(取活稿 current/settings 的 .kb-chord / .kb-key)。 */
+.codepuppy-settings-kb-chord {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  flex: 0 0 auto;
+}
+.codepuppy-settings-kb-key {
+  min-width: 24px;
+  height: 25px;
+  padding: 0 7px;
+  display: grid;
+  place-items: center;
+  background: var(--a-bg-muted);
+  border: 1px solid var(--a-border);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  font-size: var(--a-text-xs);
+  font-weight: var(--a-weight-semibold);
+  font-family: var(--a-font-mono);
+  color: var(--a-text-secondary);
+}
+
+.codepuppy-settings-number:disabled,
+.codepuppy-settings-shortcut:disabled {
+  color: var(--a-text-disabled);
+  cursor: default;
+}
+
+.codepuppy-settings-storage {
+  overflow: visible;
+  padding-bottom: 0;
+}
+
+.codepuppy-settings-storage-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--a-space-4);
+  padding: 13px var(--a-space-4);
+  border-bottom: 1px solid var(--a-border-faint);
+}
+
+.codepuppy-settings-storage-title > span:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.codepuppy-settings-storage-title strong {
+  font-size: var(--a-text-sm);
+}
+
+.codepuppy-settings-storage-title small {
+  color: var(--a-text-tertiary);
+  font-size: var(--a-text-xs);
+}
+
+.codepuppy-settings-local {
+  padding: 4px 8px;
+  border-radius: var(--a-radius-full);
+  background: var(--a-bg-muted);
+  color: var(--a-text-secondary);
+  font-size: var(--a-text-xs);
+}
+
+.codepuppy-settings-usage-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  padding: var(--a-space-4);
+}
+
+.codepuppy-settings-usage-card {
+  display: flex;
+  min-width: 0;
+  min-height: 84px;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--a-space-2);
+  padding: 11px;
+  border: 1px solid var(--a-border-faint);
+  border-radius: var(--a-radius-md);
+  background: var(--a-bg-subtle);
+}
+
+.codepuppy-settings-usage-card span {
+  color: var(--a-text-tertiary);
+  font-size: var(--a-text-xs);
+}
+
+.codepuppy-settings-usage-card strong {
+  overflow-wrap: anywhere;
+  font-size: var(--a-text-lg);
+  font-variant-numeric: tabular-nums;
+}
+
+.codepuppy-settings-storage-status {
+  display: flex;
+  align-items: center;
+  gap: var(--a-space-2);
+  margin: 0 var(--a-space-4) var(--a-space-4);
+  padding: 9px 11px;
+  border-radius: var(--a-radius-md);
+  background: var(--a-bg-subtle);
+  color: var(--a-text-secondary);
+  font-size: var(--a-text-xs);
+}
+
+.codepuppy-settings-storage-status[data-storage-code="checking"],
+.codepuppy-settings-storage-status[data-storage-code="collecting"],
+.codepuppy-settings-storage-status[data-storage-code="busy"] {
+  color: var(--a-warning);
+}
+
+.codepuppy-settings-storage-status[data-storage-code="fail-closed"],
+.codepuppy-settings-storage-status[data-storage-code="worker-failed"] {
+  color: var(--a-error);
+}
+
+.codepuppy-settings-storage-status[data-storage-code="ok"] {
+  color: var(--a-success);
+}
+
+.codepuppy-settings-storage-status code {
+  color: inherit;
+}
+
+.codepuppy-settings-storage > .a-banner {
+  margin: 0 var(--a-space-4) var(--a-space-4);
+}
+
+.codepuppy-settings-storage-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--a-space-2);
+  padding: 13px var(--a-space-4);
+  border-top: 1px solid var(--a-border-faint);
+}
+
+.codepuppy-settings-storage-actions p {
+  min-width: 0;
+  flex: 1;
+  margin: 0;
+  color: var(--a-text-tertiary);
+  font-size: var(--a-text-xs);
+}
+
+.codepuppy-settings-storage-note {
+  margin-top: calc(-1 * var(--a-space-2));
+  padding: 10px 12px;
+  border-radius: var(--a-radius-md);
+  background: var(--a-info-subtle);
+  color: var(--a-text-secondary);
+  font-size: var(--a-text-xs);
+}
+
+@media (max-width: 840px) {
+  .codepuppy-settings-layout {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .codepuppy-settings-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    padding: var(--a-space-2) var(--a-space-3);
+    border-right: 0;
+    border-bottom: 1px solid var(--a-border-faint);
+  }
+
+  .codepuppy-settings-nav button {
+    min-width: max-content;
+  }
+
+  .codepuppy-settings-main {
+    flex: 1;
+    padding: var(--a-space-6) var(--a-space-4) var(--a-space-12);
+  }
+
+  .codepuppy-settings-usage-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .codepuppy-settings-storage-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 520px) {
+  .codepuppy-settings-head {
+    padding-inline: var(--a-space-3);
+  }
+
+  .codepuppy-settings-unsaved {
+    max-width: 150px;
+  }
+
+  .codepuppy-settings-section-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .codepuppy-settings-section-head .a-btn {
+    align-self: flex-start;
+  }
+
+  .codepuppy-settings-shortcut-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .codepuppy-settings-shortcut {
+    width: 100%;
+    text-align: left;
+  }
+}
+
+/* ── 「工具」节(REQ-131 / #1130)——────────────────────────────────────────────────
+   帧:docs/design/2026-08-25-req131-settings-tool-policy/frame.html(approved),活稿锚 #set-tools。
+   只取 --a-* token,浅 / 深两色由 tokens.css 决定;状态点从不单独承担信号,总伴随文字。 */
+.codepuppy-tools-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.codepuppy-tools-group {
+  margin-bottom: var(--a-space-6);
+}
+
+.codepuppy-tools-group-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 7px;
+  padding: 0 2px;
+}
+
+.codepuppy-tools-group-head h3 {
+  margin: 0;
+  font-size: var(--a-text-md);
+}
+
+.codepuppy-tools-n {
+  color: var(--a-text-tertiary);
+  font-size: var(--a-text-xs);
+}
+
+.codepuppy-tools-sp {
+  flex: 1;
+}
+
+.codepuppy-tools-group-cap {
+  margin: 0 2px 8px;
+  color: var(--a-text-tertiary);
+  font-size: var(--a-text-2xs);
+}
+
+.codepuppy-tools-card {
+  overflow: hidden;
+  border: 1px solid var(--a-border);
+  border-radius: var(--a-radius-lg);
+  background: var(--a-surface);
+  box-shadow: var(--a-shadow-xs);
+}
+
+.codepuppy-tools-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--a-border-faint);
+}
+
+.codepuppy-tools-card > :last-child,
+.codepuppy-tools-svc-tools > :last-child {
+  border-bottom: 0;
+}
+
+.codepuppy-tools-meta {
+  min-width: 0;
+  flex: 1;
+}
+
+.codepuppy-tools-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+
+.codepuppy-tools-name b {
+  font-size: var(--a-text-sm);
+  font-weight: var(--a-weight-medium);
+  overflow-wrap: anywhere;
+}
+
+.codepuppy-tools-meta small {
+  display: block;
+  margin-top: 2px;
+  color: var(--a-text-tertiary);
+  font-size: var(--a-text-2xs);
+  line-height: 1.5;
+}
+
+.codepuppy-tools-exp {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  place-items: center;
+  border: 0;
+  border-radius: var(--a-radius-sm);
+  background: none;
+  color: var(--a-text-tertiary);
+  cursor: pointer;
+}
+
+.codepuppy-tools-exp:hover {
+  background: var(--a-bg-muted);
+  color: var(--a-text);
+}
+
+.codepuppy-tools-svc-tools {
+  background: var(--a-bg-subtle);
+}
+
+.codepuppy-tools-svc-tools .codepuppy-tools-row,
+.codepuppy-tools-svc-tools .codepuppy-tools-alert {
+  padding-left: 34px;
+}
+
+.codepuppy-tools-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: var(--a-radius-full);
+  background: var(--a-bg-muted);
+  color: var(--a-text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.codepuppy-tools-badge.cloud,
+.codepuppy-tools-badge.new {
+  background: var(--a-accent-subtle);
+  color: var(--a-accent);
+}
+
+.codepuppy-tools-badge.warn {
+  background: var(--a-warning-subtle);
+  color: var(--a-warning);
+}
+
+.codepuppy-tools-eff {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--a-text-xs);
+  white-space: nowrap;
+}
+
+.codepuppy-tools-eff i {
+  width: 6px;
+  height: 6px;
+  border-radius: 99px;
+  background: currentcolor;
+}
+
+.codepuppy-tools-eff.enabled {
+  color: var(--a-success);
+}
+
+.codepuppy-tools-eff.ask {
+  color: var(--a-info);
+}
+
+.codepuppy-tools-eff.disabled {
+  color: var(--a-text-tertiary);
+}
+
+.codepuppy-tools-lock {
+  flex: none;
+  color: var(--a-text-tertiary);
+}
+
+.codepuppy-tools-lock svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.codepuppy-tools-seg {
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--a-border);
+  border-radius: var(--a-radius-md);
+  background: var(--a-bg-subtle);
+}
+
+.codepuppy-tools-seg button {
+  border: 0;
+  border-radius: calc(var(--a-radius-md) - 3px);
+  padding: 4px 9px;
+  background: none;
+  color: var(--a-text-tertiary);
+  font-size: var(--a-text-2xs);
+  font-weight: var(--a-weight-medium);
+  cursor: pointer;
+}
+
+.codepuppy-tools-seg button:hover:not(:disabled) {
+  color: var(--a-text);
+}
+
+.codepuppy-tools-seg button:focus-visible {
+  outline: 2px solid var(--a-accent);
+  outline-offset: 1px;
+}
+
+.codepuppy-tools-seg button[aria-checked="true"] {
+  background: var(--a-surface-raised);
+  color: var(--a-text);
+  box-shadow: var(--a-shadow-xs);
+}
+
+.codepuppy-tools-seg button:disabled {
+  cursor: not-allowed;
+}
+
+.codepuppy-tools-seg[aria-disabled="true"] {
+  opacity: 0.45;
+}
+
+.codepuppy-tools-seg[aria-busy="true"] {
+  opacity: 0.6;
+}
+
+.codepuppy-tools-clear {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  place-items: center;
+  border: 0;
+  border-radius: var(--a-radius-sm);
+  background: none;
+  color: var(--a-text-tertiary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.codepuppy-tools-clear:hover:not(:disabled) {
+  background: var(--a-bg-muted);
+  color: var(--a-text);
+}
+
+.codepuppy-tools-confirm {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px;
+  padding: 9px 14px;
+  border: 1px solid color-mix(in srgb, var(--a-warning) 30%, var(--a-border));
+  border-radius: var(--a-radius-md);
+  background: var(--a-warning-subtle);
+  color: var(--a-text-secondary);
+  font-size: var(--a-text-xs);
+}
+
+.codepuppy-tools-card .codepuppy-tools-confirm {
+  margin: 0;
+  border-width: 0 0 1px;
+  border-radius: 0;
+  border-bottom: 1px solid var(--a-border-faint);
+  padding-left: 34px;
+}
+
+.codepuppy-tools-confirm b {
+  color: var(--a-text);
+}
+
+.codepuppy-tools-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 0 14px 10px;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--a-error) 30%, var(--a-border));
+  border-radius: var(--a-radius-md);
+  background: var(--a-error-subtle);
+  color: var(--a-text-secondary);
+  font-size: var(--a-text-xs);
+}
+
+.codepuppy-tools-alert b {
+  display: block;
+  color: var(--a-text);
+}
+
+.codepuppy-tools-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  margin-top: 5px;
+  border-radius: 99px;
+  background: var(--a-error);
+}
+
+.codepuppy-tools-act {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.codepuppy-tools-act small {
+  color: var(--a-text-tertiary);
+  font-size: var(--a-text-2xs);
+}
+
+.codepuppy-tools-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 13px 15px;
+  border: 1px solid color-mix(in srgb, var(--a-warning) 30%, var(--a-border));
+  border-radius: var(--a-radius-lg);
+  background: var(--a-warning-subtle);
+}
+
+.codepuppy-tools-banner .codepuppy-tools-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--a-warning);
+}
+
+.codepuppy-tools-banner.err {
+  border-color: color-mix(in srgb, var(--a-error) 30%, var(--a-border));
+  background: var(--a-error-subtle);
+}
+
+.codepuppy-tools-banner.err .codepuppy-tools-dot {
+  background: var(--a-error);
+}
+
+.codepuppy-tools-banner b {
+  display: block;
+  font-size: var(--a-text-sm);
+}
+
+.codepuppy-tools-banner p {
+  margin: 3px 0 0;
+  color: var(--a-text-secondary);
+  font-size: var(--a-text-xs);
+  line-height: 1.55;
+}
+
+.codepuppy-tools-banner:focus-visible,
+.codepuppy-tools-alert:focus-visible {
+  outline: 2px solid var(--a-accent);
+  outline-offset: 2px;
+}
+
+details.codepuppy-tools-dev {
+  border-top: 1px dashed var(--a-border-faint);
+}
+
+details.codepuppy-tools-dev summary {
+  padding: 6px 14px;
+  color: var(--a-text-tertiary);
+  font-size: var(--a-text-2xs);
+  list-style: none;
+  cursor: pointer;
+}
+
+details.codepuppy-tools-dev summary::-webkit-details-marker {
+  display: none;
+}
+
+details.codepuppy-tools-dev > div {
+  padding: 0 14px 9px;
+  color: var(--a-text-tertiary);
+  font: 10.5px/1.7 var(--a-font-mono);
+  overflow-wrap: anywhere;
+}
+
+.codepuppy-tools-svc-tools details.codepuppy-tools-dev summary,
+.codepuppy-tools-svc-tools details.codepuppy-tools-dev > div {
+  padding-left: 34px;
+}
+
+.codepuppy-tools-degraded {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: var(--a-space-6);
+  padding: 8px 14px;
+  border-radius: var(--a-radius-md);
+  background: var(--a-bg-subtle);
+  color: var(--a-text-tertiary);
+  font-size: var(--a-text-2xs);
+}
+
+.codepuppy-tools-degraded details.codepuppy-tools-dev {
+  flex-basis: 100%;
+  border-top: 0;
+}
+
+.codepuppy-tools-degraded details.codepuppy-tools-dev summary,
+.codepuppy-tools-degraded details.codepuppy-tools-dev > div {
+  padding-left: 0;
+}
+
+.codepuppy-tools-foot {
+  margin: 4px 2px 0;
+  color: var(--a-text-tertiary);
+  font-size: var(--a-text-2xs);
+}
+
+.codepuppy-tools-skel {
+  height: 13px;
+  border-radius: 6px;
+  background: var(--a-bg-muted);
+  animation: codepuppy-tools-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes codepuppy-tools-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .codepuppy-tools-skel {
+    animation: none;
+  }
+}
+
+.codepuppy-tools-dim {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+@media (max-width: 720px) {
+  .codepuppy-tools-row {
+    flex-wrap: wrap;
+  }
+
+  .codepuppy-tools-meta {
+    flex-basis: 100%;
+  }
+}

@@ -73,7 +73,7 @@ if (verify.status !== 0) {
   // Storage" — safeStorage access then re-prompts (or, when the prompt is hidden, blocks main in
   // SecItemCopyMatching: page freeze + model picker stuck loading + key errors, 2026-07-23). A
   // Developer ID signature keeps the requirement stable across rebuilds, so one "始终允许" holds
-  // forever. ALPHA_MAC_SIGN_IDENTITY overrides ("adhoc" forces the old behavior).
+  // forever. CODEPUPPY_MAC_SIGN_IDENTITY overrides ("adhoc" forces the old behavior).
   const identity = resolveSigningIdentity()
   console.log(
     identity === "-"
@@ -109,7 +109,7 @@ console.log(`  removed redundant dist artifact (Spotlight now shows one app)`)
 console.log(`  Open with Cmd+Space → "Code Puppy". (No dev instance needed.)`)
 
 function resolveSigningIdentity(): string {
-  const override = process.env.ALPHA_MAC_SIGN_IDENTITY
+  const override = process.env.CODEPUPPY_MAC_SIGN_IDENTITY
   if (override === "adhoc") return "-"
   if (override) return override
   const out = spawnSync("security", ["find-identity", "-v", "-p", "codesigning"], { encoding: "utf8" })

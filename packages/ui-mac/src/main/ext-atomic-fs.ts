@@ -1,11 +1,11 @@
 // REQ-100(issue #192)T0 —— 扩展原子事务的 fs 原语层:tmp → fsync → rename 原子落盘 + 路径守卫。
 //
 // 纪律来源:
-//   · 原子换名 = 仓内既有惯例(alpha-installs.writeLedger 的 tmp→rename),本模块补齐 fsync
+//   · 原子换名 = 仓内既有惯例(codepuppy-installs.writeLedger 的 tmp→rename),本模块补齐 fsync
 //     (crash 一致性:rename 可原子,但不 fsync 的内容在掉电后可能是空洞文件);
 //   · 路径守卫 = ADR-019 修订④「safeResolve(realpath 防逃逸)」同款态度,收紧到事务层
 //     (相对路径结构校验 + 现存路径 realpath 圈禁),任何删除/改名前必须过守卫;
-//   · 全模块 electron-free、root 参数化(与 alpha-installs / alpha-workdir 同测试性模式)。
+//   · 全模块 electron-free、root 参数化(与 codepuppy-installs / codepuppy-workdir 同测试性模式)。
 //
 // 目录 fsync 在个别平台/文件系统会失败(Windows EBADF 等)。既有调用默认 best-effort;
 // Settings 这类严格成功边界显式使用 required 变体,父目录 fsync 失败必须阻断。

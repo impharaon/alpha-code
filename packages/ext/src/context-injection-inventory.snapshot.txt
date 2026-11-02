@@ -17,11 +17,11 @@ command.init.description                            text      command-descriptio
 command.init.template                               text      command-template        3484    8192   43%
 command.review.description                          text      command-description       58    1024    6%
 command.review.template                             text      command-template        4672    8192   57%
-instruction.alpha-behavior                          text      instruction             2757    8192   34%
-instruction.alpha-identity                          text      instruction              327    1024   32%
-instruction.alpha-identity+cloudDispatch            text      instruction              573    1024   56%
-instruction.alpha-identity+websearch                text      instruction              523    1024   51%
-instruction.alpha-identity+websearch+cloudDispatch  text      instruction              729    1024   71%
+instruction.codepuppy-behavior                          text      instruction             2757    8192   34%
+instruction.codepuppy-identity                          text      instruction              327    1024   32%
+instruction.codepuppy-identity+cloudDispatch            text      instruction              573    1024   56%
+instruction.codepuppy-identity+websearch                text      instruction              523    1024   51%
+instruction.codepuppy-identity+websearch+cloudDispatch  text      instruction              729    1024   71%
 tool.codepuppy_access.description                   text      tool-description         246    1024   24%
 tool.codepuppy_echo.args.shout                      text      tool-arg-description      25    1024    2%
 tool.codepuppy_echo.args.text                       text      tool-arg-description      21    1024    2%
@@ -76,12 +76,12 @@ references (paths / verbs / definitions supplied by others — carry no Alpha te
   ref.permission.skill   /permission/skill  REQ-067 出厂禁项的 "deny" 动词(factory-deny.ts)
   ref.permission.codepuppy_hub_install /permission/codepuppy_hub_install REQ-234 #1531 定制中心安装确认框的 "ask" 动词
   ref.agent.permission.codepuppy_hub_install /agent/*/permission/codepuppy_hub_install REQ-234 #1531 每个 agent 末位的 "ask"(无人值守的 codepuppy-automation* 为 "deny")
-  ref.mcp                /mcp               云 MCP server 定义(type / url / enabled / oauth / headers.Authorization = {file:} 引用):ext 经 env 装(cloud-websearch-kill.ts),ui-mac 主进程直写并对用户全局 MCP 钉 enabled:false(alpha-config-injection.ts / cloud-sidecar-config.ts / mcp-default-deny.ts / ext-disabled-injection.ts);工具表是远端 server 的字
-  ref.schema             /$schema           ui-mac 无继承 config 时种下的 JSON Schema URL(alpha-config-injection.ts:91)
-  ref.plugin             /plugin            @alpha-code/ext 自包含 bundle 的绝对路径(alpha-config-injection.ts:105-109);bundle 里 alpha 的字各自登记在本簿
-  ref.enabled_providers  /enabled_providers provider 白名单 id(alpha-models.ts,含用户 opencode.jsonc 里的 id);不进模型上下文
-  ref.model              /model             默认模型 <providerID>/<modelID>(alpha-models.ts);引擎把选中模型的 id 原样写进 environment 段(session/system.ts:74),那是 catalog / 上游厂商的 id,不是 alpha 的字
-  ref.provider           /provider          模型菜单:npm / 展示名 / baseURL / {file:} 密钥引用 / 档位 options(alpha-models.ts;模型与展示数据在已应用目录,BYOK 的 baseURL 在 byok-adapters.ts);展示名只进 picker,不进模型上下文
+  ref.mcp                /mcp               云 MCP server 定义(type / url / enabled / oauth / headers.Authorization = {file:} 引用):ext 经 env 装(cloud-websearch-kill.ts),ui-mac 主进程直写并对用户全局 MCP 钉 enabled:false(codepuppy-config-injection.ts / cloud-sidecar-config.ts / mcp-default-deny.ts / ext-disabled-injection.ts);工具表是远端 server 的字
+  ref.schema             /$schema           ui-mac 无继承 config 时种下的 JSON Schema URL(codepuppy-config-injection.ts:91)
+  ref.plugin             /plugin            @codepuppy/ext 自包含 bundle 的绝对路径(codepuppy-config-injection.ts:105-109);bundle 里 alpha 的字各自登记在本簿
+  ref.enabled_providers  /enabled_providers provider 白名单 id(codepuppy-models.ts,含用户 opencode.jsonc 里的 id);不进模型上下文
+  ref.model              /model             默认模型 <providerID>/<modelID>(codepuppy-models.ts);引擎把选中模型的 id 原样写进 environment 段(session/system.ts:74),那是 catalog / 上游厂商的 id,不是 alpha 的字
+  ref.provider           /provider          模型菜单:npm / 展示名 / baseURL / {file:} 密钥引用 / 档位 options(codepuppy-models.ts;模型与展示数据在已应用目录,BYOK 的 baseURL 在 byok-adapters.ts);展示名只进 picker,不进模型上下文
 context-bearing plugin hooks (from packages/plugin Hooks): config, tool, chat.message, command.execute.before, tool.execute.after, experimental.chat.messages.transform, experimental.chat.system.transform, experimental.session.compacting, experimental.text.complete, tool.definition
-instruction files (ui-mac main writes them into cfg.instructions; engine session/instruction.ts reads them into the system segment; identity has one row per reachable capability shape): instruction.alpha-behavior, instruction.alpha-identity, instruction.alpha-identity+cloudDispatch, instruction.alpha-identity+websearch, instruction.alpha-identity+websearch+cloudDispatch
+instruction files (ui-mac main writes them into cfg.instructions; engine session/instruction.ts reads them into the system segment; identity has one row per reachable capability shape): instruction.codepuppy-behavior, instruction.codepuppy-identity, instruction.codepuppy-identity+cloudDispatch, instruction.codepuppy-identity+websearch, instruction.codepuppy-identity+websearch+cloudDispatch
 ui-mac agents (main writes cfg.agent.<name>.{prompt,description}; prompt replaces the base system prompt at llm/request.ts:64 — an agent without a prompt keeps the base prompt; description enters the subagent list): agent.codepuppy-automation.prompt, agent.codepuppy-automation.description, agent.codepuppy-readonly.prompt, agent.codepuppy-readonly.description, agent.codepuppy-automation-standard.prompt, agent.codepuppy-automation-standard.description, agent.codepuppy-ask.description

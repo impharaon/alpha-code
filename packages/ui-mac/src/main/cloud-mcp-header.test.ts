@@ -1,7 +1,7 @@
 // `#1195`(REQ-144 T2):云 MCP 凭证通道的**形状闸**。
 //
 // 凭证 = 登录铸的 `mcp_access` token(alpha-web T1 顶层 `mcp_access_token`),经 A6
-// `{file:…ALPHA_MCP_TOKEN}` 引用装进静态 `Authorization` header,`oauth:false` 把交互式
+// `{file:…CODEPUPPY_MCP_TOKEN}` 引用装进静态 `Authorization` header,`oauth:false` 把交互式
 // OAuth 整条关掉(基线 `docs/design/req-144-login-minted-mcp-access.md` §2.1/§3)。
 //
 // 与前身 `cloud-mcp-oauth.test.ts`(`#733`/`#1106`,随本票退役)同一纪律:
@@ -9,9 +9,9 @@
 // kill-switch 的最终一跳跑**生产件本体** `installCloudMcp()`(不是替身)。
 //
 // 四条退出条件在此逐条有闸(票面 `ac#1195`):
-//   ① header = `Bearer {file:…ALPHA_MCP_TOKEN}` + `oauth:false`,token 字面量不进
+//   ① header = `Bearer {file:…CODEPUPPY_MCP_TOKEN}` + `oauth:false`,token 字面量不进
 //      `OPENCODE_CONFIG_CONTENT`(I3);
-//   ② 字段/文件缺席 ⇒ `enabled:false` 且**无任何回退**(不回 `ALPHA_CLOUD_TOKEN` header、
+//   ② 字段/文件缺席 ⇒ `enabled:false` 且**无任何回退**(不回 `CODEPUPPY_CLOUD_TOKEN` header、
 //      不回交互式 OAuth,I6);
 //   ③ 第三方 MCP 定义注入路径回归逐项不变(AC3 静态半边)—— 错误实现(把第三方也改走
 //      header 通道 / 动第三方的 oauth 对象)在「第三方条目逐字节不变」上当场红;
@@ -26,9 +26,9 @@ import { Schema } from "effect"
 // 也不会让生产代码多出一条对上游的依赖。
 import { Remote as EngineRemoteSchema } from "../../../core/src/v1/config/mcp"
 import { materializeCloudMcpConfig } from "./cloud-sidecar-config"
-import { injectAlphaConfig } from "./alpha-config-injection"
+import { injectCodePuppyConfig } from "./codepuppy-config-injection"
 import { CLOUD_MCP_ARM_ENV, CLOUD_MCP_DEF_ENV, WITHHELD_CLOUD_MCP } from "./cloud-web-search"
-import { secretFilePath, secretFileRef } from "./alpha-secret-files"
+import { secretFilePath, secretFileRef } from "./codepuppy-secret-files"
 // kill-switch 下**最终**进配置的那一份不是注入面写的,是 ext 写回的(#733 审计 B1 的教训原样
 // 继承):只断 main 的 config / DEF = 断中间产物。这里 import 生产件本体,让最后一跳真的执行。
 import { installCloudMcp } from "../../../ext/src/cloud-websearch-kill"
@@ -39,14 +39,14 @@ const CLOUD_SECRET = "SECRET-CLOUD-TOKEN-VALUE"
 
 describe("`#1195` 云 MCP header 通道的纯工厂形状", () => {
   test("有凭证:headers.Authorization = Bearer {file:…} 且 oauth 字面 false", () => {
-    const ref = "{file:/ud/alpha-secrets/ALPHA_MCP_TOKEN}"
+    const ref = "{file:/ud/codepuppy-secrets/CODEPUPPY_MCP_TOKEN}"
     const cfg = materializeCloudMcpConfig(CLOUD_URL, ref)
     // 逐字面量断言,不拿工厂自己的拼接当基准(锚点不得与被测对象同源)。
     expect(cfg).toEqual({
       type: "remote",
       url: CLOUD_URL,
       enabled: true,
-      headers: { Authorization: "Bearer {file:/ud/alpha-secrets/ALPHA_MCP_TOKEN}" },
+      headers: { Authorization: "Bearer {file:/ud/codepuppy-secrets/CODEPUPPY_MCP_TOKEN}" },
       oauth: false,
     })
     // `oauth === false` 是引擎的分化判据(`packages/opencode/src/mcp/index.ts` 对 false 完全
@@ -58,12 +58,12 @@ describe("`#1195` 云 MCP header 通道的纯工厂形状", () => {
 
   test("引擎自己的 Remote schema 能解这份定义(headers + oauth:false 是既有语义,不是我们说它合法)", () => {
     const decoded = Schema.decodeUnknownSync(EngineRemoteSchema)(
-      materializeCloudMcpConfig(CLOUD_URL, "{file:/ud/alpha-secrets/ALPHA_MCP_TOKEN}"),
+      materializeCloudMcpConfig(CLOUD_URL, "{file:/ud/codepuppy-secrets/CODEPUPPY_MCP_TOKEN}"),
     )
     expect(decoded.type).toBe("remote")
     expect(decoded.url).toBe(CLOUD_URL)
     expect(decoded.enabled).toBe(true)
-    expect(decoded.headers).toEqual({ Authorization: "Bearer {file:/ud/alpha-secrets/ALPHA_MCP_TOKEN}" })
+    expect(decoded.headers).toEqual({ Authorization: "Bearer {file:/ud/codepuppy-secrets/CODEPUPPY_MCP_TOKEN}" })
     expect(decoded.oauth).toBe(false)
   })
 
@@ -80,7 +80,7 @@ describe("`#1195` 云 MCP header 通道的纯工厂形状", () => {
   })
 })
 
-// ── 生产接线:真 injectAlphaConfig / 真密钥文件 / 真 env ────────────────────────────────
+// ── 生产接线:真 injectCodePuppyConfig / 真密钥文件 / 真 env ────────────────────────────────
 describe("`#1195` 生产注入面", () => {
   let tmp: string
   let userData: string
@@ -97,15 +97,15 @@ describe("`#1195` 生产注入面", () => {
     userData = path.join(tmp, "userData")
     fs.mkdirSync(userData, { recursive: true })
     for (const key of Object.keys(process.env))
-      if (key.startsWith("ALPHA_") || key.startsWith("OPENCODE_")) delete process.env[key]
-    process.env.ALPHA_JSONC_TRUTH_DISABLE = "1"
-    process.env.ALPHA_GLOBAL_DIR = path.join(tmp, "global")
-    // 登录态的两份密钥文件都在:ALPHA_CLOUD_TOKEN 仍由 applyAuthEnv/syncSecretFiles 落盘
+      if (key.startsWith("CODEPUPPY_") || key.startsWith("OPENCODE_")) delete process.env[key]
+    process.env.CODEPUPPY_JSONC_TRUTH_DISABLE = "1"
+    process.env.CODEPUPPY_GLOBAL_DIR = path.join(tmp, "global")
+    // 登录态的两份密钥文件都在:CODEPUPPY_CLOUD_TOKEN 仍由 applyAuthEnv/syncSecretFiles 落盘
     //(它是 cloud.dispatch 的 platform_access),但 `#1195` 起它**不是**云 MCP 的判据 ——
     // 下面的缺席臂靠「它在而 MCP token 不在」证明没有回退。
-    plantSecret("ALPHA_CLOUD_TOKEN", CLOUD_SECRET)
-    plantSecret("ALPHA_MCP_TOKEN", MCP_SECRET)
-    process.env.ALPHA_CLOUD_MCP_URL = CLOUD_URL
+    plantSecret("CODEPUPPY_CLOUD_TOKEN", CLOUD_SECRET)
+    plantSecret("CODEPUPPY_MCP_TOKEN", MCP_SECRET)
+    process.env.CODEPUPPY_CLOUD_MCP_URL = CLOUD_URL
   })
 
   afterEach(() => {
@@ -119,8 +119,8 @@ describe("`#1195` 生产注入面", () => {
     return config.mcp ?? {}
   }
 
-  test("①/④ 注入的 cloud 定义 = Bearer {file:…ALPHA_MCP_TOKEN} + oauth:false;token 字面量不进 config;引用只在 cloud 一处", () => {
-    expect(injectAlphaConfig(userData, undefined, "stable")).toEqual({ ok: true })
+  test("①/④ 注入的 cloud 定义 = Bearer {file:…CODEPUPPY_MCP_TOKEN} + oauth:false;token 字面量不进 config;引用只在 cloud 一处", () => {
+    expect(injectCodePuppyConfig(userData, undefined, "stable")).toEqual({ ok: true })
 
     const cloud = injectedMcp().codepuppy as Record<string, unknown>
     const decoded = Schema.decodeUnknownSync(EngineRemoteSchema)(cloud)
@@ -128,8 +128,8 @@ describe("`#1195` 生产注入面", () => {
     expect(decoded.enabled).toBe(true)
     expect(decoded.oauth).toBe(false)
     // 引用逐字面量重建(独立于生产的 secretFileRef 拼接也一致 —— 双轴)。
-    const expectedRef = `{file:${path.join(userData, "alpha-secrets", "ALPHA_MCP_TOKEN")}}`
-    expect(secretFileRef(userData, "ALPHA_MCP_TOKEN")).toBe(expectedRef)
+    const expectedRef = `{file:${path.join(userData, "codepuppy-secrets", "CODEPUPPY_MCP_TOKEN")}}`
+    expect(secretFileRef(userData, "CODEPUPPY_MCP_TOKEN")).toBe(expectedRef)
     expect(decoded.headers).toEqual({ Authorization: `Bearer ${expectedRef}` })
 
     // I3:整份 config 文本里没有 token 值、没有 OAuth 对象残影。
@@ -138,33 +138,33 @@ describe("`#1195` 生产注入面", () => {
     expect(content).not.toContain(CLOUD_SECRET)
     expect(content).not.toContain("clientId")
     // I4:该文件引用在整份 config 里恰好一处(就是 cloud 的 header)。
-    expect(content.split("ALPHA_MCP_TOKEN").length - 1).toBe(1)
-    // `#1195` 起 ALPHA_CLOUD_TOKEN 不再被任何定义引用。
-    expect(content).not.toContain("ALPHA_CLOUD_TOKEN")
+    expect(content.split("CODEPUPPY_MCP_TOKEN").length - 1).toBe(1)
+    // `#1195` 起 CODEPUPPY_CLOUD_TOKEN 不再被任何定义引用。
+    expect(content).not.toContain("CODEPUPPY_CLOUD_TOKEN")
 
     // env 托管通道(DEF)= 同一份定义、同样零 token 值。
     expect(JSON.parse(process.env[CLOUD_MCP_DEF_ENV]!)).toEqual(cloud)
     expect(process.env[CLOUD_MCP_DEF_ENV]).not.toContain(MCP_SECRET)
   })
 
-  test("② 文件缺席 ⇒ enabled:false 且无任何回退(ALPHA_CLOUD_TOKEN 在场也不回退;不回交互式 OAuth)", () => {
-    fs.rmSync(secretFilePath(userData, "ALPHA_MCP_TOKEN"))
-    expect(injectAlphaConfig(userData, undefined, "stable")).toEqual({ ok: true })
+  test("② 文件缺席 ⇒ enabled:false 且无任何回退(CODEPUPPY_CLOUD_TOKEN 在场也不回退;不回交互式 OAuth)", () => {
+    fs.rmSync(secretFilePath(userData, "CODEPUPPY_MCP_TOKEN"))
+    expect(injectCodePuppyConfig(userData, undefined, "stable")).toEqual({ ok: true })
 
     // toEqual 排他:没有 headers、没有 oauth 对象、没有 {file:} 引用 —— 一个回退通道都不存在。
     expect(injectedMcp().codepuppy).toEqual({ type: "remote", url: CLOUD_URL, enabled: false, oauth: false })
     // config 文本里连引用名都不出现(引擎对缺席文件的 {file:} 引用 fail-loud 掉整个装载)。
-    expect(process.env.OPENCODE_CONFIG_CONTENT!).not.toContain("ALPHA_MCP_TOKEN")
+    expect(process.env.OPENCODE_CONFIG_CONTENT!).not.toContain("CODEPUPPY_MCP_TOKEN")
     // 缺凭证 ⇒ 不代付 ⇒ 本地 keyless websearch 不被 deny(主权判据同轴,ADR-009 B1)。
     const config = JSON.parse(process.env.OPENCODE_CONFIG_CONTENT!) as { permission?: Record<string, unknown> }
     expect(config.permission?.websearch).toBeUndefined()
     // DEF 身份通道仍是真定义(带引用):ext 端 installCloudMcp 读不到文件会响亮不装(fail-closed)。
-    expect(process.env[CLOUD_MCP_DEF_ENV]).toContain("ALPHA_MCP_TOKEN")
+    expect(process.env[CLOUD_MCP_DEF_ENV]).toContain("CODEPUPPY_MCP_TOKEN")
   })
 
-  test("反向:旧轴文件 ALPHA_CLOUD_TOKEN 缺席不再影响云 MCP(判据已整体换轴)", () => {
-    fs.rmSync(secretFilePath(userData, "ALPHA_CLOUD_TOKEN"))
-    expect(injectAlphaConfig(userData, undefined, "stable")).toEqual({ ok: true })
+  test("反向:旧轴文件 CODEPUPPY_CLOUD_TOKEN 缺席不再影响云 MCP(判据已整体换轴)", () => {
+    fs.rmSync(secretFilePath(userData, "CODEPUPPY_CLOUD_TOKEN"))
+    expect(injectCodePuppyConfig(userData, undefined, "stable")).toEqual({ ok: true })
     expect((injectedMcp().codepuppy as Record<string, unknown>).enabled).toBe(true)
   })
 
@@ -178,7 +178,7 @@ describe("`#1195` 生产注入面", () => {
     const localTool = { type: "local", command: ["partner-mcp", "--stdio"] }
     process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify({ mcp: { partner, "local-tool": localTool } })
 
-    expect(injectAlphaConfig(userData, undefined, "stable")).toEqual({ ok: true })
+    expect(injectCodePuppyConfig(userData, undefined, "stable")).toEqual({ ok: true })
 
     const mcp = injectedMcp()
     // 第三方两条:oauth 对象原样、无 headers、无 {file:} —— 错误实现(第三方也改走 header
@@ -186,18 +186,18 @@ describe("`#1195` 生产注入面", () => {
     expect(mcp.partner).toEqual(partner)
     expect(mcp["local-tool"]).toEqual(localTool)
     // cloud 是 alpha 自己的定义(带引用),与第三方互不串门。
-    expect(JSON.stringify(mcp.codepuppy)).toContain("ALPHA_MCP_TOKEN")
-    expect(JSON.stringify(mcp.partner)).not.toContain("ALPHA_MCP_TOKEN")
+    expect(JSON.stringify(mcp.codepuppy)).toContain("CODEPUPPY_MCP_TOKEN")
+    expect(JSON.stringify(mcp.partner)).not.toContain("CODEPUPPY_MCP_TOKEN")
   })
 
   // ── kill-switch 的最终一跳:真 installCloudMcp(生产件本体)────────────────────────────
   test("B1:kill-switch 下 ext 写回的最终定义 = 解析后的 Bearer 值 + oauth:false(OAuth 不复活)", () => {
-    process.env.ALPHA_WEBSEARCH_DISABLE = "1"
+    process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
     const errors: unknown[] = []
     const original = console.error
     console.error = (...args: unknown[]) => void errors.push(args)
     try {
-      expect(injectAlphaConfig(userData, path.join(tmp, "ext.js"), "stable")).toEqual({ ok: true })
+      expect(injectCodePuppyConfig(userData, path.join(tmp, "ext.js"), "stable")).toEqual({ ok: true })
     } finally {
       console.error = original
     }
@@ -219,15 +219,15 @@ describe("`#1195` 生产注入面", () => {
   })
 
   test("B1 缺席臂:kill-switch + 文件缺席 ⇒ installCloudMcp 响亮不装,留下中和条目(fail-closed)", () => {
-    fs.rmSync(secretFilePath(userData, "ALPHA_MCP_TOKEN"))
-    process.env.ALPHA_WEBSEARCH_DISABLE = "1"
+    fs.rmSync(secretFilePath(userData, "CODEPUPPY_MCP_TOKEN"))
+    process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
     const errors: unknown[] = []
     const original = console.error
     console.error = (...args: unknown[]) => void errors.push(args)
     let installed: string | undefined
     let cfg: { mcp?: Record<string, unknown> }
     try {
-      expect(injectAlphaConfig(userData, undefined, "stable")).toEqual({ ok: true })
+      expect(injectCodePuppyConfig(userData, undefined, "stable")).toEqual({ ok: true })
       cfg = { mcp: { codepuppy: injectedMcp().codepuppy } }
       installed = installCloudMcp(cfg, process.env)
     } finally {

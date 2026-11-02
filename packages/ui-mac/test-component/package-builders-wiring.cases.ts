@@ -228,18 +228,18 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
   throw new Error(`unexpected fetch: ${url}`)
 }) as typeof fetch
 
-const { initAlphaEnvironment, getAlphaEnvironment } = await import("../src/main/alpha-environment")
+const { initCodePuppyEnvironment, getCodePuppyEnvironment } = await import("../src/main/codepuppy-environment")
 const { registerExtIpcHandlers } = await import("../src/main/ext-ipc")
 // 前置事实用**生产读法**表述,与 buildMcpTxItems 的闸判据同一对函数 —— 不在测试里另写一份等价链。
 const { readMcpLeafStrict } = await import("../src/main/ext-config")
 const { findRecordV2 } = await import("../src/main/ext-receipt-v2")
 
-delete process.env.ALPHA_GLOBAL_DIR
-initAlphaEnvironment({
+delete process.env.CODEPUPPY_GLOBAL_DIR
+initCodePuppyEnvironment({
   isPackaged: false,
   channel: "dev",
   appDataDir: tmp,
-  baseRoot: join(tmp, "alpha-code-state"),
+  baseRoot: join(tmp, "codepuppy-state"),
   homeDir: join(tmp, "home"),
 })
 // 注册即触发启动期事务恢复 —— recoveryOpts 在这里构造。
@@ -299,9 +299,9 @@ test("the real ext-install-catalog IPC installs an agent package through buildAg
   const agentProbes = routerCalls.invoked.filter((c) => c.key === "agent--wired-agent" && c.action === "file")
   expect(agentProbes.map((c) => c.phase).sort()).toEqual(["post-switch", "pre-switch"])
   // ③ 真的装出来了(计划不是空转):md 落盘 + config 叶在场 + 账本有记录。
-  const root = getAlphaEnvironment().mutableRoot
+  const root = getCodePuppyEnvironment().mutableRoot
   expect(readFileSync(join(root, "agents", "wired-agent.md"), "utf8")).toBe(AGENT_MD)
-  const config = readFileSync(join(root, "alpha.jsonc"), "utf8")
+  const config = readFileSync(join(root, "codepuppy.jsonc"), "utf8")
   expect(config).toContain("wired-agent")
   expect(existsSync(join(root, "installs.json"))).toBe(true)
 })
@@ -312,13 +312,13 @@ test("the real ext-install-catalog IPC installs a secret-bearing MCP package thr
   expect(result).toMatchObject({ ok: true, kind: "mcp", name: "wired-mcp" })
   expect(builderCalls.mcp - before.mcp).toBe(1)
   expect(builderCalls.agent - before.agent).toBe(0)
-  const root = getAlphaEnvironment().mutableRoot
-  const serverDir = join(userData, "alpha-mcp-secrets", "wired-mcp")
+  const root = getCodePuppyEnvironment().mutableRoot
+  const serverDir = join(userData, "codepuppy-mcp-secrets", "wired-mcp")
   const versions = readdirSync(serverDir)
   expect(versions).toHaveLength(1)
   const secretFile = join(serverDir, versions[0]!, "A_KEY")
   expect(readFileSync(secretFile, "utf8")).toBe(secretCanary)
-  const config = readFileSync(join(root, "alpha.jsonc"), "utf8")
+  const config = readFileSync(join(root, "codepuppy.jsonc"), "utf8")
   expect(config).toContain(`{file:${secretFile}}`)
   expect(config).not.toContain(secretCanary)
 })
@@ -333,14 +333,14 @@ test("the real ext-install-catalog IPC installs a secret-bearing MCP package thr
 // 这不是合成态:上一条用例(首次安装)就把 config 叶与 V2 账本一起写了出来,
 // 兼容 package 仍然给出 install action,用户再点一次即以新 attempt 走到这里。
 test("reinstalling an already-registered MCP package keeps the ledger exemption and really re-enters the transaction", async () => {
-  const root = getAlphaEnvironment().mutableRoot
+  const root = getCodePuppyEnvironment().mutableRoot
   // ① 前置事实 = 第三格的入口条件本身(用生产读法表述,而不是"上一条跑过了"这种口头依赖)。
   const liveLeaf = readMcpLeafStrict("wired-mcp")
   expect(liveLeaf).toMatchObject({ ok: true })
   expect(liveLeaf.ok && liveLeaf.value).toBeTruthy()
   expect(findRecordV2(root, "mcp", "wired-mcp")).toBeTruthy()
 
-  const serverDir = join(userData, "alpha-mcp-secrets", "wired-mcp")
+  const serverDir = join(userData, "codepuppy-mcp-secrets", "wired-mcp")
   const versionsBefore = readdirSync(serverDir)
   const before = { ...builderCalls }
   const txRunsBefore = txCalls.runs
@@ -361,7 +361,7 @@ test("reinstalling an already-registered MCP package keeps the ledger exemption 
   expect(minted).toHaveLength(1)
   const rotatedSecretFile = join(serverDir, minted[0]!, "A_KEY")
   expect(readFileSync(rotatedSecretFile, "utf8")).toBe(secretCanaryReinstall)
-  const config = readFileSync(join(root, "alpha.jsonc"), "utf8")
+  const config = readFileSync(join(root, "codepuppy.jsonc"), "utf8")
   expect(config).toContain(`{file:${rotatedSecretFile}}`)
   expect(config).not.toContain(secretCanaryReinstall)
 })

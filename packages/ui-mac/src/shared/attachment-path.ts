@@ -3,13 +3,13 @@
 //
 // metadata 里只存**相对隐藏目录根**的 POSIX 路径 `attachments/<uuid>/<净化后的文件名>`,不含隐藏目录名本身 ——
 // 隐藏目录改名、按项目迁移后仍有效;绝对路径只由 attachmentAbsolutePath 算出。
-import { ALPHA_OFFICE_CONNECTORS, type AlphaOfficeFormat } from "./office-advisories"
+import { CODEPUPPY_OFFICE_CONNECTORS, type CodePuppyOfficeFormat } from "./office-advisories"
 import { PROJECT_HIDDEN_DIR } from "./project-hidden-dir"
 
 /** 用户消息里那个 synthetic text part 的 metadata 键(冻结面;键名以命名迁移方案定稿为准)。 */
 export const ATTACHMENT_METADATA_KEY = "codepuppy.attachment"
 
-export type AttachmentReader = AlphaOfficeFormat
+export type AttachmentReader = CodePuppyOfficeFormat
 
 /** 冻结面 `{ v:1, name, mime, size, path, reader }`。 */
 export type StagedAttachmentMeta = {
@@ -41,14 +41,14 @@ export const ATTACHMENT_READ_TOOL: Readonly<Record<AttachmentReader, string>> = 
   pdf: "read_pdf",
 })
 
-/** 读取工具所在的 MCP 服务名(第一方 Office 登记表 ALPHA_OFFICE_CONNECTORS 的 name)。 */
+/** 读取工具所在的 MCP 服务名(第一方 Office 登记表 CODEPUPPY_OFFICE_CONNECTORS 的 name)。 */
 export function attachmentReaderServer(reader: AttachmentReader): string {
-  return ALPHA_OFFICE_CONNECTORS.find((connector) => connector.format === reader)!.name
+  return CODEPUPPY_OFFICE_CONNECTORS.find((connector) => connector.format === reader)!.name
 }
 
 /** 读取工具要求的扩展名(server.py require_workspace_path 按它校验)。 */
 export function attachmentReaderExtension(reader: AttachmentReader): string {
-  return ALPHA_OFFICE_CONNECTORS.find((connector) => connector.format === reader)!.extension
+  return CODEPUPPY_OFFICE_CONNECTORS.find((connector) => connector.format === reader)!.extension
 }
 
 /** `attachments/<uuid>/<name>`(name 须已净化、不含分隔符)。 */

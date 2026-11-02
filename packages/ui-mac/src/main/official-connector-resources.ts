@@ -7,8 +7,8 @@ import {
   withConfigWriteLock,
   writeConfigTextAtomic,
 } from "./ext-config"
-import { collectMcpFileRefPaths } from "./alpha-mcp-secrets"
-import { alphaGlobalRoot } from "./engine-config-truth"
+import { collectMcpFileRefPaths } from "./codepuppy-mcp-secrets"
+import { codepuppyGlobalRoot } from "./engine-config-truth"
 import { findRecordV2 } from "./ext-receipt-v2"
 import { probeTransactionJournals, type TxPreparedResourceV1 } from "./ext-transaction"
 import { removeMcpServerRecord, upsertMcpServerRecord } from "./mcp-server-lifecycle"
@@ -31,7 +31,7 @@ import {
 } from "node:fs"
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path"
 
-import { environmentFromMutableRoot } from "./alpha-environment"
+import { environmentFromMutableRoot } from "./codepuppy-environment"
 import {
   DBHUB_READONLY_TOML,
   OFFICIAL_CONNECTOR_NAMES,
@@ -277,13 +277,13 @@ export function releaseOfficialConnectorResources(userDataPath: string, resource
     const live = collectMergedMcpRefPathsStrict(resource.server)
     if (!live.ok || live.refs.some((file) => file.includes(`/${resource.server}/${resource.version}/`)))
       throw new Error("official connector version still referenced or config unreadable")
-    removeOfficialConnectorVersion(alphaGlobalRoot(), resource.server, resource.version)
+    removeOfficialConnectorVersion(codepuppyGlobalRoot(), resource.server, resource.version)
   }
 }
 
 /** Rebind each committed connector independently; a credential failure must not stop the engine. */
 export function restoreCommittedOfficialConnectors() {
-  const root = alphaGlobalRoot()
+  const root = codepuppyGlobalRoot()
   try {
     sweepOfficialConnectorRuntime(root)
   } catch {
@@ -314,7 +314,7 @@ export function restoreCommittedOfficialConnectors() {
         // A missing/invalid recipe cannot safely provide a ref; the engine accepts disable-only leaves.
       }
       projectOfficialConnector(name, disabled)
-      // Truth otherwise injects enabled:true even when the alpha.jsonc leaf is disabled.
+      // Truth otherwise injects enabled:true even when the codepuppy.jsonc leaf is disabled.
       if (!removeMcpServerRecord(name).ok) throw officialConnectorFailure()
     }
   }

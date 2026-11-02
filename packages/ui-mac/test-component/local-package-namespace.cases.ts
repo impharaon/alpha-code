@@ -117,19 +117,19 @@ mock.module("../src/main/ext-mcp-activation", () => ({
 const originalFetch = globalThis.fetch
 globalThis.fetch = (async () => new Response(payloadBytes, { status: 200 })) as typeof fetch
 
-const { initAlphaEnvironment, getAlphaEnvironment } = await import("../src/main/alpha-environment")
+const { initCodePuppyEnvironment, getCodePuppyEnvironment } = await import("../src/main/codepuppy-environment")
 const { LOCAL_PACKAGE_READ_CHANNELS, GATED_WRITE_CHANNELS } = await import("../src/main/ext-write-channels")
 const { LOCAL_PACKAGE_ID_PREFIX, isLocalPackageId } = await import("../src/shared/local-package-namespace")
 const { previewLocalClaudePlugin } = await import("../src/main/claude-plugin-intake")
 const { materializeCorpus, pluginRootsIn } = await import("./claude-plugin-corpus.fixture")
 const { registerExtIpcHandlers } = await import("../src/main/ext-ipc")
 
-delete process.env.ALPHA_GLOBAL_DIR
-initAlphaEnvironment({
+delete process.env.CODEPUPPY_GLOBAL_DIR
+initCodePuppyEnvironment({
   isPackaged: false,
   channel: "dev",
   appDataDir: tmp,
-  baseRoot: join(tmp, "alpha-code-state"),
+  baseRoot: join(tmp, "codepuppy-state"),
   homeDir: join(tmp, "home"),
 })
 registerExtIpcHandlers(
@@ -214,7 +214,7 @@ test("只读列表通道:装成之后的 `origin` 来自 child record,不是从 
   ])
   // 安全投影:无绝对路径、无 owner token(claims 的 owner 里带着别的包的 id)、无 envelopeDigest。
   const wire = JSON.stringify(listed)
-  expect(wire).not.toContain(getAlphaEnvironment().mutableRoot)
+  expect(wire).not.toContain(getCodePuppyEnvironment().mutableRoot)
   expect(wire).not.toContain(tmp)
   expect(wire).not.toContain("bundle:")
   expect(wire).not.toContain("owners")
@@ -271,8 +271,8 @@ test("纪律 2:`origin` 必须来自 child record —— 把它改成从 package
   // 这里把**账本里那条 record 的 `origin` 改掉**,packageId 一个字不动:
   //   · 从 record 读的实现 ⇒ 跟着变成 `imported-claude`;
   //   · 从前缀推的实现   ⇒ 仍然说 `catalog` ⇒ 红。
-  const { getAlphaEnvironment } = await import("../src/main/alpha-environment")
-  const ledgerFile = join(getAlphaEnvironment().mutableRoot, "installs.json")
+  const { getCodePuppyEnvironment } = await import("../src/main/codepuppy-environment")
+  const ledgerFile = join(getCodePuppyEnvironment().mutableRoot, "installs.json")
   const before = readFileSync(ledgerFile, "utf8")
   const ledger = JSON.parse(before) as { records: Array<Record<string, unknown>> }
   const root = ledger.records.find((record) => record["kind"] === "mcp" && record["name"] === "namespace-fixture")

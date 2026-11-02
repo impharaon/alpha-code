@@ -65,7 +65,7 @@
 #      (b) registry 指向不可达地址时必须判 `network`(杀掉「一律算真失守」——那等于没有豁免);
 #      (c) 报告契约:把整个探针**套跑一遍**并注入不可达 registry,断言它 **exit 2**、
 #          输出里**有「未验证」**、且**没有**那句「新建 worktree 自己就能跑出可信 typecheck」。
-#          嵌套跑靠 ALPHA_WT_PROBE_NESTED=1 断掉递归(只关掉 (c) 自己,不关任何真判据)。
+#          嵌套跑靠 CODEPUPPY_WT_PROBE_NESTED=1 断掉递归(只关掉 (c) 自己,不关任何真判据)。
 #
 # 一条载重的实现事实:`.worktrees/` 就在主 checkout **内部**,而 `bun run` 找可执行文件是
 # 逐级往上走父目录的 `node_modules/.bin` —— 所以未 bootstrap 的 worktree 仍能跑起 `tsgo`
@@ -97,7 +97,7 @@ SWEEP="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/worktree-probe-sweep.sh"
 bash "$SWEEP"
 
 # 被测的是**跑本脚本的这棵树**上的那份 bootstrap,不是主 checkout 那份 —— 否则在 worktree 里
-# 跑 alpha-check 时,量到的是共享树上的旧版本(而本票的全部意义就是「别去量别人的树」)。
+# 跑 codepuppy-check 时,量到的是共享树上的旧版本(而本票的全部意义就是「别去量别人的树」)。
 SELF_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 BOOTSTRAP="$SELF_ROOT/scripts/worktree-bootstrap.sh"
 SELF="$SELF_ROOT/scripts/assert-worktree-bootstrap.sh"
@@ -106,7 +106,7 @@ SELF="$SELF_ROOT/scripts/assert-worktree-bootstrap.sh"
 # 探针树一律从 HEAD 建:判的是**当前这棵树上的**脚本与配置,不是某个远端 ref 的历史版本。
 BASE_SHA="$(git rev-parse HEAD 2>/dev/null)" || { echo "✗ 读不到 HEAD" >&2; exit 1; }
 
-NESTED="${ALPHA_WT_PROBE_NESTED:-0}"
+NESTED="${CODEPUPPY_WT_PROBE_NESTED:-0}"
 DEFAULT_REGISTRY="https://registry.npmjs.org"
 UNREACHABLE_REGISTRY="http://127.0.0.1:9"
 
@@ -387,12 +387,12 @@ if [ "$(uname -s)" = Darwin ] && [ -f "$SELF_ROOT/packages/ui-mac/scripts/build-
   else
     rm -rf "$MAIN/.worktrees/$NEG/packages/ui-mac/node_modules/electron/dist" \
       "$MAIN/.worktrees/$NEG/packages/ui-mac/node_modules/electron/path.txt" \
-      "$MAIN/.worktrees/$NEG/packages/ui-mac/native/alpha-fence/build"
+      "$MAIN/.worktrees/$NEG/packages/ui-mac/native/codepuppy-fence/build"
     for f in $FENCE_FILES; do
       neg_fence_out="$(cd "$MAIN/.worktrees/$NEG/packages/ui-mac" && bun test --timeout 120000 "./src/main/$f.test.ts" 2>&1)"; neg_fence_rc=$?
       if [ "$neg_fence_rc" -eq 0 ]; then
         red "缺 Electron/addon 时 $f 竟然通过 —— 围栏反向探针不成立"
-      elif ! grep -aqE 'path.txt|electron binary missing|alpha_fence.node' <<<"$neg_fence_out"; then
+      elif ! grep -aqE 'path.txt|electron binary missing|codepuppy_fence.node' <<<"$neg_fence_out"; then
         red "$f 的红不来自缺 Electron/addon —— 本次反向测量无效"
       else
         echo "    ✓ 缺 Electron/addon:$f rc=$neg_fence_rc(先证明会红)"
@@ -451,7 +451,7 @@ fi
 echo "  · [4/6] 幂等:对已装好的 worktree 重跑 bootstrap"
 fence_before="$(stat -f '%i:%m:%c' "$MAIN/.worktrees/$POS/packages/ui-mac/node_modules/electron/path.txt" \
   "$MAIN/.worktrees/$POS/packages/ui-mac/node_modules/electron/dist/version" \
-  "$MAIN/.worktrees/$POS/packages/ui-mac/native/alpha-fence/build/alpha_fence.node" 2>/dev/null || true)"
+  "$MAIN/.worktrees/$POS/packages/ui-mac/native/codepuppy-fence/build/codepuppy_fence.node" 2>/dev/null || true)"
 if [ "$pos_ready" -eq 0 ]; then
   echo "    ⚠️  跳过:[2/6] 没能装出可用的 worktree(见上),幂等这一条本次无从判起"
 elif ! run_owned bash "$BOOTSTRAP" "$POS" --detach --base "$BASE_SHA" >/dev/null 2>&1; then
@@ -466,7 +466,7 @@ else
   fi
   fence_after="$(stat -f '%i:%m:%c' "$MAIN/.worktrees/$POS/packages/ui-mac/node_modules/electron/path.txt" \
     "$MAIN/.worktrees/$POS/packages/ui-mac/node_modules/electron/dist/version" \
-    "$MAIN/.worktrees/$POS/packages/ui-mac/native/alpha-fence/build/alpha_fence.node" 2>/dev/null || true)"
+    "$MAIN/.worktrees/$POS/packages/ui-mac/native/codepuppy-fence/build/codepuppy_fence.node" 2>/dev/null || true)"
   [ "$fence_before" = "$fence_after" ] || red "重跑重复复制 Electron 或编译 addon(产物身份/时间变了)"
   fence_tests_in "$POS" || red "重跑后围栏测试反而坏了"
 fi
@@ -604,8 +604,8 @@ else
   # 嵌套自跑也是一个会写共享配置的子进程(它自己的 cleanup 会还原到**它**看到的基线)——
   # 一样要登记收割,否则父被打断时它就是下一个晚到的覆写者。输出改走临时文件(run_owned
   # 走后台进程组,命令替换接不到)。
-  nested_tmp="$(mktemp "${TMPDIR:-/tmp}/alpha-wt-nested.XXXXXX")"
-  run_owned env ALPHA_WT_PROBE_NESTED=1 BUN_CONFIG_REGISTRY="$UNREACHABLE_REGISTRY" bash "$SELF" >"$nested_tmp" 2>&1
+  nested_tmp="$(mktemp "${TMPDIR:-/tmp}/codepuppy-wt-nested.XXXXXX")"
+  run_owned env CODEPUPPY_WT_PROBE_NESTED=1 BUN_CONFIG_REGISTRY="$UNREACHABLE_REGISTRY" bash "$SELF" >"$nested_tmp" 2>&1
   nested_rc=$?
   nested_out="$(cat "$nested_tmp" 2>/dev/null)"
   rm -f "$nested_tmp"

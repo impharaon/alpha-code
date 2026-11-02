@@ -20,7 +20,7 @@ import { createRequire } from "node:module"
 // The OS keychain boundary is replaced with real AES-GCM, not a plaintext/base64 stand-in.
 const key = randomBytes(32)
 let available = true
-mock.module("../src/main/alpha-keychain-backend", () => ({
+mock.module("../src/main/codepuppy-keychain-backend", () => ({
   keychainBackend: () => ({
     isEncryptionAvailable: () => available,
     encryptString: (value: string) => {
@@ -35,8 +35,8 @@ mock.module("../src/main/alpha-keychain-backend", () => ({
     },
   }),
 }))
-const { initAlphaEnvironment, getAlphaEnvironment, __resetAlphaEnvironmentForTests } = await import(
-  "../src/main/alpha-environment"
+const { initCodePuppyEnvironment, getCodePuppyEnvironment, __resetCodePuppyEnvironmentForTests } = await import(
+  "../src/main/codepuppy-environment"
 )
 const { officialNodeCommand, DBHUB_READONLY_TOML } = await import("../src/main/official-connector-recipes")
 const {
@@ -69,24 +69,24 @@ let iso = "",
 const pat = "github_pat_FAKE_aw256_CANARY_ONLY"
 beforeEach(() => {
   available = true
-  __resetAlphaEnvironmentForTests()
-  delete process.env.ALPHA_GLOBAL_DIR
+  __resetCodePuppyEnvironmentForTests()
+  delete process.env.CODEPUPPY_GLOBAL_DIR
   iso = mkdtempSync(join(tmpdir(), "official-connectors-"))
   home = join(iso, "home")
   mkdirSync(home)
   root = join(home, "state", "env", "dev")
-  initAlphaEnvironment({
+  initCodePuppyEnvironment({
     isPackaged: false,
     channel: "dev",
     appDataDir: home,
     baseRoot: join(home, "state"),
     homeDir: home,
   })
-  root = getAlphaEnvironment().mutableRoot
+  root = getCodePuppyEnvironment().mutableRoot
 })
 afterEach(() => {
   clearOfficialConnectorRuntime()
-  __resetAlphaEnvironmentForTests()
+  __resetCodePuppyEnvironmentForTests()
   rmSync(iso, { recursive: true, force: true })
 })
 
@@ -98,7 +98,7 @@ async function fixture(name: "github-official" | "dbhub-readonly" = "github-offi
   const compiled = await Bun.file(
     resolve(
       import.meta.dir,
-      "../../alpha-contracts-consumer/vendor/alpha-web-extension-package/expected.mcp-remote.compiled.json",
+      "../../codepuppy-contracts-consumer/vendor/alpha-web-extension-package/expected.mcp-remote.compiled.json",
     ),
   ).json()
   const envelope = structuredClone(compiled.envelope) as AlphaPackageEnvelopeV1
@@ -292,7 +292,7 @@ test("deleted registered workspace does not block either recipe at installation"
   const { fenceWorkspaceTruthPath, writeWorkspaceTruth } = await import("../src/main/process-fence-workspaces")
   const workspace = join(home, "deleted-workspace")
   mkdirSync(workspace)
-  writeWorkspaceTruth(fenceWorkspaceTruthPath(getAlphaEnvironment().casBaseRoot, "dev"), [workspace], {
+  writeWorkspaceTruth(fenceWorkspaceTruthPath(getCodePuppyEnvironment().casBaseRoot, "dev"), [workspace], {
     mkdirSync, writeFileSync, renameSync: require("node:fs").renameSync,
   })
   rmSync(workspace, { recursive: true })
@@ -336,7 +336,7 @@ test("prepared journal crash recovery removes only uncommitted official versions
             key: "mcp--github-official",
             action: "config",
             config: {
-              target: join(root, "alpha.jsonc"),
+              target: join(root, "codepuppy.jsonc"),
               edits: [{ keyPath: ["mcp", "github-official"], value: { enabled: false } }],
             },
           },
@@ -365,17 +365,17 @@ test("DBHub 1.5.0 real stdio SELECT 1 succeeds, writes fail, only execute_sql ex
   // profile grants all system temp writes, so a temp-only test cannot prove TOML protection.
   const ownedHome = mkdtempSync(join(userInfo().homedir, ".connector-256-fixture-"))
   try {
-    __resetAlphaEnvironmentForTests()
-    delete process.env.ALPHA_GLOBAL_DIR
+    __resetCodePuppyEnvironmentForTests()
+    delete process.env.CODEPUPPY_GLOBAL_DIR
     home = ownedHome
-    initAlphaEnvironment({
+    initCodePuppyEnvironment({
       isPackaged: false,
       channel: "dev",
       appDataDir: home,
       baseRoot: join(home, "state"),
       homeDir: home,
     })
-    root = getAlphaEnvironment().mutableRoot
+    root = getCodePuppyEnvironment().mutableRoot
     mkdirSync(join(home, "project"))
     const database = join(home, "project", "sqlite sample.db")
     const db = new Database(database)
@@ -402,13 +402,13 @@ test("DBHub 1.5.0 real stdio SELECT 1 succeeds, writes fail, only execute_sql ex
     const require = createRequire(resolve(import.meta.dir, "../../opencode/package.json"))
     const { Client } = await import(require.resolve("@modelcontextprotocol/sdk/client/index.js"))
     const { StdioClientTransport } = await import(require.resolve("@modelcontextprotocol/sdk/client/stdio.js"))
-    const client = new Client({ name: "alpha-256-test", version: "1.0.0" })
+    const client = new Client({ name: "codepuppy-256-test", version: "1.0.0" })
     // Acquire the pinned npm fixture outside the fence, using only this test's empty npm
     // configs. Then run the real recipe offline inside the fence (no DB network permission).
     const npmEnv = {
       PATH: config.environment.PATH,
       HOME: home,
-      npm_config_cache: join(tmpdir(), "alpha-256-npm-cache"),
+      npm_config_cache: join(tmpdir(), "codepuppy-256-npm-cache"),
       npm_config_userconfig: join(iso, "user.npmrc"),
       npm_config_globalconfig: join(iso, "global.npmrc"),
     }
@@ -438,7 +438,7 @@ test("DBHub 1.5.0 real stdio SELECT 1 succeeds, writes fail, only execute_sql ex
         fence,
         renderProcessFenceProfile({
           workspaces: [join(home, "project")],
-          alphaGlobalRoot: root,
+          codepuppyGlobalRoot: root,
           userDataPath: join(home, "userData"),
           stateHome: join(home, "userData"),
           roots: resolveEngineRoots({}, home),
@@ -536,7 +536,7 @@ test("actual Node >=22.5, HOME/workspace exclusion, protected cwd and template t
   }
   // Use the producer's real main-only workspace truth writer, also pinning the reader's path.
   const { fenceWorkspaceTruthPath, writeWorkspaceTruth } = require("../src/main/process-fence-workspaces")
-  const truth = fenceWorkspaceTruthPath(getAlphaEnvironment().casBaseRoot, "dev")
+  const truth = fenceWorkspaceTruthPath(getCodePuppyEnvironment().casBaseRoot, "dev")
   writeWorkspaceTruth(truth, [tmpdir()], { mkdirSync, writeFileSync, renameSync: require("node:fs").renameSync })
   expect(() => officialRuntimeRoot(root)).toThrow("needs-reentry")
   rmSync(truth)
@@ -788,7 +788,7 @@ test("real IPC previews/cancels without secrets, installs both recipes, stops be
       expect(result).toMatchObject({ ok: true, name, installedDisabled: true })
       expect(events).toEqual(["stop", "refresh"])
       events.length = 0
-      const parent = join(getAlphaEnvironment().casBaseRoot, "connector-secrets", "dev", name)
+      const parent = join(getCodePuppyEnvironment().casBaseRoot, "connector-secrets", "dev", name)
       const versions = readdirSync(parent)
       expect(versions).toHaveLength(1)
       const paths = officialConnectorPaths(root, name, versions[0]!)

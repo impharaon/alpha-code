@@ -11,7 +11,7 @@ import { createHash } from "node:crypto"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
-import bundledCatalog from "../src/renderer/extensions/alpha-catalog.json"
+import bundledCatalog from "../src/renderer/extensions/codepuppy-catalog.json"
 import d5OldCatalog from "../src/renderer/extensions/testvectors/d5-old-catalog.json"
 import type { CatalogPackageViewV1 } from "../src/shared/catalog-package-view"
 import type {
@@ -130,7 +130,7 @@ mock.module("../src/renderer/auth-recovery", () => ({
 mock.module("@solidjs/router", () => ({
   useLocation: () => ({ pathname: "/" }),
 }))
-mock.module("../src/renderer/alpha-ui/Banner", () => ({
+mock.module("../src/renderer/codepuppy-ui/Banner", () => ({
   Banner: () => null,
 }))
 
@@ -139,11 +139,11 @@ const { render } = solidWeb
 const { ExtensionHub } = await import("../src/renderer/extensions/extension-hub")
 // 必须**动态** import:静态 import 会在 registrator 之前牵出 solid-js,整个文件拿到 server 构建
 // (指纹 = 报错与改动无关且全文件一起挂)。这条纪律写在 CLAUDE.md 的《本机验证陷阱》里。
-const { ToastViewport, pushToast } = await import("../src/renderer/alpha-ui/Toast")
+const { ToastViewport, pushToast } = await import("../src/renderer/codepuppy-ui/Toast")
 extIpcRef = (await import("../src/renderer/extensions/ext-ipc")).extIpc as unknown as typeof extIpcRef
 const { setHubSection } = await import("../src/renderer/extensions/ext-hub-state")
 
-const artifact = resolve(import.meta.dir, "../../alpha-contracts-consumer/vendor/alpha-web-extension-package")
+const artifact = resolve(import.meta.dir, "../../codepuppy-contracts-consumer/vendor/alpha-web-extension-package")
 const disposals: Array<() => void> = []
 const secretCanary = "REQ128_RENDERER_SECRET_CANARY_64f91d"
 
@@ -374,8 +374,8 @@ async function mountHarness(options?: {
   const globalRoot = join(tmp, "root")
   const userData = join(tmp, "user-data")
   mkdirSync(globalRoot, { recursive: true })
-  const previousRoot = process.env.ALPHA_GLOBAL_DIR
-  process.env.ALPHA_GLOBAL_DIR = globalRoot
+  const previousRoot = process.env.CODEPUPPY_GLOBAL_DIR
+  process.env.CODEPUPPY_GLOBAL_DIR = globalRoot
   if (options?.preauthorized)
     writeCapabilityGrantSync(globalRoot, {
       v: 1,
@@ -540,7 +540,7 @@ async function mountHarness(options?: {
               removeMcpConfig: () => ({ ok: true as const }),
               removeCommandConfig: () => ({ ok: true as const }),
               removeMcpSecretsStrict: () => ({ ok: true as const }),
-              releaseAlphaConnectionBindings: () => ({ ok: true as const }),
+              releaseCodePuppyConnectionBindings: () => ({ ok: true as const }),
               removeInstallGrants: () => ({ ok: true as const, removed: [] }),
               removePluginPath: () => ({ ok: true as const }),
             },
@@ -581,8 +581,8 @@ async function mountHarness(options?: {
   )
   disposals.push(dispose)
   disposals.push(() => {
-    if (previousRoot === undefined) delete process.env.ALPHA_GLOBAL_DIR
-    else process.env.ALPHA_GLOBAL_DIR = previousRoot
+    if (previousRoot === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+    else process.env.CODEPUPPY_GLOBAL_DIR = previousRoot
     rmSync(tmp, { recursive: true, force: true })
   })
   await waitFor(() => {
@@ -676,12 +676,12 @@ function expectDialogContract(
   expected: { capabilities: string[]; prerequisite?: string },
 ) {
   expect(
-    Array.from(dialog.querySelectorAll(".alpha-ext-authz-id"), (item) => item.textContent),
+    Array.from(dialog.querySelectorAll(".codepuppy-ext-authz-id"), (item) => item.textContent),
   ).toEqual(expected.capabilities)
   expect(
     Array.from(dialog.querySelectorAll("[data-kind='new']"), (item) => item.textContent),
-  ).toEqual(expected.capabilities.map(() => zh["alpha.ext.authz.chipNew"]))
-  const input = dialog.querySelector<HTMLInputElement>(".alpha-ext-key-input")
+  ).toEqual(expected.capabilities.map(() => zh["codepuppy.ext.authz.chipNew"]))
+  const input = dialog.querySelector<HTMLInputElement>(".codepuppy-ext-key-input")
   const button = dialog.querySelector<HTMLButtonElement>(".a-dialog-footer .a-btn:last-child")
   expect(button).toBeInstanceOf(HTMLButtonElement)
   if (!expected.prerequisite) {
@@ -689,26 +689,26 @@ function expectDialogContract(
     expect(button!.disabled).toBe(false)
     return
   }
-  expect(dialog.querySelector(".alpha-ext-key-name")?.textContent).toBe(expected.prerequisite)
+  expect(dialog.querySelector(".codepuppy-ext-key-name")?.textContent).toBe(expected.prerequisite)
   expect(input).toBeInstanceOf(HTMLInputElement)
   expect(input!.type).toBe("password")
-  expect(input!.placeholder).toBe(zh["alpha.ext.packageKeyPlaceholder"])
-  expect(dialog.querySelector(".alpha-ext-confirm-keys .alpha-ext-confirm-line")?.textContent).toBe(
-    zh["alpha.ext.packageConfirmEnv"],
+  expect(input!.placeholder).toBe(zh["codepuppy.ext.packageKeyPlaceholder"])
+  expect(dialog.querySelector(".codepuppy-ext-confirm-keys .codepuppy-ext-confirm-line")?.textContent).toBe(
+    zh["codepuppy.ext.packageConfirmEnv"],
   )
-  expect(dialog.querySelector(".alpha-ext-confirm-keys [role='status']")?.textContent).toBe(
-    zh["alpha.ext.packageKeysRequired"],
+  expect(dialog.querySelector(".codepuppy-ext-confirm-keys [role='status']")?.textContent).toBe(
+    zh["codepuppy.ext.packageKeysRequired"],
   )
   expect(button!.disabled).toBe(true)
   input!.value = "   "
   input!.dispatchEvent(new Event("input", { bubbles: true }))
-  expect(dialog.querySelector(".alpha-ext-confirm-keys [role='status']")?.textContent).toBe(
-    zh["alpha.ext.packageKeysRequired"],
+  expect(dialog.querySelector(".codepuppy-ext-confirm-keys [role='status']")?.textContent).toBe(
+    zh["codepuppy.ext.packageKeysRequired"],
   )
   expect(button!.disabled).toBe(true)
   input!.value = " dialog-contract-secret "
   input!.dispatchEvent(new Event("input", { bubbles: true }))
-  expect(dialog.querySelector(".alpha-ext-confirm-keys [role='status']")).toBeNull()
+  expect(dialog.querySelector(".codepuppy-ext-confirm-keys [role='status']")).toBeNull()
   expect(button!.disabled).toBe(false)
 }
 
@@ -723,7 +723,7 @@ const waitForPackageAuthorization = (catalogId: string) =>
 let filledSecretInput: HTMLInputElement | null = null
 
 function fillPackageSecret(value: string) {
-  const input = packageAuthorizationDialog().querySelector<HTMLInputElement>(".alpha-ext-key-input")
+  const input = packageAuthorizationDialog().querySelector<HTMLInputElement>(".codepuppy-ext-key-input")
   expect(input).toBeInstanceOf(HTMLInputElement)
   input!.value = value
   input!.dispatchEvent(new Event("input", { bubbles: true }))
@@ -790,7 +790,7 @@ function ownScalarValues(value: unknown, depth = 4): string[] {
 
 function expectNoCanaryAnywhere(canary: string, consoleOutput: unknown[]) {
   // 遮蔽是必要的:用户刚打进去的 canary 就在那个框里,不遮蔽会自己撞自己。
-  // 但只准遮蔽**用户真正写入的那一个元素**,不能按 `.alpha-ext-key-input[type=password]`
+  // 但只准遮蔽**用户真正写入的那一个元素**,不能按 `.codepuppy-ext-key-input[type=password]`
   // 选择器一刀切 —— 那恰好是唯一合法装密钥的 class,生产若把明文渲进第二个同 class 的框,
   // 扫描器会先把它一并清空,泄漏就此隐形(「破坏它 = 破坏观测它」)。
   // 按身份遮蔽之后,任何**别的**元素带着 canary 都会被下面的属性/value 扫描抓到。
@@ -883,37 +883,37 @@ describe("package detail production renderer path", () => {
         catalogId: "package:renderer-ready",
         verdict: "compatible",
         prerequisite: "ready",
-        action: zh["alpha.ext.add"],
+        action: zh["codepuppy.ext.add"],
       },
       {
         catalogId: "package:renderer-prerequisite",
         verdict: "compatible",
         prerequisite: "required-action",
-        action: zh["alpha.ext.rowSetup"],
+        action: zh["codepuppy.ext.rowSetup"],
       },
       {
         catalogId: "package:renderer-update",
         verdict: "update-required",
         prerequisite: "ready",
-        action: zh["alpha.ext.packageActionUpdateAlpha"],
+        action: zh["codepuppy.ext.packageActionUpdateCodePuppy"],
       },
       {
         catalogId: "package:renderer-blocked",
         verdict: "blocked",
         prerequisite: "ready",
-        action: zh["alpha.ext.packageActionNone"],
+        action: zh["codepuppy.ext.packageActionNone"],
       },
       {
         catalogId: "package:renderer-payload-blocked",
         verdict: "blocked",
         prerequisite: "ready",
-        action: zh["alpha.ext.packageActionNone"],
+        action: zh["codepuppy.ext.packageActionNone"],
       },
       {
         catalogId: MIXED_BUNDLE_PACKAGE_ID,
         verdict: "compatible",
         prerequisite: "required-action",
-        action: zh["alpha.ext.rowSetup"],
+        action: zh["codepuppy.ext.rowSetup"],
       },
     ]) {
       const view = browse.catalog.packages.find((view) => view.catalogId === expected.catalogId)
@@ -923,7 +923,7 @@ describe("package detail production renderer path", () => {
         prerequisites: { status: expected.prerequisite },
       })
       if (expected.verdict !== "compatible") {
-        expect(view!.action.kind).toBe(expected.verdict === "update-required" ? "update-alpha" : "none")
+        expect(view!.action.kind).toBe(expected.verdict === "update-required" ? "update-codepuppy" : "none")
         expect(document.querySelector(`[data-package-card='${expected.catalogId}']`)).toBeNull()
         continue
       }
@@ -935,19 +935,19 @@ describe("package detail production renderer path", () => {
         action: card.querySelector("button")?.textContent?.trim(),
       }).toEqual({ catalogId: expected.catalogId, prerequisite: expected.prerequisite, action: expected.action })
       expect(card.querySelectorAll("button")).toHaveLength(1)
-      expect(card.querySelector("[data-verdict], .alpha-ext-package-state, .alpha-ext-chip, .alpha-ext-meta")).toBeNull()
+      expect(card.querySelector("[data-verdict], .codepuppy-ext-package-state, .codepuppy-ext-chip, .codepuppy-ext-meta")).toBeNull()
       // `#1594` AC6:前置条件未就绪 ⇒ 描述换成缺什么(逐项取 main 安全视图的 label),动作是「设置」;
       // 「需要先处理」「处理前置条件」不再出现在行上。
       if (expected.prerequisite === "required-action")
         expect(card.querySelector("[data-package-need]")?.textContent).toBe(
-          view!.prerequisites.items.map((item) => zh["alpha.ext.needItem"].replace("{{item}}", item.label)).join(" · "),
+          view!.prerequisites.items.map((item) => zh["codepuppy.ext.needItem"].replace("{{item}}", item.label)).join(" · "),
         )
       else expect(card.querySelector("[data-package-need]")).toBeNull()
       expect(card.textContent).not.toContain("需要先处理")
       expect(card.textContent).not.toContain("处理前置条件")
     }
 
-    const search = document.querySelector<HTMLInputElement>(".alpha-ext-search input")
+    const search = document.querySelector<HTMLInputElement>(".codepuppy-ext-search input")
     expect(search).toBeInstanceOf(HTMLInputElement)
     search!.value = "renderer-update"
     search!.dispatchEvent(new Event("input", { bubbles: true }))
@@ -995,43 +995,43 @@ describe("package detail production renderer path", () => {
 
     const detail = document.querySelector("[data-package-detail]")!
     expect(detail.querySelector("h2")?.textContent).toBe("Generic Remote MCP")
-    expect(detail.querySelector(".alpha-ext-dabout")?.textContent).toBe(
+    expect(detail.querySelector(".codepuppy-ext-dabout")?.textContent).toBe(
       "Generic Phase 1 compiler corpus input.",
     )
-    expect(detail.querySelector(".alpha-ext-dhead-t .alpha-ext-chip")?.textContent).toBe(
-      zh["alpha.ext.packageSourceRemote"],
+    expect(detail.querySelector(".codepuppy-ext-dhead-t .codepuppy-ext-chip")?.textContent).toBe(
+      zh["codepuppy.ext.packageSourceRemote"],
     )
-    expect(detail.querySelector(".alpha-ext-dhead-meta span")?.textContent?.trim()).toBe(
-      `${zh["alpha.ext.detailVersion"]} 1.0.0`,
+    expect(detail.querySelector(".codepuppy-ext-dhead-meta span")?.textContent?.trim()).toBe(
+      `${zh["codepuppy.ext.detailVersion"]} 1.0.0`,
     )
     expect(
-      Array.from(detail.querySelectorAll(".alpha-ext-dsec-t")).map(
+      Array.from(detail.querySelectorAll(".codepuppy-ext-dsec-t")).map(
         (heading) => heading.textContent,
       ),
     ).toEqual([
-      zh["alpha.ext.detailAbout"],
-      zh["alpha.ext.packageInstallability"],
-      zh["alpha.ext.packageComponentsTitle"],
-      zh["alpha.ext.packageReasonTitle"],
-      zh["alpha.ext.packageActions"],
+      zh["codepuppy.ext.detailAbout"],
+      zh["codepuppy.ext.packageInstallability"],
+      zh["codepuppy.ext.packageComponentsTitle"],
+      zh["codepuppy.ext.packageReasonTitle"],
+      zh["codepuppy.ext.packageActions"],
     ])
     expect(
-      Array.from(detail.querySelectorAll(".alpha-ext-dsec")).map(
+      Array.from(detail.querySelectorAll(".codepuppy-ext-dsec")).map(
         (section) => section.textContent,
       ),
     ).toEqual([
       expect.stringContaining("Generic Phase 1 compiler corpus input."),
       expect.stringContaining(
-        zh["alpha.ext.packageVerdictCompatible"],
+        zh["codepuppy.ext.packageVerdictCompatible"],
       ),
       expect.stringContaining(
-        zh["alpha.ext.packagePrerequisiteReady"],
+        zh["codepuppy.ext.packagePrerequisiteReady"],
       ),
       expect.stringContaining(
-        zh["alpha.ext.packageReasonCompatible"],
+        zh["codepuppy.ext.packageReasonCompatible"],
       ),
       expect.stringContaining(
-        zh["alpha.ext.packageActionInstall"],
+        zh["codepuppy.ext.packageActionInstall"],
       ),
     ])
 
@@ -1074,30 +1074,30 @@ describe("package detail production renderer path", () => {
     // ② 「会装 / 不会装」是**用户能读到的中文**,不是一个 data 属性(属性可以在没有任何文案的
     //    情况下写对 —— 那正是 `#749` 之后的现状)。
     const stateText = (row: HTMLElement) =>
-      row.querySelector(".alpha-ext-package-component-state")?.textContent
+      row.querySelector(".codepuppy-ext-package-component-state")?.textContent
     expect(rows.map(stateText)).toEqual([
-      zh["alpha.ext.packageComponentIncluded"],
-      zh["alpha.ext.packageComponentIncluded"],
-      zh["alpha.ext.packageComponentIncluded"],
-      zh["alpha.ext.packageComponentIncluded"],
-      zh["alpha.ext.packageComponentSkipped"],
+      zh["codepuppy.ext.packageComponentIncluded"],
+      zh["codepuppy.ext.packageComponentIncluded"],
+      zh["codepuppy.ext.packageComponentIncluded"],
+      zh["codepuppy.ext.packageComponentIncluded"],
+      zh["codepuppy.ext.packageComponentSkipped"],
     ])
-    expect(rows.map((row) => row.querySelector(".alpha-ext-package-component-req")?.textContent)).toEqual([
-      zh["alpha.ext.packageRequired"],
-      zh["alpha.ext.packageRequired"],
-      zh["alpha.ext.packageOptional"],
-      zh["alpha.ext.packageOptional"],
-      zh["alpha.ext.packageOptional"],
+    expect(rows.map((row) => row.querySelector(".codepuppy-ext-package-component-req")?.textContent)).toEqual([
+      zh["codepuppy.ext.packageRequired"],
+      zh["codepuppy.ext.packageRequired"],
+      zh["codepuppy.ext.packageOptional"],
+      zh["codepuppy.ext.packageOptional"],
+      zh["codepuppy.ext.packageOptional"],
     ])
 
     // ③ 被跳过的那一行有**具名原因**,且原因文案非空、来自 decoder 的 token。
-    const why = rows[4]!.querySelector<HTMLElement>(".alpha-ext-package-component-why")
+    const why = rows[4]!.querySelector<HTMLElement>(".codepuppy-ext-package-component-why")
     expect(why).toBeInstanceOf(HTMLElement)
     expect(why!.getAttribute("data-skip-reason")).toBe(EXPECTED_SKIP_REASON)
-    expect(why!.textContent).toBe(zh["alpha.ext.packageSkipCapabilityUnsupported"])
+    expect(why!.textContent).toBe(zh["codepuppy.ext.packageSkipCapabilityUnsupported"])
     expect(why!.textContent!.trim()).not.toBe("")
     // 会安装的四行不得出现任何原因段(「所有行都显示原因」是另一种假绿)。
-    expect(rows.slice(0, 4).map((row) => row.querySelector(".alpha-ext-package-component-why"))).toEqual([
+    expect(rows.slice(0, 4).map((row) => row.querySelector(".codepuppy-ext-package-component-why"))).toEqual([
       null,
       null,
       null,
@@ -1105,7 +1105,7 @@ describe("package detail production renderer path", () => {
     ])
 
     // ④ 授权确认屏是第二个 preview 面:会装的四条 + 不会装的一条(带同一句原因)。
-    click(detail.querySelector(".alpha-ext-dsub button"))
+    click(detail.querySelector(".codepuppy-ext-dsub button"))
     await waitForPackageAuthorization(MIXED_BUNDLE_PACKAGE_ID)
     const dialog = packageAuthorizationDialog()
     const included = Array.from(dialog.querySelectorAll<HTMLElement>("[data-plan-component][data-included='true']"))
@@ -1118,11 +1118,11 @@ describe("package detail production renderer path", () => {
     const skippedRows = Array.from(dialog.querySelectorAll<HTMLElement>("[data-plan-component][data-included='false']"))
     expect(skippedRows.map((row) => row.getAttribute("data-plan-component"))).toEqual([LEAF_UNSUPPORTED_ID])
     expect(skippedRows[0]!.getAttribute("data-skip-reason")).toBe(EXPECTED_SKIP_REASON)
-    expect(skippedRows[0]!.querySelector(".alpha-ext-install-k")?.textContent).toBe(
-      zh["alpha.ext.packageSkipCapabilityUnsupported"],
+    expect(skippedRows[0]!.querySelector(".codepuppy-ext-install-k")?.textContent).toBe(
+      zh["codepuppy.ext.packageSkipCapabilityUnsupported"],
     )
     // 详情页与确认屏对同一个组件给出的是**同一句话**。
-    expect(skippedRows[0]!.querySelector(".alpha-ext-install-k")?.textContent).toBe(why!.textContent)
+    expect(skippedRows[0]!.querySelector(".codepuppy-ext-install-k")?.textContent).toBe(why!.textContent)
 
     cancelPackageAuthorization()
     expect(JSON.stringify(harness.installResults)).not.toContain(secretCanary)
@@ -1149,18 +1149,18 @@ describe("package detail production renderer path", () => {
       expect(document.querySelector(`[data-package-detail='${MIXED_BUNDLE_PACKAGE_ID}']`)).toBeInstanceOf(HTMLElement),
     )
     const detail = document.querySelector<HTMLElement>(`[data-package-detail='${MIXED_BUNDLE_PACKAGE_ID}']`)!
-    click(detail.querySelector(".alpha-ext-dsub button"))
+    click(detail.querySelector(".codepuppy-ext-dsub button"))
     await waitForPackageAuthorization(MIXED_BUNDLE_PACKAGE_ID)
     fillPackageSecret(secretCanary)
     confirmPackageAuthorization()
     await waitFor(() => expect(harness.installResults.at(-1)).toMatchObject({ ok: true, warning: canary }))
 
     // 用户面显示可理解的提示；上方仍断言 IPC 原始 warning 未改。
-    await waitFor(() => expect(toastsContaining(zh["alpha.ext.error.warningUnknown"])).toBe(1))
+    await waitFor(() => expect(toastsContaining(zh["codepuppy.ext.error.warningUnknown"])).toBe(1))
     // `#765`:**恰好一条**。呈现搬进 IPC 包装层之后,调用点再自己 flash 一次就会出现两条
     // 一模一样的提示 —— 那是本次重构最容易留下的尾巴,所以这里判等而不是判「有」。
     await flush()
-    expect(toastsContaining(zh["alpha.ext.error.warningUnknown"]), "the same warning was presented more than once").toBe(1)
+    expect(toastsContaining(zh["codepuppy.ext.error.warningUnknown"]), "the same warning was presented more than once").toBe(1)
   })
 
   /**
@@ -1178,7 +1178,7 @@ describe("package detail production renderer path", () => {
       expect(document.querySelector(`[data-package-detail='${MIXED_BUNDLE_PACKAGE_ID}']`)).toBeInstanceOf(HTMLElement),
     )
     const detail = () => document.querySelector<HTMLElement>(`[data-package-detail='${MIXED_BUNDLE_PACKAGE_ID}']`)!
-    click(detail().querySelector(".alpha-ext-dsub button"))
+    click(detail().querySelector(".codepuppy-ext-dsub button"))
     await waitForPackageAuthorization(MIXED_BUNDLE_PACKAGE_ID)
     fillPackageSecret(secretCanary)
     confirmPackageAuthorization()
@@ -1187,13 +1187,13 @@ describe("package detail production renderer path", () => {
       expect(detail().querySelector(`[data-package-uninstall='${MIXED_BUNDLE_PACKAGE_ID}']`)).toBeInstanceOf(HTMLElement),
     )
     // 装的时候没有注入 warning —— 卸载前的 toast 里不该已经有这条 canary(否则下面判的是别人)。
-    expect(toastsContaining(zh["alpha.ext.error.warningUnknown"])).toBe(0)
+    expect(toastsContaining(zh["codepuppy.ext.error.warningUnknown"])).toBe(0)
 
     click(detail().querySelector(`[data-package-uninstall='${MIXED_BUNDLE_PACKAGE_ID}']`))
     await waitFor(() => expect(readPackageGraphs(harness.globalRoot)).toEqual({ ok: true, packageGraphs: [] }))
-    await waitFor(() => expect(toastsContaining(zh["alpha.ext.error.warningUnknown"])).toBe(1))
+    await waitFor(() => expect(toastsContaining(zh["codepuppy.ext.error.warningUnknown"])).toBe(1))
     await flush()
-    expect(toastsContaining(zh["alpha.ext.error.warningUnknown"]), "the same warning was presented more than once").toBe(1)
+    expect(toastsContaining(zh["codepuppy.ext.error.warningUnknown"]), "the same warning was presented more than once").toBe(1)
   })
 
   /**
@@ -1220,7 +1220,7 @@ describe("package detail production renderer path", () => {
       expect(document.querySelector(`[data-package-detail='${MIXED_BUNDLE_PACKAGE_ID}']`)).toBeInstanceOf(HTMLElement),
     )
     const detail = () => document.querySelector<HTMLElement>(`[data-package-detail='${MIXED_BUNDLE_PACKAGE_ID}']`)!
-    click(detail().querySelector(".alpha-ext-dsub button"))
+    click(detail().querySelector(".codepuppy-ext-dsub button"))
     await waitForPackageAuthorization(MIXED_BUNDLE_PACKAGE_ID)
     fillPackageSecret(secretCanary)
     confirmPackageAuthorization()
@@ -1231,11 +1231,11 @@ describe("package detail production renderer path", () => {
 
     click(detail().querySelector(`[data-package-uninstall='${MIXED_BUNDLE_PACKAGE_ID}']`))
     await waitFor(() => expect(readPackageGraphs(harness.globalRoot)).toEqual({ ok: true, packageGraphs: [] }))
-    await waitFor(() => expect(toastsContaining(zh["alpha.ext.error.warningUnknown"])).toBe(1))
+    await waitFor(() => expect(toastsContaining(zh["codepuppy.ext.error.warningUnknown"])).toBe(1))
 
     // ① 呈现出来的那条**就是**常驻的那条(不是「视口里另外还有一条常驻的」)。
     expect(
-      persistentToastsContaining(zh["alpha.ext.error.warningUnknown"]),
+      persistentToastsContaining(zh["codepuppy.ext.error.warningUnknown"]),
       "the uninstall warning was pushed as a self-expiring toast",
     ).toBe(1)
 
@@ -1252,7 +1252,7 @@ describe("package detail production renderer path", () => {
       "the transient control toast never expired — timers are not running, so the assertion below would be vacuous",
     ).toBe(0)
     expect(
-      toastsContaining(zh["alpha.ext.error.warningUnknown"]),
+      toastsContaining(zh["codepuppy.ext.error.warningUnknown"]),
       "the uninstall warning expired with the toast timer — `#771` regressed",
     ).toBe(1)
   }, 20000)
@@ -1267,7 +1267,7 @@ describe("package detail production renderer path", () => {
     // 装之前:没有「移除此扩展包」这颗按钮(它不是常显的)。
     expect(detail().querySelector(`[data-package-uninstall='${MIXED_BUNDLE_PACKAGE_ID}']`)).toBeNull()
 
-    click(detail().querySelector(".alpha-ext-dsub button"))
+    click(detail().querySelector(".codepuppy-ext-dsub button"))
     await waitForPackageAuthorization(MIXED_BUNDLE_PACKAGE_ID)
     fillPackageSecret(secretCanary)
     confirmPackageAuthorization()
@@ -1282,7 +1282,7 @@ describe("package detail production renderer path", () => {
       expect(detail().querySelector(`[data-package-uninstall='${MIXED_BUNDLE_PACKAGE_ID}']`)).toBeInstanceOf(HTMLElement),
     )
     const remove = detail().querySelector<HTMLElement>(`[data-package-uninstall='${MIXED_BUNDLE_PACKAGE_ID}']`)!
-    expect(remove.textContent?.trim()).toBe(zh["alpha.ext.packageActionUninstall"])
+    expect(remove.textContent?.trim()).toBe(zh["codepuppy.ext.packageActionUninstall"])
 
     const uninstallsBefore = dataLayerPackageUninstalls.length
     click(remove)
@@ -1292,7 +1292,7 @@ describe("package detail production renderer path", () => {
       expect(detail().querySelector(`[data-package-uninstall='${MIXED_BUNDLE_PACKAGE_ID}']`)).toBeNull(),
     )
     // 没有任何 child 被保留(这个包没和别人共享),所以不显示保留清单。
-    expect(detail().querySelector(".alpha-ext-package-retained")).toBeNull()
+    expect(detail().querySelector(".codepuppy-ext-package-retained")).toBeNull()
 
     // `#784` G20:这一次移除**经过了数据层**,而不是从详情页直连 IPC。
     // 这条断言是必须的,因为上面每一条都能在「直连 IPC」的实现下照样绿 ——
@@ -1307,19 +1307,19 @@ describe("package detail production renderer path", () => {
       expect(document.querySelector("[data-package-detail='package:renderer-ready']")).toBeInstanceOf(HTMLElement),
     )
     const detail = document.querySelector<HTMLElement>("[data-package-detail='package:renderer-ready']")!
-    expect(detail.querySelector(".alpha-ext-dhead-meta span")?.textContent).toContain("1.0.0")
+    expect(detail.querySelector(".codepuppy-ext-dhead-meta span")?.textContent).toContain("1.0.0")
 
-    click(detail.querySelector(".alpha-ext-dsub button"))
+    click(detail.querySelector(".codepuppy-ext-dsub button"))
     await waitForPackageAuthorization("package:renderer-ready")
-    expect(packageAuthorizationDialog().querySelector(".alpha-ext-install-nm")?.textContent).toBe("generic-remote")
-    expect(packageAuthorizationDialog().querySelector(".alpha-ext-install-k")?.textContent).toBeTruthy()
+    expect(packageAuthorizationDialog().querySelector(".codepuppy-ext-install-nm")?.textContent).toBe("generic-remote")
+    expect(packageAuthorizationDialog().querySelector(".codepuppy-ext-install-k")?.textContent).toBeTruthy()
     expectDialogContract(packageAuthorizationDialog(), { capabilities: [] })
     confirmPackageAuthorization()
 
     await waitFor(() => expect(harness.installResults).toHaveLength(2))
     expect(harness.installResults.at(-1)).toMatchObject({ ok: true })
     await waitFor(() =>
-      expect(detail.querySelector(".alpha-ext-dhead-meta span")?.textContent).toContain("1.0.0-installed"),
+      expect(detail.querySelector(".codepuppy-ext-dhead-meta span")?.textContent).toContain("1.0.0-installed"),
     )
     expect(harness.installIntents).toHaveLength(2)
     const first = harness.installIntents[0] as Record<string, unknown>
@@ -1339,7 +1339,7 @@ describe("package detail production renderer path", () => {
       const card = packageCard("package:renderer-prerequisite")
       expect(card.getAttribute("data-prerequisite")).toBe("required-action")
       // `#1594` AC6:行上的「设置」打开的就是原来那个填写前置项的确认屏。
-      expect(card.querySelector("button")?.textContent?.trim()).toBe(zh["alpha.ext.rowSetup"])
+      expect(card.querySelector("button")?.textContent?.trim()).toBe(zh["codepuppy.ext.rowSetup"])
       click(card.querySelector("button"))
       await waitForPackageAuthorization("package:renderer-prerequisite")
       expectDialogContract(packageAuthorizationDialog(), {
@@ -1352,11 +1352,11 @@ describe("package detail production renderer path", () => {
       confirmPackageAuthorization()
 
       await waitFor(() => expect(harness.installResults.at(-1)).toMatchObject({ ok: true }))
-      const secretFile = join(harness.userData, "alpha-mcp-secrets", "generic-remote", "v-0badcafe", "A_KEY")
+      const secretFile = join(harness.userData, "codepuppy-mcp-secrets", "generic-remote", "v-0badcafe", "A_KEY")
       expect(readFileSync(secretFile, "utf8")).toBe(submittedSecret)
       expect(statSync(secretFile).mode & 0o777).toBe(0o600)
-      expect(readdirSync(join(harness.userData, "alpha-mcp-secrets", "generic-remote"))).toEqual(["v-0badcafe"])
-      expect(readFileSync(join(harness.globalRoot, "alpha.jsonc"), "utf8")).not.toContain(secretCanary)
+      expect(readdirSync(join(harness.userData, "codepuppy-mcp-secrets", "generic-remote"))).toEqual(["v-0badcafe"])
+      expect(readFileSync(join(harness.globalRoot, "codepuppy.jsonc"), "utf8")).not.toContain(secretCanary)
       expect(JSON.stringify(harness.installResults)).not.toContain(secretCanary)
       expectNoCanaryAnywhere(secretCanary, consoleCapture.output)
       await waitFor(() =>
@@ -1367,7 +1367,7 @@ describe("package detail production renderer path", () => {
           prerequisite: packageCard("package:renderer-prerequisite").getAttribute("data-prerequisite"),
           need: packageCard("package:renderer-prerequisite").querySelector("[data-package-need]"),
           action: packageCard("package:renderer-prerequisite").querySelector("button")?.textContent?.trim(),
-        }).toEqual({ prerequisite: "ready", need: null, action: zh["alpha.ext.add"] }),
+        }).toEqual({ prerequisite: "ready", need: null, action: zh["codepuppy.ext.add"] }),
       )
 
       const first = harness.installIntents[0] as Record<string, unknown>
@@ -1414,8 +1414,8 @@ describe("package detail production renderer path", () => {
     fillPackageSecret(secretCanary)
     cancelPackageAuthorization()
     await waitFor(() => expect(document.querySelector("[data-package-authorization]")).toBeNull())
-    expect(existsSync(join(harness.userData, "alpha-mcp-secrets"))).toBe(false)
-    expect(existsSync(join(harness.globalRoot, "alpha.jsonc"))).toBe(false)
+    expect(existsSync(join(harness.userData, "codepuppy-mcp-secrets"))).toBe(false)
+    expect(existsSync(join(harness.globalRoot, "codepuppy.jsonc"))).toBe(false)
     expect(document.body.textContent).not.toContain(secretCanary)
 
     click(packageCard("package:renderer-prerequisite").querySelector("button"))
@@ -1424,7 +1424,7 @@ describe("package detail production renderer path", () => {
     expect((harness.installIntents[1] as { attemptId: string }).attemptId).not.toBe(
       (harness.installIntents[0] as { attemptId: string }).attemptId,
     )
-    expect(packageAuthorizationDialog().querySelector<HTMLInputElement>(".alpha-ext-key-input")?.value).toBe("")
+    expect(packageAuthorizationDialog().querySelector<HTMLInputElement>(".codepuppy-ext-key-input")?.value).toBe("")
     cancelPackageAuthorization()
   })
 
@@ -1444,9 +1444,9 @@ describe("package detail production renderer path", () => {
       expect(
         document.querySelector("[data-package-card='package:renderer-prerequisite'] [role='alert']")
           ?.textContent,
-      ).toContain(zh["alpha.ext.error.confirmPackage"]),
+      ).toContain(zh["codepuppy.ext.error.confirmPackage"]),
     )
-    expect(existsSync(join(harness.userData, "alpha-mcp-secrets"))).toBe(false)
+    expect(existsSync(join(harness.userData, "codepuppy-mcp-secrets"))).toBe(false)
     const failedAttempt = (harness.installIntents[0] as { attemptId: string }).attemptId
 
     await waitFor(() =>
@@ -1473,17 +1473,17 @@ describe("package detail production renderer path", () => {
     await waitFor(() =>
       expect(document.querySelector("[data-package-detail='package:renderer-ready']")).toBeInstanceOf(HTMLElement),
     )
-    click(document.querySelector("[data-package-detail] .alpha-ext-dsub button"))
+    click(document.querySelector("[data-package-detail] .codepuppy-ext-dsub button"))
     await waitFor(() =>
-      expect(document.querySelector("[data-package-detail] [role='alert']")?.textContent).toContain(zh["alpha.ext.error.installUnknown"]),
+      expect(document.querySelector("[data-package-detail] [role='alert']")?.textContent).toContain(zh["codepuppy.ext.error.installUnknown"]),
     )
     expect(document.querySelector("[data-package-authorization]")).toBeNull()
-    click(document.querySelector(".alpha-ext-crumb-link"))
+    click(document.querySelector(".codepuppy-ext-crumb-link"))
     await waitFor(() => expect(document.querySelector("[data-package-detail]")).toBeNull())
     click(packageCard("package:renderer-prerequisite").querySelector("button"))
     await waitFor(() =>
       expect(packageCard("package:renderer-prerequisite").querySelector("[role='alert']")?.textContent)
-        .toContain(zh["alpha.ext.error.installPackage"]),
+        .toContain(zh["codepuppy.ext.error.installPackage"]),
     )
     expect(document.querySelector("[data-package-authorization]")).toBeNull()
     expect(harness.installIntents).toHaveLength(2)
@@ -1506,7 +1506,7 @@ describe("package detail production renderer path", () => {
       setHubSection(section)
       await flush()
       if (section === "connectors") expectInstallablePackageCards()
-      const search = document.querySelector<HTMLInputElement>(".alpha-ext-search input")!
+      const search = document.querySelector<HTMLInputElement>(".codepuppy-ext-search input")!
       for (const id of unavailablePackageIds) {
         expect(document.querySelector(`[data-package-card='${id}']`)).toBeNull()
         search.value = id
@@ -1536,7 +1536,7 @@ describe("package detail production renderer path", () => {
       Array.from(document.querySelectorAll("[data-group='cloud'] [data-package-card]"), (card) => card.getAttribute("data-package-card")),
     ).toEqual([CLOUD_PACKAGE_ID])
     for (const entry of legacyCloud)
-      expect(document.querySelector(`[data-group='cloud'] .alpha-ext-card b[title='${entry.name}']`), entry.id).toBeInstanceOf(HTMLElement)
+      expect(document.querySelector(`[data-group='cloud'] .codepuppy-ext-card b[title='${entry.name}']`), entry.id).toBeInstanceOf(HTMLElement)
 
     click(packageCard(CLOUD_PACKAGE_ID))
     await waitFor(() => expect(document.querySelector(`[data-package-detail="${CLOUD_PACKAGE_ID}"] [data-cloud-form]`)).toBeInstanceOf(HTMLElement))
@@ -1550,7 +1550,7 @@ describe("package detail production renderer path", () => {
     expect(form.querySelector('[data-cloud-field="format"]')).toBeNull()
     // 夹具未登录 ⇒ cloudReady 为假 ⇒ 表单可看不可发,与 legacy 云条目同一条门控。
     expect(form.querySelector<HTMLButtonElement>("[data-cloud-form-submit]")!.disabled).toBe(true)
-    expect(form.textContent).toContain(zh["alpha.ext.cloudNeedPlatformNote"])
+    expect(form.textContent).toContain(zh["codepuppy.ext.cloudNeedPlatformNote"])
     // F4:真注册的 detail IPC 返回的就是解码后的描述,逐字(raw 载荷不过 IPC,过的是这一份投影)。
     await waitFor(() => expect(harness.detailResults.length).toBeGreaterThan(0))
     const detail = harness.detailResults.at(-1) as CatalogPackageViewV1
@@ -1564,23 +1564,23 @@ describe("package detail production renderer path", () => {
     await mountHarness()
     setHubSection("connectors")
     await waitFor(() =>
-      expect(document.querySelector(".alpha-ext-card b[title='git']")).toBeInstanceOf(
+      expect(document.querySelector(".codepuppy-ext-card b[title='git']")).toBeInstanceOf(
         HTMLElement,
       ),
     )
-    const card = document.querySelector(".alpha-ext-card b[title='git']")!.closest(".alpha-ext-card")!
-    click(card.querySelector(".alpha-ext-add"))
-    const keys = document.querySelector<HTMLElement>(".alpha-ext-confirm-keys")
+    const card = document.querySelector(".codepuppy-ext-card b[title='git']")!.closest(".codepuppy-ext-card")!
+    click(card.querySelector(".codepuppy-ext-add"))
+    const keys = document.querySelector<HTMLElement>(".codepuppy-ext-confirm-keys")
     expect(keys).toBeInstanceOf(HTMLElement)
     const dialog = keys!.closest<HTMLElement>("[role='dialog']")
     expect(dialog).toBeInstanceOf(HTMLElement)
     expect(dialog!.querySelector("[data-package-authorization]")).toBeNull()
-    expect(zh["alpha.ext.confirmEnv"]).toBe("连接所需的密钥（可稍后填写）")
-    expect(zh["alpha.ext.keyPlaceholder"]).toBe("粘贴密钥…(可留空)")
-    expect(keys!.querySelector(".alpha-ext-confirm-line")?.textContent).toBe(zh["alpha.ext.confirmEnv"])
-    const input = keys!.querySelector<HTMLInputElement>(".alpha-ext-key-input")
+    expect(zh["codepuppy.ext.confirmEnv"]).toBe("连接所需的密钥（可稍后填写）")
+    expect(zh["codepuppy.ext.keyPlaceholder"]).toBe("粘贴密钥…(可留空)")
+    expect(keys!.querySelector(".codepuppy-ext-confirm-line")?.textContent).toBe(zh["codepuppy.ext.confirmEnv"])
+    const input = keys!.querySelector<HTMLInputElement>(".codepuppy-ext-key-input")
     expect(input).toBeInstanceOf(HTMLInputElement)
-    expect(input!.placeholder).toBe(zh["alpha.ext.keyPlaceholder"])
+    expect(input!.placeholder).toBe(zh["codepuppy.ext.keyPlaceholder"])
     expect(input!.value).toBe("")
     expect(dialog!.querySelector<HTMLButtonElement>(".a-dialog-footer .a-btn:last-child")?.disabled).toBe(false)
   })

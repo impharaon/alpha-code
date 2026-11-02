@@ -36,7 +36,7 @@ const appSrc = join(import.meta.dir, "../../../../app/src")
 // node_modules 是主 checkout 的软链,`@opencode-ai/app` 会解析出两条不同的绝对路径 → 同一个
 // context 出现两份实例 → `usePlatform` 在自己的 provider 里也报 "must be used within a
 // context provider"。钉到 worktree 内的同一份源码即消歧。
-const runtimeDirectory = mkdtempSync(join(tmpdir(), "alpha-shell-commands-"))
+const runtimeDirectory = mkdtempSync(join(tmpdir(), "codepuppy-shell-commands-"))
 await build({
   configFile: false,
   logLevel: "silent",
@@ -69,7 +69,7 @@ const runtime = (await import(
 
 beforeEach(() => {
   document.body.replaceChildren()
-  delete document.body.dataset.alphaSidebar
+  delete document.body.dataset.codepuppySidebar
   runtime.installRootHost()
   runtime.installPreloadStub()
   runtime.resetHarness()
@@ -116,12 +116,12 @@ async function mountShell(component: () => unknown) {
 }
 
 /* ── 生产 DOM 上的选择器(全部是生产代码里真实存在的钩子)────────────────────── */
-const settingsSurface = () => document.querySelector("[data-alpha-settings]")
-const accountButton = () => document.querySelector<HTMLButtonElement>(".alpha-sidebar-account")!
-const settingsItem = () => document.querySelector<HTMLButtonElement>("[data-alpha-acct-item='settings']")
-const leftToolbar = () => document.querySelector(".alpha-topbar")
-const openProjectButton = () => document.querySelector<HTMLButtonElement>("[data-alpha-sidebar-open-project]")
-const brandButton = () => document.querySelector<HTMLButtonElement>(".alpha-sidebar-brand-mark")!
+const settingsSurface = () => document.querySelector("[data-codepuppy-settings]")
+const accountButton = () => document.querySelector<HTMLButtonElement>(".codepuppy-sidebar-account")!
+const settingsItem = () => document.querySelector<HTMLButtonElement>("[data-codepuppy-acct-item='settings']")
+const leftToolbar = () => document.querySelector(".codepuppy-topbar")
+const openProjectButton = () => document.querySelector<HTMLButtonElement>("[data-codepuppy-sidebar-open-project]")
+const brandButton = () => document.querySelector<HTMLButtonElement>(".codepuppy-sidebar-brand-mark")!
 
 async function openAccountMenu() {
   accountButton().click()
@@ -146,7 +146,7 @@ describe("侧栏账户菜单「设置」:改接 alpha 自有设置面,与路由�
   test("在首页点设置 → 真实的 alpha 设置面出现在 DOM 里", async () => {
     // 首页是「原来死得最彻底」的那条路由:上游三叶已被顶替、legacy layout 不挂载。
     runtime.setHasProjects(false)
-    await mountShell(() => runtime.AlphaShell())
+    await mountShell(() => runtime.CodePuppyShell())
     expect(runtime.routerPath()).toBe(homeHref())
     expect(settingsSurface()).toBeNull()
 
@@ -164,7 +164,7 @@ describe("侧栏账户菜单「设置」:改接 alpha 自有设置面,与路由�
     // 键位 —— 留一条退休 id 在表里,就是又一个「改完保存、按下去什么都不发生」。
     // 判据落在真渲染出来的 DOM 上(必须先真把设置内容加载出来,否则这一格是空的)。
     runtime.setHasProjects(false)
-    await mountShell(() => runtime.AlphaShell())
+    await mountShell(() => runtime.CodePuppyShell())
     await openAccountMenu()
     settingsItem()!.click()
     await settle()
@@ -173,7 +173,7 @@ describe("侧栏账户菜单「设置」:改接 alpha 自有设置面,与路由�
     await settle()
 
     // #1593 AC3:行上不再显示内部命令名;命令 id 只留在行的 data 属性上。
-    const rows = Array.from(document.querySelectorAll<HTMLElement>(".alpha-settings-shortcut-row[data-shortcut]"))
+    const rows = Array.from(document.querySelectorAll<HTMLElement>(".codepuppy-settings-shortcut-row[data-shortcut]"))
     const ids = rows.map((row) => row.dataset.shortcut)
     // 前提自检:表真的渲染出来了(否则下面的 not.toContain 是空绿)。
     expect(ids.length).toBeGreaterThan(0)
@@ -200,31 +200,31 @@ describe("侧栏账户菜单「设置」:改接 alpha 自有设置面,与路由�
 
 describe("新对话页右上角「终端 / 审查」:连按钮一起退休", () => {
   test("落地路由上不存在这对浮动按钮,而左上角工具簇还在(证明壳确实渲染了)", async () => {
-    await mountShell(() => runtime.AlphaShell())
+    await mountShell(() => runtime.CodePuppyShell())
 
     expect(leftToolbar()).not.toBeNull()
     expect(leftToolbar()!.querySelectorAll("button")).toHaveLength(3) // 折叠 + 后退 + 前进
-    expect(document.querySelector(".alpha-topbar-right")).toBeNull()
+    expect(document.querySelector(".codepuppy-topbar-right")).toBeNull()
     // 按可观察语义再查一次:整篇 DOM 里不该再有终端/审查这对浮动开关。
-    expect(document.querySelectorAll(".alpha-topbar-btn")).toHaveLength(3)
+    expect(document.querySelectorAll(".codepuppy-topbar-btn")).toHaveLength(3)
   })
 
   test("换到首页也不会冒出来(以前它由 `inWorkspace()` 控制,首页藏、新对话页可见且无效)", async () => {
-    await mountShell(() => runtime.AlphaShell())
+    await mountShell(() => runtime.CodePuppyShell())
     brandButton().click()
     await settle()
 
     expect(runtime.routerPath()).toBe(homeHref())
     expect(leftToolbar()).not.toBeNull()
-    expect(document.querySelector(".alpha-topbar-right")).toBeNull()
-    expect(document.querySelectorAll(".alpha-topbar-btn")).toHaveLength(3)
+    expect(document.querySelector(".codepuppy-topbar-right")).toBeNull()
+    expect(document.querySelectorAll(".codepuppy-topbar-btn")).toHaveLength(3)
   })
 })
 
 describe("空项目态「打开项目」:改走 alpha 自己的目录选择", () => {
   test("点它 → 真的弹目录选择,选中后在该目录开一段对话并跳进去", async () => {
     runtime.setHasProjects(false)
-    await mountShell(() => runtime.AlphaShell())
+    await mountShell(() => runtime.CodePuppyShell())
 
     const button = openProjectButton()
     expect(button).not.toBeNull()
@@ -247,7 +247,7 @@ describe("空项目态「打开项目」:改走 alpha 自己的目录选择", ()
   test("用户取消选择 → 不建会话、不跳转", async () => {
     runtime.setHasProjects(false)
     runtime.setPickerResult(null)
-    await mountShell(() => runtime.AlphaShell())
+    await mountShell(() => runtime.CodePuppyShell())
     const before = runtime.navigationIntents()
 
     openProjectButton()!.click()
@@ -302,7 +302,7 @@ describe("composer 权限档位:三档各自真的改变提交参数(#1413;REQ-1
 describe("桌面菜单:发布面上的每一条在真实壳里都接得住", () => {
   test("发布的命令 id 全部真的注册了(上游新增菜单项会在这里变红)", async () => {
     runtime.setHasProjects(false)
-    await mountShell(() => runtime.AlphaShell())
+    await mountShell(() => runtime.CodePuppyShell())
     expect(runtime.routerPath()).toBe(homeHref())
     const registered = new Set(runtime.registeredCommands())
     const published = publishedMenuCommands("macos")
@@ -313,7 +313,7 @@ describe("桌面菜单:发布面上的每一条在真实壳里都接得住", () 
 
   test("逐条触发,每一条都有 alpha 自己的可观察结果", async () => {
     runtime.setHasProjects(false)
-    await mountShell(() => runtime.AlphaShell())
+    await mountShell(() => runtime.CodePuppyShell())
     expect(runtime.routerPath()).toBe(homeHref())
 
     // settings.open —— alpha 设置面出现(修复前首页上这条命令无人注册,见上面的负对照)。
@@ -323,10 +323,10 @@ describe("桌面菜单:发布面上的每一条在真实壳里都接得住", () 
     expect(settingsSurface()).not.toBeNull()
 
     // sidebar.toggle —— alpha 侧栏的可见性写在 body 上(上游那条只动上游自己的侧栏)。
-    const before = document.body.dataset.alphaSidebar
+    const before = document.body.dataset.codepuppySidebar
     runtime.trigger("sidebar.toggle")
     await settle()
-    expect(document.body.dataset.alphaSidebar).not.toBe(before)
+    expect(document.body.dataset.codepuppySidebar).not.toBe(before)
 
     // project.open —— 弹 alpha 自己的目录选择(上游那条只往上游 layout 的项目列表里加)。
     expect(runtime.pickerCalls()).toBe(0)
@@ -345,7 +345,7 @@ describe("桌面菜单:发布面上的每一条在真实壳里都接得住", () 
     // 初版在这里断言 `newSessionHref(dir)`(legacy admission 路由)—— 那是 #656 之前的世界:
     // #656(不变量 1)把新对话唯一入口改成了直接建 draft,这个入口**不得再**产生那个 href。
     // 现行保证:触发 = 上游 tabs store 真的多一个同源 draft + 壳真的落到它的新对话页。
-    await mountShell(() => runtime.AlphaShell())
+    await mountShell(() => runtime.CodePuppyShell())
     // 启动即落新草稿(#656 的启动导航)。先等它落地再触发:AC4 的 in-flight 去重会吞掉与启动
     // 并发的第二次 startDraft —— 不等就触发,测到的是去重,不是命令。
     await waitFor(() => runtime.draftTabs().length > 0 && runtime.routerPath() === runtime.draftHref(runtime.draftTabs().at(-1)!.draftID), "启动草稿落地")
@@ -398,12 +398,12 @@ describe("桌面菜单:发布面上的每一条在真实壳里都接得住", () 
    · 每条都扫一遍「legacy 形状的会话导航 = 0」:那是反推入口本身。 */
 describe("#925 多 server 下的会话导航:落在真正持有该会话的 server 上", () => {
   test("点侧栏里没开过 tab 的会话(active=wsl:ubuntu,store 连 sidecar)→ 锚点与真实落点都钉在 sidecar", async () => {
-    await mountShell(() => runtime.AlphaShellRemoteActive())
+    await mountShell(() => runtime.CodePuppyShellRemoteActive())
     runtime.expandProject(runtime.FIXTURE_DIRECTORY)
     await settle()
 
     // ① 锚点本身(右键复制/中键打开拿到的就是它):canonical 会话路由,server 段 = sidecar。
-    const anchor = document.querySelector<HTMLAnchorElement>("a.alpha-session")
+    const anchor = document.querySelector<HTMLAnchorElement>("a.codepuppy-session")
     expect(anchor).not.toBeNull()
     const anchorLanding = parseRoute(anchor!.getAttribute("href")!)
     expect({ kind: anchorLanding.kind, routeId: anchorLanding.identity.routeId }).toEqual({
@@ -428,7 +428,7 @@ describe("#925 多 server 下的会话导航:落在真正持有该会话的 serv
 
   test("「打开项目」开出的新会话(active=sidecar,store 连 wsl:fedora)→ 落点钉在 wsl:fedora", async () => {
     runtime.setHasProjects(false)
-    await mountShell(() => runtime.AlphaShellRemoteProjects())
+    await mountShell(() => runtime.CodePuppyShellRemoteProjects())
 
     openProjectButton()!.click()
     await settle()
@@ -444,7 +444,7 @@ describe("#925 多 server 下的会话导航:落在真正持有该会话的 serv
   })
 
   test("draft 晋升(active=sidecar,store 连 wsl:fedora):draft 带 store 的 server,上游 promoteDraft 的真实导航落在 wsl:fedora", async () => {
-    await mountShell(() => runtime.AlphaShellRemoteProjects())
+    await mountShell(() => runtime.CodePuppyShellRemoteProjects())
 
     // 启动导航自己建 draft(#656)。#925:draft 的 server 段 = store 的 server,不再是 active ——
     // 会话是 `projects.startChat` 在 store 的 server 上建的,draft 带 active 时,上游
@@ -472,16 +472,16 @@ describe("#925 多 server 下的会话导航:落在真正持有该会话的 serv
   })
 
   test("自动化「回跳会话」(active=wsl:ubuntu,store 连 wsl:arch)→ 落点钉在 wsl:arch", async () => {
-    await mountShell(() => runtime.AlphaShellAutomationRemote())
+    await mountShell(() => runtime.CodePuppyShellAutomationRemote())
     runtime.openAutomationPanel()
-    await waitFor(() => document.querySelector(".alpha-auto-row") !== null, "自动化任务列表渲染")
+    await waitFor(() => document.querySelector(".codepuppy-auto-row") !== null, "自动化任务列表渲染")
 
     // 进任务详情 → 运行历史 → 点「打开会话」(带 sessionID 的那条 run 才渲染这个按钮)。
     document
-      .querySelector<HTMLElement>(".alpha-auto-row")!
+      .querySelector<HTMLElement>(".codepuppy-auto-row")!
       .dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }))
-    await waitFor(() => document.querySelector(".alpha-auto-hist .alpha-ext-link") !== null, "运行历史的回跳按钮渲染")
-    document.querySelector<HTMLButtonElement>(".alpha-auto-hist .alpha-ext-link")!.click()
+    await waitFor(() => document.querySelector(".codepuppy-auto-hist .codepuppy-ext-link") !== null, "运行历史的回跳按钮渲染")
+    document.querySelector<HTMLButtonElement>(".codepuppy-auto-hist .codepuppy-ext-link")!.click()
     await settle()
 
     const landed = sessionLandings(runtime.navigationIntents()).find(
@@ -521,7 +521,7 @@ describe("#933 legacy 会话 href 咽喉收口:反推默认拒绝 + 侧栏身份
   }
 
   test("存量 legacy URL 的 id 不在任何 tab 里(active=wsl:ubuntu 恰好有同 id 无关会话)→ 回家,不打开它", async () => {
-    await mountShell(() => runtime.AlphaShellRemoteActive())
+    await mountShell(() => runtime.CodePuppyShellRemoteActive())
     await settleOnHome()
     const before = runtime.navigationIntents().length
 
@@ -544,7 +544,7 @@ describe("#933 legacy 会话 href 咽喉收口:反推默认拒绝 + 侧栏身份
   })
 
   test("存量 legacy URL,唯一持有该会话的 tab 在 wsl:fedora(active=sidecar)→ 仍放行到 wsl:fedora", async () => {
-    await mountShell(() => runtime.AlphaShellRemoteProjects())
+    await mountShell(() => runtime.CodePuppyShellRemoteProjects())
     await settleOnHome()
 
     // 经上游生产 tabs.addSessionTab 在 wsl:fedora 上留下持久化痕迹(用户曾在那台开过这条会话)。
@@ -575,7 +575,7 @@ describe("#933 legacy 会话 href 咽喉收口:反推默认拒绝 + 侧栏身份
     // #933 R1 Minor 1:单机下反推必然正确 —— 全世界只有一台 server,会话只可能在它上面。
     // 升级前引擎发的 macOS 通知指的会话从未开过标签页(tabs 里没有),一律拒绝会把默认安装的
     // 用户全数误伤回首页;多机下的拒绝仍由上面 ghost 用例钉住(两用例 key 锚点互异)。
-    await mountShell(() => runtime.AlphaShell())
+    await mountShell(() => runtime.CodePuppyShell())
     await settleOnHome()
 
     // 零匹配前提必须为真:没有任何 session tab 持有该 id(否则这条测的是唯一 tab 放行,不是单机放行)。
@@ -603,13 +603,13 @@ describe("#933 legacy 会话 href 咽喉收口:反推默认拒绝 + 侧栏身份
   })
 
   test("经 canonical 路由打开别台机器(wsl:ubuntu)的同 id 会话 → 侧栏不高亮、不抹未读点", async () => {
-    await mountShell(() => runtime.AlphaShellRemoteActive()) // store 连 sidecar,列出 ses_one(updated=10)
+    await mountShell(() => runtime.CodePuppyShellRemoteActive()) // store 连 sidecar,列出 ses_one(updated=10)
     await settleOnHome()
     runtime.expandProject(runtime.FIXTURE_DIRECTORY)
     runtime.seedSessionViewed("ses_one", 4) // 水位 4 < updated 10 → 未读点亮起
     await settle()
-    expect(document.querySelector(".alpha-session-row")).not.toBeNull()
-    expect(document.querySelector(".alpha-session-unread")).not.toBeNull()
+    expect(document.querySelector(".codepuppy-session-row")).not.toBeNull()
+    expect(document.querySelector(".codepuppy-session-unread")).not.toBeNull()
 
     runtime.navigateTo(`/server/${encodeDirectory("wsl:ubuntu")}/session/ses_one`)
     await waitFor(() => runtime.routerPath().startsWith("/server/"), "落在 canonical 会话路由")
@@ -617,28 +617,28 @@ describe("#933 legacy 会话 href 咽喉收口:反推默认拒绝 + 侧栏身份
 
     // 身份闸:路由的 server(wsl:ubuntu)不是这份 store 的 server(sidecar)→ 不反查。
     // 行还在(不是整栏没渲染),但不高亮;未读点也没被 markSessionViewed 抹掉。
-    expect(document.querySelector(".alpha-session-row")).not.toBeNull()
-    expect(document.querySelector(".alpha-session-row[data-active]")).toBeNull()
-    expect(document.querySelector(".alpha-session-unread")).not.toBeNull()
+    expect(document.querySelector(".codepuppy-session-row")).not.toBeNull()
+    expect(document.querySelector(".codepuppy-session-row[data-active]")).toBeNull()
+    expect(document.querySelector(".codepuppy-session-unread")).not.toBeNull()
   })
 
   test("同形 canonical 路由指回 store 自己的 server(wsl:arch)→ 高亮该行并推进已读水位", async () => {
-    await mountShell(() => runtime.AlphaShellAutomationRemote()) // store 连 wsl:arch
+    await mountShell(() => runtime.CodePuppyShellAutomationRemote()) // store 连 wsl:arch
     await settleOnHome()
     runtime.expandProject(runtime.FIXTURE_DIRECTORY)
     runtime.seedSessionViewed("ses_one", 4)
     await settle()
-    expect(document.querySelector(".alpha-session-unread")).not.toBeNull()
+    expect(document.querySelector(".codepuppy-session-unread")).not.toBeNull()
 
     runtime.navigateTo(`/server/${encodeDirectory("wsl:arch")}/session/ses_one`)
-    await waitFor(() => document.querySelector(".alpha-session-row[data-active]") !== null, "高亮落地")
+    await waitFor(() => document.querySelector(".codepuppy-session-row[data-active]") !== null, "高亮落地")
 
     // 「一律不反查」的错误实现过不了这条:身份相符时反查必须照常工作(已读水位推进,点消失)。
-    expect(document.querySelector(".alpha-session-unread")).toBeNull()
+    expect(document.querySelector(".codepuppy-session-unread")).toBeNull()
   })
 
   test("sidecar 上的会话完成(active=wsl:ubuntu)→ OS 通知的落点钉在 sidecar 的 canonical 路由", async () => {
-    await mountShell(() => runtime.AlphaShellRemoteActive())
+    await mountShell(() => runtime.CodePuppyShellRemoteActive())
     await waitFor(() => runtime.hasEventStream(runtime.SIDECAR_URL), "sidecar 事件流建立")
 
     runtime.emitSessionIdle(runtime.SIDECAR_URL, runtime.FIXTURE_DIRECTORY, runtime.NOTIFIED_SESSION_ID)
@@ -658,7 +658,7 @@ describe("#933 legacy 会话 href 咽喉收口:反推默认拒绝 + 侧栏身份
   })
 
   test("wsl:arch 上的会话完成(active=wsl:ubuntu)→ OS 通知的落点钉在 wsl:arch", async () => {
-    await mountShell(() => runtime.AlphaShellAutomationRemote())
+    await mountShell(() => runtime.CodePuppyShellAutomationRemote())
     await waitFor(() => runtime.hasEventStream(runtime.WSL_ARCH_URL), "wsl:arch 事件流建立")
 
     runtime.emitSessionIdle(runtime.WSL_ARCH_URL, runtime.FIXTURE_DIRECTORY, runtime.NOTIFIED_SESSION_ID)

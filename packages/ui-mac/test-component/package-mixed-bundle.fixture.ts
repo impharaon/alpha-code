@@ -314,7 +314,7 @@ export const mixedBundlePayload = (digest: string, fixture: MixedBundleFixture):
 
 const VENDORED_BUNDLE = resolve(
   import.meta.dir,
-  "../../alpha-contracts-consumer/vendor/alpha-web-extension-package/expected.bundle.compiled.json",
+  "../../codepuppy-contracts-consumer/vendor/alpha-web-extension-package/expected.bundle.compiled.json",
 )
 
 /**

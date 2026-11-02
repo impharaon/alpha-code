@@ -19,7 +19,7 @@
 import { HTML_PREVIEW_SCHEME } from "./html-preview"
 
 /** Office 宿主页与它的资产在 URL 里的固定前缀。工作区文件永远不经这个前缀供给。 */
-export const OFFICE_PREVIEW_PREFIX = "__alpha_office__"
+export const OFFICE_PREVIEW_PREFIX = "__codepuppy_office__"
 
 /** 宿主页地址(不含 scheme/token)。 */
 export const OFFICE_PREVIEW_HOST_PATH = `${OFFICE_PREVIEW_PREFIX}/host.html`

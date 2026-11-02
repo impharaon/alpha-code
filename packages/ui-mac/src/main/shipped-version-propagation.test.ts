@@ -37,12 +37,12 @@ const REPO_ROOT = resolve(import.meta.dir, "..", "..", "..", "..")
 const SHIPPED_VERSION_FILE = "packages/ui-mac/package.json"
 
 /** alpha 自己写的 consumer-pin 夹具目录(vendored 的那些属于 producer,由哈希锁管,不在此列)。 */
-const CONSUMER_PIN_DIR = "packages/alpha-contracts-consumer/fixtures/consumers"
+const CONSUMER_PIN_DIR = "packages/codepuppy-contracts-consumer/fixtures/consumers"
 
 /** 今天已知的两份 pin。枚举退化成零命中时,这两条会当场红 —— 空输出不是结论。 */
 const KNOWN_CONSUMER_PINS = [
-  "packages/alpha-contracts-consumer/fixtures/consumers/alpha-code-640/ledger-page.json",
-  "packages/alpha-contracts-consumer/fixtures/consumers/alpha-code-1556/model-catalog-v3.json",
+  "packages/codepuppy-contracts-consumer/fixtures/consumers/alpha-code-640/ledger-page.json",
+  "packages/codepuppy-contracts-consumer/fixtures/consumers/alpha-code-1556/model-catalog-v3.json",
 ]
 
 /**
@@ -152,7 +152,7 @@ function synthesizeRoot(options: {
   pins: Array<{ path: string; body: Record<string, unknown> }>
   lock: string
 }): string {
-  const root = mkdtempSync(join(tmpdir(), "alpha-1255-"))
+  const root = mkdtempSync(join(tmpdir(), "codepuppy-1255-"))
   scratchRoots.push(root)
   const write = (relPath: string, body: string) => {
     const full = join(root, relPath)

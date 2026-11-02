@@ -14,14 +14,14 @@ import { join } from "node:path"
 import { app, dialog } from "electron"
 
 import { getLogger } from "./logging"
-import { alphaGlobalRoot } from "./alpha-installs"
-import { opencodeHomeDir } from "./alpha-bridge"
-import { clearByokKeys } from "./alpha-byok-keys"
-import { secretEnvVars } from "./alpha-secret-files"
-import { logout } from "./alpha-auth"
+import { codepuppyGlobalRoot } from "./codepuppy-installs"
+import { opencodeHomeDir } from "./codepuppy-bridge"
+import { clearByokKeys } from "./codepuppy-byok-keys"
+import { secretEnvVars } from "./codepuppy-secret-files"
+import { logout } from "./codepuppy-auth"
 import * as DataClear from "./data-clear"
 import { safeStorageBackend } from "./platform"
-import { assertAlphaEnvironmentIdentity } from "./alpha-environment"
+import { assertCodePuppyEnvironmentIdentity } from "./codepuppy-environment"
 import { withConfigWriteLock } from "./ext-config"
 import { sweepEngineConfigDanglingUnlocked, type DanglingSweepOutcome } from "./engine-config-dangling"
 
@@ -64,7 +64,7 @@ const fsDeps: DataClear.FsDeps = {
 function resolveRoots(userDataPath: string): DataClear.ClearRoots {
   return {
     userData: userDataPath,
-    alphaGlobal: alphaGlobalRoot(),
+    codepuppyGlobal: codepuppyGlobalRoot(),
     opencodeHome: opencodeHomeDir(),
     engineData: DataClear.engineDataDir(process.env, homedir()),
   }
@@ -126,14 +126,14 @@ function executeClearWithDanglingSweep(
   })
   if ("acquired" in locked) {
     logDanglingSweep(level, locked.sweep)
-    // A data clear removed alphaGlobal before this post-clear lock was acquired. The lock correctly
-    // recreated only alphaGlobal/ext-tx; remove those directories iff they are still empty, so the
+    // A data clear removed codepuppyGlobal before this post-clear lock was acquired. The lock correctly
+    // recreated only codepuppyGlobal/ext-tx; remove those directories iff they are still empty, so the
     // reset does not leave its own lock scaffold and can never race-delete a new holder's file.
     if (level === "data") {
       try {
-        const txDir = join(roots.alphaGlobal, "ext-tx")
+        const txDir = join(roots.codepuppyGlobal, "ext-tx")
         if (existsSync(txDir)) rmdirSync(txDir)
-        if (existsSync(roots.alphaGlobal)) rmdirSync(roots.alphaGlobal)
+        if (existsSync(roots.codepuppyGlobal)) rmdirSync(roots.codepuppyGlobal)
       } catch (error) {
         const line = `[req053-dangling-sweep] level=data lock scaffold cleanup skipped: ${error instanceof Error ? error.message : String(error)}`
         getLogger()?.warn(line)
@@ -156,7 +156,7 @@ export function createDataClearAction(opts: {
   stopSidecars: () => Promise<void>
 }): DataClearAction {
   const clearCredentials = async () => {
-    assertAlphaEnvironmentIdentity()
+    assertCodePuppyEnvironmentIdentity()
     const roots = resolveRoots(opts.userDataPath)
     const plan = DataClear.planClear(fsDeps, "credentials", roots)
     const present = plan.items.filter((i) => i.present)
@@ -178,7 +178,7 @@ export function createDataClearAction(opts: {
 
     // 顺序有讲究:①清 BYOK(内存库+权威清 env,自带 respawn 排队)②撤密钥 env(防 respawn 的
     // syncSecretFiles 从残留 env 复活文件)③删文件 ④logout(重置态 + respawn 收尾)
-    assertAlphaEnvironmentIdentity()
+    assertCodePuppyEnvironmentIdentity()
     clearByokKeys()
     for (const name of secretEnvVars()) delete process.env[name]
     const results = executeClearWithDanglingSweep("credentials", plan, roots, true)
@@ -206,7 +206,7 @@ export function createDataClearAction(opts: {
       })
       return
     }
-    assertAlphaEnvironmentIdentity()
+    assertCodePuppyEnvironmentIdentity()
     const roots = resolveRoots(opts.userDataPath)
     const plan = DataClear.planClear(fsDeps, "data", roots)
 
@@ -246,7 +246,7 @@ export function createDataClearAction(opts: {
 
     getLogger()?.warn("[c16-data-clear] full data clear confirmed — stopping sidecars")
     await opts.stopSidecars()
-    assertAlphaEnvironmentIdentity()
+    assertCodePuppyEnvironmentIdentity()
     const results = executeClearWithDanglingSweep("data", plan, roots, confirm.checkboxChecked)
     logResults("data", results)
     const failed = results.filter((r) => r.outcome === "failed")

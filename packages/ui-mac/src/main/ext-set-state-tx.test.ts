@@ -12,7 +12,7 @@ import { applyPackageMutation, findRecordV2, skillsEnabledPath, upsertRecordV2, 
 import { bundleOwner, computeInstalledGraphDigest, type PackageGraphNodeV1 } from "./ext-package-ledger-v3"
 import { canonicalJson, sha256Hex } from "./ext-manifest-v2"
 import { packageEnvelopeIdentityV1, resolveVerifiedPackageV1 } from "./package-installability"
-import bundledCatalog from "../renderer/extensions/alpha-catalog.json"
+import bundledCatalog from "../renderer/extensions/codepuppy-catalog.json"
 import type { CatalogEntry } from "../renderer/extensions/catalog-types"
 
 type SetStateDeps = Parameters<typeof setInstallStateByKey>[1]
@@ -44,18 +44,18 @@ const deps = (over: Partial<SetStateDeps> = {}): SetStateDeps => ({
   resolvePackage: async () => ({ status: "refused", reason: "resolvePackage must not be consulted in this test" }),
   ...over,
 })
-// hermetic:隔离引擎真实读取的 legacy 源根(XDG 固定 = XDG_CONFIG_HOME/opencode;~/.opencode = ALPHA_OPENCODE_HOME),
+// hermetic:隔离引擎真实读取的 legacy 源根(XDG 固定 = XDG_CONFIG_HOME/opencode;~/.opencode = CODEPUPPY_OPENCODE_HOME),
 // 使 legacyEnableResidueStrict 探测不碰开发机真实 ~/.config,并可精确造 before(XDG)/after(~/.opencode)源。
 const savedEnv: Record<string, string | undefined> = {}
 beforeEach(() => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), "ext-setstate-"))
-  for (const k of ["XDG_CONFIG_HOME", "ALPHA_OPENCODE_HOME", "OPENCODE_CONFIG_DIR"]) savedEnv[k] = process.env[k]
+  for (const k of ["XDG_CONFIG_HOME", "CODEPUPPY_OPENCODE_HOME", "OPENCODE_CONFIG_DIR"]) savedEnv[k] = process.env[k]
   process.env.XDG_CONFIG_HOME = path.join(root, "xdg-home") // → 引擎 XDG 目录 = <root>/xdg-home/opencode
-  process.env.ALPHA_OPENCODE_HOME = path.join(root, "dot-opencode") // → ~/.opencode(after 源)
+  process.env.CODEPUPPY_OPENCODE_HOME = path.join(root, "dot-opencode") // → ~/.opencode(after 源)
   delete process.env.OPENCODE_CONFIG_DIR
 })
 afterEach(() => {
-  for (const k of ["XDG_CONFIG_HOME", "ALPHA_OPENCODE_HOME", "OPENCODE_CONFIG_DIR"]) {
+  for (const k of ["XDG_CONFIG_HOME", "CODEPUPPY_OPENCODE_HOME", "OPENCODE_CONFIG_DIR"]) {
     if (savedEnv[k] === undefined) delete process.env[k]
     else process.env[k] = savedEnv[k]
   }
@@ -68,7 +68,7 @@ const writeXdgGlobal = (cfg: unknown, file = "opencode.jsonc") => {
   fs.writeFileSync(path.join(dir, file), JSON.stringify(cfg))
 }
 const writeDotOpencode = (cfg: unknown, file = "opencode.jsonc") => {
-  const dir = process.env.ALPHA_OPENCODE_HOME!
+  const dir = process.env.CODEPUPPY_OPENCODE_HOME!
   fs.mkdirSync(dir, { recursive: true })
   fs.writeFileSync(path.join(dir, file), JSON.stringify(cfg))
 }
@@ -86,8 +86,8 @@ const record = (over: Partial<UpsertInput> & { name: string; kind: UpsertInput["
   })
   if (!w.ok) throw new Error(w.reason)
 }
-const writeCfg = (cfg: unknown) => fs.writeFileSync(path.join(root, "alpha.jsonc"), JSON.stringify(cfg, null, 2))
-const readCfg = (): Record<string, any> => JSON.parse(fs.readFileSync(path.join(root, "alpha.jsonc"), "utf8"))
+const writeCfg = (cfg: unknown) => fs.writeFileSync(path.join(root, "codepuppy.jsonc"), JSON.stringify(cfg, null, 2))
+const readCfg = (): Record<string, any> => JSON.parse(fs.readFileSync(path.join(root, "codepuppy.jsonc"), "utf8"))
 
 describe("setInstallStateByKey(#395 持久化投影 + 账本翻转)", () => {
   test("plugin:disable 仍从 plugin[] 移除并翻账本;**enable 具名拒绝且账本不翻**(ADR-040 第 6 条)", async () => {
@@ -127,13 +127,13 @@ describe("setInstallStateByKey(#395 持久化投影 + 账本翻转)", () => {
     expect(findRecordV2(root, "agent", "bot")!.desiredState).toBe("disabled")
   })
 
-  test("skill:纯账本翻转,alpha.jsonc 逐字节不动(投影 = 引擎侧注入门消费账本)", async () => {
+  test("skill:纯账本翻转,codepuppy.jsonc 逐字节不动(投影 = 引擎侧注入门消费账本)", async () => {
     record({ name: "sk", kind: "skill" })
     writeCfg({ mcp: {} })
-    const before = fs.readFileSync(path.join(root, "alpha.jsonc"), "utf8")
+    const before = fs.readFileSync(path.join(root, "codepuppy.jsonc"), "utf8")
     expect((await setInstallStateByKey({ type: "skill", name: "sk", scope: "global", state: "disabled" }, deps())).ok).toBe(true)
     expect(findRecordV2(root, "skill", "sk")!.desiredState).toBe("disabled")
-    expect(fs.readFileSync(path.join(root, "alpha.jsonc"), "utf8")).toBe(before)
+    expect(fs.readFileSync(path.join(root, "codepuppy.jsonc"), "utf8")).toBe(before)
   })
 
   test("无 v2 记录 → fail-closed", async () => {
@@ -142,9 +142,9 @@ describe("setInstallStateByKey(#395 持久化投影 + 账本翻转)", () => {
     if (!r.ok) expect(r.reason).toContain("no v2 record")
   })
 
-  test("alpha.jsonc 不可解析 → 投影拒绝(fail closed,账本不动)", async () => {
+  test("codepuppy.jsonc 不可解析 → 投影拒绝(fail closed,账本不动)", async () => {
     record({ name: "np2", kind: "plugin", configKey: "plugin:@x/np2@1.0.0" })
-    fs.writeFileSync(path.join(root, "alpha.jsonc"), "{ not jsonc !!!")
+    fs.writeFileSync(path.join(root, "codepuppy.jsonc"), "{ not jsonc !!!")
     const r = await setInstallStateByKey({ type: "plugin", name: "np2", scope: "global", state: "disabled" }, deps())
     expect(r.ok).toBe(false)
     expect(findRecordV2(root, "plugin", "np2")!.desiredState).toBe("enabled") // 账本未翻
@@ -210,11 +210,11 @@ describe("#395 Codex r4 回归", () => {
   })
 })
 
-// ── #395(Codex r5)步骤4:alpha.jsonc 读错误只容缺席(ENOENT/ENOTDIR),其余 fail-closed ─────────
+// ── #395(Codex r5)步骤4:codepuppy.jsonc 读错误只容缺席(ENOENT/ENOTDIR),其余 fail-closed ─────────
 describe("#395 步骤4 读错误收窄", () => {
   test("config 不可读(EISDIR)→ 启停双向 fail-closed(不把「读不出」当缺席谎报 disable 成功)", async () => {
     record({ name: "m", kind: "mcp", configKey: "mcp.m" })
-    fs.mkdirSync(path.join(root, "alpha.jsonc")) // 目录占位 → readFileSync EISDIR(非缺席)
+    fs.mkdirSync(path.join(root, "codepuppy.jsonc")) // 目录占位 → readFileSync EISDIR(非缺席)
     const r = await setInstallStateByKey({ type: "mcp", name: "m", scope: "global", state: "disabled" }, deps())
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.reason).toContain("unreadable")
@@ -334,7 +334,7 @@ describe("setInstallStateByKey(#817 签名 package child)", () => {
     expect(readAllowSet()).toEqual({ v: 1, keys: ["skill--psk"] })
   })
 
-  test("agent child:enable 解除 alpha.jsonc 的 disable:true 投影", async () => {
+  test("agent child:enable 解除 codepuppy.jsonc 的 disable:true 投影", async () => {
     const fix = installPackageFixture({ packageId: "package:pkg-agent", children: [{ kind: "agent", name: "pag" }] })
     writeCfg({ agent: { pag: { description: "d", disable: true } } })
     const en = await setInstallStateByKey(
@@ -346,7 +346,7 @@ describe("setInstallStateByKey(#817 签名 package child)", () => {
     expect(findRecordV2(root, "agent", "pag")!.desiredState).toBe("enabled")
   })
 
-  test("mcp child:enable 解除 alpha.jsonc 的 enabled:false", async () => {
+  test("mcp child:enable 解除 codepuppy.jsonc 的 enabled:false", async () => {
     const fix = installPackageFixture({ packageId: "package:pkg-mcp", children: [{ kind: "mcp", name: "pmc" }] })
     writeCfg({ mcp: { pmc: { type: "remote", url: "https://x.example/", enabled: false } } })
     const en = await setInstallStateByKey(
@@ -803,7 +803,7 @@ describe("setInstallStateByKey(#817 claim-only package 信号)", () => {
     // 状态对读侧合法(readPackageLedgerStateV1 会跑 validateV3State;非法即 enable 直接换一种拒因,
     // 本用例断言的是**分类信号**那一种)。
     const allowBefore = fs.readFileSync(skillsEnabledPath(root), "utf8")
-    const cfgBefore = fs.existsSync(path.join(root, "alpha.jsonc")) ? fs.readFileSync(path.join(root, "alpha.jsonc"), "utf8") : null
+    const cfgBefore = fs.existsSync(path.join(root, "codepuppy.jsonc")) ? fs.readFileSync(path.join(root, "codepuppy.jsonc"), "utf8") : null
     let resolveEntryCalls = 0
     const en = await setInstallStateByKey(
       { type: "skill", name: "solo", scope: "global", state: "enabled" },
@@ -835,21 +835,21 @@ describe("setInstallStateByKey(#817 claim-only package 信号)", () => {
     expect(resolveEntryCalls).toBe(0)
     expect(findRecordV2(root, "skill", "solo")!.desiredState).toBe("disabled")
     expect(fs.readFileSync(skillsEnabledPath(root), "utf8")).toBe(allowBefore)
-    const cfgAfter = fs.existsSync(path.join(root, "alpha.jsonc")) ? fs.readFileSync(path.join(root, "alpha.jsonc"), "utf8") : null
+    const cfgAfter = fs.existsSync(path.join(root, "codepuppy.jsonc")) ? fs.readFileSync(path.join(root, "codepuppy.jsonc"), "utf8") : null
     expect(cfgAfter).toBe(cfgBefore)
   })
 })
 
-// ── `#1381`:真源里的远程 MCP 没有 alpha.jsonc 叶,启停只翻账本 ────────────────────────────
+// ── `#1381`:真源里的远程 MCP 没有 codepuppy.jsonc 叶,启停只翻账本 ────────────────────────────
 describe("setInstallStateByKey(#1381 远程 MCP 记录住在真源)", () => {
-  test("disable 只翻账本、alpha.jsonc 不写叶;enable 不再因「叶不存在」拒;真源坏了 ⇒ 名单为空 ⇒ enable 照旧按缺生效面拒", async () => {
+  test("disable 只翻账本、codepuppy.jsonc 不写叶;enable 不再因「叶不存在」拒;真源坏了 ⇒ 名单为空 ⇒ enable 照旧按缺生效面拒", async () => {
     const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "ext-setstate-1381-"))) // 环境根解析会 realpath,日志里的路径与它同一形态
     const envRoot = path.join(base, "env", "prod")
     fs.mkdirSync(envRoot, { recursive: true })
-    const savedGlobal = process.env.ALPHA_GLOBAL_DIR
-    process.env.ALPHA_GLOBAL_DIR = envRoot
+    const savedGlobal = process.env.CODEPUPPY_GLOBAL_DIR
+    process.env.CODEPUPPY_GLOBAL_DIR = envRoot
     const truth = path.join(base, "mcp-servers", "prod.json")
-    const cfg = path.join(envRoot, "alpha.jsonc")
+    const cfg = path.join(envRoot, "codepuppy.jsonc")
     const intent = (state: "enabled" | "disabled") => ({ type: "mcp", name: "remote-demo", scope: "global", state })
     try {
       writeMcpServerTruth(truth, [{ name: "remote-demo", url: "https://mcp.example.com/mcp" }], fs)
@@ -893,8 +893,8 @@ describe("setInstallStateByKey(#1381 远程 MCP 记录住在真源)", () => {
       expect(findRecordV2(envRoot, "mcp", "remote-demo")?.desiredState).toBe("disabled")
       expect(errors.some((l) => l.startsWith(`remote MCP servers: truth file ${truth} rejected — not JSON`))).toBe(true)
     } finally {
-      if (savedGlobal === undefined) delete process.env.ALPHA_GLOBAL_DIR
-      else process.env.ALPHA_GLOBAL_DIR = savedGlobal
+      if (savedGlobal === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+      else process.env.CODEPUPPY_GLOBAL_DIR = savedGlobal
       fs.rmSync(base, { recursive: true, force: true })
     }
   })

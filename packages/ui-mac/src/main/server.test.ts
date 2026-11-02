@@ -48,32 +48,32 @@ mock.module("./logging", () => ({
 }))
 mock.module("./store", () => ({ getStore: () => ({ get: () => null, set: () => {}, delete: () => {} }) }))
 // REQ-226 `#1343`:spawnLocalServer 在 fork 前从钥匙串库取自定义服务密钥。库本身真跑;只把它那一个
-// 函数的 Electron 接缝(alpha-keychain-backend,见该文件为何不 mock `electron`)换成能落盘的假钥匙串。
-// 它不是本文件的被测对象(库的判据在 alpha-byok-keys.test.ts)。
-mock.module("./alpha-keychain-backend", () => ({
+// 函数的 Electron 接缝(codepuppy-keychain-backend,见该文件为何不 mock `electron`)换成能落盘的假钥匙串。
+// 它不是本文件的被测对象(库的判据在 codepuppy-byok-keys.test.ts)。
+mock.module("./codepuppy-keychain-backend", () => ({
   keychainBackend: () => ({
     isEncryptionAvailable: () => true,
     encryptString: (value: string) => Buffer.from(value, "utf8"),
     decryptString: (value: Buffer) => value.toString("utf8"),
   }),
 }))
-// 不 mock ./alpha-secret-files:真 syncSecretFiles 对 test 的临时 userDataPath 是 temp-scoped(写
-// <tempdir>/alpha-secrets,无 ALPHA 密钥环境变量时 no-op,afterEach 清理)。全局 mock.module 会跨文件
-// 泄漏残缺导出面,撞坏 alpha-secret-files.test.ts 的 `import { secretFileRef, ... }`(2026-07-21 Linux CI 实锤)。
+// 不 mock ./codepuppy-secret-files:真 syncSecretFiles 对 test 的临时 userDataPath 是 temp-scoped(写
+// <tempdir>/codepuppy-secrets,无 ALPHA 密钥环境变量时 no-op,afterEach 清理)。全局 mock.module 会跨文件
+// 泄漏残缺导出面,撞坏 codepuppy-secret-files.test.ts 的 `import { secretFileRef, ... }`(2026-07-21 Linux CI 实锤)。
 
-const { applyPlatformCredentialsHot, hasSecretFile, secretFilePath } = await import("./alpha-secret-files")
-const { clearByokKeys, initByokKeys, storeByokKey } = await import("./alpha-byok-keys")
+const { applyPlatformCredentialsHot, hasSecretFile, secretFilePath } = await import("./codepuppy-secret-files")
+const { clearByokKeys, initByokKeys, storeByokKey } = await import("./codepuppy-byok-keys")
 const { writeShellEnvCache } = await import("./shell-env-cache")
 const { forkedSecretNames, preferAppEnv, spawnLocalServer } = await import("./server")
 const { requestCatalogRefresh } = await import("./catalog-refresher")
-const { appliedCatalogPath, writeCatalogSnapshot } = await import("./alpha-live-allowlist")
+const { appliedCatalogPath, writeCatalogSnapshot } = await import("./codepuppy-live-allowlist")
 // REQ-159 `#1321`:生产 spawnLocalServer 在 fork 前做围栏计划(真 store / 真 sandbox-exec / 真原生模块路径);
 // 本文件的假子进程不跑 sidecar.ts,注入一个替身计划 —— 围栏本身的判据在 process-fence-*.test.ts。
-const fakePlanFence = () => ({ profile: "(version 1)\n(allow default)\n(deny file-write*)\n", addonPath: "/nonexistent/alpha_fence.node" })
+const fakePlanFence = () => ({ profile: "(version 1)\n(allow default)\n(deny file-write*)\n", addonPath: "/nonexistent/codepuppy_fence.node" })
 const { creditDanglingSweepForSpawn, resetDanglingSweepLatchForTests } = await import("./dangling-sweep-latch")
 // `#1411`(REQ-1414 CODE-1):下面「模型工具表」那一组用的四个**生产**供数方。全部动态 import ——
 // 它们要么经 ui-mac 的 main 面(必须排在 electron mock 之后),要么是引擎/注入面的真模块。
-const { injectAlphaConfig } = await import("./alpha-config-injection")
+const { injectCodePuppyConfig } = await import("./codepuppy-config-injection")
 const { webSearchEnabled } = await import("../../../opencode/src/tool/registry")
 const { RuntimeFlags } = await import("../../../opencode/src/effect/runtime-flags")
 const { Permission } = await import("../../../opencode/src/permission/index")
@@ -101,15 +101,15 @@ const keylessWebSearchFlags = [
 ] as const
 const managedEnv = [
   "SHELL",
-  "ALPHA_GLOBAL_DIR",
-  "ALPHA_CLOUD_MCP_URL",
-  "ALPHA_CLOUD_TOKEN",
-  "ALPHA_MCP_TOKEN",
-  "ALPHA_API_KEY",
-  "ALPHA_PLATFORM_AUTH_REF",
-  "ALPHA_ENV_FILE",
-  "ALPHA_SECRETS_DISABLE",
-  "ALPHA_WEBSEARCH_DISABLE",
+  "CODEPUPPY_GLOBAL_DIR",
+  "CODEPUPPY_CLOUD_MCP_URL",
+  "CODEPUPPY_CLOUD_TOKEN",
+  "CODEPUPPY_MCP_TOKEN",
+  "CODEPUPPY_API_KEY",
+  "CODEPUPPY_PLATFORM_AUTH_REF",
+  "CODEPUPPY_ENV_FILE",
+  "CODEPUPPY_SECRETS_DISABLE",
+  "CODEPUPPY_WEBSEARCH_DISABLE",
   ...keylessWebSearchFlags,
   "OPENCODE_EXPERIMENTAL",
 ] as const
@@ -125,7 +125,7 @@ beforeEach(() => {
     delete process.env[key]
   }
   process.env.SHELL = "nu"
-  process.env.ALPHA_SECRETS_DISABLE = "1"
+  process.env.CODEPUPPY_SECRETS_DISABLE = "1"
 })
 
 afterEach(() => {
@@ -159,22 +159,22 @@ async function forkSidecar() {
 /** #621:登录态由 initAuthEnv/applyAuthEnv 建立,**晚于** preferAppEnv;env token 在下次 fork 时
  *  才经 syncSecretFiles 变成密钥文件。测试照这个真实顺序走,不预置 force-off 的判据。 */
 function applyAuthEnvLikeLogin() {
-  process.env.ALPHA_CLOUD_MCP_URL = "https://cloud.example/mcp"
-  process.env.ALPHA_CLOUD_TOKEN = "token"
+  process.env.CODEPUPPY_CLOUD_MCP_URL = "https://cloud.example/mcp"
+  process.env.CODEPUPPY_CLOUD_TOKEN = "token"
   // #1195:登录信封带 mcp_access_token 时 applyAuthEnv 同步写它;它是 #1195 起的代付判据文件源。
-  process.env.ALPHA_MCP_TOKEN = "mcp-token"
+  process.env.CODEPUPPY_MCP_TOKEN = "mcp-token"
 }
 
 function applyAuthEnvLikeLogout() {
-  delete process.env.ALPHA_CLOUD_TOKEN
-  delete process.env.ALPHA_MCP_TOKEN
+  delete process.env.CODEPUPPY_CLOUD_TOKEN
+  delete process.env.CODEPUPPY_MCP_TOKEN
 }
 
 function webSearchToolSnapshot(env: Record<string, string | undefined>) {
   const local = keylessWebSearchFlags.some((key) => env[key] === "1")
   return [
     ...(local ? ["websearch"] : []),
-    ...(process.env.ALPHA_CLOUD_MCP_URL && hasSecretFile(userDataPath, "ALPHA_MCP_TOKEN")
+    ...(process.env.CODEPUPPY_CLOUD_MCP_URL && hasSecretFile(userDataPath, "CODEPUPPY_MCP_TOKEN")
       ? ["cloud_web_search"]
       : []),
   ]
@@ -191,7 +191,7 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
   // 「登录 ⇒ fork 时把四个 keyless flag 覆盖写 "0"」「登录 ⇒ 压掉用户 shell export」。
   // 那是 ADR-009 B1 的落点,已被推翻:**账户信号只决定云腿在不在,不决定本地腿在不在**。
   test("登录用户冷启动:本地 keyless 腿在 fork 时不被关掉,两条腿一起进 sidecar", async () => {
-    // 真实顺序:preferAppEnv 先跑,此刻 initAuthEnv 还没写 ALPHA_CLOUD_MCP_URL/token。
+    // 真实顺序:preferAppEnv 先跑,此刻 initAuthEnv 还没写 CODEPUPPY_CLOUD_MCP_URL/token。
     preferAppEnv(userDataPath)
     expect(process.env.OPENCODE_ENABLE_EXA).toBe("1")
 
@@ -200,7 +200,7 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
     const env = await forkSidecar()
     // `#1411` 之前这里是 `toEqual(allFlagsOff)`。
     expect(env.OPENCODE_ENABLE_EXA).toBe("1")
-    expect(env.ALPHA_LOCAL_WEBSEARCH_DENY).toBeUndefined()
+    expect(env.CODEPUPPY_LOCAL_WEBSEARCH_DENY).toBeUndefined()
     expect(webSearchToolSnapshot(env)).toEqual(["websearch", "cloud_web_search"])
   })
 
@@ -217,7 +217,7 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
   })
 
   test.each(keylessWebSearchFlags)("disable overrides a shell-exported %s flag in every auth state", async (flag) => {
-    process.env.ALPHA_WEBSEARCH_DISABLE = "1"
+    process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
     process.env[flag] = "1"
 
     preferAppEnv(userDataPath)
@@ -228,7 +228,7 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
   })
 
   test("disable wins over all shell-exported keyless flags even when cloud is registered", async () => {
-    process.env.ALPHA_WEBSEARCH_DISABLE = "1"
+    process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
     Object.assign(process.env, Object.fromEntries(keylessWebSearchFlags.map((key) => [key, "1"])))
 
     preferAppEnv(userDataPath)
@@ -239,7 +239,7 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
   })
 
   test("logged-out/BYOK forks with the unchanged local keyless websearch", async () => {
-    process.env.ALPHA_CLOUD_MCP_URL = "https://cloud.example/mcp" // URL 在场但无密钥文件 = 未登录
+    process.env.CODEPUPPY_CLOUD_MCP_URL = "https://cloud.example/mcp" // URL 在场但无密钥文件 = 未登录
 
     preferAppEnv(userDataPath)
 
@@ -261,10 +261,10 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
     applyAuthEnvLikeLogin()
     expect(keylessFlagsOf(await forkSidecar()).OPENCODE_ENABLE_PARALLEL).toBe("1")
 
-    process.env.ALPHA_WEBSEARCH_DISABLE = "1"
+    process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
     expect(keylessFlagsOf(await forkSidecar())).toEqual(allFlagsOff)
 
-    delete process.env.ALPHA_WEBSEARCH_DISABLE
+    delete process.env.CODEPUPPY_WEBSEARCH_DISABLE
 
     const env = await forkSidecar()
     expect(env.OPENCODE_ENABLE_PARALLEL).toBe("1")
@@ -289,10 +289,10 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
   // 持久 session permission / approved)。主权判决必须另有一条到得了**工具自身**的通道 —— 这条
   // 断言走真实 fork,证明判决确实进了 sidecar 的 env(即 sidecar-env 白名单也放行了它)。
   test("the sovereignty verdict reaches the sidecar so the tool itself can refuse", async () => {
-    process.env.ALPHA_WEBSEARCH_DISABLE = "1"
+    process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
     preferAppEnv(userDataPath)
 
-    expect((await forkSidecar()).ALPHA_LOCAL_WEBSEARCH_DENY).toBe("1")
+    expect((await forkSidecar()).CODEPUPPY_LOCAL_WEBSEARCH_DENY).toBe("1")
   })
 
   // `#1411`:以前这条叫「platform pays also ships the sovereignty verdict to the sidecar」,断言
@@ -303,64 +303,64 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
     applyAuthEnvLikeLogin()
 
     const env = await forkSidecar()
-    expect(env.ALPHA_LOCAL_WEBSEARCH_DENY).toBeUndefined()
-    expect(env.ALPHA_CLOUD_WEBSEARCH_DENY).toBeUndefined()
+    expect(env.CODEPUPPY_LOCAL_WEBSEARCH_DENY).toBeUndefined()
+    expect(env.CODEPUPPY_CLOUD_WEBSEARCH_DENY).toBeUndefined()
   })
 
   test("`#1195` 判据换轴:登录但无 mcp_access(旧轴文件在、新轴文件缺)不算代付,keyless 保持可用", async () => {
-    // pre-T1 服务端 / 信封未带字段的真实形态:applyAuthEnv 写了 ALPHA_CLOUD_TOKEN,没写 ALPHA_MCP_TOKEN。
-    // 旧轴(ALPHA_CLOUD_TOKEN)的错误实现会在这里把 keyless 关掉 —— 当场红。
+    // pre-T1 服务端 / 信封未带字段的真实形态:applyAuthEnv 写了 CODEPUPPY_CLOUD_TOKEN,没写 CODEPUPPY_MCP_TOKEN。
+    // 旧轴(CODEPUPPY_CLOUD_TOKEN)的错误实现会在这里把 keyless 关掉 —— 当场红。
     preferAppEnv(userDataPath)
     applyAuthEnvLikeLogin()
-    delete process.env.ALPHA_MCP_TOKEN
+    delete process.env.CODEPUPPY_MCP_TOKEN
 
     const env = await forkSidecar()
-    expect(env.ALPHA_LOCAL_WEBSEARCH_DENY).toBeUndefined()
+    expect(env.CODEPUPPY_LOCAL_WEBSEARCH_DENY).toBeUndefined()
     expect(webSearchToolSnapshot(env)).toEqual(["websearch"])
   })
 
   // `#1411`:同上,驱动态换成 kill-switch —— 「判决必须两个方向都写」这条纪律没变,变的是唯一能
   // 置位它的状态。登出那一格追加一条:它在任何方向上都不该让判决重新出现。
   test("kill-switch 关掉之后 respawn 清掉本地拒绝判决,而不是把工具留在死状态", async () => {
-    process.env.ALPHA_WEBSEARCH_DISABLE = "1"
+    process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
     preferAppEnv(userDataPath)
     applyAuthEnvLikeLogin()
-    expect((await forkSidecar()).ALPHA_LOCAL_WEBSEARCH_DENY).toBe("1")
+    expect((await forkSidecar()).CODEPUPPY_LOCAL_WEBSEARCH_DENY).toBe("1")
 
-    delete process.env.ALPHA_WEBSEARCH_DISABLE
+    delete process.env.CODEPUPPY_WEBSEARCH_DISABLE
 
-    expect((await forkSidecar()).ALPHA_LOCAL_WEBSEARCH_DENY).toBeUndefined()
+    expect((await forkSidecar()).CODEPUPPY_LOCAL_WEBSEARCH_DENY).toBeUndefined()
 
     applyAuthEnvLikeLogout()
 
-    expect((await forkSidecar()).ALPHA_LOCAL_WEBSEARCH_DENY).toBeUndefined()
+    expect((await forkSidecar()).CODEPUPPY_LOCAL_WEBSEARCH_DENY).toBeUndefined()
   })
 
   // #223 R3:云侧的同一条通道。`cloud_web_search` 是远端 MCP 工具,没有 alpha 能改的 execute
-  // 首行;最终闸在 @alpha-code/ext 的 tool.execute.before 钩子里,靠这个变量过河。它只在
+  // 首行;最终闸在 @codepuppy/ext 的 tool.execute.before 钩子里,靠这个变量过河。它只在
   // kill-switch 时置位 —— 平台代付态下云工具正是权威通道,不能连它一起关。
   test("the kill switch ships a cloud verdict to the sidecar; platform-pays does not", async () => {
-    process.env.ALPHA_WEBSEARCH_DISABLE = "1"
+    process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
     preferAppEnv(userDataPath)
-    expect((await forkSidecar()).ALPHA_CLOUD_WEBSEARCH_DENY).toBe("1")
+    expect((await forkSidecar()).CODEPUPPY_CLOUD_WEBSEARCH_DENY).toBe("1")
 
-    delete process.env.ALPHA_WEBSEARCH_DISABLE
+    delete process.env.CODEPUPPY_WEBSEARCH_DISABLE
     applyAuthEnvLikeLogin()
     const paying = await forkSidecar()
     // `#1411`:以前这里是 `toBe("1")` —— 代付即关本地腿。现在代付两条判决都不置位。
-    expect(paying.ALPHA_LOCAL_WEBSEARCH_DENY).toBeUndefined()
-    expect(paying.ALPHA_CLOUD_WEBSEARCH_DENY).toBeUndefined()
+    expect(paying.CODEPUPPY_LOCAL_WEBSEARCH_DENY).toBeUndefined()
+    expect(paying.CODEPUPPY_CLOUD_WEBSEARCH_DENY).toBeUndefined()
   })
 
   test("turning the kill switch back off clears the cloud verdict on the next fork", async () => {
-    process.env.ALPHA_WEBSEARCH_DISABLE = "1"
+    process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
     preferAppEnv(userDataPath)
     applyAuthEnvLikeLogin()
-    expect((await forkSidecar()).ALPHA_CLOUD_WEBSEARCH_DENY).toBe("1")
+    expect((await forkSidecar()).CODEPUPPY_CLOUD_WEBSEARCH_DENY).toBe("1")
 
-    delete process.env.ALPHA_WEBSEARCH_DISABLE
+    delete process.env.CODEPUPPY_WEBSEARCH_DISABLE
 
-    expect((await forkSidecar()).ALPHA_CLOUD_WEBSEARCH_DENY).toBeUndefined()
+    expect((await forkSidecar()).CODEPUPPY_CLOUD_WEBSEARCH_DENY).toBeUndefined()
   })
 })
 
@@ -376,7 +376,7 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
 //      fork 出来的那份 env(`forkSidecar()`,与上面那组同一条路径);
 //   ② 引擎的 `RuntimeFlags`(用真 `ConfigProvider` 解析①给出的那份 env,不是手写 `env[k] === "1"`);
 //   ③ 引擎的 `webSearchEnabled()` —— 本地腿的**注册**闸,`tool/registry.ts` 的 `tools()` 用的就是它;
-//   ④ 注入面的真 `injectAlphaConfig()` → 引擎的真 `Permission.fromConfig` + `Permission.disabled`
+//   ④ 注入面的真 `injectCodePuppyConfig()` → 引擎的真 `Permission.fromConfig` + `Permission.disabled`
 //      —— 两条腿的**可见性**闸,`session/llm/request.ts` 的 `resolveTools()` 用的就是它。
 //
 // 手段的自证(先证明它测得出已知的坏,再用它判未知的好):kill-switch 臂走同一条链,两条腿必须
@@ -413,12 +413,12 @@ describe("`#1411` 模型工具表:两条腿按账户态的真实在场性", () =
     for (const [key, value] of Object.entries(forkEnv)) if (value !== undefined) process.env[key] = value
     try {
       // 注入面的三个环境根钉进本用例的临时盘,免得读到宿主机的真实配置。
-      process.env.ALPHA_GLOBAL_DIR = join(userDataPath, "alpha-code-state", "env", "dev")
+      process.env.CODEPUPPY_GLOBAL_DIR = join(userDataPath, "codepuppy-state", "env", "dev")
       process.env.XDG_CONFIG_HOME = join(userDataPath, "xdg-config")
       process.env.XDG_DATA_HOME = join(userDataPath, "xdg-data")
-      mkdirSync(process.env.ALPHA_GLOBAL_DIR, { recursive: true })
+      mkdirSync(process.env.CODEPUPPY_GLOBAL_DIR, { recursive: true })
       // 先证明注入真的跑成了 —— 它有一层函数级 catch,拿一份空配置当结论正是本文件要防的那类假绿。
-      expect(injectAlphaConfig(userDataPath, undefined, "stable")).toEqual({ ok: true })
+      expect(injectCodePuppyConfig(userDataPath, undefined, "stable")).toEqual({ ok: true })
       const content = process.env.OPENCODE_CONFIG_CONTENT
       expect(typeof content).toBe("string")
       return { config: JSON.parse(content!) as EngineConfigShape, env: { ...process.env } }
@@ -467,7 +467,7 @@ describe("`#1411` 模型工具表:两条腿按账户态的真实在场性", () =
 
   // 反例臂 —— 证明上面那两条不是「怎么测都绿」:同一条链在 kill-switch 下两条腿一个都不在表里。
   test("kill-switch:同一条链下两条腿一个都不在表里(手段测得出已知的坏)", async () => {
-    process.env.ALPHA_WEBSEARCH_DISABLE = "1"
+    process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
     preferAppEnv(userDataPath)
     applyAuthEnvLikeLogin()
 
@@ -475,12 +475,12 @@ describe("`#1411` 模型工具表:两条腿按账户态的真实在场性", () =
   })
 
   test("kill-switch 关掉之后,下一次 fork 两条腿一起回来", async () => {
-    process.env.ALPHA_WEBSEARCH_DISABLE = "1"
+    process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
     preferAppEnv(userDataPath)
     applyAuthEnvLikeLogin()
     expect(modelWebSearchTools(await forkSidecar())).toEqual([])
 
-    delete process.env.ALPHA_WEBSEARCH_DISABLE
+    delete process.env.CODEPUPPY_WEBSEARCH_DISABLE
 
     expect(modelWebSearchTools(await forkSidecar())).toEqual([LOCAL_WEB_SEARCH_TOOL_ID, CLOUD_WEB_SEARCH_TOOL_ID])
   })
@@ -490,13 +490,13 @@ describe("`#1411` 模型工具表:两条腿按账户态的真实在场性", () =
   // remote server)的在场性。
   //
   // 为什么必须跨包合成来判:第三方工具不在注入面那层 permission deny 里(`applyWebSearchDenies`
-  // 只点名 `websearch` 与 `cloud_cloud_web_search` 两个 id),它唯一的闸是 `@alpha-code/ext` 的
+  // 只点名 `websearch` 与 `cloud_cloud_web_search` 两个 id),它唯一的闸是 `@codepuppy/ext` 的
   // `tool.execute.before`,判决靠 fork env 过河。两半各自都有测试 —— main 在哪一态置位哪个信号
   // (本文件上面那两组)、ext 见到某组信号怎么判(`packages/ext/src/cloud-websearch-kill.test.ts`)——
   // 但「某个账户态下第三方到底能不能用」是这两半的**合成**,此前没有任何一条判据看着它。代价实测:
   // `#1411` 把代付那一格从「关」翻成「开」,两个包的测试各自照常全绿,行为变更零登记(本票)。
   //
-  // 供数方仍然全是生产的:env 来自真 `forkSidecar()`;归属来自真 `injectAlphaConfig()` 写出的配置
+  // 供数方仍然全是生产的:env 来自真 `forkSidecar()`;归属来自真 `injectCodePuppyConfig()` 写出的配置
   // + 真 `computeMcpOwnership()`;判决就是 ext 在钩子首行调的那个函数,不在这边手写等价条件。
   // ───────────────────────────────────────────────────────────────────────────
   describe("`#1443` 用户自带的第三方 web-search MCP", () => {
@@ -528,7 +528,7 @@ describe("`#1411` 模型工具表:两条腿按账户态的真实在场性", () =
     // 反例臂,也是 owner 2026-09-24 点名问的那一格:「一键关掉所有搜网」**仍然**关得掉第三方插件。
     // 它同时证明上面两条不是「怎么测都绿」。
     test("kill-switch:第三方 web search 照样被关", async () => {
-      process.env.ALPHA_WEBSEARCH_DISABLE = "1"
+      process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
       preferAppEnv(userDataPath)
       applyAuthEnvLikeLogin()
 
@@ -536,12 +536,12 @@ describe("`#1411` 模型工具表:两条腿按账户态的真实在场性", () =
     })
 
     test("kill-switch 关掉之后,下一次 fork 第三方回来", async () => {
-      process.env.ALPHA_WEBSEARCH_DISABLE = "1"
+      process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
       preferAppEnv(userDataPath)
       applyAuthEnvLikeLogin()
       expect(thirdPartyDenial(await forkSidecar())).toContain("kill switch")
 
-      delete process.env.ALPHA_WEBSEARCH_DISABLE
+      delete process.env.CODEPUPPY_WEBSEARCH_DISABLE
 
       expect(thirdPartyDenial(await forkSidecar())).toBeUndefined()
     })
@@ -587,10 +587,10 @@ describe("keyless baseline vs the real login-shell import (#223 Major 3)", () =>
     applyAuthEnvLikeLogout()
     expect((await forkSidecar()).OPENCODE_ENABLE_PARALLEL).toBe("1")
 
-    process.env.ALPHA_WEBSEARCH_DISABLE = "1"
+    process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
     expect(keylessFlagsOf(await forkSidecar())).toEqual(allFlagsOff)
 
-    delete process.env.ALPHA_WEBSEARCH_DISABLE
+    delete process.env.CODEPUPPY_WEBSEARCH_DISABLE
     // ③ kill-switch 关掉后 respawn 还原的必须是用户真值,而不是「探测之前的空基线」。
     const env = await forkSidecar()
     expect(env.OPENCODE_ENABLE_PARALLEL).toBe("1")
@@ -613,10 +613,10 @@ describe("keyless baseline vs the real login-shell import (#223 Major 3)", () =>
     applyAuthEnvLikeLogin()
     expect((await forkSidecar()).OPENCODE_ENABLE_PARALLEL).toBe("1")
 
-    process.env.ALPHA_WEBSEARCH_DISABLE = "1"
+    process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
     expect(keylessFlagsOf(await forkSidecar())).toEqual(allFlagsOff)
 
-    delete process.env.ALPHA_WEBSEARCH_DISABLE
+    delete process.env.CODEPUPPY_WEBSEARCH_DISABLE
     expect((await forkSidecar()).OPENCODE_ENABLE_PARALLEL).toBe("1")
   })
 })
@@ -680,7 +680,7 @@ describe("spawnLocalServer", () => {
         planFence: fakePlanFence,
         fork: fakeFork,
       }),
-    ).rejects.toThrow(/alpha-secrets sync failed/)
+    ).rejects.toThrow(/codepuppy-secrets sync failed/)
     expect(forkCalls).toHaveLength(0)
   })
 
@@ -746,10 +746,10 @@ describe("spawnLocalServer", () => {
   // 文件,不经 env;sidecar env 里没有值;只有「真源文件里的 id ∩ 库键集」才物化(孤儿条目不落盘);
   // 库里没了 ⇒ 下一次 fork 清扫文件(与目录 BYOK 同一撤销语义)。
   test("REQ-226: an off-catalog custom provider's key is materialized keychain → file at fork; the forked env never carries it; gone from the store ⇒ swept next fork", async () => {
-    const base = join(realpathSync(userDataPath), "alpha-code-state")
+    const base = join(realpathSync(userDataPath), "codepuppy-state")
     const root = join(base, "env", "dev")
     mkdirSync(root, { recursive: true })
-    // `#1392`:记录的真源是 <casBaseRoot>/custom-providers/<env>.json(围栏写不到的那棵树),alpha.jsonc 里的
+    // `#1392`:记录的真源是 <casBaseRoot>/custom-providers/<env>.json(围栏写不到的那棵树),codepuppy.jsonc 里的
     // provider 块从此**既不注入也不物化**。本用例因此播在真源上 —— 播错地方时这条用例就不再驱动 fork 前物化那一步
     // (2026-09-22 `#1392` 合入后实测转红,`#1416`)。用生产写端落盘,不在这里手抄它的字节。
     writeCustomProviderTruth(
@@ -757,7 +757,7 @@ describe("spawnLocalServer", () => {
       [{ id: "my-endpoint", name: "Mine", compat: "openai", baseURL: "https://x.invalid/v1", models: ["m"] }],
       { mkdirSync, writeFileSync, renameSync, rmSync },
     )
-    process.env.ALPHA_GLOBAL_DIR = root
+    process.env.CODEPUPPY_GLOBAL_DIR = root
     const value = "test-value-not-a-real-key-Zq81"
     initByokKeys(userDataPath)
     try {
@@ -782,18 +782,18 @@ describe("spawnLocalServer", () => {
   // (applyPlatformCredentialsHot 据它判在场性变没变;不记就恒为「还没 fork 过」⇒ 热写被跳过,引擎一直读旧令牌),
   // 与交给 sidecar 的平台凭据引用(ext chat.headers 据它现读)。引用只能是 {file:} 形态,env 里不带令牌(方案 I1)。
   test("#1562 fork 记下写入的凭据名集合,并把平台凭据的 {file:} 引用(不是令牌)交给 sidecar", async () => {
-    process.env.ALPHA_API_KEY = "test-platform-key-not-real-7Kd2"
+    process.env.CODEPUPPY_API_KEY = "test-platform-key-not-real-7Kd2"
     applyAuthEnvLikeLogin()
     const env = await forkSidecar()
-    expect(env.ALPHA_PLATFORM_AUTH_REF).toMatch(/^\{file:\/.+\}$/)
-    expect(env.ALPHA_PLATFORM_AUTH_REF).toBe(`{file:${secretFilePath(userDataPath, "ALPHA_API_KEY")}}`)
+    expect(env.CODEPUPPY_PLATFORM_AUTH_REF).toMatch(/^\{file:\/.+\}$/)
+    expect(env.CODEPUPPY_PLATFORM_AUTH_REF).toBe(`{file:${secretFilePath(userDataPath, "CODEPUPPY_API_KEY")}}`)
     expect(JSON.stringify(env)).not.toContain("test-platform-key")
-    expect([...(forkedSecretNames() ?? [])]).toEqual(expect.arrayContaining(["ALPHA_API_KEY", "ALPHA_MCP_TOKEN"]))
+    expect([...(forkedSecretNames() ?? [])]).toEqual(expect.arrayContaining(["CODEPUPPY_API_KEY", "CODEPUPPY_MCP_TOKEN"]))
     // 同一份 fork 集合下的续期 ⇒ 热写生效(凭据文件就地换新)。
-    expect(applyPlatformCredentialsHot(userDataPath, { ...process.env, ALPHA_API_KEY: "next-key" }, forkedSecretNames())).toBe(
+    expect(applyPlatformCredentialsHot(userDataPath, { ...process.env, CODEPUPPY_API_KEY: "next-key" }, forkedSecretNames())).toBe(
       "applied",
     )
-    expect(readFileSync(secretFilePath(userDataPath, "ALPHA_API_KEY"), "utf8")).toBe("next-key")
+    expect(readFileSync(secretFilePath(userDataPath, "CODEPUPPY_API_KEY"), "utf8")).toBe("next-key")
   })
 
   test("forks the sidecar in the userData scratch directory", async () => {

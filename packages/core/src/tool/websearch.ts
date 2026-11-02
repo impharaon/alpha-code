@@ -34,7 +34,7 @@ export const name = "websearch"
  * 漂移与「新的出网出口」由 `packages/ui-mac/src/main/websearch-copies.test.ts` 的普查闸钉住
  * (R4 起该普查网是纵深,不再是主判据)。
  */
-export const LOCAL_WEBSEARCH_DENY_ENV = "ALPHA_LOCAL_WEBSEARCH_DENY"
+export const LOCAL_WEBSEARCH_DENY_ENV = "CODEPUPPY_LOCAL_WEBSEARCH_DENY"
 
 /** fail-closed:除「缺省 / 空串 / `"0"`」外的任何取值都判为 deny。与 legacy 副本逐字同义。 */
 export function localWebSearchDenied(env: Record<string, string | undefined> = process.env) {
@@ -73,7 +73,7 @@ export const LOCAL_WEBSEARCH_DENIED_MESSAGE =
  * 而不是一次工具崩溃。
  */
 export const localWebSearchDeniedFailure = () =>
-  new ToolFailure({ message: LOCAL_WEBSEARCH_DENIED_MESSAGE, metadata: { denied: "alpha-sovereignty" } })
+  new ToolFailure({ message: LOCAL_WEBSEARCH_DENIED_MESSAGE, metadata: { denied: "codepuppy-sovereignty" } })
 
 export const NO_RESULTS = "No search results found. Please try a different query."
 export const EXA_URL = "https://mcp.exa.ai/mcp"
@@ -194,7 +194,7 @@ const FAILURE_LABEL: Record<Schema.Schema.Type<typeof FailureKind>, string> = {
  * 并把上游 body 作为 cause 附上 —— 绝不是一句编造的「没有结果」。
  * 叶子把它映射成 canonical 的 `ToolFailure`(`ToolRegistry.settle` 只把那个结算成模型可见 error)。
  */
-export class WebSearchFailure extends Schema.TaggedErrorClass<WebSearchFailure>()("AlphaWebSearchFailure", {
+export class WebSearchFailure extends Schema.TaggedErrorClass<WebSearchFailure>()("CodePuppyWebSearchFailure", {
   kind: FailureKind,
   detail: Schema.String,
   status: Schema.optional(Schema.Number),
@@ -267,7 +267,7 @@ function statusKind(status: number): Schema.Schema.Type<typeof FailureKind> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** 关掉信封记录的开关;缺省开着 —— 绊线不预先拉上就绊不到人(D 形态是间歇的,1/13)。 */
-export const WEBSEARCH_ENVELOPE_DIAG_ENV = "ALPHA_WEBSEARCH_ENVELOPE_DIAG"
+export const WEBSEARCH_ENVELOPE_DIAG_ENV = "CODEPUPPY_WEBSEARCH_ENVELOPE_DIAG"
 
 export function envelopeDiagEnabled(env: Record<string, string | undefined> = process.env) {
   return env[WEBSEARCH_ENVELOPE_DIAG_ENV] !== "0"

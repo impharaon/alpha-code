@@ -30,7 +30,7 @@ interface ConsumerCalls {
 /** Drive the app's real consumer over a buffer, exactly as the layout's onMount does. */
 function consume(deliveries: readonly unknown[], options: { enabled?: boolean } = {}) {
   const calls: ConsumerCalls = { openProject: [], navigate: [], handoff: [] }
-  const buffer = { __alphaDeepLinks: [...deliveries] } as unknown as Window
+  const buffer = { __codepuppyDeepLinks: [...deliveries] } as unknown as Window
   const run = createDeepLinkConsumer({
     enabled: () => options.enabled ?? true,
     buffer: () => buffer,
@@ -104,7 +104,7 @@ describe("a deep link navigates to the target the manifest derives, and to nothi
     const { calls, buffer } = consume([delivery], { enabled: false })
 
     expect(calls.navigate).toEqual([])
-    expect((buffer as unknown as { __alphaDeepLinks: unknown[] }).__alphaDeepLinks).toEqual([delivery])
+    expect((buffer as unknown as { __codepuppyDeepLinks: unknown[] }).__codepuppyDeepLinks).toEqual([delivery])
   })
 
   test("anything that is not a complete delivery is dropped fail-closed", () => {

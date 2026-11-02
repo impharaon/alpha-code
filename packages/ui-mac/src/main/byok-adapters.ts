@@ -5,11 +5,11 @@
 // 字段,schema 整份拒绝(ByokCatalogV1 每层 additionalProperties:false),它列出的 provider 不在本表里就被跳过 ——
 // 所以远程数据改不了 Key 的去向,也给不了引擎新的出网放行主机(放行集合从注入的 baseURL 派生,network-egress-derived.ts)。
 //
-// 四个直接读者只认本表(方案 §2.3 读者迁移表):Key 映射(alpha-byok-keys.ts)、要物化的密钥文件集合
-// (alpha-secret-files.ts,含会删「不在 wanted 集」旧文件的清理分支)、Key 状态(alpha-provider-status.ts)、
+// 四个直接读者只认本表(方案 §2.3 读者迁移表):Key 映射(codepuppy-byok-keys.ts)、要物化的密钥文件集合
+// (codepuppy-secret-files.ts,含会删「不在 wanted 集」旧文件的清理分支)、Key 状态(codepuppy-provider-status.ts)、
 // 保留 id(ext-config.ts)。加一个新供应商 = 发版(方案 §2.9 第 1 条)。
 //
-// electron-free:sidecar 经 alpha-models.ts 读。
+// electron-free:sidecar 经 codepuppy-models.ts 读。
 
 export type ByokAdapter = {
   id: string

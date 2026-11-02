@@ -2,7 +2,7 @@ out/
 dist/
 node_modules/
 *.log
-alpha.env
+codepuppy.env
 
 # 构建产物:DB 迁移支持面清单(scripts/gen-db-expected.ts 生成,S17 T3/C17)
 resources/db-expected-migrations.json
@@ -19,8 +19,8 @@ __pycache__/
 resources/icons
 
 # 构建产物:REQ-159 进程围栏的原生模块(scripts/build-fence-addon.ts 编出的 fat .node)。源码在
-# native/alpha-fence/alpha_fence.c(追踪);产物随 prebuild/predev 重编,经 extraResources 进包。
-native/alpha-fence/build/
+# native/codepuppy-fence/codepuppy_fence.c(追踪);产物随 prebuild/predev 重编,经 extraResources 进包。
+native/codepuppy-fence/build/
 
 # 构建产物:#1564 随包 Office 运行时(scripts/build-office-runtime.ts 按 resources/office-runtime/ 的 lock 产出,
 # 每个目标架构一份,经 extraResources 进包)。下载缓存在 ~/Library/Caches/codepuppy/office-runtime/,不在仓里。

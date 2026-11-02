@@ -7,19 +7,19 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { buildOfficeRuntime } from "../../scripts/build-office-runtime"
-import { ALPHA_OFFICE_PYTHON_SLOT, ALPHA_OFFICE_SERVER_SLOT, WORKSPACE_MARKER, alphaOfficeInstallCommand, type AlphaOfficeFormat } from "../shared/office-advisories"
+import { CODEPUPPY_OFFICE_PYTHON_SLOT, CODEPUPPY_OFFICE_SERVER_SLOT, WORKSPACE_MARKER, codepuppyOfficeInstallCommand, type CodePuppyOfficeFormat } from "../shared/office-advisories"
 
 const darwin = process.platform === "darwin"
 const server = resolve(import.meta.dir, "../../resources/office-mcp/server.py")
 /** 随包解释器;beforeAll 里由生产构建脚本给出。 */
 let python: string
 const enabledFormats = new Set(
-  (process.env.ALPHA_OFFICE_MCP_TEST_FORMATS ?? "word,excel,powerpoint,pdf")
+  (process.env.CODEPUPPY_OFFICE_MCP_TEST_FORMATS ?? "word,excel,powerpoint,pdf")
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean),
 )
-const testFormat = (format: AlphaOfficeFormat) => test.skipIf(!enabledFormats.has(format))
+const testFormat = (format: CodePuppyOfficeFormat) => test.skipIf(!enabledFormats.has(format))
 let workspace: string
 /** 没有 uv、没有 Homebrew 的执行环境:命令要靠的只有包里的东西。 */
 let bare: Record<string, string>
@@ -27,10 +27,10 @@ let bare: Record<string, string>
 beforeAll(() => {
   if (!darwin) return
   if (enabledFormats.size === 0) {
-    throw new Error("本次测量作废: ALPHA_OFFICE_MCP_TEST_FORMATS is empty")
+    throw new Error("本次测量作废: CODEPUPPY_OFFICE_MCP_TEST_FORMATS is empty")
   }
   python = join(buildOfficeRuntime({ arch: process.arch === "x64" ? "x64" : "arm64" }).dir, "bin", "python3")
-  workspace = mkdtempSync(join(tmpdir(), "alpha-office-mcp-"))
+  workspace = mkdtempSync(join(tmpdir(), "codepuppy-office-mcp-"))
   bare = { PATH: "/usr/bin:/bin", HOME: workspace, TMPDIR: workspace }
 }, 900_000)
 
@@ -71,9 +71,9 @@ async function exchange(command: string[], requests: unknown[]) {
 }
 
 /** 生产模板,main 的三处替换照做:随包解释器、随包 server、workspace。 */
-function commandFor(format: AlphaOfficeFormat) {
-  return alphaOfficeInstallCommand(format).map((argument) =>
-    argument === ALPHA_OFFICE_PYTHON_SLOT ? python : argument === ALPHA_OFFICE_SERVER_SLOT ? server : argument === WORKSPACE_MARKER ? workspace : argument,
+function commandFor(format: CodePuppyOfficeFormat) {
+  return codepuppyOfficeInstallCommand(format).map((argument) =>
+    argument === CODEPUPPY_OFFICE_PYTHON_SLOT ? python : argument === CODEPUPPY_OFFICE_SERVER_SLOT ? server : argument === WORKSPACE_MARKER ? workspace : argument,
   )
 }
 
@@ -392,7 +392,7 @@ describe.skipIf(!darwin)("REQ-133 Alpha first-party Office MCP resources", () =>
       powerpoint: ["read_pptx", "write_pptx"],
       pdf: ["read_pdf", "write_pdf"],
     } as const
-    for (const format of Object.keys(expected) as AlphaOfficeFormat[]) {
+    for (const format of Object.keys(expected) as CodePuppyOfficeFormat[]) {
       const messages = await exchange(
         commandFor(format),
         [initialize(), { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }],

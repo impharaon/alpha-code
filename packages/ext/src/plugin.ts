@@ -3,10 +3,10 @@ import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import type { Plugin } from "@opencode-ai/plugin"
 import { tool } from "@opencode-ai/plugin"
-import { mergeProjectConfig, projectDirectoryIdentity, requireAlphaGlobalRoot, withProjectDirectoryIdentity } from "./project-config"
+import { mergeProjectConfig, projectDirectoryIdentity, requireCodePuppyGlobalRoot, withProjectDirectoryIdentity } from "./project-config"
 import { loadProjectPlugins, mergeHooks } from "./plugin-fanout"
 import { applyRegister, type RegisterType } from "./register"
-import { applyPromptTakeover } from "./alpha-prompts"
+import { applyPromptTakeover } from "./codepuppy-prompts"
 import { applyFactoryDeny } from "./factory-deny"
 import { injectFactorySkillPaths } from "./factory-paths"
 import { injectSkillGenerationPaths } from "./gen-skill-paths"
@@ -58,7 +58,7 @@ hubBridge.onReloadRequest((message) =>
  * Contract (packages/plugin/src/index.ts):
  *   Plugin = (input: PluginInput, options?) => Promise<Hooks>
  */
-export const AlphaExt: Plugin = async (input) => {
+export const CodePuppyExt: Plugin = async (input) => {
   // REQ-036 生效闭环(S18 X9 实测):/instance/dispose 会**打断进行中的流式回复**。REQ-234 `#1531` 起不再由本实例
   // 自己按「登记会话 idle」去 dispose,而是登记进进程级调度器(reload-scheduler.ts):等**同一实例上所有会话**空闲、
   // 查询失败不动手,只因本插件的 dispose 钩子注销。
@@ -70,10 +70,10 @@ export const AlphaExt: Plugin = async (input) => {
   // REQ-062 T1:转写残留 warning 去重(每进程每签名一次)
   const rebrandWarned = new Set<string>()
   // REQ-157 `#1284`:装载回执 —— 登记簿在 import 时已按上限校验过;这里只在 VERBOSE 下把库存打出来。
-  if (process.env.ALPHA_EXT_VERBOSE) console.log(`[@alpha-code/ext] context injections:\n${renderInventory()}`)
+  if (process.env.CODEPUPPY_EXT_VERBOSE) console.log(`[@codepuppy/ext] context injections:\n${renderInventory()}`)
 
   // sidecar 初始化批次先复验 main 派生 root 的 canonical 身份；缺失、相对、退休根或 alias 都拒绝。
-  const globalAlphaRoot = requireAlphaGlobalRoot()
+  const globalCodePuppyRoot = requireCodePuppyGlobalRoot()
   const projectRootFor = (directory: string) => {
     const identity = projectDirectoryIdentity(directory)
     return identity.status === "project" ? identity : null
@@ -146,7 +146,7 @@ export const AlphaExt: Plugin = async (input) => {
     "chat.params": async (hookInput, output) => {
       const decision = platformOutputCap({
         providerBaseURL: hookInput.provider.options?.baseURL,
-        alphaBaseURL: process.env.ALPHA_BASE_URL,
+        codepuppyBaseURL: process.env.CODEPUPPY_BASE_URL,
       })
       if (decision.omit) {
         output.maxOutputTokens = undefined
@@ -174,7 +174,7 @@ export const AlphaExt: Plugin = async (input) => {
       })
       if (authorization) output.headers.authorization = authorization
     },
-    // REQ-060 项目级扩展物 `.code-puppy`-only:config hook 按 instance 读 `<directory>/.code-puppy/alpha.jsonc`
+    // REQ-060 项目级扩展物 `.code-puppy`-only:config hook 按 instance 读 `<directory>/.code-puppy/codepuppy.jsonc`
     // 并把项目级 mcp / agent / command / skills.paths 合并进 cfg —— 引擎经 config 消费,项目不产生
     // `.opencode`(零桥)。变异可见性由真机 spike 验(hook "Notify" 语义,T0 gate)。dispose 重建重
     // 触发 = 免重启。信任门(项目自带 mcp/plugin = 加载可执行物)= T1 后续,当前 spike 只验通道。
@@ -188,24 +188,24 @@ export const AlphaExt: Plugin = async (input) => {
       const installed = installCloudMcp(cfg)
       if (installed)
         console.log(
-          `[@alpha-code/ext] cloud MCP server "${installed}" installed — the web search sovereignty gate is registered in this engine process`,
+          `[@codepuppy/ext] cloud MCP server "${installed}" installed — the web search sovereignty gate is registered in this engine process`,
         )
       // REQ-159 `#1321`:这里曾经是 REQ-138 的 wrapEngineShell —— 把 cfg.shell 包成 sandbox-exec wrapper。
       // 围栏已上移到引擎进程本身(ui-mac sidecar 在 import 引擎前自打 seatbelt,process-fence-*.ts),
       // 派生的 shell / MCP / LSP / PTY 全部继承;两层并存实测 `sandbox_apply: Operation not permitted`、
       // HTTP 200 而零执行(勘破 §6.5 / §8.4),所以那层与外层**同一次变更**拆装(基线 I2)。
-      // 本钩子从此**不碰 cfg.shell**,判据在 alpha-ext-no-shell-layer.test.ts。
-      // #223 R7:归属在**本实例全部配置合并完成之后**才算 —— 下面的项目 alpha.jsonc 合并还会往
+      // 本钩子从此**不碰 cfg.shell**,判据在 codepuppy-ext-no-shell-layer.test.ts。
+      // #223 R7:归属在**本实例全部配置合并完成之后**才算 —— 下面的项目 codepuppy.jsonc 合并还会往
       // `cfg.mcp` 里加 server,先算就会漏掉它们(漏掉 foreign ⇒ 豁免可能错给)。放在 finally 里,
       // 上面那些 early return 也照样重算;合并中途**抛错**则 cfg 只合了一半,倒向 fail-closed。
       let merged = true
       try {
         const project = projectRootFor(input.directory)
         if (project) {
-          const f = join(project.root, "alpha.jsonc")
-          const present = withProjectDirectoryIdentity(project, (root) => existsSync(join(root, "alpha.jsonc")))
+          const f = join(project.root, "codepuppy.jsonc")
+          const present = withProjectDirectoryIdentity(project, (root) => existsSync(join(root, "codepuppy.jsonc")))
           if (!present.ok) {
-            console.error(`[@alpha-code/ext] project config refused: ${present.reason}`)
+            console.error(`[@codepuppy/ext] project config refused: ${present.reason}`)
             return
           }
           if (present.value) {
@@ -213,12 +213,12 @@ export const AlphaExt: Plugin = async (input) => {
             // 的 extensionsConsent(版本化,ADR-021 模式);未 consent → mcp 被 gated,记 loud 供 renderer 弹窗。
             const trustExecutable = readProjectExtensionsConsent(project)
             if (trustExecutable === null) {
-              console.error("[@alpha-code/ext] project config refused: project alpha root identity drifted")
+              console.error("[@codepuppy/ext] project config refused: project alpha root identity drifted")
               return
             }
-            const configRead = withProjectDirectoryIdentity(project, (root) => readFileSync(join(root, "alpha.jsonc"), "utf8"))
+            const configRead = withProjectDirectoryIdentity(project, (root) => readFileSync(join(root, "codepuppy.jsonc"), "utf8"))
             if (!configRead.ok) {
-              console.error(`[@alpha-code/ext] project config refused: ${configRead.reason}`)
+              console.error(`[@codepuppy/ext] project config refused: ${configRead.reason}`)
               return
             }
             const { added, gatedExecutable } = mergeProjectConfig(cfg as Record<string, unknown>, configRead.value, {
@@ -227,38 +227,38 @@ export const AlphaExt: Plugin = async (input) => {
             })
             if (gatedExecutable.length)
               console.log(
-                `[@alpha-code/ext] project has UNTRUSTED executable extensions (${gatedExecutable.join(", ")}) — not loaded until consent: ${input.directory}`,
+                `[@codepuppy/ext] project has UNTRUSTED executable extensions (${gatedExecutable.join(", ")}) — not loaded until consent: ${input.directory}`,
               )
-            if (process.env.ALPHA_EXT_VERBOSE && added.length)
-              console.log(`[@alpha-code/ext] project config merged from ${f}: ${added.join(", ")}`)
+            if (process.env.CODEPUPPY_EXT_VERBOSE && added.length)
+              console.log(`[@codepuppy/ext] project config merged from ${f}: ${added.join(", ")}`)
           }
         }
-        // REQ-065 修订:出厂技能路径内存注入(main 经 env 传入;alpha.jsonc 只放用户自己的东西,
+        // REQ-065 修订:出厂技能路径内存注入(main 经 env 传入;codepuppy.jsonc 只放用户自己的东西,
         // 磁盘零系统路径 —— 用户拍板 2026-07-08,对齐 Claude Code「内置能力不进用户配置」心智)。
-        const factoryAdded = injectFactorySkillPaths(cfg as Record<string, unknown>, process.env.ALPHA_FACTORY_SKILL_DIRS)
-        if (process.env.ALPHA_EXT_VERBOSE && factoryAdded.length)
-          console.log(`[@alpha-code/ext] factory skill paths injected in-memory: ${factoryAdded.length}`)
+        const factoryAdded = injectFactorySkillPaths(cfg as Record<string, unknown>, process.env.CODEPUPPY_FACTORY_SKILL_DIRS)
+        if (process.env.CODEPUPPY_EXT_VERBOSE && factoryAdded.length)
+          console.log(`[@codepuppy/ext] factory skill paths injected in-memory: ${factoryAdded.length}`)
         // REQ-100 #310:把 skill generation 的 live 目录(ext-store/skill--*/current.json)投影进
         // skills.paths —— 从磁盘现读,每次 config 重建反映最新安装,current.json 是唯一原子真源。
-        const genAdded = injectSkillGenerationPaths(cfg as Record<string, unknown>, globalAlphaRoot)
-        if (process.env.ALPHA_EXT_VERBOSE && genAdded.length)
-          console.log(`[@alpha-code/ext] skill generation paths injected in-memory: ${genAdded.length}`)
+        const genAdded = injectSkillGenerationPaths(cfg as Record<string, unknown>, globalCodePuppyRoot)
+        if (process.env.CODEPUPPY_EXT_VERBOSE && genAdded.length)
+          console.log(`[@codepuppy/ext] skill generation paths injected in-memory: ${genAdded.length}`)
         // REQ-067:上游默认禁项零明文 —— main 算 effective(出厂清单 − 用户解禁)经 env 传入,内存注入
         // permission.skill deny + 键入兜底占位(同为「出厂内置行为不进用户配置」口径)。
-        const denied = applyFactoryDeny(cfg as Record<string, unknown>, process.env.ALPHA_FACTORY_DENY_SKILLS)
-        if (process.env.ALPHA_EXT_VERBOSE && denied.length)
-          console.log(`[@alpha-code/ext] factory-denied skills injected in-memory: ${denied.join(", ")}`)
+        const denied = applyFactoryDeny(cfg as Record<string, unknown>, process.env.CODEPUPPY_FACTORY_DENY_SKILLS)
+        if (process.env.CODEPUPPY_EXT_VERBOSE && denied.length)
+          console.log(`[@codepuppy/ext] factory-denied skills injected in-memory: ${denied.join(", ")}`)
         // REQ-062 T3/T6:alpha 内容层 set-if-absent 接管(/init /review 模板 + general/explore prompt)。
         // 置于项目 merge 之后 → 项目/全局/治理任何层的同名配置都先落位、alpha 出厂让位(优先级:
         // 用户治理 > alpha 出厂 > 上游内置)。与 T1 转写同一逃生门 = 路线A 一键整体回退。
-        if (process.env.ALPHA_PROMPT_REBRAND_DISABLE !== "1") {
+        if (process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE !== "1") {
           const takeover = applyPromptTakeover(cfg as Record<string, unknown>)
-          if (process.env.ALPHA_EXT_VERBOSE && takeover.applied.length)
-            console.log(`[@alpha-code/ext] prompt takeover applied: ${takeover.applied.join(", ")}`)
+          if (process.env.CODEPUPPY_EXT_VERBOSE && takeover.applied.length)
+            console.log(`[@codepuppy/ext] prompt takeover applied: ${takeover.applied.join(", ")}`)
         }
       } catch (error) {
         merged = false
-        console.error(`[@alpha-code/ext] project config hook failed: ${error instanceof Error ? error.message : String(error)}`)
+        console.error(`[@codepuppy/ext] project config hook failed: ${error instanceof Error ? error.message : String(error)}`)
       } finally {
         // #223 R6 Blocker:治理豁免绑定的是**端点身份**,不是名字前缀 —— 拿本实例已合并完成的 cfg
         // 核验「哪个 server 名真的是 alpha 那份定义」。#223 R7 Blocker:结果写进**本实例的闭包**,
@@ -267,15 +267,15 @@ export const AlphaExt: Plugin = async (input) => {
         mcpOwnership = merged ? computeMcpOwnership(cfg) : UNVERIFIED_MCP_OWNERSHIP
         // REQ-234 `#1531` I3:确认框一定会出现 —— 放在 finally:项目配置分支的 early return / 抛错都不许跳过它。
         pinHubInstallPermission(cfg as Record<string, unknown>)
-        if (process.env.ALPHA_EXT_VERBOSE)
-          console.log(`[@alpha-code/ext] MCP ownership (${input.directory}): ${JSON.stringify(mcpOwnership)}`)
+        if (process.env.CODEPUPPY_EXT_VERBOSE)
+          console.log(`[@codepuppy/ext] MCP ownership (${input.directory}): ${JSON.stringify(mcpOwnership)}`)
       }
     },
     // REQ-062 T1(路线A):系统提示词品牌转写 —— 精选子串对(见 prompt-rebrand.ts 纪律说明)。
     // experimental hook(NON_GOALS#4 标注,ADR-015 修订成文):签名漂移/失效最坏退化 = 品牌未转写
-    // (外观级,不伤功能);逃生 ALPHA_PROMPT_REBRAND_DISABLE=1。warning 每进程每签名一次(防刷屏)。
+    // (外观级,不伤功能);逃生 CODEPUPPY_PROMPT_REBRAND_DISABLE=1。warning 每进程每签名一次(防刷屏)。
     "experimental.chat.system.transform": async (hookInput, output) => {
-      if (process.env.ALPHA_PROMPT_REBRAND_DISABLE !== "1") {
+      if (process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE !== "1") {
         try {
           const r = rebrandSystem(output.system)
           if (r.changed) {
@@ -285,11 +285,11 @@ export const AlphaExt: Plugin = async (input) => {
           for (const w of r.warnings) {
             if (rebrandWarned.has(w)) continue
             rebrandWarned.add(w)
-            console.warn(`[@alpha-code/ext] prompt-rebrand: ${w}`)
+            console.warn(`[@codepuppy/ext] prompt-rebrand: ${w}`)
           }
         } catch (error) {
           // 转写失败 = 保底上游原样(外观级退化),绝不让 hook 异常伤及请求主链
-          console.error(`[@alpha-code/ext] prompt-rebrand failed: ${error instanceof Error ? error.message : String(error)}`)
+          console.error(`[@codepuppy/ext] prompt-rebrand failed: ${error instanceof Error ? error.message : String(error)}`)
         }
       }
       // `#1419`:看不了图的模型多一段登记过的说明(不受 rebrand 逃生门影响;不提 gemini)。
@@ -338,11 +338,11 @@ export const AlphaExt: Plugin = async (input) => {
               return { title: "codepuppy_register", output: "refused: entry is not a valid JSON object string", metadata: { ok: false } }
             }
           }
-          const present = withProjectDirectoryIdentity(project, (root) => existsSync(join(root, "alpha.jsonc")))
+          const present = withProjectDirectoryIdentity(project, (root) => existsSync(join(root, "codepuppy.jsonc")))
           if (!present.ok)
             return { title: "codepuppy_register", output: `refused: ${present.reason}`, metadata: { ok: false } }
           const currentRead = present.value
-            ? withProjectDirectoryIdentity(project, (root) => readFileSync(join(root, "alpha.jsonc"), "utf8"))
+            ? withProjectDirectoryIdentity(project, (root) => readFileSync(join(root, "codepuppy.jsonc"), "utf8"))
             : { ok: true as const, value: null }
           if (!currentRead.ok)
             return { title: "codepuppy_register", output: `refused: ${currentRead.reason}`, metadata: { ok: false } }
@@ -357,12 +357,12 @@ export const AlphaExt: Plugin = async (input) => {
             if (!created.ok)
               return { title: "codepuppy_register", output: `refused: ${created.reason}`, metadata: { ok: false } }
             const written = withProjectDirectoryIdentity(project, (root) =>
-              writeFileSync(join(root, "alpha.jsonc.tmp"), r.next),
+              writeFileSync(join(root, "codepuppy.jsonc.tmp"), r.next),
             )
             if (!written.ok)
               return { title: "codepuppy_register", output: `refused: ${written.reason}`, metadata: { ok: false } }
             const committed = withProjectDirectoryIdentity(project, (root) =>
-              renameSync(join(root, "alpha.jsonc.tmp"), join(root, "alpha.jsonc")),
+              renameSync(join(root, "codepuppy.jsonc.tmp"), join(root, "codepuppy.jsonc")),
             )
             if (!committed.ok)
               return { title: "codepuppy_register", output: `refused: ${committed.reason}`, metadata: { ok: false } }
@@ -434,9 +434,9 @@ export const AlphaExt: Plugin = async (input) => {
       }),
     },
     // event hook: ① 会话状态变了 ⇒ 请调度器重判(它自己查每个相关实例的 session.status,不信事件里的快照);
-    // ② liveness proof(ALPHA_EXT_VERBOSE 时打印事件)。
+    // ② liveness proof(CODEPUPPY_EXT_VERBOSE 时打印事件)。
     async event({ event }) {
-      if (process.env.ALPHA_EXT_VERBOSE) console.log(`[@alpha-code/ext] event: ${event.type}`)
+      if (process.env.CODEPUPPY_EXT_VERBOSE) console.log(`[@codepuppy/ext] event: ${event.type}`)
       if (event.type === "session.status" || event.type === "session.idle") reloads.poke()
     },
     // REQ-234 `#1531`:实例销毁(dispose / global dispose / 重建)时引擎逐插件调用 —— 调度器只在这里注销本实例。
@@ -450,7 +450,7 @@ export const AlphaExt: Plugin = async (input) => {
   const project = projectRootFor(input.directory)
   const consent = project ? readProjectExtensionsConsent(project) : false
   if (consent === null) {
-    console.error("[@alpha-code/ext] project plugin fan-out refused: project alpha root identity drifted")
+    console.error("[@codepuppy/ext] project plugin fan-out refused: project alpha root identity drifted")
     return ownHooks
   }
   const projectHooks = await loadProjectPlugins(project?.root ?? "", input, consent, {
@@ -486,4 +486,4 @@ function readProjectExtensionsConsent(
   }
 }
 
-export default AlphaExt
+export default CodePuppyExt

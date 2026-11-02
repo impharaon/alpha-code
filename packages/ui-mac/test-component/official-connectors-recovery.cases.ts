@@ -19,7 +19,7 @@ mock.module("../src/main/logging", () => ({
   rotateServerLogs: () => {},
 }))
 // Only the OS keychain boundary is replaced; corrupted ciphertext fails actual authenticated decryption.
-mock.module("../src/main/alpha-keychain-backend", () => ({
+mock.module("../src/main/codepuppy-keychain-backend", () => ({
   keychainBackend: () => ({
     isEncryptionAvailable: () => true,
     encryptString: (value: string) => {
@@ -34,8 +34,8 @@ mock.module("../src/main/alpha-keychain-backend", () => ({
     },
   }),
 }))
-const { initAlphaEnvironment, getAlphaEnvironment, __resetAlphaEnvironmentForTests } = await import(
-  "../src/main/alpha-environment"
+const { initCodePuppyEnvironment, getCodePuppyEnvironment, __resetCodePuppyEnvironmentForTests } = await import(
+  "../src/main/codepuppy-environment"
 )
 const {
   officialRuntimeRoot,
@@ -49,34 +49,34 @@ const { upsertRecordV2 } = await import("../src/main/ext-receipt-v2")
 const { writeWorkspaceTruth, fenceWorkspaceTruthPath } = await import("../src/main/process-fence-workspaces")
 const { spawnLocalServer } = await import("../src/main/server")
 const { creditDanglingSweepForSpawn } = await import("../src/main/dangling-sweep-latch")
-const { collectMcpFileRefPaths } = await import("../src/main/alpha-mcp-secrets")
+const { collectMcpFileRefPaths } = await import("../src/main/codepuppy-mcp-secrets")
 const { findMcpServerRecord } = await import("../src/main/mcp-server-lifecycle")
 const saved: Record<string, string | undefined> = {}
-const envKeys = ["SHELL", "ALPHA_SECRETS_DISABLE", "ALPHA_GLOBAL_DIR", "XDG_DATA_HOME", "XDG_STATE_HOME"]
+const envKeys = ["SHELL", "CODEPUPPY_SECRETS_DISABLE", "CODEPUPPY_GLOBAL_DIR", "XDG_DATA_HOME", "XDG_STATE_HOME"]
 beforeEach(() => {
   for (const name of envKeys) saved[name] = process.env[name]
-  __resetAlphaEnvironmentForTests()
-  delete process.env.ALPHA_GLOBAL_DIR
+  __resetCodePuppyEnvironmentForTests()
+  delete process.env.CODEPUPPY_GLOBAL_DIR
   scratch = mkdtempSync(join(tmpdir(), "official-recovery-"))
   home = join(scratch, "home")
   mkdirSync(home)
-  initAlphaEnvironment({
+  initCodePuppyEnvironment({
     isPackaged: false,
     channel: "dev",
     appDataDir: home,
     baseRoot: join(home, "state"),
     homeDir: home,
   })
-  root = getAlphaEnvironment().mutableRoot
+  root = getCodePuppyEnvironment().mutableRoot
   process.env.SHELL = "nu"
-  process.env.ALPHA_SECRETS_DISABLE = "1"
+  process.env.CODEPUPPY_SECRETS_DISABLE = "1"
   process.env.XDG_DATA_HOME = join(home, "xdg-data")
   process.env.XDG_STATE_HOME = join(home, "xdg-state")
   warnings.length = 0
 })
 afterEach(() => {
   clearOfficialConnectorRuntime()
-  __resetAlphaEnvironmentForTests()
+  __resetCodePuppyEnvironmentForTests()
   for (const name of envKeys) {
     if (saved[name] === undefined) delete process.env[name]
     else process.env[name] = saved[name]
@@ -124,7 +124,7 @@ function seed(name: "github-official" | "dbhub-readonly", value: string) {
       installedAt: "2026-10-13T00:00:00.000Z",
     }).ok,
   ).toBe(true)
-  const file = join(root, "alpha.jsonc")
+  const file = join(root, "codepuppy.jsonc")
   const previous = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : {}
   writeFileSync(
     file,
@@ -146,7 +146,7 @@ test.each(["deleted workspace", "moved SQLite", "decryption failure"])(
     const failed = failure === "decryption failure" ? "github-official" : "dbhub-readonly"
     const healthy = failed === "github-official" ? "dbhub-readonly" : "github-official"
     if (failure === "deleted workspace") {
-      writeWorkspaceTruth(fenceWorkspaceTruthPath(getAlphaEnvironment().casBaseRoot, "dev"), [workspace], {
+      writeWorkspaceTruth(fenceWorkspaceTruthPath(getCodePuppyEnvironment().casBaseRoot, "dev"), [workspace], {
         mkdirSync,
         writeFileSync,
         renameSync,
@@ -161,7 +161,7 @@ test.each(["deleted workspace", "moved SQLite", "decryption failure"])(
     try {
       const result = await spawn(new Child(), () => {
         forks++
-        const config = JSON.parse(readFileSync(join(root, "alpha.jsonc"), "utf8")).mcp
+        const config = JSON.parse(readFileSync(join(root, "codepuppy.jsonc"), "utf8")).mcp
         expect(config[failed].enabled).toBe(false)
         expect(config[healthy].enabled).toBe(true)
         const refs = collectMcpFileRefPaths(config[failed])

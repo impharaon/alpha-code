@@ -9,7 +9,7 @@
 //              origin 标 imported-claude / imported-agents 可溯源;
 //   - 项目 CLAUDE.md → AGENTS.md(引擎原生指令约定,零新通道;已有 AGENTS.md → loud 让用户手动
 //              合并,绝不静默覆盖/追加,C28);
-//   - 全局 CLAUDE.md → `<current-environment-root>/instructions/imported-claude-code.md`(sidecar injectAlphaConfig
+//   - 全局 CLAUDE.md → `<current-environment-root>/instructions/imported-claude-code.md`(sidecar injectCodePuppyConfig
 //              扫描该目录并入 instructions —— alpha 原生通道)。
 //
 // 记账:项目决策 = `.code-puppy/prefs.json` 的 externalImport(版本化,REQ-060 extensionsConsent 同款);
@@ -18,21 +18,21 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { parse as parseJsonc } from "jsonc-parser"
-import { alphaGlobalRoot } from "./alpha-installs"
+import { codepuppyGlobalRoot } from "./codepuppy-installs"
 import { importSkillFolder } from "./ext-fs-installer"
 import type { InstallTarget } from "../preload/types"
 
 export const EXTERNAL_IMPORT_VERSION = 1
 
-/** T1:default-deny flags(set-if-unset;逃生 ALPHA_ECOSYSTEM_INHERIT=1 不注入)。 */
+/** T1:default-deny flags(set-if-unset;逃生 CODEPUPPY_ECOSYSTEM_INHERIT=1 不注入)。 */
 export function applyEcosystemDefaultDeny(env: NodeJS.ProcessEnv): void {
-  if (env.ALPHA_ECOSYSTEM_INHERIT === "1") return
+  if (env.CODEPUPPY_ECOSYSTEM_INHERIT === "1") return
   env.OPENCODE_DISABLE_EXTERNAL_SKILLS ??= "1"
   env.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT ??= "1"
 }
 
 export function ecosystemInheritEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env.ALPHA_ECOSYSTEM_INHERIT === "1"
+  return env.CODEPUPPY_ECOSYSTEM_INHERIT === "1"
 }
 
 export type ExternalSkill = { name: string; dir: string; source: "claude" | "agents" }
@@ -85,7 +85,7 @@ export type ImportOutcome = {
 }
 
 /** skills 转换导入(项目/全局同一管线,只差 target 与 origin)。
- *  项目 scope 成功导入 ≥1 项时,补项目 `alpha.jsonc` 的 skills.paths 注册("./.code-puppy/skills",
+ *  项目 scope 成功导入 ≥1 项时,补项目 `codepuppy.jsonc` 的 skills.paths 注册("./.code-puppy/skills",
  *  与 codepuppy_register type=skill 同形状)—— 引擎经 ext config hook 按此发现项目技能;漏注册 =
  *  文件落了但引擎永远看不见(2026-07-08 真机验收当场抓到的缺口)。 */
 /** #390:global 未策展技能安装器 —— 由 electron 侧调用方注入(planner 的 CAS 事务路径),使本
@@ -127,9 +127,9 @@ export async function importExternalSkills(
   return { importedSkills, skipped }
 }
 
-/** 项目 `alpha.jsonc`:确保 skills.paths 含 "./.code-puppy/skills"(相对路径,项目可移动;幂等原子写)。 */
+/** 项目 `codepuppy.jsonc`:确保 skills.paths 含 "./.code-puppy/skills"(相对路径,项目可移动;幂等原子写)。 */
 export function registerProjectSkillsPath(projectDir: string): void {
-  const file = path.join(projectDir, ".code-puppy", "alpha.jsonc")
+  const file = path.join(projectDir, ".code-puppy", "codepuppy.jsonc")
   let cfg: Record<string, unknown> = {}
   try {
     const parsed: unknown = parseJsonc(fs.readFileSync(file, "utf8"))
@@ -162,15 +162,15 @@ export function importProjectClaudeMd(projectDir: string, claudeMdPath: string):
 
 /** 全局 CLAUDE.md → `<current-environment-root>/instructions/imported-claude-code.md`(sidecar 注入通道)。 */
 export function importGlobalClaudeMd(claudeMdPath: string): string {
-  const dir = path.join(alphaGlobalRoot(), "instructions")
+  const dir = path.join(codepuppyGlobalRoot(), "instructions")
   fs.mkdirSync(dir, { recursive: true })
   const dest = path.join(dir, "imported-claude-code.md")
   fs.writeFileSync(dest, fs.readFileSync(claudeMdPath, "utf8"))
   return dest
 }
 
-/** `<current-environment-root>/instructions/*.md` 清单(sidecar injectAlphaConfig 消费;缺目录 = 空)。 */
-export function listAlphaInstructionFiles(root: string = alphaGlobalRoot()): string[] {
+/** `<current-environment-root>/instructions/*.md` 清单(sidecar injectCodePuppyConfig 消费;缺目录 = 空)。 */
+export function listCodePuppyInstructionFiles(root: string = codepuppyGlobalRoot()): string[] {
   const dir = path.join(root, "instructions")
   try {
     return fs
@@ -184,7 +184,7 @@ export function listAlphaInstructionFiles(root: string = alphaGlobalRoot()): str
 }
 
 // ── 项目决策记账(T2;REQ-060 extensionsConsent 同款版本化)────────────────────────
-import type { ProjectPrefs } from "./alpha-cloud-consent"
+import type { ProjectPrefs } from "./codepuppy-cloud-consent"
 
 export type ExternalImportPref = { version: number; decision: "imported" | "declined"; at: string }
 
@@ -206,7 +206,7 @@ export type GlobalGateMarker = {
   skipped?: Array<{ name: string; reason: string }>
 }
 
-const markerPath = () => path.join(alphaGlobalRoot(), "ecosystem-import.json")
+const markerPath = () => path.join(codepuppyGlobalRoot(), "ecosystem-import.json")
 
 export function readGlobalGateMarker(): GlobalGateMarker | null {
   try {
@@ -218,7 +218,7 @@ export function readGlobalGateMarker(): GlobalGateMarker | null {
 }
 
 export function writeGlobalGateMarker(m: GlobalGateMarker): void {
-  fs.mkdirSync(alphaGlobalRoot(), { recursive: true })
+  fs.mkdirSync(codepuppyGlobalRoot(), { recursive: true })
   const tmp = markerPath() + ".tmp"
   fs.writeFileSync(tmp, JSON.stringify(m, null, 2))
   fs.renameSync(tmp, markerPath())

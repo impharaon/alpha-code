@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSy
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { parse } from "jsonc-parser"
-import { ALPHA_OFFICE_CONNECTORS, WORKSPACE_MARKER, alphaOfficeInstallCommand } from "../shared/office-advisories"
+import { CODEPUPPY_OFFICE_CONNECTORS, WORKSPACE_MARKER, codepuppyOfficeInstallCommand } from "../shared/office-advisories"
 import { reconcileMcpWorkspaceMarkers, restoreWorkspaceMarker } from "./mcp-workspace-marker"
 
 const roots: string[] = []
@@ -13,7 +13,7 @@ afterEach(() => {
 })
 
 function tempRoot() {
-  const root = mkdtempSync(join(tmpdir(), "alpha-mcp-marker-"))
+  const root = mkdtempSync(join(tmpdir(), "codepuppy-mcp-marker-"))
   roots.push(root)
   return root
 }
@@ -102,12 +102,12 @@ describe("restoreWorkspaceMarker", () => {
     ).toBeNull()
   })
 
-  // #1564:四个第一方 Office 条目整条命令都是 main 模板(含 `{workspace}`),旧的 uv 形态由 alpha-office-instance 迁移;
+  // #1564:四个第一方 Office 条目整条命令都是 main 模板(含 `{workspace}`),旧的 uv 形态由 codepuppy-office-instance 迁移;
   // 本模块对它们一个字都不改 —— 包括此前那条只换 server 槽的分支能认出的形状(随包 server + 具体 workspace)。
   test("first-party Office entries are not this module's (their command is main's template since #1564)", () => {
     const server = realpathSync(resolve(import.meta.dir, "../../resources/office-mcp/server.py"))
-    for (const connector of ALPHA_OFFICE_CONNECTORS) {
-      const shaped = alphaOfficeInstallCommand(connector.format).map((argument) =>
+    for (const connector of CODEPUPPY_OFFICE_CONNECTORS) {
+      const shaped = codepuppyOfficeInstallCommand(connector.format).map((argument) =>
         argument === "{alphaResources}/office-mcp/server.py" ? server : argument === WORKSPACE_MARKER ? "/Users/example/project" : argument,
       )
       expect(restoreWorkspaceMarker(connector.catalogId, connector.name, shaped)).toBeNull()
@@ -118,7 +118,7 @@ describe("restoreWorkspaceMarker", () => {
 describe("reconcileMcpWorkspaceMarkers", () => {
   test("migrates the two exact catalog-owned commands and is byte-idempotent", () => {
     const root = tempRoot()
-    const config = join(root, "alpha.jsonc")
+    const config = join(root, "codepuppy.jsonc")
     const workspace = join(root, "old-project")
     writeConfig(config, {
       filesystem: {
@@ -147,7 +147,7 @@ describe("reconcileMcpWorkspaceMarkers", () => {
 
   test("leaves custom-owned, custom-name, drifted, and community Excel commands untouched", () => {
     const root = tempRoot()
-    const config = join(root, "alpha.jsonc")
+    const config = join(root, "codepuppy.jsonc")
     const workspace = join(root, "old-project")
     const original = {
       filesystem: {
@@ -186,7 +186,7 @@ describe("reconcileMcpWorkspaceMarkers", () => {
 
   test("requires the catalog receipt to own the exact MCP config key", () => {
     const root = tempRoot()
-    const config = join(root, "alpha.jsonc")
+    const config = join(root, "codepuppy.jsonc")
     writeConfig(config, {
       filesystem: {
         type: "local",

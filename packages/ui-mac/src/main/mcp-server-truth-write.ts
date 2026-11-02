@@ -18,7 +18,7 @@ export type McpServerTruthWriteFs = {
 
 let tmpSeq = 0
 
-/** 原子写(见文件头)。父目录 `mcp-servers/` 不在 alpha-environment.ts 的拓扑预检里,不在就建。 */
+/** 原子写(见文件头)。父目录 `mcp-servers/` 不在 codepuppy-environment.ts 的拓扑预检里,不在就建。 */
 export function writeMcpServerTruth(path: string, servers: readonly McpServerRecord[], fs: McpServerTruthWriteFs): void {
   const bad = invalidMcpServerList(servers)
   if (bad) throw new Error(`remote MCP servers: refusing to write ${path} — ${bad}`)

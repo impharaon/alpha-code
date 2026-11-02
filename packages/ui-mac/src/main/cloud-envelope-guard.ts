@@ -1,6 +1,6 @@
 // ADR-021 §2 —— 云 dispatch 上行硬校验(REQ-020 T1,兼 B3 验收⑦)。A 侧前置单点,B 侧 Zod
 // schema 校验之前再挡一层;MCP facade 路径(agent 经 mcp.cloud 直调 B)由 B 侧兜底(双层,见
-// ADR-021 后果)。纯函数、零 electron 依赖(镜像 alpha-cloud-events-core.ts 的拆分方式,单测友好)。
+// ADR-021 后果)。纯函数、零 electron 依赖(镜像 codepuppy-cloud-events-core.ts 的拆分方式,单测友好)。
 //
 // 三条规则,全部 loud-fail —— 绝不静默截断/改写内容(改写 = 送出损坏数据还装没事,反 placebo
 // 纪律 C28;ADR-021 §2 明文「不做静默改写」):
@@ -32,7 +32,7 @@ import {
   CONTROL_ENVELOPE_MAX_BYTES,
   decodeContract,
   type CloudJobRequestV1,
-} from "@alpha-code/contracts-consumer"
+} from "@codepuppy/contracts-consumer"
 
 export const MAX_ENVELOPE_BYTES = CONTROL_ENVELOPE_MAX_BYTES
 

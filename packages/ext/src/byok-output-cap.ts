@@ -1,6 +1,6 @@
 // REQ-156:**直连 BYOK 节点**的 `max_tokens` 取该模型上游实读受理上限。
 //
-// `#1238`(REQ-153 AC2)只解决了平台代理节点那一半 —— 它的判据是「baseURL 逐字 == ALPHA_BASE_URL
+// `#1238`(REQ-153 AC2)只解决了平台代理节点那一半 —— 它的判据是「baseURL 逐字 == CODEPUPPY_BASE_URL
 // ⇒ 不发 max_tokens,由网关按 route 上限填」。直连 BYOK 节点**没有网关**,没人替它填,于是它一直
 // 发着上游默认的 `OUTPUT_TOKEN_MAX = 32_000`(`platform-output-cap.test.ts` 里判「直连节点仍是
 // 上游 32000」的那条用例正是把这个状态钉住的;REQ-156 同批把它改题为「直连 BYOK 节点:本模块
@@ -124,7 +124,7 @@ export const BYOK_OUTPUT_CAP_READINGS: readonly ByokOutputCapReading[] = [
 export const BYOK_OUTPUT_CAP_UNREAD: readonly { apiModelID: string; why: string }[] = [
   // 2026-09-07 网查 + 2026-09-08 owner 裁决(#1281:替换成继任 id,不下架)。目录里两个上游已退役的
   // id 已换掉,所以这里剩下的全是**同一个原因**:本机没有该家凭据。这些 id 上游还在不在,由
-  // `packages/ui-mac/scripts/verify-byok-catalog.ts`(alpha-check 第 [11/11] 步)在有 key 时给出答案 ——
+  // `packages/ui-mac/scripts/verify-byok-catalog.ts`(codepuppy-check 第 [11/11] 步)在有 key 时给出答案 ——
   // 不再靠人肉网查。
   {
     apiModelID: "qwen3.8-max",

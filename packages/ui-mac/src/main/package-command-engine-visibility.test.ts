@@ -2,9 +2,9 @@
 //
 // 票面点名的假绿形态(已实证过一次):断言「引擎会读的那个文件」≠ 跑「引擎的读」——
 // 摘掉注入钩子,盘面/账本断言照样全绿,而用户下一条消息里找不到那个能力。
-// 所以本文件的主断言不读 alpha.jsonc、不读账本:它把**真实引擎**(workspace 源码,
+// 所以本文件的主断言不读 codepuppy.jsonc、不读账本:它把**真实引擎**(workspace 源码,
 // `packages/opencode/src/index.ts serve`,与打包 sidecar 同一份 v1 `GET /command` 路由)
-// 在隔离 env 里拉起来,用 `OPENCODE_CONFIG` 指向生产事务写出的那份 alpha.jsonc,
+// 在隔离 env 里拉起来,用 `OPENCODE_CONFIG` 指向生产事务写出的那份 codepuppy.jsonc,
 // 然后问引擎:`GET /command` 里有没有这条命令。
 //
 // 绕过配方(#840 AC):把 `buildCommandTxItems` 里那条 config TxPlanItem 摘掉(保留 receipt/账本)
@@ -99,7 +99,7 @@ function commandFixture(
 let tmp = ""
 let root = ""
 let userData = ""
-const previousRoot = process.env.ALPHA_GLOBAL_DIR
+const previousRoot = process.env.CODEPUPPY_GLOBAL_DIR
 
 beforeEach(() => {
   tmp = mkdtempSync(join(tmpdir(), "req840-engine-gate-"))
@@ -107,12 +107,12 @@ beforeEach(() => {
   userData = join(tmp, "user-data")
   mkdirSync(root, { recursive: true })
   for (const dir of ["home", "xdg-config", "xdg-data", "xdg-cache"]) mkdirSync(join(tmp, dir), { recursive: true })
-  process.env.ALPHA_GLOBAL_DIR = root
+  process.env.CODEPUPPY_GLOBAL_DIR = root
 })
 
 afterEach(() => {
-  if (previousRoot === undefined) delete process.env.ALPHA_GLOBAL_DIR
-  else process.env.ALPHA_GLOBAL_DIR = previousRoot
+  if (previousRoot === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+  else process.env.CODEPUPPY_GLOBAL_DIR = previousRoot
   rmSync(tmp, { recursive: true, force: true })
 })
 
@@ -217,7 +217,7 @@ describe("#840 engine visibility —— 判据是引擎真的读它的那条路"
       expect(record?.id).toBe(COMPONENT_ID)
 
       // ── 主断言:真实引擎读到了这条命令(名字/模板逐字/来源/子任务/hints)──────────────
-      const configPath = join(root, "alpha.jsonc")
+      const configPath = join(root, "codepuppy.jsonc")
       const listed = await engineCommandList(configPath)
       const command = listed.find((entry) => entry.name === COMMAND_NAME)
       expect(command, `engine GET /command lacks ${COMMAND_NAME}: ${JSON.stringify(listed.map((entry) => entry.name))}`).toBeDefined()
@@ -237,7 +237,7 @@ describe("#840 engine visibility —— 判据是引擎真的读它的那条路"
         removeMcpConfig: never("removeMcpConfig"),
         removeCommandConfig: (name) => removeCommandEntry(name),
         removeMcpSecretsStrict: never("removeMcpSecretsStrict"),
-        releaseAlphaConnectionBindings: never("releaseAlphaConnectionBindings"),
+        releaseCodePuppyConnectionBindings: never("releaseCodePuppyConnectionBindings"),
         removeInstallGrants,
         removePluginPath: never("removePluginPath"),
       }

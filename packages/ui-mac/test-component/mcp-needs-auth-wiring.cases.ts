@@ -119,7 +119,7 @@ mock.module("../src/renderer/auth-recovery", () => ({
   },
 }))
 mock.module("@solidjs/router", () => ({ useLocation: () => ({ pathname: "/" }) }))
-mock.module("../src/renderer/alpha-ui/Banner", () => ({ Banner: () => null }))
+mock.module("../src/renderer/codepuppy-ui/Banner", () => ({ Banner: () => null }))
 
 Object.defineProperty(window, "api", {
   configurable: true,
@@ -151,7 +151,7 @@ Object.defineProperty(window, "api", {
       hubView: async () => ({ directory: "/", rows: [], warnings: [] }),
       reloadRequest: async () => ({ ok: true as const, generation: 1 }),
       onHubViewChanged: () => () => {},
-      builtinRead: async () => ({ tools: [], agents: [], protection: { hard: [], alphaInjected: [] } }),
+      builtinRead: async () => ({ tools: [], agents: [], protection: { hard: [], codepuppyInjected: [] } }),
       curationBlob: async () => undefined,
       migrateVerify: async () => ({ ok: true as const }),
     },
@@ -163,7 +163,7 @@ const { render } = solidWeb
 // 必须**动态** import:静态 import 会在 registrator 之前牵出 solid-js,整个文件拿到 server 构建
 //(指纹 = 报错与改动无关且全文件一起挂)。纪律在 CLAUDE.md《本机验证陷阱》。
 const { ExtensionHub } = await import("../src/renderer/extensions/extension-hub")
-const { ToastViewport, dismissToast } = await import("../src/renderer/alpha-ui/Toast")
+const { ToastViewport, dismissToast } = await import("../src/renderer/codepuppy-ui/Toast")
 const { setHubSection } = await import("../src/renderer/extensions/ext-hub-state")
 
 const disposals: Array<() => void> = []
@@ -238,9 +238,9 @@ test("needs_auth 的 MCP 行:状态说「需要重新登录」,并出现一颗�
 
   await waitFor(() => expect(authorizeButtons().map((b) => b.dataset.mcpAuthorize)).toEqual([GENERIC_MCP]))
   // 状态文案:说「需要重新登录」,**不是**「未连接」——后者会把唯一的补救路径从界面上抹掉。
-  await waitFor(() => expect(document.body.textContent).toContain(zh["alpha.ext.mcpNeedsAuth"]))
-  expect(document.body.textContent).not.toContain(zh["alpha.ext.disabled"])
-  expect(authorizeButtons()[0]!.textContent).toBe(zh["alpha.ext.mcpAuthorize"])
+  await waitFor(() => expect(document.body.textContent).toContain(zh["codepuppy.ext.mcpNeedsAuth"]))
+  expect(document.body.textContent).not.toContain(zh["codepuppy.ext.disabled"])
+  expect(authorizeButtons()[0]!.textContent).toBe(zh["codepuppy.ext.mcpAuthorize"])
   expect(authorizeButtons()[0]!.disabled).toBe(false)
 })
 
@@ -256,10 +256,10 @@ test("点下去真的走到引擎的 authenticate,授权后那颗按钮消失、
   await waitFor(() => expect(authenticateCalls).toEqual([{ name: GENERIC_MCP }]))
   // ② 状态从引擎重读 —— 不是本地乐观改一下(那会在授权其实失败时谎报成功)。
   await waitFor(() => expect(authorizeButtons().length).toBe(0))
-  await waitFor(() => expect(document.body.textContent).toContain(zh["alpha.ext.enabledLive"]))
-  expect(document.body.textContent).not.toContain(zh["alpha.ext.mcpNeedsAuth"])
+  await waitFor(() => expect(document.body.textContent).toContain(zh["codepuppy.ext.enabledLive"]))
+  expect(document.body.textContent).not.toContain(zh["codepuppy.ext.mcpNeedsAuth"])
   // ③ 成功提示到达用户面(真 ToastViewport,不是「hub 调过 flash」这种内部事实)。
-  await waitFor(() => expect(toastTexts().some((text) => text.includes(zh["alpha.ext.mcpAuthDone"]))).toBe(true))
+  await waitFor(() => expect(toastTexts().some((text) => text.includes(zh["codepuppy.ext.mcpAuthDone"]))).toBe(true))
 })
 
 test("授权没完成时如实说失败,按钮留在原地(不谎报已重新登录)", async () => {
@@ -272,8 +272,8 @@ test("授权没完成时如实说失败,按钮留在原地(不谎报已重新登
   authorizeButtons()[0]!.click()
 
   await waitFor(() => expect(authenticateCalls).toEqual([{ name: GENERIC_MCP }]))
-  await waitFor(() => expect(toastTexts().some((text) => text.includes(zh["alpha.ext.mcpAuthFailed"]))).toBe(true))
-  expect(toastTexts().some((text) => text.includes(zh["alpha.ext.mcpAuthDone"]))).toBe(false)
+  await waitFor(() => expect(toastTexts().some((text) => text.includes(zh["codepuppy.ext.mcpAuthFailed"]))).toBe(true))
+  expect(toastTexts().some((text) => text.includes(zh["codepuppy.ext.mcpAuthDone"]))).toBe(false)
   // 补救入口必须还在 —— 「再试一次」是这条提示唯一有意义的下一步。
   expect(authorizeButtons().length).toBe(1)
 })
@@ -291,8 +291,8 @@ test("M1:端点 200 但 body 是 failed —— 必须说失败,绝不能说「�
   // 授权后这个 server 是 `failed`:`needs_auth` 确实不成立了 —— 按「不再 needs_auth」
   // 判成功的实现会在这里宣布成功,而用户的 MCP 根本用不了。
   await waitFor(() => expect(document.body.textContent).toContain("token rejected by resource server"))
-  await waitFor(() => expect(toastTexts().some((text) => text.includes(zh["alpha.ext.mcpAuthFailed"]))).toBe(true))
-  expect(toastTexts().some((text) => text.includes(zh["alpha.ext.mcpAuthDone"]))).toBe(false)
+  await waitFor(() => expect(toastTexts().some((text) => text.includes(zh["codepuppy.ext.mcpAuthFailed"]))).toBe(true))
+  expect(toastTexts().some((text) => text.includes(zh["codepuppy.ext.mcpAuthDone"]))).toBe(false)
   // failed 不是用户点一下能修好的状态 ⇒ 授权按钮不该留在那里假装还能救。
   expect(authorizeButtons().length).toBe(0)
 })
@@ -316,7 +316,7 @@ test("needs_client_registration 也不出授权按钮(缺 clientId,点一百次�
 
   await waitFor(() => expect(document.body.textContent).toContain("dynamic client registration"))
   expect(authorizeButtons().length).toBe(0)
-  expect(document.body.textContent).not.toContain(zh["alpha.ext.mcpNeedsAuth"])
+  expect(document.body.textContent).not.toContain(zh["codepuppy.ext.mcpNeedsAuth"])
 })
 
 test("connected 的 MCP 行不出授权按钮", async () => {
@@ -324,7 +324,7 @@ test("connected 的 MCP 行不出授权按钮", async () => {
   engineStatus = { [GENERIC_MCP]: { status: "connected" } }
   mount()
 
-  await waitFor(() => expect(document.body.textContent).toContain(zh["alpha.ext.enabledLive"]))
+  await waitFor(() => expect(document.body.textContent).toContain(zh["codepuppy.ext.enabledLive"]))
   expect(authorizeButtons().length).toBe(0)
 })
 
@@ -334,8 +334,8 @@ test("`#1563` pending 的 MCP 行不说「已停用」,也不出授权按钮", a
   engineStatus = { [GENERIC_MCP]: { status: "pending" } }
   mount()
 
-  await waitFor(() => expect(document.body.textContent).toContain(zh["alpha.ext.hubReasonNotLoaded"]))
-  expect(document.body.textContent).not.toContain(zh["alpha.ext.disabled"])
+  await waitFor(() => expect(document.body.textContent).toContain(zh["codepuppy.ext.hubReasonNotLoaded"]))
+  expect(document.body.textContent).not.toContain(zh["codepuppy.ext.disabled"])
   expect(authorizeButtons().length).toBe(0)
 })
 
@@ -345,15 +345,15 @@ test("云连接器卡在 needs_auth 时说「需要重新登录」并给出同�
   engineStatus = { codepuppy: { status: "needs_auth" } }
   mount()
 
-  await waitFor(() => expect(document.querySelector(".alpha-ext-cloudst")?.textContent).toBe(zh["alpha.ext.mcpNeedsAuth"]))
+  await waitFor(() => expect(document.querySelector(".codepuppy-ext-cloudst")?.textContent).toBe(zh["codepuppy.ext.mcpNeedsAuth"]))
   // 「未连接(引擎会自动重连)」在这里是**假话**:没有令牌,引擎永远不会自己连上。
-  expect(document.body.textContent).not.toContain(zh["alpha.ext.cloudConnDisconnected"])
+  expect(document.body.textContent).not.toContain(zh["codepuppy.ext.cloudConnDisconnected"])
   const buttons = authorizeButtons()
   expect(buttons.length).toBe(1)
 
   buttons[0]!.click()
   await waitFor(() => expect(authenticateCalls).toEqual([{ name: "codepuppy" }]))
-  await waitFor(() => expect(document.querySelector(".alpha-ext-cloudst")?.textContent).toBe(zh["alpha.ext.cloudConnConnected"]))
+  await waitFor(() => expect(document.querySelector(".codepuppy-ext-cloudst")?.textContent).toBe(zh["codepuppy.ext.cloudConnConnected"]))
   expect(authorizeButtons().length).toBe(0)
 })
 
@@ -364,12 +364,12 @@ test("带 {workspace} 的 Hub MCP 安装不打开目录选择器,只发送全局
 
   let filesystemCard: HTMLElement | undefined
   await waitFor(() => {
-    filesystemCard = Array.from(document.querySelectorAll<HTMLElement>(".alpha-ext-card")).find((card) =>
+    filesystemCard = Array.from(document.querySelectorAll<HTMLElement>(".codepuppy-ext-card")).find((card) =>
       card.textContent?.includes("本地文件读写"),
     )
     expect(filesystemCard).toBeInstanceOf(HTMLElement)
   })
-  filesystemCard!.querySelector<HTMLButtonElement>(".alpha-ext-add")!.click()
+  filesystemCard!.querySelector<HTMLButtonElement>(".codepuppy-ext-add")!.click()
 
   let confirm: HTMLButtonElement | null = null
   await waitFor(() => {
@@ -399,13 +399,13 @@ const recoveringAuth = () => {
 }
 /** 详情页主操作按钮(「启用」/「添加」)。 */
 const primaryAddButton = () =>
-  Array.from(document.querySelectorAll<HTMLButtonElement>("button.alpha-ext-add")).find(
-    (b) => b.textContent === zh["alpha.ext.enableCloud"],
+  Array.from(document.querySelectorAll<HTMLButtonElement>("button.codepuppy-ext-add")).find(
+    (b) => b.textContent === zh["codepuppy.ext.enableCloud"],
   )
 /** 打开某个云条目的详情页(点卡片,走生产的 openEntryDetail)。 */
 async function openCloudEntry(displayName: string) {
   await waitFor(() => {
-    const card = Array.from(document.querySelectorAll<HTMLElement>(".alpha-ext-card")).find((c) =>
+    const card = Array.from(document.querySelectorAll<HTMLElement>(".codepuppy-ext-card")).find((c) =>
       c.querySelector("b")?.textContent?.includes(displayName),
     )
     if (!card) throw new Error(`card not found: ${displayName}`)
@@ -434,7 +434,7 @@ test("`#624` 恢复中:云条目的「启用」按钮禁用(ready 时可用)", a
 test("`#624` 恢复中:code-review 详情的云派发按钮禁用(ready 时可用)", async () => {
   // 派发区的按钮 = 真正把代码送出去的那两颗(上传 / legacy diff)。
   const dispatchButtons = () =>
-    Array.from(document.querySelectorAll<HTMLButtonElement>(".alpha-ext-cloudrun button.alpha-ext-add"))
+    Array.from(document.querySelectorAll<HTMLButtonElement>(".codepuppy-ext-cloudrun button.codepuppy-ext-add"))
 
   reset()
   recoveringAuth()
@@ -460,14 +460,14 @@ test("`#624` 恢复中的云连接器行不谎称「未登录 / BYOK」,也不�
   mount()
 
   await waitFor(() =>
-    expect(document.querySelector("[data-cloud-connector] .alpha-ext-cloudst")?.textContent).toBe(zh["alpha.ext.cloudConnRecovering"]),
+    expect(document.querySelector("[data-cloud-connector] .codepuppy-ext-cloudst")?.textContent).toBe(zh["codepuppy.ext.cloudConnRecovering"]),
   )
   // 用户此刻**已登录**且**已在 platform 模式** —— 「需登录」是假话。
-  expect(document.body.textContent).not.toContain(zh["alpha.ext.cloudConnNeedLogin"])
+  expect(document.body.textContent).not.toContain(zh["codepuppy.ext.cloudConnNeedLogin"])
   // 「切换到平台模式」点下去是 no-op;恢复中不给任何动作。
   expect(document.querySelector("[data-cloud-connector] button")).toBeNull()
-  expect(document.body.textContent).not.toContain(zh["alpha.ext.cloudSwitchMode"])
-  expect(document.body.textContent).not.toContain(zh["alpha.ext.cloudLoginCta"])
+  expect(document.body.textContent).not.toContain(zh["codepuppy.ext.cloudSwitchMode"])
+  expect(document.body.textContent).not.toContain(zh["codepuppy.ext.cloudLoginCta"])
 })
 
 test("`#624` 恢复中的连接器卡说「凭证恢复中」,不说「需登录平台模式」", async () => {
@@ -477,11 +477,11 @@ test("`#624` 恢复中的连接器卡说「凭证恢复中」,不说「需登录
   mount()
 
   await waitFor(() =>
-    expect(document.querySelector(".alpha-ext-cloudst")?.textContent).toBe(zh["alpha.ext.cloudConnRecovering"]),
+    expect(document.querySelector(".codepuppy-ext-cloudst")?.textContent).toBe(zh["codepuppy.ext.cloudConnRecovering"]),
   )
-  expect(document.body.textContent).not.toContain(zh["alpha.ext.cloudConnNeedLogin"])
+  expect(document.body.textContent).not.toContain(zh["codepuppy.ext.cloudConnNeedLogin"])
   // 恢复中不得谎称「已连接」—— 那正是这次要拦的放行。
-  expect(document.body.textContent).not.toContain(zh["alpha.ext.cloudConnConnected"])
+  expect(document.body.textContent).not.toContain(zh["codepuppy.ext.cloudConnConnected"])
 })
 
 // ── `#1106`:注入面推迟的云连接,hub 观察到 disabled 时补上那一次 connect ────────────────────
@@ -498,13 +498,13 @@ test("`#1106` 主线:disabled 云条目 → hub 补发一次 connect → needs_a
 
   // kick 恰好一次;引擎如实报回 needs_auth,`#733` 的卡片臂与按钮随之点亮。
   await waitFor(() => expect(connectCalls).toEqual([{ name: "codepuppy" }]))
-  await waitFor(() => expect(document.querySelector(".alpha-ext-cloudst")?.textContent).toBe(zh["alpha.ext.mcpNeedsAuth"]))
+  await waitFor(() => expect(document.querySelector(".codepuppy-ext-cloudst")?.textContent).toBe(zh["codepuppy.ext.mcpNeedsAuth"]))
   await waitFor(() => expect(authorizeButtons().length).toBe(1))
 
   // 其后的授权链与 `#733` 逐字相同 —— kick 不得再多发 connect。
   authorizeButtons()[0]!.click()
   await waitFor(() => expect(authenticateCalls).toEqual([{ name: "codepuppy" }]))
-  await waitFor(() => expect(document.querySelector(".alpha-ext-cloudst")?.textContent).toBe(zh["alpha.ext.cloudConnConnected"]))
+  await waitFor(() => expect(document.querySelector(".codepuppy-ext-cloudst")?.textContent).toBe(zh["codepuppy.ext.cloudConnConnected"]))
   expect(connectCalls).toEqual([{ name: "codepuppy" }])
 })
 
@@ -526,7 +526,7 @@ test("`#1106` kill-switch 的中和条目:kick 连到 127.0.0.1:1 即刻失败,�
 
   await waitFor(() => expect(connectCalls).toEqual([{ name: "codepuppy" }]))
   // 结局 failed:卡片说「未连接」,没有一颗点了必失败的授权按钮(与今天的 kill-switch 呈现一致)。
-  await waitFor(() => expect(document.querySelector(".alpha-ext-cloudst")?.textContent).toBe(zh["alpha.ext.cloudConnDisconnected"]))
+  await waitFor(() => expect(document.querySelector(".codepuppy-ext-cloudst")?.textContent).toBe(zh["codepuppy.ext.cloudConnDisconnected"]))
   expect(authorizeButtons().length).toBe(0)
 })
 
@@ -537,6 +537,6 @@ test("`#1106` 凭证其实已在(别处授权完成):kick 直接把它连上", a
   mount()
 
   await waitFor(() => expect(connectCalls).toEqual([{ name: "codepuppy" }]))
-  await waitFor(() => expect(document.querySelector(".alpha-ext-cloudst")?.textContent).toBe(zh["alpha.ext.cloudConnConnected"]))
+  await waitFor(() => expect(document.querySelector(".codepuppy-ext-cloudst")?.textContent).toBe(zh["codepuppy.ext.cloudConnConnected"]))
   expect(authorizeButtons().length).toBe(0)
 })

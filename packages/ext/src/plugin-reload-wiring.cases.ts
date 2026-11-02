@@ -6,7 +6,7 @@ import { afterAll, expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { buildReloadRequest, parseAlphaSidecarInbound } from "../../ui-mac/src/main/alpha-sidecar-messages"
+import { buildReloadRequest, parseCodePuppySidecarInbound } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
 
 const sent: unknown[] = []
 const listeners: Array<(event: { data: unknown }) => void> = []
@@ -16,16 +16,16 @@ const listeners: Array<(event: { data: unknown }) => void> = []
 }
 const deliver = (data: unknown) => listeners.forEach((listener) => listener({ data }))
 
-const root = realpathSync(mkdtempSync(join(tmpdir(), "alpha-plugin-reload-wiring-")))
-const globalRoot = join(root, "alpha-code-state", "env", "dev")
+const root = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-plugin-reload-wiring-")))
+const globalRoot = join(root, "codepuppy-state", "env", "dev")
 mkdirSync(globalRoot, { recursive: true })
 mkdirSync(join(root, "workspace"), { recursive: true })
-process.env.ALPHA_GLOBAL_DIR = globalRoot
+process.env.CODEPUPPY_GLOBAL_DIR = globalRoot
 afterAll(() => rmSync(root, { recursive: true, force: true }))
 
-const { AlphaExt } = await import("./plugin")
+const { CodePuppyExt } = await import("./plugin")
 
-const reports = () => sent.map((message) => parseAlphaSidecarInbound(message)).filter((m) => m?.type === "alpha.reload.report")
+const reports = () => sent.map((message) => parseCodePuppySidecarInbound(message)).filter((m) => m?.type === "codepuppy.reload.report")
 async function until(check: () => boolean, label: string) {
   for (let i = 0; i < 200; i++) {
     if (check()) return
@@ -35,7 +35,7 @@ async function until(check: () => boolean, label: string) {
 }
 
 test("main 的重载请求 ⇒ 等本实例会话空闲 ⇒ 恰好一次 dispose ⇒ 报 reloaded;dispose 钩子之后不再 dispose 这个实例", async () => {
-  // 监听在 AlphaExt 被调用之前就在了(模块装载时挂上)
+  // 监听在 CodePuppyExt 被调用之前就在了(模块装载时挂上)
   expect(listeners).toHaveLength(1)
   const engine = { busy: true, disposes: 0 }
   const client = {
@@ -43,7 +43,7 @@ test("main 的重载请求 ⇒ 等本实例会话空闲 ⇒ 恰好一次 dispose
     session: { status: async () => ({ data: engine.busy ? { ses_1: { type: "busy" } } : {} }) },
     provider: { list: async () => ({ data: { all: [], default: {}, connected: [] } }) },
   }
-  const hooks = (await AlphaExt({ directory: join(root, "workspace"), worktree: join(root, "workspace"), client } as never)) as unknown as {
+  const hooks = (await CodePuppyExt({ directory: join(root, "workspace"), worktree: join(root, "workspace"), client } as never)) as unknown as {
     event: (input: { event: { type: string; properties: unknown } }) => Promise<void>
     dispose: () => Promise<void>
     tool: Record<string, { execute: (args: unknown, ctx: unknown) => Promise<unknown> }>
@@ -51,7 +51,7 @@ test("main 的重载请求 ⇒ 等本实例会话空闲 ⇒ 恰好一次 dispose
   deliver(buildReloadRequest({ generation: 7, scope: "global", items: [{ id: "skill:writer", scope: "global" }], reason: "installed skill writer" }))
   await until(() => reports().length === 1, "the waiting report")
   expect(reports()[0]).toEqual({
-    type: "alpha.reload.report",
+    type: "codepuppy.reload.report",
     generation: 7,
     scope: "global",
     outcome: "waiting",
@@ -67,12 +67,12 @@ test("main 的重载请求 ⇒ 等本实例会话空闲 ⇒ 恰好一次 dispose
 
   engine.busy = false
   await hooks.event({ event: { type: "session.idle", properties: { sessionID: "ses_1" } } })
-  await until(() => reports().some((r) => r?.type === "alpha.reload.report" && r.outcome === "reloaded"), "the reloaded report")
+  await until(() => reports().some((r) => r?.type === "codepuppy.reload.report" && r.outcome === "reloaded"), "the reloaded report")
   expect(engine.disposes).toBe(1)
 
   await hooks.dispose()
   deliver(buildReloadRequest({ generation: 8, scope: "global", items: [], reason: "again" }))
   await until(() => reports().length === 3, "the report for generation 8")
-  expect(reports().at(-1)).toEqual({ type: "alpha.reload.report", generation: 8, scope: "global", outcome: "reloaded", directories: [] })
+  expect(reports().at(-1)).toEqual({ type: "codepuppy.reload.report", generation: 8, scope: "global", outcome: "reloaded", directories: [] })
   expect(engine.disposes).toBe(1)
 })

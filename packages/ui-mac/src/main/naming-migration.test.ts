@@ -3,7 +3,8 @@
 // 夹具 = 一台 0.1.24 用户机的形状:userData 下的旧名持久化项、三环境共用的全局根、四个 Office 组件
 // (收据与授权账用生产写器 upsertRecordV2 / writeCapabilityGrantSync 写出,形状与 codepuppy-office-instance.test.ts
 // 里取自 owner 本机 prod 的那四条相同,只是名字换回旧名)、含注释的环境配置、治理文件、设置与模型选择 store 文件、
-// 以及一个真 sqlite 引擎库。全局根骨架取自真实的 initCodePuppyEnvironment 产物(不起 GUI)。
+// 以及一个真 sqlite 引擎库。全局根的目录骨架按 codepuppy-environment.ts initCodePuppyEnvironment 建的拓扑手写
+// (`<base>/{cas,env/{prod,beta,dev}}`);没有起 dev GUI 去取真实启动产物 —— 那会碰本机的 dev userData 与钥匙串。
 import { afterAll, describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
@@ -581,7 +582,7 @@ runNamingMigrationBoot({ environment: "prod", onboardingTest: false, userData, a
 }
 
 describe("R6 —— 目标全局根已存在", () => {
-  /** 真实 dev 启动产物的形状:initCodePuppyEnvironment 建的骨架 + dev 环境的按环境真源文件。 */
+  /** dev 运行留下的形状(手写,未取真实产物):initCodePuppyEnvironment 建的骨架 + dev 环境的文件与按环境命名的真源文件。 */
   function devSkeleton(dst: string) {
     for (const dir of ["cas", "env/prod", "env/beta", "env/dev/ext-store", "fence-workspaces", "custom-providers", "mcp-servers", "egress-grants"])
       mkdirSync(join(dst, dir), { recursive: true })

@@ -96,7 +96,10 @@ UPSTREAM_PATHS="packages"
 # 只会把「改自己的代码」变成一道恒红门。
 # **这张清单由下面的运行期自检逐条对着上游镜像验一遍**:把一个真上游包写进来,是绕开整道门
 # 最便宜的一步(一行配置换一整个包的豁免),它不能只靠人看。
-CODEPUPPY_OWNED_PACKAGES="ext ui-mac codepuppy-contracts-consumer"
+# `#1570` 改名过渡:包目录 alpha-contracts-consumer → codepuppy-contracts-consumer。守卫判的是
+# `--diff-filter=DMR` 的**删除侧旧路径**,所以改名那个 PR 里旧目录必须仍在豁免表里,否则每个被搬走的
+# 文件都会被判成上游删除。紧随的 S 级 PR 删掉旧目录名(以及下面两处旧前缀 / 旧 marker)。
+CODEPUPPY_OWNED_PACKAGES="ext ui-mac codepuppy-contracts-consumer alpha-contracts-consumer"
 
 # carve-out ②:由 ADR-034 的 pin + SOT 补丁 roundtrip 盖住的前端包。
 # 它们**不是** alpha 自有(`origin/dev` 里有,alpha 也确实在改),但覆盖它们的不是本门:
@@ -213,7 +216,8 @@ UPSTREAM_EXCLUDES=(
 # 谓词 = 两个因子的**合取**,缺一不豁免:
 #   ① 出身:这条路径在上游镜像 `origin/dev` 里**不存在**。dev 是上游纯镜像(ADR-005),
 #      真上游文件按定义在它里面 ⇒ 这一条单独就挡住了「把真上游改动放行」的绝大部分。
-#   ② 自报家门:basename 以 `alpha-` 开头,**或**文件里写着 `north-star:codepuppy-owned`。
+#   ② 自报家门:basename 以 `codepuppy-` 开头,**或**文件里写着 `north-star:codepuppy-owned`
+#      (`#1570` 改名过渡期间旧前缀 `alpha-` 与旧 marker `north-star:alpha-owned` 同样认,S 级后续 PR 删)。
 #
 # 为什么必须是合取,而不是任一条单独成立:
 #   · 只有①:`origin/dev` 是个会陈旧的 ref。fetch 失败(实测 3 次 1 次)+ 上游在这段窗口里
@@ -232,6 +236,7 @@ UPSTREAM_EXCLUDES=(
 #   · 谓词判的是**路径**,不是内容:它回答「这条路径是不是上游的」,不回答「这次改动对不对」。
 UPSTREAM_MIRROR="origin/dev"
 CODEPUPPY_OWNED_MARKER="north-star:codepuppy-owned"
+LEGACY_OWNED_MARKER="north-star:alpha-owned" # `#1570` 改名过渡,S 级后续 PR 删
 
 # `#1288` 只读模式的落点:上面五个值全部定义完、而**任何** git 命令都还没跑。放在这里是判据
 # 的一部分 —— 度量步在拿不到 origin/dev 时要自己判「未测量」,它不能先被守卫的 fetch/降级
@@ -264,10 +269,10 @@ mirror_has() { git cat-file -e "${UPSTREAM_MIRROR}:$1" 2>/dev/null; }
 # 方向是 fail-closed(误判成上游 ⇒ 假红)而不是放行,但它取决于文件多大、marker 在第几行,
 # 是那种「今天绿明天红」的不可复现门。命令替换没有这个问题。
 declares_codepuppy_owned() {
-  case "${1##*/}" in alpha-*) return 0 ;; esac
+  case "${1##*/}" in codepuppy-* | alpha-*) return 0 ;; esac
   local body
   body="$(cat "$1" 2>/dev/null || git show "HEAD:$1" 2>/dev/null || git show "origin/alpha:$1" 2>/dev/null)" || return 1
-  case "$body" in *"$CODEPUPPY_OWNED_MARKER"*) return 0 ;; esac
+  case "$body" in *"$CODEPUPPY_OWNED_MARKER"* | *"$LEGACY_OWNED_MARKER"*) return 0 ;; esac
   return 1
 }
 
@@ -394,7 +399,7 @@ if [ -n "$flagged" ]; then
   echo "    ✗ upstream files modified/deleted/renamed (fork-sync would conflict):"
   printf '%s' "$flagged" | sed 's/^/      /'
   echo "      → revert; extend via alpha files (packages/ext, packages/ui-mac) or seams (ADR-002/005)."
-  echo "      → 它其实是 alpha 自有文件?命名成 alpha-*,或在文件里写一行 '${CODEPUPPY_OWNED_MARKER}'(ADR-043)。"
+  echo "      → 它其实是 alpha 自有文件?命名成 codepuppy-*,或在文件里写一行 '${CODEPUPPY_OWNED_MARKER}'(ADR-043)。"
   exit 1
 fi
 # 绿也要说清「这一跑量的是什么」(`#913` 同一条纪律):辖区不再是读者背得出来的 8 个包,

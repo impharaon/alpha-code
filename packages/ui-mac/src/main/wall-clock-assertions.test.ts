@@ -213,13 +213,20 @@ describe("控制臂:处置合法性(默认拒)", () => {
       expect(dispositionError(row({ file, disposition: "load-sensitive", reason: "负载敏感" }), repoContext), file).toContain("load-sensitive")
   })
 
-  test("upstream 不许给 alpha 自有文件:alpha 三包 / alpha- 前缀 / 正文带 north-star:codepuppy-owned", () => {
-    const ctx: LedgerContext = { ...repoContext, read: (file) => (file.endsWith("marked.test.ts") ? "// north-star:codepuppy-owned\n" : "") }
+  test("upstream 不许给 alpha 自有文件:alpha 三包 / codepuppy-(过渡期含 alpha-)前缀 / 正文带 marker", () => {
+    // `#1570` 改名过渡:旧前缀 alpha- 与旧 marker 同样认(与 north-star 守卫一致),S 级后续 PR 删这两行样本。
+    const markers: Record<string, string> = {
+      "packages/core/test/marked.test.ts": "// north-star:codepuppy-owned\n",
+      "packages/core/test/legacy-marked.test.ts": "// north-star:alpha-owned\n",
+    }
+    const ctx: LedgerContext = { ...repoContext, read: (file) => markers[file] ?? "" }
     for (const file of [
       "packages/ui-mac/src/main/synthetic.test.ts",
       "packages/ext/src/synthetic.test.ts",
       "packages/opencode/test/tool/codepuppy-synthetic.test.ts",
+      "packages/opencode/test/tool/alpha-synthetic.test.ts",
       "packages/core/test/marked.test.ts",
+      "packages/core/test/legacy-marked.test.ts",
     ])
       expect(dispositionError(row({ file, disposition: "upstream", reason: "上游" }), ctx), file).toContain("upstream")
     expect(dispositionError(row({ file: "packages/core/test/plain.test.ts", disposition: "upstream", reason: "上游" }), ctx)).toBeUndefined()

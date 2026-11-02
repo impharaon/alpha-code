@@ -452,6 +452,73 @@ describe("#1085 alpha 自有文件的结构性谓词", () => {
 //   · 另有反向一条:fetch 正常时这一段**不许出现**。缺了它,「无条件永远打印一句年龄」这个
 //     错误实现能满足上面全部断言。
 //   · 还有一条守住既有行为:降级**不是**放弃 —— 它仍要跑完并给出正确结论。
+// ── `#1570` 改名过渡:新旧两种前缀 / marker / 包目录同时认 ─────────────────────────────
+// 守卫判的是 `--diff-filter=DMR --no-renames` 的**删除侧旧路径**:改名 PR 里每一个被搬走的
+// `alpha-*` 文件、带旧 marker 的文件、旧包目录下的文件,在它眼里都是「删掉一条 dev 里没有的路径」。
+// 只认新值的守卫会把它们全判成上游删除。三条各带一个控制组(把那一格旧值从生产脚本里抹掉 ⇒ 红),
+// 证明绿是那一格旧值挣来的。紧随的 S 级 PR 删掉旧值时,连同这一节一起删。
+const LEGACY_MARKER = "north-star:alpha-owned"
+
+/** forkFixture 再往 origin/alpha 上补几条只在 alpha 侧的文件(= 改名前的基线),feature 重新对齐它。 */
+function legacyFixture(files: Record<string, string>) {
+  const { origin, work } = forkFixture()
+  commit(origin, "pre-rename alpha-side files", files)
+  git(work, ["fetch", "-q", "origin", "alpha"])
+  git(work, ["reset", "-q", "--hard", "origin/alpha"])
+  return work
+}
+
+describe("#1570 改名过渡:旧前缀、旧 marker、旧包目录在改名 PR 里仍被认作 alpha 自有", () => {
+  test("alpha-* 自有文件改名成 codepuppy-* ⇒ 绿且点名旧路径(控制组:抹掉旧前缀即红)", () => {
+    const legacy = "packages/core/test/alpha-legacy-leaf.test.ts"
+    const work = legacyFixture({ [legacy]: "export const legacy = 1\n" })
+    git(work, ["mv", legacy, "packages/core/test/codepuppy-legacy-leaf.test.ts"])
+    git(work, ["commit", "-q", "-m", "rename an alpha-owned file to the new prefix"])
+
+    const run = runGuard(work)
+    expect(run.exitCode, `改名 PR 里旧前缀的删除侧被判成上游删除:\n${run.output}`).toBe(0)
+    expect(run.output, `豁免了却没点名旧路径:\n${run.output}`).toContain(legacy)
+
+    const without = runGuard(work, mutatedGuard("no-legacy-prefix", (src) => src.replace("codepuppy-* | alpha-*)", "codepuppy-*)")))
+    expect(without.exitCode, `抹掉旧前缀之后还是绿 —— 上面那条绿不是旧前缀挣来的:\n${without.output}`).not.toBe(0)
+    expect(without.output).toContain(legacy)
+  })
+
+  test("带旧 marker 的自有文件被改 ⇒ 绿(控制组:抹掉旧 marker 即红)", () => {
+    const marked = "packages/core/src/legacy-marked-leaf.ts"
+    const work = legacyFixture({ [marked]: `// ${LEGACY_MARKER}\nexport const marked = 1\n` })
+    commit(work, "edit a file that still carries the old marker", { [marked]: `// ${LEGACY_MARKER}\nexport const marked = 2\n` })
+
+    const run = runGuard(work)
+    expect(run.exitCode, `旧 marker 不再被认:\n${run.output}`).toBe(0)
+    expect(run.output).toContain(marked)
+
+    const without = runGuard(
+      work,
+      mutatedGuard("no-legacy-marker", (src) => src.replace(' | *"$LEGACY_OWNED_MARKER"*', "")),
+    )
+    expect(without.exitCode, `抹掉旧 marker 之后还是绿:\n${without.output}`).not.toBe(0)
+    expect(without.output).toContain(marked)
+  })
+
+  test("旧包目录 alpha-contracts-consumer 整体搬到新目录 ⇒ 绿(控制组:抹掉旧目录名即红且点名)", () => {
+    const old = "packages/alpha-contracts-consumer/src/decode.ts"
+    const work = legacyFixture({ [old]: "export const decode = 1\n" })
+    git(work, ["mv", "packages/alpha-contracts-consumer", "packages/codepuppy-contracts-consumer"])
+    git(work, ["commit", "-q", "-m", "move the contracts consumer package to its new directory"])
+
+    const run = runGuard(work)
+    expect(run.exitCode, `旧包目录的删除侧被判成上游删除:\n${run.output}`).toBe(0)
+
+    const without = runGuard(
+      work,
+      mutatedGuard("no-legacy-package", (src) => src.replace(" alpha-contracts-consumer\"", '"')),
+    )
+    expect(without.exitCode, `抹掉旧目录名之后还是绿:\n${without.output}`).not.toBe(0)
+    expect(without.output).toContain(old)
+  })
+})
+
 describe("#913 fetch 失败降级时,基准的身份与年龄必须可读", () => {
   test("fetch 拿不到 + last-known 陈旧 ⇒ 基准 sha 与陈旧程度都读得出,且跟着真实状态变", () => {
     const stale = degradedFixture(3)

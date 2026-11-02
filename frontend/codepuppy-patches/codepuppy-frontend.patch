@@ -881,7 +881,7 @@ index 799c4713d..8613ca083 100644
          void platform.notify(language.t("notification.session.error.title"), description, () => input.navigate(href))
        }
 diff --git a/packages/app/src/context/permission-auto-respond.test.ts b/packages/app/src/context/permission-auto-respond.test.ts
-index 794e03ae4..683c41a37 100644
+index 794e03ae4..6e99d6674 100644
 --- a/packages/app/src/context/permission-auto-respond.test.ts
 +++ b/packages/app/src/context/permission-auto-respond.test.ts
 @@ -3,6 +3,10 @@ import type { PermissionRequest, Session } from "@opencode-ai/sdk/v2/client"
@@ -1032,7 +1032,7 @@ index 8fff6d70c..7669217bb 100644
      .find((item): item is boolean => item !== undefined)
 diff --git a/packages/app/src/context/permission-surface.tsx b/packages/app/src/context/permission-surface.tsx
 new file mode 100644
-index 000000000..382431266
+index 000000000..be0b1a0b5
 --- /dev/null
 +++ b/packages/app/src/context/permission-surface.tsx
 @@ -0,0 +1,99 @@
@@ -2501,7 +2501,7 @@ index 00849598c..d78ad3ad6 100644
 +  "session.draft.missing.action": "Back to home",
  } satisfies Partial<Record<Keys, string>>
 diff --git a/packages/app/src/i18n/desktop-native.ts b/packages/app/src/i18n/desktop-native.ts
-index 1aa9bd39f..3e1663407 100644
+index 1aa9bd39f..7157bc2ac 100644
 --- a/packages/app/src/i18n/desktop-native.ts
 +++ b/packages/app/src/i18n/desktop-native.ts
 @@ -202,7 +202,7 @@ export function detectDesktopNativeLocale(languages: readonly string[]): Desktop
@@ -3590,7 +3590,7 @@ index 95f8c0184..1910081ba 100644
        if (!mobile) scrollContainerRef = el
      },
 diff --git a/packages/app/src/pages/layout/deep-links.ts b/packages/app/src/pages/layout/deep-links.ts
-index 5dca421f7..566391c28 100644
+index 5dca421f7..e9575fe5f 100644
 --- a/packages/app/src/pages/layout/deep-links.ts
 +++ b/packages/app/src/pages/layout/deep-links.ts
 @@ -1,50 +1,110 @@
@@ -3740,7 +3740,7 @@ index 5dca421f7..566391c28 100644
 +  applyDeepLinks(drainPendingDeepLinks(deps.buffer()), deps)
  }
 diff --git a/packages/app/src/pages/layout/helpers.test.ts b/packages/app/src/pages/layout/helpers.test.ts
-index cb58b6f8b..d17f9b49b 100644
+index cb58b6f8b..1d9d85284 100644
 --- a/packages/app/src/pages/layout/helpers.test.ts
 +++ b/packages/app/src/pages/layout/helpers.test.ts
 @@ -1,10 +1,10 @@
@@ -5977,7 +5977,7 @@ index 981e3f45d..79fc55712 100644
    return (
      <div
 diff --git a/packages/ui/src/components/image-preview.tsx b/packages/ui/src/components/image-preview.tsx
-index 8462ce256..944dacd72 100644
+index 8462ce256..50fc9c012 100644
 --- a/packages/ui/src/components/image-preview.tsx
 +++ b/packages/ui/src/components/image-preview.tsx
 @@ -1,6 +1,8 @@

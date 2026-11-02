@@ -1,5 +1,5 @@
 // REQ-128 production wiring gate. Since snapshot 2026-08-25.2 (ac#1132) the shipped bundled
-// Catalog carries its first real package instance (package:alpha-first); the bottom test pins that
+// Catalog carries its first real package instance (package:codepuppy-first); the bottom test pins that
 // premise against the real bytes. The packages below remain explicit host-owned constructions that
 // reuse the pinned alpha-web corpus's identity — a reachability harness for every path the single
 // real instance does not reach (blocked verdicts, skips, admission failures).
@@ -515,8 +515,8 @@ describe("package installability production wiring", () => {
     const shape = validateCatalogPackageShape(bundledCatalog)
     if (!shape.ok) throw new Error(`bundled catalog failed the production shape gate: ${shape.error}`)
     expect(shape.packages.map((item) => `${item.prelude.packageId}@${item.prelude.version}`)).toEqual([
-      "package:alpha-first@1.0.0",
       "package:cloud-image@1.0.0",
+      "package:codepuppy-first@1.0.1",
       "package:dbhub-readonly@1.0.0",
       "package:github-official@1.0.0",
     ])

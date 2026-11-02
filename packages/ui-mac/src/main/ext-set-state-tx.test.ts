@@ -572,17 +572,17 @@ const bundledResolveOver =
         : r
   }
 
-/** 随包快照里 `package:alpha-first` 的 raw envelope + 测试自读的 wire 事实(prelude/root/
+/** 随包快照里 `package:codepuppy-first` 的 raw envelope + 测试自读的 wire 事实(prelude/root/
  *  components 直接来自快照字节 —— 独立于生产派生的输入轴)。快照若不再携带,响亮报错而不是
  *  静默跳过:那正是 ext-ipc `#817` 注释前提的又一次翻转,注释与本 describe 必须一起重审。 */
 const bundledPackageFacts = () => {
   const pkgs = (bundledCatalog as { packages?: unknown[] }).packages
   const hit = (Array.isArray(pkgs) ? pkgs : []).find(
-    (p) => (p as { prelude?: { packageId?: unknown } })?.prelude?.packageId === "package:alpha-first",
+    (p) => (p as { prelude?: { packageId?: unknown } })?.prelude?.packageId === "package:codepuppy-first",
   )
   if (!hit)
     throw new Error(
-      "随包快照不再携带 package:alpha-first —— ext-ipc `#817` 注释前提再次翻转,注释与 #1136 describe 必须一起重审",
+      "随包快照不再携带 package:codepuppy-first —— ext-ipc `#817` 注释前提再次翻转,注释与 #1136 describe 必须一起重审",
     )
   return {
     envelope: hit,
@@ -613,7 +613,7 @@ describe("setInstallStateByKey(#1136 随包快照携带真实 package:bundled �
     const { envelope, wire } = bundledPackageFacts()
     // 具名锚:当前快照的 package root。快照演进换 root 时本行红 —— 连同 fixture 一起更新,
     // 不要泛化(启停生效面随 kind 不同,泛化会把失败变成谜语)。
-    expect(wire.root).toBe("skill:alpha-first")
+    expect(wire.root).toBe("skill:codepuppy-first")
     const produced = packageEnvelopeIdentityV1(envelope)
     if (!produced.ok) throw new Error(`bundled envelope does not decode: ${produced.reason}`)
     const rootComp = wire.components.find((c) => c.id === wire.root)
@@ -622,15 +622,15 @@ describe("setInstallStateByKey(#1136 随包快照携带真实 package:bundled �
       packageId: wire.prelude.packageId,
       version: wire.prelude.version,
       envelopeDigest: produced.identity.envelopeDigest,
-      children: [{ kind: "skill", name: "alpha-first", payloadDigest: `sha256:${rootComp.payloadRef.sha256}` }],
+      children: [{ kind: "skill", name: "codepuppy-first", payloadDigest: `sha256:${rootComp.payloadRef.sha256}` }],
     })
     const en = await setInstallStateByKey(
-      { type: "skill", name: "alpha-first", scope: "global", state: "enabled" },
+      { type: "skill", name: "codepuppy-first", scope: "global", state: "enabled" },
       pkgDeps({ resolvePackage: bundledResolveOver(bundledCatalog) }),
     )
     expect(en.ok).toBe(true)
-    expect(findRecordV2(root, "skill", "alpha-first")!.desiredState).toBe("enabled")
-    expect(readAllowSet()).toEqual({ v: 1, keys: ["skill--alpha-first"] })
+    expect(findRecordV2(root, "skill", "codepuppy-first")!.desiredState).toBe("enabled")
+    expect(readAllowSet()).toEqual({ v: 1, keys: ["skill--codepuppy-first"] })
   })
 
   test("已装 envelope 摘要与随包不同(同 packageId@version)⇒ 拒:content does not match;账本不动", async () => {
@@ -641,10 +641,10 @@ describe("setInstallStateByKey(#1136 随包快照携带真实 package:bundled �
       packageId: wire.prelude.packageId,
       version: wire.prelude.version,
       envelopeDigest: dg("stale-or-tampered-install"), // 与随包摘要必然不同
-      children: [{ kind: "skill", name: "alpha-first", payloadDigest: `sha256:${rootComp.payloadRef.sha256}` }],
+      children: [{ kind: "skill", name: "codepuppy-first", payloadDigest: `sha256:${rootComp.payloadRef.sha256}` }],
     })
     const en = await setInstallStateByKey(
-      { type: "skill", name: "alpha-first", scope: "global", state: "enabled" },
+      { type: "skill", name: "codepuppy-first", scope: "global", state: "enabled" },
       pkgDeps({ resolvePackage: bundledResolveOver(bundledCatalog) }),
     )
     expect(en.ok).toBe(false)
@@ -652,7 +652,7 @@ describe("setInstallStateByKey(#1136 随包快照携带真实 package:bundled �
       expect(en.code).toBe("curation-unverifiable")
       expect(en.reason).toContain("content does not match the installed package")
     }
-    expect(findRecordV2(root, "skill", "alpha-first")!.desiredState).toBe("disabled")
+    expect(findRecordV2(root, "skill", "codepuppy-first")!.desiredState).toBe("disabled")
   })
 
   test("随包快照不含该 packageId ⇒ bundled missing 拒绝文案具名到包,不再谎称快照无任何 package", async () => {

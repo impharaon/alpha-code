@@ -100,7 +100,7 @@ const componentOf = (
     sha256: sha(payloadBytes),
     bytes: payloadBytes.byteLength,
     mediaType: `application/vnd.codepuppy.host-extension-package.${profileId}.v1+json`,
-    url: `https://alphacodeone.com/catalog/assets/${id.replace(":", ".")}/1.0.0/alpha-package/payload.json`,
+    url: `https://alphacodeone.com/catalog/assets/${id.replace(":", ".")}/1.0.0/codepuppy-package/payload.json`,
   },
 })
 

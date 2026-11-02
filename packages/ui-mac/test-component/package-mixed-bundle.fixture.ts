@@ -174,7 +174,7 @@ const componentOf = (
     sha256: sha(bytes),
     bytes: bytes.byteLength,
     mediaType: `application/vnd.codepuppy.host-extension-package.${mediaProfile}.v1+json`,
-    url: `https://alphacodeone.com/catalog/assets/${id.replace(":", ".")}/1.0.0/alpha-package/payload.json`,
+    url: `https://alphacodeone.com/catalog/assets/${id.replace(":", ".")}/1.0.0/codepuppy-package/payload.json`,
   },
 })
 

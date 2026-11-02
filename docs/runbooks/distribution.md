@@ -4,8 +4,8 @@ kind: runbook
 status: active
 owners:
   - Code Puppy maintainers
-last_reviewed: 2026-10-10
-review_after: 2026-10-14
+last_reviewed: 2026-11-02
+review_after: 2026-11-16
 ---
 
 # 发版 runbook — Code Puppy Mac(签名 · 公证 · 自动更新)
@@ -95,7 +95,7 @@ OPENCODE_CHANNEL=prod bun scripts/release-manifest.ts produce \
   --channel prod --dist dist \
   --key ~/.codepuppy-signing/release-manifest-ed25519.pem
 # 期望:"[release-manifest] OK: …/codepuppy-release-manifest.json (+.sig)";产物三件:
-# dist/codepuppy-release-manifest.json + .sig + dist/alpha-code-<版本>-sbom.cdx.json
+# dist/codepuppy-release-manifest.json + .sig + dist/codepuppy-<版本>-sbom.cdx.json
 
 # REQ-106 Windows x64 未签名手动下载(仅在已有明确批准、已下载 Windows runner 的最终
 # installer + signing facts、且官网已经部署 unsigned warning 时):
@@ -108,14 +108,14 @@ OPENCODE_CHANNEL=prod bun scripts/release-manifest.ts produce \
 # ④ 发 GitHub Release(dmg + zip + 两个 .blockmap + latest-mac.yml + manifest 三件一起传,
 #    tag = v<版本>)。manifest 是 alpha-web 消费的唯一发布真相,漏传 = 该版本对 web 不存在。
 cd dist
-gh release create v0.1.20 \
+gh release create v0.1.25 \
   codepuppy-mac-arm64.dmg codepuppy-mac-arm64.zip \
   codepuppy-mac-arm64.dmg.blockmap codepuppy-mac-arm64.zip.blockmap \
   latest-mac.yml \
   codepuppy-release-manifest.json codepuppy-release-manifest.json.sig \
-  codepuppy-0.1.20-sbom.cdx.json \
+  codepuppy-0.1.25-sbom.cdx.json \
   --repo jinjunnn/alpha-code --target <发版 PR 在 alpha 上的合并提交完整 SHA> \
-  --title "Code Puppy 0.1.20" --notes "……"
+  --title "Code Puppy 0.1.25" --notes "……"
 
 # ⑤ 确认自动更新 feed 通(electron-updater 就读这个 URL)
 curl -sL -o /dev/null -w "%{http_code}\n" \

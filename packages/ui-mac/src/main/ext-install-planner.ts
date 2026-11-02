@@ -437,7 +437,7 @@ export function synthesizeManifest(verified: VerifiedCatalogEntry): unknown {
           artifact: {
             digest: aggregateFilesDigest(entry.remoteAsset.files),
             size: entry.remoteAsset.files.reduce((n, f) => n + (typeof f.bytes === "number" ? f.bytes : 0), 0),
-            mediaType: "application/vnd.alpha.remote-asset",
+            mediaType: "application/vnd.codepuppy.remote-asset",
           },
         }
       : {}),

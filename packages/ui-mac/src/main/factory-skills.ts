@@ -30,7 +30,7 @@
 //     `skills.paths` → 同一个引擎扫描。
 //
 // 所以「某个目录不在 `CODEPUPPY_FACTORY_SKILL_DIRS` 里」**不等于**「它永不装载」——
-// `resources/skills/` 下的 `alpha-upstream-sync` / `safe-refactor` 走的正是通道 B
+// `resources/skills/` 下的 `codepuppy-upstream-sync` / `safe-refactor` 走的正是通道 B
 // (`#1250` 的票面前提据此更正)。判据不写在这段散文里:
 // `codepuppy-skill-packaging-census.test.ts` 每次跑都从两条通道的**权威**重算一遍归属,
 // 并要求 `resources/{skills,factory-skills}/` 下的每个目录至少被一条通道够到。

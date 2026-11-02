@@ -28,8 +28,8 @@
   },
   "schema": "codepuppy.package-declaration.v1",
   "source": {
-    "kind": "alpha-native",
-    "publisher": "alpha",
+    "kind": "codepuppy-native",
+    "publisher": "codepuppy",
     "redistributable": true
   },
   "version": "1.0.0"

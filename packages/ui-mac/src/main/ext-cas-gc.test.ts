@@ -83,7 +83,7 @@ function writeSeedLock(file: string, contents: string[]): void {
           type: "skill",
           version: "1.0.0",
           license: "MIT",
-          source: "alpha",
+          source: "codepuppy",
           redistributable: true,
           platforms: ["*"],
           licenseFiles: [],

@@ -17,7 +17,7 @@
       "!`": "alpha.claude-code.script-marker"
     }
   },
-  "boundsEnforcement": "every emitted declaration is compiled through compileAlphaPackageDeclarationV1 with the derived asset tables before the adapter returns — Markdown per-asset and skill budgets, asset path grammar, and path depth are the compiler's own gates, not adapter restatements",
+  "boundsEnforcement": "every emitted declaration is compiled through compileCodePuppyPackageDeclarationV1 with the derived asset tables before the adapter returns — Markdown per-asset and skill budgets, asset path grammar, and path depth are the compiler's own gates, not adapter restatements",
   "commandFrontmatter": {
     "blocked": [
       "hooks",
@@ -45,7 +45,7 @@
     "unknown": "review-required"
   },
   "componentSources": {
-    "agents": "agents/*.md files (or manifest.agents replacement list) → agent@1, targetDir alpha-agents",
+    "agents": "agents/*.md files (or manifest.agents replacement list) → agent@1, targetDir codepuppy-agents",
     "commands": "top-level commands/*.md flat files (or manifest.commands replacement list) → command@1 template leaves (alpha-code#840, #98 B1)",
     "hooksDir": "hooks/hooks.json → blocked",
     "lspFile": ".lsp.json → blocked",
@@ -53,7 +53,7 @@
     "monitorsDir": "monitors/monitors.json → blocked",
     "outputStylesDir": "output-styles/ → blocked",
     "rootSkillMd": "single SKILL.md at plugin root → review-required (layout outside the pinned profile)",
-    "skills": "skills/<name>/SKILL.md directories (+ manifest.skills additions) → skill@1, targetDir alpha-skills, whole directory as assets",
+    "skills": "skills/<name>/SKILL.md directories (+ manifest.skills additions) → skill@1, targetDir codepuppy-skills, whole directory as assets",
     "themesDir": "themes/ → blocked",
     "workflowsDir": "workflows/ → blocked"
   },
@@ -65,8 +65,8 @@
   "groundTruth": "https://code.claude.com/docs/en/plugins-reference",
   "hostContract": {
     "artifactPath": "packages/ui-mac/src/shared/host-extension-package-contract",
-    "artifactSha256": "6aabd15c98de1f6111dc7b2079b693b5921f5b8df90437317835b6db000eb8ea",
-    "commit": "59d64b18522770d081294c784d22d3970f1ac358",
+    "artifactSha256": "0af4d2fbf62755e3510c7dba1ddca381d1b436e2903d47c5261a21ed91873437",
+    "commit": "e77cb02f3f8ecd42969333682fcaa4ceff16f27e",
     "repo": "jinjunnn/alpha-code"
   },
   "identity": {

@@ -194,13 +194,13 @@ describe("AC3 提示词与技能文案 — 模型上下文里的品牌串", () =
       "packages/ui-mac/resources/factory-skills/integrate-project/SKILL.md",
       "packages/ui-mac/resources/factory-skills/customize-codepuppy/SKILL.md",
       "packages/ui-mac/resources/factory-skills/office-docs/SKILL.md",
-      "packages/ui-mac/resources/skills/alpha-upstream-sync/SKILL.md",
+      "packages/ui-mac/resources/skills/codepuppy-upstream-sync/SKILL.md",
     ]) {
       expect(read(f).includes("Code Puppy")).toBe(true)
     }
     expect(read("packages/ui-mac/resources/factory-skills/customize-codepuppy/SKILL.md")).toContain("# Customize Code Puppy")
     // repo 名是身份不是展示:sync 指令仍指向 jinjunnn/alpha-code
-    expect(read("packages/ui-mac/resources/skills/alpha-upstream-sync/SKILL.md")).toContain("gh repo sync jinjunnn/alpha-code")
+    expect(read("packages/ui-mac/resources/skills/codepuppy-upstream-sync/SKILL.md")).toContain("gh repo sync jinjunnn/alpha-code")
   })
   test("prompt-rebrand to 侧(REBRAND_TO + 自指首句)", () => {
     const src = read("packages/ext/src/prompt-rebrand.ts")

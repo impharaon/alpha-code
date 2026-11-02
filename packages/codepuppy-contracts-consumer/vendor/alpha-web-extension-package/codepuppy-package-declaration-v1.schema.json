@@ -426,7 +426,7 @@
               "type": "string"
             },
             "kind": {
-              "const": "alpha-connection"
+              "const": "codepuppy-connection"
             },
             "label": {
               "maxLength": 120,
@@ -495,7 +495,7 @@
       "type": "object"
     }
   },
-  "$id": "alpha-package-declaration-v1.schema.json",
+  "$id": "codepuppy-package-declaration-v1.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
@@ -598,11 +598,11 @@
       "additionalProperties": false,
       "properties": {
         "kind": {
-          "const": "alpha-native"
+          "const": "codepuppy-native"
         },
         "publisher": {
           "enum": [
-            "alpha",
+            "codepuppy",
             "official",
             "community"
           ]
@@ -632,6 +632,6 @@
     "source",
     "root"
   ],
-  "title": "AlphaPackageDeclarationV1",
+  "title": "CodePuppyPackageDeclarationV1",
   "type": "object"
 }

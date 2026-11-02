@@ -116,7 +116,7 @@ describe("registerDownloadedArtifact (#184 集成点)", () => {
       savedPath: a.savedPath,
       verifiedSha256: a.digest,
       detectedMime: "application/zip",
-      detector: "alpha-magic/1",
+      detector: "codepuppy-magic/1",
     })
     expect(res.ok).toBe(true)
     if (!res.ok) return

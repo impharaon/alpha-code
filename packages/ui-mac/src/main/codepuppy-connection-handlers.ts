@@ -20,7 +20,7 @@ import type {
  *
  * **The table is empty in this build, and that is the shipped behaviour, not a stub.** Concrete
  * provider connectors are out of scope for `#704`; until one is reviewed and added here, every
- * `alpha-connection` package resolves to `update-required` before any handler, auth, browser or
+ * `codepuppy-connection` package resolves to `update-required` before any handler, auth, browser or
  * store interaction — which is exactly the fail-closed default the contract asks for. Not before
  * *any* outbound call: the connection is declared inside the component payload, so that payload has
  * already been fetched when the lookup runs. `package-codepuppy-connection.test.ts` pins this key set

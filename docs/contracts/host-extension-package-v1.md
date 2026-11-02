@@ -93,7 +93,7 @@ schema alone accepts those negative vectors.
 ## Desktop consumption
 
 The signed Catalog may contain a sibling `packages[]` array of shallow
-`AlphaPackageEnvelopeV1` values. A package prelude must decode to one bounded
+`CodePuppyPackageEnvelopeV1` values. A package prelude must decode to one bounded
 `package:` identity and version, and identities must be unique. If a prelude
 cannot be decoded safely, or two package roots have the same identity and
 version, the candidate Catalog is rejected before it can replace the

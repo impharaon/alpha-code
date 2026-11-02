@@ -90,7 +90,7 @@
               ],
               "properties": {
                 "kind": {
-                  "const": "alpha-connection"
+                  "const": "codepuppy-connection"
                 },
                 "prerequisiteId": {
                   "type": "string",

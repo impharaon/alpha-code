@@ -72,7 +72,7 @@ otherwise invalid versions fail closed; no compatibility shim is selected.
 
 The same package holds a second, independent pin for the surfaces `alpha-web`
 owns. `alpha-web-contract.lock.json` pins repository `jinjunnn/alpha-web` at
-immutable commit `40520efbcd4871695f7749a792f839eb7882c0b9` and records the
+immutable commit `a7f79c667c71b03a4ae54350dd061a116a2c4080` and records the
 SHA-256 of the two consumer fixtures that repository publishes for this desktop —
 endpoint discovery (`codepuppy.web-identity.endpoint-discovery.v1`) and the account
 summary display projection (`codepuppy.web-account.summary.v1`) — plus the account

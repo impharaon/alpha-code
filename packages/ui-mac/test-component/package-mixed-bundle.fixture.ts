@@ -28,7 +28,7 @@
 import { createHash } from "node:crypto"
 import { resolve } from "node:path"
 import type {
-  AlphaPackageEnvelopeV1,
+  CodePuppyPackageEnvelopeV1,
   PackageProfilePayloadV1,
 } from "../src/shared/host-extension-package-contract/decoder"
 
@@ -121,7 +121,7 @@ type SkillFixtureFile = { path: string; data: Uint8Array; urlPath?: string }
 const skillPayloadFor = (files: SkillFixtureFile[], base: string) => ({
   schema: "codepuppy.host-extension-package.payload.skill.v1",
   behavior: {
-    targetDir: "alpha-skills",
+    targetDir: "codepuppy-skills",
     files: files.map((file) => ({
       path: file.path,
       sha256: sha(file.data),
@@ -174,12 +174,12 @@ const componentOf = (
     sha256: sha(bytes),
     bytes: bytes.byteLength,
     mediaType: `application/vnd.codepuppy.host-extension-package.${mediaProfile}.v1+json`,
-    url: `https://alphacodeone.com/catalog/assets/${id.replace(":", ".")}/1.0.0/alpha-package/payload.json`,
+    url: `https://alphacodeone.com/catalog/assets/${id.replace(":", ".")}/1.0.0/codepuppy-package/payload.json`,
   },
 })
 
 export type MixedBundleFixture = {
-  envelope: AlphaPackageEnvelopeV1
+  envelope: CodePuppyPackageEnvelopeV1
   /** payload digest → 字节(evaluatePackageForHost 的 fetchPayload 用)。 */
   payloadByDigest: Map<string, Uint8Array>
   /** markdown 资产 digest → 字节(admission 的 fetchAsset 用)。 */
@@ -236,7 +236,7 @@ export function mixedBundleFixture(options?: {
   const commandAsset = utf8(COMMAND_MD)
 
   const agentPayload = agentPayloadFor(
-    "alpha-agents",
+    "codepuppy-agents",
     agentAsset,
     "https://alphacodeone.com/catalog/assets/agent.generic-bundle-agent/1.0.0/AGENT.md",
   )
@@ -246,7 +246,7 @@ export function mixedBundleFixture(options?: {
   )
   const commandPayload = commandPayloadFor(commandAsset)
   const unsupportedPayload = agentPayloadFor(
-    "alpha-agents",
+    "codepuppy-agents",
     unsupportedAsset,
     "https://alphacodeone.com/catalog/assets/agent.generic-bundle-future/1.0.0/AGENT.md",
   )
@@ -285,7 +285,7 @@ export function mixedBundleFixture(options?: {
     components,
     // §4.3 第一层:签名并集含**全部**组件,包括不会被安装的那个。
     capabilities: [...new Set(components.flatMap((component) => component.capabilities))].sort(),
-  } as unknown as AlphaPackageEnvelopeV1
+  } as unknown as CodePuppyPackageEnvelopeV1
 
   return {
     envelope,
@@ -326,8 +326,8 @@ export async function assertMatchesVendoredBundleShape(
   fixture: MixedBundleFixture,
   expectEqual: (actual: unknown, expected: unknown, label: string) => void,
 ) {
-  const compiled = (await Bun.file(VENDORED_BUNDLE).json()) as { envelope: AlphaPackageEnvelopeV1 }
-  const shapeOf = (envelope: AlphaPackageEnvelopeV1) => ({
+  const compiled = (await Bun.file(VENDORED_BUNDLE).json()) as { envelope: CodePuppyPackageEnvelopeV1 }
+  const shapeOf = (envelope: CodePuppyPackageEnvelopeV1) => ({
     packageId: envelope.prelude.packageId,
     root: envelope.root,
     components: envelope.components

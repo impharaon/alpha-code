@@ -156,7 +156,7 @@ export async function dispatchExplicitCloudUpload(input: {
           headers: {
             authorization: `Bearer ${input.accessToken}`,
             "content-type": "application/json",
-            ...(input.uploadConsent ? { "x-alpha-upload-consent": input.uploadConsent } : {}),
+            ...(input.uploadConsent ? { "x-codepuppy-upload-consent": input.uploadConsent } : {}),
           },
           body: JSON.stringify(input.body),
           signal: AbortSignal.timeout(15000),

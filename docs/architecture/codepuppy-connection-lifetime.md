@@ -67,7 +67,7 @@ decision. A second opinion about the same grammar is a second thing to drift.
 
 An id that is not in the table is `update-required`, decided in the browse/detail
 evaluator before any handler runs, any browser opens, or any store write happens.
-The table is empty in the current build, so today every `alpha-connection`
+The table is empty in the current build, so today every `codepuppy-connection`
 package resolves that way — that is the shipped fail-closed default, not a stub.
 
 ## Handler output is untrusted input

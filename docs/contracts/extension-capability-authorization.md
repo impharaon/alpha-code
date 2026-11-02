@@ -196,7 +196,7 @@ snapshot 两条入口执行 package preview、四组 binding、main 重取重验
   `(id, scope, directory)` 即时核验:MCP 读该目录 `GET /mcp` 的 connected,只读、从不 dispose;
   读不出即不标「可用」。
 - main/IPC 入口当前有效的 package 安装行为：package secret prerequisite 只消费 host-owned
-  `AlphaPackageEnvelopeV1` 与严格 payload decoder 的产物，不 decode web Declaration；
+  `CodePuppyPackageEnvelopeV1` 与严格 payload decoder 的产物，不 decode web Declaration；
   稳定 prerequisite ID、MCP environment/header target 与 store reference 均从 signed
   component/profile 派生；renderer 提交只能携带短生命周期的
   `{prerequisiteId,value}`。main 重验 signed snapshot/Envelope/item/capability binding 后，

@@ -75,7 +75,7 @@ afterEach(() => {
 // ── catalog fixtures(已验 catalog 侧的条目;renderer 无从改写)─────────────────────────────────
 
 // #395:机器面测试用第一方 source(alpha)保持 enabled 投影(默认关策略另有专项测试)。
-const base = { displayName: "d", description: "d", source: "alpha" as const, category: "test" }
+const base = { displayName: "d", description: "d", source: "codepuppy" as const, category: "test" }
 
 const mcpEntry: CatalogEntry = {
   id: "mcp:markitdown",
@@ -124,7 +124,7 @@ const skillBuiltinEntry: CatalogEntry = {
   name: "demo",
   ...base,
   version: "1.0.0",
-  installSpec: { kind: "skill", source: "builtin", builtinAssetKey: "skills/demo", targetDir: "alpha-skills" },
+  installSpec: { kind: "skill", source: "builtin", builtinAssetKey: "skills/demo", targetDir: "codepuppy-skills" },
 }
 // REQ-098 #303:清单 digest/bytes 必须与下载 stub 的真实内容一致(promote 前结构校验 + CAS put 再验)。
 const REMOTE_SKILL_MD = "---\nname: remote-demo\ndescription: test\n---\nbody"
@@ -142,7 +142,7 @@ const skillRemoteEntry: CatalogEntry = {
   name: "remote-demo",
   ...base,
   version: "1.2.0",
-  installSpec: { kind: "skill", source: "remote", targetDir: "alpha-skills" },
+  installSpec: { kind: "skill", source: "remote", targetDir: "codepuppy-skills" },
   remoteAsset: { version: "1.2.0", files: remoteFiles },
 }
 // #361:catalog agent 走事务载体(builtin 载荷由 collectBuiltinAgentPayload 收集;remote 与
@@ -466,7 +466,7 @@ describe("manifest synthesis & pre-disk refusal (AC#1)", () => {
     expect(decoded.ok).toBe(true)
     if (!decoded.ok) return
     expect(decoded.manifest.ownership.authored).toBe("official")
-    expect(decoded.manifest.ownership.curated).toBe("alpha")
+    expect(decoded.manifest.ownership.curated).toBe("codepuppy")
     expect(decoded.manifest.ownership.supportTier).toBe("curated")
     expect(decoded.manifest.ownership.distributed).toBe("engine-config")
     expect(decoded.manifest.components[0]!.runsIn).toEqual(["local-subprocess"])
@@ -979,7 +979,7 @@ describe("other kinds — derivation & records", () => {
       installSpec: {
         kind: "mcp",
         mcpType: "local",
-        command: ["uv", "run", "--no-project", "--with", "python-docx==1.2.0", "{alphaResources}/office-mcp/server.py", "word", "{workspace}"],
+        command: ["uv", "run", "--no-project", "--with", "python-docx==1.2.0", "{codepuppyResources}/office-mcp/server.py", "word", "{workspace}"],
       },
     }
     const office: CatalogEntry = {
@@ -994,12 +994,12 @@ describe("other kinds — derivation & records", () => {
     if (!result.ok) return
     expect(result.installed).toEqual(["mcp:codepuppy-word"])
     const cfg = JSON.parse(fs.readFileSync(path.join(globalRoot, "codepuppy.jsonc"), "utf8"))
-    // 字面量占位原样写盘(REQ-134),{alphaResources} 被解到真实随包 server.py。
+    // 字面量占位原样写盘(REQ-134),{codepuppyResources} 被解到真实随包 server.py。
     expect(cfg.mcp["codepuppy-word"].command.at(-1)).toBe("{workspace}")
     expect(cfg.mcp["codepuppy-word"].command).toContain("word")
   })
 
-  // #1564 审计 r1:安装准入也不再拿卡片命令做校验 —— alpha-web 把四张卡片的命令换成新形态(两个 {alphaResources})
+  // #1564 审计 r1:安装准入也不再拿卡片命令做校验 —— alpha-web 把四张卡片的命令换成新形态(两个 {codepuppyResources})
   // 或干脆删掉之后,四个工具仍装得上,落盘的只有 main 模板;中国区的镜像 env 也不再附上(随包运行时不下载)。
   test("#1564: a first-party Office card with the new-template command, or with no command at all, still installs main's template", async () => {
     const resources = fs.realpathSync(path.resolve(import.meta.dir, "../../resources"))
@@ -1010,7 +1010,7 @@ describe("other kinds — derivation & records", () => {
       installSpec: {
         kind: "mcp",
         mcpType: "local",
-        command: ["{alphaResources}/office-runtime/bin/python3", "-I", "-B", "{alphaResources}/office-mcp/server.py", "word", "{workspace}"],
+        command: ["{codepuppyResources}/office-runtime/bin/python3", "-I", "-B", "{codepuppyResources}/office-mcp/server.py", "word", "{workspace}"],
         requiredEnvVars: [],
       },
     }
@@ -1038,7 +1038,7 @@ describe("other kinds — derivation & records", () => {
         kind: "mcp",
         mcpType: "local",
         // 具体路径替代字面量占位(REQ-134 要求 exact marker)——不是一个真实占位,伪造条目。
-        command: ["uv", "run", "--no-project", "--with", "python-docx==1.2.0", "{alphaResources}/office-mcp/server.py", "word", "/tmp/not-a-marker"],
+        command: ["uv", "run", "--no-project", "--with", "python-docx==1.2.0", "{codepuppyResources}/office-mcp/server.py", "word", "/tmp/not-a-marker"],
       },
     }
     const office: CatalogEntry = {
@@ -1132,8 +1132,8 @@ describe("other kinds — derivation & records", () => {
 
   test("#303 bundle: colliding skip ids no longer refuse the bundle (injective journal keys)", async () => {
     // 朴素 replace(":","--") 下这两个 id 会碰撞成同一 journal key → validatePlan 判 duplicate 拒整单。
-    const ghostA: CatalogEntry = { ...skillBuiltinEntry, id: "skill:a:b--c", name: "ghost-a", installSpec: { kind: "skill", source: "remote", targetDir: "alpha-skills" } }
-    const ghostB: CatalogEntry = { ...skillBuiltinEntry, id: "skill:a--b:c", name: "ghost-b", installSpec: { kind: "skill", source: "remote", targetDir: "alpha-skills" } }
+    const ghostA: CatalogEntry = { ...skillBuiltinEntry, id: "skill:a:b--c", name: "ghost-a", installSpec: { kind: "skill", source: "remote", targetDir: "codepuppy-skills" } }
+    const ghostB: CatalogEntry = { ...skillBuiltinEntry, id: "skill:a--b:c", name: "ghost-b", installSpec: { kind: "skill", source: "remote", targetDir: "codepuppy-skills" } }
     const collideBundle: CatalogEntry = { ...bundleEntry, id: "bundle:collide", name: "collideb", bundleItems: [
       { catalogEntryId: "skill:a:b--c", optional: true, installOrder: 1 },
       { catalogEntryId: "skill:a--b:c", optional: true, installOrder: 2 },
@@ -1753,12 +1753,22 @@ describe("deriveMcpConfig — boundary cases", () => {
   })
   test("main substitutes bundled Alpha resources and preserves the workspace marker", () => {
     const result = deriveMcpConfig(
-      { kind: "mcp", mcpType: "local", command: ["uv", "{alphaResources}/office-mcp/server.py", "word", "{workspace}"] },
+      { kind: "mcp", mcpType: "local", command: ["uv", "{codepuppyResources}/office-mcp/server.py", "word", "{workspace}"] },
       {},
       "/alpha/resources",
     )
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.config.command).toEqual(["uv", "/alpha/resources/office-mcp/server.py", "word", "{workspace}"])
+  })
+  // alpha-web#283 AC6:只认新占位符 —— 旧品牌槽不展开成随包资源根,原样留在命令里(Office 写策略随后按逐 token 比对拒掉)。
+  test("the previous-brand resource slot is not expanded", () => {
+    const result = deriveMcpConfig(
+      { kind: "mcp", mcpType: "local", command: ["uv", "{alphaResources}/office-mcp/server.py", "word", "{workspace}"] },
+      {},
+      "/alpha/resources",
+    )
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.config.command).toEqual(["uv", "{alphaResources}/office-mcp/server.py", "word", "{workspace}"])
   })
   test("workspace marker substrings are preserved without planner substitution", () => {
     const result = deriveMcpConfig(
@@ -1770,7 +1780,7 @@ describe("deriveMcpConfig — boundary cases", () => {
   })
   test("the Alpha resource placeholder cannot select another bundled path", () => {
     const result = deriveMcpConfig(
-      { kind: "mcp", mcpType: "local", command: ["python", "{alphaResources}/other.py", "{workspace}"] },
+      { kind: "mcp", mcpType: "local", command: ["python", "{codepuppyResources}/other.py", "{workspace}"] },
       {},
       "/alpha/resources",
     )
@@ -2593,7 +2603,7 @@ describe("#397 安装面:archived 拒装 + activationPolicy 声明落账", () =>
   test("session-grant(labs)⇒ 持久账本恒 disabled:alpha source 也不例外", async () => {
     const labsEntry: CatalogEntry = {
       ...mcpEntry,
-      source: "alpha",
+      source: "codepuppy",
       curation: makeCuration("mcp:markitdown", "1.0.0", { tier: "labs", activationPolicy: "session-grant" }),
     }
     const { deps } = makeDeps({ entries: [labsEntry] })
@@ -2608,7 +2618,7 @@ describe("#397 安装面:archived 拒装 + activationPolicy 声明落账", () =>
   test("复审过期(排他截止):default-enabled 也先落 disabled(启用走显式确认)", async () => {
     const expired: CatalogEntry = {
       ...mcpEntry,
-      source: "alpha",
+      source: "codepuppy",
       curation: makeCuration("mcp:markitdown", "1.0.0", { tier: "core", activationPolicy: "default-enabled", reviewedAt: "2025-01-01T00:00:00Z", reviewBefore: "2026-01-01T00:00:00Z" }),
     }
     const { deps } = makeDeps({ entries: [expired] })
@@ -2619,14 +2629,14 @@ describe("#397 安装面:archived 拒装 + activationPolicy 声明落账", () =>
 
   test("r1-2(更新链):已启用 mcp 重装到声明 session-grant 的版本 ⇒ 账本归位 disabled(upsert 的 prev 优先不得复活 enabled)", async () => {
     // 先以未策展 alpha 源装成 enabled(#395 规则)。
-    const plainCodePuppy: CatalogEntry = { ...mcpEntry, source: "alpha" }
+    const plainCodePuppy: CatalogEntry = { ...mcpEntry, source: "codepuppy" }
     const { deps: deps1 } = makeDeps({ entries: [plainCodePuppy] })
     expect((await installAuthorized(intent, deps1)).ok).toBe(true)
     expect(findRecordV2(globalRoot, "mcp", "markitdown")?.desiredState).toBe("enabled")
     // 目录换代:同 id 版本声明 session-grant → 重装后持久账本必须归位 disabled。
     const labsNow: CatalogEntry = {
       ...mcpEntry,
-      source: "alpha",
+      source: "codepuppy",
       curation: makeCuration("mcp:markitdown", "1.0.0", { tier: "labs", activationPolicy: "session-grant" }),
     }
     const { deps: deps2 } = makeDeps({ entries: [labsNow] })
@@ -2681,14 +2691,14 @@ describe("#397 安装面:archived 拒装 + activationPolicy 声明落账", () =>
       ...skillBuiltinEntry,
       id: "skill:sga",
       name: "sga",
-      installSpec: { kind: "skill", source: "builtin", builtinAssetKey: "skills/sga", targetDir: "alpha-skills" },
+      installSpec: { kind: "skill", source: "builtin", builtinAssetKey: "skills/sga", targetDir: "codepuppy-skills" },
       curation: makeCuration("skill:sga", "1.0.0", { tier: "labs", activationPolicy: "session-grant" }),
     }
     const sgb: CatalogEntry = {
       ...skillBuiltinEntry,
       id: "skill:sgb",
       name: "sgb",
-      installSpec: { kind: "skill", source: "builtin", builtinAssetKey: "skills/sgb", targetDir: "alpha-skills" },
+      installSpec: { kind: "skill", source: "builtin", builtinAssetKey: "skills/sgb", targetDir: "codepuppy-skills" },
     }
     const sgBundle: CatalogEntry = {
       ...bundleEntry,
@@ -2723,7 +2733,7 @@ describe("#397 安装面:archived 拒装 + activationPolicy 声明落账", () =>
   test("curation 校验失败 = fail-closed 到未策展保守面:绝不部分采信(archived 也不作数),按 #395 分类", async () => {
     const invalid: CatalogEntry = {
       ...mcpEntry,
-      source: "alpha", // #395 保守面:alpha 源 → enabled(证明走了保守面而非声明面)
+      source: "codepuppy", // #395 保守面:codepuppy 源 → enabled(证明走了保守面而非声明面)
       curation: { ...makeCuration("mcp:markitdown", "1.0.0", { upstreamStatus: "archived" }), rogue: true },
     }
     const { deps } = makeDeps({ entries: [invalid] })
@@ -2741,7 +2751,7 @@ describe("#397 enable 闸(setInstallStateByKey;advisory 之后)", () => {
   test("session-grant:enable 拒(code 判别);disable 方向不受限", async () => {
     const labsEntry: CatalogEntry = {
       ...mcpEntry,
-      source: "alpha",
+      source: "codepuppy",
       curation: makeCuration("mcp:markitdown", "1.0.0", { tier: "labs", activationPolicy: "session-grant" }),
     }
     const { deps } = makeDeps({ entries: [labsEntry] })

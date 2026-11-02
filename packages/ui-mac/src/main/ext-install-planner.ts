@@ -492,14 +492,14 @@ export function deriveMcpConfig(
   }
   const command = spec.command ?? []
   if (command.length === 0) return { ok: false, reason: "catalog entry has no command" }
-  const codepuppyResourceArgs = command.filter((argument) => argument.includes("{alphaResources}"))
+  const codepuppyResourceArgs = command.filter((argument) => argument.includes("{codepuppyResources}"))
   if (
     codepuppyResourceArgs.length > 0 &&
-    (codepuppyResourceArgs.length !== 1 || codepuppyResourceArgs[0] !== "{alphaResources}/office-mcp/server.py" || !isCodePuppyOfficeMcp("", { type: "local", command }))
+    (codepuppyResourceArgs.length !== 1 || codepuppyResourceArgs[0] !== "{codepuppyResources}/office-mcp/server.py" || !isCodePuppyOfficeMcp("", { type: "local", command }))
   ) {
-    return { ok: false, reason: "{alphaResources} is reserved for the bundled Code Puppy Office server entrypoints — refused" }
+    return { ok: false, reason: "{codepuppyResources} is reserved for the bundled Code Puppy Office server entrypoints — refused" }
   }
-  const cmd = command.map((argument) => argument.split("{alphaResources}").join(codepuppyResources))
+  const cmd = command.map((argument) => argument.split("{codepuppyResources}").join(codepuppyResources))
   const environment = { ...(grants.cnMirror ? CN_MIRROR_ENV : {}), ...subst }
   return {
     ok: true,

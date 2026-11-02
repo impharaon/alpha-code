@@ -13,7 +13,7 @@ import {
   decodePackageEnvelopeHeaderV1,
   decodePackageProfilePayloadV1,
   HOST_EXTENSION_PACKAGE_SCHEMA_V1,
-  type AlphaPackageEnvelopeV1,
+  type CodePuppyPackageEnvelopeV1,
   type PackageComponentDecodeV1,
   type PackageListingV1,
   type PackagePayloadRefV1,
@@ -83,7 +83,7 @@ export type PackageAcceptedComponentV1 = {
 }
 
 export type PackageAcceptedFactsV1 = {
-  envelope: AlphaPackageEnvelopeV1
+  envelope: CodePuppyPackageEnvelopeV1
   /**
    * Every supported component, root first. `#697` removed the root-only `payload` / `prerequisite`
    * / `connection` convenience fields that used to sit beside this list: a Bundle has one of each
@@ -493,7 +493,7 @@ function safeComponentViews(components: PackageComponentDecodeV1[]): CatalogPack
 }
 
 function compatibleView(
-  envelope: AlphaPackageEnvelopeV1,
+  envelope: CodePuppyPackageEnvelopeV1,
   components: CatalogPackageComponentV1[],
   accepted: PackageAcceptedComponentV1[],
 ): CatalogPackageViewV1 {

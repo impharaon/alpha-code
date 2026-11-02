@@ -138,8 +138,8 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
   fetchedUrls.push(url)
   if (failAssetUrlContaining && url.includes(failAssetUrlContaining))
     return new Response("nope", { status: 503 })
-  // payload 的 url 都带 `/alpha-package/payload.json`;markdown 资产不带。
-  if (url.endsWith("/alpha-package/payload.json")) {
+  // payload 的 url 都带 `/codepuppy-package/payload.json`;markdown 资产不带。
+  if (url.endsWith("/codepuppy-package/payload.json")) {
     payloadFetches++
     const component = fixture.envelope.components.find((entry) => entry.payloadRef.url === url)
     if (!component) throw new Error(`unexpected payload fetch: ${url}`)

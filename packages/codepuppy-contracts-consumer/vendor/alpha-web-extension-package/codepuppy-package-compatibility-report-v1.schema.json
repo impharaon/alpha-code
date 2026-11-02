@@ -1,5 +1,5 @@
 {
-  "$id": "alpha-package-compatibility-report-v1.schema.json",
+  "$id": "codepuppy-package-compatibility-report-v1.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
@@ -44,10 +44,10 @@
           "const": "packages/ui-mac/src/shared/host-extension-package-contract"
         },
         "artifactSha256": {
-          "const": "6aabd15c98de1f6111dc7b2079b693b5921f5b8df90437317835b6db000eb8ea"
+          "const": "0af4d2fbf62755e3510c7dba1ddca381d1b436e2903d47c5261a21ed91873437"
         },
         "commit": {
-          "const": "59d64b18522770d081294c784d22d3970f1ac358"
+          "const": "e77cb02f3f8ecd42969333682fcaa4ceff16f27e"
         },
         "repo": {
           "const": "jinjunnn/alpha-code"
@@ -95,6 +95,6 @@
     "verdict",
     "findings"
   ],
-  "title": "AlphaPackageCompatibilityReportV1",
+  "title": "CodePuppyPackageCompatibilityReportV1",
   "type": "object"
 }

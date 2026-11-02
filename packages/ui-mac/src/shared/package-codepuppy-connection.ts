@@ -213,7 +213,7 @@ export function decodePackageConnectionPrerequisiteProfileV1(
   if (
     payload.schema !== "codepuppy.host-extension-package.payload.mcp-remote.v1" ||
     payload.behavior.auth === "none" ||
-    payload.behavior.auth.kind !== "alpha-connection"
+    payload.behavior.auth.kind !== "codepuppy-connection"
   )
     return { profile: CODEPUPPY_CONNECTION_PREREQUISITE_PROFILE_V1, componentId: component.id, items: [] }
   const auth = payload.behavior.auth

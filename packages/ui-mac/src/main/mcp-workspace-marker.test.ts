@@ -108,7 +108,7 @@ describe("restoreWorkspaceMarker", () => {
     const server = realpathSync(resolve(import.meta.dir, "../../resources/office-mcp/server.py"))
     for (const connector of CODEPUPPY_OFFICE_CONNECTORS) {
       const shaped = codepuppyOfficeInstallCommand(connector.format).map((argument) =>
-        argument === "{alphaResources}/office-mcp/server.py" ? server : argument === WORKSPACE_MARKER ? "/Users/example/project" : argument,
+        argument === "{codepuppyResources}/office-mcp/server.py" ? server : argument === WORKSPACE_MARKER ? "/Users/example/project" : argument,
       )
       expect(restoreWorkspaceMarker(connector.catalogId, connector.name, shaped)).toBeNull()
     }

@@ -45,9 +45,9 @@ describe("alpha-web extension package producer artifact pin", () => {
 
     expect(lock).toMatchObject({
       repo: "jinjunnn/alpha-web",
-      commit: "40520efbcd4871695f7749a792f839eb7882c0b9",
+      commit: "a7f79c667c71b03a4ae54350dd061a116a2c4080",
       artifactPath: "contracts/extension-package/artifact",
-      artifactSha256: "862d5c7b766884fe0f0c6d744ff40ad015d482acd99f7bbcc05294897e65184b",
+      artifactSha256: "bd082405e97b433f4148869bbf70b772e2d426767db723b53d738e2afadfdb87",
     })
     // 固定条数,不留余量:上游悄悄少发一个语料文件时,只比对「lock ↔ manifest 两边一致」是
     // 抓不到的 —— 两边会一起变小并保持自洽。
@@ -58,7 +58,7 @@ describe("alpha-web extension package producer artifact pin", () => {
     // `#1287` / alpha-web#194:40 → 40,只换 hostContract 自述与 republish 的宿主副本,不增不撤。
     // `#1527` / alpha-web#270:40 → 40,同上(宿主 registry 多了 cloud@1,producer 语料不增不撤)。
     // alpha-web#283(6154104):40 → 42,带进 alpha-web#270 编译器半场的 cloud 正向语料与期望产物;
-    // 40520ef 按改名后的宿主合同重生语料,42 → 42。
+    // 40520ef 按改名后的宿主合同重生语料,42 → 42;a7f79c6 两份 schema 改名为 codepuppy-package-*,42 → 42。
     expect(lock.files.length).toBe(42)
     expect(lock.files.map((file) => file.path).sort()).toEqual(
       [...manifest.files.map((file) => file.path), "extension-package-producer-artifact.v1.json"].sort(),
@@ -189,7 +189,7 @@ describe("alpha-web extension package producer artifact pin", () => {
     expect(rules.capabilities).toEqual(
       registry.capabilities.map((capability: { token: string }) => capability.token),
     )
-    expect(rules.remoteAuthKinds.slice().sort()).toEqual(["alpha-connection", "mcp-oauth", "none"])
+    expect(rules.remoteAuthKinds.slice().sort()).toEqual(["codepuppy-connection", "mcp-oauth", "none"])
     // Bundle 已转正,但只有 **flat** 那一档:嵌套仍在排除表里,且组件上限与宿主 registry 同值。
     // `managed-plugin` 在 `#807` 短暂离开过排除表,ADR-040 否决 `opencode-plugin` 之后
     // (`#830` / alpha-web#138)**放回来了** —— 它与 `publish-wrapper`(发布端代打包)、
@@ -214,7 +214,7 @@ describe("alpha-web extension package producer artifact pin", () => {
 
   test("declaration schema directly rejects cloud, unknown auth, author-derived fields, and secret values", async () => {
     const validate = new Ajv2020({ allErrors: true, strict: false }).compile(
-      await json("alpha-package-declaration-v1.schema.json"),
+      await json("codepuppy-package-declaration-v1.schema.json"),
     )
     // 这一档是**声明 schema 自己**就能拒的负向。语料里其余负向(URL、占位符冲突、id 重复)
     // 归编译器语义层,由下面两条用例按 `vectors.v1.json` 的错误码轴各自断言 —— 混在一起会让
@@ -281,7 +281,7 @@ describe("alpha-web extension package producer artifact pin", () => {
     const connection = await json("expected.remote-connection.compiled.json")
     const connectionComponent = connection.envelope.components[0]
     const connectionBehavior = connection.payloads[connectionComponent.id].behavior
-    expect(connectionBehavior.auth.kind).toBe("alpha-connection")
+    expect(connectionBehavior.auth.kind).toBe("codepuppy-connection")
     expect(connectionBehavior.auth.connectionHandlerId).toMatch(/^[a-z][a-z0-9-]{0,63}$/)
     expect(connectionComponent.capabilities).toContain("codepuppy.connection.v1")
 

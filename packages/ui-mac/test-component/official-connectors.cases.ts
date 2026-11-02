@@ -59,7 +59,7 @@ const { decodePackageProfilePayloadV1, derivePayloadCapabilitiesV1 } = await imp
 const { evaluatePackageForHost } = await import("../src/main/package-installability")
 const { createSidecarEnv } = await import("../src/main/sidecar-env")
 import type {
-  AlphaPackageEnvelopeV1,
+  CodePuppyPackageEnvelopeV1,
   McpLocalPayloadV1,
   McpRemotePayloadV1,
 } from "../src/shared/host-extension-package-contract/decoder"
@@ -101,7 +101,7 @@ async function fixture(name: "github-official" | "dbhub-readonly" = "github-offi
       "../../codepuppy-contracts-consumer/vendor/alpha-web-extension-package/expected.mcp-remote.compiled.json",
     ),
   ).json()
-  const envelope = structuredClone(compiled.envelope) as AlphaPackageEnvelopeV1
+  const envelope = structuredClone(compiled.envelope) as CodePuppyPackageEnvelopeV1
   const payload: McpRemotePayloadV1 | McpLocalPayloadV1 =
     name === "github-official"
       ? {

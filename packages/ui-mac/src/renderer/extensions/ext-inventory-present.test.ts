@@ -21,7 +21,7 @@ import type { InventoryRow, ExtInventory } from "../../preload/types"
 
 const communityMcp: OwnershipDims = {
   authored: "community",
-  curated: "alpha",
+  curated: "codepuppy",
   distributed: "engine-config",
   runtimeSurfaces: ["local-subprocess"],
   supportTier: "community",

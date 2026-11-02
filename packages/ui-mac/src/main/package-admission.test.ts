@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join, resolve, sep } from "node:path"
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import type {
-  AlphaPackageEnvelopeV1,
+  CodePuppyPackageEnvelopeV1,
   PackageProfilePayloadV1,
   PackageSupportedComponentV1,
 } from "../shared/host-extension-package-contract/decoder"
@@ -54,7 +54,7 @@ afterEach(() => {
  */
 async function fixture() {
   const compiled = (await Bun.file(artifact).json()) as {
-    envelope: AlphaPackageEnvelopeV1
+    envelope: CodePuppyPackageEnvelopeV1
     payloads: Record<string, PackageProfilePayloadV1>
   }
   const envelope = structuredClone(compiled.envelope)
@@ -782,7 +782,7 @@ describe("package admission", () => {
     other.components[0].payloadRef.bytes = otherBytes.byteLength
     other.components[0].payloadRef.sha256 = createHash("sha256").update(otherBytes).digest("hex")
 
-    const bindingOf = async (signed: AlphaPackageEnvelopeV1, payloadBytes: Uint8Array, attemptId: string) => {
+    const bindingOf = async (signed: CodePuppyPackageEnvelopeV1, payloadBytes: Uint8Array, attemptId: string) => {
       const admit = createPackageAdmissionCoordinator({
         loadVerifiedCatalog: async () => ({
           source: "remote",
@@ -801,7 +801,7 @@ describe("package admission", () => {
       return preview.packageAuthorization.binding
     }
     // 期望值从**签名信封**独立推出来,不是从生产的 facts.graph 抄一份。
-    const expected = (signed: AlphaPackageEnvelopeV1) =>
+    const expected = (signed: CodePuppyPackageEnvelopeV1) =>
       sha256Hex(
         canonicalJson(
           packageEffectiveInstallGraphV1(signed, [
@@ -831,7 +831,7 @@ describe("package admission", () => {
     const leafPayload = {
       schema: "codepuppy.host-extension-package.payload.agent.v1",
       behavior: {
-        targetDir: "alpha-agents",
+        targetDir: "codepuppy-agents",
         asset: {
           sha256: "b".repeat(64),
           bytes: 1,
@@ -955,7 +955,7 @@ describe("package admission distinguishes a failed asset fetch from an empty one
     ]
     const payload = {
       schema: "codepuppy.host-extension-package.payload.skill.v1",
-      behavior: { targetDir: "alpha-skills", files },
+      behavior: { targetDir: "codepuppy-skills", files },
     }
     const payloadBytes = new TextEncoder().encode(`${JSON.stringify(payload, null, 2)}\n`)
     return {
@@ -982,7 +982,7 @@ describe("package admission distinguishes a failed asset fetch from an empty one
           },
         ],
         capabilities: [],
-      } as unknown as AlphaPackageEnvelopeV1,
+      } as unknown as CodePuppyPackageEnvelopeV1,
     }
   }
 

@@ -15,7 +15,7 @@ import bundledCatalog from "../src/renderer/extensions/codepuppy-catalog.json"
 import d5OldCatalog from "../src/renderer/extensions/testvectors/d5-old-catalog.json"
 import type { CatalogPackageViewV1 } from "../src/shared/catalog-package-view"
 import type {
-  AlphaPackageEnvelopeV1,
+  CodePuppyPackageEnvelopeV1,
   PackageProfilePayloadV1,
 } from "../src/shared/host-extension-package-contract/decoder"
 import { evaluatePackageForHost, runCatalogInstallWithPackagePreflight } from "../src/main/package-installability"
@@ -180,7 +180,7 @@ const producerCorpus = async () => ({
       },
     ],
     capabilities: ["codepuppy.secret-prerequisite.v1"],
-  } as unknown as AlphaPackageEnvelopeV1,
+  } as unknown as CodePuppyPackageEnvelopeV1,
   payload: {
     schema: "codepuppy.host-extension-package.payload.mcp-remote.v1",
     behavior: {
@@ -192,7 +192,7 @@ const producerCorpus = async () => ({
   } as unknown as PackageProfilePayloadV1,
 })
 
-const bindPayload = (envelope: AlphaPackageEnvelopeV1, payload: PackageProfilePayloadV1) => {
+const bindPayload = (envelope: CodePuppyPackageEnvelopeV1, payload: PackageProfilePayloadV1) => {
   const bytes = canonicalBytes(payload)
   envelope.components[0].payloadRef.bytes = bytes.byteLength
   envelope.components[0].payloadRef.sha256 = createHash("sha256").update(bytes).digest("hex")
@@ -205,7 +205,7 @@ const cloudCorpusCase = async () => {
   const corpus = (await Bun.file(
     resolve(import.meta.dir, "../src/shared/host-extension-package-contract", HOST_EXTENSION_PACKAGE_CORPUS),
   ).json()) as {
-    cases: Array<{ name: string; envelope: AlphaPackageEnvelopeV1; components: Array<{ payload: unknown }> }>
+    cases: Array<{ name: string; envelope: CodePuppyPackageEnvelopeV1; components: Array<{ payload: unknown }> }>
   }
   const item = corpus.cases.find((entry) => entry.name === "cloud-v1")!
   return { envelope: item.envelope, bytes: canonicalArtifactJsonBytesV1(item.components[0]!.payload) }
@@ -309,7 +309,7 @@ const packageFixture = async (options?: { withCloud?: boolean }) => {
     if (catalogId === ready.envelope.prelude.packageId) readyInstalled = true
   }
   const evaluator = async (envelope: unknown) => {
-    const packageId = (envelope as AlphaPackageEnvelopeV1).prelude.packageId
+    const packageId = (envelope as CodePuppyPackageEnvelopeV1).prelude.packageId
     if (packageId === MIXED_BUNDLE_PACKAGE_ID)
       return evaluatePackageForHost(envelope, {
         fetchPayload: async (ref) => bundle.payloadByDigest.get(ref.sha256) ?? new Uint8Array(),

@@ -15,6 +15,7 @@
 
 import type { AppEnvironment } from "./codepuppy-environment"
 import type { safeStorageBackend } from "./platform"
+import type { FenceAddon } from "./process-fence-apply"
 
 export const KEYCHAIN_RENAME_STEP = "keychain-rename"
 
@@ -67,11 +68,8 @@ export type KeychainPort = {
   rename(from: KeychainItem, to: KeychainItem): void
 }
 
-/** 原生模块里本模块用到的两个函数(返回 OSStatus)。 */
-export type KeychainAddon = {
-  keychainItemStatus(service: string, account: string): number
-  keychainRenameItem(fromService: string, fromAccount: string, toService: string, toAccount: string): number
-}
+/** 原生模块里本模块用到的两个函数(返回 OSStatus);类型的权威是 process-fence-apply.ts 的 FenceAddon。 */
+export type KeychainAddon = Pick<FenceAddon, "keychainItemStatus" | "keychainRenameItem">
 
 const ERR_SEC_SUCCESS = 0
 const ERR_SEC_ITEM_NOT_FOUND = -25300

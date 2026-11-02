@@ -20,6 +20,7 @@ import {
   type KeychainPort,
   type KeychainRenamePlan,
 } from "./keychain-name-migration"
+import { loadFenceAddon } from "./process-fence-apply"
 
 const PROD_SOURCE = { service: "alpha-code Safe Storage", account: "alpha-code Key" }
 const PROD_TARGET = { service: "Code Puppy Safe Storage", account: "Code Puppy Key" }
@@ -208,6 +209,15 @@ describe("nativeKeychainPort:OSStatus 只区分 0 / -25300 / -25299 (R21-4)", ()
       throw new Error("dlopen failed")
     })
     expect(() => broken.exists(PROD_TARGET)).toThrow("dlopen failed")
+  })
+
+  test("生产加载器(loadFenceAddon)拒绝没有钥匙串导出的旧构建,而不是返回一个缺函数的模块", () => {
+    const exportsOf = (extra: Record<string, unknown>) => (module: { exports: unknown }) => {
+      module.exports = { apply: () => ({ rc: 0, error: "" }), buildId: "test", libsandbox: "x", ...extra }
+    }
+    expect(() => loadFenceAddon(import.meta.path, exportsOf({}))).toThrow(/keychain rename functions/)
+    const full = loadFenceAddon(import.meta.path, exportsOf({ keychainItemStatus: () => 0, keychainRenameItem: () => 0 }))
+    expect(nativeKeychainPort(() => full).exists(PROD_TARGET)).toBe(true)
   })
 
   test("exists:0 ⇒ true,-25300 ⇒ false,其余带错误码抛", () => {

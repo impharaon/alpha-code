@@ -2,10 +2,10 @@
 // release-manifest CLI(#175)—— 发布链最后一步:从**最终发布文件的字节**产出签名 release manifest。
 //
 // 用法(权威流程在 docs/runbooks/distribution.md):
-//   keygen:  bun scripts/release-manifest.ts keygen --out ~/.alpha-code-signing/release-manifest-ed25519.pem
+//   keygen:  bun scripts/release-manifest.ts keygen --out ~/.codepuppy-signing/release-manifest-ed25519.pem
 //   produce: OPENCODE_CHANNEL=prod bun scripts/release-manifest.ts produce \
 //              --channel prod --dist dist [--windows-dir <解包的 win artifact 目录>] \
-//              --key ~/.alpha-code-signing/release-manifest-ed25519.pem
+//              --key ~/.codepuppy-signing/release-manifest-ed25519.pem
 //   verify:  bun scripts/release-manifest.ts verify --manifest <json> --sig <sig> \
 //              --trust ../../docs/contracts/desktop-release-manifest.trust.json
 //

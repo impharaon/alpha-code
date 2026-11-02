@@ -16,13 +16,25 @@ review_after: 2026-10-14
 
 ## 0. 前置(已就绪,一次性)
 
-**签名/公证凭证**(**不在仓库**,`~/.alpha-code-signing/` 0600 —— 见该目录 README):
+**签名/公证凭证**(**不在仓库**,`~/.codepuppy-signing/` 0600 —— 见该目录 README):
 - `Developer ID Application` 证书(team **RQX6X6A635** = Beijing yuanyuji,与 tideapp 同 team),已装登录钥匙串,`codesign` 已授「始终允许」→ 打包不再弹钥匙串框。全链 verify 通过。备份 `devid-backup.p12`(口令见 README)+ **已另存 iCloud**。
 - `AuthKey_Y69LXQA5B4.p8`(App Store Connect API key,`开发者` 角色,公证用,**只能下一次**)。
 - `signing.env` 导出 `CODEPUPPY_SIGN=1` + `APPLE_API_KEY`/`APPLE_API_KEY_ID`/`APPLE_API_ISSUER` + `APPLE_TEAM_ID`。
 
+**签名目录与变量名的一次性改名(#1570 之后的第一次发版前做一次)**:目录原名 `~/.alpha-code-signing/`,
+`signing.env` 里原来是 `ALPHA_SIGN` / `ALPHA_SIGN_IDENTITY` / `ALPHA_MAC_SIGN_IDENTITY`。旧变量名不会被读到,
+本地打包会**静默**产出未签名的包,所以 `electron-builder.config.ts` 见到任何一个旧名就直接拒绝打包。
+改名只动名字,不读、不打印任何值:
+
+```sh
+set -e
+[ -d ~/.alpha-code-signing ] && [ ! -e ~/.codepuppy-signing ] && mv ~/.alpha-code-signing ~/.codepuppy-signing
+sed -i '' -E 's/(^|[^A-Za-z0-9_])ALPHA_(SIGN|SIGN_IDENTITY|MAC_SIGN_IDENTITY)=/\1CODEPUPPY_\2=/' ~/.codepuppy-signing/signing.env
+grep -cE '(^|[^A-Za-z0-9_])ALPHA_' ~/.codepuppy-signing/signing.env || true   # 只数行数,应为 0
+```
+
 **打包配置**(`packages/ui-mac/electron-builder.config.ts` + `scripts/*`,零改上游):
-- prod/beta productName `Code Puppy`、appId `com.tide.alphacode`(dev/beta 加后缀)、登录 URL scheme `code-puppy`、artifact `alpha-code-*`。
+- prod/beta productName `Code Puppy`、appId `com.tide.alphacode`(dev/beta 加后缀)、登录 URL scheme `code-puppy`、artifact `codepuppy-*`。
 - 更新源 = 自有 public repo `jinjunnn/alpha-code`(prod=`latest` 渠道,beta=`beta`),**不是** `anomalyco/opencode`。
 - `CODEPUPPY_SIGN=1` → Developer ID 签名 + 公证;否则 ad-hoc(仅本机双击)。
 - `notarize` 是 boolean(electron-builder 26.x);team/凭证走 env。
@@ -58,7 +70,7 @@ review_after: 2026-10-14
 #    它枚举全部 consumer-pin 夹具 + bun.lock,把所有没跟上的格子连同改法一次打出来。
 
 # ② 打签名+公证包(package:mac,不装机)
-source ~/.alpha-code-signing/signing.env               # CODEPUPPY_SIGN=1 + Apple 凭证
+source ~/.codepuppy-signing/signing.env               # CODEPUPPY_SIGN=1 + Apple 凭证
 cd packages/ui-mac
 OPENCODE_CHANNEL=prod bun run build                     # prebuild(含 A4 patch)+ 渲染/主进程
 OPENCODE_CHANNEL=prod bun run package:mac               # 签名 → 上传 Apple 公证(在线,几分钟)→ dmg/zip
@@ -76,12 +88,12 @@ ls dist/codepuppy-mac-arm64.dmg dist/codepuppy-mac-arm64.zip dist/latest-mac.yml
 #    REQ-106 唯一例外是经 owner 明确批准的 prod 手动下载包,必须额外传
 #    --allow-unsigned-windows。该 flag 会把 installer 标为 manualDownloadOnly、保留其
 #    NotSigned facts 和 digest binding、并排除 Windows updater feed；不得用于 beta 或正常更新发布。
-#    签名私钥:~/.alpha-code-signing/release-manifest-ed25519.pem(没有则先
+#    签名私钥:~/.codepuppy-signing/release-manifest-ed25519.pem(没有则先
 #    `bun scripts/release-manifest.ts keygen --out <该路径>` 并把打印的 trust entry 落进
 #    docs/contracts/desktop-release-manifest.trust.json)。
 OPENCODE_CHANNEL=prod bun scripts/release-manifest.ts produce \
   --channel prod --dist dist \
-  --key ~/.alpha-code-signing/release-manifest-ed25519.pem
+  --key ~/.codepuppy-signing/release-manifest-ed25519.pem
 # 期望:"[release-manifest] OK: …/codepuppy-release-manifest.json (+.sig)";产物三件:
 # dist/codepuppy-release-manifest.json + .sig + dist/alpha-code-<版本>-sbom.cdx.json
 
@@ -90,7 +102,7 @@ OPENCODE_CHANNEL=prod bun scripts/release-manifest.ts produce \
 OPENCODE_CHANNEL=prod bun scripts/release-manifest.ts produce \
   --channel prod --dist dist --windows-dir /absolute/path/to/windows-release-inputs \
   --allow-unsigned-windows \
-  --key ~/.alpha-code-signing/release-manifest-ed25519.pem
+  --key ~/.codepuppy-signing/release-manifest-ed25519.pem
 # 上传时包含 codepuppy-win-x64.exe,但不上传 latest.yml,也不得让它进入自动更新测试。
 
 # ④ 发 GitHub Release(dmg + zip + 两个 .blockmap + latest-mac.yml + manifest 三件一起传,
@@ -145,7 +157,7 @@ curl -sL -o /dev/null -w "%{http_code}\n" \
 #    bun 默认只装与本机 cpu 匹配的 optionalDependencies,arm64 机器上 x64 的包根本不在盘上。
 cd <仓根> && bun install --os=darwin --cpu='*'      # 只改 node_modules,不改 bun.lock
 
-source ~/.alpha-code-signing/signing.env
+source ~/.codepuppy-signing/signing.env
 cd packages/ui-mac
 rm -f dist/latest-mac-*.yml
 
@@ -219,7 +231,7 @@ Word / Excel / PowerPoint / PDF 四个文档工具的命令是 `<Resources>/offi
 `packages/ui-mac/src/main/process-fence-apply.test.ts` 或等价的打包验证。
 
 ## 3. 排障 / 已知项
-- **打包时弹「codesign 想访问密钥」**:点「**始终允许**」+ 输 Mac 登录密码(不是「允许」——那样每个文件都弹)。授权后长期免弹。若换机后又弹:`security import ~/.alpha-code-signing/devid-backup.p12`(口令 README)。
+- **打包时弹「codesign 想访问密钥」**:点「**始终允许**」+ 输 Mac 登录密码(不是「允许」——那样每个文件都弹)。授权后长期免弹。若换机后又弹:`security import ~/.codepuppy-signing/devid-backup.p12`(口令 README)。
 - **公证失败**:多为凭证/网络。`signing.env` 的 `APPLE_API_*` 是否正确;`.p8` 文件在否;换机后重新 source。API key 是 `开发者` 角色即够公证。
 - **A4 已修**:`patch-server-version.ts` 已把 InstallationVersion 从 `local` 改真实版本(v0.1.0 打包实测生效)。若 prebuild 日志出现 `[alpha:patch-server-version] … not found`,说明上游改了那行表达式 → 去更新该脚本(否则 A4 复发)。
 - **首个 Release 前**已装 app 检查更新会「无更新」= 正常。
@@ -242,7 +254,7 @@ Word / Excel / PowerPoint / PDF 四个文档工具的命令是 `<Resources>/offi
 > ⚠️ **本节全部命令都在 `packages/ui-mac/` 下跑**,不是仓根 —— 仓根没有 `build` /
 > `package:mac` / `scripts/release-manifest.ts`。照本节抄到仓根会得到
 > `error: Script not found "build"` 与 `Module not found`。
-改 `package.json` 版本 **+ 两处 consumer-pin 的 `consumer_version`**(见下方⚠️)→ `source signing.env && OPENCODE_CHANNEL=prod bun run build && bun run package:mac` → stapler/spctl 验证 → `bun scripts/release-manifest.ts produce --channel prod --dist dist --key ~/.alpha-code-signing/release-manifest-ed25519.pem`(拒绝即停,禁止绕过)→ `gh release create v<ver> …`(含 manifest+sig+SBOM)→ curl feed 得 200。签名→公证→feed 链 v0.1.0 已端到端验证;manifest 链自 #175 起为发布必经步骤。
+改 `package.json` 版本 **+ 两处 consumer-pin 的 `consumer_version`**(见下方⚠️)→ `source signing.env && OPENCODE_CHANNEL=prod bun run build && bun run package:mac` → stapler/spctl 验证 → `bun scripts/release-manifest.ts produce --channel prod --dist dist --key ~/.codepuppy-signing/release-manifest-ed25519.pem`(拒绝即停,禁止绕过)→ `gh release create v<ver> …`(含 manifest+sig+SBOM)→ curl feed 得 200。签名→公证→feed 链 v0.1.0 已端到端验证;manifest 链自 #175 起为发布必经步骤。
 
 **Windows(beta/prod)**:`codepuppy-windows-build.yml` 打包后自带 Authenticode 硬门 ——
 未签名、签名不可验证、或 publisher 不在白名单(REQ-076 T3 采购落地前白名单为空 = 全拒)

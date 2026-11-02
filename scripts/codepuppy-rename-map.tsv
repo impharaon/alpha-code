@@ -1510,3 +1510,4 @@ writeAlphaProviders	writeCodePuppyProviders
 # 设计,对已改名的树不幂等(签名目录快照的保护按旧路径登记)。行留在这里,是为了让表仍是「旧名 → 新名」的全集。
 vnd.alpha.remote-asset	vnd.codepuppy.remote-asset
 alpha_vision	codepuppy_vision
+alpha-code-signing	codepuppy-signing

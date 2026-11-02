@@ -265,7 +265,7 @@ const negativeCases: NegativeCase[] = [
     name: "agent malicious: targetDir path traversal",
     source: "agent-v1",
     mode: "package",
-    error: "payload.behavior.targetDir: expected one of [alpha-agents, global]",
+    error: "payload.behavior.targetDir: expected one of [codepuppy-agents, global]",
     mutatePayload: (payload) => {
       behaviorOf(payload).targetDir = "../../.claude/agents"
     },
@@ -301,7 +301,7 @@ const negativeCases: NegativeCase[] = [
     mode: "payload",
     error: "control characters not allowed",
     mutatePayload: (payload) => {
-      behaviorOf(payload).targetDir = "alpha-skills\u0000"
+      behaviorOf(payload).targetDir = "codepuppy-skills\u0000"
     },
   },
   {
@@ -568,7 +568,7 @@ const negativeCases: NegativeCase[] = [
     name: "remote auth rejects an unknown kind",
     source: "mcp-remote-v1",
     mode: "package",
-    error: "payload.behavior.auth.kind: expected one of [alpha-connection, mcp-oauth]",
+    error: "payload.behavior.auth.kind: expected one of [codepuppy-connection, mcp-oauth]",
     mutatePayload: (payload) => {
       behaviorOf(payload).auth = { kind: "saml", prerequisiteId: "example", required: true }
     },
@@ -601,7 +601,7 @@ const negativeCases: NegativeCase[] = [
     },
   },
   {
-    name: "alpha-connection requires connectionHandlerId",
+    name: "codepuppy-connection requires connectionHandlerId",
     source: "mcp-remote-connection-v1",
     mode: "package",
     error: "payload.behavior.auth.connectionHandlerId: required non-empty string",
@@ -701,7 +701,7 @@ const negativeCases: NegativeCase[] = [
     },
   },
   {
-    name: "alpha-connection refuses an undeclared headersTemplate placeholder",
+    name: "codepuppy-connection refuses an undeclared headersTemplate placeholder",
     source: "mcp-remote-connection-v1",
     mode: "package",
     error: 'references undeclared secret placeholder "TENANT_ID"',
@@ -724,7 +724,7 @@ const negativeCases: NegativeCase[] = [
     name: "targetDir enum",
     source: "skill-v1",
     mode: "package",
-    error: "payload.behavior.targetDir: expected one of [alpha-skills, global]",
+    error: "payload.behavior.targetDir: expected one of [codepuppy-skills, global]",
     mutatePayload: (payload) => {
       behaviorOf(payload).targetDir = "skills"
     },
@@ -740,7 +740,7 @@ const negativeCases: NegativeCase[] = [
   },
 ]
 
-describe("AlphaPackageEnvelopeV1 synthetic decoder corpus", () => {
+describe("CodePuppyPackageEnvelopeV1 synthetic decoder corpus", () => {
   test("every accepted corpus package decodes, plans, and resolves secrets exactly once per component", async () => {
     expect(corpus.schema).toBe("codepuppy.host-extension-package.decoder-corpus.v1")
     const cases = corpus.cases.filter((item) => item.expect === "accepted")
@@ -1102,7 +1102,7 @@ describe("AlphaPackageEnvelopeV1 synthetic decoder corpus", () => {
   describe("skill payload file list", () => {
     /** 直接跑**生产解码器**;返回它的错误串(或空串)。不自建等价链。 */
     const decodeSkill = (files: unknown): string => {
-      const payload = { schema: "codepuppy.host-extension-package.payload.skill.v1", behavior: { targetDir: "alpha-skills", files } }
+      const payload = { schema: "codepuppy.host-extension-package.payload.skill.v1", behavior: { targetDir: "codepuppy-skills", files } }
       const result = decodePackageProfilePayloadV1("skill", jsonBytes(payload), [])
       return result.ok ? "" : result.errors.join("\n")
     }
@@ -1140,7 +1140,7 @@ describe("AlphaPackageEnvelopeV1 synthetic decoder corpus", () => {
       const agentPayload = {
         schema: "codepuppy.host-extension-package.payload.agent.v1",
         behavior: {
-          targetDir: "alpha-agents",
+          targetDir: "codepuppy-agents",
           asset: { sha256: "1".repeat(64), bytes: 0, mediaType: "text/markdown", url: "https://example.invalid/a.md" },
         },
       }
@@ -1199,12 +1199,12 @@ describe("AlphaPackageEnvelopeV1 synthetic decoder corpus", () => {
       expect((behavior.asset as Record<string, unknown>).mediaType).toBe("text/markdown")
       expect(decodePackageProfilePayloadV1("agent", jsonBytes(entry.payload), []).ok).toBe(true)
       // agent 载荷里出现 skill 的 files ⇒ 拒(两条路真的分家了,不是共用一个宽解码器)。
-      const drifted = { ...(entry.payload as Record<string, unknown>), behavior: { targetDir: "alpha-agents", files: [fileAt("SKILL.md")] } }
+      const drifted = { ...(entry.payload as Record<string, unknown>), behavior: { targetDir: "codepuppy-agents", files: [fileAt("SKILL.md")] } }
       expect(decodePackageProfilePayloadV1("agent", jsonBytes(drifted), []).ok).toBe(false)
       // 反向同理:skill 载荷里出现 agent 的 asset ⇒ 拒。
       const skillWithAsset = {
         schema: "codepuppy.host-extension-package.payload.skill.v1",
-        behavior: { targetDir: "alpha-skills", asset: { sha256: "1".repeat(64), bytes: 12, mediaType: "text/markdown", url: "https://example.invalid/a.md" } },
+        behavior: { targetDir: "codepuppy-skills", asset: { sha256: "1".repeat(64), bytes: 12, mediaType: "text/markdown", url: "https://example.invalid/a.md" } },
       }
       expect(decodePackageProfilePayloadV1("skill", jsonBytes(skillWithAsset), []).ok).toBe(false)
     })
@@ -1288,6 +1288,26 @@ describe("AlphaPackageEnvelopeV1 synthetic decoder corpus", () => {
     expect(decodePackageEnvelopeHeaderV1(jsonBytes(capability)).ok).toBe(false)
   })
 
+  // alpha-web#283 AC6:targetDir 两个枚举与 Connection 认证种类只认 codepuppy 形态,旧值不并认。
+  // 每一轴先证明合法语料原样通过,再只改回那一个旧值 —— 任一轴放回旧值,这条就红。
+  test("previous-brand targetDir and connection auth kind fail closed", () => {
+    const skill = caseNamed("skill-v1").components[0]!.payload!
+    expect(decodePackageProfilePayloadV1("skill", jsonBytes(skill), []).ok).toBe(true)
+    const oldSkill = { ...skill, behavior: { ...(skill.behavior as Record<string, unknown>), targetDir: "alpha-skills" } }
+    expect(decodePackageProfilePayloadV1("skill", jsonBytes(oldSkill), []).ok).toBe(false)
+
+    const agent = caseNamed("agent-v1").components[0]!.payload!
+    expect(decodePackageProfilePayloadV1("agent", jsonBytes(agent), []).ok).toBe(true)
+    const oldAgent = { ...agent, behavior: { ...(agent.behavior as Record<string, unknown>), targetDir: "alpha-agents" } }
+    expect(decodePackageProfilePayloadV1("agent", jsonBytes(oldAgent), []).ok).toBe(false)
+
+    const connection = caseNamed("mcp-remote-connection-v1").components[0]!.payload!
+    expect(decodePackageProfilePayloadV1("mcp-remote", jsonBytes(connection), ["codepuppy.connection.v1"]).ok).toBe(true)
+    const behavior = connection.behavior as Record<string, unknown>
+    const oldConnection = { ...connection, behavior: { ...behavior, auth: { ...(behavior.auth as Record<string, unknown>), kind: "alpha-connection" } } }
+    expect(decodePackageProfilePayloadV1("mcp-remote", jsonBytes(oldConnection), ["codepuppy.connection.v1"]).ok).toBe(false)
+  })
+
   test("oauth and connection payloads derive exactly one capability each", () => {
     const oauth = caseNamed("mcp-remote-oauth-v1").components[0]!.payload as unknown as PackageProfilePayloadV1
     const connection = caseNamed("mcp-remote-connection-v1").components[0]!
@@ -1346,7 +1366,7 @@ function errorsOf(result: ReturnType<typeof decodePackageEnvelopeHeaderV1>): str
   return result.ok ? "" : result.errors.join("\n")
 }
 
-describe("AlphaPackageEnvelopeV1 listing section", () => {
+describe("CodePuppyPackageEnvelopeV1 listing section", () => {
   /**
    * `#1287` AC2:**缺这一段的既有条目仍可解码、仍可安装。**
    *

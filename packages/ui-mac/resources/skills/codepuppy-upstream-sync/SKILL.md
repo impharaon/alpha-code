@@ -1,6 +1,6 @@
 ---
-name: alpha-upstream-sync
-description: Sync opencode upstream into the alpha fork and re-validate alpha's prompt/agent overrides against the refreshed base. Use when pulling upstream, after `git merge dev`, or before shipping a build that includes an upstream bump.
+name: codepuppy-upstream-sync
+description: Sync opencode upstream into the Code Puppy fork and re-validate Code Puppy's prompt/agent overrides against the refreshed base. Use when pulling upstream, after `git merge dev`, or before shipping a build that includes an upstream bump.
 ---
 
 # Upstream sync + override re-validation (Code Puppy)
@@ -17,17 +17,17 @@ sync and the one check CI cannot do for you.
   to a seam (a new file, a plugin, config), not by editing upstream.
 
 ## 2. Review the contract diff
-A legitimate upgrade only touches two contracts. Diff them across the bump and adapt alpha consumers
+A legitimate upgrade only touches two contracts. Diff them across the bump and adapt Code Puppy consumers
 only where they changed:
 - `git diff <old-dev>..<new-dev> -- packages/sdk/openapi.json packages/plugin/src/index.ts`
 
 ## 3. Re-validate prompt/agent overrides — the silent-drift check (ADR-015)
-alpha layers behavior on top of opencode's base prompt via *new* files (`codepuppy-behavior.md`,
+Code Puppy layers behavior on top of opencode's base prompt via *new* files (`codepuppy-behavior.md`,
 `codepuppy-identity.ts`, `.opencode/agent/*.md`). Drift here produces NO git conflict, so the file-diff
 guard is blind to it. Run:
 - `git diff <old-dev>..<new-dev> -- packages/opencode/src/session/prompt packages/opencode/src/agent`
 
-If the base prompt or any upstream agent prompt changed, open alpha's override files and reconcile by
+If the base prompt or any upstream agent prompt changed, open Code Puppy's override files and reconcile by
 hand: does any override now contradict, duplicate, or fight the new base? Tighten or drop it.
 
 ## 4. Typecheck + record

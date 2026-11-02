@@ -141,6 +141,19 @@ export function runNamingMigrationBoot(
   }
 }
 
+/** 写完成标记;写不下去(磁盘满、权限)⇒ 可读错误,由调用方停下启动。日志仍是 running,下次启动先撤销本次再重跑。 */
+export function completeNamingMigration(journal: NamingMigrationJournal): { ok: true } | { ok: false; message: string } {
+  try {
+    journal.complete()
+    return { ok: true }
+  } catch (error) {
+    return {
+      ok: false,
+      message: `升级迁移做完了,但完成标记没写下去(${error instanceof Error ? error.message : String(error)})。下次打开会先撤销这次迁移再重做;请先确认磁盘空间与目录权限。`,
+    }
+  }
+}
+
 // ── 布局 ───────────────────────────────────────────────────────────────────────────────
 
 type Layout = {

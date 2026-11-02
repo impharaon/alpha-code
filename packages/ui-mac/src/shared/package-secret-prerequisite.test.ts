@@ -13,7 +13,7 @@ import { verifyInstalledMcp } from "../main/ext-mcp-activation"
 import {
   decodePackageEnvelopeHeaderV1,
   decodePackageProfilePayloadV1,
-  type AlphaPackageEnvelopeV1,
+  type CodePuppyPackageEnvelopeV1,
   type PackageProfilePayloadV1,
 } from "./host-extension-package-contract/decoder"
 import {
@@ -38,7 +38,7 @@ function decodedPackage(
   profileId: "mcp-local" | "mcp-remote" = "mcp-local",
   requiredSecrets = ["API_TOKEN"],
 ): {
-  envelope: AlphaPackageEnvelopeV1
+  envelope: CodePuppyPackageEnvelopeV1
   payload: PackageProfilePayloadV1
 } {
   const payload =

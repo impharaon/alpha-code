@@ -48,7 +48,7 @@ export const DISTRIBUTION_CHANNELS = [
 export type DistributionChannel = (typeof DISTRIBUTION_CHANNELS)[number]
 
 /** authored/curated 维的保留主体名(自由字符串维度中的三个固定语义值)。 */
-export const PARTY_CODEPUPPY = "alpha"
+export const PARTY_CODEPUPPY = "codepuppy"
 export const PARTY_USER = "user"
 export const PARTY_UNKNOWN = "unknown"
 
@@ -56,7 +56,7 @@ export const PARTY_UNKNOWN = "unknown"
 export interface OwnershipDims {
   /** 谁写的(catalog source / seed asset source / user / unknown)。 */
   authored: string
-  /** 谁策展的(alpha catalog 通道 = "alpha";用户自装 = "user")。 */
+  /** 谁策展的(Code Puppy catalog 通道 = "codepuppy";用户自装 = "user")。 */
   curated: string
   distributed: DistributionChannel
   runtimeSurfaces: RuntimeSurface[]
@@ -176,10 +176,9 @@ export function distributionChannelForCatalogEntry(entry: OwnershipCatalogEntryL
   return channel === "bundled" ? "bundled" : "remote-catalog"
 }
 
-/** 支持等级 ← 来源(catalog source / seed asset source 共用):alpha/official/community/其余=user。 */
+/** 支持等级 ← 来源(catalog source / seed asset source 共用):codepuppy/official/community/其余=user。 */
 export function supportTierForSource(source: string | undefined): SupportTier {
-  // 入参 source 的取值 "alpha" 是网站目录条目的字段值(跨仓,三端同窗切换时由网站一侧先改);返回的支持等级是桌面内部值
-  if (source === "alpha") return "codepuppy"
+  if (source === "codepuppy") return "codepuppy"
   if (source === "official") return "curated"
   if (source === "community") return "community"
   return "user"
@@ -187,7 +186,7 @@ export function supportTierForSource(source: string | undefined): SupportTier {
 
 /**
  * 内置 catalog 快照(channel "bundled")或 signed channel(channel "remote"/"cache")条目 → 五维。
- * AC1 锚点:authored = 条目来源(official/community/…),curated 恒 "alpha" —— 策展 ≠ 作者,不混标。
+ * AC1 锚点:authored = 条目来源(official/community/…),curated 恒 "codepuppy" —— 策展 ≠ 作者,不混标。
  */
 export function ownershipFromCatalogEntry(entry: OwnershipCatalogEntryLike, channel: CatalogTrustChannel): OwnershipDims {
   return {

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import {
-  type AlphaPackageEnvelopeV1,
+  type CodePuppyPackageEnvelopeV1,
   type PackageProfilePayloadV1,
 } from "../shared/host-extension-package-contract/decoder"
 import type { PackageAdmissionBindingV1 } from "../shared/package-admission"
@@ -76,7 +76,7 @@ function fixture(options: { required?: boolean; handlerId?: string } = {}) {
       headersTemplate: {},
       requiredSecrets: [],
       auth: {
-        kind: "alpha-connection",
+        kind: "codepuppy-connection",
         prerequisiteId: "account-link",
         required: options.required ?? true,
         connectionHandlerId: options.handlerId ?? HANDLER_ID,
@@ -107,7 +107,7 @@ function fixture(options: { required?: boolean; handlerId?: string } = {}) {
       },
     ],
     capabilities: ["codepuppy.connection.v1"],
-  } as unknown as AlphaPackageEnvelopeV1
+  } as unknown as CodePuppyPackageEnvelopeV1
   return { envelope, bytes }
 }
 
@@ -172,7 +172,7 @@ function confirmation(preview: {
 }
 
 function admissionCoordinator(options: {
-  envelope: AlphaPackageEnvelopeV1
+  envelope: CodePuppyPackageEnvelopeV1
   bytes: Uint8Array
   handlers?: CodePuppyConnectionHandlerTableV1
   onTransaction: () => void
@@ -207,7 +207,7 @@ describe("alpha connection allowlist", () => {
    */
   test("the production handler table is empty in this build and every id is unknown", () => {
     expect(codepuppyConnectionHandlerIdsV1()).toEqual([])
-    for (const id of [HANDLER_ID, "alpha-example", "github", "", "example-connector "])
+    for (const id of [HANDLER_ID, "codepuppy-example", "github", "", "example-connector "])
       expect(lookupCodePuppyConnectionHandlerV1(id)).toEqual({ ok: false, reasonCode: "connection-handler-unknown" })
   })
 
@@ -378,7 +378,7 @@ describe("handler results are untrusted input", () => {
 })
 
 describe("attempt lifecycle", () => {
-  function coordinatorFor(table: CodePuppyConnectionHandlerTableV1, envelope: AlphaPackageEnvelopeV1, bytes: Uint8Array) {
+  function coordinatorFor(table: CodePuppyConnectionHandlerTableV1, envelope: CodePuppyPackageEnvelopeV1, bytes: Uint8Array) {
     return createCodePuppyConnectionCoordinator({
       loadVerifiedCatalog: async () => ({
         source: "remote",
@@ -477,7 +477,7 @@ describe("attempt lifecycle", () => {
 })
 
 describe("reuse key decides identity, the renderer never does", () => {
-  function coordinatorFor(table: CodePuppyConnectionHandlerTableV1, envelope: AlphaPackageEnvelopeV1, bytes: Uint8Array) {
+  function coordinatorFor(table: CodePuppyConnectionHandlerTableV1, envelope: CodePuppyPackageEnvelopeV1, bytes: Uint8Array) {
     return createCodePuppyConnectionCoordinator({
       loadVerifiedCatalog: async () => ({
         source: "remote",

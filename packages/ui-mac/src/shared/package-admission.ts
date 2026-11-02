@@ -1,6 +1,6 @@
 import type { CapabilityDiffWire } from "./ext-capability-authorization"
 import type {
-  AlphaPackageEnvelopeV1,
+  CodePuppyPackageEnvelopeV1,
   PackageComponentSkipReasonV1,
   PackageSupportedComponentV1,
 } from "./host-extension-package-contract/decoder"
@@ -49,7 +49,7 @@ export type PackageEffectiveInstallGraphV1 = {
  * are absent by construction — the caller passes only what survived the support gate.
  */
 export function packageEffectiveInstallGraphV1(
-  envelope: AlphaPackageEnvelopeV1,
+  envelope: CodePuppyPackageEnvelopeV1,
   supported: ReadonlyArray<PackageSupportedComponentV1>,
 ): PackageEffectiveInstallGraphV1 {
   return {

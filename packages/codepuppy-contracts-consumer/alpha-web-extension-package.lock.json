@@ -1,17 +1,9 @@
 {
   "repo": "jinjunnn/alpha-web",
-  "commit": "40520efbcd4871695f7749a792f839eb7882c0b9",
+  "commit": "a7f79c667c71b03a4ae54350dd061a116a2c4080",
   "artifactPath": "contracts/extension-package/artifact",
-  "artifactSha256": "862d5c7b766884fe0f0c6d744ff40ad015d482acd99f7bbcc05294897e65184b",
+  "artifactSha256": "bd082405e97b433f4148869bbf70b772e2d426767db723b53d738e2afadfdb87",
   "files": [
-    {
-      "path": "alpha-package-compatibility-report-v1.schema.json",
-      "sha256": "6f0af78cc4a8adebf6db59130438ad3c96263232e9afe3d78177c949985b2292"
-    },
-    {
-      "path": "alpha-package-declaration-v1.schema.json",
-      "sha256": "fffbbd33c06b195e26fe0539430f71e36f06d3bc7fb4bf124b6f0943d3fc2adb"
-    },
     {
       "path": "asset.generic-bundle-agent.md",
       "sha256": "f2a5576d98928e8df98f4608ac8521cabd95b17875a474317193836584683c65"
@@ -26,27 +18,35 @@
     },
     {
       "path": "claude-code.rules.v1.json",
-      "sha256": "45eff4501633b4c259b9cb2628c68d7f43c87a3a3c1755221ac6245662aeb02d"
+      "sha256": "3e3c9c4b2d2476c21d37a7057af8b292a7cb2a53fd9330da71087b5c5f631ae7"
+    },
+    {
+      "path": "codepuppy-package-compatibility-report-v1.schema.json",
+      "sha256": "d5f963afe04960419b970d48a5a26e349da38ce7dd47773d25720dbdb886f195"
+    },
+    {
+      "path": "codepuppy-package-declaration-v1.schema.json",
+      "sha256": "d7a1b0456dd14a2b06631060b47b8a26d68da18014a3307b410c32e4b664eb33"
     },
     {
       "path": "expected.bundle.compiled.json",
-      "sha256": "f68fdb85e68b37d26eb8ac887220b7b3526e40892168332fd9d6d53cf5915019"
+      "sha256": "6d04e1d0ad22b88b987385ffd0f7e2fdf64d22e52f891785f928fc17b0fbeaca"
     },
     {
       "path": "expected.cloud.compiled.json",
-      "sha256": "6153c4210b5a8c3595b14057ad1ffb91f9aeffb68b92953b720987c3ca3bb50c"
+      "sha256": "d522ae5e19d657c43e6299252608bc2649f3058870a712db9bfbd61d9cdfda03"
     },
     {
       "path": "expected.mcp-remote.compiled.json",
-      "sha256": "7c4d1fb32a352dc936b015aeac675b78b6253c85896da820eb4ad5a8fccbc523"
+      "sha256": "3ec28325164647b9089eb38a449a8802b841143fe0e108c63e94a835d13eb07c"
     },
     {
       "path": "expected.remote-connection.compiled.json",
-      "sha256": "195f27355db8ae91a1de47fbd94c845fde9c45fbeb41d2aff1de81d5abc31e25"
+      "sha256": "10ed83d1a05b0317d3518f0a08ab9f853427350ab330f0c662e7fa1a2b1abe1a"
     },
     {
       "path": "expected.remote-oauth.compiled.json",
-      "sha256": "c5ebac03db69525e6894c19dd02a6fee0dcef9b97e18d0eb3d89b7ae6b4ddeb7"
+      "sha256": "3e9ca07973e9d662133df17f4d3f24924f8c403551d81ae18046ca0d1fad3e1e"
     },
     {
       "path": "extension-package-error-v1.schema.json",
@@ -54,7 +54,7 @@
     },
     {
       "path": "extension-package-producer-artifact.v1.json",
-      "sha256": "9728a1c9b25f08ff49dd43204e6af7cb2cc5ad9817bdbda4b1a276a7b66ba939"
+      "sha256": "75a5c5d7068c3137497bdf2b6e0540f558bbc9845030941121b0033b901bf91f"
     },
     {
       "path": "generic-profiles.v1.json",
@@ -62,15 +62,15 @@
     },
     {
       "path": "generic-rules.v1.json",
-      "sha256": "ade644313c3dface8402503f34003641e727d57f0dcfb00fd34d56ce13ce6b2c"
+      "sha256": "b2a36bd8aa7a400a56f13f9b6e6a92db6c71181c6e46b5873c201bc8d9e45ba4"
     },
     {
       "path": "host-contract-pin.v1.json",
-      "sha256": "cb19496e0e1ed82eb1e92e3601af615c951d77661ce03a95be1389a54f5b4f33"
+      "sha256": "ec7af87a5d68658349ccf0cee7481888287072270c42b43b18ad442627153fe4"
     },
     {
       "path": "host-extension-package-artifact.v1.json",
-      "sha256": "ec194e98d3ffcdb3dcaadd5cb7f30eec04681261519ebbfa871d224c769065a6"
+      "sha256": "ef5eda81b5d3d5cf1f4089381cf9a64923d25c6bd35103411d9552ca7176c0ae"
     },
     {
       "path": "host-extension-package.registry.v1.json",
@@ -78,95 +78,95 @@
     },
     {
       "path": "input.author-capabilities.invalid.json",
-      "sha256": "f0d6d0adc202d1f2d2692e3f2dcf1d98e70fad7a6576963449f3d9d4e7d8ea97"
+      "sha256": "2cfce1f5ed5caf5cae2be00f7b4e8887161eda60687d178e9349081c6ad6593c"
     },
     {
       "path": "input.author-dependencies.invalid.json",
-      "sha256": "9180f8002a077d8400af27d3b83f46dbfb584daa1affb9e62f399e12ad662b00"
+      "sha256": "743e355cbbe088142d618b379c7727416c01ea5c1e04d3eb5b218fc52a25dad5"
     },
     {
       "path": "input.author-secret-value.invalid.json",
-      "sha256": "2b031e8ad5e8df06de0c7488a19396556190cc88c0140c27f5d8ebcdbae84d5b"
+      "sha256": "0e61a531905c079cfa78c82658ee0c06a3d504ae9c2cc61ed0779cc04f2143d5"
     },
     {
       "path": "input.bundle-duplicate-component.invalid.json",
-      "sha256": "9f021d1a8fac6457adb7b036a76bad6802e38f2577b2113fc62865571b42bc8f"
+      "sha256": "2751b5472c61ac765869ae7ea8f3e72f9aca0df4e4f8ccd0765fceb44f3e7e00"
     },
     {
       "path": "input.bundle-overflow.invalid.json",
-      "sha256": "3638ecf64b2d8a8df38dc5d6155c72269c25d9dcbed614e15e1f5379ce06b154"
+      "sha256": "dffffdf4bc5be0fb11ce1d40e3c6ea9b1242334d138d275871429e25d8f62306"
     },
     {
       "path": "input.bundle-root-leaf-collision.invalid.json",
-      "sha256": "66e92a2df777009fa42ed5414c8461140df0db7856941dd4004b201614553820"
+      "sha256": "2daa2632cc7cda6d5354d2385884c0c5b7680f8e8d42b14a27deb2f7ec43a19c"
     },
     {
       "path": "input.bundle.valid.json",
-      "sha256": "ae73fbf71a0f1f77a0dd468b6a4b4c14c3e94509ae872564a3f2cfd37d4c2891"
+      "sha256": "bf16db2c91303617ae8586f288ddbd5ecd629380953c435c04e3f5db89cd0173"
     },
     {
       "path": "input.cloud-profile.invalid.json",
-      "sha256": "229ac8cebfc766e9e9c375ae4c8f5f6e084472f1bcb5b42839289f8e334d722e"
+      "sha256": "8628a010f68e8e8d3fddaf5c86174eb795a526741b860fe09f84dc973c5a2109"
     },
     {
       "path": "input.cloud.valid.json",
-      "sha256": "eb9224209e51bc50728525f8a28901f2db6143667dbeb8b8780b9e7e20368bf1"
+      "sha256": "ebc42e1ea77fdec59541be7e693b95ea260ab7a5445a473609f42591414efa95"
     },
     {
       "path": "input.command-reserved-name.invalid.json",
-      "sha256": "24cdfdc9598bb4ffe1a0dfd1d545d58c2c9921684109bed887e142f515092ff2"
+      "sha256": "4a55c08040e46c7b72345b11193eb824a17b87029b888b63f677aa8a207a0a17"
     },
     {
       "path": "input.command-variant.invalid.json",
-      "sha256": "ff1e44a2f137dc99f1ba8e79ecd910b67e2ecd14667e337a2e580b5a98da27f3"
+      "sha256": "2c7ec6a7ca0adbb977965fa023a2e29c157cec1905f8f72a6dba3fc22316c2ea"
     },
     {
       "path": "input.mcp-remote.valid.json",
-      "sha256": "623f371b81804a0033be50dd651bee3c4c19dd95b56dbbeda2f2b6b877d0d8ee"
+      "sha256": "2755ce416842f8174c06b5e0b90f37653ce927de7c19497c3a5584157ea0568a"
     },
     {
       "path": "input.oauth-authorization-header.invalid.json",
-      "sha256": "9be034067b330de7e3956fa21c4d7e561205943b1fcad06067dd6bdffc2a5d06"
+      "sha256": "cec4fcb78aed9b226639406ca066014043f6f4c1db99a51a3a9e74d903eec747"
     },
     {
       "path": "input.oauth-prerequisite-collision.invalid.json",
-      "sha256": "5d2465405dabf08be39e7d33caab9881b00760fb07b93de9a4bdfbf19dd84e80"
+      "sha256": "ae8c5427f7daed9b5dba21215935d546381139f2424eb1f89dcd1b1dc002fe09"
     },
     {
       "path": "input.remote-auth-unknown.invalid.json",
-      "sha256": "f1c7f8e5652ed399d380a3b9b35722b7835eceb4c6fad661da03c34d217e9cfb"
+      "sha256": "bcc663aa5db6e14f654c6df93d945ef44161f6571644cc6a601d977aa674e287"
     },
     {
       "path": "input.remote-connection.valid.json",
-      "sha256": "36ce49578d7888d0ee7f3cbc3b24b58a41fc520fa481ecb588dce12acba314aa"
+      "sha256": "1ed08c60b30664eb0036ddcc0f58a1446c4bafd0b88eb27b0986af5187f1fab9"
     },
     {
       "path": "input.remote-http.invalid.json",
-      "sha256": "feb570952405f2223599e849319f01583516411b2f741a5b4b610adf78941a62"
+      "sha256": "cf157696179bd2bc186349a7bc7f8ed4c680d4b206dc42e5b639b6b5f8ce9f44"
     },
     {
       "path": "input.remote-oauth.valid.json",
-      "sha256": "c7e739cf79e74df366670d2238ab1bb66d19f2288bcbb8f7bf480880bd642d14"
+      "sha256": "cb4dce2f9b75694ad3068f996ba3c12fc3141a0d8af34e27ea6251ce860ff5ea"
     },
     {
       "path": "input.remote-userinfo.invalid.json",
-      "sha256": "fafc4c2de6070eac848f382958860252b6983e5f83ea7b05a70403ad3032ee2f"
+      "sha256": "46756188a5564cf391d9b5730be9161f4109a3a984a2fc84c76266183709e8d1"
     },
     {
       "path": "normalized-package-build-record-v1.schema.json",
-      "sha256": "a7b944bf83aeedcfb74e63a2317ecb32cc8c00f77e5716c162361cb93f187f3f"
+      "sha256": "66a37c29e86b0698cde22c01de99204dac22bec6a76f5b95a05ae4a779f8cf2e"
     },
     {
       "path": "report.blocked.json",
-      "sha256": "9fc29fd324673be8060bcd0ead6783d88f6cb616916a78d55b59126173d37d71"
+      "sha256": "d95c9b69a988b1be2670b3016278cea24556f287ed1e0812072ab8a71e85af2d"
     },
     {
       "path": "report.compatible.json",
-      "sha256": "d590edf2d2c77b5c55316e98f578f0227c4f0409c985dd090923cf97469437c6"
+      "sha256": "be871871d9d0d0392993647f36a000e726013ba08a8bed07b180fe0116a0ce6b"
     },
     {
       "path": "report.review-required.json",
-      "sha256": "390cbbaa5dfd3425fe434ee86d45ab26acc5d99c7148bcc25ffae2ee60a339e2"
+      "sha256": "a2f250fe87c8c0631ef74d42e7803f8bde40e75e8c12e3916c9987b4f40b1723"
     },
     {
       "path": "vectors.v1.json",

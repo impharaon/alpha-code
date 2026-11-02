@@ -1,4 +1,4 @@
-import envelopeSchemaJson from "./alpha-package-envelope-v1.schema.json"
+import envelopeSchemaJson from "./codepuppy-package-envelope-v1.schema.json"
 import {
   HOST_EXTENSION_PACKAGE_LIMITS_V1,
   findPackageProfileV1,
@@ -42,7 +42,7 @@ export type PackageSupportedComponentV1 = PackageComponentV1 & {
 
 /**
  * `#1287`:上架呈现段。**字段集不在这里,也不在任何散文里** —— 唯一权威是
- * `alpha-package-envelope-v1.schema.json` 的 `$defs.listing.properties`,本文件在装载期把它读成
+ * `codepuppy-package-envelope-v1.schema.json` 的 `$defs.listing.properties`,本文件在装载期把它读成
  * 下面的规则表。加一个展示字段 = 改那一个 JSON,decoder 不需要动;而这条约束不是靠人记得,是靠
  * `buildPackageListingRulesV1` 对**不认识的 schema 关键字直接抛**(见该函数)。
  *
@@ -83,7 +83,7 @@ const LISTING_SCHEMA_KEYWORDS = new Set([
   "type",
 ])
 /** 本 decoder 实现了的全部 `format` 值。schema 里出现别的 ⇒ 抛。 */
-const LISTING_CANONICAL_HTTPS_URL_FORMAT = "alpha-canonical-https-url"
+const LISTING_CANONICAL_HTTPS_URL_FORMAT = "codepuppy-canonical-https-url"
 
 /**
  * 把 schema 的 `$defs.listing` 读成规则表。
@@ -182,7 +182,7 @@ export function packageListingListV1(
   return Array.isArray(value) ? value : []
 }
 
-export type AlphaPackageEnvelopeV1 = {
+export type CodePuppyPackageEnvelopeV1 = {
   schema: typeof HOST_EXTENSION_PACKAGE_SCHEMA_V1
   prelude: { packageId: string; version: string }
   presentation: { displayName: string; description: string }
@@ -240,12 +240,12 @@ export const SKILL_MD_PATH = "SKILL.md"
 
 export type SkillPayloadV1 = {
   schema: "codepuppy.host-extension-package.payload.skill.v1"
-  behavior: { targetDir: "alpha-skills" | "global"; files: SkillAssetFileV1[] }
+  behavior: { targetDir: "codepuppy-skills" | "global"; files: SkillAssetFileV1[] }
 }
 
 export type AgentPayloadV1 = {
   schema: "codepuppy.host-extension-package.payload.agent.v1"
-  behavior: { targetDir: "alpha-agents" | "global"; asset: MarkdownAssetRefV1 }
+  behavior: { targetDir: "codepuppy-agents" | "global"; asset: MarkdownAssetRefV1 }
 }
 
 /**
@@ -294,7 +294,7 @@ export type McpRemoteAuthV1 =
   | "none"
   | { kind: "mcp-oauth"; prerequisiteId: string; required: boolean; label?: string }
   | {
-      kind: "alpha-connection"
+      kind: "codepuppy-connection"
       prerequisiteId: string
       required: boolean
       connectionHandlerId: string
@@ -399,7 +399,7 @@ export type PackageEnvelopeHeaderDecodeV1 =
   | {
       ok: true
       status: "accepted"
-      envelope: AlphaPackageEnvelopeV1
+      envelope: CodePuppyPackageEnvelopeV1
       /** The root component's profile. Every leaf carries its own inside `components`. */
       profile: PackageProfileRegistrationV1
       components: PackageComponentDecodeV1[]
@@ -409,8 +409,8 @@ export type PackageEnvelopeHeaderDecodeV1 =
       status: "blocked"
       stage: "header" | "support"
       errors: string[]
-      presentation?: AlphaPackageEnvelopeV1["presentation"]
-      listing?: AlphaPackageEnvelopeV1["listing"]
+      presentation?: CodePuppyPackageEnvelopeV1["presentation"]
+      listing?: CodePuppyPackageEnvelopeV1["listing"]
     }
 
 export type PackageProfilePayloadDecodeV1 =
@@ -456,9 +456,9 @@ const CLOUD_SELECT_FIELD_KEYS = new Set(["name", "control", "required", "options
 const CLOUD_OPTION_KEYS = new Set(["value", "label"])
 const CLOUD_FIXED_KEYS = new Set(["name", "value"])
 const MCP_REMOTE_BEHAVIOR_KEYS = new Set(["url", "headersTemplate", "requiredSecrets", "auth", "officialRecipe"])
-const MCP_REMOTE_AUTH_KINDS = ["alpha-connection", "mcp-oauth"] as const
+const MCP_REMOTE_AUTH_KINDS = ["codepuppy-connection", "mcp-oauth"] as const
 const MCP_OAUTH_AUTH_KEYS = new Set(["kind", "prerequisiteId", "required", "label"])
-const ALPHA_CONNECTION_AUTH_KEYS = new Set([
+const CODEPUPPY_CONNECTION_AUTH_KEYS = new Set([
   "kind",
   "prerequisiteId",
   "required",
@@ -483,7 +483,7 @@ const PROFILE_ID_RE = /^[a-z][a-z0-9-]{0,31}$/
  * token contains a colon.
  *
  * It is exported because it must stay **byte-identical** to `$defs/capabilities.items.pattern` in
- * `alpha-package-envelope-v1.schema.json`: a producer that passes the published schema and then
+ * `codepuppy-package-envelope-v1.schema.json`: a producer that passes the published schema and then
  * fails this decoder is a contract that lies. `host-extension-package-artifact.test.ts` asserts
  * that equality on `.source`, and cross-checks both against the same probe strings — hand-comparing
  * the two spellings is what let the divergence exist in the first place.
@@ -593,7 +593,7 @@ export function derivePayloadCapabilitiesV1(payload: PackageProfilePayloadV1): P
     payload.behavior.auth !== "none"
   ) {
     if (payload.behavior.auth.kind === "mcp-oauth") capabilities.push("codepuppy.mcp-oauth.v1")
-    if (payload.behavior.auth.kind === "alpha-connection") capabilities.push("codepuppy.connection.v1")
+    if (payload.behavior.auth.kind === "codepuppy-connection") capabilities.push("codepuppy.connection.v1")
   }
   return [...new Set(capabilities)].sort()
 }
@@ -750,7 +750,7 @@ function unionCapabilities(components: DecodedComponent[]): string[] {
 function decodePrelude(
   value: unknown,
   errors: string[],
-): AlphaPackageEnvelopeV1["prelude"] | undefined {
+): CodePuppyPackageEnvelopeV1["prelude"] | undefined {
   if (!isObject(value)) {
     errors.push("envelope.prelude: required object")
     return
@@ -770,7 +770,7 @@ function decodePrelude(
 function decodePresentation(
   value: unknown,
   errors: string[],
-): AlphaPackageEnvelopeV1["presentation"] | undefined {
+): CodePuppyPackageEnvelopeV1["presentation"] | undefined {
   if (!isObject(value)) {
     errors.push("envelope.presentation: required object")
     return
@@ -1083,15 +1083,15 @@ function decodeSkillPayload(value: unknown): PackageProfilePayloadDecodeV1 {
   )
   if (!behavior) return { ok: false, errors }
   const targetDir = decodeString(behavior.targetDir, "payload.behavior.targetDir", errors, { max: 32 })
-  if (targetDir && !["alpha-skills", "global"].includes(targetDir))
-    errors.push("payload.behavior.targetDir: expected one of [alpha-skills, global]")
+  if (targetDir && !["codepuppy-skills", "global"].includes(targetDir))
+    errors.push("payload.behavior.targetDir: expected one of [codepuppy-skills, global]")
   const files = decodeSkillAssetFiles(behavior.files, "payload.behavior.files", errors)
   if (errors.length || !targetDir || !files) return { ok: false, errors }
   return {
     ok: true,
     payload: {
       schema: "codepuppy.host-extension-package.payload.skill.v1",
-      behavior: { targetDir: targetDir as "alpha-skills" | "global", files },
+      behavior: { targetDir: targetDir as "codepuppy-skills" | "global", files },
     },
   }
 }
@@ -1169,8 +1169,8 @@ function decodeAgentPayload(value: unknown): PackageProfilePayloadDecodeV1 {
   )
   if (!behavior) return { ok: false, errors }
   const targetDir = decodeString(behavior.targetDir, "payload.behavior.targetDir", errors, { max: 32 })
-  if (targetDir && !["alpha-agents", "global"].includes(targetDir))
-    errors.push("payload.behavior.targetDir: expected one of [alpha-agents, global]")
+  if (targetDir && !["codepuppy-agents", "global"].includes(targetDir))
+    errors.push("payload.behavior.targetDir: expected one of [codepuppy-agents, global]")
   const asset = decodePayloadRef(behavior.asset, "payload.behavior.asset", errors, {
     maxBytes: HOST_EXTENSION_PACKAGE_LIMITS_V1.maxMarkdownAssetBytes,
     mediaType: "text/markdown",
@@ -1180,7 +1180,7 @@ function decodeAgentPayload(value: unknown): PackageProfilePayloadDecodeV1 {
     ok: true,
     payload: {
       schema: "codepuppy.host-extension-package.payload.agent.v1",
-      behavior: { targetDir: targetDir as "alpha-agents" | "global", asset: asset as MarkdownAssetRefV1 },
+      behavior: { targetDir: targetDir as "codepuppy-agents" | "global", asset: asset as MarkdownAssetRefV1 },
     },
   }
 }
@@ -1439,13 +1439,13 @@ function decodeMcpRemoteAuth(value: unknown, errors: string[]): McpRemoteAuthV1 
   }
   const kind = decodeString(value.kind, "payload.behavior.auth.kind", errors, { max: 32 })
   if (!kind) return
-  if (kind !== "mcp-oauth" && kind !== "alpha-connection") {
+  if (kind !== "mcp-oauth" && kind !== "codepuppy-connection") {
     errors.push(`payload.behavior.auth.kind: expected one of [${MCP_REMOTE_AUTH_KINDS.join(", ")}]`)
     return
   }
   rejectUnknownKeys(
     value,
-    kind === "mcp-oauth" ? MCP_OAUTH_AUTH_KEYS : ALPHA_CONNECTION_AUTH_KEYS,
+    kind === "mcp-oauth" ? MCP_OAUTH_AUTH_KEYS : CODEPUPPY_CONNECTION_AUTH_KEYS,
     "payload.behavior.auth",
     errors,
   )

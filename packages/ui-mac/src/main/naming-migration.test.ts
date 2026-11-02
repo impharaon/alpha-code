@@ -16,7 +16,7 @@ import { addReceipt } from "./codepuppy-installs"
 import { evaluateCapabilityDiff, readCapabilityGrant, writeCapabilityGrantSync } from "./ext-capability-grants"
 import { collectInventory } from "./ext-inventory"
 import { upsertRecordV2 } from "./ext-receipt-v2"
-import { runNamingMigrationBoot, type NamingMigrationPorts } from "./naming-migration"
+import { completeNamingMigration, runNamingMigrationBoot, type NamingMigrationPorts } from "./naming-migration"
 import { runNamingMigrationDbStep } from "./naming-migration-db"
 import { createMigrationFs, type MigrationFs, type WriteAllowList } from "./naming-migration-fs"
 import { openJournal, readJournalFile, type JournalJson } from "./naming-migration-journal"
@@ -510,6 +510,31 @@ describe("AC6 —— 失败整套撤销;被杀后先撤再跑;完成后跳过", 
       expect(writes.filter((w) => w === `rename ${step.payload.to} -> ${step.payload.from}`).length, "已撤的步被重复执行").toBe(0)
     for (const step of pending) expect(writes.filter((w) => w === `rename ${step.payload.to} -> ${step.payload.from}`).length).toBe(1)
     expect(snapshot(f)).toEqual(tree)
+  })
+
+  itSql("完成标记写不下去(磁盘满 / 权限)⇒ 可读错误、日志仍是 running,下次启动先撤销再重跑", () => {
+    const f = seed({ db: true })
+    const full: NamingMigrationPorts = {
+      fs: recordingFs([], (fs) => ({
+        writeAtomic: (p, d) => {
+          if (p.endsWith("journal.json") && JSON.parse(d).status === "complete") throw new Error("ENOSPC: no space left on device")
+          fs.writeAtomic(p, d)
+        },
+      })),
+    }
+    const result = boot(f, full)
+    expect(result.kind).toBe("ready")
+    if (result.kind !== "ready") return
+    expect(runNamingMigrationDbStep(result.journal, { packaged: true, env: f.env, home: f.home }, full)).toEqual({ ok: true })
+    const finished = completeNamingMigration(result.journal)
+    expect(finished.ok).toBe(false)
+    if (!finished.ok) expect(finished.message).toContain("ENOSPC")
+    expect(readJson(join(f.userData, "codepuppy-naming-migration", "journal.json")).status).toBe("running")
+    // 下次启动:先把这一轮整套撤销(归档为 undone),再重跑
+    expect(boot(f).kind).toBe("ready")
+    const archived = readdirSync(join(f.userData, "codepuppy-naming-migration")).filter((name) => name.endsWith("-undone.json"))
+    expect(archived.length).toBe(1)
+    expect(readJson(join(f.userData, "codepuppy-naming-migration", archived[0]!)).steps.every((step: { state: string }) => step.state === "undone")).toBe(true)
   })
 
   itSql("⑤ 完成后再启动 ⇒ skip(complete),零写", () => {

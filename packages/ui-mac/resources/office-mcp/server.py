@@ -86,7 +86,7 @@ def handle_message(format_name: str, workspace: Path, message: Any) -> dict[str,
             {
                 "protocolVersion": PROTOCOL_VERSION,
                 "capabilities": {"tools": {"listChanged": False}},
-                "serverInfo": {"name": f"alpha-office-{format_name}", "version": SERVER_VERSION},
+                "serverInfo": {"name": f"codepuppy-office-{format_name}", "version": SERVER_VERSION},
             },
         )
     if method == "ping":

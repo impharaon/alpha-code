@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import {
-  type AlphaPackageEnvelopeV1,
+  type CodePuppyPackageEnvelopeV1,
   type PackageProfilePayloadV1,
 } from "../shared/host-extension-package-contract/decoder"
 import type { PackageAdmissionBindingV1 } from "../shared/package-admission"
@@ -93,7 +93,7 @@ function fixture(
       },
     ],
     capabilities: ["codepuppy.mcp-oauth.v1"],
-  } as unknown as AlphaPackageEnvelopeV1
+  } as unknown as CodePuppyPackageEnvelopeV1
   return { envelope, bytes }
 }
 
@@ -149,7 +149,7 @@ function fakeEngine(script: { addFails?: boolean; startFails?: boolean; authoriz
   }
 }
 
-function coordinatorFor(engine: PackageMcpOauthEngineV1, fixtures: Array<{ envelope: AlphaPackageEnvelopeV1; bytes: Uint8Array }>) {
+function coordinatorFor(engine: PackageMcpOauthEngineV1, fixtures: Array<{ envelope: CodePuppyPackageEnvelopeV1; bytes: Uint8Array }>) {
   const payloads = new Map(
     fixtures.map((entry) => [
       (entry.envelope as { components: Array<{ payloadRef: { sha256: string } }> }).components[0]!.payloadRef.sha256,
@@ -201,7 +201,7 @@ function confirmation(preview: {
 }
 
 function admissionCoordinator(options: {
-  envelope: AlphaPackageEnvelopeV1
+  envelope: CodePuppyPackageEnvelopeV1
   bytes: Uint8Array
   engine?: PackageMcpOauthEngineV1
   onTransaction: () => void
@@ -228,7 +228,7 @@ function admissionCoordinator(options: {
 }
 
 async function install(options: {
-  envelope: AlphaPackageEnvelopeV1
+  envelope: CodePuppyPackageEnvelopeV1
   bytes: Uint8Array
   engine?: PackageMcpOauthEngineV1
   attemptId: string

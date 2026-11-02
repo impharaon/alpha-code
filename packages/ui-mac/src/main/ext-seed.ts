@@ -158,7 +158,7 @@ export function decodeSeedLock(text: string): { ok: true; lock: SeedLock } | { o
     // S8:第三方资产必须随许可文本(B 侧已执行;A 侧同语义再执行)。
     if (!Array.isArray(a.licenseFiles) || a.licenseFiles.some((p) => typeof p !== "string" || p.length < 1))
       return bad(`asset "${id}": licenseFiles`)
-    if (a.source !== "alpha" && a.licenseFiles.length === 0)
+    if (a.source !== "codepuppy" && a.licenseFiles.length === 0)
       return bad(`asset "${id}": third-party asset without license text files (S8)`)
     // S9:platforms = ["*"](平台中立)或具体 token 升序,不混用、不重复、不为空。
     if (!Array.isArray(a.platforms) || a.platforms.length < 1) return bad(`asset "${id}": platforms empty (S9)`)

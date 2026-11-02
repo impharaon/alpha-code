@@ -582,7 +582,6 @@ export const dict = {
   "codepuppy.ext.cloudInputHint": "离开本页后不再自动保存",
   "codepuppy.ext.cloudPickResults": "选择结果保存目录",
   "codepuppy.ext.cloudStart": "发起任务",
-  "codepuppy.ext.cloudDispatchHint": "取所选项目的 git diff(工作树无变更时取最近一次 commit),经 ADR-021 三校验后派发;终态后产物回流 <项目>/{{dir}}/runs/。离开本页任务在云端继续,但不再自动回流。",
   "codepuppy.ext.cloudDispatchPick": "选择项目并派发",
   "codepuppy.ext.cloudDispatching": "正在发送…",
   "codepuppy.ext.cloudRunning": "云端执行中…",

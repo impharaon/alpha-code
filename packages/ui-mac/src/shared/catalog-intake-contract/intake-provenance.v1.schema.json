@@ -1,6 +1,6 @@
 {
   "$id": "codepuppy.intake-provenance.v1",
-  "title": "Deterministic intake provenance blob (content-addressed under assets/<idDot>/<version>/alpha-curation/intake-provenance/, REQ-104 contract §5). No build timestamps, no local paths, no transport-derived values.",
+  "title": "Deterministic intake provenance blob (content-addressed under assets/<idDot>/<version>/codepuppy-curation/intake-provenance/, REQ-104 contract §5). No build timestamps, no local paths, no transport-derived values.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema", "catalogId", "version", "source", "manifest", "lockDigests", "artifactDigests"],

@@ -3,10 +3,10 @@
  *
  * Main points the engine at the bundled manifest (`<resources>/office-mcp/tools.json`, exported from server.py's
  * `tools_for()` at build time and checked in) through `CODEPUPPY_OFFICE_MCP_MANIFEST`. The manifest carries, per format,
- * the bundled command template (`{alphaResources}` slots) and its tool definitions, plus server.py's sha256.
+ * the bundled command template (`{codepuppyResources}` slots) and its tool definitions, plus server.py's sha256.
  *
  * An MCP entry gets a format's declared definitions only when its command equals that format's bundled command token
- * for token (the template with `{alphaResources}` = the manifest's resource root) and the bundled server.py next to
+ * for token (the template with `{codepuppyResources}` = the manifest's resource root) and the bundled server.py next to
  * the manifest still hashes to the manifest's digest. Anything else — another command, an extra token, a server.py
  * the manifest was not exported from, no manifest at all — gets nothing and is listed only once it has connected.
  * A declaration is never a connection: the engine still runs initialize + tools/list before executing one (I9).
@@ -19,7 +19,7 @@ import path from "node:path"
 
 export const OFFICE_MCP_MANIFEST_ENV = "CODEPUPPY_OFFICE_MCP_MANIFEST"
 
-const RESOURCES_SLOT = "{alphaResources}"
+const RESOURCES_SLOT = "{codepuppyResources}"
 
 type Manifest = {
   serverSha256: string

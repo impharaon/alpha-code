@@ -6,7 +6,7 @@ import { materializeCloudMcpConfig } from "./cloud-sidecar-config"
 import { guardCloudEnvelope } from "./cloud-envelope-guard"
 
 const hasUploadAuthorityReference = (value: unknown) =>
-  /upload[_-]?consent|manifest_sha256|consent[_-]?token|x-alpha-upload-consent/i.test(JSON.stringify(value))
+  /upload[_-]?consent|manifest_sha256|consent[_-]?token|x-codepuppy-upload-consent/i.test(JSON.stringify(value))
 
 describe("upload authority is absent from non-explicit channels", () => {
   test("MCP schedule and bounded-agent surfaces have no upload consent channel", () => {

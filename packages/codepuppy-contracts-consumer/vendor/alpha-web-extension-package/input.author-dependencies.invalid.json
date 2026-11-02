@@ -8,7 +8,7 @@
     "component": {
       "behavior": {
         "assetPath": "AGENT.md",
-        "targetDir": "alpha-agents"
+        "targetDir": "codepuppy-agents"
       },
       "id": "agent:generic-bundle-agent",
       "kind": "agent",
@@ -18,7 +18,7 @@
       {
         "component": {
           "behavior": {
-            "targetDir": "alpha-skills"
+            "targetDir": "codepuppy-skills"
           },
           "id": "skill:generic-bundle-skill",
           "kind": "skill",
@@ -63,7 +63,7 @@
   },
   "schema": "codepuppy.package-declaration.v1",
   "source": {
-    "kind": "alpha-native",
+    "kind": "codepuppy-native",
     "publisher": "official",
     "redistributable": true
   },

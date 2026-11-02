@@ -18,12 +18,12 @@ type IpcHandler = (event: { sender: { id: number } }, ...args: unknown[]) => unk
 const handlers = new Map<string, IpcHandler>()
 const root = mkdtempSync(join(tmpdir(), "ext-install-result-"))
 const canary = "REQ128_IPC_CANARY_02c9f86a"
-// 两条条目覆盖 `ext-ipc.ts` 的**两条**返回分支。R2 审计实测:只测 source="alpha" 那条
-// 是不够的 —— shipped catalog 的 8 条 MCP 全是 official/community,`source:"alpha"` 一条都没有,
+// 两条条目覆盖 `ext-ipc.ts` 的**两条**返回分支。R2 审计实测:只测 source="codepuppy" 那条
+// 是不够的 —— shipped catalog 的 8 条 MCP 全是 official/community,`source:"codepuppy"` 一条都没有,
 // 所以每一次真实首装走的都是 installedDisabled 那条提前返回。往那条分支塞明文,
 // 只测另一条时整包 3269 全绿。
 const entry = structuredClone(bundledCatalog.entries.find((item) => item.id === "mcp:dbhub")!)
-entry.source = "alpha"
+entry.source = "codepuppy"
 delete entry.curation
 
 // 未改 source:保持 catalog 里的真实形状(official)⇒ 落 installedDisabled 提前返回那条。
@@ -45,7 +45,7 @@ delete (projectEntry.installSpec as { requiredEnvVars?: string[] }).requiredEnvV
 const canaryEntry = structuredClone(bundledCatalog.entries.find((item) => item.id === "mcp:dbhub")!)
 canaryEntry.id = "mcp:dbhub-canary"
 canaryEntry.name = "dbhub-canary"
-canaryEntry.source = "alpha"
+canaryEntry.source = "codepuppy"
 delete canaryEntry.curation
 // 随包 dbhub 带「待核实」声明 ⇒ 不在可安装视图里(agent 看不见、codepuppy_hub_install 答 unknown entry);金丝雀条目去掉它
 delete (canaryEntry.installSpec as { _verify?: string })._verify

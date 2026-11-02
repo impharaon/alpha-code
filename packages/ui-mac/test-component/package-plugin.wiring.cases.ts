@@ -120,7 +120,7 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
   expect(init?.redirect).toBe("error")
   const url = String(input)
   fetchedUrls.push(url)
-  if (url.endsWith("/alpha-package/payload.json")) {
+  if (url.endsWith("/codepuppy-package/payload.json")) {
     const component = fixture.envelope.components.find((entry) => entry.payloadRef.url === url)
     if (!component) throw new Error(`unexpected payload fetch: ${url}`)
     return new Response(fixture.payloadByDigest.get(component.payloadRef.sha256)!, { status: 200 })

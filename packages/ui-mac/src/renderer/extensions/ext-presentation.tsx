@@ -40,7 +40,7 @@ const ICON_GLYPH: Record<string, string> = {
   "mcp:feishu": "飞",
   "mcp:yuque": "语",
   "skill:skill-creator": "技",
-  "skill:alpha-upstream-sync": "同",
+  "skill:codepuppy-upstream-sync": "同",
   "skill:safe-refactor": "重",
   "bundle:office": "办",
   "bundle:research": "研",
@@ -78,7 +78,7 @@ export function sourceLabel(source: CatalogSource): string {
 }
 
 export function catalogDescription(entry: CatalogEntry): string {
-  if (entry.id === "skill:alpha-upstream-sync") return t("codepuppy.ext.upstreamSyncDescription")
+  if (entry.id === "skill:codepuppy-upstream-sync") return t("codepuppy.ext.upstreamSyncDescription")
   return entry.description
 }
 

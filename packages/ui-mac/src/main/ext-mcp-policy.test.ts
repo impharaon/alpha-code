@@ -91,7 +91,7 @@ describe("persistMcpWithPolicy — REQ-133 Alpha Office workspace sandbox", () =
   })
 
   // #1564 AC1:alpha-web 签名目录里的四张卡片今天仍是 uv 命令(样本 = src/renderer/extensions/codepuppy-catalog.json 的
-  // installSpec.command,经 planner 把 {alphaResources} 解成资源根之后交给本闸)。落盘的只能是 main 模板。
+  // installSpec.command,经 planner 把 {codepuppyResources} 解成资源根之后交给本闸)。落盘的只能是 main 模板。
   test("a catalog card that still carries the uv command persists main's bundled-runtime template", () => {
     const resources = fs.realpathSync(path.resolve(import.meta.dir, "../../resources"))
     const cards = {

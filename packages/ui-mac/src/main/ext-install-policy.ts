@@ -1,7 +1,7 @@
 // ext-install-policy — REQ-104 #395:fresh-intake 初始启用策略(#394 裁决 + v5 已批稿 Q1)。
 //
 // 单一分类器,唯一决策点(裁决必改:不得在各 planner 分支散落 source 判断):
-//   · 目录安装(origin==="catalog"):source==="alpha"(Alpha 自产)= enabled;其余一律 disabled
+//   · 目录安装(origin==="catalog"):source==="codepuppy"(Code Puppy 自产)= enabled;其余一律 disabled
 //     —— 含 "official":官方出品 ≠ 我们审过,供应链语义按第三方(v5 稿 Q1 = A,owner 拍板)。
 //   · 非目录 intake(imported/created/imported-claude/imported-agents):enabled —— 用户显式
 //     选择的自有内容,不属「第三方非默认启用」面;票面 AC 与已批设计稿均只约束目录安装。

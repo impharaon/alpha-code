@@ -106,9 +106,9 @@ export const CODEPUPPY_OFFICE_CONNECTORS = [
   extension: string
 }>
 
-/** #1564: the app-bundled interpreter and the shared server, as `{alphaResources}`-relative slots. */
-export const CODEPUPPY_OFFICE_PYTHON_SLOT = "{alphaResources}/office-runtime/bin/python3"
-export const CODEPUPPY_OFFICE_SERVER_SLOT = "{alphaResources}/office-mcp/server.py"
+/** #1564: the app-bundled interpreter and the shared server, as `{codepuppyResources}`-relative slots. */
+export const CODEPUPPY_OFFICE_PYTHON_SLOT = "{codepuppyResources}/office-runtime/bin/python3"
+export const CODEPUPPY_OFFICE_SERVER_SLOT = "{codepuppyResources}/office-mcp/server.py"
 
 /** The only command the four first-party Office entries run (#1564 AC1): the app-bundled Python in
  *  isolated mode (`-I`: no user site / PYTHON* env; `-B`: never writes bytecode into the bundle), no uv,
@@ -193,7 +193,7 @@ export function checkCodePuppyOfficeMcpSafety(
   }
   const expected = codepuppyOfficeInstallCommand(connector.format).map((argument) =>
     argument
-      .split("{alphaResources}")
+      .split("{codepuppyResources}")
       .join(normalizeSlashes(codepuppyResources).replace(/\/+$/, ""))
       .split(WORKSPACE_MARKER)
       .join(workspace),

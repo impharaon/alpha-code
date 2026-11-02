@@ -251,7 +251,7 @@ export function ExtensionDetail(props: {
           <div class="codepuppy-ext-dhead-body">
             <div class="codepuppy-ext-dhead-t">
               <h2>{view().presentation.displayName}</h2>
-              <span class="codepuppy-ext-chip" data-source="alpha">{t(sourceKey)}</span>
+              <span class="codepuppy-ext-chip" data-source="codepuppy">{t(sourceKey)}</span>
               <span class="codepuppy-ext-type-pill">{t("codepuppy.ext.packageType")}</span>
             </div>
             <div class="codepuppy-ext-dhead-meta">
@@ -669,7 +669,7 @@ export function ExtensionDetail(props: {
         ic: iconForRow(undefined, "cloud", "云"),
         title: t("codepuppy.ext.cloudConnectorTitle"),
         name: "codepuppy",
-        source: "alpha" as const,
+        source: "codepuppy" as const,
         type: "mcp",
         license: undefined,
         desc: t("codepuppy.ext.cloudConnectorDesc"),
@@ -1601,7 +1601,7 @@ export function ExtensionDetail(props: {
           <>
             <Section title={t("codepuppy.ext.ownTitle")}>
               <FactRows rows={detailOwnershipRows(row().ownership)} />
-              <p class="codepuppy-ext-dnote">{t(row().ownership.curated === "alpha" ? "codepuppy.ext.ownNote" : "codepuppy.ext.ownNoteSelfAdded")}</p>
+              <p class="codepuppy-ext-dnote">{t(row().ownership.curated === "codepuppy" ? "codepuppy.ext.ownNote" : "codepuppy.ext.ownNoteSelfAdded")}</p>
             </Section>
             {/* ── #392 已授权能力段:#348 授权账(ext-store/<key>/grants.json)的被动查询面。对安装行渲染
                 (grant 只随 committed 安装存在);无记录 = 如实空态,绝不回填按类型派生的"本应请求"

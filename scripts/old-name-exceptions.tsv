@@ -17,7 +17,6 @@
 #   external-anchor   外部注册或别的仓定义的名字(GitHub 仓库名、Cloudflare 资源、别的仓的契约取值)
 #   pending           由在途票接手改名的旧名;理由里必须写接手票号,接手票合入后「登记 ⊆ 命中」会逼它删行
 .github/pull_request_template.md	39	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
-.github/pull_request_template.md	44	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
 .github/pull_request_template.md	48	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 .github/pull_request_template.md	50	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 .github/pull_request_template.md	51	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -56,7 +55,6 @@ docs/README.md	38	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alph
 docs/README.md	41	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 docs/README.md	56	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 docs/README.md	57	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/README.md	65	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
 docs/architecture/2026-08-10-catalog-readiness-signals.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-08-10-catalog-readiness-signals.md	13	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-08-10-catalog-readiness-signals.md	24	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -162,8 +160,8 @@ docs/architecture/2026-09-08-derived-process-spawn-paths.md	1381	historical	#156
 docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	13	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	14	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	49	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	56	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
+docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	49	historical	带日期的调研 / 决策记录,记录的是当时的名字
+docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	56	historical	带日期的调研 / 决策记录,记录的是当时的名字
 docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	59	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	142	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	244	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -304,18 +302,20 @@ docs/architecture/2026-09-24-exa-mcp-failure-signal-recon.md	136	external-anchor
 docs/architecture/2026-09-27-exa-entry-shape-fail-open-recon.md	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/claude-plugin-corpus-component-scale.md	288	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/codepuppy-connection-lifetime.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/codepuppy-connection-lifetime.md	70	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
 docs/architecture/constraints.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/constraints.md	24	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/constraints.md	25	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/constraints.md	26	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/constraints.md	27	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/constraints.md	28	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
+docs/architecture/constraints.md	28	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/constraints.md	29	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/constraints.md	30	upstream	导出路径由未接管的上游文件 packages/plugin/package.json 声明,改名要先接管那个文件(另需 ADR)
 docs/architecture/constraints.md	31	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/constraints.md	32	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/constraints.md	33	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/constraints.md	34	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/constraints.md	35	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/constraints.md	36	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/engine-command-and-event-surface.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/engine-command-and-event-surface.md	14	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/engine-command-and-event-surface.md	25	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -377,7 +377,6 @@ docs/contracts/extension-cas-seed.md	47	historical	记录退役根 .alpha(已退
 docs/contracts/extension-cas-seed.md	50	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 docs/contracts/extension-cas-seed.md	76	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/contracts/extension-install-ledger.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/extension-install-ledger.md	270	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
 docs/contracts/extension-package-lifecycle.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/contracts/extension-package-lifecycle.md	237	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/contracts/host-extension-package-v1.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -587,8 +586,6 @@ packages/codepuppy-contracts-consumer/alpha-web-contract.lock.json	6	external-an
 packages/codepuppy-contracts-consumer/alpha-web-contract.lock.json	10	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-contracts-consumer/alpha-web-extension-package.lock.json	0	external-anchor	文件名由别的仓定义并按锁文件 / vendor 逐字节钉住:仓库名派生的锁文件名、alpha-platform 产出的 vendor 文件名,owner D3 未裁仓库名,不改
 packages/codepuppy-contracts-consumer/alpha-web-extension-package.lock.json	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/codepuppy-contracts-consumer/alpha-web-extension-package.lock.json	8	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/codepuppy-contracts-consumer/alpha-web-extension-package.lock.json	12	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
 packages/codepuppy-contracts-consumer/fixtures/consumers/alpha-code-1556/model-catalog-v3.json	4	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-contracts-consumer/fixtures/consumers/alpha-code-640/ledger-page.json	4	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-contracts-consumer/scripts/git-cross-repo.ts	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -620,35 +617,34 @@ packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	118	
 packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	124	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	125	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	129	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	133	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	135	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	134	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	136	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	140	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	137	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	141	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	148	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	153	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	155	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	142	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	149	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	154	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	156	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	158	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	157	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	159	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	164	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	169	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	178	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	185	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	189	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	160	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	165	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	170	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	179	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	186	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	190	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	193	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	191	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	194	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	196	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	195	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	197	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	199	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	198	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	200	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	204	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	206	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	214	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	215	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	300	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	304	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	201	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	205	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	207	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	214	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	305	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	309	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-contracts-consumer/src/decode.ts	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-contracts-consumer/src/decode.ts	4	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-contracts-consumer/src/decode.ts	5	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -664,8 +660,6 @@ packages/codepuppy-contracts-consumer/src/decode.ts	46	external-anchor	GitHub �
 packages/codepuppy-contracts-consumer/src/decode.ts	50	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-contracts-consumer/src/decode.ts	51	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-contracts-consumer/vendor/alpha-platform/contracts/v1/alpha-wire-contracts.schema.json	0	external-anchor	文件名由别的仓定义并按锁文件 / vendor 逐字节钉住:仓库名派生的锁文件名、alpha-platform 产出的 vendor 文件名,owner D3 未裁仓库名,不改
-packages/codepuppy-contracts-consumer/vendor/alpha-web-extension-package/alpha-package-compatibility-report-v1.schema.json	0	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/codepuppy-contracts-consumer/vendor/alpha-web-extension-package/alpha-package-declaration-v1.schema.json	0	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
 packages/ext/README.md	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ext/README.md	29	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ext/package.json	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -721,10 +715,8 @@ packages/ui-mac/resources/factory-skills/codepuppy-workspace/SKILL.md	25	user-co
 packages/ui-mac/resources/factory-skills/codepuppy-workspace/SKILL.md	26	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
 packages/ui-mac/resources/factory-skills/customize-codepuppy/SKILL.md	48	historical	记录退役根 .alpha(已退役、零读写)的历史说明
 packages/ui-mac/resources/factory-skills/office-docs/SKILL.md	201	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
-packages/ui-mac/resources/office-mcp/server.py	89	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/resources/skills/alpha-upstream-sync/SKILL.md	2	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/resources/skills/alpha-upstream-sync/SKILL.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/resources/skills/alpha-upstream-sync/SKILL.md	13	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/resources/skills/codepuppy-upstream-sync/SKILL.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/resources/skills/codepuppy-upstream-sync/SKILL.md	13	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/scripts/build-office-preview.ts	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/scripts/export-codepuppy-names.ts	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/scripts/export-codepuppy-names.ts	7	retired-guard	#1568 第一方命名导出器的旧名判据本身
@@ -799,7 +791,6 @@ packages/ui-mac/src/main/codepuppy-bridge.ts	4	historical	指向存档文件(已
 packages/ui-mac/src/main/codepuppy-cloud-jobs.ts	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/codepuppy-cloud-jobs.ts	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/codepuppy-cloud-jobs.ts	7	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/main/codepuppy-cloud-jobs.ts	159	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
 packages/ui-mac/src/main/codepuppy-cloud-jobs.ts	209	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/codepuppy-config-injection.ts	48	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/codepuppy-config-injection.ts	55	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -808,7 +799,6 @@ packages/ui-mac/src/main/codepuppy-config-injection.ts	367	external-anchor	GitHu
 packages/ui-mac/src/main/codepuppy-config-injection.ts	413	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/codepuppy-config-injection.ts	427	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/codepuppy-config-injection.ts	455	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/main/codepuppy-connection-handlers.ts	23	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
 packages/ui-mac/src/main/codepuppy-endpoints.ts	10	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
 packages/ui-mac/src/main/codepuppy-endpoints.ts	100	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/codepuppy-environment.ts	31	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -839,11 +829,8 @@ packages/ui-mac/src/main/engine-config-truth-boot.ts	375	migration-source	清理
 packages/ui-mac/src/main/engine-config-truth.ts	136	migration-source	旧版配置文件里的钥匙串标记识别器(PROVIDER_KEYCHAIN_MARKER),派发书判断点 1:持久化取值不改值
 packages/ui-mac/src/main/ext-cas.ts	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/ext-install-planner.ts	940	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/main/ext-package-ledger-v3.ts	38	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/main/ext-package-tx-builders.ts	258	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
 packages/ui-mac/src/main/ext-seed.ts	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/factory-skills.ts	4	historical	记录退役根 .alpha(已退役、零读写)的历史说明
-packages/ui-mac/src/main/factory-skills.ts	33	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
 packages/ui-mac/src/main/factory-skills.ts	181	historical	记录退役根 .alpha(已退役、零读写)的历史说明
 packages/ui-mac/src/main/factory-skills.ts	191	historical	记录退役根 .alpha(已退役、零读写)的历史说明
 packages/ui-mac/src/main/fixtures/cloud-mcp-tools.ts	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -901,7 +888,7 @@ packages/ui-mac/src/main/naming-migration-map.ts	101	migration-source	一次性�
 packages/ui-mac/src/main/naming-migration-map.ts	102	migration-source	一次性迁移代码里识别旧名的常量(#1569 升级迁移:userData / 全局根 / 配置 / 会话库 / 侧栏键 / 项目隐藏目录 / 旧版应用可执行文件),随迁移代码一起删除
 packages/ui-mac/src/main/naming-migration-map.ts	111	migration-source	一次性迁移代码里识别旧名的常量(#1569 升级迁移:userData / 全局根 / 配置 / 会话库 / 侧栏键 / 项目隐藏目录 / 旧版应用可执行文件),随迁移代码一起删除
 packages/ui-mac/src/main/naming-migration-map.ts	114	migration-source	一次性迁移代码里识别旧名的常量(#1569 升级迁移:userData / 全局根 / 配置 / 会话库 / 侧栏键 / 项目隐藏目录 / 旧版应用可执行文件),随迁移代码一起删除
-packages/ui-mac/src/main/naming-migration.ts	416	migration-source	一次性迁移代码里识别旧名的常量(#1569 升级迁移:userData / 全局根 / 配置 / 会话库 / 侧栏键 / 项目隐藏目录 / 旧版应用可执行文件),随迁移代码一起删除
+packages/ui-mac/src/main/naming-migration.ts	429	migration-source	一次性迁移代码里识别旧名的常量(#1569 升级迁移:userData / 全局根 / 配置 / 会话库 / 侧栏键 / 项目隐藏目录 / 旧版应用可执行文件),随迁移代码一起删除
 packages/ui-mac/src/main/network-egress-derived.ts	8	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
 packages/ui-mac/src/main/network-egress-registry.ts	22	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
 packages/ui-mac/src/main/network-egress-registry.ts	23	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
@@ -964,17 +951,14 @@ packages/ui-mac/src/renderer/codepuppy-ui/session-timeline/session-timeline.css	
 packages/ui-mac/src/renderer/codepuppy-ui/session-timeline/session-timeline.css	1220	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/codepuppy-ui/session-workspace/session-workspace.css	131	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/codepuppy-ui/session-workspace/session-workspace.css	215	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/renderer/extensions/catalog-types.ts	46	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
 packages/ui-mac/src/renderer/extensions/catalog-types.ts	80	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/renderer/extensions/ext-presentation.tsx	43	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/renderer/extensions/ext-presentation.tsx	81	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
 packages/ui-mac/src/renderer/extensions/extension-detail.tsx	42	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/i18n/en.ts	131	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/i18n/en.ts	165	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/renderer/i18n/en.ts	1407	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
+packages/ui-mac/src/renderer/i18n/en.ts	1406	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
 packages/ui-mac/src/renderer/i18n/zh.ts	129	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/i18n/zh.ts	159	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/renderer/i18n/zh.ts	1382	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
+packages/ui-mac/src/renderer/i18n/zh.ts	1381	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
 packages/ui-mac/src/renderer/logo-codepuppy.tsx	4	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	266	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	282	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -1005,19 +989,13 @@ packages/ui-mac/src/renderer/theme-codepuppy.ts	4	external-anchor	GitHub 仓库�
 packages/ui-mac/src/shared/catalog-curation.ts	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/shared/catalog-curation.ts	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/shared/catalog-curation.ts	5	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/shared/catalog-curation.ts	22	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
 packages/ui-mac/src/shared/catalog-curation.ts	38	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/shared/catalog-curation.ts	138	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/shared/catalog-intake-contract/intake-provenance.v1.schema.json	3	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/catalog-package-view.ts	63	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
 packages/ui-mac/src/shared/cloud-artifact-descriptor.ts	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/shared/cloud-artifact-descriptor.ts	5	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/shared/cloud-artifact-descriptor.ts	12	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/shared/cloud-artifact-descriptor.ts	15	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/shared/cloud-artifact-descriptor.ts	54	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
 packages/ui-mac/src/shared/cloud-artifact-descriptor.ts	89	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/shared/cloud-artifact-descriptor.ts	121	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/cloud-artifact-descriptor.ts	169	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
 packages/ui-mac/src/shared/codepuppy-config.ts	23	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/shared/codepuppy-config.ts	25	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/shared/codepuppy-config.ts	28	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
@@ -1034,62 +1012,19 @@ packages/ui-mac/src/shared/codepuppy-model-types.ts	102	external-anchor	GitHub �
 packages/ui-mac/src/shared/codepuppy-model-types.ts	129	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/shared/file-viewer.ts	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/shared/host-extension-package-contract/CONTRACT.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/shared/host-extension-package-contract/CONTRACT.md	21	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
 packages/ui-mac/src/shared/host-extension-package-contract/CONTRACT.md	39	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/shared/host-extension-package-contract/CONTRACT.md	54	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
 packages/ui-mac/src/shared/host-extension-package-contract/CONTRACT.md	175	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/shared/host-extension-package-contract/CONTRACT.md	280	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/CONTRACT.md	287	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/alpha-package-envelope-v1.schema.json	0	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/alpha-package-envelope-v1.schema.json	3	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/alpha-package-envelope-v1.schema.json	180	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/decoder.ts	1	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/decoder.ts	45	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/decoder.ts	86	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/decoder.ts	243	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/decoder.ts	248	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/decoder.ts	297	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
 packages/ui-mac/src/shared/host-extension-package-contract/decoder.ts	320	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/shared/host-extension-package-contract/decoder.ts	459	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/decoder.ts	461	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/decoder.ts	486	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/decoder.ts	596	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/decoder.ts	1086	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/decoder.ts	1087	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/decoder.ts	1094	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/decoder.ts	1172	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/decoder.ts	1173	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/decoder.ts	1183	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/decoder.ts	1442	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/decoder.ts	1448	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/generate-artifact.ts	16	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/generate-artifact.ts	70	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/generate-artifact.ts	89	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/generate-artifact.ts	116	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
 packages/ui-mac/src/shared/host-extension-package-contract/generate-artifact.ts	149	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/shared/host-extension-package-contract/generate-artifact.ts	253	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/generate-artifact.ts	256	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/host-extension-package-artifact.v1.json	12	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/profiles/agent.v1.schema.json	25	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/profiles/mcp-remote.v1.schema.json	93	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/src/shared/host-extension-package-contract/profiles/skill.v1.schema.json	25	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
 packages/ui-mac/src/shared/html-preview.ts	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/shared/moderation-keywords.parity.json	5	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/shared/moderation-keywords.parity.json	14	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/shared/moderation-keywords.ts	4	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/shared/moderation-keywords.ts	5	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/shared/office-preview.ts	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/shared/package-codepuppy-connection.ts	216	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
 packages/ui-mac/test-component/effective-catalog.fixture.ts	12	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/test-component/inline-preview.fixture.ts	4	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/test-component/package-mixed-bundle.fixture.ts	124	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/test-component/package-mixed-bundle.fixture.ts	177	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/test-component/package-mixed-bundle.fixture.ts	239	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/test-component/package-mixed-bundle.fixture.ts	249	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
 packages/ui-mac/test-component/package-mixed-bundle.fixture.ts	317	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/test-component/package-plugin.fixture.ts	68	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/test-component/package-plugin.fixture.ts	103	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
-packages/ui-mac/test-component/package-plugin.fixture.ts	142	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
 packages/ui-mac/test-component/process-fold.fixture.ts	5	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 packages/ui-mac/test-live/req087/harness.ts	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/test-live/req087/webhost/main.tsx	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -1126,7 +1061,6 @@ scripts/gate-files.tsv	337	external-anchor	GitHub 仓库名 alpha-code / alpha-w
 scripts/gate-files.tsv	338	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 scripts/gate-files.tsv	339	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 scripts/gate-files.tsv	341	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-scripts/gate-files.tsv	343	pending	接手 alpha-web#283(三端同窗切换):alpha-web / alpha-platform 定义或按字节钉住的跨仓取值(宿主扩展包合同、目录条目、平台协议头、随包 Office 服务器名),单方面改会解码失败或摘要失配
 scripts/gate-files.tsv	344	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 scripts/gate-files.tsv	352	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 scripts/gate-files.tsv	360	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改

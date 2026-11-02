@@ -21,7 +21,7 @@ import {
 
 const VALID: OwnershipDims = {
   authored: "official",
-  curated: "alpha",
+  curated: "codepuppy",
   distributed: "engine-config",
   runtimeSurfaces: ["local-subprocess"],
   supportTier: "curated",
@@ -89,7 +89,7 @@ describe("来源映射:catalog 条目(内置快照 bundled / signed channel remo
   })
 
   test("alpha builtin skill → bundled / supportTier=alpha", () => {
-    const dims = ownershipFromCatalogEntry({ type: "skill", source: "alpha", installSpec: { kind: "skill", source: "builtin" } }, "cache")
+    const dims = ownershipFromCatalogEntry({ type: "skill", source: "codepuppy", installSpec: { kind: "skill", source: "builtin" } }, "cache")
     expect(dims.distributed).toBe("bundled")
     expect(dims.supportTier).toBe("codepuppy")
   })
@@ -103,14 +103,14 @@ describe("来源映射:catalog 条目(内置快照 bundled / signed channel remo
   })
 
   test("cloud → distributed=cloud / cloud-pipeline", () => {
-    const dims = ownershipFromCatalogEntry({ type: "cloud", source: "alpha" }, "remote")
+    const dims = ownershipFromCatalogEntry({ type: "cloud", source: "codepuppy" }, "remote")
     expect(dims.distributed).toBe("cloud")
     expect(dims.runtimeSurfaces).toEqual(["cloud-pipeline"])
   })
 
   test("skill 无 installSpec.source:通道兜底 —— 内置快照=bundled,signed channel=remote-catalog", () => {
-    expect(ownershipFromCatalogEntry({ type: "skill", source: "alpha" }, "bundled").distributed).toBe("bundled")
-    expect(ownershipFromCatalogEntry({ type: "skill", source: "alpha" }, "remote").distributed).toBe("remote-catalog")
+    expect(ownershipFromCatalogEntry({ type: "skill", source: "codepuppy" }, "bundled").distributed).toBe("bundled")
+    expect(ownershipFromCatalogEntry({ type: "skill", source: "codepuppy" }, "remote").distributed).toBe("remote-catalog")
   })
 
   test("AC1 反塌缩:非 alpha 来源的条目 authored 绝不是 alpha(curated 恒 alpha ≠ authored)", () => {
@@ -135,7 +135,7 @@ describe("来源映射:packaged seed(REQ-102)", () => {
   })
 
   test("alpha seed skill → supportTier=alpha / model-context", () => {
-    const dims = ownershipFromSeedAsset({ type: "skill", source: "alpha" })
+    const dims = ownershipFromSeedAsset({ type: "skill", source: "codepuppy" })
     expect(dims.supportTier).toBe("codepuppy")
     expect(dims.runtimeSurfaces).toEqual(["model-context"])
   })
@@ -174,7 +174,7 @@ describe("来源映射:本地安装(receipts/records)", () => {
 
   test("全部来源映射的产物都过严格校验(值域闭环)", () => {
     const all: OwnershipDims[] = [
-      ownershipFromCatalogEntry({ type: "bundle", source: "alpha" }, "bundled"),
+      ownershipFromCatalogEntry({ type: "bundle", source: "codepuppy" }, "bundled"),
       ownershipFromSeedAsset({ type: "plugin", source: "community" }),
       ownershipFromInstall({ id: "user:a", kind: "agent", origin: "imported-agents" }),
       ownershipFromInstall({ id: "cloud:gone", kind: "cloud", origin: "catalog" }),
@@ -193,6 +193,9 @@ describe("值域与 kind 级推导", () => {
   test("supportTierForSource:未知来源兜底 user(不向上猜)", () => {
     expect(supportTierForSource(undefined)).toBe("user")
     expect(supportTierForSource("somebody")).toBe("user")
+    // alpha-web#283 AC6:目录来源字段只认 codepuppy;旧品牌值不再映射到 Code Puppy 支持面。
+    expect(supportTierForSource("codepuppy")).toBe("codepuppy")
+    expect(supportTierForSource("alpha")).toBe("user")
   })
 
   test("runtimeSurfacesForKind:command/未知 kind 兜底 model-context", () => {

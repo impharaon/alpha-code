@@ -140,17 +140,17 @@ describe("REQ-105/REQ-135 Office retirement guards", () => {
     }
   })
 
-  // alpha-code#1568:这条断言描述的是**真签名快照今天的内容**。四个 Office 条目改名由 alpha-web#283 重签承担,
-  // RC 构建前用 sync-catalog-snapshot.mjs 同步;同步后这里的 mcp:alpha-excel 改成 mcp:codepuppy-excel。
+  // alpha-code#1568:这条断言描述的是**真签名快照今天的内容**。四个 Office 条目改名由 alpha-web#283 重签承担
+  // (stable 2026-11-02.3 起为 mcp:codepuppy-<格式>)。
   test("signed snapshot has no community Excel; Hub Excel card is the first-party connector only", () => {
     expect(catalog.entries.some((entry) => entry.id === "mcp:excel")).toBe(false)
     expect(rawText.includes("excel-mcp-server")).toBe(false)
-    expect(catalog.entries.some((entry) => entry.id === "mcp:alpha-excel")).toBe(true)
+    expect(catalog.entries.some((entry) => entry.id === "mcp:codepuppy-excel")).toBe(true)
     const office = catalog.entries.find((e) => e.id === "bundle:office")
     expect((office?.bundleItems ?? []).map((item) => item.catalogEntryId)).toEqual([
       "mcp:markitdown",
       "mcp:filesystem",
-      "mcp:alpha-excel",
+      "mcp:codepuppy-excel",
     ])
     expect(RETIRED_COMMUNITY_OFFICE_CONNECTORS.map((connector) => connector.catalogId)).toEqual(["mcp:excel"])
     expect(retiredCommunityOfficeFor({ id: "mcp:excel", name: "excel-mcp-server" })).toBeDefined()

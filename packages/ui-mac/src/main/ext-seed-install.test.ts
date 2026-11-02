@@ -108,10 +108,10 @@ function buildSeed(
       type: a.id.split(":")[0]!,
       version: a.version ?? "1.0.0",
       license: "MIT",
-      source: a.source ?? "alpha",
+      source: a.source ?? "codepuppy",
       redistributable: true as const,
       platforms: ["*"],
-      licenseFiles: a.source && a.source !== "alpha" ? ["LICENSE"] : [], // S8:第三方资产须随许可文本
+      licenseFiles: a.source && a.source !== "codepuppy" ? ["LICENSE"] : [], // S8:第三方资产须随许可文本
 
       bytes,
       files,
@@ -139,7 +139,7 @@ function buildSeed(
 }
 
 // #395:机器面测试用第一方 source(alpha)保持 enabled 投影 —— 默认关策略/disabled 投影有专项测试(ext-install-policy.test / 本文件末尾 #395 块)。
-const entryBase = { displayName: "d", description: "d", source: "alpha" as const, category: "test" }
+const entryBase = { displayName: "d", description: "d", source: "codepuppy" as const, category: "test" }
 
 function bundledSkillEntry(overrides: Partial<CatalogEntry> = {}): CatalogEntry {
   return {
@@ -148,7 +148,7 @@ function bundledSkillEntry(overrides: Partial<CatalogEntry> = {}): CatalogEntry 
     name: "hello",
     ...entryBase,
     version: "1.0.0",
-    installSpec: { kind: "skill", source: "remote", targetDir: "alpha-skills" },
+    installSpec: { kind: "skill", source: "remote", targetDir: "codepuppy-skills" },
     remoteAsset: { version: "1.0.0", files: lockFileEntries(skillFiles, { writeBlobs: false }) },
     ...overrides,
   } as CatalogEntry
@@ -1039,7 +1039,7 @@ describe("mcp seed install via installCatalog (REQ-102 #359)", () => {
             installSpec: {
               kind: "mcp",
               mcpType: "local",
-              command: ["uv", "run", "--no-project", "--with", "python-docx==1.2.0", "{alphaResources}/office-mcp/server.py", "word", "{workspace}"],
+              command: ["uv", "run", "--no-project", "--with", "python-docx==1.2.0", "{codepuppyResources}/office-mcp/server.py", "word", "{workspace}"],
             },
             remoteAsset: { version: "1.0.0", files: lockFileEntries(codepuppyFiles, { writeBlobs: false }) },
           }),

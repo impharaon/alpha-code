@@ -116,7 +116,7 @@ const getBase = (appId: string): Configuration => ({
     },
     {
       // REQ-133:四格式 Alpha stdio MCP 共用的一份 Python server。catalog 命令中的
-      // {alphaResources} 由 main 替换为 process.resourcesPath,不让 renderer 猜 app 路径。
+      // {codepuppyResources} 由 main 替换为 process.resourcesPath,不让 renderer 猜 app 路径。
       from: "resources/office-mcp/",
       to: "office-mcp/",
     },

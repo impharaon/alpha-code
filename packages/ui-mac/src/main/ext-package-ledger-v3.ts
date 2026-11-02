@@ -35,7 +35,7 @@ export const PACKAGE_LEDGER_KINDS = new Set<string>(["mcp", "skill", "agent", "c
 const DIGEST_RE = /^sha256:[0-9a-f]{64}$/
 /**
  * package id 与组件 id 的文法。真源是宿主合同 schema
- * `alpha-package-envelope-v1.schema.json`(`prelude.packageId.pattern`,组件 `id` 同 pattern),
+ * `codepuppy-package-envelope-v1.schema.json`(`prelude.packageId.pattern`,组件 `id` 同 pattern),
  * 它与 `decoder.ts` 一起被钉进跨仓 artifact —— 本票不得改动那些字节,所以这里只能带一份副本。
  *
  * 副本 = 替别人写文法,是本仓最贵的返工形态。因此 `ext-package-ledger-v3.test.ts` 用**两条

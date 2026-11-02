@@ -19,7 +19,7 @@ import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSy
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterAll, expect, mock, test } from "bun:test"
-import type { AlphaPackageEnvelopeV1, PackageProfilePayloadV1 } from "../src/shared/host-extension-package-contract/decoder"
+import type { CodePuppyPackageEnvelopeV1, PackageProfilePayloadV1 } from "../src/shared/host-extension-package-contract/decoder"
 
 type IpcHandler = (event: { sender: { id: number } }, ...args: unknown[]) => unknown
 
@@ -34,7 +34,7 @@ const payload = {
 const payloadBytes = new TextEncoder().encode(`${JSON.stringify(payload, null, 2)}\n`)
 
 /** 同一份信封,只有 packageId 不同 —— 唯一变量就是命名空间。 */
-function envelopeWith(packageId: string): AlphaPackageEnvelopeV1 {
+function envelopeWith(packageId: string): CodePuppyPackageEnvelopeV1 {
   return {
     schema: "codepuppy.host-extension-package.v1",
     prelude: { packageId, version: "1.0.0" },
@@ -57,7 +57,7 @@ function envelopeWith(packageId: string): AlphaPackageEnvelopeV1 {
       },
     ],
     capabilities: [],
-  } as unknown as AlphaPackageEnvelopeV1
+  } as unknown as CodePuppyPackageEnvelopeV1
 }
 
 const LOCAL_ENVELOPE_ID = "local:namespace-fixture"

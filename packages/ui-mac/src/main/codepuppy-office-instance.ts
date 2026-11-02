@@ -8,7 +8,7 @@
 // (应用现名 `Code Puppy.app`)。于是 `office-docs` 技能照常生效,而它推荐的四个工具一个都不在。
 //
 // ── 哪两件事是「实例特有」的,不该被当成 durable 真相 ───────────────────────────────────
-//   · **随包 server 的绝对路径**:`ext-mcp-policy` 在安装时把 `{alphaResources}` 解析成**当时那个**
+//   · **随包 server 的绝对路径**:`ext-mcp-policy` 在安装时把 `{codepuppyResources}` 解析成**当时那个**
 //     bundle 的 realpath 写进 `codepuppy.jsonc`。bundle 改名 / 挪动 / 更新,这个路径就悬空了。
 //   · **渠道根**:REQ-098 让 `env/{prod,beta,dev}` 三根恒为兄弟;切渠道等于从一个空根起步。
 // 唯一 durable 的事实是用户的**意图**:「随包 Word/Excel/PowerPoint/PDF 连接器已装,且 enabled|disabled」。

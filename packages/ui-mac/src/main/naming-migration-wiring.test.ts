@@ -78,10 +78,19 @@ function bootOrderViolations(source: string): string[] {
   for (const call of calls.filter((c) => c.pos < at("runKeychainRenameStep")))
     if (/^(initEndpoints|getStore|safeStorage\.|session\.|initAuthEnv|initByokKeys)/.test(call.text)) out.push(`${call.text} runs before the migration finished`)
   // 失败分支:ready 之前只能 app.exit(1) —— app.quit() 会触发一次钥匙串查找(#1571 第 0b 步)
+  // 三个失败分支:A 段失败;会话库一步失败;完成标记失败(完成标记写不下去也要走失败分支,不许让 main 生成器抛出)。
+  // #1571 把完成标记挪到 ready 后的解密自检之后:它经 settleNamingMigration(内部调 completeNamingMigration)写,
+  // 与自检失败共用 `if (!settled.ok)` 那个分支;index.ts 里不许再出现裸的 journal.complete()。
   const failed = source.indexOf('if (naming.kind === "failed")')
-  const failedBlock = failed < 0 ? "" : source.slice(failed, source.indexOf("}", source.indexOf("app.exit(1)", failed)) + 1)
-  if (!failedBlock.includes("dialog.showErrorBox(") || !failedBlock.includes("app.exit(1)") || failedBlock.includes("app.quit("))
-    out.push("the failed branch must show dialog.showErrorBox and app.exit(1), never app.quit()")
+  const dbFailed = source.indexOf("if (!db.ok)")
+  const settledFailed = source.indexOf("if (!settled.ok)")
+  for (const [label, start] of [["A segment", failed], ["db step", dbFailed], ["self-check / completion", settledFailed]] as const) {
+    const block = start < 0 ? "" : source.slice(start, source.indexOf("}", source.indexOf("app.exit(1)", start)) + 1)
+    if (!block.includes("dialog.showErrorBox(") || !block.includes("app.exit(1)") || block.includes("app.quit("))
+      out.push(`the ${label} failed branch must show dialog.showErrorBox and app.exit(1), never app.quit()`)
+  }
+  if (!/const settled = settleNamingMigration\(naming\.journal/.test(source) || /journal\.complete\(/.test(source))
+    out.push("completion must go through completeNamingMigration (via settleNamingMigration) and share its failed branch")
   if (boot >= 0 && failed >= 0 && failed < boot) out.push("failed branch precedes the boot call")
   return out
 }
@@ -107,6 +116,10 @@ describe("R17 —— index.ts:A 段在锁之后、preferAppEnv 之前;会话库�
     const quit = source.replace('    dialog.showErrorBox("Code Puppy 升级迁移没有完成", naming.message)\n    app.exit(1)', '    dialog.showErrorBox("Code Puppy 升级迁移没有完成", naming.message)\n    app.quit()')
     expect(quit).not.toBe(source)
     expect(bootOrderViolations(quit).join("\n")).toContain("never app.quit()")
+    // 完成标记绕开失败分支直接写(写不下去时 main 生成器会抛出)
+    const bare = source.replace("    const settled = settleNamingMigration(naming.journal", "    naming.journal.complete()\n    const settled = notSettled(naming.journal")
+    expect(bare).not.toBe(source)
+    expect(bootOrderViolations(bare).join("\n")).toContain("completion must go through completeNamingMigration")
     // 迁移完成之前先读了端点(会碰 userData 里的旧名文件)
     const early = source.replace("  const naming = runNamingMigrationBoot(", "  initEndpoints(\"\", () => {})\n  const naming = runNamingMigrationBoot(")
     expect(bootOrderViolations(early)).toContain("initEndpoints runs before the migration finished")

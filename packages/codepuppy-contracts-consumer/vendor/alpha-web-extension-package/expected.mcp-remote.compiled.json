@@ -14,7 +14,7 @@
           "bytes": 324,
           "mediaType": "application/vnd.codepuppy.host-extension-package.mcp-remote.v1+json",
           "sha256": "c384e1763e93c408ac98cbfe94477dec7c5183550c811da2fa40ff453bff06df",
-          "url": "https://codepuppy.cn/catalog/assets/mcp.generic-remote/1.0.0/alpha-package/c384e1763e93c408ac98cbfe94477dec7c5183550c811da2fa40ff453bff06df.json"
+          "url": "https://codepuppy.cn/catalog/assets/mcp.generic-remote/1.0.0/codepuppy-package/c384e1763e93c408ac98cbfe94477dec7c5183550c811da2fa40ff453bff06df.json"
         },
         "profileId": "mcp-remote",
         "profileVersion": 1,
@@ -46,7 +46,7 @@
           "bytes": 324,
           "mediaType": "application/vnd.codepuppy.host-extension-package.mcp-remote.v1+json",
           "sha256": "c384e1763e93c408ac98cbfe94477dec7c5183550c811da2fa40ff453bff06df",
-          "url": "https://codepuppy.cn/catalog/assets/mcp.generic-remote/1.0.0/alpha-package/c384e1763e93c408ac98cbfe94477dec7c5183550c811da2fa40ff453bff06df.json"
+          "url": "https://codepuppy.cn/catalog/assets/mcp.generic-remote/1.0.0/codepuppy-package/c384e1763e93c408ac98cbfe94477dec7c5183550c811da2fa40ff453bff06df.json"
         },
         "profileId": "mcp-remote",
         "profileVersion": 1,
@@ -56,18 +56,18 @@
     ],
     "root": {
       "compatibility": {
-        "reportSha256": "d590edf2d2c77b5c55316e98f578f0227c4f0409c985dd090923cf97469437c6",
+        "reportSha256": "be871871d9d0d0392993647f36a000e726013ba08a8bed07b180fe0116a0ce6b",
         "verdict": "compatible"
       },
       "componentId": "mcp:generic-remote",
-      "declarationSha256": "623f371b81804a0033be50dd651bee3c4c19dd95b56dbbeda2f2b6b877d0d8ee",
+      "declarationSha256": "2755ce416842f8174c06b5e0b90f37653ce927de7c19497c3a5584157ea0568a",
       "packageId": "package:generic-remote-mcp",
       "presentation": {
         "description": "Generic compiler corpus input.",
         "displayName": "Generic Remote MCP"
       },
       "source": {
-        "kind": "alpha-native",
+        "kind": "codepuppy-native",
         "publisher": "official",
         "redistributable": true
       },

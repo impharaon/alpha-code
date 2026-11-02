@@ -36,6 +36,7 @@ import { parseAccessTokenIdentity } from "./codepuppy-auth-identity"
 import { errorOutcome, markStartupTimeline } from "./startup-timeline"
 import type { HotApplyOutcome } from "./codepuppy-secret-files"
 import type { SidecarRespawnTrigger } from "./sidecar-lifecycle"
+import type { StoredSecretProbe } from "./keychain-name-migration"
 import { USER_DATA_LAYOUT } from "./user-data-layout"
 
 export { parseAccessTokenIdentity } from "./codepuppy-auth-identity"
@@ -214,33 +215,67 @@ function persist() {
 }
 
 function load() {
-  let raw: string
-  try {
-    raw = readFileSync(authFilePath(), "utf8")
-  } catch {
-    return // No stored auth yet — stay logged-out.
-  }
   // 凭证文件存在但恢复失败必须 loud(B11):曾因 pre-ready 调用 safeStorage 静默失败,
   // 表现为"每次重启都要重新登录"却无任何日志线索(REQ-002 联调实锤,2026-07-03)。
   try {
-    const parsed = JSON.parse(raw) as { v: number; enc?: string; plain?: string }
-    let json: string | undefined
-    if (parsed.enc) {
-      if (!safeStorage.isEncryptionAvailable()) {
-        warn("codepuppy-auth: stored credentials present but safeStorage unavailable — staying logged-out")
-        return
-      }
-      json = safeStorage.decryptString(Buffer.from(parsed.enc, "base64"))
-    } else if (parsed.plain) {
-      json = parsed.plain
+    const read = readStoredAuth(authFilePath())
+    if (read.state === "corrupt") {
+      warn("codepuppy-auth: failed to restore stored credentials (corrupt file or keychain change)", read.error)
+      return
     }
-    if (json) {
-      const parsedAuth = JSON.parse(json) as StoredAuth
-      stored = { ...parsedAuth, mode: parsedAuth.mode ?? "byok" }
+    if (read.state === "failed") {
+      warn("codepuppy-auth: stored credentials present but safeStorage unavailable — staying logged-out")
+      return
     }
+    if (read.state === "absent" || !read.json) return // No stored auth yet — stay logged-out.
+    const parsedAuth = JSON.parse(read.json) as StoredAuth
+    stored = { ...parsedAuth, mode: parsedAuth.mode ?? "byok" }
   } catch (e) {
     warn("codepuppy-auth: failed to restore stored credentials (corrupt file or keychain change)", e)
   }
+}
+
+/**
+ * #1571 钥匙串改名后的自检:登录文件还解得开吗。与 load() 走同一个读取函数,所以「自检解得开 = 启动读得出」。
+ * 没有文件、或信封本身解析不出 ⇒ absent(信封坏与改名无关,用户本来就得重新登录;判 failed 会让每次启动都
+ * 撤销迁移并退出);明文信封 ⇒ unencrypted;有密文而 safeStorage 不可用、或解密抛错 ⇒ failed。
+ * 明文在这里用完即弃:不返回、不记日志。
+ */
+export function probeStoredAuthDecryption(dataPath: string): StoredSecretProbe {
+  try {
+    const read = readStoredAuth(join(dataPath, AUTH_FILE))
+    return read.state === "corrupt" ? "absent" : read.state
+  } catch {
+    return "failed"
+  }
+}
+
+/** 读登录文件的信封并解密(load 与自检共用)。state 取自检的词汇:failed = 有密文但 safeStorage 不可用;
+ *  corrupt = 信封解析不出。解密失败原样抛出。 */
+function readStoredAuth(
+  path: string,
+):
+  | { state: "absent" }
+  | { state: "corrupt"; error: unknown }
+  | { state: "failed" }
+  | { state: "unencrypted"; json: string | undefined }
+  | { state: "decrypted"; json: string } {
+  let raw: string
+  try {
+    raw = readFileSync(path, "utf8")
+  } catch {
+    return { state: "absent" }
+  }
+  let parsed: { v: number; enc?: string; plain?: string } | null
+  try {
+    parsed = JSON.parse(raw)
+  } catch (error) {
+    return { state: "corrupt", error }
+  }
+  if (parsed === null) return { state: "corrupt", error: new Error("credential envelope is null") }
+  if (!parsed.enc) return { state: "unencrypted", json: parsed.plain }
+  if (!safeStorage.isEncryptionAvailable()) return { state: "failed" }
+  return { state: "decrypted", json: safeStorage.decryptString(Buffer.from(parsed.enc, "base64")) }
 }
 
 function deriveState(): AuthState {

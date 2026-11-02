@@ -24,6 +24,7 @@ import { computeByokEnvMutations } from "./codepuppy-byok-env"
 import { customProviderSecretName } from "./codepuppy-secret-files"
 import { BYOK_ADAPTERS, byokAdapter } from "./byok-adapters"
 import { getLogger } from "./logging"
+import type { StoredSecretProbe } from "./keychain-name-migration"
 import { USER_DATA_LAYOUT } from "./user-data-layout"
 
 const FILE = USER_DATA_LAYOUT.byokKeys
@@ -76,28 +77,21 @@ function persist(): ByokStoreResult {
 
 function load() {
   keys = {}
-  let parsed: { v?: unknown; enc?: unknown; plain?: unknown } | null
   try {
-    parsed = JSON.parse(readFileSync(filePath(), "utf8"))
-  } catch {
-    return // no store yet, or unreadable — start empty
-  }
-  if (!parsed || typeof parsed !== "object") return
-  if ("plain" in parsed && parsed.plain !== undefined) {
-    // AC7 / I1: a plaintext vault written by a pre-#1343 build (headless fallback). It is never parsed and
-    // never "healed" by re-encrypting — both would mean reading the plaintext. The user re-enters keys;
-    // the next successful persist overwrites this file with the encrypted form.
-    warn("codepuppy-byok-keys: legacy plaintext vault ignored (never read) — keys must be re-entered")
-    return
-  }
-  if (typeof parsed.enc !== "string") return
-  try {
-    const keychain = keychainBackend()
-    if (!keychain?.isEncryptionAvailable()) {
+    const vault = readVault(filePath())
+    if (vault.state === "unencrypted") {
+      // AC7 / I1: a plaintext vault written by a pre-#1343 build (headless fallback). It is never parsed and
+      // never "healed" by re-encrypting — both would mean reading the plaintext. The user re-enters keys;
+      // the next successful persist overwrites this file with the encrypted form.
+      warn("codepuppy-byok-keys: legacy plaintext vault ignored (never read) — keys must be re-entered")
+      return
+    }
+    if (vault.state === "failed") {
       warn("codepuppy-byok-keys: keychain (safeStorage) unavailable — encrypted vault not loaded")
       return
     }
-    const obj = JSON.parse(keychain.decryptString(Buffer.from(parsed.enc, "base64"))) as unknown
+    if (vault.state === "absent") return // no store yet, or unreadable — start empty
+    const obj = JSON.parse(vault.json) as unknown
     if (!obj || typeof obj !== "object" || Array.isArray(obj)) return
     for (const [id, value] of Object.entries(obj as Record<string, unknown>)) {
       if (typeof value === "string" && value.length > 0) keys[id] = value
@@ -106,6 +100,38 @@ function load() {
     // Undecryptable after an app re-sign (see ADR-017) or corrupt — start empty; user re-enters.
     keys = {}
   }
+}
+
+/**
+ * #1571 钥匙串改名后的自检:密钥库还解得开吗。与 load() 走同一个读取函数,所以「自检解得开 = 启动读得出」。
+ * 没有库(或读不出 / 不是对象 / 没有密文)⇒ absent;`plain` 旧库 ⇒ unencrypted(不读);
+ * 有密文而 safeStorage 不可用、或解密抛错 ⇒ failed。明文在这里用完即弃:不返回、不记日志。
+ */
+export function probeByokVaultDecryption(dataPath: string): StoredSecretProbe {
+  try {
+    return readVault(join(dataPath, FILE)).state
+  } catch {
+    return "failed"
+  }
+}
+
+/** 读密钥库信封并解密(load 与自检共用)。state 取自检的词汇:failed = 有密文但 safeStorage 不可用。
+ *  `plain` 旧库只认出、不读;解密失败原样抛出。 */
+function readVault(
+  path: string,
+): { state: "absent" } | { state: "unencrypted" } | { state: "failed" } | { state: "decrypted"; json: string } {
+  let parsed: { v?: unknown; enc?: unknown; plain?: unknown } | null
+  try {
+    parsed = JSON.parse(readFileSync(path, "utf8"))
+  } catch {
+    return { state: "absent" }
+  }
+  if (!parsed || typeof parsed !== "object") return { state: "absent" }
+  if ("plain" in parsed && parsed.plain !== undefined) return { state: "unencrypted" }
+  if (typeof parsed.enc !== "string") return { state: "absent" }
+  const keychain = keychainBackend()
+  if (!keychain?.isEncryptionAvailable()) return { state: "failed" }
+  return { state: "decrypted", json: keychain.decryptString(Buffer.from(parsed.enc, "base64")) }
 }
 
 /** Load the store. Call once at startup (index.ts) AFTER app ready (safeStorage), before the first fork. */

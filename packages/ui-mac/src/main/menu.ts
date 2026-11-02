@@ -136,11 +136,10 @@ function nativeItem(entry: DesktopMenuEntry, deps: Deps, target: DesktopMenuPlat
   return item
 }
 
-// REQ-139(#1178):Electron 的 about / hide / quit 三个角色在 label 缺省时**直接用 `app.name`**,
-// 于是 App 菜单显示「About alpha-code」「Hide alpha-code」「Quit alpha-code」。而
-// `app.setName(... "alpha-code")`(main/index.ts)被 REQ-139 AC5 **有意冻结** —— 它决定 macOS 钥匙串
-// 项名 "alpha-code Safe Storage",动了存量登录态与 BYOK 密钥永久解不开。
-// 身份名与显示名是两个旋钮,这里只拧显示名那个:给这三个角色显式 label,身份面一个字符不动。
+// REQ-139(#1178):Electron 的 about / hide / quit 三个角色在 label 缺省时**直接用 `app.name`**。
+// `app.name` 是 Electron 应用名(main/index.ts 的 APP_NAMES:Code Puppy / Code Puppy Beta / Code Puppy Dev),
+// 它同时决定 macOS 钥匙串条目名 "<应用名> Safe Storage",只能随钥匙串改名迁移一起改(#1571),不为菜单文案动。
+// 身份名与显示名是两个旋钮,这里只拧显示名那个:给这三个角色显式 label,渠道后缀不进菜单。
 // 其余角色(hideOthers / unhide / close / undo …)的默认文案不含应用名,不给 label,保留系统本地化。
 const ROLE_LABELS: Partial<Record<DesktopMenuRole, string>> = {
   about: "About Code Puppy",

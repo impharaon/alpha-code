@@ -1,12 +1,15 @@
 // [ac#1160] REQ-139 品牌守卫 —— 两半,判据都是**有限坐标清单**(不用「不再出现旧名」这种无界判据):
 //
-// ① AC5 身份面冻结:五组身份字面量与改名前逐字相同。display rename 不许碰它们 ——
+// ① AC5 身份面冻结:五组身份字面量逐字冻结。display rename 不许碰它们 ——
 //    APP_IDS 决定 userData 目录(动 = 存量数据"消失");setName 值(含 packaged 取的 APP_NAMES)
-//    决定钥匙串项名 "alpha-code Safe Storage"(动 = 存量登录 + BYOK 密钥永久解不开);
+//    决定钥匙串项名 "<应用名> Safe Storage"(动而不迁移 = 存量登录 + BYOK 密钥永久解不开);
 //    bundle id 动 = TCC/公证身份重置;更新 feed 动 = 存量客户端断更新;
 //    URL scheme + CLIENT_ID 是 OAuth wire 标识(动 = 登录回调断,且须 alpha-web 同刀)。
 //    alpha-web#283(REQ-236,owner 裁决 D4)就是那一刀:auth scheme `code-puppy` → `codepuppy`、
 //    CLIENT_ID `alpha-code` → `codepuppy`,与 alpha-web 同窗切换;下面两条冻结值随之改成新值。
+//    ac#1571(REQ-236 D1)是应用名与 bundle id 那一刀:APP_NAMES `alpha-code` / `alpha-code Beta`
+//    → `Code Puppy` / `Code Puppy Beta` / dev `Code Puppy Dev`,bundle id `com.tide.alphacode*` → `com.tide.codepuppy*`;
+//    存量钥匙串条目由 keychain-name-migration.ts 改名迁移。冻结值随之改成新值,APP_IDS(userData)不动。
 // ② AC1/AC3 展示面坐标:逐点断言显示 "Code Puppy" / "CODE PUPPY",漏一格红一格。
 //
 // 变异自证(2026-08-29,见 PR):把 index.ts 的 APP_IDS.prod 改一个字符 → 本文件当场红;还原后绿。
@@ -25,18 +28,21 @@ describe("AC5 身份面冻结 — 五组字面量逐字未变", () => {
   test("运行时 APP_IDS(userData 目录)+ APP_NAMES/setName(钥匙串项名)", () => {
     const src = read("packages/ui-mac/src/main/index.ts")
     expect(src).toContain(
-      'const APP_NAMES: Record<string, string> = {\n  dev: "alpha-code",\n  beta: "alpha-code Beta",\n  prod: "alpha-code",\n}',
+      'const APP_NAMES: Record<string, string> = {\n  dev: "Code Puppy Dev",\n  beta: "Code Puppy Beta",\n  prod: "Code Puppy",\n}',
     )
     expect(src).toContain(
       'const APP_IDS: Record<string, string> = {\n  dev: "ai.opencode.desktop.dev",\n  beta: "ai.opencode.desktop.beta",\n  prod: "ai.opencode.desktop",\n}',
     )
-    expect(src).toContain('app.setName(app.isPackaged ? APP_NAMES[CHANNEL] : "alpha-code")')
+    expect(src).toContain(
+      "const electronAppName = app.isPackaged ? APP_NAMES[CHANNEL] : APP_NAMES.dev\n  app.setName(electronAppName)",
+    )
+    expect(src.split("app.setName(").length - 1).toBe(1)
   })
   test("bundle id 三值(electron-builder APP_IDS)", () => {
     const src = read("packages/ui-mac/electron-builder.config.ts")
-    expect(src).toContain('dev: "com.tide.alphacode.dev",')
-    expect(src).toContain('beta: "com.tide.alphacode.beta",')
-    expect(src).toContain('prod: "com.tide.alphacode",')
+    expect(src).toContain('dev: "com.tide.codepuppy.dev",')
+    expect(src).toContain('beta: "com.tide.codepuppy.beta",')
+    expect(src).toContain('prod: "com.tide.codepuppy",')
   })
   test("更新 feed owner/repo/channel 映射", () => {
     const src = read("packages/ui-mac/src/main/codepuppy-environment.ts")
@@ -67,6 +73,9 @@ describe("AC1 展示面坐标 — ui-mac 自有面显示 Code Puppy", () => {
     expect(src).toContain('Open with Cmd+Space → "Code Puppy"')
     expect(src).not.toMatch(/PRODUCT_NAMES\s*=\s*\{[^}]*alpha-code/)
     expect(src).not.toContain('Open with Cmd+Space → "alpha-code"')
+    // bundle id 只有 electron-builder.config.ts 一份,安装脚本 import 它而不是另抄(ac#1571)
+    expect(src).toContain('import { APP_IDS } from "../electron-builder.config"')
+    expect(src).not.toContain("com.tide.")
   })
   test("i18n 品牌键 en(product / short / wordmark)", () => {
     const src = read("packages/ui-mac/src/renderer/i18n/en.ts")

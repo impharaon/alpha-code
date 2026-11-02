@@ -34,7 +34,7 @@ grep -cE '(^|[^A-Za-z0-9_])ALPHA_' ~/.codepuppy-signing/signing.env || true   # 
 ```
 
 **打包配置**(`packages/ui-mac/electron-builder.config.ts` + `scripts/*`,零改上游):
-- prod/beta productName `Code Puppy`、appId `com.tide.alphacode`(dev/beta 加后缀)、登录 URL scheme `code-puppy`、artifact `codepuppy-*`。
+- prod/beta productName `Code Puppy`、appId `com.tide.codepuppy`(dev/beta 加后缀)、Electron 应用名 `Code Puppy` / `Code Puppy Beta` / `Code Puppy Dev`(决定钥匙串条目名)、登录 URL scheme `codepuppy`、artifact `codepuppy-*`。
 - 更新源 = 自有 public repo `jinjunnn/alpha-code`(prod=`latest` 渠道,beta=`beta`),**不是** `anomalyco/opencode`。
 - `CODEPUPPY_SIGN=1` → Developer ID 签名 + 公证;否则 ad-hoc(仅本机双击)。
 - `notarize` 是 boolean(electron-builder 26.x);team/凭证走 env。
@@ -129,6 +129,42 @@ curl -sL -o /dev/null -w "%{http_code}\n" \
   不写 `--target alpha` —— 合并之后 alpha 可能已经前进,按分支名打会把 tag 打在包里没有的代码上。
   发布前核对:`git rev-parse HEAD`(打包时的检出)与 `--target` 的 SHA 逐字相同。
 - 只想本机自己用、不分发 → 用 `bun run ship:mac`(= build + package + 装到 `/Applications`);发布用 `package:mac`(只出产物,不动你在用的 app)。
+
+### 应用身份切换的那一版(#1571):只能手动安装
+
+这一版把 bundle id 换成 `com.tide.codepuppy`、Electron 应用名换成 `Code Puppy`(钥匙串条目随之改名迁移)。
+发版步骤与上面相同,但**已装的旧版不会自动更新到它**:Squirrel 只在 bundle identifier 相同时更新。发布说明与给用户的
+安装指引必须写清下面四条:
+
+1. **先退出所有渠道**(正式版、Beta、开发版都退出)再安装。另外两个渠道还在运行时,新版不做
+   数据与钥匙串迁移;旧版开着时打开新版,新版会直接退出。
+2. **手动安装**:下载 dmg,把 `Code Puppy.app` 拖进「应用程序」替换旧的那个(包名没有变),再从「应用程序」打开。
+3. **首次启动会弹钥匙串授权框**:改名本身不弹框(第 0b 步实测),弹框出现在新版第一次读取那条钥匙串记录时,
+   框上的记录名可能仍显示旧名。选「**始终允许**」。选了拒绝,新版会把钥匙串记录名改回去、退回全部迁移并退出,
+   不会丢登录信息;重开时再选「始终允许」。
+4. **系统授权要重新允许**:辅助功能、屏幕录制、自动化等授权按 bundle id 记,新 id 等于新应用 —— 到
+   「系统设置 › 隐私与安全性」里重新打开对应开关。
+
+**如果新版弹出「钥匙串里已有一条『Code Puppy Safe Storage』记录……请按升级说明处理后重开」**:说明钥匙串里
+新旧两条记录同时存在,新版为避免覆盖停下了,这次没有改动任何数据。处理方法:
+
+1. 退出所有 Code Puppy(新旧版本、各渠道都退出)。
+2. 打开「钥匙串访问」,在「登录」钥匙串里搜索 `Code Puppy Safe Storage`,删掉**名字正是 `Code Puppy Safe Storage`
+   的那一条**(新名字那条)。名字里是旧品牌的那条**不要动**。
+3. 重新打开新版:它会把旧的那条改名接上,首启授权框照第 3 条选「始终允许」。
+
+为什么删新名字那条不会丢数据:迁移完成过的机器不会走到这条提示(完成标记在就整段跳过;只有新名字那条、没有旧的
+那条时也直接放行)。走到这里时,旧的那条还在、迁移还没完成过 —— 登录信息、BYOK 密钥和网页登录状态都是用旧的那条
+里的密钥加密的;新名字那条是新版在迁移之前生成的随机密钥(例如更早的测试包在旧版开着时被打开过),没有任何已存数据
+用它加密。
+
+**开发版(dev 渠道,含本机 `bun run dev`)不迁移,改用 `Code Puppy Dev Safe Storage`**:以前开发版与正式版共用同一条
+钥匙串记录,开发版若也迁移,会把正式版那条改成开发版的名字。所以开发版里已存的登录信息与 BYOK 密钥在新名字下第一次
+启动会解不开一次(网页登录状态同样丢失),需要重新登录、重新填 BYOK 密钥;正式版与 Beta 不受影响。这是方案 §10 的
+既定取舍。
+
+装完验收(票面 AC7):不用重新登录、BYOK 密钥可用、网页登录状态还在;钥匙串弹了几次框、TCC 怎样重新授权,
+照实记进本版的验证记录(`docs/verification/`),不承诺无弹窗。
 
 ## 2. Intel 芯片 Mac(x64)包(#1496)
 
@@ -235,7 +271,8 @@ Word / Excel / PowerPoint / PDF 四个文档工具的命令是 `<Resources>/offi
 - **公证失败**:多为凭证/网络。`signing.env` 的 `APPLE_API_*` 是否正确;`.p8` 文件在否;换机后重新 source。API key 是 `开发者` 角色即够公证。
 - **A4 已修**:`patch-server-version.ts` 已把 InstallationVersion 从 `local` 改真实版本(v0.1.0 打包实测生效)。若 prebuild 日志出现 `[alpha:patch-server-version] … not found`,说明上游改了那行表达式 → 去更新该脚本(否则 A4 复发)。
 - **首个 Release 前**已装 app 检查更新会「无更新」= 正常。
-- **appId 变更**(如从旧 `ai.opencode.desktop.*` 迁到 `com.tide.alphacode.*`)= app 存储一次性重置(会话/最近项目/登录),**磁盘项目文件不受影响**,重开即可。
+- **appId(bundle id)变更**:userData 目录不跟它走(由 `main/index.ts` 的 `APP_IDS` 决定),会话与项目都在;
+  但系统授权(TCC)按 bundle id 记,要重新允许;Squirrel 不跨 identifier 自动更新,那一版只能手动安装(见 §1「应用身份切换的那一版」)。
 
 ## 4. 下一个真实版本怎么发(TL;DR)
 

@@ -11,6 +11,7 @@ import { existsSync, rmSync, cpSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
+import { APP_IDS } from "../electron-builder.config"
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const packageDir = path.resolve(scriptDir, "..")
@@ -22,13 +23,8 @@ const channel = (() => {
   return raw === "prod" || raw === "beta" ? raw : "dev"
 })()
 // These are bundle display names and must stay in lockstep with electron-builder.config.ts.
-// Compatibility identities (bundle ids, userData and Keychain names) remain unchanged below.
+// Bundle ids are imported from it (one source).
 const PRODUCT_NAMES = { dev: "Code Puppy", beta: "Code Puppy Beta", prod: "Code Puppy" } as const
-const APP_IDS = {
-  dev: "com.tide.alphacode.dev",
-  beta: "com.tide.alphacode.beta",
-  prod: "com.tide.alphacode",
-} as const
 const appName = `${PRODUCT_NAMES[channel]}.app`
 
 const DIST_DIR = path.join(packageDir, "dist")
@@ -69,7 +65,7 @@ cpSync(SRC, DEST, { recursive: true })
 const verify = spawnSync("codesign", ["--verify", "--deep", "--strict", DEST], { stdio: "ignore" })
 if (verify.status !== 0) {
   // Prefer a STABLE identity over ad-hoc: an ad-hoc signature's designated requirement is a
-  // per-build binary hash, so every reinstall invalidates the keychain ACL on "alpha-code Safe
+  // per-build binary hash, so every reinstall invalidates the keychain ACL on "Code Puppy Safe
   // Storage" — safeStorage access then re-prompts (or, when the prompt is hidden, blocks main in
   // SecItemCopyMatching: page freeze + model picker stuck loading + key errors, 2026-07-23). A
   // Developer ID signature keeps the requirement stable across rebuilds, so one "始终允许" holds

@@ -484,7 +484,7 @@ const main = Effect.gen(function* () {
   try {
     process.chdir(ensureEngineScratchCwd(app.getPath("userData")))
   } catch {
-    process.chdir(ensureEngineScratchCwd(join(tmpdir(), "alpha-code")))
+    process.chdir(ensureEngineScratchCwd(join(tmpdir(), "codepuppy")))
   }
   logger = initLogging()
   initStartupTimeline((record) => {

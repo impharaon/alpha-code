@@ -246,7 +246,7 @@ describe.skipIf(!darwin)("#1504 Office cache under the unchanged process fence",
   function connected(format: CodePuppyOfficeFormat, result: Awaited<ReturnType<typeof exchange>>) {
     expect(result.exitCode, result.stderr).toBe(0)
     const messages = result.stdout.trim().split("\n").map((line) => JSON.parse(line))
-    expect(messages.find((message) => message.id === 1)?.result).toMatchObject({ protocolVersion: "2025-06-18", serverInfo: { name: `alpha-office-${format}` } })
+    expect(messages.find((message) => message.id === 1)?.result).toMatchObject({ protocolVersion: "2025-06-18", serverInfo: { name: `codepuppy-office-${format}` } })
     const extension = CODEPUPPY_OFFICE_CONNECTORS.find((connector) => connector.format === format)!.extension.slice(1)
     expect(messages.find((message) => message.id === 2)?.result.tools.map((tool: { name: string }) => tool.name).sort()).toEqual([`read_${extension}`, `write_${extension}`])
   }

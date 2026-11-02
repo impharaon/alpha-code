@@ -367,9 +367,6 @@ export function parseLedger(text: string): LedgerRow[] {
 // 判为「不是 alpha 自有」,于是它拿不到 keep / load-sensitive 之外的任何处置也不会被误放行。
 export const CODEPUPPY_OWNED_PACKAGES = ["ext", "ui-mac", "codepuppy-contracts-consumer"] as const
 export const CODEPUPPY_OWNED_MARKER = "north-star:codepuppy-owned"
-/** `#1570` 改名过渡:旧前缀与旧 marker 与 north-star 守卫一样仍然认,紧随的 S 级 PR 删。 */
-const LEGACY_OWNED_PREFIX = "alpha-"
-const LEGACY_OWNED_MARKER = "north-star:alpha-owned"
 /** 每个 PR 都会跑到的套件根(codepuppy-check 第 [5/14] 步的四条命令 + [6/14] 登记簿点名)。 */
 export const PER_PR_GATE_PREFIXES = [
   "packages/codepuppy-contracts-consumer/",
@@ -381,8 +378,8 @@ export const PER_PR_GATE_PREFIXES = [
 export function isCodePuppyOwned(file: string, content: string): boolean {
   if (CODEPUPPY_OWNED_PACKAGES.some((pkg) => file.startsWith(`packages/${pkg}/`))) return true
   const base = basename(file)
-  if (base.startsWith("codepuppy-") || base.startsWith(LEGACY_OWNED_PREFIX)) return true
-  return content.includes(CODEPUPPY_OWNED_MARKER) || content.includes(LEGACY_OWNED_MARKER)
+  if (base.startsWith("codepuppy-")) return true
+  return content.includes(CODEPUPPY_OWNED_MARKER)
 }
 
 export function inPerPrGate(file: string, gateRegistered: ReadonlySet<string>): boolean {

@@ -24,6 +24,7 @@ import { safeStorageBackend } from "./platform"
 import { assertCodePuppyEnvironmentIdentity } from "./codepuppy-environment"
 import { withConfigWriteLock } from "./ext-config"
 import { sweepEngineConfigDanglingUnlocked, type DanglingSweepOutcome } from "./engine-config-dangling"
+import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 
 // REQ-076 T2:safeStorage 残留说明按托管后端分叉(darwin=钥匙串可手动清;win32=DPAPI 绑用户
 // 账户,加密文件删除后无独立残留项可清)——文案如实,不给 Windows 用户指一条不存在的「钥匙串」路。
@@ -233,7 +234,7 @@ export function createDataClearAction(opts: {
         `· 应用数据(设置/日志/密钥/凭证):${DataClear.formatBytes(localBytes)}\n` +
         `· 当前环境安装物及其在 ~/.opencode 的桥接链接(${plan.bridgeLinks.length} 条)\n` +
         `· 引擎数据(会话数据库/项目元数据/引擎凭证):${DataClear.formatBytes(sharedBytes)} —— 见下方勾选\n\n` +
-        "不会触碰:你的项目文件、各项目内 .code-puppy/ 目录、~/.opencode 内你自建的内容。" +
+        `不会触碰:你的项目文件、各项目内 ${PROJECT_HIDDEN_DIR}/ 目录、~/.opencode 内你自建的内容。` +
         "Code Puppy 自有配置中指向已清除数据的悬空连接器/插件引用会一并清理。\n" +
         safeStorageResidueNote(),
       checkboxLabel: "同时删除引擎数据(与独立安装的 opencode CLI 共享 —— 若你单独使用 opencode,请勿勾选)",

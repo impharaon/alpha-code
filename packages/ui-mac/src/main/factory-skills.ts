@@ -68,7 +68,7 @@ export function factorySkillSources(input: {
   return {
     "skill-creator": join(root, "skills", "skill-creator"),
     "agent-creator": join(root, "factory-skills", "agent-creator"),
-    // REQ-062 T4:接替已禁的上游 customize-opencode(教 .code-puppy/治理/定制中心约定)
+    // REQ-062 T4:接替已禁的上游 customize-opencode(教 .codepuppy/治理/定制中心约定)
     "customize-codepuppy": join(root, "factory-skills", "customize-codepuppy"),
     // REQ-063 T6:外部生态内容的对话式导入/重导入载体(default-deny 的补充入口,ADR-024)
     "integrate-project": join(root, "factory-skills", "integrate-project"),

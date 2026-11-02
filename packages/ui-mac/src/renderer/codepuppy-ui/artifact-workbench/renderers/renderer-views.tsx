@@ -35,6 +35,7 @@ import {
 } from "./office-structure"
 import type { OfficeViewerContent } from "./office-content"
 import { ArtifactHtmlPreview, canPreviewHtml } from "../../artifact-html-preview"
+import { PROJECT_HIDDEN_DIR } from "../../../../shared/project-hidden-dir"
 
 export type PreviewContext = {
   directory: string
@@ -57,7 +58,7 @@ function openExternally(ctx: PreviewContext): void {
 }
 
 function revealRunDir(ctx: PreviewContext): void {
-  void window.api.openPath(`${ctx.directory}/.code-puppy/runs/${ctx.runId}`)
+  void window.api.openPath(`${ctx.directory}/${PROJECT_HIDDEN_DIR}/runs/${ctx.runId}`)
 }
 
 // ---------------------------------------------------------------------------

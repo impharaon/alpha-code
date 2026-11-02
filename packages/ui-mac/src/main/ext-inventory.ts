@@ -36,7 +36,7 @@ import {
   type HealthView,
 } from "../shared/ext-states"
 import { readLedgerV2, type InstallRecordV2 } from "./ext-receipt-v2"
-import { readCapabilityGrant } from "./ext-capability-grants"
+import { grantKeyFor, readCapabilityGrant } from "./ext-capability-grants"
 import { readPackagedSeed } from "./ext-seed"
 import { codepuppyRoot } from "./codepuppy-workdir"
 
@@ -130,7 +130,7 @@ export function aggregateInventory(sources: InventorySources): ExtInventory {
       const entry = catalogById.get(record.id)
       const advisory = officeAdvisoryFor({ id: record.id, name: record.name })
       // #392:授权账 join —— key = 事务 item key(`<kind>--<name>`,写账与卸载清账同一构造)。
-      const granted = ledger.grants?.[`${record.kind}--${record.name}`]
+      const granted = ledger.grants?.[grantKeyFor(record.kind, record.name)]
       rows.push({
         id: record.id,
         name: record.name,
@@ -234,7 +234,7 @@ export type CollectInventoryOpts = {
   platformToken?: string
   /** 全局账本根(frozen current-environment root,REQ-098 main 真源)。 */
   globalRoot: string
-  /** 当前项目目录(可选;项目账本 = `<project>/.code-puppy`,fail-closed 由 codepuppyRoot/readLedgerV2 承载)。 */
+  /** 当前项目目录(可选;项目账本 = `<project>/.codepuppy`,fail-closed 由 codepuppyRoot/readLedgerV2 承载)。 */
   projectDir?: string
 }
 
@@ -248,7 +248,7 @@ export function collectInventory(opts: CollectInventoryOpts): ExtInventory {
 function collectGrantViews(root: string, records: InstallRecordV2[]): Record<string, InventoryGrantView> {
   const grants: Record<string, InventoryGrantView> = {}
   for (const record of records) {
-    const key = `${record.kind}--${record.name}`
+    const key = grantKeyFor(record.kind, record.name)
     const grant = readCapabilityGrant(root, key)
     if (grant) grants[key] = { capabilities: grant.capabilities, grantedAt: grant.grantedAt, txId: grant.txId }
   }

@@ -75,6 +75,7 @@ import type { CatalogPackageViewV1 } from "../../shared/catalog-package-view"
 import { packageRetainedReasonKey } from "./ext-package-presentation"
 import { packageListingTextV1 } from "../../shared/host-extension-package-contract/decoder"
 import { extIpc } from "./ext-ipc"
+import { PROJECT_HIDDEN_DIR } from "../../shared/project-hidden-dir"
 import "./extension-hub.css"
 
 
@@ -2189,9 +2190,9 @@ export function ExtensionHub(props: {
                   <Show when={migrateCandidates().length > 0}>
                     <div class="codepuppy-ext-migrate">
                       <div class="codepuppy-ext-migrate-t">{t("codepuppy.ext.migrateTitle", { count: migrateCandidates().length })}</div>
-                      <div class="codepuppy-ext-migrate-sub">{t("codepuppy.ext.migrateSub")}</div>
+                      <div class="codepuppy-ext-migrate-sub">{t("codepuppy.ext.migrateSub", { dir: PROJECT_HIDDEN_DIR })}</div>
                       <button class="codepuppy-ext-add" data-variant="primary" disabled={migrating()} onClick={() => void runMigration()}>
-                        {migrating() ? t("codepuppy.ext.migrating") : t("codepuppy.ext.migrateAction")}
+                        {migrating() ? t("codepuppy.ext.migrating") : t("codepuppy.ext.migrateAction", { dir: PROJECT_HIDDEN_DIR })}
                       </button>
                     </div>
                   </Show>
@@ -2438,7 +2439,7 @@ export function ExtensionHub(props: {
         >
           <div class="codepuppy-ext-confirm">
             <p class="codepuppy-ext-confirm-desc">
-              {t("codepuppy.ext.importGitHint")}
+              {t("codepuppy.ext.importGitHint", { dir: PROJECT_HIDDEN_DIR })}
             </p>
             <input
               class="codepuppy-ext-input codepuppy-mono"

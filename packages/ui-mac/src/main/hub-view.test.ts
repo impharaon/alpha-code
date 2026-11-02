@@ -24,6 +24,7 @@ import {
   type HubViewDeps,
 } from "./hub-view"
 import { createReloadCoordinator } from "./reload-coordinator"
+import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 
 const tmp = realpathSync(mkdtempSync(join(tmpdir(), "hub-view-")))
 afterAll(() => rmSync(tmp, { recursive: true, force: true }))
@@ -125,7 +126,7 @@ function world(
   const projectDir = join(tmp, name, "project")
   const workspace = join(tmp, name, "workspace")
   mkdirSync(globalRoot, { recursive: true })
-  mkdirSync(join(projectDir, ".code-puppy"), { recursive: true })
+  mkdirSync(join(projectDir, PROJECT_HIDDEN_DIR), { recursive: true })
   mkdirSync(workspace, { recursive: true })
   const skillDir = join(globalRoot, "skills", "writer")
   mkdirSync(skillDir, { recursive: true })
@@ -161,7 +162,7 @@ function world(
     seedDir: null,
     globalRoot: () => globalRoot,
     projectEntry: (directory) =>
-      directory === projectDir ? { ok: true, projectDir, root: join(projectDir, ".code-puppy") } : { ok: false, reason: "not a project" },
+      directory === projectDir ? { ok: true, projectDir, root: join(projectDir, PROJECT_HIDDEN_DIR) } : { ok: false, reason: "not a project" },
     defaultDirectory: () => workspace,
     projectMcpState: extra.projectMcpState ?? (async () => "unverifiable"),
     awaitServer: async () => ({ url: "http://127.0.0.1:39117", username: "opencode", password: "pw" }),
@@ -321,7 +322,7 @@ describe("hub-view 三档状态(§2.5)", () => {
     const w = world("project-pending", { projectMcpState: async () => state })
     const identity = projectScopeIdentity(w.projectDir)
     if (!identity.ok) throw new Error(identity.reason)
-    record(join(w.projectDir, ".code-puppy"), { id: "user:proj", name: "proj", kind: "mcp", origin: "created", scope: identity.scope })
+    record(join(w.projectDir, PROJECT_HIDDEN_DIR), { id: "user:proj", name: "proj", kind: "mcp", origin: "created", scope: identity.scope })
     w.coordinator.request({ scope: "project", items: [], reason: "x" })
     expect(row((await w.service.view(w.projectDir)).rows, "user:proj")).toMatchObject({
       scope: "project",

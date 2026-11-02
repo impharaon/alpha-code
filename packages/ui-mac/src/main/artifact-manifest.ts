@@ -1,4 +1,4 @@
-// Local artifact manifest — `.code-puppy/runs/<runId>/artifacts.json`(REQ-093 A 侧,alpha-code#185)。
+// Local artifact manifest — `.codepuppy/runs/<runId>/artifacts.json`(REQ-093 A 侧,alpha-code#185)。
 // Main-process only, but electron-free and root-parameterized (codepuppy-workdir.ts style) so the whole
 // surface is unit-testable against a temp dir.
 //
@@ -19,6 +19,7 @@ import { isSafeRunId, safeResolveInCodePuppy } from "./codepuppy-workdir"
 // descriptor 契约 = shared/cloud-artifact-descriptor.ts(#184 落地的平台逐字镜像;真相源在 B 仓)。
 // 本模块只消费:类型 + 校验;manifest 是 A 侧扩展,按镜像纪律不进契约文件。
 import { validateArtifactDescriptor, type ArtifactDescriptor } from "../shared/cloud-artifact-descriptor"
+import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 
 export type { ArtifactDescriptor } from "../shared/cloud-artifact-descriptor"
 
@@ -241,7 +242,7 @@ export function writeArtifactManifest(projectDir: string, runId: string, manifes
   const validated = validateArtifactManifest(manifest)
   if (!validated.ok) return { ok: false, reason: `invalid manifest: ${validated.errors.join("; ")}` }
   const file = safeResolveInCodePuppy(projectDir, "runs", runId, ARTIFACT_MANIFEST_FILE)
-  if (!file) return { ok: false, reason: "path escapes .code-puppy" }
+  if (!file) return { ok: false, reason: `path escapes ${PROJECT_HIDDEN_DIR}` }
   const tmp = `${file}.tmp-${process.pid}-${Math.random().toString(36).slice(2, 10)}`
   try {
     fs.mkdirSync(path.dirname(file), { recursive: true })

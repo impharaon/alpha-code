@@ -11,10 +11,11 @@ import { adoptProjectLedger } from "./ext-project-adopt"
 import { makeRecoveryGate } from "./ext-recovery-gate"
 import { findRecordV2, readLedgerV2 } from "./ext-receipt-v2"
 import type { InstallReceipt } from "../preload/types"
+import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 
 let tmp: string
 let projectDir: string
-const codepuppyDir = () => join(projectDir, ".code-puppy")
+const codepuppyDir = () => join(projectDir, PROJECT_HIDDEN_DIR)
 const gate = () => makeRecoveryGate(() => ({}))
 
 beforeEach(() => {
@@ -115,7 +116,7 @@ describe("adoptProjectLedger (REQ-099 #356)", () => {
     expect(retry.ok && retry.migrated === 1).toBe(true)
   })
 
-  test("无 .code-puppy 存量 → 零写副作用(不为纯净项目制造 .code-puppy/lock/journal)", async () => {
+  test("无 .codepuppy 存量 → 零写副作用(不为纯净项目制造 .codepuppy/lock/journal)", async () => {
     const r = await adoptProjectLedger(projectDir, { environment: "prod", gate: gate() })
     expect(r.ok && r.migrated === 0).toBe(true)
     expect(existsSync(codepuppyDir())).toBe(false)

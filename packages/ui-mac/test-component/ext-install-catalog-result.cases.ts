@@ -9,6 +9,7 @@ import bundledCatalog from "../src/renderer/extensions/testvectors/d5-old-catalo
 // (`platforms: ["darwin","win32"]`)。在 ubuntu runner 上不声明这一条,两条用例量到的是
 // 「runner 不是发布平台」而不是「返回值不回显 canary」。必须在任何生产模块 import 之前调。
 import { pinShippedPlatform } from "./pin-shipped-platform"
+import { PROJECT_HIDDEN_DIR } from "../src/shared/project-hidden-dir"
 
 pinShippedPlatform()
 
@@ -361,7 +362,7 @@ async function installTwice(intent: Record<string, unknown>) {
 // #1529 审计 Minor ③:项目作用域提交成功 ⇒ 只请 ext 重载**该项目目录**(items 带 project 作用域),不是 global。
 test("#1531:项目作用域安装 ⇒ 发往 ext 的是 { scope:{ directory }, items:[{ scope:'project' }] }", async () => {
   const projectDir = join(root, "project-a")
-  mkdirSync(join(projectDir, ".code-puppy"), { recursive: true })
+  mkdirSync(join(projectDir, PROJECT_HIDDEN_DIR), { recursive: true })
   const result = await installTwice({ catalogId: projectEntry.id, scope: { scope: "project", projectDir } })
   expect(result.ok, JSON.stringify(result)).toBe(true)
   expect(toSidecar.at(-1)).toMatchObject({

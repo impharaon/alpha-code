@@ -14,6 +14,7 @@
 // ⇔ packages/core/src/database/database.ts:path()。
 
 import * as path from "node:path"
+import { USER_DATA_LAYOUT } from "./user-data-layout"
 
 export type ClearLevel = "credentials" | "data"
 
@@ -52,12 +53,12 @@ export type ManifestItem = {
 }
 
 export const CREDENTIAL_ITEMS: ManifestItem[] = [
-  { id: "codepuppy-auth", root: "userData", rel: "codepuppy-auth.json", desc: "平台登录 token(safeStorage 加密)" },
-  { id: "codepuppy-pkce", root: "userData", rel: "codepuppy-pkce.json", desc: "登录握手临时凭证(PKCE)" },
-  { id: "byok-keys", root: "userData", rel: "codepuppy-byok-keys.json", desc: "BYOK 密钥库(safeStorage 加密)" },
-  { id: "secret-files", root: "userData", rel: "codepuppy-secrets", desc: "密钥文件通道(A6 {file:})" },
-  { id: "mcp-secrets", root: "userData", rel: "codepuppy-mcp-secrets", desc: "连接器密钥({file:} 通道)" },
-  { id: "codepuppy-env", root: "userData", rel: "codepuppy.env", desc: "手写密钥 env 文件(codepuppy.env)" },
+  { id: "codepuppy-auth", root: "userData", rel: USER_DATA_LAYOUT.auth, desc: "平台登录 token(safeStorage 加密)" },
+  { id: "codepuppy-pkce", root: "userData", rel: USER_DATA_LAYOUT.pkce, desc: "登录握手临时凭证(PKCE)" },
+  { id: "byok-keys", root: "userData", rel: USER_DATA_LAYOUT.byokKeys, desc: "BYOK 密钥库(safeStorage 加密)" },
+  { id: "secret-files", root: "userData", rel: USER_DATA_LAYOUT.secrets, desc: "密钥文件通道(A6 {file:})" },
+  { id: "mcp-secrets", root: "userData", rel: USER_DATA_LAYOUT.mcpSecrets, desc: "连接器密钥({file:} 通道)" },
+  { id: "codepuppy-env", root: "userData", rel: USER_DATA_LAYOUT.envFile, desc: "手写密钥 env 文件(codepuppy.env)" },
   { id: "engine-auth", root: "engineData", rel: "auth.json", desc: "引擎凭证存储(与 opencode CLI 共享)", shared: true },
   // #752:MCP 服务的 OAuth 令牌。引擎写在 Global.Path.data/mcp-auth.json
   // (packages/opencode/src/mcp/auth.ts),而 Global.Path.data = xdg-basedir 的 xdgData + "/opencode"

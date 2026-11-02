@@ -1,5 +1,6 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
+import { USER_DATA_LAYOUT } from "./user-data-layout"
 
 // alpha-code secrets loader. Reads a plain KEY=VALUE file (".env" style) at main-process startup
 // and fills any MISSING environment variables from it -- so app users can keep their API keys
@@ -29,7 +30,7 @@ export function loadCodePuppySecrets(userDataPath: string, logger?: SecretsLogge
 
   const candidates = [
     process.env.CODEPUPPY_ENV_FILE,
-    path.join(userDataPath, "codepuppy.env"),
+    path.join(userDataPath, USER_DATA_LAYOUT.envFile),
   ].filter((value): value is string => Boolean(value))
 
   for (const file of candidates) {

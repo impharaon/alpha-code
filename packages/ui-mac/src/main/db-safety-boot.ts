@@ -12,6 +12,7 @@ import { RECOVERY_ACTIONS, type RecoveryAction, type RecoveryIncidentWire } from
 import { getLogger } from "./logging"
 import * as DbSafety from "./db-safety"
 import type { RecoveryService } from "./recovery-service"
+import { USER_DATA_LAYOUT } from "./user-data-layout"
 
 // spawn + 固定绝对路径 + 参数数组(无 shell)—— 无注入面;SQL 内路径由 db-safety.sqlQuote 转义
 const exec: DbSafety.Exec = (args) =>
@@ -41,7 +42,7 @@ const fsDeps: DbSafety.FsDeps = {
 }
 
 function backupDirOf(userDataPath: string) {
-  return join(userDataPath, "codepuppy-db-backups")
+  return join(userDataPath, USER_DATA_LAYOUT.dbBackups)
 }
 
 function resolveTarget() {

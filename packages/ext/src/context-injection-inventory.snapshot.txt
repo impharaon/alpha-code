@@ -14,7 +14,7 @@ agent.general.prompt                                    text      system        
 cloud-access.login-hint                                 text      tool-output              145    1024   14%
 command.factory-denied.description                      text      command-description       41    1024    4%
 command.init.description                                text      command-description       22    1024    2%
-command.init.template                                   text      command-template        3488    8192   43%
+command.init.template                                   text      command-template        3487    8192   43%
 command.review.description                              text      command-description       58    1024    6%
 command.review.template                                 text      command-template        4672    8192   57%
 instruction.codepuppy-behavior                          text      instruction             2757    8192   34%
@@ -37,7 +37,7 @@ tool.codepuppy_ping.description                         text      tool-descripti
 tool.codepuppy_register.args.entry                      text      tool-arg-description      98    1024   10%
 tool.codepuppy_register.args.name                       text      tool-arg-description      70    1024    7%
 tool.codepuppy_register.args.type                       text      tool-arg-description      26    1024    3%
-tool.codepuppy_register.description                     text      tool-description         801    1024   78%
+tool.codepuppy_register.description                     text      tool-description         797    1024   78%
 tool.codepuppy_reload.args.reason                       text      tool-arg-description      43    1024    4%
 tool.codepuppy_reload.description                       text      tool-description         373    1024   36%
 vision.system-note-offline                              text      system                   251    1024   25%
@@ -70,7 +70,7 @@ rebrand.identity-gemini                                 rebrand   system        
 rebrand.identity-gpt                                    rebrand   system                    61     512   12%
 rebrand.identity-kimi                                   rebrand   system                    81     512   16%
 rebrand.objectivity-anthropic                           rebrand   system                    82     512   16%
-fragments: 70; injected bytes: 27724; declared limits total: 130048
+fragments: 70; injected bytes: 27719; declared limits total: 130048
 references (paths / verbs / definitions supplied by others — carry no Alpha text, not counted):
   ref.skills.paths       /skills/paths      出厂技能目录 + skill generation live 目录(factory-paths.ts / gen-skill-paths.ts);技能正文是别人的字
   ref.permission.skill   /permission/skill  REQ-067 出厂禁项的 "deny" 动词(factory-deny.ts)

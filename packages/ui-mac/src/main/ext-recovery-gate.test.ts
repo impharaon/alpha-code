@@ -16,6 +16,7 @@ import { assertProjectMcpTransactionRootIdentity, assertProjectRecoveryJournalAl
 import { removeInstallGrants } from "./ext-install-planner"
 import { capabilityGrantPath } from "./ext-capability-grants"
 import { findRecordV2, projectScopeIdentity, removeRecordV2, upsertRecordV2 } from "./ext-receipt-v2"
+import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 
 let root: string
 beforeEach(() => {
@@ -103,9 +104,9 @@ describe("withRecoveredWrite — 准入判据", () => {
 
   test("REQ-136 project gate rejects a symlinked ext-tx tree before recovery can follow it", async () => {
     let project = path.join(root, "D")
-    fs.mkdirSync(path.join(project, ".code-puppy"), { recursive: true })
+    fs.mkdirSync(path.join(project, PROJECT_HIDDEN_DIR), { recursive: true })
     project = fs.realpathSync(project)
-    const projectRoot = path.join(project, ".code-puppy")
+    const projectRoot = path.join(project, PROJECT_HIDDEN_DIR)
     const outside = path.join(root, "outside-tx")
     fs.mkdirSync(outside, { recursive: true })
     const sentinel = path.join(outside, "sentinel")
@@ -129,9 +130,9 @@ describe("withRecoveredWrite — 准入判据", () => {
 
   test("REQ-136 project gate rejects a prefs.json config journal before recovery can replay consent", async () => {
     let project = path.join(root, "D")
-    fs.mkdirSync(path.join(project, ".code-puppy", "ext-tx", "journal"), { recursive: true })
+    fs.mkdirSync(path.join(project, PROJECT_HIDDEN_DIR, "ext-tx", "journal"), { recursive: true })
     project = fs.realpathSync(project)
-    const projectRoot = path.join(project, ".code-puppy")
+    const projectRoot = path.join(project, PROJECT_HIDDEN_DIR)
     const prefs = path.join(projectRoot, "prefs.json")
     fs.writeFileSync(prefs, '{"extensionsConsent":"granted"}\n')
     const before = fs.readFileSync(prefs, "utf8")
@@ -175,9 +176,9 @@ describe("withRecoveredWrite — 准入判据", () => {
 
   test("REQ-136 project gate rejects prepared-resource journals before any global release seam", async () => {
     let project = path.join(root, "D")
-    fs.mkdirSync(path.join(project, ".code-puppy", "ext-tx", "journal"), { recursive: true })
+    fs.mkdirSync(path.join(project, PROJECT_HIDDEN_DIR, "ext-tx", "journal"), { recursive: true })
     project = fs.realpathSync(project)
-    const projectRoot = path.join(project, ".code-puppy")
+    const projectRoot = path.join(project, PROJECT_HIDDEN_DIR)
     const globalCanary = path.join(root, "global-secret-version")
     fs.writeFileSync(globalCanary, "global-secret-stays-exact")
     fs.writeFileSync(
@@ -235,9 +236,9 @@ describe("withRecoveredWrite — 准入判据", () => {
 
   test("REQ-136 project recovery algebra preserves legacy generation-only skill replay", async () => {
     let project = path.join(root, "D")
-    fs.mkdirSync(path.join(project, ".code-puppy"), { recursive: true })
+    fs.mkdirSync(path.join(project, PROJECT_HIDDEN_DIR), { recursive: true })
     project = fs.realpathSync(project)
-    const projectRoot = path.join(project, ".code-puppy")
+    const projectRoot = path.join(project, PROJECT_HIDDEN_DIR)
     writeUninstallJournal("tx-project-skill", "skill--demo", projectRoot)
     const gate = makeRecoveryGate(
       () => fullOpts(),
@@ -265,9 +266,9 @@ describe("withRecoveredWrite — 准入判据", () => {
   test("REQ-136 crash-replayed project MCP uninstall is idempotent and cannot touch global", async () => {
     let project = path.join(root, "D")
     const globalRoot = path.join(root, "global")
-    fs.mkdirSync(path.join(project, ".code-puppy"), { recursive: true })
+    fs.mkdirSync(path.join(project, PROJECT_HIDDEN_DIR), { recursive: true })
     project = fs.realpathSync(project)
-    const projectRoot = path.join(project, ".code-puppy")
+    const projectRoot = path.join(project, PROJECT_HIDDEN_DIR)
     fs.mkdirSync(globalRoot, { recursive: true })
     const projectConfig = path.join(projectRoot, "codepuppy.jsonc")
     const globalConfig = path.join(globalRoot, "codepuppy.jsonc")

@@ -187,7 +187,7 @@ describe("#1595 AC1 添加确认框的一句话", () => {
   test("三句都不出现配置文件路径", () => {
     for (const dict of [zh, en]) {
       for (const key of ["codepuppy.ext.confirmNote", "codepuppy.ext.confirmNoteDefaultOff", "codepuppy.ext.confirmNoteUnreviewed"] as const) {
-        expect(dict[key]).not.toMatch(/opencode|\.jsonc|~\/|\.code-puppy/)
+        expect(dict[key]).not.toMatch(/opencode|\.jsonc|~\/|\.codepuppy/)
       }
     }
   })

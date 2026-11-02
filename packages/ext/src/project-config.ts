@@ -1,4 +1,4 @@
-// REQ-060 项目级扩展物 `.code-puppy`-only:把 `<project>/.code-puppy/codepuppy.jsonc` 的项目级引擎配置合并进一份
+// REQ-060 项目级扩展物 `.codepuppy`-only:把 `<project>/.codepuppy/codepuppy.jsonc` 的项目级引擎配置合并进一份
 // per-instance cfg(纯逻辑,electron-free,单测覆盖)。消费方 = @codepuppy/ext 的 config hook。
 //
 // 合并语义:项目级条目补进 cfg 的命名域(mcp/agent/command),existing(全局)优先不覆盖(项目「新增」
@@ -8,13 +8,18 @@
 import { lstatSync, realpathSync } from "node:fs"
 import { homedir } from "node:os"
 import { isAbsolute, join, normalize, relative, resolve } from "node:path"
+import { PROJECT_HIDDEN_DIR } from "../../ui-mac/src/shared/project-hidden-dir"
+
+// #1569 AC7:旧项目隐藏目录。改名由 main 在解析项目时做;sidecar 这边只判不写 —— 旧目录还在就不认项目根,
+// 免得在 main 迁完之前往新目录里写东西,造成「新旧并存」。
+const LEGACY_PROJECT_HIDDEN_DIR = ".code-puppy"
 
 export type ProjectDirectoryIdentity =
   | { status: "project"; directory: string; root: string }
   | { status: "retired-home"; reason: string }
   | { status: "unknown"; reason: string }
 
-/** home 项目边界三态：project 分支携带唯一可供消费者使用的已验证 `.code-puppy` root。 */
+/** home 项目边界三态：project 分支携带唯一可供消费者使用的已验证 `.codepuppy` root。 */
 export function projectDirectoryIdentity(directory: string, homeDir: string = homedir()): ProjectDirectoryIdentity {
   if (!isAbsolute(directory)) return { status: "unknown", reason: "project directory must be absolute" }
   let candidate: string
@@ -38,7 +43,9 @@ export function projectDirectoryIdentity(directory: string, homeDir: string = ho
     }
   })()
   if (!retired.ok) return { status: "unknown", reason: "retired global root identity cannot be confirmed" }
-  const root = join(candidate, ".code-puppy")
+  const root = join(candidate, PROJECT_HIDDEN_DIR)
+  if (isRealDirectory(join(candidate, LEGACY_PROJECT_HIDDEN_DIR)))
+    return { status: "unknown", reason: "project still has the legacy hidden directory; the app migrates it when it opens the project" }
   if (sameOrInside(candidate, retired.path) || related(root, retiredLexical) || related(root, retired.path))
     return { status: "retired-home", reason: "project alpha root is related to the retired global root" }
 
@@ -242,4 +249,12 @@ export function stripJsonc(text: string): string {
   }
   // 尾逗号:`,` 后跟(空白)`}` 或 `]`
   return out.replace(/,(\s*[}\]])/g, "$1")
+}
+
+function isRealDirectory(path: string): boolean {
+  try {
+    return lstatSync(path).isDirectory()
+  } catch {
+    return false
+  }
 }

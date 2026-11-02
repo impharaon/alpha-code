@@ -9,6 +9,7 @@ import {
   BACKUP_PREFIX,
   backupFileName,
   createVerifiedBackup,
+  createVerifiedBackupSync,
   decidePlan,
   diffWatermarks,
   exportVerifiedCopy,
@@ -21,6 +22,7 @@ import {
   rotationVictims,
   timestamp,
   type Exec,
+  type ExecSync,
   type FsDeps,
 } from "./db-safety"
 
@@ -212,10 +214,38 @@ describe("restoreFromBackup", () => {
     expect(files.has("/data/opencode.db-wal")).toBe(false)
     expect(files.has("/data/opencode.db-shm")).toBe(false)
   })
-  test("rename 失败 → ok:false(不半途留摊子)", () => {
-    const { fs } = memFs({}) // dbPath 不存在 → rename 抛
+  test("备份也不存在 → ok:false(不半途留摊子)", () => {
+    const { fs } = memFs({}) // 主库与备份都不在 → 拷备份时抛
     const r = restoreFromBackup({ dbPath: "/data/opencode.db", backupPath: "/bk/x.db", fs, now })
     expect(r.ok).toBe(false)
+  })
+})
+
+// ── #1569 R16:恢复可续做 —— 上一次恢复在「主库已挪走、备份仍在」处被打断(连同残留 -wal)──────
+describe("restoreFromBackup 续做(#1569 R16)", () => {
+  const now = new Date(2026, 10, 2, 3, 4, 5)
+  test("主库已不在、残留 -wal 仍在 ⇒ 残件挪开、备份就位", () => {
+    const { fs, files } = memFs({
+      "/data/opencode.db.corrupt-20261102-010000": "MOVED-BY-FIRST-ATTEMPT",
+      "/data/opencode.db-wal": "LEFTOVER",
+      "/bk/opencode-backup-20261102-000000.db": "GOOD",
+    })
+    const r = restoreFromBackup({ dbPath: "/data/opencode.db", backupPath: "/bk/opencode-backup-20261102-000000.db", fs, now })
+    expect(r.ok).toBe(true)
+    expect(files.get("/data/opencode.db")).toBe("GOOD")
+    expect(files.has("/data/opencode.db-wal")).toBe(false)
+    expect(files.get("/data/opencode.db.corrupt-20261102-030405-wal")).toBe("LEFTOVER")
+    expect(files.has("/data/opencode.db.restore-tmp")).toBe(false)
+  })
+  test("拷到一半的 .restore-tmp 被覆盖,主库位置只出现完整件", () => {
+    const { fs, files } = memFs({
+      "/data/opencode.db.restore-tmp": "HALF",
+      "/bk/b.db": "GOOD",
+    })
+    const r = restoreFromBackup({ dbPath: "/data/opencode.db", backupPath: "/bk/b.db", fs, now })
+    expect(r.ok).toBe(true)
+    expect(files.get("/data/opencode.db")).toBe("GOOD")
+    expect(files.has("/data/opencode.db.restore-tmp")).toBe(false)
   })
 })
 
@@ -327,6 +357,25 @@ describe("integration(real sqlite3)", () => {
     // 备份可读且水位一致
     const back = await readDbMigrationIds(r.path, execReal, existsSync)
     expect(back).toEqual({ ok: true, ids: [M1, M2], legacy: false })
+  })
+
+  itSql("同步驱动(#1569):同一套步骤,备份可读、水位一致、keep 无穷时不轮转", () => {
+    const execSync: ExecSync = (args) => {
+      const proc = Bun.spawnSync([sqlite3!, ...args], { stdout: "pipe", stderr: "pipe" })
+      return { code: proc.exitCode, stdout: proc.stdout.toString(), stderr: proc.stderr.toString() }
+    }
+    const db = join(tmpRoot, "bk-sync-src.db")
+    const dir = join(tmpRoot, "sync-backups")
+    mkdirSync(dir, { recursive: true })
+    Bun.spawnSync([sqlite3!, db, `CREATE TABLE migration(id TEXT PRIMARY KEY, time_completed INTEGER NOT NULL); INSERT INTO migration VALUES ('${M1}', 1);`])
+    for (let i = 1; i <= 5; i++) writeFileSync(join(dir, `${BACKUP_PREFIX}2026070${i}-000000.db`), "old")
+    const r = createVerifiedBackupSync({ dbPath: db, backupDir: dir, exec: execSync, fs: realFs, now: new Date(2026, 6, 9), keep: Number.POSITIVE_INFINITY })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.rotated).toEqual([])
+    expect(execSync(["-readonly", r.path, "SELECT id FROM migration;"]).stdout.trim()).toBe(M1)
+    const broken = createVerifiedBackupSync({ dbPath: join(tmpRoot, "nope.db"), backupDir: dir, exec: execSync, fs: realFs, now: new Date(2026, 6, 10) })
+    expect(broken.ok).toBe(false)
   })
 
   itSql("导出:目标可读", async () => {

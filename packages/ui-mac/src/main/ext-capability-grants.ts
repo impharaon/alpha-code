@@ -43,6 +43,11 @@ export function isSafeCapability(cap: unknown): cap is string {
   return typeof cap === "string" && CAPABILITY_RE.test(cap)
 }
 
+/** 授权账键 `<kind>--<name>`:目录名与 grants.json 里的 `key` 都是它(读授权要求两者相等)。 */
+export function grantKeyFor(kind: string, name: string): string {
+  return `${kind}--${name}`
+}
+
 /** 布局与 ext-transaction.extensionStorePaths 同根:`<root>/ext-store/<key>/grants.json`。 */
 export function capabilityGrantPath(root: string, key: string): string {
   return path.join(root, "ext-store", key, "grants.json")

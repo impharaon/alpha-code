@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { mergeProjectConfig, projectDirectoryIdentity, requireCodePuppyGlobalRoot, withProjectDirectoryIdentity } from "./project-config"
 import { CodePuppyExt } from "./plugin"
+import { PROJECT_HIDDEN_DIR } from "../../ui-mac/src/shared/project-hidden-dir"
 
 const j = (o: unknown) => JSON.stringify(o)
 
@@ -28,8 +29,8 @@ describe("mergeProjectConfig — text-class domains (agent/command/skills, alway
 
   test("skills.paths union (OBJECT schema, not array), dedup, existing first", () => {
     const cfg: Record<string, any> = { skills: { paths: ["/global/skills"] } }
-    mergeProjectConfig(cfg, j({ skills: { paths: ["/global/skills", "/proj/.code-puppy/skills"] } }))
-    expect(cfg.skills).toEqual({ paths: ["/global/skills", "/proj/.code-puppy/skills"] })
+    mergeProjectConfig(cfg, j({ skills: { paths: ["/global/skills", "/proj/.codepuppy/skills"] } }))
+    expect(cfg.skills).toEqual({ paths: ["/global/skills", "/proj/.codepuppy/skills"] })
   })
 
   test("malformed json → no-op, no throw", () => {
@@ -50,7 +51,7 @@ describe("mergeProjectConfig — text-class domains (agent/command/skills, alway
 
   test("plugin domain NOT merged here (goes via host fan-out, ADR-006)", () => {
     const cfg: Record<string, any> = {}
-    const { added } = mergeProjectConfig(cfg, j({ plugin: ["/proj/.code-puppy/plugins/x.js"] }), { trustExecutable: true })
+    const { added } = mergeProjectConfig(cfg, j({ plugin: ["/proj/.codepuppy/plugins/x.js"] }), { trustExecutable: true })
     expect(cfg.plugin).toBeUndefined()
     expect(added).not.toContain("plugin")
   })
@@ -63,13 +64,13 @@ describe("mergeProjectConfig — trust gate on executable mcp", () => {
       mcp: { projmcp: { type: "local" } },
       agent: { a: { prompt: "x" } },
       command: { c: { template: "t" } },
-      skills: { paths: ["/proj/.code-puppy/skills"] },
+      skills: { paths: ["/proj/.codepuppy/skills"] },
     }))
     expect(cfg.mcp).toBeUndefined() // executable gated — engine can't discover it
     expect(r.gatedExecutable).toContain("mcp")
     expect(cfg.agent.a).toBeDefined() // text-class loads regardless
     expect(cfg.command.c).toBeDefined()
-    expect(cfg.skills.paths).toContain("/proj/.code-puppy/skills")
+    expect(cfg.skills.paths).toContain("/proj/.codepuppy/skills")
   })
 
   test("TRUSTED: mcp loads", () => {
@@ -165,7 +166,7 @@ describe("project/root identity fail-closed", () => {
     expect(projectDirectoryIdentity(alias, home).status).toBe("retired-home")
     const admitted = projectDirectoryIdentity(project, home)
     expect(admitted.status).toBe("project")
-    if (admitted.status === "project") expect(admitted.root).toBe(join(realpathSync(project), ".code-puppy"))
+    if (admitted.status === "project") expect(admitted.root).toBe(join(realpathSync(project), PROJECT_HIDDEN_DIR))
     expect(projectDirectoryIdentity(join(root, "missing"), home).status).toBe("unknown")
   })
 
@@ -173,7 +174,7 @@ describe("project/root identity fail-closed", () => {
     const retired = join(home, ".alpha")
     mkdirSync(join(retired, "nested"), { recursive: true })
     writeFileSync(join(retired, "sentinel"), "untouched")
-    symlinkSync(retired, join(project, ".code-puppy"), "dir")
+    symlinkSync(retired, join(project, PROJECT_HIDDEN_DIR), "dir")
 
     expect(projectDirectoryIdentity(project, home).status).toBe("unknown")
     expect(projectDirectoryIdentity(join(retired, "nested"), home).status).toBe("retired-home")
@@ -197,7 +198,7 @@ describe("project/root identity fail-closed", () => {
 
   test("分类后 `.alpha` 换链 → config 不读、codepuppy_register 不写、plugin 不 import", () => {
     const retired = join(home, ".alpha")
-    const admittedRoot = join(project, ".code-puppy")
+    const admittedRoot = join(project, PROJECT_HIDDEN_DIR)
     const moved = join(project, ".codepuppy-before-race")
     mkdirSync(retired)
     mkdirSync(admittedRoot)
@@ -257,7 +258,7 @@ describe("project/root identity fail-closed", () => {
     writeFileSync(join(retired, "prefs.json"), JSON.stringify({ extensionsConsent: { version: 1, granted: true } }))
     writeFileSync(join(retired, "plugins", "retired.js"), "export default async () => ({ tool: { retired_tool: {} } })")
     writeFileSync(join(retired, "sentinel"), "untouched")
-    symlinkSync(retired, join(project, ".code-puppy"), "dir")
+    symlinkSync(retired, join(project, PROJECT_HIDDEN_DIR), "dir")
 
     const global = join(root, "global", "env", "dev")
     mkdirSync(global, { recursive: true })

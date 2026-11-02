@@ -12,6 +12,7 @@ import { installUncuratedAgentImport, installUncuratedSkillImport, type Uncurate
 import { importExternalSkills, type ExternalSkill } from "./ecosystem-import"
 import { hasSkillGeneration } from "./ext-skill-generations"
 import { findRecordV2 } from "./ext-receipt-v2"
+import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 
 let root: string
 let casBase: string
@@ -284,8 +285,8 @@ describe("ecosystem-import 路由 wiring(#390)", () => {
     const r = await importExternalSkills(skills, { scope: "project", projectDir: proj }, installer)
     expect(called).toBe(false)
     expect(r.importedSkills).toEqual(["projskill"])
-    // flat 路径:落项目 .code-puppy/skills。
-    expect(fs.existsSync(path.join(proj, ".code-puppy", "skills", "projskill", "SKILL.md"))).toBe(true)
+    // flat 路径:落项目 .codepuppy/skills。
+    expect(fs.existsSync(path.join(proj, PROJECT_HIDDEN_DIR, "skills", "projskill", "SKILL.md"))).toBe(true)
     fs.rmSync(proj, { recursive: true, force: true })
   })
 })

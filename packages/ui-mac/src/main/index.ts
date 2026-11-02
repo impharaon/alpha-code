@@ -81,7 +81,11 @@ import { createWslServersController } from "./wsl/servers"
 import { registerWslIpcHandlers } from "./wsl/ipc"
 import { spawnWslSidecar } from "./wsl/sidecar"
 import { migrate } from "./migrate"
-import { catalogRegistryChannel, initCodePuppyEnvironment } from "./codepuppy-environment"
+import { catalogRegistryChannel, initCodePuppyEnvironment, resolveAppEnvironment } from "./codepuppy-environment"
+import { completeNamingMigration, MIGRATION_DIR, PROJECTS_LOG, runNamingMigrationBoot } from "./naming-migration"
+import { runNamingMigrationDbStep } from "./naming-migration-db"
+import { createMigrationFs } from "./naming-migration-fs"
+import { configureProjectHiddenDirMigration } from "./project-hidden-dir-migration"
 import { reconcileCodePuppyOfficeInstalls } from "./codepuppy-office-instance"
 import { productionCasGcConfig, startCasGcScheduler } from "./ext-cas-gc-scheduler"
 import { registerSettingsIpcHandlers } from "./settings-ipc"
@@ -546,7 +550,42 @@ const main = Effect.gen(function* () {
     return
   }
 
+  // #1569:升级到新名字后第一次启动 —— 拿到单实例锁之后、任何钥匙串访问与引擎启动之前,把旧名数据挪到新名下
+  // (A 段;会话库那一步在 preferAppEnv 之后)。失败已整套撤销:说清原因、停下,ready 前一律 app.exit(1)。
+  const naming = runNamingMigrationBoot({
+    environment: resolveAppEnvironment({ isPackaged: app.isPackaged, channel: CHANNEL }),
+    onboardingTest: Boolean(onboardingTestRoot),
+    userData: app.getPath("userData"),
+    appData: app.getPath("appData"),
+    home: homedir(),
+    env: process.env,
+    otherChannelUserData: Object.values(APP_IDS)
+      .filter((id) => id !== appId)
+      .map((id) => join(app.getPath("appData"), id)),
+    extraUndo: {},
+    precheck: () => {},
+  })
+  if (naming.kind === "failed") {
+    logger.error("naming migration did not complete — startup stopped", { message: naming.message })
+    dialog.showErrorBox("Code Puppy 升级迁移没有完成", naming.message)
+    app.exit(1)
+    return
+  }
+  if (naming.kind === "skip") logger.log("naming migration skipped", { reason: naming.reason })
+  if (naming.kind === "ready" || (naming.kind === "skip" && naming.reason === "complete"))
+    configureProjectHiddenDirMigration({ logPath: join(app.getPath("userData"), MIGRATION_DIR, PROJECTS_LOG), fs: createMigrationFs })
+
   preferAppEnv(app.getPath("userData"))
+  if (naming.kind === "ready") {
+    const db = runNamingMigrationDbStep(naming.journal, { packaged: app.isPackaged, env: process.env, home: homedir() })
+    const finished = db.ok ? completeNamingMigration(naming.journal) : db
+    if (!finished.ok) {
+      logger.error("naming migration did not complete — startup stopped", { message: finished.message })
+      dialog.showErrorBox("Code Puppy 升级迁移没有完成", finished.message)
+      app.exit(1)
+      return
+    }
+  }
   // REQ-098/#428:在任何 root 消费方前冻结 canonical 新根。packaged onboarding 只把内部生成
   // 的临时 base 作为函数参数传入；环境变量 override 不能授权 packaged 状态落点。
   const codepuppyEnv = (() => {

@@ -11,8 +11,9 @@ import { spawn } from "node:child_process"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { isNushell, minimalProbeEnv, parseShellEnv } from "./shell-env"
+import { USER_DATA_LAYOUT } from "./user-data-layout"
 
-const FILE = "codepuppy-shell-env.json"
+const FILE = USER_DATA_LAYOUT.shellEnv
 const PROBE_TIMEOUT = 5_000
 
 type ShellEnvCacheLog = (message: string, extra?: Record<string, unknown>) => void

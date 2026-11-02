@@ -10,6 +10,31 @@ const EXPANDED_KEY = "codepuppy.sidebar.expanded"
 const HIDDEN_KEY = "codepuppy.sidebar.hidden"
 const VIEWED_KEY = "codepuppy.sidebar.viewed"
 
+// #1569 AC1(R5):升级前侧栏状态存在旧名键下。首读之前复制到新名并删旧(新键已在则留新删旧);不进升级迁移日志,
+// 装回 0.1.24 只会丢侧栏展开 / 未读水位。旧名常量只为识别它们(例外登记表 migration-source)。
+const LEGACY_SIDEBAR_KEYS: ReadonlyArray<readonly [string, string]> = [
+  ["alpha.sidebar.collapsed", COLLAPSED_KEY],
+  ["alpha.sidebar.expanded", EXPANDED_KEY],
+  ["alpha.sidebar.hidden", HIDDEN_KEY],
+  ["alpha.sidebar.viewed", VIEWED_KEY],
+]
+
+export function migrateLegacyStorageKeys(
+  storage: Pick<Storage, "getItem" | "setItem" | "removeItem">,
+  pairs: ReadonlyArray<readonly [string, string]> = LEGACY_SIDEBAR_KEYS,
+): void {
+  for (const [from, to] of pairs) {
+    const value = storage.getItem(from)
+    if (value === null) continue
+    if (storage.getItem(to) === null) storage.setItem(to, value)
+    storage.removeItem(from)
+  }
+}
+
+try {
+  migrateLegacyStorageKeys(localStorage)
+} catch {}
+
 function readBool(key: string, fallback: boolean): boolean {
   try {
     const raw = localStorage.getItem(key)

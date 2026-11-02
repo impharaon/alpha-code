@@ -20,6 +20,7 @@ export const SQLITE3 = sqliteBinary()
 
 export type ExecResult = { code: number; stdout: string; stderr: string }
 export type Exec = (args: string[]) => Promise<ExecResult>
+export type ExecSync = (args: string[]) => ExecResult
 
 export type FsDeps = {
   exists(p: string): boolean
@@ -153,20 +154,53 @@ function sqlQuote(path: string): string {
   return `'${path.replaceAll("'", "''")}'`
 }
 
-async function vacuumAndVerify(opts: {
+// 备份与导出的步骤只写一份(生成器:每次 yield 一条 sqlite3 调用,收回它的结果);
+// 异步驱动给启动预检 / 菜单,同步驱动给升级迁移(naming-migration-db.ts 在第一个异步边界之前跑)。
+type ExecSteps<T> = Generator<string[], T, ExecResult>
+
+async function runAsync<T>(steps: ExecSteps<T>, exec: Exec): Promise<T> {
+  let step = steps.next()
+  while (!step.done) {
+    let result: ExecResult
+    try {
+      result = await exec(step.value)
+    } catch (error) {
+      step = steps.throw(error)
+      continue
+    }
+    step = steps.next(result)
+  }
+  return step.value
+}
+
+function runSync<T>(steps: ExecSteps<T>, exec: ExecSync): T {
+  let step = steps.next()
+  while (!step.done) {
+    let result: ExecResult
+    try {
+      result = exec(step.value)
+    } catch (error) {
+      step = steps.throw(error)
+      continue
+    }
+    step = steps.next(result)
+  }
+  return step.value
+}
+
+function* vacuumAndVerify(opts: {
   dbPath: string
   tmpPath: string
-  exec: Exec
   fs: FsDeps
-}): Promise<{ ok: true } | { ok: false; error: string }> {
+}): ExecSteps<{ ok: true } | { ok: false; error: string }> {
   if (opts.fs.exists(opts.tmpPath)) opts.fs.remove(opts.tmpPath)
-  const vac = await opts.exec(["-readonly", opts.dbPath, `VACUUM INTO ${sqlQuote(opts.tmpPath)}`])
+  const vac = yield ["-readonly", opts.dbPath, `VACUUM INTO ${sqlQuote(opts.tmpPath)}`]
   if (vac.code !== 0 || !opts.fs.exists(opts.tmpPath)) {
     if (opts.fs.exists(opts.tmpPath)) opts.fs.remove(opts.tmpPath)
     return { ok: false, error: `VACUUM INTO 失败:exit=${vac.code} ${(vac.stderr || vac.stdout).trim()}` }
   }
   // 反 placebo(F7 教训):快照必须可读且完整,否则删除 —— 绝不留「看似存在」的坏备份
-  const verify = await opts.exec(["-readonly", opts.tmpPath, "PRAGMA integrity_check; SELECT COUNT(*) FROM migration;"])
+  const verify = yield ["-readonly", opts.tmpPath, "PRAGMA integrity_check; SELECT COUNT(*) FROM migration;"]
   const firstLine = verify.stdout
     .split("\n")
     .map((s) => s.trim())
@@ -178,19 +212,15 @@ async function vacuumAndVerify(opts: {
   return { ok: true }
 }
 
-export async function createVerifiedBackup(opts: {
-  dbPath: string
-  backupDir: string
-  exec: Exec
-  fs: FsDeps
-  now: Date
-  keep?: number
-}): Promise<{ ok: true; path: string; rotated: string[] } | { ok: false; error: string }> {
+type BackupOpts = { dbPath: string; backupDir: string; fs: FsDeps; now: Date; keep?: number }
+type BackupResult = { ok: true; path: string; rotated: string[] } | { ok: false; error: string }
+
+function* backupSteps(opts: BackupOpts): ExecSteps<BackupResult> {
   try {
     opts.fs.mkdir(opts.backupDir)
     const finalPath = join(opts.backupDir, backupFileName(opts.now))
     const tmpPath = `${finalPath}.tmp`
-    const result = await vacuumAndVerify({ dbPath: opts.dbPath, tmpPath, exec: opts.exec, fs: opts.fs })
+    const result = yield* vacuumAndVerify({ dbPath: opts.dbPath, tmpPath, fs: opts.fs })
     if (!result.ok) return result
     opts.fs.rename(tmpPath, finalPath)
     const victims = rotationVictims(listBackups(opts.fs.readdir(opts.backupDir)), opts.keep ?? BACKUP_KEEP)
@@ -201,15 +231,23 @@ export async function createVerifiedBackup(opts: {
   }
 }
 
-export async function exportVerifiedCopy(opts: {
+export function createVerifiedBackup(opts: BackupOpts & { exec: Exec }): Promise<BackupResult> {
+  return runAsync(backupSteps(opts), opts.exec)
+}
+
+/** 同一套步骤的同步驱动(升级迁移在启动同步段内备份会话库;方案 §8-3)。 */
+export function createVerifiedBackupSync(opts: BackupOpts & { exec: ExecSync }): BackupResult {
+  return runSync(backupSteps(opts), opts.exec)
+}
+
+function* exportSteps(opts: {
   dbPath: string
   targetPath: string
-  exec: Exec
   fs: FsDeps
-}): Promise<{ ok: true; path: string } | { ok: false; error: string }> {
+}): ExecSteps<{ ok: true; path: string } | { ok: false; error: string }> {
   try {
     const tmpPath = `${opts.targetPath}.tmp`
-    const result = await vacuumAndVerify({ dbPath: opts.dbPath, tmpPath, exec: opts.exec, fs: opts.fs })
+    const result = yield* vacuumAndVerify({ dbPath: opts.dbPath, tmpPath, fs: opts.fs })
     if (!result.ok) return result
     if (opts.fs.exists(opts.targetPath)) opts.fs.remove(opts.targetPath) // save dialog 已确认覆盖
     opts.fs.rename(tmpPath, opts.targetPath)
@@ -217,6 +255,15 @@ export async function exportVerifiedCopy(opts: {
   } catch (error) {
     return { ok: false, error: String(error) }
   }
+}
+
+export function exportVerifiedCopy(opts: {
+  dbPath: string
+  targetPath: string
+  exec: Exec
+  fs: FsDeps
+}): Promise<{ ok: true; path: string } | { ok: false; error: string }> {
+  return runAsync(exportSteps(opts), opts.exec)
 }
 
 // ── 恢复(设计决策 4 corrupt 分支)────────────────────────────────────────────
@@ -228,13 +275,17 @@ export function restoreFromBackup(opts: {
 }): { ok: true; damagedPath: string } | { ok: false; error: string } {
   try {
     const damagedPath = `${opts.dbPath}.corrupt-${timestamp(opts.now)}`
-    opts.fs.rename(opts.dbPath, damagedPath)
+    // 可续做(#1569 R16):上一次恢复若在挪走主库之后被打断,主库已不在 —— 这时只挪残留的 -wal/-shm 再接着做。
+    if (opts.fs.exists(opts.dbPath)) opts.fs.rename(opts.dbPath, damagedPath)
     // WAL 残件必须连带挪走:留下的旧 -wal/-shm 会被 sqlite 回放进恢复件,污染它(F5)
     for (const suffix of ["-wal", "-shm"]) {
       const side = `${opts.dbPath}${suffix}`
       if (opts.fs.exists(side)) opts.fs.rename(side, `${damagedPath}${suffix}`)
     }
-    opts.fs.copy(opts.backupPath, opts.dbPath)
+    // 先拷到旁边再一次 rename 到位:被打断时主库位置要么空着、要么是完整的恢复件,不会是半个文件。
+    const restoreTmp = `${opts.dbPath}.restore-tmp`
+    opts.fs.copy(opts.backupPath, restoreTmp)
+    opts.fs.rename(restoreTmp, opts.dbPath)
     return { ok: true, damagedPath }
   } catch (error) {
     return { ok: false, error: String(error) }

@@ -20,6 +20,7 @@ import {
   type ArtifactQuickLookResult,
   type RunArtifactIdentity,
 } from "./artifact-quick-look"
+import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 
 const RUN = "job_quick_look_1"
 let projectDir: string
@@ -27,7 +28,7 @@ let artifactPath: string
 
 beforeEach(() => {
   projectDir = mkdtempSync(join(tmpdir(), "artifact-quick-look-"))
-  mkdirSync(join(projectDir, ".code-puppy", "runs", RUN, "artifacts"), { recursive: true })
+  mkdirSync(join(projectDir, PROJECT_HIDDEN_DIR, "runs", RUN, "artifacts"), { recursive: true })
 })
 
 afterEach(() => rmSync(projectDir, { recursive: true, force: true }))
@@ -169,7 +170,7 @@ function register(
   claimedMime?: string,
   detectedMime: string | null = "application/zip",
 ): RunArtifactIdentity {
-  artifactPath = join(projectDir, ".code-puppy", "runs", RUN, "artifacts", name)
+  artifactPath = join(projectDir, PROJECT_HIDDEN_DIR, "runs", RUN, "artifacts", name)
   mkdirSync(dirname(artifactPath), { recursive: true })
   writeFileSync(artifactPath, bytes)
   const digest = createHash("sha256").update(bytes).digest("hex")

@@ -27,8 +27,9 @@ import { createHash, randomBytes } from "node:crypto"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { BYOK_ADAPTERS } from "./byok-adapters"
+import { USER_DATA_LAYOUT } from "./user-data-layout"
 
-const SECRET_DIR = "codepuppy-secrets"
+const SECRET_DIR = USER_DATA_LAYOUT.secrets
 
 /** Every env var main materializes into the file channel: platform + cloud MCP + all catalog BYOK keys.
  * REQ-237 `#1556`:BYOK 的 Key 名只认 App 内置适配器表 —— 本集合同时是下方清理分支的 wanted 集,读错来源会把

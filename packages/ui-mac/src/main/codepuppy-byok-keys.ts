@@ -24,8 +24,9 @@ import { computeByokEnvMutations } from "./codepuppy-byok-env"
 import { customProviderSecretName } from "./codepuppy-secret-files"
 import { BYOK_ADAPTERS, byokAdapter } from "./byok-adapters"
 import { getLogger } from "./logging"
+import { USER_DATA_LAYOUT } from "./user-data-layout"
 
-const FILE = "codepuppy-byok-keys.json"
+const FILE = USER_DATA_LAYOUT.byokKeys
 
 export type ByokStoreResult = { ok: true } | { ok: false; reason: string }
 

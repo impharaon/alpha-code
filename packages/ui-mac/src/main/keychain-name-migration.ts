@@ -42,6 +42,12 @@ export function planKeychainRename(input: {
   return { from: keychainItemFor(LEGACY_KEYCHAIN_APP_NAMES[input.environment]), to: keychainItemFor(input.targetAppName) }
 }
 
+/**
+ * 改名后对登录文件与 BYOK 密钥库各解密一次的结果(probeStoredAuthDecryption / probeByokVaultDecryption)。
+ * 任一为 failed ⇒ 按迁移日志整套撤销(含反向改名)并停止启动;absent / unencrypted 不阻止完成。
+ */
+export type StoredSecretProbe = "absent" | "unencrypted" | "decrypted" | "failed"
+
 export class KeychainRenameError extends Error {
   constructor(message: string) {
     super(message)

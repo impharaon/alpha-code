@@ -11,6 +11,9 @@ const logger = { log: () => {}, warn: () => {}, error: () => {} }
 let packagedBuild = false
 // alpha-web#283 AC3:startAuth 交给浏览器的授权地址(断言 client_id / redirect_uri 用)。
 const openedUrls: string[] = []
+// #1571 改名后自检:safeStorage 可用性与解密失败可翻。缺省(不可用、不失败)与既有用例的口径相同,beforeEach 复位。
+let safeStorageAvailable = false
+let decryptFails = false
 
 mock.module("electron", () => ({
   app: {
@@ -39,9 +42,12 @@ mock.module("electron", () => ({
   },
   ipcMain: { handle: () => {} },
   safeStorage: {
-    isEncryptionAvailable: () => false,
+    isEncryptionAvailable: () => safeStorageAvailable,
     encryptString: (value: string) => Buffer.from(value),
-    decryptString: (value: Buffer) => value.toString("utf8"),
+    decryptString: (value: Buffer) => {
+      if (decryptFails) throw new Error("Error while decrypting the ciphertext provided to safeStorage.decryptString.")
+      return value.toString("utf8")
+    },
   },
   shell: {
     openExternal: async (url: string) => {
@@ -87,6 +93,7 @@ const {
   refreshTokens,
   setAuthDeps,
   startAuth,
+  probeStoredAuthDecryption,
 } = await import("./codepuppy-auth")
 
 const PURPOSES = [
@@ -205,6 +212,8 @@ function readStoredAuth() {
 }
 
 beforeEach(() => {
+  safeStorageAvailable = false
+  decryptFails = false
   dataPath = mkdtempSync(join(tmpdir(), "codepuppy-auth-"))
   structuralRespawns = 0
   renewedGenerations = []
@@ -1437,5 +1446,43 @@ describe("clearing the recovering platform state", () => {
     failing = false
     install() // 同一个签名必须真的补发,不能被身份门控当成「已发过」
     expect(sends).toEqual(["auth-state"])
+  })
+})
+
+describe("#1571 probeStoredAuthDecryption — 改名后自检,与 load() 同一判据", () => {
+  const writeEncrypted = (auth: Record<string, unknown>) =>
+    writeFileSync(
+      join(dataPath, "codepuppy-auth.json"),
+      JSON.stringify({ v: 1, enc: Buffer.from(JSON.stringify(auth)).toString("base64") }),
+    )
+
+  test("absent:没有登录文件", () => {
+    expect(probeStoredAuthDecryption(dataPath)).toBe("absent")
+  })
+
+  test("unencrypted:明文信封", () => {
+    storeAuth({ platformAccessTokens: tokenBundle() })
+    expect(probeStoredAuthDecryption(dataPath)).toBe("unencrypted")
+  })
+
+  test("decrypted:密文解得开,且同一份文件 load() 读得出", () => {
+    safeStorageAvailable = true
+    const bundle = tokenBundle()
+    writeEncrypted({ mode: "platform", platformAccessTokens: bundle, clientId: "codepuppy" })
+    expect(probeStoredAuthDecryption(dataPath)).toBe("decrypted")
+    initAuthEnv(dataPath)
+    expect(process.env.CODEPUPPY_API_KEY).toBe(bundle["model.invoke"])
+  })
+
+  test("failed:safeStorage 不可用、解密抛错、信封坏;前两种 load() 都读不出", () => {
+    writeEncrypted({ mode: "platform", platformAccessTokens: tokenBundle(), clientId: "codepuppy" })
+    expect(probeStoredAuthDecryption(dataPath)).toBe("failed")
+    safeStorageAvailable = true
+    decryptFails = true
+    expect(probeStoredAuthDecryption(dataPath)).toBe("failed")
+    initAuthEnv(dataPath)
+    expect(process.env.CODEPUPPY_API_KEY).toBeUndefined()
+    writeFileSync(join(dataPath, "codepuppy-auth.json"), "{not json")
+    expect(probeStoredAuthDecryption(dataPath)).toBe("failed")
   })
 })

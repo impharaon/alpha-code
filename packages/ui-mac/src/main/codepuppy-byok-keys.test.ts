@@ -20,6 +20,8 @@ import * as path from "node:path"
 // Fake keychain: reversible byte transform so the on-disk form is provably NOT the plaintext, while a
 // re-init can still decrypt it. `available` is flipped per test.
 let encryptionAvailable = true
+// #1571 probe: decryption with the wrong keychain secret throws (what safeStorage does after the item is lost).
+let decryptFails = false
 const flip = (input: Uint8Array): Buffer => {
   const out = Buffer.alloc(input.length)
   for (let i = 0; i < input.length; i++) out[i] = input[i]! ^ 0x5a
@@ -29,7 +31,10 @@ mock.module("./codepuppy-keychain-backend", () => ({
   keychainBackend: () => ({
     isEncryptionAvailable: () => encryptionAvailable,
     encryptString: (value: string) => flip(Buffer.from(value, "utf8")),
-    decryptString: (value: Buffer) => flip(value).toString("utf8"),
+    decryptString: (value: Buffer) => {
+      if (decryptFails) throw new Error("Error while decrypting the ciphertext provided to safeStorage.decryptString.")
+      return flip(value).toString("utf8")
+    },
   }),
 }))
 const logCalls: { level: string; args: unknown[] }[] = []
@@ -57,6 +62,7 @@ const serializedLog = () => JSON.stringify(logCalls, (_k, v) => (v instanceof Er
 
 beforeEach(() => {
   encryptionAvailable = true
+  decryptFails = false
   logCalls.length = 0
   userData = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-byok-keys-"))
   // Point the (retired) auth.json lookup at a temp XDG home so the test never touches a real one.
@@ -121,6 +127,37 @@ describe("I1 — keychain unavailable ⇒ refuse, never plaintext", () => {
     store.initByokKeys(userData)
     expect(store.getByokKey("deepseek")).toBeUndefined()
     expect(store.getByokKey("custom-a")).toBe(`${SECRET}-2`)
+  })
+})
+
+describe("#1571 probeByokVaultDecryption — 改名后自检,与 load() 同一判据", () => {
+  test("absent:没有密钥库", () => {
+    expect(store.probeByokVaultDecryption(userData)).toBe("absent")
+  })
+
+  test("decrypted:密文解得开,且同一份库 load() 读得出", () => {
+    expect(store.setByokKey("deepseek", SECRET).ok).toBe(true)
+    expect(store.probeByokVaultDecryption(userData)).toBe("decrypted")
+    store.initByokKeys(userData)
+    expect(store.getByokKey("deepseek")).toBe(SECRET)
+  })
+
+  test("unencrypted:plain 旧库只认出、不读", () => {
+    fs.writeFileSync(vaultPath(), JSON.stringify({ v: 1, plain: JSON.stringify({ deepseek: SECRET }) }))
+    expect(store.probeByokVaultDecryption(userData)).toBe("unencrypted")
+  })
+
+  test("failed:safeStorage 不可用,或解密抛错;两种情况 load() 都读不出", () => {
+    expect(store.setByokKey("deepseek", SECRET).ok).toBe(true)
+    encryptionAvailable = false
+    expect(store.probeByokVaultDecryption(userData)).toBe("failed")
+    encryptionAvailable = true
+    decryptFails = true
+    expect(store.probeByokVaultDecryption(userData)).toBe("failed")
+    store.initByokKeys(userData)
+    expect(store.getByokKey("deepseek")).toBeUndefined()
+    // 明文不进日志
+    expect(serializedLog()).not.toContain(SECRET)
   })
 })
 

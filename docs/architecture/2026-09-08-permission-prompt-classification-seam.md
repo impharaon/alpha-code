@@ -133,7 +133,7 @@ webfetch 臂与 bash 臂的形状完全相同。
 
 ### 2.4 每个接缝看得见什么(Q2 的正面回答)
 
-`gateToolExecution` 的 `GateInput`(`alpha-tool-policy-gate.ts:123`)实测键集,一字不差:
+`gateToolExecution` 的 `GateInput`(`codepuppy-tool-policy-gate.ts:123`)实测键集,一字不差:
 
 ```
 inputKeys = ["metadata","permission","policy","ruleset","sessionID","subject","tool"]
@@ -169,7 +169,7 @@ inputKeys = ["always","metadata","patterns","permission","ruleset","sessionID","
 `packages/app/src/context/permission-v1-adapter.ts:97` 把 v1 请求投影成审批面消费的形状,
 `metadata` 是**原样透传**的一项;`action ← permission`、`resources ← patterns`。
 而 `PermissionDialog` 的严格事实核验
-(`packages/ui-mac/src/renderer/alpha-ui/PermissionDialog.tsx:293`)只对 `subject` / `scope`
+(`packages/ui-mac/src/renderer/codepuppy-ui/PermissionDialog.tsx:293`)只对 `subject` / `scope`
 做**恰好键集**核验,**不核验 `metadata`** ⇒ 往 `metadata` 里多放一个分类结论
 **不会**让 `facts.verified` 变假、不会触发那条 `onMount` 自动拒绝。
 
@@ -228,7 +228,7 @@ MCP call count (must be 0)  = 0
 
 | 调用点 | 是什么 | 经 `gateToolExecution` 吗 |
 | --- | --- | --- |
-| `permission/alpha-tool-policy-gate.ts:149` | 身份轴(三个生产调用点共用) | 就是它 |
+| `permission/codepuppy-tool-policy-gate.ts:149` | 身份轴(三个生产调用点共用) | 就是它 |
 | `session/tools.ts:150`(`ctx.ask` 工厂)→ 各工具体内 `ctx.ask` 8 处 | 能力轴:`tool/{shell,edit,write,read,webfetch,websearch,glob,grep,lsp,skill,task,todo,apply_patch,external-directory}.ts` | 否 —— 在被包的 `execute` **内部**,gate 早已返回 |
 | `session/tools.ts:252 / 340 / 425` | MCP resource 三个 host 工具 | 否(同上) |
 | `session/prompt.ts:379`(subtask 的 `ctx.ask`) | 子任务里工具的能力轴 | 否 |
@@ -258,7 +258,7 @@ MCP call count (must be 0)  = 0
 ```
 $ bash scripts/north-star-guard.sh          # 只带三处探针时
     · alpha 自有(住在上游包里,但 origin/dev 从来没有过这条路径)—— 不算上游改动:
-      packages/opencode/src/permission/alpha-tool-policy-gate.ts
+      packages/opencode/src/permission/codepuppy-tool-policy-gate.ts
 ✓ zero upstream package edits            RC=0
 
 $ # 再往 11 个候选文件各加一行之后
@@ -276,24 +276,24 @@ $ # 再往 11 个候选文件各加一行之后
 **控制组成立**:同一次同时被改动的 `session/tools.ts`、`tool/code-mode.ts`、`session/prompt.ts`、
 `tool/websearch.ts`、`permission/index.ts`、`plugin/index.ts` **没有被点名** —— 它们已在
 `UPSTREAM_EXCLUDES` 里([ADR-033](../../.claude/rules/adrs/ADR-033-permission-kernel-takeover.md) / [ADR-035](../../.claude/rules/adrs/ADR-035-websearch-tool-takeover.md) / [ADR-038](../../.claude/rules/adrs/ADR-038-v1-permission-ask-deadline.md) / [ADR-041](../../.claude/rules/adrs/ADR-041-tool-identity-ledger.md) 逐条收编)。
-`alpha-tool-policy-gate.ts` 走 [ADR-043](../../.claude/rules/adrs/ADR-043-alpha-owned-files-under-upstream-paths.md) 谓词豁免,并被守卫**逐条打印**出来。
+`codepuppy-tool-policy-gate.ts` 走 [ADR-043](../../.claude/rules/adrs/ADR-043-alpha-owned-files-under-upstream-paths.md) 谓词豁免,并被守卫**逐条打印**出来。
 
 | 候选接缝 | 每次授权提示必经? | 看得见目的地/载荷? | north-star 代价 |
 | --- | --- | --- | --- |
 | `permission.ask` **钩子** | **零触发**(§2.6) | — | — |
-| `gateToolExecution`(`alpha-tool-policy-gate.ts:138`) | 否(§2.2/§3) | **否**(§2.4) | **0**(ADR-043 alpha 自有) |
+| `gateToolExecution`(`codepuppy-tool-policy-gate.ts:138`) | 否(§2.2/§3) | **否**(§2.4) | **0**(ADR-043 alpha 自有) |
 | **`Permission.ask`**(`permission/index.ts:158`) | **是**(§3 唯一发布点) | **是,除远端 MCP 外**(§2.4/§2.5) | **0**(ADR-038 已收编) |
 | 各工具体内 `ctx.ask` 逐处 | 否(只覆盖自己那一种) | 是 | **7 个文件判红,各需一条收编 ADR** |
 | `tool.execute.before` 钩子 | 否 —— 它在身份轴 ask **之后**(`#1574` 起改为之前,见 §2.2 订正)、能力轴 ask **之前**(§2.2),且无结构化通道把结论传给后面的 ask | 是(`output.args`) | 0(`packages/ext`) |
 
 ⚠️ **`packages/ext` 装不下这个分类模块。** `packages/ext/package.json` 的 `name` 是
-`@alpha-code/ext`、`private: true`,`packages/opencode/package.json` **对它零依赖**——
+`@codepuppy/ext`、`private: true`,`packages/opencode/package.json` **对它零依赖**——
 它是被 `OPENCODE_CONFIG_CONTENT` 注进引擎的**插件包**,方向是 ext → 引擎,引擎 import 不了它
 (这正是 `#1296`/`#1299` 采用「零依赖内容模块,ext 去 import」而不是反过来的原因)。
 ⇒ **票面「边界」一节写的「`packages/ext/src` 新增分类模块 + 接进 `permission.ask`」两半都要改**:
 分类模块要落在引擎 import 得到、且 north-star 自动豁免的地方 —— 按 [ADR-043](../../.claude/rules/adrs/ADR-043-alpha-owned-files-under-upstream-paths.md),
-`packages/opencode/src/permission/alpha-*.ts` 是零仪式的那条路(与 `alpha-tool-policy.ts`、
-`alpha-managed-policy.ts` 同址同族)。
+`packages/opencode/src/permission/alpha-*.ts` 是零仪式的那条路(与 `codepuppy-tool-policy.ts`、
+`codepuppy-managed-policy.ts` 同址同族)。
 
 ---
 
@@ -326,9 +326,9 @@ $ # 再往 11 个候选文件各加一行之后
 ## 6. 推荐(接缝选型)
 
 > **已落地(2026-09-09,[`#1285`](https://github.com/jinjunnn/alpha-code/issues/1285) 实现票)。**
-> 按本节推荐实现:分类在 `Permission.ask` 产生并写进 `metadata.alphaRisk`;`gateToolExecution` 的
+> 按本节推荐实现:分类在 `Permission.ask` 产生并写进 `metadata.codepuppyRisk`;`gateToolExecution` 的
 > `GateInput` 新增 `args`,主体带 `transport`(远端 MCP 的目的地),两者随身份轴那一问一起进 `metadata`;
-> 分类模块落 `packages/opencode/src/permission/alpha-risk-classification.ts`。契约(形状、规则表、
+> 分类模块落 `packages/opencode/src/permission/codepuppy-risk-classification.ts`。契约(形状、规则表、
 > 前提由谁守)见 [`../contracts/permission-risk-classification.md`](../contracts/permission-risk-classification.md)。
 > 本节以下是勘破时的推荐原文,保留作对照。
 
@@ -338,7 +338,7 @@ $ # 再往 11 个候选文件各加一行之后
 不是靠枚举维护的;②它看得见 `permission` / `patterns` / `metadata`,即目的地与载荷来源(§2.4);
 ③它已在 `UPSTREAM_EXCLUDES` 内,north-star 零成本(§4 实测)。
 
-**辅接缝:`gateToolExecution`**(`alpha-tool-policy-gate.ts:138` + `GateInput`,`:123`)——
+**辅接缝:`gateToolExecution`**(`codepuppy-tool-policy-gate.ts:138` + `GateInput`,`:123`)——
 **只做供数,不做分类**:把调用方词法作用域里已有的 `args` 送进 `GateInput`,再写进它发起的那一问的
 `metadata`。没有这一步,远端 MCP 与插件工具的分类只能永远落在最保守档(AC2 意义上不算错,
 但等于对整类第三方工具不给信息)。两个调用点(`session/tools.ts:106`、`code-mode.ts:157`)
@@ -346,7 +346,7 @@ $ # 再往 11 个候选文件各加一行之后
 
 **分类模块落点:`packages/opencode/src/permission/alpha-*.ts`**(不是 `packages/ext/src`,§4)。
 纯函数、零 IO、零 provider import ⇒ AC3 的源码级判据在同一目录里就能写,
-与 `alpha-tool-policy.ts` 的既有形态一致。
+与 `codepuppy-tool-policy.ts` 的既有形态一致。
 
 **三条实现约束(都从实测推出,不是偏好):**
 
@@ -389,14 +389,14 @@ bash scripts/worktree-bootstrap.sh ac-1285-seam -b recon/1285-classification-sea
 
 | 文件 | 插在哪一行之后 | 记什么 |
 | --- | --- | --- |
-| `packages/opencode/src/permission/alpha-tool-policy-gate.ts` | `:140` `const subject = yield* input.subject` | `Object.keys(input)`、`subject.*`、`metadata`、`ruleset.length` |
+| `packages/opencode/src/permission/codepuppy-tool-policy-gate.ts` | `:140` `const subject = yield* input.subject` | `Object.keys(input)`、`subject.*`、`metadata`、`ruleset.length` |
 | `packages/opencode/src/permission/index.ts` | `:158` `const ask = Effect.fn(…)` 首行 | `Object.keys(input)`、`permission` / `patterns` / `always` / `metadata` / `tool` |
 | `packages/opencode/src/permission/index.ts` | `:191` `logInfo("asking", …)` 之后 | `info`(= 真正广播出去的那条请求) |
 | `packages/opencode/src/plugin/index.ts` | `:297` `if (!name) return output` 之后 | 每一次 `trigger` 的钩子名 |
 
 探针一律写成 `;(globalThis as any).__P1285?.push({...})` —— 未初始化时是 no-op,
 不改变任何生产路径。测试文件放 `packages/opencode/test/permission/`(要 `@/` 别名),
-夹具形状照抄 `test/tool/alpha-tool-policy-execution-gate.test.ts`(真 `SessionTools.resolve()`、
+夹具形状照抄 `test/tool/codepuppy-tool-policy-execution-gate.test.ts`(真 `SessionTools.resolve()`、
 真 MCP server、真插件),`cd packages/opencode && bun test test/permission/<file>`
 (仓根跑 `bun test` 会撞 `do-not-run-tests-from-root`)。
 
@@ -610,7 +610,7 @@ bun run --cwd packages/core typecheck          # 先证明这棵树可信:RC=0,�
 
 A/B 两臂放同一个测试文件(同一进程,`beforeEach` 清轨迹),
 `cd packages/opencode && bun test test/permission/<file>`;A 臂夹具形状照抄
-`test/tool/alpha-tool-policy-execution-gate.test.ts`(真 `SessionTools.resolve()`),
+`test/tool/codepuppy-tool-policy-execution-gate.test.ts`(真 `SessionTools.resolve()`),
 B 臂层照抄 `packages/core/test/permission.test.ts`。**2 pass / 0 fail / 13 expect() / 1.96s**;
 两条变异臂(§9.1 / §9.2)逐条实测转红。
 
@@ -638,9 +638,9 @@ URL 归属表(§9.5)用 `createOpencodeClient({ fetch: 记录型 })` 在 `packag
 git grep -l "@modelcontextprotocol" -- packages/core/src            # 0
 git grep -n "tool.execute.before\|experimental.chat.system.transform" -- packages/core/src
 cd packages/ui-mac && bun test \
-  src/renderer/alpha-ui/takeover-adapter-coexistence.test.ts \
-  src/renderer/alpha-ui/session-workspace/session-second-send.test.ts \
-  src/renderer/alpha-ui/permission-dual-channel.test.ts             # 29 pass / 0 fail
+  src/renderer/codepuppy-ui/takeover-adapter-coexistence.test.ts \
+  src/renderer/codepuppy-ui/session-workspace/session-second-send.test.ts \
+  src/renderer/codepuppy-ui/permission-dual-channel.test.ts             # 29 pass / 0 fail
 bash scripts/north-star-guard.sh                                     # 带探针 RC=0;控制臂改 core/src/tool/write.ts ⇒ RC=1
 ```
 

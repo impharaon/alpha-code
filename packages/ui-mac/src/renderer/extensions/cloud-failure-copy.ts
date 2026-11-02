@@ -2,15 +2,15 @@ import { t } from "../i18n"
 
 export function failureCopy(code: string) {
   if (code === "not-authenticated" || code === "unauthorized") {
-    return { text: t("alpha.ext.cloudErrAuth"), action: "login" as const }
+    return { text: t("codepuppy.ext.cloudErrAuth"), action: "login" as const }
   }
   if (code === "account_allowance_exhausted") {
-    return { text: t("alpha.ext.cloudErrAllowance"), action: "overflow" as const }
+    return { text: t("codepuppy.ext.cloudErrAllowance"), action: "overflow" as const }
   }
   if (code === "account_wallet_insufficient") {
-    return { text: t("alpha.ext.cloudErrWallet"), action: "recharge" as const }
+    return { text: t("codepuppy.ext.cloudErrWallet"), action: "recharge" as const }
   }
-  if (code === "account_suspended") return { text: t("alpha.ext.cloudErrSuspended"), action: null }
+  if (code === "account_suspended") return { text: t("codepuppy.ext.cloudErrSuspended"), action: null }
   return null
 }
 

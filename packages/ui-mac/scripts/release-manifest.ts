@@ -2,10 +2,10 @@
 // release-manifest CLI(#175)—— 发布链最后一步:从**最终发布文件的字节**产出签名 release manifest。
 //
 // 用法(权威流程在 docs/runbooks/distribution.md):
-//   keygen:  bun scripts/release-manifest.ts keygen --out ~/.alpha-code-signing/release-manifest-ed25519.pem
+//   keygen:  bun scripts/release-manifest.ts keygen --out ~/.codepuppy-signing/release-manifest-ed25519.pem
 //   produce: OPENCODE_CHANNEL=prod bun scripts/release-manifest.ts produce \
 //              --channel prod --dist dist [--windows-dir <解包的 win artifact 目录>] \
-//              --key ~/.alpha-code-signing/release-manifest-ed25519.pem
+//              --key ~/.codepuppy-signing/release-manifest-ed25519.pem
 //   verify:  bun scripts/release-manifest.ts verify --manifest <json> --sig <sig> \
 //              --trust ../../docs/contracts/desktop-release-manifest.trust.json
 //
@@ -151,12 +151,12 @@ const feedPrefix = FEED_PREFIX[channel]
 const artifacts: ArtifactFact[] = []
 const feeds: UpdaterFeedFact[] = []
 
-// mac artifacts(code-puppy-mac-<arch>.dmg/.zip + blockmaps)—— 从最终 dist 字节计算。
+// mac artifacts(codepuppy-mac-<arch>.dmg/.zip + blockmaps)—— 从最终 dist 字节计算。
 const MAC_ARCHES = ["arm64", "x64"] as const
 let appBundle: string | null = null
 for (const arch of MAC_ARCHES) {
-  const dmg = `code-puppy-mac-${arch}.dmg`
-  const zip = `code-puppy-mac-${arch}.zip`
+  const dmg = `codepuppy-mac-${arch}.dmg`
+  const zip = `codepuppy-mac-${arch}.zip`
   if (!fs.existsSync(path.join(distDir, dmg)) && !fs.existsSync(path.join(distDir, zip))) continue
   for (const [filename, kind] of [
     [dmg, "installer"],
@@ -195,14 +195,14 @@ if (hasMac) {
   console.log(`[release-manifest] mac signing facts: ${JSON.stringify(macSigning)}`)
 }
 
-// windows artifacts + facts(由 alpha-windows-build.yml 采集,经 artifact 落到本地目录)。
+// windows artifacts + facts(由 codepuppy-windows-build.yml 采集,经 artifact 落到本地目录)。
 let windowsFacts = null
 if (values["windows-dir"]) {
   const winDir = path.resolve(packageDir, values["windows-dir"])
   if (!fs.existsSync(winDir)) die(`--windows-dir not found: ${winDir}`)
   const WIN_ARCHES = ["x64", "arm64"] as const
   for (const arch of WIN_ARCHES) {
-    const exe = `alpha-code-win-${arch}.exe`
+    const exe = `codepuppy-win-${arch}.exe`
     const p = path.join(winDir, exe)
     if (!fs.existsSync(p)) continue
     artifacts.push({
@@ -245,7 +245,7 @@ let sbom = null
       timestamp: new Date().toISOString(),
       components,
     })
-    const filename = `alpha-code-${version}-sbom.cdx.json`
+    const filename = `codepuppy-${version}-sbom.cdx.json`
     fs.mkdirSync(outDir, { recursive: true })
     fs.writeFileSync(path.join(outDir, filename), text)
     const bytes = Buffer.from(text, "utf8")
@@ -288,7 +288,7 @@ if (!result.ok) {
 const bytes = serializeManifest(result.manifest)
 const sig = signEd25519(bytes, privateKeyPem)
 fs.mkdirSync(outDir, { recursive: true })
-const manifestPath = path.join(outDir, "alpha-release-manifest.json")
+const manifestPath = path.join(outDir, "codepuppy-release-manifest.json")
 fs.writeFileSync(manifestPath, bytes)
 fs.writeFileSync(`${manifestPath}.sig`, sig + "\n")
 console.log(`[release-manifest] OK: ${manifestPath} (+.sig) — ${result.manifest.artifacts.length} artifacts, channel=${channel}, v${version}`)

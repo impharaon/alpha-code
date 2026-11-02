@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# alpha pre-push hook — enforce local-first (docs/runbooks/ci.md §6).
-# DEFAULT-ON since 2026-07-05 (REQ-015): scripts/alpha-check.sh re-arms
+# Code Puppy pre-push hook — enforce local-first (docs/runbooks/ci.md §6).
+# DEFAULT-ON since 2026-07-05 (REQ-015): scripts/codepuppy-check.sh re-arms
 #   `git config core.hooksPath .githooks` whenever it has drifted, because husky's `prepare`
 #   resets it back to .husky/_ after each `bun install` — and that upstream hook's
 #   full-turbo typecheck is permanently red under the ADR-020 frozen-frontend skew
 #   (session-ui needs new-ui props; unshipped upstream leaf; see REQ-015).
-# Disable persistently:  git config --unset core.hooksPath  (+ export ALPHA_HOOKS_DISABLE=1)
+# Disable persistently:  git config --unset core.hooksPath  (+ export CODEPUPPY_HOOKS_DISABLE=1)
 # Bypass a single push:  git push --no-verify
 repository_root="$(git rev-parse --show-toplevel)"
 
@@ -15,7 +15,7 @@ repository_root="$(git rev-parse --show-toplevel)"
 # .git/config. Ask Git for its own complete repository-local set; never maintain a second list.
 repository_local_git_env="$(git rev-parse --local-env-vars)" || exit 1
 if [ -z "$repository_local_git_env" ]; then
-  echo "alpha pre-push: git reported no repository-local environment variables; refusing an unsafe run" >&2
+  echo "codepuppy pre-push: git reported no repository-local environment variables; refusing an unsafe run" >&2
   exit 1
 fi
 while IFS= read -r name; do
@@ -27,4 +27,4 @@ cd "$repository_root" || exit 1
 if command -v gate >/dev/null 2>&1; then
   exec gate pre-push "$@"
 fi
-exec bash "$repository_root/scripts/alpha-check.sh"
+exec bash "$repository_root/scripts/codepuppy-check.sh"

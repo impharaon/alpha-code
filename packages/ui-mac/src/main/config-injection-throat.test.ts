@@ -4,7 +4,7 @@
 // 自己那个键,对 command / mcp / provider / model / plugin 零命中 —— 明天有人往第三个键写一段 alpha 的字,没有任何测试会红。
 // 判据因此从「你还能找到别的绕法吗」(无限)换成「咽喉在不在、对未知默认拒不拒」(有限,一次变异判完):
 //
-// 本文件跑**真的** injectAlphaConfig(生产 composition,零模块 mock,真临时盘),取 hook 之后 OPENCODE_CONFIG_CONTENT 里
+// 本文件跑**真的** injectCodePuppyConfig(生产 composition,零模块 mock,真临时盘),取 hook 之后 OPENCODE_CONFIG_CONTENT 里
 // **新写入或改动**的每一个字符串叶子(JSON Pointer,RFC 6901 转义:`permission.bash["*/rm *"]` 的 pointer 是 `…/bash/*~1rm *`),
 // 按**来源**先排除用户的字,其余每一片都必须落进下面三类之一,**落不进的一律点名 —— 不是 pointer 白名单,是「解释不了 = 红」**:
 //
@@ -48,36 +48,36 @@ import {
   uiMacAgentFragmentId,
   uiMacAgentFragmentIds,
 } from "../../../ext/src/context-injection"
-import { ALPHA_AGENT_TEXT } from "./alpha-agents"
-import { ALPHA_BEHAVIOR_MD } from "./alpha-behavior"
-import { injectAlphaConfig } from "./alpha-config-injection"
-import { secretFilePath } from "./alpha-secret-files"
+import { CODEPUPPY_AGENT_TEXT } from "./codepuppy-agents"
+import { CODEPUPPY_BEHAVIOR_MD } from "./codepuppy-behavior"
+import { injectCodePuppyConfig } from "./codepuppy-config-injection"
+import { secretFilePath } from "./codepuppy-secret-files"
 import { CLOUD_MCP_SERVER_NAME, CLOUD_WEB_SEARCH_TOOL_ID, LOCAL_WEB_SEARCH_TOOL_ID, WITHHELD_CLOUD_MCP } from "./cloud-web-search"
 
-// 注入读到的每一个 env 输入 + 它自己写出的 env 输出:逐个快照 / 清空 / 还原(与 alpha-config-injection.test.ts 同一份清单)。
+// 注入读到的每一个 env 输入 + 它自己写出的 env 输出:逐个快照 / 清空 / 还原(与 codepuppy-config-injection.test.ts 同一份清单)。
 const MANAGED = [
-  "ALPHA_JSONC_TRUTH_DISABLE",
-  "ALPHA_LEGACY_INSTALL_ROOT",
-  "ALPHA_GLOBAL_DIR",
-  "ALPHA_OPENCODE_HOME",
+  "CODEPUPPY_JSONC_TRUTH_DISABLE",
+  "CODEPUPPY_LEGACY_INSTALL_ROOT",
+  "CODEPUPPY_GLOBAL_DIR",
+  "CODEPUPPY_OPENCODE_HOME",
   "XDG_CONFIG_HOME",
   "XDG_DATA_HOME",
   "OPENCODE_CONFIG",
   "OPENCODE_CONFIG_CONTENT",
   "OPENCODE_CONFIG_DIR",
   "OPENCODE_MODELS_PATH",
-  "ALPHA_IDENTITY_DISABLE",
-  "ALPHA_BEHAVIOR_DISABLE",
-  "ALPHA_MODELS_DISABLE",
-  "ALPHA_AUTOMATION_DISABLE",
-  "ALPHA_READONLY_DISABLE",
-  "ALPHA_WEBSEARCH_DISABLE",
-  "ALPHA_CLOUD_MCP_URL",
-  "ALPHA_CLOUD_MCP_ARM",
-  "ALPHA_CLOUD_MCP_DEF",
-  "ALPHA_CLOUD_MCP_SERVER",
-  "ALPHA_BASE_URL",
-  "ALPHA_DEFAULT_MODEL",
+  "CODEPUPPY_IDENTITY_DISABLE",
+  "CODEPUPPY_BEHAVIOR_DISABLE",
+  "CODEPUPPY_MODELS_DISABLE",
+  "CODEPUPPY_AUTOMATION_DISABLE",
+  "CODEPUPPY_READONLY_DISABLE",
+  "CODEPUPPY_WEBSEARCH_DISABLE",
+  "CODEPUPPY_CLOUD_MCP_URL",
+  "CODEPUPPY_CLOUD_MCP_ARM",
+  "CODEPUPPY_CLOUD_MCP_DEF",
+  "CODEPUPPY_CLOUD_MCP_SERVER",
+  "CODEPUPPY_BASE_URL",
+  "CODEPUPPY_DEFAULT_MODEL",
   "OPENCODE_ENABLE_EXA",
   "OPENCODE_EXPERIMENTAL",
 ] as const
@@ -85,21 +85,21 @@ const MANAGED = [
 const saved: Record<string, string | undefined> = {}
 let tmp = ""
 let userData = ""
-let alphaRoot = ""
+let codepuppyRoot = ""
 
 beforeEach(() => {
   for (const k of MANAGED) {
     saved[k] = process.env[k]
     delete process.env[k]
   }
-  tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "alpha-config-throat-")))
-  alphaRoot = path.join(tmp, "alpha-code-state", "env", "dev")
-  process.env.ALPHA_GLOBAL_DIR = alphaRoot
+  tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-config-throat-")))
+  codepuppyRoot = path.join(tmp, "codepuppy-state", "env", "dev")
+  process.env.CODEPUPPY_GLOBAL_DIR = codepuppyRoot
   process.env.XDG_CONFIG_HOME = path.join(tmp, "xdg")
-  process.env.ALPHA_OPENCODE_HOME = path.join(tmp, "opencode-home")
+  process.env.CODEPUPPY_OPENCODE_HOME = path.join(tmp, "opencode-home")
   process.env.XDG_DATA_HOME = path.join(tmp, "xdg-data")
   userData = path.join(tmp, "userdata")
-  for (const d of [alphaRoot, process.env.XDG_CONFIG_HOME, process.env.ALPHA_OPENCODE_HOME, process.env.XDG_DATA_HOME, userData])
+  for (const d of [codepuppyRoot, process.env.XDG_CONFIG_HOME, process.env.CODEPUPPY_OPENCODE_HOME, process.env.XDG_DATA_HOME, userData])
     fs.mkdirSync(d, { recursive: true })
 })
 
@@ -220,10 +220,10 @@ type Run = Judgement & { before: Cfg; after: Cfg; importedDir: string; instructi
 function run(inherited?: Cfg, extPluginPath?: string): Run {
   const before: Cfg = inherited ?? {}
   if (inherited) process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify(inherited)
-  const result = injectAlphaConfig(userData, extPluginPath, "stable")
+  const result = injectCodePuppyConfig(userData, extPluginPath, "stable")
   expect(result).toEqual({ ok: true })
   const after = JSON.parse(process.env.OPENCODE_CONFIG_CONTENT!) as Cfg
-  const importedDir = path.join(alphaRoot, "instructions")
+  const importedDir = path.join(codepuppyRoot, "instructions")
   return {
     before,
     after,
@@ -246,10 +246,10 @@ const plantSecret = (varName: string, value: string) => {
   fs.writeFileSync(file, value, { mode: 0o600 })
 }
 
-/** 代付态(cloudDispatch=true):云 MCP URL + 登录铸 mcp_access 凭证文件同在(alpha-config-injection.ts 的 platformPays)。 */
+/** 代付态(cloudDispatch=true):云 MCP URL + 登录铸 mcp_access 凭证文件同在(codepuppy-config-injection.ts 的 platformPays)。 */
 function givenPlatformPays() {
-  plantSecret("ALPHA_MCP_TOKEN", "mcp-token-value")
-  process.env.ALPHA_CLOUD_MCP_URL = "https://cloud.example/mcp"
+  plantSecret("CODEPUPPY_MCP_TOKEN", "mcp-token-value")
+  process.env.CODEPUPPY_CLOUD_MCP_URL = "https://cloud.example/mcp"
 }
 
 const EXT_BUNDLE = "/Applications/Code Puppy.app/Contents/Resources/ext/dist/plugin.js"
@@ -259,10 +259,10 @@ const DEFAULT_MODEL = "deepseek-byok/deepseek-v4-flash"
 
 /** main 在 fork 时能给 sidecar 的全部输入一次到位:ext bundle 路径 + 平台密钥 + BYOK 密钥 + 默认模型 + 云 MCP 代付。 */
 function givenFullStack() {
-  plantSecret("ALPHA_API_KEY", PLATFORM_KEY)
+  plantSecret("CODEPUPPY_API_KEY", PLATFORM_KEY)
   plantSecret("DEEPSEEK_API_KEY", BYOK_KEY)
-  process.env.ALPHA_BASE_URL = "https://gateway.example.invalid/v1"
-  process.env.ALPHA_DEFAULT_MODEL = DEFAULT_MODEL
+  process.env.CODEPUPPY_BASE_URL = "https://gateway.example.invalid/v1"
+  process.env.CODEPUPPY_DEFAULT_MODEL = DEFAULT_MODEL
   givenPlatformPays()
 }
 
@@ -283,7 +283,7 @@ const REGISTERED_AGENT_IDS = UI_MAC_AGENT_NAMES.flatMap((n) => uiMacAgentFragmen
 const agentIdsOf = (names: readonly string[]) => names.flatMap((n) => uiMacAgentFragmentIds(n as (typeof UI_MAC_AGENT_NAMES)[number]))
 const sorted = (xs: readonly string[]) => [...xs].sort()
 
-describe("ui-mac 整份 config 咽喉:injectAlphaConfig 写进 OPENCODE_CONFIG_CONTENT 的每个字符串叶子都必须是登记文字、声明引用或引擎动词", () => {
+describe("ui-mac 整份 config 咽喉:injectCodePuppyConfig 写进 OPENCODE_CONFIG_CONTENT 的每个字符串叶子都必须是登记文字、声明引用或引擎动词", () => {
   test("动词集合与引擎源码逐字一致(drift 锁):permission 动词 / agent mode —— 引擎改了字面量而这里没跟,即红", () => {
     const permissionSource = fs.readFileSync(path.join(REPO_ROOT, "packages/core/src/v1/config/permission.ts"), "utf8")
     const agentSource = fs.readFileSync(path.join(REPO_ROOT, "packages/opencode/src/agent/agent.ts"), "utf8")
@@ -297,7 +297,7 @@ describe("ui-mac 整份 config 咽喉:injectAlphaConfig 写进 OPENCODE_CONFIG_C
   test("默认 env:整份 config 零点名;解释出的正是 identity(websearch 形状)+ behavior + 六段 agent 文字;引用只命中 $schema;判官真的走过 $schema / agent / instructions", () => {
     const r = run()
     expect(r.bad).toEqual([])
-    expect(r.instructions.map((f) => path.basename(f))).toEqual(["alpha-identity.md", "alpha-behavior.md"])
+    expect(r.instructions.map((f) => path.basename(f))).toEqual(["codepuppy-identity.md", "codepuppy-behavior.md"])
     for (const f of r.instructions) expect(fs.existsSync(f), f).toBe(true)
     expect(sorted(Object.keys(r.agent))).toEqual(sorted(UI_MAC_AGENT_NAMES))
     expect(sorted(r.explained)).toEqual(sorted([DEFAULT_IDENTITY_ID, BEHAVIOR_FRAGMENT_ID, ...REGISTERED_AGENT_IDS]))
@@ -309,7 +309,7 @@ describe("ui-mac 整份 config 咽喉:injectAlphaConfig 写进 OPENCODE_CONFIG_C
     // 生产写出的字与内容模块逐字(判官解释成功已蕴含逐字;这里把「哪段字」钉到具体 agent 上)。
     // `#1413`:没有 prompt 的 agent(codepuppy-ask)生产也**不许**写出 prompt 键 —— 写了(哪怕空串)就会顶掉底座。
     for (const name of UI_MAC_AGENT_NAMES) {
-      const text: { prompt?: string; description: string } = ALPHA_AGENT_TEXT[name]
+      const text: { prompt?: string; description: string } = CODEPUPPY_AGENT_TEXT[name]
       if (text.prompt === undefined) expect("prompt" in r.agent[name]!, name).toBe(false)
       else expect(r.agent[name]!.prompt, name).toBe(text.prompt)
       expect(r.agent[name]!.description, name).toBe(text.description)
@@ -334,14 +334,14 @@ describe("ui-mac 整份 config 咽喉:injectAlphaConfig 写进 OPENCODE_CONFIG_C
     expect(r.after.model).toBe(DEFAULT_MODEL)
     expect(r.after.enabled_providers).toEqual(expect.arrayContaining(["codepuppy", "deepseek-byok"]))
     expect(Object.keys(r.after.provider as Cfg)).toEqual(expect.arrayContaining(["codepuppy", "deepseek-byok"]))
-    expect(((r.after.mcp as Cfg)[CLOUD_MCP_SERVER_NAME] as Cfg).headers).toEqual({ Authorization: `Bearer {file:${secretFilePath(userData, "ALPHA_MCP_TOKEN")}}` })
+    expect(((r.after.mcp as Cfg)[CLOUD_MCP_SERVER_NAME] as Cfg).headers).toEqual({ Authorization: `Bearer {file:${secretFilePath(userData, "CODEPUPPY_MCP_TOKEN")}}` })
     // `#1411`:代付**不再**产生任何 web search deny —— 顶层 permission 整个不写(两条腿都留在模型
     // 工具表里)。以前这里是 `expect(...[LOCAL_WEB_SEARCH_TOOL_ID]).toBe("deny")`。
     expect(r.after.permission).toBeUndefined()
     expect(r.verbs).toBeGreaterThanOrEqual(UI_MAC_AGENT_NAMES.length * 2)
     // identity 解释出的形状必须与 env 推出的能力事实一致(代付 + keyless)
     expect(sorted(r.explained)).toEqual(sorted([`${IDENTITY_FRAGMENT_ID}+websearch+cloudDispatch`, BEHAVIOR_FRAGMENT_ID, ...REGISTERED_AGENT_IDS]))
-    // 密钥值不在任何字符串叶子里(A6;组合体层面的锁在 alpha-config-injection.test.ts,这里只证明判官看到的那份也没有)
+    // 密钥值不在任何字符串叶子里(A6;组合体层面的锁在 codepuppy-config-injection.test.ts,这里只证明判官看到的那份也没有)
     for (const l of stringLeaves(r.after, "")) {
       expect(l.value, l.pointer).not.toContain(PLATFORM_KEY)
       expect(l.value, l.pointer).not.toContain(BYOK_KEY)
@@ -354,9 +354,9 @@ describe("ui-mac 整份 config 咽喉:injectAlphaConfig 写进 OPENCODE_CONFIG_C
       for (const keyless of [false, true])
         for (const cloud of [false, true]) {
           freshRound()
-          delete process.env.ALPHA_CLOUD_MCP_URL
-          delete process.env.ALPHA_WEBSEARCH_DISABLE
-          if (websearchDisabled) process.env.ALPHA_WEBSEARCH_DISABLE = "1"
+          delete process.env.CODEPUPPY_CLOUD_MCP_URL
+          delete process.env.CODEPUPPY_WEBSEARCH_DISABLE
+          if (websearchDisabled) process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
           process.env.OPENCODE_ENABLE_EXA = keyless ? "1" : "0"
           if (cloud) givenPlatformPays()
           const label = JSON.stringify({ websearchDisabled, keyless, cloud })
@@ -369,7 +369,7 @@ describe("ui-mac 整份 config 咽喉:injectAlphaConfig 写进 OPENCODE_CONFIG_C
             websearch: !websearchDisabled && (keyless || cloud),
             cloudDispatch: cloud,
           })
-          seen.set(identityId!, fs.readFileSync(r.instructions.find((f) => f.endsWith("alpha-identity.md"))!, "utf8"))
+          seen.set(identityId!, fs.readFileSync(r.instructions.find((f) => f.endsWith("codepuppy-identity.md"))!, "utf8"))
         }
     // 先证明矩阵真的驱动出了不止一种形状(否则「集合相等」可能是 8 轮同一份)
     expect(seen.size).toBeGreaterThanOrEqual(2)
@@ -379,7 +379,7 @@ describe("ui-mac 整份 config 咽喉:injectAlphaConfig 写进 OPENCODE_CONFIG_C
   })
 
   test("用户的字不判:继承的 instructions / agent / command / mcp 与 REQ-063 导入目录都按来源放行;生产改动用户 agent 的动词叶子不算字;同一轮判官照样点名 rogue", () => {
-    const importedDir = path.join(alphaRoot, "instructions")
+    const importedDir = path.join(codepuppyRoot, "instructions")
     fs.mkdirSync(importedDir, { recursive: true })
     const imported = path.join(importedDir, "CLAUDE.md")
     fs.writeFileSync(imported, "# user's imported global instructions\n")
@@ -387,8 +387,8 @@ describe("ui-mac 整份 config 咽喉:injectAlphaConfig 写进 OPENCODE_CONFIG_C
     // kill-switch 让 applyWebSearchDenies 往顶层 permission 与**每个** agent(含用户继承的)钉 deny —— 用户 agent 上因此出现
     // 「生产新写入的叶子」,它是动词,必须走动词那条路而不是被当成未登记的字(默认 env 下它不写任何东西)。
     // 同时给云 MCP URL(无凭证)⇒ 中和条目 WITHHELD 走 /mcp 引用。
-    process.env.ALPHA_WEBSEARCH_DISABLE = "1"
-    process.env.ALPHA_CLOUD_MCP_URL = "https://cloud.example/mcp"
+    process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
+    process.env.CODEPUPPY_CLOUD_MCP_URL = "https://cloud.example/mcp"
     const r = run({
       instructions: [inherited],
       agent: {
@@ -403,7 +403,7 @@ describe("ui-mac 整份 config 咽喉:injectAlphaConfig 写进 OPENCODE_CONFIG_C
     expect(r.instructions).toContain(imported)
     expect(r.user).toEqual([imported])
     expect(r.agent.mine!.prompt).toBe("user's own agent prompt")
-    expect(r.agent["codepuppy-readonly"]!.prompt).toBe(ALPHA_AGENT_TEXT["codepuppy-readonly"].prompt)
+    expect(r.agent["codepuppy-readonly"]!.prompt).toBe(CODEPUPPY_AGENT_TEXT["codepuppy-readonly"].prompt)
     expect((r.after.command as Cfg).mine).toEqual({ template: "user's own slash command", description: "user's" })
     expect(r.bad).toEqual([])
     expect(sorted(r.explained)).toEqual(sorted([`${IDENTITY_FRAGMENT_ID}`, BEHAVIOR_FRAGMENT_ID, ...REGISTERED_AGENT_IDS]))
@@ -414,10 +414,10 @@ describe("ui-mac 整份 config 咽喉:injectAlphaConfig 写进 OPENCODE_CONFIG_C
     expect(r.verbs).toBeGreaterThanOrEqual(UI_MAC_AGENT_NAMES.length * 2 + 2 + 2)
     // 中和条目真写了,且走的是 /mcp 引用
     expect((r.after.mcp as Cfg)[CLOUD_MCP_SERVER_NAME]).toEqual({ ...WITHHELD_CLOUD_MCP })
-    // 继承了 config ⇒ 生产不种 $schema(alpha-config-injection.ts:91 只在无继承时种),所以引用只剩 /mcp 这一条
+    // 继承了 config ⇒ 生产不种 $schema(codepuppy-config-injection.ts:91 只在无继承时种),所以引用只剩 /mcp 这一条
     expect(r.refs).toEqual(["ref.mcp"])
     // 多一个不在导入目录、不在登记簿的 instruction 文件,和一个不在登记簿的 agent —— 点名它们,而且只点它们
-    const rogueFile = path.join(userData, "alpha-extra.md")
+    const rogueFile = path.join(userData, "codepuppy-extra.md")
     fs.writeFileSync(rogueFile, "rogue instruction written around the registry\n")
     const mutated = { ...r.after, instructions: [...r.instructions, rogueFile], agent: { ...r.agent, rogue: { prompt: "rogue prompt written around the registry" } } }
     expect(judge(r.before, mutated, importedDir).bad).toEqual([
@@ -426,31 +426,31 @@ describe("ui-mac 整份 config 咽喉:injectAlphaConfig 写进 OPENCODE_CONFIG_C
     ])
   })
 
-  test("逃生门 ①:ALPHA_IDENTITY_DISABLE / ALPHA_BEHAVIOR_DISABLE 各自缺席那一份 instruction,剩下的仍解释得通(判官不靠「恰好两份」)", () => {
-    process.env.ALPHA_IDENTITY_DISABLE = "1"
+  test("逃生门 ①:CODEPUPPY_IDENTITY_DISABLE / CODEPUPPY_BEHAVIOR_DISABLE 各自缺席那一份 instruction,剩下的仍解释得通(判官不靠「恰好两份」)", () => {
+    process.env.CODEPUPPY_IDENTITY_DISABLE = "1"
     let r = run()
-    expect(r.instructions.map((f) => path.basename(f))).toEqual(["alpha-behavior.md"])
+    expect(r.instructions.map((f) => path.basename(f))).toEqual(["codepuppy-behavior.md"])
     expect(r.bad).toEqual([])
     expect(sorted(r.explained)).toEqual(sorted([BEHAVIOR_FRAGMENT_ID, ...REGISTERED_AGENT_IDS]))
 
-    delete process.env.ALPHA_IDENTITY_DISABLE
-    process.env.ALPHA_BEHAVIOR_DISABLE = "1"
+    delete process.env.CODEPUPPY_IDENTITY_DISABLE
+    process.env.CODEPUPPY_BEHAVIOR_DISABLE = "1"
     freshRound()
     r = run()
-    expect(r.instructions.map((f) => path.basename(f))).toEqual(["alpha-identity.md"])
+    expect(r.instructions.map((f) => path.basename(f))).toEqual(["codepuppy-identity.md"])
     expect(r.bad).toEqual([])
     expect(sorted(r.explained)).toEqual(sorted([DEFAULT_IDENTITY_ID, ...REGISTERED_AGENT_IDS]))
   })
 
-  test("逃生门 ②:ALPHA_AUTOMATION_DISABLE 拿掉两个 automation,ALPHA_READONLY_DISABLE 拿掉 readonly —— 剩下的仍零点名,解释出的正是剩下那些;codepuppy-ask 没有逃生门,两种 env 下都在(#1413)", () => {
-    process.env.ALPHA_AUTOMATION_DISABLE = "1"
+  test("逃生门 ②:CODEPUPPY_AUTOMATION_DISABLE 拿掉两个 automation,CODEPUPPY_READONLY_DISABLE 拿掉 readonly —— 剩下的仍零点名,解释出的正是剩下那些;codepuppy-ask 没有逃生门,两种 env 下都在(#1413)", () => {
+    process.env.CODEPUPPY_AUTOMATION_DISABLE = "1"
     let r = run()
     expect(sorted(Object.keys(r.agent))).toEqual(["codepuppy-ask", "codepuppy-readonly"])
     expect(r.bad).toEqual([])
     expect(sorted(r.explained)).toEqual(sorted([DEFAULT_IDENTITY_ID, BEHAVIOR_FRAGMENT_ID, ...agentIdsOf(["codepuppy-readonly", "codepuppy-ask"])]))
 
-    delete process.env.ALPHA_AUTOMATION_DISABLE
-    process.env.ALPHA_READONLY_DISABLE = "1"
+    delete process.env.CODEPUPPY_AUTOMATION_DISABLE
+    process.env.CODEPUPPY_READONLY_DISABLE = "1"
     freshRound()
     r = run()
     expect(sorted(Object.keys(r.agent))).toEqual(["codepuppy-ask", "codepuppy-automation", "codepuppy-automation-standard"])
@@ -464,7 +464,7 @@ describe("ui-mac 整份 config 咽喉:injectAlphaConfig 写进 OPENCODE_CONFIG_C
     const r = run()
     const mutated = {
       ...r.after,
-      command: { sneaky: { template: ALPHA_BEHAVIOR_MD, description: "Alpha smuggled a sentence into a slash command" } },
+      command: { sneaky: { template: CODEPUPPY_BEHAVIOR_MD, description: "Alpha smuggled a sentence into a slash command" } },
       tools_note: "and one more top-level key nobody declared",
     }
     const v = judge(r.before, mutated, r.importedDir)
@@ -480,7 +480,7 @@ describe("ui-mac 整份 config 咽喉:injectAlphaConfig 写进 OPENCODE_CONFIG_C
 
   test("已知的坏 ①:instructions 多推一个未登记文件的路径 —— 点名那个 pointer;路径不存在同样点名,不静默跳过", () => {
     const r = run()
-    const rogue = path.join(userData, "alpha-extra.md")
+    const rogue = path.join(userData, "codepuppy-extra.md")
     fs.writeFileSync(rogue, "rogue")
     expect(judge(r.before, { ...r.after, instructions: [...r.instructions, rogue] }, r.importedDir).bad).toEqual([
       { pointer: "/instructions/2", reason: "body not registered", file: rogue },
@@ -491,9 +491,9 @@ describe("ui-mac 整份 config 咽喉:injectAlphaConfig 写进 OPENCODE_CONFIG_C
     ])
   })
 
-  test("已知的坏 ②:落盘的 alpha-behavior.md 多一个字节 —— 逐字比对,不是「像」;identity 与六段 agent 文字不受牵连", () => {
+  test("已知的坏 ②:落盘的 codepuppy-behavior.md 多一个字节 —— 逐字比对,不是「像」;identity 与六段 agent 文字不受牵连", () => {
     const r = run()
-    const behavior = r.instructions.find((f) => f.endsWith("alpha-behavior.md"))!
+    const behavior = r.instructions.find((f) => f.endsWith("codepuppy-behavior.md"))!
     fs.appendFileSync(behavior, "!")
     const v = judge(r.before, r.after, r.importedDir)
     expect(v.bad).toEqual([{ pointer: "/instructions/1", reason: "body not registered", file: behavior }])
@@ -513,11 +513,11 @@ describe("ui-mac 整份 config 咽喉:injectAlphaConfig 写进 OPENCODE_CONFIG_C
 
   test("已知的坏 ④:登记过的 prompt 多一个字节 —— 点名那一条,其余五段不受牵连;串格(description 的字写进 prompt)同样点名", () => {
     const r = run()
-    const oneByte = { ...r.after, agent: { ...r.agent, "codepuppy-readonly": { ...r.agent["codepuppy-readonly"], prompt: ALPHA_AGENT_TEXT["codepuppy-readonly"].prompt + "!" } } }
+    const oneByte = { ...r.after, agent: { ...r.agent, "codepuppy-readonly": { ...r.agent["codepuppy-readonly"], prompt: CODEPUPPY_AGENT_TEXT["codepuppy-readonly"].prompt + "!" } } }
     const v1 = judge(r.before, oneByte, r.importedDir)
     expect(v1.bad).toEqual([{ pointer: "/agent/codepuppy-readonly/prompt", reason: "text not registered" }])
     expect(sorted(v1.explained)).toEqual(sorted([DEFAULT_IDENTITY_ID, BEHAVIOR_FRAGMENT_ID, ...REGISTERED_AGENT_IDS.filter((id) => id !== uiMacAgentFragmentId("codepuppy-readonly", "prompt"))]))
-    const crossSlot = { ...r.after, agent: { ...r.agent, "codepuppy-readonly": { ...r.agent["codepuppy-readonly"], prompt: ALPHA_AGENT_TEXT["codepuppy-readonly"].description } } }
+    const crossSlot = { ...r.after, agent: { ...r.agent, "codepuppy-readonly": { ...r.agent["codepuppy-readonly"], prompt: CODEPUPPY_AGENT_TEXT["codepuppy-readonly"].description } } }
     expect(judge(r.before, crossSlot, r.importedDir).bad).toEqual([{ pointer: "/agent/codepuppy-readonly/prompt", reason: "text not registered" }])
   })
 

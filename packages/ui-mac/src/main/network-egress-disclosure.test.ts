@@ -55,8 +55,8 @@ const docStatement = () => {
 
 describe("REQ-137 #1337 AC5 覆盖面如实声明", () => {
   test("产品(终端沙箱悬停卡 zh / en):三句都在,且没有过度声明", () => {
-    const zhBody = zh["alpha.terminal.sandboxHoverBody"]
-    const enBody = en["alpha.terminal.sandboxHoverBody"]
+    const zhBody = zh["codepuppy.terminal.sandboxHoverBody"]
+    const enBody = en["codepuppy.terminal.sandboxHoverBody"]
     expect(typeof zhBody).toBe("string")
     expect(typeof enBody).toBe("string")
     const zhVerdict = judgeEgressCoverageDisclosure(zhBody, "zh")
@@ -75,8 +75,8 @@ describe("REQ-137 #1337 AC5 覆盖面如实声明", () => {
   })
 
   test("反向 ①:把声明改成「全部出网都被限制」⇒ 同一判据必红并点名过度声明(三个落点各一次)", () => {
-    const zhBad = zh["alpha.terminal.sandboxHoverBody"].replace(/联网也一样[\s\S]*$/, "所有联网都被这道沙箱限制。")
-    const enBad = en["alpha.terminal.sandboxHoverBody"].replace(/Network access works[\s\S]*$/, "All network traffic is restricted by this sandbox.")
+    const zhBad = zh["codepuppy.terminal.sandboxHoverBody"].replace(/联网也一样[\s\S]*$/, "所有联网都被这道沙箱限制。")
+    const enBad = en["codepuppy.terminal.sandboxHoverBody"].replace(/Network access works[\s\S]*$/, "All network traffic is restricted by this sandbox.")
     const docBad = docStatement().replace(/\*\*Electron main\*\*[\s\S]*$/, "全部出网都被这道围栏限制。")
     for (const [text, locale] of [
       [zhBad, "zh"],
@@ -91,10 +91,10 @@ describe("REQ-137 #1337 AC5 覆盖面如实声明", () => {
   })
 
   test("反向 ②:只删掉「应用自身不在其内」那一句(其余照旧)⇒ 红并点名缺的是哪一句", () => {
-    const zhBad = zh["alpha.terminal.sandboxHoverBody"].replace(";Code Puppy 应用自身的联网(模型目录、登录、检查更新)不在这道沙箱之内,照常直连", "")
-    const enBad = en["alpha.terminal.sandboxHoverBody"].replace(" Code Puppy's own traffic (model catalog, sign-in, update checks) is outside this sandbox and connects as before.", "")
-    expect(zhBad).not.toBe(zh["alpha.terminal.sandboxHoverBody"])
-    expect(enBad).not.toBe(en["alpha.terminal.sandboxHoverBody"])
+    const zhBad = zh["codepuppy.terminal.sandboxHoverBody"].replace(";Code Puppy 应用自身的联网(模型目录、登录、检查更新)不在这道沙箱之内,照常直连", "")
+    const enBad = en["codepuppy.terminal.sandboxHoverBody"].replace(" Code Puppy's own traffic (model catalog, sign-in, update checks) is outside this sandbox and connects as before.", "")
+    expect(zhBad).not.toBe(zh["codepuppy.terminal.sandboxHoverBody"])
+    expect(enBad).not.toBe(en["codepuppy.terminal.sandboxHoverBody"])
     const zhVerdict = judgeEgressCoverageDisclosure(zhBad, "zh")
     const enVerdict = judgeEgressCoverageDisclosure(enBad, "en")
     expect(zhVerdict.ok).toBe(false)

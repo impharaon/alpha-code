@@ -1,11 +1,11 @@
-// ext-config-tx — REQ-100 #311:alpha.jsonc 配置变更的 journaled 事务适配器(bundle 原子的兄弟 action)。
+// ext-config-tx — REQ-100 #311:codepuppy.jsonc 配置变更的 journaled 事务适配器(bundle 原子的兄弟 action)。
 //
-// 背景:mcp/plugin 是共享 alpha.jsonc 的配置条目,不是文件树 generation。要让它们与 skill generation
+// 背景:mcp/plugin 是共享 codepuppy.jsonc 的配置条目,不是文件树 generation。要让它们与 skill generation
 // 在同一事务里 required 全提交或全回滚,需要一个可 journaled + 可回滚的配置动作。现有 writeKey 成功即删
 // .bak,无法供 bundle 级回滚;persistMcp/removeMcp 混了 receipt/legacy 清理,removeMcp 补偿会删旧配置
 // 而非恢复被覆盖的旧值 —— 都不能直接当 action。
 //
-// 模型(整文件 image,天然处理「同一份 alpha.jsonc 多条 edit 按序累积」):
+// 模型(整文件 image,天然处理「同一份 codepuppy.jsonc 多条 edit 按序累积」):
 //   prepare(target, edits[]) → 读 live 得 preImage,按序 applyEdits 得 nextImage(校验 jsonc),
 //                              连同 pre/next digest 返回;多条 edit 塌缩为一次文件切换。
 //   stage    → preImage/nextImage 写 staging(0600);journal 只记受控相对路径 + before/after digest,

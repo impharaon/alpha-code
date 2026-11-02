@@ -35,7 +35,7 @@
 name: sync-upstream
 
 on:
-  # 定时同步重开(2026-07-21,ADR-034 B 方案迁移完成):日常 sync 只进引擎,apply_alpha_frontend_delta
+  # 定时同步重开(2026-07-21,ADR-034 B 方案迁移完成):日常 sync 只进引擎,apply_codepuppy_frontend_delta
   # 把 app/ui 恒还原为 frontend-pin.lock 的 pin + SOT 补丁——不再擦 alpha seam、不再丢上游前端。
   # 前端前进由月更 bump(见 frontend/README.md)。#465 曾暂停本 cron 止血,机制已 B-safe,恢复。
   schedule:
@@ -56,7 +56,7 @@ jobs:
     runs-on: ubuntu-latest
     # 冲突路径的 `bun install` 会跑 husky prepare 重挂钩子,随后 commit/push 被上游全量
     # turbo typecheck pre-push 挡死(冻结世界恒红,ADR-020 已知偏斜;2026-07-04~06
-    # 连败三天即此)。权威门是 PR 的 alpha-ci,sync 机器人不走 husky 门。
+    # 连败三天即此)。权威门是 PR 的 codepuppy-ci,sync 机器人不走 husky 门。
     env:
       HUSKY: "0"
     steps:
@@ -74,7 +74,7 @@ jobs:
 
       - name: Configure git + remotes
         run: |
-          git config user.name "alpha-code-bot"
+          git config user.name "codepuppy-bot"
           git config user.email "actions@users.noreply.github.com"
           # jinjunnn/alpha-code and anomalyco/opencode are both public — plain
           # anonymous HTTPS fetch works, no credential of any kind is needed here.
@@ -94,7 +94,7 @@ jobs:
           echo "OLD_DEV=$old_dev" >> "$GITHUB_ENV"
           echo "NEW_DEV=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
-      # ADR-015 合并验证:Tier-3 行为层(alpha-behavior/identity/.opencode/agent)与上游 prompt 底座的
+      # ADR-015 合并验证:Tier-3 行为层(codepuppy-behavior/identity/.opencode/agent)与上游 prompt 底座的
       # 矛盾不产生 git 冲突 → file-diff 守卫(ADR-004)测不出。当本次 sync 触碰上游 prompt/*.txt 或
       # agent/* 时,发一条 warning + step summary 要求人工语义复核(不阻断同步)。
       - name: Prompt/agent tripwire (ADR-015 — human review required)
@@ -105,7 +105,7 @@ jobs:
             {
               echo "## ⚠️ 上游 prompt 底座 / agent 本次 sync 有变更"
               echo ""
-              echo "ADR-015 合并验证:人工复核 \`alpha-behavior.ts\` / \`alpha-identity.ts\` / \`.opencode/agent/*.md\` 是否与新底座**语义**矛盾(非字节),结论记入 \`docs/retrospectives/\`。"
+              echo "ADR-015 合并验证:人工复核 \`codepuppy-behavior.ts\` / \`codepuppy-identity.ts\` / \`.opencode/agent/*.md\` 是否与新底座**语义**矛盾(非字节),结论记入 \`docs/retrospectives/\`。"
               echo ""
               echo '```'
               echo "$touched"
@@ -195,16 +195,16 @@ jobs:
           git checkout alpha
           # B 方案(月更 pin+补丁,supersede ADR-020 冻结;owner 2026-07-21 拍板):packages/{app,ui}
           # 恒等于 `frontend/frontend-pin.lock` 记录的上游 pin + alpha 前端 SOT 补丁
-          # `frontend/alpha-patches/alpha-frontend.patch`。日常 sync 只进引擎;前端前进由月更 bump
+          # `frontend/codepuppy-patches/codepuppy-frontend.patch`。日常 sync 只进引擎;前端前进由月更 bump
           # workflow 升 pin。每次 sync 合并后把 app/ui **还原为 pin+补丁态**(而非旧冻结基):不再丢
           # 弃上游前端(pin 就是近期上游)、也不再擦 alpha seam(补丁是唯一 SOT,改 seam=改补丁)。
           # 补丁 3-way apply 失败 = pin/补丁漂移,loud-fail 阻断整个 sync。seam marker 校验保留。
-          apply_alpha_frontend_delta() {
+          apply_codepuppy_frontend_delta() {
             PIN="$(sed -n 's/^pin=\([0-9a-f]\{7,40\}\).*/\1/p' frontend/frontend-pin.lock)"
             if [ -z "$PIN" ]; then echo "::error::frontend/frontend-pin.lock 缺 pin=<sha>,无法还原前端。Aborting sync."; exit 1; fi
             rm -rf packages/app packages/ui
             git checkout "$PIN" -- packages/app packages/ui
-            if ! git apply --binary --3way --whitespace=nowarn frontend/alpha-patches/alpha-frontend.patch; then
+            if ! git apply --binary --3way --whitespace=nowarn frontend/codepuppy-patches/codepuppy-frontend.patch; then
               echo "::error::alpha 前端 SOT 补丁在 pin $PIN 上 3-way apply 失败 —— pin 与补丁漂移。需跑月更 bump 重生补丁。Aborting sync."
               exit 1
             fi
@@ -236,7 +236,7 @@ jobs:
             fi
           }
           if git merge --no-edit --no-ff dev -m "chore(sync): merge upstream dev into alpha"; then
-            apply_alpha_frontend_delta
+            apply_codepuppy_frontend_delta
             exit 0
           fi
           conflicts="$(git diff --name-only --diff-filter=U)"
@@ -249,7 +249,7 @@ jobs:
             # app/ui 路径冲突(B:pin+补丁):不能用 `checkout --ours`——上游在 app/ui 下**新增**的
             # 文件是 add/add 冲突、没有 ours 版本,--ours 报错跳过后残留冲突标记的 package.json 会令
             # 后续 bun install 直接失败(2026-07-07 run 28847116400 实锤)。改为直接取 pin 的 app/ui
-            # 解冲突,SOT 补丁由下方 apply_alpha_frontend_delta 统一重贴。
+            # 解冲突,SOT 补丁由下方 apply_codepuppy_frontend_delta 统一重贴。
             if echo "$conflicts" | grep -qE '^packages/(app|ui)/'; then
               echo "Resolving app/ui conflicts (B: pin+patch): checking out pinned upstream app/ui; SOT patch re-applied below."
               PIN_RES="$(sed -n 's/^pin=\([0-9a-f]\{7,40\}\).*/\1/p' frontend/frontend-pin.lock)"
@@ -263,7 +263,7 @@ jobs:
             # `git ls-tree 849c2598 packages/app/vendor` 输出为空)。所以在这一格 `bun install` 必然
             # `failed to resolve`(2026-09-06 手工复演 ac#1248 实锤,原文
             # `@opencode-ai/client@file:../app/vendor/opencode-ai-client-1.17.13-v2.tgz failed to resolve`),
-            # 而那句话不告诉任何人该做什么 —— 上面 apply_alpha_frontend_delta 里的 VENDORED 判据
+            # 而那句话不告诉任何人该做什么 —— 上面 apply_codepuppy_frontend_delta 里的 VENDORED 判据
             # **正是为这一格写的**(它会说「须用 git diff --binary 重生」),却永远来不及打印。
             # 顺序因此必须是:结束合并 → 重贴补丁(vendored 资产就位;真漂移时那条判据在这里
             # 响亮失败)→ **最后**才 install,那时 lockfile 才是照着最终这棵树生成的。
@@ -271,7 +271,7 @@ jobs:
             # 这一步的 run 体、在真 git 仓上跑它本体,并把下面这两行换回旧顺序证明它当场变红。
             git add -A
             git commit --no-edit
-            apply_alpha_frontend_delta
+            apply_codepuppy_frontend_delta
             bun install
             # 上面 `--theirs` 取的是上游的 bun.lock,它不含 alpha 的 workspace 包 —— 只有跑在补丁
             # 重贴之后的这次 install 才按最终这棵树重生它。变了就单独落一个提交,否则这次 sync
@@ -313,18 +313,18 @@ jobs:
       # REQ-012 前端锚点 tripwire(镜像上面的 ADR-015 prompt tripwire):reskin 挂的上游 data-* 锚点
       # 是非公开契约,sync 改名/删除不产生 git 冲突 → file-diff 守卫测不出(546-sync 静默回归实锤,
       # 见 docs/audits/2026-07-03-frontend-reskin-regression.md)。合并后跑锚点契约测试(纯 node 内建,
-      # 无需 install);断裂 → warning + step summary 要求人工视觉复验(不阻断同步——PR 门禁 alpha-ci
+      # 无需 install);断裂 → warning + step summary 要求人工视觉复验(不阻断同步——PR 门禁 codepuppy-ci
       # 与发布 runbook 是硬闸)。
       - name: Frontend anchor tripwire (REQ-012 — human visual review required)
         run: |
-          if (cd packages/ui-mac && bun test src/renderer/alpha-ui/upstream-anchors.test.ts) > /tmp/anchor-test.log 2>&1; then
+          if (cd packages/ui-mac && bun test src/renderer/codepuppy-ui/upstream-anchors.test.ts) > /tmp/anchor-test.log 2>&1; then
             echo "Anchor contract intact this sync."
           else
             {
               echo "## ⚠️ 上游 sync 破坏了前端 reskin 锚点契约(REQ-012)"
               echo ""
               echo "锚点契约测试失败——上游改名/删除/搬包了 reskin 依赖的 data-* 锚点。**发布前必须**:"
-              echo "1. \`cd packages/ui-mac && bun test src/renderer/alpha-ui/upstream-anchors.test.ts\` 看断点;"
+              echo "1. \`cd packages/ui-mac && bun test src/renderer/codepuppy-ui/upstream-anchors.test.ts\` 看断点;"
               echo "2. 更新 reskin CSS / 跑 \`bun scripts/gen-upstream-anchors.ts\` 刷新清单;"
               echo "3. CDP 截图关键屏(首页/会话/模型卡/composer/时间线)视觉复验([[visual-verify-required]])。"
               echo ""

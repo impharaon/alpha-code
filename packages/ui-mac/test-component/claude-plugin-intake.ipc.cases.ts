@@ -28,7 +28,7 @@ import { materializeCorpus, treeFingerprint } from "./claude-plugin-corpus.fixtu
 // electron-log 在**模块顶层**就 `externalApi.onIpc('__ELECTRON_LOG__', …)`,即
 // `this.electron.ipcMain?.on(channel, listener)`。`?.` 只挡 `ipcMain` 为空,挡不住
 // `ipcMain` 在而 `.on` 缺 —— 缺了就是 TypeError,整个文件 0 pass 1 fail。
-// 这条在开发机上不发作、在 alpha-ci 上发作(两边 `electron` 这个 specifier 落到 mock 还是落到
+// 这条在开发机上不发作、在 codepuppy-ci 上发作(两边 `electron` 这个 specifier 落到 mock 还是落到
 // 真包不一样),于是它是一条**只在 CI 红**的假红。下面这份键是照 node_modules 里装着的
 // electron-log@5.4.4 `src/main/ElectronExternalApi.js` 逐条枚举出来的(不是凭记忆):
 //   app.{isReady,isPackaged,name,getName,getVersion,getPath,on,once,off}
@@ -129,23 +129,23 @@ type ImportResult = {
 }
 
 let sandbox: string
-let alphaBase: string
+let codepuppyBase: string
 let userData: string
 let corpus: ReturnType<typeof materializeCorpus>
 let invokeImport: (srcDir: string) => Promise<ImportResult>
 
 beforeAll(async () => {
-  sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "alpha-t1-ipc-"))
-  alphaBase = path.join(sandbox, "appdata")
+  sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-t1-ipc-"))
+  codepuppyBase = path.join(sandbox, "appdata")
   userData = path.join(sandbox, "userData")
-  fs.mkdirSync(alphaBase, { recursive: true })
+  fs.mkdirSync(codepuppyBase, { recursive: true })
   fs.mkdirSync(userData, { recursive: true })
   fs.mkdirSync(path.join(sandbox, "home"), { recursive: true })
   corpus = materializeCorpus()
 
-  const { __resetAlphaEnvironmentForTests, initAlphaEnvironment } = await import("../src/main/alpha-environment")
-  __resetAlphaEnvironmentForTests()
-  initAlphaEnvironment({ isPackaged: true, channel: "prod", appDataDir: alphaBase, homeDir: path.join(sandbox, "home") })
+  const { __resetCodePuppyEnvironmentForTests, initCodePuppyEnvironment } = await import("../src/main/codepuppy-environment")
+  __resetCodePuppyEnvironmentForTests()
+  initCodePuppyEnvironment({ isPackaged: true, channel: "prod", appDataDir: codepuppyBase, homeDir: path.join(sandbox, "home") })
   const { initLogging } = await import("../src/main/logging")
   initLogging()
   // 生产 composition root 本体 —— 这里注册的就是用户点「从文件夹导入」打到的那个 handler。
@@ -158,11 +158,11 @@ beforeAll(async () => {
   invokeImport = async (srcDir: string) => {
     // main 自弹 picker 的 headless 短路(`ext-ipc.ts` 里 main 控制的 env)——
     // renderer 全程给不出路径,这条正是生产里 picker 返回值的位置。
-    process.env.ALPHA_OPEN_DIR = srcDir
+    process.env.CODEPUPPY_OPEN_DIR = srcDir
     try {
       return (await handler({} as never, undefined)) as ImportResult
     } finally {
-      delete process.env.ALPHA_OPEN_DIR
+      delete process.env.CODEPUPPY_OPEN_DIR
     }
   }
 })
@@ -179,7 +179,7 @@ afterAll(() => {
  *  系统路径),或者写完把 mtime 恢复回去,它**看不见**。要堵住那一类得在进程边界上拦
  *  (seccomp / 沙箱),不在本票射程内 —— **明写而不做**。 */
 function writeSurfaceFingerprint(): string {
-  return [corpus.root, alphaBase, userData, path.join(sandbox, "home")].map(treeFingerprint).join("|")
+  return [corpus.root, codepuppyBase, userData, path.join(sandbox, "home")].map(treeFingerprint).join("|")
 }
 
 const pluginDir = (rel: string): string => path.join(corpus.root, rel)
@@ -232,8 +232,8 @@ describe("AC9 生产路径零写盘(输入树 + installs.json + userData 三处�
     // `parseLedger` 看到坏 receipt / 坏 record 时会落一份字节级取证侧写
     // (`ext-receipt-v2.ts` r18)—— 那是一个写,直接违反 AC9。
     // 启动期 recovery 非 clean 而跳过 migration、或账本在 barrier 之后变化,这条就到得了。
-    const { alphaGlobalRoot } = await import("../src/main/alpha-installs")
-    const root = alphaGlobalRoot()
+    const { codepuppyGlobalRoot } = await import("../src/main/codepuppy-installs")
+    const root = codepuppyGlobalRoot()
     fs.mkdirSync(root, { recursive: true })
     const ledgerFile = path.join(root, "installs.json")
     const before = fs.existsSync(ledgerFile) ? fs.readFileSync(ledgerFile, "utf8") : null
@@ -275,8 +275,8 @@ describe("owner 裁决 D / K19 在**生产路径**上可达", () => {
   test("本机已装同名技能 ⇒ 生产预览逐组件具名跳过", async () => {
     // 往隔离的 alpha 根写一本真账本:这不是「测试自己注入 options」,而是生产 handler
     // 自己去读它。此前生产调用一个 option 都不传 ⇒ 这条原因在生产上永远到不了。
-    const { alphaGlobalRoot } = await import("../src/main/alpha-installs")
-    const root = alphaGlobalRoot()
+    const { codepuppyGlobalRoot } = await import("../src/main/codepuppy-installs")
+    const root = codepuppyGlobalRoot()
     const first = await invokeImport(pluginDir(TIDE))
     const taken = first.localPluginPreview!.components.find((c) => c.disposition === "install")!
     const takenName = taken.name // frontmatter 的 name 才是落盘的键,目录名只是显示用
@@ -306,8 +306,8 @@ describe("owner 裁决 D / K19 在**生产路径**上可达", () => {
   })
 
   test("账本读不出来 ⇒ 如实说「读不出」,不折叠成「没装」", async () => {
-    const { alphaGlobalRoot } = await import("../src/main/alpha-installs")
-    const ledgerFile = path.join(alphaGlobalRoot(), "installs.json")
+    const { codepuppyGlobalRoot } = await import("../src/main/codepuppy-installs")
+    const ledgerFile = path.join(codepuppyGlobalRoot(), "installs.json")
     fs.mkdirSync(path.dirname(ledgerFile), { recursive: true })
     const before = fs.existsSync(ledgerFile) ? fs.readFileSync(ledgerFile, "utf8") : null
     fs.writeFileSync(ledgerFile, "{ this is not json")
@@ -337,10 +337,10 @@ describe("owner 裁决 D / K19 在**生产路径**上可达", () => {
     // ⚠️ 这条用例第一版是**假绿**:夹具写 `v: 2` 却带非空 V3 段、node 还缺 `componentId`,
     // 账本合同必然拒绝它 ⇒ 走的是「读不出来」分支,于是**删掉 K19 的生产接线照样通过**。
     // 现在的夹具是账本合同**真的接受**的形状,而且下面先自证它被接受,再断言 K19 —— 不留退路分支。
-    const { alphaGlobalRoot } = await import("../src/main/alpha-installs")
+    const { codepuppyGlobalRoot } = await import("../src/main/codepuppy-installs")
     const { upsertRecordV2, readPackageLedgerStateV1 } = await import("../src/main/ext-receipt-v2")
     const { bundleOwner, computeInstalledGraphDigest } = await import("../src/main/ext-package-ledger-v3")
-    const root = alphaGlobalRoot()
+    const root = codepuppyGlobalRoot()
     const ledgerFile = path.join(root, "installs.json")
     fs.mkdirSync(root, { recursive: true })
     const before = fs.existsSync(ledgerFile) ? fs.readFileSync(ledgerFile, "utf8") : null

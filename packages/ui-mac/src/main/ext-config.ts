@@ -16,27 +16,27 @@ import * as path from "node:path"
 import { randomUUID } from "node:crypto"
 import { fileURLToPath } from "node:url"
 import { applyEdits, format, modify, parse, type ParseError } from "jsonc-parser"
-import catalog from "./alpha-models.json"
-import { byokEngineId, type AlphaModelCatalog, type ProviderAddressRejection, type ProviderInput, type ProviderResult } from "../shared/alpha-model-types"
+import catalog from "./codepuppy-models.json"
+import { byokEngineId, type CodePuppyModelCatalog, type ProviderAddressRejection, type ProviderInput, type ProviderResult } from "../shared/codepuppy-model-types"
 import { BYOK_ADAPTERS } from "./byok-adapters"
 import { isExtensionName } from "../shared/extension-name"
 import type { InstallMeta } from "../preload/types"
-import { opencodeHomeDir } from "./alpha-bridge"
+import { opencodeHomeDir } from "./codepuppy-bridge"
 import {
   collectMcpFileRefPaths,
   gcMcpSecretVersionsLocked,
   pathIdentity,
   removeUnreferencedMcpSecretVersion,
   resolveMcpRefPath,
-} from "./alpha-mcp-secrets"
+} from "./codepuppy-mcp-secrets"
 import type { TxPreparedResourceV1 } from "./ext-transaction"
-import { alphaGlobalRoot } from "./alpha-installs"
+import { codepuppyGlobalRoot } from "./codepuppy-installs"
 import { findRecordV2 } from "./ext-receipt-v2"
-import { alphaJsoncPath, classifyProviderKey, PROVIDER_KEYCHAIN_MARKER, type ProviderKeyKind } from "./engine-config-truth"
+import { codepuppyJsoncPath, classifyProviderKey, PROVIDER_KEYCHAIN_MARKER, type ProviderKeyKind } from "./engine-config-truth"
 import { sealEnginePluginAdditions } from "./engine-plugin-seal"
 import { commandHeadBase } from "./platform"
 import { tryAcquireBundleLock } from "./ext-bundle-lock"
-import { assertProjectAlphaRootIdentity } from "./alpha-workdir"
+import { assertProjectCodePuppyRootIdentity } from "./codepuppy-workdir"
 import { writeFileAtomicSync } from "./ext-atomic-fs"
 import { classifyBaseUrl } from "./network-egress-derived"
 import { CLOUD_MCP_SERVER_NAME } from "./cloud-web-search"
@@ -52,7 +52,7 @@ export type ConfigResult = { ok: true } | { ok: false; reason: string; code?: Pr
 // plugin 列表 RMW 整函数 + 治理直写;引擎事务自身走 ext-config-tx 独立通道,不会重入此锁。
 // 非阻塞:事务在途 → 如实 busy(引擎层同约,ext-bundle-lock 不隐式等待)。
 export function withConfigWriteLock<T>(fn: () => T): T | { ok: false; reason: string } {
-  const acquired = tryAcquireBundleLock(alphaGlobalRoot(), { txId: `cfg-${randomUUID()}` })
+  const acquired = tryAcquireBundleLock(codepuppyGlobalRoot(), { txId: `cfg-${randomUUID()}` })
   if (!acquired.ok) return { ok: false, reason: `config busy: ${acquired.reason} — retry after the in-flight extension transaction` }
   try {
     return fn()
@@ -116,7 +116,7 @@ function userConfigPath(): string {
 // home `.opencode` 本就是引擎的 config 源(上游 config/paths.ts),且是**文件通道**:实例
 // reload(instance.dispose → 重建)会重读它,免重启生效成立;env 注入(OPENCODE_CONFIG_CONTENT)
 // 在 sidecar fork 时冻结,不能承载安装物。provider(BYOK 设置域)仍写共享 XDG 根,不迁。
-function alphaOpencodeConfigPath(): string {
+function codepuppyOpencodeConfigPath(): string {
   const dir = opencodeHomeDir()
   const jsonc = path.join(dir, "opencode.jsonc")
   const json = path.join(dir, "opencode.json")
@@ -125,25 +125,25 @@ function alphaOpencodeConfigPath(): string {
   return jsonc
 }
 
-// REQ-059:alpha 写入的全局引擎配置唯一真源 = <current-environment-root>/alpha.jsonc(经 sidecar G1 = OPENCODE_CONFIG
+// REQ-059:alpha 写入的全局引擎配置唯一真源 = <current-environment-root>/codepuppy.jsonc(经 sidecar G1 = OPENCODE_CONFIG
 // 注入,引擎原生「额外配置文件」合并,dispose 重读;T0 spike audits/2026-07-07-req059-060-t0-spike)。
 // 取代 REQ-018 的 ~/.opencode/opencode.jsonc(home walk 发现)。alpha 从此不写 .opencode。
-// alphaJsoncPath 由 engine-config-truth 单一真源导出(sidecar 注入用同一路径)。
+// codepuppyJsoncPath 由 engine-config-truth 单一真源导出(sidecar 注入用同一路径)。
 
 // mcp / plugin / 治理键 的写入目标。两级逃生:
-//   ALPHA_JSONC_TRUTH_DISABLE=1 → 回 REQ-018 行为(~/.opencode/opencode.jsonc);
-//   ALPHA_LEGACY_INSTALL_ROOT=1 → 回最旧行为(共享 XDG,不记账)。
+//   CODEPUPPY_JSONC_TRUTH_DISABLE=1 → 回 REQ-018 行为(~/.opencode/opencode.jsonc);
+//   CODEPUPPY_LEGACY_INSTALL_ROOT=1 → 回最旧行为(共享 XDG,不记账)。
 export function mcpPluginTargetPath(): string {
-  if (process.env.ALPHA_LEGACY_INSTALL_ROOT === "1") return userConfigPath()
-  if (process.env.ALPHA_JSONC_TRUTH_DISABLE === "1") return alphaOpencodeConfigPath()
-  return alphaJsoncPath()
+  if (process.env.CODEPUPPY_LEGACY_INSTALL_ROOT === "1") return userConfigPath()
+  if (process.env.CODEPUPPY_JSONC_TRUTH_DISABLE === "1") return codepuppyOpencodeConfigPath()
+  return codepuppyJsoncPath()
 }
 
 // provider / BYOK 设置域的写入目标(REQ-059 §3:接管 XDG 写入域)。alpha 停写 XDG;逃生回 XDG。
 function providerTargetPath(): string {
-  if (process.env.ALPHA_JSONC_TRUTH_DISABLE === "1" || process.env.ALPHA_LEGACY_INSTALL_ROOT === "1")
+  if (process.env.CODEPUPPY_JSONC_TRUTH_DISABLE === "1" || process.env.CODEPUPPY_LEGACY_INSTALL_ROOT === "1")
     return userConfigPath()
-  return alphaJsoncPath()
+  return codepuppyJsoncPath()
 }
 
 // 迁移期:主目标之外仍可能残留 alpha 写入物的历史位置(去重、排除主目标)。REQ-018 mcp/plugin 写
@@ -152,7 +152,7 @@ function providerTargetPath(): string {
 function legacyConfigPaths(primary: string): string[] {
   const out: string[] = []
   const seen = new Set<string>([primary])
-  for (const p of [alphaJsoncPath(), alphaOpencodeConfigPath(), userConfigPath()]) {
+  for (const p of [codepuppyJsoncPath(), codepuppyOpencodeConfigPath(), userConfigPath()]) {
     if (!seen.has(p)) {
       seen.add(p)
       out.push(p)
@@ -413,14 +413,14 @@ export function writeConfigLeafEditsUnlocked(
  * 引擎 config 的**整文本原子提交**(挂咽喉的那一个)。`before` = 写之前盘上的 live 文本
  * (文件缺席传 `""`/`"{}"`)。
  *
- * 导出是因为 `#832`:boot 期 reconcile 曾经自己 `writeFileSync(tmp)+rename` 写整个 `alpha.jsonc`,
+ * 导出是因为 `#832`:boot 期 reconcile 曾经自己 `writeFileSync(tmp)+rename` 写整个 `codepuppy.jsonc`,
  * 于是它写什么都不过咽喉 —— 那是 ADR-040 记录在案的最后一个结构性绕开口。现在它调本函数。
  *
  * **不要把这句话读成「只剩这一个 config 写盘点」**(实读枚举过,那是假的)。不过本咽喉的还有四条,
  * 各自靠**另一道**闸:`applyBuiltinPolicyEditsUnlocked`(本文件,自己的 tmp+rename)靠
- * `builtinPolicyPathAllowed` 具名路径白名单;`alpha-config-injection` 只在真源缺席时 seed `{$schema}`;
- * `alpha-migrate` 的 legacy 臂只做减法;**`ecosystem-import.ts` 的 `registerProjectSkillsPath`**
- * 整文件写项目级 `<proj>/.code-puppy/alpha.jsonc`,而且**它自己没有任何白名单** —— 挡住 `plugin` 的是
+ * `builtinPolicyPathAllowed` 具名路径白名单;`codepuppy-config-injection` 只在真源缺席时 seed `{$schema}`;
+ * `codepuppy-migrate` 的 legacy 臂只做减法;**`ecosystem-import.ts` 的 `registerProjectSkillsPath`**
+ * 整文件写项目级 `<proj>/.code-puppy/codepuppy.jsonc`,而且**它自己没有任何白名单** —— 挡住 `plugin` 的是
  * 另一个包里的 `mergeProjectConfig`(与同族的 `packages/ext/src/register.ts` 类型白名单)。
  * 完整一栏与实测在 `engine-plugin-seal.ts` 抬头,改这一族之前先读那里。
  */
@@ -473,7 +473,7 @@ function remoteLeafFromRecord(record: McpServerRecord): Record<string, unknown> 
   return { type: "remote", url: record.url, ...(record.headers ? { headers: { ...record.headers } } : {}) }
 }
 
-/** Persist an MCP server: local ⇒ `mcp[<name>]` in the alpha-owned engine config file (durable); remote ⇒ the main-only truth file. */
+/** Persist an MCP server: local ⇒ `mcp[<name>]` in the codepuppy-owned engine config file (durable); remote ⇒ the main-only truth file. */
 export function persistMcp(name: string, server: Record<string, unknown>, meta?: InstallMeta): ConfigResult {
   if (!isExtensionName(name)) return { ok: false, reason: "invalid server name" }
   if (name === "github-official" || name === "dbhub-readonly")
@@ -482,7 +482,7 @@ export function persistMcp(name: string, server: Record<string, unknown>, meta?:
   const valid = validateServer(server)
   if (!valid.ok) return valid
   // `#1381`(基线 I1):远程 MCP 的记录住在围栏写不到的真源里(mcp-server-truth.ts);配置文件里的 `mcp.*` 远程条目对注入面与
-  // 放行集合一概不算数。所以 type:"remote" 一条都不再写进 alpha.jsonc:先把配置文件(主 + legacy)里同名的副本清掉(重加即替换;
+  // 放行集合一概不算数。所以 type:"remote" 一条都不再写进 codepuppy.jsonc:先把配置文件(主 + legacy)里同名的副本清掉(重加即替换;
   // 清不掉 ⇒ 拒,不让一个仍会被引擎原生合并的旧副本与真源记录并存),再整条写进真源。启停不进真源(账本 desiredState 由
   // sidecar 注入 enabled:false 压住,ext-disabled-injection.ts),所以下面的 disabled 投影只对本地 MCP 做。
   if (server.type === "remote") {
@@ -493,14 +493,14 @@ export function persistMcp(name: string, server: Record<string, unknown>, meta?:
     if (!cleared.ok) return cleared
     return upsertMcpServerRecord(record.record)
   }
-  // 本地 MCP 维持现状(alpha.jsonc);同名的远程真源记录若在,一并让位(重加即替换 —— 账本键 `mcp.<name>` 是同一个)。
+  // 本地 MCP 维持现状(codepuppy.jsonc);同名的远程真源记录若在,一并让位(重加即替换 —— 账本键 `mcp.<name>` 是同一个)。
   const vacated = removeMcpServerRecord(name)
   if (!vacated.ok) return vacated
   // #354:catalog 的 eager v1 兜底已下线 —— planner 提交面 fail-closed 后,v1 视图由
   // upsertRecordV2 的 toV1Receipt 锁步派生(单一账本所有权);未策展仍归 orchestrator。
   // #395(Codex r5):未策展重加接入同一投影 —— 账本 disabled 的 server,重写叶必须带引擎
   // 消费键 enabled:false(写「正常叶」= 确定性复活禁用)。内容照常更新;状态只走 set-state 通道。
-  const prior = findRecordV2(alphaGlobalRoot(), "mcp", name)
+  const prior = findRecordV2(codepuppyGlobalRoot(), "mcp", name)
   const projected = prior?.desiredState === "disabled" ? { ...server, enabled: false } : server
   return writeKey(mcpPluginTargetPath(), ["mcp", name], projected)
 }
@@ -628,7 +628,7 @@ export function restoreMcpLeaf(name: string, value: Record<string, unknown> | un
   }
   const vacated = removeMcpServerRecord(name)
   if (!vacated.ok) return vacated
-  // 前像不存在 = 撤掉本次写入:远程首装时 alpha.jsonc 里本来就没有这片叶(可能连 `mcp` 键都没有),缺席是成功的 no-op,不是错。
+  // 前像不存在 = 撤掉本次写入:远程首装时 codepuppy.jsonc 里本来就没有这片叶(可能连 `mcp` 键都没有),缺席是成功的 no-op,不是错。
   if (value === undefined)
     return withConfigWriteLock(() => {
       const removed = removeMcpLeafFromExistingFile(mcpPluginTargetPath(), name)
@@ -749,7 +749,7 @@ export function releasePreparedTxResources(
 ): void {
   const retained: string[] = []
   for (const resource of resources) {
-    if (resource.kind !== "mcp-secret-version" || resource.store !== "alpha-mcp-secrets") {
+    if (resource.kind !== "mcp-secret-version" || resource.store !== "codepuppy-mcp-secrets") {
       retained.push(`no release seam for prepared resource "${String(resource.store)}/${String(resource.kind)}" — refused`)
       continue
     }
@@ -775,8 +775,8 @@ export function readAgentEntry(name: string, targetPath?: string): Record<string
   }
 }
 
-/** REQ-059 T3b:agent 条目写 alpha.jsonc 的 agent.<name>(桥退役后引擎经 G1 见到全局 agent)。
- *  targetPath 可覆盖(项目分支写 <proj>/.code-puppy/alpha.jsonc);条目由 agent-md-entry 转换器产出。 */
+/** REQ-059 T3b:agent 条目写 codepuppy.jsonc 的 agent.<name>(桥退役后引擎经 G1 见到全局 agent)。
+ *  targetPath 可覆盖(项目分支写 <proj>/.code-puppy/codepuppy.jsonc);条目由 agent-md-entry 转换器产出。 */
 export function persistAgentEntry(name: string, entry: Record<string, unknown>, targetPath?: string): ConfigResult {
   if (!isExtensionName(name)) return { ok: false, reason: "invalid agent name" }
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) return { ok: false, reason: "invalid agent entry" }
@@ -796,7 +796,7 @@ export function removeCommandEntry(name: string, targetPath?: string): ConfigRes
 }
 
 /**
- * Remove mcp[<name>] — from the alpha-owned file, and (pre-migration installs, T3) from the legacy
+ * Remove mcp[<name>] — from the codepuppy-owned file, and (pre-migration installs, T3) from the legacy
  * shared XDG config when it still carries the entry. Receipt goes too.
  */
 export function removeMcp(name: string): ConfigResult {
@@ -810,7 +810,7 @@ export function removeMcp(name: string): ConfigResult {
  *  fail-closed 返回失败(吞错继续会让「配置已净除」不可证明,后续密钥吊销/删账都失据)。 */
 export function removeMcpConfigInLock(name: string): ConfigResult {
   if (!isExtensionName(name)) return { ok: false, reason: "invalid server name" }
-  // `#1381`:远程 MCP 在 alpha.jsonc 里没有叶(记录住在真源),缺席的叶 / 缺席的 `mcp` 键是成功的 no-op(jsonc modify 对着空文档删键会抛);
+  // `#1381`:远程 MCP 在 codepuppy.jsonc 里没有叶(记录住在真源),缺席的叶 / 缺席的 `mcp` 键是成功的 no-op(jsonc modify 对着空文档删键会抛);
   // 文件在但解析不出 ⇒ fail-closed(与 legacy 分支同一口径)。
   const primary = removeMcpLeafFromExistingFile(mcpPluginTargetPath(), name)
   if (!primary.ok) return primary
@@ -844,7 +844,7 @@ export function removeMcpConfigInLock(name: string): ConfigResult {
 
 /** REQ-136 project MCP removal primitive. The caller already owns this root's Bundle lock; this
  *  function revalidates the project endpoint immediately before mutation and edits only
- *  `<projectRoot>/alpha.jsonc`. Missing file/leaf is an idempotent success and no file is created.
+ *  `<projectRoot>/codepuppy.jsonc`. Missing file/leaf is an idempotent success and no file is created.
  *  Global/legacy config enumeration, receipts and secret stores are unreachable by construction. */
 export function removeProjectMcpConfigInLock(projectRoot: string, name: string): ConfigResult {
   if (!isExtensionName(name)) return { ok: false, reason: "invalid server name" }
@@ -853,7 +853,7 @@ export function removeProjectMcpConfigInLock(projectRoot: string, name: string):
   } catch {
     return { ok: false, reason: "project MCP transaction root identity cannot be confirmed — removal refused" }
   }
-  const target = path.join(projectRoot, "alpha.jsonc")
+  const target = path.join(projectRoot, "codepuppy.jsonc")
   const removed = removeMcpLeafFromExistingFile(target, name, writeProjectConfigTextAtomic)
   return removed.ok ? { ok: true } : removed
 }
@@ -862,8 +862,8 @@ export function removeProjectMcpConfigInLock(projectRoot: string, name: string):
  * mutate or trust. The root itself, config, ledger, journal/lock/staging tree, and capability store
  * must be real filesystem objects beneath D; a symlink or non-regular leaf fails closed. */
 export function assertProjectMcpTransactionRootIdentity(projectRoot: string): void {
-  assertProjectAlphaRootIdentity(projectRoot)
-  assertRegularFileOrMissing(path.join(projectRoot, "alpha.jsonc"))
+  assertProjectCodePuppyRootIdentity(projectRoot)
+  assertRegularFileOrMissing(path.join(projectRoot, "codepuppy.jsonc"))
   assertRegularFileOrMissing(path.join(projectRoot, "installs.json"))
   assertRealTreeOrMissing(path.join(projectRoot, "ext-tx"))
   assertRealTreeOrMissing(path.join(projectRoot, "ext-store"))
@@ -906,7 +906,7 @@ function projectMcpRecoveryJournalAllowed(
   if (op !== "install" && op !== "uninstall") return false
   if (item.config !== undefined) {
     if (!isUnknownRecord(item.config)) return false
-    if (item.config.target !== path.join(projectRoot, "alpha.jsonc")) return false
+    if (item.config.target !== path.join(projectRoot, "codepuppy.jsonc")) return false
   }
   if (op === "install" && item.config === undefined) return false
   if (item.receipt === undefined) return op === "uninstall"
@@ -1072,7 +1072,7 @@ function writeProjectConfigTextAtomic(target: string, before: string, result: st
 
 function removeMcpUnlocked(name: string): ConfigResult {
   if (!isExtensionName(name)) return { ok: false, reason: "invalid server name" }
-  // `#1381`:远程 MCP 在 alpha.jsonc 里没有叶(记录住在真源),缺席的叶 / 缺席的 `mcp` 键是成功的 no-op(jsonc modify 对着空文档删键会抛);
+  // `#1381`:远程 MCP 在 codepuppy.jsonc 里没有叶(记录住在真源),缺席的叶 / 缺席的 `mcp` 键是成功的 no-op(jsonc modify 对着空文档删键会抛);
   // 文件在但解析不出 ⇒ fail-closed(与 legacy 分支同一口径)。
   const primary = removeMcpLeafFromExistingFile(mcpPluginTargetPath(), name)
   if (!primary.ok) return primary
@@ -1094,7 +1094,7 @@ function removeMcpUnlocked(name: string): ConfigResult {
   return removeMcpServerRecord(name)
 }
 
-const PROVIDER_CATALOG = catalog as unknown as Pick<AlphaModelCatalog, "platformProvider">
+const PROVIDER_CATALOG = catalog as unknown as Pick<CodePuppyModelCatalog, "platformProvider">
 
 /** REQ-226 (`#1343`): the marker constant and the one classifier for a provider block's `options.apiKey`.
  *  They live in engine-config-truth (the electron-free core this module already imports) because the boot
@@ -1144,8 +1144,8 @@ export function validateProviderInput(input: ProviderInput): ProviderResult {
 }
 
 /**
- * `#1392`(基线 I1 / I3):自定义节点的记录**不再**住在任何配置文件里 —— 真源是 `<appData>/alpha-code-state/custom-providers/<env>.json`
- * (custom-provider-truth.ts,只有 main 写;添加 / 删除在 provider-lifecycle.ts,注入面在 alpha-models.ts,两者都经
+ * `#1392`(基线 I1 / I3):自定义节点的记录**不再**住在任何配置文件里 —— 真源是 `<appData>/codepuppy-state/custom-providers/<env>.json`
+ * (custom-provider-truth.ts,只有 main 写;添加 / 删除在 provider-lifecycle.ts,注入面在 codepuppy-models.ts,两者都经
  * custom-provider-records.ts 读)。`persistProvider` / `readUserProviderIds` / `removeProvider` 随之退场:三处配置文件
  * (providerReadPaths)的 `provider.*` 对 enabled_providers、注入面与放行集合**一概不算数** —— 它们全在围栏的可写集里。
  *
@@ -1191,11 +1191,11 @@ export function ignoredConfigProviderBlocks(): Array<{ file: string; ids: string
 }
 
 /**
- * Classify each provider block's `options.apiKey` in alpha.jsonc (+ legacy read paths) WITHOUT returning
+ * Classify each provider block's `options.apiKey` in codepuppy.jsonc (+ legacy read paths) WITHOUT returning
  * the value — REQ-226 AC7's choke point: after `#1343` no function in main reads a plaintext key out of a
  * config file into memory. Consumer: getProviderKeyStatus (keychain / needs-reentry / config faces). `#1392` 起
- * 注入面不再是它的消费者 —— 自定义节点整块来自真源(alpha-models.ts 第 (3) 段),配置文件的 provider 块不参与注入。
- *   "keychain-marker"   value === PROVIDER_KEYCHAIN_MARKER (the marker `#1343` used to write into alpha.jsonc; `#1392` 起不再写)
+ * 注入面不再是它的消费者 —— 自定义节点整块来自真源(codepuppy-models.ts 第 (3) 段),配置文件的 provider 块不参与注入。
+ *   "keychain-marker"   value === PROVIDER_KEYCHAIN_MARKER (the marker `#1343` used to write into codepuppy.jsonc; `#1392` 起不再写)
  *   "user-ref"          `{file:…}` / `{env:…}` — a hand-written power-user reference; alpha does not manage it
  *   "legacy-plaintext"  any other non-empty string — a pre-#1343 inline key; never read, never migrated
  * A block with no / empty apiKey is not in the map (K class with the field absent).
@@ -1237,11 +1237,11 @@ function legacyKeyLeafPresent(file: string, id: string): boolean {
 /**
  * REQ-226 (`#1343`) — retire a pre-#1343 inline plaintext key for `id`: delete ONLY the
  * `provider.<id>.options.apiKey` LEAF, in every provider read path that actually carries a legacy-plaintext
- * leaf for that id (alpha.jsonc and the user's own opencode CLI config alike). The block itself — npm / name /
+ * leaf for that id (codepuppy.jsonc and the user's own opencode CLI config alike). The block itself — npm / name /
  * baseURL / models, often hand-written by the user — is never touched; an `options` left `{}` is left as is;
  * a marker or a `{file:}` / `{env:}` reference is not a legacy leaf and is not written. Files without the leaf
  * are not written at all: jsonc-parser's `modify` throws `Can not delete in empty document` when the path's
- * parent does not exist (alpha.jsonc holding only `$schema` — the R2 blocker), and a whole-block delete would
+ * parent does not exist (codepuppy.jsonc holding only `$schema` — the R2 blocker), and a whole-block delete would
  * have silently removed the user's CLI-side definition (R2 major). No lock is taken when there is nothing to
  * retire, so a busy lock only ever refuses a call that would have written.
  */
@@ -1376,7 +1376,7 @@ export function findPluginBaseConflictStrict(
 }
 
 /**
- * Remove a plugin package from config `plugin[]` (alpha-owned file + legacy XDG file, pre-migration)
+ * Remove a plugin package from config `plugin[]` (codepuppy-owned file + legacy XDG file, pre-migration)
  * and drop its receipt. Idempotent — absent package is a no-op success.
  */
 export function removePlugin(pkg: string): ConfigResult {
@@ -1495,7 +1495,7 @@ function removePluginPathUnlocked(name: string, absJsPath: string): ConfigResult
 //
 // 顶键集提取自引擎真 schema `packages/core/src/v1/config/config.ts` Info Struct(2026-07-04);
 // 上游新增顶键会造成误报(banner 多报,不吞真错)→ upstream sync 后如误报,重新提取此表即可;
-// 逃生:ALPHA_CONFIG_HEALTH_DISABLE=1。
+// 逃生:CODEPUPPY_CONFIG_HEALTH_DISABLE=1。
 const V1_TOP_KEYS = new Set([
   "$schema", "shell", "logLevel", "server", "command", "skills", "references", "reference",
   "watcher", "snapshot", "plugin", "share", "autoshare", "autoupdate", "disabled_providers",
@@ -1507,7 +1507,7 @@ const V1_TOP_KEYS = new Set([
 export type ConfigHealth = { broken: boolean; reason?: string; path?: string }
 
 export function configHealth(): ConfigHealth {
-  if (process.env.ALPHA_CONFIG_HEALTH_DISABLE === "1") return { broken: false }
+  if (process.env.CODEPUPPY_CONFIG_HEALTH_DISABLE === "1") return { broken: false }
   const file = userConfigPath()
   let text: string
   try {

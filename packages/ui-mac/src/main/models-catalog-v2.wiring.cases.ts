@@ -9,14 +9,14 @@
 // 三件事在这里落闸:
 //   1. **正向**:V3 响应经生产 IPC 后,basis 与逐行双倍数出现在 `models-catalog` 的返回里;
 //   2. **反向(持久 negative gate)**:同一入口喂上一代(V2)响应 → basis 为 null、无任何 pricing、
-//      contract-health 亮 model-catalog 面。把 alpha-platform-models.ts 的
+//      contract-health 亮 model-catalog 面。把 codepuppy-platform-models.ts 的
 //      `decodeJsonContract("ModelCatalogV3", …)` 改回上一代,本条即红 —— 那就是 ADR-039 §4 要求的
 //      那次 inversion,而它是**自动化**的,不依赖谁记得手工复原一次;
-//   3. **反分叉**:同一个 userData 下,sidecar 的 `buildAlphaModelConfig` 与 IPC 投影的 id 列表逐项
+//   3. **反分叉**:同一个 userData 下,sidecar 的 `buildCodePuppyModelConfig` 与 IPC 投影的 id 列表逐项
 //      相等 —— 含「合法但空的响应」与「从来没有缓存」两种退化态。此前两侧各写一份「什么算有效缓存」,
 //      空缓存时一边 0 行、一边静态 9 行。
 //
-// 子进程运行(models-catalog-v2.wiring.test.ts spawn):本链经 alpha-auth / alpha-contract-health /
+// 子进程运行(models-catalog-v2.wiring.test.ts spawn):本链经 codepuppy-auth / codepuppy-contract-health /
 // logging 拖入 electron,mock.module 在同一进程内会泄漏到别的测试文件。
 
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
@@ -79,37 +79,37 @@ mock.module("./logging", () => ({
   serverLogRoots: () => [],
   rotateServerLogs: () => {},
 }))
-mock.module("./alpha-endpoints", () => ({
+mock.module("./codepuppy-endpoints", () => ({
   resolveEndpoints: () => ({ platform: endpoint }),
 }))
 // `#1557`:models-ipc 现在也挂手动刷新入口(catalog-refresher),它在模块装载时就绑定 isStoredTokenExpired。
-mock.module("./alpha-auth", () => ({
+mock.module("./codepuppy-auth", () => ({
   getAccessToken: () => accessToken,
   getAuthIdentityTag: () => identity,
   isStoredTokenExpired: () => false,
 }))
 
 const { registerModelsIpcHandlers } = await import("./models-ipc")
-const { syncLiveAllowlist } = await import("./alpha-platform-models")
-const { buildAlphaModelConfig, getModelCatalog } = await import("./alpha-models")
-const { liveAllowlistPath, pinAppliedCatalog } = await import("./alpha-live-allowlist")
-const { getContractFailure } = await import("./alpha-contract-health")
-const { registerCatalogHealthIpcHandlers } = await import("./alpha-catalog-health")
-const { initAlphaEnvironment } = await import("./alpha-environment")
-import type { EffectiveCatalog } from "../shared/alpha-model-types"
+const { syncLiveAllowlist } = await import("./codepuppy-platform-models")
+const { buildCodePuppyModelConfig, getModelCatalog } = await import("./codepuppy-models")
+const { liveAllowlistPath, pinAppliedCatalog } = await import("./codepuppy-live-allowlist")
+const { getContractFailure } = await import("./codepuppy-contract-health")
+const { registerCatalogHealthIpcHandlers } = await import("./codepuppy-catalog-health")
+const { initCodePuppyEnvironment } = await import("./codepuppy-environment")
+import type { EffectiveCatalog } from "../shared/codepuppy-model-types"
 
-// buildAlphaModelConfig 经 readCustomProviderRecords → resolveAlphaGlobalRoot 解析 alpha 全局根。用 main 自己的
-// composition root 冻结一份临时环境(**不是**给 process.env.ALPHA_GLOBAL_DIR 赋值 —— 那条路
-// 被 alpha-environment.test.ts 的 grep 守卫按设计封死,而它封的就是「绕过 init 伪造根」)。
+// buildCodePuppyModelConfig 经 readCustomProviderRecords → resolveCodePuppyGlobalRoot 解析 alpha 全局根。用 main 自己的
+// composition root 冻结一份临时环境(**不是**给 process.env.CODEPUPPY_GLOBAL_DIR 赋值 —— 那条路
+// 被 codepuppy-environment.test.ts 的 grep 守卫按设计封死,而它封的就是「绕过 init 伪造根」)。
 const envRoot = mkdtempSync(join(tmpdir(), "models-catalog-v2-env-"))
-initAlphaEnvironment({ isPackaged: false, channel: "dev", appDataDir: join(envRoot, "appData"), homeDir: envRoot })
+initCodePuppyEnvironment({ isPackaged: false, channel: "dev", appDataDir: join(envRoot, "appData"), homeDir: envRoot })
 
 // ⚠️ stub 的响应体是 producer fixture 的 `value`,**不是** fixture 文件的完整字节:producer fixture
 // 是 `{kind,contract,expect,value}` 包装对象,整份喂给生产 decoder 会得到假红。
 // `#1556`:目录代际是 V3(每行带 display);文件名里的 v2 是历史名。
 const PRODUCER_FIXTURE = join(
   import.meta.dir,
-  "../../../alpha-contracts-consumer/vendor/alpha-platform-model-catalog/contracts/v3/fixtures/producer/model-catalog.json",
+  "../../../codepuppy-contracts-consumer/vendor/alpha-platform-model-catalog/contracts/v3/fixtures/producer/model-catalog.json",
 )
 const catalogV3 = (): any => structuredClone(JSON.parse(readFileSync(PRODUCER_FIXTURE, "utf8")).value)
 // 本仓提交给平台 cutover gate 的 consumer pin。它必须能真的**跑通生产链路**,而不只是过 schema:
@@ -117,7 +117,7 @@ const catalogV3 = (): any => structuredClone(JSON.parse(readFileSync(PRODUCER_FI
 // 却被 Desktop 的 isTrustedPair 整份拒绝 —— 那时闸就是假的。下面那条用例把它当 fetch body 走完整链。
 const CONSUMER_PIN = join(
   import.meta.dir,
-  "../../../alpha-contracts-consumer/fixtures/consumers/alpha-code-1556/model-catalog-v3.json",
+  "../../../codepuppy-contracts-consumer/fixtures/consumers/alpha-code-1556/model-catalog-v3.json",
 )
 const consumerPin = (): any => structuredClone(JSON.parse(readFileSync(CONSUMER_PIN, "utf8")).value)
 // 上一代(V2)wire 取自**上游发布的 negative fixture**(`expect: "invalid"`),不是本文件手写的替身:
@@ -125,15 +125,15 @@ const consumerPin = (): any => structuredClone(JSON.parse(readFileSync(CONSUMER_
 // ⚠️ 同样是 `{kind,contract,expect,value}` 包装对象 —— 取 `.value` 再 stringify。
 const INVALID_V2_SHAPED = join(
   import.meta.dir,
-  "../../../alpha-contracts-consumer/vendor/alpha-platform-model-catalog/contracts/v3/fixtures/invalid/v2-shaped-catalog.json",
+  "../../../codepuppy-contracts-consumer/vendor/alpha-platform-model-catalog/contracts/v3/fixtures/invalid/v2-shaped-catalog.json",
 )
 const catalogPrevGen = (): any => structuredClone(JSON.parse(readFileSync(INVALID_V2_SHAPED, "utf8")).value)
 
 const realFetch = globalThis.fetch
 let userData = ""
 let configDir = ""
-/** buildAlphaModelConfig 读的每个 env(与 alpha-models.test.ts 同款快照+还原,免得泄漏到宿主)。 */
-const MANAGED = ["ALPHA_BASE_URL", "ALPHA_DEFAULT_MODEL", "ALPHA_MODELS_DISABLE", "OPENCODE_CONFIG_DIR"]
+/** buildCodePuppyModelConfig 读的每个 env(与 codepuppy-models.test.ts 同款快照+还原,免得泄漏到宿主)。 */
+const MANAGED = ["CODEPUPPY_BASE_URL", "CODEPUPPY_DEFAULT_MODEL", "CODEPUPPY_MODELS_DISABLE", "OPENCODE_CONFIG_DIR"]
 const saved: Record<string, string | undefined> = {}
 
 const stubFetch = (body: unknown) => {
@@ -151,8 +151,8 @@ const invokeCatalog = () => handlers.get("models-catalog")!() as EffectiveCatalo
 
 // ── #1084:目录刷新失败的**用户可观察出口**。 ───────────────────────────────────────────────
 // 生产里 renderer 拿这个状态只有两条路,两条都必须真的送到:①挂载时 invoke
-// `alpha-catalog-health`(启动那次刷新早于 renderer 存在,只有推送的话它到不了);
-// ②`alpha-catalog-failure` 推送。所以下面既拿 handler、也拿一个记录 webContents.send 的假窗口。
+// `codepuppy-catalog-health`(启动那次刷新早于 renderer 存在,只有推送的话它到不了);
+// ②`codepuppy-catalog-failure` 推送。所以下面既拿 handler、也拿一个记录 webContents.send 的假窗口。
 type CatalogPush = { channel: string; payload: unknown }
 const pushed: CatalogPush[] = []
 const fakeWindow = {
@@ -162,8 +162,8 @@ const fakeWindow = {
 /** renderer 调 window.api.models.refreshHealth() 时跑的就是这个 handler。 */
 // `#1556`:两条口子发的是按文档分格的汇总 { platform, byok };本文件只关平台那一格。
 type Health = { platform: { code: string; at: string } | null; byok: { code: string; at: string } | null }
-const invokeRefreshHealth = () => (handlers.get("alpha-catalog-health")!() as Health).platform
-const lastPush = () => (pushed.filter((p) => p.channel === "alpha-catalog-failure").at(-1)?.payload as Health | undefined)?.platform
+const invokeRefreshHealth = () => (handlers.get("codepuppy-catalog-health")!() as Health).platform
+const lastPush = () => (pushed.filter((p) => p.channel === "codepuppy-catalog-failure").at(-1)?.payload as Health | undefined)?.platform
 
 beforeEach(() => {
   endpoint = "https://gateway.test"
@@ -183,9 +183,9 @@ beforeEach(() => {
   configDir = mkdtempSync(join(tmpdir(), "models-catalog-v2-config-"))
   process.env.OPENCODE_CONFIG_DIR = configDir
   // 平台 provider 注入的两个前置(不设它们 provider.codepuppy 根本不存在,反分叉断言会空绿)。
-  process.env.ALPHA_BASE_URL = "https://gw.example/v1"
-  mkdirSync(join(userData, "alpha-secrets"), { recursive: true })
-  writeFileSync(join(userData, "alpha-secrets", "ALPHA_API_KEY"), "jwt", { mode: 0o600 })
+  process.env.CODEPUPPY_BASE_URL = "https://gw.example/v1"
+  mkdirSync(join(userData, "codepuppy-secrets"), { recursive: true })
+  writeFileSync(join(userData, "codepuppy-secrets", "CODEPUPPY_API_KEY"), "jwt", { mode: 0o600 })
 })
 afterEach(() => {
   targets.splice(0).forEach((stop) => stop())
@@ -204,7 +204,7 @@ const startTarget = (fetch: (request: Request) => Response | Promise<Response>) 
   targets.push(() => server.stop(true))
   endpoint = server.url.origin
 }
-const completed = () => logged.filter((entry) => entry[0] === "alpha-platform-models: request completed")
+const completed = () => logged.filter((entry) => entry[0] === "codepuppy-platform-models: request completed")
 const waitFor = async (ready: () => boolean, timeoutMs = 11000) => {
   const started = Date.now()
   while (!ready()) {
@@ -213,7 +213,7 @@ const waitFor = async (ready: () => boolean, timeoutMs = 11000) => {
   }
 }
 
-const engineModelIds = () => Object.keys((buildAlphaModelConfig(userData)!.provider.codepuppy as any).models)
+const engineModelIds = () => Object.keys((buildCodePuppyModelConfig(userData)!.provider.codepuppy as any).models)
 
 describe("#681 生产 wiring:models-catalog IPC 经真实目录 decoder(`#1556` 起 V3)返回持久化投影", () => {
   test("production IPC refreshes through the V3 fetch decoder and returns the persisted projection", async () => {
@@ -325,7 +325,7 @@ describe("#681 反分叉:sidecar 引擎配置与 IPC 投影是同一份投影", 
   test("引擎配置不携带 pricing(展示投影不进 opencode provider 契约)", async () => {
     stubFetch(catalogV3())
     await refreshThenFork()
-    const models = (buildAlphaModelConfig(userData)!.provider.codepuppy as any).models
+    const models = (buildCodePuppyModelConfig(userData)!.provider.codepuppy as any).models
     expect(Object.values(models).every((m: any) => m.pricing === undefined)).toBe(true)
     // 但 variants 仍随投影下发(REQ-029 不能被本次切换弄丢)。
     expect(models["claude-opus-4.8"].variants["高"]).toEqual({ reasoning: { effort: "high" } })
@@ -337,9 +337,9 @@ describe("#681 反分叉:sidecar 引擎配置与 IPC 投影是同一份投影", 
 // 在此之前这条链的终点是 `fetchPlatformModels()` 的返回值:main/index.ts 两处 `.catch(() => {})`
 // 把它扔掉,`models-platform-live`(`#1555` 已删)有 preload 桥却零 renderer 消费者 —— 目录刷新失败在产品面上
 // 完全不存在。判据因此不看「函数返回了什么」,只看**renderer 拿得到什么**:renderer 侧只有
-// `alpha-catalog-health`(invoke)与 `alpha-catalog-failure`(push)这两个口子。
+// `codepuppy-catalog-health`(invoke)与 `codepuppy-catalog-failure`(push)这两个口子。
 //
-// 反向验证(已实跑,#1084 退出条件):把 alpha-platform-models.ts `syncLiveAllowlist` 里
+// 反向验证(已实跑,#1084 退出条件):把 codepuppy-platform-models.ts `syncLiveAllowlist` 里
 // `reportCatalogRefresh(r.error)` 那一行删掉 ⇒ 本组前两条转红(invoke 返回 null、零推送),
 // 即回到「吞掉失败」的原状。第三条钉的是清空:把 `reportCatalogRefresh(null)` 删掉 ⇒ 它转红
 // (横幅会永远挂着,即使目录早已刷新成功)。
@@ -478,7 +478,7 @@ describe("#1500 真实 HTTP 超时的后台补试与状态仲裁", () => {
   }, 30000)
 
   test("AC3:安全完成日志可计数,真实 429 样本和旧代拒绝保留原码且不补试", async () => {
-    // 429 字节沿用 alpha-platform-catalog.cases.ts 的真 worker 捕获样本(原第 276–286 行)。
+    // 429 字节沿用 codepuppy-platform-catalog.cases.ts 的真 worker 捕获样本(原第 276–286 行)。
     const rateLimited = '{"error":{"message":"rate limited: too many requests from this IP","code":"rate_limited"}}'
     let rejected = true
     const requests: string[] = []

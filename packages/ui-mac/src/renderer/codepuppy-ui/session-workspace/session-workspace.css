@@ -1,0 +1,842 @@
+@import "../tokens.css";
+@import "../base.css";
+
+.a-swk-root {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--a-bg-canvas);
+}
+
+.a-swk-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.a-swk-topbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 46px;
+  min-width: 0;
+  padding: 0 12px 0 14px;
+  border-bottom: 1px solid var(--a-border-faint);
+  background: var(--a-bg-canvas);
+  white-space: nowrap;
+  /* REQ-125 issue 574 单一顶栏:上游窗口 Titlebar 在 alpha 会话路由不再渲染(ownsTitlebar
+   * 静态标记,经 pin+patch 的 NewLayout 条件),本顶栏承接窗口拖拽区。 */
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+/* 交互件全部从拖拽区挖出,点击不被 OS 当成窗口拖动吃掉。 */
+.a-swk-topbar :is(button, a, input, textarea, select, [role="button"], [contenteditable]) {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.a-swk-project-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: var(--a-radius-md);
+  color: var(--a-text-tertiary);
+  font-size: var(--a-text-sm);
+  font-weight: var(--a-weight-medium);
+}
+
+.a-swk-project-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 17px;
+  height: 17px;
+  border-radius: 5px;
+  background: var(--a-accent-solid);
+  color: var(--a-text-on-accent);
+  font-size: 9px;
+  font-weight: var(--a-weight-bold);
+}
+
+.a-swk-project-label,
+.a-swk-session-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.a-swk-project-label {
+  max-width: 180px;
+}
+
+.a-swk-separator {
+  flex: none;
+  color: var(--a-text-disabled);
+  font-size: var(--a-text-sm);
+}
+
+.a-swk-session-title {
+  height: 28px;
+  max-width: min(42vw, 420px);
+  padding: 3px 9px 0;
+  border-radius: var(--a-radius-md);
+  color: var(--a-text);
+  font-size: var(--a-text-md);
+  font-weight: var(--a-weight-semibold);
+  letter-spacing: var(--a-tracking-tight);
+}
+
+.a-swk-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 24px;
+  margin-left: 4px;
+  padding: 0 9px;
+  border-radius: var(--a-radius-full);
+  background: var(--a-bg-muted);
+  color: var(--a-text-tertiary);
+  font-size: var(--a-text-xs);
+  font-weight: var(--a-weight-medium);
+}
+
+.a-swk-status-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--a-radius-full);
+  background: var(--a-text-disabled);
+}
+
+.a-swk-status--running {
+  background: var(--a-accent-subtle);
+  color: var(--a-accent);
+}
+
+.a-swk-status--running .a-swk-status-dot {
+  animation: a-swk-status-pulse 1.4s var(--a-ease-in-out) infinite;
+  background: var(--a-accent);
+}
+
+/* alpha-code 1588 AC4:等你批准 / 等你回答 —— 警示色,与时间线工作过程标题的等你面同一读法;在等人,不呼吸。 */
+.a-swk-status--wait {
+  background: var(--a-warning-subtle);
+  color: var(--a-warning);
+}
+
+.a-swk-status--wait .a-swk-status-dot {
+  background: var(--a-warning);
+}
+
+.a-swk-grow {
+  flex: 1;
+}
+
+.a-swk-panel-button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--a-radius-md);
+  background: transparent;
+  color: var(--a-text-tertiary);
+  cursor: pointer;
+  transition:
+    background var(--a-dur-fast) var(--a-ease-out),
+    color var(--a-dur-fast) var(--a-ease-out);
+}
+
+.a-swk-panel-button:hover {
+  background: var(--a-bg-muted);
+  color: var(--a-text);
+}
+
+.a-swk-panel-button--active {
+  background: var(--a-accent-subtle);
+  color: var(--a-accent);
+}
+
+.a-swk-panel-button svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.a-swk-control-separator {
+  flex: none;
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--a-border-faint);
+}
+
+.a-swk-timeline-host {
+  flex: 1;
+  min-height: 0;
+  background: var(--a-bg-canvas);
+}
+
+.a-swk-composer-dock {
+  flex: none;
+  padding: 12px 20px 16px;
+  background: var(--a-bg-canvas);
+}
+
+.a-swk-composer-host {
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+/* ── composer 停靠区(REQ-125 C7:审批/提问/任务清单卡 + CodePuppyComposer 直挂)── */
+.a-swk-dock {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* alpha-code issue 1225(此处刻意不写 `#` + 数字 —— 那个形状会被本文件的
+   「只许 --a-* 令牌、不许字面颜色」棘轮当成十六进制色值,实测当场红,与上面
+   `REQ-125 issue 574` 那条注释躲的是同一个坑)。
+   AI 生成内容标识 —— composer 正下方的一行小字。
+   分量刻意等同仓内既有的次要脚注(codepuppy-composer.css 的 .a-mpa-note):最小字号 + 三级文字色,
+   不新造设计语汇(本票豁免设计稿,所以只许复用既有 token)。 */
+.a-swk-ai-disclaimer {
+  margin: 0;
+  padding: 0 2px;
+  text-align: center;
+  font-size: var(--a-text-2xs);
+  line-height: 1.45;
+  color: var(--a-text-tertiary);
+}
+
+.a-swk-card {
+  border: 1px solid var(--a-border-faint);
+  border-radius: var(--a-radius-lg);
+  background: var(--a-surface);
+  box-shadow: var(--a-edge-light);
+  padding: 12px 14px;
+}
+
+.a-swk-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--a-border);
+  border-radius: var(--a-radius-md);
+  background: var(--a-surface);
+  color: var(--a-text);
+  font-size: var(--a-text-sm);
+  font-weight: var(--a-weight-medium);
+  cursor: pointer;
+}
+
+.a-swk-btn:hover:not(:disabled) {
+  background: var(--a-bg-muted);
+  border-color: var(--a-border-strong);
+}
+
+.a-swk-btn:disabled {
+  color: var(--a-text-disabled);
+  cursor: default;
+}
+
+.a-swk-btn--primary {
+  border: 0;
+  background: var(--a-accent-solid);
+  color: var(--a-text-on-accent);
+}
+
+.a-swk-btn--primary:hover:not(:disabled) {
+  background: var(--a-accent-solid-hover);
+  border-color: var(--a-accent-solid-hover);
+}
+
+.a-swk-btn--primary:disabled {
+  background: var(--a-bg-inset);
+  color: var(--a-text-disabled);
+}
+
+.a-swk-question-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.a-swk-question-error {
+  margin: 8px 0 0;
+  font-size: var(--a-text-xs);
+  color: var(--a-error);
+}
+
+.a-swk-question-item + .a-swk-question-item {
+  margin-top: 10px;
+}
+
+.a-swk-question-head {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 8px;
+}
+
+.a-swk-question-kicker {
+  font-size: var(--a-text-2xs);
+  font-weight: var(--a-weight-semibold);
+  letter-spacing: var(--a-tracking-wide);
+  text-transform: uppercase;
+  color: var(--a-text-tertiary);
+}
+
+.a-swk-question-text {
+  font-size: var(--a-text-sm);
+  color: var(--a-text);
+}
+
+.a-swk-question-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.a-swk-option {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 11px;
+  border: 1px solid var(--a-border);
+  border-radius: var(--a-radius-full);
+  background: var(--a-surface);
+  color: var(--a-text-secondary);
+  font-size: var(--a-text-sm);
+  cursor: pointer;
+}
+
+.a-swk-option:hover:not(:disabled) {
+  border-color: var(--a-border-strong);
+  color: var(--a-text);
+}
+
+.a-swk-option[data-selected] {
+  border-color: var(--a-accent-border);
+  background: var(--a-accent-subtle);
+  color: var(--a-accent);
+  font-weight: var(--a-weight-medium);
+}
+
+.a-swk-question-custom {
+  width: 100%;
+  height: 30px;
+  margin-bottom: 10px;
+  padding: 0 10px;
+  border: 1px solid var(--a-border);
+  border-radius: var(--a-radius-md);
+  background: var(--a-surface);
+  color: var(--a-text);
+  font-family: inherit;
+  font-size: var(--a-text-sm);
+}
+
+.a-swk-question-custom::placeholder {
+  color: var(--a-text-tertiary);
+}
+
+.a-swk-todos {
+  padding: 6px;
+}
+
+.a-swk-todo-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: var(--a-text-sm);
+  font-weight: var(--a-weight-medium);
+}
+
+.a-swk-todo-head svg {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.a-swk-todo-progress {
+  margin-left: auto;
+  font-size: var(--a-text-2xs);
+  color: var(--a-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.a-swk-todo-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 168px;
+  overflow-y: auto;
+}
+
+.a-swk-todo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 8px;
+  font-size: var(--a-text-sm);
+}
+
+.a-swk-todo-box {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--a-border-strong);
+  border-radius: var(--a-radius-xs);
+  color: var(--a-text-on-accent);
+}
+
+.a-swk-todo-box svg {
+  width: 11px;
+  height: 11px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.a-swk-todo[data-status="completed"] .a-swk-todo-box {
+  background: var(--a-success);
+  border-color: var(--a-success);
+}
+
+.a-swk-todo[data-status="completed"] .a-swk-todo-text,
+.a-swk-todo[data-status="cancelled"] .a-swk-todo-text {
+  color: var(--a-text-tertiary);
+  text-decoration: line-through;
+}
+
+.a-swk-todo[data-status="in_progress"] .a-swk-todo-box {
+  border-color: var(--a-accent);
+}
+
+.a-swk-todo[data-status="in_progress"] .a-swk-todo-text {
+  color: var(--a-text);
+  font-weight: var(--a-weight-medium);
+}
+
+/* 身份解析前的 composer 轻占位(REQ-125 C558:identityKey 未定 → 不挂 composer,身份到达即挂;
+   仅占位避免布局塌陷,路由解析瞬时不构成可感知延迟)。 */
+.a-swk-composer-pending {
+  min-height: 96px;
+}
+
+/* ── 检查点回退条 / 子会话条(REQ-125 C558:紧凑停靠条,复用 dock 外壳)── */
+.a-swk-revert,
+.a-swk-child {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+}
+
+.a-swk-revert {
+  border-color: var(--a-accent-border);
+  background: var(--a-accent-subtle);
+}
+
+.a-swk-revert svg {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: var(--a-accent);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.a-swk-revert-text,
+.a-swk-child-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.a-swk-revert-title,
+.a-swk-child-title {
+  font-size: var(--a-text-sm);
+  font-weight: var(--a-weight-medium);
+  color: var(--a-text);
+}
+
+.a-swk-revert-detail,
+.a-swk-child-parent {
+  font-size: var(--a-text-xs);
+  color: var(--a-text-tertiary);
+}
+
+.a-swk-child-parent {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.a-swk-child-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--a-radius-full);
+  background: var(--a-text-disabled);
+}
+
+.a-swk-child-dot--running {
+  background: var(--a-accent);
+  animation: a-swk-status-pulse 1.4s var(--a-ease-in-out) infinite;
+}
+
+.a-swk-child-jump {
+  flex: none;
+  margin-left: auto;
+}
+
+.a-swk-rail-host {
+  position: relative;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  width: 400px;
+  min-width: 320px;
+  /* REQ-140: no fixed ceiling — the session column keeps 480px. CSS min-width beats max-width,
+   * so a workspace narrower than 320+480 pins the rail at its floor (approved conflict rule).
+   * JS twin: railMaxWidth() in rail-width.ts. */
+  max-width: calc(100% - 480px);
+  min-height: 0;
+  overflow: hidden;
+  border-left: 1px solid var(--a-border-faint);
+  background: var(--a-bg-subtle);
+}
+
+/* Left-edge resize hot zone: 6px, accent hairline on hover/drag/focus (approved form). */
+.a-swk-rail-grip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 3;
+  width: 6px;
+  cursor: col-resize;
+}
+
+.a-swk-rail-grip::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background: transparent;
+  transition: background var(--a-dur-fast) var(--a-ease-out);
+}
+
+.a-swk-rail-grip:hover::after,
+.a-swk-rail-grip:focus-visible::after,
+.a-swk-rail-grip--active::after {
+  background: var(--a-accent);
+}
+
+.a-swk-rail-grip:focus-visible {
+  outline: none;
+}
+
+/* Rail tab strip — the approved switching surface for the right-rail panels (审查/文件/终端). */
+.a-swk-rail-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  height: 46px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--a-border-faint);
+  background: var(--a-bg-canvas);
+}
+
+.a-swk-rail-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: var(--a-radius-md);
+  background: transparent;
+  color: var(--a-text-secondary);
+  font-family: inherit;
+  font-size: var(--a-text-sm);
+  font-weight: var(--a-weight-medium);
+  cursor: pointer;
+  transition:
+    background var(--a-dur-fast) var(--a-ease-out),
+    color var(--a-dur-fast) var(--a-ease-out);
+}
+
+.a-swk-rail-tab:hover {
+  background: var(--a-bg-muted);
+  color: var(--a-text);
+}
+
+.a-swk-rail-tab--on {
+  background: var(--a-accent-subtle);
+  color: var(--a-accent);
+}
+
+/* Fail-closed mid-state: a panel whose lane has not landed renders as a disabled tab. */
+.a-swk-rail-tab:disabled {
+  background: transparent;
+  color: var(--a-text-disabled);
+  cursor: default;
+}
+
+/* Count badge (review = changed-file count); tinted along with the active capsule. */
+.a-swk-rail-tab-badge {
+  flex: none;
+  padding: 0 6px;
+  border-radius: var(--a-radius-full);
+  background: var(--a-bg-muted);
+  color: var(--a-text-tertiary);
+  font-size: var(--a-text-2xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+}
+
+.a-swk-rail-tab--on .a-swk-rail-tab-badge {
+  background: color-mix(in srgb, var(--a-accent) 16%, transparent);
+  color: var(--a-accent);
+}
+
+/* Terminal breathing dot: any terminal running. */
+.a-swk-rail-tab-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--a-radius-full);
+  background: var(--a-success);
+  animation: a-swk-status-pulse 1.4s var(--a-ease-in-out) infinite;
+}
+
+.a-swk-rail-close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--a-radius-md);
+  background: transparent;
+  color: var(--a-text-tertiary);
+  cursor: pointer;
+}
+
+.a-swk-rail-close:hover {
+  background: var(--a-bg-muted);
+  color: var(--a-text);
+}
+
+.a-swk-rail-close svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.a-swk-rail-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.a-swk-rail-panel--hidden {
+  display: none;
+}
+
+@keyframes a-swk-status-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Narrow windows compress the topbar only. The rail keeps the REQ-140 width contract
+ * (floor 320px, ceiling = workspace − 480px; single source of truth = rail-width.ts); on a
+ * viewport too narrow for a 320px rail the user collapses the rail — the contract is never
+ * silently undercut, and no media query may re-declare the rail's bounds (audit Major-5). */
+@media (max-width: 860px) {
+  .a-swk-project-label {
+    max-width: 110px;
+  }
+
+  .a-swk-status {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .a-swk-status--running .a-swk-status-dot,
+  .a-swk-rail-tab-dot,
+  .a-swk-child-dot--running {
+    animation: none;
+  }
+
+  .a-swk-panel-button,
+  .a-swk-rail-tab,
+  .a-swk-rail-grip::after {
+    transition: none;
+  }
+}
+
+/* ── REQ-159 issue 1322(此处刻意不写 `#` + 数字,同上面 issue 1225 那条)· 顶栏只读胶囊 + 弹层 ─────────────────────────────────
+   与状态胶囊完全同款尺寸(24px 高、圆角胶囊、xs 字号),暖色淡底 + 暖色字;紧跟状态胶囊之后。
+   弹层是抬起的卡(surface-raised + shadow-lg),箭头指回胶囊。只在引擎明确回报写被拒时渲染。 */
+
+.a-swk-readonly-wrap {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+.a-swk-readonly {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  height: 24px;
+  margin-left: 6px;
+  padding: 0 9px;
+  border-radius: var(--a-radius-full);
+  background: var(--a-warning-subtle);
+  color: var(--a-warning);
+  font-size: var(--a-text-xs);
+  font-weight: var(--a-weight-medium);
+  cursor: default;
+  outline: none;
+}
+
+.a-swk-readonly svg {
+  width: 11px;
+  height: 11px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.a-swk-readonly:focus-visible {
+  box-shadow: var(--a-ring-focus);
+}
+
+.a-swk-readonly-pop {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 30;
+  width: 320px;
+  padding: 12px 14px;
+  border: 1px solid var(--a-border);
+  border-radius: var(--a-radius-lg);
+  background: var(--a-surface-raised);
+  box-shadow: var(--a-shadow-lg);
+  color: var(--a-text-secondary);
+  font-size: var(--a-text-xs);
+  line-height: var(--a-leading-normal);
+  app-region: no-drag;
+}
+
+.a-swk-readonly-pop::before {
+  content: "";
+  position: absolute;
+  left: 28px;
+  top: -6px;
+  width: 10px;
+  height: 10px;
+  border-left: 1px solid var(--a-border);
+  border-top: 1px solid var(--a-border);
+  background: var(--a-surface-raised);
+  transform: rotate(45deg);
+}
+
+.a-swk-readonly-pop b {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--a-text);
+  font-size: var(--a-text-sm);
+}
+
+.a-swk-readonly-pop p {
+  margin: 0;
+}
+
+.a-swk-readonly-footnote {
+  margin-top: 6px;
+  color: var(--a-text-tertiary);
+}
+
+.a-swk-readonly-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.a-swk-readonly-restart {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--a-border);
+  border-radius: var(--a-radius-md);
+  background: var(--a-surface);
+  color: var(--a-text);
+  font-size: var(--a-text-xs);
+  font-weight: var(--a-weight-medium);
+  cursor: pointer;
+}
+
+.a-swk-readonly-restart:hover {
+  background: var(--a-bg-muted);
+}

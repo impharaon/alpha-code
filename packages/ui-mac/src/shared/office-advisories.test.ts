@@ -4,12 +4,12 @@
 import { describe, expect, test } from "bun:test"
 
 import {
-  ALPHA_OFFICE_CONNECTORS,
+  CODEPUPPY_OFFICE_CONNECTORS,
   ARCHIVED_OFFICE_ADVISORIES,
   RETIRED_COMMUNITY_OFFICE_CONNECTORS,
   WORKSPACE_MARKER,
-  alphaOfficeInstallCommand,
-  checkAlphaOfficeMcpSafety,
+  codepuppyOfficeInstallCommand,
+  checkCodePuppyOfficeMcpSafety,
   isRetiredOfficeMcp,
   isWorkspacePolicyMcp,
   officeAdvisoryFor,
@@ -73,7 +73,7 @@ describe("REQ-135 retired community Office connector identity", () => {
     ]) {
       expect(isRetiredOfficeMcp("renamed-sheets", { type: "local", command: ["uvx", pkg, "stdio"] })).toBe(true)
     }
-    expect(isRetiredOfficeMcp("codepuppy-excel", { type: "local", command: alphaOfficeInstallCommand("excel") })).toBe(false)
+    expect(isRetiredOfficeMcp("codepuppy-excel", { type: "local", command: codepuppyOfficeInstallCommand("excel") })).toBe(false)
     expect(isRetiredOfficeMcp("markitdown", { type: "local", command: ["uvx", "markitdown-mcp@0.0.1a4"] })).toBe(false)
   })
 })
@@ -83,13 +83,13 @@ describe("REQ-133 Alpha Office connector registry and stdio safety", () => {
   const workspace = "/Users/x/Alpha"
   const config = (format: "word" | "excel" | "powerpoint" | "pdf") => ({
     type: "local",
-    command: alphaOfficeInstallCommand(format).map((argument) =>
+    command: codepuppyOfficeInstallCommand(format).map((argument) =>
       argument.replace("{alphaResources}", resources).replace("{workspace}", workspace),
     ),
   })
 
   test("four new ids and exact catalog command arrays are stable", () => {
-    expect(ALPHA_OFFICE_CONNECTORS.map((connector) => connector.catalogId)).toEqual([
+    expect(CODEPUPPY_OFFICE_CONNECTORS.map((connector) => connector.catalogId)).toEqual([
       "mcp:codepuppy-word",
       "mcp:codepuppy-excel",
       "mcp:codepuppy-powerpoint",
@@ -97,40 +97,40 @@ describe("REQ-133 Alpha Office connector registry and stdio safety", () => {
     ])
     // #1564 AC1:随包解释器(isolated、不写字节码)+ 随包 server,没有 uv、没有首次下载;四种格式只差格式名。
     for (const format of ["word", "excel", "powerpoint", "pdf"] as const)
-      expect(alphaOfficeInstallCommand(format)).toEqual([
+      expect(codepuppyOfficeInstallCommand(format)).toEqual([
         "{alphaResources}/office-runtime/bin/python3", "-I", "-B",
         "{alphaResources}/office-mcp/server.py", format, "{workspace}",
       ])
   })
 
   test("all four exact local commands pass and share the workspace-policy registry", () => {
-    for (const connector of ALPHA_OFFICE_CONNECTORS) {
+    for (const connector of CODEPUPPY_OFFICE_CONNECTORS) {
       const server = config(connector.format)
-      expect(checkAlphaOfficeMcpSafety(connector.name, server, workspace, resources)).toEqual({ ok: true })
+      expect(checkCodePuppyOfficeMcpSafety(connector.name, server, workspace, resources)).toEqual({ ok: true })
       const marked = {
         ...server,
-        command: alphaOfficeInstallCommand(connector.format).map((argument) =>
+        command: codepuppyOfficeInstallCommand(connector.format).map((argument) =>
           argument.replace("{alphaResources}", resources),
         ),
       }
-      expect(checkAlphaOfficeMcpSafety(connector.name, marked, WORKSPACE_MARKER, resources)).toEqual({ ok: true })
+      expect(checkCodePuppyOfficeMcpSafety(connector.name, marked, WORKSPACE_MARKER, resources)).toEqual({ ok: true })
       expect(isWorkspacePolicyMcp(connector.name, server)).toBe(true)
     }
     expect(isWorkspacePolicyMcp("excel-mcp-server", { type: "local", command: ["uvx", "excel-mcp-server@0.1.8", "stdio"] })).toBe(false)
   })
 
   test("remote, unpinned, extra transport flags, traversal, and network env fail closed", () => {
-    for (const connector of ALPHA_OFFICE_CONNECTORS) {
-      expect(checkAlphaOfficeMcpSafety(connector.name, { type: "remote", url: "http://127.0.0.1/mcp" }, workspace, resources).ok).toBe(false)
-      expect(checkAlphaOfficeMcpSafety(connector.name, { ...config(connector.format), command: ["uv", "run", "latest"] }, workspace, resources).ok).toBe(false)
-      expect(checkAlphaOfficeMcpSafety(connector.name, { ...config(connector.format), command: [...config(connector.format).command, "--host", "0.0.0.0"] }, workspace, resources).ok).toBe(false)
-      expect(checkAlphaOfficeMcpSafety(connector.name, config(connector.format), `${workspace}/../etc`, resources).ok).toBe(false)
+    for (const connector of CODEPUPPY_OFFICE_CONNECTORS) {
+      expect(checkCodePuppyOfficeMcpSafety(connector.name, { type: "remote", url: "http://127.0.0.1/mcp" }, workspace, resources).ok).toBe(false)
+      expect(checkCodePuppyOfficeMcpSafety(connector.name, { ...config(connector.format), command: ["uv", "run", "latest"] }, workspace, resources).ok).toBe(false)
+      expect(checkCodePuppyOfficeMcpSafety(connector.name, { ...config(connector.format), command: [...config(connector.format).command, "--host", "0.0.0.0"] }, workspace, resources).ok).toBe(false)
+      expect(checkCodePuppyOfficeMcpSafety(connector.name, config(connector.format), `${workspace}/../etc`, resources).ok).toBe(false)
       expect(
-        checkAlphaOfficeMcpSafety(
+        checkCodePuppyOfficeMcpSafety(
           connector.name,
           {
             ...config(connector.format),
-            command: alphaOfficeInstallCommand(connector.format).map((argument) =>
+            command: codepuppyOfficeInstallCommand(connector.format).map((argument) =>
               argument.replace("{alphaResources}", resources).replace("{workspace}", "prefix-{workspace}"),
             ),
           },
@@ -138,11 +138,11 @@ describe("REQ-133 Alpha Office connector registry and stdio safety", () => {
           resources,
         ).ok,
       ).toBe(false)
-      expect(checkAlphaOfficeMcpSafety(connector.name, { ...config(connector.format), environment: { MCP_TRANSPORT: "sse" } }, workspace, resources).ok).toBe(false)
-      expect(checkAlphaOfficeMcpSafety(connector.name, { ...config(connector.format), environment: { PYTHONPATH: "/tmp/inject" } }, workspace, resources).ok).toBe(false)
+      expect(checkCodePuppyOfficeMcpSafety(connector.name, { ...config(connector.format), environment: { MCP_TRANSPORT: "sse" } }, workspace, resources).ok).toBe(false)
+      expect(checkCodePuppyOfficeMcpSafety(connector.name, { ...config(connector.format), environment: { PYTHONPATH: "/tmp/inject" } }, workspace, resources).ok).toBe(false)
       // #1564:随包运行时不下载任何东西,uv 时代的包索引变量不再放行。
       for (const key of ["UV_DEFAULT_INDEX", "PIP_INDEX_URL"])
-        expect(checkAlphaOfficeMcpSafety(connector.name, { ...config(connector.format), environment: { [key]: "https://pypi.tuna.tsinghua.edu.cn/simple" } }, workspace, resources).ok).toBe(false)
+        expect(checkCodePuppyOfficeMcpSafety(connector.name, { ...config(connector.format), environment: { [key]: "https://pypi.tuna.tsinghua.edu.cn/simple" } }, workspace, resources).ok).toBe(false)
     }
   })
 })

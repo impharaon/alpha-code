@@ -25,7 +25,7 @@
 import path from "node:path"
 
 // Latest published @opencode-ai/plugin (npm) — any real version makes the plugin install resolve.
-export const ALPHA_OPENCODE_VERSION_DEFAULT = "1.17.13"
+export const CODEPUPPY_OPENCODE_VERSION_DEFAULT = "1.17.13"
 const FILE = path.resolve(import.meta.dir, "../../opencode/dist/node/node.js")
 const TARGET = /\bInstallationVersion = "([^"]*)"/g
 const RELEASE = /^\d+\.\d+\.\d+$/
@@ -49,7 +49,7 @@ export function patchServerVersion(text: string, version: string) {
 }
 
 if (import.meta.main) {
-  const version = process.env.ALPHA_OPENCODE_VERSION ?? ALPHA_OPENCODE_VERSION_DEFAULT
+  const version = process.env.CODEPUPPY_OPENCODE_VERSION ?? CODEPUPPY_OPENCODE_VERSION_DEFAULT
   const text = await Bun.file(FILE).text()
   const result = patchServerVersion(text, version)
   if (result.changed) {

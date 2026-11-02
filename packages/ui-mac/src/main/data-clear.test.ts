@@ -76,21 +76,21 @@ class MemFs {
 
 const ROOTS: DataClear.ClearRoots = {
   userData: "/ud",
-  alphaGlobal: "/state/env/dev",
+  codepuppyGlobal: "/state/env/dev",
   opencodeHome: "/home/.opencode",
   engineData: "/home/.local/share/opencode",
 }
 
 function seed(): MemFs {
   const fs = new MemFs()
-  fs.addFile("/ud/alpha-auth.json", 100)
-  fs.addFile("/ud/alpha-byok-keys.json", 50)
-  fs.addFile("/ud/alpha-secrets/ALPHA_API_KEY", 20)
-  fs.addFile("/ud/alpha-mcp-secrets/feishu/APP_SECRET", 20)
-  fs.addFile("/ud/alpha.env", 30)
+  fs.addFile("/ud/codepuppy-auth.json", 100)
+  fs.addFile("/ud/codepuppy-byok-keys.json", 50)
+  fs.addFile("/ud/codepuppy-secrets/CODEPUPPY_API_KEY", 20)
+  fs.addFile("/ud/codepuppy-mcp-secrets/feishu/APP_SECRET", 20)
+  fs.addFile("/ud/codepuppy.env", 30)
   fs.addFile("/ud/opencode.settings", 5)
   fs.addFile("/ud/logs/main.log", 1000)
-  fs.addFile("/ud/alpha-db-backups/opencode-backup-1.db", 5000)
+  fs.addFile("/ud/codepuppy-db-backups/opencode-backup-1.db", 5000)
   fs.addFile("/state/env/dev/installs.json", 40)
   fs.addFile("/state/env/dev/skills/foo/SKILL.md", 10)
   fs.addFile("/home/.local/share/opencode/opencode.db", 9000)
@@ -104,18 +104,18 @@ describe("planClear · credentials", () => {
     const plan = DataClear.planClear(fs.deps(), "credentials", ROOTS)
     const ids = plan.items.map((i) => i.id)
     expect(ids).toEqual([
-      "alpha-auth",
-      "alpha-pkce",
+      "codepuppy-auth",
+      "codepuppy-pkce",
       "byok-keys",
       "secret-files",
       "mcp-secrets",
-      "alpha-env",
+      "codepuppy-env",
       "engine-auth",
       "engine-mcp-auth",
     ])
     const byId = Object.fromEntries(plan.items.map((i) => [i.id, i]))
-    expect(byId["alpha-pkce"]!.present).toBe(false)
-    expect(byId["alpha-auth"]!.bytes).toBe(100)
+    expect(byId["codepuppy-pkce"]!.present).toBe(false)
+    expect(byId["codepuppy-auth"]!.bytes).toBe(100)
     expect(byId["secret-files"]!.bytes).toBe(20)
     // 会话 DB / 设置 / 日志 不在凭证级
     expect(plan.items.some((i) => i.path.includes("opencode.db"))).toBe(false)
@@ -130,8 +130,8 @@ describe("planClear · credentials", () => {
     expect(engineAuth?.outcome).toBe("skipped")
     expect(fs.deps().exists("/home/.local/share/opencode/auth.json")).toBe(true)
     // 非 shared 凭证已删
-    expect(fs.deps().exists("/ud/alpha-auth.json")).toBe(false)
-    expect(fs.deps().exists("/ud/alpha-secrets")).toBe(false)
+    expect(fs.deps().exists("/ud/codepuppy-auth.json")).toBe(false)
+    expect(fs.deps().exists("/ud/codepuppy-secrets")).toBe(false)
   })
 })
 
@@ -161,7 +161,7 @@ describe("planClear · credentials · MCP 登录令牌(#752)", () => {
     }
     const fs = new MemFs()
     fs.mkdirs("/ud")
-    fs.mkdirs(ROOTS.alphaGlobal)
+    fs.mkdirs(ROOTS.codepuppyGlobal)
     fs.addFile("/xdg/opencode/mcp-auth.json", 42)
     // 默认推导位置上的同名文件:改道后它不属于本环境,必须留着(写死路径的实现会连它一起删)
     fs.addFile("/home/u/.local/share/opencode/mcp-auth.json", 42)
@@ -195,7 +195,7 @@ describe("planClear · data(全部)", () => {
     const plan = DataClear.planClear(fs.deps(), "data", ROOTS)
     const ids = plan.items.map((i) => i.id)
     expect(ids[ids.length - 1]).toBe("userdata:logs")
-    expect(ids).toContain("alpha-global")
+    expect(ids).toContain("codepuppy-global")
     expect(ids).toContain("engine-data")
     const engine = plan.items.find((i) => i.id === "engine-data")!
     expect(engine.shared).toBe(true)
@@ -222,7 +222,7 @@ describe("planClear · data(全部)", () => {
   })
 })
 
-describe("findAlphaOwnedLinks · 桥链判别", () => {
+describe("findCodePuppyOwnedLinks · 桥链判别", () => {
   test("kind 级整目录链 + 条目级链均入列;真实目录/外来链/普通文件不碰", () => {
     const fs = seed()
     // kind 级整目录链(REQ-036 形态):~/.opencode/skill → 当前环境 skills
@@ -230,22 +230,22 @@ describe("findAlphaOwnedLinks · 桥链判别", () => {
     fs.addLink("/home/.opencode/skill", "/state/env/dev/skills")
     // 真实目录内的条目级链
     fs.mkdirs("/home/.opencode/agent")
-    fs.addLink("/home/.opencode/agent/alpha-bot.md", "/state/env/dev/agents/alpha-bot.md")
-    fs.addFile("/state/env/dev/agents/alpha-bot.md", 10)
+    fs.addLink("/home/.opencode/agent/codepuppy-bot.md", "/state/env/dev/agents/codepuppy-bot.md")
+    fs.addFile("/state/env/dev/agents/codepuppy-bot.md", 10)
     // 用户自建内容:真实文件 + 指向别处的链
     fs.addFile("/home/.opencode/agent/mine.md", 10)
     fs.addLink("/home/.opencode/agent/other.md", "/somewhere/else.md")
     fs.addFile("/home/.opencode/opencode.jsonc", 10)
 
-    const links = DataClear.findAlphaOwnedLinks(fs.deps(), ROOTS.opencodeHome, ROOTS.alphaGlobal)
-    expect(links.sort()).toEqual(["/home/.opencode/agent/alpha-bot.md", "/home/.opencode/skill"])
+    const links = DataClear.findCodePuppyOwnedLinks(fs.deps(), ROOTS.opencodeHome, ROOTS.codepuppyGlobal)
+    expect(links.sort()).toEqual(["/home/.opencode/agent/codepuppy-bot.md", "/home/.opencode/skill"])
   })
 
   test("目标已失效(当前环境 root 已删)仍按字面解析识别自有链", () => {
     const fs = new MemFs()
     fs.mkdirs("/home/.opencode")
     fs.addLink("/home/.opencode/skill", "/state/env/dev/skills") // 目标不存在
-    const links = DataClear.findAlphaOwnedLinks(fs.deps(), ROOTS.opencodeHome, ROOTS.alphaGlobal)
+    const links = DataClear.findCodePuppyOwnedLinks(fs.deps(), ROOTS.opencodeHome, ROOTS.codepuppyGlobal)
     expect(links).toEqual(["/home/.opencode/skill"])
   })
 
@@ -268,7 +268,7 @@ describe("findAlphaOwnedLinks · 桥链判别", () => {
 
 describe("executeClear · 守卫与失败语义", () => {
   test("真实三兄弟根只清 dev，prod/beta/CAS sentinel 字节不变", () => {
-    const temp = nodeFs.realpathSync(nodeFs.mkdtempSync(path.join(os.tmpdir(), "alpha-clear-siblings-")))
+    const temp = nodeFs.realpathSync(nodeFs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-clear-siblings-")))
     const state = path.join(temp, "state")
     const dev = path.join(state, "env", "dev")
     const prod = path.join(state, "env", "prod")
@@ -310,7 +310,7 @@ describe("executeClear · 守卫与失败语义", () => {
     }
     const roots = {
       userData,
-      alphaGlobal: dev,
+      codepuppyGlobal: dev,
       opencodeHome: path.join(temp, "opencode-home"),
       engineData: path.join(temp, "engine-data"),
     }
@@ -327,10 +327,10 @@ describe("executeClear · 守卫与失败语义", () => {
     const fs = seed()
     const deps = fs.deps()
     const plan = DataClear.planClear(deps, "data", ROOTS)
-    const unknown: DataClear.FsDeps = { ...deps, realpath: (file) => (file === ROOTS.alphaGlobal ? null : deps.realpath(file)) }
+    const unknown: DataClear.FsDeps = { ...deps, realpath: (file) => (file === ROOTS.codepuppyGlobal ? null : deps.realpath(file)) }
     expect(() => DataClear.executeClear(unknown, plan, ROOTS, { includeShared: true })).toThrow()
-    expect(deps.exists("/ud/alpha-auth.json")).toBe(true)
-    expect(deps.exists(ROOTS.alphaGlobal)).toBe(true)
+    expect(deps.exists("/ud/codepuppy-auth.json")).toBe(true)
+    expect(deps.exists(ROOTS.codepuppyGlobal)).toBe(true)
   })
 
   test("realpath 逃逸守卫根 → 拒删", () => {
@@ -354,19 +354,19 @@ describe("executeClear · 守卫与失败语义", () => {
 
   test("单项 EACCES 失败不中断批次,逐项结果如实", () => {
     const fs = seed()
-    fs.failOn.add("/ud/alpha.env")
+    fs.failOn.add("/ud/codepuppy.env")
     const deps = fs.deps()
     const plan = DataClear.planClear(deps, "credentials", ROOTS)
     const results = DataClear.executeClear(deps, plan, ROOTS, { includeShared: true })
-    expect(results.find((r) => r.id === "alpha-env")?.outcome).toBe("failed")
-    expect(results.find((r) => r.id === "alpha-auth")?.outcome).toBe("ok")
+    expect(results.find((r) => r.id === "codepuppy-env")?.outcome).toBe("failed")
+    expect(results.find((r) => r.id === "codepuppy-auth")?.outcome).toBe("ok")
     expect(results.find((r) => r.id === "engine-auth")?.outcome).toBe("ok")
   })
 
   test("缺席项记 missing,不算失败", () => {
     const fs = new MemFs()
     fs.mkdirs("/ud")
-    fs.mkdirs(ROOTS.alphaGlobal)
+    fs.mkdirs(ROOTS.codepuppyGlobal)
     const deps = fs.deps()
     const plan = DataClear.planClear(deps, "credentials", ROOTS)
     const results = DataClear.executeClear(deps, plan, ROOTS, { includeShared: true })

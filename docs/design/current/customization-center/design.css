@@ -81,7 +81,7 @@ table.matrix{width:100%;min-width:820px;border-collapse:separate;border-spacing:
 .chip[data-shelf="connector"]{background:color-mix(in srgb,var(--a-info) 14%,transparent);color:var(--a-info)}
 .chip[data-shelf="labs"]{background:var(--a-warning-subtle);color:var(--a-warning)}
 
-/* ── Hub 帧骨架(现役 .alpha-ext-* 的稿内等价物,v4 血统) ── */
+/* ── Hub 帧骨架(现役 .codepuppy-ext-* 的稿内等价物,v4 血统) ── */
 .hub{background:var(--a-bg-subtle)}
 .hub-tabbar{display:flex;align-items:center;gap:2px;padding:10px 18px 0;border-bottom:1px solid var(--a-border-faint);background:var(--a-bg-canvas);flex-wrap:wrap}
 .hub-tab{padding:7px 12px 9px;font-size:var(--a-text-sm);font-weight:var(--a-weight-medium);color:var(--a-text-secondary);border-bottom:2px solid transparent;cursor:default;white-space:nowrap}
@@ -108,7 +108,7 @@ table.matrix{width:100%;min-width:820px;border-collapse:separate;border-spacing:
 .cat-h{margin:22px 0 2px;font-size:var(--a-text-2xs);font-weight:var(--a-weight-semibold);letter-spacing:var(--a-tracking-wide);text-transform:uppercase;color:var(--a-text-tertiary)}
 .group-note{font-size:var(--a-text-xs);color:var(--a-text-tertiary);margin:4px 0 0}
 
-/* ── 详情页帧骨架(现役 .alpha-ext-d*,v5 血统) ── */
+/* ── 详情页帧骨架(现役 .codepuppy-ext-d*,v5 血统) ── */
 .det{padding:24px 26px;max-width:760px}
 .backrow{display:inline-flex;align-items:center;gap:5px;margin-bottom:16px;padding:5px 10px 5px 4px;border:0;border-radius:var(--a-radius-md);background:transparent;color:var(--a-text-secondary);font-size:var(--a-text-sm);font-weight:var(--a-weight-medium)}
 .dhead{display:flex;gap:14px;align-items:flex-start}
@@ -131,7 +131,7 @@ table.matrix{width:100%;min-width:820px;border-collapse:separate;border-spacing:
 .errbox{display:flex;gap:10px;padding:11px 13px;border:1px solid color-mix(in srgb,var(--a-error) 34%,var(--a-border));background:var(--a-error-subtle);border-radius:var(--a-radius-md);font-size:var(--a-text-sm);color:var(--a-text);line-height:var(--a-leading-snug)}
 .ghost-btn{border:1px solid var(--a-border);background:transparent;color:var(--a-text-secondary);font-size:var(--a-text-xs);font-weight:var(--a-weight-medium);padding:4px 11px;border-radius:var(--a-radius-md)}
 
-/* ── 已安装行(现役 .alpha-ext-man,v4/v5 血统) ── */
+/* ── 已安装行(现役 .codepuppy-ext-man,v4/v5 血统) ── */
 .man-row{display:flex;align-items:center;gap:13px;padding:13px 15px;border:1px solid var(--a-border);border-radius:var(--a-radius-lg);background:var(--a-surface);margin-bottom:9px}
 .man-row .ico{width:36px;height:36px;border-radius:var(--a-radius-md);display:grid;place-items:center;color:#fff;font-size:12px;font-weight:700;flex:none;box-shadow:var(--a-shadow-xs)}
 .man-row .body{min-width:0;flex:1}
@@ -147,7 +147,7 @@ table.matrix{width:100%;min-width:820px;border-collapse:separate;border-spacing:
 
 /* ════════════════════════════════════════════════════════════════════════
    本地扩展包导入(预览屏 / 已装扩展包区块 / 启用与生效)。
-   三组基元,全部是现役 .alpha-ext-* 的稿内等价物 —— 取值照现行实现,
+   三组基元,全部是现役 .codepuppy-ext-* 的稿内等价物 —— 取值照现行实现,
    不在这里另立一套视觉。
    ════════════════════════════════════════════════════════════════════════ */
 
@@ -163,29 +163,29 @@ table.matrix{width:100%;min-width:820px;border-collapse:separate;border-spacing:
 .dlg-lead{margin:0 0 4px;font-size:var(--a-text-sm);color:var(--a-text-secondary)}
 .dlg-lead b{color:var(--a-text)}
 
-/* 提示条:琥珀底 + 块级粗体标题(现役 .alpha-ext-verify-note) */
+/* 提示条:琥珀底 + 块级粗体标题(现役 .codepuppy-ext-verify-note) */
 .vnote{margin-top:10px;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--a-warning) 8%,transparent);border:1px solid color-mix(in srgb,var(--a-warning) 25%,transparent);font-size:var(--a-text-sm);line-height:var(--a-leading-snug)}
 .vnote:first-child{margin-top:0}
 .vnote b{display:block;margin-bottom:3px;color:var(--a-warning);font-size:var(--a-text-xs)}
 .vnote p{margin:0;color:var(--a-text-secondary)}
 .vnote ul{margin:6px 0 0;padding-left:18px;color:var(--a-text-secondary)}
 .vnote li{margin-bottom:2px}
-/* 屏内红字(现役 .alpha-ext-import-err / .alpha-ext-card-err) */
+/* 屏内红字(现役 .codepuppy-ext-import-err / .codepuppy-ext-card-err) */
 .imperr{margin:10px 0 0;font-size:var(--a-text-sm);color:var(--a-error);line-height:var(--a-leading-snug)}
 
-/* 区段标题行(现役 .alpha-ext-secrow:「标签 · 数量」) */
+/* 区段标题行(现役 .codepuppy-ext-secrow:「标签 · 数量」) */
 .secrow{display:flex;align-items:center;gap:8px;margin:16px 0 8px}
 .secrow:first-child{margin-top:0}
 .secrow .ov{font-size:var(--a-text-2xs);font-weight:var(--a-weight-semibold);letter-spacing:var(--a-tracking-wide);text-transform:uppercase;color:var(--a-text-tertiary)}
 
-/* 预览逐条行(现役 .alpha-ext-man,skip 行 data-dim) */
+/* 预览逐条行(现役 .codepuppy-ext-man,skip 行 data-dim) */
 .pv{display:flex;gap:11px;align-items:center;padding:10px 12px;border:1px solid var(--a-border);border-radius:var(--a-radius-lg);background:var(--a-surface);margin-bottom:7px}
 .pv .bd{min-width:0;flex:1}
 .pv .nm{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:var(--a-text-sm);font-weight:var(--a-weight-medium)}
 .pv .why{margin:3px 0 0;font-size:var(--a-text-xs);color:var(--a-text-tertiary);line-height:var(--a-leading-snug)}
 .pv[data-dim]{opacity:.72}
 
-/* 扩展包卡(现役 .alpha-ext-pack) */
+/* 扩展包卡(现役 .codepuppy-ext-pack) */
 .pack{border:1px solid var(--a-border);border-radius:var(--a-radius-lg);background:var(--a-surface);box-shadow:var(--a-edge-light);padding:13px 15px;margin-bottom:10px}
 .pack:last-child{margin-bottom:0}
 .pack-h{display:flex;align-items:center;gap:13px}
@@ -202,10 +202,10 @@ table.matrix{width:100%;min-width:820px;border-collapse:separate;border-spacing:
 .pc .st .dot{width:6px;height:6px;border-radius:50%;flex:none;background:var(--a-text-disabled)}
 .pc .st .dot.ok{background:var(--a-success)}
 .pc .st .dot.warn{background:var(--a-warning)}
-/* 整包移除键(现役 .alpha-ext-add[data-variant=danger]:描边 + 错误色) */
+/* 整包移除键(现役 .codepuppy-ext-add[data-variant=danger]:描边 + 错误色) */
 .danger{display:inline-flex;align-items:center;height:26px;padding:0 12px;border-radius:var(--a-radius-md);border:1px solid color-mix(in srgb,var(--a-error) 35%,transparent);background:transparent;color:var(--a-error);font-size:var(--a-text-xs);font-weight:var(--a-weight-medium);white-space:nowrap}
 .danger:disabled{opacity:.6;cursor:not-allowed}
-/* 行内「下一步」键(现役 .alpha-ext-updbtn:琥珀底) */
+/* 行内「下一步」键(现役 .codepuppy-ext-updbtn:琥珀底) */
 .nextbtn{display:inline-flex;align-items:center;height:28px;padding:0 12px;border:0;border-radius:var(--a-radius-md);background:var(--a-warning-subtle);color:var(--a-warning);font-size:var(--a-text-xs);font-weight:var(--a-weight-medium);white-space:nowrap}
 .refusal{display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap}
 

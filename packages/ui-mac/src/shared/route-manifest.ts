@@ -3,7 +3,7 @@
 // ownership remains upstream. The upstream packages/app deep-link parser is held at arm's length
 // like its Route tree; Alpha validates and canonicalizes ingress here before forwarding it.
 
-import type { SurfaceId } from "./alpha-surfaces"
+import type { SurfaceId } from "./codepuppy-surfaces"
 
 export const ROUTE_MANIFEST_VERSION = 1
 

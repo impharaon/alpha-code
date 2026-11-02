@@ -53,7 +53,7 @@ skipped provenance check.
 Like the aggregate above, these three values are republished prose. Nothing
 reads this file — every SHA comparison in the repository runs between the
 manifest, the vendored bytes, and
-`packages/alpha-contracts-consumer/alpha-web-extension-package.lock.json`. The
+`packages/codepuppy-contracts-consumer/alpha-web-extension-package.lock.json`. The
 producer pin recorded here was last correct at `alpha-web@b7174810` and stayed
 stale across `#759` (`alpha-web@6e0db57d`) with every gate green, exactly as the
 host aggregate did. Re-read both from the lock and the manifest.
@@ -76,7 +76,7 @@ registry now registers `cloud`, so the live host artifact moved, while the
 vendored producer artifact still republishes the pre-cloud host copy and
 lists `cloud` among its exclusions. Until alpha-web pins a checkpoint of this
 change, republishes, and this repository re-vendors those bytes
-(`bun run --cwd packages/alpha-contracts-consumer vendor`, as `#1312` did for
+(`bun run --cwd packages/codepuppy-contracts-consumer vendor`, as `#1312` did for
 the listing section), the consumer's byte-identity check against the live
 host artifact is expected to fail, and the closure test's five-profile and
 `cloud`-excluded expectations change with the re-vendor. Same rule: do not

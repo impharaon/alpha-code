@@ -9,7 +9,7 @@
 //   · takeover-adapter-coexistence 断的是 `composer` 源码里有没有 `delivery: "queue"` 这段
 //     字面量 —— 源码文本断言,对本 bug 会照常通过。
 //
-// 所以这道闸的判据只认**可观测结果**:生产 AlphaComposer + 生产 AlphaSessionTimeline 挂在同一棵树
+// 所以这道闸的判据只认**可观测结果**:生产 CodePuppyComposer + 生产 CodePuppySessionTimeline 挂在同一棵树
 // 上,共用同一个假 sidecar;点发送 → 时间线上必须出现自己发的那句话和引擎的回复。连发三条,
 // 第 2、3 条一样要出现。
 //
@@ -22,7 +22,7 @@
 //     alpha 的 store 里**没有任何 `session.next.*` 的 reducer**,两张表也互不投影 —— 于是 UI
 //     一个字都不会变。这正是「输入框清空之后再无任何反应」的机制。
 //
-// 变异验证:把 alpha-composer 的会话发送改回 `c.v2.session.prompt`,本文件第一条用例必须转红。
+// 变异验证:把 codepuppy-composer 的会话发送改回 `c.v2.session.prompt`,本文件第一条用例必须转红。
 import { transformAsync } from "@babel/core"
 import presetTypescript from "@babel/preset-typescript"
 import { GlobalRegistrator } from "@happy-dom/global-registrator"
@@ -30,10 +30,10 @@ import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "b
 import presetSolid from "babel-preset-solid"
 import type { ModelV2Info } from "@opencode-ai/sdk/v2/client"
 import type { AccountSummary, AuthState } from "../src/preload/types"
-import type { EffectiveCatalog, ProviderKeyStatus } from "../src/shared/alpha-model-types"
-import type { AlphaProjectsApi } from "../src/renderer/sidebar/use-projects"
-import type { AlphaComposerRuntimeProps } from "../src/renderer/alpha-ui/alpha-composer"
-import type { ModelContract } from "../src/renderer/alpha-ui/model-contract"
+import type { EffectiveCatalog, ProviderKeyStatus } from "../src/shared/codepuppy-model-types"
+import type { CodePuppyProjectsApi } from "../src/renderer/sidebar/use-projects"
+import type { CodePuppyComposerRuntimeProps } from "../src/renderer/codepuppy-ui/codepuppy-composer"
+import type { ModelContract } from "../src/renderer/codepuppy-ui/model-contract"
 // `#1374`:共享 `window.api` 桩。它只 import 类型(运行期零依赖),所以静态 import 不会
 // 在 `mock.module` 之前把 solid-js 之类的东西拖进来。
 import { installPreloadStub } from "./preload-stub"
@@ -212,8 +212,8 @@ const sdkClient = {
 }
 
 mock.module("@solidjs/router", () => ({ useNavigate: () => () => {} }))
-mock.module("../src/renderer/alpha-ui/session-workspace/alpha-session-workspace", () => ({
-  useAlphaSessionLiveContext: () => ({
+mock.module("../src/renderer/codepuppy-ui/session-workspace/codepuppy-session-workspace", () => ({
+  useCodePuppySessionLiveContext: () => ({
     current: () => ({
       identity: { serverKey: "sidecar", directory: DIRECTORY, sessionID: SESSION_ID },
       title: "整理架构说明",
@@ -235,8 +235,8 @@ mock.module("@opencode-ai/app", () => ({
   }),
 }))
 
-const command = { options: [], trigger: () => {} } as unknown as AlphaComposerRuntimeProps["command"]
-mock.module("../src/renderer/alpha-ui/providers", () => ({ useCommand: () => command }))
+const command = { options: [], trigger: () => {} } as unknown as CodePuppyComposerRuntimeProps["command"]
+mock.module("../src/renderer/codepuppy-ui/providers", () => ({ useCommand: () => command }))
 
 Bun.plugin({
   name: "session-second-send-component-test",
@@ -255,8 +255,8 @@ Bun.plugin({
   },
 })
 
-const { AlphaComposerRuntime } = await import("../src/renderer/alpha-ui/alpha-composer")
-const { AlphaSessionTimeline } = await import("../src/renderer/alpha-ui/session-timeline/session-timeline")
+const { CodePuppyComposerRuntime } = await import("../src/renderer/codepuppy-ui/codepuppy-composer")
+const { CodePuppySessionTimeline } = await import("../src/renderer/codepuppy-ui/session-timeline/session-timeline")
 const {
   composerModel,
   resetComposerModelProjection,
@@ -264,8 +264,8 @@ const {
   setComposerModel,
   setComposerPerm,
   DEFAULT_PERM,
-} = await import("../src/renderer/alpha-ui/composer-state")
-const { createComposerFocusChannel } = await import("../src/renderer/alpha-ui/session-workspace/session-workspace-core")
+} = await import("../src/renderer/codepuppy-ui/composer-state")
+const { createComposerFocusChannel } = await import("../src/renderer/codepuppy-ui/session-workspace/session-workspace-core")
 
 /* ── composer 的模型链前置(与既有 composer 组件用例同一套 fixture)────────────── */
 // `#1556`:已应用目录(上游 V3 producer 快照 + 随包 BYOK 首启引导)经生产投影装配,见 effective-catalog.fixture.ts。
@@ -338,7 +338,7 @@ const projects = {
   shareSession: async () => undefined,
   deleteSession: async () => false,
   copySession: async () => undefined,
-} satisfies AlphaProjectsApi
+} satisfies CodePuppyProjectsApi
 
 const disposers: Array<() => void> = []
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
@@ -358,7 +358,7 @@ async function waitFor(assertion: () => void) {
 
 /** 生产会话页的三块,同一棵树、同一个假 sidecar:
  *  timeline(呈现面)+ session composer(会话内发送)+ home composer(首页入口)。
- *  两个 composer 都是生产 AlphaComposerRuntime,只是 mode 不同 —— 这正是 #652 里
+ *  两个 composer 都是生产 CodePuppyComposerRuntime,只是 mode 不同 —— 这正是 #652 里
  *  「第一条好、第二条起坏」的那条分界线所在。 */
 function mountSessionSurface(running: () => boolean) {
   const host = document.createElement("div")
@@ -366,8 +366,8 @@ function mountSessionSurface(running: () => boolean) {
   disposers.push(
     render(
       () => [
-        createComponent(AlphaSessionTimeline, {}),
-        createComponent(AlphaComposerRuntime, {
+        createComponent(CodePuppySessionTimeline, {}),
+        createComponent(CodePuppyComposerRuntime, {
           mode: "session",
           projects,
           directory: () => DIRECTORY,
@@ -376,7 +376,7 @@ function mountSessionSurface(running: () => boolean) {
           modelContract: readyContract(),
           sessionDock: { running, contextUsage: () => null, approvalPending: () => false },
         }),
-        createComponent(AlphaComposerRuntime, {
+        createComponent(CodePuppyComposerRuntime, {
           mode: "home",
           projects,
           directory: () => DIRECTORY,
@@ -391,7 +391,7 @@ function mountSessionSurface(running: () => boolean) {
 }
 
 const surfaceOf = (host: HTMLElement, mode: "home" | "session") =>
-  host.querySelector<HTMLElement>(`[data-alpha-composer="${mode}"]`)!
+  host.querySelector<HTMLElement>(`[data-codepuppy-composer="${mode}"]`)!
 
 async function send(host: HTMLElement, mode: "home" | "session", text: string) {
   const surface = surfaceOf(host, mode)
@@ -491,7 +491,7 @@ describe("#652 会话内连发三条:每一条都必须渲染出来", () => {
    缺席时引擎以默认助手(build,`*: allow`)运行命令,「只读」「请求审批」被整段绕过(方案 §1.3)。
    判据是**生产 composer 真发出去的请求体**:会话内那一处直接读 `session.command` 的入参;首页那一处
    把档位交给 `startChat`,它的 `session.command` 请求体由 use-projects.cases.ts 驱动真 startChat 断言。
-   变异验证:把 alpha-composer.tsx 命令请求里的 `agent` 删掉,本用例「请求审批」「只读」两格转红。 */
+   变异验证:把 codepuppy-composer.tsx 命令请求里的 `agent` 删掉,本用例「请求审批」「只读」两格转红。 */
 describe("REQ-236 AC3:斜杠命令带档位 agent(与普通发送同一张档位表)", () => {
   test("会话内 /review:全部批准不带、请求审批 codepuppy-ask、只读 codepuppy-readonly;首页 /review 把档位交给 startChat", async () => {
     engine.commands = [{ name: "review", source: "command" }]
@@ -558,10 +558,10 @@ function mountWithFocusChannel(options: { composer: boolean }) {
   disposers.push(
     render(
       () => [
-        createComponent(AlphaSessionTimeline, { onFocusPrompt: channel.focus }),
+        createComponent(CodePuppySessionTimeline, { onFocusPrompt: channel.focus }),
         ...(options.composer
           ? [
-              createComponent(AlphaComposerRuntime, {
+              createComponent(CodePuppyComposerRuntime, {
                 mode: "session",
                 projects,
                 directory: () => DIRECTORY,
@@ -585,13 +585,13 @@ function mountWithFocusChannel(options: { composer: boolean }) {
 }
 
 const retryButton = (host: HTMLElement) =>
-  host.querySelector<HTMLButtonElement>("[data-alpha-timeline-row='empty-turn'] button.a-tl-int-continue")
+  host.querySelector<HTMLButtonElement>("[data-codepuppy-timeline-row='empty-turn'] button.a-tl-int-continue")
 
 describe("#1318 AC3 空回合行「修改后再试」把焦点放回输入框", () => {
   test("按钮在生产装配下渲染,点击后会话 composer 的 textarea 获得焦点", async () => {
     seedEmptyTurn()
     const host = mountWithFocusChannel({ composer: true })
-    await waitFor(() => expect(host.querySelector("[data-alpha-timeline-row='empty-turn']")).not.toBeNull())
+    await waitFor(() => expect(host.querySelector("[data-codepuppy-timeline-row='empty-turn']")).not.toBeNull())
     const button = retryButton(host)
     expect(button).not.toBeNull()
     const textarea = surfaceOf(host, "session").querySelector("textarea")!
@@ -602,7 +602,7 @@ describe("#1318 AC3 空回合行「修改后再试」把焦点放回输入框", 
     expect(document.activeElement).toBe(textarea)
     // 只交回焦点,不代发任何东西。
     expect(engine.v1Prompts).toEqual([])
-    expect(host.querySelector("[data-alpha-timeline-row='empty-turn'] .a-tl-int-failed")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-timeline-row='empty-turn'] .a-tl-int-failed")).toBeNull()
   })
 
   test("没有 composer 登记时点击是 no-op:不抛、不出失败提示", async () => {
@@ -613,6 +613,6 @@ describe("#1318 AC3 空回合行「修改后再试」把焦点放回输入框", 
     retryButton(host)!.click()
     await flush()
     expect(document.activeElement).toBe(before)
-    expect(host.querySelector("[data-alpha-timeline-row='empty-turn'] .a-tl-int-failed")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-timeline-row='empty-turn'] .a-tl-int-failed")).toBeNull()
   })
 })

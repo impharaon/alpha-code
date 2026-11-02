@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { type DesktopMenuEntry, type DesktopMenuPlatform, type DesktopMenuRole } from "@opencode-ai/app/desktop-menu"
 import { DESKTOP_NATIVE_ENGLISH } from "@opencode-ai/app/i18n/desktop-native"
 
-import { alphaDesktopMenu } from "../shared/desktop-menu-policy"
+import { codepuppyDesktopMenu } from "../shared/desktop-menu-policy"
 import { UPDATER_ENABLED } from "./constants"
 import { runDesktopMenuAction } from "./desktop-menu-actions"
 import { menuPlatform } from "./platform"
@@ -29,7 +29,7 @@ export function createMenu(deps: Deps) {
   // REQ-126 AC7(#658):发布面来自 `shared/desktop-menu-policy`,不再直接铺开上游 DESKTOP_MENU ——
   // 随上游叶退役的命令必须显式处置(承接或退休),退休项在那里剔除,渲染进程的运行时闸门按同一份
   // 发布面逐个要求「真注册且可触发」。平台可见性过滤已在策略里做过,这里不再重复。
-  const template: MenuItemConstructorOptions[] = alphaDesktopMenu(target).map((menu) => {
+  const template: MenuItemConstructorOptions[] = codepuppyDesktopMenu(target).map((menu) => {
     if (menu.role) return roleItem(menu.role)
     // 上游 e11dbd020 起菜单项只带 labelKey;英文表就是上游此前内联的那些字面量。渲染进程的
     // onNativeTranslations → 主进程 bundle 那条本地化通道本次未接(main 无 i18n,ADR-022 先例)。

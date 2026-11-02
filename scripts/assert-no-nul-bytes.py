@@ -185,7 +185,7 @@ def self_check() -> list[str]:
     里的空闸门。所以这里先自己实施一遍绕过:造一个带真 NUL 的文件,断言它被抓到。
     """
     problems: list[str] = []
-    with tempfile.TemporaryDirectory(prefix="alpha-nul-canary-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="codepuppy-nul-canary-") as tmp:
         planted = os.path.join(tmp, "canary.ts")
         with open(planted, "wb") as handle:
             handle.write(b"export const sep = " + bytes((NUL_BYTE,)) + b"\n")

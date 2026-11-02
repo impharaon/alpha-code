@@ -5,7 +5,7 @@
 // 任何东西**会在文件继续变大时提醒我们。这种债每次只多一点点,等到必须拆的时候,拆的成本
 // 已经比当初拦住它贵很多倍。
 //
-// 被测对象是 scripts/assert-module-size.sh(alpha-check 第 [14/14] 步跑的就是它)。
+// 被测对象是 scripts/assert-module-size.sh(codepuppy-check 第 [14/14] 步跑的就是它)。
 //
 // 为什么判据必须长这样:
 //   · **反向用例是本票的退出条件之一**:把一个登记文件加长到超基线,闸**必须响**并点名。
@@ -99,7 +99,7 @@ const DEFAULT_ROWS: Array<[string, string, string, string]> = [
  * 登记簿,用来验「取不到基准时脚本明说没比对」。
  */
 function fixture(rows: ManifestRows = DEFAULT_ROWS, baseRows: ManifestRows | null = rows) {
-  const origin = mkdtempSync(join(tmpdir(), "alpha-modsize-origin-"))
+  const origin = mkdtempSync(join(tmpdir(), "codepuppy-modsize-origin-"))
   git(origin, ["init", "-q", "-b", "alpha"])
   write(origin, {
     [PINNED_A]: lines(PINNED_A_LINES, "a"),
@@ -111,7 +111,7 @@ function fixture(rows: ManifestRows = DEFAULT_ROWS, baseRows: ManifestRows | nul
   git(origin, ["add", "-A"])
   git(origin, ["commit", "-q", "-m", "seed"])
 
-  const work = mkdtempSync(join(tmpdir(), "alpha-modsize-work-"))
+  const work = mkdtempSync(join(tmpdir(), "codepuppy-modsize-work-"))
   const cloned = Bun.spawnSync(["git", "clone", "-q", origin, work], { env: { ...GIT_ENV } })
   if (cloned.exitCode !== 0) throw new Error(`git clone 失败:${cloned.stderr.toString()}`)
   git(work, ["checkout", "-q", "-b", "feature", "origin/alpha"])

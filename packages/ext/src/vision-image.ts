@@ -9,7 +9,7 @@
 // 解码 / 缩放 / 编码用的是引擎自己那份 `@silvia-odwyer/photon-node@0.3.4`(同一个 patched 包,
 // 见根 package.json 的 patchedDependencies),不另引第二套图像库 —— 同一张图两边看到的是同一个解码器。
 // wasm 经 `with { type: "file" }` 随 bundle 落地(ui-mac electron-builder 把 `*.wasm` 与 plugin.js 一起复制到
-// `<resources>/alpha-ext/`),装载路径经 photon patch 认的 `globalThis.__OPENCODE_PHOTON_WASM_PATH` 交给它。
+// `<resources>/codepuppy-ext/`),装载路径经 photon patch 认的 `globalThis.__OPENCODE_PHOTON_WASM_PATH` 交给它。
 // 引擎的 image.ts 也写同一个全局;两边指向的是同一版本、同一字节的 wasm,先后覆盖无害(2026-09-24 勘破)。
 
 import wasmAsset from "@silvia-odwyer/photon-node/photon_rs_bg.wasm" with { type: "file" }

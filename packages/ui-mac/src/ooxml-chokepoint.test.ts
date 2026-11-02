@@ -24,7 +24,7 @@ const SRC_ROOT = resolve(import.meta.dir)
 /** 唯一允许够到解压面的文件(相对 src)。 */
 const INFLATE_CHOKEPOINT = "shared/ooxml.ts"
 /** 唯一允许调 DOMParser 的文件(相对 src)。 */
-const DOM_PARSER_CHOKEPOINT = "renderer/alpha-ui/artifact-workbench/renderers/ooxml-content.ts"
+const DOM_PARSER_CHOKEPOINT = "renderer/codepuppy-ui/artifact-workbench/renderers/ooxml-content.ts"
 /** @zip.js 写侧的既有消费者(只允许 writer 符号,由规则 3 看住)。 */
 const ZIP_WRITER_EXCEPTION = "main/logging.ts"
 

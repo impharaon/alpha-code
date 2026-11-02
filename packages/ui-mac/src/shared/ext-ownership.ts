@@ -9,7 +9,7 @@
 //     (channel "remote"/"cache",ed25519 验签,REQ-101)条目;与 ext-install-planner 的
 //     manifest 合成共用(planner 从这里导入,不再私有实现)。
 //   · ownershipFromSeedAsset —— packaged seed(REQ-102,ext-seed.ts readPackagedSeed)。
-//   · ownershipFromInstall —— 本地安装(receipts/records 真源,ext-receipt-v2/alpha-installs):
+//   · ownershipFromInstall —— 本地安装(receipts/records 真源,ext-receipt-v2/codepuppy-installs):
 //     能在当前已验 catalog 解析到条目时按 catalog 推导;解析不到时如实降级
 //     (authored=unknown、supportTier=user),绝不向上猜(AC1:curated ≠ authored,不混标)。
 //
@@ -29,7 +29,7 @@ export type RuntimeSurface = (typeof RUNTIME_SURFACES)[number]
 
 /** 支持等级:谁为这个条目的可用性负责。 */
 export const SUPPORT_TIERS = [
-  "alpha", // Alpha 自产自支持
+  "codepuppy", // Code Puppy 自产自支持
   "curated", // 官方上游 + Alpha 策展支持
   "community", // 社区来源,Alpha 只做策展面
   "user", // 用户自装/自负(无策展支持面)
@@ -48,7 +48,7 @@ export const DISTRIBUTION_CHANNELS = [
 export type DistributionChannel = (typeof DISTRIBUTION_CHANNELS)[number]
 
 /** authored/curated 维的保留主体名(自由字符串维度中的三个固定语义值)。 */
-export const PARTY_ALPHA = "alpha"
+export const PARTY_CODEPUPPY = "alpha"
 export const PARTY_USER = "user"
 export const PARTY_UNKNOWN = "unknown"
 
@@ -178,7 +178,8 @@ export function distributionChannelForCatalogEntry(entry: OwnershipCatalogEntryL
 
 /** 支持等级 ← 来源(catalog source / seed asset source 共用):alpha/official/community/其余=user。 */
 export function supportTierForSource(source: string | undefined): SupportTier {
-  if (source === "alpha") return "alpha"
+  // 入参 source 的取值 "alpha" 是网站目录条目的字段值(跨仓,三端同窗切换时由网站一侧先改);返回的支持等级是桌面内部值
+  if (source === "alpha") return "codepuppy"
   if (source === "official") return "curated"
   if (source === "community") return "community"
   return "user"
@@ -191,7 +192,7 @@ export function supportTierForSource(source: string | undefined): SupportTier {
 export function ownershipFromCatalogEntry(entry: OwnershipCatalogEntryLike, channel: CatalogTrustChannel): OwnershipDims {
   return {
     authored: entry.source ?? PARTY_USER,
-    curated: PARTY_ALPHA,
+    curated: PARTY_CODEPUPPY,
     distributed: distributionChannelForCatalogEntry(entry, channel),
     runtimeSurfaces: runtimeSurfacesForCatalogEntry(entry),
     supportTier: supportTierForSource(entry.source),
@@ -205,7 +206,7 @@ export function ownershipFromCatalogEntry(entry: OwnershipCatalogEntryLike, chan
 export function ownershipFromSeedAsset(asset: { type: string; source: string }): OwnershipDims {
   return {
     authored: asset.source,
-    curated: PARTY_ALPHA,
+    curated: PARTY_CODEPUPPY,
     distributed: "bundled",
     runtimeSurfaces: runtimeSurfacesForKind(asset.type),
     supportTier: supportTierForSource(asset.source),
@@ -237,7 +238,7 @@ export function ownershipFromInstall(
   if (install.origin === "catalog") {
     return {
       authored: PARTY_UNKNOWN,
-      curated: PARTY_ALPHA,
+      curated: PARTY_CODEPUPPY,
       distributed: fallbackChannelForKind(install.kind),
       runtimeSurfaces: runtimeSurfacesForKind(install.kind),
       supportTier: "user",

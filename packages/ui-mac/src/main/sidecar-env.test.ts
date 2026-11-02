@@ -1,5 +1,5 @@
 // Unit tests for the A6 sidecar env allowlist (sidecar-env.ts). The contract under test IS the A6
-// acceptance criterion: no secret (ALPHA_API_KEY / BYOK keys / ALPHA_CLOUD_TOKEN / EXA_API_KEY /
+// acceptance criterion: no secret (CODEPUPPY_API_KEY / BYOK keys / CODEPUPPY_CLOUD_TOKEN / EXA_API_KEY /
 // DEV_PLATFORM_TOKEN) may survive into the env that MCP/LSP/shell children inherit, while everything
 // the sidecar genuinely needs must still pass.
 
@@ -11,18 +11,18 @@ import { SIDECAR_EGRESS_NO_PROXY, createSidecarEnv, isSecretish, sidecarEgressPr
 describe("createSidecarEnv — default-deny", () => {
   test("strips every secret named by the A6 acceptance criteria", () => {
     const env = createSidecarEnv({
-      ALPHA_API_KEY: "jwt",
-      ALPHA_CLOUD_TOKEN: "bearer",
-      ALPHA_MCP_TOKEN: "mcp-bearer",
+      CODEPUPPY_API_KEY: "jwt",
+      CODEPUPPY_CLOUD_TOKEN: "bearer",
+      CODEPUPPY_MCP_TOKEN: "mcp-bearer",
       DEEPSEEK_API_KEY: "sk-1",
       MOONSHOT_API_KEY: "sk-2",
       EXA_API_KEY: "exa",
       DEV_PLATFORM_TOKEN: "dev",
       PATH: "/usr/bin",
     })
-    expect(env.ALPHA_API_KEY).toBeUndefined()
-    expect(env.ALPHA_CLOUD_TOKEN).toBeUndefined()
-    expect(env.ALPHA_MCP_TOKEN).toBeUndefined()
+    expect(env.CODEPUPPY_API_KEY).toBeUndefined()
+    expect(env.CODEPUPPY_CLOUD_TOKEN).toBeUndefined()
+    expect(env.CODEPUPPY_MCP_TOKEN).toBeUndefined()
     expect(env.DEEPSEEK_API_KEY).toBeUndefined()
     expect(env.MOONSHOT_API_KEY).toBeUndefined()
     expect(env.EXA_API_KEY).toBeUndefined()
@@ -64,26 +64,26 @@ describe("createSidecarEnv — default-deny", () => {
 
   test("passes the non-secret alpha controls the sidecar reads", () => {
     const env = createSidecarEnv({
-      ALPHA_BASE_URL: "https://gw.example/v1",
-      ALPHA_CLOUD_MCP_URL: "https://mcp.example",
-      ALPHA_DEFAULT_MODEL: "alpha/x",
-      ALPHA_MODELS_DISABLE: "1",
-      ALPHA_IDENTITY_DISABLE: "1",
-      ALPHA_BEHAVIOR_DISABLE: "1",
-      ALPHA_WEBSEARCH_DISABLE: "1",
+      CODEPUPPY_BASE_URL: "https://gw.example/v1",
+      CODEPUPPY_CLOUD_MCP_URL: "https://mcp.example",
+      CODEPUPPY_DEFAULT_MODEL: "alpha/x",
+      CODEPUPPY_MODELS_DISABLE: "1",
+      CODEPUPPY_IDENTITY_DISABLE: "1",
+      CODEPUPPY_BEHAVIOR_DISABLE: "1",
+      CODEPUPPY_WEBSEARCH_DISABLE: "1",
       // main-only alpha vars must NOT pass
-      ALPHA_WEB_URL: "https://web.example",
-      ALPHA_SHOT: "1",
+      CODEPUPPY_WEB_URL: "https://web.example",
+      CODEPUPPY_SHOT: "1",
     })
-    expect(env.ALPHA_BASE_URL).toBe("https://gw.example/v1")
-    expect(env.ALPHA_CLOUD_MCP_URL).toBe("https://mcp.example")
-    expect(env.ALPHA_DEFAULT_MODEL).toBe("alpha/x")
-    expect(env.ALPHA_MODELS_DISABLE).toBe("1")
-    expect(env.ALPHA_IDENTITY_DISABLE).toBe("1")
-    expect(env.ALPHA_BEHAVIOR_DISABLE).toBe("1")
-    expect(env.ALPHA_WEBSEARCH_DISABLE).toBe("1")
-    expect(env.ALPHA_WEB_URL).toBeUndefined()
-    expect(env.ALPHA_SHOT).toBeUndefined()
+    expect(env.CODEPUPPY_BASE_URL).toBe("https://gw.example/v1")
+    expect(env.CODEPUPPY_CLOUD_MCP_URL).toBe("https://mcp.example")
+    expect(env.CODEPUPPY_DEFAULT_MODEL).toBe("alpha/x")
+    expect(env.CODEPUPPY_MODELS_DISABLE).toBe("1")
+    expect(env.CODEPUPPY_IDENTITY_DISABLE).toBe("1")
+    expect(env.CODEPUPPY_BEHAVIOR_DISABLE).toBe("1")
+    expect(env.CODEPUPPY_WEBSEARCH_DISABLE).toBe("1")
+    expect(env.CODEPUPPY_WEB_URL).toBeUndefined()
+    expect(env.CODEPUPPY_SHOT).toBeUndefined()
   })
 
   test("passes OPENCODE_/XDG_/LC_/ELECTRON_ prefixes (channel DB, state home, locale, dev exec path)", () => {
@@ -112,9 +112,9 @@ describe("createSidecarEnv — default-deny", () => {
 })
 
 describe("createSidecarEnv — escape hatch", () => {
-  test("ALPHA_ENV_ALLOWLIST_EXTRA passes the named non-secret vars through", () => {
+  test("CODEPUPPY_ENV_ALLOWLIST_EXTRA passes the named non-secret vars through", () => {
     const env = createSidecarEnv({
-      ALPHA_ENV_ALLOWLIST_EXTRA: "MY_CUSTOM_VAR, MY_PROVIDER_BASE_URL",
+      CODEPUPPY_ENV_ALLOWLIST_EXTRA: "MY_CUSTOM_VAR, MY_PROVIDER_BASE_URL",
       MY_CUSTOM_VAR: "v",
       MY_PROVIDER_BASE_URL: "https://p.example/v1",
       UNNAMED_VAR: "not-in-the-hatch",
@@ -125,31 +125,31 @@ describe("createSidecarEnv — escape hatch", () => {
     expect(env.UNNAMED_VAR).toBeUndefined()
     expect(env.DEEPSEEK_API_KEY).toBeUndefined()
     // the hatch itself stays visible for diagnostics
-    expect(env.ALPHA_ENV_ALLOWLIST_EXTRA).toBeDefined()
+    expect(env.CODEPUPPY_ENV_ALLOWLIST_EXTRA).toBeDefined()
   })
 
   // #603: the hatch used to pass its named vars BEFORE the SECRETISH guard, so
-  // ALPHA_ENV_ALLOWLIST_EXTRA=ALPHA_API_KEY leaked the raw platform bearer into the sidecar and
+  // CODEPUPPY_ENV_ALLOWLIST_EXTRA=CODEPUPPY_API_KEY leaked the raw platform bearer into the sidecar and
   // every MCP/LSP/agent-shell child it spawns. The A6 / startup-baseline ③ invariant "a token never
   // enters the sidecar env" is absolute: no user opt-in may waive it.
   test("vetoes the absolute platform tokens even when named in the hatch", () => {
     const env = createSidecarEnv({
-      ALPHA_ENV_ALLOWLIST_EXTRA: "ALPHA_API_KEY,ALPHA_CLOUD_TOKEN,DEV_PLATFORM_TOKEN",
-      ALPHA_API_KEY: "jwt",
-      ALPHA_CLOUD_TOKEN: "bearer",
-      ALPHA_MCP_TOKEN: "mcp-bearer",
+      CODEPUPPY_ENV_ALLOWLIST_EXTRA: "CODEPUPPY_API_KEY,CODEPUPPY_CLOUD_TOKEN,DEV_PLATFORM_TOKEN",
+      CODEPUPPY_API_KEY: "jwt",
+      CODEPUPPY_CLOUD_TOKEN: "bearer",
+      CODEPUPPY_MCP_TOKEN: "mcp-bearer",
       DEV_PLATFORM_TOKEN: "dev",
     })
-    expect(env.ALPHA_API_KEY).toBeUndefined()
-    expect(env.ALPHA_CLOUD_TOKEN).toBeUndefined()
-    expect(env.ALPHA_MCP_TOKEN).toBeUndefined()
+    expect(env.CODEPUPPY_API_KEY).toBeUndefined()
+    expect(env.CODEPUPPY_CLOUD_TOKEN).toBeUndefined()
+    expect(env.CODEPUPPY_MCP_TOKEN).toBeUndefined()
     expect(env.DEV_PLATFORM_TOKEN).toBeUndefined()
   })
 
   test("vetoes any credential-shaped name named in the hatch (SECRETISH, not a fixed blocklist)", () => {
     const names = ["EXA_API_KEY", "GH_TOKEN", "DB_PASSWORD", "SOME_CREDENTIAL", "AWS_SECRET_ACCESS_KEY", "my_api_key"]
     const env = createSidecarEnv({
-      ALPHA_ENV_ALLOWLIST_EXTRA: names.join(","),
+      CODEPUPPY_ENV_ALLOWLIST_EXTRA: names.join(","),
       ...Object.fromEntries(names.map((name) => [name, "leak"])),
       MY_CUSTOM_VAR: "kept",
     })
@@ -159,8 +159,8 @@ describe("createSidecarEnv — escape hatch", () => {
 
   test("the veto is absolute: no path (hatch, exact, prefix) passes a credential-shaped name", () => {
     const env = createSidecarEnv({
-      ALPHA_ENV_ALLOWLIST_EXTRA: "ALPHA_API_KEY,OPENCODE_API_KEY,MY_CUSTOM_VAR",
-      ALPHA_API_KEY: "jwt",
+      CODEPUPPY_ENV_ALLOWLIST_EXTRA: "CODEPUPPY_API_KEY,OPENCODE_API_KEY,MY_CUSTOM_VAR",
+      CODEPUPPY_API_KEY: "jwt",
       OPENCODE_API_KEY: "zen",
       OPENCODE_CLIENT: "desktop",
       PATH: "/usr/bin",
@@ -184,21 +184,21 @@ describe("createSidecarEnv — escape hatch", () => {
   })
 
   test("hatch path alone (name matches no prefix and no exact entry) vetoes a credential-shaped name", () => {
-    const env = createSidecarEnv({ ALPHA_ENV_ALLOWLIST_EXTRA: "WIDGET_TOKEN", WIDGET_TOKEN: "leak" })
+    const env = createSidecarEnv({ CODEPUPPY_ENV_ALLOWLIST_EXTRA: "WIDGET_TOKEN", WIDGET_TOKEN: "leak" })
     expect(env.WIDGET_TOKEN).toBeUndefined()
     expect(Object.values(env)).not.toContain("leak")
   })
 
   // #223 R5 Minor — 事实更正。R4 的注释声称 ext 装载握手通道「不在白名单里,所以外部 shell 伪造
   // 一个同名变量也进不来」。**不成立**:这三个名字都不是 credential-shaped,逃生阀点名即放行。
-  // 这条测试把真事实钉住(shell 进得来),握手的可信度另有来源 —— `injectAlphaConfig` 在每次 fork
-  // 的每一条分支上覆盖或删除它们,由 `alpha-config-injection.test.ts`「继承/伪造的 arm+def 变量在
+  // 这条测试把真事实钉住(shell 进得来),握手的可信度另有来源 —— `injectCodePuppyConfig` 在每次 fork
+  // 的每一条分支上覆盖或删除它们,由 `codepuppy-config-injection.test.ts`「继承/伪造的 arm+def 变量在
   // 每条分支上都被注入面覆盖或清掉」断言。两条测试合起来才是完整判据;删掉任何一条都会让
   // 「握手不可伪造」重新变成没有支撑的声明。
   test("hatch DOES pass the ext handshake vars — the handshake is not protected by this allowlist", () => {
-    const handshake = ["ALPHA_CLOUD_MCP_ARM", "ALPHA_CLOUD_MCP_DEF", "ALPHA_CLOUD_MCP_SERVER"]
+    const handshake = ["CODEPUPPY_CLOUD_MCP_ARM", "CODEPUPPY_CLOUD_MCP_DEF", "CODEPUPPY_CLOUD_MCP_SERVER"]
     const env = createSidecarEnv({
-      ALPHA_ENV_ALLOWLIST_EXTRA: handshake.join(","),
+      CODEPUPPY_ENV_ALLOWLIST_EXTRA: handshake.join(","),
       ...Object.fromEntries(handshake.map((name) => [name, `forged-${name}`])),
     })
     for (const name of handshake) expect(env[name]).toBe(`forged-${name}`)
@@ -258,10 +258,10 @@ describe("createSidecarEnv — escape hatch", () => {
 describe("createSidecarEnv — SECRETISH word boundary (#605)", () => {
   // The exact 11 names #603 measured as vetoed. Not one may become admissible.
   const MUST_DENY = [
-    "ALPHA_API_KEY",
-    "ALPHA_CLOUD_TOKEN",
+    "CODEPUPPY_API_KEY",
+    "CODEPUPPY_CLOUD_TOKEN",
     // #1195: the login-minted cloud MCP credential travels ONLY via the {file:} channel.
-    "ALPHA_MCP_TOKEN",
+    "CODEPUPPY_MCP_TOKEN",
     "DEV_PLATFORM_TOKEN",
     "EXA_API_KEY",
     "DEEPSEEK_API_KEY",
@@ -314,14 +314,14 @@ describe("createSidecarEnv — SECRETISH word boundary (#605)", () => {
     "GOPATH",
     "OPENCODE_CLIENT",
     "PATH",
-    "ALPHA_BASE_URL",
+    "CODEPUPPY_BASE_URL",
   ]
 
   test("reverse gate: every must-deny name stays vetoed, on the path that would admit them", () => {
     // The hatch names every one of them, so each has an allow rule behind it; only the veto stops
     // them. A distinct probe value per name proves the VALUE is gone, not merely the key.
     const env = createSidecarEnv({
-      ALPHA_ENV_ALLOWLIST_EXTRA: [...MUST_DENY, "MY_CUSTOM_VAR"].join(","),
+      CODEPUPPY_ENV_ALLOWLIST_EXTRA: [...MUST_DENY, "MY_CUSTOM_VAR"].join(","),
       ...Object.fromEntries(MUST_DENY.map((name) => [name, `leak-${name}`])),
       MY_CUSTOM_VAR: "kept",
     })
@@ -331,7 +331,7 @@ describe("createSidecarEnv — SECRETISH word boundary (#605)", () => {
     }
     // …and the run was not vacuous: the hatch really was live on this call.
     expect(env.MY_CUSTOM_VAR).toBe("kept")
-    expect(MUST_DENY.length).toBe(31) // #1195: +ALPHA_MCP_TOKEN
+    expect(MUST_DENY.length).toBe(31) // #1195: +CODEPUPPY_MCP_TOKEN
   })
 
   test("reverse gate: the predicate itself vetoes every must-deny name (hatch/EXACT/prefix)", () => {
@@ -357,9 +357,9 @@ describe("createSidecarEnv — SECRETISH word boundary (#605)", () => {
   test("no longer vetoes the MONKEY_MODE class, and the passing names #603 measured still pass", () => {
     expect(MUST_ALLOW.filter(isSecretish)).toEqual([])
     // Clearing the veto is only half of it — they must actually arrive in the sidecar env.
-    const viaHatch = MUST_ALLOW.filter((name) => !["OPENCODE_CLIENT", "PATH", "ALPHA_BASE_URL"].includes(name))
+    const viaHatch = MUST_ALLOW.filter((name) => !["OPENCODE_CLIENT", "PATH", "CODEPUPPY_BASE_URL"].includes(name))
     const env = createSidecarEnv({
-      ALPHA_ENV_ALLOWLIST_EXTRA: viaHatch.join(","),
+      CODEPUPPY_ENV_ALLOWLIST_EXTRA: viaHatch.join(","),
       ...Object.fromEntries(MUST_ALLOW.map((name) => [name, `value-${name}`])),
     })
     expect(MUST_ALLOW.filter((name) => env[name] === undefined)).toEqual([])
@@ -496,18 +496,18 @@ describe("createSidecarEnv — SECRETISH word boundary (#605)", () => {
   })
 })
 
-// #606: sidecar.ts reads ALPHA_JSONC_TRUTH_DISABLE / ALPHA_LEGACY_INSTALL_ROOT inside the SIDECAR
+// #606: sidecar.ts reads CODEPUPPY_JSONC_TRUTH_DISABLE / CODEPUPPY_LEGACY_INSTALL_ROOT inside the SIDECAR
 // process to decide whether to inject OPENCODE_CONFIG, but neither name was in EXACT — and the
 // sidecar's env is this function's explicit return object (Electron ForkOptions.env inherits
 // process.env only when OMITTED, server.ts:191). So the reads could never see them: both escape
 // hatches were dead. They are not obsolete — main still honours them in index.ts (desired-state
 // reconcile), engine-config-truth-boot.ts (truth migration), ext-config.ts (mcp/plugin/provider
 // write target), ext-fs-installer.ts, factory-skills.ts and ext-install-planner.ts, and ADR-019 §5 /
-// ADR-028 name ALPHA_LEGACY_INSTALL_ROOT as the documented rollback surface. Forwarding them (route
+// ADR-028 name CODEPUPPY_LEGACY_INSTALL_ROOT as the documented rollback surface. Forwarding them (route
 // 1) is therefore the fix; deleting the sidecar read (route 2) would leave main in legacy mode while
 // the sidecar kept injecting — req053 设计稿 §风险8「逃生舱错位」exactly.
 describe("createSidecarEnv — escape switches the sidecar itself reads (#606)", () => {
-  for (const name of ["ALPHA_JSONC_TRUTH_DISABLE", "ALPHA_LEGACY_INSTALL_ROOT"]) {
+  for (const name of ["CODEPUPPY_JSONC_TRUTH_DISABLE", "CODEPUPPY_LEGACY_INSTALL_ROOT"]) {
     test(`${name}=1 reaches the sidecar env`, () => {
       const env = createSidecarEnv({ [name]: "1", PATH: "/usr/bin" })
       expect(env[name]).toBe("1")
@@ -516,18 +516,18 @@ describe("createSidecarEnv — escape switches the sidecar itself reads (#606)",
 
   test("both switches are forwarded together, and neither is credential-shaped", () => {
     const env = createSidecarEnv({
-      ALPHA_JSONC_TRUTH_DISABLE: "1",
-      ALPHA_LEGACY_INSTALL_ROOT: "1",
-      ALPHA_GLOBAL_DIR: "/Users/u/.alpha",
-      ALPHA_API_KEY: "jwt",
+      CODEPUPPY_JSONC_TRUTH_DISABLE: "1",
+      CODEPUPPY_LEGACY_INSTALL_ROOT: "1",
+      CODEPUPPY_GLOBAL_DIR: "/Users/u/.alpha",
+      CODEPUPPY_API_KEY: "jwt",
     })
-    expect(env.ALPHA_JSONC_TRUTH_DISABLE).toBe("1")
-    expect(env.ALPHA_LEGACY_INSTALL_ROOT).toBe("1")
-    expect(isSecretish("ALPHA_JSONC_TRUTH_DISABLE")).toBe(false)
-    expect(isSecretish("ALPHA_LEGACY_INSTALL_ROOT")).toBe(false)
+    expect(env.CODEPUPPY_JSONC_TRUTH_DISABLE).toBe("1")
+    expect(env.CODEPUPPY_LEGACY_INSTALL_ROOT).toBe("1")
+    expect(isSecretish("CODEPUPPY_JSONC_TRUTH_DISABLE")).toBe(false)
+    expect(isSecretish("CODEPUPPY_LEGACY_INSTALL_ROOT")).toBe(false)
     // adding them must not have disturbed anything else on the path
-    expect(env.ALPHA_GLOBAL_DIR).toBe("/Users/u/.alpha")
-    expect(env.ALPHA_API_KEY).toBeUndefined()
+    expect(env.CODEPUPPY_GLOBAL_DIR).toBe("/Users/u/.alpha")
+    expect(env.CODEPUPPY_API_KEY).toBeUndefined()
   })
 })
 
@@ -538,7 +538,7 @@ describe("createSidecarEnv — escape switches the sidecar itself reads (#606)",
 // MCP/LSP/PTY spread the whole process.env into third-party children.
 //
 // Scope note (why there is no "generated content passes" case here): createSidecarEnv runs ONLY in
-// main, to build the fork env. The sidecar's own content is produced post-fork by injectAlphaConfig
+// main, to build the fork env. The sidecar's own content is produced post-fork by injectCodePuppyConfig
 // (sidecar.ts:157, not exported, single call site :135) and written straight to its own process.env
 // at :419 — it never traverses this function. So the drop is unconditional and does not need to
 // inspect the value; alpha's injection is unaffected. The tests that protect alpha's injection are
@@ -563,7 +563,7 @@ describe("createSidecarEnv — container-valued vars", () => {
   // Windows. ui-mac really ships there (package.json `ship:windows`).
   test("drops OPENCODE_CONFIG_CONTENT under Windows casing, even when named in the hatch", () => {
     const env = createSidecarEnv({
-      ALPHA_ENV_ALLOWLIST_EXTRA: "opencode_config_content",
+      CODEPUPPY_ENV_ALLOWLIST_EXTRA: "opencode_config_content",
       opencode_config_content: JSON.stringify({ provider: { p: { options: { apiKey: "sk-win-probe" } } } }),
       PATH: "/usr/bin",
     })
@@ -590,7 +590,7 @@ describe("createSidecarEnv — container-valued vars", () => {
   })
 
   // NAMING IS DELIBERATE (R2 Minor): this asserts only that createSidecarEnv still forwards the
-  // INPUTS alpha's injection reads. It is NOT a gate on the injection succeeding — injectAlphaConfig
+  // INPUTS alpha's injection reads. It is NOT a gate on the injection succeeding — injectCodePuppyConfig
   // could throw internally, be swallowed by its function-level catch (sidecar.ts:421), produce no
   // content at all, and this test would stay green. That end-to-end gate cannot live in this repo's
   // test process today: sidecar.ts is unimportable under bun because its first import,
@@ -598,23 +598,23 @@ describe("createSidecarEnv — container-valued vars", () => {
   // undefined in bun 1.3.14 — and behind it sidecar.ts:84 calls getParentPort() at top level, which
   // throws outside a utility process. No test in this repo imports sidecar.ts for that reason.
   test("forwards the env INPUTS alpha's injection reads (not a gate on the injection succeeding)", () => {
-    // injectAlphaConfig sets OPENCODE_CONFIG itself (sidecar.ts:170) and materializeV2EngineConfig
+    // injectCodePuppyConfig sets OPENCODE_CONFIG itself (sidecar.ts:170) and materializeV2EngineConfig
     // sets OPENCODE_CONFIG_DIR; both are PATHS, not secret containers. Closing exactly one channel
     // must not close the family.
     const env = createSidecarEnv({
-      OPENCODE_CONFIG: "/Users/u/.alpha/alpha.jsonc",
+      OPENCODE_CONFIG: "/Users/u/.alpha/codepuppy.jsonc",
       OPENCODE_CONFIG_DIR: "/Users/u/Library/Application Support/alpha-code/engine-config",
-      ALPHA_IDENTITY_DISABLE: "1",
-      ALPHA_BEHAVIOR_DISABLE: "1",
-      ALPHA_CLOUD_MCP_URL: "https://mcp.example",
-      ALPHA_GLOBAL_DIR: "/Users/u/.alpha",
+      CODEPUPPY_IDENTITY_DISABLE: "1",
+      CODEPUPPY_BEHAVIOR_DISABLE: "1",
+      CODEPUPPY_CLOUD_MCP_URL: "https://mcp.example",
+      CODEPUPPY_GLOBAL_DIR: "/Users/u/.alpha",
     })
-    expect(env.OPENCODE_CONFIG).toBe("/Users/u/.alpha/alpha.jsonc")
+    expect(env.OPENCODE_CONFIG).toBe("/Users/u/.alpha/codepuppy.jsonc")
     expect(env.OPENCODE_CONFIG_DIR).toBeDefined()
-    expect(env.ALPHA_IDENTITY_DISABLE).toBe("1")
-    expect(env.ALPHA_BEHAVIOR_DISABLE).toBe("1")
-    expect(env.ALPHA_CLOUD_MCP_URL).toBe("https://mcp.example")
-    expect(env.ALPHA_GLOBAL_DIR).toBe("/Users/u/.alpha")
+    expect(env.CODEPUPPY_IDENTITY_DISABLE).toBe("1")
+    expect(env.CODEPUPPY_BEHAVIOR_DISABLE).toBe("1")
+    expect(env.CODEPUPPY_CLOUD_MCP_URL).toBe("https://mcp.example")
+    expect(env.CODEPUPPY_GLOBAL_DIR).toBe("/Users/u/.alpha")
   })
 })
 
@@ -632,7 +632,7 @@ describe("sidecarEgressProxyEnv (#1337)", () => {
       NO_PROXY: SIDECAR_EGRESS_NO_PROXY,
       no_proxy: SIDECAR_EGRESS_NO_PROXY,
       // `#1572`:决定者标记,引擎据它判断代理变量是不是出网代理(同一 URL)。
-      ALPHA_EGRESS_PROXY: "http://127.0.0.1:51337",
+      CODEPUPPY_EGRESS_PROXY: "http://127.0.0.1:51337",
     })
     expect(SIDECAR_EGRESS_NO_PROXY).toBe("127.0.0.1,localhost,::1")
     // 九个名字都在白名单里(否则 fork 时会被 createSidecarEnv 丢掉,而这里的覆盖就落不到 sidecar 上)

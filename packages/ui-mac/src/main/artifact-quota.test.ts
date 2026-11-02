@@ -16,7 +16,7 @@ import {
 } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { uniquePartPath, writeChunksChecked, type ArtifactDownloadOutcome } from "./alpha-artifact-download"
+import { uniquePartPath, writeChunksChecked, type ArtifactDownloadOutcome } from "./codepuppy-artifact-download"
 import {
   artifactQuotaReservationsPath,
   ARTIFACT_QUOTA_MACHINE_ID_FILE,
@@ -314,7 +314,7 @@ describe("finalizeArtifactWithQuota", () => {
   })
 
   // #901: 唯一 final 落名点(fs.promises.rename)前的折叠比较(NFC + toLowerCase)兜底——callers
-  // (alpha-workdir.ts / cloud-ipc.ts)已按同一折叠键预约过名字,这里是不可绕过的最后一道:真出现
+  // (codepuppy-workdir.ts / cloud-ipc.ts)已按同一折叠键预约过名字,这里是不可绕过的最后一道:真出现
   // 折叠键相同但字符串不同的既有文件时一律拒绝,绝不静默覆盖。host-independent:不依赖测试机文件
   // 系统是否大小写敏感——判据是显式 readdir + 折叠比较,不是让 OS 的 rename 语义去揭示冲突。
   test("final rename refuses a target that only differs from an existing artifact by case", async () => {

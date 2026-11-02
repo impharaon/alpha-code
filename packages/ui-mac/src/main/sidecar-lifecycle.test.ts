@@ -230,7 +230,7 @@ describe("respawn generation terminal", () => {
 
 // REQ-236 AC4/AC6(`#1562`)的最后一英里:index.ts 结构上进不了 bun(见 ./source-text-anchors.ts 文件头),
 // 「重启时间线带具名原因」「只有这次 fork 健康完成才确认它捕获的代」两条接线只能锁源码形状。
-// 行为判据在 credential-hot-apply.test.ts(真 alpha-auth + 真终态生产者 + 这里锁住的那一行 glue)。
+// 行为判据在 credential-hot-apply.test.ts(真 codepuppy-auth + 真终态生产者 + 这里锁住的那一行 glue)。
 test("ANCHOR (not a gate): #1562 respawn 时间线写具名原因,确认只挂在这次 fork 的健康终态上", () => {
   const source = readFileSync(join(import.meta.dir, "index.ts"), "utf8")
   const respawn = source.slice(source.indexOf("const doRespawnSidecar"), source.indexOf("const respawnSidecar"))

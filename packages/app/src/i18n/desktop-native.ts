@@ -222,7 +222,7 @@ function locale(value: string) {
 }
 
 // alpha (frontend pin e11dbd020 bump): newer CLDR data (the ICU inside bun 1.3.14, which both the local
-// gate and alpha-ci run) maximizes `pa-PK` to the Nastaliq variant `pa-Aran-PK`, while the bundle tag
+// gate and codepuppy-ci run) maximizes `pa-PK` to the Nastaliq variant `pa-Aran-PK`, while the bundle tag
 // above is `pa-Arab-PK`. Aran is a stylistic variant of Arab (Unicode ISO 15924), so compare them as one
 // script — otherwise Punjabi (Pakistan) falls through to "en" and upstream's own
 // desktop-native.test.ts ("uses Unicode likely subtags") is red on this bun.

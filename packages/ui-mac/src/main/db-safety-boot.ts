@@ -41,7 +41,7 @@ const fsDeps: DbSafety.FsDeps = {
 }
 
 function backupDirOf(userDataPath: string) {
-  return join(userDataPath, "alpha-db-backups")
+  return join(userDataPath, "codepuppy-db-backups")
 }
 
 function resolveTarget() {

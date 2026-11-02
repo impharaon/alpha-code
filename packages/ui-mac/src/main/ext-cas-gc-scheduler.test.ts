@@ -14,7 +14,7 @@ import * as crypto from "node:crypto"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
-import { __resetAlphaEnvironmentForTests, environmentMutableRoot, initAlphaEnvironment } from "./alpha-environment"
+import { __resetCodePuppyEnvironmentForTests, environmentMutableRoot, initCodePuppyEnvironment } from "./codepuppy-environment"
 import { CAS_GC_GRACE_MS_DEFAULT, decodeCasGcRoundSummary, type CasGcRoundInput, type CasGcRoundSummary } from "./ext-cas-gc"
 import { decodeCasGcRoundInput } from "./ext-cas-gc-worker"
 import { putCasBlobFromBuffer } from "./ext-cas"
@@ -35,18 +35,18 @@ let savedGlobalDir: string | undefined
 let savedBaseDir: string | undefined
 beforeEach(() => {
   base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "cas-gc-sched-")))
-  savedGlobalDir = process.env.ALPHA_GLOBAL_DIR // before-image(review #366:不污染同进程后续测试)
-  savedBaseDir = process.env.ALPHA_ENV_BASE_DIR
-  __resetAlphaEnvironmentForTests()
-  delete process.env.ALPHA_GLOBAL_DIR
-  delete process.env.ALPHA_ENV_BASE_DIR
+  savedGlobalDir = process.env.CODEPUPPY_GLOBAL_DIR // before-image(review #366:不污染同进程后续测试)
+  savedBaseDir = process.env.CODEPUPPY_ENV_BASE_DIR
+  __resetCodePuppyEnvironmentForTests()
+  delete process.env.CODEPUPPY_GLOBAL_DIR
+  delete process.env.CODEPUPPY_ENV_BASE_DIR
 })
 afterEach(() => {
-  __resetAlphaEnvironmentForTests()
-  if (savedGlobalDir === undefined) delete process.env.ALPHA_GLOBAL_DIR
-  else process.env.ALPHA_GLOBAL_DIR = savedGlobalDir
-  if (savedBaseDir === undefined) delete process.env.ALPHA_ENV_BASE_DIR
-  else process.env.ALPHA_ENV_BASE_DIR = savedBaseDir
+  __resetCodePuppyEnvironmentForTests()
+  if (savedGlobalDir === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+  else process.env.CODEPUPPY_GLOBAL_DIR = savedGlobalDir
+  if (savedBaseDir === undefined) delete process.env.CODEPUPPY_ENV_BASE_DIR
+  else process.env.CODEPUPPY_ENV_BASE_DIR = savedBaseDir
   fs.rmSync(base, { recursive: true, force: true })
 })
 
@@ -440,9 +440,9 @@ describe("worker 构建入口 wiring(#367)", () => {
 describe("productionCasGcConfig(#318 composition root 权威取值点)", () => {
   test("未初始化环境即抛(fail-fast);初始化后 = 冻结共享根 + 三环境根固定顺序 + 无条件 seed lock + 显式非零 grace", () => {
     expect(() => productionCasGcConfig()).toThrow()
-    initAlphaEnvironment({ isPackaged: true, channel: "prod", appDataDir: base, homeDir: path.join(base, "home") })
+    initCodePuppyEnvironment({ isPackaged: true, channel: "prod", appDataDir: base, homeDir: path.join(base, "home") })
     const cfg = productionCasGcConfig()
-    const expectedBase = fs.realpathSync(path.join(base, "alpha-code-state"))
+    const expectedBase = fs.realpathSync(path.join(base, "codepuppy-state"))
     expect(cfg.casBaseRoot).toBe(expectedBase) // 冻结共享 CAS 基根(≠ prod mutable root)
     expect(cfg.envRoots).toEqual([
       environmentMutableRoot("dev", expectedBase),

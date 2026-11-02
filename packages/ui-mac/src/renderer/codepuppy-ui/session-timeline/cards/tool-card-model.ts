@@ -1,0 +1,1811 @@
+// REQ-125 C6 / #879 — 工具卡纯模型(零 DOM、零 solid、零上游组件)。
+//
+// 职责:把 SDK typed 通道进来的 ToolPart 投影成卡片可渲染的结构。#879 起:
+// **专用卡只由完整稳定 identity(#878 的 ToolDisplaySnapshotV1)命中宿主拥有的
+// 精确展示规则**;`part.tool` 是模型别名(technicalId),不再参与任何分派判定。
+// identity 缺失 / 非法、规则未命中、第三方 MCP / plugin 一律 metadata-only:
+// 只显示来源分类、被动净化且有界的名称与结构化状态,**input / metadata / output /
+// error 的内容一律不进投影**。唯一的例外读取是 #1214 AC2 的审批超时分类
+// (`permissionAskTimedOut`):它读 error 只为与引擎 UnansweredError 的固定首行形态
+// 做匹配,产出一个布尔,错误原文零字符进入投影 —— 内容不泄漏的纪律不变。
+// 命中规则的卡,字段先走类别 allowlist 与 typed
+// normalization(I2 防御读取),再过共享 redactor(tool-redactor);redactor
+// 任一步失败即隐藏整字段(AC5),不回退 raw string。
+import type { ToolAuthority, ToolIdentity, ToolLocation, ToolPart, ToolState } from "@opencode-ai/sdk/v2/client"
+import { isNetFailureLayer, type NetFailureLayer } from "@opencode-ai/schema/codepuppy-net-failure"
+import { DIFF_PATCH_MAX_CHARS } from "./tool-diff"
+import { redactPath, redactText, redactUrl, type RedactResult } from "./tool-redactor"
+
+// ── I7 输出体硬帽 ────────────────────────────────────────────────────────────
+export const TOOL_BODY_MAX_CHARS = 16_000
+export const TOOL_BODY_MAX_LINES = 400
+export const TOOL_LIST_MAX_ITEMS = 50
+export const TOOL_LINKS_MAX = 8
+export const WRITE_PREVIEW_LINES = 2
+export const TOOL_ERROR_MAX_CHARS = 4_000
+/** 单项(列表项/文件路径/URL/头部目标)字符帽:先截单项,再进过滤/映射。 */
+export const TOOL_ITEM_MAX_CHARS = 400
+/** 对完整输出做行切/URL 扫描前的扫描预算:超出部分不扫描(截断标记诚实呈现)。 */
+export const TOOL_SCAN_MAX_CHARS = 64_000
+/** 不可信数组的总迭代预算(含非法项):项数帽之外的 CPU 帽 —— 海量非法尾不全扫。 */
+export const TOOL_LIST_SCAN_MAX = 500
+/** URL 帽:超长 URL 直接丢弃(截断的 URL 指向错误目标,fail-closed 不渲染)。 */
+export const TOOL_URL_MAX_CHARS = 500
+/** 路径帽:超长路径 fail-closed 不渲染(截断的路径指向错误目标)。 */
+export const TOOL_PATH_MAX_CHARS = 1_024
+/** 默认展开的输出体(bash 终端流/错误体)超过此帽 → 默认收起,防多卡累积驻留 DOM。 */
+export const OPEN_DEFAULT_MAX_CHARS = 4_000
+
+export interface BoundedBlock {
+  text: string
+  truncated: boolean
+}
+
+/** 单项帽:超限截断(展示层配 ellipsis;是否丢弃由调用方决定)。 */
+export function cappedItem(text: string, max = TOOL_ITEM_MAX_CHARS): string {
+  return text.length > max ? text.slice(0, max) : text
+}
+
+/** 字符 + 行数双帽;两者任一超限即截断(截断标记由渲染层显式呈现,不伪装完整)。 */
+export function boundedBlock(
+  raw: string,
+  maxChars = TOOL_BODY_MAX_CHARS,
+  maxLines = TOOL_BODY_MAX_LINES,
+): BoundedBlock {
+  let text = raw
+  let truncated = false
+  if (text.length > maxChars) {
+    text = text.slice(0, maxChars)
+    truncated = true
+  }
+  let lines = 0
+  for (let index = 0; index < text.length; index += 1) {
+    if (text.charCodeAt(index) === 10) {
+      lines += 1
+      if (lines >= maxLines) {
+        text = text.slice(0, index)
+        truncated = true
+        break
+      }
+    }
+  }
+  return { text, truncated }
+}
+
+// ── #879 identity 分派(唯一的专用卡入口) ──────────────────────────────────
+export type ToolCardKind =
+  | "read"
+  | "list"
+  | "glob"
+  | "grep"
+  | "webfetch"
+  | "websearch"
+  | "bash"
+  | "edit"
+  | "write"
+  | "apply_patch"
+  | "skill"
+  | "task"
+  | "question"
+  | "cloud"
+  | "unknown"
+
+/**
+ * 展示层的可信来源分类(只从持久化 identity + authority 导出,禁止从别名猜)。
+ * `codepuppy-bundled`(#1578):当次持久化 authority = codepuppy-bundled 的 mcp / plugin 工具 —— 显示「Code Puppy 内置」,
+ * 但不是 `builtin`:不借专用卡、不享时间线隐藏等只属于引擎 builtin identity 的待遇。
+ */
+export type ToolSourceCategory = "builtin" | "host" | "codepuppy-cloud" | "codepuppy-bundled" | "mcp" | "plugin" | "unknown"
+
+/** #587 metadata-only 降级卡的确定隐藏理由(安全通用卡文案分支,AC2)。 */
+export type ToolHiddenReason = "no-snapshot" | "no-rule"
+
+export interface ToolCardDispatch {
+  /** 命中宿主规则的专用卡分支;metadata-only 时恒为 "unknown"。 */
+  kind: ToolCardKind
+  category: ToolSourceCategory
+  /** true = 严格降级卡:无参数、无错误、无输出、无展开体。 */
+  metadataOnly: boolean
+  /** 被动净化且有界的展示名称(identity.name;快照缺失时退回别名)。 */
+  name: string
+  /** mcp / plugin 的来源 origin(server 配置键 / plugin 命名空间),净化有界。 */
+  origin?: string
+  /** metadata-only 时的隐藏理由(确定分支,渲染层据此选安全卡文案)。 */
+  hiddenReason?: ToolHiddenReason
+  /** kind="cloud" 时命中的 Alpha Cloud 宿主规则(标题 + 关键目标 allowlist)。 */
+  cloudRule?: CodePuppyCloudRule
+}
+
+// ── #587 Alpha Cloud 宿主展示规则表 ─────────────────────────────────────────
+// 资格 = 基线 §4:source="mcp" + **当次持久化 authority.kind="codepuppy-cloud"** +
+// 本表精确命中 identity.name。判云端的唯一铸币是 authority(F5/T3);server 配置键
+// (origin)与工具名都不是证据,所以本表不比对 origin 字符串 —— origin 冒充
+// "codepuppy" 而无 authority 的调用仍是第三方 MCP 降级卡。
+// identity.name 是引擎持久化的**远端工具原名**(mcp/index.ts:712 以 def.name 铸造),
+// platform#560 起只说动作(`dispatch`),与引擎别名 `codepuppy_*`(server 名再拼一次)是两层,
+// 后者只进开发者详情。远端名的今日权威 = alpha-platform
+// `packages/gateway/src/lib/mcp-tool-registry.ts` 的 **5 个**工具
+// (dispatch/status/await/artifacts/web_search);本表的 schedule_* 三条
+// 仅为 2026-07-31 之前持久化的历史行回放保留 —— schedule 已按 owner 裁决剔出
+// MCP 面(同仓 cloud-mcp.ts [#175] 注记,基线 cloud-mcp-resource-surface.md
+// §3.1/§5.8)。旧勘破「2026-07-22 匿名 tools/list 实测 8 个」
+// (docs/verification/2026-07-22-e7-deploy-probe.md §3c)已被 REQ-130 的
+// 鉴权前置(工具发现前先验身份)作废,该匿名探针今天复现不了。
+export interface CodePuppyCloudRule {
+  /** 语义化中文标题的 i18n key(主标题;技术 id 绝不进主层级)。 */
+  titleKey: string
+  /** 关键目标的 input allowlist 键(经共享 redactor;失败即隐藏)。 */
+  targetInput?: "query" | "kind" | "job_id" | "name" | "schedule_id"
+  /** 完成态展开体:目前仅 web_search 有链接体,其余无 body。 */
+  links?: boolean
+}
+
+const CODEPUPPY_CLOUD_RULES = new Map<string, CodePuppyCloudRule>([
+  ["web_search", { titleKey: "codepuppy.timeline.cloud.webSearch", targetInput: "query", links: true }],
+  ["dispatch", { titleKey: "codepuppy.timeline.cloud.dispatch", targetInput: "kind" }],
+  ["status", { titleKey: "codepuppy.timeline.cloud.status", targetInput: "job_id" }],
+  ["await", { titleKey: "codepuppy.timeline.cloud.await", targetInput: "job_id" }],
+  ["artifacts", { titleKey: "codepuppy.timeline.cloud.artifacts", targetInput: "job_id" }],
+  // #1576 AC5:平台注册表快照(`ui-mac/src/main/fixtures/cloud-mcp-tools.ts`)的其余 5 个;覆盖断言在
+  // tool-card-provenance-gates.test.ts —— 快照新增名字而本表未补 ⇒ 红。标题定稿归命名迁移。
+  ["cancel", { titleKey: "codepuppy.timeline.cloud.cancel", targetInput: "job_id" }],
+  ["web_fetch", { titleKey: "codepuppy.timeline.cloud.webFetch" }],
+  ["vision", { titleKey: "codepuppy.timeline.cloud.vision" }],
+  ["decide", { titleKey: "codepuppy.timeline.cloud.decide" }],
+  ["account_status", { titleKey: "codepuppy.timeline.cloud.accountStatus" }],
+  ["schedule_create", { titleKey: "codepuppy.timeline.cloud.scheduleCreate", targetInput: "name" }],
+  ["schedule_list", { titleKey: "codepuppy.timeline.cloud.scheduleList" }],
+  ["schedule_delete", { titleKey: "codepuppy.timeline.cloud.scheduleDelete", targetInput: "schedule_id" }],
+])
+
+// 宿主拥有的精确展示规则表:key = 完整 identity 的 (source∈{builtin,builtin-v2},
+// origin="", name)。Map 天然免疫原型继承键;未登记 identity 一律 metadata-only。
+const HOST_BUILTIN_RULES = new Map<string, ToolCardKind>([
+  ["read", "read"],
+  ["list", "list"],
+  ["glob", "glob"],
+  ["grep", "grep"],
+  ["webfetch", "webfetch"],
+  ["websearch", "websearch"],
+  ["bash", "bash"],
+  ["edit", "edit"],
+  ["write", "write"],
+  ["apply_patch", "apply_patch"],
+  ["skill", "skill"],
+  ["task", "task"],
+  // #1475 AC6:答完的内置提问。只有引擎铸造的 builtin identity 才命中 —— 第三方起名
+  // question 仍是 metadata-only 降级(规则表的 key 是完整 identity,不是别名)。
+  ["question", "question"],
+])
+
+const IDENTITY_SOURCES: ReadonlySet<string> = new Set(["builtin", "builtin-v2", "plugin", "mcp", "host"])
+
+// 名称是远端输入:剥控制字符与双向覆盖字符(视觉伪装),再过单项帽。
+const UNSAFE_NAME_CHARS = /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g
+function sanitizedName(value: string): string {
+  const clean = cappedItem(value.replace(UNSAFE_NAME_CHARS, ""))
+  return clean.length > 0 ? clean : "?"
+}
+
+function nonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0
+}
+
+type DisplaySnapshot = {
+  identity: ToolIdentity
+  authority: ToolAuthority
+  technicalId: string
+  location?: ToolLocation
+  /** #1568 AC5:第一方插件工具的可读标识(引擎只给随包清单核验成立的自有工具写)。 */
+  readable?: string
+}
+
+/** #878 快照的防御校验:结构不完整/形状非法 = 无快照(按未知来源降级)。 */
+function displaySnapshotOf(part: { display?: unknown }): DisplaySnapshot | undefined {
+  const display = (part as { display?: unknown }).display
+  if (typeof display !== "object" || display === null) return undefined
+  const record = display as {
+    identity?: unknown
+    technicalId?: unknown
+    authority?: unknown
+    billing?: unknown
+    location?: unknown
+    readable?: unknown
+  }
+  if (!nonEmptyString(record.technicalId)) return undefined
+  const identity = record.identity
+  if (typeof identity !== "object" || identity === null) return undefined
+  const id = identity as { source?: unknown; origin?: unknown; name?: unknown }
+  if (typeof id.source !== "string" || !IDENTITY_SOURCES.has(id.source)) return undefined
+  if (typeof id.origin !== "string") return undefined
+  if (!nonEmptyString(id.name)) return undefined
+  const authority = record.authority
+  if (typeof authority !== "object" || authority === null) return undefined
+  const auth = authority as { kind?: unknown; bindingId?: unknown; evidenceDigest?: unknown }
+  if (auth.kind === "codepuppy-cloud" || auth.kind === "codepuppy-bundled") {
+    if (!nonEmptyString(auth.bindingId) || !nonEmptyString(auth.evidenceDigest)) return undefined
+  } else if (auth.kind !== "not-asserted") {
+    return undefined
+  }
+  if (record.billing !== undefined) {
+    const billing = record.billing as { class?: unknown; evidenceId?: unknown }
+    if (typeof billing !== "object" || billing === null) return undefined
+    if (!nonEmptyString(billing.class) || !nonEmptyString(billing.evidenceId)) return undefined
+  }
+  // #1576:执行位置(可选;缺席 = 历史行 / 事实缺席)。形状非法与其它字段同待遇:整份快照无效。
+  let location: ToolLocation | undefined
+  if (record.location !== undefined) {
+    const loc = record.location as { kind?: unknown; host?: unknown }
+    if (typeof loc !== "object" || loc === null) return undefined
+    if (loc.kind === "local") location = { kind: "local" }
+    else if (loc.kind === "remote" && nonEmptyString(loc.host)) location = { kind: "remote", host: loc.host }
+    else return undefined
+  }
+  if (record.readable !== undefined && !nonEmptyString(record.readable)) return undefined
+  return {
+    identity: { source: id.source as ToolIdentity["source"], origin: id.origin, name: id.name },
+    authority: auth as ToolAuthority,
+    technicalId: record.technicalId,
+    ...(location ? { location } : {}),
+    ...(record.readable !== undefined ? { readable: record.readable } : {}),
+  }
+}
+
+// ── #1576 来源三类 × 执行位置(只从持久化快照派生) ─────────────────────────
+/** 用户层来源三类:内置(builtin / host / 当次持久化 authority = codepuppy-bundled)、云(codepuppy-cloud)、其余一律第三方(含无快照)。 */
+export type ToolProvenanceSource = "builtin" | "codepuppy-cloud" | "third-party"
+
+/** 执行位置:本机 / 云端(codepuppy-cloud 的远端)/ 远端主机(净化有界)/ 位置未知(快照或 location 缺席)。 */
+export type ToolProvenanceLocation =
+  | { kind: "local" }
+  | { kind: "cloud" }
+  | { kind: "remote"; host: string }
+  | { kind: "unknown" }
+
+export interface ToolProvenance {
+  source: ToolProvenanceSource
+  location: ToolProvenanceLocation
+}
+
+/**
+ * I2:来源只读 identity + authority,位置只读快照的 `location`;名字、URL、标题、工具返回内容
+ * (含其中任何同名 `location` / `host` 字段)都不是输入。
+ */
+export function toolProvenanceOf(part: ToolPart): ToolProvenance {
+  return provenanceOfSnapshot(displaySnapshotOf(part))
+}
+
+/** 来源三类的人话 i18n key(时间线详情底部与审批卡共用)。 */
+export const PROVENANCE_SOURCE_KEYS = {
+  builtin: "codepuppy.timeline.sourceBuiltin",
+  "codepuppy-cloud": "codepuppy.timeline.sourceCodePuppyCloud",
+  "third-party": "codepuppy.timeline.sourceThirdParty",
+} as const
+
+/**
+ * REQ-236 `#1575`:审批卡上的那一个工具。审批请求没有调用记录,只带引擎写的 identity + authority + location
+ * (`packages/opencode/src/permission/codepuppy-tool-policy-gate.ts` confirm 的 metadata;location 是 #1617 起与时间线
+ * 同一份 `mcpLocation`)—— 名字、来源、位置走与时间线同一条判定(快照校验 → categoryOf → 宿主 / 云规则表 →
+ * 主机净化),不另判一份。
+ */
+export function approvalToolOf(facts: { identity: unknown; authority: unknown; location?: unknown; technicalId: string }) {
+  const snapshot = displaySnapshotOf({ display: facts })
+  if (!snapshot) return undefined
+  const dispatch = dispatchOfSnapshot(snapshot, () => ({}))
+  const provenance = provenanceOfSnapshot(snapshot)
+  return { name: dispatch.name, titleKey: toolTitleKeyOf(dispatch), source: provenance.source, location: provenance.location }
+}
+
+function provenanceOfSnapshot(snapshot: DisplaySnapshot | undefined): ToolProvenance {
+  if (!snapshot) return { source: "third-party", location: { kind: "unknown" } }
+  const category = categoryOf(snapshot.identity, snapshot.authority)
+  const source: ToolProvenanceSource =
+    category === "builtin" || category === "host" || category === "codepuppy-bundled"
+      ? "builtin"
+      : category === "codepuppy-cloud"
+        ? "codepuppy-cloud"
+        : "third-party"
+  const location = snapshot.location
+  if (!location) return { source, location: { kind: "unknown" } }
+  if (location.kind === "local") return { source, location: { kind: "local" } }
+  if (source === "codepuppy-cloud") return { source, location: { kind: "cloud" } }
+  return { source, location: { kind: "remote", host: sanitizedName(location.host) } }
+}
+
+function categoryOf(identity: ToolIdentity, authority: ToolAuthority): ToolSourceCategory {
+  switch (identity.source) {
+    case "builtin":
+    case "builtin-v2":
+      return "builtin"
+    case "host":
+      return "host"
+    case "mcp":
+      if (authority.kind === "codepuppy-cloud") return "codepuppy-cloud"
+      return authority.kind === "codepuppy-bundled" ? "codepuppy-bundled" : "mcp"
+    case "plugin":
+      return authority.kind === "codepuppy-bundled" ? "codepuppy-bundled" : "plugin"
+    default:
+      return "unknown"
+  }
+}
+
+/**
+ * 分派(AC1):只有完整 identity(source ∈ {builtin, builtin-v2} 且 origin="")
+ * 精确命中宿主规则表才有专用卡;其余(host / mcp / plugin / 快照缺失或非法)
+ * 一律 metadata-only。远端 annotation、标题、别名都不是分派输入。
+ */
+export function toolCardDispatchOf(part: ToolPart): ToolCardDispatch {
+  const snapshot = displaySnapshotOf(part)
+  if (!snapshot) {
+    return {
+      kind: "unknown",
+      category: "unknown",
+      metadataOnly: true,
+      name: sanitizedName(part.tool),
+      hiddenReason: "no-snapshot",
+    }
+  }
+  return dispatchOfSnapshot(snapshot, () => metadataOf(part))
+}
+
+function dispatchOfSnapshot(snapshot: DisplaySnapshot, metadata: () => Record<string, unknown>): ToolCardDispatch {
+  const { identity, authority } = snapshot
+  const category = categoryOf(identity, authority)
+  if ((identity.source === "builtin" || identity.source === "builtin-v2") && identity.origin === "") {
+    const kind = HOST_BUILTIN_RULES.get(identity.name)
+    if (kind !== undefined) {
+      // #949:引擎没有 id=list 的 builtin —— 目录读取走 read 工具的 directory 分支
+      // (packages/opencode/src/tool/read.ts 的 stat.type === "Directory"),注册表
+      // 只铸 name="read" 的 identity,`kind="list"` 在生产上没有任何铸造点。这里
+      // 消费引擎专为渲染层铸的结构化 metadata.display(type:"directory")把 read
+      // 的目录形态改派到 #583 的目录网格卡。识别输入是宿主 builtin read 工具执行期
+      // 铸的 metadata,不是远端内容/别名/标题 —— identity 闸(上一行)仍是准入
+      // 前提,冒名的第三方工具到不了这条分支;display 缺失或形状非法一律回落
+      // read 卡(fail-closed)。
+      const effective = kind === "read" && dirDisplayOf(metadata()) !== undefined ? "list" : kind
+      return { kind: effective, category, metadataOnly: false, name: sanitizedName(identity.name) }
+    }
+  }
+  // #587 Alpha Cloud 专用卡:资格闸是 category(= 当次持久化 authority 铸出的
+  // "codepuppy-cloud"),不是 origin / 别名字符串 —— authority 缺席时同名工具落到下面的
+  // 第三方 MCP 降级卡(fail-closed)。
+  if (category === "codepuppy-cloud") {
+    const cloudRule = CODEPUPPY_CLOUD_RULES.get(identity.name)
+    if (cloudRule !== undefined) {
+      return {
+        kind: "cloud",
+        category,
+        metadataOnly: false,
+        name: sanitizedName(identity.name),
+        origin: identity.origin.length > 0 ? sanitizedName(identity.origin) : undefined,
+        cloudRule,
+      }
+    }
+  }
+  const origin =
+    (identity.source === "mcp" || identity.source === "plugin") && identity.origin.length > 0
+      ? sanitizedName(identity.origin)
+      : undefined
+  return {
+    kind: "unknown",
+    category,
+    metadataOnly: true,
+    name: sanitizedName(identity.name),
+    origin,
+    hiddenReason: "no-rule",
+  }
+}
+
+export type ToolCardStatus = "pending" | "running" | "error" | "success"
+
+export function toolCardStatusOf(state: ToolState): ToolCardStatus {
+  if (state.status === "pending") return "pending"
+  if (state.status === "running") return "running"
+  if (state.status === "error") return "error"
+  return "success"
+}
+
+// ── 防御读取(I2) ──────────────────────────────────────────────────────────
+function stringOf(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined
+}
+
+function finiteOf(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined
+}
+
+function inputOf(part: ToolPart): Record<string, unknown> {
+  const input = part.state.input
+  return typeof input === "object" && input !== null ? (input as Record<string, unknown>) : {}
+}
+
+function metadataOf(part: ToolPart): Record<string, unknown> {
+  if (!("metadata" in part.state)) return {}
+  const metadata = part.state.metadata
+  return typeof metadata === "object" && metadata !== null ? (metadata as Record<string, unknown>) : {}
+}
+
+function outputOf(part: ToolPart): string {
+  return part.state.status === "completed" && typeof part.state.output === "string" ? part.state.output : ""
+}
+
+export function basenameOf(path: string): string {
+  const normalized = path.replaceAll("\\", "/")
+  const at = normalized.lastIndexOf("/")
+  return at < 0 ? normalized : normalized.slice(at + 1)
+}
+
+export function dirnameOf(path: string): string {
+  const normalized = path.replaceAll("\\", "/")
+  const at = normalized.lastIndexOf("/")
+  return at < 0 ? "" : normalized.slice(0, at + 1)
+}
+
+// ── redactor 接线辅助(AC3/AC5:失败 = 隐藏整字段) ─────────────────────────
+/** 单行自由文本(命令/模式/查询/名称):脱敏 + 单项帽;失败或空结果 = undefined。 */
+function redactedInlineOf(value: unknown, max = TOOL_ITEM_MAX_CHARS): { value?: string; hidden: boolean } {
+  const text = stringOf(value)
+  if (text === undefined) return { hidden: false }
+  const result = redactText(text, max)
+  if (!result.ok || result.value.length === 0) return { hidden: true }
+  return { value: result.value, hidden: false }
+}
+
+/** 展示路径:redactPath;失败 = 隐藏。 */
+function redactedPathOf(value: unknown): { value?: string; hidden: boolean } {
+  const text = stringOf(value)
+  if (text === undefined) return { hidden: false }
+  const result = redactPath(text, TOOL_PATH_MAX_CHARS)
+  if (!result.ok || result.value.length === 0) return { hidden: true }
+  return { value: result.value, hidden: false }
+}
+
+// ── 头部模型 ────────────────────────────────────────────────────────────────
+export interface ToolCardHead {
+  kind: ToolCardKind
+  status: ToolCardStatus
+  category: ToolSourceCategory
+  /** true = 严格降级卡:头部只有来源分类 + 名称 + 状态。 */
+  metadataOnly: boolean
+  /** 动词的 i18n key;metadata-only 无动词(来源分类文案由渲染层供给)。 */
+  titleKey?: string
+  /** mono 目标(文件名/模式/命令/查询/URL),已过 redactor。 */
+  target?: string
+  /** 目标存在但 redactor 失败/清空 → 渲染层显示确定的「详情已隐藏」。 */
+  targetHidden?: boolean
+  /** 次级细节(目录/include 等),已过 redactor。 */
+  detail?: string
+  /** 次级细节存在但 redactor 失败/清空 → 确定的「详情已隐藏」(#934 Minor:AC5 标记补齐,不再静默丢字段)。 */
+  detailHidden?: boolean
+  /** 计数徽标(文件数/命中数/目录项数/搜索结果数)。 */
+  count?: { unit: "files" | "matches" | "items" | "results"; value: number }
+  /** +N/−N 改动徽标。 */
+  stat?: { additions: number; deletions: number }
+  /** bash 完成态退出码(缺失 = 引擎未报,徽标退回「完成」)。 */
+  exit?: number
+  /** 被动净化后的展示名称(identity.name;快照缺失时退回别名)。 */
+  toolName: string
+  /** mcp / plugin 降级卡的来源 origin(净化有界)。 */
+  origin?: string
+  /** metadata-only 降级卡的确定隐藏理由(安全通用卡文案分支,AC2)。 */
+  hiddenReason?: ToolHiddenReason
+  /** #1214 AC2:error 态且失败原因是「审批等待超时,fail-closed 拒绝」(纯分类,不携带错误原文)。 */
+  askTimedOut?: boolean
+}
+
+const TITLE_KEYS: Partial<Record<ToolCardKind, string>> = {
+  read: "codepuppy.timeline.tool.read",
+  list: "codepuppy.timeline.tool.list",
+  glob: "codepuppy.timeline.tool.glob",
+  grep: "codepuppy.timeline.tool.grep",
+  webfetch: "codepuppy.timeline.tool.webfetch",
+  websearch: "codepuppy.timeline.tool.websearch",
+  edit: "codepuppy.timeline.tool.edit",
+  write: "codepuppy.timeline.tool.write",
+  apply_patch: "codepuppy.timeline.tool.patch",
+  skill: "codepuppy.timeline.tool.skill",
+  task: "codepuppy.timeline.tool.task",
+  question: "codepuppy.timeline.tool.question",
+}
+
+/**
+ * `#1473` 工作过程步骤行 / 摘要的动词(i18n key)。与卡头的 titleKey 同源,另补一条:
+ * bash 卡头今天不带动词(命令本身就是标题),步骤行需要「运行命令」才读得通。
+ * metadata-only 降级不给动词 —— 那里只显示来源分类 + 名称(规则不变)。
+ */
+export function toolTitleKeyOf(dispatch: ToolCardDispatch): string | undefined {
+  if (dispatch.metadataOnly) return undefined
+  if (dispatch.kind === "cloud") return dispatch.cloudRule?.titleKey
+  if (dispatch.kind === "bash") return "codepuppy.timeline.step.bash"
+  return TITLE_KEYS[dispatch.kind]
+}
+
+function assignInline(head: ToolCardHead, value: unknown) {
+  const result = redactedInlineOf(value)
+  if (result.hidden) head.targetHidden = true
+  else if (result.value !== undefined) head.target = result.value
+}
+
+function assignPathTarget(head: ToolCardHead, value: unknown) {
+  const result = redactedPathOf(value)
+  if (result.hidden) head.targetHidden = true
+  else if (result.value !== undefined) {
+    head.target = cappedItem(basenameOf(result.value))
+    head.detail = cappedItem(dirnameOf(result.value))
+  }
+}
+
+// ── #1214 AC2:fail-closed 审批超时的确定分类 ────────────────────────────────
+/**
+ * 引擎 `UnansweredError`(packages/opencode/src/permission/index.ts)detail 的首行形态。
+ * 分类只产布尔:错误原文零字符进投影,#587 AC2「降级卡不携带调用数据」的纪律不变。
+ * 形态契约由 tool-card-provenance-gates.test.ts 用**真引擎构造的 UnansweredError** 钉住:
+ * 引擎措辞漂移 ⇒ 那条契约用例先红,本正则跟着改,不会静默退回「错误详情已隐藏」而无人知晓。
+ */
+const PERMISSION_ASK_TIMEOUT_PATTERN = /^审批请求等待 \d+ 秒无人应答/
+
+/** true = 这次工具调用的失败是「权限审批等待超时,fail-closed 拒绝」这一确定结局。 */
+export function permissionAskTimedOut(state: ToolState): boolean {
+  return state.status === "error" && typeof state.error === "string" && PERMISSION_ASK_TIMEOUT_PATTERN.test(state.error)
+}
+
+export function toolCardHeadOf(part: ToolPart): ToolCardHead {
+  const dispatch = toolCardDispatchOf(part)
+  const status = toolCardStatusOf(part.state)
+  const head: ToolCardHead = {
+    kind: dispatch.kind,
+    status,
+    category: dispatch.category,
+    metadataOnly: dispatch.metadataOnly,
+    toolName: dispatch.name,
+    origin: dispatch.origin,
+    hiddenReason: dispatch.hiddenReason,
+  }
+  // #1214 AC2:审批超时是确定结局,所有来源(含降级卡)都要能陈述它 —— 分类见上,零内容泄漏。
+  if (permissionAskTimedOut(part.state)) head.askTimedOut = true
+  // AC2:降级卡不读 input / metadata —— 到此为止。
+  if (dispatch.metadataOnly) return head
+  head.titleKey = TITLE_KEYS[dispatch.kind]
+
+  const input = inputOf(part)
+  const metadata = metadataOf(part)
+
+  // #587 Alpha Cloud 专用卡:语义化标题 + 规则点名的关键目标(经 redactor)。
+  // 只读规则 allowlist 的单个 input 键;metadata / output 不进头部。
+  if (dispatch.kind === "cloud") {
+    const rule = dispatch.cloudRule
+    if (rule !== undefined) {
+      head.titleKey = rule.titleKey
+      if (rule.targetInput !== undefined) assignInline(head, input[rule.targetInput])
+    }
+    return head
+  }
+
+  switch (dispatch.kind) {
+    case "read": {
+      assignPathTarget(head, input.filePath)
+      return head
+    }
+    case "list": {
+      // #949:生产铸形是 read 工具的 directory 分支,引擎只读 filePath
+      // (read.ts 的 params.filePath);schema 以 additionalProperties:true 生成 ⇒
+      // 模型多给的 `path` 键会原样存进 input —— 优先级必须让引擎真正读的键赢,
+      // 否则卡面目标可被引擎从不读的键改写(#879)。`path` 兜底只为 #583 的
+      // list 形态夹具(无 filePath 时才生效)。
+      const path = redactedPathOf(input.filePath ?? input.path)
+      if (path.hidden) head.targetHidden = true
+      else if (path.value !== undefined) head.target = cappedItem(path.value)
+      // #583:完成态头部计数「共 N 项」。只有解析出完整(未截断)条目集时才出计数 ——
+      // 截断集的条数会低报总量,诚实缺席退回「完成」。
+      if (status === "success") {
+        const dir = dirEntriesOf(outputOf(part), metadata)
+        if (dir.entries.length > 0 && !dir.truncated) head.count = { unit: "items", value: dir.entries.length }
+      }
+      return head
+    }
+    case "glob": {
+      assignInline(head, input.pattern)
+      const count = finiteOf(metadata.count)
+      if (count !== undefined) head.count = { unit: "files", value: Math.max(0, Math.floor(count)) }
+      return head
+    }
+    case "grep": {
+      assignInline(head, input.pattern)
+      const include = redactedInlineOf(input.include)
+      if (include.hidden) head.detailHidden = true
+      else if (include.value !== undefined) head.detail = `include=${include.value}`
+      const matches = finiteOf(metadata.matches)
+      if (matches !== undefined) head.count = { unit: "matches", value: Math.max(0, Math.floor(matches)) }
+      return head
+    }
+    case "webfetch": {
+      const url = stringOf(input.url)
+      if (url !== undefined) {
+        const clean = redactUrl(url, TOOL_URL_MAX_CHARS)
+        if (clean.ok) head.target = cappedItem(clean.value)
+        else head.targetHidden = true
+      }
+      return head
+    }
+    case "websearch": {
+      assignInline(head, input.query)
+      // #586:头部只出「结果数」(基线 web search 顶层白名单:宿主标题 / query /
+      // 结果数 / 状态 —— 供应商名不在内,对照帧的「Exa · 3 条」不落地)。
+      // 计数 = 实际渲染的链接行数(清洗后),不转述远端自称的总量。
+      if (status === "success") {
+        const { links } = searchLinksOf(outputOf(part))
+        if (links.length > 0) head.count = { unit: "results", value: links.length }
+      }
+      return head
+    }
+    case "bash": {
+      assignInline(head, input.command)
+      const exit = finiteOf(metadata.exit)
+      if (status === "success" && exit !== undefined) head.exit = exit
+      return head
+    }
+    case "edit": {
+      assignPathTarget(head, input.filePath)
+      head.stat = editStatOf(metadata)
+      return head
+    }
+    case "write": {
+      assignPathTarget(head, input.filePath)
+      // I7:总行数只在扫描预算内计数才可信;超预算不出统计徽标(诚实缺席)。
+      const content = stringOf(input.content)
+      if (content && content.length <= TOOL_SCAN_MAX_CHARS) head.stat = { additions: countLines(content), deletions: 0 }
+      return head
+    }
+    case "apply_patch": {
+      const files = patchFilesOf(part)
+      if (files.rows.length > 0) {
+        head.count = { unit: "files", value: files.rows.length }
+        head.stat = files.rows.reduce(
+          (sum, row) => ({ additions: sum.additions + row.additions, deletions: sum.deletions + row.deletions }),
+          { additions: 0, deletions: 0 },
+        )
+      }
+      return head
+    }
+    case "skill": {
+      assignInline(head, stringOf(input.name) ?? metadata.name)
+      return head
+    }
+    case "task": {
+      assignInline(head, input.description)
+      return head
+    }
+    case "question": {
+      // #1475 AC6:对象 = 第一个问题(经共享 redactor;失败 = 确定的「详情已隐藏」)。
+      assignInline(head, firstQuestionOf(input)?.question)
+      return head
+    }
+    default:
+      return head
+  }
+}
+
+/**
+ * bash 卡的命令说明副行(matched bash 专属;已过 redactor)。#934 Minor:脱敏失败
+ * 不再静默丢字段 —— hidden=true 时渲染层显示确定的「详情已隐藏」(AC5 标记半边)。
+ */
+export function bashDescriptionOf(part: ToolPart): { value?: string; hidden: boolean } | undefined {
+  const dispatch = toolCardDispatchOf(part)
+  if (dispatch.metadataOnly || dispatch.kind !== "bash") return undefined
+  const result = redactedInlineOf(inputOf(part).description)
+  if (!result.hidden && result.value === undefined) return undefined
+  return result
+}
+
+function editStatOf(metadata: Record<string, unknown>): { additions: number; deletions: number } | undefined {
+  const filediff = metadata.filediff
+  if (typeof filediff !== "object" || filediff === null) return undefined
+  const additions = finiteOf((filediff as { additions?: unknown }).additions)
+  const deletions = finiteOf((filediff as { deletions?: unknown }).deletions)
+  if (additions === undefined && deletions === undefined) return undefined
+  return { additions: Math.max(0, additions ?? 0), deletions: Math.max(0, deletions ?? 0) }
+}
+
+function countLines(text: string): number {
+  let lines = 1
+  for (let index = 0; index < text.length; index += 1) if (text.charCodeAt(index) === 10) lines += 1
+  return lines
+}
+
+// ── 输出体模型(全部有界,全部先过 redactor) ──────────────────────────────
+export interface PatchFileRow {
+  badge: "add" | "modify" | "delete" | "move"
+  path: string
+  additions: number
+  deletions: number
+}
+
+/** #583 目录网格体的单项(路径已脱敏;dir 按条目尾随 `/` 判定)。 */
+export interface DirEntry {
+  name: string
+  dir: boolean
+}
+
+/** #584 grep 展开体的行:file = 文件分组行(分色);match = 行号 + 命中高亮 span 序列。 */
+export type GrepRow = { kind: "file"; path: string } | { kind: "match"; line?: number; spans: GrepSpan[] }
+
+export interface GrepSpan {
+  text: string
+  hit: boolean
+}
+
+/**
+ * #586 富链接行:href 已过 redactUrl;host / letter(字母徽,**不是 favicon** ——
+ * favicon = 渲染进程发远端请求,基线未授权的新隐私面)从清洗后 URL 导出;
+ * title 只来自结构化 `results[].title` allowlist 键并已过共享 redactor(基线
+ * §5.2 web search:「宿主允许的标题」),自由文本兜底路径没有标题。
+ */
+export interface SearchLink {
+  href: string
+  host: string
+  letter: string
+  title?: string
+}
+
+export type ToolCardBody =
+  | { type: "none" }
+  | { type: "hidden" }
+  | { type: "text"; text: string; truncated: boolean }
+  | { type: "term"; output: string; truncated: boolean; streaming: boolean }
+  | { type: "files"; files: string[]; truncated: boolean; badge?: "read" }
+  | { type: "dir"; entries: DirEntry[]; truncated: boolean }
+  | { type: "grep"; rows: GrepRow[]; truncated: boolean }
+  | { type: "diff"; patch: string }
+  | { type: "write"; path?: string; preview: string[]; totalLines: number; approx: boolean }
+  | { type: "patch"; files: PatchFileRow[]; truncated: boolean }
+  | { type: "links"; links: SearchLink[]; truncated: boolean }
+  /** `#1572`:`netLayer` = 引擎结算时认出的网络层(`http` 沿用原文案,不在此列),`host` = 该调用目标的主机名(只取主机名)。 */
+  | { type: "error"; message: string; truncated: boolean; netLayer?: NetFailureLayer; host?: string }
+
+// ── #583 list 目录网格(CT `#tools` G6 帧;基线 §5.2「文件读取/列表」类) ────
+/**
+ * 目录输出的有界解析:逐行取条目,尾随 `/` = 目录;`(...)` 注记行不算条目
+ * (`(Showing …` 代表引擎侧截断)。每项过 redactPath(基线:已脱敏路径列表,
+ * 不显示带用户名的 home 前缀);失败项整项丢弃并以截断标记诚实呈现(同 read/glob
+ * 列表纪律)。双约束:项数帽 + 行迭代预算 + 扫描预算(I7)。
+ */
+/**
+ * #949:read 目录分支为渲染层铸的结构化 display(引擎 read.ts 的 Display 联合的
+ * directory 形态)。防御读取:type 必须是 "directory" 且 entries 是数组,否则视为
+ * 无(分派回落 read 卡)。truncated 只在引擎明示 `truncated === false` **且**是
+ * 首页(offset 缺席或 === 1)时才为 false —— offset>1 的分页视图条数不是目录
+ * 总量,「共 N 项」按截断语义诚实缺席(不低报)。
+ */
+function dirDisplayOf(
+  metadata: Record<string, unknown>,
+): { entries: readonly unknown[]; truncated: boolean } | undefined {
+  const display = metadata.display
+  if (typeof display !== "object" || display === null) return undefined
+  const record = display as { type?: unknown; entries?: unknown; truncated?: unknown; offset?: unknown }
+  if (record.type !== "directory" || !Array.isArray(record.entries)) return undefined
+  const firstPage = record.offset === undefined || record.offset === 1
+  return { entries: record.entries, truncated: record.truncated !== false || !firstPage }
+}
+
+export function dirEntriesOf(
+  output: string,
+  metadata: Record<string, unknown>,
+): { entries: DirEntry[]; truncated: boolean } {
+  // #949:结构化 display 优先 —— 生产的 read 目录输出带 `<path>/<type>/<entries>`
+  // 包装行,按文本逐行解析会把包装行误收成条目;display.entries 是引擎铸的净条目集
+  // (尾随 `/` = 目录),同一套 redactor + 双约束纪律逐项过。文本路径保留给 #583 的
+  // list 形态输出(无结构化 display 的行)。
+  const display = dirDisplayOf(metadata)
+  if (display !== undefined) {
+    let truncated = display.truncated || metadata.truncated === true
+    const entries: DirEntry[] = []
+    for (let index = 0; index < display.entries.length; index += 1) {
+      if (index >= TOOL_LIST_SCAN_MAX || entries.length >= TOOL_LIST_MAX_ITEMS) {
+        truncated = true
+        break
+      }
+      const item = display.entries[index]
+      const line = typeof item === "string" ? cappedItem(item).trim() : ""
+      if (line.length === 0) {
+        truncated = true
+        continue
+      }
+      const dir = line.endsWith("/")
+      const clean = redactPath(line, TOOL_PATH_MAX_CHARS)
+      if (!clean.ok || clean.value.length === 0) {
+        truncated = true
+        continue
+      }
+      const name = clean.value.endsWith("/") ? clean.value.slice(0, -1) : clean.value
+      if (name.length === 0) {
+        truncated = true
+        continue
+      }
+      entries.push({ name: cappedItem(name), dir })
+    }
+    return { entries, truncated }
+  }
+  const scan = output.slice(0, TOOL_SCAN_MAX_CHARS)
+  let truncated = output.length > scan.length || metadata.truncated === true
+  const entries: DirEntry[] = []
+  const lines = scan.split("\n")
+  for (let index = 0; index < lines.length; index += 1) {
+    if (index >= TOOL_LIST_SCAN_MAX || entries.length >= TOOL_LIST_MAX_ITEMS) {
+      truncated = true
+      break
+    }
+    let line = cappedItem(lines[index]!).trim()
+    if (line.length === 0) continue
+    if (line.startsWith("(")) {
+      // 引擎的「(Showing X of Y entries…)」注记 = 上游已截断;「(N entries)」只是尾注。
+      if (line.startsWith("(Showing")) truncated = true
+      continue
+    }
+    if (line.startsWith("- ")) line = line.slice(2)
+    const dir = line.endsWith("/")
+    const clean = redactPath(line, TOOL_PATH_MAX_CHARS)
+    if (!clean.ok || clean.value.length === 0) {
+      truncated = true
+      continue
+    }
+    const name = clean.value.endsWith("/") ? clean.value.slice(0, -1) : clean.value
+    if (name.length === 0) {
+      truncated = true
+      continue
+    }
+    entries.push({ name: cappedItem(name), dir })
+  }
+  return { entries, truncated }
+}
+
+function dirBodyOf(part: ToolPart): ToolCardBody {
+  const { entries, truncated } = dirEntriesOf(outputOf(part), metadataOf(part))
+  if (entries.length === 0) return { type: "none" }
+  return { type: "dir", entries, truncated }
+}
+
+// ── #584 grep 命中高亮(CT `#tools` G7 帧;基线 §5.2「grep / 诊断」类) ──────
+/**
+ * 命中 span 的字面量切分:只做纯 substring 扫描(线性、有界)。**绝不把模型给的
+ * pattern 当正则执行** —— 不可信 regex 在 400 字符行上就能造出灾难性回溯
+ * (同 tool-redactor 的 O(n²) 教训);正则形态的 pattern 匹配不上就诚实不高亮。
+ * 扫描对象是**已脱敏后的展示文本**,pattern 原文只用于定位,绝不进 DOM。
+ */
+export function hitSpansOf(text: string, pattern: string | undefined): GrepSpan[] {
+  if (pattern === undefined || pattern.length === 0 || pattern.length > TOOL_ITEM_MAX_CHARS) {
+    return [{ text, hit: false }]
+  }
+  const spans: GrepSpan[] = []
+  let index = 0
+  while (index < text.length) {
+    const at = text.indexOf(pattern, index)
+    if (at < 0) break
+    if (at > index) spans.push({ text: text.slice(index, at), hit: false })
+    spans.push({ text: pattern, hit: true })
+    index = at + pattern.length
+  }
+  if (index === 0) return [{ text, hit: false }]
+  if (index < text.length) spans.push({ text: text.slice(index), hit: false })
+  return spans
+}
+
+// 引擎 grep 输出的行文法(packages/opencode/src/tool/grep.ts):
+//   Found N matches[ (more matches available)]
+//   /abs/path/file.ts:
+//     Line 12: matched text
+//   (Results truncated. …)
+const GREP_HEADER_LINE = /^Found \d+ matches/
+const GREP_MATCH_LINE = /^ {2}Line (\d+): (.*)$/
+
+/**
+ * grep 展开体的结构化投影:文件行过 redactPath、摘录行过共享 redactor 且有界;
+ * **任一行脱敏失败 = 整字段隐藏**(基线 §5.1;渲染层显示确定的「详情已隐藏」,
+ * 无 raw 回退)。未识别形状的行整行丢弃并标记截断(fail-closed,不当正文透传)。
+ */
+function grepBodyOf(part: ToolPart): ToolCardBody {
+  const output = outputOf(part)
+  const scan = output.slice(0, TOOL_SCAN_MAX_CHARS)
+  let truncated = output.length > scan.length || metadataOf(part).truncated === true
+  const pattern = stringOf(inputOf(part).pattern)
+  const rows: GrepRow[] = []
+  const lines = scan.split("\n")
+  for (let index = 0; index < lines.length; index += 1) {
+    if (index >= TOOL_LIST_SCAN_MAX || rows.length >= TOOL_LIST_MAX_ITEMS) {
+      truncated = true
+      break
+    }
+    // 分类看原始行(仅受扫描预算约束):先截行再判形状会把超长路径行「降级」成
+    // 未识别行,绕过下面的整字段隐藏(fail-closed 判据必须先于任何截断)。
+    const line = lines[index]!
+    if (line.trim().length === 0) continue
+    if (GREP_HEADER_LINE.test(line) || line === "No files found") continue
+    if (line.startsWith("(")) {
+      truncated = true
+      continue
+    }
+    const match = GREP_MATCH_LINE.exec(line)
+    if (match !== null) {
+      const clean = redactText(match[2]!, TOOL_ITEM_MAX_CHARS)
+      if (!clean.ok) return { type: "hidden" }
+      // 与 textBodyOf/dirEntriesOf 同口径:截断如实上抛;截空的行(无空白的超长行
+      // safeTruncate 会截成空串)不渲染「不含命中词的空命中」,缺席以截断标记留痕。
+      if (clean.truncated) truncated = true
+      if (clean.value.length === 0) {
+        truncated = true
+        continue
+      }
+      const lineNumber = finiteOf(Number(match[1]))
+      rows.push({
+        kind: "match",
+        line: lineNumber === undefined ? undefined : Math.max(0, Math.floor(lineNumber)),
+        spans: hitSpansOf(clean.value, pattern),
+      })
+      continue
+    }
+    if (line.endsWith(":")) {
+      // 不预截路径:redactPath 自身拒绝超长(截断的路径指向错误目标)⇒ 整字段隐藏。
+      const clean = redactPath(line.slice(0, -1), TOOL_PATH_MAX_CHARS)
+      if (!clean.ok || clean.value.length === 0) return { type: "hidden" }
+      rows.push({ kind: "file", path: cappedItem(clean.value) })
+      continue
+    }
+    truncated = true
+  }
+  if (rows.length === 0) return { type: "none" }
+  return { type: "grep", rows, truncated }
+}
+
+/** 从**已清洗**的 href 导出展示 host 与字母徽;解析失败 = 丢弃该行(fail-closed)。 */
+function searchLinkOf(href: string): SearchLink | undefined {
+  try {
+    const url = new URL(href)
+    const host = url.host.replace(/^www\./, "")
+    if (host.length === 0) return undefined
+    const letter = (/[a-z0-9]/i.exec(host)?.[0] ?? host[0]!).toUpperCase()
+    return { href, host: cappedItem(host), letter }
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * 结构化结果解析(#586):只认引擎会返回的 `{"results":[…]}` JSON 形状
+ * (mcp-websearch.ts 的 structuredContent 成功路)。整串有扫描预算帽;非该形状
+ * 一律 undefined,回落到裸 URL 扫描 —— 标题只能来自这里的 `title` allowlist 键。
+ */
+function structuredResultsOf(output: string): { url?: unknown; title?: unknown }[] | undefined {
+  const trimmed = output.trim()
+  if (trimmed.length === 0 || trimmed.length > TOOL_SCAN_MAX_CHARS) return undefined
+  if (!trimmed.startsWith("{")) return undefined
+  try {
+    const parsed = JSON.parse(trimmed) as { results?: unknown }
+    if (typeof parsed !== "object" || parsed === null) return undefined
+    const results = parsed.results
+    if (!Array.isArray(results)) return undefined
+    return results.filter(
+      (item): item is { url?: unknown; title?: unknown } => typeof item === "object" && item !== null,
+    )
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * websearch / cloud web_search 共用的链接体:每条 URL 过 redactUrl,失败即丢;
+ * 结构化 `results[].title` 过共享 redactor(失败 = 隐藏该标题字段并标记截断,
+ * 不静默),host / 字母徽从清洗后 URL 导出。数量与迭代双有界(I7)。
+ */
+export function searchLinksOf(output: string): { links: SearchLink[]; truncated: boolean } {
+  const links: SearchLink[] = []
+  const seen = new Set<string>()
+  let dropped = false
+  const push = (rawUrl: string, rawTitle?: unknown): void => {
+    const clean = redactUrl(rawUrl, TOOL_URL_MAX_CHARS)
+    if (!clean.ok) {
+      dropped = true
+      return
+    }
+    if (seen.has(clean.value)) return
+    const link = searchLinkOf(clean.value)
+    if (link === undefined) {
+      dropped = true
+      return
+    }
+    seen.add(clean.value)
+    const title = redactedInlineOf(rawTitle)
+    if (title.hidden) dropped = true
+    else if (title.value !== undefined) link.title = title.value
+    links.push(link)
+  }
+  const structured = structuredResultsOf(output)
+  if (structured !== undefined) {
+    for (let index = 0; index < structured.length; index += 1) {
+      if (index >= TOOL_LIST_SCAN_MAX || links.length >= TOOL_LINKS_MAX) {
+        dropped = true
+        break
+      }
+      const url = stringOf(structured[index]!.url)
+      // #586:缺 url 键 / 非字符串 = 丢掉了引擎真回过的一条结果 —— 与 push 里 redactUrl
+      // 失败那一支同口径标记截断,不静默。静默的话头部「N 条结果」低报且无任何缺席提示。
+      if (url === undefined) {
+        dropped = true
+        continue
+      }
+      push(url, structured[index]!.title)
+    }
+    return { links, truncated: dropped }
+  }
+  for (const url of extractHttpUrls(output)) {
+    if (links.length >= TOOL_LINKS_MAX) {
+      dropped = true
+      break
+    }
+    push(url)
+  }
+  return { links, truncated: dropped }
+}
+
+/** `#1572`:processor.ts 写进 ToolPart metadata 的 `codepuppyNetFailure`(只认九个层名)+ 目标 URL 的主机名(不带路径与查询)。 */
+function netFailureOf(part: ToolPart): { netLayer?: NetFailureLayer; host?: string } {
+  const layer = (metadataOf(part).codepuppyNetFailure as { layer?: unknown } | undefined)?.layer
+  if (!isNetFailureLayer(layer) || layer === "http") return {}
+  const url = (part.state.input as { url?: unknown } | undefined)?.url
+  const host = typeof url === "string" && URL.canParse(url) ? new URL(url).hostname.slice(0, 253) : ""
+  return host ? { netLayer: layer, host } : { netLayer: layer }
+}
+
+function linksBodyOf(output: string): ToolCardBody {
+  const { links, truncated } = searchLinksOf(output)
+  if (links.length === 0) return { type: "none" }
+  return { type: "links", links, truncated }
+}
+
+function textBodyOf(raw: string, maxChars = TOOL_BODY_MAX_CHARS, maxLines = TOOL_BODY_MAX_LINES): ToolCardBody {
+  const clean = redactText(raw, maxChars, maxLines)
+  if (!clean.ok) return { type: "hidden" }
+  if (!clean.value) return clean.truncated ? { type: "hidden" } : { type: "none" }
+  return { type: "text", text: clean.value, truncated: clean.truncated }
+}
+
+export function toolCardBodyOf(part: ToolPart): ToolCardBody {
+  const dispatch = toolCardDispatchOf(part)
+  // AC2:降级卡没有任何 body —— error / output / input 一律不进 DOM。
+  if (dispatch.metadataOnly) return { type: "none" }
+
+  const status = toolCardStatusOf(part.state)
+  if (status === "error") {
+    const message = part.state.status === "error" && typeof part.state.error === "string" ? part.state.error : ""
+    const clean = redactText(message, TOOL_ERROR_MAX_CHARS)
+    if (!clean.ok) return { type: "hidden" }
+    return { type: "error", message: clean.value, truncated: clean.truncated, ...netFailureOf(part) }
+  }
+  if (status === "pending") return { type: "none" }
+
+  const kind = dispatch.kind
+  const metadata = metadataOf(part)
+
+  if (kind === "bash") {
+    // 运行中:流式子消息输出(服务端 metadata.output 预览流);完成:定格 output。
+    const raw = status === "running" ? (stringOf(metadata.output) ?? "") : outputOf(part)
+    const clean = redactText(raw, TOOL_BODY_MAX_CHARS, TOOL_BODY_MAX_LINES)
+    if (!clean.ok) return { type: "hidden" }
+    return { type: "term", output: clean.value, truncated: clean.truncated, streaming: status === "running" }
+  }
+  if (status === "running") return { type: "none" }
+
+  switch (kind) {
+    case "read": {
+      // I7 双约束:项数帽(TOOL_LIST_MAX_ITEMS)+ 总迭代预算(TOOL_LIST_SCAN_MAX,
+      // 含非法项计数)—— 「50 有效 + 海量非法尾」不全扫,CPU 有界。
+      const loaded = metadata.loaded
+      if (!Array.isArray(loaded)) return { type: "none" }
+      const files: string[] = []
+      let truncated = false
+      for (let index = 0; index < loaded.length; index += 1) {
+        if (index >= TOOL_LIST_SCAN_MAX || files.length >= TOOL_LIST_MAX_ITEMS) {
+          truncated = true
+          break
+        }
+        const item = loaded[index]
+        if (typeof item !== "string" || item.length === 0) continue
+        const clean = redactPath(cappedItem(item), TOOL_PATH_MAX_CHARS)
+        // redactor 失败的项整项隐藏(fail-closed),以截断标记诚实呈现缺席。
+        if (!clean.ok || clean.value.length === 0) {
+          truncated = true
+          continue
+        }
+        files.push(cappedItem(clean.value))
+      }
+      if (files.length === 0) return { type: "none" }
+      return { type: "files", files, truncated, badge: "read" }
+    }
+    case "glob": {
+      // I7:先按扫描预算截整串,再行切;每行过单项帽 + redactor 后才进过滤。
+      const output = outputOf(part)
+      const scan = output.slice(0, TOOL_SCAN_MAX_CHARS)
+      const files: string[] = []
+      let overflow = output.length > scan.length
+      for (const rawLine of scan.split("\n")) {
+        if (files.length >= TOOL_LIST_MAX_ITEMS) {
+          overflow = true
+          break
+        }
+        const line = cappedItem(rawLine).trim()
+        if (line.length === 0 || line.startsWith("(") || line === "No files found") continue
+        const clean = redactPath(line, TOOL_PATH_MAX_CHARS)
+        if (!clean.ok || clean.value.length === 0) {
+          overflow = true
+          continue
+        }
+        files.push(cappedItem(clean.value))
+      }
+      if (files.length === 0) return { type: "none" }
+      return { type: "files", files, truncated: overflow || metadata.truncated === true }
+    }
+    case "grep": {
+      return grepBodyOf(part)
+    }
+    case "list": {
+      return dirBodyOf(part)
+    }
+    case "webfetch":
+      // 设计口径:仅触发行(URL 已在头部),不内联网页内容。
+      return { type: "none" }
+    case "cloud":
+      // #587:云卡展开体只有 web_search 的链接列表(与 builtin websearch 同管线:
+      // 每条 URL 过 redactUrl,失败即丢);其余云工具无 body。
+      if (dispatch.cloudRule?.links !== true) return { type: "none" }
+      return linksBodyOf(outputOf(part))
+    case "websearch":
+      return linksBodyOf(outputOf(part))
+    case "edit": {
+      const patch = stringOf(metadata.diff)
+      if (!patch) return { type: "none" }
+      return redactedDiffOf(patch)
+    }
+    case "write": {
+      const input = inputOf(part)
+      const content = stringOf(input.content)
+      if (!content) return { type: "none" }
+      // I7:预览只切开头一小段;总行数只在扫描预算内计数,超预算 approx(不伪装精确)。
+      const previewScan = content.slice(0, WRITE_PREVIEW_LINES * (TOOL_ITEM_MAX_CHARS + 1) + 1)
+      const previewRaw = previewScan
+        .split("\n", WRITE_PREVIEW_LINES + 1)
+        .slice(0, WRITE_PREVIEW_LINES)
+        .map((line) => cappedItem(line))
+      const cleanPreview = redactText(previewRaw.join("\n"), WRITE_PREVIEW_LINES * (TOOL_ITEM_MAX_CHARS + 1))
+      if (!cleanPreview.ok) return { type: "hidden" }
+      const approx = content.length > TOOL_SCAN_MAX_CHARS
+      const path = redactedPathOf(input.filePath)
+      return {
+        type: "write",
+        path: path.hidden ? undefined : path.value,
+        preview: cleanPreview.value.split("\n"),
+        totalLines: countLines(approx ? content.slice(0, TOOL_SCAN_MAX_CHARS) : content),
+        approx,
+      }
+    }
+    case "apply_patch":
+      return patchBodyOf(part)
+    case "skill":
+    case "task":
+    case "question":
+      // question 的详情是选项清单(questionStepInfoOf),不走通用正文。
+      return { type: "none" }
+    default:
+      // 命中规则的 kind 已全部枚举;不可达,fail-closed 兜底。
+      return { type: "none" }
+  }
+}
+
+/**
+ * diff 补丁的逐行脱敏:保住行首 diff 标记(+/-/空格/@),对行内内容跑共享
+ * redactor —— secret 赋值被替换后补丁仍可解析。任一行失败或补丁超帽 →
+ * 整字段隐藏(AC5;旧「过大占位」由 hidden 标记接管,不再向 body 传 raw)。
+ */
+function redactedDiffOf(patch: string): ToolCardBody {
+  if (patch.length > DIFF_PATCH_MAX_CHARS) return { type: "hidden" }
+  const lines = patch.split("\n")
+  const out: string[] = []
+  for (const line of lines) {
+    const first = line.charAt(0)
+    const marker = first === "+" || first === "-" || first === " " || first === "@" ? first : ""
+    const rest = line.slice(marker.length)
+    if (rest.length === 0) {
+      out.push(line)
+      continue
+    }
+    const clean = redactText(rest, rest.length)
+    if (!clean.ok) return { type: "hidden" }
+    out.push(marker + clean.value)
+  }
+  return { type: "diff", patch: out.join("\n") }
+}
+
+function patchBodyOf(part: ToolPart): ToolCardBody {
+  const files = patchFilesOf(part)
+  if (files.rows.length === 0) return { type: "none" }
+  return { type: "patch", files: files.rows, truncated: files.truncated }
+}
+
+// 徽章表同样用 Map:敌意 type(__proto__/constructor 等)不可能命中原型成员 → 无徽章即丢行。
+const PATCH_BADGES = new Map<string, PatchFileRow["badge"]>([
+  ["add", "add"],
+  ["update", "modify"],
+  ["delete", "delete"],
+  ["move", "move"],
+])
+
+function patchFilesOf(part: ToolPart): { rows: PatchFileRow[]; truncated: boolean } {
+  const files = metadataOf(part).files
+  if (!Array.isArray(files)) return { rows: [], truncated: false }
+  const rows: PatchFileRow[] = []
+  let truncated = false
+  // 同 read 列表的双约束:项数帽 + 总迭代预算(海量非法尾不全扫)。
+  for (let index = 0; index < files.length; index += 1) {
+    if (index >= TOOL_LIST_SCAN_MAX || rows.length >= TOOL_LIST_MAX_ITEMS) return { rows, truncated: true }
+    const item = files[index]
+    if (typeof item !== "object" || item === null) continue
+    const record = item as {
+      relativePath?: unknown
+      filePath?: unknown
+      type?: unknown
+      additions?: unknown
+      deletions?: unknown
+    }
+    const rawPath = stringOf(record.relativePath) ?? stringOf(record.filePath)
+    const badge = typeof record.type === "string" ? PATCH_BADGES.get(record.type) : undefined
+    if (!rawPath || !badge) continue
+    const clean = redactPath(cappedItem(rawPath), TOOL_PATH_MAX_CHARS)
+    if (!clean.ok || clean.value.length === 0) {
+      truncated = true
+      continue
+    }
+    rows.push({
+      badge,
+      path: cappedItem(clean.value),
+      additions: Math.max(0, finiteOf(record.additions) ?? 0),
+      deletions: Math.max(0, finiteOf(record.deletions) ?? 0),
+    })
+  }
+  return { rows, truncated }
+}
+
+/** I6/I7:只认 http(s) 协议的裸 URL;扫描预算截整串,超长 URL 丢弃(不截半个 URL)。 */
+export function extractHttpUrls(text: string): string[] {
+  if (!text) return []
+  const scan = text.slice(0, TOOL_SCAN_MAX_CHARS)
+  const clipped = text.length > scan.length
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const match of scan.matchAll(/https?:\/\/[^\s<>"'`)\]]+/g)) {
+    // fail-closed:命中触达扫描边界且原文更长 → 可能是被截断的半个 URL,整条丢弃。
+    if (clipped && (match.index ?? 0) + match[0].length >= scan.length) continue
+    const url = match[0].replace(/[),.;:!?]+$/, "")
+    if (url.length > TOOL_URL_MAX_CHARS) continue
+    if (seen.has(url)) continue
+    seen.add(url)
+    result.push(url)
+    if (result.length >= TOOL_LINKS_MAX * 2) break
+  }
+  return result
+}
+
+// ── 「在面板打开」pill(T8):write/edit 卡头的文件目标 ──────────────────────
+/** 路径帽:超长路径不进 intent(截断的路径指向错误目标,fail-closed 无 pill)。 */
+export const OPEN_TARGET_MAX_CHARS = 1_024
+
+/**
+ * write/edit 卡的面板打开目标 = 原始 input.filePath(intent 的功能目标,不是
+ * 展示文本,不脱敏);identity 分派命中 write/edit 规则才有 pill(#879)。
+ */
+export function openTargetOf(part: ToolPart): string | undefined {
+  const dispatch = toolCardDispatchOf(part)
+  if (dispatch.metadataOnly || (dispatch.kind !== "write" && dispatch.kind !== "edit")) return undefined
+  const filePath = inputOf(part).filePath
+  if (typeof filePath !== "string" || filePath.length === 0 || filePath.length > OPEN_TARGET_MAX_CHARS) return undefined
+  return filePath
+}
+
+// ── 诊断行(T19):edit/write 完成态 metadata.diagnostics 的有界投影 ─────────
+export const DIAG_MAX_ROWS = 8
+/** 外层帽(审计 Major-3):诊断映射的文件键扫描预算,超出即停(精确键命中不受限)。 */
+export const DIAG_FILES_SCAN_MAX = 200
+
+export interface DiagnosticRow {
+  file: string
+  line?: number
+  message: string
+}
+
+function normalizedPath(path: string): string {
+  return path.replaceAll("\\", "/")
+}
+
+/**
+ * 只取本卡文件的 ERROR 级(severity=1)诊断,与上游 report() 同口径;四重帽(I7):
+ * 外层文件键预算(DIAG_FILES_SCAN_MAX)+ 条数帽(DIAG_MAX_ROWS)+ 条目扫描预算
+ * (TOOL_LIST_SCAN_MAX)+ 单条帽(cappedItem)。文件对不上/形状非法 → 空(fail-closed)。
+ * #879:入口按 identity 分派;message 过共享 redactor,失败整行隐藏。
+ */
+export function diagnosticsOf(part: ToolPart): { rows: DiagnosticRow[]; truncated: boolean } {
+  const none = { rows: [], truncated: false }
+  const dispatch = toolCardDispatchOf(part)
+  if (dispatch.metadataOnly || (dispatch.kind !== "write" && dispatch.kind !== "edit")) return none
+  if (part.state.status !== "completed") return none
+  const filePath = inputOf(part).filePath
+  if (typeof filePath !== "string" || filePath.length === 0) return none
+  const diagnostics = metadataOf(part).diagnostics
+  if (typeof diagnostics !== "object" || diagnostics === null) return none
+  const map = diagnostics as Record<string, unknown>
+  // 外层文件数扫描预算(审计 Major-3):该映射可为全项目诊断,不做全量
+  // Object.entries/归一化 —— 先走本文件精确键 O(1) 快路,再有界逐键扫描,
+  // 预算耗尽即停(历史卡片数 × 项目文件数不再可放大)。
+  let entry: unknown = Object.prototype.hasOwnProperty.call(map, filePath) ? map[filePath] : undefined
+  if (entry === undefined) {
+    const wanted = normalizedPath(filePath)
+    let scanned = 0
+    for (const key in map) {
+      if (scanned >= DIAG_FILES_SCAN_MAX) break
+      scanned += 1
+      if (!Object.prototype.hasOwnProperty.call(map, key)) continue
+      if (normalizedPath(key) === wanted) {
+        entry = map[key]
+        break
+      }
+    }
+  }
+  if (!Array.isArray(entry)) return none
+  const cleanFile = redactPath(cappedItem(filePath), TOOL_PATH_MAX_CHARS)
+  if (!cleanFile.ok || cleanFile.value.length === 0) return none
+  const file = cappedItem(basenameOf(cleanFile.value))
+  const rows: DiagnosticRow[] = []
+  let truncated = false
+  for (let index = 0; index < entry.length; index += 1) {
+    if (index >= TOOL_LIST_SCAN_MAX || rows.length >= DIAG_MAX_ROWS) {
+      truncated = true
+      break
+    }
+    const item = entry[index]
+    if (typeof item !== "object" || item === null) continue
+    const record = item as { severity?: unknown; message?: unknown; range?: { start?: { line?: unknown } } }
+    if (record.severity !== 1) continue
+    const message = redactedInlineOf(record.message)
+    if (message.hidden) {
+      truncated = true
+      continue
+    }
+    if (message.value === undefined) continue
+    const line = finiteOf(record.range?.start?.line)
+    rows.push({
+      file,
+      line: line === undefined ? undefined : Math.max(0, Math.floor(line)) + 1,
+      message: message.value,
+    })
+  }
+  return { rows, truncated }
+}
+
+// ── #1475 步骤行(REQ-229 AC3 / AC5 / AC6):动作名 · 对象 · 行尾 ────────────────
+// 形态权威 = docs/design/2026-10-10-timeline-process-fold/design.md §5 §6 与 frame.html ⑤。
+// 行尾只放三种东西:超过 10 秒的用时(视图算)、失败或等你的人话、改动增删数;计数只在
+// 为零时上行尾(「没找到」)。非我方工具不给动作名,改由 source 在行内写来源(插头 / 拼图 /
+// 问号 + 服务名);我方步骤的 source 恒缺席 —— 第三方起名「读取」也冒充不了。
+// metadata-only 的纪律不变:这里对降级卡只读 dispatch(来源分类 + 净化名称)与审批超时
+// 的布尔分类,input / metadata / output / error 的内容零字符进投影。
+
+/** 非我方来源的行内标记:mcp = 插头 + 服务名;plugin = 拼图 + 插件名;unknown = 问号 + 来源不明。 */
+export type ToolStepSourceKind = "mcp" | "plugin" | "unknown"
+
+export interface ToolStepEnd {
+  key: string
+  params?: Record<string, string | number>
+  /** 列表参数(如「你选了」的多选答案):视图按语言的分隔符拼接后作为 params.answer。 */
+  list?: string[]
+  /** true = 这是失败 / 未执行的人话(琥珀色,带 data-codepuppy-step-failure)。 */
+  failure?: boolean
+}
+
+export interface ToolStepLine {
+  /** 我方工具的动作名(i18n key);非我方来源恒缺席。 */
+  verbKey?: string
+  verbParams?: Record<string, string | number>
+  /** 非我方来源(防冒充:我方步骤恒缺席)。label = 净化后的服务 / 插件名,缺席时视图用通用文案。 */
+  source?: { kind: ToolStepSourceKind; label?: string }
+  /** 被动净化且有界的工具名(非我方 / 无规则我方工具的对象)。 */
+  name: string
+  object?: string
+  objectMono?: boolean
+  /** 对象存在但 redactor 失败 / 清空 → 确定的「详情已隐藏」(AC5)。 */
+  objectHidden?: boolean
+  end?: ToolStepEnd
+  stat?: { additions: number; deletions: number }
+}
+
+/** 还没有展示规则的我方工具的通用动作名(#1576:来源三类的名字 ——「Code Puppy 内置」「Code Puppy 云」)。 */
+const OWN_GENERIC_KEYS: Partial<Record<ToolSourceCategory, string>> = {
+  builtin: "codepuppy.timeline.sourceBuiltin",
+  host: "codepuppy.timeline.sourceBuiltin",
+  "codepuppy-bundled": "codepuppy.timeline.sourceBuiltin",
+  "codepuppy-cloud": "codepuppy.timeline.sourceCodePuppyCloud",
+}
+
+/**
+ * 非我方来源分类(mcp / plugin / unknown);我方(builtin / host / codepuppy-cloud)= undefined。
+ * #1576:插件不带名字 —— 一律「第三方插件」,包名 / 安装路径只进开发者详情(装载端的 file/npm 来源没传到
+ * 工具身份,origin 按字符串分不出是自报 ID 还是路径)。
+ */
+export function toolStepSourceOf(dispatch: Pick<ToolCardDispatch, "category" | "origin">): { kind: ToolStepSourceKind; label?: string } | undefined {
+  if (dispatch.category === "mcp") return { kind: "mcp", label: dispatch.origin }
+  if (dispatch.category === "plugin") return { kind: "plugin" }
+  if (dispatch.category === "unknown") return { kind: "unknown" }
+  return undefined
+}
+
+/** 网页地址在步骤行上去掉协议头(详情里仍是完整、可点的地址)。 */
+function displayUrl(url: string): string {
+  return url.replace(/^https?:\/\//, "")
+}
+
+/** 答完的提问:第一个问题(防御读取;非对象 / 缺 question 键 = 缺席)。 */
+function firstQuestionOf(input: Record<string, unknown>): { question?: unknown } | undefined {
+  const questions = input.questions
+  if (!Array.isArray(questions) || questions.length === 0) return undefined
+  const first = questions[0]
+  return typeof first === "object" && first !== null ? (first as { question?: unknown }) : undefined
+}
+
+function stepEndOf(part: ToolPart, dispatch: ToolCardDispatch, head: ToolCardHead): ToolStepEnd | undefined {
+  // AC6:审批超时对所有来源、所有 kind 都是同一句人话(分类只产布尔,不读错误原文)。
+  if (head.askTimedOut) return { key: "codepuppy.timeline.stepAskTimeout", failure: true }
+  if (head.status === "error") {
+    if (dispatch.kind === "webfetch") return { key: "codepuppy.timeline.stepNotOpened", failure: true }
+    return { key: "codepuppy.timeline.stepFailed", failure: true }
+  }
+  if (head.status !== "success" || dispatch.metadataOnly) return undefined
+  switch (dispatch.kind) {
+    case "glob":
+    case "grep":
+      return head.count?.value === 0 ? { key: "codepuppy.timeline.stepNotFound" } : undefined
+    case "bash":
+      // 退出码只在非 0 时上行尾;0 是成功,成功不挂状态。
+      return head.exit !== undefined && head.exit !== 0
+        ? { key: "codepuppy.timeline.stepExit", params: { code: head.exit } }
+        : undefined
+    case "edit":
+    case "write": {
+      const count = diagnosticsOf(part).rows.length
+      return count > 0 ? { key: "codepuppy.timeline.stepDiagErrors", params: { count } } : undefined
+    }
+    case "question": {
+      const chosen = questionStepInfoOf(part)?.items[0]?.chosen ?? []
+      return chosen.length > 0 ? { key: "codepuppy.timeline.stepYouChose", list: chosen } : undefined
+    }
+    default:
+      return undefined
+  }
+}
+
+/**
+ * 一次工具调用的步骤行(单项)。合并行的动作名见 toolGroupVerbOf。
+ * 输入只有 identity 分派 + 已脱敏的头部投影(toolCardHeadOf)+ 本模块既有的有界读取器。
+ */
+export function toolStepLineOf(part: ToolPart): ToolStepLine {
+  const dispatch = toolCardDispatchOf(part)
+  const head = toolCardHeadOf(part)
+  const line: ToolStepLine = { name: dispatch.name, end: stepEndOf(part, dispatch, head) }
+  const source = toolStepSourceOf(dispatch)
+  if (source !== undefined) {
+    // AC5:非我方 = 来源标记 + 工具名;没有动作名、没有参数、没有输出。
+    line.source = source
+    line.object = dispatch.name
+    return line
+  }
+  if (dispatch.metadataOnly) {
+    // 还没有展示规则的我方工具:「本机工具 · 名称」通用行。
+    line.verbKey = OWN_GENERIC_KEYS[dispatch.category]
+    line.object = dispatch.name
+    return line
+  }
+  line.verbKey = toolTitleKeyOf(dispatch)
+  line.object = head.target
+  line.objectHidden = head.targetHidden
+  line.objectMono = dispatch.kind !== "task" && dispatch.kind !== "question" && dispatch.kind !== "skill"
+  line.stat = head.stat
+  switch (dispatch.kind) {
+    case "bash": {
+      // 有说明就写说明(人话),命令原文进详情首行(终端正文的 `$ …`)。说明脱敏失败
+      // 时退回命令,确定标记留在详情(bashDescriptionOf().hidden,AC5)。
+      const description = bashDescriptionOf(part)
+      if (description?.value !== undefined) {
+        line.object = description.value
+        line.objectHidden = undefined
+        line.objectMono = false
+      }
+      break
+    }
+    case "webfetch":
+      if (line.object !== undefined) line.object = cappedItem(displayUrl(line.object))
+      break
+    case "apply_patch":
+      // 「修改 N 个文件」:文件数进动作名,增删数留在行尾;路径各只在详情出现一次。
+      if (head.count !== undefined && head.count.value > 0) {
+        line.verbKey = "codepuppy.timeline.step.patchFiles"
+        line.verbParams = { count: head.count.value }
+      }
+      break
+  }
+  return line
+}
+
+/** 合并行(连续同类、同来源)的动作名:读取 / 编辑 / 写入按文件数说,其余缺席(视图写「X N 次」)。 */
+export function toolGroupVerbOf(part: ToolPart, count: number): { key: string; params: { count: number } } | undefined {
+  const dispatch = toolCardDispatchOf(part)
+  if (dispatch.metadataOnly) return undefined
+  if (dispatch.kind === "read") return { key: "codepuppy.timeline.step.readFiles", params: { count } }
+  if (dispatch.kind === "edit") return { key: "codepuppy.timeline.step.editFiles", params: { count } }
+  if (dispatch.kind === "write") return { key: "codepuppy.timeline.step.writeFiles", params: { count } }
+  return undefined
+}
+
+// ── #1475 AC6:答完的内置提问 —— 问题、选项与你的选择 ─────────────────────────
+export const QUESTION_MAX_ITEMS = 8
+export const QUESTION_MAX_OPTIONS = 16
+
+export interface QuestionStepItem {
+  question?: string
+  questionHidden?: boolean
+  options: { label: string; selected: boolean }[]
+  /** 你的选择(按回答顺序;已脱敏;含自己输入的答案)。 */
+  chosen: string[]
+  /** 不在选项里的答案(自己输入的),详情里单列。 */
+  custom: string[]
+  truncated: boolean
+}
+
+/**
+ * 只对 builtin identity 的 question 成立(冒名的第三方 question 仍是 metadata-only 降级)。
+ * 读 input.questions(问题 + 选项标签)与引擎铸造的 metadata.answers(按问题顺序的标签数组);
+ * 每个字符串都过共享 redactor 且有界,失败的选项 / 答案整项丢弃并标记截断(不回退原文)。
+ */
+export function questionStepInfoOf(part: ToolPart): { items: QuestionStepItem[]; truncated: boolean } | undefined {
+  const dispatch = toolCardDispatchOf(part)
+  if (dispatch.metadataOnly || dispatch.kind !== "question") return undefined
+  const questions = inputOf(part).questions
+  if (!Array.isArray(questions)) return undefined
+  const answersRaw = metadataOf(part).answers
+  const answers = Array.isArray(answersRaw) ? answersRaw : []
+  const items: QuestionStepItem[] = []
+  let truncated = questions.length > QUESTION_MAX_ITEMS
+  for (let index = 0; index < Math.min(questions.length, QUESTION_MAX_ITEMS); index += 1) {
+    const raw = questions[index]
+    if (typeof raw !== "object" || raw === null) {
+      truncated = true
+      continue
+    }
+    const record = raw as { question?: unknown; options?: unknown }
+    const question = redactedInlineOf(record.question)
+    const answerRaw = answers[index]
+    const picked = new Set<string>(
+      Array.isArray(answerRaw)
+        ? answerRaw.slice(0, QUESTION_MAX_OPTIONS).filter((value): value is string => typeof value === "string")
+        : [],
+    )
+    const item: QuestionStepItem = {
+      question: question.value,
+      questionHidden: question.hidden || undefined,
+      options: [],
+      chosen: [],
+      custom: [],
+      truncated: false,
+    }
+    const optionLabels = new Set<string>()
+    const options = Array.isArray(record.options) ? record.options : []
+    if (options.length > QUESTION_MAX_OPTIONS) item.truncated = true
+    for (const option of options.slice(0, QUESTION_MAX_OPTIONS)) {
+      const label = typeof option === "object" && option !== null ? (option as { label?: unknown }).label : undefined
+      if (typeof label !== "string") {
+        item.truncated = true
+        continue
+      }
+      optionLabels.add(label)
+      const clean = redactedInlineOf(label)
+      if (clean.value === undefined) {
+        item.truncated = true
+        continue
+      }
+      item.options.push({ label: clean.value, selected: picked.has(label) })
+    }
+    for (const answer of picked) {
+      const clean = redactedInlineOf(answer)
+      if (clean.value === undefined) {
+        item.truncated = true
+        continue
+      }
+      item.chosen.push(clean.value)
+      if (!optionLabels.has(answer)) item.custom.push(clean.value)
+    }
+    items.push(item)
+  }
+  return { items, truncated }
+}
+
+// ── #587 开发者详情(默认折叠;AC3/AC4)─────────────────────────────────────
+/** 开发者详情单字段展示帽:先限长再纯文本渲染,不能成为秘密/超长注入旁路。 */
+export const DEV_DETAIL_MAX_CHARS = 160
+
+/** 被动净化 + 限长的展示段(与 sanitizedName 同清单,但空值不占位为 "?")。 */
+function passiveSegment(value: string, max = DEV_DETAIL_MAX_CHARS): string {
+  return cappedItem(value.replace(UNSAFE_NAME_CHARS, ""), max)
+}
+
+export interface ToolDevDetails {
+  /** #1568 AC5 可读标识:MCP 工具 = `<服务器键>:<远端名>`(快照 identity 的 origin 与 name,不切别名);
+   *  第一方插件工具 = 快照里随包清单声明的 `codepuppy:<动作>`,且仅当 authority = codepuppy-bundled;其余缺席。 */
+  readable?: string
+  /** canonical identity(source:origin:name)—— 排障展示,不参与任何判定(AC4)。 */
+  canonical: string
+  /** 本次调用模型可见的别名(technical-id;只在此处,绝不进主标题,T8)。 */
+  technicalId: string
+  /** 权威来源证明摘要:"not-asserted" 或 codepuppy-cloud + binding + digest(截断)。 */
+  authority: string
+  /** #1576 AC6:执行位置原样(local / remote · 主机名;缺席 = 「—」)。 */
+  location: string
+  /** #1576:插件的包名或安装路径(只在开发者详情出现,正常界面一律「第三方插件」)。 */
+  origin?: string
+}
+
+/**
+ * 快照存在才有开发者详情(无快照的历史行没有可信的 identity/authority 可陈列;
+ * 其别名已按「被动转义后的现有名称」出现在降级卡次级文本)。全部字段限长 +
+ * 被动净化;渲染层只出纯文本节点,默认折叠(AC3)。
+ */
+export function toolDevDetailsOf(part: ToolPart): ToolDevDetails | undefined {
+  const snapshot = displaySnapshotOf(part)
+  if (!snapshot) return undefined
+  const { identity, authority, technicalId, location, readable } = snapshot
+  const canonical = `${identity.source}:${passiveSegment(identity.origin)}:${passiveSegment(identity.name)}`
+  const readableId =
+    identity.source === "mcp" && identity.origin.length > 0
+      ? `${passiveSegment(identity.origin)}:${passiveSegment(identity.name)}`
+      : identity.source === "plugin" && authority.kind === "codepuppy-bundled" && readable
+        ? passiveSegment(readable)
+        : undefined
+  const authorityText =
+    authority.kind === "not-asserted"
+      ? "not-asserted"
+      : `${authority.kind} · ${passiveSegment(authority.bindingId, 64)} · ${passiveSegment(authority.evidenceDigest, 32)}`
+  const locationText = !location ? "—" : location.kind === "local" ? "local" : `remote · ${passiveSegment(location.host)}`
+  return {
+    ...(readableId ? { readable: readableId } : {}),
+    canonical,
+    technicalId: passiveSegment(technicalId),
+    authority: authorityText,
+    location: locationText,
+    ...(identity.source === "plugin" && identity.origin.length > 0 ? { origin: passiveSegment(identity.origin) } : {}),
+  }
+}
+
+// ── 分支专属信息 ────────────────────────────────────────────────────────────
+export interface TaskCardInfo {
+  description?: string
+  agent?: string
+  /** agent 名存在但 redactor 失败 → 确定的「详情已隐藏」chip(#934 Minor;description
+   * 的标记半边已在 head.targetHidden —— toolCardHeadOf 的 task 分支同一字段)。 */
+  agentHidden?: boolean
+  childSessionID?: string
+  background: boolean
+}
+
+export function taskCardInfoOf(part: ToolPart): TaskCardInfo {
+  const dispatch = toolCardDispatchOf(part)
+  if (dispatch.metadataOnly || dispatch.kind !== "task") return { background: false }
+  const input = inputOf(part)
+  const metadata = metadataOf(part)
+  const agent = redactedInlineOf(input.subagent_type)
+  return {
+    description: redactedInlineOf(input.description).value,
+    agent: agent.value,
+    agentHidden: agent.hidden || undefined,
+    childSessionID: stringOf(metadata.sessionId),
+    background: metadata.background === true,
+  }
+}
+
+export interface ContextRowInfo {
+  /** 分派后的 kind(图标/数据属性用),metadata-only 恒 "unknown"。 */
+  kind: ToolCardKind
+  /** 被动净化后的展示名称。 */
+  tool: string
+  titleKey?: string
+  target?: string
+  /** 本行有字段(目标/include)过 redactor 失败被隐藏 → 确定的「详情已隐藏」
+   * (#934 Minor:AC5 标记补齐,目标不再凭空消失)。 */
+  targetHidden?: boolean
+  args: string[]
+}
+
+/** 「已探索」折叠组一行的动词/目标/参数(#879:identity 分派 + redactor,防御读取,单项帽)。 */
+export function contextRowOf(part: ToolPart): ContextRowInfo {
+  const dispatch = toolCardDispatchOf(part)
+  const base: ContextRowInfo = { kind: dispatch.kind, tool: dispatch.name, args: [] }
+  if (dispatch.metadataOnly) return base
+  const input = inputOf(part)
+  const offset = finiteOf(input.offset)
+  const limit = finiteOf(input.limit)
+
+  switch (dispatch.kind) {
+    case "read": {
+      const args: string[] = []
+      if (offset !== undefined) args.push(`offset=${offset}`)
+      if (limit !== undefined) args.push(`limit=${limit}`)
+      const path = redactedPathOf(input.filePath)
+      return {
+        ...base,
+        titleKey: TITLE_KEYS.read,
+        target: path.value !== undefined ? cappedItem(basenameOf(path.value)) : undefined,
+        targetHidden: path.hidden || undefined,
+        args,
+      }
+    }
+    case "list": {
+      // #949:同 toolCardHeadOf 的 list 分支 —— 引擎只读 filePath,`path` 只兜底夹具。
+      const path = redactedPathOf(input.filePath ?? input.path)
+      return { ...base, titleKey: TITLE_KEYS.list, target: path.value, targetHidden: path.hidden || undefined }
+    }
+    case "glob": {
+      const pattern = redactedInlineOf(input.pattern)
+      return { ...base, titleKey: TITLE_KEYS.glob, target: pattern.value, targetHidden: pattern.hidden || undefined }
+    }
+    case "grep": {
+      const pattern = redactedInlineOf(input.pattern)
+      const include = redactedInlineOf(input.include)
+      return {
+        ...base,
+        titleKey: TITLE_KEYS.grep,
+        target: pattern.value,
+        targetHidden: pattern.hidden || include.hidden || undefined,
+        args: include.value !== undefined ? [`include=${include.value}`] : [],
+      }
+    }
+    default:
+      return base
+  }
+}
+
+export interface ContextGroupSummary {
+  reads: number
+  searches: number
+  lists: number
+}
+
+export function contextGroupSummaryOf(parts: readonly ToolPart[]): ContextGroupSummary {
+  const kinds = parts.map((part) => {
+    const dispatch = toolCardDispatchOf(part)
+    return dispatch.metadataOnly ? "unknown" : dispatch.kind
+  })
+  return {
+    reads: kinds.filter((kind) => kind === "read").length,
+    searches: kinds.filter((kind) => kind === "glob" || kind === "grep").length,
+    lists: kinds.filter((kind) => kind === "list").length,
+  }
+}
+
+// ── 媒体预览行 ──────────────────────────────────────────────────────────────
+/** data:image 且长度受限才内联缩略(I6/I7:不外联、不整吞超大 base64);其余走图标。 */
+export const MEDIA_INLINE_URL_MAX = 2_000_000
+
+export function mediaThumbable(url: string): boolean {
+  return url.startsWith("data:image/") && url.length <= MEDIA_INLINE_URL_MAX
+}
+
+export function mediaLabelOf(mime: string, name: string): string {
+  if (mime.startsWith("image/")) return mime.slice("image/".length).toUpperCase()
+  if (mime === "application/pdf") return "PDF"
+  const base = basenameOf(name)
+  const dot = base.lastIndexOf(".")
+  if (dot <= 0) return "FILE"
+  return base.slice(dot + 1).toUpperCase()
+}
+
+export type { RedactResult }

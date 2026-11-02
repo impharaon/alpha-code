@@ -15,11 +15,11 @@ review_after: 2027-03-17
 的接线(E1–E6)归 `#1129`,Settings 编辑面归 `#1130`。V2 的会话审批(receipts /
 saved-rule)另见 [`session-permission.md`](session-permission.md),两者不共享引擎。
 
-## 形状(SOT = `packages/schema/src/alpha-tool-policy.ts`)
+## 形状(SOT = `packages/schema/src/codepuppy-tool-policy.ts`)
 
 - 三态 `ToolPolicyState = enabled | ask | disabled`,经 `toPermissionAction` 编译到
   现有 V1 Permission 的 `allow | ask | deny`。不存在第四种状态,也没有第二个审批引擎。
-- 四类 `ToolClass = builtin | alpha-cloud | third-party-mcp | plugin`。分类唯一可信输入
+- 四类 `ToolClass = builtin | codepuppy-cloud | third-party-mcp | plugin`。分类唯一可信输入
   是 `identity.source` 与 **verified** `authority.kind`(`classifyTool`);标题、
   annotation、technicalId、URL 相似性一律不是输入。用户可调用的 `host` / `builtin-v2`
   归本地类。默认:本地 `enabled`,其余一律 `ask`;identity 铸不出 canonical ⇒ `disabled`。
@@ -30,9 +30,9 @@ saved-rule)另见 [`session-permission.md`](session-permission.md),两者不共�
 - 持久化文档 `ToolPolicyDocumentV1 = { version: 1, partition, records[] }`,按
   `(account subject 或 anonymous, workspace/project id)` 分区,一分区一文件
   (文件名 = 分区 canonical JSON 的 sha256,SOT =
-  `packages/opencode/src/permission/alpha-tool-policy-store.ts`)。
+  `packages/opencode/src/permission/codepuppy-tool-policy-store.ts`)。
 
-## 合成语义(SOT = `packages/opencode/src/permission/alpha-tool-policy.ts`)
+## 合成语义(SOT = `packages/opencode/src/permission/codepuppy-tool-policy.ts`)
 
 `resolveToolPolicy` 按 #724 §4 的终局顺序(第一版 `deny > ask > allow` 排序已否决):
 
@@ -55,12 +55,12 @@ Binding digest 来源(#724 §5):Alpha Cloud 复用 verified `authority.evidenceD
 
 ## managed cap(#1128 必修)
 
-SOT = `packages/opencode/src/permission/alpha-managed-policy.ts`。与上游
+SOT = `packages/opencode/src/permission/codepuppy-managed-policy.ts`。与上游
 `config/managed.ts` 的 `OPENCODE_TEST_MANAGED_CONFIG_DIR || systemManagedConfigDir()`
 不同:**系统 managed 目录无条件读取,env 不能替换它**。`OPENCODE_TEST_MANAGED_CONFIG_DIR`
 只是 additive 的最低优先来源;系统目录 / MDM plist 存在但读不出 ⇒ 整层 `unreadable`
 ⇒ resolver `disabled`(不静默丢 org deny)。测试对系统目录的控制**仅经函数参数注入**。
-负向闸在 `packages/opencode/test/permission/alpha-tool-policy.test.ts`(M 组)。
+负向闸在 `packages/opencode/test/permission/codepuppy-tool-policy.test.ts`(M 组)。
 
 ## V1 审批层的会话语义(SOT = `packages/opencode/src/permission/index.ts`)
 
@@ -78,15 +78,15 @@ SOT = `packages/opencode/src/permission/alpha-managed-policy.ts`。与上游
 
 ## 消费 API
 
-`AlphaToolPolicy.Service`(LayerNode `AlphaToolPolicy.node`):
+`CodePuppyToolPolicy.Service`(LayerNode `CodePuppyToolPolicy.node`):
 `resolve(subject, caps?)`(每次调用重读 cap 与文档 —— #724 §6 要求 executor 调用时
 重读)、`inspect()`、`setRecord` / `removeRecord`(quarantine 期间拒写,先 `reset`)、
 `reset()`。账户 subject 今天默认 `anonymous`(引擎侧尚无账户权威),经 layer 注入。
 
-判据:`packages/opencode/test/permission/alpha-session-grants.test.ts`、
-`packages/opencode/test/permission/alpha-tool-policy.test.ts`(均登记于
+判据:`packages/opencode/test/permission/codepuppy-session-grants.test.ts`、
+`packages/opencode/test/permission/codepuppy-tool-policy.test.ts`(均登记于
 `scripts/gate-files.tsv`),生产双咽喉取证见
-`packages/opencode/test/tool/alpha-725-policy-chokepoints.cases.ts`(#1128 后
+`packages/opencode/test/tool/codepuppy-725-policy-chokepoints.cases.ts`(#1128 后
 B9/B13 转绿,B2/B3/B4/B6/B10/B11 属 #1129)。
 
 写侧失败 `ToolPolicyWriteError` 携带 `kind: quarantined | io`(#1130):消费面据此区分
@@ -101,15 +101,15 @@ B9/B13 转绿,B2/B3/B4/B6/B10/B11 属 #1129)。
 
 | 端点(`packages/protocol/src/groups/permission.ts`) | 成功 | 失败 |
 | --- | --- | --- |
-| `GET /api/permission/tool-policy/inventory` | 200 `{ data: ToolPolicyInventoryV1 }`(SOT `packages/schema/src/alpha-tool-inventory.ts`) | 503 `ServiceUnavailableError`(引擎没接线,不返回空清单) |
+| `GET /api/permission/tool-policy/inventory` | 200 `{ data: ToolPolicyInventoryV1 }`(SOT `packages/schema/src/codepuppy-tool-inventory.ts`) | 503 `ServiceUnavailableError`(引擎没接线,不返回空清单) |
 | `PUT /api/permission/tool-policy/record`,payload = `ToolPolicyRecord` | 204 | 400(记录不合 schema:service/tool 层 enabled 未带 bindingDigest、class 层带了)· 409 `ConflictError`(文档待恢复)· 500 `UnknownError`(落盘失败)· 503 |
 | `POST /api/permission/tool-policy/record/remove`,payload = `{ selector }` | 204 | 同上 |
 | `POST /api/permission/tool-policy/reset` | 200 `{ data: { backup?: string } }` | 503 |
 
-标签:core `@opencode/v2/AlphaToolPolicyApi`(`packages/core/src/permission/alpha-tool-policy-api.ts`),
-实现 = `packages/opencode/src/permission/alpha-tool-inventory.ts` 的 `bridge`(`InstanceStore.provide`
+标签:core `@opencode/v2/CodePuppyToolPolicyApi`(`packages/core/src/permission/codepuppy-tool-policy-api.ts`),
+实现 = `packages/opencode/src/permission/codepuppy-tool-inventory.ts` 的 `bridge`(`InstanceStore.provide`
 按 directory 注入实例),由 `session/prompt.ts` 的顶层 node 合成暴露。handler 用 `serviceOption`
-取标签,缺席即 503。判据:`packages/opencode/test/server/alpha-tool-policy-route.test.ts`(R1–R5,
+取标签,缺席即 503。判据:`packages/opencode/test/server/codepuppy-tool-policy-route.test.ts`(R1–R5,
 登记于 `scripts/gate-files.tsv`)+ `httpapi-exercise` 四条 scenario。
 
 桌面侧(`packages/ui-mac`):main `tool-policy-client.ts` 按上表直接 fetch(不经生成的 SDK,理由见接缝文档 §4),
@@ -119,4 +119,4 @@ B9/B13 转绿,B2/B3/B4/B6/B10/B11 属 #1129)。
 `engine-unavailable | not-wired | invalid-shape | request-failed`,写侧再加
 `quarantined | invalid-record | write-failed`;不携带路径、栈或引擎原文。四种读失败都 fail-closed:
 Settings 不显示清单、不放宽任何工具。判据:`packages/ui-mac/src/main/tool-policy-client.test.ts`、
-`packages/ui-mac/src/renderer/alpha-ui/settings-tools.test.ts`。
+`packages/ui-mac/src/renderer/codepuppy-ui/settings-tools.test.ts`。

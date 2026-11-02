@@ -1,8 +1,8 @@
 // [#963] 自动化 IPC 的云端腿 —— 走**生产 handler** 的用户可观察判据。
 //
 // 链条:automations-delete / automations-save(automation-ipc.ts 里由 `ipcMain.handle` 真实注册的
-// 那两个 handler)→ upsert/deleteCloudSchedule(alpha-cloud-schedules.ts,真模块)→ 本地 authed()
-// → fetch。alpha-automations 也是真模块(alpha-installs 钉到临时目录),「本地那条真的没了 / 还在」
+// 那两个 handler)→ upsert/deleteCloudSchedule(codepuppy-cloud-schedules.ts,真模块)→ 本地 authed()
+// → fetch。codepuppy-automations 也是真模块(codepuppy-installs 钉到临时目录),「本地那条真的没了 / 还在」
 // 按磁盘文件判,不走被测模块自己的读取器。
 //
 // 六条判据(同一判据的不同用例用不同字面量,防「恰好等于可硬编码常量」):
@@ -27,7 +27,7 @@
 //   ⑨ 云端注册成功但本机保存失败 ⇒ 同样返回本地结构码,补偿删除照发。
 //
 // mock.module 会污染同进程其它测试文件 ⇒ 真断言放这里,由 automation-ipc-delete.test.ts
-// 在隔离子进程里跑(alpha-cloud-schedules.cases.ts 同款)。
+// 在隔离子进程里跑(codepuppy-cloud-schedules.cases.ts 同款)。
 import { expect, mock, test } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
@@ -35,7 +35,7 @@ import { join } from "node:path"
 import type { AutomationTask } from "../shared/automation-types"
 
 const BASE = "https://cloud.invalid"
-const ROOT = fs.mkdtempSync(join(os.tmpdir(), "alpha-963-"))
+const ROOT = fs.mkdtempSync(join(os.tmpdir(), "codepuppy-963-"))
 
 const handlers = new Map<string, (...args: unknown[]) => unknown>()
 
@@ -51,9 +51,9 @@ mock.module("electron", () => ({
   },
 }))
 mock.module("./logging", () => ({ getLogger: () => ({ log: () => {}, warn: () => {}, error: () => {} }) }))
-// 真 alpha-automations,存储根钉到本测试的临时目录 —— 「本地删没删」是真实文件系统事实。
-mock.module("./alpha-installs", () => ({ alphaGlobalRoot: () => ROOT }))
-mock.module("./alpha-user-workspace", () => ({ ensureUserWorkspaceDir: () => {}, mirrorRunArtifacts: () => {} }))
+// 真 codepuppy-automations,存储根钉到本测试的临时目录 —— 「本地删没删」是真实文件系统事实。
+mock.module("./codepuppy-installs", () => ({ codepuppyGlobalRoot: () => ROOT }))
+mock.module("./codepuppy-user-workspace", () => ({ ensureUserWorkspaceDir: () => {}, mirrorRunArtifacts: () => {} }))
 mock.module("./automation-scheduler", () => ({
   getPlannedFireAt: () => null,
   isAutomationRunning: () => false,
@@ -61,12 +61,12 @@ mock.module("./automation-scheduler", () => ({
   runAutomationNow: () => ({ ok: false, reason: "unused" }),
 }))
 mock.module("./automation-llm", () => ({ llmParseAutomation: async () => ({ ok: false, reason: "unused" }) }))
-mock.module("./alpha-auth", () => ({ getAccessToken: () => "tok.cloud.dispatch" }))
-mock.module("./alpha-endpoints", () => ({ resolveEndpoints: () => ({ cloud: BASE }) }))
+mock.module("./codepuppy-auth", () => ({ getAccessToken: () => "tok.cloud.dispatch" }))
+mock.module("./codepuppy-endpoints", () => ({ resolveEndpoints: () => ({ cloud: BASE }) }))
 mock.module("./store", () => ({ getStore: () => ({ get: () => 0, set: () => {} }) }))
-mock.module("./alpha-workdir", () => ({ saveCloudRun: async () => ({ ok: false, reason: "unused" }) }))
+mock.module("./codepuppy-workdir", () => ({ saveCloudRun: async () => ({ ok: false, reason: "unused" }) }))
 mock.module("./artifact-service", () => ({ finalizeArtifactWithQuota: () => ({ ok: true }), registerDownloadedArtifact: () => {}, registeredArtifactNameOwner: () => undefined }))
-mock.module("./alpha-cloud-jobs", () => ({
+mock.module("./codepuppy-cloud-jobs", () => ({
   downloadCloudArtifactTo: async () => ({ ok: false, error: "unused" }),
   getCloudJobStatus: async () => ({ error: "unused" }),
   listCloudArtifacts: async () => ({ error: "unused" }),
@@ -84,7 +84,7 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
 
 // electron 的 mock 必须先于任何会牵出它的 import(CLAUDE.md《本机验证陷阱》)。
 const ipc = await import("./automation-ipc")
-const auto = await import("./alpha-automations")
+const auto = await import("./codepuppy-automations")
 ipc.registerAutomationIpcHandlers()
 
 const invoke = (channel: string, ...args: unknown[]) => {

@@ -1,18 +1,18 @@
 // #420(REQ-115 收窄):owner 的云任务在桌面运行期间进入 completed / failed 终态 → 一条 macOS 系统通知。
 //
 // main 进程的唯一咽喉;桌面既有的两条终态发现通路都汇到这里(接线在 cloud-ipc.ts):
-//   · SSE 订阅的 sink —— 界面派发的任务(cloud-dispatch-box)订阅 /events,alpha-cloud-events 识别终态帧;
+//   · SSE 订阅的 sink —— 界面派发的任务(cloud-dispatch-box)订阅 /events,codepuppy-cloud-events 识别终态帧;
 //   · 交付 tracker(cloud-run-tracker.ts,#1551)的状态查询与 SSE —— 助手经 MCP 派发的任务由 renderer
 //     CloudRunWatcher 从会话事件流发现后交给 tracker,它查到 / 等到的终态从这里发通知;
 //     界面派发的任务在 cloud-save-run 的状态查询里也会再到一次。
 // 去重:jobId + 终态,进程级 —— SSE 重连重放、两个窗口各自订阅、多路同时到达,只弹一次。
 // 不通知:job.cancelled(用户主动取消)、非终态、状态查询的传输错误信封。桌面未运行期间结束的任务
-// 没有推送来源,不在范围 —— alpha-cloud-schedules 的开机拉回直接调 saveCloudRun,不经本咽喉。
+// 没有推送来源,不在范围 —— codepuppy-cloud-schedules 的开机拉回直接调 saveCloudRun,不经本咽喉。
 // 正文只含任务种类 + job id + 结果;刻意不读 objective / input / result / error 文案 / 本地路径。
 // 开关:票面要的设置项在已批设计稿(docs/design/current/settings)里没有对应行 —— 本次默认开启、
 // 不建界面(PR 正文有说明)。
 import { BrowserWindow, Notification } from "electron"
-import { terminalEventName } from "./alpha-cloud-events-core"
+import { terminalEventName } from "./codepuppy-cloud-events-core"
 import type { CloudJobEvent, CloudJobStatus, CloudResult } from "../preload/types"
 
 export type CloudJobFinishedNotice = { jobId: string; outcome: "completed" | "failed"; kind?: string }

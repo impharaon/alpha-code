@@ -17,7 +17,7 @@ import { dict as ru } from "./ru"
 import { dict as uk } from "./uk"
 import { dict as zh } from "./zh"
 import { dict as zht } from "./zht"
-import rawCatalog from "../extensions/alpha-catalog.json"
+import rawCatalog from "../extensions/codepuppy-catalog.json"
 import type { Catalog } from "../extensions/catalog-types"
 import { catalogDescription } from "../extensions/ext-presentation"
 import { GlobalRegistrator } from "@happy-dom/global-registrator"
@@ -28,40 +28,40 @@ import { pathToFileURL } from "node:url"
 import { build } from "vite"
 import type { createComponent } from "solid-js"
 import type { render } from "solid-js/web"
-import type { RecoverySurface } from "../alpha-ui/RecoverySurface"
+import type { RecoverySurface } from "../codepuppy-ui/RecoverySurface"
 import { RECOVERY_ACTION_RESULT_CODES, type RecoveryAction, type RecoveryActionResult } from "../../shared/recovery"
 
 // Fresh C20 scan on 2026-07-21: these shipped surfaces contained user-visible
 // literals and are now registered here so a later edit cannot silently undo i18n.
 const EXTERNALIZED_SURFACES = [
-  "alpha-ui/AlphaHome.tsx",
-  "alpha-ui/AlphaOnboarding.tsx",
-  "alpha-ui/PermissionDialog.tsx",
-  "alpha-ui/RecoverySurface.tsx",
-  "alpha-ui/Toast.tsx",
-  "alpha-ui/alpha-boundary.tsx",
-  "alpha-ui/alpha-composer-model.tsx",
-  "alpha-ui/alpha-composer.tsx",
-  "alpha-ui/alpha-new-session.tsx",
-  "alpha-ui/artifact-html-preview/ArtifactHtmlPreview.tsx",
-  "alpha-ui/composer-autocomplete.tsx",
-  "alpha-ui/home-draft-discard-notice.ts",
-  "alpha-ui/model-picker-add.tsx",
-  "alpha-ui/model-picker-core.ts",
-  "alpha-ui/session-rail/artifacts/artifacts-panel-view.tsx",
-  "alpha-ui/session-rail/files/files-view.tsx",
-  "alpha-ui/session-rail/review/review-panel-view.tsx",
-  "alpha-ui/session-rail/terminal/terminal-rail-panel.tsx",
-  "alpha-ui/session-timeline/session-timeline-view.tsx",
-  "alpha-ui/session-workspace/alpha-session-workspace.tsx",
-  "alpha-ui/session-workspace/session-composer-dock.tsx",
-  "alpha-ui/settings-tools.tsx",
-  "alpha-ui/settings.tsx",
-  "alpha-ui/surface-boundary.tsx",
-  "alpha-ui/workspace-chip.tsx",
+  "codepuppy-ui/CodePuppyHome.tsx",
+  "codepuppy-ui/CodePuppyOnboarding.tsx",
+  "codepuppy-ui/PermissionDialog.tsx",
+  "codepuppy-ui/RecoverySurface.tsx",
+  "codepuppy-ui/Toast.tsx",
+  "codepuppy-ui/codepuppy-boundary.tsx",
+  "codepuppy-ui/codepuppy-composer-model.tsx",
+  "codepuppy-ui/codepuppy-composer.tsx",
+  "codepuppy-ui/codepuppy-new-session.tsx",
+  "codepuppy-ui/artifact-html-preview/ArtifactHtmlPreview.tsx",
+  "codepuppy-ui/composer-autocomplete.tsx",
+  "codepuppy-ui/home-draft-discard-notice.ts",
+  "codepuppy-ui/model-picker-add.tsx",
+  "codepuppy-ui/model-picker-core.ts",
+  "codepuppy-ui/session-rail/artifacts/artifacts-panel-view.tsx",
+  "codepuppy-ui/session-rail/files/files-view.tsx",
+  "codepuppy-ui/session-rail/review/review-panel-view.tsx",
+  "codepuppy-ui/session-rail/terminal/terminal-rail-panel.tsx",
+  "codepuppy-ui/session-timeline/session-timeline-view.tsx",
+  "codepuppy-ui/session-workspace/codepuppy-session-workspace.tsx",
+  "codepuppy-ui/session-workspace/session-composer-dock.tsx",
+  "codepuppy-ui/settings-tools.tsx",
+  "codepuppy-ui/settings.tsx",
+  "codepuppy-ui/surface-boundary.tsx",
+  "codepuppy-ui/workspace-chip.tsx",
   "dev/surface-map-inspector.tsx",
   "index.tsx",
-  "sidebar/alpha-sidebar.tsx",
+  "sidebar/codepuppy-sidebar.tsx",
 ] as const
 
 const localeDictionaries = { ar, br, bs, da, de, en, es, fr, ja, ko, no, pl, ru, uk, zh, zht }
@@ -70,7 +70,7 @@ const visibleOpencodeAllowlist = {
   // `opencode` is the real installed CLI executable; renaming this instruction would break the command.
   "desktop.cli.installed.message": "cli-command",
   // This is the real upstream-compatible configuration path written by the shipped app.
-  "alpha.ext.confirmNote": "config-path",
+  "codepuppy.ext.confirmNote": "config-path",
 } as const
 
 describe("locale regression gate", () => {
@@ -80,14 +80,14 @@ describe("locale regression gate", () => {
 
   test("locale switching and missing keys fall back predictably", () => {
     setLocale("zh")
-    expect(t("alpha.home.greetingMorning")).toBe(zh["alpha.home.greetingMorning"])
+    expect(t("codepuppy.home.greetingMorning")).toBe(zh["codepuppy.home.greetingMorning"])
 
     setLocale("en")
-    expect(t("alpha.home.greetingMorning")).toBe(en["alpha.home.greetingMorning"])
+    expect(t("codepuppy.home.greetingMorning")).toBe(en["codepuppy.home.greetingMorning"])
 
     setLocale("ja")
-    expect(t("alpha.home.greetingMorning")).toBe(en["alpha.home.greetingMorning"])
-    expect(t("alpha.c20.intentionally-missing" as never)).toBe("alpha.c20.intentionally-missing")
+    expect(t("codepuppy.home.greetingMorning")).toBe(en["codepuppy.home.greetingMorning"])
+    expect(t("codepuppy.c20.intentionally-missing" as never)).toBe("codepuppy.c20.intentionally-missing")
 
     setLocale("en")
   })
@@ -96,7 +96,7 @@ describe("locale regression gate", () => {
   // 少了这两条文案,`t()` 会把 key 原样吐回去 —— 用户在错误行上看到的就是一个开发者标识符,
   // 而不是「你要的那条限制,这个作业形态强制不了」。所以两个 locale 各自必须真的解析出人话。
   test("cloud dispatch refusals resolve to honest copy instead of a raw classification code", () => {
-    const keys = ["alpha.ext.cloudErrDeniedPaths", "alpha.ext.cloudErrToolsUndeclared"] as const
+    const keys = ["codepuppy.ext.cloudErrDeniedPaths", "codepuppy.ext.cloudErrToolsUndeclared"] as const
     for (const locale of ["en", "zh"] as const) {
       setLocale(locale)
       for (const key of keys) {
@@ -112,12 +112,12 @@ describe("locale regression gate", () => {
 
   test("project MCP consent, reload, shadowing, and unverifiable states stay distinct", () => {
     const keys = [
-      "alpha.ext.projectMcpAwaitingConsent",
-      "alpha.ext.projectMcpConsentDenied",
-      "alpha.ext.projectMcpDisabled",
-      "alpha.ext.addedPendingReload",
-      "alpha.ext.projectMcpShadowed",
-      "alpha.ext.projectMcpUnverifiable",
+      "codepuppy.ext.projectMcpAwaitingConsent",
+      "codepuppy.ext.projectMcpConsentDenied",
+      "codepuppy.ext.projectMcpDisabled",
+      "codepuppy.ext.addedPendingReload",
+      "codepuppy.ext.projectMcpShadowed",
+      "codepuppy.ext.projectMcpUnverifiable",
     ] as const
     for (const locale of ["en", "zh"] as const) {
       setLocale(locale)
@@ -125,8 +125,8 @@ describe("locale regression gate", () => {
       expect(copy.every((value, index) => value !== keys[index])).toBe(true)
       expect(new Set(copy).size).toBe(keys.length)
     }
-    expect(en["alpha.ext.projectMcpShadowed"]).toBe("Shadowed by global")
-    expect(en["alpha.ext.projectMcpUnverifiable"]).toBe("Activation unverifiable")
+    expect(en["codepuppy.ext.projectMcpShadowed"]).toBe("Shadowed by global")
+    expect(en["codepuppy.ext.projectMcpUnverifiable"]).toBe("Activation unverifiable")
     setLocale("en")
   })
 
@@ -135,8 +135,8 @@ describe("locale regression gate", () => {
       setLocale(locale)
       const status = String()
       const label = status
-        ? t("alpha.model.rowLabel", { model: "GPT-4", provider: "OpenAI", status })
-        : t("alpha.model.rowLabelNoStatus", { model: "GPT-4", provider: "OpenAI" })
+        ? t("codepuppy.model.rowLabel", { model: "GPT-4", provider: "OpenAI", status })
+        : t("codepuppy.model.rowLabelNoStatus", { model: "GPT-4", provider: "OpenAI" })
 
       expect(label).not.toMatch(/[,，]\s*$/)
     })
@@ -195,12 +195,12 @@ describe("locale regression gate", () => {
 // blind spot #475 slipped through (self-consistent dict, but the shipped surface could have kept
 // a hardcoded literal). This smoke test builds the smallest real render runtime and asserts a zh
 // value lands in real DOM. The vite bundle inlines its own i18n instance, pinned to zh by the
-// ALPHA_UI_LOCALE preload, so the assertion is independent of the setLocale() calls above.
+// CODEPUPPY_UI_LOCALE preload, so the assertion is independent of the setLocale() calls above.
 describe("locale render smoke — dictionary self-consistency is not proof the render used it", () => {
   test(
     "a real alpha component renders a zh dictionary value into the DOM under the zh locale",
     async () => {
-      const runtimeDirectory = mkdtempSync(join(tmpdir(), "alpha-locale-render-"))
+      const runtimeDirectory = mkdtempSync(join(tmpdir(), "codepuppy-locale-render-"))
       try {
         await build({
           configFile: false,
@@ -210,7 +210,7 @@ describe("locale render smoke — dictionary self-consistency is not proof the r
             emptyOutDir: true,
             outDir: runtimeDirectory,
             lib: {
-              entry: join(import.meta.dir, "..", "alpha-ui", "recovery-test-runtime.ts"),
+              entry: join(import.meta.dir, "..", "codepuppy-ui", "recovery-test-runtime.ts"),
               formats: ["es"],
               fileName: () => "recovery-test-runtime.js",
             },
@@ -245,8 +245,8 @@ describe("locale render smoke — dictionary self-consistency is not proof the r
 
           // Real component → real DOM: the zh value must be present because the component's t()
           // call resolved it, not because the dictionaries merely agree on keys.
-          expect(host.textContent).toContain(zh["alpha.recovery.unavailable"])
-          expect(host.querySelector("#alpha-recovery-title")?.textContent).toBe(zh["alpha.recovery.unavailable"])
+          expect(host.textContent).toContain(zh["codepuppy.recovery.unavailable"])
+          expect(host.querySelector("#codepuppy-recovery-title")?.textContent).toBe(zh["codepuppy.recovery.unavailable"])
           dispose()
           document.body.replaceChildren()
         } finally {

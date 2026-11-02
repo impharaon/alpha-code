@@ -1,0 +1,121 @@
+import { describe, expect, test } from "bun:test"
+import { join } from "node:path"
+import { FRONTEND_SURFACE_MANIFEST } from "../../shared/frontend-surface-manifest"
+
+const root = join(import.meta.dir, "../../../")
+const rendererIndex = Bun.file(join(root, "src/renderer/index.tsx"))
+const settingsSurface = Bun.file(join(root, "src/renderer/codepuppy-ui/settings.tsx"))
+const mainIpc = Bun.file(join(root, "src/main/ipc.ts"))
+const migration = Bun.file(join(root, "src/main/migrate.ts"))
+const upstreamPatch = Bun.file(join(root, "scripts/patch-upstream.ts"))
+const sidebarCss = Bun.file(join(root, "src/renderer/sidebar/sidebar.css"))
+const appLayout = Bun.file(join(root, "../app/src/pages/layout.tsx"))
+// pin e11dbd020:上游把 home / new-session 的 `useSettingsCommand()` 挪进了各自的 controller hook。
+const appHome = Bun.file(join(root, "../app/src/pages/home/home-projects-controller.tsx"))
+const appNewSession = Bun.file(join(root, "../app/src/pages/new-session/use-new-session-commands.tsx"))
+const appSession = Bun.file(join(root, "../app/src/pages/session.tsx"))
+const appSettingsDialog = Bun.file(join(root, "../app/src/components/settings-dialog.tsx"))
+const l2Harness = Bun.file(join(root, "../../docs/verification/2026-07-21-req090-settings-l2/harness.html"))
+const l2Readme = Bun.file(join(root, "../../docs/verification/2026-07-21-req090-settings-l2/README.md"))
+
+describe("Alpha Settings ownership ratchets", () => {
+  test("manifest registers one Alpha-owned overlay mount", () => {
+    const entries = FRONTEND_SURFACE_MANIFEST.filter((surface) => surface.id === "overlay.settings")
+    expect(entries).toHaveLength(1)
+    expect(entries[0]).toMatchObject({
+      owner: "codepuppy.settings",
+      lineage: "codepuppy",
+      mount: { kind: "overlay", host: "app-root" },
+      source: "packages/ui-mac/src/renderer/codepuppy-ui/settings.tsx",
+    })
+  })
+
+  test("deletes the observer/reskin path and mounts the Alpha surface exactly once", async () => {
+    expect(await Bun.file(join(root, "src/renderer/codepuppy-ui/settings-back-button.ts")).exists()).toBeFalse()
+    expect(await Bun.file(join(root, "src/renderer/codepuppy-ui/settings-reskin.css")).exists()).toBeFalse()
+    const source = await rendererIndex.text()
+    expect(source).not.toContain("setupSettingsBackButton")
+    expect(source).not.toContain("settings-reskin.css")
+    expect(source.match(/<CodePuppySettings\b/g)).toHaveLength(1)
+    expect(source).toContain("openSettings()")
+    expect(await settingsSurface.text()).not.toContain("<Portal")
+    expect(await upstreamPatch.text()).not.toContain("settings-v2")
+    expect(await sidebarCss.text()).not.toContain("settings-v2")
+    expect(source).toContain("settings: settingsAuthorityCoordinator")
+    expect(source).not.toContain("settingsAuthorityStorage")
+  })
+
+  test("all ui-mac Settings entrypoints short-circuit to the Alpha owner", async () => {
+    const guard = "if (platform.openSettings) return platform.openSettings()"
+    const layout = await appLayout.text()
+    expect(layout.indexOf(guard)).toBeGreaterThan(-1)
+    expect(layout.indexOf(guard)).toBeLessThan(layout.indexOf("<x.DialogSettings />"))
+
+    const settingsDialog = await appSettingsDialog.text()
+    expect(settingsDialog.indexOf(guard)).toBeGreaterThan(-1)
+    expect(settingsDialog.indexOf(guard)).toBeLessThan(settingsDialog.indexOf('import("@/components/settings-v2")'))
+
+    for (const source of [await appHome.text(), await appNewSession.text(), await appSession.text()]) {
+      expect(source).toContain(`import { useSettingsCommand } from "@/components/settings-dialog"`)
+      expect(source).toContain("useSettingsCommand()")
+    }
+  })
+
+  test("Settings surface never reaches the generic store bridge", async () => {
+    const surface = await settingsSurface.text()
+    expect(surface).not.toMatch(/storeGet|storeSet|storeDelete|storeClear/)
+    expect(surface).not.toMatch(/default\.dat|settings\.v3/)
+
+    const ipc = await mainIpc.text()
+    expect(ipc).toContain('ipcMain.handle("store-get"')
+    expect(ipc).toContain('ipcMain.handle("store-set"')
+    expect(ipc.match(/assertGenericStoreAccess\(name, key\)/g)?.length).toBeGreaterThanOrEqual(3)
+    expect(ipc).toContain("assertGenericStoreAccess(name)")
+    for (const channel of ["store-get", "store-set", "store-delete", "store-clear"]) {
+      const start = ipc.indexOf(`ipcMain.handle(\"${channel}\"`)
+      const end = ipc.indexOf("ipcMain.handle(\"", start + 20)
+      const handler = ipc.slice(start, end)
+      expect(handler.indexOf("assertGenericStoreAccess")).toBeGreaterThan(-1)
+      expect(handler.indexOf("getStore(name)")).toBeGreaterThan(handler.indexOf("assertGenericStoreAccess"))
+    }
+  })
+
+  test("Tauri migration rejects the reserved Settings authority before generic writes", async () => {
+    const source = await migration.text()
+    const guard = source.indexOf("isRendererSettingsAuthorityTarget(filename, key)")
+    const write = source.indexOf("target.set(key, value)")
+    expect(guard).toBeGreaterThan(-1)
+    expect(write).toBeGreaterThan(guard)
+    expect(source).toContain("tauri migration: skipped reserved default.dat/settings.v3")
+  })
+
+  test("L2 records four static states in both themes without forbidden report fields", async () => {
+    const harness = await l2Harness.text()
+    const readme = await l2Readme.text()
+    for (const state of ["default", "save-failed", "gc-running", "gc-failed"]) {
+      expect(harness).toContain(`data-l2-state="${state}"`)
+      expect(readme).toContain(`theme=light&state=${state}`)
+      expect(readme).toContain(`theme=dark&state=${state}`)
+    }
+    expect(harness).not.toMatch(/digest|finishedAt|warning detail|\/Users\/|\bMB\b/)
+  })
+
+  test("#1550 AC2 the back button sits below the macOS window-button strip", async () => {
+    // 设置页 `position: fixed; inset: 0` 铺满整窗,红绿灯(windows.ts trafficLightPosition y:14)画在它上面。
+    // 改前头部 `padding: 10px 22px` ⇒ 返回键(44px 高,纵向居中)落在 y≈12…56,与灯重叠、点不到。
+    // 让位常量与首页 / 定制中心 / 自动化 / 引导页是同一个 `var(--a-home-top, 40px)`,不另起一个数。
+    const css = (await Bun.file(join(root, "src/renderer/codepuppy-ui/settings.css")).text()).replace(/\/\*[\s\S]*?\*\//g, "")
+    const head = css.match(/\.codepuppy-settings-head \{([^}]*)\}/)?.[1] ?? ""
+    expect(head).toMatch(/padding: var\(--a-home-top, 40px\) 22px 10px;/)
+    expect(head).toContain("-webkit-app-region: drag;")
+    const page = css.match(/\.codepuppy-settings-page \{([^}]*)\}/)?.[1] ?? ""
+    expect(page).toContain("inset: 0;")
+    const home = await Bun.file(join(root, "src/renderer/codepuppy-ui/home.css")).text()
+    expect(home).toContain("top: var(--a-home-top, 40px);")
+    const windows = await Bun.file(join(root, "src/main/windows.ts")).text()
+    // 灯的下沿 = y14 + 12px 直径 = 26 < 40:常量真的让开了灯,而不是碰巧写了个数。
+    expect(windows).toContain("trafficLightPosition: { x: 12, y: 14 }")
+    const source = await settingsSurface.text()
+    expect(source.indexOf('class="codepuppy-settings-head"')).toBeLessThan(source.indexOf('class="codepuppy-settings-back"'))
+  })
+})

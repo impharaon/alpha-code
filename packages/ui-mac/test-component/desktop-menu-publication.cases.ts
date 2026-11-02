@@ -19,7 +19,7 @@
 import { afterEach, describe, expect, mock, test } from "bun:test"
 import { DESKTOP_MENU, desktopMenuVisible, type DesktopMenu, type DesktopMenuPlatform } from "@opencode-ai/app/desktop-menu"
 import { DESKTOP_NATIVE_ENGLISH } from "@opencode-ai/app/i18n/desktop-native"
-import { RETIRED_MENU_COMMANDS, alphaDesktopMenu, publishedMenuCommands } from "../src/shared/desktop-menu-policy"
+import { RETIRED_MENU_COMMANDS, codepuppyDesktopMenu, publishedMenuCommands } from "../src/shared/desktop-menu-policy"
 
 type NativeItem = {
   label?: string
@@ -75,7 +75,7 @@ const menuTitle = (menu: DesktopMenu) => DESKTOP_NATIVE_ENGLISH[menu.labelKey]
 /** 模型侧命令项(所属菜单 + label + command),用来在原生模板里按 label 找到同一条并真的点它。 */
 function modelCommands(platform: DesktopMenuPlatform) {
   const out: { menu: string; label: string; command: string }[] = []
-  for (const menu of alphaDesktopMenu(platform)) {
+  for (const menu of codepuppyDesktopMenu(platform)) {
     for (const entry of menu.items ?? []) {
       if (entry.type === "item" && entry.command)
         out.push({
@@ -123,7 +123,7 @@ describe("alpha 桌面菜单只发布接得住的命令", () => {
 
     test(`${platform}:真菜单的条目结构与发布面逐项对齐(多一条少一条都红)`, () => {
       const { template } = buildFor(platform)
-      const model = alphaDesktopMenu(platform)
+      const model = codepuppyDesktopMenu(platform)
       // 模板 = 发布面**前缀** + alpha 自建菜单(「数据」/ Windows 的「帮助」,都不发命令 ——
       // 「整个点一遍」那条已经保证了模板里不存在发布面之外的命令 id)。
       expect(template.length).toBeGreaterThanOrEqual(model.length)
@@ -136,7 +136,7 @@ describe("alpha 桌面菜单只发布接得住的命令", () => {
     })
 
     test(`${platform}:退休后不留悬空分隔符、不留空菜单`, () => {
-      for (const menu of alphaDesktopMenu(platform)) {
+      for (const menu of codepuppyDesktopMenu(platform)) {
         if (menu.role) continue
         const items = menu.items ?? []
         expect(items.length, `菜单「${menuTitle(menu)}」被掏空还留在菜单栏上`).toBeGreaterThan(0)

@@ -2,17 +2,17 @@
 //
 // 挂的是**真实 alpha 壳**:上游 `PlatformProvider → AppBaseProviders → AppInterface`(与
 // renderer/index.tsx 同一条 provider 链、同一个 MemoryRouter),children 里挂真实生产
-// `AlphaSidebar`。路由树、`LegacyServerLayout`、`createSessionRoute` 全是上游生产代码 ——
+// `CodePuppySidebar`。路由树、`LegacyServerLayout`、`createSessionRoute` 全是上游生产代码 ——
 // 所以「点新对话会不会挂起上游左栏」这件事在这里是真的会发生,不是模拟。
 //
 // surfaces 里 `session` / `newSession` 都用**生产组件本体**(alpha 会话工作区 / alpha 新对话页),
-// 因为闸门的两条判据正是「`[data-alpha-session-workspace]` 从未出现」与「`[data-alpha-new-session]`
+// 因为闸门的两条判据正是「`[data-codepuppy-session-workspace]` 从未出现」与「`[data-codepuppy-new-session]`
 // 最终出现」—— 用标记件代替会让前者变成一条永远成立的空断言。`home` 不在判据上,给最小标记件。
 //
 // 替身只剩最外围三样,都不在被测命题上:
 //   · `window.api` —— Electron preload 桥(壳挂载期真的会调它);
 //   · `globalThis.fetch` —— 壳会去连引擎;闸门不跑服务器,让它静默挂起而不是刷满 ECONNREFUSED;
-//   · `projects`(AlphaProjectsApi)—— 侧栏的数据层。`ensureDefaultWorkspace` 由用例控制返回值/
+//   · `projects`(CodePuppyProjectsApi)—— 侧栏的数据层。`ensureDefaultWorkspace` 由用例控制返回值/
 //     未决状态,这是 AC「ensure 失败不建 draft」的可观察输入。
 
 import {
@@ -28,11 +28,11 @@ import { MemoryRouter, useLocation, useNavigate } from "@solidjs/router"
 import { createEffect, createSignal, onCleanup } from "solid-js"
 import { createStore } from "solid-js/store"
 import { render } from "solid-js/web"
-import { AlphaSidebar } from "./alpha-sidebar"
-import { AlphaNewSession } from "../alpha-ui/alpha-new-session"
-import { alphaSessionWorkspaceSurface } from "../alpha-ui/session-workspace/alpha-session-workspace"
-import { ToastViewport } from "../alpha-ui/Toast"
-import type { AlphaProject, AlphaProjectsApi, AlphaProjectsStore } from "./use-projects"
+import { CodePuppySidebar } from "./codepuppy-sidebar"
+import { CodePuppyNewSession } from "../codepuppy-ui/codepuppy-new-session"
+import { codepuppySessionWorkspaceSurface } from "../codepuppy-ui/session-workspace/codepuppy-session-workspace"
+import { ToastViewport } from "../codepuppy-ui/Toast"
+import type { CodePuppyProject, CodePuppyProjectsApi, CodePuppyProjectsStore } from "./use-projects"
 
 export { render }
 
@@ -64,7 +64,7 @@ export const WSL_CONNECTION: ServerConnection.Any = {
   http: { url: "http://127.0.0.1:4097" },
 }
 
-const fixtureProject: AlphaProject = {
+const fixtureProject: CodePuppyProject = {
   id: "prj_alpha-code",
   worktree: PROJECT_DIRECTORY,
   name: "alpha-code",
@@ -111,7 +111,7 @@ export const holdDefaultWorkspace = () => defaultWorkspaceBarrier.hold()
 export const releaseDefaultWorkspace = () => defaultWorkspaceBarrier.release()
 
 // —— 用例可控的数据层 ——————————————————————————————————————————————————————
-const [store, setStore] = createStore<AlphaProjectsStore>({ projects: [fixtureProject], ready: false, error: false })
+const [store, setStore] = createStore<CodePuppyProjectsStore>({ projects: [fixtureProject], ready: false, error: false })
 export const setProjectsReady = (ready: boolean) => setStore("ready", ready)
 
 export const ensureCalls: string[] = []
@@ -120,7 +120,7 @@ export const setEnsureOutcome = (outcome: boolean | "pending") => {
   ensureOutcome = outcome
 }
 
-const projects: AlphaProjectsApi = {
+const projects: CodePuppyProjectsApi = {
   store,
   reload: async () => {},
   createSession: async () => undefined,
@@ -146,9 +146,9 @@ const WATCHED: Array<{ kind: MountKind; selector: string }> = [
   // 上游 legacy 左栏(pages/layout/sidebar-shell.tsx 的 SidebarContent 根)。
   { kind: "legacy-sidebar", selector: "[data-component='sidebar-rail']" },
   // alpha 会话工作区(session-workspace-shell.tsx 的根)。
-  { kind: "session-workspace", selector: "[data-alpha-session-workspace]" },
-  // alpha 新对话页(alpha-new-session.tsx 的根)—— 目标终点。
-  { kind: "new-session", selector: "[data-alpha-new-session]" },
+  { kind: "session-workspace", selector: "[data-codepuppy-session-workspace]" },
+  // alpha 新对话页(codepuppy-new-session.tsx 的根)—— 目标终点。
+  { kind: "new-session", selector: "[data-codepuppy-new-session]" },
 ]
 
 let mountLog: MountKind[] = []
@@ -375,7 +375,7 @@ export function resetHarness() {
 /** `home` 不在判据上:给最小标记件,免得把首页那棵树一起拖进来。 */
 const homeLeaf = () => <div data-harness-leaf="home" />
 
-export function AlphaShell(props: { connection?: ServerConnection.Any }) {
+export function CodePuppyShell(props: { connection?: ServerConnection.Any }) {
   const connection = props.connection ?? SIDECAR_CONNECTION
   return (
     <PlatformProvider value={platform}>
@@ -387,9 +387,9 @@ export function AlphaShell(props: { connection?: ServerConnection.Any }) {
           disableHealthCheck
           surfaces={{
             home: homeLeaf,
-            session: alphaSessionWorkspaceSurface(projects),
+            session: codepuppySessionWorkspaceSurface(projects),
             newSession: (surfaceProps) => (
-              <AlphaNewSession
+              <CodePuppyNewSession
                 projects={projects}
                 // #891:本 harness 里 `projects` 就连着这一个连接(生产是由 store 的 baseUrl 反查)。
                 serverKey={() => ServerConnection.key(connection)}
@@ -402,7 +402,7 @@ export function AlphaShell(props: { connection?: ServerConnection.Any }) {
           <ShellProbe />
           {/* #925:本 harness 是单连接世界 —— `projects` 就连着这一个连接(见上方 #891 注),
               所以侧栏的 serverKey 与它同源;draft 的 server 段自此取自这里,不再读 active。 */}
-          <AlphaSidebar projects={projects} serverKey={() => ServerConnection.key(connection)} />
+          <CodePuppySidebar projects={projects} serverKey={() => ServerConnection.key(connection)} />
           <ToastViewport />
         </AppInterface>
       </AppBaseProviders>

@@ -1,6 +1,6 @@
 // REQ-060 plugin host fan-out:项目级 plugin(`<dir>/.code-puppy/plugins/*.js`)不能经 config.plugin[] 加载
 // —— config hook 是引擎「插件已加载完」后的 Notify,改 plugin[] 太晚(鸡生蛋)。故由 host 插件
-// (@alpha-code/ext)在 per-instance init 时动态 import 项目插件、拿到它们的 Hooks,与自身 Hooks **合并**
+// (@codepuppy/ext)在 per-instance init 时动态 import 项目插件、拿到它们的 Hooks,与自身 Hooks **合并**
 // 后一并 return,引擎照常派发 —— 项目插件的 hook 得以生效,项目零 `.opencode`、零 config.plugin[]。
 //
 // 信任门(安全红线):项目 plugin = 可执行 JS,只在项目已 consent 时加载(loadProjectPlugins 门控)。
@@ -41,7 +41,7 @@ export type FanoutDeps = {
   verifyIdentity: () => boolean
   existsSync: (p: string) => boolean
   readdirSync: (p: string) => string[]
-  /** dynamic import of a self-contained ESM plugin file → module (default/AlphaExt = Plugin fn). */
+  /** dynamic import of a self-contained ESM plugin file → module (default/CodePuppyExt = Plugin fn). */
   importModule: (fileUrl: string) => Promise<Record<string, unknown>>
   pathToFileURL: (p: string) => string
   join: (...parts: string[]) => string
@@ -54,13 +54,13 @@ export type FanoutDeps = {
  * (可执行物未 consent 不加载)。逐个 import + 调用 Plugin(input);失败 loud 跳过(不阻断整体)。
  */
 export async function loadProjectPlugins(
-  alphaRoot: string,
+  codepuppyRoot: string,
   pluginInput: unknown,
   trusted: boolean,
   deps: FanoutDeps,
 ): Promise<Record<string, unknown>[]> {
   if (!trusted) return []
-  const dir = deps.join(alphaRoot, "plugins")
+  const dir = deps.join(codepuppyRoot, "plugins")
   if (!deps.verifyIdentity()) return []
   if (!deps.existsSync(dir)) return []
   const hooks: Record<string, unknown>[] = []
@@ -72,7 +72,7 @@ export async function loadProjectPlugins(
     for (const f of all)
       if (f.endsWith(".ts"))
         deps.error?.(
-          `[@alpha-code/ext] project plugin ${f} is raw TypeScript — NOT loaded (desktop runtime can't run raw TS, ADR-006). Bundle it to a self-contained ESM .js first.`,
+          `[@codepuppy/ext] project plugin ${f} is raw TypeScript — NOT loaded (desktop runtime can't run raw TS, ADR-006). Bundle it to a self-contained ESM .js first.`,
         )
     files = all.filter((f) => f.endsWith(".js"))
   } catch {
@@ -83,16 +83,16 @@ export async function loadProjectPlugins(
     try {
       if (!deps.verifyIdentity()) return []
       const mod = await deps.importModule(deps.pathToFileURL(abs))
-      const plugin = (mod.default ?? mod.AlphaExt ?? mod.plugin) as ((i: unknown) => Promise<unknown>) | undefined
+      const plugin = (mod.default ?? mod.CodePuppyExt ?? mod.plugin) as ((i: unknown) => Promise<unknown>) | undefined
       if (typeof plugin !== "function") {
-        deps.error?.(`[@alpha-code/ext] project plugin ${f} has no default export function — skipped`)
+        deps.error?.(`[@codepuppy/ext] project plugin ${f} has no default export function — skipped`)
         continue
       }
       const h = await plugin(pluginInput)
       if (h && typeof h === "object") hooks.push(h as Record<string, unknown>)
-      deps.log?.(`[@alpha-code/ext] project plugin loaded (fan-out): ${abs}`)
+      deps.log?.(`[@codepuppy/ext] project plugin loaded (fan-out): ${abs}`)
     } catch (error) {
-      deps.error?.(`[@alpha-code/ext] project plugin ${f} failed to load: ${error instanceof Error ? error.message : String(error)}`)
+      deps.error?.(`[@codepuppy/ext] project plugin ${f} failed to load: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
   return hooks

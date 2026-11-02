@@ -1,4 +1,4 @@
-# @alpha-code/ext
+# @codepuppy/ext
 
 alpha-code 的**后端隔离扩展**:零改 opencode 源码的 server plugin + 自定义 tools(`codepuppy_echo` / `codepuppy_ping` + event hook)。对应 GOALS#G1。
 

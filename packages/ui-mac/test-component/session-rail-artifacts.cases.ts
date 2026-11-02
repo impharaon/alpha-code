@@ -30,17 +30,17 @@ Bun.plugin({
   },
 })
 
-const runtime = await import("../src/renderer/alpha-ui/session-rail/artifacts/artifacts-test-runtime")
+const runtime = await import("../src/renderer/codepuppy-ui/session-rail/artifacts/artifacts-test-runtime")
 const i18n = await import("../src/renderer/i18n")
 // `#970`:下面两条判据用的信封**不许手写** —— 由真的 downloadArtifactToFile 跑出来。
 // 手写信封 = 锚点等于被测对象自己:main 侧把结构槽改坏了,renderer 侧照绿。
 // 这两个模块都不牵 solid-js(只用 node:crypto/fs/path),放在 mock.module 之后静态引入是安全的。
-const artifactDownload = await import("../src/main/alpha-artifact-download")
+const artifactDownload = await import("../src/main/codepuppy-artifact-download")
 const artifactDescriptor = await import("../src/shared/cloud-artifact-descriptor")
 // `#906`:联动判据用的是**生产**的两半 —— 时间线侧的产物链接解析(artifactLinksOf)与
 // 绑定层的换算(bindFocusArtifact)。两个模块都是纯 TS(零 solid/DOM/preload 依赖)。
-const timelineModel = await import("../src/renderer/alpha-ui/session-timeline/timeline-model")
-const timelineIntents = await import("../src/renderer/alpha-ui/session-timeline/cards/timeline-intents")
+const timelineModel = await import("../src/renderer/codepuppy-ui/session-timeline/timeline-model")
+const timelineIntents = await import("../src/renderer/codepuppy-ui/session-timeline/cards/timeline-intents")
 const disposers: Array<() => void> = []
 
 afterEach(() => {
@@ -217,7 +217,7 @@ function unmountAll() {
 
 async function openArtifactsTab(host: HTMLElement) {
   await flushTimers()
-  host.querySelector<HTMLButtonElement>("[data-alpha-session-rail-tab='artifacts']")!.click()
+  host.querySelector<HTMLButtonElement>("[data-codepuppy-session-rail-tab='artifacts']")!.click()
   await flushTimers()
   await flushTimers()
 }
@@ -233,19 +233,19 @@ describe("REQ-125 C4 artifacts view real Solid mount", () => {
     const host = mount(harness.View)
     await flush()
 
-    expect(host.querySelector("[data-alpha-session-artifacts]")!.getAttribute("data-artifacts-phase")).toBe("cards")
-    const cards = host.querySelectorAll(".alpha-wb-cardlist .alpha-wb-card")
+    expect(host.querySelector("[data-codepuppy-session-artifacts]")!.getAttribute("data-artifacts-phase")).toBe("cards")
+    const cards = host.querySelectorAll(".codepuppy-wb-cardlist .codepuppy-wb-card")
     expect(cards).toHaveLength(2)
     expect(cards[0]!.hasAttribute("data-active")).toBe(true)
     // REQ-236 #1552 AC5: "verified" is a technical detail (folded) — only states to act on stay on the row.
     expect(cards[0]!.querySelector(".a-wb-chip")).toBeNull()
     expect(cards[1]!.querySelector(".a-wb-chip")!.getAttribute("data-state")).toBe("unverified")
-    expect(cards[0]!.querySelector(".alpha-wb-card-size")!.textContent).toBe("1.2 MiB")
+    expect(cards[0]!.querySelector(".codepuppy-wb-card-size")!.textContent).toBe("1.2 MiB")
 
     host.querySelector<HTMLButtonElement>("[data-artifact-card='art-2']")!.click()
     await flush()
     expect(harness.calls.select).toEqual(["art-2"])
-    expect(host.querySelector("[data-artifact-card='art-2']")!.closest(".alpha-wb-card")!.hasAttribute("data-active")).toBe(
+    expect(host.querySelector("[data-artifact-card='art-2']")!.closest(".codepuppy-wb-card")!.hasAttribute("data-active")).toBe(
       true,
     )
   })
@@ -255,7 +255,7 @@ describe("REQ-125 C4 artifacts view real Solid mount", () => {
     harness.setPhase("loading")
     const host = mount(harness.View)
     await flush()
-    const phase = () => host.querySelector("[data-alpha-session-artifacts]")!.getAttribute("data-artifacts-phase")
+    const phase = () => host.querySelector("[data-codepuppy-session-artifacts]")!.getAttribute("data-artifacts-phase")
     expect(phase()).toBe("loading")
 
     harness.setPhase("error")
@@ -287,9 +287,9 @@ describe("REQ-125 C4 artifacts view real Solid mount", () => {
     const host = mount(harness.View)
     await flush()
 
-    expect(host.querySelectorAll(".alpha-wb-tabs [role='tab']")).toHaveLength(0)
+    expect(host.querySelectorAll(".codepuppy-wb-tabs [role='tab']")).toHaveLength(0)
     const preview = host.querySelector("[data-artifacts-preview]")!
-    const list = host.querySelector(".alpha-wb-cardlist")!
+    const list = host.querySelector(".codepuppy-wb-cardlist")!
     expect(preview.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     // Folded by default: no run id anywhere in the bar, no quota, no tech body.
     const fold = host.querySelector<HTMLButtonElement>("[data-artifacts-tech]")!
@@ -346,23 +346,23 @@ describe("#660 retrieval and empty states (view harness)", () => {
     await flush()
 
     // ① 未取回:主按钮「下载」,无进度、无错误痕迹;详情区也有「下载」;已验证卡片无动作区。
-    const actions = () => host.querySelector("[data-artifact-card='art-cloud']")!.closest(".alpha-wb-card")!
-    const detailBtn = () => host.querySelector<HTMLButtonElement>(".alpha-wb-empty .a-wb-btn")
-    expect(actions().querySelector(".alpha-wb-card-actions .a-wb-btn")!.textContent).toBe(i18n.t("alpha.wb.download"))
-    expect(actions().querySelector(".alpha-wb-progress")).toBeNull()
+    const actions = () => host.querySelector("[data-artifact-card='art-cloud']")!.closest(".codepuppy-wb-card")!
+    const detailBtn = () => host.querySelector<HTMLButtonElement>(".codepuppy-wb-empty .a-wb-btn")
+    expect(actions().querySelector(".codepuppy-wb-card-actions .a-wb-btn")!.textContent).toBe(i18n.t("codepuppy.wb.download"))
+    expect(actions().querySelector(".codepuppy-wb-progress")).toBeNull()
     expect(detailBtn()).not.toBeNull()
-    expect(host.querySelector("[data-artifact-card='art-ok']")!.closest(".alpha-wb-card")!.querySelector(".alpha-wb-card-actions")).toBeNull()
+    expect(host.querySelector("[data-artifact-card='art-ok']")!.closest(".codepuppy-wb-card")!.querySelector(".codepuppy-wb-card-actions")).toBeNull()
 
-    actions().querySelector<HTMLButtonElement>(".alpha-wb-card-actions .a-wb-btn")!.click()
+    actions().querySelector<HTMLButtonElement>(".codepuppy-wb-card-actions .a-wb-btn")!.click()
     expect(harness.calls.download).toEqual(["art-cloud"])
 
     // ② 取回中:百分比 + 取消,aria-live 播报,不打断;详情区下载入口消失。
     harness.setDownloadPhases({ "art-cloud": { status: "downloading", bytes: 43, total: 100, percent: 43 } })
     await flush()
-    expect(actions().querySelector(".alpha-wb-progress")!.textContent).toBe("43%")
-    const cancelBtn = actions().querySelector<HTMLButtonElement>(".alpha-wb-card-actions .a-wb-btn")!
-    expect(cancelBtn.textContent).toBe(i18n.t("alpha.wb.cancel"))
-    expect(host.querySelector(".alpha-wb-live")!.textContent).toContain("43%")
+    expect(actions().querySelector(".codepuppy-wb-progress")!.textContent).toBe("43%")
+    const cancelBtn = actions().querySelector<HTMLButtonElement>(".codepuppy-wb-card-actions .a-wb-btn")!
+    expect(cancelBtn.textContent).toBe(i18n.t("codepuppy.wb.cancel"))
+    expect(host.querySelector(".codepuppy-wb-live")!.textContent).toContain("43%")
     expect(detailBtn()).toBeNull()
     cancelBtn.click()
     expect(harness.calls.cancelDownload).toEqual(["art-cloud"])
@@ -373,9 +373,9 @@ describe("#660 retrieval and empty states (view harness)", () => {
     await flush()
     const doneChip = actions().querySelector("[data-download-done]")
     expect(doneChip).not.toBeNull()
-    expect(doneChip!.textContent).toBe(i18n.t("alpha.wb.state.verified"))
+    expect(doneChip!.textContent).toBe(i18n.t("codepuppy.wb.state.verified"))
     expect(doneChip!.tagName).not.toBe("BUTTON")
-    expect(actions().querySelector(".alpha-wb-card-actions .a-wb-btn")).toBeNull()
+    expect(actions().querySelector(".codepuppy-wb-card-actions .a-wb-btn")).toBeNull()
     expect(detailBtn()).toBeNull()
     const downloadsBefore = harness.calls.download.length
 
@@ -383,7 +383,7 @@ describe("#660 retrieval and empty states (view harness)", () => {
     harness.setDownloadPhases({ "art-cloud": { status: "error", message: "network(offline)" } })
     await flush()
     expect(actions().querySelector("[data-download-error]")).not.toBeNull()
-    expect(actions().querySelector(".alpha-wb-card-actions .a-wb-btn")!.textContent).toBe(i18n.t("alpha.wb.retry"))
+    expect(actions().querySelector(".codepuppy-wb-card-actions .a-wb-btn")!.textContent).toBe(i18n.t("codepuppy.wb.retry"))
     expect(host.querySelector("[data-download-failure]")!.textContent).toContain("network(offline)")
     expect(detailBtn()).not.toBeNull()
     expect(harness.calls.download.length).toBe(downloadsBefore) // done 期间没有任何再触发
@@ -405,7 +405,7 @@ describe("#660 retrieval and empty states (view harness)", () => {
     await flush()
     expect(host.querySelector("[data-download-error]")).toBeNull()
     expect(host.querySelector("[data-download-failure]")).toBeNull()
-    expect(host.querySelector(".alpha-wb-card-actions .a-wb-btn")!.textContent).toBe(i18n.t("alpha.wb.download"))
+    expect(host.querySelector(".codepuppy-wb-card-actions .a-wb-btn")!.textContent).toBe(i18n.t("codepuppy.wb.download"))
   })
 
   test("两种空态可分辨:零 run 不渲染云任务条;某次零产物条留着 + 专属文案;时刻缺失回落编号", async () => {
@@ -424,7 +424,7 @@ describe("#660 retrieval and empty states (view harness)", () => {
     await flush()
     expect(host.querySelector("[data-artifacts-runbar]")).not.toBeNull()
     expect(host.querySelector("[data-artifacts-empty-run]")!.textContent).toContain(
-      i18n.t("alpha.session.artifactsRunEmptyTitle"),
+      i18n.t("codepuppy.session.artifactsRunEmptyTitle"),
     )
     expect(host.querySelector("[data-artifacts-empty]")).toBeNull()
     // B1 失败关闭:时刻拿不到 → 条上渲染编号(中段截断),绝不渲染一个编出来的时间。
@@ -447,7 +447,7 @@ describe("#660 retrieval and empty states (view harness)", () => {
       await flush()
       host.querySelector<HTMLButtonElement>(".a-rart-runhead")!.click()
       await flush()
-      expect(host.textContent).toContain(i18n.t("alpha.wb.runReadOnly")) // chip 真的在
+      expect(host.textContent).toContain(i18n.t("codepuppy.wb.runReadOnly")) // chip 真的在
       return host
     }
 
@@ -469,7 +469,7 @@ describe("#660 retrieval and empty states (view harness)", () => {
 
 // #1591 产物右栏的警告与出错文字:一句话说状态,按钮说动作,技术原文只进「技术详情」。
 describe("#1591 产物右栏警告与出错文字(view harness)", () => {
-  const registry = () => import("../src/renderer/alpha-ui/artifact-workbench/renderers/renderer-views")
+  const registry = () => import("../src/renderer/codepuppy-ui/artifact-workbench/renderers/renderer-views")
   const textCtx = (card: ReturnType<typeof runtime.fakeCard>) =>
     ({
       directory: DIR,
@@ -505,14 +505,14 @@ describe("#1591 产物右栏警告与出错文字(view harness)", () => {
       const banner = host.querySelector(".a-wb-notice[data-kind='warn']")!
       expect(banner.textContent).toBe("文件与云端记录不一致")
       expect(host.querySelector(".a-wb-notice[data-kind='error']")).toBeNull()
-      expect(host.querySelector(".alpha-wb-empty p")!.textContent).toBe("文件已不在本机")
+      expect(host.querySelector(".codepuppy-wb-empty p")!.textContent).toBe("文件已不在本机")
       harness.setSelectedKey("d")
       await flush()
-      expect(host.querySelector(".alpha-wb-empty p")!.textContent).toBe("尚未下载")
-      expect(i18n.t("alpha.session.artifactsVerifyFailed")).toBe("文件校验未通过")
-      expect(i18n.t("alpha.wb.previewCrashed")).toBe("预览失败")
-      expect(i18n.t("alpha.wb.viewSource")).toBe("查看源文")
-      expect(i18n.t("alpha.wb.retry")).toBe("重试")
+      expect(host.querySelector(".codepuppy-wb-empty p")!.textContent).toBe("尚未下载")
+      expect(i18n.t("codepuppy.session.artifactsVerifyFailed")).toBe("文件校验未通过")
+      expect(i18n.t("codepuppy.wb.previewCrashed")).toBe("预览失败")
+      expect(i18n.t("codepuppy.wb.viewSource")).toBe("查看源文")
+      expect(i18n.t("codepuppy.wb.retry")).toBe("重试")
     })
   })
 
@@ -597,7 +597,7 @@ describe("REQ-125 C4 artifacts container in the real shell (fake preload channel
     // No updatedAt anywhere → deterministic id-order fallback still puts job_2 first.
     expect(calls.projectUsage).toBe(1)
     expect(calls.list[0]).toBe("job_2")
-    const cards = host.querySelectorAll(".alpha-wb-card")
+    const cards = host.querySelectorAll(".codepuppy-wb-card")
     expect(cards).toHaveLength(2)
     // Auto-selected first card triggered verify-before-open (REQ-093 AC#4).
     expect(cards[0]!.hasAttribute("data-active")).toBe(true)
@@ -609,10 +609,10 @@ describe("REQ-125 C4 artifacts container in the real shell (fake preload channel
     shell.rail().focusArtifact("art-2")
     await flushTimers()
     expect(
-      host.querySelector("[data-alpha-session-rail-host]")!.getAttribute("data-alpha-session-rail-panel"),
+      host.querySelector("[data-codepuppy-session-rail-host]")!.getAttribute("data-codepuppy-session-rail-panel"),
     ).toBe("artifacts")
     const target = host.querySelector<HTMLButtonElement>("[data-artifact-card='art-2']")!
-    expect(target.closest(".alpha-wb-card")!.hasAttribute("data-active")).toBe(true)
+    expect(target.closest(".codepuppy-wb-card")!.hasAttribute("data-active")).toBe(true)
     expect(document.activeElement).toBe(target)
 
     // Esc returns focus to the originating element (approved linkage contract).
@@ -642,7 +642,7 @@ describe("REQ-125 C4 artifacts container in the real shell (fake preload channel
     const host = mount(shell.Shell)
     await openArtifactsTab(host)
 
-    const cards = host.querySelectorAll(".alpha-wb-card")
+    const cards = host.querySelectorAll(".codepuppy-wb-card")
     expect(cards).toHaveLength(3)
     // Positive control: without the linkage the panel sits on its default (the first card).
     expect(cards[0]!.hasAttribute("data-active")).toBe(true)
@@ -692,8 +692,8 @@ describe("REQ-125 C4 artifacts container in the real shell (fake preload channel
     await flushTimers()
 
     const target = host.querySelector<HTMLButtonElement>(`[data-artifact-card='${ids[2]}']`)!
-    expect(target.closest(".alpha-wb-card")!.hasAttribute("data-active")).toBe(true)
-    expect(host.querySelectorAll(".alpha-wb-card")[0]!.hasAttribute("data-active")).toBe(false)
+    expect(target.closest(".codepuppy-wb-card")!.hasAttribute("data-active")).toBe(true)
+    expect(host.querySelectorAll(".codepuppy-wb-card")[0]!.hasAttribute("data-active")).toBe(false)
   })
 
   test("verify-before-open is a real barrier: no byte read until the re-check passes", async () => {
@@ -703,7 +703,7 @@ describe("REQ-125 C4 artifacts container in the real shell (fake preload channel
     const shell = runtime.createArtifactsShellHarness()
     const host = mount(shell.Shell)
     await flushTimers()
-    host.querySelector<HTMLButtonElement>("[data-alpha-session-rail-tab='artifacts']")!.click()
+    host.querySelector<HTMLButtonElement>("[data-codepuppy-session-rail-tab='artifacts']")!.click()
     await flushTimers()
 
     // Selection started the re-check; while it is pending nothing may read bytes and
@@ -733,7 +733,7 @@ describe("REQ-125 C4 artifacts container in the real shell (fake preload channel
     const shell = runtime.createArtifactsShellHarness()
     const host = mount(shell.Shell)
     await flushTimers()
-    host.querySelector<HTMLButtonElement>("[data-alpha-session-rail-tab='artifacts']")!.click()
+    host.querySelector<HTMLButtonElement>("[data-codepuppy-session-rail-tab='artifacts']")!.click()
     await flushTimers()
     await flushTimers()
 
@@ -767,7 +767,7 @@ describe("REQ-125 C4 artifacts container in the real shell (fake preload channel
     const shell = runtime.createArtifactsShellHarness()
     const host = mount(shell.Shell)
     await flushTimers()
-    host.querySelector<HTMLButtonElement>("[data-alpha-session-rail-tab='artifacts']")!.click()
+    host.querySelector<HTMLButtonElement>("[data-codepuppy-session-rail-tab='artifacts']")!.click()
     await flushTimers()
     await flushTimers()
 
@@ -807,7 +807,7 @@ describe("#660 cross-run browsing and the run-saved push (real shell)", () => {
     await openArtifactsTab(host)
 
     expect(calls.list[0]).toBe("job_a") // time-latest, NOT the id-descending job_c
-    expect(host.querySelector(".alpha-wb-card-name")!.textContent).toBe("最新一次.md")
+    expect(host.querySelector(".codepuppy-wb-card-name")!.textContent).toBe("最新一次.md")
 
     // Expand the run sheet: rows in true chronological order, then pick job_b.
     host.querySelector<HTMLButtonElement>(".a-rart-runhead")!.click()
@@ -821,7 +821,7 @@ describe("#660 cross-run browsing and the run-saved push (real shell)", () => {
     await flushTimers()
 
     expect(calls.list).toContain("job_b")
-    expect(host.querySelector(".alpha-wb-card-name")!.textContent).toBe("中间一次.md")
+    expect(host.querySelector(".codepuppy-wb-card-name")!.textContent).toBe("中间一次.md")
     // The sheet closed after the pick; the bar now states the picked run.
     expect(host.querySelector("[data-run-row]")).toBeNull()
     expect(host.querySelector(".a-rart-runhead")!.getAttribute("aria-expanded")).toBe("false")
@@ -872,14 +872,14 @@ describe("#660 cross-run browsing and the run-saved push (real shell)", () => {
     expect(host.querySelector("[data-artifacts-newrun]")).not.toBeNull()
     expect(host.querySelector(".a-rart-iconbtn[data-alert]")).not.toBeNull()
     expect(document.activeElement).toBe(card)
-    expect(host.querySelector(".alpha-wb-card-name")!.textContent).toBe("架构说明.md")
+    expect(host.querySelector(".codepuppy-wb-card-name")!.textContent).toBe("架构说明.md")
 
     // 「查看」= switch to the landed run and retire the prompt.
     host.querySelector<HTMLButtonElement>(".a-rart-newrun-lk")!.click()
     await flushTimers()
     await flushTimers()
     expect(calls.list).toContain("job_new")
-    expect(host.querySelector(".alpha-wb-card-name")!.textContent).toBe("新结果.md")
+    expect(host.querySelector(".codepuppy-wb-card-name")!.textContent).toBe("新结果.md")
     expect(host.querySelector("[data-artifacts-newrun]")).toBeNull()
     expect(host.querySelector(".a-rart-iconbtn[data-alert]")).toBeNull()
   })
@@ -891,7 +891,7 @@ describe("#660 cross-run browsing and the run-saved push (real shell)", () => {
     let host = mount(shell.Shell)
     await openArtifactsTab(host)
     await flushTimers()
-    expect(host.querySelector(".alpha-wb-card-name")!.textContent).toBe("架构说明.md")
+    expect(host.querySelector(".codepuppy-wb-card-name")!.textContent).toBe("架构说明.md")
     expect(host.querySelector("[data-cloud-unavailable]")).not.toBeNull()
     unmountAll()
     delete (window as never as Record<string, unknown>).api
@@ -915,9 +915,9 @@ describe("#660 cross-run browsing and the run-saved push (real shell)", () => {
     await openArtifactsTab(host)
     await flushTimers()
     expect(host.querySelector("[data-cloud-unavailable]")).toBeNull()
-    const cloudCard = host.querySelector("[data-artifact-card='art_cloud_9']")!.closest(".alpha-wb-card")!
+    const cloudCard = host.querySelector("[data-artifact-card='art_cloud_9']")!.closest(".codepuppy-wb-card")!
     expect(cloudCard.getAttribute("data-state")).toBe("cloud-only")
-    expect(cloudCard.querySelector(".alpha-wb-card-actions .a-wb-btn")!.textContent).toBe(i18n.t("alpha.wb.download"))
+    expect(cloudCard.querySelector(".codepuppy-wb-card-actions .a-wb-btn")!.textContent).toBe(i18n.t("codepuppy.wb.download"))
   })
 
   test("本地为空+云端未答:不宣称空(loading);本地为空+云端失败:只说平台不可用(Major-2)", async () => {
@@ -929,7 +929,7 @@ describe("#660 cross-run browsing and the run-saved push (real shell)", () => {
     let host = mount(shell.Shell)
     await openArtifactsTab(host)
     await flushTimers()
-    const phaseAttr = () => host.querySelector("[data-alpha-session-artifacts]")!.getAttribute("data-artifacts-phase")
+    const phaseAttr = () => host.querySelector("[data-codepuppy-session-artifacts]")!.getAttribute("data-artifacts-phase")
     expect(phaseAttr()).toBe("loading")
     expect(host.querySelector("[data-artifacts-empty-run]")).toBeNull()
     // 平台答复「确实没有」之后,才允许 empty-run 的断言出现。
@@ -1012,18 +1012,18 @@ describe("#660 cross-run browsing and the run-saved push (real shell)", () => {
     await openArtifactsTab(host)
     await flushTimers()
 
-    const cloudCard = () => host.querySelector("[data-artifact-card='art_cloud_9']")!.closest(".alpha-wb-card")!
-    cloudCard().querySelector<HTMLButtonElement>(".alpha-wb-card-actions .a-wb-btn")!.click()
+    const cloudCard = () => host.querySelector("[data-artifact-card='art_cloud_9']")!.closest(".codepuppy-wb-card")!
+    cloudCard().querySelector<HTMLButtonElement>(".codepuppy-wb-card-actions .a-wb-btn")!.click()
     await flush()
     expect(calls.download).toEqual(["job_1:art_cloud_9"])
 
     // A progress frame addressed by the ORIGINAL artifact id reaches this card's reducer.
     emitProgress({ runId: "job_1", artifactId: "art_cloud_9", bytes: 43, total: 100, percent: 43 })
     await flush()
-    expect(cloudCard().querySelector(".alpha-wb-progress")!.textContent).toBe("43%")
+    expect(cloudCard().querySelector(".codepuppy-wb-progress")!.textContent).toBe("43%")
 
     // Cancel addresses main's in-flight ledger by the original id — never card.key variants.
-    cloudCard().querySelector<HTMLButtonElement>(".alpha-wb-card-actions .a-wb-btn:last-of-type")!.click()
+    cloudCard().querySelector<HTMLButtonElement>(".codepuppy-wb-card-actions .a-wb-btn:last-of-type")!.click()
     await flush()
     expect(calls.cancel).toEqual(["art_cloud_9"])
 
@@ -1036,7 +1036,7 @@ describe("#660 cross-run browsing and the run-saved push (real shell)", () => {
     await flushTimers()
     expect(calls.list.length).toBeGreaterThan(listBefore) // re-read happened (not an optimistic flip)
     expect(cloudCard().querySelector("[data-download-done]")).not.toBeNull()
-    expect(cloudCard().querySelector(".alpha-wb-card-actions .a-wb-btn")).toBeNull()
+    expect(cloudCard().querySelector(".codepuppy-wb-card-actions .a-wb-btn")).toBeNull()
     expect(calls.download).toEqual(["job_1:art_cloud_9"]) // exactly one download, ever
 
     // The manifest reread finally lands the verified local card → the cloud-only card is
@@ -1045,10 +1045,10 @@ describe("#660 cross-run browsing and the run-saved push (real shell)", () => {
     emitRunSaved({ directory: DIR, runId: "job_1" })
     await flushTimers()
     await flushTimers()
-    const landed = host.querySelector("[data-artifact-card='art_cloud_9']")!.closest(".alpha-wb-card")!
+    const landed = host.querySelector("[data-artifact-card='art_cloud_9']")!.closest(".codepuppy-wb-card")!
     expect(landed.getAttribute("data-state")).toBe("verified")
     expect(landed.querySelector("[data-download-done]")).toBeNull()
-    expect(landed.querySelector(".alpha-wb-card-actions")).toBeNull()
+    expect(landed.querySelector(".codepuppy-wb-card-actions")).toBeNull()
   })
 })
 
@@ -1056,7 +1056,7 @@ describe("#660 cross-run browsing and the run-saved push (real shell)", () => {
 // 两个信封由**真的** downloadArtifactToFile 跑出来(假 fetch / 已 abort 的 AbortController),
 // 再交给容器的下载通道;断言落在用户可观察的 DOM 上,不落在 reducer 的返回值上 ——
 // 断言内层纯函数会让分流层的绕过照样绿。
-const NEVER_WRITTEN = "/tmp/alpha-970-never-written.bin"
+const NEVER_WRITTEN = "/tmp/codepuppy-970-never-written.bin"
 
 function artifact970() {
   return {
@@ -1110,8 +1110,8 @@ describe("#970 取消是本地事实:平台补一个 cancelled 分类码只改�
     const host = mount(shell.Shell)
     await openArtifactsTab(host)
     await flushTimers()
-    const card = () => host.querySelector("[data-artifact-card='art_cloud_9']")!.closest(".alpha-wb-card")!
-    card().querySelector<HTMLButtonElement>(".alpha-wb-card-actions .a-wb-btn")!.click()
+    const card = () => host.querySelector("[data-artifact-card='art_cloud_9']")!.closest(".codepuppy-wb-card")!
+    card().querySelector<HTMLButtonElement>(".codepuppy-wb-card-actions .a-wb-btn")!.click()
     await flushTimers()
     await flushTimers()
     return { host, card }
@@ -1126,7 +1126,7 @@ describe("#970 取消是本地事实:平台补一个 cancelled 分类码只改�
     expect(envelope).toMatchObject({ ok: false, error: "cancelled" })
     const { host, card } = await mountAndDownload(envelope)
     expect(card().querySelector("[data-download-error]")).not.toBeNull()
-    expect(card().querySelector(".alpha-wb-card-actions .a-wb-btn")!.textContent).toBe(i18n.t("alpha.wb.retry"))
+    expect(card().querySelector(".codepuppy-wb-card-actions .a-wb-btn")!.textContent).toBe(i18n.t("codepuppy.wb.retry"))
     expect(host.querySelector("[data-download-failure]")).not.toBeNull()
   })
 
@@ -1138,7 +1138,7 @@ describe("#970 取消是本地事实:平台补一个 cancelled 分类码只改�
     const { host, card } = await mountAndDownload(envelope)
     expect(card().querySelector("[data-download-error]")).toBeNull()
     expect(host.querySelector("[data-download-failure]")).toBeNull()
-    expect(card().querySelector(".alpha-wb-card-actions .a-wb-btn")!.textContent).toBe(i18n.t("alpha.wb.download"))
+    expect(card().querySelector(".codepuppy-wb-card-actions .a-wb-btn")!.textContent).toBe(i18n.t("codepuppy.wb.download"))
   })
 })
 

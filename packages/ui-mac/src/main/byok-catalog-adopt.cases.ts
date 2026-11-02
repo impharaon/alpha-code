@@ -1,7 +1,7 @@
 // REQ-237 `#1556` —— BYOK 预置目录采纳规则的判据(方案 §2.3 规则 1–5,AC2;带 baseURL 被拒,AC3)。
 //
 // 子进程运行(byok-catalog-adopt.test.ts spawn):adoptByokCatalog 住在 catalog-refresher.ts,模块求值即拖入
-// electron / logging,这里只 mock 到能 import 为止,被测的是纯函数本身与 alpha-live-allowlist 的「已下载 = LKG 与
+// electron / logging,这里只 mock 到能 import 为止,被测的是纯函数本身与 codepuppy-live-allowlist 的「已下载 = LKG 与
 // 随包首启引导取高者」。文档一律取上游 producer fixture 的 `value` 再改一处(不手写替身)。
 
 import { afterEach, describe, expect, mock, test } from "bun:test"
@@ -18,16 +18,16 @@ mock.module("electron", () => ({
 }))
 const logger = { log: () => {}, warn: () => {}, error: () => {} }
 mock.module("./logging", () => ({ getLogger: () => logger, initLogging: () => logger, write: () => {}, rotateServerLogs: () => {} }))
-mock.module("./alpha-auth", () => ({ getAccessToken: () => undefined, isStoredTokenExpired: () => false, getAuthIdentityTag: () => undefined }))
+mock.module("./codepuppy-auth", () => ({ getAccessToken: () => undefined, isStoredTokenExpired: () => false, getAuthIdentityTag: () => undefined }))
 
 const { adoptByokCatalog } = await import("./catalog-refresher")
 const { BYOK_ADAPTERS } = await import("./byok-adapters")
-const { downloadedByokCatalog, pinAppliedCatalog, readAppliedByokCatalog, writeByokCatalogLkg } = await import("./alpha-live-allowlist")
-const bundled = (await import("./alpha-models.json")).default.byokCatalog
+const { downloadedByokCatalog, pinAppliedCatalog, readAppliedByokCatalog, writeByokCatalogLkg } = await import("./codepuppy-live-allowlist")
+const bundled = (await import("./codepuppy-models.json")).default.byokCatalog
 
 const PRODUCER = join(
   import.meta.dir,
-  "../../../alpha-contracts-consumer/vendor/alpha-platform-model-catalog/contracts/v1/fixtures/producer/byok-catalog.json",
+  "../../../codepuppy-contracts-consumer/vendor/alpha-platform-model-catalog/contracts/v1/fixtures/producer/byok-catalog.json",
 )
 /** 上游 producer 文档,版本抬到随包首启引导之上(否则规则 2 先拦住,测不到后面几条)。 */
 const doc = (mutate?: (value: any) => void): any => {

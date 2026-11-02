@@ -12,15 +12,15 @@
 // 运行前提(见 scripts/req087-live-characterization.sh):
 // - macOS 安装了 Google Chrome(channel "chrome",不额外下载浏览器);
 // - 仓库已 bun install;
-// - 不在 alpha-check 权威门内(bun test src 不含本目录),按需执行:
+// - 不在 codepuppy-check 权威门内(bun test src 不含本目录),按需执行:
 //   bun run --cwd packages/ui-mac test:live:req087
 //
 // REQ-088 T3/T4(adapter 对比)扩展 —— 两个环境参数(默认全关 = C2 原语义,零变化):
 // - REQ088_HOST=webhost:前端改跑 test-live/req087/webhost/(harness 自有 web 入口,复刻冻结
 //   entry.tsx 并经公开 surfaces prop 支持注入;见 webhost/main.tsx 头注释)。默认 frozen =
 //   冻结 packages/app 自身 vite dev(C2 基线运行态)。
-// - REQ088_SURFACE=adapter:每个浏览器 context 预置 localStorage["ALPHA_SESSION_SPIKE"]="1"
-//   (双闸的 renderer 半边)⇒ webhost 注入真 AlphaSessionWorkspace。默认 legacy = 不注入。
+// - REQ088_SURFACE=adapter:每个浏览器 context 预置 localStorage["CODEPUPPY_SESSION_SPIKE"]="1"
+//   (双闸的 renderer 半边)⇒ webhost 注入真 CodePuppySessionWorkspace。默认 legacy = 不注入。
 //   adapter 仅在 webhost 下有意义(冻结入口不传 surfaces,结构上无法注入)—— 组合非法时直接 throw。
 // 对比方法论:adapter/legacy 两半边都跑 webhost(同 host、同引擎、同浏览器、同会话数据,唯一
 // 差异 = localStorage 闸);frozen legacy 只作历史锚点(baselines/legacy-baseline.json)的复采参照。
@@ -46,12 +46,12 @@ if (SURFACE === "adapter" && HOST !== "webhost") {
   throw new Error("REQ088_SURFACE=adapter requires REQ088_HOST=webhost (frozen entry cannot inject surfaces)")
 }
 
-/** AlphaSessionWorkspace 的 DOM 锚点(全部 data-alpha-*,R2 红线保证与上游锚点不同名)。 */
+/** CodePuppySessionWorkspace 的 DOM 锚点(全部 data-codepuppy-*,R2 红线保证与上游锚点不同名)。 */
 export const ADAPTER_SEL = {
-  workspace: "[data-alpha-session-workspace]",
-  chrome: "[data-alpha-session-workspace-chrome]",
-  leaf: "[data-alpha-session-workspace-leaf]",
-  guard: "[data-alpha-session-workspace-guard]",
+  workspace: "[data-codepuppy-session-workspace]",
+  chrome: "[data-codepuppy-session-workspace-chrome]",
+  leaf: "[data-codepuppy-session-workspace-leaf]",
+  guard: "[data-codepuppy-session-workspace-guard]",
 } as const
 
 /**
@@ -63,12 +63,12 @@ export async function assertSurfaceMode(page: Page, timeoutMs = 20000) {
   if (SURFACE === "adapter") {
     await page.waitForSelector(ADAPTER_SEL.workspace, { timeout: timeoutMs, state: "attached" })
     const chromeHeight = await page.evaluate(() => {
-      const el = document.querySelector<HTMLElement>("[data-alpha-session-workspace-chrome]")
+      const el = document.querySelector<HTMLElement>("[data-codepuppy-session-workspace-chrome]")
       return el ? Math.round(el.getBoundingClientRect().height) : -1
     })
     if (chromeHeight <= 0) throw new Error(`adapter chrome not visible (height=${chromeHeight})`)
   } else {
-    const count = await page.evaluate(() => document.querySelectorAll("[data-alpha-session-workspace]").length)
+    const count = await page.evaluate(() => document.querySelectorAll("[data-codepuppy-session-workspace]").length)
     if (count !== 0) throw new Error(`legacy run polluted by adapter workspace (count=${count})`)
   }
 }
@@ -432,7 +432,7 @@ export async function startWorld(): Promise<LiveWorld> {
         // 双闸 renderer 半边:每个 context(fresh localStorage)都要预置,否则该 context 会
         // 静默跑成 legacy(assertSurfaceMode 兜底,但预置必须在导航前)。
         await context.addInitScript(() => {
-          localStorage.setItem("ALPHA_SESSION_SPIKE", "1")
+          localStorage.setItem("CODEPUPPY_SESSION_SPIKE", "1")
         })
       }
       if (opts?.tabSessionIds?.length) {

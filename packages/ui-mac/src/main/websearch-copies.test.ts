@@ -4,7 +4,7 @@
 // 「本地 keyless websearch 工具」这一类。用户配置里的通用 Remote MCP
 // (`{"mcp":{"exa":{"type":"remote","url":"…"}}}` → `exa_web_search_exa`)两条都不经过,它的钳制点
 // 是 `packages/ext` 的 `tool.execute.before` 钩子(证据:
-// `packages/opencode/test/tool/alpha-mcp-websearch-gate.test.ts`)。本文件的范围因此**只**是本地
+// `packages/opencode/test/tool/codepuppy-mcp-websearch-gate.test.ts`)。本文件的范围因此**只**是本地
 // 工具那一类,别再据它声称 web search 已按类闭合。
 //
 // 演进史(写在这里免得下一轮又走回头路):
@@ -25,8 +25,8 @@
 //
 // 于是「换个注册名、复用传输」在**执行时**被拒,不需要被任何普查网看见。运行时证据(把 R4 那
 // 段构造当变异种真跑一遍)在两个引擎包的 alpha 自有测试里:
-//   packages/opencode/test/tool/alpha-websearch-failure.test.ts  · "R4 变异" 一组
-//   packages/core/test/alpha-websearch-sovereignty.test.ts       · "R4 变异" 一组
+//   packages/opencode/test/tool/codepuppy-websearch-failure.test.ts  · "R4 变异" 一组
+//   packages/core/test/codepuppy-websearch-sovereignty.test.ts       · "R4 变异" 一组
 //
 // 本文件因此分成两部分:
 //   ① 传输闸的位置锁(主判据的静态半场):两条出口的闸都必须排在构造请求之前。
@@ -173,9 +173,9 @@ describe("websearch 执行副本普查(#223 R3 · R4 起降为纵深)", () => {
   })
 
   test("主权信道名在四个包里逐字一致;MCP authority 共享唯一核验源", () => {
-    expect(LOCAL_WEBSEARCH_DENY_ENV).toBe("ALPHA_LOCAL_WEBSEARCH_DENY")
-    expect(CLOUD_WEBSEARCH_DENY_ENV).toBe("ALPHA_CLOUD_WEBSEARCH_DENY")
-    expect(CLOUD_MCP_ARM_ENV).toBe("ALPHA_CLOUD_MCP_ARM")
+    expect(LOCAL_WEBSEARCH_DENY_ENV).toBe("CODEPUPPY_LOCAL_WEBSEARCH_DENY")
+    expect(CLOUD_WEBSEARCH_DENY_ENV).toBe("CODEPUPPY_CLOUD_WEBSEARCH_DENY")
+    expect(CLOUD_MCP_ARM_ENV).toBe("CODEPUPPY_CLOUD_MCP_ARM")
     // 本地信号的**声明点**已下沉到两条传输(叶子只转出),这条锁跟着下沉。
     for (const transport of GATED_TRANSPORTS)
       expect(read(transport.path)).toContain(`export const LOCAL_WEBSEARCH_DENY_ENV = "${LOCAL_WEBSEARCH_DENY_ENV}"`)
@@ -208,8 +208,8 @@ describe("websearch 执行副本普查(#223 R3 · R4 起降为纵深)", () => {
     expect(allowlist).toContain(`"${LOCAL_WEBSEARCH_DENY_ENV}"`)
     expect(allowlist).toContain(`"${CLOUD_WEBSEARCH_DENY_ENV}"`)
     // 三个握手通道不在**固定**白名单里。⚠️ R5 事实更正:这**不等于**「外部 shell 伪造进不来」——
-    // 逃生阀 ALPHA_ENV_ALLOWLIST_EXTRA 点名即放行(它们都不是 credential-shaped),那半句 R4 的
-    // 断言是错的,真实判据见 sidecar-env.test.ts 与 alpha-config-injection.test.ts 两条。
+    // 逃生阀 CODEPUPPY_ENV_ALLOWLIST_EXTRA 点名即放行(它们都不是 credential-shaped),那半句 R4 的
+    // 断言是错的,真实判据见 sidecar-env.test.ts 与 codepuppy-config-injection.test.ts 两条。
     for (const name of [CLOUD_MCP_ARM_ENV, CLOUD_MCP_DEF_ENV, CLOUD_MCP_SERVER_ENV])
       expect(allowlist).not.toContain(`"${name}"`)
   })
@@ -226,7 +226,7 @@ describe("websearch 执行副本普查(#223 R3 · R4 起降为纵深)", () => {
   })
 
   // #223 R4:ext 装载回执必须是 config 钩子的第一句 —— 它后面那些项目配置分支有 early return,
-  // 排在它们之后会让「项目 alpha.jsonc 读不了」顺带把云工具一起关掉。
+  // 排在它们之后会让「项目 codepuppy.jsonc 读不了」顺带把云工具一起关掉。
   // R5:回执从「翻开 enabled:false」改成「把定义装进配置」(`installCloudMcp`),位置要求不变。
   test("ext 装载回执是 config 钩子的第一句", () => {
     const plugin = read("packages/ext/src/plugin.ts")
@@ -241,12 +241,12 @@ describe("websearch 执行副本普查(#223 R3 · R4 起降为纵深)", () => {
 
   // #223 R5 Major:注入面在 kill-switch 下**不许**把真的云 server 定义写进配置 —— `MCP.connect()`
   // 会无条件把 `enabled:false` 复制成 `enabled:true`(`/mcp/:name/connect` 公开、产品 UI 在调)。
-  // #223 R6 Major:但也不能只是「不写」—— 深合并里缺键不会删除 global / alpha.jsonc / 项目里
+  // #223 R6 Major:但也不能只是「不写」—— 深合并里缺键不会删除 global / codepuppy.jsonc / 项目里
   // 先前来源的同名定义。唯一允许写进去的是那份中和条目 `WITHHELD_CLOUD_MCP`。
-  // 行为证据在 packages/opencode/test/mcp/alpha-cloud-mcp-{revival,multisource}.test.ts;
+  // 行为证据在 packages/opencode/test/mcp/codepuppy-cloud-mcp-{revival,multisource}.test.ts;
   // 这里钉住静态形状:kill-switch 下写进 config.mcp 的**只能**是中和条目。
   test("kill-switch 分支写的是中和条目,真定义只经 ARM/DEF 托管", () => {
-    const injection = read("packages/ui-mac/src/main/alpha-config-injection.ts")
+    const injection = read("packages/ui-mac/src/main/codepuppy-config-injection.ts")
     // `#1195` 起赋值是 platformPays 三分支(缺凭证 ⇒ 工厂给的无引用 enabled:false 形状),
     // 但 kill-switch 臂**必须**仍是中和条目且排在最前(缺凭证判定不得把真 URL 放回 kill-switch 态)。
     const assign = injection.match(
@@ -266,7 +266,7 @@ describe("websearch 执行副本普查(#223 R3 · R4 起降为纵深)", () => {
   // #223 R6 Blocker:治理豁免绑定端点身份,所以 DEF 必须在**代付的两条分支**上都置位;
   // 而 ARM 只在 kill-switch 分支置位(ARM/DEF 缺一 ext 什么都不装,这条不变式仍在)。
   test("DEF 在代付两条分支都置位,ARM 只在 kill-switch 分支置位", () => {
-    const injection = read("packages/ui-mac/src/main/alpha-config-injection.ts")
+    const injection = read("packages/ui-mac/src/main/codepuppy-config-injection.ts")
     const branch = injection.indexOf("if (killSwitch) {")
     const before = injection.slice(0, branch)
     expect(before).toContain("process.env[CLOUD_MCP_DEF_ENV] = JSON.stringify(cloud)")

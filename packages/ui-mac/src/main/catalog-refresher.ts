@@ -17,20 +17,20 @@
 // `#1556`(方案 §2.1 / §2.3):两份文档 —— 平台目录 V3(`/v1/models`,有登录态就带 bearer)与 BYOK 预置目录 v1
 // (`/v1/byok-catalog`,**从不带凭据**)。每份文档各自单飞;BYOK 文档与身份无关,所以纯身份变化不拉它、冷启动也
 // 不等续期。BYOK 文档经 adoptByokCatalog(本文件,纯函数)按方案 §2.3 规则 1–5 采纳;拉取失败、校验失败、未登录
-// 都不写 LKG,已有条目从不因失败减少(I5)。两份的刷新结局按文档分别记(alpha-catalog-health.ts,I10)。
+// 都不写 LKG,已有条目从不因失败减少(I5)。两份的刷新结局按文档分别记(codepuppy-catalog-health.ts,I10)。
 //
-// 刷新器只写「已下载」(LKG);fork 前钉成「已应用」的是 spawnLocalServer → pinAppliedCatalog(alpha-live-allowlist.ts)。
+// 刷新器只写「已下载」(LKG);fork 前钉成「已应用」的是 spawnLocalServer → pinAppliedCatalog(codepuppy-live-allowlist.ts)。
 import { app } from "electron"
-import { decodeJsonContract, type ByokCatalogV1 } from "@alpha-code/contracts-consumer"
-import { getAuthIdentityTag, isStoredTokenExpired } from "./alpha-auth"
-import { reportCatalogRefresh } from "./alpha-catalog-health"
-import { resolveEndpoints } from "./alpha-endpoints"
-import { downloadedByokCatalog, readCatalogSnapshot, writeByokCatalogLkg } from "./alpha-live-allowlist"
-import { syncLiveAllowlist } from "./alpha-platform-models"
+import { decodeJsonContract, type ByokCatalogV1 } from "@codepuppy/contracts-consumer"
+import { getAuthIdentityTag, isStoredTokenExpired } from "./codepuppy-auth"
+import { reportCatalogRefresh } from "./codepuppy-catalog-health"
+import { resolveEndpoints } from "./codepuppy-endpoints"
+import { downloadedByokCatalog, readCatalogSnapshot, writeByokCatalogLkg } from "./codepuppy-live-allowlist"
+import { syncLiveAllowlist } from "./codepuppy-platform-models"
 import { BYOK_ADAPTERS, type ByokAdapter } from "./byok-adapters"
 import { getLogger } from "./logging"
 import { httpErrorCode } from "./platform-error-code"
-import { ALPHA_PATHS } from "../shared/alpha-config"
+import { CODEPUPPY_PATHS } from "../shared/codepuppy-config"
 
 export type CatalogRefreshReason = "boot" | "identity-change" | "interval" | "manual"
 export type DownloadedCatalogChange = { platformChanged: boolean; byokChanged: boolean }
@@ -125,7 +125,7 @@ export type ByokAdoption =
  *  3. provider 不在 App 适配器表 → 跳过该 provider(调用方记日志);
  *  4. 档位出现允许集外的选项键 → 不采纳。允许集 `reasoningEffort | reasoning | thinking` 由 ByokCatalogV1 自己封闭,
  *     所以越界的文档已在规则 1 整份拒绝(不会出现「半应用」的模型);
- *  5. 随包 BYOK 段只作首启引导 —— 体现在 `current` 含随包版本,以及钉住时取版本高者(alpha-live-allowlist.ts)。 */
+ *  5. 随包 BYOK 段只作首启引导 —— 体现在 `current` 含随包版本,以及钉住时取版本高者(codepuppy-live-allowlist.ts)。 */
 export function adoptByokCatalog(text: string, adapters: readonly Pick<ByokAdapter, "id">[], current: number): ByokAdoption {
   let doc: ByokCatalogV1
   try {
@@ -158,7 +158,7 @@ type ByokFetch = { text: string } | { error: string }
 async function fetchByokCatalog(attempt: number): Promise<ByokFetch> {
   const base = resolveEndpoints().platform
   if (!base) return { error: "no-platform-endpoint" }
-  const url = new URL(`${base}${ALPHA_PATHS.byokCatalog}`)
+  const url = new URL(`${base}${CODEPUPPY_PATHS.byokCatalog}`)
   const started = Date.now()
   let status: number | undefined
   let exception: string | undefined

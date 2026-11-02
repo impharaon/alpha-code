@@ -82,7 +82,7 @@ async function waitFor<T>(fn: () => Promise<T>, ok: (v: T) => boolean, timeoutMs
 function composerFocused(page: Page) {
   return page.evaluate(() => {
     const el = document.activeElement as HTMLElement | null
-    return !!el?.closest('[data-alpha-composer="session"], [data-component="prompt-input-v2"]')
+    return !!el?.closest('[data-codepuppy-composer="session"], [data-component="prompt-input-v2"]')
   })
 }
 
@@ -720,10 +720,10 @@ describe("REQ-087 C2 live-engine characterization", () => {
         await page.goto(world.sessionUrl("ses_req088_missing_0000"), { waitUntil: "domcontentloaded" })
         await page.waitForSelector(ADAPTER_SEL.guard, { timeout: 30000 })
         // SurfaceBoundary fallback 未出现(错误没有升级为 surface 致命)
-        expect(await page.evaluate(() => document.querySelectorAll("[data-alpha-surface-error]").length)).toBe(0)
+        expect(await page.evaluate(() => document.querySelectorAll("[data-codepuppy-surface-error]").length)).toBe(0)
         // 引导卡两个动作在位(重新加载 / 返回首页)
         const buttons = await page.evaluate(() =>
-          [...document.querySelectorAll("[data-alpha-session-workspace-guard] button")].map(
+          [...document.querySelectorAll("[data-codepuppy-session-workspace-guard] button")].map(
             (el) => el.textContent?.trim() ?? "",
           ),
         )

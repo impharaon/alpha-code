@@ -69,10 +69,10 @@ upstream providers are mounted per route subtree, while the Settings overlay is 
 `AppInterface` child. `useServerSync()` is therefore structurally unavailable to it,
 so a Settings section that needs to know which project the user is standing in cannot
 read `session.data.info[id]` the way the session surface does. The shell exposes one
-`AlphaSessionIdentity` channel instead (`alpha-ui/active-session-directory.ts`): the
+`CodePuppySessionIdentity` channel instead (`codepuppy-ui/active-session-directory.ts`): the
 session surface — the one face that does hold `ServerSync` — publishes the identity it
 has already resolved, and the Settings resolver
-(`alpha-ui/settings-directory.ts`) reads the sidebar project list first and falls back
+(`codepuppy-ui/settings-directory.ts`) reads the sidebar project list first and falls back
 to that channel. The fallback is what keeps the two faces on one value: the sidebar list
 is deliberately filtered (`sidebar/worktree-filter.ts` drops archived projects, a
 home-directory root, and the global `/` bucket), so without it a session that works fine

@@ -23,7 +23,7 @@ import {
 
 let base: string
 beforeEach(() => {
-  base = fs.mkdtempSync(path.join(os.tmpdir(), "alpha-cas-"))
+  base = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-cas-"))
 })
 afterEach(() => {
   fs.rmSync(base, { recursive: true, force: true })

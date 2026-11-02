@@ -2,7 +2,7 @@
 // 变异为 `injectionFailure: injection.error && undefined` 后,四条源码文本锚仍全绿,但实际
 // IPC 丢失失败字段 —— 文本锚证明「字样在源码里」,证明不了「值真的上车」。
 // 现在 ready 消息构造住在 bun 可真执行的 buildReadyMessage(sidecar.ts 唯一的 ready 通路,
-// 接线锚见 alpha-config-injection.test.ts),这里对生产函数的输出做**整体深比较 + 属性存在性**
+// 接线锚见 codepuppy-config-injection.test.ts),这里对生产函数的输出做**整体深比较 + 属性存在性**
 // 双断言:任何让 injectionFailure 变成 undefined / 缺失 / 改名 / 内容截断的等义改写都当场转红。
 import { describe, expect, test } from "bun:test"
 import type { LocationPrewarmResult } from "./sidecar-location-prewarm"

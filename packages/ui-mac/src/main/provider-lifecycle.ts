@@ -6,7 +6,7 @@
 //           current truth (a truth file that fails the strict read REFUSES the add before anything is stored: no
 //           orphan key, no silent overwrite of records we cannot read) → key into the keychain store (fail closed:
 //           keychain refuses ⇒ truth untouched, the reason goes back to the form) → the record into
-//           `<appData>/alpha-code-state/custom-providers/<env>.json` (`#1391` truth: main-only writable, outside
+//           `<appData>/codepuppy-state/custom-providers/<env>.json` (`#1391` truth: main-only writable, outside
 //           every fence root; same id ⇒ the record is replaced in place; the key NEVER goes there) → structural
 //           respawn. If the truth write fails AFTER the store write, the store is put back exactly as it was
 //           (R1 finding 2): a first fill must not leave an orphan entry claiming "configured", and a re-entry must
@@ -23,18 +23,18 @@
 //           never touches config: without this the plaintext would stay forever. Only the leaf: the block
 //           (npm / baseURL / models — often the user's hand-written opencode CLI config) stays, and files without
 //           the leaf are not written. Retire BEFORE storing: a busy lock then refuses with nothing half-done.
-// alpha.jsonc and the other two config files are NOT written by this module any more (基线 I1 / I3): whatever
+// codepuppy.jsonc and the other two config files are NOT written by this module any more (基线 I1 / I3): whatever
 // provider blocks they still carry are ignored (server.ts logs which, once per process) — the user re-adds the
 // service from the picker and the truth file becomes its only home.
 // Persistence is only complete once the process-global sidecar has been rebuilt: the rebuild re-runs
-// buildAlphaModelConfig, which emits the record as a full provider block (allowlist + baseURL + models) and the
+// buildCodePuppyModelConfig, which emits the record as a full provider block (allowlist + baseURL + models) and the
 // {file:} ref for the key file main materialized at that fork, before the renderer reconnects and asks the real
 // v2 model.list again.
 
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs"
-import type { ProviderInput, ProviderResult } from "../shared/alpha-model-types"
+import type { ProviderInput, ProviderResult } from "../shared/codepuppy-model-types"
 import { isExtensionName } from "../shared/extension-name"
-import { discardByokKey, getByokKey, removeByokKey, setByokKey, storeByokKey } from "./alpha-byok-keys"
+import { discardByokKey, getByokKey, removeByokKey, setByokKey, storeByokKey } from "./codepuppy-byok-keys"
 import { resolveCustomProviderTruthLocation } from "./custom-provider-records"
 import { canonicalCustomProviderRecord, readCustomProviderTruth, type CustomProviderRecord } from "./custom-provider-truth"
 import { writeCustomProviderTruth } from "./custom-provider-truth-write"

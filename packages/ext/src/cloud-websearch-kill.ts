@@ -3,7 +3,7 @@
 // 为什么闸只能落在这里(R3 判 B 属门控 Blocker 时的判据):
 //
 //   ① 云 `cloud_web_search` 是远端 MCP 工具,alpha 没有它的 `execute` 首行可放闸 —— 本地
-//      `websearch` 的收口(工具自身读 `ALPHA_LOCAL_WEBSEARCH_DENY`)对它不适用。
+//      `websearch` 的收口(工具自身读 `CODEPUPPY_LOCAL_WEBSEARCH_DENY`)对它不适用。
 //   ② 「注册期就不提供这个工具」在引擎侧**不存在**:`ConfigMCPV1.Remote`
 //      (`packages/core/src/v1/config/mcp.ts`)只有整 server 的 `enabled`,没有 per-tool 过滤;
 //      整 server 关会误伤 `cloud_dispatch` 等兄弟工具(AC4 禁止)。
@@ -33,7 +33,7 @@
 // 会产生 `exa_web_search_exa` —— 它既不经 `McpWebSearch.call()`,也不经 Core 的 `callMcp()`,
 // 那两道传输闸对它一概不成立;动态 `mcp.add` 同理。而**本钩子是这两条调用链的共同钳制点**:
 // 普通模式与 code-mode 的每一次 MCP 工具执行都先过它。所以本地主权判决
-// (`ALPHA_LOCAL_WEBSEARCH_DENY`)也接到同一个钩子上,判据按**工具形态**而不是 server 名。
+// (`CODEPUPPY_LOCAL_WEBSEARCH_DENY`)也接到同一个钩子上,判据按**工具形态**而不是 server 名。
 //
 // **产品语义(按「关」实现,归 owner 复核)**:主权态(平台代付或 kill-switch)下,对用户自己
 // 配置的 web-search MCP server 也**尽力**关。技术上这是唯一自洽的方向 —— 本地 keyless websearch
@@ -70,7 +70,7 @@
 //   sanitize 后失去信息的非 ASCII 名**仍然漏**,这条以回归的形式钉住(见测试同名用例)。
 //
 //   **例外(治理云 server)= 绑定 alpha 自己写的那份定义的端点身份,不再看名字前缀。**
-//   `ALPHA_CLOUD_MCP_DEF` 里的 `url` 是 alpha 在**本次 fork** 自己写进 env 的(injectAlphaConfig
+//   `CODEPUPPY_CLOUD_MCP_DEF` 里的 `url` 是 alpha 在**本次 fork** 自己写进 env 的(injectCodePuppyConfig
 //   在每条分支上覆盖或删除它),外部伪造不了;`computeMcpOwnership()` 在 `config` 钩子里拿**引擎
 //   已合并完成的**配置逐个核对:名字等于点名的那个、`type==="remote"`、`url` 逐字相同,才算治理
 //   server。工具归属按 sanitize 后的 server 名前缀解析,**任何歧义都倒向 fail-closed**:只要有
@@ -101,7 +101,7 @@
 // 项目云工具的可用性 —— 违反本文件对治理云 server 的保证,也违反 AC4「不误杀」。
 //
 // 本轮的形态:本模块只留**纯函数**(`computeMcpOwnership`),归属由 `plugin.ts` 存在**每个
-// `AlphaExt` 实例自己的闭包**里,在该实例全部配置合并完成之后(项目 `alpha.jsonc` 合并之后)才算,
+// `CodePuppyExt` 实例自己的闭包**里,在该实例全部配置合并完成之后(项目 `codepuppy.jsonc` 合并之后)才算,
 // 并显式传给该实例的 `tool.execute.before`。判决函数的默认实参恒为 `UNVERIFIED_MCP_OWNERSHIP`
 // —— 没传归属 = 没有治理 server = 豁免不给,fail-closed 不因这次重构而松动。
 //
@@ -129,13 +129,13 @@ export {
 } from "@opencode-ai/plugin/alpha-cloud-authority"
 
 /** main 每次 fork 前落定的**云侧**主权判决通道(`ui-mac/src/main/cloud-web-search.ts` 同名同义)。 */
-export const CLOUD_WEBSEARCH_DENY_ENV = "ALPHA_CLOUD_WEBSEARCH_DENY"
+export const CLOUD_WEBSEARCH_DENY_ENV = "CODEPUPPY_CLOUD_WEBSEARCH_DENY"
 
 /**
  * 同一函数落定的**本地侧**判决通道(kill-switch **或**平台代付即置位)。名字在 core / opencode /
  * ui-mac / ext 四个包各写一份(彼此之间没有可共用的 alpha 依赖边)。
  */
-export const LOCAL_WEBSEARCH_DENY_ENV = "ALPHA_LOCAL_WEBSEARCH_DENY"
+export const LOCAL_WEBSEARCH_DENY_ENV = "CODEPUPPY_LOCAL_WEBSEARCH_DENY"
 
 /** fail-closed:除「缺省 / 空串 / `"0"`」外的任何取值都判为 deny。四个包里逐字同义。 */
 function signalled(env: Record<string, string | undefined>, name: string): boolean {
@@ -218,7 +218,7 @@ export function isWebSearchToolId(tool: string): boolean {
   return false
 }
 
-/** alpha 自己注册的云 MCP server 名(注入面经 `ALPHA_CLOUD_MCP_SERVER` 告知,见 ui-mac 同名常量)。 */
+/** alpha 自己注册的云 MCP server 名(注入面经 `CODEPUPPY_CLOUD_MCP_SERVER` 告知,见 ui-mac 同名常量)。 */
 /** `McpCatalog.sanitize`(`opencode/src/mcp/catalog.ts:117`)逐字同义 —— 工具 id 的前缀就是它的产物。 */
 function sanitizeMcpName(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]/g, "_")
@@ -240,8 +240,8 @@ export function mcpEngineToolId(server: string, remoteName: string): string {
 /**
  * 一次配置装载里,每个 MCP server 名的**治理归属**。
  *
- * `governed` = 端点身份核验通过的 alpha 云 server(名字等于 `ALPHA_CLOUD_MCP_SERVER` 点名的那个,
- * 且配置里那条定义是 `type:"remote"` 且 `url` 与 `ALPHA_CLOUD_MCP_DEF` 里 alpha 自己写的逐字相同)。
+ * `governed` = 端点身份核验通过的 alpha 云 server(名字等于 `CODEPUPPY_CLOUD_MCP_SERVER` 点名的那个,
+ * 且配置里那条定义是 `type:"remote"` 且 `url` 与 `CODEPUPPY_CLOUD_MCP_DEF` 里 alpha 自己写的逐字相同)。
  * `foreign` = 配置里其余每一个 server 名 —— 一个都拿不到治理豁免。
  */
 /**
@@ -274,7 +274,7 @@ export function isGovernedCloudTool(tool: string, ownership: McpOwnership): bool
  *
  * **第二条的拒绝理由只许点名 kill-switch**(照 `#1411` 对 `LOCAL_WEBSEARCH_DENIED_MESSAGE` 的同形修正)。
  * 这句话此前写「the platform pays for search, or the web search kill switch is set」—— 那是 ADR-009 B1
- * 时代的实话:代付态 main 会置位 `ALPHA_LOCAL_WEBSEARCH_DENY`,第三方 web search 因此被关而云腿是权威
+ * 时代的实话:代付态 main 会置位 `CODEPUPPY_LOCAL_WEBSEARCH_DENY`,第三方 web search 因此被关而云腿是权威
  * 替代。B1 被推翻之后 main 只在 kill-switch 下置位两个信号(`ui-mac/src/main/server.ts` 的
  * `applyWebSearchSovereignty`,真 fork 判据在 `server.test.ts`),于是「代付」那半句在唯一可达它的状态下
  * 必然是假的;而 kill-switch **同时**关掉治理云工具(上一条分支),「除平台自己的以外」那半句也一样。
@@ -342,7 +342,7 @@ export function assertWebSearchToolAllowed(
 //      `opencode/src/plugin/index.ts` 的 `flags.pure ? [] : (cfg.plugin_origins ?? [])`
 //      于是**整个跳过**外部插件;
 //   ② bundle import 失败 —— `PluginLoader.loadExternal` 的 report.error 只 publish 一条错误;
-//   ③ `AlphaExt(input)` 初始化抛错 —— `Effect.tryPromise(...).pipe(Effect.catch(() => Effect.void))`,
+//   ③ `CodePuppyExt(input)` 初始化抛错 —— `Effect.tryPromise(...).pipe(Effect.catch(() => Effect.void))`,
 //      log-and-continue。
 //
 // R4 的做法是注入面写一个 `enabled:false` 的云 server,由本模块把它翻开。**R5 判该形态是回归**:
@@ -353,7 +353,7 @@ export function assertWebSearchToolAllowed(
 // 它只是「本次初始化不连」。
 //
 // R5 形态:**kill-switch 下云 server 的完整定义根本不进配置**。注入面只把它经
-// `ALPHA_CLOUD_MCP_DEF` 交给本模块(`ALPHA_CLOUD_MCP_ARM` 点名),由本函数在 `config` 钩子里
+// `CODEPUPPY_CLOUD_MCP_DEF` 交给本模块(`CODEPUPPY_CLOUD_MCP_ARM` 点名),由本函数在 `config` 钩子里
 // 装进 `cfg.mcp`。`config` 钩子能跑 ⇒ 插件函数已返回 hooks 对象 ⇒ 同一对象上的
 // `tool.execute.before` 闸确实注册了。三种缺席情形下本函数一次都不会被调用。
 //
@@ -378,13 +378,13 @@ export function assertWebSearchToolAllowed(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** 注入面告诉 ext「这个 MCP server 等你确认装载后才能装」的通道(ui-mac `cloud-web-search.ts` 同名同义)。 */
-export const CLOUD_MCP_ARM_ENV = "ALPHA_CLOUD_MCP_ARM"
+export const CLOUD_MCP_ARM_ENV = "CODEPUPPY_CLOUD_MCP_ARM"
 
 /**
  * 与 ARM 配对的 server 定义(JSON)。
  *
  * `#1195`(REQ-144 T2)起 alpha 治理的云 server 定义携带
- * `headers.Authorization = "Bearer {file:…ALPHA_MCP_TOKEN}"`(`oauth:false`)——
+ * `headers.Authorization = "Bearer {file:…CODEPUPPY_MCP_TOKEN}"`(`oauth:false`)——
  * 下面的 `resolveFileRefs` 对它**真的在解析**:读不到引用文件就整个不装(fail-closed),
  * 这条把关是解析后 Bearer 值进引擎前的唯一一跳。
  */
@@ -397,7 +397,7 @@ export { resolveFileRefs }
 /**
  * 把注入面托管的云 MCP server 定义装进配置。返回被装上的 server 名(没有可装的则 undefined)。
  *
- * 只在 ARM 与 DEF **同时**在场时动手 —— 两个都由 sidecar 内的 `injectAlphaConfig` 在每次 fork
+ * 只在 ARM 与 DEF **同时**在场时动手 —— 两个都由 sidecar 内的 `injectCodePuppyConfig` 在每次 fork
  * 时置位或删除,外部伪造一个进不去(见 ui-mac `cloud-web-search.ts` 的通道说明)。
  */
 export function installCloudMcp(
@@ -416,12 +416,12 @@ export function installCloudMcp(
     definition = JSON.parse(raw)
   } catch (error) {
     console.error(
-      `[@alpha-code/ext] cloud MCP server "${name}" NOT installed: ${CLOUD_MCP_DEF_ENV} is not valid JSON (${error instanceof Error ? error.message : String(error)})`,
+      `[@codepuppy/ext] cloud MCP server "${name}" NOT installed: ${CLOUD_MCP_DEF_ENV} is not valid JSON (${error instanceof Error ? error.message : String(error)})`,
     )
     return undefined
   }
   if (!definition || typeof definition !== "object" || Array.isArray(definition)) {
-    console.error(`[@alpha-code/ext] cloud MCP server "${name}" NOT installed: ${CLOUD_MCP_DEF_ENV} is not an object`)
+    console.error(`[@codepuppy/ext] cloud MCP server "${name}" NOT installed: ${CLOUD_MCP_DEF_ENV} is not an object`)
     return undefined
   }
 
@@ -432,7 +432,7 @@ export function installCloudMcp(
     // 密钥文件读不到 = 已登出或密钥同步失败。装一个没有凭据的 server 只会以 401 收场,
     // fail-closed 直接不装(loud)。
     console.error(
-      `[@alpha-code/ext] cloud MCP server "${name}" NOT installed: unresolved {file:} reference (${error instanceof Error ? error.message : String(error)})`,
+      `[@codepuppy/ext] cloud MCP server "${name}" NOT installed: unresolved {file:} reference (${error instanceof Error ? error.message : String(error)})`,
     )
     return undefined
   }

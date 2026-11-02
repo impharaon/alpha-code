@@ -50,7 +50,7 @@ describe("frontend surface manifest", () => {
   })
 
   test("every surface declares a valid intended target lineage", () => {
-    const valid = new Set(["alpha", "opencode", "hybrid"])
+    const valid = new Set(["codepuppy", "opencode", "hybrid"])
     expect(FRONTEND_SURFACE_MANIFEST.filter((surface) => !valid.has(surface.target))).toEqual([])
   })
 

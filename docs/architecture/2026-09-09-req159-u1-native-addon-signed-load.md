@@ -174,7 +174,7 @@ clang -O2 -fPIC -shared -undefined dynamic_lookup -mmacosx-version-min=11.0 \
 
 # ② 走真发版命令打包 + 签名(只用 CLI 覆盖关掉公证 / 换 target,不改配置文件)
 OPENCODE_CHANNEL=prod bun run --cwd packages/ui-mac build     # 需核对 3 行 `✓ built in`
-cd packages/ui-mac && OPENCODE_CHANNEL=prod ALPHA_SIGN=1 \
+cd packages/ui-mac && OPENCODE_CHANNEL=prod CODEPUPPY_SIGN=1 \
   ./node_modules/.bin/electron-builder --mac \
   -c.mac.notarize=false -c.mac.target=dir --config electron-builder.config.ts
 

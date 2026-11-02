@@ -26,7 +26,7 @@
   <section class="sec" style="margin-bottom:44px">
     <div class="sec-head">
       <div class="sec-kicker">设计原则</div>
-      <h2>一致、现代、居中可缩放 —— 沿用 alpha-ui 设计系统</h2>
+      <h2>一致、现代、居中可缩放 —— 沿用 codepuppy-ui 设计系统</h2>
       <p class="lede">两块全量重构:<b>定制中心</b>(7 个 tab,真实目录数据)与<b>设置</b>(仅 通用 + 快捷键)。统一语言:冷瓷白 / 石墨中性脊 + 单一克制 indigo;内容 <b>居中固定最大宽度</b>(定制中心 880 / 设置 640)、卡片随窗宽 <b>容器查询</b> 2↔1 列重排;卡片化行、现代开关、键帽快捷键。下方每个页面均可点击切换。切右上「深色」看暗色。</p>
     </div>
     <div class="note ok"><b>与现状的差异</b>:① 浏览页从「纯文本列表行」升级为<b>卡片网格</b>(图标砖 + 来源徽标 + 运行时/密钥元信息 + 添加);② 连接器按<b>分类分组</b>;③「已安装」独立成<b>可启停管理列表</b> + 空状态;④「创建」补<b>导入</b>(文件夹 / git / npm);⑤ 设置砍到两项,其余并入「通用」的<b>分组卡片</b>。零改 upstream(纯新增 alpha 组件,守 ADR-016)。</p></div>
@@ -453,9 +453,9 @@
             <p class="tp-grp-cap">默认每次询问 · 随 Code Puppy 安装,在本机运行</p>
             <div class="tp-card">
               <div class="tp-row">
-                <button class="tp-exp" type="button" aria-expanded="true" aria-label="收起 alpha-word">▾</button>
-                <div class="meta"><div class="nm"><b>alpha-word</b></div><small>2 个工具 · 继承:默认,每次询问</small></div>
-                <div class="tp-seg" role="radiogroup" aria-label="alpha-word · 整个服务"><button role="radio" aria-checked="false">启用</button><button role="radio" aria-checked="false">询问</button><button role="radio" aria-checked="false">停用</button></div>
+                <button class="tp-exp" type="button" aria-expanded="true" aria-label="收起 codepuppy-word">▾</button>
+                <div class="meta"><div class="nm"><b>codepuppy-word</b></div><small>2 个工具 · 继承:默认,每次询问</small></div>
+                <div class="tp-seg" role="radiogroup" aria-label="codepuppy-word · 整个服务"><button role="radio" aria-checked="false">启用</button><button role="radio" aria-checked="false">询问</button><button role="radio" aria-checked="false">停用</button></div>
               </div>
               <div class="tp-svc-tools">
                 <div class="tp-row">
@@ -470,19 +470,19 @@
                 </div>
               </div>
               <div class="tp-row">
-                <button class="tp-exp" type="button" aria-expanded="false" aria-label="展开 alpha-excel">▸</button>
-                <div class="meta"><div class="nm"><b>alpha-excel</b></div><small>2 个工具 · 继承:默认,每次询问</small></div>
-                <div class="tp-seg" role="radiogroup" aria-label="alpha-excel · 整个服务"><button role="radio" aria-checked="false">启用</button><button role="radio" aria-checked="false">询问</button><button role="radio" aria-checked="false">停用</button></div>
+                <button class="tp-exp" type="button" aria-expanded="false" aria-label="展开 codepuppy-excel">▸</button>
+                <div class="meta"><div class="nm"><b>codepuppy-excel</b></div><small>2 个工具 · 继承:默认,每次询问</small></div>
+                <div class="tp-seg" role="radiogroup" aria-label="codepuppy-excel · 整个服务"><button role="radio" aria-checked="false">启用</button><button role="radio" aria-checked="false">询问</button><button role="radio" aria-checked="false">停用</button></div>
               </div>
               <div class="tp-row">
-                <button class="tp-exp" type="button" aria-expanded="false" aria-label="展开 alpha-powerpoint">▸</button>
-                <div class="meta"><div class="nm"><b>alpha-powerpoint</b></div><small>2 个工具 · 继承:默认,每次询问</small></div>
-                <div class="tp-seg" role="radiogroup" aria-label="alpha-powerpoint · 整个服务"><button role="radio" aria-checked="false">启用</button><button role="radio" aria-checked="false">询问</button><button role="radio" aria-checked="false">停用</button></div>
+                <button class="tp-exp" type="button" aria-expanded="false" aria-label="展开 codepuppy-powerpoint">▸</button>
+                <div class="meta"><div class="nm"><b>codepuppy-powerpoint</b></div><small>2 个工具 · 继承:默认,每次询问</small></div>
+                <div class="tp-seg" role="radiogroup" aria-label="codepuppy-powerpoint · 整个服务"><button role="radio" aria-checked="false">启用</button><button role="radio" aria-checked="false">询问</button><button role="radio" aria-checked="false">停用</button></div>
               </div>
               <div class="tp-row">
-                <button class="tp-exp" type="button" aria-expanded="false" aria-label="展开 alpha-pdf">▸</button>
-                <div class="meta"><div class="nm"><b>alpha-pdf</b></div><small>2 个工具 · 继承:默认,每次询问</small></div>
-                <div class="tp-seg" role="radiogroup" aria-label="alpha-pdf · 整个服务"><button role="radio" aria-checked="false">启用</button><button role="radio" aria-checked="false">询问</button><button role="radio" aria-checked="false">停用</button></div>
+                <button class="tp-exp" type="button" aria-expanded="false" aria-label="展开 codepuppy-pdf">▸</button>
+                <div class="meta"><div class="nm"><b>codepuppy-pdf</b></div><small>2 个工具 · 继承:默认,每次询问</small></div>
+                <div class="tp-seg" role="radiogroup" aria-label="codepuppy-pdf · 整个服务"><button role="radio" aria-checked="false">启用</button><button role="radio" aria-checked="false">询问</button><button role="radio" aria-checked="false">停用</button></div>
               </div>
             </div>
           </div>

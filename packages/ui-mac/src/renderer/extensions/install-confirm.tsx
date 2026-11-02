@@ -1,6 +1,6 @@
 // install-confirm — 定制中心的**安装确认框**与 `#348` capability 授权两阶段控制器。
 //
-// REQ-234 `#1531`(基线 §2.3):从 extension-hub.tsx 原样抽出,定制中心与 agent 安装守望者(alpha-ui/hub-install-watcher.tsx)
+// REQ-234 `#1531`(基线 §2.3):从 extension-hub.tsx 原样抽出,定制中心与 agent 安装守望者(codepuppy-ui/hub-install-watcher.tsx)
 // 共用**同一份** —— agent 请求的安装弹的就是定制中心自己的这个框(同一个条目说明、同一个作用域选择、同一个遮罩密钥输入、
 // 同一个授权第二阶段),不是另画一个。两个宿主各建一份控制器实例,区别只在「确认之后装的那一下」(deps.install):
 // 定制中心装完自己呈现结果;守望者装的时候带上 hubRequestId,让 main 记下这一次请求的结局。
@@ -15,10 +15,10 @@
 import { createMemo, createSignal, For, Show, type Accessor } from "solid-js"
 import { t } from "../i18n"
 import { projectLabel } from "../sidebar/route"
-import { Button } from "../alpha-ui/Button"
+import { Button } from "../codepuppy-ui/Button"
 import type { AuthorizationConfirmationWire, CapabilityDiffWire } from "../../shared/ext-capability-authorization"
 import type { CatalogPackageViewV1 } from "../../shared/catalog-package-view"
-import { isAlphaOfficeCatalogId } from "../../shared/office-advisories"
+import { isCodePuppyOfficeCatalogId } from "../../shared/office-advisories"
 import type { PackageAdmissionPreviewV1 } from "../../shared/package-admission"
 import { packageSkipReasonKey } from "./ext-package-presentation"
 import { confirmNoteKey, packageConfirmNoteKey } from "./ext-curation-view"
@@ -214,7 +214,7 @@ export function createInstallConfirm(deps: InstallConfirmDeps) {
   const authzTitle = () => {
     const a = authz()
     if (!a) return ""
-    return authzIsEscalation(a.diffs) ? t("alpha.ext.authz.titleEscalation") : t("alpha.ext.authz.titleFirst")
+    return authzIsEscalation(a.diffs) ? t("codepuppy.ext.authz.titleEscalation") : t("codepuppy.ext.authz.titleFirst")
   }
 
   return {
@@ -248,11 +248,11 @@ export function createInstallConfirm(deps: InstallConfirmDeps) {
     close: () => (packageAuthz() ? closePackageAuthz() : closeAuthz()),
     title: () =>
       packageAuthz()
-        ? t("alpha.ext.confirmTitle", { name: packageAuthz()!.view.presentation.displayName })
+        ? t("codepuppy.ext.confirmTitle", { name: packageAuthz()!.view.presentation.displayName })
         : authz()?.host === "confirm"
           ? authzTitle()
           : confirming()
-            ? t("alpha.ext.confirmTitle", { name: confirming()!.displayName })
+            ? t("codepuppy.ext.confirmTitle", { name: confirming()!.displayName })
             : "",
     busy: () => confirmBusy() || authzBusy(),
   }
@@ -263,7 +263,7 @@ export type InstallConfirm = ReturnType<typeof createInstallConfirm>
 // Pre-install disclosure for the confirm dialog. #1564: the four first-party Office tools bring their own
 // runtime, so the card's leftover runtimeDep (uv) is not a program the user has to install.
 function runtimeDeps(e: CatalogEntry): string {
-  if (isAlphaOfficeCatalogId(e.id)) return ""
+  if (isCodePuppyOfficeCatalogId(e.id)) return ""
   const spec = e.installSpec && e.installSpec.kind === "mcp" ? e.installSpec : undefined
   return (spec?.runtimeDep ?? []).join(", ")
 }
@@ -294,7 +294,7 @@ export function InstallConfirmFooter(props: { confirm: InstallConfirm }) {
       fallback={
         <>
           <Button variant="ghost" autofocus disabled={c.authzBusy()} onClick={c.closePackageAuthz}>
-            {t("alpha.ext.cancel")}
+            {t("codepuppy.ext.cancel")}
           </Button>
           <Button
             variant="primary"
@@ -302,7 +302,7 @@ export function InstallConfirmFooter(props: { confirm: InstallConfirm }) {
             disabled={!c.packageSecretsComplete()}
             onClick={() => void c.confirmPackageAuthz()}
           >
-            {t("alpha.ext.confirmInstall")}
+            {t("codepuppy.ext.confirmInstall")}
           </Button>
         </>
       }
@@ -312,19 +312,19 @@ export function InstallConfirmFooter(props: { confirm: InstallConfirm }) {
         fallback={
           <>
             <Button variant="ghost" autofocus disabled={c.confirmBusy()} onClick={c.closeAuthz}>
-              {t("alpha.ext.cancel")}
+              {t("codepuppy.ext.cancel")}
             </Button>
             <Button variant="primary" loading={c.confirmBusy()} onClick={() => void c.submitInstall()}>
-              {t("alpha.ext.confirmInstall")}
+              {t("codepuppy.ext.confirmInstall")}
             </Button>
           </>
         }
       >
         <Button variant="ghost" autofocus disabled={c.authzBusy()} onClick={c.cancelAuthz}>
-          {t("alpha.ext.cancel")}
+          {t("codepuppy.ext.cancel")}
         </Button>
         <Button variant="primary" loading={c.authzBusy()} onClick={() => void c.confirmAuthz()}>
-          {c.authz()?.mode === "update" ? t("alpha.ext.authz.confirmUpdate") : t("alpha.ext.authz.confirmInstall")}
+          {c.authz()?.mode === "update" ? t("codepuppy.ext.authz.confirmUpdate") : t("codepuppy.ext.authz.confirmInstall")}
         </Button>
       </Show>
     </Show>
@@ -339,14 +339,14 @@ export function InstallConfirmBody(props: { confirm: InstallConfirm }) {
     <>
       <Show when={c.packageAuthz()}>
         {(state) => (
-          <div class="alpha-ext-confirm" data-package-authorization={state().view.catalogId}>
-            <p class="alpha-ext-confirm-desc">{state().view.presentation.description}</p>
-            <div class="alpha-ext-install-box">
+          <div class="codepuppy-ext-confirm" data-package-authorization={state().view.catalogId}>
+            <p class="codepuppy-ext-confirm-desc">{state().view.presentation.description}</p>
+            <div class="codepuppy-ext-install-box">
               <For each={c.packagePlanIncluded()}>
                 {(item) => (
-                  <div class="alpha-ext-install-row" data-plan-component={item.componentId} data-included="true">
-                    <span class="alpha-ext-install-nm">{item.name}</span>
-                    <span class="alpha-ext-install-k">{typeLabel(item.kind)}</span>
+                  <div class="codepuppy-ext-install-row" data-plan-component={item.componentId} data-included="true">
+                    <span class="codepuppy-ext-install-nm">{item.name}</span>
+                    <span class="codepuppy-ext-install-k">{typeLabel(item.kind)}</span>
                   </div>
                 )}
               </For>
@@ -354,18 +354,18 @@ export function InstallConfirmBody(props: { confirm: InstallConfirm }) {
             {/* 确认屏也是一个 preview:被跳过的组件必须在**用户按下确认之前**就说清楚,
                 并且用与详情页、收据逐字相同的原因 token。 */}
             <Show when={c.packagePlanSkipped().length > 0}>
-              <div class="alpha-ext-install-box" data-plan-skipped="true">
-                <div class="alpha-ext-confirm-line">{t("alpha.ext.packageComponentSkipped")}</div>
+              <div class="codepuppy-ext-install-box" data-plan-skipped="true">
+                <div class="codepuppy-ext-confirm-line">{t("codepuppy.ext.packageComponentSkipped")}</div>
                 <For each={c.packagePlanSkipped()}>
                   {(item) => (
                     <div
-                      class="alpha-ext-install-row"
+                      class="codepuppy-ext-install-row"
                       data-plan-component={item.componentId}
                       data-included="false"
                       data-skip-reason={item.included ? undefined : item.skipReasonCode}
                     >
-                      <span class="alpha-ext-install-nm">{item.componentId}</span>
-                      <span class="alpha-ext-install-k">
+                      <span class="codepuppy-ext-install-nm">{item.componentId}</span>
+                      <span class="codepuppy-ext-install-k">
                         {item.included ? "" : t(packageSkipReasonKey(item.skipReasonCode) as never)}
                       </span>
                     </div>
@@ -380,19 +380,19 @@ export function InstallConfirmBody(props: { confirm: InstallConfirm }) {
               diffs={state().preview.items}
             />
             <Show when={c.packagePrerequisites().length > 0}>
-              <div class="alpha-ext-confirm-keys">
-                <div class="alpha-ext-confirm-line">{t("alpha.ext.packageConfirmEnv")}</div>
+              <div class="codepuppy-ext-confirm-keys">
+                <div class="codepuppy-ext-confirm-line">{t("codepuppy.ext.packageConfirmEnv")}</div>
                 <For each={c.packagePrerequisites()}>
                   {(item) => (
-                    <label class="alpha-ext-key-field">
-                      <span class="alpha-ext-key-name">{item.prerequisiteId === "mcp:github-official#GITHUB_PERSONAL_ACCESS_TOKEN" ? t("alpha.ext.officialGithubPat") : item.prerequisiteId === "mcp:dbhub-readonly#DSN" ? t("alpha.ext.officialSqliteDsn") : item.label}</span>
+                    <label class="codepuppy-ext-key-field">
+                      <span class="codepuppy-ext-key-name">{item.prerequisiteId === "mcp:github-official#GITHUB_PERSONAL_ACCESS_TOKEN" ? t("codepuppy.ext.officialGithubPat") : item.prerequisiteId === "mcp:dbhub-readonly#DSN" ? t("codepuppy.ext.officialSqliteDsn") : item.label}</span>
                       <input
-                        class="alpha-ext-key-input"
+                        class="codepuppy-ext-key-input"
                         type="password"
                         autocomplete="off"
                         spellcheck={false}
                         required
-                        placeholder={t(item.prerequisiteId === "mcp:github-official#GITHUB_PERSONAL_ACCESS_TOKEN" ? "alpha.ext.officialGithubPat" : item.prerequisiteId === "mcp:dbhub-readonly#DSN" ? "alpha.ext.officialSqliteDsn" : "alpha.ext.packageKeyPlaceholder")}
+                        placeholder={t(item.prerequisiteId === "mcp:github-official#GITHUB_PERSONAL_ACCESS_TOKEN" ? "codepuppy.ext.officialGithubPat" : item.prerequisiteId === "mcp:dbhub-readonly#DSN" ? "codepuppy.ext.officialSqliteDsn" : "codepuppy.ext.packageKeyPlaceholder")}
                         value={c.envValues()[item.prerequisiteId] ?? ""}
                         onInput={(event) =>
                           c.setEnvValues((current) => ({
@@ -405,13 +405,13 @@ export function InstallConfirmBody(props: { confirm: InstallConfirm }) {
                   )}
                 </For>
                 <Show when={!c.packageSecretsComplete()}>
-                  <p class="alpha-ext-key-hint" role="status">{t("alpha.ext.packageKeysRequired")}</p>
+                  <p class="codepuppy-ext-key-hint" role="status">{t("codepuppy.ext.packageKeysRequired")}</p>
                 </Show>
-                <p class="alpha-ext-key-hint">{t("alpha.ext.keyHint")}</p>
+                <p class="codepuppy-ext-key-hint">{t("codepuppy.ext.keyHint")}</p>
               </div>
             </Show>
             {/* #1595 AC1:不写配置文件路径;与条目确认同一套三种情形(包没有 curation,只会落到前后两种)。 */}
-            <p class="alpha-ext-confirm-note" data-alpha-confirm-note>
+            <p class="codepuppy-ext-confirm-note" data-codepuppy-confirm-note>
               {t(packageConfirmNoteKey(c.packagePlanIncluded().map((item) => item.kind)))}
             </p>
           </div>
@@ -422,51 +422,51 @@ export function InstallConfirmBody(props: { confirm: InstallConfirm }) {
       </Show>
       <Show when={!c.packageAuthz() && c.authz()?.host !== "confirm" && c.confirming()}>
         {(entry) => (
-          <div class="alpha-ext-confirm">
-            <div class="alpha-ext-confirm-meta">
-              <span class="alpha-ext-chip" data-source={entry().source}>
+          <div class="codepuppy-ext-confirm">
+            <div class="codepuppy-ext-confirm-meta">
+              <span class="codepuppy-ext-chip" data-source={entry().source}>
                 {sourceLabel(entry().source)}
               </span>
-              <span class="alpha-ext-confirm-type">{typeLabel(entry().type)}</span>
+              <span class="codepuppy-ext-confirm-type">{typeLabel(entry().type)}</span>
             </div>
-            <p class="alpha-ext-confirm-desc">{catalogDescription(entry())}</p>
-            <div class="alpha-ext-install-box">
+            <p class="codepuppy-ext-confirm-desc">{catalogDescription(entry())}</p>
+            <div class="codepuppy-ext-install-box">
               <For each={confirmItems(entry())}>
                 {(it) => {
                   const ic = iconFor(it.entry)
                   return (
-                    <div class="alpha-ext-install-row">
-                      <span class="alpha-ext-install-ic" style={{ background: ic.color }}>
+                    <div class="codepuppy-ext-install-row">
+                      <span class="codepuppy-ext-install-ic" style={{ background: ic.color }}>
                         {ic.glyph}
                       </span>
-                      <span class="alpha-ext-install-nm">{it.entry.displayName}</span>
+                      <span class="codepuppy-ext-install-nm">{it.entry.displayName}</span>
                       <Show when={it.optional}>
-                        <span class="alpha-ext-install-opt">{t("alpha.ext.optional")}</span>
+                        <span class="codepuppy-ext-install-opt">{t("codepuppy.ext.optional")}</span>
                       </Show>
-                      <span class="alpha-ext-install-k">{typeLabel(it.entry.type)}</span>
+                      <span class="codepuppy-ext-install-k">{typeLabel(it.entry.type)}</span>
                     </div>
                   )
                 }}
               </For>
             </div>
             <Show when={entry().type === "mcp"}>
-              <fieldset class="alpha-ext-install-scope" data-install-scope="mcp">
-                <legend>{t("alpha.ext.installScopeTitle")}</legend>
-                <div class="alpha-ext-install-scope-options">
+              <fieldset class="codepuppy-ext-install-scope" data-install-scope="mcp">
+                <legend>{t("codepuppy.ext.installScopeTitle")}</legend>
+                <div class="codepuppy-ext-install-scope-options">
                   <label
-                    class="alpha-ext-install-scope-option"
+                    class="codepuppy-ext-install-scope-option"
                     data-selected={c.installScope() === "global" ? "" : undefined}
                   >
                     <input
                       type="radio"
-                      name="alpha-ext-install-scope"
+                      name="codepuppy-ext-install-scope"
                       value="global"
                       checked={c.installScope() === "global"}
                       onChange={() => c.setInstallScope("global")}
                     />
                     <span>
-                      <b>{t("alpha.ext.installScopeGlobal")}</b>
-                      <small>{t("alpha.ext.installScopeGlobalHint")}</small>
+                      <b>{t("codepuppy.ext.installScopeGlobal")}</b>
+                      <small>{t("codepuppy.ext.installScopeGlobalHint")}</small>
                     </span>
                   </label>
                   <Show when={c.projectDir()}>
@@ -474,24 +474,24 @@ export function InstallConfirmBody(props: { confirm: InstallConfirm }) {
                       const projectTarget = () => catalogInstallTargetFor(entry(), "project", dir())
                       return (
                         <label
-                          class="alpha-ext-install-scope-option"
+                          class="codepuppy-ext-install-scope-option"
                           data-selected={c.installScope() === "project" ? "" : undefined}
                           data-disabled={!projectTarget().ok ? "" : undefined}
                         >
                           <input
                             type="radio"
-                            name="alpha-ext-install-scope"
+                            name="codepuppy-ext-install-scope"
                             value="project"
                             checked={c.installScope() === "project"}
                             disabled={!projectTarget().ok}
                             onChange={() => c.setInstallScope("project")}
                           />
                           <span>
-                            <b>{t("alpha.ext.installScopeProject")}</b>
+                            <b>{t("codepuppy.ext.installScopeProject")}</b>
                             <small>
                               {projectTarget().ok
-                                ? t("alpha.ext.installScopeProjectHint", { project: projectLabel(dir()) })
-                                : t("alpha.ext.installScopeProjectUnavailable")}
+                                ? t("codepuppy.ext.installScopeProjectHint", { project: projectLabel(dir()) })
+                                : t("codepuppy.ext.installScopeProjectUnavailable")}
                             </small>
                           </span>
                         </label>
@@ -502,36 +502,36 @@ export function InstallConfirmBody(props: { confirm: InstallConfirm }) {
               </fieldset>
             </Show>
             <Show when={entry().type === "plugin"}>
-              <p class="alpha-ext-confirm-risk">⚠ {t("alpha.ext.pluginRisk")}</p>
+              <p class="codepuppy-ext-confirm-risk">⚠ {t("codepuppy.ext.pluginRisk")}</p>
             </Show>
             <Show when={runtimeDeps(entry())}>
-              <div class="alpha-ext-confirm-line">
-                {t("alpha.ext.confirmRuntime")}: <code>{runtimeDeps(entry())}</code>
+              <div class="codepuppy-ext-confirm-line">
+                {t("codepuppy.ext.confirmRuntime")}: <code>{runtimeDeps(entry())}</code>
               </div>
             </Show>
             <Show when={requiredEnvVarList(entry()).length}>
-              <div class="alpha-ext-confirm-keys">
-                <div class="alpha-ext-confirm-line">{t("alpha.ext.confirmEnv")}</div>
+              <div class="codepuppy-ext-confirm-keys">
+                <div class="codepuppy-ext-confirm-line">{t("codepuppy.ext.confirmEnv")}</div>
                 <For each={requiredEnvVarList(entry())}>
                   {(varName) => (
-                    <label class="alpha-ext-key-field">
-                      <span class="alpha-ext-key-name">{varName}</span>
+                    <label class="codepuppy-ext-key-field">
+                      <span class="codepuppy-ext-key-name">{varName}</span>
                       <input
-                        class="alpha-ext-key-input"
+                        class="codepuppy-ext-key-input"
                         type="password"
                         autocomplete="off"
                         spellcheck={false}
-                        placeholder={t("alpha.ext.keyPlaceholder")}
+                        placeholder={t("codepuppy.ext.keyPlaceholder")}
                         value={c.envValues()[varName] ?? ""}
                         onInput={(ev) => c.setEnvValues((prev) => ({ ...prev, [varName]: ev.currentTarget.value }))}
                       />
                     </label>
                   )}
                 </For>
-                <p class="alpha-ext-key-hint">{t("alpha.ext.keyHint")}</p>
+                <p class="codepuppy-ext-key-hint">{t("codepuppy.ext.keyHint")}</p>
               </div>
             </Show>
-            <p class="alpha-ext-confirm-note" data-alpha-confirm-note>
+            <p class="codepuppy-ext-confirm-note" data-codepuppy-confirm-note>
               {t(confirmNoteKey(entry(), catalog(), new Date().toISOString()))}
             </p>
           </div>

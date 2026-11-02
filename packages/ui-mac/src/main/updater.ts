@@ -3,7 +3,7 @@ import * as path from "node:path"
 import { app, dialog } from "electron"
 import pkg from "electron-updater"
 import { UPDATER_ENABLED } from "./constants"
-import { getAlphaEnvironment, parseAppUpdateYml, verifyUpdaterFeed, type PackagedFeed } from "./alpha-environment"
+import { getCodePuppyEnvironment, parseAppUpdateYml, verifyUpdaterFeed, type PackagedFeed } from "./codepuppy-environment"
 import { createUpdaterController, type UpdaterReadyRecord } from "./updater-controller"
 import { getLogger } from "./logging"
 import { getStore } from "./store"
@@ -26,7 +26,7 @@ function readPackagedFeed(): PackagedFeed | null {
 
 export function setupAutoUpdater(stop: () => Promise<void>) {
   const logger = getLogger()
-  const envInfo = getAlphaEnvironment()
+  const envInfo = getCodePuppyEnvironment()
   autoUpdater.logger = logger
   // REQ-098 T4:feed channel 由唯一环境映射派生(prod→latest=stable feed;beta→beta=preview feed,
   // 维持 ADR-012 休眠语义 —— 机制对齐、不启用发布,#232 拍板 B;dev 不启用 updater,UPDATER_ENABLED)。

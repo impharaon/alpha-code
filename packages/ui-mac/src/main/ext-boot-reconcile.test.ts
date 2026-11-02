@@ -1,4 +1,4 @@
-// REQ-104 #395 —— startup reconcile:账本 desiredState → alpha.jsonc 权威重投影(Codex r5 缺失件)。
+// REQ-104 #395 —— startup reconcile:账本 desiredState → codepuppy.jsonc 权威重投影(Codex r5 缺失件)。
 // 崩溃残留(账本 disabled / config enabled)与旁路写入必须在引擎首次读 config 前收敛;config 恒 =
 // 账本派生。真盘临时根,零 mock。
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
@@ -29,7 +29,7 @@ const record = (over: Partial<UpsertInput> & { name: string; kind: UpsertInput["
   })
   if (!w.ok) throw new Error(w.reason)
 }
-const cfgPath = () => path.join(root, "alpha.jsonc")
+const cfgPath = () => path.join(root, "codepuppy.jsonc")
 const writeCfg = (cfg: unknown) => fs.writeFileSync(cfgPath(), JSON.stringify(cfg, null, 2))
 const readCfg = (): Record<string, any> => JSON.parse(fs.readFileSync(cfgPath(), "utf8"))
 
@@ -93,7 +93,7 @@ describe("reconcileDesiredStateAtBoot(#395 崩溃残留收敛)", () => {
     expect(fs.statSync(cfgPath()).mtimeMs).toBe(beforeStat)
   })
 
-  test("alpha.jsonc 缺席:disabled 天然满足(ok);enabled 缺生效面 → warning,不无中生有建文件", () => {
+  test("codepuppy.jsonc 缺席:disabled 天然满足(ok);enabled 缺生效面 → warning,不无中生有建文件", () => {
     record({ name: "m", kind: "mcp", configKey: "mcp.m", desiredState: "disabled" })
     record({ name: "p", kind: "plugin", configKey: "plugin:@x/p@1", desiredState: "enabled" })
     const r = reconcileDesiredStateAtBoot(root, { userDataPath: root, channel: "stable" })
@@ -103,7 +103,7 @@ describe("reconcileDesiredStateAtBoot(#395 崩溃残留收敛)", () => {
     expect(fs.existsSync(cfgPath())).toBe(false)
   })
 
-  test("alpha.jsonc 非法 jsonc → fail-closed skip,文件不动", () => {
+  test("codepuppy.jsonc 非法 jsonc → fail-closed skip,文件不动", () => {
     record({ name: "m", kind: "mcp", configKey: "mcp.m", desiredState: "disabled" })
     fs.writeFileSync(cfgPath(), "{ not jsonc !!!")
     const r = reconcileDesiredStateAtBoot(root, { userDataPath: root, channel: "stable" })
@@ -247,10 +247,10 @@ describe("#395 r6 B4 派生方向排序", () => {
 // ── #395 Codex r6 B1:plugin[] concat 合并 —— legacy/XDG 源残留时 disable fail-closed + enforcementGap ─
 describe("#395 enforcement gap（r11 pivot：只 plugin 落盘失败入 gap，mcp/agent 由注入兜底）", () => {
   beforeEach(() => {
-    process.env.ALPHA_GLOBAL_DIR = root
+    process.env.CODEPUPPY_GLOBAL_DIR = root
   })
   afterEach(() => {
-    delete process.env.ALPHA_GLOBAL_DIR
+    delete process.env.CODEPUPPY_GLOBAL_DIR
   })
 
   test("plugin disable config write 失败(目标只读)→ 入 enforcementGap", () => {
@@ -295,7 +295,7 @@ describe("#395 enforcement gap（r11 pivot：只 plugin 落盘失败入 gap，mc
     }
   })
 
-  test("disabled plugin 从 alpha.jsonc plugin[] 移除 → 正常收敛,无 enforcementGap", () => {
+  test("disabled plugin 从 codepuppy.jsonc plugin[] 移除 → 正常收敛,无 enforcementGap", () => {
     record({ name: "p", kind: "plugin", configKey: "plugin:@x/p@1.0.0", desiredState: "disabled" })
     writeCfg({ plugin: ["@x/p@1.0.0"] })
     const r = reconcileDesiredStateAtBoot(root, { userDataPath: root, channel: "stable" })
@@ -346,7 +346,7 @@ describe("#397 session-grant 强制(boot reconcile 面)", () => {
     record({ name: "labs", kind: "mcp", configKey: "mcp.labs", desiredState: "enabled" })
     record({ name: "free", kind: "mcp", configKey: "mcp.free", desiredState: "enabled" })
     fs.writeFileSync(
-      path.join(root, "alpha.jsonc"),
+      path.join(root, "codepuppy.jsonc"),
       JSON.stringify({ mcp: { labs: { type: "local", command: ["x"] }, free: { type: "local", command: ["y"] } } }, null, 2),
     )
     const r = reconcileDesiredStateAtBoot(root, {
@@ -357,7 +357,7 @@ describe("#397 session-grant 强制(boot reconcile 面)", () => {
     expect(r.ok).toBe(true)
     expect(r.applied).toContain("mcp:labs→disabled")
     expect(r.warnings.some((w) => w.includes("session-grant") && w.includes("labs"))).toBe(true)
-    const cfg = JSON.parse(fs.readFileSync(path.join(root, "alpha.jsonc"), "utf8"))
+    const cfg = JSON.parse(fs.readFileSync(path.join(root, "codepuppy.jsonc"), "utf8"))
     expect(cfg.mcp.labs.enabled).toBe(false)
     expect(cfg.mcp.free.enabled).toBeUndefined()
   })
@@ -387,7 +387,7 @@ describe("#397 session-grant 强制(skill 面 + oracle 不可判定)", () => {
 
   test("r1-4:oracle 不可判定 + 存在已启用 catalog 记录 → enforcementGap 阻断(不可判定 ≠ 空集)", () => {
     record({ name: "m", kind: "mcp", configKey: "mcp.m", desiredState: "enabled" })
-    fs.writeFileSync(path.join(root, "alpha.jsonc"), JSON.stringify({ mcp: { m: { type: "local", command: ["x"] } } }))
+    fs.writeFileSync(path.join(root, "codepuppy.jsonc"), JSON.stringify({ mcp: { m: { type: "local", command: ["x"] } } }))
     const r = reconcileDesiredStateAtBoot(root, {
       userDataPath: root,
       channel: "stable",
@@ -399,7 +399,7 @@ describe("#397 session-grant 强制(skill 面 + oracle 不可判定)", () => {
   test("r1-4:oracle 不可判定但随包部分集仍尽力归位;无已启用 catalog 记录时不置 gap", () => {
     // 部分集命中:即便整体不可判定,可识别的 session-grant 仍被归位(尽力而为 + gap 已阻断)。
     record({ name: "labs2", kind: "mcp", configKey: "mcp.labs2", desiredState: "enabled" })
-    fs.writeFileSync(path.join(root, "alpha.jsonc"), JSON.stringify({ mcp: { labs2: { type: "local", command: ["x"] } } }))
+    fs.writeFileSync(path.join(root, "codepuppy.jsonc"), JSON.stringify({ mcp: { labs2: { type: "local", command: ["x"] } } }))
     const r = reconcileDesiredStateAtBoot(root, {
       userDataPath: root,
       channel: "stable",

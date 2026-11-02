@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { mergeProjectConfig, projectDirectoryIdentity, requireAlphaGlobalRoot, withProjectDirectoryIdentity } from "./project-config"
-import { AlphaExt } from "./plugin"
+import { mergeProjectConfig, projectDirectoryIdentity, requireCodePuppyGlobalRoot, withProjectDirectoryIdentity } from "./project-config"
+import { CodePuppyExt } from "./plugin"
 
 const j = (o: unknown) => JSON.stringify(o)
 
@@ -149,7 +149,7 @@ describe("project/root identity fail-closed", () => {
   let project = ""
 
   beforeEach(() => {
-    root = mkdtempSync(join(tmpdir(), "alpha-ext-identity-"))
+    root = mkdtempSync(join(tmpdir(), "codepuppy-ext-identity-"))
     home = join(root, "home")
     project = join(root, "project")
     mkdirSync(home)
@@ -198,7 +198,7 @@ describe("project/root identity fail-closed", () => {
   test("分类后 `.alpha` 换链 → config 不读、codepuppy_register 不写、plugin 不 import", () => {
     const retired = join(home, ".alpha")
     const admittedRoot = join(project, ".code-puppy")
-    const moved = join(project, ".code-puppy-before-race")
+    const moved = join(project, ".codepuppy-before-race")
     mkdirSync(retired)
     mkdirSync(admittedRoot)
     writeFileSync(join(retired, "sentinel"), "untouched")
@@ -215,7 +215,7 @@ describe("project/root identity fail-closed", () => {
     }, home)
     const registerWrite = withProjectDirectoryIdentity(expected, () => {
       calls.registerWrite++
-      writeFileSync(join(retired, "alpha.jsonc"), "must not write")
+      writeFileSync(join(retired, "codepuppy.jsonc"), "must not write")
     }, home)
     const pluginImport = withProjectDirectoryIdentity(expected, () => {
       calls.pluginImport++
@@ -234,26 +234,26 @@ describe("project/root identity fail-closed", () => {
     mkdirSync(retired)
     const alias = join(root, "retired-alias")
     symlinkSync(retired, alias)
-    expect(() => requireAlphaGlobalRoot(undefined, home)).toThrow()
-    expect(() => requireAlphaGlobalRoot("relative/root", home)).toThrow()
+    expect(() => requireCodePuppyGlobalRoot(undefined, home)).toThrow()
+    expect(() => requireCodePuppyGlobalRoot("relative/root", home)).toThrow()
     for (const candidate of [home, retired, join(retired, "child"), alias])
-      expect(() => requireAlphaGlobalRoot(candidate, home)).toThrow()
+      expect(() => requireCodePuppyGlobalRoot(candidate, home)).toThrow()
   })
 
   test("main 派生的 canonical 新根通过；非 canonical safe alias 也拒绝", () => {
     const state = join(root, "state", "env", "dev")
     mkdirSync(state, { recursive: true })
-    expect(requireAlphaGlobalRoot(realpathSync(state), home)).toBe(realpathSync(state))
+    expect(requireCodePuppyGlobalRoot(realpathSync(state), home)).toBe(realpathSync(state))
     const alias = join(root, "state-alias")
     symlinkSync(state, alias)
-    expect(() => requireAlphaGlobalRoot(alias, home)).toThrow()
+    expect(() => requireCodePuppyGlobalRoot(alias, home)).toThrow()
   })
 
   test("`.alpha → retired root` 时 config、consent、fan-out、codepuppy_register 四路行为均零触达", async () => {
     const retired = join(home, ".alpha")
     mkdirSync(join(retired, "plugins"), { recursive: true })
     const config = JSON.stringify({ agent: { retired: { prompt: "must not load" } } })
-    writeFileSync(join(retired, "alpha.jsonc"), config)
+    writeFileSync(join(retired, "codepuppy.jsonc"), config)
     writeFileSync(join(retired, "prefs.json"), JSON.stringify({ extensionsConsent: { version: 1, granted: true } }))
     writeFileSync(join(retired, "plugins", "retired.js"), "export default async () => ({ tool: { retired_tool: {} } })")
     writeFileSync(join(retired, "sentinel"), "untouched")
@@ -261,14 +261,14 @@ describe("project/root identity fail-closed", () => {
 
     const global = join(root, "global", "env", "dev")
     mkdirSync(global, { recursive: true })
-    const previous = process.env.ALPHA_GLOBAL_DIR
-    process.env.ALPHA_GLOBAL_DIR = realpathSync(global)
+    const previous = process.env.CODEPUPPY_GLOBAL_DIR
+    process.env.CODEPUPPY_GLOBAL_DIR = realpathSync(global)
     try {
-      const hooks = await AlphaExt({
+      const hooks = await CodePuppyExt({
         directory: project,
         worktree: project,
         client: { instance: { dispose: async () => {} } },
-      } as unknown as Parameters<typeof AlphaExt>[0])
+      } as unknown as Parameters<typeof CodePuppyExt>[0])
       const exposed = hooks as unknown as {
         config: (cfg: Record<string, unknown>) => Promise<void>
         tool: Record<string, { execute: (args: { type: "agent"; name: string; entry: string }, ctx: { directory: string; sessionID: string }) => Promise<{ metadata: { ok: boolean } }> }>
@@ -283,11 +283,11 @@ describe("project/root identity fail-closed", () => {
         { directory: project, sessionID: "s1" },
       )
       expect(registered.metadata.ok).toBe(false)
-      expect(readFileSync(join(retired, "alpha.jsonc"), "utf8")).toBe(config)
+      expect(readFileSync(join(retired, "codepuppy.jsonc"), "utf8")).toBe(config)
       expect(readFileSync(join(retired, "sentinel"), "utf8")).toBe("untouched")
     } finally {
-      if (previous === undefined) delete process.env.ALPHA_GLOBAL_DIR
-      else process.env.ALPHA_GLOBAL_DIR = previous
+      if (previous === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+      else process.env.CODEPUPPY_GLOBAL_DIR = previous
     }
   })
 })

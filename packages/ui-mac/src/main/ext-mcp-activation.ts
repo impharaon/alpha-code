@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { isDeepStrictEqual } from "node:util"
 import { parse, type ParseError } from "jsonc-parser"
 import { isExtensionName } from "../shared/extension-name"
-import { assertProjectAlphaRootIdentity, resolveProjectAlphaRoot } from "./alpha-workdir"
+import { assertProjectCodePuppyRootIdentity, resolveProjectCodePuppyRoot } from "./codepuppy-workdir"
 import { listConfiguredMcpServerNamesStrict } from "./ext-config"
 // 刻意不从 `packages/opencode/src/util/timeout` import:那是 UPSTREAM_PATHS 下持续滚动重钉的
 // vendored 上游,深 import 它的内部模块路径 = 下次 pin bump 上游改名就打断主进程构建。
@@ -39,7 +39,7 @@ export async function probeProjectMcpActivation(
   } = {},
 ): Promise<ProjectMcpActivationVerdict> {
   if (!isExtensionName(name)) return "unverifiable"
-  const project = resolveProjectAlphaRoot(directory)
+  const project = resolveProjectCodePuppyRoot(directory)
   if (project.status !== "project") return "unverifiable"
 
   const durable = readDurableProjectMcpLeaf(project.root, name)
@@ -129,8 +129,8 @@ function readDurableProjectMcpLeaf(
   name: string,
 ): { ok: true; value: Record<string, unknown> | undefined } | { ok: false } {
   try {
-    assertProjectAlphaRootIdentity(projectRoot)
-    const target = join(projectRoot, "alpha.jsonc")
+    assertProjectCodePuppyRootIdentity(projectRoot)
+    const target = join(projectRoot, "codepuppy.jsonc")
     const stat = lstatSync(target)
     if (stat.isSymbolicLink() || !stat.isFile()) return { ok: false }
     const errors: ParseError[] = []

@@ -38,10 +38,10 @@ export type PackageSecretPrerequisiteProfileV1 = {
 }
 
 export type PackageSecretReferenceV1 = {
-  schema: "alpha.package-secret-reference.v1"
+  schema: "codepuppy.package-secret-reference.v1"
   prerequisiteId: string
   componentId: string
-  store: "alpha-mcp-secrets"
+  store: "codepuppy-mcp-secrets"
   server: string
   version: string
   variable: string
@@ -215,10 +215,10 @@ export function packageSecretReferenceV1(
   const item = profile.items.find((candidate) => candidate.prerequisiteId === prerequisiteId)
   if (!item || !SAFE_VERSION.test(version)) return
   return {
-    schema: "alpha.package-secret-reference.v1",
+    schema: "codepuppy.package-secret-reference.v1",
     prerequisiteId: item.prerequisiteId,
     componentId: item.componentId,
-    store: "alpha-mcp-secrets",
+    store: "codepuppy-mcp-secrets",
     server: profile.server,
     version,
     variable: item.target.variable,

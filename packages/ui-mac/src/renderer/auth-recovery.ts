@@ -1,12 +1,12 @@
 import type { AuthState } from "../preload/types"
-import { nextEngineRetryDelay } from "./alpha-ui/model-picker-logic"
+import { nextEngineRetryDelay } from "./codepuppy-ui/model-picker-logic"
 
 // #604:auth 面的 fail-closed 有界自证(与 #594 的 sidecar generation 面同一缺陷类)。
 //
 // 失效序列:renderer 读到过期 token 的 `platformStatus:"recovering"` -> 平台选择/发送 fail-closed
 // -> main 刷新成功后**只发送一次** `auth-state ready` -> 该 IPC 若丢在订阅间隙/生命周期竞态里,
 // 消费侧再无下一次 `auth.getState()` => 平台能力永久 recovering。main 不会补发:
-// main/alpha-auth.ts 的 publish() 对身份签名未变的广播直接抑制,丢掉的那一次不会重来。
+// main/codepuppy-auth.ts 的 publish() 对身份签名未变的广播直接抑制,丢掉的那一次不会重来。
 //
 // 本模块是 auth 能力的**唯一恢复 owner**,也是 renderer 侧 auth 现值的**唯一序列化点**:
 // 模块级单例、一条 timer、一条桥订阅。入口枚举闸门见 auth-recovery.test.ts。
@@ -47,7 +47,7 @@ import { nextEngineRetryDelay } from "./alpha-ui/model-picker-logic"
 // 每条都写明「什么变异会让它转红」;答不出变异的不写进本表。
 //
 // A 「recovering / 未知视图可由 getState() 重读,且结果必须广播给消费侧」
-//   强制:退出条件 1 两相位模块例 + 两条真 AlphaComposerRuntime 生产 composition 例。
+//   强制:退出条件 1 两相位模块例 + 两条真 CodePuppyComposerRuntime 生产 composition 例。
 //   变异:删 broadcast(state) / settle() 里不再 scheduleRetry -> 红。
 // B 「owner 绝不静默退场:读取失败、被作废、事件不来,都必须留下下一次动作」
 //   强制:无预算,只有 1s/2s/4s/8s 封顶退避;scheduleRetry() **不看视图**;owedRead 记账
@@ -71,7 +71,7 @@ import { nextEngineRetryDelay } from "./alpha-ui/model-picker-logic"
 //   收紧为 recovering**(yieldsNoNewGrants)才返回快照 —— 它不呈现任何新身份、只收紧权限,
 //   且 owner 必然续跑纠正。按 unresolved **形态**枚举放行是 R1 Blocker:跨身份的 recovering
 //   (视图 logged-out、快照 logged-in/recovering)对凭 status/mode 放行的真实消费侧
-//   (AlphaOnboarding / extension-hub cloudReady)就是 fail-open。返回值不是视图时记
+//   (CodePuppyOnboarding / extension-hub cloudReady)就是 fail-open。返回值不是视图时记
 //   divergedFromView,使下一次定夺**即使签名未变也广播**(否则消费侧永久停在保守值上)。
 //   变异(均实跑,R1 修复轮):回到 unresolved 形态枚举 / 同身份收紧快照也返回视图 /
 //   不记 divergedFromView -> 各自转红。
@@ -107,7 +107,7 @@ let staleReads = 0
 let probeTimer: ReturnType<typeof setTimeout> | undefined
 let probeAttempt = 0
 
-/** 判据粒度对齐 main/alpha-auth.ts publish() 的身份签名(含 plan、#1543 refreshUnreachable),否则它播了本侧却吞掉。 */
+/** 判据粒度对齐 main/codepuppy-auth.ts publish() 的身份签名(含 plan、#1543 refreshUnreachable),否则它播了本侧却吞掉。 */
 const signatureOf = (state: AuthState) =>
   [
     state.status,
@@ -125,7 +125,7 @@ const identityOf = (state: AuthState) =>
 /**
  * 呈现序 ⊑(#612 R1):candidate 相对 view **不呈现任何新身份、不放宽任何权限轴** ——
  * 身份轴全等,且 platformStatus 是收紧方向的 recovering。消费侧的放行判据各不相同
- * (AlphaOnboarding 凭 status、extension-hub cloudReady 凭 status+mode、composer 凭
+ * (CodePuppyOnboarding 凭 status、extension-hub cloudReady 凭 status+mode、composer 凭
  * platformStatus),只有这种候选无论按哪个轴看都 ≤ 视图已呈现的内容,才允许在时间序
  * 不可证时先行呈现;其余一律呈现视图。这是相对视图的**定序判据**,不是快照形态枚举 ——
  * 按形态枚举正是 R1 Blocker:recovering 形态自带 logged-in/platform 身份,跨身份呈现即 fail-open。

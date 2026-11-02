@@ -13,7 +13,7 @@
 //   - 漏改 warn:转写后残留「You are opencode」行首句 / anomalyco 仓指引 / opencode.ai 文档域 →
 //     报 warning(每进程每签名一次,防每条消息刷屏);用户 instructions 里的合法提及也会触发
 //     (如 alpha-code 仓自身),warning 是诚实提示而非错误;
-//   - 逃生 ALPHA_PROMPT_REBRAND_DISABLE=1(hook 侧判,本模块纯函数);
+//   - 逃生 CODEPUPPY_PROMPT_REBRAND_DISABLE=1(hook 侧判,本模块纯函数);
 //   - 底座改版复核:tests 逐条断言 from 子串仍存在于上游 .txt(sync 后红 = 清单需复核,
 //     与 ADR-015 合并验证 / sync tripwire 呼应)。
 

@@ -57,8 +57,8 @@ import { McpCatalog } from "@/mcp/catalog"
 import { ToolAliasLedger, type ToolAuthority, type ToolIdentity } from "@opencode-ai/schema/tool-identity"
 import { readFileSync } from "node:fs"
 import { createHash } from "node:crypto"
-import { canonicalJsonDigest } from "@/permission/alpha-tool-policy-store"
-import { AlphaToolPolicy } from "@/permission/alpha-tool-policy"
+import { canonicalJsonDigest } from "@/permission/codepuppy-tool-policy-store"
+import { CodePuppyToolPolicy } from "@/permission/codepuppy-tool-policy"
 
 export function webSearchEnabled(providerID: ProviderV2.ID, flags = { exa: false, parallel: false }) {
   return (
@@ -494,7 +494,7 @@ export const node = LayerNode.make({
     Config.node,
     Plugin.node,
     Permission.node,
-    AlphaToolPolicy.node,
+    CodePuppyToolPolicy.node,
     Question.node,
     Todo.node,
     Agent.node,

@@ -3,9 +3,9 @@
 // 定位(parent jinjunnn/alpha-work#5 / ADR-028 §6 的 REQ-102 接缝):
 //   · **media-type-neutral**:blob 只是字节,按 digest 寻址,无扩展名、无格式假设;archive 格式
 //     由 ManifestV2 的 artifact.mediaType 声明(ext-manifest-v2),CAS 层永不解包、永不解释内容;
-//   · **共享层**:root = `<base>/cas`(base = appData/alpha-code-state,**不是** env mutable root)——
+//   · **共享层**:root = `<base>/cas`(base = appData/codepuppy-state,**不是** env mutable root)——
 //     prod/beta/dev 引用相同 payload 时磁盘只有一个 blob(parent AC2);环境侧 receipt/grant/
-//     current 仍在各自 env root 完全隔离(alpha-environment.ts 文件头预留的正是本层);
+//     current 仍在各自 env root 完全隔离(codepuppy-environment.ts 文件头预留的正是本层);
 //   · **三层状态分离**(parent 交付③):
 //       ① CAS blob(本模块,不可变内容,可随时由 digest 重建)——生命周期归 GC(ext-cas-gc);
 //       ② 安装态(receipts/generations/journal,env root,ext-transaction + ext-receipt-v2);

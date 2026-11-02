@@ -41,6 +41,6 @@ export type TimelineBenchmarkApi = {
 
 declare global {
   interface Window {
-    __alphaTimelineBenchmark: TimelineBenchmarkApi
+    __codepuppyTimelineBenchmark: TimelineBenchmarkApi
   }
 }

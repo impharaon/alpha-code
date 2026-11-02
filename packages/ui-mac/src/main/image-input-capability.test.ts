@@ -3,7 +3,7 @@
 // 读它的是 packages/opencode/src/provider/transform.ts 的 unsupportedParts():看不了图的模型收到的图片被换成一句
 // `ERROR: Cannot read … Inform the user.`;云端识图插件(#1419)也按它决定「原样放行还是转写」。写它的是引擎 provider.ts 的
 // config 合并:`modalities.input` 含 image ⇒ true;**没写就回落到 models.dev 底表里同 provider id、同 model id 的条目**。
-// 所以只判 buildAlphaModelConfig 的产物不够 —— 这里把生产注入交给真引擎(`bun run packages/opencode/src/index.ts models --verbose`,
+// 所以只判 buildCodePuppyModelConfig 的产物不够 —— 这里把生产注入交给真引擎(`bun run packages/opencode/src/index.ts models --verbose`,
 // 打印的就是 Provider.list() 里每个模型的完整 v1 形状),逐个模型问它最终认的值。
 //
 // 期望值手写字面量,抄自 models.dev 2026-09-23 快照(不是从被测目录派生):直连能看图的是 qwen3.8-max / kimi-k3 / kimi-k2.6,
@@ -18,10 +18,10 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
-import { environmentMutableRoot } from "./alpha-environment"
-import { buildAlphaModelConfig, getModelCatalog } from "./alpha-models"
-import { pinAppliedCatalog, writeCatalogSnapshot } from "./alpha-live-allowlist"
-import { customProviderSecretName, secretFilePath } from "./alpha-secret-files"
+import { environmentMutableRoot } from "./codepuppy-environment"
+import { buildCodePuppyModelConfig, getModelCatalog } from "./codepuppy-models"
+import { pinAppliedCatalog, writeCatalogSnapshot } from "./codepuppy-live-allowlist"
+import { customProviderSecretName, secretFilePath } from "./codepuppy-secret-files"
 import { writeCustomProviderTruth } from "./custom-provider-truth-write"
 
 const repoRoot = path.resolve(import.meta.dir, "../../../..")
@@ -30,7 +30,7 @@ const modelsFixture = path.resolve(repoRoot, "packages/opencode/test/tool/fixtur
 const BUN_EXEC = process.execPath
 const PATH_AT_LOAD = process.env.PATH ?? ""
 
-const MANAGED = ["ALPHA_MODELS_DISABLE", "ALPHA_BASE_URL", "ALPHA_DEFAULT_MODEL", "ALPHA_GLOBAL_DIR", "OPENCODE_CONFIG_DIR"]
+const MANAGED = ["CODEPUPPY_MODELS_DISABLE", "CODEPUPPY_BASE_URL", "CODEPUPPY_DEFAULT_MODEL", "CODEPUPPY_GLOBAL_DIR", "OPENCODE_CONFIG_DIR"]
 const saved: Record<string, string | undefined> = {}
 let root = ""
 let userData = ""
@@ -56,17 +56,17 @@ beforeAll(() => {
   }
   root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "image-input-capability-")))
   userData = path.join(root, "userdata")
-  const stateRoot = path.join(root, "alpha-code-state")
-  process.env.ALPHA_GLOBAL_DIR = environmentMutableRoot("dev", stateRoot)
+  const stateRoot = path.join(root, "codepuppy-state")
+  process.env.CODEPUPPY_GLOBAL_DIR = environmentMutableRoot("dev", stateRoot)
   process.env.OPENCODE_CONFIG_DIR = path.join(root, "config-dir")
-  process.env.ALPHA_BASE_URL = "https://gateway.invalid/v1"
-  for (const dir of [userData, process.env.ALPHA_GLOBAL_DIR, process.env.OPENCODE_CONFIG_DIR, path.join(root, "home"), path.join(root, "proj")])
+  process.env.CODEPUPPY_BASE_URL = "https://gateway.invalid/v1"
+  for (const dir of [userData, process.env.CODEPUPPY_GLOBAL_DIR, process.env.OPENCODE_CONFIG_DIR, path.join(root, "home"), path.join(root, "proj")])
     fs.mkdirSync(dir, { recursive: true })
-  for (const name of ["ALPHA_API_KEY", ...getModelCatalog(userData).byokProviders.map((p) => p.keyEnv)]) plant(name)
+  for (const name of ["CODEPUPPY_API_KEY", ...getModelCatalog(userData).byokProviders.map((p) => p.keyEnv)]) plant(name)
   // `#1556` AC1:平台段只来自已应用快照 —— 用上游 V3 producer fixture 的 12 行写 LKG 并钉住(一次 fork)。
   const v3 = JSON.parse(
     fs.readFileSync(
-      path.join(import.meta.dir, "../../../alpha-contracts-consumer/vendor/alpha-platform-model-catalog/contracts/v3/fixtures/producer/model-catalog.json"),
+      path.join(import.meta.dir, "../../../codepuppy-contracts-consumer/vendor/alpha-platform-model-catalog/contracts/v3/fixtures/producer/model-catalog.json"),
       "utf8",
     ),
   ).value
@@ -97,7 +97,7 @@ afterAll(() => {
   fs.rmSync(root, { recursive: true, force: true })
 })
 
-type Config = NonNullable<ReturnType<typeof buildAlphaModelConfig>>
+type Config = NonNullable<ReturnType<typeof buildCodePuppyModelConfig>>
 type Listed = Map<string, { capabilities?: { input?: { image?: boolean } } }>
 
 /** 生产注入里每一个 (provider, model) —— 判据只问这些,不问引擎从 models.dev 顺带合并进来的别的行。 */
@@ -162,7 +162,7 @@ function imageVerdicts(cfg: Config, listed: Listed): Record<string, boolean | "<
 
 describe("REQ-228 #1420:真引擎的 capabilities.input.image —— 直连按 models.dev、平台一律不能、自定义只认用户声明", () => {
   test("生产注入 ⇒ 引擎恰好判这五个能看图,其余(含全部平台模型、没声明的同名 openai 节点)都不能", async () => {
-    const cfg = buildAlphaModelConfig(userData)!
+    const cfg = buildCodePuppyModelConfig(userData)!
     const run = await engineModels(cfg)
     expect(run.rc, run.log).toBe(0)
     const verdicts = imageVerdicts(cfg, run.models)
@@ -176,7 +176,7 @@ describe("REQ-228 #1420:真引擎的 capabilities.input.image —— 直连按 m
   }, 120_000)
 
   test("手段自证:同一台引擎、同一份注入只删掉 modalities ⇒ 直连能看图的全部退回 false,而同名 openai 节点从 models.dev 继承到 true", async () => {
-    const cfg = buildAlphaModelConfig(userData)!
+    const cfg = buildCodePuppyModelConfig(userData)!
     const stripped = structuredClone(cfg)
     for (const def of Object.values(stripped.provider as Record<string, { models: Record<string, { modalities?: unknown }> }>))
       for (const model of Object.values(def.models)) delete model.modalities

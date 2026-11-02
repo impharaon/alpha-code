@@ -7,7 +7,7 @@ import os from "os"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { canonicalToolIdentity, type ToolIdentity } from "@opencode-ai/schema/tool-identity"
-import { classifyPermissionRequest, withRiskClassification } from "./alpha-risk-classification"
+import { classifyPermissionRequest, withRiskClassification } from "./codepuppy-risk-classification"
 
 export const Event = PermissionV1.Event
 
@@ -24,11 +24,11 @@ export const Event = PermissionV1.Event
 // - 上界:挂起期间整个回合冻结,期限必须短到"离开工位一趟回来就能看到结论",而不是隔天。
 // - 不取更长:本期限是**兜底**——审批呈现面已在 #668 的 A 半场恢复(v1+v2 双通道订阅),
 //   更长的期限只会延长静默期,换不来别的东西。
-// 运维/测试可用 ALPHA_PERMISSION_ASK_TIMEOUT_MS 覆盖(正整数毫秒);非法值一律回落默认。
+// 运维/测试可用 CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS 覆盖(正整数毫秒);非法值一律回落默认。
 export const ASK_TIMEOUT_MS_DEFAULT = 300_000
 
 function resolveAskTimeoutMs(): number {
-  const raw = process.env["ALPHA_PERMISSION_ASK_TIMEOUT_MS"]
+  const raw = process.env["CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS"]
   if (raw === undefined || raw === "") return ASK_TIMEOUT_MS_DEFAULT
   const parsed = Number(raw)
   if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed <= 0) return ASK_TIMEOUT_MS_DEFAULT
@@ -181,7 +181,7 @@ const layer = Layer.effect(
 
       const id = request.id ?? PermissionV1.ID.ascending()
       // #1285 / REQ-158:风险分类在**这里**产生 —— 本函数是 v1 Request 的唯一构造点、`permission.asked`
-      // 的唯一发布点,且此处在 `Deferred.await` 之前(动作被放行之前)。分类只写 `metadata.alphaRisk`,
+      // 的唯一发布点,且此处在 `Deferred.await` 之前(动作被放行之前)。分类只写 `metadata.codepuppyRisk`,
       // 不参与上面的 evaluate()(deny/allow/ask 的判定与它无关;`#1291` 决定书 §2.2)。
       // `withRiskClassification` 覆盖入参里的同名键:工具/MCP 自报的分类不算数。
       const risk = classifyPermissionRequest({

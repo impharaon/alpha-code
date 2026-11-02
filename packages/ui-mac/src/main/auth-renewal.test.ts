@@ -7,8 +7,8 @@ import {
   createAuthRenewalScheduler,
   degradedRenewalDelayMs,
 } from "./auth-renewal"
-import { MIN_USABLE_TOKEN_LIFETIME_MS } from "./alpha-auth-clock"
-import type { RenewalResult } from "./alpha-auth"
+import { MIN_USABLE_TOKEN_LIFETIME_MS } from "./codepuppy-auth-clock"
+import type { RenewalResult } from "./codepuppy-auth"
 
 const result = (outcome: RenewalResult["outcome"], generation = 1): RenewalResult => ({
   outcome,

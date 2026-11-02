@@ -1,16 +1,16 @@
 // REQ-237 `#1556`:picker / composer 测试用的 EffectiveCatalog —— 由**生产投影**装配,不手写目录形状。
 //
-// 此前这些测试把随包 alpha-models.json 原样 spread 成 EffectiveCatalog;`#1556` 起随包文件只剩 BYOK 首启引导
+// 此前这些测试把随包 codepuppy-models.json 原样 spread 成 EffectiveCatalog;`#1556` 起随包文件只剩 BYOK 首启引导
 // (ByokCatalogV1 形状)与平台 provider 外壳,平台模型只来自已应用的网关快照。这里照生产那条路拼一份「已应用」目录:
 //   · 平台段 = projectPlatformModels(上游 V3 producer fixture 的行)—— display / pricing 是上游字节,不是替身;
 //   · BYOK 段 = projectByokProviders(随包首启引导)—— 端点 / Key 名来自 App 内置适配器表;
 //   · 已下载 = 已应用(没有待生效的新清单)。
-import type { CatalogSnapshot } from "../src/main/alpha-live-allowlist"
-import { projectPlatformModels } from "../src/main/alpha-live-allowlist"
-import { projectByokProviders } from "../src/main/alpha-models"
-import bundled from "../src/main/alpha-models.json"
-import producer from "../../alpha-contracts-consumer/vendor/alpha-platform-model-catalog/contracts/v3/fixtures/producer/model-catalog.json"
-import type { EffectiveCatalog } from "../src/shared/alpha-model-types"
+import type { CatalogSnapshot } from "../src/main/codepuppy-live-allowlist"
+import { projectPlatformModels } from "../src/main/codepuppy-live-allowlist"
+import { projectByokProviders } from "../src/main/codepuppy-models"
+import bundled from "../src/main/codepuppy-models.json"
+import producer from "../../codepuppy-contracts-consumer/vendor/alpha-platform-model-catalog/contracts/v3/fixtures/producer/model-catalog.json"
+import type { EffectiveCatalog } from "../src/shared/codepuppy-model-types"
 
 export const V3_PRODUCER_CATALOG = producer.value
 

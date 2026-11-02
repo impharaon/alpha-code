@@ -30,8 +30,8 @@ const engineToolId = (remoteName: string) => McpCatalog.toolName(CLOUD_MCP_SERVE
 const siblingCloudTools = siblingRemoteTools.map(engineToolId)
 const registeredCloudTools = [CLOUD_WEB_SEARCH_TOOL_ID, ...siblingCloudTools]
 
-/** alpha 注入的三个 agent 都显式 `websearch: "allow"`(alpha-config-injection.ts)。 */
-const alphaAgents = () => ({
+/** alpha 注入的三个 agent 都显式 `websearch: "allow"`(codepuppy-config-injection.ts)。 */
+const codepuppyAgents = () => ({
   "codepuppy-automation": { permission: { websearch: "allow", bash: "deny" } },
   "codepuppy-readonly": { permission: { websearch: "allow", edit: "deny" } },
   "codepuppy-automation-standard": { permission: { websearch: "allow", edit: "allow" } },
@@ -43,7 +43,7 @@ describe("web search sovereignty denies", () => {
     const config = {
       mcp: { codepuppy: { type: "remote", url: "https://cloud.example/mcp", enabled: true } },
       permission: { [CLOUD_WEB_SEARCH_TOOL_ID]: "allow", bash: "allow" },
-      agent: alphaAgents(),
+      agent: codepuppyAgents(),
     }
 
     applyWebSearchDenies(config, { killSwitch: true, platformPays: false }, (message) => diagnostics.push(message))
@@ -71,7 +71,7 @@ describe("web search sovereignty denies", () => {
   test("platform pays denies nothing — 代付不动本地腿,两条腿都留在模型工具表里", () => {
     const config = {
       permission: { bash: "allow" },
-      agent: alphaAgents(),
+      agent: codepuppyAgents(),
     }
     const diagnostics: string[] = []
 
@@ -79,7 +79,7 @@ describe("web search sovereignty denies", () => {
 
     // 一个字都不写:既不是「写了 allow」也不是「写了 deny」—— 注入面在代付态对 web search 无话可说。
     expect(config.permission).toEqual({ bash: "allow" })
-    expect(config.agent).toEqual(alphaAgents())
+    expect(config.agent).toEqual(codepuppyAgents())
     expect(diagnostics).toEqual([])
   })
 
@@ -92,7 +92,7 @@ describe("web search sovereignty denies", () => {
       { killSwitch: true, platformPays: false },
       { killSwitch: true, platformPays: true },
     ]) {
-      const config = { permission: {}, agent: alphaAgents() }
+      const config = { permission: {}, agent: codepuppyAgents() }
       applyWebSearchDenies(config, state, () => {})
       for (const agent of Object.values(config.agent)) {
         expect(agent.permission[LOCAL_WEB_SEARCH_TOOL_ID]).toBe("deny")
@@ -102,7 +102,7 @@ describe("web search sovereignty denies", () => {
   })
 
   test("agent rules unrelated to web search stay untouched", () => {
-    const config = { permission: {}, agent: alphaAgents() }
+    const config = { permission: {}, agent: codepuppyAgents() }
     applyWebSearchDenies(config, { killSwitch: true, platformPays: true }, () => {})
     expect(config.agent["codepuppy-automation-standard"].permission.edit).toBe("allow")
     expect(config.agent["codepuppy-readonly"].permission.edit).toBe("deny")
@@ -142,7 +142,7 @@ describe("web search sovereignty denies", () => {
   // 注入面够不着的三条绕过(别的 config 源后加载的 agent / 持久 session permission / approved)
   // 由工具自身的最终闸兜底,判决靠这个 env 变量过河。两个包各写一份字面量 —— 这里钉住不许漂移。
   test("the sovereignty env channel name matches the engine-side reader", () => {
-    expect(LOCAL_WEBSEARCH_DENY_ENV).toBe("ALPHA_LOCAL_WEBSEARCH_DENY")
+    expect(LOCAL_WEBSEARCH_DENY_ENV).toBe("CODEPUPPY_LOCAL_WEBSEARCH_DENY")
     // #223 R4:声明点下沉到 `mcp-websearch.ts`(本引擎唯一的出网出口),叶子只转出。
     const transport = readFileSync(join(import.meta.dir, "../../../opencode/src/tool/mcp-websearch.ts"), "utf8")
     expect(transport).toContain(`export const LOCAL_WEBSEARCH_DENY_ENV = "${LOCAL_WEBSEARCH_DENY_ENV}"`)
@@ -156,7 +156,7 @@ describe("web search sovereignty denies", () => {
     const config = {
       mcp: { codepuppy: { type: "remote", url: "https://cloud.example/mcp", enabled: true } },
       permission: { bash: "allow" },
-      agent: alphaAgents(),
+      agent: codepuppyAgents(),
     }
 
     const diagnostics: string[] = []
@@ -165,7 +165,7 @@ describe("web search sovereignty denies", () => {
     expect(config).toEqual({
       mcp: { codepuppy: { type: "remote", url: "https://cloud.example/mcp", enabled: true } },
       permission: { bash: "allow" },
-      agent: alphaAgents(),
+      agent: codepuppyAgents(),
     })
     expect(diagnostics).toEqual([])
   })
@@ -227,9 +227,9 @@ describe("#650 云 web search 闸按引擎真实 id 命中", () => {
   const cloudWebSearchEngineId = () => engineToolId(CLOUD_WEB_SEARCH_REMOTE_TOOL)
 
   test("kill-switch:引擎真的把云 web search 滤出模型工具表,兄弟云工具一个不少", () => {
-    const config: { permission: Record<string, unknown>; agent: ReturnType<typeof alphaAgents> } = {
+    const config: { permission: Record<string, unknown>; agent: ReturnType<typeof codepuppyAgents> } = {
       permission: { bash: "allow" },
-      agent: alphaAgents(),
+      agent: codepuppyAgents(),
     }
     applyWebSearchDenies(config, { killSwitch: true, platformPays: false }, () => {})
 
@@ -239,9 +239,9 @@ describe("#650 云 web search 闸按引擎真实 id 命中", () => {
   })
 
   test("kill-switch:alpha 注入的 agent 也压得住(agent 规则排在全局之后,取 findLast)", () => {
-    const config: { permission: Record<string, unknown>; agent: ReturnType<typeof alphaAgents> } = {
+    const config: { permission: Record<string, unknown>; agent: ReturnType<typeof codepuppyAgents> } = {
       permission: {},
-      agent: alphaAgents(),
+      agent: codepuppyAgents(),
     }
     applyWebSearchDenies(config, { killSwitch: true, platformPays: false }, () => {})
 
@@ -262,9 +262,9 @@ describe("#650 云 web search 闸按引擎真实 id 命中", () => {
   // 判据仍然是引擎自己的 `Permission.fromConfig` + `Permission.disabled`,不是「config 里那个键等于
   // 某字符串」;期望值仍然从远端名经 `McpCatalog.toolName` 推导,不写第二份字面量。
   test("代付但无 kill-switch:两条腿都在模型工具表里,引擎一个都不许藏", () => {
-    const config: { permission: Record<string, unknown>; agent: ReturnType<typeof alphaAgents> } = {
+    const config: { permission: Record<string, unknown>; agent: ReturnType<typeof codepuppyAgents> } = {
       permission: {},
-      agent: alphaAgents(),
+      agent: codepuppyAgents(),
     }
     applyWebSearchDenies(config, { killSwitch: false, platformPays: true }, () => {})
 
@@ -286,7 +286,7 @@ describe("#650 云 web search 闸按引擎真实 id 命中", () => {
   // 模型看得见的那句话里点名的工具必须真的存在,否则拒绝文案本身就是错误指路。
   //
   // `#1411`:这条断言以前要求那句话**必须**点名 `codepuppy_web_search`(「本地腿被代付关掉 ⇒ 去用
-  // 云腿」)。代付不再关本地腿之后,`ALPHA_LOCAL_WEBSEARCH_DENY` 只由 kill-switch 置位 —— 而上面两条
+  // 云腿」)。代付不再关本地腿之后,`CODEPUPPY_LOCAL_WEBSEARCH_DENY` 只由 kill-switch 置位 —— 而上面两条
   // kill-switch 断言已经证明那一态**云工具同样不在模型工具表里**。于是那句指路在唯一可达它的状态下
   // 必然是错的。基线 S5:指不出在场的替代就明说没有。
   test("两份拒绝文案在唯一可达它的状态(kill-switch)下不指向任何替代工具", async () => {

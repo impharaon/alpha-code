@@ -10,7 +10,7 @@ import { ipcMain } from "electron"
 import { moderationBlocks } from "./moderation-keywords"
 
 export function registerModerationIpcHandlers(): void {
-  ipcMain.handle("alpha-moderation-check", (_event, text: unknown) => {
+  ipcMain.handle("codepuppy-moderation-check", (_event, text: unknown) => {
     if (typeof text !== "string" || !text) return false
     return moderationBlocks(text)
   })

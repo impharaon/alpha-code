@@ -1,5 +1,5 @@
 // REQ-234 `#1531` I5 的单元一半(reload-scheduler.ts)。真实例那一半 —— 引擎自己的 `/session/status` 造一个 busy 会话、
-// 「查询超时」只替换 HTTP 层 —— 在 packages/opencode/test/alpha-reload-scheduler-instance.test.ts。
+// 「查询超时」只替换 HTTP 层 —— 在 packages/opencode/test/codepuppy-reload-scheduler-instance.test.ts。
 // 这里的 client 只替换 v1 SDK 的那两个方法,用来钉调度规则本身:合并、幂等、force 的边界、连败停止、注销身份。
 import { describe, expect, test } from "bun:test"
 import { createReloadScheduler, type ReloadClient, type ReloadReport } from "./reload-scheduler"

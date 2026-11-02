@@ -18,7 +18,7 @@ describeSandbox("trialCompileProfile —— 真 sandbox-exec", () => {
   const home = homedir()
   const input = {
     workspaces: [join(home, "code-puppy"), tmpdir()],
-    alphaGlobalRoot: join(home, "Library", "Application Support", "alpha-code-state", "env", "dev"),
+    codepuppyGlobalRoot: join(home, "Library", "Application Support", "codepuppy-state", "env", "dev"),
     userDataPath: join(home, "Library", "Application Support", "ai.opencode.desktop.dev"),
     stateHome: join(home, "Library", "Application Support", "ai.opencode.desktop.dev"),
     roots: resolveEngineRoots({}, home),

@@ -8,20 +8,20 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { ConfigMarkdown } from "../../../core/src/config/markdown"
 import { Glob } from "../../../core/src/util/glob"
-import { FACTORY_SKILL_IDS, factorySkillIds, factorySkillSources, isAlphaFactoryLink, reconcileFactorySkills } from "./factory-skills"
+import { FACTORY_SKILL_IDS, factorySkillIds, factorySkillSources, isCodePuppyFactoryLink, reconcileFactorySkills } from "./factory-skills"
 import { CLOUD_MCP_TOOLS } from "./fixtures/cloud-mcp-tools"
 import { cloudMcpToolId } from "./cloud-web-search"
 import { TOOL_TEXT } from "../../../ext/src/context-injection"
-import { classifySkill } from "./alpha-skill-placeholder"
+import { classifySkill } from "./codepuppy-skill-placeholder"
 
 let tmp: string
 let home: string
 let res: string
 let sources: Record<string, string>
-let roots: { alphaRoot: string; opencodeHome: string }
+let roots: { codepuppyRoot: string; opencodeHome: string }
 
 beforeEach(() => {
-  tmp = mkdtempSync(join(tmpdir(), "alpha-factory-"))
+  tmp = mkdtempSync(join(tmpdir(), "codepuppy-factory-"))
   home = join(tmp, "home")
   res = join(tmp, "app", "resources")
   mkdirSync(join(res, "skills", "skill-creator"), { recursive: true })
@@ -33,12 +33,12 @@ beforeEach(() => {
   }
   mkdirSync(home, { recursive: true })
   sources = factorySkillSources({ packaged: true, resourcesPath: res, moduleDir: "/nope" })
-  roots = { alphaRoot: join(home, ".alpha"), opencodeHome: join(home, ".opencode") }
+  roots = { codepuppyRoot: join(home, ".alpha"), opencodeHome: join(home, ".opencode") }
 })
 afterEach(() => {
-  delete process.env.ALPHA_FACTORY_SKILLS_DISABLE
-  delete process.env.ALPHA_JSONC_TRUTH_DISABLE
-  delete process.env.ALPHA_LEGACY_INSTALL_ROOT
+  delete process.env.CODEPUPPY_FACTORY_SKILLS_DISABLE
+  delete process.env.CODEPUPPY_JSONC_TRUTH_DISABLE
+  delete process.env.CODEPUPPY_LEGACY_INSTALL_ROOT
   rmSync(tmp, { recursive: true, force: true })
 })
 
@@ -48,7 +48,7 @@ const legacyPath = (name: string) => join(home, ".opencode", "skill", name)
 
 describe("factorySkillSources", () => {
   test("#1532 AC5: customization teaches search, confirmation, availability and project trust", () => {
-    const text = readFileSync(join(import.meta.dir, "../../resources/factory-skills/customize-code-puppy/SKILL.md"), "utf8")
+    const text = readFileSync(join(import.meta.dir, "../../resources/factory-skills/customize-codepuppy/SKILL.md"), "utf8")
     for (const sentence of [
       "Search first with `codepuppy_hub_search`",
       "offers skills, agents, commands, connectors (MCP), bundles, and cloud capabilities",
@@ -71,10 +71,10 @@ describe("factorySkillSources", () => {
   })
 
   test("#1532 AC5: customization never teaches global config installation or catalog plugins", () => {
-    const text = readFileSync(join(import.meta.dir, "../../resources/factory-skills/customize-code-puppy/SKILL.md"), "utf8")
+    const text = readFileSync(join(import.meta.dir, "../../resources/factory-skills/customize-codepuppy/SKILL.md"), "utf8")
     for (const forbidden of [
-      /edit `\$ALPHA_GLOBAL_DIR\/alpha\.jsonc` directly/i,
-      /直接编辑[^\n]*alpha\.jsonc/,
+      /edit `\$CODEPUPPY_GLOBAL_DIR\/codepuppy\.jsonc` directly/i,
+      /直接编辑[^\n]*codepuppy\.jsonc/,
       /MCP \+ skills \+ plugins/i,
       /\([^\n)]*\+ plugins\)/i,
       /从目录装插件/,
@@ -83,13 +83,13 @@ describe("factorySkillSources", () => {
     ]) expect(text).not.toMatch(forbidden)
   })
 
-  test("#1513: shipped customization skill registers only customize-code-puppy", () => {
+  test("#1513: shipped customization skill registers only customize-codepuppy", () => {
     const dev = factorySkillSources({ packaged: false, resourcesPath: "/ignored", moduleDir: import.meta.dir })
-    expect(FACTORY_SKILL_IDS).toContain("customize-code-puppy")
+    expect(FACTORY_SKILL_IDS).toContain("customize-codepuppy")
     expect(FACTORY_SKILL_IDS).not.toContain("customize-alpha")
-    expect(readFileSync(join(dev["customize-code-puppy"], "SKILL.md"), "utf8")).toContain("name: customize-code-puppy\n")
-    expect(sources["customize-code-puppy"]).toBe(join(res, "factory-skills", "customize-code-puppy"))
-    expect(reconcileFactorySkills(sources, roots).active).toContain("customize-code-puppy")
+    expect(readFileSync(join(dev["customize-codepuppy"], "SKILL.md"), "utf8")).toContain("name: customize-codepuppy\n")
+    expect(sources["customize-codepuppy"]).toBe(join(res, "factory-skills", "customize-codepuppy"))
+    expect(reconcileFactorySkills(sources, roots).active).toContain("customize-codepuppy")
   })
   test("packaged resolves under resourcesPath; dev under moduleDir/../../resources", () => {
     expect(sources["skill-creator"]).toBe(join(res, "skills", "skill-creator"))
@@ -151,10 +151,10 @@ describe("reconcileFactorySkills — REQ-065(.alpha 零出厂件 + 注入组)", 
     expect(r.skipped.some((s) => s.name === "agent-creator" && s.reason.includes("source missing"))).toBe(true)
     expect(r.paths).toEqual([sources["skill-creator"]])
   })
-  test("ALPHA_FACTORY_SKILLS_DISABLE: cleanup still runs, injection group empty", () => {
+  test("CODEPUPPY_FACTORY_SKILLS_DISABLE: cleanup still runs, injection group empty", () => {
     mkdirSync(join(home, ".alpha", "skills"), { recursive: true })
     symlinkSync(sources["skill-creator"], truthPath("skill-creator"))
-    process.env.ALPHA_FACTORY_SKILLS_DISABLE = "1"
+    process.env.CODEPUPPY_FACTORY_SKILLS_DISABLE = "1"
     const r = reconcileFactorySkills(sources, roots)
     expect(r.removed).toEqual(["skill-creator"]) // 存量链照拆(它们不再有合法形态)
     expect(r.paths).toEqual([])
@@ -164,7 +164,7 @@ describe("reconcileFactorySkills — REQ-065(.alpha 零出厂件 + 注入组)", 
   test("REQ-059 escape hatch (truth channel off): touches NOTHING — no dismantle, no injection (回退保两跳态)", () => {
     mkdirSync(join(home, ".alpha", "skills"), { recursive: true })
     symlinkSync(sources["skill-creator"], truthPath("skill-creator"))
-    process.env.ALPHA_JSONC_TRUTH_DISABLE = "1"
+    process.env.CODEPUPPY_JSONC_TRUTH_DISABLE = "1"
     const r = reconcileFactorySkills(sources, roots)
     expect(r.removed).toEqual([])
     expect(r.paths).toEqual([])
@@ -206,13 +206,13 @@ describe("legacy migration — REQ-036 初版 ~/.opencode/skill 直链", () => {
   })
 })
 
-describe("isAlphaFactoryLink — 自有链判定(同名 + alpha 资源布局)", () => {
+describe("isCodePuppyFactoryLink — 自有链判定(同名 + alpha 资源布局)", () => {
   test("dev/packaged 布局命中;同名异布局/异名同布局都不命中", () => {
-    expect(isAlphaFactoryLink("/repo/packages/ui-mac/resources/skills/skill-creator", "skill-creator")).toBe(true)
-    expect(isAlphaFactoryLink("/Applications/alpha-code.app/Contents/Resources/factory-skills/agent-creator", "agent-creator")).toBe(true)
-    expect(isAlphaFactoryLink("/their/skill", "skill-creator")).toBe(false)
-    expect(isAlphaFactoryLink("/x/skills/foo", "skill-creator")).toBe(false) // 异名
-    expect(isAlphaFactoryLink("/x/resources/skills/other", "skill-creator")).toBe(false)
+    expect(isCodePuppyFactoryLink("/repo/packages/ui-mac/resources/skills/skill-creator", "skill-creator")).toBe(true)
+    expect(isCodePuppyFactoryLink("/Applications/alpha-code.app/Contents/Resources/factory-skills/agent-creator", "agent-creator")).toBe(true)
+    expect(isCodePuppyFactoryLink("/their/skill", "skill-creator")).toBe(false)
+    expect(isCodePuppyFactoryLink("/x/skills/foo", "skill-creator")).toBe(false) // 异名
+    expect(isCodePuppyFactoryLink("/x/resources/skills/other", "skill-creator")).toBe(false)
   })
 })
 

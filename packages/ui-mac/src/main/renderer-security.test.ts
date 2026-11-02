@@ -1,7 +1,7 @@
 // C24 / #898 —— CORS 放宽范围判定、registered-origin allowlist 与 CSP 文本的守卫测试。
 
 import { describe, expect, test } from "bun:test"
-import { corsRelaxAllowed, createAlphaOriginRegistry, isLoopbackUrl, RENDERER_CSP } from "./renderer-security"
+import { corsRelaxAllowed, createCodePuppyOriginRegistry, isLoopbackUrl, RENDERER_CSP } from "./renderer-security"
 
 describe("isLoopbackUrl / corsRelaxAllowed", () => {
   test.each([
@@ -43,11 +43,11 @@ describe("isLoopbackUrl / corsRelaxAllowed", () => {
     ["not a url"],
   ])("非回环 %p 在 win32 且未注册也不放宽(#898 回归锁)", (url) => {
     expect(corsRelaxAllowed(url, "win32")).toBe(false)
-    expect(corsRelaxAllowed(url, "win32", createAlphaOriginRegistry())).toBe(false)
+    expect(corsRelaxAllowed(url, "win32", createCodePuppyOriginRegistry())).toBe(false)
   })
 
   test("win32 上已登记的确切 origin 才放宽", () => {
-    const registry = createAlphaOriginRegistry()
+    const registry = createCodePuppyOriginRegistry()
     const url = "http://192.168.1.10:4096/session"
     expect(corsRelaxAllowed(url, "win32", registry)).toBe(false)
     registry.register("http://192.168.1.10:4096", 1)
@@ -59,15 +59,15 @@ describe("isLoopbackUrl / corsRelaxAllowed", () => {
   })
 
   test("darwin 不消费 registry —— 即便传入已登记的 registry,非回环 origin 仍不放宽", () => {
-    const registry = createAlphaOriginRegistry()
+    const registry = createCodePuppyOriginRegistry()
     registry.register("http://192.168.1.10:4096", 1)
     expect(corsRelaxAllowed("http://192.168.1.10:4096/session", "darwin", registry)).toBe(false)
   })
 })
 
-describe("createAlphaOriginRegistry — generation 绑定的撤销语义(#898)", () => {
+describe("createCodePuppyOriginRegistry — generation 绑定的撤销语义(#898)", () => {
   test("revoke 撤销登记", () => {
-    const registry = createAlphaOriginRegistry()
+    const registry = createCodePuppyOriginRegistry()
     registry.register("http://192.168.1.10:4096", 1)
     expect(registry.isRegistered("http://192.168.1.10:4096")).toBe(true)
     registry.revoke("http://192.168.1.10:4096", 1)
@@ -75,7 +75,7 @@ describe("createAlphaOriginRegistry — generation 绑定的撤销语义(#898)",
   })
 
   test("端口复用竞态:旧 generation 迟到的 revoke 不得冲掉新 generation 的 register", () => {
-    const registry = createAlphaOriginRegistry()
+    const registry = createCodePuppyOriginRegistry()
     const origin = "http://192.168.1.10:4096"
     registry.register(origin, 1) // 服务 A(generation 1)启动并登记
     registry.register(origin, 2) // 服务 A 退出、服务 B 复用同端口(generation 2)已重新登记

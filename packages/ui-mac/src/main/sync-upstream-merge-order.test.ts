@@ -2,7 +2,7 @@
 //
 // 这道门守的是什么(大白话):每天 06:00 UTC 那条上游同步流水线,在**遇到冲突**时会走一条与
 // 平时完全不同的分支。那条分支在 2026-09-06 之前**结构性不可用** —— 它先 `bun install`、后
-// `apply_alpha_frontend_delta`,而 `packages/session-ui` 以 `file:../app/vendor/*.tgz` 直接依赖的
+// `apply_codepuppy_frontend_delta`,而 `packages/session-ui` 以 `file:../app/vendor/*.tgz` 直接依赖的
 // 那个二进制**只存在于 alpha 的 SOT 补丁里**(pin 里没有 `packages/app/vendor`,2026-09-06 实测
 // `git ls-tree 849c2598 packages/app/vendor` 输出为空)。于是 install 跑的时候资产还没被贴出来
 // ⇒ 必然 `failed to resolve`,而那句话不告诉任何人该做什么。同一份 workflow 的 `VENDORED` 判据
@@ -13,13 +13,13 @@
 //   `@opencode-ai/client@file:../app/vendor/opencode-ai-client-1.17.13-v2.tgz failed to resolve`
 //
 // 为什么判据必须长这样:
-//   · **不断言 YAML 源码文本。** 「grep 到 apply_alpha_frontend_delta 排在 bun install 前面」在本仓
+//   · **不断言 YAML 源码文本。** 「grep 到 apply_codepuppy_frontend_delta 排在 bun install 前面」在本仓
 //     是点名过的假闸门形态 —— 有人在**更靠前的地方**再加一句 install、或把顺序改回去而文本仍匹配,
 //     它照样绿。这里起**真的 git 仓**(pin / alpha delta / SOT 补丁 / 上游前进 四段历史齐备),
 //     用 `Bun.YAML` 从**生产 workflow 里解析出那一步的 `run` 体**,再用 `bash -e` 跑它本体
 //     (Actions 对不写 `shell:` 的 `run:` 用的就是 `bash -e {0}`),断言**行为**。
 //   · **先证明这个手段能测出已知的坏,再用它判未知的好。** 下面第 2、4 条把生产 body 的
-//     `apply_alpha_frontend_delta` / `bun install` 两行**换回修复前的顺序**,断言同一夹具当场
+//     `apply_codepuppy_frontend_delta` / `bun install` 两行**换回修复前的顺序**,断言同一夹具当场
 //     死在 `failed to resolve`、且**一句 `::error::` 都没有**。变异没改到字节时抛「测量作废」,
 //     不给一个看着像通过的结果。
 //   · **主判据不依赖假 `bun` 的保真度。** 它判的是「`bun install` 被调用的那一刻,`file:` 依赖
@@ -31,7 +31,7 @@
 //     一份不含 alpha workspace 的 lockfile 推上 alpha。所以有一条专门断言重生结果**落进了提交**。
 //
 // 删掉本文件会失去什么:那一步退回零行为判据 —— 顺序换回去、install 被删掉、
-// `apply_alpha_frontend_delta` 的 loud-fail 被吞、no-conflict 分支被改成也跑 install,
+// `apply_codepuppy_frontend_delta` 的 loud-fail 被吞、no-conflict 分支被改成也跑 install,
 // 都不会有任何东西变红(那条 workflow 只在 GitHub 上、只在有冲突时才走到这几行)。
 // 它因此登记在 scripts/gate-files.tsv 里,拿精确条数。
 
@@ -83,16 +83,16 @@ function mergeStepBody(): string {
 }
 
 /** 相邻两行(顺序敏感),故意不匹配 no-conflict 分支里那个后面跟 `exit 0` 的调用点。 */
-const ORDER_PAIR = /^([ \t]*)apply_alpha_frontend_delta[ \t]*\n([ \t]*)bun install[ \t]*$/m
+const ORDER_PAIR = /^([ \t]*)apply_codepuppy_frontend_delta[ \t]*\n([ \t]*)bun install[ \t]*$/m
 
 /** 把生产 body 换回**修复前**的顺序(install 先于补丁)——「已知该失败的输入」。 */
 function preFixOrder(body: string): string {
   if (!ORDER_PAIR.test(body))
     throw new Error(
-      "生产 body 里找不到相邻的 `apply_alpha_frontend_delta` → `bun install` 两行 —— 变异构造不出「已知的坏」," +
+      "生产 body 里找不到相邻的 `apply_codepuppy_frontend_delta` → `bun install` 两行 —— 变异构造不出「已知的坏」," +
         "这道门就没有被证明过能测出它。本次测量作废(不是通过):顺序的写法变了就要改这条变异。",
     )
-  const mutated = body.replace(ORDER_PAIR, (_m, a: string, b: string) => `${b}bun install\n${a}apply_alpha_frontend_delta`)
+  const mutated = body.replace(ORDER_PAIR, (_m, a: string, b: string) => `${b}bun install\n${a}apply_codepuppy_frontend_delta`)
   if (mutated === body) throw new Error("变异一个字节都没改到 —— 本次测量作废,不是通过")
   return mutated
 }
@@ -169,14 +169,14 @@ exit 0
  *
  *   dev(= pin)   packages/{app,ui} 纯上游态:没有 AppSurfaces、没有窄导出、**没有 vendor/**
  *   alpha         + seam marker + 窄导出 + vendored tgz(二进制)+ ui 侧 alpha 文件
- *   alpha(SOT)   frontend/{frontend-pin.lock, alpha-patches/alpha-frontend.patch} + alpha 侧 bun.lock
+ *   alpha(SOT)   frontend/{frontend-pin.lock, codepuppy-patches/codepuppy-frontend.patch} + alpha 侧 bun.lock
  *   dev 前进      按 Shape 造出「与 alpha 冲突 / 干净 / 意外冲突」,可叠加 `file:` 换名漂移
  *
  * `packages/session-ui` 与 `packages/opencode` 在 app/ui 之外 ⇒ 它们随上游干净合并,
  * 与真实世界一致(换名漂移正是这么进来的)。
  */
 function fixture(shape: Shape): Fixture {
-  const work = mkdtempSync(join(tmpdir(), "alpha-sync-order-"))
+  const work = mkdtempSync(join(tmpdir(), "codepuppy-sync-order-"))
   const repo = join(work, "repo")
   const bin = join(work, "bin")
   const log = join(work, "bun-calls.log")
@@ -202,7 +202,7 @@ function fixture(shape: Shape): Fixture {
     `${JSON.stringify({ name: "app", exports: { "./index": "./src/app.tsx", "./surface/session": "./src/pages/session.tsx" } }, null, 2)}\n`,
   )
   write(repo, `packages/app/${VENDOR_TGZ}`, TGZ_BYTES)
-  write(repo, "packages/ui/src/alpha-overlay.ts", "export const overlay = 1\n")
+  write(repo, "packages/ui/src/codepuppy-overlay.ts", "export const overlay = 1\n")
   commitAll(repo, "alpha frontend delta")
 
   const diff = Bun.spawnSync(["git", "diff", "--binary", pin, "--", "packages/app", "packages/ui"], {
@@ -211,8 +211,8 @@ function fixture(shape: Shape): Fixture {
   })
   if (diff.exitCode !== 0) throw new Error(`夹具生成 SOT 补丁失败:${diff.stderr.toString()}`)
   write(repo, "frontend/frontend-pin.lock", `pin=${pin} # fixture\n`)
-  write(repo, "frontend/alpha-patches/alpha-frontend.patch", diff.stdout.toString())
-  write(repo, "bun.lock", '{\n  "lockfileVersion": 1,\n  "alpha-workspaces": true\n}\n')
+  write(repo, "frontend/codepuppy-patches/codepuppy-frontend.patch", diff.stdout.toString())
+  write(repo, "bun.lock", '{\n  "lockfileVersion": 1,\n  "codepuppy-workspaces": true\n}\n')
   if (shape.conflict === "unexpected") write(repo, "packages/opencode/src/engine.ts", "export const engine = 2 // alpha\n")
   commitAll(repo, "record SOT")
 

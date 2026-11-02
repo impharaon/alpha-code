@@ -5,7 +5,7 @@ import { createHash } from "node:crypto"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
-import { WORKSPACE_MARKER, alphaOfficeInstallCommand } from "../shared/office-advisories"
+import { WORKSPACE_MARKER, codepuppyOfficeInstallCommand } from "../shared/office-advisories"
 import { aggregateFilesDigest } from "./ext-manifest-v2"
 import { BUNDLED_OFFICE_SERVER_PATH, applyMcpWritePolicy, bundledOfficeServerDigest, persistMcpWithPolicy } from "./ext-mcp-policy"
 
@@ -14,18 +14,18 @@ let prevWorkspace: string | undefined
 let prevGlobal: string | undefined
 
 beforeEach(() => {
-  tmp = fs.mkdtempSync(path.join(os.tmpdir(), "alpha-mcp-policy-"))
-  prevWorkspace = process.env.ALPHA_USER_WORKSPACE_DIR
-  prevGlobal = process.env.ALPHA_GLOBAL_DIR
-  process.env.ALPHA_USER_WORKSPACE_DIR = path.join(tmp, "Alpha")
-  process.env.ALPHA_GLOBAL_DIR = path.join(tmp, "dot-alpha")
+  tmp = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-mcp-policy-"))
+  prevWorkspace = process.env.CODEPUPPY_USER_WORKSPACE_DIR
+  prevGlobal = process.env.CODEPUPPY_GLOBAL_DIR
+  process.env.CODEPUPPY_USER_WORKSPACE_DIR = path.join(tmp, "Alpha")
+  process.env.CODEPUPPY_GLOBAL_DIR = path.join(tmp, "dot-codepuppy")
 })
 
 afterEach(() => {
-  if (prevWorkspace === undefined) delete process.env.ALPHA_USER_WORKSPACE_DIR
-  else process.env.ALPHA_USER_WORKSPACE_DIR = prevWorkspace
-  if (prevGlobal === undefined) delete process.env.ALPHA_GLOBAL_DIR
-  else process.env.ALPHA_GLOBAL_DIR = prevGlobal
+  if (prevWorkspace === undefined) delete process.env.CODEPUPPY_USER_WORKSPACE_DIR
+  else process.env.CODEPUPPY_USER_WORKSPACE_DIR = prevWorkspace
+  if (prevGlobal === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+  else process.env.CODEPUPPY_GLOBAL_DIR = prevGlobal
   fs.rmSync(tmp, { recursive: true, force: true })
 })
 
@@ -39,7 +39,7 @@ describe("persistMcpWithPolicy — REQ-135 community Excel retirement", () => {
     ["renamed-sheets", ["uv", "run", "--with", " excel-mcp-server==0.1.8 ", "server.py"]],
   ])("retired community Excel is denied by direct or renamed package identity (%s)", (name, command) => {
     expect(persistMcpWithPolicy(name, { type: "local", command }).ok).toBe(false)
-    expect(fs.existsSync(path.join(tmp, "dot-alpha", "alpha.jsonc"))).toBe(false)
+    expect(fs.existsSync(path.join(tmp, "dot-codepuppy", "codepuppy.jsonc"))).toBe(false)
     expect(fs.existsSync(path.join(tmp, "Alpha", "excel-workspace"))).toBe(false)
   })
 
@@ -62,7 +62,7 @@ describe("persistMcpWithPolicy — REQ-133 Alpha Office workspace sandbox", () =
   test("main preserves the workspace marker and canonicalizes the bundled server path", () => {
     const server = {
       type: "local",
-      command: alphaOfficeInstallCommand("word"),
+      command: codepuppyOfficeInstallCommand("word"),
     } as Record<string, unknown>
     const result = persistMcpWithPolicy("codepuppy-word", server)
     expect(result.ok).toBe(true)
@@ -77,20 +77,20 @@ describe("persistMcpWithPolicy — REQ-133 Alpha Office workspace sandbox", () =
     fs.mkdirSync(workspace)
     const concrete = {
       type: "local",
-      command: alphaOfficeInstallCommand("word").map((argument) => argument.replace("{workspace}", workspace)),
+      command: codepuppyOfficeInstallCommand("word").map((argument) => argument.replace("{workspace}", workspace)),
     } as Record<string, unknown>
     expect(applyMcpWritePolicy("codepuppy-word", concrete).ok).toBe(true)
     expect((concrete.command as string[]).at(-1)).toBe(WORKSPACE_MARKER)
     const missing = path.join(tmp, "missing")
     const server = {
       type: "local",
-      command: alphaOfficeInstallCommand("pdf").map((argument) => argument.replace("{workspace}", missing)),
+      command: codepuppyOfficeInstallCommand("pdf").map((argument) => argument.replace("{workspace}", missing)),
     } as Record<string, unknown>
     expect(applyMcpWritePolicy("codepuppy-pdf", server).ok).toBe(true)
     expect(JSON.stringify(server.command)).not.toContain(missing)
   })
 
-  // #1564 AC1:alpha-web 签名目录里的四张卡片今天仍是 uv 命令(样本 = src/renderer/extensions/alpha-catalog.json 的
+  // #1564 AC1:alpha-web 签名目录里的四张卡片今天仍是 uv 命令(样本 = src/renderer/extensions/codepuppy-catalog.json 的
   // installSpec.command,经 planner 把 {alphaResources} 解成资源根之后交给本闸)。落盘的只能是 main 模板。
   test("a catalog card that still carries the uv command persists main's bundled-runtime template", () => {
     const resources = fs.realpathSync(path.resolve(import.meta.dir, "../../resources"))
@@ -123,7 +123,7 @@ describe("REQ-105 #319 — bundled Office artifact digest", () => {
   const bundledServer = path.resolve(import.meta.dir, `../../resources/${BUNDLED_OFFICE_SERVER_PATH}`)
 
   test("a passing Alpha Office verdict carries the content address of the bytes it just canonicalized", () => {
-    const server = { type: "local", command: alphaOfficeInstallCommand("excel") } as Record<string, unknown>
+    const server = { type: "local", command: codepuppyOfficeInstallCommand("excel") } as Record<string, unknown>
     const verdict = applyMcpWritePolicy("codepuppy-excel", server)
     expect(verdict.ok).toBe(true)
     if (!verdict.ok) return
@@ -161,7 +161,7 @@ describe("REQ-105 #319 — bundled Office artifact digest", () => {
 
   test("all four Alpha Office connectors report the same bundled artifact (one file, four entry modes)", () => {
     const digests = (["word", "excel", "powerpoint", "pdf"] as const).map((format) => {
-      const verdict = applyMcpWritePolicy(`alpha-${format}`, { type: "local", command: alphaOfficeInstallCommand(format) })
+      const verdict = applyMcpWritePolicy(`alpha-${format}`, { type: "local", command: codepuppyOfficeInstallCommand(format) })
       if (!verdict.ok) throw new Error(`${format}: ${verdict.reason}`)
       return verdict.artifactDigest
     })

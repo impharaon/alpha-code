@@ -12,7 +12,7 @@ import type { SidecarGenerationState } from "../../preload/types"
 import type { useExtensions } from "./use-extensions"
 
 const transport = fetch
-const root = await mkdtemp(join(tmpdir(), "alpha-1505-"))
+const root = await mkdtemp(join(tmpdir(), "codepuppy-1505-"))
 const listeners = new Set<(state: SidecarGenerationState) => void>()
 let generation = 0
 let runtime: { createRoot: typeof createRoot; useExtensions: typeof useExtensions }

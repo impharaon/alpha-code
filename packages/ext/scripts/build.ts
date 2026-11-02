@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// Bundle @alpha-code/ext into a SELF-CONTAINED ESM file the embedded Electron-Node
+// Bundle @codepuppy/ext into a SELF-CONTAINED ESM file the embedded Electron-Node
 // server can load without resolving raw TS at runtime. See .claude/rules/DECISIONS.md ADR-006.
 //
 // Why bundle at all:
@@ -35,15 +35,15 @@ const result = await Bun.build({
 })
 
 if (!result.success) {
-  console.error("[@alpha-code/ext] bundle failed:")
+  console.error("[@codepuppy/ext] bundle failed:")
   for (const log of result.logs) console.error(log)
   process.exit(1)
 }
 
-// #1578 AC5 (REQ-236 §2.6-7): the trusted bundled manifest, shipped next to plugin.js (electron-builder `alpha-ext/`).
+// #1578 AC5 (REQ-236 §2.6-7): the trusted bundled manifest, shipped next to plugin.js (electron-builder `codepuppy-ext/`).
 // The engine gives `codepuppy-bundled` only to these tool names, and only when the plugin module it loaded hashes to this
-// digest (packages/opencode/src/plugin/alpha-bundled-plugin.ts). Tool names = TOOL_TEXT's keys, which
-// src/context-injection.test.ts pins to the real AlphaExt's own tool set; project plugins merged in at runtime are
+// digest (packages/opencode/src/plugin/codepuppy-bundled-plugin.ts). Tool names = TOOL_TEXT's keys, which
+// src/context-injection.test.ts pins to the real CodePuppyExt's own tool set; project plugins merged in at runtime are
 // never listed.
 // #1568 AC5: `readable` = each listed tool's display identifier (`codepuppy:<action>`), declared in TOOL_TEXT.
 const manifest = {
@@ -54,4 +54,4 @@ const manifest = {
 writeFileSync("dist/bundled-tools.json", `${JSON.stringify(manifest, null, 2)}\n`)
 
 const outputs = result.outputs.map((o) => path.relative(pkgDir, o.path)).join(", ")
-console.log(`[@alpha-code/ext] bundled → ${outputs}, dist/bundled-tools.json`)
+console.log(`[@codepuppy/ext] bundled → ${outputs}, dist/bundled-tools.json`)

@@ -44,12 +44,12 @@ function macSigned() {
 
 function winFacts(channel: ReleaseChannel, overrides?: Partial<WindowsSigningFactsDoc["artifacts"][0]>): WindowsSigningFactsDoc {
   return {
-    schema: "alpha.release.windows-signing-facts.v1",
+    schema: "codepuppy.release.windows-signing-facts.v1",
     channel,
     collectedAt: "2026-08-19T00:00:00Z",
     artifacts: [
       {
-        filename: "alpha-code-win-x64.exe",
+        filename: "codepuppy-win-x64.exe",
         sha256: sha256hex("exe-bytes"),
         status: "Valid",
         signed: true,
@@ -72,11 +72,11 @@ function validInput(channel: ReleaseChannel = "prod"): BuildManifestInput {
     publishedAt: "2026-08-19T00:00:00Z",
     keyId: KEY_ID,
     artifacts: [
-      { filename: "code-puppy-mac-arm64.dmg", platform: "darwin", arch: "arm64", kind: "installer", size: 111, sha512: sha512b64("dmg"), sha256: sha256hex("dmg") },
-      { filename: "code-puppy-mac-arm64.zip", platform: "darwin", arch: "arm64", kind: "updater-archive", size: 222, sha512: sha512b64("zip"), sha256: sha256hex("zip") },
-      { filename: "code-puppy-mac-arm64.zip.blockmap", platform: "darwin", arch: "arm64", kind: "blockmap", size: 33, sha512: sha512b64("zbm"), sha256: sha256hex("zbm") },
-      { filename: "alpha-code-win-x64.exe", platform: "win32", arch: "x64", kind: "installer", size: 444, sha512: sha512b64("exe"), sha256: sha256hex("exe-bytes") },
-      { filename: "alpha-code-win-x64.exe.blockmap", platform: "win32", arch: "x64", kind: "blockmap", size: 55, sha512: sha512b64("ebm"), sha256: sha256hex("ebm") },
+      { filename: "codepuppy-mac-arm64.dmg", platform: "darwin", arch: "arm64", kind: "installer", size: 111, sha512: sha512b64("dmg"), sha256: sha256hex("dmg") },
+      { filename: "codepuppy-mac-arm64.zip", platform: "darwin", arch: "arm64", kind: "updater-archive", size: 222, sha512: sha512b64("zip"), sha256: sha256hex("zip") },
+      { filename: "codepuppy-mac-arm64.zip.blockmap", platform: "darwin", arch: "arm64", kind: "blockmap", size: 33, sha512: sha512b64("zbm"), sha256: sha256hex("zbm") },
+      { filename: "codepuppy-win-x64.exe", platform: "win32", arch: "x64", kind: "installer", size: 444, sha512: sha512b64("exe"), sha256: sha256hex("exe-bytes") },
+      { filename: "codepuppy-win-x64.exe.blockmap", platform: "win32", arch: "x64", kind: "blockmap", size: 55, sha512: sha512b64("ebm"), sha256: sha256hex("ebm") },
     ],
     feeds: [
       {
@@ -86,8 +86,8 @@ function validInput(channel: ReleaseChannel = "prod"): BuildManifestInput {
         doc: {
           version: "0.1.4",
           files: [
-            { url: "code-puppy-mac-arm64.zip", sha512: sha512b64("zip"), size: 222 },
-            { url: "code-puppy-mac-arm64.dmg", sha512: sha512b64("dmg"), size: 111 },
+            { url: "codepuppy-mac-arm64.zip", sha512: sha512b64("zip"), size: 222 },
+            { url: "codepuppy-mac-arm64.dmg", sha512: sha512b64("dmg"), size: 111 },
           ],
         },
       },
@@ -95,12 +95,12 @@ function validInput(channel: ReleaseChannel = "prod"): BuildManifestInput {
         filename: `${feedPrefix}.yml`,
         size: 200,
         sha256: sha256hex("win-feed"),
-        doc: { version: "0.1.4", files: [{ url: "alpha-code-win-x64.exe", sha512: sha512b64("exe"), size: 444 }] },
+        doc: { version: "0.1.4", files: [{ url: "codepuppy-win-x64.exe", sha512: sha512b64("exe"), size: 444 }] },
       },
     ],
     macSigning: macSigned(),
     windowsFacts: winFacts(channel),
-    sbom: { filename: "alpha-code-0.1.4-sbom.cdx.json", size: 999, sha256: sha256hex("sbom"), format: "CycloneDX-1.6", componentCount: 42 },
+    sbom: { filename: "codepuppy-0.1.4-sbom.cdx.json", size: 999, sha256: sha256hex("sbom"), format: "CycloneDX-1.6", componentCount: 42 },
     policy: {
       appleTeamId: "RQX6X6A635",
       windowsPublisherAllowlist: ["CN=Alpha Publisher, O=Alpha, C=SG"],
@@ -129,7 +129,7 @@ describe("buildReleaseManifest 正向", () => {
     expect(m.channel).toBe("prod")
     expect(m.version).toBe("0.1.4")
     expect(m.artifacts.length).toBe(5)
-    const dmg = m.artifacts.find((a) => a.filename === "code-puppy-mac-arm64.dmg")!
+    const dmg = m.artifacts.find((a) => a.filename === "codepuppy-mac-arm64.dmg")!
     expect(dmg.signing).toEqual({
       type: "apple",
       signed: true,
@@ -138,7 +138,7 @@ describe("buildReleaseManifest 正向", () => {
       notarized: true,
       stapled: true,
     })
-    const exe = m.artifacts.find((a) => a.filename === "alpha-code-win-x64.exe")!
+    const exe = m.artifacts.find((a) => a.filename === "codepuppy-win-x64.exe")!
     expect(exe.signing.type).toBe("authenticode")
     expect(exe.signing.signed).toBe(true)
     expect(m.updater.feeds.map((f) => f.filename).sort()).toEqual(["latest-mac.yml", "latest.yml"])
@@ -153,14 +153,14 @@ describe("buildReleaseManifest 正向", () => {
     const r = buildReleaseManifest(input)
     expect(r.ok).toBe(true)
     if (!r.ok) throw new Error("unreachable")
-    const exe = r.manifest.artifacts.find((a) => a.filename === "alpha-code-win-x64.exe")!
+    const exe = r.manifest.artifacts.find((a) => a.filename === "codepuppy-win-x64.exe")!
     expect(exe.signing).toEqual({ type: "authenticode", signed: false, status: "NotSigned", publisher: null, thumbprint: null })
   })
 
   test("prod:明确批准的未签名 Windows 手动下载不写 updater feed,其事实仍在已签名 manifest 中", () => {
     const input = validInput("prod")
     input.artifacts = input.artifacts.map((artifact) =>
-      artifact.filename === "alpha-code-win-x64.exe" ? { ...artifact, manualDownloadOnly: true as const } : artifact,
+      artifact.filename === "codepuppy-win-x64.exe" ? { ...artifact, manualDownloadOnly: true as const } : artifact,
     )
     input.feeds = input.feeds.filter((feed) => feed.filename !== "latest.yml")
     input.windowsFacts = winFacts("prod", { signed: false, status: "NotSigned", publisher: null, thumbprint: null })
@@ -168,7 +168,7 @@ describe("buildReleaseManifest 正向", () => {
     const r = buildReleaseManifest(input)
     expect(r.ok).toBe(true)
     if (!r.ok) throw new Error("unreachable")
-    const exe = r.manifest.artifacts.find((artifact) => artifact.filename === "alpha-code-win-x64.exe")!
+    const exe = r.manifest.artifacts.find((artifact) => artifact.filename === "codepuppy-win-x64.exe")!
     expect(exe.manualDownloadOnly).toBe(true)
     expect(exe.signing).toEqual({ type: "authenticode", signed: false, status: "NotSigned", publisher: null, thumbprint: null })
     expect(r.manifest.updater.feeds.map((feed) => feed.filename)).toEqual(["latest-mac.yml"])
@@ -227,14 +227,14 @@ describe("R1 版本与标识", () => {
 describe("R2/R3 artifact inventory", () => {
   test("#1513: builder and manifest producer agree on the download names", async () => {
     const { getConfig } = await import("../../electron-builder.config")
-    expect(getConfig("prod").mac.artifactName).toBe("code-puppy-${os}-${arch}.${ext}")
+    expect(getConfig("prod").mac.artifactName).toBe("codepuppy-${os}-${arch}.${ext}")
     const result = buildReleaseManifest(validInput())
     expect(result.ok).toBe(true)
     if (!result.ok) throw new Error(result.errors.join("\n"))
     expect(result.manifest.artifacts.filter((a) => a.platform === "darwin").map((a) => a.filename)).toEqual([
-      "code-puppy-mac-arm64.dmg",
-      "code-puppy-mac-arm64.zip",
-      "code-puppy-mac-arm64.zip.blockmap",
+      "codepuppy-mac-arm64.dmg",
+      "codepuppy-mac-arm64.zip",
+      "codepuppy-mac-arm64.zip.blockmap",
     ])
   })
   test("空 artifacts 拒", () => {
@@ -279,7 +279,7 @@ describe("R2/R3 artifact inventory", () => {
   test("未签名手动下载例外仅允许 Windows x64", () => {
     const i = validInput("prod")
     i.artifacts = i.artifacts.map((artifact) =>
-      artifact.filename === "alpha-code-win-x64.exe"
+      artifact.filename === "codepuppy-win-x64.exe"
         ? { ...artifact, arch: "arm64", manualDownloadOnly: true as const }
         : artifact,
     )
@@ -306,26 +306,26 @@ describe("R4 updater metadata 一致性", () => {
   test("feed 里的 sha512 与最终字节不一致拒(打包后被改写的包)", () => {
     const i = validInput()
     i.feeds[0]!.doc.files[0]!.sha512 = sha512b64("tampered")
-    expectErrors(i, "R4 digest mismatch (feed vs final bytes): code-puppy-mac-arm64.zip")
+    expectErrors(i, "R4 digest mismatch (feed vs final bytes): codepuppy-mac-arm64.zip")
   })
   test("feed 里的 size 与最终字节不一致拒", () => {
     const i = validInput()
     i.feeds[0]!.doc.files[0]!.size = 99999
-    expectErrors(i, "R4 size mismatch (feed vs final bytes): code-puppy-mac-arm64.zip")
+    expectErrors(i, "R4 size mismatch (feed vs final bytes): codepuppy-mac-arm64.zip")
   })
   test("feed 指向 inventory 里不存在的文件拒", () => {
     const i = validInput()
-    i.feeds[0]!.doc.files.push({ url: "code-puppy-mac-x64.zip", sha512: sha512b64("x"), size: 1 })
-    expectErrors(i, "R4 feed entry not in final inventory: code-puppy-mac-x64.zip")
+    i.feeds[0]!.doc.files.push({ url: "codepuppy-mac-x64.zip", sha512: sha512b64("x"), size: 1 })
+    expectErrors(i, "R4 feed entry not in final inventory: codepuppy-mac-x64.zip")
   })
   test("非 blockmap artifact 不在 feed 覆盖面里拒(updater 拿不到它)", () => {
     const i = validInput()
-    i.feeds[0]!.doc.files = i.feeds[0]!.doc.files.filter((f) => f.url !== "code-puppy-mac-arm64.dmg")
-    expectErrors(i, "R4 artifact missing from updater feed latest-mac.yml: code-puppy-mac-arm64.dmg")
+    i.feeds[0]!.doc.files = i.feeds[0]!.doc.files.filter((f) => f.url !== "codepuppy-mac-arm64.dmg")
+    expectErrors(i, "R4 artifact missing from updater feed latest-mac.yml: codepuppy-mac-arm64.dmg")
   })
   test("feed 条目是绝对 URL 拒(必须裸文件名)", () => {
     const i = validInput()
-    i.feeds[1]!.doc.files[0]!.url = "https://evil.example/alpha-code-win-x64.exe"
+    i.feeds[1]!.doc.files[0]!.url = "https://evil.example/codepuppy-win-x64.exe"
     expectErrors(i, "R4 feed entry must be bare filename")
   })
   test("与任何平台产物都对不上的多余 feed 拒", () => {
@@ -391,7 +391,7 @@ describe("R7/W windows signing", () => {
   test("facts 里没有该 exe 的条目拒", () => {
     const i = validInput("prod")
     i.windowsFacts!.artifacts[0]!.filename = "other.exe"
-    expectErrors(i, "R7 no signing facts for windows artifact: alpha-code-win-x64.exe")
+    expectErrors(i, "R7 no signing facts for windows artifact: codepuppy-win-x64.exe")
   })
   test("facts 的 sha256 与最终字节不一致拒(旧 facts 配新包)", () => {
     const i = validInput("prod")
@@ -401,7 +401,7 @@ describe("R7/W windows signing", () => {
   test("prod:未签名 Windows 拒(本票标题那一条)", () => {
     const i = validInput("prod")
     i.windowsFacts = winFacts("prod", { signed: false, status: "NotSigned", publisher: null, thumbprint: null })
-    expectErrors(i, "W2 unsigned windows artifact on prod: alpha-code-win-x64.exe")
+    expectErrors(i, "W2 unsigned windows artifact on prod: codepuppy-win-x64.exe")
   })
   test("beta:status=HashMismatch 即使 signed=true 也拒", () => {
     const i = validInput("beta")
@@ -443,7 +443,7 @@ describe("validateWindowsFactsDoc", () => {
     if (!r.ok) expect(r.error).toContain("unknown keys: extra")
   })
   test("schema 字符串不对拒", () => {
-    const d = { ...winFacts("prod"), schema: "alpha.release.windows-signing-facts.v2" }
+    const d = { ...winFacts("prod"), schema: "codepuppy.release.windows-signing-facts.v2" }
     expect(validateWindowsFactsDoc(d).ok).toBe(false)
   })
   test("artifacts 为空拒(采不到事实不等于没有事实)", () => {
@@ -704,30 +704,30 @@ describe("parseUpdaterFeed", () => {
   test("#1513: existing electron-updater resolves renamed files from the published mac feed shape", async () => {
     const { parseUpdateInfo, resolveFiles, findFile } = await import("electron-updater/out/providers/Provider")
     // Source: jinjunnn/alpha-code v0.1.18 latest-mac.yml; only the download prefix changes.
-    const yml = await Bun.file(new URL("./fixtures/code-puppy-latest-mac.yml", import.meta.url)).text()
+    const yml = await Bun.file(new URL("./fixtures/codepuppy-latest-mac.yml", import.meta.url)).text()
     const base = new URL("https://github.com/jinjunnn/alpha-code/releases/download/v0.1.18/")
     const files = resolveFiles(parseUpdateInfo(yml, "latest-mac.yml", new URL("latest-mac.yml", base)), base)
     expect(files.map((file) => file.info.url)).toEqual([
-      "code-puppy-mac-arm64.zip",
-      "code-puppy-mac-arm64.dmg",
-      "code-puppy-mac-x64.zip",
-      "code-puppy-mac-x64.dmg",
+      "codepuppy-mac-arm64.zip",
+      "codepuppy-mac-arm64.dmg",
+      "codepuppy-mac-x64.zip",
+      "codepuppy-mac-x64.dmg",
     ])
-    expect(findFile(files, "zip")?.url.pathname).toEndWith(`code-puppy-mac-${process.arch}.zip`)
+    expect(findFile(files, "zip")?.url.pathname).toEndWith(`codepuppy-mac-${process.arch}.zip`)
     expect(parseUpdaterFeed(yml).files.map((file) => file.url)).toEqual(files.map((file) => file.info.url))
   })
   test("解析 electron-builder latest-mac.yml 形状(多文件 + blockMapSize + path/sha512 尾行)", () => {
     const yml = [
       "version: 0.1.3",
       "files:",
-      "  - url: code-puppy-mac-arm64.zip",
+      "  - url: codepuppy-mac-arm64.zip",
       `    sha512: ${sha512b64("zip")}`,
       "    size: 222",
       "    blockMapSize: 33",
-      "  - url: code-puppy-mac-arm64.dmg",
+      "  - url: codepuppy-mac-arm64.dmg",
       `    sha512: ${sha512b64("dmg")}`,
       "    size: 111",
-      "path: code-puppy-mac-arm64.zip",
+      "path: codepuppy-mac-arm64.zip",
       `sha512: ${sha512b64("zip")}`,
       "releaseDate: '2026-08-19T00:00:00.000Z'",
       "",
@@ -735,8 +735,8 @@ describe("parseUpdaterFeed", () => {
     const parsed = parseUpdaterFeed(yml)
     expect(parsed.version).toBe("0.1.3")
     expect(parsed.files).toEqual([
-      { url: "code-puppy-mac-arm64.zip", sha512: sha512b64("zip"), size: 222 },
-      { url: "code-puppy-mac-arm64.dmg", sha512: sha512b64("dmg"), size: 111 },
+      { url: "codepuppy-mac-arm64.zip", sha512: sha512b64("zip"), size: 222 },
+      { url: "codepuppy-mac-arm64.dmg", sha512: sha512b64("dmg"), size: 111 },
     ])
   })
   test("缺 sha512/size 的残缺条目不进结果(残缺条目随后会在 R4 覆盖面判红,不静默补全)", () => {

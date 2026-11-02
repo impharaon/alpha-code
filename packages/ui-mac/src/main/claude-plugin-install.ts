@@ -34,7 +34,7 @@
 
 import * as path from "node:path"
 
-import type { AppEnvironment } from "./alpha-environment"
+import type { AppEnvironment } from "./codepuppy-environment"
 import type { LocalPackagePreviewV1 } from "./claude-plugin-intake"
 import { populateFromCas } from "./ext-cas"
 import { collectImportSkillPayload } from "./ext-fs-installer"

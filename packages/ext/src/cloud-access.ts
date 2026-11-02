@@ -19,7 +19,7 @@ export function cloudAccessState(
   env: Record<string, string | undefined> = process.env,
   exists: (path: string) => boolean = existsSync,
 ): { state: "logged-out" | "credential-missing" | "ready"; loginHint: string } {
-  const path = env.ALPHA_BASE_URL ? FILE_REF.exec(cloudMcpAuthorization(env) ?? "")?.[1] : undefined
+  const path = env.CODEPUPPY_BASE_URL ? FILE_REF.exec(cloudMcpAuthorization(env) ?? "")?.[1] : undefined
   return {
     state: !path ? "logged-out" : exists(path) ? "ready" : "credential-missing",
     loginHint: CLOUD_ACCESS_LOGIN_HINT,

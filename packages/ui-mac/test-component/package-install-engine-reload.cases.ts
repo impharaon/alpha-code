@@ -14,8 +14,8 @@
 //     于是「既走收口方法、又另外直连一次」也红。
 //
 // REQ-234 `#1529` 起「引擎有没有被叫去重扫」的判据换了位置:重扫的执行者是 ext 调度器(等会话空闲),
-// main 安装体提交成功后经 parentPort 发 `alpha.reload.request`。本文件像 server.ts 在 sidecar ready 时那样
-// 接上发送口(`alphaSidecar.attach`),**数到的那一条就是判据**;renderer 自己一次 dispose 都不许做。
+// main 安装体提交成功后经 parentPort 发 `codepuppy.reload.request`。本文件像 server.ts 在 sidecar ready 时那样
+// 接上发送口(`codepuppySidecar.attach`),**数到的那一条就是判据**;renderer 自己一次 dispose 都不许做。
 //
 // 被替身的只有进程边界:
 //   · 引擎 HTTP 客户端(`@opencode-ai/sdk/v2/client`)—— 没有对端;它的 dispose spy 用来证明 renderer **不再** dispose。
@@ -36,7 +36,7 @@ import presetSolid from "babel-preset-solid"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import bundledCatalog from "../src/renderer/extensions/alpha-catalog.json"
+import bundledCatalog from "../src/renderer/extensions/codepuppy-catalog.json"
 import { LEAF_MCP_ID, MIXED_BUNDLE_PACKAGE_ID, mixedBundleFixture } from "./package-mixed-bundle.fixture"
 import { pinShippedPlatform } from "./pin-shipped-platform"
 
@@ -216,7 +216,7 @@ mock.module("../src/renderer/auth-recovery", () => ({
   },
 }))
 mock.module("@solidjs/router", () => ({ useLocation: () => ({ pathname: "/" }) }))
-mock.module("../src/renderer/alpha-ui/Banner", () => ({ Banner: () => null }))
+mock.module("../src/renderer/codepuppy-ui/Banner", () => ({ Banner: () => null }))
 
 Bun.plugin({
   name: "req810-reload-solid",
@@ -266,29 +266,29 @@ mock.module("../src/renderer/extensions/use-extensions", () => ({
 }))
 
 // ── ⑥ 真 main:环境 + IPC 表 ─────────────────────────────────────────────────────────────
-const { initAlphaEnvironment } = await import("../src/main/alpha-environment")
+const { initCodePuppyEnvironment } = await import("../src/main/codepuppy-environment")
 const { registerExtIpcHandlers } = await import("../src/main/ext-ipc")
 const { readPackageLedgerStateV1 } = await import("../src/main/ext-receipt-v2")
-const { alphaGlobalRoot } = await import("../src/main/alpha-installs")
+const { codepuppyGlobalRoot } = await import("../src/main/codepuppy-installs")
 
-delete process.env.ALPHA_GLOBAL_DIR
-initAlphaEnvironment({
+delete process.env.CODEPUPPY_GLOBAL_DIR
+initCodePuppyEnvironment({
   isPackaged: false,
   channel: "dev",
   appDataDir: tmp,
-  baseRoot: join(tmp, "alpha-code-state"),
+  baseRoot: join(tmp, "codepuppy-state"),
   homeDir: join(tmp, "home"),
 })
-const { alphaSidecar } = registerExtIpcHandlers(
+const { codepuppySidecar } = registerExtIpcHandlers(
   userData,
   "dev",
   async () => ({ url: "http://127.0.0.1:39131", username: "opencode", password: "route-password" }),
   join(tmp, "home"),
 )
-const globalRoot = alphaGlobalRoot()
+const globalRoot = codepuppyGlobalRoot()
 /** `#1529`:main 发往 ext 调度器的重载请求 —— 「装完有没有让引擎重扫」的判据。 */
 const reloadRequests: Array<{ type?: string; generation?: number; scope?: unknown }> = []
-alphaSidecar.attach((message) => void reloadRequests.push(message as { type?: string; generation?: number; scope?: unknown }))
+codepuppySidecar.attach((message) => void reloadRequests.push(message as { type?: string; generation?: number; scope?: unknown }))
 
 // ── ⑦ renderer ↔ main 的桥:走生产 handler,不重写任何判定 ───────────────────────────────
 const SENDER: IpcSender = { id: 1, on: () => {}, once: () => {} }
@@ -324,7 +324,7 @@ const extBridge: Record<string, unknown> = {
   // `#1529`:三档状态与重载请求同样走生产 handler;视图变更推送接 main 的真 onViewChanged。
   hubView: (directory?: unknown) => call("ext-hub-view", directory),
   reloadRequest: (input: unknown) => call("ext-reload-request", input),
-  onHubViewChanged: (cb: () => void) => alphaSidecar.onViewChanged(cb),
+  onHubViewChanged: (cb: () => void) => codepuppySidecar.onViewChanged(cb),
 }
 
 Object.defineProperty(window, "api", {
@@ -346,7 +346,7 @@ Object.defineProperty(window, "api", {
 const { createComponent } = solid
 const { render } = solidWeb
 const { ExtensionHub } = await import("../src/renderer/extensions/extension-hub")
-const { ToastViewport } = await import("../src/renderer/alpha-ui/Toast")
+const { ToastViewport } = await import("../src/renderer/codepuppy-ui/Toast")
 const { setHubSection } = await import("../src/renderer/extensions/ext-hub-state")
 const { dict: zh } = await import("../src/renderer/i18n/zh")
 
@@ -396,19 +396,19 @@ const clearToasts = (): void => qa(".a-toast").forEach((node) => node.remove())
 
 /** 当前打开的对话框里那颗「确认安装」主按钮(package 授权屏与套件确认框共用同一句文案)。 */
 function confirmInstallButton(): HTMLElement | undefined {
-  return qa("[role='dialog'] button").find((node) => (node.textContent ?? "").trim() === zh["alpha.ext.confirmInstall"])
+  return qa("[role='dialog'] button").find((node) => (node.textContent ?? "").trim() === zh["codepuppy.ext.confirmInstall"])
 }
 
 /** 能力授权框(第二阶段)的主按钮。文案与上面那颗**不同**,不能共用一个查找。 */
 function authzConfirmButton(): HTMLElement | undefined {
-  return qa("[role='dialog'] button").find((node) => (node.textContent ?? "").trim() === zh["alpha.ext.authz.confirmInstall"])
+  return qa("[role='dialog'] button").find((node) => (node.textContent ?? "").trim() === zh["codepuppy.ext.authz.confirmInstall"])
 }
 
 /** 条目卡:卡上没有 id 属性,按 `<b title={e.name}>` 定位(name 是 catalog 身份的一半)。 */
 function entryCard(name: string): HTMLElement {
-  const label = qa(".alpha-ext-card b").find((node) => node.getAttribute("title") === name)
+  const label = qa(".codepuppy-ext-card b").find((node) => node.getAttribute("title") === name)
   expect(label, `entry card for ${name} is not on screen`).toBeInstanceOf(HTMLElement)
-  const card = label!.closest<HTMLElement>(".alpha-ext-card")
+  const card = label!.closest<HTMLElement>(".codepuppy-ext-card")
   expect(card).toBeInstanceOf(HTMLElement)
   return card!
 }
@@ -431,7 +431,7 @@ async function installBundleThroughUi(name: string): Promise<void> {
   expect(q("[data-package-authorization]"), "a package authorization dialog is still open").toBeNull()
   setHubSection("connectors") // `#1594`:套件是连接器页的一组
   await waitFor(() => expect(entryCard(name)).toBeInstanceOf(HTMLElement))
-  click(entryCard(name).querySelector(".alpha-ext-add"))
+  click(entryCard(name).querySelector(".codepuppy-ext-add"))
   await waitFor(() => expect(confirmInstallButton()).toBeInstanceOf(HTMLElement))
   click(confirmInstallButton())
   await waitFor(() => expect(authzConfirmButton()).toBeInstanceOf(HTMLElement))
@@ -446,7 +446,7 @@ test("① 入口一 `runPackageAction`:卡片「安装」经收口方法出站,�
   setHubSection("connectors") // `#1594`:扩展包是连接器页的一组
   await waitFor(() => expect(q(`[data-package-card="${MIXED_BUNDLE_PACKAGE_ID}"]`)).toBeInstanceOf(HTMLElement))
   const reloadsBefore = reloadRequests.length
-  click(q(`[data-package-card="${MIXED_BUNDLE_PACKAGE_ID}"] .alpha-ext-add`))
+  click(q(`[data-package-card="${MIXED_BUNDLE_PACKAGE_ID}"] .codepuppy-ext-add`))
   // 首驱恒落 authorize 臂 ⇒ 授权屏出现。
   await waitFor(() => expect(q("[data-package-authorization]")).toBeInstanceOf(HTMLElement))
 
@@ -457,11 +457,11 @@ test("① 入口一 `runPackageAction`:卡片「安装」经收口方法出站,�
 })
 
 test("② 入口二 `confirmPackageAuthz`:确认屏落盘 ⇒ 同一个收口方法 + 引擎当场重扫一次", async () => {
-  const input = q<HTMLInputElement>("[data-package-authorization] .alpha-ext-key-input")
+  const input = q<HTMLInputElement>("[data-package-authorization] .codepuppy-ext-key-input")
   expect(input, "package authorization screen has no required-secret field").toBeInstanceOf(HTMLInputElement)
   // 夹具的 MCP 叶带一个必填密钥 ⇒ 确认按钮在填完之前是禁用的。这条只为让下面的点击走
   // **用户真实做得到**的那条路;密钥面本身的判据在 `ext-package-detail-wiring` 里,不在这里重述。
-  expect((q("[data-package-authorization] .alpha-ext-key-name")?.textContent ?? "").length).toBeGreaterThan(0)
+  expect((q("[data-package-authorization] .codepuppy-ext-key-name")?.textContent ?? "").length).toBeGreaterThan(0)
   input!.value = "req810-secret"
   input!.dispatchEvent(new Event("input", { bubbles: true }))
 
@@ -480,10 +480,10 @@ test("② 入口二 `confirmPackageAuthz`:确认屏落盘 ⇒ 同一个收口方
   // 首驱与确认屏是**同一次 attempt**:确认屏若自己另铸一个 id,admission 会当场拒。
   expect(centralCalls.at(-1)!.attemptId).toBe(centralCalls[0]!.attemptId)
   // 落盘 ⇒ main 恰好请求一次重扫(global,交给 ext 调度器);renderer 自己不 dispose。
-  expect(reloadRequests.slice(reloadsBefore)).toEqual([expect.objectContaining({ type: "alpha.reload.request", scope: "global" })])
+  expect(reloadRequests.slice(reloadsBefore)).toEqual([expect.objectContaining({ type: "codepuppy.reload.request", scope: "global" })])
   expect(disposeCalls).toBe(0)
   // 请求已受理 ⇒ 不许出现「要重启」。
-  expect(toasts().join("\n")).not.toContain(zh["alpha.ext.addedPendingReload"])
+  expect(toasts().join("\n")).not.toContain(zh["codepuppy.ext.addedPendingReload"])
 })
 
 test("③ 入口三 `installBundle`:套件装完同样经收口方法 + 引擎重扫一次", async () => {
@@ -492,16 +492,16 @@ test("③ 入口三 `installBundle`:套件装完同样经收口方法 + 引擎�
   clearToasts()
   await installBundleThroughUi(BUNDLE_OK_NAME)
 
-  await waitFor(() => expect(toasts().join("\n")).toContain(zh["alpha.ext.added"]))
+  await waitFor(() => expect(toasts().join("\n")).toContain(zh["codepuppy.ext.added"]))
   // 首驱(authorize)+ 重驱(落盘)各一次,两次都经过同一个收口方法。
   expect(centralCalls.slice(centralBefore)).toEqual([
     { catalogId: BUNDLE_OK, attemptId: undefined, authorized: false },
     { catalogId: BUNDLE_OK, attemptId: undefined, authorized: true },
   ])
   // **只有落盘那一次**请求重扫:authorize 臂上盘面还没动,重扫它就是谎报。
-  expect(reloadRequests.slice(reloadsBefore)).toEqual([expect.objectContaining({ type: "alpha.reload.request", scope: "global" })])
+  expect(reloadRequests.slice(reloadsBefore)).toEqual([expect.objectContaining({ type: "codepuppy.reload.request", scope: "global" })])
   expect(disposeCalls).toBe(0)
-  expect(toasts().join("\n")).not.toContain(zh["alpha.ext.addedPendingReload"])
+  expect(toasts().join("\n")).not.toContain(zh["codepuppy.ext.addedPendingReload"])
 })
 
 test("④ `#1529` AC3:ext 报告重载失败 ⇒ 已安装列表如实「待重载 · 上次重载没有成功」,不谎报可以使用", async () => {
@@ -511,8 +511,8 @@ test("④ `#1529` AC3:ext 报告重载失败 ⇒ 已安装列表如实「待重�
   await waitFor(() => expect(reloadRequests.length).toBe(reloadsBefore + 1))
   // 引擎(ext 调度器)对**所有在途**的重载报失败 —— 它们都覆盖当前目录。
   for (const request of reloadRequests)
-    alphaSidecar.receive(
-      { type: "alpha.reload.report", generation: request.generation, scope: "global", outcome: "failed", directories: [], error: "dispose refused (fixture)" },
+    codepuppySidecar.receive(
+      { type: "codepuppy.reload.report", generation: request.generation, scope: "global", outcome: "failed", directories: [], error: "dispose refused (fixture)" },
       () => {},
     )
   // `#1594`:已装行分在三页各自的「已安装」组(技能、命令进技能页,助手进助手页,其余进连接器页)。
@@ -525,12 +525,12 @@ test("④ `#1529` AC3:ext 报告重载失败 ⇒ 已安装列表如实「待重�
     await flush()
     await waitFor(() => {
       for (const node of qa("[data-hub-state='reload-pending']")) {
-        expect(node.textContent ?? "").toContain(zh["alpha.ext.hubStatePending"])
-        expect(node.textContent ?? "").toContain(zh["alpha.ext.hubReasonFailed"])
+        expect(node.textContent ?? "").toContain(zh["codepuppy.ext.hubStatePending"])
+        expect(node.textContent ?? "").toContain(zh["codepuppy.ext.hubReasonFailed"])
       }
     })
     // 没核验过的东西不许说「可以使用」;待重载的行各有一颗「立即生效」。
-    for (const node of qa("[data-hub-state='reload-pending']")) expect(node.textContent ?? "").not.toContain(zh["alpha.ext.hubStateAvailable"])
+    for (const node of qa("[data-hub-state='reload-pending']")) expect(node.textContent ?? "").not.toContain(zh["codepuppy.ext.hubStateAvailable"])
     expect(qa("[data-hub-reload-now]").length).toBe(qa("[data-hub-state='reload-pending']").length)
     pendingRows += qa("[data-hub-state='reload-pending']").length
   }

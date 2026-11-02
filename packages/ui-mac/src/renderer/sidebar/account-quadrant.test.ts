@@ -1,5 +1,5 @@
 // REQ-146(ac#1194):账户浮层「订阅×余额」四象限的组件端闸门入口。真实判据在
-// packages/ui-mac/test-component/account-quadrant.cases.ts —— 生产 AlphaSidebar + 真路由 +
+// packages/ui-mac/test-component/account-quadrant.cases.ts —— 生产 CodePuppySidebar + 真路由 +
 // 真点击,断言 chip 三态(免费版/按量付费/计划名)、未订阅时两行显示 summary.usage 真实
 // 用量、未订阅且无余额时面板不新增提示行。
 // 起子进程同 overlay-close.test.ts:cases 里的 mock.module 会污染同进程其它测试文件。

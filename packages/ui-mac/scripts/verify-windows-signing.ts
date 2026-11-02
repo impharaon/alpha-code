@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// verify-windows-signing(#175)—— alpha-windows-build.yml 的 Authenticode 硬门。
+// verify-windows-signing(#175)—— codepuppy-windows-build.yml 的 Authenticode 硬门。
 //
 //   bun scripts/verify-windows-signing.ts --channel <dev|beta|prod> --facts <windows-signing-facts.json>
 //

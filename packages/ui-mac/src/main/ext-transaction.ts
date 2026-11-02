@@ -7,7 +7,7 @@
 //   · 一切写入先落 `<root>/ext-tx/staging/<txId>/`(与 store 同根 = 同卷),校验(逐文件 sha256 +
 //     结构精确匹配 + 拒 symlink)通过前不碰任何 live 路径;
 //   · generation 目录经单次 rename 原子出现;live 指针 = `current.json` 原子换名写
-//     (tmp → fsync → rename,与 alpha-installs.writeLedger 同仓惯例 —— 本仓 materialization
+//     (tmp → fsync → rename,与 codepuppy-installs.writeLedger 同仓惯例 —— 本仓 materialization
 //     的既有原子原语是 rename,不引入 symlink,呼应 ADR-019 全面零 symlink 的方向);
 //   · 指针翻转前旧 generation 一直保留;journal 先记 intent(state=switching,含 previous
 //     指针)再翻转 —— 崩溃恢复永远有据可依,且「撤销状态优先于 receipt」:journal 是权威,
@@ -19,7 +19,7 @@
 //   · GC 有界:每扩展默认保留 3 代(current + 前两个,AC4 离线回滚口径),删除受
 //     realpath 圈禁 + 命名模式双守卫。
 //
-// root = 环境 mutable root(REQ-098 alpha-environment:prod/beta/dev 分域)。所有 API root
+// root = 环境 mutable root(REQ-098 codepuppy-environment:prod/beta/dev 分域)。所有 API root
 // 参数化 → 环境隔离天然成立(prod 事务不可能触碰 beta 根),单测零 mock(仓规:不用
 // mock.module,可注入面走参数,html-preview-host DI 同款纪律)。
 //
@@ -79,7 +79,7 @@ export type TxFileSpec = { path: string; sha256: string; size?: number }
 
 /** REQ-100 #311:action 判别式。缺省 "generation"(向后兼容:老 plan/journal 无此字段即文件树 generation)。
  *  - generation:文件树装进不可变 generation 目录 + current.json 指针翻转(skill 等)。
- *  - config:alpha.jsonc 叶/数组的 journaled 原子替换(mcp/plugin;走 ext-config-tx 适配器)。
+ *  - config:codepuppy.jsonc 叶/数组的 journaled 原子替换(mcp/plugin;走 ext-config-tx 适配器)。
  *  - file:根内单文件的 journaled 原子替换(agent md;走 ext-file-tx 适配器,REQ-102 #358)。
  *  - receipt:无 materialize/switch 副作用,只参加最终 receipt commit(cloud)。 */
 export type TxActionKind = "generation" | "config" | "receipt" | "file"
@@ -153,7 +153,7 @@ export type TxSkippedOptional = { key: string; reason?: string }
  */
 export type TxPreparedResourceV1 = {
   kind: "mcp-secret-version"
-  store: "alpha-mcp-secrets" | "official-connectors"
+  store: "codepuppy-mcp-secrets" | "official-connectors"
   /** store 内的所有者标识(单个安全路径段;真正的文法由 store 拥有者在释放接缝里再验一次)。 */
   server: string
   /** store 内的版本标识(同上)。 */
@@ -162,7 +162,7 @@ export type TxPreparedResourceV1 = {
 
 /** 已登记的 prepared resource 种类 / store。未登记者一律拒绝(咽喉对新成员默认拒绝)。 */
 const PREPARED_KINDS = new Set<string>(["mcp-secret-version"])
-const PREPARED_STORES = new Set<string>(["alpha-mcp-secrets", "official-connectors"])
+const PREPARED_STORES = new Set<string>(["codepuppy-mcp-secrets", "official-connectors"])
 /** 通用界:单个安全路径段(无分隔符/NUL/相对段,有界)。isExtensionName 与密钥版本名都是其真子集。 */
 const SAFE_PREPARED_SEGMENT = /^[A-Za-z0-9._-]{1,128}$/
 const PREPARED_FIELDS = new Set(["kind", "store", "server", "version"])
@@ -655,7 +655,7 @@ function validatePlan(root: string, plan: TxPlan): string | null {
   if (mutationCarriers.length > 1)
     return `plan carries ${mutationCarriers.length} package ledger mutations (${mutationCarriers.map((it) => it.key).join(", ")}) — only the root package item may carry one`
   const keys = new Set<string>()
-  // #378 r13 Major:同一物理 config 文件的**别名 target**(/a/alpha.jsonc 与 /a/sub/../alpha.jsonc)
+  // #378 r13 Major:同一物理 config 文件的**别名 target**(/a/codepuppy.jsonc 与 /a/sub/../codepuppy.jsonc)
   // 在 prepare 期按原始字符串各自成链(第二条覆盖第一条的写),恢复期按 resolve 归一又当同一条
   // 链 —— 语义分叉,fail-closed 拒(合法消费方都用单一构造路径;同一 raw target 多 item = 合法链)。
   const configTargetByResolved = new Map<string, string>()
@@ -672,12 +672,12 @@ function validatePlan(root: string, plan: TxPlan): string | null {
         return `config item "${item.key}": target must be an absolute path`
       // #378(Codex 裁决结构性风险 3):前向路径同样圈禁事务根 —— #375 只对恢复侧采信(isFlipped/
       // reconstruct/restore)加了圈禁,写入侧缺同一约束会让 root 外绝对 target 先合法进 journal。
-      // 全部现有消费方(bundle/seed/单装)都用 root 锚定的 alpha.jsonc,零行为变化。
+      // 全部现有消费方(bundle/seed/单装)都用 root 锚定的 codepuppy.jsonc,零行为变化。
       const relTarget = path.relative(root, item.config.target)
       if (!isSafeRelPath(relTarget) || !confineFileTarget(root, relTarget).ok)
         return `config item "${item.key}": target escapes the transaction root — refused`
       // r14 Major:词法 resolve 不够 —— 大小写不敏感/NFD 卷(macOS 缺省)上 ALPHA.JSONC 与
-      // alpha.jsonc 同一物理文件却是不同 map 键。身份键 = realpath(父目录)+ 归一化文件名
+      // codepuppy.jsonc 同一物理文件却是不同 map 键。身份键 = realpath(父目录)+ 归一化文件名
       // (NFC + 小写);区分大小写卷上的极端误拒可接受(合法消费方单一构造路径)。
       const resolvedTarget = path.resolve(item.config.target)
       const parentReal = (() => {
@@ -1458,7 +1458,7 @@ export async function runExtensionTransaction(root: string, plan: TxPlan, hooks:
   }
 
   // ③ materialize:generation → staging 目录单次 rename 进 generations/<genId>;config/receipt 不
-  //    materialize(config 的 next-image 已在 staging 待命,live alpha.jsonc 未动)。
+  //    materialize(config 的 next-image 已在 staging 待命,live codepuppy.jsonc 未动)。
   try {
     for (let i = 0; i < journal.items.length; i++) {
       const it = journal.items[i]!
@@ -1513,7 +1513,7 @@ export async function runExtensionTransaction(root: string, plan: TxPlan, hooks:
   crash("after-pre-probe")
 
   // ⑤ atomic switch:先持久化 previous 指针 + 意图(journal=switching),再逐 item 翻转 —— generation
-  //    换 current.json 指针,config 原子替换 live alpha.jsonc(next-image),receipt 无副作用。
+  //    换 current.json 指针,config 原子替换 live codepuppy.jsonc(next-image),receipt 无副作用。
   for (const it of journal.items)
     it.previousGeneration = actionOf(it) === "generation" ? (readCurrentGeneration(root, it.key)?.genId ?? null) : null
   advance("switching")

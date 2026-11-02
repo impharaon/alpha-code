@@ -4,8 +4,8 @@
 import { For, onCleanup, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { t } from "../i18n"
-import { pushToast } from "../alpha-ui/Toast"
-import { CopyButton } from "../alpha-ui/CopyButton"
+import { pushToast } from "../codepuppy-ui/Toast"
+import { CopyButton } from "../codepuppy-ui/CopyButton"
 import type {
   CloudJobEnvelope,
   CloudUploadResult,
@@ -19,23 +19,23 @@ import { createCloudJobLifecycle, dispatchError, type CloudJobState } from "./cl
 type ConsentState = { requestId: string; preview: UploadPreview }
 
 function uploadError(code: Extract<CloudUploadResult, { status: "failed" }>["error"]) {
-  if (code === "not-authenticated") return t("alpha.ext.cloudErrAuth")
-  if (code === "upload-file-limit") return t("alpha.cloud.consent.errFileLimit")
-  if (code === "upload-size-limit") return t("alpha.cloud.consent.errSizeLimit")
-  if (code === "upload-control-limit") return t("alpha.cloud.consent.errControlLimit")
-  if (code === "upload-not-text") return t("alpha.cloud.consent.errText")
+  if (code === "not-authenticated") return t("codepuppy.ext.cloudErrAuth")
+  if (code === "upload-file-limit") return t("codepuppy.cloud.consent.errFileLimit")
+  if (code === "upload-size-limit") return t("codepuppy.cloud.consent.errSizeLimit")
+  if (code === "upload-control-limit") return t("codepuppy.cloud.consent.errControlLimit")
+  if (code === "upload-not-text") return t("codepuppy.cloud.consent.errText")
   if (code === "upload-consent-issuance-failed" || code === "upload-consent-invalid") {
-    return t("alpha.cloud.consent.errToken")
+    return t("codepuppy.cloud.consent.errToken")
   }
   // [#940] 本地准入面的其余码 = 范围问题。判据是**结构**的,不手抄名单:本地准入码全是
-  // `upload-` 前缀 kebab(UploadErrorCode,alpha-upload-manifest.ts),而平台分类码的文法
+  // `upload-` 前缀 kebab(UploadErrorCode,codepuppy-upload-manifest.ts),而平台分类码的文法
   // /^[a-z][a-z0-9_]{2,63}$/(platform-error-code.ts)不含连字符 —— 两个域在这个前缀上
   // 不相交,新增本地准入码自动落回这里,不会静默漏出一份手抄清单。
-  if (code.startsWith("upload-")) return t("alpha.cloud.consent.errScope")
+  if (code.startsWith("upload-")) return t("codepuppy.cloud.consent.errScope")
   // 派发腿不再坍缩成 "upload-dispatch-failed":到这里的是平台分类码(upload_reserved_input …)
   // 或 unauthorized / network / http-<status> 回退,与 dispatch 面同一呈现纪律 ——
   // 已知码说明原因，未知结果提示先核对任务状态。
-  return dispatchError(code, "alpha.ext.cloudUnknownUpload")
+  return dispatchError(code, "codepuppy.ext.cloudUnknownUpload")
 }
 
 /** `#624`:`ready` 是**放行**判据(恢复中为 false);`recovering` 只改那句「为什么不能点」——
@@ -88,7 +88,7 @@ export function CloudDispatchBox(props: { entryId?: string; spec: CloudPipelineS
       setState({ phase: "idle", consent: result, consentBusy: false })
       return
     }
-    pushToast({ kind: "success", title: t("alpha.cloud.consent.toastSent") })
+    pushToast({ kind: "success", title: t("codepuppy.cloud.consent.toastSent") })
     // beginJob 曾在同一次 setState 里清掉 consent;它住进共享生命周期后,这两格归本组件自己清。
     setState({ consent: null, consentBusy: false })
     await beginJob(
@@ -120,13 +120,13 @@ export function CloudDispatchBox(props: { entryId?: string; spec: CloudPipelineS
 
   const runLegacyDiff = async () => {
     setState({ err: "", errAction: null, savedDir: "", diffSource: null, transparent: false })
-    const picked = await window.api.openDirectoryPicker({ title: t("alpha.ext.cloudPickProject") })
+    const picked = await window.api.openDirectoryPicker({ title: t("codepuppy.ext.cloudPickProject") })
     const directory = Array.isArray(picked) ? picked[0] : picked
     if (!directory) return
     setState("phase", "dispatching")
     const diff = await window.api.cloud.gitDiff(directory)
     if (!diff.ok) {
-      setState({ err: diff.reason === "no-diff" ? t("alpha.ext.cloudNoDiff") : t("alpha.ext.cloudDiffReadFailed"), phase: "failed" })
+      setState({ err: diff.reason === "no-diff" ? t("codepuppy.ext.cloudNoDiff") : t("codepuppy.ext.cloudDiffReadFailed"), phase: "failed" })
       return
     }
     setState("diffSource", diff.source)
@@ -150,8 +150,8 @@ export function CloudDispatchBox(props: { entryId?: string; spec: CloudPipelineS
     : props.entryId === "cloud:excel" ? "xlsx"
     : props.entryId === "cloud:powerpoint" ? "pptx" : undefined
   const inputLabel = () => t(props.spec.pipelineKind === "research"
-    ? "alpha.ext.cloudQuestion"
-    : props.spec.pipelineKind === "docs" ? "alpha.ext.cloudCode" : "alpha.ext.cloudTopic")
+    ? "codepuppy.ext.cloudQuestion"
+    : props.spec.pipelineKind === "docs" ? "codepuppy.ext.cloudCode" : "codepuppy.ext.cloudTopic")
   const runInput = async () => {
     const input = props.spec.pipelineKind === "research"
       ? { question: state.input.trim() }
@@ -159,7 +159,7 @@ export function CloudDispatchBox(props: { entryId?: string; spec: CloudPipelineS
         ? { code: state.input.trim() }
         : { topic: state.input.trim(), format: format() }
     setState({ phase: "dispatching", err: "", errAction: null, savedDir: "", result: "", files: [] })
-    const picked = await window.api.openDirectoryPicker({ title: t("alpha.ext.cloudPickResults") })
+    const picked = await window.api.openDirectoryPicker({ title: t("codepuppy.ext.cloudPickResults") })
     const directory = Array.isArray(picked) ? picked[0] : picked
     if (!directory) {
       setState("phase", "idle")
@@ -183,88 +183,88 @@ export function CloudDispatchBox(props: { entryId?: string; spec: CloudPipelineS
   const busy = () => state.phase === "dispatching" || state.phase === "running"
 
   return (
-    <div class="alpha-ext-dsub">
-      <div class="alpha-ext-dsub-t">{t("alpha.ext.cloudDispatchTitle")}</div>
-      <p class="alpha-ext-dnote">{t(props.spec.pipelineKind === "code-review" ? "alpha.cloud.consent.uploadHint" : "alpha.ext.cloudInputHint")}</p>
-      <div class="alpha-ext-cloudrun">
+    <div class="codepuppy-ext-dsub">
+      <div class="codepuppy-ext-dsub-t">{t("codepuppy.ext.cloudDispatchTitle")}</div>
+      <p class="codepuppy-ext-dnote">{t(props.spec.pipelineKind === "code-review" ? "codepuppy.cloud.consent.uploadHint" : "codepuppy.ext.cloudInputHint")}</p>
+      <div class="codepuppy-ext-cloudrun">
         <Show when={props.spec.pipelineKind === "code-review"}>
           <button
             ref={(element) => (triggerButton = element)}
-            class="alpha-ext-add"
+            class="codepuppy-ext-add"
             data-variant="primary"
             disabled={!props.ready || busy()}
             onClick={() => void runUpload()}
           >
             {state.phase === "dispatching"
-              ? t("alpha.ext.cloudDispatching")
+              ? t("codepuppy.ext.cloudDispatching")
               : state.phase === "running"
-                ? t("alpha.ext.cloudRunning")
-                : t("alpha.cloud.consent.uploadPick")}
+                ? t("codepuppy.ext.cloudRunning")
+                : t("codepuppy.cloud.consent.uploadPick")}
           </button>
-          <button class="alpha-ext-add" disabled={!props.ready || busy()} onClick={() => void runLegacyDiff()}>
-            {t("alpha.cloud.consent.legacyDiff")}
+          <button class="codepuppy-ext-add" disabled={!props.ready || busy()} onClick={() => void runLegacyDiff()}>
+            {t("codepuppy.cloud.consent.legacyDiff")}
           </button>
         </Show>
         <Show when={props.spec.pipelineKind !== "code-review"}>
           <label style={{ width: "100%" }}>
             {inputLabel()}
-            <textarea class="alpha-ext-ddoc" style={{ width: "100%" }} rows={6} aria-label={inputLabel()} value={state.input}
+            <textarea class="codepuppy-ext-ddoc" style={{ width: "100%" }} rows={6} aria-label={inputLabel()} value={state.input}
               disabled={!props.ready || busy()} onInput={(event) => setState("input", event.currentTarget.value)} />
           </label>
-          <button class="alpha-ext-add" data-variant="primary" data-cloud-input=""
+          <button class="codepuppy-ext-add" data-variant="primary" data-cloud-input=""
             disabled={!props.ready || busy() || !state.input.trim() || (props.spec.pipelineKind === "office-report" && !format())}
             onClick={() => void runInput()}>
-            {t(state.phase === "dispatching" ? "alpha.ext.cloudDispatching" : state.phase === "running" ? "alpha.ext.cloudRunning" : "alpha.ext.cloudStart")}
+            {t(state.phase === "dispatching" ? "codepuppy.ext.cloudDispatching" : state.phase === "running" ? "codepuppy.ext.cloudRunning" : "codepuppy.ext.cloudStart")}
           </button>
         </Show>
         <Show when={!props.ready}>
-          <span class="alpha-ext-meta">
-            {props.recovering ? t("alpha.ext.cloudRecoveringNote") : t("alpha.ext.cloudNeedPlatformNote")}
+          <span class="codepuppy-ext-meta">
+            {props.recovering ? t("codepuppy.ext.cloudRecoveringNote") : t("codepuppy.ext.cloudNeedPlatformNote")}
           </span>
         </Show>
         <Show when={state.transparent}>
-          <span class="alpha-ext-meta" data-live="">{t("alpha.cloud.consent.silentPass")}</span>
+          <span class="codepuppy-ext-meta" data-live="">{t("codepuppy.cloud.consent.silentPass")}</span>
         </Show>
         <Show when={state.diffSource}>
-          <span class="alpha-ext-meta">
-            {t("alpha.ext.cloudDiffSource")}:
-            {state.diffSource === "worktree" ? t("alpha.ext.cloudDiffWorktree") : t("alpha.ext.cloudDiffLastCommit")}
+          <span class="codepuppy-ext-meta">
+            {t("codepuppy.ext.cloudDiffSource")}:
+            {state.diffSource === "worktree" ? t("codepuppy.ext.cloudDiffWorktree") : t("codepuppy.ext.cloudDiffLastCommit")}
           </span>
         </Show>
         <Show when={state.phase === "running"}>
-          <span class="alpha-ext-meta" data-live="">{t(state.step === "queued" ? "alpha.ext.cloudQueued" : state.step === "job.completed" ? "alpha.ext.cloudCompleted" : state.step === "job.failed" ? "alpha.ext.cloudFailed" : state.step === "job.cancelled" ? "alpha.ext.cloudCancelled" : "alpha.ext.cloudProgress")}</span>
+          <span class="codepuppy-ext-meta" data-live="">{t(state.step === "queued" ? "codepuppy.ext.cloudQueued" : state.step === "job.completed" ? "codepuppy.ext.cloudCompleted" : state.step === "job.failed" ? "codepuppy.ext.cloudFailed" : state.step === "job.cancelled" ? "codepuppy.ext.cloudCancelled" : "codepuppy.ext.cloudProgress")}</span>
         </Show>
         <Show when={state.phase === "running" && state.cancel !== "cancelling"}>
           <button
-            class="alpha-ext-add"
+            class="codepuppy-ext-add"
             data-cancel-job=""
             disabled={state.cancel === "requesting"}
             onClick={() => void cancelJob()}
           >
-            {t("alpha.ext.cloudCancel")}
+            {t("codepuppy.ext.cloudCancel")}
           </button>
         </Show>
         <Show when={state.phase === "running" && state.cancel === "cancelling"}>
-          <span class="alpha-ext-meta" data-live="" data-cancelling="">{t("alpha.ext.cloudCancelling")}</span>
+          <span class="codepuppy-ext-meta" data-live="" data-cancelling="">{t("codepuppy.ext.cloudCancelling")}</span>
         </Show>
       </div>
       <Show when={state.phase === "done"}>
-        <p class="alpha-ext-dnote" data-ok="">
-          ✓ {t("alpha.ext.cloudDone")} · <code class="alpha-ext-dcode">{state.savedDir}</code>
+        <p class="codepuppy-ext-dnote" data-ok="">
+          ✓ {t("codepuppy.ext.cloudDone")} · <code class="codepuppy-ext-dcode">{state.savedDir}</code>
         </p>
       </Show>
       <Show when={state.result}>
-        <pre class="alpha-ext-ddoc" data-cloud-result="">{state.result}</pre>
-        <CopyButton label={t("alpha.wb.copy")} text={() => state.result} dataAttr="data-copy-cloud-result" />
+        <pre class="codepuppy-ext-ddoc" data-cloud-result="">{state.result}</pre>
+        <CopyButton label={t("codepuppy.wb.copy")} text={() => state.result} dataAttr="data-copy-cloud-result" />
       </Show>
       <For each={state.files}>
-        {(file) => <button class="alpha-ext-add" data-cloud-file="" onClick={() => void window.api.openPath(`${state.savedDir}/${file}`)}>{file}</button>}
+        {(file) => <button class="codepuppy-ext-add" data-cloud-file="" onClick={() => void window.api.openPath(`${state.savedDir}/${file}`)}>{file}</button>}
       </For>
       <Show when={state.err}>
-        <p class="alpha-ext-card-err">{state.err}</p>
+        <p class="codepuppy-ext-card-err">{state.err}</p>
         <Show when={state.errAction}>
           {(action) => (
-            <button class="alpha-ext-add" data-cloud-error-action="" onClick={() => {
+            <button class="codepuppy-ext-add" data-cloud-error-action="" onClick={() => {
               const target = action()
               if (target === "login") {
                 void window.api.auth.start()
@@ -272,14 +272,14 @@ export function CloudDispatchBox(props: { entryId?: string; spec: CloudPipelineS
               }
               void window.api.cloud.openBillingPage(target)
             }}>
-              {t(action() === "login" ? "alpha.ext.cloudGoLogin" : action() === "recharge" ? "alpha.ext.cloudGoRecharge" : "alpha.ext.cloudOpenOverflow")}
+              {t(action() === "login" ? "codepuppy.ext.cloudGoLogin" : action() === "recharge" ? "codepuppy.ext.cloudGoRecharge" : "codepuppy.ext.cloudOpenOverflow")}
             </button>
           )}
         </Show>
       </Show>
       <Show when={state.phase === "failed" && state.savedDir}>
-        <p class="alpha-ext-dnote">
-          {t("alpha.ext.cloudSaved")} <code class="alpha-ext-dcode">{state.savedDir}</code>
+        <p class="codepuppy-ext-dnote">
+          {t("codepuppy.ext.cloudSaved")} <code class="codepuppy-ext-dcode">{state.savedDir}</code>
         </p>
       </Show>
 

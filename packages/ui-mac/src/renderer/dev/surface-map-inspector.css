@@ -1,4 +1,4 @@
-@import "../alpha-ui/base.css";
+@import "../codepuppy-ui/base.css";
 
 .a-smap-trigger {
   position: fixed;
@@ -82,7 +82,7 @@ button.a-smap-stat:hover, button.a-smap-stat[aria-pressed="true"] { border-color
 .a-smap-route-next { display: flex; flex-direction: column; gap: 3px; margin-top: auto; padding-top: var(--a-space-3); color: var(--a-text-tertiary); font-size: var(--a-text-2xs); }
 
 .a-smap-lineage, .a-smap-mount, .a-smap-active { display: inline-flex; align-items: center; min-height: 22px; padding: 0 7px; border-radius: var(--a-radius-full); font-size: var(--a-text-2xs); font-weight: var(--a-weight-semibold); }
-.a-smap-lineage[data-lineage="alpha"] { background: var(--a-accent-subtle); color: var(--a-accent); }
+.a-smap-lineage[data-lineage="codepuppy"] { background: var(--a-accent-subtle); color: var(--a-accent); }
 .a-smap-lineage[data-lineage="opencode"] { background: var(--a-bg-muted); color: var(--a-text-secondary); }
 .a-smap-lineage[data-lineage="hybrid"] { background: var(--a-warning-subtle); color: var(--a-warning); }
 .a-smap-mount { background: var(--a-info-subtle); color: var(--a-info); }

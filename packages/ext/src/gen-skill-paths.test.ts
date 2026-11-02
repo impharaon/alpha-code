@@ -10,7 +10,7 @@ import { injectSkillGenerationPaths, skillGenerationLiveDirs } from "./gen-skill
 
 let root: string
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), "alpha-genpaths-"))
+  root = mkdtempSync(join(tmpdir(), "codepuppy-genpaths-"))
 })
 afterEach(() => {
   rmSync(root, { recursive: true, force: true })
@@ -87,10 +87,10 @@ describe("injectSkillGenerationPaths", () => {
 
 describe("#395 允许集投影门(skills-enabled.json,fail closed)", () => {
   test("允许集内的 skill 注入、不在集内(disabled)的不注入", () => {
-    const a = makeGeneration("alpha-on", "gen-000001-000001")
+    const a = makeGeneration("codepuppy-on", "gen-000001-000001")
     makeGeneration("beta-off", "gen-000001-000002")
     const c = makeGeneration("gamma-on", "gen-000001-000003")
-    writeAllowList(["alpha-on", "gamma-on"]) // beta-off 被 main 排除(disabled)
+    writeAllowList(["codepuppy-on", "gamma-on"]) // beta-off 被 main 排除(disabled)
     expect(skillGenerationLiveDirs(root)).toEqual([a, c].sort())
   })
 

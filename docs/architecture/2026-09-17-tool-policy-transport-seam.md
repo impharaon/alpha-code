@@ -11,7 +11,7 @@ review_after: 2027-03-17
 # 引擎 tool policy 面走出引擎进程的接缝
 
 REQ-131 的 Settings「工具」节要从**引擎(sidecar)进程**读 live inventory、写策略记录。
-inventory 与策略文档住在引擎的实例态服务里(`AlphaToolInventory.Service` / `AlphaToolPolicy.Service`,
+inventory 与策略文档住在引擎的实例态服务里(`CodePuppyToolInventory.Service` / `CodePuppyToolPolicy.Service`,
 按 `(account, workspace)` 分区);桌面 main / renderer 不能自己重算一份(#724 §9 CODE#3:
 「只消费 policy inventory/API;不建第二 identity / UI auth map」)。本文记录 2026-09-17 勘破出的
 那一跳:**不扩 ADR-033 名单、不碰 `httpapi/api.ts`**,把出口挂在已收编的 v2 permission 面上。
@@ -38,25 +38,25 @@ handler 是看不见的;而 `app` 组本身是上游文件。
 - `Permission.node` / `MCP.node`(已收编)—— inventory 依赖它们 ⇒ LayerNode 环,不行;
 - `ToolRegistry.node`(已收编)—— 要先把 inventory 自己的 node 拆开,且撞下面的 ESM 环,不值;
 - **`SessionPrompt.node`**(`session/prompt.ts`,#1011 收编)—— 依赖面已含 ToolRegistry / MCP / Config /
-  AlphaToolPolicy,合成暴露不必新增任何 dep。**选它。**
+  CodePuppyToolPolicy,合成暴露不必新增任何 dep。**选它。**
 
 **InstanceStore 在请求时取,不加进宿主的 deps。** 探针版把 `InstanceStore.node` 加进了 SessionPrompt 的 deps
 (bridge 在 layer 构建期 `yield* InstanceStore.Service`);实测这会让**每个**编译 `SessionPrompt.node` 的测试
-被迫绑定 `InstanceStore.bootstrapNode`(`test/session/alpha-subtask-attachment-policy.test.ts` 当场
+被迫绑定 `InstanceStore.bootstrapNode`(`test/session/codepuppy-subtask-attachment-policy.test.ts` 当场
 `Unbound layer node: @opencode/InstanceBootstrap`;`test/session/prompt.test.ts` 等四个上游测试同形)。
 而 v2 handler 的请求上下文 = `app` 组**全部顶层输出**的合并(`LayerNode.compile` 对顶层 `provideMerge`,
 `httpapi/server.ts` 把它整份 `Layer.provide` 给 handlers),`InstanceStore.node` 正是顶层成员 ⇒ bridge 在
 每次调用里 `Effect.serviceOption(InstanceStore.Service)` 一定拿得到;缺席只可能是装配变了,所以 die 而不是
 静默成空清单。
 
-`tool/registry → tool/task → session/prompt → alpha-tool-inventory → tool/registry` 是 ESM 环:
-顶层直接取 `AlphaToolInventory.exposed` 在 inventory 先被加载时撞 TDZ,所以宿主用
-`Layer.suspend(() => AlphaToolInventory.exposed)`。
+`tool/registry → tool/task → session/prompt → codepuppy-tool-inventory → tool/registry` 是 ESM 环:
+顶层直接取 `CodePuppyToolInventory.exposed` 在 inventory 先被加载时撞 TDZ,所以宿主用
+`Layer.suspend(() => CodePuppyToolInventory.exposed)`。
 
 **`packages/server` 只依赖 core / protocol**(`packages/server/package.json`),import 不到 opencode
-的服务标签。标签放 core:`packages/core/src/permission/alpha-tool-policy-api.ts`(既在 ADR-033 §1 收编
+的服务标签。标签放 core:`packages/core/src/permission/codepuppy-tool-policy-api.ts`(既在 ADR-033 §1 收编
 目录 `core/src/permission/**` 内,又是 `alpha-*` 命名)。opencode 侧
-`permission/alpha-tool-inventory.ts` 的 `bridge` 按 v2 location 的 `directory` 用 `InstanceStore.provide`
+`permission/codepuppy-tool-inventory.ts` 的 `bridge` 按 v2 location 的 `directory` 用 `InstanceStore.provide`
 注入 `InstanceRef` 再跑 `list()` / `setRecord` / `removeRecord` / `reset` —— 与上游
 `server/src/pty-environment.ts` ↔ `opencode/src/plugin/pty-environment.ts` 同形。
 
@@ -70,15 +70,15 @@ handler 用 `Effect.serviceOption` 取标签、缺席即 **503 `ServiceUnavailab
 
 | 面 | 路径 |
 | --- | --- |
-| core 标签 | `packages/core/src/permission/alpha-tool-policy-api.ts`(`@opencode/v2/AlphaToolPolicyApi`,含 `WriteError{kind: quarantined \| io}`) |
+| core 标签 | `packages/core/src/permission/codepuppy-tool-policy-api.ts`(`@opencode/v2/CodePuppyToolPolicyApi`,含 `WriteError{kind: quarantined \| io}`) |
 | 端点 | `GET /api/permission/tool-policy/inventory` · `PUT /api/permission/tool-policy/record` · `POST /api/permission/tool-policy/record/remove` · `POST /api/permission/tool-policy/reset`(`packages/protocol/src/groups/permission.ts`) |
 | handler | `packages/server/src/handlers/permission.ts`:503 没接线 / 409 文档待恢复 / 400 记录不合 schema(service/tool 层 enabled 无 digest)/ 500 落盘失败 |
-| 实现 + 合成暴露 | `packages/opencode/src/permission/alpha-tool-inventory.ts`(`bridge` / `exposed`;InstanceStore 请求时取)· `packages/opencode/src/session/prompt.ts`(宿主,deps 不变) |
-| 闸 | `packages/opencode/test/server/alpha-tool-policy-route.test.ts`(R1–R5,登记于 `scripts/gate-files.tsv`)· `httpapi-exercise` 四条 scenario |
+| 实现 + 合成暴露 | `packages/opencode/src/permission/codepuppy-tool-inventory.ts`(`bridge` / `exposed`;InstanceStore 请求时取)· `packages/opencode/src/session/prompt.ts`(宿主,deps 不变) |
+| 闸 | `packages/opencode/test/server/codepuppy-tool-policy-route.test.ts`(R1–R5,登记于 `scripts/gate-files.tsv`)· `httpapi-exercise` 四条 scenario |
 
 桌面侧:`ui-mac/src/main/tool-policy-client.ts`(按 protocol 定义直接 fetch,main 侧再 decode 一次
 `parseToolPolicyInventory`)→ `main/tool-policy-ipc.ts` → preload `window.api.toolPolicy` →
-`renderer/alpha-ui/settings-tools.tsx`。契约见 [`../contracts/tool-policy.md`](../contracts/tool-policy.md)。
+`renderer/codepuppy-ui/settings-tools.tsx`。契约见 [`../contracts/tool-policy.md`](../contracts/tool-policy.md)。
 
 ## 4. 主动没走的路
 

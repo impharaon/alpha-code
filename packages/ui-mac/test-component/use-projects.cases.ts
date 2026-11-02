@@ -17,10 +17,10 @@ import { GlobalRegistrator } from "@happy-dom/global-registrator"
 import presetSolid from "babel-preset-solid"
 import type { ModelV2Info } from "@opencode-ai/sdk/v2/client"
 import type { SidecarGenerationState, AccountSummary, AuthState } from "../src/preload/types"
-import type { EffectiveCatalog, ProviderKeyStatus } from "../src/shared/alpha-model-types"
-import type { AlphaProjectsApi, ServerInfo } from "../src/renderer/sidebar/use-projects"
-import type { AlphaComposerRuntimeProps } from "../src/renderer/alpha-ui/alpha-composer"
-import type { ModelContract } from "../src/renderer/alpha-ui/model-contract"
+import type { EffectiveCatalog, ProviderKeyStatus } from "../src/shared/codepuppy-model-types"
+import type { CodePuppyProjectsApi, ServerInfo } from "../src/renderer/sidebar/use-projects"
+import type { CodePuppyComposerRuntimeProps } from "../src/renderer/codepuppy-ui/codepuppy-composer"
+import type { ModelContract } from "../src/renderer/codepuppy-ui/model-contract"
 import { dict as zh } from "../src/renderer/i18n/zh"
 // `#1374`:共享 `window.api` 桩(只 import 类型,运行期零依赖 ⇒ 静态 import 不会抢在
 // 下面的 `mock.module` 之前拖进 solid-js)。
@@ -54,8 +54,8 @@ Bun.plugin({
   },
 })
 
-const command = { options: [], trigger: () => {} } as unknown as AlphaComposerRuntimeProps["command"]
-mock.module("../src/renderer/alpha-ui/providers", () => ({ useCommand: () => command }))
+const command = { options: [], trigger: () => {} } as unknown as CodePuppyComposerRuntimeProps["command"]
+mock.module("../src/renderer/codepuppy-ui/providers", () => ({ useCommand: () => command }))
 
 // —— preload 桥 stub:subscribe 捕获 runtime-recovery 的内部回调,getState 提供「现值」 ——
 let bridgeCb: ((state: SidecarGenerationState) => void) | undefined
@@ -98,7 +98,7 @@ const summary: AccountSummary = {
   usageSeries: [],
 }
 
-// REQ-126 不变量 5(#656):`alpha-workspace-ensure` **不 throw**,失败以 `{ok:false}` 回来;而
+// REQ-126 不变量 5(#656):`codepuppy-workspace-ensure` **不 throw**,失败以 `{ok:false}` 回来;而
 // main 对**非默认路径**同样返回 `{ok:false}`(那是合法的 no-op,不是失败)。用例逐条设定默认目录
 // 与这个回复(Error 实例 = 桥本身炸了),并记录 ensure 到底被调了几次。
 const DEFAULT_WORKSPACE_DIR = "/Users/tester/Alpha"
@@ -268,20 +268,20 @@ globalThis.fetch = ((input: unknown, init?: RequestInit) => {
   return new Promise(() => {})
 }) as typeof fetch
 
-const { useAlphaProjects } = await import("../src/renderer/sidebar/use-projects")
+const { useCodePuppyProjects } = await import("../src/renderer/sidebar/use-projects")
 const { projectSidebarGroups } = await import("../src/renderer/sidebar/project-display")
 const { replayRuntimeRecoveryState, subscribeCatalogUpdated, subscribeRuntimeRecovery } = await import(
   "../src/renderer/runtime-recovery"
 )
-const { AlphaComposerRuntime } = await import("../src/renderer/alpha-ui/alpha-composer")
-const { ModelPickPop } = await import("../src/renderer/alpha-ui/alpha-composer-model")
+const { CodePuppyComposerRuntime } = await import("../src/renderer/codepuppy-ui/codepuppy-composer")
+const { ModelPickPop } = await import("../src/renderer/codepuppy-ui/codepuppy-composer-model")
 const { composerModel, setComposerModel, setComposerAgent, resetComposerModelProjection } = await import(
-  "../src/renderer/alpha-ui/composer-state"
+  "../src/renderer/codepuppy-ui/composer-state"
 )
 // #882:接线用例要驱动**真的**就绪屏障 —— 只订阅 notifyCatalogUpdated 只能证明「最终被唤醒」,
 // 证明不了「事件跑赢了兜底档位」。
-const { createModelContract } = await import("../src/renderer/alpha-ui/model-contract")
-const { ALPHA_V2_CATALOG_READY_PROVIDER_ID } = await import("../src/shared/alpha-config")
+const { createModelContract } = await import("../src/renderer/codepuppy-ui/model-contract")
+const { CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID } = await import("../src/shared/codepuppy-config")
 
 const serverInfo: ServerInfo = { baseUrl: "http://127.0.0.1:19099", username: "u", password: "p" }
 const tick = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -302,11 +302,11 @@ async function waitFor(assertion: () => void, timeoutMs = 3_000) {
 const activeDisposals: Array<() => void> = []
 /** #882 接线用例里那条**真**兜底定时器;用例结束必须清掉,不许把 tick 漏进下一条用例。 */
 const fallbackTimers: Array<ReturnType<typeof setTimeout>> = []
-function mountHook(probeDelayMs: number): { api: AlphaProjectsApi } {
-  let api!: AlphaProjectsApi
+function mountHook(probeDelayMs: number): { api: CodePuppyProjectsApi } {
+  let api!: CodePuppyProjectsApi
   const dispose = createRoot((d: () => void) => {
     const [server] = createSignal<ServerInfo | undefined>(serverInfo)
-    api = useAlphaProjects(server, { delayFor: () => probeDelayMs })
+    api = useCodePuppyProjects(server, { delayFor: () => probeDelayMs })
     return d
   })
   activeDisposals.push(dispose)
@@ -480,7 +480,7 @@ test("R1 Blocker2:自探重建后发本地恢复通知 —— composer 模型链
     switch: async () => {},
   }
   const host = mountView(() =>
-    createComponent(AlphaComposerRuntime, {
+    createComponent(CodePuppyComposerRuntime, {
       mode: "home",
       projects: api,
       directory: () => "/W",
@@ -544,18 +544,18 @@ test("R1 闩死点三收口:真实点击「立即重试」→ client 重建 + �
     }),
   )
   // client 缺失 → 列表进入 recovering 横幅,出现「立即重试」;本地目录行全部锁死不可选
-  await waitFor(() => expect(buttonByText(host, zh["alpha.model.retryNow"])).toBeDefined())
+  await waitFor(() => expect(buttonByText(host, zh["codepuppy.model.retryNow"])).toBeDefined())
   const rows = () => [...host.querySelectorAll(".a-mpp-row")] as HTMLButtonElement[]
   expect(rows().length).toBeGreaterThan(0)
   expect(rows().every((row) => row.disabled)).toBe(true)
 
   // 修复前:按钮只重跑 fetch 层(loadAll),sdk() 依旧 undefined → 原地同步失败,
   // 横幅与锁死常驻。
-  buttonByText(host, zh["alpha.model.retryNow"])!.click()
+  buttonByText(host, zh["codepuppy.model.retryNow"])!.click()
   await waitFor(() => expect(api.sdk()).toBeDefined())
   await waitFor(() => expect(rows().some((row) => !row.disabled)).toBe(true))
   expect(retryCurrentCalls).toBeGreaterThan(0)
-  expect(buttonByText(host, zh["alpha.model.retryNow"])).toBeUndefined()
+  expect(buttonByText(host, zh["codepuppy.model.retryNow"])).toBeUndefined()
 })
 
 test("REQ-126 不变量5:默认对话目录的供给结果必须如实回报,非默认路径不当成失败", async () => {
@@ -731,7 +731,7 @@ test("#882 global 事件流把 catalog.updated 按 directory 派发给就绪屏�
             get: async () => {
               ticksAtProbe.push(fallbackTicks)
               return markerReady
-                ? { data: { data: { id: ALPHA_V2_CATALOG_READY_PROVIDER_ID } } }
+                ? { data: { data: { id: CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID } } }
                 : { error: { message: "Provider not found" }, response: { status: 404 } }
             },
           },

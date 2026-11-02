@@ -6,7 +6,7 @@
 // 旧 `resolvedSurfaces` 异步 admission 已被 REQ-089(#638)删除,但「删了驱动」≠「命题被钉住」——
 // 本文件把退出条件(收敛/换血后 composer mount 计数不再跳增、状态跨收敛保持)钉在生产接线上。
 //
-// 判据的可观察量 = 生产 AlphaComposer 自己的 `renderer.composer.mount` timeline 打点
+// 判据的可观察量 = 生产 CodePuppyComposer 自己的 `renderer.composer.mount` timeline 打点
 // (真机取证同一口径)+ DOM 节点同一性 + 草稿文本。第一条用例是**控制组**:驱动一次真实的
 // 服务器身份切换(keyed Show 的合法重挂),断言计数器确实数得到 2 —— 先证明手段能测出已知的
 // 坏,再用它判未知的好。每条「事件确实到达生产代码」都有独立证据(generation.received 打点 /
@@ -14,7 +14,7 @@
 //
 // 【harness 的边界,如实】`App()` 的响应图是对 renderer/index.tsx 的逐行复刻(render() 入口
 // 无法 import),真正执行的生产件是:AppInterface + 上游路由树/Provider 链、composeRoutes、
-// AlphaHome/AlphaComposer、useAlphaProjects、runtime-recovery。若 index.tsx 的接线形状变了,
+// CodePuppyHome/CodePuppyComposer、useCodePuppyProjects、runtime-recovery。若 index.tsx 的接线形状变了,
 // 下面的源码锚点先红,提示同步 harness —— 锚点红不代表行为坏,代表这道闸的复刻过期了。
 
 import { GlobalRegistrator } from "@happy-dom/global-registrator"
@@ -34,7 +34,7 @@ const appSrc = join(import.meta.dir, "../../../app/src")
 
 // 与 Electron renderer 同一个 Solid vite 插件编译生产组件(bun 原生 TSX 变换是 React 形状的,
 // 会静默丢掉 Solid 的响应式 DOM 表达式);alias 是消歧不是替身(见 start-draft.test.ts)。
-const runtimeDirectory = mkdtempSync(join(tmpdir(), "alpha-surface-remount-"))
+const runtimeDirectory = mkdtempSync(join(tmpdir(), "codepuppy-surface-remount-"))
 await build({
   configFile: false,
   logLevel: "silent",
@@ -104,11 +104,11 @@ async function waitFor(check: () => boolean, label: string) {
 function mountShell() {
   const host = document.createElement("div")
   document.body.append(host)
-  disposers.push(runtime.render(() => runtime.AlphaSurfaceShell({}), host))
+  disposers.push(runtime.render(() => runtime.CodePuppySurfaceShell({}), host))
 }
 
 function composerRoot(): HTMLElement {
-  const node = document.querySelector('[data-alpha-composer="home"]') as HTMLElement | null
+  const node = document.querySelector('[data-codepuppy-composer="home"]') as HTMLElement | null
   if (!node) throw new Error("首页 composer 不在 DOM 里")
   return node
 }
@@ -127,7 +127,7 @@ function typeDraft(text: string) {
 
 /** #927 丢稿提示的可观察面:toast DOM 里按**独立字面量**筛(不 import i18n 目录 ——
  *  期望值与被测对象同源就是自指等价链,文案改了这里要跟着人工改)。字面量取 zh:本包
- *  bunfig 的 test-preload 把所有 bun 测试钉在 ALPHA_UI_LOCALE=zh(与既有 zh 断言套件同口径)。 */
+ *  bunfig 的 test-preload 把所有 bun 测试钉在 CODEPUPPY_UI_LOCALE=zh(与既有 zh 断言套件同口径)。 */
 function discardNoticeToasts(): HTMLElement[] {
   return [...document.querySelectorAll(".a-toast")].filter((el) =>
     el.textContent?.includes("已切换服务器"),
@@ -147,7 +147,7 @@ async function bootToHome() {
   const bootGeneration = runtime.nextGeneration()
   runtime.emitSidecarGeneration({ generation: bootGeneration, status: "ready", reason: "boot" })
   await waitFor(() => runtime.composerMountCount() === 1, "首页 composer 首次挂载")
-  await waitFor(() => runtime.projectsApi()?.store.ready === true, "生产 useAlphaProjects 完成首拉")
+  await waitFor(() => runtime.projectsApi()?.store.ready === true, "生产 useCodePuppyProjects 完成首拉")
   return bootGeneration
 }
 
@@ -241,7 +241,7 @@ describe("#1056 冷启动只挂一次 home composer(启动 draft 交接闸)", ()
   // 一次 `renderer.root.mount` 下有**两条** home 模式模型链 —— `chain:2` 先起、以
   // `outcome:"error:request"` 收场,`chain:1` 随后 30–50ms 内起并 `ok`,`catalog_ready` 只在
   // 后者身上发过。两条链分属两个组件实例(`chainSeq` 是实例本地的 `let`),即 composer 挂了两次。
-  // 机制:路由起点恒为 `/` ⇒ AlphaHome 先挂;侧栏的启动效应(REQ-126 §4 序 3)在 `store.ready`
+  // 机制:路由起点恒为 `/` ⇒ CodePuppyHome 先挂;侧栏的启动效应(REQ-126 §4 序 3)在 `store.ready`
   // 之后必然把路由换到 `/new-session`,首页那一个实例连同它的模型链一起被丢弃。
   //
   // 本组用**生产侧栏 + 生产首页 + 生产新对话页**跑完整条启动路径,判据仍是真机取证的那一个
@@ -258,9 +258,9 @@ describe("#1056 冷启动只挂一次 home composer(启动 draft 交接闸)", ()
 
   // 判据取**存在与否的布尔**而不是节点本身:失败时 happy-dom 节点会被整棵序列化进 diff
   // (实测把一次失败拖成 140s 的日志),这里只需要"在/不在"。
-  const newSessionMounted = () => document.querySelector("[data-alpha-new-session]") !== null
-  const homeMounted = () => document.querySelector("[data-alpha-home]") !== null
-  const homeComposerMounted = () => document.querySelector('[data-alpha-composer="home"]') !== null
+  const newSessionMounted = () => document.querySelector("[data-codepuppy-new-session]") !== null
+  const homeMounted = () => document.querySelector("[data-codepuppy-home]") !== null
+  const homeComposerMounted = () => document.querySelector('[data-codepuppy-composer="home"]') !== null
 
   test("控制组:交接位缺席时,同一条启动路径确实挂两次 composer", async () => {
     // 抢先 arm 一个**当场到期**的交接位:侧栏自己的 arm 因一次性闩而成为 no-op,
@@ -320,7 +320,7 @@ describe("#1099 启动窗口不再是一段空白(REQ-109 观测闸)", () => {
   const INJECTED_DELAY_MS = 200
 
   // `#1300`:归因判据不量墙钟。renderer 的每个交接点都读 `performance.now()`(startup-timeline.ts
-  // 默认时钟、alpha-sidebar.tsx 的逐步记时、shell-boot-timeline.ts),bun 里它可写。这里把它换成一个
+  // 默认时钟、codepuppy-sidebar.tsx 的逐步记时、shell-boot-timeline.ts),bun 里它可写。这里把它换成一个
   // **只由夹具推进**的时钟:注入 200ms 延迟的那一处同时把时钟推进 200,其余处一律不动 ⇒
   // 「延迟落在哪一步」是精确相等(200 / 0),不再是「别处 < 150ms」—— 后者在满载下是掷骰子。
   let fakeNow = 0

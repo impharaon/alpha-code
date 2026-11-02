@@ -6,7 +6,7 @@ import {
   attachmentAbsolutePath,
   type StagedAttachmentMeta,
 } from "../../ui-mac/src/shared/attachment-path"
-import { attachmentReadOf } from "../../ui-mac/src/renderer/alpha-ui/session-timeline/timeline-attachments"
+import { attachmentReadOf } from "../../ui-mac/src/renderer/codepuppy-ui/session-timeline/timeline-attachments"
 import { attachmentInstruction, createAttachmentReaderHooks } from "./attachment-reader-hooks"
 import { mcpEngineToolId } from "./cloud-websearch-kill"
 import { explainAttachmentBlock } from "./context-injection"

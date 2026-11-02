@@ -76,7 +76,7 @@ export function imageCapabilityOf(list: unknown, model: ModelRef): boolean | und
 }
 
 /** 转写块 part 与 Read 结果 metadata 上的标记键;messages.transform 据它重建登记簿、剔图。 */
-export const VISION_MARKER = "alpha_vision"
+export const VISION_MARKER = "codepuppy_vision"
 
 /** 持久化标记(`#1447` R1 M1):原图哈希、会话内编号、标签、云端正文(失败时没有 text)。 */
 export type VisionMarker = { readonly hash: string; readonly number: number; readonly label: string; readonly text?: string }
@@ -154,10 +154,10 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
     try {
       value = imageCapabilityOf(await deps.listProviders(), model)
     } catch (error) {
-      deps.error?.(`[@alpha-code/ext] cloud vision: provider list unavailable (${error instanceof Error ? error.message : String(error)})`)
+      deps.error?.(`[@codepuppy/ext] cloud vision: provider list unavailable (${error instanceof Error ? error.message : String(error)})`)
     }
     if (value !== undefined) capability.set(key, value)
-    else deps.error?.(`[@alpha-code/ext] cloud vision: capabilities.input.image unknown for ${key} — treating the model as unable to see images (fail-closed)`)
+    else deps.error?.(`[@codepuppy/ext] cloud vision: capabilities.input.image unknown for ${key} — treating the model as unable to see images (fail-closed)`)
     return value ?? false
   }
 
@@ -221,7 +221,7 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
       if (!Array.isArray(msgs)) return
       for (const m of msgs as MessageLike[]) if (m?.info) rehydrate(session, m)
     } catch (error) {
-      deps.error?.(`[@alpha-code/ext] cloud vision: session history unavailable for ${sessionID} (${error instanceof Error ? error.message : String(error)})`)
+      deps.error?.(`[@codepuppy/ext] cloud vision: session history unavailable for ${sessionID} (${error instanceof Error ? error.message : String(error)})`)
     }
   }
 
@@ -268,7 +268,7 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
           })
         })
       } catch (error) {
-        deps.error?.(`[@alpha-code/ext] cloud vision (chat.message) failed: ${error instanceof Error ? error.message : String(error)}`)
+        deps.error?.(`[@codepuppy/ext] cloud vision (chat.message) failed: ${error instanceof Error ? error.message : String(error)}`)
       }
     },
 
@@ -345,7 +345,7 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
         const marker: VisionReadMarker = { images: entries.map((entry) => markerFor(session, entry)) }
         metadata[VISION_MARKER] = marker
       } catch (error) {
-        deps.error?.(`[@alpha-code/ext] cloud vision (tool.execute.after) failed: ${error instanceof Error ? error.message : String(error)}`)
+        deps.error?.(`[@codepuppy/ext] cloud vision (tool.execute.after) failed: ${error instanceof Error ? error.message : String(error)}`)
       }
     },
 
@@ -360,7 +360,7 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
         const access = cloudVisionAccess(env, readFile)
         output.system.push(toolId && access.ok ? renderTemplate(VISION_SYSTEM_NOTE_ID, { name: toolId }) : contextText(VISION_SYSTEM_NOTE_OFFLINE_ID))
       } catch (error) {
-        deps.error?.(`[@alpha-code/ext] cloud vision (system.transform) failed: ${error instanceof Error ? error.message : String(error)}`)
+        deps.error?.(`[@codepuppy/ext] cloud vision (system.transform) failed: ${error instanceof Error ? error.message : String(error)}`)
       }
     },
 
@@ -423,7 +423,7 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
           if (changed) msgs[i] = { ...m, parts }
         }
       } catch (error) {
-        deps.error?.(`[@alpha-code/ext] cloud vision (messages.transform) failed: ${error instanceof Error ? error.message : String(error)}`)
+        deps.error?.(`[@codepuppy/ext] cloud vision (messages.transform) failed: ${error instanceof Error ? error.message : String(error)}`)
       }
     },
 

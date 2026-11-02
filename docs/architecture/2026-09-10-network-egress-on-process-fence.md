@@ -27,7 +27,7 @@ prompt `!command` 的子进程),它从不监听端口。`#1321` 把地基换了:
 | --- | --- |
 | 仓 | `alpha-code@6a6f4bd37`(`origin/alpha`,worktree `ac-1334`) |
 | 宿主 | macOS Darwin 25.3.0 arm64 · `/usr/bin/sandbox-exec` · node v25.8.1(独立探针)/ Electron 42.3.3 内嵌 node(出货 sidecar) |
-| 出货形态 | 本机发版命令打的 Developer ID + hardened runtime 签名包,`com.tide.alphacode` 0.1.12,fat `alpha_fence.node`,`codesign --verify --deep --strict` exit 0 |
+| 出货形态 | 本机发版命令打的 Developer ID + hardened runtime 签名包,`com.tide.alphacode` 0.1.12,fat `codepuppy_fence.node`,`codesign --verify --deep --strict` exit 0 |
 | 观测面 | ①runner 进程 `existsSync` 实读落盘;②loopback CONNECT 代理的逐条请求日志;③内核 Sandbox 拒绝日志(`log show … eventMessage CONTAINS "deny("`);④真 `sandbox-exec` 试编译器的报错原文 |
 | 日期 | 2026-09-10 |
 
@@ -338,7 +338,7 @@ process fence profile does not compile even with the minimum writable set
 {"event":"egress.connect","authority":"alpha-cloud.tidelabs.click:443","verdict":"allow","status":200}
 ```
 
-同一次启动 `alpha-secrets sync: wrote [… DEEPSEEK_API_KEY, ZHIPU_API_KEY]` —— **密钥在**,拦它的是我们自己。
+同一次启动 `codepuppy-secrets sync: wrote [… DEEPSEEK_API_KEY, ZHIPU_API_KEY]` —— **密钥在**,拦它的是我们自己。
 
 **为什么不是「表里少了两行」。** BYOK 的 baseURL 由**用户配置了谁**决定,注册表抬头早就把它列进「动态」类别。
 补上 DeepSeek 与智谱,下一个供应商照样 403 —— 而「下一个供应商」正是这条路的卖点。手写清单与缺陷同形。
@@ -351,18 +351,18 @@ process fence profile does not compile even with the minimum writable set
 | 动态 | `packages/ui-mac/src/main/network-egress-derived.ts` | **这一代**注入面里的 BYOK 目的地(目录 baseURL × 密钥文件在场) | 用户 —— 在模型选择器里给某一家填 Key |
 
 派生的唯一权威是**引擎真正会去连的那个值**:有效配置里 `provider.<id>.options.baseURL`(回退字段 `api`;
-字段选择与 v2 桥 `alpha-config-injection.ts:457-462` 逐字同源 —— `options.baseURL` **是字符串就赢**,
+字段选择与 v2 桥 `codepuppy-config-injection.ts:457-462` 逐字同源 —— `options.baseURL` **是字符串就赢**,
 回退条件是它不是字符串,而不是「它派生失败」)。
 
-输入**只有一个**:`buildAlphaModelConfig(userDataPath).provider`。目录 BYOK 节点只在**密钥文件在场**时
-才出现,也就是说「用户配过这一家」在这里已经是一个文件在不在的问题;sidecar 侧 `injectAlphaConfig` 调的是
+输入**只有一个**:`buildCodePuppyModelConfig(userDataPath).provider`。目录 BYOK 节点只在**密钥文件在场**时
+才出现,也就是说「用户配过这一家」在这里已经是一个文件在不在的问题;sidecar 侧 `injectCodePuppyConfig` 调的是
 **同一个函数、同一个 `userDataPath`**,而密钥文件刚由同一次 `syncSecretFiles` 落定 ⇒ 两边结构上不可能分叉。
 
 ### 为什么**不读**配置文件(`#1380` R1 Blocker,合并前拦下)
 
-第一版还读了「文件面」—— `alpha.jsonc` / `<XDG_CONFIG_HOME>/opencode` / `~/.opencode` 里的 provider 块,
+第一版还读了「文件面」—— `codepuppy.jsonc` / `<XDG_CONFIG_HOME>/opencode` / `~/.opencode` 里的 provider 块,
 理由是用户自建节点的 baseURL 只住在那里。**那是一个 confused deputy**:这三条路径逐条落在 seatbelt 的
-**可写集**里(`process-fence-profile.ts` 的 W2 `alphaGlobalRoot` / W6 `<configHome>/opencode` /
+**可写集**里(`process-fence-profile.ts` 的 W2 `codepuppyGlobalRoot` / W6 `<configHome>/opencode` /
 W16 `<home>/.opencode`),也就是**被围栏的引擎树自己写得了**的地方。于是引擎树里任意一段代码
 (bash 工具、被打开仓库自带的 plugin、MCP stdio 子进程)只要写一行
 
@@ -377,13 +377,13 @@ W16 `<home>/.opencode`),也就是**被围栏的引擎树自己写得了**的地�
 fork 前 `syncSecretFiles` 收敛(不在 wanted 集合里的遗留文件当场扫掉),两者都不在引擎的可写集里。
 `#1392`(2026-09-22)之前,注入面对文件里的那些 id 只贡献 `enabled_providers` 与 `options.apiKey`、从不贡献 baseURL,
 用户手工添加的自定义节点因此**仍然被拒**(它的 baseURL 只住在那个可写文件里)。**现在**:自定义节点的记录整体搬进了
-`<appData>/alpha-code-state/custom-providers/<env>.json`(`#1391` 真源,只有 main 写、不在任何可写根之下;方案基线
+`<appData>/codepuppy-state/custom-providers/<env>.json`(`#1391` 真源,只有 main 写、不在任何可写根之下;方案基线
 [`../design/2026-09-21-1383-custom-provider-address-truth-baseline.md`](../design/2026-09-21-1383-custom-provider-address-truth-baseline.md)),
-注入面(`alpha-models.ts` 第 (3) 段)从它发出**完整块**(npm / name / baseURL / models / `{file:}` 密钥引用),本模块零改动就把
+注入面(`codepuppy-models.ts` 第 (3) 段)从它发出**完整块**(npm / name / baseURL / models / `{file:}` 密钥引用),本模块零改动就把
 它们算进放行集合;三处配置文件的 `provider.*` 对 `enabled_providers`、注入表与放行集合**一概不算数**(基线 I1)。引擎原生仍会合并
-`alpha.jsonc`,让它写的块失效的机制是 `enabled_providers` 整体替换 + 注入完整块(同 id 后合并者赢),判据因此是端到端的:
-`custom-provider-derivation.test.ts` 起真引擎问清单 —— 真源节点在清单里且被放行,alpha.jsonc / XDG 里的节点两边都进不了。
-v2 那半同样收口:picker 读的 v2 目录桥(`alpha-config-injection.ts`)此前把 alpha.jsonc **原样**拷成 `opencode.json`,而 v2 catalog 的可用性不看 `enabled_providers`,现在拷贝去掉 `provider` 键。添加时的地址准入与这里的四条准入是**同一个函数**(`classifyBaseUrl`):围栏放不了的地址(http、loopback)在添加那一刻就被拒并说明原因。
+`codepuppy.jsonc`,让它写的块失效的机制是 `enabled_providers` 整体替换 + 注入完整块(同 id 后合并者赢),判据因此是端到端的:
+`custom-provider-derivation.test.ts` 起真引擎问清单 —— 真源节点在清单里且被放行,codepuppy.jsonc / XDG 里的节点两边都进不了。
+v2 那半同样收口:picker 读的 v2 目录桥(`codepuppy-config-injection.ts`)此前把 codepuppy.jsonc **原样**拷成 `opencode.json`,而 v2 catalog 的可用性不看 `enabled_providers`,现在拷贝去掉 `provider` 键。添加时的地址准入与这里的四条准入是**同一个函数**(`classifyBaseUrl`):围栏放不了的地址(http、loopback)在添加那一刻就被拒并说明原因。
 升级后配置文件里既有的 provider 块只忽略 + 一行日志(main 每进程一次),不采信、不迁移、不建「待确认」面(基线 I3)。
 
 准入四条(有一条不过就是不收,不猜、不修补):`new URL()` 解析得出 / scheme 是 `https:` / host 不是 loopback /
@@ -401,10 +401,10 @@ host 过**静态表同一个** `isEgressHostShape`(同一个函数,不是抄一�
    这件事不做了**,作废 9-10 那条「要单独设计本机目的地怎么走」。技术事实不变(围栏只放行代理端口、`NO_PROXY`
    又含 loopback ⇒ 放行它不会让它可达,只会让登记簿说假话),但它现在是一条**已关闭**的分支,不是待办。
 3. ~~**用户配置的远程 MCP URL** —— 同属「动态」类别,本轮没做。~~ —— **已闭合(`#1381`,2026-09-22)**:与自定义节点同一个解 ——
-   记录搬进同一状态根下的兄弟真源 `<appData>/alpha-code-state/mcp-servers/<env>.json`(`mcp-server-truth.ts`,只有 main 写),
+   记录搬进同一状态根下的兄弟真源 `<appData>/codepuppy-state/mcp-servers/<env>.json`(`mcp-server-truth.ts`,只有 main 写),
    `deriveMcpEgressDestinations` 经**同一个**准入函数 `classifyBaseUrl` 派生,`server.ts` 把它与 provider 那一半并成一次登记
-   (日志 `network egress: N configured destination(s) …`,出处标签 `mcp:<name>`);sidecar 侧 `alpha-config-injection.ts` 从真源注入
-   完整条目(`enabled:true`,账本 disabled 由后续 `injectDisabledOverrides` 压回),`mcp-default-deny.ts` 把 alpha.jsonc 里不在真源的
+   (日志 `network egress: N configured destination(s) …`,出处标签 `mcp:<name>`);sidecar 侧 `codepuppy-config-injection.ts` 从真源注入
+   完整条目(`enabled:true`,账本 disabled 由后续 `injectDisabledOverrides` 压回),`mcp-default-deny.ts` 把 codepuppy.jsonc 里不在真源的
    `type:"remote"` 条目压成 `enabled:false`(引擎原生仍合并 `OPENCODE_CONFIG`,不压它就会去连 —— 只是被这里 403)。本地 MCP 不动。
    判据在 `mcp-server-derivation.test.ts`(端到端,含真引擎 `debug config`)。
 4. ~~**被拒时界面上的归因**~~ —— **已闭合(`#1382`,2026-09-21)**。代理的 403 正文
@@ -439,7 +439,7 @@ host 过**静态表同一个** `isEgressHostShape`(同一个函数,不是抄一�
 <!-- egress-coverage-statement:end -->
 
 用户眼前的同一句话在终端「沙箱开启」悬停卡的第四句(`packages/ui-mac/src/renderer/i18n/{zh,en}.ts`
-`alpha.terminal.sandboxHoverBody`)。上面这段与那两句文案都由 `packages/ui-mac/src/main/network-egress-disclosure.test.ts`
+`codepuppy.terminal.sandboxHoverBody`)。上面这段与那两句文案都由 `packages/ui-mac/src/main/network-egress-disclosure.test.ts`
 守着存在与内容:删掉、或改成「全部出网都被限制」一类的过度声明,判据当场红。
 
 ## 用法

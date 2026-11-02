@@ -15,7 +15,7 @@ review_after: 2027-01-30
 The repository is a fork. The `dev` lineage is the upstream integration base;
 Alpha delivery occurs on the Alpha branch. The
 [`sync-upstream.yml`](../../.github/workflows/sync-upstream.yml) workflow and
-[`alpha-ci.yml`](../../.github/workflows/alpha-ci.yml) are the executable source
+[`codepuppy-ci.yml`](../../.github/workflows/codepuppy-ci.yml) are the executable source
 of truth for protected paths and synchronization gates.
 
 `#899` (SEC): the daily sync is split across two trust domains.
@@ -35,8 +35,8 @@ code sourced from `anomalyco/opencode`.
 ADR-034 (B: monthly pin + patch) they are a **projection** of the upstream pin
 recorded in [`frontend/frontend-pin.lock`](../../frontend/frontend-pin.lock)
 plus the single Alpha SOT patch
-[`frontend/alpha-patches/alpha-frontend.patch`](../../frontend/alpha-patches/alpha-frontend.patch).
-After every merge, `apply_alpha_frontend_delta` rebuilds them
+[`frontend/codepuppy-patches/codepuppy-frontend.patch`](../../frontend/codepuppy-patches/codepuppy-frontend.patch).
+After every merge, `apply_codepuppy_frontend_delta` rebuilds them
 (`rm -rf` → `git checkout <pin> --` → `git apply --3way`) and must preserve the
 typed `AppSurfaces` seam, the REQ-088 narrow export, and the vendored client
 tarball; each is a loud-fail. The frontend only moves forward through the
@@ -49,7 +49,7 @@ directly (`"@opencode-ai/client": "file:../app/vendor/<name>.tgz"`), and that
 binary exists **only inside the SOT patch** — the pin has no
 `packages/app/vendor` at all (measured 2026-09-06:
 `git ls-tree 849c2598 packages/app/vendor` prints nothing). So any `bun install`
-that runs before `apply_alpha_frontend_delta` re-applies the patch is looking at
+that runs before `apply_codepuppy_frontend_delta` re-applies the patch is looking at
 a tree where the file it needs is absent, and it dies with
 `… failed to resolve`.
 
@@ -60,7 +60,7 @@ the patch. That path was therefore **structurally unusable**, and the
 points at `git diff --binary` / the monthly bump) never got the chance to print.
 The judgement was right; the order was wrong.
 
-The order is now: conclude the merge → `apply_alpha_frontend_delta` → `bun install`
+The order is now: conclude the merge → `apply_codepuppy_frontend_delta` → `bun install`
 → commit the regenerated `bun.lock`. The lockfile step is not optional: the
 conflict branch resolves `bun.lock` with `--theirs`, i.e. upstream's copy, which
 does not contain Alpha's workspace packages; only an install that runs against
@@ -225,9 +225,9 @@ Current disposition (REQ-126 AC7):
 | Entry | Command | Disposition |
 |---|---|---|
 | Sidebar account menu → Settings | `settings.open` | Inherited: calls the Alpha settings surface directly, route-independent |
-| Sidebar search | `command.palette` | Inherited: registered once by `AlphaSessionSearch` on the shell |
+| Sidebar search | `command.palette` | Inherited: registered once by `CodePuppySessionSearch` on the shell |
 | Settings → Shortcuts list | `settings.open`, `command.palette`, `project.open`, `session.new` | Kept, but only ids the Alpha shell registers: upstream applies a custom keybind **only to a registered option**, so a retired id left in that table would be editable, saveable and inert |
-| Sidebar new chat / open project / collapse | `session.new`, `project.open`, `sidebar.toggle` | Inherited: registered once by `AlphaSidebar` on the shell, so the desktop menu and its accelerators reach the same handlers on every route |
+| Sidebar new chat / open project / collapse | `session.new`, `project.open`, `sidebar.toggle` | Inherited: registered once by `CodePuppySidebar` on the shell, so the desktop menu and its accelerators reach the same handlers on every route |
 | Empty-project state → Open project | `project.open` | Re-wired to Alpha's own directory picker (upstream's command only fed upstream's project list) |
 | Sidebar back / forward buttons | — | Kept as-is. They never went through the command bus (`navigate(±1)` directly), so they work on every route; they are the entry for this capability |
 | Floating terminal / review toggles | `terminal.toggle`, `review.toggle` | Retired with the buttons; the session workspace top bar owns the live equivalents |
@@ -238,7 +238,7 @@ Current disposition (REQ-126 AC7):
 
 Gates are runtime, not source text.
 `packages/ui-mac/src/renderer/sidebar/shell-commands.test.ts` mounts the real
-shell (production `AlphaSidebar` + `AlphaSettings` + `AlphaSessionSearch`) and,
+shell (production `CodePuppySidebar` + `CodePuppySettings` + `CodePuppySessionSearch`) and,
 for **some** of the entries above, clicks the real control and asserts an
 observable result — settings surface in the DOM, the directory picker actually
 called, the real router moving, the retired DOM absent while its container is
@@ -314,7 +314,7 @@ Run the repository synchronization/CI gates and:
 
 ```bash
 bash scripts/verify-freeze-restore.sh
-bash scripts/alpha-check.sh
+bash scripts/codepuppy-check.sh
 ```
 
 Do not infer protected paths from old plans or design documents.

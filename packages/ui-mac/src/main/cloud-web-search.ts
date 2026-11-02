@@ -37,7 +37,7 @@ export const LOCAL_WEB_SEARCH_TOOL_ID = "websearch"
  * 工具自身:`packages/opencode/src/tool/websearch.ts` 读本变量直接拒绝执行。
  * 名字在两个包各写一份(ui-mac 不依赖 opencode),漂移由 `cloud-web-search.test.ts` 的字面量锁钉住。
  */
-export const LOCAL_WEBSEARCH_DENY_ENV = "ALPHA_LOCAL_WEBSEARCH_DENY"
+export const LOCAL_WEBSEARCH_DENY_ENV = "CODEPUPPY_LOCAL_WEBSEARCH_DENY"
 /**
  * 云侧同一条通道(#223 R3)。云 web search(引擎 id `codepuppy_web_search`)是**远端 MCP 工具**,没有 alpha 能改的
  * `execute` 首行可放闸,而 `ConfigMCPV1.Remote`(`packages/core/src/v1/config/mcp.ts`)只有
@@ -47,14 +47,14 @@ export const LOCAL_WEBSEARCH_DENY_ENV = "ALPHA_LOCAL_WEBSEARCH_DENY"
  * (`tool/code-mode.ts`)两条路都在 `ctx.ask` **之前**触发它,钩子抛错即 die,
  * 因此 agent/session 的后置 allow 与 `approved` 一概够不着。
  */
-export const CLOUD_WEBSEARCH_DENY_ENV = "ALPHA_CLOUD_WEBSEARCH_DENY"
+export const CLOUD_WEBSEARCH_DENY_ENV = "CODEPUPPY_CLOUD_WEBSEARCH_DENY"
 
 /**
  * kill-switch 下写进 `OPENCODE_CONFIG_CONTENT` 的**中和条目**(#223 R6 Major)。
  *
  * R5 只从继承来的 `OPENCODE_CONFIG_CONTENT` 对象里删掉 `mcp.cloud`,并据此声称「继承来的同名
  * 条目一并抹掉」。R6 判该声称**不成立**:引擎还分别加载 XDG global、`OPENCODE_CONFIG`
- * (alpha.jsonc)、项目目录与 managed 配置(`opencode/src/config/config.ts`),而深合并里
+ * (codepuppy.jsonc)、项目目录与 managed 配置(`opencode/src/config/config.ts`),而深合并里
  * 「缺少 cloud 键」**不会删除**先前来源的定义。于是那些来源里的一份完整 `cloud` 定义仍会自动
  * 连接;写成 `enabled:false` 也没用 —— `MCP.connect()` 无条件复制成 `enabled:true`。
  *
@@ -70,11 +70,11 @@ export const CLOUD_WEBSEARCH_DENY_ENV = "ALPHA_CLOUD_WEBSEARCH_DENY"
  *
  * **覆盖不到的两个来源(诚实登记)**:managed 目录与 macOS MDM 托管偏好排在
  * `OPENCODE_CONFIG_CONTENT` 之后,能覆盖回去 —— 两者都需要 root/管理员,不在用户威胁模型内。
- * 事实由 `packages/opencode/test/mcp/alpha-cloud-mcp-multisource.test.ts` 用真实多源加载钉住。
+ * 事实由 `packages/opencode/test/mcp/codepuppy-cloud-mcp-multisource.test.ts` 用真实多源加载钉住。
  */
 export const WITHHELD_CLOUD_MCP = {
   type: "remote" as const,
-  url: "http://127.0.0.1:1/alpha-cloud-withheld",
+  url: "http://127.0.0.1:1/codepuppy-cloud-withheld",
   enabled: false as const,
   oauth: false as const,
 }
@@ -87,7 +87,7 @@ export const WITHHELD_CLOUD_MCP = {
  * 例外是这个 server:平台代付时它是**权威**通道,只有 kill-switch 才关它。ext 靠本变量识别它,
  * 而不是写死 `"codepuppy"` 字面量。注入面在每次 fork 注册云 server 时置位、否则删除。
  */
-export const CLOUD_MCP_SERVER_ENV = "ALPHA_CLOUD_MCP_SERVER"
+export const CLOUD_MCP_SERVER_ENV = "CODEPUPPY_CLOUD_MCP_SERVER"
 
 /**
  * ext 装载**握手**通道(#223 R4,R5 收紧)。
@@ -95,7 +95,7 @@ export const CLOUD_MCP_SERVER_ENV = "ALPHA_CLOUD_MCP_SERVER"
  * R3 的 fail-closed 判据是「`extPluginPath` 这个路径存不存在」——R4 证明那什么也证明不了:
  * `OPENCODE_PURE=true`(经 `sidecar-env.ts` 的 `OPENCODE_` 前缀规则进 sidecar,
  * `opencode/src/effect/runtime-flags.ts` 解释为 pure)会让 `opencode/src/plugin/index.ts` **整个
- * 跳过外部插件**;bundle import 失败与 `AlphaExt` 初始化失败同样是 log-and-continue。三种情形下
+ * 跳过外部插件**;bundle import 失败与 `CodePuppyExt` 初始化失败同样是 log-and-continue。三种情形下
  * 路径都还在,钩子却根本不存在。
  *
  * R4 据此把 kill-switch 下的注册改成两段式:注入面写一个 `enabled:false` 的云 server,由 ext 的
@@ -110,12 +110,12 @@ export const CLOUD_MCP_SERVER_ENV = "ALPHA_CLOUD_MCP_SERVER"
  * ext 缺席则配置里**没有**名为 `cloud` 的条目,`/connect` 直接 NotFound —— 这才是「确认装载」。
  *
  * **通道可信度的准确表述(#223 R5 Minor,更正 R4 的「shell 进不来」)**:本变量确实不在
- * `sidecar-env.ts` 的固定白名单里,但那份白名单有一个逃生阀 `ALPHA_ENV_ALLOWLIST_EXTRA`,
+ * `sidecar-env.ts` 的固定白名单里,但那份白名单有一个逃生阀 `CODEPUPPY_ENV_ALLOWLIST_EXTRA`,
  * 用它点名即可放行任意非密钥名 —— 所以「外部 shell 伪造进不来」**不成立**。真正成立的是:
- * `injectAlphaConfig` 在每次 fork 的每一条分支上都**覆盖或删除**本变量与 `CLOUD_MCP_DEF_ENV`,
+ * `injectCodePuppyConfig` 在每次 fork 的每一条分支上都**覆盖或删除**本变量与 `CLOUD_MCP_DEF_ENV`,
  * 因此继承来的值一律不作数;而且单有 ARM 没有 DEF 时 ext 什么也不装。
  */
-export const CLOUD_MCP_ARM_ENV = "ALPHA_CLOUD_MCP_ARM"
+export const CLOUD_MCP_ARM_ENV = "CODEPUPPY_CLOUD_MCP_ARM"
 
 /**
  * 与 ARM 配对的云 server 定义(JSON)。内容是 `materializeCloudMcpConfig()` 的产物。
@@ -126,7 +126,7 @@ export const CLOUD_MCP_ARM_ENV = "ALPHA_CLOUD_MCP_ARM"
  * 云 MCP 的凭证由引擎自己的 OAuth 凭证库持有,从不经过这条 env 通道。
  * ext 侧仍由 `installCloudMcp()` 把它装进配置。
  */
-export const CLOUD_MCP_DEF_ENV = "ALPHA_CLOUD_MCP_DEF"
+export const CLOUD_MCP_DEF_ENV = "CODEPUPPY_CLOUD_MCP_DEF"
 
 type AgentConfig = { permission?: Record<string, unknown> }
 
@@ -135,12 +135,12 @@ type EngineConfig = {
   agent?: Record<string, AgentConfig | undefined>
 }
 
-/** web search 的两个主权判据,由 `injectAlphaConfig` 从 sidecar 自己的 env/密钥文件推导。 */
+/** web search 的两个主权判据,由 `injectCodePuppyConfig` 从 sidecar 自己的 env/密钥文件推导。 */
 export type WebSearchSovereignty = {
-  /** `ALPHA_WEBSEARCH_DISABLE`:与登录态无关的能力总闸。**两条腿的在场性只由它决定。** */
+  /** `CODEPUPPY_WEBSEARCH_DISABLE`:与登录态无关的能力总闸。**两条腿的在场性只由它决定。** */
   killSwitch: boolean
   /**
-   * 平台代付(`ALPHA_CLOUD_MCP_URL` + `ALPHA_MCP_TOKEN` 密钥文件同在,`#1195` 换轴)= **云腿在不在**。
+   * 平台代付(`CODEPUPPY_CLOUD_MCP_URL` + `CODEPUPPY_MCP_TOKEN` 密钥文件同在,`#1195` 换轴)= **云腿在不在**。
    * `#1411`:**不得**参与本地腿判定。字段留着,因为这一轴仍要给云 MCP 定义用,而本文件同名测试的
    * `{ killSwitch:false, platformPays:true }` 臂正是「代付不产生任何 deny」那条反回归断言。
    */

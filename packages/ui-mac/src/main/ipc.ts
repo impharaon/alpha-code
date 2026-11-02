@@ -15,9 +15,9 @@ import type {
   WorkspaceWriteProbeResult,
 } from "../preload/types"
 import type { DeepLinkBatch } from "./deep-link-queue"
-import { getAlphaEnvironment } from "./alpha-environment"
+import { getCodePuppyEnvironment } from "./codepuppy-environment"
 import { runDesktopMenuAction } from "./desktop-menu-actions"
-import { alphaUserWorkspaceDir, ensureUserWorkspaceDir } from "./alpha-user-workspace"
+import { codepuppyUserWorkspaceDir, ensureUserWorkspaceDir } from "./codepuppy-user-workspace"
 import { resolveAppPath } from "./apps"
 import { editorCliName } from "./platform"
 import { assertAttachmentBudget, createPickedFileAuthorizations } from "./attachment-picker"
@@ -85,8 +85,8 @@ export function registerIpcHandlers(deps: Deps) {
   registerStartupTimelineIpc(ipcMain)
 
   // REQ-098(AC#6):环境快照只读 IPC —— 回调零参数(不读任何 renderer 输入),返回启动时冻结的
-  // 快照;不存在任何对应写面(环境只由 main 的构建事实解析,见 alpha-environment.ts)。
-  ipcMain.handle("alpha-environment", () => getAlphaEnvironment())
+  // 快照;不存在任何对应写面(环境只由 main 的构建事实解析,见 codepuppy-environment.ts)。
+  ipcMain.handle("codepuppy-environment", () => getCodePuppyEnvironment())
   ipcMain.handle("kill-sidecar", () => deps.killSidecar())
   ipcMain.handle("sidecar-generation-state", () => deps.sidecarGenerationState())
   // REQ-159 `#1322`:目录来自 renderer(untrusted):不是非空字符串就答 unknown,不猜、不 throw。
@@ -184,10 +184,10 @@ export function registerIpcHandlers(deps: Deps) {
   ipcMain.handle(
     "open-directory-picker",
     async (_event: IpcMainInvokeEvent, opts?: { multiple?: boolean; title?: string; defaultPath?: string }) => {
-      // alpha-code: ALPHA_OPEN_DIR short-circuits the native dialog with a fixed
+      // alpha-code: CODEPUPPY_OPEN_DIR short-circuits the native dialog with a fixed
       // directory (used to auto-open a default project / for headless verification).
-      if (process.env.ALPHA_OPEN_DIR) {
-        const dir = process.env.ALPHA_OPEN_DIR
+      if (process.env.CODEPUPPY_OPEN_DIR) {
+        const dir = process.env.CODEPUPPY_OPEN_DIR
         return opts?.multiple ? [dir] : dir
       }
       // REQ-071/ADR-025:全部目录选择器统一默认落 ~/Alpha(调用方显式 defaultPath 优先)。
@@ -203,8 +203,8 @@ export function registerIpcHandlers(deps: Deps) {
   )
 
   // REQ-071/ADR-025:~/Alpha 默认工作目录 —— 路径查询(不建)与 lazy 供给(仅对默认目录生效)。
-  ipcMain.handle("alpha-workspace-default", () => alphaUserWorkspaceDir())
-  ipcMain.handle("alpha-workspace-ensure", (_event: IpcMainInvokeEvent, dir?: unknown) => {
+  ipcMain.handle("codepuppy-workspace-default", () => codepuppyUserWorkspaceDir())
+  ipcMain.handle("codepuppy-workspace-ensure", (_event: IpcMainInvokeEvent, dir?: unknown) => {
     const ensured = ensureUserWorkspaceDir(typeof dir === "string" ? dir : undefined)
     return ensured ? { ok: true, dir: ensured } : { ok: false }
   })

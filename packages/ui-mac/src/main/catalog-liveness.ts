@@ -5,7 +5,7 @@
 // 既有存活性判据 = 「进程在 + ready IPC 已发」,结构上看不见「引擎活着但治理目录从未收敛」。
 //
 // 判据(照 docs/architecture/2026-08-10-catalog-readiness-signals.md 的实跑结论):
-//   - marker 探针(`/api/provider/alpha-internal-catalog-ready?location[directory]=…`)是目录就绪
+//   - marker 探针(`/api/provider/codepuppy-internal-catalog-ready?location[directory]=…`)是目录就绪
 //     的**唯一证明**:未收敛恒 404(此时 `/api/model` 照样 200 count 0,所以不能拿 model.list
 //     的 200 当就绪),收敛后 200。
 //   - 引擎 ready 之后的 DEADLINE 窗口内**从未**观测到一次 marker 200 → 判实例退化,kill 交给

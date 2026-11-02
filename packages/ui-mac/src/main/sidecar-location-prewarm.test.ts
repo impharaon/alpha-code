@@ -18,7 +18,7 @@ describe("sidecar initial location prewarm", () => {
       initialModelPrewarmRequest("/Users/example/Alpha", "synthetic-password")!,
     ]
     expect(requests.map((request) => new URL(request.url).pathname)).toEqual([
-      "/api/provider/alpha-internal-catalog-ready",
+      "/api/provider/codepuppy-internal-catalog-ready",
       "/api/model",
     ])
     for (const request of requests) {
@@ -60,10 +60,10 @@ describe("sidecar initial location prewarm", () => {
       "/Users/example/Alpha",
       { password: "synthetic-password" },
     )
-    expect(paths).toEqual(["/api/provider/alpha-internal-catalog-ready"])
+    expect(paths).toEqual(["/api/provider/codepuppy-internal-catalog-ready"])
     resolve(new Response(null, { status: 200 }))
     expect(await warming).toEqual({ outcome: "ready", status: 200, durationMs: expect.any(Number) })
-    expect(paths).toEqual(["/api/provider/alpha-internal-catalog-ready", "/api/model"])
+    expect(paths).toEqual(["/api/provider/codepuppy-internal-catalog-ready", "/api/model"])
   })
 
   // 分类与「这处锚守不住什么」登记在 ./source-text-anchors.ts(`#968` 第 ⑤ 层机械校验)。

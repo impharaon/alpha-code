@@ -39,13 +39,13 @@ const here = fileURLToPath(new URL(".", import.meta.url))
 const repo = fileURLToPath(new URL("../../../..", import.meta.url))
 const config = fileURLToPath(new URL("./vite.config.ts", import.meta.url))
 const script = fileURLToPath(import.meta.url)
-const output = process.env.ALPHA_TIMELINE_BENCH_OUTPUT ?? `/tmp/alpha-timeline-benchmark-${Date.now()}`
+const output = process.env.CODEPUPPY_TIMELINE_BENCH_OUTPUT ?? `/tmp/codepuppy-timeline-benchmark-${Date.now()}`
 const chrome = process.env.CHROME_PATH ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 const commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" }).trim()
 const tree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: repo, encoding: "utf8" }).trim()
 const dirty = execFileSync("git", ["status", "--porcelain"], { cwd: repo, encoding: "utf8" }).trim()
 
-if (dirty && process.env.ALPHA_TIMELINE_BENCH_ALLOW_DIRTY !== "1")
+if (dirty && process.env.CODEPUPPY_TIMELINE_BENCH_ALLOW_DIRTY !== "1")
   throw new Error("Refusing to record a baseline from a dirty worktree")
 
 await access(chrome).catch(() => {
@@ -53,12 +53,12 @@ await access(chrome).catch(() => {
 })
 const fixture = materializeTimelineBenchmarkFixture()
 const fixtureSha256 = createHash("sha256").update(JSON.stringify(fixture)).digest("hex")
-const childRun = process.env.ALPHA_TIMELINE_BENCH_CHILD_RUN
+const childRun = process.env.CODEPUPPY_TIMELINE_BENCH_CHILD_RUN
 
 if (childRun) {
   const run = Number(childRun)
-  const baseURL = process.env.ALPHA_TIMELINE_BENCH_CHILD_BASE_URL
-  const rawPath = process.env.ALPHA_TIMELINE_BENCH_CHILD_OUTPUT
+  const baseURL = process.env.CODEPUPPY_TIMELINE_BENCH_CHILD_BASE_URL
+  const rawPath = process.env.CODEPUPPY_TIMELINE_BENCH_CHILD_OUTPUT
   if (![1, 2, 3].includes(run) || !baseURL || !rawPath) throw new Error("Invalid timeline benchmark child input")
   const result = await benchmarkRun(run, baseURL)
   await writeFile(rawPath, `${JSON.stringify(result, null, 2)}\n`)
@@ -92,7 +92,7 @@ try {
     dirtyWorktreeAllowed: dirty.length > 0,
     fixtureSha256,
     fixture: timelineBenchmarkFixture,
-    command: `CHROME_PATH=${chrome} ALPHA_TIMELINE_BENCH_OUTPUT=<evidence>/raw bun run bench:timeline (from packages/ui-mac; three serial runs)`,
+    command: `CHROME_PATH=${chrome} CODEPUPPY_TIMELINE_BENCH_OUTPUT=<evidence>/raw bun run bench:timeline (from packages/ui-mac; three serial runs)`,
     productionBuild: "Vite production build + loopback preview",
     browser: {
       executable: chrome,
@@ -154,9 +154,9 @@ async function runWorker(run: number, baseURL: string, rawPath: string) {
       cwd: process.cwd(),
       env: {
         ...process.env,
-        ALPHA_TIMELINE_BENCH_CHILD_RUN: String(run),
-        ALPHA_TIMELINE_BENCH_CHILD_BASE_URL: baseURL,
-        ALPHA_TIMELINE_BENCH_CHILD_OUTPUT: rawPath,
+        CODEPUPPY_TIMELINE_BENCH_CHILD_RUN: String(run),
+        CODEPUPPY_TIMELINE_BENCH_CHILD_BASE_URL: baseURL,
+        CODEPUPPY_TIMELINE_BENCH_CHILD_OUTPUT: rawPath,
       },
       stdio: "inherit",
     })
@@ -217,7 +217,7 @@ async function benchmarkRun(run: number, baseURL: string): Promise<BenchmarkRun>
     const coldOpen = await phase(
       run,
       "cold-open",
-      page.evaluate(() => window.__alphaTimelineBenchmark.ready),
+      page.evaluate(() => window.__codepuppyTimelineBenchmark.ready),
       30_000,
     )
     assertColdOpen(coldOpen)
@@ -226,7 +226,7 @@ async function benchmarkRun(run: number, baseURL: string): Promise<BenchmarkRun>
       run,
       "streaming",
       page.evaluate(
-        (durationMs) => window.__alphaTimelineBenchmark.runStreaming(durationMs),
+        (durationMs) => window.__codepuppyTimelineBenchmark.runStreaming(durationMs),
         timelineBenchmarkFixture.streamDurationMs,
       ),
       timelineBenchmarkFixture.streamDurationMs + 30_000,
@@ -236,7 +236,7 @@ async function benchmarkRun(run: number, baseURL: string): Promise<BenchmarkRun>
     const history = await phase(
       run,
       "history-load",
-      page.evaluate(() => window.__alphaTimelineBenchmark.runHistoryLoad()),
+      page.evaluate(() => window.__codepuppyTimelineBenchmark.runHistoryLoad()),
       30_000,
     )
     assertHistory(history)

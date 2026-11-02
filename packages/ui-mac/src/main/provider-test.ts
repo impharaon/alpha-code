@@ -3,7 +3,7 @@
 // (decided 2026-06-27: 1-token chat, not just /models). The key stays in the main process — the
 // renderer only gets {ok, ms} or {ok:false, reason}. No opencode internals (ADR-006): global fetch.
 
-import type { ProviderTestInput, ProviderTestResult } from "../shared/alpha-model-types"
+import type { ProviderTestInput, ProviderTestResult } from "../shared/codepuppy-model-types"
 
 const TIMEOUT_MS = 12_000
 

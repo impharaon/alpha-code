@@ -43,7 +43,7 @@
 - **静态半场** `packages/ui-mac/src/main/network-egress-registry.ts:76-100` —— 14 条冻结常量;
 - **动态半场** `packages/ui-mac/src/main/network-egress-derived.ts:122-149` —— 只从两处派生
   (`packages/ui-mac/src/main/server.ts:194-197`):①注入面的 provider 表
-  (`buildAlphaModelConfig(userDataPath).provider`),②远程 MCP 真源 `mcp-servers/<env>.json`。
+  (`buildCodePuppyModelConfig(userDataPath).provider`),②远程 MCP 真源 `mcp-servers/<env>.json`。
 
 ## 2. 现场证据(owner 本机,2026-09-23,正式包 0.1.16)
 
@@ -132,7 +132,7 @@ https://en.wikipedia.org/wiki/Jev_(AI_model)  | error     | Transport error (GET
 ```
 --- CONNECT en.wikipedia.org:443
     HTTP/1.1 403 Forbidden
-    Proxy-Agent: alpha-egress-policy
+    Proxy-Agent: codepuppy-egress-policy
 
     alpha egress policy: en.wikipedia.org:443 denied (reason=unregistered) — blocked by this app's
     local egress policy — the destination is neither a registered app endpoint
@@ -166,7 +166,7 @@ https://en.wikipedia.org/wiki/Jev_(AI_model)  | error     | Transport error (GET
    **它永远等不到那串字节**。(`network-egress-proxy.ts:20` 的头注说「bun 的 fetch 会把代理的 403 当目标响应返回」——
    那是 bun;出货包的引擎跑在 Electron 的 node 上,行为不同。)
 2. **消费端只看模型请求那一格。** `egressPolicyDenialOf` 全仓唯一的生产消费者是
-   `packages/ui-mac/src/renderer/alpha-ui/session-timeline/timeline-model.ts:710`,它读的是
+   `packages/ui-mac/src/renderer/codepuppy-ui/session-timeline/timeline-model.ts:710`,它读的是
    **`AssistantMessage.error`**(`turnErrorOf`,`:702-716`)。工具失败不走那里:它落在
    `part.state.status = "error"`(`packages/opencode/src/session/processor.ts:200-208`),
    于是 `#1379` 那次「自带 Key 九天没人发现」的归因修复,对 `webfetch` 一格都没覆盖到。

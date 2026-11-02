@@ -27,13 +27,13 @@ Bun.plugin({
   },
 })
 
-const runtime = await import("../src/renderer/alpha-ui/session-rail/review/review-test-runtime")
+const runtime = await import("../src/renderer/codepuppy-ui/session-rail/review/review-test-runtime")
 
 // Major-2: run the real data container against a controllable fake of the
 // typed useServerSync channel (behavior assertions, not source strings).
-const fakeSync = await import("../src/renderer/alpha-ui/session-rail/review/review-fake-sync")
+const fakeSync = await import("../src/renderer/codepuppy-ui/session-rail/review/review-fake-sync")
 mock.module("@opencode-ai/app", () => ({ useServerSync: fakeSync.useServerSync }))
-const containerRuntime = await import("../src/renderer/alpha-ui/session-rail/review/review-container-test-runtime")
+const containerRuntime = await import("../src/renderer/codepuppy-ui/session-rail/review/review-container-test-runtime")
 
 const disposers: Array<() => void> = []
 
@@ -81,7 +81,7 @@ describe("REQ-125 C2 review panel real Solid mount", () => {
     const host = mount()
     await flush()
 
-    const root = host.querySelector<HTMLElement>("[data-alpha-session-review]")!
+    const root = host.querySelector<HTMLElement>("[data-codepuppy-session-review]")!
     expect(root.getAttribute("data-review-phase")).toBe("changes")
 
     const summary = root.querySelector(".a-rvw-sum")!
@@ -91,7 +91,7 @@ describe("REQ-125 C2 review panel real Solid mount", () => {
 
     const cards = root.querySelectorAll("[data-review-file]")
     expect(cards).toHaveLength(3)
-    expect(cards[0]!.querySelector(".a-rvw-dir")!.textContent).toBe("alpha-ui/")
+    expect(cards[0]!.querySelector(".a-rvw-dir")!.textContent).toBe("codepuppy-ui/")
     expect(cards[0]!.querySelector(".a-rvw-kind--modified")!.textContent).toBe("修改")
     expect(cards[1]!.querySelector(".a-rvw-kind--added")!.textContent).toBe("新增")
     expect(cards[1]!.querySelector(".a-rvw-dir")).toBeNull()
@@ -106,10 +106,10 @@ describe("REQ-125 C2 review panel real Solid mount", () => {
     const host = mount()
     await flush()
 
-    headOf(host, "alpha-ui/button.css").click()
+    headOf(host, "codepuppy-ui/button.css").click()
     await flush()
 
-    const card = host.querySelector('[data-review-file="alpha-ui/button.css"]')!
+    const card = host.querySelector('[data-review-file="codepuppy-ui/button.css"]')!
     expect(card.querySelector(".a-rvw-fhead")!.getAttribute("aria-expanded")).toBe("true")
 
     const folds = card.querySelectorAll<HTMLButtonElement>("[data-review-fold]")
@@ -136,9 +136,9 @@ describe("REQ-125 C2 review panel real Solid mount", () => {
     const host = mount()
     await flush()
 
-    headOf(host, "alpha-ui/button.css").click()
+    headOf(host, "codepuppy-ui/button.css").click()
     await flush()
-    const card = host.querySelector('[data-review-file="alpha-ui/button.css"]')!
+    const card = host.querySelector('[data-review-file="codepuppy-ui/button.css"]')!
     const before = card.querySelectorAll(".a-rvw-dl").length
 
     card.querySelector<HTMLButtonElement>("[data-review-fold]")!.click()
@@ -176,9 +176,9 @@ describe("REQ-125 C2 review panel real Solid mount", () => {
     const host = mount()
     await flush()
 
-    headOf(host, "alpha-ui/button.css").click()
+    headOf(host, "codepuppy-ui/button.css").click()
     await flush()
-    const root = host.querySelector<HTMLElement>("[data-alpha-session-review]")!
+    const root = host.querySelector<HTMLElement>("[data-codepuppy-session-review]")!
     const seg = root.querySelectorAll<HTMLButtonElement>(".a-rvw-seg button")
     expect(seg[0]!.getAttribute("aria-pressed")).toBe("true")
     expect(root.querySelector(".a-rvw-split")).toBeNull()
@@ -186,7 +186,7 @@ describe("REQ-125 C2 review panel real Solid mount", () => {
     seg[1]!.click()
     await flush()
     expect(seg[1]!.getAttribute("aria-pressed")).toBe("true")
-    const split = root.querySelector('[data-review-file="alpha-ui/button.css"] .a-rvw-split')!
+    const split = root.querySelector('[data-review-file="codepuppy-ui/button.css"] .a-rvw-split')!
     const cols = split.querySelectorAll(".a-rvw-col")
     expect(cols).toHaveLength(2)
     expect(cols[0]!.querySelectorAll(".a-rvw-sl--del")).toHaveLength(1)
@@ -242,21 +242,21 @@ describe("REQ-125 C2 review panel real Solid mount", () => {
     const host = mount()
     await flush()
 
-    headOf(host, "alpha-ui/button.css").click()
+    headOf(host, "codepuppy-ui/button.css").click()
     await flush()
     expect(host.querySelectorAll(".a-rvw-fbody")).toHaveLength(1)
 
     runtime.setReviewResetKey("identity-b")
     await flush()
     expect(host.querySelectorAll(".a-rvw-fbody")).toHaveLength(0)
-    expect(headOf(host, "alpha-ui/button.css").getAttribute("aria-expanded")).toBe("false")
+    expect(headOf(host, "codepuppy-ui/button.css").getAttribute("aria-expanded")).toBe("false")
   })
 
   test("the inline comment entry reports the file and line", async () => {
     const host = mount()
     await flush()
 
-    headOf(host, "alpha-ui/button.css").click()
+    headOf(host, "codepuppy-ui/button.css").click()
     await flush()
     const add = host.querySelector(".a-rvw-dl--add")!
     add.querySelector<HTMLButtonElement>(".a-rvw-cmt")!.click()
@@ -264,7 +264,7 @@ describe("REQ-125 C2 review panel real Solid mount", () => {
 
     const log = runtime.reviewCommentLog()
     expect(log).toHaveLength(1)
-    expect(log[0]!.file).toBe("alpha-ui/button.css")
+    expect(log[0]!.file).toBe("codepuppy-ui/button.css")
     expect(log[0]!.line).toMatchObject({ kind: "add", newLine: 4 })
   })
 
@@ -321,13 +321,13 @@ describe("REQ-125 C2 review panel real Solid mount", () => {
     expect(document.activeElement).toBe(card("架构说明.md").querySelector(".a-rvw-fhead"))
 
     // A fresh jump to another badged file re-targets; unknown files are a no-op.
-    runtime.setReviewFocusTarget("alpha-ui/button.css")
+    runtime.setReviewFocusTarget("codepuppy-ui/button.css")
     await flush()
-    expect(card("alpha-ui/button.css").classList.contains("a-rvw-file--open")).toBe(true)
-    expect(document.activeElement).toBe(card("alpha-ui/button.css").querySelector(".a-rvw-fhead"))
+    expect(card("codepuppy-ui/button.css").classList.contains("a-rvw-file--open")).toBe(true)
+    expect(document.activeElement).toBe(card("codepuppy-ui/button.css").querySelector(".a-rvw-fhead"))
     runtime.setReviewFocusTarget("not-in-change-set.ts")
     await flush()
-    expect(card("alpha-ui/button.css").classList.contains("a-rvw-file--open")).toBe(true)
+    expect(card("codepuppy-ui/button.css").classList.contains("a-rvw-file--open")).toBe(true)
   })
 })
 
@@ -337,7 +337,7 @@ describe("REQ-125 C2 / REQ-142 data container against the typed channel", () => 
     await flush()
 
     expect(fakeSync.fakeSyncSyncCalls()).toEqual(["ses_a"])
-    const root = host.querySelector<HTMLElement>("[data-alpha-session-review]")!
+    const root = host.querySelector<HTMLElement>("[data-codepuppy-session-review]")!
     expect(root.getAttribute("data-review-phase")).toBe("loading")
     expect(host.querySelectorAll("[data-review-file]")).toHaveLength(0)
 
@@ -360,7 +360,7 @@ describe("REQ-125 C2 / REQ-142 data container against the typed channel", () => 
       fakeSync.fakeSyncUserMessage("msg_u1", [containerRuntime.containerDiffFixture()]),
     ])
     await flush()
-    const root = host.querySelector<HTMLElement>("[data-alpha-session-review]")!
+    const root = host.querySelector<HTMLElement>("[data-codepuppy-session-review]")!
     expect(root.getAttribute("data-review-phase")).toBe("changes")
 
     // Next turn begins: a fresh user message lands; it changed nothing.
@@ -391,7 +391,7 @@ describe("REQ-125 C2 / REQ-142 data container against the typed channel", () => 
       fakeSync.fakeSyncUserMessage("msg_u1", [null, 42, {}, { file: "" }, { file: 7 }, { file: "ok.ts", patch: 9 }]),
     ])
     await flush()
-    const root = host.querySelector<HTMLElement>("[data-alpha-session-review]")!
+    const root = host.querySelector<HTMLElement>("[data-codepuppy-session-review]")!
     expect(root.getAttribute("data-review-phase")).toBe("clean")
     expect(host.querySelector('[data-review-empty="clean"]')).not.toBeNull()
     expect(host.querySelectorAll("[data-review-file]")).toHaveLength(0)
@@ -423,7 +423,7 @@ describe("REQ-125 C2 / REQ-142 data container against the typed channel", () => 
 
     const intents = containerRuntime.containerIntents()
     expect(intents).toHaveLength(1)
-    expect(intents[0]!.file).toBe("alpha-ui/button.css")
+    expect(intents[0]!.file).toBe("codepuppy-ui/button.css")
     expect(intents[0]!.line).toMatchObject({ kind: "add", newLine: 1 })
   })
 

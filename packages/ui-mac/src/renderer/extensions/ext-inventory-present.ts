@@ -8,7 +8,7 @@
 //   · 权限「能力授权总账」段:#392 已落 —— inventoryView 行带 granted(授权账只读快照),详情页
 //     直接消费(extension-detail.tsx),无需本模块翻译(能力词汇归 ext-authz.tsx,与确认框同源)。
 //   · 来源与签名:仅有 ownership.distributed + view.catalogChannel + view.catalogVersion;
-//     发布钥(如「alpha-web-1」)不在读面 —— 如实省略(降精,不造)。
+//     发布钥(网站签名钥环当前的 kid)不在读面 —— 如实省略(降精,不造)。
 //   · 隔离态(签名撤销强制停用):ext-states.ts 的 HealthIssue 联合无 revoked/quarantine kind
 //     —— isSwitchLocked 只在既有 kind 上判定,当前恒不锁(OPEN:数据面需补 kind)。
 
@@ -29,52 +29,52 @@ export type PresentRow = { labelKey: I18nKey; valueKeys?: I18nKey[]; value?: str
 export function authoredLabelKey(authored: string): I18nKey {
   switch (authored) {
     case "official":
-      return "alpha.ext.partyOfficial"
+      return "codepuppy.ext.partyOfficial"
     case "community":
-      return "alpha.ext.partyCommunity"
+      return "codepuppy.ext.partyCommunity"
     case "alpha":
-      return "alpha.ext.partyAlpha"
+      return "codepuppy.ext.partyCodePuppy"
     case "user":
-      return "alpha.ext.partyUser"
+      return "codepuppy.ext.partyUser"
     default:
-      return "alpha.ext.partyUnknown"
+      return "codepuppy.ext.partyUnknown"
   }
 }
 
 /** 甄选维:alpha(经 Alpha 策展)/ 其余(未经甄选,自装)。 */
 export function curatedLabelKey(curated: string): I18nKey {
-  return curated === "alpha" ? "alpha.ext.curatedAlpha" : "alpha.ext.curatedUser"
+  return curated === "alpha" ? "codepuppy.ext.curatedCodePuppy" : "codepuppy.ext.curatedUser"
 }
 
 // 闭集维度用 Record 查表(Record<union, …> 键缺失即编译错,穷举保障与 switch 等价且免 consistent-return)。
 const DISTRIBUTION_KEYS: Record<DistributionChannel, I18nKey> = {
-  bundled: "alpha.ext.distBundled",
-  "remote-catalog": "alpha.ext.distRemoteCatalog",
-  npm: "alpha.ext.distNpm",
-  "engine-config": "alpha.ext.distEngineConfig",
-  cloud: "alpha.ext.distCloud",
-  "local-import": "alpha.ext.distLocalImport",
+  bundled: "codepuppy.ext.distBundled",
+  "remote-catalog": "codepuppy.ext.distRemoteCatalog",
+  npm: "codepuppy.ext.distNpm",
+  "engine-config": "codepuppy.ext.distEngineConfig",
+  cloud: "codepuppy.ext.distCloud",
+  "local-import": "codepuppy.ext.distLocalImport",
 }
 export function distributionLabelKey(channel: DistributionChannel): I18nKey {
   return DISTRIBUTION_KEYS[channel]
 }
 
 const RUNTIME_SURFACE_KEYS: Record<RuntimeSurface, I18nKey> = {
-  "engine-process": "alpha.ext.surfEngineProcess",
-  "local-subprocess": "alpha.ext.surfLocalSubprocess",
-  "remote-service": "alpha.ext.surfRemoteService",
-  "model-context": "alpha.ext.surfModelContext",
-  "cloud-pipeline": "alpha.ext.surfCloudPipeline",
+  "engine-process": "codepuppy.ext.surfEngineProcess",
+  "local-subprocess": "codepuppy.ext.surfLocalSubprocess",
+  "remote-service": "codepuppy.ext.surfRemoteService",
+  "model-context": "codepuppy.ext.surfModelContext",
+  "cloud-pipeline": "codepuppy.ext.surfCloudPipeline",
 }
 export function runtimeSurfaceLabelKey(surface: RuntimeSurface): I18nKey {
   return RUNTIME_SURFACE_KEYS[surface]
 }
 
 const SUPPORT_TIER_KEYS: Record<SupportTier, I18nKey> = {
-  alpha: "alpha.ext.tierAlpha",
-  curated: "alpha.ext.tierCurated",
-  community: "alpha.ext.tierCommunity",
-  user: "alpha.ext.tierUser",
+  codepuppy: "codepuppy.ext.tierCodePuppy",
+  curated: "codepuppy.ext.tierCurated",
+  community: "codepuppy.ext.tierCommunity",
+  user: "codepuppy.ext.tierUser",
 }
 export function supportTierLabelKey(tier: SupportTier): I18nKey {
   return SUPPORT_TIER_KEYS[tier]
@@ -84,14 +84,14 @@ export function supportTierLabelKey(tier: SupportTier): I18nKey {
 
 export function ownershipRows(ownership: OwnershipDims): PresentRow[] {
   return [
-    { labelKey: "alpha.ext.ownAuthor", valueKeys: [authoredLabelKey(ownership.authored)] },
-    { labelKey: "alpha.ext.ownCurated", valueKeys: [curatedLabelKey(ownership.curated)] },
-    { labelKey: "alpha.ext.ownDistributed", valueKeys: [distributionLabelKey(ownership.distributed)] },
+    { labelKey: "codepuppy.ext.ownAuthor", valueKeys: [authoredLabelKey(ownership.authored)] },
+    { labelKey: "codepuppy.ext.ownCurated", valueKeys: [curatedLabelKey(ownership.curated)] },
+    { labelKey: "codepuppy.ext.ownDistributed", valueKeys: [distributionLabelKey(ownership.distributed)] },
     {
-      labelKey: "alpha.ext.ownRuntime",
+      labelKey: "codepuppy.ext.ownRuntime",
       valueKeys: ownership.runtimeSurfaces.map(runtimeSurfaceLabelKey),
     },
-    { labelKey: "alpha.ext.ownSupport", valueKeys: [supportTierLabelKey(ownership.supportTier)] },
+    { labelKey: "codepuppy.ext.ownSupport", valueKeys: [supportTierLabelKey(ownership.supportTier)] },
   ]
 }
 
@@ -99,9 +99,9 @@ export function ownershipRows(ownership: OwnershipDims): PresentRow[] {
 
 /** 签名/信任状态:已验签名通道(remote/cache)/ 随包内置信任(bundled)/ 不可用(null)。 */
 export function trustSignatureKey(catalogChannel: ExtInventory["catalogChannel"]): I18nKey {
-  if (catalogChannel === "remote" || catalogChannel === "cache") return "alpha.ext.trustSignedChannel"
-  if (catalogChannel === "bundled") return "alpha.ext.trustBundled"
-  return "alpha.ext.trustUnverified"
+  if (catalogChannel === "remote" || catalogChannel === "cache") return "codepuppy.ext.trustSignedChannel"
+  if (catalogChannel === "bundled") return "codepuppy.ext.trustBundled"
+  return "codepuppy.ext.trustUnverified"
 }
 
 export function trustRows(
@@ -110,10 +110,10 @@ export function trustRows(
   catalogVersion: ExtInventory["catalogVersion"],
 ): PresentRow[] {
   const rows: PresentRow[] = [
-    { labelKey: "alpha.ext.trustSignatureLabel", valueKeys: [trustSignatureKey(catalogChannel)] },
-    { labelKey: "alpha.ext.trustDistLabel", valueKeys: [distributionLabelKey(ownership.distributed)] },
+    { labelKey: "codepuppy.ext.trustSignatureLabel", valueKeys: [trustSignatureKey(catalogChannel)] },
+    { labelKey: "codepuppy.ext.trustDistLabel", valueKeys: [distributionLabelKey(ownership.distributed)] },
   ]
-  if (catalogVersion) rows.push({ labelKey: "alpha.ext.trustVersionLabel", value: catalogVersion })
+  if (catalogVersion) rows.push({ labelKey: "codepuppy.ext.trustVersionLabel", value: catalogVersion })
   return rows
 }
 
@@ -130,14 +130,14 @@ const WARN_ISSUE_KINDS = new Set(["archived-upstream", "transaction-pending", "t
 export function healthPresentation(health: HealthView): HealthPresentation {
   // 优先级:archived ≻ 事务回滚 ≻ 事务未落定 ≻ 健康(v1-compat 不作 dot 警示)。
   for (const issue of health.issues) {
-    if (issue.kind === "archived-upstream") return { tone: "warn", textKey: "alpha.ext.healthArchived" }
+    if (issue.kind === "archived-upstream") return { tone: "warn", textKey: "codepuppy.ext.healthArchived" }
   }
   for (const issue of health.issues) {
-    if (issue.kind === "transaction-rolled-back") return { tone: "warn", textKey: "alpha.ext.healthTxRolledBack" }
-    if (issue.kind === "transaction-pending") return { tone: "warn", textKey: "alpha.ext.healthTxPending" }
+    if (issue.kind === "transaction-rolled-back") return { tone: "warn", textKey: "codepuppy.ext.healthTxRolledBack" }
+    if (issue.kind === "transaction-pending") return { tone: "warn", textKey: "codepuppy.ext.healthTxPending" }
   }
-  if (health.state === "unknown") return { tone: "muted", textKey: "alpha.ext.healthUnknown" }
-  return { tone: "ok", textKey: "alpha.ext.healthOk" }
+  if (health.state === "unknown") return { tone: "muted", textKey: "codepuppy.ext.healthUnknown" }
+  return { tone: "ok", textKey: "codepuppy.ext.healthOk" }
 }
 
 /** 该行是否含真运行面警示(archived/事务)—— 驱动「审查更新」旁的诚实提示与 dot 色。 */

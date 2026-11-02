@@ -1,7 +1,7 @@
 // Data layer for the Extension Hub (定制中心). Mirrors use-projects.ts: one read client + one
 // global SSE subscription, patching a Solid store in place. The "installed" truth comes from the
 // SDK (mcp.status) — alpha keeps NO separate persisted install store (ADR-014 §4). The browsable
-// catalog comes from the bundled resources/alpha-catalog.json.
+// catalog comes from the bundled resources/codepuppy-catalog.json.
 //
 // Catalog MCP install persists through main; main then asks the ext scheduler to reload the engine
 // (REQ-234 `#1529`: once every session on the instance is idle) so `{file:}` references resolve
@@ -29,11 +29,11 @@ import type {
   UninstallKeyIntent,
 } from "../../preload/types"
 import { isExtensionName } from "../../shared/extension-name"
-import { ALPHA_OFFICE_CONNECTORS, isAlphaOfficeCatalogId, isWorkspacePolicyMcp } from "../../shared/office-advisories"
+import { CODEPUPPY_OFFICE_CONNECTORS, isCodePuppyOfficeCatalogId, isWorkspacePolicyMcp } from "../../shared/office-advisories"
 import type { AuthorizationConfirmationWire, CapabilityDiffWire, TxStageNonAuthorizeWire } from "../../shared/ext-capability-authorization"
-import type { ProviderAddressRejection } from "../../shared/alpha-model-types"
+import type { ProviderAddressRejection } from "../../shared/codepuppy-model-types"
 import type { SessionGrantRefusalCode, SessionGrantWire } from "../../shared/ext-session-grant-wire"
-import type { HubViewRow, ReloadItem, ReloadScope } from "../../main/alpha-sidecar-messages"
+import type { HubViewRow, ReloadItem, ReloadScope } from "../../main/codepuppy-sidecar-messages"
 import { connectOutcome, grantsToReassert, sessionGrantKeyOf } from "./ext-session-toggle"
 import { extIpc } from "./ext-ipc"
 import { subscribeRuntimeRecovery } from "../runtime-recovery"
@@ -42,7 +42,7 @@ import { subscribeRuntimeRecovery } from "../runtime-recovery"
 
 type Client = ReturnType<typeof createOpencodeClient>
 
-/** An agent the engine knows about (SDK app.agents) — built-in (native) or alpha-created.
+/** An agent the engine knows about (SDK app.agents) — built-in (native) or codepuppy-created.
  *  REQ-019 T3:补详情页所需字段(model/variant/prompt/permission),形状 = SDK v2 Agent。 */
 export interface HubAgent {
   name: string
@@ -65,7 +65,7 @@ export interface ExtensionsStore {
   /** REQ-099/136 项目账本视图:当前打开项目的 scope=project 收据(导入/收编与合规 MCP 安装)。
    *  无项目上下文时恒空。catalog「已安装」判定仍只看 global receipts,以保留独立全局安装入口。 */
   projectReceipts: InstallReceipt[]
-  /** Agents the engine knows (REQ-018 T7 Agent tab): built-in + alpha-created (via SDK app.agents). */
+  /** Agents the engine knows (REQ-018 T7 Agent tab): built-in + codepuppy-created (via SDK app.agents). */
   agents: HubAgent[]
   /** #408:当前会话的 session-grant 全集(main 内存真源;会话结束事件即清空)。 */
   sessionGrants: SessionGrantWire[]
@@ -193,37 +193,37 @@ export function projectMcpStatusView(state: ProjectMcpState | undefined) {
       state,
       connected: false,
       tone: "muted" as const,
-      textKey: "alpha.ext.projectMcpAwaitingConsent" as const,
+      textKey: "codepuppy.ext.projectMcpAwaitingConsent" as const,
     }
   if (state === "consent-denied")
     return {
       state,
       connected: false,
       tone: "warn" as const,
-      textKey: "alpha.ext.projectMcpConsentDenied" as const,
+      textKey: "codepuppy.ext.projectMcpConsentDenied" as const,
     }
   if (state === "disabled")
     return {
       state,
       connected: false,
       tone: "muted" as const,
-      textKey: "alpha.ext.projectMcpDisabled" as const,
+      textKey: "codepuppy.ext.projectMcpDisabled" as const,
     }
   if (state === "reload-pending")
     return {
       state,
       connected: false,
       tone: "warn" as const,
-      textKey: "alpha.ext.addedPendingReload" as const,
+      textKey: "codepuppy.ext.addedPendingReload" as const,
     }
   if (state === "active")
-    return { state, connected: true, tone: "ok" as const, textKey: "alpha.ext.enabledLive" as const }
+    return { state, connected: true, tone: "ok" as const, textKey: "codepuppy.ext.enabledLive" as const }
   if (state === "shadowed")
     return {
       state,
       connected: false,
       tone: "warn" as const,
-      textKey: "alpha.ext.projectMcpShadowed" as const,
+      textKey: "codepuppy.ext.projectMcpShadowed" as const,
     }
   // `#1563`:引擎还在后台启动它(准备中)。复用定制中心三档视图给同一状态的文案键,不新造文案(定稿归 T19)。
   if (state === "pending")
@@ -231,13 +231,13 @@ export function projectMcpStatusView(state: ProjectMcpState | undefined) {
       state,
       connected: false,
       tone: "muted" as const,
-      textKey: "alpha.ext.hubReasonNotLoaded" as const,
+      textKey: "codepuppy.ext.hubReasonNotLoaded" as const,
     }
   return {
     state: "unverifiable" as const,
     connected: false,
     tone: "muted" as const,
-    textKey: "alpha.ext.projectMcpUnverifiable" as const,
+    textKey: "codepuppy.ext.projectMcpUnverifiable" as const,
   }
 }
 
@@ -246,22 +246,22 @@ export function projectMcpStatusView(state: ProjectMcpState | undefined) {
 export type HubStateView = {
   state: Exclude<HubViewRow["state"], "not-installed">
   tone: "ok" | "muted" | "warn"
-  textKey: "alpha.ext.hubStateAvailable" | "alpha.ext.hubStateInstalled" | "alpha.ext.hubStatePending"
-  reasonKey?: "alpha.ext.hubReasonWaiting" | "alpha.ext.hubReasonFailed" | "alpha.ext.hubReasonNotLoaded"
+  textKey: "codepuppy.ext.hubStateAvailable" | "codepuppy.ext.hubStateInstalled" | "codepuppy.ext.hubStatePending"
+  reasonKey?: "codepuppy.ext.hubReasonWaiting" | "codepuppy.ext.hubReasonFailed" | "codepuppy.ext.hubReasonNotLoaded"
   /** main 给的技术细节,只进 title。 */
   detail?: string
   reloadNow: boolean
 }
 export function hubStateView(row: HubViewRow | undefined): HubStateView | undefined {
   if (!row || row.state === "not-installed") return undefined
-  if (row.state === "available") return { state: row.state, tone: "ok", textKey: "alpha.ext.hubStateAvailable", reloadNow: false }
+  if (row.state === "available") return { state: row.state, tone: "ok", textKey: "codepuppy.ext.hubStateAvailable", reloadNow: false }
   // 已安装但没核验通过(云条目:缺连接或缺工具,基线 §2.5 云行)⇒ 说出原因;停用的行原因已由「未启用」徽标说了。
   if (row.state === "installed")
     return {
       state: row.state,
       tone: "muted",
-      textKey: "alpha.ext.hubStateInstalled",
-      ...(row.stateReason?.code === "not-loaded" ? { reasonKey: "alpha.ext.hubReasonNotLoaded" as const } : {}),
+      textKey: "codepuppy.ext.hubStateInstalled",
+      ...(row.stateReason?.code === "not-loaded" ? { reasonKey: "codepuppy.ext.hubReasonNotLoaded" as const } : {}),
       ...(row.stateReason?.detail ? { detail: row.stateReason.detail } : {}),
       reloadNow: false,
     }
@@ -269,8 +269,8 @@ export function hubStateView(row: HubViewRow | undefined): HubStateView | undefi
   return {
     state: row.state,
     tone: "warn",
-    textKey: "alpha.ext.hubStatePending",
-    reasonKey: code === "reload-failed" ? "alpha.ext.hubReasonFailed" : code === "reload-waiting" ? "alpha.ext.hubReasonWaiting" : "alpha.ext.hubReasonNotLoaded",
+    textKey: "codepuppy.ext.hubStatePending",
+    reasonKey: code === "reload-failed" ? "codepuppy.ext.hubReasonFailed" : code === "reload-waiting" ? "codepuppy.ext.hubReasonWaiting" : "codepuppy.ext.hubReasonNotLoaded",
     ...(row.stateReason?.detail ? { detail: row.stateReason.detail } : {}),
     reloadNow: row.kind !== "cloud",
   }
@@ -487,7 +487,7 @@ function isPending(info: unknown): boolean {
  *  重新安装 Code Puppy。别的连接器的 dependency_missing 是用户自己的命令缺了,不给这个动作。 */
 export function mcpRepair(name: string, info: unknown): InstalledState["repair"] {
   if (statusTag(info) !== "failed" || (info as { code?: unknown }).code !== "dependency_missing") return undefined
-  return ALPHA_OFFICE_CONNECTORS.some((connector) => connector.name === name) ? "reinstall-app" : undefined
+  return CODEPUPPY_OFFICE_CONNECTORS.some((connector) => connector.name === name) ? "reinstall-app" : undefined
 }
 function statusError(info: unknown): string | undefined {
   if (!info || typeof info !== "object") return undefined
@@ -665,7 +665,7 @@ export function useExtensions(
   // ── `#1106`:被注入面推迟连接的云 server,在有人看的时刻补上那一次 connect ────────────────
   //
   // 注入面在「无已存 OAuth 凭证 ⇒ boot 连接注定 needs_auth」时把云 server 写成
-  // `enabled:false`(alpha-config-injection.ts),引擎 boot 因此不再为它等 1.8–9.7 秒;
+  // `enabled:false`(codepuppy-config-injection.ts),引擎 boot 因此不再为它等 1.8–9.7 秒;
   // 代价是引擎状态停在 `disabled`,而 `#733` 的授权补救入口(McpNeedsAuthAction)只认
   // `needs_auth`。这里把「今天 boot 里那次连接尝试」搬到 hub 真的在看状态的时刻:
   // 观察到云条目 disabled 就补发一次 `/mcp/:name/connect`(引擎 MCP.connect 对 config 里
@@ -780,7 +780,7 @@ export function useExtensions(
   async function persistAndConnectMcp(name: string, config: McpConfig, secretVars?: string[]): Promise<ActionResult> {
     const c = client
     if (!c) return { ok: false, reason: "no server" }
-    // Durable first: write the alpha-owned config. If this fails, never touch the live server —
+    // Durable first: write the codepuppy-owned config. If this fails, never touch the live server —
     // avoids a "live but not persisted" state that vanishes on restart. Main file-ifies the
     // secretVars → opencode.jsonc gets {file:} refs, never the plaintext secret.
     const persisted = await extIpc.persistMcp(name, config as unknown as Record<string, unknown>, secretVars)
@@ -1028,7 +1028,7 @@ export function useExtensions(
   }
 
   async function checkRuntime(entry: CatalogEntry): Promise<RuntimeCheck> {
-    if (isAlphaOfficeCatalogId(entry.id)) {
+    if (isCodePuppyOfficeCatalogId(entry.id)) {
       const ready = await extIpc.officeRuntime()
       return ready.ok ? { ok: true } : { ok: false, reason: ready.reason }
     }

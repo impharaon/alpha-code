@@ -5,7 +5,7 @@
 // 多少」,也不回答「上一次跟上游对齐是多久以前」。于是偏离可以一点一点长大,而永远不触发任何
 // 提示;账在某一次 sync 时一次性付(2026-08 那次积到四周 / 375 个提交)。
 //
-// 被测对象是 scripts/north-star-drift-metrics.sh(alpha-check 第 [13/14] 步跑的就是它)。
+// 被测对象是 scripts/north-star-drift-metrics.sh(codepuppy-check 第 [13/14] 步跑的就是它)。
 //
 // 为什么判据必须长这样:
 //   · **不断言脚本源码文本。** 「grep 到脚本里写着 merge-base」在本仓是点名过的假闸门形态 ——
@@ -77,10 +77,10 @@ const UPSTREAM_FILE = "packages/core/src/upstream-leaf.ts"
 /** ADR-033 白名单里的**被接管**文件:守卫按设计放行它,而度量必须照样把它算进去。 */
 const ADOPTED_FILE = "packages/core/src/permission.ts"
 /** 上游路径下、alpha 这一侧**新增**的文件:`--diff-filter=DMR` 结构上不该点名它。 */
-const ADDED_FILE = "packages/core/src/brand-new-alpha-leaf.ts"
+const ADDED_FILE = "packages/core/src/brand-new-codepuppy-leaf.ts"
 /** carve-out ①:alpha 自有包。 */
-const ALPHA_PKG_FILE = "packages/ui-mac/src/main/alpha-owned.ts"
-const EXT_PKG_FILE = "packages/ext/src/alpha-ext-leaf.ts"
+const CODEPUPPY_PKG_FILE = "packages/ui-mac/src/main/codepuppy-owned.ts"
+const EXT_PKG_FILE = "packages/ext/src/codepuppy-ext-leaf.ts"
 /** carve-out ②:ADR-034 roundtrip 包。 */
 const ROUNDTRIP_FILE = "packages/app/src/frontend-leaf.ts"
 
@@ -98,7 +98,7 @@ const EXPECTED_DELETED = 1
  * ⇒ merge-base(origin/dev, HEAD) 恒等于 seed,年龄由构造决定,不是从脚本输出反推的。
  */
 function driftFixture(forkAgeDays: number) {
-  const origin = mkdtempSync(join(tmpdir(), "alpha-drift-origin-"))
+  const origin = mkdtempSync(join(tmpdir(), "codepuppy-drift-origin-"))
   git(origin, ["init", "-q", "-b", "alpha"])
   commit(
     origin,
@@ -106,7 +106,7 @@ function driftFixture(forkAgeDays: number) {
     {
       [UPSTREAM_FILE]: "a\nb\nc\n",
       [ADOPTED_FILE]: "p1\np2\n",
-      [ALPHA_PKG_FILE]: "alpha1\n",
+      [CODEPUPPY_PKG_FILE]: "codepuppy1\n",
       [EXT_PKG_FILE]: "ext1\n",
       [ROUNDTRIP_FILE]: "front1\n",
     },
@@ -126,14 +126,14 @@ function driftFixture(forkAgeDays: number) {
       // ③ 新增文件:DMR 不该点名(否则 alpha 自己写的判据文件会被算成上游漂移)
       [ADDED_FILE]: "brand\nnew\nfile\n",
       // ④⑤⑥ 三张 carve-out:各改一行,都不该计入
-      [ALPHA_PKG_FILE]: "alpha1\nalpha2\nalpha3\n",
+      [CODEPUPPY_PKG_FILE]: "codepuppy1\nalpha2\nalpha3\n",
       [EXT_PKG_FILE]: "ext1\next2\next3\n",
       [ROUNDTRIP_FILE]: "front1\nfront2\nfront3\n",
     },
     ageEnv(0),
   )
 
-  const work = mkdtempSync(join(tmpdir(), "alpha-drift-work-"))
+  const work = mkdtempSync(join(tmpdir(), "codepuppy-drift-work-"))
   const cloned = Bun.spawnSync(["git", "clone", "-q", origin, work], { env: { ...GIT_ENV } })
   if (cloned.exitCode !== 0) throw new Error(`git clone 失败:${cloned.stderr.toString()}`)
   git(work, ["checkout", "-q", "-b", "feature", "origin/alpha"])
@@ -241,7 +241,7 @@ describe("#1288 north-star 漂移度量:② 上游漂移", () => {
 
     const guardPath = join(work, GUARD_REL)
     const patched = readFileSync(guardPath, "utf8")
-      .replace(/^ALPHA_OWNED_PACKAGES="[^"]+"/m, 'ALPHA_OWNED_PACKAGES="carveout-gone"')
+      .replace(/^CODEPUPPY_OWNED_PACKAGES="[^"]+"/m, 'CODEPUPPY_OWNED_PACKAGES="carveout-gone"')
       .replace(/^ROUNDTRIP_PACKAGES="[^"]+"/m, 'ROUNDTRIP_PACKAGES="roundtrip-gone"')
     writeFileSync(guardPath, patched)
 

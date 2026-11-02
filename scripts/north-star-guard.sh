@@ -4,7 +4,7 @@
 # 本仓是 opencode 的 fork:上游包只读,能力靠**新增** alpha 文件与接缝实现。改了上游文件,
 # 下一次 fork-sync 就冲突。这道门是那条铁律唯一的机械判据。
 #
-# ── 为什么它是一个文件,而不是 alpha-check.sh 里的一段内联 shell(`#889`)────────────
+# ── 为什么它是一个文件,而不是 codepuppy-check.sh 里的一段内联 shell(`#889`)────────────
 # 与 `#717` 把 detect 分类步抽成 scripts/detect-changed-scope.sh 是**同一个理由**:内联时
 # 它没有任何判据。断言 shell 源码文本按本仓定义是假闸门 —— 守卫被整段注释掉时,那种断言
 # 照样绿。抽成文件的唯一目的,是让 packages/ui-mac/src/main/north-star-guard.test.ts 能起
@@ -16,14 +16,14 @@
 #   · 「我们今天**总共**偏离了多少」—— 下面 UPSTREAM_EXCLUDES 里的每一条都是一次**有意的收编**,
 #     本门放行它们;放行是判决,不是「不存在」,于是白名单背后那堆行数对本门永远不可见。
 #   · 「上一次跟上游对齐是多久以前」—— 本门只拿 origin/dev 判「这条路径是不是上游的」,从不看它的日期。
-# 这两个量由 scripts/north-star-drift-metrics.sh(alpha-check 第 [13/14] 步)每次本地闸打印,
+# 这两个量由 scripts/north-star-drift-metrics.sh(codepuppy-check 第 [13/14] 步)每次本地闸打印,
 # **只量不拦**(先量后闸,不设阈值)。它消费本文件的 `--print-jurisdiction`,不另抄一份清单。
 # CLAUDE.md 的北极星那一段与本段说的是同一件事 —— 两处措辞不一致本身就是缺陷(`#1288` 退出条件 3)。
 # 一句话:**这道门今天绿 ≠ 我们没有偏离。**
 #
 # ── 比较基准 = `origin/alpha`,不是 `origin/dev`(`#889`)──────────────────────────
 # 这道门要回答的是「**这个 PR 自己**改了上游文件吗」,所以基准只能是它的目标分支 ——
-# alpha-ci 的 `on: push/pull_request: branches: [alpha]`,分支保护也挂在 alpha 上。
+# codepuppy-ci 的 `on: push/pull_request: branches: [alpha]`,分支保护也挂在 alpha 上。
 # 原来两处写死 `origin/dev`(上游纯镜像分支),那是一个与目标分支无关的字面常量:
 #
 #   · 实测(2026-08-10):`origin/dev` 与 `origin/alpha` 的 merge-base 停在 `347510a73`
@@ -49,12 +49,12 @@ set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 # ── `#1288`:只读模式 `--print-jurisdiction` —— 把辖区说出来,而不是让别人再抄一份 ────
-# 漂移度量步(alpha-check 第 [13/14] 步,scripts/north-star-drift-metrics.sh)要回答的是
+# 漂移度量步(codepuppy-check 第 [13/14] 步,scripts/north-star-drift-metrics.sh)要回答的是
 # 「我们现在**总共**偏离上游多少」。它需要的四样东西 —— 辖区、两张 carve-out、上游镜像 ref、
 # 收编白名单有多长 —— 全都住在本文件里,而本文件是它们的**唯一真源**(`#889`)。
 # 让度量步自己再写一份 = `#637` 那个已经咬过我们一次的形状:两份清单各自漂移,而没有任何
 # 东西会变红。所以这里开一个只读模式:打印这些值然后退出,**一个 git 命令都不跑、一个字节
-# 都不判**。无参数时的行为逐字不变(CI 与 alpha-check 都不带参数)。
+# 都不判**。无参数时的行为逐字不变(CI 与 codepuppy-check 都不带参数)。
 #
 # `#1566`:第二个只读模式 `--print-takeover` —— 逐行打印 UPSTREAM_EXCLUDES 里的路径(去掉
 # `:(exclude)` 前缀),给每日上游同步(`.github/workflows/sync-upstream.yml` 的
@@ -96,14 +96,17 @@ UPSTREAM_PATHS="packages"
 # 只会把「改自己的代码」变成一道恒红门。
 # **这张清单由下面的运行期自检逐条对着上游镜像验一遍**:把一个真上游包写进来,是绕开整道门
 # 最便宜的一步(一行配置换一整个包的豁免),它不能只靠人看。
-ALPHA_OWNED_PACKAGES="ext ui-mac alpha-contracts-consumer"
+# `#1570` 改名过渡:包目录 alpha-contracts-consumer → codepuppy-contracts-consumer。守卫判的是
+# `--diff-filter=DMR` 的**删除侧旧路径**,所以改名那个 PR 里旧目录必须仍在豁免表里,否则每个被搬走的
+# 文件都会被判成上游删除。紧随的 S 级 PR 删掉旧目录名(以及下面两处旧前缀 / 旧 marker)。
+CODEPUPPY_OWNED_PACKAGES="ext ui-mac codepuppy-contracts-consumer alpha-contracts-consumer"
 
 # carve-out ②:由 ADR-034 的 pin + SOT 补丁 roundtrip 盖住的前端包。
 # 它们**不是** alpha 自有(`origin/dev` 里有,alpha 也确实在改),但覆盖它们的不是本门:
 #   · 无空档 —— `scripts/assert-frontend-patch-roundtrip.sh` 判的是「HEAD 的这两棵树必须能由
-#     `frontend/frontend-pin.lock` 的 pin + `frontend/alpha-patches/alpha-frontend.patch`
+#     `frontend/frontend-pin.lock` 的 pin + `frontend/codepuppy-patches/codepuppy-frontend.patch`
 #     **逐字节重建**」(比 tree sha),它比本门**更强**:连「改了但没重生补丁」都当场红,
-#     而本门只判「有没有改」。它跑在 alpha-ci 的同一个 job 里,且刻意用 `if: !cancelled()`。
+#     而本门只判「有没有改」。它跑在 codepuppy-ci 的同一个 job 里,且刻意用 `if: !cancelled()`。
 #   · 无重复 —— 本门若也盖它们,ADR-034 明写的日常工作流(改 seam = 改补丁 + 重生那两棵树)
 #     每一次都会被判成破北极星 ⇒ 恒红门 ⇒ `--no-verify` ⇒ 十道门一起关掉(`#754` 形态)。
 # 两处清单相同由 local-gate-parity.test.ts 判(有人把 roundtrip 门的 PACKAGES 改小 = 空档,即红)。
@@ -113,10 +116,10 @@ ROUNDTRIP_PACKAGES="app ui"
 # 「ADR-033/035/038/041/042 逐文件**收编**」,与「这个包根本不归本门管」不是一回事,混在
 # 一起会让「新增收编须自己的 ADR」这条纪律在阅读时失焦。
 CARVEOUT_PATHSPECS=()
-for pkg in $ALPHA_OWNED_PACKAGES $ROUNDTRIP_PACKAGES; do
+for pkg in $CODEPUPPY_OWNED_PACKAGES $ROUNDTRIP_PACKAGES; do
   CARVEOUT_PATHSPECS+=(":(exclude)packages/$pkg")
 done
-# 被接管/生成文件的例外,与 alpha-ci.yml 的 `excludes=()` 逐条对齐。新增收编须自己的 ADR,
+# 被接管/生成文件的例外,与 codepuppy-ci.yml 的 `excludes=()` 逐条对齐。新增收编须自己的 ADR,
 # 不得静默加 exclude(ADR-029 §3)。两处逐条相同由 local-gate-parity.test.ts 判(`#637`)。
 UPSTREAM_EXCLUDES=(
   # ADR-033 §1 被接管 permission 表面(L3)
@@ -144,7 +147,7 @@ UPSTREAM_EXCLUDES=(
   ':(exclude)packages/client/src/generated/types.ts'
   # ADR-035(#489):E7 web search 失败诚实所需的两文件接管(L3)。上游
   # test/tool/websearch.test.ts **不**接管(#223 修复轮):新增失败测试落 alpha 自有的
-  # test/tool/alpha-websearch-failure.test.ts(新增文件不触发 --diff-filter=DMR,无需 exclude)。
+  # test/tool/codepuppy-websearch-failure.test.ts(新增文件不触发 --diff-filter=DMR,无需 exclude)。
   ':(exclude)packages/opencode/src/tool/websearch.ts'
   ':(exclude)packages/opencode/src/tool/mcp-websearch.ts'
   # ADR-035 §1 追加(#223 R3 Blocker 1,2026-07-26):打包 sidecar 同时挂载 V2 Location 服务,
@@ -156,11 +159,11 @@ UPSTREAM_EXCLUDES=(
   # 高频路径)。期限只能落在 Deferred 所在的这一处;L0 接缝只能改判定、壳侧看门狗会连带
   # 拒绝同会话全部 pending、L1/L2 无法 loud-fail 承载安全语义(逐条证据见 ADR-038 §2)。
   # 接管面刻意压到这一个文件;新增闸门落 alpha 自有的
-  # test/permission/alpha-ask-deadline.test.ts(新增文件不触发 --diff-filter=DMR)。
+  # test/permission/codepuppy-ask-deadline.test.ts(新增文件不触发 --diff-filter=DMR)。
   ':(exclude)packages/opencode/src/permission/index.ts'
   # ADR-041(#878,2026-08-09):工具身份与不可变显示快照。来源信息在这些注册/聚合/
   # 权限/首次写入咽喉之后结构性丢失,L0-L2 无法从 alias 诚实反推。仅逐文件接管;
-  # 新的 alpha-tool-identity 闸门是新增文件,无需 exclude。permission/index.ts 已由
+  # 新的 codepuppy-tool-identity 闸门是新增文件,无需 exclude。permission/index.ts 已由
   # ADR-038 接管,不重复列。
   ':(exclude)packages/schema/src/v1/session.ts'
   ':(exclude)packages/sdk/js/src/gen/types.gen.ts'
@@ -189,7 +192,7 @@ UPSTREAM_EXCLUDES=(
   # ADR-041 订正 · 2026-09-22(#1370 一次性追平上游 e11dbd020..fe3f3a41f,PR #1401):上游
   # 2026-09-01 新增的 test/session/tools.test.ts 手写 mock 按上游接口写,而上面 ADR-038 / ADR-041 /
   # #1129 收编的 permission/index.ts(clearGrants)、tool/registry.ts(RegisteredTool)、
-  # session/processor.ts(registerToolDisplay)、session/tools.ts(AlphaToolPolicy 依赖)把接口扩宽
+  # session/processor.ts(registerToolDisplay)、session/tools.ts(CodePuppyToolPolicy 依赖)把接口扩宽
   # ⇒ 它在 alpha 上 typecheck 红。接管面 = 只补 mock 缺的成员,生产签名不动;它是上面那几份收编的
   # **测试兄弟**,owner 裁决并入 ADR-041(「精确 L3 接管面」已列入,不另开 ADR)。
   ':(exclude)packages/opencode/test/session/tools.test.ts'
@@ -213,7 +216,8 @@ UPSTREAM_EXCLUDES=(
 # 谓词 = 两个因子的**合取**,缺一不豁免:
 #   ① 出身:这条路径在上游镜像 `origin/dev` 里**不存在**。dev 是上游纯镜像(ADR-005),
 #      真上游文件按定义在它里面 ⇒ 这一条单独就挡住了「把真上游改动放行」的绝大部分。
-#   ② 自报家门:basename 以 `alpha-` 开头,**或**文件里写着 `north-star:alpha-owned`。
+#   ② 自报家门:basename 以 `codepuppy-` 开头,**或**文件里写着 `north-star:codepuppy-owned`
+#      (`#1570` 改名过渡期间旧前缀 `alpha-` 与旧 marker `north-star:alpha-owned` 同样认,S 级后续 PR 删)。
 #
 # 为什么必须是合取,而不是任一条单独成立:
 #   · 只有①:`origin/dev` 是个会陈旧的 ref。fetch 失败(实测 3 次 1 次)+ 上游在这段窗口里
@@ -231,7 +235,8 @@ UPSTREAM_EXCLUDES=(
 #   · 上游**删掉**、而 alpha 留着的文件,①成立 ⇒ 它要拿到豁免仍需②(得有人显式标记)。
 #   · 谓词判的是**路径**,不是内容:它回答「这条路径是不是上游的」,不回答「这次改动对不对」。
 UPSTREAM_MIRROR="origin/dev"
-ALPHA_OWNED_MARKER="north-star:alpha-owned"
+CODEPUPPY_OWNED_MARKER="north-star:codepuppy-owned"
+LEGACY_OWNED_MARKER="north-star:alpha-owned" # `#1570` 改名过渡,S 级后续 PR 删
 
 # `#1288` 只读模式的落点:上面五个值全部定义完、而**任何** git 命令都还没跑。放在这里是判据
 # 的一部分 —— 度量步在拿不到 origin/dev 时要自己判「未测量」,它不能先被守卫的 fetch/降级
@@ -239,7 +244,7 @@ ALPHA_OWNED_MARKER="north-star:alpha-owned"
 # 本脚本复制一份、只删掉三条 exclude,断言度量步打印的条数**跟着变**(杀掉「印一个写死的数」)。
 if [ "$GUARD_MODE" = print-jurisdiction ]; then
   printf 'UPSTREAM_PATHS\t%s\n' "$UPSTREAM_PATHS"
-  printf 'ALPHA_OWNED_PACKAGES\t%s\n' "$ALPHA_OWNED_PACKAGES"
+  printf 'CODEPUPPY_OWNED_PACKAGES\t%s\n' "$CODEPUPPY_OWNED_PACKAGES"
   printf 'ROUNDTRIP_PACKAGES\t%s\n' "$ROUNDTRIP_PACKAGES"
   printf 'UPSTREAM_MIRROR\t%s\n' "$UPSTREAM_MIRROR"
   printf 'UPSTREAM_EXCLUDES_COUNT\t%s\n' "${#UPSTREAM_EXCLUDES[@]}"
@@ -263,18 +268,18 @@ mirror_has() { git cat-file -e "${UPSTREAM_MIRROR}:$1" 2>/dev/null; }
 #   $ bash -c 'set -uo pipefail; cat big.txt | grep -qF token; echo $?'   → 141
 # 方向是 fail-closed(误判成上游 ⇒ 假红)而不是放行,但它取决于文件多大、marker 在第几行,
 # 是那种「今天绿明天红」的不可复现门。命令替换没有这个问题。
-declares_alpha_owned() {
-  case "${1##*/}" in alpha-*) return 0 ;; esac
+declares_codepuppy_owned() {
+  case "${1##*/}" in codepuppy-* | alpha-*) return 0 ;; esac
   local body
   body="$(cat "$1" 2>/dev/null || git show "HEAD:$1" 2>/dev/null || git show "origin/alpha:$1" 2>/dev/null)" || return 1
-  case "$body" in *"$ALPHA_OWNED_MARKER"*) return 0 ;; esac
+  case "$body" in *"$CODEPUPPY_OWNED_MARKER"* | *"$LEGACY_OWNED_MARKER"*) return 0 ;; esac
   return 1
 }
 
-is_alpha_owned() {
+is_codepuppy_owned() {
   [ "$mirror_ok" -eq 1 ] || return 1
   mirror_has "$1" && return 1
-  declares_alpha_owned "$1"
+  declares_codepuppy_owned "$1"
 }
 
 # ── fetch 失败时的降级,以及它为什么必须自报家门(`#913`)───────────────────────────
@@ -285,7 +290,7 @@ is_alpha_owned() {
 # 真正的问题是**可见性**:那行 warn 混在一整屏门输出里极易被略过,而「落后 1 个提交」与
 # 「落后 3 周」原来长得一模一样 ⇒「守卫今天绿」这句话的含义,取决于一个没人看得见的量。
 # 所以降级时把基准的身份与年龄一并报出来(在基准 ref 确认存在之后的那一段)。
-# CI 不走这条路:alpha-ci.yml 的 `Ensure origin/alpha is available` 步是裸 fetch,失败即 job
+# CI 不走这条路:codepuppy-ci.yml 的 `Ensure origin/alpha is available` 步是裸 fetch,失败即 job
 # 红。降级只属于本地档。
 fetched=1
 if ! git fetch --no-tags origin alpha --quiet 2>/dev/null; then
@@ -334,19 +339,19 @@ if [ "$mirror_ok" -eq 1 ] && [ "$mirror_fetched" -eq 0 ]; then
   echo "      mirror: last-known ${UPSTREAM_MIRROR} @ $(git rev-parse --short "$UPSTREAM_MIRROR") — dated $(git log -1 --format=%cd --date=short "$UPSTREAM_MIRROR") ($(git log -1 --format=%cr "$UPSTREAM_MIRROR"))"
 fi
 
-# ── ALPHA_OWNED_PACKAGES 的运行期自检(ADR-044 / `#1247`)────────────────────────────
+# ── CODEPUPPY_OWNED_PACKAGES 的运行期自检(ADR-044 / `#1247`)────────────────────────────
 # 辖区变成「整棵 packages/ 减 carve-out」之后,**那张 carve-out 清单就是这道门的软肋**:往
-# ALPHA_OWNED_PACKAGES 里加一个词,就把一整个上游包移出辖区,而其余每一条断言照样绿。
+# CODEPUPPY_OWNED_PACKAGES 里加一个词,就把一整个上游包移出辖区,而其余每一条断言照样绿。
 # 所以它必须有机械判据 —— 判据现成:alpha 自有包按定义在上游镜像里**查无此路径**。
 # 镜像取不到时跳过(上面已经因此发过警告);那一档只是「这一跑没验」,不是放行,因为辖区
 # 本身不依赖镜像。
 if [ "$mirror_ok" -eq 1 ]; then
   forged=""
-  for pkg in $ALPHA_OWNED_PACKAGES; do
+  for pkg in $CODEPUPPY_OWNED_PACKAGES; do
     if mirror_has "packages/$pkg"; then forged="${forged} packages/$pkg"; fi
   done
   if [ -n "$forged" ]; then
-    echo "    ✗ ALPHA_OWNED_PACKAGES 里有上游镜像 ${UPSTREAM_MIRROR} 里就存在的包:${forged}"
+    echo "    ✗ CODEPUPPY_OWNED_PACKAGES 里有上游镜像 ${UPSTREAM_MIRROR} 里就存在的包:${forged}"
     echo "      → 上游有的包不是 alpha 自有。把它写进那张清单等于给整个包发豁免,本次守卫作废(不是通过)。"
     echo "      → 真要接管上游文件,走 ADR-029 的阶梯并逐文件登记进 UPSTREAM_EXCLUDES,不要动包级 carve-out。"
     exit 1
@@ -356,7 +361,7 @@ fi
 # committed delta (mirrors CI) ∪ working-tree edits (earlier local feedback)
 # 同一条理由:diff 本身失败也是「测不到」,不是「没有改动」。宁可当场红。
 # `--no-renames` 是**判据的一部分**,不是风格(`#1085`)。默认开着的改名检测会把一次改名压成
-# 一条 `R`,而 `--name-only` 对 `R` 只印**目的路径** —— 于是「把上游文件改名成 alpha-foo.ts」
+# 一条 `R`,而 `--name-only` 对 `R` 只印**目的路径** —— 于是「把上游文件改名成 codepuppy-foo.ts」
 # 在下面的谓词里两个因子全中,被当成 alpha 自有放行,而上游那条路径其实已经消失(fork-sync
 # 照样冲突)。关掉改名检测后,同一次改名回到 `D`(旧路径)+ `A`(新路径):`D` 落进 DMR 被点名,
 # 点的还正好是真正受害的那条路径。north-star-guard.test.ts 里有一条专钉这个形状。
@@ -373,7 +378,7 @@ flagged=""
 exempt=""
 while IFS= read -r path; do
   [ -n "$path" ] || continue
-  if is_alpha_owned "$path"; then
+  if is_codepuppy_owned "$path"; then
     exempt="${exempt}${path}
 "
   else
@@ -394,9 +399,9 @@ if [ -n "$flagged" ]; then
   echo "    ✗ upstream files modified/deleted/renamed (fork-sync would conflict):"
   printf '%s' "$flagged" | sed 's/^/      /'
   echo "      → revert; extend via alpha files (packages/ext, packages/ui-mac) or seams (ADR-002/005)."
-  echo "      → 它其实是 alpha 自有文件?命名成 alpha-*,或在文件里写一行 '${ALPHA_OWNED_MARKER}'(ADR-043)。"
+  echo "      → 它其实是 alpha 自有文件?命名成 codepuppy-*,或在文件里写一行 '${CODEPUPPY_OWNED_MARKER}'(ADR-043)。"
   exit 1
 fi
 # 绿也要说清「这一跑量的是什么」(`#913` 同一条纪律):辖区不再是读者背得出来的 8 个包,
 # 而是「整棵 packages/ 减两张 carve-out」—— 不把 carve-out 打出来,「今天绿」就又变成隐含知识。
-echo "✓ zero upstream package edits (辖区 = packages/ 全树 − alpha 自有包 [${ALPHA_OWNED_PACKAGES}] − ADR-034 roundtrip 包 [${ROUNDTRIP_PACKAGES}];baseline origin/alpha;ADR-033 收编白名单 + ADR-043 alpha 自有谓词除外)"
+echo "✓ zero upstream package edits (辖区 = packages/ 全树 − alpha 自有包 [${CODEPUPPY_OWNED_PACKAGES}] − ADR-034 roundtrip 包 [${ROUNDTRIP_PACKAGES}];baseline origin/alpha;ADR-033 收编白名单 + ADR-043 alpha 自有谓词除外)"

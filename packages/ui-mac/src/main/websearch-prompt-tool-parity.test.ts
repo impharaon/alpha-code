@@ -2,14 +2,14 @@
 //
 // 守的是一件事:**开场白里说的「你能搜网」,必须与模型这一轮手里真有的工具对得上。**
 // 勘破(`docs/architecture/2026-09-23-web-tools-account-routing-recon.md` §6 第 6 行)测出
-// 全仓有**四处**在判「能不能搜网」,其中 `buildAlphaCapabilities` 把结论**直接写进系统提示**,
+// 全仓有**四处**在判「能不能搜网」,其中 `buildCodePuppyCapabilities` 把结论**直接写进系统提示**,
 // 而它与真闸不同源 —— 于是可以「提示说有、工具表里其实没有」,模型要么去调一个不存在的工具,
 // 要么凭印象编一个答案。CODE-2 的修法是让提示**消费真闸的判决**而不是自己再判一遍;
 // 本文件是那条保证的执行者。
 //
 // 判官看的是**生产自己写出来的两样东西**,不是两份都由本文件算的期望值:
-//   · 「提示里那一行」= 真 `injectAlphaConfig` 写到盘上的 `alpha-identity.md` 正文里,
-//     有没有生产 `buildAlphaIdentity` 的 web search 那一行(行本身也从生产取,不抄措辞);
+//   · 「提示里那一行」= 真 `injectCodePuppyConfig` 写到盘上的 `codepuppy-identity.md` 正文里,
+//     有没有生产 `buildCodePuppyIdentity` 的 web search 那一行(行本身也从生产取,不抄措辞);
 //   · 「工具表的在场性」= 同一次注入写进 `OPENCODE_CONFIG_CONTENT` 的 permission deny 表
 //     (引擎 `Permission.disabled` 按它把工具从模型工具表里摘掉,
 //     `packages/opencode/src/session/llm/request.ts:234-244`)与 `mcp.cloud` 的 `enabled`。
@@ -47,35 +47,35 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
-import { buildAlphaIdentity } from "./alpha-identity"
-import { injectAlphaConfig } from "./alpha-config-injection"
-import { secretFilePath } from "./alpha-secret-files"
+import { buildCodePuppyIdentity } from "./codepuppy-identity"
+import { injectCodePuppyConfig } from "./codepuppy-config-injection"
+import { secretFilePath } from "./codepuppy-secret-files"
 import { CLOUD_MCP_SERVER_NAME, CLOUD_WEB_SEARCH_TOOL_ID, LOCAL_WEB_SEARCH_TOOL_ID } from "./cloud-web-search"
 
 // 注入读到的 env 输入 + 它自己写出的 env 输出:逐个快照/清空/还原(与同目录两个注入测试同一份清单)。
 const MANAGED = [
-  "ALPHA_JSONC_TRUTH_DISABLE",
-  "ALPHA_LEGACY_INSTALL_ROOT",
-  "ALPHA_GLOBAL_DIR",
-  "ALPHA_OPENCODE_HOME",
+  "CODEPUPPY_JSONC_TRUTH_DISABLE",
+  "CODEPUPPY_LEGACY_INSTALL_ROOT",
+  "CODEPUPPY_GLOBAL_DIR",
+  "CODEPUPPY_OPENCODE_HOME",
   "XDG_CONFIG_HOME",
   "XDG_DATA_HOME",
   "OPENCODE_CONFIG",
   "OPENCODE_CONFIG_CONTENT",
   "OPENCODE_CONFIG_DIR",
   "OPENCODE_MODELS_PATH",
-  "ALPHA_IDENTITY_DISABLE",
-  "ALPHA_BEHAVIOR_DISABLE",
-  "ALPHA_MODELS_DISABLE",
-  "ALPHA_AUTOMATION_DISABLE",
-  "ALPHA_READONLY_DISABLE",
-  "ALPHA_WEBSEARCH_DISABLE",
-  "ALPHA_CLOUD_MCP_URL",
-  "ALPHA_CLOUD_MCP_ARM",
-  "ALPHA_CLOUD_MCP_DEF",
-  "ALPHA_CLOUD_MCP_SERVER",
-  "ALPHA_BASE_URL",
-  "ALPHA_DEFAULT_MODEL",
+  "CODEPUPPY_IDENTITY_DISABLE",
+  "CODEPUPPY_BEHAVIOR_DISABLE",
+  "CODEPUPPY_MODELS_DISABLE",
+  "CODEPUPPY_AUTOMATION_DISABLE",
+  "CODEPUPPY_READONLY_DISABLE",
+  "CODEPUPPY_WEBSEARCH_DISABLE",
+  "CODEPUPPY_CLOUD_MCP_URL",
+  "CODEPUPPY_CLOUD_MCP_ARM",
+  "CODEPUPPY_CLOUD_MCP_DEF",
+  "CODEPUPPY_CLOUD_MCP_SERVER",
+  "CODEPUPPY_BASE_URL",
+  "CODEPUPPY_DEFAULT_MODEL",
   "OPENCODE_ENABLE_EXA",
   "OPENCODE_EXPERIMENTAL",
 ] as const
@@ -89,12 +89,12 @@ beforeEach(() => {
     saved[k] = process.env[k]
     delete process.env[k]
   }
-  tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "alpha-ws-parity-")))
-  process.env.ALPHA_GLOBAL_DIR = path.join(tmp, "alpha-code-state", "env", "dev")
+  tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-ws-parity-")))
+  process.env.CODEPUPPY_GLOBAL_DIR = path.join(tmp, "codepuppy-state", "env", "dev")
   process.env.XDG_CONFIG_HOME = path.join(tmp, "xdg")
-  process.env.ALPHA_OPENCODE_HOME = path.join(tmp, "opencode-home")
+  process.env.CODEPUPPY_OPENCODE_HOME = path.join(tmp, "opencode-home")
   process.env.XDG_DATA_HOME = path.join(tmp, "xdg-data")
-  for (const d of [process.env.ALPHA_GLOBAL_DIR, process.env.XDG_CONFIG_HOME, process.env.ALPHA_OPENCODE_HOME, process.env.XDG_DATA_HOME])
+  for (const d of [process.env.CODEPUPPY_GLOBAL_DIR, process.env.XDG_CONFIG_HOME, process.env.CODEPUPPY_OPENCODE_HOME, process.env.XDG_DATA_HOME])
     fs.mkdirSync(d!, { recursive: true })
   userData = path.join(tmp, "userdata")
   fs.mkdirSync(userData, { recursive: true })
@@ -118,8 +118,8 @@ const plantSecret = (varName: string, value: string) => {
 // 提示里那两行**从生产取**,不抄措辞:用「打开某个能力前后的差集」把行本身解出来。
 // 抄一份字面量 = 第二份真源,改了文案这道闸会静默失明。
 const lineAddedBy = (caps: { websearch?: boolean; cloudDispatch?: boolean }) => {
-  const base = buildAlphaIdentity({}).split("\n")
-  const added = buildAlphaIdentity(caps)
+  const base = buildCodePuppyIdentity({}).split("\n")
+  const added = buildCodePuppyIdentity(caps)
     .split("\n")
     .filter((l) => l.trim().startsWith("- ") && !base.includes(l))
   return added
@@ -132,7 +132,7 @@ type Cfg = Record<string, any>
 /** 一次真注入之后,生产写出来的两样东西。 */
 function observe() {
   const config: Cfg = JSON.parse(process.env.OPENCODE_CONFIG_CONTENT!)
-  const identityFile = (config.instructions as string[]).find((f) => f.endsWith("alpha-identity.md"))!
+  const identityFile = (config.instructions as string[]).find((f) => f.endsWith("codepuppy-identity.md"))!
   const identity = fs.readFileSync(identityFile, "utf8")
 
   // 一个工具在不在模型工具表里:顶层 deny 摘掉它,agent 级规则排在全局之后(`Permission.evaluate`
@@ -163,16 +163,16 @@ function observe() {
 }
 
 const givenLoggedOut = () => {
-  // 登出/BYOK:`ALPHA_CLOUD_MCP_URL` 由登录时的 applyAuthEnv 写入,登出态它不在;也没有 mcp_access 凭证。
+  // 登出/BYOK:`CODEPUPPY_CLOUD_MCP_URL` 由登录时的 applyAuthEnv 写入,登出态它不在;也没有 mcp_access 凭证。
   plantSecret("DEEPSEEK_API_KEY", "sk-byok-parity")
-  process.env.ALPHA_BASE_URL = "https://gateway.example.invalid/v1"
-  process.env.ALPHA_DEFAULT_MODEL = "deepseek/deepseek-chat"
+  process.env.CODEPUPPY_BASE_URL = "https://gateway.example.invalid/v1"
+  process.env.CODEPUPPY_DEFAULT_MODEL = "deepseek/deepseek-chat"
 }
 const givenLoggedIn = () => {
   givenLoggedOut()
-  plantSecret("ALPHA_API_KEY", "sk-platform-parity")
-  plantSecret("ALPHA_MCP_TOKEN", "mcp-access-parity")
-  process.env.ALPHA_CLOUD_MCP_URL = "https://cloud.example/mcp"
+  plantSecret("CODEPUPPY_API_KEY", "sk-platform-parity")
+  plantSecret("CODEPUPPY_MCP_TOKEN", "mcp-access-parity")
+  process.env.CODEPUPPY_CLOUD_MCP_URL = "https://cloud.example/mcp"
 }
 
 /** 每格都在 keyless flag 的两个值上各跑一遍 —— 它的值由 CODE-1 正在改的那一处落定,不当常量。 */
@@ -197,9 +197,9 @@ describe("S4:系统提示里的「能搜网」与模型工具表的在场性,在
     expect(lineAddedBy({ cloudDispatch: true })).toHaveLength(1)
     expect(WEBSEARCH_LINE).toContain("Web search")
     expect(WEBSEARCH_LINE).not.toBe(CLOUD_DISPATCH_LINE)
-    expect(buildAlphaIdentity({ websearch: true })).toContain(WEBSEARCH_LINE)
-    expect(buildAlphaIdentity({ websearch: false })).not.toContain(WEBSEARCH_LINE)
-    expect(buildAlphaIdentity({ cloudDispatch: true })).not.toContain(WEBSEARCH_LINE)
+    expect(buildCodePuppyIdentity({ websearch: true })).toContain(WEBSEARCH_LINE)
+    expect(buildCodePuppyIdentity({ websearch: false })).not.toContain(WEBSEARCH_LINE)
+    expect(buildCodePuppyIdentity({ cloudDispatch: true })).not.toContain(WEBSEARCH_LINE)
   })
 
   for (const keyless of KEYLESS_ARMS) {
@@ -208,7 +208,7 @@ describe("S4:系统提示里的「能搜网」与模型工具表的在场性,在
         givenLoggedOut()
         process.env.OPENCODE_ENABLE_EXA = keyless
 
-        silently(() => injectAlphaConfig(userData, undefined, "stable"))
+        silently(() => injectCodePuppyConfig(userData, undefined, "stable"))
         const o = observe()
 
         // 真闸:登出态一个 deny 都不写(不误伤登出兜底)
@@ -228,7 +228,7 @@ describe("S4:系统提示里的「能搜网」与模型工具表的在场性,在
         givenLoggedIn()
         process.env.OPENCODE_ENABLE_EXA = keyless
 
-        silently(() => injectAlphaConfig(userData, undefined, "stable"))
+        silently(() => injectCodePuppyConfig(userData, undefined, "stable"))
         const o = observe()
 
         // 云腿这一半 CODE-1 一个字不改(基线 §二 落地方向 2)
@@ -251,15 +251,15 @@ describe("S4:系统提示里的「能搜网」与模型工具表的在场性,在
       test("③ 登录(无额度):额度信号进不了桌面 ⇒ 注入产物与有额度态逐字相同,提示不多说也不少说", () => {
         givenLoggedIn()
         process.env.OPENCODE_ENABLE_EXA = keyless
-        silently(() => injectAlphaConfig(userData, undefined, "stable"))
+        silently(() => injectCodePuppyConfig(userData, undefined, "stable"))
         const withQuota = observe()
 
         // 换一份干净的起点重跑,唯一的差别是环境里多了「这个账户没钱了」的信号。
         delete process.env.OPENCODE_CONFIG_CONTENT
-        process.env.ALPHA_ACCOUNT_BALANCE_FEN = "0"
-        process.env.ALPHA_ACCOUNT_PLAN_STATUS = "expired"
+        process.env.CODEPUPPY_ACCOUNT_BALANCE_FEN = "0"
+        process.env.CODEPUPPY_ACCOUNT_PLAN_STATUS = "expired"
         try {
-          silently(() => injectAlphaConfig(userData, undefined, "stable"))
+          silently(() => injectCodePuppyConfig(userData, undefined, "stable"))
           const noQuota = observe()
 
           // 桌面对额度结构性失明:同一组桌面输入 ⇒ 同一份产物。基线 §二否决 A —— 桌面持有额度判据
@@ -272,17 +272,17 @@ describe("S4:系统提示里的「能搜网」与模型工具表的在场性,在
           expect(noQuota.cloudWebSearchPresent).toBe(true)
           expect(noQuota.promptClaimsWebSearch).toBe(noQuota.localWebSearchPresent || noQuota.cloudWebSearchPresent)
         } finally {
-          delete process.env.ALPHA_ACCOUNT_BALANCE_FEN
-          delete process.env.ALPHA_ACCOUNT_PLAN_STATUS
+          delete process.env.CODEPUPPY_ACCOUNT_BALANCE_FEN
+          delete process.env.CODEPUPPY_ACCOUNT_PLAN_STATUS
         }
       })
 
       test("④ kill-switch:两条腿都不在场,提示里那一行必须消失", () => {
         givenLoggedIn()
         process.env.OPENCODE_ENABLE_EXA = keyless
-        process.env.ALPHA_WEBSEARCH_DISABLE = "1"
+        process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
 
-        silently(() => injectAlphaConfig(userData, undefined, "stable"))
+        silently(() => injectCodePuppyConfig(userData, undefined, "stable"))
         const o = observe()
 
         // kill-switch 半场逐字保留(基线 §三 S3):两个工具 id 都被钉 deny,云 server 是中和条目
@@ -305,18 +305,18 @@ describe("S4:系统提示里的「能搜网」与模型工具表的在场性,在
 
     for (const [label, arrange] of [
       ["登出", givenLoggedOut],
-      ["kill-switch", () => (givenLoggedIn(), void (process.env.ALPHA_WEBSEARCH_DISABLE = "1"))],
+      ["kill-switch", () => (givenLoggedIn(), void (process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"))],
     ] as const) {
       for (const keyless of KEYLESS_ARMS) {
         // 每一轮换一份干净的 userData 与 config 起点
         userData = fs.mkdtempSync(path.join(tmp, "ud-"))
         delete process.env.OPENCODE_CONFIG_CONTENT
-        delete process.env.ALPHA_CLOUD_MCP_URL
-        delete process.env.ALPHA_WEBSEARCH_DISABLE
+        delete process.env.CODEPUPPY_CLOUD_MCP_URL
+        delete process.env.CODEPUPPY_WEBSEARCH_DISABLE
         arrange()
         process.env.OPENCODE_ENABLE_EXA = keyless
 
-        silently(() => injectAlphaConfig(userData, undefined, "stable"))
+        silently(() => injectCodePuppyConfig(userData, undefined, "stable"))
         const o = observe()
         const truth = o.localWebSearchPresent || o.cloudWebSearchPresent
         // 生产(已修)必须与真相一致

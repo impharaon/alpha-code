@@ -6,7 +6,7 @@
 // authenticated model request settles the renderer's exact first handler without
 // opening a second server, inventing a catalog fast-path, or touching account state.
 import path from "node:path"
-import { ALPHA_V2_CATALOG_READY_PROVIDER_ID } from "../shared/alpha-config"
+import { CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID } from "../shared/codepuppy-config"
 
 type ServerApp = {
   request(input: string | URL | Request, init?: RequestInit): Response | Promise<Response>
@@ -38,10 +38,10 @@ export function initialLocationPrewarmRequest(
   directory: string,
   password: string,
   signal?: AbortSignal,
-  base: string = "http://alpha-sidecar.invalid",
+  base: string = "http://codepuppy-sidecar.invalid",
 ): Request | undefined {
   if (!path.isAbsolute(directory)) return
-  const url = new URL(`/api/provider/${encodeURIComponent(ALPHA_V2_CATALOG_READY_PROVIDER_ID)}`, base)
+  const url = new URL(`/api/provider/${encodeURIComponent(CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID)}`, base)
   url.searchParams.set("location[directory]", directory)
   return new Request(url, {
     method: "GET",
@@ -56,7 +56,7 @@ export function initialModelPrewarmRequest(
   signal?: AbortSignal,
 ): Request | undefined {
   if (!path.isAbsolute(directory)) return
-  const url = new URL("/api/model", "http://alpha-sidecar.invalid")
+  const url = new URL("/api/model", "http://codepuppy-sidecar.invalid")
   url.searchParams.set("location[directory]", directory)
   return new Request(url, {
     method: "GET",

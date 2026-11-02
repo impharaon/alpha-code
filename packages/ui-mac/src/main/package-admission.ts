@@ -2,8 +2,8 @@ import { isOfficialConnector } from "./official-connector-recipes"
 import { collectOldOfficialConnectorVersions, releaseOfficialConnectorResources, restoreCommittedOfficialConnectors } from "./official-connector-resources"
 import { createHash } from "node:crypto"
 import { isAbsolute } from "node:path"
-import type { AppEnvironment } from "./alpha-environment"
-import { newMcpSecretVersionId } from "./alpha-mcp-secrets"
+import type { AppEnvironment } from "./codepuppy-environment"
+import { newMcpSecretVersionId } from "./codepuppy-mcp-secrets"
 import { agentMdToEntry } from "./agent-md-entry"
 import { evaluateBundleAuthorization, evaluateCapabilityDiff, isSafeCapability, type CapabilityDiff } from "./ext-capability-grants"
 import { recoveryReceiptInputs } from "./ext-agent-install"
@@ -71,14 +71,14 @@ import {
   evaluatePackageConnectionPrerequisiteV1,
   packageConnectionReferenceV1,
   type PackageConnectionReferenceV1,
-} from "../shared/package-alpha-connection"
-import { lookupAlphaConnectionHandlerV1, ALPHA_CONNECTION_HANDLERS_V1 } from "./alpha-connection-handlers"
+} from "../shared/package-codepuppy-connection"
+import { lookupCodePuppyConnectionHandlerV1, CODEPUPPY_CONNECTION_HANDLERS_V1 } from "./codepuppy-connection-handlers"
 import { probePackageMcpOauthPrerequisiteV1, type PackageMcpOauthEngineV1 } from "./package-mcp-oauth"
 import {
-  bindAlphaConnectionPackageV1,
-  readAlphaConnectionRecordsV1,
-  type AlphaConnectionStoreScope,
-} from "./alpha-connection-store"
+  bindCodePuppyConnectionPackageV1,
+  readCodePuppyConnectionRecordsV1,
+  type CodePuppyConnectionStoreScope,
+} from "./codepuppy-connection-store"
 
 const ATTEMPT_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/
 const DIGEST = /^[a-f0-9]{64}$/
@@ -179,7 +179,7 @@ export type PackageAdmissionDeps = {
   root: () => string
   userDataPath: string
   /**
-   * `#828`:验证共享 CAS 的基根(生产 = `getAlphaEnvironment().casBaseRoot`)。
+   * `#828`:验证共享 CAS 的基根(生产 = `getCodePuppyEnvironment().casBaseRoot`)。
    *
    * skill 载荷从这一票起走 `promotePayloadToCas` → generation item → `populateFromCas`,
    * 与 Phase 3 本地导入路径**同一组函数**。必填、无缺省:给一个「猜一个路径」的兜底,
@@ -468,15 +468,15 @@ function resolveConnectionBinding(
   const items = prepared.components.flatMap((component) => component.accepted.connection.items)
   if (items.length === 0) return { ok: true, references: [], unavailable: false }
   const scope = connectionScope(deps)
-  const stored = readAlphaConnectionRecordsV1(scope)
+  const stored = readCodePuppyConnectionRecordsV1(scope)
   if (!stored.ok) return { ok: false, reasonCode: `connection store unreadable (${stored.reason})` }
   const now = deps.now?.() ?? new Date()
-  const table = deps.installability?.connectionHandlers ?? ALPHA_CONNECTION_HANDLERS_V1
+  const table = deps.installability?.connectionHandlers ?? CODEPUPPY_CONNECTION_HANDLERS_V1
 
   const references: PackageConnectionReferenceV1[] = []
   let unavailable = false
   for (const item of items) {
-    const known = lookupAlphaConnectionHandlerV1(item.handlerId, table).ok
+    const known = lookupCodePuppyConnectionHandlerV1(item.handlerId, table).ok
     const evaluated = evaluatePackageConnectionPrerequisiteV1(item, stored.records, known, now)
     if (evaluated.state !== "ready") {
       if (item.required) return { ok: false, reasonCode: evaluated.reasonCode }
@@ -496,7 +496,7 @@ function resolveConnectionBinding(
  * for the independence guard to mean anything, and a caller-supplied one could be made to agree
  * with a bad layout.
  */
-function connectionScope(deps: PackageAdmissionDeps): AlphaConnectionStoreScope {
+function connectionScope(deps: PackageAdmissionDeps): CodePuppyConnectionStoreScope {
   return { userDataPath: deps.userDataPath, extensionRoot: deps.root() }
 }
 
@@ -620,7 +620,7 @@ async function resolvePreparedPackage(
     const component = entry.component
     const name = component.id.slice(component.id.indexOf(":") + 1)
     // `#809`(基线 §5 第 7 类):kind 只此**一张表**派生。此前这里是 `else → "mcp"` 的兜底三元
-    // ⇒ 一个只在合同侧登记、宿主表没跟上的 profile 会被**静默当成 MCP** 装进 `alpha.jsonc` 的
+    // ⇒ 一个只在合同侧登记、宿主表没跟上的 profile 会被**静默当成 MCP** 装进 `codepuppy.jsonc` 的
     // `mcp` 段,而卸载侧是 fail-closed 的 ⇒ 装得上、卸不掉。未登记 ⇒ 整个组件具名拒绝。
     const routed = packageChildKindV1(component.profileId)
     if (!routed.ok) return { ok: false, reason: `package admission: ${routed.reason}`, package: view }
@@ -1322,7 +1322,7 @@ function bindConnectionsAfterCommit(
   const scope = connectionScope(deps)
   const now = (deps.now?.() ?? new Date()).toISOString()
   const failures = connection.references.flatMap((reference) => {
-    const bound = bindAlphaConnectionPackageV1(scope, reference.connectionId, reference.componentId, now)
+    const bound = bindCodePuppyConnectionPackageV1(scope, reference.connectionId, reference.componentId, now)
     return bound.ok ? [] : [bound.reason]
   })
   return failures.length ? `connection binding not recorded: ${failures.join("; ")}` : undefined

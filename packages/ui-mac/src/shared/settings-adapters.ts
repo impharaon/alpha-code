@@ -1,5 +1,5 @@
 /** REQ-090 Settings persisted in default.dat/settings.v3. */
-export type AlphaSettings = {
+export type CodePuppySettings = {
   general: {
     autoSave: boolean
     releaseNotes: boolean
@@ -45,7 +45,7 @@ export type AlphaSettings = {
   }
 }
 
-export const ALPHA_SETTINGS_DEFAULTS: AlphaSettings = {
+export const CODEPUPPY_SETTINGS_DEFAULTS: CodePuppySettings = {
   general: {
     autoSave: true,
     releaseNotes: true,
@@ -90,7 +90,7 @@ export const ALPHA_SETTINGS_DEFAULTS: AlphaSettings = {
 }
 
 export type SettingsAuthority = {
-  value: AlphaSettings
+  value: CodePuppySettings
   /** Opaque compare-and-set token; callers must not interpret it. */
   revision: string
 }

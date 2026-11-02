@@ -24,15 +24,15 @@ LSP / PTY / formatter …)自动继承;REQ-138 那层(`cfg.shell` → `sandbox-e
 
 | 进程 | 文件 | 做什么 |
 | --- | --- | --- |
-| **main**(不被围栏) | `packages/ui-mac/src/main/server.ts` `spawnLocalServer` → `process-fence-plan.ts` | fork 之前做**计划**:渲染可写集(`process-fence-profile.ts`)→ 用真 `/usr/bin/sandbox-exec` **试编译**(`process-fence-compile.ts`)→ 编不过就从并集尾部丢一个工作区再试 → 解析原生模块路径 → 把 `{ profile, addonPath }` 放进 `start` 命令。任何一步失败 ⇒ **拒绝 fork**(与 alpha-secrets sync 失败同一条路),日志一行原因 |
+| **main**(不被围栏) | `packages/ui-mac/src/main/server.ts` `spawnLocalServer` → `process-fence-plan.ts` | fork 之前做**计划**:渲染可写集(`process-fence-profile.ts`)→ 用真 `/usr/bin/sandbox-exec` **试编译**(`process-fence-compile.ts`)→ 编不过就从并集尾部丢一个工作区再试 → 解析原生模块路径 → 把 `{ profile, addonPath }` 放进 `start` 命令。任何一步失败 ⇒ **拒绝 fork**(与 codepuppy-secrets sync 失败同一条路),日志一行原因 |
 | **sidecar**(被围栏) | `packages/ui-mac/src/main/sidecar.ts` `start()` 第一句 → `process-fence-apply.ts` | 收到 `start` 后**第一件事** `process.dlopen` 原生模块、`sandbox_init(profile)`,然后**双向自证**:往 `/private/var/tmp` 写一个探针必须 EPERM(围栏不是空的)、往自己的 cwd(`engine-scratch-cwd`,W3 之下)写一个探针必须成功(围栏没紧到干不了活)。任一失败 ⇒ 抛 ⇒ 既有的 `error` IPC + `exit(1)` ⇒ main 宣告这一代失败。darwin 上 `start` 命令没带 `fence` 也拒。非 darwin 没有 seatbelt:打一行 warn,如实不装 |
 | **引擎及其子进程** | 上游 0 行改动 | 继承 sidecar 的 seatbelt(勘破 §6.2:cross-spawn / `node:child_process` / 孙进程 / detached / node-pty 五条原语实测) |
 
-原生模块:`packages/ui-mac/native/alpha-fence/alpha_fence.c`(约 100 行 C,N-API 8,头文件来自钉版的
+原生模块:`packages/ui-mac/native/codepuppy-fence/codepuppy_fence.c`(约 100 行 C,N-API 8,头文件来自钉版的
 `node-api-headers` devDependency)。它只做三件事:`dlopen` libsandbox(dyld 共享缓存里的名字)、`dlsym`
 `sandbox_init` / `sandbox_free_error`、`apply(profile) → { rc, error }`。**它不决定可写集**。
 `scripts/build-fence-addon.ts` 在 `prebuild` / `predev` 里把它编成一个 **fat** 文件(arm64 + x86_64 同一个
-`.node`),`electron-builder.config.ts` 经 `extraResources` 放到 `<resources>/alpha-fence/alpha_fence.node`
+`.node`),`electron-builder.config.ts` 经 `extraResources` 放到 `<resources>/codepuppy-fence/codepuppy_fence.node`
 (与 U1 `#1316` 实测加载得了的落点同形;签名由发版流水线深签,与 `pty.node` 同 Team)。
 
 ## 2. 可写集:唯一权威 + 两道闸
@@ -42,7 +42,7 @@ LSP / PTY / formatter …)自动继承;REQ-138 那层(`cfg.shell` → `sandbox-e
 参数已代入:
 
 - `W1` 每个工作区一条 `(subpath …)`(并集规则见 §3);
-- `W2` `<alphaGlobalRoot>` · `W3` `<userDataPath>`(state 根跟着 sidecar.ts 对 `XDG_STATE_HOME` 的决定:用户
+- `W2` `<codepuppyGlobalRoot>` · `W3` `<userDataPath>`(state 根跟着 sidecar.ts 对 `XDG_STATE_HOME` 的决定:用户
   显式导出别处时多一行) · `W4/W5/W6` `<XDG_{DATA,CACHE,CONFIG}_HOME>/opencode`(与 `packages/core/src/global.ts`
   经 `xdg-basedir` 的取法逐字同形,由测试对着 node_modules 里那份包交叉验证) · `W7` `~/.npm`;
 - `W8` `~/.zsh_history*`(regex) · `W10` `~/.zsh_sessions` · `W19` `~/.zcompdump*`(regex);
@@ -59,10 +59,10 @@ LSP / PTY / formatter …)自动继承;REQ-138 那层(`cfg.shell` → `sandbox-e
    alpha 在 sidecar 进程里的每一处写盘调用点(`packages/ext/src/**` 全部 + `sidecar.ts` 的相对 import 闭包,
    用 TypeScript AST 解析 `node:fs` 绑定 —— 改名 import / namespace / `promises` / 多行 import 都抓)都要登记
    它落在哪一行(`W-id`,可 `+` 连多个;`arg` = 路径来自调用方;`main-only` = 只有 main 执行到,今天只
-   `alpha-environment.ts` 一处)。**新增一处写盘不登记 ⇒ 红**;点不出根 = 新的写入根 = 要么给可写集加行
+   `codepuppy-environment.ts` 一处)。**新增一处写盘不登记 ⇒ 红**;点不出根 = 新的写入根 = 要么给可写集加行
    (带实测)要么改代码。当前 76 条签名 / 92 个调用点。
 
-**状态根下 main 独占的真源**(可写集的反面:这些位置**故意**不在任何一行之下)。`<appData>/alpha-code-state`(冻结环境快照的
+**状态根下 main 独占的真源**(可写集的反面:这些位置**故意**不在任何一行之下)。`<appData>/codepuppy-state`(冻结环境快照的
 `casBaseRoot`)本身不在可写集里 —— W2 只放行它之下的 `env/<env>`;于是它的其它子目录就是「main 写得了、引擎写不到」的家,
 由文件系统边界给出,一条 `grep` 就能复核,不依赖任何加密假设:
 
@@ -72,7 +72,7 @@ LSP / PTY / formatter …)自动继承;REQ-138 那层(`cfg.shell` → `sandbox-e
 | `fence-workspaces/<env>.json` | 围栏的工作区清单(§3 5c) | main,经 renderer IPC | `#1394` |
 | `custom-providers/<env>.json` | 用户「添加自定义节点」的记录 `{ v: 1, providers: [{ id, name, compat, baseURL, models }] }`,**密钥不进这里**(仍在 `#1343` 的钥匙串库) | main(`custom-provider-truth-write.ts`);读端 `custom-provider-truth.ts` 零写盘、不 import `node:fs` | `#1391` 只落存储层,**零消费者**(§7) |
 
-`custom-providers` 的读与写刻意拆成两个文件:读端将来要被 `alpha-models.ts` / `ext-config.ts`(都在 sidecar 的 import 闭包里)
+`custom-providers` 的读与写刻意拆成两个文件:读端将来要被 `codepuppy-models.ts` / `ext-config.ts`(都在 sidecar 的 import 闭包里)
 消费,写入点若跟着进闭包,上面那本登记簿只能给它填 `main-only` 这个文字标签 —— 那不是判据。写模块不在闭包里由
 `custom-provider-truth-write.test.ts` 对着生产的 `sidecarSourceFiles` 实测。读端**严格**:缺失 = 没有记录;解析失败 / 版本不认识 /
 字段不合法 / 同 id 重复 / 多余的键 ⇒ 「没问出来」(不是空清单)并出一行日志。真源路径不在可写集任何固定行之下的判据在
@@ -90,7 +90,7 @@ U2(`#1317`)裁了「取并集、封顶、按最近使用序」,K 与排序留给
 3. 只认 `server === "sidecar"` 的 tab(与 `catalog-liveness.ts` 同一判据)。
 4. 只收**绝对路径且盘上存在的目录**;不代建(ADR-025)。
 5. 排除 `/`、HOME、HOME 的任何祖先 —— 放行 HOME = 没有围栏。
-5b. 排除与**应用状态根**(`<appData>/alpha-code-state`,三个 env 根与 CAS 的父目录;冻结环境快照的 `casBaseRoot`)
+5b. 排除与**应用状态根**(`<appData>/codepuppy-state`,三个 env 根与 CAS 的父目录;冻结环境快照的 `casBaseRoot`)
    **相关**的候选 —— 同一路径、在它之内、或包含它(`#1390`)。理由(当时):候选来自 `opencode.global.dat`,而它住在 W3 之下,
    **被围栏的引擎树自己写得了**;一条伪造的 draft 记录(`{type:"draft", server:"sidecar", directory:"~/Library/Application Support"}`)
    就能在下次启动把状态根的祖先放进可写集(票面实测:`selected` 含该目录、`excluded` 为空)。比较在 **`fs.realpathSync.native`
@@ -99,7 +99,7 @@ U2(`#1317`)裁了「取并集、封顶、按最近使用序」,K 与排序留给
    所以这条差别在 bun 里测不出来。realpath 拿不到(ENOENT 等)退回词法比较,不因此放行;排除进 `excluded` 带理由,
    并出现在 `process fence planned:` 那行日志。这是第一步;第二步(5c)把清单本身搬出了围栏可写处之后,本条**留作第二道闸**:
    候选不管从哪来,状态根都进不来(`process-fence-plan.test.ts` 那条 `#1390` 用例改成「真源里的记录指向状态根祖先仍排除」)。
-5c. **清单从哪来**(`#1394`,`#1390` 第二步,2026-09-22):不再是 store。真源是 `<appData>/alpha-code-state/fence-workspaces/<env>.json`
+5c. **清单从哪来**(`#1394`,`#1390` 第二步,2026-09-22):不再是 store。真源是 `<appData>/codepuppy-state/fence-workspaces/<env>.json`
    (`process-fence-workspaces.ts`)—— 与三个 env 根、`cas/` 同级,W2 只放行 `env/<env>`、W3 是另一棵树,其余 17 行都不覆盖它
    (`#1383` 基线 §1.1/§1.2 逐行核过;`cas/` 已是「main 写、引擎只读」的先例)。形状 `{ "v": 1, "workspaces": ["<绝对路径>", …] }`,
    顺序与此前从 store 派生时相同(recent → tab 栏 → info);原子写;**严格读**(版本 / 数组 / 每项绝对路径,不对就整份拒)。
@@ -155,7 +155,7 @@ U1 只出了 arm64,并明写将来出 Intel / universal 时若漏第二份,x64 �
 | `custom-provider-truth-write.test.ts` | 全平台 | `#1391` 写端:字节固定、原子(rename / write 中途抛 ⇒ 旧内容不动)、坏记录不落盘;写模块不在 sidecar import 闭包里(生产 `sidecarSourceFiles` 实测 + 合成三文件控制臂) |
 | `custom-provider-truth-fence.test.ts` | darwin | `#1391` I2 的真裁判:生产 profile 交给真 sandbox-exec,围栏内写 / 建目录 / mv 进真源全拦、零落盘;W2 / W3 落盘;bare 臂写得进 |
 | `process-fence-engine.test.ts` | darwin | **真引擎 + 真 ext** 在生产 .node 围栏下:shell 工具 / PTY / MCP 三条真消费方界外 0 落盘、界内落盘;AC2 shell 工具照常执行、`cfg.shell` 不指向 wrapper |
-| `packages/ext/src/alpha-ext-no-shell-layer.test.ts` | 全平台 | REQ-138 层已拆:生产 config 钩子不碰 `cfg.shell` |
+| `packages/ext/src/codepuppy-ext-no-shell-layer.test.ts` | 全平台 | REQ-138 层已拆:生产 config 钩子不碰 `cfg.shell` |
 
 全部登记在 `scripts/gate-files.tsv`(darwin-only 的按 `[平台:darwin]` 登记)。
 
@@ -189,8 +189,8 @@ U1 只出了 arm64,并明写将来出 Intel / universal 时若漏第二份,x64 �
   端到端判据(`process-fence-wiring.test.ts`)在 bun 里对着生产计划器跑,fork 是假子进程;**没有**在真 Electron 主进程里冷启动一次
   取证 —— 「index.ts 在预清之后、注册 IPC 之前播种」与「ipc.ts 三个通道写完都通知 tracker」两跳是源码锚,不是行为判据。
 - **`#1391` 自定义节点的真源只有存储层**(§2 那张表的第三行):`custom-providers/<env>.json` 可读可写、判据齐,但**零消费者** ——
-  注入面(`buildAlphaModelConfig`)、`enabled_providers`(`readUserProviderIds`)与出网派生今天仍看 `alpha.jsonc` 等三份配置文件
-  (`#1392`);添加时的地址准入与出网同源、旧 `alpha.jsonc` 记录的处置(`#1393`)。用户可观察行为在 `#1391` 合入后零变化:
+  注入面(`buildCodePuppyModelConfig`)、`enabled_providers`(`readUserProviderIds`)与出网派生今天仍看 `codepuppy.jsonc` 等三份配置文件
+  (`#1392`);添加时的地址准入与出网同源、旧 `codepuppy.jsonc` 记录的处置(`#1393`)。用户可观察行为在 `#1391` 合入后零变化:
   「自己填服务地址加节点」那半入口仍是 `#1397` 关掉的状态。
 - 非 darwin:不装围栏,sidecar 打一行 warn(基线「如实声明」);§8 的两处告知随之**不出现**(没有围栏就不说有)。
 
@@ -206,8 +206,8 @@ owner 2026-09-09 裁决(`#1286`):终端配置降级与集合外工作区都**不
 | --- | --- | --- |
 | main | `server.ts` `spawnLocalServer` 返回值 | `fence: "applied"` **只在两个事实同时成立时**出现:本进程把计划放进了 start 命令(darwin 上没有计划走不到这里),且 sidecar 发了 `ready` —— 而 sidecar.ts 的 `start()` 第一句就是 `installProcessFence`,apply 失败 ⇒ error IPC + exit(1),永远发不出 ready(接线锚 `process-fence-wiring.test.ts`) |
 | main | `sidecar-generation.ts` / `sidecar-lifecycle.ts` | 终态生产者把它挂到**引擎在线**的终态上(`ready` / `injection-failed`);`failed` 不带 —— 没有引擎就没有围栏可言。经既有的 `sidecar-generation` IPC 到 renderer |
-| renderer | `alpha-ui/sandbox-state.ts` | 订阅既有的 runtime-recovery 通道,投影成 `sandboxApplied()`:在线 **且** `fence === "applied"`。缺席 / 不在线 / 字段不在 ⇒ false |
-| renderer | `session-workspace-shell.tsx` → `terminal-rail-panel.tsx` | 经 props 递进终端面板(面板的 I1 棘轮禁 window.api);脚条第三项(env 之后、size 之前,窄于 360px 只留「沙箱开启」)+ 空态一行 + 悬停层。钩子 `data-alpha-terminal-foot-sandbox` / `data-alpha-terminal-empty-sandbox` |
+| renderer | `codepuppy-ui/sandbox-state.ts` | 订阅既有的 runtime-recovery 通道,投影成 `sandboxApplied()`:在线 **且** `fence === "applied"`。缺席 / 不在线 / 字段不在 ⇒ false |
+| renderer | `session-workspace-shell.tsx` → `terminal-rail-panel.tsx` | 经 props 递进终端面板(面板的 I1 棘轮禁 window.api);脚条第三项(env 之后、size 之前,窄于 360px 只留「沙箱开启」)+ 空态一行 + 悬停层。钩子 `data-codepuppy-terminal-foot-sandbox` / `data-codepuppy-terminal-empty-sandbox` |
 
 非 darwin:计划为 `undefined` ⇒ 返回值不带 `fence` ⇒ 一路缺席 ⇒ 不出现。
 
@@ -218,10 +218,10 @@ owner 2026-09-09 裁决(`#1286`):终端配置降级与集合外工作区都**不
 | 环节 | 文件 | 事实 |
 | --- | --- | --- |
 | 合同 | `workspace-write-probe.ts` | main → sidecar `{type:"write-probe", id, directory}`,sidecar → main `{type:"write-probe-result", id, outcome, detail?}`;形状不对就当没有。`outcome` 三种:`writable`(写-删成功)/ `denied`(**EPERM** —— seatbelt 的拒绝就是这个码,`process-fence-apply.test.ts` B2 实测)/ `unknown`(其它一切:ENOENT、ENOTDIR、EACCES 是文件系统自己的权限位而不是围栏、超时、引擎不在) |
-| sidecar | `sidecar.ts` 消息循环 | 收到命令即同步在目标目录写一个 `.alpha-write-probe-<戳>`(`wx`,永不覆盖用户文件)再删,回一条应答。写入点登记在 `scripts/process-fence-write-sites.tsv`(根 W1 = 它**该**落的根;落不进正是它要报告的) |
+| sidecar | `sidecar.ts` 消息循环 | 收到命令即同步在目标目录写一个 `.codepuppy-write-probe-<戳>`(`wx`,永不覆盖用户文件)再删,回一条应答。写入点登记在 `scripts/process-fence-write-sites.tsv`(根 W1 = 它**该**落的根;落不进正是它要报告的) |
 | main | `server.ts` `listener.probeWrite` → `ipc.ts` `workspace-write-probe` → preload `workspaceWriteProbe` | 请求簿按 id 对号;超时 5 s / 子进程退出 / 没有活着的 sidecar ⇒ `unknown` |
-| renderer | `alpha-ui/workspace-writable.ts`(核 `workspace-writable-core.ts`) | 「这个目录成为当前工作区」的单一咽喉:两个宿主各挂一次 `useWorkspaceWritable(dir)` —— 会话页是 `live.current().identity.directory`(deep link / draft 晋升都落这里),新对话页与首页是 chip 的 `activeWs`(chip 选目录 / 侧栏 draft 目标解析都落这里)。只在 `sandboxApplied()` 时才探;答案按「引擎代 + 目录」缓存(respawn 换代重问);四态里只有 `denied` 标记 |
-| renderer | `session-workspace-shell.tsx`(顶栏胶囊 + 弹层,动作 = 既有 `window.api.relaunch`)/ `workspace-chip.tsx`(尾标) | 钩子 `data-alpha-workspace-readonly` / `data-alpha-workspace-chip-readonly` |
+| renderer | `codepuppy-ui/workspace-writable.ts`(核 `workspace-writable-core.ts`) | 「这个目录成为当前工作区」的单一咽喉:两个宿主各挂一次 `useWorkspaceWritable(dir)` —— 会话页是 `live.current().identity.directory`(deep link / draft 晋升都落这里),新对话页与首页是 chip 的 `activeWs`(chip 选目录 / 侧栏 draft 目标解析都落这里)。只在 `sandboxApplied()` 时才探;答案按「引擎代 + 目录」缓存(respawn 换代重问);四态里只有 `denied` 标记 |
+| renderer | `session-workspace-shell.tsx`(顶栏胶囊 + 弹层,动作 = 既有 `window.api.relaunch`)/ `workspace-chip.tsx`(尾标) | 钩子 `data-codepuppy-workspace-readonly` / `data-codepuppy-workspace-chip-readonly` |
 
 **为什么不在 main 里探**:main 没有被围栏,`fs.writeFile` 在那里恒答可写。`workspace-write-probe-fence.test.ts` 的 bare 臂
 就是这个形态的实测(集合外也答 writable),AC3 的判据(`workspace-write-probe-judge.ts`)把它当假探针拒掉;
@@ -236,6 +236,6 @@ owner 2026-09-09 裁决(`#1286`):终端配置降级与集合外工作区都**不
 | `process-fence-wiring.test.ts` | 全平台 | `spawnLocalServer` 返回 `fence:"applied"`;`listener.probeWrite` 走线上命令、按 id 对号、停后答 unknown |
 | `sidecar-generation.test.ts` / `sidecar-lifecycle.test.ts` | 全平台 | 围栏字段只随在线终态上车,failed 不带 |
 | `test-component/terminal-rail.cases.ts`(宿主 `terminal-rail.test.ts`) | 全平台 | AC1:脚条第三项位置、空态一行、悬停层;反向臂 = 信号关 / prop 缺席 ⇒ 两个钩子都不在 |
-| `test-component/session-workspace.cases.ts`(宿主 `alpha-session-workspace.test.ts`) | 全平台 | AC2 顶栏两臂:集合内无胶囊;集合外胶囊紧跟状态胶囊、role=status、悬停/点击开弹层、重启动作、Esc 关 |
+| `test-component/session-workspace.cases.ts`(宿主 `codepuppy-session-workspace.test.ts`) | 全平台 | AC2 顶栏两臂:集合内无胶囊;集合外胶囊紧跟状态胶囊、role=status、悬停/点击开弹层、重启动作、Esc 关 |
 | `test-component/new-session-workspace.cases.ts`(宿主 `new-session-workspace.component.test.ts`) | 全平台 | AC2 chip 两臂 + 四态:denied 才有尾标;unknown / 出错 / 桥缺席 无标记;沙箱没装一次都不探 |
 | `workspace-writable-core.test.ts` / `sandbox-state.test.ts` | 全平台 | 状态机四态、分代缓存、同代只探一次;沙箱投影只认在线 + fence 字段 |

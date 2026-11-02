@@ -18,26 +18,26 @@ import { runExtensionTransaction } from "./ext-transaction"
 
 const artifact = resolve(
   import.meta.dir,
-  "../../../alpha-contracts-consumer/vendor/alpha-web-extension-package/expected.mcp-remote.compiled.json",
+  "../../../codepuppy-contracts-consumer/vendor/alpha-web-extension-package/expected.mcp-remote.compiled.json",
 )
 const snapshotDigest = "7".repeat(64)
 const secretCanary = "REQ128_ADMISSION_SECRET_8d38a2"
 let tmp = ""
 let root = ""
 let userData = ""
-const previousRoot = process.env.ALPHA_GLOBAL_DIR
+const previousRoot = process.env.CODEPUPPY_GLOBAL_DIR
 
 beforeEach(() => {
   tmp = mkdtempSync(join(tmpdir(), "package-admission-"))
   root = join(tmp, "root")
   userData = join(tmp, "user-data")
   mkdirSync(root, { recursive: true })
-  process.env.ALPHA_GLOBAL_DIR = root
+  process.env.CODEPUPPY_GLOBAL_DIR = root
 })
 
 afterEach(() => {
-  if (previousRoot === undefined) delete process.env.ALPHA_GLOBAL_DIR
-  else process.env.ALPHA_GLOBAL_DIR = previousRoot
+  if (previousRoot === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+  else process.env.CODEPUPPY_GLOBAL_DIR = previousRoot
   rmSync(tmp, { recursive: true, force: true })
 })
 
@@ -266,7 +266,7 @@ describe("package admission", () => {
         fetchPayload: async () => {
           payloadFetches++
           order.push(payloadFetches === 1 ? "preview" : "revalidate")
-          expect(existsSync(join(userData, "alpha-mcp-secrets"))).toBe(false)
+          expect(existsSync(join(userData, "codepuppy-mcp-secrets"))).toBe(false)
           return bytes
         },
       },
@@ -311,13 +311,13 @@ describe("package admission", () => {
       reason: expect.stringContaining("only after the authorization preview"),
     })
     expect(transactionCalls).toBe(0)
-    expect(existsSync(join(userData, "alpha-mcp-secrets"))).toBe(false)
+    expect(existsSync(join(userData, "codepuppy-mcp-secrets"))).toBe(false)
 
     const first = await admit(intent)
     expect(first).toMatchObject({ ok: false, stage: "authorize" })
     if (first.ok || first.stage !== "authorize") throw new Error("expected package authorization preview")
     expect(transactionCalls).toBe(0)
-    expect(existsSync(join(userData, "alpha-mcp-secrets"))).toBe(false)
+    expect(existsSync(join(userData, "codepuppy-mcp-secrets"))).toBe(false)
 
     const second = await admit({
       ...intent,
@@ -333,11 +333,11 @@ describe("package admission", () => {
     expect(transactionCalls).toBe(1)
     // 语料声明了几个密钥就要落几个。只钉第一个名字的话,宿主静默丢掉第二个密钥仍然全绿 ——
     // 而用户拿到的是一个连不上的 MCP。名字来自**产物自己**,不是这里手打的常量。
-    const versionDir = join(userData, "alpha-mcp-secrets", "generic-remote", "v-12345678")
+    const versionDir = join(userData, "codepuppy-mcp-secrets", "generic-remote", "v-12345678")
     const declaredSecrets = (payload.behavior as { requiredSecrets: string[] }).requiredSecrets
     expect(declaredSecrets.length).toBeGreaterThan(1)
     expect(readdirSync(versionDir).sort()).toEqual([...declaredSecrets].sort())
-    const config = readFileSync(join(root, "alpha.jsonc"), "utf8")
+    const config = readFileSync(join(root, "codepuppy.jsonc"), "utf8")
     for (const name of declaredSecrets) {
       const secretFile = join(versionDir, name)
       expect(readFileSync(secretFile, "utf8"), name).toBe(secretCanary)
@@ -511,7 +511,7 @@ describe("package admission", () => {
     ).toMatchObject({ ok: false, reason: expect.stringContaining("replayed") })
     expect(transactionCalls).toBe(1)
     expect(
-      readdirSync(join(userData, "alpha-mcp-secrets", "generic-remote")).filter((name) => name.startsWith("v-")),
+      readdirSync(join(userData, "codepuppy-mcp-secrets", "generic-remote")).filter((name) => name.startsWith("v-")),
     ).toHaveLength(1)
   })
 
@@ -574,10 +574,10 @@ describe("package admission", () => {
       failCanary,
     )
     expect(failOutcome).toMatchObject({ ok: false })
-    expect(existsSync(join(userData, "alpha-mcp-secrets", "generic-remote", "v-2222bbbb"))).toBe(false)
+    expect(existsSync(join(userData, "codepuppy-mcp-secrets", "generic-remote", "v-2222bbbb"))).toBe(false)
 
-    const secretStore = join(userData, "alpha-mcp-secrets")
-    const liveConfig = join(root, "alpha.jsonc")
+    const secretStore = join(userData, "codepuppy-mcp-secrets")
+    const liveConfig = join(root, "codepuppy.jsonc")
     const files: string[] = []
     const walk = (dir: string) => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -620,7 +620,7 @@ describe("package admission", () => {
 
   test("prepared secret failures abort and remove every unreferenced version", async () => {
     const { envelope, bytes } = await fixture()
-    const secretRoot = join(userData, "alpha-mcp-secrets", "generic-remote")
+    const secretRoot = join(userData, "codepuppy-mcp-secrets", "generic-remote")
     const dependencies = {
       loadVerifiedCatalog: async () => ({
         source: "remote" as const,
@@ -692,7 +692,7 @@ describe("package admission", () => {
 
   test("preexisting and lock-raced handwritten MCP config is never adopted or overwritten", async () => {
     const { envelope, bytes } = await fixture()
-    const configPath = join(root, "alpha.jsonc")
+    const configPath = join(root, "codepuppy.jsonc")
     const handwritten =
       '{\n  // user-owned MCP leaf\n  "mcp": {\n    "generic-remote": { "type": "remote", "url": "https://user.example/mcp" }\n  }\n}\n'
     const dependencies = {
@@ -927,7 +927,7 @@ describe("package admission", () => {
     expect(transactionCalls).toBe(1)
     // 半装包的判据不是「没红」,是**盘上没有那个 agent**:跳过的组件零文件、零配置叶。
     expect(existsSync(join(root, "agents", "bundle-leaf.md"))).toBe(false)
-    expect(readFileSync(join(root, "alpha.jsonc"), "utf8")).not.toContain("bundle-leaf")
+    expect(readFileSync(join(root, "codepuppy.jsonc"), "utf8")).not.toContain("bundle-leaf")
     const ledger = JSON.parse(readFileSync(join(root, "installs.json"), "utf8")) as {
       packageGraphs: Array<{ children: unknown[] }>
       claims: Array<{ kind: string; name: string }>

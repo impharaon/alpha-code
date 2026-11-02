@@ -29,40 +29,40 @@ import { availableStartupServer, isEphemeralLocalServerUrl, readyWslConnections 
 import "./styles.css"
 import "./sidebar/sidebar.css"
 import "./sidebar/account-popover.css"
-import "./alpha-ui/composer-reskin.css"
-import { ToastViewport } from "./alpha-ui/Toast"
-import { installHomeDraftDiscardNotice } from "./alpha-ui/home-draft-discard-notice"
-import { ContractFailureBanner } from "./alpha-ui/Banner"
-import { AlphaBoundary } from "./alpha-ui/alpha-boundary"
-import { ContractHealthProvider } from "./alpha-ui/providers"
-import { PermissionWatcher } from "./alpha-ui/permission-watcher"
-import { CloudRunWatcher } from "./alpha-ui/cloud-run-watcher"
-import { ExtTrustWatcher } from "./alpha-ui/ext-trust-watcher"
-import { AlphaSidebar } from "./sidebar/alpha-sidebar"
-import { type AlphaProjectsApi, useAlphaProjects } from "./sidebar/use-projects"
-import { AlphaHome } from "./alpha-ui/AlphaHome"
-import { AlphaNewSession } from "./alpha-ui/alpha-new-session"
-import { AlphaSessionSearch } from "./alpha-ui/alpha-session-search"
-import { SurfaceBoundary } from "./alpha-ui/surface-boundary"
-import { RuntimeRecoveryHost } from "./alpha-ui/RuntimeRecoveryHost"
-import { UpstreamDialogHost } from "./alpha-ui/UpstreamDialogHost"
+import "./codepuppy-ui/composer-reskin.css"
+import { ToastViewport } from "./codepuppy-ui/Toast"
+import { installHomeDraftDiscardNotice } from "./codepuppy-ui/home-draft-discard-notice"
+import { ContractFailureBanner } from "./codepuppy-ui/Banner"
+import { CodePuppyBoundary } from "./codepuppy-ui/codepuppy-boundary"
+import { ContractHealthProvider } from "./codepuppy-ui/providers"
+import { PermissionWatcher } from "./codepuppy-ui/permission-watcher"
+import { CloudRunWatcher } from "./codepuppy-ui/cloud-run-watcher"
+import { ExtTrustWatcher } from "./codepuppy-ui/ext-trust-watcher"
+import { CodePuppySidebar } from "./sidebar/codepuppy-sidebar"
+import { type CodePuppyProjectsApi, useCodePuppyProjects } from "./sidebar/use-projects"
+import { CodePuppyHome } from "./codepuppy-ui/CodePuppyHome"
+import { CodePuppyNewSession } from "./codepuppy-ui/codepuppy-new-session"
+import { CodePuppySessionSearch } from "./codepuppy-ui/codepuppy-session-search"
+import { SurfaceBoundary } from "./codepuppy-ui/surface-boundary"
+import { RuntimeRecoveryHost } from "./codepuppy-ui/RuntimeRecoveryHost"
+import { UpstreamDialogHost } from "./codepuppy-ui/UpstreamDialogHost"
 import { type DeepLinkBatch, type DeepLinkDelivery, parseRoute } from "../shared/route-manifest"
 import { createDeepLinkPublisher } from "./deep-link-bridge"
-import { alphaSessionWorkspaceSurface } from "./alpha-ui/session-workspace/alpha-session-workspace" // REQ-088 T2
-import { AlphaOnboarding } from "./alpha-ui/AlphaOnboarding"
-import { AlphaSettings } from "./alpha-ui/settings"
-import { settingsAuthorityCoordinator } from "./alpha-ui/settings-authority-client"
-import { setSettingsOpen, settingsOpen } from "./alpha-ui/settings-state"
-import { sessionDirectoryFromShell, settingsDirectoryOf } from "./alpha-ui/settings-directory"
-import { activeSessionIdentity } from "./alpha-ui/active-session-directory"
+import { codepuppySessionWorkspaceSurface } from "./codepuppy-ui/session-workspace/codepuppy-session-workspace" // REQ-088 T2
+import { CodePuppyOnboarding } from "./codepuppy-ui/CodePuppyOnboarding"
+import { CodePuppySettings } from "./codepuppy-ui/settings"
+import { settingsAuthorityCoordinator } from "./codepuppy-ui/settings-authority-client"
+import { setSettingsOpen, settingsOpen } from "./codepuppy-ui/settings-state"
+import { sessionDirectoryFromShell, settingsDirectoryOf } from "./codepuppy-ui/settings-directory"
+import { activeSessionIdentity } from "./codepuppy-ui/active-session-directory"
 import { ExtensionHub } from "./extensions/extension-hub"
 import { extHubOpen, setExtHubOpen } from "./extensions/ext-hub-state"
 import { AutomationPanel } from "./automations/automation-panel"
-import { Splash } from "./logo-alpha"
+import { Splash } from "./logo-codepuppy"
 import { useTheme } from "@opencode-ai/ui/theme/context"
-import { ALPHA_THEME, ALPHA_THEME_ID } from "./theme-alpha"
+import { CODEPUPPY_THEME, CODEPUPPY_THEME_ID } from "./theme-codepuppy"
 import { composeRoutes } from "./route-composition"
-import { installShellBootTimeline } from "./alpha-ui/shell-boot-timeline"
+import { installShellBootTimeline } from "./codepuppy-ui/shell-boot-timeline"
 import { markStartupTimeline } from "./startup-timeline"
 
 // Every route composes exactly one Alpha surface. There is no second release state and no
@@ -72,15 +72,15 @@ const productionRoutes = composeRoutes({
   // #891:两个「新会话入口」叶都要 `serverKey` —— 它们经 `projects.startChat` 建会话,新会话的
   // canonical 身份因此落在**那个 store 连着的 server** 上,composer 拿它给开局档位/只读档登记。
   // 值由 App() 的 `projectsServerKey` 反查(见那里),不在叶里自己猜。
-  home: (projects: AlphaProjectsApi, serverKey: () => string | undefined) => () => (
+  home: (projects: CodePuppyProjectsApi, serverKey: () => string | undefined) => () => (
     <SurfaceBoundary surface="home">
-      <AlphaHome projects={projects} serverKey={serverKey} />
+      <CodePuppyHome projects={projects} serverKey={serverKey} />
     </SurfaceBoundary>
   ),
   newSession:
-    (projects: AlphaProjectsApi, serverKey: () => string | undefined) => (props: DraftSurfaceProps) => (
+    (projects: CodePuppyProjectsApi, serverKey: () => string | undefined) => (props: DraftSurfaceProps) => (
       <SurfaceBoundary surface="newSession">
-        <AlphaNewSession
+        <CodePuppyNewSession
           projects={projects}
           serverKey={serverKey}
           draftId={props.draftId}
@@ -88,13 +88,13 @@ const productionRoutes = composeRoutes({
         />
       </SurfaceBoundary>
     ),
-  session: (projects: AlphaProjectsApi) => alphaSessionWorkspaceSurface(projects),
+  session: (projects: CodePuppyProjectsApi) => codepuppySessionWorkspaceSurface(projects),
   // REQ-131(#1130):「工具」节按项目分区读写引擎策略;当前项目 = 路由 → 目录(settings-directory.ts):
   // 生产导航走 canonical `/server/:serverKey/session/:id`,路由本身不带目录,按会话 id 查:先壳层项目
   // 清单(与侧栏导航同一份数据),清单缺这一格再回落到会话页此刻登记的身份(`#1361`:侧栏按设计过滤掉
   // 归档 / 家目录为根的会话,而会话页认服务端给的会话信息 —— 回落让两个面读同一个目录)。
   // home / newSession、或两处都没有该会话 ⇒ 该节显示「先打开一个项目」(拒绝,不猜默认项目)。
-  settings: (projects: AlphaProjectsApi) => () => {
+  settings: (projects: CodePuppyProjectsApi) => () => {
     const location = useLocation()
     const directory = () =>
       settingsDirectoryOf(
@@ -102,9 +102,9 @@ const productionRoutes = composeRoutes({
         sessionDirectoryFromShell(projects.store, activeSessionIdentity),
       )
     return (
-      <AlphaBoundary name="AlphaSettings">
-        <AlphaSettings open={settingsOpen()} onClose={() => setSettingsOpen(false)} directory={directory} />
-      </AlphaBoundary>
+      <CodePuppyBoundary name="CodePuppySettings">
+        <CodePuppySettings open={settingsOpen()} onClose={() => setSettingsOpen(false)} directory={directory} />
+      </CodePuppyBoundary>
     )
   },
   dialog: UpstreamDialogHost,
@@ -121,7 +121,7 @@ const DevSurfaceMapInspector = import.meta.env.DEV ? lazy(() => import("./dev/su
 // user picks any theme, that key is owned by the picker and we never overwrite it.
 try {
   if (!localStorage.getItem("opencode-theme-id")) {
-    localStorage.setItem("opencode-theme-id", ALPHA_THEME_ID)
+    localStorage.setItem("opencode-theme-id", CODEPUPPY_THEME_ID)
   }
 } catch {}
 
@@ -161,7 +161,7 @@ void window.api.updater.subscribe(setUpdaterState)
 // Deliveries arrive already decoded by the manifest (main). They go into the window buffer, which
 // is the queue; the event only wakes the layout up. See deep-link-bridge.ts for why the event
 // carries no payload — that is what makes double consumption impossible.
-const deepLinkBuffer = window as Window & { __alphaDeepLinks?: DeepLinkDelivery[] }
+const deepLinkBuffer = window as Window & { __codepuppyDeepLinks?: DeepLinkDelivery[] }
 
 const publishDeepLinks = createDeepLinkPublisher(deepLinkBuffer)
 
@@ -432,7 +432,7 @@ render(() => {
     // Make the brand theme known to the store + theme picker (named "Alpha").
     // The context's load() checks store.themes first, so registering here is
     // enough for both first-run apply and later re-selection from the picker.
-    theme.registerTheme(ALPHA_THEME)
+    theme.registerTheme(CODEPUPPY_THEME)
 
     createEffect(() => {
       theme.themeId()
@@ -452,7 +452,7 @@ render(() => {
       <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base">
         <Splash class="w-16 h-20 opacity-50 animate-pulse" />
         {/* B20:等待期原本零文案(最坏 ~60s 纯 logo);给一句状态,弱网/慢启动不再像死机 */}
-        <div class="mt-4 text-xs opacity-50">{t("alpha.engine.starting")}</div>
+        <div class="mt-4 text-xs opacity-50">{t("codepuppy.engine.starting")}</div>
       </div>
     )
 
@@ -494,18 +494,18 @@ render(() => {
 
     // A3: one shared projects store for the whole alpha shell — sidebar + home consume the same
     // instance instead of each running its own (was ×2 project.list / ×2N session.list + an extra SSE).
-    const alphaProjects = useAlphaProjects(sidebarServer)
+    const codepuppyProjects = useCodePuppyProjects(sidebarServer)
     // 设置面挂在壳上(与路由无关地常驻);「工具」节要按会话 id 查项目目录,所以拿同一份项目清单。
-    const SettingsSurface = productionRoutes.settings.mount(alphaProjects)
+    const SettingsSurface = productionRoutes.settings.mount(codepuppyProjects)
 
-    // `alphaProjects` 这份 store 连着的那个 server 的 `ServerConnection.key`。**唯一**的反查口:
+    // `codepuppyProjects` 这份 store 连着的那个 server 的 `ServerConnection.key`。**唯一**的反查口:
     // 由 store 自己的 `baseUrl` 找回连接再算 key,而不是读"当前 active server"。
     //
     // REQ-126 CODE-F(#659,第一个消费者):会话搜索结果的 href。搜索只读这一份 store,当前
     // server 是 WSL/remote 时,拿 active server 拼 href 会把本地 sidecar 的结果导向错误的服务器
     // (legacy `sessionHref` 正是这么坏的)。
     //
-    // #891(第二个消费者):首页 / 新对话页的 composer。这两个叶经 `alphaProjects.startChat` 建
+    // #891(第二个消费者):首页 / 新对话页的 composer。这两个叶经 `codepuppyProjects.startChat` 建
     // 会话 —— 会话**就落在这个 baseUrl 上**,它的 canonical 身份三元组第一段因此是这个 key,不是
     // active server。composer 用它给新会话登记开局档位/只读档;记到 active server 下面,会话页
     // 按真实身份 adopt 时就永远认领不到那条登记(用户在首页开的只读档静默丢失)。
@@ -520,16 +520,16 @@ render(() => {
     // 经 SurfaceBoundary 兜致命 render 错误(main 建立稳定 incident + Alpha Recovery)。
     const surfaceComponents = createMemo<AppSurfaces>(() => ({
       permission: (props) => (
-        <AlphaBoundary name="PermissionWatcher">
+        <CodePuppyBoundary name="PermissionWatcher">
           <PermissionWatcher {...props} server={sidebarServer} />
-        </AlphaBoundary>
+        </CodePuppyBoundary>
       ),
-      [productionRoutes.home.surface]: productionRoutes.home.mount(alphaProjects, projectsServerKey),
+      [productionRoutes.home.surface]: productionRoutes.home.mount(codepuppyProjects, projectsServerKey),
       [productionRoutes["new-session"].surface]: productionRoutes["new-session"].mount(
-        alphaProjects,
+        codepuppyProjects,
         projectsServerKey,
       ),
-      [productionRoutes.session.surface]: productionRoutes.session.mount(alphaProjects),
+      [productionRoutes.session.surface]: productionRoutes.session.mount(codepuppyProjects),
     }))
 
     return (
@@ -538,53 +538,53 @@ render(() => {
           {(key) => (
             <AppInterface defaultServer={key} servers={servers()} router={MemoryRouter} surfaces={surfaceComponents()}>
               {/* C28(S17 T4)崩溃边界下沉:上游 ErrorBoundary 在 AppBaseProviders 内包住全部 children,
-                  alpha 任一注入件 throw 会整屏坠成上游 ErrorPage —— 逐个紧裹 AlphaBoundary(更内层先命中)
-                  = 崩溃只降级该区域。探针 window.__alphaCrashProbe */}
-              <AlphaBoundary name="Inner">
+                  alpha 任一注入件 throw 会整屏坠成上游 ErrorPage —— 逐个紧裹 CodePuppyBoundary(更内层先命中)
+                  = 崩溃只降级该区域。探针 window.__codepuppyCrashProbe */}
+              <CodePuppyBoundary name="Inner">
                 <Inner />
-              </AlphaBoundary>
-              <AlphaBoundary name="AlphaSidebar">
+              </CodePuppyBoundary>
+              <CodePuppyBoundary name="CodePuppySidebar">
                 {/* #925(第三个消费者):侧栏的会话 href / 新会话导航 / draft 的 server 段。
                     侧栏列的与建的会话全在这份 store 的 server 上,身份只能是这个 key。 */}
-                <AlphaSidebar projects={alphaProjects} serverKey={projectsServerKey} />
-              </AlphaBoundary>
-              {/* REQ-085:AlphaHome 不再作为 children Portal 注入 —— 它是正式 `home` surface
+                <CodePuppySidebar projects={codepuppyProjects} serverKey={projectsServerKey} />
+              </CodePuppyBoundary>
+              {/* REQ-085:CodePuppyHome 不再作为 children Portal 注入 —— 它是正式 `home` surface
                   (见上方 surfaceComponents);legacy 模式下 upstream Home 原样呈现。 */}
-              <AlphaBoundary name="AlphaOnboarding">
-                <AlphaOnboarding />
-              </AlphaBoundary>
+              <CodePuppyBoundary name="CodePuppyOnboarding">
+                <CodePuppyOnboarding />
+              </CodePuppyBoundary>
               {/* REQ-126 CODE-F(#659):`command.palette` 的**唯一**注册点。挂在壳上而不是叶上 ——
                   上游三处注册全在已被 alpha 顶替的叶里,注册随叶一起蒸发,侧栏「搜索」才成了静默
                   no-op。放在这里,它与路由无关地常驻,侧栏按钮与 mod+k 都落到它。 */}
-              <AlphaBoundary name="AlphaSessionSearch">
-                <AlphaSessionSearch projects={alphaProjects} serverKey={projectsServerKey} />
-              </AlphaBoundary>
+              <CodePuppyBoundary name="CodePuppySessionSearch">
+                <CodePuppySessionSearch projects={codepuppyProjects} serverKey={projectsServerKey} />
+              </CodePuppyBoundary>
               <SettingsSurface />
-              <AlphaBoundary name="ExtensionHub">
+              <CodePuppyBoundary name="ExtensionHub">
                 <ExtensionHub server={sidebarServer} open={extHubOpen} onClose={() => setExtHubOpen(false)} />
-              </AlphaBoundary>
-              <AlphaBoundary name="AutomationPanel">
+              </CodePuppyBoundary>
+              <CodePuppyBoundary name="AutomationPanel">
                 {/* #925(第四个消费者):「回跳会话」。自动化 run 的会话由主进程建在内嵌
                     sidecar 上,renderer 侧那台机器的身份就是这个 key。 */}
                 <AutomationPanel serverKey={projectsServerKey} />
-              </AlphaBoundary>
+              </CodePuppyBoundary>
               {/* REQ-126 AC3(#654):产物工作台不再全页挂载 —— 产物只经会话右栏 artifacts 面板到达。 */}
-              {/* REQ-125 C7/C8:会话页 composer = AlphaComposer 经 seam 会话页直挂(session surface
+              {/* REQ-125 C7/C8:会话页 composer = CodePuppyComposer 经 seam 会话页直挂(session surface
                   内部,零 Portal/零选择器),时间线为 session surface 内自持 typed leaf —— 旧的
                   composer/时间线 DOM 接管注入件已全部删除。 */}
-              <AlphaBoundary name="CloudRunWatcher">
-                <CloudRunWatcher server={sidebarServer} projects={alphaProjects} />
-              </AlphaBoundary>
+              <CodePuppyBoundary name="CloudRunWatcher">
+                <CloudRunWatcher server={sidebarServer} projects={codepuppyProjects} />
+              </CodePuppyBoundary>
               {/* REQ-060 信任门:进入项目会话时检测项目自带可执行扩展 → per-project consent → dispose 生效 */}
-              <AlphaBoundary name="ExtTrustWatcher">
+              <CodePuppyBoundary name="ExtTrustWatcher">
                 <ExtTrustWatcher server={sidebarServer} />
-              </AlphaBoundary>
-              <AlphaBoundary name="ToastViewport">
+              </CodePuppyBoundary>
+              <CodePuppyBoundary name="ToastViewport">
                 <ToastViewport />
-              </AlphaBoundary>
-              <AlphaBoundary name="ContractFailureBanner">
+              </CodePuppyBoundary>
+              <CodePuppyBoundary name="ContractFailureBanner">
                 <ContractFailureBanner />
-              </AlphaBoundary>
+              </CodePuppyBoundary>
               {/* #1557:平台目录刷新失败不再是全局横幅 —— 提示随使用点出现在输入框提示槽与模型选择器里。 */}
               <RecoverySurface />
               <DevSurfaceMapInspector />

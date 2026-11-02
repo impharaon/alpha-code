@@ -29,30 +29,30 @@ import { persistMcp, readPluginArrayStrict, removePlugin, writeConfigTextAtomic 
 import { reconcileEngineConfigTruth } from "./engine-config-truth-boot"
 
 let tmp = ""
-let alphaTmp = ""
+let codepuppyTmp = ""
 const prevConfigDir = process.env.OPENCODE_CONFIG_DIR
-const prevHome = process.env.ALPHA_OPENCODE_HOME
-const prevAlpha = process.env.ALPHA_GLOBAL_DIR
+const prevHome = process.env.CODEPUPPY_OPENCODE_HOME
+const prevCodePuppy = process.env.CODEPUPPY_GLOBAL_DIR
 
 beforeEach(() => {
-  tmp = fs.mkdtempSync(path.join(os.tmpdir(), "alpha-plugin-seal-"))
-  alphaTmp = path.join(tmp, "alpha-home")
-  fs.mkdirSync(alphaTmp, { recursive: true })
+  tmp = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-plugin-seal-"))
+  codepuppyTmp = path.join(tmp, "codepuppy-home")
+  fs.mkdirSync(codepuppyTmp, { recursive: true })
   process.env.OPENCODE_CONFIG_DIR = tmp
-  process.env.ALPHA_OPENCODE_HOME = path.join(tmp, "opencode-home")
-  process.env.ALPHA_GLOBAL_DIR = alphaTmp
+  process.env.CODEPUPPY_OPENCODE_HOME = path.join(tmp, "opencode-home")
+  process.env.CODEPUPPY_GLOBAL_DIR = codepuppyTmp
 })
 afterEach(() => {
   if (prevConfigDir === undefined) delete process.env.OPENCODE_CONFIG_DIR
   else process.env.OPENCODE_CONFIG_DIR = prevConfigDir
-  if (prevHome === undefined) delete process.env.ALPHA_OPENCODE_HOME
-  else process.env.ALPHA_OPENCODE_HOME = prevHome
-  if (prevAlpha === undefined) delete process.env.ALPHA_GLOBAL_DIR
-  else process.env.ALPHA_GLOBAL_DIR = prevAlpha
+  if (prevHome === undefined) delete process.env.CODEPUPPY_OPENCODE_HOME
+  else process.env.CODEPUPPY_OPENCODE_HOME = prevHome
+  if (prevCodePuppy === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+  else process.env.CODEPUPPY_GLOBAL_DIR = prevCodePuppy
   fs.rmSync(tmp, { recursive: true, force: true })
 })
 
-const target = () => path.join(alphaTmp, "alpha.jsonc")
+const target = () => path.join(codepuppyTmp, "codepuppy.jsonc")
 const writeCfg = (value: unknown) => fs.writeFileSync(target(), JSON.stringify(value, null, 2))
 const readCfg = (): Record<string, unknown> => JSON.parse(fs.readFileSync(target(), "utf8"))
 const refusal = (r: { ok: boolean } | { ok: false; reason: string }): string => {
@@ -158,7 +158,7 @@ describe("ADR-040 咽喉:清理方向与无关写入照常通过(闸不能是「
 
 // ── ④ 第三族物理写原语:boot reconcile 的**整文件**写(`#832`)────────────────────────────────
 //
-// `#825` 交付时它是**唯一已知绕开咽喉**的写入口:每次启动都跑,`JSON.stringify` 整个 `alpha.jsonc`
+// `#825` 交付时它是**唯一已知绕开咽喉**的写入口:每次启动都跑,`JSON.stringify` 整个 `codepuppy.jsonc`
 // 覆盖一遍,三道白名单一道都不过。本段是那个口子被关掉的判据。
 //
 // 三格分工(缺一格就有一半是假的):
@@ -198,7 +198,7 @@ describe("ADR-040 咽喉:boot reconcile 的整文件写(第三族物理写原语
     expect((readCfg().mcp as Record<string, unknown>).markitdown).toBeDefined()
   })
 
-  test("生产入口:盘上的 alpha.jsonc 语法坏掉而它自己容错读得出 plugin 条目 ⇒ 整次拒写,文件身份不变", () => {
+  test("生产入口:盘上的 codepuppy.jsonc 语法坏掉而它自己容错读得出 plugin 条目 ⇒ 整次拒写,文件身份不变", () => {
     // 缺一个逗号:jsonc-parser 3.3.1 的容错解析照样给出 {plugin,mcp}(实测),而带 errors 的严格读
     // 报 1 个语法错 —— 于是「写完之后没多出元素」证不出来。fail-closed 的定义就是这一格。
     fs.writeFileSync(target(), '{\n  "plugin": ["kept@1"]\n  "mcp": {}\n}\n')
@@ -227,7 +227,7 @@ describe("ADR-040 咽喉:boot reconcile 的整文件写(第三族物理写原语
 // 是本仓记录在案的假闸形态),但它是唯一能把「证不出来」的三种形状逐个摆出来的地方。
 
 describe("sealEnginePluginAdditions — fail-closed 的边界", () => {
-  const t = "/tmp/alpha.jsonc"
+  const t = "/tmp/codepuppy.jsonc"
   test("待写文本不是合法 jsonc ⇒ 拒(无法证明没新增)", () => {
     expect(sealEnginePluginAdditions(t, "{}", "{ not jsonc").ok).toBe(false)
   })

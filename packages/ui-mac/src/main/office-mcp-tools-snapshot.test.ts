@@ -1,5 +1,5 @@
 // #1565 AC1(REQ-236 §2.3):resources/office-mcp/tools.json 是 server.py 的 tools_for() 在构建期导出的、入库的清单。
-// 引擎在文档工具连上之前把它当作这四个工具的声明定义(packages/opencode/src/mcp/alpha-first-party-mcp.ts);它与 server.py
+// 引擎在文档工具连上之前把它当作这四个工具的声明定义(packages/opencode/src/mcp/codepuppy-first-party-mcp.ts);它与 server.py
 // 一旦不同步,模型拿到的就是错的用法。判据:
 //   · 由生产生成脚本重新生成,与入库内容逐字节相等,且生成前后 server.py 的字节不变;
 //   · 只改 server.py 里一个 schema 字段,重新生成的工具定义就与入库内容不同(证明比的是 schema,不只是摘要)。
@@ -10,7 +10,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { OFFICE_MCP_MANIFEST, OFFICE_MCP_SERVER, renderOfficeMcpTools } from "../../scripts/gen-office-mcp-tools"
 
-const scratch = mkdtempSync(join(tmpdir(), "alpha-1565-snapshot-"))
+const scratch = mkdtempSync(join(tmpdir(), "codepuppy-1565-snapshot-"))
 afterAll(() => rmSync(scratch, { recursive: true, force: true }))
 
 const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex")

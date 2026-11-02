@@ -7,14 +7,14 @@
  *   1. [data-slot="titlebar-tabs"]            — the V2 titlebar tab-strip (components/titlebar.tsx)
  *   2. .relative.bg-v2-background-bg-deep.flex-1 — the V2 layout shell (pages/layout.tsx fallback)
  *
- * COLOR: the sidebar's OWN elements (.alpha-*) consume alpha-ui design tokens (--a-*, see
- * alpha-ui/tokens.css) — cool graphite / porcelain. The upstream-chrome override rules below
+ * COLOR: the sidebar's OWN elements (.alpha-*) consume codepuppy-ui design tokens (--a-*, see
+ * codepuppy-ui/tokens.css) — cool graphite / porcelain. The upstream-chrome override rules below
  * (wordmark overlay) keep opencode's --v2-* tokens on purpose, so they match the opencode surface
  * they are embedded in.
  */
 
 :root {
-  --alpha-sidebar-w: 256px;
+  --codepuppy-sidebar-w: 256px;
 }
 
 /* ── opencode V2 chrome overrides (only while our sidebar is mounted) ─────────────────── */
@@ -24,18 +24,18 @@
  * hidden whether the sidebar is open or collapsed; when collapsed the reveal button reopens it,
  * and the sidebar brand doubles as a "home" link. The cluster is the V2 titlebar div that is the
  * direct parent of [data-slot="titlebar-tabs"] (components/titlebar.tsx). */
-body[data-alpha-sidebar] header div:has(> [data-slot="titlebar-tabs"]) {
+body[data-codepuppy-sidebar] header div:has(> [data-slot="titlebar-tabs"]) {
   display: none !important;
 }
 /* Fallback if the cluster selector ever misses: still kill the tab-strip itself. */
-body[data-alpha-sidebar] [data-slot="titlebar-tabs"] {
+body[data-codepuppy-sidebar] [data-slot="titlebar-tabs"] {
   display: none !important;
 }
 
 /* Hide opencode's faint titlebar review toggle — our top-right toolbar provides a clear
    terminal + review pair instead. (Scoped to the titlebar portal so the review panel's own
    header buttons are untouched.) */
-body[data-alpha-sidebar] #opencode-titlebar-right [aria-controls="review-panel"] {
+body[data-codepuppy-sidebar] #opencode-titlebar-right [aria-controls="review-panel"] {
   display: none !important;
 }
 
@@ -44,20 +44,20 @@ body[data-alpha-sidebar] #opencode-titlebar-right [aria-controls="review-panel"]
  * top is seamless (the alpha sidebar owns the left; this header floats only over content on the
  * right). Scoped to `header` so the shared deep-bg shell div is untouched. Cosmetic coupling:
  * re-point the class fragment on an upstream rename. */
-body[data-alpha-sidebar] header[class*="bg-v2-background-bg-deep"] {
+body[data-codepuppy-sidebar] header[class*="bg-v2-background-bg-deep"] {
   background: var(--a-bg-canvas) !important;
 }
 /* …and the deep shell background itself (#ededec) — it shows as a gray band between the white header
  * and the white conversation content (#22). Whiten the whole content shell so the canvas is seamless
  * white (alpha design). Scoped to the flex-1 shell so only the main content area is repainted. */
-body[data-alpha-sidebar] .relative.bg-v2-background-bg-deep.flex-1 {
+body[data-codepuppy-sidebar] .relative.bg-v2-background-bg-deep.flex-1 {
   background: var(--a-bg-canvas) !important;
 }
 
 /* Hide opencode's floating bottom-right "?" help button (dev-channel, components/help-button.tsx).
    Alpha's account menu owns the Help & Feedback entry. */
-body[data-alpha-sidebar] .fixed.bottom-4.right-4:has(button[aria-label="Help"]),
-body[data-alpha-sidebar] button[aria-label="Help"] {
+body[data-codepuppy-sidebar] .fixed.bottom-4.right-4:has(button[aria-label="Help"]),
+body[data-codepuppy-sidebar] button[aria-label="Help"] {
   display: none !important;
 }
 
@@ -66,7 +66,7 @@ body[data-alpha-sidebar] button[aria-label="Help"] {
    so the switcher is redundant. opencode's mobileTab defaults to "session" (a non-persisted store),
    so with the strip gone the chat shows by default. Matched precisely as the only tabs whose
    triggers are exactly session + changes — a rename only brings the strip back (cosmetic). */
-body[data-alpha-sidebar]
+body[data-codepuppy-sidebar]
   [data-component="tabs"]:has([data-slot="tabs-trigger-wrapper"][data-value="session"]):has(
     [data-slot="tabs-trigger-wrapper"][data-value="changes"]
   ) {
@@ -74,18 +74,18 @@ body[data-alpha-sidebar]
 }
 
 /* Shift the whole V2 shell (titlebar + main) right so it clears our fixed sidebar. */
-body[data-alpha-sidebar="open"] .relative.bg-v2-background-bg-deep.flex-1 {
-  padding-left: var(--alpha-sidebar-w) !important;
+body[data-codepuppy-sidebar="open"] .relative.bg-v2-background-bg-deep.flex-1 {
+  padding-left: var(--codepuppy-sidebar-w) !important;
   transition: padding-left 180ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* The V2 home repeats the project list in a 280px left column — redundant now that the sidebar
  * owns projects and account actions. Drop that column and let the
  * recent-sessions section take the full width. Keyed on the home grid's literal track template. */
-body[data-alpha-sidebar] [class*="grid-cols-[280px"] {
+body[data-codepuppy-sidebar] [class*="grid-cols-[280px"] {
   grid-template-columns: minmax(0, 1fr) !important;
 }
-body[data-alpha-sidebar] [class*="grid-cols-[280px"] > aside {
+body[data-codepuppy-sidebar] [class*="grid-cols-[280px"] > aside {
   display: none !important;
 }
 /* Brand the upstream "opencode" wordmarks as ALPHA. Two variants exist:
@@ -123,10 +123,10 @@ svg[viewBox="0 0 720.002 129.001"] {
 
 /* ── the sidebar ─────────────────────────────────────────────────────────────────────── */
 
-.alpha-sidebar {
+.codepuppy-sidebar {
   position: fixed;
   inset: 0 auto 0 0;
-  width: var(--alpha-sidebar-w);
+  width: var(--codepuppy-sidebar-w);
   z-index: 40;
   display: flex;
   flex-direction: column;
@@ -143,13 +143,13 @@ svg[viewBox="0 0 720.002 129.001"] {
  * drag region here (a separate element from the toolbar) overlaps the toolbar buttons and the
  * OS lets it "show through" their no-drag, swallowing clicks. Window dragging is provided by the
  * toolbar's own data-tauri-drag-region gaps + opencode's titlebar. */
-.alpha-sidebar-titlebar {
+.codepuppy-sidebar-titlebar {
   height: 38px;
   flex: 0 0 auto;
   -webkit-app-region: no-drag;
 }
 
-.alpha-sidebar-brand {
+.codepuppy-sidebar-brand {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -158,7 +158,7 @@ svg[viewBox="0 0 720.002 129.001"] {
   padding: 2px 10px 10px 12px;
 }
 
-.alpha-sidebar-brand-mark {
+.codepuppy-sidebar-brand-mark {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -167,17 +167,17 @@ svg[viewBox="0 0 720.002 129.001"] {
   margin-left: -6px;
   border-radius: 7px;
 }
-.alpha-sidebar-brand-mark:hover {
+.codepuppy-sidebar-brand-mark:hover {
   background: var(--a-overlay-hover);
 }
 
-.alpha-sidebar-mark {
+.codepuppy-sidebar-mark {
   width: 16px;
   height: 20px;
   flex: 0 0 auto;
 }
 
-.alpha-sidebar-wordmark {
+.codepuppy-sidebar-wordmark {
   font-weight: 680;
   font-size: 12.5px;
   letter-spacing: 0.085em;
@@ -185,12 +185,12 @@ svg[viewBox="0 0 720.002 129.001"] {
   white-space: nowrap;
 }
 
-.alpha-sidebar-brand-mark,
-.alpha-sidebar-icon-btn,
-.alpha-sidebar-nav-item,
-.alpha-project-add,
-.alpha-sidebar-open-project,
-.alpha-sidebar-reveal {
+.codepuppy-sidebar-brand-mark,
+.codepuppy-sidebar-icon-btn,
+.codepuppy-sidebar-nav-item,
+.codepuppy-project-add,
+.codepuppy-sidebar-open-project,
+.codepuppy-sidebar-reveal {
   -webkit-app-region: no-drag;
   font: inherit;
   color: inherit;
@@ -199,7 +199,7 @@ svg[viewBox="0 0 720.002 129.001"] {
   cursor: pointer;
 }
 
-.alpha-sidebar-icon-btn {
+.codepuppy-sidebar-icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -208,12 +208,12 @@ svg[viewBox="0 0 720.002 129.001"] {
   border-radius: 7px;
   color: var(--a-text-secondary);
 }
-.alpha-sidebar-icon-btn:hover {
+.codepuppy-sidebar-icon-btn:hover {
   background: var(--a-overlay-hover);
   color: var(--a-text);
 }
 
-.alpha-sidebar-nav {
+.codepuppy-sidebar-nav {
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
@@ -221,7 +221,7 @@ svg[viewBox="0 0 720.002 129.001"] {
   padding: 0 8px;
 }
 
-.alpha-sidebar-nav-item {
+.codepuppy-sidebar-nav-item {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -231,17 +231,17 @@ svg[viewBox="0 0 720.002 129.001"] {
   text-align: left;
   color: var(--a-text);
 }
-.alpha-sidebar-nav-item:hover {
+.codepuppy-sidebar-nav-item:hover {
   background: var(--a-overlay-hover);
 }
-.alpha-sidebar-nav-icon {
+.codepuppy-sidebar-nav-icon {
   width: 16px;
   height: 16px;
   flex: 0 0 auto;
   color: var(--a-text-secondary);
 }
 
-.alpha-sidebar-section {
+.codepuppy-sidebar-section {
   flex: 0 0 auto;
   padding: 16px 14px 6px;
   font-size: 11px;
@@ -250,7 +250,7 @@ svg[viewBox="0 0 720.002 129.001"] {
   color: var(--a-text-tertiary);
 }
 
-.alpha-sidebar-scroll {
+.codepuppy-sidebar-scroll {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
@@ -258,7 +258,7 @@ svg[viewBox="0 0 720.002 129.001"] {
   scrollbar-width: thin;
 }
 
-.alpha-sidebar-footer {
+.codepuppy-sidebar-footer {
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
@@ -268,7 +268,7 @@ svg[viewBox="0 0 720.002 129.001"] {
 }
 
 /* [ac#1207] 更新状态条(footer,账户按钮上方)。状态语义在 updater-state-surface.ts。 */
-.alpha-updater-note {
+.codepuppy-updater-note {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -279,20 +279,20 @@ svg[viewBox="0 0 720.002 129.001"] {
   color: var(--a-text-secondary);
   background: var(--a-overlay-hover);
 }
-.alpha-updater-note[data-status="ready"] {
+.codepuppy-updater-note[data-status="ready"] {
   color: var(--a-accent);
 }
-.alpha-updater-note[data-status="error"] {
+.codepuppy-updater-note[data-status="error"] {
   color: var(--a-error);
 }
-.alpha-updater-text {
+.codepuppy-updater-text {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.alpha-updater-install {
+.codepuppy-updater-install {
   flex: 0 0 auto;
   border: 1px solid var(--a-accent);
   border-radius: 6px;
@@ -302,10 +302,10 @@ svg[viewBox="0 0 720.002 129.001"] {
   background: transparent;
   cursor: pointer;
 }
-.alpha-updater-install:hover {
+.codepuppy-updater-install:hover {
   background: var(--a-overlay-hover);
 }
-.alpha-updater-dismiss {
+.codepuppy-updater-dismiss {
   flex: 0 0 auto;
   border: none;
   background: transparent;
@@ -318,7 +318,7 @@ svg[viewBox="0 0 720.002 129.001"] {
 
 /* ── projects + sessions ─────────────────────────────────────────────────────────────── */
 
-.alpha-project-row {
+.codepuppy-project-row {
   position: relative;
   display: flex;
   align-items: center;
@@ -327,36 +327,36 @@ svg[viewBox="0 0 720.002 129.001"] {
   border-radius: 8px;
   cursor: pointer;
 }
-.alpha-project-row:hover {
+.codepuppy-project-row:hover {
   background: var(--a-overlay-hover);
 }
-.alpha-project-row[data-active] {
+.codepuppy-project-row[data-active] {
   background: var(--a-overlay-hover);
 }
 /* Active project = bold name (no heavy gray slab — just a faint overlay + emphasis), shell.html §A. */
-.alpha-project-row[data-active] .alpha-project-name {
+.codepuppy-project-row[data-active] .codepuppy-project-name {
   font-weight: var(--a-weight-semibold);
 }
 
-.alpha-project-chevron {
+.codepuppy-project-chevron {
   width: 13px;
   height: 13px;
   flex: 0 0 auto;
   color: var(--a-text-tertiary);
   transition: transform 120ms ease;
 }
-.alpha-project-chevron[data-collapsed] {
+.codepuppy-project-chevron[data-collapsed] {
   transform: rotate(-90deg);
 }
 
-.alpha-project-avatar {
+.codepuppy-project-avatar {
   width: 18px;
   height: 18px;
   flex: 0 0 auto;
   font-size: 10px;
 }
 
-.alpha-project-name {
+.codepuppy-project-name {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -367,7 +367,7 @@ svg[viewBox="0 0 720.002 129.001"] {
 
 /* The per-project hover actions (⋯ more, + new chat). Hidden until the row is hovered (or, for
    the ⋯ trigger, while its menu is open), so the row stays clean at rest. */
-.alpha-project-action {
+.codepuppy-project-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -378,22 +378,22 @@ svg[viewBox="0 0 720.002 129.001"] {
   color: var(--a-text-secondary);
   opacity: 0;
 }
-.alpha-project-action :where(svg) {
+.codepuppy-project-action :where(svg) {
   width: 14px;
   height: 14px;
 }
-.alpha-project-row:hover .alpha-project-action,
-.alpha-project-row[data-menu] .alpha-project-action {
+.codepuppy-project-row:hover .codepuppy-project-action,
+.codepuppy-project-row[data-menu] .codepuppy-project-action {
   opacity: 1;
 }
-.alpha-project-action:hover {
+.codepuppy-project-action:hover {
   background: var(--a-overlay-active);
   color: var(--a-text);
 }
 
 /* Dropdown opened by the ⋯ button. Fixed-positioned (viewport coords from the trigger rect),
    rendered at the Portal root so the project scroll container can't clip it. */
-.alpha-project-menu {
+.codepuppy-project-menu {
   position: fixed;
   z-index: 60;
   min-width: 168px;
@@ -407,7 +407,7 @@ svg[viewBox="0 0 720.002 129.001"] {
   box-shadow: var(--a-shadow-lg);
   cursor: default;
 }
-.alpha-project-menu-item {
+.codepuppy-project-menu-item {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -418,23 +418,23 @@ svg[viewBox="0 0 720.002 129.001"] {
   text-align: left;
   color: var(--a-text);
 }
-.alpha-project-menu-item:hover {
+.codepuppy-project-menu-item:hover {
   background: var(--a-overlay-hover);
 }
-.alpha-project-menu-item-danger {
+.codepuppy-project-menu-item-danger {
   color: var(--a-error);
 }
-.alpha-project-menu-item-danger:hover {
+.codepuppy-project-menu-item-danger:hover {
   background: var(--a-error-subtle);
 }
-.alpha-project-menu-icon {
+.codepuppy-project-menu-icon {
   width: 15px;
   height: 15px;
   flex: 0 0 auto;
 }
 
 /* Transparent full-screen catcher that closes the open menu on an outside click. */
-.alpha-menu-backdrop {
+.codepuppy-menu-backdrop {
   position: fixed;
   inset: 0;
   z-index: 55;
@@ -442,7 +442,7 @@ svg[viewBox="0 0 720.002 129.001"] {
 }
 
 /* "Archived (N) · Restore all" — shown only when projects are hidden, so archiving is reversible. */
-.alpha-sidebar-archived {
+.codepuppy-sidebar-archived {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -454,22 +454,22 @@ svg[viewBox="0 0 720.002 129.001"] {
   font-size: 12px;
   color: var(--a-text-secondary);
 }
-.alpha-sidebar-archived:hover {
+.codepuppy-sidebar-archived:hover {
   background: var(--a-overlay-hover);
 }
-.alpha-sidebar-archived-action {
+.codepuppy-sidebar-archived-action {
   color: var(--a-accent);
   flex: 0 0 auto;
 }
 
-.alpha-project-sessions {
+.codepuppy-project-sessions {
   display: flex;
   flex-direction: column;
   margin: 1px 0 4px;
   padding-left: 14px;
 }
 
-.alpha-session {
+.codepuppy-session {
   display: block;
   padding: 5px 8px 5px 14px;
   margin-left: 5px;
@@ -482,14 +482,14 @@ svg[viewBox="0 0 720.002 129.001"] {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.alpha-session:hover {
+.codepuppy-session:hover {
   background: var(--a-overlay-hover);
   color: var(--a-text);
 }
 /* Selected session = indigo-subtle pill + ~2.5px left accent bar + accent text (shell.html §A).
  * The accent bar = the connector border turned accent (1px) + a 1.5px inset shadow, so it reads as
  * a single 2.5px bar WITHOUT shifting the row (no layout jump vs the 1px connector). */
-.alpha-session[data-active] {
+.codepuppy-session[data-active] {
   background: var(--a-overlay-selected);
   color: var(--a-accent);
   font-weight: var(--a-weight-medium);
@@ -498,14 +498,14 @@ svg[viewBox="0 0 720.002 129.001"] {
 }
 
 /* Per-session row: the link + a hover-revealed "⋯" actions button (rename/share/delete). */
-.alpha-session-row {
+.codepuppy-session-row {
   display: flex;
   align-items: center;
   position: relative;
 }
 /* Unread dot: an agent produced new activity while this session was in the background. Sits in the
    left gutter (absolute, so it never shifts the title) and clears the moment the session is opened. */
-.alpha-session-unread {
+.codepuppy-session-unread {
   position: absolute;
   left: 1px;
   top: 50%;
@@ -518,11 +518,11 @@ svg[viewBox="0 0 720.002 129.001"] {
   pointer-events: none;
   z-index: 1;
 }
-.alpha-session-row > .alpha-session {
+.codepuppy-session-row > .codepuppy-session {
   flex: 1;
   min-width: 0;
 }
-.alpha-session-menu-btn {
+.codepuppy-session-menu-btn {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -541,15 +541,15 @@ svg[viewBox="0 0 720.002 129.001"] {
     background var(--a-dur-fast) var(--a-ease-out),
     color var(--a-dur-fast) var(--a-ease-out);
 }
-.alpha-session-row:hover .alpha-session-menu-btn,
-.alpha-session-row[data-active] .alpha-session-menu-btn {
+.codepuppy-session-row:hover .codepuppy-session-menu-btn,
+.codepuppy-session-row[data-active] .codepuppy-session-menu-btn {
   opacity: 1;
 }
-.alpha-session-menu-btn:hover {
+.codepuppy-session-menu-btn:hover {
   background: var(--a-overlay-active);
   color: var(--a-text);
 }
-.alpha-session-rename {
+.codepuppy-session-rename {
   flex: 1;
   min-width: 0;
   margin-left: 5px;
@@ -565,7 +565,7 @@ svg[viewBox="0 0 720.002 129.001"] {
 }
 
 /* Sidebar-native search box (filters projects/sessions in place). */
-.alpha-sidebar-search {
+.codepuppy-sidebar-search {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -576,19 +576,19 @@ svg[viewBox="0 0 720.002 129.001"] {
   border: 1px solid var(--a-border);
   border-radius: var(--a-radius-md);
 }
-.alpha-sidebar-search:focus-within {
+.codepuppy-sidebar-search:focus-within {
   border-color: var(--a-accent);
   box-shadow: var(--a-ring-focus);
 }
-.alpha-sidebar-search-icon {
+.codepuppy-sidebar-search-icon {
   flex: 0 0 auto;
   color: var(--a-text-tertiary);
 }
-.alpha-sidebar-search-icon svg {
+.codepuppy-sidebar-search-icon svg {
   width: 14px;
   height: 14px;
 }
-.alpha-sidebar-search-input {
+.codepuppy-sidebar-search-input {
   flex: 1;
   min-width: 0;
   border: none;
@@ -598,10 +598,10 @@ svg[viewBox="0 0 720.002 129.001"] {
   font-size: 12.5px;
   outline: none;
 }
-.alpha-sidebar-search-input::placeholder {
+.codepuppy-sidebar-search-input::placeholder {
   color: var(--a-text-tertiary);
 }
-.alpha-sidebar-search-clear {
+.codepuppy-sidebar-search-clear {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -616,44 +616,44 @@ svg[viewBox="0 0 720.002 129.001"] {
   font-size: 15px;
   line-height: 1;
 }
-.alpha-sidebar-search-clear:hover {
+.codepuppy-sidebar-search-clear:hover {
   background: var(--a-bg-muted);
   color: var(--a-text);
 }
 
-.alpha-sidebar-empty {
+.codepuppy-sidebar-empty {
   padding: 6px 10px 6px 19px;
   color: var(--a-text-tertiary);
   font-size: 12px;
 }
-.alpha-sidebar-empty-projects {
+.codepuppy-sidebar-empty-projects {
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 18px 14px;
   text-align: center;
 }
-.alpha-sidebar-open-project {
+.codepuppy-sidebar-open-project {
   align-self: center;
   padding: 6px 12px;
   border-radius: 8px;
   background: var(--a-bg-muted);
   color: var(--a-text);
 }
-.alpha-sidebar-open-project:hover {
+.codepuppy-sidebar-open-project:hover {
   background: var(--a-bg-inset);
 }
 
 /* ── top-left toolbar (lives in the native titlebar strip, always visible) ───────────── */
 
-.alpha-topbar {
+.codepuppy-topbar {
   position: fixed;
   /* vertically centre the icons on the native macOS traffic lights (trafficLightPosition
    * {x:12,y:14} in windows.ts → lights centre ≈ y20; 24px buttons → top 8). */
   top: 8px;
   /* RIGHT-aligned to the sidebar's right edge (not left, not centred) per request. */
   left: auto;
-  right: calc(100vw - var(--alpha-sidebar-w) + 10px);
+  right: calc(100vw - var(--codepuppy-sidebar-w) + 10px);
   z-index: 42;
   display: flex;
   align-items: center;
@@ -664,12 +664,12 @@ svg[viewBox="0 0 720.002 129.001"] {
  * drag container does not carve out reliably in this Electron build, so the OS would steal the
  * click. With everything no-drag (and the sidebar strip no-drag), there is simply nothing to
  * intercept the click. !important beats the prefixed/unprefixed aliasing. */
-.alpha-topbar,
-.alpha-topbar * {
+.codepuppy-topbar,
+.codepuppy-topbar * {
   -webkit-app-region: no-drag !important;
   app-region: no-drag !important;
 }
-.alpha-topbar-btn {
+.codepuppy-topbar-btn {
   -webkit-app-region: no-drag;
   display: inline-flex;
   align-items: center;
@@ -682,29 +682,29 @@ svg[viewBox="0 0 720.002 129.001"] {
   color: var(--a-text-secondary);
   cursor: pointer;
 }
-.alpha-topbar-btn:hover {
+.codepuppy-topbar-btn:hover {
   background: var(--a-overlay-hover);
   color: var(--a-text);
 }
-.alpha-topbar-btn :where(svg) {
+.codepuppy-topbar-btn :where(svg) {
   width: 16px;
   height: 16px;
 }
-.alpha-topbar-divider {
+.codepuppy-topbar-divider {
   width: 1px;
   height: 16px;
   margin: 0 4px;
   background: var(--a-border);
 }
 
-/* REQ-126 AC7(#658):`.alpha-topbar-right`(浮动的终端 + 审查开关)整块已删。#574 曾用
- * `body:has([data-alpha-session-workspace])` 把它在会话页藏起来 —— 但那只是**遮**:命令
+/* REQ-126 AC7(#658):`.codepuppy-topbar-right`(浮动的终端 + 审查开关)整块已删。#574 曾用
+ * `body:has([data-codepuppy-session-workspace])` 把它在会话页藏起来 —— 但那只是**遮**:命令
  * `terminal.toggle` / `review.toggle` 随上游 session 叶退役后全应用无人注册,而 `inWorkspace()`
  * 在**新对话页**同样为真,那一页的这对按钮既可见又无效。控件本身退休,遮它的规则一并作废。
  *
  * #574 单一顶栏的另一半仍然有效:侧栏折叠时,工作区顶栏成为窗口最上沿,左侧让位 macOS 红绿灯(trafficLightPosition
  *    x:12,windows.ts)与本文件的浮动工具簇(其右缘 = sidebar 宽 − 10px)。内容起点对齐
  *    侧栏展开态(sidebar 宽 + 顶栏自身 14px 左 padding),折叠/展开切换不跳字。 */
-body[data-alpha-sidebar="collapsed"] .a-swk-topbar {
-  padding-left: calc(var(--alpha-sidebar-w) + 14px);
+body[data-codepuppy-sidebar="collapsed"] .a-swk-topbar {
+  padding-left: calc(var(--codepuppy-sidebar-w) + 14px);
 }

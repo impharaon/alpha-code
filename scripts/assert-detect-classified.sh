@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# `#895` —— alpha-ci 每个 **required** job 的第一步:证明 `detect` 真的给出了一个可用的分类。
+# `#895` —— codepuppy-ci 每个 **required** job 的第一步:证明 `detect` 真的给出了一个可用的分类。
 #
-# 它挡的是什么(大白话):alpha-ci 里四道必需检查的每一步,条件都是
+# 它挡的是什么(大白话):codepuppy-ci 里四道必需检查的每一步,条件都是
 # `needs.detect.outputs.code == 'true'`。detect 一旦没给出结论,那个值就是空串 ——
 # 于是每一步都判假、一步不跑,而这一格照样报「通过」。也就是说**一道闸门都没真跑,PR 也能合**。
 #
@@ -25,7 +25,7 @@
 #   packages/ui-mac/src/main/local-gate-parity.test.ts 才能真去跑**生产的这一份**,
 #   用真实的 result/outputs 组合驱动它。
 #
-# 入参走 env(alpha-ci 从不把 ${{ }} 插进脚本文本):
+# 入参走 env(codepuppy-ci 从不把 ${{ }} 插进脚本文本):
 #   DETECT_RESULT — `needs.detect.result`:success / failure / cancelled / skipped
 #   DETECT_CODE   — `needs.detect.outputs.code`:'true' / 'false' / 空串
 set -uo pipefail
@@ -38,7 +38,7 @@ code="${DETECT_CODE-}"
 echo "detect: result=[${result}] outputs.code=[${code}]"
 
 if [ "$result" != "success" ]; then
-  echo "::error::alpha-ci 的分类步 detect 没有成功(result=[${result}])—— 本 job 的闸门步骤全部挂在 needs.detect.outputs.code 上,继续跑等于一步不跑还报绿。先修 detect。"
+  echo "::error::codepuppy-ci 的分类步 detect 没有成功(result=[${result}])—— 本 job 的闸门步骤全部挂在 needs.detect.outputs.code 上,继续跑等于一步不跑还报绿。先修 detect。"
   exit 1
 fi
 

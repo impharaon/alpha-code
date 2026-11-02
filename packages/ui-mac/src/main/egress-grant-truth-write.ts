@@ -18,7 +18,7 @@ export type EgressGrantTruthWriteFs = {
 
 let tmpSeq = 0
 
-/** 原子写(见文件头)。父目录 `egress-grants/` 不在 alpha-environment.ts 的拓扑预检里,不在就建。 */
+/** 原子写(见文件头)。父目录 `egress-grants/` 不在 codepuppy-environment.ts 的拓扑预检里,不在就建。 */
 export function writeEgressGrantTruth(path: string, grants: readonly EgressGrantRecord[], fs: EgressGrantTruthWriteFs): void {
   const bad = invalidEgressGrantList(grants)
   if (bad) throw new Error(`egress grants: refusing to write ${path} — ${bad}`)

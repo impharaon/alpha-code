@@ -118,7 +118,7 @@ mock.module("../src/renderer/auth-recovery", () => ({
   },
 }))
 mock.module("@solidjs/router", () => ({ useLocation: () => ({ pathname: "/" }) }))
-mock.module("../src/renderer/alpha-ui/Banner", () => ({ Banner: () => null }))
+mock.module("../src/renderer/codepuppy-ui/Banner", () => ({ Banner: () => null }))
 
 const browseResults: unknown[] = []
 const detailResults: unknown[] = []
@@ -153,7 +153,7 @@ const { createComponent } = solid
 const { render } = solidWeb
 // **动态** import:静态 import 会在 registrator 之前牵出 solid-js,整个文件拿到 server 构建。
 const { ExtensionHub } = await import("../src/renderer/extensions/extension-hub")
-const { ToastViewport } = await import("../src/renderer/alpha-ui/Toast")
+const { ToastViewport } = await import("../src/renderer/codepuppy-ui/Toast")
 const { setHubSection } = await import("../src/renderer/extensions/ext-hub-state")
 
 const flush = () => new Promise((r) => setTimeout(r, 0))
@@ -224,13 +224,13 @@ test("live stable catalog 的 package:alpha-first 走到生产 ExtensionHub 卡�
     catalogId: CATALOG_ID,
     verdict: "compatible",
     prerequisite: "ready",
-    action: zh["alpha.ext.packageActionInstall"],
+    action: zh["codepuppy.ext.packageActionInstall"],
   })
   expect(cardFacts.text).toContain(DISPLAY_NAME)
   expect(cardFacts.text).toContain(DESCRIPTION)
 
   // 搜索框:用户打「alpha-first」筛得到它(浏览面真的接在同一份 live 数据上)
-  const search = document.querySelector<HTMLInputElement>(".alpha-ext-search input")
+  const search = document.querySelector<HTMLInputElement>(".codepuppy-ext-search input")
   expect(search).toBeInstanceOf(HTMLInputElement)
   search!.value = "alpha install check"
   search!.dispatchEvent(new Event("input", { bubbles: true }))
@@ -257,30 +257,30 @@ test("live stable catalog 的 package:alpha-first 走到生产 ExtensionHub 卡�
   console.log(`[AC2] ext-package-detail → ${JSON.stringify(detailResults.at(-1))}`)
 
   const detail = document.querySelector<HTMLElement>("[data-package-detail]")!
-  const headings = Array.from(detail.querySelectorAll(".alpha-ext-dsec-t"), (h) => h.textContent)
+  const headings = Array.from(detail.querySelectorAll(".codepuppy-ext-dsec-t"), (h) => h.textContent)
   console.log(`[AC2] detail h2 = ${JSON.stringify(detail.querySelector("h2")?.textContent)}`)
-  console.log(`[AC2] detail about = ${JSON.stringify(detail.querySelector(".alpha-ext-dabout")?.textContent)}`)
-  console.log(`[AC2] detail version = ${JSON.stringify(detail.querySelector(".alpha-ext-dhead-meta span")?.textContent?.trim())}`)
+  console.log(`[AC2] detail about = ${JSON.stringify(detail.querySelector(".codepuppy-ext-dabout")?.textContent)}`)
+  console.log(`[AC2] detail version = ${JSON.stringify(detail.querySelector(".codepuppy-ext-dhead-meta span")?.textContent?.trim())}`)
   console.log(`[AC2] detail sections = ${JSON.stringify(headings)}`)
 
   expect(detail.querySelector("h2")?.textContent).toBe(DISPLAY_NAME)
-  expect(detail.querySelector(".alpha-ext-dabout")?.textContent).toBe(DESCRIPTION)
-  expect(detail.querySelector(".alpha-ext-dhead-meta span")?.textContent?.trim()).toBe(
-    `${zh["alpha.ext.detailVersion"]} ${VERSION}`,
+  expect(detail.querySelector(".codepuppy-ext-dabout")?.textContent).toBe(DESCRIPTION)
+  expect(detail.querySelector(".codepuppy-ext-dhead-meta span")?.textContent?.trim()).toBe(
+    `${zh["codepuppy.ext.detailVersion"]} ${VERSION}`,
   )
   expect(headings).toEqual([
-    zh["alpha.ext.detailAbout"],
-    zh["alpha.ext.packageInstallability"],
-    zh["alpha.ext.packageComponentsTitle"],
-    zh["alpha.ext.packageReasonTitle"],
-    zh["alpha.ext.packageActions"],
+    zh["codepuppy.ext.detailAbout"],
+    zh["codepuppy.ext.packageInstallability"],
+    zh["codepuppy.ext.packageComponentsTitle"],
+    zh["codepuppy.ext.packageReasonTitle"],
+    zh["codepuppy.ext.packageActions"],
   ])
-  const sections = Array.from(detail.querySelectorAll(".alpha-ext-dsec"), (s) => s.textContent ?? "")
+  const sections = Array.from(detail.querySelectorAll(".codepuppy-ext-dsec"), (s) => s.textContent ?? "")
   expect(sections[0]).toContain(DESCRIPTION)
-  expect(sections[1]).toContain(zh["alpha.ext.packageVerdictCompatible"])
+  expect(sections[1]).toContain(zh["codepuppy.ext.packageVerdictCompatible"])
   expect(sections[2]).toContain("skill:alpha-first")
-  expect(sections[3]).toContain(zh["alpha.ext.packageReasonCompatible"])
-  expect(sections[4]).toContain(zh["alpha.ext.packageActionInstall"])
+  expect(sections[3]).toContain(zh["codepuppy.ext.packageReasonCompatible"])
+  expect(sections[4]).toContain(zh["codepuppy.ext.packageActionInstall"])
 
   // 安全投影:**package 面**过线的是 view,不含 raw envelope 的任何传输事实。
   // 扫描对象只取 `catalog.packages` 与详情返回值 —— legacy `entries[]` 本来就合法地带着

@@ -3,14 +3,14 @@
 // 通道演进:
 //   REQ-036 初版:`~/.opencode/skill/<name>` 直链 app 资源(违反 .alpha 中转不变量,已迁移);
 //   REQ-052:两跳桥 `<global-root>/skills/<name>` → app 资源 + `~/.opencode/skills` 桥;
-//   REQ-059 T3:桥退役,引擎经 alpha.jsonc `skills.paths:[<global-root>/skills]`(文件通道)发现;
-//   **REQ-065(现行)**:真源根纯度反向收口 —— `alphaGlobalRoot()` 只承载**用户自有**内容(有用户动作、
+//   REQ-059 T3:桥退役,引擎经 codepuppy.jsonc `skills.paths:[<global-root>/skills]`(文件通道)发现;
+//   **REQ-065(现行)**:真源根纯度反向收口 —— `codepuppyGlobalRoot()` 只承载**用户自有**内容(有用户动作、
 //   receipts 可溯);出厂件(零用户动作预置)不落真源根,由 `skills.paths` **直指 app 资源目录**
 //   (boot reconcile 每启动重写该组条目,跟随 app 路径/版本变化,见 engine-config-truth 的
 //   rewriteFactorySkillPaths)。本模块职责收敛为:存量清理(拆我方旧链)+ 注入组计算(eligibility)。
 //
 // 实测约束不变:`OPENCODE_CONFIG_CONTENT.skills.paths` 对引擎不生效(env 内容源忽略 skills.paths),
-// 文件 config 生效 —— 故走 alpha.jsonc 文件通道,不走 env。
+// 文件 config 生效 —— 故走 codepuppy.jsonc 文件通道,不走 env。
 //
 // 所有权纪律(codex 审计 High×2,继续有效):只动**可证明是 alpha 自有**的 symlink —— 判定 =
 // 链目标以 `…/(resources|Resources)/(skills|factory-skills)/<同名>` 结尾。用户自建的真实目录、
@@ -20,19 +20,19 @@
 // ── 技能资产随包发出去之后,有**两条**装载通道(`#1250`,别只看一条就下结论)────────────
 //
 //   通道 A —— **出厂注入**(零用户动作):本文件的 `FACTORY_SKILL_IDS` + `factorySkillSources()`
-//     是唯一权威 → `reconcileFactorySkills().paths` → env `ALPHA_FACTORY_SKILL_DIRS` →
+//     是唯一权威 → `reconcileFactorySkills().paths` → env `CODEPUPPY_FACTORY_SKILL_DIRS` →
 //     `packages/ext/src/factory-paths.ts` 内存注入 `cfg.skills.paths` → 引擎扫描。
 //   通道 B —— **定制中心按需安装**(Extension Hub E1b,ADR-014):catalog 条目的
 //     `installSpec.source === "builtin"` + `builtinAssetKey: "skills/<name>"` →
 //     `ext-install-planner.ts` 的 builtin 分支 → `ext-fs-installer.ts` 的
-//     `installBuiltinSkill` 复制进 `<alphaGlobalRoot>/skills/<name>` →
-//     `engine-config-truth.ts` 的 `ensureSkillsPath` 把那个目录写进 alpha.jsonc 的
+//     `installBuiltinSkill` 复制进 `<codepuppyGlobalRoot>/skills/<name>` →
+//     `engine-config-truth.ts` 的 `ensureSkillsPath` 把那个目录写进 codepuppy.jsonc 的
 //     `skills.paths` → 同一个引擎扫描。
 //
-// 所以「某个目录不在 `ALPHA_FACTORY_SKILL_DIRS` 里」**不等于**「它永不装载」——
+// 所以「某个目录不在 `CODEPUPPY_FACTORY_SKILL_DIRS` 里」**不等于**「它永不装载」——
 // `resources/skills/` 下的 `alpha-upstream-sync` / `safe-refactor` 走的正是通道 B
 // (`#1250` 的票面前提据此更正)。判据不写在这段散文里:
-// `alpha-skill-packaging-census.test.ts` 每次跑都从两条通道的**权威**重算一遍归属,
+// `codepuppy-skill-packaging-census.test.ts` 每次跑都从两条通道的**权威**重算一遍归属,
 // 并要求 `resources/{skills,factory-skills}/` 下的每个目录至少被一条通道够到。
 //
 // 资产两处(S18 冲突矩阵 X1:skill-creator 的 catalog 条目保持可安装,供关掉出厂注入的用户手动装):
@@ -41,21 +41,21 @@
 
 import * as fs from "node:fs"
 import { join, sep } from "node:path"
-import { opencodeHomeDir } from "./alpha-bridge"
-import { alphaGlobalRoot } from "./alpha-installs"
+import { opencodeHomeDir } from "./codepuppy-bridge"
+import { codepuppyGlobalRoot } from "./codepuppy-installs"
 
 export const FACTORY_SKILL_IDS = [
   "skill-creator",
   "agent-creator",
-  "customize-code-puppy",
+  "customize-codepuppy",
   "integrate-project",
-  "alpha-workspace",
+  "codepuppy-workspace",
   "cloud-capabilities",
   "office-docs",
 ] as const
 
 export function factorySkillsEnabled(): boolean {
-  return process.env.ALPHA_FACTORY_SKILLS_DISABLE !== "1"
+  return process.env.CODEPUPPY_FACTORY_SKILLS_DISABLE !== "1"
 }
 
 /** name → 打包资源内的技能目录(packaged=process.resourcesPath,dev=仓内 resources/)。 */
@@ -69,11 +69,11 @@ export function factorySkillSources(input: {
     "skill-creator": join(root, "skills", "skill-creator"),
     "agent-creator": join(root, "factory-skills", "agent-creator"),
     // REQ-062 T4:接替已禁的上游 customize-opencode(教 .code-puppy/治理/定制中心约定)
-    "customize-code-puppy": join(root, "factory-skills", "customize-code-puppy"),
+    "customize-codepuppy": join(root, "factory-skills", "customize-codepuppy"),
     // REQ-063 T6:外部生态内容的对话式导入/重导入载体(default-deny 的补充入口,ADR-024)
     "integrate-project": join(root, "factory-skills", "integrate-project"),
     // REQ-071/ADR-025:~/Alpha 目录契约(Journal/Memory/Outputs)的写入约定载体
-    "alpha-workspace": join(root, "factory-skills", "alpha-workspace"),
+    "codepuppy-workspace": join(root, "factory-skills", "codepuppy-workspace"),
     // REQ-233:本机/云端选择与派发教学(目录内 cloud 技能提供 /cloud 入口)
     "cloud-capabilities": join(root, "factory-skills", "cloud-capabilities"),
     // REQ-080:办公文档引导(连接器选型 + xlsx 惯例自写重表达 + PDF 缺口 pypdf/reportlab 补位)
@@ -83,7 +83,7 @@ export function factorySkillSources(input: {
 
 /** alpha 自有链判定:目标 = 任一 alpha 资源布局下的**同名**技能目录(容忍 app 路径迁移)。
  *  用户链哪怕同名、只要不在 (resources|Resources)/(skills|factory-skills)/ 布局下就不是我们的。 */
-export function isAlphaFactoryLink(linkTo: string, name: string): boolean {
+export function isCodePuppyFactoryLink(linkTo: string, name: string): boolean {
   const norm = linkTo.split(sep).join("/").replace(/\/+$/, "")
   return (
     norm.endsWith(`/resources/skills/${name}`) ||
@@ -94,7 +94,7 @@ export function isAlphaFactoryLink(linkTo: string, name: string): boolean {
 }
 
 export type FactoryReconcileResult = {
-  /** REQ-065 T1:本次应注入 alpha.jsonc skills.paths 的出厂资源目录(enabled 且未被用户内容遮蔽)。 */
+  /** REQ-065 T1:本次应注入 codepuppy.jsonc skills.paths 的出厂资源目录(enabled 且未被用户内容遮蔽)。 */
   paths: string[]
   /** REQ-065 T2:拆除的 `<current-environment-root>/skills/<name>` 存量出厂链。 */
   removed: string[]
@@ -122,28 +122,28 @@ function msg(e: unknown): string {
 
 /**
  * 幂等 reconcile(REQ-065 形态)。boot 时(首个 fork 前)调用一次,产出注入组交给
- * reconcileEngineConfigTruth 写入 alpha.jsonc:
+ * reconcileEngineConfigTruth 写入 codepuppy.jsonc:
  * - 迁移:旧位 `<opencodeHome>/skill/<name>` 是我方直链 → 拆;用户内容占位 → 整项跳过且**不注入**
  *   (引擎单双数目录都扫,同名会双源);
- * - T2 拆链:`<alphaRoot>/skills/<name>` 是我方出厂链(REQ-052 遗留)→ 拆;真实目录(catalog 装的
+ * - T2 拆链:`<codepuppyRoot>/skills/<name>` 是我方出厂链(REQ-052 遗留)→ 拆;真实目录(catalog 装的
  *   /用户自建)→ 不接管、不注入(它已是用户内容真源);异源链 → 不碰、不注入;
  * - 注入组:enabled 且 src 存在且未被遮蔽 → 出厂资源目录进 paths;
- * - REQ-059 逃生(ALPHA_JSONC_TRUTH_DISABLE / ALPHA_LEGACY_INSTALL_ROOT)→ 全程不拆不改
+ * - REQ-059 逃生(CODEPUPPY_JSONC_TRUTH_DISABLE / CODEPUPPY_LEGACY_INSTALL_ROOT)→ 全程不拆不改
  *   (回退 = 保留现两跳态,REQ-065 §风险)。
  */
 export function reconcileFactorySkills(
   sources: Record<string, string>,
-  roots: { alphaRoot?: string; opencodeHome?: string } = {},
+  roots: { codepuppyRoot?: string; opencodeHome?: string } = {},
 ): FactoryReconcileResult {
-  const alphaRoot = roots.alphaRoot ?? alphaGlobalRoot()
+  const codepuppyRoot = roots.codepuppyRoot ?? codepuppyGlobalRoot()
   const opencodeHome = roots.opencodeHome ?? opencodeHomeDir()
   const result: FactoryReconcileResult = { paths: [], removed: [], migrated: [], skipped: [], active: [] }
-  const truthRoot = join(alphaRoot, "skills")
+  const truthRoot = join(codepuppyRoot, "skills")
   const legacyRoot = join(opencodeHome, "skill") // REQ-036 初版直链落点(迁移源)
   const enabled = factorySkillsEnabled()
 
-  if (process.env.ALPHA_JSONC_TRUTH_DISABLE === "1" || process.env.ALPHA_LEGACY_INSTALL_ROOT === "1") {
-    // 真源通道关闭 = legacy 世界:注入无处落(boot 不写 alpha.jsonc),拆链会让出厂技能变暗 → 不拆不改。
+  if (process.env.CODEPUPPY_JSONC_TRUTH_DISABLE === "1" || process.env.CODEPUPPY_LEGACY_INSTALL_ROOT === "1") {
+    // 真源通道关闭 = legacy 世界:注入无处落(boot 不写 codepuppy.jsonc),拆链会让出厂技能变暗 → 不拆不改。
     for (const name of FACTORY_SKILL_IDS) result.skipped.push({ name, reason: "REQ-059 escape hatch set — factory state left as-is" })
     lastActive = []
     return result
@@ -157,7 +157,7 @@ export function reconcileFactorySkills(
     // ── 0. legacy 迁移:我方直链 → 拆;用户内容占位 → 整项跳过(引擎单双数目录都扫,重名会双源)
     const legacyLink = readlinkOrNull(legacy)
     if (legacyLink !== null) {
-      if (legacyLink === src || isAlphaFactoryLink(legacyLink, name)) {
+      if (legacyLink === src || isCodePuppyFactoryLink(legacyLink, name)) {
         try {
           // TOCTOU 收窄(codex Low):删除前重读确认仍是同一目标的 symlink
           if (readlinkOrNull(legacy) === legacyLink) {
@@ -181,7 +181,7 @@ export function reconcileFactorySkills(
     // ── 1. T2 拆存量 `.alpha` 出厂链(REQ-052 遗留;用户自装真实目录/异源链不碰)
     const t = readlinkOrNull(truth)
     if (t !== null) {
-      if (t === src || isAlphaFactoryLink(t, name)) {
+      if (t === src || isCodePuppyFactoryLink(t, name)) {
         try {
           if (readlinkOrNull(truth) === t) {
             fs.rmSync(truth)

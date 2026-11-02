@@ -3,7 +3,7 @@
 // 正例跑的是**真树**:导出器直接 import 每一层的权威(注入面常量、Office 登记表、扩展工具表、agent 文字表、schema、
 // 随包模型目录、vendored 平台清单、随包 Office 工具清单),所以任何一层回退成旧名,这里当场红。
 // 反例是改名前那棵树会导出的清单(名字逐字取自 7573fd5bf:cloud-web-search.ts:2、office-advisories.ts:80-98、
-// context-injection.ts TOOL_TEXT 键、alpha-agents.ts 键、tool-identity.ts / alpha-tool-policy.ts、alpha-models.json:8;
+// context-injection.ts TOOL_TEXT 键、codepuppy-agents.ts 键、tool-identity.ts / codepuppy-tool-policy.ts、codepuppy-models.json:8;
 // 当时远端名带 `cloud_` 前缀,扩展工具表还没有可读标识),证明判据看得见每一层的旧名。
 import { describe, expect, test } from "bun:test"
 import { codepuppyNameViolations, exportCodepuppyNames, type CodepuppyNames } from "../../scripts/export-codepuppy-names"

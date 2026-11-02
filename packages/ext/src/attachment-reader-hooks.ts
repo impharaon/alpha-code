@@ -67,7 +67,7 @@ export function createAttachmentReaderHooks(deps: AttachmentReaderHookDeps) {
           const record = response && typeof response === "object" && ("data" in response || "error" in response) ? response.data : response
           if (record && typeof record === "object") services = record as Record<string, unknown>
         } catch (error) {
-          deps.error?.(`[@alpha-code/ext] attachment reader: MCP status unavailable (${error instanceof Error ? error.message : String(error)})`)
+          deps.error?.(`[@codepuppy/ext] attachment reader: MCP status unavailable (${error instanceof Error ? error.message : String(error)})`)
         }
         for (const { part, meta } of staged) {
           output.parts.push({
@@ -81,7 +81,7 @@ export function createAttachmentReaderHooks(deps: AttachmentReaderHookDeps) {
           })
         }
       } catch (error) {
-        deps.error?.(`[@alpha-code/ext] attachment reader (chat.message) failed: ${error instanceof Error ? error.message : String(error)}`)
+        deps.error?.(`[@codepuppy/ext] attachment reader (chat.message) failed: ${error instanceof Error ? error.message : String(error)}`)
       }
     },
   }

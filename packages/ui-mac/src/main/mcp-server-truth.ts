@@ -3,18 +3,18 @@
 // 不往一个文件里塞两种东西。
 //
 // ── 为什么要有这份文件 ──────────────────────────────────────────────────────────
-// 「接入其它服务」里配的远程 MCP 连接器,`#1381` 之前落在 `<alphaGlobalRoot>/alpha.jsonc`(ext-config.ts persistMcp,写键
+// 「接入其它服务」里配的远程 MCP 连接器,`#1381` 之前落在 `<codepuppyGlobalRoot>/codepuppy.jsonc`(ext-config.ts persistMcp,写键
 // `mcp.<name>`)—— 那是可写根 W2,**被围栏的引擎树自己写得了**;出网围栏因此不敢照它放行(network-egress-derived.ts 文件头),
 // 真机实测(票面 2026-09-21):`mcp.deepwiki.com:443` → `verdict:"deny" reason:"unregistered"`,连接器一个都连不上,而拦它的是我们自己。
-// 本文件给它一个引擎写不到的家:`<appData>/alpha-code-state/mcp-servers/<env>.json`,与三个 env 根、`cas/`、`fence-workspaces/`、
-// `custom-providers/` 同级 —— 父目录是 alpha-environment.ts 冻结快照的 `casBaseRoot`;W2 只放行 `env/<env>`,W3 是 `<userData>`
+// 本文件给它一个引擎写不到的家:`<appData>/codepuppy-state/mcp-servers/<env>.json`,与三个 env 根、`cas/`、`fence-workspaces/`、
+// `custom-providers/` 同级 —— 父目录是 codepuppy-environment.ts 冻结快照的 `casBaseRoot`;W2 只放行 `env/<env>`,W3 是 `<userData>`
 // (另一棵树),其余固定行都不覆盖它(mcp-server-truth.test.ts 对着生产渲染的 profile 逐行枚举 W-id 断言;真 sandbox-exec 的裁决
 // 由 custom-provider-truth-fence.test.ts 对同一个父目录下的兄弟文件给出,两个真源在围栏眼里是同一条规则)。
 //
 // ── 形状 ─────────────────────────────────────────────────────────────────────
 // `{ "v": 1, "servers": [{ "name", "url", "headers"? }] }`。`name` 是扩展名(isExtensionName,与账本 / 配置键同一份判据);
 // `headers` 可选、值是字符串(引擎 v1 Remote schema:`headers?: Record<string,string>`)。**本地 MCP 不进这里**(它不需要出网授权,
-// 仍住 alpha.jsonc);`enabled` 也不进这里 —— 启停是账本(installs.json desiredState)的事,由 sidecar 注入 `enabled:false` 压住。
+// 仍住 codepuppy.jsonc);`enabled` 也不进这里 —— 启停是账本(installs.json desiredState)的事,由 sidecar 注入 `enabled:false` 压住。
 // 读:**严格** —— 缺失 = 「没有记录」(ok,空清单;用户没加过连接器是正常状态,不出声);解析失败 / 版本不认识 / 字段不合法 /
 // 同名重复 / 多余的键 ⇒ 「没问出来」(ok:false),**不是空记录**,并经注入的 log 出一行原因(`#1387`:静默的失败路径事后
 // 无法与「一切正常」区分)。不猜、不修、不改写。字段判据只问「是不是这个形状」;地址准入(https / 非 loopback / host 形状)是
@@ -22,13 +22,13 @@
 // 溜进来的坏地址最多是「不放行」,不会是「放行了一个不该放的」。
 //
 // ── 读与写为什么拆成两个文件 ───────────────────────────────────────────────────
-// 理由逐字同 custom-provider-truth.ts 文件头:读端要进 sidecar 的 import 闭包(alpha-config-injection.ts 从这里读),写入点若跟着进
+// 理由逐字同 custom-provider-truth.ts 文件头:读端要进 sidecar 的 import 闭包(codepuppy-config-injection.ts 从这里读),写入点若跟着进
 // 闭包,写盘登记簿只能给它填 `main-only` 这个文字标签。所以本文件**零写盘**(连 node:fs 都不 import,读也经注入的 fs);写在
 // mcp-server-truth-write.ts,它不进闭包由 mcp-server-truth.test.ts 对着生产的闭包工具实测。electron-free。
 
 import { resolve } from "node:path"
 import { isExtensionName } from "../shared/extension-name"
-import type { AppEnvironment } from "./alpha-environment"
+import type { AppEnvironment } from "./codepuppy-environment"
 
 export const MCP_SERVERS_DIRNAME = "mcp-servers"
 export const MCP_SERVER_TRUTH_VERSION = 1

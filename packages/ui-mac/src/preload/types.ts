@@ -1,9 +1,9 @@
 import type { DesktopMenuAction } from "@opencode-ai/app/desktop-menu"
 import type { WslServersPlatform } from "@opencode-ai/app/wsl/types"
 import type { UpdaterState } from "@opencode-ai/app/updater"
-import type { AlphaEndpoints } from "../shared/alpha-config"
+import type { CodePuppyEndpoints } from "../shared/codepuppy-config"
 // Type-only (erased at build): the IPC row must not restate the wire's kind enum and drift from it.
-import type { LedgerFactKindV1 } from "@alpha-code/contracts-consumer"
+import type { LedgerFactKindV1 } from "@codepuppy/contracts-consumer"
 import type {
   AuthorizationConfirmationWire,
   CapabilityDiffWire,
@@ -18,7 +18,7 @@ import type {
 // #408:preload/index.ts 只许 import "./types"(ext-security-boundaries AC4③ 装载路径钉)—— wire 类型经此转口。
 export type { SessionGrantsEndedEventWire } from "../shared/ext-session-grant-wire"
 import type { ArtifactDescriptor } from "../shared/cloud-artifact-descriptor"
-import type { NetFailureLayer } from "@opencode-ai/schema/alpha-net-failure"
+import type { NetFailureLayer } from "@opencode-ai/schema/codepuppy-net-failure"
 import type { ToolPolicyApi } from "../shared/tool-policy-wire"
 import type { CatalogPackageViewV1 } from "../shared/catalog-package-view"
 import type { OfficeRuntimeReadiness } from "../shared/office-advisories"
@@ -31,10 +31,10 @@ import type {
 // delivery, never a URL, so no second codec can exist on the renderer side.
 import type { DeepLinkBatch } from "../shared/route-manifest"
 export type { DeepLinkBatch, DeepLinkDelivery } from "../shared/route-manifest"
-import type { SurfaceId } from "../shared/alpha-surfaces"
+import type { SurfaceId } from "../shared/codepuppy-surfaces"
 import type { RecoveryAction, RecoveryActionResult, RecoveryIncidentWire } from "../shared/recovery"
 import type {
-  AlphaSettings,
+  CodePuppySettings,
   ExtensionStorageResult,
   ExtensionStorageSnapshot,
   SettingsReadResult,
@@ -50,7 +50,7 @@ import type {
   AutomationSchedule,
 } from "../shared/automation-types"
 import type {
-  AlphaModelCatalog,
+  CodePuppyModelCatalog,
   CatalogRefreshHealth,
   EffectiveCatalog,
   PlatformModelDisplay,
@@ -61,8 +61,8 @@ import type {
   ProviderResult,
   ProviderTestInput,
   ProviderTestResult,
-} from "../shared/alpha-model-types"
-export type { CatalogRefreshFailure, CatalogRefreshHealth } from "../shared/alpha-model-types"
+} from "../shared/codepuppy-model-types"
+export type { CatalogRefreshFailure, CatalogRefreshHealth } from "../shared/codepuppy-model-types"
 export type {
   WslDistroProbe,
   WslInstalledDistro,
@@ -171,7 +171,7 @@ export type FatalRendererError = {
 }
 
 // Renderer/preload projection of the safe contract-health wire. The runtime authority and decoder
-// remain in @alpha-code/contracts-consumer; this type intentionally carries no producer payload.
+// remain in @codepuppy/contracts-consumer; this type intentionally carries no producer payload.
 export type ContractFailure = {
   code: "contract-incompatible"
   surface:
@@ -189,7 +189,7 @@ export type ContractFailure = {
   reason: "schema-validation" | "size-limit" | "route-purpose-mismatch"
 }
 
-// alpha-code ↔ platform auth (see main/alpha-auth.ts + docs/contracts/platform-integration.md). Defined
+// alpha-code ↔ platform auth (see main/codepuppy-auth.ts + docs/contracts/platform-integration.md). Defined
 // here so main, preload and renderer share one shape (the established cross-bundle type pattern).
 export type AuthMode = "byok" | "platform"
 export type AuthStatus = "logged-out" | "logged-in"
@@ -259,14 +259,14 @@ export type AccountTransaction = {
  *  分类码,无码时回落 `http-<status>`,进 UI),`status` 是原始 HTTP status,**只给控制流判定用**。
  *  非 HTTP 结局(not-authenticated / unauthorized / contract-incompatible / network)**不带 status** ——
  *  消费方据此区分「服务拒绝了」与「根本没走到服务 / 服务没拒绝」。与 #963 在
- *  alpha-cloud-schedules.ts 的 CloudErr 同形。 */
+ *  codepuppy-cloud-schedules.ts 的 CloudErr 同形。 */
 export type AccountResult<T> = T | { error: string; status?: number }
 
 // Extension-hub install receipts (REQ-018): alpha's record of installed items and the files/config
 // keys each install owns. Engine visibility truth remains the SDK (mcp.status / app.skills / …);
 // receipts ⨝ SDK drives installed/pending-reload UI states, uninstall and update.
-/** REQ-037:治理真源形状(main alpha-governance.ts 与 renderer 共用)。 */
-export interface AlphaBuiltinPolicy {
+/** REQ-037:治理真源形状(main codepuppy-governance.ts 与 renderer 共用)。 */
+export interface CodePuppyBuiltinPolicy {
   version: 1
   mode: "denylist" | "allowlist"
   agents: { hide: string[]; disable: string[]; allow: string[]; override: Record<string, Record<string, unknown>> }
@@ -469,16 +469,16 @@ export type CloudArtifactDownloadResult =
 /** #660 裁决 A1:run 回流落盘 settle 后 main 向全部窗口广播的最小提示事件。只有这两个字段 ——
  *  它是「去重读」的提示,不是数据源;消费端收到后仍走 projectUsage / list 重新取真相。 */
 export type CloudRunSavedEvent = { directory: string; runId: string }
-/** B3/ADR-019 artifact 回流:写 <projectDir>/.code-puppy/runs/<runId>/ 的结果清单(真源 main/alpha-workdir.ts;
+/** B3/ADR-019 artifact 回流:写 <projectDir>/.code-puppy/runs/<runId>/ 的结果清单(真源 main/codepuppy-workdir.ts;
  *  #1551 起带 `failures`,`ok:true` 只表示 status.json 已写)。 */
-import type { CloudRunManifest, CloudRunSaveFailure } from "../main/alpha-workdir"
+import type { CloudRunManifest, CloudRunSaveFailure } from "../main/codepuppy-workdir"
 /** REQ-236 #1551:宿主交付状态(真源 main/cloud-run-tracker.ts;冻结面,供时间线生图卡与产物面板消费)。 */
 import type { CloudRunDeliveryFailure, CloudRunOrigin, CloudRunState } from "../main/cloud-run-tracker"
 export type { CloudRunDeliveryFailure, CloudRunManifest, CloudRunOrigin, CloudRunSaveFailure, CloudRunState }
 /** SSE 进度事件(job.snapshot / job.started / job.running / workflow.step.completed / job.completed|failed|cancelled / error)。 */
 export type CloudJobEvent = { event: string; data: unknown; id?: string }
 /** Same shape as AccountResult; distinct alias for the cloud jobs surface.
- *  `#1572`:`error: "network"` 时可带 `netLayer`(卡在哪一层,@opencode-ai/schema/alpha-net-failure),`error` 码集合不变。 */
+ *  `#1572`:`error: "network"` 时可带 `netLayer`(卡在哪一层,@opencode-ai/schema/codepuppy-net-failure),`error` 码集合不变。 */
 export type CloudResult<T> = T | { error: string; netLayer?: NetFailureLayer }
 export type UploadFindingKind = "contact" | "identity" | "credential" | "protected" | "unknown"
 export type UploadPreview = {
@@ -566,7 +566,7 @@ export type {
 // REQ-103(#195):governance 只读视图形状(真源 main/ext-inventory.ts;shared/ext-ownership +
 // ext-states 的五维/三态纯值)。
 import type { ExtInventory } from "../main/ext-inventory"
-import type { HubRequestStage, HubView, ReloadItem } from "../main/alpha-sidecar-messages"
+import type { HubRequestStage, HubView, ReloadItem } from "../main/codepuppy-sidecar-messages"
 export type { InventoryRow, ExtInventory } from "../main/ext-inventory"
 
 // REQ-128 Phase 3(`#780`/`#782`/`#784`):本地 Claude 插件包导入的 wire 形状。
@@ -666,7 +666,7 @@ export type {
 } from "../shared/file-viewer"
 
 /** REQ-098:App 运行环境快照(main 启动时由打包状态 + 构建渠道解析后冻结;renderer 只读,无写面)。 */
-export type AlphaEnvironmentInfo = {
+export type CodePuppyEnvironmentInfo = {
   environment: "prod" | "beta" | "dev"
   registryChannel: "stable" | "preview" | "dev"
   buildChannel: "dev" | "beta" | "prod"
@@ -721,7 +721,7 @@ export type ElectronAPI = {
   settings: {
     read: () => Promise<SettingsReadResult>
     validate: (value: unknown) => Promise<SettingsValidateResult>
-    write: (input: { value: AlphaSettings; expectedRevision: string }) => Promise<SettingsWriteResult>
+    write: (input: { value: CodePuppySettings; expectedRevision: string }) => Promise<SettingsWriteResult>
   }
   /** REQ-090/#253:manual CAS GC; renderer receives only the closed aggregate projection. */
   extensionStorage: {
@@ -778,7 +778,7 @@ export type ElectronAPI = {
   relaunch: () => void
   /** Resolved backend endpoints (env > userData pin > login discovery > default). Renderer reads these
    *  instead of baking the URLs. */
-  endpoints: () => Promise<AlphaEndpoints>
+  endpoints: () => Promise<CodePuppyEndpoints>
   /** ac#1187:当前应用版本(app.getVersion(),唯一真源 = package.json;账户浮层显示用,只读)。 */
   appVersion: () => Promise<string>
   /** REQ-160 AC2(`#1353`):这句话在本机是否命中已同步的违规关键词。
@@ -797,7 +797,7 @@ export type ElectronAPI = {
   }
   /** REQ-098:App 环境快照(只读)。main 启动时解析后冻结;此 IPC 无参数、无对应写面 —— renderer
    *  既不能伪造环境,也没有任何通道改写环境根(AC#6)。 */
-  environment: () => Promise<AlphaEnvironmentInfo>
+  environment: () => Promise<CodePuppyEnvironmentInfo>
   /** REQ-090:surface crash admission。main 按 crashID 建立唯一 incident，renderer 只能持有安全
    *  Recovery DTO；失败 surface 留在 Alpha 区域(没有可回退的第二种组合)。 */
   surfaces: {
@@ -843,18 +843,18 @@ export type ElectronAPI = {
     officeRuntime: () => Promise<OfficeRuntimeReadiness>
     // B11/B23:全局配置健康(broken=引擎会整份忽略用户配置)
     configHealth: () => Promise<{ broken: boolean; reason?: string; path?: string }>
-    /** REQ-036 出厂技能名单(skills.paths 注入的技能名;ALPHA_FACTORY_SKILLS_DISABLE 时为空)——
+    /** REQ-036 出厂技能名单(skills.paths 注入的技能名;CODEPUPPY_FACTORY_SKILLS_DISABLE 时为空)——
      *  hub 用来把对应 catalog 条目标成「出厂内置」而非「可安装」(S18 X1)。 */
     factorySkillIds: () => Promise<string[]>
     /** REQ-037 上游能力治理(真源 <current-environment-root>/governance.json;物化 home jsonc 受控叶子,apply 后
      *  renderer 需自行 refreshEngine() 使 dispose 热生效)。 */
     builtinRead: () => Promise<{
-      gov: AlphaBuiltinPolicy
-      protection: { hard: string[]; alphaInjected: string[]; confirm: string[] }
+      gov: CodePuppyBuiltinPolicy
+      protection: { hard: string[]; codepuppyInjected: string[]; confirm: string[] }
       factoryDenied: string[]
     }>
     builtinApply: (
-      gov: AlphaBuiltinPolicy,
+      gov: CodePuppyBuiltinPolicy,
       visibleAgents: string[],
       confirmBuildDisable?: boolean,
     ) => Promise<{
@@ -1110,9 +1110,9 @@ export type ElectronAPI = {
         }
       | { ok: false; reason: string }
     >
-    /** REQ-104 #395:key-based 启停 —— main 按账本自查。写序 = 账本翻转 + alpha.jsonc config 投影
+    /** REQ-104 #395:key-based 启停 —— main 按账本自查。写序 = 账本翻转 + codepuppy.jsonc config 投影
      *  (两次写 + 失败补偿,非单事务);mcp/agent 的禁用**权威由 sidecar 注入 OPENCODE_CONFIG_CONTENT
-     *  保证**(引擎最后加载 override),alpha.jsonc 投影仅 consistency;plugin 禁用 = 从 alpha.jsonc
+     *  保证**(引擎最后加载 override),codepuppy.jsonc 投影仅 consistency;plugin 禁用 = 从 codepuppy.jsonc
      *  plugin[] 移除;skill 纯账本翻转(投影 = 引擎侧按账本注入)。enable 过 advisory 闸(R14)。 */
     setInstallState: (
       intent: SetStateKeyIntent,
@@ -1405,13 +1405,13 @@ export type ElectronAPI = {
     /** #1557:手动请求一次目录刷新(单飞;结局经 refreshHealth 的推送回来)。 */
     refresh: () => Promise<void>
   }
-  // custom provider add/test (writes alpha.jsonc provider[], respawns sidecar; 1-token probe).
+  // custom provider add/test (writes codepuppy.jsonc provider[], respawns sidecar; 1-token probe).
   providers: {
     add: (input: ProviderInput) => Promise<ProviderResult>
     test: (input: ProviderTestInput) => Promise<ProviderTestResult>
     /** Read-only BYOK key state per provider id (drives the picker's 需 Key / 已配置 gating). */
     keyStatus: () => Promise<ProviderKeyStatus>
-    /** Store a catalog BYOK provider's key in alpha's encrypted keychain (alpha-byok-keys). */
+    /** Store a catalog BYOK provider's key in alpha's encrypted keychain (codepuppy-byok-keys). */
     setKey: (id: string, key: string) => Promise<ProviderResult>
     /** Drop a catalog BYOK provider's key from alpha's keychain. */
     removeKey: (id: string) => Promise<ProviderResult>

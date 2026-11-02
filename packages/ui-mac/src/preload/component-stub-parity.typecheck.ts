@@ -19,7 +19,7 @@
 //
 // 为什么从 src 反向 import 一个测试目录:被判的就是那份桩,而 `test-component/` 不在
 // ui-mac 的 tsconfig `include` 里(cases 文件不进 typecheck)。把判据放在这里,是让它
-// 搭上 alpha-check 已有的 `typecheck ui-mac` 那一步 —— 不新增闸门入口。判据本身不被
+// 搭上 codepuppy-check 已有的 `typecheck ui-mac` 那一步 —— 不新增闸门入口。判据本身不被
 // preload 的构建入口(electron.vite.config.ts 只列 index/recovery 两个)引用,不进产物。
 import type { AbsentOnPurposeKey, ProvidedKey } from "../../test-component/preload-stub"
 import type { ElectronAPI } from "./types"
@@ -38,7 +38,7 @@ const classificationGateIsNotADud: MustBeEmpty<Unclassified<Exclude<ProvidedKey,
 void classificationGateIsNotADud
 
 // 反向:preload 删掉某个能力后,登记表里不许留僵尸条目(单向的表会变成僵尸,见
-// scripts/alpha-path-residue.tsv 抬头同一条理由)。
+// scripts/old-name-exceptions.tsv 抬头同一条理由)。
 const noZombieAbsentEntries: MustBeEmpty<Exclude<AbsentOnPurposeKey, keyof ElectronAPI>> = true
 void noZombieAbsentEntries
 

@@ -3,10 +3,10 @@
 // 只做动作;装不上就退出 3 —— 引擎根本起不来,测试据此判「本次测量作废」,不是「围栏拦住了」。
 import { readFileSync } from "node:fs"
 
-const addonPath = process.env.ALPHA1321_FENCE_ADDON
-const profileFile = process.env.ALPHA1321_FENCE_PROFILE
+const addonPath = process.env.CODEPUPPY1321_FENCE_ADDON
+const profileFile = process.env.CODEPUPPY1321_FENCE_PROFILE
 if (!addonPath || !profileFile) {
-  console.error("engine-fence-preload: ALPHA1321_FENCE_ADDON / ALPHA1321_FENCE_PROFILE missing")
+  console.error("engine-fence-preload: CODEPUPPY1321_FENCE_ADDON / CODEPUPPY1321_FENCE_PROFILE missing")
   process.exit(3)
 }
 const m = { exports: {} as { apply?: (p: string) => { rc: number; error: string }; buildId?: string } }

@@ -19,7 +19,7 @@
 | --- | --- |
 | 仓 | `alpha-code@f56748c4f`(`origin/alpha`),worktree `.worktrees/1414-tools` |
 | 探针运行时 | `bun test`(引擎服务)与 `bun run`(生产模块本体)+ `/usr/bin/sandbox-exec` + `/usr/bin/curl` |
-| 隔离 | 全部探针把 `ALPHA_GLOBAL_DIR` / `XDG_*` / `ALPHA_OPENCODE_HOME` / `userDataPath` 钉进 `mkdtemp` 临时目录;**没有起过任何打包实例,没有写过 owner 的任何配置** |
+| 隔离 | 全部探针把 `CODEPUPPY_GLOBAL_DIR` / `XDG_*` / `CODEPUPPY_OPENCODE_HOME` / `userDataPath` 钉进 `mkdtemp` 临时目录;**没有起过任何打包实例,没有写过 owner 的任何配置** |
 | 日期 | 2026-09-23 |
 
 **本轮没有在打包实例上跑过任何一个工具。** 表里的判定来自两样东西:①**运行时**枚举出的工具集合
@@ -50,16 +50,16 @@ packages/opencode/src/tool/task.ts:81         id = id               → "task"  
 | # | 路径 | 内容 | 在出货桌面端的地位 |
 | --- | --- | --- | --- |
 | R1 | `packages/opencode/src/tool/registry.ts`(v1 引擎) | 17 个 `Tool.define` 叶子 | **活的主路径** |
-| R2 | `Plugin.Service` → `registry.ts:221,229` 的 `custom.push` | `@alpha-code/ext` 的 4 个工具 + `.opencode/tool{,s}/*.ts` 目录插件 | 活;与 R1 汇进同一个 `ToolRegistry.all()` |
+| R2 | `Plugin.Service` → `registry.ts:221,229` 的 `custom.push` | `@codepuppy/ext` 的 4 个工具 + `.opencode/tool{,s}/*.ts` 目录插件 | 活;与 R1 汇进同一个 `ToolRegistry.all()` |
 | R3 | `MCP.Service` → `session/tools.ts:480` | 云 `cloud_*` + 用户配置的 MCP | 活;**不经 `ToolRegistry`**,在 `session/tools.ts` 才合流 |
 | R4 | `packages/core/src/tool/builtins.ts`(v2 引擎) | 12 个 `export const name` | **挂载了但桌面端不驱动** —— 见 §1.2 |
 
 因此「模型手里有哪些工具」的**单一权威是 `packages/opencode/src/session/tools.ts`**
 (`:162` 取 R1+R2,`:480` 取 R3),不是任何一个 registry。照 `registry.ts` 一条路径列表会漏掉 R3。
 
-`@alpha-code/ext` 的 4 个工具(`packages/ext/src/plugin.ts:232,248,320,335`):
+`@codepuppy/ext` 的 4 个工具(`packages/ext/src/plugin.ts:232,248,320,335`):
 `alpha_reload` / `alpha_register` / `alpha_echo` / `alpha_ping`。它经
-`alpha-config-injection.ts:108-110` 无条件并进引擎的 `plugin` 列表。
+`codepuppy-config-injection.ts:108-110` 无条件并进引擎的 `plugin` 列表。
 
 ### 1.2 v2 那份注册今天到不了桌面端的聊天路径
 
@@ -76,7 +76,7 @@ packages/opencode/src/tool/task.ts:81         id = id               → "task"  
 
 ### 1.3 运行时权威(实测)
 
-探针跑**真 `ToolRegistry.Service`**(真 `injectAlphaConfig` + 真 `Agent.Service`),
+探针跑**真 `ToolRegistry.Service`**(真 `injectCodePuppyConfig` + 真 `Agent.Service`),
 flags 按出货桌面端 sidecar 的真实值(`packages/ui-mac/src/main/server.ts:408-422`:
 `OPENCODE_CLIENT=desktop`、`OPENCODE_ENABLE_EXA` 默认 `"1"`、umbrella `OPENCODE_EXPERIMENTAL` **不设**):
 
@@ -106,8 +106,8 @@ HIDDEN_BY_PERMISSION []
 - **在工具表里** = 今天默认状态下,模型的工具清单里有没有它(§1.3 的 `ADVERTISED`)。
 - **判定** = 能用 / 部分 / 不能用 / 未测。`未测` 表示本轮拿不到足以定性的证据,**不猜**。
 - **挡它的那一道**:出网围栏 = `network-egress-proxy.ts:185`(判据 `network-egress-derived.ts:191-193`);
-  进程围栏 = `process-fence-profile.ts:150-180`;权限规则集 = agent ruleset / `alpha-tool-policy.ts`;
-  主权闸 = `webSearchEnabled()` / `ALPHA_LOCAL_WEBSEARCH_DENY`;注册闸 = `RuntimeFlags` / `client` / 模型 id。
+  进程围栏 = `process-fence-profile.ts:150-180`;权限规则集 = agent ruleset / `codepuppy-tool-policy.ts`;
+  主权闸 = `webSearchEnabled()` / `CODEPUPPY_LOCAL_WEBSEARCH_DENY`;注册闸 = `RuntimeFlags` / `client` / 模型 id。
 - **模型即时生成?** = 这个工具要触碰的**资源标识**是不是由模型在调用那一刻产生的。
   这一列决定「补白名单」是不是一个可能的修法。
 
@@ -162,7 +162,7 @@ plan 档 `edit` 实测 `deny`,所以「绕过去直接改东西」也做不到�
 初版第 9 / 10 / 14 行是 `未测`。本节把三格各跑成实测并各带反向臂,判定已回填进上表,
 §2.2 的「未测」一列因此归零。**探针同样不进 `main`**(理由同 §8),落点与复现在 §7 ④。
 
-共用的口径:隔离照 §0(`ALPHA_GLOBAL_DIR` / `XDG_*` / `ALPHA_OPENCODE_HOME` / `userDataPath`
+共用的口径:隔离照 §0(`CODEPUPPY_GLOBAL_DIR` / `XDG_*` / `CODEPUPPY_OPENCODE_HOME` / `userDataPath`
 全钉进 `mkdtemp`,没起过打包实例,没写过 owner 的任何配置);模型脑子是
 `test/lib/llm-server.ts` 的 `TestLLMServer`(真 OpenAI 兼容 SSE 服务,发真的 `tool_calls`),
 其余每一跳都是生产件。
@@ -362,14 +362,14 @@ GET https://alpha-gateway.tidelabs.click/v1/models   (无 token,2026-09-23)
 | 路 | 今天选得到 `gpt-` 吗 | 依据 |
 | --- | --- | --- |
 | 平台代付(cn 版、已成功同步目录) | **选不到** | 上面的 `/v1/models` 实测 |
-| 平台段的 static 回退(首启尚未成功同步 / 拉取失败且从未成功过) | **选得到** `gpt-5.4-mini` `gpt-5.4-nano` | `alpha-models.json` 的 `platformModels` 实读 + `projectPlatformModels(local, null)` 实跑 |
+| 平台段的 static 回退(首启尚未成功同步 / 拉取失败且从未成功过) | **选得到** `gpt-5.4-mini` `gpt-5.4-nano` | `codepuppy-models.json` 的 `platformModels` 实读 + `projectPlatformModels(local, null)` 实跑 |
 | BYOK / 自定义 provider(openai 兼容,模型 id 用户自己写) | **选得到** | 本节整回合那一格就是这条路(`provider: test`,`npm: @ai-sdk/openai-compatible`) |
 
 ⇒ **这工具到得了用户,不是空集合**(票面这一句成立),但**「因为平台 serving 所以选得到」那半句今天对 cn 版不成立**。
 **intl 版(带登录 token 的租户目录)本轮没测** —— 没有可用凭据,不猜。
 
 顺带订正 §6 的一句:初版写「本机缓存与出货资源里**零个** `gpt-` 模型 id」——
-**出货资源里有**:`packages/ui-mac/src/main/alpha-models.json` 的 `platformModels` 逐字含
+**出货资源里有**:`packages/ui-mac/src/main/codepuppy-models.json` 的 `platformModels` 逐字含
 `gpt-5.4-mini` 与 `gpt-5.4-nano`(实读)。
 
 
@@ -388,7 +388,7 @@ GET https://alpha-gateway.tidelabs.click/v1/models   (无 token,2026-09-23)
 
 | 类 | 目的地 | 判定 | 依据 |
 | --- | --- | --- | --- |
-| `@alpha-code/ext` 4 个(`alpha_reload` / `alpha_register` / `alpha_echo` / `alpha_ping`) | 不出网 | 推导:能用 | 读码;本轮未跑 |
+| `@codepuppy/ext` 4 个(`alpha_reload` / `alpha_register` / `alpha_echo` / `alpha_ping`) | 不出网 | 推导:能用 | 读码;本轮未跑 |
 | 云 MCP `cloud_web_search` / `cloud_dispatch` / `cloud_status` / `cloud_await` / `cloud_artifacts` | `alpha-cloud.tidelabs.click:443` | **能用**(在静态表里) | 本轮实测 CONNECT 200 |
 | owner 本机的 4 个 Office MCP(`alpha-word` / `alpha-excel` / `alpha-powerpoint` / `alpha-pdf`) | 本地 stdio,不出网 | 未测 | 读 owner 配置(只读) |
 | 用户自配的远程 MCP | 由 `mcp-servers/<env>.json` 真源派生放行(`#1381`) | 未测 | — |
@@ -515,8 +515,8 @@ W4 无围栏 + 写 $HOME 直下 rc=0                                            
 
 ### 4.4 一条顺带闭合的:owner 真机上没有覆盖默认权限
 
-`#1413` §10 把「owner 机器上的 `alpha.jsonc` 有没有 `permission` 键」列为未测。
-只读实查 `~/Library/Application Support/alpha-code-state/env/prod/alpha.jsonc`:
+`#1413` §10 把「owner 机器上的 `codepuppy.jsonc` 有没有 `permission` 键」列为未测。
+只读实查 `~/Library/Application Support/codepuppy-state/env/prod/codepuppy.jsonc`:
 
 ```
 TOP KEYS: ['$schema', 'mcp', 'provider', 'skills']
@@ -550,12 +550,12 @@ mcp ids: ['alpha-excel', 'alpha-pdf', 'alpha-powerpoint', 'alpha-word']
   故推断 `websearch` 同样拿不到那 292 字节的解释。**未跑,不要引用为实测。**
 - ~~**`task` 的整回合**、**`question` 的渲染与应答链**、**`apply_patch` 能不能真被选到**~~
   —— 三格已由 `#1418` 填实,见 §2.4。原文那句「本机缓存与出货资源里**零个** `gpt-` 模型 id」
-  **是错的**:`packages/ui-mac/src/main/alpha-models.json` 的 `platformModels` 逐字含
+  **是错的**:`packages/ui-mac/src/main/codepuppy-models.json` 的 `platformModels` 逐字含
   `gpt-5.4-mini` 与 `gpt-5.4-nano`(实读)。
 - **`#1418` 之后仍未测的**:平台 **intl 版**目录里有没有 `gpt-`(需要带登录 token 的租户目录,
   本轮无可用凭据);`question` / `task` / `apply_patch` 在**打包实例**上的表现(同下一条)。
 - **ext 的 4 个工具、owner 的 4 个 Office MCP** 的实际执行。
-- **`bash` 的 403 正文能不能到模型**:`curl -v` 实测能看到 `Proxy-Agent: alpha-egress-policy` 与
+- **`bash` 的 403 正文能不能到模型**:`curl -v` 实测能看到 `Proxy-Agent: codepuppy-egress-policy` 与
   `Content-Length: 292` 两行响应头,但**正文没有被 curl 打印**;工具把 stderr 怎么交给模型本轮未跑。
 
 ## 7. 复现
@@ -642,23 +642,23 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 import { Permission } from "@/permission"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
-import { injectAlphaConfig } from "../../../ui-mac/src/main/alpha-config-injection"
+import { injectCodePuppyConfig } from "../../../ui-mac/src/main/codepuppy-config-injection"
 
 const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "alpha-1414-")))
-process.env.ALPHA_GLOBAL_DIR = path.join(tmp, "alpha-code-state", "env", "dev")
+process.env.CODEPUPPY_GLOBAL_DIR = path.join(tmp, "codepuppy-state", "env", "dev")
 process.env.XDG_CONFIG_HOME = path.join(tmp, "xdg")
-process.env.ALPHA_OPENCODE_HOME = path.join(tmp, "opencode-home")
+process.env.CODEPUPPY_OPENCODE_HOME = path.join(tmp, "opencode-home")
 process.env.XDG_DATA_HOME = path.join(tmp, "xdg-data")
 for (const d of [
-  process.env.ALPHA_GLOBAL_DIR,
+  process.env.CODEPUPPY_GLOBAL_DIR,
   process.env.XDG_CONFIG_HOME,
-  process.env.ALPHA_OPENCODE_HOME,
+  process.env.CODEPUPPY_OPENCODE_HOME,
   process.env.XDG_DATA_HOME,
 ])
   fs.mkdirSync(d!, { recursive: true })
 const userData = path.join(tmp, "userdata")
 fs.mkdirSync(userData, { recursive: true })
-console.log("INJECT", JSON.stringify(injectAlphaConfig(userData)))
+console.log("INJECT", JSON.stringify(injectCodePuppyConfig(userData)))
 
 const root = LayerNode.group([ToolRegistry.node, Agent.node])
 
@@ -758,18 +758,18 @@ import { Agent } from "@/agent/agent"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
-import { injectAlphaConfig } from "../../../ui-mac/src/main/alpha-config-injection"
+import { injectCodePuppyConfig } from "../../../ui-mac/src/main/codepuppy-config-injection"
 
 const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "alpha-1414b-")))
-process.env.ALPHA_GLOBAL_DIR = path.join(tmp, "alpha-code-state", "env", "dev")
+process.env.CODEPUPPY_GLOBAL_DIR = path.join(tmp, "codepuppy-state", "env", "dev")
 process.env.XDG_CONFIG_HOME = path.join(tmp, "xdg")
-process.env.ALPHA_OPENCODE_HOME = path.join(tmp, "opencode-home")
+process.env.CODEPUPPY_OPENCODE_HOME = path.join(tmp, "opencode-home")
 process.env.XDG_DATA_HOME = path.join(tmp, "xdg-data")
-for (const d of [process.env.ALPHA_GLOBAL_DIR, process.env.XDG_CONFIG_HOME, process.env.ALPHA_OPENCODE_HOME, process.env.XDG_DATA_HOME])
+for (const d of [process.env.CODEPUPPY_GLOBAL_DIR, process.env.XDG_CONFIG_HOME, process.env.CODEPUPPY_OPENCODE_HOME, process.env.XDG_DATA_HOME])
   fs.mkdirSync(d!, { recursive: true })
 const userData = path.join(tmp, "userdata")
 fs.mkdirSync(userData, { recursive: true })
-injectAlphaConfig(userData)
+injectCodePuppyConfig(userData)
 
 const root = LayerNode.group([ToolRegistry.node, Agent.node])
 const mk = (o: Record<string, unknown>) => testEffect(LayerNode.compile(root, [[RuntimeFlags.node, RuntimeFlags.layer(o as never)]]))
@@ -902,7 +902,7 @@ const proxy = await startEgressPolicyProxy({ log: (r: any) => records.push(r) })
 const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "alpha-1414-bash-")))
 const ws = path.join(tmp, "w"); fs.mkdirSync(ws); const ud = path.join(tmp, "u"); fs.mkdirSync(ud)
 const mk = (port: number) => renderProcessFenceProfile({
-  workspaces: [ws], alphaGlobalRoot: path.join(tmp,"a"), userDataPath: ud, stateHome: ud,
+  workspaces: [ws], codepuppyGlobalRoot: path.join(tmp,"a"), userDataPath: ud, stateHome: ud,
   roots: { home: os.homedir(), dataHome: path.join(tmp,"d"), cacheHome: path.join(tmp,"c"), configHome: path.join(tmp,"g") },
   egressProxyPort: port,
 })
@@ -967,7 +967,7 @@ const OUT  = path.join(HOME, ".alpha-1414-probe-outside.txt")          // HOME �
 const IN_NPM = path.join(HOME, ".npm", ".alpha-1414-probe.txt")        // W7,集合内(对照)
 const pf = path.join(tmp,"f.sb")
 fs.writeFileSync(pf, renderProcessFenceProfile({
-  workspaces: [ws], alphaGlobalRoot: path.join(tmp,"a"), userDataPath: ud, stateHome: ud,
+  workspaces: [ws], codepuppyGlobalRoot: path.join(tmp,"a"), userDataPath: ud, stateHome: ud,
   roots: { home: HOME, dataHome: path.join(tmp,"d"), cacheHome: path.join(tmp,"c"), configHome: path.join(tmp,"g") },
   egressProxyPort: 61000,
 }))

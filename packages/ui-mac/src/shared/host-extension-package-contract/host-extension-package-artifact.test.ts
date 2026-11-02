@@ -61,7 +61,7 @@ function schemaSampleValue(node: SchemaNode | undefined): unknown {
   return "schema-probe"
 }
 
-const driftRoot = mkdtempSync(resolve(tmpdir(), "alpha-host-contract-drift-"))
+const driftRoot = mkdtempSync(resolve(tmpdir(), "codepuppy-host-contract-drift-"))
 
 afterAll(() => rmSync(driftRoot, { recursive: true, force: true }))
 

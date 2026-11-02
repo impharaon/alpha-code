@@ -17,7 +17,7 @@ integration. Service wire formats remain owned by their producer repositories.
 
 | Surface                                                          | Owner                            | Desktop seam                                 |
 | ---------------------------------------------------------------- | -------------------------------- | -------------------------------------------- |
-| Authorization code, refresh/session rotation, endpoint discovery | `alpha-web`                      | `alpha-auth.ts`, `alpha-endpoints.ts`        |
+| Authorization code, refresh/session rotation, endpoint discovery | `alpha-web`                      | `codepuppy-auth.ts`, `codepuppy-endpoints.ts`        |
 | Manifest-bound `upload_consent` issuance                         | `alpha-web`                      | main-process upload issuer client            |
 | Chat archive turn upload (retention/moderation)                  | `alpha-web`                      | `chat-archive-uploader.ts`                   |
 | Enabled moderation keyword list (desktop pre-send check)         | `alpha-web`                      | `moderation-keywords.ts`, `moderation-ipc.ts` |
@@ -35,7 +35,7 @@ Endpoint precedence is defined in
 ## Pinned Alpha contract consumer
 
 The desktop consumes Alpha Platform v1 through
-`packages/alpha-contracts-consumer`. Its
+`packages/codepuppy-contracts-consumer`. Its
 `alpha-platform-contract.lock.json` pins repository
 `jinjunnn/alpha-platform` at immutable commit
 `3f2f0dda43066b42eac584d27e75844d42635369` and records the SHA-256 of every
@@ -58,7 +58,7 @@ counts credits — so amounts from the two domains must never be summed.
 
 The desktop's side of the platform deploy gate
 (`contracts/v1/consumer-cutover-required.json`) is the consumer pin
-[`fixtures/consumers/alpha-code-640/ledger-page.json`](../../packages/alpha-contracts-consumer/fixtures/consumers/alpha-code-640/ledger-page.json),
+[`fixtures/consumers/alpha-code-640/ledger-page.json`](../../packages/codepuppy-contracts-consumer/fixtures/consumers/alpha-code-640/ledger-page.json),
 which declares the released `ui-mac` version and is decoded by the shipped
 strict decoder in this repository's own gate. It lives outside `vendor/`
 because `vendor/` is hash-locked to upstream bytes and this fixture is authored
@@ -81,7 +81,7 @@ summary schema itself. All three are vendored byte-identically under
 
 Those fixtures are exercised through the shipped decoders, not through a second
 statement of the shape:
-[`alpha-web-contract-fixtures.test.ts`](../../packages/ui-mac/src/main/alpha-web-contract-fixtures.test.ts)
+[`codepuppy-web-contract-fixtures.test.ts`](../../packages/ui-mac/src/main/codepuppy-web-contract-fixtures.test.ts)
 feeds each fixture `value` into `decodeEndpointDiscovery()` and into the decode
 function `fetchAccountSummary()` passes to `createAuthedGet`. An upstream release
 whose shape those decoders reject therefore turns the merge gate red as soon as
@@ -162,9 +162,9 @@ inactive-plan payloads.
    Main atomically rewrites the model and cloud-connector credential files
    (same-directory temp file, fsync, rename), and the engine reads them at each
    request boundary: platform model requests through the extension's
-   `chat.headers` hook (`ALPHA_PLATFORM_AUTH_REF`), the governed cloud
+   `chat.headers` hook (`CODEPUPPY_PLATFORM_AUTH_REF`), the governed cloud
    connector through a per-request `fetch` that resolves the reference in
-   `ALPHA_CLOUD_MCP_DEF`. The injected platform provider carries only a fixed
+   `CODEPUPPY_CLOUD_MCP_DEF`. The injected platform provider carries only a fixed
    non-credential placeholder key. A credential that cannot be read fails that
    request as an authentication error before it is sent; no cached or loaded
    value is used. If the set of present credentials changed since the last
@@ -204,9 +204,9 @@ inactive-plan payloads.
   audience is the Cloud MCP resource, rotated with every ~10-minute envelope
   refresh and held opaquely by main (it never passes the `platform_access`
   claims decoder). The credential reaches the engine only through the A6
-  `{file:}` secret channel: main mirrors it into the `ALPHA_MCP_TOKEN` secret
+  `{file:}` secret channel: main mirrors it into the `CODEPUPPY_MCP_TOKEN` secret
   file, and the injected cloud server definition is
-  `headers.Authorization = "Bearer {file:…ALPHA_MCP_TOKEN}"` plus
+  `headers.Authorization = "Bearer {file:…CODEPUPPY_MCP_TOKEN}"` plus
   `oauth: false` — the engine substitutes the file at config load, so the token
   value enters neither the sidecar env nor `OPENCODE_CONFIG_CONTENT`. With
   `oauth: false` the engine constructs no OAuth provider, touches no
@@ -218,7 +218,7 @@ inactive-plan payloads.
   unparseable file is left alone). When the credential is
   absent (logged out, or the issuer does not mint the field yet) the sidecar
   injects a credential-free `enabled:false` definition — no fallback to
-  `ALPHA_CLOUD_TOKEN`, no fallback to interactive OAuth, and never a `{file:}`
+  `CODEPUPPY_CLOUD_TOKEN`, no fallback to interactive OAuth, and never a `{file:}`
   reference to a missing file (the engine fails the whole config load on one);
   the disabled entry still overrides any inherited same-name definition. This
   also preserves `#1106`'s boot property on the new axis: a credential-less
@@ -278,7 +278,7 @@ inactive-plan payloads.
   /api/chat-archive/keywords` (REQ-160 AC2, `#1353`), an ETag-revalidated list
   of the currently enabled keywords. Main holds it, refreshes it on a timer
   **and again whenever the sign-in credential changes**, and answers one boolean
-  over `alpha-moderation-check`; **the list itself never reaches the
+  over `codepuppy-moderation-check`; **the list itself never reaches the
   renderer**, because the route is credentialed precisely so it does
   not become a public oracle for composing a message that passes. Matching is
   plain case-folded substring containment — deliberately not a pattern language,
@@ -321,10 +321,10 @@ inactive-plan payloads.
   mirrored into `0600` secret files. The sidecar allowlist carries non-secret
   endpoint configuration, while provider configuration carries file references
   rather than token values. Since `#1195` the platform-pays predicate is the
-  `ALPHA_MCP_TOKEN` secret file (its presence, together with the Cloud MCP URL,
+  `CODEPUPPY_MCP_TOKEN` secret file (its presence, together with the Cloud MCP URL,
   gates the live cloud registration and web-search sovereignty) — the predicate
   and the credential the cloud definition references are now the same fact.
-  `ALPHA_CLOUD_TOKEN` is still written and mirrored (it remains the
+  `CODEPUPPY_CLOUD_TOKEN` is still written and mirrored (it remains the
   `cloud.dispatch` purpose token for main-held Cloud Jobs calls) but is not a
   credential source for the Cloud MCP server and no longer gates it.
 - **Sidecar continuity:** main publishes token-free `recovering` and `ready`

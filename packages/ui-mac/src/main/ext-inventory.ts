@@ -8,7 +8,7 @@
 // 分层:
 //   · aggregateInventory —— 纯函数核心(bun:test 直接锁行为);
 //   · collectInventory —— 薄采集器:用既有 reader(readLedgerV2 / readPackagedSeed /
-//     alphaRoot)把磁盘真源变成 aggregate 的输入。catalog 由调用方注入(已验 catalog 的
+//     codepuppyRoot)把磁盘真源变成 aggregate 的输入。catalog 由调用方注入(已验 catalog 的
 //     resolve 面归 ext-ipc 既有机器;本模块不重复实现验签/回退链)。
 //
 // 身份与 join 规则:
@@ -38,7 +38,7 @@ import {
 import { readLedgerV2, type InstallRecordV2 } from "./ext-receipt-v2"
 import { readCapabilityGrant } from "./ext-capability-grants"
 import { readPackagedSeed } from "./ext-seed"
-import { alphaRoot } from "./alpha-workdir"
+import { codepuppyRoot } from "./codepuppy-workdir"
 
 // ── 输入(现有真源的已解码形状)─────────────────────────────────────────────────────────────────
 
@@ -234,7 +234,7 @@ export type CollectInventoryOpts = {
   platformToken?: string
   /** 全局账本根(frozen current-environment root,REQ-098 main 真源)。 */
   globalRoot: string
-  /** 当前项目目录(可选;项目账本 = `<project>/.code-puppy`,fail-closed 由 alphaRoot/readLedgerV2 承载)。 */
+  /** 当前项目目录(可选;项目账本 = `<project>/.code-puppy`,fail-closed 由 codepuppyRoot/readLedgerV2 承载)。 */
   projectDir?: string
 }
 
@@ -279,7 +279,7 @@ function collectInventoryWithWarnings(opts: CollectInventoryOpts, priorWarnings:
   })
 
   if (opts.projectDir !== undefined) {
-    const projectRoot = alphaRoot(opts.projectDir)
+    const projectRoot = codepuppyRoot(opts.projectDir)
     if (projectRoot === null) {
       warnings.push(`project ledger skipped: invalid project root ${opts.projectDir} (fail closed)`)
     } else {

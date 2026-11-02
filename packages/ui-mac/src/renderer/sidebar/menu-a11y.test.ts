@@ -39,7 +39,7 @@ describe("sidebar menu accessibility behavior", () => {
   })
 
   test("project and session menus both use the focus and Escape behavior", async () => {
-    const source = await Bun.file(new URL("./alpha-sidebar.tsx", import.meta.url)).text()
+    const source = await Bun.file(new URL("./codepuppy-sidebar.tsx", import.meta.url)).text()
     expect(source.match(/ref=\{focusFirstMenuItem\}/g)).toHaveLength(2)
     expect(source.match(/onKeyDown=\{\(event\) => dismissMenuOnEscape/g)).toHaveLength(2)
     expect(source.match(/dismissMenu\(\(\) => setMenuFor\(null\), projectMenuTrigger\)/g)).toHaveLength(3)

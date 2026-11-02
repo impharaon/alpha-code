@@ -1,0 +1,277 @@
+// REQ-037 — 治理层单测:保护名单硬校验、物化叶子计算(denylist/allowlist)、apply/reset 端到端
+// (真临时目录:CODEPUPPY_GLOBAL_DIR + 受控 home jsonc;验收③⑥⑦ 的机制面)。
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { applyFactoryDeny } from "../../../ext/src/factory-deny"
+import { Permission } from "../../../opencode/src/permission/index"
+import {
+  DEFAULT_BUILTIN_POLICY,
+  applyBuiltinPolicy,
+  effectiveFactoryDenied,
+  materializeEdits,
+  normalizeBuiltinPolicy,
+  resetBuiltinPolicy,
+  validateBuiltinPolicy,
+  type BuiltinPolicy,
+} from "./codepuppy-builtin-policy"
+
+let tmp: string
+const gov = (over: Partial<BuiltinPolicy> = {}): BuiltinPolicy => ({
+  ...structuredClone(DEFAULT_BUILTIN_POLICY),
+  ...over,
+})
+
+beforeEach(() => {
+  tmp = mkdtempSync(join(tmpdir(), "codepuppy-gov-"))
+  process.env.CODEPUPPY_GLOBAL_DIR = join(tmp, "codepuppy-global")
+  // ext-config 的 home jsonc 目标经 opencodeHomeDir() —— 测试用 CODEPUPPY_OPENCODE_HOME 隔离(现成覆盖点)
+  process.env.CODEPUPPY_OPENCODE_HOME = join(tmp, "home", ".opencode")
+  mkdirSync(join(tmp, "home"), { recursive: true })
+})
+afterEach(() => {
+  delete process.env.CODEPUPPY_GLOBAL_DIR
+  delete process.env.CODEPUPPY_OPENCODE_HOME
+  rmSync(tmp, { recursive: true, force: true })
+})
+
+// REQ-059:治理键(mcpPluginTargetPath)随 alpha 真源迁 ~/.alpha/codepuppy.jsonc(默认无逃生)。
+const jsoncPath = () => join(tmp, "codepuppy-global", "codepuppy.jsonc")
+const readJsonc = () => JSON.parse(readFileSync(jsoncPath(), "utf8"))
+
+describe("validateBuiltinPolicy — 保护名单硬校验(验收③)", () => {
+  test("disable compaction/title/summary → loud 拒绝", () => {
+    const v = validateBuiltinPolicy(gov({ agents: { hide: [], disable: ["compaction"], allow: [], override: {} } }), false)
+    expect(v.length).toBe(1)
+    expect(v[0].reason).toContain("compaction")
+  })
+  test("#1507 AC1:保护治理拒绝使用 Code Puppy,codepuppy-automation 技术名不变", () => {
+    expect(validateBuiltinPolicy(gov({ agents: { hide: ["codepuppy-automation"], disable: [], allow: [], override: {} } }), false).length).toBe(1)
+    expect(validateBuiltinPolicy(gov({ agents: { hide: [], disable: ["codepuppy-automation"], allow: [], override: {} } }), false).length).toBe(1)
+    expect(validateBuiltinPolicy(gov({ agents: { hide: [], disable: ["codepuppy-automation"], allow: [], override: {} } }), false)[0]?.reason).toBe("受保护:codepuppy-automation 是 Code Puppy 注入的功能载体(自动化等),禁用会使其静默失效,已拒绝")
+    expect(validateBuiltinPolicy(gov({ agents: { hide: ["codepuppy-automation"], disable: [], allow: [], override: {} } }), false)[0]?.reason).toBe("受保护:codepuppy-automation 是 Code Puppy 注入的功能载体,隐藏会使其入口消失,已拒绝")
+  })
+  test("disable build:未确认拒绝,确认后放行", () => {
+    const g = gov({ agents: { hide: [], disable: ["build"], allow: [], override: {} } })
+    expect(validateBuiltinPolicy(g, false).length).toBe(1)
+    expect(validateBuiltinPolicy(g, true).length).toBe(0)
+  })
+})
+
+describe("materializeEdits — 物化叶子计算", () => {
+  test("#1513: customization deny matches the new skill and command name", () => {
+    const edits = materializeEdits(gov({ skills: { deny: ["customize-codepuppy"] } }), [])
+    const m = new Map(edits.map((e) => [e.path.join("."), e.value]))
+    expect(m.get("permission.skill.customize-codepuppy")).toBe("deny")
+    expect(m.get("command.customize-codepuppy.template")).toContain("该技能(customize-codepuppy)")
+    expect(m.has("permission.skill.customize-alpha")).toBe(false)
+    const rules = Permission.fromConfig({
+      skill: { "*": "allow", "customize-codepuppy": m.get("permission.skill.customize-codepuppy") },
+    } as never)
+    expect(Permission.evaluate("skill", "customize-codepuppy", rules).action).toBe("deny")
+  })
+  test("denylist:hide/disable/override → agent.<n>.<字段> 叶子", () => {
+    const g = gov({
+      agents: { hide: ["build"], disable: ["explore"], allow: [], override: { plan: { prompt: "自定义" } } },
+    })
+    const paths = materializeEdits(g, ["build", "plan", "general", "explore"]).map((e) => e.path.join("."))
+    expect(paths).toContain("agent.build.hidden")
+    expect(paths).toContain("agent.explore.disable")
+    expect(paths).toContain("agent.plan.prompt")
+    expect(paths).not.toContain("agent.general.hidden") // denylist:未列名不动
+  })
+  test("allowlist:可见未列名一律 hidden,保护/alpha 注入豁免(验收⑦)", () => {
+    const g = gov({ mode: "allowlist", agents: { hide: [], disable: [], allow: ["build"], override: {} } })
+    const paths = materializeEdits(g, ["build", "plan", "general", "codepuppy-automation", "compaction"]).map((e) => e.path.join("."))
+    expect(paths).not.toContain("agent.build.hidden") // 在 allow
+    expect(paths).toContain("agent.plan.hidden")
+    expect(paths).toContain("agent.general.hidden")
+    expect(paths).not.toContain("agent.codepuppy-automation.hidden") // 豁免
+    expect(paths).not.toContain("agent.compaction.hidden") // 豁免
+  })
+  test("skill deny → permission.skill.<n>=deny + 同名 command 占位模板(泄漏缓解,验收④)", () => {
+    const g = gov({ skills: { deny: ["customize-opencode"] } })
+    const edits = materializeEdits(g, [])
+    const m = new Map(edits.map((e) => [e.path.join("."), e.value]))
+    expect(m.get("permission.skill.customize-opencode")).toBe("deny")
+    expect(m.get("command.customize-opencode.description")).toBe("(已禁用)该技能已在 Code Puppy 治理中禁用")
+    expect(String(m.get("command.customize-opencode.template"))).toContain("已在 Code Puppy 的治理设置中被禁用")
+    expect(String(m.get("command.customize-opencode.template"))).toContain("/customize-codepuppy(Code Puppy 自带的定制指南技能)")
+    expect(edits.find((e) => e.path.join(".") === "permission.skill.*")?.onlyIfAbsent).toBe(true)
+  })
+  test("command override → command.<n>.template(重写 /init,验收⑤)", () => {
+    const g = gov({ commands: { override: { init: { template: "alpha 版 init 模板" } } } })
+    const m = new Map(materializeEdits(g, []).map((e) => [e.path.join("."), e.value]))
+    expect(m.get("command.init.template")).toBe("alpha 版 init 模板")
+  })
+})
+
+describe("applyBuiltinPolicy / resetBuiltinPolicy — 端到端(叶子写入不破坏用户内容,验收⑥)", () => {
+  test("apply 写入受控叶子;用户自有兄弟字段保留;重放清 stale;reset 全量净除", () => {
+    // 用户已有的 jsonc 内容(同名 agent 的兄弟字段 + 无关顶键)
+    mkdirSync(join(tmp, "codepuppy-global"), { recursive: true })
+    writeFileSync(jsoncPath(), JSON.stringify({ theme: "dark", agent: { explore: { temperature: 0.5 } } }, null, 2))
+
+    const g1 = gov({ agents: { hide: [], disable: ["explore"], allow: [], override: {} }, skills: { deny: ["customize-opencode"] } })
+    const r1 = applyBuiltinPolicy(g1, ["build", "explore"])
+    expect(r1.ok).toBe(true)
+    let cfg = readJsonc()
+    expect(cfg.agent.explore.disable).toBe(true)
+    expect(cfg.agent.explore.temperature).toBe(0.5) // 用户兄弟字段保留
+    expect(cfg.theme).toBe("dark")
+    expect(cfg.permission.skill["customize-opencode"]).toBe("deny")
+    expect(cfg.command["customize-opencode"].template).toContain("禁用")
+
+    // 重放:撤掉 skill deny → stale 键(permission/command 占位)应被移除,disable 保留
+    const g2 = gov({ agents: { hide: [], disable: ["explore"], allow: [], override: {} } })
+    const r2 = applyBuiltinPolicy(g2, ["build", "explore"])
+    expect(r2.ok).toBe(true)
+    expect(r2.removedStale).toBeGreaterThan(0)
+    cfg = readJsonc()
+    expect(cfg.agent.explore.disable).toBe(true)
+    expect(cfg.permission).toBeUndefined() // 空壳剪枝
+    expect(cfg.command).toBeUndefined()
+
+    // reset:全量净除,用户内容原样
+    const r3 = resetBuiltinPolicy()
+    expect(r3.ok).toBe(true)
+    cfg = readJsonc()
+    expect(cfg.agent.explore.disable).toBeUndefined()
+    expect(cfg.agent.explore.temperature).toBe(0.5)
+    expect(cfg.theme).toBe("dark")
+  })
+  test("codex H1 回归:用户预设 permission.skill.* 不入账,reset 不删(用户全局 deny 保留)", () => {
+    mkdirSync(join(tmp, "codepuppy-global"), { recursive: true })
+    writeFileSync(jsoncPath(), JSON.stringify({ permission: { skill: { "*": "deny" } } }, null, 2))
+    const g = gov({ skills: { deny: ["customize-opencode"] } })
+    expect(applyBuiltinPolicy(g, []).ok).toBe(true)
+    let cfg = readJsonc()
+    expect(cfg.permission.skill["*"]).toBe("deny") // onlyIfAbsent 跳过,用户值不动
+    expect(applyBuiltinPolicy(gov(), []).ok).toBe(true) // 撤 deny → stale 清除
+    cfg = readJsonc()
+    expect(cfg.permission.skill["*"]).toBe("deny") // 用户通配保留(未入账 → 未被当 stale 删)
+    expect(cfg.permission.skill["customize-opencode"]).toBeUndefined()
+  })
+  test("allowlist 漂移环防护:被隐藏 agent 从可见列表消失后,重放不清其 hidden 叶子", () => {
+    const g = gov({ mode: "allowlist", agents: { hide: [], disable: [], allow: ["build"], override: {} } })
+    expect(applyBuiltinPolicy(g, ["build", "plan"]).ok).toBe(true)
+    let cfg = readJsonc()
+    expect(cfg.agent.plan.hidden).toBe(true)
+    // 第二次 apply:renderer 只报可见的 build(plan 已被隐)—— hidden 叶子必须保留,不得被当 stale 清掉
+    expect(applyBuiltinPolicy(g, ["build"]).ok).toBe(true)
+    cfg = readJsonc()
+    expect(cfg.agent.plan.hidden).toBe(true)
+  })
+  test("保护违规 → apply 整体拒绝,jsonc 不动", () => {
+    const g = gov({ agents: { hide: [], disable: ["compaction"], allow: [], override: {} } })
+    const r = applyBuiltinPolicy(g, [])
+    expect(r.ok).toBe(false)
+    expect(r.reason).toContain("compaction")
+  })
+})
+
+describe("normalizeBuiltinPolicy — renderer 原始输入清洗", () => {
+  test("非法字段/名字被剔除;坏形状回默认", () => {
+    const g = normalizeBuiltinPolicy({
+      version: 1,
+      mode: "denylist",
+      agents: { hide: ["ok-name", "bad/../name"], disable: [], allow: [], override: { x: { prompt: "p", evil: "e" } } },
+      skills: { deny: [123, "fine"] },
+      commands: { override: { init: { template: "t" }, bad: { notemplate: 1 } } },
+    })
+    expect(g.agents.hide).toEqual(["ok-name"])
+    expect(g.agents.override.x).toEqual({ prompt: "p" })
+    expect(g.skills.deny).toEqual(["fine"])
+    expect(Object.keys(g.commands.override)).toEqual(["init"])
+    expect(normalizeBuiltinPolicy({ mode: "nope" }).mode).toBe("denylist")
+  })
+})
+
+describe("REQ-067 — 出厂默认禁内置化(deny 零明文)", () => {
+  test("#1522 AC2:normalize 清洗旧 allowFactory 解禁项,保留其它用户 deny", () => {
+    const g = normalizeBuiltinPolicy({
+      version: 1,
+      mode: "denylist",
+      agents: { hide: [], disable: [], allow: [], override: {} },
+      skills: { deny: ["customize-opencode", "my-own"], allowFactory: ["customize-opencode", "not-factory"] },
+      commands: { override: {} },
+    })
+    expect(g.skills.deny).toEqual(["my-own"]) // 出厂项不入用户 deny
+    expect(g.skills.allowFactory).toEqual([])
+  })
+  test("#1522 AC2:旧 allowFactory 不能恢复技能或同名斜杠命令,保存后清洗", () => {
+    // 旧治理形状来自本文件 REQ-067 解禁用例;权限/command 是现有出厂禁注入的同名键。
+    const legacy = gov({ skills: { deny: [], allowFactory: ["customize-opencode"] } })
+    expect(effectiveFactoryDenied(DEFAULT_BUILTIN_POLICY)).toEqual(["customize-opencode"])
+    expect(effectiveFactoryDenied(legacy)).toEqual(["customize-opencode"])
+    const cleaned = normalizeBuiltinPolicy(legacy)
+    expect(applyBuiltinPolicy(cleaned, []).ok).toBe(true)
+    expect(JSON.parse(readFileSync(join(tmp, "codepuppy-global", "governance.json"), "utf8")).skills.allowFactory).toEqual([])
+    const cfg = {
+      permission: { skill: { "customize-opencode": "allow", "*": "allow" } },
+      command: { "customize-opencode": { template: "user's own" } },
+    }
+    applyFactoryDeny(cfg, JSON.stringify(effectiveFactoryDenied(cleaned)))
+    expect(Permission.evaluate("skill", "customize-opencode", Permission.fromConfig(cfg.permission)).action).toBe("deny")
+    expect(Permission.evaluate("skill", "customize-codepuppy", Permission.fromConfig(cfg.permission)).action).toBe("allow")
+    expect(cfg.command["customize-opencode"].template).toBe("该技能(customize-opencode)已弃用。定制 Code Puppy 请改用 /customize-codepuppy。")
+  })
+  test("materializeEdits:出厂项零物化 —— 空治理不产生任何 permission/command 叶子", () => {
+    const edits = materializeEdits(structuredClone(DEFAULT_BUILTIN_POLICY), [])
+    expect(edits).toEqual([])
+  })
+})
+
+// ── O4 钉测 — 账实分离自愈(S50 真机白捡)────────────────────────────────────────────
+// 现场:REQ-067 前的老 governance 把出厂禁物化进当时的目标文件;REQ-059 迁真源后,新真源
+// codepuppy.jsonc 没这些键但旧账还在 → normalize 洗掉 deny 使 4 键全变 stale 删除 → 修前
+// jsonc-parser 对缺父路径的删除 throw,任何 apply/reset 永久失败(治理面全砖)。
+describe("O4 — 幽灵旧账不砖治理面,成功 apply 后记账自愈", () => {
+  const ledgerPath = () => join(tmp, "codepuppy-global", "governance-materialized.json")
+  const phantomLedger = () =>
+    writeFileSync(
+      ledgerPath(),
+      JSON.stringify({
+        keys: [
+          ["permission", "skill", "*"],
+          ["permission", "skill", "customize-opencode"],
+          ["command", "customize-opencode", "description"],
+          ["command", "customize-opencode", "template"],
+        ],
+      }),
+    )
+
+  test("apply:幽灵 stale 跳过、真实写入生效、记账收敛只剩实际写入", () => {
+    mkdirSync(join(tmp, "codepuppy-global"), { recursive: true })
+    writeFileSync(jsoncPath(), JSON.stringify({ theme: "dark" }, null, 2))
+    phantomLedger()
+    // 老 governance.json 形状(deny 含出厂项)→ normalize 自愈洗掉 deny
+    const legacy = normalizeBuiltinPolicy({
+      version: 1,
+      mode: "denylist",
+      agents: { hide: ["plan"], disable: [], allow: [], override: {} },
+      skills: { deny: ["customize-opencode"] },
+      commands: { override: {} },
+    })
+    const r = applyBuiltinPolicy(legacy, ["build", "plan"])
+    expect(r.ok).toBe(true)
+    const cfg = readJsonc()
+    expect(cfg.agent.plan.hidden).toBe(true)
+    expect(cfg.theme).toBe("dark") // 用户内容不动
+    expect(cfg.permission).toBeUndefined() // 幽灵删除零副作用
+    expect(cfg.command).toBeUndefined()
+    const ledger = JSON.parse(readFileSync(ledgerPath(), "utf8"))
+    expect(ledger.keys).toEqual([["agent", "plan", "hidden"]]) // 幽灵键出账
+  })
+
+  test("reset:同样现场不砖,记账清空、用户内容原样", () => {
+    mkdirSync(join(tmp, "codepuppy-global"), { recursive: true })
+    writeFileSync(jsoncPath(), JSON.stringify({ theme: "dark" }, null, 2))
+    phantomLedger()
+    const r = resetBuiltinPolicy()
+    expect(r.ok).toBe(true)
+    expect(JSON.parse(readFileSync(ledgerPath(), "utf8")).keys).toEqual([])
+    expect(readJsonc().theme).toBe("dark")
+  })
+})

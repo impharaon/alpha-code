@@ -8,14 +8,14 @@ import * as crypto from "node:crypto"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
-import type { ArtifactDownloadOutcome } from "./alpha-artifact-download"
-import type { SaveRunDeps } from "./alpha-workdir"
+import type { ArtifactDownloadOutcome } from "./codepuppy-artifact-download"
+import type { SaveRunDeps } from "./codepuppy-workdir"
 import { readArtifactManifest } from "./artifact-manifest"
 import { recordRunOrigin, registerDownloadedArtifact, registeredArtifactNameOwner } from "./artifact-service"
 import { createCloudRunTracker, DELIVERY_MAX_ATTEMPTS, type CloudRunState, type CloudRunTrackerDeps } from "./cloud-run-tracker"
 import type { CloudArtifactDescriptor, CloudArtifactList, CloudJobEvent, CloudJobStatus, CloudResult } from "../preload/types"
 
-const producer = path.join(import.meta.dir, "../../../alpha-contracts-consumer/vendor/alpha-platform/contracts/v1/fixtures/producer")
+const producer = path.join(import.meta.dir, "../../../codepuppy-contracts-consumer/vendor/alpha-platform/contracts/v1/fixtures/producer")
 const STATUS_FIXTURE = (await Bun.file(path.join(producer, "cloud-job-status.json")).json()).value as CloudJobStatus
 const LIST_FIXTURE = (await Bun.file(path.join(producer, "artifact-list.json")).json()).value as CloudArtifactList
 const RUN = STATUS_FIXTURE.job_id

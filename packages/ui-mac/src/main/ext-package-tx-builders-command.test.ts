@@ -13,18 +13,18 @@ import { upsertRecordV2, type UpsertInput } from "./ext-receipt-v2"
 
 let tmp = ""
 let root = ""
-const previousRoot = process.env.ALPHA_GLOBAL_DIR
+const previousRoot = process.env.CODEPUPPY_GLOBAL_DIR
 
 beforeEach(() => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), "req840-cmd-builder-"))
   root = path.join(tmp, "global")
   fs.mkdirSync(root, { recursive: true })
-  process.env.ALPHA_GLOBAL_DIR = root
+  process.env.CODEPUPPY_GLOBAL_DIR = root
 })
 
 afterEach(() => {
-  if (previousRoot === undefined) delete process.env.ALPHA_GLOBAL_DIR
-  else process.env.ALPHA_GLOBAL_DIR = previousRoot
+  if (previousRoot === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+  else process.env.CODEPUPPY_GLOBAL_DIR = previousRoot
   fs.rmSync(tmp, { recursive: true, force: true })
 })
 
@@ -60,7 +60,7 @@ describe("buildCommandTxItems (#840)", () => {
     expect(built.build.items).toHaveLength(1)
     const item = built.build.items[0]!
     expect(item.action).toBe("config")
-    expect(item.config?.target).toBe(path.join(root, "alpha.jsonc"))
+    expect(item.config?.target).toBe(path.join(root, "codepuppy.jsonc"))
     expect(item.config?.edits).toEqual([
       { keyPath: ["command", "probe"], value: { template: "PKG $ARGUMENTS", description: "d", subtask: true } },
     ])
@@ -84,7 +84,7 @@ describe("buildCommandTxItems (#840)", () => {
 
   test("fresh 闸:未登记的 live command 叶不认领不覆盖(治理路 builtin 覆盖叶是真实保护对象)", () => {
     fs.writeFileSync(
-      path.join(root, "alpha.jsonc"),
+      path.join(root, "codepuppy.jsonc"),
       JSON.stringify({ command: { probe: { template: "governance-owned", description: "(已禁用)某占位" } } }),
     )
     const built = buildCommandTxItems(input())
@@ -92,7 +92,7 @@ describe("buildCommandTxItems (#840)", () => {
   })
 
   test("在册即可覆盖(update/重装同位置换内容)", () => {
-    fs.writeFileSync(path.join(root, "alpha.jsonc"), JSON.stringify({ command: { probe: { template: "old" } } }))
+    fs.writeFileSync(path.join(root, "codepuppy.jsonc"), JSON.stringify({ command: { probe: { template: "old" } } }))
     const w = upsertRecordV2(root, receipt())
     expect(w.ok).toBe(true)
     const built = buildCommandTxItems(input())
@@ -103,7 +103,7 @@ describe("buildCommandTxItems (#840)", () => {
     const built = buildCommandTxItems(input())
     expect(built.ok).toBe(true)
     if (!built.ok) return
-    fs.writeFileSync(path.join(root, "alpha.jsonc"), JSON.stringify({ command: { probe: { template: "sneaked" } } }))
+    fs.writeFileSync(path.join(root, "codepuppy.jsonc"), JSON.stringify({ command: { probe: { template: "sneaked" } } }))
     const pre = built.build.precondition()
     expect(pre).toMatchObject({ ok: false, reason: expect.stringContaining("appeared before commit") })
   })

@@ -3,7 +3,7 @@
 # 跑 `bun test`,并断言**实际执行的用例数**符合给定期望。期望有两种形态(`#844`):
 #   · `N`  —— 下界:pass ≥ N。整包地板专用(3000/100/15 这类刻意留大余量的灾难闸)。
 #   · `=N` —— 精确:pass == N,且本次运行必须恰好跑了 1 个文件(该「恰好 1 个文件」判定
-#             同样罩住 ALPHA_TEST_COUNT_FILE 置位的测量模式 —— #844 R2)。闸门登记簿
+#             同样罩住 CODEPUPPY_TEST_COUNT_FILE 置位的测量模式 —— #844 R2)。闸门登记簿
 #             (scripts/gate-files.tsv)专用 —— 下界留余量时,新加进闸门文件的用例
 #             可以被整段删掉而登记簿全绿(#844 实测 35/87 条有余量);精确条数让
 #             「删一条」与「加一条没登记」都当场红。
@@ -44,31 +44,31 @@ case "$floor" in
   ''|*[!0-9]*) echo "::error::非法的条数参数:${exact:+=}${floor}" >&2; exit 2 ;;
 esac
 
-# `#844` R2:测量契约(ALPHA_TEST_COUNT_FILE)只属于**本次调用**,读入后立刻 unset ——
+# `#844` R2:测量契约(CODEPUPPY_TEST_COUNT_FILE)只属于**本次调用**,读入后立刻 unset ——
 # 否则它会顺着 env 继承进被测用例自己 spawn 的 bun-test-floor.sh(gate-environment.test.ts
 # 的形状 B 就以双文件下界模式合法调用本脚本),让「恰好 1 个文件」判定误伤合法的多文件
 # 子调用,并让子调用反过来覆写父测量值。
-count_file="${ALPHA_TEST_COUNT_FILE:-}"
-unset ALPHA_TEST_COUNT_FILE
+count_file="${CODEPUPPY_TEST_COUNT_FILE:-}"
+unset CODEPUPPY_TEST_COUNT_FILE
 
-# ── `#1086`:base fail-set 棘轮(仅当 ALPHA_KNOWN_FAILS_FILE 置位)────────────────
+# ── `#1086`:base fail-set 棘轮(仅当 CODEPUPPY_KNOWN_FAILS_FILE 置位)────────────────
 # 语义:测试失败不再一票否决 —— 失败名(由外层 junit 报告逐测试归因)与仓内静态清单
 # 比对:清单内的红容忍、**清单外的红拦住并逐条点名**、无法归因的失败一律拦住。
 # 判官 = scripts/known-fails-compare.py(三条 fail-closed 作废轴都在那边)。
-# 今天只有 ui-mac 全量置位它(alpha-check [5/10] 与 alpha-ci `bun test (ui-mac)`,同一条命令)。
+# 今天只有 ui-mac 全量置位它(codepuppy-check [5/10] 与 codepuppy-ci `bun test (ui-mac)`,同一条命令)。
 # 与 count_file 同款纪律:读入后立刻 unset —— 否则它会顺着 env 继承进被测用例自己
 # spawn 的 bun-test-floor.sh(gate-environment 的形状 B 探针、host 夹具),让那些子调用的
 # 失败判定被容忍语义静默软化。
-known_fails="${ALPHA_KNOWN_FAILS_FILE:-}"
-unset ALPHA_KNOWN_FAILS_FILE
+known_fails="${CODEPUPPY_KNOWN_FAILS_FILE:-}"
+unset CODEPUPPY_KNOWN_FAILS_FILE
 if [ -n "$known_fails" ] && [ -n "$exact" ]; then
   # 精确条数模式(闸门登记簿的逐文件点名)与容忍语义互斥:登记的是「恰好 N 条 pass」,
   # 容忍一条红等于把登记值静默降一,两个判据会互相打架 —— 配置错,直接拒。
-  echo "::error::ALPHA_KNOWN_FAILS_FILE 与精确条数模式(=N)互斥 —— 登记簿的逐文件点名不吸收已知红" >&2
+  echo "::error::CODEPUPPY_KNOWN_FAILS_FILE 与精确条数模式(=N)互斥 —— 登记簿的逐文件点名不吸收已知红" >&2
   exit 2
 fi
 if [ -n "$known_fails" ] && [ ! -f "$known_fails" ]; then
-  echo "::error::ALPHA_KNOWN_FAILS_FILE 指向的清单不存在:$known_fails" >&2
+  echo "::error::CODEPUPPY_KNOWN_FAILS_FILE 指向的清单不存在:$known_fails" >&2
   exit 2
 fi
 
@@ -79,7 +79,7 @@ fi
 # 而同一棵树在开发机上 0 fail。这种红最贵 —— 它会被读成「间歇性 flaky」,一道真闸被当噪声。
 #
 # 为什么闸门在这里、而不是每个测试文件各写一遍:所有**闸门**运行(CI 的三条 test 步、
-# assert-gate-files.sh 的逐条点名、alpha-check.sh 的 [4/7])都经过本脚本 —— 一处声明,
+# assert-gate-files.sh 的逐条点名、codepuppy-check.sh 的 [4/7])都经过本脚本 —— 一处声明,
 # 新增的门默认拿到。单条用例仍可显式覆盖(显式值恒胜,已实测)。
 #
 # 为什么是 CLI flag 而不是别的(bun 1.3.14,全部实测,不是推断):
@@ -91,7 +91,7 @@ fi
 #   · `bun test --timeout N` 跨全部文件生效 —— 只有这一条成立。
 # 取值 120s:与仓内已显式声明超时的那批同档(最慢的正当 host 在 CI 上实测 37.7s)。
 # 超时不是断言:卡死的用例仍会在 120s 内判红,而 5s 的代价是让真闸在慢机器上恒假红。
-ALPHA_TEST_TIMEOUT_MS="${ALPHA_TEST_TIMEOUT_MS:-120000}"
+CODEPUPPY_TEST_TIMEOUT_MS="${CODEPUPPY_TEST_TIMEOUT_MS:-120000}"
 
 log="$(mktemp)"
 junit="$(mktemp)"
@@ -103,9 +103,9 @@ if [ -n "$known_fails" ]; then
   # 子进程 bun run 的 `(fail)` 行与 summary 原样回显进外层日志,裸 grep console 会把子进程的
   # 红当外层新红。junit 只由外层写(bun 1.3.14 实测:console 输出不受影响、退出码不变)。
   # 判官会先拿 console 的外层 summary 与 (fail) 行交叉验证 junit,轴打架即测量作废。
-  (cd "$workdir" && bun test --timeout "$ALPHA_TEST_TIMEOUT_MS" --reporter=junit --reporter-outfile="$junit" "$@") 2>&1 | tee "$log"
+  (cd "$workdir" && bun test --timeout "$CODEPUPPY_TEST_TIMEOUT_MS" --reporter=junit --reporter-outfile="$junit" "$@") 2>&1 | tee "$log"
 else
-  (cd "$workdir" && bun test --timeout "$ALPHA_TEST_TIMEOUT_MS" "$@") 2>&1 | tee "$log"
+  (cd "$workdir" && bun test --timeout "$CODEPUPPY_TEST_TIMEOUT_MS" "$@") 2>&1 | tee "$log"
 fi
 status=${PIPESTATUS[0]}
 set -e
@@ -133,7 +133,7 @@ elif [ "$status" -ne 0 ]; then
 fi
 
 # `#844` R2(Codex 二审 Blocker):「恰好 1 个文件」的判定必须同时罩住**精确模式**与
-# **测量模式**(ALPHA_TEST_COUNT_FILE 置位,即 --update 的取数路径)。R1 版只挂在精确
+# **测量模式**(CODEPUPPY_TEST_COUNT_FILE 置位,即 --update 的取数路径)。R1 版只挂在精确
 # 模式上,而 --update 对精确行以下界 0 测量 —— 一个过宽的路径过滤器(实测
 # `src/main/ext-package-lifecycle` 同时命中 lifecycle 与 lifecycle-permutations 两个文件,
 # 47 across 2 files)会把跨文件合计数当成单文件实测写回登记簿。判定先于写 count 文件:

@@ -27,19 +27,6 @@
         "turbo": "2.10.2",
       },
     },
-    "packages/alpha-contracts-consumer": {
-      "name": "@alpha-code/contracts-consumer",
-      "version": "0.0.0",
-      "dependencies": {
-        "ajv": "8.20.0",
-        "ajv-formats": "3.0.1",
-      },
-      "devDependencies": {
-        "@types/bun": "catalog:",
-        "@types/node": "catalog:",
-        "@typescript/native-preview": "catalog:",
-      },
-    },
     "packages/app": {
       "name": "@opencode-ai/app",
       "version": "1.18.19",
@@ -166,6 +153,19 @@
       "devDependencies": {
         "@tsconfig/bun": "catalog:",
         "@types/bun": "catalog:",
+        "@typescript/native-preview": "catalog:",
+      },
+    },
+    "packages/codepuppy-contracts-consumer": {
+      "name": "@codepuppy/contracts-consumer",
+      "version": "0.0.0",
+      "dependencies": {
+        "ajv": "8.20.0",
+        "ajv-formats": "3.0.1",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "@types/node": "catalog:",
         "@typescript/native-preview": "catalog:",
       },
     },
@@ -508,11 +508,11 @@
       },
     },
     "packages/ext": {
-      "name": "@alpha-code/ext",
+      "name": "@codepuppy/ext",
       "version": "0.0.0",
       "dependencies": {
         "@ai-sdk/provider": "3.0.16",
-        "@alpha-code/contracts-consumer": "workspace:*",
+        "@codepuppy/contracts-consumer": "workspace:*",
         "@opencode-ai/plugin": "workspace:*",
         "@silvia-odwyer/photon-node": "0.3.4",
       },
@@ -1039,7 +1039,7 @@
       "name": "ui-mac",
       "version": "0.1.24",
       "dependencies": {
-        "@alpha-code/contracts-consumer": "workspace:*",
+        "@codepuppy/contracts-consumer": "workspace:*",
         "@file-viewer/pptx": "3.0.0",
         "@file-viewer/renderer-spreadsheet": "3.0.0",
         "@zip.js/zip.js": "2.7.62",
@@ -1307,10 +1307,6 @@
 
     "@alloc/quick-lru": ["@alloc/quick-lru@5.2.0", "", {}, "sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw=="],
 
-    "@alpha-code/contracts-consumer": ["@alpha-code/contracts-consumer@workspace:packages/alpha-contracts-consumer"],
-
-    "@alpha-code/ext": ["@alpha-code/ext@workspace:packages/ext"],
-
     "@ampproject/remapping": ["@ampproject/remapping@2.3.0", "", { "dependencies": { "@jridgewell/gen-mapping": "^0.3.5", "@jridgewell/trace-mapping": "^0.3.24" } }, "sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw=="],
 
     "@anthropic-ai/sdk": ["@anthropic-ai/sdk@0.71.2", "", { "dependencies": { "json-schema-to-ts": "^3.1.1" }, "peerDependencies": { "zod": "^3.25.0 || ^4.0.0" }, "optionalPeers": ["zod"], "bin": { "anthropic-ai-sdk": "bin/cli" } }, "sha512-TGNDEUuEstk/DKu0/TflXAEt+p+p/WhTlFzEnoosvbaDU2LTjm42igSdlL0VijrKpWejtOKxX0b8A7uc+XiSAQ=="],
@@ -1556,6 +1552,10 @@
     "@cloudflare/workerd-windows-64": ["@cloudflare/workerd-windows-64@1.20251118.0", "", { "os": "win32", "cpu": "x64" }, "sha512-2LV99AHSlpr8WcCb/BYbU2QsYkXLUL1izN6YKWkN9Eibv80JKX0RtgmD3dfmajE5sNvClavxZejgzVvHD9N9Ag=="],
 
     "@cloudflare/workers-types": ["@cloudflare/workers-types@4.20251008.0", "", {}, "sha512-dZLkO4PbCL0qcCSKzuW7KE4GYe49lI12LCfQ5y9XeSwgYBoAUbwH4gmJ6A0qUIURiTJTkGkRkhVPqpq2XNgYRA=="],
+
+    "@codepuppy/contracts-consumer": ["@codepuppy/contracts-consumer@workspace:packages/codepuppy-contracts-consumer"],
+
+    "@codepuppy/ext": ["@codepuppy/ext@workspace:packages/ext"],
 
     "@corvu/dialog": ["@corvu/dialog@0.2.4", "", { "dependencies": { "@corvu/utils": "~0.4.2", "solid-dismissible": "~0.1.1", "solid-focus-trap": "~0.1.8", "solid-presence": "~0.2.0", "solid-prevent-scroll": "~0.1.10" }, "peerDependencies": { "solid-js": "^1.8" } }, "sha512-n54vJq+fOy8GVrnYBdJpD6JXNuyx7LOeMrRxwzAvZnYGpW8+AA12tnb/P/2emJj/HjOO5otheGKb0breshdFlA=="],
 

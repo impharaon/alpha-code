@@ -32,7 +32,7 @@ let root: string
 let cfgTarget: string
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "ext-tx-file-"))
-  cfgTarget = join(root, "alpha.jsonc")
+  cfgTarget = join(root, "codepuppy.jsonc")
 })
 afterEach(() => {
   rmSync(root, { recursive: true, force: true })

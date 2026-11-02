@@ -42,14 +42,26 @@ const channel: Channel = (() => {
   return "dev"
 })()
 
-// Signing + notarization run in CI, OR locally when ALPHA_SIGN=1 (once the Mac "Developer ID
+// Signing + notarization run in CI, OR locally when CODEPUPPY_SIGN=1 (once the Mac "Developer ID
 // Application" cert for team RQX6X6A635 exists in the keychain + notary creds are in env). Otherwise a
 // local `bun run package:mac` produces an ad-hoc–signed app you can double-click from dist/ — no cert
 // needed. See docs/runbooks/distribution.md.
 const isCI = process.env.GITHUB_ACTIONS === "true"
-const shouldSign = isCI || process.env.ALPHA_SIGN === "1"
+const shouldSign = isCI || process.env.CODEPUPPY_SIGN === "1"
 // Apple team (Beijing yuanyuji, RQX6X6A635 — same as tideapp) + notary creds are supplied via env at
-// sign time (see docs/runbooks/distribution.md / ~/.alpha-code-signing/signing.env), not baked into config.
+// sign time (see docs/runbooks/distribution.md / ~/.codepuppy-signing/signing.env), not baked into config.
+
+// #1570 退役守卫:签名开关与身份的环境变量已改为 CODEPUPPY_ 前缀。沿用旧名的 signing.env 不会报错,
+// 只会让 shouldSign 为假 ⇒ 本地静默打出未签名的包。所以旧名一出现就拒绝打包,而不是忽略它。
+const RETIRED_SIGNING_ENV = ["ALPHA_SIGN", "ALPHA_SIGN_IDENTITY", "ALPHA_MAC_SIGN_IDENTITY"] as const
+function rejectRetiredSigningEnv() {
+  const found = RETIRED_SIGNING_ENV.filter((name) => process.env[name] !== undefined)
+  if (found.length === 0) return
+  throw new Error(
+    `环境里还有退役的签名变量 ${found.join(", ")} —— 已改名为 CODEPUPPY_ 前缀(${found.map((name) => name.replace(/^ALPHA_/, "CODEPUPPY_")).join(", ")})。` +
+      "按 docs/runbooks/distribution.md「签名目录与变量名的一次性改名」改好 signing.env 再打包。",
+  )
+}
 
 // Own bundle identity (com.tide.*, matching tideapp's convention) — NOT opencode's ai.opencode.desktop.
 // Changing this from the old id is a deliberate one-time reset of the app's stored data (accepted:
@@ -60,7 +72,7 @@ const APP_IDS = {
   prod: "com.tide.alphacode",
 } as const
 
-// #1496:mac 只出**一个**目标架构(`ALPHA_TARGET_ARCH=arm64|x64`,缺省宿主架构)。arm64 与 x64 各跑一轮
+// #1496:mac 只出**一个**目标架构(`CODEPUPPY_TARGET_ARCH=arm64|x64`,缺省宿主架构)。arm64 与 x64 各跑一轮
 // build + package(终端原生包名是 build 时编进产物的,一份产物不能同时服务两种架构),最后合并
 // latest-mac.yml(scripts/merge-latest-mac-yml.ts)。见 docs/runbooks/distribution.md §2。
 // 非 mac 平台不读它(win 由 CLI `--x64` 决定),所以这里只在 darwin 上解析,避免影响别的平台打包。
@@ -69,7 +81,7 @@ const macTargets = (names: MacOsTargetName[]) =>
   macTargetArch ? names.map((target) => ({ target, arch: [macTargetArch] })) : names
 
 const getBase = (appId: string): Configuration => ({
-  artifactName: "alpha-code-${os}-${arch}.${ext}",
+  artifactName: "codepuppy-${os}-${arch}.${ext}",
   // MIT requires OpenCode's copyright + permission notice ship with the app (B15 / D10);
   // full text in resources/NOTICE.txt, also surfaced via app.setAboutPanelOptions.
   copyright: "© 2025 opencode (MIT). Code Puppy fork build.",
@@ -129,16 +141,16 @@ const getBase = (appId: string): Configuration => ({
       to: "extension-seed/",
     },
     {
-      // B6(=G1):@alpha-code/ext 自包含 ESM bundle(prebuild 已构建)。落点
-      // <resources>/alpha-ext/plugin.js,main 经 alpha-ext-plugin.ts 解析后由 sidecar 注入
+      // B6(=G1):@codepuppy/ext 自包含 ESM bundle(prebuild 已构建)。落点
+      // <resources>/codepuppy-ext/plugin.js,main 经 codepuppy-ext-plugin.ts 解析后由 sidecar 注入
       // OPENCODE_CONFIG_CONTENT 的 `plugin` 数组(零改上游,ADR-002/006)。
       // `#1419`(REQ-228):bundle 旁边多一份 photon 的 wasm(`*.wasm`,Bun.build 按 `with { type: "file" }`
       // 复制到 dist/ 并带哈希名)—— plugin.js 用 `import.meta.url` 相对解析它,所以两者必须落在同一目录。
       // 漏了它不会红在打包,会红在第一次识图(装 photon 时 ENOENT ⇒ 图片一律按「本机无法解码」处理)。
       // `#1578`(REQ-236 §2.6-7):bundled-tools.json = ext 构建写出的随包清单(plugin.js 的 sha256 + 自有工具名),
-      // main 经 ALPHA_EXT_BUNDLED_MANIFEST 指给引擎;漏了它不会红在打包,而是自有工具全部按第三方插件显示。
+      // main 经 CODEPUPPY_EXT_BUNDLED_MANIFEST 指给引擎;漏了它不会红在打包,而是自有工具全部按第三方插件显示。
       from: "../ext/dist/",
-      to: "alpha-ext/",
+      to: "codepuppy-ext/",
       filter: ["plugin.js", "*.wasm", "bundled-tools.json"],
     },
     {
@@ -148,16 +160,16 @@ const getBase = (appId: string): Configuration => ({
       to: "db-expected-migrations.json",
     },
     // REQ-159(`#1321`):引擎进程围栏的原生模块(prebuild 里 scripts/build-fence-addon.ts 编出的 **fat**
-    // .node,arm64 + x86_64 同一个文件;缺任一片构建本身就红)。落点 <resources>/alpha-fence/alpha_fence.node,
+    // .node,arm64 + x86_64 同一个文件;缺任一片构建本身就红)。落点 <resources>/codepuppy-fence/codepuppy_fence.node,
     // 与 U1(`#1316`)实测加载得了的 extraResources 路径同形;electron-builder 深签时把它签成与 pty.node 同 Team。
     // sidecar 起不来而不是静默无围栏:文件缺席 ⇒ main 拒 fork(process-fence-plan.ts)。只在 darwin 声明 ——
     // 别的平台没有 seatbelt,不带这条(否则 `from` 不存在会炸 win/linux 打包)。
     ...(process.platform === "darwin"
       ? [
           {
-            from: "native/alpha-fence/build/",
-            to: "alpha-fence/",
-            filter: ["alpha_fence.node"],
+            from: "native/codepuppy-fence/build/",
+            to: "codepuppy-fence/",
+            filter: ["codepuppy_fence.node"],
           },
           // #1564:Word/Excel/PowerPoint/PDF 四个文档工具的随包运行时(prebuild 里 scripts/build-office-runtime.ts
           // 按 resources/office-runtime/ 的两架构 lock 产出,只装目标架构那一份)。落点 <resources>/office-runtime/,
@@ -182,7 +194,7 @@ const getBase = (appId: string): Configuration => ({
     enableCookieEncryption: true,
   },
   mac: {
-    artifactName: "code-puppy-${os}-${arch}.${ext}",
+    artifactName: "codepuppy-${os}-${arch}.${ext}",
     category: "public.app-category.developer-tools",
     icon: `resources/icons/icon.icns`,
     // Notarization requires hardenedRuntime + entitlements; only when actually signing.
@@ -191,8 +203,8 @@ const getBase = (appId: string): Configuration => ({
     entitlements: "resources/entitlements.plist",
     entitlementsInherit: "resources/entitlements.plist",
     // null => ad-hoc sign (no Developer ID, local dev builds). When signing, auto-discover the
-    // "Developer ID Application" cert from the keychain (override with ALPHA_SIGN_IDENTITY).
-    identity: shouldSign ? (process.env.ALPHA_SIGN_IDENTITY ?? undefined) : null,
+    // "Developer ID Application" cert from the keychain (override with CODEPUPPY_SIGN_IDENTITY).
+    identity: shouldSign ? (process.env.CODEPUPPY_SIGN_IDENTITY ?? undefined) : null,
     // electron-builder 26.x wants a boolean; notarytool creds/team come from env
     // (APPLE_API_KEY/APPLE_API_KEY_ID/APPLE_API_ISSUER, or APPLE_ID/APPLE_APP_SPECIFIC_PASSWORD/APPLE_TEAM_ID).
     notarize: shouldSign,
@@ -244,6 +256,7 @@ const getBase = (appId: string): Configuration => ({
 })
 
 export function getConfig(target: Channel = channel) {
+  rejectRetiredSigningEnv()
   const appId = APP_IDS[target]
   const base = getBase(appId)
 

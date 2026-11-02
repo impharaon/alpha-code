@@ -38,7 +38,7 @@ packages/opencode/src/session/llm/request.ts:84-87
 | 问题 | 实读 | 结论 |
 | --- | --- | --- |
 | alpha 出 CLI 吗? | `packages/ui-mac/package.json` 无 `bin` 字段 | 否 |
-| 安装包里带可执行 CLI 吗? | `packages/ui-mac/electron-builder.config.ts:79-133` 的 `extraResources` 共 8 条:`skills/` `factory-skills/` `office-mcp/` `agents/` `NOTICE.txt` `extension-seed/` `alpha-ext/` `db-expected-migrations.json` | 否 |
+| 安装包里带可执行 CLI 吗? | `packages/ui-mac/electron-builder.config.ts:79-133` 的 `extraResources` 共 8 条:`skills/` `factory-skills/` `office-mcp/` `agents/` `NOTICE.txt` `extension-seed/` `codepuppy-ext/` `db-expected-migrations.json` | 否 |
 | 应用起引擎时传 argv 吗? | `packages/ui-mac/src/main/server.ts:293-295`:`fork(sidecar, [], …)` | 传的是 `[]` |
 | 那个 sidecar 是 CLI 吗? | `packages/ui-mac/src/main/sidecar.ts:118` `const { Server } = await import("virtual:opencode-server")` | 是**服务器**,不解析 argv |
 | runbook 里有人用它吗? | `grep -rn -- "--variant" docs/ .claude/` → **0 命中** | 否 |
@@ -57,9 +57,9 @@ packages/opencode/src/session/llm/request.ts:84-87
 
 | 位置 | 代码 | 作用 |
 | --- | --- | --- |
-| `alpha-ui/model-picker-core.ts:74-78` | `withModelVariant`:`variant && model.variants.includes(variant) ? variant : undefined` | 选档时就丢掉非法值 |
-| `alpha-ui/composer-state.ts:232-233` | `setComposerModel`:换模型时 `m.variant && !m.variants.includes(m.variant)` ⇒ 清空 | 换模型不留下陈旧档 |
-| `alpha-ui/composer-state.ts:318` | `buildPromptRequest`:`input.effort && input.model.variants.includes(input.effort) ? { variant: input.effort } : {}` | 发送前最后一道(C28) |
+| `codepuppy-ui/model-picker-core.ts:74-78` | `withModelVariant`:`variant && model.variants.includes(variant) ? variant : undefined` | 选档时就丢掉非法值 |
+| `codepuppy-ui/composer-state.ts:232-233` | `setComposerModel`:换模型时 `m.variant && !m.variants.includes(m.variant)` ⇒ 清空 | 换模型不留下陈旧档 |
+| `codepuppy-ui/composer-state.ts:318` | `buildPromptRequest`:`input.effort && input.model.variants.includes(input.effort) ? { variant: input.effort } : {}` | 发送前最后一道(C28) |
 | 档位来源 | `model-picker-core.ts:70/109` `Object.keys(platform.variants)` | 只可能是该模型真有的键 |
 
 **这一半已经有闸**:`composer-state.test.ts` 的「无档模型 → 绝不携带 variant(C28)」与
@@ -79,21 +79,21 @@ packages/opencode/src/session/llm/request.ts:84-87
 
 ## 5. 真正没被守住的那一半:「告诉用户为什么没生效」
 
-`alpha-composer.tsx` 的 `EffortChip` 已经做了这件事:
+`codepuppy-composer.tsx` 的 `EffortChip` 已经做了这件事:
 
 - `:414-415` `supported() = variants().length > 0`;
-- `:434` / `:441` / `:449` chip 上 `title` 走 `alpha.composer.effortUnsupported`、
+- `:434` / `:441` / `:449` chip 上 `title` 走 `codepuppy.composer.effortUnsupported`、
   `data-muted={supported() ? undefined : ""}`、值位显示 `—`;
-- `:501` 弹层里 `alpha.composer.effortUnavailableHint` **点名那个模型**
+- `:501` 弹层里 `codepuppy.composer.effortUnavailableHint` **点名那个模型**
   (zh:「「{{model}}」未提供推理档位;请换用带档位的模型。」)。
 
-**但这一半在 2026-09-06 之前没有任何判据。** 而它不是边角:`packages/ui-mac/src/main/alpha-models.json`
+**但这一半在 2026-09-06 之前没有任何判据。** 而它不是边角:`packages/ui-mac/src/main/codepuppy-models.json`
 当天 12 个平台模型里,只有 `claude-opus-4.8` 与 `gpt-5.4-mini` 有 `variants`,**另外 10 个没有**。
 把 `supported()` 改成恒真、或把弹层那段 hint 换成空,用户点开档位入口看到的就是一片空白 ——
 和票面描述的沉默同形,而当时没有任何东西会变红。
 
-判据因此补在 `packages/ui-mac/test-component/alpha-composer-model.cases.ts`
-(真挂 `AlphaComposerRuntime`,由已登记的 `alpha-composer-model.component.test.ts` 起子进程跑):
+判据因此补在 `packages/ui-mac/test-component/codepuppy-composer-model.cases.ts`
+(真挂 `CodePuppyComposerRuntime`,由已登记的 `codepuppy-composer-model.component.test.ts` 起子进程跑):
 无档位模型 ⇒ chip muted + `—` + title 说明原因 + 弹层点名模型 + **零个可点档位**;
 同一条用例里以**有**档位的模型作控制组(否则「弹层根本没渲染」也能满足全部否定断言)。
 变异实测(2026-09-06):拿掉 `data-muted` / `supported()` 恒真 / hint 置空,三条各自变红。
@@ -111,7 +111,7 @@ packages/opencode/src/session/llm/request.ts:84-87
 它的另一面 —— **有徽标的模型在 chip 上选不到档**(`deepseek-v4-pro`、`glm-5.2`,平台与直连都是),
 以及**没徽标的模型在悄悄推理**(`gpt-5.4-nano` 默认 `reasoning_effort: medium`)。修法与判据:
 
-- **档位的唯一 alpha 侧来源仍是 `alpha-models.json` 的 `variants`**(ADR-014 的 config 杠杆)。
+- **档位的唯一 alpha 侧来源仍是 `codepuppy-models.json` 的 `variants`**(ADR-014 的 config 杠杆)。
   平台条目补齐:`gpt-5.4-nano`(`reasoning: true` + 低/中/高)、`deepseek-v4-pro`(低/中/高/最高)、
   `glm-5.2`(高/最高);wire 值(`reasoningEffort`)逐条对照上游 `transform.variants()` 对
   `@ai-sdk/openai-compatible` 的派生表写,不发引擎不认识的值。
@@ -124,8 +124,8 @@ packages/opencode/src/session/llm/request.ts:84-87
   `model.list`,其档位由 `packages/core/src/plugin/variant.ts` `generate()` 产出 —— 只认 glm-5.2;
   而请求装配走 v1 `transform.variants()`(deepseek-v4 有 low/medium/high/max)。两份不是同一份
   (基线 `req-153-output-capability.md` §6.5),读 V2 清单会让 deepseek-v4-pro 在 chip 上仍然零档。
-- **判据是双向的、走真引擎**:`packages/ui-mac/src/main/alpha-reasoning-badge-parity.test.ts`
-  对生产 `buildModelPickerRows` 的每一行,用生产 `buildAlphaModelConfig` 的配置起本仓
+- **判据是双向的、走真引擎**:`packages/ui-mac/src/main/codepuppy-reasoning-badge-parity.test.ts`
+  对生产 `buildModelPickerRows` 的每一行,用生产 `buildCodePuppyModelConfig` 的配置起本仓
   `packages/opencode/src/index.ts run`(与打包 sidecar 同一份 v1 装配)打到测试进程里的假上游:
   有徽标 ⇒ chip 每一档的主请求体带推理参数且 `reasoning_effort` 值逐字对上;无徽标 ⇒ 零档且默认
   请求不带。未修的树上它点名 5 行红(见 PR `#1266` 正文的变异输出)。
@@ -133,8 +133,8 @@ packages/opencode/src/session/llm/request.ts:84-87
   条目可派生,而 BYOK 目录 `models` 曾是纯 `string[]`,没有逐模型元数据槽 ⇒ 无徽标、零档,而上游
   `transform.options()`(`transform.ts:1184-1192`)对 `providerID` 含 `zhipuai` + `@ai-sdk/openai-compatible`
   **无条件**写 `thinking: { type: "enabled", clear_thinking: false }`。修法是目录 schema 扩面:
-  `byokProviders[].modelMeta[<id>]`(`shared/alpha-model-types.ts` `ByokModelMeta`),仍由同一个
-  `byokModelMeta` 派生(显式槽优先于平台同名条目;两者不得同时存在,alpha-models 套件钉着)。glm-4.5-air
+  `byokProviders[].modelMeta[<id>]`(`shared/codepuppy-model-types.ts` `ByokModelMeta`),仍由同一个
+  `byokModelMeta` 派生(显式槽优先于平台同名条目;两者不得同时存在,codepuppy-models 套件钉着)。glm-4.5-air
   现在标徽标并给 `开` / `关` 两档:`开 = { thinking: { type: "enabled" } }`、`关 = { thinking: { type: "disabled" } }`,
   经 `request.ts:95` 的 mergeDeep 与上游默认合成 `{ type, clear_thinking: false }` 原样进请求体(假上游捕获实证)。
   原先 `KNOWN_UNFIXED` 登记已按其过期断言删除;判据扩为「显式关闭档 ⇒ 请求体 `thinking.type` 逐字 `disabled`
@@ -154,15 +154,15 @@ packages/opencode/src/session/llm/request.ts:84-87
 
 三条结论:①`disabled` **真的**关掉思考(无 `reasoning_content`,token 128 → 4);②`type` 写错**不报错**,上游静默
 回落到思考 —— **HTTP 200 不是受理证据**,`reasoning_content` 有没有才是;③因此目录里的关闭档值必须逐字 `disabled`,
-alpha-models 套件钉住每个 `thinking.type ∈ {enabled, disabled}`(变异实测:写成 `disable` 当场红)。
-端到端复核:用生产 `buildAlphaModelConfig` 的配置起本仓引擎 `run --model zhipuai-byok/glm-4.5-air`,默认 / `--variant 开` /
+codepuppy-models 套件钉住每个 `thinking.type ∈ {enabled, disabled}`(变异实测:写成 `disable` 当场红)。
+端到端复核:用生产 `buildCodePuppyModelConfig` 的配置起本仓引擎 `run --model zhipuai-byok/glm-4.5-air`,默认 / `--variant 开` /
 `--variant 关` 三次都 rc=0 并拿到回答(3.5 s / 3.0 s / 2.4 s)—— 引擎实际发出的三种请求体上游都受理。
 - **未验**:`deepseek-v4-pro` 直连与平台节点收到 `reasoning_effort: max` 的真实受理情况(无凭据;
   `#1239` 只对智谱回放过 `max`)。
 
 ## 8. 追记(2026-09-06 同日,`#1237`):黑名单模型的档位 —— 形状逐腿取自实打表,未实打的钉在无档
 
-§7 说「档位的唯一 alpha 侧来源是 `alpha-models.json` 的 `variants`」。`#1237` 给上游黑名单族
+§7 说「档位的唯一 alpha 侧来源是 `codepuppy-models.json` 的 `variants`」。`#1237` 给上游黑名单族
 (`transform.ts` `variants()` 的 `glm && !glm52` / `qwen`)里的三个平台模型补上档位,但**形状不是照
 `reasoningEffort` 套的** —— 本票 v1 正是那样写的,被两条实测推翻后作废重写:网关曾整个丢掉推理字段
 (`alpha-platform#423`,已修),智谱直连对非 5.2 的 GLM **不校验** `reasoning_effort`(`bogus-value`
@@ -218,7 +218,7 @@ DOC §3.4 对 qwen 每档只有单样本且 `high`/`medium`/`max` 撞到 256 上
 ### 8.3 辅助调用取档位表第一项 —— 「关」必须排第一(基线 §3.8a 的实证)
 
 `session/llm/request.ts:88-89` 对 `input.small` 的辅助调用(标题)走 `transform.smallOptions()`,首行
-`Object.values(model.variants ?? {})[0]` —— **取档位表第一项,与用户选档无关**。用生产 `buildAlphaModelConfig`
+`Object.values(model.variants ?? {})[0]` —— **取档位表第一项,与用户选档无关**。用生产 `buildCodePuppyModelConfig`
 起本仓引擎打到假上游,每次 run 捕到两条 POST(主请求 + 标题),8/8 次都捕到:
 
 | run | 主请求体 | 标题请求体 |
@@ -244,11 +244,11 @@ DOC §3.4 对 qwen 每档只有单样本且 `high`/`medium`/`max` 撞到 256 上
 
 ### 8.5 判据
 
-- `packages/ui-mac/src/main/alpha-models.test.ts` 的 `#1237` 节:`VERIFIED_TIERS`(键 = 引擎侧 id,值 = 逐字档位表
-  + 腿 + 出处)与 `UNVERIFIED_TIERLESS`;判官是纯函数,对生产 `buildAlphaModelConfig` 的产物判 ——
+- `packages/ui-mac/src/main/codepuppy-models.test.ts` 的 `#1237` 节:`VERIFIED_TIERS`(键 = 引擎侧 id,值 = 逐字档位表
+  + 腿 + 出处)与 `UNVERIFIED_TIERLESS`;判官是纯函数,对生产 `buildCodePuppyModelConfig` 的产物判 ——
   表外声明即红、注入与表不逐字相等即红、无档清单里的模型必须**真的被注入且**无徽标无档(空集不算)、
   有关闭档而关不在第一位即红、表登记的档位从注入里消失即红。手段自证五种已知的坏各自点名(v1 的 GLM
   `reasoningEffort` 形状 / 给 MiniMax 补档 / 关档值写成 `off` / 开排第一 / 退回无档)。
-- `alpha-reasoning-badge-parity.test.ts`:新三行由矩阵原判据逐档覆盖(主请求体 `thinking.type` /
+- `codepuppy-reasoning-badge-parity.test.ts`:新三行由矩阵原判据逐档覆盖(主请求体 `thinking.type` /
   `reasoning_effort` 逐字对上);新增**标题辅助调用**判据 —— 有徽标的每一行,默认 run 的标题体必须带第一档;
   手段自证把 qwen「开」档的主请求体冒充标题体 ⇒ 点名 `medium ≠ none`。

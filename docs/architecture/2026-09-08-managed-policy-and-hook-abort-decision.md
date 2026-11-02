@@ -31,7 +31,7 @@ review_after: 2026-12-08
 
 **真正的缺口只有一个,而且不在 hook 上:我们没有「谁是管理员」这个概念。**
 策略分区的 account 在生产里恒为字符串 `"anonymous"`
-(`packages/opencode/src/permission/alpha-tool-policy.ts:233`),
+(`packages/opencode/src/permission/codepuppy-tool-policy.ts:233`),
 `entitlement` cap 在生产里**没有任何供数方**(§2.3)。
 第一个团队客户到来时要补的是这个,不是 hook。
 
@@ -151,7 +151,7 @@ $ grep -rh -A2 'plugin\.trigger(' --include="*.ts" packages/ | grep -o '"[a-z][a
 
 **能,而且已经在生产里跑了三周,不需要新造。**
 
-`packages/opencode/src/permission/alpha-managed-policy.ts`(alpha 自有文件,ADR-043 谓词因子②)
+`packages/opencode/src/permission/codepuppy-managed-policy.ts`(alpha 自有文件,ADR-043 谓词因子②)
 读三个来源,合成一层**不可突破的 cap**:
 
 | 优先级(低→高) | 来源 | 谁写得了 |
@@ -165,7 +165,7 @@ $ grep -rh -A2 'plugin\.trigger(' --include="*.ts" packages/ | grep -o '"[a-z][a
 **一个进程环境变量就能把系统目录整个换掉**。alpha 的读取器**无条件读系统目录**,
 env 只当最低优先的 additive 补充。
 
-合成语义(`alpha-tool-policy.ts:133-141`,纯函数、无 IO):
+合成语义(`codepuppy-tool-policy.ts:133-141`,纯函数、无 IO):
 
 ```
 cap 命中 ⇒ disabled,任何下层(用户 enabled、会话 always/approved)都撬不开
@@ -207,7 +207,7 @@ cap 命中 ⇒ disabled,任何下层(用户 enabled、会话 always/approved)都
 一次工具调用的真实顺序(`session/tools.ts:98-118`、`tool/code-mode.ts:157-176`):
 
 ```
-① AlphaToolPolicyGate.gateToolExecution(...)        ← 策略咽喉(alpha 自有)
+① CodePuppyToolPolicyGate.gateToolExecution(...)        ← 策略咽喉(alpha 自有)
    ├ resolve():每次调用重读 managed cap + 用户文档
    ├ deny ⇒ namedDeny() ⇒ PermissionV1.DeniedError,调用点 .pipe(Effect.orDie)
    │        ⇒ 具名、响亮、零 hook、零副作用
@@ -231,7 +231,7 @@ cap 命中 ⇒ disabled,任何下层(用户 enabled、会话 always/approved)都
   `permission.ask` 钩子**永不触发**。REQ-158 的分类若挂在那里,是一条**假闸**:
   类型检查过、测试可以过、生产零调用。**唯一在 `Permission.ask` 之前必经、
   且今天真的在跑的 alpha 自有咽喉是 `gateToolExecution`**
-  (`packages/opencode/src/permission/alpha-tool-policy-gate.ts:138`,`alpha-*` 基名 ⇒ ADR-043 alpha 自有)。
+  (`packages/opencode/src/permission/codepuppy-tool-policy-gate.ts:138`,`alpha-*` 基名 ⇒ ADR-043 alpha 自有)。
   这条更正**属于 `#1285`,不属于本票**,已在 §6 登记为要回写的票面事实。
 
 ### 2.3 Q3 — 托管层的下发与信任从哪来?撤销怎么走?
@@ -240,7 +240,7 @@ cap 命中 ⇒ disabled,任何下层(用户 enabled、会话 always/approved)都
 
 | 通道 | 信任根 | 撤销 | 今天能不能用 |
 | --- | --- | --- | --- |
-| **A. 系统 managed 目录 / MDM**(已实现) | root / MDM 描述文件 —— **操作系统级**,不需要我们发明任何东西 | 删文件 / 撤 MDM profile。**下一次工具调用即生效**:`resolve()` 每次调用重读盘,零缓存(`alpha-tool-policy.ts:249-259`) | ✅ **能**,但只对**真的部署了 MDM 或有 IT 管理机器的客户**成立 |
+| **A. 系统 managed 目录 / MDM**(已实现) | root / MDM 描述文件 —— **操作系统级**,不需要我们发明任何东西 | 删文件 / 撤 MDM profile。**下一次工具调用即生效**:`resolve()` 每次调用重读盘,零缓存(`codepuppy-tool-policy.ts:249-259`) | ✅ **能**,但只对**真的部署了 MDM 或有 IT 管理机器的客户**成立 |
 | **B. 平台侧租户策略**(`alpha-platform` 下发) | 我们自己的账户体系 | 平台改一次,客户端下次取到 | ❌ **不能** —— 见下 |
 | **C. 签名包携带托管规则** | 包签名 + admission | 卸载 / catalog 撤下 | ❌ **不该** —— 见下 |
 
@@ -258,7 +258,7 @@ cap 命中 ⇒ disabled,任何下层(用户 enabled、会话 always/approved)都
 **B 为什么今天不能用 —— 这才是真缺口。**
 
 - 策略文档的分区是 `{account, workspace}`,而 `account` 在生产里是
-  `options?.account ?? Effect.succeed("anonymous")`(`alpha-tool-policy.ts:233`),
+  `options?.account ?? Effect.succeed("anonymous")`(`codepuppy-tool-policy.ts:233`),
   源码注释自陈:「生产默认 anonymous —— 引擎侧今天没有账户权威,`#1129`/`#1130` 接线」。
   **⇒ 引擎不知道「你是谁」,更不知道「谁是你的管理员」。**
 - `entitlement` cap 的类型位存在(`"allow" | "deny" | "missing"`),
@@ -364,7 +364,7 @@ cap 命中 ⇒ disabled,任何下层(用户 enabled、会话 always/approved)都
 
 **先说不用补的**(这三样已经在跑,不因为等待而腐坏):
 
-- 「压过用户设置」的合成语义与它的负向判据(`test/permission/alpha-tool-policy.test.ts`
+- 「压过用户设置」的合成语义与它的负向判据(`test/permission/codepuppy-tool-policy.test.ts`
   有「env 存在时系统 managed deny 仍生效」的负向闸);
 - 执行咽喉的 fail-closed 与「deny 早于任何 hook / 任何副作用」;
 - 坏输入的方向(managed 读不出 ⇒ 全部 disabled)。
@@ -373,7 +373,7 @@ cap 命中 ⇒ disabled,任何下层(用户 enabled、会话 always/approved)都
 
 | | 内容 | 为什么现在做不了 |
 | --- | --- | --- |
-| **T1** | **租户身份进引擎**:把 `alpha-tool-policy` 的 partition account 从字面量 `"anonymous"` 换成真实账户/组织标识 | 引擎侧今天没有账户权威(源码自陈,`#1130` 承接一半) |
+| **T1** | **租户身份进引擎**:把 `codepuppy-tool-policy` 的 partition account 从字面量 `"anonymous"` 换成真实账户/组织标识 | 引擎侧今天没有账户权威(源码自陈,`#1130` 承接一半) |
 | **T2** | **平台侧租户策略的存储、下发与撤销**(`alpha-platform`),以及 `entitlement` cap 的**供数方**(今天类型位在、生产零来源) | 依赖 T1;且 `alpha-platform` 侧今天没有 tenant policy 概念 |
 | **T3** | **管理员面**(`alpha-web`):规则的编辑、下发、审计与撤销 | 依赖 T2 |
 | **T4** | 表达力扩档(若 §4 第 2 条命中):要么把 managed 文法从「只有 deny」扩到能说 ask,要么才谈可执行 hook | 依赖一个**真实规则样本** |
@@ -394,7 +394,7 @@ T4/T5 才是会被「早做」浪费掉的部分 —— 没有样本就设计,�
 - [`#1285`](https://github.com/jinjunnn/alpha-code/issues/1285)(REQ-158):
   票面「`packages/plugin/src/index.ts:261` 已有 `permission.ask` hook ⋯ **接缝是现成的**」
   **不成立**(§1.4 两条轴实测)。分类结论应挂在
-  `packages/opencode/src/permission/alpha-tool-policy-gate.ts` 的 `gateToolExecution`
+  `packages/opencode/src/permission/codepuppy-tool-policy-gate.ts` 的 `gateToolExecution`
   ——`Permission.ask` 之前唯一必经且真的在跑的 alpha 自有咽喉。
 - [`docs/architecture/2026-08-23-codex-harness-comparison.md`](2026-08-23-codex-harness-comparison.md)
   §6 最后一条写「⇒ 托管 hook 是**裁决题**而非实现题(`#1291`)」——

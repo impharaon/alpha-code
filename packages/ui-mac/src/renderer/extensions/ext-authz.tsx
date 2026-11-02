@@ -9,9 +9,9 @@
 import { For, Show } from "solid-js"
 import type { JSX } from "solid-js"
 import { t } from "../i18n"
-import { Button } from "../alpha-ui/Button"
-import { Dialog } from "../alpha-ui/Dialog"
-import type { DialogRestoreFocus } from "../alpha-ui/dialog-core"
+import { Button } from "../codepuppy-ui/Button"
+import { Dialog } from "../codepuppy-ui/Dialog"
+import type { DialogRestoreFocus } from "../codepuppy-ui/dialog-core"
 import type { AuthorizationConfirmationWire, CapabilityDiffWire } from "../../shared/ext-capability-authorization"
 
 type I18nKey = Parameters<typeof t>[0]
@@ -25,12 +25,12 @@ const ic = (d: string) => () => (
 
 /** 能力词汇表(设计稿 §6)。语义白名单在 main manifest 解码期;此处只管展示。 */
 const CAP_VOCAB: Record<string, CapVocab> = {
-  "prompt:context": { label: "alpha.ext.cap.promptContext", desc: "alpha.ext.cap.promptContextDesc", tier: "low", icon: ic("M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z") },
-  "engine:config": { label: "alpha.ext.cap.engineConfig", desc: "alpha.ext.cap.engineConfigDesc", tier: "mid", icon: ic("M8 5.8a2.2 2.2 0 1 0 0 4.4 2.2 2.2 0 0 0 0-4.4M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6 5 5M11 11l1.4 1.4M12.4 3.6 11 5M5 11l-1.4 1.4") },
-  "engine:plugin": { label: "alpha.ext.cap.enginePlugin", desc: "alpha.ext.cap.enginePluginDesc", tier: "high", icon: ic("M5.5 4.5 2 8l3.5 3.5M10.5 4.5 14 8l-3.5 3.5") },
-  "process:spawn": { label: "alpha.ext.cap.processSpawn", desc: "alpha.ext.cap.processSpawnDesc", tier: "high", icon: ic("M1.8 2.8h12.4v10.4H1.8zM4.5 6l2 2-2 2M8.5 10.5h3") },
-  "network:remote": { label: "alpha.ext.cap.networkRemote", desc: "alpha.ext.cap.networkRemoteDesc", tier: "mid", icon: ic("M8 1.8a6.2 6.2 0 1 0 0 12.4A6.2 6.2 0 0 0 8 1.8M1.8 8h12.4M8 1.8c-3.6 3.4-3.6 9 0 12.4c3.6-3.4 3.6-9 0-12.4") },
-  "cloud:dispatch": { label: "alpha.ext.cap.cloudDispatch", desc: "alpha.ext.cap.cloudDispatchDesc", tier: "mid", icon: ic("M4.5 12.5a3 3 0 0 1-.4-6A4 4 0 0 1 12 7.6a2.5 2.5 0 0 1-.5 4.9z") },
+  "prompt:context": { label: "codepuppy.ext.cap.promptContext", desc: "codepuppy.ext.cap.promptContextDesc", tier: "low", icon: ic("M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z") },
+  "engine:config": { label: "codepuppy.ext.cap.engineConfig", desc: "codepuppy.ext.cap.engineConfigDesc", tier: "mid", icon: ic("M8 5.8a2.2 2.2 0 1 0 0 4.4 2.2 2.2 0 0 0 0-4.4M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6 5 5M11 11l1.4 1.4M12.4 3.6 11 5M5 11l-1.4 1.4") },
+  "engine:plugin": { label: "codepuppy.ext.cap.enginePlugin", desc: "codepuppy.ext.cap.enginePluginDesc", tier: "high", icon: ic("M5.5 4.5 2 8l3.5 3.5M10.5 4.5 14 8l-3.5 3.5") },
+  "process:spawn": { label: "codepuppy.ext.cap.processSpawn", desc: "codepuppy.ext.cap.processSpawnDesc", tier: "high", icon: ic("M1.8 2.8h12.4v10.4H1.8zM4.5 6l2 2-2 2M8.5 10.5h3") },
+  "network:remote": { label: "codepuppy.ext.cap.networkRemote", desc: "codepuppy.ext.cap.networkRemoteDesc", tier: "mid", icon: ic("M8 1.8a6.2 6.2 0 1 0 0 12.4A6.2 6.2 0 0 0 8 1.8M1.8 8h12.4M8 1.8c-3.6 3.4-3.6 9 0 12.4c3.6-3.4 3.6-9 0-12.4") },
+  "cloud:dispatch": { label: "codepuppy.ext.cap.cloudDispatch", desc: "codepuppy.ext.cap.cloudDispatchDesc", tier: "mid", icon: ic("M4.5 12.5a3 3 0 0 1-.4-6A4 4 0 0 1 12 7.6a2.5 2.5 0 0 1-.5 4.9z") },
 }
 const HIGH_RISK = new Set(["engine:plugin", "process:spawn"])
 
@@ -69,8 +69,8 @@ export function ExtStandaloneAuthzDialog(props: {
 }) {
   const title = () => {
     const state = props.state
-    if (!state) return t("alpha.ext.authz.titleFirst")
-    return authzIsEscalation(state.diffs) ? t("alpha.ext.authz.titleEscalation") : t("alpha.ext.authz.titleFirst")
+    if (!state) return t("codepuppy.ext.authz.titleFirst")
+    return authzIsEscalation(state.diffs) ? t("codepuppy.ext.authz.titleEscalation") : t("codepuppy.ext.authz.titleFirst")
   }
   return (
     <Dialog
@@ -85,10 +85,10 @@ export function ExtStandaloneAuthzDialog(props: {
       footer={
         <>
           <Button variant="ghost" autofocus disabled={props.busy} onClick={props.onCancel}>
-            {t("alpha.ext.cancel")}
+            {t("codepuppy.ext.cancel")}
           </Button>
           <Button variant="primary" loading={props.busy} onClick={props.onConfirm}>
-            {props.state?.mode === "update" ? t("alpha.ext.authz.confirmUpdate") : t("alpha.ext.authz.confirmInstall")}
+            {props.state?.mode === "update" ? t("codepuppy.ext.authz.confirmUpdate") : t("codepuppy.ext.authz.confirmInstall")}
           </Button>
         </>
       }
@@ -125,15 +125,15 @@ function CapRow(props: { cap: string; kind: CapRowKind }) {
   // 风险标识跟随能力本身(新增与已授权都标;将收回不标)—— review minor:高风险不因「已授权」而隐身。
   const tier = () => (props.kind === "removed" ? "low" : (vocab()?.tier ?? "mid"))
   const chipKey = () =>
-    props.kind === "new" ? "alpha.ext.authz.chipNew" : props.kind === "granted" ? "alpha.ext.authz.chipGranted" : "alpha.ext.authz.chipRemoved"
+    props.kind === "new" ? "codepuppy.ext.authz.chipNew" : props.kind === "granted" ? "codepuppy.ext.authz.chipGranted" : "codepuppy.ext.authz.chipRemoved"
   return (
-    <div class="alpha-ext-authz-cap" data-muted={props.kind !== "new" ? "" : undefined}>
-      <span class="alpha-ext-authz-ic" data-tier={tier()}>
+    <div class="codepuppy-ext-authz-cap" data-muted={props.kind !== "new" ? "" : undefined}>
+      <span class="codepuppy-ext-authz-ic" data-tier={tier()}>
         <Show when={vocab()} fallback={<span aria-hidden="true">?</span>}>
           {vocab()!.icon()}
         </Show>
       </span>
-      <span class="alpha-ext-authz-nm">
+      <span class="codepuppy-ext-authz-nm">
         <b>
           <Show when={props.kind === "removed"} fallback={vocab() ? t(vocab()!.label) : props.cap}>
             <s>{vocab() ? t(vocab()!.label) : props.cap}</s>
@@ -143,13 +143,13 @@ function CapRow(props: { cap: string; kind: CapRowKind }) {
           <small>{t(vocab()!.desc)}</small>
         </Show>
       </span>
-      <span class="alpha-ext-authz-id">{props.cap}</span>
+      <span class="codepuppy-ext-authz-id">{props.cap}</span>
       <Show when={props.kind !== "removed" && HIGH_RISK.has(props.cap)}>
-        <span class="alpha-ext-authz-chip" data-kind="risk">
-          {t("alpha.ext.authz.riskHigh")}
+        <span class="codepuppy-ext-authz-chip" data-kind="risk">
+          {t("codepuppy.ext.authz.riskHigh")}
         </span>
       </Show>
-      <span class="alpha-ext-authz-chip" data-kind={props.kind}>
+      <span class="codepuppy-ext-authz-chip" data-kind={props.kind}>
         {t(chipKey())}
       </span>
     </div>
@@ -162,22 +162,22 @@ function CapRow(props: { cap: string; kind: CapRowKind }) {
 export function ExtGrantedCapRow(props: { cap: string; subtitle?: string }) {
   const vocab = () => CAP_VOCAB[props.cap]
   return (
-    <div class="alpha-ext-authz-cap">
-      <span class="alpha-ext-authz-ic" data-tier={vocab()?.tier ?? "mid"}>
+    <div class="codepuppy-ext-authz-cap">
+      <span class="codepuppy-ext-authz-ic" data-tier={vocab()?.tier ?? "mid"}>
         <Show when={vocab()} fallback={<span aria-hidden="true">?</span>}>
           {vocab().icon()}
         </Show>
       </span>
-      <span class="alpha-ext-authz-nm">
+      <span class="codepuppy-ext-authz-nm">
         <b>{vocab() ? t(vocab().label) : props.cap}</b>
         <Show when={props.subtitle} fallback={<Show when={vocab()}><small>{t(vocab().desc)}</small></Show>}>
           <small>{props.subtitle}</small>
         </Show>
       </span>
-      <span class="alpha-ext-authz-id">{props.cap}</span>
+      <span class="codepuppy-ext-authz-id">{props.cap}</span>
       <Show when={HIGH_RISK.has(props.cap)}>
-        <span class="alpha-ext-authz-chip" data-kind="risk">
-          {t("alpha.ext.authz.riskHigh")}
+        <span class="codepuppy-ext-authz-chip" data-kind="risk">
+          {t("codepuppy.ext.authz.riskHigh")}
         </span>
       </Show>
     </div>
@@ -196,35 +196,35 @@ export function ExtAuthzView(props: { name: string; isBundle: boolean; mode: "in
   // grants.json)不是「首次安装」—— 按 mode 给中性文案,避免与「授权并更新」按钮自相矛盾。
   const intro = () =>
     props.isBundle
-      ? t("alpha.ext.authz.introBundle", { name: props.name, n: String(confirmDiffs().length) })
+      ? t("codepuppy.ext.authz.introBundle", { name: props.name, n: String(confirmDiffs().length) })
       : escalation()
-        ? t("alpha.ext.authz.introEscalation", { name: props.name })
+        ? t("codepuppy.ext.authz.introEscalation", { name: props.name })
         : props.mode === "update"
-          ? t("alpha.ext.authz.introUpdate", { name: props.name })
-          : t("alpha.ext.authz.introFirst", { name: props.name })
+          ? t("codepuppy.ext.authz.introUpdate", { name: props.name })
+          : t("codepuppy.ext.authz.introFirst", { name: props.name })
   // 阶段切换用 aria-live 通告(内容非纯色分层:chip 均带文字,收回项另有删除线)。
   return (
-    <div class="alpha-ext-authz" aria-live="polite">
-      <p class="alpha-ext-authz-intro">{intro()}</p>
-      <div class="alpha-ext-authz-box">
+    <div class="codepuppy-ext-authz" aria-live="polite">
+      <p class="codepuppy-ext-authz-intro">{intro()}</p>
+      <div class="codepuppy-ext-authz-box">
         <For each={shownDiffs()}>
           {(diff) => (
             <>
               <Show when={props.isBundle}>
-                <div class="alpha-ext-authz-item">{itemLabel(diff.key)}</div>
+                <div class="codepuppy-ext-authz-item">{itemLabel(diff.key)}</div>
               </Show>
               <For each={capRows(diff)}>{(row) => <CapRow cap={row.cap} kind={row.kind} />}</For>
             </>
           )}
         </For>
         <Show when={props.isBundle && restCount() > 0}>
-          <div class="alpha-ext-authz-rest">{t("alpha.ext.authz.bundleRest", { n: String(restCount()) })}</div>
+          <div class="codepuppy-ext-authz-rest">{t("codepuppy.ext.authz.bundleRest", { n: String(restCount()) })}</div>
         </Show>
       </div>
       <Show when={authzHasHighRisk(props.diffs)}>
-        <p class="alpha-ext-confirm-risk">{t("alpha.ext.authz.riskLine")}</p>
+        <p class="codepuppy-ext-confirm-risk">{t("codepuppy.ext.authz.riskLine")}</p>
       </Show>
-      <p class="alpha-ext-confirm-note">{t("alpha.ext.authz.note")}</p>
+      <p class="codepuppy-ext-confirm-note">{t("codepuppy.ext.authz.note")}</p>
     </div>
   )
 }

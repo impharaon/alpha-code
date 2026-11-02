@@ -28,8 +28,8 @@ import {
 } from "./process-fence-profile"
 
 const HOME = "/Users/alpha"
-/** `#1390`:应用状态根 = 三个 env 根与 CAS 的父目录(alpha-environment.ts defaultAlphaBaseRoot)。 */
-const STATE_ROOT = `${HOME}/Library/Application Support/alpha-code-state`
+/** `#1390`:应用状态根 = 三个 env 根与 CAS 的父目录(codepuppy-environment.ts defaultCodePuppyBaseRoot)。 */
+const STATE_ROOT = `${HOME}/Library/Application Support/codepuppy-state`
 /** 假盘:这些路径不在盘上,realpath 抛 ENOENT ⇒ selectWorkspaceUnion 退回词法比较(生产对不存在的路径同一条路)。 */
 const noDisk = (p: string): string => {
   throw Object.assign(new Error(`ENOENT: no such file or directory, realpath '${p}'`), { code: "ENOENT" })
@@ -37,7 +37,7 @@ const noDisk = (p: string): string => {
 const roots = { home: HOME, dataHome: `${HOME}/.local/share`, cacheHome: `${HOME}/.cache`, configHome: `${HOME}/.config` }
 const base: ProcessFenceProfileInput = {
   workspaces: [`${HOME}/code-puppy`, "/Users/alpha/app/alpha-code"],
-  alphaGlobalRoot: `${HOME}/Library/Application Support/alpha-code-state/env/prod`,
+  codepuppyGlobalRoot: `${HOME}/Library/Application Support/codepuppy-state/env/prod`,
   userDataPath: `${HOME}/Library/Application Support/ai.opencode.desktop`,
   stateHome: `${HOME}/Library/Application Support/ai.opencode.desktop`,
   roots,
@@ -68,7 +68,7 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的 19 行,逐行全等"
       "(allow file-write*",
       `(subpath "${HOME}/code-puppy")`,
       `(subpath "/Users/alpha/app/alpha-code")`,
-      `(subpath "${HOME}/Library/Application Support/alpha-code-state/env/prod")`,
+      `(subpath "${HOME}/Library/Application Support/codepuppy-state/env/prod")`,
       `(subpath "${HOME}/Library/Application Support/ai.opencode.desktop")`,
       `(subpath "${HOME}/.local/share/opencode")`,
       `(subpath "${HOME}/.cache/opencode")`,
@@ -270,7 +270,7 @@ describe("selectWorkspaceUnion —— 并集裁剪规则(K=32,顺序 = 默认工
 })
 
 // ── `#1390`:围栏的输入当时是 opencode.global.dat 的三个 tab 键,住在围栏可写的 W3 里,所以被围栏的引擎树自己就能往里
-// 塞一条「最近打开的项目是 <appData>/alpha-code-state」,下一次启动它就进了可写集。这里钉住第一步:凡与应用状态根
+// 塞一条「最近打开的项目是 <appData>/codepuppy-state」,下一次启动它就进了可写集。这里钉住第一步:凡与应用状态根
 // 相关(同一路径 / 在它之内 / 包含它)的候选一律排除,而且先 realpath 再比 —— APFS 大小写不敏感,词法比较会漏。
 // `#1394` 把清单搬到了围栏写不到的真源之后,这条规则留作第二道闸:候选不管从哪来,状态根都进不来(候选形状经
 // workspaceCandidatesFromStore 造,与写入侧同一顺序)。
@@ -300,9 +300,9 @@ describe("`#1390` selectWorkspaceUnion —— 与应用状态根相关的候选�
     expect(union.selected).toEqual(["/Users/alpha/code-puppy"])
     expect(union.excluded).toEqual([
       {
-        directory: "/Users/alpha/Library/Application Support/alpha-code-state",
+        directory: "/Users/alpha/Library/Application Support/codepuppy-state",
         reason:
-          "related to the app state root /Users/alpha/Library/Application Support/alpha-code-state (same path, inside it, or contains it) — the fence's own state must never be a workspace (#1390)",
+          "related to the app state root /Users/alpha/Library/Application Support/codepuppy-state (same path, inside it, or contains it) — the fence's own state must never be a workspace (#1390)",
       },
     ])
   })
@@ -331,7 +331,7 @@ describe("`#1390` selectWorkspaceUnion —— 与应用状态根相关的候选�
     try {
       const home = join(base, "home")
       const appSupport = join(home, "Library", "Application Support")
-      const state = join(appSupport, "alpha-code-state")
+      const state = join(appSupport, "codepuppy-state")
       const puppy = join(home, "code-puppy")
       for (const d of [join(state, "env", "prod"), join(state, "cas"), puppy]) mkdirSync(d, { recursive: true })
       const link = join(home, "link-to-app-support")
@@ -385,7 +385,7 @@ describe("`#1390` selectWorkspaceUnion —— 与应用状态根相关的候选�
       realpath: noDisk,
       isDirectory: () => true,
     })
-    // ~/Library 之下但与 alpha-code-state 无关的目录(iCloud 文稿)也照常放行 —— 规则只认「相关」,不是「在 ~/Library 下」
+    // ~/Library 之下但与 codepuppy-state 无关的目录(iCloud 文稿)也照常放行 —— 规则只认「相关」,不是「在 ~/Library 下」
     expect(union.selected).toEqual(["/Users/alpha/code-puppy", "/Users/alpha/proj-a", "/Users/alpha/app/alpha-code", "/Users/alpha/Library/Mobile Documents/notes"])
     expect(union.excluded).toEqual([])
   })

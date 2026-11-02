@@ -12,10 +12,10 @@ import {
   pathIdentity,
   resolveMcpRefPath,
   type PathIdentity,
-} from "./alpha-mcp-secrets"
-import { alphaGlobalRoot } from "./alpha-installs"
-import { opencodeHomeDir } from "./alpha-bridge"
-import { ALPHA_CONFIG_TOP_KEYS, alphaJsoncPath, isAlphaOwnedConfig } from "./engine-config-truth"
+} from "./codepuppy-mcp-secrets"
+import { codepuppyGlobalRoot } from "./codepuppy-installs"
+import { opencodeHomeDir } from "./codepuppy-bridge"
+import { CODEPUPPY_CONFIG_TOP_KEYS, codepuppyJsoncPath, isCodePuppyOwnedConfig } from "./engine-config-truth"
 import {
   mcpPluginTargetPath,
   writeConfigLeafEditsUnlocked,
@@ -99,7 +99,7 @@ export function planDanglingSweep(parsed: unknown, options: DanglingSweepOptions
 
   const edits: DanglingSweepEdit[] = []
   const uncertain: DanglingSweepPlan["uncertain"] = []
-  if (ALPHA_CONFIG_TOP_KEYS.has("plugin") && Array.isArray(parsed.plugin)) {
+  if (CODEPUPPY_CONFIG_TOP_KEYS.has("plugin") && Array.isArray(parsed.plugin)) {
     parsed.plugin.forEach((entry, index) => {
       if (typeof entry !== "string" || !isAbsolute(entry)) return
       const resolvedPath = resolve(entry)
@@ -113,7 +113,7 @@ export function planDanglingSweep(parsed: unknown, options: DanglingSweepOptions
     })
   }
 
-  if (ALPHA_CONFIG_TOP_KEYS.has("mcp") && isRecord(parsed.mcp)) {
+  if (CODEPUPPY_CONFIG_TOP_KEYS.has("mcp") && isRecord(parsed.mcp)) {
     Object.entries(parsed.mcp).forEach(([name, leaf]) => {
       if (!isRecord(leaf)) return
       ;(["environment", "headers"] as const).forEach((field) => {
@@ -168,7 +168,7 @@ export function sweepEngineConfigDanglingUnlocked(options: {
   inspectPath?: (file: string) => DanglingPathInspection
 }): DanglingSweepOutcome {
   const homeDir = options.homeDir ?? homedir()
-  const alphaConfig = alphaJsoncPath()
+  const codepuppyConfig = codepuppyJsoncPath()
   const legacyDir = opencodeHomeDir()
   const legacyConfig = existsSync(join(legacyDir, "opencode.jsonc"))
     ? join(legacyDir, "opencode.jsonc")
@@ -186,8 +186,8 @@ export function sweepEngineConfigDanglingUnlocked(options: {
       ? join(xdgDir, "opencode.json")
       : join(xdgDir, "opencode.jsonc")
   const routedConfig = mcpPluginTargetPath()
-  const writable = routedConfig === alphaConfig
-    ? options.phase === "data-clear" ? [legacyConfig] : [alphaConfig, legacyConfig]
+  const writable = routedConfig === codepuppyConfig
+    ? options.phase === "data-clear" ? [legacyConfig] : [codepuppyConfig, legacyConfig]
     : routedConfig === legacyConfig
       ? [legacyConfig]
       : []
@@ -197,7 +197,7 @@ export function sweepEngineConfigDanglingUnlocked(options: {
   ].filter((target, index, all) => all.findIndex((item) => item.file === target.file) === index)
   const enforcement = options.phase === "boot" || options.phase === "respawn"
   const outcome: DanglingSweepOutcome = { changedFiles: [], stripped: [], warnings: [], enforcementGap: [] }
-  const guardRoots = [options.userDataPath, alphaGlobalRoot(), options.engineDataPath, join(homeDir, ".alpha")]
+  const guardRoots = [options.userDataPath, codepuppyGlobalRoot(), options.engineDataPath, join(homeDir, ".alpha")]
 
   targets.forEach((target) => {
     let text: string
@@ -226,7 +226,7 @@ export function sweepEngineConfigDanglingUnlocked(options: {
       inspectPath: options.inspectPath,
     })
     const verdict = target.ownership === "legacy"
-      ? isAlphaOwnedConfig({ parsed, receiptMcpNames: new Set(), receiptPluginKeys: new Set() })
+      ? isCodePuppyOwnedConfig({ parsed, receiptMcpNames: new Set(), receiptPluginKeys: new Set() })
       : null
     const writableTarget = target.ownership !== "foreign" && (target.ownership !== "legacy" || verdict?.owned)
 

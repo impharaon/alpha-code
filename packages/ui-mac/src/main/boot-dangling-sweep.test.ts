@@ -6,29 +6,29 @@ import { parse } from "jsonc-parser"
 import { runBootDanglingSweep } from "./boot-dangling-sweep"
 
 const ENV_KEYS = [
-  "ALPHA_GLOBAL_DIR",
-  "ALPHA_OPENCODE_HOME",
+  "CODEPUPPY_GLOBAL_DIR",
+  "CODEPUPPY_OPENCODE_HOME",
   "OPENCODE_CONFIG_DIR",
   "OPENCODE_TEST_ONBOARDING",
 ] as const
 
 let temporary = ""
 let userData = ""
-let alphaGlobal = ""
+let codepuppyGlobal = ""
 let engineData = ""
 const saved: Record<string, string | undefined> = {}
 
 beforeEach(() => {
   ENV_KEYS.forEach((key) => (saved[key] = process.env[key]))
-  temporary = realpathSync(mkdtempSync(join(tmpdir(), "alpha-boot-sweep-")))
+  temporary = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-boot-sweep-")))
   userData = join(temporary, "user-data")
-  alphaGlobal = join(temporary, "alpha-global")
+  codepuppyGlobal = join(temporary, "codepuppy-global")
   engineData = join(temporary, "engine-data")
-  ;[userData, alphaGlobal, engineData, join(temporary, "opencode-home"), join(temporary, "xdg")].forEach((directory) =>
+  ;[userData, codepuppyGlobal, engineData, join(temporary, "opencode-home"), join(temporary, "xdg")].forEach((directory) =>
     mkdirSync(directory, { recursive: true }),
   )
-  process.env.ALPHA_GLOBAL_DIR = alphaGlobal
-  process.env.ALPHA_OPENCODE_HOME = join(temporary, "opencode-home")
+  process.env.CODEPUPPY_GLOBAL_DIR = codepuppyGlobal
+  process.env.CODEPUPPY_OPENCODE_HOME = join(temporary, "opencode-home")
   process.env.OPENCODE_CONFIG_DIR = join(temporary, "xdg")
 })
 
@@ -42,8 +42,8 @@ afterEach(() => {
 
 test("OPENCODE_TEST_ONBOARDING=1 still strips confirmed-absent guarded {file:} refs at boot", () => {
   process.env.OPENCODE_TEST_ONBOARDING = "1"
-  const gone = join(userData, "alpha-mcp-secrets", "demo", "GONE")
-  const target = join(alphaGlobal, "alpha.jsonc")
+  const gone = join(userData, "codepuppy-mcp-secrets", "demo", "GONE")
+  const target = join(codepuppyGlobal, "codepuppy.jsonc")
   mkdirSync(dirname(gone), { recursive: true })
   writeFileSync(
     target,
@@ -75,7 +75,7 @@ test("OPENCODE_TEST_ONBOARDING=1 still strips confirmed-absent guarded {file:} r
 
 test("boot enforcement gap from an unparseable dangling-shaped config still surfaces", () => {
   process.env.OPENCODE_TEST_ONBOARDING = "1"
-  const target = join(alphaGlobal, "alpha.jsonc")
+  const target = join(codepuppyGlobal, "codepuppy.jsonc")
   writeFileSync(target, `{ "plugin": ["/abs/gone.js"], `)
 
   const errors: string[] = []

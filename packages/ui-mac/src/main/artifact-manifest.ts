@@ -1,5 +1,5 @@
 // Local artifact manifest — `.code-puppy/runs/<runId>/artifacts.json`(REQ-093 A 侧,alpha-code#185)。
-// Main-process only, but electron-free and root-parameterized (alpha-workdir.ts style) so the whole
+// Main-process only, but electron-free and root-parameterized (codepuppy-workdir.ts style) so the whole
 // surface is unit-testable against a temp dir.
 //
 // 职责:每个 managed run 的本地产物真相源 —— 镜像的平台 descriptor + 本地状态(savedPath 相对路径、
@@ -7,7 +7,7 @@
 // list 或再次请求平台(REQ-093 交付 1)。
 //
 // 不变量:
-//   · 原子写(tmp + rename;复用 ADR-019 守卫链 safeResolveInAlpha);
+//   · 原子写(tmp + rename;复用 ADR-019 守卫链 safeResolveInCodePuppy);
 //   · schemaVersion=1;未知未来版本 → 只读/报错,绝不静默重写(REQ-093 AC#8);
 //   · manifest 内容不含 bearer/token、不含绝对路径 —— savedPath 是 run 目录内的 POSIX 相对路径,
 //     且必须落在 `artifacts/` 子目录(保护 contract.json/status.json/artifacts.json 自身不可被登记/GC);
@@ -15,7 +15,7 @@
 
 import * as fs from "node:fs"
 import * as path from "node:path"
-import { isSafeRunId, safeResolveInAlpha } from "./alpha-workdir"
+import { isSafeRunId, safeResolveInCodePuppy } from "./codepuppy-workdir"
 // descriptor 契约 = shared/cloud-artifact-descriptor.ts(#184 落地的平台逐字镜像;真相源在 B 仓)。
 // 本模块只消费:类型 + 校验;manifest 是 A 侧扩展,按镜像纪律不进契约文件。
 import { validateArtifactDescriptor, type ArtifactDescriptor } from "../shared/cloud-artifact-descriptor"
@@ -201,7 +201,7 @@ export type ManifestReadResult =
 
 export function readArtifactManifest(projectDir: string, runId: string): ManifestReadResult {
   if (!isSafeRunId(runId)) return { ok: false, reason: "invalid-run" }
-  const file = safeResolveInAlpha(projectDir, "runs", runId, ARTIFACT_MANIFEST_FILE)
+  const file = safeResolveInCodePuppy(projectDir, "runs", runId, ARTIFACT_MANIFEST_FILE)
   if (!file) return { ok: false, reason: "invalid-run" }
   let raw: string
   try {
@@ -231,7 +231,7 @@ export function readArtifactManifest(projectDir: string, runId: string): Manifes
 export type ManifestWriteResult = { ok: true; file: string } | { ok: false; reason: string }
 
 /**
- * 原子写(tmp + rename,同 alpha-workdir.writeFileAtomic 语义;tmp 名含 pid+随机段,崩溃遗留的
+ * 原子写(tmp + rename,同 codepuppy-workdir.writeFileAtomic 语义;tmp 名含 pid+随机段,崩溃遗留的
  * tmp 文件不会被读取端认作 manifest,下次写入也不受其影响)。写前全量校验 —— 非法结构 loud 拒绝,
  * 绝不落半成品。调用方负责 run 目录已存在(register 前 run 目录必然已由写入器创建)。
  */
@@ -240,7 +240,7 @@ export function writeArtifactManifest(projectDir: string, runId: string, manifes
   if (manifest.runId !== runId) return { ok: false, reason: "manifest runId does not match target run" }
   const validated = validateArtifactManifest(manifest)
   if (!validated.ok) return { ok: false, reason: `invalid manifest: ${validated.errors.join("; ")}` }
-  const file = safeResolveInAlpha(projectDir, "runs", runId, ARTIFACT_MANIFEST_FILE)
+  const file = safeResolveInCodePuppy(projectDir, "runs", runId, ARTIFACT_MANIFEST_FILE)
   if (!file) return { ok: false, reason: "path escapes .code-puppy" }
   const tmp = `${file}.tmp-${process.pid}-${Math.random().toString(36).slice(2, 10)}`
   try {

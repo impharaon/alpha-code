@@ -17,7 +17,7 @@
 //      内容摘要与夹具钉住值一致(独立客户端 + /usr/bin/shasum,不经被测代码)。
 //   ④ 每臂 3 轮,报每轮值与离散度(max − min)。
 //
-// 不在 alpha-check / CI 权威门内(单轮 ~20s、依赖本机 electron 二进制),与
+// 不在 codepuppy-check / CI 权威门内(单轮 ~20s、依赖本机 electron 二进制),与
 // scripts/req087-live-characterization.sh 同级:按需 / 改动传输路径后 / 发布前人工执行。
 //   bash scripts/artifact-memory-gate.sh
 // 退出码:0 = PASS;1 = FAIL(生产路径超限,或臂本身失败);3 = 本次测量作废(口径不满足)。
@@ -207,7 +207,7 @@ async function main(): Promise<number> {
   }
 
   // ── 夹具:确定性生成 + 第三方摘要钉住 ───────────────────────────────────────
-  const work = fs.mkdtempSync(path.join(os.tmpdir(), "alpha-1114-gate-"))
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-1114-gate-"))
   const fixtureDir = path.join(work, "fixtures")
   fs.mkdirSync(fixtureDir)
   console.error("[1/5] 生成夹具(确定性 LCG)…")

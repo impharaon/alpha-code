@@ -2,34 +2,34 @@
 //
 // 挂的是**真实 alpha 壳**:上游 `PlatformProvider → AppBaseProviders → AppInterface`(与
 // renderer/index.tsx 同一条 provider 链、同一个 MemoryRouter),children 里挂真实生产
-// `AlphaSidebar`、真实生产 `AlphaSettings` 与真实生产 `AlphaSessionSearch` —— 壳组成与
+// `CodePuppySidebar`、真实生产 `CodePuppySettings` 与真实生产 `CodePuppySessionSearch` —— 壳组成与
 // renderer/index.tsx 一致。少挂其中任何一件,「某条命令没人注册」就会被误判成产品缺陷。
 // 于是命令总线是真的、注册是生产代码真跑的、触发是**点真实按钮**、判据落在真实 DOM 与真实路由上。
 //
 // 替身只剩最外围:`window.api`(Electron preload 桥)、`globalThis.fetch`(壳会去连引擎,闸门不
-// 跑服务器)、三片叶(不在本票射程内,给最小标记件)、以及 AlphaSettings 的 `api` seam
+// 跑服务器)、三片叶(不在本票射程内,给最小标记件)、以及 CodePuppySettings 的 `api` seam
 // (设置**内容**不是本票命题,本票只问「点了设置,设置面出没出来」)。
 //
-// 形制沿用 alpha-session-search-test-runtime.tsx(含 `window.api` 必须用 defineProperty 而不是
+// 形制沿用 codepuppy-session-search-test-runtime.tsx(含 `window.api` 必须用 defineProperty 而不是
 // 裸赋值 —— 整包跑时先跑的测试可能已把它定义成只读属性)。
 
 import { AppBaseProviders, AppInterface, PlatformProvider, ServerConnection, useCommand, useTabs, type Platform } from "@opencode-ai/app"
 import { MemoryRouter, useBeforeLeave, useLocation, useNavigate } from "@solidjs/router"
 import { createEffect, createSignal } from "solid-js"
 import { render } from "solid-js/web"
-import { AlphaSidebar } from "./alpha-sidebar"
-import { AlphaSettings } from "../alpha-ui/settings"
-import { AlphaSessionSearch } from "../alpha-ui/alpha-session-search"
-import { setSettingsOpen, settingsOpen } from "../alpha-ui/settings-state"
-import { PermChip } from "../alpha-ui/alpha-composer"
-import { ASK_AGENT, DEFAULT_PERM, READONLY_AGENT, buildPromptRequest, composerPerm, setComposerPerm } from "../alpha-ui/composer-state"
+import { CodePuppySidebar } from "./codepuppy-sidebar"
+import { CodePuppySettings } from "../codepuppy-ui/settings"
+import { CodePuppySessionSearch } from "../codepuppy-ui/codepuppy-session-search"
+import { setSettingsOpen, settingsOpen } from "../codepuppy-ui/settings-state"
+import { PermChip } from "../codepuppy-ui/codepuppy-composer"
+import { ASK_AGENT, DEFAULT_PERM, READONLY_AGENT, buildPromptRequest, composerPerm, setComposerPerm } from "../codepuppy-ui/composer-state"
 import { setSidebarCollapsed, setProjectExpanded, markSessionViewed } from "./sidebar-state"
 import { AutomationPanel } from "../automations/automation-panel"
 import { setAutomationOpen } from "../automations/automation-state"
-import type { AlphaProject, AlphaProjectsApi } from "./use-projects"
-import { ALPHA_SETTINGS_DEFAULTS } from "../../shared/settings-adapters"
+import type { CodePuppyProject, CodePuppyProjectsApi } from "./use-projects"
+import { CODEPUPPY_SETTINGS_DEFAULTS } from "../../shared/settings-adapters"
 import { hrefFor } from "../../shared/route-manifest"
-import type { SettingsSurfaceApi } from "../alpha-ui/settings-authority-client"
+import type { SettingsSurfaceApi } from "../codepuppy-ui/settings-authority-client"
 
 export { render }
 export { PermChip }
@@ -83,7 +83,7 @@ export const SIDECAR_URL = connection.http.url
 export const WSL_UBUNTU_URL = wslUbuntu.http.url
 export const WSL_ARCH_URL = wslArch.http.url
 
-const fixtureProject: AlphaProject = {
+const fixtureProject: CodePuppyProject = {
   id: "prj_alpha-code",
   worktree: FIXTURE_DIRECTORY,
   name: "alpha-code",
@@ -121,7 +121,7 @@ const projects = {
     setCreatedIn((seen) => [...seen, worktree])
     return CREATED_SESSION_ID
   },
-} as unknown as AlphaProjectsApi
+} as unknown as CodePuppyProjectsApi
 
 /** #925:展开侧栏里某个项目(生产状态函数;会话行只在展开后渲染)。 */
 export function expandProject(worktree: string) {
@@ -351,7 +351,7 @@ const NewSessionPromoteProbe = (props: {
  */
 const settingsApi = {
   settings: {
-    read: async () => ({ ok: true, value: structuredClone(ALPHA_SETTINGS_DEFAULTS), revision: "harness-rev" }),
+    read: async () => ({ ok: true, value: structuredClone(CODEPUPPY_SETTINGS_DEFAULTS), revision: "harness-rev" }),
     validate: () => new Promise(() => {}),
     write: () => new Promise(() => {}),
   },
@@ -555,13 +555,13 @@ function Shell(props: {
         >
           <RouteProbe />
           <CommandProbe />
-          {props.sidebar === false ? null : <AlphaSidebar projects={projects} serverKey={projectsServerKey} />}
+          {props.sidebar === false ? null : <CodePuppySidebar projects={projects} serverKey={projectsServerKey} />}
           {/* 与 renderer/index.tsx 的 settings surface 同一接法。 */}
-          <AlphaSettings open={settingsOpen()} onClose={() => setSettingsOpen(false)} api={settingsApi} />
+          <CodePuppySettings open={settingsOpen()} onClose={() => setSettingsOpen(false)} api={settingsApi} />
           {/* `command.palette` 的唯一注册点(#659)。壳组成必须与 renderer/index.tsx 一致 ——
               设置页快捷键表里就有这一条,少挂它会把「产品少注册了一条」误判成真。
               负对照那个壳同样不挂它(它复现的正是「alpha 壳级注册还不存在」的世界)。 */}
-          {props.sidebar === false ? null : <AlphaSessionSearch projects={projects} serverKey={projectsServerKey} />}
+          {props.sidebar === false ? null : <CodePuppySessionSearch projects={projects} serverKey={projectsServerKey} />}
           {/* #925:自动化面板与生产同构地挂在壳上(renderer/index.tsx),「回跳会话」用例点它。 */}
           {props.sidebar === false ? null : <AutomationPanel serverKey={projectsServerKey} />}
           {props.legacySettingsEntry ? <LegacySettingsEntry /> : null}
@@ -582,7 +582,7 @@ function LegacySettingsEntry() {
 }
 
 /** 真实壳(侧栏 + 生产设置面),与生产入口的接法一致。 */
-export function AlphaShell() {
+export function CodePuppyShell() {
   return <Shell />
 }
 
@@ -591,17 +591,17 @@ export function AlphaShell() {
    "wsl:fedora" / "wsl:arch")—— 判据锚在各自的独立字面量上,写死任何单值的实现无法全绿。 */
 
 /** active = wsl:ubuntu,projects store 连的是本地 sidecar("sidecar")。 */
-export function AlphaShellRemoteActive() {
+export function CodePuppyShellRemoteActive() {
   return <Shell servers={[connection, wslUbuntu]} activeServer={wslUbuntu} projectsServer={connection} />
 }
 
 /** active = sidecar,projects store 连的是 wsl:fedora。 */
-export function AlphaShellRemoteProjects() {
+export function CodePuppyShellRemoteProjects() {
   return <Shell servers={[connection, wslFedora]} activeServer={connection} projectsServer={wslFedora} />
 }
 
 /** active = wsl:ubuntu,projects store 连的是 wsl:arch(自动化「回跳会话」用例)。 */
-export function AlphaShellAutomationRemote() {
+export function CodePuppyShellAutomationRemote() {
   return <Shell servers={[wslUbuntu, wslArch]} activeServer={wslUbuntu} projectsServer={wslArch} />
 }
 

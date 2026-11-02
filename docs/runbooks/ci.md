@@ -1,17 +1,17 @@
 # CI 规范（Code Puppy）
 
 > 一句话:**本地先跑,CI 兜底**。CI 不是你第一次看到失败的地方——它是 merge 前的强制关卡。
-> 权威触发定义在 `.github/workflows/alpha-ci.yml`;北极星守卫语义见 ADR-004,fork 纪律见 ADR-005。
+> 权威触发定义在 `.github/workflows/codepuppy-ci.yml`;北极星守卫语义见 ADR-004,fork 纪律见 ADR-005。
 
 ## 0. TL;DR — push 前一条命令
 
-先提交再运行 `gate run`(经 `bin/check` 转调全量检查);pre-push 使用 `gate pre-push` 复用已通过的代码树并签 `check`,机器上没有 `gate` 时回落到直接运行 `scripts/alpha-check.sh`。
+先提交再运行 `gate run`(经 `bin/check` 转调全量检查);pre-push 使用 `gate pre-push` 复用已通过的代码树并签 `check`,机器上没有 `gate` 时回落到直接运行 `scripts/codepuppy-check.sh`。
 
 ```bash
 gate run
 ```
 
-绿了再 push。它跑的是 `alpha-ci` 的**全部 21 个代码步**,并在末尾打印一张逐步对照表
+绿了再 push。它跑的是 `codepuppy-ci` 的**全部 21 个代码步**,并在末尾打印一张逐步对照表
 (`MIRRORED` / `SUPERSET:<理由>` / `DEGRADED:<理由>`)。
 
 > 再加**六步** CI 结构上跑不了、或按裁决不该占一个 required context 的(`[9/14]` worktree bootstrap 能力、`[10/14]` required contexts 对真源、`[11/14]` BYOK 目录 id、`[12/14]` 注入库存、`[13/14]` north-star 漂移度量、`[14/14]` 模块体积)。下面先说最早的两步。
@@ -25,14 +25,14 @@ gate run
 > —— `bun install` 依赖网络,registry 不可达时它什么都证明不了,这时**不拦 push**但也**不报绿**。
 >
 > 另一步是 `#890` 的第 `[10/14]` 步:把 `.github/required-contexts.txt`
-> 与 GitHub 分支保护里那份真的 required status checks 比一次。读分支保护要带令牌,而 alpha-ci
+> 与 GitHub 分支保护里那份真的 required status checks 比一次。读分支保护要带令牌,而 codepuppy-ci
 > 触发在 `pull_request` —— fork PR 拿不到 secrets,所以它只能落在有鉴权的开发机上。
 > 这一步有**三档**结局:一致 / 漂移(红,点名差在哪条)/ **未比对**(没装 `gh`、没登录、
 > 网络不通)。未比对不拦 push,但总结行会从 `✅ all local gates green` 换成一句明说
 > 「本次未比对」的话 —— 把「没检查」读成「检查过了」正是这道门要消掉的东西。
 
-> `#777` 起,「与 alpha-ci 1:1」不再是散文。2026-08-03 实读:此前这句话写在三处
-> (本文件、`CLAUDE.md`、`scripts/alpha-check.sh` 抬头),而脚本实际只跑了 12 步里的 9 步 ——
+> `#777` 起,「与 codepuppy-ci 1:1」不再是散文。2026-08-03 实读:此前这句话写在三处
+> (本文件、`CLAUDE.md`、`scripts/codepuppy-check.sh` 抬头),而脚本实际只跑了 12 步里的 9 步 ——
 > 缺 `assert-gate-files.sh`(登记闸门里 llm / core / opencode 那几个**只在这一步执行**)、
 > 缺 `assert-seed-assets.sh`、缺 `check-doc-links.py`;而且三条测试用的是裸 `bun test`
 > (跑 0 条照样 exit 0 —— CI 早在 `#647` 修掉的假绿形态,本地原样留着)。
@@ -45,25 +45,25 @@ gate run
 - **快**:本地三关秒级;CI 往返一轮 = 排队 + 起机 + 装依赖 + 跑,分钟级。
 - **省往返**:把 CI 当"第一次跑"= 每个错都要等一轮红了才知道 → 慢、烦、还堵别人的队。
 - **CI 的真正职责**是①**强制门禁**(branch protection:不绿不让 merge,挡手滑)②**中立环境兜底**(抓"在我机器上是好的"那类环境差异)——不是给你当调试台用的。
-- 所以顺序永远是:**本地 `alpha-check` 绿 → push → CI 复核 → merge**。
+- 所以顺序永远是:**本地 `codepuppy-check` 绿 → push → CI 复核 → merge**。
 
-## 2. 十四关是什么(逐步对照见 `alpha-check.sh` 的 `CI_STEPS`)
+## 2. 十四关是什么(逐步对照见 `codepuppy-check.sh` 的 `CI_STEPS`)
 
 | 关 | 本地步骤 | CI job | 失败含义 |
 |---|---|---|---|
 | **北极星守卫**(零改上游) | `[1/14]` `scripts/north-star-guard.sh`;等价 `git diff --no-renames --diff-filter=DMR --name-only origin/alpha...HEAD -- <上游 8 包>` 去掉 ADR-043 判为 alpha 自有的路径之后必须空 | `north-star guard (zero upstream edits)` | 改了上游文件 → 下次 fork-sync 冲突,破北极星 |
-| **前端 SOT round-trip**(`#976`) | `[2/14]` `scripts/assert-frontend-patch-roundtrip.sh`:临时 index → `read-tree <pin>` → `apply --cached --binary` SOT 补丁 → `write-tree`,判 `packages/{app,ui}` 的 **tree sha** 是否逐字等于 `HEAD` 的 | 同上 job(`Assert packages/app + packages/ui == pinned upstream + SOT patch (#976)`;落在这个 job 是因为它 `fetch-depth: 0`,test job 是浅 checkout 取不到 pin) | `packages/{app,ui}` 的改动没进 `frontend/alpha-patches/alpha-frontend.patch` ⇒ **下一次 sync-upstream 或月更 bump 会把它静默删掉**(不是报错)。ADR-034 起那两个包是「pin + 补丁」的投影,sync 的 `apply_alpha_frontend_delta` 会 `rm -rf` 后按补丁重建。已发生过:`f420fe2bb`…`7281627ed` 四个提交补丁缺 vendored `.tgz` 而树里有,存活两天零变红。**修法**:按 [`frontend/README.md`](../../frontend/README.md) 块 4 重生补丁,并与源码改动放进**同一个提交**(判据锚在 HEAD,未提交的改动只会被列成 dirty 清单,不参与判决)。**三档结局**:一致 / 漂移或测量作废(红,点名到具体路径)/ **未比对**(本地浅克隆取不到 pin 对象 ⇒ exit 2,不拦 push 但不报绿;CI 侧 `ROUNDTRIP_REQUIRE_PIN=1` 没有这一档) |
+| **前端 SOT round-trip**(`#976`) | `[2/14]` `scripts/assert-frontend-patch-roundtrip.sh`:临时 index → `read-tree <pin>` → `apply --cached --binary` SOT 补丁 → `write-tree`,判 `packages/{app,ui}` 的 **tree sha** 是否逐字等于 `HEAD` 的 | 同上 job(`Assert packages/app + packages/ui == pinned upstream + SOT patch (#976)`;落在这个 job 是因为它 `fetch-depth: 0`,test job 是浅 checkout 取不到 pin) | `packages/{app,ui}` 的改动没进 `frontend/codepuppy-patches/codepuppy-frontend.patch` ⇒ **下一次 sync-upstream 或月更 bump 会把它静默删掉**(不是报错)。ADR-034 起那两个包是「pin + 补丁」的投影,sync 的 `apply_codepuppy_frontend_delta` 会 `rm -rf` 后按补丁重建。已发生过:`f420fe2bb`…`7281627ed` 四个提交补丁缺 vendored `.tgz` 而树里有,存活两天零变红。**修法**:按 [`frontend/README.md`](../../frontend/README.md) 块 4 重生补丁,并与源码改动放进**同一个提交**(判据锚在 HEAD,未提交的改动只会被列成 dirty 清单,不参与判决)。**三档结局**:一致 / 漂移或测量作废(红,点名到具体路径)/ **未比对**(本地浅克隆取不到 pin 对象 ⇒ exit 2,不拦 push 但不报绿;CI 侧 `ROUNDTRIP_REQUIRE_PIN=1` 没有这一档) |
 | **NUL 字节闸** | `[3/14]` `scripts/assert-no-nul-bytes.py` | 同上 job | 字面 NUL 让 `grep` 对整个文件静默失明(`#760`) |
 | **typecheck**(三个 alpha 包) | `[4/14]` contracts-consumer + ext + ui-mac | `typecheck (alpha packages)` | 类型不过 |
-| **契约锁 + 单元测试** | `[5/14]` `check:vendor` + `bun-test-floor.sh` × 3(15 / 100 / 3000)+ `bun-test-app.sh`;其中 ui-mac 全量带 **base fail-set 棘轮**(`#1086`):`ALPHA_KNOWN_FAILS_FILE=scripts/known-fails.tsv` ⇒ [`scripts/known-fails.tsv`](../../scripts/known-fails.tsv) 里逐测试点名的已知红放行(逐条打出理由),**清单外的红拦住并点名**,无法逐测试归因的失败(如模块加载崩溃)一律拦住。失败名的权威是外层 junit 报告(host 回显的子进程 `(fail)` 行不算),并与 console 双轴交叉,轴打架即测量作废 —— 判官在 [`scripts/known-fails-compare.py`](../../scripts/known-fails-compare.py)。清单是**静态文件**:没有 --update、没有运行时写回,加长只能发生在人手写的 diff 里;某行的红修绿后判官提示「清单可缩短」,删行即收紧。行为闸(双向,含「清单外必须拦」)= `packages/ui-mac/src/main/known-fails-ratchet.test.ts`。注意清单只罩这一条全量;`[6/14]` 登记簿的逐文件精确点名**不**吸收已知红(`#946`:滚动 pin 的 packages/app 以 CI=1 钉上游 CI 口径 —— pin 自带的 i18n parity 红被上游自己的 skipIf 治住、新红默认拒;另把 alpha-frontend.patch 里的 alpha 判据文件逐个点名重跑、逐文件判**精确条数**(登记在脚本内,与 CI=1 钉在同一处)—— 删文件/删用例/skipIf 包住都当场红) | `unit tests (alpha packages)` | vendored hash、producer/consumer fixture 或运行时守卫回归;packages/app 半场 = alpha 改动打穿了随 pin 而来的上游测试(#933 形态)或 alpha 判据文件消失 |
+| **契约锁 + 单元测试** | `[5/14]` `check:vendor` + `bun-test-floor.sh` × 3(15 / 100 / 3000)+ `bun-test-app.sh`;其中 ui-mac 全量带 **base fail-set 棘轮**(`#1086`):`CODEPUPPY_KNOWN_FAILS_FILE=scripts/known-fails.tsv` ⇒ [`scripts/known-fails.tsv`](../../scripts/known-fails.tsv) 里逐测试点名的已知红放行(逐条打出理由),**清单外的红拦住并点名**,无法逐测试归因的失败(如模块加载崩溃)一律拦住。失败名的权威是外层 junit 报告(host 回显的子进程 `(fail)` 行不算),并与 console 双轴交叉,轴打架即测量作废 —— 判官在 [`scripts/known-fails-compare.py`](../../scripts/known-fails-compare.py)。清单是**静态文件**:没有 --update、没有运行时写回,加长只能发生在人手写的 diff 里;某行的红修绿后判官提示「清单可缩短」,删行即收紧。行为闸(双向,含「清单外必须拦」)= `packages/ui-mac/src/main/known-fails-ratchet.test.ts`。注意清单只罩这一条全量;`[6/14]` 登记簿的逐文件精确点名**不**吸收已知红(`#946`:滚动 pin 的 packages/app 以 CI=1 钉上游 CI 口径 —— pin 自带的 i18n parity 红被上游自己的 skipIf 治住、新红默认拒;另把 codepuppy-frontend.patch 里的 alpha 判据文件逐个点名重跑、逐文件判**精确条数**(登记在脚本内,与 CI=1 钉在同一处)—— 删文件/删用例/skipIf 包住都当场红) | `unit tests (alpha packages)` | vendored hash、producer/consumer fixture 或运行时守卫回归;packages/app 半场 = alpha 改动打穿了随 pin 而来的上游测试(#933 形态)或 alpha 判据文件消失 |
 | **闸门文件点名** | `[6/14]` `scripts/assert-gate-files.sh`(全量见 `scripts/gate-files.tsv`) | 同上 job | 某个闸门文件被删/被清空/条数偏离登记 —— 整包地板抓不到。`#844` 起逐条判**精确条数**(少=删了用例,多=新增未登记);改动闸门文件后跑 `bash scripts/assert-gate-files.sh --update` 从实测写回登记簿(all-or-nothing、幂等),例外语法与理由要求见 TSV 抬头或脚本 `--help`。**平台条件闸**(`#1153`):guarantee 列逐字 `[平台:darwin]`/`[平台:linux]` = 该行只在那个平台适用 —— 适用平台照常精确条数;不适用平台**仍真跑该文件**并要求它自报 0 条(标注不是免检牌:该跑的文件被误标 ⇒ >0 条当场红,文件被删也当场红)。**三档结局**(与 `[2/14]`/`[9/14]`/`[10/14]` 同形):全部适用行已验证 / 真失守(红,拦住)/ **存在「本平台不适用」行**(exit 2 —— 门绿但那几行的保证本次未被验证;本地 `[6/14]` 与 CI 的 assert gate files 步都记「未验证」不拦,恒红只会训练人把 darwin-only 判据摘出登记簿) |
 | **seed assets** | `[7/14]` `scripts/assert-seed-assets.sh` | `seed assets present` | 打包资源被静默删除(B7/B15) |
 | **docs gate** | `[8/14]` `scripts/check-doc-links.py <改动的 md>` | `docs gate` | Markdown 相对链接断了 |
 | **worktree bootstrap 能力**(`#916`) | `[9/14]` `scripts/assert-worktree-bootstrap.sh` | **无 —— CI 结构上没有 worktree**(每个 job 都是全新 checkout + `bun install`) | 新建的 worktree 里跑不出可信 typecheck ⇒ 每条 lane 为了下结论都得去动**共享**主 checkout ⇒ 并行时互相污染彼此的门测量(2026-08-02 把一道真闸门误诊成「1/5 间歇性 flaky」是同一形态)。判据是**能力**不是产物:真建 worktree、真跑 typecheck,并且**先证明没 bootstrap 的树确实会红**,再判 bootstrap 过的树绿。**三档结局**:已验证 / 真失守(红,拦住)/ **未验证**(registry 不可达 ⇒ `bun install` 装不上 ⇒ 本跑什么都没证明;不拦 push,但不报绿)|
-| **Alpha 注入模型上下文的库存**(`#1284` / `#1296` / `#1299`) | `[12/14]` `bun packages/ext/scripts/context-injection-inventory.ts --check`:打印每段 alpha 注入(ext 四处 + ui-mac 两份 instruction 文件(identity 每种能力形状一行)+ ui-mac 三个 agent 的 prompt / description)的 id / 落点 / 实测字节 / 上限,并与 [`packages/ext/src/context-injection-inventory.snapshot.txt`](../../packages/ext/src/context-injection-inventory.snapshot.txt) 逐字节比对 | **无独立步** —— 判据在 `bun test (ext)`(登记簿咽喉 + 快照测试)与 `bun test (ui-mac)`(instructions 咽喉 + agent 咽喉,都跑真 injectAlphaConfig)里跑;本地这一步是 AC3「随本地闸打印」 | ① 某段注入超过声明上限(登记簿 import 即抛,ext 整个装不上);② 改了片段 / 上限没重生快照(`--write` 重生,让评审读快照 diff)。勘破与派生链见 [`../architecture/2026-09-08-context-injection-registry.md`](../architecture/2026-09-08-context-injection-registry.md) |
+| **Alpha 注入模型上下文的库存**(`#1284` / `#1296` / `#1299`) | `[12/14]` `bun packages/ext/scripts/context-injection-inventory.ts --check`:打印每段 alpha 注入(ext 四处 + ui-mac 两份 instruction 文件(identity 每种能力形状一行)+ ui-mac 三个 agent 的 prompt / description)的 id / 落点 / 实测字节 / 上限,并与 [`packages/ext/src/context-injection-inventory.snapshot.txt`](../../packages/ext/src/context-injection-inventory.snapshot.txt) 逐字节比对 | **无独立步** —— 判据在 `bun test (ext)`(登记簿咽喉 + 快照测试)与 `bun test (ui-mac)`(instructions 咽喉 + agent 咽喉,都跑真 injectCodePuppyConfig)里跑;本地这一步是 AC3「随本地闸打印」 | ① 某段注入超过声明上限(登记簿 import 即抛,ext 整个装不上);② 改了片段 / 上限没重生快照(`--write` 重生,让评审读快照 diff)。勘破与派生链见 [`../architecture/2026-09-08-context-injection-registry.md`](../architecture/2026-09-08-context-injection-registry.md) |
 | **required contexts 对真源**(`#890`) | `[10/14]` `scripts/assert-required-contexts.sh` | **无 —— CI 结构上跑不了**(读分支保护要令牌,fork PR 拿不到 secrets) | 仓内 [`.github/required-contexts.txt`](../../.github/required-contexts.txt) 与 GitHub 分支保护里那份真的对不上:漏一条 ⇒ 那道检查其实不必需(红着也能合),而仓内测试全绿。三档结局:一致 / 漂移(红,点名差在哪条,含「分支保护被整个关掉」)/ **未比对**(没 `gh`、没登录、网络不通 —— 不拦 push,但总结行不再说「全绿」) |
 | **north-star 漂移度量**(`#1288`) | `[13/14]` `scripts/north-star-drift-metrics.sh`:每次本地闸打印三个量 —— **收编面**(守卫 `UPSTREAM_EXCLUDES` 的条目数)/ **上游漂移**(`merge-base(origin/dev, HEAD)` → `HEAD`,辖区内被改/删的上游文件数与行数,`--diff-filter=DMR --no-renames`,**收编白名单里的文件照样计入**)/ **merge-base 年龄**(天)。辖区与白名单长度由 `north-star-guard.sh --print-jurisdiction` 给出,本步一个字都不解释(抄一份就是 `#637` 那个形状) | **无 —— 它不判任何东西**,不该占一个 required context | 第 `[1/14]` 步的守卫基准是 `origin/alpha`,只回答「**这个 PR 自己**有没有新增偏离」;白名单里的每一条它都按设计放行,`origin/dev` 的日期它连问都没问过。于是偏离一点一点长大而没有任何一次 push 提示过 —— 账在某一次 sync 时一次性付(2026-08 那次积到四周 / 375 个提交 ⇒ `#1248`)。**只量不拦**(先量后闸,`#1288` out of scope 明写不新设阈值闸)。三档:0 三个量都量到 / **2 未测量**(取不到 `origin/dev` —— 明说「未测量」并**拒绝打印 0**,给 0 会被读成「零漂移」)/ 1 脚本自己坏了。行为闸 = `packages/ui-mac/src/main/north-star-drift-metrics.test.ts` |
-| **模块体积棘轮 + 阈值告警**(`#1289`) | `[14/14]` `scripts/assert-module-size.sh`:① 棘轮 —— [`scripts/module-size-ratchet.tsv`](../../scripts/module-size-ratchet.tsv) 点名的文件/目录**只许降不许升**(目录那一行是关键:只钉单文件的话,把行搬进一个新文件就能全绿);①′ **交叉判据**(`#1435`)—— **抬高** tree 行基线的那一次,树下每条被单独登记的 file 行必须跟着改:抬了 tree 行、而树下某个 file 行实测已超它自己的基线且那一行一个字没动 ⇒ **exit 1** 并点名是第几行(缺陷本体:`#1381` / PR `#1409` 抬 tree 行、理由里逐字写了 `ext-install-planner.ts` 的增量,却没改那个文件自己那一行 ⇒ 主干自身超基线三个月,每条分支都背一条不属于自己的 ⚠,而当时**没有任何东西**会发现这种漏);② 阈值告警 —— 本分支新增/修改的非测试 `.ts`/`.tsx` 超过 800 行就点名(codex harness 口径:目标 <500,超 800 必须新开模块),辖区取守卫的 `ALPHA_OWNED_PACKAGES` | **无 —— 按裁决不拦**,做成 required context 只会是一格永远绿的装饰 | 2026-09-08 实测 `packages/ui-mac/src/main` 非测试 TS **53,539 行**,`ext-install-planner.ts` **3,525**、`ext-transaction.ts` **2,825**,而没有任何东西会在它们继续变大时说一句话。**不硬红**(`#1289` out of scope 明写;今天全仓 27 个非测试文件超过 800 行,硬红 = 开局恒红 ⇒ `--no-verify` ⇒ 十几道门一起关掉,`#754` 形态)。约束力不在退出码,在**登记簿是静态的**:没有 `--update`、没有运行时写回,抬高基线只能发生在人手写的 diff 里(与 `known-fails.tsv` 同一条纪律)。三档:0 都在基线内 / **2 闸响了**(不拦,但总结行不许再说「全绿」)/ 1 登记簿或度量自己坏了 —— 含 `#1435` 的**登记只做了一半**(半份登记不是「量到了、结果不好看」,是**登记簿在骗人**,与「点名的路径不存在」同一族;它结构上到不了「主干恒红」:合并之后登记簿 diff 归零,这一条自动闭嘴,能红的只有正在改登记簿的那条分支,而那正是唯一能修它的人)。行为闸 = `packages/ui-mac/src/main/module-size-ratchet.test.ts`,含反向用例(把登记文件加长到超基线,闸必须响并点名;抬 tree 行漏改树下那条 file 行,必须 exit 1 并点名第几行)|
+| **模块体积棘轮 + 阈值告警**(`#1289`) | `[14/14]` `scripts/assert-module-size.sh`:① 棘轮 —— [`scripts/module-size-ratchet.tsv`](../../scripts/module-size-ratchet.tsv) 点名的文件/目录**只许降不许升**(目录那一行是关键:只钉单文件的话,把行搬进一个新文件就能全绿);①′ **交叉判据**(`#1435`)—— **抬高** tree 行基线的那一次,树下每条被单独登记的 file 行必须跟着改:抬了 tree 行、而树下某个 file 行实测已超它自己的基线且那一行一个字没动 ⇒ **exit 1** 并点名是第几行(缺陷本体:`#1381` / PR `#1409` 抬 tree 行、理由里逐字写了 `ext-install-planner.ts` 的增量,却没改那个文件自己那一行 ⇒ 主干自身超基线三个月,每条分支都背一条不属于自己的 ⚠,而当时**没有任何东西**会发现这种漏);② 阈值告警 —— 本分支新增/修改的非测试 `.ts`/`.tsx` 超过 800 行就点名(codex harness 口径:目标 <500,超 800 必须新开模块),辖区取守卫的 `CODEPUPPY_OWNED_PACKAGES` | **无 —— 按裁决不拦**,做成 required context 只会是一格永远绿的装饰 | 2026-09-08 实测 `packages/ui-mac/src/main` 非测试 TS **53,539 行**,`ext-install-planner.ts` **3,525**、`ext-transaction.ts` **2,825**,而没有任何东西会在它们继续变大时说一句话。**不硬红**(`#1289` out of scope 明写;今天全仓 27 个非测试文件超过 800 行,硬红 = 开局恒红 ⇒ `--no-verify` ⇒ 十几道门一起关掉,`#754` 形态)。约束力不在退出码,在**登记簿是静态的**:没有 `--update`、没有运行时写回,抬高基线只能发生在人手写的 diff 里(与 `known-fails.tsv` 同一条纪律)。三档:0 都在基线内 / **2 闸响了**(不拦,但总结行不许再说「全绿」)/ 1 登记簿或度量自己坏了 —— 含 `#1435` 的**登记只做了一半**(半份登记不是「量到了、结果不好看」,是**登记簿在骗人**,与「点名的路径不存在」同一族;它结构上到不了「主干恒红」:合并之后登记簿 diff 归零,这一条自动闭嘴,能红的只有正在改登记簿的那条分支,而那正是唯一能修它的人)。行为闸 = `packages/ui-mac/src/main/module-size-ratchet.test.ts`,含反向用例(把登记文件加长到超基线,闸必须响并点名;抬 tree 行漏改树下那条 file 行,必须 exit 1 并点名第几行)|
 
 - **写了一个起子进程跑 `bun test` 的测试(仓内惯例 `*.cases.ts`)?必须把宿主登记进
   `scripts/gate-files.tsv`。** `#893` 起这是**默认拒**:不登记,
@@ -116,7 +116,7 @@ gate run
   改写的形状(先例都在登记簿抬头):冻住 `Date.now` 让到期由钩子触发 / 永不返回的钩子逼期限计时器收尾
   (artifact-quota)、给生产注入 `now` 把耗时钉成精确值(sidecar-location-prewarm)、看 abort reason 的来源
   而不是量时间(model-contract)、把 `performance.now` 换成只由夹具推进的时钟让归因成为精确相等
-  (surface-remount)、Effect `TestClock`(alpha-websearch-failure)。
+  (surface-remount)、Effect `TestClock`(codepuppy-websearch-failure)。
   实在要留,四种处置默认拒:`keep` 只给真性能/时序契约(理由 ≥ 40 字符,写清余量与失败签名)、
   `load-sensitive` 只给每 PR 套件之外的文件(如 `test-live/`,单独命令跑)、`upstream` 只给非 alpha 文件、
   `not-elapsed` 只给扫描器过报。**不许**登记进 `scripts/known-fails.tsv`(`#1094` AC3/AC4),**不许**把上界
@@ -127,10 +127,10 @@ gate run
 - **上游包** = `packages/{opencode,core,server,tui,sdk,protocol,schema,client}`(**8 个**;`app`/`ui`
   已按 ADR-020 移出守卫,`protocol`/`schema`/`client` 按 ADR-033 补入)。这份清单与 ADR-033 收编
   白名单的**唯一真源**是 [`scripts/north-star-guard.sh`](../../scripts/north-star-guard.sh) ——
-  CI 与本地 `alpha-check.sh` 调用的是同一份字节(`#889`;此前是两份内联副本靠 `local-gate-parity.test.ts`
+  CI 与本地 `codepuppy-check.sh` 调用的是同一份字节(`#889`;此前是两份内联副本靠 `local-gate-parity.test.ts`
   逐行比对维持,`#637` 咬过一次)。workflow 里再出现第二份副本即红,同样由该文件判。
 - **比较基准 = `origin/alpha`**(`#889`)。这道门要回答的是「**这个 PR 自己**改了上游文件吗」,
-  基准只能是它的目标分支(alpha-ci 的 `on: push/pull_request: branches: [alpha]`)。此前写死
+  基准只能是它的目标分支(codepuppy-ci 的 `on: push/pull_request: branches: [alpha]`)。此前写死
   `origin/dev`(上游纯镜像):实测 2026-08-10 两条 ref 的 merge-base 停在 2026-07-23,窗口是
   550 commits / 2467 文件,窗口内点名的 47 个上游文件全靠 44 条收编白名单恰好吸收才没红 ——
   任何一次不在白名单里的合法上游改动,都会让这道门在**每个 PR** 上恒红(`#754` 那一类)。
@@ -142,10 +142,10 @@ gate run
   它们落地那一次是 `A`、不触发 `--diff-filter=DMR`;**但只有那一次** —— 进了 `origin/alpha` 之后
   任何修改都是 `M`,守卫当场红(`#971` 实测)。守卫因此不把它们当上游改动,判据是**两个因子的合取**:
   - ① **出身**:这条路径在上游镜像 `origin/dev` 里不存在(`dev` 是上游纯镜像,ADR-005);
-  - ② **自报家门**:basename 以 `alpha-` 开头,**或**文件里写着 `north-star:alpha-owned`。
+  - ② **自报家门**:basename 以 `alpha-` 开头,**或**文件里写着 `north-star:codepuppy-owned`。
 
   **加一个新成员**:命名成 `alpha-*` ⇒ 零仪式;名字改不了(迁移的时间戳名、被 import 的模块名)
-  ⇒ 在文件里写一行 `north-star:alpha-owned`。两条都不做 ⇒ 第一次修改就红,红的那一行会把这两条
+  ⇒ 在文件里写一行 `north-star:codepuppy-owned`。两条都不做 ⇒ 第一次修改就红,红的那一行会把这两条
   出路印出来。**豁免是会被打印的** —— 输出里 `· alpha 自有(…)—— 不算上游改动:` 后面逐条列出。
 
   **边界(不谎称穷尽)**:①`origin/dev` 整个 ref 取不到 ⇒ 豁免**整体停用**(fail-closed,回到谓词
@@ -180,7 +180,7 @@ gate run
     (lock ↔ vendored 字节 ↔ 上游字节),只有开发机/pre-push 会到这一档;
   - 有 `PROVENANCE NOT VERIFIED this run` = 本次只验了本仓侧,commit 归属没验。
     **这是 CI 的常态,不是故障**;要真验 provenance 就在本机 `bun run --cwd
-  packages/alpha-contracts-consumer check:vendor`(旁边有 `../alpha-web` checkout)。
+  packages/codepuppy-contracts-consumer check:vendor`(旁边有 `../alpha-web` checkout)。
   - 降级档仍然是一道**真闸**:除 lock ↔ vendored 字节外,还把 producer manifest
     的 35 条哈希锚在 `artifactSha256` 上 —— 那是**源码里的人工评审常量**,
     `vendor` 从不回写它,所以「拿错目录跑一次 vendor 把字节和 lock 一起改写」
@@ -190,14 +190,14 @@ gate run
 
 ## 3. GitHub 上只跑两个 workflow(其余上游的已禁用)
 
-本仓是 opencode 的 fork,继承了 ~26 个上游 workflow。它们要上游订阅的 **Blacksmith 自建 runner**(如 `runs-on: blacksmith-4vcpu-ubuntu-2404`),本 fork 没有这种机器 → 一触发就永久 `queued` 挂死。**这是历史上"CI 一直卡 / 连不通"的真因**(不是 API、不是限流、不是 alpha-ci)。
+本仓是 opencode 的 fork,继承了 ~26 个上游 workflow。它们要上游订阅的 **Blacksmith 自建 runner**(如 `runs-on: blacksmith-4vcpu-ubuntu-2404`),本 fork 没有这种机器 → 一触发就永久 `queued` 挂死。**这是历史上"CI 一直卡 / 连不通"的真因**(不是 API、不是限流、不是 codepuppy-ci)。
 
-2026-07-03 已 `gh workflow disable` 全部上游 workflow,alpha-owned 现役 workflow 见下表
+2026-07-03 已 `gh workflow disable` 全部上游 workflow,codepuppy-owned 现役 workflow 见下表
 (`#899` 起 `sync-upstream` 拆成 candidate/push 两个信任域,详见下方"上游同步的信任域拆分"):
 
 | workflow | 作用 | 触发 |
 |---|---|---|
-| **`alpha-ci`** | 本仓 CI(上面三关) | `push` / `pull_request` → `alpha`;也可 `workflow_dispatch` |
+| **`codepuppy-ci`** | 本仓 CI(上面三关) | `push` / `pull_request` → `alpha`;也可 `workflow_dispatch` |
 | **`sync-upstream`** | 只读 candidate:合并上游、跑 guard/tripwire/引擎冒烟,产出待推送的 bundle artifact,**全程无推送凭据** | 定时 + 手动 |
 | **`sync-upstream-push`** | 特权推送:只解包并推送 candidate 已验证的提交,不执行任何上游代码 | `workflow_run`(仅当 `sync-upstream` 报告 `success`) |
 
@@ -226,7 +226,7 @@ bundle(逐字比对提交 sha,防篡改),推送凭据仅在最后一步临时配
   `name:`」+「每个 job 要么在记录里、要么显式登记为不必需」。
 - **手抄件与真源之间现在有判据了**(`#890`,2026-08-11)。上一条那两个断言只把手抄件与 workflow
   的 job 名对齐 —— 两边一起错就一起自洽,而真正决定「PR 能不能合」的那份清单在 GitHub 的分支保护
-  设置里,此前没有任何东西比对它。现在 `alpha-check.sh` 第 `[10/14]` 步跑
+  设置里,此前没有任何东西比对它。现在 `codepuppy-check.sh` 第 `[10/14]` 步跑
   [`scripts/assert-required-contexts.sh`](../../scripts/assert-required-contexts.sh),
   把两者逐条比一次,不一致就点名差在哪条。**边界照旧诚实**:CI 里跑不了(fork PR 拿不到
   secrets),没鉴权的那次 push 也跑不了 —— 那时它报「未比对」而不是静默放行。
@@ -250,7 +250,7 @@ bundle(逐字比对提交 sha,防篡改),推送凭据仅在最后一步临时配
 
 ## 4. 提交纪律
 
-1. push 前 `bash scripts/alpha-check.sh` **必须绿**。
+1. push 前 `bash scripts/codepuppy-check.sh` **必须绿**。
 2. 需要新增能力 → 走 alpha 自有文件(`packages/ext`、`packages/ui-mac`)或接缝(tool/plugin/MCP/sidecar,ADR-002/005),**绝不改上游 7 包**(改了北极星守卫本地就红)。
 3. 短命 `feat/*` / `fix/*` 分支 → PR → squash 合回 `alpha` → **合后即删分支**(ADR-005)。
    **唯一例外:受审上游集成**(`#1566`)。每日同步的 `Takeover intake check` 以
@@ -263,11 +263,11 @@ bundle(逐字比对提交 sha,防篡改),推送凭据仅在最后一步临时配
 
 ## 5. CI 卡住了怎么办(排查手册)
 
-1. **先分清谁卡**:`gh run list` 看是哪个 workflow。`alpha-ci` 卡 = 真问题;别的 = 已禁用的僵尸,忽略/取消。
+1. **先分清谁卡**:`gh run list` 看是哪个 workflow。`codepuppy-ci` 卡 = 真问题;别的 = 已禁用的僵尸,忽略/取消。
 2. **queued(排队) vs in_progress(在跑但慢)**:
    - 一直 `queued` = 等 runner(无匹配 runner / Actions 额度耗尽 / 并发上限);
    - `in_progress` 慢 = job 本身慢(装依赖 / 测试)——那才是 REQ-009 缓存优化的场景。
-3. **命令**:`gh run cancel <id>` 取消 · `gh run watch <id>` 盯 · `gh run rerun <id>` 重跑 · `gh run list --workflow=alpha-ci.yml` 只看本仓 CI。
+3. **命令**:`gh run cancel <id>` 取消 · `gh run watch <id>` 盯 · `gh run rerun <id>` 重跑 · `gh run list --workflow=codepuppy-ci.yml` 只看本仓 CI。
 4. **别被堵**:本地十步已绿 = 代码没问题。`#717` 之前这里写着「required 里有一个永远不会上报的
    context,真急可 `--admin`」—— **那条已经过时,别再照它办**。四个 required context 现在都会产出
    结论(§3),`--admin` 回到「例外」而不是「结构性必需」。
@@ -287,20 +287,20 @@ bundle(逐字比对提交 sha,防篡改),推送凭据仅在最后一步临时配
 
 ## 6. pre-push 钩子 —— local-first 强制(2026-07-05 REQ-015 起默认开启)
 
-`.githooks/pre-push` = 跑 `scripts/alpha-check.sh`(覆盖 alpha-ci 全部 16 个代码步 + 一步 CI 跑不了的
-`#890` required contexts 对真源,末尾自陈对照表)。**默认开启**:`alpha-check.sh` 每次运行都会检查 `core.hooksPath`,只在偏离时重挂 `.githooks`；健康值不重写共享 `.git/config`。
+`.githooks/pre-push` = 跑 `scripts/codepuppy-check.sh`(覆盖 codepuppy-ci 全部 16 个代码步 + 一步 CI 跑不了的
+`#890` required contexts 对真源,末尾自陈对照表)。**默认开启**:`codepuppy-check.sh` 每次运行都会检查 `core.hooksPath`,只在偏离时重挂 `.githooks`；健康值不重写共享 `.git/config`。
 
 `#815` 起,钩子会先保存当前工作树根,再按 `git rev-parse --local-env-vars` 的**Git 自有清单**
-清掉全部 repository-local `GIT_*` 变量,最后才启动 `alpha-check`。这是被测对象完整性边界:
+清掉全部 repository-local `GIT_*` 变量,最后才启动 `codepuppy-check`。这是被测对象完整性边界:
 linked worktree 的 `git push` 会把 `GIT_DIR` 注入钩子,而它压过测试夹具的 cwd 与 `git -C`；不清理时,
 夹具本想写临时仓的空提交、`Test <test@opencode.test>` 与 `core.bare` 会落进正在推送的分支和
 所有 worktree 共享的 `.git/config`。清单不手写,因为 Git 新增一个 repository-local 变量时枚举会
 默认放行。`pre-push-git-env.test.ts` 在隔离的 linked worktree 里真 push 五次,并复用生产
-`alpha-check` 的自愈块,同时钉住反向污染与 shipped hook 的 HEAD/config 文件身份零变化。
+`codepuppy-check` 的自愈块,同时钉住反向污染与 shipped hook 的 HEAD/config 文件身份零变化。
 
 为什么不能用上游 husky 门(此前「配置过又失效」的根因,REQ-015):
-- `.husky/pre-push` 跑**全量** `bun turbo typecheck`,在 ADR-020 冻结偏斜下 `session-ui` 恒红(上游叶子包,alpha 不 ship,权威门 alpha-ci 不含)→ 逼出 `--no-verify` 习惯;
-- husky 的 `prepare` 在每次 `bun install` 后把 `core.hooksPath` 重置回 `.husky/_` → 手动 `git config` 一次性开启会被静默冲掉。alpha-check 的自愈重挂即对策;残余窗口(install 后、首次 alpha-check 前直接 push)会撞上游红门 → 跑一次 alpha-check 即恢复,**永不劣于旧状**。
+- `.husky/pre-push` 跑**全量** `bun turbo typecheck`,在 ADR-020 冻结偏斜下 `session-ui` 恒红(上游叶子包,alpha 不 ship,权威门 codepuppy-ci 不含)→ 逼出 `--no-verify` 习惯;
+- husky 的 `prepare` 在每次 `bun install` 后把 `core.hooksPath` 重置回 `.husky/_` → 手动 `git config` 一次性开启会被静默冲掉。codepuppy-check 的自愈重挂即对策;残余窗口(install 后、首次 codepuppy-check 前直接 push)会撞上游红门 → 跑一次 codepuppy-check 即恢复,**永不劣于旧状**。
   **在 worktree 里跑 `bun install` 更糟一格(`#916` 实测)**:`core.hooksPath` 是 repository-local 的,
   所以那次写落在**所有 worktree 共享的** `.git/config` 上 —— 受害的不是你,是下一个在别的 lane 里
   `git push` 的人。`scripts/worktree-bootstrap.sh` 在 install 前后夹住并还原这个值,把 worktree 这半边
@@ -315,7 +315,7 @@ linked worktree 的 `git push` 会把 `GIT_DIR` 注入钩子,而它压过测试�
 ```bash
 # 逃生:
 git push --no-verify                                # 单次绕过
-git config --unset core.hooksPath                   # 关闭(需配合 export ALPHA_HOOKS_DISABLE=1,否则下次 alpha-check 重挂)
+git config --unset core.hooksPath                   # 关闭(需配合 export CODEPUPPY_HOOKS_DISABLE=1,否则下次 codepuppy-check 重挂)
 ```
 
 ## 7. 新建 worktree —— 一条命令,建完就能跑真闸门(`#916`)
@@ -326,7 +326,7 @@ bash scripts/worktree-bootstrap.sh 916-worktree-bootstrap -b feat/916-worktree-b
 ```
 
 建在主 checkout 的 `.worktrees/<name>`(治理规定的唯一位置),建完立刻 `bun install`。
-退出 0 = 这棵树自己就能跑 `bash scripts/alpha-check.sh` 并给出**可信**结论,
+退出 0 = 这棵树自己就能跑 `bash scripts/codepuppy-check.sh` 并给出**可信**结论,
 **不必去碰共享主 checkout**。幂等:对已存在且已装好的 worktree 重跑只是再跑一次
 `bun install`(实测 3.5s / exit 0,不破坏它)。
 

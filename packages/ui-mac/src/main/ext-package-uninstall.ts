@@ -72,7 +72,7 @@ export type PackageArtifactInstallersV1 = {
    *  实现自取锁)。command 无盘上实物 —— 叶就是它的全部。 */
   removeCommandConfig(name: string): { ok: true } | { ok: false; reason: string }
   removeMcpSecretsStrict(name: string): { ok: true } | { ok: false; reason: string }
-  releaseAlphaConnectionBindings(componentId: string): { ok: true } | { ok: false; reason: string }
+  releaseCodePuppyConnectionBindings(componentId: string): { ok: true } | { ok: false; reason: string }
   removeInstallGrants(root: string, keys: string[]): { ok: true; removed: string[] } | { ok: false; reason: string }
   /** `#809`:managed plugin 的 `plugin[]` 条目摘除。与 `PlannerInstallers.removePluginPath` 同名
    *  同签名(`uninstallByKey` 的 plugin 臂用的就是它)—— 两条卸载路径摘的必须是同一个东西,
@@ -147,7 +147,7 @@ export function removePackageChildArtifactsV1(
       continue
     }
     if (child.kind === "command") {
-      // `#840`:command 的「实物」只有一个 —— `alpha.jsonc` 的 `command.<name>` 叶。
+      // `#840`:command 的「实物」只有一个 —— `codepuppy.jsonc` 的 `command.<name>` 叶。
       // update 路径(`skipConfig: true`)上它已由 `buildDepartingChildConfigItemsV1` 的事务
       // config item 删除(before-image 回滚兜底);整包卸载路径在锁外跑,`removeCommandConfig`
       // 自取 config 写锁,与 mcp 臂同构。
@@ -173,7 +173,7 @@ export function removePackageChildArtifactsV1(
       removed.push(...grants.removed)
       // `#704`:**只释放绑定**,绝不 disconnect/revoke —— 连接是共享的,真实撤销在 provider 那边。
       // 释放失败不阻断卸载(陈旧绑定只让连接看起来还被用着,那是保守方向)。
-      const released = installers.releaseAlphaConnectionBindings(`mcp:${child.name}`)
+      const released = installers.releaseCodePuppyConnectionBindings(`mcp:${child.name}`)
       if (!released.ok) warnings.push(`connection binding not released for mcp:${child.name}: ${released.reason}`)
       continue
     }

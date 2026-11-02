@@ -189,8 +189,8 @@ function installers(calls: Calls, opts?: { failFsFor?: string }): PackageArtifac
       calls.push(`removeMcpSecretsStrict:${name}`)
       return { ok: true as const }
     },
-    releaseAlphaConnectionBindings: (componentId) => {
-      calls.push(`releaseAlphaConnectionBindings:${componentId}`)
+    releaseCodePuppyConnectionBindings: (componentId) => {
+      calls.push(`releaseCodePuppyConnectionBindings:${componentId}`)
       return { ok: true as const }
     },
     removeInstallGrants: (_root, keys) => {

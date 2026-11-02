@@ -9,7 +9,7 @@
 // ── 判据可行(已勘破,不是设想)──────────────────────────────────────────────────────
 // 2026-09-08 实打:智谱 / DeepSeek 的 `GET <baseURL>/models` 带 key 均回 200 且列出真实 id
 // (OpenAI 标准形状 `{object, data:[{id,...}]}`)。目录里每个 provider 都是 `compat: "openai"`
-// (alpha-models.test.ts 钉着这条不变量),所以这条路对全部 BYOK provider 成立。
+// (codepuppy-models.test.ts 钉着这条不变量),所以这条路对全部 BYOK provider 成立。
 //
 // ── 三档结局(照本仓 `#890` 已有形状,不新发明)──────────────────────────────────────
 //   0 已验证    有 key 的 provider,目录里每个 id 都在上游 /models 里
@@ -33,13 +33,13 @@ import { fileURLToPath } from "node:url"
 import { BYOK_ADAPTERS } from "../src/main/byok-adapters"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const CATALOG = join(HERE, "..", "src", "main", "alpha-models.json")
+const CATALOG = join(HERE, "..", "src", "main", "codepuppy-models.json")
 /** 两个 userData 根(prod / dev 渠道各一份);main 每次 fork 前把 keychain 里的 key 落成这些文件。 */
 const SECRET_DIRS = ["ai.opencode.desktop", "ai.opencode.desktop.dev"].map((r) =>
-  join(homedir(), "Library", "Application Support", r, "alpha-secrets"),
+  join(homedir(), "Library", "Application Support", r, "codepuppy-secrets"),
 )
 /** 结构上不可能被上游收录的 id —— 正样本自检用。 */
-const IMPOSSIBLE_ID = "__alpha-liveness-probe-must-not-exist__"
+const IMPOSSIBLE_ID = "__codepuppy-liveness-probe-must-not-exist__"
 
 type Provider = { id: string; name: string; baseURL: string; keyEnv: string; models: string[] }
 
@@ -127,7 +127,7 @@ if (unverified.length) {
 
 if (real > 0) process.exit(1)
 // **只有全部 provider 都验成了才退 0。** 部分验证退 2(未验证档)——
-// 理由不是洁癖:目录 8 个 id 里本机只能验 2 个,若按 0 退出,alpha-check 末行会打
+// 理由不是洁癖:目录 8 个 id 里本机只能验 2 个,若按 0 退出,codepuppy-check 末行会打
 // 「✅ all local gates green」,而那句话会把「没检查」读成「检查过了」,正是 `#890` 立三档
 // 结局要消灭的形态,也正是 kimi-k2 在目录里躺了三个多月没人发现的那个形态。
 // 未验证不拦 push(fail 仍为 0),只是让总结行说实话。

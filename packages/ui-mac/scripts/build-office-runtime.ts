@@ -29,7 +29,7 @@ import { homedir, tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { ALPHA_OFFICE_PYTHON_SLOT, ALPHA_OFFICE_SERVER_SLOT, WORKSPACE_MARKER, alphaOfficeInstallCommand } from "../src/shared/office-advisories"
+import { CODEPUPPY_OFFICE_PYTHON_SLOT, CODEPUPPY_OFFICE_SERVER_SLOT, WORKSPACE_MARKER, codepuppyOfficeInstallCommand } from "../src/shared/office-advisories"
 import { OFFICE_RUNTIME_BUILD_DIR, checkOfficeRuntime, machOArchs, resolveTargetArch, type TargetArch } from "./target-arch"
 
 const scriptPath = fileURLToPath(import.meta.url)
@@ -207,7 +207,7 @@ function verify(dir: string, arch: TargetArch, locked: Map<string, unknown>): st
   const leaked = filesContaining(dir, Buffer.from(`${dir}.staging`))
   if (leaked.length)
     throw new Error(`office runtime ${arch}: ${leaked.length} file(s) carry the build machine's staging path, e.g.\n  - ${leaked.slice(0, 5).join("\n  - ")}`)
-  const workspace = realpathSync(mkdtempSync(join(tmpdir(), "alpha-office-runtime-verify-")))
+  const workspace = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-office-runtime-verify-")))
   try {
     // 干净环境:没有用户的 PATH / HOME,证明不靠本机装的 python、uv 或缓存。
     const env = { PATH: "/usr/bin:/bin", HOME: workspace, TMPDIR: workspace, LANG: "en_US.UTF-8" }
@@ -240,8 +240,8 @@ function verify(dir: string, arch: TargetArch, locked: Map<string, unknown>): st
       // 生产命令本身(main 模板,三个槽按 main 的方式替换),不是手写的一份近似。
       const command = [
         ...interpreter(arch),
-        ...alphaOfficeInstallCommand(sample.format).map((argument) =>
-          argument === ALPHA_OFFICE_PYTHON_SLOT ? join(dir, "bin", "python3") : argument === ALPHA_OFFICE_SERVER_SLOT ? SERVER : argument === WORKSPACE_MARKER ? workspace : argument,
+        ...codepuppyOfficeInstallCommand(sample.format).map((argument) =>
+          argument === CODEPUPPY_OFFICE_PYTHON_SLOT ? join(dir, "bin", "python3") : argument === CODEPUPPY_OFFICE_SERVER_SLOT ? SERVER : argument === WORKSPACE_MARKER ? workspace : argument,
         ),
       ]
       const stdout = run(command[0]!, command.slice(1), {

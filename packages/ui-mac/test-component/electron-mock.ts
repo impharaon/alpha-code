@@ -3,7 +3,7 @@
 // 为什么需要它(2026-09-23 实测,不是推断):`bun test src` 把 382 个测试文件跑在**同一个进程**
 // 里,而 bun 1.3.14 的 `mock.module("electron", …)` 把该模块的**导出名集合**钉死在进程里
 // **第一个被实例化**的工厂上 —— 后来的工厂只更新这些名字的值,新名字静默丢掉
-// (同一条机制已记在 src/main/alpha-keychain-backend.ts 的头注里)。
+// (同一条机制已记在 src/main/codepuppy-keychain-backend.ts 的头注里)。
 //
 // 而 electron 是 CJS —— `node_modules/.bun/electron@*/node_modules/electron/index.js` 末行是
 // `module.exports = getElectronPath()`。bun 因此把**任何形态**的 import(具名 / 默认 / 命名空间)
@@ -13,9 +13,9 @@
 // junit 里连 testsuite 都没有),于是棘轮点不出名字。
 //
 // 最小复现与反证(两条都实跑过):
-//   bun test src/main/alpha-surfaces.test.ts src/main/process-fence-wiring.test.ts
-//     ⇒ 1 error(alpha-surfaces 的工厂先被实例化,它没有 default)
-//   给 alpha-surfaces 的工厂补上 default 之后同一条命令 ⇒ 16 pass / 0 fail
+//   bun test src/main/codepuppy-surfaces.test.ts src/main/process-fence-wiring.test.ts
+//     ⇒ 1 error(codepuppy-surfaces 的工厂先被实例化,它没有 default)
+//   给 codepuppy-surfaces 的工厂补上 default 之后同一条命令 ⇒ 16 pass / 0 fail
 //
 // 为什么只罩 `src/**/*.test.ts`:`*.cases.ts` 由各自的 host 用 `Bun.spawnSync([bun,"test",<单个文件>])`
 // 起**独立进程**,一个进程里只有它自己那一个工厂,名字集合天然完整 —— 跨文件污染面不在那里。

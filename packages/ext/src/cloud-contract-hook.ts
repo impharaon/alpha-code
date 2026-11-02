@@ -5,14 +5,14 @@
 //   远端名(worker 自己 advertise;platform#560 起只说动作)   dispatch
 //   引擎 id(McpCatalog.toolName(server, remote))           codepuppy_dispatch   ← plugin.ts 传进来的
 //
-// 现在 id 一律**推导**:server 名取注入面在本次 fork 写进 env 的那个(`ALPHA_CLOUD_MCP_SERVER`,
+// 现在 id 一律**推导**:server 名取注入面在本次 fork 写进 env 的那个(`CODEPUPPY_CLOUD_MCP_SERVER`,
 // 与 `cloud-websearch-kill.ts` 的治理豁免同源),远端名是下面这张表。仓里不许再出现第二份 id 字面量。
 //
 // alpha-code#1568:表与平台公开工具清单的关系由 ui-mac `cloud-remote-names-pin.test.ts` 双向钉住(下面两张表合起来
 // = 平台 §6 全集)。运行期再补一道:一个工具 id **确定**属于本次 fork 的治理云 server、却一个远端名都对不上,
 // 就响亮拒绝,不再静默跳过契约校验 —— 改名期间远端名表落后于平台,正是 #650 那种「闸一次都没跑」的形态。
 
-import { ContractIncompatibleError, decodeContract, decodeJsonContract, type ContractName } from "@alpha-code/contracts-consumer"
+import { ContractIncompatibleError, decodeContract, decodeJsonContract, type ContractName } from "@codepuppy/contracts-consumer"
 import {
   CLOUD_MCP_SERVER_ENV,
   isGovernedCloudTool,

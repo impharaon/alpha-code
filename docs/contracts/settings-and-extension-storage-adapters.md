@@ -23,7 +23,7 @@ Settings 真源仍是 Electron `userData/default.dat` 的 `settings.v3` 值；�
 settings.read(): Promise<SettingsReadResult>
 settings.validate(value: unknown): Promise<SettingsValidateResult>
 settings.write(input: {
-  value: AlphaSettings
+  value: CodePuppySettings
   expectedRevision: string
 }): Promise<SettingsWriteResult>
 ```

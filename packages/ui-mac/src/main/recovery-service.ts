@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import type { SurfaceId } from "../shared/alpha-surfaces"
+import type { SurfaceId } from "../shared/codepuppy-surfaces"
 import {
   RECOVERY_ACTIONS,
   RECOVERY_ACTION_RESULT_CODES,

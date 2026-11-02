@@ -11,7 +11,7 @@
    停止内嵌引擎 → 删除 → 退出应用。逐项结果留痕 main.log(`[c16-data-clear]`,日志目录最后删)。
 2. **再把 Code Puppy.app 拖进废纸篓**。
 
-> 下列 `alpha-code` / `alpha-code-state` 路径和钥匙串项是为保留既有登录、设置与升级能力而冻结的
+> 下列 `alpha-code` / `codepuppy-state` 路径和钥匙串项是为保留既有登录、设置与升级能力而冻结的
 > 兼容存储标识，不是产品展示名；卸载 Code Puppy 时仍需按这些实际路径清理。
 
 ## 残留路径清单(app 内清除各级覆盖范围)
@@ -20,12 +20,12 @@
 
 | 路径 | 内容 |
 |---|---|
-| `~/Library/Application Support/alpha-code/alpha-auth.json` | 平台登录 token(safeStorage 加密) |
-| `~/Library/Application Support/alpha-code/alpha-pkce.json` | 登录握手临时凭证(短命) |
-| `~/Library/Application Support/alpha-code/alpha-byok-keys.json` | BYOK 密钥库(safeStorage 加密) |
-| `~/Library/Application Support/alpha-code/alpha-secrets/` | 密钥文件通道(A6 {file:},0600) |
-| `~/Library/Application Support/alpha-code/alpha-mcp-secrets/` | 连接器(MCP)密钥({file:} 通道) |
-| `~/Library/Application Support/alpha-code/alpha.env` | 手写密钥 env 文件 |
+| `~/Library/Application Support/alpha-code/codepuppy-auth.json` | 平台登录 token(safeStorage 加密) |
+| `~/Library/Application Support/alpha-code/codepuppy-pkce.json` | 登录握手临时凭证(短命) |
+| `~/Library/Application Support/alpha-code/codepuppy-byok-keys.json` | BYOK 密钥库(safeStorage 加密) |
+| `~/Library/Application Support/alpha-code/codepuppy-secrets/` | 密钥文件通道(A6 {file:},0600) |
+| `~/Library/Application Support/alpha-code/codepuppy-mcp-secrets/` | 连接器(MCP)密钥({file:} 通道) |
+| `~/Library/Application Support/alpha-code/codepuppy.env` | 手写密钥 env 文件 |
 | `~/.local/share/opencode/auth.json`(或 `$XDG_DATA_HOME/opencode/auth.json`) | 引擎凭证存储 —— **与独立安装的 opencode CLI 共享**,删除后 CLI 侧需重新登录 |
 | `~/.local/share/opencode/mcp-auth.json`(或 `$XDG_DATA_HOME/opencode/mcp-auth.json`) | MCP 服务登录令牌(OAuth access/refresh token 与客户端注册)—— **与独立安装的 opencode CLI 共享**,删除后需重新授权各连接器 |
 
@@ -33,8 +33,8 @@
 
 | 路径 | 内容 | 备注 |
 |---|---|---|
-| `~/Library/Application Support/alpha-code/` 整目录 | 设置(opencode.settings)、日志(logs/)、DB 备份(alpha-db-backups/)、端点/模型缓存、远程 catalog 缓存等 | 全删 |
-| `~/Library/Application Support/alpha-code-state/env/<当前环境>/` | 当前 dev/prod/beta 环境的安装物(installs.json 账本、skills/agents/plugins)、自动化任务与状态 | 只删当前 frozen 环境 root；不会删另外两个环境或共享 CAS |
+| `~/Library/Application Support/alpha-code/` 整目录 | 设置(opencode.settings)、日志(logs/)、DB 备份(codepuppy-db-backups/)、端点/模型缓存、远程 catalog 缓存等 | 全删 |
+| `~/Library/Application Support/codepuppy-state/env/<当前环境>/` | 当前 dev/prod/beta 环境的安装物(installs.json 账本、skills/agents/plugins)、自动化任务与状态 | 只删当前 frozen 环境 root；不会删另外两个环境或共享 CAS |
 | `~/.opencode/` 内 **alpha 自有 symlink** | 指向当前环境 root 的历史桥接链(kind 级整目录链 + 条目级链) | **只摘链**;你自建的真实文件/目录、指向别处的链一律不碰 |
 | `~/.local/share/opencode/`(或 `$XDG_DATA_HOME/opencode/`) | 会话数据库(opencode.db 及 -wal/-shm)、项目元数据、快照、引擎凭证 | **与独立安装的 opencode CLI 共享** —— 终确认对话框单独勾选;单独使用 opencode 的用户请勿勾选 |
 
@@ -43,8 +43,8 @@
 | 路径 | 说明 |
 |---|---|
 | 你的项目文件、各项目内 `.code-puppy/` 目录 | ADR-019 §4:项目级产物属用户项目(云任务 run 记录、项目偏好);清理=进各项目手删 `.code-puppy/` |
-| `~/Library/Application Support/alpha-code-state/cas/` | dev/prod/beta 共享的可重建 CAS，由 GC 管理；app 内 data-clear 不删除，避免跨环境误删。彻底卸载全部 channel 后可手动删除整个 `alpha-code-state/` |
-| `~/Library/Application Support/alpha-code-state/env/<其它环境>/` | 其它 channel 的 mutable root；必须从对应 channel 清除，或在全部 channel 均卸载后手动删除共享 base |
+| `~/Library/Application Support/codepuppy-state/cas/` | dev/prod/beta 共享的可重建 CAS，由 GC 管理；app 内 data-clear 不删除，避免跨环境误删。彻底卸载全部 channel 后可手动删除整个 `codepuppy-state/` |
+| `~/Library/Application Support/codepuppy-state/env/<其它环境>/` | 其它 channel 的 mutable root；必须从对应 channel 清除，或在全部 channel 均卸载后手动删除共享 base |
 | `~/.alpha/` | 已退休旧根；当前版本零读取、零迁移、零 dual-read，也不会替用户删除其中历史内容 |
 | `~/.opencode/opencode.jsonc` | 引擎共享配置。经定制中心装过连接器/插件的,**建议卸载前先在定制中心逐项卸载**(会净除对应条目);~~历史悬空引用需手动删除对应 `mcp.*` / `plugin[]` 条目~~ —— 见下方「悬空引用:什么自动、什么必须手动」订正块 |
 | `~/.opencode/` 内你自建的 skill/agent/command 等 | 用户内容红线,永不代删 |
@@ -60,9 +60,9 @@
 **自动剥离(无需手动)** —— 必须**同时**满足两条:
 
 1. **引用目标**解析后落在四个守卫根内:`~/Library/Application Support/alpha-code/`(userData)、
-   当前环境 root(`alpha-code-state/env/<环境>/`)、引擎数据目录(`~/.local/share/opencode/` 或 `$XDG_DATA_HOME/opencode/`)、
+   当前环境 root(`codepuppy-state/env/<环境>/`)、引擎数据目录(`~/.local/share/opencode/` 或 `$XDG_DATA_HOME/opencode/`)、
    退休根 `~/.alpha/`;**且**
-2. **该引用所在的配置文件**是 alpha 拥有的:`<当前环境 root>/alpha.jsonc`(恒),
+2. **该引用所在的配置文件**是 alpha 拥有的:`<当前环境 root>/codepuppy.jsonc`(恒),
    或 legacy `~/.opencode/opencode.jsonc` **且**该文件的顶层键全部 ∈ `$schema` / `mcp` / `plugin` / `agent` / `permission` / `command` / `provider`。
 
 满足这两条的悬空 `mcp.<名>.environment/headers` 的 `{file:}` 值与 `plugin[]` 绝对路径条目,会在
@@ -87,11 +87,11 @@
 ```bash
 du -sh ~/Library/Application\ Support/alpha-code ~/.local/share/opencode 2>/dev/null
 # 期望:上面两项 No such file or directory
-du -sh ~/Library/Application\ Support/alpha-code-state 2>/dev/null
+du -sh ~/Library/Application\ Support/codepuppy-state 2>/dev/null
 # 可能仍存在:共享 CAS 或其它 channel 的环境根；只有全部 channel 均卸载后才手动删除整个 base
 ls -la ~/.opencode 2>/dev/null   # 只应剩你自建的内容与 opencode.jsonc(见上表)
 ```
 
 保留项(设计内不归零):各项目 `.code-puppy/`、退休根 `~/.alpha` 的历史内容、`~/.opencode`
-用户自建内容与 opencode.jsonc、钥匙串项。共享 `alpha-code-state/cas` 和其它环境根仅在所有
+用户自建内容与 opencode.jsonc、钥匙串项。共享 `codepuppy-state/cas` 和其它环境根仅在所有
 channel 均卸载后手动整 base 清理。

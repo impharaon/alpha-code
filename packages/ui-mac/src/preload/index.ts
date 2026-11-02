@@ -47,18 +47,18 @@ const api: ElectronAPI = {
       ipcRenderer.send(STARTUP_TIMELINE_CHANNEL, { name, rendererNow, extra }),
   },
   contracts: {
-    health: () => ipcRenderer.invoke("alpha-contract-health"),
+    health: () => ipcRenderer.invoke("codepuppy-contract-health"),
     subscribe: (cb) => {
       const handler = (_: unknown, failure: ContractFailure) => cb(failure)
-      ipcRenderer.on("alpha-contract-failure", handler)
-      return () => ipcRenderer.removeListener("alpha-contract-failure", handler)
+      ipcRenderer.on("codepuppy-contract-failure", handler)
+      return () => ipcRenderer.removeListener("codepuppy-contract-failure", handler)
     },
   },
   recovery: {
     onIncident: (cb) => {
       const handler = (_: unknown, incident: Parameters<typeof cb>[0]) => cb(incident)
-      ipcRenderer.on("alpha-recovery-incident", handler)
-      return () => ipcRenderer.removeListener("alpha-recovery-incident", handler)
+      ipcRenderer.on("codepuppy-recovery-incident", handler)
+      return () => ipcRenderer.removeListener("codepuppy-recovery-incident", handler)
     },
     submit: (request) => ipcRenderer.invoke("recovery-submit", request),
     retryEngine: () => ipcRenderer.invoke("recovery-retry-engine"),
@@ -112,7 +112,7 @@ const api: ElectronAPI = {
   // 理由见 main/moderation-ipc.ts。IPC 本身失败(main 还没注册 / 通道坏了)一律当「不拦」:
   // 已批设计 §3 明写「读不到时不拦也不提示」。
   moderation: {
-    check: (text) => ipcRenderer.invoke("alpha-moderation-check", text).catch(() => false),
+    check: (text) => ipcRenderer.invoke("codepuppy-moderation-check", text).catch(() => false),
   },
   // REQ-236 `#1553` AC2:PDF / Office 附件存一份到会话实例目录的隐藏目录(main/composer-attachment-stage.ts)。
   attachments: {
@@ -162,8 +162,8 @@ const api: ElectronAPI = {
   acknowledgeDeepLinks: (batchId) => ipcRenderer.invoke("acknowledge-deep-links", batchId),
 
   openDirectoryPicker: (opts) => ipcRenderer.invoke("open-directory-picker", opts),
-  workspaceDefaultDir: () => ipcRenderer.invoke("alpha-workspace-default"),
-  workspaceEnsureDefault: (dir) => ipcRenderer.invoke("alpha-workspace-ensure", dir),
+  workspaceDefaultDir: () => ipcRenderer.invoke("codepuppy-workspace-default"),
+  workspaceEnsureDefault: (dir) => ipcRenderer.invoke("codepuppy-workspace-ensure", dir),
   workspaceWriteProbe: (directory) => ipcRenderer.invoke("workspace-write-probe", directory),
   openFilePicker: (opts) => ipcRenderer.invoke("open-file-picker", opts),
   readPickedFile: (token, path) => ipcRenderer.invoke("read-picked-file", token, path),
@@ -179,12 +179,12 @@ const api: ElectronAPI = {
   setWindowFocus: () => ipcRenderer.invoke("set-window-focus"),
   showWindow: () => ipcRenderer.invoke("show-window"),
   relaunch: () => ipcRenderer.send("relaunch"),
-  endpoints: () => ipcRenderer.invoke("alpha-endpoints"),
+  endpoints: () => ipcRenderer.invoke("codepuppy-endpoints"),
   appVersion: () => ipcRenderer.invoke("app-version"),
   // REQ-098:环境快照只读通道 —— 刻意不传任何参数(环境由 main 从构建事实解析,renderer 零输入)。
-  environment: () => ipcRenderer.invoke("alpha-environment"),
+  environment: () => ipcRenderer.invoke("codepuppy-environment"),
   surfaces: {
-    reportFailure: (payload) => ipcRenderer.invoke("alpha-surface-failure", payload),
+    reportFailure: (payload) => ipcRenderer.invoke("codepuppy-surface-failure", payload),
   },
   getZoomFactor: () => ipcRenderer.invoke("get-zoom-factor"),
   setZoomFactor: (factor) => ipcRenderer.invoke("set-zoom-factor", factor),
@@ -405,12 +405,12 @@ const api: ElectronAPI = {
     catalog: () => ipcRenderer.invoke("models-catalog"),
     // #1084:目录刷新的最后结局。invoke 取当前值(启动那次刷新早于 renderer 挂载),
     // subscribe 收后续变化;`#1556` 起两份目录各一格,`null` = 那一份最近一次刷新成功。
-    refreshHealth: () => ipcRenderer.invoke("alpha-catalog-health"),
+    refreshHealth: () => ipcRenderer.invoke("codepuppy-catalog-health"),
     refresh: () => ipcRenderer.invoke("models-catalog-refresh"),
     subscribeRefreshHealth: (cb) => {
       const handler = (_: unknown, health: CatalogRefreshHealth) => cb(health)
-      ipcRenderer.on("alpha-catalog-failure", handler)
-      return () => ipcRenderer.removeListener("alpha-catalog-failure", handler)
+      ipcRenderer.on("codepuppy-catalog-failure", handler)
+      return () => ipcRenderer.removeListener("codepuppy-catalog-failure", handler)
     },
   },
   providers: {

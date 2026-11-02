@@ -3,7 +3,7 @@
 // Codex 方案裁决(2026-07-18,Design A 通过):
 //   · 时间边界 = 当前 embedded sidecar 的一次连续运行;exit / 主动 kill / respawn / 崩溃均结束
 //     全部 grant。存放面 = **纯 main 内存**(拒绝落盘会话戳):崩溃即失 = 「崩溃不复活」零证明
-//     负担;持久账本(installs.json)/ alpha.jsonc / 注入 env(OPENCODE_CONFIG_CONTENT)全程零写
+//     负担;持久账本(installs.json)/ codepuppy.jsonc / 注入 env(OPENCODE_CONFIG_CONTENT)全程零写
 //     —— #397 三闸(enable 闸拒 session-grant-persistent-enable、写点例外恒 disabled、boot
 //     reconcile 归位)与注入面「session-grant 恒 disabled」不变量原样保持,本模块不开任何例外。
 //   · **generation 失效栅栏**(裁决 Q3 竞态不变量):会话结束处理必须先撤 active 标记、再清 Map;

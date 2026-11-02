@@ -6,7 +6,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { build } from "vite"
-import { decodeContract } from "@alpha-code/contracts-consumer"
+import { decodeContract } from "@codepuppy/contracts-consumer"
 import type { createComponent } from "solid-js"
 import type { render } from "solid-js/web"
 import type { CloudJobEnvelope, CloudUploadResult, UploadPreview } from "../../preload/types"
@@ -14,7 +14,7 @@ import type { UploadConsentDialog } from "./upload-consent-dialog"
 import type { CloudDispatchBox } from "./cloud-dispatch-box"
 import type { ExtensionDetail } from "./extension-detail"
 import type { CatalogEntry, CloudPipelineSpec } from "./catalog-types"
-import bundledCatalog from "./alpha-catalog.json"
+import bundledCatalog from "./codepuppy-catalog.json"
 import { dict as zh } from "../i18n/zh"
 
 type Runtime = {
@@ -25,7 +25,7 @@ type Runtime = {
   ExtensionDetail: typeof ExtensionDetail
 }
 
-const runtimeDirectory = mkdtempSync(join(tmpdir(), "alpha-upload-consent-render-"))
+const runtimeDirectory = mkdtempSync(join(tmpdir(), "codepuppy-upload-consent-render-"))
 await build({
   configFile: false,
   logLevel: "silent",
@@ -133,17 +133,17 @@ describe("approved explicit-upload consent dialog harness", () => {
     await flush()
 
     const dialog = document.querySelector("[role=dialog]")
-    expect(dialog?.textContent).toContain(zh["alpha.cloud.consent.title"])
+    expect(dialog?.textContent).toContain(zh["codepuppy.cloud.consent.title"])
     expect(dialog?.textContent).toContain("2 个文件，共 1.5 KB")
-    expect(dialog?.textContent).toContain(zh["alpha.cloud.consent.purposeLabel"])
-    expect(dialog?.textContent).toContain(zh["alpha.cloud.consent.retentionLabel"])
-    expect(document.querySelectorAll(".alpha-upl-file")).toHaveLength(0)
+    expect(dialog?.textContent).toContain(zh["codepuppy.cloud.consent.purposeLabel"])
+    expect(dialog?.textContent).toContain(zh["codepuppy.cloud.consent.retentionLabel"])
+    expect(document.querySelectorAll(".codepuppy-upl-file")).toHaveLength(0)
 
-    document.querySelector<HTMLButtonElement>(".alpha-upl-more")!.click()
+    document.querySelector<HTMLButtonElement>(".codepuppy-upl-more")!.click()
     await flush()
-    expect(document.querySelectorAll(".alpha-upl-file")).toHaveLength(2)
-    expect(document.querySelector(".alpha-upl-file[data-flag]")?.textContent).toContain("src/contact.ts")
-    expect(document.querySelectorAll(".alpha-upl-file .chip")).toHaveLength(1)
+    expect(document.querySelectorAll(".codepuppy-upl-file")).toHaveLength(2)
+    expect(document.querySelector(".codepuppy-upl-file[data-flag]")?.textContent).toContain("src/contact.ts")
+    expect(document.querySelectorAll(".codepuppy-upl-file .chip")).toHaveLength(1)
   })
 
   test("cancel is the safe autofocus action and Escape backdrop and button all cancel", async () => {
@@ -234,7 +234,7 @@ describe("#400 cancel semantics: server-decidable result, never optimistic", () 
     const harness = mountRunningJob({
       cancel: async () => ({ schema_version: 1, job_id: "job_cancelme", status: "cancelling", accepted: true }),
     })
-    document.querySelector<HTMLButtonElement>('.alpha-ext-add[data-variant="primary"]')!.click()
+    document.querySelector<HTMLButtonElement>('.codepuppy-ext-add[data-variant="primary"]')!.click()
     await flush()
 
     // running:取消入口在,任何取消 UI 未出现。
@@ -244,15 +244,15 @@ describe("#400 cancel semantics: server-decidable result, never optimistic", () 
 
     // 服务端受理 → 显示「正在取消」;绝不显示已完成/已取消的终态文案,也不显示任务失败。
     expect(harness.cancelCalls).toEqual(["job_cancelme"])
-    expect(document.querySelector("[data-cancelling]")?.textContent).toBe(zh["alpha.ext.cloudCancelling"])
+    expect(document.querySelector("[data-cancelling]")?.textContent).toBe(zh["codepuppy.ext.cloudCancelling"])
     expect(cancelButton()).toBeNull()
-    expect(document.body.textContent).not.toContain(zh["alpha.ext.cloudDone"])
-    expect(document.body.textContent).not.toContain(zh["alpha.ext.cloudRunFailed"])
+    expect(document.body.textContent).not.toContain(zh["codepuppy.ext.cloudDone"])
+    expect(document.body.textContent).not.toContain(zh["codepuppy.ext.cloudRunFailed"])
 
     // 终态只能由服务端事实(SSE job.cancelled)驱动。
     harness.sse("job.cancelled")
     await flush()
-    expect(document.body.textContent).toContain(zh["alpha.ext.cloudRunFailed"])
+    expect(document.body.textContent).toContain(zh["codepuppy.ext.cloudRunFailed"])
     expect(document.querySelector("[data-cancelling]")).toBeNull()
   })
 
@@ -260,25 +260,25 @@ describe("#400 cancel semantics: server-decidable result, never optimistic", () 
     mountRunningJob({
       cancel: async () => ({ schema_version: 1, job_id: "job_cancelme", status: "completed", accepted: false }),
     })
-    document.querySelector<HTMLButtonElement>('.alpha-ext-add[data-variant="primary"]')!.click()
+    document.querySelector<HTMLButtonElement>('.codepuppy-ext-add[data-variant="primary"]')!.click()
     await flush()
     cancelButton()!.click()
     await flush()
 
-    expect(document.body.textContent).toContain(zh["alpha.ext.cloudCancelRejected"])
+    expect(document.body.textContent).toContain(zh["codepuppy.ext.cloudCancelRejected"])
     expect(document.querySelector("[data-cancelling]")).toBeNull()
     // 运行显示保持由服务端事实驱动 —— 没有任何本地编造的 cancelled。
-    expect(document.body.textContent).toContain(zh["alpha.ext.cloudRunning"])
+    expect(document.body.textContent).toContain(zh["codepuppy.ext.cloudRunning"])
   })
 
   test("a transport failure keeps the cancel entry available instead of faking any cancel state", async () => {
     mountRunningJob({ cancel: async () => ({ error: "network" }) })
-    document.querySelector<HTMLButtonElement>('.alpha-ext-add[data-variant="primary"]')!.click()
+    document.querySelector<HTMLButtonElement>('.codepuppy-ext-add[data-variant="primary"]')!.click()
     await flush()
     cancelButton()!.click()
     await flush()
 
-    expect(document.body.textContent).toContain(zh["alpha.ext.cloudErrNetwork"])
+    expect(document.body.textContent).toContain(zh["codepuppy.ext.cloudErrNetwork"])
     expect(document.querySelector("[data-cancelling]")).toBeNull()
     expect(cancelButton()).not.toBeNull()
     expect(cancelButton()!.disabled).toBe(false)
@@ -288,7 +288,7 @@ describe("#400 cancel semantics: server-decidable result, never optimistic", () 
 describe("four approved upload UI outcomes", () => {
   test("sensitive opens the preview dialog", async () => {
     mountDispatch({ status: "consent-required", requestId: "request-1", preview })
-    document.querySelector<HTMLButtonElement>('.alpha-ext-add[data-variant="primary"]')!.click()
+    document.querySelector<HTMLButtonElement>('.codepuppy-ext-add[data-variant="primary"]')!.click()
     await flush()
     expect(document.querySelector("[role=dialog]")).not.toBeNull()
   })
@@ -307,64 +307,64 @@ describe("four approved upload UI outcomes", () => {
         urls: { status: "/status", events: "/events", result: "/result" },
       },
     })
-    document.querySelector<HTMLButtonElement>('.alpha-ext-add[data-variant="primary"]')!.click()
+    document.querySelector<HTMLButtonElement>('.codepuppy-ext-add[data-variant="primary"]')!.click()
     await flush()
     expect(document.querySelector("[role=dialog]")).toBeNull()
-    expect(document.body.textContent).toContain(zh["alpha.cloud.consent.silentPass"])
+    expect(document.body.textContent).toContain(zh["codepuppy.cloud.consent.silentPass"])
   })
 
   test("cancelled returns to neutral without dialog or inline error", async () => {
     mountDispatch({ status: "cancelled" })
-    document.querySelector<HTMLButtonElement>('.alpha-ext-add[data-variant="primary"]')!.click()
+    document.querySelector<HTMLButtonElement>('.codepuppy-ext-add[data-variant="primary"]')!.click()
     await flush()
     expect(document.querySelector("[role=dialog]")).toBeNull()
-    expect(document.querySelector(".alpha-ext-card-err")).toBeNull()
+    expect(document.querySelector(".codepuppy-ext-card-err")).toBeNull()
   })
 
   test("failure closes the dialog surface and renders an inline error", async () => {
     mountDispatch({ status: "failed", error: "upload-consent-issuance-failed" })
-    document.querySelector<HTMLButtonElement>('.alpha-ext-add[data-variant="primary"]')!.click()
+    document.querySelector<HTMLButtonElement>('.codepuppy-ext-add[data-variant="primary"]')!.click()
     await flush()
     expect(document.querySelector("[role=dialog]")).toBeNull()
-    expect(document.querySelector(".alpha-ext-card-err")?.textContent).toContain(zh["alpha.cloud.consent.errToken"])
+    expect(document.querySelector(".codepuppy-ext-card-err")?.textContent).toContain(zh["codepuppy.cloud.consent.errToken"])
   })
 
   // #1508: unknown platform outcomes stay distinct from local refusal (nothing sent).
   test("unknown platform send result asks the user to check task status", async () => {
     mountDispatch({ status: "failed", error: "upload_reserved_input" })
-    document.querySelector<HTMLButtonElement>('.alpha-ext-add[data-variant="primary"]')!.click()
+    document.querySelector<HTMLButtonElement>('.codepuppy-ext-add[data-variant="primary"]')!.click()
     await flush()
-    const err = document.querySelector(".alpha-ext-card-err")?.textContent ?? ""
-    expect(err).toBe(zh["alpha.ext.cloudUnknownUpload"])
+    const err = document.querySelector(".codepuppy-ext-card-err")?.textContent ?? ""
+    expect(err).toBe(zh["codepuppy.ext.cloudUnknownUpload"])
     expect(err).not.toContain("upload_reserved_input")
-    expect(err).not.toContain(zh["alpha.cloud.consent.errScope"])
+    expect(err).not.toContain(zh["codepuppy.cloud.consent.errScope"])
   })
 
   test("another unknown platform result never claims nothing was sent", async () => {
     mountDispatch({ status: "failed", error: "upload_consent_replayed" })
-    document.querySelector<HTMLButtonElement>('.alpha-ext-add[data-variant="primary"]')!.click()
+    document.querySelector<HTMLButtonElement>('.codepuppy-ext-add[data-variant="primary"]')!.click()
     await flush()
-    const err = document.querySelector(".alpha-ext-card-err")?.textContent ?? ""
-    expect(err).toBe(zh["alpha.ext.cloudUnknownUpload"])
+    const err = document.querySelector(".codepuppy-ext-card-err")?.textContent ?? ""
+    expect(err).toBe(zh["codepuppy.ext.cloudUnknownUpload"])
     expect(err).not.toContain("upload_consent_replayed")
-    expect(err).not.toContain(zh["alpha.cloud.consent.errScope"])
+    expect(err).not.toContain(zh["codepuppy.cloud.consent.errScope"])
   })
 
   // [#940] 反向判据:本地准入码(`upload-` 前缀 kebab)仍然给人话「范围」文案、裸码不上屏 ——
   // 一个「什么都原样透出」的恒显实现能过上面两条正向,但过不了这条。
   test("a local admission code still renders the scope message, never the raw code", async () => {
     mountDispatch({ status: "failed", error: "upload-main-gate-required" })
-    document.querySelector<HTMLButtonElement>('.alpha-ext-add[data-variant="primary"]')!.click()
+    document.querySelector<HTMLButtonElement>('.codepuppy-ext-add[data-variant="primary"]')!.click()
     await flush()
-    const err = document.querySelector(".alpha-ext-card-err")?.textContent ?? ""
-    expect(err).toContain(zh["alpha.cloud.consent.errScope"])
+    const err = document.querySelector(".codepuppy-ext-card-err")?.textContent ?? ""
+    expect(err).toContain(zh["codepuppy.cloud.consent.errScope"])
     expect(err).not.toContain("upload-main-gate-required")
   })
 })
 
 // Server shapes come from the pinned producer corpus, not a handwritten HTTP payload.
 // Input/result contents below are synthetic; fields match gateway/src/pipelines.ts researchRun/docsRun.
-const producer = join(import.meta.dir, "../../../../alpha-contracts-consumer/vendor/alpha-platform/contracts/v1/fixtures/producer")
+const producer = join(import.meta.dir, "../../../../codepuppy-contracts-consumer/vendor/alpha-platform/contracts/v1/fixtures/producer")
 const requestFixture = (await Bun.file(join(producer, "cloud-job-request.json")).json()).value
 const acceptedFixture = (await Bun.file(join(producer, "cloud-job-accepted.json")).json()).value
 const statusFixture = (await Bun.file(join(producer, "cloud-job-status.json")).json()).value
@@ -411,7 +411,7 @@ function mountCloudEntry(id: string, kind: CloudPipelineSpec["pipelineKind"], re
     onBack: () => {}, onInstall: () => {}, onUninstall: () => {}, onOpenEntry: () => {},
     onPackageAction: async () => undefined, cloudReady: () => true,
     curationStatus: () => ({ kind: "uncurated" }), nowIso: () => "2026-10-12T00:00:00Z",
-    onToggleState: async () => {}, sessionViewFor: () => ({ on: false, textKey: "alpha.ext.sessionOffRow", tone: "muted" }),
+    onToggleState: async () => {}, sessionViewFor: () => ({ on: false, textKey: "codepuppy.ext.sessionOffRow", tone: "muted" }),
     sessionAvailable: () => false, sessionBusyFor: () => false, onSessionToggle: async () => {},
   }), host))
   return {
@@ -439,7 +439,7 @@ describe("#1509 customization center cloud entries", () => {
     expect(decodeContract("CloudJobRequestV1", { ...requestFixture, ...harness.envelopes[0] }, "cloud-http").kind).toBe(kind)
     harness.sse("workflow.step.completed")
     await flush()
-    expect(document.querySelector("[data-live]")?.textContent).toContain(zh["alpha.ext.cloudProgress"])
+    expect(document.querySelector("[data-live]")?.textContent).toContain(zh["codepuppy.ext.cloudProgress"])
     harness.sse("job.completed")
     await flush()
     const text = "finalAnswer" in result ? result.finalAnswer : result.docs
@@ -448,8 +448,8 @@ describe("#1509 customization center cloud entries", () => {
     await flush()
     expect(await navigator.clipboard.readText()).toBe(text)
     expect(harness.saves[0]).toEqual(["/results", acceptedFixture.job_id, harness.envelopes[0]])
-    expect(document.body.textContent).toContain(zh["alpha.ext.cloudDone"])
-    expect(document.body.textContent).not.toContain(zh["alpha.cloud.consent.legacyDiff"])
+    expect(document.body.textContent).toContain(zh["codepuppy.ext.cloudDone"])
+    expect(document.body.textContent).not.toContain(zh["codepuppy.cloud.consent.legacyDiff"])
   })
 
   test.each([
@@ -477,13 +477,13 @@ describe("#1509 customization center cloud entries", () => {
   test("AC3 code-review retains its diff dispatch and completed run display", async () => {
     const harness = mountCloudEntry("cloud:code-review", "code-review", statusFixture.result)
     expect(document.querySelector("textarea")).toBeNull()
-    Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find((button) => button.textContent === zh["alpha.cloud.consent.legacyDiff"])!.click()
+    Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find((button) => button.textContent === zh["codepuppy.cloud.consent.legacyDiff"])!.click()
     await flush()
     expect(harness.envelopes[0]).toMatchObject({ kind: requestFixture.kind, input: requestFixture.input })
     harness.sse("job.completed")
     await flush()
     expect(harness.saves).toHaveLength(1)
-    expect(document.body.textContent).toContain(zh["alpha.ext.cloudDone"])
+    expect(document.body.textContent).toContain(zh["codepuppy.ext.cloudDone"])
     expect(document.querySelector("[data-cloud-result]")).toBeNull()
   })
 })
@@ -501,7 +501,7 @@ function mountDetail(target: Parameters<typeof ExtensionDetail>[0]["target"], op
     onBack: () => {}, onInstall: () => {}, onUninstall: () => {}, onOpenEntry: () => {},
     onPackageAction: async () => undefined, cloudReady: () => options.cloudReady ?? true, onLogin: options.onLogin,
     curationStatus: () => ({ kind: "uncurated" }), nowIso: () => "2026-10-30T00:00:00Z",
-    onToggleState: async () => {}, sessionViewFor: () => ({ on: false, textKey: "alpha.ext.sessionOffRow", tone: "muted" }),
+    onToggleState: async () => {}, sessionViewFor: () => ({ on: false, textKey: "codepuppy.ext.sessionOffRow", tone: "muted" }),
     sessionAvailable: () => false, sessionBusyFor: () => false, onSessionToggle: async () => {},
   }), host))
 }
@@ -513,12 +513,12 @@ describe("#1595 AC2 云端任务详情首屏:最长运行 / 发送内容 / 结�
     mountDetail({ kind: "entry", entry: research() })
     await flush()
 
-    const facts = document.querySelector("[data-alpha-cloud-task-facts]")?.textContent ?? ""
+    const facts = document.querySelector("[data-codepuppy-cloud-task-facts]")?.textContent ?? ""
     // 「做什么」取条目自身的描述;页头简介不再重复同一段。
-    expect(facts).toContain(zh["alpha.ext.cloudWhat"])
+    expect(facts).toContain(zh["codepuppy.ext.cloudWhat"])
     expect(facts).toContain(research().description)
-    expect(document.querySelector(".alpha-ext-dabout") === null).toBe(true)
-    for (const label of [zh["alpha.ext.cloudMaxRun"], zh["alpha.ext.cloudSends"], zh["alpha.ext.cloudResult"], zh["alpha.ext.cloudCost"]]) {
+    expect(document.querySelector(".codepuppy-ext-dabout") === null).toBe(true)
+    for (const label of [zh["codepuppy.ext.cloudMaxRun"], zh["codepuppy.ext.cloudSends"], zh["codepuppy.ext.cloudResult"], zh["codepuppy.ext.cloudCost"]]) {
       expect(facts).toContain(label)
     }
     expect(facts).toContain("约 10 分钟")
@@ -526,10 +526,10 @@ describe("#1595 AC2 云端任务详情首屏:最长运行 / 发送内容 / 结�
     expect(facts).toContain("按用量结算")
     expect(facts).not.toMatch(/iter|tokens|Tier|research/)
 
-    const dev = document.querySelector<HTMLDetailsElement>("details[data-alpha-cloud-task-dev]")
+    const dev = document.querySelector<HTMLDetailsElement>("details[data-codepuppy-cloud-task-dev]")
     expect(dev !== null).toBe(true)
     expect(dev!.open).toBe(false)
-    expect(dev!.querySelector("summary")?.textContent).toBe(zh["alpha.timeline.devDetails"])
+    expect(dev!.querySelector("summary")?.textContent).toBe(zh["codepuppy.timeline.devDetails"])
     expect(dev!.textContent).toContain("research")
     expect(dev!.textContent).toContain("tokens")
     expect(dev!.textContent).toContain("input.question")
@@ -543,7 +543,7 @@ describe("#1595 AC2 云端任务详情首屏:最长运行 / 发送内容 / 结�
       entry: { ...entry, installSpec: { ...spec, budgetDefaults: { ...spec.budgetDefaults, max_wall_clock_sec: 1800 } } } as CatalogEntry,
     })
     await flush()
-    expect(document.querySelector("[data-alpha-cloud-task-facts]")?.textContent).toContain("约 30 分钟")
+    expect(document.querySelector("[data-codepuppy-cloud-task-facts]")?.textContent).toContain("约 30 分钟")
   })
 })
 
@@ -556,23 +556,23 @@ describe("#1595 AC3 云连接器详情:人话标题、状态、登录入口与�
     expect(document.body.textContent).toContain("云连接器")
     expect(document.body.textContent).not.toContain("云连接器(cloud)")
     expect(document.body.textContent).toContain("未连接 · 需登录")
-    expect(document.body.textContent).toContain(zh["alpha.ext.cloudInjectTitle"])
-    const login = [...document.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent === zh["alpha.auth.signIn"])
+    expect(document.body.textContent).toContain(zh["codepuppy.ext.cloudInjectTitle"])
+    const login = [...document.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent === zh["codepuppy.auth.signIn"])
     expect(login !== undefined).toBe(true)
     login!.click()
     expect(logins).toBe(1)
 
-    const tools = document.querySelector("[data-alpha-cloud-tools]")!
-    const heads = [...tools.querySelectorAll(".alpha-ext-dtool b")].map((el) => el.textContent)
+    const tools = document.querySelector("[data-codepuppy-cloud-tools]")!
+    const heads = [...tools.querySelectorAll(".codepuppy-ext-dtool b")].map((el) => el.textContent)
     expect(heads).toEqual([
-      zh["alpha.timeline.cloud.dispatch"],
-      zh["alpha.timeline.cloud.status"],
-      zh["alpha.timeline.cloud.await"],
-      zh["alpha.timeline.cloud.artifacts"],
+      zh["codepuppy.timeline.cloud.dispatch"],
+      zh["codepuppy.timeline.cloud.status"],
+      zh["codepuppy.timeline.cloud.await"],
+      zh["codepuppy.timeline.cloud.artifacts"],
     ])
     expect(tools.textContent).not.toContain("codepuppy")
     // alpha-code#1568 AC5:开发者详情里是可读标识 `<服务器键>:<远端名>`,不是模型函数名。
-    const dev = document.querySelector("details[data-alpha-cloud-tools-dev]")!
+    const dev = document.querySelector("details[data-codepuppy-cloud-tools-dev]")!
     expect(dev.textContent).toContain("codepuppy:dispatch")
     expect(dev.textContent).toContain("codepuppy:artifacts")
     expect(dev.textContent).not.toContain("cloud_")
@@ -582,28 +582,28 @@ describe("#1595 AC3 云连接器详情:人话标题、状态、登录入口与�
 describe("#1595 AC4 发送框、结果、生效状态与云端错误的文字按批准稿对照表", () => {
   test("zh 文案逐条对照,且不写 .code-puppy/runs 一类目录名", () => {
     const expected: Partial<Record<keyof typeof zh, string>> = {
-      "alpha.ext.hubStatePending": "待生效",
-      "alpha.ext.hubReasonWaiting": "对话空闲后自动生效",
-      "alpha.ext.hubReasonFailed": "上次未能生效",
-      "alpha.ext.hubReloadNow": "立即生效",
-      "alpha.ext.hubReloadNowHint": "会打断正在输出的回答",
-      "alpha.ext.hubReloadNowRefused": "未能生效,请重启应用",
-      "alpha.cloud.runSaved": "结果已存到本机",
-      "alpha.ext.cloudConnRecovering": "正在恢复登录",
-      "alpha.ext.cloudConnectorTitle": "云连接器",
-      "alpha.ext.cloudConnNeedLogin": "未连接 · 需登录",
-      "alpha.ext.cloudInjectTitle": "自动连接",
-      "alpha.ext.cloudInputHint": "离开本页后不再自动保存",
-      "alpha.ext.cloudDiffSource": "审查范围",
-      "alpha.ext.cloudDiffWorktree": "未提交的改动",
-      "alpha.ext.cloudDiffLastCommit": "最近一次提交",
-      "alpha.ext.cloudDone": "已完成",
-      "alpha.ext.cloudSaved": "已保存",
-      "alpha.ext.cloudErrConsentDeclined": "未同意上传,未发送",
-      "alpha.ext.cloudErrNetwork": "暂时连不上云端服务,稍后重试",
+      "codepuppy.ext.hubStatePending": "待生效",
+      "codepuppy.ext.hubReasonWaiting": "对话空闲后自动生效",
+      "codepuppy.ext.hubReasonFailed": "上次未能生效",
+      "codepuppy.ext.hubReloadNow": "立即生效",
+      "codepuppy.ext.hubReloadNowHint": "会打断正在输出的回答",
+      "codepuppy.ext.hubReloadNowRefused": "未能生效,请重启应用",
+      "codepuppy.cloud.runSaved": "结果已存到本机",
+      "codepuppy.ext.cloudConnRecovering": "正在恢复登录",
+      "codepuppy.ext.cloudConnectorTitle": "云连接器",
+      "codepuppy.ext.cloudConnNeedLogin": "未连接 · 需登录",
+      "codepuppy.ext.cloudInjectTitle": "自动连接",
+      "codepuppy.ext.cloudInputHint": "离开本页后不再自动保存",
+      "codepuppy.ext.cloudDiffSource": "审查范围",
+      "codepuppy.ext.cloudDiffWorktree": "未提交的改动",
+      "codepuppy.ext.cloudDiffLastCommit": "最近一次提交",
+      "codepuppy.ext.cloudDone": "已完成",
+      "codepuppy.ext.cloudSaved": "已保存",
+      "codepuppy.ext.cloudErrConsentDeclined": "未同意上传,未发送",
+      "codepuppy.ext.cloudErrNetwork": "暂时连不上云端服务,稍后重试",
     }
     for (const [key, value] of Object.entries(expected)) expect(zh[key as keyof typeof zh], key).toBe(value)
-    for (const key of ["alpha.cloud.runSaved", "alpha.ext.cloudSub", "alpha.ext.cloudInputHint"] as const) {
+    for (const key of ["codepuppy.cloud.runSaved", "codepuppy.ext.cloudSub", "codepuppy.ext.cloudInputHint"] as const) {
       expect(zh[key]).not.toContain(".code-puppy")
     }
   })

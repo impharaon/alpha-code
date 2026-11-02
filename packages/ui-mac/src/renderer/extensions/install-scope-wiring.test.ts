@@ -91,7 +91,7 @@ describe("REQ-136 wiring: only catalog MCP may submit Current project", () => {
   test("MCP confirmation uses route-gated native radios and no install-time directory picker", () => {
     const source = read("install-confirm.tsx")
     const hub = read("extension-hub.tsx")
-    const start = source.indexOf('<fieldset class="alpha-ext-install-scope" data-install-scope="mcp">')
+    const start = source.indexOf('<fieldset class="codepuppy-ext-install-scope" data-install-scope="mcp">')
     const scope = source.slice(start, source.indexOf("</fieldset>", start))
     const confirmation = `${source}${hub.slice(hub.indexOf("{/* Install confirmation"))}`
     expect(hub.indexOf("{/* Install confirmation")).toBeGreaterThan(0)
@@ -131,7 +131,7 @@ describe("REQ-136 wiring: only catalog MCP may submit Current project", () => {
     expect(source).toContain("projectMcpStatusView(row.receipt.projectMcpState)")
     expect(source).toContain("sdkMcpStatusForReceipt(r, ext.store.mcp)")
     expect(source).toContain("nameOnlyLiveMcpIsUnambiguousGlobal(s.name, ext.store.projectReceipts)")
-    expect(source).toContain('else if (res.reason === "reload-pending") flash(t("alpha.ext.addedPendingReload"))')
+    expect(source).toContain('else if (res.reason === "reload-pending") flash(t("codepuppy.ext.addedPendingReload"))')
     // REQ-234 `#1529`:renderer 不再 dispose 任何实例 —— 重载只经 `ext-reload-request` 交给 ext 调度器;
     // 项目 MCP 装完由 main 安装体请求**只重载该项目目录**,这里只重读该项目的收据与三档状态。
     expect(hook).not.toContain(".dispose(")
@@ -166,7 +166,7 @@ describe("REQ-136 wiring: only catalog MCP may submit Current project", () => {
       uninstall.indexOf("client?.mcp.disconnect"),
     )
     expect(source).toContain('res.reason === "reload-pending"')
-    expect(source).toContain('t("alpha.ext.statePendingReload")')
+    expect(source).toContain('t("codepuppy.ext.statePendingReload")')
   })
 
   test("main projects consent first and probes only the resolved current project", () => {

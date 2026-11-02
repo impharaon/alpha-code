@@ -11,7 +11,7 @@ import * as fs from "node:fs"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
-import { environmentMutableRoot } from "./alpha-environment"
+import { environmentMutableRoot } from "./codepuppy-environment"
 import { customProviderTruthPath, readCustomProviderTruth } from "./custom-provider-truth"
 import { writeCustomProviderTruth } from "./custom-provider-truth-write"
 import { SANDBOX_EXEC } from "./process-fence-compile"
@@ -29,7 +29,7 @@ describeSandbox("I2 真围栏:custom-providers/<env>.json 在生产 profile 下�
 
   beforeAll(() => {
     scratch = mkdtempSync(join(homedir(), ".ac1391-fence-"))
-    stateRoot = join(scratch, "alpha-code-state")
+    stateRoot = join(scratch, "codepuppy-state")
     envRoot = environmentMutableRoot("prod", stateRoot)
     userData = join(scratch, "userData")
     truthDir = join(stateRoot, "custom-providers")
@@ -38,7 +38,7 @@ describeSandbox("I2 真围栏:custom-providers/<env>.json 在生产 profile 下�
     writeFileSync(
       profileFile,
       // `#1337`:生产 profile 含网络行;这里不出网,给一个没人听的端口即可。
-      renderProcessFenceProfile({ workspaces: [join(scratch, "ws")], alphaGlobalRoot: envRoot, userDataPath: userData, stateHome: userData, roots: resolveEngineRoots({}, homedir()), egressProxyPort: 4443 }),
+      renderProcessFenceProfile({ workspaces: [join(scratch, "ws")], codepuppyGlobalRoot: envRoot, userDataPath: userData, stateHome: userData, roots: resolveEngineRoots({}, homedir()), egressProxyPort: 4443 }),
     )
   })
 

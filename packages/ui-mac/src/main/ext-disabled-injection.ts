@@ -3,14 +3,14 @@
 // agent-md·plugin-script 自动发现目录 / 项目)。mergeDeep later-wins 使 alpha 的 `enabled:false`/
 // `disable:true` **压过一切 in-scope 源** —— disabled 扩展永不被引擎加载,无需逐源探测(探测器无底洞
 // 由此消除)。引擎 schema 显式允许 lone `{enabled:false}` mcp 叶(core/v1/config/config.ts:114)与
-// disable-only agent 叶(全 optional)。plugin 是 union 无覆盖面,靠 alpha.jsonc 移除(无用户 = 无他源);
-// cloud/skill 无此面。仅 global scope。best-effort:账本不可读 → 跳过(alpha.jsonc 投影仍在)。
+// disable-only agent 叶(全 optional)。plugin 是 union 无覆盖面,靠 codepuppy.jsonc 移除(无用户 = 无他源);
+// cloud/skill 无此面。仅 global scope。best-effort:账本不可读 → 跳过(codepuppy.jsonc 投影仍在)。
 //
 // #397(Codex 裁决必改①):curation activationPolicy=session-grant 的记录,持久账本 enabled
 // 本身非法(会话级启用 = #408 瞬态,永不落盘)—— 注入面把它**按 disabled 处理**(历史安装/
 // 旁路写入不得借持久账本获得跨会话启用)。判定真源 = ext-curation-policy(已验 catalog 同步读)。
 
-import { alphaGlobalRoot } from "./alpha-installs"
+import { codepuppyGlobalRoot } from "./codepuppy-installs"
 import { readSessionGrantIdsSync, type SessionGrantOracle } from "./ext-curation-policy"
 import { readLedgerV2 } from "./ext-receipt-v2"
 import type { ChannelName } from "./catalog-channels"
@@ -25,7 +25,7 @@ export function injectDisabledOverrides(
   },
 ): void {
   try {
-    const { records } = readLedgerV2(alphaGlobalRoot())
+    const { records } = readLedgerV2(codepuppyGlobalRoot())
     // r1-4:oracle 不可判定 ≠ 空集 —— 注入面尽力强制随包可识别子集并 loud;fail-closed 权威
     // 在 boot reconcile(不可判定 + 存在已启用 catalog 记录 = enforcementGap 阻断 sidecar,
     // 本函数在被阻断时根本不会执行到)。

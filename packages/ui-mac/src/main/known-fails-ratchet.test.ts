@@ -1,7 +1,7 @@
 // `#1086` —— base fail-set 棘轮的行为闸。
 //
 // 被测对象是 scripts/bun-test-floor.sh + scripts/known-fails-compare.py 这对组合在
-// ALPHA_KNOWN_FAILS_FILE 置位时的判决:清单内的红放行、**清单外的红拦住并点名**、
+// CODEPUPPY_KNOWN_FAILS_FILE 置位时的判决:清单内的红放行、**清单外的红拦住并点名**、
 // 清单里已不失败的行提示可缩短、任何无法逐测试归因的失败一律拦住(fail-closed)。
 // 全部判据都驱动**脚本本体**跑合成夹具(真 bun 子进程、真 junit 落盘),不断言脚本源码文本 ——
 // 按本仓定义,断言 shell 源码文本是假闸门(守卫被整段注释掉时那种断言照样绿)。
@@ -32,12 +32,12 @@ function runFloor(args: string[], knownFails?: string) {
     ...process.env,
     PATH: `${BUN_DIR}${path.delimiter}${process.env.PATH ?? ""}`,
     // 夹具都是毫秒级用例;缩短子进程超时,让「夹具卡死」在 15s 内变红而不是拖满 120s。
-    ALPHA_TEST_TIMEOUT_MS: "15000",
+    CODEPUPPY_TEST_TIMEOUT_MS: "15000",
   }
   // 防继承污染:本测试自己可能正跑在一次置位了测量/容忍变量的闸门运行里。
-  delete env.ALPHA_KNOWN_FAILS_FILE
-  delete env.ALPHA_TEST_COUNT_FILE
-  if (knownFails) env.ALPHA_KNOWN_FAILS_FILE = knownFails
+  delete env.CODEPUPPY_KNOWN_FAILS_FILE
+  delete env.CODEPUPPY_TEST_COUNT_FILE
+  if (knownFails) env.CODEPUPPY_KNOWN_FAILS_FILE = knownFails
   const r = Bun.spawnSync({ cmd: ["bash", FLOOR, ...args], cwd: REPO_ROOT, env })
   return { output: `${r.stdout.toString()}${r.stderr.toString()}`, code: r.exitCode }
 }

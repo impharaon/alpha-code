@@ -12,19 +12,19 @@ import * as fs from "node:fs"
 import { homedir } from "node:os"
 import * as path from "node:path"
 import { toolProbe } from "./platform"
-import { extensionsGranted, hasExtensionsDecision, listProjectExecutables, withExtensionsConsent } from "./alpha-ext-trust"
-import { readProjectPrefs, writeProjectPrefs } from "./alpha-workdir"
+import { extensionsGranted, hasExtensionsDecision, listProjectExecutables, withExtensionsConsent } from "./codepuppy-ext-trust"
+import { readProjectPrefs, writeProjectPrefs } from "./codepuppy-workdir"
 import { projectIpcHandler, resolveProjectIpcEntry, withProjectIpcEntryIdentity } from "./ext-project-entry"
 import type { InstalledPackagesResultV1, InstallTarget, ProjectMcpState, ServerReadyData } from "../preload/types"
 import { isExtensionName } from "../shared/extension-name"
-import { alphaGlobalRoot, listInstalls } from "./alpha-installs"
-import { claimMcpSecretVersionDir, mcpSecretVersionedRef, removeMcpSecretVersionDir, removeMcpServerSecrets, removeMcpServerSecretsStrict, writeMcpSecretVersioned } from "./alpha-mcp-secrets"
-import { isMigrationEnabled, removeLegacy, scanLegacy, verifyLegacyProvenance, type ProvenanceRequest } from "./alpha-migrate"
+import { codepuppyGlobalRoot, listInstalls } from "./codepuppy-installs"
+import { claimMcpSecretVersionDir, mcpSecretVersionedRef, removeMcpSecretVersionDir, removeMcpServerSecrets, removeMcpServerSecretsStrict, writeMcpSecretVersioned } from "./codepuppy-mcp-secrets"
+import { isMigrationEnabled, removeLegacy, scanLegacy, verifyLegacyProvenance, type ProvenanceRequest } from "./codepuppy-migrate"
 import { assertProjectMcpTransactionRootIdentity, assertProjectRecoveryJournalAlgebra, collectLegacyMcpRefPathsStrict, configHealth, findPluginBaseConflictStrict, gcMcpSecretsAgainstConfig, listConfiguredMcpServerNamesStrict, mcpConfigTruthPath, readLegacyPluginArrayStrict, readMcpLeafStrict, readPluginArrayStrict, removeCommandEntry, removeMcp, removeMcpConfigInLock, removePlugin, removePluginPath, removeProjectMcpConfigInLock, withConfigWriteLock } from "./ext-config"
 import { makeUncuratedInstallBodies } from "./ext-uncurated-bodies"
 import { applyMcpWritePolicy, officeRuntimeReadiness } from "./ext-mcp-policy"
 import { probeProjectMcpActivation } from "./ext-mcp-activation"
-import { alphaUserWorkspaceDir, ensureUserWorkspaceDir } from "./alpha-user-workspace"
+import { codepuppyUserWorkspaceDir, ensureUserWorkspaceDir } from "./codepuppy-user-workspace"
 import { agentInstallPresent, cloneSkillGitToTmp, collectBuiltinAgentPayload, collectVendoredPluginPayload, stageVendoredPluginVersioned, importSkillFolder, installBuiltinSkill, installRemoteSkill, readBuiltinSkill, removeFsInstall, removeFsInstallFilesOnly, resourcesRoot } from "./ext-fs-installer"
 import { intakeImportDir, type LocalPackagePreviewV1 } from "./claude-plugin-intake"
 import { collectRetainedPayloads, localPackagePreviews, previewWireV1 } from "./local-package-preview"
@@ -39,7 +39,7 @@ import { randomUUID } from "node:crypto"
 import { pickedFiles } from "./ipc"
 import { factorySkillIds } from "./factory-skills"
 import { downloadRemoteAsset, refreshRemoteCatalog, registerPackageCatalogReadIpcHandlers } from "./remote-catalog"
-import { applyBuiltinPolicy, effectiveFactoryDenied, normalizeBuiltinPolicy, protectionInfo, readBuiltinPolicy, resetBuiltinPolicy } from "./alpha-builtin-policy"
+import { applyBuiltinPolicy, effectiveFactoryDenied, normalizeBuiltinPolicy, protectionInfo, readBuiltinPolicy, resetBuiltinPolicy } from "./codepuppy-builtin-policy"
 import {
   detectExternal,
   ecosystemInheritEnabled,
@@ -50,9 +50,9 @@ import {
 } from "./ecosystem-import"
 // REQ-099(ADR-028):main-only 安装计划 + v2 账本。随包 catalog 快照 = 验签远端/缓存不可用时的
 // 兜底真源(ADR-023 两级真源;与 renderer 的 B20 兜底同一字节)。
-import bundledCatalogJson from "../renderer/extensions/alpha-catalog.json"
+import bundledCatalogJson from "../renderer/extensions/codepuppy-catalog.json"
 import type { BundledCatalogSnapshotV1, Catalog } from "../renderer/extensions/catalog-types"
-import { assertAlphaEnvironmentIdentity, environmentMutableRoot, getAlphaEnvironment } from "./alpha-environment"
+import { assertCodePuppyEnvironmentIdentity, environmentMutableRoot, getCodePuppyEnvironment } from "./codepuppy-environment"
 import { createInventoryQuery } from "./ext-inventory"
 import {
   removePackageChildArtifactsV1,
@@ -67,17 +67,17 @@ import { makeRecoveryGate, runVerifiedMutation } from "./ext-recovery-gate"
 import { grantSessionGrant, revokeSessionGrant, sessionGrantRegistry } from "./ext-session-grants"
 import { adoptProjectLedger } from "./ext-project-adopt"
 import { buildGatedWriteChannels, buildJournalAdminChannels, GATED_WRITE_CHANNELS, HUB_READ_CHANNELS, JOURNAL_ADMIN_CHANNELS, LOCAL_PACKAGE_READ_CHANNELS } from "./ext-write-channels"
-// REQ-234 `#1529`:三档状态的唯一权威 + 重载请求方/记录方 + parentPort `alpha.*` 分发(基线 §2.2 / §2.5 / §2.6)。
-import { createAlphaSidecarHost, createHubRequestStages, createHubViewService, type AlphaSidecarHost } from "./hub-view"
+// REQ-234 `#1529`:三档状态的唯一权威 + 重载请求方/记录方 + parentPort `codepuppy.*` 分发(基线 §2.2 / §2.5 / §2.6)。
+import { createCodePuppySidecarHost, createHubRequestStages, createHubViewService, type CodePuppySidecarHost } from "./hub-view"
 import { createReloadCoordinator } from "./reload-coordinator"
 import type { CatalogPackageViewV1 } from "../shared/catalog-package-view"
-import { isHubRequestId, parseReloadScope, type ReloadItem } from "./alpha-sidecar-messages"
+import { isHubRequestId, parseReloadScope, type ReloadItem } from "./codepuppy-sidecar-messages"
 import { packageVersionFromRecordsV1 } from "./ext-package-lifecycle"
 import { tryAcquireBundleLock } from "./ext-bundle-lock"
 import { lookupForUninstall, migrateV1Ledger, parseUninstallLedgerKey, readLedgerV2, readPackageLedgerStateV1, removeRecordV2 } from "./ext-receipt-v2"
 import { commitTransactionLedger } from "./ext-package-ledger-commit"
 import { packagedSeedBrowseView, readPackagedSeed } from "./ext-seed"
-import { releaseAlphaConnectionBindingsV1 } from "./alpha-connection-store"
+import { releaseCodePuppyConnectionBindingsV1 } from "./codepuppy-connection-store"
 import { listTransactionJournals, recoverExtensionTransactions, recoverExtensionTransactionsInHeldLock, recoveryClean, type RecoverOptions } from "./ext-transaction"
 import { getLogger } from "./logging"
 import { resolveVerifiedPackageV1, runCatalogInstallWithPackagePreflight } from "./package-installability"
@@ -109,7 +109,7 @@ export function registerExtIpcHandlers(
   homeDir: string = homedir(),
   officialRuntime?: { stop(): Promise<void>; refresh(): Promise<boolean> },
 ) {
-  assertAlphaEnvironmentIdentity()
+  assertCodePuppyEnvironmentIdentity()
   const resolveProjectEntry = (projectDir: unknown) => resolveProjectIpcEntry(projectDir, homeDir)
   const projectMcpState = async (name: string, projectDir: string, disabled: boolean): Promise<ProjectMcpState> => {
     const prefs = readProjectPrefs(projectDir)
@@ -155,15 +155,15 @@ export function registerExtIpcHandlers(
   // gate + ledgerReady(#347,review #376 B1)。
   const { persistMcpBody } = makeUncuratedInstallBodies({
     userDataPath,
-    globalRoot: alphaGlobalRoot,
-    environment: () => getAlphaEnvironment().environment,
+    globalRoot: codepuppyGlobalRoot,
+    environment: () => getCodePuppyEnvironment().environment,
   })
   // Codex review #351:先删配置(锁内)、成功才吊销密钥 —— busy 时不得留下「配置还在、密钥已毁」。
   // #346(Codex 裁决旁路封堵):本通道只服务**无账 live MCP**;有账(v2/v1/损坏)一律拒 ——
   // ledger-backed 卸载必须走 journaled 的 ext-uninstall-v2,否则这里就是绕开 journal 的活旁路。
   const removeMcpLegacyBody = async (name: unknown) => {
     const nm = typeof name === "string" ? name : ""
-    const lk = lookupForUninstall(alphaGlobalRoot(), "mcp", nm)
+    const lk = lookupForUninstall(codepuppyGlobalRoot(), "mcp", nm)
     if (lk.status !== "absent")
       return { ok: false, reason: `ledger-backed MCP (${lk.status}) — use the journaled uninstall channel (ext-uninstall-v2)` }
     const r = removeMcp(nm)
@@ -354,7 +354,7 @@ export function registerExtIpcHandlers(
   // 少一栏 / 改一个名字必须是一条类型错误,而不是「Hub 那边少画一个开关」这种静默退化。
   ipcMain.handle(LOCAL_PACKAGE_READ_CHANNELS.listInstalledPackages, async (): Promise<InstalledPackagesResultV1> => {
     await ledgerReady
-    const state = readPackageLedgerStateV1(alphaGlobalRoot())
+    const state = readPackageLedgerStateV1(codepuppyGlobalRoot())
     if (!state.ok) {
       // reader 的失败理由里**内嵌着 `installs.json` 的绝对路径**(`ext-receipt-v2.ts` 的
       // `readPackageLedgerStateV1`)。原样过线就违反本面自己那条安全投影 AC —— 而
@@ -409,11 +409,11 @@ export function registerExtIpcHandlers(
             snapshotDigest: loaded.snapshotDigest,
           }
     },
-    root: alphaGlobalRoot,
+    root: codepuppyGlobalRoot,
     userDataPath,
     // `#828`:skill 载荷经验证共享 CAS 落 generation —— 与单装/本地导入路径同一个基根。
-    casBaseRoot: () => getAlphaEnvironment().casBaseRoot,
-    environment: () => getAlphaEnvironment().environment,
+    casBaseRoot: () => getCodePuppyEnvironment().casBaseRoot,
+    environment: () => getCodePuppyEnvironment().environment,
     // `#698`:update 把 child 踢出图时,那个 child 的实物由这条接缝删 —— 与整包卸载**同一份**
     // 实现。接缝缺席时 admission 响亮拒绝该次更新(见 executePreparedPackage),不会留下
     // 「账本说没了、MCP server 还在跑」。
@@ -428,7 +428,7 @@ export function registerExtIpcHandlers(
   ipcMain.handle("ext-package-installed", (_event: IpcMainInvokeEvent, catalogId: unknown) => {
     if (typeof catalogId !== "string" || catalogId.length === 0 || catalogId.length > 160)
       return { ok: false as const, reason: "invalid catalogId" }
-    const state = readPackageLedgerStateV1(alphaGlobalRoot())
+    const state = readPackageLedgerStateV1(codepuppyGlobalRoot())
     // 「读不出来」与「没装」不是一回事:折叠成 installed:false 会让用户在一本损坏的账本上
     // 看到一个装好的包显示成没装,而「移除」按钮随之消失。
     if (!state.ok) return { ok: false as const, reason: state.reason }
@@ -468,7 +468,7 @@ export function registerExtIpcHandlers(
   // 非安全边界)。合并「弹窗+导入」为一个 IPC,renderer 全程拿不到可回传的授权路径。
   // #347:目录选择对话框在 gate 之外(mutex 决不能横跨用户交互);持久化阶段经写通道表过 gate。
   const pickImportSkillDir = async (): Promise<{ ok: true; srcDir: string } | { ok: false; canceled: true; reason: string }> => {
-    if (process.env.ALPHA_OPEN_DIR) return { ok: true, srcDir: process.env.ALPHA_OPEN_DIR } // headless/测试短路(main 控制的 env)
+    if (process.env.CODEPUPPY_OPEN_DIR) return { ok: true, srcDir: process.env.CODEPUPPY_OPEN_DIR } // headless/测试短路(main 控制的 env)
     const result = await dialog.showOpenDialog({
       properties: ["openDirectory"],
       title: "选择要导入的技能文件夹",
@@ -514,11 +514,11 @@ export function registerExtIpcHandlers(
   // 直达 rmSync/removePluginPath 是任意路径删除通道(startsWith 前缀挡不住 `..`,Codex review #345
   // critical);卸载只走 ext-uninstall-v2(key-based,receipt 事实由 main 账本自查,ADR-028 §1)。
   // REQ-018 T3:存量迁移(旧 XDG 根 → .code-puppy)。scan 报告 + removeLegacy 删旧位;新位由 renderer
-  // 复用既有 installer 重装(顺带 A2 钉版 + secret file 化)。用户面触发受 ALPHA_MIGRATE_ENABLE 门控
+  // 复用既有 installer 重装(顺带 A2 钉版 + secret file 化)。用户面触发受 CODEPUPPY_MIGRATE_ENABLE 门控
   // (A6 真机验证后开,S12 T8)。
   // REQ-060 信任门 UI:renderer 打开项目时调用。项目 `.code-puppy` 含可执行扩展(mcp/plugins)且无当前
   // 版本决策 → 弹 per-project 原生确认(B16/ADR-021 同款);granted/denied 都写 `.code-puppy/prefs.json`
-  // 的 extensionsConsent(@alpha-code/ext 信任门读同一字段)。granted 后由 renderer 调 dispose 免重启
+  // 的 extensionsConsent(@codepuppy/ext 信任门读同一字段)。granted 后由 renderer 调 dispose 免重启
   // 生效(链路已真机证通,audits/2026-07-07-req060-fanout-realmachine)。写盘失败不静默放行(反 placebo):
   // 不落决策 + 返回 denied,下次仍会弹。
   ipcMain.handle("ext-trust-check", projectIpcHandler(
@@ -532,7 +532,7 @@ export function registerExtIpcHandlers(
     // (adoption 幂等,renderer 的一次性 checked 吞不掉);gate/锁只罩迁移,不横跨原生确认框。
     try {
       await ledgerReady
-      const adopted = await adoptProjectLedger(directory, { environment: getAlphaEnvironment().environment, gate: recoveryGate })
+      const adopted = await adoptProjectLedger(directory, { environment: getCodePuppyEnvironment().environment, gate: recoveryGate })
       if (!adopted.ok)
         getLogger().log(`[req099-adopt] project ledger adoption refused (${adopted.transient ? "transient — will retry" : "final"}): ${adopted.reason}`)
       else if (adopted.migrated > 0 || adopted.warnings.length > 0)
@@ -542,7 +542,7 @@ export function registerExtIpcHandlers(
     }
     const configRead = withProjectIpcEntryIdentity(project, homeDir, (current) => {
       try {
-        return fs.readFileSync(path.join(current.root, "alpha.jsonc"), "utf8")
+        return fs.readFileSync(path.join(current.root, "codepuppy.jsonc"), "utf8")
       } catch {
         return null
       }
@@ -603,7 +603,7 @@ export function registerExtIpcHandlers(
   // REQ-063(ADR-024):外部生态 consent 导入门(项目级)。default-deny 后引擎不再读项目自带的
   // `.claude`/`.agents` skills 与 CLAUDE.md;首次进入检测到外来内容 → 原生确认 → 「导入」= 安装期
   // 转换为本项目 `.code-puppy` 原生扩展(快照、脱钩,ADR-023);两种决策都记 `.code-puppy/prefs.json` 不再弹。
-  // 逃生 ALPHA_ECOSYSTEM_INHERIT=1 → 全程静默(上游继承已恢复,alpha 不检测不弹窗,ADR-024 §5)。
+  // 逃生 CODEPUPPY_ECOSYSTEM_INHERIT=1 → 全程静默(上游继承已恢复,alpha 不检测不弹窗,ADR-024 §5)。
   ipcMain.handle("ext-external-check", async (event: IpcMainInvokeEvent, requestedDirectory: string) => {
     const none = { prompted: false, imported: false, importedSkills: [] as string[], skipped: [] as Array<{ name: string; reason: string }>, claudeMd: "none" as const }
     const project = resolveProjectEntry(requestedDirectory)
@@ -733,7 +733,7 @@ export function registerExtIpcHandlers(
     // mutation 的事务在恢复期也必须重建**同一份** V3 mutation,否则前滚会写出一本没有
     // graph/claims 的账本(而 child records 已 durable),owner 集合从此失据。
     commitReceipt: (recs) => {
-      if (root !== alphaGlobalRoot()) assertProjectMcpTransactionRootIdentity(root)
+      if (root !== codepuppyGlobalRoot()) assertProjectMcpTransactionRootIdentity(root)
       return commitTransactionLedger(root, recs)
     },
     // #336 r3(r2 Major 1):receipt durable 证伪 —— 恢复进入任何回滚分支前读账本判定。
@@ -754,7 +754,7 @@ export function registerExtIpcHandlers(
     // REQ-100 #313:卸载恢复的账本删除(幂等去账;去账失败抛错 → 保持 uninstalling 供下次前滚)。
     // review #374 Major:非法/未知 key 必须抛错(journal 保持非终态待诊断),绝不静默假终态。
     commitUninstall: (key) => {
-      if (root !== alphaGlobalRoot()) assertProjectMcpTransactionRootIdentity(root)
+      if (root !== codepuppyGlobalRoot()) assertProjectMcpTransactionRootIdentity(root)
       const parsed = parseUninstallLedgerKey(key)
       if (!parsed) throw new Error(`unrecognized uninstall ledger key "${key}" — retained for diagnosis`)
       const rm = removeRecordV2(root, parsed.kind, parsed.name)
@@ -764,7 +764,7 @@ export function registerExtIpcHandlers(
     uninstallArtifacts: (key) => {
       if (!key.startsWith("mcp--")) throw new Error(`no artifact seam for uninstall key: ${key}`)
       const name = key.slice("mcp--".length)
-      if (root !== alphaGlobalRoot()) {
+      if (root !== codepuppyGlobalRoot()) {
         // A non-current environment root must not be guessed to be a project. Revalidate the
         // exact D/.code-puppy identity before choosing the project-only cleanup algebra.
         assertProjectMcpTransactionRootIdentity(root)
@@ -792,19 +792,19 @@ export function registerExtIpcHandlers(
     // 与安装路径同一份实现(合并引用视图复核:仍被引用/来源不可读/身份不可判一律不删)。
     // REQ-136 C3/C6:prepared identities name the process-global MCP secret store. Project plans
     // never produce them, and a D journal must never gain a global cleanup capability.
-    ...(root === alphaGlobalRoot()
+    ...(root === codepuppyGlobalRoot()
       ? { releasePrepared: (resources) => releaseOfficialConnectorResources(userDataPath, resources) }
       : {}),
     log: (event, detail) => getLogger().log(`[req100-tx-recovery] ${event} ${JSON.stringify(detail)}`),
   })
-  assertAlphaEnvironmentIdentity()
-  const txRecovery = recoverExtensionTransactions(alphaGlobalRoot(), recoveryOpts(alphaGlobalRoot()))
+  assertCodePuppyEnvironmentIdentity()
+  const txRecovery = recoverExtensionTransactions(codepuppyGlobalRoot(), recoveryOpts(codepuppyGlobalRoot()))
   // #347:写方事务准入 gate —— 每次写操作前恢复收敛 + 终态探测放行(进程内 per-root mutex
   // 把恢复→探测→操作链成一条所有权链;拒绝语义与 busy 一致,如实返回 reason)。
   const verifyRecoveryRoot = (root: string) => {
-    const environment = getAlphaEnvironment()
+    const environment = getCodePuppyEnvironment()
     if (root === environment.mutableRoot) {
-      assertAlphaEnvironmentIdentity()
+      assertCodePuppyEnvironmentIdentity()
       return
     }
     assertProjectMcpTransactionRootIdentity(root)
@@ -817,7 +817,7 @@ export function registerExtIpcHandlers(
   // 操作成一条 per-root 所有权链,拒则返回 GateRefusal({ok:false})不写盘。gate refusal 与安装失败
   // 对 ecosystem 调用方同形(both {ok:false;reason}),as-skipped 处置。
   const ecosystemGlobalSkillInstaller = (dir: string, origin: "imported-claude" | "imported-agents") =>
-    recoveryGate.withRecoveredWrite(alphaGlobalRoot(), () => installUncuratedSkillImport(dir, plannerDeps(), { origin }))
+    recoveryGate.withRecoveredWrite(codepuppyGlobalRoot(), () => installUncuratedSkillImport(dir, plannerDeps(), { origin }))
   // REQ-099 #309:统一账本就绪 barrier —— recovery(结果不吞)→ 仅在恢复干净时跑 v1→v2 迁移。
   // recovery 不干净(锁被占/journal 未收敛)或迁移被拒:loud 记录但 barrier 正常结束,不阻断启动
   // (v2 消费面对结构有效的 v1-only 有 fallback;文件级损坏本就被 lookup fail-closed)。
@@ -835,7 +835,7 @@ export function registerExtIpcHandlers(
         getLogger().log(`[req099-migrate] recovery not clean (${r.reports.map((x) => `${x.txId}:${x.state}/${x.action}`).join(", ")}) — skipping migration this launch`)
         return
       }
-      const env = getAlphaEnvironment()
+      const env = getCodePuppyEnvironment()
       // recovery/probe 收敛后、migration 写盘紧前再次夹逼冻结全局根身份。
       const m = runVerifiedMutation(env.mutableRoot, verifyRecoveryRoot, () =>
         migrateV1Ledger(env.mutableRoot, env.environment),
@@ -899,7 +899,7 @@ export function registerExtIpcHandlers(
     removeMcpSecretsStrict: (name) => {
       if (isOfficialConnector(name)) {
         try {
-          removeOfficialConnector(alphaGlobalRoot(), name)
+          removeOfficialConnector(codepuppyGlobalRoot(), name)
           return { ok: true as const }
         } catch {
           return { ok: false as const, reason: "official connector cleanup failed; retry removal" }
@@ -910,8 +910,8 @@ export function registerExtIpcHandlers(
       const names = new Set(live.names)
       return removeMcpServerSecretsStrict(userDataPath, name, (cand) => names.has(cand))
     },
-    releaseAlphaConnectionBindings: (componentId) =>
-      releaseAlphaConnectionBindingsV1({ userDataPath, extensionRoot: alphaGlobalRoot() }, componentId, new Date().toISOString()),
+    releaseCodePuppyConnectionBindings: (componentId) =>
+      releaseCodePuppyConnectionBindingsV1({ userDataPath, extensionRoot: codepuppyGlobalRoot() }, componentId, new Date().toISOString()),
     removeInstallGrants,
     // `#809`:managed plugin 的 `plugin[]` 摘除。与 `plannerDeps().installers.removePluginPath`
     // 是**同一个函数**——单装卸载与整包卸载摘的是同一个东西。
@@ -923,7 +923,7 @@ export function registerExtIpcHandlers(
    * 路径按构造不碰配置,**不可能**重入 `withConfigWriteLock`(R2 Blocker 1 正是那次重入)。
    */
   const packageChildFileCleanup = (children: Array<{ kind: string; name: string }>): PackageArtifactRemovalV1 =>
-    removePackageChildArtifactsV1(alphaGlobalRoot(), children, { ...packageArtifactInstallers(), removeFsInstall: removeFsInstallFilesOnly }, {
+    removePackageChildArtifactsV1(codepuppyGlobalRoot(), children, { ...packageArtifactInstallers(), removeFsInstall: removeFsInstallFilesOnly }, {
       skipConfig: true,
     })
 
@@ -987,9 +987,9 @@ export function registerExtIpcHandlers(
             ? { status: "missing", channel: cat.channel, anyVersionPresent: resolved.anyVersionPresent }
             : resolved
       },
-      environment: () => getAlphaEnvironment().environment,
+      environment: () => getCodePuppyEnvironment().environment,
       platform: () => process.platform,
-      globalRoot: alphaGlobalRoot,
+      globalRoot: codepuppyGlobalRoot,
       installers: {
         // #378:MCP 策略闸口(REQ-135 退役拒绝 + REQ-133 Alpha Office 路径收敛,
         // 引擎 config action 落盘)
@@ -1007,7 +1007,7 @@ export function registerExtIpcHandlers(
         removeMcpSecretsStrict: (name) => {
           if (isOfficialConnector(name)) {
             try {
-              removeOfficialConnector(alphaGlobalRoot(), name)
+              removeOfficialConnector(codepuppyGlobalRoot(), name)
               return { ok: true as const }
             } catch {
               return { ok: false as const, reason: "official connector cleanup failed; retry removal" }
@@ -1022,9 +1022,9 @@ export function registerExtIpcHandlers(
         },
         // #704:卸载只释放 Alpha Connection 绑定,不 disconnect —— store 在 userData 下,
         // 与事务根互斥(独立性由 store 自己的守卫强制,不靠这里记得)。
-        releaseAlphaConnectionBindings: (componentId) =>
-          releaseAlphaConnectionBindingsV1(
-            { userDataPath, extensionRoot: alphaGlobalRoot() },
+        releaseCodePuppyConnectionBindings: (componentId) =>
+          releaseCodePuppyConnectionBindingsV1(
+            { userDataPath, extensionRoot: codepuppyGlobalRoot() },
             componentId,
             new Date().toISOString(),
           ),
@@ -1060,7 +1060,7 @@ export function registerExtIpcHandlers(
       },
       // REQ-098 #303:共享 CAS 基根 = main 冻结环境快照(renderer 无路径通道);skill 内容一律
       // 先提升进验证 CAS 再由事务物化。
-      casBaseRoot: () => getAlphaEnvironment().casBaseRoot,
+      casBaseRoot: () => getCodePuppyEnvironment().casBaseRoot,
       // REQ-102 #317:seed 安装通道 —— seedDir/回表 catalog 全部 main-owned。回表只用随包
       // bundled catalog 快照(绝不 effective remote/cache:远端更新会让 seed 字节配错安装语义)。
       seed: {
@@ -1078,7 +1078,7 @@ export function registerExtIpcHandlers(
   }
   // #347 root 解析:global 写方恒全局根;uninstall/set-state 由严格 intent 解码定根(project
   // identity fail-closed,与 planner 同口径);解析失败原样返回、零副作用、不进 gate。
-  const globalWriteRoot = (..._args: unknown[]) => ({ ok: true as const, root: alphaGlobalRoot() })
+  const globalWriteRoot = (..._args: unknown[]) => ({ ok: true as const, root: codepuppyGlobalRoot() })
   const projectRootOf = (projectDir: string): { ok: true; root: string } | { ok: false; reason: string } => {
     const resolved = resolveProjectEntry(projectDir)
     return resolved.ok ? { ok: true, root: resolved.root } : resolved
@@ -1103,7 +1103,7 @@ export function registerExtIpcHandlers(
   // REQ-100 #313:generation 历史读 + 两版离线回滚(key-based,同卸载信任边界;先等崩溃恢复收敛)。
   ipcMain.handle("ext-list-generations", async (_event: IpcMainInvokeEvent, intent: unknown) => {
     await ledgerReady
-    return listGenerationsByKey(intent, { globalRoot: alphaGlobalRoot })
+    return listGenerationsByKey(intent, { globalRoot: codepuppyGlobalRoot })
   })
   // #397:SBOM / 来源溯源 blob 按需拉取(合同 §7.3 采信前置全在 main;renderer 只给
   // (catalogId, kind),entry/BlobRef/URL 全由 main 从已验 catalog 派生 —— 只读通道,零写面。
@@ -1116,7 +1116,7 @@ export function registerExtIpcHandlers(
   ipcMain.handle("ext-advisory-active", () => listAdvisoryBlockedFacts(userDataPath))
   // ── #408:session-grant 三通道(labs 条目的会话级启用;Codex 方案裁决 2026-07-18)──────────
   // grant = main 内存登记(sidecar 代际栅栏,ext-session-grants.ts;生命周期接线在 index.ts),
-  // **零持久面**:不写账本、不写 alpha.jsonc、不进注入 env —— #397「注入面对 session-grant 恒
+  // **零持久面**:不写账本、不写 codepuppy.jsonc、不进注入 env —— #397「注入面对 session-grant 恒
   // disabled」不变量原样。生效 = renderer 在 ok 后对**同 directory** 调引擎 /mcp/:name/connect
   // (原生热连);引擎 global.disposed 后 renderer 经本通道 re-assert(重校验失败 = 旧 grant 已
   // 就地撤下,开关回落)。校验复用 plannerDeps(resolveEntry 已验 catalog + 每操作冻结 advisory
@@ -1127,7 +1127,7 @@ export function registerExtIpcHandlers(
     const deps = plannerDeps()
     return grantSessionGrant(input, {
       registry: sessionGrantRegistry,
-      globalRoot: alphaGlobalRoot,
+      globalRoot: codepuppyGlobalRoot,
       resolveEntry: deps.resolveEntry,
       advisoryGate: deps.advisoryGate,
     })
@@ -1168,8 +1168,8 @@ export function registerExtIpcHandlers(
   // (恢复 gate 拒非终态 journal 是其本职,与 retire 对象语义相反;不写 ledger/config/store),
   // 经 JOURNAL_ADMIN_CHANNELS 独立注册表 + 构造器接入;互斥 = retire 自持 root Bundle 锁。
   const journalGlobalRoots = (): JournalRootRef[] => {
-    assertAlphaEnvironmentIdentity()
-    const base = getAlphaEnvironment().casBaseRoot
+    assertCodePuppyEnvironmentIdentity()
+    const base = getCodePuppyEnvironment().casBaseRoot
     return [
       { identity: "dev", root: environmentMutableRoot("dev", base) },
       { identity: "prod", root: environmentMutableRoot("prod", base) },
@@ -1269,13 +1269,13 @@ export function registerExtIpcHandlers(
         if (official && !officialRuntime) return { ok: false, reason: "official connector runtime unavailable" }
         if (official) await officialRuntime!.stop()
         try {
-          return await uninstallPackageV1(packageId, { globalRoot: alphaGlobalRoot, installers: packageArtifactInstallers() })
+          return await uninstallPackageV1(packageId, { globalRoot: codepuppyGlobalRoot, installers: packageArtifactInstallers() })
         } finally {
           if (official && !(await officialRuntime!.refresh()))
             return { ok: false, reason: "official-connector-needs-reentry: runtime refresh failed" }
         }
       },
-      rollback: async (intent, genId) => rollbackGenerationByKey(intent, genId, { globalRoot: alphaGlobalRoot, advisoryGate: makeAdvisoryGate(userDataPath) }),
+      rollback: async (intent, genId) => rollbackGenerationByKey(intent, genId, { globalRoot: codepuppyGlobalRoot, advisoryGate: makeAdvisoryGate(userDataPath) }),
       setInstallState: setInstallStateBody,
       // #347:清理前先经 gate 对项目根做显式恢复收敛(ADR-030「先显式恢复再清理」);clean 自身
       // 的 openJournals fail-closed 仍在(纵深)。
@@ -1383,7 +1383,7 @@ export function registerExtIpcHandlers(
     // 会落一个 `installs.json.evidence-*`(`ext-receipt-v2.ts` r18 的字节级取证侧写)。
     // 那是一个**写**。预览承诺零写盘,不能因为账本恰好带一条坏条目就落文件 —— 取证不会因此丢失:
     // 任何写路径的读仍会落它,而侧写本来就按损坏集哈希幂等。
-    const globalRoot = alphaGlobalRoot()
+    const globalRoot = codepuppyGlobalRoot()
     const ledgerV2 = readLedgerV2(globalRoot, { sideEffectFree: true })
     const graphState = readPackageLedgerStateV1(globalRoot, { sideEffectFree: true })
     const installedSkillNames = new Set(ledgerV2.records.filter((r) => r.kind === "skill").map((r) => r.name))
@@ -1428,16 +1428,16 @@ export function registerExtIpcHandlers(
   const inventoryQuery = createInventoryQuery({
     resolveCatalog: resolveEffectiveCatalog,
     seedDir: fs.existsSync(inventorySeedDir) ? inventorySeedDir : null,
-    globalRoot: alphaGlobalRoot,
+    globalRoot: codepuppyGlobalRoot,
   })
-  // ── REQ-234 `#1529`:三档状态面。定制中心(本 IPC)与 agent 工具(parentPort,下面的 alphaSidecar)读同一个服务。
+  // ── REQ-234 `#1529`:三档状态面。定制中心(本 IPC)与 agent 工具(parentPort,下面的 codepuppySidecar)读同一个服务。
   const hubView = createHubViewService({
     resolveCatalog: resolveEffectiveCatalog,
     advisoryBlocked: () => new Set(listAdvisoryBlockedFacts(userDataPath).ids),
     seedDir: fs.existsSync(inventorySeedDir) ? inventorySeedDir : null,
-    globalRoot: alphaGlobalRoot,
+    globalRoot: codepuppyGlobalRoot,
     projectEntry: (directory) => resolveProjectEntry(directory),
-    defaultDirectory: alphaUserWorkspaceDir,
+    defaultDirectory: codepuppyUserWorkspaceDir,
     projectMcpState: (name, projectDir) => projectMcpState(name, projectDir, false),
     awaitServer,
     pendingFor: (directory) => reloads.pendingFor(directory),
@@ -1446,14 +1446,14 @@ export function registerExtIpcHandlers(
     hubView.view(typeof directory === "string" ? directory : undefined),
   )
   ipcMain.handle(HUB_READ_CHANNELS.hubRequestStage, (_event: IpcMainInvokeEvent, input: unknown) => hubRequests.record(input))
-  const alphaSidecarHost: AlphaSidecarHost = createAlphaSidecarHost({
+  const codepuppySidecarHost: CodePuppySidecarHost = createCodePuppySidecarHost({
     view: hubView,
     requests: hubRequests,
     reloads,
     log: (line) => getLogger()?.warn(line),
   })
-  const alphaSidecar = {
-    ...alphaSidecarHost,
+  const codepuppySidecar = {
+    ...codepuppySidecarHost,
     /** 「待重载」原因变了(请求 / 报告 / sidecar 连上或断开)。返回退订函数。 */
     onViewChanged(listener: () => void): () => void {
       hubViewChangedListeners.add(listener)
@@ -1470,7 +1470,7 @@ export function registerExtIpcHandlers(
   })
   // #309:启动期账本消费方(index.ts 的 global ecosystem gate)await 此 barrier 后再写账本。
   // #390:同时交出恢复-gate 包装的 global 技能安装器,供 ecosystem gate 走事务安装(不绕恢复准入)。
-  // REQ-234 `#1529`:alphaSidecar 交给 composition root —— spawnLocalServer 在 `child.on("message")` 旁挂它的 receive,
+  // REQ-234 `#1529`:codepuppySidecar 交给 composition root —— spawnLocalServer 在 `child.on("message")` 旁挂它的 receive,
   // ready 时 attach;onViewChanged 接 `ext-hub-view-changed` 推送。
-  return { ledgerReady, ecosystemGlobalSkillInstaller, alphaSidecar }
+  return { ledgerReady, ecosystemGlobalSkillInstaller, codepuppySidecar }
 }

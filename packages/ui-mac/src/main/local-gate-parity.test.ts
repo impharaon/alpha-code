@@ -1,14 +1,14 @@
-// `#777` —— 「本地门与 alpha-ci 1:1」的**可检查断言**。
+// `#777` —— 「本地门与 codepuppy-ci 1:1」的**可检查断言**。
 //
 // 为什么存在:`CLAUDE.md` 的铁律是「合并门在本地验证,本地绿 ⇒ 直接合」。这条铁律的全部
-// 依据,是 `scripts/alpha-check.sh` 抬头那句「This mirrors alpha-ci's jobs 1:1」。
+// 依据,是 `scripts/codepuppy-check.sh` 抬头那句「This mirrors codepuppy-ci's jobs 1:1」。
 // 2026-08-03 实读:那句话是**散文**,而实际本地只跑了 CI 十二个代码步里的九个,其中三个
 // 还是降级档(裸 `bun test`,跑 0 条照样 exit 0)。缺的三步里有 `assert-gate-files.sh` ——
 // 77 个登记闸门中 llm / core / opencode 那几个**只在那一步执行**。
 //
 // 一句没人核对的「1:1」比没有这句话更坏:它让「本地绿」被当成「CI 会绿」的证据。
 // 所以这里把它变成断言:
-//   ①  alpha-ci 的每一个代码步,都必须登记在 alpha-check.sh 的 CI_STEPS 对照表里(反之亦然);
+//   ①  codepuppy-ci 的每一个代码步,都必须登记在 codepuppy-check.sh 的 CI_STEPS 对照表里(反之亦然);
 //   ②  登记的档位只能是 MIRRORED / SUPERSET:<理由> / DEGRADED:<理由> —— 没有「静默不跑」这一档;
 //   ③  UPSTREAM_PATHS 与 ADR-033 收编白名单**只有一处**:CI 与本地都调用
 //       `scripts/north-star-guard.sh`,workflow 里不得再出现第二份副本(`#637` 退出条件 3 的
@@ -17,7 +17,7 @@
 //   ③′ (`#889`)守卫的比较基准 = 这个 workflow 服务的那条分支,且 fetch 与 diff 用同一条 ref
 //       —— 守卫的**行为**判据不在本文件,在 packages/ui-mac/src/main/north-star-guard.test.ts;
 //   ④  `assert gate files` 这一步不得因为前一步红而被跳过(GitHub step 默认条件是 success())。
-//   ⑤  (`#717`)`alpha` 分支保护要求的每个 context,都必须等于 alpha-ci 某个 job 的 `name:`;
+//   ⑤  (`#717`)`alpha` 分支保护要求的每个 context,都必须等于 codepuppy-ci 某个 job 的 `name:`;
 //       反过来每个 job 要么在那份记录里、要么在本文件里显式写明「不必需」。
 //   ⑥  (`#895`)每个必需 job 都必须在 `detect` 没给出结论时**照跑并变红**,而不是被 `needs`
 //       折成 skipped —— GitHub 把 skipped 记成「已满足」(实测,见下);
@@ -26,7 +26,7 @@
 //       用假的 `gh`(PATH 注入)驱动生产脚本本体,不断言它的源码文本。
 //
 // 删掉本文件会失去什么:上面七条全部退回「靠人记得」。CI 改一个 job/步骤名、加一步、
-// 或者有人把 alpha-check 的某一步删掉,都不再有任何东西变红。
+// 或者有人把 codepuppy-check 的某一步删掉,都不再有任何东西变红。
 
 import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -34,8 +34,8 @@ import { join, resolve } from "node:path"
 import { describe, expect, test } from "bun:test"
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..", "..", "..")
-const WORKFLOW = readFileSync(resolve(REPO_ROOT, ".github/workflows/alpha-ci.yml"), "utf8")
-const SCRIPT = readFileSync(resolve(REPO_ROOT, "scripts/alpha-check.sh"), "utf8")
+const WORKFLOW = readFileSync(resolve(REPO_ROOT, ".github/workflows/codepuppy-ci.yml"), "utf8")
+const SCRIPT = readFileSync(resolve(REPO_ROOT, "scripts/codepuppy-check.sh"), "utf8")
 /** `#889`:north-star 守卫本体 —— CI 与本地跑的是同一份字节。 */
 const NORTH_STAR_GUARD = "scripts/north-star-guard.sh"
 const GUARD_SCRIPT = readFileSync(resolve(REPO_ROOT, NORTH_STAR_GUARD), "utf8")
@@ -45,11 +45,11 @@ const ROUNDTRIP_GUARD_SCRIPT = readFileSync(resolve(REPO_ROOT, ROUNDTRIP_GUARD),
 const REQUIRED_CONTEXTS_FILE = readFileSync(resolve(REPO_ROOT, ".github/required-contexts.txt"), "utf8")
 /** `#895` 的判据本体 —— 四个必需 job 的第一步跑的就是这个文件。 */
 const DETECT_CLASSIFIED_SCRIPT = "scripts/assert-detect-classified.sh"
-/** `#890` 的判据本体 —— alpha-check.sh 第 [8/8] 步跑的就是这个文件。 */
+/** `#890` 的判据本体 —— codepuppy-check.sh 第 [8/8] 步跑的就是这个文件。 */
 const REQUIRED_CONTEXTS_SCRIPT = "scripts/assert-required-contexts.sh"
 
 /**
- * alpha-ci.yml 里「有名字、且真的执行一条命令」的步骤。
+ * codepuppy-ci.yml 里「有名字、且真的执行一条命令」的步骤。
  * 刻意不引 YAML 库:本仓无 yaml 依赖,而这份文件的缩进是自己写的、稳定的。
  */
 type CiStep = { job: string; name: string; condition: string }
@@ -98,7 +98,7 @@ function line2prop(text: string, cur: { name?: string; run?: boolean; condition?
 const NON_GATE_STEPS = new Set(["detect|Classify diff (code vs docs-only)", "upstream-guard|Ensure origin/alpha is available"])
 
 /**
- * alpha-ci.yml 里每个 job 的 `name:` —— 也就是 GitHub 上那一格 check 的**显示名**,
+ * codepuppy-ci.yml 里每个 job 的 `name:` —— 也就是 GitHub 上那一格 check 的**显示名**,
  * 分支保护的 required context 用的就是这个字符串。job `name:` 恒在 4 空格缩进,
  * step 的 `- name:` 在 6 空格,两者不会混。
  */
@@ -115,7 +115,7 @@ type CiJob = { key: string; name: string; condition: string; body: string }
 
 function parseWorkflowJobs(yaml: string): CiJob[] {
   const jobsAt = yaml.indexOf("\njobs:\n")
-  if (jobsAt < 0) throw new Error("alpha-ci.yml 里找不到 `jobs:`")
+  if (jobsAt < 0) throw new Error("codepuppy-ci.yml 里找不到 `jobs:`")
   const lines = yaml.slice(jobsAt + "\njobs:\n".length).split("\n")
   const out: CiJob[] = []
   let key = ""
@@ -154,20 +154,20 @@ function parseRequiredContexts(text: string): string[] {
 
 // ── `#890` 的夹具:用假的 `gh` 驱动生产脚本本体 ────────────────────────────────
 // 刻意**不**在生产脚本里做「真源从哪来」的开关(env / 参数)。那种开关自己就是绕过口:
-// 在 alpha-check 里给它喂一份合意的清单,这道门就永远绿。改用 PATH 注入 —— 被测的是
+// 在 codepuppy-check 里给它喂一份合意的清单,这道门就永远绿。改用 PATH 注入 —— 被测的是
 // 生产脚本原样的那条路径,连它怎么拼 `gh` 的参数、怎么解析输出都一起验到。
 
 /** 假 `gh` 的 stdout:与 2026-08-11 实测的三种形状同构(见脚本抬头)。 */
 function fakeGhStdout(contexts: string[], enabled = "true"): string {
   const lines = [`enabled=${enabled}`, ...contexts.map((c) => `context=${c}`)]
-  return `cat <<'ALPHA_FAKE_GH'\n${lines.join("\n")}\nALPHA_FAKE_GH`
+  return `cat <<'CODEPUPPY_FAKE_GH'\n${lines.join("\n")}\nCODEPUPPY_FAKE_GH`
 }
 
 type RequiredContextsRun = { exitCode: number; out: string; argv: string[] }
 
 /** 跑 `scripts/assert-required-contexts.sh`(默认跑仓内那份生产脚本),`gh` 换成 `behaviour`。 */
 function runRequiredContexts(behaviour: string, root: string = REPO_ROOT): RequiredContextsRun {
-  const binDir = mkdtempSync(join(tmpdir(), "alpha-890-gh-"))
+  const binDir = mkdtempSync(join(tmpdir(), "codepuppy-890-gh-"))
   const argvFile = join(binDir, "argv.txt")
   const shim = join(binDir, "gh")
   writeFileSync(shim, `#!/usr/bin/env bash\nprintf '%s\\n' "$@" > ${JSON.stringify(argvFile)}\n${behaviour}\n`)
@@ -186,7 +186,7 @@ function runRequiredContexts(behaviour: string, root: string = REPO_ROOT): Requi
 
 /** 把生产脚本原样复制到一棵临时树里,只换掉手抄件 —— 脚本按自己的位置解析仓根,故会读那一份。 */
 function sandboxWithSnapshot(snapshot: string): string {
-  const root = mkdtempSync(join(tmpdir(), "alpha-890-root-"))
+  const root = mkdtempSync(join(tmpdir(), "codepuppy-890-root-"))
   mkdirSync(join(root, "scripts"), { recursive: true })
   mkdirSync(join(root, ".github"), { recursive: true })
   copyFileSync(resolve(REPO_ROOT, REQUIRED_CONTEXTS_SCRIPT), join(root, REQUIRED_CONTEXTS_SCRIPT))
@@ -215,7 +215,7 @@ const NOT_REQUIRED_JOBS: Record<string, string> = {
 
 function parseLedger(script: string): Array<{ job: string; name: string; status: string }> {
   const block = /^CI_STEPS=\(\n([\s\S]*?)^\)$/m.exec(script)
-  if (!block) throw new Error("scripts/alpha-check.sh 里找不到 CI_STEPS=( … ) 对照表")
+  if (!block) throw new Error("scripts/codepuppy-check.sh 里找不到 CI_STEPS=( … ) 对照表")
   return block[1]
     .split("\n")
     .map((l) => l.trim())
@@ -232,8 +232,8 @@ function bashArrayItems(script: string, varName: string): string[] {
   return [...block[1].matchAll(/'([^']+)'/g)].map((m) => m[1])
 }
 
-describe("#777 本地门与 alpha-ci 的对照表", () => {
-  test("alpha-ci 的每个代码步都登记在 alpha-check.sh 的 CI_STEPS 里", () => {
+describe("#777 本地门与 codepuppy-ci 的对照表", () => {
+  test("codepuppy-ci 的每个代码步都登记在 codepuppy-check.sh 的 CI_STEPS 里", () => {
     const ciSteps = parseWorkflowSteps(WORKFLOW).filter((s) => !NON_GATE_STEPS.has(`${s.job}|${s.name}`))
     const ledger = parseLedger(SCRIPT)
     // 先证明解析手段本身没瞎:一份跑不出步骤的解析器会让下面每条断言都空对空地绿。
@@ -241,16 +241,16 @@ describe("#777 本地门与 alpha-ci 的对照表", () => {
     const missing = ciSteps.filter((s) => !ledger.some((l) => l.job === s.job && l.name === s.name))
     expect(
       missing.map((s) => `${s.job}|${s.name}`),
-      "alpha-ci 有这些代码步,而 scripts/alpha-check.sh 的 CI_STEPS 没有登记 —— 「1:1」这句话当场变成假话",
+      "codepuppy-ci 有这些代码步,而 scripts/codepuppy-check.sh 的 CI_STEPS 没有登记 —— 「1:1」这句话当场变成假话",
     ).toEqual([])
   })
 
-  test("CI_STEPS 里的每一行都对得上 alpha-ci 的一个真实步骤(改名即红)", () => {
+  test("CI_STEPS 里的每一行都对得上 codepuppy-ci 的一个真实步骤(改名即红)", () => {
     const ciSteps = parseWorkflowSteps(WORKFLOW)
     const ledger = parseLedger(SCRIPT)
     expect(ledger.length).toBeGreaterThanOrEqual(12)
     const stale = ledger.filter((l) => !ciSteps.some((s) => s.job === l.job && s.name === l.name))
-    expect(stale.map((l) => `${l.job}|${l.name}`), "CI_STEPS 登记了 alpha-ci 里不存在的步骤(改名或删除后没同步)").toEqual([])
+    expect(stale.map((l) => `${l.job}|${l.name}`), "CI_STEPS 登记了 codepuppy-ci 里不存在的步骤(改名或删除后没同步)").toEqual([])
   })
 
   test("每一行的档位只能是 MIRRORED / SUPERSET:<理由> / DEGRADED:<理由>", () => {
@@ -265,7 +265,7 @@ describe("#777 本地门与 alpha-ci 的对照表", () => {
 
   // ── `#1134`:`MIRRORED` 到目前为止只是一句**登记**,不是一条断言 ────────────────────
   // 上面三条比的全是**步骤名**:CI 有没有这一步、对照表登没登记、档位合不合法。没有任何一条
-  // 问过最要紧的那句 ——「alpha-check.sh 真的跑那条命令吗」。
+  // 问过最要紧的那句 ——「codepuppy-check.sh 真的跑那条命令吗」。
   // 实测(2026-08-26,`#1134` 的变异实验 B3):把第 [4/10] 步里 `bun run --cwd packages/opencode
   // typecheck` 那一行删掉,CI 那一步与 `MIRRORED` 登记都原样留着 —— 本文件 **15 pass / 0 fail**,
   // 而本地那半道门已经不存在了。这在本 portfolio 里格外贵:合并路径是「本地判绿 ⇒ --admin 合」,
@@ -274,27 +274,27 @@ describe("#777 本地门与 alpha-ci 的对照表", () => {
   // 诚实边界:只覆盖 typecheck 这一类 —— 它们形状统一(`bun run --cwd <pkg> typecheck`),能从
   // workflow 里无歧义解析出来。别的步骤本地或是脚本、或带 env 前缀、或登记成超集/降级档,
   // 本条**不**覆盖它们(那是另一张票,不是在这里顺手扩)。
-  test("`#1134`:alpha-ci 的每条 typecheck 命令,alpha-check.sh 里必须真的有那一行", () => {
+  test("`#1134`:codepuppy-ci 的每条 typecheck 命令,codepuppy-check.sh 里必须真的有那一行", () => {
     const commands = [...WORKFLOW.matchAll(/^ {8}run: (bun run --cwd \S+ typecheck)$/gm)].map((m) => m[1])
     // 解析自检:一份解析不出命令的正则会让下面那条断言空对空地绿(本文件已有四条同类自检)。
-    expect(commands.length, "alpha-ci 里没解析到 typecheck 命令 —— 本次测量作废,不是通过").toBeGreaterThanOrEqual(4)
+    expect(commands.length, "codepuppy-ci 里没解析到 typecheck 命令 —— 本次测量作废,不是通过").toBeGreaterThanOrEqual(4)
     expect(
       commands.filter((c) => !SCRIPT.includes(c)),
-      "alpha-ci 跑了这些 typecheck,而 scripts/alpha-check.sh 里找不到那一行 —— 登记的 MIRRORED 是假的,本地那半道门不存在",
+      "codepuppy-ci 跑了这些 typecheck,而 scripts/codepuppy-check.sh 里找不到那一行 —— 登记的 MIRRORED 是假的,本地那半道门不存在",
     ).toEqual([])
   })
 
   // ── `#637` → `#889`:从「两处逐条相同」升级成「只有一处」──────────────────────
-  // `#637` 的原判据是逐行比对 CI 内联 shell 与 alpha-check.sh 里**两份** UPSTREAM_PATHS +
+  // `#637` 的原判据是逐行比对 CI 内联 shell 与 codepuppy-check.sh 里**两份** UPSTREAM_PATHS +
   // ADR-033 收编白名单。那是枚举比对 —— 对新成员默认放行,只在两边都被解析到时才成立。
   // `#889` 把守卫本体收进 scripts/north-star-guard.sh,CI 与本地跑同一份字节 ⇒ 那一类漂移
   // 在结构上不存在。本条改为守住这个前提:workflow 必须**调用**它,且不得留第二份副本。
   test("#889:CI 的 north-star 步跑的是共用脚本本体,workflow 里没有第二份清单", () => {
     const guardStep = parseWorkflowSteps(WORKFLOW).find((s) => s.name === "Fail on any modification to upstream package files")
-    expect(guardStep, "alpha-ci.yml 里找不到 north-star 守卫步").toBeDefined()
+    expect(guardStep, "codepuppy-ci.yml 里找不到 north-star 守卫步").toBeDefined()
     expect(
       WORKFLOW.includes(`run: bash ${NORTH_STAR_GUARD}`),
-      `alpha-ci 的守卫步没有调用 ${NORTH_STAR_GUARD} —— 它又长回了一份自己的副本`,
+      `codepuppy-ci 的守卫步没有调用 ${NORTH_STAR_GUARD} —— 它又长回了一份自己的副本`,
     ).toBe(true)
 
     // 第二份真源默认拒:workflow 里再出现 `:(exclude)` 或 UPSTREAM_PATHS 定义,就是有人把
@@ -311,8 +311,8 @@ describe("#777 本地门与 alpha-ci 的对照表", () => {
       "packages",
     )
     expect(
-      /^ALPHA_OWNED_PACKAGES="([^"]+)"/m.exec(GUARD_SCRIPT)?.[1].trim().split(/\s+/).length,
-      "守卫脚本里没解析到 ALPHA_OWNED_PACKAGES",
+      /^CODEPUPPY_OWNED_PACKAGES="([^"]+)"/m.exec(GUARD_SCRIPT)?.[1].trim().split(/\s+/).length,
+      "守卫脚本里没解析到 CODEPUPPY_OWNED_PACKAGES",
     ).toBeGreaterThanOrEqual(3)
     expect(
       /^ROUNDTRIP_PACKAGES="([^"]+)"/m.exec(GUARD_SCRIPT)?.[1].trim().split(/\s+/).length,
@@ -345,20 +345,20 @@ describe("#777 本地门与 alpha-ci 的对照表", () => {
 
   // ── `#889`:比较基准只有一个家 ────────────────────────────────────────────────
   // 缺陷形态:守卫的基准写死 `origin/dev`(上游纯镜像),而这道门要回答的是「**这个 PR
-  // 自己**改了上游文件吗」—— 基准只能是它的目标分支。同一个 alpha-check.sh 里 docs gate
+  // 自己**改了上游文件吗」—— 基准只能是它的目标分支。同一个 codepuppy-check.sh 里 docs gate
   // 用的却是 `origin/alpha`:同一个脚本,两套基准。
   // 这一条是**防漂**断言,不是守卫的行为判据(行为判据在 north-star-guard.test.ts,它造一个
   // 只落在 dev 窗口里的上游改动,断言守卫不点名它)。锚点刻意取 workflow 自己的触发分支 ——
   // 不是把两个可以一起改错的值互相比对(自指等价链)。
   test("#889:守卫基准 = 这个 workflow 服务的分支,且 fetch 与 diff 是同一条 ref", () => {
     const triggerBranches = [...WORKFLOW.matchAll(/^ {4}branches: \[([^\]]+)\]$/gm)].map((m) => m[1].trim())
-    expect(triggerBranches.length, "alpha-ci.yml 里没解析到 on: push/pull_request 的 branches").toBeGreaterThanOrEqual(2)
-    expect(new Set(triggerBranches).size, `alpha-ci 服务多条分支,守卫基准该取哪条需要一个裁决:${triggerBranches}`).toBe(1)
+    expect(triggerBranches.length, "codepuppy-ci.yml 里没解析到 on: push/pull_request 的 branches").toBeGreaterThanOrEqual(2)
+    expect(new Set(triggerBranches).size, `codepuppy-ci 服务多条分支,守卫基准该取哪条需要一个裁决:${triggerBranches}`).toBe(1)
     const target = triggerBranches[0]
 
     const guardBaseline = /--diff-filter=DMR --name-only (\S+)\.\.\.HEAD/.exec(GUARD_SCRIPT)?.[1]
     expect(guardBaseline, "守卫脚本里没解析到 `<ref>...HEAD` 的比较基准").toBeDefined()
-    expect(guardBaseline, `守卫基准不是 alpha-ci 服务的那条分支(origin/${target})—— 它量的就不是「这个 PR 改了什么」`).toBe(
+    expect(guardBaseline, `守卫基准不是 codepuppy-ci 服务的那条分支(origin/${target})—— 它量的就不是「这个 PR 改了什么」`).toBe(
       `origin/${target}`,
     )
 
@@ -367,15 +367,15 @@ describe("#777 本地门与 alpha-ci 的对照表", () => {
     const guardFetch = /git fetch --no-tags origin (\S+)/.exec(GUARD_SCRIPT)?.[1]
     expect(guardFetch, "守卫脚本里没解析到 git fetch").toBe(target)
     const ciFetch = /run: git fetch --no-tags origin (\S+)/.exec(WORKFLOW)?.[1]
-    expect(ciFetch, "alpha-ci 的 `Ensure origin/… is available` 步取的不是守卫要用的那条 ref").toBe(target)
+    expect(ciFetch, "codepuppy-ci 的 `Ensure origin/… is available` 步取的不是守卫要用的那条 ref").toBe(target)
 
-    // 同一个 alpha-check.sh 内部也不许再有第二套基准(`#889` 票面点名的那句「同一脚本两套基准」)。
+    // 同一个 codepuppy-check.sh 内部也不许再有第二套基准(`#889` 票面点名的那句「同一脚本两套基准」)。
     const docsBaseline = /--diff-filter=d (\S+)\.\.\.HEAD/.exec(SCRIPT)?.[1]
-    expect(docsBaseline, "alpha-check.sh 的 docs gate 里没解析到比较基准").toBe(`origin/${target}`)
+    expect(docsBaseline, "codepuppy-check.sh 的 docs gate 里没解析到比较基准").toBe(`origin/${target}`)
   })
 
   // ── `#717`:required context 名的防漂 ──────────────────────────────────────
-  // 这个值有两个家 —— 仓外的 GitHub 分支保护设置,和仓内 alpha-ci.yml 的 job `name:` ——
+  // 这个值有两个家 —— 仓外的 GitHub 分支保护设置,和仓内 codepuppy-ci.yml 的 job `name:` ——
   // 而两边都没声明自己是真源。2026-07-22 `ebd29cda` 把 job 改名成
   // `unit tests (alpha packages)`,分支保护那侧没跟,GitHub 从此再没见过旧名字 ⇒ 每个 PR
   // 都在那一格永久 pending,人人 --admin。改名当天没有任何东西变红。
@@ -383,20 +383,20 @@ describe("#777 本地门与 alpha-ci 的对照表", () => {
   // ⚠️ 诚实边界:真源在仓外,CI 够不着(fork PR 拿不到 secrets)。`.github/required-contexts.txt`
   //    是**手抄快照**,抓得住 workflow 侧改名(咬过我们的那一类),抓不住「只改 GitHub 设置」
   //    或「两侧一起改错」。这是减速带,不是闸门 —— 文件抬头把这条也写着。
-  test("#717:分支保护记录里的每个 context 都对应 alpha-ci 的一个 job name(改名即红)", () => {
+  test("#717:分支保护记录里的每个 context 都对应 codepuppy-ci 的一个 job name(改名即红)", () => {
     const jobNames = parseWorkflowJobNames(WORKFLOW)
     const required = parseRequiredContexts(REQUIRED_CONTEXTS_FILE)
     // 解析自检:任一侧解析退化成空,下面的比对就会空对空地绿。
-    expect(jobNames.length, "alpha-ci.yml 里一个 job name 都没解析到 —— 解析器坏了").toBeGreaterThanOrEqual(6)
+    expect(jobNames.length, "codepuppy-ci.yml 里一个 job name 都没解析到 —— 解析器坏了").toBeGreaterThanOrEqual(6)
     expect(required.length, ".github/required-contexts.txt 一条都没解析到 —— 记录被清空或解析器坏了").toBeGreaterThanOrEqual(4)
     const orphaned = required.filter((context) => !jobNames.includes(context))
     expect(
       orphaned,
-      "分支保护要求的 context 在 alpha-ci 里没有同名 job —— GitHub 永远等不到它,每个 PR 都在那一格永久 pending(`ebd29cda` 那一类)",
+      "分支保护要求的 context 在 codepuppy-ci 里没有同名 job —— GitHub 永远等不到它,每个 PR 都在那一格永久 pending(`ebd29cda` 那一类)",
     ).toEqual([])
   })
 
-  test("#717:alpha-ci 的每个 job 要么是必需 context,要么显式登记为不必需(默认拒)", () => {
+  test("#717:codepuppy-ci 的每个 job 要么是必需 context,要么显式登记为不必需(默认拒)", () => {
     const jobNames = parseWorkflowJobNames(WORKFLOW)
     const required = parseRequiredContexts(REQUIRED_CONTEXTS_FILE)
     expect(jobNames.length).toBeGreaterThanOrEqual(6)
@@ -407,20 +407,20 @@ describe("#777 本地门与 alpha-ci 的对照表", () => {
     ).toEqual([])
     // 反向:登记为「不必需」的 job 必须真的存在,且必须真的不在必需列表里(自相矛盾即红)。
     for (const [name, reason] of Object.entries(NOT_REQUIRED_JOBS)) {
-      expect(jobNames, `NOT_REQUIRED_JOBS 登记了 alpha-ci 里不存在的 job:${name}`).toContain(name)
+      expect(jobNames, `NOT_REQUIRED_JOBS 登记了 codepuppy-ci 里不存在的 job:${name}`).toContain(name)
       expect(required, `${name} 同时被登记为「不必需」和分支保护必需 —— 两处矛盾`).not.toContain(name)
       expect(reason.trim().length, `${name} 的「不必需」理由为空`).toBeGreaterThan(0)
     }
   })
 
   // ── `#890`:手抄件 ↔ **仓外真源** 的漂移判据 ────────────────────────────────
-  // 上面两条 `#717` 只把手抄件与 alpha-ci 的 job 名对齐 —— 两边一起错就一起自洽,而真正
+  // 上面两条 `#717` 只把手抄件与 codepuppy-ci 的 job 名对齐 —— 两边一起错就一起自洽,而真正
   // 决定「PR 能不能合」的那份清单在 GitHub 的分支保护设置里,没有任何东西比对它。
   // 漏一条的后果是安静的:那道检查从此不再必需(红着也能合),仓内测试**全绿**;而且
   // `#895` 那两条遍历的也是这份手抄件 ⇒ 漏掉的那条连 `!cancelled()` 的保护都没有。
   //
   // 真源只在**有鉴权**的地方够得着(CI 里够不着:fork PR 结构上拿不到 secrets),所以门落在
-  // scripts/alpha-check.sh 第 [8/8] 步。下面五条驱动**生产脚本本体**,`gh` 用 PATH 注入换掉:
+  // scripts/codepuppy-check.sh 第 [8/8] 步。下面五条驱动**生产脚本本体**,`gh` 用 PATH 注入换掉:
   // 生产代码里没有「真源从哪来」的开关(那种开关自己就是绕过口)。
   test("`#890`:真源与记录逐条相同时绿 —— 先证明这个手段测得出「好」", () => {
     const required = parseRequiredContexts(REQUIRED_CONTEXTS_FILE)
@@ -484,17 +484,17 @@ describe("#777 本地门与 alpha-ci 的对照表", () => {
     }
   })
 
-  test("`#890`:跑的就是文件抬头写着的那条命令,且问的是 alpha-ci 服务的那条分支", () => {
+  test("`#890`:跑的就是文件抬头写着的那条命令,且问的是 codepuppy-ci 服务的那条分支", () => {
     // 锚点取两处**独立**的东西:命令取自手抄件抬头(人手对真源时照抄的就是那一条),
     // 分支名取自 workflow 的触发分支(`#889` 同款)。不拿脚本自己的常量当期望值 —— 那是自指。
     const documented = [...REQUIRED_CONTEXTS_FILE.matchAll(/^#\s+(gh api \S+ --jq '[^']*')\s*$/gm)].map((m) => m[1])
     expect(documented.length, ".github/required-contexts.txt 抬头没有(或有多条)可解析的 gh api 命令").toBe(1)
 
     const triggerBranches = [...WORKFLOW.matchAll(/^ {4}branches: \[([^\]]+)\]$/gm)].map((m) => m[1].trim())
-    expect(new Set(triggerBranches).size, `alpha-ci 服务多条分支:${triggerBranches}`).toBe(1)
+    expect(new Set(triggerBranches).size, `codepuppy-ci 服务多条分支:${triggerBranches}`).toBe(1)
     expect(
       documented[0],
-      `抬头那条命令问的不是 alpha-ci 服务的分支(origin/${triggerBranches[0]})—— 比的就不是这条线上的保护`,
+      `抬头那条命令问的不是 codepuppy-ci 服务的分支(origin/${triggerBranches[0]})—— 比的就不是这条线上的保护`,
     ).toContain(`/branches/${triggerBranches[0]} --jq`)
 
     const r = runRequiredContexts(fakeGhStdout(parseRequiredContexts(REQUIRED_CONTEXTS_FILE)))
@@ -508,7 +508,7 @@ describe("#777 本地门与 alpha-ci 的对照表", () => {
   test("`#890`:比的是那个文件里的内容 —— 换掉手抄件,判决必须跟着变", () => {
     // 少了这一条,一个把清单**写死在脚本里**的实现能满足上面全部断言(它今天恰好也是四条),
     // 而那时 .github/required-contexts.txt 已经是摆设:改它不影响任何判断。
-    const custom = ["alpha-only check A", "alpha-only check B"]
+    const custom = ["codepuppy-only check A", "codepuppy-only check B"]
     const root = sandboxWithSnapshot(`# 抄件(夹具)\n\n${custom.join("\n")}\n`)
     try {
       const same = runRequiredContexts(fakeGhStdout(custom), root)
@@ -535,7 +535,7 @@ describe("#777 本地门与 alpha-ci 的对照表", () => {
 
   test("`assert gate files` 不因前一步失败而被跳过", () => {
     const step = parseWorkflowSteps(WORKFLOW).find((s) => s.name.startsWith("assert gate files"))
-    expect(step, "alpha-ci.yml 里找不到 `assert gate files` 步骤").toBeDefined()
+    expect(step, "codepuppy-ci.yml 里找不到 `assert gate files` 步骤").toBeDefined()
     // GitHub 的 step 默认条件是 success():前一步红 ⇒ 这一步 skipped ⇒ 77 个登记闸门集体消失。
     expect(step!.condition, "assert gate files 缺 !cancelled() —— 前一步一红,77 个闸门就一起没了").toContain("!cancelled()")
   })
@@ -580,11 +580,11 @@ describe("#777 本地门与 alpha-ci 的对照表", () => {
     const jobs = parseWorkflowJobs(WORKFLOW)
     const required = parseRequiredContexts(REQUIRED_CONTEXTS_FILE)
     // 解析自检:任一侧退化成空,下面的循环就一次都不跑,空对空地绿。
-    expect(jobs.length, "alpha-ci.yml 一个 job 都没解析到 —— 解析器坏了").toBeGreaterThanOrEqual(6)
+    expect(jobs.length, "codepuppy-ci.yml 一个 job 都没解析到 —— 解析器坏了").toBeGreaterThanOrEqual(6)
     expect(required.length, ".github/required-contexts.txt 一条都没解析到").toBeGreaterThanOrEqual(4)
     for (const context of required) {
       const job = jobs.find((j) => j.name === context)
-      expect(job, `必需 context「${context}」在 alpha-ci.yml 里没有同名 job`).toBeDefined()
+      expect(job, `必需 context「${context}」在 codepuppy-ci.yml 里没有同名 job`).toBeDefined()
       expect(
         job!.condition,
         `必需 job「${context}」缺 job 级 !cancelled() —— detect 一失败它就被 needs 折成 skipped,而 GitHub 把 skipped 当成满足(#895 实测:四格全 skipped ⇒ mergeStateStatus=UNSTABLE ⇒ 可合)`,

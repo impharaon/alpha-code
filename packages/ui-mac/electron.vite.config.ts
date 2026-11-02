@@ -16,7 +16,7 @@ const channel = (() => {
   return "dev"
 })()
 
-// #1496:按**目标**架构选 node-pty 包(`ALPHA_TARGET_ARCH=arm64|x64`,缺省宿主架构)。包名会被编进
+// #1496:按**目标**架构选 node-pty 包(`CODEPUPPY_TARGET_ARCH=arm64|x64`,缺省宿主架构)。包名会被编进
 // out/main —— 用宿主 `process.arch` 会让 arm64 机器打出的 Intel 包带着 arm64 终端。打包前由
 // electron-builder.config.ts 的 beforePack 再核对一遍产物(scripts/target-arch.ts)。
 const nodePtyPkg = nodePtyPackage(process.platform, resolveTargetArch())
@@ -64,13 +64,13 @@ const require = __cjs_mod__.createRequire(import.meta.url);
 `,
         },
       },
-      // `@alpha-code/contracts-consumer` is a private, source-only workspace package
+      // `@codepuppy/contracts-consumer` is a private, source-only workspace package
       // (`exports: "./src/index.ts"`). If externalized it ships as raw .ts inside
       // app.asar/node_modules, where Node refuses to strip types at runtime
       // (ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING) and the main process crashes on
       // launch. Exclude it so rollup bundles+transpiles it (and its ajv deps) into the
-      // main chunk. (`@alpha-code/ext` avoids this by shipping a built dist/plugin.js.)
-      externalizeDeps: { include: [nodePtyPkg], exclude: ["@alpha-code/contracts-consumer"] },
+      // main chunk. (`@codepuppy/ext` avoids this by shipping a built dist/plugin.js.)
+      externalizeDeps: { include: [nodePtyPkg], exclude: ["@codepuppy/contracts-consumer"] },
     },
     plugins: [
       {
@@ -113,10 +113,10 @@ const require = __cjs_mod__.createRequire(import.meta.url);
     // brandI18nPlugin rewrites upstream app i18n brand strings at bundle time only —
     // the on-disk source stays untouched, so upstream sync never conflicts (ADR-005/006).
     // C14④:冻结(ADR-020)后补丁子串恒应命中,打偏=真漂移 → 默认 strict(build 即红);
-    // 逃生 ALPHA_PATCH_LENIENT=1(re-freeze 体检期临时放行)。
+    // 逃生 CODEPUPPY_PATCH_LENIENT=1(re-freeze 体检期临时放行)。
     plugins: [
-      brandI18nPlugin({ strict: process.env.ALPHA_PATCH_LENIENT !== "1" }),
-      patchUpstreamPlugin({ strict: process.env.ALPHA_PATCH_LENIENT !== "1" }),
+      brandI18nPlugin({ strict: process.env.CODEPUPPY_PATCH_LENIENT !== "1" }),
+      patchUpstreamPlugin({ strict: process.env.CODEPUPPY_PATCH_LENIENT !== "1" }),
       appPlugin,
       sentry,
     ],

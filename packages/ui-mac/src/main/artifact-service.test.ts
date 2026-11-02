@@ -1,6 +1,6 @@
 // Unit tests for the main-owned ArtifactService (REQ-093 A 侧,#185):register/list/reconcile
 // (missing / size drift / sha mismatch)、verify(离线篡改检测)、path-escape 拒绝、GC 原子性、
-// 字节核算、legacy 只读发现、未来版本只读。真实临时目录 harness(alpha-workdir.test.ts 同款)。
+// 字节核算、legacy 只读发现、未来版本只读。真实临时目录 harness(codepuppy-workdir.test.ts 同款)。
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import * as crypto from "node:crypto"

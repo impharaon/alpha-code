@@ -61,7 +61,7 @@ async function api(token: string, method: string, path: string, body?: unknown):
       accept: "application/vnd.github+json",
       authorization: `Bearer ${token}`,
       "x-github-api-version": "2022-11-28",
-      "user-agent": "alpha-code-sync-upstream-alert",
+      "user-agent": "codepuppy-sync-upstream-alert",
       ...(body === undefined ? {} : { "content-type": "application/json" }),
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),

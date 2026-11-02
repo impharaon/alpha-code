@@ -1,0 +1,656 @@
+// Renderer 视图层 — REQ-095(#187)。把 registry 的路由结果映射为 Solid 组件。
+// 铁律:
+//   · 所有文本内容只经 Solid 文本节点呈现(无 innerHTML、无 <iframe>、无动态 <script>);
+//   · 字节唯一入口 = window.api.runArtifacts.read(main 侧守卫 + 上限,见 artifact-service);
+//   · image 只经 <img> + blob URL(被动解码;切换/卸载即 revoke);
+//   · pdf/未知格式 = 诚实卡片(descriptor 事实 + 外部打开),不伪造预览;
+//   · html = REQ-096 隔离预览(独立进程 host,零 preload bridge),不满足前置时回落诚实卡片。
+
+import {
+  createEffect,
+  createResource,
+  createSignal,
+  For,
+  Match,
+  onCleanup,
+  onMount,
+  Show,
+  Switch,
+  type Component,
+  type JSX,
+} from "solid-js"
+import type { ArtifactReadRef } from "../../../../preload/types"
+import { t } from "../../../i18n"
+import type { ArtifactCard } from "../workbench-core"
+import { formatBytes, shortSha } from "../workbench-core"
+import { JsonNodeView, LinesView, MdBlockView, OfficeTextContent } from "./content-views"
+import { XlsxWorkbookView } from "./xlsx-view"
+import { parseCsvModel } from "./csv-model"
+import { parseJsonModel } from "./json-model"
+import { parseMarkdownModel } from "./markdown-model"
+import { extensionOf, type RendererId, type RouteDecision } from "./registry"
+import {
+  type OfficeRejectionCategory,
+  type OfficeStructurePresentation,
+} from "./office-structure"
+import type { OfficeViewerContent } from "./office-content"
+import { ArtifactHtmlPreview, canPreviewHtml } from "../../artifact-html-preview"
+
+export type PreviewContext = {
+  directory: string
+  runId: string
+  readRef: ArtifactReadRef
+  name: string
+  decision: RouteDecision
+  card: ArtifactCard
+  officeStructure: OfficeStructurePresentation | null
+  // REQ-123(#1175/#1176)pass 分支的默认内容视图,由 officeViewerContentOf 装配
+  // (docx/pptx 文本 · xlsx 工作表 · 诚实失败)。undefined = 结构闸尚未过,呈现为诚实占位。
+  officeContent?: OfficeViewerContent
+}
+
+export type PreviewProps = { ctx: PreviewContext }
+
+function openExternally(ctx: PreviewContext): void {
+  if (!ctx.card.descriptor) return
+  void window.api.runArtifacts.openExternal(ctx.directory, ctx.runId, ctx.card.descriptor.id)
+}
+
+function revealRunDir(ctx: PreviewContext): void {
+  void window.api.openPath(`${ctx.directory}/.code-puppy/runs/${ctx.runId}`)
+}
+
+// ---------------------------------------------------------------------------
+// 文本装载壳(loading / error / truncated / binary 的统一诚实呈现)
+// ---------------------------------------------------------------------------
+
+type TextLoad = { text: string; truncated: boolean; totalBytes: number; readBytes: number; binary: boolean }
+
+function TextShell(props: { ctx: PreviewContext; children: (load: TextLoad) => JSX.Element }) {
+  // source 读取 props.ctx(getter)→ 选中 artifact 变化即重取;同 renderer 复用挂载也不串内容。
+  const [res] = createResource(
+    () => ({ dir: props.ctx.directory, run: props.ctx.runId, ref: props.ctx.readRef }),
+    async (k) => {
+      const r = await window.api.runArtifacts.read(k.dir, k.run, k.ref, { mode: "text" })
+      if (!r.ok) throw new Error(r.reason)
+      if (r.kind !== "text") throw new Error("unexpected read kind")
+      return { text: r.text, truncated: r.truncated, totalBytes: r.totalBytes, readBytes: r.readBytes, binary: r.binary }
+    },
+  )
+  return (
+    <Show
+      when={!res.error}
+      fallback={
+        <div class="a-wb-notice" data-kind="error" role="alert">
+          {t("codepuppy.wb.readFailed")}:{String((res.error as Error)?.message ?? res.error)}
+        </div>
+      }
+    >
+      <Show when={res()} fallback={<div class="a-wb-notice">{t("codepuppy.wb.loading")}</div>}>
+        {(load) => (
+          <>
+            <Show when={load().binary}>
+              <div class="a-wb-notice" data-kind="warn">{t("codepuppy.wb.binaryHint")}</div>
+            </Show>
+            <Show when={load().truncated}>
+              <div class="a-wb-notice" data-kind="warn">
+                {t("codepuppy.wb.truncated", { shown: formatBytes(load().readBytes), total: formatBytes(load().totalBytes) })}
+              </div>
+            </Show>
+            {props.children(load())}
+          </>
+        )}
+      </Show>
+    </Show>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// text / code
+// ---------------------------------------------------------------------------
+
+const TextView: Component<PreviewProps> = (props) => (
+  <TextShell ctx={props.ctx}>{(load) => <LinesView text={load.text} lang={null} />}</TextShell>
+)
+
+const CodeView: Component<PreviewProps> = (props) => (
+  <TextShell ctx={props.ctx}>{(load) => <LinesView text={load.text} lang={extensionOf(props.ctx.name)} />}</TextShell>
+)
+
+// ---------------------------------------------------------------------------
+// markdown(净化模型 → Solid 节点;无 HTML 注入路径)
+// ---------------------------------------------------------------------------
+
+const MarkdownView: Component<PreviewProps> = (props) => (
+  <TextShell ctx={props.ctx}>
+    {(load) => {
+      const model = parseMarkdownModel(load.text)
+      return (
+        <div class="a-wb-md">
+          <Show when={model.truncated}>
+            <div class="a-wb-notice" data-kind="warn">{t("codepuppy.wb.mdTruncated", { count: model.blockCount })}</div>
+          </Show>
+          <MdBlockView blocks={model.blocks} />
+        </div>
+      )
+    }}
+  </TextShell>
+)
+
+// ---------------------------------------------------------------------------
+// json
+// ---------------------------------------------------------------------------
+
+const JsonView: Component<PreviewProps> = (props) => (
+  <TextShell ctx={props.ctx}>
+    {(load) => {
+      const model = parseJsonModel(load.text)
+      if (!model.ok)
+        return (
+          <>
+            <div class="a-wb-notice" data-kind="error">{t("codepuppy.wb.jsonInvalid", { error: model.error })}</div>
+            <LinesView text={load.text} lang="json" />
+          </>
+        )
+      return (
+        <div class="a-wb-json">
+          <div class="a-wb-toolbar">
+            <button
+              type="button"
+              class="a-wb-btn"
+              onClick={() => void window.api.writeClipboard(load.text)}
+            >
+              {t("codepuppy.wb.copy")}
+            </button>
+            <Show when={model.truncated}>
+              <span class="a-wb-chip" data-kind="warn">{t("codepuppy.wb.jsonNodesCut")}</span>
+            </Show>
+          </div>
+          <JsonNodeView node={model.root} depth={0} />
+        </div>
+      )
+    }}
+  </TextShell>
+)
+
+// ---------------------------------------------------------------------------
+// csv / tsv
+// ---------------------------------------------------------------------------
+
+const CsvView: Component<PreviewProps> = (props) => (
+  <TextShell ctx={props.ctx}>
+    {(load) => {
+      const forceTab = props.ctx.decision.effectiveMime === "text/tab-separated-values"
+      const model = parseCsvModel(load.text, { delimiter: forceTab ? "\t" : "auto" })
+      return (
+        <div class="a-wb-csv">
+          <Show when={model.truncatedRows || load.truncated}>
+            <div class="a-wb-notice" data-kind="warn">
+              {t("codepuppy.wb.csvTruncated", { shown: model.rowCount })}
+            </div>
+          </Show>
+          <div class="a-wb-tablewrap" tabIndex={0}>
+            <table>
+              <thead>
+                <tr><For each={model.header}>{(cell) => <th>{cell}</th>}</For></tr>
+              </thead>
+              <tbody>
+                {/* 单元格 = 纯文本节点:公式字符串(=CMD 等)只展示、不执行、不成为链接(REQ-095 AC#4) */}
+                <For each={model.rows}>{(row) => <tr><For each={row}>{(cell) => <td>{cell}</td>}</For></tr>}</For>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )
+    }}
+  </TextShell>
+)
+
+// ---------------------------------------------------------------------------
+// image(bytes → blob URL,被动解码;卸载即 revoke)
+// ---------------------------------------------------------------------------
+
+const ImageView: Component<PreviewProps> = (props) => {
+  let url: string | null = null
+  const revoke = () => {
+    if (url) URL.revokeObjectURL(url)
+    url = null
+  }
+  onCleanup(revoke) // 切换 artifact / 卸载即释放(REQ-095 资源释放协议)
+  const [res] = createResource(
+    () => ({ dir: props.ctx.directory, run: props.ctx.runId, ref: props.ctx.readRef, mime: props.ctx.decision.effectiveMime }),
+    async (k) => {
+      const r = await window.api.runArtifacts.read(k.dir, k.run, k.ref, { mode: "bytes" })
+      if (!r.ok) throw new Error(r.reason)
+      if (r.kind !== "bytes") throw new Error("unexpected read kind")
+      revoke()
+      const blob = new Blob([r.bytes as Uint8Array<ArrayBuffer>], { type: k.mime ?? "application/octet-stream" })
+      url = URL.createObjectURL(blob)
+      return { url, bytes: r.totalBytes }
+    },
+  )
+  const [decodeError, setDecodeError] = createSignal(false)
+  return (
+    <Show
+      when={!res.error}
+      fallback={
+        <div class="a-wb-notice" data-kind="error" role="alert">
+          {t("codepuppy.wb.readFailed")}:{String((res.error as Error)?.message ?? res.error)}
+          <Show when={props.ctx.card.descriptor && props.ctx.decision.externalOpen === "allowed"}>
+            <button type="button" class="a-wb-btn" onClick={() => openExternally(props.ctx)}>{t("codepuppy.wb.openExternal")}</button>
+          </Show>
+        </div>
+      }
+    >
+      <Show when={res()} fallback={<div class="a-wb-notice">{t("codepuppy.wb.loading")}</div>}>
+        {(img) => (
+          <Show
+            when={!decodeError()}
+            fallback={
+              <div class="a-wb-notice" data-kind="error" role="alert">
+                {t("codepuppy.wb.imgDecodeFailed")}
+                <Show when={props.ctx.card.descriptor && props.ctx.decision.externalOpen === "allowed"}>
+                  <button type="button" class="a-wb-btn" onClick={() => openExternally(props.ctx)}>{t("codepuppy.wb.openExternal")}</button>
+                </Show>
+              </div>
+            }
+          >
+            <figure class="a-wb-image">
+              <img src={img().url} alt={props.ctx.name} onError={() => setDecodeError(true)} />
+              <figcaption>{props.ctx.name} · {formatBytes(img().bytes)}</figcaption>
+            </figure>
+          </Show>
+        )}
+      </Show>
+    </Show>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// 诚实卡片:pdf / html(REQ-096 接线点)/ fallback
+// ---------------------------------------------------------------------------
+
+function FactRow(props: { label: string; value: string }) {
+  return (
+    <div class="a-wb-fact">
+      <span class="a-wb-fact-k">{props.label}</span>
+      <span class="a-wb-fact-v" title={props.value}>{props.value}</span>
+    </div>
+  )
+}
+
+function HonestCard(props: PreviewProps & { title: string; note: string }) {
+  const d = props.ctx.card.descriptor
+  return (
+    <div class="a-wb-fallback" role="group" aria-label={props.title}>
+      <b>{props.title}</b>
+      <p>{props.note}</p>
+      <FactRow label={t("codepuppy.wb.factName")} value={props.ctx.name} />
+      <FactRow label={t("codepuppy.wb.factSize")} value={formatBytes(props.ctx.card.bytes)} />
+      <FactRow label={t("codepuppy.wb.factState")} value={props.ctx.card.state} />
+      <Show when={d}>
+        <FactRow label="MIME" value={`${d!.claimedMime ?? "—"} / ${d!.detectedMime ?? "—"}`} />
+        <FactRow label="sha256" value={shortSha(d!.sha256)} />
+        <FactRow label={t("codepuppy.wb.factTrust")} value={`${d!.trust} · ${d!.role}`} />
+      </Show>
+      <Show when={props.ctx.decision.ooxmlSubtype}>
+        <FactRow label="OOXML" value={`${props.ctx.decision.ooxmlSubtype} · ${props.ctx.decision.effectiveMime}`} />
+      </Show>
+      <div class="a-wb-toolbar">
+        <Show when={props.ctx.card.savedPath && props.ctx.card.descriptor && props.ctx.decision.externalOpen === "allowed"}>
+          <button type="button" class="a-wb-btn" data-variant="primary" onClick={() => openExternally(props.ctx)}>
+            {t("codepuppy.wb.openExternal")}
+          </button>
+        </Show>
+        <button type="button" class="a-wb-btn" onClick={() => revealRunDir(props.ctx)}>{t("codepuppy.wb.revealDir")}</button>
+        <Show when={d?.sha256}>
+          <button type="button" class="a-wb-btn" onClick={() => void window.api.writeClipboard(d!.sha256!)}>
+            {t("codepuppy.wb.copySha")}
+          </button>
+        </Show>
+      </div>
+    </div>
+  )
+}
+
+const OFFICE_REJECTION_KEYS = {
+  "invalid-document": "codepuppy.wb.office.rejection.invalid",
+  encrypted: "codepuppy.wb.office.rejection.encrypted",
+  "safety-limit": "codepuppy.wb.office.rejection.limit",
+  "unsafe-path": "codepuppy.wb.office.rejection.path",
+  "incomplete-structure": "codepuppy.wb.office.rejection.incomplete",
+  "type-mismatch": "codepuppy.wb.office.rejection.type",
+} as const satisfies Record<OfficeRejectionCategory, Parameters<typeof t>[0]>
+
+export const OfficeArtifactView: Component<PreviewProps> = (props) => {
+  const [quickLookFailure, setQuickLookFailure] = createSignal<string | null>(null)
+  const [quickLookBusy, setQuickLookBusy] = createSignal(false)
+  const [externalOpenRefused, setExternalOpenRefused] = createSignal(false)
+  let quickLookButton: HTMLButtonElement | undefined
+  const rejection = () =>
+    props.ctx.officeStructure?.status === "rejected" ? props.ctx.officeStructure : undefined
+  // REQ-123 IA(基线 ②-5):提取内容视图是 pass 分支的默认呈现,Quick Look 降为次级动作。
+  const extractedModel = () => {
+    const content = props.ctx.officeContent
+    return content?.status === "text" ? content.model : undefined
+  }
+  const extractedWorkbook = () => {
+    const content = props.ctx.officeContent
+    return content?.status === "sheets" ? content.workbook : undefined
+  }
+  const extractionFailure = () => {
+    const content = props.ctx.officeContent
+    return content?.status === "failed" ? content : undefined
+  }
+
+  createEffect(() => {
+    props.ctx.card.key
+    setQuickLookFailure(null)
+    setQuickLookBusy(false)
+    setExternalOpenRefused(false)
+  })
+
+  const quickLook = () => {
+    if (
+      props.ctx.officeStructure?.status !== "pass" ||
+      !props.ctx.card.descriptor ||
+      quickLookBusy()
+    )
+      return
+    quickLookButton?.focus()
+    setQuickLookBusy(true)
+    void window.api.runArtifacts
+      .quickLook({
+        directory: props.ctx.directory,
+        runId: props.ctx.runId,
+        artifactId: props.ctx.card.descriptor.id,
+      })
+      .then((result) => setQuickLookFailure(result.ok ? null : result.code))
+      .catch(() => setQuickLookFailure("PREVIEW_UNAVAILABLE"))
+      .finally(() => setQuickLookBusy(false))
+  }
+
+  const externalOpen = () => {
+    if (!props.ctx.card.descriptor) return
+    void window.api.runArtifacts
+      .openExternal(props.ctx.directory, props.ctx.runId, props.ctx.card.descriptor.id)
+      .then((result) => setExternalOpenRefused(!result.ok))
+      .catch(() => setExternalOpenRefused(true))
+  }
+
+  onMount(() => {
+    const onSpace = (event: KeyboardEvent) => {
+      if (
+        event.key !== " " ||
+        event.defaultPrevented ||
+        event.repeat ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.shiftKey ||
+        props.ctx.officeStructure?.status !== "pass" ||
+        !props.ctx.card.descriptor ||
+        quickLookBusy()
+      )
+        return
+      const target = event.target
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target instanceof HTMLElement && target.isContentEditable)
+      )
+        return
+      if (
+        target instanceof HTMLButtonElement &&
+        target !== quickLookButton &&
+        !target.classList.contains("codepuppy-wb-card-main")
+      )
+        return
+      if (target === quickLookButton) return
+      event.preventDefault()
+      quickLook()
+    }
+    document.addEventListener("keydown", onSpace)
+    onCleanup(() => document.removeEventListener("keydown", onSpace))
+  })
+
+  return (
+    <div class="a-wb-office" data-office-status={props.ctx.officeStructure?.status}>
+      <Show when={props.ctx.officeStructure?.status === "checking"}>
+        <div class="a-wb-office-status" role="status">
+          <span class="a-wb-chip">
+            <span class="a-wb-spinner" aria-hidden="true" />
+            {t("codepuppy.wb.office.status.checking")}
+          </span>
+          <div>
+            <b>{t("codepuppy.wb.office.checkingTitle")}</b>
+            <p>{t("codepuppy.wb.office.checkingDetail")}</p>
+          </div>
+        </div>
+        <div class="a-wb-fallback">
+          <b>{t("codepuppy.wb.office.documentTitle")}</b>
+          <p>{t("codepuppy.wb.office.checkingNote")}</p>
+          <FactRow label={t("codepuppy.wb.factName")} value={props.ctx.name} />
+          <FactRow label={t("codepuppy.wb.factSize")} value={formatBytes(props.ctx.card.bytes)} />
+          <div class="a-wb-toolbar a-wb-office-actions">
+            <button
+              type="button"
+              class="a-wb-btn"
+              disabled
+              title={t("codepuppy.wb.office.openPending")}
+            >
+              {t("codepuppy.wb.openExternal")}
+            </button>
+            <button type="button" class="a-wb-btn" onClick={() => revealRunDir(props.ctx)}>
+              {t("codepuppy.wb.revealDir")}
+            </button>
+          </div>
+        </div>
+      </Show>
+
+      <Show when={props.ctx.officeStructure?.status === "rejected"}>
+        <div class="a-wb-office-status" data-kind="error" role="alert">
+          <span class="a-wb-chip" data-kind="error">{t("codepuppy.wb.office.status.rejected")}</span>
+          <div>
+            <b>{t("codepuppy.wb.office.rejectedTitle")}</b>
+            <p>
+              {t("codepuppy.wb.office.rejectedDetail", {
+                reason: t(OFFICE_REJECTION_KEYS[rejection()!.category]),
+              })}
+            </p>
+          </div>
+        </div>
+        <div class="a-wb-fallback" data-rejection-category={rejection()!.category}>
+          <b>{t("codepuppy.wb.office.structureFailed")}</b>
+          <FactRow label={t("codepuppy.wb.factName")} value={props.ctx.name} />
+          <FactRow
+            label={t("codepuppy.wb.office.reason")}
+            value={t(OFFICE_REJECTION_KEYS[rejection()!.category])}
+          />
+          <div class="a-wb-office-diagnostic">
+            <span>{t("codepuppy.wb.office.diagnostic")}</span>
+            <code>
+              {rejection()!.code}
+            </code>
+          </div>
+          <p>{t("codepuppy.wb.office.nextStep")}</p>
+          <div class="a-wb-toolbar a-wb-office-actions">
+            <Show when={props.ctx.card.descriptor}>
+              <button type="button" class="a-wb-btn" data-office-action="external-open" onClick={externalOpen}>
+                {t("codepuppy.wb.openExternal")}
+              </button>
+            </Show>
+            <button type="button" class="a-wb-btn" data-office-action="reveal-run" onClick={() => revealRunDir(props.ctx)}>
+              {t("codepuppy.wb.revealDir")}
+            </button>
+            <button
+              type="button"
+              class="a-wb-btn"
+              onClick={() => void window.api.writeClipboard(rejection()!.code)}
+            >
+              {t("codepuppy.wb.office.copyDiagnostic")}
+            </button>
+          </div>
+        </div>
+      </Show>
+
+      <Show when={props.ctx.officeStructure?.status === "pass"}>
+        <div class="a-wb-office-status" data-kind="success" role="status">
+          <span class="a-wb-chip" data-kind="success">{t("codepuppy.wb.office.status.pass")}</span>
+          <div>
+            <b>{t("codepuppy.wb.office.passTitle")}</b>
+            <p>{t("codepuppy.wb.office.passDetail")}</p>
+          </div>
+        </div>
+        <Show when={quickLookFailure()}>
+          {(code) => (
+            <div class="a-wb-notice a-wb-office-channel-notice" data-kind="warn" role="status">
+              <b>{t("codepuppy.wb.office.quickLookUnavailable")}</b>
+              <span>{t("codepuppy.wb.office.quickLookUnavailableDetail")}</span>
+              <code>{code()}</code>
+            </div>
+          )}
+        </Show>
+        {/* pass 分支的内容:三选一 + 未接线占位。四条互斥,由 officeContent 这一个 union 裁,
+            不再靠嵌套 fallback 相互猜(#1227:xlsx 接上之后,旧的嵌套写法会同时画表格和占位卡)。*/}
+        <Switch
+          fallback={
+            <div class="a-wb-office-placeholder" role="img" aria-label={t("codepuppy.wb.office.contentAria")}>
+              <b>{t("codepuppy.wb.office.contentTitle")}</b>
+              <span>{t("codepuppy.wb.office.contentNote")}</span>
+            </div>
+          }
+        >
+          <Match when={extractedModel()} keyed>
+            {(model) => <OfficeTextContent model={model} />}
+          </Match>
+          <Match when={extractedWorkbook()} keyed>
+            {(workbook) => (
+              <>
+                <p class="a-wb-office-fidelity" data-office-fidelity>{t("codepuppy.wb.office.fidelityNote")}</p>
+                <XlsxWorkbookView workbook={workbook} />
+              </>
+            )}
+          </Match>
+          <Match when={extractionFailure()} keyed>
+            {(failure) => (
+              // 提取失败 = 诚实降级卡(基线 ③ 类 6):不空白、不伪造;原件与其余动作不受影响。
+              <div class="a-wb-notice a-wb-office-extract-failed" data-kind="warn" role="status" data-office-extract-failed>
+                <b>{t("codepuppy.wb.office.extractFailed")}</b>
+                <span>{t("codepuppy.wb.office.extractFailedDetail")}</span>
+                <code>{failure.code}</code>
+              </div>
+            )}
+          </Match>
+        </Switch>
+        <div class="a-wb-toolbar a-wb-office-actions">
+          <Show when={props.ctx.card.descriptor}>
+            <button
+              ref={quickLookButton}
+              type="button"
+              class="a-wb-btn"
+              data-office-action="quick-look"
+              disabled={quickLookBusy()}
+              onClick={quickLook}
+            >
+              {quickLookBusy()
+                ? quickLookFailure()
+                  ? t("codepuppy.wb.office.quickLookRetrying")
+                  : t("codepuppy.wb.office.quickLookOpening")
+                : quickLookFailure()
+                  ? t("codepuppy.wb.office.quickLookRetry")
+                  : t("codepuppy.wb.office.quickLook")}
+              <span class="a-wb-kbd" aria-hidden="true">{t("codepuppy.wb.office.space")}</span>
+            </button>
+          </Show>
+          <Show when={props.ctx.card.descriptor}>
+            <button type="button" class="a-wb-btn" data-office-action="external-open" onClick={externalOpen}>
+              {t("codepuppy.wb.openExternal")}
+            </button>
+          </Show>
+          <button type="button" class="a-wb-btn" data-office-action="reveal-run" onClick={() => revealRunDir(props.ctx)}>
+            {t("codepuppy.wb.revealDir")}
+          </button>
+        </div>
+        <Show when={props.ctx.card.descriptor}>
+          <div class="a-wb-office-origin">
+            <span>{t("codepuppy.wb.office.source")}</span>
+            <FactRow
+              label={t("codepuppy.wb.office.producedBy")}
+              value={props.ctx.card.descriptor!.provenance.jobId}
+            />
+            <FactRow
+              label={t("codepuppy.wb.office.structureCheck")}
+              value={t("codepuppy.wb.office.structurePassLocal")}
+            />
+          </div>
+        </Show>
+      </Show>
+
+      <Show when={externalOpenRefused()}>
+        <div class="a-wb-notice" data-kind="warn" role="status">
+          {t("codepuppy.wb.office.externalOpenRefused")}
+        </div>
+      </Show>
+    </div>
+  )
+}
+
+const PdfCard: Component<PreviewProps> = (props) => (
+  // 诚实降级:未 ship PDF.js 隔离 worker 前不伪造内置查看器(REQ-095 非目标纪律)。
+  <HonestCard ctx={props.ctx} title={t("codepuppy.wb.pdfTitle")} note={t("codepuppy.wb.pdfNote")} />
+)
+
+const HtmlCard: Component<PreviewProps> = (props) => (
+  // REQ-096 已接线:隔离 HTML 预览(独立进程 host,main 按 manifest 解析路径,零 preload bridge)。
+  // 仅盘上有完整 manifest 登记且非 mismatch/missing 时可预览;其余状态保持诚实卡片。
+  <Show
+    when={
+      props.ctx.card.descriptor &&
+      props.ctx.card.savedPath &&
+      canPreviewHtml(props.ctx.card.descriptor) &&
+      (props.ctx.card.state === "verified" || props.ctx.card.state === "unverified")
+    }
+    fallback={<HonestCard ctx={props.ctx} title={t("codepuppy.wb.htmlTitle")} note={t("codepuppy.wb.htmlNote")} />}
+  >
+    <ArtifactHtmlPreview
+      directory={props.ctx.directory}
+      runId={props.ctx.runId}
+      descriptor={props.ctx.card.descriptor!}
+      savedPath={props.ctx.card.savedPath!}
+    />
+  </Show>
+)
+
+const FallbackCard: Component<PreviewProps> = (props) => (
+  <Show
+    when={props.ctx.officeStructure}
+    fallback={<HonestCard ctx={props.ctx} title={t("codepuppy.wb.fallbackTitle")} note={t("codepuppy.wb.fallbackNote")} />}
+  >
+    <OfficeArtifactView ctx={props.ctx} />
+  </Show>
+)
+
+// ---------------------------------------------------------------------------
+// 组件表(registry 的 id → 视图;REQ-096 只需替换 "html" 一格)
+// ---------------------------------------------------------------------------
+
+export const RENDERER_COMPONENTS: Record<RendererId, Component<PreviewProps>> = {
+  markdown: MarkdownView,
+  code: CodeView,
+  text: TextView,
+  json: JsonView,
+  csv: CsvView,
+  image: ImageView,
+  pdf: PdfCard,
+  html: HtmlCard,
+  fallback: FallbackCard,
+}
+
+/** Source 视图(Preview/Source/Metadata 三模式之一):任何 artifact 都可看原文(有界)。 */
+export const SourceView: Component<PreviewProps> = (props) => (
+  <TextShell ctx={props.ctx}>{(load) => <LinesView text={load.text} lang={extensionOf(props.ctx.name)} />}</TextShell>
+)
+
+export { openExternally, revealRunDir }

@@ -4,13 +4,13 @@
 // `injectionFailure: injection.error && undefined` 时四条文本锚全绿、IPC 却丢失失败字段。
 // 「失败字段真的在 ready 消息上」只能由真执行的运行时闸门守住(sidecar-ready-message.test.ts),
 // 所以这段逻辑必须住在 bun 可 import 的模块里。抽取范围以「闸门能真执行」为限,只此一个函数;
-// sidecar.ts 侧的接线锚(唯一通路 + 捕获值整体入参)见 alpha-config-injection.test.ts。
-import type { AlphaConfigInjectionFailure, AlphaConfigInjectionResult } from "./alpha-config-injection"
+// sidecar.ts 侧的接线锚(唯一通路 + 捕获值整体入参)见 codepuppy-config-injection.test.ts。
+import type { CodePuppyConfigInjectionFailure, CodePuppyConfigInjectionResult } from "./codepuppy-config-injection"
 import type { LocationPrewarmResult } from "./sidecar-location-prewarm"
 
 export type SidecarReadyMessage = {
   type: "ready"
-  injectionFailure?: AlphaConfigInjectionFailure
+  injectionFailure?: CodePuppyConfigInjectionFailure
   /**
    * #881:ready 是**在什么事实之后**发出的。sidecar 是独立 fork 进程(顶层 `getParentPort()`
    * 必抛),拿不到 main 的 `markStartupTimeline` —— 这条事实进时间线的唯一通路就是搭 ready 上车。
@@ -28,7 +28,7 @@ export type SidecarReadyMessage = {
  * 而 T7 样本 1 恰恰是「prewarm 没到 2s 就收场、ready 照发、目录再过 13.8s 才收敛」那一格。
  */
 export function buildReadyMessage(
-  injection: AlphaConfigInjectionResult,
+  injection: CodePuppyConfigInjectionResult,
   prewarm: LocationPrewarmResult,
 ): SidecarReadyMessage {
   const message: SidecarReadyMessage = {

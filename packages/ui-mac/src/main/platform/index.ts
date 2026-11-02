@@ -58,7 +58,7 @@ export function editorCliName(appDisplayName: string): string | null {
 /**
  * 打包态 CSP 注入资格(C24 / windows.ts):darwin(原状)+ win32(ADR-026 §5 加固面对齐)。
  * ⚠️ WSL 远端若走非回环地址会被 connect-src 回环白名单拦(真机批验证;坏则退守 darwin-only
- * 或补白名单);逃生阀 ALPHA_CSP_DISABLE=1 不变。linux 不发布,维持不注入。
+ * 或补白名单);逃生阀 CODEPUPPY_CSP_DISABLE=1 不变。linux 不发布,维持不注入。
  */
 export function cspPlatformEligible(platform: NodeJS.Platform = process.platform): boolean {
   return platform === "darwin" || platform === "win32"

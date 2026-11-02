@@ -1,0 +1,170 @@
+# codepuppy-windows-build(alpha 自有新增;REQ-077,ADR-026 §6)—— Windows 正式包构建通道。
+#
+# 为什么必须在 Windows runner 上打:bun 只安装当前平台的 optionalDependencies,mac 交叉包缺
+# @lydell/node-pty-win32-x64 / @parcel/watcher-win32-x64 等 win32 原生件(S35 T1b 实测;上游
+# publish.yml 同款约束)。runner = GitHub 托管标准池 windows-latest —— 刻意不依赖 Blacksmith
+# (继承的上游 workflow 永久 queued 的真因,docs/runbooks/ci.md §5)。
+#
+# 签名:上游 script/sign-windows.ps1 在 AZURE_TRUSTED_SIGNING_* 未配置时优雅自跳(exit 0),
+# 故本 workflow 出**未签名**包;Authenticode/Trusted Signing 接线归 REQ-076 T3(证书拍板
+# 「T3 时再定」;上游用 Azure Trusted Signing,可作 T3 采购先例)。
+# 发布:workflow_dispatch 非 tag 且不注入 GH_TOKEN → electron-builder 不 publish,只出 artifact。
+#
+# #175(alpha-work#11):上面那个「优雅自跳」对 dev 是便利,对 beta/prod 是 fail-open。
+# 打包后新增两步把它关死:① pwsh 从最终 .exe 采集 Authenticode 事实(status/publisher/
+# 文件 sha256,绑定到具体字节)写 windows-signing-facts.json;② scripts/verify-windows-signing.ts
+# 按出厂策略裁决 —— beta/prod 未签名、status 非 Valid、或 publisher 不在白名单(REQ-076 T3
+# 落地前白名单为空 = 全拒)⇒ job 红,artifact 不出。facts JSON 随 artifact 上传,
+# 是发版机 release-manifest producer(docs/contracts/desktop-release-manifest.md)的必需输入。
+#
+# REQ-106 的唯一例外是显式的 prod workflow_dispatch 输入。它仍必须采集且断言精确
+# NotSigned/无 publisher/无 thumbprint 事实；producer 还必须以
+# --allow-unsigned-windows 把该 exe 标成 manualDownloadOnly。此开关绝不创建 updater feed，
+# 更不把未签名包伪装成可自动更新的正式包。
+name: codepuppy-windows-build
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "打包渠道(ADR-012;内测/真机批默认 dev)"
+        type: choice
+        options: [dev, beta, prod]
+        default: dev
+      allow_unsigned_windows_manual_download:
+        description: "REQ-106: 仅限 prod，生成已披露风险的未签名 Windows 手动下载包"
+        type: boolean
+        default: false
+
+concurrency:
+  group: codepuppy-windows-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: windows package (${{ inputs.channel }})
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.14"
+      # REQ-009 同款:lockfile 键的 bun 全局缓存,miss 只是退化为全量安装
+      - name: Cache bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+      - run: bun install
+      # REQ-027:flags 必须在 run 之后。bun 自动先跑 prebuild(icons/metainfo/db-expected/
+      # ext bundle/内嵌引擎 build-node)—— fresh runner 上全部产物由此生成,无本地残留依赖。
+      - name: build + package (unsigned NSIS)
+        run: bun run --cwd packages/ui-mac ship:windows
+        env:
+          OPENCODE_CHANNEL: ${{ inputs.channel }}
+      # REQ-077 验收②:win32 原生件必须在包内 —— 缺 = 与 mac 交叉包同病,loud 红,绝不静默出残包
+      - name: assert win32 natives present
+        shell: pwsh
+        run: |
+          $root = "packages/ui-mac/dist/win-unpacked/resources/app.asar.unpacked/node_modules"
+          $must = @("@lydell/node-pty-win32-x64", "@parcel/watcher-win32-x64")
+          $missing = @()
+          foreach ($m in $must) {
+            if (-not (Test-Path "$root/$m")) { $missing += $m }
+          }
+          if ($missing.Count -gt 0) {
+            Write-Error "win32 natives missing from package: $($missing -join ', ') (REQ-077 acceptance-2 RED)"
+            exit 1
+          }
+          if (-not (Test-Path "packages/ui-mac/dist/codepuppy-win-x64.exe")) {
+            Write-Error "installer missing: packages/ui-mac/dist/codepuppy-win-x64.exe"
+            exit 1
+          }
+          Write-Host "OK: win32 natives + installer present"
+      # #175 ①:从最终 .exe 字节采集 Authenticode 事实。sha256 一并记录 —— producer 会拿它与
+      # 最终 inventory 比对,旧 facts 配新包必炸(R7)。采集本身不裁决,裁决在下一步的 bun 门里
+      # (纯逻辑,负向测试在 packages/ui-mac/src/main/release-manifest.test.ts)。
+      - name: collect Authenticode signing facts
+        shell: pwsh
+        env:
+          OPENCODE_CHANNEL: ${{ inputs.channel }}
+        run: |
+          $exe = "packages/ui-mac/dist/codepuppy-win-x64.exe"
+          $sig = Get-AuthenticodeSignature $exe
+          $hash = (Get-FileHash -Algorithm SHA256 $exe).Hash.ToLowerInvariant()
+          $facts = [ordered]@{
+            schema = "codepuppy.release.windows-signing-facts.v1"
+            channel = $env:OPENCODE_CHANNEL
+            collectedAt = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+            artifacts = @([ordered]@{
+              filename = "codepuppy-win-x64.exe"
+              sha256 = $hash
+              status = $sig.Status.ToString()
+              signed = ($sig.Status -eq "Valid")
+              publisher = if ($sig.SignerCertificate) { $sig.SignerCertificate.Subject } else { $null }
+              thumbprint = if ($sig.SignerCertificate) { $sig.SignerCertificate.Thumbprint } else { $null }
+            })
+          }
+          $facts | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 "packages/ui-mac/dist/windows-signing-facts.json"
+          Get-Content "packages/ui-mac/dist/windows-signing-facts.json"
+      # REQ-106:唯一受控例外的形状断言。它不接受「任何没签名」——只接受 producer
+      # 所能安全披露的 NotSigned + 无发布者/指纹，且 channel 必须是 prod。
+      - name: assert explicit unsigned manual exception
+        if: ${{ inputs.allow_unsigned_windows_manual_download }}
+        shell: pwsh
+        env:
+          OPENCODE_CHANNEL: ${{ inputs.channel }}
+        run: |
+          if ($env:OPENCODE_CHANNEL -ne "prod") {
+            Write-Error "allow_unsigned_windows_manual_download is valid only for prod"
+            exit 1
+          }
+          $facts = Get-Content "packages/ui-mac/dist/windows-signing-facts.json" -Raw | ConvertFrom-Json
+          if ($facts.artifacts.Count -ne 1) {
+            Write-Error "manual exception requires exactly one installer signing fact"
+            exit 1
+          }
+          $artifact = $facts.artifacts[0]
+          if ($artifact.filename -ne "codepuppy-win-x64.exe" -or
+              $artifact.signed -ne $false -or
+              $artifact.status -ne "NotSigned" -or
+              $null -ne $artifact.publisher -or
+              $null -ne $artifact.thumbprint) {
+            Write-Error "manual exception requires exact NotSigned/no-publisher/no-thumbprint facts"
+            exit 1
+          }
+          Write-Host "REQ-106 manual-only exception facts verified"
+      # #175 ②:常规硬门。beta/prod 上未签名 / 不可验证 / publisher 不在白名单 ⇒ 红,不出 artifact。
+      # dev 放行但事实必须完整如实(dev 包不发布,发布链只认 beta/prod)。REQ-106 的受控
+      # 手动下载例外在上一步精确断言，绝不放宽该门的默认路径。
+      - name: windows signing gate (fail unsigned beta/prod)
+        if: ${{ !inputs.allow_unsigned_windows_manual_download }}
+        shell: pwsh
+        env:
+          OPENCODE_CHANNEL: ${{ inputs.channel }}
+        run: bun packages/ui-mac/scripts/verify-windows-signing.ts --channel $env:OPENCODE_CHANNEL --facts packages/ui-mac/dist/windows-signing-facts.json
+      - name: upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: codepuppy-win-x64-${{ inputs.channel }}
+          path: |
+            packages/ui-mac/dist/codepuppy-win-x64.exe
+            packages/ui-mac/dist/codepuppy-win-x64.exe.blockmap
+          if-no-files-found: error
+          retention-days: 14
+      # #175:release-manifest producer 的输入面 —— facts JSON(恒在)+ electron-builder 的
+      # updater feed(latest.yml/beta.yml,--publish never 下是否落盘随 electron-builder 行为;
+      # 缺了不在这里裁决,producer 侧 R4 会因「win32 有产物而无 feed」硬拒,门不在传输层)。
+      # REQ-106 的 manualDownloadOnly 例外不消费 Windows feed；仍携带 app.asar 以生成 SBOM。
+      - name: upload release facts (manifest producer inputs)
+        uses: actions/upload-artifact@v4
+        with:
+          name: codepuppy-win-x64-${{ inputs.channel }}-release-facts
+          path: |
+            packages/ui-mac/dist/windows-signing-facts.json
+            packages/ui-mac/dist/*.yml
+            packages/ui-mac/dist/win-unpacked/resources/app.asar
+          if-no-files-found: error
+          retention-days: 14

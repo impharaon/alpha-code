@@ -8,7 +8,7 @@ import {
   mcpSecretVersionedRef,
   removeMcpServerSecretsStrict,
   writeMcpSecretVersioned,
-} from "../main/alpha-mcp-secrets"
+} from "../main/codepuppy-mcp-secrets"
 import { verifyInstalledMcp } from "../main/ext-mcp-activation"
 import {
   decodePackageEnvelopeHeaderV1,
@@ -24,7 +24,7 @@ import {
   type PackageSecretPrerequisiteProfileV1,
 } from "./package-secret-prerequisite"
 
-const root = mkdtempSync(resolve(tmpdir(), "alpha-package-secret-"))
+const root = mkdtempSync(resolve(tmpdir(), "codepuppy-package-secret-"))
 const encoder = new TextEncoder()
 const secretValue = "REQ128_SECRET_DO_NOT_ECHO_7db4"
 
@@ -227,10 +227,10 @@ describe("package secret prerequisite", () => {
     const profile = profileOf()
     const reference = packageSecretReferenceV1(profile, profile.items[0]!.prerequisiteId, "v-0123456789abcdef")
     expect(reference).toEqual({
-      schema: "alpha.package-secret-reference.v1",
+      schema: "codepuppy.package-secret-reference.v1",
       prerequisiteId: "mcp-local:demo#API_TOKEN",
       componentId: "mcp-local:demo",
-      store: "alpha-mcp-secrets",
+      store: "codepuppy-mcp-secrets",
       server: "demo",
       version: "v-0123456789abcdef",
       variable: "API_TOKEN",
@@ -295,7 +295,7 @@ describe("package secret prerequisite", () => {
     const fileRef = mcpSecretVersionedRef(userData, profile.server, nextVersion, "API_TOKEN")
     expect(fileRef).not.toContain(secretValue)
     expect(removeMcpServerSecretsStrict(userData, profile.server, () => false).ok).toBe(true)
-    expect(existsSync(resolve(userData, "alpha-mcp-secrets", profile.server, nextVersion, "API_TOKEN"))).toBe(false)
+    expect(existsSync(resolve(userData, "codepuppy-mcp-secrets", profile.server, nextVersion, "API_TOKEN"))).toBe(false)
   })
 
   // `#1529`:安装体不再 dispose;main 只剩**核验**那一半(按目录读一次 status)。重载归 ext 调度器。

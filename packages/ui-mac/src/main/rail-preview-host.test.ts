@@ -162,7 +162,7 @@ const fakeElectron = {
     // 生产用 app.getAppPath() 当锚点(见 officePreviewDir 的注释:__dirname 会随 rollup
     // 拆不拆 chunk 漂移,而漂了只表现为运行时静默 404)。fake 指向 ui-mac 包根,与真实同形。
     getAppPath: () => path.join(import.meta.dir, "..", ".."),
-    getPath: (_name: string) => path.join(os.tmpdir(), "alpha-rail-preview-test-userdata"),
+    getPath: (_name: string) => path.join(os.tmpdir(), "codepuppy-rail-preview-test-userdata"),
   },
   session: {
     fromPartition: (partition: string) => {
@@ -310,7 +310,7 @@ describe("view creation & lifecycle", () => {
     // off-the-record(无 persist: 的内存)profile 里不装载,症状是**看起来正常的黑屏**:
     // mime handler 仍挂上 chrome-extension://…/index.html,真正渲染页面的 plugin OOPIF
     // 永远建不出来。真 Chromium 实测见 docs/architecture/2026-09-03-electron-pdf-viewer-session.md。
-    expect(String(view.opts.webPreferences.partition)).toStartWith("persist:alpha-rail-preview-")
+    expect(String(view.opts.webPreferences.partition)).toStartWith("persist:codepuppy-rail-preview-")
     expect(win.children).toEqual([view])
     expect(view.bounds).toEqual({ x: 701, y: 0, width: 380, height: 501 })
     const url = view.webContents.loadedUrls[0]!
@@ -633,7 +633,7 @@ describe("#1229 office 载体:同一套隔离,第三块画布", () => {
     expect(view.opts.webPreferences.plugins).toBe(false)
     expect(view.opts.webPreferences.sandbox).toBe(true)
     expect("preload" in view.opts.webPreferences).toBe(false)
-    expect(String(view.opts.webPreferences.partition)).toStartWith("persist:alpha-rail-preview-")
+    expect(String(view.opts.webPreferences.partition)).toStartWith("persist:codepuppy-rail-preview-")
   })
 
   test("资产面是定长白名单:表内的给,表外的一律 403 并记账", async () => {
@@ -644,11 +644,11 @@ describe("#1229 office 载体:同一套隔离,第三块画布", () => {
     const ses = sessions[0]!
     const token = tokenOf(FakeWebContentsView.instances[0]!)
     for (const name of Object.keys(OFFICE_PREVIEW_ASSETS)) {
-      const res = await serve(ses, `${HTML_PREVIEW_SCHEME}://${token}/__alpha_office__/${name}`)
+      const res = await serve(ses, `${HTML_PREVIEW_SCHEME}://${token}/__codepuppy_office__/${name}`)
       expect({ name, status: res.status }).toEqual({ name, status: 200 })
       expect(res.headers.get("Content-Security-Policy")).toBe(OFFICE_PREVIEW_CSP)
     }
-    for (const bad of ["__alpha_office__/other.js", "__alpha_office__/sub/app.js", "__alpha_office__/../main/index.js"]) {
+    for (const bad of ["__codepuppy_office__/other.js", "__codepuppy_office__/sub/app.js", "__codepuppy_office__/../main/index.js"]) {
       const res = await serve(ses, `${HTML_PREVIEW_SCHEME}://${token}/${bad}`)
       expect({ bad, status: res.status }).toEqual({ bad, status: 403 })
     }
@@ -695,7 +695,7 @@ describe("#1229 office 载体:同一套隔离,第三块画布", () => {
     const stash = `${appJs}.stash`
     fs.renameSync(appJs, stash)
     try {
-      const res = await serve(ses, `${HTML_PREVIEW_SCHEME}://${token}/__alpha_office__/app.js`)
+      const res = await serve(ses, `${HTML_PREVIEW_SCHEME}://${token}/__codepuppy_office__/app.js`)
       expect(res.status).toBe(404)
     } finally {
       fs.renameSync(stash, appJs)

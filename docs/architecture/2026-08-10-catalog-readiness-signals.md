@@ -39,7 +39,7 @@ review_after: 2026-11-10
 
 ```
 [  6.8ms] SSE connected 200
-[506.2ms] → GET /api/provider/alpha-internal-catalog-ready   (冷,触发该 directory 的实例引导)
+[506.2ms] → GET /api/provider/codepuppy-internal-catalog-ready   (冷,触发该 directory 的实例引导)
 [636.7ms] ← 404
 [636.7ms] → GET /api/model
 [639.6ms] ← 200  count 0            ← 目录还没收敛,引擎照样 200
@@ -55,8 +55,8 @@ review_after: 2026-11-10
 
 ### 1.2 它是**唤醒**，不是**证明**
 
-trial 2 把 `alpha-internal-catalog-ready` 这个 marker provider 写进 `OPENCODE_CONFIG_DIR`
-的 `opencode.jsonc`（生产由 `packages/ui-mac/src/main/alpha-config-injection.ts` 写同一形状），
+trial 2 把 `codepuppy-internal-catalog-ready` 这个 marker provider 写进 `OPENCODE_CONFIG_DIR`
+的 `opencode.jsonc`（生产由 `packages/ui-mac/src/main/codepuppy-config-injection.ts` 写同一形状），
 然后一边收事件、一边按 `model-contract.ts` 的方式轮询 marker：
 
 ```
@@ -98,7 +98,7 @@ trial 3 直接构造这个形态：先在**无任何订阅者**的情况下把�
 ## 2. 票面前提的一处更正
 
 `#882` 正文说「主进程广播 `main.sidecar.generation.emit phase=ready` 而渲染层不消费它」。
-前半句为真，后半句不成立：`alpha-composer.tsx` 一直在订阅 `subscribeRuntimeRecovery`。
+前半句为真，后半句不成立：`codepuppy-composer.tsx` 一直在订阅 `subscribeRuntimeRecovery`。
 
 真正的问题是**那条事件不是这件事的信号**。`packages/ui-mac/src/main/sidecar.ts` 把 sidecar 的
 ready 上报压在 `prewarmInitialLocation` 之后，而后者硬顶 2s

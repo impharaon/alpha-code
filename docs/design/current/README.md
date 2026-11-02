@@ -17,7 +17,7 @@ Notable entries:
   frames are tracked in its §⑦ 待补 index). Add future timeline component
   frames there, not in the session-workspace page draft.
 
-- **Which surface is which, and its alpha-vs-opencode status:** see
+- **Which surface is which, and its codepuppy-vs-opencode status:** see
   [`../PAGE-MAP.md`](../PAGE-MAP.md).
 - **The two-layer model and workflow:** see [`../README.md`](../README.md).
 - **On approval / ship:** cut a new dated snapshot from the current file so the

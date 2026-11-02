@@ -6,7 +6,7 @@
 //      编进 out/main 产物(node-pty 的 narrower 插件);
 //   ② bun install 默认只装与宿主 cpu 匹配的 optionalDependencies,x64 的原生包在 arm64 机器上根本不在盘上。
 //
-// 本模块是唯一的选择点:目标架构 = `ALPHA_TARGET_ARCH`(arm64 | x64),缺省才回落宿主架构(保持今天的行为)。
+// 本模块是唯一的选择点:目标架构 = `CODEPUPPY_TARGET_ARCH`(arm64 | x64),缺省才回落宿主架构(保持今天的行为)。
 // electron.vite.config.ts 用它选 node-pty 包名;electron-builder.config.ts 的 beforePack 用
 // `assertMacTargetArch` 在真正装包前逐项核对产物与 node_modules,任何一项对不上就拒绝打包。
 //
@@ -15,7 +15,7 @@ import fs from "node:fs"
 import { createRequire } from "node:module"
 import path from "node:path"
 
-export const TARGET_ARCH_ENV = "ALPHA_TARGET_ARCH"
+export const TARGET_ARCH_ENV = "CODEPUPPY_TARGET_ARCH"
 
 export type TargetArch = "arm64" | "x64"
 const SUPPORTED: readonly TargetArch[] = ["arm64", "x64"]
@@ -44,7 +44,7 @@ export function nodePtyPackage(platform: string, arch: TargetArch): string {
  * - node-pty:内置终端;pty.node + spawn-helper。
  * - @parcel/watcher:引擎的文件监听;引擎产物在**运行时**按 `process.arch` require 它,
  *   所以包名不进产物,但对应架构的包必须真的在 node_modules 里被打进去。
- * 另一处原生模块 alpha_fence.node 是 fat(arm64+x86_64)文件,由 build-fence-addon.ts 自己逐片校验,不在此列。
+ * 另一处原生模块 codepuppy_fence.node 是 fat(arm64+x86_64)文件,由 build-fence-addon.ts 自己逐片校验,不在此列。
  */
 export function macNativePackages(arch: TargetArch): string[] {
   return [nodePtyPackage("darwin", arch), `@parcel/watcher-darwin-${arch}`]
@@ -134,7 +134,7 @@ export function checkNativePackage(pkgName: string, arch: TargetArch, resolveFro
 
 /**
  * 主进程产物(out/main)里写死的 node-pty 包名必须恰好是目标架构那一个。
- * 产物是 `bun run build` 时按当时的 ALPHA_TARGET_ARCH 生成的;若之后换了架构只重打包没重 build,这里会抓到。
+ * 产物是 `bun run build` 时按当时的 CODEPUPPY_TARGET_ARCH 生成的;若之后换了架构只重打包没重 build,这里会抓到。
  */
 export function checkBundledNodePty(outMainDir: string, platform: string, arch: TargetArch): string[] {
   if (!fs.existsSync(outMainDir)) return [`${outMainDir} 不存在(先跑 \`${TARGET_ARCH_ENV}=${arch} bun run build\`)`]
@@ -174,7 +174,7 @@ export function checkOfficeRuntime(dir: string, arch: TargetArch): string[] {
 }
 
 /**
- * electron-builder beforePack 调用:正在打的 mac 架构必须 == ALPHA_TARGET_ARCH(缺省宿主),
+ * electron-builder beforePack 调用:正在打的 mac 架构必须 == CODEPUPPY_TARGET_ARCH(缺省宿主),
  * 产物里的 node-pty 包名 == 该架构,且该架构的原生包齐全、二进制片对得上,随包 Office 运行时同样逐个
  * Mach-O 对得上(#1564)。任一不过即抛,拒绝打包。
  */

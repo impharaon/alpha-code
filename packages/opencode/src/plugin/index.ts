@@ -34,7 +34,7 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { InstallationChannel } from "@opencode-ai/core/installation/version"
 import { readFileSync } from "node:fs"
-import { bundledPluginTools, type BundledPluginTools } from "./alpha-bundled-plugin"
+import { bundledPluginTools, type BundledPluginTools } from "./codepuppy-bundled-plugin"
 
 type State = {
   // #1578 AC5: `bundled` = the loader-side proof for this plugin's own tools (absent = nothing proven).

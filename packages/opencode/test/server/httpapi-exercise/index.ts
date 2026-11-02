@@ -976,7 +976,7 @@ const scenarios: Scenario[] = [
     .delete("/api/permission/saved/{id}", "v2.permission.saved.remove")
     .at((ctx) => ({ path: route("/api/permission/saved/{id}", { id: "psv_httpapi_missing" }), headers: ctx.headers() }))
     .status(204, undefined, "status"),
-  // REQ-131 / #1130:tool policy 面(Settings「工具」节的数据源与写口;闸在 alpha-tool-policy-route.test.ts)。
+  // REQ-131 / #1130:tool policy 面(Settings「工具」节的数据源与写口;闸在 codepuppy-tool-policy-route.test.ts)。
   http.protected.get("/api/permission/tool-policy/inventory", "v2.permission.tool-policy.inventory").json(200, (body) => {
     object(body)
     object(body.data)

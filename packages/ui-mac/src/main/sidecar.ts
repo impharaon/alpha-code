@@ -4,8 +4,8 @@ import * as http from "node:http"
 import * as tls from "node:tls"
 import { pathToFileURL } from "node:url"
 // #607:注入组合体住在自己的模块里 —— 本文件的第一个 import(registerHooks)与顶层
-// getParentPort() 让 sidecar.ts 无法被测试 import,注入因此长期零覆盖。见 alpha-config-injection.ts。
-import { injectAlphaConfig, type AlphaConfigInjectionResult } from "./alpha-config-injection"
+// getParentPort() 让 sidecar.ts 无法被测试 import,注入因此长期零覆盖。见 codepuppy-config-injection.ts。
+import { injectCodePuppyConfig, type CodePuppyConfigInjectionResult } from "./codepuppy-config-injection"
 // #613 R1:ready 消息构造抽成 bun 可真执行的单元 —— 文本锚锁不住「值真的上车」,运行时闸门
 // 在 sidecar-ready-message.test.ts;本文件不得字面量构造 ready 消息(接线锚断言其不存在)。
 import { buildReadyMessage, type SidecarReadyMessage } from "./sidecar-ready-message"
@@ -77,10 +77,10 @@ type StartCommand = {
   port: number
   password: string
   userDataPath: string
-  /** B6(=G1):@alpha-code/ext 自包含 bundle 的绝对路径(main 解析,见 alpha-ext-plugin.ts);缺省不装载。 */
+  /** B6(=G1):@codepuppy/ext 自包含 bundle 的绝对路径(main 解析,见 codepuppy-ext-plugin.ts);缺省不装载。 */
   extPluginPath?: string
   /** #397 override 注入用的 catalog 通道。必须由 main 从冻结环境快照取好传入 —— 本进程从不跑
-   *  initAlphaEnvironment,在这里调 catalogRegistryChannel() 会抛,且曾把整个 injectAlphaConfig
+   *  initCodePuppyEnvironment,在这里调 catalogRegistryChannel() 会抛,且曾把整个 injectCodePuppyConfig
    *  连同 provider 注入一起炸掉(2026-07-23 打包端「全模型当前不可用」事故)。缺省 = loud 跳过
    *  override 注入(fail-closed 权威在 boot reconcile,见 ext-disabled-injection.ts)。 */
   registryChannel?: ChannelName
@@ -150,14 +150,14 @@ async function start(command: StartCommand) {
     // 围栏只放行出网代理端口,ext 拿到的 input.client 在引擎监听后走 TCP 连自己 —— 出货形态下被拒,重载调度器就永远查不到
     // 会话状态、零 dispose。交接点与判据见 in-process-engine.ts / process-fence-engine.test.ts 的 #1531 三臂。
     publishInProcessEngine((request) => Server.Default().app.fetch(request))
-    // REQ-234 `#1531`:@alpha-code/ext 在**模块装载时**挂 parentPort 监听(定制中心桥 + 重载调度器),而 main 只在 ready
+    // REQ-234 `#1531`:@codepuppy/ext 在**模块装载时**挂 parentPort 监听(定制中心桥 + 重载调度器),而 main 只在 ready
     // 那一刻重发排队的重载代际。引擎要等第一个 v1 实例初始化插件才 import 它 —— 常常晚于 ready,那一批就丢了。这里先 import
     // 引擎稍后要 import 的**同一个 URL**(引擎解析路径插件 = pathToFileURL(path).href;ESM 按 URL 缓存 ⇒ 同一个模块记录、
     // 同一份调度器),ready 之前它一定已经在听。失败只记一行、不拦 ready:引擎稍后照常再装载一次,结局由它报。
     const extPreload = command.extPluginPath
       ? import(pathToFileURL(command.extPluginPath).href).then(
           () => undefined,
-          (error: unknown) => console.warn("@alpha-code/ext preload before ready failed — reload requests re-sent at ready may be lost", error),
+          (error: unknown) => console.warn("@codepuppy/ext preload before ready failed — reload requests re-sent at ready may be lost", error),
         )
       : Promise.resolve()
 
@@ -221,13 +221,13 @@ function prepareSidecarEnv(
   userDataPath: string,
   extPluginPath?: string,
   registryChannel?: ChannelName,
-): AlphaConfigInjectionResult {
+): CodePuppyConfigInjectionResult {
   Object.assign(process.env, {
     OPENCODE_SERVER_USERNAME: "opencode",
     OPENCODE_SERVER_PASSWORD: password,
     XDG_STATE_HOME: process.env.XDG_STATE_HOME ?? userDataPath,
   })
-  return injectAlphaConfig(userDataPath, extPluginPath, registryChannel)
+  return injectCodePuppyConfig(userDataPath, extPluginPath, registryChannel)
 }
 
 function ensureLoopbackNoProxy() {

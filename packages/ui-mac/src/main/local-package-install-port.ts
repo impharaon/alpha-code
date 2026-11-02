@@ -22,8 +22,8 @@
 //
 // 本文件不该长出第二个职责;它长了就说明它变成了那种「为将来写的抽象」。
 
-import { getAlphaEnvironment } from "./alpha-environment"
-import { alphaGlobalRoot } from "./alpha-installs"
+import { getCodePuppyEnvironment } from "./codepuppy-environment"
+import { codepuppyGlobalRoot } from "./codepuppy-installs"
 import { installLocalClaudePluginV1 } from "./claude-plugin-install"
 import type { IssuedLocalPackagePreview } from "./local-package-preview"
 
@@ -64,9 +64,9 @@ export const installLocalClaudePlugin: LocalPackageInstaller = async (issued) =>
       payloads: issued.payloads.map((payload) => ({ name: payload.name, dir: payload.dir, files: payload.files })),
     },
     {
-      globalRoot: alphaGlobalRoot,
-      casBaseRoot: () => getAlphaEnvironment().casBaseRoot,
-      environment: () => getAlphaEnvironment().environment,
+      globalRoot: codepuppyGlobalRoot,
+      casBaseRoot: () => getCodePuppyEnvironment().casBaseRoot,
+      environment: () => getCodePuppyEnvironment().environment,
     },
   )
   if (!result.ok) return { ok: false, reason: result.reason, code: result.code }

@@ -258,7 +258,7 @@ const STYLES = `
   @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
 `
 
-// Text wordmark — matches `alpha.brand.product` / auth.tidelabs.click (ADR-042).
+// Text wordmark — matches `codepuppy.brand.product` / auth.tidelabs.click (ADR-042).
 const WORDMARK = `<span class="wordmark-text" aria-label="Code Puppy" role="img">Code Puppy</span>`
 
 const ICON_CHECK = `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="m8.5 12.5 2.4 2.4 4.6-5.4" /></svg>`

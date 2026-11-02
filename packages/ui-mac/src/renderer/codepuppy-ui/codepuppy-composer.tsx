@@ -1,0 +1,2118 @@
+// CodePuppyComposer — REQ-055/REQ-125 C7:alpha 唯一的 composer 组件(用户拍板 2026-07-07:「一个 CSS
+// 一个完整的组件」「自建,不再集成 opencode」)。首页(mode="home")、新会话与会话页
+// (mode="session",由 seam 会话页的 SessionComposerDock **直挂**,props 传入 —— 零 Portal/
+// 零选择器,takeover 时代随 REQ-125 C7 终结)渲染**同一个组件**,样式只来自 codepuppy-composer.css。
+//
+// 与旧世界的本质区别:session 的模型/推理档以 typed Session Model.Ref 为真源，composer-state
+// 只保留已确认的 UI 投影;agent/权限仍是轻量提交态。不再有 agent.cycle 轮转、variant cycleTo
+// 或隐藏上游选择器标签发布 —— 那一类「驱动/收养隐藏上游控件」的机制全部退役。
+//
+// session 专属数据(live 运行态/上下文用量/审批挂起/斜杠捕获)一律经 sessionDock props 从
+// typed 通道注入(基线 I1/I2/I8);2.5s status 轮询与上游 ring DOM 收养已删。
+
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  Match,
+  onCleanup,
+  onMount,
+  Show,
+  Switch,
+  untrack,
+  type JSX,
+} from "solid-js"
+import { Portal } from "solid-js/web"
+import { useCommand } from "./providers"
+import { setExtHubOpen } from "../extensions/ext-hub-state"
+import { createComposerAutocomplete } from "./composer-autocomplete"
+import { buildMentionParts, type MentionPart } from "./composer-autocomplete-core"
+import {
+  ATTACH_ACCEPT,
+  ATTACH_MAX_COUNT,
+  buildAttachmentParts,
+  classifyAttachment,
+  imageRouteOf,
+  mergeAttachments,
+  revalidateStagedDirectory,
+  textAttachmentUrl,
+  type AttachmentReadResult,
+  type ComposerAttachment,
+  type PendingAttachmentRead,
+} from "./composer-attachments-core"
+import { ComposerAttachmentStrip } from "./attachment-cards"
+import { pathHitsPopover } from "./popover-hit"
+import { claimOverlay, releaseOverlay } from "./overlay-stack"
+import { Tooltip } from "./Tooltip"
+import { pushToast } from "./Toast"
+import type { CodePuppyProjectsApi } from "../sidebar/use-projects"
+import type { AuthState } from "../../preload/types"
+import {
+  adoptComposerAgentScope,
+  adoptComposerPermScope,
+  applyDefaultComposerModel,
+  buildPromptRequest,
+  clearSuspendedModel,
+  composerAgent,
+  composerEffortSel,
+  composerModel,
+  composerModelExplicit,
+  composerModelProjection,
+  composerModelSuspended,
+  composerPerm,
+  PERM_MODES,
+  permLocksAgent,
+  failComposerModelProjection,
+  invalidateComposerModelProjection,
+  isRememberedExplicit,
+  releaseComposerAgentScope,
+  releaseComposerPermScope,
+  rememberExplicitModel,
+  resetComposerModelProjection,
+  resolveComposerModelProjection,
+  routeSlash,
+  seedComposerAgentScope,
+  seedComposerPermScope,
+  setComposerAgent,
+  setComposerModel,
+  setComposerPerm,
+  slashSourceOf,
+  suspendComposerModel,
+  tierAgent,
+  v1CommandModelFields,
+  v1PromptModelFields,
+  type ComposerModel,
+  type PermMode,
+  type SlashCommandSource,
+} from "./composer-state"
+import {
+  checkSelectedModel,
+  preflightBlockReason,
+  resolveDefaultModel,
+  type EngineModelRef,
+} from "./model-default-core"
+import { ModelPickPop } from "./codepuppy-composer-model"
+import { identityKey } from "./session-workspace/session-workspace-core"
+import { createModelContract, type ModelContract } from "./model-contract"
+import { byokEngineId, isByokEngineId } from "../../shared/codepuppy-model-types"
+import type { EffectiveCatalog } from "../../shared/codepuppy-model-types"
+import { composerModelFromRef, modelBrandOf, modelRefOf, withModelVariant } from "./model-picker-core"
+import { BrandIcon } from "./brand-icon"
+import { accountResultState, createRetryWakeup, loadEngineModelsWithRetry, resolveAccountWithRetry } from "./model-recovery"
+import { t } from "../i18n"
+import { markStartupTimeline } from "../startup-timeline"
+import { subscribeRuntimeRecovery, subscribeSseReconnected } from "../runtime-recovery"
+import { reconcileAuthSnapshot, subscribeAuthState } from "../auth-recovery"
+import { catalogFailureReason, createCatalogRefreshHealth, retryCatalogRefresh } from "./catalog-refresh-health"
+import "./codepuppy-composer.css"
+
+/* ── 单开注册表(全部 chips 共享;开新的自动关旧的)──────────────────────────── */
+// #1476:芯片菜单与「+ / @ /」列表同属一套菜单,「同时只开一个」经 overlay-stack 跨两方生效。
+const [openChipId, setOpenChipId] = createSignal<number | null>(null)
+const CHIP_OVERLAY = {}
+let chipSeq = 0
+let homeModelListMarkCount = 0
+let homeModelRetryMarkCount = 0
+let homeAccountMarkCount = 0
+/** #881:目录真就绪标的预算,与上面三个同构(每代引擎封顶 25 条,见下)。 */
+let homeCatalogReadyMarkCount = 0
+let homeMarkGeneration: number | undefined
+/** #1557 AC4:上面四类时序标记的 25 条上限按**每代引擎**计 —— 每进程一份预算在长会话里很快触顶
+ *  (实测 25 条已用完,之后的复发没有记录)。引擎换代(不论原因)即整批归零。 */
+const budgetHomeMarksForGeneration = (generation: number) => {
+  if (generation === homeMarkGeneration) return
+  homeMarkGeneration = generation
+  homeModelListMarkCount = 0
+  homeModelRetryMarkCount = 0
+  homeAccountMarkCount = 0
+  homeCatalogReadyMarkCount = 0
+}
+export const closeChips = () => {
+  setOpenChipId(null)
+  releaseOverlay(CHIP_OVERLAY)
+}
+
+function useChip() {
+  const id = ++chipSeq
+  const isOpen = () => openChipId() === id
+  const close = () => {
+    if (openChipId() !== id) return
+    setOpenChipId(null)
+    releaseOverlay(CHIP_OVERLAY)
+  }
+  const toggle = () => {
+    if (isOpen()) return close()
+    claimOverlay(CHIP_OVERLAY, () => setOpenChipId(null))
+    setOpenChipId(id)
+  }
+  const onDoc = (e: MouseEvent) => {
+    // REQ-061:composedPath 在 dispatch 时快照 —— 点击处理器同步重渲染把被点按钮 detach 后,
+    // 旧 e.target.closest(".a-pop") 会返回 null 误判外部点击、误关整层(B21 真机 3 次复现:
+    // 改键表单入口不可达)。判定细节见 popover-hit.ts。
+    if (pathHitsPopover(e.composedPath())) return
+    close()
+  }
+  document.addEventListener("click", onDoc)
+  onCleanup(() => document.removeEventListener("click", onDoc))
+  return { isOpen, toggle, close }
+}
+
+const stop = (e: Event) => e.stopPropagation()
+
+/** 菜单里可用方向键走到的项(#1476)。二级页(添加供应商)打开时只在二级页内走。 */
+const MENU_ITEM_SELECTOR =
+  "button.a-pop-item:not(:disabled), [role^='menuitem']:not([aria-disabled='true']), button.a-mpa-preset:not(:disabled)"
+
+/** ↑↓ / Home / End 在 `scope` 内的菜单项间环形移动焦点;返回是否处理了该键。 */
+export function moveMenuFocus(scope: HTMLElement, event: KeyboardEvent): boolean {
+  if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return false
+  if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return false
+  const target = event.target as Element | null
+  // 文本输入里的方向键属于光标(搜索框除外:从搜索框 ↓ 进入列表)。
+  if (target?.closest("textarea, select, [contenteditable='true'], input:not([type='search'])")) return false
+  const inSub = scope.classList.contains("a-mpa")
+  const items = [...scope.querySelectorAll<HTMLElement>(MENU_ITEM_SELECTOR)].filter(
+    (el) => inSub || !el.closest(".a-mpa"),
+  )
+  if (items.length === 0) return false
+  const index = items.indexOf(document.activeElement as HTMLElement)
+  const next =
+    event.key === "Home"
+      ? 0
+      : event.key === "End"
+        ? items.length - 1
+        : index < 0
+          ? event.key === "ArrowDown"
+            ? 0
+            : items.length - 1
+          : (index + (event.key === "ArrowDown" ? 1 : items.length - 1)) % items.length
+  event.preventDefault()
+  items[next]!.focus()
+  return true
+}
+
+/* 逃出 overflow 裁剪的弹层(Portal 到 body、fixed 定位、朝上开)。
+ * #1476 一套键盘 / 关闭规则:↑↓ 移动、回车选(原生 button)、Esc 关并把焦点还给触发按钮 ——
+ * **无论焦点在哪**(焦点在弹层外时由 window 捕获阶段的监听兜住);点别处关(useChip);
+ * 同时只开一个(overlay-stack);窗口尺寸变化时跟着重新定位。 */
+export function ChipPopover(props: {
+  anchor: HTMLElement | undefined
+  align?: "left" | "right"
+  minWidth?: number
+  role?: "menu"
+  onEscape?: () => void
+  children: JSX.Element
+}) {
+  const a = props.anchor
+  if (!a) return null
+  const [layout, setLayout] = createSignal(0)
+  const minW = props.minWidth ?? 200
+  let popover: HTMLDivElement | undefined
+  const style = (): JSX.CSSProperties => {
+    layout()
+    const r = a.getBoundingClientRect()
+    const vw = window.innerWidth
+    const next: JSX.CSSProperties = {
+      position: "fixed",
+      bottom: `${Math.round(window.innerHeight - r.top + 8)}px`,
+      "z-index": "var(--a-z-dropdown)",
+      "min-width": `${minW}px`,
+      "max-width": `${Math.round(vw - 16)}px`,
+    }
+    if (props.align === "right") next.right = `${Math.round(Math.max(8, vw - r.right))}px`
+    else next.left = `${Math.round(Math.min(Math.max(8, r.left), vw - minW - 8))}px`
+    return next
+  }
+  const escape = () => {
+    props.onEscape?.()
+    if (a.isConnected) a.focus()
+  }
+  const onResize = () => setLayout((n) => n + 1)
+  // 焦点不在弹层里(例如还在输入框)时的 Esc:捕获阶段先于其它 Esc 处理器,只关菜单、不连带别的动作。
+  const onWindowKey = (event: KeyboardEvent) => {
+    if (event.key !== "Escape" || event.defaultPrevented) return
+    if (popover?.contains(event.target as Node)) return
+    event.preventDefault()
+    event.stopPropagation()
+    escape()
+  }
+  window.addEventListener("resize", onResize)
+  window.addEventListener("keydown", onWindowKey, true)
+  onMount(() => {
+    queueMicrotask(() =>
+      (
+        popover?.querySelector<HTMLElement>(
+          "button:not(:disabled), [href], input:not(:disabled), [tabindex]:not([tabindex='-1'])",
+        ) ?? popover
+      )?.focus(),
+    )
+  })
+  onCleanup(() => {
+    window.removeEventListener("resize", onResize)
+    window.removeEventListener("keydown", onWindowKey, true)
+    const el = document.activeElement
+    if (!popover || popover.contains(el) || el === document.body || el === null)
+      queueMicrotask(() => a.isConnected && a.focus())
+  })
+  return (
+    <Portal>
+      <div
+        ref={popover}
+        class="a-ui a-pop a-pop-fixed"
+        role={props.role}
+        tabindex="-1"
+        style={style()}
+        onClick={stop}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.preventDefault()
+            event.stopPropagation()
+            escape()
+            return
+          }
+          const active = document.activeElement
+          const sub = active instanceof Element ? active.closest<HTMLElement>(".a-mpa") : null
+          moveMenuFocus(sub ?? popover!, event)
+        }}
+      >
+        {props.children}
+      </div>
+    </Portal>
+  )
+}
+
+/* ── icons ─────────────────────────────────────────────────────────────────── */
+const ico = "0 0 24 24"
+const Plus = () => (
+  <svg class="a-ic" viewBox={ico}>
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+)
+const Chevron = () => (
+  <svg class="a-ic a-chev" viewBox={ico}>
+    <path d="M6 9l6 6 6-6" />
+  </svg>
+)
+/* 「全部批准」的盾(活稿 §07 第一项:光盾,无勾无眼)。 */
+const ShieldOpen = () => (
+  <svg class="a-ic a-ic-sm" viewBox={ico}>
+    <path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z" />
+  </svg>
+)
+const ShieldAsk = () => (
+  <svg class="a-ic a-ic-sm" viewBox={ico}>
+    <path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z" />
+    <path d="M9 12l2 2 4-4" />
+  </svg>
+)
+const ShieldEye = () => (
+  <svg class="a-ic a-ic-sm" viewBox={ico}>
+    <path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z" />
+    <circle cx="12" cy="11" r="2.4" />
+  </svg>
+)
+const Bolt = () => (
+  <svg class="a-ic a-ic-sm" viewBox={ico}>
+    <path d="M13 2L4.5 12.5h6L11 22l8.5-10.5h-6z" />
+  </svg>
+)
+const ArrowUp = () => (
+  <svg class="a-ic" viewBox={ico}>
+    <path d="M12 19V5M5 12l7-7 7 7" />
+  </svg>
+)
+const StopSquare = () => (
+  <svg class="a-ic" viewBox={ico} style={{ fill: "currentColor", stroke: "none" }}>
+    <rect x="7" y="7" width="10" height="10" rx="2" />
+  </svg>
+)
+const TermGlyph = () => (
+  <svg class="a-ic" viewBox={ico}>
+    <path d="M4 17l6-5-6-5M12 19h8" />
+  </svg>
+)
+
+/* ── + 按钮:打开统一装配弹窗(REQ-073)—— 与 @ 同一弹窗,内容/键盘/分节见
+ * composer-autocomplete(添加/AGENT/文件/扩展);旧 AddButton 的四条「扩展」占位行
+ * (文档/PDF/表格/连接器全是同一个 setExtHubOpen 动作)随之收敛为弹窗单行「扩展市场…」。 */
+function AddButton(props: { onOpen: () => void; expanded: boolean }) {
+  return (
+    <Tooltip label={t("codepuppy.composer.assemble")}>
+      <button
+        class="a-chip a-chip-icon"
+        aria-label={t("codepuppy.composer.assemble")}
+        aria-haspopup="listbox"
+        aria-expanded={props.expanded}
+        onClick={(e) => (stop(e), props.onOpen())}
+      >
+        <Plus />
+      </button>
+    </Tooltip>
+  )
+}
+
+/* ── 权限 chip(`#1413`):三档,每档发出的请求逐字节不同 ──
+ * allow「全部批准」= 不压 agent(引擎默认 build,edit/bash 全放行 —— 这就是此前「请求审批」档的真实行为);
+ * ask「请求审批」= 提交时强制 codepuppy-ask(edit/bash 真的弹审批);readonly「只读」= 强制 codepuppy-readonly(deny)。
+ * 映射表是 composer-state 的 PERM_AGENT;这里的标签 / 副标题 / 图标同样按 PermMode 穷举 —— 少一档 typecheck 红,
+ * 不会有哪一档静默借用别人的标签或图标。
+ * REQ-126 AC7(#658)退休过的「全自动」档是反例:提交层只对 readonly 分支,它与「询问」产出完全相同的请求,
+ * 界面上一个点了不算数的开关。这次的判据(shell-commands.test.ts)逐档真点、断言提交层的 agent 三个互不相同。 */
+type DictKey = Parameters<typeof t>[0]
+const PERM_TEXT: Record<PermMode, { label: DictKey; hint: DictKey }> = {
+  allow: { label: "codepuppy.composer.permAllow", hint: "codepuppy.composer.permAllowHint" },
+  ask: { label: "codepuppy.composer.permAsk", hint: "codepuppy.composer.permAskHint" },
+  readonly: { label: "codepuppy.composer.permReadonly", hint: "codepuppy.composer.permReadonlyHint" },
+}
+const PERM_ICON: Record<PermMode, () => JSX.Element> = { allow: ShieldOpen, ask: ShieldAsk, readonly: ShieldEye }
+const permLabel = (mode: PermMode) => t(PERM_TEXT[mode].label)
+
+type CommandApi = ReturnType<typeof useCommand>
+
+export function PermChip() {
+  const { isOpen, toggle, close } = useChip()
+  let btn: HTMLButtonElement | undefined
+  const pick = (m: PermMode) => {
+    setComposerPerm(m)
+    close()
+  }
+  return (
+    <div class="a-pop-wrap" data-kind="perm">
+      <button
+        ref={btn}
+        class="a-chip a-chip-perm"
+        data-mode={composerPerm()}
+        aria-haspopup="menu"
+        aria-expanded={isOpen()}
+        onClick={(e) => (stop(e), toggle())}
+      >
+        {PERM_ICON[composerPerm()]()}
+        {permLabel(composerPerm())}
+        <Chevron />
+      </button>
+      <Show when={isOpen()}>
+        <ChipPopover anchor={btn} align="left" minWidth={300} role="menu" onEscape={close}>
+          <div class="a-pop-label" role="presentation">{t("codepuppy.composer.permissions")}</div>
+          <For each={PERM_MODES}>
+            {(mode) => (
+              <button
+                class="a-pop-item"
+                classList={{ "is-on": composerPerm() === mode }}
+                role="menuitemradio"
+                aria-checked={composerPerm() === mode}
+                data-perm={mode}
+                onClick={() => pick(mode)}
+              >
+                {PERM_ICON[mode]()} {t(PERM_TEXT[mode].label)} <span class="a-pop-desc">{t(PERM_TEXT[mode].hint)}</span>
+              </button>
+            )}
+          </For>
+          {/* REQ-236:三档共同、任何档都越不过的那几样(批准稿 #tier-menu 底部一句)。 */}
+          <div class="a-pop-sep" role="separator" />
+          <div class="a-pop-note" role="presentation" data-perm-boundary="">
+            {t("codepuppy.composer.permBoundary")}
+          </div>
+        </ChipPopover>
+      </Show>
+    </div>
+  )
+}
+
+/* ── 计划模式 chip(REQ-073,取代 AgentChip)—— composerAgent 即模式载体:null = 引擎默认
+ * (build,不出控件);"plan"/第三方主档 = chip 呈现,点击关闭;开关入口在统一装配弹窗,
+ * Shift+Tab 快捷切换;权限档压 agent 时(readonly / ask,`#1413`:permLocksAgent)模式不生效
+ * (buildPromptRequest 强制该档的 agent),chip 如实置灰并在 title 里点名是哪一档压的。 */
+function PlanChip() {
+  const label = () => (composerAgent() === "plan" ? t("codepuppy.composer.plan") : composerAgent())
+  const locked = () => permLocksAgent(composerPerm())
+  // #1543(owner 2026-10-26 取代 #1476):底栏不写原因正文 —— 被权限档压住时芯片置灰,
+  // 原因进悬停提示(Tooltip 同时经 aria-describedby 交给读屏)。
+  const tip = () =>
+    locked()
+      ? `${t("codepuppy.composer.planLocked", { tier: permLabel(composerPerm()) })} · ${t("codepuppy.composer.planEnabled")}`
+      : t("codepuppy.composer.planEnabled")
+  return (
+    <Show when={composerAgent()}>
+      <Tooltip label={tip()}>
+        <button
+          class="a-chip a-chip-plan"
+          data-disabled={locked() ? "" : undefined}
+          onClick={(e) => (stop(e), setComposerAgent(null))}
+        >
+          <span class="a-chip-x" aria-hidden="true">
+            ⊗
+          </span>
+          {label()}
+        </button>
+      </Tooltip>
+    </Show>
+  )
+}
+
+/* ── 模型 chip:打开 canonical alpha picker，选择经 typed model contract 提交。──────────── */
+function ModelChip(props: {
+  contract: ReturnType<typeof createModelContract>
+  directory: () => string | undefined
+  onSelect: (model: NonNullable<ReturnType<typeof composerModel>>) => Promise<void>
+  onRetryCurrent: () => void
+  modelChainReady: () => boolean
+  onNeedWorkspace?: () => void
+  hasWorkspace: () => boolean
+  /** alpha-code#1558:当前所选模型的品牌;缺省 = 中性图形(未选 / 自定义节点 / 目录未到)。 */
+  brand: () => string | undefined
+  /** `#1588` AC3:把「打开模型选择器」登记给会话页(回合错误卡「换模型」);缺席 = 不登记。 */
+  registerOpen?: (open: () => void) => () => void
+}) {
+  const { isOpen, toggle, close } = useChip()
+  let btn: HTMLButtonElement | undefined
+  // 打开推到下一个宏任务:触发它的那次点击还要冒泡到 document,useChip 的外部点击监听会把同一拍打开的浮层关掉。
+  onMount(() => {
+    const unregister = props.registerOpen?.(() =>
+      setTimeout(() => {
+        if (!isOpen() && props.hasWorkspace()) toggle()
+      }, 0),
+    )
+    if (unregister) onCleanup(unregister)
+  })
+  const label = () => {
+    const projection = composerModelProjection()
+    if (projection.status === "loading") return t("codepuppy.composer.modelReading")
+    if (projection.status === "error") return t("codepuppy.composer.modelFailed")
+    return composerModel()?.name ?? t("codepuppy.model.choose")
+  }
+  return (
+    <div class="a-pop-wrap" data-kind="model">
+      <Tooltip label={`${t("codepuppy.model.choose")} · ${label()}`}>
+        <button
+          ref={btn}
+          class="a-chip a-chip-model"
+          aria-haspopup="dialog"
+          aria-expanded={isOpen()}
+          onClick={(e) => {
+            stop(e)
+            if (!props.hasWorkspace()) {
+              // 零工作区不留死点(REQ-054①):引导先选工作区,与发送按钮同一分支。
+              props.onNeedWorkspace?.()
+              return
+            }
+            toggle()
+          }}
+        >
+          {/* 图标跟着标签走:读取中 / 读取失败时标签不是模型名,图标也不是品牌。 */}
+          <BrandIcon brand={composerModelProjection().status === "ready" ? props.brand() : undefined} size="sm" />
+          <span class="a-chip-label">{label()}</span>
+          <Chevron />
+        </button>
+      </Tooltip>
+      <Show when={isOpen()}>
+        <ChipPopover anchor={btn} align="right" minWidth={360} onEscape={close}>
+          <ModelPickPop
+            contract={props.contract}
+            directory={props.directory}
+            selected={composerModel}
+            onSelect={props.onSelect}
+            onPicked={close}
+            onRetryCurrent={props.onRetryCurrent}
+            modelChainReady={props.modelChainReady}
+          />
+        </ChipPopover>
+      </Show>
+    </div>
+  )
+}
+
+/* ── effort chip:档位定义取目录 variants；session 当前值是服务端 Model.Ref 的 UI 投影。
+ *    全链 ready 后才允许调档；无模型时弹层内嵌模型选择器就地选，有模型无档位时如实说明原因。── */
+function EffortChip(props: {
+  contract: ReturnType<typeof createModelContract>
+  directory: () => string | undefined
+  onSelect: (model: NonNullable<ReturnType<typeof composerModel>>) => Promise<void>
+  onRetryCurrent: () => void
+  modelChainReady: () => boolean
+}) {
+  const { isOpen, toggle, close } = useChip()
+  let btn: HTMLButtonElement | undefined
+  const variants = () => composerModel()?.variants ?? []
+  const supported = () => variants().length > 0
+  const current = () => composerEffortSel() ?? t("codepuppy.composer.default")
+  const blocked = () => composerModelProjection().status !== "ready" || !props.modelChainReady()
+  const selectVariant = (variant: string | null) => {
+    const model = composerModel()
+    if (!model) return
+    void props
+      .onSelect(withModelVariant(model, variant))
+      .then(close)
+      .catch(() => {})
+  }
+  /** 芯片「为什么不能用」的原因;能用时为 undefined。#1543(owner 2026-10-26 取代 #1476):底栏不写原因正文,
+   *  原因进芯片的悬停提示(Tooltip 同时经 aria-describedby 交给读屏);浮层里的说明不变。 */
+  const reason = () => {
+    if (composerModelProjection().status === "loading") return t("codepuppy.composer.effortModelLoading")
+    if (composerModelProjection().status === "error") return t("codepuppy.composer.effortModelFailed")
+    if (!props.modelChainReady()) return t("codepuppy.composer.effortChainPending")
+    if (!composerModel()) return t("codepuppy.composer.effortNeedsModel")
+    return supported() ? undefined : t("codepuppy.composer.effortUnsupported")
+  }
+  return (
+    <div class="a-pop-wrap" data-kind="effort">
+      <Tooltip label={reason() ?? t("codepuppy.composer.effortTitle")}>
+        <button
+          ref={btn}
+          class="a-chip"
+          data-muted={supported() ? undefined : ""}
+          disabled={blocked()}
+          aria-haspopup="dialog"
+          aria-expanded={isOpen()}
+          onClick={(e) => (stop(e), toggle())}
+        >
+          <Bolt />
+          <span class="a-comp-eff">{supported() ? current() : "—"}</span>
+          <Chevron />
+        </button>
+      </Tooltip>
+      <Show when={isOpen()}>
+        <ChipPopover
+          anchor={btn}
+          align="right"
+          minWidth={supported() ? 170 : composerModel() ? 260 : 360}
+          onEscape={close}
+        >
+          <Switch>
+            <Match when={supported()}>
+              <div class="a-pop-label">{t("codepuppy.composer.effortModel", { model: composerModel()?.name ?? "" })}</div>
+              <button
+                class="a-pop-item"
+                classList={{ "is-on": composerEffortSel() === null }}
+                aria-current={composerEffortSel() === null ? "true" : undefined}
+                disabled={!props.modelChainReady()}
+                onClick={() => selectVariant(null)}
+              >
+                {t("codepuppy.composer.default")} <span class="a-pop-desc">{t("codepuppy.composer.engineDefault")}</span>
+              </button>
+              <For each={variants()}>
+                {(v) => (
+                  <button
+                    class="a-pop-item"
+                    classList={{ "is-on": composerEffortSel() === v }}
+                    aria-current={composerEffortSel() === v ? "true" : undefined}
+                    disabled={!props.modelChainReady()}
+                    onClick={() => selectVariant(v)}
+                  >
+                    {v}
+                  </button>
+                )}
+              </For>
+            </Match>
+            <Match when={!composerModel()}>
+              <div class="a-pop-label">{t("codepuppy.composer.effortChooseModel")}</div>
+              <div class="a-pop-note">{t("codepuppy.composer.effortChooseHint")}</div>
+              <ModelPickPop
+                contract={props.contract}
+                directory={props.directory}
+                selected={composerModel}
+                onSelect={props.onSelect}
+                onPicked={() => {}}
+                onRetryCurrent={props.onRetryCurrent}
+                modelChainReady={props.modelChainReady}
+              />
+            </Match>
+            <Match when={true}>
+              <div class="a-pop-label">{t("codepuppy.composer.effort")}</div>
+              <div class="a-pop-note">
+                {t("codepuppy.composer.effortUnavailableHint", { model: composerModel()?.name ?? "" })}
+              </div>
+            </Match>
+          </Switch>
+        </ChipPopover>
+      </Show>
+    </div>
+  )
+}
+
+/* ── CodePuppyComposer 主体 ─────────────────────────────────────────────────────── */
+
+/** 斜杠命令发送成功时的来源捕获(REQ-125 C7,供时间线 chip;上游 send 后不保留)。 */
+export type ComposerSlashCapture = {
+  sessionID: string
+  directory: string
+  command: string
+  arguments: string
+  /** 引擎返回的 assistant message id(session.command response.info.id)。 */
+  assistantMessageID?: string
+  /** 引擎 `/command` 注册方声明的来源(E3/E4 chip 分型);缺席 = chip 回通用形,不猜。 */
+  source?: SlashCommandSource
+}
+
+/**
+ * session 模式的 typed 数据面(REQ-125 C7)。由 seam 会话页的 SessionComposerDock 注入;
+ * 全部取自 typed 通道(session_status / messages+model catalog / PermissionV2 feed),
+ * 缺席(home/newSession 或测试)时组件按「无会话数据」诚实降级:无停止键、无 ring。
+ */
+export type ComposerSessionDockApi = {
+  /** live 运行态(session_status typed 通道;不再轮询)。 */
+  running: () => boolean
+  /** 上下文用量百分比(0-100);null = 事实不足,ring 不渲染。 */
+  contextUsage: () => number | null
+  /** 当前会话是否有挂起审批(驱动占位文案与权限 chip 琥珀态)。 */
+  approvalPending: () => boolean
+  /** 斜杠命令发送成功后的捕获回调。 */
+  onSlashCommand?: (capture: ComposerSlashCapture) => void
+  /** `#1318` AC3:登记「聚焦我的输入框」,返回注销函数。挂载登记、卸载注销;缺席 = 不登记。 */
+  registerFocus?: (focus: () => void) => () => void
+  /** `#1588` AC3:登记「打开模型选择器」,返回注销函数;缺席 = 不登记(回合错误卡不出「换模型」)。 */
+  registerModelPicker?: (open: () => void) => () => void
+}
+
+/** #894:home 首发建成会话那一刻的落点快照 —— 会话就是 `startChat` 在 `serverKey` 这个 server
+ *  的 `directory` 下建的。宿主拿它拼导航目标,**不得**在 `onSubmitted` 里回头读 accessor:
+ *  那一行跑在 `await startChat(...)` 之后,读到的是「完成时」的值(用户可能已经切了 server /
+ *  换了工作区),而会话早就落在提交那一刻的那个 server 上了。
+ *
+ *  `serverKey` 仍可能是 `undefined`(身份未解析)—— 与 `CodePuppyComposerProps.serverKey` 同一口径:
+ *  身份不成立时宁可什么都不做,也不要拿一个猜出来的 server 当落点。 */
+export type ComposerSubmission = { serverKey: string | undefined; directory: string }
+
+export type CodePuppyComposerProps = {
+  mode: "home" | "session"
+  projects: CodePuppyProjectsApi
+  /** 提交目标目录(home = 所选工作区;session = 会话目录)。 */
+  directory: () => string | undefined
+  /** session 模式必传:目标会话。 */
+  sessionID?: () => string | undefined
+  /** #891:目标会话所属的 server 身份(`ServerConnection.key`)。与 `directory` / `sessionID` 合成
+   *  仓内 canonical 的会话身份三元组 —— composer 的档位/只读档作用域就以它的 `identityKey` 为键
+   *  (与草稿暂存、artifacts、review 同一把钥匙)。宿主各自给权威源:会话页给 live 身份的
+   *  `serverKey`;首页与新对话页给**那份 projects store 连着的 server**(会话是 `startChat` 在
+   *  它上面建的),不是"当前 active server"。三段缺任何一段 = 身份不成立,作用域退到 `null`
+   *  (一律默认档,不登记)—— 宁可不记,也不记到一把与会话页对不上的钥匙下面。
+   *
+   *  这里的类型仍是可选的,只为**测试**能直挂 `CodePuppyComposerRuntime`;生产宿主一律必传,见
+   *  下面 `CodePuppyComposer` 的签名。 */
+  serverKey?: () => string | undefined
+  /** session 模式:seam dock 注入的 typed 数据面。 */
+  sessionDock?: ComposerSessionDockApi
+  /** home:零工作区时的引导(打开工作区选择器)。 */
+  onNeedWorkspace?: () => void
+  /** home:创建+首发成功后的跳转。第二参 = **提交那一刻**的落点快照(见 `ComposerSubmission`)。 */
+  onSubmitted?: (sessionID: string, submitted: ComposerSubmission) => void
+  /** REQ-086:一次性预填文本(deep link `?prompt=`),仅初始化时注入,不覆盖用户后续输入。 */
+  initialText?: string
+  /** REQ-126:与 `initialText` 同期一次性注入的 mention / 附件(新对话页切目录重挂后的还原)。 */
+  initialMentions?: readonly MentionPart[]
+  initialAttachments?: readonly ComposerAttachment[]
+  /** #663:上一实例交下来的在途读盘工单。挂载即接手 —— settle 后并入本实例的附件列表,本实例
+   *  再卸载时把还没 settle 的继续交出去。这样「读盘中的附件」跟着 draft 走,而不是跟着实例死。 */
+  initialPendingReads?: readonly PendingAttachmentRead[]
+  /** REQ-125 C558:卸载时回报当前草稿(seam dock per-identity 暂存用);门翻转卸载 composer
+   *  时据此捕获正在输入的草稿,门翻回时经 `initialText` 注入,使卸载不等于不可恢复的丢失。 */
+  onDraftCapture?: (text: string) => void
+  /** REQ-126:卸载时回报**完整**草稿(文本 + mention + 附件)。与 `onDraftCapture` 同一时机、
+   *  同一份 sending 判据,只是内容更全 —— 新对话页切目录会重挂整叶,只留文本仍然是丢内容。
+   *  #663:`pendingReads` = 卸载这一刻还没读完的附件。宿主必须把它连同快照一起存,并在下次挂载
+   *  时经 `initialPendingReads` 交回去 —— 只存 `attachments` 就等于丢掉正在读的那些。 */
+  onDraftSnapshot?: (draft: {
+    text: string
+    mentions: readonly MentionPart[]
+    attachments: readonly ComposerAttachment[]
+    pendingReads: readonly PendingAttachmentRead[]
+  }) => void
+  /** REQ-126:附件正在被 FileReader 读取。读取未完成时 composer 里还没有这份附件 —— 宿主据此
+   *  **拦住**会导致重挂的操作(切目录)并明确提示,而不是让用户对着一个暂时空着的附件区发愣。
+   *  (#663 起内容本身不会因重挂而丢:在途工单随草稿快照移交,见 `initialPendingReads`。) */
+  onAttachmentReadPending?: (pending: boolean) => void
+}
+
+// 附件 id 在**渲染进程内**唯一。#663 起读盘工单可跨实例移交,两个实例各自从 1 开始编号就会撞 id
+// (removeAttachment 按 id 过滤,撞了会一次删掉两个)。id 只对内,不进请求。
+let attachmentSeq = 0
+const nextAttachmentId = () => `att-${++attachmentSeq}`
+
+type ReadState<T> = { status: "ready"; data: T } | { status: "error" }
+const readState = <T,>(promise: Promise<T>): Promise<ReadState<T>> =>
+  promise.then(
+    (data) => ({ status: "ready", data }),
+    () => ({ status: "error" }),
+  )
+
+/* #652:会话档位的权威实时读(readSessionAgent / SESSION_AGENT_READ_TIMEOUT_MS)随 v2
+   durable 发送一起退役 —— v1 promptAsync 每条消息自带 agent,不存在「会话档」这个需要
+   先读后 CAS 的中间状态。 */
+
+/** #891:生产宿主的 composer 契约 —— `serverKey` **必传**。
+ *
+ *  为什么单独收紧这一处:漏传不是"少一个可选项",而是**系统替用户把只读关掉** —— 身份不成立
+ *  ⇒ 作用域为 `null` ⇒ 只读档回默认的 `ask`,而用户在这个会话里明明开过只读。这种降级既不报错
+ *  也没有 UI 痕迹,只有下一次模型动了文件才看得出来。把它做成**编译期**错误,是唯一能让"将来
+ *  某个宿主忘了接这条线"当场响的办法(测试文件不进 typecheck,靠测试兜不住新宿主)。
+ *
+ *  必传管的是「宿主有没有把这条线接上」,**不是**「这一刻算不算得出身份」:accessor 的返回值
+ *  仍可以是 `undefined`(身份尚未解析,如 `SessionComposerMount` 的 `props.identity()?.serverKey`),
+ *  那时 composer 照旧按"身份不成立"退到默认档、不登记。 */
+export type CodePuppyComposerHostProps = CodePuppyComposerProps & { serverKey: () => string | undefined }
+
+export function CodePuppyComposer(props: CodePuppyComposerHostProps) {
+  return <CodePuppyComposerRuntime {...props} command={useCommand()} />
+}
+
+export type CodePuppyComposerRuntimeProps = CodePuppyComposerProps & {
+  command: CommandApi
+  /** 生产默认走 createModelContract；组件级 contract 驱动测试从同一接缝注入确定性实现。 */
+  modelContract?: ModelContract
+}
+
+export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
+  const command = props.command
+  const modelContract =
+    props.modelContract ??
+    // #881:屏障是唯一知道「目录真就绪时刻」的位置,发标通道从这里注入(contract 不 import
+    // renderer 的 startup-timeline —— 它读 window.api,静态 import 会把 contract 的组件测试
+    // 整文件拖进 server 构建)。
+    createModelContract(props.projects.sdk, {
+      onCatalogReady: (fact) => {
+        if (props.mode !== "home" || homeCatalogReadyMarkCount >= 25) return
+        homeCatalogReadyMarkCount++
+        markStartupTimeline("renderer.home.catalog_ready", fact)
+      },
+    })
+  // #663:本实例是否已卸载。异步读盘 settle 时据此让位 —— 已卸载的实例不写暂存、不弹 toast。
+  let disposed = false
+  const [text, setText] = createSignal(props.initialText ?? "")
+  const [sending, setSending] = createSignal(false)
+  // REQ-160 AC2(`#1353`):本机词表命中、因而没有发给引擎的那一段正文。
+  // 已批稿 `docs/design/2026-09-19-req160-send-blocked-notice/design.md` §3:
+  // 一改即消失、发送成功即消失、不计时、不自动淡出、不堆叠、发送键保持可用。
+  //
+  // **存的是正文而不是一个布尔位**,因为消失条件要靠推导而不是靠记得去清:
+  // ① 输入框一改 → onInput 就地清掉(否则把 A 改成 B 再改回 A,提示会自己冒出来);
+  // ② 发送成功 → 正文被清空,`blockedText() === text().trim()` 自然不成立(少写一处清理
+  //    就会留下一条对着空输入框说「这条消息没有发出去」的提示,那是在骗用户);
+  // ③ 原样再发 → 写进去的是同一个字符串,signal 相等不触发重渲染 ⇒ 提示不堆叠、不变化、
+  //    `role="alert"` 不重播。
+  const [blockedText, setBlockedText] = createSignal<string | undefined>(undefined)
+  const sendBlocked = () => {
+    const blocked = blockedText()
+    return blocked !== undefined && blocked === text().trim()
+  }
+  // 提交发起时记录的已提交文本快照:区分「在途未编辑(=正在交付)」与「在途被改成新草稿」。
+  let submittedText: string | undefined
+  // REQ-085(#259):home 模式下,`startChat` 可能"session 建成但首条消息没投递成功"——原地
+  // 重试如果无脑重跑 `startChat`,会在同一份失败草稿上再建一个新 session,留下一具打不开的
+  // 空壳(AC3 明令禁止"重试产生重复 Session")。这里记下上一次已建成但未投递成功的
+  // {directory, sessionID};下次提交若目录未变就把它传回 `startChat` 复用,只重投递消息、
+  // 不重建 session。目录变了(用户显式换了工作区,或换代/登出把整条链拉到不同 generation)
+  // 视为放弃那个孤儿——不同目录/generation 下这个 id 不一定还能用,盲目复用会把"投递失败"
+  // 换成"session not found"这种更难恢复的错误,不如老实重新建一个。
+  let homePendingSession: { directory: string; sessionID: string } | undefined
+  // REQ-125 C558:卸载时把当前草稿交回宿主(seam dock 按身份暂存),避免门翻转卸载丢草稿。
+  // 仅当发送在途**且文本仍等于已提交快照**(未编辑,正在交付)才跳过——否则切走再翻回会「复活」
+  // 已发送文本、用户再发 = 重复发送。textarea 在途仍可编辑:改成不同内容即新草稿,照常捕获(不丢)。
+  // 失败保留走既有失败路径(sending 落回 false 后一律捕获,text 留在 composer 信号供原地重试)。
+  // 注:mentions / attachments / inflightReads 在下方声明;cleanup 只在 dispose 时执行,那时三者
+  // 早已初始化。
+  onCleanup(() => {
+    // #663:卸载后本实例**不再动任何东西** —— 读完的工单由接手方处理(见 trackRead)。已死的实例
+    // 继续往暂存里写整份快照,会把活着那个实例的快照覆盖掉,那正是「回来得比读完早」时丢附件的路。
+    disposed = true
+    if (sending() && text() === submittedText) return
+    props.onDraftCapture?.(text())
+    props.onDraftSnapshot?.({
+      text: text(),
+      mentions: mentions(),
+      attachments: attachments(),
+      // #663:还没读完的那些随快照一起移交 —— 读盘结果属于这条 draft,不属于发起读取的实例。
+      pendingReads: [...inflightReads],
+    })
+  })
+  const [modelChainState, setModelChainState] = createSignal<"loading" | "recovering" | "ready" | "error">(
+    "loading",
+  )
+  // Token renewal briefly replaces the loopback sidecar without remounting this renderer. Keep
+  // the established model projection visible while idle, but gate every engine-backed action
+  // until the new generation is healthy. This separates availability from presentation: a
+  // routine renewal no longer inserts/removes the "Syncing…" row and shifts the whole composer.
+  const [runtimeUnavailable, setRuntimeUnavailable] = createSignal(false)
+  const [mentions, setMentions] = createSignal<MentionPart[]>([...(props.initialMentions ?? [])])
+  const [composing, setComposing] = createSignal(false)
+  let taRef: HTMLTextAreaElement | undefined
+  const isImeComposing = (e: KeyboardEvent) => e.isComposing || composing() || e.keyCode === 229
+  onMount(() => markStartupTimeline("renderer.composer.mount", { mode: props.mode }))
+
+  /* ── 附件真通道(REQ-078 T2;REQ-236 `#1553` 逐类路径见 composer-attachments-core 抬头)──
+     入口三通道:弹窗「添加附件」→ 隐藏 <input type=file>;textarea 粘贴;整框拖拽。
+     不合规(类型/超限/读盘/暂存失败)在附件条里以卡片如实说明,绝不静默丢(C28 —— 旧「文件和文件夹」行正是静默吞);
+     只有超出总数上限仍是 toast(没有卡可放)。 */
+  const [attachments, setAttachments] = createSignal<ComposerAttachment[]>([...(props.initialAttachments ?? [])])
+  // REQ-236 `#1553`:已存到本机的文档属于存进去的那个实例目录;目录换了(新对话页切目录)读取工具就够不着它,
+  // 改成可重试的失败卡,不带着一个读不到的路径发出去。
+  createEffect(() => {
+    const directory = props.directory()
+    if (directory) setAttachments((xs) => revalidateStagedDirectory(xs, directory))
+  })
+  const [dragOver, setDragOver] = createSignal(false)
+  // REQ-126:有附件正在读盘(FileReader 未 settle)。这段窗口里内容既不在 attachments() 里、
+  // 也无处可存 —— 宿主据此拦住会触发重挂的操作(见 onAttachmentReadPending)。
+  const [attachmentReads, setAttachmentReads] = createSignal(0)
+  createEffect(() => props.onAttachmentReadPending?.(attachmentReads() > 0))
+  // #663:本实例名下还没 settle 的读盘工单(自己发起的 + 从上一实例接手的)。卸载时随快照交出去。
+  const inflightReads = new Set<PendingAttachmentRead>()
+  let fileInputRef: HTMLInputElement | undefined
+  // 「粘贴的附件 N」这个**显示名**按本实例计数(用户看到的是这次输入里的第几个)。
+  let pasteSeq = 0
+  const readAsDataUrl = (f: File) =>
+    new Promise<string>((resolve, reject) => {
+      const r = new FileReader()
+      r.onload = () => (typeof r.result === "string" ? resolve(r.result) : reject(new Error("read")))
+      r.onerror = () => reject(r.error ?? new Error("read"))
+      // abort 也必须 settle:漏了它,读取计数永不归零,工作区切换从此被永久拦住。
+      r.onabort = () => reject(new Error("attachment read aborted"))
+      r.readAsDataURL(f)
+    })
+  // 读一批文件,**不碰任何实例状态** —— 并入谁、由谁报拒绝,交给 trackRead 里那个「settle 时还
+  // 活着的实例」决定(#663)。这是工单可以跨实例移交的前提。
+  // REQ-236 `#1553`:拒绝与失败不再只弹一次 toast —— 一律作为卡片进附件条(卡内说明,可移除;读盘 / 暂存失败可重试)。
+  // 文档在这里(用户选择 / 拖入 / 粘贴的这一刻)经 main 存进实例目录的隐藏目录,只此一处调用暂存。
+  const readFiles = async (list: ArrayLike<File>): Promise<AttachmentReadResult> => {
+    const accepted: ComposerAttachment[] = []
+    for (const f of Array.from(list)) {
+      const name = f.name || t("codepuppy.composer.pastedAttachment", { count: ++pasteSeq })
+      const c = classifyAttachment({ name, type: f.type, size: f.size })
+      const id = nextAttachmentId()
+      if (!c.ok) {
+        accepted.push({ id, name, size: f.size, kind: "failed", reason: c.reason })
+        continue
+      }
+      try {
+        if (c.kind === "image") {
+          accepted.push({ id, name, mime: f.type, kind: "image", size: f.size, url: await readAsDataUrl(f) })
+          continue
+        }
+        const bytes = await f.arrayBuffer()
+        if (c.kind === "text") {
+          const url = textAttachmentUrl(new Uint8Array(bytes))
+          accepted.push(url ? { id, name, mime: "text/plain", kind: "text", size: f.size, url } : { id, name, size: f.size, kind: "failed", reason: "type" })
+          continue
+        }
+        const directory = props.directory()
+        const staged = directory ? await window.api.attachments.stage(directory, name, c.reader, bytes) : ({ ok: false, reason: "not-project" } as const)
+        accepted.push(
+          staged.ok
+            ? { id, name, mime: c.mime, kind: "document", size: f.size, reader: c.reader, directory: directory!, path: staged.path, file: f }
+            : { id, name, size: f.size, kind: "failed", reason: staged.reason, file: f },
+        )
+      } catch {
+        accepted.push({ id, name, size: f.size, kind: "failed", reason: "read", file: f })
+      }
+    }
+    return { accepted, rejected: [] }
+  }
+  /** 认领一份读盘工单:挂起计数 +1,settle 时并入**当时活着的这个实例**并如实 toast 拒绝。
+   *  已卸载则原地让位 —— 结果已经随工单交给了接手方,这里再写就是覆盖活人的状态。 */
+  const trackRead = (read: PendingAttachmentRead) => {
+    // 计数(不是布尔):并发的多次粘贴/拖拽各自 settle,最后一个读完才算不再挂起。
+    setAttachmentReads((n) => n + 1)
+    inflightReads.add(read)
+    void read.then((result) => {
+      inflightReads.delete(read)
+      setAttachmentReads((n) => n - 1)
+      if (disposed) return
+      const merged = mergeAttachments(attachments(), result.accepted)
+      setAttachments(revalidateStagedDirectory(merged.next, props.directory()))
+      const bad = [...result.rejected, ...merged.rejected]
+      if (bad.length)
+        pushToast({
+          kind: "error",
+          title: t("codepuppy.composer.attachmentsRejected"),
+          detail: bad.map((item) => `${item.name}: ${attachmentReason(item.reason)}`).join("; "),
+        })
+    })
+  }
+  const addFiles = (list: ArrayLike<File> | null | undefined) => {
+    if (!list || list.length === 0) return
+    // 工单**必须** settle:不 settle 则挂起计数永不归零,工作区切换从此被永久拦住。每文件的读失败
+    // readFiles 内部已转成 rejected,这里只兜意料外的抛错 —— 兜也如实报出来,不静默吞(C28)。
+    const names = Array.from(list).map((f, i) => f.name || t("codepuppy.composer.pastedAttachment", { count: i + 1 }))
+    trackRead(
+      readFiles(list).catch(() => ({
+        accepted: [],
+        rejected: names.map((name) => ({ name, reason: t("codepuppy.composer.attachmentReadFailed") })),
+      })),
+    )
+  }
+  // #663:接手上一实例交下来的在途工单(离开 draft 时随草稿快照移交)。已经 settle 的照接 ——
+  // promise 记着结果,接手即并入;「读完时正好没人活着」因此不再是丢失,只是晚一点并进来。
+  props.initialPendingReads?.forEach(trackRead)
+  const removeAttachment = (id: string) => setAttachments((xs) => xs.filter((a) => a.id !== id))
+  /** 失败卡的「重试」:拿留着的原文件重走一遍读盘 / 暂存(仍是用户这一次点击发起的)。 */
+  const retryAttachment = (id: string) => {
+    const failed = attachments().find((a) => a.id === id)
+    if (failed?.kind !== "failed" || !failed.file) return
+    removeAttachment(id)
+    addFiles([failed.file])
+  }
+  const hasDragFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files")
+
+  // REQ-073 拍板③:模式是会话级的 —— home 是新会话入口,挂载即回默认(build)。
+  onMount(() => {
+    if (props.mode !== "home") return
+    setComposerModel(null)
+    clearSuspendedModel()
+    resetComposerModelProjection()
+  })
+
+  /* #570:上一行那句「会话级」此前只写在注释里 —— 档位信号是模块级的,会话页又不重置,于是它
+     **跟着人跑**:在会话 A 开「计划」、点侧栏进会话 B,B 的 chip 照样显示「计划」,B 的下一条
+     消息也真的以 agent=plan 发出。这里把作用域接上:进一个会话就接管它自己的档位(没开过 =
+     默认 build),离开就把当前档位交还给它。home 的作用域是 null(新会话入口,一律回默认)。
+     用 createEffect 而不是 onMount:生产的会话 composer 由 SessionComposerMount 按身份 keyed
+     重挂,但同一实例内 sessionID 换代(模型链已按此换代)也必须换档位 —— 两种都盖住。
+
+     #884:只读档(perm)走**同一把钥匙、同一处 adopt/release**。它不跟上就等于上面白改 ——
+     `buildPromptRequest` 里 readonly 强制 codepuppy-readonly 并压过手选档位,只读档跨会话粘连时
+     B 的档位照样被顶掉。两者的作用域生命周期完全一致,所以共用这一个 effect,不另起一条。
+
+     #891:那把钥匙此前是 raw `sessionID`,现在是仓内 canonical 的会话身份键
+     (`identityKey(serverKey, directory, sessionID)`,与草稿暂存/artifacts/review 同一把)。raw id
+     不是永久身份:同一个 id 在不同 server 或不同目录下是两个会话,共用一条登记就会串档;会话删掉
+     后同 id 再出现(导入/外部创建)也会未经用户操作就继承旧的只读档。身份三元组缺任何一段 = 身份
+     不成立,作用域按 null 处理(与首页同档:一律默认,不登记)。 */
+  const composerScopeKey = (): string | null => {
+    if (props.mode === "home") return null
+    const sessionID = props.sessionID?.()
+    const directory = props.directory()
+    const serverKey = props.serverKey?.()
+    if (!sessionID || !directory || !serverKey) return null
+    return identityKey({ serverKey, directory, sessionID }) ?? null
+  }
+  let composerScope: string | null = null
+  let composerScopeHeld = false
+  // adopt 发下来的租约(两份各自一张)。卸载时原样交回 —— 别的实例已经接管时,租约不匹配,
+  // 本实例的 cleanup 就不会去清掉人家的持有权(同一个会话 id 的新旧实例只能靠它分开)。
+  let composerAgentLease = 0
+  let composerPermLease = 0
+  const releaseComposerScope = () => {
+    releaseComposerAgentScope(composerScope, composerAgentLease)
+    releaseComposerPermScope(composerScope, composerPermLease)
+  }
+  createEffect(() => {
+    const next = composerScopeKey()
+    untrack(() => {
+      if (composerScopeHeld && next === composerScope) return
+      if (composerScopeHeld) releaseComposerScope()
+      composerScope = next
+      composerScopeHeld = true
+      composerAgentLease = adoptComposerAgentScope(next)
+      composerPermLease = adoptComposerPermScope(next)
+    })
+  })
+  onCleanup(() => {
+    if (composerScopeHeld) releaseComposerScope()
+  })
+
+  const auto = createComposerAutocomplete({
+    text,
+    setText,
+    textarea: () => taRef,
+    directory: props.directory,
+    command,
+    sdk: props.projects.sdk,
+    onMention: (m) => setMentions((xs) => [...xs.filter((x) => x.content !== m.content), m]),
+    isComposing: isImeComposing,
+    surface: props.mode,
+    onAttach: () => fileInputRef?.click(),
+  })
+
+  const hasWorkspace = () => !!props.directory()
+
+  /* session 模式:运行态来自 sessionDock 注入的 live status typed 通道(REQ-125 C7,取代
+     2.5s 轮询)。状态未知(dock 缺席)= false —— 不显示停止按钮(C28:不装能停)。 */
+  const running = () => (props.mode === "session" && props.sessionDock?.running()) || false
+  const approvalPending = () => (props.mode === "session" && props.sessionDock?.approvalPending()) || false
+  const contextUsage = createMemo(() =>
+    props.mode === "session" ? (props.sessionDock?.contextUsage() ?? null) : null,
+  )
+  // `#1318` AC3:把「聚焦输入框」登记给会话页的焦点通道(时间线空回合行「修改后再试」消费)。
+  onMount(() => {
+    if (props.mode !== "session") return
+    const unregister = props.sessionDock?.registerFocus?.(() => taRef?.focus())
+    if (unregister) onCleanup(unregister)
+  })
+  const placeholder = () => {
+    if (approvalPending()) return t("codepuppy.composer.placeholderDecision")
+    if (running()) return t("codepuppy.composer.placeholderQueue")
+    return composerAgent() === "plan" ? t("codepuppy.composer.placeholderPlan") : t("codepuppy.composer.placeholder")
+  }
+
+  /* ── 默认模型解析链。session 先从 typed get 收敛真实 Model.Ref；随后 list 负责可用性与默认。
+     home 只保留创建会话前的内存选择，创建时把同一 Model.Ref 写进 Session。 */
+  const [lastAuth, setLastAuth] = createSignal<AuthState | null>(null)
+  const [platformId, setPlatformId] = createSignal<string | null>(null)
+  const [hasConfiguredByok, setHasConfiguredByok] = createSignal(false)
+  /* alpha-code#1558:模型按钮的品牌图标读解析链最近一次读到的已应用目录(与选择器行同一份事实)。 */
+  const [modelCatalog, setModelCatalog] = createSignal<EffectiveCatalog | null>(null)
+  const [platformPermission, setPlatformPermission] = createSignal<"out" | "recovering" | "ready" | "failed">(
+    "recovering",
+  )
+  /* #595 谓词 2 的事实源:引擎本次实际注册的模型。撤销豁免(checkSelectedModel)让「选择」活了下来,
+     发送门就必须自己拿这份清单挡住不可执行的提交 —— 两个谓词各自执行,谁也不代替谁。 */
+  const [engineModelRefs, setEngineModelRefs] = createSignal<EngineModelRef[]>([])
+  /* REQ-236 `#1553` AC7:引擎对每个已注册模型的 `capabilities.input` 是否含 image —— 与 ext 云识图读同一格,
+     图片读取方式(直接看 / 云端识图 / 看不了 / 未知)只从这里派生。 */
+  const [engineImageInput, setEngineImageInput] = createSignal<ReadonlyMap<string, boolean>>(new Map())
+  const [authEpoch, setAuthEpoch] = createSignal(0)
+  const [modelRetryEpoch, setModelRetryEpoch] = createSignal(0)
+  let chainSeq = 0
+  let chainDisposed = false
+  /* #882:目录就绪屏障不再自带 deadline(它等的是「目录还没收敛」,那不是故障),于是它必须有
+     一个真的取消源。每次 supersede/卸载都在这里取消在途的等待 —— 少了它,每一次 supersede 都
+     会永久留下一条自己跑的探针循环。`seq !== chainSeq` 只在 promise settle 之后才判得到,
+     对一个不会自己 settle 的等待毫无作用。 */
+  let chainAbort = new AbortController()
+  /* #1557(方案 req236 §2.5「状态行与出口」):本轮第一次读取请求发出的时刻,跨重试累计;链成功 / 失败 /
+     被取代时清零。只挂在 `recovering` 上的出口会漏掉最长的那种等待 —— 首轮屏障一直不答时 `list()` 不落定,
+     链停在 `loading`。`clock` 每秒推进一次,只用来算「已等待 N 秒」。 */
+  const [waitSince, setWaitSince] = createSignal<number | null>(null)
+  const [clock, setClock] = createSignal(Date.now())
+  const startWaitClock = () => {
+    if (untrack(waitSince) !== null) return
+    const at = Date.now()
+    setClock(at)
+    setWaitSince(at)
+  }
+  const supersedeChain = () => {
+    // #1557:等待计时随链走 —— 被取代即清零,接替的链从它自己的第一条读取重新计。
+    setWaitSince(null)
+    chainSeq++
+    chainAbort.abort(new Error("model chain superseded"))
+    chainAbort = new AbortController()
+    return chainSeq
+  }
+  let runtimeGenerationEpoch = 0
+  let lastAuthSignature: string | undefined
+  const modelRetryWakeup = createRetryWakeup({
+    onCancel: (reason, outcome) =>
+      markStartupTimeline("renderer.retry_backoff.cancel", {
+        reason,
+        outcome,
+        surface: "home",
+      }),
+  })
+  const accountRetryWakeup = createRetryWakeup()
+  const authSignature = (state: AuthState) =>
+    `${state.status}\u0000${state.mode}\u0000${state.platformStatus ?? "ready"}\u0000${state.account?.email ?? ""}`
+  const imageRoute = createMemo(() => {
+    const model = composerModel()
+    return imageRouteOf({
+      image: model ? engineImageInput().get(`${model.providerID}\u0000${model.id}`) : undefined,
+      loggedIn: lastAuth()?.status === "logged-in" && (lastAuth()?.platformStatus ?? "ready") === "ready",
+    })
+  })
+  const preflightCtx = () => ({
+    // #686:链的引擎事实(下面四项)在 runModelChain 起手时被整批复位 —— 未就绪时把它们喂给判据
+    // 只会得到一条编造的拒绝。就绪与否因此是判据的**必填入参**,不再是一句请求调用方自觉的注释。
+    engineFactsReady: modelChainState() === "ready",
+    loggedIn: lastAuth()?.status === "logged-in" && (lastAuth()?.platformStatus ?? "ready") === "ready",
+    platformProviderId: platformId(),
+    hasConfiguredByok: hasConfiguredByok(),
+    engineModels: engineModelRefs(),
+  })
+  /** #595:已选的本地 BYOK 在引擎清单里查无对应节点(含引擎成功返回空清单)—— 可选择性照旧
+   *  (不撤销),但**不可执行**。
+   *  #686:「链是否就绪」现在经 `preflightCtx().engineFactsReady` 喂进判据本体,未就绪时它回
+   *  `not-ready` 而非本结论 —— 因此本 memo 与它的每一个消费点都不必(也不能)再各自记得先把门。 */
+  const byokNotRegistered = createMemo(
+    () => preflightBlockReason(composerModel(), preflightCtx()) === "byok-not-registered",
+  )
+  const canSend = createMemo(() => {
+    const selected = composerModel()
+    const needsPlatform =
+      (!!selected && selected.providerID === platformId()) ||
+      (!selected && lastAuth()?.status === "logged-in" && !hasConfiguredByok())
+    return (
+      text().trim().length > 0 &&
+      !!props.directory() &&
+      !runtimeUnavailable() &&
+      modelChainState() === "ready" &&
+      (!needsPlatform || platformPermission() === "ready") &&
+      // 谓词 2:引擎里没有这个直连节点就发不出去,按钮如实关闭(行内另有告知)。
+      !byokNotRegistered() &&
+      !sending()
+    )
+  })
+
+  const selectComposerModel = async (model: NonNullable<ReturnType<typeof composerModel>>) => {
+    /* REQ-109 #595:home 的本地 BYOK 直连节点在引擎链恢复中也能写进内存选择 —— 它的可选择性只由
+       本地目录 + 本地 KEY 决定(契约 docs/contracts/byok-availability.md),而 home 的“选中”本身
+       只是一次内存写(下方 setComposerModel),不需要引擎。执行仍是另一个谓词:canSend 继续要求
+       modelChainState() === "ready",绝不在引擎未恢复时假装能发送。
+       session 模式不豁免:换模型必须落到服务端 switchModel,引擎不在就不能伪装成已切换。 */
+    const homeLocalByok = props.mode === "home" && !props.sessionID?.() && isByokEngineId(model.providerID)
+    if (runtimeUnavailable() && !homeLocalByok) throw new Error("runtime is recovering")
+    // 未获全链 admission 时不能 supersede 正在完成 auth/KEY/account/list 的 owner，否则无人接管 loading。
+    if (modelChainState() !== "ready" && !homeLocalByok) throw new Error("model chain is not ready")
+    if (model.providerID === platformId() && platformPermission() !== "ready")
+      throw new Error("platform permission is recovering")
+    /* home 本地 BYOK 选择在**任何** modelChainState 下都不得 supersede 在跑的链:`++chainSeq` 会让
+       list 重试循环(loadEngineModelsWithRetry)与账户恢复循环(resolveAccountWithRetry)双双判
+       isStale 而静默退出 —— 前者是 #594 修掉的模型链悬崖,后者是它的孪生形态(链已 ready 而
+       account 仍在重试时,supersede 会让 platformPermission 永久留在 recovering,代理节点再也选不了)。
+       不递增也不丢语义:home 无 sessionID,`seq` 只被下面的 session switch 分支消费;而链尾的默认
+       解析读的是 `composerModel()` 实时值,本次选择照样压过它(applyDefaultComposerModel 空判)。
+       安全的 supersede(directory / authEpoch / session 切换 / retryAll)都会建立新的 replacement
+       owner,不在此列。 */
+    const seq = homeLocalByok ? chainSeq : supersedeChain()
+    const sessionID = props.sessionID?.()
+    if (sessionID) {
+      const projection = composerModelProjection()
+      if (projection.status !== "ready" || projection.sessionID !== sessionID) {
+        pushToast({ kind: "info", title: t("codepuppy.composer.currentModelPending"), detail: t("codepuppy.composer.currentModelPendingDetail") })
+        throw new Error("session model projection is not ready")
+      }
+      const switched = await readState(modelContract.switch(sessionID, modelRefOf(model)))
+      if (chainDisposed || seq !== chainSeq || props.sessionID?.() !== sessionID) {
+        throw new Error("session changed while switching model")
+      }
+      if (switched.status === "error") {
+        pushToast({ kind: "error", title: t("codepuppy.model.switchFailed"), detail: t("codepuppy.model.switchFailedDetail") })
+        throw new Error("model switch failed")
+      }
+    }
+    setComposerModel(model, true) // #1560:picker / 档位芯片是唯一的显式写入口
+    // #1560 r1:按会话记住(首页无会话,发出后由 seed 交给新会话)。
+    if (composerScope) rememberExplicitModel(composerScope, modelRefOf(model))
+    clearSuspendedModel()
+  }
+
+  // 账户状态无法确认时 fail-closed；只有明确会员或有余额才允许代理模型。
+  const summaryUsable = (r: unknown): boolean => {
+    if (!r || typeof r !== "object" || "error" in (r as Record<string, unknown>)) return false
+    const s = r as { plan?: { status?: string }; balanceFen?: number }
+    return s.plan?.status === "active" || (s.balanceFen ?? 0) > 0
+  }
+
+  const runModelChain = async (directory: string, sessionID: string | undefined) => {
+    const seq = supersedeChain()
+    const chainSignal = chainAbort.signal
+    setModelChainState("loading")
+    setLastAuth(null)
+    setPlatformId(null)
+    setHasConfiguredByok(false)
+    setPlatformPermission("recovering")
+    setEngineModelRefs([])
+    if (sessionID) invalidateComposerModelProjection(sessionID)
+    else resetComposerModelProjection()
+
+    const catalogRead = readState(window.api.models.catalog())
+    const authRead = readState(window.api.auth.getState())
+    const keysRead = readState(window.api.providers.keyStatus())
+    const currentPromise = sessionID ? readState(modelContract.current(sessionID)) : undefined
+    let modelAttempt = 0
+    const readModels = () => {
+      startWaitClock()
+      const attempt = ++modelAttempt
+      const markModelList = props.mode === "home" && homeModelListMarkCount < 25
+      const started = markModelList ? performance.now() : 0
+      if (markModelList) {
+        homeModelListMarkCount++
+        markStartupTimeline("renderer.home.model_list.start", { attempt, chain: seq })
+      }
+      // #882:传的是**链的生命期**信号,不再是一个 10s 固定预算。请求自身的悬挂防御留在
+      // contract 里(每次网络往返各自 ENGINE_FETCH_TIMEOUT_MS);目录就绪的等待不该被它掐断 ——
+      // 掐断只会把「还在收敛」伪装成一次失败,再交给退避空转,那正是本票要消灭的东西。
+      const listing = modelContract.list(directory, chainSignal)
+      /* #882:这条 listing 的**拒绝**必须在创建处就登记一个观察者。它唯一的真消费者是下面的
+         `loadEngineModelsWithRetry`(自带 try/catch),而它与这里之间隔着三个早退点
+         (`currentRead` / `catalogRead` / `auth+keys` 各自的 `chainDisposed || seq !== chainSeq`),
+         退避循环自己在 `isStale()` 上也会丢下一条刚发出的 listing —— 每一处早退都把这条在途请求
+         留成**无主**。
+
+         从前无主是安全的:它只挂在一个 10s 预算上,被丢下时既不 settle 也不 reject。本票把它改挂
+         到**链的生命期**上之后,`supersede`/卸载会当场把它拒掉 ⇒ **未处理拒绝**。它不改变任何
+         用户可观察的档位/身份结果(#891 那两条断言的值全对),但在 renderer 里是真的
+         `unhandledrejection`:bun 直接把它记到当前用例头上,Electron 里则会走全局错误上报。
+         别用「早退点各自补一句」代替这里 —— 那是按实例修,下一个早退点会再漏一次。
+
+         `.catch` 只登记「这个拒绝已被观察」,`listing` 本身不受影响:真消费者仍从自己的 `await`
+         拿到同一个拒绝,recovering + 1/2/4/8s 恢复链一步不少。 */
+      listing.catch(() => {})
+      if (markModelList)
+        void listing.then(
+          (listed) =>
+            markStartupTimeline("renderer.home.model_list.end", {
+              attempt,
+              chain: seq,
+              count: listed.length,
+              durationMs: performance.now() - started,
+              outcome: "ok",
+            }),
+          () =>
+            markStartupTimeline("renderer.home.model_list.end", {
+              attempt,
+              chain: seq,
+              durationMs: performance.now() - started,
+              // #882:`error:catalog-not-ready` 这个分类跟着屏障 deadline 一起没了 —— 屏障不再
+              // 自己判失败,能到这里的只有真正的请求失败或链被 supersede。留一个永不成立的标签
+              // 只会让 #881 的归因把「假失败」和「真失败」混在一起数。
+              //
+              // #1056:那两种情形当时还共用 `error:request` 这**一个**标签,于是 #1053 的证据里
+              // 13/13 条「链被 supersede / composer 被卸载」全部读成了「客户端请求失败」,归因
+              // 因此写成了「首链撞上 10s 预算」。取消不是失败:这里按 `chainSignal.aborted`
+              // 分成 `cancelled`,让下一次归因不必再从时间戳去猜是谁结束了这条链。
+              outcome: chainSignal.aborted ? "cancelled" : "error:request",
+            }),
+        )
+      return listing
+    }
+    // T3:directory SDK 可用就立刻发 model.list；账户读取在下面独立推进，不能成为目录前置门。
+    let modelListing = readModels()
+    const currentRead = currentPromise ? await currentPromise : undefined
+    if (chainDisposed || seq !== chainSeq) return
+    if (sessionID && currentRead?.status === "error") {
+      failComposerModelProjection(sessionID)
+      setModelChainState("error")
+      return
+    }
+    // #1560 r1:会话模型若就是本次运行里用户在这个会话显式选过的那个,投影后仍算显式。
+    const projectSession = (next: ComposerModel | null) =>
+      resolveComposerModelProjection(sessionID!, next, isRememberedExplicit(composerScope, next))
+    if (sessionID && currentRead?.status === "ready") {
+      projectSession(currentRead.data ? composerModelFromRef(currentRead.data, null) : null)
+    }
+
+    const cat = await catalogRead
+    if (chainDisposed || seq !== chainSeq) return
+    if (cat.status === "error") {
+      setModelChainState("error")
+      return
+    }
+    setModelCatalog(cat.data)
+    if (sessionID && currentRead?.status === "ready") {
+      projectSession(currentRead.data ? composerModelFromRef(currentRead.data, cat.data) : null)
+    }
+
+    const [auth, keys] = await Promise.all([authRead, keysRead])
+    if (chainDisposed || seq !== chainSeq) return
+    if (keys.status === "error") {
+      setModelChainState("error")
+      return
+    }
+    // #604:链自己这次读取与 owner 的视图之间没有顺序保证(两次读取之间 main 可能已完成续期)。
+    // 交给 owner 过同一条 freshness 判据并取回它认定的现值,避免用更旧的快照把已恢复的能力判成
+    // recovering —— 那正是「消费侧各读各的」把恢复信号丢掉的相位。读取失败仍按既有语义算未登录。
+    const authState = auth.status === "ready" ? reconcileAuthSnapshot(auth.data) : null
+    if (authState) {
+      lastAuthSignature = authSignature(authState)
+      setLastAuth(authState)
+    }
+    const pid = cat.data.platformProvider.id
+    setPlatformId(pid)
+    const configured = Object.entries(keys.data)
+      .filter(([, value]) => value.configured)
+      .map(([id]) => id)
+    setHasConfiguredByok(configured.some((id) => id !== pid))
+    const loggedIn = authState?.status === "logged-in"
+    const platformAuthReady = loggedIn && (authState.platformStatus ?? "ready") === "ready"
+    if (!loggedIn) setPlatformPermission("out")
+    else if (!platformAuthReady) setPlatformPermission("recovering")
+    // #594 R1 第 4 实例:account summary 是被修掉的 list 预算悬崖的同类 —— 旧 20×1s 耗尽后
+    // 不再安排任何定时器,唤醒 wake 落空、epoch 重启又只看 model 链 ⇒ 代理节点永久不可用。
+    // 改为与 list 同构的无上限封顶退避(resolveAccountWithRetry),直到 ready/failed/supersede。
+    const accountResolution = platformAuthReady
+      ? (async () => {
+          let recovering = false
+          const classify = (summary: Awaited<ReturnType<typeof readSummary>>) =>
+            summary.status === "error" ? ("recovering" as const) : accountResultState(summary.data)
+          function readSummary() {
+            return readState(window.api.account.summary())
+          }
+          const resolved = await resolveAccountWithRetry({
+            read: async (attempt) => {
+              const markAccount = props.mode === "home" && homeAccountMarkCount < 25
+              const started = performance.now()
+              if (markAccount) {
+                homeAccountMarkCount++
+                markStartupTimeline("renderer.home.account_summary.start", { attempt, chain: seq })
+              }
+              const summary = await readSummary()
+              if (markAccount)
+                markStartupTimeline("renderer.home.account_summary.end", {
+                  attempt,
+                  chain: seq,
+                  durationMs: performance.now() - started,
+                  outcome: classify(summary),
+                })
+              return summary
+            },
+            classify,
+            wait: (delayMs) => accountRetryWakeup.wait(delayMs),
+            isStale: () => chainDisposed || seq !== chainSeq,
+            onRecovering: () => {
+              recovering = true
+              setPlatformPermission("recovering")
+            },
+          })
+          if (resolved.status === "stale") return { status: "superseded" as const }
+          if (resolved.status === "failed") {
+            setPlatformPermission("failed")
+            accountRetryWakeup.clear()
+            return { status: "failed" as const }
+          }
+          // classify 只在 readState 成功时给 ready;这里的收窄是类型层面的防御。
+          if (resolved.data.status !== "ready") return { status: "superseded" as const }
+          const usable = summaryUsable(resolved.data.data)
+          setPlatformPermission(usable ? "ready" : "failed")
+          if (recovering && modelChainState() === "recovering") modelRetryWakeup.wake("account-recovered")
+          accountRetryWakeup.clear()
+          return { status: "ready" as const, usable }
+        })()
+      : null
+
+    // #594 闩死点二:list 重试不再有 20×1s 预算悬崖(耗尽后不安排任何定时器 = 三个唤醒源
+    // 全死时永久闩死)。改为无上限封顶退避(loadEngineModelsWithRetry,1s/2s/4s/8s 封顶),
+    // 直到成功或本链被 supersede;唤醒信号(generation/SSE/手动重试)仍可提前打断等待。
+    const loaded = await loadEngineModelsWithRetry({
+      initial: modelListing,
+      read: readModels,
+      wait: (delayMs) => modelRetryWakeup.wait(delayMs),
+      clearWake: () => modelRetryWakeup.clear(),
+      isStale: () => chainDisposed || seq !== chainSeq,
+      onAttemptFailed: () => setModelChainState("recovering"),
+      onRetryTick: ({ attempt, delayMs, wait }) => {
+        if (props.mode === "home" && homeModelRetryMarkCount < 25) {
+          homeModelRetryMarkCount++
+          markStartupTimeline("renderer.home.model_list.retry_tick", {
+            attempt,
+            chain: seq,
+            count: homeModelRetryMarkCount,
+            delayMs: wait === "cancelled" ? 0 : delayMs,
+            reason: wait === "cancelled" ? "recovery-signal" : "request-error",
+          })
+        }
+      },
+    })
+    if (loaded.status === "stale") return
+    const engineModels: EngineModelRef[] = loaded.data
+      .filter((model) => model.enabled && model.status !== "deprecated")
+      .map((model) => ({ providerID: model.providerID, id: model.id }))
+    setEngineModelRefs(engineModels)
+    setEngineImageInput(new Map(loaded.data.map((model) => [`${model.providerID}\u0000${model.id}`, model.capabilities.input.includes("image")])))
+    setHasConfiguredByok(
+      configured.some(
+        (id) =>
+          id !== pid &&
+          engineModels.some((model) => model.providerID === id || model.providerID === `${id}-byok`),
+      ),
+    )
+    // #595:「BYOK 本地可选择」的载体 —— 本地目录 ∩ 本地 KEY 已配置,**不经引擎清单过滤**。
+    // 与下面 engine 过滤过的 configuredEngineProviders 分工不同:后者只服务「默认必须真能跑」。
+    const localKeyedByokProviders = cat.data.byokProviders
+      .filter((provider) => configured.includes(provider.id))
+      .map((provider) => byokEngineId(provider.id))
+    const configuredEngineProviders = configured.flatMap((id) => {
+      if (engineModels.some((model) => model.providerID === id)) return [id]
+      const byokID = `${id}-byok`
+      return engineModels.some((model) => model.providerID === byokID) ? [byokID] : []
+    })
+
+    const resolveSelection = async (accountUsable: boolean, accountVerified: boolean) => {
+      if (chainDisposed || seq !== chainSeq) return
+      const current = composerModel()
+      const baseCtx = {
+        loggedIn: Boolean(platformAuthReady),
+        accountUsable,
+        platformProviderId: pid,
+        configuredProviders: configuredEngineProviders,
+        localKeyedByokProviders,
+        // #679:`defaultPlatformModel` 必须真的传下去 —— 漏了它,平台自动默认会**静默消失**
+        // (解析链已不再有任何兜底挑选,那是本票刻意去掉的)。
+        catalog: {
+          defaultModel: cat.data.defaultModel,
+          defaultPlatformModel: cat.data.defaultPlatformModel,
+          platformModels: cat.data.platformModels,
+          byokProviders: cat.data.byokProviders,
+        },
+        engineModels,
+      }
+      // 平台当前选择只有在账户事实已验证后才可挂起；恢复窗口不把未知误写成业务否定。
+      if (current) {
+        if (current.providerID === pid && !accountVerified) return
+        const verdict = checkSelectedModel(current, baseCtx)
+        if (!verdict.ok) suspendComposerModel(verdict.reason)
+        return
+      }
+      const resolved = resolveDefaultModel(baseCtx)
+      if (resolved.kind !== "model") return
+      if (sessionID) {
+        const switched = await readState(modelContract.switch(sessionID, modelRefOf(resolved.model)))
+        if (chainDisposed || seq !== chainSeq || props.sessionID?.() !== sessionID) return
+        if (switched.status === "error") {
+          setModelChainState("error")
+          return
+        }
+      }
+      applyDefaultComposerModel(resolved.model)
+    }
+
+    setModelChainState("ready")
+    if (!platformAuthReady) await resolveSelection(false, !loggedIn)
+    if (!platformAuthReady || chainDisposed || seq !== chainSeq) return
+    await resolveSelection(false, false)
+    if (chainDisposed || seq !== chainSeq) return
+
+    void accountResolution?.then(async (resolution) => {
+      if (chainDisposed || seq !== chainSeq || resolution.status !== "ready") return
+      await resolveSelection(resolution.usable, true)
+    })
+  }
+
+  createEffect(() => {
+    authEpoch()
+    modelRetryEpoch()
+    const directory = props.directory()
+    const sessionID = props.sessionID?.()
+    if (!directory) {
+      // #882:这里 supersede 之后**没有接替者**,在途的目录就绪等待只能靠取消收场。
+      supersedeChain()
+      setModelChainState("loading")
+      return
+    }
+    void runModelChain(directory, sessionID)
+  })
+
+  const retryCurrentModel = () => {
+    setModelChainState("loading")
+    setModelRetryEpoch((value) => value + 1)
+  }
+
+  createEffect(() => {
+    const state = modelChainState()
+    if (state === "ready" || state === "error") setWaitSince(null)
+    // 引擎换代把已就绪的链打回 recovering 时不发新请求(换代完成才重建链),这段等待从进入 recovering 起计。
+    else if (state === "recovering") startWaitClock()
+  })
+  createEffect(() => {
+    if (waitSince() === null) return
+    const timer = setInterval(() => setClock(Date.now()), 1_000)
+    onCleanup(() => clearInterval(timer))
+  })
+  /** 状态行:10s 内只说正在读;满 10s 说卡点并给「重试」;满 30s 加「重启引擎」。 */
+  const modelWait = createMemo(() => {
+    const since = waitSince()
+    const state = modelChainState()
+    if (since === null || (state !== "loading" && state !== "recovering")) return null
+    const seconds = Math.max(0, Math.floor((clock() - since) / 1_000))
+    return { seconds, restarting: runtimeUnavailable() }
+  })
+
+  /* #1557 AC5:平台目录**从未获取成功**(已应用版本为空)且最近一次刷新失败 ⇒ 输入框提示槽。有已应用旧版本时
+     只在选择器弹层底部说明,输入框里什么都不出现。已应用版本只在有失败时才去读。 */
+  const catalogFailure = createCatalogRefreshHealth()
+  const [platformAppliedAt, setPlatformAppliedAt] = createSignal<string | null | undefined>(undefined)
+  createEffect(() => {
+    if (!catalogFailure().platform) return
+    void window.api.models.catalog().then(
+      (current) => !disposed && setPlatformAppliedAt(current.applied.platformFetchedAt),
+      () => {},
+    )
+  })
+  // 自带 Key 那份不进输入框:随包清单本身可用,只在选择器的自带 Key 分组头提示(AC5)。
+  const catalogSlotFailure = createMemo(() => (platformAppliedAt() === null ? catalogFailure().platform : null))
+
+  onMount(() => {
+    // 登录态变化递增 epoch；路由 directory/sessionID 由上面的 effect 直接跟踪。
+    let receivedInitialAuth = false
+    const unsub = subscribeAuthState((state) => {
+      const signature = authSignature(state)
+      if (!receivedInitialAuth) {
+        receivedInitialAuth = true
+        lastAuthSignature = signature
+        return
+      }
+      if (signature === lastAuthSignature) return
+      lastAuthSignature = signature
+      setAuthEpoch((value) => {
+        markStartupTimeline("renderer.composer.auth_epoch.increment", {
+          candidate: "B",
+          epoch: value + 1,
+          trigger: "auth-change",
+        })
+        return value + 1
+      })
+    })
+    let receivedRuntimeState = false
+    const unsubscribeRuntime = subscribeRuntimeRecovery((state) => {
+      budgetHomeMarksForGeneration(state.generation)
+      if (!receivedRuntimeState) {
+        receivedRuntimeState = true
+        if (state.status === "ready") return
+      }
+      if (state.status === "recovering") {
+        setRuntimeUnavailable(true)
+        runtimeGenerationEpoch++
+        const interrupted = running() || sending()
+        // Every respawn is structural (token renewal hot-applies credentials without one, REQ-236 `#1562`):
+        // rebuild the chain and surface recovery.
+        setModelChainState("recovering")
+        // C7:引擎运行态是 typed live 通道的派生值(sessionDock.running),重启后随
+        // session_status 自行归位 —— 本地只需复位在途提交并如实播报中断。
+        if (interrupted) {
+          markStartupTimeline("renderer.generation.interruption", {
+            generation: state.generation,
+            reason: state.reason,
+          })
+          setSending(false)
+          pushToast({
+            kind: "info",
+            title: t("codepuppy.composer.generationInterrupted"),
+            detail: t("codepuppy.composer.generationInterruptedDetail"),
+          })
+        }
+        return
+      }
+      if (state.status === "failed") {
+        setRuntimeUnavailable(true)
+        setModelChainState("recovering")
+        // #577 终态:引擎未通过健康线,不得当成 ready 唤醒(那是在已知失败下伪造恢复信号)。
+        // 执行面保持关闭并显式进入恢复态;模型链自身的无上限封顶退避(#594)继续自证:
+        // 引擎真实可达时 list 成功,链自然回 ready。
+        return
+      }
+      // ready 与 injection-failed(#613)都证明引擎可达 —— 唤醒停跑的链不是伪造恢复信号;
+      // 「配置未生效」的区分呈现归 picker 横幅(codepuppy-composer-model),不在唤醒面。
+      setRuntimeUnavailable(false)
+      modelRetryWakeup.wake("generation-ready")
+      if (modelChainState() === "recovering") setModelRetryEpoch((value) => value + 1)
+      accountRetryWakeup.wake("generation-ready")
+    })
+    const unsubscribeSse = subscribeSseReconnected(() => {
+      // The bounded health/SSE self-probe is the recovery path when a generation-ready IPC event
+      // is lost. A proven live transport may reopen the execution gate; otherwise the hidden
+      // availability latch would stay closed even after the model chain recovered.
+      setRuntimeUnavailable(false)
+      modelRetryWakeup.wake("sse-reconnected")
+      if (modelChainState() === "recovering") setModelRetryEpoch((value) => value + 1)
+      accountRetryWakeup.wake("sse-reconnected")
+    })
+    onCleanup(() => {
+      chainDisposed = true
+      // #882:卸载必须取消在途的目录就绪等待 —— 它自己没有 deadline,没有取消就永远不结束。
+      chainAbort.abort(new Error("composer unmounted"))
+      unsub?.()
+      unsubscribeRuntime()
+      unsubscribeSse()
+      modelRetryWakeup.dispose()
+      accountRetryWakeup.dispose()
+    })
+  })
+
+  const abort = async () => {
+    const c = props.projects.sdk()
+    const sid = props.sessionID?.()
+    if (!c || !sid) return
+    try {
+      const result = await c.session.abort({ sessionID: sid, directory: props.directory() } as any)
+      // throwOnError:false 档位的 { error } 信封同样是失败(审计 minor:4xx 不装停止成功)。
+      if ((result as { error?: unknown } | undefined)?.error !== undefined) throw new Error("abort rejected")
+    } catch {
+      pushToast({ kind: "error", title: t("codepuppy.composer.abortFailed") })
+    }
+  }
+
+  const submit = async () => {
+    if (!text().trim() || sending()) return
+    const dir = props.directory()
+    if (!dir) {
+      props.onNeedWorkspace?.()
+      return
+    }
+    if (runtimeUnavailable()) {
+      pushToast({ kind: "info", title: t("codepuppy.composer.modelStateReading"), detail: t("codepuppy.composer.modelStateDetail") })
+      return
+    }
+    if (modelChainState() !== "ready") {
+      pushToast({
+        kind: modelChainState() === "error" ? "error" : "info",
+        title: modelChainState() === "error" ? t("codepuppy.composer.modelStateFailed") : t("codepuppy.composer.modelStateReading"),
+        detail: t("codepuppy.composer.modelStateDetail"),
+      })
+      return
+    }
+    const suspended = composerModelSuspended()
+    if (suspended && !composerModel()) {
+      pushToast({
+        kind: "info",
+        title: t("codepuppy.composer.currentModelUnavailable"),
+        detail:
+          suspended.reason === "needs-login"
+            ? t("codepuppy.composer.currentModelLogin")
+            : suspended.reason === "needs-credit"
+              ? t("codepuppy.composer.currentModelCredit")
+              : t("codepuppy.composer.currentModelChoose"),
+      })
+      return
+    }
+    // REQ-069 preflight:未登录 + 代理模型(或全无可用)→ 行内引导替代网关拒绝原文。
+    // #595:Enter 直调 submit(不经 canSend),同一条纯核判据必须在这里也拦住不可执行的 BYOK。
+    const block = preflightBlockReason(composerModel(), preflightCtx())
+    if (block) {
+      pushToast(
+        block === "platform-needs-login"
+          ? {
+              kind: "info",
+              title: t("codepuppy.composer.modelNeedsLogin"),
+              detail: t("codepuppy.composer.modelNeedsLoginDetail"),
+            }
+          : block === "byok-not-registered"
+            ? {
+                kind: "info",
+                title: t("codepuppy.composer.modelNotLoaded", { model: composerModel()?.name ?? "" }),
+                detail: t("codepuppy.composer.modelNotLoadedDetail"),
+              }
+            : // #686:未就绪只能说「正在读取」—— 断言「引擎没有加载这个模型」是链 ready 之后才成立的
+              // 结论。上面的 modelChainState 早退已覆盖本分支,这里是纵深:少了它,新增的 not-ready
+              // 会静默落进下面的「没有可用模型」文案,又是一条编造的结论。
+              block === "not-ready"
+              ? {
+                  kind: "info",
+                  title: t("codepuppy.composer.modelStateReading"),
+                  detail: t("codepuppy.composer.modelStateDetail"),
+                }
+              : {
+                  kind: "info",
+                  title: t("codepuppy.composer.noModel"),
+                  detail: t("codepuppy.composer.noModelDetail"),
+                },
+      )
+      return
+    }
+    const body = text().trim()
+    // 斜杠命令走 session.command,不携带 parts —— 附件会被静默丢弃;如实拦下(C28),不装作发出去了。
+    if (attachments().length > 0 && body.startsWith("/")) {
+      pushToast({ kind: "info", title: t("codepuppy.composer.commandNoAttachments"), detail: t("codepuppy.composer.commandNoAttachmentsDetail") })
+      return
+    }
+    // #884:档位/只读档在这里**定格**。它们是模块级 signal(所有渲染面共用一份),而 home 的
+    // `await startChat(...)` 之后还要把这条消息的档位登记给新会话 —— 中途用户完全可能点侧栏进另一个
+    // 会话,那时 signal 已经是**那个会话**的值。续行再读一次 signal,登记的就是别人的档位:
+    // 第一条确实以只读发出去了,进了新会话却显示「请求审批」,第二条也真的不再带 codepuppy-readonly。
+    // 一份快照,构造请求与两处 seed 都用它。
+    const submittedAgent = composerAgent()
+    const submittedPerm = composerPerm()
+    // #891:新会话的身份 server 段也在这里定格 —— 与档位同理,`await startChat(...)` 之后用户可能
+    // 已经切了 server,那时读到的 key 属于别人。
+    const submittedServerKey = props.serverKey?.()
+    const req = buildPromptRequest({
+      text: body,
+      extraParts: [...buildMentionParts(body, dir, mentions()), ...buildAttachmentParts(attachments())],
+      model: composerModel(),
+      effort: composerEffortSel(),
+      perm: submittedPerm,
+      agent: submittedAgent,
+    })
+    // #1560(REQ-236 §2.8):只有用户显式选的模型才随消息/命令发出 —— 它压过 agent 与命令自带的推荐模型;
+    // 没显式选时不带,推荐模型照旧作默认。与档位同理在这里定格。
+    const submittedExplicitModel = composerModelExplicit() ? req.model : undefined
+    const submissionGeneration = runtimeGenerationEpoch
+    const interrupted = () => submissionGeneration !== runtimeGenerationEpoch
+    submittedText = text() // 已提交文本快照(在途未编辑判据)
+    setSending(true)
+    try {
+      // REQ-160 AC2(`#1353`):发给引擎之前,先在本机对着已同步的违规关键词表查一遍。
+      //
+      // **这里是整个产品里有人在看的唯一发送入口**:首页的 `projects.startChat(...)`、会话页的
+      // `c.session.promptAsync(...)`、斜杠命令的 `c.session.command(...)`、时间线「编辑重发」
+      // (它只把正文回填进这个输入框,发送仍走这里)四条路都从这一行下面分出去。所以这一问
+      // 放在分叉**之前**,而不是逐个入口各查一遍 —— 将来新增第五条分支默认被罩住。
+      //
+      // 查的是 `body`,与服务端入库复判读的是同一段:mention 产生的是 `agent`/`file` part、
+      // 附件是字节,都不是 text part,而服务端 `partsText` 只取 text part
+      // (main/chat-archive-turn.ts:141)。
+      //
+      // 这不是安全边界:它跑在用户自己的机器上、可以被绕过,留证的权威在服务端。词表没同步
+      // 下来或读不到时 `check` 回 false —— 不拦也不提示(已批稿 §3「不出现」一行)。
+      if (await window.api.moderation.check(body)) {
+        setBlockedText(body)
+        return
+      }
+      if (props.mode === "home") {
+        // REQ-085(#259):目录不变才复用上一次的孤儿 session——换目录等于放弃它,老实重建。
+        const reuseSessionID =
+          homePendingSession && homePendingSession.directory === dir ? homePendingSession.sessionID : undefined
+        const id = await props.projects.startChat(dir, body, req.parts.slice(1), {
+          model: req.model,
+          explicitModel: submittedExplicitModel,
+          agent: req.agent,
+          perm: submittedPerm,
+          existingSessionID: reuseSessionID,
+          onSessionCreated: (createdId) => {
+            homePendingSession = { directory: dir, sessionID: createdId }
+          },
+        })
+        if (interrupted()) {
+          // 换代/登出打断了在途请求:后续重试极可能落在不同的 generation 上,这个 id 未必
+          // 还能用——盲目复用会把"投递失败"换成"session not found",不如老实重建。
+          homePendingSession = undefined
+          return
+        }
+        if (!id) {
+          pushToast({ kind: "error", title: t("codepuppy.composer.sendFailed") })
+          return
+        }
+        // 整条链(含消息投递)成功落定:不再是待重试的孤儿,清掉记账。
+        homePendingSession = undefined
+        // #570:这条消息用的档位就是新会话的开局档位 —— 不交给它,跳进会话页的瞬间 chip 熄灭、
+        // 第二条消息掉回默认档,而用户明明在首页把计划模式开着发出了第一条。
+        // #884:只读档同理 —— 第一条**已经**是以只读发出去的(req.agent = codepuppy-readonly),
+        // 跳进会话页却回到「请求审批」,等于我们背着用户把它关了。
+        // 用上面的提交快照,不重读 signal:这一行跑在 await 之后,signal 可能早已易主(见那段注释)。
+        // #891:登记用的钥匙必须与会话页 adopt 时算出的**逐字节相同** —— 同一个 `identityKey`,
+        // 三段都取提交那一刻的快照。serverKey 缺席就不登记:与其记到一把没人认领的钥匙下面,
+        // 不如让新会话老实回默认档(用户看得见 chip 熄灭,而不是被静默记到别的会话名下)。
+        const seedKey = submittedServerKey
+          ? identityKey({ serverKey: submittedServerKey, directory: dir, sessionID: id })
+          : undefined
+        if (seedKey) {
+          seedComposerAgentScope(seedKey, submittedAgent)
+          seedComposerPermScope(seedKey, submittedPerm)
+          // #1560 r1:首页的显式选择就是新会话的显式选择 —— 少了它,第二条消息又让推荐模型赢回来。
+          if (submittedExplicitModel) rememberExplicitModel(seedKey, submittedExplicitModel)
+        }
+        setText("")
+        setMentions([])
+        setAttachments([])
+        // #894:落点快照与上面的 `seedKey` 取自**同一份**提交时快照 —— 登记用哪把钥匙,就跳到
+        // 哪个 server。两处若各读各的,首页开的档位会记在 A 而人被送到 B。
+        props.onSubmitted?.(id, { serverKey: submittedServerKey, directory: dir })
+        return
+      }
+      // session 模式
+      const c = props.projects.sdk()
+      const sid = props.sessionID?.()
+      if (!c || !sid) {
+        pushToast({ kind: "error", title: t("codepuppy.composer.sessionPending") })
+        return
+      }
+      const slash = routeSlash(body)
+      if (slash) {
+        const { data: cmds } = await c.command
+          .list({ directory: dir } as any)
+          .catch(() => ({ data: undefined }) as const)
+        if (interrupted()) return
+        const matched = Array.isArray(cmds) ? cmds.find((x: any) => x?.name === slash.name) : undefined
+        if (matched) {
+          // REQ-236 E5:命令带档位 agent(与普通发送同一张表);缺席时引擎以默认助手运行,档位被绕过。
+          const tier = tierAgent(submittedPerm)
+          const { data: commanded, error } = await c.session.command({
+            sessionID: sid,
+            directory: dir,
+            command: slash.name,
+            arguments: slash.args,
+            ...(tier ? { agent: tier } : {}),
+            ...v1CommandModelFields(submittedExplicitModel),
+          } as any)
+          if (interrupted()) return
+          if (error) {
+            pushToast({ kind: "error", title: t("codepuppy.composer.commandFailed") })
+            return
+          }
+          // REQ-125 C7:send 当下捕获命令来源(上游不保留);assistant messageID 用于时间线对齐。
+          // E3/E4:来源只读 `/command` 响应里注册方声明的 `source`(基线 §6/T3 禁从名字反推);
+          // 声明缺席/非法 → 不带 source,chip 回通用形。
+          const assistantMessageID = (commanded as { info?: { id?: string } } | undefined)?.info?.id
+          const slashSource = slashSourceOf(matched)
+          props.sessionDock?.onSlashCommand?.({
+            sessionID: sid,
+            directory: dir,
+            command: slash.name,
+            arguments: slash.args,
+            ...(typeof assistantMessageID === "string" && assistantMessageID ? { assistantMessageID } : {}),
+            ...(slashSource ? { source: slashSource } : {}),
+          })
+          setText("")
+          setMentions([])
+          return
+        }
+      }
+      // #652(owner 裁决 2026-07-28):会话内发送回到与首页 startChat 完全同一条 v1 路径
+      // (session.promptAsync)。REQ-125 C7 曾把「后续消息」改路由到 v2 durable 队列
+      // (c.v2.session.prompt),于是同一个会话里第一条走旧引擎、第二条起走新引擎 ——
+      // 而新引擎那条链拿不到 provider 凭证(全库受理 8 次、started 8 次、failed 8 次,零成功),
+      // 表现为「只能发第一条」。更根本的是:新引擎(上游 packages/core)**没有 MCP 运行时**,
+      // 也**没有 alpha ext 插件的钩子挂载点**(tool.execute.before/after、
+      // experimental.chat.system.transform),而 alpha 的整个主权层 —— 云搜索、kill switch、
+      // prompt 接管、工厂拒绝、skill 注入 —— 全建在旧引擎的钩子上。「一半迁移」才是半成品;
+      // 回到单一代次是干净状态。迁移推迟到上游补齐 MCP 与插件钩子之后,另立需求。
+      //
+      // 档位随每条消息走(v1 PromptInput.agent,与 startChat 同一个字段):v1 引擎不读会话的
+      // agent 列(SessionPrompt.createUserMessage 只认 input.agent,缺省即引擎默认档),
+      // 因此 v2 的档位协议(switchAgent 落会话档 + 权威实时读 + CAS 回滚 + 本地推送账本)
+      // 随 v2 发送一起退役 —— 留着它只会在每次发送前多两次网络往返,并把「读不到会话档」
+      // 变成一个新的发送拦截点。
+      const { error } = await c.session.promptAsync({
+        sessionID: sid,
+        directory: dir,
+        parts: req.parts,
+        ...(req.agent ? { agent: req.agent } : {}),
+        ...v1PromptModelFields(submittedExplicitModel),
+      } as any)
+      if (interrupted()) return
+      if (error) {
+        pushToast({ kind: "error", title: t("codepuppy.composer.sendFailed") })
+        return
+      }
+      setText("")
+      setMentions([])
+      setAttachments([])
+      // 忙态由 live status typed 通道驱动,这里不再乐观置位。
+    } catch {
+      if (!interrupted()) pushToast({ kind: "error", title: t("codepuppy.composer.sendFailed") })
+    } finally {
+      setSending(false)
+      submittedText = undefined // 落定后复位:成功已清空、失败保留,此后一律按草稿捕获
+    }
+  }
+
+  const onKey = (e: KeyboardEvent) => {
+    if (auto.onKeyDown(e)) return
+    // REQ-073:Shift+Tab 切换计划模式(Codex 同款;压 agent 的权限档下不切换 —— 模式本就不生效,`#1413`)
+    if (e.key === "Tab" && e.shiftKey && !isImeComposing(e)) {
+      e.preventDefault()
+      if (!permLocksAgent(composerPerm())) setComposerAgent(composerAgent() === "plan" ? null : "plan")
+      return
+    }
+    if (e.key === "Enter" && !e.shiftKey && !isImeComposing(e)) {
+      e.preventDefault()
+      void submit()
+    }
+  }
+
+  return (
+    // a-ui 作用域类保持随组件走:home 与 session 宿主布局各异,自带作用域才能保证焦点圈治理
+    // (.a-ui .a-chip:focus…)与基础排版在任何挂点一致(用户报障 2026-07-07 的固化教训)。
+    <div
+      class="a-ui a-comp"
+      data-codepuppy-composer={props.mode}
+      data-empty={text().trim() ? undefined : ""}
+      data-approval={approvalPending() ? "" : undefined}
+      data-drag={dragOver() ? "" : undefined}
+      onClick={stop}
+      onDragOver={(e) => {
+        if (!hasDragFiles(e)) return
+        e.preventDefault()
+        setDragOver(true)
+      }}
+      onDragLeave={(e) => {
+        // 只在真正离开 composer 树时熄灭(进入子元素也会触发 dragleave)
+        if (!(e.relatedTarget instanceof Node) || !e.currentTarget.contains(e.relatedTarget)) setDragOver(false)
+      }}
+      onDrop={(e) => {
+        if (!hasDragFiles(e)) return
+        e.preventDefault()
+        setDragOver(false)
+        void addFiles(e.dataTransfer?.files)
+      }}
+    >
+      <auto.Menu />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={ATTACH_ACCEPT}
+        multiple
+        style={{ display: "none" }}
+        onChange={(e) => {
+          void addFiles(e.currentTarget.files)
+          e.currentTarget.value = "" // 允许再次选择同一文件
+        }}
+      />
+      <ComposerAttachmentStrip
+        attachments={attachments()}
+        reading={attachmentReads() > 0}
+        imageRoute={imageRoute()}
+        onRemove={removeAttachment}
+        onRetry={retryAttachment}
+      />
+      <textarea
+        ref={taRef}
+        class="a-comp-input"
+        rows="1"
+        placeholder={placeholder()}
+        aria-label={placeholder()}
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={auto.open()}
+        aria-controls={auto.listboxId}
+        aria-activedescendant={auto.activeDescendant()}
+        value={text()}
+        onInput={(e) => {
+          setText(e.currentTarget.value)
+          // `#1353`:输入框一改,「这条消息没有发出去」就该消失 —— 用户已经在动手改了。
+          setBlockedText(undefined)
+          auto.onInput()
+        }}
+        onKeyDown={onKey}
+        onPaste={(e) => {
+          const files = e.clipboardData?.files
+          if (files && files.length > 0) {
+            e.preventDefault() // 图片/PDF 粘贴进附件通道;纯文本粘贴不受影响
+            void addFiles(files)
+          }
+        }}
+        onCompositionStart={() => setComposing(true)}
+        onCompositionEnd={() => setComposing(false)}
+      />
+      {/* #1557 AC6:文字区之下、工具栏之上这一槽一次只放一条,按序取第一条成立的:
+          发送被拦 > 模型状态行(含失败的红色一句)> 自带 Key 节点未加载 > 平台目录未获取。 */}
+      <Switch>
+        {/* REQ-160 AC2(`#1353`)· 已批稿 2026-09-19-req160-send-blocked-notice/frame.html:
+            琥珀而不是红 —— 红在这条槽里已经有确定的含义(系统这会儿不行、请重试),而这一条不是
+            系统坏了,是这句话要改一下。无图标、无按钮、无关闭叉。 */}
+        <Match when={sendBlocked()}>
+          <div class="a-comp-send-blocked" role="alert" data-codepuppy-composer-blocked="true">
+            <span class="a-comp-send-blocked-fact">{t("codepuppy.composer.sendBlocked")}</span>
+            <span class="a-comp-send-blocked-why">{t("codepuppy.composer.sendBlockedWhy")}</span>
+          </div>
+        </Match>
+        <Match when={modelChainState() === "error"}>
+          <div class="a-comp-model-alert" role="alert">
+            <span>{t("codepuppy.composer.modelChainFailed")}</span>
+            <button type="button" onClick={retryCurrentModel}>
+              {t("codepuppy.common.retry")}
+            </button>
+          </div>
+        </Match>
+        {/* #1557 AC1/AC2/AC4 · 批准稿 2026-10-30-req236-model-status §一:等待不是错误,用中性色。
+            秒数 aria-hidden —— 读屏只在说明与按钮变化时播报,不每秒播报。 */}
+        <Match when={modelWait()}>
+          {(wait) => (
+            <div class="a-comp-model-status" role="status" data-codepuppy-model-wait={wait().seconds >= 10 ? "stuck" : "reading"}>
+              <span class="a-comp-model-spin" aria-hidden="true" />
+              <span class="a-comp-model-status-tx">
+                <Show when={wait().seconds >= 10} fallback={t("codepuppy.composer.modelStatusReading")}>
+                  <b>{wait().restarting ? t("codepuppy.composer.engineRestarting") : t("codepuppy.composer.engineNotResponding")}</b>
+                  <span class="a-comp-model-status-n" aria-hidden="true">
+                    {t("codepuppy.composer.waitedSeconds", { seconds: wait().seconds })}
+                  </span>
+                </Show>
+              </span>
+              <Show when={wait().seconds >= 10}>
+                <span class="a-comp-model-status-acts">
+                  <button type="button" onClick={retryCurrentModel}>
+                    {t("codepuppy.common.retry")}
+                  </button>
+                  <Show when={wait().seconds >= 30}>
+                    {/* 恢复页「重试本地引擎」(RECOVERY_ACTIONS.retryEngine)的同一组效果。 */}
+                    <button type="button" onClick={() => void window.api.recovery.retryEngine()}>
+                      {t("codepuppy.composer.restartEngine")}
+                    </button>
+                  </Show>
+                </span>
+              </Show>
+            </div>
+          )}
+        </Match>
+        {/* #595:发送门因「引擎没有这个直连节点」而关闭时,必须常驻如实说明 ——
+            按钮已 disabled,toast 点不出来,不说等于静默失败。选择本身照旧保留。
+            #686:不再在这里补一道 ready —— 判据自己就不会在未就绪时给出这个结论。 */}
+        <Match when={byokNotRegistered()}>
+          <div class="a-comp-model-alert" role="status">
+            <span>{t("codepuppy.composer.modelNotLoaded", { model: composerModel()?.name ?? "" })}</span>
+            <span>{t("codepuppy.composer.modelNotLoadedDetail")}</span>
+            <button type="button" onClick={retryCurrentModel}>
+              {t("codepuppy.common.retry")}
+            </button>
+          </div>
+        </Match>
+        {/* #1557 AC5 · 批准稿 §二 A:中性色 —— 发送没有被拦,自带 Key 的模型照常能发。 */}
+        <Match when={catalogSlotFailure()}>
+          {(failure) => (
+            <div class="a-comp-model-status" role="status" data-codepuppy-catalog-unavailable={failure().code}>
+              <svg class="a-comp-model-status-ic" viewBox="0 0 16 16" aria-hidden="true">
+                <circle cx="8" cy="8" r="6.25" />
+                <path d="M8 7.25v3.5M8 5.25v.01" />
+              </svg>
+              <span class="a-comp-model-status-tx">
+                <b>{t("codepuppy.model.catalogUnavailable")}</b> · {catalogFailureReason(failure().code)}
+              </span>
+              <span class="a-comp-model-status-acts">
+                <button type="button" onClick={retryCatalogRefresh}>
+                  {t("codepuppy.common.retry")}
+                </button>
+              </span>
+            </div>
+          )}
+        </Match>
+      </Switch>
+      <div class="a-comp-bar">
+        <AddButton expanded={auto.assembleOpen()} onOpen={() => auto.toggleAssemble()} />
+        <PermChip />
+        <PlanChip />
+        <div class="a-comp-grow" />
+        {/* 上下文用量 ring(session:sessionDock 从 typed 通道计算注入;事实不足 = null 不渲染;
+            home 无会话无用量,不渲染 —— 收养上游 DOM 节点的 takeover 机制已随 REQ-125 C7 终结) */}
+        <Show when={contextUsage() !== null}>
+          <Tooltip label={t("codepuppy.composer.contextUsage", { percent: contextUsage()! })}>
+            <span
+              class="a-comp-usage"
+              tabindex="0"
+              role="img"
+              aria-label={t("codepuppy.composer.contextUsage", { percent: contextUsage()! })}
+            >
+              <span class="a-comp-usage-ring" style={{ "--a-comp-usage-fill": `${contextUsage()}%` }} aria-hidden="true" />
+              <span class="a-comp-usage-num">{contextUsage()}%</span>
+            </span>
+          </Tooltip>
+        </Show>
+        <ModelChip
+          contract={modelContract}
+          directory={props.directory}
+          onSelect={selectComposerModel}
+          onRetryCurrent={retryCurrentModel}
+          modelChainReady={() => modelChainState() === "ready" && !runtimeUnavailable()}
+          onNeedWorkspace={props.onNeedWorkspace}
+          hasWorkspace={hasWorkspace}
+          brand={() => modelBrandOf(composerModel(), modelCatalog())}
+          registerOpen={props.mode === "session" ? props.sessionDock?.registerModelPicker : undefined}
+        />
+        <EffortChip
+          contract={modelContract}
+          directory={props.directory}
+          onSelect={selectComposerModel}
+          onRetryCurrent={retryCurrentModel}
+          modelChainReady={() => modelChainState() === "ready" && !runtimeUnavailable()}
+        />
+        <Show
+          when={running()}
+          fallback={
+            <Tooltip label={t("codepuppy.composer.send")}>
+              <button
+                class="a-comp-send"
+                data-ready={canSend() ? "" : undefined}
+                disabled={!canSend()}
+                onClick={() => void submit()}
+                aria-label={t("codepuppy.composer.send")}
+              >
+                <ArrowUp />
+              </button>
+            </Tooltip>
+          }
+        >
+          <Tooltip label={t("codepuppy.composer.stopGenerating")}>
+            <button
+              class="a-comp-send a-comp-stop"
+              data-ready
+              onClick={() => void abort()}
+              aria-label={t("codepuppy.composer.stopGenerating")}
+            >
+              <StopSquare />
+            </button>
+          </Tooltip>
+        </Show>
+      </div>
+    </div>
+  )
+}
+
+function attachmentReason(reason: string) {
+  if (reason.startsWith("最多")) return t("codepuppy.composer.attachmentCountExceeded", { count: ATTACH_MAX_COUNT })
+  return reason
+}

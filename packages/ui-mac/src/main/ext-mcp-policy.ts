@@ -11,13 +11,13 @@ import type { ConfigResult } from "./ext-config"
 import { persistMcp } from "./ext-config"
 import { aggregateFilesDigest, sha256Hex } from "./ext-manifest-v2"
 import {
-  ALPHA_OFFICE_CONNECTORS,
-  ALPHA_OFFICE_PYTHON_SLOT,
-  ALPHA_OFFICE_SERVER_SLOT,
+  CODEPUPPY_OFFICE_CONNECTORS,
+  CODEPUPPY_OFFICE_PYTHON_SLOT,
+  CODEPUPPY_OFFICE_SERVER_SLOT,
   WORKSPACE_MARKER,
-  alphaOfficeInstallCommand,
-  checkAlphaOfficeMcpSafety,
-  isAlphaOfficeMcp,
+  codepuppyOfficeInstallCommand,
+  checkCodePuppyOfficeMcpSafety,
+  isCodePuppyOfficeMcp,
   isRetiredOfficeMcp,
   type OfficeRuntimeReadiness,
 } from "../shared/office-advisories"
@@ -48,29 +48,29 @@ export type McpWritePolicyResult = { ok: true; artifactDigest?: string } | { ok:
  *  interpreter and server resolved against Alpha's resources, the `{workspace}` spawn-time marker —
  *  whatever command the catalog card (or a legacy uv-era card) carried. Card tokens are not compared or
  *  consumed. Boot reconciliation owns migrating already-installed entries. */
-function applyAlphaOfficeWorkspacePolicy(name: string, server: Record<string, unknown>): McpWritePolicyResult {
-  if (!isAlphaOfficeMcp(name, server)) return { ok: true }
+function applyCodePuppyOfficeWorkspacePolicy(name: string, server: Record<string, unknown>): McpWritePolicyResult {
+  if (!isCodePuppyOfficeMcp(name, server)) return { ok: true }
   const command = Array.isArray(server.command) && server.command.every((argument) => typeof argument === "string")
     ? (server.command as string[])
     : []
-  const connector = ALPHA_OFFICE_CONNECTORS.find((candidate) =>
+  const connector = CODEPUPPY_OFFICE_CONNECTORS.find((candidate) =>
     candidate.name === name || command.includes(candidate.format),
   )
   if (!connector) return { ok: false, reason: "unknown Code Puppy Office connector mode (REQ-133 fail-closed)" }
   try {
-    const alphaResources = fs.realpathSync(resourcesRoot())
-    const serverPath = fs.realpathSync(path.join(alphaResources, "office-mcp", "server.py"))
-    if (path.relative(alphaResources, serverPath).startsWith(`..${path.sep}`)) {
+    const codepuppyResources = fs.realpathSync(resourcesRoot())
+    const serverPath = fs.realpathSync(path.join(codepuppyResources, "office-mcp", "server.py"))
+    if (path.relative(codepuppyResources, serverPath).startsWith(`..${path.sep}`)) {
       return { ok: false, reason: `${connector.name} bundled server escaped Code Puppy resources (REQ-133)` }
     }
-    server.command = alphaOfficeInstallCommand(connector.format).map((argument) =>
-      argument === ALPHA_OFFICE_SERVER_SLOT
+    server.command = codepuppyOfficeInstallCommand(connector.format).map((argument) =>
+      argument === CODEPUPPY_OFFICE_SERVER_SLOT
         ? serverPath
-        : argument === ALPHA_OFFICE_PYTHON_SLOT
-          ? path.join(alphaResources, "office-runtime", "bin", "python3")
+        : argument === CODEPUPPY_OFFICE_PYTHON_SLOT
+          ? path.join(codepuppyResources, "office-runtime", "bin", "python3")
           : argument,
     )
-    const safety = checkAlphaOfficeMcpSafety(name, server, WORKSPACE_MARKER, alphaResources)
+    const safety = checkCodePuppyOfficeMcpSafety(name, server, WORKSPACE_MARKER, codepuppyResources)
     if (!safety.ok) return safety
     // REQ-105 (#319) fail-closed: an Alpha Office install never persists without the content
     // address of the bytes it will execute. readFileSync failing here lands in the same catch as a
@@ -83,12 +83,12 @@ function applyAlphaOfficeWorkspacePolicy(name: string, server: Record<string, un
 
 /** #1564 AC3: the bundled Office runtime is ready when its `python3` is executable and the shared server
  *  resolves inside Alpha's resources — the same two paths the write policy puts into the command. */
-export function officeRuntimeReadiness(alphaResourcesRoot: string = resourcesRoot()): OfficeRuntimeReadiness {
+export function officeRuntimeReadiness(codepuppyResourcesRoot: string = resourcesRoot()): OfficeRuntimeReadiness {
   try {
-    const alphaResources = fs.realpathSync(alphaResourcesRoot)
-    const serverPath = fs.realpathSync(path.join(alphaResources, "office-mcp", "server.py"))
-    if (path.relative(alphaResources, serverPath).startsWith(`..${path.sep}`)) return { ok: false, reason: "office-runtime-missing" }
-    fs.accessSync(path.join(alphaResources, "office-runtime", "bin", "python3"), fs.constants.X_OK)
+    const codepuppyResources = fs.realpathSync(codepuppyResourcesRoot)
+    const serverPath = fs.realpathSync(path.join(codepuppyResources, "office-mcp", "server.py"))
+    if (path.relative(codepuppyResources, serverPath).startsWith(`..${path.sep}`)) return { ok: false, reason: "office-runtime-missing" }
+    fs.accessSync(path.join(codepuppyResources, "office-runtime", "bin", "python3"), fs.constants.X_OK)
     return { ok: true }
   } catch {
     return { ok: false, reason: "office-runtime-missing" }
@@ -102,7 +102,7 @@ export function applyMcpWritePolicy(name: string, server: Record<string, unknown
     if (isRetiredOfficeMcp(name, server)) {
       return { ok: false, reason: "community excel-mcp-server is retired; use mcp:codepuppy-excel (REQ-135)" }
     }
-    return applyAlphaOfficeWorkspacePolicy(name, server)
+    return applyCodePuppyOfficeWorkspacePolicy(name, server)
   }
   return { ok: false, reason: "invalid server config" }
 }

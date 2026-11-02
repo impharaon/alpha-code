@@ -110,7 +110,7 @@ const BASE_HEADERS: Record<string, string> = {
  * 分区名前缀。`persist:` 不是可选的 —— 见文件头:内存分区里 Chromium PDF viewer 不装载。
  * 前缀之后是一次性的 previewId,故每个 preview 仍是自己的 session(互不寻址不变)。
  */
-export const RAIL_PREVIEW_PARTITION_PREFIX = "persist:alpha-rail-preview-"
+export const RAIL_PREVIEW_PARTITION_PREFIX = "persist:codepuppy-rail-preview-"
 
 /** `persist:` 之后的那一段就是 userData/Partitions 下的目录名(Electron 直接以它建目录)。 */
 const PARTITION_DIR_PREFIX = RAIL_PREVIEW_PARTITION_PREFIX.slice("persist:".length)
@@ -608,7 +608,7 @@ async function refreshOfficeOutcome(record: RailPreviewRecord): Promise<void> {
   if (record.view.webContents.isDestroyed()) return
   try {
     const raw = (await record.view.webContents.executeJavaScript(
-      "window.__alphaOfficeOutcome ?? null",
+      "window.__codepuppyOfficeOutcome ?? null",
       false,
     )) as { status?: unknown; code?: unknown; detail?: unknown } | null
     if (!raw || typeof raw.status !== "string") return

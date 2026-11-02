@@ -2,17 +2,17 @@
 // of what that can mean.
 //
 // THE PRIMARY JUDGEMENT IS NOT IN THIS FILE. Three executed tests decide behaviour:
-//   * `renderer/alpha-ui/model-picker-core.test.ts` — the row projection and the two pricing
+//   * `renderer/codepuppy-ui/model-picker-core.test.ts` — the row projection and the two pricing
 //     states, over real fixtures, in both locales;
-//   * `renderer/alpha-ui/model-default-core.test.ts` — that default resolution cannot see price
+//   * `renderer/codepuppy-ui/model-default-core.test.ts` — that default resolution cannot see price
 //     or catalog order;
-//   * `renderer/alpha-ui/alpha-composer-model.component.test.ts` — the production Solid picker,
+//   * `renderer/codepuppy-ui/codepuppy-composer-model.component.test.ts` — the production Solid picker,
 //     asserting the numbers land in BOTH the visible DOM and the `aria-label`.
 // Change what the app actually shows and those move, whatever the source text says.
 //
 // WHAT THIS FILE COVERS is the one thing an executed test cannot: that the deleted local price
 // authority has not GROWN BACK somewhere the executed tests never look. REQ-127 #679 removed a
-// hardcoded ladder in `main/alpha-models.json` — `tiers: {flag: "×8", pro: "×3", std: "×1"}` plus a
+// hardcoded ladder in `main/codepuppy-models.json` — `tiers: {flag: "×8", pro: "×3", std: "×1"}` plus a
 // `tier` on every model — which was wrong twice over:
 //   ① for models it did list, the number had nothing to do with the real multiplier;
 //   ② for models the platform had launched but the local snapshot had not caught up with, the
@@ -44,7 +44,7 @@
 //
 // COMMENTS ARE STRIPPED before the code rules run (`.ts` / `.tsx` only). This gate judges code and
 // data, not prose: a comment explaining WHY there is no local tier — this one included — must not
-// be a red light. `alpha-models.json` has no comment syntax, so it is read whole, `_note` included,
+// be a red light. `codepuppy-models.json` has no comment syntax, so it is read whole, `_note` included,
 // and that is deliberate: `_note` is the instruction a human follows when editing the catalog, and
 // "retune tier/倍率" written there is exactly how the field grows back.
 //
@@ -69,14 +69,14 @@ const packageRoot = join(import.meta.dir, "../..")
  * added here too, which is the maintenance cost this list is paying for its precision.
  */
 const CATALOG_SURFACE = [
-  "src/main/alpha-models.json",
-  "src/main/alpha-models.ts",
-  "src/main/alpha-live-allowlist.ts",
-  "src/main/alpha-platform-models.ts",
-  "src/shared/alpha-model-types.ts",
-  "src/renderer/alpha-ui/model-picker-core.ts",
-  "src/renderer/alpha-ui/model-default-core.ts",
-  "src/renderer/alpha-ui/alpha-composer-model.tsx",
+  "src/main/codepuppy-models.json",
+  "src/main/codepuppy-models.ts",
+  "src/main/codepuppy-live-allowlist.ts",
+  "src/main/codepuppy-platform-models.ts",
+  "src/shared/codepuppy-model-types.ts",
+  "src/renderer/codepuppy-ui/model-picker-core.ts",
+  "src/renderer/codepuppy-ui/model-default-core.ts",
+  "src/renderer/codepuppy-ui/codepuppy-composer-model.tsx",
 ] as const
 
 type Rule = { rule: string; pattern: RegExp }
@@ -136,10 +136,10 @@ const scanFile = (relative: string) => {
   return priceClaimsIn(source, { stripComments: !relative.endsWith(".json") }).map((rule) => `${relative}: ${rule}`)
 }
 
-/** i18n entries whose KEY is on the model surface. `alpha.ext.cloudTier` and friends are not. */
+/** i18n entries whose KEY is on the model surface. `codepuppy.ext.cloudTier` and friends are not. */
 const modelStrings = (dict: Record<string, string>) =>
   Object.entries(dict)
-    .filter(([key]) => key.startsWith("alpha.model."))
+    .filter(([key]) => key.startsWith("codepuppy.model."))
     .map(([key, value]) => `${key} ${value}`)
 
 describe("#679 平台计价权威棘轮:本地目录不得重新长出价格轴", () => {
@@ -155,9 +155,9 @@ describe("#679 平台计价权威棘轮:本地目录不得重新长出价格轴"
     expect(CATALOG_SURFACE.flatMap(scanFile)).toEqual([])
   })
 
-  test("alpha-models.json 结构上就没有价格轴:无 tiers 块、无逐模型 tier、也不含 pricing", () => {
+  test("codepuppy-models.json 结构上就没有价格轴:无 tiers 块、无逐模型 tier、也不含 pricing", () => {
     // 数据层单独钉一次:正则读的是文本,这条读的是解析后的结构 —— 两种读法一起错的概率低得多。
-    const catalog = JSON.parse(readFileSync(join(packageRoot, "src/main/alpha-models.json"), "utf8")) as {
+    const catalog = JSON.parse(readFileSync(join(packageRoot, "src/main/codepuppy-models.json"), "utf8")) as {
       tiers?: unknown
       defaultPlatformModel?: unknown
       platformModels?: unknown
@@ -177,7 +177,7 @@ describe("#679 平台计价权威棘轮:本地目录不得重新长出价格轴"
     expect(typeof catalog.defaultPlatformModel === "string" || catalog.defaultPlatformModel === null).toBe(true)
   })
 
-  test("alpha.model.* 文案里没有档位词、也没有写死的倍数", () => {
+  test("codepuppy.model.* 文案里没有档位词、也没有写死的倍数", () => {
     const offenders = [
       ...modelStrings(zh).map((entry) => ({ locale: "zh", entry })),
       ...modelStrings(en).map((entry) => ({ locale: "en", entry })),
@@ -207,7 +207,7 @@ describe("#679 棘轮的扫描器自己咬得动(否则它是个空闸)", () => 
   })
 
   test("本票删掉的那行兜底,原样放回去就是红的(这条就是「自己绕一遍」的机器版)", () => {
-    // `alpha-live-allowlist.ts` 的投影里曾经有这一行,它是「未收录模型显示标准 ×1」的直接成因。
+    // `codepuppy-live-allowlist.ts` 的投影里曾经有这一行,它是「未收录模型显示标准 ×1」的直接成因。
     const restored = `
       return {
         id: remote.id,
@@ -227,9 +227,9 @@ describe("#679 棘轮的扫描器自己咬得动(否则它是个空闸)", () => 
   test.each([
     ["真实模型 id deepseek-v4-pro", '{ "id": "deepseek-v4-pro", "name": "DeepSeek V4 Pro" }'],
     ["provider / 复合词不该被误伤", "const provider = catalog.platformProvider; const flagship = false"],
-    ["运行时插值的倍数模板不是写死的价格", '"alpha.model.pricingPair": "输入 {{input}}× · 输出 {{output}}×"'],
-    ["英文模板同理", '"alpha.model.pricingPair": "In {{input}}× · Out {{output}}×"'],
-    ["不可用文案里既没数字也没档位词", '"alpha.model.pricingUnavailable": "计价信息暂不可用"'],
+    ["运行时插值的倍数模板不是写死的价格", '"codepuppy.model.pricingPair": "输入 {{input}}× · 输出 {{output}}×"'],
+    ["英文模板同理", '"codepuppy.model.pricingPair": "In {{input}}× · Out {{output}}×"'],
+    ["不可用文案里既没数字也没档位词", '"codepuppy.model.pricingUnavailable": "计价信息暂不可用"'],
   ])("不误伤:%s", (_shape, source) => {
     expect(priceClaimsIn(source, { stripComments: false })).toEqual([])
   })

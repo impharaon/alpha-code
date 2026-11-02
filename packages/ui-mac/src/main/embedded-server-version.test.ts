@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { ALPHA_OPENCODE_VERSION_DEFAULT, patchServerVersion } from "../../scripts/patch-server-version"
+import { CODEPUPPY_OPENCODE_VERSION_DEFAULT, patchServerVersion } from "../../scripts/patch-server-version"
 
 // 逐字取自 ac#1248 同步栈(上游 e11dbd020)真构建出的 packages/opencode/dist/node/node.js(2026-09-07)。
 // 上游 build-node.ts 从这一版起 define 了 OPENCODE_VERSION,bundler 把 `typeof … : "local"` 折叠成一个字面量。
@@ -12,7 +12,7 @@ const BAKED_APP_VERSION =
 // e11dbd020 之前的形状(本脚本旧版的目标子串)—— 现在的 bundle 里不再出现,脚本也不得再静默接受它。
 const LEGACY_FOLDABLE = 'var InstallationVersion = typeof OPENCODE_VERSION === "string" ? OPENCODE_VERSION : "local";'
 
-const V = ALPHA_OPENCODE_VERSION_DEFAULT
+const V = CODEPUPPY_OPENCODE_VERSION_DEFAULT
 
 describe("embedded server InstallationVersion patch (A4, ac#1248)", () => {
   test("rewrites the baked preview literal to the real npm version and touches nothing else", () => {

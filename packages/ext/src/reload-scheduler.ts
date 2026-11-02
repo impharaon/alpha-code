@@ -2,7 +2,7 @@
 //
 // 一个引擎进程一份(插件模块被 import 缓存;plugin.ts 在模块作用域建它)。三类来源都进同一个队列:
 //   ① codepuppy_reload / codepuppy_register(进程内,无 generation,不向 main 报告);
-//   ② main 经 parentPort 发来的 `alpha.reload.request`(定制中心按钮、安装体、信任门 / 外部导入,带 generation);
+//   ② main 经 parentPort 发来的 `codepuppy.reload.request`(定制中心按钮、安装体、信任门 / 外部导入,带 generation);
 //   ③ 用户在定制中心点「现在重载」= ② 带 `force`。
 //
 // 决定规则(I5):
@@ -16,14 +16,14 @@
 //   · dispose 失败 ⇒ 保留队列、报 failed、下一次事件再试;连败 3 次停止自动重试(仍报最后一条 failed)。绝不降级成「可用」。
 //   · 一直忙(> 5 分钟):只记一行日志,继续等 —— 不打断(约束 4);用户要立刻生效走 force。
 //
-// 实例登记:每次 AlphaExt(input) 初始化登记 { directory, client };**只因插件自己的 dispose 钩子注销**(引擎销毁实例时逐插件
+// 实例登记:每次 CodePuppyExt(input) 初始化登记 { directory, client };**只因插件自己的 dispose 钩子注销**(引擎销毁实例时逐插件
 // 调用它)。查询失败不注销、不猜。登记接口缺口:引擎没有「暂停会话准入」,两次查空闲与 dispose 之间仍可能有新回合被准入
 // (基线 §2.6 登记在案,本模块不假装覆盖)。
 //
 // 报给 main 的 `error` 文本会原样出现在定制中心(只进 title),所以只写给人看的短句,不放异常原文与内部细节;
 // 细节进本进程日志。
 
-import type { ReloadOutcome, ReloadScope } from "../../ui-mac/src/main/alpha-sidecar-messages"
+import type { ReloadOutcome, ReloadScope } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
 import type { EngineFetch } from "../../ui-mac/src/main/in-process-engine"
 
 /** 引擎递给插件的 v1 SDK client 里本模块用到的两样(与 `input.client` 同形)。 */
@@ -37,7 +37,7 @@ export function inProcessEngineRequest(engineFetch: EngineFetch, directory: stri
   const password = env.OPENCODE_SERVER_PASSWORD
   const authorization = password ? `Basic ${Buffer.from(`${env.OPENCODE_SERVER_USERNAME ?? "opencode"}:${password}`).toString("base64")}` : undefined
   return async (method: "GET" | "POST", path: string): Promise<{ data?: unknown; error?: { status: number } }> => {
-    const url = new URL(path, "http://alpha-engine.invalid")
+    const url = new URL(path, "http://codepuppy-engine.invalid")
     url.searchParams.set("directory", directory)
     const response = await engineFetch(
       new Request(url, { method, headers: { "x-opencode-directory": encodeURIComponent(directory), ...(authorization ? { authorization } : {}) } }),
@@ -121,7 +121,7 @@ export function createReloadScheduler(deps: {
         (status) => !(status && typeof status === "object" && (status as { type?: unknown }).type === "idle"),
       ).length
     } catch (error) {
-      deps.error(`[@alpha-code/ext] reload: session status of ${directory} unknown — ${error instanceof Error ? error.message : String(error)}`)
+      deps.error(`[@codepuppy/ext] reload: session status of ${directory} unknown — ${error instanceof Error ? error.message : String(error)}`)
       return "unknown"
     } finally {
       clearTimeout(timer)
@@ -161,7 +161,7 @@ export function createReloadScheduler(deps: {
     const reasons = [...new Set(members.map((member) => member.reason))].join("; ")
     const directories = scope === "global" ? [...instances.keys()] : instances.has(scope.directory) ? [scope.directory] : []
     if (directories.length === 0) {
-      deps.log(`[@alpha-code/ext] reload: nothing loaded for ${scope === "global" ? "any directory" : scope.directory} — the next load reads the new state (${reasons})`)
+      deps.log(`[@codepuppy/ext] reload: nothing loaded for ${scope === "global" ? "any directory" : scope.directory} — the next load reads the new state (${reasons})`)
       reportAll(members, "reloaded", [])
       settle(members)
       return
@@ -169,7 +169,7 @@ export function createReloadScheduler(deps: {
     for (const pass of [1, 2]) {
       const seen = await census(directories)
       if (seen.unknown.length > 0) {
-        deps.error(`[@alpha-code/ext] reload: zero dispose — engine status unknown for ${seen.unknown.join(", ")}${force ? " (force does not override this)" : ""}`)
+        deps.error(`[@codepuppy/ext] reload: zero dispose — engine status unknown for ${seen.unknown.join(", ")}${force ? " (force does not override this)" : ""}`)
         reportAll(members, "waiting", directories, "engine status unavailable — restart the app if this persists")
         return
       }
@@ -177,9 +177,9 @@ export function createReloadScheduler(deps: {
         const first = members[0]!
         if (now() - first.since > LONG_WAIT_MS && !longWaitLogged.has(first)) {
           longWaitLogged.add(first)
-          deps.log(`[@alpha-code/ext] reload: still waiting after 5 minutes — ${seen.busy} session(s) busy (${reasons})`)
+          deps.log(`[@codepuppy/ext] reload: still waiting after 5 minutes — ${seen.busy} session(s) busy (${reasons})`)
         }
-        if (pass === 2) deps.log(`[@alpha-code/ext] reload: a session became busy between the two status checks — waiting again`)
+        if (pass === 2) deps.log(`[@codepuppy/ext] reload: a session became busy between the two status checks — waiting again`)
         reportAll(members, "waiting", directories, `${seen.busy} session(s) busy`)
         return
       }
@@ -193,12 +193,12 @@ export function createReloadScheduler(deps: {
           throw new Error(`dispose returned ${JSON.stringify((result as { error?: unknown }).error).slice(0, 200)}`)
       } catch (error) {
         failed.push(directory)
-        deps.error(`[@alpha-code/ext] reload: dispose of ${directory} failed — ${error instanceof Error ? error.message : String(error)}`)
+        deps.error(`[@codepuppy/ext] reload: dispose of ${directory} failed — ${error instanceof Error ? error.message : String(error)}`)
       }
     }
     if (failed.length === 0) {
       failures = 0
-      deps.log(`[@alpha-code/ext] reload executed for ${directories.length} instance(s)${force ? " (forced)" : ""} — ${reasons}`)
+      deps.log(`[@codepuppy/ext] reload executed for ${directories.length} instance(s)${force ? " (forced)" : ""} — ${reasons}`)
       reportAll(members, "reloaded", directories)
       settle(members)
       return
@@ -206,7 +206,7 @@ export function createReloadScheduler(deps: {
     failures += 1
     if (failures >= MAX_FAILURES) {
       failures = 0
-      deps.error(`[@alpha-code/ext] reload FAILED ${MAX_FAILURES}x — giving up; changes appear after an app restart (${reasons})`)
+      deps.error(`[@codepuppy/ext] reload FAILED ${MAX_FAILURES}x — giving up; changes appear after an app restart (${reasons})`)
       reportAll(members, "failed", directories, `reload failed ${MAX_FAILURES} times — restart the app to apply`)
       settle(members)
       return
@@ -249,7 +249,7 @@ export function createReloadScheduler(deps: {
           if (queue.length > 0) await runOnce()
         } while (again)
       } catch (error) {
-        deps.error(`[@alpha-code/ext] reload scheduler failed: ${error instanceof Error ? error.message : String(error)}`)
+        deps.error(`[@codepuppy/ext] reload scheduler failed: ${error instanceof Error ? error.message : String(error)}`)
       } finally {
         running = undefined
       }

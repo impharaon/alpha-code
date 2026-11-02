@@ -26,8 +26,8 @@ Excel / PPT 用 `@file-viewer`),不走「把 LibreOffice 装进安装包」那�
 宿主页要把文档字节当**数据**取回来。不加这一条,同源 `fetch` 被拒:
 
 ```
-Fetch API cannot load alpha-artifact-preview://<token>/__alpha_office__/document.
-URL scheme "alpha-artifact-preview" is not supported.
+Fetch API cannot load codepuppy-artifact-preview://<token>/__codepuppy_office__/document.
+URL scheme "codepuppy-artifact-preview" is not supported.
 ```
 
 这是**全应用一次性**的注册,与 HTML 产物预览共用同一个协议名。所以必须回答:加了之后,
@@ -37,7 +37,7 @@ URL scheme "alpha-artifact-preview" is not supported.
 按生产的 `HTML_PREVIEW_CSP` 供给,实测控制台只有:
 
 ```
-Blocked script execution in 'alpha-artifact-preview://<token>/evil.html'
+Blocked script execution in 'codepuppy-artifact-preview://<token>/evil.html'
 because the document's frame is sandboxed
 ```
 
@@ -64,7 +64,7 @@ default-src 'none'   ← 其余一律 none
 ## 顺带收紧的两处
 
 **工作区路径不进 URL。** html / pdf 载体直接装载那份文档本身,URL 里带着文件名;Office 载体
-装的是宿主页,文档在 `__alpha_office__/document` 这个定长地址上供给,由 main 按记录解析回
+装的是宿主页,文档在 `__codepuppy_office__/document` 这个定长地址上供给,由 main 按记录解析回
 工作区文件(身份 + 尺寸复核照旧,盘上被换即 409)。叠放层的地址因此不泄露工作区内容。
 
 **结构闸仍在渲染库之前。** `detectOoxmlContainer`(#1174)照旧先跑:畸形容器、加密包、

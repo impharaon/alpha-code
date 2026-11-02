@@ -4,7 +4,7 @@ import { planSelfHeal, type SelfHealPlan, type SelfHealState } from "./sidecar-s
 /**
  * REQ-236 §2.6(`#1562`):引擎重启只由 main 按白名单决定,每一次都带一个具名原因写进
  * `main.sidecar.respawn.fork.start` 的 `reason`。令牌续期**不在**表里 —— 同身份续期热应用凭据文件
- * (`alpha-secret-files.applyPlatformCredentialsHot`),不重启;只有凭据在场性变化或热写失败才以
+ * (`codepuppy-secret-files.applyPlatformCredentialsHot`),不重启;只有凭据在场性变化或热写失败才以
  * `credential-change` 走结构性重启。单个 MCP 失败、远端目录刷新失败同样不在表里。
  */
 export const SIDECAR_RESPAWN_TRIGGERS = [

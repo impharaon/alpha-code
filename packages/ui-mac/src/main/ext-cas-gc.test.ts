@@ -14,7 +14,7 @@ import { collectCasGarbage, defaultCasGcEnvRoots } from "./ext-cas-gc"
 let base: string
 let envRoot: string
 beforeEach(() => {
-  base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "alpha-casgc-")))
+  base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-casgc-")))
   envRoot = path.join(base, "env", "prod")
   fs.mkdirSync(envRoot, { recursive: true })
   fs.mkdirSync(path.join(base, "cas"), { recursive: true })

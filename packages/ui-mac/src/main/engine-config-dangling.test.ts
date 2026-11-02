@@ -24,11 +24,11 @@ import {
 import { withConfigWriteLock } from "./ext-config"
 
 const ENV_KEYS = [
-  "ALPHA_GLOBAL_DIR",
-  "ALPHA_OPENCODE_HOME",
+  "CODEPUPPY_GLOBAL_DIR",
+  "CODEPUPPY_OPENCODE_HOME",
   "OPENCODE_CONFIG_DIR",
-  "ALPHA_JSONC_TRUTH_DISABLE",
-  "ALPHA_LEGACY_INSTALL_ROOT",
+  "CODEPUPPY_JSONC_TRUTH_DISABLE",
+  "CODEPUPPY_LEGACY_INSTALL_ROOT",
 ] as const
 
 let temporary = ""
@@ -37,21 +37,21 @@ const saved: Record<string, string | undefined> = {}
 
 beforeEach(() => {
   ENV_KEYS.forEach((key) => saved[key] = process.env[key])
-  temporary = realpathSync(mkdtempSync(join(tmpdir(), "alpha-dangling-")))
+  temporary = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-dangling-")))
   roots = {
     userData: join(temporary, "user-data"),
-    alphaGlobal: join(temporary, "alpha-global"),
+    codepuppyGlobal: join(temporary, "codepuppy-global"),
     opencodeHome: join(temporary, "opencode-home"),
     engineData: join(temporary, "engine-data"),
   }
-  ;[roots.userData, roots.alphaGlobal, roots.opencodeHome, roots.engineData, join(temporary, "xdg")].forEach((directory) =>
+  ;[roots.userData, roots.codepuppyGlobal, roots.opencodeHome, roots.engineData, join(temporary, "xdg")].forEach((directory) =>
     mkdirSync(directory, { recursive: true }),
   )
-  process.env.ALPHA_GLOBAL_DIR = roots.alphaGlobal
-  process.env.ALPHA_OPENCODE_HOME = roots.opencodeHome
+  process.env.CODEPUPPY_GLOBAL_DIR = roots.codepuppyGlobal
+  process.env.CODEPUPPY_OPENCODE_HOME = roots.opencodeHome
   process.env.OPENCODE_CONFIG_DIR = join(temporary, "xdg")
-  delete process.env.ALPHA_JSONC_TRUTH_DISABLE
-  delete process.env.ALPHA_LEGACY_INSTALL_ROOT
+  delete process.env.CODEPUPPY_JSONC_TRUTH_DISABLE
+  delete process.env.CODEPUPPY_LEGACY_INSTALL_ROOT
 })
 
 afterEach(() => {
@@ -80,7 +80,7 @@ describe("planDanglingSweep", () => {
     const foreign = join(temporary, "user-project", "plugin.js")
     const plan = planDanglingSweep(
       { plugin: [guarded, "opencode-plugin", present, foreign], other: { plugin: [guarded] } },
-      { configDir: roots.alphaGlobal, guardRoots: [roots.userData], inspectPath: inspector({ absent: [guarded, foreign] }) },
+      { configDir: roots.codepuppyGlobal, guardRoots: [roots.userData], inspectPath: inspector({ absent: [guarded, foreign] }) },
     )
 
     expect(plan.edits.map((edit) => edit.keyPath)).toEqual([["plugin", 0]])
@@ -88,10 +88,10 @@ describe("planDanglingSweep", () => {
   })
 
   test("strips only {file:} values resolved inside a guard root", () => {
-    const guarded = join(roots.userData, "alpha-mcp-secrets", "demo", "TOKEN")
+    const guarded = join(roots.userData, "codepuppy-mcp-secrets", "demo", "TOKEN")
     const foreign = join(temporary, "user-secrets", "TOKEN")
-    const relativeGuarded = relative(roots.alphaGlobal, join(roots.userData, "alpha-mcp-secrets", "demo", "RELATIVE"))
-    const resolvedRelative = resolve(roots.alphaGlobal, relativeGuarded)
+    const relativeGuarded = relative(roots.codepuppyGlobal, join(roots.userData, "codepuppy-mcp-secrets", "demo", "RELATIVE"))
+    const resolvedRelative = resolve(roots.codepuppyGlobal, relativeGuarded)
     const plan = planDanglingSweep(
       {
         mcp: {
@@ -106,7 +106,7 @@ describe("planDanglingSweep", () => {
         },
       },
       {
-        configDir: roots.alphaGlobal,
+        configDir: roots.codepuppyGlobal,
         guardRoots: [roots.userData],
         inspectPath: inspector({ absent: [guarded, resolvedRelative, foreign] }),
       },
@@ -120,12 +120,12 @@ describe("planDanglingSweep", () => {
   })
 
   test("keeps an EACCES/uncertain reference for fail-closed enforcement", () => {
-    const guarded = join(roots.userData, "alpha-mcp-secrets", "demo", "TOKEN")
-    const absent = join(roots.userData, "alpha-mcp-secrets", "demo", "ABSENT")
+    const guarded = join(roots.userData, "codepuppy-mcp-secrets", "demo", "TOKEN")
+    const absent = join(roots.userData, "codepuppy-mcp-secrets", "demo", "ABSENT")
     const plan = planDanglingSweep(
       { mcp: { demo: { environment: { TOKEN: `{file:${guarded}}:{file:${absent}}` } } } },
       {
-        configDir: roots.alphaGlobal,
+        configDir: roots.codepuppyGlobal,
         guardRoots: [roots.userData],
         inspectPath: inspector({ absent: [absent], uncertain: [guarded] }),
       },
@@ -142,7 +142,7 @@ describe("planDanglingSweep", () => {
     const plan = planDanglingSweep(
       { plugin: [lexical] },
       {
-        configDir: roots.alphaGlobal,
+        configDir: roots.codepuppyGlobal,
         guardRoots: [roots.userData],
         inspectPath: (file) => file === lexical
           ? { identity: { forms: [lexical, canonical], certain: true }, status: "absent" }
@@ -158,11 +158,11 @@ describe("config target safety and writes", () => {
   test("the sweep wrapper admits all four Alpha guard roots", () => {
     const guarded = [
       join(roots.userData, "gone.js"),
-      join(roots.alphaGlobal, "plugins", "gone.js"),
+      join(roots.codepuppyGlobal, "plugins", "gone.js"),
       join(roots.engineData, "gone.js"),
       join(temporary, ".alpha", "gone.js"),
     ]
-    const target = join(roots.alphaGlobal, "alpha.jsonc")
+    const target = join(roots.codepuppyGlobal, "codepuppy.jsonc")
     writeFileSync(target, JSON.stringify({ plugin: guarded }))
 
     const outcome = sweepEngineConfigDanglingUnlocked({
@@ -178,9 +178,9 @@ describe("config target safety and writes", () => {
   })
 
   test("trailing-comma configs match engine parsing for healthy and dangling refs", () => {
-    const live = join(roots.userData, "alpha-mcp-secrets", "demo", "LIVE")
-    const dangling = join(roots.userData, "alpha-mcp-secrets", "demo", "GONE")
-    const target = join(roots.alphaGlobal, "alpha.jsonc")
+    const live = join(roots.userData, "codepuppy-mcp-secrets", "demo", "LIVE")
+    const dangling = join(roots.userData, "codepuppy-mcp-secrets", "demo", "GONE")
+    const target = join(roots.codepuppyGlobal, "codepuppy.jsonc")
     mkdirSync(dirname(live), { recursive: true })
     writeFileSync(live, "secret")
     const config = (secret: string) => `{
@@ -243,9 +243,9 @@ describe("config target safety and writes", () => {
     expect(outcome.warnings.some((warning) => warning.includes("ownership bail-out"))).toBe(true)
   })
 
-  test("data-level sweep edits owned legacy only and never rewrites surviving alpha.jsonc", () => {
+  test("data-level sweep edits owned legacy only and never rewrites surviving codepuppy.jsonc", () => {
     const plugin = join(roots.userData, "gone.js")
-    const alpha = join(roots.alphaGlobal, "alpha.jsonc")
+    const alpha = join(roots.codepuppyGlobal, "codepuppy.jsonc")
     const legacy = join(roots.opencodeHome, "opencode.jsonc")
     const original = JSON.stringify({ plugin: [plugin] })
     writeFileSync(alpha, original)
@@ -265,7 +265,7 @@ describe("config target safety and writes", () => {
   })
 
   test("parse-error target gets zero writes", () => {
-    const target = join(roots.alphaGlobal, "alpha.jsonc")
+    const target = join(roots.codepuppyGlobal, "codepuppy.jsonc")
     const original = `{ "mcp": { "demo": { "environment": { "TOKEN": "{file:${join(roots.userData, "gone")}}" } }`
     writeFileSync(target, original)
 
@@ -284,7 +284,7 @@ describe("config target safety and writes", () => {
 
   test("boot keeps an uncertain ref and raises the existing fail-closed gap", () => {
     const plugin = join(roots.userData, "uncertain.js")
-    const target = join(roots.alphaGlobal, "alpha.jsonc")
+    const target = join(roots.codepuppyGlobal, "codepuppy.jsonc")
     const original = JSON.stringify({ plugin: [plugin] })
     writeFileSync(target, original)
 
@@ -319,10 +319,10 @@ describe("config target safety and writes", () => {
     expect(outcome.enforcementGap.some((gap) => gap.includes("user-foreign"))).toBe(true)
   })
 
-  test("ALPHA_JSONC_TRUTH_DISABLE sweeps only the routed owned legacy config", () => {
-    process.env.ALPHA_JSONC_TRUTH_DISABLE = "1"
+  test("CODEPUPPY_JSONC_TRUTH_DISABLE sweeps only the routed owned legacy config", () => {
+    process.env.CODEPUPPY_JSONC_TRUTH_DISABLE = "1"
     const plugin = join(roots.userData, "gone.js")
-    const alpha = join(roots.alphaGlobal, "alpha.jsonc")
+    const alpha = join(roots.codepuppyGlobal, "codepuppy.jsonc")
     const legacy = join(roots.opencodeHome, "opencode.json")
     const original = JSON.stringify({ plugin: [plugin] })
     writeFileSync(alpha, original)
@@ -341,11 +341,11 @@ describe("config target safety and writes", () => {
     expect(outcome.changedFiles).toEqual([legacy])
   })
 
-  test("ALPHA_LEGACY_INSTALL_ROOT leaves every config untouched because XDG is foreign", () => {
-    process.env.ALPHA_LEGACY_INSTALL_ROOT = "1"
+  test("CODEPUPPY_LEGACY_INSTALL_ROOT leaves every config untouched because XDG is foreign", () => {
+    process.env.CODEPUPPY_LEGACY_INSTALL_ROOT = "1"
     const plugin = join(roots.userData, "gone.js")
     const targets = [
-      join(roots.alphaGlobal, "alpha.jsonc"),
+      join(roots.codepuppyGlobal, "codepuppy.jsonc"),
       join(roots.opencodeHome, "opencode.jsonc"),
       join(process.env.OPENCODE_CONFIG_DIR!, "opencode.jsonc"),
     ]
@@ -367,10 +367,10 @@ describe("config target safety and writes", () => {
 
   test("a busy config lock prevents the sweep callback from writing", () => {
     const plugin = join(roots.userData, "gone.js")
-    const target = join(roots.alphaGlobal, "alpha.jsonc")
+    const target = join(roots.codepuppyGlobal, "codepuppy.jsonc")
     const original = JSON.stringify({ plugin: [plugin] })
     writeFileSync(target, original)
-    const held = tryAcquireBundleLock(roots.alphaGlobal, { txId: "held-by-test" })
+    const held = tryAcquireBundleLock(roots.codepuppyGlobal, { txId: "held-by-test" })
     expect(held.ok).toBe(true)
     if (!held.ok) return
 
@@ -394,14 +394,14 @@ describe("config target safety and writes", () => {
 // 它证明的是「这三步合起来能得到正确结果」,**不是**「生产真的这么接线了」。把
 // `data-clear-boot.ts` 里那次 sweep 调用整段删掉,它仍然全绿(本仓假闸形态⑧)。
 // 生产接线的判据在 `req053-clear-wiring.test.ts`。
-test("credential-level clear leaves alpha.jsonc with no guarded dangling refs and preserves the mcp leaf", () => {
-  const plugin = join(roots.userData, "alpha-secrets", "plugin.js")
-  const secret = join(roots.userData, "alpha-mcp-secrets", "demo", "TOKEN")
+test("credential-level clear leaves codepuppy.jsonc with no guarded dangling refs and preserves the mcp leaf", () => {
+  const plugin = join(roots.userData, "codepuppy-secrets", "plugin.js")
+  const secret = join(roots.userData, "codepuppy-mcp-secrets", "demo", "TOKEN")
   mkdirSync(dirname(plugin), { recursive: true })
   mkdirSync(dirname(secret), { recursive: true })
   writeFileSync(plugin, "export default {}")
   writeFileSync(secret, "secret")
-  const target = join(roots.alphaGlobal, "alpha.jsonc")
+  const target = join(roots.codepuppyGlobal, "codepuppy.jsonc")
   writeFileSync(
     target,
     `{
@@ -461,7 +461,7 @@ test("credential-level clear leaves alpha.jsonc with no guarded dangling refs an
   expect(result.sweep.stripped).toHaveLength(2)
   expect(planDanglingSweep(config, {
     configDir: dirname(target),
-    guardRoots: [roots.userData, roots.alphaGlobal, roots.engineData, join(temporary, ".alpha")],
+    guardRoots: [roots.userData, roots.codepuppyGlobal, roots.engineData, join(temporary, ".alpha")],
   }).edits).toEqual([])
 })
 

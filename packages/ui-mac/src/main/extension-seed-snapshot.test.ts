@@ -4,7 +4,7 @@
 // 交叉复核生成,禁手编。本测试钉住:
 //   · 入仓 lock 过消费端严格解码(ext-seed.decodeSeedLock —— 未知键/预算/许可/平台全门);
 //   · lock/NOTICE 字节 sha256 与快照 meta 一致(手编即红);
-//   · **与内置 catalog 快照互钉**:lock.catalog.sha256 == alpha-catalog.json 字节 sha256
+//   · **与内置 catalog 快照互钉**:lock.catalog.sha256 == codepuppy-catalog.json 字节 sha256
 //     (stable 晋级后只再生其一 → 红;两个快照必须同 stable target 同步再生);
 //   · blob 目录与 lock 清单精确互等(缺一/多一/内容漂移/symlink 均红)——S11 逐字节重哈希;
 //   · 真实消费链冒烟:readPackagedSeed(纯读)+ 逐兼容资产 verifySeedAsset + 单资产提升进
@@ -20,8 +20,8 @@ import { decodeSeedLock, promoteSeedAssetToCas, readPackagedSeed, verifySeedAsse
 
 const seedDir = path.resolve(import.meta.dir, "../../resources/extension-seed")
 const metaPath = path.join(seedDir, "extension-seed.snapshot.json")
-const catalogPath = path.resolve(import.meta.dir, "../renderer/extensions/alpha-catalog.json")
-const catalogMetaPath = path.resolve(import.meta.dir, "../renderer/extensions/alpha-catalog.snapshot.json")
+const catalogPath = path.resolve(import.meta.dir, "../renderer/extensions/codepuppy-catalog.json")
+const catalogMetaPath = path.resolve(import.meta.dir, "../renderer/extensions/codepuppy-catalog.snapshot.json")
 
 const sha = (data: Buffer | string) => crypto.createHash("sha256").update(data).digest("hex")
 const PLATFORM = "darwin-arm64" // lock.supportedPlatforms 成员;逐资产兼容性在下方按资产判定
@@ -99,7 +99,7 @@ describe("extension-seed snapshot drift guard", () => {
       const verified = verifySeedAsset(seedDir, read.seed.lock, asset.id, { platformToken: PLATFORM })
       expect(verified.ok).toBeTrue()
     }
-    const casBase = fs.mkdtempSync(path.join(os.tmpdir(), "alpha-seed-snap-"))
+    const casBase = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-seed-snap-"))
     try {
       const first = read.seed.assets.find((a) => a.platformCompatible)!
       const promoted = promoteSeedAssetToCas(seedDir, read.seed.lock, first.id, casBase, { platformToken: PLATFORM })

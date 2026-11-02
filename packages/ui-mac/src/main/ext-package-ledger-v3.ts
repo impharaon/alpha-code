@@ -16,7 +16,7 @@
 //
 // 本模块是**纯**的:只有类型、严格解码器与集合代数,零 fs、零 electron。账本文件的读写
 // 仍然只有 `ext-receipt-v2.ts` 一个物理写器(V3 落地时同时删掉了第二个物理写器
-// `alpha-installs.writeLedger` 的全部生产调用)。
+// `codepuppy-installs.writeLedger` 的全部生产调用)。
 
 import { isExtensionName } from "../shared/extension-name"
 import { canonicalJson, sha256Hex } from "./ext-manifest-v2"

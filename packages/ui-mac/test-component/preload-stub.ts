@@ -1,7 +1,7 @@
 // 组件测试共享的 `window.api` 最小桩(`#1374`)。
 //
 // ── 为什么有这个文件 ──────────────────────────────────────────────────────────────
-// 挂 composer 的四个 cases 文件(alpha-composer-model / new-session-workspace /
+// 挂 composer 的四个 cases 文件(codepuppy-composer-model / new-session-workspace /
 // session-second-send / use-projects)此前各写各的 `window.api` 桩。给 preload 面加一个
 // 新能力就要手工找齐四处,漏一处**只有那一个文件红**,而红法长得像自己刚把代码改坏了
 // (`#1353` 加 `moderation.check` 时漏掉 use-projects.cases.ts,实测就是这个形态)。
@@ -23,7 +23,7 @@
 // 上面几处的分支从「没有这个能力」翻成「有」,悄悄改掉四个文件里已经绿着的用例。
 // 未提供的键一律保持 `undefined`;需要它在场的 cases 文件自己经 `extras` 注入。
 import type { AccountSummary, AuthState, ElectronAPI } from "../src/preload/types"
-import type { CatalogRefreshHealth, EffectiveCatalog, ProviderKeyStatus } from "../src/shared/alpha-model-types"
+import type { CatalogRefreshHealth, EffectiveCatalog, ProviderKeyStatus } from "../src/shared/codepuppy-model-types"
 
 /** 只约束**顶层键名**属于真面,不约束各成员形状 —— 桩在成员一级本来就是残缺的。 */
 type PreloadSurfaceShape = { [Key in keyof ElectronAPI]?: unknown }

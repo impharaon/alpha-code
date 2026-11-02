@@ -21,12 +21,12 @@ import * as crypto from "node:crypto"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
-import { downloadArtifactToFile } from "../../packages/ui-mac/src/main/alpha-artifact-download"
+import { downloadArtifactToFile } from "../../packages/ui-mac/src/main/codepuppy-artifact-download"
 import {
   finalizeArtifactWithQuota,
   initializeArtifactQuotaEnvironment,
 } from "../../packages/ui-mac/src/main/artifact-service"
-import { ensureAlphaScaffold, safeResolveInAlpha } from "../../packages/ui-mac/src/main/alpha-workdir"
+import { ensureCodePuppyScaffold, safeResolveInCodePuppy } from "../../packages/ui-mac/src/main/codepuppy-workdir"
 
 const [mode, originBase, fixtureFile, fixtureSha, fixtureSizeRaw, warmupFile] = process.argv.slice(2)
 if (!mode || !originBase || !fixtureFile || !fixtureSha || !fixtureSizeRaw || !warmupFile) {
@@ -77,14 +77,14 @@ const stopSampling = () => {
 }
 
 async function main() {
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "alpha-1114-proj-"))
-  const userData = fs.mkdtempSync(path.join(os.tmpdir(), "alpha-1114-ud-"))
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-1114-proj-"))
+  const userData = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-1114-ud-"))
   try {
-    ensureAlphaScaffold(projectDir)
+    ensureCodePuppyScaffold(projectDir)
     const init = await initializeArtifactQuotaEnvironment(userData)
     if (!init.ok) throw new Error(`quota env init failed: ${JSON.stringify(init)}`)
     const runId = "job_memgate01"
-    const artifactsDir = safeResolveInAlpha(projectDir, "runs", runId, "artifacts")!
+    const artifactsDir = safeResolveInCodePuppy(projectDir, "runs", runId, "artifacts")!
     fs.mkdirSync(artifactsDir, { recursive: true })
     const targetPath = path.join(artifactsDir, "big.bin")
 
@@ -99,7 +99,7 @@ async function main() {
     })
 
     // 预热:真跑一遍 1 KiB,把 ajv/undici/fs 全部 fault-in,再取 baseline。
-    const warmDir = safeResolveInAlpha(projectDir, "runs", "job_memgatewarm", "artifacts")!
+    const warmDir = safeResolveInCodePuppy(projectDir, "runs", "job_memgatewarm", "artifacts")!
     fs.mkdirSync(warmDir, { recursive: true })
     const warm = await downloadArtifactToFile(
       {

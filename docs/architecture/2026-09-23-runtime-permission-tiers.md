@@ -14,7 +14,7 @@
 > 这两种的修法完全不同;
 
 **答:两种都不是。**引擎侧三值齐全(`packages/core/src/v1/config/permission.ts:5`),
-UI 只暴露两档(`alpha-composer.tsx:292-309`)—— 但**缺的那一档不是 `allow`**:
+UI 只暴露两档(`codepuppy-composer.tsx:292-309`)—— 但**缺的那一档不是 `allow`**:
 引擎默认档 `build` 的规则集**已经**对 `edit` / `bash` 求值为 `allow`
 (`agent/agent.ts:119-152`,实测 §5.1),而 composer 的「请求审批」档**恰好就是不带 agent
 发出去、落到 `build` 上**(`composer-state.ts:303-323`)。
@@ -31,12 +31,12 @@ UI 只暴露两档(`alpha-composer.tsx:292-309`)—— 但**缺的那一档不�
 
 - 今天默认档**仍然会问**的只有三类(实测 §5.1 / §5.2):`external_directory`(工作区之外的路径)、
   `doom_loop`、`read` 命中 `*.env` / `*.env.*`;外加文档轴对**非 builtin** 工具(第三方 MCP /
-  插件 / Alpha Cloud)的默认 `ask`(`packages/schema/src/alpha-tool-policy.ts:157-159`)。
+  插件 / Alpha Cloud)的默认 `ask`(`packages/schema/src/codepuppy-tool-policy.ts:157-159`)。
 - 因此「完全访问 = 所有工具一律 allow」相对今天的默认档,**净增量只有上面这几类**;
   若定义成「除某几类仍要问」,则与今天的默认档**可能一格差别都没有**。
 
 > **3. 和 alpha 主权判决的关系**:有些拒绝是**最终闸**,permission 覆盖不了
-> (`ALPHA_LOCAL_WEBSEARCH_DENY` 就是这样:工具 `execute` 首行直接拒,
+> (`CODEPUPPY_LOCAL_WEBSEARCH_DENY` 就是这样:工具 `execute` 首行直接拒,
 > agent wildcard / session permission / approved 三条都顶不掉,
 > 见 `packages/ui-mac/src/main/cloud-web-search.ts` 的头注)。
 > ⇒ **「完全访问」不能承诺它覆盖这些** —— 否则就是对用户说假话。
@@ -64,9 +64,9 @@ ruleset**;头注(`packages/ui-mac/src/main/cloud-web-search.ts:33-39`)逐条列�
 - 档位**不落盘**:模块级 signal(`composer-state.ts:53`)+ 按会话身份键登记的内存 Map
   (`composer-state.ts:170`,`rememberScopedPerm` / `adoptComposerPermScope` / `seedComposerPermScope`,
   `composer-state.ts:176-205`)。重启即回默认。
-- 文案:`alpha.composer.permAsk` = 「请求审批」/「逐次询问」(`i18n/zh.ts:1197-1198`、
+- 文案:`codepuppy.composer.permAsk` = 「请求审批」/「逐次询问」(`i18n/zh.ts:1197-1198`、
   `i18n/en.ts:1229-1230`);`permReadonly` = 「只读」/「不能改文件/执行命令」(`zh.ts:1199-1200`)。
-- 菜单只有两个 `menuitemradio`:`alpha-composer.tsx:292-300`(ask)与 `:301-309`(readonly)。
+- 菜单只有两个 `menuitemradio`:`codepuppy-composer.tsx:292-300`(ask)与 `:301-309`(readonly)。
 
 ### 2.2 引擎侧的档位真源
 
@@ -79,17 +79,17 @@ ruleset**;头注(`packages/ui-mac/src/main/cloud-web-search.ts:33-39`)逐条列�
   `build` = `defaults` + `question/plan_enter: allow` + 用户 `cfg.permission`(`:141-155`)。
 - 默认 agent 的选法:`agent/agent.ts:328-340` —— 无 `cfg.default_agent` 时取第一个
   非 subagent、非 hidden 的 primary ⇒ **`build`**(三个 alpha 注入 agent 都是 `hidden: true`)。
-- alpha 注入的三个 agent:`packages/ui-mac/src/main/alpha-config-injection.ts`
+- alpha 注入的三个 agent:`packages/ui-mac/src/main/codepuppy-config-injection.ts`
   —— `alpha-automation`(`:176-198`)、`alpha-readonly`(`:205-228`)、
   `alpha-automation-standard`(`:233-…`)。**注入面不写任何顶层 `permission` 键**
   (实测:`INJECTED_TOP_LEVEL_PERMISSION null`,§6)。
 - 执行时真正生效的规则集 = `Permission.merge(agent.permission, session.permission ?? [])`
   (`packages/opencode/src/session/tools.ts:111` 与 `:157`)—— **session 规则排在 agent 之后,
   `findLast` 下压过 agent**。
-- 第二条正交轴(REQ-131 文档轴):`AlphaToolPolicy.resolve`
-  (`packages/opencode/src/permission/alpha-tool-policy.ts:114-171`),四类默认
-  **builtin = enabled,其余 = ask**(`packages/schema/src/alpha-tool-policy.ts:132-159`);
-  合成入口 `gateToolExecution`(`permission/alpha-tool-policy-gate.ts:162-190`):
+- 第二条正交轴(REQ-131 文档轴):`CodePuppyToolPolicy.resolve`
+  (`packages/opencode/src/permission/codepuppy-tool-policy.ts:114-171`),四类默认
+  **builtin = enabled,其余 = ask**(`packages/schema/src/codepuppy-tool-policy.ts:132-159`);
+  合成入口 `gateToolExecution`(`permission/codepuppy-tool-policy-gate.ts:162-190`):
   `deny` ⇒ 具名拒绝;`ask` ⇒ 往本次 ruleset 末尾**追加**一条 exact-canonical 的 ask;
   `enabled` ⇒ **什么都不加**,交回 ruleset 轴裁决。
 
@@ -123,15 +123,15 @@ ASK alpha-readonly bash "ls" -> PermissionDeniedError: …                      
 三条必须一起说的边界,否则上面这句会被过度解读:
 
 1. 上表是**出厂默认**(用户 `cfg.permission` 为空、Settings→工具 无记录、无 session 规则)。
-   用户在 `alpha.jsonc` / `opencode.jsonc` 写了 `permission`,或在 Settings→工具
+   用户在 `codepuppy.jsonc` / `opencode.jsonc` 写了 `permission`,或在 Settings→工具
    (`settings.tsx:738` → `settings-tools.tsx`)把某个工具设成「每次询问」,就会问。
 2. **非 builtin 的工具默认就问**:第三方 MCP / 插件 / Alpha Cloud 三类的文档轴默认是 `ask`
-   (`schema/alpha-tool-policy.ts:157-159`;已有生产断言
-   `packages/opencode/test/permission/alpha-tool-policy.test.ts:83-86`)。
+   (`schema/codepuppy-tool-policy.ts:157-159`;已有生产断言
+   `packages/opencode/test/permission/codepuppy-tool-policy.test.ts:83-86`)。
 3. 今天默认档**仍然会问**的三类:`external_directory`(工作区之外)、`doom_loop`、`read` 命中
    `*.env`。用户实际看到的审批弹窗,今天多半来自这几类而不是 `bash`/`edit`。
 
-顺带一条与代码注释矛盾的实测:`alpha-config-injection.ts:201-203` 的注释写
+顺带一条与代码注释矛盾的实测:`codepuppy-config-injection.ts:201-203` 的注释写
 「交互场景有人在场 → question/task 允许」,而 `alpha-readonly` 实测
 `question = deny`、`question` 工具**不在工具表里** —— 因为 `agent.ts:126` 的 `defaults`
 本来就是 `question: "deny"`,而注入的 agent 配置没有覆盖它。`task` 确实是 `allow`。
@@ -146,18 +146,18 @@ ASK alpha-readonly bash "ls" -> PermissionDeniedError: …                      
 | `composer-state.ts:320` `if (input.perm === "readonly") … else if (input.agent) …` | **二元** | 第三档落进 `else` ⇒ 与 `ask` 产出**逐字节相同**的请求。**这正是 REQ-126 退休的那个假档的形态**(`composer-state.ts:23-27`) |
 | `composer-state.ts:176-182` `if (value === "ask") delete else set` | 二元(判「是不是默认」) | 第三档会被登记(语义上对),但「默认」概念仍钉死在 `"ask"` |
 | `composer-state.ts:190` `?? "ask"` / `:53` 初值 | 单点默认 | 新会话默认档若要改成「完全访问」,改这两处;**注意它同时改掉今天所有用户的开局行为** |
-| `alpha-composer.tsx:260` `mode === "ask" ? permAsk : permReadonly` | **二元三目** | 第三档会被**标成「只读」** |
-| `alpha-composer.tsx:281-285` `<Switch fallback={<ShieldAsk/>}><Match when={=== "readonly"}>` | **二元 fallback** | 第三档拿到「请求审批」的盾牌图标 |
-| `alpha-composer.tsx:292-309` 两个 `menuitemradio` | 列表 | 加一项即可 |
-| `alpha-composer.tsx:325-330` PlanChip `data-disabled` / title 按 `=== "readonly"` | 二元 | 第三档下计划 chip 保持可用(大概率是想要的,但**是默认落下来的,不是选出来的**) |
-| `alpha-composer.tsx:1644` Shift+Tab:`if (composerPerm() !== "readonly") 切 plan` | 二元 | 第三档下可切 plan;但若第三档也要压过 agent,这里会与 `:320` 打架 |
+| `codepuppy-composer.tsx:260` `mode === "ask" ? permAsk : permReadonly` | **二元三目** | 第三档会被**标成「只读」** |
+| `codepuppy-composer.tsx:281-285` `<Switch fallback={<ShieldAsk/>}><Match when={=== "readonly"}>` | **二元 fallback** | 第三档拿到「请求审批」的盾牌图标 |
+| `codepuppy-composer.tsx:292-309` 两个 `menuitemradio` | 列表 | 加一项即可 |
+| `codepuppy-composer.tsx:325-330` PlanChip `data-disabled` / title 按 `=== "readonly"` | 二元 | 第三档下计划 chip 保持可用(大概率是想要的,但**是默认落下来的,不是选出来的**) |
+| `codepuppy-composer.tsx:1644` Shift+Tab:`if (composerPerm() !== "readonly") 切 plan` | 二元 | 第三档下可切 plan;但若第三档也要压过 agent,这里会与 `:320` 打架 |
 | `composer-autocomplete.tsx:277` `readonly: composerPerm() === "readonly"` | 二元 | 第三档按「非只读」处理 |
-| `alpha-composer.css:209-211` 只有 `[data-mode="readonly"]` 有配色 | 二元 | 第三档无专属视觉 |
+| `codepuppy-composer.css:209-211` 只有 `[data-mode="readonly"]` 有配色 | 二元 | 第三档无专属视觉 |
 
 引擎侧可承载第三档的**已存在**接缝(都不是新能力,坐标已核):
 
 - **换 agent**:与只读档同形 —— 注入一个 `permission` 全 allow 的 hidden agent,提交时带上。
-  现成同类:`alpha-automation-standard`(`alpha-config-injection.ts:233-…`,`edit: allow`),
+  现成同类:`alpha-automation-standard`(`codepuppy-config-injection.ts:233-…`,`edit: allow`),
   但它同时 deny 了 `question`/`task`/`doom_loop`/`external_directory`,**不是**「完全访问」。
 - **session 规则集**:`PATCH /session/{id}` 的 `UpdatePayload.permission`
   (`server/routes/instance/httpapi/groups/session.ts:49-58`)→ `Session.setPermission`
@@ -173,14 +173,14 @@ ASK alpha-readonly bash "ls" -> PermissionDeniedError: …                      
 
 ### 5.1 规则集与工具表(探针 A)
 
-真 `injectAlphaConfig`(生产注入) → 真 `Agent.Service` → 真 `Permission.evaluate` /
-`Permission.disabled`。零 mock;`ALPHA_GLOBAL_DIR` / `XDG_*` 全部钉进临时目录,
+真 `injectCodePuppyConfig`(生产注入) → 真 `Agent.Service` → 真 `Permission.evaluate` /
+`Permission.disabled`。零 mock;`CODEPUPPY_GLOBAL_DIR` / `XDG_*` 全部钉进临时目录,
 不读宿主机真实配置。
 
 ### 5.2 运行时是否真的弹审批(探针 B)
 
 真 `Permission.Service.ask`(与 `session/tools.ts` 给工具的那条 `ctx.ask` 是同一个服务、
-同一个方法),`ALPHA_PERMISSION_ASK_TIMEOUT_MS=300` 让「真的在等人批」在 300 ms 内
+同一个方法),`CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS=300` 让「真的在等人批」在 300 ms 内
 以具名失败落地,而不是挂住。
 
 ### 5.3 自证(先证明手段测得出已知的坏)
@@ -192,7 +192,7 @@ ASK alpha-readonly bash "ls" -> PermissionDeniedError: …                      
 - **既有生产断言对齐**:`packages/opencode/test/agent/agent.test.ts:61-68` 早已断言
   `build` 的 `edit`/`bash` 都是 `allow` —— 本勘破与它一致,不是新发现的孤证。
 - **变异臂**(证明探针读的是**真注入**而不是常量):把
-  `alpha-config-injection.ts:222` 的 `edit: "deny"` 临时改成 `"allow"` 再跑,
+  `codepuppy-config-injection.ts:222` 的 `edit: "deny"` 临时改成 `"allow"` 再跑,
   `alpha-readonly` 那一行当场从
   `["apply_patch","bash","edit","plan_exit","question","write"]` 变成
   `["bash","plan_exit","question"]`;跑完已还原(`git status` 干净)。
@@ -254,7 +254,7 @@ ASK alpha-readonly bash "ls" -> PermissionDeniedError: The user has specified a 
 <details><summary>探针 A:<code>alpha-1413-probe.test.ts</code></summary>
 
 ```ts
-// 勘破探针(ac#1413)—— 不进 main。跑真 injectAlphaConfig + 真 Agent 服务,
+// 勘破探针(ac#1413)—— 不进 main。跑真 injectCodePuppyConfig + 真 Agent 服务,
 // 打印每个 agent 对每条 permission 的**实际**裁决。
 import { afterEach, expect, beforeAll } from "bun:test"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
@@ -272,7 +272,7 @@ import { Permission } from "../../src/permission"
 import { Plugin } from "../../src/plugin"
 import { Provider } from "../../src/provider/provider"
 import { Skill } from "../../src/skill"
-import { injectAlphaConfig } from "../../../ui-mac/src/main/alpha-config-injection"
+import { injectCodePuppyConfig } from "../../../ui-mac/src/main/codepuppy-config-injection"
 import { ApplyPatchTool } from "../../src/tool/apply_patch"
 import { EditTool } from "../../src/tool/edit"
 import { GlobTool } from "../../src/tool/glob"
@@ -308,16 +308,16 @@ function load<A>(fn: (svc: Agent.Interface) => Effect.Effect<A>) {
 
 beforeAll(() => {
   const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "alpha-1413-")))
-  process.env.ALPHA_GLOBAL_DIR = path.join(tmp, "alpha-code-state", "env", "dev")
-  fs.mkdirSync(process.env.ALPHA_GLOBAL_DIR, { recursive: true })
+  process.env.CODEPUPPY_GLOBAL_DIR = path.join(tmp, "codepuppy-state", "env", "dev")
+  fs.mkdirSync(process.env.CODEPUPPY_GLOBAL_DIR, { recursive: true })
   process.env.XDG_CONFIG_HOME = path.join(tmp, "xdg")
-  process.env.ALPHA_OPENCODE_HOME = path.join(tmp, "opencode-home")
+  process.env.CODEPUPPY_OPENCODE_HOME = path.join(tmp, "opencode-home")
   process.env.XDG_DATA_HOME = path.join(tmp, "xdg-data")
-  for (const d of [process.env.XDG_CONFIG_HOME, process.env.ALPHA_OPENCODE_HOME, process.env.XDG_DATA_HOME])
+  for (const d of [process.env.XDG_CONFIG_HOME, process.env.CODEPUPPY_OPENCODE_HOME, process.env.XDG_DATA_HOME])
     fs.mkdirSync(d, { recursive: true })
   const userData = path.join(tmp, "userdata")
   fs.mkdirSync(userData, { recursive: true })
-  const res = injectAlphaConfig(userData)
+  const res = injectCodePuppyConfig(userData)
   // eslint-disable-next-line no-console
   console.log("INJECT_RESULT", JSON.stringify(res))
   const parsed = JSON.parse(process.env.OPENCODE_CONFIG_CONTENT!)
@@ -406,22 +406,22 @@ import { RuntimeFlags } from "../../src/effect/runtime-flags"
 import { Plugin } from "../../src/plugin"
 import { Provider } from "../../src/provider/provider"
 import { Skill } from "../../src/skill"
-import { injectAlphaConfig } from "../../../ui-mac/src/main/alpha-config-injection"
+import { injectCodePuppyConfig } from "../../../ui-mac/src/main/codepuppy-config-injection"
 
 // 期限压到 300ms:被测的是「会不会挂起等人批」,不是「300 秒有多长」。
-process.env["ALPHA_PERMISSION_ASK_TIMEOUT_MS"] = "300"
+process.env["CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS"] = "300"
 
 const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "alpha-1413b-")))
-process.env.ALPHA_GLOBAL_DIR = path.join(tmp, "alpha-code-state", "env", "dev")
-fs.mkdirSync(process.env.ALPHA_GLOBAL_DIR, { recursive: true })
+process.env.CODEPUPPY_GLOBAL_DIR = path.join(tmp, "codepuppy-state", "env", "dev")
+fs.mkdirSync(process.env.CODEPUPPY_GLOBAL_DIR, { recursive: true })
 process.env.XDG_CONFIG_HOME = path.join(tmp, "xdg")
-process.env.ALPHA_OPENCODE_HOME = path.join(tmp, "opencode-home")
+process.env.CODEPUPPY_OPENCODE_HOME = path.join(tmp, "opencode-home")
 process.env.XDG_DATA_HOME = path.join(tmp, "xdg-data")
-for (const d of [process.env.XDG_CONFIG_HOME, process.env.ALPHA_OPENCODE_HOME, process.env.XDG_DATA_HOME])
+for (const d of [process.env.XDG_CONFIG_HOME, process.env.CODEPUPPY_OPENCODE_HOME, process.env.XDG_DATA_HOME])
   fs.mkdirSync(d, { recursive: true })
 const userData = path.join(tmp, "userdata")
 fs.mkdirSync(userData, { recursive: true })
-console.log("INJECT", JSON.stringify(injectAlphaConfig(userData)))
+console.log("INJECT", JSON.stringify(injectCodePuppyConfig(userData)))
 
 const noopBootstrap = Layer.succeed(InstanceBootstrap.Service, InstanceBootstrap.Service.of({ run: Effect.void }))
 const env = AppNodeBuilder.build(
@@ -503,10 +503,10 @@ it.instance("真 Permission.ask:build(=「请求审批」档)对 bash/edit 是�
    ⇒ **今天在 alpha 里打开这个开关基本没有可命中的记录**;它与本票要加的档位**语义重叠**,
    两个开关同时存在会让用户无从判断谁说了算。
 2. **Settings → 工具(REQ-131 / `#1130`)**:逐工具 enabled/ask/disabled 的第二条轴,
-   已上线(`settings.tsx:738` → `alpha-ui/settings-tools.tsx`),与档位轴汇进同一个引擎
-   (`alpha-tool-policy-gate.ts:5-20`:deny 是上限、ask 挂起、allow 才放行)。
+   已上线(`settings.tsx:738` → `codepuppy-ui/settings-tools.tsx`),与档位轴汇进同一个引擎
+   (`codepuppy-tool-policy-gate.ts:5-20`:deny 是上限、ask 挂起、allow 才放行)。
 3. **composer 自己**:只读档**压过**用户手选的 agent(`composer-state.ts:320`,
-   `alpha-composer.tsx:318` 的注释如实说明)。
+   `codepuppy-composer.tsx:318` 的注释如实说明)。
 4. **主权闸(permission 覆盖不了的)**:本机 websearch(`tool/websearch.ts:145`)、
    云 websearch(`packages/ext/src/cloud-websearch-kill.ts`)、MCP 默认 deny
    (`main/mcp-default-deny.ts`)、进程围栏 / 出网围栏(见
@@ -535,7 +535,7 @@ it.instance("真 Permission.ask:build(=「请求审批」档)对 bash/edit 是�
   **未跑**。本文测的是引擎层(真注入 + 真 Agent + 真 Permission 服务)。
   `req.agent === undefined` 真的落成 `PromptInput.agent === undefined`,是**读**出来的
   (`composer-state.ts:303-323`),不是量出来的。
-- 用户机上已有的 `alpha.jsonc` / `opencode.jsonc` 里有没有 `permission` 键 —— 未读 owner 的真实
+- 用户机上已有的 `codepuppy.jsonc` / `opencode.jsonc` 里有没有 `permission` 键 —— 未读 owner 的真实
   配置(探针把配置根钉进了临时目录)。owner 机器上若有,实际行为会与本表不同。
 - Settings → 工具里 owner 现有的记录 —— 未读。
 - `doom_loop` 在真实回合里多久触发一次 —— 未测。
@@ -548,14 +548,14 @@ it.instance("真 Permission.ask:build(=「请求审批」档)对 bash/edit 是�
 | 档(用户看到的) | `PermMode` | 提交时 `agent` 字段 | 引擎侧规则集 | 相对此前 |
 |---|---|---|---|---|
 | 全部批准 · 改文件/执行命令不再询问 | `allow`(**新会话默认**) | 不带(引擎默认 `build`) | §3 表 `build` 那一行,一格未动 | = 此前「请求审批」的**真实**行为,只换了个诚实的标签 |
-| 请求审批 · 逐次询问 | `ask` | `"alpha-ask"` | `build` + `edit: ask` + `bash: ask`(主进程 `alpha-config-injection.ts` 注入的 hidden agent,**无 prompt**) | 此前一次都不问;现在 edit / bash 各进一次待批队列 |
+| 请求审批 · 逐次询问 | `ask` | `"alpha-ask"` | `build` + `edit: ask` + `bash: ask`(主进程 `codepuppy-config-injection.ts` 注入的 hidden agent,**无 prompt**) | 此前一次都不问;现在 edit / bash 各进一次待批队列 |
 | 只读 · 不能改文件/执行命令 | `readonly` | `"alpha-readonly"` | §3 表 `alpha-readonly` 那一行,一格未动 | 逐字不变 |
 
 - 三档不再走 §4 那个二元分支:`composer-state.ts` 的 `PERM_AGENT: Record<PermMode, string | null>` 是穷举表,
   少一档 typecheck 红;`ask` 与 `readonly` 都压过手选档位(计划 chip 置灰并点名是哪一档压的),`allow` 透传。
 - `alpha-ask` 与 `build` 对每一把内置权限键的求值**只在 edit / bash 上不同**,工具表逐字相同;
   `external_directory` / `doom_loop` / `read *.env` 两者都仍是 ask(没有顺手放宽)。
-- 引擎层常驻闸:`packages/opencode/test/permission/alpha-composer-tiers.test.ts`(真 `injectAlphaConfig` + 真 Agent +
+- 引擎层常驻闸:`packages/opencode/test/permission/codepuppy-composer-tiers.test.ts`(真 `injectCodePuppyConfig` + 真 Agent +
   真 `Permission.ask`;§7 的两份探针由它接替,探针本身仍不进 main)。renderer 层:`composer-state.test.ts`
   (三份请求体逐字节不同)、`shell-commands.test.ts`(真壳逐档点选,提交层 agent 三个互不相同)。
 - §8 第 1 条(Settings 的「自动批准权限」总闸)与 §10 的「打包版真机端到端」**本轮仍未处置 / 未跑**。

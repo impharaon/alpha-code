@@ -8,7 +8,7 @@
 
 **定位**:基于 opencode fork 的桌面编码 agent 产品(macOS 首发 + Windows,ADR-026;面向多用户 + 云多租户)—— 本地不改 opencode 自身文件,以原生 workspace 成员叠加自有 UI 与后端,fork-sync 零冲突继承上游;云平台为独立运行时(见独立项目 alpha-platform 的 .claude/rules)。
 **北极星**:升级隔离健康度 —— 每次 upstream sync 后冲突文件数 = 0。
-它的机械判据**分两层,别把其中一层当成全部**(`#1288`):`scripts/north-star-guard.sh`(alpha-check 第 `[1/14]` 步,也是 alpha 分支保护上的必需 context)的比较基准是 `origin/alpha`,所以它只回答「**这个 PR 自己**有没有新增偏离」——收编白名单里的每一条它都按设计放行,`origin/dev` 的日期它连问都没问过。**总量与对齐年龄**由第 `[13/14]` 步 `scripts/north-star-drift-metrics.sh` 每次本地闸打印:收编面(白名单条目数)/ merge-base 起的上游漂移文件数与行数 / merge-base 年龄(天)。它**只量不拦**(先量后闸,不设阈值)。因此:**守卫今天绿 ≠ 我们没有偏离**。
+它的机械判据**分两层,别把其中一层当成全部**(`#1288`):`scripts/north-star-guard.sh`(codepuppy-check 第 `[1/14]` 步,也是 alpha 分支保护上的必需 context)的比较基准是 `origin/alpha`,所以它只回答「**这个 PR 自己**有没有新增偏离」——收编白名单里的每一条它都按设计放行,`origin/dev` 的日期它连问都没问过。**总量与对齐年龄**由第 `[13/14]` 步 `scripts/north-star-drift-metrics.sh` 每次本地闸打印:收编面(白名单条目数)/ merge-base 起的上游漂移文件数与行数 / merge-base 年龄(天)。它**只量不拦**(先量后闸,不设阈值)。因此:**守卫今天绿 ≠ 我们没有偏离**。
 **明确不做**:① 编辑任何 opencode 自身的文件(只新增);② 重写 agent core/session/context 引擎;③ 给 upstream 提 PR(这是个人 fork)。
 **硬约束**:① 只新增文件,绝不改 opencode 既有文件(否则 fork-sync 冲突);② 前后端只走 `@opencode-ai/sdk` 契约;③ 后端走 plugin/tool/MCP,新 HTTP 接口走 sidecar 不改 server。
 
@@ -39,7 +39,7 @@
 2. **设计系统**:读 [`docs/design/system/`](docs/design/system/)(`principles` 设计宪法 · `color` 用色宪法 · `tokens` · `components` · `patterns`)。
 3. **在现有面上优化**,禁止凭空另画一套 IA;新稿必须带"与上一稿的关系"块(继承什么 + 改什么)。
 4. **产出走技能**:一切界面产出(新/改设计稿、组件画廊)走 `frontend-design` skill,不手搓界面 HTML。
-5. **Token 纪律**:只用 `--a-*`,新值加进 `packages/ui-mac/src/renderer/alpha-ui/tokens.css`;绝不改 upstream `--v2-*` / 不 fork 上游 DOM;light+dark 双模 + WCAG 对比 + 可见 focus。UI 文案禁开发术语(REQ/票号)。
+5. **Token 纪律**:只用 `--a-*`,新值加进 `packages/ui-mac/src/renderer/codepuppy-ui/tokens.css`;绝不改 upstream `--v2-*` / 不 fork 上游 DOM;light+dark 双模 + WCAG 对比 + 可见 focus。UI 文案禁开发术语(REQ/票号)。
 
 完整契约见 [`docs/design/system/contributing.md`](docs/design/system/contributing.md);设计稿两层模型(current 活稿 / 日期历史)见 [`docs/design/README.md`](docs/design/README.md)。
 
@@ -47,14 +47,14 @@
 ```
 bun install
 bun run --cwd packages/ui-mac dev   # electron 解析失败时加 ELECTRON_EXEC_PATH(见 ALPHA.md);flag 须在 run 后(REQ-027)
-bash scripts/alpha-check.sh          # push 前自检:跑 alpha-ci 的全部 16 个代码步,末尾自陈逐步覆盖
+bash scripts/codepuppy-check.sh          # push 前自检:跑 codepuppy-ci 的全部 16 个代码步,末尾自陈逐步覆盖
 ```
 
 ## CI(规范见 `docs/runbooks/ci.md`)
-**本地先跑,CI 兜底**。push 前必过 `scripts/alpha-check.sh` —— 它跑 `alpha-ci` 的**全部 16 个代码步**,
+**本地先跑,CI 兜底**。push 前必过 `scripts/codepuppy-check.sh` —— 它跑 `codepuppy-ci` 的**全部 16 个代码步**,
 并在末尾打印逐步对照表(MIRRORED / SUPERSET / DEGRADED,后两者必须写理由)。这张表由
 `packages/ui-mac/src/main/local-gate-parity.test.ts` 反向核对:CI 加一步而本地没登记即红。
-`#777` 之前这里写的是「与 alpha-ci 1:1」,而实测只跑了 9 步、其中 3 步是裸 `bun test` 的降级档
+`#777` 之前这里写的是「与 codepuppy-ci 1:1」,而实测只跑了 9 步、其中 3 步是裸 `bun test` 的降级档
 (跑 0 条照样 exit 0)—— 一句没人核对的 1:1,比没有这句话更坏。
-GitHub 上只有 `alpha-ci` + `sync-upstream` 两个 workflow active;继承的 ~26 个上游 workflow 已禁用(要 Blacksmith runner,本 fork 没有 → 永久 queued,即"CI 卡"真因)。排查手册见 `docs/runbooks/ci.md` §5。
+GitHub 上只有 `codepuppy-ci` + `sync-upstream` 两个 workflow active;继承的 ~26 个上游 workflow 已禁用(要 Blacksmith runner,本 fork 没有 → 永久 queued,即"CI 卡"真因)。排查手册见 `docs/runbooks/ci.md` §5。
 **门自身的环境清单**(每道门 × 每个环境 × 真实状态)见 `docs/architecture/quality-gate-environments.md`。

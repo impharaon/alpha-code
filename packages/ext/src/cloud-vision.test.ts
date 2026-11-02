@@ -1,4 +1,4 @@
-// cloud-vision.test.ts —— `#1419`(REQ-228 §2-B)走生产路径:**真 AlphaExt 的钩子**(不是单独 new 一份 hooks)
+// cloud-vision.test.ts —— `#1419`(REQ-228 §2-B)走生产路径:**真 CodePuppyExt 的钩子**(不是单独 new 一份 hooks)
 // + **真 HTTP** 到一个记录请求的桩 gateway(Bun.serve,127.0.0.1)+ 真 photon 压缩。桩的只有 gateway 那一端。
 // 期望值全是独立字面量:文案逐字抄自票面 / 基线,不从 renderWrapper / renderTemplate 派生 —— 文案改了这里要一起改,
 // 那正是想要的红。凭据来源与「云端是否可用」的判据见 cloud-vision.ts 文件头。
@@ -22,12 +22,12 @@ type Recorded = { path: string; authorization: string | null; body: Record<strin
 type Reply = { status: number; body: unknown }
 
 const SANITIZE = [
-  "ALPHA_GLOBAL_DIR",
-  "ALPHA_BASE_URL",
-  "ALPHA_FACTORY_SKILL_DIRS",
-  "ALPHA_FACTORY_DENY_SKILLS",
-  "ALPHA_PROMPT_REBRAND_DISABLE",
-  "ALPHA_EXT_VERBOSE",
+  "CODEPUPPY_GLOBAL_DIR",
+  "CODEPUPPY_BASE_URL",
+  "CODEPUPPY_FACTORY_SKILL_DIRS",
+  "CODEPUPPY_FACTORY_DENY_SKILLS",
+  "CODEPUPPY_PROMPT_REBRAND_DISABLE",
+  "CODEPUPPY_EXT_VERBOSE",
   CLOUD_MCP_ARM_ENV,
   CLOUD_MCP_DEF_ENV,
   CLOUD_MCP_SERVER_ENV,
@@ -102,18 +102,18 @@ beforeAll(async () => {
 afterAll(() => server.stop(true))
 
 beforeEach(() => {
-  root = realpathSync(mkdtempSync(join(tmpdir(), "alpha-ext-vision-")))
+  root = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-vision-")))
   mkdirSync(join(root, "global", "env", "dev"), { recursive: true })
   mkdirSync(join(root, "project"), { recursive: true })
   for (const k of SANITIZE) {
     saved.set(k, process.env[k])
     delete process.env[k]
   }
-  process.env.ALPHA_GLOBAL_DIR = join(root, "global", "env", "dev")
+  process.env.CODEPUPPY_GLOBAL_DIR = join(root, "global", "env", "dev")
   tokenFile = join(root, "mcp-token")
   writeFileSync(tokenFile, "tok-vision-123\n")
   // 与 ui-mac 每次 fork 写的三样同形:平台 base(gateway 主机 + /v1)、云 server 名、带 {file:} 凭据的云 MCP 定义
-  process.env.ALPHA_BASE_URL = `http://127.0.0.1:${server.port}/v1`
+  process.env.CODEPUPPY_BASE_URL = `http://127.0.0.1:${server.port}/v1`
   process.env[CLOUD_MCP_SERVER_ENV] = "codepuppy"
   process.env[CLOUD_MCP_DEF_ENV] = JSON.stringify({ type: "remote", url: "https://cloud.invalid/mcp", enabled: true, headers: { Authorization: `Bearer {file:${tokenFile}}` }, oauth: false })
   requests = []
@@ -129,10 +129,10 @@ afterEach(() => {
 })
 
 type Message = { info: Record<string, unknown>; parts: unknown[] }
-/** 真 AlphaExt;`history` = 引擎 `client.session.messages()` 会答的会话历史(缺省空)。 */
+/** 真 CodePuppyExt;`history` = 引擎 `client.session.messages()` 会答的会话历史(缺省空)。 */
 async function loadHooks(history: Message[] = []): Promise<Hooks> {
-  const { AlphaExt } = await import("./plugin")
-  return (await AlphaExt({
+  const { CodePuppyExt } = await import("./plugin")
+  return (await CodePuppyExt({
     directory: join(root, "project"),
     worktree: join(root, "project"),
     client: {
@@ -140,7 +140,7 @@ async function loadHooks(history: Message[] = []): Promise<Hooks> {
       provider: { list: async () => PROVIDER_LIST },
       session: { messages: async () => ({ data: history }) },
     },
-  } as unknown as Parameters<typeof AlphaExt>[0])) as unknown as Hooks
+  } as unknown as Parameters<typeof CodePuppyExt>[0])) as unknown as Hooks
 }
 
 const dataUrl = (bytes: Uint8Array, mime = "image/png") => `data:${mime};base64,${Buffer.from(bytes).toString("base64")}`
@@ -196,7 +196,7 @@ describe("chat.message —— 看不了图 ⇒ 自动转写", () => {
       type: "text",
       synthetic: true,
       text: transcript("#1 login.png", CLOUD_TEXT),
-      metadata: { alpha_vision: { hash: screenshotHash, number: 1, label: "login.png", text: CLOUD_TEXT } },
+      metadata: { codepuppy_vision: { hash: screenshotHash, number: 1, label: "login.png", text: CLOUD_TEXT } },
     })
 
     // 同一张图(同字节)在下一条消息里换个名字再贴:零调用,转写复用,标签用这次的文件名、编号不变
@@ -253,7 +253,7 @@ describe("content_refused ⇒「这张图片无法识别」", () => {
     await chat(hooks, "s5", "m1", GLM, parts)
     expect(requests.length).toBe(1)
     expect(textOf(parts[1])).toBe("〔图片 #1 meme.png:这张图片无法识别〕")
-    expect((parts[1] as { metadata: { alpha_vision: Record<string, unknown> } }).metadata.alpha_vision.text).toBeUndefined()
+    expect((parts[1] as { metadata: { codepuppy_vision: Record<string, unknown> } }).metadata.codepuppy_vision.text).toBeUndefined()
     reply = ok
     const retry = [filePart("prt_52", "s5", "m2", screenshot, "meme.png")]
     await chat(hooks, "s5", "m2", GLM, retry)
@@ -374,9 +374,9 @@ describe("云端不可用 ⇒ 说得出原因的话(与 #1411 同一根轴:云 M
       text: "〔图片 #1 a.png 未能识别:云端识图不可用 —— 尚未登录 Code Puppy 账号〕",
     },
     {
-      name: "未登录:没有 ALPHA_BASE_URL(BYOK 态)⇒ 不出网",
+      name: "未登录:没有 CODEPUPPY_BASE_URL(BYOK 态)⇒ 不出网",
       setup: () => {
-        delete process.env.ALPHA_BASE_URL
+        delete process.env.CODEPUPPY_BASE_URL
       },
       calls: 0,
       text: "〔图片 #1 a.png 未能识别:云端识图不可用 —— 尚未登录 Code Puppy 账号〕",
@@ -392,7 +392,7 @@ describe("云端不可用 ⇒ 说得出原因的话(与 #1411 同一根轴:云 M
     {
       name: "连不上(loopback 上没人听的端口)⇒ 网络",
       setup: () => {
-        process.env.ALPHA_BASE_URL = "http://127.0.0.1:1/v1"
+        process.env.CODEPUPPY_BASE_URL = "http://127.0.0.1:1/v1"
       },
       calls: 0,
       text: "〔图片 #1 a.png 未能识别:连不上云端识图服务,请检查网络〕",
@@ -503,7 +503,7 @@ describe("tool.execute.after —— Read 读到的图片走同一条转写", () 
     expect(requests[0]!.body.fallback_on_refusal).toBe(false)
     expect(output.output).toBe(`Image read successfully\n${transcript("#1 a.png", CLOUD_TEXT)}`)
     expect(output.attachments.length).toBe(1)
-    expect(output.metadata.alpha_vision).toEqual({ images: [{ hash: screenshotHash, number: 1, label: "a.png", text: CLOUD_TEXT }] })
+    expect(output.metadata.codepuppy_vision).toEqual({ images: [{ hash: screenshotHash, number: 1, label: "a.png", text: CLOUD_TEXT }] })
     for (const ref of ["shots/a.png", join(root, "project", "shots", "a.png"), "a.png", "1"]) {
       const o = { args: { image: ref, question: "q" } as Record<string, unknown> }
       await hooks["tool.execute.before"]!({ ...VISION_TOOL, sessionID: "s11" }, o)
@@ -540,7 +540,7 @@ function readToolPart(sessionID: string) {
       input: { filePath: "shots/a.png" },
       output: `Image read successfully\n${transcript("#1 a.png", CLOUD_TEXT)}`,
       title: "shots/a.png",
-      metadata: { preview: "Image read successfully", alpha_vision: { images: [{ hash: screenshotHash, number: 1, label: "a.png", text: CLOUD_TEXT }] } },
+      metadata: { preview: "Image read successfully", codepuppy_vision: { images: [{ hash: screenshotHash, number: 1, label: "a.png", text: CLOUD_TEXT }] } },
       time: { start: 1, end: 2 },
       attachments: [{ id: "prt_att9", sessionID, messageID: "m2", type: "file", mime: "image/png", url: dataUrl(screenshot) }],
     },
@@ -586,7 +586,7 @@ describe("experimental.chat.messages.transform —— 本次请求里剔掉已�
     await chat(restarted, "s14", "m3", GLM, again)
     expect(requests.length).toBe(1)
     expect(textOf(again[1])).toBe(transcript("#1 login.png", CLOUD_TEXT))
-    expect((again[1] as { metadata: { alpha_vision: { number: number; hash: string } } }).metadata.alpha_vision).toMatchObject({ number: 1, hash: screenshotHash })
+    expect((again[1] as { metadata: { codepuppy_vision: { number: number; hash: string } } }).metadata.codepuppy_vision).toMatchObject({ number: 1, hash: screenshotHash })
     // 路径二:SDK 答空、靠 messages.transform 重建 —— 同样不再出网
     const rebuilt = await loadHooks()
     await rebuilt["experimental.chat.messages.transform"]!({}, { messages: structuredClone(history) })

@@ -4,7 +4,7 @@
 // 一夜之间对引擎不可见 —— 不弹这个门就会重演「技能丢了」误会。首启检测非空 → 一次性询问:
 // 「导入」= 转换为当前环境全局原生资产(skills 走既有导入管线 + receipts 溯源;CLAUDE.md 落
 // `<current-environment-root>/instructions/`,sidecar 注入通道);「不导入」= loud 明示从此不可见。
-// 两种决策都写当前环境 marker,不再重复弹。逃生 ALPHA_ECOSYSTEM_INHERIT=1 → 静默。
+// 两种决策都写当前环境 marker,不再重复弹。逃生 CODEPUPPY_ECOSYSTEM_INHERIT=1 → 静默。
 //
 // 时机:窗口就绪后 fire-and-forget(不阻塞启动;导入生效走下一次 fork/dispose —— 首启导入的技能
 // 在引擎侧的可见时机 = 下一条消息触发的实例装配,与定制中心安装同节奏)。

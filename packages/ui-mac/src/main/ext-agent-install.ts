@@ -1,6 +1,6 @@
 // ext-agent-install — REQ-102 #358:把 agent seed 安装路由进事务引擎(file + config 双 item 单事务)。
 //
-// 背景:agent 的物理形态 = `<root>/agents/<name>.md`(内容真源)+ alpha.jsonc `agent.<name>` 条目
+// 背景:agent 的物理形态 = `<root>/agents/<name>.md`(内容真源)+ codepuppy.jsonc `agent.<name>` 条目
 // (引擎生效面),既非文件树 generation 也非纯配置叶。旧路径 writeAgent 用进程内手工前像补偿
 // (md→config→receipt 三步间有失败窗口),且绕过 #348 授权闸 —— Codex 裁决 #358 P2 否决。本模块
 // 把 agent seed 收敛成一次 runExtensionTransaction:
@@ -14,7 +14,7 @@ import { createHash } from "node:crypto"
 import { readFileSync } from "node:fs"
 import { isAbsolute, join } from "node:path"
 import { parse, type ParseError } from "jsonc-parser"
-import type { AppEnvironment } from "./alpha-environment"
+import type { AppEnvironment } from "./codepuppy-environment"
 import type { InstallReceiptOrigin } from "../preload/types"
 import { isExtensionName } from "../shared/extension-name"
 import { agentMdToEntry } from "./agent-md-entry"
@@ -75,7 +75,7 @@ function deepEqual(a: unknown, b: unknown): boolean {
  * 必须自带探针并在此处扩展,绝不静默放行)。
  */
 export function agentFileProbe(root: string): HealthProbe {
-  const configTarget = join(root, "alpha.jsonc")
+  const configTarget = join(root, "codepuppy.jsonc")
   return (input) => {
     if (input.action !== "file") return { healthy: true } // generation/config 由各自 probe 管
     if (!input.key.startsWith("agent--") || input.key.endsWith("--config"))
@@ -190,7 +190,7 @@ export async function installAgentFromCas(root: string, spec: AgentSeedInstall):
   const relTarget = `agents/${spec.name}.md`
   const mdPath = join(root, relTarget)
   // config 落点 = root 派生固定约定(与 agentFileProbe 同源;调用方无路径通道)。
-  const configTarget = join(root, "alpha.jsonc")
+  const configTarget = join(root, "codepuppy.jsonc")
   const now = new Date().toISOString()
   const receiptTemplate: UpsertInput = {
     id: spec.id,

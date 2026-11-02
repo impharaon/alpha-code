@@ -17,7 +17,7 @@
 
 import { randomUUID } from "node:crypto"
 import { tool } from "@opencode-ai/plugin"
-import type { HubRequestRecord, HubView, HubViewRow } from "../../ui-mac/src/main/alpha-sidecar-messages"
+import type { HubRequestRecord, HubView, HubViewRow } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
 import { TOOL_TEXT } from "./context-injection"
 import type { BridgeFailure, HubBridge } from "./hub-bridge"
 
@@ -96,7 +96,7 @@ export function createHubTools(bridge: HubBridge) {
         // 应答只负责唤醒;三种醒法(放行 / RejectedError / UnansweredError)一律接住,结局按 requestId 去 main 查。
         let approved = false
         try {
-          await ctx.ask({ permission: "codepuppy_hub_install", patterns: [catalogId], always: [], metadata: { alphaHub: { catalogId, requestId } } })
+          await ctx.ask({ permission: "codepuppy_hub_install", patterns: [catalogId], always: [], metadata: { codepuppyHub: { catalogId, requestId } } })
           approved = true
         } catch {
           approved = false

@@ -25,7 +25,7 @@ export interface DeepLinkDelivery {
 
 declare global {
   interface Window {
-    __alphaDeepLinks?: DeepLinkDelivery[]
+    __codepuppyDeepLinks?: DeepLinkDelivery[]
   }
 }
 
@@ -55,9 +55,9 @@ export const collectNewSessionDeepLinks = (links: readonly unknown[]) => deliver
  * layout, a late listener) sees, it is not a replay.
  */
 export const drainPendingDeepLinks = (target: Window) => {
-  const pending = target.__alphaDeepLinks ?? []
+  const pending = target.__codepuppyDeepLinks ?? []
   if (pending.length === 0) return []
-  target.__alphaDeepLinks = []
+  target.__codepuppyDeepLinks = []
   return pending
 }
 

@@ -11,10 +11,10 @@ import type { render } from "solid-js/web"
 import type { CloudDispatchBox } from "./cloud-dispatch-box"
 import type { CloudJobEnvelope, CloudJobEvent } from "../../preload/types"
 import type { CloudPipelineSpec } from "./catalog-types"
-import bundledCatalog from "./alpha-catalog.json"
+import bundledCatalog from "./codepuppy-catalog.json"
 import { dict as zh } from "../i18n/zh"
 
-const directory = mkdtempSync(join(tmpdir(), "alpha-cloud-failure-render-"))
+const directory = mkdtempSync(join(tmpdir(), "codepuppy-cloud-failure-render-"))
 await build({
   configFile: false,
   logLevel: "silent",
@@ -48,7 +48,7 @@ afterAll(async () => {
 // Live and replay serialize the same event record; synthesized frames serialize a status view.
 const producer = join(
   import.meta.dir,
-  "../../../../alpha-contracts-consumer/vendor/alpha-platform/contracts/v1/fixtures/producer",
+  "../../../../codepuppy-contracts-consumer/vendor/alpha-platform/contracts/v1/fixtures/producer",
 )
 const accepted = (await Bun.file(join(producer, "cloud-job-accepted.json")).json()).value
 const status = { ...(await Bun.file(join(producer, "cloud-job-status.json")).json()).value, status: "failed" }
@@ -121,7 +121,7 @@ async function flush() {
   await new Promise((resolve) => setTimeout(resolve, 0))
 }
 const action = () => document.querySelector<HTMLButtonElement>("[data-cloud-error-action]")
-const text = () => document.querySelector(".alpha-ext-card-err")?.textContent
+const text = () => document.querySelector(".codepuppy-ext-card-err")?.textContent
 
 // `#1572` AC5:旧式云卡片(extension-detail 仍在用)与 cloud-form-box 同一分层文案 —— main 认出层就说那一层,
 // 认不出的 network 逐字仍是原来那句。期望值是独立字面量(界面拿不到云服务主机名,代入「对方服务器」)。
@@ -172,8 +172,8 @@ describe("REQ-232 AC5 cloud refusal reasons and actions", () => {
   test.each([
     ["account_wallet_insufficient", wallet, "recharge"],
     ["account_allowance_exhausted", allowance, "overflow"],
-    ["not-authenticated", zh["alpha.ext.cloudErrAuth"], "login"],
-    ["unauthorized", zh["alpha.ext.cloudErrAuth"], "login"],
+    ["not-authenticated", zh["codepuppy.ext.cloudErrAuth"], "login"],
+    ["unauthorized", zh["codepuppy.ext.cloudErrAuth"], "login"],
   ])("dispatch refusal %s shows its reason and working action", async (code, message, target) => {
     const harness = await mount(code)
     expect(text()).toBe(message)
@@ -191,11 +191,11 @@ describe("REQ-232 AC5 cloud refusal reasons and actions", () => {
     const harness = await mount()
     harness.send(live("provider_failed"))
     await flush()
-    expect(text()).toBe(zh["alpha.ext.cloudRunFailed"])
+    expect(text()).toBe(zh["codepuppy.ext.cloudRunFailed"])
     expect(action()).toBeNull()
     harness.send(live())
     await flush()
-    expect(text()).toBe(zh["alpha.ext.cloudRunFailed"])
+    expect(text()).toBe(zh["codepuppy.ext.cloudRunFailed"])
     expect(harness.statusCalls).toEqual([accepted.job_id])
   })
 })
@@ -318,7 +318,7 @@ describe("REQ-235 AC2 legacy cloud branches are frozen before the lifecycle extr
     inputButton()!.click()
     await flush()
     await flush()
-    expect(harness.pickerCalls).toEqual([{ title: zh["alpha.ext.cloudPickResults"] }])
+    expect(harness.pickerCalls).toEqual([{ title: zh["codepuppy.ext.cloudPickResults"] }])
     expect(harness.envelopes).toEqual([
       { autonomy: "pipeline", kind, input, budget: spec.budgetDefaults, constraints: { network: "restricted" } },
     ])
@@ -330,7 +330,7 @@ describe("REQ-235 AC2 legacy cloud branches are frozen before the lifecycle extr
     expect(harness.saves).toEqual([["/synthetic/results", accepted.job_id, harness.envelopes[0]]])
     expect(document.querySelector("[data-cloud-result]")?.textContent ?? "").toBe(text)
     expect(Array.from(document.querySelectorAll("[data-cloud-file]")).map((node) => node.textContent)).toEqual(["artifacts/output.bin"])
-    expect(document.body.textContent).toContain(zh["alpha.ext.cloudDone"])
+    expect(document.body.textContent).toContain(zh["codepuppy.ext.cloudDone"])
   })
 
   test("office-report without one of the three Office identities stays disabled", async () => {
@@ -350,7 +350,7 @@ describe("REQ-235 AC2 legacy cloud branches are frozen before the lifecycle extr
     await flush()
     expect(harness.envelopes).toEqual([])
     expect(inputButton()!.disabled).toBe(false)
-    expect(inputButton()!.textContent).toBe(zh["alpha.ext.cloudStart"])
+    expect(inputButton()!.textContent).toBe(zh["codepuppy.ext.cloudStart"])
   })
 
   test("a failed terminal still saves the run and points at the saved folder", async () => {
@@ -363,8 +363,8 @@ describe("REQ-235 AC2 legacy cloud branches are frozen before the lifecycle extr
     await flush()
     await flush()
     expect(harness.saves).toEqual([["/synthetic/results", accepted.job_id, harness.envelopes[0]]])
-    expect(document.body.textContent).toContain(zh["alpha.ext.cloudSaved"])
-    expect(document.querySelector(".alpha-ext-card-err")?.textContent).toBe(zh["alpha.ext.cloudRunFailed"])
+    expect(document.body.textContent).toContain(zh["codepuppy.ext.cloudSaved"])
+    expect(document.querySelector(".codepuppy-ext-card-err")?.textContent).toBe(zh["codepuppy.ext.cloudRunFailed"])
   })
 
   // REQ-236 #1551 AC2:saveCloudRun 的第三个生产消费者(定制中心表单经 cloud-save-run)—— 产物没齐不报「完成」。
@@ -383,8 +383,8 @@ describe("REQ-235 AC2 legacy cloud branches are frozen before the lifecycle extr
     await flush()
     await flush()
     expect(harness.saves).toHaveLength(1)
-    expect(document.body.textContent).not.toContain(zh["alpha.ext.cloudDone"])
-    expect(document.querySelector(".alpha-ext-card-err")?.textContent).toBe(zh["alpha.ext.cloudSaveFailed"])
+    expect(document.body.textContent).not.toContain(zh["codepuppy.ext.cloudDone"])
+    expect(document.querySelector(".codepuppy-ext-card-err")?.textContent).toBe(zh["codepuppy.ext.cloudSaveFailed"])
   })
 
   test("events for another job id are ignored", async () => {
@@ -396,14 +396,14 @@ describe("REQ-235 AC2 legacy cloud branches are frozen before the lifecycle extr
     harness.send("job.completed", "job_someone_else")
     await flush()
     expect(harness.saves).toEqual([])
-    expect(document.body.textContent).toContain(zh["alpha.ext.cloudRunning"])
+    expect(document.body.textContent).toContain(zh["codepuppy.ext.cloudRunning"])
   })
 
   test("code-review legacy diff: exact envelope, no result read, no artifact list", async () => {
     const spec = legacySpecOf("cloud:code-review")
     const harness = mountLegacy({ spec, entryId: "cloud:code-review", savedFiles: ["artifacts/review.md"] })
     expect(document.querySelector("textarea")).toBeNull()
-    buttonByText(zh["alpha.cloud.consent.legacyDiff"])!.click()
+    buttonByText(zh["codepuppy.cloud.consent.legacyDiff"])!.click()
     await flush()
     await flush()
     expect(harness.envelopes).toEqual([
@@ -415,7 +415,7 @@ describe("REQ-235 AC2 legacy cloud branches are frozen before the lifecycle extr
         constraints: { network: "restricted" },
       },
     ])
-    expect(document.body.textContent).toContain(zh["alpha.ext.cloudDiffWorktree"])
+    expect(document.body.textContent).toContain(zh["codepuppy.ext.cloudDiffWorktree"])
     harness.send("job.completed")
     await flush()
     await flush()
@@ -423,7 +423,7 @@ describe("REQ-235 AC2 legacy cloud branches are frozen before the lifecycle extr
     expect(harness.saves).toEqual([["/synthetic/results", accepted.job_id, harness.envelopes[0]]])
     expect(document.querySelectorAll("[data-cloud-file]").length).toBe(0)
     expect(document.querySelector("[data-cloud-result]")).toBeNull()
-    expect(document.body.textContent).toContain(zh["alpha.ext.cloudDone"])
+    expect(document.body.textContent).toContain(zh["codepuppy.ext.cloudDone"])
   })
 
   test("code-review legacy diff with no changes sends nothing", async () => {
@@ -432,11 +432,11 @@ describe("REQ-235 AC2 legacy cloud branches are frozen before the lifecycle extr
       entryId: "cloud:code-review",
       gitDiff: { ok: false, reason: "no-diff" },
     })
-    buttonByText(zh["alpha.cloud.consent.legacyDiff"])!.click()
+    buttonByText(zh["codepuppy.cloud.consent.legacyDiff"])!.click()
     await flush()
     await flush()
     expect(harness.envelopes).toEqual([])
-    expect(document.querySelector(".alpha-ext-card-err")?.textContent).toBe(zh["alpha.ext.cloudNoDiff"])
+    expect(document.querySelector(".codepuppy-ext-card-err")?.textContent).toBe(zh["codepuppy.ext.cloudNoDiff"])
   })
 
   test("code-review upload: confirmed send closes the dialog and saves under the upload contract", async () => {
@@ -458,7 +458,7 @@ describe("REQ-235 AC2 legacy cloud branches are frozen before the lifecycle extr
       },
       confirm: { status: "sent", privacy: "sensitive", directory: "/project", job: accepted },
     })
-    buttonByText(zh["alpha.cloud.consent.uploadPick"])!.click()
+    buttonByText(zh["codepuppy.cloud.consent.uploadPick"])!.click()
     await flush()
     expect(harness.uploads).toEqual([{ kind: "code-review" }])
     expect(document.querySelector("[role=dialog]")).not.toBeNull()
@@ -467,8 +467,8 @@ describe("REQ-235 AC2 legacy cloud branches are frozen before the lifecycle extr
     await flush()
     await flush()
     expect(document.querySelector("[role=dialog]")).toBeNull()
-    expect(document.body.textContent).toContain(zh["alpha.ext.cloudRunning"])
-    expect(document.body.textContent).not.toContain(zh["alpha.cloud.consent.silentPass"])
+    expect(document.body.textContent).toContain(zh["codepuppy.ext.cloudRunning"])
+    expect(document.body.textContent).not.toContain(zh["codepuppy.cloud.consent.silentPass"])
     harness.send("job.completed")
     await flush()
     await flush()
@@ -477,12 +477,12 @@ describe("REQ-235 AC2 legacy cloud branches are frozen before the lifecycle extr
   })
 
   test.each([
-    [false, "alpha.ext.cloudNeedPlatformNote"],
-    [true, "alpha.ext.cloudRecoveringNote"],
+    [false, "codepuppy.ext.cloudNeedPlatformNote"],
+    [true, "codepuppy.ext.cloudRecoveringNote"],
   ] as const)("not ready (recovering=%s) disables every dispatch control and says why", (recovering, note) => {
     mountLegacy({ spec: legacySpecOf("cloud:code-review"), entryId: "cloud:code-review", ready: false, recovering })
-    expect(buttonByText(zh["alpha.cloud.consent.uploadPick"])!.disabled).toBe(true)
-    expect(buttonByText(zh["alpha.cloud.consent.legacyDiff"])!.disabled).toBe(true)
+    expect(buttonByText(zh["codepuppy.cloud.consent.uploadPick"])!.disabled).toBe(true)
+    expect(buttonByText(zh["codepuppy.cloud.consent.legacyDiff"])!.disabled).toBe(true)
     expect(document.body.textContent).toContain(zh[note])
     document.body.replaceChildren()
     mountLegacy({ spec: legacySpecOf("cloud:research"), entryId: "cloud:research", ready: false, recovering })

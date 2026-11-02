@@ -19,7 +19,7 @@ or the engine being asked to open browsers on main's behalf — so the ownership
 table and the two non-obvious mechanisms below are pinned here.
 
 Its sibling for the other authorization kind is
-[`alpha-connection-lifetime.md`](alpha-connection-lifetime.md). The two are
+[`codepuppy-connection-lifetime.md`](codepuppy-connection-lifetime.md). The two are
 separate subsystems on purpose: an Alpha Connection's durable record is
 main-owned; an MCP OAuth credential's durable record is the engine's
 `mcp-auth.json` (`0600 + flock`, the accepted boundary for REQ-128 — not

@@ -19,7 +19,7 @@
 
 import * as path from "node:path"
 import { Worker } from "node:worker_threads"
-import { getAlphaEnvironment } from "./alpha-environment"
+import { getCodePuppyEnvironment } from "./codepuppy-environment"
 import { CAS_GC_GRACE_MS_DEFAULT, decodeCasGcRoundSummary, defaultCasGcEnvRoots, type CasGcRoundInput, type CasGcRoundSummary } from "./ext-cas-gc"
 import { resourcesRoot } from "./ext-fs-installer"
 
@@ -42,7 +42,7 @@ export type CasGcSchedulerConfig = {
  *  冻结共享 CAS 基根 + dev/prod/beta 三环境根(固定顺序)+ 当前 packaged seed lock(无条件)
  *  + 显式非零 grace + dryRun=false。未初始化环境即抛(fail-fast)。 */
 export function productionCasGcConfig(): CasGcSchedulerConfig {
-  const casBaseRoot = getAlphaEnvironment().casBaseRoot
+  const casBaseRoot = getCodePuppyEnvironment().casBaseRoot
   return Object.freeze({
     casBaseRoot,
     envRoots: Object.freeze(defaultCasGcEnvRoots(casBaseRoot)),

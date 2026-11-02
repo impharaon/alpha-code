@@ -1,4 +1,4 @@
-// [#969] 云档定时任务被拒绝时,用户在 `.alpha-auto-err` 那一行读到的东西。
+// [#969] 云档定时任务被拒绝时,用户在 `.codepuppy-auto-err` 那一行读到的东西。
 // [#994] 删除与开关在云端失败时弹出的提示也用这张表 —— 同一个码,在三个动作上说同一句话。
 // [#1001] 保存时**本机**失败(存储层校验 / 落盘)的本地结构码也在这里出人话 —— main 只给码与英文日志串。
 //
@@ -23,7 +23,7 @@
 //     (该码在 **dispatch** 面可达且已有文案,见 cloud-dispatch-box.tsx —— schedule 面到不了。)
 // 它们若真的出现,走下面的回落分支原样上屏 —— 那正是「我们的勘破错了」应该长的样子。
 
-import type { NetFailureLayer } from "@opencode-ai/schema/alpha-net-failure"
+import type { NetFailureLayer } from "@opencode-ai/schema/codepuppy-net-failure"
 import { t } from "../i18n"
 import {
   AUTOMATION_DEFAULTS,
@@ -32,20 +32,20 @@ import {
   type AutomationRunReasonCode,
   type AutomationStoreErrorCode,
 } from "../../shared/automation-types"
-import { netFailureCopy } from "../alpha-ui/net-failure-copy"
+import { netFailureCopy } from "../codepuppy-ui/net-failure-copy"
 
 /**
  * [#1001] 本地结构码 → 文案键。以类型为键:main 新增一个码而这里没跟上,typecheck 当场红
  * (本地码是我们自己铸的,不存在「不认识」—— 与平台码的回落纪律不同)。
  */
 const LOCAL_STORE_COPY: Record<AutomationStoreErrorCode, Parameters<typeof t>[0]> = {
-  "automation-invalid": "alpha.auto.localErrInvalid",
-  "automation-name-invalid": "alpha.auto.localErrName",
-  "automation-prompt-invalid": "alpha.auto.localErrPrompt",
-  "automation-project-dir-invalid": "alpha.auto.localErrProjectDir",
-  "automation-schedule-invalid": "alpha.auto.localErrSchedule",
-  "automation-duration-invalid": "alpha.auto.localErrDuration",
-  "automation-storage-failed": "alpha.auto.localErrStorage",
+  "automation-invalid": "codepuppy.auto.localErrInvalid",
+  "automation-name-invalid": "codepuppy.auto.localErrName",
+  "automation-prompt-invalid": "codepuppy.auto.localErrPrompt",
+  "automation-project-dir-invalid": "codepuppy.auto.localErrProjectDir",
+  "automation-schedule-invalid": "codepuppy.auto.localErrSchedule",
+  "automation-duration-invalid": "codepuppy.auto.localErrDuration",
+  "automation-storage-failed": "codepuppy.auto.localErrStorage",
 }
 
 /**
@@ -59,24 +59,24 @@ export function scheduleRefusalCopy(code: string, netLayer?: NetFailureLayer): s
   // 本机存储层(桌面自铸,kebab,`automation-` 前缀)。
   if (Object.hasOwn(LOCAL_STORE_COPY, code)) return t(LOCAL_STORE_COPY[code as AutomationStoreErrorCode])
   // 传输腿(桌面自铸,kebab)。文案与 dispatch 面共用既有键 —— 同一件事只说一遍。
-  if (code === "not-authenticated" || code === "unauthorized") return t("alpha.ext.cloudErrAuth")
-  if (code === "no-cloud-endpoint") return t("alpha.ext.cloudErrEndpoint")
+  if (code === "not-authenticated" || code === "unauthorized") return t("codepuppy.ext.cloudErrAuth")
+  if (code === "no-cloud-endpoint") return t("codepuppy.ext.cloudErrEndpoint")
   // `#1572`:认得出卡在哪一层就说那一层;认不出保持原文案。
-  if (code === "network") return netLayer ? netFailureCopy(netLayer) : t("alpha.ext.cloudErrNetwork")
+  if (code === "network") return netLayer ? netFailureCopy(netLayer) : t("codepuppy.ext.cloudErrNetwork")
   // 桌面自己的早返(请求根本没发出去,平台侧刻意无码)。
-  if (code === "cloud-schedule-form-unsupported") return t("alpha.auto.cloudErrFormUnsupported")
+  if (code === "cloud-schedule-form-unsupported") return t("codepuppy.auto.cloudErrFormUnsupported")
   // 平台分类码里**桌面到得了**的那些(alpha-platform lib/schedules.ts 的 SCHEDULE_REFUSAL_CODES
   // + 两个 429 桶 + 413)。
-  if (code === "schedule_limit_reached") return t("alpha.auto.cloudErrLimitReached")
-  if (code === "schedule_name_invalid") return t("alpha.auto.cloudErrNameInvalid")
-  if (code === "schedule_cron_invalid") return t("alpha.auto.cloudErrCronInvalid")
-  if (code === "schedule_interval_too_tight") return t("alpha.auto.cloudErrIntervalTooTight")
-  if (code === "control_envelope_too_large") return t("alpha.auto.cloudErrEnvelopeTooLarge")
-  if (code === "rate_limited") return t("alpha.auto.cloudErrRateLimited")
-  if (code === "account_admission_rate_exceeded") return t("alpha.auto.cloudErrTenantRateLimited")
+  if (code === "schedule_limit_reached") return t("codepuppy.auto.cloudErrLimitReached")
+  if (code === "schedule_name_invalid") return t("codepuppy.auto.cloudErrNameInvalid")
+  if (code === "schedule_cron_invalid") return t("codepuppy.auto.cloudErrCronInvalid")
+  if (code === "schedule_interval_too_tight") return t("codepuppy.auto.cloudErrIntervalTooTight")
+  if (code === "control_envelope_too_large") return t("codepuppy.auto.cloudErrEnvelopeTooLarge")
+  if (code === "rate_limited") return t("codepuppy.auto.cloudErrRateLimited")
+  if (code === "account_admission_rate_exceeded") return t("codepuppy.auto.cloudErrTenantRateLimited")
   // 回落:原样带上码。刻意**不**区分注册/删除 —— 那个区分今天只存在于 main 硬编码的中文前缀里,
   // 而这一层要对 16 个语种成立。
-  return t("alpha.auto.cloudErrUnknown", { code })
+  return t("codepuppy.auto.cloudErrUnknown", { code })
 }
 
 /**
@@ -87,13 +87,13 @@ const LOCAL_ACTION_COPY: Record<
   AutomationRunNowErrorCode | AutomationParseErrorCode | AutomationRunReasonCode,
   Parameters<typeof t>[0]
 > = {
-  "automation-run-not-found": "alpha.auto.runErrNotFound",
-  "automation-run-busy": "alpha.auto.runErrBusy",
-  "automation-run-daily-cap": "alpha.auto.runErrDailyCap",
-  "automation-parse-no-schedule": "alpha.auto.parseErrNoSchedule",
-  "automation-parse-unavailable": "alpha.auto.parseErrUnavailable",
-  "automation-parse-blocked": "alpha.auto.parseErrBlocked",
-  "automation-run-not-ready": "alpha.auto.runReasonNotReady",
+  "automation-run-not-found": "codepuppy.auto.runErrNotFound",
+  "automation-run-busy": "codepuppy.auto.runErrBusy",
+  "automation-run-daily-cap": "codepuppy.auto.runErrDailyCap",
+  "automation-parse-no-schedule": "codepuppy.auto.parseErrNoSchedule",
+  "automation-parse-unavailable": "codepuppy.auto.parseErrUnavailable",
+  "automation-parse-blocked": "codepuppy.auto.parseErrBlocked",
+  "automation-run-not-ready": "codepuppy.auto.runReasonNotReady",
 }
 
 /**

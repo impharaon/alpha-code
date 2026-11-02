@@ -33,7 +33,7 @@ review_after: 2027-03-08
 
 真正的自有资产集中在 `ui-mac/src/main`:`ext-install-planner` · `ext-transaction` ·
 `ext-receipt-v2` · `artifact-service` · `package-admission` · `ext-package-ledger-v3` ·
-`catalog-channels` · `alpha-auth` · `claude-plugin-intake`。**这批是 Extension Hub,与底下是
+`catalog-channels` · `codepuppy-auth` · `claude-plugin-intake`。**这批是 Extension Hub,与底下是
 哪个引擎基本正交。**
 
 ## 2. 结构对照
@@ -62,7 +62,7 @@ review_after: 2027-03-08
 3. **没有进程内扩展点。** `packages/ext` 这个模型在 codex 里不存在:要么写 in-tree Rust(单体
    仓,没有 workspace 成员叠加位,零上游编辑的北极星当场失效),要么退到进程外 hook(能力面窄
    一大截)。
-4. **整套验证体系换语言。** `alpha-check.sh`、`bun test`、`tsgo`、`worktree-bootstrap.sh`、
+4. **整套验证体系换语言。** `codepuppy-check.sh`、`bun test`、`tsgo`、`worktree-bootstrap.sh`、
    `local-gate-parity.test.ts` 全部是 TS/Bun 形态;连本机验证陷阱那一册也要重攒。
 
 **「换底座」没有潜力,「换角色」有**:`app-server` 是设计得不错的嵌入接口,技术上 Electron

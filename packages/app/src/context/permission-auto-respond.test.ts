@@ -4,7 +4,7 @@ import { base64Encode } from "@opencode-ai/core/util/encode"
 import { autoRespondsPermission, isDirectoryAutoAccepting, sessionAutoAccept } from "./permission-auto-respond"
 
 // #668:总闸 `permissions.autoApprove`。本文件断的是**开启后**的既有语义(一字未改);
-// 总闸关闭时的矩阵在 packages/ui-mac/src/renderer/alpha-ui/permission-auto-approve-switch.test.ts。
+// 总闸关闭时的矩阵在 packages/ui-mac/src/renderer/codepuppy-ui/permission-auto-approve-switch.test.ts。
 const ON = { autoApprove: true }
 
 const session = (input: { id: string; parentID?: string }) =>

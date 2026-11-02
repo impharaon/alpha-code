@@ -48,7 +48,7 @@ const FILES: TxFileSpec[] = [{ path: "SKILL.md", sha256: sha(BODY), size: Buffer
 
 const DESCRIPTOR: TxPreparedResourceV1 = {
   kind: "mcp-secret-version",
-  store: "alpha-mcp-secrets",
+  store: "codepuppy-mcp-secrets",
   server: "demo",
   version: "v-deadbeefcafe",
 }

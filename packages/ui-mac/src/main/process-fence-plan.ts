@@ -37,7 +37,7 @@ export type ProcessFencePlan = {
   excluded: WorkspaceExclusion[]
   attempts: number
   profileBytes: number
-  roots: EngineRoots & { alphaGlobalRoot: string; userDataPath: string; stateHome: string }
+  roots: EngineRoots & { codepuppyGlobalRoot: string; userDataPath: string; stateHome: string }
 }
 
 export type PlanProcessFenceInput = {
@@ -54,12 +54,12 @@ export type PlanProcessFenceInput = {
 
 export type PlanProcessFenceDeps = {
   homeDir: () => string
-  alphaGlobalRoot: () => string
-  /** `#1390`:应用状态根 `<appData>/alpha-code-state`(冻结环境快照的 casBaseRoot);来自 store 的候选与它相关即排除。 */
+  codepuppyGlobalRoot: () => string
+  /** `#1390`:应用状态根 `<appData>/codepuppy-state`(冻结环境快照的 casBaseRoot);来自 store 的候选与它相关即排除。 */
   appStateRoot: () => string
   /** `#1390`:路径归一,生产必须是 `fs.realpathSync.native`(理由见 process-fence-profile.ts WorkspaceUnionInput.realpath)。 */
   realpath: (p: string) => string
-  /** `~/code-puppy`,已 ensure(ensureUserWorkspaceDir 返回 null 时给 alphaUserWorkspaceDir 让并集判它不存在)。 */
+  /** `~/code-puppy`,已 ensure(ensureUserWorkspaceDir 返回 null 时给 codepuppyUserWorkspaceDir 让并集判它不存在)。 */
   defaultWorkspace: () => string
   /**
    * `#1394`:工作区清单(绝对路径,顺序即优先级),来自围栏写不到的真源(process-fence-workspaces.ts),不再是 electron store。
@@ -79,7 +79,7 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
   // sidecar.ts:prepareSidecarEnv 把 XDG_STATE_HOME 设成 `process.env.XDG_STATE_HOME ?? userDataPath`。
   // 这里消费同一个决定:用户显式导出的 state 根跟着走,否则 locks 就在 W3 之下。
   const stateHome = input.sidecarEnv.XDG_STATE_HOME && input.sidecarEnv.XDG_STATE_HOME.length > 0 ? input.sidecarEnv.XDG_STATE_HOME : input.userDataPath
-  const alphaGlobalRoot = deps.alphaGlobalRoot()
+  const codepuppyGlobalRoot = deps.codepuppyGlobalRoot()
 
   // 父目录预建(见文件头)。
   for (const dir of [
@@ -112,7 +112,7 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
     throw new Error("process fence: the default workspace is not a directory on disk — refusing to fork an engine that could not write anywhere a user expects")
 
   const trimmed = trimUntilCompiles(
-    { workspaces: union.selected, alphaGlobalRoot, userDataPath: input.userDataPath, roots, stateHome, egressProxyPort: input.egressProxyPort },
+    { workspaces: union.selected, codepuppyGlobalRoot, userDataPath: input.userDataPath, roots, stateHome, egressProxyPort: input.egressProxyPort },
     deps.compile,
   )
   const addonPath = resolveFenceAddonPath(input.addon)
@@ -124,7 +124,7 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
     excluded: union.excluded,
     attempts: trimmed.attempts,
     profileBytes: Buffer.byteLength(trimmed.profile),
-    roots: { ...roots, alphaGlobalRoot, userDataPath: input.userDataPath, stateHome },
+    roots: { ...roots, codepuppyGlobalRoot, userDataPath: input.userDataPath, stateHome },
   }
   deps.log(
     `process fence planned: workspaces=${plan.workspaces.length} (candidates=${union.candidates}, excluded=${plan.excluded.length}, dropped=${plan.dropped.length}), egressProxyPort=${input.egressProxyPort}, profile=${plan.profileBytes}B, compile attempts=${plan.attempts}` +

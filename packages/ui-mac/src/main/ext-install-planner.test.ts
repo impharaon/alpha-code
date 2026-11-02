@@ -14,9 +14,9 @@ import * as os from "node:os"
 import * as path from "node:path"
 import type { CatalogEntry } from "../renderer/extensions/catalog-types"
 // #823:随包 catalog 快照本体(端到端回归专用,见文件末尾同号 describe)。
-import bundledCatalogSnapshot from "../renderer/extensions/alpha-catalog.json"
+import bundledCatalogSnapshot from "../renderer/extensions/codepuppy-catalog.json"
 import { curationBlobUrl } from "../shared/catalog-curation"
-import { addReceipt } from "./alpha-installs"
+import { addReceipt } from "./codepuppy-installs"
 import { aggregateFilesDigest, computeManifestDigest, decodeManifestV2 } from "./ext-manifest-v2"
 import { hasCasBlob } from "./ext-cas"
 import { computeGrantDigest, findRecordV2, projectScopeIdentity, upsertRecordV2, type UpsertInput } from "./ext-receipt-v2"
@@ -271,13 +271,13 @@ function makeDeps(opts: {
       calls.push({ fn: "readLegacyPluginArrayStrict", args: [] })
       return { ok: true as const, sources: [] as Array<{ value: unknown[]; configDir: string }> }
     },
-    mcpConfigTruthPath: () => path.join(globalRoot, "alpha.jsonc"),
-    // #378(裁决 Q5):跨源同 base 检查 —— 镜像真实 alpha.jsonc 的 plugin[](legacy 缺省无冲突)。
+    mcpConfigTruthPath: () => path.join(globalRoot, "codepuppy.jsonc"),
+    // #378(裁决 Q5):跨源同 base 检查 —— 镜像真实 codepuppy.jsonc 的 plugin[](legacy 缺省无冲突)。
     findPluginBaseConflictStrict: (pkg: string) => {
       calls.push({ fn: "findPluginBaseConflictStrict", args: [pkg] })
       const base = pkg.lastIndexOf("@") > 0 ? pkg.slice(0, pkg.lastIndexOf("@")) : pkg
       try {
-        const t = path.join(globalRoot, "alpha.jsonc")
+        const t = path.join(globalRoot, "codepuppy.jsonc")
         if (!fs.existsSync(t)) return { ok: true as const, existing: undefined }
         const parsed = JSON.parse(fs.readFileSync(t, "utf8")) as { plugin?: unknown }
         const list = Array.isArray(parsed.plugin) ? parsed.plugin : []
@@ -290,10 +290,10 @@ function makeDeps(opts: {
         return { ok: false as const, reason: "config unreadable" }
       }
     },
-    // #352:strict 数组读镜像测试真实 alpha.jsonc(引擎 config action 写同一文件,plan/precondition 同源)。
+    // #352:strict 数组读镜像测试真实 codepuppy.jsonc(引擎 config action 写同一文件,plan/precondition 同源)。
     readPluginArrayStrict: () => {
       try {
-        const t = path.join(globalRoot, "alpha.jsonc")
+        const t = path.join(globalRoot, "codepuppy.jsonc")
         if (!fs.existsSync(t)) return { ok: true as const, value: [] as unknown[] }
         const parsed = JSON.parse(fs.readFileSync(t, "utf8")) as { plugin?: unknown }
         return { ok: true as const, value: Array.isArray(parsed.plugin) ? parsed.plugin : [] }
@@ -318,7 +318,7 @@ function makeDeps(opts: {
       return removeProjectMcpConfigInLock(root, name)
     },
     removeMcpSecretsStrict: record("removeMcpSecretsStrict", { ok: true as const }),
-    releaseAlphaConnectionBindings: record("releaseAlphaConnectionBindings", { ok: true as const }),
+    releaseCodePuppyConnectionBindings: record("releaseCodePuppyConnectionBindings", { ok: true as const }),
     removePlugin: record("removePlugin", { ok: true as const }),
     // #378:vendored 载荷采集(CAS 摄取源;真 plugin.js 字节供引擎 file items 全链)。
     collectVendoredPluginPayload: (key: string, name: string) => {
@@ -369,11 +369,11 @@ function makeDeps(opts: {
 
 const called = (calls: Call[], fn: string) => calls.filter((c) => c.fn === fn)
 
-// #361:零断言读 alpha.jsonc 的 agent.<name> 叶(JSON.parse 结果走谓词收窄,不 cast)。
+// #361:零断言读 codepuppy.jsonc 的 agent.<name> 叶(JSON.parse 结果走谓词收窄,不 cast)。
 const isRec = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v)
 // #378:零断言读盘助手(oxlint no-unsafe-type-assertion Δ=0)。
 const readCfgRoot = (): Record<string, unknown> => {
-  const raw: unknown = JSON.parse(fs.readFileSync(path.join(globalRoot, "alpha.jsonc"), "utf8"))
+  const raw: unknown = JSON.parse(fs.readFileSync(path.join(globalRoot, "codepuppy.jsonc"), "utf8"))
   return isRec(raw) ? raw : {}
 }
 const mcpLeafOnDisk = (name: string): Record<string, unknown> | undefined => {
@@ -389,7 +389,7 @@ const pluginArrayOnDisk = (): unknown[] => {
 const recOf = (v: unknown): Record<string, unknown> => (isRec(v) ? v : {})
 const strOf = (v: unknown): string => (typeof v === "string" ? v : "")
 const readAgentLeaf = (rootDir: string, name: string): Record<string, unknown> | undefined => {
-  const raw: unknown = JSON.parse(fs.readFileSync(path.join(rootDir, "alpha.jsonc"), "utf8"))
+  const raw: unknown = JSON.parse(fs.readFileSync(path.join(rootDir, "codepuppy.jsonc"), "utf8"))
   if (!isRec(raw) || !isRec(raw.agent)) return undefined
   const leaf = raw.agent[name]
   return isRec(leaf) ? leaf : undefined
@@ -596,14 +596,14 @@ describe("MCP install — facts re-derived from catalog, grants validated", () =
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.reason).toContain("refusing plaintext persist")
     expect(called(calls, "writeMcpSecretVersioned")).toHaveLength(0) // 拒绝先于任何落盘
-    expect(fs.existsSync(path.join(globalRoot, "alpha.jsonc"))).toBe(false)
+    expect(fs.existsSync(path.join(globalRoot, "codepuppy.jsonc"))).toBe(false)
   })
 
   test("REQ-100 #342(#351 回归锁)+ #378 Q1:更新失败(事务在途 busy)不毁既有密钥 —— 版本化只增,新版本目录清理,旧引用原样", async () => {
     const { deps, calls } = makeDeps()
     const first = await installAuthorized({ catalogId: "mcp:markitdown", scope: { scope: "global" }, grants: { secrets: { API_KEY: "old-value" } } }, deps)
     expect(first.ok).toBe(true)
-    const cfgBefore = fs.readFileSync(path.join(globalRoot, "alpha.jsonc"), "utf8")
+    const cfgBefore = fs.readFileSync(path.join(globalRoot, "codepuppy.jsonc"), "utf8")
     const refBefore = strOf(recOf(mcpLeafOnDisk("markitdown")?.environment).API_KEY)
     const oldSecretPath = refBefore.replace(/^\{file:/, "").replace(/\}$/, "")
     expect(fs.readFileSync(oldSecretPath, "utf8")).toBe("old-value")
@@ -617,7 +617,7 @@ describe("MCP install — facts re-derived from catalog, grants validated", () =
       if (held.ok) held.lock.release()
     }
     // 旧安装零接触:leaf 原样、旧密钥文件原值;本次版本目录已清(无引用惰性)
-    expect(fs.readFileSync(path.join(globalRoot, "alpha.jsonc"), "utf8")).toBe(cfgBefore)
+    expect(fs.readFileSync(path.join(globalRoot, "codepuppy.jsonc"), "utf8")).toBe(cfgBefore)
     expect(fs.readFileSync(oldSecretPath, "utf8")).toBe("old-value")
     expect(called(calls, "writeMcpSecretVersioned")).toHaveLength(1) // 新版本写过(独立目录)
     const rm = called(calls, "removeMcpSecretVersionDir")
@@ -723,9 +723,9 @@ describe("MCP install — facts re-derived from catalog, grants validated", () =
   test("REQ-136 direct project MCP is one D-only config action with no CAS, secret, prepared resource, generation, or consent", async () => {
     const proj = makeProject("proj-mcp")
     const projectRoot = path.join(proj, ".code-puppy")
-    fs.writeFileSync(path.join(globalRoot, "alpha.jsonc"), '{"mcp":{"project-demo":{"type":"local","command":["npx","global-canary"]}}}\n')
+    fs.writeFileSync(path.join(globalRoot, "codepuppy.jsonc"), '{"mcp":{"project-demo":{"type":"local","command":["npx","global-canary"]}}}\n')
     fs.writeFileSync(path.join(globalRoot, "installs.json"), "global-ledger-canary\n")
-    const globalConfigBefore = fs.readFileSync(path.join(globalRoot, "alpha.jsonc"), "utf8")
+    const globalConfigBefore = fs.readFileSync(path.join(globalRoot, "codepuppy.jsonc"), "utf8")
     const globalLedgerBefore = fs.readFileSync(path.join(globalRoot, "installs.json"), "utf8")
     const { deps, calls } = makeDeps()
     let casCalls = 0
@@ -736,7 +736,7 @@ describe("MCP install — facts re-derived from catalog, grants validated", () =
         ...deps.installers,
         mcpConfigTruthPath: () => {
           truthCalls++
-          return path.join(globalRoot, "alpha.jsonc")
+          return path.join(globalRoot, "codepuppy.jsonc")
         },
       },
       casBaseRoot: () => {
@@ -751,7 +751,7 @@ describe("MCP install — facts re-derived from catalog, grants validated", () =
     )
     expect(r.ok).toBe(true)
     if (!r.ok) return
-    const config: unknown = JSON.parse(fs.readFileSync(path.join(projectRoot, "alpha.jsonc"), "utf8"))
+    const config: unknown = JSON.parse(fs.readFileSync(path.join(projectRoot, "codepuppy.jsonc"), "utf8"))
     expect(recOf(recOf(config).mcp)["project-demo"]).toEqual({
       type: "local",
       command: ["npx", "-y", "project-demo-mcp@1.0.0"],
@@ -759,7 +759,7 @@ describe("MCP install — facts re-derived from catalog, grants validated", () =
     const record = findRecordV2(projectRoot, "mcp", "project-demo")
     expect(record?.scope.kind).toBe("project")
     if (record?.scope.kind === "project") expect(record.scope.projectPath).toBe(proj)
-    expect(fs.readFileSync(path.join(globalRoot, "alpha.jsonc"), "utf8")).toBe(globalConfigBefore)
+    expect(fs.readFileSync(path.join(globalRoot, "codepuppy.jsonc"), "utf8")).toBe(globalConfigBefore)
     expect(fs.readFileSync(path.join(globalRoot, "installs.json"), "utf8")).toBe(globalLedgerBefore)
 
     const journals = probeTransactionJournals(projectRoot)
@@ -771,7 +771,7 @@ describe("MCP install — facts re-derived from catalog, grants validated", () =
       action: "config",
       genId: "gen-000000-000000",
       files: [],
-      config: { target: path.join(projectRoot, "alpha.jsonc") },
+      config: { target: path.join(projectRoot, "codepuppy.jsonc") },
     })
     expect(journal?.prepared ?? []).toEqual([])
     expect(fs.existsSync(path.join(projectRoot, "ext-store", "mcp--project-demo", "generations"))).toBe(false)
@@ -783,7 +783,7 @@ describe("MCP install — facts re-derived from catalog, grants validated", () =
     expect(called(calls, "writeMcpSecretVersioned")).toHaveLength(0)
     expect(called(calls, "legacyMcpRefPaths")).toHaveLength(0)
     expect(called(calls, "gcMcpSecrets")).toHaveLength(0)
-    expect(called(calls, "readMcpLeafStrict").every((call) => call.args[1] === path.join(projectRoot, "alpha.jsonc"))).toBe(true)
+    expect(called(calls, "readMcpLeafStrict").every((call) => call.args[1] === path.join(projectRoot, "codepuppy.jsonc"))).toBe(true)
   })
 
   test("REQ-136 project MCP safety subset rejects secrets and workspace-policy entries before project writes", async () => {
@@ -844,7 +844,7 @@ describe("MCP install — facts re-derived from catalog, grants validated", () =
     expect(fs.lstatSync(projectRoot).isSymbolicLink()).toBe(true)
     expect(fs.readFileSync(sentinel, "utf8")).toBe("outside-stays-exact")
     expect(fs.existsSync(path.join(outside, "ext-tx"))).toBe(false)
-    expect(fs.existsSync(path.join(outside, "alpha.jsonc"))).toBe(false)
+    expect(fs.existsSync(path.join(outside, "codepuppy.jsonc"))).toBe(false)
     expect(fs.existsSync(path.join(outside, "installs.json"))).toBe(false)
   })
 })
@@ -971,7 +971,7 @@ describe("other kinds — derivation & records", () => {
   // 逐字节生效:下面两个 case 分别钉住「合规条目现在装得上」与「classification 不是靠早退分支
   // 撑着的——伪造/不合规条目照样被 applyMcpWritePolicy 挡」。
   test("REQ-133/#823: well-formed Alpha Office bundle child installs (workspace marker is not an atomic-bundle blocker)", async () => {
-    const alphaWord: CatalogEntry = {
+    const codepuppyWord: CatalogEntry = {
       ...mcpEntry,
       id: "mcp:codepuppy-word",
       name: "codepuppy-word",
@@ -985,14 +985,14 @@ describe("other kinds — derivation & records", () => {
       ...bundleEntry,
       id: "bundle:alpha-office",
       name: "alpha-office",
-      bundleItems: [{ catalogEntryId: alphaWord.id, optional: false, installOrder: 1 }],
+      bundleItems: [{ catalogEntryId: codepuppyWord.id, optional: false, installOrder: 1 }],
     }
-    const { deps } = makeDeps({ entries: [...ALL_ENTRIES, alphaWord, office] })
+    const { deps } = makeDeps({ entries: [...ALL_ENTRIES, codepuppyWord, office] })
     const result = await installAuthorized({ catalogId: office.id, scope: { scope: "global" } }, deps)
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.installed).toEqual(["mcp:codepuppy-word"])
-    const cfg = JSON.parse(fs.readFileSync(path.join(globalRoot, "alpha.jsonc"), "utf8"))
+    const cfg = JSON.parse(fs.readFileSync(path.join(globalRoot, "codepuppy.jsonc"), "utf8"))
     // 字面量占位原样写盘(REQ-134),{alphaResources} 被解到真实随包 server.py。
     expect(cfg.mcp["codepuppy-word"].command.at(-1)).toBe("{workspace}")
     expect(cfg.mcp["codepuppy-word"].command).toContain("word")
@@ -1018,7 +1018,7 @@ describe("other kinds — derivation & records", () => {
     for (const [entry, format] of [[newShape, "word"], [noCommand, "pdf"]] as const) {
       const result = await installAuthorized({ catalogId: entry.id, scope: { scope: "global" }, grants: { cnMirror: true } }, deps)
       expect(result.ok, JSON.stringify(result)).toBe(true)
-      const cfg = JSON.parse(fs.readFileSync(path.join(globalRoot, "alpha.jsonc"), "utf8"))
+      const cfg = JSON.parse(fs.readFileSync(path.join(globalRoot, "codepuppy.jsonc"), "utf8"))
       expect(cfg.mcp[entry.name]).toEqual({
         type: "local",
         command: [path.join(resources, "office-runtime", "bin", "python3"), "-I", "-B", path.join(resources, "office-mcp", "server.py"), format, "{workspace}"],
@@ -1042,14 +1042,14 @@ describe("other kinds — derivation & records", () => {
     }
     const office: CatalogEntry = {
       ...bundleEntry,
-      id: "bundle:alpha-office-spoofed",
-      name: "alpha-office-spoofed",
+      id: "bundle:codepuppy-office-spoofed",
+      name: "codepuppy-office-spoofed",
       bundleItems: [{ catalogEntryId: spoofed.id, optional: false, installOrder: 1 }],
     }
     const { deps } = makeDeps({ entries: [...ALL_ENTRIES, spoofed, office] })
     const result = await installAuthorized({ catalogId: office.id, scope: { scope: "global" } }, deps)
     expect(result.ok).toBe(true)
-    const cfg = JSON.parse(fs.readFileSync(path.join(globalRoot, "alpha.jsonc"), "utf8"))
+    const cfg = JSON.parse(fs.readFileSync(path.join(globalRoot, "codepuppy.jsonc"), "utf8"))
     const resources = fs.realpathSync(path.resolve(import.meta.dir, "../../resources"))
     expect(cfg.mcp["codepuppy-word"].command).toEqual([
       path.join(resources, "office-runtime", "bin", "python3"), "-I", "-B", path.join(resources, "office-mcp", "server.py"), "word", "{workspace}",
@@ -1066,7 +1066,7 @@ describe("other kinds — derivation & records", () => {
     if (!r.ok) return
     expect(r.installed?.sort()).toEqual(["mcp:clean", "skill:demo"])
     expect(resolveLiveGenerationDir(globalRoot, "skill--demo")).not.toBeNull() // skill 进 generation
-    const cfg = JSON.parse(fs.readFileSync(path.join(globalRoot, "alpha.jsonc"), "utf8"))
+    const cfg = JSON.parse(fs.readFileSync(path.join(globalRoot, "codepuppy.jsonc"), "utf8"))
     expect(cfg.mcp.clean).toEqual({ type: "local", command: ["uvx", "clean-mcp@1.0.0"] }) // MCP 进 config
     expect(findRecordV2(globalRoot, "skill", "demo")).not.toBeNull()
     expect(findRecordV2(globalRoot, "mcp", "clean")).not.toBeNull()
@@ -1098,7 +1098,7 @@ describe("other kinds — derivation & records", () => {
 
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.reason).toContain("excel-mcp-server is retired")
-    expect(fs.existsSync(path.join(globalRoot, "alpha.jsonc"))).toBe(false)
+    expect(fs.existsSync(path.join(globalRoot, "codepuppy.jsonc"))).toBe(false)
     expect(findRecordV2(globalRoot, "mcp", renamedExcel.name)).toBeNull()
   })
 
@@ -1345,7 +1345,7 @@ describe("legacy project manage (AC#3/AC#4 semantics kept for residuals)", () =>
     )
     expect(enabled.ok).toBe(false)
     if (!enabled.ok) expect(enabled.reason).toContain("consent-aware scoped activation")
-    const globalConfigBefore = fs.readFileSync(path.join(globalRoot, "alpha.jsonc"), "utf8")
+    const globalConfigBefore = fs.readFileSync(path.join(globalRoot, "codepuppy.jsonc"), "utf8")
     const globalLedgerBefore = fs.readFileSync(path.join(globalRoot, "installs.json"), "utf8")
     calls.length = 0
 
@@ -1359,12 +1359,12 @@ describe("legacy project manage (AC#3/AC#4 semantics kept for residuals)", () =>
     ])
     expect(called(calls, "removeMcpConfigInLock")).toHaveLength(0)
     expect(called(calls, "removeMcpSecretsStrict")).toHaveLength(0)
-    expect(called(calls, "releaseAlphaConnectionBindings")).toHaveLength(0)
+    expect(called(calls, "releaseCodePuppyConnectionBindings")).toHaveLength(0)
     expect(findRecordV2(projectRoot, "mcp", "project-demo")).toBeNull()
-    const projectConfig: unknown = JSON.parse(fs.readFileSync(path.join(projectRoot, "alpha.jsonc"), "utf8"))
+    const projectConfig: unknown = JSON.parse(fs.readFileSync(path.join(projectRoot, "codepuppy.jsonc"), "utf8"))
     expect(recOf(recOf(projectConfig).mcp)["project-demo"]).toBeUndefined()
     expect(fs.existsSync(path.join(projectRoot, "ext-store", "mcp--project-demo", "grants.json"))).toBe(false)
-    expect(fs.readFileSync(path.join(globalRoot, "alpha.jsonc"), "utf8")).toBe(globalConfigBefore)
+    expect(fs.readFileSync(path.join(globalRoot, "codepuppy.jsonc"), "utf8")).toBe(globalConfigBefore)
     expect(fs.readFileSync(path.join(globalRoot, "installs.json"), "utf8")).toBe(globalLedgerBefore)
     expect(probeTransactionJournals(projectRoot).entries.some((entry) => entry.op === "uninstall" && entry.state === "uninstalled")).toBe(true)
   })
@@ -1484,7 +1484,7 @@ describe("uninstall — facts from main's own ledger", () => {
     const oldJs = path.join(oldDir, "plugin.js")
     fs.mkdirSync(oldDir, { recursive: true })
     fs.writeFileSync(oldJs, "// old")
-    fs.writeFileSync(path.join(globalRoot, "alpha.jsonc"), JSON.stringify({ plugin: [oldJs] }, null, 2))
+    fs.writeFileSync(path.join(globalRoot, "codepuppy.jsonc"), JSON.stringify({ plugin: [oldJs] }, null, 2))
     const base = {
       id: "plugin:vp", name: "vp", kind: "plugin" as const, environment: "prod" as const, scope: { kind: "global" as const },
       version: "0.9.0", desiredState: "enabled" as const, origin: "catalog" as const,
@@ -1836,7 +1836,7 @@ describe("#315 advisory 激活闸接线", () => {
 
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.reason).toContain("required bundle child \"mcp:excel\" is retired")
-    expect(fs.existsSync(path.join(globalRoot, "alpha.jsonc"))).toBe(false)
+    expect(fs.existsSync(path.join(globalRoot, "codepuppy.jsonc"))).toBe(false)
     expect(findRecordV2(globalRoot, "mcp", retiredCommunityExcelEntry.name)).toBeNull()
   })
 
@@ -2013,7 +2013,7 @@ describe("capability authorize gate via installCatalog (REQ-100 #348)", () => {
     expect(byKey["cloud--research"]!.requested).toEqual(["cloud:dispatch"])
     expect(first.authorization.every((d) => d.requiresConfirmation && d.previous === null)).toBe(true)
     // 零权威副作用(bundle 同样)。
-    expect(fs.existsSync(path.join(globalRoot, "alpha.jsonc"))).toBe(false)
+    expect(fs.existsSync(path.join(globalRoot, "codepuppy.jsonc"))).toBe(false)
     const confirmed = Object.fromEntries(first.authorization.map((d) => [d.key, d.requested]))
     const second = await installCatalog({ catalogId: "bundle:authz", scope: { scope: "global" }, authorization: { confirmed } }, deps)
     expect(second.ok).toBe(true)
@@ -2109,7 +2109,7 @@ describe("fail-closed non-generation ledger commit (REQ-100 #354)", () => {
     } finally {
       unlockRoot()
     }
-    expect(fs.existsSync(path.join(globalRoot, "alpha.jsonc"))).toBe(false)
+    expect(fs.existsSync(path.join(globalRoot, "codepuppy.jsonc"))).toBe(false)
     expect(findRecordV2(globalRoot, "mcp", "markitdown")).toBeNull()
     // 本次版本目录清理(密钥文件在 userData 侧可写,失败路径不留孤儿)
     const rm = called(calls, "removeMcpSecretVersionDir")
@@ -2141,7 +2141,7 @@ describe("fail-closed non-generation ledger commit (REQ-100 #354)", () => {
     expect(r.ok).toBe(false)
     expect(called(calls, "writeMcpSecretVersioned")).toHaveLength(0)
     expect(called(calls, "applyMcpWritePolicy")).toHaveLength(0)
-    expect(fs.existsSync(path.join(globalRoot, "alpha.jsonc"))).toBe(false)
+    expect(fs.existsSync(path.join(globalRoot, "codepuppy.jsonc"))).toBe(false)
   })
 
   test("agent:有账或文件在场 → 写前拒绝(无更新链,不静默覆盖/认领),零内容副作用", async () => {
@@ -2174,7 +2174,7 @@ describe("fail-closed non-generation ledger commit (REQ-100 #354)", () => {
     // 引擎回滚零残留:无 md、无 config 叶、无账;补偿不再是 planner 手工调用。
     expect(fs.existsSync(path.join(globalRoot, "agents", "helper.md"))).toBe(false)
     expect(findRecordV2(globalRoot, "agent", "helper")).toBeNull()
-    if (fs.existsSync(path.join(globalRoot, "alpha.jsonc"))) {
+    if (fs.existsSync(path.join(globalRoot, "codepuppy.jsonc"))) {
       expect(readAgentLeaf(globalRoot, "helper")).toBeUndefined()
     }
     expect(called(calls, "removeFsInstall")).toHaveLength(0)
@@ -2222,7 +2222,7 @@ describe("fail-closed non-generation ledger commit (REQ-100 #354)", () => {
     if (first.ok || first.stage !== "authorize") throw new Error("expected authorize pause")
     expect(first.authorization.length).toBeGreaterThan(0)
     // 零权威副作用:无 config 叶、无账、无 grant;本次密钥版本目录已清(用户确认前零明文残留)
-    expect(fs.existsSync(path.join(globalRoot, "alpha.jsonc"))).toBe(false)
+    expect(fs.existsSync(path.join(globalRoot, "codepuppy.jsonc"))).toBe(false)
     expect(findRecordV2(globalRoot, "mcp", "markitdown")).toBeNull()
     expect(readCapabilityGrant(globalRoot, "mcp--markitdown")).toBeNull()
     const rm = called(calls, "removeMcpSecretVersionDir")
@@ -2313,7 +2313,7 @@ describe("single-install transactionalization exit criteria (REQ-100 #378)", () 
     const r = await installAuthorized({ catalogId: "mcp:markitdown", scope: { scope: "global" }, grants: { secrets: { API_KEY: "v" } } }, deps)
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.reason).toContain("secret file")
-    expect(fs.existsSync(path.join(globalRoot, "alpha.jsonc"))).toBe(false) // 绝不提交悬空引用
+    expect(fs.existsSync(path.join(globalRoot, "codepuppy.jsonc"))).toBe(false) // 绝不提交悬空引用
     expect(findRecordV2(globalRoot, "mcp", "markitdown")).toBeNull()
   })
 
@@ -2376,7 +2376,7 @@ describe("single-install transactionalization exit criteria (REQ-100 #378)", () 
       expect(r.ok).toBe(false)
       if (!r.ok) expect(r.reason).toContain("escape-hatch")
     }
-    expect(fs.existsSync(path.join(globalRoot, "alpha.jsonc"))).toBe(false)
+    expect(fs.existsSync(path.join(globalRoot, "codepuppy.jsonc"))).toBe(false)
     expect(fs.existsSync(path.join(globalRoot, "installs.json"))).toBe(false)
   })
 
@@ -2483,7 +2483,7 @@ describe("catalog agent install via transaction engine (REQ-098 #361)", () => {
   })
 
   test("锁内 fresh 门(引擎 precondition):锁外门被绕过(agentPresent=false)仍拒无账 config 叶,引擎回滚零残留", async () => {
-    fs.writeFileSync(path.join(globalRoot, "alpha.jsonc"), JSON.stringify({ agent: { helper: { description: "mine", prompt: "p" } } }))
+    fs.writeFileSync(path.join(globalRoot, "codepuppy.jsonc"), JSON.stringify({ agent: { helper: { description: "mine", prompt: "p" } } }))
     const { deps } = makeDeps({ entries: entriesWithAgents }) // harness 缺省 agentPresent=false = 锁外门失明
     const r = await installAuthorized({ catalogId: "agent:helper", scope: { scope: "global" } }, deps)
     expect(r.ok).toBe(false)
@@ -2536,7 +2536,7 @@ const makeCuration = (
   deliveryMode: "installable",
   review: {
     reviewedAt: over.reviewedAt ?? "2026-07-01T00:00:00Z",
-    reviewedBy: "alpha-review",
+    reviewedBy: "codepuppy-review",
     upstreamStatus: over.upstreamStatus ?? "active",
     supportTier: "best-effort",
     reviewBefore: over.reviewBefore ?? "2027-07-01T00:00:00Z",
@@ -2618,8 +2618,8 @@ describe("#397 安装面:archived 拒装 + activationPolicy 声明落账", () =>
 
   test("r1-2(更新链):已启用 mcp 重装到声明 session-grant 的版本 ⇒ 账本归位 disabled(upsert 的 prev 优先不得复活 enabled)", async () => {
     // 先以未策展 alpha 源装成 enabled(#395 规则)。
-    const plainAlpha: CatalogEntry = { ...mcpEntry, source: "alpha" }
-    const { deps: deps1 } = makeDeps({ entries: [plainAlpha] })
+    const plainCodePuppy: CatalogEntry = { ...mcpEntry, source: "alpha" }
+    const { deps: deps1 } = makeDeps({ entries: [plainCodePuppy] })
     expect((await installAuthorized(intent, deps1)).ok).toBe(true)
     expect(findRecordV2(globalRoot, "mcp", "markitdown")?.desiredState).toBe("enabled")
     // 目录换代:同 id 版本声明 session-grant → 重装后持久账本必须归位 disabled。
@@ -2868,21 +2868,21 @@ describe("ADR-040(`#825`):catalog plugin 条目在事务开始前具名拒绝", 
       // 拒绝若挪到 dispatch 之后,这条立刻红。下面那条对照用例证明 `calls` 确实会被填。
       expect(calls).toEqual([])
       // 零副作用的三个面(config / 账本 / 载荷目录)。
-      expect(fs.existsSync(path.join(globalRoot, "alpha.jsonc"))).toBe(false)
+      expect(fs.existsSync(path.join(globalRoot, "codepuppy.jsonc"))).toBe(false)
       expect(fs.existsSync(path.join(globalRoot, "installs.json"))).toBe(false)
       expect(fs.existsSync(path.join(globalRoot, "plugins"))).toBe(false)
       expect(findRecordV2(globalRoot, "plugin", catalogId.slice("plugin:".length))).toBeNull()
     })
   }
 
-  test("对照:同一个 makeDeps 下 mcp 条目照常装成 —— 且它**真的**填了 calls 与 alpha.jsonc", async () => {
+  test("对照:同一个 makeDeps 下 mcp 条目照常装成 —— 且它**真的**填了 calls 与 codepuppy.jsonc", async () => {
     const { deps, calls } = makeDeps()
     const r = await installAuthorized({ catalogId: "mcp:markitdown", scope: { scope: "global" }, grants: { secrets: { API_KEY: "v" } } }, deps)
     expect(r.ok).toBe(true)
-    // 观测手段自检:上面那两条用例断言的 `calls` 与 `alpha.jsonc` 在成功路径上确实非空/存在,
+    // 观测手段自检:上面那两条用例断言的 `calls` 与 `codepuppy.jsonc` 在成功路径上确实非空/存在,
     // 所以它们的「空/不存在」不是恒成立的空断言。
     expect(calls.length).toBeGreaterThan(0)
-    expect(fs.existsSync(path.join(globalRoot, "alpha.jsonc"))).toBe(true)
+    expect(fs.existsSync(path.join(globalRoot, "codepuppy.jsonc"))).toBe(true)
   })
 })
 
@@ -2894,7 +2894,7 @@ describe("ADR-040(`#825`):catalog plugin 条目在事务开始前具名拒绝", 
 // bundle:design 的必需成员是两个远程技能、不含任何 MCP,从未受这个 bug 影响(它本来就走
 // authorize→confirm 就能装成;这里把它也钉进来只是为了让"随包四条套件全部可装"这句话对全部
 // 四条都有回归覆盖,不止对被这个 bug 影响的三条)。
-describe("#823:随包 catalog 四条套件端到端可装(真实 alpha-catalog.json,非内部函数返回值)", () => {
+describe("#823:随包 catalog 四条套件端到端可装(真实 codepuppy-catalog.json,非内部函数返回值)", () => {
   function bundledCatalogEntries(): CatalogEntry[] {
     const raw = bundledCatalogSnapshot as unknown as { entries: CatalogEntry[] }
     // bundle:design 的两个远程技能在真实 catalog 里指向线上资产 URL;测试离线跑,替换成
@@ -2958,7 +2958,7 @@ describe("#823:随包 catalog 四条套件端到端可装(真实 alpha-catalog.j
 //
 // 现象定位(2026-07-14 逐需求审计 · REQ-105 原文:「receipt 记录条目版 1.0.0 而实际执行 0.1.8 且
 // 无包 digest 字段」):
-//   · `alpha-catalog.json` 的 `mcp:codepuppy-excel` 卡片版本是 `1.0.0`;
+//   · `codepuppy-catalog.json` 的 `mcp:codepuppy-excel` 卡片版本是 `1.0.0`;
 //   · 它真正执行的是随包 `resources/office-mcp/server.py` + 钉版依赖 —— 卡片版本一个字都不描述它;
 //   · `synthesizeManifest` 的 `version` 取的就是卡片版本,`artifact` 只在 `remoteAsset.files` 在场时
 //     才有(MCP 条目没有)⇒ 修复前 receipt 上 **零** digest 能指认执行物。

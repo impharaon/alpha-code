@@ -607,7 +607,7 @@ POST /mcp {"name":"alpha1286probe","config":{"type":"local","command":["<node>",
 **由此还得到一条设计上的硬约束:围栏一旦套上就不能再加宽** —— 想扩可写集只能换新进程。
 
 **对本票的直接后果:** REQ-138 的 wrapper 是
-`exec /usr/bin/sandbox-exec -f "$ALPHA_SB_PROFILE" -D WORKDIR="$(pwd)" "$ALPHA_REAL_SHELL" "$@"`。
+`exec /usr/bin/sandbox-exec -f "$CODEPUPPY_SB_PROFILE" -D WORKDIR="$(pwd)" "$CODEPUPPY_REAL_SHELL" "$@"`。
 外层若已有整进程围栏,`$(pwd)` 逐次不同 ⇒ 命中第 1 行 ⇒ **每一次 shell 工具调用 exit 71、零执行**。
 整进程围栏与 REQ-138 的 `cfg.shell` 层**互斥**:选前者就要把后者拆掉(`wrapEngineShell` 不再包
 `cfg.shell`),而不是两层并存。
@@ -679,9 +679,9 @@ v0.1.11 的一次真实启动):同一个 sidecar 同时挂着两组 Office MCP �
 - **~~alpha 自己那部分写入集没有枚举完~~ —— 已在 §7 跑完(第三轮,2026-09-08),分上下界两级。以 §7.6 为准。**
   (以下为第二轮原文,保留以便追溯)
 - **alpha 自己那部分写入集没有枚举完。** 本轮跑的是 `bun … serve` 的上游引擎,**没有**装载
-  `@alpha-code/ext`、没有 `injectAlphaConfig`。静态实读可见 ext 插件在 sidecar 里还会写
-  `<alphaGlobalRoot>/sandbox/`、`<alphaGlobalRoot>/bin/`(`shell-sandbox.ts:201-216`)与项目级
-  `alpha.jsonc`(`plugin.ts:320-329`);catalog / 模型缓存 / ext-store / ext-tx 未逐条实跑。
+  `@codepuppy/ext`、没有 `injectCodePuppyConfig`。静态实读可见 ext 插件在 sidecar 里还会写
+  `<codepuppyGlobalRoot>/sandbox/`、`<codepuppyGlobalRoot>/bin/`(`shell-sandbox.ts:201-216`)与项目级
+  `codepuppy.jsonc`(`plugin.ts:320-329`);catalog / 模型缓存 / ext-store / ext-tx 未逐条实跑。
   **P1/P2 落地前必须把这一段补齐**,漏一条 ⇒ sidecar 起不来。
 - **P1 只在 bun:ffi 上验过机制,没有写原生附加模块**,因此「node 侧真能调通 + 能签名 + 能在
   hardened runtime 下加载」是**推断**(依据:出货包已带三个 prebuild `.node`),不是实测。
@@ -701,7 +701,7 @@ v0.1.11 的一次真实启动):同一个 sidecar 同时挂着两组 Office MCP �
 ## 7. 第三轮勘破:alpha 自己在 sidecar 进程里的写入面(2026-09-08)
 
 第二轮把这一条明确记为**没跑**(§6.8 第三条):「本轮跑的是 `bun … serve` 的上游引擎,**没有**装载
-`@alpha-code/ext`……P1/P2 落地前必须把这一段补齐,漏一条 ⇒ sidecar 起不来」。本节把它跑了。
+`@codepuppy/ext`……P1/P2 落地前必须把这一段补齐,漏一条 ⇒ sidecar 起不来」。本节把它跑了。
 
 一句话结论:**alpha 自己的写入面收得住**,而且**只有一条前缀随工作区变化**(`<workspace>/`);
 但这份枚举有**上下界两级**,写围栏时必须按上界写,除非逐条证明够不着(§7.6 B 段)。
@@ -724,12 +724,12 @@ v0.1.11 的一次真实启动):同一个 sidecar 同时挂着两组 Office MCP �
 ### 7.1 四问,各一句
 
 1. **alpha 自己在 sidecar 里写哪些地方?** 冷启动 + 真实工作负载实跑落盘 **13 条**(§7.6 A 段),
-   全部落在三个固定根(`<alphaGlobalRoot>`、`<userDataPath>`、`<workspace>/.code-puppy`)之下。
+   全部落在三个固定根(`<codepuppyGlobalRoot>`、`<userDataPath>`、`<workspace>/.code-puppy`)之下。
 2. **哪些随工作区变化?** alpha 自己只有 `<workspace>/.code-puppy/**` 一处;算上上游引擎与工具,
    随工作区变化的全部路径都在 **`<workspace>/` 这一条前缀**之下 ⇒ 围栏每多服务一个工作区
    只需要多一条 `(subpath <workspace>)`。
 3. **这份清单能不能从代码里长出来?** 能,而且必须从**出货产物**长(§7.3)。源码侧手写扫描
-   本轮当场漏了一个模块(多行 import 没被正则吃到,漏 `alpha-mcp-secrets.ts` 的 19 处写盘);
+   本轮当场漏了一个模块(多行 import 没被正则吃到,漏 `codepuppy-mcp-secrets.ts` 的 19 处写盘);
    产物侧派生 + 反向臂四条,新增/改名一处写盘都判红。
 4. **有没有推翻前两轮的东西?** 有一条,而且是**减覆盖**方向:§3 表第 6 行「PTY 缺省已被
    REQ-138 罩住」在**真实产品接线下不成立**(§7.7)。
@@ -787,8 +787,8 @@ sh   报告 5 / 落盘 5
 
 **为什么不能是源码清单。** 本轮先写了一个源码侧的 import 闭包扫描器,它给出 79 个文件 / 140 处
 写盘。把它的 import 正则从「`import … from` 必须同一行」改成「任何 `from "…"`」之后,
-**同一棵树变成 99 个文件 / 186 处** —— 多出来的里就有 `alpha-mcp-secrets.ts`(19 处写盘,
-目标是 `<userDataPath>/alpha-mcp-secrets/<server>/<verId>/<VAR>`),它被漏掉的唯一原因是
+**同一棵树变成 99 个文件 / 186 处** —— 多出来的里就有 `codepuppy-mcp-secrets.ts`(19 处写盘,
+目标是 `<userDataPath>/codepuppy-mcp-secrets/<server>/<verId>/<VAR>`),它被漏掉的唯一原因是
 `ext-config.ts:27` 用了**多行** import。**这是「手写一个别人文法的替身」的又一例**,而它是靠
 比对出货产物才暴露的:产物里明明有 `fs.rmSync(serverDir(userDataPath, server), …)`。
 
@@ -837,23 +837,23 @@ packages/ui-mac/out/main/chunks/sidecar-stop-*.js
 - 签名归一化会把标识符尾部的数字剥掉(为了吃掉 bundler 的 `join4`),**字符串字面量里的数字
   也一起被剥**。不影响判红,但签名是有损的(ARM C 的输出里 `alpha1286-new-write-point.log`
   被显示成 `alpha-new-write-point.log`)。
-- **本轮这套判据没有入仓、没有接进 `scripts/alpha-check.sh`。** 只入仓不接闸 = 安慰剂闸
+- **本轮这套判据没有入仓、没有接进 `scripts/codepuppy-check.sh`。** 只入仓不接闸 = 安慰剂闸
   (`#1292` 的形态),所以这里只交出「它成立、四臂都验过」,落地形态归实现票。
 
-### 7.4 实跑:装了 `@alpha-code/ext` 的 sidecar,冷启动 + 真实工作负载
+### 7.4 实跑:装了 `@codepuppy/ext` 的 sidecar,冷启动 + 真实工作负载
 
-按 `sidecar.ts` 的真实顺序驱动:先 `injectAlphaConfig(userDataPath, extPluginPath, "dev")`
+按 `sidecar.ts` 的真实顺序驱动:先 `injectCodePuppyConfig(userDataPath, extPluginPath, "dev")`
 (它自己就落盘),再起引擎;整条链跑在 `sandbox-exec -f trace.sb` 里,报告面全程 `log stream`。
 
 ```
-HOME=<ISO>/home  XDG_{CONFIG,DATA,CACHE,STATE}_HOME=<ISO>/home/…  ALPHA_GLOBAL_DIR=<ISO>/alpha-state/env/dev
+HOME=<ISO>/home  XDG_{CONFIG,DATA,CACHE,STATE}_HOME=<ISO>/home/…  CODEPUPPY_GLOBAL_DIR=<ISO>/codepuppy-state/env/dev
 cd packages/ui-mac && /usr/bin/sandbox-exec -f trace.sb "$(which bun)" run ./alpha1286-driver.ts
   → ALPHA1286-INJECT {"ok":true}
-  → ALPHA1286-OPENCODE_CONFIG <ISO>/alpha-state/env/dev/alpha.jsonc
+  → ALPHA1286-OPENCODE_CONFIG <ISO>/codepuppy-state/env/dev/codepuppy.jsonc
   → ALPHA1286-CONTENT-PLUGIN [".../packages/ext/dist/plugin.js"]
   → opencode server listening on http://127.0.0.1:43290
-  → [@alpha-code/ext] engine shell fenced: cfg.shell=<ISO>/alpha-state/env/dev/bin/zsh
-       real=/bin/zsh profile=<ISO>/alpha-state/env/dev/sandbox/alpha-shell.sb
+  → [@codepuppy/ext] engine shell fenced: cfg.shell=<ISO>/codepuppy-state/env/dev/bin/zsh
+       real=/bin/zsh profile=<ISO>/codepuppy-state/env/dev/sandbox/alpha-shell.sb
 ```
 
 工作负载,逐条:
@@ -865,21 +865,21 @@ cd packages/ui-mac && /usr/bin/sandbox-exec -f trace.sb "$(which bun)" run ./alp
 | `POST /session` | 200,`ses_f7febb2d8ffeAT7rwxUnEvo8DH` |
 | `POST /mcp`(**装一个连接器**) | 200,`{"alpha1286probe":{"status":"connected"}}`,子进程真起来并真写盘 |
 | `POST /pty`(**开一个终端**) | 200,`status:"running"`,`pid:44246` |
-| `alpha_register` 工具(**写一次 `alpha.jsonc`**) | `command "alpha1286probe" registered in .code-puppy/alpha.jsonc`,文件真落盘 |
+| `alpha_register` 工具(**写一次 `codepuppy.jsonc`**) | `command "alpha1286probe" registered in .code-puppy/codepuppy.jsonc`,文件真落盘 |
 | `POST /session/{id}/shell`(**跑一次 shell 工具**) | **没跑成** —— `HTTP=500`,引擎日志 `ProviderNoProvidersError: No providers are available`(隔离家目录里没有任何凭据)。**与围栏无关,如实记账**;这一格未闭合 |
 
 `alpha_register` 那条走的是**直接装载出货 bundle 真执行**(`import(packages/ext/dist/plugin.js)` →
 `hooks.tool.alpha_register.execute(...)`),因为它需要模型回合才会经会话触发。落盘实证:
 
 ```
-<ISO>/ws/.code-puppy/alpha.jsonc    { "command": { "alpha1286probe": { "template": "echo hi" } } }
-报告面同时记到:  <WS>/.code-puppy  、 <WS>/.code-puppy/alpha.jsonc.tmp 、 <WS>/.code-puppy/alpha.jsonc
+<ISO>/ws/.code-puppy/codepuppy.jsonc    { "command": { "alpha1286probe": { "template": "echo hi" } } }
+报告面同时记到:  <WS>/.code-puppy  、 <WS>/.code-puppy/codepuppy.jsonc.tmp 、 <WS>/.code-puppy/codepuppy.jsonc
 ```
 
 **报告面按桶折叠(8 627 条唯一路径):**
 
 ```
-  3933  <userDataPath>/*                     e.g. alpha-identity.md / alpha-engine-config/…
+  3933  <userDataPath>/*                     e.g. codepuppy-identity.md / codepuppy-engine-config/…
   3923  <XDG_CONFIG>/opencode/node_modules/** 运行时装 provider 包
    556  $HOME/.npm/**                        npm cacache(不随 XDG)
    138  <XDG_CACHE>/bun/**                   bun 运行时(出货 node sidecar 不需要)
@@ -889,10 +889,10 @@ cd packages/ui-mac && /usr/bin/sandbox-exec -f trace.sb "$(which bun)" run ./alp
      4  <XDG_CACHE>/opencode/*               bin / models.json
      4  <XDG_CONFIG>/opencode/*              .gitignore / package.json / package-lock.json
      3  <workspace>/.code-puppy/*
-     2  <alphaGlobalRoot>/bin/*
-     2  <alphaGlobalRoot>/sandbox/*
+     2  <codepuppyGlobalRoot>/bin/*
+     2  <codepuppyGlobalRoot>/sandbox/*
      2  $TMPDIR(/private/var/folders)/**
-     1  <alphaGlobalRoot>/alpha.jsonc
+     1  <codepuppyGlobalRoot>/codepuppy.jsonc
      1  <workspace>/.git/**                  .git/opencode
      1  <ISO>/positive-control.txt           ← 正样本臂(证明这台仪器这一刻是活的)
 ```
@@ -900,10 +900,10 @@ cd packages/ui-mac && /usr/bin/sandbox-exec -f trace.sb "$(which bun)" run ./alp
 **两处反直觉、且会直接弄死产品的:**
 
 1. **provider 包被装了两份。** 第二轮跑裸引擎时只看到 `<XDG_CONFIG>/opencode/node_modules`;
-   装了 alpha 之后 `injectAlphaConfig` 把 `OPENCODE_CONFIG_DIR` 指到
-   `<userDataPath>/alpha-engine-config`,于是**两处各装一份**,实测各 26 个顶层包 / 61 MB
+   装了 alpha 之后 `injectCodePuppyConfig` 把 `OPENCODE_CONFIG_DIR` 指到
+   `<userDataPath>/codepuppy-engine-config`,于是**两处各装一份**,实测各 26 个顶层包 / 61 MB
    (`du -sh` 两处都是 61M)。真机同样两处都在(`~/.config/opencode/node_modules` 24 个、
-   `~/Library/Application Support/ai.opencode.desktop/alpha-engine-config/node_modules` 26 个)。
+   `~/Library/Application Support/ai.opencode.desktop/codepuppy-engine-config/node_modules` 26 个)。
    **围栏漏掉任一处 ⇒ provider 装不上。**
 2. **`POST /pty` 起的是登录 shell(`-l`),它会写 `$HOME/.zsh_history`、`$HOME/.zsh_history.LOCK`
    与 `$HOME/.zsh_sessions/**`。** 这几条在家目录里、不在任何应用目录下,漏掉的后果不是少拦
@@ -940,10 +940,10 @@ ps → 52489 52441 …/Code Puppy Helper --type=utility --utility-sub-type=node.
 该 sidecar pid 的报告(全部 19 条,已折叠;整窗口有 **34 次 dropped**,所以这份**不完整**):
 
 ```
-~/Library/Application Support/ai.opencode.desktop/alpha-identity.md
-~/Library/Application Support/ai.opencode.desktop/alpha-behavior.md
-~/Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.json   (data/mode/owner)
-~/Library/Application Support/ai.opencode.desktop/alpha-engine-config/opencode.jsonc
+~/Library/Application Support/ai.opencode.desktop/codepuppy-identity.md
+~/Library/Application Support/ai.opencode.desktop/codepuppy-behavior.md
+~/Library/Application Support/ai.opencode.desktop/codepuppy-engine-config/opencode.json   (data/mode/owner)
+~/Library/Application Support/ai.opencode.desktop/codepuppy-engine-config/opencode.jsonc
 ~/Library/Application Support/ai.opencode.desktop/opencode/locks/<hash>.lock/{heartbeat,meta.json}
 ~/.local/share/opencode/log/opencode.log
 ~/.local/share/opencode/opencode.db{,-wal,-shm}
@@ -958,15 +958,15 @@ ps → 52489 52441 …/Code Puppy Helper --type=utility --utility-sub-type=node.
 第二台仪器(`find -newermt <窗口起点>`)在同一窗口补到的 alpha 状态根:
 
 ```
-~/Library/Application Support/alpha-code-state/env/prod/{skills-enabled.json, ext-tx/}
-~/Library/Application Support/ai.opencode.desktop/{alpha-live-models.json, alpha-shell-env.json,
-      alpha-secrets/ZHIPU_API_KEY, catalog-channel-state.json, logs/<ts>/, alpha-engine-config/…}
+~/Library/Application Support/codepuppy-state/env/prod/{skills-enabled.json, ext-tx/}
+~/Library/Application Support/ai.opencode.desktop/{codepuppy-live-models.json, codepuppy-shell-env.json,
+      codepuppy-secrets/ZHIPU_API_KEY, catalog-channel-state.json, logs/<ts>/, codepuppy-engine-config/…}
 ```
 
-生产 `alphaGlobalRoot`(`env/prod`)的实况目录清单:
+生产 `codepuppyGlobalRoot`(`env/prod`)的实况目录清单:
 
 ```
-alpha.jsonc  bin/zsh  sandbox/alpha-shell.sb  ext-store/  ext-tx/
+codepuppy.jsonc  bin/zsh  sandbox/alpha-shell.sb  ext-store/  ext-tx/
 installs.json  skills-enabled.json  ecosystem-import.json
 ```
 
@@ -980,19 +980,19 @@ installs.json  skills-enabled.json  ecosystem-import.json
 
 | # | 路径 | 谁写的 | 什么时机 | 随工作区变化 |
 | --- | --- | --- | --- | --- |
-| 1 | `<alphaGlobalRoot>/alpha.jsonc` | `ui-mac/src/main/alpha-config-injection.ts:80,82`(sidecar 进程 start 第一步) | 每次 start;缺失才 seed | 否 |
-| 2 | `<userDataPath>/alpha-identity.md` | 同上 `:111,115` | 每次 start | 否 |
-| 3 | `<userDataPath>/alpha-behavior.md` | 同上 `:111,115` | 每次 start | 否 |
-| 4 | `<userDataPath>/alpha-engine-config/`(mkdir `0700`) | 同上 `:513` | 每次 start | 否 |
-| 5 | `<userDataPath>/alpha-engine-config/opencode.jsonc`(`0600`) | 同上 `:537` | 每次 start | 否 |
-| 6 | `<userDataPath>/alpha-engine-config/opencode.json` | 同上 `:516`(拷 `alpha.jsonc`)/ `:518`(清陈尸) | 每次 start | 否 |
-| 7 | `<userDataPath>/alpha-engine-config/models.json`(`0600`) | 同上 `:557` / `:560` | 每次 start | 否 |
-| 8 | `<userDataPath>/alpha-engine-config/{package.json,package-lock.json,node_modules/**}` | 上游引擎的运行时 npm;**落点由 alpha 的 `OPENCODE_CONFIG_DIR` 决定** | 首次 / 缺包(实测 26 包 61 MB) | 否 |
-| 9 | `<alphaGlobalRoot>/sandbox/alpha-shell.sb` | `ext/src/shell-sandbox.ts:201-202`(`config` 钩子) | **每次配置加载**(每实例、每次 dispose 重建) | 否 |
-| 10 | `<alphaGlobalRoot>/bin/<真 shell 的 basename>`(+`chmod 0755`) | `ext/src/shell-sandbox.ts:203-205` | 同上 | 否 |
+| 1 | `<codepuppyGlobalRoot>/codepuppy.jsonc` | `ui-mac/src/main/codepuppy-config-injection.ts:80,82`(sidecar 进程 start 第一步) | 每次 start;缺失才 seed | 否 |
+| 2 | `<userDataPath>/codepuppy-identity.md` | 同上 `:111,115` | 每次 start | 否 |
+| 3 | `<userDataPath>/codepuppy-behavior.md` | 同上 `:111,115` | 每次 start | 否 |
+| 4 | `<userDataPath>/codepuppy-engine-config/`(mkdir `0700`) | 同上 `:513` | 每次 start | 否 |
+| 5 | `<userDataPath>/codepuppy-engine-config/opencode.jsonc`(`0600`) | 同上 `:537` | 每次 start | 否 |
+| 6 | `<userDataPath>/codepuppy-engine-config/opencode.json` | 同上 `:516`(拷 `codepuppy.jsonc`)/ `:518`(清陈尸) | 每次 start | 否 |
+| 7 | `<userDataPath>/codepuppy-engine-config/models.json`(`0600`) | 同上 `:557` / `:560` | 每次 start | 否 |
+| 8 | `<userDataPath>/codepuppy-engine-config/{package.json,package-lock.json,node_modules/**}` | 上游引擎的运行时 npm;**落点由 alpha 的 `OPENCODE_CONFIG_DIR` 决定** | 首次 / 缺包(实测 26 包 61 MB) | 否 |
+| 9 | `<codepuppyGlobalRoot>/sandbox/alpha-shell.sb` | `ext/src/shell-sandbox.ts:201-202`(`config` 钩子) | **每次配置加载**(每实例、每次 dispose 重建) | 否 |
+| 10 | `<codepuppyGlobalRoot>/bin/<真 shell 的 basename>`(+`chmod 0755`) | `ext/src/shell-sandbox.ts:203-205` | 同上 | 否 |
 | 11 | `<workspace>/.code-puppy/`(mkdir) | `ext/src/plugin.ts:316` | `alpha_register` 工具 | **是** |
-| 12 | `<workspace>/.code-puppy/alpha.jsonc.tmp` | `ext/src/plugin.ts:320` | 同上 | **是** |
-| 13 | `<workspace>/.code-puppy/alpha.jsonc`(rename) | `ext/src/plugin.ts:325` | 同上 | **是** |
+| 12 | `<workspace>/.code-puppy/codepuppy.jsonc.tmp` | `ext/src/plugin.ts:320` | 同上 | **是** |
+| 13 | `<workspace>/.code-puppy/codepuppy.jsonc`(rename) | `ext/src/plugin.ts:325` | 同上 | **是** |
 
 **同一个进程里,上游引擎与它派生的进程还会写这些 —— 围栏同样必须放行,漏一条同样起不来:**
 
@@ -1015,16 +1015,16 @@ bundle(§7.3 的 70 条签名里),只是这次工作负载没走到。围栏要�
 
 | 额外的写入根 | 来源模块(产物里可达) |
 | --- | --- |
-| `<alphaGlobalRoot>/bin/alpha-shell-denied`(+`chmod 0755`) | `ext/src/shell-sandbox.ts:215-217` —— 围栏装不上时的 fail-closed 分支;根与 A 段第 10 行相同,所以不额外扩大可写集 |
-| `<userDataPath>/alpha-secrets/**`(`0700`/`0600`) | `alpha-secret-files.ts` |
-| `<userDataPath>/alpha-mcp-secrets/<server>/<verId>/<VAR>` | `alpha-mcp-secrets.ts`(源码侧 19 处) |
+| `<codepuppyGlobalRoot>/bin/alpha-shell-denied`(+`chmod 0755`) | `ext/src/shell-sandbox.ts:215-217` —— 围栏装不上时的 fail-closed 分支;根与 A 段第 10 行相同,所以不额外扩大可写集 |
+| `<userDataPath>/codepuppy-secrets/**`(`0700`/`0600`) | `codepuppy-secret-files.ts` |
+| `<userDataPath>/codepuppy-mcp-secrets/<server>/<verId>/<VAR>` | `codepuppy-mcp-secrets.ts`(源码侧 19 处) |
 | `<userDataPath>/catalog-channel-state.json` | `catalog-channels.ts` |
 | `<userDataPath>/`(远端 catalog 缓存) | `remote-catalog.ts` |
-| `<alphaGlobalRoot>/{ext-store,ext-tx}/**` | `ext-receipt-v2.ts` / `ext-transaction.ts` / `ext-bundle-lock.ts` / `ext-atomic-fs.ts` / `ext-cas.ts` / `ext-file-tx.ts` / `ext-config-tx.ts` |
-| `<alphaGlobalRoot>/alpha.jsonc` + `*.alpha-bak-*` | `ext-config.ts`(真机 `~/.config/opencode/opencode.jsonc.alpha-bak-*` 是同族历史产物) |
-| `<alphaGlobalRoot>/{installs.json,skills-enabled.json,ecosystem-import.json}` | `alpha-installs.ts` 等 |
-| `~/.opencode/**`(桥的 unbridge 一侧) | `alpha-bridge.ts` |
-| `<workspace>/.code-puppy/{.gitignore,runs/**,artifacts/**}` | `alpha-workdir.ts` —— **随工作区变化** |
+| `<codepuppyGlobalRoot>/{ext-store,ext-tx}/**` | `ext-receipt-v2.ts` / `ext-transaction.ts` / `ext-bundle-lock.ts` / `ext-atomic-fs.ts` / `ext-cas.ts` / `ext-file-tx.ts` / `ext-config-tx.ts` |
+| `<codepuppyGlobalRoot>/codepuppy.jsonc` + `*.alpha-bak-*` | `ext-config.ts`(真机 `~/.config/opencode/opencode.jsonc.alpha-bak-*` 是同族历史产物) |
+| `<codepuppyGlobalRoot>/{installs.json,skills-enabled.json,ecosystem-import.json}` | `codepuppy-installs.ts` 等 |
+| `~/.opencode/**`(桥的 unbridge 一侧) | `codepuppy-bridge.ts` |
+| `<workspace>/.code-puppy/{.gitignore,runs/**,artifacts/**}` | `codepuppy-workdir.ts` —— **随工作区变化** |
 
 **⇒ 随工作区变化的全部路径(A 段 11–13、20–21,B 段最后一行)都在 `<workspace>/` 这一条前缀
 之下。** 对第二块地基(一个 sidecar 服多工作区)的直接含义:围栏每多服务一个工作区只需要多一条
@@ -1036,8 +1036,8 @@ bundle(§7.3 的 70 条签名里),只是这次工作负载没走到。围栏要�
 
 | 前两轮的说法 | 第三轮实测 |
 | --- | --- |
-| §3 表第 6 行:「**PTY 终端(缺省)** …… 今天被 C1(`cfg.shell` wrapper)罩住 = **是**」 | **在真实产品接线下不成立。** 同一个引擎、同一时刻:`GET /config` 返回 `shell = <alphaGlobalRoot>/bin/zsh`(= ext 的 wrapper),而 `POST /pty` 返回 `command:"/bin/zsh"`、`args:["-l"]`,`ps -p 44246` 也是 `/bin/zsh -l`。机理:ext 的 `config` 钩子改的是 **opencode 侧**合并出来的那个对象(`plugin/index.ts:254` 把 `cfg` 递给钩子),而 `packages/core/src/pty.ts:167` 读的是 **packages/core 的** `Config.Service.entries()` —— 它返回 layer 构造时**从磁盘读到的** `configs` 数组(`packages/core/src/config.ts:214-216`),插件的内存改写它看不见;`Shell.preferred(undefined)` 于是退到 `process.env.SHELL`。第一轮 §2.4 ARM A 是把 `cfg.shell` 直接放进 core 的那份 config 测的,所以它证到的是**结构条件成立**,不是产品接线成立 |
-| 第二轮 §6.3.1 的写入集(裸引擎) | 装了 ext 之后**多一份 provider 安装**:`<userDataPath>/alpha-engine-config/node_modules`(26 包 61 MB),与 `<XDG_CONFIG>/opencode/node_modules` 并存 |
+| §3 表第 6 行:「**PTY 终端(缺省)** …… 今天被 C1(`cfg.shell` wrapper)罩住 = **是**」 | **在真实产品接线下不成立。** 同一个引擎、同一时刻:`GET /config` 返回 `shell = <codepuppyGlobalRoot>/bin/zsh`(= ext 的 wrapper),而 `POST /pty` 返回 `command:"/bin/zsh"`、`args:["-l"]`,`ps -p 44246` 也是 `/bin/zsh -l`。机理:ext 的 `config` 钩子改的是 **opencode 侧**合并出来的那个对象(`plugin/index.ts:254` 把 `cfg` 递给钩子),而 `packages/core/src/pty.ts:167` 读的是 **packages/core 的** `Config.Service.entries()` —— 它返回 layer 构造时**从磁盘读到的** `configs` 数组(`packages/core/src/config.ts:214-216`),插件的内存改写它看不见;`Shell.preferred(undefined)` 于是退到 `process.env.SHELL`。第一轮 §2.4 ARM A 是把 `cfg.shell` 直接放进 core 的那份 config 测的,所以它证到的是**结构条件成立**,不是产品接线成立 |
+| 第二轮 §6.3.1 的写入集(裸引擎) | 装了 ext 之后**多一份 provider 安装**:`<userDataPath>/codepuppy-engine-config/node_modules`(26 包 61 MB),与 `<XDG_CONFIG>/opencode/node_modules` 并存 |
 | 第二轮 §6.8「alpha 自己那部分写入集没有枚举完」 | 本节闭合,分上下界两级(§7.6) |
 
 第一条的后果要说清楚:**今天 REQ-138 罩住的通路比 §3 表少一行**(终端面板缺省那一支实际未被罩)。
@@ -1052,10 +1052,10 @@ bundle(§7.3 的 70 条签名里),只是这次工作负载没走到。围栏要�
   而那属于方案基线之后的事。
 - **shell 工具经会话那条路没跑成**(`ProviderNoProvidersError`,隔离家目录无凭据)。
   §7.4 ARM 1/2 直接执行 wrapper 覆盖了围栏语义,但「引擎 → 工具 → wrapper」整条链在本轮是断的。
-- **打包 app 只做了冷启动**:没有装连接器、没开终端、没写 `alpha.jsonc`;而且它那一窗口有
+- **打包 app 只做了冷启动**:没有装连接器、没开终端、没写 `codepuppy.jsonc`;而且它那一窗口有
   34 次 dropped ⇒ §7.5 的 19 条是**下界的下界**。
 - **上界(85 个调用点)里哪些在 sidecar 里真的到得了,没有逐条证明。** 本轮只证明了它们
-  **链接进了出货产物**(rollup 的 tree-shaking 已经删掉一批:例如 `alpha-bridge.ts` 的
+  **链接进了出货产物**(rollup 的 tree-shaking 已经删掉一批:例如 `codepuppy-bridge.ts` 的
   `symlinkSync` 分支不在产物里,`unlinkSync` 在)。逐条可达性是实现票的活。
 - **多工作区没测**(§6.7 那一问仍然开着)。本节只回答了「随工作区变化的是哪些路径」。
 - **`~/.npm` 与 `<XDG_CONFIG>/opencode` 能不能收窄**(改 `npm_config_cache`、把 config 文件挪出
@@ -1069,7 +1069,7 @@ bundle(§7.3 的 70 条签名里),只是这次工作负载没走到。围栏要�
 跑了。
 
 一句话结论:**路一活着。** 五步工作负载(冷启动 → 装连接器 → 开终端 → 跑 shell 工具 →
-写 `alpha.jsonc`)在围栏里全部通过,四条越界探针一条都没落盘,而同一批探针在去掉围栏的那条臂上
+写 `codepuppy.jsonc`)在围栏里全部通过,四条越界探针一条都没落盘,而同一批探针在去掉围栏的那条臂上
 全部落盘。**但候选可写集比 §7.6 的枚举多两条**,两条都只有实跑才冒得出来,其中一条(`§8.5` 第二条)
 **加进可写集也修不好**。
 
@@ -1119,7 +1119,7 @@ bundle(§7.3 的 70 条签名里),只是这次工作负载没走到。围栏要�
 
 ### 8.2 候选可写集(19 行)与逐行消融
 
-profile 由一个生成器按根变量展开(`WORKDIR` / `<alphaGlobalRoot>` / `<userDataPath>` / `HOME`),
+profile 由一个生成器按根变量展开(`WORKDIR` / `<codepuppyGlobalRoot>` / `<userDataPath>` / `HOME`),
 每行带一个 id,消融臂 = 只去掉那一行、其余逐字不变。F2 那一跑的实际 profile(隔离路径已保留原样):
 
 ```
@@ -1128,8 +1128,8 @@ profile 由一个生成器按根变量展开(`WORKDIR` / `<alphaGlobalRoot>` / `
 (deny file-write*)
 (allow file-write*
   (subpath "<WORKDIR>")                                  ; W1  每个工作区一条
-  (subpath "<alphaGlobalRoot>")                          ; W2  = <appData>/alpha-code-state/env/<env>
-  (subpath "<userDataPath>")                             ; W3  含 alpha-engine-config/**、opencode/locks/**
+  (subpath "<codepuppyGlobalRoot>")                          ; W2  = <appData>/codepuppy-state/env/<env>
+  (subpath "<userDataPath>")                             ; W3  含 codepuppy-engine-config/**、opencode/locks/**
   (subpath "<HOME>/.local/share/opencode")               ; W4  上游引擎 log / *.db / -wal / -shm / repos
   (subpath "<HOME>/.cache/opencode")                     ; W5  bin / models.json
   (subpath "<HOME>/.config/opencode")                    ; W6  第二份 provider 安装(见 §7.4 坑一)
@@ -1152,15 +1152,15 @@ profile 由一个生成器按根变量展开(`WORKDIR` / `<alphaGlobalRoot>` / `
 
 | id | 内容 | 去掉之后实测 | 定级 |
 | --- | --- | --- | --- |
-| **W3** | `<userDataPath>` | **`/global/health` 从头到尾拿不到 200**(90 s 超时);`injectAlphaConfig` = `{ok:false, EPERM ...}` | **起不来** |
+| **W3** | `<userDataPath>` | **`/global/health` 从头到尾拿不到 200**(90 s 超时);`injectCodePuppyConfig` = `{ok:false, EPERM ...}` | **起不来** |
 | **W4** | `<HOME>/.local/share/opencode` | **health 恒 0** | **起不来** |
 | **W5** | `<HOME>/.cache/opencode` | **health 恒 0** | **起不来** |
 | **W6** | `<HOME>/.config/opencode` | **health 恒 0** | **起不来** |
 | **W15** | `/dev/ptmx` + `^/dev/ttys` | 引擎正常、MCP 连上,但 **`POST /pty` = HTTP 500**,PTY 探针不落盘 | **终端面板整个不可用** |
-| **W2** | `<alphaGlobalRoot>` | 引擎 health 200,但 `injectAlphaConfig` = `{ok:false, EPERM}`;`<alphaGlobalRoot>/alpha.jsonc` **未落盘**,`<userDataPath>/alpha-engine-config` **不存在** | **注入整份丢失** = `alpha-config-injection.ts` 头注里 `#613` 记的「模型全灰」 |
+| **W2** | `<codepuppyGlobalRoot>` | 引擎 health 200,但 `injectCodePuppyConfig` = `{ok:false, EPERM}`;`<codepuppyGlobalRoot>/codepuppy.jsonc` **未落盘**,`<userDataPath>/codepuppy-engine-config` **不存在** | **注入整份丢失** = `codepuppy-config-injection.ts` 头注里 `#613` 记的「模型全灰」 |
 | **W7** | `<HOME>/.npm` | 引擎 health 200、MCP 连上、PTY 200、shell 工具正常 —— 但**两处 `node_modules` 都不存在**;`opencode.log` 里两条 `level=WARN … "background dependency install failed" … NpmInstallFailedError`,各对应一个 provider 目录 | **静默:provider 一个都装不上**(health 仍 200,这是最难诊断的一档) |
 | **W8** | `\.zsh_history` 家族 | 引擎与 PTY 都正常,但终端里出现 `zsh: locking failed for <HOME>/.zsh_history: operation not permitted`;`.zsh_history` 不落盘 | **用户每开一次终端看一条报错** |
-| W1 | `<WORKDIR>` | health 200、MCP `connected`、`POST /pty` 200 —— 但**工作区里一个字节都写不进去**:self / mcp / pty / shelltool / `.code-puppy/alpha.jsonc` 五条界内探针**全部不落盘** | 起得来、连得上、**一件活也干不了** |
+| W1 | `<WORKDIR>` | health 200、MCP `connected`、`POST /pty` 200 —— 但**工作区里一个字节都写不进去**:self / mcp / pty / shelltool / `.code-puppy/codepuppy.jsonc` 五条界内探针**全部不落盘** | 起得来、连得上、**一件活也干不了** |
 | W11 | `/private/tmp` | 五步工作负载全过,探针表与 F2 逐格相同 | 本轮**未证伪** |
 | W12 | `/private/var/folders`($TMPDIR) | 同上 | 本轮**未证伪** |
 | W13 | `/dev/null` `/dev/stdout` `/dev/stderr` | 同上 | 本轮**未证伪** |
@@ -1189,7 +1189,7 @@ cd packages/ui-mac && /usr/bin/sandbox-exec -f <ISO>/fence.sb "$(which bun)" run
 ```
 
 驱动本身就是被围栏的那个进程(与生产里「sidecar 自打沙箱之后再 import 引擎」同形),
-它先跑 `injectAlphaConfig(userDataPath, extPluginPath, "dev")`,再把引擎作为**子进程**拉起来。
+它先跑 `injectCodePuppyConfig(userDataPath, extPluginPath, "dev")`,再把引擎作为**子进程**拉起来。
 
 **探针落盘表(第二台仪器:跑完 `ls` 实读,不看进程自报):**
 
@@ -1203,8 +1203,8 @@ cd packages/ui-mac && /usr/bin/sandbox-exec -f <ISO>/fence.sb "$(which bun)" run
 | `<esc>/pty-esc.txt` | 同上 | **落盘** | 不落盘 | 不落盘 |
 | `<ws>/shelltool-in.txt` | `POST /session/:id/shell` → `cfg.shell` | **落盘** | **不落盘(零执行)** | **落盘** |
 | `<esc>/shelltool-esc.txt` | 同上 | **落盘** | 不落盘 | 不落盘 |
-| `<ws>/.code-puppy/alpha.jsonc` | ext 的 `alpha_register` | **落盘** | **落盘** | **落盘** |
-| `<alphaGlobalRoot>/alpha.jsonc` | `injectAlphaConfig` | **落盘** | **落盘** | **落盘** |
+| `<ws>/.code-puppy/codepuppy.jsonc` | ext 的 `alpha_register` | **落盘** | **落盘** | **落盘** |
+| `<codepuppyGlobalRoot>/codepuppy.jsonc` | `injectCodePuppyConfig` | **落盘** | **落盘** | **落盘** |
 | `<HOME>/.zsh_history` | `POST /pty` 起的登录 shell | **落盘** | **落盘** | **落盘** |
 | **escape 目录条目数** | | **4** | **0** | **0** |
 
@@ -1222,12 +1222,12 @@ cd packages/ui-mac && /usr/bin/sandbox-exec -f <ISO>/fence.sb "$(which bun)" run
 | **开一个终端** `POST /pty`(缺省) | `200`,`command:"/bin/zsh"`,`args:["-l"]` |
 | `POST /pty`(带 `command`/`args`) | `200`,PTY 探针界内落盘、界外不落盘 |
 | **跑一次 shell 工具** `POST /session/:id/shell` | `200`;工具输出 = `(eval):1: operation not permitted: <esc>/shelltool-esc.txt` + `rc=0`;界内那条**落盘** |
-| **写一次 `alpha.jsonc`** `alpha_register` | `command "alpha1286probe" registered in .code-puppy/alpha.jsonc`,文件真落盘 |
+| **写一次 `codepuppy.jsonc`** `alpha_register` | `command "alpha1286probe" registered in .code-puppy/codepuppy.jsonc`,文件真落盘 |
 | 运行时 npm 安装 | **在围栏里完成**,两处各 **28 个顶层包 / 61 MB**,`<HOME>/.npm` 93 MB(§7.4 记的是 26 包,本轮 28 —— 依赖推进,**两份并存这一条不变**) |
 | `GET /experimental/tool/ids` | 含 `alpha_reload` / `alpha_register` / `alpha_echo` / `alpha_ping` ⇒ ext 确实装进了这台被围栏的引擎 |
 
 ⇒ **AC2(MCP)、AC3(LSP 同族)、PTY、shell 工具四条通路的越界写,在整进程围栏下同时失败;
-上游 0 行改动。** 与 §6.3.2 的区别是:那一轮跑的是**裸引擎**,这一轮是**装了 `@alpha-code/ext`
+上游 0 行改动。** 与 §6.3.2 的区别是:那一轮跑的是**裸引擎**,这一轮是**装了 `@codepuppy/ext`
 的引擎跑完一整套工作负载**。
 
 **一条口径上的诚实话:`alpha_register` 是直接装载出货 bundle 执行的**(`import(dist/plugin.js)`
@@ -1243,7 +1243,7 @@ cd packages/ui-mac && /usr/bin/sandbox-exec -f <ISO>/fence.sb "$(which bun)" run
 | | |
 | --- | --- |
 | 命令 | 与 F2 逐字相同,只把 ext bundle 换成出货形态那一份 |
-| `GET /config` 的 `shell` | `<alphaGlobalRoot>/bin/zsh`(= ext 的 wrapper,REQ-138 那层还在) |
+| `GET /config` 的 `shell` | `<codepuppyGlobalRoot>/bin/zsh`(= ext 的 wrapper,REQ-138 那层还在) |
 | `POST /session/:id/shell` | HTTP **200**,但工具输出 = **`sandbox-exec: sandbox_apply: Operation not permitted`** |
 | 落盘 | 界内 **和** 界外**都不落盘** ⇒ **零执行** |
 | 其余 | health / MCP / PTY / `alpha_register` / 两处 provider 安装**全部正常** |
@@ -1316,7 +1316,7 @@ zsh 存历史是**写 `.zsh_history.new` 再改名**,那个中间名不在枚举
 - `Pty.create` 传下去的 env 是 `{...process.env, TERM, OPENCODE_TERMINAL}`,而 sidecar 的
   `process.env` 由 `sidecar-env.ts` 的 **allowlist** 产生:`EXACT` 表里没有 `TERM_PROGRAM`,
   `PREFIXES` 只有 `OPENCODE_` / `XDG_` / `LC_` / `ELECTRON_`;
-- 真机 `~/Library/Application Support/ai.opencode.desktop/alpha-shell-env.json` 实读 **3 个键,
+- 真机 `~/Library/Application Support/ai.opencode.desktop/codepuppy-shell-env.json` 实读 **3 个键,
   不含 `TERM_PROGRAM`**;
 - 实测复现:同一条 PTY 命令,`TERM_PROGRAM` 缺席时家目录只出 `.zsh_history`;把
   `TERM_PROGRAM=Apple_Terminal` 加回去才出 `.zsh_sessions/*.session`。

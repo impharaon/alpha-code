@@ -6,12 +6,12 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { build } from "vite"
-import { DEFAULT_BUILTIN_POLICY } from "../../main/alpha-builtin-policy"
+import { DEFAULT_BUILTIN_POLICY } from "../../main/codepuppy-builtin-policy"
 import type { createComponent } from "solid-js"
 import type { render } from "solid-js/web"
 import type { BuiltinControlsPanel } from "./builtin-controls-panel"
 
-const directory = mkdtempSync(join(tmpdir(), "alpha-builtin-render-"))
+const directory = mkdtempSync(join(tmpdir(), "codepuppy-builtin-render-"))
 await build({
   configFile: false,
   logLevel: "silent",
@@ -46,7 +46,7 @@ test.each([{ allowFactory: [] }, { allowFactory: ["customize-opencode"] }])("#15
   Object.defineProperty(window, "api", { configurable: true, value: { ext: {
     builtinRead: async () => ({
       gov: { ...structuredClone(DEFAULT_BUILTIN_POLICY), skills: { deny: [], allowFactory: input.allowFactory } },
-      protection: { hard: [], alphaInjected: [], confirm: [] },
+      protection: { hard: [], codepuppyInjected: [], confirm: [] },
       factoryDenied: ["customize-opencode"],
     }),
   } } })
@@ -59,11 +59,11 @@ test.each([{ allowFactory: [] }, { allowFactory: ["customize-opencode"] }])("#15
     flash: () => {},
   }), host)
   await new Promise((resolve) => setTimeout(resolve, 0))
-  const rows = [...host.querySelectorAll(".alpha-ext-man")]
-  expect(host.querySelector(".alpha-ext-import-err")).toBeNull()
+  const rows = [...host.querySelectorAll(".codepuppy-ext-man")]
+  expect(host.querySelector(".codepuppy-ext-import-err")).toBeNull()
   expect(host.textContent).not.toContain("customize-opencode")
   expect(rows).toHaveLength(3)
-  expect(rows.map((row) => row.querySelector(".alpha-ext-man-name")?.textContent)).toEqual([
+  expect(rows.map((row) => row.querySelector(".codepuppy-ext-man-name")?.textContent)).toEqual([
     expect.stringContaining("build"), expect.stringContaining("/init"), expect.stringContaining("/review"),
   ])
   dispose()

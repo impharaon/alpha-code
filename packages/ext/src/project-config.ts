@@ -1,5 +1,5 @@
-// REQ-060 项目级扩展物 `.code-puppy`-only:把 `<project>/.code-puppy/alpha.jsonc` 的项目级引擎配置合并进一份
-// per-instance cfg(纯逻辑,electron-free,单测覆盖)。消费方 = @alpha-code/ext 的 config hook。
+// REQ-060 项目级扩展物 `.code-puppy`-only:把 `<project>/.code-puppy/codepuppy.jsonc` 的项目级引擎配置合并进一份
+// per-instance cfg(纯逻辑,electron-free,单测覆盖)。消费方 = @codepuppy/ext 的 config hook。
 //
 // 合并语义:项目级条目补进 cfg 的命名域(mcp/agent/command),existing(全局)优先不覆盖(项目「新增」
 // 而非「覆盖全局」的语义在此阶段——覆盖策略留 T1 信任门后细化);skills 走 { paths:[] } object 并集
@@ -70,17 +70,17 @@ export function withProjectDirectoryIdentity<T>(
 }
 
 /** sidecar/ext 无 main 快照，必须只消费 main 已派生的 canonical root。 */
-export function requireAlphaGlobalRoot(value: string | undefined = process.env.ALPHA_GLOBAL_DIR, homeDir: string = homedir()): string {
+export function requireCodePuppyGlobalRoot(value: string | undefined = process.env.CODEPUPPY_GLOBAL_DIR, homeDir: string = homedir()): string {
   const raw = value?.trim()
-  if (!raw || !isAbsolute(raw)) throw new Error("ALPHA_GLOBAL_DIR requires an absolute initialized root")
+  if (!raw || !isAbsolute(raw)) throw new Error("CODEPUPPY_GLOBAL_DIR requires an absolute initialized root")
   const candidate = normalize(raw)
   const retired = normalize(join(homeDir, ".alpha"))
-  if (related(candidate, retired)) throw new Error("ALPHA_GLOBAL_DIR is related to the retired global root")
+  if (related(candidate, retired)) throw new Error("CODEPUPPY_GLOBAL_DIR is related to the retired global root")
   try {
     const canonical = normalize(realpathSync(candidate))
     const stat = lstatSync(candidate)
     if (stat.isSymbolicLink() || !stat.isDirectory() || canonical !== candidate)
-      throw new Error("ALPHA_GLOBAL_DIR is not the canonical directory")
+      throw new Error("CODEPUPPY_GLOBAL_DIR is not the canonical directory")
     const home = normalize(realpathSync(homeDir))
     const retiredCanonical = (() => {
       try {
@@ -90,11 +90,11 @@ export function requireAlphaGlobalRoot(value: string | undefined = process.env.A
         return join(home, ".alpha")
       }
     })()
-    if (related(canonical, retiredCanonical)) throw new Error("ALPHA_GLOBAL_DIR resolves to the retired global root")
+    if (related(canonical, retiredCanonical)) throw new Error("CODEPUPPY_GLOBAL_DIR resolves to the retired global root")
     return canonical
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("ALPHA_GLOBAL_DIR")) throw error
-    throw new Error("ALPHA_GLOBAL_DIR identity cannot be confirmed", { cause: error })
+    if (error instanceof Error && error.message.startsWith("CODEPUPPY_GLOBAL_DIR")) throw error
+    throw new Error("CODEPUPPY_GLOBAL_DIR identity cannot be confirmed", { cause: error })
   }
 }
 
@@ -115,7 +115,7 @@ export type MergeResult = {
 }
 
 /** 信任门(REQ-060 §3):mcp = 可执行连接器,只在 trustExecutable 时加载;agent 的 permission/model/disable/mode 同受此门(REQ-236 P1),其余 agent 字段、command、skills = 文本注入,恒加载。
- *  opts.directory:项目根 —— skills.paths 的相对条目("./…")以此解析为绝对(项目可移动,alpha.jsonc 存相对)。 */
+ *  opts.directory:项目根 —— skills.paths 的相对条目("./…")以此解析为绝对(项目可移动,codepuppy.jsonc 存相对)。 */
 export function mergeProjectConfig(
   cfg: Record<string, unknown>,
   projectJsoncText: string,
@@ -205,7 +205,7 @@ function mergeNamed(cfg: Record<string, unknown>, src: Record<string, unknown>, 
   return touched
 }
 
-/** 极简 jsonc → json:去 // 行注释与 /* *​/ 块注释 + 尾逗号。够用于 alpha 自写的项目 alpha.jsonc。 */
+/** 极简 jsonc → json:去 // 行注释与 /* *​/ 块注释 + 尾逗号。够用于 alpha 自写的项目 codepuppy.jsonc。 */
 export function stripJsonc(text: string): string {
   let out = ""
   let inStr = false

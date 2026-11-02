@@ -16,15 +16,27 @@ review_after: 2026-10-14
 
 ## 0. 前置(已就绪,一次性)
 
-**签名/公证凭证**(**不在仓库**,`~/.alpha-code-signing/` 0600 —— 见该目录 README):
+**签名/公证凭证**(**不在仓库**,`~/.codepuppy-signing/` 0600 —— 见该目录 README):
 - `Developer ID Application` 证书(team **RQX6X6A635** = Beijing yuanyuji,与 tideapp 同 team),已装登录钥匙串,`codesign` 已授「始终允许」→ 打包不再弹钥匙串框。全链 verify 通过。备份 `devid-backup.p12`(口令见 README)+ **已另存 iCloud**。
 - `AuthKey_Y69LXQA5B4.p8`(App Store Connect API key,`开发者` 角色,公证用,**只能下一次**)。
-- `signing.env` 导出 `ALPHA_SIGN=1` + `APPLE_API_KEY`/`APPLE_API_KEY_ID`/`APPLE_API_ISSUER` + `APPLE_TEAM_ID`。
+- `signing.env` 导出 `CODEPUPPY_SIGN=1` + `APPLE_API_KEY`/`APPLE_API_KEY_ID`/`APPLE_API_ISSUER` + `APPLE_TEAM_ID`。
+
+**签名目录与变量名的一次性改名(#1570 之后的第一次发版前做一次)**:目录原名 `~/.alpha-code-signing/`,
+`signing.env` 里原来是 `ALPHA_SIGN` / `ALPHA_SIGN_IDENTITY` / `ALPHA_MAC_SIGN_IDENTITY`。旧变量名不会被读到,
+本地打包会**静默**产出未签名的包,所以 `electron-builder.config.ts` 见到任何一个旧名就直接拒绝打包。
+改名只动名字,不读、不打印任何值:
+
+```sh
+set -e
+[ -d ~/.alpha-code-signing ] && [ ! -e ~/.codepuppy-signing ] && mv ~/.alpha-code-signing ~/.codepuppy-signing
+sed -i '' -E 's/(^|[^A-Za-z0-9_])ALPHA_(SIGN|SIGN_IDENTITY|MAC_SIGN_IDENTITY)=/\1CODEPUPPY_\2=/' ~/.codepuppy-signing/signing.env
+grep -cE '(^|[^A-Za-z0-9_])ALPHA_' ~/.codepuppy-signing/signing.env || true   # 只数行数,应为 0
+```
 
 **打包配置**(`packages/ui-mac/electron-builder.config.ts` + `scripts/*`,零改上游):
-- prod/beta productName `Code Puppy`、appId `com.tide.alphacode`(dev/beta 加后缀)、登录 URL scheme `code-puppy`、artifact `alpha-code-*`。
+- prod/beta productName `Code Puppy`、appId `com.tide.alphacode`(dev/beta 加后缀)、登录 URL scheme `code-puppy`、artifact `codepuppy-*`。
 - 更新源 = 自有 public repo `jinjunnn/alpha-code`(prod=`latest` 渠道,beta=`beta`),**不是** `anomalyco/opencode`。
-- `ALPHA_SIGN=1` → Developer ID 签名 + 公证;否则 ad-hoc(仅本机双击)。
+- `CODEPUPPY_SIGN=1` → Developer ID 签名 + 公证;否则 ad-hoc(仅本机双击)。
 - `notarize` 是 boolean(electron-builder 26.x);team/凭证走 env。
 - prebuild 会 `patch-server-version.ts` 把内嵌 server 的 `InstallationVersion` 从 `local` 改成真实版本(A4:否则 `@opencode-ai/plugin@local` 装不上,带 `.opencode` 插件的项目首个请求卡住)。
 
@@ -32,12 +44,12 @@ review_after: 2026-10-14
 
 ```bash
 # ⓪ 前端合并复验(REQ-012,546-sync 静默回归教训——v0.1.0 就是跳过这步翻的车):
-#    a. cd packages/ui-mac && bun test src/renderer/alpha-ui/upstream-anchors.test.ts   # 锚点契约必须绿
+#    a. cd packages/ui-mac && bun test src/renderer/codepuppy-ui/upstream-anchors.test.ts   # 锚点契约必须绿
 #    b. CDP 截图关键屏(首页/会话/模型卡/composer/时间线)对上一版基线肉眼比对(visual-verify-required)
 #    上游 sync 后未做过 a+b 的树,禁止打 tag。
 
 # ①′ 刷新内置 catalog 快照(REQ-046):cd packages/ui-mac && node scripts/sync-catalog-snapshot.mjs
-#    (拉已发布 catalog + 验签 + 字节快照;alpha-catalog.json 禁手编 —— 单测守卫,手编即红。
+#    (拉已发布 catalog + 验签 + 字节快照;codepuppy-catalog.json 禁手编 —— 单测守卫,手编即红。
 #     上架/撤架条目一律在 alpha-web catalog-src 操作,联网用户即时生效,发版只是刷新离线底座。)
 # ①′′ 刷新随包 extension seed(REQ-102):node scripts/sync-extension-seed.mjs
 #    (同样走 trust→stable→payload 全链验签,并与上一步 catalog 字节互钉;resources/extension-seed 禁手编。
@@ -46,8 +58,8 @@ review_after: 2026-10-14
 #    例:0.1.19 → 0.1.20。用真实 semver,别回 0.0.0。
 # ①a 同一个字面量还被抄在**另外三处**,必须同批抬(`#1255`:0.1.10 那次只抬了真源,于是两条
 #    consumer-pin 断言在 alpha 基线上恒红了两天,与任何人的改动无关,并诱发 `--no-verify`):
-#      · packages/alpha-contracts-consumer/fixtures/consumers/alpha-code-640/ledger-page.json 的 consumer_version
-#      · packages/alpha-contracts-consumer/fixtures/consumers/alpha-code-1556/model-catalog-v3.json 的 consumer_version
+#      · packages/codepuppy-contracts-consumer/fixtures/consumers/alpha-code-640/ledger-page.json 的 consumer_version
+#      · packages/codepuppy-contracts-consumer/fixtures/consumers/alpha-code-1556/model-catalog-v3.json 的 consumer_version
 #        (这两格是 alpha-platform 的 cutover gate 读的「本仓已切到哪一版」)
 #      · bun.lock 里 workspaces["packages/ui-mac"].version —— **不要手改**,在仓根跑一次
 #        `HUSKY=0 bun install` 让 bun 自己写回(HUSKY=0:不让 husky 的 prepare 改写共享 `.git/config`
@@ -58,7 +70,7 @@ review_after: 2026-10-14
 #    它枚举全部 consumer-pin 夹具 + bun.lock,把所有没跟上的格子连同改法一次打出来。
 
 # ② 打签名+公证包(package:mac,不装机)
-source ~/.alpha-code-signing/signing.env               # ALPHA_SIGN=1 + Apple 凭证
+source ~/.codepuppy-signing/signing.env               # CODEPUPPY_SIGN=1 + Apple 凭证
 cd packages/ui-mac
 OPENCODE_CHANNEL=prod bun run build                     # prebuild(含 A4 patch)+ 渲染/主进程
 OPENCODE_CHANNEL=prod bun run package:mac               # 签名 → 上传 Apple 公证(在线,几分钟)→ dmg/zip
@@ -66,42 +78,42 @@ OPENCODE_CHANNEL=prod bun run package:mac               # 签名 → 上传 Appl
 # ③ 验证产物真的签名+公证了(必须都过)
 xcrun stapler validate "dist/mac-arm64/Code Puppy.app"    # 期望 "The validate action worked!"
 spctl -a -vvv -t install "dist/mac-arm64/Code Puppy.app"  # 期望 "accepted / source=Notarized Developer ID"
-ls dist/code-puppy-mac-arm64.dmg dist/code-puppy-mac-arm64.zip dist/latest-mac.yml   # 三件齐
+ls dist/codepuppy-mac-arm64.dmg dist/codepuppy-mac-arm64.zip dist/latest-mac.yml   # 三件齐
 
 # ③′ 产签名 release manifest(#175;契约 docs/contracts/desktop-release-manifest.md)。
 #    从最终 dist 字节计算全部事实(size/digest/签名/公证/SBOM/updater metadata),任何缺失或
 #    不一致会打印全部错误并 exit 1 —— 此时**禁止发布**,先修再重打。含 Windows 产物时,把
-#    alpha-windows-build 的两个 artifact(exe/blockmap 与 *-release-facts)解到一个目录,
+#    codepuppy-windows-build 的两个 artifact(exe/blockmap 与 *-release-facts)解到一个目录,
 #    加 --windows-dir <目录>。默认 beta/prod 未签名 Windows 包在 CI 就已经红了,到不了这一步；
 #    REQ-106 唯一例外是经 owner 明确批准的 prod 手动下载包,必须额外传
 #    --allow-unsigned-windows。该 flag 会把 installer 标为 manualDownloadOnly、保留其
 #    NotSigned facts 和 digest binding、并排除 Windows updater feed；不得用于 beta 或正常更新发布。
-#    签名私钥:~/.alpha-code-signing/release-manifest-ed25519.pem(没有则先
+#    签名私钥:~/.codepuppy-signing/release-manifest-ed25519.pem(没有则先
 #    `bun scripts/release-manifest.ts keygen --out <该路径>` 并把打印的 trust entry 落进
 #    docs/contracts/desktop-release-manifest.trust.json)。
 OPENCODE_CHANNEL=prod bun scripts/release-manifest.ts produce \
   --channel prod --dist dist \
-  --key ~/.alpha-code-signing/release-manifest-ed25519.pem
-# 期望:"[release-manifest] OK: …/alpha-release-manifest.json (+.sig)";产物三件:
-# dist/alpha-release-manifest.json + .sig + dist/alpha-code-<版本>-sbom.cdx.json
+  --key ~/.codepuppy-signing/release-manifest-ed25519.pem
+# 期望:"[release-manifest] OK: …/codepuppy-release-manifest.json (+.sig)";产物三件:
+# dist/codepuppy-release-manifest.json + .sig + dist/alpha-code-<版本>-sbom.cdx.json
 
 # REQ-106 Windows x64 未签名手动下载(仅在已有明确批准、已下载 Windows runner 的最终
 # installer + signing facts、且官网已经部署 unsigned warning 时):
 OPENCODE_CHANNEL=prod bun scripts/release-manifest.ts produce \
   --channel prod --dist dist --windows-dir /absolute/path/to/windows-release-inputs \
   --allow-unsigned-windows \
-  --key ~/.alpha-code-signing/release-manifest-ed25519.pem
-# 上传时包含 alpha-code-win-x64.exe,但不上传 latest.yml,也不得让它进入自动更新测试。
+  --key ~/.codepuppy-signing/release-manifest-ed25519.pem
+# 上传时包含 codepuppy-win-x64.exe,但不上传 latest.yml,也不得让它进入自动更新测试。
 
 # ④ 发 GitHub Release(dmg + zip + 两个 .blockmap + latest-mac.yml + manifest 三件一起传,
 #    tag = v<版本>)。manifest 是 alpha-web 消费的唯一发布真相,漏传 = 该版本对 web 不存在。
 cd dist
 gh release create v0.1.20 \
-  code-puppy-mac-arm64.dmg code-puppy-mac-arm64.zip \
-  code-puppy-mac-arm64.dmg.blockmap code-puppy-mac-arm64.zip.blockmap \
+  codepuppy-mac-arm64.dmg codepuppy-mac-arm64.zip \
+  codepuppy-mac-arm64.dmg.blockmap codepuppy-mac-arm64.zip.blockmap \
   latest-mac.yml \
-  alpha-release-manifest.json alpha-release-manifest.json.sig \
-  alpha-code-0.1.20-sbom.cdx.json \
+  codepuppy-release-manifest.json codepuppy-release-manifest.json.sig \
+  codepuppy-0.1.20-sbom.cdx.json \
   --repo jinjunnn/alpha-code --target <发版 PR 在 alpha 上的合并提交完整 SHA> \
   --title "Code Puppy 0.1.20" --notes "……"
 
@@ -120,7 +132,7 @@ curl -sL -o /dev/null -w "%{http_code}\n" \
 
 ## 2. Intel 芯片 Mac(x64)包(#1496)
 
-一次发版出**两套** mac 包:`code-puppy-mac-arm64.*` 与 `code-puppy-mac-x64.*`,`latest-mac.yml` 同时列出两者
+一次发版出**两套** mac 包:`codepuppy-mac-arm64.*` 与 `codepuppy-mac-x64.*`,`latest-mac.yml` 同时列出两者
 (electron-updater 在 mac 上按文件名里的架构挑自己那一份)。不做 universal。
 
 **为什么不能「在 arm64 机器上加个 `--x64` 就完事」**:包里有按芯片编译的部件,今天只按打包机架构准备 ——
@@ -128,16 +140,16 @@ curl -sL -o /dev/null -w "%{http_code}\n" \
 
 | 部件 | 文件 | 怎么按目标架构准备 |
 | --- | --- | --- |
-| 内置终端 | `@lydell/node-pty-darwin-<arch>`(`pty.node` + `spawn-helper`) | **包名在 build 时编进 `out/main`**(`electron.vite.config.ts` 的 node-pty narrower)⇒ build 必须带 `ALPHA_TARGET_ARCH` |
+| 内置终端 | `@lydell/node-pty-darwin-<arch>`(`pty.node` + `spawn-helper`) | **包名在 build 时编进 `out/main`**(`electron.vite.config.ts` 的 node-pty narrower)⇒ build 必须带 `CODEPUPPY_TARGET_ARCH` |
 | 引擎文件监听 | `@parcel/watcher-darwin-<arch>`(`watcher.node`) | 引擎产物运行时按 `process.arch` require ⇒ 只要求该架构的包在 `node_modules` 里被打进去 |
-| 进程围栏 | `native/alpha-fence/build/alpha_fence.node` | 本来就是 fat(arm64 + x86_64),见下 |
-| 文档工具运行环境(#1564) | `native/office-runtime/build/<arch>/` → 包内 `Contents/Resources/office-runtime/` | prebuild 按 `ALPHA_TARGET_ARCH` 构建那一份,见下「随包 Office 运行时」 |
+| 进程围栏 | `native/codepuppy-fence/build/codepuppy_fence.node` | 本来就是 fat(arm64 + x86_64),见下 |
+| 文档工具运行环境(#1564) | `native/office-runtime/build/<arch>/` → 包内 `Contents/Resources/office-runtime/` | prebuild 按 `CODEPUPPY_TARGET_ARCH` 构建那一份,见下「随包 Office 运行时」 |
 | Electron 本体 | electron-builder 按打包架构下载 | 无需操作 |
 | 引擎本体 / ext / 预览 | `../opencode/dist/node/node.js` + `*.wasm`、`../ext/dist/plugin.js` + photon wasm、tree-sitter wasm、ghostty-web(wasm,渲染层) | 纯 JS / wasm,与架构无关 |
 
-目标架构的**唯一**选择点是 `packages/ui-mac/scripts/target-arch.ts`:`ALPHA_TARGET_ARCH=arm64|x64`,缺省 = 打包机架构
+目标架构的**唯一**选择点是 `packages/ui-mac/scripts/target-arch.ts`:`CODEPUPPY_TARGET_ARCH=arm64|x64`,缺省 = 打包机架构
 (所以 `bun run build && bun run package:mac` 的行为与以前一样)。electron-builder 的 `beforePack` 在装包前核对:
-正在打的架构 == `ALPHA_TARGET_ARCH`、`out/main` 里编进的 node-pty 包名 == 该架构、该架构的原生包都在 `node_modules`
+正在打的架构 == `CODEPUPPY_TARGET_ARCH`、`out/main` 里编进的 node-pty 包名 == 该架构、该架构的原生包都在 `node_modules`
 里且每个 Mach-O 文件都含这一片 —— 任一项不过就**拒绝出包**并列出原因(判据:`src/main/mac-target-arch.test.ts`)。
 
 ```bash
@@ -145,7 +157,7 @@ curl -sL -o /dev/null -w "%{http_code}\n" \
 #    bun 默认只装与本机 cpu 匹配的 optionalDependencies,arm64 机器上 x64 的包根本不在盘上。
 cd <仓根> && bun install --os=darwin --cpu='*'      # 只改 node_modules,不改 bun.lock
 
-source ~/.alpha-code-signing/signing.env
+source ~/.codepuppy-signing/signing.env
 cd packages/ui-mac
 rm -f dist/latest-mac-*.yml
 
@@ -155,8 +167,8 @@ OPENCODE_CHANNEL=prod bun run package:mac
 cp dist/latest-mac.yml dist/latest-mac-arm64.yml
 
 # ② x64 一轮 —— build 必须重跑(out/ 会被换成 x64 的),顺序不能颠倒成「先 build 两次再打两次」
-OPENCODE_CHANNEL=prod bun run build:mac-x64        # = ALPHA_TARGET_ARCH=x64 bun run build
-OPENCODE_CHANNEL=prod bun run package:mac-x64      # = ALPHA_TARGET_ARCH=x64 electron-builder --mac --x64
+OPENCODE_CHANNEL=prod bun run build:mac-x64        # = CODEPUPPY_TARGET_ARCH=x64 bun run build
+OPENCODE_CHANNEL=prod bun run package:mac-x64      # = CODEPUPPY_TARGET_ARCH=x64 electron-builder --mac --x64
 cp dist/latest-mac.yml dist/latest-mac-x64.yml
 
 # ③ 合并 feed:写回 dist/latest-mac.yml(两种架构都列出;版本不一或两份放反即拒)
@@ -170,12 +182,12 @@ find "dist/mac/Code Puppy.app" \( -name "*.node" -o -name spawn-helper \) -not -
 # 包里还会带着同名的 *-darwin-arm64 原生包(⓪ 的 --cpu='*' 把两种都装进了 node_modules),它们只有 arm64 一片 = 正常:
 # x64 上只加载 *-darwin-x64 那一份。已发布的 v0.1.20、v0.1.21 x64 包都是这样(2026-10-27 逐项核过)。要判的是 x64 那份齐不齐:
 find "dist/mac/Code Puppy.app" -path "*darwin-x64*" \( -name "*.node" -o -name spawn-helper \) | wc -l   # 期望 4(pty.node、spawn-helper、watcher.node、msgpackr-extract)
-ls dist/code-puppy-mac-x64.dmg dist/code-puppy-mac-x64.zip
-grep -c "url: code-puppy-mac-" dist/latest-mac.yml       # 期望 4(两种架构各 dmg + zip)
+ls dist/codepuppy-mac-x64.dmg dist/codepuppy-mac-x64.zip
+grep -c "url: codepuppy-mac-" dist/latest-mac.yml       # 期望 4(两种架构各 dmg + zip)
 ```
 
 之后照 §1 ③′ 产 release manifest(`release-manifest.ts` 本来就枚举 `mac-arm64` 与 `mac-x64` 两套产物),
-④ 上传时把 x64 的 `code-puppy-mac-x64.dmg` / `.zip` / 两个 `.blockmap` 一并加上。官网 `/download` 的 Intel
+④ 上传时把 x64 的 `codepuppy-mac-x64.dmg` / `.zip` / 两个 `.blockmap` 一并加上。官网 `/download` 的 Intel
 卡位读 manifest 里 darwin/x64 的产物,不需要改站点。
 
 只出 x64 时(例如重打 Intel 包)只跑 ② 即可,此时 `dist/latest-mac.yml` 只含 x64 —— **不要**单独上传它,
@@ -211,15 +223,15 @@ Word / Excel / PowerPoint / PDF 四个文档工具的命令是 `<Resources>/offi
 本仓 CI 与开发机都没有 x86_64 运行时,上面的 `lipo` 只证明**装进去的片对**,不证明跑得起来。
 
 **进程围栏的原生模块不需要为 x64 多做任何事**(REQ-159 `#1321`):`prebuild` 里的
-`scripts/build-fence-addon.ts` 一次编出 **fat** 的 `native/alpha-fence/build/alpha_fence.node`(arm64 + x86_64
+`scripts/build-fence-addon.ts` 一次编出 **fat** 的 `native/codepuppy-fence/build/codepuppy_fence.node`(arm64 + x86_64
 同一个文件),编完逐片判 —— `lipo -archs` 缺任一片、或某一片没有 N-API 入口 ⇒ 删产物、构建红。它经
-`extraResources` 落到 `Contents/Resources/alpha-fence/alpha_fence.node`,由流水线深签(与 `pty.node` 同 Team)。
+`extraResources` 落到 `Contents/Resources/codepuppy-fence/codepuppy_fence.node`,由流水线深签(与 `pty.node` 同 Team)。
 漏了它的包**起不了引擎**(main 拒 fork / sidecar 拒启动,原因可读),不会静默无围栏。
 未验证:x86_64 那一片没有被执行过(本机只有 arm64 运行时);首个 Intel 包要在 Intel 机上跑一次
 `packages/ui-mac/src/main/process-fence-apply.test.ts` 或等价的打包验证。
 
 ## 3. 排障 / 已知项
-- **打包时弹「codesign 想访问密钥」**:点「**始终允许**」+ 输 Mac 登录密码(不是「允许」——那样每个文件都弹)。授权后长期免弹。若换机后又弹:`security import ~/.alpha-code-signing/devid-backup.p12`(口令 README)。
+- **打包时弹「codesign 想访问密钥」**:点「**始终允许**」+ 输 Mac 登录密码(不是「允许」——那样每个文件都弹)。授权后长期免弹。若换机后又弹:`security import ~/.codepuppy-signing/devid-backup.p12`(口令 README)。
 - **公证失败**:多为凭证/网络。`signing.env` 的 `APPLE_API_*` 是否正确;`.p8` 文件在否;换机后重新 source。API key 是 `开发者` 角色即够公证。
 - **A4 已修**:`patch-server-version.ts` 已把 InstallationVersion 从 `local` 改真实版本(v0.1.0 打包实测生效)。若 prebuild 日志出现 `[alpha:patch-server-version] … not found`,说明上游改了那行表达式 → 去更新该脚本(否则 A4 复发)。
 - **首个 Release 前**已装 app 检查更新会「无更新」= 正常。
@@ -231,10 +243,10 @@ Word / Excel / PowerPoint / PDF 四个文档工具的命令是 `<Resources>/offi
 > 还有两处 consumer-pin 夹具的 `consumer_version` 必须同步到同一个版本号 ——
 > `alpha-platform` 的 cutover gate 读这一格判本仓是否已切:
 >
-> - `packages/alpha-contracts-consumer/fixtures/consumers/alpha-code-640/ledger-page.json`
-> - `packages/alpha-contracts-consumer/fixtures/consumers/alpha-code-1556/model-catalog-v3.json`
+> - `packages/codepuppy-contracts-consumer/fixtures/consumers/alpha-code-640/ledger-page.json`
+> - `packages/codepuppy-contracts-consumer/fixtures/consumers/alpha-code-1556/model-catalog-v3.json`
 >
-> 不同步 ⇒ `packages/alpha-contracts-consumer/src/contracts.test.ts`
+> 不同步 ⇒ `packages/codepuppy-contracts-consumer/src/contracts.test.ts`
 > (`expect(pin.consumer_version).toBe(shipped.version)`)与
 > `packages/ui-mac/src/main/shipped-version-propagation.test.ts` 当场红,push 被拦。
 > `bun install` 会顺带把 `bun.lock` 里同一个 workspace 版本字段改掉,**那是该带的**,不是意外。
@@ -242,9 +254,9 @@ Word / Excel / PowerPoint / PDF 四个文档工具的命令是 `<Resources>/offi
 > ⚠️ **本节全部命令都在 `packages/ui-mac/` 下跑**,不是仓根 —— 仓根没有 `build` /
 > `package:mac` / `scripts/release-manifest.ts`。照本节抄到仓根会得到
 > `error: Script not found "build"` 与 `Module not found`。
-改 `package.json` 版本 **+ 两处 consumer-pin 的 `consumer_version`**(见下方⚠️)→ `source signing.env && OPENCODE_CHANNEL=prod bun run build && bun run package:mac` → stapler/spctl 验证 → `bun scripts/release-manifest.ts produce --channel prod --dist dist --key ~/.alpha-code-signing/release-manifest-ed25519.pem`(拒绝即停,禁止绕过)→ `gh release create v<ver> …`(含 manifest+sig+SBOM)→ curl feed 得 200。签名→公证→feed 链 v0.1.0 已端到端验证;manifest 链自 #175 起为发布必经步骤。
+改 `package.json` 版本 **+ 两处 consumer-pin 的 `consumer_version`**(见下方⚠️)→ `source signing.env && OPENCODE_CHANNEL=prod bun run build && bun run package:mac` → stapler/spctl 验证 → `bun scripts/release-manifest.ts produce --channel prod --dist dist --key ~/.codepuppy-signing/release-manifest-ed25519.pem`(拒绝即停,禁止绕过)→ `gh release create v<ver> …`(含 manifest+sig+SBOM)→ curl feed 得 200。签名→公证→feed 链 v0.1.0 已端到端验证;manifest 链自 #175 起为发布必经步骤。
 
-**Windows(beta/prod)**:`alpha-windows-build.yml` 打包后自带 Authenticode 硬门 ——
+**Windows(beta/prod)**:`codepuppy-windows-build.yml` 打包后自带 Authenticode 硬门 ——
 未签名、签名不可验证、或 publisher 不在白名单(REQ-076 T3 采购落地前白名单为空 = 全拒)
 ⇒ job 红、不出 artifact。dev 渠道照旧出未签名内测包,但事实(status/publisher/sha256)
 必须如实落进 `windows-signing-facts.json` 随 artifact 上传。
@@ -260,12 +272,12 @@ Word / Excel / PowerPoint / PDF 四个文档工具的命令是 `<Resources>/offi
 ## 5. 硬化面(C27/C24,2026-07-04,S11 T6/T7)
 - **Electron fuses**(`electron-builder.config.ts` electronFuses):`RunAsNode` / `NODE_OPTIONS` / node-inspect 三注入原语关闭;`EmbeddedAsarIntegrityValidation` + `OnlyLoadAppFromAsar` + `CookieEncryption` 开启。sidecar 走 utilityProcess 不受影响;全仓无 `ELECTRON_RUN_AS_NODE` 用法。
 - **entitlements 收紧**(`resources/entitlements.plist`):移除 `disable-executable-page-protection`、`allow-dyld-environment-variables`、`disable-library-validation`(dylib 注入组合);保留 `allow-jit`/`allow-unsigned-executable-memory`(V8)+ `audio-input`。**若签名包 native 模块(node-pty/ghostty)加载失败 → 仅回补 `disable-library-validation` 一项并在此记账。**
-- **打包态 CSP + 回环-only CORS**(C24,`renderer-security.ts`):排障逃生 `ALPHA_CSP_DISABLE=1`。
+- **打包态 CSP + 回环-only CORS**(C24,`renderer-security.ts`):排障逃生 `CODEPUPPY_CSP_DISABLE=1`。
 - **引擎进程围栏**(REQ-159 `#1321`,2026-09-09):引擎 sidecar 在 import 引擎前用自己的 N-API 模块
   `sandbox_init` 把整个进程关进 seatbelt,派生的 shell / MCP / LSP / PTY 全部继承;可写集 = 工作区并集 +
   应用目录 + 引擎缓存根(`packages/ui-mac/src/main/process-fence-profile.ts`,唯一权威)。
   **失败形态是「引擎起不来 + 可读原因」,不是「没有围栏但照常服务」**:main 日志 `process fence plan FAILED …`
-  或 sidecar 的 `process fence: …` 就是它。排障:①`Contents/Resources/alpha-fence/alpha_fence.node` 在不在、
+  或 sidecar 的 `process fence: …` 就是它。排障:①`Contents/Resources/codepuppy-fence/codepuppy_fence.node` 在不在、
   `lipo -archs` 两片、`codesign -dv` 同 Team;②`~/code-puppy` 是不是目录;③日志里 `process fence planned:` 那行
   的 dropped / excluded。用户可见代价(如实披露,基线 §五 子票 4):围栏内 set-ID 二进制(`ps` / `top` …)
   不可 exec;登录 shell 写 `$HOME` 下 rc 产物(`.zcompdump` 等)会静默不落盘;非 zsh 用户的 history 文件不在可写集。

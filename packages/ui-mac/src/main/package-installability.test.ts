@@ -17,7 +17,7 @@ import {
   validateCatalogPackageShape,
 } from "./package-installability"
 
-const artifact = resolve(import.meta.dir, "../../../alpha-contracts-consumer/vendor/alpha-web-extension-package")
+const artifact = resolve(import.meta.dir, "../../../codepuppy-contracts-consumer/vendor/alpha-web-extension-package")
 
 const canonicalBytes = (value: unknown) => new TextEncoder().encode(`${JSON.stringify(value, null, 2)}\n`)
 
@@ -477,7 +477,7 @@ describe("package installability authority", () => {
       catalogId: "package:generic-remote-mcp",
       verdict: "update-required",
       action: {
-        kind: "update-alpha",
+        kind: "update-codepuppy",
         enabled: true,
         reasonCode: "package-host-update-required",
       },
@@ -828,7 +828,7 @@ describe("package installability authority", () => {
         reasonCode: "package-prerequisite-required",
       },
       "package-host-update-required": {
-        kind: "update-alpha",
+        kind: "update-codepuppy",
         enabled: true,
         reasonCode: "package-host-update-required",
       },

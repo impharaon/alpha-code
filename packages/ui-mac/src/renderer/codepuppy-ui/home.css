@@ -1,0 +1,638 @@
+/* CodePuppyHome — covers opencode's home on "/". Sits above opencode content but below the alpha
+ * sidebar (z 40) and modals, so the sidebar stays visible + clickable. Tokens only. */
+@import "./tokens.css";
+@import "./base.css";
+@import "./composer-shell.css"; /* shell visuals shared with the in-session composer (REQ-038 目标④) */
+
+.a-home {
+  position: fixed;
+  top: var(--a-home-top, 40px); /* leave opencode's titlebar (window controls) intact */
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  background: var(--a-bg-canvas);
+  overflow: hidden;
+}
+body[data-codepuppy-sidebar="open"] .a-home {
+  left: var(--codepuppy-sidebar-w, 260px);
+}
+
+/* REQ-085/ADR-027: routed surface mode —— 正式叶页面在 upstream Layout 内成流布局,
+ * 不再 fixed 覆盖;sidebar 偏移由外层布局负责,此处归零。 */
+.a-home--page {
+  position: relative;
+  top: 0;
+  z-index: auto;
+  width: 100%;
+  height: 100%;
+}
+body[data-codepuppy-sidebar="open"] .a-home--page {
+  left: 0;
+}
+
+/* Atmosphere: ≤4% accent glow + faint grain behind content (frontend-design pass). */
+.a-home::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--a-glow-accent);
+  pointer-events: none;
+  z-index: 0;
+}
+.a-home::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--a-grain);
+  background-size: 140px 140px;
+  pointer-events: none;
+  z-index: 0;
+}
+.a-home-scroll {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  overflow-y: auto;
+}
+.a-home-inner {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: var(--a-space-12) var(--a-space-8) var(--a-space-16);
+}
+
+/* ── Hero ───────────────────────────────────────────────────────────────── */
+.a-home-hero {
+  display: flex;
+  align-items: center;
+  gap: var(--a-space-4);
+  margin-bottom: var(--a-space-10);
+}
+.a-home-mark {
+  width: 34px;
+  height: 42px;
+  color: var(--a-text);
+  flex: 0 0 auto;
+}
+.a-home-title {
+  font-size: var(--a-text-2xl);
+  font-weight: var(--a-weight-bold);
+  letter-spacing: var(--a-tracking-tight);
+}
+.a-home-tagline {
+  margin: 2px 0 0;
+  font-size: var(--a-text-md);
+  color: var(--a-text-secondary);
+}
+
+/* Staggered entrance — one orchestrated reveal on open (frontend-design pass). */
+.a-home-hero { animation: a-rise var(--a-dur-slow) var(--a-ease-out) both; }
+.a-home-section,
+.a-home-empty { animation: a-rise var(--a-dur-slow) var(--a-ease-out) 90ms both; }
+@media (prefers-reduced-motion: reduce) {
+  .a-home-hero,
+  .a-home-section,
+  .a-home-empty,
+  .a-home-greet,
+  [data-codepuppy-home] .a-comp { animation: none; }
+}
+
+/* ── Empty state ────────────────────────────────────────────────────────── */
+.a-home-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--a-space-3);
+  padding: var(--a-space-16) var(--a-space-4);
+}
+.a-home-empty-art {
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  margin-bottom: var(--a-space-2);
+  border-radius: var(--a-radius-2xl);
+  background: var(--a-bg-subtle);
+  border: 1px solid var(--a-border-faint);
+}
+.a-home-empty-mark {
+  width: 34px;
+  height: 42px;
+  color: var(--a-text-tertiary);
+}
+.a-home-empty-title {
+  font-size: var(--a-text-xl);
+  font-weight: var(--a-weight-semibold);
+}
+.a-home-empty-sub {
+  margin: 0 0 var(--a-space-3);
+  font-size: var(--a-text-md);
+  color: var(--a-text-secondary);
+  max-width: 360px;
+}
+
+/* ── Projects section ───────────────────────────────────────────────────── */
+.a-home-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--a-space-4);
+}
+.a-home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--a-space-4);
+}
+
+.a-home-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--a-space-3);
+  padding: var(--a-space-4);
+  border-radius: var(--a-radius-lg);
+  border: 1px solid var(--a-border-faint);
+  background: var(--a-surface);
+  box-shadow: var(--a-edge-light);
+  transition:
+    border-color var(--a-dur-fast) var(--a-ease-out),
+    box-shadow var(--a-dur-fast) var(--a-ease-out),
+    transform var(--a-dur-fast) var(--a-ease-out);
+}
+.a-home-card:hover {
+  border-color: var(--a-border);
+  box-shadow: var(--a-shadow-md), var(--a-edge-light);
+  transform: translateY(-1px);
+}
+.a-home-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--a-space-3);
+}
+.a-home-card-avatar {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--a-radius-md);
+  background: color-mix(in srgb, var(--_c, var(--a-accent)) 16%, transparent);
+  color: var(--_c, var(--a-accent));
+  font-weight: var(--a-weight-bold);
+  font-size: var(--a-text-md);
+}
+.a-home-card-meta {
+  min-width: 0;
+}
+.a-home-card-name {
+  font-weight: var(--a-weight-semibold);
+  font-size: var(--a-text-md);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.a-home-card-path {
+  font-size: var(--a-text-xs);
+  color: var(--a-text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+
+.a-home-sessions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.a-home-session {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--a-space-2);
+  width: 100%;
+  padding: var(--a-space-2);
+  border: none;
+  border-radius: var(--a-radius-sm);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--a-dur-fast) var(--a-ease-out);
+}
+.a-home-session:hover {
+  background: var(--a-bg-muted);
+}
+.a-home-session-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--a-text-sm);
+}
+.a-home-session-time {
+  flex: 0 0 auto;
+  font-size: var(--a-text-xs);
+  color: var(--a-text-tertiary);
+}
+.a-home-card-empty {
+  padding: var(--a-space-3) var(--a-space-2);
+  font-size: var(--a-text-sm);
+  color: var(--a-text-tertiary);
+}
+.a-home-card-foot {
+  margin-top: auto;
+}
+
+/* ============================================================================
+   CodePuppyHome v2 — greeting + shared composer + workspace + recents (mockup §01).
+   Supersedes the project-card layout above (those classes are now unused).
+   ============================================================================ */
+.a-home-stage {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  overflow: auto;
+}
+.a-home-ghost {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 88px;
+  font-weight: var(--a-weight-bold);
+  letter-spacing: -0.03em;
+  color: var(--a-text);
+  opacity: 0.035;
+  user-select: none;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.a-home-center {
+  position: relative;
+  z-index: 1;
+  width: min(640px, 100%);
+  display: flex;
+  flex-direction: column;
+}
+.a-home-greet {
+  font-size: var(--a-text-2xl);
+  font-weight: var(--a-weight-semibold);
+  letter-spacing: var(--a-tracking-tight);
+  text-align: center;
+  /* More breathing room between the greeting and the composer (was 22px — read as cramped).
+   * !important because a non-obvious upstream/reset rule was zeroing it (measured 0px live). */
+  margin-bottom: var(--a-space-10) !important;
+  animation: a-rise 0.55s var(--a-ease-out) both;
+}
+.a-home-greet-dim {
+  color: var(--a-text-tertiary);
+}
+
+/* composer 本体样式已收敛至 codepuppy-composer.css(REQ-055:单一组件单一 CSS)。
+ * home 只保留自己的入场动画;.a-pop/.a-ic/.a-comp-auto 等通用原语仍在本文件(全 codepuppy-ui 共享)。 */
+[data-codepuppy-home] .a-comp {
+  animation: a-rise 0.55s var(--a-ease-out) 0.09s both;
+}
+
+/* workspace chip */
+.a-home-ws {
+  margin-top: 10px;
+  padding: 0 4px;
+  display: flex;
+  justify-content: flex-start;
+}
+.a-ws-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 11px;
+  background: var(--a-surface);
+  border: 1px solid var(--a-border);
+  border-radius: var(--a-radius-full);
+  box-shadow: var(--a-shadow-sm);
+  font-size: var(--a-text-sm);
+  color: var(--a-text-secondary);
+  font-weight: var(--a-weight-medium);
+  transition: border-color var(--a-dur-fast) var(--a-ease-out), color var(--a-dur-fast) var(--a-ease-out);
+}
+.a-ws-chip:hover {
+  border-color: var(--a-border-strong);
+  color: var(--a-text);
+}
+.a-ws-chip .a-ic {
+  color: var(--a-text-tertiary);
+}
+
+/* popovers (composer secondary menus) */
+.a-pop-wrap {
+  position: relative;
+  display: inline-flex;
+}
+/* REQ-230:所有菜单(模型 / 权限 / 思考强度 / 「+」「/」「@」)同一个容器 —— 抬升底色、细边框、
+   11px 圆角、**中档阴影**(菜单不该和对话框一样重;--a-shadow-overlay 只留给对话框);
+   层级用 tokens.css 的 --a-z-dropdown。 */
+.a-pop {
+  position: absolute;
+  z-index: var(--a-z-dropdown);
+  min-width: 240px;
+  background: var(--a-surface-raised);
+  border: 1px solid var(--a-border-faint);
+  border-radius: var(--a-radius-lg);
+  box-shadow: var(--a-shadow-md);
+  padding: 6px;
+  animation: a-pop-in var(--a-dur-fast) var(--a-ease-out) both;
+}
+.a-pop-up {
+  bottom: calc(100% + 8px);
+  left: 0;
+  transform-origin: bottom left;
+}
+@keyframes a-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.a-pop-label {
+  padding: 8px 10px 6px;
+  font-size: var(--a-text-2xs);
+  font-weight: var(--a-weight-semibold);
+  letter-spacing: var(--a-tracking-wide);
+  text-transform: uppercase;
+  color: var(--a-text-tertiary);
+}
+/* .a-pop-note(popover 内的诚实说明行)唯一定义在 codepuppy-composer.css(REQ-230 去重)。 */
+.a-pop-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
+  border-radius: var(--a-radius-md);
+  font-size: var(--a-text-sm);
+  color: var(--a-text);
+  text-align: left;
+  font-family: inherit;
+}
+.a-pop-item:hover {
+  background: var(--a-bg-muted);
+}
+.a-pop-item .a-ic {
+  color: var(--a-text-secondary);
+  flex: none;
+}
+.a-pop-item.is-on {
+  color: var(--a-accent);
+}
+.a-pop-item.is-on .a-ic {
+  color: var(--a-accent);
+}
+.a-pop-desc {
+  margin-left: auto;
+  color: var(--a-text-tertiary);
+  font-size: var(--a-text-xs);
+}
+.a-pop-kbd {
+  margin-left: auto;
+  font-family: var(--a-font-mono);
+  font-size: var(--a-text-2xs);
+  color: var(--a-text-tertiary);
+  background: var(--a-bg-muted);
+  padding: 1px 6px;
+  border-radius: 5px;
+}
+.a-pop-sep {
+  height: 1px;
+  background: var(--a-border-faint);
+  margin: 6px 4px;
+}
+
+/* slash / @ autocomplete menu (REQ-038;REQ-072 重设计定稿) — an .a-pop anchored to the composer
+ * box, opening upward. 结构:滚动区(全量列表 + sticky 分节)+ 常驻键位页脚。 */
+.a-comp-auto {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 10px;
+  right: 10px;
+  min-width: 0;
+  max-height: 380px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: var(--a-z-dropdown);
+  transform-origin: bottom left;
+}
+.a-comp-auto-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+  min-height: 0;
+}
+/* 分节标题(类型维度,拍板②);sticky 抵消滚动区 padding,滚动中保持可读 */
+.a-comp-sec {
+  position: sticky;
+  top: -6px;
+  z-index: 1;
+  background: var(--a-surface-raised);
+  padding: 8px 10px 4px;
+  font-size: var(--a-text-2xs);
+  font-weight: var(--a-weight-semibold);
+  letter-spacing: var(--a-tracking-wide);
+  color: var(--a-text-tertiary);
+}
+/* 选中态 = indigo 淡底(定稿 v1-b:不加左缘指示条) */
+.a-pop-item.is-active {
+  background: var(--a-accent-subtle);
+}
+.a-pop-item.is-active .a-auto-trig,
+.a-pop-item.is-active .a-auto-ic {
+  color: var(--a-accent);
+}
+.a-auto-ic {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--a-text-tertiary);
+}
+.a-auto-trig {
+  font-family: var(--a-font-mono);
+  font-size: var(--a-text-sm);
+  color: var(--a-text);
+  flex: none;
+}
+.a-auto-file {
+  font-family: var(--a-font-mono);
+  font-size: var(--a-text-xs);
+  color: var(--a-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 简介 = 弹性列单行截断(title 供全文);来源签 = 行尾纯文字右缘对齐(追加拍板④,去胶囊) */
+.a-auto-desc {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--a-text-xs);
+  color: var(--a-text-secondary);
+}
+.a-auto-tag {
+  flex: none;
+  font-size: var(--a-text-2xs);
+  color: var(--a-text-tertiary);
+}
+/* 「个人」= 你装的 —— 唯一吃淡强调色的归属签(定稿 v1-a) */
+.a-auto-tag[data-personal] {
+  color: var(--a-accent);
+  opacity: 0.75;
+}
+/* 空态:无匹配保留弹窗如实说明(根因③,不再闪没) */
+.a-comp-empty {
+  padding: 22px 12px;
+  text-align: center;
+  font-size: var(--a-text-xs);
+  color: var(--a-text-tertiary);
+}
+.a-comp-empty b {
+  display: block;
+  margin-bottom: 2px;
+  font-size: var(--a-text-sm);
+  font-weight: var(--a-weight-medium);
+  color: var(--a-text-secondary);
+}
+/* 键位页脚:左键位 · 右语法分工提示(/ 执行 vs @ 引用,GLOSSARY 固化规则)+ 结果计数 */
+.a-comp-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+  padding: 6px 12px;
+  border-top: 1px solid var(--a-border-faint);
+  background: var(--a-bg-subtle);
+  font-size: var(--a-text-2xs);
+  color: var(--a-text-tertiary);
+}
+.a-comp-foot-grow {
+  flex: 1;
+}
+/* 装配弹窗(REQ-073):文件节无查询提示行;禁用行可见不可选(如实说明,C28) */
+.a-comp-hint {
+  padding: 4px 10px 8px;
+  font-size: var(--a-text-xs);
+  color: var(--a-text-tertiary);
+}
+.a-auto-row[data-disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+.a-auto-nm {
+  flex: none;
+  font-weight: var(--a-weight-medium);
+  font-size: var(--a-text-sm);
+}
+/* 计划模式 chip(REQ-073):唯一吃强调色的工具条 chip;⊗ 即关闭 affordance */
+.a-chip-plan {
+  background: var(--a-accent-subtle);
+  color: var(--a-accent);
+  border-color: var(--a-accent-border);
+}
+.a-chip-plan .a-chip-x {
+  font-weight: 600;
+}
+.a-chip-plan[data-disabled] {
+  opacity: 0.55;
+}
+
+/* workspace-missing hint (REQ-038 验收④ / C28 honest controls): visible reason, not a dead button */
+.a-ws-hint {
+  margin-left: 10px;
+  font-size: var(--a-text-xs);
+  color: var(--a-warning);
+  align-self: center;
+}
+
+/* icons */
+.a-ic {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  display: block;
+}
+.a-ic-sm {
+  width: 14px;
+  height: 14px;
+}
+.a-chev {
+  width: 12px;
+  height: 12px;
+  opacity: 0.6;
+}
+
+/* REQ-159 `#1322`:工作区 chip 的「只读」尾标(顶栏只读胶囊的第二宿主,同色更小,嵌在目录名与折叠箭头之间)。 */
+.a-ws-chip-readonly {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--a-radius-full);
+  background: var(--a-warning-subtle);
+  color: var(--a-warning);
+  font-size: var(--a-text-2xs);
+  font-weight: var(--a-weight-semibold);
+}
+.a-ws-chip-readonly .a-ic {
+  width: 9px;
+  height: 9px;
+  color: inherit;
+}
+
+/* #1590:新对话准备中的占位 —— 与输入框同尺寸、中性色(批准稿 #home)。 */
+.a-home-preparing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--a-space-2);
+  min-height: 100px;
+  border: 1px dashed var(--a-border);
+  border-radius: var(--a-radius-2xl);
+  color: var(--a-text-tertiary);
+  font-size: var(--a-text-sm);
+}
+.a-home-preparing-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.6px solid var(--a-border-strong);
+  border-top-color: var(--a-text-tertiary);
+  animation: a-home-preparing-spin 0.9s linear infinite;
+}
+@keyframes a-home-preparing-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .a-home-preparing-spinner { animation: none; }
+}

@@ -108,7 +108,7 @@ function showFile(repo: string, rev: string, path: string): string | null {
 function takeoverBody(edits: Record<number, string> = {}): string {
   return Array.from({ length: 12 }, (_, i) => edits[i + 1] ?? `export const l${i + 1} = ${i + 1}`).join("\n") + "\n"
 }
-const ALPHA_EDIT = { 1: 'export const l1 = "alpha" // alpha takeover' }
+const CODEPUPPY_EDIT = { 1: 'export const l1 = "alpha" // alpha takeover' }
 const UPSTREAM_FAR = { 12: 'export const l12 = "upstream" // upstream change' }
 const UPSTREAM_SAME = { 1: 'export const l1 = "upstream" // upstream change' }
 
@@ -133,7 +133,7 @@ type Fixture = { repo: string; work: string; oldDev: string; newDev: string; old
  * (上一步 `Fast-forward dev` 刚 checkout 了它)。
  */
 function fixture(shape: Shape, opts: { evilGuardInDev?: boolean } = {}): Fixture {
-  const work = mkdtempSync(join(tmpdir(), "alpha-sync-takeover-"))
+  const work = mkdtempSync(join(tmpdir(), "codepuppy-sync-takeover-"))
   const repo = join(work, "repo")
   mkdirSync(repo, { recursive: true })
 
@@ -166,11 +166,11 @@ function fixture(shape: Shape, opts: { evilGuardInDev?: boolean } = {}): Fixture
   })
   if (patch.exitCode !== 0) throw new Error(`夹具生成 SOT 补丁失败:${patch.stderr.toString()}`)
   write(repo, "frontend/frontend-pin.lock", `pin=${pin} # fixture\n`)
-  write(repo, "frontend/alpha-patches/alpha-frontend.patch", patch.stdout.toString())
+  write(repo, "frontend/codepuppy-patches/codepuppy-frontend.patch", patch.stdout.toString())
   // 生产守卫的原样副本 —— 接管清单只有它一份。
   mkdirSync(join(repo, "scripts"), { recursive: true })
   copyFileSync(GUARD, join(repo, "scripts/north-star-guard.sh"))
-  write(repo, TAKEOVER, takeoverBody(ALPHA_EDIT))
+  write(repo, TAKEOVER, takeoverBody(CODEPUPPY_EDIT))
   if (shape === "unregistered") write(repo, ENGINE, "export const engine = 2 // alpha\n")
   const oldAlpha = commitAll(repo, "alpha: SOT + takeover")
 
@@ -245,13 +245,13 @@ function runSteps(fx: Fixture, names: string[], bodies: Record<string, string> =
 
 const bundleProduced = (fx: Fixture) => existsSync(join(fx.repo, "sync-artifact/sync.bundle"))
 
-function expectReviewFailure(fx: Fixture, run: Run, alphaBefore: string, takeoverBefore: string | null) {
+function expectReviewFailure(fx: Fixture, run: Run, codepuppyBefore: string, takeoverBefore: string | null) {
   expect(run.failedAt, `应在 intake 步以升级审查失败:\n${run.output}`).toBe(INTAKE)
   expect(run.output, `失败标题不是「需要升级审查」:\n${run.output}`).toContain(REVIEW_TITLE)
   expect(run.output).toContain("需要升级审查")
   expect(run.output, `没点名接管路径:\n${run.output}`).toContain(TAKEOVER)
   expect(bundleProduced(fx), "intake 失败了却产出了推送包").toBe(false)
-  expect(git(fx.repo, ["rev-parse", "alpha"]), "intake 失败了 alpha 却前进了(发生了合并)").toBe(alphaBefore)
+  expect(git(fx.repo, ["rev-parse", "alpha"]), "intake 失败了 alpha 却前进了(发生了合并)").toBe(codepuppyBefore)
   expect(showFile(fx.repo, "alpha", TAKEOVER), "我方接管文件被改了").toBe(takeoverBefore)
 }
 
@@ -343,7 +343,7 @@ function portByHand(fx: Fixture, how: "merge-commit" | "squash"): string {
   git(fx.repo, ["checkout", "-q", "alpha"])
   if (how === "merge-commit") git(fx.repo, ["merge", "--no-ff", "--no-commit", fx.newDev])
   else git(fx.repo, ["merge", "--squash", fx.newDev])
-  const ported = takeoverBody({ ...ALPHA_EDIT, ...UPSTREAM_FAR })
+  const ported = takeoverBody({ ...CODEPUPPY_EDIT, ...UPSTREAM_FAR })
   write(fx.repo, TAKEOVER, ported)
   git(fx.repo, ["add", "-A"])
   git(fx.repo, ["commit", "-q", "--no-edit", "-m", `port upstream ${fx.newDev} into takeover (${how})`])

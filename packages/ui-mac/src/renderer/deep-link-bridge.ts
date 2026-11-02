@@ -15,7 +15,7 @@
 import { DEEP_LINK_EVENT, type DeepLinkBatch, type DeepLinkDelivery } from "../shared/route-manifest"
 
 export interface DeepLinkBufferTarget {
-  __alphaDeepLinks?: DeepLinkDelivery[]
+  __codepuppyDeepLinks?: DeepLinkDelivery[]
   dispatchEvent: (event: Event) => boolean
 }
 
@@ -29,7 +29,7 @@ export function createDeepLinkPublisher(target: DeepLinkBufferTarget) {
     if (published.has(batch.id)) return false
     published.add(batch.id)
     if (batch.links.length === 0) return false
-    target.__alphaDeepLinks = [...(target.__alphaDeepLinks ?? []), ...batch.links]
+    target.__codepuppyDeepLinks = [...(target.__codepuppyDeepLinks ?? []), ...batch.links]
     target.dispatchEvent(new CustomEvent(DEEP_LINK_EVENT))
     return true
   }

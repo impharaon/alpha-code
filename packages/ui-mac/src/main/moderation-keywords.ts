@@ -3,7 +3,7 @@
 // MAIN-ONLY,与上报同源:凭据 `archive_access_token` 只在主进程,而**词表本身也不下放 renderer**。
 // 路由文档写着它为什么需要凭据:「Published without a credential it becomes a public oracle for
 // composing a message that passes」—— 把整份表送进渲染进程等于把那个 oracle 摆在 devtools 里。
-// 所以 renderer 问的是「这句话要不要拦」(`alpha-moderation-check`),拿回一个布尔值。
+// 所以 renderer 问的是「这句话要不要拦」(`codepuppy-moderation-check`),拿回一个布尔值。
 //
 // ── 这不是安全边界 ─────────────────────────────────────────────────────────────────────
 // 这道拦截跑在用户自己的电脑上,懂技术的人能绕过。它的价值只有一个:让无心撞上的人**当场**
@@ -21,7 +21,7 @@
 // 401 是「没有 bearer,或它不是一张活的 archive_access」⇒ 换人/登出了,手里那份不再属于这台
 // 机器当前的身份,丢掉。
 
-import { ALPHA_PATHS } from "../shared/alpha-config"
+import { CODEPUPPY_PATHS } from "../shared/codepuppy-config"
 import { isBlockedByKeywords, parseKeywordPayload, type ModerationKeyword } from "../shared/moderation-keywords"
 
 export type ModerationKeywordLog = {
@@ -125,7 +125,7 @@ export function createModerationKeywordStore(deps: ModerationKeywordDeps): Moder
       })
     }
     const base = deps.webBase().replace(/\/$/, "")
-    const url = `${base}${ALPHA_PATHS.chatArchiveKeywords}`
+    const url = `${base}${CODEPUPPY_PATHS.chatArchiveKeywords}`
     const controller = new AbortController()
     const killer = setTimeout(() => controller.abort(), timeoutMs)
     try {
@@ -242,7 +242,7 @@ export function moderationBlocks(text: string): boolean {
  * 「令牌可能到位了」—— auth 一变就同步一次(`#1387` AC1)。
  *
  * 冷启动那一次同步跑在令牌到位**之前**:实测 `app starting` 07:29:51.180、
- * `alpha-auth: tokens refreshed` 07:29:51.625,词表那唯一一次尝试落在这 0.4 秒里,拿到
+ * `codepuppy-auth: tokens refreshed` 07:29:51.625,词表那唯一一次尝试落在这 0.4 秒里,拿到
  * `undefined` 就放弃,然后按 15 分钟睡过去 —— 用户在第 36 秒发出「澳门赌场」,本机零拦截。
  * 接住 auth 变更这个事件,比把周期调短对得多:后者只是把 15 分钟的洞换成小一点的洞。
  *

@@ -1,7 +1,7 @@
 // REQ-135 #1012: retire the legacy community Excel MCP before the first sidecar fork.
 // The first-party Hub connector is `mcp:codepuppy-excel`; `excel-mcp-server` is removed, not renamed.
 
-import { alphaGlobalRoot } from "./alpha-installs"
+import { codepuppyGlobalRoot } from "./codepuppy-installs"
 import { tryAcquireBundleLock } from "./ext-bundle-lock"
 import { removeMcpLeafCopiesUnlocked } from "./ext-config"
 import { retireCommunityExcelRecordV2 } from "./ext-receipt-v2"
@@ -27,7 +27,7 @@ export async function retireCommunityExcelAfterRecovery(
     }
   }
 
-  const root = alphaGlobalRoot()
+  const root = codepuppyGlobalRoot()
   const acquired = tryAcquireBundleLock(root, { txId: "req135-community-excel-retirement" })
   if (!acquired.ok)
     return { ok: false, reason: `extension transaction lock unavailable: ${acquired.reason}` }
@@ -57,7 +57,7 @@ function retireCommunityExcelInHeldLock(): CommunityExcelRetirementResult {
   const config = removeCommunityExcelConfig()
   if (!config.ok) return config
 
-  const receipt = retireCommunityExcelRecordV2(alphaGlobalRoot())
+  const receipt = retireCommunityExcelRecordV2(codepuppyGlobalRoot())
   if (!receipt.ok) return { ok: false, reason: `global receipt teardown failed: ${receipt.reason}` }
 
   return { ok: true, configRemoved: config.removed, receiptRemoved: receipt.removed }

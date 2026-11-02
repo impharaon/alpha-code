@@ -31,28 +31,28 @@ describe("所有权段(AC1:作者与甄选分开陈述)", () => {
   test("5 行、顺序固定、作者≠甄选", () => {
     const rows = ownershipRows(communityMcp)
     expect(rows.map((r) => r.labelKey)).toEqual([
-      "alpha.ext.ownAuthor",
-      "alpha.ext.ownCurated",
-      "alpha.ext.ownDistributed",
-      "alpha.ext.ownRuntime",
-      "alpha.ext.ownSupport",
+      "codepuppy.ext.ownAuthor",
+      "codepuppy.ext.ownCurated",
+      "codepuppy.ext.ownDistributed",
+      "codepuppy.ext.ownRuntime",
+      "codepuppy.ext.ownSupport",
     ])
     // 社区作者 + Alpha 甄选 —— 两维独立,不塌缩成「Alpha 出品」。
-    expect(rows[0].valueKeys).toEqual(["alpha.ext.partyCommunity"])
-    expect(rows[1].valueKeys).toEqual(["alpha.ext.curatedAlpha"])
+    expect(rows[0].valueKeys).toEqual(["codepuppy.ext.partyCommunity"])
+    expect(rows[1].valueKeys).toEqual(["codepuppy.ext.curatedCodePuppy"])
     expect(rows[0].valueKeys).not.toEqual(rows[1].valueKeys)
   })
 
   test("多运行面如实并列(不塌缩为单值)", () => {
     const rows = ownershipRows({ ...communityMcp, runtimeSurfaces: ["local-subprocess", "remote-service"] })
-    expect(rows[3].valueKeys).toEqual(["alpha.ext.surfLocalSubprocess", "alpha.ext.surfRemoteService"])
+    expect(rows[3].valueKeys).toEqual(["codepuppy.ext.surfLocalSubprocess", "codepuppy.ext.surfRemoteService"])
   })
 
   test("作者维越域/未知如实落 unknown,不猜", () => {
-    expect(authoredLabelKey("unknown")).toBe("alpha.ext.partyUnknown")
-    expect(authoredLabelKey("user")).toBe("alpha.ext.partyUser")
-    expect(authoredLabelKey("official")).toBe("alpha.ext.partyOfficial")
-    expect(curatedLabelKey("user")).toBe("alpha.ext.curatedUser")
+    expect(authoredLabelKey("unknown")).toBe("codepuppy.ext.partyUnknown")
+    expect(authoredLabelKey("user")).toBe("codepuppy.ext.partyUser")
+    expect(authoredLabelKey("official")).toBe("codepuppy.ext.partyOfficial")
+    expect(curatedLabelKey("user")).toBe("codepuppy.ext.curatedUser")
   })
 })
 
@@ -60,24 +60,24 @@ describe("来源与签名段(信任链就近;发布钥不在读面 → 省略)",
   test("已验签名通道:签名 + 分发 + 版本 三行", () => {
     const rows = trustRows(communityMcp, "remote", "2026-07-13.1")
     expect(rows.map((r) => r.labelKey)).toEqual([
-      "alpha.ext.trustSignatureLabel",
-      "alpha.ext.trustDistLabel",
-      "alpha.ext.trustVersionLabel",
+      "codepuppy.ext.trustSignatureLabel",
+      "codepuppy.ext.trustDistLabel",
+      "codepuppy.ext.trustVersionLabel",
     ])
-    expect(rows[0].valueKeys).toEqual(["alpha.ext.trustSignedChannel"])
+    expect(rows[0].valueKeys).toEqual(["codepuppy.ext.trustSignedChannel"])
     expect(rows[2].value).toBe("2026-07-13.1")
   })
 
   test("catalogChannel 决定签名文案:remote/cache=已验,bundled=内置信任,null=不可用", () => {
-    expect(trustSignatureKey("remote")).toBe("alpha.ext.trustSignedChannel")
-    expect(trustSignatureKey("cache")).toBe("alpha.ext.trustSignedChannel")
-    expect(trustSignatureKey("bundled")).toBe("alpha.ext.trustBundled")
-    expect(trustSignatureKey(null)).toBe("alpha.ext.trustUnverified")
+    expect(trustSignatureKey("remote")).toBe("codepuppy.ext.trustSignedChannel")
+    expect(trustSignatureKey("cache")).toBe("codepuppy.ext.trustSignedChannel")
+    expect(trustSignatureKey("bundled")).toBe("codepuppy.ext.trustBundled")
+    expect(trustSignatureKey(null)).toBe("codepuppy.ext.trustUnverified")
   })
 
   test("无 catalogVersion 时不产版本行(不造)", () => {
     const rows = trustRows(communityMcp, "bundled", null)
-    expect(rows.some((r) => r.labelKey === "alpha.ext.trustVersionLabel")).toBe(false)
+    expect(rows.some((r) => r.labelKey === "codepuppy.ext.trustVersionLabel")).toBe(false)
   })
 })
 
@@ -85,30 +85,30 @@ describe("已安装三态:health → dot 色 + 文案(与 activation 正交)", (
   const view = (state: HealthView["state"], issues: HealthView["issues"] = []): HealthView => ({ state, issues })
 
   test("ok → 绿点·运行健康", () => {
-    expect(healthPresentation(view("ok"))).toEqual({ tone: "ok", textKey: "alpha.ext.healthOk" })
+    expect(healthPresentation(view("ok"))).toEqual({ tone: "ok", textKey: "codepuppy.ext.healthOk" })
   })
 
   test("v1-compat 单独存在不作运行故障 dot(仍绿·运行健康)", () => {
     // 迁移窗口既有事实:完整性不可验 ≠ 运行不健康 —— 否则现存 v1 安装一片琥珀。
     expect(healthPresentation(view("degraded", [{ kind: "ledger-v1-compat" }]))).toEqual({
       tone: "ok",
-      textKey: "alpha.ext.healthOk",
+      textKey: "codepuppy.ext.healthOk",
     })
   })
 
   test("上游归档 → 琥珀·上游已归档", () => {
     const h = view("degraded", [{ kind: "archived-upstream", catalogId: "mcp:word", archivedAt: "2026-03-03" }])
-    expect(healthPresentation(h)).toEqual({ tone: "warn", textKey: "alpha.ext.healthArchived" })
+    expect(healthPresentation(h)).toEqual({ tone: "warn", textKey: "codepuppy.ext.healthArchived" })
   })
 
   test("事务未落定 / 已回滚 → 琥珀,各自文案", () => {
     expect(healthPresentation(view("degraded", [{ kind: "transaction-pending", transactionId: "t1" }]))).toEqual({
       tone: "warn",
-      textKey: "alpha.ext.healthTxPending",
+      textKey: "codepuppy.ext.healthTxPending",
     })
     expect(healthPresentation(view("degraded", [{ kind: "transaction-rolled-back", transactionId: "t2" }]))).toEqual({
       tone: "warn",
-      textKey: "alpha.ext.healthTxRolledBack",
+      textKey: "codepuppy.ext.healthTxRolledBack",
     })
   })
 
@@ -117,11 +117,11 @@ describe("已安装三态:health → dot 色 + 文案(与 activation 正交)", (
       { kind: "transaction-pending", transactionId: "t1" },
       { kind: "archived-upstream", catalogId: "mcp:word", archivedAt: "2026-03-03" },
     ])
-    expect(healthPresentation(h).textKey).toBe("alpha.ext.healthArchived")
+    expect(healthPresentation(h).textKey).toBe("codepuppy.ext.healthArchived")
   })
 
   test("unknown(未安装浏览行)→ muted·未安装,不塌缩成 ok", () => {
-    expect(healthPresentation(view("unknown"))).toEqual({ tone: "muted", textKey: "alpha.ext.healthUnknown" })
+    expect(healthPresentation(view("unknown"))).toEqual({ tone: "muted", textKey: "codepuppy.ext.healthUnknown" })
   })
 })
 

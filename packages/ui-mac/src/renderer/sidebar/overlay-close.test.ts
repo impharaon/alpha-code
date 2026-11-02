@@ -1,6 +1,6 @@
 // REQ-126 AC2(#655)覆盖层随导航关闭闸门的入口。
 //
-// 真实判据在 packages/ui-mac/test-component/overlay-close.cases.ts —— 那里挂生产 AlphaSidebar +
+// 真实判据在 packages/ui-mac/test-component/overlay-close.cases.ts —— 那里挂生产 CodePuppySidebar +
 // 生产 ExtensionHub/AutomationPanel + 真 @solidjs/router,对「每个已登记覆盖层 × 每类导航路径」
 // 参数化断言覆盖层 DOM 消失。之所以起子进程而不是就地跑:cases 里的 mock.module 会把 solid 实例、
 // 上游 ui 组件与 SDK 传输层整个换成替身,同进程会污染 `bun test src` 里其它文件 —— 仓内既有的

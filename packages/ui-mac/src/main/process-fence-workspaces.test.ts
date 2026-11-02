@@ -14,10 +14,10 @@ import {
   workspacesFromRendererTabs,
   writeWorkspaceTruth,
 } from "./process-fence-workspaces"
-import { environmentMutableRoot } from "./alpha-environment"
+import { environmentMutableRoot } from "./codepuppy-environment"
 import { GLOBAL_RENDERER_STORE, TABS_INFO_KEY, TABS_KEY, TABS_RECENT_KEY } from "./tabs-preclean"
 
-const STATE_ROOT = "/Users/alpha/Library/Application Support/alpha-code-state"
+const STATE_ROOT = "/Users/alpha/Library/Application Support/codepuppy-state"
 
 function withTemp<T>(run: (dir: string) => T): T {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "fence-ws-")))
@@ -32,8 +32,8 @@ const draft = (id: string, directory: string, server = "sidecar") => ({ type: "d
 
 describe("真源文件:位置、严格读、原子写", () => {
   test("路径 = <casBaseRoot>/fence-workspaces/<env>.json,与三个 env 根、cas/ 同级 —— 不在 W2(env/<env>)之下", () => {
-    expect(fenceWorkspaceTruthPath(STATE_ROOT, "prod")).toBe("/Users/alpha/Library/Application Support/alpha-code-state/fence-workspaces/prod.json")
-    expect(fenceWorkspaceTruthPath(STATE_ROOT, "dev")).toBe("/Users/alpha/Library/Application Support/alpha-code-state/fence-workspaces/dev.json")
+    expect(fenceWorkspaceTruthPath(STATE_ROOT, "prod")).toBe("/Users/alpha/Library/Application Support/codepuppy-state/fence-workspaces/prod.json")
+    expect(fenceWorkspaceTruthPath(STATE_ROOT, "dev")).toBe("/Users/alpha/Library/Application Support/codepuppy-state/fence-workspaces/dev.json")
     for (const env of ["prod", "beta", "dev"] as const) {
       const rel = relative(environmentMutableRoot(env, STATE_ROOT), fenceWorkspaceTruthPath(STATE_ROOT, env))
       expect(rel.startsWith(".."), `${env}: ${rel}`).toBe(true)

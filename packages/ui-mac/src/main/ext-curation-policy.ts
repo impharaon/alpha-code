@@ -2,7 +2,7 @@
 //
 // 合同 §7.2:activationPolicy=session-grant 的启用只对当前会话生效 —— 持久账本里
 // desiredState=enabled 的 session-grant 记录本身非法(历史安装/旁路写入/损坏)。在一切
-// **持久投影面**(startup reconcile 的账本归位 + alpha.jsonc 重投影、sidecar
+// **持久投影面**(startup reconcile 的账本归位 + codepuppy.jsonc 重投影、sidecar
 // OPENCODE_CONFIG_CONTENT 主权注入)必须按 disabled 处理;会话级启用机制本体 = #408。
 //
 // r1-4(fail-closed):**「无法判定」≠「确定空集」**。判定真源分两级:
@@ -14,7 +14,7 @@
 //     (调用方仍可用它强制,但**不得当作完整**;boot reconcile 对「存在已启用 catalog 记录」
 //     的不可判定态必须 fail-closed 置 enforcementGap 阻断 sidecar,见 ext-install-planner)。
 
-import bundledCatalogJson from "../renderer/extensions/alpha-catalog.json"
+import bundledCatalogJson from "../renderer/extensions/codepuppy-catalog.json"
 import type { BundledCatalogSnapshotV1 } from "../renderer/extensions/catalog-types"
 import { decodeEntryCuration, type CurationEntryLike } from "../shared/catalog-curation"
 import { readCachedTrust, readChannelLastKnownGood, readRevokedTargets, BUILTIN_CATALOG_PUBKEY_B64, type ChannelName } from "./catalog-channels"

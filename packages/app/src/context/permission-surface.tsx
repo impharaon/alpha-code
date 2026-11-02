@@ -2,7 +2,7 @@
 //
 // 从 app.tsx 抽出来的原因不是整洁,是**可被闸门执行**:审批决定提交的接线点只有这一处,
 // 而闸门要能在真实 DOM 里挂载它、点真的按钮、看真的 SDK 出口(ADR-037 决策 4)。抽成模块后
-// `packages/ui-mac/src/renderer/alpha-ui/permission-dual-channel.test.ts` 挂的就是这份生产代码,
+// `packages/ui-mac/src/renderer/codepuppy-ui/permission-dual-channel.test.ts` 挂的就是这份生产代码,
 // 而不是测试里重写一遍的等价物。app.tsx 只保留一行 `createPermissionSurfaceMount(...)` 调用。
 //
 // #668:list / subscribe 走 permission-v1-adapter 的合并源(v1 `permission.asked` +

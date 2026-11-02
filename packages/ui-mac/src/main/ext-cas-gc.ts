@@ -28,7 +28,7 @@ import { tryAcquireBundleLock, type BundleLock } from "./ext-bundle-lock"
 import { CAS_SHA256_RE, casPaths, readCasPinsStrict } from "./ext-cas"
 import { decodeSeedLock } from "./ext-seed"
 import { listGenerationsStrict, readTransactionJournal, type TxLog } from "./ext-transaction"
-import { environmentMutableRoot } from "./alpha-environment"
+import { environmentMutableRoot } from "./codepuppy-environment"
 
 /** 宽限窗默认 6 小时:提升进 CAS 但尚未被 journal/generation 引用的新 blob 不被误扫。 */
 export const CAS_GC_GRACE_MS_DEFAULT = 6 * 60 * 60_000

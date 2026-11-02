@@ -7,7 +7,7 @@ import {
   ContractIncompatibleError,
   decodeContract,
   type ArtifactDescriptorV1,
-} from "@alpha-code/contracts-consumer"
+} from "@codepuppy/contracts-consumer"
 
 // REQ-092 / REQ-093(alpha-platform#27 / #28)—— 跨端 `ArtifactDescriptor` 契约(平台侧单一真相源)。
 //

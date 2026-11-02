@@ -13,7 +13,7 @@
 #   等号修的是类:对新增的闸门默认保护,对删除默认拒绝。
 # 三层各管各的:地板管灾难,本脚本管单点,精确条数管单点里的单条。
 #
-# `#1153`:平台条件闸与退出码三档(与 alpha-check 第 [2/10]/[9/10]/[10/10] 步同形):
+# `#1153`:平台条件闸与退出码三档(与 codepuppy-check 第 [2/10]/[9/10]/[10/10] 步同形):
 #   0 = 全部适用行已验证;1 = 真失守(文件被删/条数偏离/标注与自报不符/登记簿坏),拦住;
 #   2 = 门绿,但存在「本平台不适用」的平台条件行 —— 本次运行不构成那几行的证据,消费方记
 #       「未验证」不拦(硬红会训练下一个人把 darwin-only 判据摘出登记簿,即 #1153 的病根)。
@@ -177,13 +177,13 @@ while IFS=$'\t' read -r floor workdir path delegates guarantee || [ -n "${floor:
     [ "$kind" = range ] && run_spec="$spec"
     echo "── [$checked] measure $workdir/$path (登记 $floor)"
     : > "$countfile"
-    if ! ALPHA_TEST_COUNT_FILE="$countfile" bash "$ROOT/scripts/bun-test-floor.sh" "$run_spec" "$workdir" "$path"; then
+    if ! CODEPUPPY_TEST_COUNT_FILE="$countfile" bash "$ROOT/scripts/bun-test-floor.sh" "$run_spec" "$workdir" "$path"; then
       echo "::error::--update 中止:$workdir/$path 测试失败 —— all-or-nothing,一条都不写回"
       exit 1
     fi
     measured="$(cat "$countfile")"
     case "$measured" in
-      ''|*[!0-9]*) echo "::error::--update 中止:$workdir/$path 没量到条数(ALPHA_TEST_COUNT_FILE 空)"; exit 1 ;;
+      ''|*[!0-9]*) echo "::error::--update 中止:$workdir/$path 没量到条数(CODEPUPPY_TEST_COUNT_FILE 空)"; exit 1 ;;
     esac
     if [ "$measured" -eq 0 ]; then
       echo "::error::--update 中止:$workdir/$path 实测 0 条 —— 文件被清空/路径写歪不允许被写回成 0"
@@ -240,7 +240,7 @@ fi
 [ "$failed" -eq 0 ] || exit 1
 if [ "$na_count" -gt 0 ]; then
   # `#1153` 第三档:门绿,但平台条件行的保证本次未被验证 —— 总结行不许说「全部」,退出码 2
-  # 供消费方(alpha-check [6/10] / alpha-ci 的 assert gate files 步)记「未验证」不拦。
+  # 供消费方(codepuppy-check [6/10] / codepuppy-ci 的 assert gate files 步)记「未验证」不拦。
   echo "⚠️  $((checked - na_count)) 个闸门文件在位且真的跑过(条数与登记精确一致);另 $na_count 个为平台条件闸,本平台($RUNTIME_PLATFORM)不适用 —— 已验证其自报 0 条与标注相符,但其保证本次未被验证:$na_names"
   exit 2
 fi

@@ -56,7 +56,7 @@ let globalRoot: string
 beforeEach(() => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ext-seed-install-"))
   seedDir = path.join(tmp, "extension-seed")
-  casBase = path.join(tmp, "alpha-base")
+  casBase = path.join(tmp, "codepuppy-base")
   globalRoot = path.join(tmp, "global")
   fs.mkdirSync(seedDir, { recursive: true })
   fs.mkdirSync(globalRoot, { recursive: true })
@@ -197,13 +197,13 @@ function forbiddenInstallers(): PlannerInstallers {
     removeMcpConfigInLock: forbid("removeMcpConfigInLock"),
     removeProjectMcpConfigInLock: forbid("removeProjectMcpConfigInLock"),
     removeMcpSecretsStrict: forbid("removeMcpSecretsStrict"),
-    releaseAlphaConnectionBindings: forbid("releaseAlphaConnectionBindings"),
+    releaseCodePuppyConnectionBindings: forbid("releaseCodePuppyConnectionBindings"),
     findPluginBaseConflictStrict: forbid("findPluginBaseConflictStrict"),
     readPluginArrayStrict: forbid("readPluginArrayStrict"),
     // #378 r6:legacy XDG 合并视图检查是 seed plugin 路径的**合法只读消费**(同名路径双载门 +
     // 旧目录 GC 引用对账)—— 给良性空 stub 而非 forbid;真实实现归 ext-config(环境派生)。
     readLegacyPluginArrayStrict: () => ({ ok: true, sources: [] }),
-    mcpConfigTruthPath: () => path.join(globalRoot, "alpha.jsonc"),
+    mcpConfigTruthPath: () => path.join(globalRoot, "codepuppy.jsonc"),
     stageVendoredPluginVersioned: forbid("stageVendoredPluginVersioned"),
     removePlugin: forbid("removePlugin"),
     collectVendoredPluginPayload: forbid("collectVendoredPluginPayload"),
@@ -608,8 +608,8 @@ describe("agent seed install via installCatalog (REQ-102 #358)", () => {
     expect(fs.readFileSync(mdPath, "utf8")).toBe(AGENT_MD)
 
     // config 叶与 md 同事务落位:agent.<name> 严格等于 agentMdToEntry 解析结果。
-    const cfg: unknown = parse(fs.readFileSync(path.join(globalRoot, "alpha.jsonc"), "utf8"))
-    if (!isRec(cfg) || !isRec(cfg.agent)) throw new Error("alpha.jsonc missing agent map")
+    const cfg: unknown = parse(fs.readFileSync(path.join(globalRoot, "codepuppy.jsonc"), "utf8"))
+    if (!isRec(cfg) || !isRec(cfg.agent)) throw new Error("codepuppy.jsonc missing agent map")
     expect(cfg.agent["bug-triage"]).toEqual(AGENT_ENTRY)
 
     // receipt 语义回表 bundled entry:kind/version/origin/configKey/files/payloadDigest。
@@ -653,7 +653,7 @@ describe("agent seed install via installCatalog (REQ-102 #358)", () => {
     expect(main.requiresConfirmation).toBe(true)
     // 零权威副作用:无 md、无 config 叶、无账、无授权账。
     expect(fs.existsSync(path.join(globalRoot, "agents", "bug-triage.md"))).toBe(false)
-    expect(fs.existsSync(path.join(globalRoot, "alpha.jsonc"))).toBe(false)
+    expect(fs.existsSync(path.join(globalRoot, "codepuppy.jsonc"))).toBe(false)
     expect(findRecordV2(globalRoot, "agent", "bug-triage")).toBeNull()
     expect(fs.existsSync(capabilityGrantPath(globalRoot, agentInstallKey("bug-triage")))).toBe(false)
   })
@@ -687,7 +687,7 @@ describe("agent seed install via installCatalog (REQ-102 #358)", () => {
     fs.rmSync(path.join(globalRoot, "agents", "bug-triage.md"), { force: true })
 
     // C:无账 config 叶在场。
-    fs.writeFileSync(path.join(globalRoot, "alpha.jsonc"), JSON.stringify({ agent: { "bug-triage": { description: "x", prompt: "y" } } }))
+    fs.writeFileSync(path.join(globalRoot, "codepuppy.jsonc"), JSON.stringify({ agent: { "bug-triage": { description: "x", prompt: "y" } } }))
     const withLeaf = await installAuthorized(agentSeedIntent, agentDeps())
     expect(withLeaf.ok).toBe(false)
     if (!withLeaf.ok) expect(withLeaf.reason).toContain('config entry "agent.bug-triage"')
@@ -696,19 +696,19 @@ describe("agent seed install via installCatalog (REQ-102 #358)", () => {
   test("形状异常的合法 jsonc(agent 段非对象 / 根非对象)fail-closed,锁正常释放(review Major 5)", async () => {
     buildSeed([{ id: "agent:bug-triage", files: agentFiles }])
     // agent 段是字符串 —— 若放行到 jsonc modify 会抛异常且不释放引擎锁。
-    fs.writeFileSync(path.join(globalRoot, "alpha.jsonc"), JSON.stringify({ agent: "mine" }))
+    fs.writeFileSync(path.join(globalRoot, "codepuppy.jsonc"), JSON.stringify({ agent: "mine" }))
     const strShape = await installAuthorized(agentSeedIntent, agentDeps())
     expect(strShape.ok).toBe(false)
     if (!strShape.ok) expect(strShape.reason).toContain('"agent" section is not an object')
 
     // 根是数组。
-    fs.writeFileSync(path.join(globalRoot, "alpha.jsonc"), "[]")
+    fs.writeFileSync(path.join(globalRoot, "codepuppy.jsonc"), "[]")
     const arrRoot = await installAuthorized(agentSeedIntent, agentDeps())
     expect(arrRoot.ok).toBe(false)
     if (!arrRoot.ok) expect(arrRoot.reason).toContain("root is not an object")
 
     // 锁已释放:恢复 config 后同一 deps 可正常安装(若锁泄漏这里会 busy)。
-    fs.rmSync(path.join(globalRoot, "alpha.jsonc"), { force: true })
+    fs.rmSync(path.join(globalRoot, "codepuppy.jsonc"), { force: true })
     const ok = await installAuthorized(agentSeedIntent, agentDeps())
     expect(ok.ok).toBe(true)
   })
@@ -793,7 +793,7 @@ describe("agent seed install via installCatalog (REQ-102 #358)", () => {
       ...forbiddenInstallers(),
       removeFsInstall: (_type, name) => {
         fs.rmSync(path.join(globalRoot, "agents", `${name}.md`), { force: true })
-        fs.writeFileSync(path.join(globalRoot, "alpha.jsonc"), "{}\n")
+        fs.writeFileSync(path.join(globalRoot, "codepuppy.jsonc"), "{}\n")
         return { ok: true, files: [] }
       },
     }
@@ -819,7 +819,7 @@ describe("agent seed install via installCatalog (REQ-102 #358)", () => {
       ...forbiddenInstallers(),
       removeFsInstall: (_type, name) => {
         fs.rmSync(path.join(globalRoot, "agents", `${name}.md`), { force: true })
-        fs.writeFileSync(path.join(globalRoot, "alpha.jsonc"), "{}\n")
+        fs.writeFileSync(path.join(globalRoot, "codepuppy.jsonc"), "{}\n")
         return { ok: true, files: [] }
       },
     }
@@ -868,7 +868,7 @@ const projectMcpSeedIntent = (projectDir: string) =>
   }) satisfies Parameters<ElectronAPI["ext"]["installCatalog"]>[0]
 const mcpDeps = (overrides: Partial<CatalogEntry> = {}) => makeSeedDeps({ bundledEntries: [bundledMcpEntry(overrides)] })
 const readCfg = (): Record<string, unknown> => {
-  const cfg: unknown = parse(fs.readFileSync(path.join(globalRoot, "alpha.jsonc"), "utf8"))
+  const cfg: unknown = parse(fs.readFileSync(path.join(globalRoot, "codepuppy.jsonc"), "utf8"))
   if (!isRec(cfg)) throw new Error("config root not an object")
   return cfg
 }
@@ -919,13 +919,13 @@ describe("mcp seed install via installCatalog (REQ-102 #359)", () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.kind).toBe("mcp")
-    const config: unknown = parse(fs.readFileSync(path.join(projectRoot, "alpha.jsonc"), "utf8"))
+    const config: unknown = parse(fs.readFileSync(path.join(projectRoot, "codepuppy.jsonc"), "utf8"))
     if (!isRec(config) || !isRec(config.mcp)) throw new Error("project mcp config missing")
     expect(config.mcp.demo).toEqual(EXPECTED_MCP)
     const record = findRecordV2(projectRoot, "mcp", "demo")
     expect(record?.scope.kind).toBe("project")
     if (record?.scope.kind === "project") expect(record.scope.projectPath).toBe(fs.realpathSync(project))
-    expect(fs.existsSync(path.join(globalRoot, "alpha.jsonc"))).toBe(false)
+    expect(fs.existsSync(path.join(globalRoot, "codepuppy.jsonc"))).toBe(false)
     expect(fs.existsSync(path.join(globalRoot, "installs.json"))).toBe(false)
     expect(fs.existsSync(path.join(casBase, "cas"))).toBe(false)
     expect(casCalls).toBe(0)
@@ -939,7 +939,7 @@ describe("mcp seed install via installCatalog (REQ-102 #359)", () => {
       action: "config",
       genId: "gen-000000-000000",
       files: [],
-      config: { target: path.join(fs.realpathSync(project), ".code-puppy", "alpha.jsonc") },
+      config: { target: path.join(fs.realpathSync(project), ".code-puppy", "codepuppy.jsonc") },
     })
     expect(journal?.prepared ?? []).toEqual([])
     expect(fs.existsSync(path.join(projectRoot, "ext-store", "mcp--demo", "generations"))).toBe(false)
@@ -997,7 +997,7 @@ describe("mcp seed install via installCatalog (REQ-102 #359)", () => {
     expect(fs.lstatSync(projectRoot).isSymbolicLink()).toBe(true)
     expect(fs.readFileSync(sentinel, "utf8")).toBe("outside-stays-exact")
     expect(fs.existsSync(path.join(outside, "ext-tx"))).toBe(false)
-    expect(fs.existsSync(path.join(outside, "alpha.jsonc"))).toBe(false)
+    expect(fs.existsSync(path.join(outside, "codepuppy.jsonc"))).toBe(false)
     expect(fs.existsSync(path.join(outside, "installs.json"))).toBe(false)
     expect(fs.existsSync(path.join(casBase, "cas"))).toBe(false)
   })
@@ -1012,7 +1012,7 @@ describe("mcp seed install via installCatalog (REQ-102 #359)", () => {
     expect(first.authorization).toHaveLength(1)
     expect(first.authorization[0].key).toBe("mcp--demo")
     expect(first.authorization[0].requested).toEqual(["engine:config", "process:spawn"])
-    expect(fs.existsSync(path.join(globalRoot, "alpha.jsonc"))).toBe(false)
+    expect(fs.existsSync(path.join(globalRoot, "codepuppy.jsonc"))).toBe(false)
     expect(findRecordV2(globalRoot, "mcp", "demo")).toBeNull()
   })
 
@@ -1026,9 +1026,9 @@ describe("mcp seed install via installCatalog (REQ-102 #359)", () => {
     expect(ws.ok).toBe(false)
     if (!ws.ok) expect(ws.reason).toContain("workspace")
 
-    const alphaFiles = [{ path: "x.md", content: "alpha word" }]
-    buildSeed([{ id: "mcp:codepuppy-word", files: alphaFiles }])
-    const alphaWord = await installAuthorized(
+    const codepuppyFiles = [{ path: "x.md", content: "alpha word" }]
+    buildSeed([{ id: "mcp:codepuppy-word", files: codepuppyFiles }])
+    const codepuppyWord = await installAuthorized(
       { source: "seed", assetId: "mcp:codepuppy-word", scope: { scope: "global" } },
       makeSeedDeps({
         bundledEntries: [
@@ -1040,13 +1040,13 @@ describe("mcp seed install via installCatalog (REQ-102 #359)", () => {
               mcpType: "local",
               command: ["uv", "run", "--no-project", "--with", "python-docx==1.2.0", "{alphaResources}/office-mcp/server.py", "word", "{workspace}"],
             },
-            remoteAsset: { version: "1.0.0", files: lockFileEntries(alphaFiles, { writeBlobs: false }) },
+            remoteAsset: { version: "1.0.0", files: lockFileEntries(codepuppyFiles, { writeBlobs: false }) },
           }),
         ],
       }),
     )
-    expect(alphaWord.ok).toBe(false)
-    if (!alphaWord.ok) expect(alphaWord.reason).toContain("workspace-policy")
+    expect(codepuppyWord.ok).toBe(false)
+    if (!codepuppyWord.ok) expect(codepuppyWord.reason).toContain("workspace-policy")
   })
 
   test("REQ-135 community Excel seed is denial-only and stops before CAS/config writes", async () => {
@@ -1073,7 +1073,7 @@ describe("mcp seed install via installCatalog (REQ-102 #359)", () => {
       expect(excel.reason).toContain("REQ-135")
     }
     expect(fs.existsSync(path.join(casBase, "cas"))).toBe(false)
-    expect(fs.existsSync(path.join(globalRoot, "alpha.jsonc"))).toBe(false)
+    expect(fs.existsSync(path.join(globalRoot, "codepuppy.jsonc"))).toBe(false)
   })
 
   test("REQ-135 seed write policy rejects a renamed excel-mcp-server command", async () => {
@@ -1101,7 +1101,7 @@ describe("mcp seed install via installCatalog (REQ-102 #359)", () => {
 
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.reason).toContain("excel-mcp-server is retired")
-    expect(fs.existsSync(path.join(globalRoot, "alpha.jsonc"))).toBe(false)
+    expect(fs.existsSync(path.join(globalRoot, "codepuppy.jsonc"))).toBe(false)
     expect(findRecordV2(globalRoot, "mcp", entry.name)).toBeNull()
   })
 
@@ -1114,17 +1114,17 @@ describe("mcp seed install via installCatalog (REQ-102 #359)", () => {
     expect(badHead.ok).toBe(false)
     if (!badHead.ok) expect(badHead.reason).toContain("failed validation")
     // 零副作用:config 未创建。
-    expect(fs.existsSync(path.join(globalRoot, "alpha.jsonc"))).toBe(false)
+    expect(fs.existsSync(path.join(globalRoot, "codepuppy.jsonc"))).toBe(false)
   })
 
   test("锁内门:无账 config 叶拒认领;downgrade 拒;同版本重装幂等", async () => {
     buildSeed([{ id: "mcp:demo", files: MCP_FILES }])
     // 无账叶。
-    fs.writeFileSync(path.join(globalRoot, "alpha.jsonc"), JSON.stringify({ mcp: { demo: { type: "local", command: ["npx", "mine"] } } }))
+    fs.writeFileSync(path.join(globalRoot, "codepuppy.jsonc"), JSON.stringify({ mcp: { demo: { type: "local", command: ["npx", "mine"] } } }))
     const unregistered = await installAuthorized(mcpSeedIntent, mcpDeps())
     expect(unregistered.ok).toBe(false)
     if (!unregistered.ok) expect(unregistered.reason).toContain("without a ledger record")
-    fs.rmSync(path.join(globalRoot, "alpha.jsonc"), { force: true })
+    fs.rmSync(path.join(globalRoot, "codepuppy.jsonc"), { force: true })
 
     // downgrade。
     const newer: UpsertInput = {
@@ -1158,14 +1158,14 @@ describe("mcp seed install via installCatalog (REQ-102 #359)", () => {
     const installers: PlannerInstallers = {
       ...forbiddenInstallers(),
       removeMcpConfigInLock: (_name) => {
-        fs.writeFileSync(path.join(globalRoot, "alpha.jsonc"), "{}\n")
+        fs.writeFileSync(path.join(globalRoot, "codepuppy.jsonc"), "{}\n")
         return { ok: true }
       },
       removeMcpSecretsStrict: (_name) => ({ ok: true }),
       // `#704`:MCP 卸载路径**必须**释放 Alpha Connection 绑定(不 disconnect)。基表里它是
       // forbid —— 摘掉 ext-install-planner 里那次生产调用,这一行就是多余的;把这一行删掉,
       // 生产调用会撞上 forbid 而红。两个方向都咬人。
-      releaseAlphaConnectionBindings: (_componentId) => ({ ok: true }),
+      releaseCodePuppyConnectionBindings: (_componentId) => ({ ok: true }),
     }
     const un = await uninstallByKey({ type: "mcp", name: "demo", scope: "global" }, { ...deps, installers })
     expect(un.ok).toBe(true)
@@ -1206,7 +1206,7 @@ const pluginDigest16 = (files: FileFixture[]) => aggregateFilesDigest(lockFileEn
 
 // ADR-040(`#825`):`plugin seed install via installCatalog` 整个 describe(21 条)随 seed 侧的
 // plugin 安装路径退场 —— 它们逐条断言的是「seed 的 plugin 载荷怎么落进 plugins/<name>@<digest>/
-// 并写进 alpha.jsonc 的 plugin[]」,而这条路径现在拒在 CAS promotion 之前。`gcVendoredPluginDirLocked`
+// 并写进 codepuppy.jsonc 的 plugin[]」,而这条路径现在拒在 CAS promotion 之前。`gcVendoredPluginDirLocked`
 // 是其中一条用例的被测函数,它在生产里唯一的调用点(replace 提交后的旧目录 GC)一并消失,故与用例同去。
 // 取代它的是下方 “ADR-040:seed 的 plugin 资产具名拒绝” —— 断言拒绝发生在任何写盘之前。
 
@@ -1222,7 +1222,7 @@ describe("ADR-040(`#825`):seed 的 plugin 资产具名拒绝", () => {
     expect(r.reason).toContain("ADR-040")
     // 零副作用的四个面。plugins/ 与 CAS 一并断言,因为「拒在 promotion 之前」是这条拒绝的位置承诺,
     // 只断 config 的话,把拒绝挪到 promotion 之后仍然全绿。
-    expect(fs.existsSync(path.join(globalRoot, "alpha.jsonc"))).toBe(false)
+    expect(fs.existsSync(path.join(globalRoot, "codepuppy.jsonc"))).toBe(false)
     expect(fs.existsSync(path.join(globalRoot, "installs.json"))).toBe(false)
     expect(fs.existsSync(path.join(globalRoot, "plugins"))).toBe(false)
     // 共享 CAS 在 `<casBase>/cas`(**不在** globalRoot 下)—— 写成 globalRoot 下的名字就是一条
@@ -1269,7 +1269,7 @@ describe("#395 第三方 seed 安装默认关(账本 disabled;持久化 config �
     expect(Object.keys(r)).not.toContain("live" + "Mcp") // 默认关不自动连
     expect(findRecordV2(globalRoot, "mcp", "demo")!.desiredState).toBe("disabled")
     // 持久化投影:disabled mcp 叶带引擎消费键 enabled:false(引擎查 mcp.enabled === false 即跳过)。
-    const cfg: { mcp: Record<string, Record<string, unknown>> } = JSON.parse(fs.readFileSync(path.join(globalRoot, "alpha.jsonc"), "utf8"))
+    const cfg: { mcp: Record<string, Record<string, unknown>> } = JSON.parse(fs.readFileSync(path.join(globalRoot, "codepuppy.jsonc"), "utf8"))
     expect(cfg.mcp.demo?.enabled).toBe(false)
   })
 })
@@ -1288,7 +1288,7 @@ const seedCurationOf = (
     deliveryMode: "installable",
     review: {
       reviewedAt: "2026-07-01T00:00:00Z",
-      reviewedBy: "alpha-review",
+      reviewedBy: "codepuppy-review",
       upstreamStatus: "active",
       supportTier: "best-effort",
       reviewBefore: "2027-07-01T00:00:00Z",

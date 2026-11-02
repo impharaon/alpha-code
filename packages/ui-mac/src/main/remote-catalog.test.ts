@@ -12,7 +12,7 @@ import * as os from "node:os"
 import * as path from "node:path"
 import { sha256Hex, type ChannelClientDeps } from "./catalog-channels"
 import { readCachedCatalog, refreshRemoteCatalog } from "./remote-catalog"
-import { registryChannelFor } from "./alpha-environment"
+import { registryChannelFor } from "./codepuppy-environment"
 
 const NOW = Date.parse("2026-07-13T12:00:00.000Z")
 const CH_BASE = "https://channels.test/catalog/v1"

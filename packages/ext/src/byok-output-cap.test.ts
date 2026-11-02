@@ -1,7 +1,7 @@
 // REQ-156 —— 直连 BYOK 节点的 `max_tokens` 取逐模型实读上限。三层:
 //   ① 纯判据 `byokOutputCap`(只抬不降 / baseURL 逐字 / 无读数不动);
-//   ② 真 `AlphaExt` 的 `chat.params` 钩子(证明判据真的接在钩子上,而不是只在纯函数里成立);
-//   ③ **双向漂移锁**:实读表 ↔ 出货目录 `alpha-models.json`。`#1265` 的教训是只锁一个方向等于没锁 ——
+//   ② 真 `CodePuppyExt` 的 `chat.params` 钩子(证明判据真的接在钩子上,而不是只在纯函数里成立);
+//   ③ **双向漂移锁**:实读表 ↔ 出货目录 `codepuppy-models.json`。`#1265` 的教训是只锁一个方向等于没锁 ——
 //      表里多出目录没有的条目(读数发给一个已下架的模型)与目录新增而没人量它(静默留在 32000),
 //      两个方向都必须红。
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
@@ -9,12 +9,12 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BYOK_OUTPUT_CAP_READINGS, BYOK_OUTPUT_CAP_UNREAD, byokOutputCap } from "./byok-output-cap"
-import catalog from "../../ui-mac/src/main/alpha-models.json"
+import catalog from "../../ui-mac/src/main/codepuppy-models.json"
 // `#1556`:出货目录 = 随包 BYOK 首启引导(模型)× App 内置适配器表(baseURL)。
 import { BYOK_ADAPTERS } from "../../ui-mac/src/main/byok-adapters"
 // 生产公式,不手抄 —— 抄一份的话公式变了,readings 里写死的 `zhipuai-byok` 会在生产上静默
 // 查不到(fail-closed ⇒ AC1 无声丢失),而漂移锁照样绿。
-import { byokEngineId } from "../../ui-mac/src/shared/alpha-model-types"
+import { byokEngineId } from "../../ui-mac/src/shared/codepuppy-model-types"
 
 const ZHIPU = "https://open.bigmodel.cn/api/paas/v4"
 const DEEPSEEK = "https://api.deepseek.com/v1"
@@ -59,25 +59,25 @@ describe("byokOutputCap —— 判据形状域", () => {
   })
 })
 
-describe("真 AlphaExt 的 chat.params 钩子", () => {
+describe("真 CodePuppyExt 的 chat.params 钩子", () => {
   let root = ""
   let savedBase: string | undefined
   let savedGlobal: string | undefined
   beforeEach(() => {
-    root = realpathSync(mkdtempSync(join(tmpdir(), "alpha-ext-byokcap-")))
+    root = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-byokcap-")))
     const global = join(root, "global", "env", "dev")
     mkdirSync(global, { recursive: true })
     mkdirSync(join(root, "project"), { recursive: true })
-    savedBase = process.env.ALPHA_BASE_URL
-    savedGlobal = process.env.ALPHA_GLOBAL_DIR
-    process.env.ALPHA_GLOBAL_DIR = global
-    process.env.ALPHA_BASE_URL = "https://gw.example/v1"
+    savedBase = process.env.CODEPUPPY_BASE_URL
+    savedGlobal = process.env.CODEPUPPY_GLOBAL_DIR
+    process.env.CODEPUPPY_GLOBAL_DIR = global
+    process.env.CODEPUPPY_BASE_URL = "https://gw.example/v1"
   })
   afterEach(() => {
-    if (savedBase === undefined) delete process.env.ALPHA_BASE_URL
-    else process.env.ALPHA_BASE_URL = savedBase
-    if (savedGlobal === undefined) delete process.env.ALPHA_GLOBAL_DIR
-    else process.env.ALPHA_GLOBAL_DIR = savedGlobal
+    if (savedBase === undefined) delete process.env.CODEPUPPY_BASE_URL
+    else process.env.CODEPUPPY_BASE_URL = savedBase
+    if (savedGlobal === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+    else process.env.CODEPUPPY_GLOBAL_DIR = savedGlobal
     rmSync(root, { recursive: true, force: true })
   })
 
@@ -87,12 +87,12 @@ describe("真 AlphaExt 的 chat.params 钩子", () => {
   ) => Promise<void>
 
   const load = async () => {
-    const { AlphaExt } = await import("./plugin")
-    const hooks = await AlphaExt({
+    const { CodePuppyExt } = await import("./plugin")
+    const hooks = await CodePuppyExt({
       directory: join(root, "project"),
       worktree: join(root, "project"),
       client: { instance: { dispose: async () => {} } },
-    } as unknown as Parameters<typeof AlphaExt>[0])
+    } as unknown as Parameters<typeof CodePuppyExt>[0])
     return (hooks as unknown as Record<string, unknown>)["chat.params"] as ChatParams
   }
   const call = async (hook: ChatParams, providerID: string, modelID: string, baseURL: string) => {
@@ -149,7 +149,7 @@ describe("真 AlphaExt 的 chat.params 钩子", () => {
   })
 })
 
-describe("双向漂移锁:实读表 ↔ 出货目录 alpha-models.json", () => {
+describe("双向漂移锁:实读表 ↔ 出货目录 codepuppy-models.json", () => {
   const byok = catalog.byokCatalog.providers.map((p) => ({
     id: p.id,
     baseURL: BYOK_ADAPTERS.find((adapter) => adapter.id === p.id)!.baseURL,

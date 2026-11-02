@@ -15,13 +15,13 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { TOOL_TEXT } from "../../ext/src/context-injection"
 import { McpCatalog } from "../../opencode/src/mcp/catalog"
-import { ToolClass } from "../../schema/src/alpha-tool-policy"
+import { ToolClass } from "../../schema/src/codepuppy-tool-policy"
 import { ToolAuthority } from "../../schema/src/tool-identity"
-import { ALPHA_AGENT_TEXT } from "../src/main/alpha-agents"
-import catalog from "../src/main/alpha-models.json"
+import { CODEPUPPY_AGENT_TEXT } from "../src/main/codepuppy-agents"
+import catalog from "../src/main/codepuppy-models.json"
 import { CLOUD_MCP_SERVER_NAME } from "../src/main/cloud-web-search"
 import { CLOUD_MCP_TOOLS } from "../src/main/fixtures/cloud-mcp-tools"
-import { ALPHA_OFFICE_CONNECTORS } from "../src/shared/office-advisories"
+import { CODEPUPPY_OFFICE_CONNECTORS } from "../src/shared/office-advisories"
 
 export type CodepuppyNames = {
   serverKeys: string[]
@@ -44,14 +44,14 @@ const OFFICE_TOOLS = join(import.meta.dir, "../resources/office-mcp/tools.json")
 
 export function exportCodepuppyNames(): CodepuppyNames {
   const office = JSON.parse(readFileSync(OFFICE_TOOLS, "utf8")) as OfficeManifest
-  const officeFunctions = ALPHA_OFFICE_CONNECTORS.flatMap((connector) =>
+  const officeFunctions = CODEPUPPY_OFFICE_CONNECTORS.flatMap((connector) =>
     (office.formats[connector.format]?.tools ?? []).map((tool) => McpCatalog.toolName(connector.name, tool.name)),
   )
   const authorityMembers = ToolAuthority.members as ReadonlyArray<{ fields: { kind: { literal: string } } }>
   return {
-    serverKeys: [CLOUD_MCP_SERVER_NAME, ...ALPHA_OFFICE_CONNECTORS.map((connector) => connector.name)],
+    serverKeys: [CLOUD_MCP_SERVER_NAME, ...CODEPUPPY_OFFICE_CONNECTORS.map((connector) => connector.name)],
     pluginTools: Object.entries(TOOL_TEXT).map(([id, text]) => ({ id, readable: text.readable })),
-    agents: Object.keys(ALPHA_AGENT_TEXT),
+    agents: Object.keys(CODEPUPPY_AGENT_TEXT),
     sourceClasses: [...ToolClass.literals],
     authorityKinds: authorityMembers.map((member) => member.fields.kind.literal),
     providerIds: [catalog.platformProvider.id],

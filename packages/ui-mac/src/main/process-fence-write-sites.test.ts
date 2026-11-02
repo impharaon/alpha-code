@@ -49,14 +49,14 @@ describe("AC3 登记簿 == 扫描(生产源码)", () => {
   test("每一行的根都合法,且没有 TODO", () => {
     expect(diff.invalidRoot.map((r) => `${signatureOf(r)}\t${r.root}`)).toEqual([])
     expect(ledger.filter((r) => r.root === "TODO").map(signatureOf)).toEqual([])
-    // `main-only` 只许给 alpha-environment.ts(见 isValidRoot 的说明);别处用它就是给真写入点开豁免。
-    expect(ledger.filter((r) => r.root === "main-only" && !r.file.endsWith("alpha-environment.ts")).map(signatureOf)).toEqual([])
+    // `main-only` 只许给 codepuppy-environment.ts(见 isValidRoot 的说明);别处用它就是给真写入点开豁免。
+    expect(ledger.filter((r) => r.root === "main-only" && !r.file.endsWith("codepuppy-environment.ts")).map(signatureOf)).toEqual([])
   })
 
   test("集合自证:闭包含 sidecar 真 import 的模块与 ext 全部源码;不含 main 进程入口与测试文件", () => {
     const files = sidecarSourceFiles(repoRoot)
     expect(files).toContain("packages/ui-mac/src/main/sidecar.ts")
-    expect(files).toContain("packages/ui-mac/src/main/alpha-config-injection.ts")
+    expect(files).toContain("packages/ui-mac/src/main/codepuppy-config-injection.ts")
     expect(files).toContain("packages/ui-mac/src/main/process-fence-apply.ts")
     expect(files).toContain("packages/ext/src/plugin.ts")
     expect(files).not.toContain("packages/ui-mac/src/main/index.ts")

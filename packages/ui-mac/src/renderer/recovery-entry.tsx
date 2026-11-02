@@ -1,7 +1,7 @@
 import { createResource, Show } from "solid-js"
 import { render } from "solid-js/web"
 import type { RecoveryAction, RecoveryActionResult, RecoveryIncidentWire } from "../shared/recovery"
-import { RecoverySurface } from "./alpha-ui/RecoverySurface"
+import { RecoverySurface } from "./codepuppy-ui/RecoverySurface"
 
 declare global {
   interface Window {

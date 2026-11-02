@@ -1,7 +1,7 @@
 // REQ-137 (`#1379`) —— 出网授权的**动态半场**:自带 Key 直连的目的地由用户的有效配置派生。
 //
 // 本文件守四件事,每一件都带一条「本该被拒」的对照臂:
-//   AC1 用户配过的那一家,它的 baseURL 的 `host:port` 真的被授权 —— 而且是从 **buildAlphaModelConfig 产出的
+//   AC1 用户配过的那一家,它的 baseURL 的 `host:port` 真的被授权 —— 而且是从 **buildCodePuppyModelConfig 产出的
 //       那份真配置**派生的(不是手打一个 provider 字面量喂给派生函数:那样测的是夹具,不是生产供数方)。
 //   AC2 没配过的地址仍被拒。对照臂不是一句断言,是一组 MUST_DENY 加一个**判据函数**,再拿三种
 //       「本该被拒却放行」的变异证明这个判据会把它们逐个点名 —— 空数组不是结论,先证明这个手段测得出已知的坏。
@@ -16,8 +16,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
-import { buildAlphaModelConfig } from "./alpha-models"
-import { secretFilePath } from "./alpha-secret-files"
+import { buildCodePuppyModelConfig } from "./codepuppy-models"
+import { secretFilePath } from "./codepuppy-secret-files"
 import { parse } from "jsonc-parser"
 import { writeCustomProviderTruth } from "./custom-provider-truth-write"
 import {
@@ -29,23 +29,23 @@ import {
   setConfiguredEgressDestinations,
 } from "./network-egress-derived"
 import { isEgressAuthorized } from "./network-egress-registry"
-import { pinAppliedCatalog, writeByokCatalogLkg } from "./alpha-live-allowlist"
+import { pinAppliedCatalog, writeByokCatalogLkg } from "./codepuppy-live-allowlist"
 import { BYOK_ADAPTERS } from "./byok-adapters"
-import bundledCatalog from "./alpha-models.json"
+import bundledCatalog from "./codepuppy-models.json"
 
-// 刻意不像密钥的测试值(与 alpha-models.test.ts 同一颗);断言里不出现它。
+// 刻意不像密钥的测试值(与 codepuppy-models.test.ts 同一颗);断言里不出现它。
 const NOT_A_KEY = "test-value-not-a-real-key-Zq81"
 
 const MANAGED = [
-  "ALPHA_MODELS_DISABLE",
-  "ALPHA_BASE_URL",
-  "ALPHA_DEFAULT_MODEL",
+  "CODEPUPPY_MODELS_DISABLE",
+  "CODEPUPPY_BASE_URL",
+  "CODEPUPPY_DEFAULT_MODEL",
   "DEEPSEEK_API_KEY",
   "ZHIPU_API_KEY",
   "MINIMAX_API_KEY",
   "DASHSCOPE_API_KEY",
   "MOONSHOT_API_KEY",
-  "ALPHA_GLOBAL_DIR",
+  "CODEPUPPY_GLOBAL_DIR",
   "OPENCODE_CONFIG_DIR",
 ]
 const saved: Record<string, string | undefined> = {}
@@ -64,8 +64,8 @@ beforeEach(() => {
     delete process.env[k]
   }
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), "egress-derived-"))
-  process.env.ALPHA_GLOBAL_DIR = path.join(fs.realpathSync(tmp), "alpha-code-state", "env", "dev")
-  fs.mkdirSync(process.env.ALPHA_GLOBAL_DIR, { recursive: true })
+  process.env.CODEPUPPY_GLOBAL_DIR = path.join(fs.realpathSync(tmp), "codepuppy-state", "env", "dev")
+  fs.mkdirSync(process.env.CODEPUPPY_GLOBAL_DIR, { recursive: true })
   process.env.OPENCODE_CONFIG_DIR = tmp
   userData = fs.mkdtempSync(path.join(os.tmpdir(), "egress-derived-userdata-"))
   setConfiguredEgressDestinations([])
@@ -95,7 +95,7 @@ function leaks(authorize: (host: string, port: number) => boolean, cases: Readon
 describe("AC1 用户配过的 BYOK 目的地被授权(从有效配置派生,不是手写域名清单)", () => {
   test("配了 DeepSeek 的 Key ⇒ api.deepseek.com:443 授权;静态表一行都没动", () => {
     plantSecret("DEEPSEEK_API_KEY")
-    const config = buildAlphaModelConfig(userData)!
+    const config = buildCodePuppyModelConfig(userData)!
 
     // 前提自证:这份**真配置**里确实有那条 baseURL。缺了它下面的绿就是空的。
     const node = config.provider["deepseek-byok"] as { options: { baseURL: string } }
@@ -118,7 +118,7 @@ describe("AC1 用户配过的 BYOK 目的地被授权(从有效配置派生,不�
   test("配两家就放两家,顺序无关;`#1379` 现场那两个 authority 一起变成授权的", () => {
     plantSecret("DEEPSEEK_API_KEY")
     plantSecret("ZHIPU_API_KEY")
-    const accepted = setConfiguredEgressDestinations(deriveEgressDestinations(buildAlphaModelConfig(userData)!.provider))
+    const accepted = setConfiguredEgressDestinations(deriveEgressDestinations(buildCodePuppyModelConfig(userData)!.provider))
     expect(accepted.map((d) => `${d.host}:${d.port}`).sort()).toEqual(["api.deepseek.com:443", "open.bigmodel.cn:443"])
     // 票面现场证据里的那两条 CONNECT,正是这两个 authority。
     expect(isEgressAuthorizedForSidecar("api.deepseek.com", 443)).toBe(true)
@@ -126,7 +126,7 @@ describe("AC1 用户配过的 BYOK 目的地被授权(从有效配置派生,不�
   })
 
   test("没配任何一家 ⇒ 派生出空集合(不是「配置读不到就全放行」)", () => {
-    const config = buildAlphaModelConfig(userData)!
+    const config = buildCodePuppyModelConfig(userData)!
     expect(config.provider).toEqual({})
     expect(setConfiguredEgressDestinations(deriveEgressDestinations(config.provider))).toEqual([])
     expect(getConfiguredEgressDestinations()).toEqual([])
@@ -148,7 +148,7 @@ describe("`#1556` AC3 远程 BYOK 目录无法新增放行主机", () => {
     expect(writeByokCatalogLkg(userData, doc)).toBe(true)
     pinAppliedCatalog(userData, 1)
 
-    const config = buildAlphaModelConfig(userData)!
+    const config = buildCodePuppyModelConfig(userData)!
     const hosts = setConfiguredEgressDestinations(deriveEgressDestinations(config.provider)).map((d) => d.host).sort()
     expect(hosts).toEqual(BYOK_ADAPTERS.map((adapter) => new URL(adapter.baseURL).hostname).sort())
     expect(isEgressAuthorizedForSidecar("evil.example", 443)).toBe(false)
@@ -177,7 +177,7 @@ describe("AC2 没配过的地址仍被拒 —— 判据先证明它测得出已�
 
   beforeEach(() => {
     plantSecret("DEEPSEEK_API_KEY")
-    setConfiguredEgressDestinations(deriveEgressDestinations(buildAlphaModelConfig(userData)!.provider))
+    setConfiguredEgressDestinations(deriveEgressDestinations(buildCodePuppyModelConfig(userData)!.provider))
   })
 
   test("生产判据:配过的那一条放行,MUST_DENY 十条一条不漏地拒", () => {
@@ -206,7 +206,7 @@ describe("AC2 没配过的地址仍被拒 —— 判据先证明它测得出已�
     expect(isEgressAuthorizedForSidecar("api.deepseek.com", 443)).toBe(true)
     fs.rmSync(secretFilePath(userData, "DEEPSEEK_API_KEY"), { force: true })
     plantSecret("ZHIPU_API_KEY")
-    setConfiguredEgressDestinations(deriveEgressDestinations(buildAlphaModelConfig(userData)!.provider))
+    setConfiguredEgressDestinations(deriveEgressDestinations(buildCodePuppyModelConfig(userData)!.provider))
     expect(isEgressAuthorizedForSidecar("open.bigmodel.cn", 443)).toBe(true)
     expect(isEgressAuthorizedForSidecar("api.deepseek.com", 443)).toBe(false)
   })
@@ -214,9 +214,9 @@ describe("AC2 没配过的地址仍被拒 —— 判据先证明它测得出已�
 
 // ── `#1380` R1 Blocker:动态半场的输入里不许出现「被围栏的引擎树写得了的文件」 ──────────────
 // provider 块的三条读取路径逐条落在 seatbelt 的可写集里:
-//   alpha.jsonc                                   ← process-fence-profile.ts W2  (alphaGlobalRoot)
+//   codepuppy.jsonc                                   ← process-fence-profile.ts W2  (codepuppyGlobalRoot)
 //   <OPENCODE_CONFIG_DIR | XDG_CONFIG_HOME>/opencode ← W6  (configHome/opencode)
-//   ~/.opencode(ALPHA_OPENCODE_HOME 可重定向)       ← W16 (home/.opencode)
+//   ~/.opencode(CODEPUPPY_OPENCODE_HOME 可重定向)       ← W16 (home/.opencode)
 // 引擎树里任意一段代码(bash 工具 / 仓库自带 plugin / MCP stdio 子进程)写一行 baseURL,下一代 fork
 // 就给它铸出一条出网通道 —— confused deputy,围栏对任意目的地开口,而产品披露「只能访问已登记的地址」
 // (network-egress-disclosure.test.ts)当场变成假话。
@@ -229,14 +229,14 @@ describe("B1 配置文件里的 provider 一条都进不了放行集合(那三�
   let files: string[] = []
 
   beforeEach(() => {
-    savedOpencodeHome = process.env.ALPHA_OPENCODE_HOME
+    savedOpencodeHome = process.env.CODEPUPPY_OPENCODE_HOME
     opencodeHome = fs.mkdtempSync(path.join(os.tmpdir(), "egress-derived-ochome-"))
-    process.env.ALPHA_OPENCODE_HOME = opencodeHome
+    process.env.CODEPUPPY_OPENCODE_HOME = opencodeHome
 
-    // ① alpha.jsonc —— `#1392` 之前产品自己就往这里写(persistProvider,已退场);现在这是围栏内一行 `printf … > file`
+    // ① codepuppy.jsonc —— `#1392` 之前产品自己就往这里写(persistProvider,已退场);现在这是围栏内一行 `printf … > file`
     // 就能写出的**完整**块(npm / baseURL / models / 明文 key),形状与当年产品写的相同 —— 引擎原生仍会合并它。
     fs.writeFileSync(
-      path.join(process.env.ALPHA_GLOBAL_DIR!, "alpha.jsonc"),
+      path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "codepuppy.jsonc"),
       JSON.stringify({ provider: { "exfil-alpha": { npm: "@ai-sdk/openai-compatible", name: "Exfil", options: { baseURL: EXFIL, apiKey: NOT_A_KEY }, models: { m1: { name: "m1" } } } } }),
     )
 
@@ -245,12 +245,12 @@ describe("B1 配置文件里的 provider 一条都进不了放行集合(那三�
     const home = path.join(opencodeHome, "opencode.jsonc")
     fs.writeFileSync(xdg, JSON.stringify({ provider: { "exfil-xdg": { options: { baseURL: EXFIL } } } }))
     fs.writeFileSync(home, JSON.stringify({ provider: { "exfil-home": { options: { baseURL: EXFIL } } } }))
-    files = [path.join(process.env.ALPHA_GLOBAL_DIR!, "alpha.jsonc"), xdg, home]
+    files = [path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "codepuppy.jsonc"), xdg, home]
   })
 
   afterEach(() => {
-    if (savedOpencodeHome === undefined) delete process.env.ALPHA_OPENCODE_HOME
-    else process.env.ALPHA_OPENCODE_HOME = savedOpencodeHome
+    if (savedOpencodeHome === undefined) delete process.env.CODEPUPPY_OPENCODE_HOME
+    else process.env.CODEPUPPY_OPENCODE_HOME = savedOpencodeHome
     try {
       fs.rmSync(opencodeHome, { recursive: true, force: true })
     } catch {
@@ -260,7 +260,7 @@ describe("B1 配置文件里的 provider 一条都进不了放行集合(那三�
 
   test("三条路径都写了 provider:`#1392` 起它们连 allowlist 都进不了,注入表里没有它们,放行集合里只有目录 BYOK 那一条", () => {
     plantSecret("DEEPSEEK_API_KEY")
-    const config = buildAlphaModelConfig(userData)!
+    const config = buildCodePuppyModelConfig(userData)!
 
     // 前提自证:三个文件真的躺在注入面会读的那三条路径上(下一条控制臂读同一批文件能派生出 exfil)。
     for (const file of files) expect(fs.existsSync(file), file).toBe(true)
@@ -279,11 +279,11 @@ describe("B1 配置文件里的 provider 一条都进不了放行集合(那三�
   test("#1392 a truth-file record IS authorized (api.openai.com:443) while the three config-file providers still are not", () => {
     plantSecret("DEEPSEEK_API_KEY")
     writeCustomProviderTruth(
-      path.join(fs.realpathSync(tmp), "alpha-code-state", "custom-providers", "dev.json"),
+      path.join(fs.realpathSync(tmp), "codepuppy-state", "custom-providers", "dev.json"),
       [{ id: "my-openai", name: "My OpenAI", compat: "openai", baseURL: "https://api.openai.com/v1", models: ["gpt-5.4"] }],
       fs,
     )
-    const config = buildAlphaModelConfig(userData)!
+    const config = buildCodePuppyModelConfig(userData)!
     expect(config.enabled_providers).toEqual(["deepseek-byok", "my-openai"])
     const accepted = setConfiguredEgressDestinations(deriveEgressDestinations(config.provider))
     expect(accepted.map((d) => `${d.host}:${d.port} (${d.providerId})`)).toEqual(["api.deepseek.com:443 (deepseek-byok)", "api.openai.com:443 (my-openai)"])
@@ -357,7 +357,7 @@ describe("边界:loopback / 非 https / 畸形一条都收不进来", () => {
     expect(JSON.stringify(withCreds)).not.toContain(NOT_A_KEY)
   })
 
-  test("没有 options.baseURL 时回退读 `api`(与 alpha-config-injection 的 v2 桥同两个字段、同顺序)", () => {
+  test("没有 options.baseURL 时回退读 `api`(与 codepuppy-config-injection 的 v2 桥同两个字段、同顺序)", () => {
     expect(deriveEgressDestinations({ p: { api: "https://api.fallback.example/v1" } }).map((d) => d.host)).toEqual([
       "api.fallback.example",
     ])

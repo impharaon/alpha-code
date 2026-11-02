@@ -4,31 +4,31 @@ import * as os from "node:os"
 import * as path from "node:path"
 import { reconcileEngineConfigTruth } from "./engine-config-truth-boot"
 
-// Reconcile: legacy ~/.opencode + XDG provider → current-environment alpha.jsonc, skills.paths injection (T3),
+// Reconcile: legacy ~/.opencode + XDG provider → current-environment codepuppy.jsonc, skills.paths injection (T3),
 // and ~/.opencode cleanup (T3: unbridge + delete migrated config + junk-only dir removal).
 // Temp-dir isolated via the same env knobs ext-config uses. Receipts gate ownership.
 let tmp = ""
-let alphaTmp = ""
+let codepuppyTmp = ""
 let homeTmp = ""
 let xdgTmp = ""
 const saved: Record<string, string | undefined> = {}
-const KEYS = ["ALPHA_GLOBAL_DIR", "ALPHA_OPENCODE_HOME", "OPENCODE_CONFIG_DIR", "ALPHA_JSONC_TRUTH_DISABLE", "ALPHA_LEGACY_INSTALL_ROOT"]
+const KEYS = ["CODEPUPPY_GLOBAL_DIR", "CODEPUPPY_OPENCODE_HOME", "OPENCODE_CONFIG_DIR", "CODEPUPPY_JSONC_TRUTH_DISABLE", "CODEPUPPY_LEGACY_INSTALL_ROOT"]
 
 beforeEach(() => {
   for (const k of KEYS) saved[k] = process.env[k]
-  tmp = fs.mkdtempSync(path.join(os.tmpdir(), "alpha-reconcile-"))
-  alphaTmp = path.join(fs.realpathSync(tmp), "alpha-code-state", "env", "dev")
+  tmp = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-reconcile-"))
+  codepuppyTmp = path.join(fs.realpathSync(tmp), "codepuppy-state", "env", "dev")
   homeTmp = path.join(tmp, "opencode-home")
   xdgTmp = path.join(tmp, "xdg")
-  fs.mkdirSync(alphaTmp, { recursive: true })
-  alphaTmp = fs.realpathSync(alphaTmp)
+  fs.mkdirSync(codepuppyTmp, { recursive: true })
+  codepuppyTmp = fs.realpathSync(codepuppyTmp)
   fs.mkdirSync(homeTmp, { recursive: true })
   fs.mkdirSync(xdgTmp, { recursive: true })
-  process.env.ALPHA_GLOBAL_DIR = alphaTmp
-  process.env.ALPHA_OPENCODE_HOME = homeTmp
+  process.env.CODEPUPPY_GLOBAL_DIR = codepuppyTmp
+  process.env.CODEPUPPY_OPENCODE_HOME = homeTmp
   process.env.OPENCODE_CONFIG_DIR = xdgTmp
-  delete process.env.ALPHA_JSONC_TRUTH_DISABLE
-  delete process.env.ALPHA_LEGACY_INSTALL_ROOT
+  delete process.env.CODEPUPPY_JSONC_TRUTH_DISABLE
+  delete process.env.CODEPUPPY_LEGACY_INSTALL_ROOT
 })
 afterEach(() => {
   for (const k of KEYS) {
@@ -46,15 +46,15 @@ const ISO = "2026-07-07T00:00:00.000Z"
 const writeLegacy = (obj: unknown) => fs.writeFileSync(path.join(homeTmp, "opencode.jsonc"), JSON.stringify(obj))
 const writeXdg = (obj: unknown) => fs.writeFileSync(path.join(xdgTmp, "opencode.jsonc"), JSON.stringify(obj))
 const writeLedger = (receipts: unknown[]) =>
-  fs.writeFileSync(path.join(alphaTmp, "installs.json"), JSON.stringify({ version: 1, receipts }))
+  fs.writeFileSync(path.join(codepuppyTmp, "installs.json"), JSON.stringify({ version: 1, receipts }))
 const mcpReceipt = (name: string) => ({ id: `mcp:${name}`, name, type: "mcp", scope: "global", installedAt: ISO, origin: "catalog", configKey: `mcp.${name}` })
-const readTruth = (): Record<string, any> => JSON.parse(fs.readFileSync(path.join(alphaTmp, "alpha.jsonc"), "utf8"))
-const truthExists = () => fs.existsSync(path.join(alphaTmp, "alpha.jsonc"))
+const readTruth = (): Record<string, any> => JSON.parse(fs.readFileSync(path.join(codepuppyTmp, "codepuppy.jsonc"), "utf8"))
+const truthExists = () => fs.existsSync(path.join(codepuppyTmp, "codepuppy.jsonc"))
 const homeExists = () => fs.existsSync(homeTmp)
 
 describe("reconcile — migration + skills.paths", () => {
   test("escape hatch → skipped, no write", () => {
-    process.env.ALPHA_JSONC_TRUTH_DISABLE = "1"
+    process.env.CODEPUPPY_JSONC_TRUTH_DISABLE = "1"
     writeLegacy({ mcp: { markitdown: { type: "local" } } })
     const r = reconcileEngineConfigTruth()
     expect(r.skipped).toBe(true)
@@ -69,17 +69,17 @@ describe("reconcile — migration + skills.paths", () => {
     if (!r.skipped) expect(r.migrated).toBe(true)
     const t = readTruth()
     expect(t.mcp.markitdown).toEqual({ type: "local" })
-    expect((t.skills as any).paths).toContain(path.join(alphaTmp, "skills")) // T3 skills.paths
+    expect((t.skills as any).paths).toContain(path.join(codepuppyTmp, "skills")) // T3 skills.paths
   })
 
   test("skills.paths injected even with nothing to migrate (truth created)", () => {
     const r = reconcileEngineConfigTruth()
     expect(r.skipped).toBe(false)
     if (!r.skipped) expect(r.migrated).toBe(true) // skills.paths write
-    expect((readTruth().skills as any).paths).toContain(path.join(alphaTmp, "skills"))
+    expect((readTruth().skills as any).paths).toContain(path.join(codepuppyTmp, "skills"))
   })
 
-  test("XDG provider lifted into alpha.jsonc; XDG file untouched", () => {
+  test("XDG provider lifted into codepuppy.jsonc; XDG file untouched", () => {
     writeXdg({ provider: { deepseek: { options: { baseURL: "https://api.deepseek.com" } } } })
     const r = reconcileEngineConfigTruth()
     expect(r.skipped).toBe(false)
@@ -88,13 +88,13 @@ describe("reconcile — migration + skills.paths", () => {
   })
 
   // `#1359`:上一条只断「块搬过来了」——它对「明文也一起搬过来了」同样成立。这一条断的是**落盘后
-  // 的字节**:启动迁移跑完,alpha.jsonc 的文本里不得出现旧明文,而 XDG 源文件仍原样保留它。
-  test("XDG provider 的旧明文密钥不落进 alpha.jsonc:字段是标记,文本里没有原值", () => {
+  // 的字节**:启动迁移跑完,codepuppy.jsonc 的文本里不得出现旧明文,而 XDG 源文件仍原样保留它。
+  test("XDG provider 的旧明文密钥不落进 codepuppy.jsonc:字段是标记,文本里没有原值", () => {
     const PLAIN = "sk-xdg-boot-inline-Qq77Ww66"
     writeXdg({ provider: { myco: { options: { baseURL: "https://api.myco.invalid/v1", apiKey: PLAIN } } } })
     const r = reconcileEngineConfigTruth()
     expect(r.skipped).toBe(false)
-    const truthText = fs.readFileSync(path.join(alphaTmp, "alpha.jsonc"), "utf8")
+    const truthText = fs.readFileSync(path.join(codepuppyTmp, "codepuppy.jsonc"), "utf8")
     expect(truthText).not.toContain(PLAIN)
     expect(readTruth().provider.myco.options.apiKey).toBe("alpha-keychain")
     expect(readTruth().provider.myco.options.baseURL).toBe("https://api.myco.invalid/v1")
@@ -116,7 +116,7 @@ describe("reconcile — migration + skills.paths", () => {
 // 断言成对写:「真源既有的一条都不能少」与「legacy 独有的一条都不能进来」是两件事,
 // 而且都不能拿「整次 reconcile 干脆不写了」来满足 —— 所以每格都同时钉住「该迁的确实迁了」。
 describe("reconcile — ADR-040 legacy plugin[] 不并入", () => {
-  const seedTruth = (obj: unknown) => fs.writeFileSync(path.join(alphaTmp, "alpha.jsonc"), JSON.stringify(obj, null, 2))
+  const seedTruth = (obj: unknown) => fs.writeFileSync(path.join(codepuppyTmp, "codepuppy.jsonc"), JSON.stringify(obj, null, 2))
 
   test("legacy 带一个真源没有的 plugin:不并入,而 mcp / skills.paths 照常落盘", () => {
     seedTruth({ $schema: "https://opencode.ai/config.json", plugin: ["/already/installed/notify.js"] })
@@ -133,7 +133,7 @@ describe("reconcile — ADR-040 legacy plugin[] 不并入", () => {
     const t = readTruth()
     expect(t.plugin).toEqual(["/already/installed/notify.js"]) // 逐元素:既有的还在、legacy 的没进来
     expect(t.mcp.markitdown).toEqual({ type: "local" }) // 同一次写里,该迁的迁了
-    expect((t.skills as any).paths).toContain(path.join(alphaTmp, "skills"))
+    expect((t.skills as any).paths).toContain(path.join(codepuppyTmp, "skills"))
   })
 
   test("真源根本没有 plugin 键:legacy 的 plugin[] 不会把这个键造出来", () => {
@@ -149,7 +149,7 @@ describe("reconcile — ADR-040 legacy plugin[] 不并入", () => {
     // 幂等重写会让「内容逐字节不变」照样成立 —— 判据必须带文件身份与时间。
     writeLegacy({ plugin: ["unregistered-plugin@9.9.9"] })
     reconcileEngineConfigTruth({ log: () => {}, warn: () => {} }) // 第一次:注入 skills.paths,写盘
-    const truthPath = path.join(alphaTmp, "alpha.jsonc")
+    const truthPath = path.join(codepuppyTmp, "codepuppy.jsonc")
     const before = { text: fs.readFileSync(truthPath, "utf8"), stat: fs.statSync(truthPath) }
     fs.mkdirSync(homeTmp, { recursive: true }) // 上一轮 T3 清理把 ~/.opencode 整个删了
     writeLegacy({ plugin: ["unregistered-plugin@9.9.9"] }) // 重新摆上,再来一次
@@ -170,13 +170,13 @@ describe("reconcile — ownership bail-out", () => {
     const r = reconcileEngineConfigTruth({ log: () => {}, warn: (m) => warns.push(m) })
     expect(r.skipped).toBe(false)
     if (!r.skipped) expect(r.bailedOut).toContain("keybinds")
-    expect(warns.some((w) => w.includes("not alpha-owned"))).toBe(true)
+    expect(warns.some((w) => w.includes("not codepuppy-owned"))).toBe(true)
     expect(fs.existsSync(path.join(homeTmp, "opencode.jsonc"))).toBe(true) // legacy kept in place
     // T3 fix: bail-out does NOT migrate legacy, but skills.paths IS still injected (factory skills
     // must not go dark on machines whose legacy mcp lacks a receipt).
     expect(truthExists()).toBe(true)
     const t = readTruth()
-    expect((t.skills as any).paths).toContain(path.join(alphaTmp, "skills")) // skills.paths injected despite bail
+    expect((t.skills as any).paths).toContain(path.join(codepuppyTmp, "skills")) // skills.paths injected despite bail
     expect(t.keybinds).toBeUndefined() // legacy stray key NOT migrated
     expect(t.mcp).toBeUndefined()
   })
@@ -209,7 +209,7 @@ describe("reconcile — T3 ~/.opencode cleanup", () => {
     fs.mkdirSync(path.join(homeTmp, "commands"))
     fs.symlinkSync(path.join(retired, "commands", "legacy.md"), path.join(homeTmp, "commands", "legacy.md"), "file")
 
-    process.env.ALPHA_JSONC_TRUTH_DISABLE = "1"
+    process.env.CODEPUPPY_JSONC_TRUTH_DISABLE = "1"
     const result = reconcileEngineConfigTruth(undefined, { retiredHomeDir: retiredHome })
 
     expect(result.skipped).toBe(true)
@@ -250,7 +250,7 @@ describe("reconcile — T3 ~/.opencode cleanup", () => {
     const bridge = path.join(homeTmp, "skills")
     fs.symlinkSync(firstTarget, bridge, "dir")
     let bridgeStats = 0
-    process.env.ALPHA_JSONC_TRUTH_DISABLE = "1"
+    process.env.CODEPUPPY_JSONC_TRUTH_DISABLE = "1"
 
     const result = reconcileEngineConfigTruth(undefined, {
       retiredHomeDir: retiredHome,
@@ -281,7 +281,7 @@ describe("reconcile — T3 ~/.opencode cleanup", () => {
     const bridge = path.join(homeTmp, "skills")
     fs.symlinkSync(retired, bridge, "dir")
     let bridgeStats = 0
-    process.env.ALPHA_JSONC_TRUTH_DISABLE = "1"
+    process.env.CODEPUPPY_JSONC_TRUTH_DISABLE = "1"
 
     const result = reconcileEngineConfigTruth(undefined, {
       retiredHomeDir: retiredHome,
@@ -314,9 +314,9 @@ describe("reconcile — T3 ~/.opencode cleanup", () => {
   })
 
   test("alpha skills dir-link unbridged", () => {
-    const alphaSkills = path.join(alphaTmp, "skills")
-    fs.mkdirSync(alphaSkills, { recursive: true })
-    fs.symlinkSync(alphaSkills, path.join(homeTmp, "skills"), "dir")
+    const codepuppySkills = path.join(codepuppyTmp, "skills")
+    fs.mkdirSync(codepuppySkills, { recursive: true })
+    fs.symlinkSync(codepuppySkills, path.join(homeTmp, "skills"), "dir")
     reconcileEngineConfigTruth()
     // link removed (and dir removed since only the link was there)
     expect(homeExists()).toBe(false)
@@ -357,27 +357,27 @@ describe("reconcile — REQ-065 factory skills.paths group", () => {
     expect(r.skipped).toBe(false)
     expect(r.added).toContain("skills.factory[]")
     const paths = readTruth().skills.paths as string[]
-    expect(paths).toContain(path.join(alphaTmp, "skills"))
+    expect(paths).toContain(path.join(codepuppyTmp, "skills"))
     for (const d of dirs) expect(paths).toContain(d)
   })
   test("app moved: stale factory entries rewritten to the current install; user entries kept", () => {
     fs.writeFileSync(
-      path.join(alphaTmp, "alpha.jsonc"),
+      path.join(codepuppyTmp, "codepuppy.jsonc"),
       JSON.stringify({
         $schema: "https://opencode.ai/config.json",
-        skills: { paths: [path.join(alphaTmp, "skills"), "/users/own/path", "/Old.app/Contents/Resources/skills/skill-creator"] },
+        skills: { paths: [path.join(codepuppyTmp, "skills"), "/users/own/path", "/Old.app/Contents/Resources/skills/skill-creator"] },
       }),
     )
     const dirs = ["/New.app/Contents/Resources/skills/skill-creator"]
     const r = reconcileEngineConfigTruth(undefined, { factorySkillDirs: dirs })
     expect(r.added).toContain("skills.factory[]")
     const paths = readTruth().skills.paths as string[]
-    expect(paths).toEqual([path.join(alphaTmp, "skills"), "/users/own/path", "/New.app/Contents/Resources/skills/skill-creator"])
+    expect(paths).toEqual([path.join(codepuppyTmp, "skills"), "/users/own/path", "/New.app/Contents/Resources/skills/skill-creator"])
   })
   test("opts omitted (legacy callers/tests): factory group untouched", () => {
     fs.writeFileSync(
-      path.join(alphaTmp, "alpha.jsonc"),
-      JSON.stringify({ skills: { paths: [path.join(alphaTmp, "skills"), "/Old.app/Contents/Resources/skills/skill-creator"] } }),
+      path.join(codepuppyTmp, "codepuppy.jsonc"),
+      JSON.stringify({ skills: { paths: [path.join(codepuppyTmp, "skills"), "/Old.app/Contents/Resources/skills/skill-creator"] } }),
     )
     reconcileEngineConfigTruth()
     const paths = readTruth().skills.paths as string[]
@@ -385,10 +385,10 @@ describe("reconcile — REQ-065 factory skills.paths group", () => {
   })
 })
 
-// ── #395(Codex r5)步骤4:alpha.jsonc 读错误只容缺席,其余 fail-closed ───────────────────────────
+// ── #395(Codex r5)步骤4:codepuppy.jsonc 读错误只容缺席,其余 fail-closed ───────────────────────────
 describe("reconcile — #395 读错误收窄(非缺席 fail-closed)", () => {
   test("truth 不可读(EISDIR)→ 整体 skip,不写盘(不以不完整基底重建)", () => {
-    fs.mkdirSync(path.join(alphaTmp, "alpha.jsonc")) // 目录占位 → readFileSync EISDIR(非缺席)
+    fs.mkdirSync(path.join(codepuppyTmp, "codepuppy.jsonc")) // 目录占位 → readFileSync EISDIR(非缺席)
     writeLegacy({ mcp: { demo: { type: "local" } } })
     writeLedger([mcpReceipt("demo")])
     const out = reconcileEngineConfigTruth()

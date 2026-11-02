@@ -20,7 +20,7 @@ ADR-040 把扩展安装的唯一形态定为 Bundle，于是两件事成了地�
 > **实现状态（`#840`，2026-08-05）**：§1.4 的“没有安装路径”和 §1.5 的四-profile
 > 对比记录的是本票开工前的勘破基线。A checkpoint 已选择 §1.5(b)：host 注册第五个
 > `command` profile，模板按签名字节取回并严格 UTF-8 解码，事务写
-> `alpha.jsonc.command.<name>`，更新/整包卸载删除同一叶；真实引擎 `GET /command`
+> `codepuppy.jsonc.command.<name>`，更新/整包卸载删除同一叶；真实引擎 `GET /command`
 > 验证安装可见、卸载不可见。旧 catalog 与本地导入仍不新增 command 路径。
 > 跨仓发布必须继续经过 `alpha-web#147` 与 `alpha-code#853` 的固定 artifact pin；在
 > re-vendor 前 consumer byte-identity 红灯是预期依赖门。
@@ -121,22 +121,22 @@ try { return matter(content) } catch { return matter(sanitize(content)) }
 #### 有：项目级 `alpha_register`（让一条命令对用户可用）
 
 ```text
-桌面解析 @alpha-code/ext bundle → 注入 OPENCODE_CONFIG_CONTENT.plugin[]
+桌面解析 @codepuppy/ext bundle → 注入 OPENCODE_CONFIG_CONTENT.plugin[]
   → 上游 PluginLoader import() → 插件 tool map 暴露 alpha_register
-  → 模型调用 alpha_register(type="command") → applyRegister 写 .code-puppy/alpha.jsonc 的 command.<name>
-  → session.idle 后 instance.dispose() → 新 instance 的 config hook 读项目 alpha.jsonc
+  → 模型调用 alpha_register(type="command") → applyRegister 写 .code-puppy/codepuppy.jsonc 的 command.<name>
+  → session.idle 后 instance.dispose() → 新 instance 的 config hook 读项目 codepuppy.jsonc
   → mergeProjectConfig 合入 cfg.command → Command.init 建表
   → command.list 出现在斜杠菜单 → session.command → SessionPrompt.command → prompt
 ```
 
-逐跳证据：`main/alpha-ext-plugin.ts:28`、`main/server.ts:247`、
-`main/alpha-config-injection.ts:96` 与 `:386`、
+逐跳证据：`main/codepuppy-ext-plugin.ts:28`、`main/server.ts:247`、
+`main/codepuppy-config-injection.ts:96` 与 `:386`、
 `opencode/src/plugin/loader.ts:76`/`:135`、`plugin/index.ts:177`、`tool/registry.ts:194`、
 `ext/src/plugin.ts:210`、`ext/src/register.ts:15`(白名单，同样**没有 `variant`**)与 `:55`、
 `ext/src/plugin.ts:226`(原子写)与 `:323`(idle 后 dispose)与 `:80`(重建时读项目文件)、
 `ext/src/project-config.ts:117`/`:144`(`agent`/`command` 恒合入)、
 `opencode/src/command/index.ts:90`、
-`renderer/alpha-ui/composer-autocomplete.tsx:123`、`alpha-composer.tsx:1302`、
+`renderer/codepuppy-ui/composer-autocomplete.tsx:123`、`codepuppy-composer.tsx:1302`、
 `httpapi/groups/session.ts:343` → `handlers/session.ts:331`、
 `session/prompt.ts:1356`(展开 `$1`/`$ARGUMENTS`、shell 插值、选 agent/model)与 `:1460`。
 
@@ -151,7 +151,7 @@ try { return matter(content) } catch { return matter(sanitize(content)) }
 | 旧 catalog | `CatalogType` 与 `ManifestKind` 都无 command（`catalog-types.ts:8`、`ext-manifest-v2.ts:19`）；receipt 更**明确拒绝** catalog-origin command（`ext-receipt-v2.ts:224`） |
 | 本地 Claude 插件导入 | `commands` 被列为 unsupported 并向用户显示「本版本不安装」（`claude-plugin-intake.ts:56`、`:128`、`:529`）；安装器只装预览里的 skill（`claude-plugin-install.ts`） |
 | 文件夹 / git / agent 导入 | 生产接线只落到 `installUncuratedSkillImport` 或 `installUncuratedAgentImport`，无 command 分派（`ext-ipc.ts:1102`） |
-| 旧 bridge | `alpha-bridge.ts:50` 的类型含 `commands`，但生产里只有 `unbridgeItem` 调用、**没有 `bridgeItem` 调用** ⇒ 不是活路径 |
+| 旧 bridge | `codepuppy-bridge.ts:50` 的类型含 `commands`，但生产里只有 `unbridgeItem` 调用、**没有 `bridgeItem` 调用** ⇒ 不是活路径 |
 
 ⇒ **`ext-install-planner.ts:231` 的 `RECEIPT_TYPES` 含 `"command"`、`:2657` 有 `record.kind === "command"` 分支
 这两条是弱证据，不构成安装路径。**（`plugin` 也曾同时出现在这两处，而它的安装路径已被具名拒绝，见 `:1113`。）
@@ -170,7 +170,7 @@ try { return matter(content) } catch { return matter(sanitize(content)) }
 3. **生效层选择 (b)**：
    - **未采用 (a)**：存原始 `.md`，放进引擎真的会扫的 `{command,commands}` 目录，
      让**安装版本的** `ConfigCommand.load → gray-matter` 解析；
-   - **采用 (b)**：profile 直接携带结构化 `ConfigCommandV1.Info`，builder 写 `alpha.jsonc` 的 `command.<name>`，
+   - **采用 (b)**：profile 直接携带结构化 `ConfigCommandV1.Info`，builder 写 `codepuppy.jsonc` 的 `command.<name>`，
      **完全不解析 Markdown**。
 4. ⚠️ **不要复用 agent 的 frontmatter 转换器。** 它明说只认 Alpha 自有的受限文法
    （`main/agent-md-entry.ts:1`），**不是上游 command 的文法**。

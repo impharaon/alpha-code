@@ -3,7 +3,7 @@
 // 断言从生产入口出发,不是从 notify 函数出发:
 //   · SSE 路 —— 真 registerCloudIpcHandlers 挂上的 cloud-subscribe handler,拿到它交给
 //     subscribeCloudJobEvents 的 sink,往 sink 里灌终态帧,看 electron.Notification 有没有被 new + show;
-//   · 会话事件流路 —— 真 cloud-save-run handler + **真 saveCloudRun**(alpha-workdir,写临时目录),
+//   · 会话事件流路 —— 真 cloud-save-run handler + **真 saveCloudRun**(codepuppy-workdir,写临时目录),
 //     只桩掉网络(getCloudJobStatus / listCloudArtifacts),看状态查询回 completed / failed 时通不通知。
 // 摘掉 cloud-ipc.ts 里任一处接线,对应那组当场红(本文件先于接线写成,红过)。
 //
@@ -14,7 +14,7 @@ import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
-import { isTerminalCloudEvent } from "./alpha-cloud-events-core"
+import { isTerminalCloudEvent } from "./codepuppy-cloud-events-core"
 import type { CloudJobEvent, CloudJobStatus, CloudResult } from "../preload/types"
 
 type Shown = { title: string; body?: string; shown: boolean; clicks: Array<() => void> }
@@ -67,7 +67,7 @@ mock.module("./artifact-service", () => ({
   recordRunOrigin: () => ({ ok: false, reason: "unused in this harness" }),
   verifyArtifact: async () => ({ ok: false, reason: "unused in this harness" }),
 }))
-mock.module("./alpha-cloud-jobs", () => ({
+mock.module("./codepuppy-cloud-jobs", () => ({
   dispatchCloudJob: async () => ({ error: "unused" }),
   dispatchExplicitCloudUpload: async () => ({ error: "unused" }),
   getCloudJobStatus: async () => statusResult,
@@ -75,22 +75,22 @@ mock.module("./alpha-cloud-jobs", () => ({
   listCloudArtifacts: async () => ({ error: "unused" }),
   downloadCloudArtifactTo: async () => ({ ok: false, error: "unused" }),
 }))
-mock.module("./alpha-cloud-events", () => ({
+mock.module("./codepuppy-cloud-events", () => ({
   isTerminalCloudEvent,
   subscribeCloudJobEvents: (jobId: string, sink: (ev: CloudJobEvent) => void) => {
     sinks.set(jobId, [...(sinks.get(jobId) ?? []), sink])
     return () => {}
   },
 }))
-mock.module("./alpha-auth", () => ({
+mock.module("./codepuppy-auth", () => ({
   getAccessTokenIdentity: async () => ({ error: "unused" }),
   getAuthIdentityEpoch: () => 0,
   getAuthIdentityTag: () => undefined,
 }))
-mock.module("./alpha-web-upload-consent", () => ({
+mock.module("./codepuppy-web-upload-consent", () => ({
   requestUploadConsent: async () => ({ error: "unused" }),
 }))
-mock.module("./alpha-upload", () => ({
+mock.module("./codepuppy-upload", () => ({
   assertSafeUploadResult: (value: unknown) => value,
   createMainUploadService: () => ({
     prepare: async () => ({ status: "cancelled" }),

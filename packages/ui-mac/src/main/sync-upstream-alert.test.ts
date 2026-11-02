@@ -278,7 +278,7 @@ describe("#995 告警链的接线", () => {
     expect(mutate((d) => (d.jobs.alert.if = "${{ github.event.workflow_run.conclusion == 'success' }}"))).toContain(
       "job 的 if 没有钉住 failure",
     )
-    expect(mutate((d) => (d.on.workflow_run.workflows = ["alpha-ci"]))).toContain("没有监视 sync-upstream")
+    expect(mutate((d) => (d.on.workflow_run.workflows = ["codepuppy-ci"]))).toContain("没有监视 sync-upstream")
     expect(mutate((d) => d.jobs.alert.steps.push({ name: "x", run: "bun install" }))).toContain(
       "持有 issues:write 的 job 里出现了 bun install",
     )

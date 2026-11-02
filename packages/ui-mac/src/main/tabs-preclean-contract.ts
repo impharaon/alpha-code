@@ -46,7 +46,7 @@ export type _DraftKeysExact = Assert<KeysExact<UpstreamDraftTab, DraftTabContrac
 type HasKey<K extends string> = [K] extends [keyof Window["api"]] ? true : false
 
 // ① 合并后的全局就是 alpha 那份完整面(上游那份赢 ⇒ 结构不兼容 ⇒ 红)。
-export type _WindowApiIsAlphaElectronAPI = Assert<[Window["api"]] extends [ElectronAPI] ? true : false>
+export type _WindowApiIsCodePuppyElectronAPI = Assert<[Window["api"]] extends [ElectronAPI] ? true : false>
 // ② 上游那份是 `api?:`(整枝可选)。这条单独钉住「不可为 undefined」—— ①若哪天被放宽成双向
 //    兼容也拦不住可选性回潮,而可选性正是 162 条 TS18048 的来源。
 export type _WindowApiIsNotOptional = Assert<[undefined] extends [Window["api"]] ? false : true>

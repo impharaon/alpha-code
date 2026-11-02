@@ -4,8 +4,8 @@
  * extension sovereignty gate and the engine display snapshot use one fact.
  */
 
-export const CLOUD_MCP_SERVER_ENV = "ALPHA_CLOUD_MCP_SERVER"
-export const CLOUD_MCP_DEF_ENV = "ALPHA_CLOUD_MCP_DEF"
+export const CLOUD_MCP_SERVER_ENV = "CODEPUPPY_CLOUD_MCP_SERVER"
+export const CLOUD_MCP_DEF_ENV = "CODEPUPPY_CLOUD_MCP_DEF"
 
 export type McpOwnership = {
   governed: string[]
@@ -67,7 +67,7 @@ export function resolveFileRefs(value: unknown, readFile: (path: string) => stri
 }
 
 /**
- * REQ-236 §2.1-5(`#1562`):治理云 MCP 条目每次请求的凭据,从 `ALPHA_CLOUD_MCP_DEF` 定义里
+ * REQ-236 §2.1-5(`#1562`):治理云 MCP 条目每次请求的凭据,从 `CODEPUPPY_CLOUD_MCP_DEF` 定义里
  * `headers.Authorization` 的 `{file:}` 引用**现读**(权限方案冻结接口),不读已装载条目里的字面量 ——
  * 那个字面量是引擎配置加载器(生产分支)或 ext `installCloudMcp`(kill-switch 分支)在装载时替换进去的,
  * 续期之后它就是旧令牌。返回给 MCP SDK transport 的 `fetch` 选项:StreamableHTTP 与 SSE 的 POST、GET/SSE

@@ -6,7 +6,7 @@
 
 ## A. 后端:零-fork 扩展(自有能力住在 opencode 源码之外)
 
-所有项都被 opencode 运行时从配置目录自动发现(`.opencode/` 向上走到 git 根、全局配置目录、`~/.opencode`)。alpha-code 的做法:打成独立包 `@alpha-code/ext`,经 `.opencode/opencode.jsonc` 的 `plugin[]` / `mcp` 引用。
+所有项都被 opencode 运行时从配置目录自动发现(`.opencode/` 向上走到 git 根、全局配置目录、`~/.opencode`)。alpha-code 的做法:打成独立包 `@codepuppy/ext`,经 `.opencode/opencode.jsonc` 的 `plugin[]` / `mcp` 引用。
 
 | # | 能力 | 落点(零 fork) | 状态 |
 |---|---|---|---|

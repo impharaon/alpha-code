@@ -1,4 +1,4 @@
-import type { TimelineRow } from "../../src/renderer/alpha-ui/session-timeline/timeline-model"
+import type { TimelineRow } from "../../src/renderer/codepuppy-ui/session-timeline/timeline-model"
 
 export const timelineBenchmarkFixture = {
   schemaVersion: 1,
@@ -27,7 +27,7 @@ export function materializeTimelineBenchmarkFixture() {
       streaming: true,
       part: {
         id: "prt_stream_markdown",
-        sessionID: "ses_alpha_timeline_benchmark",
+        sessionID: "ses_codepuppy_timeline_benchmark",
         messageID: "msg_stream_assistant",
         type: "text",
         text: "Streaming benchmark begins.",
@@ -60,7 +60,7 @@ function turnRows(prefix: string, index: number, order: number): TimelineRow[] {
       rev: "1",
       message: {
         id: userID,
-        sessionID: "ses_alpha_timeline_benchmark",
+        sessionID: "ses_codepuppy_timeline_benchmark",
         role: "user",
         agent: "build",
         model: { providerID: "openai", modelID: "gpt-5" },
@@ -92,7 +92,7 @@ function turnRows(prefix: string, index: number, order: number): TimelineRow[] {
                 parts: [
                   {
                     id: `prt_${prefix}_reasoning_${index}`,
-                    sessionID: "ses_alpha_timeline_benchmark",
+                    sessionID: "ses_codepuppy_timeline_benchmark",
                     messageID: assistantID,
                     type: "reasoning",
                     text: `Reviewing deterministic fixture row ${index}.`,
@@ -111,7 +111,7 @@ function turnRows(prefix: string, index: number, order: number): TimelineRow[] {
       streaming: false,
       part: {
         id: `prt_${prefix}_markdown_${index}`,
-        sessionID: "ses_alpha_timeline_benchmark",
+        sessionID: "ses_codepuppy_timeline_benchmark",
         messageID: assistantID,
         type: "text",
         text: markdown,

@@ -20,6 +20,6 @@ review_after: 2027-04-30
 
 | 组件 | 锚 | 增量稿 | 设计定稿 | 实现票 | 落地 | 代码入口 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 行首品牌图标(选择器三组行、添加供应商卡;映射外与自定义节点回落通用图形) | `#brand-icons` | [`2026-10-30-req236-model-picker/`](../../2026-10-30-req236-model-picker/frame.html) | — | ac#1558 | — | 现状:`alpha-ui/model-picker-core.ts`(`pico` 字母方块)· `alpha-ui/alpha-composer-model.tsx:761-762` · `alpha-ui/model-picker-add.tsx:239-240` | 设计中 |
+| 行首品牌图标(选择器三组行、添加供应商卡;映射外与自定义节点回落通用图形) | `#brand-icons` | [`2026-10-30-req236-model-picker/`](../../2026-10-30-req236-model-picker/frame.html) | — | ac#1558 | — | 现状:`codepuppy-ui/model-picker-core.ts`(`pico` 字母方块)· `codepuppy-ui/codepuppy-composer-model.tsx:761-762` · `codepuppy-ui/model-picker-add.tsx:239-240` | 设计中 |
 | 弹层底部清单状态行(已下载待生效 / 更新失败带最近成功时间与重试;两份清单分开、最多两条) | `#catalog-footer` | [`2026-10-30-req236-model-picker/`](../../2026-10-30-req236-model-picker/frame.html)(待生效)· [`2026-10-30-req236-model-status/`](../../2026-10-30-req236-model-status/frame.html)(更新失败) | — | ac#1556 · ac#1557 | — | 现状:无此槽 | 设计中 |
-| 平台段空态与分组头失败提示(「平台模型清单尚未获取」,不显示任何价格) | `#platform-empty` | [`2026-10-30-req236-model-picker/`](../../2026-10-30-req236-model-picker/frame.html) · [`2026-10-30-req236-model-status/`](../../2026-10-30-req236-model-status/frame.html) | — | ac#1556 · ac#1557 | — | 现状:无快照时回退随包平台清单(`main/alpha-live-allowlist.ts` `projectPlatformModels`) | 设计中 |
+| 平台段空态与分组头失败提示(「平台模型清单尚未获取」,不显示任何价格) | `#platform-empty` | [`2026-10-30-req236-model-picker/`](../../2026-10-30-req236-model-picker/frame.html) · [`2026-10-30-req236-model-status/`](../../2026-10-30-req236-model-status/frame.html) | — | ac#1556 · ac#1557 | — | 现状:无快照时回退随包平台清单(`main/codepuppy-live-allowlist.ts` `projectPlatformModels`) | 设计中 |

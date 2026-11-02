@@ -15,13 +15,13 @@ review_after: 2026-10-13
 `alpha-code` resolves service bases in this precedence order:
 
 ```text
-environment override > <userData>/alpha-endpoints.json > OAuth token discovery > bootstrap default
+environment override > <userData>/codepuppy-endpoints.json > OAuth token discovery > bootstrap default
 ```
 
 The executable consumer is
-[`alpha-endpoints.ts`](../../packages/ui-mac/src/main/alpha-endpoints.ts); bootstrap
+[`codepuppy-endpoints.ts`](../../packages/ui-mac/src/main/codepuppy-endpoints.ts); bootstrap
 defaults and appended paths are defined in
-[`alpha-config.ts`](../../packages/ui-mac/src/shared/alpha-config.ts).
+[`codepuppy-config.ts`](../../packages/ui-mac/src/shared/codepuppy-config.ts).
 
 The current `alpha-web` authorization-code and refresh-token responses include:
 
@@ -46,7 +46,7 @@ there are no unknown fields, and every base is HTTPS (or loopback HTTP for
 development). An unversioned, partial, future, or unsafe discovery payload is a
 `contract-incompatible` failure; it is not merged and does not change the
 current discovery state. Valid discovery is normalized and persisted to
-`<userData>/alpha-discovered-endpoints.json` with mode `0600`.
+`<userData>/codepuppy-discovered-endpoints.json` with mode `0600`.
 
 The persisted copy is decoded just as strictly at startup and is never trusted
 as a legacy format. If it is unversioned, malformed, or otherwise incompatible,
@@ -58,8 +58,8 @@ not accept or migrate the rejected data.
 The model gateway and Cloud Jobs/MCP service are separate Workers. If `mcp` is
 omitted, the client derives `${cloud}/mcp`; it must never derive MCP from the
 model gateway. Environment variables remain development/self-host escape
-hatches: `ALPHA_WEB_URL`, `ALPHA_PLATFORM_URL`, `ALPHA_ACCOUNT_URL`,
-`ALPHA_CLOUD_URL`, and `ALPHA_MCP_URL`.
+hatches: `CODEPUPPY_WEB_URL`, `CODEPUPPY_PLATFORM_URL`, `CODEPUPPY_ACCOUNT_URL`,
+`CODEPUPPY_CLOUD_URL`, and `CODEPUPPY_MCP_URL`.
 
 The desktop-facing account endpoint above is distinct from the service-to-
 service `ACCOUNT_URL=https://account.tidelabs.click` committed in Alpha Platform
@@ -89,7 +89,7 @@ The basis is a **unit definition, not a membership claim** — an edition that
 filters the reference model out still publishes it, so consumers must not assume
 it appears in `data`.
 
-A validated response replaces `<userData>/alpha-live-models.json` atomically.
+A validated response replaces `<userData>/codepuppy-live-models.json` atomically.
 The cache carries no version field of its own: a pre-cut V1 cache is missing the
 basis and the per-row pairs, so the one snapshot validator — used by both the
 write and the read — rejects it. That validator also treats an **empty model

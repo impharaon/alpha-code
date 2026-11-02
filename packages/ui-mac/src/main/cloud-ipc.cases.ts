@@ -83,7 +83,7 @@ mock.module("./artifact-service", () => ({
   recordRunOrigin: () => ({ ok: true }),
   verifyArtifact: async () => (verifyQueue.length > 0 ? verifyQueue.shift() : verifyResult),
 }))
-mock.module("./alpha-cloud-jobs", () => ({
+mock.module("./codepuppy-cloud-jobs", () => ({
   dispatchCloudJob: async () => ({ error: "unused" }),
   dispatchExplicitCloudUpload: async () => ({ error: "unused" }),
   getCloudJobStatus: () => statusImpl(),
@@ -94,14 +94,14 @@ mock.module("./alpha-cloud-jobs", () => ({
     return downloadOutcome
   },
 }))
-mock.module("./alpha-cloud-events", () => ({
+mock.module("./codepuppy-cloud-events", () => ({
   isTerminalCloudEvent: () => false,
   subscribeCloudJobEvents: () => () => {},
 }))
-mock.module("./alpha-workdir", () => ({
-  ensureAlphaScaffold: () => true,
+mock.module("./codepuppy-workdir", () => ({
+  ensureCodePuppyScaffold: () => true,
   isSafeRunId: (id: unknown) => typeof id === "string" && /^job_[a-z0-9]+$/.test(id),
-  safeResolveInAlpha: () => "/tmp/unused",
+  safeResolveInCodePuppy: () => "/tmp/unused",
   sanitizeArtifactName: (name?: string) => name ?? "artifact",
   reserveArtifactSavedName: (
     _artifactsDir: string,
@@ -118,21 +118,21 @@ mock.module("./alpha-workdir", () => ({
     return saveResult
   },
 }))
-mock.module("./alpha-user-workspace", () => ({
+mock.module("./codepuppy-user-workspace", () => ({
   mirrorRunArtifacts: () => {
     order.push("mirror")
     return { ok: true, mirroredFiles: [] }
   },
 }))
-mock.module("./alpha-auth", () => ({
+mock.module("./codepuppy-auth", () => ({
   getAccessTokenIdentity: async () => ({ error: "unused" }),
   getAuthIdentityEpoch: () => 1,
   getAuthIdentityTag: () => "acct",
 }))
-mock.module("./alpha-web-upload-consent", () => ({
+mock.module("./codepuppy-web-upload-consent", () => ({
   requestUploadConsent: async () => ({ error: "unused" }),
 }))
-mock.module("./alpha-upload", () => ({
+mock.module("./codepuppy-upload", () => ({
   assertSafeUploadResult: (value: unknown) => value,
   createMainUploadService: () => ({
     prepare: async () => ({ status: "cancelled" }),
@@ -148,15 +148,15 @@ const saveRun = handlers.get("cloud-save-run")!
 const artifactDownload = handlers.get("cloud-artifact-download")!
 
 test("REQ-232 AC5 billing actions use the resolved web endpoint and frozen portal paths", async () => {
-  const previous = process.env.ALPHA_WEB_URL
-  process.env.ALPHA_WEB_URL = "https://portal.invalid"
+  const previous = process.env.CODEPUPPY_WEB_URL
+  process.env.CODEPUPPY_WEB_URL = "https://portal.invalid"
   try {
     await handlers.get("cloud-open-billing-page")!({}, "recharge")
     await handlers.get("cloud-open-billing-page")!({}, "overflow")
     expect(opened).toEqual(["https://portal.invalid/wallet?tab=recharge", "https://portal.invalid/account"])
   } finally {
-    if (previous === undefined) delete process.env.ALPHA_WEB_URL
-    if (previous !== undefined) process.env.ALPHA_WEB_URL = previous
+    if (previous === undefined) delete process.env.CODEPUPPY_WEB_URL
+    if (previous !== undefined) process.env.CODEPUPPY_WEB_URL = previous
   }
 })
 
@@ -203,7 +203,7 @@ describe("#660 A1 cloud-run-saved broadcast wiring", () => {
 
 // `#970`:main → renderer 之间隔着**两跳有逻辑的转发**,这里钉的是靠上的那一跳
 // (cloud-artifact-download 的真 handler);低一层的 downloadCloudArtifactTo 由
-// src/main/alpha-cloud-jobs.cases.ts 钉同样两个方向。
+// src/main/codepuppy-cloud-jobs.cases.ts 钉同样两个方向。
 // 判据不能在两端各自绿而中间没人跑 —— 今天这一跳是原样直传,但它正是最容易长出
 // 「规整返回形状 / 只挑白名单字段」的地方(同文件上方已经在自己铸造 invalid-request /
 // invalid-artifact / unsafe-path 信封)。哪天有人加个 normalizer 把结构槽挑掉,用户可观察的
@@ -227,7 +227,7 @@ describe("#970 cloud-artifact-download 这一跳既不吞掉、也不凭空造�
 
   // #1112:handler 必须把「账本占用 + 自身 id」组合成占用谓词交给预约 ——
   // 归他人的名字算占用、归自己的与无主的名字不算(同件重下的原地覆盖因此保留)。
-  // 谓词语义的机械正确性在 alpha-workdir/artifact-service 各自的真测试里;这里钉的是
+  // 谓词语义的机械正确性在 codepuppy-workdir/artifact-service 各自的真测试里;这里钉的是
   // 这一跳真的把两者接上了(漏传谓词 = 预约退回只读目录,C5.5 静默覆盖原样回来)。
   test("#1112 预约收到账本占用谓词:他人名字 → 占用;自己/无主 → 放行", async () => {
     ledgerOwners.set("owned-by-other.md", "art_someone_else")
@@ -246,7 +246,7 @@ describe("#970 cloud-artifact-download 这一跳既不吞掉、也不凭空造�
 
 // ---- REQ-236 #1551:cloud-save-run 不吞失败;tracker 与面板单件下载共用一个协调者 ----
 
-const producer = new URL("../../../alpha-contracts-consumer/vendor/alpha-platform/contracts/v1/fixtures/producer/", import.meta.url)
+const producer = new URL("../../../codepuppy-contracts-consumer/vendor/alpha-platform/contracts/v1/fixtures/producer/", import.meta.url)
 const DESCRIPTOR = (await Bun.file(new URL("artifact-list.json", producer)).json()).value.artifacts[0]
 const COMPLETED = { ...(await Bun.file(new URL("cloud-job-status.json", producer)).json()).value, job_id: "job_abc" }
 const runStates = () => sent.filter((s) => s.channel === "cloud-run-state").map((s) => s.payload as { delivery: { status: string } })

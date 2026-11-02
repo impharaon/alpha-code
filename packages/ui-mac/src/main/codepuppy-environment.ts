@@ -1,0 +1,445 @@
+// REQ-098 唯一环境映射(issue #190/#428)—— main 进程持有,renderer 零输入。
+//
+// App 运行环境(prod/beta/dev)只由两个构建事实推导:app.isPackaged + 构建渠道(OPENCODE_CHANNEL,
+// 打包时冻结,ADR-012)。由环境单向派生三件事,任何消费方不得自行再推:
+//   ① Registry 通道:prod → stable、beta → preview、dev → dev(preview 维持 ADR-012 休眠语义,
+//      #232 拍板 B:机制对齐、不承诺发布);
+//   ② updater feed channel:prod → latest(stable feed)、beta → beta(preview feed)、dev → 禁用;
+//   ③ 环境 mutable root(可变状态分域):<appData>/codepuppy-state/env/{prod,beta,dev};
+//      三根恒为兄弟,共享 CAS 落 <appData>/codepuppy-state/cas。
+//
+// initCodePuppyEnvironment 在任何根消费方之前校验三根的词法与 canonical 身份,创建新拓扑后复验
+// endpoint 非 symlink 且 realpath 未漂移,最后才冻结快照并派生 CODEPUPPY_GLOBAL_DIR。旧全局根不迁移、
+// 不 dual-read；CODEPUPPY_GLOBAL_DIR 不再接受外部预置。unpackaged 可用 CODEPUPPY_ENV_BASE_DIR 做 base 级
+// 隔离；packaged onboarding 只接受 composition root 传入的内部临时 base。
+//
+// electron-free:isPackaged/channel/appData 由 index.ts 注入,单测零 mock。
+
+import { lstatSync, mkdirSync, readdirSync, realpathSync, rmdirSync, statSync } from "node:fs"
+import { homedir } from "node:os"
+import { basename, dirname, isAbsolute, join, normalize, relative, resolve } from "node:path"
+import type { CodePuppyEnvironmentInfo } from "../preload/types"
+
+export type AppEnvironment = "prod" | "beta" | "dev"
+export type RegistryChannel = "stable" | "preview" | "dev"
+export type BuildChannel = "dev" | "beta" | "prod"
+
+export type { CodePuppyEnvironmentInfo }
+
+// updater feed 只允许指向自有发布仓(B9:错 owner = 会把上游 OpenCode 当更新装回来)。
+export const UPDATE_FEED_OWNER = "jinjunnn"
+export const UPDATE_FEED_REPO = "alpha-code"
+
+/** 环境判定:打包 + 渠道 → 环境;未打包一律 dev(开发运行)。 */
+export function resolveAppEnvironment(input: { isPackaged: boolean; channel: BuildChannel }): AppEnvironment {
+  if (!input.isPackaged) return "dev"
+  if (input.channel === "prod") return "prod"
+  if (input.channel === "beta") return "beta"
+  return "dev"
+}
+
+/** prod → stable、beta → preview、dev → dev(REQ-098 交付①)。 */
+export function registryChannelFor(env: AppEnvironment): RegistryChannel {
+  if (env === "prod") return "stable"
+  if (env === "beta") return "preview"
+  return "dev"
+}
+
+/** electron-updater channel:prod → latest(stable feed)、beta → beta(preview feed)、dev → null(禁用)。 */
+export function updaterFeedChannelFor(env: AppEnvironment): "latest" | "beta" | null {
+  if (env === "prod") return "latest"
+  if (env === "beta") return "beta"
+  return null
+}
+
+/** 新共享基根；appDataDir 由 Electron composition root 注入。 */
+export function defaultCodePuppyBaseRoot(appDataDir: string): string {
+  return join(appDataDir, "codepuppy-state")
+}
+
+/** 三环境 mutable root 恒为兄弟。 */
+export function environmentMutableRoot(env: AppEnvironment, baseRoot: string): string {
+  return join(baseRoot, "env", env)
+}
+
+/**
+ * `environmentMutableRoot` 的逆映射(`#1392`):sidecar 进程没有冻结快照,手里只有 main 派生给它的 `CODEPUPPY_GLOBAL_DIR`
+ * = `<baseRoot>/env/<env>`;需要「状态根 + 环境名」的消费者(自定义节点真源 custom-provider-records.ts)从这里拿回来。
+ * 形状不对(父目录不叫 `env`、末段不是三个环境名之一)⇒ undefined,不猜 —— 调用方按「位置未知」fail-closed。
+ * 拓扑的文法只住在本文件:这里改了,上面那条也得跟着改。
+ */
+export function environmentFromMutableRoot(mutableRoot: string): { environment: AppEnvironment; casBaseRoot: string } | undefined {
+  const root = normalize(mutableRoot)
+  const envDir = dirname(root)
+  if (basename(envDir) !== "env") return undefined
+  const environment = basename(root)
+  if (environment !== "prod" && environment !== "beta" && environment !== "dev") return undefined
+  const casBaseRoot = dirname(envDir)
+  if (casBaseRoot === envDir || basename(casBaseRoot) === "") return undefined // `/env/<env>`:base 没有名字,不算
+  return { environment, casBaseRoot }
+}
+
+export type CodePuppyStateBase = { ok: true; casBaseRoot: string; environment: AppEnvironment } | { ok: false; reason: string }
+
+/**
+ * 「这个进程的状态根 + 环境名」(`#1392` / `#1381`):main 走冻结快照;sidecar(无快照)走 `CODEPUPPY_GLOBAL_DIR` 的逆映射
+ * (environmentFromMutableRoot)。形状不对 ⇒ ok:false 且不猜 —— 调用方按「位置未知」fail-closed。`subject` 只进拒绝理由
+ * (哪个真源的位置未知),两个真源(custom-providers / mcp-servers)共用这一份解析,不各自抄一遍。
+ */
+export function resolveCodePuppyStateBase(subject: string): CodePuppyStateBase {
+  const info = tryGetCodePuppyEnvironment()
+  if (info) return { ok: true, casBaseRoot: info.casBaseRoot, environment: info.environment }
+  let root: string
+  try {
+    root = resolveCodePuppyGlobalRoot()
+  } catch (error) {
+    return { ok: false, reason: `alpha environment root unavailable (${error instanceof Error ? error.message : String(error)})` }
+  }
+  const derived = environmentFromMutableRoot(root)
+  if (!derived) return { ok: false, reason: `CODEPUPPY_GLOBAL_DIR ${root} is not of the form <base>/env/<prod|beta|dev>; the ${subject} location is unknown` }
+  return { ok: true, ...derived }
+}
+
+let current: CodePuppyEnvironmentInfo | undefined
+
+export type InitEnvironmentInput = {
+  isPackaged: boolean
+  channel: BuildChannel
+  /** Electron `app.getPath("appData")`；本模块不自行推导。 */
+  appDataDir: string
+  /** 默认 process.env；注入以便单测。 */
+  env?: NodeJS.ProcessEnv
+  /** 仅 composition root 内部生成的 base（packaged onboarding）；不读取环境变量。 */
+  baseRoot?: string
+  /** 仅用于退休根 denial；默认真实 home。 */
+  homeDir?: string
+  /** 单测 seam：在完整预检后、单个缺失目录创建前注入 late collision。 */
+  beforeDirectoryCreate?: (directory: string) => void
+}
+
+/**
+ * 启动早期调用一次；先完整校验并创建/复验新拓扑，随后才写派生 env 与冻结快照。
+ */
+export function initCodePuppyEnvironment(input: InitEnvironmentInput): CodePuppyEnvironmentInfo {
+  if (current) return current
+  const env = input.env ?? process.env
+  if (env.CODEPUPPY_GLOBAL_DIR !== undefined) throw new Error("external CODEPUPPY_GLOBAL_DIR override is retired")
+  if (input.isPackaged && env.CODEPUPPY_ENV_BASE_DIR !== undefined)
+    throw new Error("packaged builds refuse external alpha base overrides")
+  if (input.baseRoot !== undefined && env.CODEPUPPY_ENV_BASE_DIR !== undefined)
+    throw new Error("multiple alpha base inputs are not allowed")
+
+  const environment = resolveAppEnvironment(input)
+  const externalBase = input.isPackaged ? undefined : env.CODEPUPPY_ENV_BASE_DIR
+  const requestedBase = input.baseRoot ?? externalBase ?? defaultCodePuppyBaseRoot(input.appDataDir)
+  if (!requestedBase.trim() || !isAbsolute(requestedBase)) throw new Error("alpha base must be a non-empty absolute path")
+
+  const lexicalBase = normalize(requestedBase)
+  rejectTerminalSymlink(lexicalBase, "alpha base")
+  const lexicalRoots = environmentRoots(lexicalBase)
+  assertSiblingRoots(Object.values(lexicalRoots), "lexical")
+  assertOutsideRetiredRoot([lexicalBase, ...Object.values(lexicalRoots)], input.homeDir ?? homedir(), false)
+
+  const baseRoot = prospectiveCanonical(lexicalBase)
+  const roots = environmentRoots(baseRoot)
+  const envRoot = join(baseRoot, "env")
+  assertSiblingRoots(Object.values(roots), "canonical")
+  if (Object.values(roots).some((root) => dirname(root) !== envRoot))
+    throw new Error("canonical environment roots must share the expected env parent")
+  assertOutsideRetiredRoot([baseRoot, ...Object.values(roots)], input.homeDir ?? homedir(), true)
+
+  // 先把全部 endpoint（含创建 base 所需的缺失父链）一次性预检完，再产生任何目录副作用。
+  // prospective canonical 必须逐字等于预期 endpoint；现存 endpoint 还必须是同路径的非链实目录。
+  const topology = [baseRoot, envRoot, ...Object.values(roots), join(baseRoot, "cas")]
+  const directories = [...new Set([...missingDirectoryChain(dirname(baseRoot)), ...topology])]
+  const preflight = new Map(directories.map((directory) => [directory, inspectExpectedDirectory(directory)]))
+  const created: Array<{ directory: string; identity: DirectoryIdentity }> = []
+  try {
+    for (const directory of directories) {
+      const expected = preflight.get(directory)!
+      if (expected) {
+        assertDirectoryIdentity(directory, expected)
+        continue
+      }
+      assertCanonicalDirectory(dirname(directory), dirname(directory))
+      input.beforeDirectoryCreate?.(directory)
+      mkdirSync(directory)
+      created.push({ directory, identity: directoryIdentity(directory) })
+    }
+    topology.forEach((directory) => assertCanonicalDirectory(directory, directory))
+  } catch (error) {
+    rollbackCreatedDirectories(created)
+    throw new Error("alpha environment topology initialization failed", { cause: error })
+  }
+
+  const mutableRoot = roots[environment]
+  env.CODEPUPPY_GLOBAL_DIR = mutableRoot
+  current = Object.freeze({
+    environment,
+    registryChannel: registryChannelFor(environment),
+    buildChannel: input.channel,
+    packaged: input.isPackaged,
+    mutableRoot,
+    casBaseRoot: baseRoot,
+    rootOverridden: input.baseRoot !== undefined || externalBase !== undefined,
+    updaterFeedChannel: updaterFeedChannelFor(environment),
+  })
+  return current
+}
+
+/** main 消费方的唯一根解析：快照优先；无快照只接受显式、绝对且不指向退休根的派生输出。 */
+export function resolveCodePuppyGlobalRoot(env: NodeJS.ProcessEnv = process.env, homeDir: string = homedir()): string {
+  if (current) return current.mutableRoot
+  const raw = env.CODEPUPPY_GLOBAL_DIR?.trim()
+  if (!raw || !isAbsolute(raw)) throw new Error("CODEPUPPY_GLOBAL_DIR requires an absolute initialized root")
+  assertOutsideRetiredRoot([normalize(raw)], homeDir, false)
+  const canonical = prospectiveCanonical(raw)
+  assertOutsideRetiredRoot([canonical], homeDir, true)
+  return canonical
+}
+
+/** 高风险批次入口调用：冻结的 base、三环境根与 CAS endpoint 身份必须仍然完全一致。 */
+export function assertCodePuppyEnvironmentIdentity(): void {
+  const info = getCodePuppyEnvironment()
+  const roots = environmentRoots(info.casBaseRoot)
+  ;[info.casBaseRoot, ...Object.values(roots), join(info.casBaseRoot, "cas")].forEach((root) =>
+    assertCanonicalDirectory(root, root),
+  )
+  if (roots[info.environment] !== info.mutableRoot) throw new Error("frozen alpha root mapping changed")
+}
+
+/** 三根恒为兄弟(见文件头③):当前环境之外的另外两根,固定序 prod → beta → dev。
+ *  REQ-155 `#1244`:随包 Office 连接器的 boot reconcile(codepuppy-office-instance.ts)只**读**它们,绝不写。 */
+export function siblingEnvironmentRoots(
+  environment: AppEnvironment,
+  baseRoot: string,
+): Array<{ environment: AppEnvironment; root: string }> {
+  return (["prod", "beta", "dev"] as const)
+    .filter((candidate) => candidate !== environment)
+    .map((candidate) => ({ environment: candidate, root: environmentMutableRoot(candidate, baseRoot) }))
+}
+
+/** 冻结快照派生的兄弟根;未初始化即抛(与 getCodePuppyEnvironment 同一 fail-fast)。 */
+export function codepuppySiblingEnvironmentRoots(): Array<{ environment: AppEnvironment; root: string }> {
+  const info = getCodePuppyEnvironment()
+  return siblingEnvironmentRoots(info.environment, info.casBaseRoot)
+}
+
+function environmentRoots(baseRoot: string): Record<AppEnvironment, string> {
+  return {
+    dev: environmentMutableRoot("dev", baseRoot),
+    prod: environmentMutableRoot("prod", baseRoot),
+    beta: environmentMutableRoot("beta", baseRoot),
+  }
+}
+
+function assertCanonicalDirectory(directory: string, expected: string): void {
+  try {
+    const stat = lstatSync(directory)
+    if (stat.isSymbolicLink() || !stat.isDirectory()) throw new Error("endpoint is not a real directory")
+    if (normalize(realpathSync(directory)) !== normalize(expected)) throw new Error("canonical identity drifted")
+  } catch {
+    throw new Error("alpha root identity cannot be confirmed")
+  }
+}
+
+type DirectoryIdentity = { dev: number; ino: number }
+
+function inspectExpectedDirectory(directory: string): DirectoryIdentity | null {
+  if (prospectiveCanonical(directory) !== directory) throw new Error("alpha endpoint does not resolve to its expected path")
+  try {
+    return directoryIdentity(directory)
+  } catch (error) {
+    if (errorCode(error) === "ENOENT") return null
+    throw error
+  }
+}
+
+function directoryIdentity(directory: string): DirectoryIdentity {
+  const stat = lstatSync(directory)
+  if (stat.isSymbolicLink() || !stat.isDirectory()) throw new Error("endpoint is not a real directory")
+  if (normalize(realpathSync(directory)) !== normalize(directory)) throw new Error("canonical identity drifted")
+  return { dev: stat.dev, ino: stat.ino }
+}
+
+function assertDirectoryIdentity(directory: string, expected: DirectoryIdentity): void {
+  const actual = directoryIdentity(directory)
+  if (actual.dev !== expected.dev || actual.ino !== expected.ino) throw new Error("alpha endpoint identity changed after preflight")
+}
+
+function missingDirectoryChain(directory: string): string[] {
+  const missing: string[] = []
+  let cursor = directory
+  while (true) {
+    try {
+      directoryIdentity(cursor)
+      return missing.reverse()
+    } catch (error) {
+      if (errorCode(error) !== "ENOENT") throw error
+      const parent = dirname(cursor)
+      if (parent === cursor) throw new Error("alpha root identity cannot be confirmed", { cause: error })
+      missing.push(cursor)
+      cursor = parent
+    }
+  }
+}
+
+function rollbackCreatedDirectories(created: Array<{ directory: string; identity: DirectoryIdentity }>): void {
+  created.reverse().forEach(({ directory, identity }) => {
+    try {
+      assertDirectoryIdentity(directory, identity)
+      if (readdirSync(directory).length === 0) rmdirSync(directory)
+    } catch {
+      // 只回收仍为空且 inode 未变的本次创建目录；漂移或新内容一律保留。
+    }
+  })
+}
+
+function prospectiveCanonical(input: string): string {
+  const suffix: string[] = []
+  let cursor = normalize(input)
+  while (true) {
+    try {
+      lstatSync(cursor)
+    } catch (error) {
+      if (errorCode(error) !== "ENOENT") throw new Error("alpha root identity cannot be confirmed", { cause: error })
+      const parent = dirname(cursor)
+      if (parent === cursor) throw new Error("alpha root identity cannot be confirmed", { cause: error })
+      suffix.push(basename(cursor))
+      cursor = parent
+      continue
+    }
+    try {
+      if (suffix.length > 0 && !statSync(cursor).isDirectory()) throw new Error("existing ancestor is not a directory")
+      return resolve(realpathSync(cursor), ...suffix.reverse())
+    } catch {
+      throw new Error("alpha root identity cannot be confirmed")
+    }
+  }
+}
+
+function rejectTerminalSymlink(directory: string, label: string): void {
+  try {
+    if (lstatSync(directory).isSymbolicLink()) throw new Error(`${label} cannot be a symlink`)
+  } catch (error) {
+    if (errorCode(error) === "ENOENT") return
+    throw error
+  }
+}
+
+function errorCode(error: unknown): unknown {
+  if (!error || typeof error !== "object" || !("code" in error)) return undefined
+  return error.code
+}
+
+function assertSiblingRoots(roots: string[], kind: string): void {
+  for (const root of roots)
+    for (const other of roots)
+      if (root !== other && related(root, other)) throw new Error(`${kind} environment roots overlap`)
+  if (new Set(roots).size !== roots.length) throw new Error(`${kind} environment roots alias`)
+}
+
+function assertOutsideRetiredRoot(candidates: string[], homeDir: string, canonical: boolean): void {
+  const retiredLexical = normalize(join(homeDir, ".alpha"))
+  const retired = canonical ? retiredCanonical(retiredLexical, homeDir) : retiredLexical
+  if (candidates.some((candidate) => related(normalize(candidate), retired)))
+    throw new Error("alpha root is related to the retired global root")
+}
+
+function retiredCanonical(retiredRoot: string, homeDir: string): string {
+  try {
+    return normalize(realpathSync(retiredRoot))
+  } catch (error) {
+    if (errorCode(error) !== "ENOENT") throw new Error("retired alpha root identity cannot be confirmed", { cause: error })
+    return join(prospectiveCanonical(homeDir), ".alpha")
+  }
+}
+
+function related(left: string, right: string): boolean {
+  return sameOrInside(left, right) || sameOrInside(right, left)
+}
+
+function sameOrInside(child: string, parent: string): boolean {
+  const rel = relative(parent, child)
+  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel))
+}
+
+export function getCodePuppyEnvironment(): CodePuppyEnvironmentInfo {
+  if (!current) throw new Error("alpha environment not initialized (initCodePuppyEnvironment must run at boot)")
+  return current
+}
+
+/** 非抛出变体:main 进程消费者用它读取冻结根;未初始化(纯单测 / sidecar 进程)返回 undefined,
+ *  调用方退回 process.env(REQ-098 #301:冻结快照是 main 的单一真源)。 */
+export function tryGetCodePuppyEnvironment(): CodePuppyEnvironmentInfo | undefined {
+  return current
+}
+
+/** catalog 拉取通道的**唯一权威取值点**(REQ-098 #302,review #364 接线缝):恒等于冻结快照的
+ *  registryChannel。composition root 必须经此取值传给 refreshRemoteCatalog —— 不得另行推导或
+ *  写死字面量;未初始化即抛(fail-fast,catalog 拉取不允许发生在环境解析之前)。 */
+export function catalogRegistryChannel(): RegistryChannel {
+  return getCodePuppyEnvironment().registryChannel
+}
+
+/** 仅测试:重置单例。生产代码不得调用 —— 环境一经解析在进程生命周期内不可变。 */
+export function __resetCodePuppyEnvironmentForTests(): void {
+  current = undefined
+}
+
+// ── T4:updater feed 对齐校验(AC#2 loud-fail 判定核)─────────────────────────────────────────
+// 三侧一致:构建发布 channel(app-update.yml,electron-builder publish 配置落盘)/ 运行时检查
+// channel(autoUpdater.channel)/ 环境映射(updaterFeedChannelFor)。任何不一致 = 错误 feed 映射,
+// 调用方必须 loud-fail(禁用 updater + 显式报错),绝不带错 feed 去 update-check。
+
+export type PackagedFeed = { provider?: string; owner?: string; repo?: string; channel?: string }
+
+export type FeedVerdict = { ok: true } | { ok: false; reason: string }
+
+export function verifyUpdaterFeed(input: {
+  environment: AppEnvironment
+  /** 运行时将要请求的 channel(autoUpdater.channel)。 */
+  runtimeChannel: string
+  /** 打包内 app-update.yml 解析结果;null = 无发布元数据可核(本地 dir 构建)→ 只核运行时映射。 */
+  packaged: PackagedFeed | null
+}): FeedVerdict {
+  const expected = updaterFeedChannelFor(input.environment)
+  if (expected === null) {
+    return { ok: false, reason: `dev environment must not update-check (runtime channel: ${input.runtimeChannel})` }
+  }
+  if (input.runtimeChannel !== expected) {
+    return {
+      ok: false,
+      reason: `runtime channel "${input.runtimeChannel}" != "${expected}" required by environment "${input.environment}"`,
+    }
+  }
+  const packaged = input.packaged
+  if (packaged) {
+    if (packaged.owner !== undefined && packaged.owner !== UPDATE_FEED_OWNER) {
+      return { ok: false, reason: `packaged feed owner "${packaged.owner}" != "${UPDATE_FEED_OWNER}" (wrong-owner feed, B9)` }
+    }
+    if (packaged.repo !== undefined && packaged.repo !== UPDATE_FEED_REPO) {
+      return { ok: false, reason: `packaged feed repo "${packaged.repo}" != "${UPDATE_FEED_REPO}"` }
+    }
+    // electron-builder 对 channel=latest 可能省略该键 —— 缺省 = latest 语义,只在显式声明时比对。
+    if (packaged.channel !== undefined && packaged.channel !== expected) {
+      return {
+        ok: false,
+        reason: `packaged feed channel "${packaged.channel}" != "${expected}" required by environment "${input.environment}"`,
+      }
+    }
+  }
+  return { ok: true }
+}
+
+/** app-update.yml 的极简行解析(只取 provider/owner/repo/channel 四个标量键,不引 yaml 依赖)。 */
+export function parseAppUpdateYml(text: string): PackagedFeed {
+  const out: PackagedFeed = {}
+  for (const line of text.split(/\r?\n/)) {
+    const m = /^(provider|owner|repo|channel):\s*(.+?)\s*$/.exec(line)
+    if (!m) continue
+    const value = m[2].replace(/^['"]|['"]$/g, "")
+    out[m[1] as keyof PackagedFeed] = value
+  }
+  return out
+}

@@ -365,20 +365,24 @@ export function parseLedger(text: string): LedgerRow[] {
 // 与 scripts/north-star-guard.sh 同一套判据(整包 carve-out + ADR-043 的自报家门),这里只做
 // 不需要 git 的那一半(不查 origin/dev):方向是过报 —— 上游镜像里没有、又没自报家门的文件,这里
 // 判为「不是 alpha 自有」,于是它拿不到 keep / load-sensitive 之外的任何处置也不会被误放行。
-export const ALPHA_OWNED_PACKAGES = ["ext", "ui-mac", "alpha-contracts-consumer"] as const
-export const ALPHA_OWNED_MARKER = "north-star:alpha-owned"
-/** 每个 PR 都会跑到的套件根(alpha-check 第 [5/14] 步的四条命令 + [6/14] 登记簿点名)。 */
+export const CODEPUPPY_OWNED_PACKAGES = ["ext", "ui-mac", "codepuppy-contracts-consumer"] as const
+export const CODEPUPPY_OWNED_MARKER = "north-star:codepuppy-owned"
+/** `#1570` 改名过渡:旧前缀与旧 marker 与 north-star 守卫一样仍然认,紧随的 S 级 PR 删。 */
+const LEGACY_OWNED_PREFIX = "alpha-"
+const LEGACY_OWNED_MARKER = "north-star:alpha-owned"
+/** 每个 PR 都会跑到的套件根(codepuppy-check 第 [5/14] 步的四条命令 + [6/14] 登记簿点名)。 */
 export const PER_PR_GATE_PREFIXES = [
-  "packages/alpha-contracts-consumer/",
+  "packages/codepuppy-contracts-consumer/",
   "packages/ext/",
   "packages/ui-mac/src/",
   "packages/ui-mac/test-component/",
 ] as const
 
-export function isAlphaOwned(file: string, content: string): boolean {
-  if (ALPHA_OWNED_PACKAGES.some((pkg) => file.startsWith(`packages/${pkg}/`))) return true
-  if (basename(file).startsWith("alpha-")) return true
-  return content.includes(ALPHA_OWNED_MARKER)
+export function isCodePuppyOwned(file: string, content: string): boolean {
+  if (CODEPUPPY_OWNED_PACKAGES.some((pkg) => file.startsWith(`packages/${pkg}/`))) return true
+  const base = basename(file)
+  if (base.startsWith("codepuppy-") || base.startsWith(LEGACY_OWNED_PREFIX)) return true
+  return content.includes(CODEPUPPY_OWNED_MARKER) || content.includes(LEGACY_OWNED_MARKER)
 }
 
 export function inPerPrGate(file: string, gateRegistered: ReadonlySet<string>): boolean {
@@ -420,7 +424,7 @@ export function dispositionError(row: LedgerRow, ctx: LedgerContext): string | u
     return "load-sensitive 只许给每 PR 套件之外的文件(PER_PR_GATE_PREFIXES 之外且不在 gate-files.tsv 里);在套件里的要么改写要么搬出去"
   if (row.disposition === "upstream") {
     const content = ctx.read(row.file) ?? ""
-    if (isAlphaOwned(row.file, content)) return "upstream 只许给不是 alpha 自有的文件(不在 ext/ui-mac/alpha-contracts-consumer,basename 不以 alpha- 开头,正文无 north-star:alpha-owned)"
+    if (isCodePuppyOwned(row.file, content)) return "upstream 只许给不是 alpha 自有的文件(不在 ext/ui-mac/codepuppy-contracts-consumer,basename 不以 codepuppy- 开头,正文无 north-star:codepuppy-owned)"
   }
   return undefined
 }

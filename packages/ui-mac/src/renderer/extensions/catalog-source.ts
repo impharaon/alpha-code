@@ -2,7 +2,7 @@
 // (上次验签通过的缓存)→ builtin(随包内置,永不空白 B20)。模块级 signal,use-extensions 与
 // extension-hub 共同消费;refreshCatalog() 在 hub 打开时调用(main 侧另有启动预热)。
 import { createSignal } from "solid-js"
-import catalogJson from "./alpha-catalog.json"
+import catalogJson from "./codepuppy-catalog.json"
 import type { BundledCatalogSnapshotV1, Catalog, CatalogEntry } from "./catalog-types"
 import { extIpc } from "./ext-ipc"
 

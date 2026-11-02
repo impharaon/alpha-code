@@ -30,7 +30,7 @@ beforeAll(() => {
 })
 afterAll(() => rmSync(root, { recursive: true, force: true }))
 
-/** 生产注入面给自定义节点写的模型形状就是 `{ name, modalities }`(ui-mac alpha-models.ts:186);引擎补齐其余字段。 */
+/** 生产注入面给自定义节点写的模型形状就是 `{ name, modalities }`(ui-mac codepuppy-models.ts:186);引擎补齐其余字段。 */
 const PROVIDER = {
   npm: "@ai-sdk/openai-compatible",
   name: "My VL",

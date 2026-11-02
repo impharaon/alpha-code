@@ -21,7 +21,7 @@
 #      是不是也长在某个被单独盯着的文件上」(`#1430` 补完那半边登记,`#1435` 加这条判据)。
 #   ② **阈值告警**:本分支**新增/修改**的非测试 `.ts`/`.tsx`,超过 ${WARN_LINES} 行就点名,
 #      要求在票面写明理由。默认 800 = codex harness 的口径(目标 <500,超 800 必须新开模块)。
-#      辖区取守卫的 ALPHA_OWNED_PACKAGES(alpha 自己写的那几个包),不是自己再抄一份清单。
+#      辖区取守卫的 CODEPUPPY_OWNED_PACKAGES(alpha 自己写的那几个包),不是自己再抄一份清单。
 #      已在棘轮里的路径由 ① 管,这里不重复点名。
 #
 # ── 为什么**不**硬红(`#1289` out of scope 明写)────────────────────────────────────
@@ -52,7 +52,7 @@ cd "$ROOT" || { echo "✗ 进不去仓库根目录:$ROOT" >&2; exit 1; }
 MANIFEST_REL="scripts/module-size-ratchet.tsv"
 MANIFEST="$ROOT/$MANIFEST_REL"
 GUARD="$ROOT/scripts/north-star-guard.sh"
-WARN_LINES="${ALPHA_MODULE_WARN_LINES:-800}"
+WARN_LINES="${CODEPUPPY_MODULE_WARN_LINES:-800}"
 BASELINE_REF="origin/alpha"
 
 [ -f "$MANIFEST" ] || { echo "    ✗ 模块体积登记簿缺失:$MANIFEST —— 本次度量作废"; exit 1; }
@@ -202,12 +202,12 @@ if ! jurisdiction="$(bash "$GUARD" --print-jurisdiction 2>/dev/null)"; then
   echo "    ✗ 读不出守卫的 alpha 自有包清单 —— 阈值告警这一半无从划定辖区,本次度量作废"
   exit 1
 fi
-alpha_pkgs="$(printf '%s\n' "$jurisdiction" | awk -F'\t' '$1 == "ALPHA_OWNED_PACKAGES" { print $2 }')"
+codepuppy_pkgs="$(printf '%s\n' "$jurisdiction" | awk -F'\t' '$1 == "CODEPUPPY_OWNED_PACKAGES" { print $2 }')"
 upstream_paths="$(printf '%s\n' "$jurisdiction" | awk -F'\t' '$1 == "UPSTREAM_PATHS" { print $2 }')"
-[ -n "$alpha_pkgs" ] && [ -n "$upstream_paths" ] || { echo "    ✗ 守卫辖区里读不到 ALPHA_OWNED_PACKAGES / UPSTREAM_PATHS —— 本次度量作废"; exit 1; }
+[ -n "$codepuppy_pkgs" ] && [ -n "$upstream_paths" ] || { echo "    ✗ 守卫辖区里读不到 CODEPUPPY_OWNED_PACKAGES / UPSTREAM_PATHS —— 本次度量作废"; exit 1; }
 
 SCOPE=()
-for pkg in $alpha_pkgs; do SCOPE+=("${upstream_paths}/${pkg}"); done
+for pkg in $codepuppy_pkgs; do SCOPE+=("${upstream_paths}/${pkg}"); done
 
 window_note=""
 committed=""

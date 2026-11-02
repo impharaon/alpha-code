@@ -9,14 +9,14 @@ import { join } from "node:path"
 import { Wildcard } from "../../../core/src/util/wildcard"
 import { CLOUD_DISPATCH_REMOTE_TOOL } from "../../../ext/src/cloud-contract-hook"
 import type { CatalogEntry } from "../renderer/extensions/catalog-types"
-import { AGENT_NOTE_DENIED, AGENT_NOTE_UNVERIFIED, type AlphaSidecarOutbound, type HubViewRow } from "./alpha-sidecar-messages"
+import { AGENT_NOTE_DENIED, AGENT_NOTE_UNVERIFIED, type CodePuppySidecarOutbound, type HubViewRow } from "./codepuppy-sidecar-messages"
 import { applyPackageMutation, projectScopeIdentity, upsertRecordV2, type UpsertInput } from "./ext-receipt-v2"
 import { bundleOwner, computeInstalledGraphDigest } from "./ext-package-ledger-v3"
 import type { CatalogPackageViewV1 } from "../shared/catalog-package-view"
 import { decodePackageProfilePayloadV1 } from "../shared/host-extension-package-contract/decoder"
 import {
   CLOUD_DISPATCH_TOOL,
-  createAlphaSidecarHost,
+  createCodePuppySidecarHost,
   createHubRequestStages,
   createHubViewService,
   skillActionFor,
@@ -215,16 +215,16 @@ describe("hub-view 三档状态(§2.5)", () => {
     expect(row(view.rows, "skill:writer").stateReason).toEqual({ code: "not-loaded", detail: "skill not loaded" })
     expect(row(view.rows, "mcp:files").stateReason).toEqual({ code: "not-loaded", detail: "MCP failed" })
 
-    const sent: AlphaSidecarOutbound[] = []
+    const sent: CodePuppySidecarOutbound[] = []
     w.coordinator.attach((m) => void sent.push(m))
     const { generation } = w.coordinator.request({ scope: "global", items: [{ id: "skill:writer", scope: "global" }], reason: "installed skill writer" })
     view = await w.service.view(w.projectDir)
     expect(row(view.rows, "skill:writer")).toMatchObject({ state: "reload-pending", stateReason: { code: "reload-waiting", detail: "queued" } })
-    w.coordinator.receiveReport({ type: "alpha.reload.report", generation, scope: "global", outcome: "failed", directories: [], error: "dispose refused" })
+    w.coordinator.receiveReport({ type: "codepuppy.reload.report", generation, scope: "global", outcome: "failed", directories: [], error: "dispose refused" })
     view = await w.service.view(w.projectDir)
     expect(row(view.rows, "skill:writer").stateReason).toEqual({ code: "reload-failed", detail: "dispose refused" })
     expect(row(view.rows, "mcp:files").stateReason).toEqual({ code: "reload-failed", detail: "dispose refused" })
-    w.coordinator.receiveReport({ type: "alpha.reload.report", generation, scope: "global", outcome: "reloaded", directories: [] })
+    w.coordinator.receiveReport({ type: "codepuppy.reload.report", generation, scope: "global", outcome: "reloaded", directories: [] })
     view = await w.service.view(w.projectDir)
     expect(row(view.rows, "skill:writer").stateReason).toEqual({ code: "not-loaded", detail: "skill not loaded" })
     // 核验通过就是可用,与在途重载无关
@@ -547,31 +547,31 @@ describe("I6:main 侧 alpha.* 分发只做只读查询与重载记录", () => {
     const w = world("host")
     const logs: string[] = []
     const stages = createHubRequestStages({ log: () => {} })
-    const host = createAlphaSidecarHost({ view: w.service, requests: stages, reloads: w.coordinator, log: (line) => logs.push(line) })
-    const posted: AlphaSidecarOutbound[] = []
-    const post = (m: AlphaSidecarOutbound) => void posted.push(m)
+    const host = createCodePuppySidecarHost({ view: w.service, requests: stages, reloads: w.coordinator, log: (line) => logs.push(line) })
+    const posted: CodePuppySidecarOutbound[] = []
+    const post = (m: CodePuppySidecarOutbound) => void posted.push(m)
 
     expect(host.receive({ type: "write-probe-result", id: 1, outcome: "writable" }, post)).toBe(false)
-    expect(host.receive({ type: "alpha.hub.install", catalogId: "mcp:files" }, post)).toBe(true)
-    expect(host.receive({ type: "alpha.hub.view.request", id: "1", directory: w.projectDir }, post)).toBe(true)
+    expect(host.receive({ type: "codepuppy.hub.install", catalogId: "mcp:files" }, post)).toBe(true)
+    expect(host.receive({ type: "codepuppy.hub.view.request", id: "1", directory: w.projectDir }, post)).toBe(true)
     expect(posted).toEqual([])
     expect(logs.filter((l) => l.includes("dropped malformed")).length).toBe(2)
 
-    expect(host.receive({ type: "alpha.hub.request.request", id: 5, requestId: "req_abcdef12" }, post)).toBe(true)
-    expect(posted.pop()).toEqual({ type: "alpha.hub.request.reply", id: 5, record: null })
+    expect(host.receive({ type: "codepuppy.hub.request.request", id: 5, requestId: "req_abcdef12" }, post)).toBe(true)
+    expect(posted.pop()).toEqual({ type: "codepuppy.hub.request.reply", id: 5, record: null })
 
-    host.receive({ type: "alpha.hub.view.request", id: 6, directory: w.projectDir, sessionID: "ses_1", agent: "build" }, post)
+    host.receive({ type: "codepuppy.hub.view.request", id: 6, directory: w.projectDir, sessionID: "ses_1", agent: "build" }, post)
     await new Promise((resolve) => setTimeout(resolve, 200))
     const reply = posted.pop()
-    if (!reply || reply.type !== "alpha.hub.view.reply" || !("view" in reply)) throw new Error(`expected view reply, got ${JSON.stringify(reply)}`)
+    if (!reply || reply.type !== "codepuppy.hub.view.reply" || !("view" in reply)) throw new Error(`expected view reply, got ${JSON.stringify(reply)}`)
     expect(reply.id).toBe(6)
     expect(row(reply.view.rows, "mcp:files").state).toBe("available")
 
-    const sent: AlphaSidecarOutbound[] = []
+    const sent: CodePuppySidecarOutbound[] = []
     host.attach((m) => void sent.push(m))
     const { generation } = w.coordinator.request({ scope: "global", items: [], reason: "x" })
-    expect(sent.map((m) => m.type)).toEqual(["alpha.reload.request"])
-    host.receive({ type: "alpha.reload.report", generation, scope: "global", outcome: "waiting", directories: [], error: "1 session(s) busy" }, post)
+    expect(sent.map((m) => m.type)).toEqual(["codepuppy.reload.request"])
+    host.receive({ type: "codepuppy.reload.report", generation, scope: "global", outcome: "waiting", directories: [], error: "1 session(s) busy" }, post)
     expect(w.coordinator.pendingFor("/any")).toEqual({ code: "reload-waiting", detail: "1 session(s) busy" })
   })
 
@@ -579,9 +579,9 @@ describe("I6:main 侧 alpha.* 分发只做只读查询与重载记录", () => {
     const w = world("host-dead")
     const logs: string[] = []
     const stages = createHubRequestStages({ log: () => {} })
-    const host = createAlphaSidecarHost({ view: w.service, requests: stages, reloads: w.coordinator, log: (line) => logs.push(line) })
+    const host = createCodePuppySidecarHost({ view: w.service, requests: stages, reloads: w.coordinator, log: (line) => logs.push(line) })
     expect(() =>
-      host.receive({ type: "alpha.hub.request.request", id: 1, requestId: "req_abcdef12" }, () => {
+      host.receive({ type: "codepuppy.hub.request.request", id: 1, requestId: "req_abcdef12" }, () => {
         throw new Error("Cannot post to a dead process")
       }),
     ).not.toThrow()

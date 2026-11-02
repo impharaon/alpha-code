@@ -20,18 +20,18 @@ review_after: 2026-10-13
 
 | 层 | 根 | 生命周期 | 所有者模块 |
 | --- | --- | --- | --- |
-| 共享 base | `<appData>/alpha-code-state` | main 启动时 canonical 冻结；不是可变安装根，也不是 data-clear 删除目标 | `alpha-environment.ts` |
+| 共享 base | `<appData>/codepuppy-state` | main 启动时 canonical 冻结；不是可变安装根，也不是 data-clear 删除目标 | `codepuppy-environment.ts` |
 | CAS blob(不可变内容,media-type-neutral) | `<base>/cas/v1/sha256/<aa>/<64hex>`(**跨环境共享** —— prod/beta/dev 同 payload 只占一份磁盘,parent AC2) | 由 mark/sweep GC 管理;blob 可随时按 digest 重建 | `ext-cas.ts` |
 | 安装态(receipts / generations / journal / grants) | `<base>/env/dev`、`<base>/env/prod`、`<base>/env/beta`(两两不等且互非祖先) | REQ-099 账本 + REQ-100 事务引擎(有界代数保留) | `ext-receipt-v2.ts` / `ext-transaction.ts` |
 | 用户数据(workspace / secrets / 会话 / 导入源) | 各自既有根 | **任何 CAS/GC 路径在构造上不可达**;GC 唯一删除面 = 严格 blob 命名 + realpath 圈禁的 CAS 文件 | — |
 
 环境根安全合同(#428):
 
-- `initAlphaEnvironment` 是唯一解析点。默认 base 来自 Electron `app.getPath("appData")`；
-  `ALPHA_ENV_BASE_DIR` 仅 unpackaged 构建接受且只覆盖 base，不能直接指定 mutable root。
+- `initCodePuppyEnvironment` 是唯一解析点。默认 base 来自 Electron `app.getPath("appData")`；
+  `CODEPUPPY_ENV_BASE_DIR` 仅 unpackaged 构建接受且只覆盖 base，不能直接指定 mutable root。
   packaged onboarding 只使用 composition root 内部生成、经显式函数参数传入的临时 base。
-- `ALPHA_GLOBAL_DIR` 只是初始化成功后的派生输出。packaged 发现任何外部 root override，或任意
-  构建发现预置 `ALPHA_GLOBAL_DIR`，均在窗口、sidecar 与派生写盘前 fail-closed 退出。
+- `CODEPUPPY_GLOBAL_DIR` 只是初始化成功后的派生输出。packaged 发现任何外部 root override，或任意
+  构建发现预置 `CODEPUPPY_GLOBAL_DIR`，均在窗口、sidecar 与派生写盘前 fail-closed 退出。
 - 初始化先对三环境根执行词法与 prospective-canonical equality/ancestry 检查，并拒绝退休根
   `~/.alpha` 的等值、祖先、后代和可解析 symlink alias；首次创建新拓扑后立即复验 endpoint
   非 symlink 且 realpath 未漂移，随后才冻结 canonical base/root 并写派生环境变量。
@@ -83,7 +83,7 @@ CAS 补充语义:
      CAS 同构布局去重 + 确定性 meta,零时间戳,二连跑 diff 为空)。
    漂移守卫:`src/main/extension-seed-snapshot.test.ts`(S13 A 侧)—— 严格解码、逐 blob
    重哈希、快照 meta 钉合、**与内置 catalog 快照互钉**(`lock.catalog.sha256 ==
-   alpha-catalog.json` 字节 sha256:stable 晋级后两个快照必须同步再生,否则 `bun test` 红)。
+   codepuppy-catalog.json` 字节 sha256:stable 晋级后两个快照必须同步再生,否则 `bun test` 红)。
    打包落点:electron-builder `extraResources` → `<process.resourcesPath>/extension-seed`。
 2. **运行期浏览(纯读)**:`ext-seed.readPackagedSeed(seedDir)` —— lock 严格解码(未知顶层键
    = 降级混淆,拒绝)、S10 预算按 lock 记录同值再执行、S9 平台门(当前平台 ∉
@@ -290,19 +290,19 @@ REQ-136 的窄例外仅允许已验 MCP 走 project config-only 安装,其完整
   `entry.type === "mcp"` 可进 project；seed 必须 selected asset 与同包 bundled entry 都解析为
   MCP 且 `verifySeedAsset` 全过。Renderer id 前缀不算 kind 证据；skill/agent/plugin/bundle/cloud/
   signed-package/unlisted 均拒。事务根由 canonical D 派生为 `D/.code-puppy`，唯一 config target 是
-  `D/.code-puppy/alpha.jsonc`，receipt/journal 同根；不写 `extensionsConsent`，不写进
+  `D/.code-puppy/codepuppy.jsonc`，receipt/journal 同根；不写 `extensionsConsent`，不写进
   `OPENCODE_CONFIG`/`OPENCODE_CONFIG_CONTENT`，也不造第二个项目注册表。
 - **安全子集与管理面**:project MCP 要求零 required env、零 secret version、零 secret/workspace
   grant，并拒 literal `{workspace}` 与 workspace-policy classifier 命中。每次 project write/uninstall
-  经 per-root gate 惰性恢复恰好 D；D 根及 `alpha.jsonc`/`installs.json`/`ext-tx`/`ext-store`
+  经 per-root gate 惰性恢复恰好 D；D 根及 `codepuppy.jsonc`/`installs.json`/`ext-tx`/`ext-store`
   既有端点在恢复前与 transaction 紧前复验，symlink/非常规文件 fail-closed。恢复前另验 journal
-  algebra：REQ-136 MCP 只容单一 `mcp--*` config item 指向 D 的 `alpha.jsonc`、空 files/placeholder
+  algebra：REQ-136 MCP 只容单一 `mcp--*` config item 指向 D 的 `codepuppy.jsonc`、空 files/placeholder
   generation/零 prepared；保留的旧管理面只容 skill/agent generation journal。其它 config/file/
   receipt/package 形状拒绝，不交给 generic replay（尤其不能写 `prefs.json`/consent）。MCP 卸载只删 D 的
   config leaf、D 授权账与 D receipt，绝不调用 global legacy-config/secret/connection cleanup。
   Global 与 project 同名卸载互不改写对方字节。
   Project skill/agent 历史残留仍保留原管理面；generation-backed skill 继续 journaled teardown。
-- **发现与激活**:project MCP 仍只由既有 per-instance hook 读取 `D/.code-puppy/alpha.jsonc`；安装不写
+- **发现与激活**:project MCP 仍只由既有 per-instance hook 读取 `D/.code-puppy/codepuppy.jsonc`；安装不写
   `extensionsConsent`，也不执行 session-switch writer。Main 的 D-scoped probe 先排除 effective global
   同名项，再要求 D 的 effective MCP leaf 与 durable project leaf 精确一致，最后才查询 D-scoped
   name-only status；只返回 `active | shadowed | unverifiable`，不回传 config bytes，shadowed/
@@ -315,7 +315,7 @@ REQ-136 的窄例外仅允许已验 MCP 走 project config-only 安装,其完整
   ① project-identity 的 catalog record(identity 不符单项 fail-closed);② 账本判 absent 且
   形状为 `skill--<safe>`、具 generation-store 结构的 ghost 店。其余一律只报告:非该形状的
   ext-store 条目、误置(非 project scope)record、v1 占位、以及 orphan agent 面
-  (`.code-puppy/agents/*.md`、`alpha.jsonc` agent 条目)—— 永不自动清。
+  (`.code-puppy/agents/*.md`、`codepuppy.jsonc` agent 条目)—— 永不自动清。
 
 ## 附:seed 安装的初始启用态(REQ-104 #395)
 

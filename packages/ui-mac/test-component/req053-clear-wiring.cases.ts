@@ -11,7 +11,7 @@
 // 排在 logout/exit **之前**。
 //
 // ⚠️ 安全前置(对抗审计 Major):本文件驱动的是**生产的递归删除路径**(`rmSync(p,{recursive,force})`),
-// 而它的四个根全部由运行时 env/homedir 推导,且身份闸 `assertAlphaEnvironmentIdentity` 在这里被
+// 而它的四个根全部由运行时 env/homedir 推导,且身份闸 `assertCodePuppyEnvironmentIdentity` 在这里被
 // mock 掉了。所以每次调 `clearData()` 之前必须先跑 `assertBlastRadiusIsScratch()`:用**生产解析器**
 // 各取一次四个根、再用**生产 planClear** 把这一级真正会删的每一条路径枚举出来,逐条断言落在本次
 // mkdtemp 的根内,不满足直接 throw(不是 skip)。「以后有人加第五个根」会自动进枚举 ⇒ 默认拒。
@@ -66,7 +66,7 @@ mock.module("electron", () =>
 
 // mock.module 会**就地改写**已捕获的命名空间对象 ⇒ 真值必须在注册**之前**拷进普通对象。
 const realLogging = { ...(await import("../src/main/logging")) }
-const realAlphaEnvironment = { ...(await import("../src/main/alpha-environment")) }
+const realCodePuppyEnvironment = { ...(await import("../src/main/codepuppy-environment")) }
 
 const logged: Array<{ level: string; line: string }> = []
 const recorder = {
@@ -75,27 +75,27 @@ const recorder = {
   error: (line: unknown) => logged.push({ level: "error", line: String(line) }),
 }
 mock.module("../src/main/logging", () => ({ ...realLogging, getLogger: () => recorder }))
-// 只导出 assertAlphaEnvironmentIdentity 会让 `resolveAlphaGlobalRoot` 变成 undefined —— 那会抛在
-// `tryAcquireBundleLock(alphaGlobalRoot(), …)` 上,被 clearData 的外层 catch 吞成一行日志,
+// 只导出 assertCodePuppyEnvironmentIdentity 会让 `resolveCodePuppyGlobalRoot` 变成 undefined —— 那会抛在
+// `tryAcquireBundleLock(codepuppyGlobalRoot(), …)` 上,被 clearData 的外层 catch 吞成一行日志,
 // 现场与本闸毫无关系。整份命名空间照抄,只顶替身份闸。
-mock.module("../src/main/alpha-environment", () => ({
-  ...realAlphaEnvironment,
-  assertAlphaEnvironmentIdentity: () => {},
+mock.module("../src/main/codepuppy-environment", () => ({
+  ...realCodePuppyEnvironment,
+  assertCodePuppyEnvironmentIdentity: () => {},
 }))
 
 let logoutSnapshot: Snapshot | null = null
 let exitSnapshot: Snapshot | null = null
-mock.module("../src/main/alpha-auth", () => ({
+mock.module("../src/main/codepuppy-auth", () => ({
   logout: async () => {
     logoutSnapshot = takeSnapshot()
   },
 }))
-mock.module("../src/main/alpha-byok-keys", () => ({ clearByokKeys: () => {} }))
+mock.module("../src/main/codepuppy-byok-keys", () => ({ clearByokKeys: () => {} }))
 
 const { createDataClearAction } = await import("../src/main/data-clear-boot")
 const { engineDataDir, planClear } = await import("../src/main/data-clear")
-const { alphaGlobalRoot } = await import("../src/main/alpha-installs")
-const { opencodeHomeDir } = await import("../src/main/alpha-bridge")
+const { codepuppyGlobalRoot } = await import("../src/main/codepuppy-installs")
+const { opencodeHomeDir } = await import("../src/main/codepuppy-bridge")
 const { tryAcquireBundleLock } = await import("../src/main/ext-bundle-lock")
 
 const realFs: FsDeps = {
@@ -138,25 +138,25 @@ const LIVE_ENV_KEY = "KEEP"
 let caseDir = ""
 let roots: ClearRoots
 let xdgConfigDir = ""
-let alphaConfig = ""
+let codepuppyConfig = ""
 let legacyConfig = ""
 let xdgConfig = ""
 let danglingPlugin = ""
 let foreignPlugin = ""
 let secretFile = ""
 let liveRefTarget = ""
-let seededAlphaText = ""
+let seededCodePuppyText = ""
 let seededLegacyText = ""
 let xdgIdentity = { ino: 0, mtimeMs: 0, text: "" }
 
 const ENV_KEYS = [
-  "ALPHA_GLOBAL_DIR",
-  "ALPHA_OPENCODE_HOME",
+  "CODEPUPPY_GLOBAL_DIR",
+  "CODEPUPPY_OPENCODE_HOME",
   "OPENCODE_CONFIG_DIR",
   "XDG_DATA_HOME",
   "XDG_CONFIG_HOME",
-  "ALPHA_JSONC_TRUTH_DISABLE",
-  "ALPHA_LEGACY_INSTALL_ROOT",
+  "CODEPUPPY_JSONC_TRUTH_DISABLE",
+  "CODEPUPPY_LEGACY_INSTALL_ROOT",
 ] as const
 const savedEnv: Record<string, string | undefined> = {}
 
@@ -178,7 +178,7 @@ function readOrNull(file: string): string | null {
 function takeSnapshot(): Snapshot {
   const xdgStat = existsSync(xdgConfig) ? statSync(xdgConfig) : null
   return {
-    alpha: readOrNull(alphaConfig),
+    alpha: readOrNull(codepuppyConfig),
     legacy: readOrNull(legacyConfig),
     xdg: xdgStat ? { text: readFileSync(xdgConfig, "utf8"), ino: xdgStat.ino, mtimeMs: xdgStat.mtimeMs } : null,
     secretExists: existsSync(secretFile),
@@ -199,7 +199,7 @@ function incidentRefsStillIn(text: string | null): string[] {
 }
 
 function configText(kind: "alpha" | "legacy") {
-  const configDir = kind === "alpha" ? roots.alphaGlobal : roots.opencodeHome
+  const configDir = kind === "alpha" ? roots.codepuppyGlobal : roots.opencodeHome
   return `{
   // ${COMMENT} (${kind}, dir=${configDir})
   "plugin": [
@@ -228,7 +228,7 @@ beforeEach(() => {
   caseDir = join(SCRATCH, `case-${caseIndex}`)
   roots = {
     userData: join(caseDir, "user-data"),
-    alphaGlobal: join(caseDir, "alpha-global"),
+    codepuppyGlobal: join(caseDir, "codepuppy-global"),
     opencodeHome: join(caseDir, "opencode-home"),
     engineData: join(caseDir, "xdg-data", "opencode"),
   }
@@ -241,34 +241,34 @@ beforeEach(() => {
   logoutSnapshot = null
   exitSnapshot = null
 
-  process.env.ALPHA_GLOBAL_DIR = roots.alphaGlobal
-  process.env.ALPHA_OPENCODE_HOME = roots.opencodeHome
+  process.env.CODEPUPPY_GLOBAL_DIR = roots.codepuppyGlobal
+  process.env.CODEPUPPY_OPENCODE_HOME = roots.opencodeHome
   process.env.OPENCODE_CONFIG_DIR = xdgConfigDir
   process.env.XDG_DATA_HOME = join(caseDir, "xdg-data")
   delete process.env.XDG_CONFIG_HOME
-  delete process.env.ALPHA_JSONC_TRUTH_DISABLE
-  delete process.env.ALPHA_LEGACY_INSTALL_ROOT
+  delete process.env.CODEPUPPY_JSONC_TRUTH_DISABLE
+  delete process.env.CODEPUPPY_LEGACY_INSTALL_ROOT
 
   danglingPlugin = join(roots.userData, "plugins", "gone.js") // 从来不存在 ⇒ 确证缺席
   foreignPlugin = join(caseDir, "user-project", "plugin.js") // 守卫根**之外**,同样缺席 ⇒ 必须保留
-  secretFile = join(roots.userData, "alpha-mcp-secrets", MCP_NAME, DANGLING_ENV_KEY)
+  secretFile = join(roots.userData, "codepuppy-mcp-secrets", MCP_NAME, DANGLING_ENV_KEY)
   liveRefTarget = join(roots.engineData, "live", LIVE_ENV_KEY)
-  alphaConfig = join(roots.alphaGlobal, "alpha.jsonc")
+  codepuppyConfig = join(roots.codepuppyGlobal, "codepuppy.jsonc")
   legacyConfig = join(roots.opencodeHome, "opencode.jsonc")
   xdgConfig = join(xdgConfigDir, "opencode.jsonc")
 
-  for (const dir of [roots.userData, roots.alphaGlobal, roots.opencodeHome, roots.engineData, xdgConfigDir]) {
+  for (const dir of [roots.userData, roots.codepuppyGlobal, roots.opencodeHome, roots.engineData, xdgConfigDir]) {
     mkdirSync(dir, { recursive: true })
   }
   mkdirSync(join(roots.userData, "plugins"), { recursive: true })
-  mkdirSync(join(roots.userData, "alpha-mcp-secrets", MCP_NAME), { recursive: true })
+  mkdirSync(join(roots.userData, "codepuppy-mcp-secrets", MCP_NAME), { recursive: true })
   mkdirSync(join(roots.engineData, "live"), { recursive: true })
   writeFileSync(secretFile, "s3cret")
   writeFileSync(liveRefTarget, "still here")
 
-  writeFileSync(alphaConfig, configText("alpha"))
+  writeFileSync(codepuppyConfig, configText("alpha"))
   writeFileSync(legacyConfig, configText("legacy"))
-  seededAlphaText = readFileSync(alphaConfig, "utf8")
+  seededCodePuppyText = readFileSync(codepuppyConfig, "utf8")
   seededLegacyText = readFileSync(legacyConfig, "utf8")
   // XDG 用户配置:同形悬空引用,目标就在守卫根里 —— 产品仍然一个字节都不许写(I1)。
   writeFileSync(xdgConfig, configText("legacy"))
@@ -296,7 +296,7 @@ afterAll(() => {
 function assertBlastRadiusIsScratch(level: "credentials" | "data") {
   const resolved = {
     userData: userDataPath,
-    alphaGlobal: alphaGlobalRoot(),
+    codepuppyGlobal: codepuppyGlobalRoot(),
     opencodeHome: opencodeHomeDir(),
     engineData: engineDataDir(process.env, homedir()),
   }
@@ -404,7 +404,7 @@ test("a busy config lock deletes the files but leaves both configs byte-identica
   routeByTitle({ 清除数据: { response: 0 }, 清除凭证: { response: 0 }, 已清除凭证: { response: 0 } })
   assertBlastRadiusIsScratch("credentials")
 
-  const held = tryAcquireBundleLock(alphaGlobalRoot(), { txId: "held-by-req053-test" })
+  const held = tryAcquireBundleLock(codepuppyGlobalRoot(), { txId: "held-by-req053-test" })
   expect(held.ok).toBe(true)
   if (!held.ok) return
   try {
@@ -413,7 +413,7 @@ test("a busy config lock deletes the files but leaves both configs byte-identica
     const snapshot = logoutSnapshot!
 
     expect(snapshot.secretExists).toBe(false)
-    expect(snapshot.alpha).toBe(seededAlphaText)
+    expect(snapshot.alpha).toBe(seededCodePuppyText)
     expect(snapshot.legacy).toBe(seededLegacyText)
     expect(logged.some((entry) => entry.line.startsWith("[req053-dangling-sweep] level=credentials skipped:"))).toBe(true)
   } finally {
@@ -439,7 +439,7 @@ test("full data clear sweeps the legacy config before app.exit(0)", async () => 
   expectNoUnexpectedErrors()
 
   expect(exitCalls).toEqual([0])
-  // data 级把 alphaGlobal 整根删掉 ⇒ alpha.jsonc 随根消失,唯一还在盘上的 alpha 自有配置是 legacy。
+  // data 级把 codepuppyGlobal 整根删掉 ⇒ codepuppy.jsonc 随根消失,唯一还在盘上的 alpha 自有配置是 legacy。
   expect(snapshot.alpha).toBeNull()
   expect(snapshot.secretExists).toBe(false)
   expect(incidentRefsStillIn(snapshot.legacy)).toEqual([])

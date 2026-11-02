@@ -1,5 +1,5 @@
 // #918:桌面派发的信封在 alpha-platform 诚实门下的可达性闸门。真断言在 cloud-dispatch-gate.cases.ts ——
-// 子进程跑(alpha-cloud-jobs.test.ts 同款),因为 mock.module("./alpha-auth" 等)与替换 globalThis.fetch
+// 子进程跑(codepuppy-cloud-jobs.test.ts 同款),因为 mock.module("./codepuppy-auth" 等)与替换 globalThis.fetch
 // 会污染同进程的其它测试文件。
 //
 // 「6 pass」这个数字本身也是判据:批量跑测试最贵的假绿是**一条都没跑而 0 fail 恒成立**

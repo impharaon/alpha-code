@@ -23,9 +23,9 @@ let tmp: string
 let seedDir: string
 let casBase: string
 beforeEach(() => {
-  tmp = fs.mkdtempSync(path.join(os.tmpdir(), "alpha-seed-"))
+  tmp = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-seed-"))
   seedDir = path.join(tmp, "extension-seed")
-  casBase = path.join(tmp, "alpha-base")
+  casBase = path.join(tmp, "codepuppy-base")
   fs.mkdirSync(seedDir, { recursive: true })
 })
 afterEach(() => {

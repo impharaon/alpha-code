@@ -4,7 +4,7 @@ import { afterAll, describe, expect, test } from "bun:test"
 import { copyFileSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
-import { resolveProjectAlphaRoot } from "../main/alpha-workdir"
+import { resolveProjectCodePuppyRoot } from "../main/codepuppy-workdir"
 import {
   ATTACHMENT_METADATA_KEY,
   attachmentAbsolutePath,
@@ -37,7 +37,7 @@ describe("attachmentAbsolutePath", () => {
     expect(normalizePosixPath("a/../../b")).toBe("../b")
   })
   test("改 PROJECT_HIDDEN_DIR 的值,附件路径随之改变(拷一份共享模块改常量再装载)", async () => {
-    const dir = realpathSync(mkdtempSync(join(tmpdir(), "alpha-attpath-")))
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-attpath-")))
     temps.push(dir)
     for (const file of ["attachment-path.ts", "office-advisories.ts"]) copyFileSync(join(import.meta.dir, file), join(dir, file))
     const constant = readFileSync(join(import.meta.dir, "project-hidden-dir.ts"), "utf8")
@@ -47,12 +47,12 @@ describe("attachmentAbsolutePath", () => {
     expect(renamed.attachmentAbsolutePath("/p", `attachments/${UUID}/a.pdf`)).toBe(`/p/.codepuppy/attachments/${UUID}/a.pdf`)
     expect(attachmentAbsolutePath("/p", `attachments/${UUID}/a.pdf`)).toBe(`/p/${PROJECT_HIDDEN_DIR}/attachments/${UUID}/a.pdf`)
   })
-  test("main 的项目根解析器读同一个常量(暂存落点经 safeResolveInAlpha 跟着它走)", () => {
-    const project = realpathSync(mkdtempSync(join(tmpdir(), "alpha-attpath-proj-")))
+  test("main 的项目根解析器读同一个常量(暂存落点经 safeResolveInCodePuppy 跟着它走)", () => {
+    const project = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-attpath-proj-")))
     temps.push(project)
-    const home = realpathSync(mkdtempSync(join(tmpdir(), "alpha-attpath-home-")))
+    const home = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-attpath-home-")))
     temps.push(home)
-    const resolved = resolveProjectAlphaRoot(project, home)
+    const resolved = resolveProjectCodePuppyRoot(project, home)
     expect(resolved).toEqual({ status: "project", projectDir: project, root: join(project, PROJECT_HIDDEN_DIR) })
   })
 })
@@ -60,9 +60,9 @@ describe("attachmentAbsolutePath", () => {
 describe("AC8 附件代码里没有隐藏目录名 / 附件目录的字面量", () => {
   const FILES = [
     "packages/ui-mac/src/main/composer-attachment-stage.ts",
-    "packages/ui-mac/src/renderer/alpha-ui/composer-attachments-core.ts",
-    "packages/ui-mac/src/renderer/alpha-ui/attachment-cards.tsx",
-    "packages/ui-mac/src/renderer/alpha-ui/session-timeline/timeline-attachments.ts",
+    "packages/ui-mac/src/renderer/codepuppy-ui/composer-attachments-core.ts",
+    "packages/ui-mac/src/renderer/codepuppy-ui/attachment-cards.tsx",
+    "packages/ui-mac/src/renderer/codepuppy-ui/session-timeline/timeline-attachments.ts",
     "packages/ext/src/attachment-reader-hooks.ts",
   ]
   // 两种写法都抓:引号起头(`".code-puppy"`、`'.codepuppy/…'`)与路径中段(`${dir}/.codepuppy/x`、`"./.code-puppy"`)。
@@ -75,10 +75,10 @@ describe("AC8 附件代码里没有隐藏目录名 / 附件目录的字面量", 
     expect(HIDDEN_LITERAL.test('`${root}/.code-puppy`')).toBe(true)
     expect(HIDDEN_LITERAL.test("path.join(dir, PROJECT_HIDDEN_DIR)")).toBe(false)
     expect(HIDDEN_LITERAL.test("'.codepuppy/attachments'")).toBe(true)
-    expect(ATTACHMENTS_LITERAL.test('safeResolveInAlpha(d, "attachments", id)')).toBe(true)
+    expect(ATTACHMENTS_LITERAL.test('safeResolveInCodePuppy(d, "attachments", id)')).toBe(true)
     expect(ATTACHMENTS_LITERAL.test("`${root}/attachments/${id}`")).toBe(true)
   })
-  test("附件五个模块零命中;alpha-workdir 的解析器与身份复验不再写隐藏目录名", () => {
+  test("附件五个模块零命中;codepuppy-workdir 的解析器与身份复验不再写隐藏目录名", () => {
     for (const file of FILES) {
       const code = readFileSync(join(REPO, file), "utf8")
         .split("\n")
@@ -87,7 +87,7 @@ describe("AC8 附件代码里没有隐藏目录名 / 附件目录的字面量", 
       expect(HIDDEN_LITERAL.test(code), file).toBe(false)
       expect(ATTACHMENTS_LITERAL.test(code), file).toBe(false)
     }
-    const workdir = readFileSync(join(SRC, "main/alpha-workdir.ts"), "utf8")
+    const workdir = readFileSync(join(SRC, "main/codepuppy-workdir.ts"), "utf8")
     expect(workdir).toContain("path.join(project, PROJECT_HIDDEN_DIR)")
     expect(workdir).toContain("path.basename(root) !== PROJECT_HIDDEN_DIR")
     expect(workdir).not.toMatch(/path\.join\(project, "\.code-puppy"\)|basename\(root\) !== "\.code-puppy"/)

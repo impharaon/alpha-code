@@ -1,4 +1,4 @@
-// REQ-100 #311:事务引擎 action-union —— config(alpha.jsonc)与 generation 混在同一原子事务;
+// REQ-100 #311:事务引擎 action-union —— config(codepuppy.jsonc)与 generation 混在同一原子事务;
 // receipt-only(cloud)。验证:异构 commit、config 回滚(receipt 失败)、config 崩溃恢复原子性。
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
@@ -21,7 +21,7 @@ let root: string
 let cfg: string
 beforeEach(() => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), "ext-tx-cfg-"))
-  cfg = path.join(root, "alpha.jsonc")
+  cfg = path.join(root, "codepuppy.jsonc")
 })
 afterEach(() => {
   fs.rmSync(root, { recursive: true, force: true })
@@ -60,7 +60,7 @@ describe("config action", () => {
             {
               key: "mcp--x",
               action: "config" as const,
-              config: { target: path.join(outside, "alpha.jsonc"), edits: [{ keyPath: ["mcp", "x"], value: { type: "local" } }] },
+              config: { target: path.join(outside, "codepuppy.jsonc"), edits: [{ keyPath: ["mcp", "x"], value: { type: "local" } }] },
               manifestDigest: `sha256:${sha("x")}`,
             },
           ],
@@ -69,14 +69,14 @@ describe("config action", () => {
       )
       expect(r.ok).toBe(false)
       if (!r.ok) expect(r.reason).toContain("escapes the transaction root")
-      expect(fs.existsSync(path.join(outside, "alpha.jsonc"))).toBe(false) // 零写盘
+      expect(fs.existsSync(path.join(outside, "codepuppy.jsonc"))).toBe(false) // 零写盘
     } finally {
       fs.rmSync(outside, { recursive: true, force: true })
     }
   })
 
   test("#378 r13:同一物理文件的别名 config target(sub/../)在 validate 期拒绝", async () => {
-    const aliased = `${root}${path.sep}sub${path.sep}..${path.sep}alpha.jsonc` // 不经 join 归一的原始别名
+    const aliased = `${root}${path.sep}sub${path.sep}..${path.sep}codepuppy.jsonc` // 不经 join 归一的原始别名
     const r = await runExtensionTransaction(
       root,
       {
@@ -96,7 +96,7 @@ describe("config action", () => {
     if (typeof process.getuid === "function" && process.getuid() === 0) return // root 下 0o555 仍可写
     const sub = path.join(root, "ro")
     fs.mkdirSync(sub, { recursive: true })
-    const target = path.join(sub, "alpha.jsonc")
+    const target = path.join(sub, "codepuppy.jsonc")
     const pre = "{}"
     const next = JSON.stringify({ mcp: { a: { type: "local" } } })
     fs.writeFileSync(target, next)
@@ -215,7 +215,7 @@ describe("config action", () => {
     expect(readCfg().mcp.a.type).toBe("bypass") // 留证:不复原、不覆盖
   })
 
-  test("config 装进 live alpha.jsonc + 提交 config receipt", async () => {
+  test("config 装进 live codepuppy.jsonc + 提交 config receipt", async () => {
     const received: TxCommitRecord[][] = []
     const r = await runExtensionTransaction(root, { items: [configItem("mcp--a", "a", { type: "local" })] }, {
       populate: noop,
@@ -228,7 +228,7 @@ describe("config action", () => {
     expect(received[0]![0]!.configTarget).toBe(cfg)
   })
 
-  test("同一 alpha.jsonc 两条 config edit 累积落地(不互相覆盖)", async () => {
+  test("同一 codepuppy.jsonc 两条 config edit 累积落地(不互相覆盖)", async () => {
     writeCfg({ mcp: { existing: 1 } })
     const r = await runExtensionTransaction(
       root,
@@ -255,7 +255,7 @@ describe("异构 bundle 原子性", () => {
     expect(readCfg().mcp.a).toEqual({ type: "local" }) // config live
   })
 
-  test("receipt commit 失败 → config 回滚(live alpha.jsonc 复原)+ generation 不切换", async () => {
+  test("receipt commit 失败 → config 回滚(live codepuppy.jsonc 复原)+ generation 不切换", async () => {
     writeCfg({ mcp: { existing: 1 } })
     const before = fs.readFileSync(cfg, "utf8")
     const r = await runExtensionTransaction(
@@ -277,7 +277,7 @@ describe("异构 bundle 原子性", () => {
 })
 
 describe("config 崩溃恢复", () => {
-  test("switch 后崩溃(config 已应用)+ 无 probe → 恢复回滚,alpha.jsonc 复原(原子性)", async () => {
+  test("switch 后崩溃(config 已应用)+ 无 probe → 恢复回滚,codepuppy.jsonc 复原(原子性)", async () => {
     writeCfg({ mcp: { existing: 1 } })
     const before = fs.readFileSync(cfg, "utf8")
     // 在 after-switched 崩溃:config next-image 已写入 live,journal=switched,receipt 未提交。
@@ -317,10 +317,10 @@ describe("config 崩溃恢复", () => {
 describe("prepareConfigTx 形状异常 fail-closed(#358 review)", () => {
   test("非对象父节点(agent 为字符串/数字)返回 ok:false 而非抛异常", async () => {
     const { prepareConfigTx } = await import("./ext-config-tx")
-    const r1 = prepareConfigTx("/nonexistent/alpha.jsonc", [{ keyPath: ["agent", "demo"], value: { a: 1 } }], '{"agent": "mine"}')
+    const r1 = prepareConfigTx("/nonexistent/codepuppy.jsonc", [{ keyPath: ["agent", "demo"], value: { a: 1 } }], '{"agent": "mine"}')
     expect(r1.ok).toBe(false)
     if (!r1.ok) expect(r1.reason).toContain("config edit failed")
-    const r2 = prepareConfigTx("/nonexistent/alpha.jsonc", [{ keyPath: ["mcp", "x"], value: {} }], '{"mcp": 3}')
+    const r2 = prepareConfigTx("/nonexistent/codepuppy.jsonc", [{ keyPath: ["mcp", "x"], value: {} }], '{"mcp": 3}')
     expect(r2.ok).toBe(false)
   })
 })

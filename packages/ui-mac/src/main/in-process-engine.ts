@@ -8,11 +8,11 @@
 // sidecar 与 ext 是两个独立 bundle,互相 import 不到,也不能往插件模块上多挂导出(引擎把插件模块的每个导出都当插件调用)。
 // 所以交接走进程级的全局 symbol:sidecar 在 import 引擎之后挂上进程内的 `app.fetch`(与本进程 prewarm 同一调用方式,
 // 不经 TCP),ext 按需取用;没人挂(CLI / 测试宿主)就是 undefined,调用方自己决定退回什么。
-// 本文件零依赖(ext 经相对路径 import,与 alpha-sidecar-messages.ts 同一先例)。
+// 本文件零依赖(ext 经相对路径 import,与 codepuppy-sidecar-messages.ts 同一先例)。
 
 export type EngineFetch = (request: Request) => Response | Promise<Response>
 
-const KEY = Symbol.for("alpha.engine.in-process-fetch")
+const KEY = Symbol.for("codepuppy.engine.in-process-fetch")
 
 export function publishInProcessEngine(fetch: EngineFetch): void {
   ;(globalThis as Record<symbol, unknown>)[KEY] = fetch

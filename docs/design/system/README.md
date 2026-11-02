@@ -18,10 +18,10 @@ any surface — that is a hard rule, see [`contributing.md`](contributing.md).
 
 Design **intent** lives in these docs. The **implemented** values are code:
 
-- **Tokens** → [`packages/ui-mac/src/renderer/alpha-ui/tokens.css`](../../../packages/ui-mac/src/renderer/alpha-ui/tokens.css)
+- **Tokens** → [`packages/ui-mac/src/renderer/codepuppy-ui/tokens.css`](../../../packages/ui-mac/src/renderer/codepuppy-ui/tokens.css)
   (`--a-*`). This file is authoritative for every value; the docs distill and
   explain it. When a doc and `tokens.css` disagree, `tokens.css` wins — fix the doc.
-- **Components** → `packages/ui-mac/src/renderer/alpha-ui/*.css` + `*.tsx`.
+- **Components** → `packages/ui-mac/src/renderer/codepuppy-ui/*.css` + `*.tsx`.
 - **Live styleguide** → [`gallery.html`](gallery.html) — every token and component
   rendered in light + dark, generated from the sources above. Open it in a browser.
 

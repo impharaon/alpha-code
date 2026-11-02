@@ -37,7 +37,7 @@ import { registerAutomationIpcHandlers } from "./automation-ipc"
 import { startAutomationScheduler } from "./automation-scheduler"
 import { initAutomationLlm } from "./automation-llm"
 import { registerToolPolicyIpcHandlers } from "./tool-policy-ipc"
-import { pullCloudScheduleRuns } from "./alpha-cloud-schedules"
+import { pullCloudScheduleRuns } from "./codepuppy-cloud-schedules"
 import { registerModelsIpcHandlers } from "./models-ipc"
 import { requestCatalogRefresh } from "./catalog-refresher"
 import { registerProviderIpcHandlers } from "./provider-ipc"
@@ -67,7 +67,7 @@ import {
   spawnLocalServer,
   type SidecarListener,
 } from "./server"
-import { applyPlatformCredentialsHot } from "./alpha-secret-files"
+import { applyPlatformCredentialsHot } from "./codepuppy-secret-files"
 import { setupAutoUpdater, showUpdaterDialog } from "./updater"
 import {
   createMainWindow,
@@ -81,11 +81,11 @@ import { createWslServersController } from "./wsl/servers"
 import { registerWslIpcHandlers } from "./wsl/ipc"
 import { spawnWslSidecar } from "./wsl/sidecar"
 import { migrate } from "./migrate"
-import { catalogRegistryChannel, initAlphaEnvironment } from "./alpha-environment"
-import { reconcileAlphaOfficeInstalls } from "./alpha-office-instance"
+import { catalogRegistryChannel, initCodePuppyEnvironment } from "./codepuppy-environment"
+import { reconcileCodePuppyOfficeInstalls } from "./codepuppy-office-instance"
 import { productionCasGcConfig, startCasGcScheduler } from "./ext-cas-gc-scheduler"
 import { registerSettingsIpcHandlers } from "./settings-ipc"
-import { ensureAlphaLayoutDefault } from "./alpha-defaults"
+import { ensureCodePuppyLayoutDefault } from "./codepuppy-defaults"
 import { initialSelfHealState, noteSpawn, planSelfHeal, SELF_HEAL_MAX_DELAY_MS } from "./sidecar-self-heal"
 import { ensureEngineScratchCwd } from "./engine-scratch-cwd"
 import {
@@ -108,20 +108,20 @@ import {
   probeCatalogMarker,
   startCatalogLivenessProbes,
 } from "./catalog-liveness"
-import { alphaUserWorkspaceDir } from "./alpha-user-workspace"
+import { codepuppyUserWorkspaceDir } from "./codepuppy-user-workspace"
 // #408:session-grant 生命周期接线(会话边界 = sidecar 运行期;栅栏语义见 ext-session-grants.ts)。
 import { sessionGrantRegistry } from "./ext-session-grants"
 import type { SessionGrantsEndedEventWire } from "../shared/ext-session-grant-wire"
-import { initEndpoints, resolveEndpoints } from "./alpha-endpoints"
+import { initEndpoints, resolveEndpoints } from "./codepuppy-endpoints"
 import { registerEndpointsIpcHandlers } from "./endpoints-ipc"
 import { registerAppVersionIpcHandler } from "./app-version-ipc"
-import { registerContractHealthIpcHandlers, reportContractFailure } from "./alpha-contract-health"
-import { registerCatalogHealthIpcHandlers } from "./alpha-catalog-health"
-import { registerSurfaceIpc } from "./alpha-surfaces"
+import { registerContractHealthIpcHandlers, reportContractFailure } from "./codepuppy-contract-health"
+import { registerCatalogHealthIpcHandlers } from "./codepuppy-catalog-health"
+import { registerSurfaceIpc } from "./codepuppy-surfaces"
 import { createRecoveryService, type RecoveryService } from "./recovery-service"
 import { registerRecoveryIpcHandlers } from "./recovery-ipc"
 import { RECOVERY_ACTIONS } from "../shared/recovery"
-import { initByokKeys, injectByokKeysIntoEnv, setByokKeyDeps } from "./alpha-byok-keys"
+import { initByokKeys, injectByokKeysIntoEnv, setByokKeyDeps } from "./codepuppy-byok-keys"
 import { reconcileEngineConfigTruth } from "./engine-config-truth-boot"
 import { sweepEngineConfigDanglingUnlocked, type DanglingSweepOutcome } from "./engine-config-dangling"
 import { runBootDanglingSweep } from "./boot-dangling-sweep"
@@ -132,10 +132,10 @@ import { reconcileMcpWorkspaceMarkers } from "./mcp-workspace-marker"
 import { engineDataDir } from "./data-clear"
 import { sweepLegacyCloudMcpAuthEntry } from "./cloud-mcp-auth-sweep"
 import { reconcileDesiredStateAtBoot } from "./ext-install-planner"
-import { alphaGlobalRoot } from "./alpha-installs"
+import { codepuppyGlobalRoot } from "./codepuppy-installs"
 import { factorySkillSources, reconcileFactorySkills } from "./factory-skills"
 import { runGlobalEcosystemGate } from "./ecosystem-gate"
-import { effectiveFactoryDenied, readBuiltinPolicy } from "./alpha-builtin-policy"
+import { effectiveFactoryDenied, readBuiltinPolicy } from "./codepuppy-builtin-policy"
 import {
   enableProxy,
   ensureFreshToken,
@@ -151,7 +151,7 @@ import {
   setAuthDeps,
   setAuthMode,
   startAuth,
-} from "./alpha-auth"
+} from "./codepuppy-auth"
 import { openChatArchiveCursor } from "./chat-archive-cursor"
 import { createChatArchiveUploader } from "./chat-archive-uploader"
 import { initModerationKeywords, notifyModerationAuthChanged } from "./moderation-keywords"
@@ -306,7 +306,7 @@ function handleSidecarExit(gen: number, code: number) {
         },
       },
     })
-    if (incident) mainWindow.webContents.send("alpha-recovery-incident", incident)
+    if (incident) mainWindow.webContents.send("codepuppy-recovery-incident", incident)
     return
   }
   writeLog("utility", "sidecar self-heal scheduled", { delayMs: plan.delayMs, attempt: selfHeal.attempts }, "warn")
@@ -388,7 +388,7 @@ function armEngineRunawayMeter(gen: number) {
         },
       },
     })
-    if (incident) mainWindow.webContents.send("alpha-recovery-incident", incident)
+    if (incident) mainWindow.webContents.send("codepuppy-recovery-incident", incident)
   }, ENGINE_RUNAWAY_WINDOW_MS)
 }
 
@@ -454,7 +454,7 @@ const main = Effect.gen(function* () {
     process.env.XDG_STATE_HOME = join(root, "state")
     // 安装真源与引擎桥根不在 XDG 下 → 测试态显式改道,
     // 否则隔离 test build 的定制中心安装会写进真实 home(os.homedir() 不吃 env 重定向)。
-    process.env.ALPHA_OPENCODE_HOME = join(root, "opencode-home")
+    process.env.CODEPUPPY_OPENCODE_HOME = join(root, "opencode-home")
     return root
   })()
   app.setName(app.isPackaged ? APP_NAMES[CHANNEL] : "alpha-code")
@@ -537,9 +537,9 @@ const main = Effect.gen(function* () {
   app.commandLine.appendSwitch("proxy-bypass-list", "<-loopback>")
   const features = app.commandLine.getSwitchValue("enable-features")
   app.commandLine.appendSwitch("enable-features", features ? `${jsCallStackFeature},${features}` : jsCallStackFeature)
-  // Dev always exposes CDP for the visual-audit harness; ALPHA_CDP=1 also opens it on a
+  // Dev always exposes CDP for the visual-audit harness; CODEPUPPY_CDP=1 also opens it on a
   // PACKAGED build so the real-data (logged-in) UI can be screenshot-audited via CDP.
-  if (!app.isPackaged || process.env.ALPHA_CDP === "1") app.commandLine.appendSwitch("remote-debugging-port", "9222")
+  if (!app.isPackaged || process.env.CODEPUPPY_CDP === "1") app.commandLine.appendSwitch("remote-debugging-port", "9222")
 
   if (!app.requestSingleInstanceLock()) {
     app.quit()
@@ -549,13 +549,13 @@ const main = Effect.gen(function* () {
   preferAppEnv(app.getPath("userData"))
   // REQ-098/#428:在任何 root 消费方前冻结 canonical 新根。packaged onboarding 只把内部生成
   // 的临时 base 作为函数参数传入；环境变量 override 不能授权 packaged 状态落点。
-  const alphaEnv = (() => {
+  const codepuppyEnv = (() => {
     try {
-      return initAlphaEnvironment({
+      return initCodePuppyEnvironment({
         isPackaged: app.isPackaged,
         channel: CHANNEL,
         appDataDir: app.getPath("appData"),
-        ...(onboardingTestRoot ? { baseRoot: join(onboardingTestRoot, "alpha-code-state") } : {}),
+        ...(onboardingTestRoot ? { baseRoot: join(onboardingTestRoot, "codepuppy-state") } : {}),
       })
     } catch {
       logger.error("alpha environment initialization refused (external override or root identity is invalid)")
@@ -563,15 +563,15 @@ const main = Effect.gen(function* () {
       return null
     }
   })()
-  if (!alphaEnv) return
+  if (!codepuppyEnv) return
   logger.log("alpha environment resolved", {
-    environment: alphaEnv.environment,
-    registryChannel: alphaEnv.registryChannel,
-    mutableRoot: alphaEnv.mutableRoot,
-    rootOverridden: alphaEnv.rootOverridden,
+    environment: codepuppyEnv.environment,
+    registryChannel: codepuppyEnv.registryChannel,
+    mutableRoot: codepuppyEnv.mutableRoot,
+    rootOverridden: codepuppyEnv.rootOverridden,
   })
   // Load the endpoint resolver (userData pin + persisted login discovery) BEFORE initAuthEnv, so the
-  // proxy URL it derives reflects discovery/pin, not just the hardcoded default. See alpha-endpoints.ts.
+  // proxy URL it derives reflects discovery/pin, not just the hardcoded default. See codepuppy-endpoints.ts.
   initEndpoints(app.getPath("userData"), reportContractFailure)
   // ⚠️ initAuthEnv / initByokKeys 不能在这里调(REQ-002 联调实锤,2026-07-03):它们解密 safeStorage
   // 凭证,而 macOS 上 app ready 之前 safeStorage 不可用 → 解密静默失败 → 每次冷启动都"未登录"、
@@ -660,11 +660,11 @@ const main = Effect.gen(function* () {
   if (!artifactQuotaEnvironment.ok)
     writeLog("utility", "artifact quota environment unavailable", { error: artifactQuotaEnvironment.error }, "warn")
 
-  // Derive the platform proxy env (ALPHA_BASE_URL/ALPHA_API_KEY for the model proxy + cloud MCP)
+  // Derive the platform proxy env (CODEPUPPY_BASE_URL/CODEPUPPY_API_KEY for the model proxy + cloud MCP)
   // from any stored login or DEV_PLATFORM_TOKEN,AFTER app ready(safeStorage 可用)且 BEFORE
-  // sidecar fork(~L400)。修复:冷启动登录态恢复(原 pre-ready 调用解密恒失败)。A6:ALPHA_BASE_URL
+  // sidecar fork(~L400)。修复:冷启动登录态恢复(原 pre-ready 调用解密恒失败)。A6:CODEPUPPY_BASE_URL
   // 过 sidecar env 白名单;密钥不进 sidecar env,由 spawnLocalServer 在 fork 时经 syncSecretFiles
-  // 落入 {file:} 通道(alpha-secret-files.ts)。
+  // 落入 {file:} 通道(codepuppy-secret-files.ts)。
   initAuthEnv(app.getPath("userData"))
   // auth 依赖必须在任何网络续期开始前安装。冷启动时 structural 变化先记账;首 fork 若已
   // 采用当前 generation 则自然消解,否则 respawn 入口建成后补一次 structural respawn。
@@ -678,7 +678,7 @@ const main = Effect.gen(function* () {
       pendingAuthRespawn = pendingAuthRespawn ?? trigger
     },
     // REQ-236 §2.1(`#1562`):同身份续期把新凭据原子写进引擎现读的文件,不重启引擎;在场性变了或写失败
-    // ⇒ needs-structural,alpha-auth 自己请求 credential-change 重启并等它确认。
+    // ⇒ needs-structural,codepuppy-auth 自己请求 credential-change 重启并等它确认。
     applyCredentials: () => applyPlatformCredentialsHot(app.getPath("userData"), process.env, forkedSecretNames()),
     onChanged: () => {
       authScheduler?.rearm("auth-change")
@@ -713,21 +713,21 @@ const main = Effect.gen(function* () {
   // Load alpha's encrypted key vault (REQ-226 `#1343`: no auth.json migration, no plaintext fallback —
   // keychain unavailable ⇒ empty store, keys are re-entered) and bridge each catalog BYOK key into its
   // provider's keyEnv in MAIN's env BEFORE the sidecar forks — the source syncSecretFiles mirrors into the
-  // {file:} channel (A6). Off-catalog keys skip env (spawnLocalServer → extra). See alpha-byok-keys.ts.
+  // {file:} channel (A6). Off-catalog keys skip env (spawnLocalServer → extra). See codepuppy-byok-keys.ts.
   initByokKeys(app.getPath("userData"))
   injectByokKeysIntoEnv()
   // REQ-001 / `#1555`:启动刷新远程目录(同步返回,不阻塞窗口/首个 fork——B1 纪律)。首启无缓存 → 本次 fork
   // 用内置 snapshot;刷新成功只更新「已下载」,picker 与引擎在下一次 fork 钉住后一起变。分类失败由
-  // syncLiveAllowlist 自己送到 alpha-catalog-health(#1084)。
+  // syncLiveAllowlist 自己送到 codepuppy-catalog-health(#1084)。
   requestCatalogRefresh("boot")
 
   if (!TEST_ONBOARDING) migrate()
-  // REQ-059:存量引擎配置(~/.opencode/opencode.jsonc + XDG provider 域)迁进当前环境 alpha.jsonc
+  // REQ-059:存量引擎配置(~/.opencode/opencode.jsonc + XDG provider 域)迁进当前环境 codepuppy.jsonc
   // (copy-don't-delete,幂等,所有权判定 bail-out loud)。在 migrate() 之后(REQ-018 先把散落迁 ~/.opencode)、
   // 首个 sidecar fork 之前,使第一次 fork 即读到迁移后配置。~/.opencode 清理(拆桥+删目录)属 T3。
   // REQ-065(修订,用户拍板 2026-07-08):出厂技能先行 reconcile(拆存量 .alpha 出厂链 + 计算注入组);
-  // 注入组**不落盘** —— 经 ALPHA_FACTORY_SKILL_DIRS(env,fork 继承)传引擎,由 @alpha-code/ext
-  // config hook 内存注入 skills.paths。alpha.jsonc 只承载用户自己的内容:truth reconcile 传 []
+  // 注入组**不落盘** —— 经 CODEPUPPY_FACTORY_SKILL_DIRS(env,fork 继承)传引擎,由 @codepuppy/ext
+  // config hook 内存注入 skills.paths。codepuppy.jsonc 只承载用户自己的内容:truth reconcile 传 []
   // 剥离历史版本写入的出厂条目(布局+名单判定,用户自加路径不动)。anti-B11:结果落日志。
   if (!TEST_ONBOARDING) {
     let stripFactory: string[] | undefined
@@ -739,10 +739,10 @@ const main = Effect.gen(function* () {
           moduleDir: dirname(fileURLToPath(import.meta.url)),
         }),
       )
-      process.env.ALPHA_FACTORY_SKILL_DIRS = JSON.stringify(factory.paths)
-      stripFactory = [] // reconcile 成功 → 剥离 alpha.jsonc 里的存量出厂条目(它们改由内存注入)
+      process.env.CODEPUPPY_FACTORY_SKILL_DIRS = JSON.stringify(factory.paths)
+      stripFactory = [] // reconcile 成功 → 剥离 codepuppy.jsonc 里的存量出厂条目(它们改由内存注入)
       // REQ-067:出厂默认禁项(− 用户治理解禁)同走 env → ext hook 内存注入,用户配置零明文
-      process.env.ALPHA_FACTORY_DENY_SKILLS = JSON.stringify(effectiveFactoryDenied(readBuiltinPolicy()))
+      process.env.CODEPUPPY_FACTORY_DENY_SKILLS = JSON.stringify(effectiveFactoryDenied(readBuiltinPolicy()))
       if (factory.removed.length)
         logger.log(
           "[req065] factory-skills: stale .alpha links dismantled (factory content now served from app resources)",
@@ -766,21 +766,21 @@ const main = Effect.gen(function* () {
       bootEnforcementGap = [`engine config reconcile failed: ${error instanceof Error ? error.message : String(error)}`]
       logger.error("[req059] engine config reconcile failed — blocking sidecar (fail closed)", error)
     }
-    // #395:startup reconcile —— 账本 desiredState 权威重投影回 alpha.jsonc(REQ-059 truth reconcile
+    // #395:startup reconcile —— 账本 desiredState 权威重投影回 codepuppy.jsonc(REQ-059 truth reconcile
     // 之后、首个 sidecar fork 读 config 之前;双向)。消除「账本 disabled / config enabled」崩溃残留
     // 与旁路写入的复活面(引擎 import 插件早于任何 config-hook,持久化 config 是唯一权威生效面)。
     // 失败/跳过一律 loud 且不阻断启动(config 保持原样;fail-closed 细则在函数内)。escape hatch 与
-    // REQ-059 同口径:legacy 模式下 alpha.jsonc 非引擎读取目标,不投影。
-    if (process.env.ALPHA_JSONC_TRUTH_DISABLE !== "1" && process.env.ALPHA_LEGACY_INSTALL_ROOT !== "1") {
+    // REQ-059 同口径:legacy 模式下 codepuppy.jsonc 非引擎读取目标,不投影。
+    if (process.env.CODEPUPPY_JSONC_TRUTH_DISABLE !== "1" && process.env.CODEPUPPY_LEGACY_INSTALL_ROOT !== "1") {
       try {
         // #397:userDataPath/channel 供 session-grant 强制面(已验 catalog 同步读)使用。
-        const ds = reconcileDesiredStateAtBoot(alphaGlobalRoot(), {
+        const ds = reconcileDesiredStateAtBoot(codepuppyGlobalRoot(), {
           userDataPath: app.getPath("userData"),
           channel: catalogRegistryChannel(),
         })
         if (ds.skipped) logger.warn("[req104-395] desired-state reconcile skipped", { reason: ds.skipped })
         if (ds.applied.length > 0)
-          logger.log("[req104-395] desired-state residue reprojected into alpha.jsonc", { applied: ds.applied })
+          logger.log("[req104-395] desired-state residue reprojected into codepuppy.jsonc", { applied: ds.applied })
         for (const w of ds.warnings) logger.warn(`[req104-395] desired-state reconcile: ${w}`)
         // r6 B2/B3:有未能保证的禁用项 → 置 fail-closed 位(spawn 前阻断引擎)。
         if (ds.enforcementGap && ds.enforcementGap.length > 0) {
@@ -826,16 +826,16 @@ const main = Effect.gen(function* () {
   }
   // REQ-155 `#1244`:随包 Office 连接器跟随运行中的实例 —— 当前根里指着旧 bundle 的 server 路径重锚到
   // 本 bundle;当前根里没有、兄弟渠道根里有的 committed 记录经安装同一道写策略收养进来。排在 marker
-  // reconcile 之前:marker reconcile 认模板需要当前 server 路径。锚在 alpha-office-instance.test.ts。
-  reconcileAlphaOfficeInstalls()
+  // reconcile 之前:marker reconcile 认模板需要当前 server 路径。锚在 codepuppy-office-instance.test.ts。
+  reconcileCodePuppyOfficeInstalls()
   reconcileMcpWorkspaceMarkers()
-  ensureAlphaLayoutDefault()
+  ensureCodePuppyLayoutDefault()
   // Packaged builds only: on macOS this sets the user-level Launch Services handler pref to the
   // bundle the process runs from — in dev that is node_modules' bare Electron.app, which then hijacks
   // the schemes system-wide: auth callbacks cold-start a blank Electron welcome window instead of the
   // installed app (until the installed app relaunches and re-registers). Dev deep-link testing:
-  // ALPHA_DEV_PROTOCOL=1, and keep the dev instance running so open-url is delivered to it.
-  if (app.isPackaged || process.env.ALPHA_DEV_PROTOCOL === "1") {
+  // CODEPUPPY_DEV_PROTOCOL=1, and keep the dev instance running so open-url is delivered to it.
+  if (app.isPackaged || process.env.CODEPUPPY_DEV_PROTOCOL === "1") {
     // Register every manifest-declared transport scheme; registration remains an OS/main concern.
     DEEP_LINK_SCHEMES.forEach((scheme) => app.setAsDefaultProtocolClient(scheme))
   }
@@ -856,7 +856,7 @@ const main = Effect.gen(function* () {
   // (process-fence-workspaces.ts 文件头)。位置必须在 tier-1 预清**之后**(播种读的是预清后的 store)、IPC 注册与首次 fork
   // **之前**(计划器读的是这里播好 / 装好的文件;IPC 一来就要有 tracker 接)。store 读挂不炸 boot:按空 store 处理并出声。
   const fenceWorkspaces = bootFenceWorkspaceTruth({
-    truthPath: fenceWorkspaceTruthPath(alphaEnv.casBaseRoot, alphaEnv.environment),
+    truthPath: fenceWorkspaceTruthPath(codepuppyEnv.casBaseRoot, codepuppyEnv.environment),
     store: (() => {
       try {
         const store = getStore(GLOBAL_RENDERER_STORE)
@@ -916,7 +916,7 @@ const main = Effect.gen(function* () {
   // 一次注入,IPC/planner/预热同一份。
   const registryChannel = catalogRegistryChannel()
   // #390:解构出恢复-gate 包装的 global 技能安装器,传给首启 ecosystem gate(不绕恢复准入)。
-  const { ledgerReady: extLedgerReady, ecosystemGlobalSkillInstaller, alphaSidecar } = registerExtIpcHandlers(
+  const { ledgerReady: extLedgerReady, ecosystemGlobalSkillInstaller, codepuppySidecar } = registerExtIpcHandlers(
     app.getPath("userData"),
     registryChannel,
     () => Effect.runPromise(Deferred.await(serverReady)),
@@ -924,7 +924,7 @@ const main = Effect.gen(function* () {
     { stop: () => killSidecar(), refresh: () => requestSidecarRespawn?.("connector-change") ?? Promise.resolve(false) },
   )
   // REQ-234 `#1529`:「待重载」原因变了(重载请求 / ext 报告 / sidecar 连上或断开)⇒ 定制中心重读三档视图。
-  alphaSidecar.onViewChanged(() => {
+  codepuppySidecar.onViewChanged(() => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("ext-hub-view-changed")
   })
   // REQ-135 retirement is a ledger mutation, so it waits for crash recovery and then takes the
@@ -1078,7 +1078,7 @@ const main = Effect.gen(function* () {
         return undefined // store 读挂了不许炸 boot 路径 —— 回退默认目录
       }
     })()
-    const probeDirectory = userDirectory && existsSync(userDirectory) ? userDirectory : alphaUserWorkspaceDir()
+    const probeDirectory = userDirectory && existsSync(userDirectory) ? userDirectory : codepuppyUserWorkspaceDir()
     // R1 Blocker:探针目录不存在时 marker 端点**确定性 500**(实测 8/8,永不 404/200)——观测面
     // 不可用,不武装。也绝不顺手 mkdir:REQ-071/ADR-025「绝不代建」,启动即建目录是产品行为变更。
     // (~/Alpha 是 lazy 供给;首屏目录若存在则武装在它身上,~/Alpha 缺席不再一票否决。)
@@ -1195,7 +1195,7 @@ const main = Effect.gen(function* () {
             },
           },
         })
-        if (incident) mainWindow.webContents.send("alpha-recovery-incident", incident)
+        if (incident) mainWindow.webContents.send("codepuppy-recovery-incident", incident)
       }).catch((error) => {
         // R2 Minor:回调体做 writeLog / markStartupTimeline / recoveryService.register /
         // webContents.send / current.kill(),任一抛出都不得变成 main 的 unhandled rejection
@@ -1300,7 +1300,7 @@ const main = Effect.gen(function* () {
         onExit: (code) => handleSidecarExit(spawnGen, code),
         timelineContext: "boot",
         generation: spawnGen,
-        alphaSidecar,
+        codepuppySidecar,
       })
       void spawning.then(
         () =>
@@ -1453,7 +1453,7 @@ const main = Effect.gen(function* () {
         onExit: (code) => handleSidecarExit(spawnGen, code),
         timelineContext: "respawn",
         generation: spawnGen,
-        alphaSidecar,
+        codepuppySidecar,
       })
       void spawning.then(
         () =>

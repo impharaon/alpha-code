@@ -1,6 +1,6 @@
 // #660 A1:cloud-run-saved 广播接线闸门(`#970` 起另含 cloud-artifact-download 那一跳的
 // 结构槽穿透判据)。真断言在 cloud-ipc.cases.ts ——
-// 子进程跑(alpha-auth.test.ts 同款),因为 mock.module("electron") 会污染同进程的其它测试文件。
+// 子进程跑(codepuppy-auth.test.ts 同款),因为 mock.module("electron") 会污染同进程的其它测试文件。
 import { expect, test } from "bun:test"
 import { join } from "node:path"
 

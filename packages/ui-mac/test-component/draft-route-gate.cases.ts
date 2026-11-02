@@ -1,7 +1,7 @@
 // alpha-code #903 —— `/new-session?draftId=…` 两个非 happy-path 的**真组件**闸门。
 //
 // 独立进程运行:`mock.module("solid-js", …)` 会污染同进程其它测试文件(与
-// new-session-workspace.cases.ts 同因)。宿主见 `src/renderer/alpha-ui/draft-route-gate.component.test.ts`。
+// new-session-workspace.cases.ts 同因)。宿主见 `src/renderer/codepuppy-ui/draft-route-gate.component.test.ts`。
 //
 // 判据全部是**可观察结果**:真挂载 `packages/app/src/pages/draft-route-gate.tsx`(生产模块
 // 本体,不是这里重写一份等价物),对真 DOM 断言、对真回调断言。**不断言源码文本** ——

@@ -1,12 +1,12 @@
-/* Account footer entry + upward popover (single bottom entry). Uses the alpha-ui --a-* tokens
- * (globally defined by alpha-ui/tokens.css, loaded via home/dialog/ext-hub css). Follows light/dark. */
+/* Account footer entry + upward popover (single bottom entry). Uses the codepuppy-ui --a-* tokens
+ * (globally defined by codepuppy-ui/tokens.css, loaded via home/dialog/ext-hub css). Follows light/dark. */
 
-.alpha-sidebar-footer {
+.codepuppy-sidebar-footer {
   position: relative;
 }
 
 /* the single footer entry */
-.alpha-sidebar-account {
+.codepuppy-sidebar-account {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -21,37 +21,37 @@
   text-align: left;
   -webkit-app-region: no-drag;
 }
-.alpha-sidebar-account:hover {
+.codepuppy-sidebar-account:hover {
   background: var(--a-bg-muted);
 }
-.alpha-sidebar-account-id {
+.codepuppy-sidebar-account-id {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
 }
-.alpha-sidebar-account-name {
+.codepuppy-sidebar-account-name {
   font-size: 13px;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.alpha-sidebar-account-sub {
+.codepuppy-sidebar-account-sub {
   font-size: 11px;
   color: var(--a-text-tertiary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.alpha-acct-chev {
+.codepuppy-acct-chev {
   width: 12px;
   height: 12px;
   flex: 0 0 auto;
   color: var(--a-text-tertiary);
 }
 
-.alpha-acct-av {
+.codepuppy-acct-av {
   flex: 0 0 auto;
   width: 30px;
   height: 30px;
@@ -64,19 +64,19 @@
   font-weight: 700;
   font-size: 13px;
 }
-.alpha-acct-av.guest,
-.alpha-acct-av[data-guest] {
+.codepuppy-acct-av.guest,
+.codepuppy-acct-av[data-guest] {
   background: var(--a-bg-inset);
   color: var(--a-text-tertiary);
 }
 
 /* popover */
-.alpha-acct-backdrop {
+.codepuppy-acct-backdrop {
   position: fixed;
   inset: 0;
   z-index: 48;
 }
-.alpha-acct-pop {
+.codepuppy-acct-pop {
   /* fixed (not absolute) so it escapes the sidebar's overflow:hidden and can be wider than 256px */
   position: fixed;
   left: 10px;
@@ -90,37 +90,37 @@
   border-radius: var(--a-radius-xl, 14px);
   box-shadow: var(--a-shadow-overlay);
   padding-bottom: 6px;
-  animation: alpha-acct-in 160ms var(--a-ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+  animation: codepuppy-acct-in 160ms var(--a-ease-out, cubic-bezier(0.22, 1, 0.36, 1));
 }
-@keyframes alpha-acct-in {
+@keyframes codepuppy-acct-in {
   from {
     opacity: 0;
     transform: translateY(8px) scale(0.98);
   }
 }
 
-.alpha-acct-head {
+.codepuppy-acct-head {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 14px;
 }
-.alpha-acct-id {
+.codepuppy-acct-id {
   flex: 1;
   min-width: 0;
 }
-.alpha-acct-name {
+.codepuppy-acct-name {
   font-weight: 600;
   font-size: 13.5px;
 }
-.alpha-acct-email {
+.codepuppy-acct-email {
   font-size: 11.5px;
   color: var(--a-text-tertiary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.alpha-acct-plan {
+.codepuppy-acct-plan {
   flex: 0 0 auto;
   font-size: 10px;
   font-weight: 700;
@@ -130,43 +130,43 @@
   background: var(--a-bg-muted);
   color: var(--a-text-tertiary);
 }
-.alpha-acct-plan[data-pro] {
+.codepuppy-acct-plan[data-pro] {
   background: var(--a-accent-subtle);
   color: var(--a-accent);
 }
 
-.alpha-acct-card {
+.codepuppy-acct-card {
   margin: 0 14px 12px;
   padding: 12px;
   border: 1px solid var(--a-border-faint);
   border-radius: var(--a-radius-lg);
   background: var(--a-bg-subtle);
 }
-.alpha-acct-row {
+.codepuppy-acct-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 3px 0;
   font-size: 12.5px;
 }
-.alpha-acct-k {
+.codepuppy-acct-k {
   color: var(--a-text-secondary);
 }
-.alpha-acct-v {
+.codepuppy-acct-v {
   font-weight: 600;
 }
-.alpha-acct-pending {
+.codepuppy-acct-pending {
   font-weight: 500;
   color: var(--a-text-tertiary);
   font-size: 11px;
 }
 
-.alpha-acct-cta {
+.codepuppy-acct-cta {
   display: flex;
   gap: 8px;
   margin: 0 14px 10px;
 }
-.alpha-acct-btn {
+.codepuppy-acct-btn {
   flex: 1;
   height: 34px;
   border-radius: var(--a-radius-md);
@@ -182,19 +182,19 @@
   cursor: pointer;
   color: var(--a-text);
 }
-.alpha-acct-btn:hover {
+.codepuppy-acct-btn:hover {
   background: var(--a-bg-muted);
 }
-.alpha-acct-btn.primary {
+.codepuppy-acct-btn.primary {
   background: var(--a-accent-solid);
   border-color: var(--a-accent-solid);
   color: var(--a-text-on-accent);
 }
-.alpha-acct-btn.primary:hover {
+.codepuppy-acct-btn.primary:hover {
   background: var(--a-accent-solid-hover);
 }
 
-.alpha-acct-login {
+.codepuppy-acct-login {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -212,25 +212,25 @@
   font-weight: 600;
   cursor: pointer;
 }
-.alpha-acct-login:hover {
+.codepuppy-acct-login:hover {
   background: var(--a-accent-solid-hover);
 }
 
-.alpha-acct-sep {
+.codepuppy-acct-sep {
   height: 1px;
   background: var(--a-border-faint);
   margin: 6px 0;
 }
 
 /* ac#1187: current app version, pinned at the popover's bottom (read-only, muted) */
-.alpha-acct-version {
+.codepuppy-acct-version {
   padding: 6px 16px 2px;
   font-size: 11px;
   color: var(--a-text-tertiary);
   text-align: center;
   user-select: text;
 }
-.alpha-acct-item {
+.codepuppy-acct-item {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -248,42 +248,42 @@
   text-align: left;
   white-space: nowrap;
 }
-.alpha-acct-item:hover {
+.codepuppy-acct-item:hover {
   background: var(--a-bg-muted);
 }
 /* a divider above the first menu item (after the card/CTA or login) */
-.alpha-acct-cta + .alpha-acct-item,
-.alpha-acct-login + .alpha-acct-item {
+.codepuppy-acct-cta + .codepuppy-acct-item,
+.codepuppy-acct-login + .codepuppy-acct-item {
   margin-top: 6px;
   border-top: 1px solid var(--a-border-faint);
   border-radius: 0;
 }
-.alpha-acct-ic {
+.codepuppy-acct-ic {
   width: 18px;
   text-align: center;
   color: var(--a-text-tertiary);
   flex: 0 0 auto;
 }
-.alpha-acct-spacer {
+.codepuppy-acct-spacer {
   flex: 1;
 }
-.alpha-acct-danger {
+.codepuppy-acct-danger {
   color: var(--a-error);
 }
-.alpha-acct-appearance {
+.codepuppy-acct-appearance {
   cursor: default;
 }
-.alpha-acct-appearance:hover {
+.codepuppy-acct-appearance:hover {
   background: transparent;
 }
-.alpha-acct-seg {
+.codepuppy-acct-seg {
   display: inline-flex;
   padding: 2px;
   gap: 2px;
   background: var(--a-bg-muted);
   border-radius: var(--a-radius-sm);
 }
-.alpha-acct-seg button {
+.codepuppy-acct-seg button {
   border: none;
   background: transparent;
   font: inherit;
@@ -295,7 +295,7 @@
   cursor: pointer;
   white-space: nowrap;
 }
-.alpha-acct-seg button[data-on] {
+.codepuppy-acct-seg button[data-on] {
   background: var(--a-surface);
   color: var(--a-text);
   box-shadow: var(--a-shadow-xs);

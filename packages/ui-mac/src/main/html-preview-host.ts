@@ -49,7 +49,7 @@ export function __setHtmlPreviewLogSink(fn: HtmlPreviewLogFn | null) {
 }
 import { resolveArtifact } from "./artifact-service"
 import { isSafeSavedPath, RUN_ARTIFACTS_SUBDIR } from "./artifact-manifest"
-import { safeResolveInAlpha, sanitizeArtifactName } from "./alpha-workdir"
+import { safeResolveInCodePuppy, sanitizeArtifactName } from "./codepuppy-workdir"
 import {
   canPreviewHtml,
   HTML_PREVIEW_CSP,
@@ -162,7 +162,7 @@ function serveRequest(record: PreviewRecord, request: Request): Response {
     return deny()
   }
   // ADR-019 realpath 守卫:symlink 逃逸 / .code-puppy 外解析在此被拒。
-  const abs = safeResolveInAlpha(record.projectDir, "runs", record.runId, ...saved.split("/"))
+  const abs = safeResolveInCodePuppy(record.projectDir, "runs", record.runId, ...saved.split("/"))
   if (!abs) {
     recordBlocked(record, rel)
     return deny()
@@ -306,7 +306,7 @@ export function openHtmlPreview(
   if (!isSafeSavedPath(entry.local.savedPath)) return refuse("savedPath violates the relative-path invariant")
   if (!canPreviewHtml(entry.descriptor, entry.local.detectedMime))
     return refuse("artifact is not previewable static HTML")
-  const abs = safeResolveInAlpha(projectDir, "runs", runId, ...entry.local.savedPath.split("/"))
+  const abs = safeResolveInCodePuppy(projectDir, "runs", runId, ...entry.local.savedPath.split("/"))
   if (!abs) return refuse("path escapes .code-puppy")
   let st: fs.Stats
   try {
@@ -321,7 +321,7 @@ export function openHtmlPreview(
   const token = crypto.randomBytes(16).toString("hex")
   const previewId = `hp_${crypto.randomBytes(6).toString("hex")}`
   // 一次性 in-memory partition(无 persist: 前缀);名字用 previewId 派生,不含 token。
-  const partition = `alpha-html-preview-${previewId}`
+  const partition = `codepuppy-html-preview-${previewId}`
   const ses = electronRef.session.fromPartition(partition)
 
   const record: PreviewRecord = {

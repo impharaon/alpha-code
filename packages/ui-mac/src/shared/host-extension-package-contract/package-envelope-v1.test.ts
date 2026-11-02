@@ -615,7 +615,7 @@ const negativeCases: NegativeCase[] = [
     mode: "package",
     error: "payload.behavior.auth.connectionHandlerId: invalid format",
     mutatePayload: (payload) => {
-      ;(behaviorOf(payload).auth as Record<string, unknown>).connectionHandlerId = "Alpha_Example"
+      ;(behaviorOf(payload).auth as Record<string, unknown>).connectionHandlerId = "CodePuppy_Example"
     },
   },
   {
@@ -624,7 +624,7 @@ const negativeCases: NegativeCase[] = [
     mode: "package",
     error: "payload.behavior.auth.connectionHandlerId: invalid format",
     mutatePayload: (payload) => {
-      ;(behaviorOf(payload).auth as Record<string, unknown>).connectionHandlerId = "1alpha"
+      ;(behaviorOf(payload).auth as Record<string, unknown>).connectionHandlerId = "1codepuppy"
     },
   },
   {

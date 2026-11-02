@@ -54,14 +54,14 @@ if ! jurisdiction="$(bash "$GUARD" --print-jurisdiction 2>&1)"; then
 fi
 
 UPSTREAM_PATHS=""
-ALPHA_OWNED_PACKAGES=""
+CODEPUPPY_OWNED_PACKAGES=""
 ROUNDTRIP_PACKAGES=""
 UPSTREAM_MIRROR=""
 UPSTREAM_EXCLUDES_COUNT=""
 while IFS=$'\t' read -r key value; do
   case "$key" in
     UPSTREAM_PATHS) UPSTREAM_PATHS="$value" ;;
-    ALPHA_OWNED_PACKAGES) ALPHA_OWNED_PACKAGES="$value" ;;
+    CODEPUPPY_OWNED_PACKAGES) CODEPUPPY_OWNED_PACKAGES="$value" ;;
     ROUNDTRIP_PACKAGES) ROUNDTRIP_PACKAGES="$value" ;;
     UPSTREAM_MIRROR) UPSTREAM_MIRROR="$value" ;;
     UPSTREAM_EXCLUDES_COUNT) UPSTREAM_EXCLUDES_COUNT="$value" ;;
@@ -71,7 +71,7 @@ $jurisdiction
 JURISDICTION
 
 # 解析退化必须当场红:一份读不出辖区的解析器会让下面每个数都空对空地「成立」。
-for required in UPSTREAM_PATHS ALPHA_OWNED_PACKAGES ROUNDTRIP_PACKAGES UPSTREAM_MIRROR UPSTREAM_EXCLUDES_COUNT; do
+for required in UPSTREAM_PATHS CODEPUPPY_OWNED_PACKAGES ROUNDTRIP_PACKAGES UPSTREAM_MIRROR UPSTREAM_EXCLUDES_COUNT; do
   if [ -z "${!required}" ]; then
     echo "    ✗ 守卫辖区里读不到 ${required} —— 本次度量作废(解析器坏了,不是「零漂移」)"
     exit 1
@@ -84,7 +84,7 @@ esac
 echo "    · ① 收编面(守卫白名单条目数):${UPSTREAM_EXCLUDES_COUNT} 条(scripts/north-star-guard.sh 的 UPSTREAM_EXCLUDES;每条都是一次有 ADR 背书的接管,守卫按设计放行它们)"
 
 # ── ②③ 都建在 merge-base 上。取不到镜像 ⇒ 未测量(exit 2),**不打 0** ────────────────
-# 刻意不在这里 `git fetch`:alpha-check 第 [1/14] 步的守卫刚刚 fetch 过 origin/dev,再来一次
+# 刻意不在这里 `git fetch`:codepuppy-check 第 [1/14] 步的守卫刚刚 fetch 过 origin/dev,再来一次
 # 只是多一趟网络;而独立跑时本地镜像陈旧只会把 merge-base 推得更早 ⇒ 年龄偏大、漂移偏多,
 # 方向是报警不是安心。
 if ! git rev-parse --verify --quiet "$UPSTREAM_MIRROR" >/dev/null; then
@@ -99,7 +99,7 @@ fi
 
 # 辖区 = UPSTREAM_PATHS − 两张 carve-out,与守卫同源(值由守卫给,本脚本只拼 pathspec)。
 CARVEOUT_PATHSPECS=()
-for pkg in $ALPHA_OWNED_PACKAGES $ROUNDTRIP_PACKAGES; do
+for pkg in $CODEPUPPY_OWNED_PACKAGES $ROUNDTRIP_PACKAGES; do
   CARVEOUT_PATHSPECS+=(":(exclude)${UPSTREAM_PATHS}/${pkg}")
 done
 
@@ -132,7 +132,7 @@ age_days=$(( ( $(date +%s) - base_epoch ) / 86400 ))
 [ "$age_days" -ge 0 ] || age_days=0
 
 drift_lines=$(( drift_added + drift_deleted ))
-echo "    · ② 上游漂移:${drift_files} 个文件 / ${drift_lines} 行(${drift_added} 增 / ${drift_deleted} 删)(辖区 ${UPSTREAM_PATHS}/ 全树 − alpha 自有包 [${ALPHA_OWNED_PACKAGES}] − roundtrip 包 [${ROUNDTRIP_PACKAGES}];窗口 merge-base ${base_sha} → HEAD;收编白名单里的文件**照样计入**)"
+echo "    · ② 上游漂移:${drift_files} 个文件 / ${drift_lines} 行(${drift_added} 增 / ${drift_deleted} 删)(辖区 ${UPSTREAM_PATHS}/ 全树 − alpha 自有包 [${CODEPUPPY_OWNED_PACKAGES}] − roundtrip 包 [${ROUNDTRIP_PACKAGES}];窗口 merge-base ${base_sha} → HEAD;收编白名单里的文件**照样计入**)"
 echo "    · ③ merge-base 年龄:${age_days} 天(${UPSTREAM_MIRROR} @ ${mirror_sha};merge-base ${base_sha},${base_date})"
 echo "    ⓘ 三个量只做记录,不设阈值、不拦 push(先量后闸,#1288)。数字变大不等于变坏 —— 它等于「下一次 sync 要付的账」在变大。"
 exit 0

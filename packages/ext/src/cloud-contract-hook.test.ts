@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "bun:test"
 import { resolve } from "node:path"
-import { decodeContract } from "@alpha-code/contracts-consumer"
+import { decodeContract } from "@codepuppy/contracts-consumer"
 // #650:工具 id 只从**引擎自己的**拼名规则推导。ext 不依赖 opencode(生产侧因此自带一份
 // `mcpEngineToolId`),但测试可以直接装真的 `McpCatalog` —— 拼名规则一变,下面全部期望值跟着变。
 import { McpCatalog } from "../../opencode/src/mcp/catalog"
@@ -19,11 +19,11 @@ const fixture = (name: string) =>
   Bun.file(
     resolve(
       import.meta.dir,
-      `../../alpha-contracts-consumer/vendor/alpha-platform/contracts/v1/fixtures/producer/${name}.json`,
+      `../../codepuppy-contracts-consumer/vendor/alpha-platform/contracts/v1/fixtures/producer/${name}.json`,
     ),
   ).json()
 
-/** 注入面在本次 fork 写进 sidecar env 的云 server 名(`alpha-config-injection.ts`;alpha-code#1568 起 `codepuppy`)。 */
+/** 注入面在本次 fork 写进 sidecar env 的云 server 名(`codepuppy-config-injection.ts`;alpha-code#1568 起 `codepuppy`)。 */
 const CLOUD_SERVER = "codepuppy"
 /** 引擎注册 id —— 钩子 `tool.execute.before/after` 拿到的就是它(`plugin.ts` 的 `hookInput.tool`)。 */
 const engineToolId = (remoteName: string) => McpCatalog.toolName(CLOUD_SERVER, remoteName)

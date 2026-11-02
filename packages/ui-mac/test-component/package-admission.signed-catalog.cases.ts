@@ -17,15 +17,15 @@ const tmp = mkdtempSync(join(tmpdir(), "package-admission-signed-"))
 const catalogState = join(tmp, "catalog-state")
 const root = join(tmp, "root")
 const userData = join(tmp, "user-data")
-const previousRoot = process.env.ALPHA_GLOBAL_DIR
+const previousRoot = process.env.CODEPUPPY_GLOBAL_DIR
 const secretCanary = "REQ128_SIGNED_ENVELOPE_SECRET_9fd15c"
 
 mkdirSync(root, { recursive: true })
-process.env.ALPHA_GLOBAL_DIR = root
+process.env.CODEPUPPY_GLOBAL_DIR = root
 
 afterAll(() => {
-  if (previousRoot === undefined) delete process.env.ALPHA_GLOBAL_DIR
-  else process.env.ALPHA_GLOBAL_DIR = previousRoot
+  if (previousRoot === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+  else process.env.CODEPUPPY_GLOBAL_DIR = previousRoot
   rmSync(tmp, { recursive: true, force: true })
 })
 
@@ -223,7 +223,7 @@ test("verified signed snapshot and Envelope secret prerequisite reach the restri
       requiresConfirmation: true,
     },
   ])
-  expect(existsSync(join(userData, "alpha-mcp-secrets"))).toBe(false)
+  expect(existsSync(join(userData, "codepuppy-mcp-secrets"))).toBe(false)
 
   const result = await admit({
     ...intent,
@@ -241,11 +241,11 @@ test("verified signed snapshot and Envelope secret prerequisite reach the restri
   })
   expect(JSON.stringify(result)).not.toContain(secretCanary)
 
-  const secretFile = join(userData, "alpha-mcp-secrets", "generic-remote", "v-a1b2c3d4", "A_KEY")
-  expect(readdirSync(join(userData, "alpha-mcp-secrets", "generic-remote"))).toEqual(["v-a1b2c3d4"])
+  const secretFile = join(userData, "codepuppy-mcp-secrets", "generic-remote", "v-a1b2c3d4", "A_KEY")
+  expect(readdirSync(join(userData, "codepuppy-mcp-secrets", "generic-remote"))).toEqual(["v-a1b2c3d4"])
   expect(readFileSync(secretFile, "utf8")).toBe(secretCanary)
   expect(statSync(secretFile).mode & 0o777).toBe(0o600)
-  const config = readFileSync(join(root, "alpha.jsonc"), "utf8")
+  const config = readFileSync(join(root, "codepuppy.jsonc"), "utf8")
   expect(config).toContain(`{file:${secretFile}}`)
   expect(config).not.toContain(secretCanary)
   expect(existsSync(join(root, "installs.json"))).toBe(true)

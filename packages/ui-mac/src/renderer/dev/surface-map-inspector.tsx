@@ -25,16 +25,16 @@ import {
 import "./surface-map-inspector.css"
 
 const lineageLabel = (lineage: FrontendSurfaceLineage) => {
-  if (lineage === "alpha") return t("alpha.brand.short")
-  if (lineage === "opencode") return t("alpha.surfaceMap.upstream")
-  return t("alpha.surfaceMap.hybrid")
+  if (lineage === "codepuppy") return t("codepuppy.brand.short")
+  if (lineage === "opencode") return t("codepuppy.surfaceMap.upstream")
+  return t("codepuppy.surfaceMap.hybrid")
 }
 
 const mountLabel = (kind: FrontendSurfaceMount["kind"]) => {
-  if (kind === "route") return t("alpha.surfaceMap.route")
-  if (kind === "overlay") return t("alpha.surfaceMap.overlay")
-  if (kind === "inline") return t("alpha.surfaceMap.inline")
-  return t("alpha.surfaceMap.boot")
+  if (kind === "route") return t("codepuppy.surfaceMap.route")
+  if (kind === "overlay") return t("codepuppy.surfaceMap.overlay")
+  if (kind === "inline") return t("codepuppy.surfaceMap.inline")
+  return t("codepuppy.surfaceMap.boot")
 }
 
 export default function SurfaceMapInspector() {
@@ -118,7 +118,7 @@ export default function SurfaceMapInspector() {
         ref={trigger}
         type="button"
         class="a-ui a-smap-trigger"
-        aria-label={t("alpha.surfaceMap.open")}
+        aria-label={t("codepuppy.surfaceMap.open")}
         aria-keyshortcuts="Meta+Shift+M Control+Shift+M"
         onClick={show}
       >
@@ -139,31 +139,31 @@ export default function SurfaceMapInspector() {
           >
             <header class="a-smap-header">
               <div>
-                <div class="a-overline">{t("alpha.surfaceMap.inspector", { version: FRONTEND_SURFACE_MANIFEST_VERSION })}</div>
-                <h1 id="a-smap-title">{t("alpha.surfaceMap.title")}</h1>
-                <p>{t("alpha.surfaceMap.description")}</p>
+                <div class="a-overline">{t("codepuppy.surfaceMap.inspector", { version: FRONTEND_SURFACE_MANIFEST_VERSION })}</div>
+                <h1 id="a-smap-title">{t("codepuppy.surfaceMap.title")}</h1>
+                <p>{t("codepuppy.surfaceMap.description")}</p>
               </div>
-              <div class="a-smap-header-meta" aria-label={t("alpha.surfaceMap.currentRoute")}>
-                <span>{t("alpha.surfaceMap.router")}</span>
+              <div class="a-smap-header-meta" aria-label={t("codepuppy.surfaceMap.currentRoute")}>
+                <span>{t("codepuppy.surfaceMap.router")}</span>
                 <code>{location.pathname + location.search}</code>
-                <span>{t("alpha.surfaceMap.shell")}</span>
+                <span>{t("codepuppy.surfaceMap.shell")}</span>
                 <code>{window.location.pathname}</code>
               </div>
-              <button type="button" class="a-smap-close" aria-label={t("alpha.surfaceMap.close")} onClick={close}>
+              <button type="button" class="a-smap-close" aria-label={t("codepuppy.surfaceMap.close")} onClick={close}>
                 <Icon name="close" />
               </button>
             </header>
 
             <div class="a-smap-scroll">
-              <section class="a-smap-summary" aria-label={t("alpha.surfaceMap.summary")}>
+              <section class="a-smap-summary" aria-label={t("codepuppy.surfaceMap.summary")}>
                 <button
                   type="button"
                   class="a-smap-stat"
-                  data-lineage="alpha"
-                  aria-pressed={lineage() === "alpha"}
-                  onClick={() => setLineage(lineage() === "alpha" ? "all" : "alpha")}
+                  data-lineage="codepuppy"
+                  aria-pressed={lineage() === "codepuppy"}
+                  onClick={() => setLineage(lineage() === "codepuppy" ? "all" : "codepuppy")}
                 >
-                  <span>{t("alpha.brand.short")}</span><strong>{counts("alpha")}</strong><small>{t("alpha.surfaceMap.owned")}</small>
+                  <span>{t("codepuppy.brand.short")}</span><strong>{counts("codepuppy")}</strong><small>{t("codepuppy.surfaceMap.owned")}</small>
                 </button>
                 <button
                   type="button"
@@ -172,7 +172,7 @@ export default function SurfaceMapInspector() {
                   aria-pressed={lineage() === "opencode"}
                   onClick={() => setLineage(lineage() === "opencode" ? "all" : "opencode")}
                 >
-                  <span>{t("alpha.surfaceMap.upstream")}</span><strong>{counts("opencode")}</strong><small>{t("alpha.surfaceMap.upstreamImplementation")}</small>
+                  <span>{t("codepuppy.surfaceMap.upstream")}</span><strong>{counts("opencode")}</strong><small>{t("codepuppy.surfaceMap.upstreamImplementation")}</small>
                 </button>
                 <button
                   type="button"
@@ -181,19 +181,19 @@ export default function SurfaceMapInspector() {
                   aria-pressed={lineage() === "hybrid"}
                   onClick={() => setLineage(lineage() === "hybrid" ? "all" : "hybrid")}
                 >
-                  <span>{t("alpha.surfaceMap.hybrid")}</span><strong>{counts("hybrid")}</strong><small>{t("alpha.surfaceMap.seam")}</small>
+                  <span>{t("codepuppy.surfaceMap.hybrid")}</span><strong>{counts("hybrid")}</strong><small>{t("codepuppy.surfaceMap.seam")}</small>
                 </button>
                 <div class="a-smap-stat a-smap-stat--current">
-                  <span>{t("alpha.surfaceMap.currentRoute")}</span>
-                  <strong>{frontendSurfaceById(currentRoute() ?? "")?.label ?? t("alpha.surfaceMap.unknown")}</strong>
+                  <span>{t("codepuppy.surfaceMap.currentRoute")}</span>
+                  <strong>{frontendSurfaceById(currentRoute() ?? "")?.label ?? t("codepuppy.surfaceMap.unknown")}</strong>
                   <small>{currentRoute() ?? location.pathname}</small>
                 </div>
               </section>
 
               <section class="a-smap-section" aria-labelledby="a-smap-flow-title">
                 <div class="a-smap-section-head">
-                  <div><span class="a-overline">{t("alpha.surfaceMap.navigationAbi")}</span><h2 id="a-smap-flow-title">{t("alpha.surfaceMap.routeFlow")}</h2></div>
-                  <p>{t("alpha.surfaceMap.routeFlowDetail")}</p>
+                  <div><span class="a-overline">{t("codepuppy.surfaceMap.navigationAbi")}</span><h2 id="a-smap-flow-title">{t("codepuppy.surfaceMap.routeFlow")}</h2></div>
+                  <p>{t("codepuppy.surfaceMap.routeFlowDetail")}</p>
                 </div>
                 <div class="a-smap-route-flow">
                   <For each={routeSurfaces}>
@@ -201,7 +201,7 @@ export default function SurfaceMapInspector() {
                       <article class="a-smap-route-node" data-active={active().has(surface.id) ? "" : undefined}>
                         <div class="a-smap-route-top">
                           <span class="a-smap-lineage" data-lineage={surface.lineage}>{lineageLabel(surface.lineage)}</span>
-                          <Show when={active().has(surface.id)}><span class="a-smap-active">{t("alpha.surfaceMap.current")}</span></Show>
+                          <Show when={active().has(surface.id)}><span class="a-smap-active">{t("codepuppy.surfaceMap.current")}</span></Show>
                         </div>
                         <code>{surface.mount.kind === "route" ? surface.mount.path : ""}</code>
                         <strong>{surface.label}</strong>
@@ -218,30 +218,30 @@ export default function SurfaceMapInspector() {
 
               <section class="a-smap-section" aria-labelledby="a-smap-inventory-title">
                 <div class="a-smap-section-head a-smap-section-head--inventory">
-                  <div><span class="a-overline">{t("alpha.surfaceMap.canonicalInventory")}</span><h2 id="a-smap-inventory-title">{t("alpha.surfaceMap.inventory")}</h2></div>
+                  <div><span class="a-overline">{t("codepuppy.surfaceMap.canonicalInventory")}</span><h2 id="a-smap-inventory-title">{t("codepuppy.surfaceMap.inventory")}</h2></div>
                   <div class="a-smap-filters">
                     <label class="a-smap-search">
-                      <span>{t("alpha.sidebar.search")}</span>
-                      <div><Icon name="magnifying-glass" size="small" /><input ref={search} value={query()} onInput={(event) => setQuery(event.currentTarget.value)} placeholder={t("alpha.surfaceMap.searchPlaceholder")} /></div>
+                      <span>{t("codepuppy.sidebar.search")}</span>
+                      <div><Icon name="magnifying-glass" size="small" /><input ref={search} value={query()} onInput={(event) => setQuery(event.currentTarget.value)} placeholder={t("codepuppy.surfaceMap.searchPlaceholder")} /></div>
                     </label>
                     <label>
-                      <span>{t("alpha.surfaceMap.mountType")}</span>
+                      <span>{t("codepuppy.surfaceMap.mountType")}</span>
                       <select value={mount()} onChange={(event) => setMount(event.currentTarget.value as SurfaceMapMountFilter)}>
-                        <option value="all">{t("alpha.surfaceMap.all")}</option>
-                        <option value="route">{t("alpha.surfaceMap.route")}</option>
-                        <option value="overlay">{t("alpha.surfaceMap.overlay")}</option>
-                        <option value="inline">{t("alpha.surfaceMap.inline")}</option>
-                        <option value="boot">{t("alpha.surfaceMap.boot")}</option>
+                        <option value="all">{t("codepuppy.surfaceMap.all")}</option>
+                        <option value="route">{t("codepuppy.surfaceMap.route")}</option>
+                        <option value="overlay">{t("codepuppy.surfaceMap.overlay")}</option>
+                        <option value="inline">{t("codepuppy.surfaceMap.inline")}</option>
+                        <option value="boot">{t("codepuppy.surfaceMap.boot")}</option>
                       </select>
                     </label>
                     <Show when={lineage() !== "all" || mount() !== "all" || query()}>
-                      <button type="button" class="a-smap-reset" onClick={() => { setQuery(""); setLineage("all"); setMount("all") }}>{t("alpha.surfaceMap.clearFilters")}</button>
+                      <button type="button" class="a-smap-reset" onClick={() => { setQuery(""); setLineage("all"); setMount("all") }}>{t("codepuppy.surfaceMap.clearFilters")}</button>
                     </Show>
                   </div>
                 </div>
 
                 <div class="a-smap-list" aria-live="polite">
-                  <Show when={filtered().length > 0} fallback={<div class="a-smap-empty"><strong>{t("alpha.surfaceMap.noMatches")}</strong><span>{t("alpha.surfaceMap.noMatchesDetail")}</span></div>}>
+                  <Show when={filtered().length > 0} fallback={<div class="a-smap-empty"><strong>{t("codepuppy.surfaceMap.noMatches")}</strong><span>{t("codepuppy.surfaceMap.noMatchesDetail")}</span></div>}>
                     <For each={filtered()}>
                       {(surface) => {
                         const runtime = () => surfaceRuntimeState(surface)
@@ -251,21 +251,21 @@ export default function SurfaceMapInspector() {
                               <div>
                                 <span class="a-smap-lineage" data-lineage={surface.lineage}>{lineageLabel(surface.lineage)}</span>
                                 <span class="a-smap-mount">{mountLabel(surface.mount.kind)}</span>
-                                <Show when={active().has(surface.id)}><span class="a-smap-active">{t("alpha.surfaceMap.mounted")}</span></Show>
+                                <Show when={active().has(surface.id)}><span class="a-smap-active">{t("codepuppy.surfaceMap.mounted")}</span></Show>
                               </div>
                               <h3>{surface.label}</h3>
                               <code>{surface.id}</code>
                             </div>
                             <p class="a-smap-description">{surface.description}</p>
                             <dl class="a-smap-facts">
-                              <div><dt>{t("alpha.surfaceMap.owner")}</dt><dd><code>{surface.owner}</code></dd></div>
-                              <div><dt>{t("alpha.surfaceMap.mount")}</dt><dd>{mountDescription(surface.mount)}</dd></div>
-                              <div><dt>{t("alpha.surfaceMap.runtime")}</dt><dd><strong>{runtime().mode}</strong><span>{runtime().detail}</span></dd></div>
-                              <div><dt>{t("alpha.surfaceMap.source")}</dt><dd><code title={surface.source}>{surface.source}</code></dd></div>
+                              <div><dt>{t("codepuppy.surfaceMap.owner")}</dt><dd><code>{surface.owner}</code></dd></div>
+                              <div><dt>{t("codepuppy.surfaceMap.mount")}</dt><dd>{mountDescription(surface.mount)}</dd></div>
+                              <div><dt>{t("codepuppy.surfaceMap.runtime")}</dt><dd><strong>{runtime().mode}</strong><span>{runtime().detail}</span></dd></div>
+                              <div><dt>{t("codepuppy.surfaceMap.source")}</dt><dd><code title={surface.source}>{surface.source}</code></dd></div>
                             </dl>
                             <div class="a-smap-paths">
-                              <div><span>{t("alpha.surfaceMap.entrypoints")}</span><p>{surface.entrypoints.join(" · ")}</p></div>
-                              <div><span>{t("alpha.surfaceMap.transitions")}</span><p>{surface.transitions.map((transition) => `${transition.label} → ${frontendSurfaceById(transition.target)?.label ?? transition.target}`).join(" · ")}</p></div>
+                              <div><span>{t("codepuppy.surfaceMap.entrypoints")}</span><p>{surface.entrypoints.join(" · ")}</p></div>
+                              <div><span>{t("codepuppy.surfaceMap.transitions")}</span><p>{surface.transitions.map((transition) => `${transition.label} → ${frontendSurfaceById(transition.target)?.label ?? transition.target}`).join(" · ")}</p></div>
                             </div>
                           </article>
                         )

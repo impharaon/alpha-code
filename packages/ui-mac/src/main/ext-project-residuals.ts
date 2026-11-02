@@ -11,7 +11,7 @@
 //   · ghost 判定只认 `skill--<safe-name>` 且具 generation-store 结构的目录;其余 ext-store
 //     条目一律只报告(unknownStoreEntries),绝不删;
 //   · 非终态/不可读 journal、journal 目录不可枚举 → 整单拒,零自动删除;
-//   · orphan agent 面(.code-puppy/agents/*.md、alpha.jsonc agent 条目)只报告,永不自动清;
+//   · orphan agent 面(.code-puppy/agents/*.md、codepuppy.jsonc agent 条目)只报告,永不自动清;
 //   · 绝不做全盘项目扫描 —— 只看调用方交来的这个项目根。
 // 并发窗口:detect→clean 非原子;兜底 = 清理起步前重新巡检 journal(拒绝新在途),且 skill
 // 店删除本身是持 Bundle 锁的 journaled 事务(与任何并发事务串行);flat agent 删除由
@@ -20,7 +20,7 @@ import fs from "node:fs"
 import path from "node:path"
 import { parse as parseJsonc } from "jsonc-parser"
 
-import { alphaRoot } from "./alpha-workdir"
+import { codepuppyRoot } from "./codepuppy-workdir"
 import { uninstallByKey, type PlannerDeps } from "./ext-install-planner"
 import { lookupForUninstall, projectScopeIdentity, readLedgerV2, removeRecordV2, type InstallRecordV2 } from "./ext-receipt-v2"
 import { skillGenerationKey, skillStorePaths } from "./ext-skill-generations"
@@ -42,7 +42,7 @@ export type ProjectResidualReport = {
   ghostStoreKeys: string[]
   /** 非 skill--* 形状 / 无 generation-store 结构的 ext-store 条目 —— 只报告,绝不清。 */
   unknownStoreEntries: string[]
-  /** 无任何账面依据的 agent 残留面(.code-puppy/agents/*.md 文件名、alpha.jsonc agent 键)—— 只报告。 */
+  /** 无任何账面依据的 agent 残留面(.code-puppy/agents/*.md 文件名、codepuppy.jsonc agent 键)—— 只报告。 */
   orphanAgentFiles: string[]
   orphanAgentConfigEntries: string[]
   /** 非终态或不可读 journal —— 在场即阻断清理。 */
@@ -60,7 +60,7 @@ function projectRootOf(projectDir: unknown): { ok: true; root: string; projectPa
     return { ok: false, reason: "projectDir: required absolute path" }
   const identity = projectScopeIdentity(projectDir)
   if (!identity.ok) return { ok: false, reason: `fail closed: ${identity.reason}` }
-  const root = alphaRoot(identity.scope.projectPath)
+  const root = codepuppyRoot(identity.scope.projectPath)
   if (!root) return { ok: false, reason: `fail closed: invalid project root: ${projectDir}` }
   return { ok: true, root, projectPath: identity.scope.projectPath }
 }
@@ -100,13 +100,13 @@ function listOrphanAgentSurfaces(root: string, hasAgentRecord: (name: string) =>
   }
   const configEntries: string[] = []
   try {
-    const parsed: unknown = parseJsonc(fs.readFileSync(path.join(root, "alpha.jsonc"), "utf8"))
+    const parsed: unknown = parseJsonc(fs.readFileSync(path.join(root, "codepuppy.jsonc"), "utf8"))
     const agent = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>).agent : undefined
     if (agent && typeof agent === "object" && !Array.isArray(agent)) {
       for (const name of Object.keys(agent)) if (!hasAgentRecord(name)) configEntries.push(name)
     }
   } catch {
-    /* 无 / 不可解析 alpha.jsonc:agent 面只报告,不因此阻断 */
+    /* 无 / 不可解析 codepuppy.jsonc:agent 面只报告,不因此阻断 */
   }
   return { files: files.sort(), configEntries: configEntries.sort() }
 }

@@ -1,27 +1,27 @@
 // REQ-229 / REQ-230 视觉 harness 入口。场景经 `?scene=` 选择,`?theme=dark` 切深色。
-// 挂的全是生产组件(SessionTimelineView / ProcessRow / PermissionDialog / AlphaComposerRuntime);
+// 挂的全是生产组件(SessionTimelineView / ProcessRow / PermissionDialog / CodePuppyComposerRuntime);
 // 只有数据(消息、part、模型目录)与 IPC(window.api、SDK)是桩。
 import type { ModelV2Info, PermissionV2Request } from "@opencode-ai/sdk/v2/client"
 import { render } from "solid-js/web"
 import { createSignal, type JSX } from "solid-js"
 import { researchTurn } from "../test-component/process-fold.fixture"
 import { installPreloadStub } from "../test-component/preload-stub"
-import catalogJson from "../src/main/alpha-models.json"
-import producer from "../../alpha-contracts-consumer/vendor/alpha-platform-model-catalog/contracts/v3/fixtures/producer/model-catalog.json"
+import catalogJson from "../src/main/codepuppy-models.json"
+import producer from "../../codepuppy-contracts-consumer/vendor/alpha-platform-model-catalog/contracts/v3/fixtures/producer/model-catalog.json"
 import { BYOK_ADAPTERS } from "../src/main/byok-adapters"
-import type { EffectiveCatalog, ProviderKeyStatus } from "../src/shared/alpha-model-types"
+import type { EffectiveCatalog, ProviderKeyStatus } from "../src/shared/codepuppy-model-types"
 import type { AccountSummary } from "../src/preload/types"
-import { projectTimelineRows, type TimelineRow, type TimelineTurnWait } from "../src/renderer/alpha-ui/session-timeline/timeline-model"
-import { SessionTimelineView } from "../src/renderer/alpha-ui/session-timeline/session-timeline-view"
-import { PermissionDialog } from "../src/renderer/alpha-ui/PermissionDialog"
-import { AlphaComposerRuntime } from "../src/renderer/alpha-ui/alpha-composer"
-import { pushToast, ToastViewport } from "../src/renderer/alpha-ui/Toast"
-import type { ModelContract } from "../src/renderer/alpha-ui/model-contract"
+import { projectTimelineRows, type TimelineRow, type TimelineTurnWait } from "../src/renderer/codepuppy-ui/session-timeline/timeline-model"
+import { SessionTimelineView } from "../src/renderer/codepuppy-ui/session-timeline/session-timeline-view"
+import { PermissionDialog } from "../src/renderer/codepuppy-ui/PermissionDialog"
+import { CodePuppyComposerRuntime } from "../src/renderer/codepuppy-ui/codepuppy-composer"
+import { pushToast, ToastViewport } from "../src/renderer/codepuppy-ui/Toast"
+import type { ModelContract } from "../src/renderer/codepuppy-ui/model-contract"
 // 与生产 index.tsx 同口径:home.css(.a-pop / .a-ic / .a-chip 通用原语)与 composer-reskin 全局在场。
-import "../src/renderer/alpha-ui/base.css"
-import "../src/renderer/alpha-ui/home.css"
-import "../src/renderer/alpha-ui/composer-reskin.css"
-import "../src/renderer/alpha-ui/session-workspace/session-workspace.css"
+import "../src/renderer/codepuppy-ui/base.css"
+import "../src/renderer/codepuppy-ui/home.css"
+import "../src/renderer/codepuppy-ui/composer-reskin.css"
+import "../src/renderer/codepuppy-ui/session-workspace/session-workspace.css"
 import "./harness.css"
 
 const params = new URLSearchParams(location.search)
@@ -30,7 +30,7 @@ if (params.get("theme") === "dark") document.documentElement.dataset.colorScheme
 
 // ── 数据桩 ─────────────────────────────────────────────────────────────────────
 // `#1556`:已应用目录 = 上游 V3 producer 快照(平台段)+ 随包 BYOK 首启引导 × 适配器表(BYOK 段)。生产投影
-// (main/alpha-live-allowlist.ts projectPlatformModels、main/alpha-models.ts projectByokProviders)所在模块引 node:fs,
+// (main/codepuppy-live-allowlist.ts projectPlatformModels、main/codepuppy-models.ts projectByokProviders)所在模块引 node:fs,
 // 进不了浏览器 bundle;bun 测试用的是 test-component/effective-catalog.fixture.ts(走生产投影),这里只为画面照抄字段。
 const catalog = {
   defaultModel: catalogJson.defaultModel,
@@ -261,7 +261,7 @@ function Workspace(): JSX.Element {
       </div>
       {withComposer && (
         <div class="vh-composer">
-          <AlphaComposerRuntime
+          <CodePuppyComposerRuntime
             mode="session"
             projects={projects as never}
             directory={directory}

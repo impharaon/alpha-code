@@ -31,7 +31,7 @@ review_after: 2026-10-14
 > 判「`plugin[]` 有没有多出写之前没有的元素」,有则拒 —— **新增写入点不需要登记就已经被挡住**。
 >
 > `#832`(2026-08-03)关掉了 `#825` 留下的最后一个结构性绕开口:boot 期 reconcile 曾经自己
-> `writeFileSync+rename` 整个 `alpha.jsonc`,三道白名单一道都不过,而它每次启动都跑。处置是两件事:
+> `writeFileSync+rename` 整个 `codepuppy.jsonc`,三道白名单一道都不过,而它每次启动都跑。处置是两件事:
 > ① `planConfigMerge` 里「legacy `plugin[]` 并集」删掉(本 portfolio 无真实用户 ⇒ 无 legacy 迁移
 > 义务;而「来源是用户旧配置」不改变「以引擎同等权限执行的第三方 JS」这个事实);② 那次整文件写盘
 > 改调 `ext-config` 的同一个原子提交点。
@@ -41,16 +41,16 @@ review_after: 2026-10-14
 >
 > | 不过咽喉的写 | 真正挡住 `plugin` 的是什么 |
 > | --- | --- |
-> | `ext-config.ts` `applyBuiltinPolicyEditsUnlocked`(自己的 tmp+rename 写 `alpha.jsonc`) | `builtinPolicyPathAllowed` 具名路径白名单(只放 `agent` / `permission.skill` / `command` 叶子,`plugin` 不是合法首段,落盘前逐条判) |
-> | `alpha-config-injection` | 只在真源**缺席**时 seed 字面量 `{$schema}`,内容里没有 `plugin` 键 |
-> | `alpha-migrate` legacy 臂 | 目标是 legacy `opencode.jsonc`,只做减法,且要 `ALPHA_MIGRATE_ENABLE=1` |
-> | **`ecosystem-import.ts` `registerProjectSkillsPath`**(整文件写**项目级** `<proj>/.code-puppy/alpha.jsonc`) | **它自己没有任何白名单**;挡住 `plugin` 的闸在另一个包:`packages/ext/src/project-config.ts` 的 `mergeProjectConfig` 只合 `mcp`(信任门)/`agent`/`command`/`skills.paths`。同族的 `packages/ext/src/register.ts`(引擎进程侧整文件序列化同一文件)靠 `RegisterType` 类型白名单 |
+> | `ext-config.ts` `applyBuiltinPolicyEditsUnlocked`(自己的 tmp+rename 写 `codepuppy.jsonc`) | `builtinPolicyPathAllowed` 具名路径白名单(只放 `agent` / `permission.skill` / `command` 叶子,`plugin` 不是合法首段,落盘前逐条判) |
+> | `codepuppy-config-injection` | 只在真源**缺席**时 seed 字面量 `{$schema}`,内容里没有 `plugin` 键 |
+> | `codepuppy-migrate` legacy 臂 | 目标是 legacy `opencode.jsonc`,只做减法,且要 `CODEPUPPY_MIGRATE_ENABLE=1` |
+> | **`ecosystem-import.ts` `registerProjectSkillsPath`**(整文件写**项目级** `<proj>/.code-puppy/codepuppy.jsonc`) | **它自己没有任何白名单**;挡住 `plugin` 的闸在另一个包:`packages/ext/src/project-config.ts` 的 `mergeProjectConfig` 只合 `mcp`(信任门)/`agent`/`command`/`skills.paths`。同族的 `packages/ext/src/register.ts`(引擎进程侧整文件序列化同一文件)靠 `RegisterType` 类型白名单 |
 >
 > 最后一行是 `#832` 审计补上的,也是唯一一条「今天只写 `skills.paths`」属于**恰好**而非被挡:实测在
 > `registerProjectSkillsPath` 里加一行 `cfg.plugin=[…]`,盘上当场多出该条目而咽喉用例全绿;同一份文本
 > 喂 `mergeProjectConfig` 则 `added` 只有 `["skills.paths"]`、`cfg.plugin === undefined`。
 > **今天没有洞,但功劳不是咽喉的,两道闸之间也没有任何东西把它们和 ADR-040 连起来。**
-> 随之而来的一格新 fail-closed:盘上的 `alpha.jsonc` 语法坏掉、而容错解析仍读得出 `plugin` 条目时,
+> 随之而来的一格新 fail-closed:盘上的 `codepuppy.jsonc` 语法坏掉、而容错解析仍读得出 `plugin` 条目时,
 > reconcile **整次不写盘**(loud,`bailedOut` 带咽喉理由,`~/.opencode` 也不清理)—— 因为「写完之后
 > 没多出元素」在那种输入上证不出来。坏文件原样留给用户,不被改写。
 >
@@ -145,7 +145,7 @@ MCP 重装是产品流(确认框重装),允许覆盖(引擎前像可复原)而�
   一律沿用 prev 当前 desiredState(启停只经 set-state 通道 `setDesiredStateV2` 改);fresh(无 prev)
   才用分类器传入值。v1→v2 迁移如实保留 enabled(存量不回溯)。
 - **持久化 config 投影(#394 裁决 A′;Codex r2/r3 定稿)**:disabled 的 mcp/agent/plugin 的启用态**写进
-  磁盘 alpha.jsonc**,字段用**引擎真实消费的键**:mcp `enabled:false`(引擎查 `mcp.enabled === false`)、
+  磁盘 codepuppy.jsonc**,字段用**引擎真实消费的键**:mcp `enabled:false`(引擎查 `mcp.enabled === false`)、
   agent `disable:true`(引擎查 `value.disable`)、plugin 从 `plugin[]` **缺席** —— 因引擎 import 插件早于
   config-hook,disabled plugin 必须从持久化 config 缺席才拦得住加载。plugin 增删按**解析路径身份**匹配
   (绝对/相对/`file://` 等价形态同判),受管归一化:enable 按 configKey 补回受管条目形态(受管安装从不
@@ -179,13 +179,13 @@ MCP 重装是产品流(确认框重装),允许覆盖(引擎前像可复原)而�
   (升级首启 backfill / 扩容失败残留 / 账本损坏时撤陈旧允许集)。
 - **startup reconcile(Codex r5 缺失件,#395 定稿)**:主进程启动时(REQ-059 truth reconcile 之后、
   首个 sidecar fork 读 config 之前)`reconcileDesiredStateAtBoot` 把账本全部 global mcp/agent/plugin
-  记录的 desiredState **双向重投影**回 alpha.jsonc(disabled → 禁用键/缺席;enabled → 剥禁用键/补回),
+  记录的 desiredState **双向重投影**回 codepuppy.jsonc(disabled → 禁用键/缺席;enabled → 剥禁用键/补回),
   使 config 恒 = 账本派生 —— 消除「账本 disabled / config enabled」崩溃残留与一切旁路写入的复活面。
-  边界 loud;**enforcementGap(r11 pivot 后收窄到 plugin)**:唯 **plugin disable 无法从 alpha.jsonc
+  边界 loud;**enforcementGap(r11 pivot 后收窄到 plugin)**:唯 **plugin disable 无法从 codepuppy.jsonc
   `plugin[]` 落盘**(config 写失败/非缺席读错误/非法 jsonc)= gap → 主进程 **fail-closed 阻断首个
   sidecar spawn**(dialog + `app.exit`)。mcp/agent 由下述主权注入兜底,写失败非 gap;锁忙/enable 缺
   生效面 = 非 gap(仅 warning)。escape hatch 与 REQ-059 同口径。
-- **主权注入(Codex r11 定案 —— 取代 r6→r10 的 legacy 探测器)**:引擎除 alpha.jsonc 外还合并许多源
+- **主权注入(Codex r11 定案 —— 取代 r6→r10 的 legacy 探测器)**:引擎除 codepuppy.jsonc 外还合并许多源
   (XDG 全局三 json + legacy TOML `config` / `~/.opencode` / 各目录 `{agent,agents}/**/*.md` + `{plugin,
   plugins}/*.{ts,js}` 自动发现 / `OPENCODE_CONFIG_CONTENT` / 项目 / managed / MDM / active-org)。**逐源探测
   = 重实现引擎整个 config 解析器,是发散的无底洞**(r7→r11 每轮暴露新源:TOML、逐目录交错序、gray-matter
@@ -196,11 +196,11 @@ MCP 重装是产品流(确认框重装),允许覆盖(引擎前像可复原)而�
       `mergeDeep` later-wins 使 alpha 的禁用**压过一切 in-scope 源**,disabled 扩展**永不被引擎加载,无需
       探测**。引擎 schema 显式允许 lone `{enabled:false}` mcp 叶(`core/v1/config/config.ts:114` 的 Union)
       与 disable-only agent 叶(全 optional)。每次 sidecar fork 从账本重算,best-effort(账本不可读 → 跳过,
-      alpha.jsonc 投影仍在)。
-    · **plugin**:union(`mergePluginOrigins`)**无 disable 键、无覆盖面** → 只能从 **alpha.jsonc `plugin[]`
+      codepuppy.jsonc 投影仍在)。
+    · **plugin**:union(`mergePluginOrigins`)**无 disable 键、无覆盖面** → 只能从 **codepuppy.jsonc `plugin[]`
       移除**(`computeEnableProjectionEdit`:disable 按 base 移除同 base 全部钉版;enable 按精确 spec 重建)。
       **已知边界(Codex r12 Major2,信任模型显式声明)**:plugin 的 disable **只治理 alpha 自有副本**
-      (alpha 只写 alpha.jsonc);若同一 plugin 也出现在其他引擎读取源(XDG / 项目 / `~/.opencode` / 自动
+      (alpha 只写 codepuppy.jsonc);若同一 plugin 也出现在其他引擎读取源(XDG / 项目 / `~/.opencode` / 自动
       发现目录),引擎 union 仍会 import —— **本设计不防御该情形**。当前部署无用户 = 无其他 plugin 源,故
       移除即权威;若未来引入用户手写配置,须显式向用户暴露"plugin 开关仅治理 alpha 安装的副本"这一限制,
       或补 plugin 侧的运行时 enforcement。移除失败 = plugin gap(阻断 sidecar)。
@@ -217,11 +217,11 @@ MCP 重装是产品流(确认框重装),允许覆盖(引擎前像可复原)而�
     · **live 运行面**:引擎 `mcp.connect`/`mcp.add` 强制 `enabled:true`,当前 session 的连接是暂态;权威层 =
       注入(任何 reload 引擎必读 disabled)。安装/开关的 live 连接前经 inventoryView 复查 activation,读失败
       **fail-closed 不激活**(Codex r12 Major1:回 reload-pending,不靠"下次自愈"当安全控制);disabled 则不
-      连。alpha.jsonc 的 mcp/agent 投影(set-state/boot)保留作 consistency,非 load-bearing。
+      连。codepuppy.jsonc 的 mcp/agent 投影(set-state/boot)保留作 consistency,非 load-bearing。
 - **未策展重加投影(Codex r5/r6 M1 → r11)**:`persistMcp` 对账本 disabled 的 mcp 重写叶并入 `enabled:false`
-  (内容更新、状态不翻);`persistPlugin` 对 disabled 的 plugin 从 alpha.jsonc `plugin[]` 移除该 base 全部
+  (内容更新、状态不翻);`persistPlugin` 对 disabled 的 plugin 从 codepuppy.jsonc `plugin[]` 移除该 base 全部
   条目(换钉版旧 spec 不留)——无用户 = 无他源,移除即权威(不再逐源探测)。
-- **读错误收窄(Codex r5)**:alpha.jsonc 各读点只容缺席(ENOENT/ENOTDIR);EACCES/EIO 等
+- **读错误收窄(Codex r5)**:codepuppy.jsonc 各读点只容缺席(ENOENT/ENOTDIR);EACCES/EIO 等
   「读不出」≠「不存在」,一律 fail-closed(启停双向拒、truth reconcile 整体 skip、legacy 不迁不清理、
   persistPlugin 拒写防空基底 clobber)。断链 symlink `pathIdentity` 判 certain:false —— **Codex r6 B5**:
   不只查最终组件,realpath **最长存在前缀**(穿透好 symlink 消除系统链别名歧义)+ 逐段上溯检测,
@@ -322,8 +322,8 @@ fail-closed/skills 派生允许集锁步 + boot 自愈)、`gen-skill-paths.test.
 fail-closed)、`ext-install-planner.test.ts`(fail-closed ledger commit:逐类型写前门/根只读事务失败零
 残留/损坏账本写前拒绝/v1-only 双查/authorize 暂停零权威副作用/v1 锁步派生;#378 退出条件
 组:四类首装 authorize 生产入口、cloud 卸载双清与 desiredState 继承、plugin 更新失败旧版
-健康、MCP 密钥版本化轮换)、`alpha-mcp-secrets.test.ts`(版本化原语)、
-`ext-config.test.ts` / `ext-fs-installer.test.ts` / `alpha-environment.test.ts`
+健康、MCP 密钥版本化轮换)、`codepuppy-mcp-secrets.test.ts`(版本化原语)、
+`ext-config.test.ts` / `ext-fs-installer.test.ts` / `codepuppy-environment.test.ts`
 (eager v1 下线后的层级契约 + strict 读真实实现)、`ext-project-adopt.test.ts`
 (adoption 矩阵:纯文本收编/幂等不重写 env/scope 不符 retained/损坏零改动/busy 可重试/
 零存量零副作用/触发面源文本合同)、`ext-receipt-v2.test.ts`(**`#773` V3 只读路径一致失败(§6.3)**;**#336 projectionLag 判别式:

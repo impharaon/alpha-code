@@ -3,10 +3,10 @@
 // 谁需要它:任何会走到生产平台闸的用例。生产侧 `ext-install-planner.ts` 有四处
 //   `if (!manifest.compatibility.platforms.includes(deps.platform())) return { ok:false, … }`
 // 而 `synthesizeManifest` 把 `platforms` 写死成 `["darwin","win32"]`(ADR-026 桌面双平台)。
-// alpha-ci 跑 ubuntu ⇒ 这些用例在 CI 上量到的是「runner 不是发布平台」,不是它们要验的行为
+// codepuppy-ci 跑 ubuntu ⇒ 这些用例在 CI 上量到的是「runner 不是发布平台」,不是它们要验的行为
 // (实测报错原文:`platform linux not supported by this entry — refusing before any disk write`)。
 //
-// 为什么是 opt-in 而不是在 preload 里全局钉:**实测过全局钉,代价更大**。alpha-ci 上
+// 为什么是 opt-in 而不是在 preload 里全局钉:**实测过全局钉,代价更大**。codepuppy-ci 上
 // 全局 `process.platform = "darwin"` 让 14 个 renderer 文件整片挂在
 // `Cannot find module @rollup/rollup-darwin-x64`(vite/rollup 按 process.platform 选原生
 // 可选依赖,linux runner 上装的是 linux 那份),3752 pass 掉到 3625。
@@ -30,7 +30,7 @@ export function pinShippedPlatform(): boolean {
   const host = process.platform
   Object.defineProperty(process, "platform", { value: "darwin", configurable: true, enumerable: true })
   console.log(
-    `[alpha-test-env] host platform "${host}" is not one this product ships on (${SHIPPED_PLATFORMS.join("/")}); ` +
+    `[codepuppy-test-env] host platform "${host}" is not one this product ships on (${SHIPPED_PLATFORMS.join("/")}); ` +
       `process.platform pinned to "darwin" for THIS FILE so the production install gate exercises a supported platform. ` +
       `PLATFORM SIMULATED this run; genuinely ${host}-specific behaviour is NOT covered.`,
   )

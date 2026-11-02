@@ -209,7 +209,7 @@ const counterexamples = [
     {
       ...safePackage,
       verdict: "update-required",
-      action: { kind: "update-alpha", enabled: true, reasonCode: "package-host-update-required" },
+      action: { kind: "update-codepuppy", enabled: true, reasonCode: "package-host-update-required" },
     },
     { ...safePackage, action: { ...safePackage.action, enabled: false } },
   ].map((view) => ({
@@ -269,7 +269,7 @@ describe("alpha-web#255 old-cache installable view", () => {
       import { projectRemoteCatalogForRenderer } from "../../main/remote-catalog"
       const input = ${JSON.stringify(input)}
       const views = ${JSON.stringify(views)}
-      mock.module("./alpha-catalog.json", () => ({ default: input }))
+      mock.module("./codepuppy-catalog.json", () => ({ default: input }))
       const queue = ["remote", "cache"]
       mock.module("./ext-ipc", () => ({ extIpc: { remoteCatalog: async () => projectRemoteCatalogForRenderer({
         source: queue.shift(), catalog: input, packageViews: views, version: input.version,

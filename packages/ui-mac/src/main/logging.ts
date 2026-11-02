@@ -48,9 +48,9 @@ export function initCrashReporter() {
 }
 
 export async function startNetLog() {
-  // netlog is opt-in — enable with ALPHA_NETLOG=1. A 20MB capture on every launch is wasteful for the
+  // netlog is opt-in — enable with CODEPUPPY_NETLOG=1. A 20MB capture on every launch is wasteful for the
   // common case where nobody inspects it; default off keeps long-running installs bounded (C3).
-  if (process.env.ALPHA_NETLOG !== "1") return
+  if (process.env.CODEPUPPY_NETLOG !== "1") return
   if (netLog.currentlyLogging) return
   netLogPath = join(run, "network.netlog")
   await netLog.startLogging(netLogPath, { captureMode: "default", maxFileSize: NET_LOG_SIZE })

@@ -5,7 +5,7 @@
 >
 > 存在理由:一道**恒红**的门等于没有门 —— 大家会习惯性 `--no-verify` / `--admin`,真出问题时也没人看。
 > 一道**假绿**的门更糟 —— 它主动告诉你「没事」。本仓在半个月里撞上同一形态四次
-> (`#754` / `#769` / 本票原列的 `alpha-check` typecheck / 2026-08-02 起主线连红两天),
+> (`#754` / `#769` / 本票原列的 `codepuppy-check` typecheck / 2026-08-02 起主线连红两天),
 > 所以这里不再逐个修,而是把整类列出来并在咽喉点收口。
 
 ## 1. 这一类的共同前提
@@ -20,7 +20,7 @@
 | `#769` | CI 的 vendor lock 闸 | 「兄弟仓 `../alpha-web` 在」 | 裸 checkout 没有 ⇒ **CI 上恒红**,红的理由与它要验的漂移无关 |
 | `#777`-A | `bun test` 的 31 条 host 用例 | 「机器快到 5 秒内能跑完一整套子 suite」 | 慢一点就超时 ⇒ 红,而红的理由与被验的行为无关 |
 | `#777`-B | 生产安装闸的组件测试 | 「跑在本产品发布的平台上」 | ubuntu runner ⇒ 写盘前直接拒 ⇒ 门跑不起来 |
-| `#916` | 本地 `alpha-check` 的 typecheck / 测试 | 「跑门的这棵树装着依赖」 | 全新 worktree 一个 `node_modules` 都没有 ⇒ **11627 条假红** ⇒ 唯一出路是去动**共享**主 checkout ⇒ 并行 lane 互相污染彼此的门测量 |
+| `#916` | 本地 `codepuppy-check` 的 typecheck / 测试 | 「跑门的这棵树装着依赖」 | 全新 worktree 一个 `node_modules` 都没有 ⇒ **11627 条假红** ⇒ 唯一出路是去动**共享**主 checkout ⇒ 并行 lane 互相污染彼此的门测量 |
 | `#1294` | `bun test src` 里的子进程宿主 | 「子进程里那一跳 loopback HTTP 每次都能形成响应」 | 满载时形不成 ⇒ 宿主间歇红,而它不在 `known-fails.tsv` 里 ⇒ 拦下一个**没碰过相关代码**的 PR ⇒ 最省事的动作是 `--no-verify`(见 3.12) |
 | `#1300` | `bun test src` 里的墙钟上界断言(`expect(Date.now() - t0).toBeLessThan(100)` 一类,首轮枚举 34 处) | 「这条路径 100ms 内返回」= 「机器此刻够闲」 | 同机 31 个 `bun test` 并跑时 100ms 收到 156ms ⇒ 拦下一个纯文档 PR ⇒ `--no-verify`(见 3.13) |
 | `#1416` | CI 的 `bun test (ui-mac)` | 「这个测试文件在 runner 上加载得起来」 | Linux 的 `electron` 解不出 `utilityProcess` 具名导出 ⇒ 三个文件**一条用例都没执行**,失败记成 `(fail) (unnamed)` ⇒ 棘轮点不出名 ⇒ 这三个文件里的红在 CI 上**结构性不可见**(见 3.14) |
@@ -34,11 +34,11 @@
 
 | 枚举对象 | 轴 1 | 轴 2 | 结果一致? |
 | --- | --- | --- | --- |
-| CI 的代码步 | `.github/workflows/alpha-ci.yml` 里带 `run:` 的具名步骤 | `scripts/alpha-check.sh` 的 `CI_STEPS` 对照表 | 是(12 = 12,由 `local-gate-parity.test.ts` 持续判) |
+| CI 的代码步 | `.github/workflows/codepuppy-ci.yml` 里带 `run:` 的具名步骤 | `scripts/codepuppy-check.sh` 的 `CI_STEPS` 对照表 | 是(12 = 12,由 `local-gate-parity.test.ts` 持续判) |
 | 子进程 host 测试 | `grep -ran -l "process.execPath" src` | `grep -ran -l "Bun.spawnSync" src` | 一致到 31 个文件 |
 | host 的超时声明 | `grep -c "timeout"`(逐文件) | `grep -oE "\}, *[0-9_]+\)"`(数字第三参形态) | **否 —— 轴 1 漏了 6 个文件**。数字形态 `}, 180_000)` 不含 "timeout" 这个词 |
 | 超时声明的**粒度** | 逐文件 | 逐 `test(...)` 声明 | **否 —— 逐文件会数错**。一个文件里可以既有带声明的又有不带的 |
-| 上游守卫白名单 | `alpha-ci.yml` 的 `':(exclude)…'` | `alpha-check.sh` 的 `UPSTREAM_EXCLUDES` | 是(24 = 24,逐条同序) |
+| 上游守卫白名单 | `codepuppy-ci.yml` 的 `':(exclude)…'` | `codepuppy-check.sh` 的 `UPSTREAM_EXCLUDES` | 是(24 = 24,逐条同序) |
 | alpha 自有的 opencode 测试 | 文件名 `alpha-*.test.ts` | `git cat-file -e origin/dev:<path>` 失败者 | 是(各 5 个,同一组) |
 
 轴 1 与轴 2 在第三、四行**给出了不同答案**,而只跑轴 1 会得出「31 条 host 全都没声明超时」这个错结论 ——
@@ -46,16 +46,16 @@
 
 ## 3. 门 × 环境:真实状态表
 
-环境有四个:**alpha-ci(ubuntu runner)** / **本地 `alpha-check.sh`(开发机 macOS)** /
+环境有四个:**codepuppy-ci(ubuntu runner)** / **本地 `codepuppy-check.sh`(开发机 macOS)** /
 **本地 pre-push 钩子**(= 同一个脚本)/ **开发者手跑 `bun test`**。
 
 ### 3.1 CI 的 12 个代码步(`#777` 当时的普查)
 
 > 数字已变:`#895` 给四个必需 job 各加了一步 `Assert detect classified this diff`,
-> 现在是 16 步(`scripts/alpha-check.sh` 的 `CI_STEPS` 是权威,它自己会打出来)。下表刻意保留
+> 现在是 16 步(`scripts/codepuppy-check.sh` 的 `CI_STEPS` 是权威,它自己会打出来)。下表刻意保留
 > `#777` 当时的 12 行 —— 它讲的是「修前/修后」那段历史,不是今天的清单。
 
-| # | job | 步骤 | alpha-ci | alpha-check(修前) | alpha-check(修后) |
+| # | job | 步骤 | codepuppy-ci | codepuppy-check(修前) | codepuppy-check(修后) |
 | --- | --- | --- | --- | --- | --- |
 | 1 | upstream-guard | No literal NUL bytes | 真结果 | 有 | 有 |
 | 2 | upstream-guard | Fail on any modification to upstream package files | 真结果 | 有(且是超集:含未提交改动) | 同 |
@@ -81,7 +81,7 @@
 | 指定的测试文件不存在 | 1 | 1 |
 | 整个目录零匹配 | 1 | 1 |
 
-> 顺带更正一条仓内既有说法:`alpha-ci.yml` / `bun-test-floor.sh` 的注释把「指定的测试文件
+> 顺带更正一条仓内既有说法:`codepuppy-ci.yml` / `bun-test-floor.sh` 的注释把「指定的测试文件
 > 根本不存在」也列进了「exit 0」那一档 —— 在 bun 1.3.14 上它 exit 1。**真正的假绿只有第一行**,
 > 而第一行恰好正是「有人把闸门文件清空 / 把用例条件掉」的形状,所以下界该立还是要立。
 > (这属于 `#777` 范围外的注释更正,本 PR 不动那两处文字,记在这里。)
@@ -137,7 +137,7 @@
 
 | 读者 | 要求的 context | 写者 | 实际产出的 job 名 | 对得上? |
 | --- | --- | --- | --- | --- |
-| `alpha` 分支保护 | `north-star guard (zero upstream edits)` | alpha-ci | 同名 | 是 |
+| `alpha` 分支保护 | `north-star guard (zero upstream edits)` | codepuppy-ci | 同名 | 是 |
 | | `typecheck (alpha packages)` | | 同名 | 是 |
 | | `unit tests (alpha packages)` | | 同名 | 是(曾经写着 `unit tests (ui-mac)`) |
 | | `docs gate` | | 同名 | 是 |
@@ -148,7 +148,7 @@ PR 都缺**。于是每个 PR 在那一格永久 pending ⇒ 每次合并都得 
 挡住任何人。**「大家习惯性 --admin」不是纪律松懈,是分支保护自己造出来的。**
 owner 已于 2026-08-03 直接改分支保护补上(`#717` 评论里有回滚值)。
 
-**这个值的数据模型问题(`#717` 收的口)**:它同时活在**仓外的 GitHub 分支保护**与**仓内 alpha-ci.yml
+**这个值的数据模型问题(`#717` 收的口)**:它同时活在**仓外的 GitHub 分支保护**与**仓内 codepuppy-ci.yml
 的 job `name:`** 两处,而两处都没声明自己是真源,也没有任何东西比对它们 —— 所以 `ebd29cda` 改名当天
 无一处变红。现在仓内有一份手抄快照 [`.github/required-contexts.txt`](../../.github/required-contexts.txt),
 `packages/ui-mac/src/main/local-gate-parity.test.ts` 两条断言把它接上:记录里的每个 context 必须等于
@@ -166,12 +166,12 @@ workflow 触发在 `pull_request`,fork PR 拿不到 secrets)。这份记录**抓
 
 | 门 | 谁跑它 | 状态 |
 | --- | --- | --- |
-| `packages/opencode/test/tool/alpha-websearch-failure.test.ts` | 只有 `assert-gate-files.sh` | 登记在册;`#777` 之前该步在 CI 上连续两天 skipped、本地根本没有 |
-| `packages/opencode/test/permission/alpha-ask-deadline.test.ts` | 同上 | 同上 |
-| `packages/opencode/test/permission/alpha-composer-tiers.test.ts`(`#1413`) | 只有 `assert-gate-files.sh` | 登记在册(本地 [6/14] + CI 同步);整包地板不覆盖 opencode,所以它与上两行同类 |
-| `packages/opencode/test/tool/alpha-mcp-websearch-gate.test.ts` | **无** | `#649` 未决(本地 23.45s,且打印 `Bun.serve` 10 秒超时告警) |
-| `packages/opencode/test/mcp/alpha-cloud-mcp-multisource.test.ts` | **无** | `#649` 未决 |
-| `packages/opencode/test/mcp/alpha-cloud-mcp-revival.test.ts` | **无** | `#649` 未决 |
+| `packages/opencode/test/tool/codepuppy-websearch-failure.test.ts` | 只有 `assert-gate-files.sh` | 登记在册;`#777` 之前该步在 CI 上连续两天 skipped、本地根本没有 |
+| `packages/opencode/test/permission/codepuppy-ask-deadline.test.ts` | 同上 | 同上 |
+| `packages/opencode/test/permission/codepuppy-composer-tiers.test.ts`(`#1413`) | 只有 `assert-gate-files.sh` | 登记在册(本地 [6/14] + CI 同步);整包地板不覆盖 opencode,所以它与上两行同类 |
+| `packages/opencode/test/tool/codepuppy-mcp-websearch-gate.test.ts` | **无** | `#649` 未决(本地 23.45s,且打印 `Bun.serve` 10 秒超时告警) |
+| `packages/opencode/test/mcp/codepuppy-cloud-mcp-multisource.test.ts` | **无** | `#649` 未决 |
+| `packages/opencode/test/mcp/codepuppy-cloud-mcp-revival.test.ts` | **无** | `#649` 未决 |
 
 `#649` 是本类的**极端成员**:门假设的环境是「某个 CI」,而那个环境**不存在**。
 本票不处置它(逐份取舍要付 CI 时间的账,归 `#649`),但把它归类记在这里。
@@ -179,7 +179,7 @@ workflow 触发在 `pull_request`,fork PR 拿不到 secrets)。这份记录**抓
 ### 3.7 `detect` 的 diff 基准 —— 决定「今天哪些门跑」的那一格(`#717`)
 
 本节记的是**同一类里的上游**:3.1~3.6 讲的是某道门在某个环境里真不真;这一格讲的是
-**这些门今天到底跑不跑**。alpha-ci 里 upstream-guard / typecheck / test / seed-assets 的
+**这些门今天到底跑不跑**。codepuppy-ci 里 upstream-guard / typecheck / test / seed-assets 的
 **全部**步骤都挂在 `needs.detect.outputs.code == 'true'` 上,docs gate 的入参就是 `detect` 输出的
 `md`。**一个布尔值算错,当天所有门的开关就一起错。**
 
@@ -266,7 +266,7 @@ changed` 与 `code=false`,自相矛盾。上面那条判据此前也测不出这
 - **基准 = 这个 workflow 服务的那条分支**(`on: push/pull_request: branches: [alpha]`)。
   防漂断言的锚点取 workflow 自己的触发分支,不是把两个可以一起改错的值互相比对(自指等价链)。
 - **守卫本体搬进 [`scripts/north-star-guard.sh`](../../scripts/north-star-guard.sh)**,CI 与本地
-  `alpha-check.sh` 跑**同一份字节**。此前 `UPSTREAM_PATHS` + 44 条收编白名单在两处各有一份内联
+  `codepuppy-check.sh` 跑**同一份字节**。此前 `UPSTREAM_PATHS` + 44 条收编白名单在两处各有一份内联
   副本,靠 `local-gate-parity.test.ts` 逐行比对维持(`#637` 咬过一次:ADR-033 落地只同步了 paths、
   白名单漏了 ⇒ 干净 alpha 上本地恒假红、人人 `--no-verify`)。**枚举比对对新成员默认放行**,
   共用一份让那一类漂移在结构上不存在;防漂断言随之改成「workflow 必须调用它,且不得留第二份副本」。
@@ -308,7 +308,7 @@ changed` 与 `code=false`,自相矛盾。上面那条判据此前也测不出这
 基准提交自己的 sha / 日期,加上 `origin/alpha..HEAD` 的条数(= 比较窗口有多宽,也就是过报的量)——
 **不是**「落后远端 N 条」。
 
-- **CI 不走这条路**:`alpha-ci.yml` 的 `Ensure origin/alpha is available` 是一条裸 `git fetch`,
+- **CI 不走这条路**:`codepuppy-ci.yml` 的 `Ensure origin/alpha is available` 是一条裸 `git fetch`,
   失败即 job 红。降级只属于本地档。
 - **本票只做可见性,不加阈值**(「超过 N 条就转红」是独立判断:先让它可见,再谈要不要拦)。
 - 判据在 `north-star-guard.test.ts` 的三条:造「fetch 拿不到 + last-known 陈旧」的树,断言基准
@@ -364,7 +364,7 @@ changed` 与 `code=false`,自相矛盾。上面那条判据此前也测不出这
 咽喉:[`scripts/worktree-bootstrap.sh`](../../scripts/worktree-bootstrap.sh) —— 建 worktree 与
 `bun install` 合成一步,失败即非零退出并把**本次**创建的半装树整棵删掉。
 判据是**能力**不是产物([`scripts/assert-worktree-bootstrap.sh`](../../scripts/assert-worktree-bootstrap.sh),
-`alpha-check` 第 `[8/9]` 步):真建 worktree、真跑 typecheck,且**先证明未 bootstrap 的树确实会红**
+`codepuppy-check` 第 `[8/9]` 步):真建 worktree、真跑 typecheck,且**先证明未 bootstrap 的树确实会红**
 再判 bootstrap 过的树绿 —— 少了反向那条,「这台机器碰巧哪里都能解析」会让正向断言空对空地绿。
 
 附带修掉的一格:`bun install` 会触发根 `package.json` 的 `"prepare": "husky"`,把
@@ -408,10 +408,10 @@ pid 死了、或 pid 活着但 `ps` 说那不是探针本人 —— pid 会复�
 **这道门跑到哪些包**。答案此前是一份没有任何东西对照的手抄清单。
 
 **实测(2026-08-25,`alpha@82bf5d152`)**:`bun run --cwd packages/opencode typecheck`
-**exit 2 / 15 条 `error TS`** —— 13 条在 `test/tool/alpha-725-policy-chokepoints.cases.ts`
-(`TS2345`,`#1123` 带入),各 1 条在 `alpha-websearch-failure.test.ts`(`TS2345`)与
-`alpha-mcp-websearch-gate.test.ts`(`TS2352`)。**CI 与本地都没有任何一步跑这个包的 typecheck**:
-`alpha-ci.yml` 的 typecheck job 与 `alpha-check.sh` 第 [4/10] 步当时都只列 contracts-consumer /
+**exit 2 / 15 条 `error TS`** —— 13 条在 `test/tool/codepuppy-725-policy-chokepoints.cases.ts`
+(`TS2345`,`#1123` 带入),各 1 条在 `codepuppy-websearch-failure.test.ts`(`TS2345`)与
+`codepuppy-mcp-websearch-gate.test.ts`(`TS2352`)。**CI 与本地都没有任何一步跑这个包的 typecheck**:
+`codepuppy-ci.yml` 的 typecheck job 与 `codepuppy-check.sh` 第 [4/10] 步当时都只列 contracts-consumer /
 ext / ui-mac 三个包。后果不是「少一道门」,是**主动骗人**:主 session 当天在 `#319` 上把这片红
 当成自己引入的,查了一轮才排除。
 
@@ -425,7 +425,7 @@ ADR-043 的结构性谓词(不在 `origin/dev` 里 ∧ 自报家门)。两条独
 | 轴 2:出身 | 同一批里 `git cat-file -e origin/dev:<path>` **失败**者 | 18 |
 
 差集只有一条,而且方向是对的:`src/session/tool-display.ts` 不叫 `alpha-*`,靠文件首行的
-`north-star:alpha-owned` marker 自报家门(ADR-041)。⇒ **18 个 alpha 自有文件住在 `packages/opencode`
+`north-star:codepuppy-owned` marker 自报家门(ADR-041)。⇒ **18 个 alpha 自有文件住在 `packages/opencode`
 里,其中 14 个在 `test/` 下,1 个是 `.cases.ts`。** 它们全都被该包的 tsconfig 收进 typecheck,
 而 typecheck 从没跑过。
 
@@ -465,9 +465,9 @@ ADR-043 的结构性谓词(不在 `origin/dev` 里 ∧ 自报家门)。两条独
 
 | 想让它红的东西 | 谁判红 |
 | --- | --- |
-| 有人往 `packages/opencode` 的 alpha 判据文件里写错类型 | `alpha-ci.yml` 的 `typecheck opencode …` 步 + `alpha-check.sh` 第 [4/10] 步(本机实测该包 typecheck **4 秒**) |
+| 有人往 `packages/opencode` 的 alpha 判据文件里写错类型 | `codepuppy-ci.yml` 的 `typecheck opencode …` 步 + `codepuppy-check.sh` 第 [4/10] 步(本机实测该包 typecheck **4 秒**) |
 | 有人把 CI 那一步删掉/改名,而本地没跟(或反过来) | `src/main/local-gate-parity.test.ts` —— 双向比对,档位只允许 `MIRRORED`/`SUPERSET:`/`DEGRADED:` |
-| 有人只把 `alpha-check.sh` 里那条命令删掉(CI 步与 `MIRRORED` 登记都留着) | 同上文件的**第十六条**(`#1134` 新增)。**在它之前这是个洞**:变异实测 15 pass / 0 fail,而本地那半道门已经不存在 —— 而本 portfolio 的合并路径是「本地判绿 ⇒ `--admin` 合」,CI 那一格恰恰是被绕过的那道,假绿的正是真正在用的那一半 |
+| 有人只把 `codepuppy-check.sh` 里那条命令删掉(CI 步与 `MIRRORED` 登记都留着) | 同上文件的**第十六条**(`#1134` 新增)。**在它之前这是个洞**:变异实测 15 pass / 0 fail,而本地那半道门已经不存在 —— 而本 portfolio 的合并路径是「本地判绿 ⇒ `--admin` 合」,CI 那一格恰恰是被绕过的那道,假绿的正是真正在用的那一半 |
 
 **诚实边界(不假装闭合)**:这一步跑的是**整个** `packages/opencode`,不只是那 18 个 alpha 文件 ——
 tsgo 的项目单位就是 tsconfig,而那个 tsconfig 是上游的、不能改。⇒ 一次把上游源码带红的 fork-sync
@@ -482,7 +482,7 @@ tsgo 的项目单位就是 tsconfig,而那个 tsconfig 是上游的、不能改�
 
 **实测(2026-09-08,`.worktrees/ac-1286-recon@94ade5e68`,一次 docs-only 改动的 pre-push)**:
 `bun test src` **4799 pass / 1 fail / Ran 4800 tests across 340 files [245.68s]**,唯一那条红是
-`src/main/cloud-result-scrub.test.ts`;同一个 sha 直接跑 `scripts/alpha-check.sh` 是**绿**的。
+`src/main/cloud-result-scrub.test.ts`;同一个 sha 直接跑 `scripts/codepuppy-check.sh` 是**绿**的。
 日志里子进程**跑起来了**:`1 pass / 2 fail / 5 expect() calls / Ran 3 tests across 1 file [45.00ms]`
 —— 纯函数那条(扫描器标定)照常 pass,两条走真 HTTP 的停在
 `expect(status.job_id).toBe("job_scrub1113a")  Received: undefined`。
@@ -492,8 +492,8 @@ tsgo 的项目单位就是 tsconfig,而那个 tsconfig 是上游的、不能改�
 —— 人为让响应形不成 —— 复跑的签名逐项吻合:`1 pass / 2 fail / 5 expect() calls`、两条停在
 同一个断言、耗时 **8.79ms / 0.57ms**(红那次 10.33ms / 0.49ms)。随后给 cases 补上
 「先断言错误信封」再跑同一注入,直接打出 `expect(received).toBeNull()  Received: "network"` ——
-即 `alpha-cloud-jobs.ts` 的 `authed()` 落进 catch 分支。状态读那一跳生产里就是
-`maxAttempts = 1`(`alpha-cloud-jobs.ts:100`,只有 dispatch 有 3 次有界重试),
+即 `codepuppy-cloud-jobs.ts` 的 `authed()` 落进 catch 分支。状态读那一跳生产里就是
+`maxAttempts = 1`(`codepuppy-cloud-jobs.ts:100`,只有 dispatch 有 3 次有界重试),
 **一次瞬态失败即定案**。
 
 **为什么这一格比「慢一点就超时」更贵**:它不在 `scripts/known-fails.tsv` 里(棘轮的行为是**对的**,
@@ -545,7 +545,7 @@ tsgo 的项目单位就是 tsconfig,而那个 tsconfig 是上游的、不能改�
 
 | 处置 | 条数 | 落点 |
 | --- | --- | --- |
-| 改写(不再命中,留痕在登记簿抬头) | 17 | artifact-quota ×5(冻住 `Date.now`,到期由钩子拨时钟 / 永不返回的钩子逼期限计时器收尾,断言改为「钩子被触到 + 扫描恰好停在第 N 条 + 让出过事件循环」)· sidecar-location-prewarm ×2(生产注入 `now`,判据精确 `toBe(20)` / `toBe(80)`)· model-contract ×2(看 abort reason 的来源:屏障自己的 controller ⇒ `AbortError`,链级预算 ⇒ `TimeoutError`)· surface-remount ×5(`performance.now` 换成只由夹具推进的时钟,归因精确相等)· alpha-auth.cases ×1(删:有界的结构性证据是落定且 `applied:false`)· alpha-websearch-failure ×1(Effect `TestClock`:99ms 悬着、100ms 落定) |
+| 改写(不再命中,留痕在登记簿抬头) | 17 | artifact-quota ×5(冻住 `Date.now`,到期由钩子拨时钟 / 永不返回的钩子逼期限计时器收尾,断言改为「钩子被触到 + 扫描恰好停在第 N 条 + 让出过事件循环」)· sidecar-location-prewarm ×2(生产注入 `now`,判据精确 `toBe(20)` / `toBe(80)`)· model-contract ×2(看 abort reason 的来源:屏障自己的 controller ⇒ `AbortError`,链级预算 ⇒ `TimeoutError`)· surface-remount ×5(`performance.now` 换成只由夹具推进的时钟,归因精确相等)· codepuppy-auth.cases ×1(删:有界的结构性证据是落定且 `applied:false`)· codepuppy-websearch-failure ×1(Effect `TestClock`:99ms 悬着、100ms 落定) |
 | `upstream`(north-star 不改) | 14 | codemode / core / opencode 的 12 个上游测试文件 |
 | `keep`(真性能契约,写清余量与失败签名) | 2 | worktree-probe-sweep(200 次直读 vs 2 次 spawn,相对量,余量 ≥ 100×)· tool-card-provenance-gates(redactor 线性,2000ms 预算余量 ≥ 20×) |
 | `load-sensitive`(只许门外文件) | 1 | `test-live/req087`(不进每 PR 门,单独命令跑) |
@@ -556,7 +556,7 @@ tsgo 的项目单位就是 tsconfig,而那个 tsconfig 是上游的、不能改�
 (2026-09-09):artifact-service 的扫描预算去掉到期判据 ⇒ `slowEntries` 53 ≠ 2 红;返回路径/重读的期限
 计时器去掉 ⇒ 三条用例挂到套件超时红;model-contract 把链级预算加回探针取消面 ⇒ `TimeoutError` ≠
 `AbortError` 红(**原来的墙钟上界能抓到这一变异,而只看 `wake: "timeout"` 抓不到** —— 期限计时器照样在 5ms
-时把 `deadline.signal.aborted` 置真,第一版改写差点把这一格丢掉);alpha-sidebar 逐步记时忘记推进步起点 ⇒
+时把 `deadline.signal.aborted` 置真,第一版改写差点把这一格丢掉);codepuppy-sidebar 逐步记时忘记推进步起点 ⇒
 `new_draft` 200 ≠ 0 红;websearch 先拨 100ms 再看「仍悬着」⇒ 红。
 
 **棘轮**:`wall-clock-assertions.test.ts`(登记进 `gate-files.tsv`,跑在 `bun test src` ⇒ 每 PR)。新增一条
@@ -606,7 +606,7 @@ SyntaxError: Export named 'utilityProcess' not found in module
 **诚实边界(这几条不要照抄成结论,它们都是本票实测的)**:
 
 - 这条红**不是 macOS-only**。失败发生在自定义节点真源的**位置解析**
-  (`custom-provider-records.ts` → `alpha-environment.ts` 的 `<base>/env/<env>` 逆映射),
+  (`custom-provider-records.ts` → `codepuppy-environment.ts` 的 `<base>/env/<env>` 逆映射),
   纯 `node:path` / `node:fs` 语义;该用例里钥匙串接缝本来就是 mock 的。**它在 Linux 上同样会红 ——
   只是在 Linux 上这个文件没有机会跑到那一行。** 把「只在 Mac 上红」当成原因会导向错的修法
   (给它加平台条件),真问题是**加载不起来**。
@@ -625,7 +625,7 @@ SyntaxError: Export named 'utilityProcess' not found in module
 | --- | --- | --- |
 | `5bbda385c`(该用例引入,`#1343`) | 2026-09-17 | 23 pass / 0 fail |
 | `f10653b14`(= `9d7d811f3~1`) | 2026-09-22 | 23 pass / 0 fail |
-| `9d7d811f3`(`#1392` 合入:自定义节点真源从 `alpha.jsonc` 移到 `<casBaseRoot>/custom-providers/<env>.json`) | 2026-09-22 | 22 pass / **1 fail** |
+| `9d7d811f3`(`#1392` 合入:自定义节点真源从 `codepuppy.jsonc` 移到 `<casBaseRoot>/custom-providers/<env>.json`) | 2026-09-22 | 22 pass / **1 fail** |
 
 红的窗口 ≈ **1.3 天**,不是 6 天;「6 天」是从**用例引入日**起算的。
 **红的起点要跑出来,不要从引入日推** —— 与本文件其余各格同一条纪律。
@@ -639,7 +639,7 @@ SyntaxError: Export named 'utilityProcess' not found in module
 | 形状 | 谁是这个形状 | 声明在哪 | 机制 |
 | --- | --- | --- | --- |
 | **A 单文件** | 31 条 host 用例用 `Bun.spawnSync([bun, "test", <一个绝对路径>])` 起的子进程 —— host 自己拼 argv,传不进 CLI flag | `packages/ui-mac/scripts/test-preload.ts` | `setDefaultTimeout(120_000)` |
-| **B 多文件** | CI 的三条 test 步、`assert-gate-files.sh` 的 77 次点名、`alpha-check.sh` 的 `[4/7]` —— **所有闸门运行的唯一入口** | `scripts/bun-test-floor.sh` | `bun test --timeout 120000` |
+| **B 多文件** | CI 的三条 test 步、`assert-gate-files.sh` 的 77 次点名、`codepuppy-check.sh` 的 `[4/7]` —— **所有闸门运行的唯一入口** | `scripts/bun-test-floor.sh` | `bun test --timeout 120000` |
 
 preload 此前已经承担过一次同类职责(把 UI locale 钉成 `zh`,因为 happy-dom 的 navigator 让
 `detectLocale()` 落到 `en`)—— **同一个位置,同一个问题形态**。
@@ -653,7 +653,7 @@ preload 此前已经承担过一次同类职责(把 UI locale 钉成 `zh`,因为
 | 目前的调用方 | `test-component/ext-install-catalog-result.cases.ts` | 它跑生产 `ext-install-catalog` 全链,里面有 ADR-026 的平台闸 |
 
 > **为什么不是全局钉 —— 这是在真环境里量出来的,不是设计品味。**
-> 本票第一版把钉桩放进 preload(全局)。alpha-ci 上实测:14 个 renderer 测试文件整片挂在
+> 本票第一版把钉桩放进 preload(全局)。codepuppy-ci 上实测:14 个 renderer 测试文件整片挂在
 > `error: Cannot find module @rollup/rollup-darwin-x64` —— vite/rollup 按 `process.platform`
 > 选原生可选依赖,而 linux runner 上装的是 linux 那一份。`3752 pass` 掉到 `3625 pass`。
 > **为了修 2 条而弄坏 14 个文件,是把一处假红换成一片真红。**
@@ -697,7 +697,7 @@ darwin 与 linux 同为 posix,钉 `win32` 会把路径语义改坏。
 
 `PLATFORM SIMULATED` / `[gate-environment]` 是**子进程**打的,而 host 把子进程 stdout 吃进变量、
 只在失败时抛出来 —— 于是「这次降级了什么」在**绿的那一次反而看不见**,而那正是需要它的时候。
-实测:第一版在 alpha-ci 全绿的 run 里 `grep` 不到任何一行自陈。
+实测:第一版在 codepuppy-ci 全绿的 run 里 `grep` 不到任何一行自陈。
 现在 `gate-environment.test.ts` 在成功路径上把子进程的自陈行转述出来;
 运行级的那句(`PLATFORM DEGRADED this run: … must opt in via pinShippedPlatform()`)
 由 preload 直接打在每个测试进程的 stdout 上,不经转述。
@@ -705,7 +705,7 @@ darwin 与 linux 同为 posix,钉 `win32` 会把路径语义改坏。
 ### 还有一条只有真环境才说得出来的
 
 行为闸的形状 B 要经 `bash scripts/bun-test-floor.sh`,而那个脚本里写的是裸 `bun`。
-第一版在 alpha-ci 上直接挂在 `bun-test-floor.sh: line 55: bun: command not found` ——
+第一版在 codepuppy-ci 上直接挂在 `bun-test-floor.sh: line 55: bun: command not found` ——
 从 bun 进程 spawn 出去的 bash 拿到的 `PATH` 里没有 runner 装的那个 bun。
 开发机上 `bun` 在 PATH 里,所以本地怎么跑都看不到。
 修法是把**正在跑本测试的那个 bun**所在目录前置进子进程 PATH:既修好,也顺带保证父子跑同一个二进制。
@@ -716,7 +716,7 @@ darwin 与 linux 同为 posix,钉 `win32` 会把路径语义改坏。
 | --- | --- |
 | 新 host 没声明超时 | 不需要声明 —— 咽喉默认给到。**咽喉本身**被删掉时,`src/main/gate-environment.test.ts` 当场红(它跑一条 6 秒、不写超时的用例) |
 | 新门走到生产平台闸、忘了 opt-in | preload 在非发布平台上打出 `PLATFORM DEGRADED this run: … must opt in via pinShippedPlatform()`;门本身会红在 `platform … not supported by this entry`(**具名**,不是超时那种莫名其妙的红) |
-| `pinShippedPlatform()` 被改坏 | `src/main/gate-environment.test.ts` —— 子用例按 `os.platform()` **自陈这一半本次跑没跑到**(开发机跑不到、alpha-ci 跑得到),不会让本地的绿被误读 |
+| `pinShippedPlatform()` 被改坏 | `src/main/gate-environment.test.ts` —— 子用例按 `os.platform()` **自陈这一半本次跑没跑到**(开发机跑不到、codepuppy-ci 跑得到),不会让本地的绿被误读 |
 | CI 加了一步而本地没跟 | `src/main/local-gate-parity.test.ts` —— 双向比对,CI 改名也红 |
 | 本地某一步被悄悄降级 | 同上:档位只能是 `MIRRORED` / `SUPERSET:<理由>` / `DEGRADED:<理由>`,**没有「静默不跑」这一档** |
 | ADR 新增收编而只改了 CI 一侧 | **结构上不可能了**(`#889`):清单只有 `scripts/north-star-guard.sh` 一份,CI 与本地都调用它;`local-gate-parity.test.ts` 守住「workflow 必须调用它、且不得留第二份副本」 |
@@ -724,7 +724,7 @@ darwin 与 linux 同为 posix,钉 `win32` 会把路径语义改坏。
 | `assert gate files` 又被条件掉 | 同上(断言该步带 `!cancelled()`) |
 | 新增闸门文件没登记 | `src/main/gate-file-registry.test.ts`(既有) |
 | 往 `packages/opencode` 的 alpha 判据文件里写错类型 | `typecheck opencode …` 那一步(`#1134`,§3.11)。此前**无人判红** —— 门的清单里根本没有这个包 |
-| 只把 `alpha-check.sh` 里某条 typecheck 命令删掉,登记与 CI 都不动 | `local-gate-parity.test.ts` 第十六条(`#1134`)。此前**无人判红**:上面三条 CI_STEPS 断言比的全是步骤名,`MIRRORED` 只是一句登记,不是一条断言 |
+| 只把 `codepuppy-check.sh` 里某条 typecheck 命令删掉,登记与 CI 都不动 | `local-gate-parity.test.ts` 第十六条(`#1134`)。此前**无人判红**:上面三条 CI_STEPS 断言比的全是步骤名,`MIRRORED` 只是一句登记,不是一条断言 |
 | 一整个测试文件在**链接期**就抛(整份夭折,一条用例都没跑)| `scripts/known-fails-compare.py` **按文件点名并拦住**(`#1423`)。此前它只能报「失败无法逐测试归因」—— 拦住了,却说不出是哪个文件,于是那些文件里的红与绿在报表上长得一样。机制、最小复现与诚实边界见 [`2026-09-23-bun-electron-mock-link-abort.md`](2026-09-23-bun-electron-mock-link-abort.md) |
 
 解析自检钉在 `local-gate-parity.test.ts` 里(`ciSteps ≥ 12`、守卫脚本的 `UPSTREAM_PATHS ≥ 8`

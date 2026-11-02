@@ -6,8 +6,8 @@
 // 字面量(不管抄的是真版本还是别的),哨兵值不会出现,当场红。
 // 登录/登出两种分支都断言:版本行挂在 auth <Show> 之外,谁也不该丢。
 //
-// 挂载走生产组合体(OverlayCloseHarness:真 AlphaSidebar + 真 @solidjs/router),
-// 打开浮层走真实点击(.alpha-sidebar-account)。替身面与 overlay-close.cases.ts 同因同法:
+// 挂载走生产组合体(OverlayCloseHarness:真 CodePuppySidebar + 真 @solidjs/router),
+// 打开浮层走真实点击(.codepuppy-sidebar-account)。替身面与 overlay-close.cases.ts 同因同法:
 // 上游 ui 装饰件 / SDK 传输层 / preload 桥,不含被测语义。
 // 子进程运行(src/renderer/sidebar/account-version.test.ts spawn):mock.module 会污染同进程。
 
@@ -16,7 +16,7 @@ import presetTypescript from "@babel/preset-typescript"
 import { GlobalRegistrator } from "@happy-dom/global-registrator"
 import { afterAll, afterEach, beforeEach, expect, mock, test } from "bun:test"
 import presetSolid from "babel-preset-solid"
-import type { AlphaProject, AlphaProjectsApi } from "../src/renderer/sidebar/use-projects"
+import type { CodePuppyProject, CodePuppyProjectsApi } from "../src/renderer/sidebar/use-projects"
 import { dict as zh } from "../src/renderer/i18n/zh"
 
 GlobalRegistrator.register()
@@ -50,7 +50,7 @@ mock.module("@opencode-ai/ui/v2/project-avatar-v2", () => ({ ProjectAvatar: () =
 mock.module("@opencode-ai/ui/theme/context", () => ({
   useTheme: () => ({ colorScheme: () => "dark", setColorScheme: () => {} }),
 }))
-mock.module("../src/renderer/alpha-ui/providers", () => ({
+mock.module("../src/renderer/codepuppy-ui/providers", () => ({
   useCommand: () => ({ options: [], register: () => {}, trigger: () => {}, show: () => {}, hide: () => {} }),
   ServerConnection: { key: () => "sidecar", Key: { make: (value: string) => value } },
   useTabs: () => ({
@@ -110,8 +110,8 @@ const { hrefFor } = await import("../src/shared/route-manifest")
 const DIR = "/Users/tester/proj-a"
 const SESSION = "ses-current"
 
-function makeProjects(): AlphaProjectsApi {
-  const project: AlphaProject = {
+function makeProjects(): CodePuppyProjectsApi {
+  const project: CodePuppyProject = {
     id: "prj-a",
     worktree: DIR,
     name: "proj-a",
@@ -129,7 +129,7 @@ function makeProjects(): AlphaProjectsApi {
     shareSession: async () => undefined,
     deleteSession: async () => true,
     copySession: async () => undefined,
-  } as unknown as AlphaProjectsApi
+  } as unknown as CodePuppyProjectsApi
 }
 
 const disposers: Array<() => void> = []
@@ -172,17 +172,17 @@ for (const status of ["logged-out", "logged-in"] as const) {
   test(`账户浮层(${status})显示当前版本号,值来自 window.api.appVersion`, async () => {
     authStatus = status
     await mount()
-    const trigger = document.querySelector(".alpha-sidebar-account")
+    const trigger = document.querySelector(".codepuppy-sidebar-account")
     expect(trigger, "侧栏账户入口未挂载").not.toBeNull()
     click(trigger!)
     await flush()
-    const pop = document.querySelector(".alpha-acct-pop")
+    const pop = document.querySelector(".codepuppy-acct-pop")
     expect(pop, "点账户入口没打开浮层").not.toBeNull()
     // 前提自检:分支真的是我们要的那个(登录分支有退出登录项,登出分支没有)。
-    expect((pop!.textContent ?? "").includes(zh["alpha.sidebar.signOut"])).toBe(status === "logged-in")
-    const line = pop!.querySelector(".alpha-acct-version")
+    expect((pop!.textContent ?? "").includes(zh["codepuppy.sidebar.signOut"])).toBe(status === "logged-in")
+    const line = pop!.querySelector(".codepuppy-acct-version")
     expect(line, "浮层里没有版本行").not.toBeNull()
     expect(line!.textContent ?? "").toContain(SENTINEL_VERSION)
-    expect(line!.textContent ?? "").toContain(zh["alpha.sidebar.version"])
+    expect(line!.textContent ?? "").toContain(zh["codepuppy.sidebar.version"])
   })
 }

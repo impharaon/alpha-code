@@ -19,10 +19,10 @@ import type { CasGcRoundInput, CasGcRoundSummary } from "./ext-cas-gc"
 import type { CasGcSchedulerConfig } from "./ext-cas-gc-scheduler"
 import { createExtensionStorageAdapter, createSettingsAdapter } from "./settings-adapters"
 import { writeFileDurableAtomicSync, type DurableAtomicFileSystem } from "./settings-durable-writer"
-import { ALPHA_SETTINGS_DEFAULTS, type AlphaSettings } from "../shared/settings-adapters"
+import { CODEPUPPY_SETTINGS_DEFAULTS, type CodePuppySettings } from "../shared/settings-adapters"
 import { RENDERER_SETTINGS_KEY } from "./store-keys"
 
-const settings = (): AlphaSettings => structuredClone(ALPHA_SETTINGS_DEFAULTS)
+const settings = (): CodePuppySettings => structuredClone(CODEPUPPY_SETTINGS_DEFAULTS)
 const childModule = new URL("./settings-adapters.ts", import.meta.url).href
 const childSource = `
 const { createSettingsAdapter } = await import(${JSON.stringify(childModule)})
@@ -44,7 +44,7 @@ if (mode === "write") {
 function runSettingsChild(
   file: string,
   mode: "read" | "write",
-  input?: { value: AlphaSettings; revision: string; crashPoint?: "file-synced" | "renamed" },
+  input?: { value: CodePuppySettings; revision: string; crashPoint?: "file-synced" | "renamed" },
 ) {
   return Bun.spawnSync({
     cmd: [process.execPath, "--eval", childSource],
@@ -145,7 +145,7 @@ describe("Settings typed adapter", () => {
   test("read returns defaults for an empty authority and normalizes the existing partial alpha seed", () => {
     const empty = createSettingsAdapter(file).read()
     expect(empty.ok).toBe(true)
-    if (empty.ok) expect(empty.value).toEqual(ALPHA_SETTINGS_DEFAULTS)
+    if (empty.ok) expect(empty.value).toEqual(CODEPUPPY_SETTINGS_DEFAULTS)
 
     writeAuthority(file, JSON.stringify({ general: { newLayoutDesigns: true, showCustomAgents: true } }))
     const seeded = createSettingsAdapter(file).read()
@@ -425,7 +425,7 @@ describe("Settings typed adapter", () => {
       expect(durableTemporaryFiles(file)).toEqual([])
       const restarted = readInChild(file)
       expect(restarted.ok).toBe(true)
-      if (restarted.ok) expect(restarted.value).toEqual(ALPHA_SETTINGS_DEFAULTS)
+      if (restarted.ok) expect(restarted.value).toEqual(CODEPUPPY_SETTINGS_DEFAULTS)
     },
   )
 

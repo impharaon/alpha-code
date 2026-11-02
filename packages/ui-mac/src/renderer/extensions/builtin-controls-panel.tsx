@@ -9,7 +9,7 @@
 
 import { extensionError, MoreMenu } from "./ext-presentation"
 import { createMemo, createSignal, For, onMount, Show } from "solid-js"
-import type { AlphaBuiltinPolicy } from "../../preload/types"
+import type { CodePuppyBuiltinPolicy } from "../../preload/types"
 import type { HubAgent } from "./use-extensions"
 import { t } from "../i18n"
 import { extIpc } from "./ext-ipc"
@@ -20,7 +20,7 @@ const BUILTIN_COMMANDS = ["init", "review"]
 /** 「系统」分段里应用自带条目的图标底色(批准稿 `#hub-skills` 系统行)。 */
 const BUILTIN_TINT = "#52525b"
 
-const DEFAULT_GOV: AlphaBuiltinPolicy = {
+const DEFAULT_GOV: CodePuppyBuiltinPolicy = {
   version: 1,
   mode: "denylist",
   agents: { hide: [], disable: [], allow: [], override: {} },
@@ -38,7 +38,7 @@ export function BuiltinControlsPanel(props: {
   flash: (msg: string, kind?: "success" | "error") => void
 }) {
   const [gov, setGov] = createSignal(structuredClone(DEFAULT_GOV))
-  const [protection, setProtection] = createSignal<{ hard: string[]; alphaInjected: string[]; confirm: string[] }>({ hard: [], alphaInjected: [], confirm: [] })
+  const [protection, setProtection] = createSignal<{ hard: string[]; codepuppyInjected: string[]; confirm: string[] }>({ hard: [], codepuppyInjected: [], confirm: [] })
   const [busy, setBusy] = createSignal(false)
   const [err, setErr] = createSignal("")
   const [cmdEdit, setCmdEdit] = createSignal<{ name: string; template: string } | null>(null)
@@ -50,7 +50,7 @@ export function BuiltinControlsPanel(props: {
       setProtection(r.protection)
     }).catch(() => {
       // load failed → keep the empty DEFAULT_GOV but say so, or the user might apply over real config
-      setErr(t("alpha.builtin.loadFailed"))
+      setErr(t("codepuppy.builtin.loadFailed"))
     })
   })
 
@@ -66,31 +66,31 @@ export function BuiltinControlsPanel(props: {
 
   const protectedReason = (name: string): string | null => {
     const p = protection()
-    if (p.hard.includes(name)) return t("alpha.builtin.protHard")
-    if (p.alphaInjected.includes(name)) return t("alpha.builtin.protAlpha")
+    if (p.hard.includes(name)) return t("codepuppy.builtin.protHard")
+    if (p.codepuppyInjected.includes(name)) return t("codepuppy.builtin.protCodePuppy")
     return null
   }
 
-  const apply = async (next: AlphaBuiltinPolicy, confirmBuild = false) => {
+  const apply = async (next: CodePuppyBuiltinPolicy, confirmBuild = false) => {
     if (busy()) return // codex M2:硬闸 —— 全量快照式 apply 并发会互相覆盖(last-write-wins 丢改动)
     setBusy(true)
     setErr("")
     try {
       const r = await extIpc.builtinApply(next, visibleAgentNames(), confirmBuild)
       if (!r.ok) {
-        setErr(extensionError(r.reason, "alpha.ext.error.builtinApply"))
-        props.flash(extensionError(r.reason, "alpha.ext.error.builtinApply"), "error")
+        setErr(extensionError(r.reason, "codepuppy.ext.error.builtinApply"))
+        props.flash(extensionError(r.reason, "codepuppy.ext.error.builtinApply"), "error")
         return
       }
       setGov(next)
       const refreshed = await props.requestReload()
       void props.reloadAgents()
-      props.flash(refreshed ? t("alpha.builtin.applied") : t("alpha.builtin.appliedPendingReload"), "success")
+      props.flash(refreshed ? t("codepuppy.builtin.applied") : t("codepuppy.builtin.appliedPendingReload"), "success")
     } catch {
       // builtinApply threw (IPC/main error) — callers do `void apply(...)`, so without this catch the
       // rejection is silent: busy clears but nothing changed and no feedback (silent-failure class).
-      setErr(t("alpha.builtin.applyFailed"))
-      props.flash(t("alpha.builtin.applyFailed"), "error")
+      setErr(t("codepuppy.builtin.applyFailed"))
+      props.flash(t("codepuppy.builtin.applyFailed"), "error")
     } finally {
       setBusy(false)
     }
@@ -103,7 +103,7 @@ export function BuiltinControlsPanel(props: {
     if (i >= 0) arr.splice(i, 1)
     else arr.push(name)
     const needConfirm = list === "disable" && arr.includes(name) && protection().confirm.includes(name)
-    if (needConfirm && !window.confirm(t("alpha.builtin.buildConfirm"))) return
+    if (needConfirm && !window.confirm(t("codepuppy.builtin.buildConfirm"))) return
     void apply(g, needConfirm)
   }
   const toggleAllow = (name: string) => {
@@ -144,18 +144,18 @@ export function BuiltinControlsPanel(props: {
     void apply(g)
   }
   const reset = async () => {
-    if (!window.confirm(t("alpha.builtin.resetConfirm"))) return
+    if (!window.confirm(t("codepuppy.builtin.resetConfirm"))) return
     setBusy(true)
     try {
       const r = await extIpc.builtinReset()
       if (!r.ok) {
-        setErr(extensionError(r.reason, "alpha.ext.error.builtinReset"))
+        setErr(extensionError(r.reason, "codepuppy.ext.error.builtinReset"))
         return
       }
       setGov(structuredClone(DEFAULT_GOV))
       await props.requestReload()
       void props.reloadAgents()
-      props.flash(t("alpha.builtin.resetDone"), "success")
+      props.flash(t("codepuppy.builtin.resetDone"), "success")
     } finally {
       setBusy(false)
     }
@@ -165,27 +165,27 @@ export function BuiltinControlsPanel(props: {
   const showAgents = () => props.part !== "commands"
   const showCommands = () => props.part !== "agents"
   return (
-    <div class="alpha-gov">
+    <div class="codepuppy-gov">
       <Show when={showAgents()}>
-        <div class="alpha-gov-bar">
-          <span class="alpha-gov-mode">
+        <div class="codepuppy-gov-bar">
+          <span class="codepuppy-gov-mode">
             <button data-on={g().mode === "denylist" ? "" : undefined} disabled={busy()} onClick={() => switchMode("denylist")}>
-              {t("alpha.builtin.denylist")}
+              {t("codepuppy.builtin.denylist")}
             </button>
             <button data-on={g().mode === "allowlist" ? "" : undefined} disabled={busy()} onClick={() => switchMode("allowlist")}>
-              {t("alpha.builtin.allowlist")}
+              {t("codepuppy.builtin.allowlist")}
             </button>
           </span>
-          <button class="alpha-ext-inline-cta" disabled={busy()} onClick={() => void reset()}>
-            {t("alpha.builtin.reset")}
+          <button class="codepuppy-ext-inline-cta" disabled={busy()} onClick={() => void reset()}>
+            {t("codepuppy.builtin.reset")}
           </button>
         </div>
       </Show>
       <Show when={err()}>
-        <p class="alpha-ext-import-err">{err()}</p>
+        <p class="codepuppy-ext-import-err">{err()}</p>
       </Show>
 
-      <div class="alpha-ext-grid">
+      <div class="codepuppy-ext-grid">
         {/* agents */}
         <Show when={showAgents()}>
           <For each={agentNames()}>
@@ -197,24 +197,24 @@ export function BuiltinControlsPanel(props: {
               const allowed = () => g().agents.allow.includes(name)
               const state = () =>
                 [
-                  hidden() ? t("alpha.builtin.stateHidden") : "",
-                  disabled() ? t("alpha.builtin.stateDisabled") : "",
-                  overridden() ? t("alpha.builtin.stateOverridden") : "",
-                  g().mode === "allowlist" ? (allowed() ? t("alpha.builtin.inAllow") : t("alpha.builtin.notInAllow")) : "",
+                  hidden() ? t("codepuppy.builtin.stateHidden") : "",
+                  disabled() ? t("codepuppy.builtin.stateDisabled") : "",
+                  overridden() ? t("codepuppy.builtin.stateOverridden") : "",
+                  g().mode === "allowlist" ? (allowed() ? t("codepuppy.builtin.inAllow") : t("codepuppy.builtin.notInAllow")) : "",
                 ]
                   .filter(Boolean)
-                  .join(" · ") || t("alpha.ext.builtinAgentLabel")
+                  .join(" · ") || t("codepuppy.ext.builtinAgentLabel")
               return (
-                <div class="alpha-ext-kit alpha-ext-man" data-gov-dim={disabled() || hidden() ? "" : undefined} data-builtin-agent={name}>
-                  <span class="alpha-ext-kit-ic" style={{ background: BUILTIN_TINT }}>
+                <div class="codepuppy-ext-kit codepuppy-ext-man" data-gov-dim={disabled() || hidden() ? "" : undefined} data-builtin-agent={name}>
+                  <span class="codepuppy-ext-kit-ic" style={{ background: BUILTIN_TINT }}>
                     {(name[0] ?? "?").toUpperCase()}
                   </span>
-                  <div class="alpha-ext-kit-body">
-                    <div class="alpha-ext-kit-ttl">
-                      <b class="alpha-ext-man-name">{name}</b>
+                  <div class="codepuppy-ext-kit-body">
+                    <div class="codepuppy-ext-kit-ttl">
+                      <b class="codepuppy-ext-man-name">{name}</b>
                     </div>
-                    <div class="alpha-ext-kit-desc" title={prot() ?? undefined}>
-                      {prot() ? `${t("alpha.builtin.protected")} · ${prot()}` : state()}
+                    <div class="codepuppy-ext-kit-desc" title={prot() ?? undefined}>
+                      {prot() ? `${t("codepuppy.builtin.protected")} · ${prot()}` : state()}
                     </div>
                   </div>
                   <Show when={!prot()}>
@@ -223,13 +223,13 @@ export function BuiltinControlsPanel(props: {
                       disabled={busy()}
                       items={[
                         ...(g().mode === "allowlist"
-                          ? [{ key: "allow", label: allowed() ? t("alpha.builtin.deny") : t("alpha.builtin.allow"), onSelect: () => toggleAllow(name) }]
+                          ? [{ key: "allow", label: allowed() ? t("codepuppy.builtin.deny") : t("codepuppy.builtin.allow"), onSelect: () => toggleAllow(name) }]
                           : []),
-                        { key: "hide", label: hidden() ? t("alpha.builtin.unhide") : t("alpha.builtin.hide"), onSelect: () => toggle("hide", name) },
-                        { key: "disable", label: disabled() ? t("alpha.builtin.enable") : t("alpha.builtin.disable"), onSelect: () => toggle("disable", name) },
+                        { key: "hide", label: hidden() ? t("codepuppy.builtin.unhide") : t("codepuppy.builtin.hide"), onSelect: () => toggle("hide", name) },
+                        { key: "disable", label: disabled() ? t("codepuppy.builtin.enable") : t("codepuppy.builtin.disable"), onSelect: () => toggle("disable", name) },
                         {
                           key: "override",
-                          label: t("alpha.builtin.override"),
+                          label: t("codepuppy.builtin.override"),
                           onSelect: () => setAgentEdit({ name, prompt: String(g().agents.override[name]?.prompt ?? "") }),
                         },
                       ]}
@@ -247,16 +247,16 @@ export function BuiltinControlsPanel(props: {
             {(name) => {
               const overridden = () => !!g().commands.override[name]
               return (
-                <div class="alpha-ext-kit alpha-ext-man" data-builtin-command={name}>
-                  <span class="alpha-ext-kit-ic" style={{ background: BUILTIN_TINT }}>
+                <div class="codepuppy-ext-kit codepuppy-ext-man" data-builtin-command={name}>
+                  <span class="codepuppy-ext-kit-ic" style={{ background: BUILTIN_TINT }}>
                     /
                   </span>
-                  <div class="alpha-ext-kit-body">
-                    <div class="alpha-ext-kit-ttl">
-                      <b class="alpha-ext-man-name">/{name}</b>
+                  <div class="codepuppy-ext-kit-body">
+                    <div class="codepuppy-ext-kit-ttl">
+                      <b class="codepuppy-ext-man-name">/{name}</b>
                     </div>
-                    <div class="alpha-ext-kit-desc" title={t("alpha.builtin.cmdNote")}>
-                      {overridden() ? t("alpha.builtin.stateOverridden") : t("alpha.ext.typeCommand")}
+                    <div class="codepuppy-ext-kit-desc" title={t("codepuppy.builtin.cmdNote")}>
+                      {overridden() ? t("codepuppy.builtin.stateOverridden") : t("codepuppy.ext.typeCommand")}
                     </div>
                   </div>
                   <MoreMenu
@@ -265,7 +265,7 @@ export function BuiltinControlsPanel(props: {
                     items={[
                       {
                         key: "override",
-                        label: overridden() ? t("alpha.builtin.editOverride") : t("alpha.builtin.override"),
+                        label: overridden() ? t("codepuppy.builtin.editOverride") : t("codepuppy.builtin.override"),
                         onSelect: () => setCmdEdit({ name, template: g().commands.override[name]?.template ?? "" }),
                       },
                     ]}
@@ -280,38 +280,38 @@ export function BuiltinControlsPanel(props: {
       {/* command 重写编辑器(极简:模板 textarea;空 = 恢复上游) */}
       <Show when={cmdEdit()}>
         {(e) => (
-          <div class="alpha-gov-editor">
-            <div class="alpha-ext-flabel">/{e().name} {t("alpha.builtin.cmdTemplate")}</div>
+          <div class="codepuppy-gov-editor">
+            <div class="codepuppy-ext-flabel">/{e().name} {t("codepuppy.builtin.cmdTemplate")}</div>
             <textarea
-              class="alpha-ext-input alpha-ext-textarea alpha-mono"
+              class="codepuppy-ext-input codepuppy-ext-textarea codepuppy-mono"
               value={e().template}
               onInput={(ev) => setCmdEdit({ ...e(), template: ev.currentTarget.value })}
-              placeholder={t("alpha.builtin.cmdPlaceholder")}
+              placeholder={t("codepuppy.builtin.cmdPlaceholder")}
             />
-            <div class="alpha-gov-acts">
-              <button class="alpha-ext-add" data-variant="primary" disabled={busy()} onClick={saveCmdOverride}>
-                {t("alpha.builtin.save")}
+            <div class="codepuppy-gov-acts">
+              <button class="codepuppy-ext-add" data-variant="primary" disabled={busy()} onClick={saveCmdOverride}>
+                {t("codepuppy.builtin.save")}
               </button>
-              <button class="alpha-ext-add" onClick={() => setCmdEdit(null)}>{t("alpha.builtin.cancel")}</button>
+              <button class="codepuppy-ext-add" onClick={() => setCmdEdit(null)}>{t("codepuppy.builtin.cancel")}</button>
             </div>
           </div>
         )}
       </Show>
       <Show when={agentEdit()}>
         {(e) => (
-          <div class="alpha-gov-editor">
-            <div class="alpha-ext-flabel">{e().name} {t("alpha.builtin.agentPrompt")}</div>
+          <div class="codepuppy-gov-editor">
+            <div class="codepuppy-ext-flabel">{e().name} {t("codepuppy.builtin.agentPrompt")}</div>
             <textarea
-              class="alpha-ext-input alpha-ext-textarea alpha-mono"
+              class="codepuppy-ext-input codepuppy-ext-textarea codepuppy-mono"
               value={e().prompt}
               onInput={(ev) => setAgentEdit({ ...e(), prompt: ev.currentTarget.value })}
-              placeholder={t("alpha.builtin.agentPromptPlaceholder")}
+              placeholder={t("codepuppy.builtin.agentPromptPlaceholder")}
             />
-            <div class="alpha-gov-acts">
-              <button class="alpha-ext-add" data-variant="primary" disabled={busy()} onClick={saveAgentOverride}>
-                {t("alpha.builtin.save")}
+            <div class="codepuppy-gov-acts">
+              <button class="codepuppy-ext-add" data-variant="primary" disabled={busy()} onClick={saveAgentOverride}>
+                {t("codepuppy.builtin.save")}
               </button>
-              <button class="alpha-ext-add" onClick={() => setAgentEdit(null)}>{t("alpha.builtin.cancel")}</button>
+              <button class="codepuppy-ext-add" onClick={() => setAgentEdit(null)}>{t("codepuppy.builtin.cancel")}</button>
             </div>
           </div>
         )}

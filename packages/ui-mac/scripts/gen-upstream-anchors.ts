@@ -5,7 +5,7 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { fileURLToPath } from "node:url"
-import { checkAnchors, extractReferencedAnchors, loadSources, type AnchorManifest } from "../src/renderer/alpha-ui/anchor-audit"
+import { checkAnchors, extractReferencedAnchors, loadSources, type AnchorManifest } from "../src/renderer/codepuppy-ui/anchor-audit"
 
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const repoRoot = path.resolve(pkgRoot, "..", "..")
@@ -21,6 +21,6 @@ const manifest: AnchorManifest = {
   alive,
   knownDead,
 }
-const out = path.join(rendererDir, "alpha-ui", "upstream-anchors.json")
+const out = path.join(rendererDir, "codepuppy-ui", "upstream-anchors.json")
 fs.writeFileSync(out, JSON.stringify(manifest, null, 2) + "\n")
 console.log(`written ${out}: alive=${alive.length} knownDead=${knownDead.length}`)

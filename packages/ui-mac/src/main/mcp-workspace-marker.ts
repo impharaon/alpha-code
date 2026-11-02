@@ -1,17 +1,17 @@
 // REQ-134 #1011: catalog MCPs stay global while their filesystem boundary follows the active
-// opencode instance. Older installs persisted the Hub-selected directory in alpha.jsonc; this boot
+// opencode instance. Older installs persisted the Hub-selected directory in codepuppy.jsonc; this boot
 // reconcile restores only exact catalog command templates to the literal {workspace} marker before
 // the first sidecar fork. Receipt identity plus byte-exact argv matching keeps custom MCPs and
 // catalog version drift outside this migration. The four first-party Office entries are not this
 // module's: since #1564 their whole command (workspace marker included) is main's template, and
-// alpha-office-instance.ts migrates the older uv form.
+// codepuppy-office-instance.ts migrates the older uv form.
 
 import { readFileSync } from "node:fs"
 import { isAbsolute, win32 } from "node:path"
 import { applyEdits, modify, parse } from "jsonc-parser"
 import type { ParseError } from "jsonc-parser"
 import { WORKSPACE_MARKER } from "../shared/office-advisories"
-import { alphaGlobalRoot, readLedger } from "./alpha-installs"
+import { codepuppyGlobalRoot, readLedger } from "./codepuppy-installs"
 import { mcpPluginTargetPath, writeConfigTextAtomic } from "./ext-config"
 
 const BUNDLED_WORKSPACE_MCPS = [
@@ -100,7 +100,7 @@ export function reconcileMcpWorkspaceMarkers(options: ReconcileOptions = {}): Wo
     return { migrated: [], warnings }
   }
 
-  const ledger = readLedger(options.ledgerRoot ?? alphaGlobalRoot())
+  const ledger = readLedger(options.ledgerRoot ?? codepuppyGlobalRoot())
   if (ledger.warning) warn(`[req134-1011] workspace-marker ownership read warning: ${ledger.warning}`)
   const owned = new Map(
     ledger.receipts

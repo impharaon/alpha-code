@@ -9,8 +9,8 @@ import { Session } from "@/session/session"
 import { Permission } from "@/permission"
 import { Plugin } from "@/plugin"
 import type { PermissionV1 } from "@opencode-ai/core/v1/permission"
-import { AlphaToolPolicy, mcpBindingDigest } from "@/permission/alpha-tool-policy"
-import { AlphaToolPolicyGate } from "@/permission/alpha-tool-policy-gate"
+import { CodePuppyToolPolicy, mcpBindingDigest } from "@/permission/codepuppy-tool-policy"
+import { CodePuppyToolPolicyGate } from "@/permission/codepuppy-tool-policy-gate"
 
 export const CODE_MODE_TOOL = "execute"
 
@@ -137,7 +137,7 @@ function toolTree(catalog: readonly CatalogEntry[], run: (entry: CatalogEntry) =
 
 const invokeChildTool = Effect.fn("CodeMode.invokeChildTool")(function* (input: {
   plugin: Plugin.Interface
-  policy: AlphaToolPolicy.Interface
+  policy: CodePuppyToolPolicy.Interface
   permission: Permission.Interface
   mcp: MCP.Interface
   ruleset: PermissionV1.Ruleset
@@ -163,20 +163,20 @@ const invokeChildTool = Effect.fn("CodeMode.invokeChildTool")(function* (input: 
         authority: facts?.authority ?? ({ kind: "not-asserted" } as const),
         bindingDigest: facts?.entry ? mcpBindingDigest(identity.origin, facts.entry) : undefined,
         // #1285:子工具全是 MCP —— 目的地(transport)随身份轴那一问供数。
-        transport: AlphaToolPolicyGate.mcpTransportFact(facts?.entry),
+        transport: CodePuppyToolPolicyGate.mcpTransportFact(facts?.entry),
         // #1617:执行位置(与时间线同一份派生)随那一问送到审批卡。
-        location: AlphaToolPolicyGate.mcpLocation(facts?.entry),
+        location: CodePuppyToolPolicyGate.mcpLocation(facts?.entry),
       }
     }),
     ruleset: input.ruleset,
   }
-  const decision = yield* AlphaToolPolicyGate.decide(gate).pipe(Effect.orDie)
+  const decision = yield* CodePuppyToolPolicyGate.decide(gate).pipe(Effect.orDie)
   yield* input.plugin.trigger(
     "tool.execute.before",
     { tool: input.entry.key, sessionID: input.ctx.sessionID, callID: input.callID },
     { args: input.args },
   )
-  yield* AlphaToolPolicyGate.confirm(decision, {
+  yield* CodePuppyToolPolicyGate.confirm(decision, {
     ...gate,
     permission: input.permission,
     sessionID: input.ctx.sessionID,
@@ -234,7 +234,7 @@ export const CodeModeTool = Tool.define(
     const sessions = yield* Session.Service
     const plugin = yield* Plugin.Service
     const permission = yield* Permission.Service
-    const toolPolicy = yield* AlphaToolPolicy.Service
+    const toolPolicy = yield* CodePuppyToolPolicy.Service
 
     const init: Tool.DefWithoutID<typeof Parameters, Metadata> = {
       description: DESCRIPTION,
@@ -253,7 +253,7 @@ export const CodeModeTool = Tool.define(
         const rulesetVisible = Permission.visibleTools(yield* mcp.tools(), ruleset)
         // #1129 / #724 §6 E4:「disabled child 也不进 child catalog」的第二条轴 ——
         // 策略文档轴按当轮 snapshot 判 deny(ask 照旧进目录,由上面的执行闸负责问)。
-        const childPolicyDenied = yield* AlphaToolPolicyGate.snapshotCatalogDenied(
+        const childPolicyDenied = yield* CodePuppyToolPolicyGate.snapshotCatalogDenied(
           toolPolicy,
           Object.entries(rulesetVisible).map(([technicalId, item]) => ({
             technicalId,

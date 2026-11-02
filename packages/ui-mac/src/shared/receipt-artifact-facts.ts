@@ -11,7 +11,7 @@
 // 都归为同一个诚实结论 `digest: null` —— 呈现层据此说「未记录」,而不是显示半截字符串。
 // 纯模块:无 node、无 solid、无 i18n(文案由调用方按 locale 取)。
 
-/** 与 `ext-receipt-v2.ts` / `alpha-installs.ts` 落盘校验同一形状。此处独立成字面量而不是从 main
+/** 与 `ext-receipt-v2.ts` / `codepuppy-installs.ts` 落盘校验同一形状。此处独立成字面量而不是从 main
  *  import,是因为呈现层必须能独立判定「这串东西看起来像不像一个 digest」。 */
 export const RECEIPT_DIGEST_RE = /^sha256:[0-9a-f]{64}$/
 

@@ -11,7 +11,7 @@ review_after: 2027-01-16
 # Composition patterns
 
 How alpha surfaces attach to an app whose shell it inherited from opencode.
-alpha-code is a fork: `packages/ui-mac` (the Electron app) is alpha-authored and
+alpha-code is a fork: `packages/ui-mac` (the Electron app) is codepuppy-authored and
 mounts upstream `@opencode-ai/app`, then replaces or overlays pieces. The
 upstream leaf remains reachable only as a **boot-time escape valve** (env/pin →
 `legacy`); there is no runtime fallback — a crashed alpha surface enters Alpha
@@ -21,7 +21,7 @@ Recovery, never the upstream leaf.
 
 Alpha swaps an upstream page through the typed `AppSurfaces` seam
 (`home` / `newSession` / `session`), whose ids live in
-`packages/ui-mac/src/shared/alpha-surfaces.ts`:
+`packages/ui-mac/src/shared/codepuppy-surfaces.ts`:
 
 - Each route composes **exactly one** surface, resolved from the route manifest
   by `renderer/route-composition.ts`. There is no release state, no env or pin
@@ -51,18 +51,18 @@ must not grow into a logic fork; when behavior must change, promote to a seam
 surface instead — `settings-reskin.css`, `dialog-reskin.css`, and
 `timeline-reskin.css` were all retired this way (REQ-090, REQ-125).
 
-## Full-page overlay (alpha-new surface)
+## Full-page overlay (codepuppy-new surface)
 
 Net-new surfaces with no upstream equivalent render as a full-page Portal over
 the shell: Extension Hub (`extensions/extension-hub.tsx`), Automations
 (`automations/automation-panel.tsx`), Artifact Workbench
-(`alpha-ui/artifact-workbench/`). These own their own layout and use the token
+(`codepuppy-ui/artifact-workbench/`). These own their own layout and use the token
 system directly.
 
 ## Recovery boundary
 
 Alpha surfaces are wrapped so a fatal error degrades instead of white-screening:
-`alpha-ui/surface-boundary.tsx` admits the crash once (stable crashID → one
+`codepuppy-ui/surface-boundary.tsx` admits the crash once (stable crashID → one
 process-local incident) into **Alpha Recovery** — no reload, no legacy swap —
 and `main/db-safety-boot.ts` handles Electron-side boot recovery / DB safety.
 Design every alpha surface assuming it may be the thing that failed — provide an

@@ -1,5 +1,5 @@
 // REQ-108(#244)—— 文件查看器组件用例(真 Solid + happy-dom 挂载,fake IO)。
-// 驱动器:src/renderer/alpha-ui/session-rail/files/file-viewer.test.ts(子进程绿判据)。
+// 驱动器:src/renderer/codepuppy-ui/session-rail/files/file-viewer.test.ts(子进程绿判据)。
 
 import { transformAsync } from "@babel/core"
 import presetTypescript from "@babel/preset-typescript"
@@ -54,7 +54,7 @@ Bun.plugin({
   },
 })
 
-const runtime = await import("../src/renderer/alpha-ui/session-rail/files/files-test-runtime")
+const runtime = await import("../src/renderer/codepuppy-ui/session-rail/files/files-test-runtime")
 const { FILE_VIEWER_EXCERPT_BYTES, FILE_VIEWER_TEXT_MAX_BYTES } = await import("../src/shared/file-viewer")
 const disposers: Array<() => void> = []
 
@@ -96,11 +96,11 @@ describe("REQ-108 file viewer real Solid mount", () => {
     harness.viewer().open("docs/arch.md")
     await flushTimers()
 
-    const rootEl = host.querySelector("[data-alpha-file-viewer='docs/arch.md']")
+    const rootEl = host.querySelector("[data-codepuppy-file-viewer='docs/arch.md']")
     expect(rootEl).not.toBeNull()
-    expect(host.querySelector("[data-alpha-fv-back]")).toBe(document.activeElement)
+    expect(host.querySelector("[data-codepuppy-fv-back]")).toBe(document.activeElement)
     // 内容:净化模型渲染出真实标题,不是源码文本。
-    const md = host.querySelector("[data-alpha-fv-markdown]")!
+    const md = host.querySelector("[data-codepuppy-fv-markdown]")!
     expect(md.querySelector("h1")!.textContent).toBe("Hello")
     expect(host.textContent).toContain("World paragraph.")
     // 头部合同:文件名 + 上级目录暗示。
@@ -108,10 +108,10 @@ describe("REQ-108 file viewer real Solid mount", () => {
     expect(host.querySelector(".a-fv-dir")!.textContent).toBe("docs/")
 
     const readsBefore = harness.calls.readChunk.length
-    const src = [...host.querySelectorAll("[data-alpha-fv-modes] button")].find((b) => b.textContent === "源码")!
+    const src = [...host.querySelectorAll("[data-codepuppy-fv-modes] button")].find((b) => b.textContent === "源码")!
     ;(src as HTMLButtonElement).click()
     await flush()
-    expect(host.querySelector("[data-alpha-fv-markdown]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-fv-markdown]")).toBeNull()
     expect(host.querySelector(".a-wb-code")!.textContent).toContain("# Hello")
     // 交互契约:切换模式不重新读取。
     expect(harness.calls.readChunk.length).toBe(readsBefore)
@@ -128,20 +128,20 @@ describe("REQ-108 file viewer real Solid mount", () => {
     harness.viewer().open("big.md")
     await flushTimers()
 
-    expect(host.querySelector("[data-alpha-fv-loading]")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-fv-loading]")).not.toBeNull()
     expect(harness.pendingChunks()).toBe(1)
 
-    const cancel = host.querySelector<HTMLButtonElement>("[data-alpha-fv-cancel]")!
+    const cancel = host.querySelector<HTMLButtonElement>("[data-codepuppy-fv-cancel]")!
     cancel.click()
     await flush()
     // 回到树(查看器卸载),读取会话归还。
-    expect(host.querySelector("[data-alpha-file-viewer]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-file-viewer]")).toBeNull()
     expect(harness.calls.closeRead).toEqual(["read_1"])
 
     // 迟到的 chunk 被 epoch 闸丢弃 —— 不闪现内容、不复活查看器。
     harness.releaseChunk()
     await flushTimers()
-    expect(host.querySelector("[data-alpha-file-viewer]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-file-viewer]")).toBeNull()
     expect(host.textContent).not.toContain("xxxx")
   })
 
@@ -163,7 +163,7 @@ describe("REQ-108 file viewer real Solid mount", () => {
     await flushTimers()
     expect(host.textContent).toContain("BBBB")
     expect(host.textContent).not.toContain("AAAA")
-    expect(host.querySelector("[data-alpha-file-viewer='b.txt']")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-file-viewer='b.txt']")).not.toBeNull()
   })
 
   test("symlink refusal renders the unsafe state with zero actions and no kebab (AC4/AC6)", async () => {
@@ -176,10 +176,10 @@ describe("REQ-108 file viewer real Solid mount", () => {
     await flushTimers()
 
     expect(host.textContent).toContain("已停止打开这个文件")
-    expect(host.querySelector("[data-alpha-fv-kebab]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-fv-kebab]")).toBeNull()
     // 除返回箭头外没有任何动作按钮 —— 可疑文件不转交任何应用。
-    const buttons = [...host.querySelectorAll("[data-alpha-file-viewer] button")]
-    expect(buttons.map((b) => b.getAttribute("data-alpha-fv-back") !== null)).toEqual([true])
+    const buttons = [...host.querySelectorAll("[data-codepuppy-file-viewer] button")]
+    expect(buttons.map((b) => b.getAttribute("data-codepuppy-fv-back") !== null)).toEqual([true])
   })
 
   test("read failure renders the fail state and retry recovers (AC6)", async () => {
@@ -193,7 +193,7 @@ describe("REQ-108 file viewer real Solid mount", () => {
 
     delete files["flaky.txt"]!.refusal
     files["flaky.txt"]!.content = "recovered"
-    host.querySelector<HTMLButtonElement>("[data-alpha-fv-retry]")!.click()
+    host.querySelector<HTMLButtonElement>("[data-codepuppy-fv-retry]")!.click()
     await flushTimers()
     expect(host.textContent).toContain("recovered")
   })
@@ -212,7 +212,7 @@ describe("REQ-108 file viewer real Solid mount", () => {
     // 过大态本身零 chunk 读取。
     expect(harness.calls.readChunk).toHaveLength(0)
 
-    host.querySelector<HTMLButtonElement>("[data-alpha-fv-excerpt]")!.click()
+    host.querySelector<HTMLButtonElement>("[data-codepuppy-fv-excerpt]")!.click()
     await flushTimers()
     const requested = harness.calls.readChunk.reduce((sum, call) => sum + call.length, 0)
     expect(requested).toBeGreaterThan(0)
@@ -241,7 +241,7 @@ describe("REQ-108 file viewer real Solid mount", () => {
     expect(host.textContent).toContain("暂不支持内联预览")
     // 事实行,不读内容。
     expect(harness.calls.readChunk).toHaveLength(0)
-    const actions = [...host.querySelectorAll<HTMLButtonElement>("[data-alpha-fv-card] .a-fv-btn")]
+    const actions = [...host.querySelectorAll<HTMLButtonElement>("[data-codepuppy-fv-card] .a-fv-btn")]
     expect(actions.map((b) => b.textContent)).toEqual(["在系统中打开", "打开所在目录"])
     actions[0]!.click()
     actions[1]!.click()
@@ -257,17 +257,17 @@ describe("REQ-108 file viewer real Solid mount", () => {
     await flushTimers()
 
     // 主文档 DOM 只有容器 —— 内容画在 main 的 WebContentsView(证据形态,设计 §4)。
-    expect(host.querySelector("[data-alpha-fv-overlay='pdf']")).not.toBeNull()
-    expect(host.querySelector("[data-alpha-fv-overlay-region]")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-fv-overlay='pdf']")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-fv-overlay-region]")).not.toBeNull()
     expect(harness.calls.overlayOpen).toHaveLength(1)
     expect(harness.calls.overlayOpen[0]!.kind).toBe("pdf")
     // pdf 载体不画 html 的隔离状态行。
     expect(host.querySelector(".a-fv-isobar")).toBeNull()
 
-    host.querySelector<HTMLButtonElement>("[data-alpha-fv-back]")!.click()
+    host.querySelector<HTMLButtonElement>("[data-codepuppy-fv-back]")!.click()
     await flushTimers()
     expect(harness.calls.overlayClose).toEqual(["rp_1"])
-    expect(host.querySelector("[data-alpha-fv-overlay-region]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-fv-overlay-region]")).toBeNull()
   })
 
   test("html overlay shows the isolation bar and panel deactivation destroys the view (AC3/AC5)", async () => {
@@ -276,7 +276,7 @@ describe("REQ-108 file viewer real Solid mount", () => {
     await flush()
     harness.viewer().open("page.html")
     await flushTimers()
-    expect(host.querySelector("[data-alpha-fv-overlay='html']")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-fv-overlay='html']")).not.toBeNull()
     expect(host.querySelector(".a-fv-isobar")!.textContent).toContain("隔离预览")
     expect(harness.calls.overlayOpen[0]!.kind).toBe("html")
 
@@ -302,7 +302,7 @@ describe("REQ-108 file viewer real Solid mount", () => {
     // 无模态时不发多余的 setVisible —— 这条也钉住"每次打开都响一声"的稀释写法。
     expect(harness.calls.overlaySetVisible).toEqual([])
 
-    // 真模态:生产的 alpha-ui/Dialog(= 权限审批/能力授权走的同一个组件)。
+    // 真模态:生产的 codepuppy-ui/Dialog(= 权限审批/能力授权走的同一个组件)。
     harness.setModalOpen(true)
     await flushTimers()
     expect(document.querySelector("[role='dialog'][aria-modal='true']")).not.toBeNull()
@@ -344,7 +344,7 @@ describe("REQ-108 file viewer real Solid mount", () => {
     await flushTimers()
     expect(host.textContent).toContain("这个文件太大")
     // pdf 无节选通道 —— 只给系统打开。
-    expect(host.querySelector("[data-alpha-fv-excerpt]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-fv-excerpt]")).toBeNull()
   })
 
   test("Escape exits the viewer (drill-down contract)", async () => {
@@ -353,10 +353,10 @@ describe("REQ-108 file viewer real Solid mount", () => {
     await flush()
     harness.viewer().open("a.md")
     await flushTimers()
-    const rootEl = host.querySelector<HTMLElement>("[data-alpha-file-viewer]")!
+    const rootEl = host.querySelector<HTMLElement>("[data-codepuppy-file-viewer]")!
     rootEl.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))
     await flush()
-    expect(host.querySelector("[data-alpha-file-viewer]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-file-viewer]")).toBeNull()
     expect(harness.exits).toHaveLength(1)
   })
 
@@ -366,9 +366,9 @@ describe("REQ-108 file viewer real Solid mount", () => {
     await flush()
     harness.viewer().open("a.md")
     await flushTimers()
-    host.querySelector<HTMLButtonElement>("[data-alpha-fv-kebab]")!.click()
+    host.querySelector<HTMLButtonElement>("[data-codepuppy-fv-kebab]")!.click()
     await flush()
-    const items = [...host.querySelectorAll<HTMLButtonElement>("[data-alpha-fv-menu] [role='menuitem']")]
+    const items = [...host.querySelectorAll<HTMLButtonElement>("[data-codepuppy-fv-menu] [role='menuitem']")]
     expect(items.map((b) => b.textContent)).toEqual(["在系统中打开", "打开所在目录", "另存副本"])
     items[2]!.click()
     expect(harness.calls.saveCopy).toEqual(["a.md"])
@@ -382,7 +382,7 @@ describe("REQ-108 files panel → viewer linkage", () => {
     })
     const host = mount(harness.View)
     await flushTimers()
-    host.querySelector<HTMLButtonElement>("[data-alpha-srf-file='README.md']")!.click()
+    host.querySelector<HTMLButtonElement>("[data-codepuppy-srf-file='README.md']")!.click()
     await flush()
     // 打开列表仍登记(「已打开」组数据源)+ 查看器成为真实承接方。
     expect(harness.calls.open).toEqual(["file://README.md"])
@@ -396,7 +396,7 @@ describe("REQ-108 files panel → viewer linkage", () => {
     harness.setChangeKinds(new Map([["a.css", "modified"]]))
     const host = mount(harness.View)
     await flushTimers()
-    host.querySelector<HTMLButtonElement>("[data-alpha-srf-file='a.css']")!.click()
+    host.querySelector<HTMLButtonElement>("[data-codepuppy-srf-file='a.css']")!.click()
     await flush()
     expect(harness.calls.jumpToReview).toEqual(["a.css"])
     expect(harness.calls.openViewer).toEqual([])
@@ -407,7 +407,7 @@ describe("REQ-108 files panel → viewer linkage", () => {
     harness.setTabsAll(["file://notes.md"])
     const host = mount(harness.View)
     await flushTimers()
-    host.querySelector<HTMLButtonElement>("[data-alpha-srf-opentab='notes.md'] .a-srf-opentab-main")!.click()
+    host.querySelector<HTMLButtonElement>("[data-codepuppy-srf-opentab='notes.md'] .a-srf-opentab-main")!.click()
     await flush()
     expect(harness.calls.openViewer).toEqual(["notes.md"])
   })
@@ -419,12 +419,12 @@ describe("REQ-108 shell linkage (openFileViewer / activePanel)", () => {
     const host = mount(shell.Shell)
     await flush()
     // rail api 在 files 面板首次渲染时被捕获(与既有 shell 用例同法)。
-    host.querySelector<HTMLButtonElement>("[data-alpha-session-rail-tab='files']")!.click()
+    host.querySelector<HTMLButtonElement>("[data-codepuppy-session-rail-tab='files']")!.click()
     await flush()
     shell.rail()!.openFileViewer("docs/a.md")
     await flush()
     expect(
-      host.querySelector("[data-alpha-session-rail-tab='files']")!.classList.contains("a-swk-rail-tab--on"),
+      host.querySelector("[data-codepuppy-session-rail-tab='files']")!.classList.contains("a-swk-rail-tab--on"),
     ).toBe(true)
     const first = shell.rail()!.fileViewerTarget()
     expect(first?.file).toBe("docs/a.md")
@@ -480,9 +480,9 @@ describe("#1229 office layout rendering in the rail file viewer", () => {
         { path: name, kind },
       ])
       // 版式在另一个进程 —— 主文档 DOM 里只有占位容器,不该同时画一份文字提取。
-      expect(host.querySelector("[data-alpha-fv-overlay-region]")).not.toBeNull()
+      expect(host.querySelector("[data-codepuppy-fv-overlay-region]")).not.toBeNull()
       expect(host.querySelector("[data-office-content]")).toBeNull()
-      expect(host.querySelector("[data-alpha-xlsx-sheet]")).toBeNull()
+      expect(host.querySelector("[data-codepuppy-xlsx-sheet]")).toBeNull()
     })
   }
 
@@ -490,7 +490,7 @@ describe("#1229 office layout rendering in the rail file viewer", () => {
     const { harness, host } = await mountOffice("mislabelled.docx", officeFixtures.xlsxContainer())
     // 冲突由 presentOfficeStructure 裁为 type-mismatch —— 既不按扩展名渲染,也不按结构渲染。
     expect(harness.calls.overlayOpen).toEqual([])
-    const card = host.querySelector("[data-alpha-fv-card]")
+    const card = host.querySelector("[data-codepuppy-fv-card]")
     expect(card).not.toBeNull()
     expect(card!.textContent).toContain("OOXML_CLAIM_CONFLICT")
   })
@@ -499,7 +499,7 @@ describe("#1229 office layout rendering in the rail file viewer", () => {
     const { harness, host } = await mountOffice("fake.docx", new TextEncoder().encode("this is not a zip at all"))
     expect(harness.calls.overlayOpen).toEqual([])
     expect(host.querySelector("[data-office-content]")).toBeNull()
-    const card = host.querySelector("[data-alpha-fv-card]")
+    const card = host.querySelector("[data-codepuppy-fv-card]")
     expect(card).not.toBeNull()
     expect(card!.textContent).toContain("NOT_ZIP")
   })
@@ -519,7 +519,7 @@ describe("#1229 office layout rendering in the rail file viewer", () => {
     const content = host.querySelector("[data-office-content]")
     expect(content).not.toBeNull()
     expect(content!.textContent!.trim().length).toBeGreaterThan(0)
-    const degraded = host.querySelector("[data-alpha-fv-office-degraded]")
+    const degraded = host.querySelector("[data-codepuppy-fv-office-degraded]")
     expect(degraded).not.toBeNull()
     expect(degraded!.textContent).toContain("boom in the renderer")
     // 降级是换画布,不是重读文件:不该出现第二次 openRead。
@@ -529,7 +529,7 @@ describe("#1229 office layout rendering in the rail file viewer", () => {
   test("macro-enabled and template variants stay unsupported (they never reach any carrier)", async () => {
     const { harness, host } = await mountOffice("macros.docm", officeFixtures.docxContainer())
     expect(harness.calls.overlayOpen).toEqual([])
-    expect(host.querySelector("[data-alpha-fv-office]")).toBeNull()
-    expect(host.querySelector("[data-alpha-fv-card]")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-fv-office]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-fv-card]")).not.toBeNull()
   })
 })

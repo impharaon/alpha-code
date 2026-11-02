@@ -6,7 +6,7 @@
 // 运行时的穷尽性由 updater-state-surface.test.ts 再钉一道(独立字面量清单,不从本文件推导)。
 //
 // 「呈现」允许是「确定地不画」(null):disabled/idle 是静息态,没有值得占位的信息。
-// 其余六个 status 都投影到侧栏 footer 的更新条(alpha-sidebar.tsx 消费本映射渲染)。
+// 其余六个 status 都投影到侧栏 footer 的更新条(codepuppy-sidebar.tsx 消费本映射渲染)。
 //
 // unsolicited 的语义:后台到达(启动自检 / 10 分钟定时器)也要显示,还是只在用户主动
 // 检查过之后显示。downloading/ready/installing 是「正在发生/等着你装」的事实,不请自来也该
@@ -33,12 +33,12 @@ export type UpdaterSurfaceSpec = {
 export const UPDATER_STATUS_SURFACE: Record<UpdaterState["status"], UpdaterSurfaceSpec | null> = {
   disabled: null,
   idle: null,
-  checking: { textKey: "alpha.updater.checking", unsolicited: false },
-  downloading: { textKey: "alpha.updater.downloading", unsolicited: true },
-  ready: { textKey: "alpha.updater.ready", unsolicited: true, action: "install" },
-  "up-to-date": { textKey: "alpha.updater.upToDate", unsolicited: false, dismissible: true },
-  installing: { textKey: "alpha.updater.installing", unsolicited: true },
-  error: { textKey: "alpha.updater.error", unsolicited: false, dismissible: true },
+  checking: { textKey: "codepuppy.updater.checking", unsolicited: false },
+  downloading: { textKey: "codepuppy.updater.downloading", unsolicited: true },
+  ready: { textKey: "codepuppy.updater.ready", unsolicited: true, action: "install" },
+  "up-to-date": { textKey: "codepuppy.updater.upToDate", unsolicited: false, dismissible: true },
+  installing: { textKey: "codepuppy.updater.installing", unsolicited: true },
+  error: { textKey: "codepuppy.updater.error", unsolicited: false, dismissible: true },
 }
 
 /** 文案插值参数(版本号 / 错误消息)。窄化只能按 status 写 switch,穷尽权威仍是上面那张表。 */

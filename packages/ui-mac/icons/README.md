@@ -10,7 +10,7 @@ dev/ beta/ prod/       one folder per channel; scripts/copy-icons.ts copies the 
 ```
 
 `resources/icons` is a **generated** directory and is not under version control
-(`ac#1115`; `src/main/alpha-generated-icons-hygiene.test.ts` is the gate). The channel
+(`ac#1115`; `src/main/codepuppy-generated-icons-hygiene.test.ts` is the gate). The channel
 folders here *are* tracked — they are the input.
 
 ## The eight files Electron actually consumes

@@ -55,7 +55,7 @@ mock.module("../src/main/store", () => ({
 const { spawnLocalServer } = await import("../src/main/server")
 // REQ-159 `#1321`:生产 spawnLocalServer 在 fork 前做围栏计划(真 store / 真 sandbox-exec / 真原生模块路径);
 // 本文件的假子进程不跑 sidecar.ts,注入一个替身计划 —— 围栏本身的判据在 src/main/process-fence-*.test.ts。
-const fakePlanFence = () => ({ profile: "(version 1)\n(allow default)\n(deny file-write*)\n", addonPath: "/nonexistent/alpha_fence.node" })
+const fakePlanFence = () => ({ profile: "(version 1)\n(allow default)\n(deny file-write*)\n", addonPath: "/nonexistent/codepuppy_fence.node" })
 const { serverLogRoots } = await import("../src/main/logging")
 const { creditDanglingSweepForSpawn, resetDanglingSweepLatchForTests } = await import(
   "../src/main/dangling-sweep-latch"
@@ -74,7 +74,7 @@ let xdgDataHome = ""
 /** 两个期望的日志根 —— **独立字面量**,不是从 serverLogRoots() 抄回来的。 */
 let expectedLogDirs: string[] = []
 const savedEnv: Record<string, string | undefined> = {}
-const ENV_KEYS = ["XDG_DATA_HOME", "ALPHA_SECRETS_DISABLE", "SHELL"] as const
+const ENV_KEYS = ["XDG_DATA_HOME", "CODEPUPPY_SECRETS_DISABLE", "SHELL"] as const
 
 /** 稀疏地造一个精确尺寸的大文件:头尾各一个可辨识 marker,中间空洞。 */
 function seedSizedFile(file: string, size: number, tag: string) {
@@ -119,7 +119,7 @@ beforeEach(() => {
   mkdirSync(userDataPath, { recursive: true })
   mkdirSync(xdgDataHome, { recursive: true })
   process.env.XDG_DATA_HOME = xdgDataHome
-  process.env.ALPHA_SECRETS_DISABLE = "1"
+  process.env.CODEPUPPY_SECRETS_DISABLE = "1"
   process.env.SHELL = "nu"
   expectedLogDirs = [join(xdgDataHome, "opencode", "log"), join(userDataPath, "opencode", "log")]
   expectedLogDirs.forEach((dir) => mkdirSync(dir, { recursive: true }))

@@ -6,17 +6,17 @@
 //   · 模型追问:模型调 `codepuppy_vision` 时 `tool.execute.before` 把 `args.image` 原地换成压缩后的 base64。
 //
 // ── 凭据从哪来(2026-09-24 勘破)────────────────────────────────────────────────────
-// 引擎访问云端用的是登录铸的 `mcp_access` token:ui-mac 每次 fork 把云 MCP 定义经 `ALPHA_CLOUD_MCP_DEF`
-// 交给本插件(`alpha-config-injection.ts:391`),定义里 `headers.Authorization = "Bearer {file:…ALPHA_MCP_TOKEN}"`
+// 引擎访问云端用的是登录铸的 `mcp_access` token:ui-mac 每次 fork 把云 MCP 定义经 `CODEPUPPY_CLOUD_MCP_DEF`
+// 交给本插件(`codepuppy-config-injection.ts:391`),定义里 `headers.Authorization = "Bearer {file:…CODEPUPPY_MCP_TOKEN}"`
 // (`cloud-sidecar-config.ts`,`#1195`);`installCloudMcp()` 已经在解析这个 `{file:}`。gateway 的 vision 路由
 // 对**这一条封印路径**额外接受 `mcp_access`(alpha-platform `worker.ts` visionHandler:`FORWARDED_MCP_AUTH_OPTS`
 // 与 `actionAllowed(auth, "cloud.dispatch")`),而云 MCP 的 `vision` 也只是把同一个 Authorization 原样转发
 // 到同一条路由(`cloud-mcp.ts` mount)。所以这里用的**就是**引擎经 MCP 访问云端的那份凭据,不另铸、不回退。
-// 路由的主机:`ALPHA_BASE_URL`(`alpha-auth.ts:301`,= `<platform>/v1`,platform 即 gateway 主机)的 origin。
+// 路由的主机:`CODEPUPPY_BASE_URL`(`codepuppy-auth.ts:301`,= `<platform>/v1`,platform 即 gateway 主机)的 origin。
 // 凭据在每次调用时现读文件(令牌续期会重写文件;比引擎装配置时解析一次更新)。
 //
 // ── 「云端是否可用」(与 alpha-code#1411 同轴)──────────────────────────────────────
-// `#1411` / `#1442` 的判据是 `platformPays = ALPHA_CLOUD_MCP_URL && ALPHA_MCP_TOKEN 密钥文件在场`,桌面侧
+// `#1411` / `#1442` 的判据是 `platformPays = CODEPUPPY_CLOUD_MCP_URL && CODEPUPPY_MCP_TOKEN 密钥文件在场`,桌面侧
 // 「登录+有额度」与「登录+无额度」**不可区分**(account 契约没有只读额度查询),额度只在调用时以 402 出面。
 // 这里同一根轴:DEF 缺席 / 定义无 Authorization(= 密钥文件缺席时 ui-mac 给的 `enabled:false` 形状)/ `{file:}`
 // 读不到 ⇒ 未登录;HTTP 401/403 ⇒ 凭据失效;402 ⇒ 无额度;5xx / 网络 ⇒ 上游故障 —— 每一种都给用户说得出原因的话。
@@ -66,9 +66,9 @@ export function cloudVisionToolId(env: Record<string, string | undefined> = proc
   return server ? mcpEngineToolId(server, CLOUD_VISION_REMOTE_TOOL) : undefined
 }
 
-/** `ALPHA_BASE_URL`(`<platform>/v1`)的 origin + 识图路由;没有 = 未登录平台 / BYOK 态。 */
+/** `CODEPUPPY_BASE_URL`(`<platform>/v1`)的 origin + 识图路由;没有 = 未登录平台 / BYOK 态。 */
 export function cloudVisionEndpoint(env: Record<string, string | undefined> = process.env): string | undefined {
-  const base = env.ALPHA_BASE_URL
+  const base = env.CODEPUPPY_BASE_URL
   if (!base) return undefined
   try {
     return new URL(CLOUD_VISION_ROUTE, new URL(base).origin).toString()
@@ -382,16 +382,16 @@ export async function transcribeEntry(session: VisionSession, entry: VisionImage
     image = await entry.compressed()
   } catch (error) {
     if (error instanceof VisionImageDecodeError || error instanceof VisionImageTooLargeError) {
-      deps.log?.(`[@alpha-code/ext] cloud vision: ${label} not sent — ${error.message}`)
+      deps.log?.(`[@codepuppy/ext] cloud vision: ${label} not sent — ${error.message}`)
       return visionFailureBlock(label, "unsupported-format")
     }
     // 装不上 photon(wasm 缺席之类)也落在这一格:本机压不了 ⇒ 不发原图去撞 413。
-    deps.log?.(`[@alpha-code/ext] cloud vision: compressor unavailable for ${label} — ${error instanceof Error ? error.message : String(error)}`)
+    deps.log?.(`[@codepuppy/ext] cloud vision: compressor unavailable for ${label} — ${error instanceof Error ? error.message : String(error)}`)
     return visionFailureBlock(label, "unsupported-format")
   }
   const outcome = await session.describeOnce(entry, () => describeImage({ access, image, fetch: deps.fetch, timeoutMs: deps.timeoutMs }))
   if (outcome.ok) return visionTranscriptBlock(label, outcome.text)
-  deps.log?.(`[@alpha-code/ext] cloud vision: ${label} failed (${outcome.kind}): ${outcome.detail}`)
+  deps.log?.(`[@codepuppy/ext] cloud vision: ${label} failed (${outcome.kind}): ${outcome.detail}`)
   return visionFailureBlock(label, outcome.kind)
 }
 

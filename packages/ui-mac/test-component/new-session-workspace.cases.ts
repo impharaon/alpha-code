@@ -1,9 +1,9 @@
 // REQ-126 CODE-D（#657）——「新对话页工作区选择器 + 切目录不吞内容」的**真组件**闸门。
 //
-// 独立进程运行:mock.module 会污染同进程其它测试文件(与 alpha-composer-model.cases.ts 同因)。
+// 独立进程运行:mock.module 会污染同进程其它测试文件(与 codepuppy-composer-model.cases.ts 同因)。
 //
-// 本文件的判据全部是**可观察结果**:真实挂载 AlphaNewSession / AlphaHome(内含真实
-// AlphaComposer),对真实 DOM 点击、真实输入,再断言 DOM 与真实回调收到的值。**不断言源码文本**。
+// 本文件的判据全部是**可观察结果**:真实挂载 CodePuppyNewSession / CodePuppyHome(内含真实
+// CodePuppyComposer),对真实 DOM 点击、真实输入,再断言 DOM 与真实回调收到的值。**不断言源码文本**。
 //
 // 关键形制:切目录的重挂在这里是**真的** —— harness 复刻上游 `createDraftRoute` 的
 // `<Show when={`${server}\0${directory}`} keyed>`(packages/app/src/app.tsx),并在
@@ -15,10 +15,10 @@ import { transformAsync } from "@babel/core"
 import presetTypescript from "@babel/preset-typescript"
 import { GlobalRegistrator } from "@happy-dom/global-registrator"
 import presetSolid from "babel-preset-solid"
-import type { AlphaProject, AlphaProjectsApi } from "../src/renderer/sidebar/use-projects"
-import type { ComposerAttachment } from "../src/renderer/alpha-ui/composer-attachments-core"
-import type { MentionPart } from "../src/renderer/alpha-ui/composer-autocomplete-core"
-import { ALPHA_V2_CATALOG_READY_PROVIDER_ID } from "../src/shared/alpha-config"
+import type { CodePuppyProject, CodePuppyProjectsApi } from "../src/renderer/sidebar/use-projects"
+import type { ComposerAttachment } from "../src/renderer/codepuppy-ui/composer-attachments-core"
+import type { MentionPart } from "../src/renderer/codepuppy-ui/composer-autocomplete-core"
+import { CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID } from "../src/shared/codepuppy-config"
 // `#1374`:共享 `window.api` 桩(只 import 类型,运行期零依赖)。
 import { installPreloadStub } from "./preload-stub"
 import { effectiveCatalogFixture } from "./effective-catalog.fixture"
@@ -49,14 +49,14 @@ Bun.plugin({
 })
 
 /* ── seams the leaf borrows from upstream / the router ─────────────────────────
-   AlphaNewSession reads the draft through upstream `useTabs()` and clears `?prompt=`
+   CodePuppyNewSession reads the draft through upstream `useTabs()` and clears `?prompt=`
    through the router; both are replaced with observable fakes so the assertions can be
    about *what the page asked for*, not about internal calls. */
 // #891:「当会话身份用就是错的」的值在本文件里被**故意钉成与 store 的 server 不同**:
 // `useServer().key`(当前 active server)恒为 ACTIVE_SERVER_KEY,任一叶回头去读它,判据当场红。
 // 首页/新对话页的会话是 `projects.startChat` 在 **store 连着的那个 server** 上建的,身份只能是
-// 后者。draft 的 server 段:#925 起 alpha-sidebar 建的 draft 已钉在 projects key 上,且
-// AlphaNewSession 在唯一消费者处把不同值的 draft 收口钉回(#925 审计 Major,上游 Titlebar 的
+// 后者。draft 的 server 段:#925 起 codepuppy-sidebar 建的 draft 已钉在 projects key 上,且
+// CodePuppyNewSession 在唯一消费者处把不同值的 draft 收口钉回(#925 审计 Major,上游 Titlebar 的
 // 「+ 新标签」/ mod+t 仍按 active server 建 draft)—— 所以本文件默认 draft 带 STORE_SERVER_KEY
 // (生产两头收口后的稳态),「上游入口建的 wrong-server draft」由 #925 那组用例显式铺设。
 const ACTIVE_SERVER_KEY = "wsl:ubuntu"
@@ -117,20 +117,20 @@ mock.module("@solidjs/router", () => ({
   },
 }))
 const command = { options: [], trigger: () => {} }
-mock.module("../src/renderer/alpha-ui/providers", () => ({
+mock.module("../src/renderer/codepuppy-ui/providers", () => ({
   useCommand: () => command,
   useContractHealth: () => () => null,
 }))
 
-const { AlphaNewSession } = await import("../src/renderer/alpha-ui/alpha-new-session")
-const { AlphaHome } = await import("../src/renderer/alpha-ui/AlphaHome")
+const { CodePuppyNewSession } = await import("../src/renderer/codepuppy-ui/codepuppy-new-session")
+const { CodePuppyHome } = await import("../src/renderer/codepuppy-ui/CodePuppyHome")
 const { parseRoute } = await import("../src/shared/route-manifest")
-const { newSessionDraftStash } = await import("../src/renderer/alpha-ui/new-session-draft-stash")
-const { refreshConfigHealth } = await import("../src/renderer/alpha-ui/use-config-health")
-const { ToastViewport } = await import("../src/renderer/alpha-ui/Toast")
+const { newSessionDraftStash } = await import("../src/renderer/codepuppy-ui/new-session-draft-stash")
+const { refreshConfigHealth } = await import("../src/renderer/codepuppy-ui/use-config-health")
+const { ToastViewport } = await import("../src/renderer/codepuppy-ui/Toast")
 const { dict: zh } = await import("../src/renderer/i18n/zh")
 // [ac#1225] AI 生成标识的中英两条文案要在**同一个生产节点**上各验一次,所以要能真的切 locale。
-// (本包 bunfig 的 preload 把每个 bun test 进程钉在 ALPHA_UI_LOCALE=zh —— 默认渲染的是中文那条。)
+// (本包 bunfig 的 preload 把每个 bun test 进程钉在 CODEPUPPY_UI_LOCALE=zh —— 默认渲染的是中文那条。)
 const { setLocale } = await import("../src/renderer/i18n")
 const {
   resetComposerAgentScopesForTests,
@@ -138,32 +138,32 @@ const {
   resetComposerPermScopesForTests,
   setComposerAgent,
   setComposerModel,
-} = await import("../src/renderer/alpha-ui/composer-state")
+} = await import("../src/renderer/codepuppy-ui/composer-state")
 // #891 判据要跑**会话页那一侧的真实 adopt**(不是自己拼一条等价链):seed 写进去的钥匙,
 // 只有 SessionComposerMount 按 canonical 身份算出同一把时才认领得到。
 const { SessionComposerMount } = await import(
-  "../src/renderer/alpha-ui/session-workspace/session-composer-mount"
+  "../src/renderer/codepuppy-ui/session-workspace/session-composer-mount"
 )
 const { createComposerDraftStash } = await import(
-  "../src/renderer/alpha-ui/session-workspace/session-dock-core"
+  "../src/renderer/codepuppy-ui/session-workspace/session-dock-core"
 )
 // #582(PR#954 审计 Major-2):斜杠 source 的登记判据必须穿过**真 dock**(它才是
 // recordSessionSlashOrigin 的生产调用点);registry 的读口用来断言登记结果。
 const { SessionComposerDock } = await import(
-  "../src/renderer/alpha-ui/session-workspace/session-composer-dock"
+  "../src/renderer/codepuppy-ui/session-workspace/session-composer-dock"
 )
 // REQ-159 `#1322`:chip 尾标的两个数据源 —— 沙箱状态(引擎自报,测试直接灌)与写探针(测试给替身,
 // 生产是 preload 桥背后被围栏的 sidecar)。
-const { setSandboxStateForTests } = await import("../src/renderer/alpha-ui/sandbox-state")
-const { resetWorkspaceWritableForTests } = await import("../src/renderer/alpha-ui/workspace-writable")
+const { setSandboxStateForTests } = await import("../src/renderer/codepuppy-ui/sandbox-state")
+const { resetWorkspaceWritableForTests } = await import("../src/renderer/codepuppy-ui/workspace-writable")
 const { resetSessionSlashOrigins, sessionSlashOriginsFor } = await import(
-  "../src/renderer/alpha-ui/session-workspace/session-slash-origin"
+  "../src/renderer/codepuppy-ui/session-workspace/session-slash-origin"
 )
 
 const DEFAULT_WORKSPACE = "/Users/tester/Alpha"
 
 /* ── model chain fixture:composer 不 ready 就不肯提交,而本文件的判据里有两条要走真提交。
-      形制照搬 alpha-composer-model.cases.ts:真出厂目录 + 已登录平台账户。 ────────────── */
+      形制照搬 codepuppy-composer-model.cases.ts:真出厂目录 + 已登录平台账户。 ────────────── */
 // `#1556`:已应用目录(上游 V3 producer 快照 + 随包 BYOK 首启引导)经生产投影装配,见 effective-catalog.fixture.ts。
 const catalog = effectiveCatalogFixture()
 const modelInfo = (providerID: string, id: string, name = id) => ({
@@ -202,7 +202,7 @@ const accountSummary = {
   usageSeries: [],
 }
 
-const project = (name: string, worktree: string): AlphaProject => ({
+const project = (name: string, worktree: string): CodePuppyProject => ({
   id: name,
   worktree,
   name,
@@ -226,7 +226,7 @@ function gateStartChat() {
   startChatGate = { promise, release }
   return startChatGate
 }
-function projectsApi(projects: AlphaProject[]): AlphaProjectsApi {
+function projectsApi(projects: CodePuppyProject[]): CodePuppyProjectsApi {
   return {
     store: { projects, ready: true, error: false },
     reload: async () => {},
@@ -256,7 +256,7 @@ function projectsApi(projects: AlphaProject[]): AlphaProjectsApi {
         v2: {
           agent: { list: async () => ({ data: { data: [] } }) },
           provider: {
-            get: async () => ({ data: { data: { id: ALPHA_V2_CATALOG_READY_PROVIDER_ID } } }),
+            get: async () => ({ data: { data: { id: CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID } } }),
           },
           model: { list: async () => ({ data: { data: platformModels } }) },
           session: {
@@ -269,7 +269,7 @@ function projectsApi(projects: AlphaProject[]): AlphaProjectsApi {
     shareSession: async () => undefined,
     deleteSession: async () => false,
     copySession: async () => undefined,
-  } as unknown as AlphaProjectsApi
+  } as unknown as CodePuppyProjectsApi
 }
 
 let pickedDirectory: string | undefined
@@ -383,7 +383,7 @@ function pasteFile(el: HTMLTextAreaElement, file: File) {
  *  session tab 并导航(packages/app/src/app.tsx:272-277)—— 这里如实照抄那次读取并记下来。
  *  它就是「打开的是哪台机器」的决定值:断言落在它身上,而不是某个内部 memo。 */
 const promoteCalls: Array<{ server: string; sessionId: string }> = []
-function DraftLeaf(props: { projects: AlphaProjectsApi; draftId?: string; serverKey?: () => string | undefined }) {
+function DraftLeaf(props: { projects: CodePuppyProjectsApi; draftId?: string; serverKey?: () => string | undefined }) {
   // 上游 createDraftRoute 的 keyed 包装(packages/app/src/app.tsx):server/directory 变 ⇒ 整叶重挂。
   return createComponent(solid.Show, {
     get when() {
@@ -391,7 +391,7 @@ function DraftLeaf(props: { projects: AlphaProjectsApi; draftId?: string; server
     },
     keyed: true,
     get children() {
-      return createComponent(AlphaNewSession, {
+      return createComponent(CodePuppyNewSession, {
         projects: props.projects,
         // #891:生产由 index.tsx 的 `projectsServerKey` 供给(store 的 baseUrl 反查),这里同源:
         // 这份 `projects` 连的就是 STORE_SERVER_KEY(#925 的用例用自己的 key 覆盖,两组字面量
@@ -529,10 +529,10 @@ describe("#1590 新对话页:配置失效提示、标题与准备中占位", () 
     await flush()
     await flush()
 
-    const banner = banners(host).find((el) => el.textContent?.includes(zh["alpha.home.configBroken"]))
+    const banner = banners(host).find((el) => el.textContent?.includes(zh["codepuppy.home.configBroken"]))
     expect(banner).toBeDefined()
     expect(banner!.textContent).toContain(BROKEN.reason)
-    const action = Array.from(banner!.querySelectorAll("button")).find((b) => b.textContent === zh["alpha.home.openConfig"])!
+    const action = Array.from(banner!.querySelectorAll("button")).find((b) => b.textContent === zh["codepuppy.home.openConfig"])!
     action.click()
     expect(openPathCalls).toEqual([BROKEN.path])
   })
@@ -540,12 +540,12 @@ describe("#1590 新对话页:配置失效提示、标题与准备中占位", () 
   test("AC1 同一组件:首页在同一信号下渲染逐字相同的提示条", async () => {
     installConfigHealth(BROKEN)
     const newSession = mount(() => createComponent(DraftLeaf, { projects: projectsApi([project("alpha-code", "/ws/a")]) }))
-    const home = mount(() => createComponent(AlphaHome, { projects: projectsApi([project("alpha-code", "/ws/a")]), serverKey: () => STORE_SERVER_KEY }))
+    const home = mount(() => createComponent(CodePuppyHome, { projects: projectsApi([project("alpha-code", "/ws/a")]), serverKey: () => STORE_SERVER_KEY }))
     await flush()
     await flush()
 
     const configBanner = (host: HTMLElement) =>
-      banners(host).find((el) => el.textContent?.includes(zh["alpha.home.configBroken"]))?.outerHTML
+      banners(host).find((el) => el.textContent?.includes(zh["codepuppy.home.configBroken"]))?.outerHTML
     expect(configBanner(newSession)).toBeDefined()
     expect(configBanner(newSession)).toBe(configBanner(home))
   })
@@ -556,7 +556,7 @@ describe("#1590 新对话页:配置失效提示、标题与准备中占位", () 
     await flush()
     await flush()
 
-    expect(host.textContent).not.toContain(zh["alpha.home.configBroken"])
+    expect(host.textContent).not.toContain(zh["codepuppy.home.configBroken"])
   })
 
   test("两页共用健康信号:先挂首页再挂新对话页,卸掉首页后新对话页仍在定时刷新;最后一个卸载才停", async () => {
@@ -586,7 +586,7 @@ describe("#1590 新对话页:配置失效提示、标题与准备中占位", () 
       const homeHost = document.createElement("div")
       document.body.append(homeHost)
       const disposeHome = render(
-        () => createComponent(AlphaHome, { projects: projectsApi([project("alpha-code", "/ws/a")]), serverKey: () => STORE_SERVER_KEY }) as never,
+        () => createComponent(CodePuppyHome, { projects: projectsApi([project("alpha-code", "/ws/a")]), serverKey: () => STORE_SERVER_KEY }) as never,
         homeHost,
       )
       const sessionHost = document.createElement("div")
@@ -629,7 +629,7 @@ describe("#1590 新对话页:配置失效提示、标题与准备中占位", () 
     await flush()
     await flush()
 
-    const placeholder = host.querySelector<HTMLElement>("[data-alpha-new-session-preparing]")
+    const placeholder = host.querySelector<HTMLElement>("[data-codepuppy-new-session-preparing]")
     expect(placeholder?.textContent).toBe("正在准备新对话…")
     expect(placeholder?.getAttribute("role")).toBe("status")
     expect(banners(host)).toHaveLength(0)
@@ -640,15 +640,15 @@ describe("#1590 新对话页:配置失效提示、标题与准备中占位", () 
     const host = mount(() => createComponent(DraftLeaf, { projects: projectsApi([project("alpha-code", "/ws/a")]) }))
     await flush()
 
-    expect(host.querySelector("[data-alpha-new-session-preparing]")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-new-session-preparing]")).toBeNull()
     expect(textarea(host)).not.toBeNull()
   })
 
   test("AC4:输入框四处提示文案与批准稿 #home 表一致", () => {
-    expect(zh["alpha.composer.assemble"]).toBe("添加文件、上下文或模式")
-    expect(zh["alpha.composer.effortTitle"]).toBe("推理强度")
-    expect(zh["alpha.composer.effortChainPending"]).toBe("模型读取中")
-    expect(zh["alpha.composer.engineDefault"]).toBe("由模型决定")
+    expect(zh["codepuppy.composer.assemble"]).toBe("添加文件、上下文或模式")
+    expect(zh["codepuppy.composer.effortTitle"]).toBe("推理强度")
+    expect(zh["codepuppy.composer.effortChainPending"]).toBe("模型读取中")
+    expect(zh["codepuppy.composer.engineDefault"]).toBe("由模型决定")
   })
 })
 
@@ -751,7 +751,7 @@ describe("REQ-126 CODE-D 切目录不吞内容(真重挂)", () => {
       expect(updateDraftCalls).toEqual([])
       expect(draft().directory).toBe("/ws/a")
       expect(textarea(host)).toBe(before) // 没重挂
-      expect(toastTitles()).toContain(zh["alpha.newSession.attachmentReadPending"])
+      expect(toastTitles()).toContain(zh["codepuppy.newSession.attachmentReadPending"])
 
       // 读完 → 附件落位 → 再切,这次放行且附件随之走。
       PendingFileReader.pending.splice(0)[0]!.release("data:image/png;base64,shot")
@@ -965,7 +965,7 @@ describe("REQ-126 CODE-D 切目录不吞内容(真重挂)", () => {
 describe("REQ-126 CODE-D 首页:chip 抽取行为保持 + 默认落 ~/Alpha", () => {
   test("未显式选择 ⇒ chip 与真实提交目标都是默认对话目录(不是第一个项目)", async () => {
     const host = mount(() =>
-      createComponent(AlphaHome, {
+      createComponent(CodePuppyHome, {
         projects: projectsApi([project("alpha-code", "/ws/a"), project("beta", "/ws/b")]),
         serverKey: () => STORE_SERVER_KEY,
       }),
@@ -991,7 +991,7 @@ describe("REQ-126 CODE-D 首页:chip 抽取行为保持 + 默认落 ~/Alpha", ()
     mountToasts()
     const gate = gateDefaultWorkspace() // workspaceDefaultDir 保持未决
     const host = mount(() =>
-      createComponent(AlphaHome, {
+      createComponent(CodePuppyHome, {
         projects: projectsApi([project("alpha-code", "/ws/a"), project("beta", "/ws/b")]),
         serverKey: () => STORE_SERVER_KEY,
       }),
@@ -1007,7 +1007,7 @@ describe("REQ-126 CODE-D 首页:chip 抽取行为保持 + 默认落 ~/Alpha", ()
 
     // 判据是**真实提交目标**:未解析期间一条都不许发出去,且用户看得到「需要工作区」提示。
     expect(startChatCalls).toEqual([])
-    expect(toastTitles()).toContain(zh["alpha.home.workspaceRequired"])
+    expect(toastTitles()).toContain(zh["codepuppy.home.workspaceRequired"])
 
     // 解析回来后照常可发,落点是默认对话目录。
     gate.resolve(DEFAULT_WORKSPACE)
@@ -1020,7 +1020,7 @@ describe("REQ-126 CODE-D 首页:chip 抽取行为保持 + 默认落 ~/Alpha", ()
 
   test("chip 抽取行为保持:仍列默认工作区 + 项目 + 打开项目…,显式选中即改提交目标", async () => {
     const host = mount(() =>
-      createComponent(AlphaHome, {
+      createComponent(CodePuppyHome, {
         projects: projectsApi([project("alpha-code", "/ws/a"), project("beta", "/ws/b")]),
         serverKey: () => STORE_SERVER_KEY,
       }),
@@ -1031,14 +1031,14 @@ describe("REQ-126 CODE-D 首页:chip 抽取行为保持 + 默认落 ~/Alpha", ()
     chipButton(host).click()
     await flush()
     const labels = popItems(host).map((button) => button.textContent ?? "")
-    // [ac#1186] 常驻首项读 `alpha.brand.short`,它是产品名不是目录名 —— owner 在这里看到的必须是 Code Puppy。
+    // [ac#1186] 常驻首项读 `codepuppy.brand.short`,它是产品名不是目录名 —— owner 在这里看到的必须是 Code Puppy。
     // 「不含 Alpha」不能省:缺陷的用户可观察形态就是这一行写着「Alpha」,只断言含新名会漏掉两名并存。
     expect(labels[0]).toContain("Code Puppy") // 默认工作区常驻首项(未注册为项目)
     expect(labels[0]).not.toContain("Alpha")
     expect(popItems(host)[0]?.className).toContain("is-on") // 未选时选中态在它身上
     expect(labels.some((label) => label.includes("alpha-code"))).toBe(true)
     expect(labels.some((label) => label.includes("beta"))).toBe(true)
-    expect(labels.at(-1)).toContain(zh["alpha.home.openProjectEllipsis"]) // 「打开项目…」仍在末位
+    expect(labels.at(-1)).toContain(zh["codepuppy.home.openProjectEllipsis"]) // 「打开项目…」仍在末位
 
     popItems(host).find((button) => (button.textContent ?? "").includes("beta"))!.click()
     await flush()
@@ -1073,7 +1073,7 @@ const planChipOf = (host: HTMLElement) => host.querySelector<HTMLButtonElement>(
 const permChipOf = (host: HTMLElement) => host.querySelector<HTMLButtonElement>(".a-chip-perm")
 const readonlyItems = () =>
   [...document.body.querySelectorAll<HTMLButtonElement>('.a-pop-item[role="menuitemradio"]')].filter((item) =>
-    item.textContent?.includes(zh["alpha.composer.permReadonly"]),
+    item.textContent?.includes(zh["codepuppy.composer.permReadonly"]),
   )
 
 /** #891/#894 都要「先挂 A 断言、卸掉、再挂 B」——共享的 disposers 只在 afterEach 收,这里要能就地卸。 */
@@ -1091,7 +1091,7 @@ function mountDisposable(view: () => unknown) {
 }
 
 /** 会话页那一侧的生产挂载:它自己从 identity 算 `identityKey`,再 adopt 档位/只读档。 */
-function mountSessionAt(projects: AlphaProjectsApi, serverKey: string, sessionID: string) {
+function mountSessionAt(projects: CodePuppyProjectsApi, serverKey: string, sessionID: string) {
   return mountDisposable(() =>
     createComponent(SessionComposerMount, {
       identity: () => ({ serverKey, directory: DEFAULT_WORKSPACE, sessionID }),
@@ -1109,10 +1109,10 @@ function mountSessionAt(projects: AlphaProjectsApi, serverKey: string, sessionID
 
 /** 首页:开计划档 + 只读档,再真提交。顺序不能反 —— 只读档下 Shift+Tab 是 no-op。 */
 async function submitFromHomeWithBothOn(
-  projects: AlphaProjectsApi,
+  projects: CodePuppyProjectsApi,
   serverKey: () => string | undefined = () => STORE_SERVER_KEY,
 ) {
-  const home = mountDisposable(() => createComponent(AlphaHome, { projects, serverKey }))
+  const home = mountDisposable(() => createComponent(CodePuppyHome, { projects, serverKey }))
   for (let i = 0; i < 20 && !textarea(home.host); i++) await flush()
   textarea(home.host)!.dispatchEvent(
     new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true }),
@@ -1255,7 +1255,7 @@ describe("#891 首页/新对话页:开局档位登记在 store 连着的那个 s
     permChipOf(session.host)!.click()
     const allowItems = () =>
       [...document.body.querySelectorAll<HTMLButtonElement>('.a-pop-item[role="menuitemradio"]')].filter((item) =>
-        item.textContent?.includes(zh["alpha.composer.permAllow"]),
+        item.textContent?.includes(zh["codepuppy.composer.permAllow"]),
       )
     for (let i = 0; i < 20 && allowItems().length === 0; i++) await flush()
     allowItems()[0]!.click()
@@ -1323,7 +1323,7 @@ describe("#894 首页提交后的导航:落地的是真正创建会话的那个 
     const [storeServerKey, setStoreServerKey] = createSignal<string | undefined>(SUBMIT_TIME_SERVER_KEY)
     const gate = gateStartChat()
 
-    const home = mountDisposable(() => createComponent(AlphaHome, { projects, serverKey: storeServerKey }))
+    const home = mountDisposable(() => createComponent(CodePuppyHome, { projects, serverKey: storeServerKey }))
     for (let i = 0; i < 20 && !textarea(home.host); i++) await flush()
     type(textarea(home.host)!, "开工")
     await flush()
@@ -1350,11 +1350,11 @@ describe("#894 首页提交后的导航:落地的是真正创建会话的那个 
   })
 })
 
-/* ── #925 审计 Major:draft 的生产者不止 alpha-sidebar 一个 ────────────────────────────
+/* ── #925 审计 Major:draft 的生产者不止 codepuppy-sidebar 一个 ────────────────────────────
    上游 Titlebar 的「+ 新标签」/ mod+t(packages/app/src/components/titlebar.tsx `openNewTab`,
    五个分支)建的 draft 带的是 active(或兜底)server;而新对话页发第一条恒经
    `props.projects.startChat` 把会话建在 projects store 连着的 server 上。收口在唯一消费者:
-   AlphaNewSession 挂载/取到 key 后把不同值的 draft.server 钉回 projects key,上游 `promoteDraft`
+   CodePuppyNewSession 挂载/取到 key 后把不同值的 draft.server 钉回 projects key,上游 `promoteDraft`
    按 `draft.server` 建的 session tab 与导航才落在真正持有会话的那台。
    判据纪律:两组用例的 projects key 用**不同**字面量(STORE / LATER),写死单值的实现两条同时
    过不了;负向夹具的 draft.server 也取两个互不相同的非退化值(ACTIVE / SUBMIT_TIME)。 */
@@ -1424,17 +1424,17 @@ describe("#925 上游入口建的 draft(带 active server)在唯一消费者处�
 
 /* ── #582(PR#954 审计 Major-2)斜杠 source 的生产接线 ─────────────────────────────────
    本票唯一的取数点是两跳:composer 在发送当下读引擎 `/command` 声明的 source
-   (alpha-composer.tsx 的 `slashSourceOf(matched)` + capture 展开),真 dock 的
+   (codepuppy-composer.tsx 的 `slashSourceOf(matched)` + capture 展开),真 dock 的
    `onSlashCommand` 再把 `capture.source` 透传进 `recordSessionSlashOrigin`
    (session-composer-dock.tsx)。此前三层判据全部从「已带 source 的登记」开始注入 ——
    删掉任一跳,生产上 source 永远到不了 chip、技能/MCP 命令全退回通用灰,而闸门全绿。
-   这里挂**生产 SessionComposerDock**(内含生产 SessionComposerMount 与 AlphaComposer),
+   这里挂**生产 SessionComposerDock**(内含生产 SessionComposerMount 与 CodePuppyComposer),
    从输入框真发斜杠,断言 registry 的读口 —— 一条判据同时穿过两跳。
-   (alpha-composer-model.cases.ts 的原则同样适用:用测试自建复刻一份 dock 绑定不算证据。) */
+   (codepuppy-composer-model.cases.ts 的原则同样适用:用测试自建复刻一份 dock 绑定不算证据。) */
 describe("#582 斜杠 source 生产接线:composer 发送 → 真 dock 捕获 → 登记", () => {
   const SLASH_IDENTITY = { serverKey: STORE_SERVER_KEY, directory: DEFAULT_WORKSPACE, sessionID: "session-9" }
 
-  function mountRealDock(projects: AlphaProjectsApi) {
+  function mountRealDock(projects: CodePuppyProjectsApi) {
     return mountDisposable(() =>
       createComponent(SessionComposerDock, {
         live: {
@@ -1504,7 +1504,7 @@ describe("#582 斜杠 source 生产接线:composer 发送 → 真 dock 捕获 �
    《人工智能生成合成内容标识办法》要求生成结果面带显式标识。这类文案的典型死法不是写错,
    是**下一次改 UI 时被顺手删掉而没人知道** —— 它没有任何行为依赖它,删掉之后所有别的用例照绿。
    所以判据挂在**真 DOM** 上,而不是挂在字典里:挂真 dock(生产 SessionComposerDock,内含生产
-   SessionComposerMount 与 AlphaComposer),看渲染出来的节点在哪、写着什么。
+   SessionComposerMount 与 CodePuppyComposer),看渲染出来的节点在哪、写着什么。
    期望值是**测试里的字面量**(owner 2026-09-09 逐字给定的那句),不是从字典读回来的 ——
    期望值与被测对象同源的话,把字典改成任意别的话它照样绿。
    本节**不**覆盖 AC2(全部生成结果呈现面 + 单一权威清单)与 AC3(复制/导出不丢标识):
@@ -1537,17 +1537,17 @@ describe("#1225 AI 生成内容标识:会话页输入框下方一行小字", () 
   test("标识就在 composer 下方,恰好一处,文案与 owner 给定的逐字相同", async () => {
     const mounted = await mountedDock()
     try {
-      const dockRoot = mounted.host.querySelector("[data-alpha-session-dock]")!
+      const dockRoot = mounted.host.querySelector("[data-codepuppy-session-dock]")!
       expect(dockRoot).toBeTruthy()
 
-      const lines = dockRoot.querySelectorAll("[data-alpha-ai-disclaimer]")
+      const lines = dockRoot.querySelectorAll("[data-codepuppy-ai-disclaimer]")
       expect(lines).toHaveLength(1)
       expect(lines[0]!.textContent?.trim()).toBe("内容由AI生成,仅供参考")
 
       // 「下方」是可观察的 DOM 次序,不是散文:composer 与标识都是 dock 的直接子节点。
       const kids = Array.from(dockRoot.children)
-      const composerIndex = kids.findIndex((el) => el.hasAttribute("data-alpha-composer"))
-      const disclaimerIndex = kids.findIndex((el) => el.hasAttribute("data-alpha-ai-disclaimer"))
+      const composerIndex = kids.findIndex((el) => el.hasAttribute("data-codepuppy-composer"))
+      const disclaimerIndex = kids.findIndex((el) => el.hasAttribute("data-codepuppy-ai-disclaimer"))
       expect(composerIndex).toBeGreaterThanOrEqual(0)
       expect(disclaimerIndex).toBeGreaterThan(composerIndex)
       // 它是 dock 的最后一件东西 —— 有人把别的卡片塞到 composer 与标识之间时也要红。
@@ -1560,7 +1560,7 @@ describe("#1225 AI 生成内容标识:会话页输入框下方一行小字", () 
   test("同一个生产节点在 en 下给出等义英文,而不是回落成中文或裸 key", async () => {
     const mounted = await mountedDock()
     try {
-      const line = mounted.host.querySelector("[data-alpha-ai-disclaimer]")!
+      const line = mounted.host.querySelector("[data-codepuppy-ai-disclaimer]")!
       expect(line.textContent?.trim()).toBe("内容由AI生成,仅供参考")
 
       setLocale("en")
@@ -1576,7 +1576,7 @@ describe("#1225 AI 生成内容标识:会话页输入框下方一行小字", () 
 // ── REQ-159 `#1322` AC2:新对话页 / 首页 chip 的「只读」尾标(顶栏胶囊的第二宿主)────
 // 四态:探针未答 / 可写 / 未知 ⇒ 无标记;只有引擎明确回报 denied ⇒ 标记。沙箱没装 ⇒ 探针一次都不发。
 describe("REQ-159 #1322 workspace read-only tag on the chip (AC2)", () => {
-  const tag = (host: HTMLElement) => host.querySelector<HTMLElement>("[data-alpha-workspace-chip-readonly]")
+  const tag = (host: HTMLElement) => host.querySelector<HTMLElement>("[data-codepuppy-workspace-chip-readonly]")
   const sandboxOn = () => setSandboxStateForTests({ status: "ready", generation: 1, reason: "boot", fence: "applied" })
   /** 可控探针:按目录给答案,并记下问过谁。 */
   const probeStub = (answers: Record<string, "writable" | "denied" | "unknown">) => {
@@ -1659,7 +1659,7 @@ describe("REQ-159 #1322 workspace read-only tag on the chip (AC2)", () => {
   test("home page: the chip is the same host — denied on the chosen directory shows the tag", async () => {
     sandboxOn()
     const asked = probeStub({ [DEFAULT_WORKSPACE]: "writable", "/ws/b": "denied" })
-    const host = mount(() => createComponent(AlphaHome, { projects: projectsApi([project("alpha-code", "/ws/a"), project("beta", "/ws/b")]), serverKey: () => STORE_SERVER_KEY }))
+    const host = mount(() => createComponent(CodePuppyHome, { projects: projectsApi([project("alpha-code", "/ws/a"), project("beta", "/ws/b")]), serverKey: () => STORE_SERVER_KEY }))
     await flush()
     await flush()
     expect(asked).toEqual([DEFAULT_WORKSPACE])

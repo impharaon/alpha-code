@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# alpha-ci 的 `detect` 分类步:把一次变更分成「docs-only」还是「有代码」,并收集改过的
-# Markdown 供 docs gate 用。`code` / `md` 两个输出决定 alpha-ci 里**几乎每一步跑不跑**
+# codepuppy-ci 的 `detect` 分类步:把一次变更分成「docs-only」还是「有代码」,并收集改过的
+# Markdown 供 docs gate 用。`code` / `md` 两个输出决定 codepuppy-ci 里**几乎每一步跑不跑**
 # (upstream-guard / typecheck / test / seed-assets 的全部步骤都挂在 `code == 'true'` 上,
 # docs gate 的入参就是 `md`)。
 #
@@ -27,7 +27,7 @@ set -euo pipefail
 # 所有守卫步全跳过 ⇒ **假绿**。宁可当场炸。
 : "${GITHUB_OUTPUT:?GITHUB_OUTPUT must be set — 没有它这一步会静默把全部闸门关掉}"
 
-# 输入全部走 env(alpha-ci 里从不把 ${{ }} 插进脚本文本),so nothing an attacker controls
+# 输入全部走 env(codepuppy-ci 里从不把 ${{ }} 插进脚本文本),so nothing an attacker controls
 # can be re-parsed as shell. SHAs are hex, but keep the pattern uniform.
 if [ "${EVENT_NAME:-}" = "pull_request" ]; then
   base="${PR_BASE_SHA:-}"

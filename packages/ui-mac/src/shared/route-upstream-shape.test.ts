@@ -7,7 +7,7 @@
 //
 // 只比形状,不比参数名:上游写 `:dir` / `:id`,manifest 写 `:directory` / `:sessionId`,两边都是
 // 自己那侧的命名权;可选段 `:id?` 展开成「有 / 无」两条,因为它同时覆盖两个 manifest 路由。
-// 形态沿用仓内已有的源码锚点范式(renderer/alpha-ui/surface-seam-contract.test.ts)。
+// 形态沿用仓内已有的源码锚点范式(renderer/codepuppy-ui/surface-seam-contract.test.ts)。
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"

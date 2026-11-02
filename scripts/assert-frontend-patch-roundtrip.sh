@@ -4,9 +4,9 @@
 # 逐字重建出来**。
 #
 # 这道门守的是什么(大白话):ADR-034 起 `packages/{app,ui}` 不是 alpha 自己的代码,而是
-# 「上游 pin(frontend/frontend-pin.lock)+ 一份补丁(frontend/alpha-patches/alpha-frontend.patch)」
+# 「上游 pin(frontend/frontend-pin.lock)+ 一份补丁(frontend/codepuppy-patches/codepuppy-frontend.patch)」
 # 的**投影**。两个地方会把这个投影**当真**并据此重写那两个目录:
-#   ① .github/workflows/sync-upstream.yml 的 `apply_alpha_frontend_delta` ——
+#   ① .github/workflows/sync-upstream.yml 的 `apply_codepuppy_frontend_delta` ——
 #      `rm -rf packages/app packages/ui` → `git checkout $PIN --` → `git apply` 补丁;
 #   ② frontend/README.md 的月更 bump 块 1 —— `git checkout $NEWPIN -- packages/app packages/ui`。
 # 也就是说:**改了 packages/{app,ui} 而没把改动重生进补丁,那份改动会被静默删除** ——
@@ -29,7 +29,7 @@
 # 跑在 pre-push(该提交的都提交了)。代价是开发中途跑门时工作树里的 app/ui 改动不计入 ——
 # 所以下面无论红绿都会把 dirty 清单打出来,不让「这一跑量的是什么」变成隐含知识。
 #
-# 三档结局(与 alpha-check 第 [9/10]/[10/10] 步同形):
+# 三档结局(与 codepuppy-check 第 [9/10]/[10/10] 步同形):
 #   0 = 已比对,一致;
 #   1 = 红(真漂移 / 补丁贴不上 / 本次测量作废);
 #   2 = **未比对**(pin 对象本地取不到:浅克隆或没 fetch)。刻意不判红 —— 主 checkout 本身
@@ -50,7 +50,7 @@ fi
 cd "$ROOT" || exit 1
 
 LOCK="frontend/frontend-pin.lock"
-PATCH="frontend/alpha-patches/alpha-frontend.patch"
+PATCH="frontend/codepuppy-patches/codepuppy-frontend.patch"
 PACKAGES="packages/app packages/ui"
 
 echo "▸ round-trip 判据:HEAD 的 packages/{app,ui} == pin + ${PATCH}(锚在 **HEAD**,不含未提交改动)"
@@ -105,7 +105,7 @@ for p in $PACKAGES; do
 done
 
 # ── 重建:全程只写一个临时 index,不碰仓库 index / 工作树 / 当前分支 ──────────────
-TMP_INDEX="$(mktemp -u "${TMPDIR:-/tmp}/alpha-roundtrip-index-XXXXXX")"
+TMP_INDEX="$(mktemp -u "${TMPDIR:-/tmp}/codepuppy-roundtrip-index-XXXXXX")"
 cleanup() { rm -f "$TMP_INDEX"; }
 trap cleanup EXIT
 export GIT_INDEX_FILE="$TMP_INDEX"
@@ -162,7 +162,7 @@ for p in $PACKAGES; do
   fi
 done
 
-dirty="$(git --no-optional-locks status --porcelain -- packages/app packages/ui frontend/alpha-patches frontend/frontend-pin.lock 2>/dev/null || true)"
+dirty="$(git --no-optional-locks status --porcelain -- packages/app packages/ui frontend/codepuppy-patches frontend/frontend-pin.lock 2>/dev/null || true)"
 if [ -n "$dirty" ]; then
   echo "    注:下列文件有**未提交**改动,本判据锚在 HEAD ⇒ 它们不在本次比较里:"
   printf '%s\n' "$dirty" | sed 's/^/      /'

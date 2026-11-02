@@ -978,7 +978,7 @@ describe("other kinds — derivation & records", () => {
       installSpec: {
         kind: "mcp",
         mcpType: "local",
-        command: ["uv", "run", "--no-project", "--with", "python-docx==1.2.0", "{alphaResources}/office-mcp/server.py", "word", "{workspace}"],
+        command: ["uv", "run", "--no-project", "--with", "python-docx==1.2.0", "{codepuppyResources}/office-mcp/server.py", "word", "{workspace}"],
       },
     }
     const office: CatalogEntry = {
@@ -993,12 +993,12 @@ describe("other kinds — derivation & records", () => {
     if (!result.ok) return
     expect(result.installed).toEqual(["mcp:codepuppy-word"])
     const cfg = JSON.parse(fs.readFileSync(path.join(globalRoot, "codepuppy.jsonc"), "utf8"))
-    // 字面量占位原样写盘(REQ-134),{alphaResources} 被解到真实随包 server.py。
+    // 字面量占位原样写盘(REQ-134),{codepuppyResources} 被解到真实随包 server.py。
     expect(cfg.mcp["codepuppy-word"].command.at(-1)).toBe("{workspace}")
     expect(cfg.mcp["codepuppy-word"].command).toContain("word")
   })
 
-  // #1564 审计 r1:安装准入也不再拿卡片命令做校验 —— alpha-web 把四张卡片的命令换成新形态(两个 {alphaResources})
+  // #1564 审计 r1:安装准入也不再拿卡片命令做校验 —— alpha-web 把四张卡片的命令换成新形态(两个 {codepuppyResources})
   // 或干脆删掉之后,四个工具仍装得上,落盘的只有 main 模板;中国区的镜像 env 也不再附上(随包运行时不下载)。
   test("#1564: a first-party Office card with the new-template command, or with no command at all, still installs main's template", async () => {
     const resources = fs.realpathSync(path.resolve(import.meta.dir, "../../resources"))
@@ -1009,7 +1009,7 @@ describe("other kinds — derivation & records", () => {
       installSpec: {
         kind: "mcp",
         mcpType: "local",
-        command: ["{alphaResources}/office-runtime/bin/python3", "-I", "-B", "{alphaResources}/office-mcp/server.py", "word", "{workspace}"],
+        command: ["{codepuppyResources}/office-runtime/bin/python3", "-I", "-B", "{codepuppyResources}/office-mcp/server.py", "word", "{workspace}"],
         requiredEnvVars: [],
       },
     }
@@ -1037,7 +1037,7 @@ describe("other kinds — derivation & records", () => {
         kind: "mcp",
         mcpType: "local",
         // 具体路径替代字面量占位(REQ-134 要求 exact marker)——不是一个真实占位,伪造条目。
-        command: ["uv", "run", "--no-project", "--with", "python-docx==1.2.0", "{alphaResources}/office-mcp/server.py", "word", "/tmp/not-a-marker"],
+        command: ["uv", "run", "--no-project", "--with", "python-docx==1.2.0", "{codepuppyResources}/office-mcp/server.py", "word", "/tmp/not-a-marker"],
       },
     }
     const office: CatalogEntry = {
@@ -1752,12 +1752,22 @@ describe("deriveMcpConfig — boundary cases", () => {
   })
   test("main substitutes bundled Alpha resources and preserves the workspace marker", () => {
     const result = deriveMcpConfig(
-      { kind: "mcp", mcpType: "local", command: ["uv", "{alphaResources}/office-mcp/server.py", "word", "{workspace}"] },
+      { kind: "mcp", mcpType: "local", command: ["uv", "{codepuppyResources}/office-mcp/server.py", "word", "{workspace}"] },
       {},
       "/alpha/resources",
     )
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.config.command).toEqual(["uv", "/alpha/resources/office-mcp/server.py", "word", "{workspace}"])
+  })
+  // alpha-web#283 AC6:只认新占位符 —— 旧品牌槽不展开成随包资源根,原样留在命令里(Office 写策略随后按逐 token 比对拒掉)。
+  test("the previous-brand resource slot is not expanded", () => {
+    const result = deriveMcpConfig(
+      { kind: "mcp", mcpType: "local", command: ["uv", "{alphaResources}/office-mcp/server.py", "word", "{workspace}"] },
+      {},
+      "/alpha/resources",
+    )
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.config.command).toEqual(["uv", "{alphaResources}/office-mcp/server.py", "word", "{workspace}"])
   })
   test("workspace marker substrings are preserved without planner substitution", () => {
     const result = deriveMcpConfig(
@@ -1769,7 +1779,7 @@ describe("deriveMcpConfig — boundary cases", () => {
   })
   test("the Alpha resource placeholder cannot select another bundled path", () => {
     const result = deriveMcpConfig(
-      { kind: "mcp", mcpType: "local", command: ["python", "{alphaResources}/other.py", "{workspace}"] },
+      { kind: "mcp", mcpType: "local", command: ["python", "{codepuppyResources}/other.py", "{workspace}"] },
       {},
       "/alpha/resources",
     )

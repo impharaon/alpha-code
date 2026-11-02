@@ -1038,7 +1038,7 @@ describe("mcp seed install via installCatalog (REQ-102 #359)", () => {
             installSpec: {
               kind: "mcp",
               mcpType: "local",
-              command: ["uv", "run", "--no-project", "--with", "python-docx==1.2.0", "{alphaResources}/office-mcp/server.py", "word", "{workspace}"],
+              command: ["uv", "run", "--no-project", "--with", "python-docx==1.2.0", "{codepuppyResources}/office-mcp/server.py", "word", "{workspace}"],
             },
             remoteAsset: { version: "1.0.0", files: lockFileEntries(codepuppyFiles, { writeBlobs: false }) },
           }),

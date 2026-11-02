@@ -4,7 +4,7 @@
 // 引擎在文档工具连上之前就要把它们的用法告诉模型(连上要几秒;那几秒里模型会以为没有文档工具)。用法只有一个来源:
 // server.py 的 tools_for()。本脚本以模块方式载入 server.py(它的 `__main__` 守卫不让 stdio 循环跑起来;`-B` 不写
 // 字节码,server.py 所在目录一个字节都不动),逐格式取 tools_for(),连同每个格式的随包命令模板
-// (office-advisories.ts 的 codepuppyOfficeInstallCommand,`{alphaResources}` 槽原样保留)与 server.py 的 sha256 写成
+// (office-advisories.ts 的 codepuppyOfficeInstallCommand,`{codepuppyResources}` 槽原样保留)与 server.py 的 sha256 写成
 // `{serverSha256, formats}`,入库。引擎只对命令与模板逐 token 相等、且随包 server.py 摘要仍与清单一致的条目使用它
 // (packages/opencode/src/mcp/codepuppy-first-party-mcp.ts)。
 //

@@ -300,7 +300,7 @@ describe.skipIf(!darwin)("#1504 Office cache under the unchanged process fence",
     const withoutUv = { ...env, PATH: "/usr/bin:/bin" }
     for (const connector of CODEPUPPY_OFFICE_CONNECTORS) {
       const template = codepuppyOfficeInstallCommand(connector.format).map((argument) =>
-        argument.replace("{alphaResources}/office-runtime", runtime).replace("{alphaResources}", resolve(import.meta.dir, "../../resources")),
+        argument.replace("{codepuppyResources}/office-runtime", runtime).replace("{codepuppyResources}", resolve(import.meta.dir, "../../resources")),
       )
       expect(template.slice(0, 3)).toEqual([join(runtime, "bin", "python3"), "-I", "-B"])
       const file = join(workspace, `fenced${connector.extension}`)

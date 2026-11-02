@@ -65,7 +65,7 @@ const excelEntry = {
   installSpec: {
     kind: "mcp",
     mcpType: "local",
-    command: ["uv", "run", "--no-project", "--with", "openpyxl==3.1.5", "{alphaResources}/office-mcp/server.py", "excel", "{workspace}"],
+    command: ["uv", "run", "--no-project", "--with", "openpyxl==3.1.5", "{codepuppyResources}/office-mcp/server.py", "excel", "{workspace}"],
   },
 } as never
 
@@ -83,7 +83,7 @@ const wordEntry = {
   installSpec: {
     kind: "mcp",
     mcpType: "local",
-    command: ["uv", "run", "--no-project", "--with", "python-docx==1.2.0", "{alphaResources}/office-mcp/server.py", "word", "{workspace}"],
+    command: ["uv", "run", "--no-project", "--with", "python-docx==1.2.0", "{codepuppyResources}/office-mcp/server.py", "word", "{workspace}"],
     requiredEnvVars: [],
     runtimeDep: ["uv"],
   },

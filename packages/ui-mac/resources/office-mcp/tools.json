@@ -3,10 +3,10 @@
   "formats": {
     "word": {
       "command": [
-        "{alphaResources}/office-runtime/bin/python3",
+        "{codepuppyResources}/office-runtime/bin/python3",
         "-I",
         "-B",
-        "{alphaResources}/office-mcp/server.py",
+        "{codepuppyResources}/office-mcp/server.py",
         "word",
         "{workspace}"
       ],
@@ -207,10 +207,10 @@
     },
     "excel": {
       "command": [
-        "{alphaResources}/office-runtime/bin/python3",
+        "{codepuppyResources}/office-runtime/bin/python3",
         "-I",
         "-B",
-        "{alphaResources}/office-mcp/server.py",
+        "{codepuppyResources}/office-mcp/server.py",
         "excel",
         "{workspace}"
       ],
@@ -274,10 +274,10 @@
     },
     "powerpoint": {
       "command": [
-        "{alphaResources}/office-runtime/bin/python3",
+        "{codepuppyResources}/office-runtime/bin/python3",
         "-I",
         "-B",
-        "{alphaResources}/office-mcp/server.py",
+        "{codepuppyResources}/office-mcp/server.py",
         "powerpoint",
         "{workspace}"
       ],
@@ -354,10 +354,10 @@
     },
     "pdf": {
       "command": [
-        "{alphaResources}/office-runtime/bin/python3",
+        "{codepuppyResources}/office-runtime/bin/python3",
         "-I",
         "-B",
-        "{alphaResources}/office-mcp/server.py",
+        "{codepuppyResources}/office-mcp/server.py",
         "pdf",
         "{workspace}"
       ],

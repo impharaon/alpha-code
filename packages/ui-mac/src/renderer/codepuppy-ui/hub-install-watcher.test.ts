@@ -66,7 +66,7 @@ const ENTRIES = [
     installSpec: {
       kind: "mcp",
       mcpType: "local",
-      command: ["uv", "run", "--no-project", "--with", "python-docx==1.2.0", "{alphaResources}/office-mcp/server.py", "word", "{workspace}"],
+      command: ["uv", "run", "--no-project", "--with", "python-docx==1.2.0", "{codepuppyResources}/office-mcp/server.py", "word", "{workspace}"],
       requiredEnvVars: [],
       runtimeDep: ["uv"],
     },

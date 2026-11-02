@@ -1,6 +1,8 @@
 #!/usr/bin/env bun
 // build-fence-addon — REQ-159 (`#1321`):把 native/codepuppy-fence/codepuppy_fence.c 编成一个 **fat** 的
 // N-API 模块(arm64 + x86_64 在同一个 .node 里),落到 native/codepuppy-fence/build/codepuppy_fence.node。
+// `#1571`:同一个模块再编进 keychain_rename.c(钥匙串条目只改属性的改名函数,main 进程用),链 Security /
+// CoreFoundation;逐片判随之多一条:每一片都必须真的引用 `_SecItemUpdate`(`nm -u`)。
 //
 // 为什么是 fat 而不是「一架构一份」:U1(`#1316`)只出了 arm64,并明写这是路一将来最容易漏的一格 ——
 // 出 Intel / universal 时若漏了第二份,x64 包里围栏**静默不装**(用户以为有沙箱而实际没有)。
@@ -26,6 +28,8 @@ const packageDir = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 export const FENCE_ADDON_ARCHS = ["arm64", "x86_64"] as const
 export const FENCE_ADDON_BASENAME = "codepuppy_fence.node"
 export const FENCE_ADDON_SOURCE = join(packageDir, "native", "codepuppy-fence", "codepuppy_fence.c")
+/** `#1571` 钥匙串改名函数的源文件,与围栏编进同一个 .node。 */
+export const FENCE_ADDON_KEYCHAIN_SOURCE = join(packageDir, "native", "codepuppy-fence", "keychain_rename.c")
 export const FENCE_ADDON_BUILD_DIR = join(packageDir, "native", "codepuppy-fence", "build")
 export const FENCE_ADDON_OUT = join(FENCE_ADDON_BUILD_DIR, FENCE_ADDON_BASENAME)
 
@@ -62,6 +66,7 @@ export function buildFenceAddon(options: BuildFenceAddonOptions = {}): BuildFenc
   const archs = [...(options.archs ?? FENCE_ADDON_ARCHS)]
   const buildId = options.buildId ?? `fence-${new Date().toISOString().replace(/[-:.]/g, "")}`
   if (!existsSync(source)) throw new Error(`codepuppy_fence source missing: ${source}`)
+  if (!existsSync(FENCE_ADDON_KEYCHAIN_SOURCE)) throw new Error(`keychain_rename source missing: ${FENCE_ADDON_KEYCHAIN_SOURCE}`)
   mkdirSync(dirname(out), { recursive: true })
   rmSync(out, { force: true })
 
@@ -73,12 +78,17 @@ export function buildFenceAddon(options: BuildFenceAddonOptions = {}): BuildFenc
     "-mmacosx-version-min=11.0",
     "-undefined",
     "dynamic_lookup",
+    "-framework",
+    "Security",
+    "-framework",
+    "CoreFoundation",
     "-DNAPI_VERSION=8",
     `-DCODEPUPPY_FENCE_BUILD_ID="${buildId}"`,
     `-I${headersIncludeDir()}`,
     "-o",
     out,
     source,
+    FENCE_ADDON_KEYCHAIN_SOURCE,
   ])
   if (clang.status !== 0 || !existsSync(out)) {
     rmSync(out, { force: true })
@@ -109,10 +119,14 @@ export function assertFenceAddonSlices(file: string, archs: readonly string[] = 
   if (lipo.status !== 0 || missing.length)
     throw new Error(`codepuppy_fence.node is missing arch slice(s) ${missing.join(", ")} (lipo -archs → "${present.join(" ")}") at ${file}`)
   // 判据②:每一片都真的是一个 N-API 模块(导出 napi_register_module_v1)。一片是空壳也会过 lipo。
+  // 判据③(`#1571`):每一片都真的编进了钥匙串改名函数(未定义符号里有 `_SecItemUpdate`)。
   for (const arch of archs) {
     const nm = run("nm", ["-g", "-arch", arch, file])
     if (nm.status !== 0 || !/\b_napi_register_module_v1\b/.test(nm.stdout))
       throw new Error(`codepuppy_fence.node ${arch} slice does not export _napi_register_module_v1 (nm exit ${nm.status}) at ${file}`)
+    const undefinedSymbols = run("nm", ["-u", "-arch", arch, file])
+    if (undefinedSymbols.status !== 0 || !/^_SecItemUpdate$/m.test(undefinedSymbols.stdout))
+      throw new Error(`codepuppy_fence.node ${arch} slice does not reference _SecItemUpdate (nm -u exit ${undefinedSymbols.status}) at ${file}`)
   }
   return present
 }

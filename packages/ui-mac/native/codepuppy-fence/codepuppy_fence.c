@@ -15,6 +15,7 @@
 // 失败方向全部响亮:dlopen / dlsym 失败在 `apply` 里抛 JS 异常(带 dlerror 原文),不返回 rc=0。
 // 头文件来自 node-api-headers(devDependency,钉版),不依赖本机装了哪个 node。
 // 构建:scripts/build-fence-addon.ts(fat binary:arm64 + x86_64 同一个文件,两片缺一即构建失败)。
+// 同一个 .node 还挂着 keychain_rename.c 的钥匙串改名函数(#1571,main 进程用;sidecar 只用 apply)。
 
 #define NAPI_VERSION 8
 #include <node_api.h>
@@ -34,6 +35,9 @@ typedef int (*sandbox_init_fn)(const char *profile, uint64_t flags, char **error
 typedef void (*sandbox_free_error_fn)(char *errorbuf);
 
 static const char *LIBSANDBOX = "/usr/lib/libsandbox.1.dylib";
+
+/* keychain_rename.c */
+napi_value register_keychain_exports(napi_env env, napi_value exports);
 
 static napi_value throw_and_null(napi_env env, const char *message) {
   napi_throw_error(env, NULL, message);
@@ -96,5 +100,5 @@ NAPI_MODULE_INIT() {
   napi_set_named_property(env, exports, "buildId", build_id);
   napi_create_string_utf8(env, LIBSANDBOX, NAPI_AUTO_LENGTH, &lib_name);
   napi_set_named_property(env, exports, "libsandbox", lib_name);
-  return exports;
+  return register_keychain_exports(env, exports);
 }

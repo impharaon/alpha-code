@@ -123,7 +123,7 @@ const skillBuiltinEntry: CatalogEntry = {
   name: "demo",
   ...base,
   version: "1.0.0",
-  installSpec: { kind: "skill", source: "builtin", builtinAssetKey: "skills/demo", targetDir: "alpha-skills" },
+  installSpec: { kind: "skill", source: "builtin", builtinAssetKey: "skills/demo", targetDir: "codepuppy-skills" },
 }
 // REQ-098 #303:清单 digest/bytes 必须与下载 stub 的真实内容一致(promote 前结构校验 + CAS put 再验)。
 const REMOTE_SKILL_MD = "---\nname: remote-demo\ndescription: test\n---\nbody"
@@ -141,7 +141,7 @@ const skillRemoteEntry: CatalogEntry = {
   name: "remote-demo",
   ...base,
   version: "1.2.0",
-  installSpec: { kind: "skill", source: "remote", targetDir: "alpha-skills" },
+  installSpec: { kind: "skill", source: "remote", targetDir: "codepuppy-skills" },
   remoteAsset: { version: "1.2.0", files: remoteFiles },
 }
 // #361:catalog agent 走事务载体(builtin 载荷由 collectBuiltinAgentPayload 收集;remote 与
@@ -1131,8 +1131,8 @@ describe("other kinds — derivation & records", () => {
 
   test("#303 bundle: colliding skip ids no longer refuse the bundle (injective journal keys)", async () => {
     // 朴素 replace(":","--") 下这两个 id 会碰撞成同一 journal key → validatePlan 判 duplicate 拒整单。
-    const ghostA: CatalogEntry = { ...skillBuiltinEntry, id: "skill:a:b--c", name: "ghost-a", installSpec: { kind: "skill", source: "remote", targetDir: "alpha-skills" } }
-    const ghostB: CatalogEntry = { ...skillBuiltinEntry, id: "skill:a--b:c", name: "ghost-b", installSpec: { kind: "skill", source: "remote", targetDir: "alpha-skills" } }
+    const ghostA: CatalogEntry = { ...skillBuiltinEntry, id: "skill:a:b--c", name: "ghost-a", installSpec: { kind: "skill", source: "remote", targetDir: "codepuppy-skills" } }
+    const ghostB: CatalogEntry = { ...skillBuiltinEntry, id: "skill:a--b:c", name: "ghost-b", installSpec: { kind: "skill", source: "remote", targetDir: "codepuppy-skills" } }
     const collideBundle: CatalogEntry = { ...bundleEntry, id: "bundle:collide", name: "collideb", bundleItems: [
       { catalogEntryId: "skill:a:b--c", optional: true, installOrder: 1 },
       { catalogEntryId: "skill:a--b:c", optional: true, installOrder: 2 },
@@ -2680,14 +2680,14 @@ describe("#397 安装面:archived 拒装 + activationPolicy 声明落账", () =>
       ...skillBuiltinEntry,
       id: "skill:sga",
       name: "sga",
-      installSpec: { kind: "skill", source: "builtin", builtinAssetKey: "skills/sga", targetDir: "alpha-skills" },
+      installSpec: { kind: "skill", source: "builtin", builtinAssetKey: "skills/sga", targetDir: "codepuppy-skills" },
       curation: makeCuration("skill:sga", "1.0.0", { tier: "labs", activationPolicy: "session-grant" }),
     }
     const sgb: CatalogEntry = {
       ...skillBuiltinEntry,
       id: "skill:sgb",
       name: "sgb",
-      installSpec: { kind: "skill", source: "builtin", builtinAssetKey: "skills/sgb", targetDir: "alpha-skills" },
+      installSpec: { kind: "skill", source: "builtin", builtinAssetKey: "skills/sgb", targetDir: "codepuppy-skills" },
     }
     const sgBundle: CatalogEntry = {
       ...bundleEntry,

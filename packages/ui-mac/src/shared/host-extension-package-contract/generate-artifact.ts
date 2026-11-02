@@ -13,7 +13,7 @@ export const HOST_EXTENSION_PACKAGE_CORPUS = "testvectors/decoder-corpus.v1.json
 
 export const HOST_EXTENSION_PACKAGE_ARTIFACT_FILES = [
   "CONTRACT.md",
-  "alpha-package-envelope-v1.schema.json",
+  "codepuppy-package-envelope-v1.schema.json",
   "decoder.ts",
   "generate-artifact.ts",
   "host-extension-package.registry.v1.json",
@@ -67,7 +67,7 @@ type ComponentSpec = {
 const skillPayload = (slug: string) => ({
   schema: "codepuppy.host-extension-package.payload.skill.v1",
   behavior: {
-    targetDir: "alpha-skills",
+    targetDir: "codepuppy-skills",
     files: [
       {
         path: "SKILL.md",
@@ -86,7 +86,7 @@ const skillPayload = (slug: string) => ({
 const multiFileSkillPayload = (slug: string) => ({
   schema: "codepuppy.host-extension-package.payload.skill.v1",
   behavior: {
-    targetDir: "alpha-skills",
+    targetDir: "codepuppy-skills",
     files: [
       {
         path: "SKILL.md",
@@ -113,7 +113,7 @@ const multiFileSkillPayload = (slug: string) => ({
 const agentPayload = (slug: string) => ({
   schema: "codepuppy.host-extension-package.payload.agent.v1",
   behavior: {
-    targetDir: "alpha-agents",
+    targetDir: "codepuppy-agents",
     asset: {
       sha256: "2".repeat(64),
       bytes: 12,
@@ -250,10 +250,10 @@ export function decoderCorpusBytesV1(): Uint8Array {
       "mcp-remote",
       ["codepuppy.connection.v1"],
       mcpRemotePayload({
-        kind: "alpha-connection",
+        kind: "codepuppy-connection",
         prerequisiteId: "example-connection",
         required: true,
-        connectionHandlerId: "alpha-example",
+        connectionHandlerId: "codepuppy-example",
         label: "Alpha Example Connection",
       }),
     ),

@@ -69,7 +69,7 @@ function envelopeFor(kind: "skill" | "agent" | "mcp") {
             // package-mixed-bundle.wiring.cases.ts,走真事务、真盘面)。
             schema: "codepuppy.host-extension-package.payload.skill.v1",
             behavior: {
-              targetDir: "alpha-skills",
+              targetDir: "codepuppy-skills",
               files: [
                 {
                   path: "SKILL.md",
@@ -83,7 +83,7 @@ function envelopeFor(kind: "skill" | "agent" | "mcp") {
         : {
             schema: "codepuppy.host-extension-package.payload.agent.v1",
             behavior: {
-              targetDir: "alpha-agents",
+              targetDir: "codepuppy-agents",
               asset: {
                 sha256: sha(assetBytes),
                 bytes: assetBytes.byteLength,

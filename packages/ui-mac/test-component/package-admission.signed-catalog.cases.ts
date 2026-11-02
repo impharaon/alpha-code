@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { afterAll, expect, test } from "bun:test"
 import type {
-  AlphaPackageEnvelopeV1,
+  CodePuppyPackageEnvelopeV1,
   PackageProfilePayloadV1,
 } from "../src/shared/host-extension-package-contract/decoder"
 import { sha256Hex, type ChannelClientDeps } from "../src/main/catalog-channels"
@@ -94,7 +94,7 @@ test("verified signed snapshot and Envelope secret prerequisite reach the restri
       },
     ],
     capabilities: ["codepuppy.secret-prerequisite.v1"],
-  } as unknown as AlphaPackageEnvelopeV1
+  } as unknown as CodePuppyPackageEnvelopeV1
 
   const key = signingKey()
   const catalogBody = JSON.stringify({

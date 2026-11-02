@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import type { AlphaPackageEnvelopeV1, CloudPayloadV1 } from "../shared/host-extension-package-contract/decoder"
+import type { CodePuppyPackageEnvelopeV1, CloudPayloadV1 } from "../shared/host-extension-package-contract/decoder"
 import { canonicalArtifactJsonBytesV1, HOST_EXTENSION_PACKAGE_CORPUS } from "../shared/host-extension-package-contract/generate-artifact"
 import type { PackageAdmissionPreviewV1 } from "../shared/package-admission"
 import { readCapabilityGrant } from "./ext-capability-grants"
@@ -25,7 +25,7 @@ import { evaluatePackageForHost } from "./package-installability"
 
 type CorpusCase = {
   name: string
-  envelope: AlphaPackageEnvelopeV1
+  envelope: CodePuppyPackageEnvelopeV1
   components: Array<{ id: string; payload: Record<string, unknown> | null }>
 }
 const corpus = (await Bun.file(

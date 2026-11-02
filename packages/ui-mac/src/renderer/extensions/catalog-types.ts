@@ -43,7 +43,7 @@ export interface SkillInstallSpec {
   source: "builtin" | "remote"
   builtinAssetKey?: string
   remoteIndexUrl?: string
-  targetDir: "alpha-skills" | "global"
+  targetDir: "codepuppy-skills" | "global"
   /** Unverified claim carried from the catalog — surfaced as 「待核实」 on the detail page (D5). */
   _verify?: string
 }

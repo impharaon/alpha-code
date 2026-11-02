@@ -5,7 +5,7 @@ import { CATALOG_PACKAGE_REASON_CODES, type CatalogPackageReasonCodeV1 } from ".
 import {
   decodePackageEnvelopeHeaderV1,
   decodePackageProfilePayloadV1,
-  type AlphaPackageEnvelopeV1,
+  type CodePuppyPackageEnvelopeV1,
   type PackageProfilePayloadV1,
 } from "../shared/host-extension-package-contract/decoder"
 import { decodePackageSecretPrerequisiteProfileV1 } from "../shared/package-secret-prerequisite"
@@ -32,7 +32,7 @@ const canonicalBytes = (value: unknown) => new TextEncoder().encode(`${JSON.stri
  */
 const vendoredProducerPackage = async (file: string) => {
   const compiled = (await Bun.file(resolve(artifact, file)).json()) as {
-    envelope: AlphaPackageEnvelopeV1
+    envelope: CodePuppyPackageEnvelopeV1
     payloads: Record<string, unknown>
     normalizedRecord: { root: { compatibility: { verdict: string } } }
   }
@@ -90,11 +90,11 @@ const corpus = async () => {
       },
     ],
     capabilities: ["codepuppy.secret-prerequisite.v1"],
-  } as unknown as AlphaPackageEnvelopeV1
+  } as unknown as CodePuppyPackageEnvelopeV1
   return { envelope, payload }
 }
 
-const bindPayload = (envelope: AlphaPackageEnvelopeV1, payload: PackageProfilePayloadV1) => {
+const bindPayload = (envelope: CodePuppyPackageEnvelopeV1, payload: PackageProfilePayloadV1) => {
   const bytes = canonicalBytes(payload)
   envelope.components[0]!.payloadRef.bytes = bytes.byteLength
   envelope.components[0]!.payloadRef.sha256 = createHash("sha256").update(bytes).digest("hex")
@@ -112,7 +112,7 @@ const packageWithComponentName = (
       ? {
           schema: "codepuppy.host-extension-package.payload.skill.v1",
           behavior: {
-            targetDir: "alpha-skills",
+            targetDir: "codepuppy-skills",
             files: [
               {
                 path: "SKILL.md",
@@ -127,7 +127,7 @@ const packageWithComponentName = (
         ? {
             schema: "codepuppy.host-extension-package.payload.agent.v1",
             behavior: {
-              targetDir: "alpha-agents",
+              targetDir: "codepuppy-agents",
               asset: {
                 sha256: "a".repeat(64),
                 bytes: 1,
@@ -513,21 +513,21 @@ describe("package installability authority", () => {
   test.each([
     [
       "unknown profile",
-      (envelope: AlphaPackageEnvelopeV1) => {
+      (envelope: CodePuppyPackageEnvelopeV1) => {
         ;(envelope.components[0] as { profileId: string }).profileId = "future-profile"
       },
       "package-host-update-required",
     ],
     [
       "missing profile",
-      (envelope: AlphaPackageEnvelopeV1) => {
+      (envelope: CodePuppyPackageEnvelopeV1) => {
         delete (envelope.components[0] as { profileId?: string }).profileId
       },
       "package-invalid",
     ],
     [
       "unknown capability",
-      (envelope: AlphaPackageEnvelopeV1) => {
+      (envelope: CodePuppyPackageEnvelopeV1) => {
         const capabilities = ["codepuppy.secret-prerequisite.v1", "future.required.v1"]
         ;(envelope as { capabilities: string[] }).capabilities = capabilities
         ;(envelope.components[0] as { capabilities: string[] }).capabilities = capabilities
@@ -536,14 +536,14 @@ describe("package installability authority", () => {
     ],
     [
       "unknown profileVersion",
-      (envelope: AlphaPackageEnvelopeV1) => {
+      (envelope: CodePuppyPackageEnvelopeV1) => {
         ;(envelope.components[0] as { profileVersion: number }).profileVersion = 2
       },
       "package-host-update-required",
     ],
     [
       "profile mediaType mismatch",
-      (envelope: AlphaPackageEnvelopeV1) => {
+      (envelope: CodePuppyPackageEnvelopeV1) => {
         envelope.components[0].payloadRef.mediaType =
           "application/vnd.codepuppy.host-extension-package.skill.v1+json"
       },
@@ -925,7 +925,7 @@ describe("package installability authority", () => {
     const rootPayload = {
       schema: "codepuppy.host-extension-package.payload.skill.v1",
       behavior: {
-        targetDir: "alpha-skills",
+        targetDir: "codepuppy-skills",
         files: [
           { path: "SKILL.md", sha256: "a".repeat(64), bytes: 1, url: "https://example.invalid/root/SKILL.md" },
         ],
@@ -934,7 +934,7 @@ describe("package installability authority", () => {
     const leafPayload = {
       schema: "codepuppy.host-extension-package.payload.agent.v1",
       behavior: {
-        targetDir: "alpha-agents",
+        targetDir: "codepuppy-agents",
         asset: {
           sha256: "b".repeat(64),
           bytes: 1,
@@ -990,7 +990,7 @@ describe("package installability authority", () => {
           ),
         ],
         capabilities: [...leafCapabilities].sort(),
-      } as unknown as AlphaPackageEnvelopeV1,
+      } as unknown as CodePuppyPackageEnvelopeV1,
     }
   }
 

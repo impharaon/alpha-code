@@ -255,7 +255,7 @@ export function buildAgentTxItems(input: AgentTxBuildInputV1): PackageTxBuildRes
  *
  * **R4-1(owner 2026-08-05)**:command 没有禁用面(引擎叶无 disable 键、
  * `setInstallStateByKey` 拒绝翻转)。`desiredState === "disabled"` 的 receipt(唯一可达
- * 来源 = alpha-connection 前置不可用时 admission 的全组件压制)在这里**具名拒绝** ——
+ * 来源 = codepuppy-connection 前置不可用时 admission 的全组件压制)在这里**具名拒绝** ——
  * 装成 disabled 是永远无法启用的死态,且叶一旦落盘命令就活着,账本却说关。整包因此
  * fail-closed,而不是装出半真半假。
  */

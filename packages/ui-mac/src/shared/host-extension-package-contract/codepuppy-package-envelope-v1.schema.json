@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "alpha-package-envelope-v1.schema.json",
-  "title": "AlphaPackageEnvelopeV1",
+  "$id": "codepuppy-package-envelope-v1.schema.json",
+  "title": "CodePuppyPackageEnvelopeV1",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -177,7 +177,7 @@
       "minLength": 1,
       "maxLength": 1024,
       "pattern": "^https://",
-      "format": "alpha-canonical-https-url"
+      "format": "codepuppy-canonical-https-url"
     },
     "listingUrlList": {
       "type": "array",

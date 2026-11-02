@@ -41,7 +41,7 @@ Choose exactly one and provide paths or a reason:
       → 改的是**已经收编**的文件(白名单里已有的那几条):它在下一次 fork-sync 必然冲突、由我们手解。
       改动要落在对应 ADR 记下的接管面之内;越界 = 扩大收编 = 仍然要走新 ADR。
 
-- [ ] **`alpha-package-envelope` 契约** —— `packages/ui-mac/src/shared/host-extension-package-contract/`
+- [ ] **`codepuppy-package-envelope` 契约** —— `packages/ui-mac/src/shared/host-extension-package-contract/`
       的 schema / registry / decoder / 语料([宿主合同](../docs/contracts/host-extension-package-v1.md))。
       → 重生 artifact 清单并自检:
       `bun packages/ui-mac/src/shared/host-extension-package-contract/generate-artifact.ts` 然后 `--check`。

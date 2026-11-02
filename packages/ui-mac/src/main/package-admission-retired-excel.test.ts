@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import type { AlphaPackageEnvelopeV1 } from "../shared/host-extension-package-contract/decoder"
+import type { CodePuppyPackageEnvelopeV1 } from "../shared/host-extension-package-contract/decoder"
 import { createPackageAdmissionCoordinator } from "./package-admission"
 
 const snapshotDigest = "7".repeat(64)
@@ -68,7 +68,7 @@ function mcpPackage(input: McpPackageInput) {
       },
     ],
     capabilities: [],
-  } as unknown as AlphaPackageEnvelopeV1
+  } as unknown as CodePuppyPackageEnvelopeV1
   return { bytes, envelope }
 }
 

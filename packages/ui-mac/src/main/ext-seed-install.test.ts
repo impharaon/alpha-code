@@ -147,7 +147,7 @@ function bundledSkillEntry(overrides: Partial<CatalogEntry> = {}): CatalogEntry 
     name: "hello",
     ...entryBase,
     version: "1.0.0",
-    installSpec: { kind: "skill", source: "remote", targetDir: "alpha-skills" },
+    installSpec: { kind: "skill", source: "remote", targetDir: "codepuppy-skills" },
     remoteAsset: { version: "1.0.0", files: lockFileEntries(skillFiles, { writeBlobs: false }) },
     ...overrides,
   } as CatalogEntry

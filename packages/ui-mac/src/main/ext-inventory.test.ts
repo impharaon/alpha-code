@@ -60,7 +60,7 @@ describe("aggregateInventory(纯函数核心)", () => {
   const CATALOG: InventorySources["catalog"] = {
     entries: [
       entry({ id: "mcp:word", type: "mcp", name: "office-word-mcp-server", source: "community", installSpec: { kind: "mcp", mcpType: "local" } }),
-      entry({ id: "skill:writer", type: "skill", name: "writer", source: "alpha", installSpec: { kind: "skill", source: "builtin", targetDir: "alpha-skills" } }),
+      entry({ id: "skill:writer", type: "skill", name: "writer", source: "alpha", installSpec: { kind: "skill", source: "builtin", targetDir: "codepuppy-skills" } }),
     ],
     channel: "remote",
     version: "9.9.9",

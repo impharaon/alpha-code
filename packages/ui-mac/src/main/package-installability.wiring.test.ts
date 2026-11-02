@@ -12,7 +12,7 @@ import { resolve } from "node:path"
 import { describe, expect, test } from "bun:test"
 import bundledCatalog from "../renderer/extensions/codepuppy-catalog.json"
 import { CATALOG_PACKAGE_REASON_CODES, type CatalogPackageViewV1 } from "../shared/catalog-package-view"
-import type { AlphaPackageEnvelopeV1, PackageProfilePayloadV1 } from "../shared/host-extension-package-contract/decoder"
+import type { CodePuppyPackageEnvelopeV1, PackageProfilePayloadV1 } from "../shared/host-extension-package-contract/decoder"
 import {
   evaluatePackageForHost,
   runCatalogInstallWithPackagePreflight,
@@ -39,7 +39,7 @@ const artifact = resolve(import.meta.dir, "../../../codepuppy-contracts-consumer
  */
 const vendoredProducerPackage = async (file: string) => {
   const compiled = (await Bun.file(resolve(artifact, file)).json()) as {
-    envelope: AlphaPackageEnvelopeV1
+    envelope: CodePuppyPackageEnvelopeV1
     payloads: Record<string, unknown>
     normalizedRecord: { root: { compatibility: { verdict: string } } }
   }
@@ -97,12 +97,12 @@ const producerPackage = async () => {
       },
     ],
     capabilities: ["codepuppy.secret-prerequisite.v1"],
-  } as unknown as AlphaPackageEnvelopeV1
+  } as unknown as CodePuppyPackageEnvelopeV1
   return { envelope, bytes }
 }
 
 // 变参:detail 那条闸必须能分辨「按 id 查找」与「恒取第一个」——单条夹具下两者不可分辨。
-const rawResult = (...envelopes: AlphaPackageEnvelopeV1[]): RemoteCatalogResult => ({
+const rawResult = (...envelopes: CodePuppyPackageEnvelopeV1[]): RemoteCatalogResult => ({
   source: "remote",
   catalog: { version: "2026-07-30", entries: [{}], packages: envelopes },
   version: "2026-07-30",
@@ -133,7 +133,7 @@ describe("package installability production wiring", () => {
     const calls: string[] = []
     const evaluator: PackageEvaluator = async (input, deps) => {
       calls.push("evaluatePackageForHost")
-      const id = (input as AlphaPackageEnvelopeV1).prelude?.packageId
+      const id = (input as CodePuppyPackageEnvelopeV1).prelude?.packageId
       return evaluatePackageForHost(input, {
         ...deps,
         fetchPayload: async () => payloadFor.get(id) ?? bytes,

@@ -79,7 +79,7 @@ const ENTRIES = [
     description: "writes",
     source: "official",
     category: "writing",
-    installSpec: { kind: "skill", source: "builtin", builtinAssetKey: "writer", targetDir: "alpha-skills" },
+    installSpec: { kind: "skill", source: "builtin", builtinAssetKey: "writer", targetDir: "codepuppy-skills" },
   },
 ]
 

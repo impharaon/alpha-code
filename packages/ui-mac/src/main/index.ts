@@ -570,7 +570,7 @@ const main = Effect.gen(function* () {
   }
 
   // #1571:钥匙串条目随应用名改名(prod / beta;dev 与非钥匙串后端为 null)。原生模块只在真要查询或改名时才加载,
-  // 加载失败即预检失败。目标条目已存在 ⇒ 预检就停(不覆盖、不合并),此时还没有任何数据被改动。
+  // 加载失败即预检失败。源与目标条目都在 ⇒ 预检就停(不覆盖、不合并),此时还没有任何数据被改动;只有目标 ⇒ 不需要改名。
   const environment = resolveAppEnvironment({ isPackaged: app.isPackaged, channel: CHANNEL })
   const keychainPlan = planKeychainRename({ environment, backend: safeStorageBackend(), targetAppName: electronAppName })
   const keychainPort = nativeKeychainPort(() =>

@@ -8,7 +8,7 @@
 // 补丁;目标若不带它,Electron 会读出秘密复制成新条目再删旧条目)。bundle id 与 CFBundleName 不参与条目选择。
 // 第 0b 步实测:改名本身不弹框;目标已存在返回 -25299 且两条都不变。
 //
-// 迁移是 #1569 迁移日志里的最后一步:预检(目标已存在 ⇒ 任何数据改动之前就停)→ 会话库步之后登记改名 →
+// 迁移是 #1569 迁移日志里的最后一步:预检(源与目标都在 ⇒ 任何数据改动之前就停)→ 会话库步之后登记改名 →
 // ready 后对登录文件与 BYOK 密钥库各解密一次 → 全部解得开才写完成标记;任一步失败或解不开 ⇒ 日志逆序撤销,
 // 撤销动作就是同一个调用把名字改回去。
 // dev 渠道不迁移:今天 dev 与 prod 共用同一条条目,dev 迁移会把 prod 的条目改成 dev 的名字。
@@ -61,7 +61,7 @@ export class KeychainRenameError extends Error {
 
 export class KeychainTargetExistsError extends KeychainRenameError {
   constructor(readonly target: KeychainItem) {
-    super(`钥匙串里已有一条「${target.service}」记录,为避免覆盖,没有改名。`)
+    super(`钥匙串里已有一条「${target.service}」记录,为避免覆盖,没有改名。请按升级说明处理后重开。`)
     this.name = "KeychainTargetExistsError"
   }
 }
@@ -102,9 +102,13 @@ export function nativeKeychainPort(loadAddon: () => KeychainAddon): KeychainPort
   }
 }
 
-/** 迁移预检:目标条目已存在 ⇒ 抛(不覆盖、不合并),此时还没有任何数据被改动,源条目保持原样。 */
+/**
+ * 迁移预检:源与目标**都在** ⇒ 抛(不覆盖、不合并),此时还没有任何数据被改动,两条都保持原样。
+ * 只有目标、没有源(例如迁移完成后清除过数据,迁移目录没了而新名条目还在)⇒ 不需要改名,不拦 ——
+ * 改名步会因源不存在而不登记、不自检,迁移正常完成。
+ */
 export function assertKeychainTargetFree(port: KeychainPort, plan: KeychainRenamePlan): void {
-  if (port.exists(plan.to)) throw new KeychainTargetExistsError(plan.to)
+  if (port.exists(plan.to) && port.exists(plan.from)) throw new KeychainTargetExistsError(plan.to)
 }
 
 /**

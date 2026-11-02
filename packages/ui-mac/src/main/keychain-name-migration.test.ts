@@ -99,17 +99,19 @@ describe("条目名与迁移计划 (AC4 目标属性 / AC5 渠道)", () => {
   })
 })
 
-describe("预检:目标已存在 ⇒ 停止、源不变 (AC5)", () => {
-  test("目标已存在 ⇒ assertKeychainTargetFree 抛 KeychainTargetExistsError,没有任何改名,两条都原样", () => {
+describe("预检:源与目标都在 ⇒ 停止、两条都不变 (AC5)", () => {
+  test("源与目标都在 ⇒ assertKeychainTargetFree 抛 KeychainTargetExistsError(带「请按升级说明处理后重开」),没有任何改名,两条都原样", () => {
     const keychain = fakePort([PROD_SOURCE, PROD_TARGET])
     expect(() => assertKeychainTargetFree(keychain.port, PROD_PLAN)).toThrow(KeychainTargetExistsError)
+    expect(() => assertKeychainTargetFree(keychain.port, PROD_PLAN)).toThrow("请按升级说明处理后重开")
     expect(keychain.renames()).toEqual([])
     expect(keychain.has(PROD_SOURCE)).toBe(true)
     expect(keychain.has(PROD_TARGET)).toBe(true)
   })
 
-  test("目标不存在 ⇒ 预检通过", () => {
+  test("目标不存在 ⇒ 预检通过;只有目标、没有源 ⇒ 也通过(不需要改名)", () => {
     expect(() => assertKeychainTargetFree(fakePort([PROD_SOURCE]).port, PROD_PLAN)).not.toThrow()
+    expect(() => assertKeychainTargetFree(fakePort([PROD_TARGET]).port, PROD_PLAN)).not.toThrow()
   })
 })
 
@@ -307,7 +309,7 @@ describe.skipIf(!canBoot)("与 #1569 真日志联测 (AC5 / AC6)", () => {
       steps: { kind: string; payload: unknown; state: string }[]
     }
 
-  test("目标已存在 ⇒ 预检失败、迁移目录都没建、源条目不动", () => {
+  test("源与目标都在 ⇒ 预检失败、迁移目录都没建、两条都不动", () => {
     const dirs = bootDirs()
     const keychain = fakePort([PROD_SOURCE, PROD_TARGET])
     const result = boot(dirs, keychain.port)
@@ -354,6 +356,18 @@ describe.skipIf(!canBoot)("与 #1569 真日志联测 (AC5 / AC6)", () => {
     expect(journalOf(dirs).status).toBe("complete")
     expect(keychain.has(PROD_TARGET)).toBe(true)
     expect(boot(dirs, keychain.port)).toEqual({ kind: "skip", reason: "complete" })
+  })
+
+  test("只有目标、没有源(例如清除数据后迁移目录没了)⇒ 正常启动:不登记改名、不自检、完成标记写入", () => {
+    const dirs = bootDirs()
+    const keychain = fakePort([PROD_TARGET])
+    const result = boot(dirs, keychain.port)
+    if (result.kind !== "ready") throw new Error(`boot: ${JSON.stringify(result)}`)
+    expect(runKeychainRenameStep(result.journal, keychain.port, PROD_PLAN)).toBe(false)
+    expect(settleNamingMigration(result.journal, false, () => ["failed"])).toEqual({ ok: true })
+    expect(journalOf(dirs)).toMatchObject({ status: "complete", steps: [] })
+    expect(keychain.renames()).toEqual([])
+    expect(keychain.has(PROD_TARGET)).toBe(true)
   })
 
   test("源条目不存在 ⇒ 不登记、不自检、照样完成", () => {

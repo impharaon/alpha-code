@@ -129,9 +129,10 @@ const UPSTREAMS = [
     // alpha-web#283(REQ-236):两份消费夹具与账户 schema 的契约 ID 改为 `codepuppy.*`;源为 alpha-web 分支
     // feat/283-codepuppy-identity 的 6154104(维护窗口内以 merge commit 合入,SHA 保持可达)。顺带吞下
     // b597f0d 之后从未 re-vendor 的端点发现品牌域名切换(web/account → codepuppy.cn)。
-    // 随后与扩展包一起前移到同一分支的 40520ef(这三份文件在 6154104..40520ef 之间字节不变)。
+    // 随后与扩展包一起前移到同一分支的 40520ef(这三份文件在 6154104..40520ef 之间字节不变),
+    // 再前移到 a7f79c6(40520ef..a7f79c6 之间同样字节不变)。
     repo: "jinjunnn/alpha-web",
-    commit: "40520efbcd4871695f7749a792f839eb7882c0b9",
+    commit: "a7f79c667c71b03a4ae54350dd061a116a2c4080",
     lock: "alpha-web-contract.lock.json",
     vendor: "vendor/alpha-web",
     sourceEnv: "CODEPUPPY_WEB_CONTRACT_SOURCE",
@@ -151,7 +152,7 @@ const UPSTREAMS = [
     // older optional staged fixtures above, an unavailable checkout or missing commit is a hard
     // failure:provenance cannot be proved by a self-consistent replacement lock.
     repo: "jinjunnn/alpha-web",
-    commit: "40520efbcd4871695f7749a792f839eb7882c0b9",
+    commit: "a7f79c667c71b03a4ae54350dd061a116a2c4080",
     lock: "alpha-web-extension-package.lock.json",
     vendor: "vendor/alpha-web-extension-package",
     sourceEnv: "CODEPUPPY_WEB_EXTENSION_PACKAGE_SOURCE",
@@ -159,7 +160,7 @@ const UPSTREAMS = [
     sourceFallback: "../../../alpha-web",
     sourcePrefix: "contracts/extension-package/artifact",
     artifactPath: "contracts/extension-package/artifact",
-    artifactSha256: "862d5c7b766884fe0f0c6d744ff40ad015d482acd99f7bbcc05294897e65184b",
+    artifactSha256: "bd082405e97b433f4148869bbf70b772e2d426767db723b53d738e2afadfdb87",
     commitBound: true,
     // #759 / alpha-web#109:producer 追平宿主合同 v2。语料从 22 个文件长到 36 个 —— 新增的是
     // flat Bundle 正/负向、OAuth 与 Alpha Connection 的正向语料(旧的 `input.remote-oauth.invalid.json`
@@ -210,13 +211,17 @@ const UPSTREAMS = [
     // 发布端已重钉:同一分支的 40520ef 把 host pin 钉到本仓 59d64b185(宿主 aggregate 6aabd15c…)并按
     // `codepuppy.host-extension-package.*` 重生语料,producer aggregate 862d5c7b…,语料 42 → 42
     // (18 份改写,不增不撤)。
+    // alpha-web#283 AC6:同一分支的 a7f79c6 把 host pin 钉到本仓 e77cb02f3(宿主 aggregate 0af4d2fb…),
+    // 语料里其余第一方旧名改为 codepuppy(两份 schema 文件改名为 codepuppy-package-*、载荷命名空间
+    // codepuppy-package/、声明种类 codepuppy-native、发现码 codepuppy.profile.*),producer aggregate
+    // bd082405…,语料 42 → 42(两份改名,其余按需改写)。
     files: [
-      "alpha-package-compatibility-report-v1.schema.json",
-      "alpha-package-declaration-v1.schema.json",
       "asset.generic-bundle-agent.md",
       "asset.generic-bundle-command.md",
       "asset.generic-bundle-skill.md",
       "claude-code.rules.v1.json",
+      "codepuppy-package-compatibility-report-v1.schema.json",
+      "codepuppy-package-declaration-v1.schema.json",
       "expected.bundle.compiled.json",
       "expected.cloud.compiled.json",
       "expected.mcp-remote.compiled.json",

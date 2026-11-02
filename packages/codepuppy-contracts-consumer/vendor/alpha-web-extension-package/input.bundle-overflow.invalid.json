@@ -8,7 +8,7 @@
     "component": {
       "behavior": {
         "assetPath": "AGENT.md",
-        "targetDir": "alpha-agents"
+        "targetDir": "codepuppy-agents"
       },
       "id": "agent:generic-bundle-agent",
       "kind": "agent",
@@ -531,7 +531,7 @@
   },
   "schema": "codepuppy.package-declaration.v1",
   "source": {
-    "kind": "alpha-native",
+    "kind": "codepuppy-native",
     "publisher": "official",
     "redistributable": true
   },

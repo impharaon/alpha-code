@@ -26,7 +26,11 @@
 //   · 历史存档不在「现行文档」里:`docs/verification`、`docs/audits`、`docs/evidence`、
 //     `docs/archive`、`docs/retrospectives`、`docs/design/` 下带日期的历史稿、ADR、CHANGELOG。
 //
-// 登记表:scripts/old-name-exceptions.tsv(`文件 ⇥ 行号 ⇥ 类别 ⇥ 理由`)。行号随上方增删行漂移时,
+// ── 文件名这一层(#1570 审计 F1)────────────────────────────────────────────────────
+// 第一方路径的 basename 也用同一个判据判一次,命中记为第 0 行。这一层**不排除**测试文件与字节副本:
+// 它们的内容可以合法地写旧名或由别人生产,名字却是我们放进仓里的。
+//
+// 登记表:scripts/old-name-exceptions.tsv(`文件 ⇥ 行号 ⇥ 类别 ⇥ 理由`;文件名命中写行号 0)。行号随上方增删行漂移时,
 // 先确认那一处今天仍然该留着,再改行号 —— 不要只把数字改对。
 
 import { readFileSync } from "node:fs"
@@ -161,6 +165,16 @@ const RENAME_TOOLING = new Set(["scripts/codepuppy-rename-map.tsv", "scripts/cod
 function inScope(path: string): boolean {
   if (IS_TEST_CODE.test(path) || RENAME_TOOLING.has(path)) return false
   if (BYTE_COPIES.some((re) => re.test(path))) return false
+  return isFirstParty(path)
+}
+
+/**
+ * 第一方路径(不看是不是测试文件、是不是字节副本)。内容扫描在它上面再排除测试代码与字节副本;
+ * 文件名扫描不排除 —— 一个叫 `alpha-x.test.ts` 的文件内容可以合法地写旧名,名字本身却仍是旧名,
+ * 删旧前缀之后守卫会把它当成上游文件(#1570 审计 F1:两个 opencode 测试文件就这样漏过了改名)。
+ */
+function isFirstParty(path: string): boolean {
+  if (RENAME_TOOLING.has(path)) return false
   if (path.startsWith("scripts/") || path.startsWith(".github/")) return true
   if (CURRENT_DOCS.some((re) => re.test(path))) return true
   const pkg = /^packages\/([^/]+)\//.exec(path)?.[1]
@@ -174,14 +188,24 @@ function inScope(path: string): boolean {
 }
 
 const SCANNED = ALL_LISTED.filter(inScope)
+const NAME_SCANNED = ALL_LISTED.filter(isFirstParty)
 
 type Hit = { path: string; line: number; text: string }
 
 function scan(): Hit[] {
-  return SCANNED.flatMap((path) => {
+  const contentHits = SCANNED.flatMap((path) => {
     const text = readText(path)
     if (text === undefined) return []
     return text.split("\n").flatMap((line, i) => (OLD_NAME.test(line) ? [{ path, line: i + 1, text: line }] : []))
+  })
+  return [...contentHits, ...nameHits(NAME_SCANNED)]
+}
+
+/** 文件名这一层:basename 用同一个判据判一次,命中记为第 0 行(登记表里写 `路径 ⇥ 0`)。 */
+function nameHits(paths: string[]): Hit[] {
+  return paths.flatMap((path) => {
+    const base = path.slice(path.lastIndexOf("/") + 1)
+    return OLD_NAME.test(base) ? [{ path, line: 0, text: base }] : []
   })
 }
 
@@ -239,6 +263,17 @@ describe("旧名扫描门 (#1570)", () => {
     // 两个独立来源各取一个锚:迁移源常量(代码),仓库名(CI 配置)
     expect(HITS.some((h) => h.path === "packages/ui-mac/src/main/engine-config-truth.ts" && h.text.includes('"alpha-keychain"'))).toBe(true)
     expect(HITS.some((h) => h.path.startsWith(".github/workflows/") && h.text.includes("alpha-code"))).toBe(true)
+  })
+
+  test("文件名层:内容干净的 alpha-x.ts 照样被点名,且不在登记表里 ⇒ 方向 A 会红", () => {
+    const clean = "packages/ext/src/alpha-x.ts"
+    expect(isFirstParty(clean)).toBe(true)
+    expect(nameHits([clean])).toEqual([{ path: clean, line: 0, text: "alpha-x.ts" }])
+    expect(ROW_KEYS.has(`${clean}:0`)).toBe(false)
+    // 控制组:新名字不命中;扫描面真的包含测试文件的名字(F1 漏网的正是两个测试文件)
+    expect(nameHits(["packages/ext/src/codepuppy-x.ts"])).toEqual([])
+    expect(NAME_SCANNED.some((path) => IS_TEST_CODE.test(path))).toBe(true)
+    expect(HITS.some((h) => h.line === 0)).toBe(true)
   })
 
   test("登记表合形:类别取自固定枚举、理由非空、pending 写明接手票、无重复行", () => {

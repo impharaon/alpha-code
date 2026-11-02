@@ -8,7 +8,7 @@
 //   · 权限「能力授权总账」段:#392 已落 —— inventoryView 行带 granted(授权账只读快照),详情页
 //     直接消费(extension-detail.tsx),无需本模块翻译(能力词汇归 ext-authz.tsx,与确认框同源)。
 //   · 来源与签名:仅有 ownership.distributed + view.catalogChannel + view.catalogVersion;
-//     发布钥(如「alpha-web-1」)不在读面 —— 如实省略(降精,不造)。
+//     发布钥(网站签名钥环当前的 kid)不在读面 —— 如实省略(降精,不造)。
 //   · 隔离态(签名撤销强制停用):ext-states.ts 的 HealthIssue 联合无 revoked/quarantine kind
 //     —— isSwitchLocked 只在既有 kind 上判定,当前恒不锁(OPEN:数据面需补 kind)。
 

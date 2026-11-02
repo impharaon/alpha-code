@@ -1509,3 +1509,4 @@ writeAlphaProviders	writeCodePuppyProviders
 # 下面的行在改名提交之后才加入,是按裁决**手工**落到已改名的树上的,不经脚本执行:脚本面对改名前的基线
 # 设计,对已改名的树不幂等(签名目录快照的保护按旧路径登记)。行留在这里,是为了让表仍是「旧名 → 新名」的全集。
 vnd.alpha.remote-asset	vnd.codepuppy.remote-asset
+alpha_vision	codepuppy_vision

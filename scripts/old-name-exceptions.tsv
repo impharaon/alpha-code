@@ -296,9 +296,8 @@ docs/architecture/2026-09-24-cloud-vision-client-seam.md	13	external-anchor	GitH
 docs/architecture/2026-09-24-cloud-vision-client-seam.md	14	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-09-24-cloud-vision-client-seam.md	27	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-09-24-cloud-vision-client-seam.md	33	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-24-cloud-vision-client-seam.md	51	pending	#1570 待裁:VISION_MARKER 写进会话 part metadata 并从历史里读回(持久化取值),改值 = 旧会话的识图标记认不出
 docs/architecture/2026-09-24-cloud-vision-client-seam.md	52	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-24-cloud-vision-client-seam.md	53	pending	#1570 待裁:VISION_MARKER 写进会话 part metadata 并从历史里读回(持久化取值),改值 = 旧会话的识图标记认不出
+docs/architecture/2026-09-24-cloud-vision-client-seam.md	53	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 docs/architecture/2026-09-24-cloud-vision-client-seam.md	54	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 docs/architecture/2026-09-24-exa-mcp-failure-signal-recon.md	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-09-24-exa-mcp-failure-signal-recon.md	106	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -735,7 +734,6 @@ packages/ext/README.md	29	external-anchor	GitHub 仓库名 alpha-code / alpha-we
 packages/ext/package.json	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ext/src/cloud-access.ts	2	upstream	导出路径由未接管的上游文件 packages/plugin/package.json 声明,改名要先接管那个文件(另需 ADR)
 packages/ext/src/cloud-contract-hook.ts	11	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ext/src/cloud-vision-hooks.ts	79	pending	#1570 待裁:VISION_MARKER 写进会话 part metadata 并从历史里读回(持久化取值),改值 = 旧会话的识图标记认不出
 packages/ext/src/cloud-vision.ts	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ext/src/cloud-vision.ts	12	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ext/src/cloud-vision.ts	18	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改

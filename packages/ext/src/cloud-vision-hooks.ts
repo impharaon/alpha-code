@@ -76,7 +76,7 @@ export function imageCapabilityOf(list: unknown, model: ModelRef): boolean | und
 }
 
 /** 转写块 part 与 Read 结果 metadata 上的标记键;messages.transform 据它重建登记簿、剔图。 */
-export const VISION_MARKER = "alpha_vision"
+export const VISION_MARKER = "codepuppy_vision"
 
 /** 持久化标记(`#1447` R1 M1):原图哈希、会话内编号、标签、云端正文(失败时没有 text)。 */
 export type VisionMarker = { readonly hash: string; readonly number: number; readonly label: string; readonly text?: string }

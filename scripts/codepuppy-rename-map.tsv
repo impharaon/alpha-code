@@ -1505,3 +1505,18 @@ vendor-alpha-contracts	vendor-codepuppy-contracts
 writeAlpha	writeCodePuppy
 writeAlphaConfig	writeCodePuppyConfig
 writeAlphaProviders	writeCodePuppyProviders
+# ── 第 2 轮(编排器裁决 C1–C9,2026-11-02)──
+# 下面的行在改名提交之后才加入,是按裁决**手工**落到已改名的树上的,不经脚本执行:脚本面对改名前的基线
+# 设计,对已改名的树不幂等(签名目录快照的保护按旧路径登记)。行留在这里,是为了让表仍是「旧名 → 新名」的全集。
+vnd.alpha.remote-asset	vnd.codepuppy.remote-asset
+alpha_vision	codepuppy_vision
+alpha-code-signing	codepuppy-signing
+alpha-ized	codepuppy-ized
+alpha-new	codepuppy-new
+alpha-vs-opencode	codepuppy-vs-opencode
+alpha-authored	codepuppy-authored
+alpha-mark	codepuppy-mark
+alpha-default	codepuppy-default
+alpha-ext-pack	codepuppy-ext-pack
+alpha-remote-transport-retry	codepuppy-remote-transport-retry
+alpha-review-turn-supply	codepuppy-review-turn-supply

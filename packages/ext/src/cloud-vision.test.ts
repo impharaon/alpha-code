@@ -196,7 +196,7 @@ describe("chat.message —— 看不了图 ⇒ 自动转写", () => {
       type: "text",
       synthetic: true,
       text: transcript("#1 login.png", CLOUD_TEXT),
-      metadata: { alpha_vision: { hash: screenshotHash, number: 1, label: "login.png", text: CLOUD_TEXT } },
+      metadata: { codepuppy_vision: { hash: screenshotHash, number: 1, label: "login.png", text: CLOUD_TEXT } },
     })
 
     // 同一张图(同字节)在下一条消息里换个名字再贴:零调用,转写复用,标签用这次的文件名、编号不变
@@ -253,7 +253,7 @@ describe("content_refused ⇒「这张图片无法识别」", () => {
     await chat(hooks, "s5", "m1", GLM, parts)
     expect(requests.length).toBe(1)
     expect(textOf(parts[1])).toBe("〔图片 #1 meme.png:这张图片无法识别〕")
-    expect((parts[1] as { metadata: { alpha_vision: Record<string, unknown> } }).metadata.alpha_vision.text).toBeUndefined()
+    expect((parts[1] as { metadata: { codepuppy_vision: Record<string, unknown> } }).metadata.codepuppy_vision.text).toBeUndefined()
     reply = ok
     const retry = [filePart("prt_52", "s5", "m2", screenshot, "meme.png")]
     await chat(hooks, "s5", "m2", GLM, retry)
@@ -503,7 +503,7 @@ describe("tool.execute.after —— Read 读到的图片走同一条转写", () 
     expect(requests[0]!.body.fallback_on_refusal).toBe(false)
     expect(output.output).toBe(`Image read successfully\n${transcript("#1 a.png", CLOUD_TEXT)}`)
     expect(output.attachments.length).toBe(1)
-    expect(output.metadata.alpha_vision).toEqual({ images: [{ hash: screenshotHash, number: 1, label: "a.png", text: CLOUD_TEXT }] })
+    expect(output.metadata.codepuppy_vision).toEqual({ images: [{ hash: screenshotHash, number: 1, label: "a.png", text: CLOUD_TEXT }] })
     for (const ref of ["shots/a.png", join(root, "project", "shots", "a.png"), "a.png", "1"]) {
       const o = { args: { image: ref, question: "q" } as Record<string, unknown> }
       await hooks["tool.execute.before"]!({ ...VISION_TOOL, sessionID: "s11" }, o)
@@ -540,7 +540,7 @@ function readToolPart(sessionID: string) {
       input: { filePath: "shots/a.png" },
       output: `Image read successfully\n${transcript("#1 a.png", CLOUD_TEXT)}`,
       title: "shots/a.png",
-      metadata: { preview: "Image read successfully", alpha_vision: { images: [{ hash: screenshotHash, number: 1, label: "a.png", text: CLOUD_TEXT }] } },
+      metadata: { preview: "Image read successfully", codepuppy_vision: { images: [{ hash: screenshotHash, number: 1, label: "a.png", text: CLOUD_TEXT }] } },
       time: { start: 1, end: 2 },
       attachments: [{ id: "prt_att9", sessionID, messageID: "m2", type: "file", mime: "image/png", url: dataUrl(screenshot) }],
     },
@@ -586,7 +586,7 @@ describe("experimental.chat.messages.transform —— 本次请求里剔掉已�
     await chat(restarted, "s14", "m3", GLM, again)
     expect(requests.length).toBe(1)
     expect(textOf(again[1])).toBe(transcript("#1 login.png", CLOUD_TEXT))
-    expect((again[1] as { metadata: { alpha_vision: { number: number; hash: string } } }).metadata.alpha_vision).toMatchObject({ number: 1, hash: screenshotHash })
+    expect((again[1] as { metadata: { codepuppy_vision: { number: number; hash: string } } }).metadata.codepuppy_vision).toMatchObject({ number: 1, hash: screenshotHash })
     // 路径二:SDK 答空、靠 messages.transform 重建 —— 同样不再出网
     const rebuilt = await loadHooks()
     await rebuilt["experimental.chat.messages.transform"]!({}, { messages: structuredClone(history) })

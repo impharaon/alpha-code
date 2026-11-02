@@ -19,6 +19,7 @@ import { tmpdir } from "node:os"
 import { basename, isAbsolute, join, normalize, relative } from "node:path"
 import { isSafeRunId, safeResolveInCodePuppy } from "./codepuppy-workdir"
 import { isSafeSavedPath, readArtifactManifest } from "./artifact-manifest"
+import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 import {
   OOXML_LIMITS,
   detectOoxmlContainer,
@@ -128,7 +129,7 @@ export function isManagedRunArtifactPath(value: unknown): boolean {
   return paths.some((candidate) => {
     const segments = candidate.split(/[\\/]+/).map((segment) => segment.toLowerCase())
     return segments.some((segment, index) =>
-      segment === ".code-puppy" &&
+      segment === PROJECT_HIDDEN_DIR &&
       segments[index + 1] === "runs" &&
       Boolean(segments[index + 2]) &&
       segments[index + 3] === "artifacts" &&

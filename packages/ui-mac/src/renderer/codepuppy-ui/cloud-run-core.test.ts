@@ -6,6 +6,7 @@ import { describe, expect, test } from "bun:test"
 import { extractCloudRunHit, parseAcceptedDispatch, parseRunFromOutput, runStateToast } from "./cloud-run-core"
 import { dict as zh } from "../i18n/zh"
 import type { CloudRunState } from "../../preload/types"
+import { PROJECT_HIDDEN_DIR } from "../../shared/project-hidden-dir"
 
 /** 第一方 cloud facade 的持久化快照(引擎 mcp/index.ts 以 clientName="cloud" 为 origin)。 */
 const facadeDisplay = (name = "cloud_await") => ({
@@ -188,7 +189,7 @@ describe("#1551 runStateToast", () => {
   test("saved 才说已回流;任务失败但记录已落盘 → 说结束而非成功;交付未落定不弹", () => {
     expect(runStateToast(state({ status: "saved" }))).toMatchObject({ kind: "success", key: "codepuppy.cloud.runSaved" })
     // #1591:界面文字不写目录名,路径由程序给出。
-    expect(`${zh["codepuppy.cloud.runSaved"]} ${runStateToast(state({ status: "saved" }))!.detail}`).not.toContain(".code-puppy")
+    expect(`${zh["codepuppy.cloud.runSaved"]} ${runStateToast(state({ status: "saved" }))!.detail}`).not.toContain(PROJECT_HIDDEN_DIR)
     expect(runStateToast(state({ status: "saved" }, { status: "failed" }))).toMatchObject({ kind: "info", key: "codepuppy.cloud.runEnded" })
     expect(runStateToast(state({ status: "pending" }))).toBeNull()
     expect(runStateToast(state({ status: "downloading" }))).toBeNull()

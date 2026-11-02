@@ -4,7 +4,7 @@
 //
 // T3 `/init` `/review`:同名覆盖为 alpha 模板(用户拍板 2026-07-08:两个都换,内容层主权归 alpha,
 //    不因上游 review.txt 恰好无品牌字样而豁免 —— 初版只换 init 是执行偏差,已纠正)。init 面向
-//    AGENTS.md 与 `.code-puppy` 约定;review 保持上游语义(alpha 承载内容,后续随质量评估自行演进)。
+//    AGENTS.md 与 `.codepuppy` 约定;review 保持上游语义(alpha 承载内容,后续随质量评估自行演进)。
 // T6 general/explore:同名覆盖 prompt(agent.ts config prompt 优先;request.ts 里 agent.prompt
 //    与 provider 底座**二选一**)→ 两个单一任务型 subagent 的内容 100% alpha 承载;名字与
 //    task 委托接线全保留(不走禁用+另建)。
@@ -33,6 +33,8 @@
 // 与 agent 无关 ⇒ 跑 docs agent 的会话照样吃得到)。本 prompt 只承载那一层结构上承载不了的东西:
 // 顶掉基座后必须自带的作业纪律、被明确解除的长度压制、以及**产出物级**(文件/格式)的要求。
 
+import { PROJECT_HIDDEN_DIR } from "../../ui-mac/src/shared/project-hidden-dir"
+
 /** T3:/init 同名覆盖模板(config command 无 ${path} 替换,写「repository root」;$ARGUMENTS 保留)。 */
 export const CODEPUPPY_INIT_TEMPLATE = `Create or update \`AGENTS.md\` at the repository root.
 
@@ -48,7 +50,7 @@ Read the highest-value sources first:
 - build, test, lint, formatter, typecheck, and codegen config
 - CI workflows and pre-commit / task runner config
 - existing instruction files (\`AGENTS.md\`, \`CLAUDE.md\`, \`.cursor/rules/\`, \`.github/copilot-instructions.md\`)
-- project-local agent config such as \`.code-puppy/codepuppy.jsonc\` (Code Puppy's per-project extensions: connectors, agents, commands, skills)
+- project-local agent config such as \`${PROJECT_HIDDEN_DIR}/codepuppy.jsonc\` (Code Puppy's per-project extensions: connectors, agents, commands, skills)
 
 If architecture is still unclear after reading config and docs, inspect a small number of representative code files to find the real entrypoints, package boundaries, and execution flow. Prefer reading the files that explain how the system is wired together over random leaf files.
 

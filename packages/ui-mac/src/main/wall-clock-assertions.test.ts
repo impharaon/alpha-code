@@ -213,8 +213,7 @@ describe("控制臂:处置合法性(默认拒)", () => {
       expect(dispositionError(row({ file, disposition: "load-sensitive", reason: "负载敏感" }), repoContext), file).toContain("load-sensitive")
   })
 
-  test("upstream 不许给 alpha 自有文件:alpha 三包 / codepuppy-(过渡期含 alpha-)前缀 / 正文带 marker", () => {
-    // `#1570` 改名过渡:旧前缀 alpha- 与旧 marker 同样认(与 north-star 守卫一致),S 级后续 PR 删这两行样本。
+  test("upstream 不许给 Code Puppy 自有文件:自有三包 / codepuppy- 前缀 / 正文带 marker;旧 alpha- 前缀与旧 marker 不再算自有", () => {
     const markers: Record<string, string> = {
       "packages/core/test/marked.test.ts": "// north-star:codepuppy-owned\n",
       "packages/core/test/legacy-marked.test.ts": "// north-star:alpha-owned\n",
@@ -224,12 +223,17 @@ describe("控制臂:处置合法性(默认拒)", () => {
       "packages/ui-mac/src/main/synthetic.test.ts",
       "packages/ext/src/synthetic.test.ts",
       "packages/opencode/test/tool/codepuppy-synthetic.test.ts",
-      "packages/opencode/test/tool/alpha-synthetic.test.ts",
       "packages/core/test/marked.test.ts",
-      "packages/core/test/legacy-marked.test.ts",
     ])
       expect(dispositionError(row({ file, disposition: "upstream", reason: "上游" }), ctx), file).toContain("upstream")
-    expect(dispositionError(row({ file: "packages/core/test/plain.test.ts", disposition: "upstream", reason: "上游" }), ctx)).toBeUndefined()
+    // `#1570` 过渡期结束:只靠旧前缀 / 旧 marker / 旧包目录认领的文件,与 north-star 守卫一样按上游判。
+    for (const file of [
+      "packages/core/test/plain.test.ts",
+      "packages/opencode/test/tool/alpha-synthetic.test.ts",
+      "packages/core/test/legacy-marked.test.ts",
+      "packages/alpha-contracts-consumer/src/synthetic.ts",
+    ])
+      expect(dispositionError(row({ file, disposition: "upstream", reason: "上游" }), ctx), file).toBeUndefined()
   })
 
   test("keep 的理由必须 ≥ 40 字符,not-elapsed ≥ 20,任何处置理由不许空", () => {

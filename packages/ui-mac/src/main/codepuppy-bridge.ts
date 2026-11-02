@@ -1,5 +1,5 @@
-// `.code-puppy` ↔ `.opencode` symlink bridge (REQ-018 T2 / ADR-019 修订). Truth lives under an alpha
-// root (the frozen current-environment root or `<project>/.code-puppy`); the engine discovers it through symlinks placed in the
+// `.codepuppy` ↔ `.opencode` symlink bridge (REQ-018 T2 / ADR-019 修订). Truth lives under an alpha
+// root (the frozen current-environment root or `<project>/.codepuppy`); the engine discovers it through symlinks placed in the
 // adjacent engine-scanned `.opencode` dir. REQ-004 spike facts
 // (audits/2026-07-03-req004-alpha-bridge-spike.md): upstream scans pass symlink:true (npm glob
 // follow), directory chains work for `**` patterns (skills/agents/commands), but single-level `*`

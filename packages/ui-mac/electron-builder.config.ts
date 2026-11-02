@@ -49,7 +49,19 @@ const channel: Channel = (() => {
 const isCI = process.env.GITHUB_ACTIONS === "true"
 const shouldSign = isCI || process.env.CODEPUPPY_SIGN === "1"
 // Apple team (Beijing yuanyuji, RQX6X6A635 — same as tideapp) + notary creds are supplied via env at
-// sign time (see docs/runbooks/distribution.md / ~/.alpha-code-signing/signing.env), not baked into config.
+// sign time (see docs/runbooks/distribution.md / ~/.codepuppy-signing/signing.env), not baked into config.
+
+// #1570 退役守卫:签名开关与身份的环境变量已改为 CODEPUPPY_ 前缀。沿用旧名的 signing.env 不会报错,
+// 只会让 shouldSign 为假 ⇒ 本地静默打出未签名的包。所以旧名一出现就拒绝打包,而不是忽略它。
+const RETIRED_SIGNING_ENV = ["ALPHA_SIGN", "ALPHA_SIGN_IDENTITY", "ALPHA_MAC_SIGN_IDENTITY"] as const
+function rejectRetiredSigningEnv() {
+  const found = RETIRED_SIGNING_ENV.filter((name) => process.env[name] !== undefined)
+  if (found.length === 0) return
+  throw new Error(
+    `环境里还有退役的签名变量 ${found.join(", ")} —— 已改名为 CODEPUPPY_ 前缀(${found.map((name) => name.replace(/^ALPHA_/, "CODEPUPPY_")).join(", ")})。` +
+      "按 docs/runbooks/distribution.md「签名目录与变量名的一次性改名」改好 signing.env 再打包。",
+  )
+}
 
 // Own bundle identity (com.tide.*, matching tideapp's convention) — NOT opencode's ai.opencode.desktop.
 // userData is NOT keyed on it (main/index.ts APP_IDS is). Changing it resets macOS privacy (TCC) grants and
@@ -245,6 +257,7 @@ const getBase = (appId: string): Configuration => ({
 })
 
 export function getConfig(target: Channel = channel) {
+  rejectRetiredSigningEnv()
   const appId = APP_IDS[target]
   const base = getBase(appId)
 

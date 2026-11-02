@@ -50,6 +50,7 @@ export function __setHtmlPreviewLogSink(fn: HtmlPreviewLogFn | null) {
 import { resolveArtifact } from "./artifact-service"
 import { isSafeSavedPath, RUN_ARTIFACTS_SUBDIR } from "./artifact-manifest"
 import { safeResolveInCodePuppy, sanitizeArtifactName } from "./codepuppy-workdir"
+import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 import {
   canPreviewHtml,
   HTML_PREVIEW_CSP,
@@ -161,7 +162,7 @@ function serveRequest(record: PreviewRecord, request: Request): Response {
     recordBlocked(record, rel || "/")
     return deny()
   }
-  // ADR-019 realpath 守卫:symlink 逃逸 / .code-puppy 外解析在此被拒。
+  // ADR-019 realpath 守卫:symlink 逃逸 / .codepuppy 外解析在此被拒。
   const abs = safeResolveInCodePuppy(record.projectDir, "runs", record.runId, ...saved.split("/"))
   if (!abs) {
     recordBlocked(record, rel)
@@ -307,7 +308,7 @@ export function openHtmlPreview(
   if (!canPreviewHtml(entry.descriptor, entry.local.detectedMime))
     return refuse("artifact is not previewable static HTML")
   const abs = safeResolveInCodePuppy(projectDir, "runs", runId, ...entry.local.savedPath.split("/"))
-  if (!abs) return refuse("path escapes .code-puppy")
+  if (!abs) return refuse(`path escapes ${PROJECT_HIDDEN_DIR}`)
   let st: fs.Stats
   try {
     st = fs.lstatSync(abs)

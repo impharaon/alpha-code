@@ -3,9 +3,10 @@ import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, 
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { projectIpcHandler, withProjectIpcEntryIdentity } from "./ext-project-entry"
+import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 
 describe("main project IPC identity boundary", () => {
-  test("real home、home alias、unknown、retired `.code-puppy` link 均在 adoption/read/write body 前拒绝", async () => {
+  test("real home、home alias、unknown、retired `.codepuppy` link 均在 adoption/read/write body 前拒绝", async () => {
     const root = mkdtempSync(join(tmpdir(), "codepuppy-project-entry-"))
     const home = join(root, "home")
     const retired = join(home, ".alpha")
@@ -17,7 +18,7 @@ describe("main project IPC identity boundary", () => {
     writeFileSync(join(retired, "sentinel"), "untouched")
     writeFileSync(join(retired, "installs.json"), JSON.stringify({ version: 1, receipts: [] }))
     symlinkSync(home, alias, "dir")
-    symlinkSync(retired, join(project, ".code-puppy"), "dir")
+    symlinkSync(retired, join(project, PROJECT_HIDDEN_DIR), "dir")
     let bodies = 0
     const handler = projectIpcHandler(
       home,
@@ -38,12 +39,12 @@ describe("main project IPC identity boundary", () => {
     }
   })
 
-  test("adoption 异步边界后 `.code-puppy` 换链 → trust 读取零执行并 fail-closed", async () => {
+  test("adoption 异步边界后 `.codepuppy` 换链 → trust 读取零执行并 fail-closed", async () => {
     const root = mkdtempSync(join(tmpdir(), "codepuppy-project-entry-race-"))
     const home = join(root, "home")
     const retired = join(home, ".alpha")
     const project = join(root, "project")
-    const admittedRoot = join(project, ".code-puppy")
+    const admittedRoot = join(project, PROJECT_HIDDEN_DIR)
     const moved = join(project, ".codepuppy-before-race")
     mkdirSync(retired, { recursive: true })
     mkdirSync(admittedRoot, { recursive: true })

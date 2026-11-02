@@ -174,7 +174,7 @@ test("#1551 定时任务拉回:产物没全部存到本机 ⇒ 历史记 failed,
   jobStatus = { job_id: "job_1551", status: "completed" }
   saveResult = {
     ok: true,
-    dir: "/project/.code-puppy/runs/job_1551",
+    dir: "/project/.codepuppy/runs/job_1551",
     files: ["status.json"],
     warnings: [],
     failures: [{ scope: "download", artifactId: "art_1", code: "network" }],

@@ -24,7 +24,7 @@ describe("Alpha Settings ownership ratchets", () => {
     expect(entries).toHaveLength(1)
     expect(entries[0]).toMatchObject({
       owner: "codepuppy.settings",
-      lineage: "alpha",
+      lineage: "codepuppy",
       mount: { kind: "overlay", host: "app-root" },
       source: "packages/ui-mac/src/renderer/codepuppy-ui/settings.tsx",
     })

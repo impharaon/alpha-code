@@ -186,6 +186,34 @@ describe("生产 electron-builder.config.ts 的 beforePack", () => {
   })
 })
 
+describe("#1570 生产 electron-builder.config.ts 拒绝退役的签名变量名", () => {
+  const RETIRED = ["ALPHA_SIGN", "ALPHA_SIGN_IDENTITY", "ALPHA_MAC_SIGN_IDENTITY"]
+  for (const name of RETIRED)
+    test(`环境里有 ${name} ⇒ getConfig 抛错并点名新前缀(否则旧 signing.env 会静默打出未签名包)`, async () => {
+      // 先在干净环境里装载模块(它在装载时就调一次 getConfig),再放进旧名,判的是每次取配置都过守卫。
+      const { getConfig } = await import("../../electron-builder.config")
+      const saved = process.env[name]
+      process.env[name] = "1"
+      try {
+        expect(() => getConfig("prod")).toThrow(new RegExp(`${name}[\\s\\S]*${name.replace(/^ALPHA_/, "CODEPUPPY_")}`))
+      } finally {
+        if (saved === undefined) delete process.env[name]
+        else process.env[name] = saved
+      }
+    })
+
+  test("控制组:三个旧名都不在 ⇒ 照常出配置(新前缀 CODEPUPPY_SIGN 不受影响)", async () => {
+    const saved = RETIRED.map((name) => [name, process.env[name]] as const)
+    for (const name of RETIRED) delete process.env[name]
+    try {
+      const { getConfig } = await import("../../electron-builder.config")
+      expect(getConfig("prod").appId).toBeString()
+    } finally {
+      for (const [name, value] of saved) if (value !== undefined) process.env[name] = value
+    }
+  })
+})
+
 describe("#1564 生产 electron-builder.config.ts 把随包 Office 运行时装进包", () => {
   test("darwin extraResources:目标架构那一份 → <Resources>/office-runtime/(main 模板的命令头所在);别的平台不带", async () => {
     const { getConfig } = await import("../../electron-builder.config")

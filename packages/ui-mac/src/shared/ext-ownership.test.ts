@@ -91,7 +91,7 @@ describe("来源映射:catalog 条目(内置快照 bundled / signed channel remo
   test("alpha builtin skill → bundled / supportTier=alpha", () => {
     const dims = ownershipFromCatalogEntry({ type: "skill", source: "alpha", installSpec: { kind: "skill", source: "builtin" } }, "cache")
     expect(dims.distributed).toBe("bundled")
-    expect(dims.supportTier).toBe("alpha")
+    expect(dims.supportTier).toBe("codepuppy")
   })
 
   test("plugin:vendored 资产 → bundled;无资产 → npm;运行面恒 engine-process", () => {
@@ -136,7 +136,7 @@ describe("来源映射:packaged seed(REQ-102)", () => {
 
   test("alpha seed skill → supportTier=alpha / model-context", () => {
     const dims = ownershipFromSeedAsset({ type: "skill", source: "alpha" })
-    expect(dims.supportTier).toBe("alpha")
+    expect(dims.supportTier).toBe("codepuppy")
     expect(dims.runtimeSurfaces).toEqual(["model-context"])
   })
 })
@@ -186,7 +186,7 @@ describe("来源映射:本地安装(receipts/records)", () => {
 describe("值域与 kind 级推导", () => {
   test("枚举显式且互不重叠(#212 §1)", () => {
     expect([...RUNTIME_SURFACES]).toEqual(["engine-process", "local-subprocess", "remote-service", "model-context", "cloud-pipeline"])
-    expect([...SUPPORT_TIERS]).toEqual(["alpha", "curated", "community", "user"])
+    expect([...SUPPORT_TIERS]).toEqual(["codepuppy", "curated", "community", "user"])
     expect([...DISTRIBUTION_CHANNELS]).toEqual(["bundled", "remote-catalog", "npm", "engine-config", "cloud", "local-import"])
   })
 

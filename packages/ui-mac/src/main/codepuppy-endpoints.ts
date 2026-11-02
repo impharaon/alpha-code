@@ -16,6 +16,7 @@ import * as fs from "node:fs"
 import * as path from "node:path"
 import { ContractIncompatibleError } from "@codepuppy/contracts-consumer"
 import { CODEPUPPY_ENDPOINTS, type CodePuppyEndpoints } from "../shared/codepuppy-config"
+import { USER_DATA_LAYOUT } from "./user-data-layout"
 
 const ENV_KEYS: Record<keyof CodePuppyEndpoints, string> = {
   web: "CODEPUPPY_WEB_URL",
@@ -45,8 +46,8 @@ const strip = (u?: string | null): string | undefined => {
   }
   return undefined
 }
-const overrideFile = () => path.join(userDataPath, "codepuppy-endpoints.json")
-const discoveredFile = () => path.join(userDataPath, "codepuppy-discovered-endpoints.json")
+const overrideFile = () => path.join(userDataPath, USER_DATA_LAYOUT.endpoints)
+const discoveredFile = () => path.join(userDataPath, USER_DATA_LAYOUT.discoveredEndpoints)
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value)
 

@@ -2,7 +2,7 @@
 //
 // 语义:execution:"cloud" 的自动化不走本地调度器 —— 保存即注册到 B(D1 registry),app 不在线
 // B 也按时执行;开 app 时按 `GET /v1/cloud/jobs?since=<ts>&origin=schedule` 枚举错过的 run,
-// 经既有 status/artifacts 链取结果落目标项目 `.code-puppy/runs/`(saveCloudRun,ADR-019/回流守卫)。
+// 经既有 status/artifacts 链取结果落目标项目 `.codepuppy/runs/`(saveCloudRun,ADR-019/回流守卫)。
 //
 // MVP 边界(与 B 侧 PA-28 对齐,诚实声明):
 //  · 云端执行走 **research 管线**(任务描述 = 调研问题;bounded-agent 档随 B service-token 演进);
@@ -19,6 +19,7 @@ import { saveCloudRun } from "./codepuppy-workdir"
 import { mirrorRunArtifacts } from "./codepuppy-user-workspace"
 import { getLogger } from "./logging"
 import { getStore } from "./store"
+import { CLOUD_SCHEDULE_LAST_PULL_KEY } from "./store-keys"
 import { cloudScheduleEnvelopeFor, cloudScheduleRegistrationFor } from "./cloud-schedule-config"
 
 // 与 codepuppy-cloud-jobs 同一 authed 通道(bearer 不进 renderer)。为避免循环依赖,这里复制其极简
@@ -133,12 +134,12 @@ export async function listCloudSchedules(): Promise<CloudScheduleView[] | null> 
   return isErr(r) ? null : r.schedules
 }
 
-const LAST_PULL_KEY = "codepuppyCloudScheduleLastPull"
+const LAST_PULL_KEY = CLOUD_SCHEDULE_LAST_PULL_KEY
 
 // codex M1:拉取单飞(startup 与面板 cloudSync 可能并发)—— 复用在飞 promise,不重入。
 let pullInflight: Promise<{ pulled: number } | { error: string }> | null = null
 
-/** 开机拉回:枚举错过的 schedule 触发 job → 终态取结果 → saveCloudRun 落对应任务的项目 .code-puppy/runs/。 */
+/** 开机拉回:枚举错过的 schedule 触发 job → 终态取结果 → saveCloudRun 落对应任务的项目 .codepuppy/runs/。 */
 export function pullCloudScheduleRuns(): Promise<{ pulled: number } | { error: string }> {
   if (pullInflight) return pullInflight
   pullInflight = doPull().finally(() => {

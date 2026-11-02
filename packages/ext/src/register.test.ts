@@ -46,7 +46,7 @@ describe("applyRegister — codepuppy_register 纯逻辑(REQ-060 T2)", () => {
     expect(r1.ok).toBe(true)
     const r2 = applyRegister(r1.ok ? r1.next : "", "skill", "", undefined)
     expect(r2.ok).toBe(true)
-    if (r2.ok) expect(JSON.parse(r2.next).skills.paths).toEqual(["./.code-puppy/skills"])
+    if (r2.ok) expect(JSON.parse(r2.next).skills.paths).toEqual(["./.codepuppy/skills"])
   })
 
   test("既有 jsonc(含注释/尾逗号)被保留合并;坏 jsonc 拒写(不覆盖用户文件)", () => {
@@ -69,11 +69,11 @@ describe("applyRegister — codepuppy_register 纯逻辑(REQ-060 T2)", () => {
   })
 })
 
-describe("mergeProjectConfig 相对 skills.paths 解析(register 写入的 ./.code-puppy/skills)", () => {
+describe("mergeProjectConfig 相对 skills.paths 解析(register 写入的 ./.codepuppy/skills)", () => {
   test("./ 前缀按 directory 解析为绝对", async () => {
     const { mergeProjectConfig } = await import("./project-config")
     const cfg: Record<string, any> = {}
-    mergeProjectConfig(cfg, JSON.stringify({ skills: { paths: ["./.code-puppy/skills"] } }), { directory: "/proj/x" })
-    expect(cfg.skills.paths).toEqual(["/proj/x/.code-puppy/skills"])
+    mergeProjectConfig(cfg, JSON.stringify({ skills: { paths: ["./.codepuppy/skills"] } }), { directory: "/proj/x" })
+    expect(cfg.skills.paths).toEqual(["/proj/x/.codepuppy/skills"])
   })
 })

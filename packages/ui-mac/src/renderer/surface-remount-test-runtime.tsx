@@ -307,7 +307,7 @@ export function installPreloadStub() {
     "models.catalog": async () => ({
       defaultModel: null,
       defaultPlatformModel: null,
-      platformProvider: { id: "alpha", name: "Alpha", npm: "" },
+      platformProvider: { id: "codepuppy", name: "Code Puppy", npm: "" },
       platformModels: [],
       byokProviders: [],
       presetIds: [],

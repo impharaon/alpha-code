@@ -1,3 +1,4 @@
+// north-star:codepuppy-owned — Code Puppy 自有文件,住在上游包目录里(ADR-043 因子②;文件名为何未改见 scripts/old-name-exceptions.tsv)。
 /**
  * Alpha Cloud MCP authority is proven only by the definition that the desktop
  * injection handshake placed in this process. Keep this verifier pure so the

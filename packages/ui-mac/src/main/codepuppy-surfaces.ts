@@ -15,9 +15,10 @@ import { type SurfaceId } from "../shared/codepuppy-surfaces"
 import { getLogger } from "./logging"
 import { RECOVERY_CODES } from "../shared/recovery"
 import type { RecoveryService, SurfaceRecoveryRequest } from "./recovery-service"
+import { USER_DATA_LAYOUT } from "./user-data-layout"
 
 const SURFACE_IDS = ["home", "newSession", "session"] as const
-const FILE = "codepuppy-surfaces.json"
+const FILE = USER_DATA_LAYOUT.surfaces
 export type SurfaceFailure = { at: string; appVersion: string; error: string }
 export type SurfaceFile = {
   failures?: Partial<Record<SurfaceId, SurfaceFailure>>

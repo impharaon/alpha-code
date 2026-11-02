@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { probeProjectMcpActivation, verifyInstalledMcp } from "./ext-mcp-activation"
+import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 
 let tmp: string
 let project: string
@@ -13,10 +14,10 @@ const durableLeaf = { type: "local", command: ["npx", "-y", "demo-mcp@1.0.0"] }
 beforeEach(() => {
   tmp = mkdtempSync(join(tmpdir(), "project-mcp-activation-"))
   project = join(tmp, "D")
-  mkdirSync(join(project, ".code-puppy"), { recursive: true })
+  mkdirSync(join(project, PROJECT_HIDDEN_DIR), { recursive: true })
   project = realpathSync(project)
   writeFileSync(
-    join(project, ".code-puppy", "codepuppy.jsonc"),
+    join(project, PROJECT_HIDDEN_DIR, "codepuppy.jsonc"),
     JSON.stringify({ mcp: { demo: durableLeaf } }, null, 2),
   )
   delete process.env.OPENCODE_CONFIG_CONTENT
@@ -84,7 +85,7 @@ describe("project MCP activation provenance probe (REQ-136 C5)", () => {
 
   test("accepts JSONC trailing commas in both the durable project file and injected global config", async () => {
     writeFileSync(
-      join(project, ".code-puppy", "codepuppy.jsonc"),
+      join(project, PROJECT_HIDDEN_DIR, "codepuppy.jsonc"),
       `{
         "mcp": {
           "demo": {
@@ -163,7 +164,7 @@ describe("project MCP activation provenance probe (REQ-136 C5)", () => {
     expect(verdict).toBe("unverifiable")
     expect(requests.map((url) => url.pathname)).toEqual(["/global/config"])
 
-    writeFileSync(join(project, ".code-puppy", "codepuppy.jsonc"), '{"mcp":{"demo":')
+    writeFileSync(join(project, PROJECT_HIDDEN_DIR, "codepuppy.jsonc"), '{"mcp":{"demo":')
     const malformed = await probeProjectMcpActivation("demo", project, ready, {
       configuredGlobalNames: emptyGlobalNames,
       fetch: (async () => {
@@ -174,7 +175,7 @@ describe("project MCP activation provenance probe (REQ-136 C5)", () => {
   })
 
   test("a symlinked durable project config is unverifiable before any engine request", async () => {
-    const target = join(project, ".code-puppy", "codepuppy.jsonc")
+    const target = join(project, PROJECT_HIDDEN_DIR, "codepuppy.jsonc")
     const outside = join(tmp, "outside-alpha.jsonc")
     writeFileSync(outside, JSON.stringify({ mcp: { demo: durableLeaf } }))
     unlinkSync(target)

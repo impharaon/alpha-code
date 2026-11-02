@@ -1,10 +1,10 @@
-// alpha project workdir (`.code-puppy/`) writer — ADR-019. Main-process only, but electron-free and
+// alpha project workdir (`.codepuppy/`) writer — ADR-019. Main-process only, but electron-free and
 // root-parameterized so the whole surface is unit-testable against a temp dir.
 //
-// Layout (ADR-019 §2 修订): <projectDir>/.code-puppy/runs/<runId>/{contract.json,status.json,artifacts/*}
-// Guards mirror ext-fs-installer.safeResolve (realpath anti-escape, ADR-014 §8) with root = .code-puppy;
+// Layout (ADR-019 §2 修订): <projectDir>/.codepuppy/runs/<runId>/{contract.json,status.json,artifacts/*}
+// Guards mirror ext-fs-installer.safeResolve (realpath anti-escape, ADR-014 §8) with root = .codepuppy;
 // artifact names come from the platform (B) and are treated as hostile until sanitized.
-// The dir self-ignores via a seeded `.code-puppy/.gitignore` (`*`) — ADR-019 §5: runtime artifacts,
+// The dir self-ignores via a seeded `.codepuppy/.gitignore` (`*`) — ADR-019 §5: runtime artifacts,
 // no user .gitignore edit required.
 
 import * as fs from "node:fs"
@@ -15,6 +15,7 @@ import type { ArtifactDownloadOutcome } from "./codepuppy-artifact-download"
 import { validateArtifactDescriptor, type ArtifactDescriptor } from "../shared/cloud-artifact-descriptor"
 import { parsePrefs, type ProjectPrefs } from "./codepuppy-cloud-consent"
 import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
+import { adoptLegacyProjectHiddenDir } from "./project-hidden-dir-migration"
 
 /** REQ-236(#1551):一次交付里没落成的那一段 —— 列表、某件下载、或某件登记。 */
 export type CloudRunSaveFailure = { scope: "list" | "download" | "register"; artifactId?: string; code: string; detail?: string }
@@ -113,9 +114,9 @@ export function reserveArtifactSavedName(
 export type ProjectCodePuppyRootResolution =
   | { status: "project"; projectDir: string; root: string }
   | { status: "retired-home"; reason: string }
-  | { status: "unknown"; reason: string }
+  | { status: "unknown"; reason: string; code?: "hidden-dir-conflict" | "hidden-dir-pending" }
 
-/** main 项目入口的统一三态身份：返回 canonical project + 已验证 `.code-puppy` endpoint。 */
+/** main 项目入口的统一三态身份：返回 canonical project + 已验证 `.codepuppy` endpoint。 */
 export function resolveProjectCodePuppyRoot(projectDir: string, homeDir: string = os.homedir()): ProjectCodePuppyRootResolution {
   if (typeof projectDir !== "string" || !path.isAbsolute(projectDir) || projectDir === path.parse(projectDir).root)
     return { status: "unknown", reason: "project directory must be an absolute non-root path" }
@@ -145,6 +146,10 @@ export function resolveProjectCodePuppyRoot(projectDir: string, homeDir: string 
   if (sameOrInside(project, retired.path) || related(root, retiredLexical) || related(root, retired.path))
     return { status: "retired-home", reason: "project Code Puppy root is related to the retired global root" }
 
+  // #1569 AC7:旧隐藏目录 `.codepuppy` 在这里改名并补完子步骤(prod/beta 的 main);冲突或未迁完 ⇒ 不认这个项目根
+  const adopted = adoptLegacyProjectHiddenDir(project)
+  if (adopted.kind === "conflict" || adopted.kind === "pending") return { status: "unknown", reason: adopted.reason, code: `hidden-dir-${adopted.kind}` }
+
   try {
     const stat = fs.lstatSync(root)
     if (stat.isSymbolicLink() || !stat.isDirectory())
@@ -158,13 +163,13 @@ export function resolveProjectCodePuppyRoot(projectDir: string, homeDir: string 
   return { status: "project", projectDir: project, root }
 }
 
-/** `<projectDir>/.code-puppy`, or null unless the unified three-state resolver admits it. */
+/** `<projectDir>/.codepuppy`, or null unless the unified three-state resolver admits it. */
 export function codepuppyRoot(projectDir: string): string | null {
   const resolved = resolveProjectCodePuppyRoot(projectDir)
   return resolved.status === "project" ? resolved.root : null
 }
 
-/** Recovery gate 的 project-root 复验：root 必须仍是同一 canonical 项目的已验证 `.code-puppy` endpoint。 */
+/** Recovery gate 的 project-root 复验：root 必须仍是同一 canonical 项目的已验证 `.codepuppy` endpoint。 */
 export function assertProjectCodePuppyRootIdentity(root: string): void {
   if (!path.isAbsolute(root) || path.basename(root) !== PROJECT_HIDDEN_DIR) throw new Error("invalid project alpha root")
   const resolved = resolveProjectCodePuppyRoot(path.dirname(root))
@@ -181,7 +186,7 @@ function sameOrInside(child: string, parent: string): boolean {
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))
 }
 
-// Resolve a target inside <projectDir>/.code-puppy and assert (via realpath of the nearest existing
+// Resolve a target inside <projectDir>/.codepuppy and assert (via realpath of the nearest existing
 // ancestor) that it cannot escape through symlinks or `..` — same walk as ext-fs-installer.ts.
 export function safeResolveInCodePuppy(projectDir: string, ...segments: string[]): string | null {
   const root = codepuppyRoot(projectDir)
@@ -197,7 +202,7 @@ export function safeResolveInCodePuppy(projectDir: string, ...segments: string[]
   try {
     const real = fs.realpathSync(probe)
     const realRoot = fs.existsSync(root) ? fs.realpathSync(root) : root
-    // before .code-puppy exists the nearest ancestor is the project dir itself — that is still in-bounds.
+    // before .codepuppy exists the nearest ancestor is the project dir itself — that is still in-bounds.
     const realProject = fs.realpathSync(projectDir)
     if (real !== realRoot && !real.startsWith(realRoot + path.sep) && real !== realProject) return null
   } catch {
@@ -213,7 +218,7 @@ function writeFileAtomic(file: string, data: string | Buffer): void {
 }
 
 /**
- * 项目偏好 `.code-puppy/prefs.json`(ADR-019 落点)读写。B16 云同意等 per-project 偏好的落点;缺失/损坏
+ * 项目偏好 `.codepuppy/prefs.json`(ADR-019 落点)读写。B16 云同意等 per-project 偏好的落点;缺失/损坏
  * 读为 {}(不误判);写走 ensureCodePuppyScaffold + 守卫 + 原子写。
  */
 export function readProjectPrefs(projectDir: string): ProjectPrefs {
@@ -229,7 +234,7 @@ export function readProjectPrefs(projectDir: string): ProjectPrefs {
 export function writeProjectPrefs(projectDir: string, prefs: ProjectPrefs): { ok: true } | { ok: false; reason: string } {
   if (!ensureCodePuppyScaffold(projectDir)) return { ok: false, reason: "invalid project dir" }
   const target = safeResolveInCodePuppy(projectDir, "prefs.json")
-  if (!target) return { ok: false, reason: "path escapes .code-puppy" }
+  if (!target) return { ok: false, reason: `path escapes ${PROJECT_HIDDEN_DIR}` }
   try {
     writeFileAtomic(target, JSON.stringify(prefs, null, 2) + "\n")
     return { ok: true }
@@ -238,7 +243,7 @@ export function writeProjectPrefs(projectDir: string, prefs: ProjectPrefs): { ok
   }
 }
 
-/** Create `.code-puppy/` and seed its self-ignoring .gitignore (idempotent). */
+/** Create `.codepuppy/` and seed its self-ignoring .gitignore (idempotent). */
 export function ensureCodePuppyScaffold(projectDir: string): string | null {
   const root = codepuppyRoot(projectDir)
   if (!root) return null
@@ -249,7 +254,7 @@ export function ensureCodePuppyScaffold(projectDir: string): string | null {
 }
 
 /**
- * 通用 run 目录写入(REQ-021 自动化用;复用 .code-puppy 守卫 + 原子写)。files = 文件名 → 文本内容;
+ * 通用 run 目录写入(REQ-021 自动化用;复用 .codepuppy 守卫 + 原子写)。files = 文件名 → 文本内容;
  * 文件名过 sanitizeArtifactName(拒路径分隔/dotfile)。失败返回 reason,不抛。
  */
 export function writeRunFiles(
@@ -260,7 +265,7 @@ export function writeRunFiles(
   if (!isSafeRunId(runId)) return { ok: false, reason: "unsafe run id" }
   if (!ensureCodePuppyScaffold(projectDir)) return { ok: false, reason: "invalid project dir" }
   const dir = safeResolveInCodePuppy(projectDir, "runs", runId)
-  if (!dir) return { ok: false, reason: "path escapes .code-puppy" }
+  if (!dir) return { ok: false, reason: `path escapes ${PROJECT_HIDDEN_DIR}` }
   try {
     fs.mkdirSync(dir, { recursive: true })
     for (const [name, content] of Object.entries(files)) {
@@ -294,7 +299,7 @@ export type SaveRunDeps = {
 }
 
 /**
- * Persist one cloud run under `<projectDir>/.code-puppy/runs/<runId>/` — status.json (always),
+ * Persist one cloud run under `<projectDir>/.codepuppy/runs/<runId>/` — status.json (always),
  * contract.json (when the caller knows the dispatch envelope) and artifacts/* (fetched in main,
  * bearer never leaves the main process). The run dir + status.json are the `ok` criterion; a failed
  * list / download / register is reported structurally in `failures` (#1551 R2) — never folded into
@@ -309,7 +314,7 @@ export async function saveCloudRun(
   if (!isSafeRunId(runId)) return { ok: false, reason: "invalid run id" }
   if (!ensureCodePuppyScaffold(projectDir)) return { ok: false, reason: "invalid project directory" }
   const runDir = safeResolveInCodePuppy(projectDir, "runs", runId)
-  if (!runDir) return { ok: false, reason: "refused: path escapes .code-puppy" }
+  if (!runDir) return { ok: false, reason: `refused: path escapes ${PROJECT_HIDDEN_DIR}` }
 
   // transport-error envelope = bare {error}; a real CloudJobStatus always carries job_id (its own
   // `error` field is null on success and a message on failed jobs — both still savable states).
@@ -342,7 +347,7 @@ export async function saveCloudRun(
   }
   const metas = list.artifacts
 
-  // REQ-092:字节不再进本模块 —— 名字净化 + .code-puppy 逃逸守卫后,把目标路径交给流式下载器
+  // REQ-092:字节不再进本模块 —— 名字净化 + .codepuppy 逃逸守卫后,把目标路径交给流式下载器
   // (.part + 限额前置 + 单遍 sha256 + 原子 rename;失败分类回警告,绝不产出看似成功的最终文件)。
   const used = new Set<string>()
   for (const meta of metas) {

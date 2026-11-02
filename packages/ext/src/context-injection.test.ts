@@ -481,7 +481,7 @@ describe("③d tool.execute.after 咽喉:工具结果回模型的路上,alpha �
     expect(lines.length).toBe(2)
     expect(explainVisionBlock(lines[1]!)).toEqual({ ok: true, id: "vision.failure.not-logged-in", kind: "template" })
     expect(output.attachments.length).toBe(1)
-    expect((output.metadata as Record<string, unknown>).alpha_vision).toBeDefined()
+    expect((output.metadata as Record<string, unknown>).codepuppy_vision).toBeDefined()
     // 已知的坏:块尾多一个字节 / 整行换成散文 —— 判官都不解释
     expect(explainVisionBlock(lines[1]! + "!").ok).toBe(false)
     expect(explainVisionBlock("the image shows a login page").ok).toBe(false)
@@ -593,12 +593,12 @@ const history = (sessionID: string) => [
     info: { id: "msg_u", role: "user", sessionID, model: { providerID: "alpha", modelID: "glm-5" } },
     parts: [
       ...userParts(sessionID, "msg_u"),
-      { id: "prt_b-vision", sessionID, messageID: "msg_u", type: "text", synthetic: true, text: "〔图片 #1 shot.png:这张图片无法识别〕", metadata: { alpha_vision: { hash: "h", number: 1, label: "shot.png" } } },
+      { id: "prt_b-vision", sessionID, messageID: "msg_u", type: "text", synthetic: true, text: "〔图片 #1 shot.png:这张图片无法识别〕", metadata: { codepuppy_vision: { hash: "h", number: 1, label: "shot.png" } } },
     ],
   },
   {
     info: { id: "msg_a", role: "assistant", sessionID },
-    parts: [{ id: "prt_t", type: "tool", tool: "read", state: { status: "completed", input: { filePath: "a.png" }, output: "Image read successfully", metadata: { alpha_vision: { images: [{ hash: "h", number: 1, label: "a.png" }] } }, attachments: [imagePart("prt_att")] } }],
+    parts: [{ id: "prt_t", type: "tool", tool: "read", state: { status: "completed", input: { filePath: "a.png" }, output: "Image read successfully", metadata: { codepuppy_vision: { images: [{ hash: "h", number: 1, label: "a.png" }] } }, attachments: [imagePart("prt_att")] } }],
   },
 ]
 

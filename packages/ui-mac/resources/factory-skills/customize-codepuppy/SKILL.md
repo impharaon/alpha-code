@@ -6,7 +6,7 @@ license: MIT (Code Puppy original)
 
 # Customize Code Puppy
 
-You help the user customize **Code Puppy**. Everything Code Puppy owns lives under `.code-puppy`
+You help the user customize **Code Puppy**. Everything Code Puppy owns lives under `.codepuppy`
 directories — never create or edit a `.opencode` directory or a `.mcp.json` file (those are other
 tools' conventions; Code Puppy does not read them).
 
@@ -16,11 +16,11 @@ tools' conventions; Code Puppy does not read them).
 |---|---|---|
 | Global (all projects) | `$CODEPUPPY_GLOBAL_DIR/codepuppy.jsonc` | connectors (`mcp`), `plugin`, `agent`, `command`, `provider` overrides |
 | Global installs | `$CODEPUPPY_GLOBAL_DIR/{skills,agents,plugins}/` + ledger `$CODEPUPPY_GLOBAL_DIR/installs.json` | things the user installed/created/imported |
-| Per project | `<project>/.code-puppy/codepuppy.jsonc` | project-scoped connectors / agents / commands / skills path |
-| Per project content | `<project>/.code-puppy/skills/<name>/SKILL.md`, `<project>/.code-puppy/plugins/*.js` | project skills and plugins |
+| Per project | `<project>/.codepuppy/codepuppy.jsonc` | project-scoped connectors / agents / commands / skills path |
+| Per project content | `<project>/.codepuppy/skills/<name>/SKILL.md`, `<project>/.codepuppy/plugins/*.js` | project skills and plugins |
 
-Rule of thumb: `.code-puppy` only ever contains what the user chose to add. Factory content ships inside
-the app and never appears in `.code-puppy`.
+Rule of thumb: `.codepuppy` only ever contains what the user chose to add. Factory content ships inside
+the app and never appears in `.codepuppy`.
 
 ## How to make changes
 
@@ -40,7 +40,7 @@ the app and never appears in `.code-puppy`.
    - `type=agent|command` with the entry JSON (`{"description":"...","prompt":"..."}` / `{"template":"..."}`)
    - `type=mcp` with the connector config — executable connectors additionally need the user's
      per-project consent dialog before they load
-   - `type=skill` (no entry) after writing `<project>/.code-puppy/skills/<name>/SKILL.md`
+   - `type=skill` (no entry) after writing `<project>/.codepuppy/skills/<name>/SKILL.md`
    Changes are validated, written atomically, and scheduled for reload after sessions become idle.
    Executable connectors stay gated until the user trusts the project; do not promise immediate use.
 5. **Global installs** — use the Customization Center tools above. The desktop process supplies
@@ -56,7 +56,7 @@ the app and never appears in `.code-puppy`.
   and stored as `{file:}` references — **never write a connector API key in plaintext into
   `codepuppy.jsonc` yourself**; if a connector needs a key, send the user to the Hub install flow.
 - **Project-scoped secondary path** = `codepuppy_register type=mcp` (config goes to
-  `<project>/.code-puppy/codepuppy.jsonc`): executable connectors only load after the user grants the
+  `<project>/.codepuppy/codepuppy.jsonc`): executable connectors only load after the user grants the
   per-project trust dialog — expect that, don't call it a failure.
 - **Runtime note**: catalog connectors run via `uvx`/`npx` pinned versions; first launch downloads
   from PyPI/npm and can be slow or blocked on restricted networks. A just-installed connector may
@@ -77,7 +77,7 @@ agents) because disabling them breaks the engine or alpha features — the panel
 ## Honest boundaries
 
 - Plugins must be self-contained ESM `.js` (raw TypeScript is rejected by the desktop runtime).
-- Project `.code-puppy/plugins/*.js` files are loaded and executed with the same permissions as
+- Project `.codepuppy/plugins/*.js` files are loaded and executed with the same permissions as
   the engine after the user trusts the project. Trust is granted once for the whole project,
   not per file or per execution. Explain this boundary before asking the user to trust a project.
 - Executable plugins from the catalog are refused (ADR-040).

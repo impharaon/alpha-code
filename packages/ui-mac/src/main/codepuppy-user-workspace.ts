@@ -1,7 +1,7 @@
 // codepuppy-user-workspace — REQ-071 / ADR-025:`~/code-puppy` 用户默认工作目录。
 //
 // main 单点供给(lazy):只在「目标就是默认工作目录」时 mkdir,绝不代建任意路径;同名被文件
-// 占用时不覆盖不清理(返回 null,调用方 loud)。Outputs 可见副本是 `.code-puppy/runs` 真源之外的
+// 占用时不覆盖不清理(返回 null,调用方 loud)。Outputs 可见副本是 `.codepuppy/runs` 真源之外的
 // best-effort 镜像 —— 只在 run 的目标项目就是 ~/code-puppy 时发生,失败不抛不阻断回流。
 // electron-free、env 可覆盖根目录,整面可单测。
 
@@ -38,7 +38,7 @@ const OUTPUTS_DIRNAME = "Outputs"
 
 /** ADR-025 Outputs 契约:run 目标项目 = ~/code-puppy 时,把用户可读交付物复制到
  *  `~/code-puppy/Outputs/<YYYY-MM-DD>-<runId>/`。名字过 sanitizeArtifactName,目标断言在 Outputs
- *  根内;`.code-puppy/runs` 仍是真源,本函数失败只由调用方记 warning。 */
+ *  根内;`.codepuppy/runs` 仍是真源,本函数失败只由调用方记 warning。 */
 export function saveVisibleOutputs(
   projectDir: string,
   runId: string,
@@ -62,7 +62,7 @@ export function saveVisibleOutputs(
         fs.copyFileSync(f.from, target)
         written.push(name)
       } catch {
-        // 单文件失败不掀桌:真源在 .code-puppy/runs,这里是可见镜像
+        // 单文件失败不掀桌:真源在 .codepuppy/runs,这里是可见镜像
       }
     }
     return written.length > 0 ? { ok: true, dir, files: written } : { ok: false, reason: "no files written" }
@@ -72,7 +72,7 @@ export function saveVisibleOutputs(
 }
 
 /** 云 run 回流镜像:saveCloudRun 清单里的 artifacts/*(用户可读交付物)→ Outputs。
- *  contract/status 等机器件不镜像(留 `.code-puppy/runs` 真源)。 */
+ *  contract/status 等机器件不镜像(留 `.codepuppy/runs` 真源)。 */
 export function mirrorRunArtifacts(
   projectDir: string,
   runId: string,

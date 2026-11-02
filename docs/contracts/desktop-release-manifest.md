@@ -36,7 +36,7 @@ updater 事实。必需事实缺失或不一致时 producer **拒绝产出 manif
 - ed25519 over manifest 的**精确字节**(`JSON.stringify(manifest, null, 2) + "\n"`,无
   canonical-JSON 变换);`.sig` 为 base64,允许尾随空白。
 - `keyId` = 公钥 SPKI DER 字节的 sha256 hex,写在 manifest 内(签名覆盖它)。
-- 私钥不入库:`~/.alpha-code-signing/release-manifest-ed25519.pem`(0600),由
+- 私钥不入库:`~/.codepuppy-signing/release-manifest-ed25519.pem`(0600),由
   `release-manifest.ts keygen` 生成。
 
 ## 3. 信任与轮换(AC6)

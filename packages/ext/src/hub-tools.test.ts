@@ -13,6 +13,7 @@ import { join } from "node:path"
 import type { HubRequestRecord, HubView, HubViewRow } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
 import type { HubBridge } from "./hub-bridge"
 import { createHubTools, HUB_INSTALL_OUTCOME, HUB_NEXT_MESSAGE_HINT, HUB_PRICE_NOTE_MISSING, pinHubInstallPermission } from "./hub-tools"
+import { PROJECT_HIDDEN_DIR } from "../../ui-mac/src/shared/project-hidden-dir"
 
 const row = (patch: Partial<HubViewRow>): HubViewRow => ({
   id: "mcp:github",
@@ -140,7 +141,7 @@ describe("I3:确认框一定会出现(钉子)", () => {
     for (const name of ["codepuppy_hub_search", "codepuppy_hub_install", "codepuppy_hub_status"]) expect(Object.keys(hooks.tool)).toContain(name)
 
     // 项目配置读不了(codepuppy.jsonc 是个目录 ⇒ 读失败分支)⇒ try 体后半段整段跳过(提示词接管没跑 = 走的确实是那条分支),钉子照钉
-    mkdirSync(join(root, "project", ".code-puppy", "codepuppy.jsonc"), { recursive: true })
+    mkdirSync(join(root, "project", PROJECT_HIDDEN_DIR, "codepuppy.jsonc"), { recursive: true })
     const broken: Record<string, unknown> = { permission: { "*": "allow" } }
     await hooks.config(broken)
     expect((broken.agent as Record<string, unknown> | undefined)?.general).toBeUndefined()

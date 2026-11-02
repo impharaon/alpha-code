@@ -51,7 +51,7 @@ describe("Alpha Permission unique-mount ratchet", () => {
     expect(watcher).not.toContain("global.event")
     expect(frontendSurfaceById("inline.permission")).toMatchObject({
       owner: "codepuppy.permission",
-      lineage: "alpha",
+      lineage: "codepuppy",
       mount: { kind: "overlay", host: "codepuppy-permission-dialog" },
       source: "packages/ui-mac/src/renderer/codepuppy-ui/permission-watcher.tsx",
     })

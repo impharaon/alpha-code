@@ -82,7 +82,7 @@ import { registerWslIpcHandlers } from "./wsl/ipc"
 import { spawnWslSidecar } from "./wsl/sidecar"
 import { migrate } from "./migrate"
 import { catalogRegistryChannel, initCodePuppyEnvironment, resolveAppEnvironment } from "./codepuppy-environment"
-import { MIGRATION_DIR, PROJECTS_LOG, runNamingMigrationBoot } from "./naming-migration"
+import { completeNamingMigration, MIGRATION_DIR, PROJECTS_LOG, runNamingMigrationBoot } from "./naming-migration"
 import { runNamingMigrationDbStep } from "./naming-migration-db"
 import { createMigrationFs } from "./naming-migration-fs"
 import { configureProjectHiddenDirMigration } from "./project-hidden-dir-migration"
@@ -578,13 +578,13 @@ const main = Effect.gen(function* () {
   preferAppEnv(app.getPath("userData"))
   if (naming.kind === "ready") {
     const db = runNamingMigrationDbStep(naming.journal, { packaged: app.isPackaged, env: process.env, home: homedir() })
-    if (!db.ok) {
-      logger.error("naming migration did not complete — startup stopped", { message: db.message })
-      dialog.showErrorBox("Code Puppy 升级迁移没有完成", db.message)
+    const finished = db.ok ? completeNamingMigration(naming.journal) : db
+    if (!finished.ok) {
+      logger.error("naming migration did not complete — startup stopped", { message: finished.message })
+      dialog.showErrorBox("Code Puppy 升级迁移没有完成", finished.message)
       app.exit(1)
       return
     }
-    naming.journal.complete()
   }
   // REQ-098/#428:在任何 root 消费方前冻结 canonical 新根。packaged onboarding 只把内部生成
   // 的临时 base 作为函数参数传入；环境变量 override 不能授权 packaged 状态落点。

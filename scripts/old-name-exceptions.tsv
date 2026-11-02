@@ -920,7 +920,7 @@ packages/ui-mac/src/main/naming-migration-map.ts	101	migration-source	一次性�
 packages/ui-mac/src/main/naming-migration-map.ts	102	migration-source	一次性迁移代码里识别旧名的常量(#1569 升级迁移:userData / 全局根 / 配置 / 会话库 / 侧栏键 / 项目隐藏目录 / 旧版应用可执行文件),随迁移代码一起删除
 packages/ui-mac/src/main/naming-migration-map.ts	111	migration-source	一次性迁移代码里识别旧名的常量(#1569 升级迁移:userData / 全局根 / 配置 / 会话库 / 侧栏键 / 项目隐藏目录 / 旧版应用可执行文件),随迁移代码一起删除
 packages/ui-mac/src/main/naming-migration-map.ts	114	migration-source	一次性迁移代码里识别旧名的常量(#1569 升级迁移:userData / 全局根 / 配置 / 会话库 / 侧栏键 / 项目隐藏目录 / 旧版应用可执行文件),随迁移代码一起删除
-packages/ui-mac/src/main/naming-migration.ts	416	migration-source	一次性迁移代码里识别旧名的常量(#1569 升级迁移:userData / 全局根 / 配置 / 会话库 / 侧栏键 / 项目隐藏目录 / 旧版应用可执行文件),随迁移代码一起删除
+packages/ui-mac/src/main/naming-migration.ts	429	migration-source	一次性迁移代码里识别旧名的常量(#1569 升级迁移:userData / 全局根 / 配置 / 会话库 / 侧栏键 / 项目隐藏目录 / 旧版应用可执行文件),随迁移代码一起删除
 packages/ui-mac/src/main/network-egress-derived.ts	8	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
 packages/ui-mac/src/main/network-egress-registry.ts	22	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
 packages/ui-mac/src/main/network-egress-registry.ts	23	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改

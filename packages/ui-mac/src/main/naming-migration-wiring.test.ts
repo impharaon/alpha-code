@@ -65,7 +65,7 @@ function bootOrderViolations(source: string): string[] {
     "runNamingMigrationBoot",
     "preferAppEnv",
     "runNamingMigrationDbStep",
-    "naming.journal.complete",
+    "completeNamingMigration",
     "initCodePuppyEnvironment",
   ]
   for (const name of order) if (at(name) < 0) out.push(`${name} is not called inside main`)
@@ -73,13 +73,19 @@ function bootOrderViolations(source: string): string[] {
     if (at(order[i - 1]!) >= at(order[i]!)) out.push(`${order[i - 1]} must come before ${order[i]}`)
   if (at("runNamingMigrationDbStep") >= firstYield) out.push("runNamingMigrationDbStep must run before the first async boundary (yield*)")
   const boot = at("runNamingMigrationBoot")
-  for (const call of calls.filter((c) => c.pos < at("naming.journal.complete")))
+  for (const call of calls.filter((c) => c.pos < at("completeNamingMigration")))
     if (/^(initEndpoints|getStore|safeStorage\.|session\.|initAuthEnv|initByokKeys)/.test(call.text)) out.push(`${call.text} runs before the migration finished`)
   // 失败分支:ready 之前只能 app.exit(1) —— app.quit() 会触发一次钥匙串查找(#1571 第 0b 步)
+  // 两个失败分支:A 段失败;会话库一步或完成标记失败(完成标记写不下去也要走这里,不许让 main 生成器抛出)
   const failed = source.indexOf('if (naming.kind === "failed")')
-  const failedBlock = failed < 0 ? "" : source.slice(failed, source.indexOf("}", source.indexOf("app.exit(1)", failed)) + 1)
-  if (!failedBlock.includes("dialog.showErrorBox(") || !failedBlock.includes("app.exit(1)") || failedBlock.includes("app.quit("))
-    out.push("the failed branch must show dialog.showErrorBox and app.exit(1), never app.quit()")
+  const finishedFailed = source.indexOf("if (!finished.ok)")
+  for (const [label, start] of [["A segment", failed], ["db step / completion", finishedFailed]] as const) {
+    const block = start < 0 ? "" : source.slice(start, source.indexOf("}", source.indexOf("app.exit(1)", start)) + 1)
+    if (!block.includes("dialog.showErrorBox(") || !block.includes("app.exit(1)") || block.includes("app.quit("))
+      out.push(`the ${label} failed branch must show dialog.showErrorBox and app.exit(1), never app.quit()`)
+  }
+  if (!/const finished = db\.ok \? completeNamingMigration\(naming\.journal\) : db/.test(source))
+    out.push("completion must go through completeNamingMigration and share the db step's failed branch")
   if (boot >= 0 && failed >= 0 && failed < boot) out.push("failed branch precedes the boot call")
   return out
 }
@@ -105,6 +111,10 @@ describe("R17 —— index.ts:A 段在锁之后、preferAppEnv 之前;会话库�
     const quit = source.replace('    dialog.showErrorBox("Code Puppy 升级迁移没有完成", naming.message)\n    app.exit(1)', '    dialog.showErrorBox("Code Puppy 升级迁移没有完成", naming.message)\n    app.quit()')
     expect(quit).not.toBe(source)
     expect(bootOrderViolations(quit).join("\n")).toContain("never app.quit()")
+    // 完成标记绕开失败分支直接写(写不下去时 main 生成器会抛出)
+    const bare = source.replace("    const finished = db.ok ? completeNamingMigration(naming.journal) : db\n", "    naming.journal.complete()\n    const finished = db\n")
+    expect(bare).not.toBe(source)
+    expect(bootOrderViolations(bare).join("\n")).toContain("completion must go through completeNamingMigration")
     // 迁移完成之前先读了端点(会碰 userData 里的旧名文件)
     const early = source.replace("  const naming = runNamingMigrationBoot(", "  initEndpoints(\"\", () => {})\n  const naming = runNamingMigrationBoot(")
     expect(bootOrderViolations(early)).toContain("initEndpoints runs before the migration finished")

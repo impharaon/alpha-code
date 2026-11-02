@@ -8,6 +8,7 @@ import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
 import { mockElectron } from "../../test-component/electron-mock"
+import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 
 mockElectron(() => ({
   app: { isPackaged: false },
@@ -114,16 +115,16 @@ describe("writeAgent — global scope", () => {
 })
 
 describe("project scope", () => {
-  test("writes under <project>/.code-puppy + <project>/.opencode bridge + project receipt", () => {
+  test("writes under <project>/.codepuppy + <project>/.opencode bridge + project receipt", () => {
     const projectDir = path.join(base, "proj")
     fs.mkdirSync(projectDir, { recursive: true })
     const r = writeSkill("proj-skill", "d", "b", { scope: "project", projectDir })
     expect(r.ok).toBe(true)
-    expect(fs.existsSync(path.join(projectDir, ".code-puppy", "skills", "proj-skill", "SKILL.md"))).toBe(true)
+    expect(fs.existsSync(path.join(projectDir, PROJECT_HIDDEN_DIR, "skills", "proj-skill", "SKILL.md"))).toBe(true)
     expect(fs.existsSync(path.join(projectDir, ".opencode", "skills"))).toBe(false) // T3:skills 桥退役
-    // .code-puppy self-ignores (ADR-019 §5)
-    expect(fs.readFileSync(path.join(projectDir, ".code-puppy", ".gitignore"), "utf8")).toBe("*\n")
-    const { receipts } = readLedger(path.join(projectDir, ".code-puppy"))
+    // .codepuppy self-ignores (ADR-019 §5)
+    expect(fs.readFileSync(path.join(projectDir, PROJECT_HIDDEN_DIR, ".gitignore"), "utf8")).toBe("*\n")
+    const { receipts } = readLedger(path.join(projectDir, PROJECT_HIDDEN_DIR))
     expect(receipts[0]).toMatchObject({ scope: "project", name: "proj-skill" })
     // global ledger untouched
     expect(readLedger(codepuppyDir).receipts).toHaveLength(0)
@@ -153,7 +154,7 @@ describe("installBuiltinSkill — name + asset-key guards", () => {
     expect((r as any).reason).toContain("未随此版本打包")
   })
 
-  test("bundled asset installs into .code-puppy + bridge + catalog receipt", () => {
+  test("bundled asset installs into .codepuppy + bridge + catalog receipt", () => {
     // safe-refactor ships in repo resources/skills (E1b)
     const r = installBuiltinSkill("skills/safe-refactor", "safe-refactor", { scope: "global" }, { catalogId: "skill:safe-refactor" })
     expect(r.ok).toBe(true)

@@ -737,6 +737,23 @@ describe("跳过:dev / 打包 onboarding 测试 / Windows —— 一个文件都
     })
 })
 
+describe("全新安装(没有任何旧数据)", () => {
+  test("userData 还不存在、也没有旧全局根 ⇒ ready,只写迁移日志", () => {
+    const root = join(TMP, `fresh${++seq}`)
+    const appData = join(root, "Application Support")
+    mkdirSync(appData, { recursive: true })
+    const userData = join(appData, "ai.opencode.desktop")
+    const writes: string[] = []
+    const result = runNamingMigrationBoot(
+      { environment: "prod", onboardingTest: false, userData, appData, home: root, env: {}, otherChannelUserData: [], extraUndo: {}, precheck: () => {} },
+      { fs: recordingFs(writes) },
+    )
+    expect(result.kind).toBe("ready")
+    expect(writes.every((w) => w.includes("codepuppy-naming-migration"))).toBe(true)
+    expect(readdirSync(appData)).toEqual(["ai.opencode.desktop"])
+  })
+})
+
 describe("AC8 —— 只写白名单里的位置,不读出、不记录凭据", () => {
   itSql("全夹具跑一遍:每一次写都落在 userData / 新旧全局根 / 引擎库及其旁件里;日志与备份里没有凭据哨兵", () => {
     const f = seed({ db: true })

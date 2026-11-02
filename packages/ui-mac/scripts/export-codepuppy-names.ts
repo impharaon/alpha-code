@@ -68,7 +68,7 @@ export function exportCodepuppyNames(): CodepuppyNames {
 }
 
 /**
- * 持久化取值(alpha-code#1569 方案 R8):写进用户盘 / 设置 / 会话库、升级后还要从那里读回来的名字。
+ * 持久化取值(#1569 方案 R8):写进用户盘 / 设置 / 会话库、升级后还要从那里读回来的名字。
  * 原则:#1570 改了值的,由升级迁移(src/main/naming-migration-map.ts)把旧值映射过来;不该改值的保留旧值,
  * 并在旧名例外登记表里登记。防漏判据在 src/main/naming-migration-wiring.test.ts。
  */

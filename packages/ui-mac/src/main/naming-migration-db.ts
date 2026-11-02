@@ -1,10 +1,10 @@
-// 升级迁移的会话库一步(alpha-code#1569 AC3;方案 §5、R17、R18、裁决 C2)。
+// 升级迁移的会话库一步(#1569 AC3;方案 §5、R17、R18、裁决 C2)。
 //
 // 只改让旧会话还能接着用的指针,不改历史:
 //   · `session.model` 的供应商、`session.agent`;
 //   · 每个会话**最近一条用户消息**(续写回落 prompt.ts 与压缩 compaction.ts 取的那条)与**最近一条普通用户消息**
 //     (不带压缩部件 —— compaction.ts 溢出重放复制 agent/model 的来源)的 `model.providerID` / `agent`;
-//   · 全部 part 的显示快照 `display.identity` / `display.authority.kind`,与云端识图标记键 `alpha_vision`(值原样)。
+//   · 全部 part 的显示快照 `display.identity` / `display.authority.kind`,与云端识图标记的旧键名(值原样)。
 // 其余消息、`tool` 别名、`technicalId`、`bindingId`、正文一律不碰。排序照抄 message-v2.ts `latest()`:
 // `time.created` 降序、`id` 降序。
 //

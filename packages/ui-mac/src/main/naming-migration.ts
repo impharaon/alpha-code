@@ -1,4 +1,4 @@
-// 升级到新名字后第一次启动的一次性迁移(alpha-code#1569;方案 §3、§4、§7)。
+// 升级到新名字后第一次启动的一次性迁移(#1569;方案 §3、§4、§7)。
 //
 // owner 电脑上 0.1.24 及更早版本写下的数据还挂在旧名字下;新版只认新名字。这里在拿到单实例锁之后、
 // 任何钥匙串访问与引擎启动之前,把它们一次挪到新名字下:
@@ -187,7 +187,13 @@ function planSteps(fs: MigrationFs, layout: Layout, runId: string): PlannedStep[
         fs.mkdir(backupDir)
         fs.copy(file, `${backup}.tmp`)
         fs.rename(`${backup}.tmp`, backup)
-        const after = transform(before)
+        const after = (() => {
+          try {
+            return transform(before)
+          } catch (error) {
+            throw new Error(`${file} 读不懂,没有改它(${error instanceof Error ? error.message : String(error)})。请参照升级说明处理后再打开。`)
+          }
+        })()
         if (after !== before) fs.writeAtomic(file, after)
         verify?.(before)
       })
@@ -331,7 +337,7 @@ function planSteps(fs: MigrationFs, layout: Layout, runId: string): PlannedStep[
     )
 
   // 模型选择(R8):global / 各工作区 / 各草稿 store 文件,一个改动的文件一步
-  for (const name of fs.readdir(layout.userData).filter(isModelSelectionStore).sort()) {
+  for (const name of (fs.isDirectory(layout.userData) ? fs.readdir(layout.userData) : []).filter(isModelSelectionStore).sort()) {
     const file = join(layout.userData, name)
     if (rewriteModelSelections(name, fs.readText(file)) !== fs.readText(file)) steps.push(rewrite(file, (text) => rewriteModelSelections(name, text)))
   }

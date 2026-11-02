@@ -37,6 +37,7 @@ import {
 // ---- 配额基线(REQ-093 §5)。单件/单 run 件数上限来自契约镜像(与平台同值);单 run 字节与
 // managed project 字节是 A 侧基线。单件上限由流式写入器执行,其余三项由本模块在 final rename 前执行。----
 import { ARTIFACT_MAX_BYTES, MAX_ARTIFACTS_PER_RUN } from "../shared/cloud-artifact-descriptor"
+import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 export { ARTIFACT_MAX_BYTES, MAX_ARTIFACTS_PER_RUN }
 export const MAX_RUN_ARTIFACT_BYTES = 512 * 1024 * 1024
 export const MAX_PROJECT_ARTIFACT_BYTES = 5 * 1024 * 1024 * 1024
@@ -1108,9 +1109,9 @@ export function registerDownloadedArtifact(
 ): RegisterArtifactResult {
   if (!isSafeRunId(runId)) return { ok: false, reason: "invalid run id" }
   if (!isSafeSavedPath(input.savedPath)) return { ok: false, reason: "savedPath violates the relative-path invariant" }
-  // ADR-019 守卫:realpath 防逃逸(symlink 文件解析到 .code-puppy 外也在此被拒)。
+  // ADR-019 守卫:realpath 防逃逸(symlink 文件解析到 .codepuppy 外也在此被拒)。
   const target = safeResolveInCodePuppy(projectDir, "runs", runId, ...input.savedPath.split("/"))
-  if (!target) return { ok: false, reason: "path escapes .code-puppy" }
+  if (!target) return { ok: false, reason: `path escapes ${PROJECT_HIDDEN_DIR}` }
   let st: fs.Stats
   try {
     st = fs.statSync(target)
@@ -1220,7 +1221,7 @@ export function recordRunOrigin(
     if (read.manifest.origin.sessionID === origin.sessionID) return { ok: true }
     return { ok: false, reason: "run already attributed to another session" }
   }
-  // 空 manifest 会建出 run 目录:先播种 `.code-puppy/.gitignore`,与 saveCloudRun 的落盘同一纪律。
+  // 空 manifest 会建出 run 目录:先播种 `.codepuppy/.gitignore`,与 saveCloudRun 的落盘同一纪律。
   if (!read.manifest && !ensureCodePuppyScaffold(projectDir)) return { ok: false, reason: "invalid project directory" }
   const now = new Date().toISOString()
   const manifest: ArtifactManifestV1 = read.manifest ?? {
@@ -1307,7 +1308,7 @@ function walkArtifactFiles(runDir: string): LegacyRunFile[] {
 export function listRunArtifacts(projectDir: string, runId: string): RunArtifactsListResult {
   if (!isSafeRunId(runId)) return { ok: false, reason: "invalid run id" }
   const runDir = safeResolveInCodePuppy(projectDir, "runs", runId)
-  if (!runDir) return { ok: false, reason: "path escapes .code-puppy" }
+  if (!runDir) return { ok: false, reason: `path escapes ${PROJECT_HIDDEN_DIR}` }
   const read = readArtifactManifest(projectDir, runId)
   if (!read.ok) {
     if (read.reason === "unsupported-version")
@@ -1410,7 +1411,7 @@ export async function verifyArtifact(
   const entry = manifest.artifacts.find((e) => e.descriptor.id === artifactId)
   if (!entry) return { ok: false, reason: "artifact not found" }
   const target = safeResolveInCodePuppy(projectDir, "runs", runId, ...entry.local.savedPath.split("/"))
-  if (!target) return { ok: false, reason: "path escapes .code-puppy" }
+  if (!target) return { ok: false, reason: `path escapes ${PROJECT_HIDDEN_DIR}` }
 
   // #1551:复核结论与已存记录一致时不写回、不刷新 updatedAt —— 复核在交付热路径上,每次都写会把旧 run
   // 顶到按时间排序(REQ-126 B1)的最前。
@@ -1511,7 +1512,7 @@ export async function saveRunArtifactCopy(
 // 字节访问模式(决策记录):renderer 侧 Workbench/renderer 不拿 file:// 自由寻径,也不开新
 // protocol —— 全库唯一的本地文件到 renderer 先例是「有界字节过 IPC」(read-picked-file /
 // read-clipboard-image),本表面沿用同款并收得更窄:
-//   · 只可寻址 `.code-puppy/runs/<runId>/artifacts/` 内的文件(isSafeSavedPath + safeResolveInCodePuppy,
+//   · 只可寻址 `.codepuppy/runs/<runId>/artifacts/` 内的文件(isSafeSavedPath + safeResolveInCodePuppy,
 //     ADR-019 守卫复用;artifactId 经 manifest 解析,savedPath 直读仅限 legacy 只读发现);
 //   · text 模式:上限 2 MiB,超限截断 + 诚实 truncated 标记(REQ-095 的 range/stream 全量虚拟化
 //     属后续深化,此处先保证「大文件绝不整段进 IPC/store」的硬边界);
@@ -1571,7 +1572,7 @@ export function readArtifactContent(
   }
 
   const target = safeResolveInCodePuppy(projectDir, "runs", runId, ...savedPath.split("/"))
-  if (!target) return { ok: false, reason: "path escapes .code-puppy" }
+  if (!target) return { ok: false, reason: `path escapes ${PROJECT_HIDDEN_DIR}` }
   let st: fs.Stats
   try {
     st = fs.statSync(target)
@@ -1668,7 +1669,7 @@ export function removeArtifact(projectDir: string, runId: string, artifactId: st
   if (idx < 0) return { ok: false, reason: "artifact not found" }
   const entry = manifest.artifacts[idx]
   const target = safeResolveInCodePuppy(projectDir, "runs", runId, ...entry.local.savedPath.split("/"))
-  if (!target) return { ok: false, reason: "path escapes .code-puppy" }
+  if (!target) return { ok: false, reason: `path escapes ${PROJECT_HIDDEN_DIR}` }
   let removedFile = false
   try {
     fs.unlinkSync(target)
@@ -1715,7 +1716,7 @@ export type RunUsageResult = { ok: true; usage: RunArtifactUsage } | { ok: false
 export function runArtifactUsage(projectDir: string, runId: string): RunUsageResult {
   if (!isSafeRunId(runId)) return { ok: false, reason: "invalid run id" }
   const runDir = safeResolveInCodePuppy(projectDir, "runs", runId)
-  if (!runDir) return { ok: false, reason: "path escapes .code-puppy" }
+  if (!runDir) return { ok: false, reason: `path escapes ${PROJECT_HIDDEN_DIR}` }
   const files = walkArtifactFiles(runDir)
   const diskBytes = files.reduce((sum, f) => sum + f.bytesOnDisk, 0)
   const read = readArtifactManifest(projectDir, runId)
@@ -1767,7 +1768,7 @@ export type ProjectArtifactUsage = {
 
 export type ProjectUsageResult = { ok: true; usage: ProjectArtifactUsage } | { ok: false; reason: string }
 
-/** 项目级(managed project)核算:遍历 `.code-puppy/runs/*` 逐 run 汇总。 */
+/** 项目级(managed project)核算:遍历 `.codepuppy/runs/*` 逐 run 汇总。 */
 export function projectArtifactUsage(projectDir: string): ProjectUsageResult {
   const runsDir = safeResolveInCodePuppy(projectDir, "runs")
   if (!runsDir) return { ok: false, reason: "invalid project dir" }

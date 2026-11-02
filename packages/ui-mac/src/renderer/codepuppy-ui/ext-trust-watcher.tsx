@@ -1,8 +1,8 @@
 // ExtTrustWatcher — REQ-060 信任门 UI 驱动端(headless AppInterface child,仿 CloudRunWatcher)。
 //
 // 时机:进入某项目的会话路由(/:b64dir/session/:id)首次见到该 directory → main `ext-trust-check`:
-// 项目 `.code-puppy` 含可执行扩展(mcp / plugins)且未决策 → main 弹 per-project 原生确认(B16 模式)→
-// 决策写 `.code-puppy/prefs.json`;granted → 本组件请 ext 调度器重载(REQ-234 `#1529`:IPC `ext-reload-request`,
+// 项目 `.codepuppy` 含可执行扩展(mcp / plugins)且未决策 → main 弹 per-project 原生确认(B16 模式)→
+// 决策写 `.codepuppy/prefs.json`;granted → 本组件请 ext 调度器重载(REQ-234 `#1529`:IPC `ext-reload-request`,
 // 等同一引擎实例上所有会话空闲再重建,不打断正在输出的回答),@codepuppy/ext 信任门重读 consent,
 // 项目扩展在重载之后的下一条消息生效(免重启,链路真机证据 audits/2026-07-07-req060-fanout-realmachine)。
 //

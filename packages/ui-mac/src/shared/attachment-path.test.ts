@@ -42,9 +42,9 @@ describe("attachmentAbsolutePath", () => {
     for (const file of ["attachment-path.ts", "office-advisories.ts"]) copyFileSync(join(import.meta.dir, file), join(dir, file))
     const constant = readFileSync(join(import.meta.dir, "project-hidden-dir.ts"), "utf8")
     expect(constant).toContain(`export const PROJECT_HIDDEN_DIR = "${PROJECT_HIDDEN_DIR}"`)
-    writeFileSync(join(dir, "project-hidden-dir.ts"), constant.replace(`"${PROJECT_HIDDEN_DIR}"`, '".codepuppy"'))
+    writeFileSync(join(dir, "project-hidden-dir.ts"), constant.replace(`"${PROJECT_HIDDEN_DIR}"`, '".probe-hidden"'))
     const renamed = (await import(join(dir, "attachment-path.ts"))) as typeof import("./attachment-path")
-    expect(renamed.attachmentAbsolutePath("/p", `attachments/${UUID}/a.pdf`)).toBe(`/p/.codepuppy/attachments/${UUID}/a.pdf`)
+    expect(renamed.attachmentAbsolutePath("/p", `attachments/${UUID}/a.pdf`)).toBe(`/p/.probe-hidden/attachments/${UUID}/a.pdf`)
     expect(attachmentAbsolutePath("/p", `attachments/${UUID}/a.pdf`)).toBe(`/p/${PROJECT_HIDDEN_DIR}/attachments/${UUID}/a.pdf`)
   })
   test("main 的项目根解析器读同一个常量(暂存落点经 safeResolveInCodePuppy 跟着它走)", () => {
@@ -91,6 +91,38 @@ describe("AC8 附件代码里没有隐藏目录名 / 附件目录的字面量", 
     expect(workdir).toContain("path.join(project, PROJECT_HIDDEN_DIR)")
     expect(workdir).toContain("path.basename(root) !== PROJECT_HIDDEN_DIR")
     expect(workdir).not.toMatch(/path\.join\(project, "\.code-puppy"\)|basename\(root\) !== "\.code-puppy"/)
+  })
+})
+
+// #1569 AC7:项目隐藏目录名只来自常量 PROJECT_HIDDEN_DIR(值 `.codepuppy`)—— 全部第一方源码(非注释行)里不写隐藏目录名,
+// 新旧两种写法都不许;只有常量文件与识别旧名的迁移代码例外。
+describe("#1569 AC7 第一方源码里没有项目隐藏目录名的字面量", () => {
+  const ANY_HIDDEN = /(^|[^A-Za-z0-9.-])\.code-?puppy(?![A-Za-z0-9_.-])/
+  const ALLOWED = new Set([
+    "packages/ui-mac/src/shared/project-hidden-dir.ts",
+    "packages/ui-mac/src/main/naming-migration-map.ts",
+    "packages/ui-mac/src/main/project-hidden-dir-migration.ts",
+    "packages/ext/src/project-config.ts",
+  ])
+  const listed = Bun.spawnSync(["git", "ls-files", "packages/ui-mac/src", "packages/ext/src", "packages/codepuppy-contracts-consumer/src"], { cwd: REPO })
+  const FILES = listed.stdout
+    .toString()
+    .split("\n")
+    .filter((file) => /\.(ts|tsx)$/.test(file) && !/\.(test|cases|spec)\.(ts|tsx)$/.test(file) && !ALLOWED.has(file))
+  test("判据先测出已知的坏、放过普通词", () => {
+    expect(PROJECT_HIDDEN_DIR).toBe(".codepuppy")
+    for (const bad of ['join(dir, ".code-puppy")', "`${dir}/.codepuppy/runs`", '"./.codepuppy/skills"', "'.code-puppy'", "path escapes .codepuppy"]) expect(ANY_HIDDEN.test(bad), bad).toBe(true)
+    for (const ok of ["https://account.codepuppy.cn", '"codepuppy.jsonc"', "join(dir, PROJECT_HIDDEN_DIR)", "~/code-puppy", "codepuppy://auth"]) expect(ANY_HIDDEN.test(ok), ok).toBe(false)
+  })
+  test("全部第一方源码零命中", () => {
+    expect(listed.exitCode).toBe(0)
+    expect(FILES.length).toBeGreaterThan(500)
+    const hits = FILES.flatMap((file) =>
+      readFileSync(join(REPO, file), "utf8")
+        .split("\n")
+        .flatMap((line, i) => (!/^\s*(\/\/|\*|\/\*)/.test(line) && ANY_HIDDEN.test(line) ? [`${file}:${i + 1}: ${line.trim().slice(0, 100)}`] : [])),
+    )
+    expect(hits).toEqual([])
   })
 })
 

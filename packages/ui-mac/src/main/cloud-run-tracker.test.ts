@@ -14,6 +14,7 @@ import { readArtifactManifest } from "./artifact-manifest"
 import { recordRunOrigin, registerDownloadedArtifact, registeredArtifactNameOwner } from "./artifact-service"
 import { createCloudRunTracker, DELIVERY_MAX_ATTEMPTS, type CloudRunState, type CloudRunTrackerDeps } from "./cloud-run-tracker"
 import type { CloudArtifactDescriptor, CloudArtifactList, CloudJobEvent, CloudJobStatus, CloudResult } from "../preload/types"
+import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 
 const producer = path.join(import.meta.dir, "../../../codepuppy-contracts-consumer/vendor/alpha-platform/contracts/v1/fixtures/producer")
 const STATUS_FIXTURE = (await Bun.file(path.join(producer, "cloud-job-status.json")).json()).value as CloudJobStatus
@@ -33,7 +34,7 @@ afterEach(() => {
   fs.rmSync(projectDir, { recursive: true, force: true })
 })
 
-const savedFile = () => path.join(projectDir, ".code-puppy", "runs", RUN, "artifacts", DESCRIPTOR.name!)
+const savedFile = () => path.join(projectDir, PROJECT_HIDDEN_DIR, "runs", RUN, "artifacts", DESCRIPTOR.name!)
 
 async function until(cond: () => boolean, label: string) {
   for (let i = 0; i < 400; i++) {

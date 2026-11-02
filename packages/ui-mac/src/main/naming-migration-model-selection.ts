@@ -1,4 +1,4 @@
-// 升级迁移:渲染进程存下的模型选择换成新供应商 id(alpha-code#1569 AC1;方案 §4「模型选择」、R8)。
+// 升级迁移:渲染进程存下的模型选择换成新供应商 id(#1569 AC1;方案 §4「模型选择」、R8)。
 //
 // 这些值经 store 桥落在 userData 的 electron-store 文件里,值本身是渲染进程 JSON.stringify 过的字符串:
 //   · `opencode.global.dat` 的 `model` = `{ user[], recent[], variant{"<provider>/<model>"} }`(packages/app context/models.tsx);

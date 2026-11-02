@@ -1,4 +1,4 @@
-// 升级迁移模块唯一的写盘出口(alpha-code#1569 AC8)。
+// 升级迁移模块唯一的写盘出口(#1569 AC8)。
 // 迁移代码(naming-migration*.ts、project-hidden-dir-migration.ts)不直接调用任何 fs 写原语,一律经这里;
 // 每次写之前判目标在不在白名单里 —— userData、新旧全局根、引擎库及其旁件、被打开项目的隐藏目录 —— 不在 ⇒ 抛,
 // 一个字节都不落。读接口不设限。electron-free。

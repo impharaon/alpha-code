@@ -174,7 +174,7 @@ export const CodePuppyExt: Plugin = async (input) => {
       })
       if (authorization) output.headers.authorization = authorization
     },
-    // REQ-060 项目级扩展物 `.code-puppy`-only:config hook 按 instance 读 `<directory>/.code-puppy/codepuppy.jsonc`
+    // REQ-060 项目级扩展物 `.codepuppy`-only:config hook 按 instance 读 `<directory>/.codepuppy/codepuppy.jsonc`
     // 并把项目级 mcp / agent / command / skills.paths 合并进 cfg —— 引擎经 config 消费,项目不产生
     // `.opencode`(零桥)。变异可见性由真机 spike 验(hook "Notify" 语义,T0 gate)。dispose 重建重
     // 触发 = 免重启。信任门(项目自带 mcp/plugin = 加载可执行物)= T1 后续,当前 spike 只验通道。
@@ -209,7 +209,7 @@ export const CodePuppyExt: Plugin = async (input) => {
             return
           }
           if (present.value) {
-            // 信任门:项目自带 mcp(可执行连接器)只在项目已 consent 时加载。consent 落 `.code-puppy/prefs.json`
+            // 信任门:项目自带 mcp(可执行连接器)只在项目已 consent 时加载。consent 落 `.codepuppy/prefs.json`
             // 的 extensionsConsent(版本化,ADR-021 模式);未 consent → mcp 被 gated,记 loud 供 renderer 弹窗。
             const trustExecutable = readProjectExtensionsConsent(project)
             if (trustExecutable === null) {
@@ -445,7 +445,7 @@ export const CodePuppyExt: Plugin = async (input) => {
     },
   }
 
-  // REQ-060 plugin host fan-out:加载项目 `.code-puppy/plugins/*.js`(信任门:未 consent 不加载可执行物)
+  // REQ-060 plugin host fan-out:加载项目 `.codepuppy/plugins/*.js`(信任门:未 consent 不加载可执行物)
   // 并与 ownHooks 合并 return —— 项目插件的 hook 经引擎照常派发,项目零 `.opencode`/零 config.plugin[]。
   const project = projectRootFor(input.directory)
   const consent = project ? readProjectExtensionsConsent(project) : false
@@ -468,7 +468,7 @@ export const CodePuppyExt: Plugin = async (input) => {
   >
 }
 
-/** 项目扩展信任门 consent:`<dir>/.code-puppy/prefs.json` 的 `extensionsConsent.granted === true`(版本化,
+/** 项目扩展信任门 consent:`<dir>/.codepuppy/prefs.json` 的 `extensionsConsent.granted === true`(版本化,
  *  ADR-021 模式)。缺失/坏/未授 = 不信任(默认拒绝可执行物,安全红线)。 */
 function readProjectExtensionsConsent(
   project: Extract<ReturnType<typeof projectDirectoryIdentity>, { status: "project" }>,

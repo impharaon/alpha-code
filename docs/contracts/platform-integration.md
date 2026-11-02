@@ -487,7 +487,7 @@ control fields through an ordinary renderer or agent envelope fails with
 ## Managed cloud artifact persistence
 
 Cloud artifact bytes remain in the main process and stream to a unique `.part`
-file below `<project>/.code-puppy/runs/<run>/artifacts/`. After length and digest
+file below `<project>/.codepuppy/runs/<run>/artifacts/`. After length and digest
 verification, every production download must pass the project-owned artifact
 quota finalizer; no caller has direct final-rename authority.
 
@@ -521,7 +521,7 @@ eligible for same-machine dead-PID cleanup.
 
 Each finalization attempt first creates and fsyncs exactly one owner-unique
 reservation with an exclusive `O_EXCL` open at
-`<project>/.code-puppy/runs/<run>/reservations/<startedAt>-<uuid>.json`. `startedAt`
+`<project>/.codepuppy/runs/<run>/reservations/<startedAt>-<uuid>.json`. `startedAt`
 is a fixed-width sortable value derived from millisecond wall-clock time; it
 does not claim microsecond clock precision. The immutable record is
 `{pid, machineId, declaredBytes, startedAt, uuid}`. A path is owned only by the

@@ -1,4 +1,4 @@
-// 打开项目时把旧隐藏目录 `.code-puppy/` 改成 `.codepuppy/`(alpha-code#1569 AC7;方案 §6、R4、R19、R20-9)。
+// 打开项目时把旧名字的项目隐藏目录改成 `.codepuppy/`(#1569 AC7;方案 §6、R4、R19、R20-9)。
 //
 // 只在 prod / beta 渠道写(index.ts 在升级迁移就绪后调一次 configure);未配置(dev、测试、Windows)时只判不写。
 // 每次解析项目都检查并补完子步骤 —— 不以「新目录已在」当作迁完(R19):
@@ -62,7 +62,9 @@ export function adoptLegacyProjectHiddenDir(project: string, now: () => Date = (
     ] as const) {
       if (!lstat(file) || verified.get(file) === statSync(file).mtimeMs) continue
       const text = readFileSync(file, "utf8")
-      const next = editJsonText(text, { value: (path, value) => (step === "rewrite-config" || path.includes("files") ? rewritePath(value) : undefined) })
+      // 坏文件不改写、也不当作迁完(不记 mtime):它的读取方照旧对坏文件 fail-closed 并报出来
+      const next = tryEditJsonText(text, { value: (path, value) => (step === "rewrite-config" || path.includes("files") ? rewritePath(value) : undefined) })
+      if (next === undefined) continue
       if (next !== text) {
         if (!fs || !log) return pending(`${file} 里还有指向旧目录的路径,这个版本不迁移它`)
         fs.writeAtomic(file, next)
@@ -75,6 +77,14 @@ export function adoptLegacyProjectHiddenDir(project: string, now: () => Date = (
   fs.mkdir(dirname(log))
   fs.append(log, `${now().toISOString()}\t${project}\t${done.join(",")}\n`)
   return { kind: "migrated" }
+}
+
+function tryEditJsonText(text: string, edits: Parameters<typeof editJsonText>[1]): string | undefined {
+  try {
+    return editJsonText(text, edits)
+  } catch {
+    return undefined
+  }
 }
 
 function lstat(p: string) {

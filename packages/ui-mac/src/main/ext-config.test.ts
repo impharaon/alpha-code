@@ -16,6 +16,7 @@ import { newMcpSecretVersionId, writeMcpSecretVersioned } from "./codepuppy-mcp-
 import { tryAcquireBundleLock } from "./ext-bundle-lock"
 import { addReceipt, findReceipt, readLedger } from "./codepuppy-installs"
 import { upsertRecordV2 } from "./ext-receipt-v2"
+import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 
 // REQ-018 T2: mcp/plugin persistence targets the codepuppy-owned ~/.opencode/opencode.jsonc
 // (CODEPUPPY_OPENCODE_HOME-overridable); provider persistence stays on the shared XDG config
@@ -268,8 +269,8 @@ describe("persistMcp — accept paths write mcp[name]", () => {
     const globalFile = path.join(codepuppyTmp, "codepuppy.jsonc")
     const globalBefore = fs.readFileSync(globalFile, "utf8")
     const project = path.join(tmp, "project-remove")
-    fs.mkdirSync(path.join(project, ".code-puppy"), { recursive: true })
-    const projectRoot = path.join(fs.realpathSync(project), ".code-puppy")
+    fs.mkdirSync(path.join(project, PROJECT_HIDDEN_DIR), { recursive: true })
+    const projectRoot = path.join(fs.realpathSync(project), PROJECT_HIDDEN_DIR)
     const projectFile = path.join(projectRoot, "codepuppy.jsonc")
     fs.writeFileSync(
       projectFile,
@@ -291,8 +292,8 @@ describe("persistMcp — accept paths write mcp[name]", () => {
   test("REQ-136 global remove leaves D byte-for-byte intact; missing project config stays absent", () => {
     expect(persistMcp("demo", { type: "local", command: ["npx", "global-demo"] }).ok).toBe(true)
     const project = path.join(tmp, "project-global-remove")
-    fs.mkdirSync(path.join(project, ".code-puppy"), { recursive: true })
-    const projectRoot = path.join(fs.realpathSync(project), ".code-puppy")
+    fs.mkdirSync(path.join(project, PROJECT_HIDDEN_DIR), { recursive: true })
+    const projectRoot = path.join(fs.realpathSync(project), PROJECT_HIDDEN_DIR)
     const projectFile = path.join(projectRoot, "codepuppy.jsonc")
     fs.writeFileSync(projectFile, JSON.stringify({ mcp: { demo: { type: "local", command: ["npx", "project-demo"] } } }, null, 4) + "\n")
     const projectBefore = fs.readFileSync(projectFile, "utf8")
@@ -302,8 +303,8 @@ describe("persistMcp — accept paths write mcp[name]", () => {
     expect(readCodePuppyConfig().mcp?.demo).toBeUndefined()
 
     const emptyProject = path.join(tmp, "project-empty")
-    fs.mkdirSync(path.join(emptyProject, ".code-puppy"), { recursive: true })
-    const emptyRoot = path.join(fs.realpathSync(emptyProject), ".code-puppy")
+    fs.mkdirSync(path.join(emptyProject, PROJECT_HIDDEN_DIR), { recursive: true })
+    const emptyRoot = path.join(fs.realpathSync(emptyProject), PROJECT_HIDDEN_DIR)
     expect(removeProjectMcpConfigInLock(emptyRoot, "demo")).toEqual({ ok: true })
     expect(fs.existsSync(path.join(emptyRoot, "codepuppy.jsonc"))).toBe(false)
   })
@@ -313,8 +314,8 @@ describe("persistMcp — accept paths write mcp[name]", () => {
     const globalFile = path.join(codepuppyTmp, "codepuppy.jsonc")
     const globalBefore = fs.readFileSync(globalFile, "utf8")
     const project = path.join(tmp, "project-malformed")
-    fs.mkdirSync(path.join(project, ".code-puppy"), { recursive: true })
-    const projectRoot = path.join(fs.realpathSync(project), ".code-puppy")
+    fs.mkdirSync(path.join(project, PROJECT_HIDDEN_DIR), { recursive: true })
+    const projectRoot = path.join(fs.realpathSync(project), PROJECT_HIDDEN_DIR)
     const projectFile = path.join(projectRoot, "codepuppy.jsonc")
     fs.writeFileSync(projectFile, '{"mcp":{"demo":')
     const projectBefore = fs.readFileSync(projectFile, "utf8")
@@ -327,14 +328,14 @@ describe("persistMcp — accept paths write mcp[name]", () => {
 
   test("REQ-136 project remove rejects an codepuppy.jsonc symlink without reading through it", () => {
     const project = path.join(tmp, "project-config-symlink")
-    const projectRoot = path.join(project, ".code-puppy")
+    const projectRoot = path.join(project, PROJECT_HIDDEN_DIR)
     fs.mkdirSync(projectRoot, { recursive: true })
     const outside = path.join(tmp, "outside-alpha.jsonc")
     const outsideBefore = JSON.stringify({ mcp: { demo: { type: "local", command: ["npx", "outside"] } } })
     fs.writeFileSync(outside, outsideBefore)
     fs.symlinkSync(outside, path.join(projectRoot, "codepuppy.jsonc"))
 
-    const result = removeProjectMcpConfigInLock(path.join(fs.realpathSync(project), ".code-puppy"), "demo")
+    const result = removeProjectMcpConfigInLock(path.join(fs.realpathSync(project), PROJECT_HIDDEN_DIR), "demo")
     expect(result.ok).toBe(false)
     expect(fs.readFileSync(outside, "utf8")).toBe(outsideBefore)
     expect(fs.lstatSync(path.join(projectRoot, "codepuppy.jsonc")).isSymbolicLink()).toBe(true)
@@ -342,7 +343,7 @@ describe("persistMcp — accept paths write mcp[name]", () => {
 
   test("REQ-136 project remove never uses legacy predictable scratch paths", () => {
     const project = path.join(tmp, "project-scratch-symlink")
-    const projectRoot = path.join(project, ".code-puppy")
+    const projectRoot = path.join(project, PROJECT_HIDDEN_DIR)
     fs.mkdirSync(projectRoot, { recursive: true })
     const projectFile = path.join(projectRoot, "codepuppy.jsonc")
     const projectBefore = JSON.stringify({ mcp: { demo: { type: "local", command: ["npx", "project"] } } })
@@ -351,7 +352,7 @@ describe("persistMcp — accept paths write mcp[name]", () => {
     fs.writeFileSync(outside, "outside-stays-exact")
     fs.symlinkSync(outside, `${projectFile}.tmp`)
 
-    const result = removeProjectMcpConfigInLock(path.join(fs.realpathSync(project), ".code-puppy"), "demo")
+    const result = removeProjectMcpConfigInLock(path.join(fs.realpathSync(project), PROJECT_HIDDEN_DIR), "demo")
     expect(result.ok).toBe(true)
     expect(JSON.parse(fs.readFileSync(projectFile, "utf8")).mcp?.demo).toBeUndefined()
     expect(fs.readFileSync(outside, "utf8")).toBe("outside-stays-exact")
@@ -360,7 +361,7 @@ describe("persistMcp — accept paths write mcp[name]", () => {
 
   test("REQ-136 project remove rejects a symlinked capability store before config or grants can change", () => {
     const project = path.join(tmp, "project-store-symlink")
-    const projectRoot = path.join(project, ".code-puppy")
+    const projectRoot = path.join(project, PROJECT_HIDDEN_DIR)
     fs.mkdirSync(projectRoot, { recursive: true })
     const projectFile = path.join(projectRoot, "codepuppy.jsonc")
     const projectBefore = JSON.stringify({ mcp: { demo: { type: "local", command: ["npx", "project"] } } })
@@ -371,7 +372,7 @@ describe("persistMcp — accept paths write mcp[name]", () => {
     fs.writeFileSync(outsideGrant, "outside-grant-stays-exact")
     fs.symlinkSync(outsideStore, path.join(projectRoot, "ext-store"))
 
-    const result = removeProjectMcpConfigInLock(path.join(fs.realpathSync(project), ".code-puppy"), "demo")
+    const result = removeProjectMcpConfigInLock(path.join(fs.realpathSync(project), PROJECT_HIDDEN_DIR), "demo")
     expect(result.ok).toBe(false)
     expect(fs.readFileSync(projectFile, "utf8")).toBe(projectBefore)
     expect(fs.readFileSync(outsideGrant, "utf8")).toBe("outside-grant-stays-exact")

@@ -25,6 +25,7 @@ import {
   type ArtifactQuotaFinalizeOptions,
   type ArtifactQuotaLimits,
 } from "./artifact-service"
+import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 
 const RUN = "job-quota"
 const OTHER_RUN = "job-other"
@@ -77,7 +78,7 @@ function hang(onEntered: () => void) {
 let projectDir: string
 let reservationCounter: number
 let machineId: string
-const artifactsDir = (runId = RUN) => join(projectDir, ".code-puppy", "runs", runId, "artifacts")
+const artifactsDir = (runId = RUN) => join(projectDir, PROJECT_HIDDEN_DIR, "runs", runId, "artifacts")
 const target = (name: string) => join(artifactsDir(), name)
 
 beforeEach(async () => {
@@ -857,7 +858,7 @@ describe("finalizeArtifactWithQuota", () => {
     const artifactsPerRun = 245
     expect(runCount * artifactsPerRun).toBeGreaterThan(10_000)
     Array.from({ length: runCount }, (_, runIndex) => {
-      const dir = join(projectDir, ".code-puppy", "runs", `job-large-${runIndex}`, "artifacts")
+      const dir = join(projectDir, PROJECT_HIDDEN_DIR, "runs", `job-large-${runIndex}`, "artifacts")
       mkdirSync(dir, { recursive: true })
       Array.from({ length: artifactsPerRun }, (_, artifactIndex) =>
         writeFileSync(join(dir, `artifact-${artifactIndex}.bin`), ""),

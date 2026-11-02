@@ -64,7 +64,7 @@ describe("factorySkillSources", () => {
       "`codepuppy_register` tool only for project scope",
       "Executable connectors stay gated until the user trusts the project",
       "(skills + agents + commands + connectors)",
-      "Project `.code-puppy/plugins/*.js` files are loaded and executed with the same permissions as\n  the engine after the user trusts the project",
+      "Project `.codepuppy/plugins/*.js` files are loaded and executed with the same permissions as\n  the engine after the user trusts the project",
       "Trust is granted once for the whole project,\n  not per file or per execution",
       "Executable plugins from the catalog are refused (ADR-040)",
     ]) expect(text).toContain(sentence)

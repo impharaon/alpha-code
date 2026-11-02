@@ -125,7 +125,7 @@ describe("saveVisibleOutputs (Outputs contract)", () => {
 })
 
 describe("mirrorRunArtifacts (cloud manifest → Outputs)", () => {
-  test("mirrors artifacts/* only; machine files stay in .code-puppy", () => {
+  test("mirrors artifacts/* only; machine files stay in .codepuppy", () => {
     ensureUserWorkspaceDir()
     const runDir = path.join(base, "rundir")
     fs.mkdirSync(path.join(runDir, "artifacts"), { recursive: true })

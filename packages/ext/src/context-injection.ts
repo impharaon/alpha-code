@@ -53,7 +53,7 @@
 // 引用**(`explainConfigReference`:`/$schema` `/plugin` `/enabled_providers` `/model` `/provider` `/mcp`)、引擎的
 // permission / mode 动词 —— 其它一律点名;用户的字按来源排除。`#1296` / `#1299` 那两道按键的判据已并入它。
 //
-// 仍不在本登记簿里、也不该在:项目自己的 `.code-puppy/plugins/*.js` 与 `codepuppy.jsonc`(用户的字,不是
+// 仍不在本登记簿里、也不该在:项目自己的 `.codepuppy/plugins/*.js` 与 `codepuppy.jsonc`(用户的字,不是
 // alpha 的);REQ-063 用户经导入门放进 `<codepuppy-root>/instructions/*.md` 的字(用户的);skills 正文与
 // MCP 工具表(别人的字);ui-mac 写进 agent 与顶层 permission 的动词、`hidden` / `disable` / `enabled` 布尔(不是字)。
 
@@ -71,6 +71,7 @@ import {
   CODEPUPPY_REVIEW_TEMPLATE,
 } from "./codepuppy-prompts"
 import { REBRAND_RULES } from "./prompt-rebrand"
+import { PROJECT_HIDDEN_DIR } from "../../ui-mac/src/shared/project-hidden-dir"
 
 /** 计量单位:UTF-8 字节。全模块只此一处量长度。 */
 export function contextBytes(text: string): number {
@@ -298,11 +299,11 @@ export const TOOL_TEXT = {
   codepuppy_register: {
     readable: "codepuppy:register",
     description:
-      "Register a project-scoped extension entry into <project>/.code-puppy/codepuppy.jsonc (the ONLY alpha directory in a project — never create .opencode). " +
+      `Register a project-scoped extension entry into <project>/${PROJECT_HIDDEN_DIR}/codepuppy.jsonc (the ONLY alpha directory in a project — never create .opencode). ` +
       "Use type=agent|command with an entry object (agent: {description,prompt,mode,...}; command: {template,description,...}); " +
       "type=mcp with the connector config (loading executable connectors additionally requires the user's per-project consent dialog); " +
-      "type=skill takes no entry — it registers the ./.code-puppy/skills path; write the skill itself to .code-puppy/skills/<name>/SKILL.md. " +
-      "Plugins are NOT registered here: drop a self-contained ESM .js into .code-puppy/plugins/ (raw TypeScript is rejected). " +
+      `type=skill takes no entry — it registers the ./${PROJECT_HIDDEN_DIR}/skills path; write the skill itself to ${PROJECT_HIDDEN_DIR}/skills/<name>/SKILL.md. ` +
+      `Plugins are NOT registered here: drop a self-contained ESM .js into ${PROJECT_HIDDEN_DIR}/plugins/ (raw TypeScript is rejected). ` +
       "The change is validated, written atomically, and auto-reloaded once no reply is in progress in this workspace (available from the NEXT message).",
     args: {
       type: "Extension kind to register",

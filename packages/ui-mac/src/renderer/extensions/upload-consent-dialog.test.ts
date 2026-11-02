@@ -16,6 +16,7 @@ import type { ExtensionDetail } from "./extension-detail"
 import type { CatalogEntry, CloudPipelineSpec } from "./catalog-types"
 import bundledCatalog from "./codepuppy-catalog.json"
 import { dict as zh } from "../i18n/zh"
+import { PROJECT_HIDDEN_DIR } from "../../shared/project-hidden-dir"
 
 type Runtime = {
   createComponent: typeof createComponent
@@ -397,7 +398,7 @@ function mountCloudEntry(id: string, kind: CloudPipelineSpec["pipelineKind"], re
         onEvent: (handler: typeof event) => { event = handler; return () => {} },
         saveRun: async (...args: unknown[]) => {
           saves.push(args)
-          return { ok: true, dir: "/results/.code-puppy/runs/job", files: kind === "office-report" ? [`artifacts/output.${id === "cloud:word" ? "docx" : id === "cloud:excel" ? "xlsx" : "pptx"}`] : [], warnings: [], failures: [] }
+          return { ok: true, dir: "/results/.codepuppy/runs/job", files: kind === "office-report" ? [`artifacts/output.${id === "cloud:word" ? "docx" : id === "cloud:excel" ? "xlsx" : "pptx"}`] : [], warnings: [], failures: [] }
         },
       },
     },
@@ -471,7 +472,7 @@ describe("#1509 customization center cloud entries", () => {
     expect(file.textContent).toBe(`artifacts/output.${format}`)
     file.click()
     await flush()
-    expect(harness.opened).toEqual([`/results/.code-puppy/runs/job/artifacts/output.${format}`])
+    expect(harness.opened).toEqual([`/results/.codepuppy/runs/job/artifacts/output.${format}`])
   })
 
   test("AC3 code-review retains its diff dispatch and completed run display", async () => {
@@ -580,7 +581,7 @@ describe("#1595 AC3 云连接器详情:人话标题、状态、登录入口与�
 })
 
 describe("#1595 AC4 发送框、结果、生效状态与云端错误的文字按批准稿对照表", () => {
-  test("zh 文案逐条对照,且不写 .code-puppy/runs 一类目录名", () => {
+  test("zh 文案逐条对照,且不写 .codepuppy/runs 一类目录名", () => {
     const expected: Partial<Record<keyof typeof zh, string>> = {
       "codepuppy.ext.hubStatePending": "待生效",
       "codepuppy.ext.hubReasonWaiting": "对话空闲后自动生效",
@@ -604,7 +605,7 @@ describe("#1595 AC4 发送框、结果、生效状态与云端错误的文字按
     }
     for (const [key, value] of Object.entries(expected)) expect(zh[key as keyof typeof zh], key).toBe(value)
     for (const key of ["codepuppy.cloud.runSaved", "codepuppy.ext.cloudSub", "codepuppy.ext.cloudInputHint"] as const) {
-      expect(zh[key]).not.toContain(".code-puppy")
+      expect(zh[key]).not.toContain(PROJECT_HIDDEN_DIR)
     }
   })
 })

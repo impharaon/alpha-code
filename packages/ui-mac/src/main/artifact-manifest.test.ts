@@ -16,12 +16,13 @@ import {
   type ArtifactManifestV1,
   type ManifestArtifactEntry,
 } from "./artifact-manifest"
+import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 
 let projectDir: string
 const RUN = "job_1234"
 beforeEach(() => {
   projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "artifact-manifest-"))
-  fs.mkdirSync(path.join(projectDir, ".code-puppy", "runs", RUN, "artifacts"), { recursive: true })
+  fs.mkdirSync(path.join(projectDir, PROJECT_HIDDEN_DIR, "runs", RUN, "artifacts"), { recursive: true })
 })
 afterEach(() => {
   fs.rmSync(projectDir, { recursive: true, force: true })
@@ -67,7 +68,7 @@ function manifest(entries: ManifestArtifactEntry[]): ArtifactManifestV1 {
   return { schemaVersion: 1, runId: RUN, updatedAt: "2026-07-12T00:00:00.000Z", artifacts: entries }
 }
 
-const manifestPath = () => path.join(projectDir, ".code-puppy", "runs", RUN, ARTIFACT_MANIFEST_FILE)
+const manifestPath = () => path.join(projectDir, PROJECT_HIDDEN_DIR, "runs", RUN, ARTIFACT_MANIFEST_FILE)
 
 describe("isSafeSavedPath", () => {
   test.each([["artifacts/report.md"], ["artifacts/sub/data.csv"], ["artifacts/中文 名.pdf"]])("accepts %p", (p) =>
@@ -135,7 +136,7 @@ describe("atomic write", () => {
   })
 
   test("absolute savedPath is refused", () => {
-    const bad = manifest([entry({ savedPath: path.join(projectDir, ".code-puppy", "runs", RUN, "artifacts", "x") })])
+    const bad = manifest([entry({ savedPath: path.join(projectDir, PROJECT_HIDDEN_DIR, "runs", RUN, "artifacts", "x") })])
     expect(writeArtifactManifest(projectDir, RUN, bad).ok).toBe(false)
   })
 

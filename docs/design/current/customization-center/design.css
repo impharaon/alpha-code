@@ -108,7 +108,7 @@ table.matrix{width:100%;min-width:820px;border-collapse:separate;border-spacing:
 .cat-h{margin:22px 0 2px;font-size:var(--a-text-2xs);font-weight:var(--a-weight-semibold);letter-spacing:var(--a-tracking-wide);text-transform:uppercase;color:var(--a-text-tertiary)}
 .group-note{font-size:var(--a-text-xs);color:var(--a-text-tertiary);margin:4px 0 0}
 
-/* ── 详情页帧骨架(现役 .alpha-ext-d*,v5 血统) ── */
+/* ── 详情页帧骨架(现役 .codepuppy-ext-d*,v5 血统) ── */
 .det{padding:24px 26px;max-width:760px}
 .backrow{display:inline-flex;align-items:center;gap:5px;margin-bottom:16px;padding:5px 10px 5px 4px;border:0;border-radius:var(--a-radius-md);background:transparent;color:var(--a-text-secondary);font-size:var(--a-text-sm);font-weight:var(--a-weight-medium)}
 .dhead{display:flex;gap:14px;align-items:flex-start}
@@ -185,7 +185,7 @@ table.matrix{width:100%;min-width:820px;border-collapse:separate;border-spacing:
 .pv .why{margin:3px 0 0;font-size:var(--a-text-xs);color:var(--a-text-tertiary);line-height:var(--a-leading-snug)}
 .pv[data-dim]{opacity:.72}
 
-/* 扩展包卡(现役 .alpha-ext-pack) */
+/* 扩展包卡(现役 .codepuppy-ext-pack) */
 .pack{border:1px solid var(--a-border);border-radius:var(--a-radius-lg);background:var(--a-surface);box-shadow:var(--a-edge-light);padding:13px 15px;margin-bottom:10px}
 .pack:last-child{margin-bottom:0}
 .pack-h{display:flex;align-items:center;gap:13px}

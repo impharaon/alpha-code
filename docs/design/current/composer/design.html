@@ -310,7 +310,7 @@
         <div class="note"><b>计价倍数(REQ-127 #679 改写)</b>:代理模型的计价由网关 <span class="mono">GET /v1/models</span> 下发,形状是<strong>每个模型两个倍数</strong>(输入 / 输出),相对基准模型的未缓存 token 单价 —— <strong>不是</strong>「旗舰/高级/标准 + 单一 ×N」那种档位表,本地也不再保存任何价格。原稿那句是明确的错误设计主张:折叠成一个 scalar 对输入或输出至少有一侧必然错(claude-fable-5 是 输入 71.4× / 输出 178.6×)。没有可信数据时行内明说「计价信息暂不可用」,绝不合成一个便宜的数字。</div>
         <div class="note"><b>推理点(蓝点)</b>:标记该模型支持 effort(来自 <span class="mono">model.variants</span>);只有带点的模型,effort 控件才可用。</div>
         <div class="note warn"><b>四种账号态</b>(顶部切换,对接 <span class="mono">/v1/account/summary</span>):① <strong>会员</strong> 额度充足直接用;② <strong>仅余额</strong> 未订阅、按钱包余额按量扣;③ <strong>余额不足</strong> 软锁,提示充值/订阅;④ <strong>未登录</strong> 硬锁,提示登录。代理段随账号态变,<strong>国内直连 / 自定义始终可用</strong>(BYOK 不受影响)。</div>
-        <div class="note"><b>实现说明</b>:数据来自 <span class="mono">useProviders()/useModels()</span>;代理段需在 <span class="mono">codepuppy-models.ts</span> 把当前单个 <span class="mono">alpha-default</span> 扩成<strong>带等级的多模型注册</strong>(已知小缺口,属构建项)。弹层为新增 alpha 组件,替换现 <span class="mono">dialog-select-model.tsx</span> 的观感。</div>
+        <div class="note"><b>实现说明</b>:数据来自 <span class="mono">useProviders()/useModels()</span>;代理段需在 <span class="mono">codepuppy-models.ts</span> 把当前单个 <span class="mono">codepuppy-default</span> 扩成<strong>带等级的多模型注册</strong>(已知小缺口,属构建项)。弹层为新增 alpha 组件,替换现 <span class="mono">dialog-select-model.tsx</span> 的观感。</div>
       </div>
     </div>
   </section>

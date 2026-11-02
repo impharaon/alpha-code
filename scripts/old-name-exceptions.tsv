@@ -460,9 +460,7 @@ docs/design/README.md	120	historical	指向存档文件(已接受 ADR / 审计�
 docs/design/README.md	123	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
 docs/design/current/artifact-workbench/components.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/current/artifact-workbench/design.css	2	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
-docs/design/current/artifact-workbench/design.css	79	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
 docs/design/current/artifact-workbench/design.html	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/design/current/artifact-workbench/design.html	15	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
 docs/design/current/artifact-workbench/design.html	92	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/current/assemble-popup/design.html	38	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 docs/design/current/capability-authorize/design.html	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -478,7 +476,6 @@ docs/design/current/composer/design.html	91	external-anchor	GitHub 仓库名 alp
 docs/design/current/composer/design.html	92	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/current/composer/design.html	260	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/current/composer/design.html	270	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/design/current/composer/design.html	313	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
 docs/design/current/composer/design.html	409	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/current/composer/design.html	423	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/current/composer/design.html	429	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
@@ -505,8 +502,6 @@ docs/design/current/conversation-timeline/design.html	1251	external-anchor	GitHu
 docs/design/current/conversation-timeline/design.html	1252	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/current/conversation-timeline/design.html	1254	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/current/customization-center/components.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/design/current/customization-center/design.css	111	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
-docs/design/current/customization-center/design.css	188	pending	#1570 待裁:现行文档里的旧品牌用语 / 样式名,命名规范 §3 没有给新名(派发书判断点 9)
 docs/design/current/customization-center/design.html	22	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/current/customization-center/design.html	185	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/current/customization-center/design.html	198	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改

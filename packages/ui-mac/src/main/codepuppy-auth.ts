@@ -219,6 +219,10 @@ function load() {
   // 表现为"每次重启都要重新登录"却无任何日志线索(REQ-002 联调实锤,2026-07-03)。
   try {
     const read = readStoredAuth(authFilePath())
+    if (read.state === "corrupt") {
+      warn("codepuppy-auth: failed to restore stored credentials (corrupt file or keychain change)", read.error)
+      return
+    }
     if (read.state === "failed") {
       warn("codepuppy-auth: stored credentials present but safeStorage unavailable — staying logged-out")
       return
@@ -233,23 +237,26 @@ function load() {
 
 /**
  * #1571 钥匙串改名后的自检:登录文件还解得开吗。与 load() 走同一个读取函数,所以「自检解得开 = 启动读得出」。
- * 没有文件 ⇒ absent;明文信封 ⇒ unencrypted;有密文而 safeStorage 不可用、解密抛错或信封坏 ⇒ failed。
+ * 没有文件、或信封本身解析不出 ⇒ absent(信封坏与改名无关,用户本来就得重新登录;判 failed 会让每次启动都
+ * 撤销迁移并退出);明文信封 ⇒ unencrypted;有密文而 safeStorage 不可用、或解密抛错 ⇒ failed。
  * 明文在这里用完即弃:不返回、不记日志。
  */
 export function probeStoredAuthDecryption(dataPath: string): StoredSecretProbe {
   try {
-    return readStoredAuth(join(dataPath, AUTH_FILE)).state
+    const read = readStoredAuth(join(dataPath, AUTH_FILE))
+    return read.state === "corrupt" ? "absent" : read.state
   } catch {
     return "failed"
   }
 }
 
-/** 读登录文件的信封并解密(load 与自检共用)。state 取自检的词汇:failed = 有密文但 safeStorage 不可用。
- *  信封解析失败、解密失败原样抛出。 */
+/** 读登录文件的信封并解密(load 与自检共用)。state 取自检的词汇:failed = 有密文但 safeStorage 不可用;
+ *  corrupt = 信封解析不出。解密失败原样抛出。 */
 function readStoredAuth(
   path: string,
 ):
   | { state: "absent" }
+  | { state: "corrupt"; error: unknown }
   | { state: "failed" }
   | { state: "unencrypted"; json: string | undefined }
   | { state: "decrypted"; json: string } {
@@ -259,7 +266,13 @@ function readStoredAuth(
   } catch {
     return { state: "absent" }
   }
-  const parsed = JSON.parse(raw) as { v: number; enc?: string; plain?: string }
+  let parsed: { v: number; enc?: string; plain?: string } | null
+  try {
+    parsed = JSON.parse(raw)
+  } catch (error) {
+    return { state: "corrupt", error }
+  }
+  if (parsed === null) return { state: "corrupt", error: new Error("credential envelope is null") }
   if (!parsed.enc) return { state: "unencrypted", json: parsed.plain }
   if (!safeStorage.isEncryptionAvailable()) return { state: "failed" }
   return { state: "decrypted", json: safeStorage.decryptString(Buffer.from(parsed.enc, "base64")) }

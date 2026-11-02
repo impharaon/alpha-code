@@ -1474,7 +1474,7 @@ describe("#1571 probeStoredAuthDecryption — 改名后自检,与 load() 同一�
     expect(process.env.CODEPUPPY_API_KEY).toBe(bundle["model.invoke"])
   })
 
-  test("failed:safeStorage 不可用、解密抛错、信封坏;前两种 load() 都读不出", () => {
+  test("failed:只有 safeStorage 不可用、或解密抛错;两种情况 load() 都读不出", () => {
     writeEncrypted({ mode: "platform", platformAccessTokens: tokenBundle(), clientId: "codepuppy" })
     expect(probeStoredAuthDecryption(dataPath)).toBe("failed")
     safeStorageAvailable = true
@@ -1482,7 +1482,15 @@ describe("#1571 probeStoredAuthDecryption — 改名后自检,与 load() 同一�
     expect(probeStoredAuthDecryption(dataPath)).toBe("failed")
     initAuthEnv(dataPath)
     expect(process.env.CODEPUPPY_API_KEY).toBeUndefined()
-    writeFileSync(join(dataPath, "codepuppy-auth.json"), "{not json")
-    expect(probeStoredAuthDecryption(dataPath)).toBe("failed")
+  })
+
+  test("信封解析不出 ⇒ absent(与改名无关,不能让每次启动都撤销迁移);load() 照旧当未登录", () => {
+    safeStorageAvailable = true
+    for (const body of ["{not json", "null"]) {
+      writeFileSync(join(dataPath, "codepuppy-auth.json"), body)
+      expect(probeStoredAuthDecryption(dataPath)).toBe("absent")
+      initAuthEnv(dataPath)
+      expect(process.env.CODEPUPPY_API_KEY).toBeUndefined()
+    }
   })
 })

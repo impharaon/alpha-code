@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { createMemo } from "solid-js"
 import { toV1Receipt, type InstallRecordV2 } from "../../main/ext-receipt-v2"
 import type { CatalogPackageViewV1 } from "../../shared/catalog-package-view"
-import { CURATION_SCHEMA_ID, decodeEntryCuration, INTAKE_PROVENANCE_SCHEMA_ID } from "../../shared/catalog-curation"
+import { CURATION_ASSET_NAMESPACE, CURATION_SCHEMA_ID, decodeEntryCuration, INTAKE_PROVENANCE_SCHEMA_ID } from "../../shared/catalog-curation"
 import type { Catalog, CatalogEntry } from "./catalog-types"
 import { installableCatalogEntries, installableCatalogPackages } from "./catalog-installable-view"
 import { nameOnlyLiveMcpIsUnambiguousGlobal, sdkMcpStatusForReceipt } from "./use-extensions"
@@ -129,13 +129,15 @@ describe("installableCatalogEntries(REQ-135 Hub retirement view)", () => {
 // alpha-web#283:样本早于契约 ID 改名,五条策展记录写的是 `alpha.catalog.curation.v1` 与
 // `alpha.intake-provenance.v1+json`,消费端如今只认 `codepuppy.*`(旧 ID = invalid,见下面 AC1 那条用例)。
 // 这里研究的是条目形状与 Hub 视图,不是 ID,所以加载时只把这两个 ID 换成现行值,其余逐字取自样本;
-// 样本文件本身不动。
+// 样本文件本身不动。alpha-web#283 AC6 之后策展 blob 地址的命名空间同样只认 `codepuppy-curation/`,
+// 样本里的 `alpha-curation/` 按同一理由在加载时换成现行值。
 const captured = oldCatalog as unknown as Catalog
 const PREVIOUS_CURATION_SCHEMA_ID = "alpha.catalog.curation.v1"
 const old = JSON.parse(
   JSON.stringify(captured)
     .replaceAll(`"${PREVIOUS_CURATION_SCHEMA_ID}"`, `"${CURATION_SCHEMA_ID}"`)
-    .replaceAll('"alpha.intake-provenance.v1+json"', `"${INTAKE_PROVENANCE_SCHEMA_ID}+json"`),
+    .replaceAll('"alpha.intake-provenance.v1+json"', `"${INTAKE_PROVENANCE_SCHEMA_ID}+json"`)
+    .replaceAll("/alpha-curation/", `/${CURATION_ASSET_NAMESPACE}/`),
 ) as Catalog
 const safePackage = oldPackageView as CatalogPackageViewV1
 const git = old.entries.find((entry) => entry.id === "mcp:git")!

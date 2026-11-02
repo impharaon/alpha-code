@@ -1,7 +1,7 @@
 // ac#1571 —— main 入口里与钥匙串有关的启动顺序闸(判 `src/main/index.ts` 的源码结构)。
 //
-// 本文件现在判一件事(AC3 末句,第 0b 步⑥实测):**拿不到单实例锁时,在任何会触发钥匙串查找的代码之前,
-// 用 ready 前的 `app.exit(0)` 退出**。实测:现行写法 `app.quit()` 退出前 Chromium 仍会按新应用名查钥匙串,
+// 两组判据。第一组(AC3 末句,第 0b 步⑥实测):**拿不到单实例锁时,在任何会触发钥匙串查找的代码之前,
+// 用 ready 前的 `app.exit(0)` 退出**。第二组是迁移接线的位置(见下方「迁移接线」一节的抬头)。实测:现行写法 `app.quit()` 退出前 Chromium 仍会按新应用名查钥匙串,
 // 查不到就新建一条随机秘密的 `Code Puppy Safe Storage`;之后真正的改名迁移被「目标已存在」永久挡住。
 // `app.exit(0)` 一次钥匙串调用都不发生。
 //
@@ -57,6 +57,160 @@ describe("失锁早退先于任何钥匙串查找 (ac#1571 AC3 / 0b⑥)", () => 
     expect(lockLossViolations(deferred)).toEqual([])
   })
 })
+
+// ── 迁移接线(方案 §5.3 / AC3 / AC6 / R21-3)──────────────────────────────────────────────
+// 判的都是 main 生成器体内的源码位置(连闭包一起算,宁严勿漏):
+//   ① 钥匙串改名步在 requestSingleInstanceLock、app.setName、preferAppEnv、runNamingMigrationDbStep 之后,
+//      在第一个 yield* 之前;它之前不引用 safeStorage / session / net / BrowserWindow / cookies / initAuthEnv /
+//      initByokKeys / getStore(ready 前后 Chromium 就会按新名查钥匙串,改名必须赶在前面,且不能先被谁触发);
+//   ② 两个解密自检与收尾(settleNamingMigration)在 whenReady 之后、initAuthEnv 之前;
+//   ③ R21-3:收尾之前不引用会打开 Cookie 库的代码(session / BrowserWindow / net / cookies / createMainWindow);
+//      自检失败的分支只 app.exit(1) + return(撤销在 settleNamingMigration 里,行为由迁移模块自己的单测判);
+//   ④ 完成标记不在 index.ts 里直接写 —— 只由 settleNamingMigration 在自检之后写。
+const BEFORE_RENAME_FORBIDDEN = new Set([...KEYCHAIN_TOUCHING, "getStore"])
+const COOKIE_LOADERS = new Set(["session", "BrowserWindow", "net", "cookies", "createMainWindow"])
+
+describe("迁移接线顺序 (ac#1571 §5.3 / AC3 / AC6 / R21-3)", () => {
+  test("ANCHOR (not a gate): 生产 index.ts:改名步、自检、Cookie 前退出、完成标记的位置全部满足", () => {
+    expect(migrationOrderViolations(INDEX_SOURCE)).toEqual([])
+  })
+
+  test("变异副本:改名步挪到 whenReady 之后 ⇒ 报违例", () => {
+    const moved = replaceOnce(
+      replaceOnce(INDEX_SOURCE, "        keychainRenamed = runKeychainRenameStep(", "        keychainRenamed = movedAway("),
+      '  markStartupTimeline("main.app.ready")\n',
+      '  markStartupTimeline("main.app.ready")\n  runKeychainRenameStep(naming.journal, keychainPort, keychainPlan)\n',
+    )
+    expect(migrationOrderViolations(moved).join("\n")).toContain("钥匙串改名步必须在第一个 yield* 之前")
+  })
+
+  test("变异副本:改名步之前先读 store ⇒ 报违例", () => {
+    const early = replaceOnce(INDEX_SOURCE, '  preferAppEnv(app.getPath("userData"))\n', '  getStore()\n  preferAppEnv(app.getPath("userData"))\n')
+    expect(migrationOrderViolations(early).join("\n")).toContain("改名步之前引用了 getStore")
+  })
+
+  test("变异副本:ready 后先 initAuthEnv / 先开 Cookie 库再自检 ⇒ 报违例", () => {
+    const ready = '  markStartupTimeline("main.app.ready")\n'
+    const auth = replaceOnce(INDEX_SOURCE, ready, `${ready}  initAuthEnv(app.getPath("userData"))\n`)
+    expect(migrationOrderViolations(auth).join("\n")).toContain("必须在 initAuthEnv 之前")
+    const cookies = replaceOnce(INDEX_SOURCE, ready, `${ready}  void session.defaultSession.cookies.get({})\n`)
+    expect(migrationOrderViolations(cookies).join("\n")).toContain("自检之前引用了会打开 Cookie 库的 session")
+    const window = replaceOnce(INDEX_SOURCE, ready, `${ready}  mainWindow = createMainWindow()\n`)
+    expect(migrationOrderViolations(window).join("\n")).toContain("自检之前引用了会打开 Cookie 库的 createMainWindow")
+  })
+
+  test("变异副本:自检失败分支换成 app.quit() ⇒ 报违例", () => {
+    const quit = replaceOnce(
+      INDEX_SOURCE,
+      '      dialog.showErrorBox("Code Puppy 升级迁移没有完成", settled.message)\n      app.exit(1)\n',
+      '      dialog.showErrorBox("Code Puppy 升级迁移没有完成", settled.message)\n      app.quit()\n',
+    )
+    expect(migrationOrderViolations(quit).join("\n")).toContain("自检失败分支必须 app.exit(1) 并 return")
+  })
+
+  test("变异副本:改名步之后直接写完成标记 ⇒ 报违例", () => {
+    const anchor = "        keychainRenamed = runKeychainRenameStep(naming.journal, keychainPort, keychainPlan)\n"
+    const complete = replaceOnce(INDEX_SOURCE, anchor, `${anchor}        naming.journal.complete()\n`)
+    expect(migrationOrderViolations(complete).join("\n")).toContain("完成标记只能由 settleNamingMigration 在自检之后写")
+  })
+})
+
+function migrationOrderViolations(source: string): string[] {
+  const file = ts.createSourceFile("index.ts", source, ts.ScriptTarget.Latest, true)
+  const mainBody = findMainBody(file)
+  if (!mainBody) return ["找不到 `const main = Effect.gen(function* () { … })`"]
+  const calls: { text: string; pos: number }[] = []
+  const references: { text: string; pos: number }[] = []
+  let firstYield = Number.POSITIVE_INFINITY
+  const visit = (node: ts.Node) => {
+    if (ts.isTypeNode(node)) return
+    if (ts.isYieldExpression(node) && node.asteriskToken) firstYield = Math.min(firstYield, node.getStart(file))
+    if (ts.isCallExpression(node)) calls.push({ text: node.expression.getText(file), pos: node.getStart(file) })
+    if (ts.isIdentifier(node) && isValueReference(node)) references.push({ text: node.text, pos: node.getStart(file) })
+    ts.forEachChild(node, visit)
+  }
+  visit(mainBody)
+  const at = (name: string) => calls.find((call) => call.text === name)?.pos ?? -1
+  const lineOf = (pos: number) => file.getLineAndCharacterOfPosition(pos).line + 1
+  const out: string[] = []
+  const required = [
+    "app.requestSingleInstanceLock",
+    "app.setName",
+    "preferAppEnv",
+    "runNamingMigrationDbStep",
+    "runKeychainRenameStep",
+    "app.whenReady",
+    "settleNamingMigration",
+    "probeStoredAuthDecryption",
+    "probeByokVaultDecryption",
+    "initAuthEnv",
+  ]
+  for (const name of required) if (at(name) < 0) out.push(`main 里找不到 ${name}(…) 调用`)
+  if (out.length) return out
+
+  // ①
+  const rename = at("runKeychainRenameStep")
+  for (const before of ["app.requestSingleInstanceLock", "app.setName", "preferAppEnv", "runNamingMigrationDbStep"])
+    if (at(before) >= rename) out.push(`钥匙串改名步必须在 ${before} 之后`)
+  if (rename >= firstYield) out.push("钥匙串改名步必须在第一个 yield* 之前(ready 前后 Chromium 就会按新名查钥匙串)")
+  for (const ref of references.filter((r) => r.pos < rename && BEFORE_RENAME_FORBIDDEN.has(r.text)))
+    out.push(`改名步之前引用了 ${ref.text}(index.ts:${lineOf(ref.pos)})`)
+
+  // ②
+  const ready = at("app.whenReady")
+  const settle = at("settleNamingMigration")
+  for (const name of ["settleNamingMigration", "probeStoredAuthDecryption", "probeByokVaultDecryption"]) {
+    if (at(name) <= ready) out.push(`${name} 必须在 whenReady 之后`)
+    if (at(name) >= at("initAuthEnv")) out.push(`${name} 必须在 initAuthEnv 之前`)
+  }
+
+  // ③
+  for (const ref of references.filter((r) => r.pos < settle && COOKIE_LOADERS.has(r.text)))
+    out.push(`自检之前引用了会打开 Cookie 库的 ${ref.text}(index.ts:${lineOf(ref.pos)})`)
+  const failed = findIf(mainBody, (condition) => condition.getText(file) === "!settled.ok")
+  const failedCalls = failed ? collectCalls(failed.thenStatement, file) : []
+  const failedRefs = failed ? collectReferences(failed.thenStatement) : []
+  const returns = failed && ts.isBlock(failed.thenStatement) && failed.thenStatement.statements.some(ts.isReturnStatement)
+  if (!failed || !failedCalls.includes("app.exit(1)") || failedCalls.some((c) => c.startsWith("app.quit")) || !returns)
+    out.push("自检失败分支必须 app.exit(1) 并 return(不能 app.quit())")
+  for (const name of failedRefs.filter((name) => COOKIE_LOADERS.has(name))) out.push(`自检失败分支里引用了 ${name}`)
+
+  // ④
+  for (const call of calls.filter((c) => /(^|\.)complete$/.test(c.text)))
+    out.push(`完成标记只能由 settleNamingMigration 在自检之后写 —— index.ts:${lineOf(call.pos)} 直接调用了 ${call.text}`)
+  return out
+}
+
+function findIf(root: ts.Node, match: (condition: ts.Expression) => boolean): ts.IfStatement | undefined {
+  let found: ts.IfStatement | undefined
+  const visit = (node: ts.Node) => {
+    if (found) return
+    if (ts.isIfStatement(node) && match(node.expression)) found = node
+    else ts.forEachChild(node, visit)
+  }
+  visit(root)
+  return found
+}
+
+function collectCalls(root: ts.Node, file: ts.SourceFile): string[] {
+  const out: string[] = []
+  const visit = (node: ts.Node) => {
+    if (ts.isCallExpression(node)) out.push(node.getText(file))
+    ts.forEachChild(node, visit)
+  }
+  visit(root)
+  return out
+}
+
+function collectReferences(root: ts.Node): string[] {
+  const out: string[] = []
+  const visit = (node: ts.Node) => {
+    if (ts.isIdentifier(node) && isValueReference(node)) out.push(node.text)
+    ts.forEachChild(node, visit)
+  }
+  visit(root)
+  return out
+}
 
 function replaceOnce(source: string, from: string, to: string): string {
   const parts = source.split(from)

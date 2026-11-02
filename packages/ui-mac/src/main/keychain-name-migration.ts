@@ -9,13 +9,15 @@
 // 第 0b 步实测:改名本身不弹框;目标已存在返回 -25299 且两条都不变。
 //
 // 迁移是 #1569 迁移日志里的最后一步:预检(目标已存在 ⇒ 任何数据改动之前就停)→ 会话库步之后登记改名 →
-// 任一步失败或改名后自检解不开 ⇒ 日志逆序撤销,撤销动作就是同一个调用把名字改回去。
+// ready 后对登录文件与 BYOK 密钥库各解密一次 → 全部解得开才写完成标记;任一步失败或解不开 ⇒ 日志逆序撤销,
+// 撤销动作就是同一个调用把名字改回去。
 // dev 渠道不迁移:今天 dev 与 prod 共用同一条条目,dev 迁移会把 prod 的条目改成 dev 的名字。
-// 本模块不 import electron;接进启动流程的位置由 index.ts 决定。
+// 本模块不 import electron;在启动流程里的位置由 index.ts 决定(顺序闸:keychain-boot-order.test.ts)。
 
 import type { AppEnvironment } from "./codepuppy-environment"
 import type { safeStorageBackend } from "./platform"
 import type { FenceAddon } from "./process-fence-apply"
+import { journalDirectory, type JournalUndo, type NamingMigrationJournal } from "./naming-migration-journal"
 
 export const KEYCHAIN_RENAME_STEP = "keychain-rename"
 
@@ -58,7 +60,7 @@ export class KeychainRenameError extends Error {
 
 export class KeychainTargetExistsError extends KeychainRenameError {
   constructor(readonly target: KeychainItem) {
-    super(`钥匙串里已有一条「${target.service}」记录;为避免覆盖,不改名`)
+    super(`钥匙串里已有一条「${target.service}」记录,为避免覆盖,没有改名。`)
     this.name = "KeychainTargetExistsError"
   }
 }
@@ -88,13 +90,13 @@ export function nativeKeychainPort(loadAddon: () => KeychainAddon): KeychainPort
       const status = native().keychainItemStatus(item.service, item.account)
       if (status === ERR_SEC_SUCCESS) return true
       if (status === ERR_SEC_ITEM_NOT_FOUND) return false
-      throw new KeychainRenameError(`查询钥匙串记录「${item.service}」失败(错误码 ${status})`)
+      throw new KeychainRenameError(`查询钥匙串记录「${item.service}」失败(错误码 ${status})。`)
     },
     rename(from, to) {
       const status = native().keychainRenameItem(from.service, from.account, to.service, to.account)
       if (status === ERR_SEC_SUCCESS) return
       if (status === ERR_SEC_DUPLICATE_ITEM) throw new KeychainTargetExistsError(to)
-      throw new KeychainRenameError(`钥匙串记录「${from.service}」改名为「${to.service}」失败(错误码 ${status})`)
+      throw new KeychainRenameError(`钥匙串记录「${from.service}」改名为「${to.service}」失败(错误码 ${status})。`)
     },
   }
 }
@@ -104,14 +106,11 @@ export function assertKeychainTargetFree(port: KeychainPort, plan: KeychainRenam
   if (port.exists(plan.to)) throw new KeychainTargetExistsError(plan.to)
 }
 
-/** #1569 迁移日志(票面 §3)里本模块用到的那一个方法;真日志按结构直接传入。 */
-type JournalStep = { step(kind: string, payload: KeychainRenamePlan, apply: () => void): void }
-
 /**
  * 改名步:会话库步之后、第一个异步边界之前调用。源条目不存在 ⇒ 不登记、返回 false(不改名,也不阻止启动)。
  * 否则登记一步并改名,返回 true;改名抛错原样抛出(该步留在 pending),由调用方按日志整套撤销。
  */
-export function runKeychainRenameStep(journal: JournalStep, port: KeychainPort, plan: KeychainRenamePlan): boolean {
+export function runKeychainRenameStep(journal: NamingMigrationJournal, port: KeychainPort, plan: KeychainRenamePlan): boolean {
   if (!port.exists(plan.from)) return false
   journal.step(KEYCHAIN_RENAME_STEP, plan, () => port.rename(plan.from, plan.to))
   return true
@@ -121,23 +120,53 @@ export function runKeychainRenameStep(journal: JournalStep, port: KeychainPort, 
  * 这一步的撤销动作(`extraUndo["keychain-rename"]`),对「改名只做了一半或根本没做」幂等:
  * 目标在、源不在 ⇒ 改回;源在、目标不在 ⇒ 什么都不做;两条都在或都不在 ⇒ 抛(不知道该留哪条 / 条目丢了)。
  */
-export function keychainRenameUndo(port: KeychainPort): (payload: unknown) => void {
+export function keychainRenameUndo(port: KeychainPort): JournalUndo {
   return (payload) => {
     const plan = parsePlan(payload)
     const targetExists = port.exists(plan.to)
     const sourceExists = port.exists(plan.from)
     if (targetExists && sourceExists)
-      throw new KeychainRenameError(`撤销改名时「${plan.from.service}」与「${plan.to.service}」同时存在,无法判断该保留哪一条`)
+      throw new KeychainRenameError(`撤销改名时「${plan.from.service}」与「${plan.to.service}」同时存在,无法判断该保留哪一条。`)
     if (!targetExists && !sourceExists)
-      throw new KeychainRenameError(`撤销改名时「${plan.from.service}」与「${plan.to.service}」都不存在`)
+      throw new KeychainRenameError(`撤销改名时「${plan.from.service}」与「${plan.to.service}」都不存在。`)
     if (targetExists) port.rename(plan.to, plan.from)
+  }
+}
+
+/**
+ * ready 之后收尾(在任何会打开 Cookie 库的代码之前调用):改过名才跑 `probes`(登录文件、BYOK 密钥库各解密一次);
+ * 任一 failed ⇒ 按日志整套撤销(含把钥匙串记录名改回),不写完成标记,返回给用户看的原因;
+ * 否则写完成标记。没改名(源条目不存在)⇒ 不自检,直接完成。
+ */
+export function settleNamingMigration(
+  journal: NamingMigrationJournal,
+  keychainRenamed: boolean,
+  probes: () => readonly StoredSecretProbe[],
+): { ok: true } | { ok: false; message: string } {
+  if (keychainRenamed && probes().includes("failed")) {
+    const rollback = rollBackNamingMigration(journal)
+    const retry = rollback.undone ? "重新打开时请在钥匙串授权框里选「始终允许」。" : ""
+    return { ok: false, message: `改名后读不出登录信息或 BYOK 密钥(多半是钥匙串授权框没有选「允许」)。${rollback.text}${retry}` }
+  }
+  journal.complete()
+  return { ok: true }
+}
+
+/** 按日志整套撤销,给出接在失败原因后面的那句说明;撤销本身失败时说清迁移日志在哪。 */
+export function rollBackNamingMigration(journal: NamingMigrationJournal): { undone: boolean; text: string } {
+  try {
+    journal.undoAll()
+    return { undone: true, text: "已把这次升级的所有改动退回原样。" }
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    return { undone: false, text: `自动撤销没有完成(${reason}),迁移日志在 ${journalDirectory(journal)}。` }
   }
 }
 
 function parsePlan(payload: unknown): KeychainRenamePlan {
   const plan = payload as Partial<Record<"from" | "to", unknown>> | null
   if (isItem(plan?.from) && isItem(plan?.to)) return { from: plan.from, to: plan.to }
-  throw new KeychainRenameError("迁移日志里的钥匙串改名记录格式不对,无法撤销")
+  throw new KeychainRenameError("迁移日志里的钥匙串改名记录格式不对,无法撤销。")
 }
 
 function isItem(value: unknown): value is KeychainItem {

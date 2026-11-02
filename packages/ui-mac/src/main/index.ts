@@ -125,7 +125,19 @@ import { registerSurfaceIpc } from "./codepuppy-surfaces"
 import { createRecoveryService, type RecoveryService } from "./recovery-service"
 import { registerRecoveryIpcHandlers } from "./recovery-ipc"
 import { RECOVERY_ACTIONS } from "../shared/recovery"
-import { initByokKeys, injectByokKeysIntoEnv, setByokKeyDeps } from "./codepuppy-byok-keys"
+import { initByokKeys, injectByokKeysIntoEnv, probeByokVaultDecryption, setByokKeyDeps } from "./codepuppy-byok-keys"
+import {
+  KEYCHAIN_RENAME_STEP,
+  assertKeychainTargetFree,
+  keychainRenameUndo,
+  nativeKeychainPort,
+  planKeychainRename,
+  rollBackNamingMigration,
+  runKeychainRenameStep,
+  settleNamingMigration,
+} from "./keychain-name-migration"
+import { loadFenceAddon, resolveFenceAddonPath } from "./process-fence-apply"
+import { safeStorageBackend } from "./platform"
 import { reconcileEngineConfigTruth } from "./engine-config-truth-boot"
 import { sweepEngineConfigDanglingUnlocked, type DanglingSweepOutcome } from "./engine-config-dangling"
 import { runBootDanglingSweep } from "./boot-dangling-sweep"
@@ -152,6 +164,7 @@ import {
   getArchiveAccessToken,
   getAuthIdentityTag,
   markTokenGenerationApplied,
+  probeStoredAuthDecryption,
   setAuthDeps,
   setAuthMode,
   startAuth,
@@ -556,10 +569,25 @@ const main = Effect.gen(function* () {
     return
   }
 
+  // #1571:钥匙串条目随应用名改名(prod / beta;dev 与非钥匙串后端为 null)。原生模块只在真要查询或改名时才加载,
+  // 加载失败即预检失败。目标条目已存在 ⇒ 预检就停(不覆盖、不合并),此时还没有任何数据被改动。
+  const environment = resolveAppEnvironment({ isPackaged: app.isPackaged, channel: CHANNEL })
+  const keychainPlan = planKeychainRename({ environment, backend: safeStorageBackend(), targetAppName: electronAppName })
+  const keychainPort = nativeKeychainPort(() =>
+    loadFenceAddon(
+      resolveFenceAddonPath({
+        packaged: app.isPackaged,
+        resourcesPath: process.resourcesPath,
+        moduleDir: dirname(fileURLToPath(import.meta.url)),
+        exists: existsSync,
+      }),
+    ),
+  )
+
   // #1569:升级到新名字后第一次启动 —— 拿到单实例锁之后、任何钥匙串访问与引擎启动之前,把旧名数据挪到新名下
   // (A 段;会话库那一步在 preferAppEnv 之后)。失败已整套撤销:说清原因、停下,ready 前一律 app.exit(1)。
   const naming = runNamingMigrationBoot({
-    environment: resolveAppEnvironment({ isPackaged: app.isPackaged, channel: CHANNEL }),
+    environment,
     onboardingTest: Boolean(onboardingTestRoot),
     userData: app.getPath("userData"),
     appData: app.getPath("appData"),
@@ -568,8 +596,10 @@ const main = Effect.gen(function* () {
     otherChannelUserData: Object.values(APP_IDS)
       .filter((id) => id !== appId)
       .map((id) => join(app.getPath("appData"), id)),
-    extraUndo: {},
-    precheck: () => {},
+    extraUndo: { [KEYCHAIN_RENAME_STEP]: keychainRenameUndo(keychainPort) },
+    precheck: () => {
+      if (keychainPlan) assertKeychainTargetFree(keychainPort, keychainPlan)
+    },
   })
   if (naming.kind === "failed") {
     logger.error("naming migration did not complete — startup stopped", { message: naming.message })
@@ -582,6 +612,7 @@ const main = Effect.gen(function* () {
     configureProjectHiddenDirMigration({ logPath: join(app.getPath("userData"), MIGRATION_DIR, PROJECTS_LOG), fs: createMigrationFs })
 
   preferAppEnv(app.getPath("userData"))
+  let keychainRenamed = false
   if (naming.kind === "ready") {
     const db = runNamingMigrationDbStep(naming.journal, { packaged: app.isPackaged, env: process.env, home: homedir() })
     if (!db.ok) {
@@ -590,7 +621,19 @@ const main = Effect.gen(function* () {
       app.exit(1)
       return
     }
-    naming.journal.complete()
+    // #1571:钥匙串改名是日志的最后一步 —— 会话库步之后、第一个异步边界之前(ready 前后 Chromium 就会按新应用名
+    // 查钥匙串,查不到会生成新的随机秘密)。源条目不存在 ⇒ 不改名、不自检、不阻止启动。完成标记等 ready 后自检通过再写。
+    if (keychainPlan) {
+      try {
+        keychainRenamed = runKeychainRenameStep(naming.journal, keychainPort, keychainPlan)
+      } catch (error) {
+        const message = `${error instanceof Error ? error.message : String(error)}${rollBackNamingMigration(naming.journal).text}`
+        logger.error("naming migration did not complete — startup stopped", { message })
+        dialog.showErrorBox("Code Puppy 升级迁移没有完成", message)
+        app.exit(1)
+        return
+      }
+    }
   }
   // REQ-098/#428:在任何 root 消费方前冻结 canonical 新根。packaged onboarding 只把内部生成
   // 的临时 base 作为函数参数传入；环境变量 override 不能授权 packaged 状态落点。
@@ -698,6 +741,24 @@ const main = Effect.gen(function* () {
 
   yield* Effect.promise(() => app.whenReady())
   markStartupTimeline("main.app.ready")
+
+  // #1571 R21-3:改名后的双自检必须先于任何会打开 Cookie 库的代码(默认 session、BrowserWindow、net、cookies API)。
+  // 新身份拿不到秘密时,一打开 Cookie 库就会删掉解不开的 Cookie,改回原名也找不回(第 0b 步实测);所以解不开 ⇒
+  // 按日志整套撤销(含把钥匙串记录名改回)并在这里退出。全部解得开(或没改名)才写完成标记。
+  if (naming.kind === "ready") {
+    const userData = app.getPath("userData")
+    const settled = settleNamingMigration(naming.journal, keychainRenamed, () => {
+      const probes = [probeStoredAuthDecryption(userData), probeByokVaultDecryption(userData)]
+      logger.log("keychain rename self-check", { auth: probes[0], byok: probes[1] })
+      return probes
+    })
+    if (!settled.ok) {
+      logger.error("naming migration did not complete — startup stopped", { message: settled.message })
+      dialog.showErrorBox("Code Puppy 升级迁移没有完成", settled.message)
+      app.exit(1)
+      return
+    }
+  }
 
   const artifactQuotaEnvironment = yield* Effect.promise(() =>
     initializeArtifactQuotaEnvironment(app.getPath("userData")),

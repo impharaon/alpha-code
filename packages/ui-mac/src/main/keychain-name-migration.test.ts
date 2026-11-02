@@ -4,7 +4,12 @@
 // pending 也撤),payload 经一次 JSON 往返模拟落盘。与 #1569 真日志的联测留到接线阶段。
 // 第 0 步实测的条目对(service / account)在这里写成独立字面量,不从被测模块推导。
 
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { MIGRATION_DIR, runNamingMigrationBoot } from "./naming-migration"
+import { sqliteBinary } from "./platform"
 import {
   KEYCHAIN_RENAME_STEP,
   KeychainRenameError,
@@ -14,7 +19,9 @@ import {
   keychainRenameUndo,
   nativeKeychainPort,
   planKeychainRename,
+  rollBackNamingMigration,
   runKeychainRenameStep,
+  settleNamingMigration,
   type KeychainAddon,
   type KeychainItem,
   type KeychainPort,
@@ -239,5 +246,160 @@ describe("nativeKeychainPort:OSStatus 只区分 0 / -25300 / -25299 (R21-4)", ()
       expect(attempt).toThrow(`错误码 ${status}`)
       expect(attempt).not.toThrow(KeychainTargetExistsError)
     }
+  })
+})
+
+// ── 与 #1569 真迁移日志联测(方案 §7 AC5 / AC6 行)──────────────────────────────────────────
+// 用真的 runNamingMigrationBoot + 真日志(空的临时 userData / appData,没有旧名文件 ⇒ #1569 的文件步为空),
+// 钥匙串仍是假端口。index.ts 的接线顺序由启动顺序闸判;这里判接上之后的行为。
+const canBoot = Boolean(sqliteBinary(process.platform))
+if (!canBoot) console.warn(`[SKIP] keychain-name-migration 真日志联测:${process.platform} 上没有 sqlite3,#1569 的迁移直接 skip`)
+
+describe.skipIf(!canBoot)("与 #1569 真日志联测 (AC5 / AC6)", () => {
+  const roots: string[] = []
+  afterEach(() => roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true })))
+
+  function bootDirs() {
+    const root = mkdtempSync(join(tmpdir(), "codepuppy-keychain-journal-"))
+    roots.push(root)
+    return { userData: join(root, "userData"), appData: join(root, "appData"), home: join(root, "home") }
+  }
+
+  function boot(
+    dirs: ReturnType<typeof bootDirs>,
+    port: KeychainPort,
+    options: { environment?: "prod" | "beta" | "dev"; extraUndo?: Record<string, (payload: unknown) => void> } = {},
+  ) {
+    const environment = options.environment ?? "prod"
+    const plan = planKeychainRename({ environment, backend: "keychain", targetAppName: "Code Puppy" })
+    return runNamingMigrationBoot({
+      environment,
+      onboardingTest: false,
+      ...dirs,
+      env: {},
+      otherChannelUserData: [],
+      extraUndo: { [KEYCHAIN_RENAME_STEP]: keychainRenameUndo(port), ...options.extraUndo },
+      precheck: () => {
+        if (plan) assertKeychainTargetFree(port, plan)
+      },
+    })
+  }
+
+  const journalOf = (dirs: ReturnType<typeof bootDirs>) =>
+    JSON.parse(readFileSync(join(dirs.userData, MIGRATION_DIR, "journal.json"), "utf8")) as {
+      status: string
+      steps: { kind: string; payload: unknown; state: string }[]
+    }
+
+  test("目标已存在 ⇒ 预检失败、迁移目录都没建、源条目不动", () => {
+    const dirs = bootDirs()
+    const keychain = fakePort([PROD_SOURCE, PROD_TARGET])
+    const result = boot(dirs, keychain.port)
+    expect(result.kind).toBe("failed")
+    expect(result.kind === "failed" && result.message).toContain("Code Puppy Safe Storage")
+    expect(existsSync(join(dirs.userData, MIGRATION_DIR))).toBe(false)
+    expect(keychain.renames()).toEqual([])
+    expect(keychain.has(PROD_SOURCE)).toBe(true)
+  })
+
+  test("改名后登录文件解不开 ⇒ 整套撤销(假端口回源名)、不写完成标记、给出原因", () => {
+    const dirs = bootDirs()
+    const keychain = fakePort([PROD_SOURCE])
+    const result = boot(dirs, keychain.port)
+    if (result.kind !== "ready") throw new Error(`boot: ${JSON.stringify(result)}`)
+    expect(runKeychainRenameStep(result.journal, keychain.port, PROD_PLAN)).toBe(true)
+    expect(journalOf(dirs).steps).toEqual([{ seq: 1, kind: "keychain-rename", payload: PROD_PLAN, state: "done" }])
+    const settled = settleNamingMigration(result.journal, true, () => ["failed", "absent"])
+    expect(settled.ok).toBe(false)
+    expect(!settled.ok && settled.message).toContain("已把这次升级的所有改动退回原样")
+    expect(keychain.has(PROD_SOURCE)).toBe(true)
+    expect(keychain.has(PROD_TARGET)).toBe(false)
+    expect(journalOf(dirs).status).toBe("undone")
+  })
+
+  test("只有 BYOK 密钥库且它解不开 ⇒ 同样整套撤销", () => {
+    const dirs = bootDirs()
+    const keychain = fakePort([PROD_SOURCE])
+    const result = boot(dirs, keychain.port)
+    if (result.kind !== "ready") throw new Error(`boot: ${JSON.stringify(result)}`)
+    runKeychainRenameStep(result.journal, keychain.port, PROD_PLAN)
+    expect(settleNamingMigration(result.journal, true, () => ["absent", "failed"]).ok).toBe(false)
+    expect(keychain.has(PROD_SOURCE)).toBe(true)
+    expect(journalOf(dirs).status).toBe("undone")
+  })
+
+  test("两个都解得开 ⇒ 写完成标记,改名保留;下次启动整段跳过", () => {
+    const dirs = bootDirs()
+    const keychain = fakePort([PROD_SOURCE])
+    const result = boot(dirs, keychain.port)
+    if (result.kind !== "ready") throw new Error(`boot: ${JSON.stringify(result)}`)
+    runKeychainRenameStep(result.journal, keychain.port, PROD_PLAN)
+    expect(settleNamingMigration(result.journal, true, () => ["decrypted", "absent"])).toEqual({ ok: true })
+    expect(journalOf(dirs).status).toBe("complete")
+    expect(keychain.has(PROD_TARGET)).toBe(true)
+    expect(boot(dirs, keychain.port)).toEqual({ kind: "skip", reason: "complete" })
+  })
+
+  test("源条目不存在 ⇒ 不登记、不自检、照样完成", () => {
+    const dirs = bootDirs()
+    const keychain = fakePort([])
+    const result = boot(dirs, keychain.port)
+    if (result.kind !== "ready") throw new Error(`boot: ${JSON.stringify(result)}`)
+    expect(runKeychainRenameStep(result.journal, keychain.port, PROD_PLAN)).toBe(false)
+    let probed = false
+    expect(
+      settleNamingMigration(result.journal, false, () => {
+        probed = true
+        return ["failed"]
+      }),
+    ).toEqual({ ok: true })
+    expect(probed).toBe(false)
+    expect(journalOf(dirs)).toMatchObject({ status: "complete", steps: [] })
+  })
+
+  test("dev ⇒ 迁移整段跳过,预检没跑,端口一次都没被调用", () => {
+    const keychain = fakePort([PROD_SOURCE])
+    expect(boot(bootDirs(), keychain.port, { environment: "dev" })).toEqual({ kind: "skip", reason: "dev" })
+    expect(keychain.calls).toEqual([])
+  })
+
+  test("改名步 done 之后被杀 ⇒ 下次启动先按日志改回,再开新一轮", () => {
+    const dirs = bootDirs()
+    const keychain = fakePort([PROD_SOURCE])
+    const first = boot(dirs, keychain.port)
+    if (first.kind !== "ready") throw new Error(`boot: ${JSON.stringify(first)}`)
+    runKeychainRenameStep(first.journal, keychain.port, PROD_PLAN)
+    // 这里进程被杀:日志停在 running,钥匙串已是新名
+    const second = boot(dirs, keychain.port)
+    expect(second.kind).toBe("ready")
+    expect(keychain.renames()).toEqual([
+      "rename alpha-code Safe Storage -> Code Puppy Safe Storage",
+      "rename Code Puppy Safe Storage -> alpha-code Safe Storage",
+    ])
+    expect(keychain.has(PROD_SOURCE)).toBe(true)
+  })
+
+  test("撤销途中(改名步已 undone)被杀 ⇒ 续撤时不再调用 rename", () => {
+    const dirs = bootDirs()
+    const keychain = fakePort([PROD_SOURCE])
+    let earlierUndoFails = true
+    const extraUndo = {
+      "test-earlier-step": () => {
+        if (earlierUndoFails) throw new Error("killed while undoing")
+      },
+    }
+    const first = boot(dirs, keychain.port, { extraUndo })
+    if (first.kind !== "ready") throw new Error(`boot: ${JSON.stringify(first)}`)
+    first.journal.step("test-earlier-step", null, () => {})
+    runKeychainRenameStep(first.journal, keychain.port, PROD_PLAN)
+    const rollback = rollBackNamingMigration(first.journal)
+    expect(rollback.undone).toBe(false)
+    expect(rollback.text).toContain(join(dirs.userData, MIGRATION_DIR))
+    expect(journalOf(dirs).steps.map((step) => step.state)).toEqual(["done", "undone"])
+    const renamesBefore = keychain.renames().length
+    earlierUndoFails = false
+    expect(boot(dirs, keychain.port, { extraUndo }).kind).toBe("ready")
+    expect(keychain.renames().length).toBe(renamesBefore)
+    expect(keychain.has(PROD_SOURCE)).toBe(true)
   })
 })

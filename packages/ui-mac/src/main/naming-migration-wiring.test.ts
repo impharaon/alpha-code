@@ -60,12 +60,14 @@ function bootOrderViolations(source: string): string[] {
   walk(body)
   const at = (name: string) => calls.find((call) => call.text === name)?.pos ?? -1
   const out: string[] = []
+  // #1571 把完成标记挪到 ready 后的解密自检之后(settleNamingMigration;顺序闸在 keychain-boot-order.test.ts),
+  // 迁移在 ready 前的最后一步是钥匙串改名 —— 「迁移完成之前不碰端点 / store / 凭据」以它为界。
   const order = [
     "app.requestSingleInstanceLock",
     "runNamingMigrationBoot",
     "preferAppEnv",
     "runNamingMigrationDbStep",
-    "naming.journal.complete",
+    "runKeychainRenameStep",
     "initCodePuppyEnvironment",
   ]
   for (const name of order) if (at(name) < 0) out.push(`${name} is not called inside main`)
@@ -73,7 +75,7 @@ function bootOrderViolations(source: string): string[] {
     if (at(order[i - 1]!) >= at(order[i]!)) out.push(`${order[i - 1]} must come before ${order[i]}`)
   if (at("runNamingMigrationDbStep") >= firstYield) out.push("runNamingMigrationDbStep must run before the first async boundary (yield*)")
   const boot = at("runNamingMigrationBoot")
-  for (const call of calls.filter((c) => c.pos < at("naming.journal.complete")))
+  for (const call of calls.filter((c) => c.pos < at("runKeychainRenameStep")))
     if (/^(initEndpoints|getStore|safeStorage\.|session\.|initAuthEnv|initByokKeys)/.test(call.text)) out.push(`${call.text} runs before the migration finished`)
   // 失败分支:ready 之前只能 app.exit(1) —— app.quit() 会触发一次钥匙串查找(#1571 第 0b 步)
   const failed = source.indexOf('if (naming.kind === "failed")')

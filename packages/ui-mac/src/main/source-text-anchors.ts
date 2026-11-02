@@ -205,7 +205,7 @@ export const DOWNGRADED_ANCHORS: Record<string, SourceTextEntry> = {
     lines: 4,
   },
   "packages/ui-mac/src/main/keychain-boot-order.test.ts": {
-    why: "`#1571` AC3 末句 / 第 0b 步⑥:用 TypeScript AST 判 index.ts 的失锁分支恰为 ready 前 `app.exit(0); return`,且失锁判断之前执行到的代码(模块顶层可执行语句 + main 里排在它前面的语句)不引用 safeStorage / session / net / BrowserWindow / cookies / initAuthEnv / initByokKeys;同文件三条变异副本证明判据会红。主语是运行期顺序、算子是源码结构,所以是锚。两个不会让它变红的变异:①失锁之前调用的某个函数(如 useEnvProxy)在函数体里去碰 session —— 判据不追调用链;②点名清单之外的某个 Electron API 在 ready 前触发了钥匙串查找。运行面证据是完整包在隔离钥匙串里的启动实测。",
+    why: "`#1571` 用 TypeScript AST 判 index.ts 的两组启动顺序。①AC3 末句 / 第 0b 步⑥:失锁分支恰为 ready 前 `app.exit(0); return`,失锁判断之前执行到的代码(模块顶层可执行语句 + main 里排在它前面的语句)不引用 safeStorage / session / net / BrowserWindow / cookies / initAuthEnv / initByokKeys。②迁移接线:钥匙串改名步在锁 / setName / preferAppEnv / 会话库步之后、第一个 yield* 之前,之前不碰上述标识符与 getStore;两个解密自检与 settleNamingMigration 在 whenReady 之后、initAuthEnv 之前,R21-3 收尾之前不引用 session / BrowserWindow / net / cookies / createMainWindow,失败分支只 app.exit(1) + return,index.ts 不直接写完成标记。同文件 8 种变异副本证明判据会红。主语是运行期顺序、算子是源码结构,所以是锚。两个不会让它变红的变异:①ready 之前调用的某个函数(如 useEnvProxy 或 initCodePuppyEnvironment)在函数体里去碰 session —— 判据不追调用链;②点名清单之外的某个 Electron API(或被 import 的模块在顶层)提前打开了 Cookie 库。运行面证据是完整包在隔离钥匙串里的启动实测。",
     evidence: "#1571",
     lines: 1,
   },

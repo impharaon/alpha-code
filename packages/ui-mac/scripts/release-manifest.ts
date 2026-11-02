@@ -36,6 +36,7 @@ import {
   type UpdaterFeedFact,
 } from "../src/main/release-manifest"
 import { buildCycloneDxSbom, collectBundledPackages } from "../src/main/release-sbom"
+import { getConfig } from "../electron-builder.config"
 
 const packageDir = path.resolve(import.meta.dir, "..")
 
@@ -238,8 +239,11 @@ let sbom = null
   }
   if (asarPath && fs.existsSync(asarPath)) {
     const components = collectBundledPackages(asarPath)
+    // 应用名取打包配置里这个渠道的 productName(打出来的 .app 叫什么,SBOM 就叫什么)。
+    const appName = getConfig(channel).productName
+    if (!appName) die(`electron-builder config has no productName for channel ${channel}`)
     const text = buildCycloneDxSbom({
-      appName: "alpha-code",
+      appName,
       version,
       channel,
       timestamp: new Date().toISOString(),

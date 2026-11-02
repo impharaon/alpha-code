@@ -67,10 +67,10 @@ function buildLock(assets: AssetFixture[], opts: { writeBlobs?: boolean; budget?
       type: a.id.split(":")[0]!,
       version: "1.0.0",
       license: a.license ?? "MIT",
-      source: a.source ?? "alpha",
+      source: a.source ?? "codepuppy",
       redistributable: true as const,
       platforms: a.platforms ?? ["*"],
-      licenseFiles: a.licenseFiles ?? (a.source && a.source !== "alpha" ? ["LICENSE.txt"] : []),
+      licenseFiles: a.licenseFiles ?? (a.source && a.source !== "codepuppy" ? ["LICENSE.txt"] : []),
       bytes,
       files,
     }

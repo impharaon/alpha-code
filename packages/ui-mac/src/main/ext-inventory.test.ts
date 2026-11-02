@@ -60,7 +60,7 @@ describe("aggregateInventory(纯函数核心)", () => {
   const CATALOG: InventorySources["catalog"] = {
     entries: [
       entry({ id: "mcp:word", type: "mcp", name: "office-word-mcp-server", source: "community", installSpec: { kind: "mcp", mcpType: "local" } }),
-      entry({ id: "skill:writer", type: "skill", name: "writer", source: "alpha", installSpec: { kind: "skill", source: "builtin", targetDir: "codepuppy-skills" } }),
+      entry({ id: "skill:writer", type: "skill", name: "writer", source: "codepuppy", installSpec: { kind: "skill", source: "builtin", targetDir: "codepuppy-skills" } }),
     ],
     channel: "remote",
     version: "9.9.9",
@@ -72,7 +72,7 @@ describe("aggregateInventory(纯函数核心)", () => {
     expect(row.scope).toBeNull()
     expect(row.availability.state).toBe("catalog")
     expect(row.activation).toBe("not-installed")
-    expect(row.ownership.authored).toBe("alpha")
+    expect(row.ownership.authored).toBe("codepuppy")
     expect(row.ownership.supportTier).toBe("codepuppy")
     expect(view.catalogVersion).toBe("9.9.9")
   })
@@ -98,7 +98,7 @@ describe("aggregateInventory(纯函数核心)", () => {
     expect(row.availability.sources.catalog).toBe(true)
     expect(row.activation).toBe("disabled") // 已安装但关闭 ≠ 未安装(父 AC2)
     expect(row.health.state).toBe("ok")
-    expect(row.ownership.authored).toBe("alpha")
+    expect(row.ownership.authored).toBe("codepuppy")
     expect(row.generation).toBe(3)
     expect(row.version).toBe("1.2.0")
   })
@@ -199,7 +199,7 @@ describe("aggregateInventory(纯函数核心)", () => {
     const view = aggregateInventory({
       catalog: CATALOG,
       seedAssets: [
-        { id: "skill:writer", type: "skill", source: "alpha", platformCompatible: true },
+        { id: "skill:writer", type: "skill", source: "codepuppy", platformCompatible: true },
         { id: "skill:seed-only", type: "skill", source: "official", platformCompatible: true },
         { id: "mcp:other-arch", type: "mcp", source: "official", platformCompatible: false },
       ],
@@ -223,7 +223,7 @@ describe("aggregateInventory(纯函数核心)", () => {
   test("输出为纯 JSON(IPC 序列化就绪):round-trip 深等;排序确定(id ↑,global<project<浏览行)", () => {
     const view = aggregateInventory({
       catalog: CATALOG,
-      seedAssets: [{ id: "skill:seed-only", type: "skill", source: "alpha", platformCompatible: true }],
+      seedAssets: [{ id: "skill:seed-only", type: "skill", source: "codepuppy", platformCompatible: true }],
       ledgers: [
         { scope: "global", records: [record({ id: "skill:writer", name: "writer", kind: "skill" })], v1Only: [], warnings: ["w1"] },
       ],
@@ -266,7 +266,7 @@ describe("collectInventory(薄采集器,零写入)", () => {
     expect(p.ok).toBe(true)
 
     const view = collectInventory({
-      catalog: { entries: [entry({ id: "skill:writer", type: "skill", name: "writer", source: "alpha" })], channel: "cache", version: "1.0.0" },
+      catalog: { entries: [entry({ id: "skill:writer", type: "skill", name: "writer", source: "codepuppy" })], channel: "cache", version: "1.0.0" },
       seedDir: path.join(tmp, "no-such-seed"),
       globalRoot,
       projectDir,
@@ -275,7 +275,7 @@ describe("collectInventory(薄采集器,零写入)", () => {
     expect(byId(view.rows, "user:my-mcp", "global")).toHaveLength(1)
     const proj = byId(view.rows, "skill:writer", "project")[0]!
     expect(proj.activation).toBe("disabled")
-    expect(proj.ownership.authored).toBe("alpha")
+    expect(proj.ownership.authored).toBe("codepuppy")
     expect(view.warnings.some((w) => w.startsWith("packaged seed unavailable:"))).toBe(true)
 
     // 采集是只读的:两本账本文件内容不因聚合而改变。
@@ -329,7 +329,7 @@ describe("createInventoryQuery(IPC 通道核心:只读、fail-closed、纯 JSON)
     const globalRoot = path.join(tmp, "gq-root")
     seedGlobalLedger(globalRoot)
     const catalog = {
-      entries: [entry({ id: "skill:writer", type: "skill", name: "writer", source: "alpha" })],
+      entries: [entry({ id: "skill:writer", type: "skill", name: "writer", source: "codepuppy" })],
       channel: "cache" as const,
       version: "1.0.0",
     }

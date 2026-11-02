@@ -17,10 +17,12 @@ afterEach(() => {
 
 describe("initialDesiredState(#394 裁决 + v5 Q1)", () => {
   test("目录来源矩阵:alpha 默认开;official/community/缺省一律默认关(官方出品 ≠ 我们审过)", () => {
-    expect(initialDesiredState({ origin: "catalog", source: "alpha" })).toBe("enabled")
+    expect(initialDesiredState({ origin: "catalog", source: "codepuppy" })).toBe("enabled")
     expect(initialDesiredState({ origin: "catalog", source: "official" })).toBe("disabled")
     expect(initialDesiredState({ origin: "catalog", source: "community" })).toBe("disabled")
     expect(initialDesiredState({ origin: "catalog" })).toBe("disabled")
+    // alpha-web#283 AC6:旧品牌来源值不再被认作自产 —— 与未知来源同样默认关。
+    expect(initialDesiredState({ origin: "catalog", source: "alpha" })).toBe("disabled")
   })
 
   test("非目录 intake(用户显式导入/创建)恒开 —— 不属「第三方非默认启用」面", () => {
@@ -52,7 +54,7 @@ describe("nextDesiredState(存量当前策略优先)", () => {
 describe("#397 activationPolicy 声明优先序(Codex 裁决钉死)", () => {
   test("规则 1:有效声明 > 来源分类 —— default-enabled 开(即使 official);default-disabled 关(即使 alpha)", () => {
     expect(initialDesiredState({ origin: "catalog", source: "official", activationPolicy: "default-enabled" })).toBe("enabled")
-    expect(initialDesiredState({ origin: "catalog", source: "alpha", activationPolicy: "default-disabled" })).toBe("disabled")
+    expect(initialDesiredState({ origin: "catalog", source: "codepuppy", activationPolicy: "default-disabled" })).toBe("disabled")
   })
 
   test("session-grant → 持久账本恒 disabled(会话级启用 = #408)", () => {
@@ -60,7 +62,7 @@ describe("#397 activationPolicy 声明优先序(Codex 裁决钉死)", () => {
   })
 
   test("复审过期(排他截止):fresh install 一律先落 disabled,即使 default-enabled", () => {
-    expect(initialDesiredState({ origin: "catalog", source: "alpha", activationPolicy: "default-enabled", reviewExpired: true })).toBe("disabled")
+    expect(initialDesiredState({ origin: "catalog", source: "codepuppy", activationPolicy: "default-enabled", reviewExpired: true })).toBe("disabled")
     expect(initialDesiredState({ origin: "catalog", source: "official", activationPolicy: "default-disabled", reviewExpired: true })).toBe("disabled")
   })
 

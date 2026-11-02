@@ -124,7 +124,7 @@ const testBundle = (id: string, name: string, member: string) => ({
   name,
   displayName: name,
   description: "REQ-128 #810 fixture bundle.",
-  source: "alpha",
+  source: "codepuppy",
   category: "dev",
   license: "MIT",
   redistributable: true,

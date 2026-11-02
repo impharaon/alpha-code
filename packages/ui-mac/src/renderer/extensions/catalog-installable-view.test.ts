@@ -27,7 +27,7 @@ const bundle = (id: string, catalogEntryId: string): CatalogEntry => ({
   name: id.slice("bundle:".length),
   displayName: id,
   description: id,
-  source: "alpha",
+  source: "codepuppy",
   category: "office",
   bundleItems: [{ catalogEntryId, optional: false, installOrder: 1 }],
 })

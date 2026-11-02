@@ -61,7 +61,7 @@ const ENTRIES = [
     name: "codepuppy-word",
     displayName: "Word 文档读写",
     description: "读取 .docx 的正文和结构，也能新建或改写文档。",
-    source: "alpha",
+    source: "codepuppy",
     category: "office",
     installSpec: {
       kind: "mcp",

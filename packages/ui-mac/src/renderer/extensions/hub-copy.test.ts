@@ -22,7 +22,7 @@ test("reviewed copy interpolates names, dates and counts without exposing transa
 
 test("curation copy follows recorded origin, including a catalog entry that has since disappeared", () => {
   // D5 installed-record is an actual committed receipt from the diagnostic run.
-  expect(ownershipFromInstall(installed).curated).toBe("alpha")
+  expect(ownershipFromInstall(installed).curated).toBe("codepuppy")
   expect(ownershipFromInstall({ ...installed, origin: "imported" }).curated).toBe("user")
   for (const dictionary of [zh, en]) {
     expect(dictionary["codepuppy.ext.ownNote"]).toContain("Code Puppy")

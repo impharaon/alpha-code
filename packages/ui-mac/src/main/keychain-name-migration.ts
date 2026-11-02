@@ -18,6 +18,7 @@ import type { AppEnvironment } from "./codepuppy-environment"
 import type { safeStorageBackend } from "./platform"
 import type { FenceAddon } from "./process-fence-apply"
 import { journalDirectory, type JournalUndo, type NamingMigrationJournal } from "./naming-migration-journal"
+import { completeNamingMigration } from "./naming-migration"
 
 export const KEYCHAIN_RENAME_STEP = "keychain-rename"
 
@@ -136,7 +137,7 @@ export function keychainRenameUndo(port: KeychainPort): JournalUndo {
 /**
  * ready 之后收尾(在任何会打开 Cookie 库的代码之前调用):改过名才跑 `probes`(登录文件、BYOK 密钥库各解密一次);
  * 任一 failed ⇒ 按日志整套撤销(含把钥匙串记录名改回),不写完成标记,返回给用户看的原因;
- * 否则写完成标记。没改名(源条目不存在)⇒ 不自检,直接完成。
+ * 否则经 #1569 的 completeNamingMigration 写完成标记(写不下去同样返回失败,不抛)。没改名 ⇒ 不自检,直接完成。
  */
 export function settleNamingMigration(
   journal: NamingMigrationJournal,
@@ -148,8 +149,7 @@ export function settleNamingMigration(
     const retry = rollback.undone ? "重新打开时请在钥匙串授权框里选「始终允许」。" : ""
     return { ok: false, message: `改名后读不出登录信息或 BYOK 密钥(多半是钥匙串授权框没有选「允许」)。${rollback.text}${retry}` }
   }
-  journal.complete()
-  return { ok: true }
+  return completeNamingMigration(journal)
 }
 
 /** 按日志整套撤销,给出接在失败原因后面的那句说明;撤销本身失败时说清迁移日志在哪。 */

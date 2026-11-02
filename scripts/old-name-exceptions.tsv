@@ -842,8 +842,8 @@ packages/ui-mac/src/main/index.ts	834	historical	记录退役根 .alpha(已退�
 packages/ui-mac/src/main/index.ts	854	historical	记录退役根 .alpha(已退役、零读写)的历史说明
 packages/ui-mac/src/main/index.ts	1069	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/ipc.ts	187	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/main/keychain-name-migration.ts	30	migration-source	改名前 prod / beta 的 Electron 应用名,一次性钥匙串改名迁移用它定位旧条目(`<名> Safe Storage` / `<名> Key`);随迁移代码一起删除(#1571)
 packages/ui-mac/src/main/keychain-name-migration.ts	31	migration-source	改名前 prod / beta 的 Electron 应用名,一次性钥匙串改名迁移用它定位旧条目(`<名> Safe Storage` / `<名> Key`);随迁移代码一起删除(#1571)
+packages/ui-mac/src/main/keychain-name-migration.ts	32	migration-source	改名前 prod / beta 的 Electron 应用名,一次性钥匙串改名迁移用它定位旧条目(`<名> Safe Storage` / `<名> Key`);随迁移代码一起删除(#1571)
 packages/ui-mac/src/main/mcp-default-deny.ts	77	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/menu.ts	60	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/moderation-keywords.ts	10	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改

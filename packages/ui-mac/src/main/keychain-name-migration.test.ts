@@ -151,6 +151,22 @@ describe("改名步与日志撤销 (AC5 可逆改名)", () => {
   })
 })
 
+describe("settleNamingMigration 写完成标记 (AC6)", () => {
+  test("完成标记写不下去 ⇒ 返回失败与可读原因,不抛(经 completeNamingMigration,与自检失败走同一个失败分支)", () => {
+    const journal = {
+      step: () => {},
+      undoAll: () => {},
+      complete: () => {
+        throw new Error("ENOSPC: no space left on device")
+      },
+    }
+    const settled = settleNamingMigration(journal, true, () => ["decrypted", "absent"])
+    expect(settled.ok).toBe(false)
+    expect(!settled.ok && settled.message).toContain("完成标记没写下去")
+    expect(!settled.ok && settled.message).toContain("ENOSPC")
+  })
+})
+
 describe("keychainRenameUndo 的状态 (AC5)", () => {
   test("目标在、源不在 ⇒ 改回", () => {
     const keychain = fakePort([PROD_TARGET])

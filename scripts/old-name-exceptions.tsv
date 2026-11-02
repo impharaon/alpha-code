@@ -126,7 +126,7 @@ docs/architecture/2026-09-08-derived-process-spawn-paths.md	13	external-anchor	G
 docs/architecture/2026-09-08-derived-process-spawn-paths.md	31	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-09-08-derived-process-spawn-paths.md	311	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-09-08-derived-process-spawn-paths.md	351	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	386	pending	应用名 / bundle id / 由应用名派生的钥匙串条目名,接手票 #1571
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	386	historical	出货事实的证据记录:当时实测的 bundle id / 应用名(#1571 已改成 com.tide.codepuppy / Code Puppy),记录保持原样
 docs/architecture/2026-09-08-derived-process-spawn-paths.md	657	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
 docs/architecture/2026-09-08-derived-process-spawn-paths.md	658	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-09-08-derived-process-spawn-paths.md	713	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -150,7 +150,7 @@ docs/architecture/2026-09-08-derived-process-spawn-paths.md	1018	historical	带�
 docs/architecture/2026-09-08-derived-process-spawn-paths.md	1024	migration-source	清理用户盘上旧版留下的 *.alpha-bak-* 残留文件,识别旧名才能删掉它们
 docs/architecture/2026-09-08-derived-process-spawn-paths.md	1027	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
 docs/architecture/2026-09-08-derived-process-spawn-paths.md	1080	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	1085	pending	应用名 / bundle id / 由应用名派生的钥匙串条目名,接手票 #1571
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	1085	historical	出货事实的证据记录:当时实测的 bundle id / 应用名(#1571 已改成 com.tide.codepuppy / Code Puppy),记录保持原样
 docs/architecture/2026-09-08-derived-process-spawn-paths.md	1163	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
 docs/architecture/2026-09-08-derived-process-spawn-paths.md	1206	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
 docs/architecture/2026-09-08-derived-process-spawn-paths.md	1225	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
@@ -211,7 +211,7 @@ docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	123	historica
 docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	173	historical	带日期的调研 / 决策记录,记录的是当时的名字
 docs/architecture/2026-09-10-network-egress-on-process-fence.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-09-10-network-egress-on-process-fence.md	28	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-10-network-egress-on-process-fence.md	30	pending	应用名 / bundle id / 由应用名派生的钥匙串条目名,接手票 #1571
+docs/architecture/2026-09-10-network-egress-on-process-fence.md	30	historical	出货事实的证据记录:当时实测的 bundle id / 应用名(#1571 已改成 com.tide.codepuppy / Code Puppy),记录保持原样
 docs/architecture/2026-09-10-network-egress-on-process-fence.md	109	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 docs/architecture/2026-09-10-network-egress-on-process-fence.md	220	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
 docs/architecture/2026-09-10-network-egress-on-process-fence.md	338	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
@@ -282,9 +282,9 @@ docs/architecture/2026-09-23-web-tools-account-routing-recon.md	120	external-anc
 docs/architecture/2026-09-23-web-tools-account-routing-recon.md	248	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 docs/architecture/2026-09-23-web-tools-account-routing-recon.md	270	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	10	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	11	pending	应用名 / bundle id / 由应用名派生的钥匙串条目名,接手票 #1571
-docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	26	pending	应用名 / bundle id / 由应用名派生的钥匙串条目名,接手票 #1571
-docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	27	pending	应用名 / bundle id / 由应用名派生的钥匙串条目名,接手票 #1571
+docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	11	historical	出货事实的证据记录:当时实测的 bundle id / 应用名(#1571 已改成 com.tide.codepuppy / Code Puppy),记录保持原样
+docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	26	historical	出货事实的证据记录:当时实测的 bundle id / 应用名(#1571 已改成 com.tide.codepuppy / Code Puppy),记录保持原样
+docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	27	historical	出货事实的证据记录:当时实测的 bundle id / 应用名(#1571 已改成 com.tide.codepuppy / Code Puppy),记录保持原样
 docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	61	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
 docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	84	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
 docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	116	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改

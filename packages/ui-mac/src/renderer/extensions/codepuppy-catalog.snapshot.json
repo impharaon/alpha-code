@@ -3,7 +3,7 @@
   "version": "2026-11-02.3",
   "entries": 26,
   "sha256": "9389c090c2adab432985d4f7d2bd819ac72143f55c81d47fdf754bb62af1beb5",
-  "source": "file:/Users/tide/app/alpha-web/.worktrees/web283/public/catalog/v1/catalog.json",
-  "fetchedAt": "2026-11-02T08:11:28.202Z",
+  "source": "https://codepuppy.cn/catalog/v1/catalog.json",
+  "fetchedAt": "2026-11-03T01:31:40.594Z",
   "_note": "由 scripts/sync-catalog-snapshot.mjs 生成;codepuppy-catalog.json 禁手编(REQ-046),上架/撤架唯一动作在 alpha-web catalog-src。"
 }

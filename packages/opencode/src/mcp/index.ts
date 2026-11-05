@@ -54,6 +54,7 @@ import { InstanceState } from "@/effect/instance-state"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { McpCatalog } from "./catalog"
+import { CodePuppyToolDiscovery } from "./codepuppy-tool-discovery"
 import { McpEvent } from "@opencode-ai/schema/mcp-event"
 import { McpBrowser } from "./browser"
 import {
@@ -696,7 +697,7 @@ const layer = Layer.effect(
           ? yield* connectRemote(name, mcp as ConfigMCPV1.Info & { type: "remote" })
           : yield* connectLocal(name, mcp as ConfigMCPV1.Info & { type: "local" }))
       return yield* Effect.gen(function* () {
-        const listed = client.getServerCapabilities()?.tools ? yield* McpCatalog.defs(client) : Result.succeed([])
+        const listed = client.getServerCapabilities()?.tools ? yield* CodePuppyToolDiscovery.listTools(client, DEFAULT_TIMEOUT) : Result.succeed([])
         if (Result.isFailure(listed)) return yield* toolsListFailure(listed.failure, mcp)
         const connection: Connection = {
           client,
@@ -732,7 +733,7 @@ const layer = Layer.effect(
         const live = () => isCurrent(s, name, generation) && s.servers[name]?.status.status === "connected"
         if (!live()) return
 
-        const listed = await s.bridge.promise(McpCatalog.defs(client))
+        const listed = await s.bridge.promise(CodePuppyToolDiscovery.listTools(client, DEFAULT_TIMEOUT))
         if (Result.isFailure(listed) || !live()) return
 
         connection.defs = listed.success

@@ -4,7 +4,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js"
 import { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js"
 import { McpCatalog } from "@/mcp/catalog"
-import { Effect, Result } from "effect"
+import { Effect } from "effect"
 
 const options = { toolCallId: "call_mcp", abortSignal: new AbortController().signal } as any
 
@@ -97,7 +97,7 @@ test("preserves output schema validation across paginated tool discovery", async
 
   try {
     const tools = await Effect.runPromise(McpCatalog.defs(client))
-    expect(Result.getOrThrow(tools).map((tool) => tool.name)).toEqual(["first", "second"])
+    expect(tools?.map((tool) => tool.name)).toEqual(["first", "second"])
     await expect(client.callTool({ name: "first", arguments: {} })).rejects.toThrow(
       "Structured content does not match the tool's output schema",
     )

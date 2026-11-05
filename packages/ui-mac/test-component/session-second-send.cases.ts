@@ -628,7 +628,7 @@ describe("#1318 AC3 空回合行「修改后再试」把焦点放回输入框", 
 
 // Image bytes are the valid PNG fixture already used by attachment-cards.cases.ts.
 const pendingPNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
-test("#1642 AC1/AC2 已有会话发送图片先显示,两条真实消息与 parts 分批到达时 FIFO 替换且不空白", async () => {
+test("#1642 AC1/AC2 已有会话发送图片先显示,两条真实消息与 parts 分批到达时匹配替换且不空白", async () => {
   holdImagePrompts = true
   v1Admit(SESSION_ID, [{ type: "text", text: "已有历史" }], "build")
   const host = mountSessionSurface(() => false)
@@ -687,6 +687,53 @@ test("#1642 AC1/AC2 已有会话发送图片先显示,两条真实消息与 part
   bumpStoreVersion((v) => v + 1)
   await flush()
   expect(host.textContent).toContain("第三张图")
+})
+
+// Reuse the message/part envelopes above; only publication order changes (message.updated before parts).
+test("#1642 AC2 图片消息等待时发纯文字,文字不能认领图片且发布后不重复", async () => {
+  v1Admit(SESSION_ID, [{ type: "text", text: "已有历史" }], "build")
+  const host = mountSessionSurface(() => false)
+  const submitted = [{ type: "text", text: "图片 A" }, { type: "file", mime: "image/png", filename: "A.png", url: `data:image/png;base64,${pendingPNG}` }]
+  stageImageSend(SESSION_ID, submitted)
+  const info = engine.message[SESSION_ID]![0]!
+  engine.message[SESSION_ID]!.push({ ...info, id: "msg_zB" })
+  bumpStoreVersion((v) => v + 1)
+  await flush()
+  expect(host.querySelectorAll(".a-tl-user")).toHaveLength(2)
+  engine.part.msg_zB = [{ type: "text", text: "纯文字 B", id: "prt_B", sessionID: SESSION_ID, messageID: "msg_zB" }]
+  bumpStoreVersion((v) => v + 1)
+  await flush()
+  expect(host.textContent).toContain("纯文字 B")
+  expect(host.querySelectorAll(".a-tl-attachments .a-att-thumb")).toHaveLength(1)
+  engine.message[SESSION_ID]!.push({ ...info, id: "msg_zA" })
+  engine.part.msg_zA = submitted.map((part, n) => ({ ...part, id: `prt_A${n}`, sessionID: SESSION_ID, messageID: "msg_zA" }))
+  bumpStoreVersion((v) => v + 1)
+  await flush()
+  expect(host.querySelectorAll(".a-tl-user")).toHaveLength(3)
+  expect(host.textContent?.split("图片 A")).toHaveLength(2)
+  expect(host.textContent).toContain("纯文字 B")
+})
+
+test("#1642 AC2 两图乱序发布,同文不同文件名仍各认领自己的消息", async () => {
+  v1Admit(SESSION_ID, [{ type: "text", text: "已有历史" }], "build")
+  const host = mountSessionSurface(() => false)
+  const submissions = ["A.png", "B.png"].map((filename) => [
+    { type: "text", text: "看看这张图" }, { type: "file", mime: "image/png", filename, url: `data:image/png;base64,${pendingPNG}` },
+  ])
+  for (const parts of submissions) stageImageSend(SESSION_ID, parts)
+  for (const index of [1, 0]) {
+    const id = `msg_zzz${index}`
+    engine.message[SESSION_ID]!.push({ ...engine.message[SESSION_ID]![0], id })
+    bumpStoreVersion((v) => v + 1)
+    await flush()
+    expect(host.querySelectorAll(".a-tl-user")).toHaveLength(3)
+    engine.part[id] = submissions[index]!.map((part, n) => ({ ...part, id: `${id}-${n}`, sessionID: SESSION_ID, messageID: id }))
+    bumpStoreVersion((v) => v + 1)
+    await flush()
+    expect(host.querySelectorAll(".a-tl-user")).toHaveLength(3)
+    for (const name of ["A.png", "B.png"])
+      expect(host.querySelectorAll(`.a-tl-attachments button[aria-label*="${name}"]`)).toHaveLength(1)
+  }
 })
 
 test.each(["response", "throw"] as const)("#1642 AC3 图片发送请求 %s 失败时撤销临时气泡并保留草稿", async (failure) => {

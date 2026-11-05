@@ -5,7 +5,7 @@ import { t } from "../i18n"
 import { pushToast } from "./Toast"
 
 // Renderer-only: these records never enter the engine's history or request body.
-type Pending = { message: UserMessage; parts: Part[]; realID?: string; after?: string }
+type Pending = { message: UserMessage; parts: Part[]; after?: string }
 const [pending, setPending] = createSignal<Record<string, Pending[]>>({})
 const observed = new Map<string, Set<string>>()
 let sequence = 0
@@ -41,29 +41,32 @@ export function failImageSends(sessionID?: string) {
 
 export function projectImageSends(sessionID: string, messages: Message[], partsOf: (id: string) => Part[]) {
   const queue = pending()[sessionID] ?? []
+  const waiting = [...queue]
   const seen = observed.get(sessionID) ?? new Set<string>()
   for (const message of messages) {
-    if (message.role !== "user" || seen.has(message.id)) continue
-    // Older history pages are not acknowledgements of a new send.
-    const item = queue.find((entry) => !entry.realID && (!entry.after || message.id > entry.after))
-    if (item) item.realID = message.id
+    if (message.role !== "user") continue
     seen.add(message.id)
+    // Older history pages are not acknowledgements of a new send.
+    const parts = partsOf(message.id)
+    if (!parts.length) continue
+    const index = waiting.findIndex((entry) =>
+      (!entry.after || message.id > entry.after) && imageSendContent(parts) === imageSendContent(entry.parts),
+    )
+    if (index >= 0) waiting.splice(index, 1)
   }
   observed.set(sessionID, seen)
-  // message.updated precedes its parts. Keep the submitted image visible until the real
-  // parts reach the same store, so a split SSE batch cannot produce an empty frame.
-  const waiting = queue.filter(
-    (item) =>
-      !item.realID ||
-      ["text", "file"].some(
-        (type) =>
-          partsOf(item.realID!).filter((part) => part.type === type).length <
-          item.parts.filter((part) => part.type === type).length,
-      ),
-  )
   if (waiting.length !== queue.length) setPending((all) => ({ ...all, [sessionID]: waiting }))
   return {
-    messages: [...messages, ...waiting.filter((item) => !item.realID).map((item) => item.message)],
-    partsOf: (id: string) => waiting.find((item) => (item.realID ?? item.message.id) === id)?.parts ?? partsOf(id),
+    // message.updated precedes parts: hide that empty frame while submitted images stay visible.
+    messages: [...messages.filter((message) => message.role !== "user" || partsOf(message.id).length ||
+      !waiting.some((item) => !item.after || message.id > item.after)), ...waiting.map((item) => item.message)],
+    partsOf: (id: string) => waiting.find((item) => item.message.id === id)?.parts ?? partsOf(id),
   }
+}
+
+function imageSendContent(parts: Part[]) {
+  return JSON.stringify([
+    parts.flatMap((part) => part.type === "text" && !part.synthetic ? [part.text] : []),
+    parts.flatMap((part) => part.type === "file" && part.mime.startsWith("image/") ? [part.filename] : []),
+  ])
 }

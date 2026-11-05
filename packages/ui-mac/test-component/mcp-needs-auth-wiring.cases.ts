@@ -572,4 +572,22 @@ test("#1645 AC4 hub follows current conversation directory and never claims conn
   await waitFor(() => expect(clientDirectories.at(-1)).toBeUndefined())
   await flush()
   expect(state()).toBe(zh["codepuppy.ext.cloudConnDisconnected"])
+  ;(document.querySelector("[data-cloud-connector]") as HTMLElement).click()
+  await waitFor(() => expect(document.querySelector(".codepuppy-ext-cloudst")?.textContent).toBe(zh["codepuppy.ext.cloudConnDisconnected"]))
+})
+
+test.each(["list", "detail"])("#1645 AC4 首页 %s 保留 needs_auth,只有已连接要求当前项目", async (surface) => {
+  reset()
+  setPathname("/")
+  engineStatus = { codepuppy: { status: "needs_auth" } }
+  mount()
+  await waitFor(() => expect(authorizeButtons().length).toBe(1))
+  if (surface === "detail") {
+    ;(document.querySelector("[data-cloud-connector]") as HTMLElement).click()
+    await waitFor(() => expect(document.querySelector(".codepuppy-ext-cloudst")?.textContent).toBe(zh["codepuppy.ext.mcpNeedsAuth"]))
+    return
+  }
+  authorizeButtons()[0]!.click()
+  await waitFor(() => expect(authenticateCalls).toEqual([{ name: "codepuppy" }]))
+  await waitFor(() => expect(document.querySelector(".codepuppy-ext-cloudst")?.textContent).toBe(zh["codepuppy.ext.cloudConnDisconnected"]))
 })

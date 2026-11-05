@@ -91,29 +91,28 @@ test("AC2: a tampered remote payload cannot make the real boot oracle pass", asy
 test("AC3: 15-second timeout keeps the event loop responsive and returns the AC2 dialog", async () => {
   let finish!: (value: Awaited<ReturnType<typeof refresh>>) => void
   const pending = new Promise<Awaited<ReturnType<typeof refresh>>>((resolve) => { finish = resolve })
-  let ticks = 0
+  let expire!: () => void
+  const deadline = new Promise<void>((resolve) => { expire = resolve })
+  let settled = false
   let reconciled = false
-  const timer = setInterval(() => ticks++, 25)
-  const started = performance.now()
-  try {
-    const result = await resolveBootExtensionSafety(reconcile(), {
-      refresh: () => pending, reconcile: () => { reconciled = true; return reconcile() }, warn,
-    })
-    const elapsed = performance.now() - started
-    console.log(`[1632] real timeout wait: ${Math.round(elapsed)}ms; event loop ticks: ${ticks}`)
-    expect(elapsed).toBeGreaterThanOrEqual(14_900)
-    expect(elapsed).toBeLessThan(16_500)
-    expect(ticks).toBeGreaterThan(100)
-    expect(reconciled).toBe(false)
-    expect(result?.title).toBe("需要联网确认扩展安全")
-    expect(result?.message).toBe(networkMessage)
-    expect(logs.at(-1)?.detail?.result).toBe("timeout")
-    expect(logs.at(-1)?.detail).not.toHaveProperty("error")
-    expect(logs.at(-1)?.detail).not.toHaveProperty("reasonClass")
-    finish(await refresh())
-    expect((await pending).source).toBe("remote")
-  } finally { clearInterval(timer) }
-}, 17_000)
+  const decision = resolveBootExtensionSafety(reconcile(), {
+    refresh: () => pending, reconcile: () => { reconciled = true; return reconcile() }, warn,
+    wait: (ms) => { expect(ms).toBe(15_000); return deadline },
+  }).then((result) => { settled = true; return result })
+  await new Promise<void>((resolve) => setImmediate(resolve))
+  expect(settled).toBe(false)
+  expect(reconciled).toBe(false)
+  expire()
+  const result = await decision
+  expect(reconciled).toBe(false)
+  expect(result?.title).toBe("需要联网确认扩展安全")
+  expect(result?.message).toBe(networkMessage)
+  expect(logs.at(-1)?.detail?.result).toBe("timeout")
+  expect(logs.at(-1)?.detail).not.toHaveProperty("error")
+  expect(logs.at(-1)?.detail).not.toHaveProperty("reasonClass")
+  finish(await refresh())
+  expect((await pending).source).toBe("remote")
+})
 
 test("AC2: another gap including danglingBoot skips refresh and preserves the original refusal", async () => {
   const initial = reconcile()

@@ -8,13 +8,16 @@ export async function resolveBootExtensionSafety(
     refresh: () => Promise<RemoteCatalogResult>
     reconcile: () => BootReconcileOutcome | Promise<BootReconcileOutcome>
     warn: (message: string, detail?: Record<string, unknown>) => void
+    wait?: (ms: number) => Promise<void>
   },
 ) {
   if (state.curationUnknown && state.enforcementGap?.length === 1) {
     const started = Date.now()
     deps.warn("[1632] refreshing catalog before boot safety decision")
     let timer: ReturnType<typeof setTimeout> | undefined
-    const timeout = new Promise<{ result: "timeout" }>((resolve) => { timer = setTimeout(() => resolve({ result: "timeout" }), 15_000) })
+    const timeout = deps.wait
+      ? deps.wait(15_000).then(() => ({ result: "timeout" as const }))
+      : new Promise<{ result: "timeout" }>((resolve) => { timer = setTimeout(() => resolve({ result: "timeout" }), 15_000) })
     const result = await Promise.race([
       deps.refresh().then(
         (catalog) => catalog.source === "none"

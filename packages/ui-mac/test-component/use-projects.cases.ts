@@ -268,6 +268,32 @@ globalThis.fetch = ((input: unknown, init?: RequestInit) => {
   return new Promise(() => {})
 }) as typeof fetch
 
+// #1642: production timeline binding, driven by the same public store shape as session-second-send.cases.ts.
+let pendingSessionID = "ses_pending_1642"
+const pendingData = { message: {} as Record<string, unknown[]>, part: {} as Record<string, unknown[]>, session_status: {} }
+mock.module("@opencode-ai/app", () => ({
+  useLayout: () => ({ tabs: () => ({ all: () => [], active: () => undefined }) }),
+  useServerSDK: () => () => ({ client: {} }),
+  useServerSync: () => () => ({
+    data: { provider: { all: new Map() } },
+    session: { sync: async () => {}, data: pendingData, history: { more: () => false, loading: () => false } },
+  }),
+}))
+mock.module("@solidjs/router", () => ({ useNavigate: () => () => {} }))
+mock.module("../src/renderer/codepuppy-ui/session-workspace/codepuppy-session-workspace", () => ({
+  useCodePuppySessionLiveContext: () => ({ current: () => ({ identity: { serverKey: "sidecar", directory: "/repos/alpha-code", sessionID: pendingSessionID } }) }),
+}))
+mock.module("@opencode-ai/session-ui/markdown", () => ({ Markdown: () => document.createElement("div") }))
+class PendingObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+Object.assign(globalThis, { IntersectionObserver: PendingObserver, ResizeObserver: PendingObserver })
+const { CodePuppySessionTimeline } = await import("../src/renderer/codepuppy-ui/session-timeline/session-timeline")
+const { ToastViewport } = await import("../src/renderer/codepuppy-ui/Toast")
+const { failImageSends } = await import("../src/renderer/codepuppy-ui/pending-image-sends")
+
 const { useCodePuppyProjects } = await import("../src/renderer/sidebar/use-projects")
 const { projectSidebarGroups } = await import("../src/renderer/sidebar/project-display")
 const { replayRuntimeRecoveryState, subscribeCatalogUpdated, subscribeRuntimeRecovery } = await import(
@@ -801,4 +827,73 @@ test("#1560 首发:显式选择的模型随首条消息与斜杠命令发出(含
     model: "deepseek-byok/deepseek-v4-flash",
     variant: "高",
   })
+})
+
+// PNG bytes reused from attachment-cards.cases.ts; SSE envelope follows the existing #882 fixture.
+const pendingImage = {
+  type: "file",
+  mime: "image/png",
+  filename: "截图.png",
+  url: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+}
+test("#1642 AC1 首页 startChat 返回并跳转前已有临时文字图片,纯文字不临时显示", async () => {
+  sendScenario = true
+  pendingSessionID = "ses_pending_home"
+  pendingData.message[pendingSessionID] = []
+  const { api } = mountHook(60_000)
+  await waitFor(() => expect(api.sdk()).toBeDefined())
+  expect(await api.startChat("/repos/alpha-code", "只发文字", [], { existingSessionID: pendingSessionID })).toBe(
+    pendingSessionID,
+  )
+  const host = mountView(() => solid.createComponent(CodePuppySessionTimeline, {}) as HTMLElement)
+  await tick()
+  expect(host.querySelector("[data-codepuppy-timeline-empty]")).not.toBeNull()
+  expect(
+    await api.startChat("/repos/alpha-code", "首页图片", [pendingImage], { existingSessionID: pendingSessionID }),
+  ).toBe(pendingSessionID)
+  expect(host.querySelectorAll(".a-tl-user")).toHaveLength(1)
+  expect(host.textContent).toContain("首页图片")
+  expect(host.querySelector(".a-tl-attachments img")?.getAttribute("src")).toBe(pendingImage.url)
+  expect(host.querySelector("[data-codepuppy-timeline-empty]")).toBeNull()
+  expect(host.querySelector("[data-codepuppy-timeline-row=process]")).toBeNull()
+  expect(pendingData.message[pendingSessionID]).toEqual([])
+  failImageSends(pendingSessionID)
+})
+
+test("#1642 AC3 session.error 按会话撤销且只提示一次,sidecar 换代清空其余临时消息", async () => {
+  sendScenario = true
+  sidebarScenario = true
+  pendingSessionID = "ses_pending_error"
+  pendingData.message[pendingSessionID] = []
+  const { api } = mountHook(60_000)
+  await waitFor(() => expect(api.sdk()).toBeDefined())
+  await waitFor(() => expect(globalEventController).toBeDefined())
+  const host = mountView(() => solid.createComponent(CodePuppySessionTimeline, {}) as HTMLElement)
+  mountView(() => solid.createComponent(ToastViewport, {}) as HTMLElement)
+  document.querySelectorAll<HTMLButtonElement>(".a-toast-x").forEach((button) => button.click())
+  await api.startChat("/repos/alpha-code", "会失败的图片", [pendingImage], { existingSessionID: pendingSessionID })
+  const emit = (sessionID: string) =>
+    globalEventController!.enqueue(
+      encoder.encode(
+        `data: ${JSON.stringify({ directory: "/repos/alpha-code", payload: { type: "session.error", properties: { sessionID, error: { name: "UnknownError", data: { message: "hook failed" } } } } })}\n\n`,
+      ),
+    )
+  emit("ses_elsewhere")
+  await tick()
+  expect(host.querySelectorAll(".a-tl-user")).toHaveLength(1)
+  expect(document.querySelectorAll(".a-toast")).toHaveLength(0)
+  emit(pendingSessionID)
+  await waitFor(() => expect(host.querySelectorAll(".a-tl-user")).toHaveLength(0))
+  expect(document.querySelectorAll(".a-toast")).toHaveLength(1)
+  expect(document.querySelector(".a-toast")?.textContent).toContain(zh["codepuppy.composer.sendFailed"])
+  emit(pendingSessionID)
+  await tick()
+  expect(document.querySelectorAll(".a-toast")).toHaveLength(1)
+  await api.startChat("/repos/alpha-code", "重启前图片", [pendingImage], { existingSessionID: pendingSessionID })
+  expect(host.querySelectorAll(".a-tl-user")).toHaveLength(1)
+  currentState = { status: "recovering", generation: currentState.generation + 1, reason: "boot" }
+  bridgeCb!(currentState)
+  await tick()
+  expect(host.querySelectorAll(".a-tl-user")).toHaveLength(0)
+  expect(document.querySelectorAll(".a-toast")).toHaveLength(2)
 })

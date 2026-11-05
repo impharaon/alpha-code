@@ -46,6 +46,7 @@ import { pathHitsPopover } from "./popover-hit"
 import { claimOverlay, releaseOverlay } from "./overlay-stack"
 import { Tooltip } from "./Tooltip"
 import { pushToast } from "./Toast"
+import { stageImageSend } from "./pending-image-sends"
 import type { CodePuppyProjectsApi } from "../sidebar/use-projects"
 import type { AuthState } from "../../preload/types"
 import {
@@ -1848,18 +1849,26 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
       // 因此 v2 的档位协议(switchAgent 落会话档 + 权威实时读 + CAS 回滚 + 本地推送账本)
       // 随 v2 发送一起退役 —— 留着它只会在每次发送前多两次网络往返,并把「读不到会话档」
       // 变成一个新的发送拦截点。
-      const { error } = await c.session.promptAsync({
+      const undo = stageImageSend(sid, req.parts, { agent: req.agent, model: req.model })
+      const request = c.session.promptAsync({
         sessionID: sid,
         directory: dir,
         parts: req.parts,
         ...(req.agent ? { agent: req.agent } : {}),
         ...v1PromptModelFields(submittedExplicitModel),
       } as any)
-      if (interrupted()) return
+      const { error } = await (undo
+        ? request.catch((error: unknown) => {
+            undo()
+            throw error
+          })
+        : request)
       if (error) {
-        pushToast({ kind: "error", title: t("codepuppy.composer.sendFailed") })
+        undo?.()
+        if (!interrupted()) pushToast({ kind: "error", title: t("codepuppy.composer.sendFailed") })
         return
       }
+      if (interrupted()) return
       setText("")
       setMentions([])
       setAttachments([])

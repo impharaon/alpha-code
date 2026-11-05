@@ -177,6 +177,8 @@ function v2Admit(sessionID: string, delivery: string) {
   return { data: { admittedSeq: seq, delivery } }
 }
 
+let imageFailure: "response" | "throw" | undefined
+let holdImagePrompts = false
 const sdkClient = {
   command: { list: async () => ({ data: engine.commands }) },
   session: {
@@ -188,6 +190,9 @@ const sdkClient = {
       engine.v1Prompts.push(args)
       const sessionID = String(args["sessionID"])
       if (engine.info[sessionID] === undefined) return { error: { status: 404 } }
+      if (imageFailure === "throw") throw new Error("send failed")
+      if (imageFailure === "response") return { error: { status: 500 } }
+      if (holdImagePrompts) return {}
       v1Admit(sessionID, (args["parts"] as Array<Record<string, unknown>>) ?? [], args["agent"] as string | undefined)
       return {}
     },
@@ -256,6 +261,7 @@ Bun.plugin({
 })
 
 const { CodePuppyComposerRuntime } = await import("../src/renderer/codepuppy-ui/codepuppy-composer")
+const { failImageSends, stageImageSend } = await import("../src/renderer/codepuppy-ui/pending-image-sends")
 const { CodePuppySessionTimeline } = await import("../src/renderer/codepuppy-ui/session-timeline/session-timeline")
 const {
   composerModel,
@@ -403,6 +409,9 @@ async function send(host: HTMLElement, mode: "home" | "session", text: string) {
 }
 
 beforeEach(() => {
+  holdImagePrompts = false
+  imageFailure = undefined
+  failImageSends()
   resetEngine()
   bumpStoreVersion((value) => value + 1)
   document.body.replaceChildren()
@@ -615,4 +624,87 @@ describe("#1318 AC3 空回合行「修改后再试」把焦点放回输入框", 
     expect(document.activeElement).toBe(before)
     expect(host.querySelector("[data-codepuppy-timeline-row='empty-turn'] .a-tl-int-failed")).toBeNull()
   })
+})
+
+// Image bytes are the valid PNG fixture already used by attachment-cards.cases.ts.
+const pendingPNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+test("#1642 AC1/AC2 已有会话发送图片先显示,两条真实消息与 parts 分批到达时 FIFO 替换且不空白", async () => {
+  holdImagePrompts = true
+  v1Admit(SESSION_ID, [{ type: "text", text: "已有历史" }], "build")
+  const host = mountSessionSurface(() => false)
+  await waitFor(() => expect(composerModel()?.id).toBe(catalog.platformModels[0]!.id))
+  for (const text of ["第一张图", "第二张图"]) {
+    const data = new DataTransfer()
+    data.items.add(
+      new File([Uint8Array.from(atob(pendingPNG), (c) => c.charCodeAt(0))], "截图.png", { type: "image/png" }),
+    )
+    surfaceOf(host, "session")
+      .querySelector("textarea")!
+      .dispatchEvent(new ClipboardEvent("paste", { bubbles: true, clipboardData: data }))
+    await waitFor(() => expect(surfaceOf(host, "session").querySelector(".a-att-thumb")).not.toBeNull())
+    await send(host, "session", text)
+    await waitFor(() => expect(host.querySelectorAll(".a-tl-user")).toHaveLength(text === "第一张图" ? 2 : 3))
+    await waitFor(() => expect(surfaceOf(host, "session").querySelector("textarea")!.value).toBe(""))
+  }
+  expect(engine.message[SESSION_ID]).toHaveLength(2) // UI-only: no fabricated engine record.
+  expect(host.querySelector("[data-codepuppy-timeline-empty]")).toBeNull()
+  expect(host.querySelector(".a-comp-stop")).toBeNull()
+  expect(host.querySelector("[data-codepuppy-timeline-row=process]")).toBeNull()
+  for (const [index, prompt] of engine.v1Prompts.entries()) {
+    const id = `msg_z${index}`
+    const info = {
+      id,
+      sessionID: SESSION_ID,
+      role: "user",
+      time: { created: Date.now() },
+      agent: "build",
+      model: { providerID: "test", modelID: "test" },
+    }
+    engine.message[SESSION_ID]!.push(info)
+    bumpStoreVersion((v) => v + 1)
+    await flush()
+    expect(host.querySelectorAll(".a-tl-user")).toHaveLength(3)
+    expect(host.querySelectorAll(".a-tl-attachments .a-att-thumb")).toHaveLength(2)
+    engine.part[id] = (prompt.parts as StoreMessage[]).map((part, n) => ({
+      ...part,
+      id: `${id}-${n}`,
+      sessionID: SESSION_ID,
+      messageID: id,
+    }))
+    bumpStoreVersion((v) => v + 1)
+    await flush()
+    expect(host.querySelectorAll(".a-tl-user")).toHaveLength(3)
+    expect(host.querySelectorAll(".a-tl-attachments .a-att-thumb")).toHaveLength(2)
+    expect(host.textContent?.split("第一张图")).toHaveLength(2)
+    expect(host.textContent?.split("第二张图")).toHaveLength(2)
+  }
+  // Replayed update and older-page insertion must not consume a later pending send.
+  stageImageSend(SESSION_ID, [
+    { type: "text", text: "第三张图" },
+    { type: "file", mime: "image/png", url: `data:image/png;base64,${pendingPNG}` },
+  ])
+  engine.message[SESSION_ID]!.unshift({ ...engine.message[SESSION_ID]![0], id: "msg_old" })
+  bumpStoreVersion((v) => v + 1)
+  await flush()
+  expect(host.textContent).toContain("第三张图")
+})
+
+test.each(["response", "throw"] as const)("#1642 AC3 图片发送请求 %s 失败时撤销临时气泡并保留草稿", async (failure) => {
+  imageFailure = failure
+  const host = mountSessionSurface(() => false)
+  await waitFor(() => expect(composerModel()?.id).toBe(catalog.platformModels[0]!.id))
+  const data = new DataTransfer()
+  data.items.add(
+    new File([Uint8Array.from(atob(pendingPNG), (c) => c.charCodeAt(0))], "截图.png", { type: "image/png" }),
+  )
+  surfaceOf(host, "session")
+    .querySelector("textarea")!
+    .dispatchEvent(new ClipboardEvent("paste", { bubbles: true, clipboardData: data }))
+  await waitFor(() => expect(surfaceOf(host, "session").querySelector(".a-att-thumb")).not.toBeNull())
+  await send(host, "session", "失败的图片")
+  await waitFor(() => expect(engine.v1Prompts).toHaveLength(1))
+  await flush()
+  expect(host.querySelectorAll(".a-tl-user")).toHaveLength(0)
+  expect(surfaceOf(host, "session").querySelector("textarea")!.value).toBe("失败的图片")
+  expect(surfaceOf(host, "session").querySelector(".a-att-thumb")).not.toBeNull()
 })

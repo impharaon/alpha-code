@@ -41,7 +41,7 @@
   "capabilities": [
     {
       "token": "codepuppy.connection.v1",
-      "semantic": "Complete a host-owned Code Puppy Connection handshake through a statically registered handler before the component is installed."
+      "semantic": "Complete a host-owned Alpha Connection handshake through a statically registered handler before the component is installed."
     },
     {
       "token": "codepuppy.mcp-oauth.v1",

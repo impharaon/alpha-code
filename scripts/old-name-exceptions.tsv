@@ -1133,3 +1133,4 @@ packages/ui-mac/src/shared/frontend-surface-manifest.ts	338	external-anchor	GitH
 packages/ui-mac/src/shared/host-extension-package-contract/generate-artifact.ts	257	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
 packages/ui-mac/test-fixtures/claude-plugin-corpus.json	1	third-party	#848 从 ~/.claude/plugins/marketplaces 采集的真实插件语料逐字快照，保留第三方原文
 scripts/gate-files.tsv	95	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/shared/host-extension-package-contract/host-extension-package.registry.v1.json	44	external-anchor	跨仓宿主合同的生产方产物语义原文，与冻结的 vendored 副本逐字节一致；品牌文案须由合同生产方改名

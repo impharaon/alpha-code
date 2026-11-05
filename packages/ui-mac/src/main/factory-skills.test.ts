@@ -337,7 +337,7 @@ describe("REQ-233 cloud skill instructions", () => {
   test("AC2 office-docs creates, reads and edits every office file locally", () => {
     const text = office.content.replace(/\s+/g, " ")
     for (const instruction of [
-      "**Create, read or edit Word/Excel/PowerPoint/PDF with Alpha's four first-party local stdio MCP connectors below**",
+      "**Create, read or edit Word/Excel/PowerPoint/PDF with Code Puppy's four first-party local stdio MCP connectors below**",
       "`mcp:codepuppy-word`, `mcp:codepuppy-excel`, `mcp:codepuppy-powerpoint` and `mcp:codepuppy-pdf`",
       "They write the file straight into the project directory",
       "the file stays on this machine, with no cloud charge",

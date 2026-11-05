@@ -4,13 +4,13 @@ kind: runbook
 status: active
 owners:
   - Code Puppy maintainers
-last_reviewed: 2026-11-02
+last_reviewed: 2026-11-04
 review_after: 2026-11-16
 ---
 
 # 发版 runbook — Code Puppy Mac(签名 · 公证 · 自动更新)
 
-> 权威发版文档。把 Code Puppy(opencode 引擎 + 自有前端/后端)打成**你自己**的、签名+公证、可分发给任意 Mac 的 app,并经 GitHub Release 走自动更新。
+> 权威发版文档。把 Code Puppy(opencode 引擎 + 自有前端/后端)打成**你自己**的、签名+公证、可分发给 Apple 芯片 Mac 的 app,并经 GitHub Release 走自动更新。
 > 首个签名+公证发布:**v0.1.0**(2026-07-03,`jinjunnn/alpha-code`),下述流程即由它验证。
 > 卸载与数据残留:见 [uninstall.md](uninstall.md)(C16;app 内入口 = 数据 ▸ 清除数据…)。
 
@@ -24,13 +24,15 @@ review_after: 2026-11-16
 **签名目录与变量名的一次性改名(#1570 之后的第一次发版前做一次)**:目录原名 `~/.alpha-code-signing/`,
 `signing.env` 里原来是 `ALPHA_SIGN` / `ALPHA_SIGN_IDENTITY` / `ALPHA_MAC_SIGN_IDENTITY`。旧变量名不会被读到,
 本地打包会**静默**产出未签名的包,所以 `electron-builder.config.ts` 见到任何一个旧名就直接拒绝打包。
-改名只动名字,不读、不打印任何值:
+`signing.env` 的值里也有旧目录路径(如 `.p8` 的路径),目录改名时必须一起替换,否则公证仍会找旧路径。
+下面只改名字与路径,不读、不打印任何值:
 
 ```sh
 set -e
 [ -d ~/.alpha-code-signing ] && [ ! -e ~/.codepuppy-signing ] && mv ~/.alpha-code-signing ~/.codepuppy-signing
 sed -i '' -E 's/(^|[^A-Za-z0-9_])ALPHA_(SIGN|SIGN_IDENTITY|MAC_SIGN_IDENTITY)=/\1CODEPUPPY_\2=/' ~/.codepuppy-signing/signing.env
-grep -cE '(^|[^A-Za-z0-9_])ALPHA_' ~/.codepuppy-signing/signing.env || true   # 只数行数,应为 0
+sed -i '' 's/\.alpha-code-signing/.codepuppy-signing/g' ~/.codepuppy-signing/signing.env
+grep -cE '(^|[^A-Za-z0-9_])ALPHA_|\.alpha-code-signing' ~/.codepuppy-signing/signing.env || true   # 只数行数,应为 0
 ```
 
 **打包配置**(`packages/ui-mac/electron-builder.config.ts` + `scripts/*`,零改上游):
@@ -41,6 +43,9 @@ grep -cE '(^|[^A-Za-z0-9_])ALPHA_' ~/.codepuppy-signing/signing.env || true   # 
 - prebuild 会 `patch-server-version.ts` 把内嵌 server 的 `InstallationVersion` 从 `local` 改成真实版本(A4:否则 `@opencode-ai/plugin@local` 装不上,带 `.opencode` 插件的项目首个请求卡住)。
 
 ## 1. 发一个版本(权威步骤)
+
+从 0.1.26 起只出 Apple 芯片(arm64)Mac 包(#1496)。在 arm64 打包机上照下列步骤执行;
+mac 打包配置只接受 arm64 目标,误设其它架构会在配置解析时直接报错。
 
 ```bash
 # ⓪ 前端合并复验(REQ-012,546-sync 静默回归教训——v0.1.0 就是跳过这步翻的车):
@@ -166,70 +171,7 @@ curl -sL -o /dev/null -w "%{http_code}\n" \
 装完验收(票面 AC7):不用重新登录、BYOK 密钥可用、网页登录状态还在;钥匙串弹了几次框、TCC 怎样重新授权,
 照实记进本版的验证记录(`docs/verification/`),不承诺无弹窗。
 
-## 2. Intel 芯片 Mac(x64)包(#1496)
-
-一次发版出**两套** mac 包:`codepuppy-mac-arm64.*` 与 `codepuppy-mac-x64.*`,`latest-mac.yml` 同时列出两者
-(electron-updater 在 mac 上按文件名里的架构挑自己那一份)。不做 universal。
-
-**为什么不能「在 arm64 机器上加个 `--x64` 就完事」**:包里有按芯片编译的部件,今天只按打包机架构准备 ——
-直接加 `--x64` 会得到一个终端打不开、引擎文件监听起不来的 Intel 包。架构相关的东西全部清单:
-
-| 部件 | 文件 | 怎么按目标架构准备 |
-| --- | --- | --- |
-| 内置终端 | `@lydell/node-pty-darwin-<arch>`(`pty.node` + `spawn-helper`) | **包名在 build 时编进 `out/main`**(`electron.vite.config.ts` 的 node-pty narrower)⇒ build 必须带 `CODEPUPPY_TARGET_ARCH` |
-| 引擎文件监听 | `@parcel/watcher-darwin-<arch>`(`watcher.node`) | 引擎产物运行时按 `process.arch` require ⇒ 只要求该架构的包在 `node_modules` 里被打进去 |
-| 进程围栏 | `native/codepuppy-fence/build/codepuppy_fence.node` | 本来就是 fat(arm64 + x86_64),见下 |
-| 文档工具运行环境(#1564) | `native/office-runtime/build/<arch>/` → 包内 `Contents/Resources/office-runtime/` | prebuild 按 `CODEPUPPY_TARGET_ARCH` 构建那一份,见下「随包 Office 运行时」 |
-| Electron 本体 | electron-builder 按打包架构下载 | 无需操作 |
-| 引擎本体 / ext / 预览 | `../opencode/dist/node/node.js` + `*.wasm`、`../ext/dist/plugin.js` + photon wasm、tree-sitter wasm、ghostty-web(wasm,渲染层) | 纯 JS / wasm,与架构无关 |
-
-目标架构的**唯一**选择点是 `packages/ui-mac/scripts/target-arch.ts`:`CODEPUPPY_TARGET_ARCH=arm64|x64`,缺省 = 打包机架构
-(所以 `bun run build && bun run package:mac` 的行为与以前一样)。electron-builder 的 `beforePack` 在装包前核对:
-正在打的架构 == `CODEPUPPY_TARGET_ARCH`、`out/main` 里编进的 node-pty 包名 == 该架构、该架构的原生包都在 `node_modules`
-里且每个 Mach-O 文件都含这一片 —— 任一项不过就**拒绝出包**并列出原因(判据:`src/main/mac-target-arch.test.ts`)。
-
-```bash
-# ⓪ 一次性(以及每次 bun install 之后):把两种架构的 darwin 原生包都装上。
-#    bun 默认只装与本机 cpu 匹配的 optionalDependencies,arm64 机器上 x64 的包根本不在盘上。
-cd <仓根> && bun install --os=darwin --cpu='*'      # 只改 node_modules,不改 bun.lock
-
-source ~/.codepuppy-signing/signing.env
-cd packages/ui-mac
-rm -f dist/latest-mac-*.yml
-
-# ① arm64 一轮(与 §1 ② 相同,只是把 feed 留底)
-OPENCODE_CHANNEL=prod bun run build
-OPENCODE_CHANNEL=prod bun run package:mac
-cp dist/latest-mac.yml dist/latest-mac-arm64.yml
-
-# ② x64 一轮 —— build 必须重跑(out/ 会被换成 x64 的),顺序不能颠倒成「先 build 两次再打两次」
-OPENCODE_CHANNEL=prod bun run build:mac-x64        # = CODEPUPPY_TARGET_ARCH=x64 bun run build
-OPENCODE_CHANNEL=prod bun run package:mac-x64      # = CODEPUPPY_TARGET_ARCH=x64 electron-builder --mac --x64
-cp dist/latest-mac.yml dist/latest-mac-x64.yml
-
-# ③ 合并 feed:写回 dist/latest-mac.yml(两种架构都列出;版本不一或两份放反即拒)
-bun run merge:latest-mac
-
-# ④ 验证 x64 那一份(arm64 那一份照 §1 ③)
-xcrun stapler validate "dist/mac/Code Puppy.app"          # x64 的 .app 在 dist/mac/(electron-builder 对 x64 不加后缀)
-spctl -a -vvv -t install "dist/mac/Code Puppy.app"
-lipo -archs "dist/mac/Code Puppy.app/Contents/MacOS/Code Puppy"                                   # 期望 x86_64
-find "dist/mac/Code Puppy.app" \( -name "*.node" -o -name spawn-helper \) -not -path "*darwin-arm64*" -exec lipo -archs {} \;   # 每行都含 x86_64
-# 包里还会带着同名的 *-darwin-arm64 原生包(⓪ 的 --cpu='*' 把两种都装进了 node_modules),它们只有 arm64 一片 = 正常:
-# x64 上只加载 *-darwin-x64 那一份。已发布的 v0.1.20、v0.1.21 x64 包都是这样(2026-10-27 逐项核过)。要判的是 x64 那份齐不齐:
-find "dist/mac/Code Puppy.app" -path "*darwin-x64*" \( -name "*.node" -o -name spawn-helper \) | wc -l   # 期望 4(pty.node、spawn-helper、watcher.node、msgpackr-extract)
-ls dist/codepuppy-mac-x64.dmg dist/codepuppy-mac-x64.zip
-grep -c "url: codepuppy-mac-" dist/latest-mac.yml       # 期望 4(两种架构各 dmg + zip)
-```
-
-之后照 §1 ③′ 产 release manifest(`release-manifest.ts` 本来就枚举 `mac-arm64` 与 `mac-x64` 两套产物),
-④ 上传时把 x64 的 `codepuppy-mac-x64.dmg` / `.zip` / 两个 `.blockmap` 一并加上。官网 `/download` 的 Intel
-卡位读 manifest 里 darwin/x64 的产物,不需要改站点。
-
-只出 x64 时(例如重打 Intel 包)只跑 ② 即可,此时 `dist/latest-mac.yml` 只含 x64 —— **不要**单独上传它,
-否则会把 arm64 用户的自动更新 feed 覆盖掉;仍按 ③ 与留底的 arm64 feed 合并。
-
-**未验证(需真 Intel 机)**:x64 包在 Intel Mac 上启动、本地引擎起来、内置终端能打开并执行命令(#1496 AC2)。
+## 2. 随包运行时与原生模块
 
 ### 随包 Office 运行时(#1564)
 
@@ -256,19 +198,27 @@ Word / Excel / PowerPoint / PDF 四个文档工具的命令是 `<Resources>/offi
 [alpha:office-runtime] arm64: 111.2 MB (4750 files, 48 Mach-O, 11 top-level modules imported, 4 formats round-tripped)
 [alpha:office-runtime] x64: 104.4 MB (4750 files, 48 Mach-O, 11 top-level modules imported, 4 formats round-tripped)
 ```
-本仓 CI 与开发机都没有 x86_64 运行时,上面的 `lipo` 只证明**装进去的片对**,不证明跑得起来。
+本仓 CI 与开发机都没有 x86_64 运行时,Mach-O 架构检查只证明**装进去的片对**,不证明跑得起来。
 
-**进程围栏的原生模块不需要为 x64 多做任何事**(REQ-159 `#1321`):`prebuild` 里的
+**进程围栏的原生模块**(REQ-159 `#1321`):`prebuild` 里的
 `scripts/build-fence-addon.ts` 一次编出 **fat** 的 `native/codepuppy-fence/build/codepuppy_fence.node`(arm64 + x86_64
 同一个文件),编完逐片判 —— `lipo -archs` 缺任一片、或某一片没有 N-API 入口 ⇒ 删产物、构建红。它经
 `extraResources` 落到 `Contents/Resources/codepuppy-fence/codepuppy_fence.node`,由流水线深签(与 `pty.node` 同 Team)。
 漏了它的包**起不了引擎**(main 拒 fork / sidecar 拒启动,原因可读),不会静默无围栏。
-未验证:x86_64 那一片没有被执行过(本机只有 arm64 运行时);首个 Intel 包要在 Intel 机上跑一次
-`packages/ui-mac/src/main/process-fence-apply.test.ts` 或等价的打包验证。
+未验证:x86_64 那一片没有被执行过(本机只有 arm64 运行时)。
 
 ## 3. 排障 / 已知项
 - **打包时弹「codesign 想访问密钥」**:点「**始终允许**」+ 输 Mac 登录密码(不是「允许」——那样每个文件都弹)。授权后长期免弹。若换机后又弹:`security import ~/.codepuppy-signing/devid-backup.p12`(口令 README)。
 - **公证失败**:多为凭证/网络。`signing.env` 的 `APPLE_API_*` 是否正确;`.p8` 文件在否;换机后重新 source。API key 是 `开发者` 角色即够公证。
+  上传卡住或超时时(0.1.25 踩坑),手动禁用 S3 加速重新提交;打包流水线仍走 electron-builder 内置公证:
+
+  ```sh
+  xcrun notarytool submit <文件> --no-s3-acceleration \
+    --key "$APPLE_API_KEY" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER" --wait
+  # 返回 Accepted 后,给这次提交对应的 .app / dmg 附上公证票,再回 §1 ③ 验证:
+  xcrun stapler staple <对应的.app或.dmg>
+  ```
+
 - **A4 已修**:`patch-server-version.ts` 已把 InstallationVersion 从 `local` 改真实版本(v0.1.0 打包实测生效)。若 prebuild 日志出现 `[alpha:patch-server-version] … not found`,说明上游改了那行表达式 → 去更新该脚本(否则 A4 复发)。
 - **首个 Release 前**已装 app 检查更新会「无更新」= 正常。
 - **appId(bundle id)变更**:userData 目录不跟它走(由 `main/index.ts` 的 `APP_IDS` 决定),会话与项目都在;

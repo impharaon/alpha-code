@@ -1,0 +1,118 @@
+{
+ "tally": {
+  "src/renderer/sidebar/use-projects.ts:602": 3,
+  "app/src/context/server-sdk.tsx:281": 1,
+  "src/renderer/alpha-ui/cloud-run-watcher.tsx:60": 2,
+  "(unmapped)": 8
+ },
+ "rows": [
+  {
+   "t": 1793858517408,
+   "wc": 1,
+   "owner": "src/renderer/sidebar/use-projects.ts:602",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "src/renderer/sidebar/use-projects.ts:602"
+   ]
+  },
+  {
+   "t": 1793858517425,
+   "wc": 1,
+   "owner": "app/src/context/server-sdk.tsx:281",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "app/src/context/server-sdk.tsx:281"
+   ]
+  },
+  {
+   "t": 1793858517498,
+   "wc": 1,
+   "owner": "src/renderer/alpha-ui/cloud-run-watcher.tsx:60",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "src/renderer/alpha-ui/cloud-run-watcher.tsx:60"
+   ]
+  },
+  {
+   "t": 1793858544421,
+   "wc": 1,
+   "owner": "src/renderer/sidebar/use-projects.ts:602",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "src/renderer/sidebar/use-projects.ts:602"
+   ]
+  },
+  {
+   "t": 1793858544604,
+   "wc": 1,
+   "owner": "src/renderer/sidebar/use-projects.ts:602",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "src/renderer/sidebar/use-projects.ts:602"
+   ]
+  },
+  {
+   "t": 1793858544660,
+   "wc": 1,
+   "owner": "src/renderer/alpha-ui/cloud-run-watcher.tsx:60",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "src/renderer/alpha-ui/cloud-run-watcher.tsx:60"
+   ]
+  },
+  {
+   "t": 1793858591809,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858591962,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858592114,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858592265,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858592417,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858592569,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858592720,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858592872,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  }
+ ]
+}

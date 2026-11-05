@@ -1,0 +1,128 @@
+{
+ "tally": {
+  "src/renderer/sidebar/use-projects.ts:602": 3,
+  "app/src/context/server-sdk.tsx:281": 2,
+  "src/renderer/alpha-ui/cloud-run-watcher.tsx:60": 2,
+  "(unmapped)": 8
+ },
+ "rows": [
+  {
+   "t": 1793858317819,
+   "wc": 1,
+   "owner": "src/renderer/sidebar/use-projects.ts:602",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "src/renderer/sidebar/use-projects.ts:602"
+   ]
+  },
+  {
+   "t": 1793858317848,
+   "wc": 1,
+   "owner": "app/src/context/server-sdk.tsx:281",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "app/src/context/server-sdk.tsx:281"
+   ]
+  },
+  {
+   "t": 1793858317906,
+   "wc": 1,
+   "owner": "src/renderer/alpha-ui/cloud-run-watcher.tsx:60",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "src/renderer/alpha-ui/cloud-run-watcher.tsx:60"
+   ]
+  },
+  {
+   "t": 1793858344641,
+   "wc": 1,
+   "owner": "src/renderer/sidebar/use-projects.ts:602",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "src/renderer/sidebar/use-projects.ts:602"
+   ]
+  },
+  {
+   "t": 1793858344819,
+   "wc": 1,
+   "owner": "src/renderer/sidebar/use-projects.ts:602",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "src/renderer/sidebar/use-projects.ts:602"
+   ]
+  },
+  {
+   "t": 1793858344860,
+   "wc": 1,
+   "owner": "src/renderer/alpha-ui/cloud-run-watcher.tsx:60",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "src/renderer/alpha-ui/cloud-run-watcher.tsx:60"
+   ]
+  },
+  {
+   "t": 1793858344882,
+   "wc": 1,
+   "owner": "app/src/context/server-sdk.tsx:281",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "app/src/context/server-sdk.tsx:281"
+   ]
+  },
+  {
+   "t": 1793858407719,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858407871,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858408023,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858408175,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858408326,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858408477,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858408629,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858408780,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  }
+ ]
+}

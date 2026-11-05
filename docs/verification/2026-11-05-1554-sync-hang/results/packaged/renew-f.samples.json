@@ -1,0 +1,50 @@
+[
+ {
+  "i": 1,
+  "renewalSeenAt": "2026-11-05T08:41:10.820Z",
+  "click": "clicked",
+  "clickAt": "2026-11-05T08:41:10.820Z",
+  "windowMs": 60000,
+  "probes": 569,
+  "probeErrors": 0,
+  "syncingSeen": false,
+  "firstMs": null,
+  "lastMs": null,
+  "spanMs": 0,
+  "alert": null,
+  "modelAtEnd": "deepseek-flash",
+  "stillSyncingAtEnd": false
+ },
+ {
+  "i": 2,
+  "renewalSeenAt": "2026-11-05T08:51:11.454Z",
+  "click": "clicked",
+  "clickAt": "2026-11-05T08:51:11.455Z",
+  "windowMs": 60000,
+  "probes": 568,
+  "probeErrors": 0,
+  "syncingSeen": false,
+  "firstMs": null,
+  "lastMs": null,
+  "spanMs": 0,
+  "alert": null,
+  "modelAtEnd": "deepseek-flash",
+  "stillSyncingAtEnd": false
+ },
+ {
+  "i": 3,
+  "renewalSeenAt": "2026-11-05T09:01:11.120Z",
+  "click": "clicked",
+  "clickAt": "2026-11-05T09:01:11.122Z",
+  "windowMs": 60000,
+  "probes": 568,
+  "probeErrors": 0,
+  "syncingSeen": false,
+  "firstMs": null,
+  "lastMs": null,
+  "spanMs": 0,
+  "alert": null,
+  "modelAtEnd": "deepseek-flash",
+  "stillSyncingAtEnd": false
+ }
+]

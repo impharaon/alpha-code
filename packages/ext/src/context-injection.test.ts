@@ -143,7 +143,7 @@ async function loadHooks(): Promise<Hooks> {
   return (await CodePuppyExt({
     directory: join(root, "project"),
     worktree: join(root, "project"),
-    client: { instance: { dispose: async () => {} }, provider: { list: async () => PROVIDER_LIST } },
+    client: { mcp: { status: async () => ({ data: {} }) }, instance: { dispose: async () => {} }, provider: { list: async () => PROVIDER_LIST } },
   } as unknown as Parameters<typeof CodePuppyExt>[0])) as unknown as Hooks
 }
 
@@ -422,7 +422,7 @@ describe("③c 工具表咽喉:每个 description 都是登记项,登记项也�
     // The real desktop producer; an existing directory makes a file-content read throw.
     process.env[CLOUD_MCP_DEF_ENV] = JSON.stringify(materializeCloudMcpConfig("https://cloud.invalid/mcp", `{file:${root}}`))
     const ready = JSON.parse((await access.execute()).output)
-    expect(ready).toMatchObject({ logged_in: true, state: "ready", cloud_tools_enabled: true })
+    expect(ready).toMatchObject({ logged_in: true, state: "ready", cloud_tools_enabled: false })
     expect(JSON.stringify(ready)).not.toContain(root)
   })
   test("zodDescription 先测出已知的形状:describe 后 default 也取得到", () => {

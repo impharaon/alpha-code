@@ -2522,12 +2522,12 @@ describe("#570 档位按会话归属:切会话不把上一个会话的档位带�
     await waitFor(() => expect(host.querySelector<HTMLButtonElement>(".a-comp-send")!.disabled).toBe(false))
     host.querySelector<HTMLButtonElement>(".a-comp-send")!.click()
   }
-  const mountSession = (sdk: ReturnType<typeof scopedSdk>, identity: () => { sessionID: string } | undefined) =>
+  const mountSession = (sdk: ReturnType<typeof scopedSdk>, identity: () => { sessionID: string } | undefined, dock = dockApi) =>
     mount(() =>
       createComponent(SessionComposerMount, {
         identity: identity as never,
         projects: scopedProjects(sdk),
-        dock: dockApi,
+        dock,
         drafts: createComposerDraftStash(),
       }),
     )
@@ -2661,6 +2661,67 @@ describe("#570 档位按会话归属:切会话不把上一个会话的档位带�
       allowItems()[0]!.click()
       await waitFor(() => expect(permChipOf(host)!.getAttribute("data-mode")).toBe("allow"))
     }
+
+    // Message role/agent projection from the v1 transcript used by session-timeline; no stored history is rewritten.
+    const history = (agent: string | undefined) => [{ role: "user", agent: "build" }, { role: "user", agent }, { role: "assistant", agent: "build" }]
+
+    for (const [agent, mode, sent] of [
+      ["codepuppy-ask", "ask", "codepuppy-ask"],
+      ["codepuppy-readonly", "readonly", "codepuppy-readonly"],
+      ["alpha-ask", "ask", "codepuppy-ask"],
+      ["alpha-readonly", "readonly", "codepuppy-readonly"],
+      ["my-assistant", "allow", undefined],
+      [undefined, "allow", undefined],
+    ]) {
+      test(`#1643 AC1 重建渲染状态后从最后用户消息恢复 ${agent} 并发送`, async () => {
+        installApi()
+        const sdk = scopedSdk()
+        const dock = { ...dockApi, messages: () => history(agent!) }
+        const first = mountSession(sdk, () => identityFor("A"), dock)
+        first.dispose()
+        resetComposerPermScopesForTests()
+        const restored = mountSession(sdk, () => identityFor("A"), dock)
+        await waitFor(() => expect(permChipOf(restored.host)?.getAttribute("data-mode")).toBe(mode))
+        await sendVia(restored.host, "继续")
+        await waitFor(() => expect(sdk.promptAsyncCalls).toHaveLength(1))
+        expect(sdk.promptAsyncCalls[0]!.agent).toBe(sent)
+      })
+    }
+
+    test("#1643 AC2 消息未读回时按钮和 Enter 都不能发送全部批准", async () => {
+      installApi()
+      const sdk = scopedSdk()
+      const [messages, setMessages] = createSignal<ReturnType<typeof history>>()
+      const mounted = mountSession(sdk, () => identityFor("A"), { ...dockApi, messages })
+      const input = ta(mounted.host)
+      input.value = "继续"
+      input.dispatchEvent(new InputEvent("input", { bubbles: true }))
+      await waitFor(() => expect(composerModel()).not.toBeNull())
+      expect(mounted.host.querySelector<HTMLButtonElement>(".a-comp-send")!.disabled).toBe(true)
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }))
+      await flush()
+      expect(sdk.promptAsyncCalls).toHaveLength(0)
+      setMessages(history("codepuppy-ask"))
+      await sendVia(mounted.host, "继续")
+      await waitFor(() => expect(sdk.promptAsyncCalls).toHaveLength(1))
+      expect(sdk.promptAsyncCalls[0]!.agent).toBe("codepuppy-ask")
+    })
+
+    test("#1643 AC3 手动全部批准优先于历史,切换对话后仍保留", async () => {
+      installApi()
+      const sdk = scopedSdk()
+      const [identity, setIdentity] = createSignal(identityFor("A"))
+      const mounted = mountSession(sdk, identity, { ...dockApi, messages: () => history("codepuppy-readonly") })
+      await waitFor(() => expect(permChipOf(mounted.host)?.getAttribute("data-mode")).toBe("readonly"))
+      await pickAllow(mounted.host)
+      setIdentity(identityFor("B"))
+      await waitFor(() => expect(permChipOf(mounted.host)?.getAttribute("data-mode")).toBe("readonly"))
+      setIdentity(identityFor("A"))
+      await waitFor(() => expect(permChipOf(mounted.host)?.getAttribute("data-mode")).toBe("allow"))
+      await sendVia(mounted.host, "继续")
+      await waitFor(() => expect(sdk.promptAsyncCalls).toHaveLength(1))
+      expect(sdk.promptAsyncCalls[0]!.agent).toBeUndefined()
+    })
 
     test("⑤ 在 A 开只读 → 切到 B:B 的 chip 不是只读态,B 手选的档位也不再被 codepuppy-readonly 顶掉", async () => {
       installApi()

@@ -37,6 +37,7 @@ import {
 import { InstanceBootstrap } from "../../src/project/bootstrap"
 import { InstanceStore } from "../../src/project/instance-store"
 import { testEffect } from "../lib/effect"
+import { provideInstance, tmpdirScoped } from "../fixture/fixture"
 
 // ── 手写字面量锚点 ───────────────────────────────────────────────────────────
 const ID_MCP_PAID = "mcp:policy:paid_action"
@@ -652,3 +653,66 @@ test("字面量锚点与生产编码一致", () => {
   expect(withSecret).toBe(base)
   expect(rebound).not.toBe(base)
 })
+
+// N06 in /tmp/w129/result-0126-b.md: exact tool grant for dbhub-readonly/execute_sql.
+// The report redacts the digest; use the existing opaque binding fixture, keeping the recorded schema unchanged.
+const folderGrant = {
+  selector: { level: "tool", canonical: "mcp:dbhub-readonly:execute_sql" },
+  state: "enabled",
+  bindingDigest: DIGEST_A,
+} as const
+const folderSubject: ToolPolicySubject = {
+  identity: { source: "mcp", origin: "dbhub-readonly", name: "execute_sql" },
+  authority: { kind: "not-asserted" },
+  bindingDigest: DIGEST_A,
+}
+
+it.live("#1644 AC1 non-git folders isolate grants, normalized A survives instance reload, old global stays unread", () =>
+  Effect.gen(function* () {
+    const a = yield* tmpdirScoped()
+    const b = yield* tmpdirScoped()
+    const policy = yield* CodePuppyToolPolicy.Service
+    const instances = yield* InstanceStore.Service
+    const legacy = { account: "acct-service", workspace: "global" }
+    savePolicyDocument(SERVICE_BASE_DIR, legacy, [folderGrant])
+    expect((yield* policy.resolve(folderSubject).pipe(provideInstance(a))).state).toBe("ask")
+    yield* policy.setRecord(folderGrant).pipe(provideInstance(a))
+    expect((yield* policy.inspect().pipe(provideInstance(a))).partition.workspace).toBe(a)
+    yield* instances.disposeDirectory(a)
+    expect((yield* policy.resolve(folderSubject).pipe(provideInstance(a + "/."))).state).toBe("enabled")
+    expect((yield* policy.resolve(folderSubject).pipe(provideInstance(b))).state).toBe("ask")
+    expect(loadPolicyDocument(SERVICE_BASE_DIR, legacy)).toMatchObject({ status: "ok", doc: { records: [folderGrant] } })
+  }),
+)
+
+it.live("#1644 AC2 git subdirectories share the project grant, different git projects stay isolated", () =>
+  Effect.gen(function* () {
+    const a = yield* tmpdirScoped({ git: true })
+    const b = yield* tmpdirScoped({ git: true })
+    const child = path.join(a, "child")
+    fs.mkdirSync(child)
+    const policy = yield* CodePuppyToolPolicy.Service
+    yield* policy.setRecord(folderGrant).pipe(provideInstance(a))
+    expect((yield* policy.resolve(folderSubject).pipe(provideInstance(child))).state).toBe("enabled")
+    expect((yield* policy.resolve(folderSubject).pipe(provideInstance(b))).state).toBe("ask")
+    const parentPartition = (yield* policy.inspect().pipe(provideInstance(a))).partition
+    expect((yield* policy.inspect().pipe(provideInstance(child))).partition).toEqual(parentPartition)
+    expect(parentPartition.workspace).not.toBe(a)
+  }),
+)
+
+it.live("#1644 AC3 settings inspect and revoke use the execution partition of the current folder", () =>
+  Effect.gen(function* () {
+    const a = yield* tmpdirScoped()
+    const b = yield* tmpdirScoped()
+    const policy = yield* CodePuppyToolPolicy.Service
+    yield* policy.setRecord(folderGrant).pipe(provideInstance(a))
+    yield* policy.setRecord(folderGrant).pipe(provideInstance(b))
+    const before = yield* policy.inspect().pipe(provideInstance(a))
+    expect(before).toMatchObject({ partition: { workspace: a }, user: { status: "ok", doc: { records: [folderGrant] } } })
+    yield* policy.removeRecord(folderGrant.selector).pipe(provideInstance(a))
+    expect((yield* policy.resolve(folderSubject).pipe(provideInstance(a))).state).toBe("ask")
+    expect((yield* policy.resolve(folderSubject).pipe(provideInstance(b))).state).toBe("enabled")
+    expect((yield* policy.inspect().pipe(provideInstance(a))).user).toMatchObject({ status: "ok", doc: { records: [] } })
+  }),
+)

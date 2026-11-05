@@ -21,10 +21,10 @@ import path from "node:path"
 import { expect } from "bun:test"
 import { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js"
-import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js"
+import { ErrorCode, McpError, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { ProviderV2 } from "@opencode-ai/core/provider"
-import { Cause, Effect, Exit, Fiber, Layer } from "effect"
+import { Cause, Effect, Exit, Fiber, Layer, Logger } from "effect"
 import * as TestClock from "effect/testing/TestClock"
 import { Agent } from "../../src/agent/agent"
 import { GlobalBus } from "../../src/bus/global"
@@ -244,17 +244,16 @@ type Mode = "refuse" | "hold" | "serve" | "unauthorized" | "policy" | "cert" | "
 function remoteStandIn() {
   return Effect.acquireRelease(
     Effect.promise(async () => {
-      const protocol = new Server({ name: "codepuppy-1563-remote", version: "1.0.0" }, { capabilities: { tools: {} } })
-      protocol.setRequestHandler(ListToolsRequestSchema, () =>
-        Promise.resolve({ tools: [{ name: "probe", inputSchema: { type: "object" as const, properties: {} } }] }),
-      )
-      const transport = new WebStandardStreamableHTTPServerTransport({
-        sessionIdGenerator: () => crypto.randomUUID(),
-        enableJsonResponse: true,
-      })
-      await protocol.connect(transport)
       const original = globalThis.fetch
-      const net = { mode: "refuse" as Mode, posts: 0, release: () => {} }
+      const net = {
+        mode: "refuse" as Mode,
+        posts: 0,
+        lists: 0,
+        listFailure: "" as "" | "timeout" | "network" | "auth" | "validation",
+        release: () => {},
+      }
+      const protocols: Server[] = []
+      let transport: WebStandardStreamableHTTPServerTransport
       const dispatch = async (request: Request): Promise<Response> => {
         if (net.mode === "hold") {
           await new Promise<void>((resolve) => (net.release = resolve))
@@ -267,6 +266,30 @@ function remoteStandIn() {
         if (net.mode === "unauthorized" && request.method === "POST")
           return new Response("unauthorized", { status: 401 })
         if (request.method === "GET") return new Response(null, { status: 405 })
+        const method = request.method === "POST" ? (await request.clone().json()).method : undefined
+        if (method === "initialize") {
+          const protocol = new Server(
+            { name: "codepuppy-1563-remote", version: "1.0.0" },
+            { capabilities: { tools: {} } },
+          )
+          // Timeout shape comes from SDK shared/protocol.js; the real SDK parses the malformed response.
+          protocol.setRequestHandler(ListToolsRequestSchema, async () => {
+            if (net.listFailure === "timeout") throw new McpError(ErrorCode.RequestTimeout, "synthetic-secret")
+            if (net.listFailure === "validation") return { tools: [{ name: "probe", inputSchema: "synthetic-secret" }] }
+            return { tools: [{ name: "probe", inputSchema: { type: "object" as const, properties: {} } }] }
+          })
+          transport = new WebStandardStreamableHTTPServerTransport({
+            sessionIdGenerator: () => crypto.randomUUID(),
+            enableJsonResponse: true,
+          })
+          protocols.push(protocol)
+          await protocol.connect(transport)
+        }
+        if (method === "tools/list") {
+          net.lists++
+          if (net.listFailure === "network") throw refused()
+          if (net.listFailure === "auth") return new Response("synthetic-secret", { status: 403 })
+        }
         return transport.handleRequest(request)
       }
       globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -275,13 +298,13 @@ function remoteStandIn() {
         if (request.method === "POST") net.posts++
         return dispatch(request)
       }) as typeof fetch
-      return { net, protocol, original }
+      return { net, protocols, original }
     }),
     (s) =>
       Effect.promise(async () => {
         globalThis.fetch = s.original
         s.net.release()
-        await s.protocol.close().catch(() => {})
+        await Promise.all(s.protocols.map((protocol) => protocol.close().catch(() => {})))
       }),
   ).pipe(Effect.map((s) => s.net))
 }
@@ -724,3 +747,52 @@ it.instance(
     }),
   { config: { mcp: { "slow-start": local({ CODEPUPPY_MCP_INIT_DELAY_MS: "600" }, { timeout: 1_500 }) } } },
 )
+
+for (const kind of ["timeout", "network"] as const) {
+  it.instance(`#1645 AC1 tools/list ${kind} retries after 30 seconds and exposes tools in the same instance`, () =>
+    Effect.gen(function* () {
+      const net = yield* remoteStandIn()
+      net.mode = "serve"
+      net.listFailure = kind
+      const mcp = yield* MCP.Service
+      yield* mcp.add("cloud", cloud)
+      expect(yield* statusOf("cloud")).toMatchObject({ status: "failed", code: kind === "timeout" ? "timeout" : "tcp" })
+      const lists = net.lists
+      net.listFailure = ""
+      yield* TestClock.adjust("29 seconds")
+      yield* quiet
+      expect(net.lists).toBe(lists)
+      yield* TestClock.adjust("1 second")
+      yield* settle(
+        statusOf("cloud").pipe(Effect.map((s) => (s?.status === "connected" ? s : undefined))),
+        "tools/list did not recover",
+      )
+      expect(Object.keys(yield* mcp.tools())).toContain("cloud_probe")
+    }).pipe(Effect.provide(TestClock.layer())),
+  )
+}
+for (const kind of ["auth", "validation"] as const) {
+  it.instance(`#1645 AC2/AC3 tools/list ${kind} is typed, sanitized and never retried`, () => {
+    const logs: string[] = []
+    return Effect.gen(function* () {
+      const net = yield* remoteStandIn()
+      net.mode = "serve"
+      net.listFailure = kind
+      const mcp = yield* MCP.Service
+      yield* mcp.add("cloud", cloud)
+      expect(yield* statusOf("cloud")).toMatchObject({ status: "failed", code: kind })
+      const lists = net.lists
+      net.listFailure = ""
+      yield* TestClock.adjust("10 minutes")
+      yield* quiet
+      expect(net.lists).toBe(lists)
+      const failure = logs.filter((line) => line.includes("server unavailable")).join("\n")
+      expect(failure).toContain(kind)
+      expect(failure).not.toContain("synthetic-secret")
+      expect(failure).not.toContain("Authorization")
+    }).pipe(
+      Effect.provide(TestClock.layer()),
+      Effect.provide(Logger.layer([Logger.make((entry) => logs.push(JSON.stringify(entry.message)))])),
+    )
+  })
+}

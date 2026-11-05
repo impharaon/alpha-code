@@ -19,6 +19,8 @@ import { createEffect, createMemo, createResource, createSignal, For, Show, onCl
 import { Portal } from "solid-js/web"
 import { useLocation } from "@solidjs/router"
 import { t } from "../i18n"
+import { activeSessionIdentity } from "../codepuppy-ui/active-session-directory"
+import { settingsDirectoryOf } from "../codepuppy-ui/settings-directory"
 import { parseRoute } from "../../shared/route-manifest"
 import { initialDesiredState } from "../../shared/ext-install-policy"
 import { projectLabel } from "../sidebar/route"
@@ -65,7 +67,7 @@ import { hubSection, setHubSection, type HubSection } from "./ext-hub-state"
 import { extensionError, catalogDescription, iconFor, iconForRow, MoreMenu, PackageLogo, typeLabel, Svg, SearchIc, type MoreMenuItem } from "./ext-presentation"
 import { inventoryInstallRow, healthPresentation } from "./ext-inventory-present"
 import { ExtensionDetail, type DetailTarget } from "./extension-detail"
-import { officeAdvisoryFor, retiredCommunityOfficeFor } from "../../shared/office-advisories"
+import { isCodePuppyOfficeCatalogId, officeAdvisoryFor, retiredCommunityOfficeFor } from "../../shared/office-advisories"
 // #397 PR-B:四级货架与策展呈现(纯派生层;解码真源 = shared/catalog-curation,fail-closed)。
 import { curatedOf, curationMapOf, curationOf, isArchived, isSessionGrant, splitBrowse } from "./ext-curation-view"
 // #408 PR-C:会话开关纯派生层(状态机 / 拒绝码路由;真源 = main grant 登记 + 本地连接结果)。
@@ -163,7 +165,10 @@ export function ExtensionHub(props: {
   const loc = useLocation()
   const projectDir = createMemo((): string | undefined => {
     const r = parseRoute(loc.pathname)
-    return r.kind === "session" || r.kind === "directory" ? r.directory : undefined
+    return settingsDirectoryOf(r, (id) => {
+      const active = activeSessionIdentity()
+      return active?.sessionID === id ? active.directory : undefined
+    })
   })
   const ext = useExtensions(props.server, props.open, projectDir)
   const section = hubSection
@@ -251,7 +256,7 @@ export function ExtensionHub(props: {
   // ⚠️ fail-close **不等于**复用未登录/BYOK 那套文案:此时用户确实已登录、确实在 platform 模式,
   // 说「切换到平台模式」既是假话,按钮点下去还是 no-op。恢复中因此走自己的一支(见云 tab 门控条)。
   const cloudReady = () => onPlatform() && !cloudRecovering()
-  const cloudLive = () => ext.store.mcp["codepuppy"]
+  const cloudLive = () => projectDir() || ext.store.mcp["codepuppy"]?.needsAuth ? ext.store.mcp["codepuppy"] : undefined
   const [query, setQuery] = createSignal("")
   const [busy, setBusy] = createSignal<string | null>(null)
   // #395(Codex r9 B3):启停唯一处理器 —— 行内开关(row)与详情页开关共用,保证详情页不再绕过
@@ -279,7 +284,7 @@ export function ExtensionHub(props: {
       return
     }
     let mcPending = false
-    if (args.type === "mcp") {
+    if (args.type === "mcp" && !isCodePuppyOfficeCatalogId(args.receipt.id)) {
       const mc = await ext.setMcpConnected(args.name, true)
       mcPending = mc.reason === "reload-pending"
     }
@@ -371,7 +376,7 @@ export function ExtensionHub(props: {
       return
     }
     let mcPending = false
-    if (args.type === "mcp") {
+    if (args.type === "mcp" && !isCodePuppyOfficeCatalogId(args.receipt.id)) {
       const mc = await ext.setMcpConnected(args.name, next === "enabled")
       mcPending = mc.reason === "reload-pending"
     }
@@ -724,7 +729,7 @@ export function ExtensionHub(props: {
       setCmName(""); setCmCommand(""); setCmUrl(""); setCmEnv(""); setCmSecrets("")
       // #395(Codex r10 M5):重加已 disabled 的自定义 MCP —— 落盘成功但不激活连接,如实提示。
       flash(
-        r.reason === "installed-disabled" ? t("codepuppy.ext.installedDisabled") : r.reason === "slow" ? t("codepuppy.ext.customMcpSlow") : t("codepuppy.ext.customMcpDone"),
+        r.reason === "installed-disabled" ? t("codepuppy.ext.installedDisabled") : r.reason === "reload-pending" ? t("codepuppy.ext.statePendingReload") : t("codepuppy.ext.customMcpDone"),
         "success",
       )
     } finally {
@@ -889,7 +894,7 @@ export function ExtensionHub(props: {
     // live MCP the SDK knows but we have no receipt for (manual / pre-migration) — allow uninstall.
     // `#1594`:平台云连接器在连接器页有自己的一行(状态、登录、去授权都在那一行),不再重复成一条已装行。
     for (const s of Object.values(ext.store.mcp)) {
-      if (s === cloudLive() || seenMcp.has(s.name) || !nameOnlyLiveMcpIsUnambiguousGlobal(s.name, ext.store.projectReceipts))
+      if (s.name === "codepuppy" || seenMcp.has(s.name) || !nameOnlyLiveMcpIsUnambiguousGlobal(s.name, ext.store.projectReceipts))
         continue
       const entry = mcpByName.get(s.name)
       rows.push({
@@ -2141,6 +2146,7 @@ export function ExtensionHub(props: {
                     onUninstall={(r) => void onUninstall(r)}
                     onOpenEntry={(e) => openEntryDetail(e)}
                     cloudReady={cloudReady}
+                    cloudLive={cloudLive}
                     cloudRecovering={cloudRecovering}
                     onLogin={authState().status !== "logged-in" ? () => void window.api.auth.start() : undefined}
                     governance={governance}

@@ -24,7 +24,7 @@ test("use-projects 恢复语义(8 例)+ REQ-126 供给回报(2 例)+ #692 非 Gi
   })
   const output = `${result.stdout.toString()}${result.stderr.toString()}`
   if (result.exitCode !== 0) throw new Error(output)
-  expect(output).toContain(" 14 pass")
+  expect(output).toContain(" 16 pass")
   expect(output).toContain(" 0 fail")
-  expect(output).toMatch(/Ran 14 tests across 1 file/)
+  expect(output).toMatch(/Ran 16 tests across 1 file/)
 })

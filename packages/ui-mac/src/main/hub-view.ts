@@ -75,7 +75,7 @@ export type HubViewDeps = {
   projectMcpState(name: string, projectDir: string): Promise<string>
   awaitServer(): Promise<ServerReadyData>
   /** reload-coordinator.pendingFor。 */
-  pendingFor(directory: string): HubStateReason | undefined
+  pendingFor(directory: string, itemID?: string): HubStateReason | undefined
   fetch?: typeof fetch
   timeoutMs?: number
 }
@@ -379,6 +379,9 @@ export function createHubViewService(deps: HubViewDeps): HubViewService {
             ...(priceNote !== undefined ? { priceNote } : {}),
           }
           if (row.scope === null) return { ...base, installed: false, enabled: false, state: "not-installed" }
+          const connectorPending = row.kind === "mcp" ? deps.pendingFor(directory, row.id) : undefined
+          if (connectorPending)
+            return { ...base, installed: true, enabled: row.activation !== "disabled", state: "reload-pending", stateReason: connectorPending }
           if (row.activation === "disabled")
             return { ...base, installed: true, enabled: false, state: "installed", stateReason: { code: "disabled" } }
           const verdict = await verify(row, directory, project, reads)

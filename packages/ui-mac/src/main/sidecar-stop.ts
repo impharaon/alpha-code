@@ -6,6 +6,10 @@
 // 停止一律排空(引擎 listener 的 `stop()` 不传强关参数,活动连接自然收口)。#858 曾为 token-only 换血加过
 // 「强关活动连接」一档;REQ-236 `#1562` 起令牌续期热应用凭据文件、不再重启引擎,那一档没有任何生产者,随之删除。
 
+import type { EngineFetch } from "./in-process-engine"
+
+export const SIDECAR_DRAIN_TIMEOUT_MS = 5_000
+
 export type SidecarStopCommand = { type: "stop" }
 
 /** 引擎 listener 里本模块用得到的那一面(`Server.listen()` 的返回值满足它)。 */
@@ -20,8 +24,32 @@ export function parseSidecarStopCommand(value: unknown): SidecarStopCommand | un
   return SIDECAR_STOP_COMMAND
 }
 
-/** sidecar 侧的执行:排空(不传参,与 #858 之前的既有调用逐字节相同)。 */
-export async function stopSidecarListener(listener: StoppableListener | undefined) {
-  if (!listener) return
-  await listener.stop()
+/** Release the shared runtime before draining HTTP; stay inside main's six-second kill fallback. */
+export async function stopSidecarListener(
+  listener: StoppableListener | undefined,
+  engine?: { fetch: EngineFetch; password: string },
+) {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    await Promise.race([
+      (async () => {
+        if (engine) {
+          const response = await engine.fetch(
+            new Request("http://codepuppy-sidecar.invalid/global/dispose", {
+              method: "POST",
+              headers: { Authorization: `Basic ${Buffer.from(`opencode:${engine.password}`).toString("base64")}` },
+            }),
+          )
+          await response.arrayBuffer()
+          if (!response.ok) throw new Error(`Runtime disposal failed (${response.status})`)
+        }
+        await listener?.stop()
+      })(),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, SIDECAR_DRAIN_TIMEOUT_MS)
+      }),
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
 }

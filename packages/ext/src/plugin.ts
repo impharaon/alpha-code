@@ -406,12 +406,15 @@ export const CodePuppyExt: Plugin = async (input) => {
         args: {},
         async execute() {
           const access = cloudAccessState()
+          const status = await (engineRequest ? engineRequest("GET", "/mcp") : input.client.mcp.status()).catch(() => undefined)
+          const data = status?.error ? undefined : status?.data
+          const cloud = data && typeof data === "object" && "codepuppy" in data ? data.codepuppy : undefined
           return {
             title: "codepuppy_access",
             output: JSON.stringify({
               logged_in: access.state === "ready",
               state: access.state,
-              cloud_tools_enabled: access.state === "ready",
+              cloud_tools_enabled: !!cloud && typeof cloud === "object" && "status" in cloud && cloud.status === "connected",
               login_hint: access.loginHint,
             }),
             metadata: {},

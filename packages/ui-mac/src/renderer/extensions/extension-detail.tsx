@@ -7,7 +7,7 @@
 
 import { createMemo, createResource, createSignal, For, Show, type Accessor, type JSX } from "solid-js"
 import { t } from "../i18n"
-import type { CatalogEntry, CloudPipelineSpec, McpInstallSpec, PluginInstallSpec, SkillInstallSpec } from "./catalog-types"
+import type { CatalogEntry, CloudPipelineSpec, InstalledState, McpInstallSpec, PluginInstallSpec, SkillInstallSpec } from "./catalog-types"
 import type { InstallReceipt, ExtInventory } from "../../preload/types"
 import { hubRowFor, hubStateView, type ExtensionsApi, type HubAgent } from "./use-extensions"
 import { CloudDispatchBox } from "./cloud-dispatch-box"
@@ -122,6 +122,7 @@ export function ExtensionDetail(props: {
   /** REQ-020 T2:云门控(登录且 platform 模式)。cloud 条目「启用」与 dispatch 入口据此禁用。
    *  `#624` 起额外含「平台凭证未在恢复中」——恢复中一律 fail-close(判断依据见 extension-hub.tsx)。 */
   cloudReady?: Accessor<boolean>
+  cloudLive?: Accessor<InstalledState | undefined>
   /** `#624`:已登录 platform 但凭证恢复中。**只驱动文案**,不参与放行(放行看 cloudReady)。
    *  分出这一支是因为此时说「需登录平台模式」是假话 —— 用户已经登录了。 */
   cloudRecovering?: Accessor<boolean>
@@ -483,7 +484,7 @@ export function ExtensionDetail(props: {
   const cloudReady = () => props.cloudReady?.() ?? false
   const cloudRecovering = () => props.cloudRecovering?.() ?? false
   // 注入的 mcp.cloud 的 SDK 实时态(platform 模式下 sidecar 注入后才存在)。
-  const cloudLive = () => props.ext.store.mcp["codepuppy"]
+  const cloudLive = () => props.cloudLive?.()
 
   // Receipt truth for the shown entry — receipts ⨝ SDK (mirror of the manage list, ADR-014 v3).
   // Live-but-unreceipted MCP gets a synthetic receipt so uninstall still works.
@@ -1338,7 +1339,7 @@ export function ExtensionDetail(props: {
               }
             >
               <span class="codepuppy-ext-cloudst" data-st={cloudLive()?.connected ? "on" : "idle"}>
-                {cloudLive()?.connected ? t("codepuppy.ext.cloudConnConnected") : t("codepuppy.ext.cloudConnDisconnected")}
+                {cloudLive()?.needsAuth ? t("codepuppy.ext.mcpNeedsAuth") : cloudLive()?.connected ? t("codepuppy.ext.cloudConnConnected") : t("codepuppy.ext.cloudConnDisconnected")}
               </span>
             </Show>
           </FactRow>

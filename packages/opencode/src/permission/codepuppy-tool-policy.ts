@@ -255,7 +255,7 @@ export const layer = (options?: LayerOptions) =>
       const partition = Effect.gen(function* () {
         const account = yield* accountEffect
         const ctx = yield* InstanceState.context
-        return { account, workspace: String(ctx.project.id) }
+        return { account, workspace: ctx.project.id === "global" ? ctx.directory : String(ctx.project.id) }
       })
 
       const snapshot = Effect.fn("CodePuppyToolPolicy.snapshot")(function* () {

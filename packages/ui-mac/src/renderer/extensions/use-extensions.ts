@@ -533,15 +533,6 @@ function toMcpConfig(spec: McpInstallSpec, env: Record<string, string>): McpConf
   }
 }
 
-// Cap how long we wait on the live add/connect. opencode spawns the server synchronously, and a
-// first-run `uvx`/`npx` can download from PyPI/npm (slow, or stalls on a blocked registry). The
-// config is already persisted by then, so on timeout we stop waiting and report "slow" rather than
-// hang the UI forever — the server keeps connecting in the background / on next launch.
-const TIMED_OUT = Symbol("timeout")
-function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | typeof TIMED_OUT> {
-  return Promise.race([p, new Promise<typeof TIMED_OUT>((r) => setTimeout(() => r(TIMED_OUT), ms))])
-}
-
 /** REQ-099(#307)卸载意图构造(纯函数,use-extensions-ipc.test 锁契约):scope 取自 receipt 真源;
  *  project 收据必须带当前项目目录 —— 目录缺失(上下文丢失)如实拒绝,绝不降级成 global intent
  *  去删同名全局安装(AC5 同名并存下那是删错对象)。 */
@@ -740,43 +731,7 @@ export function useExtensions(
     return { ok: true }
   }
 
-  // 未策展自定义连接器的 live 段;catalog 连接器由 main 重载 `{file:}` 引用。
-  async function liveAddAndConnect(name: string, config: unknown): Promise<ActionResult> {
-    const c = client
-    if (!c) return { ok: false, reason: "no server" }
-    // #395(Codex r10 B4/M5):连接前复查当前 activation —— 安装/持久化提交后返回 live 段,与用户并发
-    // disable(post-commit)竞态,或本就是「重加已 disabled 的自定义 MCP」。引擎 mcp.connect 强制
-    // enabled:true,会绕过账本/config 的 disabled 复活运行面。account 为 disabled 则不激活连接,如实
-    // 回「已装未启用」。(inventoryView 读账本 desiredState 投影;global mcp 无 projectDir。)
-    // #395 连接前复查 activation —— 与并发 disable 竞态、或重加已 disabled 的 MCP。引擎 mcp.add/connect
-    // 强制 enabled:true,会绕账本复活运行面。**只有 activation 明确 === "enabled" 才连接**;读失败/行缺席/
-    // activation unknown/disabled 一律 **fail-closed 不激活**(Codex 增量 r13 Major:此前只在 IPC 抛错才
-    // fail-closed,查询成功但行缺席/unknown 时 activation=undefined 仍照连 → 已禁 MCP 被激活)。
-    let activation: string | undefined
-    try {
-      const inv = await extIpc.inventoryView()
-      // Codex r11 B7:选**已安装 global 行**(scope==="global"),不落未安装浏览行(scope=null)。
-      activation = inv.rows.find((r) => r.kind === "mcp" && r.name === name && r.scope === "global")?.activation
-    } catch {
-      activation = undefined
-    }
-    if (activation !== "enabled") {
-      // 非明确 enabled(disabled / undefined / unknown / 行缺席 / 读失败)→ 不激活,已落盘。
-      await Promise.all([loadStatus(), loadInstalls()])
-      return { ok: true, reason: activation === "disabled" ? "installed-disabled" : "reload-pending" }
-    }
-    const added = await withTimeout(c.mcp.add({ name, config } as any), 15000)
-    if (added === TIMED_OUT) {
-      void loadStatus()
-      return { ok: true, reason: "slow" } // persisted; connecting in background / on next launch
-    }
-    if ((added as { error?: unknown }).error) return { ok: false, reason: "mcp.add failed" }
-    await withTimeout((c.mcp.connect({ name } as any) as Promise<unknown>).catch(() => {}), 10000)
-    await Promise.all([loadStatus(), loadInstalls()])
-    return { ok: true }
-  }
-
-  // 未策展自定义连接器:persist(先写盘防「live 未持久」,不带 meta —— 无 catalog 身份)→ live 段。
+  // 自定义连接器落盘后由 main 排队换代,新引擎同时重算出网名单与停用覆盖。
   async function persistAndConnectMcp(name: string, config: McpConfig, secretVars?: string[]): Promise<ActionResult> {
     const c = client
     if (!c) return { ok: false, reason: "no server" }
@@ -785,7 +740,10 @@ export function useExtensions(
     // secretVars → opencode.jsonc gets {file:} refs, never the plaintext secret.
     const persisted = await extIpc.persistMcp(name, config as unknown as Record<string, unknown>, secretVars)
     if (!persisted.ok) return { ok: false, reason: persisted.reason, ...(persisted.code ? { addressCode: persisted.code } : {}) }
-    return liveAddAndConnect(name, config)
+    await Promise.all([loadStatus(), loadInstalls(), loadHubView()])
+    const view = await extIpc.inventoryView().catch(() => undefined)
+    const activation = view?.rows.find((r) => r.kind === "mcp" && r.name === name && r.scope === "global")?.activation
+    return { ok: true, reason: activation === "disabled" ? "installed-disabled" : "reload-pending" }
   }
 
   // REQ-033:任意 MCP 手动添加(catalog 外;跨生态主通道)。校验主体在 main(persistMcp 的 C2
@@ -1078,7 +1036,8 @@ export function useExtensions(
     activated = true
     const gen = ++generation
     abortRef = new AbortController()
-    client = createOpencodeClient({ baseUrl: info.baseUrl, headers: authHeaders(info) })
+    client = createOpencodeClient({ baseUrl: info.baseUrl, directory: projectDir?.(), headers: authHeaders(info) })
+    setStore("mcp", {})
     void loadStatus()
     void loadInstalls()
     void loadAgents()

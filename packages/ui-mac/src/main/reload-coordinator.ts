@@ -22,7 +22,7 @@ import {
   type ReloadScope,
 } from "./codepuppy-sidecar-messages"
 
-export type ReloadRequestInput = { scope: ReloadScope; items: ReloadItem[]; reason: string; force?: boolean }
+export type ReloadRequestInput = { scope: ReloadScope; items: ReloadItem[]; reason: string; force?: boolean; connectorChange?: boolean }
 
 type GenerationRecord = {
   generation: number
@@ -30,6 +30,8 @@ type GenerationRecord = {
   items: ReloadItem[]
   reason: string
   force: boolean
+  connectorChange: boolean
+  applying?: boolean
   requestedAt: number
   reportedAt?: number
   outcome?: ReloadOutcome
@@ -45,7 +47,7 @@ export type ReloadCoordinator = {
    *  在途的保留(下一次 attach 重发),它们已收到的 waiting/failed 作废;晚到的旧连接断开不影响新连接。 */
   attach(post: (message: ReloadRequestMessage) => void): (reason: string) => void
   /** 覆盖 `directory` 的在途重载给出的原因;没有在途 ⇒ undefined。 */
-  pendingFor(directory: string): HubStateReason | undefined
+  pendingFor(directory: string, itemID?: string): HubStateReason | undefined
 }
 
 function covers(scope: ReloadScope, directory: string): boolean {
@@ -64,16 +66,18 @@ export function createReloadCoordinator(deps: {
   log: (line: string) => void
   /** 任何会改变「待重载」原因的事件之后调用(hub-view 据此推 `ext-hub-view-changed`)。 */
   onChange: () => void
+  restartConnectors?: () => Promise<boolean>
   now?: () => number
 }): ReloadCoordinator {
   const now = deps.now ?? Date.now
   const inFlight = new Map<number, GenerationRecord>()
   let seq = 0
+  let restarting: Promise<void> | undefined
   let post: ((message: ReloadRequestMessage) => void) | undefined
   let detachedBecause: string | undefined = "engine not running"
 
   const send = (record: GenerationRecord) => {
-    if (!post) return
+    if (!post || record.applying) return
     try {
       post(
         buildReloadRequest({
@@ -89,7 +93,7 @@ export function createReloadCoordinator(deps: {
     }
   }
 
-  return {
+  const coordinator: ReloadCoordinator = {
     request(input) {
       const record: GenerationRecord = {
         generation: ++seq,
@@ -97,6 +101,9 @@ export function createReloadCoordinator(deps: {
         items: input.items,
         reason: input.reason,
         force: input.force === true,
+        connectorChange: input.connectorChange === true || [...inFlight.values()].some(
+          (other) => other.connectorChange && !other.applying && coversScope(input.scope, other.scope),
+        ),
         requestedAt: now(),
       }
       inFlight.set(record.generation, record)
@@ -112,6 +119,36 @@ export function createReloadCoordinator(deps: {
       const record = inFlight.get(report.generation)
       if (!record) {
         deps.log(`reload: report for unknown generation ${report.generation} (${report.outcome}) ignored`)
+        return
+      }
+      if (record.applying) return
+      if (restarting) {
+        void restarting.then(() => { if (inFlight.has(report.generation)) coordinator.receiveReport(report) })
+        return
+      }
+      if (report.outcome === "reloaded" && record.connectorChange) {
+        // ext has checked every instance idle (or honored force) and disposed it. Only a fresh
+        // engine drops startup environment overrides; keep these requests pending until ready.
+        const covered = [...inFlight.values()]
+        for (const other of covered) {
+          other.applying = true
+          other.outcome = "waiting"
+          delete other.error
+        }
+        restarting = (async () => {
+          const ok = await deps.restartConnectors?.().catch(() => false)
+          for (const other of covered) {
+            delete other.applying
+            if (ok) inFlight.delete(other.generation)
+            else {
+              other.connectorChange = true
+              other.outcome = "failed"
+              other.error = "official-connector-needs-reentry: runtime refresh failed"
+            }
+          }
+          deps.onChange()
+        })().finally(() => { restarting = undefined })
+        deps.onChange()
         return
       }
       record.reportedAt = now()
@@ -148,14 +185,15 @@ export function createReloadCoordinator(deps: {
       }
     },
 
-    pendingFor(directory) {
+    pendingFor(directory, itemID) {
       let latest: GenerationRecord | undefined
       for (const record of inFlight.values())
-        if (covers(record.scope, directory) && (!latest || record.generation > latest.generation)) latest = record
+        if (covers(record.scope, directory) && (!itemID || (record.connectorChange && record.items.some((item) => item.id === itemID))) && (!latest || record.generation > latest.generation)) latest = record
       if (!latest) return
       if (latest.outcome === "failed") return { code: "reload-failed", ...(latest.error ? { detail: latest.error } : {}) }
       if (latest.outcome === "waiting") return { code: "reload-waiting", ...(latest.error ? { detail: latest.error } : {}) }
       return { code: "reload-waiting", detail: detachedBecause ?? "queued" }
     },
   }
+  return coordinator
 }

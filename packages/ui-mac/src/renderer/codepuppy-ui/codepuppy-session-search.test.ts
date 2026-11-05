@@ -427,3 +427,16 @@ describe("#1589 AC6:面板文案与批准稿 #search 表一致", () => {
     expect(emptyText()).toBe(zh["codepuppy.search.hint"])
   })
 })
+
+
+test("#1648 AC1 global 里的非 git 搜索结果按真实目录显示项目名,与侧栏一致", async () => {
+  await openViaSidebarButton()
+  runtime.loadGlobalProjectSessions()
+  await settle()
+  await type("新对话")
+  const names = rows().map((row) => row.querySelector(".a-search-result-project")!.textContent)
+  expect(names).toEqual(["notes", "workbench", "alpha-code"])
+  const sidebar = [...document.querySelectorAll(".codepuppy-project-name")].map((node) => node.textContent)
+  for (const name of names) expect(sidebar).toContain(name)
+  expect(rowFor("ses_global_0")!.getAttribute("href")).toBe(hrefFor.session(runtime.SIDECAR_SERVER_KEY, "ses_global_0"))
+})

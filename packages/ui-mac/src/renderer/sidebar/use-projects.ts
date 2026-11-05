@@ -15,6 +15,7 @@ import { createEffect, onCleanup, type Accessor } from "solid-js"
 import { createOpencodeClient, type ModelRef } from "@opencode-ai/sdk/v2/client"
 import type { SidecarGenerationState } from "../../preload/types"
 import { projectLabel } from "./route"
+import { stageImageSend, failImageSends } from "../codepuppy-ui/pending-image-sends"
 import { hiddenProjects } from "./sidebar-state"
 import { isUnderSkippedWorktree, shouldSkipWorktree } from "./worktree-filter"
 import {
@@ -506,18 +507,23 @@ export function useCodePuppyProjects(
           }
         }
         if (!ranCommand) {
+          const parts = [{ type: "text", text: body }, ...(extraParts ?? [])]
+          const undo = stageImageSend(id, parts, opts)
           const prompted = await c.session
             .promptAsync({
               sessionID: id,
               ...(opts?.agent ? { agent: opts.agent } : {}),
               ...v1PromptModelFields(opts?.explicitModel),
-              parts: [{ type: "text", text: body }, ...(extraParts ?? [])],
+              parts,
             } as any)
             .catch(() => null)
           // A sidecar generation boundary can sever admission before the request resolves. Returning
           // undefined keeps the user's draft in the home composer and surfaces its existing send
           // failure state instead of silently navigating as though the prompt were accepted.
-          if (!prompted || prompted.error) return undefined
+          if (!prompted || prompted.error) {
+            undo?.()
+            return undefined
+          }
         }
       }
       return id
@@ -611,6 +617,9 @@ export function useCodePuppyProjects(
           const projectID: string | undefined = event?.project ?? payload?.properties?.info?.projectID
           const directory: string | undefined = event?.directory
           switch (payload?.type) {
+            case "session.error":
+              if (payload.properties?.sessionID) failImageSends(payload.properties.sessionID)
+              break
             case "session.created":
             case "session.updated":
               upsertSession(payload.properties?.info)
@@ -730,6 +739,7 @@ export function useCodePuppyProjects(
 
   const unsubscribeRuntime = subscribeRuntimeRecovery((state) => {
     runtimeStateReceived = true
+    if (state.status === "recovering" || (runtimeState && state.generation > runtimeState.generation)) failImageSends()
     runtimeState = state
     clearTimeout(bridgeFallbackTimer)
     if (state.status === "recovering") {

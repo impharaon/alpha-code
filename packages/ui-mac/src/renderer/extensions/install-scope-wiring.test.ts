@@ -41,7 +41,7 @@ describe("REQ-136 wiring: only catalog MCP may submit Current project", () => {
     const calls = installCatalogCallArgs(source)
     expect(calls).toHaveLength(6)
 
-    const mcpCalls = installCatalogCallArgs(functionSlice(source, "addMcp", "liveAddAndConnect"))
+    const mcpCalls = installCatalogCallArgs(functionSlice(source, "addMcp", "persistAndConnectMcp"))
     expect(mcpCalls).toHaveLength(1)
     expect(mcpCalls[0]).toContain("scope: target.target")
 

@@ -46,11 +46,13 @@ import { pathHitsPopover } from "./popover-hit"
 import { claimOverlay, releaseOverlay } from "./overlay-stack"
 import { Tooltip } from "./Tooltip"
 import { pushToast } from "./Toast"
+import { stageImageSend } from "./pending-image-sends"
 import type { CodePuppyProjectsApi } from "../sidebar/use-projects"
 import type { AuthState } from "../../preload/types"
 import {
   adoptComposerAgentScope,
   adoptComposerPermScope,
+  restoreComposerPermScope,
   applyDefaultComposerModel,
   buildPromptRequest,
   clearSuspendedModel,
@@ -650,6 +652,8 @@ export type ComposerSlashCapture = {
  * 缺席(home/newSession 或测试)时组件按「无会话数据」诚实降级:无停止键、无 ring。
  */
 export type ComposerSessionDockApi = {
+  /** undefined = 消息尚未读回;空数组 = 已读回的新会话。 */
+  messages?: () => readonly { role: string; agent?: string }[] | undefined
   /** live 运行态(session_status typed 通道;不再轮询)。 */
   running: () => boolean
   /** 上下文用量百分比(0-100);null = 事实不足,ring 不渲染。 */
@@ -1009,6 +1013,15 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
     if (composerScopeHeld) releaseComposerScope()
   })
 
+  const permissionHistoryReady = () => !props.sessionDock?.messages || props.sessionDock.messages() !== undefined
+  createEffect(() => {
+    const scope = composerScopeKey()
+    const messages = props.sessionDock?.messages?.()
+    if (!scope || !messages) return
+    const agent = messages.findLast((message) => message.role === "user")?.agent
+    untrack(() => restoreComposerPermScope(scope, agent))
+  })
+
   const auto = createComposerAutocomplete({
     text,
     setText,
@@ -1132,6 +1145,7 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
       text().trim().length > 0 &&
       !!props.directory() &&
       !runtimeUnavailable() &&
+      permissionHistoryReady() &&
       modelChainState() === "ready" &&
       (!needsPlatform || platformPermission() === "ready") &&
       // 谓词 2:引擎里没有这个直连节点就发不出去,按钮如实关闭(行内另有告知)。
@@ -1619,7 +1633,7 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
   }
 
   const submit = async () => {
-    if (!text().trim() || sending()) return
+    if (!text().trim() || sending() || !permissionHistoryReady()) return
     const dir = props.directory()
     if (!dir) {
       props.onNeedWorkspace?.()
@@ -1848,18 +1862,26 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
       // 因此 v2 的档位协议(switchAgent 落会话档 + 权威实时读 + CAS 回滚 + 本地推送账本)
       // 随 v2 发送一起退役 —— 留着它只会在每次发送前多两次网络往返,并把「读不到会话档」
       // 变成一个新的发送拦截点。
-      const { error } = await c.session.promptAsync({
+      const undo = stageImageSend(sid, req.parts, { agent: req.agent, model: req.model })
+      const request = c.session.promptAsync({
         sessionID: sid,
         directory: dir,
         parts: req.parts,
         ...(req.agent ? { agent: req.agent } : {}),
         ...v1PromptModelFields(submittedExplicitModel),
       } as any)
-      if (interrupted()) return
+      const { error } = await (undo
+        ? request.catch((error: unknown) => {
+            undo()
+            throw error
+          })
+        : request)
       if (error) {
-        pushToast({ kind: "error", title: t("codepuppy.composer.sendFailed") })
+        undo?.()
+        if (!interrupted()) pushToast({ kind: "error", title: t("codepuppy.composer.sendFailed") })
         return
       }
+      if (interrupted()) return
       setText("")
       setMentions([])
       setAttachments([])

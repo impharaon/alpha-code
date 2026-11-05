@@ -178,9 +178,29 @@ describe("#858 停止合同:一律排空", () => {
     // sidecar.ts 顶层的 registerHooks / getParentPort() 让它无法被 import,所以这一跳只能锚源码。
     // 上面三条才是行为判据 —— 这一条只保证生产真的接在那上面。
     const source = readFileSync(join(import.meta.dir, "sidecar.ts"), "utf8")
-    expect(source).toContain("await stopSidecarListener(listener)")
+    expect(source).toContain("await stopSidecarListener(listener, engine)")
     expect(source).toContain("return parseSidecarStopCommand(value)")
     // 本地再决定一次 = 合同有两个真源,迟早漂移。
     expect(source).not.toMatch(/listener\??\.stop\(/)
   })
+})
+
+test.each(["runtime", "listener"] as const)("#1647 AC2 %s draining stays inside the five-second stop budget", async (phase) => {
+  vi.useFakeTimers()
+  try {
+    let done = false
+    let stopped = false
+    const stopping = stopSidecarListener({ stop: () => { stopped = true; return new Promise<void>(() => {}) } }, {
+      fetch: () => phase === "runtime" ? new Promise<Response>(() => {}) : Response.json(true), password: "fixture",
+    }).then(() => { done = true })
+    for (let tick = 0; tick < 8; tick++) await Promise.resolve()
+    vi.advanceTimersByTime(4_999)
+    await Promise.resolve()
+    expect(done).toBe(false)
+    expect(stopped).toBe(phase === "listener")
+    vi.advanceTimersByTime(1)
+    for (let tick = 0; tick < 4; tick++) await Promise.resolve()
+    expect(done).toBe(true)
+    await stopping
+  } finally { vi.useRealTimers() }
 })

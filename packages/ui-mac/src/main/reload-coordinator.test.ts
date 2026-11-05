@@ -99,3 +99,60 @@ describe("reload-coordinator", () => {
     expect(logs.some((line) => line.includes("unknown generation 99"))).toBe(true)
   })
 })
+
+// Existing ext scheduler is the only busy/idle authority; main only completes the full generation.
+test("#1646 AC1 waits for all instances to be idle, then keeps pending until connector generation is ready", async () => {
+  const { createReloadScheduler } = await import("../../../ext/src/reload-scheduler")
+  let busy = true
+  let refreshes = 0
+  let finish!: (ok: boolean) => void
+  const coordinator = createReloadCoordinator({ log: () => {}, onChange: () => {}, restartConnectors: () => {
+    refreshes++
+    return new Promise<boolean>((resolve) => { finish = resolve })
+  } })
+  const scheduler = createReloadScheduler({ log: () => {}, error: () => {}, report: (report) => coordinator.receiveReport({ type: "codepuppy.reload.report", ...report }) })
+  for (const dir of ["/current", "/other"]) scheduler.register(dir, {
+    session: { status: async () => ({ data: dir === "/other" && busy ? { ses_1: { type: "busy" } } : {} }) },
+    instance: { dispose: async () => ({ data: true }) },
+  })
+  coordinator.attach((request) => scheduler.request(request))
+  coordinator.request({ scope: "global", items: [{ id: "mcp:codepuppy-pdf", scope: "global" }], reason: "set mcp codepuppy-pdf disabled", connectorChange: true })
+  await scheduler.settled()
+  expect(refreshes).toBe(0)
+  expect(coordinator.pendingFor("/current")?.code).toBe("reload-waiting")
+  busy = false
+  scheduler.poke()
+  await scheduler.settled()
+  expect(refreshes).toBe(1)
+  expect(coordinator.pendingFor("/current")?.code).toBe("reload-waiting")
+  const replay: unknown[] = []
+  coordinator.attach((request) => replay.push(request))
+  expect(replay).toEqual([])
+  finish(true)
+  for (let n = 0; n < 8; n++) await Promise.resolve()
+  expect(coordinator.pendingFor("/current")).toBeUndefined()
+})
+
+test("#1646 AC2 reload-now forces a queued connector change and a failed generation remains retryable", async () => {
+  const { createReloadScheduler } = await import("../../../ext/src/reload-scheduler")
+  let refreshes = 0
+  let succeeds = false
+  const coordinator = createReloadCoordinator({ log: () => {}, onChange: () => {}, restartConnectors: async () => { refreshes++; return succeeds } })
+  const scheduler = createReloadScheduler({ log: () => {}, error: () => {}, report: (report) => coordinator.receiveReport({ type: "codepuppy.reload.report", ...report }) })
+  scheduler.register("/current", { session: { status: async () => ({ data: { ses_1: { type: "busy" } } }) }, instance: { dispose: async () => ({ data: true }) } })
+  coordinator.attach((request) => scheduler.request(request))
+  coordinator.request({ scope: "global", items: [], reason: "enable PDF", connectorChange: true })
+  await scheduler.settled()
+  expect(refreshes).toBe(0)
+  coordinator.request({ scope: "global", items: [], reason: "user: reload now", force: true })
+  await scheduler.settled()
+  for (let n = 0; n < 8; n++) await Promise.resolve()
+  expect(refreshes).toBe(1)
+  expect(coordinator.pendingFor("/current")?.code).toBe("reload-failed")
+  succeeds = true
+  coordinator.request({ scope: "global", items: [], reason: "user: reload now", force: true })
+  await scheduler.settled()
+  for (let n = 0; n < 8; n++) await Promise.resolve()
+  expect(refreshes).toBe(2)
+  expect(coordinator.pendingFor("/current")).toBeUndefined()
+})

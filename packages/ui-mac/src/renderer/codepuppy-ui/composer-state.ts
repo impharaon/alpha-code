@@ -107,7 +107,12 @@ export const composerEffortSel = () => model()?.variant ?? null
 export const composerPerm = perm
 export const composerAgent = agent
 export const composerAgents = agents
-export { setPerm as setComposerPerm, setAgent as setComposerAgent, setAgents as setComposerAgents }
+export { setAgent as setComposerAgent, setAgents as setComposerAgents }
+
+export function setComposerPerm(value: PermMode) {
+  if (permScopeOwner !== null) rememberScopedPerm(permScopeOwner, value)
+  return setPerm(value)
+}
 
 /** 登录且代理可用时自动选中 catalog 默认档；只在当前无选择时生效。 */
 export function applyDefaultComposerModel(m: ComposerModel) {
@@ -209,7 +214,7 @@ export function resetComposerAgentScopesForTests() {
  *
  * ① 默认值不同 —— 档位的默认是 `null`(引擎自己的 build),权限档的默认是 `DEFAULT_PERM`
  *    (`"allow"`,`#1413` 之前写的是 `"ask"`,而那时的 `"ask"` 发出的正是今天 `"allow"` 的请求),
- *    所以「默认不登记」这条判的是 `=== DEFAULT_PERM`。
+ *    恢复历史时仍以最后用户消息为准;本次显式选择(包括默认档)优先。
  * ② **只读档这一份没有容量上界**(#896 起档位那份也没有,两份至此逐条同形)。
  *    原先照抄了草稿暂存的 LRU,并在这里写着「丢登记只会多问一次,不会静默放松限制」——
  *    **那句话是错的**:依次在 33 个会话里开只读,第 1 个就被淘汰,回到它时 chip 变回「请求审批」、
@@ -222,28 +227,30 @@ let permScopeOwner: string | null = null
 let permScopeLease = 0
 
 function rememberScopedPerm(scopeKey: string, value: PermMode) {
-  if (value === DEFAULT_PERM) {
-    permByScope.delete(scopeKey) // 默认档 = 不登记(显式退回默认时要把旧登记删掉)
-    return
-  }
   permByScope.set(scopeKey, value)
 }
 
 /** 挂载:接管该身份的权限档(无登记 = `DEFAULT_PERM`)。`null` = 首页或身份未定,一律回默认。 */
 export function adoptComposerPermScope(scopeKey: string | null): number {
-  // 先落账现任持有者的值,理由同档位那份(adopt 可能早于 release)。
-  if (permScopeOwner !== null) rememberScopedPerm(permScopeOwner, perm())
   permScopeOwner = scopeKey
   permScopeLease += 1
   setPerm(scopeKey === null ? DEFAULT_PERM : (permByScope.get(scopeKey) ?? DEFAULT_PERM))
   return permScopeLease
 }
 
-/** 卸载:把当前只读档交还给该身份。守卫同档位那条 —— 租约不匹配即不写。 */
+/** 卸载:放下持有权;选择已在写入口登记,消息尚未加载时不把临时默认值落账。 */
 export function releaseComposerPermScope(scopeKey: string | null, lease: number) {
   if (permScopeLease !== lease || permScopeOwner !== scopeKey) return
-  if (scopeKey !== null) rememberScopedPerm(scopeKey, perm())
   permScopeOwner = null
+}
+
+/** 无本次运行选择时,从最后用户消息恢复;显式全部批准也保留,不让历史覆盖。 */
+export function restoreComposerPermScope(scopeKey: string, agent: string | undefined) {
+  if (permScopeOwner !== scopeKey || permByScope.has(scopeKey)) return
+  const current = agent?.replace(/^alpha-(ask|readonly)$/, "codepuppy-$1")
+  const mode = PERM_MODES.find((mode) => PERM_AGENT[mode] === current) ?? DEFAULT_PERM
+  rememberScopedPerm(scopeKey, mode)
+  setPerm(mode)
 }
 
 /** 首页发出第一条消息后新建的那个会话,继承这条消息用的只读档 —— 第一条就是以只读发出去的。

@@ -16,6 +16,7 @@ import { createEffect, createMemo, createSignal, on, onCleanup, type Accessor } 
 import { hrefFor } from "../../../shared/route-manifest"
 import { t } from "../../i18n"
 import { setSettingsOpen } from "../settings-state"
+import { projectImageSends } from "../pending-image-sends"
 import { useCodePuppySessionLiveContext } from "../session-workspace/codepuppy-session-workspace"
 import type { SessionRailApi } from "../session-workspace/session-workspace-shell"
 import type { StagedAttachmentMeta } from "../../../shared/attachment-path"
@@ -140,8 +141,7 @@ export function CodePuppySessionTimeline(props: CodePuppySessionTimelineProps = 
     return reuseTimelineRows(
       previous,
       projectTimelineRows({
-        messages: data.message[id] ?? [],
-        partsOf: (messageID) => data.part[messageID] ?? [],
+        ...projectImageSends(id, data.message[id] ?? [], (messageID) => data.part[messageID] ?? []),
         status: status?.type ?? "idle",
         retry:
           status?.type === "retry"

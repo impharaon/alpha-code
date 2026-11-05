@@ -289,7 +289,7 @@ test("ANCHOR (not a gate): sidecar.ts 在 ready 之前预载 ext 的同一个 UR
   const engine = source.indexOf('const { Server } = await import("virtual:opencode-server")')
   const preload = source.indexOf("import(pathToFileURL(command.extPluginPath).href)")
   // 审计 R1 Major 1:进程内交接在引擎 import 之后、ext 预载之前挂上(ext 的重载调度器登记实例时就要用到)
-  const handoff = source.indexOf("publishInProcessEngine((request) => Server.Default().app.fetch(request))")
+  const handoff = source.indexOf("publishInProcessEngine(engine.fetch)")
   expect(handoff).toBeGreaterThan(engine)
   expect(preload).toBeGreaterThan(handoff)
   const joined = source.indexOf("await extPreload")

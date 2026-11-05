@@ -113,6 +113,7 @@ type Listener = StoppableListener
 
 const parentPort = getParentPort()
 let listener: Listener | undefined
+let engine: Parameters<typeof stopSidecarListener>[1]
 
 parentPort.on("message", (event) => {
   const command = parseCommand(event.data)
@@ -149,7 +150,8 @@ async function start(command: StartCommand) {
     // REQ-234 `#1531`(审计 R1 Major 1):把引擎**进程内**的 app.fetch 交给 ext(与下面 prewarm 同一调用方式,不经 TCP)。
     // 围栏只放行出网代理端口,ext 拿到的 input.client 在引擎监听后走 TCP 连自己 —— 出货形态下被拒,重载调度器就永远查不到
     // 会话状态、零 dispose。交接点与判据见 in-process-engine.ts / process-fence-engine.test.ts 的 #1531 三臂。
-    publishInProcessEngine((request) => Server.Default().app.fetch(request))
+    engine = { fetch: (request) => Server.Default().app.fetch(request), password: command.password }
+    publishInProcessEngine(engine.fetch)
     // REQ-234 `#1531`:@codepuppy/ext 在**模块装载时**挂 parentPort 监听(定制中心桥 + 重载调度器),而 main 只在 ready
     // 那一刻重发排队的重载代际。引擎要等第一个 v1 实例初始化插件才 import 它 —— 常常晚于 ready,那一批就丢了。这里先 import
     // 引擎稍后要 import 的**同一个 URL**(引擎解析路径插件 = pathToFileURL(path).href;ESM 按 URL 缓存 ⇒ 同一个模块记录、
@@ -191,9 +193,10 @@ async function start(command: StartCommand) {
 
 async function stop() {
   try {
-    await stopSidecarListener(listener)
+    await stopSidecarListener(listener, engine)
   } finally {
     listener = undefined
+    engine = undefined
     parentPort.postMessage({ type: "stopped" })
     setImmediate(() => process.exit(0))
   }

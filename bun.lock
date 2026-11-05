@@ -1037,7 +1037,7 @@
     },
     "packages/ui-mac": {
       "name": "ui-mac",
-      "version": "0.1.25",
+      "version": "0.1.26",
       "dependencies": {
         "@codepuppy/contracts-consumer": "workspace:*",
         "@file-viewer/pptx": "3.0.0",

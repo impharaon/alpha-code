@@ -2419,7 +2419,7 @@ describe("#568 回合末富脚注(A6/A7)", () => {
 
     const footnote = host.querySelector("[data-codepuppy-timeline-row='footnote']")!
     expect(footnote).not.toBeNull()
-    expect(footnote.querySelector(".a-tl-fn-agent")!.textContent).toContain("build")
+    expect(footnote.querySelector(".a-tl-fn-agent")!.textContent).toContain("全部批准")
     expect(footnote.textContent).toContain("deepseek-reasoner")
     // `#1473`:脚注不再写用时(只量最后一条助手消息,与整轮计时同名不同量);零 tokens 诚实缺席。
     expect(footnote.textContent).not.toContain("秒")
@@ -3261,7 +3261,7 @@ describe("#591 富脚注:provider 图标 + 效率段", () => {
 
     const footnote = host.querySelector("[data-codepuppy-timeline-row='footnote']")!
     expect(footnote.querySelector(".a-tl-fn-prov")!.textContent).toBe("D")
-    expect(footnote.querySelector(".a-tl-fn-agent")!.textContent).toContain("build")
+    expect(footnote.querySelector(".a-tl-fn-agent")!.textContent).toContain("全部批准")
     expect(footnote.textContent).toContain("deepseek-reasoner")
     // 命中 3000/(3000+1000) = 75% → 高档,具体口径在统一提示里(#1476:不再用原生 title;
     // 键盘可聚焦,且经 aria-describedby 被读出)。
@@ -4748,4 +4748,35 @@ describe("#1588 AC6 发送后:不在底部时自己发出的新消息出现 → 
     expect(scrollEl.scrollTop).toBe(300)
     expect(host.querySelector(".a-tl-jump")).not.toBeNull()
   })
+})
+
+
+describe("#1649 对话小字", () => {
+  for (const [agent, label] of [
+    ["build", "全部批准"],
+    ["codepuppy-ask", "请求审批"], ["alpha-ask", "请求审批"],
+    ["codepuppy-readonly", "只读"], ["alpha-readonly", "只读"],
+    ["plan", "计划"],
+    ["codepuppy-automation", "自动化任务"], ["alpha-automation", "自动化任务"],
+    ["codepuppy-automation-standard", "自动化任务"], ["alpha-automation-standard", "自动化任务"],
+    ["my-helper", "my-helper"], ["alpha-my-helper", "alpha-my-helper"],
+  ]) {
+    test(`#1649 ${agent === label ? "AC2 自建助手保留原名" : "AC1 新旧第一方档名"}: ${agent} 用户小字与回答脚注一致`, async () => {
+      const host = mount()
+      // Reuse the existing v1 transcript projection fixture; only the recorded agent varies.
+      runtime.setTimelineRows(conversationRows().map((row) =>
+        row.kind === "user" ? { ...row, message: { ...row.message, agent } }
+        : row.kind === "footnote" ? { ...row, footnote: { ...row.footnote, agent } } : row,
+      ))
+      await flush()
+      const user = host.querySelector(".a-tl-user-meta")!.textContent!
+      const footnote = host.querySelector(".a-tl-fn-agent")!.textContent!
+      expect(user.split(" · ")[0]).toBe(agent === label ? `发往 ${agent}` : label)
+      expect(footnote).toContain(label)
+      if (agent !== label) {
+        expect(user).not.toContain(agent)
+        expect(footnote).not.toContain(agent)
+      }
+    })
+  }
 })

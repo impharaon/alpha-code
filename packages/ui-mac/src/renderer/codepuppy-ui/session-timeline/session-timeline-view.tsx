@@ -388,7 +388,7 @@ function TimelineRowView(props: { row: TimelineRow; displayNames?: TimelineDispl
   if (row.kind === "cloudImage") return <CloudImageCard row={row} />
   if (row.kind === "turnError") return <TurnErrorCard row={row} />
   if (row.kind === "divider") return <DividerRow row={row} />
-  if (row.kind === "footnote") return <FootnoteRow row={row} />
+  if (row.kind === "footnote") return <FootnoteRow row={row} displayNames={props.displayNames} />
   if (row.kind === "diffsum") return <TurnDiffSummaryRow row={row} />
   // fail-closed:未知行类型不渲染任何内容。
   return null
@@ -417,8 +417,13 @@ function efficiencyLabel(percent: number): string {
   return t("codepuppy.timeline.efficiencyLow")
 }
 
-function FootnoteRow(props: { row: Extract<TimelineRow, { kind: "footnote" }> }) {
+function FootnoteRow(props: { row: Extract<TimelineRow, { kind: "footnote" }>; displayNames?: TimelineDisplayNames }) {
   const footnote = () => props.row.footnote
+  const agent = () => {
+    const name = footnote().agent
+    const mode = firstPartyMode(name)
+    return mode ? t(mode.label) : name ? displayName(() => props.displayNames?.agent(name) ?? name, name) : ""
+  }
   // 复制动作:剪贴板通道缺席即不渲染按钮(fail-closed)。重试/分支钮按 owner 直令登记跳过:
   // 引擎无「重试」操作(SDK 无对应端点),分支只有 v1 `session.fork`(建新会话 + 导航,
   // 属另建链路)—— 两者均不在时间线的数据面内,不为凑形态伪造。
@@ -432,7 +437,7 @@ function FootnoteRow(props: { row: Extract<TimelineRow, { kind: "footnote" }> })
               {footnote().provider!.slice(0, 1).toUpperCase()}
             </i>
           </Show>
-          {footnote().agent}
+          {agent()}
         </span>
       </Show>
       <Show when={footnote().model}>
@@ -517,9 +522,13 @@ const FIRST_PARTY_MODES = new Map<string, { label: Parameters<typeof t>[0]; tier
   [AUTOMATION_DEFAULTS.agentStandard, { label: "codepuppy.timeline.modeAutomation", tier: "automation" }],
 ])
 
+function firstPartyMode(agent: string | undefined) {
+  return agent ? FIRST_PARTY_MODES.get(agent.replace(/^alpha-/, "codepuppy-")) : undefined
+}
+
 function UserRow(props: { row: Extract<TimelineRow, { kind: "user" }>; displayNames?: TimelineDisplayNames }) {
   const intents = useTimelineIntents()
-  const mode = () => (props.row.message.agent ? FIRST_PARTY_MODES.get(props.row.message.agent) : undefined)
+  const mode = () => firstPartyMode(props.row.message.agent)
   const meta = () => {
     const message = props.row.message
     const firstParty = mode()

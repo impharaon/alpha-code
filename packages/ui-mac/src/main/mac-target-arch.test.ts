@@ -153,7 +153,7 @@ describe("#1629 mac 打包只接受 Apple 芯片", () => {
     expect(JSON.parse(apple.stdout.trim()).every((target: { arch: string[] }) => target.arch.join() === "arm64")).toBe(true)
   })
 
-  test("manifest CLI:仅 arm64 dist 产出合法签名 manifest,遗留 x64 文件不被枚举", async () => {
+  test("manifest CLI:仅 arm64 dist 产出合法签名 manifest,遗留 x64 文件不被枚举;prod 打印来源 SHA 并传入 SBOM", async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-arm64-manifest-"))
     tmpDirs.push(dir)
     const app = path.join(dir, "mac-arm64", "Code Puppy.app", "Contents", "Resources")
@@ -204,6 +204,25 @@ describe("#1629 mac 打包只接受 Apple 芯片", () => {
       expect(verified.manifest.artifacts.map((artifact) => artifact.filename).sort()).toEqual(["codepuppy-mac-arm64.dmg", "codepuppy-mac-arm64.zip"])
       expect(verified.manifest.artifacts.every((artifact) => artifact.arch === "arm64")).toBe(true)
     }
+    const cwd = path.join(dir, "checkout")
+    for (const [where, args] of [
+      [dir, ["init", "--bare", path.join(dir, "origin.git")]],
+      [dir, ["clone", path.join(dir, "origin.git"), cwd]],
+      [cwd, ["switch", "-c", "alpha"]],
+      [cwd, ["commit", "--allow-empty", "-m", "release checkout"]],
+      [cwd, ["push", "origin", "alpha"]],
+    ] as const) {
+      const result = spawnSync("git", ["-c", "user.name=Release Test", "-c", "user.email=release@example.invalid", ...args], { cwd: where, encoding: "utf8" })
+      expect(result.status, result.stderr).toBe(0)
+    }
+    const sha = spawnSync("git", ["rev-parse", "HEAD"], { cwd, encoding: "utf8" }).stdout.trim()
+    const prod = spawnSync(process.execPath, ["--preload", path.join(dir, "darwin.ts"), path.join(packageDir, "scripts/release-manifest.ts"), "produce", "--channel", "prod", "--dist", dir, "--key", path.join(dir, "test-key.pem")], {
+      cwd, encoding: "utf8", env: { ...process.env, OPENCODE_CHANNEL: "prod", [TARGET_ARCH_ENV]: "arm64", PATH: `${bin}:${process.env.PATH}` }, timeout: 30_000,
+    })
+    expect(prod.status).toBe(1)
+    expect(prod.stderr).toContain("R6 unsigned mac build on prod")
+    expect(prod.stdout).toContain(`source commit: ${sha}`)
+    expect(JSON.parse(fs.readFileSync(path.join(dir, `codepuppy-${version}-sbom.cdx.json`), "utf8")).metadata.properties).toContainEqual({ name: "codepuppy:release:source-commit", value: sha })
   })
 })
 

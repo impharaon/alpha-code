@@ -84,6 +84,20 @@ export function loadSessions() {
   )
 }
 
+// N12(a): the engine's non-git project is global / "/" / empty name; sessions retain their actual directory.
+export function loadGlobalProjectSessions() {
+  setStore("projects", [
+    ...FIXTURE_PROJECTS,
+    {
+      id: "global", worktree: "/", name: "", directories: ["/"], loaded: true,
+      sessions: ["/Users/tide/code-puppy", "/Users/tide/notes"].map((directory, index) => ({
+        id: `ses_global_${index}`, title: "New session - 2026-11-05T10:40:00.000Z",
+        directory, projectID: "global", updated: 40 + index,
+      })),
+    },
+  ])
+}
+
 const connection: ServerConnection.Any = {
   displayName: "Local Server",
   type: "sidecar",

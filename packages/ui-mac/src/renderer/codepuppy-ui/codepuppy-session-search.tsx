@@ -32,6 +32,7 @@ import { t } from "../i18n"
 import { hrefFor } from "../../shared/route-manifest"
 import type { CodePuppyProject, CodePuppyProjectsApi, CodePuppyProjectsStore } from "../sidebar/use-projects"
 import { sessionDisplayTitle } from "./session-title"
+import { projectSidebarGroups } from "../sidebar/project-display"
 import { runMomentOf } from "./session-rail/artifacts/artifacts-core"
 import "./session-search.css"
 
@@ -63,7 +64,7 @@ export function sessionSearchResults(
   const needle = query.trim().toLowerCase()
   if (!needle || !serverKey) return []
   const matched: Array<{ result: SessionSearchResult; updated: number }> = []
-  for (const project of projects) {
+  for (const project of projectSidebarGroups([...projects])) {
     for (const session of project.sessions) {
       const title = sessionDisplayTitle(session.title)
       if (!title.toLowerCase().includes(needle)) continue

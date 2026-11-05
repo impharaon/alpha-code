@@ -247,3 +247,49 @@ test.each(["composer", "timeline"])("#1641 AC2 %s 上方放不下翻到下方,�
     thumb.click()
   }
 })
+
+// Extend the measured thumbnail/lightbox geometry above to a timeline clipped below its header.
+test.each([
+  { surface: "timeline", top: 210, height: 118, imageHeight: 72, below: true, maxHeight: 196 },
+  { surface: "timeline", top: 350, height: 406, imageHeight: 360, below: false, maxHeight: 96 },
+  { surface: "timeline", top: 280, height: 406, imageHeight: 360, below: true, maxHeight: 126 },
+  { surface: "composer", top: 70, height: 406, imageHeight: 360, below: true, maxHeight: 360 },
+  { surface: "composer", top: 390, height: 406, imageHeight: 360, below: false, maxHeight: 336 },
+])("#1641 AC2 $surface 灯箱遵守滚动边界,两边不足选较大空间并限制图片 $top", async (geometry) => {
+  const host = mount(() => geometry.surface === "composer"
+    ? createComponent(ComposerAttachmentStrip, {
+        attachments: [image("i", "截图.png")], reading: false, imageRoute: "native", onRemove: () => {}, onRetry: () => {},
+      })
+    : createComponent(TimelineAttachments, {
+        attachments: [{ partID: "i", name: "截图.png", media: "image", label: "PNG", url: PNG }], onReadAgain: () => {},
+      }))
+  if (geometry.surface === "timeline") {
+    host.className = "a-tl-scroll"
+    host.getBoundingClientRect = () => new DOMRect(0, 200, 1000, 300)
+  }
+  const thumb = host.querySelector<HTMLButtonElement>(".a-att-thumb")!
+  thumb.getBoundingClientRect = () => new DOMRect(400, geometry.top, 56, 40)
+  thumb.click()
+  await flush()
+  const box = document.querySelector<HTMLElement>(".a-att-lightbox")!
+  box.getBoundingClientRect = () => new DOMRect(400, 0, 300, geometry.height)
+  const img = box.querySelector("img")!
+  img.getBoundingClientRect = () => new DOMRect(0, 0, 282, geometry.imageHeight)
+  img.dispatchEvent(new Event("load"))
+  await flush()
+  expect(box.style.top === "auto").toBe(!geometry.below)
+  expect(img.style.maxHeight).toBe(`${geometry.maxHeight}px`)
+})
+
+test.each([{ left: -20, expected: "8px" }, { left: 400, expected: "400px" }, { left: 1200, expected: "716px" }])("#1641 AC1 输入框灯箱横向留在窗口内 left=$left", async ({ left, expected }) => {
+  const host = mount(() => createComponent(ComposerAttachmentStrip, {
+    attachments: [image("i", "截图.png")], reading: false, imageRoute: "native", onRemove: () => {}, onRetry: () => {},
+  }))
+  const thumb = host.querySelector<HTMLButtonElement>(".a-att-thumb")!
+  thumb.getBoundingClientRect = () => new DOMRect(left, 600, 56, 56)
+  thumb.click()
+  await flush()
+  const box = document.querySelector<HTMLElement>(".a-att-lightbox")!
+  expect(window.innerWidth).toBe(1024)
+  expect(box.style.left).toBe(expected)
+})

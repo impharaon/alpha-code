@@ -16,7 +16,7 @@ test(
     // 取回真实数字再比:`toContain("0 fail")` 会被 "10 fail" 满足;文件数一并核对,子进程匹配 0 个文件时「0 fail」是假绿。
     const fail = output.match(/(\d+) fail\b/)?.[1]
     const pass = Number(output.match(/(\d+) pass\b/)?.[1] ?? 0)
-    expect({ fail, pass }).toEqual({ fail: "0", pass: 7 })
+    expect({ fail, pass }).toEqual({ fail: "0", pass: 15 })
     expect(output.match(/Ran \d+ tests? across (\d+) files?/)?.[1]).toBe("1")
   },
   60_000,

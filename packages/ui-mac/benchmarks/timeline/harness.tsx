@@ -56,7 +56,7 @@ function App() {
         rows={rows()}
         ready={true}
         epoch="sidecar:/fixture:ses_codepuppy_timeline_benchmark"
-        emptyTitle="Alpha timeline benchmark"
+        emptyTitle="Code Puppy timeline benchmark"
         history={history}
         onLoadOlder={loadOlder}
       />
@@ -85,7 +85,7 @@ async function waitForTimelineReady(resolve: (value: TimelineReadyResult) => voi
       return
     }
   }
-  throw new Error("Alpha timeline did not become ready within 15 seconds")
+  throw new Error("Code Puppy timeline did not become ready within 15 seconds")
 }
 
 async function runStreaming(durationMs: number): Promise<TimelineStreamResult> {
@@ -205,7 +205,7 @@ function timelineScroller() {
 
 function requireTimelineScroller() {
   const scroller = timelineScroller()
-  if (!scroller) throw new Error("Alpha timeline scroller is missing")
+  if (!scroller) throw new Error("Code Puppy timeline scroller is missing")
   return scroller
 }
 

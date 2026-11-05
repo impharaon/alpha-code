@@ -799,7 +799,7 @@ export type ElectronAPI = {
    *  既不能伪造环境,也没有任何通道改写环境根(AC#6)。 */
   environment: () => Promise<CodePuppyEnvironmentInfo>
   /** REQ-090:surface crash admission。main 按 crashID 建立唯一 incident，renderer 只能持有安全
-   *  Recovery DTO；失败 surface 留在 Alpha 区域(没有可回退的第二种组合)。 */
+   *  Recovery DTO；失败 surface 留在 Code Puppy 区域(没有可回退的第二种组合)。 */
   surfaces: {
     reportFailure: (payload: { crashID: string; surface: SurfaceId }) => Promise<RecoveryIncidentWire>
   }
@@ -1007,7 +1007,7 @@ export type ElectronAPI = {
           name: string
           manifestDigest?: string
           installedDisabled?: true
-          /** `#704`:已安装,但可选的 Alpha Connection 未建立 —— 与「装完默认关」是两回事。 */
+          /** `#704`:已安装,但可选的 Code Puppy Connection 未建立 —— 与「装完默认关」是两回事。 */
           connectionUnavailable?: true
           /** Bundle:实际装上的成员(package 走 component id,legacy planner 走 entry id)。 */
           installed?: string[]

@@ -1,4 +1,4 @@
-// REQ-053 AC1/AC2: remove only confirmed-absent Alpha-owned engine-config references.
+// REQ-053 AC1/AC2: remove only confirmed-absent Code Puppy-owned engine-config references.
 // The planner is electron-free and performs no writes. Filesystem identity/absence is injectable so
 // every fail-closed branch can be tested without changing process-global fs behavior.
 

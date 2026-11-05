@@ -50,7 +50,7 @@ import 是 bun 未实现的 `node:module` registerHooks,顶层还有 `getParentP
 
 v2 catalog 的配置文件就位不等于每个 directory 的内存 catalog 已经收敛。`PluginInternal`
 在后台依次装载 models.dev、provider、用户配置与 variant transform;中途读取曾把 6,132 行
-models.dev 过渡态序列化给首屏,而同进程热路径只有 37 行(#857)。Alpha 模型治理开启时,现有
+models.dev 过渡态序列化给首屏,而同进程热路径只有 37 行(#857)。Code Puppy 模型治理开启时,现有
 provider 投影已完整定义内建的可用 provider/model identity,因此同一桥目录会从**这份既有投影**
 机械生成最小 models.dev base,并令现有 `OPENCODE_MODELS_PATH` 指向它;它只携带 identity、名称、
 endpoint 和上游 schema 必填的保守零值,不复制 key、不制定第二份 allow/deny 策略。ConfigProvider
@@ -59,7 +59,7 @@ catalog 逃生语义。
 
 机械 base 同时带 `codepuppy-internal-catalog-ready` 记录(`env:[]`、零 models):它不进入可选模型集合。
 上游 `PluginInternal` 原本把全部 internal plugin 包在同一个 `State.batch`;即使 ModelsDevPlugin
-排在前面,它的 base/marker 也会被推迟到末序 ConfigProvider/variant 完成后才一起提交。Alpha 不改
+排在前面,它的 base/marker 也会被推迟到末序 ConfigProvider/variant 完成后才一起提交。Code Puppy 不改
 受 north-star 保护的 core 源码,而在 `build-node` 后由
 `packages/ui-mac/scripts/patch-plugin-internal-models.ts` 严格修改 gitignored 的 embedded-server
 产物:只把唯一的 ModelsDevPlugin 注册移到该外层 batch 之前,其余 plugin 仍维持原顺序与单批提交。
@@ -76,7 +76,7 @@ ConfigProvider 合并完文件来源,不得用局部 early set 冒充完整目�
 `codepuppyUserWorkspaceDir()` 唯一解析为 `~/code-puppy`;sidecar 把这个精确值随 start command 带入,并在
 `Server.listen` 同时经引擎已有的 `Server.Default().app` 发一次带 sidecar Basic auth 的真实 V2
 marker 请求。上游 `Default` 与 `listen` 原本各自调用 `createRoutes` 并使用不同 memo map,无法共享
-`LocationServiceMap`;Alpha production prebuild 因而只对 gitignored embedded-server 生成物施加严格
+`LocationServiceMap`;Code Puppy production prebuild 因而只对 gitignored embedded-server 生成物施加严格
 补丁:仅 `cors=["oc://renderer"]` 的固定 Electron listener 复用 `Default` 的 singleton routes 和全局
 memo map,其他调用仍走原 `createRoutes(opts)`。预热在 marker 证明治理提交后继续读取同目录真实
 `/api/model`,把 renderer 的首个 handler 也在本地结算。这只是把同一张生产服务图及真实 handler
@@ -160,7 +160,7 @@ codepuppy.jsonc 而不是目录。方案基线
   绕过 barrier 时替身确实暴露未治理集合。`codepuppy-config-injection.test.ts` 另锁 marker 在 v2
   config 投影中保持 keyless,并在 models.dev base 中只随完整 identity 投影出现;用户文件 provider
   缺投影时 base 必须无 marker、回到 late barrier。barrier 不得换成账户或网络门。
-- **Alpha 治理目录不得物化全量 models.dev 快照或第二份策略真源**:
+- **Code Puppy 治理目录不得物化全量 models.dev 快照或第二份策略真源**:
   `codepuppy-config-injection.test.ts` 锁定 `OPENCODE_MODELS_PATH` 指向桥目录中的最小机械 base、其
   provider/model identity 与既有 v2 provider 投影精确一致、全部条目通过上游 ModelsDev schema、
   且不含任何 key;同时锁定 `CODEPUPPY_MODELS_DISABLE=1` 不覆盖 operator 提供的上游路径。可用

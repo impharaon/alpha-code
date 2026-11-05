@@ -289,7 +289,7 @@ Word / Excel / PowerPoint / PDF 四个文档工具的命令是 `<Resources>/offi
   不可 exec;登录 shell 写 `$HOME` 下 rc 产物(`.zcompdump` 等)会静默不落盘;非 zsh 用户的 history 文件不在可写集。
   用户打开的**新**文件夹要到下次启动才可写(启动时取并集,U2 裁决)。
 - 验证清单(每次签名发版):stapler validate + spctl ✓ → 启动 → 终端(WASM+PTY)→ diff → 流式会话 → 定制中心 → 登录/账户 → 更新器检查 → **进程围栏**(引擎起来 = 围栏装上了;在项目外写一个文件必须 `operation not permitted`,项目内落盘)。
-- Alpha 契约 RC-L3:`packaged app rejects a token whose purpose does not match the route as a visible auth failure`。本项须在真实 packaged executable 上执行并把证据落 `docs/verification/`;#224 只提供 fixture、运行时断言与持久 `role=alert` 边界,不代跑打包。
+- Code Puppy 契约 RC-L3:`packaged app rejects a token whose purpose does not match the route as a visible auth failure`。本项须在真实 packaged executable 上执行并把证据落 `docs/verification/`;#224 只提供 fixture、运行时断言与持久 `role=alert` 边界,不代跑打包。
 - **CAS GC worker(REQ-102 #367,L3 项;裁决 Q6 —— bench 总耗时不能证明 main 占用,须按下列五步)**:
   1. 确认 `app.asar/out/main/ext-cas-gc-worker.js` 存在(`npx @electron/asar list <app>/Contents/Resources/app.asar | grep ext-cas-gc-worker`);
   2. packaged app 对隔离 heavy fixture(可用 `packages/ui-mac/scripts/bench-cas-gc.ts` 的 heavy 档参数造店)实际触发一轮(等 5 分钟首跑或临时把 `CAS_GC_INITIAL_DELAY_MS` 建包为短值);

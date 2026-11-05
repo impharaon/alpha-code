@@ -11,7 +11,7 @@
 //
 // 隔离矩阵(每个预览):
 //   · 进程:独立 BrowserWindow,sandbox=true + contextIsolation=true + nodeIntegration=false,
-//     **无 preload**(零 window.api / 零 Alpha bridge,AC#3/#7);
+//     **无 preload**(零 window.api / 零 Code Puppy bridge,AC#3/#7);
 //   · session:随机一次性 in-memory partition(无 persist: 前缀),权限 request/check/device
 //     全 deny,will-download 拦截,webRequest 默认拒绝一切非本协议请求(零外网,AC#2);
 //   · 内容:协议 handler 只服务经 manifest + ADR-019 守卫验证过的 run 内文件 —— 根文档 +
@@ -360,7 +360,7 @@ export function openHtmlPreview(
       disableDialogs: true,
       safeDialogs: true,
       spellcheck: false,
-      // ⚠️ 刻意无 preload —— REQ-096 AC#3/#7:preview 上下文零 Alpha bridge;代码审查门禁止
+      // ⚠️ 刻意无 preload —— REQ-096 AC#3/#7:preview 上下文零 Code Puppy bridge;代码审查门禁止
       // 给 HtmlPreviewHost 配置 preload。
     },
   })

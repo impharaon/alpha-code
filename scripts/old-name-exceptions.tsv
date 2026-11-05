@@ -815,7 +815,7 @@ packages/ui-mac/src/main/codepuppy-office-instance.ts	7	external-anchor	GitHub �
 packages/ui-mac/src/main/codepuppy-secrets.ts	5	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/codepuppy-user-workspace.ts	1	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
 packages/ui-mac/src/main/codepuppy-user-workspace.ts	5	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
-packages/ui-mac/src/main/codepuppy-user-workspace.ts	13	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
+packages/ui-mac/src/main/codepuppy-user-workspace.ts	13	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)；Alpha 仅记录 ADR-025 的原目录名
 packages/ui-mac/src/main/codepuppy-user-workspace.ts	15	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
 packages/ui-mac/src/main/codepuppy-user-workspace.ts	23	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
 packages/ui-mac/src/main/codepuppy-user-workspace.ts	39	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
@@ -837,9 +837,9 @@ packages/ui-mac/src/main/fixtures/cloud-mcp-tools.ts	3	external-anchor	GitHub �
 packages/ui-mac/src/main/fixtures/cloud-mcp-tools.ts	4	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/fixtures/cloud-mcp-tools.ts	14	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/html-preview-host.ts	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/main/index.ts	834	historical	记录退役根 .alpha(已退役、零读写)的历史说明
-packages/ui-mac/src/main/index.ts	854	historical	记录退役根 .alpha(已退役、零读写)的历史说明
-packages/ui-mac/src/main/index.ts	1069	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/main/index.ts	836	historical	记录退役根 .alpha(已退役、零读写)的历史说明
+packages/ui-mac/src/main/index.ts	856	historical	记录退役根 .alpha(已退役、零读写)的历史说明
+packages/ui-mac/src/main/index.ts	1073	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/ipc.ts	187	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/keychain-name-migration.ts	31	migration-source	改名前 prod / beta 的 Electron 应用名,一次性钥匙串改名迁移用它定位旧条目(`<名> Safe Storage` / `<名> Key`);随迁移代码一起删除(#1571)
 packages/ui-mac/src/main/keychain-name-migration.ts	32	migration-source	改名前 prod / beta 的 Electron 应用名,一次性钥匙串改名迁移用它定位旧条目(`<名> Safe Storage` / `<名> Key`);随迁移代码一起删除(#1571)
@@ -940,7 +940,7 @@ packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search-test-runtime.
 packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search-test-runtime.tsx	59	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search-test-runtime.tsx	60	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/codepuppy-ui/composer-autocomplete-core.ts	119	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
-packages/ui-mac/src/renderer/codepuppy-ui/default-workspace.ts	5	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/renderer/codepuppy-ui/default-workspace.ts	5	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改；同一行 ~/Alpha 是历史工作目录字面量，本票冻结路径名
 packages/ui-mac/src/renderer/codepuppy-ui/model-picker-core.ts	34	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/codepuppy-ui/model-recovery.ts	22	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/codepuppy-ui/session-timeline/cards/cards.css	685	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -962,8 +962,8 @@ packages/ui-mac/src/renderer/logo-codepuppy.tsx	4	external-anchor	GitHub 仓库�
 packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	266	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	282	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	283	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	682	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	846	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	682	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改；同一行 ~/Alpha 是历史工作目录字面量，本票冻结路径名
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	846	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改；同一行 ~/Alpha 是历史工作目录字面量，本票冻结路径名
 packages/ui-mac/src/renderer/sidebar/shell-commands-test-runtime.tsx	37	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/sidebar/shell-commands-test-runtime.tsx	87	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/sidebar/shell-commands-test-runtime.tsx	89	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -1069,3 +1069,68 @@ scripts/worktree-link-deps.sh	84	external-anchor	GitHub 仓库名 alpha-code / a
 packages/ui-mac/scripts/target-arch.ts	40	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/runbooks/distribution.md	34	migration-source	一次性改名步骤:把 owner 本机旧签名目录 ~/.alpha-code-signing 与 signing.env 里的旧变量名改成 codepuppy 形式,要写出旧名才能找到它们;owner 本机改完后随下一版 runbook 删除
 docs/runbooks/distribution.md	35	migration-source	一次性改名步骤:把 owner 本机旧签名目录 ~/.alpha-code-signing 与 signing.env 里的旧变量名改成 codepuppy 形式,要写出旧名才能找到它们;owner 本机改完后随下一版 runbook 删除
+packages/ui-mac/src/main/fixtures/catalog-boot-0.1.24.json	5	user-content	#1632:真实 0.1.24 状态与公开签名响应的原始字节夹具;改写会破坏签名或历史输入
+packages/ui-mac/src/main/fixtures/catalog-boot-0.1.24.json	10	user-content	#1632:真实 0.1.24 状态与公开签名响应的原始字节夹具;改写会破坏签名或历史输入
+packages/ui-mac/src/main/fixtures/catalog-boot-0.1.24.json	15	user-content	#1632:真实 0.1.24 状态与公开签名响应的原始字节夹具;改写会破坏签名或历史输入
+packages/ui-mac/src/main/fixtures/catalog-boot-0.1.24.json	27	user-content	#1632:真实 0.1.24 状态与公开签名响应的原始字节夹具;改写会破坏签名或历史输入
+packages/ui-mac/src/main/fixtures/catalog-boot-0.1.24.json	31	user-content	#1632:真实 0.1.24 状态与公开签名响应的原始字节夹具;改写会破坏签名或历史输入
+packages/ui-mac/src/main/fixtures/catalog-boot-0.1.24.json	35	user-content	#1632:真实 0.1.24 状态与公开签名响应的原始字节夹具;改写会破坏签名或历史输入
+packages/ui-mac/src/main/fixtures/catalog-boot-0.1.24.json	52	user-content	#1632:真实 0.1.24 状态与公开签名响应的原始字节夹具;改写会破坏签名或历史输入
+ALPHA.md	18	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
+docs/README.md	6	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
+docs/README.md	52	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+docs/architecture/2026-08-23-codex-harness-comparison.md	19	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
+docs/architecture/2026-09-09-multi-workspace-fence-decision.md	21	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+docs/architecture/2026-09-09-multi-workspace-fence-decision.md	145	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+docs/architecture/2026-09-09-multi-workspace-fence-decision.md	158	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+docs/architecture/2026-09-09-multi-workspace-fence-decision.md	201	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+docs/architecture/2026-09-09-multi-workspace-fence-decision.md	253	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+docs/architecture/2026-09-09-multi-workspace-fence-decision.md	259	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+docs/architecture/2026-09-09-multi-workspace-fence-decision.md	270	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+docs/architecture/frontend-surfaces.md	28	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
+docs/architecture/overview.md	49	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
+docs/contracts/platform-integration.md	474	external-anchor	跨仓请求头 X-Alpha-Upload-Consent 的逐字协议标识，本票冻结标识符
+docs/contracts/platform-integration.md	673	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
+docs/design/PAGE-MAP.md	32	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
+docs/design/current/slash-menu/design.html	98	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+docs/design/system/replacing-opencode.md	17	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
+docs/design/system/replacing-opencode.md	98	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
+packages/ui-mac/src/main/automation-ipc.ts	32	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/main/automation-scheduler.ts	313	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/main/catalog-liveness.ts	165	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/main/catalog-liveness.ts	203	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/main/cloud-ipc.ts	93	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/main/codepuppy-cloud-schedules.ts	197	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/main/factory-skills.ts	75	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/main/index.ts	1174	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/main/index.ts	1194	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/main/ipc.ts	193	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/main/ipc.ts	205	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/main/platform/index.ts	7	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/main/sidecar.ts	87	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/preload/types.ts	750	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/renderer/automations/automation-panel.tsx	205	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/renderer/codepuppy-ui/CodePuppyHome.tsx	58	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/renderer/codepuppy-ui/artifact-workbench/renderers/fixtures/office-text/make-fixtures.py	77	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
+packages/ui-mac/src/renderer/codepuppy-ui/artifact-workbench/renderers/fixtures/office-text/py-pptx/ppt/slides/slide1.xml	2	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
+packages/ui-mac/src/renderer/codepuppy-ui/artifact-workbench/renderers/fixtures/xlsx/openpyxl/xl/worksheets/sheet1.xml	1	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
+packages/ui-mac/src/renderer/codepuppy-ui/artifact-workbench/renderers/fixtures/xlsx/xlsxwriter/xl/sharedStrings.xml	2	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
+packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-new-session.tsx	68	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/renderer/codepuppy-ui/default-workspace.ts	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/renderer/codepuppy-ui/workspace-chip.tsx	30	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/renderer/codepuppy-ui/workspace-chip.tsx	83	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	194	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	664	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	672	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/renderer/sidebar/start-draft-test-runtime.tsx	39	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
+packages/ui-mac/src/renderer/sidebar/start-draft-test-runtime.tsx	51	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
+packages/ui-mac/src/renderer/sidebar/start-draft-test-runtime.tsx	58	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
+packages/ui-mac/src/renderer/sidebar/start-draft-test-runtime.tsx	299	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
+packages/ui-mac/src/renderer/sidebar/use-projects.ts	109	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/renderer/sidebar/use-projects.ts	381	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/renderer/surface-remount-test-runtime.tsx	70	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
+packages/ui-mac/src/shared/frontend-surface-manifest.ts	338	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
+packages/ui-mac/src/shared/host-extension-package-contract/generate-artifact.ts	257	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
+packages/ui-mac/test-fixtures/claude-plugin-corpus.json	1	third-party	#848 从 ~/.claude/plugins/marketplaces 采集的真实插件语料逐字快照，保留第三方原文
+scripts/gate-files.tsv	95	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/shared/host-extension-package-contract/host-extension-package.registry.v1.json	44	external-anchor	跨仓宿主合同的生产方产物语义原文，与冻结的 vendored 副本逐字节一致；品牌文案须由合同生产方改名

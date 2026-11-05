@@ -129,7 +129,7 @@ describe("login discovery persistence", () => {
         account: "https://acct.example",
         cloud: "https://cloud.example",
       }),
-    ).toThrow("Alpha contract incompatible")
+    ).toThrow("Code Puppy contract incompatible")
     expect(() =>
       setDiscoveredEndpoints({
         schema_version: 1,
@@ -138,7 +138,7 @@ describe("login discovery persistence", () => {
         account: "http://evil.example",
         cloud: "https://cloud.example",
       }),
-    ).toThrow("Alpha contract incompatible")
+    ).toThrow("Code Puppy contract incompatible")
     expect(resolveEndpoints().account).toBe(CODEPUPPY_ENDPOINTS.account)
   })
 

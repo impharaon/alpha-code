@@ -163,7 +163,7 @@ const UPSTREAMS = [
     artifactSha256: "bd082405e97b433f4148869bbf70b772e2d426767db723b53d738e2afadfdb87",
     commitBound: true,
     // #759 / alpha-web#109:producer 追平宿主合同 v2。语料从 22 个文件长到 36 个 —— 新增的是
-    // flat Bundle 正/负向、OAuth 与 Alpha Connection 的正向语料(旧的 `input.remote-oauth.invalid.json`
+    // flat Bundle 正/负向、OAuth 与 Code Puppy Connection 的正向语料(旧的 `input.remote-oauth.invalid.json`
     // 随之消失,它在 v2 下是**合法**输入),外加 Bundle 组件引用的两份 markdown 资产。
     // 这两份 `.md` 是本清单里第一批非 JSON 字节,vendor 循环的 JSON 语法自检因此按扩展名分流。
     //
@@ -302,7 +302,7 @@ if (check) {
     const sourceRoot = sourceRootOf(upstream)
     const hasStagedSource = existsSync(sourceRoot)
     // #769:这里原本对 commitBound 条目**硬抛**「required producer checkout is unavailable」。
-    // CI 跑的是裸 checkout,兄弟仓 `../alpha-web` 结构上不存在 —— 于是 `verify immutable Alpha
+    // CI 跑的是裸 checkout,兄弟仓 `../alpha-web` 结构上不存在 —— 于是 `verify immutable Code Puppy
     // contract vendor lock` 这一步**恒红**,而红的理由与它要验的漂移毫无关系。一道恒红的闸等于
     // 没有闸,还更糟:大家学会忽略它,真出漂移时也没人看(#754 是同一种病的本地那一道)。
     //

@@ -201,7 +201,7 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     // #857:internal V2-only marker is committed by ConfigProvider in the same local batch as the
     // governed catalog. Empty env + zero models keeps it unavailable and invisible to model.list.
     expect(v2.provider[CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID]).toEqual({
-      name: "Alpha catalog readiness marker",
+      name: "Code Puppy catalog readiness marker",
       env: [],
     })
     const decodedV1 = Schema.decodeUnknownSync(ConfigV1.Info)(v2)
@@ -227,7 +227,7 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     )
     expect(modelsBase[CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID]).toEqual({
       id: CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID,
-      name: "Alpha catalog readiness marker",
+      name: "Code Puppy catalog readiness marker",
       env: [],
       models: {},
     })

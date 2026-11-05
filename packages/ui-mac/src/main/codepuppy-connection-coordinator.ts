@@ -27,7 +27,7 @@ import {
 } from "../shared/package-codepuppy-connection"
 
 /**
- * The main-owned Alpha Connection lifecycle: begin → status → (record) and the separate disconnect.
+ * The main-owned Code Puppy Connection lifecycle: begin → status → (record) and the separate disconnect.
  *
  * The renderer's entire vocabulary here is three key sets, each an exact allowlist: which package
  * prerequisite to satisfy, which attempt to poll, which connection to drop. It cannot name a
@@ -94,7 +94,7 @@ export function createCodePuppyConnectionCoordinator(deps: CodePuppyConnectionCo
     if (!handler.ok)
       return refuse(
         "connection-handler-unknown",
-        `alpha connection: handler "${resolved.item.handlerId}" is not in this build — update Alpha`,
+        `alpha connection: handler "${resolved.item.handlerId}" is not in this build — update Code Puppy`,
       )
 
     const attemptId = (deps.attemptId ?? mintAttemptId)()
@@ -139,7 +139,7 @@ export function createCodePuppyConnectionCoordinator(deps: CodePuppyConnectionCo
     const handler = lookupCodePuppyConnectionHandlerV1(attempt.handlerId, table)
     if (!handler.ok) {
       attempts.delete(attempt.attemptId)
-      return refuse("connection-handler-unknown", "alpha connection: handler is not in this build — update Alpha")
+      return refuse("connection-handler-unknown", "alpha connection: handler is not in this build — update Code Puppy")
     }
     const reported = await handler.handler
       .status(attempt.attemptId)
@@ -206,7 +206,7 @@ export function createCodePuppyConnectionCoordinator(deps: CodePuppyConnectionCo
     if (!record) return { ok: true, disconnected: false }
     const handler = lookupCodePuppyConnectionHandlerV1(record.handlerId, table)
     if (!handler.ok)
-      return refuse("connection-handler-unknown", "alpha connection: handler is not in this build — update Alpha")
+      return refuse("connection-handler-unknown", "alpha connection: handler is not in this build — update Code Puppy")
     const result = await handler.handler
       .disconnect(connectionId)
       .catch(() => ({ ok: false as const, reasonCode: "connection-handler-error" as const }))

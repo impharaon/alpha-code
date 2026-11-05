@@ -65,8 +65,8 @@ import { composeRoutes } from "./route-composition"
 import { installShellBootTimeline } from "./codepuppy-ui/shell-boot-timeline"
 import { markStartupTimeline } from "./startup-timeline"
 
-// Every route composes exactly one Alpha surface. There is no second release state and no
-// runtime switch: a fatal render goes to Alpha Recovery (SurfaceBoundary), never to an
+// Every route composes exactly one Code Puppy surface. There is no second release state and no
+// runtime switch: a fatal render goes to Code Puppy Recovery (SurfaceBoundary), never to an
 // upstream leaf.
 const productionRoutes = composeRoutes({
   // #891:两个「新会话入口」叶都要 `serverKey` —— 它们经 `projects.startChat` 建会话,新会话的
@@ -115,9 +115,9 @@ const RecoverySurface = productionRoutes.recovery.mount
 
 const DevSurfaceMapInspector = import.meta.env.DEV ? lazy(() => import("./dev/surface-map-inspector")) : () => null
 
-// First-run brand default: ship the orange Alpha theme. The theme context reads
+// First-run brand default: ship the orange Code Puppy theme. The theme context reads
 // `opencode-theme-id` from localStorage before it mounts, so seeding it here (only
-// when unset) makes Alpha the default without touching @opencode-ai/app. Once the
+// when unset) makes Code Puppy the default without touching @opencode-ai/app. Once the
 // user picks any theme, that key is owned by the picker and we never overwrite it.
 try {
   if (!localStorage.getItem("opencode-theme-id")) {
@@ -429,7 +429,7 @@ render(() => {
     menuTrigger = (id) => cmd.trigger(id)
 
     const theme = useTheme()
-    // Make the brand theme known to the store + theme picker (named "Alpha").
+    // Make the brand theme known to the store + theme picker (named "Code Puppy").
     // The context's load() checks store.themes first, so registering here is
     // enough for both first-run apply and later re-selection from the picker.
     theme.registerTheme(CODEPUPPY_THEME)
@@ -517,7 +517,7 @@ render(() => {
     })
 
     // 每个叶页面经 typed surface seam 注入(单一 page root,upstream 叶不挂载)。surface 组件
-    // 经 SurfaceBoundary 兜致命 render 错误(main 建立稳定 incident + Alpha Recovery)。
+    // 经 SurfaceBoundary 兜致命 render 错误(main 建立稳定 incident + Code Puppy Recovery)。
     const surfaceComponents = createMemo<AppSurfaces>(() => ({
       permission: (props) => (
         <CodePuppyBoundary name="PermissionWatcher">

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Alpha first-party Office MCP server (stdio only).
+"""Code Puppy first-party Office MCP server (stdio only).
 
 One bundled server exposes a narrow tool pair for the selected file format. The
 host supplies both the format and a canonical workspace directory on argv; tool

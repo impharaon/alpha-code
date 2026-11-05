@@ -1,5 +1,5 @@
 ---
-title: Alpha Code architecture overview
+title: Code Puppy architecture overview
 kind: architecture
 status: active
 owners:
@@ -19,7 +19,7 @@ Claude Code distribution.
 | Surface | Owner |
 |---|---|
 | Electron desktop shell and product UI | `packages/ui-mac` |
-| Alpha extension seams | `packages/ext` |
+| Code Puppy extension seams | `packages/ext` |
 | Frozen frontend application and component layer | `packages/app`, `packages/ui` |
 | Local engine and synchronized upstream packages | governed fork integration |
 | Model gateway, cloud jobs, metering | `alpha-platform` |
@@ -33,7 +33,7 @@ privileged filesystem/credential operations, and exposes narrow preload/IPC
 surfaces to the renderer. The renderer must not gain direct Node, shell, secret,
 or unrestricted filesystem access.
 
-Alpha cloud calls cross explicit authenticated contracts owned by
+Code Puppy cloud calls cross explicit authenticated contracts owned by
 `alpha-platform`; public account and identity flows cross contracts owned by
 `alpha-web`. Credentials stay in their owning trust domain and must not be
 placed in tracked documentation.

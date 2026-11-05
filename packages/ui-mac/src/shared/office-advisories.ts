@@ -1,4 +1,4 @@
-// office-advisories — REQ-105 archived Office guidance + REQ-133 Alpha first-party registry +
+// office-advisories — REQ-105 archived Office guidance + REQ-133 Code Puppy first-party registry +
 // REQ-135 retired community Office denial.
 //
 // 背景：2026-07-10 安全复核，交付记录见 GitHub issue #197。
@@ -12,7 +12,7 @@
 //     可审计路径)。
 //   * RETIRED_COMMUNITY_OFFICE_CONNECTORS / retiredCommunityOfficeFor —— 新安装/重新激活的
 //     随包静态拒绝事实。它不复用 archived keep-installed 语义。
-//   * CODEPUPPY_OFFICE_CONNECTORS / checkCodePuppyOfficeMcpSafety —— four Alpha-authored bundled stdio
+//   * CODEPUPPY_OFFICE_CONNECTORS / checkCodePuppyOfficeMcpSafety —— four Code Puppy-authored bundled stdio
 //     entrypoints, exact dependency pins, and the shared workspace-policy membership for REQ-133.
 //
 // 远程签名 advisory 通道是 REQ-101 的未来工作;本表是其之前的最小诚实路径(随包静态数据)。
@@ -114,7 +114,7 @@ export const CODEPUPPY_OFFICE_SERVER_SLOT = "{codepuppyResources}/office-mcp/ser
  *  isolated mode (`-I`: no user site / PYTHON* env; `-B`: never writes bytecode into the bundle), no uv,
  *  no first-run download. Main owns both substitutions; catalog card commands are not consumed. */
 export function codepuppyOfficeInstallCommand(format: CodePuppyOfficeFormat): string[] {
-  if (!CODEPUPPY_OFFICE_CONNECTORS.some((candidate) => candidate.format === format)) throw new Error(`unknown Alpha Office format: ${format}`)
+  if (!CODEPUPPY_OFFICE_CONNECTORS.some((candidate) => candidate.format === format)) throw new Error(`unknown Code Puppy Office format: ${format}`)
   return [CODEPUPPY_OFFICE_PYTHON_SLOT, "-I", "-B", CODEPUPPY_OFFICE_SERVER_SLOT, format, WORKSPACE_MARKER]
 }
 
@@ -172,7 +172,7 @@ function isAbsolutePath(p: string): boolean {
   return n.startsWith("/") || /^[A-Za-z]:\//.test(n)
 }
 
-/** REQ-133 persistence gate: only the exact Alpha-authored bundled stdio command may be durable. */
+/** REQ-133 persistence gate: only the exact Code Puppy-authored bundled stdio command may be durable. */
 export function checkCodePuppyOfficeMcpSafety(
   name: string,
   server: Record<string, unknown>,

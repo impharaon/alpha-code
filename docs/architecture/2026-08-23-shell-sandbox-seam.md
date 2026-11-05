@@ -18,7 +18,7 @@ review_after: 2026-11-26
 
 # 三个候选接缝，只有一个不用收编上游
 
-Alpha 在 `packages/ui-mac/src/shared/ext-capability-authorization.ts` 里声明了六种
+Code Puppy 在 `packages/ui-mac/src/shared/ext-capability-authorization.ts` 里声明了六种
 能力，其中 `process:spawn`（本地 MCP 派生子进程）与 `engine:plugin`（在引擎进程内
 执行 JS）是**授予即无约束**的：授权记录写进了 `ext-capability-grants`，但执行侧没有
 任何一道机械边界。全仓 `grep -ril 'seatbelt\|landlock\|sandbox-exec\|bubblewrap'`
@@ -167,7 +167,7 @@ packages/opencode/src/server/server.ts:106
 packages/opencode/src/effect/bootstrap-runtime.ts:15
 ```
 
-Alpha 无处注入 ⇒ **C3 必须收编其中一个热文件**（`north-star-guard.sh` 的白名单
+Code Puppy 无处注入 ⇒ **C3 必须收编其中一个热文件**（`north-star-guard.sh` 的白名单
 +1，且按 ADR-029 §3 须自带 ADR）。
 
 ### 2.10 C2 会污染权限扫描

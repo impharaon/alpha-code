@@ -55,7 +55,7 @@
       </div>
       <div class="note relcard"><span class="rt">与实机现状的关系</span>
         <ul>
-          <li>实机现状 = alpha 薄外框 + 上游内瓤;上游布局迁移后 alpha 注入落空,页面视觉整体回退。本稿即「彻底摆脱注入」的终态:整页 alpha 自渲染,崩溃时进入 Alpha Recovery(REQ-090 单向门合同,明文禁止回退上游;恢复边界既定,不在本稿画)。</li>
+          <li>实机现状 = alpha 薄外框 + 上游内瓤;上游布局迁移后 alpha 注入落空,页面视觉整体回退。本稿即「彻底摆脱注入」的终态:整页 alpha 自渲染,崩溃时进入 Code Puppy Recovery(REQ-090 单向门合同,明文禁止回退上游;恢复边界既定,不在本稿画)。</li>
           <li>既定盘点里顶栏的双 header 叠加、右栏与左侧脱节两项缺陷,在本稿分别以「归并单一顶栏」「右栏四面板 alpha 化」回应。</li>
           <li>上游右栏(审查计数 / 统一拆分 / 每文件统计、文件树、终端)仅作为信息架构清单被继承 —— 能力不缺失,视觉不锚定。</li>
         </ul>
@@ -572,7 +572,7 @@
 
     <div class="subsec" id="wtop-readonly">
       <div class="label">工作区只读 · 顶栏第二枚胶囊</div>
-      <p class="lede">沙箱允许写入的项目在 Alpha 启动那一刻就定下了。之后才打开的项目打得开、读得了,一写就失败,而失败只出现在某一次工具输出里。这里把它提到项目层面:状态胶囊之后一枚暖色「只读」胶囊,悬停 / 点击说明原因与出路;首页 / 新对话页没有顶栏,同一信息落在工作区 chip 的尾标上。</p>
+      <p class="lede">沙箱允许写入的项目在 Code Puppy 启动那一刻就定下了。之后才打开的项目打得开、读得了,一写就失败,而失败只出现在某一次工具输出里。这里把它提到项目层面:状态胶囊之后一枚暖色「只读」胶囊,悬停 / 点击说明原因与出路;首页 / 新对话页没有顶栏,同一信息落在工作区 chip 的尾标上。</p>
 
       <div class="label">顶栏 · 项目只读</div>
       <div class="strip"><div class="wtop">
@@ -597,7 +597,7 @@
         <span class="vsep"></span>
         <button class="wbtn on" title="收起右栏"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></button>
       </div>
-        <div class="wpop"><b>这个项目现在写不进去</b>沙箱允许写入的项目在 Alpha 启动时就定下了;这个项目是之后打开的 —— 打得开、读得了,但助手和终端都改不了它里面的文件。重新启动 Alpha 后,它就会被算进去。<div class="fn">能正常写入的项目不会有这个标记。</div><div class="row"><button class="btn-ghost">重新启动 Alpha</button></div></div>
+        <div class="wpop"><b>这个项目现在写不进去</b>沙箱允许写入的项目在 Code Puppy 启动时就定下了;这个项目是之后打开的 —— 打得开、读得了,但助手和终端都改不了它里面的文件。重新启动 Code Puppy 后,它就会被算进去。<div class="fn">能正常写入的项目不会有这个标记。</div><div class="row"><button class="btn-ghost">重新启动 Code Puppy</button></div></div>
       </div>
       <div class="wpop-space"></div>
 
@@ -620,7 +620,7 @@
       <div class="note"><b>为什么不是 toast</b>:toast 会消失,而只读会持续到重启。用户需要的是回到这个项目时随时能看到的状态,不是一次性的提醒。</div>
       <div class="note"><b>为什么不放左栏项目行</b>:左栏列的是全部项目;只读描述的是「这个项目 vs 这次启动」的关系,只对当前工作区成立,所以挂在当前工作区的身份旁边。</div>
       <div class="note"><b>判断只能靠真写一次</b>(帧外):用路径字符串比较会在四种形状上出错(前缀相同但不是路径分段、软链进出集合、大小写不同的同一目录),所以标记只在被围住的引擎真的写失败之后才出现,而且探针必须先在可写项目上答过「可写」才算数。</div>
-      <div class="note"><b>「重新启动 Alpha」按钮</b>(帧外):这是本组件里唯一超出「只呈现」的动作。没有它,弹层只告诉用户出路却让他自己去菜单里找。owner 2026-09-10 裁决保留。</div>
+      <div class="note"><b>「重新启动 Code Puppy」按钮</b>(帧外):这是本组件里唯一超出「只呈现」的动作。没有它,弹层只告诉用户出路却让他自己去菜单里找。owner 2026-09-10 裁决保留。</div>
 
       <div class="label">文案 · 中英一对一</div>
       <table class="spec">
@@ -628,13 +628,13 @@
         <tr><td>终端脚条项(整句)</td><td>沙箱开启 · 你的部分终端配置可能不生效</td><td>Sandbox on · some of your shell config may not apply</td></tr>
         <tr><td>终端脚条项(窄)</td><td>沙箱开启</td><td>Sandbox on</td></tr>
         <tr><td>脚条悬停 · 标题</td><td>沙箱开启</td><td>Sandbox on</td></tr>
-        <tr><td>脚条悬停 · 正文</td><td>终端只能写入当前项目和 Alpha 自己的目录。你的 shell 配置里凡是要往主目录写缓存的步骤(例如补全缓存)会被拦下,而且不会报错 —— 表现通常是补全变慢或不灵。不写文件的设置(别名、提示符、PATH)照常生效。</td><td>The terminal can only write inside the current project and Alpha's own folders. Steps in your shell config that write caches to your home folder (completion caches, for example) are blocked silently — completion may feel slow or stop working. Settings that don't write files (aliases, prompt, PATH) work as usual.</td></tr>
+        <tr><td>脚条悬停 · 正文</td><td>终端只能写入当前项目和 Code Puppy 自己的目录。你的 shell 配置里凡是要往主目录写缓存的步骤(例如补全缓存)会被拦下,而且不会报错 —— 表现通常是补全变慢或不灵。不写文件的设置(别名、提示符、PATH)照常生效。</td><td>The terminal can only write inside the current project and Code Puppy's own folders. Steps in your shell config that write caches to your home folder (completion caches, for example) are blocked silently — completion may feel slow or stop working. Settings that don't write files (aliases, prompt, PATH) work as usual.</td></tr>
         <tr><td>终端空态 · 第三行</td><td>沙箱已开启 —— 终端里你自己的配置可能有一部分不生效。</td><td>Sandbox is on — some of your own shell config may not apply in here.</td></tr>
         <tr><td>顶栏胶囊 / chip 尾标</td><td>只读</td><td>Read-only</td></tr>
         <tr><td>只读弹层 · 标题</td><td>这个项目现在写不进去</td><td>This project can't be written to right now</td></tr>
-        <tr><td>只读弹层 · 正文</td><td>沙箱允许写入的项目在 Alpha 启动时就定下了;这个项目是之后打开的 —— 打得开、读得了,但助手和终端都改不了它里面的文件。重新启动 Alpha 后,它就会被算进去。</td><td>The sandbox fixed which projects can be written to when Alpha started; this one was opened later — you can open and read it, but neither the assistant nor the terminal can change its files. Restart Alpha and it will be included.</td></tr>
+        <tr><td>只读弹层 · 正文</td><td>沙箱允许写入的项目在 Code Puppy 启动时就定下了;这个项目是之后打开的 —— 打得开、读得了,但助手和终端都改不了它里面的文件。重新启动 Code Puppy 后,它就会被算进去。</td><td>The sandbox fixed which projects can be written to when Code Puppy started; this one was opened later — you can open and read it, but neither the assistant nor the terminal can change its files. Restart Code Puppy and it will be included.</td></tr>
         <tr><td>只读弹层 · 脚注</td><td>能正常写入的项目不会有这个标记。</td><td>Projects that can be written to normally don't show this badge.</td></tr>
-        <tr><td>只读弹层 · 动作</td><td>重新启动 Alpha</td><td>Restart Alpha</td></tr>
+        <tr><td>只读弹层 · 动作</td><td>重新启动 Code Puppy</td><td>Restart Code Puppy</td></tr>
       </table>
     </div>
 
@@ -871,7 +871,7 @@
               <div><span class="host">libiao@mac</span> <span class="dir">~/app/workspace</span></div>
               <div><span class="pmt">$</span> <span class="tm-cursor"></span></div>
             </div>
-            <div class="tm-tip"><b>沙箱开启</b>终端只能写入当前项目和 Alpha 自己的目录。你的 shell 配置里凡是要往主目录写缓存的步骤(例如补全缓存)会被拦下,而且不会报错 —— 表现通常是补全变慢或不灵。不写文件的设置(别名、提示符、PATH)照常生效。</div>
+            <div class="tm-tip"><b>沙箱开启</b>终端只能写入当前项目和 Code Puppy 自己的目录。你的 shell 配置里凡是要往主目录写缓存的步骤(例如补全缓存)会被拦下,而且不会报错 —— 表现通常是补全变慢或不灵。不写文件的设置(别名、提示符、PATH)照常生效。</div>
             <div class="tm-foot"><span class="st idle"><i></i>空闲</span><span>·</span><span>zsh</span><span>·</span><span class="tm-sbx on"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.5-3 8-7 9-4-1-7-4.5-7-9V6z"/></svg>沙箱开启 · 你的部分终端配置可能不生效</span><span style="margin-left:auto">80×24</span></div>
           </div>
         </div>
@@ -1070,7 +1070,7 @@
       <tr><td>终端脚条第三项</td><td>沙箱装上时常驻:不可关闭、不计数、不弹窗;面板窄于 360px 只显「沙箱开启」,整句由 <code>title</code> 承接;悬停层非模态 —— 不拦输入、不夺焦点,移开即收。沙箱没装上时该项不存在。</td></tr>
       <tr><td>工作区只读状态</td><td>胶囊 <code>role=status</code>,可达名称即「只读」;弹层 <code>aria-describedby</code> 指回胶囊,悬停与点击都能打开,Esc 关闭并把焦点还给胶囊。只在被围栏的引擎真写失败之后出现,探针未答与未知一律不呈现。</td></tr>
       <tr><td>动效</td><td>状态呼吸 / 进度扫线 / 流式光标均为装饰性,reduced-motion 下全部静止;面板开合无滑动动画,直接切换。</td></tr>
-      <tr><td>降级</td><td>整页任何 alpha 渲染崩溃 → 进入 <b>Alpha Recovery</b>(REQ-090 单向门合同:恢复边界呈现 Alpha 自持的恢复面,<b>明文禁止回退上游整页</b>;既定合同,不在本稿画),且不影响其他 surface。</td></tr>
+      <tr><td>降级</td><td>整页任何 alpha 渲染崩溃 → 进入 <b>Code Puppy Recovery</b>(REQ-090 单向门合同:恢复边界呈现 Code Puppy 自持的恢复面,<b>明文禁止回退上游整页</b>;既定合同,不在本稿画),且不影响其他 surface。</td></tr>
     </table>
     <p class="cap" style="margin-top:16px">评审稿 · 基线 = shell-sidebar / conversation-timeline / composer / artifact-workbench 四份现行稿 + 产物链接行增量稿。帧内数据均为演示值。本地打开即可交互(主题切换 / 展开折叠 / tab 切换)。</p>
   </section>

@@ -80,7 +80,7 @@ export function supportTierLabelKey(tier: SupportTier): I18nKey {
   return SUPPORT_TIER_KEYS[tier]
 }
 
-// ── 详情页:所有权段(AC1 锚:作者与甄选分开陈述,永不塌缩成「Alpha 出品」)────────────────────
+// ── 详情页:所有权段(AC1 锚:作者与甄选分开陈述,永不塌缩成「Code Puppy 出品」)────────────────────
 
 export function ownershipRows(ownership: OwnershipDims): PresentRow[] {
   return [

@@ -11,7 +11,7 @@
 export type CodePuppyEndpoints = { web: string; platform: string; account: string; cloud: string; mcp?: string }
 
 /**
- * Alpha-owned V2 config marker. It has no models and an empty env integration, so it is never an
+ * Code Puppy-owned V2 config marker. It has no models and an empty env integration, so it is never an
  * available provider. The mechanically derived governed ModelsDev base materializes it in the same
  * early batch as the exact provider/model identities; the ordinary ConfigProvider projection keeps
  * the same marker for the conservative user/file-provider fallback. Renderer model consumers can

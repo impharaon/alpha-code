@@ -14,12 +14,12 @@ How alpha surfaces attach to an app whose shell it inherited from opencode.
 alpha-code is a fork: `packages/ui-mac` (the Electron app) is codepuppy-authored and
 mounts upstream `@opencode-ai/app`, then replaces or overlays pieces. The
 upstream leaf remains reachable only as a **boot-time escape valve** (env/pin →
-`legacy`); there is no runtime fallback — a crashed alpha surface enters Alpha
+`legacy`); there is no runtime fallback — a crashed alpha surface enters Code Puppy
 Recovery, never the upstream leaf.
 
 ## Surface seam (replace an upstream leaf)
 
-Alpha swaps an upstream page through the typed `AppSurfaces` seam
+Code Puppy swaps an upstream page through the typed `AppSurfaces` seam
 (`home` / `newSession` / `session`), whose ids live in
 `packages/ui-mac/src/shared/codepuppy-surfaces.ts`:
 
@@ -29,7 +29,7 @@ Alpha swaps an upstream page through the typed `AppSurfaces` seam
   (REQ-089 hard cut; the ratchet in `shared/route-authority-ratchet.test.ts`
   keeps the flag machine from growing back).
 - A seam surface is a real alpha component; if it throws,
-  `surface-boundary.tsx` records the crash once and admits **Alpha Recovery**
+  `surface-boundary.tsx` records the crash once and admits **Code Puppy Recovery**
   (REQ-090 one-way door) — the failed region never reloads and never swaps to
   the legacy leaf.
 
@@ -61,9 +61,9 @@ system directly.
 
 ## Recovery boundary
 
-Alpha surfaces are wrapped so a fatal error degrades instead of white-screening:
+Code Puppy surfaces are wrapped so a fatal error degrades instead of white-screening:
 `codepuppy-ui/surface-boundary.tsx` admits the crash once (stable crashID → one
-process-local incident) into **Alpha Recovery** — no reload, no legacy swap —
+process-local incident) into **Code Puppy Recovery** — no reload, no legacy swap —
 and `main/db-safety-boot.ts` handles Electron-side boot recovery / DB safety.
 Design every alpha surface assuming it may be the thing that failed — provide an
 empty state, a loading state, and a degraded path.
@@ -72,6 +72,6 @@ empty state, a loading state, and a degraded path.
 
 A surface is replaced by landing its alpha leaf as the route's single
 composition. There is no release flag and no boot-time escape valve: a fatal
-render goes to Alpha Recovery, never to an upstream leaf. Sequencing lives in
+render goes to Code Puppy Recovery, never to an upstream leaf. Sequencing lives in
 Issues, and `../PAGE-MAP.md` marks a surface `partial` while its replacement is
 in flight.

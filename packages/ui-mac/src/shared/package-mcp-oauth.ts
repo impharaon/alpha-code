@@ -7,7 +7,7 @@ import type {
  * MCP OAuth prerequisite v1 — the frozen shapes for the remote-MCP authorization kind whose
  * protocol authority is the *engine's* OAuth stack (`packages/opencode/src/mcp/**`), not a handler
  * compiled into this App. Its sibling is `package-codepuppy-connection.ts`; the two are deliberately
- * separate files because their record owners differ (§2.6 of the REQ-128 baseline): an Alpha
+ * separate files because their record owners differ (§2.6 of the REQ-128 baseline): a Code Puppy
  * Connection's durable record is main-owned, an MCP OAuth credential's durable record is the
  * engine's `mcp-auth.json` token store (`0600 + flock`, entries bound to `serverUrl`).
  *

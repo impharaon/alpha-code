@@ -55,7 +55,7 @@ body[data-codepuppy-sidebar] .relative.bg-v2-background-bg-deep.flex-1 {
 }
 
 /* Hide opencode's floating bottom-right "?" help button (dev-channel, components/help-button.tsx).
-   Alpha's account menu owns the Help & Feedback entry. */
+   Code Puppy's account menu owns the Help & Feedback entry. */
 body[data-codepuppy-sidebar] .fixed.bottom-4.right-4:has(button[aria-label="Help"]),
 body[data-codepuppy-sidebar] button[aria-label="Help"] {
   display: none !important;

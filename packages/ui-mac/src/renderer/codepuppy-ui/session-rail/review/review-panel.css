@@ -1,4 +1,4 @@
-/* REQ-125 C2 — review panel. Alpha-owned form: --a-* tokens only (I5); both
+/* REQ-125 C2 — review panel. Code Puppy-owned form: --a-* tokens only (I5); both
  * themes come from the token layer; focus rings come from the shared
  * `.a-ui :focus-visible` contract in base.css. */
 @import "../../tokens.css";

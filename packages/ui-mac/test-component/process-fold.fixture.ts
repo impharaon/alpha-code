@@ -1,7 +1,7 @@
 // `#1473` 夹具:一次真实形态的 18 步研究回合(design 2026-10-10-timeline-process-fold §1 的样本)。
 //
 // 形态对照本机会话库里那次回合:一轮用户提问 → 6 条助手消息(引擎每一次 LLM 调用一条),
-// 每条带 step-start / step-finish part;思考 6 段,云端网页搜索 16 次(第一方 Alpha Cloud identity
+// 每条带 step-start / step-finish part;思考 6 段,云端网页搜索 16 次(第一方 Code Puppy Cloud identity
 // + 持久化 alpha-cloud authority),打开网页 2 次都失败(本机 webfetch,Transport error),
 // 最后一条消息写回答。工具之间没有过渡话。
 //

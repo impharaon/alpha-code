@@ -511,7 +511,7 @@ export function deriveMcpConfig(
 // ── deps(注入面;ext-ipc 接真机器,测试接假)────────────────────────────────────────────────
 
 export type ConfigOutcome = { ok: true } | { ok: false; reason: string }
-/** REQ-105(#319):MCP 写盘策略闸口的裁决 —— 放行 Alpha Office 连接器时连带交出**实际执行物**
+/** REQ-105(#319):MCP 写盘策略闸口的裁决 —— 放行 Code Puppy Office 连接器时连带交出**实际执行物**
  *  的内容地址。其余 MCP 恒缺省:缺省 = 「未记录」,绝不等于「已审计」。 */
 export type McpWritePolicyOutcome = { ok: true; artifactDigest?: string } | { ok: false; reason: string }
 export type FsOutcome = { ok: true; files?: string[] } | { ok: false; reason: string }
@@ -522,9 +522,9 @@ export type TargetArg = { scope: "global" } | { scope: "project"; projectDir: st
 
 export type PlannerInstallers = {
   /** #378(Codex 裁决 Q2):MCP 写盘策略闸口。REQ-135 retired package denial and REQ-133
-   *  Alpha Office resource/workspace canonicalization share this main-owned seam. It may update the
+   *  Code Puppy Office resource/workspace canonicalization share this main-owned seam. It may update the
    *  server in place; single-install transactions and uncurated writes consume the same verdict.
-   *  REQ-105(#319):放行 Alpha Office 连接器时,裁决连带交出 `artifactDigest` —— 本次安装将要
+   *  REQ-105(#319):放行 Code Puppy Office 连接器时,裁决连带交出 `artifactDigest` —— 本次安装将要
    *  执行的随包字节的内容地址。planner 原样落账,绝不自算、不推断。 */
   applyMcpWritePolicy(name: string, server: Record<string, unknown>): McpWritePolicyOutcome
   /** #378(Codex 裁决 Q1):版本化密钥原语 —— 引用纯推导(零写盘,planner 先构造 durable config)
@@ -553,7 +553,7 @@ export type PlannerInstallers = {
   /** #346:严格密钥吊销 —— 失败可观察(journal 据此保持非终态);目录缺失 = 幂等成功。
    *  整 server 目录删除,天然覆盖 #378 的全部版本目录 + legacy flat。 */
   removeMcpSecretsStrict(name: string): { ok: true } | { ok: false; reason: string }
-  /** `#704`:卸载时**只释放**这个组件对 Alpha Connection 的绑定,绝不 disconnect/revoke。
+  /** `#704`:卸载时**只释放**这个组件对 Code Puppy Connection 的绑定,绝不 disconnect/revoke。
    *  连接是共享的、且真实副作用在 provider 那边,所以「最后一个绑定消失」不是删除条件 ——
    *  它只是「当前没有已安装的包在用」。释放失败不阻断卸载(陈旧绑定只会让连接被多留一会儿,
    *  那是安全的方向);删除只有显式 disconnect 一条路。 */
@@ -935,7 +935,7 @@ async function classifyBundleChild(
     // 「{workspace} 留字面量写盘、由引擎在 spawn 时按当前 instance 目录替换」之后,
     // deriveMcpConfig(spec, {}) 对 {workspace} 占位不再需要任何 grant、也不会失败——
     // 这条早退分支从此再没有实际拦截作用之外的东西可拦,只是把本该走到
-    // applyMcpWritePolicy(单装同款策略闸,已经正确处理 {workspace} 字面量与 Alpha Office
+    // applyMcpWritePolicy(单装同款策略闸,已经正确处理 {workspace} 字面量与 Code Puppy Office
     // 校验)的合法安装,挡在了一句过期文案后面。四条随包套件全部经这条路被拒
     // (jinjunnn/alpha-code#823)。
     if ((spec.requiredEnvVars?.length ?? 0) > 0)
@@ -1191,7 +1191,7 @@ export async function installCatalog(rawIntent: unknown, deps: PlannerDeps): Pro
 
   // ADR-040(`#825` 第 2/3/4 条):catalog 的 plugin 条目 —— npm 钉版、vendored 载荷、以及它们的
   // 更新链(原子置换)—— 一律**具名拒绝**,而且拒在这里:资产下载、CAS 提升、事务开启、账本探测
-  // 之前。plugin 条目意味着把第三方 JS 写进引擎的 `plugin[]` 以同等权限执行,那不再是 Alpha 提供的
+  // 之前。plugin 条目意味着把第三方 JS 写进引擎的 `plugin[]` 以同等权限执行,那不再是 Code Puppy 提供的
   // 能力。静默跳过是票面明令禁止的第三个选项 —— 用户点了「安装」就必须听见「为什么没装」。
   if (entry.type === "plugin")
     return {
@@ -1340,7 +1340,7 @@ export async function installCatalog(rawIntent: unknown, deps: PlannerDeps): Pro
       refs = sub.substituted
     }
     // #378(Codex 裁决 Q2):main-owned write policy checks the retired-package deny and
-    // canonicalizes REQ-133 Alpha Office paths before the durable config action is built.
+    // canonicalizes REQ-133 Code Puppy Office paths before the durable config action is built.
     const pol = deps.installers.applyMcpWritePolicy(entry.name, durable)
     if (!pol.ok) {
       if (verId) deps.installers.removeMcpSecretVersionDir(entry.name, verId) // 已认领的空目录随拒绝清理
@@ -2675,7 +2675,7 @@ export async function uninstallByKey(rawIntent: unknown, deps: PlannerDeps): Pro
         const grants = removeInstallGrants(root, [`mcp--${intent.name}`])
         if (!grants.ok) throw new Error(grants.reason)
         // #704:这里是最容易顺手写错的一行 —— 密钥与授权账都是**本次安装拥有**的东西,清掉是对的;
-        // Alpha Connection 不是。它是共享的、跨安装的,真实撤销发生在 provider 侧。所以这里
+        // Code Puppy Connection 不是。它是共享的、跨安装的,真实撤销发生在 provider 侧。所以这里
         // **只释放绑定**,而且**不抛错**:释放失败最多让连接看起来还被人用着(保守方向),
         // 而抛错会把一个成功的卸载卡在 uninstalling 上。
         deps.installers.releaseCodePuppyConnectionBindings(`mcp:${intent.name}`)
@@ -3369,6 +3369,8 @@ export type BootReconcileOutcome = {
    *  codepuppy.jsonc plugin[] 落盘移除**(config 写失败/读不出/非法 jsonc)、**账本损坏/不可读**(注入会拿到
    *  空 records,Codex r12 B2)、skills 陈旧允许集入此列。enable 失败只记 warning(功能缺失非安全洞)。 */
   enforcementGap?: string[]
+  /** The session-grant oracle was unavailable; other gaps still independently block boot. */
+  curationUnknown?: boolean
 }
 
 /** 主进程启动 reconcile(引擎首次 fork 读 config 之前调用)。r11 pivot:mcp/agent 的 disable 由 sidecar
@@ -3394,8 +3396,9 @@ export function reconcileDesiredStateAtBoot(
   const warnings: string[] = []
   const applied: string[] = []
   const gap: string[] = []
+  let curationUnknown = false
   const done = (o: Omit<BootReconcileOutcome, "enforcementGap">): BootReconcileOutcome =>
-    gap.length > 0 ? { ...o, enforcementGap: gap } : o
+    gap.length > 0 ? { ...o, enforcementGap: gap, curationUnknown } : o
   const held = tryAcquireBundleLock(root, { txId: `boot-reconcile-${randomUUID()}` })
   if (!held.ok) {
     // Codex r7 B2:启动期(sidecar 未起、IPC 未接)本不该有其他事务持锁 —— 拿不到锁 = 锁文件 EACCES/EIO
@@ -3419,10 +3422,12 @@ export function reconcileDesiredStateAtBoot(
       const catalogEnabled = pre.records.filter(
         (r) => r.scope.kind === "global" && r.origin === "catalog" && r.desiredState !== "disabled" && enforceableKinds.has(r.kind),
       )
-      if (!oracle.ok && catalogEnabled.length > 0)
+      if (!oracle.ok && catalogEnabled.length > 0) {
+        curationUnknown = true
         gap.push(
           `session-grant determination unavailable (${oracle.reason}) while ${catalogEnabled.length} catalog extension(s) are enabled — cannot prove none is session-grant; blocking sidecar (fail closed)`,
         )
+      }
       const ids = oracle.ok ? oracle.ids : oracle.partialIds
       for (const r of catalogEnabled) {
         if (!ids.has(r.id)) continue

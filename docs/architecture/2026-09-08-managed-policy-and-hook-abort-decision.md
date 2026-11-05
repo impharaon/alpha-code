@@ -67,7 +67,7 @@ $ python3 -c "import json;d=json.load(open('alpha-package-envelope-v1.schema.jso
 但 [ADR-040](../../.claude/rules/adrs/ADR-040-extension-package-taxonomy.md) 的
 **2026-08-03 owner 补充裁决**把判据①明确收紧过,原文:
 
-> 它问的**不是**「要不要执行第三方代码」。`hooks`(Alpha 起的子进程、边界由我们定)
+> 它问的**不是**「要不要执行第三方代码」。`hooks`(Code Puppy 起的子进程、边界由我们定)
 > **不落在这一问里** —— owner 已裁决后续支持它,届时它按判据③走「新种类」的路。
 
 ⇒ **「ADR-040 挡住了托管 hook」这个前提本身要修正。** 挡住的是
@@ -248,8 +248,8 @@ cap 命中 ⇒ disabled,任何下层(用户 enabled、会话 always/approved)都
 
 1. **目录名是上游品牌。** `systemManagedPolicyDir()` 与上游 `config/managed.ts` 一样写死
    `opencode` / `ai.opencode.managed`,而产品面早已改名 code-puppy(REQ-139 `#1191`)。
-   ⇒ 团队管理员要给 Alpha 下策略,写的是一个叫 `opencode` 的目录;
-   反过来,一份为 opencode 部署的 MDM 描述文件**也会作用到 Alpha**。
+   ⇒ 团队管理员要给 Code Puppy 下策略,写的是一个叫 `opencode` 的目录;
+   反过来,一份为 opencode 部署的 MDM 描述文件**也会作用到 Code Puppy**。
    两者都需要 root,不在用户威胁模型内,但**做团队交付时这是要说清楚的一句话**。
    本机实测:`/Library/Application Support/opencode` 与 `/Library/Managed Preferences/`
    **均不存在**(`ls` 各一次,No such file or directory)⇒ 这条通道在开发机上是**零占用**的。

@@ -79,7 +79,7 @@ export function makeUncuratedInstallBodies(deps: UncuratedBodyDeps) {
         }
       }
     }
-    // MCP write-policy entrypoint: REQ-135 retired connectors are refused and REQ-133 Alpha Office
+    // MCP write-policy entrypoint: REQ-135 retired connectors are refused and REQ-133 Code Puppy Office
     // commands are validated before durable config is written.
     const r = persistMcpWithPolicy(name, server, undefined)
     if (!r.ok) {

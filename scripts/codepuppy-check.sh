@@ -44,7 +44,7 @@ CI_STEPS=(
   "typecheck|typecheck opencode (alpha 自有判据住在上游包里)|MIRRORED"
   "typecheck|typecheck core (alpha 自有判据住在上游包里)|MIRRORED"
   "typecheck|typecheck schema (alpha 自有判据住在上游包里)|MIRRORED"
-  "test|verify immutable Alpha contract vendor lock|SUPERSET:开发机有兄弟仓 ⇒ 跑的是 provenance 已验档,CI 是降级档(#769)"
+  "test|verify immutable Code Puppy contract vendor lock|SUPERSET:开发机有兄弟仓 ⇒ 跑的是 provenance 已验档,CI 是降级档(#769)"
   "test|bun test (contracts consumer fixtures)|MIRRORED"
   "test|bun test (ext)|MIRRORED"
   "test|bun test (ui-mac)|MIRRORED"
@@ -289,7 +289,7 @@ unset byok_catalog_rc
 echo "▶ [12/14] alpha 注入模型上下文的库存(REQ-157 #1284/#1296/#1299:ext 四处 + ui-mac 两份 instruction 文件 + ui-mac 三个 agent 的 prompt/description,每段实测字节 / 上限,与快照逐字节比对)"
 # 这一步在 codepuppy-ci 里**没有对应的独立步**(判据本身 —— 快照测试与咽喉测试 —— 已在 `bun test (ext)`
 # 与 `bun test (ui-mac)` 里跑,那两步是 MIRRORED 的),所以它不进 CI_STEPS。它存在的理由是 AC3 的后半句
-# 「并随本地闸打印」:把「Alpha 今天往每次对话里塞了什么、各多大、上限多少」打在每次 push 前的屏幕上,
+# 「并随本地闸打印」:把「Code Puppy 今天往每次对话里塞了什么、各多大、上限多少」打在每次 push 前的屏幕上,
 # 让「每加一段说明都在无声地吃掉用户的对话长度」这件事**有人看得见**。
 #
 # 库存是**一份**:packages/ext 的四处(`#1295`)、ui-mac 主进程经 cfg.instructions 写的

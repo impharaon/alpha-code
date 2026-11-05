@@ -48,7 +48,7 @@ saved-rule)另见 [`session-permission.md`](session-permission.md),两者不共�
    `.quarantined-<ts>` 备份,回到批准默认)。
 3. **默认**:按四类;新发现工具吃默认。
 
-Binding digest 来源(#724 §5):Alpha Cloud 复用 verified `authority.evidenceDigest`;
+Binding digest 来源(#724 §5):Code Puppy Cloud 复用 verified `authority.evidenceDigest`;
 第三方 MCP 用 `mcpBindingDigest`(去秘密后的 definition:remote 取 `url`、local 取
 `command+cwd`;headers / environment / oauth / enabled / timeout 不参与);plugin 经
 `deriveBindingDigest` 对安装 receipt / manifest / loader generation 派生(由 #1129 供值)。

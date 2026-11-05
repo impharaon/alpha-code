@@ -13,7 +13,7 @@ import type { Plugin } from "vite"
 
 const PATCHES: Record<string, ReadonlyArray<readonly [string, string]>> = {
   // The new v2 composer moved image preview opening out of prompt-input.tsx and dropped the explicit
-  // hosted-dialog option. ui-mac supplies the canonical Alpha Dialog host, so keep this active v2
+  // hosted-dialog option. ui-mac supplies the canonical Code Puppy Dialog host, so keep this active v2
   // entrypoint on the same host as the legacy composer without modifying the frozen app source.
   "app/src/components/prompt-input-v2.tsx": [
     [

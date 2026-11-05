@@ -62,7 +62,7 @@
 | 3 | typecheck | contracts-consumer | 真结果 exit 0 | 有 | 有 |
 | 4 | typecheck | ext | 真结果 exit 0 | 有 | 有 |
 | 5 | typecheck | ui-mac | 真结果 exit 0 | 有 | 有 |
-| 6 | test | verify immutable Alpha contract vendor lock | **降级档**,自陈 `PROVENANCE NOT VERIFIED this run`(`#769`) | 有(开发机有兄弟仓 ⇒ 已验档,是超集) | 同 |
+| 6 | test | verify immutable Code Puppy contract vendor lock | **降级档**,自陈 `PROVENANCE NOT VERIFIED this run`(`#769`) | 有(开发机有兄弟仓 ⇒ 已验档,是超集) | 同 |
 | 7 | test | bun test (contracts consumer fixtures) 下界 15 | 真结果 | **降级**:裸 `bun test`,无下界 | 走 `bun-test-floor.sh 15` |
 | 8 | test | bun test (ext) 下界 100 | 真结果 | **降级**:同上 | 走 `bun-test-floor.sh 100` |
 | 9 | test | bun test (ui-mac) 下界 3000 | **红**(见 §3.2) | **降级**:同上 | 走 `bun-test-floor.sh 3000` |

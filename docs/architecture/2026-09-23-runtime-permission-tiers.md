@@ -31,7 +31,7 @@ UI 只暴露两档(`codepuppy-composer.tsx:292-309`)—— 但**缺的那一档�
 
 - 今天默认档**仍然会问**的只有三类(实测 §5.1 / §5.2):`external_directory`(工作区之外的路径)、
   `doom_loop`、`read` 命中 `*.env` / `*.env.*`;外加文档轴对**非 builtin** 工具(第三方 MCP /
-  插件 / Alpha Cloud)的默认 `ask`(`packages/schema/src/codepuppy-tool-policy.ts:157-159`)。
+  插件 / Code Puppy Cloud)的默认 `ask`(`packages/schema/src/codepuppy-tool-policy.ts:157-159`)。
 - 因此「完全访问 = 所有工具一律 allow」相对今天的默认档,**净增量只有上面这几类**;
   若定义成「除某几类仍要问」,则与今天的默认档**可能一格差别都没有**。
 
@@ -125,7 +125,7 @@ ASK alpha-readonly bash "ls" -> PermissionDeniedError: …                      
 1. 上表是**出厂默认**(用户 `cfg.permission` 为空、Settings→工具 无记录、无 session 规则)。
    用户在 `codepuppy.jsonc` / `opencode.jsonc` 写了 `permission`,或在 Settings→工具
    (`settings.tsx:738` → `settings-tools.tsx`)把某个工具设成「每次询问」,就会问。
-2. **非 builtin 的工具默认就问**:第三方 MCP / 插件 / Alpha Cloud 三类的文档轴默认是 `ask`
+2. **非 builtin 的工具默认就问**:第三方 MCP / 插件 / Code Puppy Cloud 三类的文档轴默认是 `ask`
    (`schema/codepuppy-tool-policy.ts:157-159`;已有生产断言
    `packages/opencode/test/permission/codepuppy-tool-policy.test.ts:83-86`)。
 3. 今天默认档**仍然会问**的三类:`external_directory`(工作区之外)、`doom_loop`、`read` 命中

@@ -109,7 +109,7 @@ export function agentFileProbe(root: string): HealthProbe {
     if (errors.length > 0) return { healthy: false, reason: `agent "${name}": live config is not valid jsonc` }
     const agentMap = isObj(cfg) ? cfg.agent : undefined
     const leaf = isObj(agentMap) ? agentMap[name] : undefined
-    // #395:disable 是 Alpha 管理的启停投影叶(set-state/默认关写入),不来自 md —— 比对前剥离,
+    // #395:disable 是 Code Puppy 管理的启停投影叶(set-state/默认关写入),不来自 md —— 比对前剥离,
     // 其余任何键背离仍如实判 fork(禁启用面被 md 内容偷改)。
     const leafForCompare = isObj(leaf) && typeof leaf.disable === "boolean" ? Object.fromEntries(Object.entries(leaf).filter(([k]) => k !== "disable")) : leaf
     if (!deepEqual(leafForCompare, parsed.entry))

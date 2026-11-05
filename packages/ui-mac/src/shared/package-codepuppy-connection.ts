@@ -4,7 +4,7 @@ import type {
 } from "./host-extension-package-contract/decoder"
 
 /**
- * Registered Alpha Connection v1 — the frozen shapes for the *other* remote-MCP authorization kind,
+ * Registered Code Puppy Connection v1 — the frozen shapes for the *other* remote-MCP authorization kind,
  * the one whose protocol authority is a handler compiled into this App rather than the engine's
  * OAuth stack.
  *

@@ -1,5 +1,5 @@
 ---
-title: Alpha 注入模型上下文的登记簿与咽喉(REQ-157)
+title: Code Puppy 注入模型上下文的登记簿与咽喉(REQ-157)
 kind: architecture
 status: active
 owners:
@@ -8,7 +8,7 @@ last_reviewed: 2026-09-24
 review_after: 2027-03-24
 ---
 
-# Alpha 注入模型上下文的登记簿与咽喉(REQ-157)
+# Code Puppy 注入模型上下文的登记簿与咽喉(REQ-157)
 
 来源:[`alpha-code#1284`](https://github.com/jinjunnn/alpha-code/issues/1284)。判据本体:
 [`packages/ext/src/context-injection.ts`](../../packages/ext/src/context-injection.ts) 与
@@ -278,5 +278,5 @@ prompt 多一字节 / 串格、动词槽塞字(agent mode / permission.edit / �
 
 **不判的**(如实):`materializeV2EngineConfig` 写给 picker 的 v2 目录(`<userData>/codepuppy-engine-config/opencode.jsonc` /
 `models.json`)是同一对象的投影(`$schema` / `model` / `provider` 剥掉 apiKey)外加固定的 readiness marker
-(`name: "Alpha catalog readiness marker"`、`release_date: "1970-01-01"`),只供 `/api/model` 列目录,不进模型上下文。
+(`name: "Code Puppy catalog readiness marker"`、`release_date: "1970-01-01"`),只供 `/api/model` 列目录,不进模型上下文。
 `codepuppy.jsonc` 文件通道(`OPENCODE_CONFIG`)是用户 / ext 安装面写的,不是 ui-mac 主进程往对话里塞的字。

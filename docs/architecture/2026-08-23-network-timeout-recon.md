@@ -155,7 +155,7 @@ req      +11,753 ms       req_aborted  +21,755 ms
 
 | 形态 | 依据 | 实测墙钟 | 服务端请求数 | 返回 |
 | --- | --- | --- | --- | --- |
-| Alpha 桌面（默认） | `packages/ui-mac/src/main/server.ts:227` 把 `OPENCODE_DISABLE_MODELS_FETCH` 默认置 `"1"` | **39 ms** | **0** | `{}` |
+| Code Puppy 桌面（默认） | `packages/ui-mac/src/main/server.ts:227` 把 `OPENCODE_DISABLE_MODELS_FETCH` 默认置 `"1"` | **39 ms** | **0** | `{}` |
 | 编译产物带快照 | `packages/opencode/script/build.ts:195` 把 `OPENCODE_MODELS_DEV` define 进二进制 | **28 ms** | **0** | `keys=snapshotProvider` |
 
 第一行的「0 次请求」是**代码级保证 + 实测**：`OPENCODE_DISABLE_MODELS_FETCH`
@@ -294,7 +294,7 @@ req_aborted  id=1  /hang/probe-node   rel=+301,507 ms
 `skill.list` 与提示词组装会阻塞约 15 分钟（每进程首次；`skill.ts:109` 的
 `cache` Map 之后不再重复付）。
 
-**但 Alpha 自己不产生这种配置**：`engine-config-truth.ts:34-45` 与
+**但 Code Puppy 自己不产生这种配置**：`engine-config-truth.ts:34-45` 与
 `factory-skills.ts` 只往 `skills.paths` 写**绝对本地目录**；
 全仓 `grep -rna 'type: "url"' --include='*.ts'` 在非测试代码里共 3 处命中，
 其中只有 `config/plugin/skill.ts:36` 是技能源的构造点，
@@ -322,8 +322,8 @@ req_aborted  id=1  /hang/probe-node   rel=+301,507 ms
 
 ## 7. 未验证 / 残余风险
 
-- **未验证：Electron utilityProcess（= Alpha 出货引擎）里的 900 秒。**
-  §3 的四个 `pull()` 样本全部在 **bun 1.3.14** 下跑，而 Alpha 桌面的引擎是
+- **未验证：Electron utilityProcess（= Code Puppy 出货引擎）里的 900 秒。**
+  §3 的四个 `pull()` 样本全部在 **bun 1.3.14** 下跑，而 Code Puppy 桌面的引擎是
   `utilityProcess.fork(sidecar.js)`（`packages/ui-mac/src/main/server.ts:290`），
   跑的是 **Electron 的 Node**（`sidecar.ts` 顶部注释自述 "the packaged Electron-Node
   sidecar"）。已做的对齐只有两条：裸 node v22.22.3 的单跳天花板实测 301,448 ms（§4），

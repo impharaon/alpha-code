@@ -5,7 +5,7 @@
 // defers the ModelsDevPlugin catalog commit until the later config/provider/variant
 // plugins finish, so the renderer's readiness marker cannot become visible early even
 // when the generated models.dev base is already complete. ADR-005 forbids editing the
-// upstream source, so Alpha moves that one generated registration in the gitignored
+// upstream source, so Code Puppy moves that one generated registration in the gitignored
 // embedded-server bundle immediately after build-node.
 //
 // This patch is deliberately strict. Generated-name suffixes may change, but the target

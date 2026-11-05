@@ -43,7 +43,7 @@ const shouldInjectCsp = () => app.isPackaged && cspPlatformEligible() && process
 // 暴露写入口,renderer/扩展代码结构上无法自行注册。当前没有任何调用方往里 register(内嵌
 // sidecar 与 WSL 远端 sidecar 今天都只用 127.0.0.1 回环地址,已被 isLoopbackUrl 覆盖),留空
 // 即是默认拒:win32 上未注册的非回环 origin 不再拿到 ACAO。将来若出现需要放宽的非回环
-// Alpha 服务(例如真正的 WSL 远端地址),由该服务自己的启动/健康检查/退出路径调用
+// Code Puppy 服务(例如真正的 WSL 远端地址),由该服务自己的启动/健康检查/退出路径调用
 // registry.register/revoke,不得走 IPC 让 renderer 决定放行谁。
 const codepuppyOriginRegistry = createCodePuppyOriginRegistry()
 

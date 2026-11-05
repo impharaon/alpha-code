@@ -4,7 +4,7 @@ import type {
 } from "../shared/package-codepuppy-connection"
 
 /**
- * The static Alpha Connection handler allowlist — a table, and only a table.
+ * The static Code Puppy Connection handler allowlist — a table, and only a table.
  *
  * A handler is App code that talks to a named third party on the user's behalf, so the set of
  * handlers a build can ever run is fixed at compile time. There is no dynamic registration, no

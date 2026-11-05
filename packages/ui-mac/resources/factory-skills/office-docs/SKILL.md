@@ -10,7 +10,7 @@ You help the user produce and read real office files. All of it runs locally.
 
 ## Always local
 
-- **Create, read or edit Word/Excel/PowerPoint/PDF with Alpha's four first-party local stdio MCP
+- **Create, read or edit Word/Excel/PowerPoint/PDF with Code Puppy's four first-party local stdio MCP
   connectors below** — `mcp:codepuppy-word`, `mcp:codepuppy-excel`, `mcp:codepuppy-powerpoint` and
   `mcp:codepuppy-pdf`. They write the file straight into the project directory (see "Output
   location"); the file stays on this machine, with no cloud charge.
@@ -24,7 +24,7 @@ You help the user produce and read real office files. All of it runs locally.
 > Security note: the old community `mcp:word` and `mcp:powerpoint` connectors remain archived and
 > unsupported; do not recommend or relabel them. The separate community `mcp:excel` /
 > `excel-mcp-server` connector is retired and is not an install option. The primary cards are the
-> distinct Alpha-authored ids below. They run over stdio, accept only absolute paths inside the
+> distinct Code Puppy-authored ids below. They run over stdio, accept only absolute paths inside the
 > granted workspace, and do not expose host, port, HTTP, or SSE modes.
 
 ## Which tool for which job
@@ -37,15 +37,15 @@ You help the user produce and read real office files. All of it runs locally.
 | **Read/write PDF text pages** | `mcp:codepuppy-pdf` (`read_pdf`, `write_pdf`) | `pypdf` + `reportlab`; replace/generate or append text pages, not layout design |
 | **Broad read/conversion** | markitdown (`convert_to_markdown`) | optional secondary path for formats outside the four focused tools |
 
-All four Alpha connectors run on a Python runtime and pinned libraries that ship inside Code Puppy;
+All four Code Puppy connectors run on a Python runtime and pinned libraries that ship inside Code Puppy;
 they need no Microsoft Office installation and nothing else to install. Hub Excel means `mcp:codepuppy-excel` only. Do not install, recommend, or fall back
-to the retired community `excel-mcp-server`, and never present it as Alpha-authored.
+to the retired community `excel-mcp-server`, and never present it as Code Puppy-authored.
 
 ## If the tool is not available
 
 Check your tool list first. If the needed tools are absent:
 
-1. Point the user to **Extension Hub (定制中心) → 连接器 → 办公** and the matching Alpha Word,
+1. Point the user to **Extension Hub (定制中心) → 连接器 → 办公** and the matching Code Puppy Word,
    Excel, PowerPoint, or PDF card.
 2. As a fallback, only with the user's consent to run code, write a local Python script using
    `python-docx`, `openpyxl`, `python-pptx`, `pypdf`, or `reportlab`.

@@ -355,7 +355,7 @@ export function createModelContract(sdk: () => Client | undefined, options: Mode
       const client = sdk()
       if (!client) throw new ModelContractError("list")
       // #857:PluginInternal boots per directory in a background fiber. A first model.list could
-      // serialize the 6,132-model models.dev intermediate state before Alpha's config transforms
+      // serialize the 6,132-model models.dev intermediate state before Code Puppy's config transforms
       // committed, then settle to 37 models on the hot path. The injected, unavailable provider
       // marker appears only in that same local batched commit, so this probe prevents the oversized
       // first response without waiting on account summary, bearer state, or any remote service.

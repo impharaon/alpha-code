@@ -1,4 +1,4 @@
-/* Alpha polish for opencode's v2 composer surface — CSS only, via stable data-component hooks.
+/* Code Puppy polish for opencode's v2 composer surface — CSS only, via stable data-component hooks.
  * The FULL alpha composer rebuild (usage ring, effort, premium toolbar, model selector) is Phase 1;
  * this interim pass lifts the existing v2 composer to alpha depth/edges so it stops reading "v2-gray".
  * COUPLING (cosmetic; re-point on upstream rename): prompt-input-v2. */

@@ -1,6 +1,6 @@
 // #857 — start the real V2 location graph before the renderer's first model request.
 //
-// The embedded server exposes an in-process app. Alpha's generated-output patch
+// The embedded server exposes an in-process app. Code Puppy's generated-output patch
 // pins the fixed Electron listener to that app's routes and memo map, so an
 // authenticated marker request starts the exact production location layer, then an
 // authenticated model request settles the renderer's exact first handler without

@@ -54,7 +54,7 @@ test("cloud MCP rejects incompatible results as visible tool errors", async () =
   const status = await fixture("cloud-job-status")
   status.value.status = "waiting"
   expect(() => validateCloudToolOutput(engineToolId("status"), { output: "", metadata: status.value })).toThrow(
-    "Alpha contract incompatible",
+    "Code Puppy contract incompatible",
   )
 })
 
@@ -76,13 +76,13 @@ test("#650 契约校验按引擎真实 id 命中(远端名单独出现时不是�
     // 引擎 id ≠ 远端名:混淆二者就是空闸门。
     expect([remote, id]).toEqual([remote, `${CLOUD_SERVER}_${remote}`])
     // 真实 id ⇒ 校验真的跑(输出面对四个工具都有契约)。
-    expect(() => validateCloudToolOutput(id, { output: "", metadata: broken })).toThrow("Alpha contract incompatible")
+    expect(() => validateCloudToolOutput(id, { output: "", metadata: broken })).toThrow("Code Puppy contract incompatible")
     // 远端名本身不是任何已注册工具的 id ⇒ 不该被当成云工具。
     expect(() => validateCloudToolOutput(remote, { output: "", metadata: broken })).not.toThrow()
   }
 
   expect(() => validateCloudToolInput(engineToolId(CLOUD_DISPATCH_REMOTE_TOOL), broken)).toThrow(
-    "Alpha contract incompatible",
+    "Code Puppy contract incompatible",
   )
   expect(() => validateCloudToolInput(CLOUD_DISPATCH_REMOTE_TOOL, broken)).not.toThrow()
 })
@@ -94,7 +94,7 @@ test("#650 server 名换了,闸跟着换 —— 不是钉在 `cloud_` 这个字�
   process.env[CLOUD_MCP_SERVER_ENV] = renamed
 
   expect(() => validateCloudToolInput(McpCatalog.toolName(renamed, CLOUD_DISPATCH_REMOTE_TOOL), broken)).toThrow(
-    "Alpha contract incompatible",
+    "Code Puppy contract incompatible",
   )
   // 旧 server 名下的 id 不再属于本次 fork 的云 server。
   expect(() => validateCloudToolInput(engineToolId(CLOUD_DISPATCH_REMOTE_TOOL), broken)).not.toThrow()

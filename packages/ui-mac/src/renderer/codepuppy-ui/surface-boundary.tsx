@@ -1,4 +1,4 @@
-// SurfaceBoundary — Alpha-only fatal surface recovery. A crash is admitted once with a stable
+// SurfaceBoundary — Code Puppy-only fatal surface recovery. A crash is admitted once with a stable
 // renderer crashID; main turns it into one process-local incident and returns only the safe #434 DTO.
 // The failed region never reloads or swaps to a legacy surface.
 import { ErrorBoundary, type JSX } from "solid-js"

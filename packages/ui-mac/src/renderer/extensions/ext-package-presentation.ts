@@ -70,7 +70,7 @@ export function packageComponentPresentation(component: CatalogPackageComponentV
 /**
  * `#698`:整包移除之后,有些部件会**留下来**。用户看到「移除成功」却发现某个技能还在,如果
  * 系统说不出为什么,那和一个 bug 没有区别。四个 token 各对一句话:还有别的扩展包在用它 /
- * 你自己也单独装过它 / 它比 Alpha 开始记录扩展包还早 / 它不由 Alpha 管理。
+ * 你自己也单独装过它 / 它比 Code Puppy 开始记录扩展包还早 / 它不由 Code Puppy 管理。
  *
  * `satisfies Record<…>` 只在**编译期**挡漏项,而 bun 直接剥类型 —— 新增一个 token 时运行期
  * 拿到的是 `undefined`,`t(undefined)` 会渲染出空白。所以真正的判据是

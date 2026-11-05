@@ -7,7 +7,7 @@
 // #898(SEC):win32 此前额外短路成 `platform === "win32" || isLoopbackUrl(url)` —— 短路项在前,
 // 意味着 win32 上**任何** URL(含恶意页面/被顶替扩展代码指向的任意跨域站点)都会拿到
 // `Access-Control-Allow-Origin: *`,loopback 判据形同虚设。收窄为:main 进程持有的内存态
-// registered-origin 集合(见 CodePuppyOriginRegistry)——只有 main 真正启动并验证过的确切 Alpha
+// registered-origin 集合(见 CodePuppyOriginRegistry)——只有 main 真正启动并验证过的确切 Code Puppy
 // 服务 origin(按 generation 登记)才在有效期内命中;未注册的 origin 一律默认拒绝。registry
 // 实例只存活在 main 进程模块闭包内,从不经 preload/contextBridge/IPC 暴露写入口,renderer 与
 // 扩展代码结构上无法自行注册。darwin 分支的回环判据逐字节不变。

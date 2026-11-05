@@ -2,7 +2,7 @@ import type { DialogHostProps } from "@opencode-ai/ui/context/dialog"
 import { Dialog } from "./Dialog"
 import "./upstream-dialog-host.css"
 
-/** Selected upstream consumers render inside the one canonical Alpha Dialog mount. */
+/** Selected upstream consumers render inside the one canonical Code Puppy Dialog mount. */
 export function UpstreamDialogHost(props: DialogHostProps) {
   const title = () => (typeof props.title === "string" && props.title.trim() ? props.title : "Dialog")
   const size = () => (props.size === "large" || props.size === "x-large" ? "lg" : "md")

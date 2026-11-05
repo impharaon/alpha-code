@@ -994,7 +994,7 @@ export const dict = {
   "codepuppy.wb.office.structureCheck": "Structure check",
   "codepuppy.wb.office.structurePassLocal": "This Mac · passed",
 
-  // Alpha-owned renderer surfaces (C20 locale completion).
+  // Code Puppy-owned renderer surfaces (C20 locale completion).
   "codepuppy.brand.product": "Code Puppy",
   "codepuppy.brand.short": "Code Puppy",
   "codepuppy.brand.wordmark": "CODE PUPPY",

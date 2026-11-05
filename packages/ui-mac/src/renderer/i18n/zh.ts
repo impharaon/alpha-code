@@ -974,7 +974,7 @@ export const dict = {
   "codepuppy.wb.office.structureCheck": "结构检查",
   "codepuppy.wb.office.structurePassLocal": "本机 · 已通过",
 
-  // Alpha 自有 renderer 界面(C20 国际化补全)。
+  // Code Puppy 自有 renderer 界面(C20 国际化补全)。
   "codepuppy.brand.product": "Code Puppy",
   "codepuppy.brand.short": "Code Puppy",
   "codepuppy.brand.wordmark": "CODE PUPPY",

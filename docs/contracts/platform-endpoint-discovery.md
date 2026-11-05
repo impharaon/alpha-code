@@ -1,5 +1,5 @@
 ---
-title: Alpha platform endpoint and model discovery
+title: Code Puppy platform endpoint and model discovery
 kind: contract
 status: active
 owners:
@@ -62,14 +62,14 @@ hatches: `CODEPUPPY_WEB_URL`, `CODEPUPPY_PLATFORM_URL`, `CODEPUPPY_ACCOUNT_URL`,
 `CODEPUPPY_CLOUD_URL`, and `CODEPUPPY_MCP_URL`.
 
 The desktop-facing account endpoint above is distinct from the service-to-
-service `ACCOUNT_URL=https://account.tidelabs.click` committed in Alpha Platform
+service `ACCOUNT_URL=https://account.tidelabs.click` committed in Code Puppy platform
 Wrangler configuration. Do not exchange these hostnames without deployment and
 authentication evidence.
 
 ## Model edition discovery
 
 `GET /v1/models` is the executable source for the signed-in model catalog. In
-addition to OpenAI list fields, Alpha Platform returns `edition`,
+addition to OpenAI list fields, Code Puppy platform returns `edition`,
 `byok_providers`, a `pricing_multiplier` pair per model, and the
 `pricing_basis_model_id` those multipliers are relative to. `data` contains
 platform-proxy models allowed for the resolved edition; `byok_providers` limits
@@ -99,5 +99,5 @@ validated V2 snapshot, marked `cache`. A contract mismatch is different: it
 raises the persistent contract-health failure, writes nothing, and the platform
 segment falls back to the bundled snapshot **with no pricing claim at all** —
 never to V1 and never to a locally-invented price. Active model IDs, multipliers
-and edition rules come from the current Alpha Platform registry and tests, not
+and edition rules come from the current Code Puppy platform registry and tests, not
 from examples in this document.

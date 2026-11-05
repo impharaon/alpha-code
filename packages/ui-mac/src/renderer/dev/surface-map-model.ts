@@ -34,9 +34,9 @@ export function filterSurfaceMap(
   })
 }
 
-/** 每个路由叶恒组合它唯一的 Alpha surface —— 没有运行时模式可查,只报挂载事实。 */
+/** 每个路由叶恒组合它唯一的 Code Puppy surface —— 没有运行时模式可查,只报挂载事实。 */
 export function surfaceRuntimeState(surface: FrontendSurfaceEntry) {
-  if (surface.releaseSurface) return { mode: "Alpha", detail: surface.releaseSurface }
+  if (surface.releaseSurface) return { mode: "Code Puppy", detail: surface.releaseSurface }
   return {
     mode:
       surface.availability === "development" ? "仅开发" : surface.availability === "gated" ? "门控" : "静态挂载",

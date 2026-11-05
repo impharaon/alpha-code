@@ -521,7 +521,7 @@ export function openRailPreview(
       // plugins 只开在 pdf 载体的这个 view 上(内置 Chromium PDF viewer);主窗口不动。
       // Office 载体不需要插件面 —— 它是纯 DOM/canvas 渲染。
       plugins: kind === "pdf",
-      // ⚠️ 刻意无 preload —— 与 html-preview-host 同一条铁律:预览上下文零 Alpha bridge。
+      // ⚠️ 刻意无 preload —— 与 html-preview-host 同一条铁律:预览上下文零 Code Puppy bridge。
     },
   })
   record.view = view

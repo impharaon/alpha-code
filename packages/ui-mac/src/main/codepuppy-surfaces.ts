@@ -1,7 +1,7 @@
 // Surface 失败诊断(main process)。REQ-089 硬切之后**没有 surface 解析器**:每个路由恒组合
-// 它唯一的 Alpha 叶,不存在 legacy 发布态、`CODEPUPPY_SURFACE_*` env 覆盖、userData pin,也不存在
-// 崩溃回退 —— 致命渲染错误进 Alpha Recovery(AC4),绝不改变 composition。
-// 本模块只剩一件事:把一次 Alpha surface 的致命渲染错误落成脱敏诊断记录。
+// 它唯一的 Code Puppy 叶,不存在 legacy 发布态、`CODEPUPPY_SURFACE_*` env 覆盖、userData pin,也不存在
+// 崩溃回退 —— 致命渲染错误进 Code Puppy Recovery(AC4),绝不改变 composition。
+// 本模块只剩一件事:把一次 Code Puppy surface 的致命渲染错误落成脱敏诊断记录。
 // 失败上报(codepuppy-surface-failure)落盘 <userData>/codepuppy-surfaces.json:原子写(同目录 tmp +
 // fsync + rename,ext-atomic-fs 原语)且 fail-closed；写入失败由 Recovery adapter 映射为可重试的
 // 安全动作。Renderer 不上传原始错误文本；诊断记录只落稳定码，路径/secret 不进入 IPC 或状态文件。
@@ -55,7 +55,7 @@ export function readSurfaceFile(userDataPath: string): SurfaceFile {
   }
 }
 
-/** 记录一次 Alpha surface 的致命渲染错误(仅作脱敏诊断，不参与 composition)。
+/** 记录一次 Code Puppy surface 的致命渲染错误(仅作脱敏诊断，不参与 composition)。
  *  未知 surface id 直接拒绝(throw → IPC promise reject)；只落稳定码，不接收 renderer 错误文本。
  *  #334 r1:写入走 writeFileAtomicSync(同目录 tmp + fsync + rename——覆盖中断不会留半截文件)
  *  且 fail-closed:落盘失败同样 throw(重抛干净错误,不带文件路径)，由 Recovery 呈现保存失败动作。 */

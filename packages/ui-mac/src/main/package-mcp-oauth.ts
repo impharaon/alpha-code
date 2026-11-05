@@ -273,7 +273,7 @@ async function handleCallback(
     }
     attempt.listener?.close()
     response.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" })
-    response.end("Authorization was not granted. You can close this window and retry from Alpha.")
+    response.end("Authorization was not granted. You can close this window and retry from Code Puppy.")
     return
   }
   const code = url.searchParams.get("code")
@@ -299,8 +299,8 @@ async function handleCallback(
   response.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" })
   response.end(
     attempt.terminal.state === "ready"
-      ? "Authorization complete. You can close this window and return to Alpha."
-      : "Authorization could not be completed. You can close this window and retry from Alpha.",
+      ? "Authorization complete. You can close this window and return to Code Puppy."
+      : "Authorization could not be completed. You can close this window and retry from Code Puppy.",
   )
 }
 

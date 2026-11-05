@@ -121,7 +121,7 @@ function turnRows(prefix: string, index: number, order: number): TimelineRow[] {
 }
 
 function benchmarkMarkdown(prefix: string, index: number) {
-  const prose = `Fixture ${prefix}/${index} exercises the Alpha-owned session timeline with deterministic content. `
+  const prose = `Fixture ${prefix}/${index} exercises the Code Puppy-owned session timeline with deterministic content. `
   if (index % 20 !== 0) return prose.repeat(4)
   return `${prose.repeat(3)}\n\n\`\`\`ts\nexport const fixture${index} = ${index}\n\`\`\``
 }

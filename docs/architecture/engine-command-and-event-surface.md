@@ -172,7 +172,7 @@ try { return matter(content) } catch { return matter(sanitize(content)) }
      让**安装版本的** `ConfigCommand.load → gray-matter` 解析；
    - **采用 (b)**：profile 直接携带结构化 `ConfigCommandV1.Info`，builder 写 `codepuppy.jsonc` 的 `command.<name>`，
      **完全不解析 Markdown**。
-4. ⚠️ **不要复用 agent 的 frontmatter 转换器。** 它明说只认 Alpha 自有的受限文法
+4. ⚠️ **不要复用 agent 的 frontmatter 转换器。** 它明说只认 Code Puppy 自有的受限文法
    （`main/agent-md-entry.ts:1`），**不是上游 command 的文法**。
    照它改 = 造第三套解析器 = 本仓最贵的那个形态。
 
@@ -223,13 +223,13 @@ try { return matter(content) } catch { return matter(sanitize(content)) }
 | `experimental.text.complete` | 每个 assistant text part 完成、持久化前（`processor.ts:512`） | out `{text}` |
 | `tool.definition` | 本 turn 工具定义送给模型前（`tool/registry.ts:305`） | out `{description,parameters}` |
 
-### 2.4 上游 loader 与 Alpha 项目 fan-out 的差别
+### 2.4 上游 loader 与 Code Puppy 项目 fan-out 的差别
 
 - **上游 loader**：从 config origin resolve/install/entry/compatibility 后 `import()`
   （`plugin/loader.ts:76`、`:203`），能返回完整 `Hooks`。
-- **Alpha 项目 fan-out**（`packages/ext/src/plugin-fanout.ts`）：只加载经 consent 的
+- **Code Puppy 项目 fan-out**（`packages/ext/src/plugin-fanout.ts`）：只加载经 consent 的
   `<project>/.codepuppy/plugins/*.js`，**原始 TS 拒绝**（`:52`）；同一个 `PluginInput` 调用（`:81`）；
-  `tool` 浅合并且 **Alpha 自有工具优先**，其余**函数型**键按 own→project 串行（`:18`、`:26`）；
+  `tool` 浅合并且 **Code Puppy 自有工具优先**，其余**函数型**键按 own→project 串行（`:18`、`:26`）；
   最终仍只返回一个合并后的 Hooks 给上游（`ext/src/plugin.ts:355`）。
   ⇒ 项目插件拿得到 `config`/`event`/`dispose` 与全部 14 个活钩子，也能加工具；
   **拿不到对象形的 `auth` / `provider`**。
@@ -383,7 +383,7 @@ identity、事务 builder、V3 账本、更新/整包卸载，以及真实引擎
 ### 5.3 最大的替身风险
 
 **照 Claude 的 `commands/*.md` 自写 frontmatter/参数语法。**
-夹具正文是占位字节、Alpha 的 agent parser 又是自有受限文法 ——
+夹具正文是占位字节、Code Puppy 的 agent parser 又是自有受限文法 ——
 应当让**安装版本的** `ConfigCommand.load / gray-matter` 解析原文件，
 或者定义**纯结构化** profile。**不要造第三套解析器。**
 

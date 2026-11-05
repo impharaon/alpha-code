@@ -134,7 +134,7 @@ ID and fingerprint therefore form the immutable idempotency identity.
 grant for the active project; a different project or an `always` request
 without `save` resources fails closed.
 
-Alpha regenerates the legacy JavaScript SDK through
+Code Puppy regenerates the legacy JavaScript SDK through
 `bun ./scripts/generate-codepuppy-sdk.ts`. That codepuppy-owned entry point runs the
 unchanged upstream generator, then applies a loud-fail post-generation step so
 the generated `once` and `reject` arms retain `never` grant fields.

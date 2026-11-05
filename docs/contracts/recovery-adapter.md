@@ -79,7 +79,7 @@ process has new identity and is outside this process-local guarantee.
   `RECOVERY_ACTION_CONFLICT` without running an effect. The original action continues to return its
   cached `RECOVERY_ACTION_FAILED` result.
 
-## Main incident ownership and Alpha-only surface recovery
+## Main incident ownership and Code Puppy-only surface recovery
 
 The renderer supplies a per-boundary crash nonce only for retry reconciliation. Main owns the actual
 incident identifier, creates exactly one surface source object after the first persistence attempt,

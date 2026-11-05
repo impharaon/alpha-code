@@ -1,4 +1,4 @@
-Alpha context injections (packages/ext + packages/ui-mac) — unit: UTF-8 bytes; limit enforced at registration, over-limit throws (never truncates)
+Code Puppy context injections (packages/ext + packages/ui-mac) — unit: UTF-8 bytes; limit enforced at registration, over-limit throws (never truncates)
 id                                                      kind      sink                   bytes   limit  used
 agent.codepuppy-ask.description                         text      agent-description        130    1024   13%
 agent.codepuppy-automation-standard.description         text      agent-description         98    1024   10%
@@ -71,7 +71,7 @@ rebrand.identity-gpt                                    rebrand   system        
 rebrand.identity-kimi                                   rebrand   system                    81     512   16%
 rebrand.objectivity-anthropic                           rebrand   system                    82     512   16%
 fragments: 70; injected bytes: 27719; declared limits total: 130048
-references (paths / verbs / definitions supplied by others — carry no Alpha text, not counted):
+references (paths / verbs / definitions supplied by others — carry no Code Puppy text, not counted):
   ref.skills.paths       /skills/paths      出厂技能目录 + skill generation live 目录(factory-paths.ts / gen-skill-paths.ts);技能正文是别人的字
   ref.permission.skill   /permission/skill  REQ-067 出厂禁项的 "deny" 动词(factory-deny.ts)
   ref.permission.codepuppy_hub_install /permission/codepuppy_hub_install REQ-234 #1531 定制中心安装确认框的 "ask" 动词

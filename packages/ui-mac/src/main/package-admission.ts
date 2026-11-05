@@ -146,7 +146,7 @@ export type PackageAdmissionOutcome =
       activateMcp: string[]
       installedDisabled?: true
       /**
-       * Installed, but an optional Alpha Connection is not established. Distinct from
+       * Installed, but an optional Code Puppy Connection is not established. Distinct from
        * `installedDisabled`, which is true for every catalog install under the current activation
        * policy: this one says *why* the thing will not work, so the user is told "connect an
        * account" rather than "turn it on".
@@ -382,7 +382,7 @@ export function createPackageAdmissionCoordinator(deps: PackageAdmissionDeps) {
     )
       return { ok: false, reason: "package admission: only signed secret prerequisites accept grants in Phase 1" }
 
-    // §2.7 puts "required Alpha Connection ready" between capability authorization and the local
+    // §2.7 puts "required Code Puppy Connection ready" between capability authorization and the local
     // transaction, and this is that step. It runs on the *revalidated* facts and reads the
     // main-owned store directly — the renderer cannot name a connection at all, so there is no
     // supplied value to distrust, and re-resolving here (rather than remembering what the preview

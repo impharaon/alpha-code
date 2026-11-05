@@ -24,7 +24,7 @@ alpha-code 是 opencode 的 fork:`packages/ui-mac`(Electron 壳,alpha 自有)挂
 一个面从上游走到全 alpha,经由 [`patterns.md`](patterns.md) 的手法**逐级**推进。
 每一级是一次合并,不是一个开关:上一级的上游实现在下一级落地时**被替换掉**,没有
 "崩了回落上游叶子"的发布态(REQ-089 硬切)。致命渲染错误走 `surface-boundary.tsx`
-进 Alpha Recovery:
+进 Code Puppy Recovery:
 
 ```
 opencode(纯上游,零改)

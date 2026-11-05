@@ -285,7 +285,7 @@ function mergeNamed(
  * merge 语义:命名条目域(mcp/provider/agent/command)逐名补 absent。
  *
  * **`plugin[]` 刻意不在 merge 语义里(ADR-040,`#832`)**:合并 legacy 的 `plugin[]` 就是「把一段
- * 第三方 JS 装进引擎、以同等权限执行」,而 ADR-040 裁定 Alpha 不再提供这个能力 —— 它不因为
+ * 第三方 JS 装进引擎、以同等权限执行」,而 ADR-040 裁定 Code Puppy 不再提供这个能力 —— 它不因为
  * 「来源是用户自己的旧配置」而变成另一件事。existing(`codepuppy.jsonc` 里已有的条目)原样穿过
  * 浅拷贝,本函数**既不加也不删**;删除归卸载侧(`removePlugin` / dangling 清扫)。
  * 想「顺手把这条并集加回来」的下一位:它加不回来 —— 落盘那一刻的咽喉会拒(`engine-plugin-seal.ts`),

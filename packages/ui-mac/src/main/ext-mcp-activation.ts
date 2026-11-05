@@ -79,7 +79,7 @@ export async function probeProjectMcpActivation(
     })
 
     // `/global/config` covers the engine's global config service; the strict main-side name read
-    // above additionally covers Alpha's OPENCODE_CONFIG truth and retained legacy files.
+    // above additionally covers Code Puppy's OPENCODE_CONFIG truth and retained legacy files.
     const globalResponse = responseData(
       await withTimeout(
         client.global.config.get(),

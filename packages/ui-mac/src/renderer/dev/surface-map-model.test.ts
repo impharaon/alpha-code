@@ -12,14 +12,14 @@ describe("surface map model", () => {
     )
   })
 
-  test("route leaves report their single Alpha composition; other mounts report availability", () => {
+  test("route leaves report their single Code Puppy composition; other mounts report availability", () => {
     const home = frontendSurfaceById("route.home")
     const session = frontendSurfaceById("route.session")
     const inspector = frontendSurfaceById("dev.surface-map")
     if (!home || !session || !inspector) throw new Error("surface fixture missing from canonical manifest")
 
-    expect(surfaceRuntimeState(home)).toEqual({ mode: "Alpha", detail: "home" })
-    expect(surfaceRuntimeState(session)).toEqual({ mode: "Alpha", detail: "session" })
+    expect(surfaceRuntimeState(home)).toEqual({ mode: "Code Puppy", detail: "home" })
+    expect(surfaceRuntimeState(session)).toEqual({ mode: "Code Puppy", detail: "session" })
     expect(surfaceRuntimeState(inspector)).toEqual({ mode: "仅开发", detail: "development" })
   })
 

@@ -19,7 +19,7 @@
 //     ⇒ codepuppySessionWorkspaceSurface() 返回组件 ⇒ surfaces.session 注入;
 //   - 闸关 ⇒ 工厂返回 undefined ⇒ surfaces.session 未注入 ⇒ seam 走上游默认叶(严格零变化)。
 //   历史注记:这套双闸描述的是 REQ-087/088 采集期的形态。生产侧的发布态开关(主进程
-//   env-override / userData pin)已在 REQ-089 硬切中删除——今天每条路由恒组合它唯一的 Alpha 叶,
+//   env-override / userData pin)已在 REQ-089 硬切中删除——今天每条路由恒组合它唯一的 Code Puppy 叶,
 //   本 host 的 localStorage 闸只为复采历史基线而保留。
 //
 // 与冻结 entry.tsx 的两处显式偏差(均不在 adapter-vs-legacy 差异面上,两半边同受影响):

@@ -42,7 +42,7 @@ import {
 // bun rewrites `.js`→`.ts`; the packaged Electron-Node sidecar does NOT, so those imports throw
 // ERR_MODULE_NOT_FOUND → prompt_async crashes → the model never replies (looks like "no response").
 // This in-thread resolve hook restores bun's behavior: when a `.js` specifier fails to resolve but the
-// sibling `.ts` exists on disk, use the `.ts`. Alpha-only, zero opencode edits; registered at module
+// sibling `.ts` exists on disk, use the `.ts`. Code Puppy-only, zero opencode edits; registered at module
 // load (before the server import) so it covers every runtime tool load.
 registerHooks({
   resolve(specifier, context, nextResolve) {
@@ -162,7 +162,7 @@ async function start(command: StartCommand) {
       : Promise.resolve()
 
     // Start the real per-location graph through the embedded server's authenticated in-process app
-    // before socket-listen finishes. Alpha's strict generated-output patch pins the fixed Electron
+    // before socket-listen finishes. Code Puppy's strict generated-output patch pins the fixed Electron
     // listener to this app's routes and memo map, so the marker and real model handler settle before
     // the renderer's first V2 model call. Start the request before
     // listen so both builds progress in parallel, but do not publish ready until the local prewarm

@@ -4,7 +4,7 @@
 // HttpApiApp.Default uses one singleton routes layer and the process-wide core memo map,
 // while Server.listen normally creates a fresh routes layer and a fresh memo map. That
 // means an in-process location prewarm cannot warm the socket listener. ADR-005 forbids
-// editing upstream source, so Alpha patches only the freshly generated, gitignored
+// editing upstream source, so Code Puppy patches only the freshly generated, gitignored
 // embedded-server bundle for the one fixed Electron CORS shape. Other callers retain
 // createRoutes(opts), and any compiled-shape drift aborts the build.
 import path from "node:path"

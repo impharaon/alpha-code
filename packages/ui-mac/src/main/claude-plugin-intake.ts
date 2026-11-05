@@ -62,7 +62,7 @@ export type LocalPackageSkipCode =
   | "frontmatter-unreadable"
   /** 载荷读不出(超帽、symlink 竞态、非常规文件…)—— 原文来自 collector,不改写。 */
   | "payload-unreadable"
-  /** 带 Alpha 没有对应语义的调用控制字段(owner 裁决 C)。 */
+  /** 带 Code Puppy 没有对应语义的调用控制字段(owner 裁决 C)。 */
   | "control-field-unsupported"
   /** 目录内有带可执行位的文件(owner 裁决 A)。 */
   | "not-self-contained-executable-bit"

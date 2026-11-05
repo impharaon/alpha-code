@@ -1,4 +1,4 @@
-// context-injection — REQ-157 `#1284`:Alpha 往模型上下文里塞的每一段文字,都在这里登记并声明上限。
+// context-injection — REQ-157 `#1284`:Code Puppy 往模型上下文里塞的每一段文字,都在这里登记并声明上限。
 //
 // 问题(票面 2026-09-08 实读):ext 至少从四处把 alpha 自己写的文字送进模型上下文 ——
 //   · `codepuppy-prompts.ts` 经 config hook 写 `cfg.command.*.template` / `cfg.agent.*.prompt|description`
@@ -692,7 +692,7 @@ export function renderInventory(): string {
   const idW = Math.max(...rows.map((r) => r.id.length), 2)
   const sinkW = Math.max(...rows.map((r) => r.sink.length), 4)
   const lines: string[] = []
-  lines.push("Alpha context injections (packages/ext + packages/ui-mac) — unit: UTF-8 bytes; limit enforced at registration, over-limit throws (never truncates)")
+  lines.push("Code Puppy context injections (packages/ext + packages/ui-mac) — unit: UTF-8 bytes; limit enforced at registration, over-limit throws (never truncates)")
   lines.push(`${"id".padEnd(idW)}  ${"kind".padEnd(8)}  ${"sink".padEnd(sinkW)}  ${"bytes".padStart(6)}  ${"limit".padStart(6)}  used`)
   let total = 0
   let totalCap = 0
@@ -703,7 +703,7 @@ export function renderInventory(): string {
     lines.push(`${r.id.padEnd(idW)}  ${r.kind.padEnd(8)}  ${r.sink.padEnd(sinkW)}  ${String(r.bytes).padStart(6)}  ${String(r.maxBytes).padStart(6)}  ${used.padStart(4)}`)
   }
   lines.push(`fragments: ${rows.length}; injected bytes: ${total}; declared limits total: ${totalCap}`)
-  lines.push("references (paths / verbs / definitions supplied by others — carry no Alpha text, not counted):")
+  lines.push("references (paths / verbs / definitions supplied by others — carry no Code Puppy text, not counted):")
   for (const f of CONTEXT_INJECTIONS) if (f.kind === "reference") lines.push(`  ${f.id.padEnd(22)} ${f.pointer.padEnd(18)} ${f.note}`)
   const ctx = Object.entries(HOOK_CONTEXT_CLASS)
     .filter(([, c]) => c === "context")

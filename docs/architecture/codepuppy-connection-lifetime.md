@@ -1,5 +1,5 @@
 ---
-title: Alpha Connection record lifetime
+title: Code Puppy Connection record lifetime
 kind: architecture
 status: active
 owners:
@@ -8,11 +8,11 @@ last_reviewed: 2026-07-31
 review_after: 2027-01-27
 ---
 
-# Alpha Connection record lifetime
+# Code Puppy Connection record lifetime
 
 ## Why this document exists
 
-A registered Alpha Connection is the first durable object in this app whose
+A registered Code Puppy Connection is the first durable object in this app whose
 lifetime belongs to none of the things that normally own durable state. Every
 other record here dies with something: an `installs.json` entry dies with its
 `(kind, name)`, and `<root>/ext-store/<key>/` is deleted wholesale by

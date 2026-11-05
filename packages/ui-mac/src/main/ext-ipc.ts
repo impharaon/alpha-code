@@ -1001,7 +1001,7 @@ export function registerExtIpcHandlers(
       platform: () => process.platform,
       globalRoot: codepuppyGlobalRoot,
       installers: {
-        // #378:MCP 策略闸口(REQ-135 退役拒绝 + REQ-133 Alpha Office 路径收敛,
+        // #378:MCP 策略闸口(REQ-135 退役拒绝 + REQ-133 Code Puppy Office 路径收敛,
         // 引擎 config action 落盘)
         // + 版本化密钥原语(裁决 Q1:只增不覆盖;引用纯推导与落盘同参)。
         applyMcpWritePolicy,
@@ -1030,7 +1030,7 @@ export function registerExtIpcHandlers(
           const names = new Set(live.names)
           return removeMcpServerSecretsStrict(userDataPath, name, (cand) => names.has(cand))
         },
-        // #704:卸载只释放 Alpha Connection 绑定,不 disconnect —— store 在 userData 下,
+        // #704:卸载只释放 Code Puppy Connection 绑定,不 disconnect —— store 在 userData 下,
         // 与事务根互斥(独立性由 store 自己的守卫强制,不靠这里记得)。
         releaseCodePuppyConnectionBindings: (componentId) =>
           releaseCodePuppyConnectionBindingsV1(

@@ -387,7 +387,7 @@ function mentionSpans(parts: readonly Part[]) {
       // 不出没有名字的 chip)。
       //
       // 上游数据面缺口登记(#588,审计 R1):这条 resource 分支当前在生产不可达 ——
-      // ① Alpha composer 只支持 file/agent 提及,V2 PromptInput 没有携带 clientName/uri 的
+      // ① Code Puppy composer 只支持 file/agent 提及,V2 PromptInput 没有携带 clientName/uri 的
       //    resource 身份;② 旧 V1 路径收到 resource part 后,在 packages/opencode/src/session/
       //    prompt.ts(resolveUserPart,source.type==="resource" 分支,~L703)把原 part 替换成
       //    synthetic text/blob part,不保留 source.type==="resource" 的原件。

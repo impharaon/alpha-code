@@ -60,7 +60,7 @@ host aggregate did. Re-read both from the lock and the manifest.
 
 The byte lock is not a semantic oracle. Consumer tests additionally execute the
 published declaration schema against the published negative vectors, and assert
-the profile/capability closure as an exact set. Alpha Connection is a registered
+the profile/capability closure as an exact set. Code Puppy Connection is a registered
 capability — it was promoted in `#749` — and `cloud` remains excluded.
 
 ⚠️ **The vendored producer closure is one hop behind the host registry.** This
@@ -121,7 +121,7 @@ reason code; `ready | required-action` prerequisite status with bounded
 summaries; and bounded presentation. Raw envelopes, payload references, URLs,
 commands, header templates, secret values, and secret injection targets do
 not cross the IPC boundary. Phase 1 has one required component, so the wire
-does not reserve optional-child or Alpha Connection states.
+does not reserve optional-child or Code Puppy Connection states.
 
 REQ-235 adds one optional field. When the root profile is `cloud@1` and the
 verdict is `compatible`, the view carries `cloud: { pipelineKind, fields,

@@ -16,7 +16,7 @@ review_after: 2026-10-14
 
 > ## ⚠️ ADR-040(2026-08-03,`#825` 已落地):plugin 的**安装与启用**整段作废
 >
-> **Alpha 的扩展安装唯一形态是 Bundle;任何扩展安装都不得写入引擎的 `plugin[]`。**
+> **Code Puppy 的扩展安装唯一形态是 Bundle;任何扩展安装都不得写入引擎的 `plugin[]`。**
 > 本文中一切描述「plugin 怎么装进去」的段落 —— npm fresh、vendored fresh、`installPluginFromCas`、
 > §3.1 的原子替换、以及启停投影的 **enable 臂**(「按 configKey 补回受管条目形态」)——
 > **都已随生产代码退场**,保留在此仅作历史脉络。
@@ -210,7 +210,7 @@ MCP 重装是产品流(确认框重装),允许覆盖(引擎前像可复原)而�
       boot reconcile `probeLedgerForWrite` 检出损坏(非缺席)即 **enforcementGap 阻断 sidecar**(不放行可能
       加载已禁扩展的引擎)。缺席账本(ENOENT)= 无记录 = 安全,不阻断。
     · **command/bundle 无启停投影**(Codex r12 Major3;`#840` 收窄):command 已有签名包安装生效面，
-      但引擎 config.command 没有 disable 键；fresh command 只允许 enabled，若 Alpha Connection
+      但引擎 config.command 没有 disable 键；fresh command 只允许 enabled，若 Code Puppy Connection
       前置不可用把 receipt 压成 disabled，builder 整包拒绝。bundle 自身仍无 live 叶。set-state
       对 command/bundle/cloud 一律拒(翻 desiredState 会谎报已禁而仍可执行)，行内/详情页开关
       也只给有启停投影的 mcp/agent/plugin/skill。

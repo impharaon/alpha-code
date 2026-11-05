@@ -22,7 +22,7 @@ export class ContractIncompatibleError extends Error {
   readonly failure: ContractFailure
 
   constructor(failure: Omit<ContractFailure, "code" | "expected_version"> & { expected_version?: 1 | 3 }) {
-    super(`Alpha contract incompatible on ${failure.surface}: ${failure.reason}`)
+    super(`Code Puppy contract incompatible on ${failure.surface}: ${failure.reason}`)
     this.name = "ContractIncompatibleError"
     // `expected_version` last and coalesced: spreading an explicitly-`undefined` field over a default
     // would leave the record claiming `1 | 3` while carrying `undefined`.

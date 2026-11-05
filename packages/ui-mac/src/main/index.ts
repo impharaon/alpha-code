@@ -290,7 +290,7 @@ function publishSidecarGeneration(next: SidecarGenerationState) {
 
 function recordDanglingSweep(context: "boot" | "respawn", outcome: DanglingSweepOutcome) {
   if (outcome.stripped.length > 0)
-    logger.warn("[req053-dangling-sweep] confirmed-absent Alpha config references stripped", {
+    logger.warn("[req053-dangling-sweep] confirmed-absent Code Puppy config references stripped", {
       context,
       stripped: outcome.stripped.length,
       files: outcome.changedFiles,

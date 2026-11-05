@@ -1,7 +1,7 @@
-// Alpha's canonical route contract. The manifest owns route identity, parameter shape,
+// Code Puppy's canonical route contract. The manifest owns route identity, parameter shape,
 // location encoding, and the single leaf/redirect composition seam. Router/provider/layout
 // ownership remains upstream. The upstream packages/app deep-link parser is held at arm's length
-// like its Route tree; Alpha validates and canonicalizes ingress here before forwarding it.
+// like its Route tree; Code Puppy validates and canonicalizes ingress here before forwarding it.
 
 import type { SurfaceId } from "./codepuppy-surfaces"
 
@@ -212,14 +212,14 @@ export type DeepLinkRouteId = (typeof ROUTE_MANIFEST.deepLinks.routes)[number]["
 export const DEEP_LINK_SCHEMES = ROUTE_MANIFEST.deepLinks.schemes.map((scheme) => scheme.value)
 
 /**
- * The single event name Alpha's shell uses to hand a decoded deep link to the renderer.
+ * The single event name Code Puppy's shell uses to hand a decoded deep link to the renderer.
  * The upstream layout listens for this name; `route-upstream-shape.test.ts` anchors its copy
  * against this constant so the two cannot drift silently.
  */
 export const DEEP_LINK_EVENT = "opencode:deep-link"
 
 /**
- * What Alpha's main process forwards after the manifest has decoded an OS deep link: the
+ * What Code Puppy's main process forwards after the manifest has decoded an OS deep link: the
  * decoded result, never the URL. Downstream consumers (including the upstream renderer) read
  * these fields and therefore cannot own a second URL codec.
  */
@@ -429,7 +429,7 @@ export function parseDeepLink(input: string): DeepLinkNavigation {
 }
 
 /**
- * Decode one OS deep link into the delivery Alpha forwards to the renderer. Anything the
+ * Decode one OS deep link into the delivery Code Puppy forwards to the renderer. Anything the
  * manifest does not recognise — foreign scheme, unknown host, corrupt or incomplete query —
  * decodes to `undefined` and is dropped at the boundary (fail-closed, AC4).
  */

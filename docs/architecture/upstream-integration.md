@@ -1,5 +1,5 @@
 ---
-title: Alpha Code upstream integration
+title: Code Puppy upstream integration
 kind: architecture
 status: active
 owners:
@@ -13,7 +13,7 @@ review_after: 2027-01-30
 ## Branch and synchronization model
 
 The repository is a fork. The `dev` lineage is the upstream integration base;
-Alpha delivery occurs on the Alpha branch. The
+Code Puppy delivery occurs on the `alpha` branch. The
 [`sync-upstream.yml`](../../.github/workflows/sync-upstream.yml) workflow and
 [`codepuppy-ci.yml`](../../.github/workflows/codepuppy-ci.yml) are the executable source
 of truth for protected paths and synchronization gates.
@@ -34,7 +34,7 @@ code sourced from `anomalyco/opencode`.
 `packages/app` and `packages/ui` are not ordinary upstream mirrors. Under
 ADR-034 (B: monthly pin + patch) they are a **projection** of the upstream pin
 recorded in [`frontend/frontend-pin.lock`](../../frontend/frontend-pin.lock)
-plus the single Alpha SOT patch
+plus the single Code Puppy SOT patch
 [`frontend/codepuppy-patches/codepuppy-frontend.patch`](../../frontend/codepuppy-patches/codepuppy-frontend.patch).
 After every merge, `apply_codepuppy_frontend_delta` rebuilds them
 (`rm -rf` → `git checkout <pin> --` → `git apply --3way`) and must preserve the
@@ -63,7 +63,7 @@ The judgement was right; the order was wrong.
 The order is now: conclude the merge → `apply_codepuppy_frontend_delta` → `bun install`
 → commit the regenerated `bun.lock`. The lockfile step is not optional: the
 conflict branch resolves `bun.lock` with `--theirs`, i.e. upstream's copy, which
-does not contain Alpha's workspace packages; only an install that runs against
+does not contain Code Puppy's workspace packages; only an install that runs against
 the final tree regenerates a lockfile that matches what gets pushed.
 
 The gate is
@@ -83,7 +83,7 @@ Measured 2026-09-19 from the real run history, not inferred from the workflow:
 the last successful `sync-upstream` run was `2026-07-22T08:06:35Z`
 (run `29902706228`), and every run since — **59 consecutive daily runs,
 2026-07-23 through 2026-09-19** — failed. Nobody was notified for any of them.
-Upstream reached Alpha in that window exactly once, by hand (`ac#1248`,
+Upstream reached Code Puppy in that window exactly once, by hand (`ac#1248`,
 `efced9fa9`, 2026-09-06).
 
 The streak is **not one cause**. Classifying each failing run by the step the
@@ -100,7 +100,7 @@ run — that fingerprint is useless):
 The current abort is **correct behaviour, and it will recur**. The conflicting
 file is on the north-star annexation whitelist
 ([`scripts/north-star-guard.sh`](../../scripts/north-star-guard.sh)
-`UPSTREAM_EXCLUDES`, 48 entries): Alpha deliberately edits it (`#1147`), so the
+`UPSTREAM_EXCLUDES`, 48 entries): Code Puppy deliberately edits it (`#1147`), so the
 merge step's message "the only-add discipline was broken" is literally false
 here — the discipline was waived on purpose. Every annexed upstream file is a
 permanent conflict generator, and a conflict there genuinely requires a human
@@ -137,9 +137,9 @@ add a `bun install` step) so the checker is proven to detect the known-bad.
 
 ### The takeover list governs the sync (`#1566`)
 
-Conflicts alone never told the sync which files Alpha owns. An upstream change
-to an annexed file that did not overlap Alpha's edit merged cleanly and was
-silently mixed into Alpha's version (`003f6f764`, 2026-10-01: +2 lines in
+Conflicts alone never told the sync which files Code Puppy owns. An upstream change
+to an annexed file that did not overlap Code Puppy's edit merged cleanly and was
+silently mixed into Code Puppy's version (`003f6f764`, 2026-10-01: +2 lines in
 `session/llm/request.ts`; `57646831b`, 2026-09-24: `test/provider/transform.test.ts`);
 an overlapping one aborted the whole run (`#1408`, 19 consecutive failures from
 2026-10-11). The rules now are:
@@ -153,7 +153,7 @@ an overlapping one aborted the whole run (`#1408`, 19 consecutive failures from
    the working tree at that moment is upstream `dev`, so nothing in it is
    executed) and diffs `merge-base(OLD_ALPHA, NEW_DEV)..NEW_DEV` against the list
    with git pathspec semantics, the same ones the guard uses. Any hit ⇒ no merge,
-   no bundle; every path with its upstream commits, the upstream diff and Alpha's
+   no bundle; every path with its upstream commits, the upstream diff and Code Puppy's
    diff goes to the step summary and the `takeover-review` artifact, and the step
    fails with `takeover upgrade review required` (需要升级审查). The alert
    workflow files it under that step name like any other failure.
@@ -171,7 +171,7 @@ an overlapping one aborted the whole run (`#1408`, 19 consecutive failures from
    forward and the next run only sees newer upstream commits; a squash leaves the
    merge-base where it was and the same paths are hit again.
 6. The candidate job still holds no push credential (`#899`); the new steps only
-   execute the guard script from Alpha's own pre-merge tree.
+   execute the guard script from Code Puppy's own pre-merge tree.
 
 Not part of this mechanism: registering or reverting the conflicting paths that
 are outside the list (27 in run `40869114423`) — until each is handled the sync
@@ -179,7 +179,7 @@ keeps failing, now with the named message above.
 
 The gate is
 [`packages/ui-mac/src/main/sync-upstream-takeover-isolation.test.ts`](../../packages/ui-mac/src/main/sync-upstream-takeover-isolation.test.ts):
-it runs the production step bodies in order on a real git repository whose Alpha
+it runs the production step bodies in order on a real git repository whose Code Puppy
 tree carries a verbatim copy of the guard, with mutation arms (drop the intake
 step ⇒ the clean case merges silently; port with squash ⇒ the next run hits the
 same paths again; read the guard from the working tree ⇒ an upstream script is
@@ -191,7 +191,7 @@ ADR-029 defines the only supported ways to change upstream behavior:
 
 | Level | Mechanism | Rule |
 |---|---|---|
-| L0 | Alpha-owned seam | default; add through plugin/tool/MCP/sidecar/config/owned package |
+| L0 | Code Puppy-owned seam | default; add through plugin/tool/MCP/sidecar/config/owned package |
 | L1 | Build/runtime transform | upstream source stays byte-identical |
 | L2 | Mechanical patch | apply in build/restore; failure must block loudly |
 | L3 | Frozen takeover | named path exits sync and accepts full maintenance cost |
@@ -199,20 +199,20 @@ ADR-029 defines the only supported ways to change upstream behavior:
 There is no direct-edit level for a still-synchronized file. Moving a path to
 L2 or L3 requires an accepted ADR naming scope, guard, rollback, and ownership.
 
-## Shell-level registrations when Alpha replaces an upstream leaf
+## Shell-level registrations when Code Puppy replaces an upstream leaf
 
 Upstream keeps command registrations (`command.register`) inside the page leaves
 and inside the legacy layout. `command.trigger(id)` is
 `optionMap.get(id)?.onSelect?.()` — an **unregistered id returns silently**. So
-when Alpha takes over a leaf (REQ-085/086/125 replaced `home`, `new-session` and
+when Code Puppy takes over a leaf (REQ-085/086/125 replaced `home`, `new-session` and
 `session`), every shell-level registration that leaf carried disappears, and any
 entry still pointing at it becomes a control that does nothing and reports
 nothing. The failure surface is **per route**: the same entry can work on one
 route and be dead on another.
 
 **Rule.** Replacing an upstream leaf requires an explicit decision for every
-shell-level registration it carried — inherit (re-register in the Alpha shell),
-retire (delete the entry as well), or restore. Alpha's UI must not contain a
+shell-level registration it carried — inherit (re-register in the Code Puppy shell),
+retire (delete the entry as well), or restore. Code Puppy's UI must not contain a
 clickable entry pointing at an unregistered command. The judgement is enumerated
 **per entry**, not per command — but that enumeration is a **hand-maintained list
 of known entries**, not something the gates derive. Nothing here discovers a new
@@ -224,17 +224,17 @@ Current disposition (REQ-126 AC7):
 
 | Entry | Command | Disposition |
 |---|---|---|
-| Sidebar account menu → Settings | `settings.open` | Inherited: calls the Alpha settings surface directly, route-independent |
+| Sidebar account menu → Settings | `settings.open` | Inherited: calls the Code Puppy settings surface directly, route-independent |
 | Sidebar search | `command.palette` | Inherited: registered once by `CodePuppySessionSearch` on the shell |
-| Settings → Shortcuts list | `settings.open`, `command.palette`, `project.open`, `session.new` | Kept, but only ids the Alpha shell registers: upstream applies a custom keybind **only to a registered option**, so a retired id left in that table would be editable, saveable and inert |
+| Settings → Shortcuts list | `settings.open`, `command.palette`, `project.open`, `session.new` | Kept, but only ids the Code Puppy shell registers: upstream applies a custom keybind **only to a registered option**, so a retired id left in that table would be editable, saveable and inert |
 | Sidebar new chat / open project / collapse | `session.new`, `project.open`, `sidebar.toggle` | Inherited: registered once by `CodePuppySidebar` on the shell, so the desktop menu and its accelerators reach the same handlers on every route |
-| Empty-project state → Open project | `project.open` | Re-wired to Alpha's own directory picker (upstream's command only fed upstream's project list) |
+| Empty-project state → Open project | `project.open` | Re-wired to Code Puppy's own directory picker (upstream's command only fed upstream's project list) |
 | Sidebar back / forward buttons | — | Kept as-is. They never went through the command bus (`navigate(±1)` directly), so they work on every route; they are the entry for this capability |
 | Floating terminal / review toggles | `terminal.toggle`, `review.toggle` | Retired with the buttons; the session workspace top bar owns the live equivalents |
 | Composer permission tier "full auto" | `permissions.autoaccept.*` | Retired; the ids never existed upstream and the submit layer only branches on `readonly` |
-| Desktop menu: terminal / file tree / previous·next session / previous·next project | `terminal.toggle`, `fileTree.toggle`, `session.previous`, `session.next`, `project.previous`, `project.next` | Retired from the published menu (`packages/ui-mac/src/shared/desktop-menu-policy.ts`); reviving them needs an Alpha-owned ordering model or panel handle, i.e. a new capability |
+| Desktop menu: terminal / file tree / previous·next session / previous·next project | `terminal.toggle`, `fileTree.toggle`, `session.previous`, `session.next`, `project.previous`, `project.next` | Retired from the published menu (`packages/ui-mac/src/shared/desktop-menu-policy.ts`); reviving them needs a Code Puppy-owned ordering model or panel handle, i.e. a new capability |
 | Desktop menu: Back / Forward | `common.goBack`, `common.goForward` | Retired from the published menu. Upstream's Titlebar registers the same ids and wins on home / new-session (`AppInterface` renders injected children before the route shell, and a duplicate id keeps the first registration), and it drives a **private** history whose stack is `["/"]` after returning from a session — so the menu item was a no-op on some routes and someone else's handler on others. Reviving it means taking over that private history first |
-| Upstream titlebar `home.toggle` / `tab.*` | — | Not inherited. They are upstream's own controls, registered by the component that renders them, and Alpha adds no entry of its own: home is the sidebar brand button and the tab strip is hidden |
+| Upstream titlebar `home.toggle` / `tab.*` | — | Not inherited. They are upstream's own controls, registered by the component that renders them, and Code Puppy adds no entry of its own: home is the sidebar brand button and the tab strip is hidden |
 
 Gates are runtime, not source text.
 `packages/ui-mac/src/renderer/sidebar/shell-commands.test.ts` mounts the real
@@ -252,7 +252,7 @@ Known not covered by those gates, stated rather than implied:
 
 - A **new** UI entry pointing at a command is not discovered by anything. The
   shell gate walks a hand-written list of known entries; a control added
-  elsewhere in Alpha's UI is simply absent from it and stays green.
+  elsewhere in Code Puppy's UI is simply absent from it and stays green.
 - The sidebar back / forward buttons have **no behavioural case**. The gate only
   asserts the top-left toolbar exists with its three buttons; nothing clicks
   them and observes navigation. (An earlier attempt was removed: upstream's
@@ -272,12 +272,12 @@ Known not covered by those gates, stated rather than implied:
 
 ## Colliding global declarations: `window.api` (#932)
 
-`ui-mac` compiles Alpha source and upstream `packages/app` in **one TypeScript
+`ui-mac` compiles Code Puppy source and upstream `packages/app` in **one TypeScript
 program**, and both declare the same global property:
 
 | Declared in | Shape |
 |---|---|
-| `packages/ui-mac/src/renderer/env.d.ts` (Alpha) | `api: ElectronAPI` — the full preload surface, ~160 renderer call sites |
+| `packages/ui-mac/src/renderer/env.d.ts` (Code Puppy) | `api: ElectronAPI` — the full preload surface, ~160 renderer call sites |
 | `packages/app/src/app.tsx` (upstream), reaching `ui-mac` as the project-reference output `.ts-dist/src/app.d.ts` | `api?: { setTitlebar?; exportDebugLogs? }` — minimal, wholly optional |
 
 Both declaration sites are `.d.ts` inside `ui-mac`'s program, so `skipLibCheck:
@@ -295,13 +295,13 @@ if the author broke the renderer. `#926` could only route around it.
 Two things pin it down:
 
 1. `packages/ui-mac/tsconfig.json` lists `"files": ["src/renderer/env.d.ts"]`.
-   `files` entries are expanded ahead of `include`, so the Alpha declaration is
+   `files` entries are expanded ahead of `include`, so the Code Puppy declaration is
    always root file #0 and always wins the merge.
 2. `packages/ui-mac/src/main/tabs-preclean-contract.ts` reproduces the hazard on
    purpose (it genuinely imports the upstream root export for the tab-shape
    drift gate) and asserts what the merge actually produced —
    `Window["api"]` still assignable to `ElectronAPI`, still non-optional, and
-   still carrying Alpha-only keys. Those assertions must stay in a `.ts` file;
+   still carrying Code Puppy-only keys. Those assertions must stay in a `.ts` file;
    inside a `.d.ts` `skipLibCheck` would swallow them too.
 
 `compilerOptions.types` is **not** an alternative lever: type reference

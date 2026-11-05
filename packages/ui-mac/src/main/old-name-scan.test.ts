@@ -45,6 +45,7 @@ const REGISTRY = "scripts/old-name-exceptions.tsv"
  * 旧名判据。前九支逐字取自方案 §1.3 的 P(`sk-alpha-` 与 `code-puppy` 两支随 owner 裁决 D4 / F5 加入);
  * 第十支 `.alpha` 承接被取代的 `#1206` 门 —— 不收它,`~/.alpha` / `<proj>/.alpha` 这类退役根写法就从此无人拦;
  * 它要求 `.alpha` 前面不是标识符字符,否则 CSS 里表示透明度的 `.chip.alpha` 这类类名也会被判成旧名。
+ * 独立 `Alpha` 分支拦住用户与模型可见的退役品牌词(#1635),包括英文所有格。
  */
 const OLD_NAME = new RegExp(
   [
@@ -58,6 +59,7 @@ const OLD_NAME = new RegExp(
     "sk-alpha-",
     "code-puppy",
     "(^|[^A-Za-z0-9_])\\.alpha([^-A-Za-z0-9_]|$)",
+    "(^|[^A-Za-z0-9])Alpha([^A-Za-z0-9]|$)",
   ].join("|"),
 )
 
@@ -75,6 +77,7 @@ const CATEGORIES = new Set([
 
 /** 正样本:每一支至少一个;`x alpha_cloud_access` 是只有 `\b` 写法才会漏的那一个(方案 §1.7)。 */
 const KNOWN_OLD = [
+  "with Alpha's", // office-docs/SKILL.md 的真实品牌所有格(AC1)。
   "x alpha_cloud_access",
   'const key = "sk-alpha-0123456789"',
   "codepuppy://auth vs code-puppy://auth/callback",
@@ -92,6 +95,8 @@ const KNOWN_OLD = [
 
 /** 反样本:普通英文词、颜色透明度、语义化版本、新名字本身、分支名 —— 一条都不许命中。 */
 const ORDINARY = [
+  "withAlpha(",
+  "AlphaBlend",
   "alphanumeric",
   "alphabetical order",
   "color.withAlpha(0.5)",

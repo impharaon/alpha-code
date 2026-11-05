@@ -1,6 +1,6 @@
 // ext-mcp-policy — REQ-133 + REQ-135:MCP 写盘的 main 侧 Office 策略闸口(单一入口)。
 //
-// Alpha bundled Office server 的资源与 workspace 路径只能由 main canonicalize;legacy IPC
+// Code Puppy bundled Office server 的资源与 workspace 路径只能由 main canonicalize;legacy IPC
 // (ext-persist-mcp)与 main-only planner 都走这里。REQ-135 另在同一咽喉拒绝已退役的社区
 // Excel 身份/包命令,但不保留其 workspace、环境变量或兼容安装策略。
 
@@ -23,7 +23,7 @@ import {
 } from "../shared/office-advisories"
 import { resourcesRoot } from "./ext-fs-installer"
 
-/** REQ-105 (#319): the Alpha Office connectors execute app-bundled bytes, so the only fact that
+/** REQ-105 (#319): the Code Puppy Office connectors execute app-bundled bytes, so the only fact that
  *  identifies WHAT RUNS is the content address of that file — the catalog card version (`1.0.0`)
  *  names the connector, not its bytes. This is the resources-relative payload path recorded with
  *  the digest, so the receipt value is machine-comparable and reproducible across machines. */
@@ -39,13 +39,13 @@ export function bundledOfficeServerDigest(serverPath: string): string {
 }
 
 /** REQ-105 (#319): the write-policy verdict now also carries the executed artifact's content
- *  address for Alpha Office connectors, so the install transaction can persist it into the receipt
+ *  address for Code Puppy Office connectors, so the install transaction can persist it into the receipt
  *  without the planner re-deriving or guessing it. Absent for every other MCP — an absent digest
  *  means "not recorded", never "audited". */
 export type McpWritePolicyResult = { ok: true; artifactDigest?: string } | { ok: false; reason: string }
 
 /** #1564 AC1: the four first-party Office entries always persist main's template — the app-bundled
- *  interpreter and server resolved against Alpha's resources, the `{workspace}` spawn-time marker —
+ *  interpreter and server resolved against Code Puppy's resources, the `{workspace}` spawn-time marker —
  *  whatever command the catalog card (or a legacy uv-era card) carried. Card tokens are not compared or
  *  consumed. Boot reconciliation owns migrating already-installed entries. */
 function applyCodePuppyOfficeWorkspacePolicy(name: string, server: Record<string, unknown>): McpWritePolicyResult {
@@ -72,7 +72,7 @@ function applyCodePuppyOfficeWorkspacePolicy(name: string, server: Record<string
     )
     const safety = checkCodePuppyOfficeMcpSafety(name, server, WORKSPACE_MARKER, codepuppyResources)
     if (!safety.ok) return safety
-    // REQ-105 (#319) fail-closed: an Alpha Office install never persists without the content
+    // REQ-105 (#319) fail-closed: a Code Puppy Office install never persists without the content
     // address of the bytes it will execute. readFileSync failing here lands in the same catch as a
     // missing bundled server — refuse rather than write a receipt that cannot name what runs.
     return { ok: true, artifactDigest: bundledOfficeServerDigest(serverPath) }
@@ -82,7 +82,7 @@ function applyCodePuppyOfficeWorkspacePolicy(name: string, server: Record<string
 }
 
 /** #1564 AC3: the bundled Office runtime is ready when its `python3` is executable and the shared server
- *  resolves inside Alpha's resources — the same two paths the write policy puts into the command. */
+ *  resolves inside Code Puppy's resources — the same two paths the write policy puts into the command. */
 export function officeRuntimeReadiness(codepuppyResourcesRoot: string = resourcesRoot()): OfficeRuntimeReadiness {
   try {
     const codepuppyResources = fs.realpathSync(codepuppyResourcesRoot)

@@ -124,7 +124,7 @@ export interface ToolPolicySubject {
   readonly authority: ToolAuthority
   /**
    * 当前 binding 的宿主派生 digest(§5):第三方 MCP = 去秘密后的 server definition,
-   * plugin = 安装 receipt/manifest/loader generation。Alpha Cloud 不用传 ——
+   * plugin = 安装 receipt/manifest/loader generation。Code Puppy Cloud 不用传 ——
    * verified `authority.evidenceDigest` 就是它的 binding。
    */
   readonly bindingDigest?: string

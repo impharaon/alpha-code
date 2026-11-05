@@ -1,4 +1,4 @@
-// Alpha ArtifactDescriptor helpers. The wire schema and runtime decoder come only from the pinned
+// Code Puppy ArtifactDescriptor helpers. The wire schema and runtime decoder come only from the pinned
 // alpha-platform contract consumer; this file retains alpha-work#1/#2's local ID/projection helpers.
 //
 // Wire truth lives in the pinned consumer package. The remaining ID/projection helpers are the

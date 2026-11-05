@@ -1,4 +1,4 @@
-// codepuppy-office-instance — REQ-155 `#1244`:四个 Alpha 随包 Office 连接器的安装记录**跟随运行中的实例**,
+// codepuppy-office-instance — REQ-155 `#1244`:四个 Code Puppy 随包 Office 连接器的安装记录**跟随运行中的实例**,
 // 不跟随安装那一刻冻结进去的 app 包路径,也不跟随它们当初被装进去的那个渠道根。
 //
 // ── 地面真相(2026-09-04,owner 本机,实读)──────────────────────────────────────────────
@@ -16,7 +16,7 @@
 // 排在第一次 sidecar fork 之前(锚在 codepuppy-office-instance.test.ts;index.ts 结构上进不了 bun)。
 //
 // ── 收窄式操作,都幂等、都 fail-closed ───────────────────────────────────────────────
-//   1. **re-anchor**:当前根里的 Alpha Office `mcp.<name>` 叶子,命令与钉死模板逐 token 相同、只有
+//   1. **re-anchor**:当前根里的 Code Puppy Office `mcp.<name>` 叶子,命令与钉死模板逐 token 相同、只有
 //      server 槽指着另一个绝对 `…/office-mcp/server.py` ⇒ 把 server 槽改写成当前 bundle 的 canonical
 //      路径。命令里别的一个字不动(workspace 槽可能还是遗留的具体路径 —— 紧接着跑的
 //      `reconcileMcpWorkspaceMarkers` 会把它还原成 `{workspace}`,而它认模板**需要**当前 server 路径,

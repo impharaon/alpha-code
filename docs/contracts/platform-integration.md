@@ -1,5 +1,5 @@
 ---
-title: Alpha Code platform integration
+title: Code Puppy platform integration
 kind: contract
 status: active
 owners:
@@ -8,9 +8,9 @@ last_reviewed: 2026-07-24
 review_after: 2026-10-13
 ---
 
-# Alpha Code platform integration
+# Code Puppy platform integration
 
-This contract describes the desktop side of the Alpha Web and Alpha Platform
+This contract describes the desktop side of the Code Puppy web and Code Puppy platform
 integration. Service wire formats remain owned by their producer repositories.
 
 ## Ownership and authority
@@ -25,16 +25,16 @@ integration. Service wire formats remain owned by their producer repositories.
 | Cloud Jobs HTTP/SSE, artifacts, schedules, MCP facade            | `alpha-platform`                 | main-process clients and injected MCP server |
 | Account summary and billing transactions                         | `alpha-platform` account service | main-process account client                  |
 
-Current Alpha Platform contracts are
+Current Code Puppy platform contracts are
 [`cloud-jobs-v1.md`](https://github.com/jinjunnn/alpha-platform/blob/main/docs/contracts/cloud-jobs-v1.md)
 and
 [`account-billing.md`](https://github.com/jinjunnn/alpha-platform/blob/main/docs/contracts/account-billing.md).
 Endpoint precedence is defined in
 [`platform-endpoint-discovery.md`](platform-endpoint-discovery.md).
 
-## Pinned Alpha contract consumer
+## Pinned Code Puppy contract consumer
 
-The desktop consumes Alpha Platform v1 through
+The desktop consumes Code Puppy platform v1 through
 `packages/codepuppy-contracts-consumer`. Its
 `alpha-platform-contract.lock.json` pins repository
 `jinjunnn/alpha-platform` at immutable commit
@@ -116,10 +116,10 @@ inactive-plan payloads.
    manifest, which is also what the installer registers with the OS; the
    previous client `alpha-code` and scheme `code-puppy` are not accepted
    (alpha-web#283).
-2. Alpha Web authenticates the user and returns a one-time authorization code.
+2. Code Puppy web authenticates the user and returns a one-time authorization code.
 3. The desktop validates state and exchanges the code and verifier at
    `POST <web>/auth/token`.
-4. Alpha Web returns a short-lived access JWT, rotating refresh token, session
+4. Code Puppy web returns a short-lived access JWT, rotating refresh token, session
    ID, and optionally a versioned endpoint discovery payload. Before
    persistence, the desktop decodes the JWT payload as the platform-access
    branch of `TokenClaimsV1` and requires v1 `iss`, `aud`, `token_use`,
@@ -176,8 +176,8 @@ inactive-plan payloads.
 ## Runtime seams
 
 - **Model proxy:** platform mode sets the model gateway base and injects an
-  `alpha` provider. BYOK providers remain direct and do not traverse Alpha
-  Platform.
+  `alpha` provider. BYOK providers remain direct and do not traverse Code Puppy
+  platform.
 - **Cloud Jobs:** renderer requests cross narrow IPC handlers; the main process
   calls the Cloud Jobs HTTP/SSE and artifact APIs with the main-held bearer.
   Submit, status, and cancel all speak the versioned platform#255 contract
@@ -465,15 +465,15 @@ file preview, findings, purpose, and retention; cancel mints nothing and sends
 nothing.
 
 After confirmation, main reacquires a `cloud.dispatch` access token and
-requires the same valid `sub`, then calls the Alpha Web-owned
+requires the same valid `sub`, then calls the Code Puppy web-owned
 `POST <web>/auth/upload-consent` issuance seam. The request carries the exact
-manifest JSON and its SHA-256. Alpha Web must return the vendored
+manifest JSON and its SHA-256. Code Puppy web must return the vendored
 `upload_consent` JWT branch (`iss=codepuppy-web`, `aud=codepuppy-platform-upload`,
 `token_use=upload_consent`, `purpose=artifact.upload`). Main checks its subject,
 expiry, manifest ID, manifest SHA-256, and egress declaration before sending
 the frozen request to Cloud Jobs with `X-Alpha-Upload-Consent`. The desktop
-does not call or describe an Alpha Platform issuance API. Deployment of the
-real Alpha Web issuer remains an Alpha Web integration prerequisite; desktop
+does not call or describe a Code Puppy platform issuance API. Deployment of the
+real Code Puppy web issuer remains a Code Puppy web integration prerequisite; desktop
 tests use a mocked issuer response.
 
 Pending consent is one-shot process memory, scoped to the requesting renderer,
@@ -657,8 +657,8 @@ The complete write surface for this artifact state machine is:
 
 ## Invariants
 
-- Alpha Web is the authority for public identity and desktop sessions; Alpha
-  Platform verifies its JWT and owns enforcement, metering, jobs, and ledger.
+- Code Puppy web is the authority for public identity and desktop sessions; Code Puppy
+  platform verifies its JWT and owns enforcement, metering, jobs, and ledger.
 - The renderer never receives access, refresh, provider, MCP, or account
   bearer values.
 - The model gateway and Cloud Jobs/MCP worker are separate endpoints.

@@ -64,7 +64,7 @@ export type PackageInstallabilityDeps = {
   fetchPayload?: (ref: PackagePayloadRefV1) => Promise<Uint8Array>
   decodePayload?: typeof decodePackageProfilePayloadV1
   decodeSecretPrerequisite?: typeof decodePackageSecretPrerequisiteProfileV1
-  /** The static Alpha Connection allowlist. Production default is the compiled-in table. */
+  /** The static Code Puppy Connection allowlist. Production default is the compiled-in table. */
   connectionHandlers?: CodePuppyConnectionHandlerTableV1
   accepted?: (facts: PackageAcceptedFactsV1) => void
 }
@@ -76,7 +76,7 @@ export type PackageAcceptedComponentV1 = {
   role: "root" | "leaf"
   payload: PackageProfilePayloadV1
   prerequisite: Extract<PackageSecretPrerequisiteProfileDecodeV1, { ok: true }>["profile"]
-  /** Alpha Connection prerequisites declared by this component. Empty for every other profile. */
+  /** Code Puppy Connection prerequisites declared by this component. Empty for every other profile. */
   connection: PackageConnectionPrerequisiteProfileV1
   /** MCP OAuth prerequisites (engine-owned protocol). Empty for every other auth kind. */
   oauth: PackageMcpOauthPrerequisiteProfileV1
@@ -337,7 +337,7 @@ export async function evaluatePackageForHost(
     )
     if (!prerequisite.ok) return refuse("package-prerequisite-invalid")
 
-    // Alpha Connection is answered here, in the browse/detail evaluator, which is the earliest
+    // Code Puppy Connection is answered here, in the browse/detail evaluator, which is the earliest
     // point at which the host knows a signed package wants one: the declaration lives inside the
     // component payload fetched just above, so this is the first line that can see it. An id this
     // build has no handler for becomes `update-required` now — before a handler runs, before an

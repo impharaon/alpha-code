@@ -47,7 +47,7 @@ import {
 } from "./codepuppy-tool-policy-store"
 
 // ── binding digest 派生(§5)────────────────────────────────────────────────────
-// Alpha Cloud:直接复用 verified `authority.evidenceDigest`,不再派生第二个。
+// Code Puppy Cloud:直接复用 verified `authority.evidenceDigest`,不再派生第二个。
 // 第三方 MCP:对**去秘密后的**有效 server definition 派生 —— headers / environment /
 // oauth 里住着 token/secret,既不该进 digest 也不该因轮换而判 rebind;
 // enabled/timeout 是运维参数,不是 binding。url(remote)/ command+cwd(local)
@@ -66,7 +66,7 @@ export function deriveBindingDigest(evidence: unknown): string {
   return canonicalJsonDigest(evidence)
 }
 
-/** 主体当前 binding:Alpha Cloud 用 authority 证据,其余用调用方派生的 digest。 */
+/** 主体当前 binding:Code Puppy Cloud 用 authority 证据,其余用调用方派生的 digest。 */
 export function subjectBindingDigest(subject: ToolPolicySubject): string | undefined {
   if (subject.authority.kind === "codepuppy-cloud") return subject.authority.evidenceDigest
   return subject.bindingDigest

@@ -191,7 +191,7 @@ One `packageId` has at most one graph, so two versions are never active at once.
 * **capability grants** — re-authorisation is decided by the committed grant
   ledger (`grants.json`) versus this attempt's request set. Expanding capabilities
   therefore requires confirmation by construction, not by a separate flag.
-* **Alpha Connections** — a connection is shared and revoked at the provider.
+* **Code Puppy Connections** — a connection is shared and revoked at the provider.
   Uninstall releases this component's *binding* and never disconnects or revokes;
   a release failure is reported, never fatal.
 

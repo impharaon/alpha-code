@@ -112,11 +112,11 @@ export interface ToolCardDispatch {
   origin?: string
   /** metadata-only 时的隐藏理由(确定分支,渲染层据此选安全卡文案)。 */
   hiddenReason?: ToolHiddenReason
-  /** kind="cloud" 时命中的 Alpha Cloud 宿主规则(标题 + 关键目标 allowlist)。 */
+  /** kind="cloud" 时命中的 Code Puppy Cloud 宿主规则(标题 + 关键目标 allowlist)。 */
   cloudRule?: CodePuppyCloudRule
 }
 
-// ── #587 Alpha Cloud 宿主展示规则表 ─────────────────────────────────────────
+// ── #587 Code Puppy Cloud 宿主展示规则表 ─────────────────────────────────────────
 // 资格 = 基线 §4:source="mcp" + **当次持久化 authority.kind="codepuppy-cloud"** +
 // 本表精确命中 identity.name。判云端的唯一铸币是 authority(F5/T3);server 配置键
 // (origin)与工具名都不是证据,所以本表不比对 origin 字符串 —— origin 冒充
@@ -366,7 +366,7 @@ function dispatchOfSnapshot(snapshot: DisplaySnapshot, metadata: () => Record<st
       return { kind: effective, category, metadataOnly: false, name: sanitizedName(identity.name) }
     }
   }
-  // #587 Alpha Cloud 专用卡:资格闸是 category(= 当次持久化 authority 铸出的
+  // #587 Code Puppy Cloud 专用卡:资格闸是 category(= 当次持久化 authority 铸出的
   // "codepuppy-cloud"),不是 origin / 别名字符串 —— authority 缺席时同名工具落到下面的
   // 第三方 MCP 降级卡(fail-closed)。
   if (category === "codepuppy-cloud") {
@@ -570,7 +570,7 @@ export function toolCardHeadOf(part: ToolPart): ToolCardHead {
   const input = inputOf(part)
   const metadata = metadataOf(part)
 
-  // #587 Alpha Cloud 专用卡:语义化标题 + 规则点名的关键目标(经 redactor)。
+  // #587 Code Puppy Cloud 专用卡:语义化标题 + 规则点名的关键目标(经 redactor)。
   // 只读规则 allowlist 的单个 input 键;metadata / output 不进头部。
   if (dispatch.kind === "cloud") {
     const rule = dispatch.cloudRule

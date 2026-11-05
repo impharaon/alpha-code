@@ -43,7 +43,7 @@ if (expected === rendered) {
 }
 const a = expected.split("\n")
 const b = rendered.split("\n")
-console.error(`✗ inventory differs from ${shown} — an Alpha fragment / limit changed without regenerating the snapshot:`)
+console.error(`✗ inventory differs from ${shown} — a Code Puppy fragment / limit changed without regenerating the snapshot:`)
 for (let i = 0; i < Math.max(a.length, b.length); i++) {
   if (a[i] === b[i]) continue
   if (a[i] !== undefined) console.error(`  - ${a[i]}`)

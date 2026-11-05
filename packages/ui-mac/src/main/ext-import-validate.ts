@@ -4,7 +4,7 @@
 
 import { isExtensionName } from "../shared/extension-name"
 
-/** REQ-128 Phase 3(基线 §14 R2-b):Alpha 没有对应语义的**调用控制**字段。
+/** REQ-128 Phase 3(基线 §14 R2-b):Code Puppy 没有对应语义的**调用控制**字段。
  *  出现任一即具名跳过该技能(owner 裁决 C)——判据是「这个顶层键在不在」,与它的值无关。 */
 export const SKILL_CONTROL_FIELD_KEYS: readonly string[] = ["allowed-tools", "argument-hint", "disable-model-invocation", "user-invocable"]
 

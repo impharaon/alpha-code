@@ -20,7 +20,7 @@ table and the two non-obvious mechanisms below are pinned here.
 
 Its sibling for the other authorization kind is
 [`codepuppy-connection-lifetime.md`](codepuppy-connection-lifetime.md). The two are
-separate subsystems on purpose: an Alpha Connection's durable record is
+separate subsystems on purpose: a Code Puppy Connection's durable record is
 main-owned; an MCP OAuth credential's durable record is the engine's
 `mcp-auth.json` (`0600 + flock`, the accepted boundary for REQ-128 — not
 safeStorage, not a migration rider).

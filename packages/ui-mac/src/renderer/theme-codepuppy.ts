@@ -8,12 +8,12 @@ import { BRAND } from "./brand"
 // "monochrome chrome + one brand accent", not "no color anywhere".
 //
 // Registered at runtime via theme.registerTheme() (see renderer/index.tsx);
-// opencode source is never touched. Appears in the theme picker as "Alpha".
+// opencode source is never touched. Appears in the theme picker as "Code Puppy".
 export const CODEPUPPY_THEME_ID = "alpha"
 
 export const CODEPUPPY_THEME: DesktopTheme = {
   $schema: "https://opencode.ai/desktop-theme.json",
-  name: "Alpha",
+  name: "Code Puppy",
   id: CODEPUPPY_THEME_ID,
   light: {
     palette: {

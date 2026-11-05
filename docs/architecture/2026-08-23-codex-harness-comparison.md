@@ -23,8 +23,8 @@ review_after: 2027-03-08
 | 层 | 归属 | 规模(2026-08-22 实测) |
 |---|---|---|
 | 引擎 / session / context / provider | 上游 `anomalyco/opencode`(当时 v1.18.19) | ~800K 行 TS,948 测试文件 / ~7,127 用例 |
-| `packages/ext` | Alpha(进程内 TS plugin + 自定义 tool) | 3.6K 行 |
-| `packages/ui-mac` | Alpha(Electron 外壳 + 品牌 + 扩展中枢) | main 50K(非测试)/ renderer 77K |
+| `packages/ext` | Code Puppy(进程内 TS plugin + 自定义 tool) | 3.6K 行 |
+| `packages/ui-mac` | Code Puppy(Electron 外壳 + 品牌 + 扩展中枢) | main 50K(非测试)/ renderer 77K |
 | 云 | `alpha-platform`(网关、计量、多租户) | 独立仓 |
 
 关键耦合:`ui-mac/src/renderer` 有 **135 处** `@opencode-ai/*` import(`app` 69 · `sdk` 37 ·

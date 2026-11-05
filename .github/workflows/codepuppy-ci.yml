@@ -28,7 +28,7 @@
 #                     Lives in THIS job because it needs the pin object — the `test` job checkout is
 #                     shallow, which is why the same-family axis inside scripts/bun-test-app.sh has
 #                     never once executed in CI ("未比对: pin … 的对象本地取不到").
-#   typecheck       — tsgo on the Alpha packages a PR can actually touch.
+#   typecheck       — tsgo on the Code Puppy packages a PR can actually touch.
 #   test            — vendored contract hashes/fixtures plus alpha package unit tests.
 #   seed-assets     — B7: asserts electron-builder extraResources (REQ-023 vendored agent/plugin,
 #                     builtin skills, NOTICE.txt/B15, signing assets) exist; a silent deletion ships a
@@ -258,7 +258,7 @@ jobs:
       # 要把私仓读令牌放进公开仓的 secrets,而本 workflow 触发在 `pull_request` —— fork PR
       # 结构上拿不到 secrets,那一步对外部贡献者依然红。provenance 由开发机 pre-push 真验
       # (那里有兄弟仓);判读法见 docs/runbooks/ci.md 第 2 节。
-      - name: verify immutable Alpha contract vendor lock
+      - name: verify immutable Code Puppy contract vendor lock
         if: needs.detect.outputs.code == 'true'
         run: bun run --cwd packages/codepuppy-contracts-consumer check:vendor
       # 这两步与下面三步是**同一类**:`bun test` 对零用例退出 0,只看退出码会在 suite 被清空时

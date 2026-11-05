@@ -8,7 +8,7 @@ import {
 } from "./dialog-core"
 import "./dialog.css"
 
-export const DIALOG_TITLE_ERROR = "Alpha Dialog requires a non-empty title"
+export const DIALOG_TITLE_ERROR = "Code Puppy Dialog requires a non-empty title"
 
 /**
  * codepuppy-ui Dialog — the canonical modal. The overlay exists only while `open` is true and owns

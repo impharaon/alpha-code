@@ -1,6 +1,6 @@
 // north-star:codepuppy-owned — Code Puppy 自有文件,住在上游包目录里(ADR-043 因子②;文件名为何未改见 scripts/old-name-exceptions.tsv)。
 /**
- * Alpha Cloud MCP authority is proven only by the definition that the desktop
+ * Code Puppy Cloud MCP authority is proven only by the definition that the desktop
  * injection handshake placed in this process. Keep this verifier pure so the
  * extension sovereignty gate and the engine display snapshot use one fact.
  */
@@ -85,7 +85,7 @@ export function governedCredentialFetch(
   return async (url, init) => {
     const authorization = template ? await resolveAuthorization(template, readFile) : undefined
     if (!authorization)
-      return new Response("Alpha cloud connector credential could not be read; the request was not sent.", {
+      return new Response("Code Puppy cloud connector credential could not be read; the request was not sent.", {
         status: 401,
         statusText: "Unauthorized",
       })

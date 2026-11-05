@@ -30,12 +30,12 @@ Markdown 不再复制活跃 backlog、优先级、负责人或 Sprint 状态。
   是独立的特权 workflow(持推送 token),只在 candidate 报告 `success` 后被 `workflow_run` 触发,
   只解包并推送 candidate 已验证过的那份提交——推送凭据从不与任何来自上游的代码在同一进程存在。
 - **纪律(北极星)**:**只新增文件,从不编辑 opencode 自身的任何文件** → 每次 sync 零冲突。这是 fork 模型能保持干净的唯一要求。
-- **上游 roadmap 不是 Alpha backlog**:`specs/v2/`、
+- **上游 roadmap 不是 Code Puppy backlog**:`specs/v2/`、
   `packages/opencode/specs/effect/`、`packages/codemode/` 与
   `packages/llm/example/` 中的 TODO、Status 和 checklist 随 `dev` 镜像，仅描述
-  upstream 工作，不是 Alpha 的交付状态。不得为治理而改写这些上游文件或把
-  其未完成项批量迁入 Alpha；只有当某项成为 Alpha 发布/采用门槛时，才在
-  `alpha-code` 新建验收 Issue，引用准确的 upstream revision，并纳入 Alpha
+  upstream 工作，不是 Code Puppy 的交付状态。不得为治理而改写这些上游文件或把
+  其未完成项批量迁入 Code Puppy；只有当某项成为 Code Puppy 发布/采用门槛时，才在
+  `alpha-code` 新建验收 Issue，引用准确的 upstream revision，并纳入 Code Puppy
   Delivery。
 
 ## 自有新增(都是新文件/新目录,不碰 upstream)
@@ -43,7 +43,7 @@ Markdown 不再复制活跃 backlog、优先级、负责人或 Sprint 状态。
 |---|---|
 | `packages/ext/` | `@codepuppy/ext` —— 零改动 opencode 的后端扩展(server plugin + 自定义 tools)。原生 workspace 成员,`@opencode-ai/plugin` 走 `workspace:*`。 |
 | `packages/ui-mac/` | 自有 Electron Mac 外壳:复用 `@opencode-ai/app` 的 `AppInterface` + 自定义 `Platform` + token 换肤(镜像 `packages/desktop` 的原生模式,无任何 symlink hack)。 |
-| `packages/ui-mac/src/renderer/{brand,theme-codepuppy,logo-codepuppy}.*` | 品牌层(全部新增,零改 upstream):`brand.ts` 是品牌色单一来源(图标橙 `#F87814` + 奶油 `#FBF4EC`);`theme-codepuppy.ts` 是 orng 主题的品牌重皮("Alpha" 主题,`registerTheme` 注册进选择器、首启动 `localStorage` 设默认);`logo-codepuppy.tsx` 是 α 版 Splash(替换我方 `index.tsx` 的 import)。 |
+| `packages/ui-mac/src/renderer/{brand,theme-codepuppy,logo-codepuppy}.*` | 品牌层(全部新增,零改 upstream):`brand.ts` 是品牌色单一来源(图标橙 `#F87814` + 奶油 `#FBF4EC`);`theme-codepuppy.ts` 是 orng 主题的品牌重皮("Code Puppy" 主题,`registerTheme` 注册进选择器、首启动 `localStorage` 设默认);`logo-codepuppy.tsx` 是 α 版 Splash(替换我方 `index.tsx` 的 import)。 |
 | `.claude/rules/` | 项目宪法(6 文件,`/app:*` 方法论)。 |
 | `docs/` | 架构理解 + 扩展接缝手册 + opencode code-graph(SVG)。 |
 | `CLAUDE.md` | 速查 + 升级 runbook。 |

@@ -1,4 +1,4 @@
-// ModelPickPop — canonical Alpha composer model picker. It owns the visible IA and talks only to the
+// ModelPickPop — canonical Code Puppy composer model picker. It owns the visible IA and talks only to the
 // generated SDK v2 model contract; no upstream picker DOM is mounted, hidden, observed, or clicked.
 
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show, untrack } from "solid-js"

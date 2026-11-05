@@ -1,6 +1,6 @@
 {
   "artifactPath": "packages/ui-mac/src/shared/host-extension-package-contract",
-  "artifactSha256": "0af4d2fbf62755e3510c7dba1ddca381d1b436e2903d47c5261a21ed91873437",
+  "artifactSha256": "d1ca6f6a41716d29d32cba5eb8e8048cac82c5766666685386e31f247e345c95",
   "files": [
     {
       "bytes": 20455,
@@ -23,9 +23,9 @@
       "sha256": "b72f493103ce877b5fb55e9af5015e01d587d227c6dc49904bf2c9bd76472d73"
     },
     {
-      "bytes": 2505,
+      "bytes": 2510,
       "path": "host-extension-package.registry.v1.json",
-      "sha256": "d17f4cbbf0bae0fd7acd71e2f792c0b05a25b01f472d63d963ac5cb903493005"
+      "sha256": "c47a6f197918a6ed5a15201b2e8c16796f7b72ac44af88915395279b24102aed"
     },
     {
       "bytes": 1377,

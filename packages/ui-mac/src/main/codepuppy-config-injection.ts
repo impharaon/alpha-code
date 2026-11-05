@@ -584,7 +584,7 @@ function governedModelsBase(config: { enabled_providers?: unknown; provider?: un
   }
   base[CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID] = {
     id: CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID,
-    name: "Alpha catalog readiness marker",
+    name: "Code Puppy catalog readiness marker",
     env: [],
     models: {},
   }
@@ -626,7 +626,7 @@ function materializeV2EngineConfig(
     ),
   )
   provider[CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID] = {
-    name: "Alpha catalog readiness marker",
+    name: "Code Puppy catalog readiness marker",
     env: [],
   }
   const v2 = {
@@ -637,7 +637,7 @@ function materializeV2EngineConfig(
   fs.writeFileSync(path.join(dir, "opencode.jsonc"), JSON.stringify(v2, null, 2), { mode: 0o600 })
   process.env.OPENCODE_CONFIG_DIR = dir
 
-  // #857:when Alpha model governance is active, every available built-in provider/model is already
+  // #857:when Code Puppy model governance is active, every available built-in provider/model is already
   // described by the provider projection above. Letting ModelsDev fall through to the bundled
   // snapshot still makes the first V2 request decode and materialize 6,132 unrelated rows before
   // ConfigProvider commits (2.8-6.1s in the signed packaged matrix). Materialize a minimal ModelsDev

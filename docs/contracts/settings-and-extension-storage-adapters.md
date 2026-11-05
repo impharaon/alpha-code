@@ -28,10 +28,10 @@ settings.write(input: {
 }): Promise<SettingsWriteResult>
 ```
 
-- `read` 对既有 Alpha 首启写入的 partial seed 补齐当前默认值，但不在读取时改盘；未知字段、
+- `read` 对既有 Code Puppy 首启写入的 partial seed 补齐当前默认值，但不在读取时改盘；未知字段、
   错误类型和危险 key 均 fail closed。成功返回完整 typed value 与 opaque revision。
 - `validate` 是无副作用预检；`write` 必须再次执行相同校验，renderer 的预检结果不构成授权。
-- Electron renderer 的 Alpha Settings 与上游 `SettingsProvider` 必须使用同一个 Platform
+- Electron renderer 的 Code Puppy Settings 与上游 `SettingsProvider` 必须使用同一个 Platform
   coordinator。该 coordinator 串行化 typed `read`/`write`，只在成功读取、成功提交或冲突返回
   typed authority 时更新其完整值与 opaque revision，并把快照同步广播给两类消费者。
 - `SettingsProvider` setter 不得把自己的完整内存 store 当成新权威值。每次 setter 只提交本字段

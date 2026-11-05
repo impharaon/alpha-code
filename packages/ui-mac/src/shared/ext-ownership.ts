@@ -30,8 +30,8 @@ export type RuntimeSurface = (typeof RUNTIME_SURFACES)[number]
 /** 支持等级:谁为这个条目的可用性负责。 */
 export const SUPPORT_TIERS = [
   "codepuppy", // Code Puppy 自产自支持
-  "curated", // 官方上游 + Alpha 策展支持
-  "community", // 社区来源,Alpha 只做策展面
+  "curated", // 官方上游 + Code Puppy 策展支持
+  "community", // 社区来源,Code Puppy 只做策展面
   "user", // 用户自装/自负(无策展支持面)
 ] as const
 export type SupportTier = (typeof SUPPORT_TIERS)[number]

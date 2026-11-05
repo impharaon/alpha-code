@@ -1,0 +1,138 @@
+{
+ "tally": {
+  "src/renderer/sidebar/use-projects.ts:608": 3,
+  "app/src/context/server-sdk.tsx:281": 3,
+  "src/renderer/codepuppy-ui/cloud-run-watcher.tsx:60": 2,
+  "(unmapped)": 8
+ },
+ "rows": [
+  {
+   "t": 1793858867658,
+   "wc": 1,
+   "owner": "src/renderer/sidebar/use-projects.ts:608",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "src/renderer/sidebar/use-projects.ts:608"
+   ]
+  },
+  {
+   "t": 1793858867680,
+   "wc": 1,
+   "owner": "app/src/context/server-sdk.tsx:281",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "app/src/context/server-sdk.tsx:281"
+   ]
+  },
+  {
+   "t": 1793858867751,
+   "wc": 1,
+   "owner": "src/renderer/codepuppy-ui/cloud-run-watcher.tsx:60",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "src/renderer/codepuppy-ui/cloud-run-watcher.tsx:60"
+   ]
+  },
+  {
+   "t": 1793858890397,
+   "wc": 1,
+   "owner": "app/src/context/server-sdk.tsx:281",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "app/src/context/server-sdk.tsx:281"
+   ]
+  },
+  {
+   "t": 1793858890947,
+   "wc": 1,
+   "owner": "src/renderer/sidebar/use-projects.ts:608",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "src/renderer/sidebar/use-projects.ts:608"
+   ]
+  },
+  {
+   "t": 1793858891121,
+   "wc": 1,
+   "owner": "src/renderer/sidebar/use-projects.ts:608",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "src/renderer/sidebar/use-projects.ts:608"
+   ]
+  },
+  {
+   "t": 1793858891163,
+   "wc": 1,
+   "owner": "src/renderer/codepuppy-ui/cloud-run-watcher.tsx:60",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "src/renderer/codepuppy-ui/cloud-run-watcher.tsx:60"
+   ]
+  },
+  {
+   "t": 1793858891179,
+   "wc": 1,
+   "owner": "app/src/context/server-sdk.tsx:281",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "app/src/context/server-sdk.tsx:281"
+   ]
+  },
+  {
+   "t": 1793858937980,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858938132,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858938284,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858938436,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858938588,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858938739,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858938892,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858939043,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  }
+ ]
+}

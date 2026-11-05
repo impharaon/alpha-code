@@ -1,0 +1,91 @@
+{
+ "label": "preflight",
+ "n": 1,
+ "mcp": true,
+ "round": "p",
+ "startedAt": "2026-11-05T06:22:38.780Z",
+ "isolation": {
+  "guardProof": {
+   "target": "~/Library/Keychains",
+   "outsideStatus": 0,
+   "insideStatus": 1,
+   "proven": true
+  },
+  "lsofVerdictProof": {
+   "catchesLeak": true,
+   "catchesNoRoot": true,
+   "passesClean": true,
+   "proven": true
+  },
+  "securityAgentBaseline": 0,
+  "devUserDataMtimeBefore": 1789973435203.6592,
+  "securityAgentEvents": []
+ },
+ "deviations": [
+  "窗口透明且不抢前台(dev-preload),CDP 口被改写;都不碰网络栈。"
+ ],
+ "launch": {
+  "flags": [
+   "--no-sandbox",
+   "--use-mock-keychain",
+   "--user-data-dir=<root>/udd",
+   "--log-net-log=<root>/net.json"
+  ],
+  "cdpPort": 43433,
+  "envKeys": [
+   "PATH",
+   "HOME",
+   "CFFIXED_USER_HOME",
+   "TMPDIR",
+   "USER",
+   "LOGNAME",
+   "SHELL",
+   "LANG",
+   "OPENCODE_TEST_ONBOARDING",
+   "NO_PROXY",
+   "no_proxy",
+   "CODEPUPPY_WEB_URL",
+   "CODEPUPPY_PLATFORM_URL",
+   "CODEPUPPY_ACCOUNT_URL",
+   "CODEPUPPY_CLOUD_URL",
+   "CODEPUPPY_MCP_URL",
+   "ALPHA_WEB_URL",
+   "ALPHA_PLATFORM_URL",
+   "ALPHA_ACCOUNT_URL",
+   "ALPHA_CLOUD_URL",
+   "ALPHA_MCP_URL",
+   "OPENCODE_DISABLE_MODELS_FETCH",
+   "P1554_DIRS",
+   "P1554_CDP_PORT",
+   "P1554_PRELOAD_LOG",
+   "P1554_INITIATORS"
+  ]
+ },
+ "preflight": {
+  "startStamp": "2026-11-05 06:22:37",
+  "pidsWatched": 4,
+  "positiveControlCaught": true,
+  "appKeychainOrAuthDenies": 0,
+  "fenceRefusedProvesSandboxActive": true,
+  "stop": {
+   "killed": 3,
+   "mainExitedAlone": true,
+   "sigkillNeeded": 0,
+   "leftover": []
+  },
+  "denyLines": 0,
+  "sample": []
+ },
+ "endedAt": "2026-11-05T06:23:02.559Z",
+ "exit": {
+  "code": 0,
+  "why": "guarded preflight complete"
+ },
+ "cleanup": {
+  "killed": 0,
+  "mainExitedAlone": true,
+  "sigkillNeeded": 0,
+  "leftover": [],
+  "orphansInRoot": []
+ }
+}

@@ -1,0 +1,373 @@
+{
+ "versions": {
+  "electron": "42.3.3",
+  "chrome": "148.0.7778.218",
+  "node": "24.15.0"
+ },
+ "argv": [
+  "--use-mock-keychain",
+  "--user-data-dir=<tmp>/udd",
+  "--log-net-log=<tmp>/net.json",
+  "--out=<tmp>/report.json"
+ ],
+ "visibility": "visible",
+ "startedAt": "2026-11-05T06:19:52.806Z",
+ "results": [
+  {
+   "id": "P0-control-12-origins",
+   "perOriginArrivals": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "total": 12,
+   "pass": true
+  },
+  {
+   "id": "P1-cap-simple",
+   "issued": 12,
+   "arrivedBeforeRelease": 6,
+   "tcpConnectionsBeforeRelease": 6,
+   "arrivedAfterOneRelease": 7,
+   "arrivedAfterAllReleased": 12,
+   "tcpConnectionsTotal": 6,
+   "settled": [
+    "done:200"
+   ],
+   "holds": true
+  },
+  {
+   "id": "P2-sse-counts-simple",
+   "rows": [
+    {
+     "sse": 0,
+     "sseArrived": 0,
+     "sseStreaming": 0,
+     "hangArrived": 6,
+     "expected": 6,
+     "tcpConnections": 6
+    },
+    {
+     "sse": 1,
+     "sseArrived": 1,
+     "sseStreaming": 1,
+     "hangArrived": 5,
+     "expected": 5,
+     "tcpConnections": 6
+    },
+    {
+     "sse": 2,
+     "sseArrived": 2,
+     "sseStreaming": 2,
+     "hangArrived": 4,
+     "expected": 4,
+     "tcpConnections": 6
+    },
+    {
+     "sse": 3,
+     "sseArrived": 3,
+     "sseStreaming": 3,
+     "hangArrived": 3,
+     "expected": 3,
+     "tcpConnections": 6
+    },
+    {
+     "sse": 4,
+     "sseArrived": 4,
+     "sseStreaming": 4,
+     "hangArrived": 2,
+     "expected": 2,
+     "tcpConnections": 6
+    },
+    {
+     "sse": 5,
+     "sseArrived": 5,
+     "sseStreaming": 5,
+     "hangArrived": 1,
+     "expected": 1,
+     "tcpConnections": 6
+    },
+    {
+     "sse": 6,
+     "sseArrived": 6,
+     "sseStreaming": 6,
+     "hangArrived": 0,
+     "expected": 0,
+     "tcpConnections": 6
+    }
+   ],
+   "starved": {
+    "sse": 6,
+    "fastAnsweredWithin3sMs": null,
+    "afterClosingOneStreamMs": 27
+   },
+   "control": {
+    "sse": 5,
+    "fastAnsweredWithin3sMs": 26,
+    "afterClosingOneStreamMs": null
+   },
+   "holds": true
+  },
+  {
+   "id": "P3-requeue-simple",
+   "fifoControl": {
+    "queuedArrivedBeforeRelease": 0,
+    "order": [
+     "A",
+     "B",
+     "C"
+    ],
+    "isFifo": true
+   },
+   "rounds": [
+    {
+     "arrivedBeforeRelease": 6,
+     "order": [
+      "B",
+      "C",
+      "A2"
+     ],
+     "arrivedA": false,
+     "methodsSeen": [
+      "GET:B",
+      "GET:C",
+      "GET:A2"
+     ]
+    },
+    {
+     "arrivedBeforeRelease": 6,
+     "order": [
+      "B",
+      "C",
+      "A2"
+     ],
+     "arrivedA": false,
+     "methodsSeen": [
+      "GET:B",
+      "GET:C",
+      "GET:A2"
+     ]
+    },
+    {
+     "arrivedBeforeRelease": 6,
+     "order": [
+      "B",
+      "C",
+      "A2"
+     ],
+     "arrivedA": false,
+     "methodsSeen": [
+      "GET:B",
+      "GET:C",
+      "GET:A2"
+     ]
+    }
+   ],
+   "barrier": {
+    "probesIssued": 12,
+    "order": [
+     "cmd1",
+     "cmd2",
+     "cmd3",
+     "probe9",
+     "probe10",
+     "probe11"
+    ]
+   },
+   "holds": true
+  },
+  {
+   "id": "P1-cap-auth",
+   "issued": 12,
+   "arrivedBeforeRelease": 6,
+   "tcpConnectionsBeforeRelease": 6,
+   "arrivedAfterOneRelease": 7,
+   "arrivedAfterAllReleased": 12,
+   "tcpConnectionsTotal": 6,
+   "settled": [
+    "done:200"
+   ],
+   "holds": true
+  },
+  {
+   "id": "P2-sse-counts-auth",
+   "rows": [
+    {
+     "sse": 0,
+     "sseArrived": 0,
+     "sseStreaming": 0,
+     "hangArrived": 6,
+     "expected": 6,
+     "tcpConnections": 6
+    },
+    {
+     "sse": 1,
+     "sseArrived": 1,
+     "sseStreaming": 1,
+     "hangArrived": 5,
+     "expected": 5,
+     "tcpConnections": 6
+    },
+    {
+     "sse": 2,
+     "sseArrived": 2,
+     "sseStreaming": 2,
+     "hangArrived": 4,
+     "expected": 4,
+     "tcpConnections": 6
+    },
+    {
+     "sse": 3,
+     "sseArrived": 3,
+     "sseStreaming": 3,
+     "hangArrived": 3,
+     "expected": 3,
+     "tcpConnections": 6
+    },
+    {
+     "sse": 4,
+     "sseArrived": 4,
+     "sseStreaming": 4,
+     "hangArrived": 2,
+     "expected": 2,
+     "tcpConnections": 6
+    },
+    {
+     "sse": 5,
+     "sseArrived": 5,
+     "sseStreaming": 5,
+     "hangArrived": 1,
+     "expected": 1,
+     "tcpConnections": 6
+    },
+    {
+     "sse": 6,
+     "sseArrived": 6,
+     "sseStreaming": 6,
+     "hangArrived": 0,
+     "expected": 0,
+     "tcpConnections": 6
+    }
+   ],
+   "starved": {
+    "sse": 6,
+    "fastAnsweredWithin3sMs": null,
+    "afterClosingOneStreamMs": 30
+   },
+   "control": {
+    "sse": 5,
+    "fastAnsweredWithin3sMs": 28,
+    "afterClosingOneStreamMs": null
+   },
+   "holds": true
+  },
+  {
+   "id": "P3-requeue-auth",
+   "fifoControl": {
+    "queuedArrivedBeforeRelease": 0,
+    "order": [
+     "A",
+     "B",
+     "C"
+    ],
+    "isFifo": true
+   },
+   "rounds": [
+    {
+     "arrivedBeforeRelease": 6,
+     "order": [
+      "B",
+      "C",
+      "A2"
+     ],
+     "arrivedA": false,
+     "methodsSeen": [
+      "GET:H0",
+      "GET:H1",
+      "GET:H2",
+      "GET:H3",
+      "GET:H4",
+      "GET:H5",
+      "OPTIONS:A",
+      "OPTIONS:B",
+      "OPTIONS:C",
+      "OPTIONS:A2",
+      "GET:B",
+      "GET:C",
+      "GET:A2"
+     ]
+    },
+    {
+     "arrivedBeforeRelease": 6,
+     "order": [
+      "B",
+      "C",
+      "A2"
+     ],
+     "arrivedA": false,
+     "methodsSeen": [
+      "GET:H0",
+      "GET:H1",
+      "GET:H2",
+      "GET:H3",
+      "GET:H4",
+      "GET:H5",
+      "OPTIONS:A",
+      "OPTIONS:B",
+      "OPTIONS:C",
+      "OPTIONS:A2",
+      "GET:B",
+      "GET:C",
+      "GET:A2"
+     ]
+    },
+    {
+     "arrivedBeforeRelease": 6,
+     "order": [
+      "B",
+      "C",
+      "A2"
+     ],
+     "arrivedA": false,
+     "methodsSeen": [
+      "GET:H0",
+      "GET:H1",
+      "GET:H2",
+      "GET:H3",
+      "GET:H4",
+      "GET:H5",
+      "OPTIONS:A",
+      "OPTIONS:B",
+      "OPTIONS:C",
+      "OPTIONS:A2",
+      "GET:B",
+      "GET:C",
+      "GET:A2"
+     ]
+    }
+   ],
+   "barrier": {
+    "probesIssued": 12,
+    "order": [
+     "cmd1",
+     "cmd2",
+     "cmd3",
+     "probe9",
+     "probe10",
+     "probe11"
+    ]
+   },
+   "holds": true
+  }
+ ],
+ "endedAt": "2026-11-05T06:21:51.206Z"
+}

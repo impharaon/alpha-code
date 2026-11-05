@@ -1,0 +1,1395 @@
+{
+ "meta": {
+  "events": 39035,
+  "firstEventEpochMs": 1793858599978,
+  "spanMs": 83967,
+  "cutoffMs": 83950,
+  "cutoffSource": "auto:teardown(3 cancels in last 300ms)",
+  "stallMs": 1000,
+  "engineOrigins": [
+   "http://127.0.0.1:39791"
+  ],
+  "stalledEventsTotal": 253,
+  "finalized": true,
+  "unparsedLines": 1
+ },
+ "engine": {
+  "total": 222,
+  "byLabel": {
+   "answered": 205,
+   "waiting-socket:pool-stalled": 9,
+   "sent-no-response:stream-bound-no-send-yet": 1,
+   "sent-no-response": 6,
+   "not-on-wire": 1
+  },
+  "peak": {
+   "maxHoldingSocket": 6,
+   "atMs": 1210
+  },
+  "openStreamsAtCutoff": 3,
+  "streamsEverOpened": 15,
+  "byPath": [
+   {
+    "key": "/command [answered]",
+    "count": 21
+   },
+   {
+    "key": "/project [answered]",
+    "count": 15
+   },
+   {
+    "key": "/experimental/session [answered]",
+    "count": 13
+   },
+   {
+    "key": "/mcp [answered]",
+    "count": 13
+   },
+   {
+    "key": "/api/agent [answered]",
+    "count": 12
+   },
+   {
+    "key": "/api/provider/alpha-internal-catalog-ready [answered]",
+    "count": 11
+   },
+   {
+    "key": "/api/model [answered]",
+    "count": 11
+   },
+   {
+    "key": "/global/event [answered]",
+    "count": 9
+   },
+   {
+    "key": "/api/health [answered]",
+    "count": 9
+   },
+   {
+    "key": "/experimental/resource [answered]",
+    "count": 9
+   },
+   {
+    "key": "/provider [answered]",
+    "count": 8
+   },
+   {
+    "key": "/path [answered]",
+    "count": 8
+   },
+   {
+    "key": "/session/status [answered]",
+    "count": 8
+   },
+   {
+    "key": "/api/provider/alpha-internal-catalog-ready [waiting-socket:pool-stalled]",
+    "count": 6
+   },
+   {
+    "key": "/lsp [answered]",
+    "count": 6
+   },
+   {
+    "key": "/api/reference [answered]",
+    "count": 6
+   },
+   {
+    "key": "/session [answered]",
+    "count": 6
+   },
+   {
+    "key": "/agent [answered]",
+    "count": 6
+   },
+   {
+    "key": "/config [answered]",
+    "count": 6
+   },
+   {
+    "key": "/project/current [answered]",
+    "count": 6
+   },
+   {
+    "key": "/vcs [answered]",
+    "count": 6
+   },
+   {
+    "key": "/permission [answered]",
+    "count": 6
+   },
+   {
+    "key": "/question [answered]",
+    "count": 6
+   },
+   {
+    "key": "/global/event [sent-no-response]",
+    "count": 4
+   },
+   {
+    "key": "/global/health [answered]",
+    "count": 2
+   },
+   {
+    "key": "/global/config [answered]",
+    "count": 2
+   },
+   {
+    "key": "/global/event [waiting-socket:pool-stalled]",
+    "count": 2
+   },
+   {
+    "key": "/api/provider/alpha-internal-catalog-ready [sent-no-response:stream-bound-no-send-yet]",
+    "count": 1
+   },
+   {
+    "key": "/project [sent-no-response]",
+    "count": 1
+   },
+   {
+    "key": "/api/provider/alpha-internal-catalog-ready [sent-no-response]",
+    "count": 1
+   },
+   {
+    "key": "/api/provider/alpha-internal-catalog-ready [not-on-wire]",
+    "count": 1
+   },
+   {
+    "key": "/global/health [waiting-socket:pool-stalled]",
+    "count": 1
+   }
+  ],
+  "slow": [
+   {
+    "id": 13,
+    "path": "/project",
+    "query": "",
+    "method": "GET",
+    "startMs": 1160,
+    "durationMs": 18432,
+    "label": "answered",
+    "group": "pm/http://127.0.0.1:39791",
+    "socketWaitMs": 0,
+    "responseWaitMs": 18429,
+    "status": 200,
+    "open": false
+   },
+   {
+    "id": 60,
+    "path": "/provider",
+    "query": "",
+    "method": "GET",
+    "startMs": 1182,
+    "durationMs": 18413,
+    "label": "answered",
+    "stalled": "SOCKET_POOL_STALLED_MAX_SOCKETS_PER_GROUP",
+    "group": "pm/http://127.0.0.1:39791",
+    "socketWaitMs": 1,
+    "responseWaitMs": 18384,
+    "status": 200,
+    "open": false
+   },
+   {
+    "id": 62,
+    "path": "/path",
+    "query": "",
+    "method": "GET",
+    "startMs": 1182,
+    "durationMs": 18410,
+    "label": "answered",
+    "stalled": "SOCKET_POOL_STALLED_MAX_SOCKETS_PER_GROUP",
+    "group": "pm/http://127.0.0.1:39791",
+    "socketWaitMs": 27,
+    "responseWaitMs": 18381,
+    "status": 200,
+    "open": false
+   },
+   {
+    "id": 64,
+    "path": "/session/status",
+    "query": "",
+    "method": "GET",
+    "startMs": 1182,
+    "durationMs": 18410,
+    "label": "answered",
+    "group": "pm/http://127.0.0.1:39791",
+    "socketWaitMs": 27,
+    "responseWaitMs": 18381,
+    "status": 200,
+    "open": false
+   },
+   {
+    "id": 118,
+    "path": "/api/health",
+    "query": "",
+    "method": "GET",
+    "startMs": 11169,
+    "durationMs": 8464,
+    "label": "answered",
+    "stalled": "SOCKET_POOL_STALLED_MAX_SOCKETS_PER_GROUP",
+    "group": "pm/http://127.0.0.1:39791",
+    "socketWaitMs": 8459,
+    "responseWaitMs": 1,
+    "status": 200,
+    "open": false
+   },
+   {
+    "id": 122,
+    "path": "/command",
+    "query": "directory=#17f35628",
+    "method": "GET",
+    "startMs": 13227,
+    "durationMs": 6430,
+    "label": "answered",
+    "stalled": "SOCKET_POOL_STALLED_MAX_SOCKETS_PER_GROUP",
+    "group": "pm/http://127.0.0.1:39791",
+    "socketWaitMs": 6402,
+    "responseWaitMs": 11,
+    "status": 200,
+    "open": false
+   },
+   {
+    "id": 124,
+    "path": "/api/agent",
+    "query": "location[directory]=#17f35628",
+    "method": "GET",
+    "startMs": 13227,
+    "durationMs": 6427,
+    "label": "answered",
+    "stalled": "SOCKET_POOL_STALLED_MAX_SOCKETS_PER_GROUP",
+    "group": "pm/http://127.0.0.1:39791",
+    "socketWaitMs": 6402,
+    "responseWaitMs": 1,
+    "status": 200,
+    "open": false
+   },
+   {
+    "id": 126,
+    "path": "/api/provider/alpha-internal-catalog-ready",
+    "query": "location[directory]=#17f35628",
+    "method": "(preflight)",
+    "startMs": 13227,
+    "durationMs": 1002,
+    "label": "waiting-socket",
+    "reason": "pool-stalled",
+    "via": "preflight",
+    "stalled": "SOCKET_POOL_STALLED_MAX_SOCKETS_PER_GROUP",
+    "group": "pm/http://127.0.0.1:39791",
+    "socketWaitMs": 1000,
+    "responseWaitMs": null,
+    "orphanPreflightMs": 5365,
+    "cancelled": true,
+    "open": false
+   },
+   {
+    "id": 134,
+    "path": "/api/provider/alpha-internal-catalog-ready",
+    "query": "location[directory]=#17f35628",
+    "method": "(preflight)",
+    "startMs": 14228,
+    "durationMs": 1002,
+    "label": "waiting-socket",
+    "reason": "pool-stalled",
+    "via": "preflight",
+    "stalled": "SOCKET_POOL_STALLED_MAX_SOCKETS_PER_GROUP",
+    "group": "pm/http://127.0.0.1:39791",
+    "socketWaitMs": 1001,
+    "responseWaitMs": null,
+    "orphanPreflightMs": 4365,
+    "cancelled": true,
+    "open": false
+   },
+   {
+    "id": 138,
+    "path": "/api/provider/alpha-internal-catalog-ready",
+    "query": "location[directory]=#17f35628",
+    "method": "(preflight)",
+    "startMs": 15229,
+    "durationMs": 1001,
+    "label": "waiting-socket",
+    "reason": "pool-stalled",
+    "via": "preflight",
+    "stalled": "SOCKET_POOL_STALLED_MAX_SOCKETS_PER_GROUP",
+    "group": "pm/http://127.0.0.1:39791",
+    "socketWaitMs": 1000,
+    "responseWaitMs": null,
+    "orphanPreflightMs": 3365,
+    "cancelled": true,
+    "open": false
+   },
+   {
+    "id": 142,
+    "path": "/api/provider/alpha-internal-catalog-ready",
+    "query": "location[directory]=#17f35628",
+    "method": "(preflight)",
+    "startMs": 16230,
+    "durationMs": 1002,
+    "label": "waiting-socket",
+    "reason": "pool-stalled",
+    "via": "preflight",
+    "stalled": "SOCKET_POOL_STALLED_MAX_SOCKETS_PER_GROUP",
+    "group": "pm/http://127.0.0.1:39791",
+    "socketWaitMs": 1001,
+    "responseWaitMs": null,
+    "orphanPreflightMs": 2386,
+    "cancelled": true,
+    "open": false
+   },
+   {
+    "id": 146,
+    "path": "/api/provider/alpha-internal-catalog-ready",
+    "query": "location[directory]=#17f35628",
+    "method": "(preflight)",
+    "startMs": 17232,
+    "durationMs": 1002,
+    "label": "waiting-socket",
+    "reason": "pool-stalled",
+    "via": "preflight",
+    "stalled": "SOCKET_POOL_STALLED_MAX_SOCKETS_PER_GROUP",
+    "group": "pm/http://127.0.0.1:39791",
+    "socketWaitMs": 1001,
+    "responseWaitMs": null,
+    "orphanPreflightMs": 1396,
+    "cancelled": true,
+    "open": false
+   },
+   {
+    "id": 150,
+    "path": "/api/provider/alpha-internal-catalog-ready",
+    "query": "location[directory]=#17f35628",
+    "method": "(preflight)",
+    "startMs": 18234,
+    "durationMs": 1002,
+    "label": "waiting-socket",
+    "reason": "pool-stalled",
+    "via": "preflight",
+    "stalled": "SOCKET_POOL_STALLED_MAX_SOCKETS_PER_GROUP",
+    "group": "pm/http://127.0.0.1:39791",
+    "socketWaitMs": 1002,
+    "responseWaitMs": null,
+    "orphanPreflightMs": 395,
+    "cancelled": true,
+    "open": false
+   },
+   {
+    "id": 154,
+    "path": "/api/provider/alpha-internal-catalog-ready",
+    "query": "location[directory]=#17f35628",
+    "method": "GET",
+    "startMs": 19235,
+    "durationMs": 417,
+    "label": "sent-no-response",
+    "reason": "stream-bound-no-send-yet",
+    "stalled": "SOCKET_POOL_STALLED_MAX_SOCKETS_PER_GROUP",
+    "group": "pm/http://127.0.0.1:39791",
+    "socketWaitMs": 378,
+    "responseWaitMs": null,
+    "cancelled": true,
+    "open": false
+   },
+   {
+    "id": 1150,
+    "path": "/project",
+    "query": "",
+    "method": "GET",
+    "startMs": 30012,
+    "durationMs": 7,
+    "label": "sent-no-response",
+    "group": "pm/http://127.0.0.1:39791",
+    "socketWaitMs": 0,
+    "responseWaitMs": 2,
+    "cancelled": true,
+    "open": false
+   },
+   {
+    "id": 1152,
+    "path": "/api/provider/alpha-internal-catalog-ready",
+    "query": "location[directory]=#86a36bc3",
+    "method": "GET",
+    "startMs": 30013,
+    "durationMs": 6,
+    "label": "sent-no-response",
+    "group": "pm/http://127.0.0.1:39791",
+    "socketWaitMs": 1,
+    "responseWaitMs": 1,
+    "cancelled": true,
+    "open": false
+   },
+   {
+    "id": 1187,
+    "path": "/api/provider/alpha-internal-catalog-ready",
+    "query": "location[directory]=#86a36bc3",
+    "method": "(preflight)",
+    "startMs": 30020,
+    "durationMs": 0,
+    "label": "not-on-wire",
+    "via": "preflight",
+    "group": "pm/http://127.0.0.1:39791",
+    "socketWaitMs": 0,
+    "responseWaitMs": null,
+    "orphanPreflightMs": 3,
+    "cancelled": true,
+    "open": false
+   },
+   {
+    "id": 1721,
+    "path": "/global/health",
+    "query": "",
+    "method": "(preflight)",
+    "startMs": 79779,
+    "durationMs": 3003,
+    "label": "waiting-socket",
+    "reason": "pool-stalled",
+    "via": "preflight",
+    "stalled": "SOCKET_POOL_STALLED_MAX_SOCKETS_PER_GROUP",
+    "group": "pm/http://127.0.0.1:39791",
+    "socketWaitMs": 3001,
+    "responseWaitMs": null,
+    "orphanPreflightMs": 6,
+    "cancelled": true,
+    "open": false
+   },
+   {
+    "id": 1725,
+    "path": "/api/health",
+    "query": "",
+    "method": "GET",
+    "startMs": 80197,
+    "durationMs": 2593,
+    "label": "answered",
+    "group": "pm/http://127.0.0.1:39791",
+    "socketWaitMs": 2588,
+    "responseWaitMs": 0,
+    "status": 200,
+    "open": false
+   }
+  ]
+ },
+ "upstream": [],
+ "timeline": {
+  "phases": [
+   {
+    "name": "main.app.ready",
+    "t": 80.60683399999999,
+    "seq": 2
+   },
+   {
+    "name": "main.sidecar.boot.fork.start",
+    "t": 172.17591699999997,
+    "seq": 5,
+    "generation": 1
+   },
+   {
+    "name": "main.sidecar.boot.fork.end",
+    "t": 954.582375,
+    "seq": 7,
+    "durationMs": 782.405542,
+    "generation": 1,
+    "outcome": "ok"
+   },
+   {
+    "name": "main.window.first_show",
+    "t": 1257.776417,
+    "seq": 20
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 13314.531417,
+    "seq": 23,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 12304.5,
+    "occurrence": 1
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 13315.6085,
+    "seq": 24,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 12305.299999952316,
+    "occurrence": 1
+   },
+   {
+    "name": "renderer.launch_draft.end",
+    "t": 19741.097125,
+    "seq": 32,
+    "trigger": "launch",
+    "outcome": "navigated",
+    "durationMs": 41.10000002384186,
+    "source": "renderer",
+    "rendererNow": 18712.899999976158,
+    "occurrence": 1
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 19741.198209,
+    "seq": 33,
+    "attempt": 1,
+    "chain": 1,
+    "durationMs": 6407.600000023842,
+    "outcome": "cancelled",
+    "source": "renderer",
+    "rendererNow": 18712.899999976158,
+    "occurrence": 1
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 19765.494,
+    "seq": 34,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 18755.699999928474,
+    "occurrence": 2
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 19766.088042,
+    "seq": 35,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 18755.899999976158,
+    "occurrence": 2
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 19769.502583999998,
+    "seq": 36,
+    "barrierMs": 3.799999952316284,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 18759.699999928474,
+    "occurrence": 1
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 19772.593625,
+    "seq": 37,
+    "attempt": 1,
+    "chain": 1,
+    "count": 0,
+    "durationMs": 6.899999976158142,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 18762.799999952316,
+    "occurrence": 2
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 21366.682459,
+    "seq": 43,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 20347.399999976158,
+    "occurrence": 3
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 21367.772709,
+    "seq": 44,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 20347.699999928474,
+    "occurrence": 3
+   },
+   {
+    "name": "renderer.launch_draft.end",
+    "t": 21368.139667,
+    "seq": 46,
+    "trigger": "manual",
+    "outcome": "navigated",
+    "durationMs": 23.600000023841858,
+    "source": "renderer",
+    "rendererNow": 20348.600000023842,
+    "occurrence": 2
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 21372.694042,
+    "seq": 47,
+    "barrierMs": 15.300000071525574,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 20363,
+    "occurrence": 2
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 21375.405875,
+    "seq": 48,
+    "attempt": 1,
+    "chain": 1,
+    "count": 0,
+    "durationMs": 18,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 20365.699999928474,
+    "occurrence": 3
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 22120.197334,
+    "seq": 50,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 21110.5,
+    "occurrence": 4
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 22120.795417,
+    "seq": 51,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 21110.600000023842,
+    "occurrence": 4
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 22131.520167,
+    "seq": 52,
+    "barrierMs": 10.799999952316284,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 21121.399999976158,
+    "occurrence": 3
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 22134.054375,
+    "seq": 53,
+    "attempt": 1,
+    "chain": 1,
+    "count": 0,
+    "durationMs": 13.799999952316284,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 21124.399999976158,
+    "occurrence": 4
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 22697.072084,
+    "seq": 59,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 21676.899999976158,
+    "occurrence": 5
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 22697.680834,
+    "seq": 60,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 21677,
+    "occurrence": 5
+   },
+   {
+    "name": "renderer.launch_draft.end",
+    "t": 22698.273167,
+    "seq": 62,
+    "trigger": "manual",
+    "outcome": "navigated",
+    "durationMs": 24.5,
+    "source": "renderer",
+    "rendererNow": 21677.899999976158,
+    "occurrence": 3
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 22705.7295,
+    "seq": 63,
+    "barrierMs": 19,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 21696,
+    "occurrence": 4
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 22708.787125,
+    "seq": 64,
+    "attempt": 1,
+    "chain": 1,
+    "count": 0,
+    "durationMs": 22.100000023841858,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 21699.100000023842,
+    "occurrence": 5
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 23403.157625,
+    "seq": 66,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 22393.5,
+    "occurrence": 6
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 23403.659209,
+    "seq": 67,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 22393.600000023842,
+    "occurrence": 6
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 23415.420667,
+    "seq": 68,
+    "barrierMs": 12.099999904632568,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 22405.699999928474,
+    "occurrence": 5
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 23417.391084,
+    "seq": 69,
+    "attempt": 1,
+    "chain": 1,
+    "count": 0,
+    "durationMs": 14.099999904632568,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 22407.699999928474,
+    "occurrence": 6
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 24006.202334,
+    "seq": 75,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 22984.5,
+    "occurrence": 7
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 24006.754417,
+    "seq": 76,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 22984.699999928474,
+    "occurrence": 7
+   },
+   {
+    "name": "renderer.launch_draft.end",
+    "t": 24007.097999999998,
+    "seq": 78,
+    "trigger": "manual",
+    "outcome": "navigated",
+    "durationMs": 19.700000047683716,
+    "source": "renderer",
+    "rendererNow": 22985.399999976158,
+    "occurrence": 4
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 24013.788625,
+    "seq": 79,
+    "barrierMs": 19.40000009536743,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 23004.100000023842,
+    "occurrence": 6
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 24016.341792,
+    "seq": 80,
+    "attempt": 1,
+    "chain": 1,
+    "count": 0,
+    "durationMs": 22,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 23006.699999928474,
+    "occurrence": 7
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 24713.331167,
+    "seq": 82,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 23703.600000023842,
+    "occurrence": 8
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 24713.82325,
+    "seq": 83,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 23703.799999952316,
+    "occurrence": 8
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 24724.587167,
+    "seq": 84,
+    "barrierMs": 11.100000023841858,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 23714.899999976158,
+    "occurrence": 7
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 24726.717792,
+    "seq": 85,
+    "attempt": 1,
+    "chain": 1,
+    "count": 0,
+    "durationMs": 13.200000047683716,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 23717,
+    "occurrence": 8
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 25292.312584,
+    "seq": 91,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 24275.399999976158,
+    "occurrence": 9
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 25292.643459,
+    "seq": 92,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 24275.600000023842,
+    "occurrence": 9
+   },
+   {
+    "name": "renderer.launch_draft.end",
+    "t": 25292.908292,
+    "seq": 94,
+    "trigger": "manual",
+    "outcome": "navigated",
+    "durationMs": 18.799999952316284,
+    "source": "renderer",
+    "rendererNow": 24276.199999928474,
+    "occurrence": 5
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 25297.49375,
+    "seq": 95,
+    "barrierMs": 12.199999928474426,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 24287.799999952316,
+    "occurrence": 8
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 25299.819875,
+    "seq": 96,
+    "attempt": 1,
+    "chain": 1,
+    "count": 0,
+    "durationMs": 14.5,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 24290.100000023842,
+    "occurrence": 9
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 26008.2155,
+    "seq": 98,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 24998.5,
+    "occurrence": 10
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 26008.69575,
+    "seq": 99,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 24998.600000023842,
+    "occurrence": 10
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 26019.473917,
+    "seq": 100,
+    "barrierMs": 11.199999928474426,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 25009.799999952316,
+    "occurrence": 9
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 26021.670167,
+    "seq": 101,
+    "attempt": 1,
+    "chain": 1,
+    "count": 0,
+    "durationMs": 13.399999976158142,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 25012,
+    "occurrence": 10
+   },
+   {
+    "name": "main.sidecar.respawn.fork.start",
+    "t": 29345.910334,
+    "seq": 103,
+    "generation": 2,
+    "reason": "structural"
+   },
+   {
+    "name": "main.sidecar.respawn.fork.end",
+    "t": 30095.864917,
+    "seq": 106,
+    "durationMs": 749.9620419999992,
+    "generation": 2,
+    "reason": "structural",
+    "outcome": "ok"
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 30101.158,
+    "seq": 112,
+    "attempt": 1,
+    "chain": 2,
+    "source": "renderer",
+    "rendererNow": 29088.799999952316,
+    "occurrence": 11
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 30108.803625,
+    "seq": 113,
+    "attempt": 1,
+    "chain": 2,
+    "durationMs": 10.300000071525574,
+    "outcome": "error:request",
+    "source": "renderer",
+    "rendererNow": 29099.100000023842,
+    "occurrence": 11
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 30109.245959,
+    "seq": 115,
+    "attempt": 2,
+    "chain": 2,
+    "source": "renderer",
+    "rendererNow": 29099.199999928474,
+    "occurrence": 12
+   },
+   {
+    "name": "renderer.launch_draft.end",
+    "t": 30365.320792,
+    "seq": 134,
+    "trigger": "launch",
+    "outcome": "navigated",
+    "durationMs": 45.200000047683716,
+    "source": "renderer",
+    "rendererNow": 256.2000000476837,
+    "occurrence": 6
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 30406.989417,
+    "seq": 135,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 307.5,
+    "occurrence": 11
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 30407.594084,
+    "seq": 136,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 308,
+    "occurrence": 13
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 30416.067417,
+    "seq": 137,
+    "barrierMs": 8.600000023841858,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 316.7000000476837,
+    "occurrence": 10
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 30418.685667,
+    "seq": 138,
+    "attempt": 1,
+    "chain": 1,
+    "count": 0,
+    "durationMs": 11.300000071525574,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 319.3000000715256,
+    "occurrence": 12
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 31924.357709,
+    "seq": 144,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 1815.4000000953674,
+    "occurrence": 12
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 31925.364084,
+    "seq": 145,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 1815.6000000238419,
+    "occurrence": 14
+   },
+   {
+    "name": "renderer.launch_draft.end",
+    "t": 31925.584,
+    "seq": 147,
+    "trigger": "manual",
+    "outcome": "navigated",
+    "durationMs": 14.199999928474426,
+    "source": "renderer",
+    "rendererNow": 1816.1000000238419,
+    "occurrence": 7
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 31929.505042,
+    "seq": 148,
+    "barrierMs": 14.600000023841858,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 1830.2000000476837,
+    "occurrence": 11
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 31931.784709,
+    "seq": 149,
+    "attempt": 1,
+    "chain": 1,
+    "count": 0,
+    "durationMs": 16.800000071525574,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 1832.4000000953674,
+    "occurrence": 13
+   }
+  ],
+  "probeTimeouts": [
+   {
+    "t": 19769.502583999998,
+    "barrierMs": 3.799999952316284,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 21372.694042,
+    "barrierMs": 15.300000071525574,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 22131.520167,
+    "barrierMs": 10.799999952316284,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 22705.7295,
+    "barrierMs": 19,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 23415.420667,
+    "barrierMs": 12.099999904632568,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 24013.788625,
+    "barrierMs": 19.40000009536743,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 24724.587167,
+    "barrierMs": 11.100000023841858,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 25297.49375,
+    "barrierMs": 12.199999928474426,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 26019.473917,
+    "barrierMs": 11.199999928474426,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 30416.067417,
+    "barrierMs": 8.600000023841858,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 31929.505042,
+    "barrierMs": 14.600000023841858,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   }
+  ],
+  "modelList": [
+   {
+    "t": 19741.198209,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "cancelled",
+    "durationMs": 6407.600000023842
+   },
+   {
+    "t": 19772.593625,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 6.899999976158142,
+    "count": 0
+   },
+   {
+    "t": 21375.405875,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 18,
+    "count": 0
+   },
+   {
+    "t": 22134.054375,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 13.799999952316284,
+    "count": 0
+   },
+   {
+    "t": 22708.787125,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 22.100000023841858,
+    "count": 0
+   },
+   {
+    "t": 23417.391084,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 14.099999904632568,
+    "count": 0
+   },
+   {
+    "t": 24016.341792,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 22,
+    "count": 0
+   },
+   {
+    "t": 24726.717792,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 13.200000047683716,
+    "count": 0
+   },
+   {
+    "t": 25299.819875,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 14.5,
+    "count": 0
+   },
+   {
+    "t": 26021.670167,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 13.399999976158142,
+    "count": 0
+   },
+   {
+    "t": 30108.803625,
+    "chain": 2,
+    "attempt": 1,
+    "outcome": "error:request",
+    "durationMs": 10.300000071525574
+   },
+   {
+    "t": 30418.685667,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 11.300000071525574,
+    "count": 0
+   },
+   {
+    "t": 31931.784709,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 16.800000071525574,
+    "count": 0
+   }
+  ],
+  "maxProbeTimeouts": 0,
+  "maxListDurationMs": 6407.600000023842
+ },
+ "sampleTable": {
+  "samples": [
+   {
+    "kind": "model_list.end",
+    "t": 19741.198209,
+    "spanMs": 6407.600000023842,
+    "outcome": "cancelled",
+    "requests": 7,
+    "labels": {
+     "waiting-socket:pool-stalled": 6,
+     "sent-no-response:stream-bound-no-send-yet": 1
+    },
+    "verdict": "混合:等 socket 6 / 已发出无响应 1"
+   },
+   {
+    "kind": "model_list.end",
+    "t": 30108.803625,
+    "spanMs": 10.300000071525574,
+    "outcome": "error:request",
+    "requests": 0,
+    "labels": {},
+    "verdict": "窗口内 netlog 没有模型读取请求(没记到,不是没发)"
+   }
+  ]
+ },
+ "engineLog": {
+  "linesInWindow": 174,
+  "perRun": {
+   "2e160602": {
+    "connected": 4,
+    "disconnected": 0
+   },
+   "f8fdc19d": {
+    "connected": 8,
+    "disconnected": 4
+   }
+  },
+  "skillInit": 6,
+  "serverUnavailable": 0
+ },
+ "afterOpen": {
+  "command": {
+   "requests": 1,
+   "worstMs": 18,
+   "labels": {
+    "answered": 1
+   }
+  },
+  "modelRead": {
+   "requests": 2,
+   "worstMs": 3,
+   "labels": {
+    "answered": 2
+   }
+  },
+  "stalledRequests": 0,
+  "lastCommandEndMs": 31840,
+  "lastProbeAnsweredMs": 31840,
+  "orphanPreflights": {
+   "count": 6,
+   "maxMs": 6
+  }
+ }
+}

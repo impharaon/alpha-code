@@ -1,0 +1,59 @@
+timestamp=2026-11-05T06:17:01.842Z level=INFO run=92c399f0 message="downloading ripgrep" url=https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-aarch64-apple-darwin.tar.gz
+timestamp=2026-11-05T06:17:01.869Z level=INFO run=92c399f0 message="booting location services" directory=<root>/home/code-puppy workspaceID=undefined
+timestamp=2026-11-05T06:17:01.942Z level=INFO run=92c399f0 message="global event connected"
+timestamp=2026-11-05T06:17:02.175Z level=INFO run=92c399f0 message="creating instance" directory=<root>/tmp/opencode-onboarding-c1feb90e-bd22-496b-b731-50489ab3692e/desktop/engine-scratch-cwd
+timestamp=2026-11-05T06:17:02.176Z level=INFO run=92c399f0 message="global event connected"
+timestamp=2026-11-05T06:17:02.224Z level=INFO run=92c399f0 message="global event connected"
+timestamp=2026-11-05T06:17:14.305Z level=INFO run=92c399f0 message="global event connected"
+timestamp=2026-11-05T06:17:14.306Z level=INFO run=92c399f0 message="creating instance" directory=<root>/home/code-puppy
+timestamp=2026-11-05T06:17:14.317Z level=INFO run=92c399f0 message=init count=1
+timestamp=2026-11-05T06:17:16.679Z level=INFO run=92c399f0 message="creating instance" directory=<root>/ws1
+timestamp=2026-11-05T06:17:16.700Z level=INFO run=92c399f0 message="booting location services" directory=<root>/ws1 workspaceID=undefined
+timestamp=2026-11-05T06:17:16.706Z level=INFO run=92c399f0 message=init count=1
+timestamp=2026-11-05T06:17:17.970Z level=INFO run=92c399f0 message="creating instance" directory=<root>/ws2
+timestamp=2026-11-05T06:17:17.989Z level=INFO run=92c399f0 message="booting location services" directory=<root>/ws2 workspaceID=undefined
+timestamp=2026-11-05T06:17:17.997Z level=INFO run=92c399f0 message=init count=1
+timestamp=2026-11-05T06:17:19.260Z level=INFO run=92c399f0 message="creating instance" directory=<root>/ws3
+timestamp=2026-11-05T06:17:19.276Z level=INFO run=92c399f0 message="booting location services" directory=<root>/ws3 workspaceID=undefined
+timestamp=2026-11-05T06:17:19.283Z level=INFO run=92c399f0 message=init count=1
+timestamp=2026-11-05T06:17:20.570Z level=INFO run=92c399f0 message="creating instance" directory=<root>/ws4
+timestamp=2026-11-05T06:17:20.587Z level=INFO run=92c399f0 message="booting location services" directory=<root>/ws4 workspaceID=undefined
+timestamp=2026-11-05T06:17:20.594Z level=INFO run=92c399f0 message=init count=1
+timestamp=2026-11-05T06:17:22.713Z level=INFO run=92c399f0 message="global event disconnected"
+timestamp=2026-11-05T06:17:24.500Z level=INFO run=1389b3e5 message="booting location services" directory=<root>/home/code-puppy workspaceID=undefined
+timestamp=2026-11-05T06:17:24.518Z level=INFO run=1389b3e5 message="creating instance" directory=<root>/tmp/opencode-onboarding-c1feb90e-bd22-496b-b731-50489ab3692e/desktop/engine-scratch-cwd
+timestamp=2026-11-05T06:17:24.519Z level=INFO run=1389b3e5 message="global event connected"
+timestamp=2026-11-05T06:17:24.522Z level=INFO run=1389b3e5 message="global event disconnected"
+timestamp=2026-11-05T06:17:24.536Z level=INFO run=1389b3e5 message="booting location services" directory=<root>/ws4 workspaceID=undefined
+timestamp=2026-11-05T06:17:24.691Z level=INFO run=1389b3e5 message="global event connected"
+timestamp=2026-11-05T06:17:24.757Z level=INFO run=1389b3e5 message="global event connected"
+timestamp=2026-11-05T06:17:24.758Z level=INFO run=1389b3e5 message="global event connected"
+timestamp=2026-11-05T06:17:24.773Z level=INFO run=1389b3e5 message="creating instance" directory=<root>/home/code-puppy
+timestamp=2026-11-05T06:17:24.784Z level=INFO run=1389b3e5 message=init count=1
+timestamp=2026-11-05T06:17:26.141Z level=INFO run=1389b3e5 message="global event connected"
+timestamp=2026-11-05T06:17:27.017Z level=INFO run=1389b3e5 message="creating instance" directory=<root>/ws5
+timestamp=2026-11-05T06:17:27.034Z level=INFO run=1389b3e5 message="booting location services" directory=<root>/ws5 workspaceID=undefined
+timestamp=2026-11-05T06:17:27.041Z level=INFO run=1389b3e5 message=init count=1
+timestamp=2026-11-05T06:17:27.705Z level=INFO run=1389b3e5 message="creating instance" directory=<root>/ws6
+timestamp=2026-11-05T06:17:27.727Z level=INFO run=1389b3e5 message="booting location services" directory=<root>/ws6 workspaceID=undefined
+timestamp=2026-11-05T06:17:27.734Z level=INFO run=1389b3e5 message=init count=1
+timestamp=2026-11-05T06:17:28.392Z level=INFO run=1389b3e5 message="creating instance" directory=<root>/ws7
+timestamp=2026-11-05T06:17:28.415Z level=INFO run=1389b3e5 message="booting location services" directory=<root>/ws7 workspaceID=undefined
+timestamp=2026-11-05T06:17:28.423Z level=INFO run=1389b3e5 message=init count=1
+timestamp=2026-11-05T06:17:29.092Z level=INFO run=1389b3e5 message="creating instance" directory=<root>/ws8
+timestamp=2026-11-05T06:17:29.108Z level=INFO run=1389b3e5 message="booting location services" directory=<root>/ws8 workspaceID=undefined
+timestamp=2026-11-05T06:17:29.115Z level=INFO run=1389b3e5 message=init count=1
+timestamp=2026-11-05T06:18:08.308Z level=WARN run=1389b3e5 message="server unavailable" key=blackhole type=remote status=failed error="fetch failed: Connect Timeout Error (attempted address: <lan-ip>:42380, timeout: 10000ms)"
+timestamp=2026-11-05T06:18:10.309Z level=WARN run=1389b3e5 message="server unavailable" key=blackhole type=remote status=failed error="fetch failed: Connect Timeout Error (attempted address: <lan-ip>:42380, timeout: 10000ms)"
+timestamp=2026-11-05T06:18:10.809Z level=WARN run=1389b3e5 message="server unavailable" key=blackhole type=remote status=failed error="fetch failed: Connect Timeout Error (attempted address: <lan-ip>:42380, timeout: 10000ms)"
+timestamp=2026-11-05T06:18:11.407Z level=INFO run=1389b3e5 message="creating instance" directory=<root>/ws1
+timestamp=2026-11-05T06:18:11.417Z level=INFO run=1389b3e5 message="creating instance" directory=<root>/ws2
+timestamp=2026-11-05T06:18:11.427Z level=INFO run=1389b3e5 message="creating instance" directory=<root>/ws3
+timestamp=2026-11-05T06:18:11.437Z level=INFO run=1389b3e5 message="creating instance" directory=<root>/ws4
+timestamp=2026-11-05T06:18:11.450Z level=INFO run=1389b3e5 message="global event connected"
+timestamp=2026-11-05T06:18:11.604Z level=INFO run=1389b3e5 message="global event connected"
+timestamp=2026-11-05T06:18:11.757Z level=INFO run=1389b3e5 message="global event connected"
+timestamp=2026-11-05T06:18:11.809Z level=WARN run=1389b3e5 message="server unavailable" key=blackhole type=remote status=failed error="fetch failed: Connect Timeout Error (attempted address: <lan-ip>:42380, timeout: 10000ms)"
+timestamp=2026-11-05T06:18:17.169Z level=INFO run=1389b3e5 message="global event disconnected"
+timestamp=2026-11-05T06:18:17.172Z level=INFO run=1389b3e5 message="global event disconnected"
+timestamp=2026-11-05T06:18:17.172Z level=INFO run=1389b3e5 message="global event disconnected"

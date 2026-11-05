@@ -1,0 +1,1529 @@
+{
+ "meta": {
+  "events": 54935,
+  "firstEventEpochMs": 1793859420992,
+  "spanMs": 77354,
+  "cutoffMs": 77335,
+  "cutoffSource": "auto:teardown(3 cancels in last 300ms)",
+  "stallMs": 1000,
+  "engineOrigins": [
+   "http://127.0.0.1:42302"
+  ],
+  "stalledEventsTotal": 382,
+  "finalized": true,
+  "unparsedLines": 1
+ },
+ "engine": {
+  "total": 308,
+  "byLabel": {
+   "answered": 296,
+   "waiting-socket:pool-stalled": 4,
+   "failed:net_error=-102": 2,
+   "sent-no-response": 5,
+   "waiting-socket:connecting": 1
+  },
+  "peak": {
+   "maxHoldingSocket": 6,
+   "atMs": 1230
+  },
+  "openStreamsAtCutoff": 3,
+  "streamsEverOpened": 16,
+  "byPath": [
+   {
+    "key": "/command [answered]",
+    "count": 29
+   },
+   {
+    "key": "/mcp [answered]",
+    "count": 21
+   },
+   {
+    "key": "/project [answered]",
+    "count": 19
+   },
+   {
+    "key": "/experimental/session [answered]",
+    "count": 17
+   },
+   {
+    "key": "/api/agent [answered]",
+    "count": 16
+   },
+   {
+    "key": "/api/provider/codepuppy-internal-catalog-ready [answered]",
+    "count": 16
+   },
+   {
+    "key": "/api/model [answered]",
+    "count": 15
+   },
+   {
+    "key": "/experimental/resource [answered]",
+    "count": 13
+   },
+   {
+    "key": "/provider [answered]",
+    "count": 12
+   },
+   {
+    "key": "/path [answered]",
+    "count": 12
+   },
+   {
+    "key": "/session/status [answered]",
+    "count": 12
+   },
+   {
+    "key": "/api/reference [answered]",
+    "count": 11
+   },
+   {
+    "key": "/global/event [answered]",
+    "count": 10
+   },
+   {
+    "key": "/lsp [answered]",
+    "count": 10
+   },
+   {
+    "key": "/session [answered]",
+    "count": 10
+   },
+   {
+    "key": "/agent [answered]",
+    "count": 10
+   },
+   {
+    "key": "/config [answered]",
+    "count": 10
+   },
+   {
+    "key": "/project/current [answered]",
+    "count": 10
+   },
+   {
+    "key": "/vcs [answered]",
+    "count": 10
+   },
+   {
+    "key": "/permission [answered]",
+    "count": 10
+   },
+   {
+    "key": "/question [answered]",
+    "count": 10
+   },
+   {
+    "key": "/api/health [answered]",
+    "count": 9
+   },
+   {
+    "key": "/global/event [sent-no-response]",
+    "count": 3
+   },
+   {
+    "key": "/global/health [answered]",
+    "count": 2
+   },
+   {
+    "key": "/global/config [answered]",
+    "count": 2
+   },
+   {
+    "key": "/global/event [waiting-socket:pool-stalled]",
+    "count": 2
+   },
+   {
+    "key": "/api/model [waiting-socket:pool-stalled]",
+    "count": 1
+   },
+   {
+    "key": "/global/health [failed:net_error=-102]",
+    "count": 1
+   },
+   {
+    "key": "/global/event [failed:net_error=-102]",
+    "count": 1
+   },
+   {
+    "key": "/project [sent-no-response]",
+    "count": 1
+   },
+   {
+    "key": "/api/provider/codepuppy-internal-catalog-ready [sent-no-response]",
+    "count": 1
+   },
+   {
+    "key": "/api/provider/codepuppy-internal-catalog-ready [waiting-socket:connecting]",
+    "count": 1
+   },
+   {
+    "key": "/global/health [waiting-socket:pool-stalled]",
+    "count": 1
+   }
+  ],
+  "slow": [
+   {
+    "id": 13,
+    "path": "/project",
+    "query": "",
+    "method": "GET",
+    "startMs": 1178,
+    "durationMs": 12131,
+    "label": "answered",
+    "group": "pm/http://127.0.0.1:42302",
+    "socketWaitMs": 1,
+    "responseWaitMs": 12127,
+    "status": 200,
+    "open": false
+   },
+   {
+    "id": 57,
+    "path": "/provider",
+    "query": "",
+    "method": "GET",
+    "startMs": 1201,
+    "durationMs": 12111,
+    "label": "answered",
+    "stalled": "SOCKET_POOL_STALLED_MAX_SOCKETS_PER_GROUP",
+    "group": "pm/http://127.0.0.1:42302",
+    "socketWaitMs": 2,
+    "responseWaitMs": 12081,
+    "status": 200,
+    "open": false
+   },
+   {
+    "id": 59,
+    "path": "/path",
+    "query": "",
+    "method": "GET",
+    "startMs": 1201,
+    "durationMs": 12108,
+    "label": "answered",
+    "stalled": "SOCKET_POOL_STALLED_MAX_SOCKETS_PER_GROUP",
+    "group": "pm/http://127.0.0.1:42302",
+    "socketWaitMs": 27,
+    "responseWaitMs": 12078,
+    "status": 200,
+    "open": false
+   },
+   {
+    "id": 61,
+    "path": "/session/status",
+    "query": "",
+    "method": "GET",
+    "startMs": 1202,
+    "durationMs": 12107,
+    "label": "answered",
+    "stalled": "SOCKET_POOL_STALLED_MAX_SOCKETS_PER_GROUP",
+    "group": "pm/http://127.0.0.1:42302",
+    "socketWaitMs": 27,
+    "responseWaitMs": 12078,
+    "status": 200,
+    "open": false
+   },
+   {
+    "id": 118,
+    "path": "/api/health",
+    "query": "",
+    "method": "GET",
+    "startMs": 11187,
+    "durationMs": 2136,
+    "label": "answered",
+    "stalled": "SOCKET_POOL_STALLED_MAX_SOCKETS_PER_GROUP",
+    "group": "pm/http://127.0.0.1:42302",
+    "socketWaitMs": 2121,
+    "responseWaitMs": 0,
+    "status": 200,
+    "open": false
+   },
+   {
+    "id": 196,
+    "path": "/api/model",
+    "query": "location[directory]=#6cbd7731",
+    "method": "(preflight)",
+    "startMs": 13331,
+    "durationMs": 17,
+    "label": "waiting-socket",
+    "reason": "pool-stalled",
+    "via": "preflight",
+    "stalled": "SOCKET_POOL_STALLED_MAX_SOCKETS_PER_GROUP",
+    "group": "pm/http://127.0.0.1:42302",
+    "socketWaitMs": 15,
+    "responseWaitMs": null,
+    "orphanPreflightMs": 3,
+    "cancelled": true,
+    "open": false
+   },
+   {
+    "id": 1135,
+    "path": "/global/health",
+    "query": "",
+    "method": "(preflight)",
+    "startMs": 22723,
+    "durationMs": 61,
+    "label": "failed",
+    "reason": "net_error=-102",
+    "via": "preflight",
+    "group": "pm/http://127.0.0.1:42302",
+    "socketWaitMs": 58,
+    "responseWaitMs": 58,
+    "cancelled": true,
+    "open": false
+   },
+   {
+    "id": 1155,
+    "path": "/project",
+    "query": "",
+    "method": "GET",
+    "startMs": 23521,
+    "durationMs": 6,
+    "label": "sent-no-response",
+    "group": "pm/http://127.0.0.1:42302",
+    "socketWaitMs": 1,
+    "responseWaitMs": 3,
+    "cancelled": true,
+    "open": false
+   },
+   {
+    "id": 1157,
+    "path": "/api/provider/codepuppy-internal-catalog-ready",
+    "query": "location[directory]=#593758f1",
+    "method": "GET",
+    "startMs": 23521,
+    "durationMs": 6,
+    "label": "sent-no-response",
+    "group": "pm/http://127.0.0.1:42302",
+    "socketWaitMs": 1,
+    "responseWaitMs": 3,
+    "cancelled": true,
+    "open": false
+   },
+   {
+    "id": 1190,
+    "path": "/api/provider/codepuppy-internal-catalog-ready",
+    "query": "location[directory]=#593758f1",
+    "method": "(preflight)",
+    "startMs": 23528,
+    "durationMs": 0,
+    "label": "waiting-socket",
+    "reason": "connecting",
+    "via": "preflight",
+    "group": "pm/http://127.0.0.1:42302",
+    "socketWaitMs": 0,
+    "responseWaitMs": null,
+    "orphanPreflightMs": 2,
+    "cancelled": true,
+    "open": false
+   },
+   {
+    "id": 2362,
+    "path": "/global/health",
+    "query": "",
+    "method": "(preflight)",
+    "startMs": 73172,
+    "durationMs": 3004,
+    "label": "waiting-socket",
+    "reason": "pool-stalled",
+    "via": "preflight",
+    "stalled": "SOCKET_POOL_STALLED_MAX_SOCKETS_PER_GROUP",
+    "group": "pm/http://127.0.0.1:42302",
+    "socketWaitMs": 3002,
+    "responseWaitMs": null,
+    "orphanPreflightMs": 6,
+    "cancelled": true,
+    "open": false
+   },
+   {
+    "id": 2366,
+    "path": "/api/health",
+    "query": "",
+    "method": "GET",
+    "startMs": 73708,
+    "durationMs": 2477,
+    "label": "answered",
+    "group": "pm/http://127.0.0.1:42302",
+    "socketWaitMs": 2472,
+    "responseWaitMs": 0,
+    "status": 200,
+    "open": false
+   }
+  ]
+ },
+ "upstream": [],
+ "timeline": {
+  "phases": [
+   {
+    "name": "main.app.ready",
+    "t": 84.50270799999998,
+    "seq": 2
+   },
+   {
+    "name": "main.sidecar.boot.fork.start",
+    "t": 203.08491700000002,
+    "seq": 5,
+    "generation": 1
+   },
+   {
+    "name": "main.sidecar.boot.fork.end",
+    "t": 976.0696669999999,
+    "seq": 7,
+    "durationMs": 772.9842499999999,
+    "generation": 1,
+    "outcome": "ok"
+   },
+   {
+    "name": "main.window.first_show",
+    "t": 1285.7442919999999,
+    "seq": 20
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 13333.981792,
+    "seq": 23,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 12305.100000023842,
+    "occurrence": 1
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 13335.211041999999,
+    "seq": 24,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 12305.600000023842,
+    "occurrence": 1
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 13422.899417,
+    "seq": 31,
+    "barrierMs": 87.10000002384186,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 12392.800000071526,
+    "occurrence": 1
+   },
+   {
+    "name": "renderer.launch_draft.end",
+    "t": 13440.804708,
+    "seq": 33,
+    "trigger": "launch",
+    "outcome": "navigated",
+    "durationMs": 25.600000023841858,
+    "source": "renderer",
+    "rendererNow": 12399.200000047684,
+    "occurrence": 1
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 13440.915917,
+    "seq": 34,
+    "attempt": 1,
+    "chain": 1,
+    "durationMs": 93.70000004768372,
+    "outcome": "cancelled",
+    "source": "renderer",
+    "rendererNow": 12399.300000071526,
+    "occurrence": 1
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 13454.186458,
+    "seq": 35,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 12425.400000095367,
+    "occurrence": 2
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 13454.844167,
+    "seq": 36,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 12425.5,
+    "occurrence": 2
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 13463.196542,
+    "seq": 37,
+    "barrierMs": 8.900000095367432,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 12434.400000095367,
+    "occurrence": 2
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 13465.476083,
+    "seq": 38,
+    "attempt": 1,
+    "chain": 1,
+    "count": 0,
+    "durationMs": 11.200000047683716,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 12436.700000047684,
+    "occurrence": 2
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 15089.462792,
+    "seq": 44,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 14051,
+    "occurrence": 3
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 15090.234583,
+    "seq": 45,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 14051.200000047684,
+    "occurrence": 3
+   },
+   {
+    "name": "renderer.launch_draft.end",
+    "t": 15090.55075,
+    "seq": 47,
+    "trigger": "manual",
+    "outcome": "navigated",
+    "durationMs": 24.699999928474426,
+    "source": "renderer",
+    "rendererNow": 14052,
+    "occurrence": 2
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 15095.866333,
+    "seq": 48,
+    "barrierMs": 15.899999976158142,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 14067.100000023842,
+    "occurrence": 3
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 15098.954167,
+    "seq": 49,
+    "attempt": 1,
+    "chain": 1,
+    "count": 0,
+    "durationMs": 19,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 14070.200000047684,
+    "occurrence": 3
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 15814.08625,
+    "seq": 51,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 14785.100000023842,
+    "occurrence": 4
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 15814.802208,
+    "seq": 52,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 14785.200000047684,
+    "occurrence": 4
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 15826.146083,
+    "seq": 53,
+    "barrierMs": 7.600000023841858,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 14792.800000071526,
+    "occurrence": 4
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 15829.251417,
+    "seq": 54,
+    "attempt": 1,
+    "chain": 1,
+    "count": 0,
+    "durationMs": 15.299999952316284,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 14800.5,
+    "occurrence": 4
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 16374.612916999999,
+    "seq": 60,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 15337.400000095367,
+    "occurrence": 5
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 16375.2075,
+    "seq": 61,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 15337.600000023842,
+    "occurrence": 5
+   },
+   {
+    "name": "renderer.launch_draft.end",
+    "t": 16375.56325,
+    "seq": 63,
+    "trigger": "manual",
+    "outcome": "navigated",
+    "durationMs": 12,
+    "source": "renderer",
+    "rendererNow": 15338.600000023842,
+    "occurrence": 3
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 16380.670917,
+    "seq": 64,
+    "barrierMs": 14.300000071525574,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 15351.900000095367,
+    "occurrence": 5
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 16383.517917000001,
+    "seq": 65,
+    "attempt": 1,
+    "chain": 1,
+    "count": 0,
+    "durationMs": 17.200000047683716,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 15354.800000071526,
+    "occurrence": 5
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 17100.769375,
+    "seq": 67,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 16072,
+    "occurrence": 6
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 17101.347917,
+    "seq": 68,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 16072.100000023842,
+    "occurrence": 6
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 17113.300708,
+    "seq": 69,
+    "barrierMs": 12.5,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 16084.600000023842,
+    "occurrence": 6
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 17115.440875,
+    "seq": 70,
+    "attempt": 1,
+    "chain": 1,
+    "count": 0,
+    "durationMs": 14.600000023841858,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 16086.700000047684,
+    "occurrence": 6
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 17682.033124999998,
+    "seq": 76,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 16642.400000095367,
+    "occurrence": 7
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 17682.625167,
+    "seq": 77,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 16642.700000047684,
+    "occurrence": 7
+   },
+   {
+    "name": "renderer.launch_draft.end",
+    "t": 17682.914667,
+    "seq": 79,
+    "trigger": "manual",
+    "outcome": "navigated",
+    "durationMs": 24.299999952316284,
+    "source": "renderer",
+    "rendererNow": 16643.600000023842,
+    "occurrence": 4
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 17689.271667,
+    "seq": 80,
+    "barrierMs": 17.799999952316284,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 16660.5,
+    "occurrence": 7
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 17691.921208,
+    "seq": 81,
+    "attempt": 1,
+    "chain": 1,
+    "count": 0,
+    "durationMs": 20.5,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 16663.200000047684,
+    "occurrence": 7
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 18389.487458,
+    "seq": 83,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 17360.700000047684,
+    "occurrence": 8
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 18390.04025,
+    "seq": 84,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 17360.800000071526,
+    "occurrence": 8
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 18405.296208,
+    "seq": 85,
+    "barrierMs": 15.699999928474426,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 17376.5,
+    "occurrence": 8
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 18407.671083,
+    "seq": 86,
+    "attempt": 1,
+    "chain": 1,
+    "count": 0,
+    "durationMs": 18.100000023841858,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 17378.900000095367,
+    "occurrence": 8
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 18983.093917,
+    "seq": 92,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 17943.800000071526,
+    "occurrence": 9
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 18983.687083,
+    "seq": 93,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 17944,
+    "occurrence": 9
+   },
+   {
+    "name": "renderer.launch_draft.end",
+    "t": 18984.027625,
+    "seq": 95,
+    "trigger": "manual",
+    "outcome": "navigated",
+    "durationMs": 20,
+    "source": "renderer",
+    "rendererNow": 17945.300000071526,
+    "occurrence": 5
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 18990.21525,
+    "seq": 96,
+    "barrierMs": 17.40000009536743,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 17961.400000095367,
+    "occurrence": 9
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 18992.844957999998,
+    "seq": 97,
+    "attempt": 1,
+    "chain": 1,
+    "count": 0,
+    "durationMs": 20.100000023841858,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 17964.100000023842,
+    "occurrence": 9
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 19703.870375,
+    "seq": 99,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 18675,
+    "occurrence": 10
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 19704.562667,
+    "seq": 100,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 18675.100000023842,
+    "occurrence": 10
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 19715.617958,
+    "seq": 101,
+    "barrierMs": 11.800000071525574,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 18686.900000095367,
+    "occurrence": 10
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 19717.631833,
+    "seq": 102,
+    "attempt": 1,
+    "chain": 1,
+    "count": 0,
+    "durationMs": 13.800000071525574,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 18688.900000095367,
+    "occurrence": 10
+   },
+   {
+    "name": "main.sidecar.respawn.fork.start",
+    "t": 22861.096833,
+    "seq": 105,
+    "generation": 2,
+    "reason": "retry-engine"
+   },
+   {
+    "name": "main.sidecar.respawn.fork.end",
+    "t": 23608.132292,
+    "seq": 107,
+    "durationMs": 747.0379160000011,
+    "generation": 2,
+    "reason": "retry-engine",
+    "outcome": "ok"
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 23613.412042,
+    "seq": 113,
+    "attempt": 1,
+    "chain": 2,
+    "source": "renderer",
+    "rendererNow": 22582.100000023842,
+    "occurrence": 11
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 23620.53875,
+    "seq": 114,
+    "attempt": 1,
+    "chain": 2,
+    "durationMs": 9.700000047683716,
+    "outcome": "error:request",
+    "source": "renderer",
+    "rendererNow": 22591.800000071526,
+    "occurrence": 11
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 23620.916167,
+    "seq": 116,
+    "attempt": 2,
+    "chain": 2,
+    "source": "renderer",
+    "rendererNow": 22591.900000095367,
+    "occurrence": 12
+   },
+   {
+    "name": "renderer.launch_draft.end",
+    "t": 23883.87575,
+    "seq": 135,
+    "trigger": "launch",
+    "outcome": "navigated",
+    "durationMs": 47.799999952316284,
+    "source": "renderer",
+    "rendererNow": 259.5,
+    "occurrence": 6
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 23908.661208,
+    "seq": 136,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 296.90000009536743,
+    "occurrence": 11
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 23909.375792,
+    "seq": 137,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 297.40000009536743,
+    "occurrence": 13
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 23912.348542,
+    "seq": 138,
+    "barrierMs": 3.100000023841858,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 300.60000002384186,
+    "occurrence": 11
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 23914.525542,
+    "seq": 139,
+    "attempt": 1,
+    "chain": 1,
+    "count": 0,
+    "durationMs": 5.399999976158142,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 302.8000000715256,
+    "occurrence": 12
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 25435.731832999998,
+    "seq": 145,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 1816.2000000476837,
+    "occurrence": 12
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 25437.156625,
+    "seq": 146,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 1816.3000000715256,
+    "occurrence": 14
+   },
+   {
+    "name": "renderer.launch_draft.end",
+    "t": 25437.752542,
+    "seq": 148,
+    "trigger": "manual",
+    "outcome": "navigated",
+    "durationMs": 15.399999976158142,
+    "source": "renderer",
+    "rendererNow": 1817.2000000476837,
+    "occurrence": 7
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 25442.029292,
+    "seq": 149,
+    "barrierMs": 14,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 1830.3000000715256,
+    "occurrence": 12
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 25444.440458,
+    "seq": 150,
+    "attempt": 1,
+    "chain": 1,
+    "count": 0,
+    "durationMs": 16.399999976158142,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 1832.7000000476837,
+    "occurrence": 13
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 26148.589667,
+    "seq": 152,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 2536.7000000476837,
+    "occurrence": 13
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 26149.181875,
+    "seq": 153,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 2536.8000000715256,
+    "occurrence": 15
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 26158.732792,
+    "seq": 154,
+    "barrierMs": 10.100000023841858,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 2546.9000000953674,
+    "occurrence": 13
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 26161.362417,
+    "seq": 155,
+    "attempt": 1,
+    "chain": 1,
+    "count": 0,
+    "durationMs": 12.799999952316284,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 2549.600000023842,
+    "occurrence": 14
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 26839.497167,
+    "seq": 157,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 3227.5,
+    "occurrence": 14
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 26840.349333,
+    "seq": 158,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 3227.7000000476837,
+    "occurrence": 16
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 26856.939833,
+    "seq": 159,
+    "barrierMs": 16.899999976158142,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 3244.600000023842,
+    "occurrence": 14
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 26860.03825,
+    "seq": 160,
+    "attempt": 1,
+    "chain": 1,
+    "count": 0,
+    "durationMs": 20.5,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 3248.3000000715256,
+    "occurrence": 15
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 27530.076333,
+    "seq": 162,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 3918.3000000715256,
+    "occurrence": 15
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 27530.721542,
+    "seq": 163,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 3918.4000000953674,
+    "occurrence": 17
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 27546.38125,
+    "seq": 164,
+    "barrierMs": 16.199999928474426,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 3934.600000023842,
+    "occurrence": 15
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 27549.402917,
+    "seq": 165,
+    "attempt": 1,
+    "chain": 1,
+    "count": 0,
+    "durationMs": 19.199999928474426,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 3937.600000023842,
+    "occurrence": 16
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 28219.255,
+    "seq": 167,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 4607.5,
+    "occurrence": 16
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 28219.804167,
+    "seq": 168,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 4607.700000047684,
+    "occurrence": 18
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 28241.263667,
+    "seq": 169,
+    "barrierMs": 21.299999952316284,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 4629,
+    "occurrence": 16
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 28243.927292,
+    "seq": 170,
+    "attempt": 1,
+    "chain": 1,
+    "count": 0,
+    "durationMs": 24.600000023841858,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 4632.200000047684,
+    "occurrence": 17
+   }
+  ],
+  "probeTimeouts": [
+   {
+    "t": 13422.899417,
+    "barrierMs": 87.10000002384186,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 13463.196542,
+    "barrierMs": 8.900000095367432,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 15095.866333,
+    "barrierMs": 15.899999976158142,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 15826.146083,
+    "barrierMs": 7.600000023841858,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 16380.670917,
+    "barrierMs": 14.300000071525574,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 17113.300708,
+    "barrierMs": 12.5,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 17689.271667,
+    "barrierMs": 17.799999952316284,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 18405.296208,
+    "barrierMs": 15.699999928474426,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 18990.21525,
+    "barrierMs": 17.40000009536743,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 19715.617958,
+    "barrierMs": 11.800000071525574,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 23912.348542,
+    "barrierMs": 3.100000023841858,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 25442.029292,
+    "barrierMs": 14,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 26158.732792,
+    "barrierMs": 10.100000023841858,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 26856.939833,
+    "barrierMs": 16.899999976158142,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 27546.38125,
+    "barrierMs": 16.199999928474426,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 28241.263667,
+    "barrierMs": 21.299999952316284,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   }
+  ],
+  "modelList": [
+   {
+    "t": 13440.915917,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "cancelled",
+    "durationMs": 93.70000004768372
+   },
+   {
+    "t": 13465.476083,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 11.200000047683716,
+    "count": 0
+   },
+   {
+    "t": 15098.954167,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 19,
+    "count": 0
+   },
+   {
+    "t": 15829.251417,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 15.299999952316284,
+    "count": 0
+   },
+   {
+    "t": 16383.517917000001,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 17.200000047683716,
+    "count": 0
+   },
+   {
+    "t": 17115.440875,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 14.600000023841858,
+    "count": 0
+   },
+   {
+    "t": 17691.921208,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 20.5,
+    "count": 0
+   },
+   {
+    "t": 18407.671083,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 18.100000023841858,
+    "count": 0
+   },
+   {
+    "t": 18992.844957999998,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 20.100000023841858,
+    "count": 0
+   },
+   {
+    "t": 19717.631833,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 13.800000071525574,
+    "count": 0
+   },
+   {
+    "t": 23620.53875,
+    "chain": 2,
+    "attempt": 1,
+    "outcome": "error:request",
+    "durationMs": 9.700000047683716
+   },
+   {
+    "t": 23914.525542,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 5.399999976158142,
+    "count": 0
+   },
+   {
+    "t": 25444.440458,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 16.399999976158142,
+    "count": 0
+   },
+   {
+    "t": 26161.362417,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 12.799999952316284,
+    "count": 0
+   },
+   {
+    "t": 26860.03825,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 20.5,
+    "count": 0
+   },
+   {
+    "t": 27549.402917,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 19.199999928474426,
+    "count": 0
+   },
+   {
+    "t": 28243.927292,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 24.600000023841858,
+    "count": 0
+   }
+  ],
+  "maxProbeTimeouts": 0,
+  "maxListDurationMs": 93.70000004768372
+ },
+ "sampleTable": {
+  "samples": [
+   {
+    "kind": "model_list.end",
+    "t": 23620.53875,
+    "spanMs": 9.700000047683716,
+    "outcome": "error:request",
+    "requests": 0,
+    "labels": {},
+    "verdict": "窗口内 netlog 没有模型读取请求(没记到,不是没发)"
+   }
+  ]
+ },
+ "engineLog": {
+  "linesInWindow": 226,
+  "perRun": {
+   "92c399f0": {
+    "connected": 4,
+    "disconnected": 1
+   },
+   "1389b3e5": {
+    "connected": 8,
+    "disconnected": 4
+   }
+  },
+  "skillInit": 10,
+  "serverUnavailable": 4
+ },
+ "afterOpen": {
+  "command": {
+   "requests": 9,
+   "worstMs": 58,
+   "labels": {
+    "answered": 9
+   }
+  },
+  "modelRead": {
+   "requests": 10,
+   "worstMs": 21,
+   "labels": {
+    "answered": 10
+   }
+  },
+  "stalledRequests": 71,
+  "lastCommandEndMs": 28147,
+  "lastProbeAnsweredMs": 28148,
+  "orphanPreflights": {
+   "count": 6,
+   "maxMs": 6
+  }
+ }
+}

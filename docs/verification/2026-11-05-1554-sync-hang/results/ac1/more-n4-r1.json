@@ -1,0 +1,403 @@
+{
+ "label": "more-n4-r1",
+ "n": 4,
+ "mcp": true,
+ "round": "1",
+ "startedAt": "2026-11-05T06:15:41.305Z",
+ "isolation": {
+  "guardProof": {
+   "target": "~/Library/Keychains",
+   "outsideStatus": 0,
+   "insideStatus": 1,
+   "proven": true
+  },
+  "lsofVerdictProof": {
+   "catchesLeak": true,
+   "catchesNoRoot": true,
+   "passesClean": true,
+   "proven": true
+  },
+  "securityAgentBaseline": 0,
+  "devUserDataMtimeBefore": 1789973435203.6592,
+  "securityAgentEvents": [],
+  "lsof": {
+   "pids": 5,
+   "total": 253,
+   "inRoot": 70,
+   "leaks": [],
+   "ok": true,
+   "sample": [
+    "/private<root>/tmp/opencode-onboarding-67076090-0921-4ece-8f01-35e546e47dba/desktop/engine-scratch-cwd",
+    "/private<root>/tmp/opencode-onboarding-67076090-0921-4ece-8f01-35e546e47dba/session/GPUCache/index",
+    "/private<root>/tmp/opencode-onboarding-67076090-0921-4ece-8f01-35e546e47dba/session/GPUCache/data_0",
+    "/private<root>/tmp/opencode-onboarding-67076090-0921-4ece-8f01-35e546e47dba/session/GPUCache/data_1",
+    "/private<root>/tmp/opencode-onboarding-67076090-0921-4ece-8f01-35e546e47dba/session/GPUCache/data_2",
+    "/private<root>/tmp/opencode-onboarding-67076090-0921-4ece-8f01-35e546e47dba/session/GPUCache/data_3"
+   ]
+  },
+  "devUserDataMtimeAfter": 1789973435203.6592,
+  "lsofEnd": {
+   "pids": 5,
+   "total": 249,
+   "inRoot": 66,
+   "leaks": [],
+   "ok": true
+  },
+  "homePathsInLogs": []
+ },
+ "deviations": [
+  "窗口透明且不抢前台(dev-preload),CDP 口被改写;都不碰网络栈。"
+ ],
+ "launch": {
+  "flags": [
+   "--use-mock-keychain",
+   "--user-data-dir=<root>/udd",
+   "--log-net-log=<root>/net.json"
+  ],
+  "cdpPort": 41910,
+  "envKeys": [
+   "PATH",
+   "HOME",
+   "CFFIXED_USER_HOME",
+   "TMPDIR",
+   "USER",
+   "LOGNAME",
+   "SHELL",
+   "LANG",
+   "OPENCODE_TEST_ONBOARDING",
+   "NO_PROXY",
+   "no_proxy",
+   "CODEPUPPY_WEB_URL",
+   "CODEPUPPY_PLATFORM_URL",
+   "CODEPUPPY_ACCOUNT_URL",
+   "CODEPUPPY_CLOUD_URL",
+   "CODEPUPPY_MCP_URL",
+   "ALPHA_WEB_URL",
+   "ALPHA_PLATFORM_URL",
+   "ALPHA_ACCOUNT_URL",
+   "ALPHA_CLOUD_URL",
+   "ALPHA_MCP_URL",
+   "OPENCODE_DISABLE_MODELS_FETCH",
+   "P1554_DIRS",
+   "P1554_CDP_PORT",
+   "P1554_PRELOAD_LOG",
+   "P1554_INITIATORS"
+  ]
+ },
+ "versions": {
+  "chrome": "148.0.7778.218",
+  "visibility": "visible"
+ },
+ "cold": {
+  "durationMs": 322.2000000476837,
+  "outcome": "cancelled"
+ },
+ "opened": [
+  {
+   "ws": "ws1",
+   "newChat": "clicked",
+   "click": "clicked",
+   "t": 16332
+  },
+  {
+   "ws": "ws2",
+   "newChat": "clicked",
+   "click": "clicked",
+   "t": 17620
+  },
+  {
+   "ws": "ws3",
+   "newChat": "clicked",
+   "click": "clicked",
+   "t": 18906
+  },
+  {
+   "ws": "ws4",
+   "newChat": "clicked",
+   "click": "clicked",
+   "t": 20194
+  }
+ ],
+ "allOpened": true,
+ "mcpRecord": {
+  "host": "<lan-ip>",
+  "port": 42051
+ },
+ "persist": {
+  "ok": true
+ },
+ "retryEngine": true,
+ "engineGeneration": 2,
+ "newChatAfterRespawn": {
+  "click": "clicked",
+  "t": 26156
+ },
+ "openedMore": [
+  {
+   "ws": "ws5",
+   "click": "clicked",
+   "t": 26842
+  },
+  {
+   "ws": "ws6",
+   "click": "clicked",
+   "t": 27526
+  },
+  {
+   "ws": "ws7",
+   "click": "clicked",
+   "t": 28210
+  },
+  {
+   "ws": "ws8",
+   "click": "clicked",
+   "t": 28895
+  }
+ ],
+ "heldMs": 45094,
+ "afterOpen": {
+  "mounts": 5,
+  "starts": [
+   {
+    "t": 25780.288292,
+    "chain": 1,
+    "attempt": 1
+   },
+   {
+    "t": 26524.746042000002,
+    "chain": 1,
+    "attempt": 1
+   },
+   {
+    "t": 27186.064084,
+    "chain": 1,
+    "attempt": 1
+   },
+   {
+    "t": 27860.358667,
+    "chain": 1,
+    "attempt": 1
+   },
+   {
+    "t": 28554.0275,
+    "chain": 1,
+    "attempt": 1
+   }
+  ],
+  "ends": [
+   {
+    "t": 25789.205584,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 19,
+    "count": 0
+   },
+   {
+    "t": 26535.419584,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 11,
+    "count": 0
+   },
+   {
+    "t": 27199.966292,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 14.399999976158142,
+    "count": 0
+   },
+   {
+    "t": 27874.027167,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 14.200000047683716,
+    "count": 0
+   },
+   {
+    "t": 28561.119584,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 14.800000071525574,
+    "count": 0
+   }
+  ],
+  "catalogReady": [
+   {
+    "t": 25785.949917,
+    "barrierMs": 15.700000047683716,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 26529.93375,
+    "barrierMs": 5.600000023841858,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 27194.889084000002,
+    "barrierMs": 9.399999976158142,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 27871.033875,
+    "barrierMs": 10.800000071525574,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   },
+   {
+    "t": 28559.036834000002,
+    "barrierMs": 12.200000047683716,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   }
+  ],
+  "retries": 0
+ },
+ "composerReads": [
+  {
+   "startT": 25780.288292,
+   "chain": 1,
+   "attempt": 1,
+   "outcome": "ok",
+   "ownEndMs": 8.91729199999827,
+   "firstOkAfterMs": 8.91729199999827
+  },
+  {
+   "startT": 26524.746042000002,
+   "chain": 1,
+   "attempt": 1,
+   "outcome": "ok",
+   "ownEndMs": 10.673541999996814,
+   "firstOkAfterMs": 10.673541999996814
+  },
+  {
+   "startT": 27186.064084,
+   "chain": 1,
+   "attempt": 1,
+   "outcome": "ok",
+   "ownEndMs": 13.902207999999519,
+   "firstOkAfterMs": 13.902207999999519
+  },
+  {
+   "startT": 27860.358667,
+   "chain": 1,
+   "attempt": 1,
+   "outcome": "ok",
+   "ownEndMs": 13.668499999999767,
+   "firstOkAfterMs": 13.668499999999767
+  },
+  {
+   "startT": 28554.0275,
+   "chain": 1,
+   "attempt": 1,
+   "outcome": "ok",
+   "ownEndMs": 7.092083999999886,
+   "firstOkAfterMs": 7.092083999999886
+  }
+ ],
+ "lastComposer": {
+  "startT": 28554.0275,
+  "chain": 1,
+  "attempt": 1,
+  "outcome": "ok",
+  "ownEndMs": 7.092083999999886,
+  "firstOkAfterMs": 7.092083999999886
+ },
+ "reproduced": false,
+ "readsOver10s": 0,
+ "blackholes": [
+  {
+   "label": "global",
+   "conns": 17,
+   "bytes": 4165,
+   "firstConnAfterLaunchMs": 24681
+  }
+ ],
+ "stubHits": {
+  "/v1/byok-catalog": 1,
+  "/v1/models": 1
+ },
+ "egressLines": [
+  "01:15:41.935                    › network egress: 0 configured destination(s) authorized for this generation — none",
+  "01:16:04.782                    › network egress: 1 configured destination(s) authorized for this generation — <lan-ip>:<port> (mcp:blackhole)"
+ ],
+ "domStatus": null,
+ "paths": {
+  "root": "<root>",
+  "netlog": "<root>/net.json",
+  "timeline": "<root>/tmp/opencode-onboarding-67076090-0921-4ece-8f01-35e546e47dba/desktop/logs/20261105T061541/startup-timeline.log",
+  "engineLogs": [
+   "<root>/tmp/opencode-onboarding-67076090-0921-4ece-8f01-35e546e47dba/data/opencode/log/opencode.log"
+  ],
+  "initiators": "<root>/initiators.jsonl",
+  "preloadLog": "<root>/preload.jsonl"
+ },
+ "mcpStatus": {
+  "ws1": {
+   "blackhole": "pending"
+  },
+  "ws2": {
+   "blackhole": "pending"
+  },
+  "ws3": {
+   "blackhole": "pending"
+  },
+  "ws4": {
+   "blackhole": "pending"
+  },
+  "ws5": {
+   "blackhole": "failed"
+  },
+  "ws6": {
+   "blackhole": "failed"
+  },
+  "ws7": {
+   "blackhole": "pending"
+  },
+  "ws8": {
+   "blackhole": "pending"
+  }
+ },
+ "streamProbe": {
+  "snapshot": [
+   "streaming:200",
+   "streaming:200",
+   "streaming:200",
+   "pending",
+   "pending",
+   "pending",
+   "pending",
+   "pending"
+  ],
+  "healthAnswered": "no-answer-in-3000ms"
+ },
+ "endedAt": "2026-11-05T06:16:59.495Z",
+ "exit": {
+  "code": 0,
+  "why": "round complete"
+ },
+ "appExit": {
+  "code": 0,
+  "signal": null,
+  "afterMs": 78317
+ },
+ "cleanup": {
+  "killed": 5,
+  "mainExitedAlone": true,
+  "sigkillNeeded": 0,
+  "leftover": [],
+  "orphansInRoot": []
+ }
+}

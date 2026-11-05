@@ -166,7 +166,7 @@ function world(
     defaultDirectory: () => workspace,
     projectMcpState: extra.projectMcpState ?? (async () => "unverifiable"),
     awaitServer: async () => ({ url: "http://127.0.0.1:39117", username: "opencode", password: "pw" }),
-    pendingFor: (directory) => coordinator.pendingFor(directory),
+    pendingFor: (directory, itemID) => coordinator.pendingFor(directory, itemID),
     fetch: engineFetch(engine, seen),
     timeoutMs: 2_000,
   }

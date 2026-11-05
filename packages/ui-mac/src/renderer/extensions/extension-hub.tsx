@@ -67,7 +67,7 @@ import { hubSection, setHubSection, type HubSection } from "./ext-hub-state"
 import { extensionError, catalogDescription, iconFor, iconForRow, MoreMenu, PackageLogo, typeLabel, Svg, SearchIc, type MoreMenuItem } from "./ext-presentation"
 import { inventoryInstallRow, healthPresentation } from "./ext-inventory-present"
 import { ExtensionDetail, type DetailTarget } from "./extension-detail"
-import { officeAdvisoryFor, retiredCommunityOfficeFor } from "../../shared/office-advisories"
+import { isCodePuppyOfficeCatalogId, officeAdvisoryFor, retiredCommunityOfficeFor } from "../../shared/office-advisories"
 // #397 PR-B:四级货架与策展呈现(纯派生层;解码真源 = shared/catalog-curation,fail-closed)。
 import { curatedOf, curationMapOf, curationOf, isArchived, isSessionGrant, splitBrowse } from "./ext-curation-view"
 // #408 PR-C:会话开关纯派生层(状态机 / 拒绝码路由;真源 = main grant 登记 + 本地连接结果)。
@@ -284,7 +284,7 @@ export function ExtensionHub(props: {
       return
     }
     let mcPending = false
-    if (args.type === "mcp") {
+    if (args.type === "mcp" && !isCodePuppyOfficeCatalogId(args.receipt.id)) {
       const mc = await ext.setMcpConnected(args.name, true)
       mcPending = mc.reason === "reload-pending"
     }
@@ -376,7 +376,7 @@ export function ExtensionHub(props: {
       return
     }
     let mcPending = false
-    if (args.type === "mcp") {
+    if (args.type === "mcp" && !isCodePuppyOfficeCatalogId(args.receipt.id)) {
       const mc = await ext.setMcpConnected(args.name, next === "enabled")
       mcPending = mc.reason === "reload-pending"
     }
@@ -729,7 +729,7 @@ export function ExtensionHub(props: {
       setCmName(""); setCmCommand(""); setCmUrl(""); setCmEnv(""); setCmSecrets("")
       // #395(Codex r10 M5):重加已 disabled 的自定义 MCP —— 落盘成功但不激活连接,如实提示。
       flash(
-        r.reason === "installed-disabled" ? t("codepuppy.ext.installedDisabled") : r.reason === "slow" ? t("codepuppy.ext.customMcpSlow") : t("codepuppy.ext.customMcpDone"),
+        r.reason === "installed-disabled" ? t("codepuppy.ext.installedDisabled") : r.reason === "reload-pending" ? t("codepuppy.ext.statePendingReload") : t("codepuppy.ext.customMcpDone"),
         "success",
       )
     } finally {

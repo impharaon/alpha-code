@@ -50,6 +50,10 @@ pinShippedPlatform()
 //     函数值先存 const,再 mock.module。
 /** REQ-234 `#1529`:renderer 不再 dispose —— 恒为 0 是判据的一半(另一半是 main 发出的重载请求)。 */
 let disposeCalls = 0
+let connectorRefreshes = 0
+let liveMcpCalls = 0
+let startup: { mcp?: Record<string, { enabled?: boolean }> } | undefined
+const services = () => startup ? { "codepuppy-pdf": { status: startup.mcp?.["codepuppy-pdf"]?.enabled === false ? "disabled" : "connected" } } : {}
 const engineClient = {
   global: {
     dispose: async () => {
@@ -59,9 +63,10 @@ const engineClient = {
     event: async () => ({ stream: (async function* () {})() }),
   },
   mcp: {
-    status: async () => ({ data: {} }),
-    connect: async () => ({ data: {} }),
-    disconnect: async () => ({ data: {} }),
+    status: async () => ({ data: services() }),
+    add: async () => { liveMcpCalls++; return { data: {} } },
+    connect: async () => { liveMcpCalls++; return { data: {} } },
+    disconnect: async () => { liveMcpCalls++; return { data: {} } },
   },
   app: { agents: async () => ({ data: [] }) },
 }
@@ -268,7 +273,13 @@ mock.module("../src/renderer/extensions/use-extensions", () => ({
 // ── ⑥ 真 main:环境 + IPC 表 ─────────────────────────────────────────────────────────────
 const { initCodePuppyEnvironment } = await import("../src/main/codepuppy-environment")
 const { registerExtIpcHandlers } = await import("../src/main/ext-ipc")
-const { readPackageLedgerStateV1 } = await import("../src/main/ext-receipt-v2")
+const { readPackageLedgerStateV1, upsertRecordV2 } = await import("../src/main/ext-receipt-v2")
+const { injectDisabledOverrides } = await import("../src/main/ext-disabled-injection")
+const { restoreMcpLeaf } = await import("../src/main/ext-config")
+const { codepuppyOfficeInstallCommand } = await import("../src/shared/office-advisories")
+const { deriveMcpEgressDestinations, setConfiguredEgressDestinations, isEgressAuthorizedForSidecar } = await import("../src/main/network-egress-derived")
+const { readMcpServerRecords } = await import("../src/main/mcp-server-records")
+const { createReloadScheduler } = await import("../../ext/src/reload-scheduler")
 const { codepuppyGlobalRoot } = await import("../src/main/codepuppy-installs")
 
 delete process.env.CODEPUPPY_GLOBAL_DIR
@@ -284,6 +295,17 @@ const { codepuppySidecar } = registerExtIpcHandlers(
   "dev",
   async () => ({ url: "http://127.0.0.1:39131", username: "opencode", password: "route-password" }),
   join(tmp, "home"),
+  {
+    stop: async () => { throw new Error("first-party/custom changes must wait for the scheduler") },
+    refresh: async () => {
+      connectorRefreshes++
+      // Process boundary: boot producers reread this fixture's real ledger and records.
+      startup = {}
+      injectDisabledOverrides(startup, { userDataPath: userData, channel: "dev" })
+      setConfiguredEgressDestinations(deriveMcpEgressDestinations(readMcpServerRecords()))
+      return true
+    },
+  },
 )
 const globalRoot = codepuppyGlobalRoot()
 /** `#1529`:main 发往 ext 调度器的重载请求 —— 「装完有没有让引擎重扫」的判据。 */
@@ -310,6 +332,8 @@ const extBridge: Record<string, unknown> = {
   packageDetail: (catalogId: unknown) => call("ext-package-detail", catalogId),
   packageInstalled: (catalogId: unknown) => call("ext-package-installed", catalogId),
   installedPackages: () => call("ext-installed-packages"),
+  setInstallState: (intent: unknown) => call("ext-set-install-state", intent),
+  persistMcp: (name: unknown, server: unknown, secrets: unknown) => call("ext-persist-mcp", name, server, secrets),
   listInstalls: (projectDir?: unknown) => call("ext-list-installs", projectDir),
   inventoryView: (projectDir?: unknown) => call("ext-inventory-view", projectDir),
   factorySkillIds: () => call("ext-factory-skill-ids"),
@@ -554,4 +578,103 @@ test("⑤ 出站计数相等:到达 IPC 的每一次安装都经过了收口方�
   // 夹具自检:被装的那个 package 里真的有一个 MCP 组件(套件成员之外还有 fs 类组件),
   // 也就是说「装完要重扫」这件事对本夹具是真需求,不是摆设。
   expect(fixture.envelope.components.map((component) => component.id)).toContain(LEAF_MCP_ID)
+})
+
+// #1646 uses the same real Hub → IPC → ledger. Only process launch is substituted;
+// startup projections use production producers, never a hand-written ledger.
+let busy = true
+const scheduler = createReloadScheduler({
+  log: () => {}, error: () => {},
+  report: (report) => codepuppySidecar.receive({ type: "codepuppy.reload.report", ...report }, () => {}),
+})
+const pdfRow = () => q('[data-installed-row="mcp:codepuppy-pdf"]')!
+// Same staged attachment metadata as attachment-reader-hooks.test.ts / attachment-cards.cases.ts.
+const meta = { v: 1 as const, name: "a.pdf", mime: "application/pdf", size: 2048, path: "attachments/00000000-0000-4000-8000-000000000000/a.pdf", reader: "pdf" as const }
+
+test("#1646 AC1 disable PDF waits for idle, then the fresh runtime blocks reading and the attachment shows why", async () => {
+  for (const request of reloadRequests) codepuppySidecar.receive({ type: "codepuppy.reload.report", generation: request.generation, scope: "global", outcome: "reloaded", directories: [] }, () => {})
+  expect(restoreMcpLeaf("codepuppy-pdf", { type: "local", command: codepuppyOfficeInstallCommand("pdf"), enabled: true }).ok).toBe(true)
+  expect(upsertRecordV2(globalRoot, {
+    id: "mcp:codepuppy-pdf", name: "codepuppy-pdf", kind: "mcp", origin: "catalog", environment: "dev",
+    version: bundledCatalog.entries.find((entry) => entry.id === "mcp:codepuppy-pdf")!.version,
+    scope: { kind: "global" }, installedAt: "2026-11-05T10:40:00.000Z", desiredState: "enabled", configKey: "mcp.codepuppy-pdf",
+  }).ok).toBe(true)
+  startup = {}
+  scheduler.register(join(tmp, "project"), {
+    session: { status: async () => ({ data: busy ? { ses_1: { type: "busy" } } : {} }) },
+    instance: { dispose: async () => ({ data: true }) },
+  })
+  codepuppySidecar.attach((request) => scheduler.request(request))
+  setHubSection("connectors")
+  document.dispatchEvent(new Event("visibilitychange"))
+  await waitFor(() => expect(pdfRow()).toBeInstanceOf(HTMLElement))
+  click(pdfRow().querySelector('[data-more]'))
+  click(pdfRow().querySelector('[data-menu-item="disable"]'))
+  await waitFor(() => expect(pdfRow().querySelector('[data-hub-reload-now]')).toBeInstanceOf(HTMLElement))
+  await scheduler.settled()
+  expect(connectorRefreshes).toBe(0)
+  expect(liveMcpCalls).toBe(0)
+  expect(services()["codepuppy-pdf"]?.status).toBe("connected")
+  busy = false
+  scheduler.poke()
+  await scheduler.settled()
+  await waitFor(() => expect(connectorRefreshes).toBe(1))
+  expect(startup.mcp?.["codepuppy-pdf"]?.enabled).toBe(false)
+  const { attachmentInstruction } = await import("../../ext/src/attachment-reader-hooks")
+  expect(attachmentInstruction(meta, tmp, services())).not.toContain("codepuppy-pdf_read_pdf")
+  const { attachmentReadOf } = await import("../src/renderer/codepuppy-ui/session-timeline/timeline-attachments")
+  const { TimelineAttachments } = await import("../src/renderer/codepuppy-ui/attachment-cards")
+  const host = document.body.appendChild(document.createElement("div"))
+  const dispose = render(() => createComponent(TimelineAttachments, { attachments: [{ partID: "pdf", name: meta.name, media: "file", label: "PDF", read: attachmentReadOf(meta, { directory: tmp, services: services(), tools: [], turnActive: true }) }] }), host)
+  expect(host.textContent).toContain(zh["codepuppy.attach.readFailedNotRunning"])
+  dispose(); host.remove()
+})
+
+test("#1646 AC2 enable from a disabled boot plus reload-now removes the startup override permanently", async () => {
+  busy = true
+  await waitFor(() => expect(pdfRow().querySelector('[data-enable-row]')).toBeInstanceOf(HTMLElement))
+  click(pdfRow().querySelector('[data-enable-row]'))
+  await waitFor(() => expect(pdfRow().querySelector('[data-hub-reload-now]')).toBeInstanceOf(HTMLElement))
+  expect(connectorRefreshes).toBe(1)
+  expect(startup?.mcp?.["codepuppy-pdf"]?.enabled).toBe(false)
+  click(pdfRow().querySelector('[data-hub-reload-now]'))
+  await waitFor(() => expect(connectorRefreshes).toBe(2))
+  expect(startup?.mcp?.["codepuppy-pdf"]).toBeUndefined()
+  expect(liveMcpCalls).toBe(0)
+  const { attachmentInstruction } = await import("../../ext/src/attachment-reader-hooks")
+  expect(attachmentInstruction(meta, tmp, services())).toContain("codepuppy-pdf_read_pdf")
+  await call("ext-reload-request", { scope: "global", items: [], reason: "user: reload now", force: true })
+  await scheduler.settled()
+  expect(startup?.mcp?.["codepuppy-pdf"]).toBeUndefined()
+  expect(attachmentInstruction(meta, tmp, services())).toContain("codepuppy-pdf_read_pdf")
+})
+
+test("#1646 AC4 custom connector waits for idle or reload-now and the new generation authorizes its destination", async () => {
+  setHubSection("connectors")
+  for (const force of [false, true]) {
+    busy = true
+    const name = force ? "custom-forced" : "custom-idle"
+    const host = `${name}.example.com`
+    const before = connectorRefreshes
+    expect(isEgressAuthorizedForSidecar(host, 443)).toBe(false)
+    click(q('[data-more="add"]'))
+    click(q('[data-menu-item="custom-connector"]'))
+    await waitFor(() => expect(q('input[placeholder="my-connector"]')).toBeInstanceOf(HTMLInputElement))
+    const input = q<HTMLInputElement>('input[placeholder="my-connector"]')!
+    input.value = name; input.dispatchEvent(new Event("input", { bubbles: true }))
+    click(qa('[role="dialog"] button').find((b) => b.textContent === zh["codepuppy.ext.customMcpTypeRemote"]))
+    const url = q<HTMLInputElement>('input[placeholder="https://mcp.example.com/sse"]')!
+    url.value = `https://${host}/mcp`; url.dispatchEvent(new Event("input", { bubbles: true }))
+    click(qa('[role="dialog"] button').find((b) => b.textContent === zh["codepuppy.ext.customMcpAdd"]))
+    const row = () => q(`[data-installed-row="mcp:${name}"]`)
+    await waitFor(() => expect(row()?.querySelector('[data-hub-reload-now]')).toBeInstanceOf(HTMLElement))
+    await scheduler.settled()
+    expect(connectorRefreshes).toBe(before)
+    expect(liveMcpCalls).toBe(0)
+    expect(isEgressAuthorizedForSidecar(host, 443)).toBe(false)
+    if (force) click(row()?.querySelector('[data-hub-reload-now]'))
+    else { busy = false; scheduler.poke() }
+    await waitFor(() => expect(connectorRefreshes).toBe(before + 1))
+    expect(isEgressAuthorizedForSidecar(host, 443)).toBe(true)
+  }
 })

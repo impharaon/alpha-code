@@ -1,3 +1,4 @@
+import { isCodePuppyOfficeCatalogId } from "../shared/office-advisories"
 import { isOfficialConnector } from "./official-connector-recipes"
 import { removeOfficialConnector, releaseOfficialConnectorResources } from "./official-connector-resources"
 // Extension Hub IPC handlers (main process). Mirrors ipc.ts's ipcMain.handle pattern. Three thin
@@ -17,7 +18,7 @@ import { readProjectPrefs, writeProjectPrefs } from "./codepuppy-workdir"
 import { projectIpcHandler, resolveProjectIpcEntry, withProjectIpcEntryIdentity } from "./ext-project-entry"
 import type { InstalledPackagesResultV1, InstallTarget, ProjectMcpState, ServerReadyData } from "../preload/types"
 import { isExtensionName } from "../shared/extension-name"
-import { codepuppyGlobalRoot, listInstalls } from "./codepuppy-installs"
+import { codepuppyGlobalRoot, findReceipt, listInstalls } from "./codepuppy-installs"
 import { claimMcpSecretVersionDir, mcpSecretVersionedRef, removeMcpSecretVersionDir, removeMcpServerSecrets, removeMcpServerSecretsStrict, writeMcpSecretVersioned } from "./codepuppy-mcp-secrets"
 import { isMigrationEnabled, removeLegacy, scanLegacy, verifyLegacyProvenance, type ProvenanceRequest } from "./codepuppy-migrate"
 import { assertProjectMcpTransactionRootIdentity, assertProjectRecoveryJournalAlgebra, collectLegacyMcpRefPathsStrict, configHealth, findPluginBaseConflictStrict, gcMcpSecretsAgainstConfig, listConfiguredMcpServerNamesStrict, mcpConfigTruthPath, readLegacyPluginArrayStrict, readMcpLeafStrict, readPluginArrayStrict, removeCommandEntry, removeMcp, removeMcpConfigInLock, removePlugin, removePluginPath, removeProjectMcpConfigInLock, withConfigWriteLock } from "./ext-config"
@@ -125,6 +126,7 @@ export function registerExtIpcHandlers(
   // ⇒ 通知 renderer 重读视图(index.ts 把它接到 `ext-hub-view-changed`)。
   const hubViewChangedListeners = new Set<() => void>()
   const reloads = createReloadCoordinator({
+    restartConnectors: () => officialRuntime?.refresh() ?? Promise.resolve(false),
     log: (line) => getLogger()?.log(line),
     onChange: () => {
       for (const listener of hubViewChangedListeners) {
@@ -1154,10 +1156,17 @@ export function registerExtIpcHandlers(
     // #397:enable 方向的 curation 闸需要 resolveEntry(已验 effective catalog)—— 直接用
     // plannerDeps(自带 #314/#315 security browse-only 语义与懒冻结 advisory 视图)。
     const official = !!intent && typeof intent === "object" && "name" in intent && typeof intent.name === "string" && isOfficialConnector(intent.name)
-    if (official && !officialRuntime) return { ok: false, reason: "official connector runtime unavailable" }
+    const decoded = decodeSetStateIntent(intent)
+    const firstParty = decoded.ok && decoded.intent.scope === "global" && decoded.intent.type === "mcp" && isCodePuppyOfficeCatalogId(`mcp:${decoded.intent.name}`)
+    if ((official || firstParty) && !officialRuntime) return { ok: false, reason: "official connector runtime unavailable" }
     if (official) await officialRuntime!.stop()
     try {
-      return await setInstallStateByKey(intent, plannerDeps())
+      const result = await setInstallStateByKey(intent, plannerDeps())
+      if (result.ok && firstParty) reloads.request({
+        scope: "global", items: [{ id: `mcp:${decoded.intent.name}`, scope: "global" }],
+        reason: `set mcp ${decoded.intent.name} ${decoded.intent.state}`, connectorChange: true,
+      })
+      return result
     } finally {
       if (official && !(await officialRuntime!.refresh()))
         return { ok: false, reason: "official-connector-needs-reentry: runtime refresh failed" }
@@ -1291,7 +1300,14 @@ export function registerExtIpcHandlers(
       // 的 openJournals fail-closed 仍在(纵深)。
       projectResidualsClean: (projectDir) => cleanProjectCatalogResiduals(projectDir, plannerDeps()),
       removeMcpLegacy: removeMcpLegacyBody,
-      persistMcp: (name, server, secretVars) => persistMcpBody(name as string, server as Record<string, unknown>, secretVars as string[] | undefined),
+      persistMcp: async (name, server, secretVars) => {
+        const result = await persistMcpBody(name as string, server as Record<string, unknown>, secretVars as string[] | undefined)
+        if (result.ok) reloads.request({
+          scope: "global", items: [{ id: findReceipt(codepuppyGlobalRoot(), "mcp", name as string)!.id, scope: "global" }],
+          reason: `installed mcp ${name}`, connectorChange: true,
+        })
+        return result
+      },
       importAgentConfirm: importAgentConfirmBody,
       importClaudePluginConfirm: importClaudePluginConfirmBody,
       // #390:global 未策展技能导入走 planner 的 CAS + generation 事务(取代 flat copy 的崩溃半成品窗);
@@ -1450,7 +1466,7 @@ export function registerExtIpcHandlers(
     defaultDirectory: codepuppyUserWorkspaceDir,
     projectMcpState: (name, projectDir) => projectMcpState(name, projectDir, false),
     awaitServer,
-    pendingFor: (directory) => reloads.pendingFor(directory),
+    pendingFor: (directory, itemID) => reloads.pendingFor(directory, itemID),
   })
   ipcMain.handle(HUB_READ_CHANNELS.hubView, (_event: IpcMainInvokeEvent, directory?: unknown) =>
     hubView.view(typeof directory === "string" ? directory : undefined),

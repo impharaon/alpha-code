@@ -153,7 +153,7 @@ const artifacts: ArtifactFact[] = []
 const feeds: UpdaterFeedFact[] = []
 
 // mac artifacts(codepuppy-mac-<arch>.dmg/.zip + blockmaps)—— 从最终 dist 字节计算。
-const MAC_ARCHES = ["arm64", "x64"] as const
+const MAC_ARCHES = ["arm64"] as const
 let appBundle: string | null = null
 for (const arch of MAC_ARCHES) {
   const dmg = `codepuppy-mac-${arch}.dmg`
@@ -170,8 +170,7 @@ for (const arch of MAC_ARCHES) {
     if (fs.existsSync(path.join(distDir, bm)))
       artifacts.push({ filename: bm, platform: "darwin", arch, kind: "blockmap", ...fileFacts(path.join(distDir, bm)) })
   }
-  // electron-builder 的 unpacked 目录:x64 是它的默认架构,不加后缀 ⇒ dist/mac/;arm64 ⇒ dist/mac-arm64/(#1496)。
-  const unpacked = path.join(distDir, arch === "x64" ? "mac" : `mac-${arch}`)
+  const unpacked = path.join(distDir, `mac-${arch}`)
   if (fs.existsSync(unpacked)) {
     const app = fs.readdirSync(unpacked).find((n) => n.endsWith(".app"))
     if (app) appBundle = path.join(unpacked, app)
@@ -188,7 +187,7 @@ if (hasMac) {
 let macSigning = null
 if (hasMac) {
   if (process.platform !== "darwin") die("darwin artifacts present but not running on macOS — cannot collect signing facts")
-  if (!appBundle) die("darwin artifacts present but no unpacked .app found in dist (need dist/mac-arm64/*.app or dist/mac/*.app for signing facts)")
+  if (!appBundle) die("darwin artifacts present but no unpacked .app found in dist (need dist/mac-arm64/*.app for signing facts)")
   const codesign = run("codesign", ["-dvv", appBundle])
   const spctl = run("spctl", ["-a", "-vvv", "-t", "install", appBundle])
   const stapler = run("xcrun", ["stapler", "validate", appBundle])

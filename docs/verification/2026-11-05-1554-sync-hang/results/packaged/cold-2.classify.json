@@ -1,0 +1,502 @@
+{
+ "meta": {
+  "events": 33245,
+  "firstEventEpochMs": 1793864003404,
+  "spanMs": 90269,
+  "cutoffMs": 90248,
+  "cutoffSource": "auto:teardown(3 cancels in last 300ms)",
+  "stallMs": 1000,
+  "engineOrigins": [
+   "http://127.0.0.1:57259"
+  ],
+  "stalledEventsTotal": 311,
+  "finalized": true,
+  "unparsedLines": 1
+ },
+ "engine": {
+  "total": 177,
+  "byLabel": {
+   "answered": 177
+  },
+  "peak": {
+   "maxHoldingSocket": 6,
+   "atMs": 1341
+  },
+  "openStreamsAtCutoff": 3,
+  "streamsEverOpened": 3,
+  "byPath": [
+   {
+    "key": "/session [answered]",
+    "count": 12
+   },
+   {
+    "key": "/api/health [answered]",
+    "count": 9
+   },
+   {
+    "key": "/project [answered]",
+    "count": 8
+   },
+   {
+    "key": "/experimental/session [answered]",
+    "count": 7
+   },
+   {
+    "key": "/provider [answered]",
+    "count": 6
+   },
+   {
+    "key": "/path [answered]",
+    "count": 6
+   },
+   {
+    "key": "/session/status [answered]",
+    "count": 6
+   },
+   {
+    "key": "/api/reference [answered]",
+    "count": 6
+   },
+   {
+    "key": "/command [answered]",
+    "count": 6
+   },
+   {
+    "key": "/lsp [answered]",
+    "count": 5
+   },
+   {
+    "key": "/mcp [answered]",
+    "count": 5
+   },
+   {
+    "key": "/experimental/resource [answered]",
+    "count": 5
+   },
+   {
+    "key": "/agent [answered]",
+    "count": 5
+   },
+   {
+    "key": "/config [answered]",
+    "count": 5
+   },
+   {
+    "key": "/vcs [answered]",
+    "count": 5
+   },
+   {
+    "key": "/permission [answered]",
+    "count": 5
+   },
+   {
+    "key": "/question [answered]",
+    "count": 5
+   },
+   {
+    "key": "/project/current [answered]",
+    "count": 4
+   },
+   {
+    "key": "/global/event [answered]",
+    "count": 3
+   },
+   {
+    "key": "/global/health [answered]",
+    "count": 1
+   },
+   {
+    "key": "/global/config [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_0c55bc852ffekEbmWhJQ824HJ4 [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_0baa7458bfferaCjttZxZGRMBa [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_0ba9d5115ffeQQcvghXsx1FgGc [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_ff0cbb7c8ffeMx44G56d0m961S [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_fc835407bffe5I7LJjumW69pkx [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_faa563420ffe9uouBOCs7Ad7LL [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_faa26b7a8ffe69gCWSS4eEcQry [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_fa8d38a48ffethBddzeW6a5GqW [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_fa035e646ffeOxrL3K6jZtwX6J [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f9ef5fec4ffeVn3vDSCNIaWJhU [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f9eed5206ffeCcY6sfeuF2skZO [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f9e945928ffeA0xscoqblufz93 [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f7a8d7567ffe5jG2iCLJxDaQEd [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f3e25aa4fffeXhK7IYniUnpP7x [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f3e24ddbfffemMvJqOwabz1gjG [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f3e24a113ffeTg5u7Dc5OmcZPD [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f3e22e135ffe37vuTjcd4VN7Cv [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f3e22b648ffeRqm33PsBTD49k0 [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f3d588efaffeTjTgsNncNPo6FM [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f3c79f6eaffejzMB00ACX5Srw2 [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f3c44b2d8ffeblWN16C33VvJyQ [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f3321be0fffeX6qJ46G1L8IwNt [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_ed23667deffelGHcWPqVFnLzWD [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_ec7e37ee5ffeSdPqe1qSyXjvwc [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_e87ac6ec3ffeP07jFPoadv0tN4 [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_e7a42955dffe1fRcSy7b6kQ33o [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_e75355dc2ffeS0Kr4AGg7aXx4e [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_e55601e8effeCqzP10k80k2woA [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_0c55bc852ffekEbmWhJQ824HJ4/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/api/agent [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_0baa7458bfferaCjttZxZGRMBa/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_0ba9d5115ffeQQcvghXsx1FgGc/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_ff0cbb7c8ffeMx44G56d0m961S/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_faa563420ffe9uouBOCs7Ad7LL/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_faa26b7a8ffe69gCWSS4eEcQry/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_fc835407bffe5I7LJjumW69pkx/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_fa8d38a48ffethBddzeW6a5GqW/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_fa035e646ffeOxrL3K6jZtwX6J/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f9ef5fec4ffeVn3vDSCNIaWJhU/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f9eed5206ffeCcY6sfeuF2skZO/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f9e945928ffeA0xscoqblufz93/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f7a8d7567ffe5jG2iCLJxDaQEd/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f3e25aa4fffeXhK7IYniUnpP7x/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f3e24ddbfffemMvJqOwabz1gjG/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f3e24a113ffeTg5u7Dc5OmcZPD/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f3e22e135ffe37vuTjcd4VN7Cv/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f3e22b648ffeRqm33PsBTD49k0/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f3c79f6eaffejzMB00ACX5Srw2/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f3d588efaffeTjTgsNncNPo6FM/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f3321be0fffeX6qJ46G1L8IwNt/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f3c44b2d8ffeblWN16C33VvJyQ/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_ec7e37ee5ffeSdPqe1qSyXjvwc/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_ed23667deffelGHcWPqVFnLzWD/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_e87ac6ec3ffeP07jFPoadv0tN4/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_e7a42955dffe1fRcSy7b6kQ33o/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_e75355dc2ffeS0Kr4AGg7aXx4e/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_e55601e8effeCqzP10k80k2woA/message [answered]",
+    "count": 1
+   },
+   {
+    "key": "/api/provider/codepuppy-internal-catalog-ready [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_ff0cbb7c8ffeMx44G56d0m961S/message/msg_018082bbe001vuuav7g7KwdIA9 [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f9e945928ffeA0xscoqblufz93/message/msg_07a9eef50001UdnygmTuNpHgYE [answered]",
+    "count": 1
+   },
+   {
+    "key": "/session/ses_f3321be0fffeX6qJ46G1L8IwNt/message/msg_0ccf46fff0012oQ5umAHqk61yC [answered]",
+    "count": 1
+   },
+   {
+    "key": "/api/model [answered]",
+    "count": 1
+   }
+  ],
+  "slow": []
+ },
+ "upstream": [
+  {
+   "origin": "https://github.com",
+   "count": 7,
+   "byLabel": {
+    "answered": 7
+   },
+   "maxSocketWaitMs": 226,
+   "maxResponseWaitMs": 556
+  },
+  {
+   "origin": "https://release-assets.githubusercontent.com",
+   "count": 1,
+   "byLabel": {
+    "answered": 1
+   },
+   "maxSocketWaitMs": 217,
+   "maxResponseWaitMs": 107
+  }
+ ],
+ "timeline": {
+  "phases": [
+   {
+    "name": "main.app.ready",
+    "t": 92.74254200000001,
+    "seq": 2
+   },
+   {
+    "name": "main.sidecar.boot.fork.start",
+    "t": 288.40112500000004,
+    "seq": 5,
+    "generation": 1
+   },
+   {
+    "name": "main.sidecar.boot.fork.end",
+    "t": 1067.390875,
+    "seq": 7,
+    "durationMs": 778.9879169999999,
+    "generation": 1,
+    "outcome": "ok"
+   },
+   {
+    "name": "main.window.first_show",
+    "t": 1402.7185829999999,
+    "seq": 20
+   },
+   {
+    "name": "renderer.launch_draft.end",
+    "t": 1613.2576669999999,
+    "seq": 30,
+    "trigger": "launch",
+    "outcome": "navigated",
+    "durationMs": 162,
+    "source": "renderer",
+    "rendererNow": 481,
+    "occurrence": 1
+   },
+   {
+    "name": "renderer.composer.mount",
+    "t": 1754.81325,
+    "seq": 31,
+    "mode": "home",
+    "source": "renderer",
+    "rendererNow": 627.9000000953674,
+    "occurrence": 1
+   },
+   {
+    "name": "renderer.home.model_list.start",
+    "t": 1756.30675,
+    "seq": 32,
+    "attempt": 1,
+    "chain": 1,
+    "source": "renderer",
+    "rendererNow": 628.3000000715256,
+    "occurrence": 1
+   },
+   {
+    "name": "renderer.home.catalog_ready",
+    "t": 1993.1602919999998,
+    "seq": 35,
+    "barrierMs": 237.89999997615814,
+    "probes": 1,
+    "pollWaits": 0,
+    "probeTimeouts": 0,
+    "wake": "first",
+    "source": "renderer",
+    "rendererNow": 866.3000000715256,
+    "occurrence": 1
+   },
+   {
+    "name": "renderer.home.model_list.end",
+    "t": 2000.4180829999998,
+    "seq": 36,
+    "attempt": 1,
+    "chain": 1,
+    "count": 10,
+    "durationMs": 245.19999992847443,
+    "outcome": "ok",
+    "source": "renderer",
+    "rendererNow": 873.5,
+    "occurrence": 1
+   }
+  ],
+  "probeTimeouts": [
+   {
+    "t": 1993.1602919999998,
+    "barrierMs": 237.89999997615814,
+    "probes": 1,
+    "probeTimeouts": 0,
+    "wake": "first"
+   }
+  ],
+  "modelList": [
+   {
+    "t": 2000.4180829999998,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 245.19999992847443,
+    "count": 10
+   }
+  ],
+  "maxProbeTimeouts": 0,
+  "maxListDurationMs": 245.19999992847443
+ },
+ "sampleTable": {
+  "samples": []
+ },
+ "engineLog": {
+  "linesInWindow": 101,
+  "perRun": {
+   "e6b301cd": {
+    "connected": 4,
+    "disconnected": 0
+   }
+  },
+  "skillInit": 5,
+  "serverUnavailable": 4
+ }
+}

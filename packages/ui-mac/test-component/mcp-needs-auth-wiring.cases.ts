@@ -17,6 +17,7 @@ import { transformAsync } from "@babel/core"
 import presetTypescript from "@babel/preset-typescript"
 import { GlobalRegistrator } from "@happy-dom/global-registrator"
 import presetSolid from "babel-preset-solid"
+import { hrefFor } from "../src/shared/route-manifest"
 import { dict as zh } from "../src/renderer/i18n/zh"
 
 GlobalRegistrator.register()
@@ -106,7 +107,12 @@ const fakeClient = {
     dispose: async () => ({ data: {}, error: undefined }),
   },
 }
-mock.module("@opencode-ai/sdk/v2/client", () => ({ createOpencodeClient: () => fakeClient }))
+const clientDirectories: Array<string | undefined> = []
+let statusesByDirectory: Record<string, StatusMap> | undefined
+mock.module("@opencode-ai/sdk/v2/client", () => ({ createOpencodeClient: (options: { directory?: string }) => {
+  clientDirectories.push(options.directory)
+  return { ...fakeClient, mcp: { ...fakeClient.mcp, status: async () => ({ data: statusesByDirectory ? statusesByDirectory[options.directory ?? ""] : engineStatus }) } }
+} }))
 
 // 云连接器卡只在「已登录 + platform」时展示状态与动作。`#624` 起 `platformStatus` 也进判据,
 // 故这里改成**可驱动**的:用例设完 `authStateForCase` 再 mount,订阅时回放当前值。
@@ -118,7 +124,8 @@ mock.module("../src/renderer/auth-recovery", () => ({
     return () => {}
   },
 }))
-mock.module("@solidjs/router", () => ({ useLocation: () => ({ pathname: "/" }) }))
+const [pathname, setPathname] = solid.createSignal(hrefFor.session("local", "ses_1645"))
+mock.module("@solidjs/router", () => ({ useLocation: () => ({ get pathname() { return pathname() } }) }))
 mock.module("../src/renderer/codepuppy-ui/Banner", () => ({ Banner: () => null }))
 
 Object.defineProperty(window, "api", {
@@ -162,6 +169,7 @@ const { createComponent } = solid
 const { render } = solidWeb
 // 必须**动态** import:静态 import 会在 registrator 之前牵出 solid-js,整个文件拿到 server 构建
 //(指纹 = 报错与改动无关且全文件一起挂)。纪律在 CLAUDE.md《本机验证陷阱》。
+const { publishActiveSessionIdentity } = await import("../src/renderer/codepuppy-ui/active-session-directory")
 const { ExtensionHub } = await import("../src/renderer/extensions/extension-hub")
 const { ToastViewport, dismissToast } = await import("../src/renderer/codepuppy-ui/Toast")
 const { setHubSection } = await import("../src/renderer/extensions/ext-hub-state")
@@ -210,6 +218,10 @@ function reset() {
   // 下一个用例挂上新视口时,上一条 toast 会原样再渲染一遍,于是「没有出现成功提示」
   // 这类断言会读到上一条的残留而假绿/假红。id 单调递增,逐个撤掉即可(幂等)。
   for (let id = 1; id <= 500; id++) dismissToast(id)
+  clientDirectories.length = 0
+  statusesByDirectory = undefined
+  setPathname(hrefFor.session("local", "ses_1645"))
+  publishActiveSessionIdentity({ sessionID: "ses_1645", directory: "/current", serverKey: "local" })
   authenticateCalls.length = 0
   installCatalogCalls.length = 0
   connectCalls.length = 0
@@ -539,4 +551,25 @@ test("`#1106` 凭证其实已在(别处授权完成):kick 直接把它连上", a
   await waitFor(() => expect(connectCalls).toEqual([{ name: "codepuppy" }]))
   await waitFor(() => expect(document.querySelector(".codepuppy-ext-cloudst")?.textContent).toBe(zh["codepuppy.ext.cloudConnConnected"]))
   expect(authorizeButtons().length).toBe(0)
+})
+
+// Canonical route from route-manifest; live identity is published by the session workspace.
+test("#1645 AC4 hub follows current conversation directory and never claims connected without a project", async () => {
+  reset()
+  statusesByDirectory = {
+    "/current": { codepuppy: { status: "connected" } },
+    "/failed": { codepuppy: { status: "failed", error: "Failed to get tools (timeout)" } },
+    "": { codepuppy: { status: "connected" } },
+  }
+  mount()
+  const state = () => document.querySelector("[data-cloud-connector] .codepuppy-ext-cloudst")?.textContent
+  await waitFor(() => expect(state()).toBe(zh["codepuppy.ext.cloudConnConnected"]))
+  expect(clientDirectories).toContain("/current")
+  publishActiveSessionIdentity({ sessionID: "ses_1645", directory: "/failed", serverKey: "local" })
+  await waitFor(() => expect(state()).toBe(zh["codepuppy.ext.cloudConnDisconnected"]))
+  expect(clientDirectories).toContain("/failed")
+  setPathname("/")
+  await waitFor(() => expect(clientDirectories.at(-1)).toBeUndefined())
+  await flush()
+  expect(state()).toBe(zh["codepuppy.ext.cloudConnDisconnected"])
 })

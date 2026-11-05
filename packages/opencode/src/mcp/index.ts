@@ -12,6 +12,8 @@ import { SSEClientTransport, SseError } from "@modelcontextprotocol/sdk/client/s
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js"
 import {
+  ErrorCode,
+  McpError,
   CallToolResultSchema,
   type CallToolResult,
   ListRootsRequestSchema,
@@ -40,6 +42,7 @@ import {
   Layer,
   Context,
   Option,
+  Result,
   Schema,
   ScopedCache,
   Scope,
@@ -252,6 +255,34 @@ function remoteFailure(error: Error, url: URL, timeout: number) {
   })
 }
 
+// Keep response bodies, headers and validator input out of tools/list status and logs.
+function toolsListFailure(error: Error, entry: ConfigMCPV1.Info) {
+  const code =
+    error instanceof UnauthorizedError
+      ? "auth"
+      : error instanceof McpError
+        ? error.code === ErrorCode.RequestTimeout
+          ? "timeout"
+          : error.code === ErrorCode.ConnectionClosed
+            ? "transport"
+            : error.code === ErrorCode.InvalidParams || error.code === ErrorCode.ParseError
+              ? "validation"
+              : "protocol"
+        : error.name === "ZodError" || error.name === "$ZodError" || error.message.startsWith("MCP list ")
+          ? "validation"
+          : undefined
+  const failure = code
+    ? new ConnectFailure({ status: failed(code, ""), reconnect: RECONNECT_CODES.has(code) })
+    : entry.type === "remote"
+      ? remoteFailure(error, new URL(entry.url), DEFAULT_TIMEOUT)
+      : new ConnectFailure({ status: failed("tools_list_failed", ""), reconnect: false })
+  const kind = failure.status.status === "failed" ? failure.status.code : "tools_list_failed"
+  return new ConnectFailure({
+    status: failed(kind ?? "tools_list_failed", `Failed to get tools (${kind})`),
+    reconnect: failure.reconnect,
+  })
+}
+
 /** A failed attempt whose cause the classifier attributed to a network layer (not the unrecognised `transport`). */
 function attributed(failure: ConnectFailure | undefined) {
   const status = failure?.status
@@ -351,7 +382,12 @@ export function authorityForMcp(
   return {
     kind: "codepuppy-bundled",
     bindingId: `mcp:${encodeURIComponent(name)}`,
-    evidenceDigest: canonicalJsonDigest({ kind: "codepuppy-bundled-mcp", name, command: entry.command, tools: declared }),
+    evidenceDigest: canonicalJsonDigest({
+      kind: "codepuppy-bundled-mcp",
+      name,
+      command: entry.command,
+      tools: declared,
+    }),
   }
 }
 
@@ -525,7 +561,11 @@ const layer = Layer.effect(
       // REQ-236 `#1562`:alpha 治理的云连接器每次请求现读 CODEPUPPY_CLOUD_MCP_DEF 里引用的凭据文件(续期热应用,
       // 引擎不重启);读不到就以认证错误失败,不用已装载条目里的旧字面量。其它条目不传 fetch,行为不变。
       const fetch = isGovernedMcpEntry(key, mcp, process.env)
-        ? governedCredentialFetch(process.env, (file) => readFile(file, "utf8"), (input, init) => globalThis.fetch(input, init))
+        ? governedCredentialFetch(
+            process.env,
+            (file) => readFile(file, "utf8"),
+            (input, init) => globalThis.fetch(input, init),
+          )
         : undefined
       const streamableHTTP = () => new StreamableHTTPClientTransport(url, { authProvider, requestInit, fetch })
       // A transport serves a single connect(), so every attempt builds a fresh one. #1547: an attempt
@@ -656,15 +696,11 @@ const layer = Layer.effect(
           ? yield* connectRemote(name, mcp as ConfigMCPV1.Info & { type: "remote" })
           : yield* connectLocal(name, mcp as ConfigMCPV1.Info & { type: "local" }))
       return yield* Effect.gen(function* () {
-        const listed = client.getServerCapabilities()?.tools ? yield* McpCatalog.defs(client) : []
-        if (!listed)
-          return yield* new ConnectFailure({
-            status: failed("tools_list_failed", "Failed to get tools"),
-            reconnect: false,
-          })
+        const listed = client.getServerCapabilities()?.tools ? yield* McpCatalog.defs(client) : Result.succeed([])
+        if (Result.isFailure(listed)) return yield* toolsListFailure(listed.failure, mcp)
         const connection: Connection = {
           client,
-          defs: listed,
+          defs: listed.success,
           instructions: client.getInstructions()?.trim(),
           authority: authorityForMcp(name, mcp),
         }
@@ -697,9 +733,9 @@ const layer = Layer.effect(
         if (!live()) return
 
         const listed = await s.bridge.promise(McpCatalog.defs(client))
-        if (!listed || !live()) return
+        if (Result.isFailure(listed) || !live()) return
 
-        connection.defs = listed
+        connection.defs = listed.success
         await s.bridge.promise(events.publish(ToolsChanged, { server: name }).pipe(Effect.ignore))
       })
     }
@@ -837,6 +873,7 @@ const layer = Layer.effect(
             key: name,
             type: server.entry.type,
             status: failure.status.status,
+            code: failure.status.status === "failed" ? failure.status.code : undefined,
             error: "error" in failure.status ? failure.status.error : undefined,
           })
           // Readers re-read status on this event; without it a failed background start stays "pending" (audit F3).

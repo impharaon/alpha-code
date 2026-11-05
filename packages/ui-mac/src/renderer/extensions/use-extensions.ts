@@ -1078,7 +1078,8 @@ export function useExtensions(
     activated = true
     const gen = ++generation
     abortRef = new AbortController()
-    client = createOpencodeClient({ baseUrl: info.baseUrl, headers: authHeaders(info) })
+    client = createOpencodeClient({ baseUrl: info.baseUrl, directory: projectDir?.(), headers: authHeaders(info) })
+    setStore("mcp", {})
     void loadStatus()
     void loadInstalls()
     void loadAgents()

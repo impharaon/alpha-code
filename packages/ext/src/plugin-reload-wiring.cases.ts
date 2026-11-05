@@ -76,3 +76,29 @@ test("main 的重载请求 ⇒ 等本实例会话空闲 ⇒ 恰好一次 dispose
   expect(reports().at(-1)).toEqual({ type: "codepuppy.reload.report", generation: 8, scope: "global", outcome: "reloaded", directories: [] })
   expect(engine.disposes).toBe(1)
 })
+
+// Real desktop definition producer and in-process request envelope; synthetic paths contain no credential.
+test("#1645 AC4 codepuppy_access reads the current instance MCP status even when login is ready", async () => {
+  const { publishInProcessEngine } = await import("../../ui-mac/src/main/in-process-engine")
+  const { materializeCloudMcpConfig } = await import("../../ui-mac/src/main/cloud-sidecar-config")
+  const { CLOUD_MCP_DEF_ENV } = await import("./cloud-websearch-kill")
+  process.env.CODEPUPPY_BASE_URL = "https://gateway.invalid/v1"
+  process.env[CLOUD_MCP_DEF_ENV] = JSON.stringify(materializeCloudMcpConfig("https://cloud.invalid/mcp", `{file:${root}}`))
+  const seen: string[] = []
+  let status = "failed"
+  publishInProcessEngine((request) => {
+    const url = new URL(request.url)
+    seen.push(url.searchParams.get("directory")!)
+    return Response.json(url.pathname === "/mcp" ? { codepuppy: { status } } : {})
+  })
+  const directory = join(root, "workspace")
+  const hooks = await CodePuppyExt({ directory, worktree: directory, client: {} } as never)
+  const access = async () => JSON.parse((await hooks.tool!.codepuppy_access!.execute({}, {} as never)).output)
+  expect(await access()).toMatchObject({ logged_in: true, cloud_tools_enabled: false })
+  status = "pending"
+  expect((await access()).cloud_tools_enabled).toBe(false)
+  status = "connected"
+  expect((await access()).cloud_tools_enabled).toBe(true)
+  expect(seen).toEqual([directory, directory, directory])
+  await hooks.dispose?.()
+})

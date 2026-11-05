@@ -47,11 +47,11 @@
 ```
 bun install
 bun run --cwd packages/ui-mac dev   # electron 解析失败时加 ELECTRON_EXEC_PATH(见 ALPHA.md);flag 须在 run 后(REQ-027)
-bash scripts/codepuppy-check.sh          # push 前自检:跑 codepuppy-ci 的全部 16 个代码步,末尾自陈逐步覆盖
+bash scripts/codepuppy-check.sh          # 完整门(git push 时经 gate 自动跑,手动只为诊断红门):跑 codepuppy-ci 的全部 16 个代码步,末尾自陈逐步覆盖
 ```
 
 ## CI(规范见 `docs/runbooks/ci.md`)
-**本地先跑,CI 兜底**。push 前必过 `scripts/codepuppy-check.sh` —— 它跑 `codepuppy-ci` 的**全部 16 个代码步**,
+**本地先跑,CI 兜底**。`git push` 时 pre-push 经 `gate` 跑一次 `scripts/codepuppy-check.sh`(开发中只跑相关测试,时机归用户级 `dev-loop`)—— 它跑 `codepuppy-ci` 的**全部 16 个代码步**,
 并在末尾打印逐步对照表(MIRRORED / SUPERSET / DEGRADED,后两者必须写理由)。这张表由
 `packages/ui-mac/src/main/local-gate-parity.test.ts` 反向核对:CI 加一步而本地没登记即红。
 `#777` 之前这里写的是「与 codepuppy-ci 1:1」,而实测只跑了 9 步、其中 3 步是裸 `bun test` 的降级档

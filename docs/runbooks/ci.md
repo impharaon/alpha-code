@@ -3,15 +3,15 @@
 > 一句话:**本地先跑,CI 兜底**。CI 不是你第一次看到失败的地方——它是 merge 前的强制关卡。
 > 权威触发定义在 `.github/workflows/codepuppy-ci.yml`;北极星守卫语义见 ADR-004,fork 纪律见 ADR-005。
 
-## 0. TL;DR — push 前一条命令
+## 0. TL;DR — 全量门在 push 时跑一次
 
-先提交再运行 `gate run`(经 `bin/check` 转调全量检查);pre-push 使用 `gate pre-push` 复用已通过的代码树并签 `check`,机器上没有 `gate` 时回落到直接运行 `scripts/codepuppy-check.sh`。
+全量门在 `git push` 时跑一次:pre-push 经 `gate pre-push` 调 `bin/check`(转调全量检查)并签 `check`,同一代码树不重跑;机器上没有 `gate` 时回落到直接运行 `scripts/codepuppy-check.sh`。开发中只跑相关测试,什么时候跑门归用户级规则(`dev-loop`)。诊断红门时手动跑:
 
 ```bash
 gate run
 ```
 
-绿了再 push。它跑的是 `codepuppy-ci` 的**全部 21 个代码步**,并在末尾打印一张逐步对照表
+它跑的是 `codepuppy-ci` 的**全部 21 个代码步**,并在末尾打印一张逐步对照表
 (`MIRRORED` / `SUPERSET:<理由>` / `DEGRADED:<理由>`)。
 
 > 再加**六步** CI 结构上跑不了、或按裁决不该占一个 required context 的(`[9/14]` worktree bootstrap 能力、`[10/14]` required contexts 对真源、`[11/14]` BYOK 目录 id、`[12/14]` 注入库存、`[13/14]` north-star 漂移度量、`[14/14]` 模块体积)。下面先说最早的两步。
@@ -45,7 +45,7 @@ gate run
 - **快**:本地三关秒级;CI 往返一轮 = 排队 + 起机 + 装依赖 + 跑,分钟级。
 - **省往返**:把 CI 当"第一次跑"= 每个错都要等一轮红了才知道 → 慢、烦、还堵别人的队。
 - **CI 的真正职责**是①**强制门禁**(branch protection:不绿不让 merge,挡手滑)②**中立环境兜底**(抓"在我机器上是好的"那类环境差异)——不是给你当调试台用的。
-- 所以顺序永远是:**本地 `codepuppy-check` 绿 → push → CI 复核 → merge**。
+- 所以顺序永远是:**push(pre-push 跑 `codepuppy-check`,绿了才推上去)→ CI 复核 → merge**。
 
 ## 2. 十四关是什么(逐步对照见 `codepuppy-check.sh` 的 `CI_STEPS`)
 

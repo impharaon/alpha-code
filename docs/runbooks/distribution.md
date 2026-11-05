@@ -241,7 +241,7 @@ Word / Excel / PowerPoint / PDF 四个文档工具的命令是 `<Resources>/offi
 > ⚠️ **本节全部命令都在 `packages/ui-mac/` 下跑**,不是仓根 —— 仓根没有 `build` /
 > `package:mac` / `scripts/release-manifest.ts`。照本节抄到仓根会得到
 > `error: Script not found "build"` 与 `Module not found`。
-改 `package.json` 版本 **+ 两处 consumer-pin 的 `consumer_version`**(见下方⚠️)→ `source signing.env && OPENCODE_CHANNEL=prod bun run build && bun run package:mac` → stapler/spctl 验证 → `bun scripts/release-manifest.ts produce --channel prod --dist dist --key ~/.codepuppy-signing/release-manifest-ed25519.pem`(拒绝即停,禁止绕过)→ `gh release create v<ver> …`(含 manifest+sig+SBOM)→ curl feed 得 200。签名→公证→feed 链 v0.1.0 已端到端验证;manifest 链自 #175 起为发布必经步骤。
+改 `package.json` 版本 **+ 两处 consumer-pin 的 `consumer_version`**(见下方⚠️)→ `source signing.env && OPENCODE_CHANNEL=prod bun run build && OPENCODE_CHANNEL=prod bun run package:mac` → stapler/spctl 验证 → `bun scripts/release-manifest.ts produce --channel prod --dist dist --key ~/.codepuppy-signing/release-manifest-ed25519.pem`(拒绝即停,禁止绕过)→ `gh release create v<ver> …`(含 manifest+sig+SBOM)→ curl feed 得 200。签名→公证→feed 链 v0.1.0 已端到端验证;manifest 链自 #175 起为发布必经步骤。
 
 **Windows(beta/prod)**:`codepuppy-windows-build.yml` 打包后自带 Authenticode 硬门 ——
 未签名、签名不可验证、或 publisher 不在白名单(REQ-076 T3 采购落地前白名单为空 = 全拒)

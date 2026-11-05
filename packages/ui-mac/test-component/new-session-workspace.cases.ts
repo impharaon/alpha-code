@@ -95,6 +95,7 @@ const server = {
 }
 const [dockMessages, setDockMessages] = solid.createSignal<Array<{ role: "user"; agent: string }> | undefined>([])
 const [dockHistoryLoading, setDockHistoryLoading] = solid.createSignal(false)
+const [dockHistoryMore, setDockHistoryMore] = solid.createSignal(false)
 mock.module("@opencode-ai/app", () => ({
   useTabs: () => tabs,
   useServer: () => server,
@@ -108,7 +109,7 @@ mock.module("@opencode-ai/app", () => ({
   useServerSDK: () => () => ({ client: undefined, ensureDirSdkContext: () => undefined }),
   useServerSync: () => () => ({ session: {
     data: { get message() { return { "session-9": dockMessages() } }, todo: {}, question: {}, info: {} },
-    history: { loading: () => dockHistoryLoading() },
+    history: { loading: () => dockHistoryLoading(), more: () => dockHistoryMore() },
   } }),
   createPermissionChannelSource: () => ({ list: async () => [], subscribe: () => () => {} }),
 }))
@@ -414,6 +415,7 @@ function DraftLeaf(props: { projects: CodePuppyProjectsApi; draftId?: string; se
 beforeEach(() => {
   setDockMessages([])
   setDockHistoryLoading(false)
+  setDockHistoryMore(false)
   installApi()
   newSessionDraftStash.resetForTests()
   updateDraftCalls.splice(0)
@@ -1481,6 +1483,21 @@ describe("#582 斜杠 source 生产接线:composer 发送 → 真 dock 捕获 �
     for (let i = 0; i < 20; i++) await flush()
     expect(dock.host.querySelector(".a-chip-perm")!.getAttribute("data-mode")).toBe("ask")
     dock.host.querySelector<HTMLButtonElement>(".a-comp-send")!.click()
+    for (let i = 0; i < 20 && promptAsyncCalls.length === 0; i++) await flush()
+    expect(promptAsyncCalls[0]).toMatchObject({ sessionID: "session-9", agent: "codepuppy-ask" })
+  })
+
+  test("#1643 AC3 长对话加载更早消息时发送不被禁用,仍按当前请求审批发送", async () => {
+    // Real createServerSession.history.loadMore keeps loading=true and more=true until its page arrives.
+    setDockMessages([{ role: "user", agent: "codepuppy-ask" }])
+    setDockHistoryMore(true)
+    setDockHistoryLoading(true)
+    const dock = mountRealDock(projectsApi([project("alpha-code", "/ws/a")]))
+    type(textarea(dock.host)!, "加载历史时继续")
+    for (let i = 0; i < 20; i++) await flush()
+    const button = dock.host.querySelector<HTMLButtonElement>(".a-comp-send")!
+    expect(button.disabled).toBe(false)
+    button.click()
     for (let i = 0; i < 20 && promptAsyncCalls.length === 0; i++) await flush()
     expect(promptAsyncCalls[0]).toMatchObject({ sessionID: "session-9", agent: "codepuppy-ask" })
   })

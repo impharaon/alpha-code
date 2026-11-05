@@ -106,7 +106,10 @@ const serverSdk = {
 }
 
 const serverSyncState = {
-  session: { data: { todo: {}, question: {}, info: {}, message: {} } },
+  session: {
+    data: { todo: {}, question: {}, info: {}, message: {} },
+    history: { loading: () => false, more: () => false },
+  },
 }
 
 export function useServerSDK() {

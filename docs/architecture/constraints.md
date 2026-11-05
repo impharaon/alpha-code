@@ -21,6 +21,7 @@ review_after: 2027-04-30
 
 | 位置 | 偏离 | 事实 | 碰到它的票 |
 | --- | --- | --- | --- |
+| `packages/ui-mac/src/main/naming-migration-map.ts:51`、`packages/ui-mac/src/renderer/codepuppy-ui/composer-state.ts:250`、`packages/ui-mac/src/renderer/codepuppy-ui/session-timeline/session-timeline-view.tsx:526` | K2 | 旧到新 agent 名的映射已有 `naming-migration-map.ts` 的权威表;`composer-state.ts` 与 `session-timeline-view.tsx` 又各写一条 `alpha-` → `codepuppy-` 正则。渲染进程不能引入 main 模块。 | `alpha-code#1643`、`alpha-code#1649` |
 | `packages/ui-mac/src/main/codepuppy-builtin-policy.ts`(`CODEPUPPY_INJECTED_AGENTS`)、`packages/ui-mac/src/main/codepuppy-config-injection.ts`(载体的规则表) | K1 | 档位载体名单只在 ui-mac 主进程一份;引擎(`packages/opencode/src/session/prompt.ts` 的委派判定)只拿得到当前 agent 的规则集,区分不了档位限制与助手自带规则 —— 例如「全部批准」档手选计划助手时,计划助手自带的 `task: {general: "deny"}` 对用户点名 `@general` 同样生效。gate 靠规则落到 `*` 推断全部批准,未声明 `tool-policy-default` 的 agent 都放开(#1638)。 | `alpha-code#1573`、`alpha-code#1638` |
 | `packages/opencode/src/tool/code-mode.ts:195-203` | K2 | Code Mode 子调用把 MCP 结果的 `isError` 投影成错误的那段,是 `packages/opencode/src/mcp/catalog.ts:68-74`(`McpCatalog.convertTool` 的 execute)的刻意镜像,同一概念两份;`catalog.ts` 是未接管的上游文件,放不进一份共用实现。 | `alpha-code#1563` |
 | `packages/ui-mac/src/renderer/extensions/use-extensions.ts:463-484` | K2 | MCP 状态的种类以引擎 `MCP.Status`(SDK `McpStatus` 判别联合)为准,而定制中心对状态词做子串匹配(`connected` / `disabled` 用 `includes`,`needs_auth` / `pending` 判等),不消费引擎给出的状态种类。 | `alpha-code#1563` |

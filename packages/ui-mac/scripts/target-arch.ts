@@ -34,6 +34,13 @@ export function resolveTargetArch(env: Record<string, string | undefined> = proc
   return arch as TargetArch
 }
 
+/** mac 打包只出 Apple 芯片产物;通用解析仍保留 x64,供其它平台构建使用。 */
+export function resolveMacTargetArch(env: Record<string, string | undefined> = process.env, hostArch: string = process.arch) {
+  const arch = resolveTargetArch(env, hostArch)
+  if (arch !== "arm64") throw new Error("从 0.1.26 起不再出 Intel 包(alpha-code#1496);请使用 CODEPUPPY_TARGET_ARCH=arm64")
+  return arch
+}
+
 /** 终端(node-pty)按平台+架构拆成独立 npm 包;主进程产物里写死的就是这个包名。 */
 export function nodePtyPackage(platform: string, arch: TargetArch): string {
   return `@lydell/node-pty-${platform}-${arch}`

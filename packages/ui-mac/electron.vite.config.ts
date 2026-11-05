@@ -17,7 +17,7 @@ const channel = (() => {
 })()
 
 // #1496:按**目标**架构选 node-pty 包(`CODEPUPPY_TARGET_ARCH=arm64|x64`,缺省宿主架构)。包名会被编进
-// out/main —— 用宿主 `process.arch` 会让 arm64 机器打出的 Intel 包带着 arm64 终端。打包前由
+// out/main;这里也供 Windows 构建使用,保留 x64。mac 打包只接受 arm64(#1629),打包前由
 // electron-builder.config.ts 的 beforePack 再核对一遍产物(scripts/target-arch.ts)。
 const nodePtyPkg = nodePtyPackage(process.platform, resolveTargetArch())
 

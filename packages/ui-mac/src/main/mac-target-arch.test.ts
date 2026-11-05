@@ -8,6 +8,8 @@
 //   ④ #1564:随包 Office 运行时(native/office-runtime/build/<arch>/)缺席或任一 Mach-O 缺目标片 ⇒ 同样拒绝。
 import { afterEach, describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
+import { createHash, generateKeyPairSync } from "node:crypto"
+import { createRequire } from "node:module"
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
@@ -22,9 +24,12 @@ import {
   macNativePackages,
   nodePtyPackage,
   resolveTargetArch,
+  resolveMacTargetArch,
   type TargetArch,
 } from "../../scripts/target-arch"
-import { mergeMacFeeds, parse, serialize } from "../../scripts/latest-yml"
+import { parse, serialize } from "../../scripts/latest-yml"
+
+import { keyIdOfSpkiDerB64, verifyReleaseManifestBytes } from "./release-manifest"
 
 const packageDir = path.resolve(import.meta.dir, "../..")
 const host = process.arch
@@ -123,6 +128,82 @@ describe("resolveTargetArch", () => {
     expect(() => resolveTargetArch({ [TARGET_ARCH_ENV]: "universal" }, "arm64")).toThrow(/不受支持/)
     expect(() => resolveTargetArch({ [TARGET_ARCH_ENV]: "x86_64" }, "arm64")).toThrow(/不受支持/)
     expect(() => resolveTargetArch({}, "ia32")).toThrow(/不受支持/)
+  })
+})
+
+describe("#1629 mac 打包只接受 Apple 芯片", () => {
+  test("arm64 宿主缺省不变;显式 x64 或 x64 宿主缺省都拒绝 Intel 包", () => {
+    expect(resolveMacTargetArch({}, "arm64")).toBe("arm64")
+    expect(resolveMacTargetArch({ [TARGET_ARCH_ENV]: "arm64" }, "x64")).toBe("arm64")
+    expect(() => resolveMacTargetArch({ [TARGET_ARCH_ENV]: "x64" }, "arm64")).toThrow("从 0.1.26 起不再出 Intel 包(alpha-code#1496)")
+    expect(() => resolveMacTargetArch({}, "x64")).toThrow("从 0.1.26 起不再出 Intel 包(alpha-code#1496)")
+  })
+
+  test("生产打包配置解析时 CODEPUPPY_TARGET_ARCH=x64 立即报错;arm64 照常出配置", () => {
+    const script = `Object.defineProperty(process, "platform", { value: "darwin" }); console.log(JSON.stringify((await import(${JSON.stringify(path.join(packageDir, "electron-builder.config.ts"))})).default.mac.target))`
+    const intel = spawnSync(process.execPath, ["-e", script], {
+      cwd: packageDir, env: { ...process.env, [TARGET_ARCH_ENV]: "x64" }, encoding: "utf8", timeout: 30_000,
+    })
+    expect(intel.status).toBe(1)
+    expect(intel.stderr).toContain("从 0.1.26 起不再出 Intel 包(alpha-code#1496)")
+    const apple = spawnSync(process.execPath, ["-e", script], {
+      cwd: packageDir, env: { ...process.env, [TARGET_ARCH_ENV]: "arm64" }, encoding: "utf8", timeout: 30_000,
+    })
+    expect(apple.status, apple.stderr).toBe(0)
+    expect(JSON.parse(apple.stdout.trim()).every((target: { arch: string[] }) => target.arch.join() === "arm64")).toBe(true)
+  })
+
+  test("manifest CLI:仅 arm64 dist 产出合法签名 manifest,遗留 x64 文件不被枚举", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-arm64-manifest-"))
+    tmpDirs.push(dir)
+    const app = path.join(dir, "mac-arm64", "Code Puppy.app", "Contents", "Resources")
+    fs.mkdirSync(app, { recursive: true })
+    const source = path.join(dir, "source", "node_modules", "ui-mac")
+    fs.mkdirSync(source, { recursive: true })
+    // 真实 package.json 经 electron-builder 自带的 asar writer 产出归档,不手写另一系统的格式。
+    fs.copyFileSync(path.join(packageDir, "package.json"), path.join(source, "package.json"))
+    const { createPackage } = await import(createRequire(require.resolve("electron-builder")).resolve("@electron/asar"))
+    await createPackage(path.join(dir, "source"), path.join(app, "app.asar"))
+    const version = JSON.parse(fs.readFileSync(path.join(packageDir, "package.json"), "utf8")).version
+    // 来源:0.1.25 真实 feed 夹具;只取 arm64 条目,按本轮不透明摘要输入的字节刷新 size/hash。
+    const sample = fs.readFileSync(path.join(import.meta.dir, "fixtures", "codepuppy-latest-mac.yml"), "utf8")
+    const feed = parse(sample)
+    feed.version = version
+    feed.files = feed.files.filter((file) => file.url.includes("-arm64."))
+    for (const file of feed.files) {
+      fs.writeFileSync(path.join(dir, file.url), sample)
+      file.size = Buffer.byteLength(sample)
+      file.sha512 = createHash("sha512").update(sample).digest("base64")
+    }
+    fs.writeFileSync(path.join(dir, "latest-mac.yml"), serialize(feed))
+    const key = generateKeyPairSync("ed25519")
+    fs.writeFileSync(path.join(dir, "test-key.pem"), key.privateKey.export({ type: "pkcs8", format: "pem" }), { mode: 0o600 })
+    const publicKey = key.publicKey.export({ type: "spki", format: "der" }).toString("base64")
+    const keyId = keyIdOfSpkiDerB64(publicKey)
+    // 只替换 Apple 外部工具边界:返回失败、没有伪造签名事实;dev 渠道如实记录未签名状态。
+    const bin = path.join(dir, "bin")
+    fs.mkdirSync(bin)
+    for (const tool of ["codesign", "spctl", "xcrun"]) fs.symlinkSync("/usr/bin/false", path.join(bin, tool))
+    // 子进程隔离 mac 分支,让非 mac 测试机也执行同一断言。
+    fs.writeFileSync(path.join(dir, "darwin.ts"), 'Object.defineProperty(process, "platform", { value: "darwin" })')
+    for (const staleIntel of [false, true]) {
+      if (staleIntel) fs.writeFileSync(path.join(dir, "codepuppy-mac-x64.dmg"), sample)
+      const result = spawnSync(process.execPath, ["--preload", path.join(dir, "darwin.ts"), "scripts/release-manifest.ts", "produce", "--channel", "dev", "--dist", dir, "--key", path.join(dir, "test-key.pem")], {
+        cwd: packageDir,
+        env: { ...process.env, OPENCODE_CHANNEL: "dev", [TARGET_ARCH_ENV]: "arm64", PATH: `${bin}:${process.env.PATH}` },
+        encoding: "utf8", timeout: 30_000,
+      })
+      expect(result.status, result.stderr).toBe(0)
+      const verified = verifyReleaseManifestBytes(
+        fs.readFileSync(path.join(dir, "codepuppy-release-manifest.json")),
+        fs.readFileSync(path.join(dir, "codepuppy-release-manifest.json.sig"), "utf8"),
+        { schema: "codepuppy.release-manifest.trust.v1", sequence: 1, publishedAt: "2026-01-01T00:00:00Z", keys: [{ keyId, publicKey, status: "active", notBefore: "2026-01-01T00:00:00Z" }], revokedManifests: [] },
+      )
+      expect(verified.ok).toBe(true)
+      if (!verified.ok) throw new Error(verified.error)
+      expect(verified.manifest.artifacts.map((artifact) => artifact.filename).sort()).toEqual(["codepuppy-mac-arm64.dmg", "codepuppy-mac-arm64.zip"])
+      expect(verified.manifest.artifacts.every((artifact) => artifact.arch === "arm64")).toBe(true)
+    }
   })
 })
 
@@ -308,40 +389,5 @@ describe("assertMacTargetArch(beforePack 的核对)", () => {
     expect(() =>
       assertMacTargetArch({ packingArch: "universal", packageDir: dir, env: { [TARGET_ARCH_ENV]: "arm64" }, hostArch: "arm64" }),
     ).toThrow(/universal 不支持/)
-  })
-})
-
-describe("mergeMacFeeds(latest-mac.yml 两架构合并)", () => {
-  const feed = (arch: TargetArch, version = "0.1.19") =>
-    parse(
-      [
-        `version: ${version}`,
-        "files:",
-        `  - url: codepuppy-mac-${arch}.zip`,
-        `    sha512: ${arch}zip`,
-        "    size: 10",
-        `  - url: codepuppy-mac-${arch}.dmg`,
-        `    sha512: ${arch}dmg`,
-        "    size: 20",
-        `path: codepuppy-mac-${arch}.zip`,
-        `releaseDate: '2026-10-10T00:00:0${arch === "x64" ? 1 : 0}.000Z'`,
-      ].join("\n"),
-    )
-
-  test("合并后两种架构的 dmg/zip 都在,且经序列化往返不丢", () => {
-    const merged = parse(serialize(mergeMacFeeds(feed("arm64"), feed("x64"))))
-    expect(merged.version).toBe("0.1.19")
-    expect(merged.files.map((f) => f.url)).toEqual([
-      "codepuppy-mac-arm64.zip",
-      "codepuppy-mac-arm64.dmg",
-      "codepuppy-mac-x64.zip",
-      "codepuppy-mac-x64.dmg",
-    ])
-  })
-  test("版本不一致 ⇒ 拒绝", () => {
-    expect(() => mergeMacFeeds(feed("arm64", "0.1.19"), feed("x64", "0.1.18"))).toThrow(/版本/)
-  })
-  test("两份 feed 放反(arm64 槽里是 x64 文件)⇒ 拒绝", () => {
-    expect(() => mergeMacFeeds(feed("x64"), feed("arm64"))).toThrow(/不属于 arm64/)
   })
 })

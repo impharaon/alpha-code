@@ -5,7 +5,7 @@ import { promisify } from "node:util"
 
 import { Arch, type Configuration, type MacOsTargetName } from "electron-builder"
 
-import { OFFICE_RUNTIME_BUILD_DIR, assertMacTargetArch, resolveTargetArch } from "./scripts/target-arch"
+import { OFFICE_RUNTIME_BUILD_DIR, assertMacTargetArch, resolveMacTargetArch } from "./scripts/target-arch"
 
 // REQ-089 AC3: the OS protocol list has exactly one source. The installer metadata that makes a
 // cold-start deep link reach the app at all is derived from the same manifest the runtime
@@ -73,11 +73,9 @@ export const APP_IDS = {
   prod: "com.tide.codepuppy",
 } as const
 
-// #1496:mac 只出**一个**目标架构(`CODEPUPPY_TARGET_ARCH=arm64|x64`,缺省宿主架构)。arm64 与 x64 各跑一轮
-// build + package(终端原生包名是 build 时编进产物的,一份产物不能同时服务两种架构),最后合并
-// latest-mac.yml(scripts/merge-latest-mac-yml.ts)。见 docs/runbooks/distribution.md §2。
+// #1629:从 0.1.26 起 mac 只出 arm64 包,配置解析时拒绝 Intel 目标。见 docs/runbooks/distribution.md §1。
 // 非 mac 平台不读它(win 由 CLI `--x64` 决定),所以这里只在 darwin 上解析,避免影响别的平台打包。
-const macTargetArch = process.platform === "darwin" ? resolveTargetArch() : undefined
+const macTargetArch = process.platform === "darwin" ? resolveMacTargetArch() : undefined
 const macTargets = (names: MacOsTargetName[]) =>
   macTargetArch ? names.map((target) => ({ target, arch: [macTargetArch] })) : names
 

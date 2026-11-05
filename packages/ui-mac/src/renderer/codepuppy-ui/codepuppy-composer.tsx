@@ -52,6 +52,7 @@ import type { AuthState } from "../../preload/types"
 import {
   adoptComposerAgentScope,
   adoptComposerPermScope,
+  restoreComposerPermScope,
   applyDefaultComposerModel,
   buildPromptRequest,
   clearSuspendedModel,
@@ -651,6 +652,8 @@ export type ComposerSlashCapture = {
  * 缺席(home/newSession 或测试)时组件按「无会话数据」诚实降级:无停止键、无 ring。
  */
 export type ComposerSessionDockApi = {
+  /** undefined = 消息尚未读回;空数组 = 已读回的新会话。 */
+  messages?: () => readonly { role: string; agent?: string }[] | undefined
   /** live 运行态(session_status typed 通道;不再轮询)。 */
   running: () => boolean
   /** 上下文用量百分比(0-100);null = 事实不足,ring 不渲染。 */
@@ -1010,6 +1013,15 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
     if (composerScopeHeld) releaseComposerScope()
   })
 
+  const permissionHistoryReady = () => !props.sessionDock?.messages || props.sessionDock.messages() !== undefined
+  createEffect(() => {
+    const scope = composerScopeKey()
+    const messages = props.sessionDock?.messages?.()
+    if (!scope || !messages) return
+    const agent = messages.findLast((message) => message.role === "user")?.agent
+    untrack(() => restoreComposerPermScope(scope, agent))
+  })
+
   const auto = createComposerAutocomplete({
     text,
     setText,
@@ -1133,6 +1145,7 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
       text().trim().length > 0 &&
       !!props.directory() &&
       !runtimeUnavailable() &&
+      permissionHistoryReady() &&
       modelChainState() === "ready" &&
       (!needsPlatform || platformPermission() === "ready") &&
       // 谓词 2:引擎里没有这个直连节点就发不出去,按钮如实关闭(行内另有告知)。
@@ -1620,7 +1633,7 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
   }
 
   const submit = async () => {
-    if (!text().trim() || sending()) return
+    if (!text().trim() || sending() || !permissionHistoryReady()) return
     const dir = props.directory()
     if (!dir) {
       props.onNeedWorkspace?.()

@@ -196,6 +196,12 @@ export function SessionComposerDock(props: {
   })
 
   const dockApi: ComposerSessionDockApi = {
+    messages: () => {
+      const bound = identity()
+      const session = serverSync().session
+      if (!bound || session.history.loading(bound.sessionID)) return undefined
+      return session.data.message[bound.sessionID]
+    },
     running,
     contextUsage: usage,
     approvalPending,

@@ -93,6 +93,8 @@ const server = {
     return ACTIVE_SERVER_KEY
   },
 }
+const [dockMessages, setDockMessages] = solid.createSignal<Array<{ role: "user"; agent: string }> | undefined>([])
+const [dockHistoryLoading, setDockHistoryLoading] = solid.createSignal(false)
 mock.module("@opencode-ai/app", () => ({
   useTabs: () => tabs,
   useServer: () => server,
@@ -104,7 +106,10 @@ mock.module("@opencode-ai/app", () => ({
   // 模型用量环,全部给成惰性缺席(client 缺席 ⇒ modelContract.list 拒绝 ⇒ 用量环隐藏;
   // dir 上下文缺席 ⇒ 审批 feed 不建,fail-closed 无审批挂起)—— onSlashCommand 与它们无关。
   useServerSDK: () => () => ({ client: undefined, ensureDirSdkContext: () => undefined }),
-  useServerSync: () => () => ({ session: { data: { message: {}, todo: {}, question: {}, info: {} } } }),
+  useServerSync: () => () => ({ session: {
+    data: { get message() { return { "session-9": dockMessages() } }, todo: {}, question: {}, info: {} },
+    history: { loading: () => dockHistoryLoading() },
+  } }),
   createPermissionChannelSource: () => ({ list: async () => [], subscribe: () => () => {} }),
 }))
 /** #894:叶真正跳去了哪里。路由本体不参与 —— 记的是叶交给 `useNavigate()` 的那个 href,
@@ -407,6 +412,8 @@ function DraftLeaf(props: { projects: CodePuppyProjectsApi; draftId?: string; se
 }
 
 beforeEach(() => {
+  setDockMessages([])
+  setDockHistoryLoading(false)
   installApi()
   newSessionDraftStash.resetForTests()
   updateDraftCalls.splice(0)
@@ -1460,6 +1467,23 @@ describe("#582 斜杠 source 生产接线:composer 发送 → 真 dock 捕获 �
     // 发送落定(setText("") 在 await 之后)再返回,下一次输入才不会被这次的清空抹掉(#888 实测)。
     for (let i = 0; i < 30 && textarea(host)!.value !== ""; i++) await flush()
   }
+
+  test("#1643 AC1/AC2 真 dock 消费当前会话消息及加载信号,读回后才按请求审批发送", async () => {
+    setDockMessages([{ role: "user", agent: "codepuppy-ask" }])
+    setDockHistoryLoading(true)
+    const dock = mountRealDock(projectsApi([project("alpha-code", "/ws/a")]))
+    type(textarea(dock.host)!, "继续")
+    for (let i = 0; i < 20; i++) await flush()
+    expect(dock.host.querySelector<HTMLButtonElement>(".a-comp-send")!.disabled).toBe(true)
+    textarea(dock.host)!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }))
+    expect(promptAsyncCalls).toHaveLength(0)
+    setDockHistoryLoading(false)
+    for (let i = 0; i < 20; i++) await flush()
+    expect(dock.host.querySelector(".a-chip-perm")!.getAttribute("data-mode")).toBe("ask")
+    dock.host.querySelector<HTMLButtonElement>(".a-comp-send")!.click()
+    for (let i = 0; i < 20 && promptAsyncCalls.length === 0; i++) await flush()
+    expect(promptAsyncCalls[0]).toMatchObject({ sessionID: "session-9", agent: "codepuppy-ask" })
+  })
 
   test("command.list 声明 skill/mcp → 登记逐条带对应 source(两个不同字面量,写死单值满足不了)", async () => {
     commandListEntries = [

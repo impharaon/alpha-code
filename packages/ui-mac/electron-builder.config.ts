@@ -6,6 +6,7 @@ import { promisify } from "node:util"
 import { Arch, type Configuration, type MacOsTargetName } from "electron-builder"
 
 import { OFFICE_RUNTIME_BUILD_DIR, assertMacTargetArch, resolveMacTargetArch } from "./scripts/target-arch"
+import { assertReleaseSource } from "./scripts/release-source"
 
 // REQ-089 AC3: the OS protocol list has exactly one source. The installer metadata that makes a
 // cold-start deep link reach the app at all is derived from the same manifest the runtime
@@ -216,6 +217,7 @@ const getBase = (appId: string): Configuration => ({
   // 任一不过即抛,宁可不出包,也不出一个终端打不开的包。
   beforePack: async (context) => {
     if (context.electronPlatformName !== "darwin") return
+    if (channel !== "dev" && shouldSign) assertReleaseSource(packageDir)
     assertMacTargetArch({ packingArch: Arch[context.arch], packageDir })
   },
   dmg: {

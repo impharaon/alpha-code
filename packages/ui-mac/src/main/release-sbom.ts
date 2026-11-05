@@ -105,6 +105,7 @@ export function buildCycloneDxSbom(input: {
   appName: string
   version: string
   channel: string
+  sourceCommit?: string
   timestamp: string
   components: SbomComponent[]
 }): string {
@@ -127,7 +128,10 @@ export function buildCycloneDxSbom(input: {
     metadata: {
       timestamp: input.timestamp,
       component: { type: "application", name: input.appName, version: input.version },
-      properties: [{ name: "alpha:release:channel", value: input.channel }],
+      properties: [
+        { name: "alpha:release:channel", value: input.channel },
+        ...(input.sourceCommit ? [{ name: "codepuppy:release:source-commit", value: input.sourceCommit }] : []),
+      ],
     },
     components: input.components.map((c) => ({
       type: "library",

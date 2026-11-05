@@ -3,6 +3,7 @@
 - Keep runtime dependencies directed from Schema to Core and Protocol, then from Core and Protocol to Server. Client runtime code may depend on Schema and Protocol but never Core or Server; `sdk-next` composes Client, Core, and Server.
 - The default branch in this repo is `alpha`.
 - Local `main` ref may not exist; use `alpha` or `origin/alpha` for diffs.
+- Before pushing, run `bash scripts/north-star-guard.sh` and `cd packages/ui-mac && bun test src/main/old-name-scan.test.ts` in addition to the related tests.
 - GitHub Issues and Alpha Delivery are the only live delivery state.
 - `docs/README.md` is the current documentation entry point. Keep current
   architecture, contracts, runbooks, selected audits, and release history;

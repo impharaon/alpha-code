@@ -37,6 +37,7 @@ import {
 } from "../src/main/release-manifest"
 import { buildCycloneDxSbom, collectBundledPackages } from "../src/main/release-sbom"
 import { getConfig } from "../electron-builder.config"
+import { assertReleaseSource } from "./release-source"
 
 const packageDir = path.resolve(import.meta.dir, "..")
 
@@ -134,6 +135,14 @@ const { values } = parseArgs({
 
 const channel = values.channel as ReleaseChannel
 if (channel !== "dev" && channel !== "beta" && channel !== "prod") die("--channel must be dev | beta | prod")
+const sourceCommit = channel === "dev" ? undefined : (() => {
+  try {
+    return assertReleaseSource(process.cwd())
+  } catch (error) {
+    return die(error instanceof Error ? error.message : String(error))
+  }
+})()
+if (sourceCommit) console.log(`[release-manifest] source commit: ${sourceCommit}`)
 if (values["allow-unsigned-windows"] && channel !== "prod")
   die("--allow-unsigned-windows is restricted to the prod manual-download release path")
 if (!values.key) die("--key <ed25519 pkcs8 pem> is required")
@@ -245,6 +254,7 @@ let sbom = null
       appName,
       version,
       channel,
+      sourceCommit,
       timestamp: new Date().toISOString(),
       components,
     })

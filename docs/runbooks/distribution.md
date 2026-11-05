@@ -47,8 +47,23 @@ grep -cE '(^|[^A-Za-z0-9_])ALPHA_|\.alpha-code-signing' ~/.codepuppy-signing/sig
 从 0.1.26 起只出 Apple 芯片(arm64)Mac 包(#1496)。在 arm64 打包机上照下列步骤执行;
 mac 打包配置只接受 arm64 目标,误设其它架构会在配置解析时直接报错。
 
+### ⓪ 取得最新主线的检出
+
+版本号、catalog 与 extension seed 等发版改动先经发版 PR 合并到 `alpha`,再从最新主线创建干净检出并在其中打包:
+
 ```bash
-# ⓪ 前端合并复验(REQ-012,546-sync 静默回归教训——v0.1.0 就是跳过这步翻的车):
+git fetch origin alpha
+git worktree add --detach <路径> origin/alpha
+cd <路径>
+```
+
+beta/prod 签名包在 `beforePack` 开始时会先 fetch 并核对:有未提交改动(含未跟踪文件)、HEAD 与
+`origin/alpha` 不同、或 fetch 失败都会拒绝,列出改动文件或差异提交。`produce --channel prod|beta`
+会再核对一次;打包途中主线前进也会拒绝生成 manifest。被拒后先处理列出的改动或 fetch 故障,
+同步到最新主线,从 build 开始重新打包,再跑 `produce`;不要绕过检查或沿用旧包。dev 与未签名打包不受影响。
+
+```bash
+# 前端合并复验(REQ-012,546-sync 静默回归教训——v0.1.0 就是跳过这步翻的车):
 #    a. cd packages/ui-mac && bun test src/renderer/codepuppy-ui/upstream-anchors.test.ts   # 锚点契约必须绿
 #    b. CDP 截图关键屏(首页/会话/模型卡/composer/时间线)对上一版基线肉眼比对(visual-verify-required)
 #    上游 sync 后未做过 a+b 的树,禁止打 tag。
@@ -101,6 +116,7 @@ OPENCODE_CHANNEL=prod bun scripts/release-manifest.ts produce \
   --key ~/.codepuppy-signing/release-manifest-ed25519.pem
 # 期望:"[release-manifest] OK: …/codepuppy-release-manifest.json (+.sig)";产物三件:
 # dist/codepuppy-release-manifest.json + .sig + dist/codepuppy-<版本>-sbom.cdx.json
+# 同时打印 "source commit: <完整 SHA>";④ 的 --target 使用这个 SHA。
 
 # REQ-106 Windows x64 未签名手动下载(仅在已有明确批准、已下载 Windows runner 的最终
 # installer + signing facts、且官网已经部署 unsigned warning 时):
@@ -119,7 +135,7 @@ gh release create v0.1.25 \
   latest-mac.yml \
   codepuppy-release-manifest.json codepuppy-release-manifest.json.sig \
   codepuppy-0.1.25-sbom.cdx.json \
-  --repo jinjunnn/alpha-code --target <发版 PR 在 alpha 上的合并提交完整 SHA> \
+  --repo jinjunnn/alpha-code --target <produce 打印的 source commit 完整 SHA> \
   --title "Code Puppy 0.1.25" --notes "……"
 
 # ⑤ 确认自动更新 feed 通(electron-updater 就读这个 URL)
@@ -130,9 +146,12 @@ curl -sL -o /dev/null -w "%{http_code}\n" \
 **要点**
 - `latest-mac.yml` 里的文件名必须与上传的 asset 名**逐字一致**(electron-builder 自动生成,勿改名)。
 - Release **不能是 draft/prerelease**(否则 `latest` 渠道拉不到)。tag 用 `v<version>`。
-- `--target`:tag `v<version>` 必须指向**发版 PR 的合并提交**(就是 ②③ 打包时检出的那个提交;v0.1.23 = `cdac75a58`),
+- `--target`:tag `v<version>` 必须指向 **`produce` 打印的 `source commit` 完整 SHA**(就是 ②③ 打包时检出的来源提交),
   不写 `--target alpha` —— 合并之后 alpha 可能已经前进,按分支名打会把 tag 打在包里没有的代码上。
-  发布前核对:`git rev-parse HEAD`(打包时的检出)与 `--target` 的 SHA 逐字相同。
+  发布前核对:`produce` 打印的 SHA 与 `--target` 逐字相同。
+- 从 Release 下载 `codepuppy-<版本>-sbom.cdx.json`,读取 `metadata.properties` 中
+  `codepuppy:release:source-commit` 的 `value`,就是该发布物的来源提交;例如:
+  `jq -r '.metadata.properties[] | select(.name == "codepuppy:release:source-commit") | .value' codepuppy-<版本>-sbom.cdx.json`。
 - 只想本机自己用、不分发 → 用 `bun run ship:mac`(= build + package + 装到 `/Applications`);发布用 `package:mac`(只出产物,不动你在用的 app)。
 
 ### 应用身份切换的那一版(#1571):只能手动安装

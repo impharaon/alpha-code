@@ -147,6 +147,16 @@ describe("buildCycloneDxSbom", () => {
   test("确定性:同输入两次生成逐字节相等", () => {
     expect(buildCycloneDxSbom(input)).toBe(buildCycloneDxSbom(input))
   })
+  test("#1631:来源提交写入 SBOM properties;省略时保持原字节", () => {
+    const sourceCommit = Bun.spawnSync(["git", "rev-parse", "HEAD"], { cwd: import.meta.dir }).stdout.toString().trim()
+    expect(sourceCommit).toMatch(/^[a-f0-9]{40}$/)
+    const original = buildCycloneDxSbom(input)
+    const withSource = buildCycloneDxSbom({ ...input, sourceCommit })
+    const doc = JSON.parse(withSource)
+    expect(doc.metadata.properties.pop()).toEqual({ name: "codepuppy:release:source-commit", value: sourceCommit })
+    expect(JSON.stringify(doc, null, 2) + "\n").toBe(original)
+    expect(buildCycloneDxSbom({ ...input, sourceCommit: undefined })).toBe(original)
+  })
   test("CycloneDX 1.6 形状:bomFormat/specVersion/组件/license/channel 属性齐", () => {
     const doc = JSON.parse(buildCycloneDxSbom(input)) as {
       bomFormat: string

@@ -134,15 +134,51 @@ describe("输入框附件条", () => {
     expect(thumb.getAttribute("aria-label")).toBe(zh["codepuppy.attach.open"].replace("{{name}}", "首页截图.png"))
     thumb.click()
     await flush()
-    expect(host.querySelector(".a-att-lightbox")?.textContent).toContain("首页截图.png")
+    expect(document.querySelector(".a-att-lightbox")?.textContent).toContain("首页截图.png")
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))
     await flush()
-    expect(host.querySelector(".a-att-lightbox")).toBeNull()
+    expect(document.querySelector(".a-att-lightbox")).toBeNull()
   })
+
+  test.each(["a-home-stage", "a-swk-dock"])(
+    "#1641 AC1 %s 输入框灯箱逃出附件条和输入框,再点或 Esc 关闭",
+    async (shell) => {
+      const host = mount(() =>
+        createComponent(ComposerAttachmentStrip, {
+          attachments: [image("i1", "首页截图.png")],
+          reading: false,
+          imageRoute: "native",
+          onRemove: () => {},
+          onRetry: () => {},
+        }),
+      )
+      host.className = `${shell} a-comp`
+      await flush()
+      const thumb = host.querySelector<HTMLButtonElement>(".a-att-thumb")!
+      thumb.getBoundingClientRect = () => new DOMRect(400, 600, 56, 56)
+      thumb.click()
+      await flush()
+      const box = document.querySelector<HTMLElement>(".a-att-lightbox")!
+      expect(box).not.toBeNull()
+      expect(box.closest(".a-comp-atts")?.className).toBeUndefined()
+      expect(host.contains(box)).toBe(false)
+      expect(box.style.position).toBe("fixed")
+      expect(box.style.bottom).toBe(`${window.innerHeight - thumb.getBoundingClientRect().top + 8}px`)
+      thumb.click()
+      await flush()
+      expect(document.querySelector(".a-att-lightbox")).toBeNull()
+      thumb.click()
+      await flush()
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))
+      await flush()
+      expect(document.querySelector(".a-att-lightbox")).toBeNull()
+      expect(document.activeElement).toBe(thumb)
+    },
+  )
 })
 
 describe("用户消息里的附件", () => {
-  test("AC4 读取结果按事实一行;失败给「重新读取」、没读给「请助手读取」,点了把同一个暂存记录交给宿主;已读取 / 文本不给按钮", async () => {
+  test("#1641 AC2 时间线灯箱原位开关;AC4 读取结果与重新读取行为不变", async () => {
     const meta = (name: string) => ({ v: 1 as const, name, mime: "x", size: 1, path: `attachments/${UUID}/${name}`, reader: "word" as const })
     const asked: string[] = []
     const items: TimelineAttachment[] = [
@@ -167,7 +203,47 @@ describe("用户消息里的附件", () => {
     card("渠道.xlsx").querySelector<HTMLButtonElement>(".a-att-link")!.click()
     card("需求.docx").querySelector<HTMLButtonElement>(".a-att-link")!.click()
     expect(asked).toEqual(["渠道.xlsx", "需求.docx"])
-    const single = host.querySelector(".a-tl-attach[data-media=image] .a-att-thumb")!
+    const single = host.querySelector<HTMLButtonElement>(".a-tl-attach[data-media=image] .a-att-thumb")!
     expect(single.hasAttribute("data-large")).toBe(true)
+    single.click()
+    await flush()
+    const box = host.querySelector<HTMLElement>(".a-att-lightbox")!
+    expect(box).not.toBeNull()
+    expect(box.parentElement).toBe(single.parentElement)
+    expect(box.style.position).toBe("")
+    single.click()
+    await flush()
+    expect(host.querySelector(".a-att-lightbox")).toBeNull()
+    single.click()
+    await flush()
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))
+    await flush()
+    expect(host.querySelector(".a-att-lightbox")).toBeNull()
   })
+})
+
+// 几何回归取自 #1641 顶部图片实测:原浮层 y=-56..62,即高 118、缩略图上沿 70、间距 8。
+test.each(["composer", "timeline"])("#1641 AC2 %s 上方放不下翻到下方,放得下仍在上方", async (surface) => {
+  const host = mount(() => surface === "composer"
+    ? createComponent(ComposerAttachmentStrip, {
+        attachments: [image("i1", "截图.png")], reading: false, imageRoute: "native",
+        onRemove: () => {}, onRetry: () => {},
+      })
+    : createComponent(TimelineAttachments, {
+        attachments: [{ partID: "6", name: "截图.png", media: "image", label: "PNG", url: PNG }],
+        onReadAgain: () => {},
+      }))
+  const thumb = host.querySelector<HTMLButtonElement>(".a-att-thumb")!
+  for (const top of [70, 500]) {
+    thumb.getBoundingClientRect = () => new DOMRect(400, top, 240, 180)
+    thumb.click()
+    await flush()
+    const box = document.querySelector<HTMLElement>(".a-att-lightbox")!
+    box.getBoundingClientRect = () => new DOMRect(340, top - 126, 300, 118)
+    box.querySelector("img")!.dispatchEvent(new Event("load"))
+    await flush()
+    expect(box.style.top).toBe(top === 70 ? (surface === "composer" ? "258px" : "calc(100% + 8px)") : "auto")
+    expect(box.style.bottom).toBe(top === 70 ? "auto" : (surface === "composer" ? `${window.innerHeight - top + 8}px` : "calc(100% + 8px)"))
+    thumb.click()
+  }
 })

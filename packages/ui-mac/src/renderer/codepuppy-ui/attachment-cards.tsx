@@ -6,6 +6,7 @@
 // 请助手读取」—— 那是在输入框里以同一个附件再发一条请求读取的消息,不在后台悄悄重读。
 // 「已读取」只陈述打开过,不转述读懂了什么(卡上不显示摘要 / 页数)。
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js"
+import { Portal } from "solid-js/web"
 import { t } from "../i18n"
 import { MAX_ATTACHMENT_BYTES } from "../../shared/attachment-path"
 import {
@@ -140,9 +141,14 @@ function StatusIcon(props: { tone: "ok" | "warn" | "error" | undefined }) {
   )
 }
 
-/** 看大图:贴缩略图上方的小浮层;Esc、点别处、再点缩略图关闭,焦点回到缩略图(时间线弹出层家族同一套关闭规则)。 */
+/** 看大图:贴缩略图上方、放不下时翻到下方的小浮层;Esc、点别处、再点缩略图关闭,焦点回到缩略图(时间线弹出层家族同一套关闭规则)。 */
 function Lightbox(props: { url: string; name: string; size?: number; anchor: HTMLElement; onClose: () => void }) {
   let box: HTMLDivElement | undefined
+  // 输入框附件条的 mask 会裁掉 fixed 子元素;时间线仍在原位渲染。
+  const portal = !!props.anchor.closest(".a-comp-atts")
+  const rect = props.anchor.getBoundingClientRect()
+  const [below, setBelow] = createSignal(false)
+  const place = () => setBelow(rect.top < (box?.getBoundingClientRect().height ?? 0) + 8)
   const [dims, setDims] = createSignal("")
   const close = () => {
     props.onClose()
@@ -159,6 +165,7 @@ function Lightbox(props: { url: string; name: string; size?: number; anchor: HTM
     close()
   }
   onMount(() => {
+    place()
     document.addEventListener("keydown", onKey, true)
     document.addEventListener("pointerdown", onPointer, true)
   })
@@ -166,12 +173,30 @@ function Lightbox(props: { url: string; name: string; size?: number; anchor: HTM
     document.removeEventListener("keydown", onKey, true)
     document.removeEventListener("pointerdown", onPointer, true)
   })
-  return (
-    <div ref={box} class="a-att-lightbox" role="dialog" aria-label={props.name}>
+  const content = (
+    <div
+      ref={box}
+      class="a-att-lightbox"
+      role="dialog"
+      aria-label={props.name}
+      style={
+        portal
+          ? {
+              position: "fixed",
+              left: `${rect.left}px`,
+              top: below() ? `${rect.bottom + 8}px` : "auto",
+              bottom: below() ? "auto" : `${window.innerHeight - rect.top + 8}px`,
+            }
+          : { top: below() ? "calc(100% + 8px)" : "auto", bottom: below() ? "auto" : "calc(100% + 8px)" }
+      }
+    >
       <img
         src={props.url}
         alt=""
-        onLoad={(e) => setDims(`${e.currentTarget.naturalWidth} × ${e.currentTarget.naturalHeight}`)}
+        onLoad={(e) => {
+          setDims(`${e.currentTarget.naturalWidth} × ${e.currentTarget.naturalHeight}`)
+          place()
+        }}
       />
       <div class="a-att-lightbox-meta">
         <b>{props.name}</b>
@@ -179,6 +204,7 @@ function Lightbox(props: { url: string; name: string; size?: number; anchor: HTM
       </div>
     </div>
   )
+  return portal ? <Portal>{content}</Portal> : content
 }
 
 function Thumb(props: { url: string; name: string; size?: number; route?: ImageRoute; large?: boolean }) {

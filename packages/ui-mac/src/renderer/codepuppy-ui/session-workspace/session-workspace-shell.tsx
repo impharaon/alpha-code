@@ -207,8 +207,8 @@ function WorkspaceTopbar(props: {
     const current = snapshot()
     if (current?.activity !== "running") return undefined
     const wait = props.turnWait?.()
-    if (wait === "approval") return { kind: "approval", label: t("codepuppy.session.statusWaitApproval") }
-    if (wait === "question") return { kind: "question", label: t("codepuppy.session.statusWaitQuestion") }
+    if (wait?.kind === "approval") return { kind: "approval", label: t("codepuppy.session.statusWaitApproval") }
+    if (wait?.kind === "question") return { kind: "question", label: t("codepuppy.session.statusWaitQuestion") }
     if (current.retrying) return { kind: "retry", label: t("codepuppy.session.statusRetrying") }
     return { kind: "running", label: t("codepuppy.session.statusRunning") }
   }

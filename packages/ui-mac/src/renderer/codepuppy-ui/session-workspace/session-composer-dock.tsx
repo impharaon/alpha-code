@@ -135,7 +135,11 @@ export function SessionComposerDock(props: {
   // `#1399`:两个投影都已按当前身份收窄(feed 随身份重建、question 按 sessionID 读),发布值天然 I8;
   // 卸载时收回 —— 不让上一个 dock 的「在等你」挂在下一个时间线上。
   createEffect(() =>
-    props.publishTurnWait?.(turnWaitOf({ approvalPending: approvalPending(), questionPending: question() !== undefined })),
+    props.publishTurnWait?.(turnWaitOf({
+      approvalPending: approvalPending(),
+      approvalSource: feed()?.state.requests[0]?.source,
+      questionPending: question() !== undefined,
+    })),
   )
   onCleanup(() => props.publishTurnWait?.(undefined))
 

@@ -18,6 +18,7 @@ import type {
   FilePart,
   Message,
   Part,
+  PermissionV2Source,
   ReasoningPart,
   TextPart,
   ToolPart,
@@ -278,7 +279,7 @@ export type TimelineRow =
  * `#1399`:活跃回合在等你 —— 等你批准(审批弹窗)或等你回答(输入框上方的提问卡)。缺席 = 运行面。
  * `#1474` 起由工作过程的实时标题消费(原回合脚行并入工作过程)。
  */
-export type TimelineTurnWait = "approval" | "question"
+export type TimelineTurnWait = { kind: "approval" | "question"; source?: PermissionV2Source }
 
 /** `#1588` 回合错误卡认得出的五类原因(批准稿 frame.html#turn-error 的表)。 */
 export type TurnErrorCause = "billing" | "auth" | "rateLimit" | "contextOverflow" | "outputLength"

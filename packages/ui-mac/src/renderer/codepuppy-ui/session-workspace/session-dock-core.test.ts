@@ -122,9 +122,9 @@ describe("question:头部挂起请求与回答完备性", () => {
 // 用户此刻能动手的只有它;提问卡要等弹窗关掉才够得着。
 describe("#1399 turnWaitOf:审批优先于提问;都没有 = undefined(运行面)", () => {
   test("只审批 → approval;只提问 → question;都挂起 → approval;都没有 → undefined", () => {
-    expect(turnWaitOf({ approvalPending: true, questionPending: false })).toBe("approval")
-    expect(turnWaitOf({ approvalPending: false, questionPending: true })).toBe("question")
-    expect(turnWaitOf({ approvalPending: true, questionPending: true })).toBe("approval")
+    expect(turnWaitOf({ approvalPending: true, questionPending: false })).toEqual({ kind: "approval", source: undefined })
+    expect(turnWaitOf({ approvalPending: false, questionPending: true })).toEqual({ kind: "question" })
+    expect(turnWaitOf({ approvalPending: true, questionPending: true })).toEqual({ kind: "approval", source: undefined })
     expect(turnWaitOf({ approvalPending: false, questionPending: false })).toBeUndefined()
   })
 })

@@ -166,7 +166,7 @@ describe("REQ-125 session workspace real Solid mount", () => {
     expect(status()).toBeNull()
     expect(host.querySelector("[data-codepuppy-session-workspace-topbar]")!.textContent).not.toContain("空闲")
     // 空闲时等待信号残留也不说(与时间线一致:只有活跃回合才「在等你」)。
-    runtime.setSessionWorkspaceTurnWait("approval")
+    runtime.setSessionWorkspaceTurnWait({ kind: "approval" })
     await flush()
     expect(status()).toBeNull()
 
@@ -177,13 +177,13 @@ describe("REQ-125 session workspace real Solid mount", () => {
 
     expect(status()!.classList.contains("a-swk-status--running")).toBe(true)
 
-    runtime.setSessionWorkspaceTurnWait("approval")
+    runtime.setSessionWorkspaceTurnWait({ kind: "approval" })
     await flush()
     expect({ kind: status()!.dataset.codepuppySessionStatus, text: status()!.textContent }).toEqual({ kind: "approval", text: "等你批准" })
     // 批准稿 #conv-header:「等你」态是警示色(不是生成中的强调色)。
     expect([...status()!.classList].filter((name) => name.startsWith("a-swk-status--"))).toEqual(["a-swk-status--wait"])
 
-    runtime.setSessionWorkspaceTurnWait("question")
+    runtime.setSessionWorkspaceTurnWait({ kind: "question" })
     await flush()
     expect({ kind: status()!.dataset.codepuppySessionStatus, text: status()!.textContent }).toEqual({ kind: "question", text: "等你回答" })
 

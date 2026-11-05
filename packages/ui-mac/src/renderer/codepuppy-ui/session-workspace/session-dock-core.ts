@@ -59,9 +59,13 @@ export function todoDockVisible(input: { todos: readonly Todo[]; running: boolea
  * `#1399` 回合脚行的等你面:两种触发共用一面,同时挂起时按审批说 —— 审批弹窗是强模态、盖在提问卡之上,
  * 用户此刻能动手的只有它;提问卡要等弹窗关掉才够得着。都没有 = undefined(运行面)。
  */
-export function turnWaitOf(input: { approvalPending: boolean; questionPending: boolean }): TimelineTurnWait | undefined {
-  if (input.approvalPending) return "approval"
-  if (input.questionPending) return "question"
+export function turnWaitOf(input: {
+  approvalPending: boolean
+  approvalSource?: TimelineTurnWait["source"]
+  questionPending: boolean
+}): TimelineTurnWait | undefined {
+  if (input.approvalPending) return { kind: "approval", source: input.approvalSource }
+  if (input.questionPending) return { kind: "question" }
   return undefined
 }
 

@@ -17,12 +17,13 @@ import type { CodePuppyProjectsApi } from "../../sidebar/use-projects"
 import { PermissionWatcher } from "../permission-watcher"
 import { SessionComposerDock } from "./session-composer-dock"
 import { dockClientCalls, emitDockPermissionAsked, emitDockPermissionReplied, recordingClient, resetSingleSurfaceStub } from "./single-surface-app-stub"
+import type { TimelineTurnWait } from "../session-timeline/timeline-model"
 import type { CodePuppySessionIdentity, CodePuppySessionLiveSnapshot } from "./session-workspace-core"
 
 export { render, dockClientCalls }
 
 /** `#1399`:dock 发布给回合脚行的「等你」信号(生产 prop `publishTurnWait`)—— 按发布顺序记录。 */
-export const turnWaitLog: Array<"approval" | "question" | undefined> = []
+export const turnWaitLog: Array<TimelineTurnWait | undefined> = []
 
 export const HARNESS_IDENTITY: CodePuppySessionIdentity = {
   serverKey: "sidecar",

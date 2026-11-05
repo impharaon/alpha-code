@@ -126,7 +126,7 @@ const it = testEffect(
 
 // 三档的载体(列序 = 方案表的列序)。
 const TIERS = ["build", "codepuppy-ask", "codepuppy-readonly"] as const
-type Tier = (typeof TIERS)[number]
+type Tier = (typeof TIERS)[number] | "codepuppy-automation" | "codepuppy-automation-standard"
 type Verdict = "PASS" | "ASK" | "DENY"
 type Row = readonly [Verdict, Verdict, Verdict]
 
@@ -313,6 +313,19 @@ for (const [cls, subject] of policySubjects)
             yield* row(`#1638 ${cls} / ${record}`, (tier) => identity(tier, subject).pipe(Effect.map(classify))),
           ).toEqual([...expected])
         }),
+      { git: true },
+      TEST_TIMEOUT_MS,
+    )
+
+for (const agent of ["codepuppy-automation", "codepuppy-automation-standard"] as const)
+  for (const [cls, subject] of policySubjects)
+    it.instance(
+      `#1638 AC3 automation ${agent} / ${cls} / none: ASK`,
+      () => Effect.gen(function* () {
+        const result = classify(yield* identity(agent, subject))
+        console.log(`MATRIX ${agent} / ${cls} / none: ${result}`)
+        expect(result).toBe("ASK")
+      }),
       { git: true },
       TEST_TIMEOUT_MS,
     )

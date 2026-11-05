@@ -271,8 +271,10 @@ export function CodePuppySessionTimeline(props: CodePuppySessionTimelineProps = 
       const id = sessionID()
       if (!id) return
       if ((session().data.session_status[id]?.type ?? "idle") !== "idle") return
+      const agent = session().data.message[id]?.findLast((message) => message.role === "user")?.agent
       const result = await serverSDK().client.session.promptAsync({
         sessionID: id,
+        ...(agent ? { agent } : {}),
         parts: [{ type: "text", text: t("codepuppy.timeline.continuePrompt"), synthetic: true }],
       })
       if ((result as { error?: unknown } | undefined)?.error !== undefined)

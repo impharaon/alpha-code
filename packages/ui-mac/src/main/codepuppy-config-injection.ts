@@ -207,6 +207,7 @@ export function injectCodePuppyConfig(
           mode: "primary",
           prompt: CODEPUPPY_AGENT_TEXT["codepuppy-automation"].prompt,
           permission: {
+            "tool-policy-default": "ask",
             read: { "*": "allow", "*.env*": "deny" },
             glob: "allow",
             grep: "allow",
@@ -313,6 +314,7 @@ export function injectCodePuppyConfig(
           mode: "primary",
           prompt: CODEPUPPY_AGENT_TEXT["codepuppy-automation-standard"].prompt,
           permission: {
+            "tool-policy-default": "ask",
             read: { "*": "allow", "*.env*": "deny" },
             glob: "allow",
             grep: "allow",

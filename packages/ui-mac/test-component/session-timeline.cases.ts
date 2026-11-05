@@ -3075,26 +3075,35 @@ describe("#589 真实继续生成闸门(生产绑定层挂载,SDK 层观察)", (
     await new Promise((resolve) => setTimeout(resolve, 0))
   }
 
-  test("续钮执行生产 handler:v1 session.promptAsync 收到本会话 ID 与继续文案(#652)", async () => {
-    primeInterruptedBinding()
-    sdkPromptImpl = () => Promise.resolve({})
-    v2PromptCalls.length = 0
-    const host = mountBinding()
-    await settle()
+  test.each(["build", "codepuppy-ask", "codepuppy-readonly", undefined])(
+    "#1638 AC3 继续生成沿用最后用户消息的 agent=%s,缺席则不带(#652)",
+    async (agent) => {
+      primeInterruptedBinding()
+      // Reuse the interrupted binding fixture; earlier user and later assistant stay build.
+      const messages = bindingData.message[BINDING_SESSION_ID]!
+      const user = messages[0] as Record<string, unknown>
+      messages.unshift({ ...user, id: "msg_bu0" })
+      if (agent) user.agent = agent
+      else delete user.agent
+      sdkPromptImpl = () => Promise.resolve({})
+      v2PromptCalls.length = 0
+      const host = mountBinding()
+      await settle()
 
-    const cont = host.querySelector<HTMLButtonElement>(".a-tl-int-continue")
-    expect(cont).not.toBeNull()
-    cont!.click()
-    await settle()
+      const cont = host.querySelector<HTMLButtonElement>(".a-tl-int-continue")
+      expect(cont).not.toBeNull()
+      cont!.click()
+      await settle()
 
-    // #620:续写的输入带 v1 wire 契约的 synthetic 标记(它是「系统替用户按的」,不是发言)。
-    expect(sdkPromptCalls).toEqual([
-      { sessionID: BINDING_SESSION_ID, parts: [{ type: "text", text: "继续", synthetic: true }] },
-    ])
-    // 续写与 composer 同代次:新引擎那条链一次都不碰。
-    expect(v2PromptCalls).toEqual([])
-    expect(host.querySelector(".a-tl-int-failed")).toBeNull()
-  })
+      // #620:续写的输入带 v1 wire 契约的 synthetic 标记(它是「系统替用户按的」,不是发言)。
+      expect(sdkPromptCalls).toEqual([
+        { sessionID: BINDING_SESSION_ID, ...(agent ? { agent } : {}), parts: [{ type: "text", text: "继续", synthetic: true }] },
+      ])
+      // 续写与 composer 同代次:新引擎那条链一次都不碰。
+      expect(v2PromptCalls).toEqual([])
+      expect(host.querySelector(".a-tl-int-failed")).toBeNull()
+    },
+  )
 
   test("续发被引擎装进 { error } 信封时不当成功:就地失败提示(#652)", async () => {
     primeInterruptedBinding()

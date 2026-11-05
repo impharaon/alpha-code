@@ -148,6 +148,7 @@ import { reconcileMcpWorkspaceMarkers } from "./mcp-workspace-marker"
 import { engineDataDir } from "./data-clear"
 import { sweepLegacyCloudMcpAuthEntry } from "./cloud-mcp-auth-sweep"
 import { reconcileDesiredStateAtBoot } from "./ext-install-planner"
+import { resolveBootExtensionSafety } from "./ext-boot-safety"
 import { codepuppyGlobalRoot } from "./codepuppy-installs"
 import { factorySkillSources, reconcileFactorySkills } from "./factory-skills"
 import { runGlobalEcosystemGate } from "./ecosystem-gate"
@@ -248,6 +249,7 @@ let sidecarGen = 0
 // #395/#428:startup reconcile 发现「本应禁用的扩展无法保证从引擎配置移除」或退休桥无法确认
 // 已断链时置位 —— 首个 sidecar fork 前 fail-closed 阻断,绝不让引擎依赖未收敛的旧桥/配置启动。
 let bootEnforcementGap: string[] | null = null
+let bootCurationUnknown = false
 let selfHeal = initialSelfHealState()
 let selfHealTimer: NodeJS.Timeout | null = null
 let engineRunawayGuard = initialEngineRunawayGuardState()
@@ -890,6 +892,7 @@ const main = Effect.gen(function* () {
         for (const w of ds.warnings) logger.warn(`[req104-395] desired-state reconcile: ${w}`)
         // r6 B2/B3:有未能保证的禁用项 → 置 fail-closed 位(spawn 前阻断引擎)。
         if (ds.enforcementGap && ds.enforcementGap.length > 0) {
+          bootCurationUnknown = ds.curationUnknown === true
           bootEnforcementGap = [...(bootEnforcementGap ?? []), ...ds.enforcementGap]
           logger.error(
             "[req104-395] desired-state enforcement gap — disabled extensions cannot be guaranteed; blocking sidecar",
@@ -1039,7 +1042,8 @@ const main = Effect.gen(function* () {
     ? Promise.resolve({ ok: true as const, configRemoved: false, receiptRemoved: false })
     : retireCommunityExcelAfterRecovery(extLedgerReady)
   // REQ-032:启动预热远端 catalog(ETag 缓存;失败静默回退,进 hub 时再刷)
-  void refreshRemoteCatalog(app.getPath("userData"), registryChannel).catch(() => {})
+  const bootCatalogRefresh = refreshRemoteCatalog(app.getPath("userData"), registryChannel)
+  void bootCatalogRefresh.catch(() => {})
   // REQ-102 #318:CAS GC 生产触发(5min 首跑 + 24h 链式周期;锁忙/mark 根损坏 = 本轮跳过等下轮)。
   // 配置经唯一权威取值点 productionCasGcConfig(冻结共享 CAS 根 + 三环境根 + 无条件 seed lock +
   // 显式非零 grace,已单测钉死)。
@@ -1374,20 +1378,28 @@ const main = Effect.gen(function* () {
     // #395/#428:startup reconcile 判定配置禁用面或退休桥断链无法保证 → fail-closed 拒绝
     // spawn 引擎。gap 细节已 error 记日志；只 gate 首次 spawn(respawn 不重跑 reconcile)。
     if (bootEnforcementGap) {
-      logger.error("[req104-395] refusing to spawn sidecar — extension disable state cannot be guaranteed", {
-        gap: bootEnforcementGap,
-      })
       // Packaged VERIFY (OPENCODE_TEST_ONBOARDING) must observe exit 1 without dismissing a modal.
       if (TEST_ONBOARDING) {
         app.exit(1)
         return
       }
-      dialog.showErrorBox(
-        "扩展安全状态无法确保",
-        "扩展配置或历史桥接状态无法确认已经安全收敛(可能因磁盘空间、权限或配置文件损坏)。为避免旧桥或本应关闭的扩展被意外加载,已暂停启动。请检查磁盘与目录权限后重新打开应用;若持续出现,请联系支持并附上日志。",
-      )
-      app.exit(1)
-      return
+      const refusal = yield* Effect.promise(() => resolveBootExtensionSafety(
+        { enforcementGap: bootEnforcementGap!, curationUnknown: bootCurationUnknown },
+        {
+          refresh: () => bootCatalogRefresh,
+          reconcile: async () => {
+            await extLedgerReady
+            return reconcileDesiredStateAtBoot(codepuppyGlobalRoot(), { userDataPath: app.getPath("userData"), channel: registryChannel })
+          },
+          warn: (message, detail) => logger.warn(message, detail),
+        },
+      ))
+      if (refusal) {
+        logger.error("[req104-395] refusing to spawn sidecar — extension disable state cannot be guaranteed", { gap: refusal.gap })
+        dialog.showErrorBox(refusal.title, refusal.message)
+        app.exit(1)
+        return
+      }
     }
 
     yield* Effect.promise(() => extLedgerReady)

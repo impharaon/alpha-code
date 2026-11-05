@@ -3369,6 +3369,8 @@ export type BootReconcileOutcome = {
    *  codepuppy.jsonc plugin[] 落盘移除**(config 写失败/读不出/非法 jsonc)、**账本损坏/不可读**(注入会拿到
    *  空 records,Codex r12 B2)、skills 陈旧允许集入此列。enable 失败只记 warning(功能缺失非安全洞)。 */
   enforcementGap?: string[]
+  /** The session-grant oracle was unavailable; other gaps still independently block boot. */
+  curationUnknown?: boolean
 }
 
 /** 主进程启动 reconcile(引擎首次 fork 读 config 之前调用)。r11 pivot:mcp/agent 的 disable 由 sidecar
@@ -3394,8 +3396,9 @@ export function reconcileDesiredStateAtBoot(
   const warnings: string[] = []
   const applied: string[] = []
   const gap: string[] = []
+  let curationUnknown = false
   const done = (o: Omit<BootReconcileOutcome, "enforcementGap">): BootReconcileOutcome =>
-    gap.length > 0 ? { ...o, enforcementGap: gap } : o
+    gap.length > 0 ? { ...o, enforcementGap: gap, curationUnknown } : o
   const held = tryAcquireBundleLock(root, { txId: `boot-reconcile-${randomUUID()}` })
   if (!held.ok) {
     // Codex r7 B2:启动期(sidecar 未起、IPC 未接)本不该有其他事务持锁 —— 拿不到锁 = 锁文件 EACCES/EIO
@@ -3419,10 +3422,12 @@ export function reconcileDesiredStateAtBoot(
       const catalogEnabled = pre.records.filter(
         (r) => r.scope.kind === "global" && r.origin === "catalog" && r.desiredState !== "disabled" && enforceableKinds.has(r.kind),
       )
-      if (!oracle.ok && catalogEnabled.length > 0)
+      if (!oracle.ok && catalogEnabled.length > 0) {
+        curationUnknown = true
         gap.push(
           `session-grant determination unavailable (${oracle.reason}) while ${catalogEnabled.length} catalog extension(s) are enabled — cannot prove none is session-grant; blocking sidecar (fail closed)`,
         )
+      }
       const ids = oracle.ok ? oracle.ids : oracle.partialIds
       for (const r of catalogEnabled) {
         if (!ids.has(r.id)) continue

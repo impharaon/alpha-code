@@ -1275,7 +1275,7 @@ export const dict = {
   "codepuppy.composer.assemble": "Add files, context or a mode",
   "codepuppy.composer.permissions": "Runtime permissions",
   "codepuppy.composer.permAllow": "Approve all",
-  "codepuppy.composer.permAllowHint": "Edits and commands run without asking. Folders outside the project, .env, and external or cloud tools still ask.",
+  "codepuppy.composer.permAllowHint": "All tools run directly except those individually set to ask or disabled in settings.",
   "codepuppy.composer.permAsk": "Ask for approval",
   "codepuppy.composer.permAskHint": "Asks before edits, commands, or handing off to another assistant. External and cloud tools follow Settings.",
   "codepuppy.composer.permReadonly": "Read-only",

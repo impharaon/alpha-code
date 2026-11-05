@@ -163,6 +163,7 @@ function assertInjectedFacts(content: string | undefined, userDataPath: string):
   expect(Object.keys(config.agent ?? {})).toEqual(
     expect.arrayContaining(["codepuppy-automation", "codepuppy-readonly", "codepuppy-automation-standard", "codepuppy-ask"]),
   )
+  expect(config.agent?.["codepuppy-ask"]).toMatchObject({ permission: { "tool-policy-default": "ask" } })
   // A6:BYOK 密钥以 {file:} ref 进 content,明文永不进(此处是**组合体**层面的锁,
   // codepuppy-models.test.ts 锁的是单件 buildCodePuppyModelConfig)。REQ-236 `#1562`:平台 provider 只带非凭据占位值,
   // 凭据由 ext 的 chat.headers 每次请求现读。

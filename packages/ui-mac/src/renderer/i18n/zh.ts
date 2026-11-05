@@ -1247,7 +1247,7 @@ export const dict = {
   "codepuppy.composer.assemble": "添加文件、上下文或模式",
   "codepuppy.composer.permissions": "运行权限",
   "codepuppy.composer.permAllow": "全部批准",
-  "codepuppy.composer.permAllowHint": "改文件、运行命令不再询问。项目外文件夹、.env、外部与云端工具仍询问。",
+  "codepuppy.composer.permAllowHint": "所有工具直接执行，设置里单独设成询问或禁用的除外。",
   "codepuppy.composer.permAsk": "请求审批",
   "codepuppy.composer.permAskHint": "改文件、运行命令、交给其它助手前询问。外部与云端工具按设置执行。",
   "codepuppy.composer.permReadonly": "只读",

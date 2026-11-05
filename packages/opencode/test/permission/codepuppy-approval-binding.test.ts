@@ -302,6 +302,9 @@ const setup = Effect.fn("codepuppy1574.setup")(function* () {
   const server = testServer()
   const running = yield* server.handle
   yield* (yield* MCP.Service).add(SERVER, remote(running.url))
+  // #1638:全部批准不再为无记录的 MCP 询问;这些审批绑定用例显式选择「每次询问」。
+  const policy = yield* CodePuppyToolPolicy.Service
+  yield* policy.setRecord({ selector: { level: "tool", canonical: ID_UPLOAD }, state: "ask" })
   return {
     url: running.url,
     counts: server.counts,
@@ -516,7 +519,7 @@ describe("#1574 AC3:审批挂起期间停用或重绑 ⇒ 回复后实现 0 次,
       const policy = yield* CodePuppyToolPolicy.Service
       const tools = yield* resolveTools([ALLOW_ALL])
       for (const answer of ["once", "always"] as const) {
-        yield* policy.removeRecord({ level: "tool", canonical: ID_UPLOAD })
+        yield* policy.setRecord({ selector: { level: "tool", canonical: ID_UPLOAD }, state: "ask" })
         const run = launch(tools[ALIAS_UPLOAD]!, `ac3-${answer}`, { destination: EXFIL, body: "x" })
         const request = yield* onlyPending(run)
         yield* policy.setRecord({ selector: { level: "tool", canonical: ID_UPLOAD }, state: "disabled" })
@@ -651,7 +654,7 @@ describe("#1574 AC5 / AC7:规则集要求的询问不产生会话放行,已有�
     }),
   )
 
-  it.instance("只读档回复「始终」不留放行:随后全部批准档的同一工具仍按文档轴问;设置里启用后只读档仍问", () =>
+  it.instance("只读档回复「始终」不留放行:随后全部批准档的显式 ask 工具仍问;设置里启用后只读档仍问", () =>
     Effect.gen(function* () {
       const { url, counts } = yield* setup()
       const open = yield* resolveTools([ALLOW_ALL])

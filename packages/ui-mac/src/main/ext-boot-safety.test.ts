@@ -25,13 +25,15 @@ const record = (name: string) => {
   return { type: "local", command: entry.installSpec.command }
 }
 const reconcile = () => reconcileDesiredStateAtBoot(root, { userDataPath: root, channel: "stable" })
-const warn = () => {}
+const logs: Array<{ message: string; detail?: Record<string, unknown> }> = []
+const warn = (message: string, detail?: Record<string, unknown>) => { logs.push({ message, detail }) }
 const refresh = (fetchImpl = (async (url) => new Response(routes[String(url)] ?? "", { status: routes[String(url)] ? 200 : 404 })) as typeof fetch) =>
   refreshRemoteCatalog(root, "stable", { fetchImpl, builtinKeyB64: BUILTIN_CATALOG_PUBKEY_B64, now: () => Date.parse("2026-11-05T05:00:00Z") })
 const networkMessage = "Code Puppy 要先取一次扩展目录,才能确认已启用的扩展是安全的。请联网后重新打开。"
 const oldMessage = "扩展配置或历史桥接状态无法确认已经安全收敛(可能因磁盘空间、权限或配置文件损坏)。为避免旧桥或本应关闭的扩展被意外加载,已暂停启动。请检查磁盘与目录权限后重新打开应用;若持续出现,请联系支持并附上日志。"
 
 beforeEach(() => {
+  logs.length = 0
   root = mkdtempSync(join(tmpdir(), "boot-catalog-"))
   writeFileSync(join(root, "catalog-channel-state.json"), JSON.stringify(fixture.legacy))
   writeFileSync(join(root, "codepuppy.jsonc"), JSON.stringify({ mcp: { "codepuppy-word": record("codepuppy-word") } }))
@@ -49,6 +51,9 @@ test("AC1: 0.1.24 unknown catalog refreshes once through full verification and b
   expect(calls).toBe(1)
   expect(readSessionGrantIdsSync(root, "stable").ok).toBe(true)
   expect(findRecordV2(root, "mcp", "codepuppy-word")?.desiredState).toBe("enabled")
+  expect(logs.at(-1)?.detail?.result).toBe("completed")
+  expect(logs.at(-1)?.detail).not.toHaveProperty("error")
+  expect(logs.at(-1)?.detail).not.toHaveProperty("reasonClass")
 })
 
 test("AC2: 0.1.24 plus network failure remains closed with the network dialog", async () => {
@@ -59,6 +64,17 @@ test("AC2: 0.1.24 plus network failure remains closed with the network dialog", 
   expect(result?.title).toBe("需要联网确认扩展安全")
   expect(result?.message).toBe(networkMessage)
   expect(result?.gap).toHaveLength(1)
+  expect(logs.at(-1)?.detail).toMatchObject({ result: "failed", reasonClass: "security" })
+  expect(logs.at(-1)?.detail?.error).toContain("offline")
+  // Exercise rejected refreshes too; use the real target URL with test-only credentials appended.
+  await resolveBootExtensionSafety(reconcile(), {
+    refresh: () => Promise.reject(new Error(`fetch failed: bearer TEST-ONLY-TOKEN ${target.url}?signature=TEST-ONLY-QUERY`)), reconcile, warn,
+  })
+  expect(logs.at(-1)?.detail).toMatchObject({ result: "failed", reasonClass: "unknown" })
+  expect(logs.at(-1)?.detail?.error).toContain("fetch failed")
+  expect(logs.at(-1)?.detail?.error).not.toContain("TEST-ONLY-TOKEN")
+  expect(logs.at(-1)?.detail?.error).not.toContain("signature=")
+  expect(logs.at(-1)?.detail?.error).not.toContain("TEST-ONLY-QUERY")
 })
 
 test("AC2: a tampered remote payload cannot make the real boot oracle pass", async () => {
@@ -68,9 +84,11 @@ test("AC2: a tampered remote payload cannot make the real boot oracle pass", asy
   })
   expect(readSessionGrantIdsSync(root, "stable").ok).toBe(false)
   expect(result?.message).toBe(networkMessage)
+  expect(logs.at(-1)?.detail).toMatchObject({ result: "failed", reasonClass: "security" })
+  expect(logs.at(-1)?.detail?.error).toContain("MISMATCH")
 })
 
-test("AC3: 15-second timeout keeps the event loop responsive and returns the AC2 dialog without cancelling refresh", async () => {
+test("AC3: 15-second timeout keeps the event loop responsive and returns the AC2 dialog", async () => {
   let finish!: (value: Awaited<ReturnType<typeof refresh>>) => void
   const pending = new Promise<Awaited<ReturnType<typeof refresh>>>((resolve) => { finish = resolve })
   let ticks = 0
@@ -89,6 +107,9 @@ test("AC3: 15-second timeout keeps the event loop responsive and returns the AC2
     expect(reconciled).toBe(false)
     expect(result?.title).toBe("需要联网确认扩展安全")
     expect(result?.message).toBe(networkMessage)
+    expect(logs.at(-1)?.detail?.result).toBe("timeout")
+    expect(logs.at(-1)?.detail).not.toHaveProperty("error")
+    expect(logs.at(-1)?.detail).not.toHaveProperty("reasonClass")
     finish(await refresh())
     expect((await pending).source).toBe("remote")
   } finally { clearInterval(timer) }

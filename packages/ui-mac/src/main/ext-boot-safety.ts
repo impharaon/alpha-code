@@ -1,5 +1,6 @@
 import type { BootReconcileOutcome } from "./ext-install-planner"
 import type { RemoteCatalogResult } from "./remote-catalog"
+import { sanitizeTransportError } from "./codepuppy-artifact-download"
 
 export async function resolveBootExtensionSafety(
   state: Pick<BootReconcileOutcome, "enforcementGap" | "curationUnknown">,
@@ -13,15 +14,20 @@ export async function resolveBootExtensionSafety(
     const started = Date.now()
     deps.warn("[1632] refreshing catalog before boot safety decision")
     let timer: ReturnType<typeof setTimeout> | undefined
-    const timeout = new Promise<"timeout">((resolve) => { timer = setTimeout(() => resolve("timeout"), 15_000) })
+    const timeout = new Promise<{ result: "timeout" }>((resolve) => { timer = setTimeout(() => resolve({ result: "timeout" }), 15_000) })
     const result = await Promise.race([
-      deps.refresh().then((catalog) => catalog.source === "none" ? "failed" as const : "completed" as const, () => "failed" as const),
+      deps.refresh().then(
+        (catalog) => catalog.source === "none"
+          ? { result: "failed" as const, error: sanitizeTransportError(catalog.error), reasonClass: catalog.reasonClass }
+          : { result: "completed" as const },
+        (error: unknown) => ({ result: "failed" as const, error: sanitizeTransportError(error instanceof Error ? error.message : String(error)), reasonClass: "unknown" }),
+      ),
       timeout,
     ]).finally(() => clearTimeout(timer))
     // The caller awaits ledger recovery and retirement; reconcile owns the global extension lock.
-    if (result === "completed") state = await deps.reconcile()
+    if (result.result === "completed") state = await deps.reconcile()
     deps.warn("[1632] catalog boot refresh finished", {
-      result, elapsedMs: Date.now() - started, blocked: !!state.enforcementGap?.length,
+      ...result, elapsedMs: Date.now() - started, blocked: !!state.enforcementGap?.length,
     })
   }
   if (!state.enforcementGap?.length) return null

@@ -1380,6 +1380,7 @@ const main = Effect.gen(function* () {
     if (bootEnforcementGap) {
       // Packaged VERIFY (OPENCODE_TEST_ONBOARDING) must observe exit 1 without dismissing a modal.
       if (TEST_ONBOARDING) {
+        logger.error("[req104-395] refusing to spawn sidecar — extension disable state cannot be guaranteed", { gap: bootEnforcementGap })
         app.exit(1)
         return
       }
@@ -1389,7 +1390,12 @@ const main = Effect.gen(function* () {
           refresh: () => bootCatalogRefresh,
           reconcile: async () => {
             await extLedgerReady
-            return reconcileDesiredStateAtBoot(codepuppyGlobalRoot(), { userDataPath: app.getPath("userData"), channel: registryChannel })
+            const ds = reconcileDesiredStateAtBoot(codepuppyGlobalRoot(), { userDataPath: app.getPath("userData"), channel: registryChannel })
+            if (ds.skipped) logger.warn("[req104-395] desired-state reconcile skipped", { reason: ds.skipped })
+            if (ds.applied.length > 0)
+              logger.log("[req104-395] desired-state residue reprojected into codepuppy.jsonc", { applied: ds.applied })
+            for (const w of ds.warnings) logger.warn(`[req104-395] desired-state reconcile: ${w}`)
+            return ds
           },
           warn: (message, detail) => logger.warn(message, detail),
         },

@@ -1,0 +1,15 @@
+{
+ "fast0": "answered",
+ "S0": "sent-no-response",
+ "S1": "sent-no-response",
+ "S2": "sent-no-response",
+ "S3": "sent-no-response",
+ "S4": "sent-no-response",
+ "S5": "sent-no-response",
+ "W0": "waiting-socket:pool-stalled",
+ "W1": "waiting-socket:pool-stalled",
+ "W2": "waiting-socket:pool-stalled",
+ "X0": "waiting-socket:pool-stalled",
+ "Y0": "sent-no-response",
+ "F0": "failed:net_error=-102"
+}

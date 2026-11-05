@@ -206,7 +206,7 @@ describe("REQ-125 C1b I1 and Recovery static ratchets", () => {
   test("`#1399`:dock 发布的「等你」信号经 workspace 的 signal 进时间线;审批卡不搬进时间线", () => {
     expect(tsx).toContain("publishTurnWait={setTurnWait}")
     expect(tsx).toContain("turnWait={turnWait}")
-    expect(dock).toContain("turnWaitOf({ approvalPending: approvalPending(), questionPending: question() !== undefined })")
+    expect(dock).toContain("approvalSource: feed()?.state.requests[0]?.source")
     expect(dockCore).toContain("export function turnWaitOf(")
     expect(tsx).not.toContain("PermissionDialog")
   })

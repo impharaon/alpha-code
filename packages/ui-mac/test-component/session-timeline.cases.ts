@@ -3075,26 +3075,35 @@ describe("#589 真实继续生成闸门(生产绑定层挂载,SDK 层观察)", (
     await new Promise((resolve) => setTimeout(resolve, 0))
   }
 
-  test("续钮执行生产 handler:v1 session.promptAsync 收到本会话 ID 与继续文案(#652)", async () => {
-    primeInterruptedBinding()
-    sdkPromptImpl = () => Promise.resolve({})
-    v2PromptCalls.length = 0
-    const host = mountBinding()
-    await settle()
+  test.each(["build", "codepuppy-ask", "codepuppy-readonly", undefined])(
+    "#1638 AC3 继续生成沿用最后用户消息的 agent=%s,缺席则不带(#652)",
+    async (agent) => {
+      primeInterruptedBinding()
+      // Reuse the interrupted binding fixture; earlier user and later assistant stay build.
+      const messages = bindingData.message[BINDING_SESSION_ID]!
+      const user = messages[0] as Record<string, unknown>
+      messages.unshift({ ...user, id: "msg_bu0" })
+      if (agent) user.agent = agent
+      else delete user.agent
+      sdkPromptImpl = () => Promise.resolve({})
+      v2PromptCalls.length = 0
+      const host = mountBinding()
+      await settle()
 
-    const cont = host.querySelector<HTMLButtonElement>(".a-tl-int-continue")
-    expect(cont).not.toBeNull()
-    cont!.click()
-    await settle()
+      const cont = host.querySelector<HTMLButtonElement>(".a-tl-int-continue")
+      expect(cont).not.toBeNull()
+      cont!.click()
+      await settle()
 
-    // #620:续写的输入带 v1 wire 契约的 synthetic 标记(它是「系统替用户按的」,不是发言)。
-    expect(sdkPromptCalls).toEqual([
-      { sessionID: BINDING_SESSION_ID, parts: [{ type: "text", text: "继续", synthetic: true }] },
-    ])
-    // 续写与 composer 同代次:新引擎那条链一次都不碰。
-    expect(v2PromptCalls).toEqual([])
-    expect(host.querySelector(".a-tl-int-failed")).toBeNull()
-  })
+      // #620:续写的输入带 v1 wire 契约的 synthetic 标记(它是「系统替用户按的」,不是发言)。
+      expect(sdkPromptCalls).toEqual([
+        { sessionID: BINDING_SESSION_ID, ...(agent ? { agent } : {}), parts: [{ type: "text", text: "继续", synthetic: true }] },
+      ])
+      // 续写与 composer 同代次:新引擎那条链一次都不碰。
+      expect(v2PromptCalls).toEqual([])
+      expect(host.querySelector(".a-tl-int-failed")).toBeNull()
+    },
+  )
 
   test("续发被引擎装进 { error } 信封时不当成功:就地失败提示(#652)", async () => {
     primeInterruptedBinding()
@@ -3539,7 +3548,7 @@ describe("#1474 进行中的工作过程:实时标题 / 最近两步 / 已等 / 
     const row = processOf(host)!
     const status = row.querySelector("[role='status']")!
 
-    runtime.setTimelineTurnWait("approval")
+    runtime.setTimelineTurnWait({ kind: "approval", source: { type: "tool", messageID: "msg_a1", callID: "call_prt_b1" } })
     await flush()
     expect(processOf(host)).toBe(row)
     expect(row.getAttribute("data-face")).toBe("waiting")
@@ -3555,7 +3564,7 @@ describe("#1474 进行中的工作过程:实时标题 / 最近两步 / 已等 / 
     expect(waiting.getAttribute("data-tone")).toBe("wait")
     expect(waiting.querySelector("[data-codepuppy-step-waiting]")!.textContent).toBe("等你批准")
 
-    runtime.setTimelineTurnWait("question")
+    runtime.setTimelineTurnWait({ kind: "question" })
     await flush()
     expect(row.getAttribute("data-wait")).toBe("question")
     expect(titleOf(host)).toBe("等你回答")
@@ -3571,12 +3580,43 @@ describe("#1474 进行中的工作过程:实时标题 / 最近两步 / 已等 / 
     expect(row.querySelector(".a-tl-pf-sum .a-tl-pf-pulse")).not.toBeNull()
   })
 
+  test("#1637 process-fold: multiple pending tools highlight the presented source pair; missing or unmatched source highlights none", async () => {
+    // Source sample: the recorded research turn in process-fold.fixture; replay its first two calls as waiting.
+    const { researchTurn } = await import("./process-fold.fixture")
+    const sample = researchTurn()
+    const messages = sample.messages.slice(0, 2).map((message) => ({ ...message, time: { created: message.time.created } }))
+    const tools = sample.parts[messages[1]!.id]!.filter((part) => part.type === "tool").slice(0, 2)
+      .map((part) => ({ ...part, state: { status: "running", input: part.state.input, time: { start: Date.now() } } }))
+    const host = mount()
+    runtime.setTimelineRows(model.projectTimelineRows({
+      messages: messages as never,
+      partsOf: (id) => (id === messages[1]!.id ? tools : sample.parts[id] ?? []) as never,
+      status: "busy",
+    }))
+    const source = (index: number) => ({ type: "tool" as const, messageID: tools[index]!.messageID, callID: tools[index]!.callID })
+    const highlighted = () => [...host.querySelectorAll("[data-codepuppy-tool-card]")]
+      .filter((card) => card.querySelector("[data-codepuppy-step-waiting]"))
+    // Move the presented request from the first call to the second without changing the timeline.
+    for (const index of [0, 1]) {
+      runtime.setTimelineTurnWait({ kind: "approval", source: source(index) })
+      await flush()
+      expect(host.querySelectorAll("[data-codepuppy-tool-card]")).toHaveLength(2)
+      expect(highlighted()).toHaveLength(1)
+      expect(highlighted()[0]).toBe(host.querySelectorAll("[data-codepuppy-tool-card]")[index])
+    }
+    for (const unmatched of [undefined, { ...source(0), messageID: "msg_missing" }, { ...source(0), callID: "call_missing" }]) {
+      runtime.setTimelineTurnWait({ kind: "approval", source: unmatched })
+      await flush()
+      expect(highlighted()).toEqual([])
+    }
+  })
+
   test("等你面在工作过程收起时也露出(标题不被藏起来)", async () => {
     const host = mount()
     runtime.setTimelineRows(answerRows())
     await flush()
     expect(processOf(host)!.querySelector(".a-tl-pf-sum")!.getAttribute("aria-expanded")).toBe("false")
-    runtime.setTimelineTurnWait("question")
+    runtime.setTimelineTurnWait({ kind: "question" })
     await flush()
     expect(titleOf(host)).toBe("等你回答")
     expect(processOf(host)!.querySelector(".a-tl-pf-list")).toBeNull()
@@ -3597,7 +3637,7 @@ describe("#1474 进行中的工作过程:实时标题 / 最近两步 / 已等 / 
     expect(after).not.toBe(before)
     heard.push(status.textContent ?? "")
 
-    runtime.setTimelineTurnWait("approval")
+    runtime.setTimelineTurnWait({ kind: "approval" })
     await flush()
     heard.push(status.textContent ?? "")
     runtime.setTimelineTurnWait(undefined)

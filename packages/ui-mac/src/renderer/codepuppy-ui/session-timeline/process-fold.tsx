@@ -48,7 +48,6 @@ import {
   liveWaitedMs,
   liveWindowOf,
   type ProcessLiveAction,
-  toolPartLive,
 } from "./process-live"
 import { TimelineMarkdown } from "./timeline-markdown"
 import {
@@ -249,18 +248,19 @@ export function ProcessRow(props: { row: Extract<TimelineRow, { kind: "process" 
   const action = createMemo(() => liveActionOf(props.row.steps))
   const stepNumber = createMemo(() => liveStepNumberOf(props.row.steps))
   const waitingPartID = createMemo(() => {
-    if (wait() !== "approval") return undefined
-    let id: string | undefined
-    for (const step of props.row.steps)
-      if (step.kind === "tool") for (const part of step.parts) if (toolPartLive(part)) id = part.id
-    return id
+    const waiting = wait()
+    const source = waiting?.kind === "approval" ? waiting.source : undefined
+    if (!source) return undefined
+    return props.row.steps
+      .flatMap((step) => step.kind === "tool" ? step.parts : [])
+      .find((part) => part.messageID === source.messageID && part.callID === source.callID)?.id
   })
   // 实时标题出现在:展开的活跃回合,以及任何「等你 / 重试」时刻(即使收起,也不能把它们藏起来)。
   const headLive = () => active() && (open() || !!wait() || !!retry())
   const statusText = () => {
     const waiting = wait()
-    if (waiting === "approval") return `${t("codepuppy.timeline.turnWaitApproval")} ${t("codepuppy.timeline.turnWaitApprovalHint")}`
-    if (waiting === "question") return `${t("codepuppy.timeline.turnWaitQuestion")} ${t("codepuppy.timeline.turnWaitQuestionHint")}`
+    if (waiting?.kind === "approval") return `${t("codepuppy.timeline.turnWaitApproval")} ${t("codepuppy.timeline.turnWaitApprovalHint")}`
+    if (waiting?.kind === "question") return `${t("codepuppy.timeline.turnWaitQuestion")} ${t("codepuppy.timeline.turnWaitQuestionHint")}`
     const current = retry()
     if (current) return t("codepuppy.timeline.liveRetrying", { attempt: current.attempt })
     return t("codepuppy.timeline.turnRunning")
@@ -315,7 +315,7 @@ export function ProcessRow(props: { row: Extract<TimelineRow, { kind: "process" 
       data-open={open() ? "true" : undefined}
       data-active={props.row.active ? "true" : undefined}
       data-face={face()}
-      data-wait={wait()}
+      data-wait={wait()?.kind}
     >
       <button
         type="button"
@@ -460,11 +460,11 @@ function LiveHead(props: {
         <>
           {pauseIcon()}
           <span class="a-tl-pf-title" data-codepuppy-process-title>
-            {wait() === "approval" ? t("codepuppy.timeline.turnWaitApproval") : t("codepuppy.timeline.turnWaitQuestion")}
+            {wait().kind === "approval" ? t("codepuppy.timeline.turnWaitApproval") : t("codepuppy.timeline.turnWaitQuestion")}
           </span>
           <span class="a-tl-pf-dot" aria-hidden="true" />
           <span class="a-tl-pf-hint">
-            {wait() === "approval"
+            {wait().kind === "approval"
               ? t("codepuppy.timeline.turnWaitApprovalHint")
               : t("codepuppy.timeline.turnWaitQuestionHint")}
           </span>

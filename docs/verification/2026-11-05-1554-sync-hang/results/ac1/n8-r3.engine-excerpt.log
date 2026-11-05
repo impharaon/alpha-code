@@ -1,0 +1,60 @@
+timestamp=2026-11-05T06:11:55.839Z level=INFO run=76b20b9a message="downloading ripgrep" url=https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-aarch64-apple-darwin.tar.gz
+timestamp=2026-11-05T06:11:55.866Z level=INFO run=76b20b9a message="booting location services" directory=<root>/home/code-puppy workspaceID=undefined
+timestamp=2026-11-05T06:11:55.937Z level=INFO run=76b20b9a message="global event connected"
+timestamp=2026-11-05T06:11:56.167Z level=INFO run=76b20b9a message="creating instance" directory=<root>/tmp/opencode-onboarding-21a29358-576d-4a10-81c9-55770a274818/desktop/engine-scratch-cwd
+timestamp=2026-11-05T06:11:56.167Z level=INFO run=76b20b9a message="global event connected"
+timestamp=2026-11-05T06:11:56.239Z level=INFO run=76b20b9a message="global event connected"
+timestamp=2026-11-05T06:12:07.085Z level=INFO run=76b20b9a message="global event connected"
+timestamp=2026-11-05T06:12:07.139Z level=INFO run=76b20b9a message="creating instance" directory=<root>/home/code-puppy
+timestamp=2026-11-05T06:12:07.153Z level=INFO run=76b20b9a message=init count=1
+timestamp=2026-11-05T06:12:09.464Z level=INFO run=76b20b9a message="creating instance" directory=<root>/ws1
+timestamp=2026-11-05T06:12:09.484Z level=INFO run=76b20b9a message="booting location services" directory=<root>/ws1 workspaceID=undefined
+timestamp=2026-11-05T06:12:09.488Z level=INFO run=76b20b9a message=init count=1
+timestamp=2026-11-05T06:12:10.755Z level=INFO run=76b20b9a message="creating instance" directory=<root>/ws2
+timestamp=2026-11-05T06:12:10.771Z level=INFO run=76b20b9a message="booting location services" directory=<root>/ws2 workspaceID=undefined
+timestamp=2026-11-05T06:12:10.777Z level=INFO run=76b20b9a message=init count=1
+timestamp=2026-11-05T06:12:12.072Z level=INFO run=76b20b9a message="creating instance" directory=<root>/ws3
+timestamp=2026-11-05T06:12:12.091Z level=INFO run=76b20b9a message="booting location services" directory=<root>/ws3 workspaceID=undefined
+timestamp=2026-11-05T06:12:12.098Z level=INFO run=76b20b9a message=init count=1
+timestamp=2026-11-05T06:12:13.372Z level=INFO run=76b20b9a message="creating instance" directory=<root>/ws4
+timestamp=2026-11-05T06:12:13.389Z level=INFO run=76b20b9a message="booting location services" directory=<root>/ws4 workspaceID=undefined
+timestamp=2026-11-05T06:12:13.396Z level=INFO run=76b20b9a message=init count=1
+timestamp=2026-11-05T06:12:14.671Z level=INFO run=76b20b9a message="creating instance" directory=<root>/ws5
+timestamp=2026-11-05T06:12:14.691Z level=INFO run=76b20b9a message="booting location services" directory=<root>/ws5 workspaceID=undefined
+timestamp=2026-11-05T06:12:14.698Z level=INFO run=76b20b9a message=init count=1
+timestamp=2026-11-05T06:12:16.001Z level=INFO run=76b20b9a message="creating instance" directory=<root>/ws6
+timestamp=2026-11-05T06:12:16.017Z level=INFO run=76b20b9a message=init count=1
+timestamp=2026-11-05T06:12:16.028Z level=INFO run=76b20b9a message="booting location services" directory=<root>/ws6 workspaceID=undefined
+timestamp=2026-11-05T06:12:17.299Z level=INFO run=76b20b9a message="creating instance" directory=<root>/ws7
+timestamp=2026-11-05T06:12:17.314Z level=INFO run=76b20b9a message="booting location services" directory=<root>/ws7 workspaceID=undefined
+timestamp=2026-11-05T06:12:17.320Z level=INFO run=76b20b9a message=init count=1
+timestamp=2026-11-05T06:12:18.602Z level=INFO run=76b20b9a message="creating instance" directory=<root>/ws8
+timestamp=2026-11-05T06:12:18.621Z level=INFO run=76b20b9a message="booting location services" directory=<root>/ws8 workspaceID=undefined
+timestamp=2026-11-05T06:12:18.628Z level=INFO run=76b20b9a message=init count=1
+timestamp=2026-11-05T06:12:20.786Z level=INFO run=76b20b9a message="global event disconnected"
+timestamp=2026-11-05T06:12:22.586Z level=INFO run=a87433dd message="global event connected"
+timestamp=2026-11-05T06:12:22.615Z level=INFO run=a87433dd message="booting location services" directory=<root>/home/code-puppy workspaceID=undefined
+timestamp=2026-11-05T06:12:22.631Z level=INFO run=a87433dd message="creating instance" directory=<root>/tmp/opencode-onboarding-21a29358-576d-4a10-81c9-55770a274818/desktop/engine-scratch-cwd
+timestamp=2026-11-05T06:12:22.631Z level=INFO run=a87433dd message="global event connected"
+timestamp=2026-11-05T06:12:22.638Z level=INFO run=a87433dd message="global event disconnected"
+timestamp=2026-11-05T06:12:22.647Z level=INFO run=a87433dd message="booting location services" directory=<root>/ws8 workspaceID=undefined
+timestamp=2026-11-05T06:12:22.805Z level=INFO run=a87433dd message="global event connected"
+timestamp=2026-11-05T06:12:22.868Z level=INFO run=a87433dd message="global event connected"
+timestamp=2026-11-05T06:12:22.874Z level=INFO run=a87433dd message="global event connected"
+timestamp=2026-11-05T06:12:22.889Z level=INFO run=a87433dd message="creating instance" directory=<root>/home/code-puppy
+timestamp=2026-11-05T06:12:22.900Z level=INFO run=a87433dd message=init count=1
+timestamp=2026-11-05T06:13:06.423Z level=WARN run=a87433dd message="server unavailable" key=blackhole type=remote status=failed error="fetch failed: Connect Timeout Error (attempted address: <lan-ip>:41235, timeout: 10000ms)"
+timestamp=2026-11-05T06:13:09.744Z level=INFO run=a87433dd message="creating instance" directory=<root>/ws1
+timestamp=2026-11-05T06:13:09.758Z level=INFO run=a87433dd message="creating instance" directory=<root>/ws2
+timestamp=2026-11-05T06:13:09.770Z level=INFO run=a87433dd message="creating instance" directory=<root>/ws3
+timestamp=2026-11-05T06:13:09.781Z level=INFO run=a87433dd message="creating instance" directory=<root>/ws4
+timestamp=2026-11-05T06:13:09.792Z level=INFO run=a87433dd message="creating instance" directory=<root>/ws5
+timestamp=2026-11-05T06:13:09.803Z level=INFO run=a87433dd message="creating instance" directory=<root>/ws6
+timestamp=2026-11-05T06:13:09.812Z level=INFO run=a87433dd message="creating instance" directory=<root>/ws7
+timestamp=2026-11-05T06:13:09.822Z level=INFO run=a87433dd message="creating instance" directory=<root>/ws8
+timestamp=2026-11-05T06:13:09.832Z level=INFO run=a87433dd message="global event connected"
+timestamp=2026-11-05T06:13:09.986Z level=INFO run=a87433dd message="global event connected"
+timestamp=2026-11-05T06:13:10.138Z level=INFO run=a87433dd message="global event connected"
+timestamp=2026-11-05T06:13:15.553Z level=INFO run=a87433dd message="global event disconnected"
+timestamp=2026-11-05T06:13:15.555Z level=INFO run=a87433dd message="global event disconnected"
+timestamp=2026-11-05T06:13:15.557Z level=INFO run=a87433dd message="global event disconnected"

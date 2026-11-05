@@ -18,7 +18,7 @@ import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { canonicalToolIdentity, type ToolIdentity } from "@opencode-ai/schema/tool-identity"
-import type { ToolPolicySubject } from "@opencode-ai/schema/codepuppy-tool-policy"
+import { classifyTool, type ToolPolicySubject } from "@opencode-ai/schema/codepuppy-tool-policy"
 import { afterAll, beforeAll, expect } from "bun:test"
 import { Cause, Effect, Exit, Layer } from "effect"
 import * as fs from "node:fs"
@@ -126,7 +126,7 @@ const it = testEffect(
 
 // 三档的载体(列序 = 方案表的列序)。
 const TIERS = ["build", "codepuppy-ask", "codepuppy-readonly"] as const
-type Tier = (typeof TIERS)[number]
+type Tier = (typeof TIERS)[number] | "codepuppy-automation" | "codepuppy-automation-standard"
 type Verdict = "PASS" | "ASK" | "DENY"
 type Row = readonly [Verdict, Verdict, Verdict]
 
@@ -238,6 +238,98 @@ const PLUGIN: ToolPolicySubject = {
 }
 const canonical = (subject: ToolPolicySubject) => canonicalToolIdentity(subject.identity)
 
+// Bundled input comes from the shipped Office manifest, verified by the same authorityForMcp as execution.
+const office = path.resolve(import.meta.dir, "../../../ui-mac/resources/office-mcp/tools.json")
+const manifest = (await Bun.file(office).json()) as {
+  formats: { word: { command: string[]; tools: { name: string }[] } }
+}
+const bundledEntry = {
+  type: "local" as const,
+  command: manifest.formats.word.command.map((token) =>
+    token.replaceAll("{codepuppyResources}", path.dirname(path.dirname(office))),
+  ),
+}
+const BUNDLED: ToolPolicySubject = {
+  identity: { source: "mcp", origin: "codepuppy-word", name: manifest.formats.word.tools[0]!.name },
+  authority: authorityForMcp("codepuppy-word", bundledEntry, { CODEPUPPY_OFFICE_MCP_MANIFEST: office }),
+  bindingDigest: mcpBindingDigest("codepuppy-word", bundledEntry),
+}
+const policySubjects = [
+  ["codepuppy-bundled", BUNDLED],
+  ["codepuppy-cloud", CLOUD],
+  ["third-party-mcp", THIRD_PARTY],
+] as const
+
+it.instance("#1638 prerequisite 1: config schema preserves tool-policy-default in the merged agent ruleset", () =>
+  Effect.gen(function* () {
+    const config = yield* Config.Service
+    expect((yield* config.get()).agent?.["codepuppy-ask"]?.permission).toMatchObject({ "tool-policy-default": "ask" })
+    expect(Permission.evaluate("tool-policy-default", "*", yield* ruleset("codepuppy-ask")).action).toBe("ask")
+    expect(Permission.evaluate("tool-policy-default", "*", yield* ruleset("build")).action).toBe("allow")
+  }),
+)
+
+it.instance("#1638 prerequisite 2: tool-policy-default does not change evaluation of real tool identities", () =>
+  Effect.gen(function* () {
+    const rules = yield* ruleset("codepuppy-ask")
+    const without = rules.filter((rule) => rule.permission !== "tool-policy-default")
+    for (const [cls, subject] of policySubjects) {
+      expect(classifyTool(subject)).toBe(cls)
+      expect(Permission.evaluate(canonical(subject), "*", rules).action).toBe("allow")
+      expect(Permission.evaluate(canonical(subject), "*", rules)).toEqual(
+        Permission.evaluate(canonical(subject), "*", without),
+      )
+    }
+  }),
+)
+
+for (const [cls, subject] of policySubjects)
+  for (const [record, expected] of [
+    ["none", ["PASS", "ASK", "ASK"]],
+    ["ask", ["ASK", "ASK", "ASK"]],
+    ["disabled", ["DENY", "DENY", "DENY"]],
+    ["enabled", ["PASS", "PASS", "ASK"]],
+    ["binding-changed", ["ASK", "ASK", "ASK"]],
+  ] as const)
+    it.instance(
+      `#1638 AC1-AC3 ${cls} / ${record}: ${expected.join(" | ")}`,
+      () =>
+        Effect.gen(function* () {
+          const policy = yield* CodePuppyToolPolicy.Service
+          expect(classifyTool(subject)).toBe(cls)
+          if (record !== "none")
+            yield* policy.setRecord({
+              selector: { level: "tool", canonical: canonical(subject) },
+              state: record === "binding-changed" ? "enabled" : record,
+              ...(record === "enabled" || record === "binding-changed"
+                ? {
+                    bindingDigest: record === "enabled"
+                      ? subjectBindingDigest(subject)!
+                      : deriveBindingDigest({ previous: subjectBindingDigest(subject) }),
+                  }
+                : {}),
+            })
+          expect(
+            yield* row(`#1638 ${cls} / ${record}`, (tier) => identity(tier, subject).pipe(Effect.map(classify))),
+          ).toEqual([...expected])
+        }),
+      { git: true },
+      TEST_TIMEOUT_MS,
+    )
+
+for (const agent of ["codepuppy-automation", "codepuppy-automation-standard"] as const)
+  for (const [cls, subject] of policySubjects)
+    it.instance(
+      `#1638 AC3 automation ${agent} / ${cls} / none: ASK`,
+      () => Effect.gen(function* () {
+        const result = classify(yield* identity(agent, subject))
+        console.log(`MATRIX ${agent} / ${cls} / none: ${result}`)
+        expect(result).toBe("ASK")
+      }),
+      { git: true },
+      TEST_TIMEOUT_MS,
+    )
+
 const tableHides = (tier: Tier, tools: readonly string[]) =>
   Effect.gen(function* () {
     return [...Permission.disabled(tools, yield* ruleset(tier))].sort()
@@ -340,7 +432,7 @@ it.instance(
 )
 
 it.instance(
-  "R9–R11 云 / 第三方 MCP / 插件:默认询问三档都问;设置里启用后前两档放行,只读档仍问(AC4)",
+  "R9–R11 云 / 第三方 MCP / 插件:无记录仅全部批准放行;设置里启用后前两档放行,只读档仍问",
   () =>
     Effect.gen(function* () {
       const policy = yield* CodePuppyToolPolicy.Service
@@ -350,9 +442,9 @@ it.instance(
         ["R10 third-party", THIRD_PARTY],
         ["R11 plugin", PLUGIN],
       ] as const) {
-        // 状态一:设置为默认询问(无记录 ⇒ 文档轴四类默认 ask)。
+        // #1638:无记录时全部批准跳过分类默认 ask,其余两档仍问。
         expect(yield* row(`${label} default`, (t) => identity(t, subject).pipe(Effect.map(classify)))).toEqual([
-          "ASK",
+          "PASS",
           "ASK",
           "ASK",
         ] satisfies Row)

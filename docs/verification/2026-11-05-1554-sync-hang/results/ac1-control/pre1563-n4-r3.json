@@ -1,0 +1,257 @@
+{
+ "label": "pre1563-n4-r3",
+ "n": 4,
+ "mcp": true,
+ "round": "3",
+ "startedAt": "2026-11-05T06:00:15.573Z",
+ "isolation": {
+  "guardProof": {
+   "target": "~/Library/Keychains",
+   "outsideStatus": 0,
+   "insideStatus": 1,
+   "proven": true
+  },
+  "lsofVerdictProof": {
+   "catchesLeak": true,
+   "catchesNoRoot": true,
+   "passesClean": true,
+   "proven": true
+  },
+  "securityAgentBaseline": 0,
+  "devUserDataMtimeBefore": 1789973435203.6592,
+  "securityAgentEvents": [],
+  "lsof": {
+   "pids": 5,
+   "total": 254,
+   "inRoot": 71,
+   "leaks": [],
+   "ok": true,
+   "sample": [
+    "/private<root>/tmp/opencode-onboarding-dd448f33-e112-4d85-a20b-e5fe0f08e39e/desktop/engine-scratch-cwd",
+    "/private<root>/tmp/opencode-onboarding-dd448f33-e112-4d85-a20b-e5fe0f08e39e/session/GPUCache/index",
+    "/private<root>/tmp/opencode-onboarding-dd448f33-e112-4d85-a20b-e5fe0f08e39e/session/GPUCache/data_0",
+    "/private<root>/tmp/opencode-onboarding-dd448f33-e112-4d85-a20b-e5fe0f08e39e/session/GPUCache/data_1",
+    "/private<root>/tmp/opencode-onboarding-dd448f33-e112-4d85-a20b-e5fe0f08e39e/session/GPUCache/data_2",
+    "/private<root>/tmp/opencode-onboarding-dd448f33-e112-4d85-a20b-e5fe0f08e39e/session/GPUCache/data_3"
+   ]
+  },
+  "devUserDataMtimeAfter": 1789973435203.6592,
+  "lsofEnd": {
+   "pids": 5,
+   "total": 251,
+   "inRoot": 67,
+   "leaks": [],
+   "ok": true
+  },
+  "homePathsInLogs": [
+   "~/app/alpha-code/.worktrees"
+  ]
+ },
+ "deviations": [
+  "窗口透明且不抢前台(dev-preload),CDP 口被改写;都不碰网络栈。"
+ ],
+ "launch": {
+  "flags": [
+   "--use-mock-keychain",
+   "--user-data-dir=<root>/udd",
+   "--log-net-log=<root>/net.json"
+  ],
+  "cdpPort": 36038,
+  "envKeys": [
+   "PATH",
+   "HOME",
+   "CFFIXED_USER_HOME",
+   "TMPDIR",
+   "USER",
+   "LOGNAME",
+   "SHELL",
+   "LANG",
+   "OPENCODE_TEST_ONBOARDING",
+   "NO_PROXY",
+   "no_proxy",
+   "CODEPUPPY_WEB_URL",
+   "CODEPUPPY_PLATFORM_URL",
+   "CODEPUPPY_ACCOUNT_URL",
+   "CODEPUPPY_CLOUD_URL",
+   "CODEPUPPY_MCP_URL",
+   "ALPHA_WEB_URL",
+   "ALPHA_PLATFORM_URL",
+   "ALPHA_ACCOUNT_URL",
+   "ALPHA_CLOUD_URL",
+   "ALPHA_MCP_URL",
+   "OPENCODE_DISABLE_MODELS_FETCH",
+   "P1554_DIRS",
+   "P1554_CDP_PORT",
+   "P1554_PRELOAD_LOG",
+   "P1554_INITIATORS"
+  ]
+ },
+ "versions": {
+  "chrome": "148.0.7778.218",
+  "visibility": "visible"
+ },
+ "cold": {
+  "durationMs": 5208.100000023842,
+  "outcome": "cancelled"
+ },
+ "opened": [
+  {
+   "ws": "ws1",
+   "newChat": "clicked",
+   "click": "clicked",
+   "t": 21027
+  },
+  {
+   "ws": "ws2",
+   "newChat": "clicked",
+   "click": "clicked",
+   "t": 22316
+  },
+  {
+   "ws": "ws3",
+   "newChat": "clicked",
+   "click": "clicked",
+   "t": 23609
+  },
+  {
+   "ws": "ws4",
+   "newChat": "clicked",
+   "click": "clicked",
+   "t": 24895
+  }
+ ],
+ "allOpened": true,
+ "mcpRecord": {
+  "host": "<lan-ip>",
+  "port": 36184
+ },
+ "persist": {
+  "ok": true
+ },
+ "retryEngine": "sigkill-engine-listener(crash self-heal path)",
+ "engineGeneration": 2,
+ "newChatAfterRespawn": {
+  "click": "clicked",
+  "t": 30957
+ },
+ "heldMs": 45261,
+ "afterOpen": {
+  "mounts": 1,
+  "starts": [
+   {
+    "t": 30686.326833000003,
+    "chain": 1,
+    "attempt": 1
+   }
+  ],
+  "ends": [
+   {
+    "t": 30687.145875000002,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "cancelled",
+    "durationMs": 1497.2000000476837
+   },
+   {
+    "t": 72758.6425,
+    "chain": 1,
+    "attempt": 1,
+    "outcome": "ok",
+    "durationMs": 42080.89999997616,
+    "count": 0
+   }
+  ],
+  "catalogReady": [
+   {
+    "t": 72756.106125,
+    "barrierMs": 42078.299999952316,
+    "probes": 43,
+    "probeTimeouts": 42,
+    "wake": "timeout"
+   }
+  ],
+  "retries": 0
+ },
+ "composerReads": [
+  {
+   "startT": 30686.326833000003,
+   "chain": 1,
+   "attempt": 1,
+   "outcome": "cancelled",
+   "ownEndMs": 0.8190419999991718,
+   "firstOkAfterMs": 42072.315667
+  }
+ ],
+ "lastComposer": {
+  "startT": 30686.326833000003,
+  "chain": 1,
+  "attempt": 1,
+  "outcome": "cancelled",
+  "ownEndMs": 0.8190419999991718,
+  "firstOkAfterMs": 42072.315667
+ },
+ "reproduced": true,
+ "readsOver10s": 1,
+ "blackholes": [
+  {
+   "label": "global",
+   "conns": 4,
+   "bytes": 980,
+   "firstConnAfterLaunchMs": 29458
+  }
+ ],
+ "stubHits": {
+  "/v1/models": 1
+ },
+ "egressLines": [
+  "01:00:16.093                    › network egress: 0 configured destination(s) authorized for this generation — none",
+  "01:00:43.965                    › network egress: 1 configured destination(s) authorized for this generation — <lan-ip>:<port> (mcp:blackhole)"
+ ],
+ "domStatus": null,
+ "paths": {
+  "root": "<root>",
+  "netlog": "<root>/net.json",
+  "timeline": "<root>/tmp/opencode-onboarding-dd448f33-e112-4d85-a20b-e5fe0f08e39e/desktop/logs/20261105T060015/startup-timeline.log",
+  "engineLogs": [
+   "<root>/tmp/opencode-onboarding-dd448f33-e112-4d85-a20b-e5fe0f08e39e/data/opencode/log/opencode.log"
+  ],
+  "initiators": "<root>/initiators.jsonl",
+  "preloadLog": "<root>/preload.jsonl"
+ },
+ "mcpStatus": {
+  "ws1": "err:AbortError",
+  "ws2": "err:AbortError",
+  "ws3": "err:AbortError",
+  "ws4": "err:AbortError"
+ },
+ "streamProbe": {
+  "snapshot": [
+   "streaming:200",
+   "streaming:200",
+   "streaming:200",
+   "pending",
+   "pending",
+   "pending",
+   "pending",
+   "pending"
+  ],
+  "healthAnswered": "no-answer-in-3000ms"
+ },
+ "endedAt": "2026-11-05T06:01:54.681Z",
+ "exit": {
+  "code": 0,
+  "why": "round complete"
+ },
+ "appExit": {
+  "code": 0,
+  "signal": null,
+  "afterMs": 99242
+ },
+ "cleanup": {
+  "killed": 5,
+  "mainExitedAlone": true,
+  "sigkillNeeded": 0,
+  "leftover": [],
+  "orphansInRoot": []
+ }
+}

@@ -26,6 +26,7 @@ import type {
   ToolPolicyWriteResult,
 } from "../../shared/tool-policy-wire"
 import { dict as zh } from "../i18n/zh"
+import { dict as en } from "../i18n/en"
 
 type TestRuntime = {
   createComponent: typeof createComponent
@@ -309,7 +310,7 @@ describe("Alpha Settings 「工具」节", () => {
     expect(text(q("[data-codepuppy-settings]"))).toContain(zh["codepuppy.settings.toolsFooter"])
   })
 
-  test("#1593 AC5 无计费数据的工具行不挂计费徽标(不再写「未知」);有数据的照常;第三方组说明按批准稿", async () => {
+  test("#1638 AC4 / #1593 AC5 默认工具说明按档位执行,云端保留计费说明;无计费数据不挂徽标", async () => {
     await openTools(api())
 
     // docgen(alpha-cloud)与 context7 的工具都没有 billing:行上与服务摘要里都不出现「计费:」。
@@ -319,7 +320,16 @@ describe("Alpha Settings 「工具」节", () => {
     expect(text(q("[data-tools-service='mcp:context7']"))).not.toContain(billingPrefix)
     // 对照:websearch 带真实计费数据,徽标还在(证明上面不是整个徽标被删掉)。
     expect(text(row("mcp:alpha-cloud:websearch"))).toContain(zhFill("codepuppy.settings.toolsBilling", { value: "metered" }))
-    expect(text(q("[data-tools-class='third-party-mcp']"))).toContain("默认每次询问 · 是否收费由服务方决定")
+    expect(text(q("[data-tools-class='third-party-mcp']"))).toContain("全部批准下直接执行,其它档询问 · 是否收费由服务方决定")
+    expect(text(q("[data-tools-class='codepuppy-cloud']"))).toContain("全部批准下直接执行,其它档询问 · 云端调用可能计费;不能越过套餐限制")
+    expect(text(q("[data-tools-class='plugin']"))).toContain("全部批准下直接执行,其它档询问")
+    expect(text(row("mcp:context7:resolve-library-id"))).toContain("默认,全部批准下直接执行,其它档询问")
+    expect(text(q("[data-tools-service='mcp:context7']"))).toContain("继承:默认,全部批准下直接执行,其它档询问")
+    expect(zh["codepuppy.settings.toolsEffectiveAsk"]).toBe("询问")
+    expect(en["codepuppy.settings.toolsEffectiveAsk"]).toBe("Ask")
+    for (const key of ["toolsCapBundled", "toolsCapCloud", "toolsCapMcp", "toolsCapPlugin", "toolsReasonDefault", "toolsInheritedDefaultAsk"] as const)
+      expect(en[`codepuppy.settings.${key}`].toLowerCase()).toContain("runs directly in approve all; asks in other modes")
+    expect(en["codepuppy.settings.toolsCapCloud"]).toContain("cloud calls may be billed")
   })
 
   // #1578 AC3:引擎把核验成立的随包文档工具分成 class=codepuppy-bundled(引擎侧判据在 codepuppy-tool-policy.test.ts / codepuppy-tool-identity.test.ts)。
@@ -351,7 +361,7 @@ describe("Alpha Settings 「工具」节", () => {
     const group = q("[data-tools-class='codepuppy-bundled']")!
     expect(group).not.toBeNull()
     expect(text(group.querySelector("h3"))).toBe("Code Puppy 文档工具")
-    expect(text(group)).toContain("默认每次询问")
+    expect(text(group)).toContain("全部批准下直接执行,其它档询问")
     expect(text(row("mcp:codepuppy-word:read_docx"))).toContain(
       zhFill("codepuppy.settings.toolsEffective", {
         state: zh["codepuppy.settings.toolsEffectiveAsk"],

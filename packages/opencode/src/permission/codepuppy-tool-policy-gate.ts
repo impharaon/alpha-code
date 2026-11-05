@@ -13,7 +13,8 @@
 // · 合成结果只有三种,全部编译进**同一个** Permission 引擎调用(§2:不另造第二个审批引擎):
 //     deny  ⇒ 具名响亮拒绝(`PermissionV1.DeniedError`,载明 canonical 与 reason),
 //             零 hook / 零副作用;session grant 结构性接触不到它。
-//     ask   ⇒ 在这一次 `Permission.ask` 的 ruleset 末尾追加一条 exact-canonical 的 ask
+//     ask   ⇒ 用户策略或 binding 变化照旧追加 exact-canonical ask;分类默认由 ruleset 的
+//             tool-policy-default 决定,allow 不追加,其它值在这一次 `Permission.ask` 末尾追加 ask
 //             (findLast 语义下压过默认 allow 底)⇒ 挂起等批准。ruleset 轴自己的 ask 同样在
 //             这一问里生效 —— **一次调用恰好一问**(§6 E3 的去重不回潮)。
 //     allow ⇒ 文档轴不加 identity prompt;ruleset 轴与工具自身 ability 闸原样保留(§6)。
@@ -236,7 +237,9 @@ export const confirm = <R>(decision: GateDecision, input: GateInput<R>): Effect.
       always: askedBy === "ruleset" ? [] : patterns,
       tool: input.tool,
       ruleset:
-        decision.effective.action === "ask"
+        decision.effective.action === "ask" &&
+        (decision.effective.reason.kind !== "default" ||
+          rulesetIdentityAction("tool-policy-default", input.ruleset) !== "allow")
           ? [...input.ruleset, { permission: canonical, pattern: "*", action: "ask" }]
           : input.ruleset,
     })

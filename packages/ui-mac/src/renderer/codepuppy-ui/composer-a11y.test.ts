@@ -151,14 +151,15 @@ describe("composer accessibility behavior", () => {
 
   // REQ-236 `#1575` AC5:每档显示批准稿(docs/design/2026-10-30-req236-permission-cards/frame.html `#tier-menu`)的边界说明,
   // 底部一句三档共同、任何档都越不过。文案逐字取自批准稿;英文词典必须有同一组键。
-  test("#1575 AC5 tier menu shows each tier's approved boundary and the one line no tier can bypass", async () => {
+  test("#1638 AC4 / #1575 AC5 tier menu shows direct execution with folder and .env exceptions and shared boundaries", async () => {
     const approved = {
-      allow: "改文件、运行命令不再询问。项目外文件夹、.env、外部与云端工具仍询问。",
+      allow: "所有工具直接执行,项目外文件夹和 .env 除外。",
       ask: "改文件、运行命令、交给其它助手前询问。外部与云端工具按设置执行。",
       readonly: "不能改文件、运行命令、交给其它助手。项目外文件夹不可访问;外部与云端工具每次询问。",
     }
     const boundary = "任何档都越不过:已停用的工具、未获准的网址、项目外写入。"
     expect(zh["codepuppy.composer.permAllowHint"]).toBe(approved.allow)
+    expect(en["codepuppy.composer.permAllowHint"]).toBe("All tools run directly, except folders outside the project and .env files.")
     expect(zh["codepuppy.composer.permAskHint"]).toBe(approved.ask)
     expect(zh["codepuppy.composer.permReadonlyHint"]).toBe(approved.readonly)
     expect(zh["codepuppy.composer.permBoundary"]).toBe(boundary)

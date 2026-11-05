@@ -382,7 +382,7 @@ describe("审批单一呈现面:watcher × 生产 dock 同场运行时闸门", (
 
     runtime.injectPermissionAsked(request)
     await flush()
-    expect(runtime.turnWaitLog.at(-1)).toBe("approval")
+    expect(runtime.turnWaitLog.at(-1)).toEqual({ kind: "approval", source: request.source })
 
     runtime.injectPermissionReplied({
       requestID: request.id,
@@ -395,8 +395,40 @@ describe("审批单一呈现面:watcher × 生产 dock 同场运行时闸门", (
     })
     await flush()
     expect(runtime.turnWaitLog.at(-1)).toBeUndefined()
-    expect(runtime.turnWaitLog.filter((wait) => wait === "approval")).toHaveLength(1)
+    expect(runtime.turnWaitLog.filter((wait) => wait?.kind === "approval")).toHaveLength(1)
     expect([...dockPermissionTraffic()].every((path) => SANCTIONED_DOCK_TRAFFIC.has(path))).toBe(true)
+  })
+
+  test("#1637 dock publishes the approval card's head source and advances it after reply", async () => {
+    const { researchTurn } = await import("../../../../test-component/process-fold.fixture")
+    const tools = Object.values(researchTurn().parts).flat().filter((part) => part.type === "tool").slice(0, 2)
+    const requests = tools.map((part, index) => ({
+      ...request,
+      id: `${request.id}_${index}`,
+      resources: [part.callID],
+      source: { type: "tool" as const, messageID: part.messageID, callID: part.callID },
+    }))
+    mountHarness()
+    await flush()
+    await flush()
+    for (const pending of requests) runtime.injectPermissionAsked(pending)
+    await flush()
+    for (const pending of requests) {
+      expect(runtime.turnWaitLog.at(-1)).toEqual({ kind: "approval", source: pending.source })
+      expect(document.querySelector("[role='dialog']")!.textContent).toContain(pending.resources[0]!)
+      runtime.injectPermissionReplied({
+        requestID: pending.id,
+        sessionID: pending.sessionID,
+        requestFingerprint: pending.fingerprint,
+        decisionID: `dec_${pending.id}`,
+        decision: "once",
+        committedAt: 1_893_456_000_001,
+        resolvedRequestIDs: [pending.id],
+      })
+      await flush()
+    }
+    expect(runtime.turnWaitLog.at(-1)).toBeUndefined()
+    expect(document.querySelector("[role='dialog']")).toBeNull()
   })
 
   test("等义改写回归:不新增 DOM、另建真实 SDK client、方括号提交 —— 同样落进录音面,闸③照样红", async () => {

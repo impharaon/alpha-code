@@ -311,7 +311,7 @@ const awaitPending = Effect.fn("codepuppy1129doc.awaitPending")(function* (round
 })
 
 describe("#1129 文档轴闸(四类默认 / 用户 selector / 重读 / binding guard / quarantine)", () => {
-  it.instance("D1 四类默认抵达 executor:MCP 默认 ask —— 目录照旧广告,执行挂起等批准,批准前零 tools/call", () =>
+  it.instance("#1638 AC1 D1 全部批准 + MCP 无记录:目录照旧广告,零待批直接执行一次", () =>
     Effect.gen(function* () {
       const { counts } = yield* setup()
       const permission = yield* Permission.Service
@@ -319,14 +319,10 @@ describe("#1129 文档轴闸(四类默认 / 用户 selector / 重读 / binding g
       expect(yield* prepareCatalogKeys([ALLOW_ALL])).toContain(ALIAS_MCP_PAID)
       const tools = yield* resolveTools([ALLOW_ALL])
       const run = launch(tools[ALIAS_MCP_PAID]!, "d1")
-      const pending = yield* awaitPending()
-      expect(pending.length).toBe(1)
-      expect(pending[0]!.permission).toBe(ID_MCP_PAID)
-      expect(counts.call).toBe(0)
-      yield* permission.reply({ requestID: pending[0]!.id, reply: "reject" })
       yield* Effect.promise(() => run.promise)
-      expect(run.settled()?.ok).toBe(false)
-      expect(counts.call).toBe(0)
+      expect(run.settled()?.ok).toBe(true)
+      expect(yield* permission.list()).toEqual([])
+      expect(counts.call).toBe(1)
     }),
   )
 
@@ -457,16 +453,15 @@ describe("#1129 文档轴闸(四类默认 / 用户 selector / 重读 / binding g
       ).pipe(Effect.exit)
       expect(squashed(exitPlugin)).toBeDefined()
       expect(yield* markerExists(marker)).toBe(false)
-      // 生产恢复入口:reset 挪走坏文件(留备份)⇒ 回到批准默认(MCP 默认 ask,而不是照跑)。
+      // #1638:reset 挪走坏文件并清除用户记录,全部批准按 agent 规则直接执行。
       const { backup } = yield* policy.reset()
       expect(backup).toBeDefined()
       const permission = yield* Permission.Service
       const run = launch(tools[ALIAS_MCP_PAID]!, "d6c")
-      const pending = yield* awaitPending()
-      expect(pending.length).toBe(1)
-      yield* permission.reply({ requestID: pending[0]!.id, reply: "reject" })
       yield* Effect.promise(() => run.promise)
-      expect(counts.call).toBe(0)
+      expect(run.settled()?.ok).toBe(true)
+      expect(yield* permission.list()).toEqual([])
+      expect(counts.call).toBe(1)
     }),
   )
 
@@ -476,7 +471,8 @@ describe("#1129 文档轴闸(四类默认 / 用户 selector / 重读 / binding g
       const permission = yield* Permission.Service
       const policy = yield* CodePuppyToolPolicy.Service
       const tools = yield* resolveTools([ALLOW_ALL])
-      // ① 默认 ask ⇒ 用户点「总是允许」(grant 落在本 session + canonical 上)。
+      // #1638:显式 class ask ⇒ 用户点「总是允许」,随后同一 selector 改 disabled。
+      yield* policy.setRecord({ selector: { level: "class", class: "third-party-mcp" }, state: "ask" })
       const first = launch(tools[ALIAS_MCP_PAID]!, "d7a")
       const pending = yield* awaitPending()
       yield* permission.reply({ requestID: pending[0]!.id, reply: "always" })

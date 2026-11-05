@@ -207,6 +207,7 @@ export function injectCodePuppyConfig(
           mode: "primary",
           prompt: CODEPUPPY_AGENT_TEXT["codepuppy-automation"].prompt,
           permission: {
+            "tool-policy-default": "ask",
             read: { "*": "allow", "*.env*": "deny" },
             glob: "allow",
             grep: "allow",
@@ -285,6 +286,7 @@ export function injectCodePuppyConfig(
         hidden: true,
         mode: "primary",
         permission: {
+          "tool-policy-default": "ask",
           question: "allow",
           plan_enter: "allow",
           // 与另外三个 alpha agent 同形:显式写 websearch allow(defaults 的 `*` 本来就 allow,求值结果不变),
@@ -312,6 +314,7 @@ export function injectCodePuppyConfig(
           mode: "primary",
           prompt: CODEPUPPY_AGENT_TEXT["codepuppy-automation-standard"].prompt,
           permission: {
+            "tool-policy-default": "ask",
             read: { "*": "allow", "*.env*": "deny" },
             glob: "allow",
             grep: "allow",

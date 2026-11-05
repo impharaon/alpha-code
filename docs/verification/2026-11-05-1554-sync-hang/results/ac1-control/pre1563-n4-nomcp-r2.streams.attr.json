@@ -1,0 +1,128 @@
+{
+ "tally": {
+  "src/renderer/sidebar/use-projects.ts:602": 3,
+  "app/src/context/server-sdk.tsx:281": 2,
+  "src/renderer/alpha-ui/cloud-run-watcher.tsx:60": 2,
+  "(unmapped)": 8
+ },
+ "rows": [
+  {
+   "t": 1793858601138,
+   "wc": 1,
+   "owner": "src/renderer/sidebar/use-projects.ts:602",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "src/renderer/sidebar/use-projects.ts:602"
+   ]
+  },
+  {
+   "t": 1793858601160,
+   "wc": 1,
+   "owner": "app/src/context/server-sdk.tsx:281",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "app/src/context/server-sdk.tsx:281"
+   ]
+  },
+  {
+   "t": 1793858601223,
+   "wc": 1,
+   "owner": "src/renderer/alpha-ui/cloud-run-watcher.tsx:60",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "src/renderer/alpha-ui/cloud-run-watcher.tsx:60"
+   ]
+  },
+  {
+   "t": 1793858629992,
+   "wc": 1,
+   "owner": "src/renderer/sidebar/use-projects.ts:602",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "src/renderer/sidebar/use-projects.ts:602"
+   ]
+  },
+  {
+   "t": 1793858630164,
+   "wc": 1,
+   "owner": "src/renderer/sidebar/use-projects.ts:602",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "src/renderer/sidebar/use-projects.ts:602"
+   ]
+  },
+  {
+   "t": 1793858630177,
+   "wc": 1,
+   "owner": "app/src/context/server-sdk.tsx:281",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "app/src/context/server-sdk.tsx:281"
+   ]
+  },
+  {
+   "t": 1793858630206,
+   "wc": 1,
+   "owner": "src/renderer/alpha-ui/cloud-run-watcher.tsx:60",
+   "frames": [
+    "sdk/js/src/v2/client.ts:55",
+    "sdk/js/src/v2/gen/core/serverSentEvents.gen.ts:129",
+    "src/renderer/alpha-ui/cloud-run-watcher.tsx:60"
+   ]
+  },
+  {
+   "t": 1793858677040,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858677193,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858677345,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858677496,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858677648,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858677800,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858677952,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  },
+  {
+   "t": 1793858678104,
+   "wc": 1,
+   "owner": null,
+   "frames": []
+  }
+ ]
+}

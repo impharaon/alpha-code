@@ -239,7 +239,7 @@ export type TimelineRow =
       netLayer?: NetFailureLayer
       /** `#1572`:模型请求一个 HTTP 应答都没拿到、层又认不出(引擎记 `codepuppyNetCode: "unattributed"`)。 */
       netUnattributed?: true
-      /** `#1588`:按错误名与状态码认出的五类原因之一;缺席 = 认不出,呈现不变。 */
+      /** 按错误名、状态码与注册拒绝码认出的原因;缺席 = 认不出,呈现不变。 */
       cause?: TurnErrorCause
       /** `#1588`:服务回的状态码(只进「开发者详情」)。 */
       statusCode?: number
@@ -281,8 +281,8 @@ export type TimelineRow =
  */
 export type TimelineTurnWait = { kind: "approval" | "question"; source?: PermissionV2Source }
 
-/** `#1588` 回合错误卡认得出的五类原因(批准稿 frame.html#turn-error 的表)。 */
-export type TurnErrorCause = "billing" | "auth" | "rateLimit" | "contextOverflow" | "outputLength"
+/** `#1588` 回合错误卡的原因;`#1650` 另认线路停收的注册拒绝码。 */
+export type TurnErrorCause = "billing" | "modelUnavailable" | "auth" | "rateLimit" | "contextOverflow" | "outputLength"
 
 /**
  * `#1588`:只看错误名与状态码,不读消息文本。402 余额/会员;401 / 403 / ProviderAuthError 登录凭据;429 频率;
@@ -737,21 +737,26 @@ const REFUSAL_BY_CODE: Record<string, CloudImageRefusal> = {
 }
 
 /**
- * 错误原文 → 拒绝原因。平台拒绝时 MCP 把响应体(JSON,带 `code`)原样作为错误文本;解析不出任何 JSON
- * 对象 = 请求没有送到云端(连不上 / 超时)。
+ * MCP 错误文本与回合 responseBody 共用 JSON 提取;MCP 解析不出对象时仍归为联网失败。
  */
-export function cloudImageRefusalOf(error: string): CloudImageRefusal {
+function cloudErrorBodyOf(error: string) {
   const start = error.indexOf("{")
   const end = error.lastIndexOf("}")
-  if (start < 0 || end <= start) return "network"
+  if (start < 0 || end <= start) return undefined
   let body: unknown
   try {
     body = JSON.parse(error.slice(start, end + 1))
   } catch {
-    return "network"
+    return undefined
   }
-  if (typeof body !== "object" || body === null) return "network"
-  const code = (body as { code?: unknown }).code
+  if (typeof body !== "object" || body === null) return undefined
+  return body as { code?: unknown; error?: { code?: unknown } }
+}
+
+export function cloudImageRefusalOf(error: string): CloudImageRefusal {
+  const body = cloudErrorBodyOf(error)
+  if (!body) return "network"
+  const code = body.code
   return (typeof code === "string" && REFUSAL_BY_CODE[code]) || "other"
 }
 
@@ -1091,7 +1096,14 @@ export function turnErrorOf(
   const statusCode = typeof data?.statusCode === "number" ? data.statusCode : undefined
   // `#1588`:围栏拒绝(`#1382`)与分层联网失败(`#1572`)先认,保持它们的呈现 —— 围栏拒绝本身就是 403。
   const cause =
-    egressDenied || netLayer || netUnattributed ? undefined : turnErrorCauseOf(failed.error.name, statusCode)
+    egressDenied || netLayer || netUnattributed
+      ? undefined
+      : statusCode === 402 &&
+          (cloudErrorBodyOf(body)?.error?.code === "route_usage_stopped" ||
+            // Platform lib/failure-codes.ts: Anthropic has no code slot, so the registered code travels in this mark.
+            `${raw}\n${body}`.includes("[failure_code=route_usage_stopped]"))
+        ? "modelUnavailable"
+        : turnErrorCauseOf(failed.error.name, statusCode)
   return {
     name: failed.error.name,
     message: boundedText(raw, TURN_ERROR_MAX_CHARS).text,

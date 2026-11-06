@@ -31,6 +31,9 @@ function greeting(): string {
   return t("codepuppy.home.greetingEvening")
 }
 
+// 首页未发送的草稿跨重挂保持身份,成功发送后才开始下一份。
+let homeDraftSequence = 0
+
 export function CodePuppyHome(props: {
   projects: CodePuppyProjectsApi
   /** #891:`props.projects` 这份 store 连着的那个 server 的 key(`index.tsx` 的 `projectsServerKey`
@@ -49,6 +52,7 @@ export function CodePuppyHome(props: {
   markStartupTimeline("renderer.home.surface.setup", { composerPending: launchDraftPending() })
   const navigate = useNavigate()
   const { store } = props.projects
+  const draftId = `home:${homeDraftSequence}`
 
   const visibleProjects = createMemo(() => visibleWorkspaces(store.projects))
 
@@ -140,6 +144,7 @@ export function CodePuppyHome(props: {
           <Show when={!launchDraftPending()}>
             <CodePuppyComposer
               mode="home"
+              draftId={draftId}
               projects={props.projects}
               directory={activeWs}
               serverKey={props.serverKey}
@@ -154,6 +159,7 @@ export function CodePuppyHome(props: {
                 pushToast({ kind: "info", title: t("codepuppy.home.workspaceRequired") })
               }}
               onSubmitted={(id, submitted) => {
+                homeDraftSequence += 1
                 // #894:落点 = **提交那一刻**的 server 快照。会话是 `projects.startChat` 在那个
                 // server 上建的,所以身份从来就在手上 —— 过去这里跳的是 legacy
                 // `/{目录}/session/{id}`(不带 server 段),壳只能事后反推:「完成时的 active

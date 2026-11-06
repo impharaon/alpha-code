@@ -39,3 +39,4 @@ review_after: 2027-04-30
 | `packages/ui-mac/src/main/catalog-channels.ts:1009` | 约束一节无对应编号:刷新结果与持久化结果不一致 | coherent set 写缓存时忽略 `writeState` 返回值;刷新可能返回 `source: "remote"`,但目录实际未写入,后续同步重读仍无法判定。 | `#1632` |
 | `packages/ui-mac/src/renderer/extensions/use-extensions.ts`、`packages/ui-mac/src/renderer/codepuppy-ui/permission-mount-ratchet.test.ts` | K2 | 定制中心启停成为 Permission surface 之外的第二个审批决定入口;白名单按文件 + token 放行,该入口只允许字面量 `reply: "reject"`。 | `#1652` |
 | `packages/opencode/src/mcp/index.ts` | 约束一节无对应编号:状态词复用 | MCP 的 `pending` 同时表示首次启动、退避中、重试中三种状态。 | `#1653` |
+| `packages/ext/src/hub-tools.ts`、`packages/ui-mac/src/renderer/extensions/use-extensions.ts:271` | K2 | `HubReasonCode` 的 code → 文案有两张表,分别由 agent 工具与定制中心 UI 维护。 | `#1658` |

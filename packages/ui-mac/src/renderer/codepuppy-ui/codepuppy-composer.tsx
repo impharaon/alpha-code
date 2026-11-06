@@ -686,6 +686,8 @@ export type CodePuppyComposerProps = {
   directory: () => string | undefined
   /** session 模式必传:目标会话。 */
   sessionID?: () => string | undefined
+  /** 新对话草稿的稳定身份;目标目录变化或重挂时保留显式权限选择。 */
+  draftId?: string
   /** #891:目标会话所属的 server 身份(`ServerConnection.key`)。与 `directory` / `sessionID` 合成
    *  仓内 canonical 的会话身份三元组 —— composer 的档位/只读档作用域就以它的 `identityKey` 为键
    *  (与草稿暂存、artifacts、review 同一把钥匙)。宿主各自给权威源:会话页给 live 身份的
@@ -958,7 +960,7 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
   }
   const hasDragFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files")
 
-  // REQ-073 拍板③:模式是会话级的 —— home 是新会话入口,挂载即回默认(build)。
+  // home 挂载重置模型投影;助手和权限选择由下方的会话/草稿作用域接管。
   onMount(() => {
     if (props.mode !== "home") return
     setComposerModel(null)
@@ -966,14 +968,14 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
     resetComposerModelProjection()
   })
 
-  /* #570:上一行那句「会话级」此前只写在注释里 —— 档位信号是模块级的,会话页又不重置,于是它
+  /* #570:「会话级」此前只写在注释里 —— 档位信号是模块级的,会话页又不重置,于是它
      **跟着人跑**:在会话 A 开「计划」、点侧栏进会话 B,B 的 chip 照样显示「计划」,B 的下一条
      消息也真的以 agent=plan 发出。这里把作用域接上:进一个会话就接管它自己的档位(没开过 =
-     默认 build),离开就把当前档位交还给它。home 的作用域是 null(新会话入口,一律回默认)。
+     默认 build),离开就把当前档位交还给它。home 按 draftId 登记;无草稿身份才回默认。
      用 createEffect 而不是 onMount:生产的会话 composer 由 SessionComposerMount 按身份 keyed
      重挂,但同一实例内 sessionID 换代(模型链已按此换代)也必须换档位 —— 两种都盖住。
 
-     #884:只读档(perm)走**同一把钥匙、同一处 adopt/release**。它不跟上就等于上面白改 ——
+     #884:已建会话的只读档(perm)走**同一把钥匙、同一处 adopt/release**。它不跟上就等于上面白改 ——
      `buildPromptRequest` 里 readonly 强制 codepuppy-readonly 并压过手选档位,只读档跨会话粘连时
      B 的档位照样被顶掉。两者的作用域生命周期完全一致,所以共用这一个 effect,不另起一条。
 
@@ -981,9 +983,9 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
      (`identityKey(serverKey, directory, sessionID)`,与草稿暂存/artifacts/review 同一把)。raw id
      不是永久身份:同一个 id 在不同 server 或不同目录下是两个会话,共用一条登记就会串档;会话删掉
      后同 id 再出现(导入/外部创建)也会未经用户操作就继承旧的只读档。身份三元组缺任何一段 = 身份
-     不成立,作用域按 null 处理(与首页同档:一律默认,不登记)。 */
+     不成立,作用域按 null 处理(无身份就回默认,不登记)。 */
   const composerScopeKey = (): string | null => {
-    if (props.mode === "home") return null
+    if (props.mode === "home") return props.draftId ? `draft:${props.draftId}` : null
     const sessionID = props.sessionID?.()
     const directory = props.directory()
     const serverKey = props.serverKey?.()

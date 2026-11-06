@@ -1636,6 +1636,7 @@ export const dict = {
   "codepuppy.timeline.openSubtask": "Open subsession",
   "codepuppy.timeline.turnErrorTitle": "This reply didn't finish",
   "codepuppy.timeline.turnErrorBilling": "Not enough balance or membership",
+  "codepuppy.timeline.turnErrorModelUnavailable": "This model is temporarily unavailable. Please try another model.",
   "codepuppy.timeline.turnErrorAuth": "Sign-in or key is invalid",
   "codepuppy.timeline.turnErrorRateLimit": "Too many requests, try again later",
   "codepuppy.timeline.turnErrorContextOverflow": "This conversation is too long",
@@ -2217,4 +2218,7 @@ export const dict = {
   "codepuppy.net.timeout": "Waiting for {{host}} timed out; try again later",
   "codepuppy.net.unattributed": "The connection dropped partway",
   "codepuppy.ext.connectorDisabled": "Connector disabled",
+  "codepuppy.ext.hubCloudConnection": "Cloud connection verification has not passed",
+  "codepuppy.ext.hubCloudTools": "Tool list verification has not passed",
+  "codepuppy.ext.hubCloudPolicy": "Permission policy verification has not passed",
 }

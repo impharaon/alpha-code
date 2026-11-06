@@ -16,6 +16,7 @@ import { createEffect, createMemo, createSignal, on, onCleanup, type Accessor } 
 import { hrefFor } from "../../../shared/route-manifest"
 import { t } from "../../i18n"
 import { setSettingsOpen } from "../settings-state"
+import { composerAgent, composerPerm, tierAgent } from "../composer-state"
 import { projectImageSends } from "../pending-image-sends"
 import { useCodePuppySessionLiveContext } from "../session-workspace/codepuppy-session-workspace"
 import type { SessionRailApi } from "../session-workspace/session-workspace-shell"
@@ -271,7 +272,7 @@ export function CodePuppySessionTimeline(props: CodePuppySessionTimelineProps = 
       const id = sessionID()
       if (!id) return
       if ((session().data.session_status[id]?.type ?? "idle") !== "idle") return
-      const agent = session().data.message[id]?.findLast((message) => message.role === "user")?.agent
+      const agent = tierAgent(composerPerm()) ?? composerAgent()
       const result = await serverSDK().client.session.promptAsync({
         sessionID: id,
         ...(agent ? { agent } : {}),

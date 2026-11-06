@@ -141,6 +141,7 @@ export function CodePuppyNewSession(props: {
             {(dir) => (
               <CodePuppyComposer
                 mode="home"
+                draftId={props.draftId}
                 projects={props.projects}
                 directory={directory}
                 serverKey={props.serverKey}

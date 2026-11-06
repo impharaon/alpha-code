@@ -151,9 +151,9 @@ export function applyDefaultComposerModel(m: ComposerModel) {
  * 当永久身份,同一个仓里就有了两套会话口径:同一个 id 出现在不同 serverKey / directory 下时
  * 两边共用一条登记(串档),会话删掉后又出现同 id 也会静默继承旧的只读档。本模块不认识身份的
  * 结构,只认宿主传进来的那把钥匙 —— 造钥匙的地方只有一处(`codepuppy-composer` 的 scope effect
- * 与 home 提交后的 seed),都过 `identityKey`。 */
+ * 与 home 提交后的 seed);会话键过 `identityKey`,新对话沿用宿主的 draftId。 */
 const agentByScope = new Map<string, string>()
-/** 当前持有档位信号的会话身份键;null = 首页(新会话入口)、身份未定、或无人持有。 */
+/** 当前持有档位信号的会话身份键或 draft:草稿ID;null = 身份未定或无人持有。 */
 let agentScopeOwner: string | null = null
 /** 每次 adopt 发一张新租约。release 必须**同时**匹配 scope 与租约 —— 只比 scope 的话,同一个
  *  身份键的新旧两个实例分不开:旧实例的 cleanup 会把新实例刚拿到的持有权清成 null,新实例
@@ -168,7 +168,7 @@ function rememberScopedAgent(scopeKey: string, value: string | null) {
   agentByScope.set(scopeKey, value)
 }
 
-/** 挂载:接管该身份的档位(无登记 = 默认 build)。`null` = 首页或身份未定,一律回默认。返回本次
+/** 挂载:接管该会话/草稿的档位(无登记 = 默认 build)。`null` = 无身份,回默认。返回本次
  *  租约,卸载时必须原样交回 `releaseComposerAgentScope`。 */
 export function adoptComposerAgentScope(scopeKey: string | null): number {
   // 先把**现任持有者**的值落账。宿主完全可能 adopt 早于 release(新面先挂、旧面后卸),那时旧值
@@ -209,19 +209,19 @@ export function resetComposerAgentScopesForTests() {
  * 合起来:在 A 打开只读、切到 B,B 的只读 chip 照样亮着,B 手选的档位也被 READONLY_AGENT 顶掉
  * —— 用户在 B 从没开过只读,只会看到模型忽然不肯动文件。
  *
- * 机制与档位那份**逐条同形**:同一把钥匙(canonical 身份键 / null=首页,见 #891)、同一处
- * adopt/release(codepuppy-composer 的那一个 createEffect)、同一套租约守卫。两处差别,都在这一段说清:
+ * 与助手共用会话身份键 / draftId、adopt/release 生命周期和租约守卫,但写入时机不同:
+ * 助手在交接/卸载时登记,权限在显式选择时登记;只有权限从最后用户消息恢复。其余差别如下:
  *
  * ① 默认值不同 —— 档位的默认是 `null`(引擎自己的 build),权限档的默认是 `DEFAULT_PERM`
  *    (`"allow"`,`#1413` 之前写的是 `"ask"`,而那时的 `"ask"` 发出的正是今天 `"allow"` 的请求),
  *    恢复历史时仍以最后用户消息为准;本次显式选择(包括默认档)优先。
- * ② **只读档这一份没有容量上界**(#896 起档位那份也没有,两份至此逐条同形)。
+ * ② **只读档这一份没有容量上界**(#896 起助手档位那份也没有)。
  *    原先照抄了草稿暂存的 LRU,并在这里写着「丢登记只会多问一次,不会静默放松限制」——
  *    **那句话是错的**:依次在 33 个会话里开只读,第 1 个就被淘汰,回到它时 chip 变回「请求审批」、
  *    请求也不再带 `codepuppy-readonly`。ask 确实不会未经批准就写盘,但**是系统替用户把只读关掉了**,
  *    而用户从没做过这个动作。登记是「用户显式开过只读」的唯一凭据,不能有损。 */
 const permByScope = new Map<string, PermMode>()
-/** 当前持有只读档信号的会话身份键;null = 首页(新会话入口)、身份未定、或无人持有。 */
+/** 当前持有权限信号的会话身份键或 draft:草稿ID;null = 无草稿身份的首页、身份未定、或无人持有。 */
 let permScopeOwner: string | null = null
 /** 租约语义同档位那份(见 `agentScopeLease`)。两份各自持有,不共用计数器。 */
 let permScopeLease = 0
@@ -230,7 +230,7 @@ function rememberScopedPerm(scopeKey: string, value: PermMode) {
   permByScope.set(scopeKey, value)
 }
 
-/** 挂载:接管该身份的权限档(无登记 = `DEFAULT_PERM`)。`null` = 首页或身份未定,一律回默认。 */
+/** 挂载:接管该会话/草稿的权限档(无登记 = `DEFAULT_PERM`)。`null` = 无身份,回默认。 */
 export function adoptComposerPermScope(scopeKey: string | null): number {
   permScopeOwner = scopeKey
   permScopeLease += 1

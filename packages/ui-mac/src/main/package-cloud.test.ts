@@ -192,6 +192,7 @@ describe("REQ-235 cloud@1 package: authorization, receipts-only install, uninsta
     expect(readCapabilityGrant(root, grantKey)?.capabilities).toEqual(["cloud:dispatch"])
     expect(existsSync(join(root, "codepuppy.jsonc"))).toBe(false)
     const graphs = readPackageGraphs(root)
+    expect(graphs.ok && graphs.packageGraphs[0]?.displayName).toBe(cloudCase.envelope.presentation.displayName)
     expect(graphs.ok && graphs.packageGraphs.map((graph) => [graph.packageId, graph.root.kind, graph.root.name])).toEqual([
       [packageId, "cloud", componentName],
     ])

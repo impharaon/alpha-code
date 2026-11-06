@@ -18,6 +18,7 @@ import { createEffect, createSignal, onCleanup, untrack, type Accessor } from "s
 import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
 import type { ServerInfo } from "../sidebar/use-projects"
 import type { CatalogEntry, InstalledState, McpConfig, McpInstallSpec, RuntimeCheck } from "./catalog-types"
+import type { CatalogPackageViewV1 } from "../../shared/catalog-package-view"
 import type {
   ElectronAPI,
   InstallReceipt,
@@ -249,8 +250,8 @@ export type HubStateView = {
   state: Exclude<HubViewRow["state"], "not-installed">
   tone: "ok" | "muted" | "warn"
   textKey: "codepuppy.ext.hubStateAvailable" | "codepuppy.ext.hubStateInstalled" | "codepuppy.ext.hubStatePending" | "codepuppy.ext.mcpPreparing"
-  reasonKey?: "codepuppy.ext.hubReasonWaiting" | "codepuppy.ext.hubReasonFailed" | "codepuppy.ext.hubReasonNotLoaded"
-  /** main 给的技术细节,只进 title。 */
+  reasonKey?: "codepuppy.ext.hubReasonWaiting" | "codepuppy.ext.hubReasonFailed" | "codepuppy.ext.hubReasonNotLoaded" | "codepuppy.ext.hubCloudConnection" | "codepuppy.ext.hubCloudTools" | "codepuppy.ext.hubCloudPolicy"
+  /** main 给的技术细节,云组件收进开发者详情。 */
   detail?: string
   reloadNow: boolean
 }
@@ -260,17 +261,17 @@ export function hubStateView(row: HubViewRow | undefined, mcp?: Pick<InstalledSt
     return { state: "installed", tone: "muted", textKey: "codepuppy.ext.mcpPreparing", detail: mcp.error, reloadNow: false }
   if (!row || row.state === "not-installed") return undefined
   if (row.state === "available") return { state: row.state, tone: "ok", textKey: "codepuppy.ext.hubStateAvailable", reloadNow: false }
+  const code = row.stateReason?.code
   // 已安装但没核验通过(云条目:缺连接或缺工具,基线 §2.5 云行)⇒ 说出原因;停用的行原因已由「未启用」徽标说了。
   if (row.state === "installed")
     return {
       state: row.state,
       tone: "muted",
       textKey: "codepuppy.ext.hubStateInstalled",
-      ...(row.stateReason?.code === "not-loaded" ? { reasonKey: "codepuppy.ext.hubReasonNotLoaded" as const } : {}),
+      reasonKey: code === "cloud-connection" ? "codepuppy.ext.hubCloudConnection" : code === "cloud-tools" ? "codepuppy.ext.hubCloudTools" : code === "cloud-policy" ? "codepuppy.ext.hubCloudPolicy" : code === "not-loaded" ? "codepuppy.ext.hubReasonNotLoaded" : undefined,
       ...(row.stateReason?.detail ? { detail: row.stateReason.detail } : {}),
       reloadNow: false,
     }
-  const code = row.stateReason?.code
   return {
     state: row.state,
     tone: "warn",
@@ -389,7 +390,7 @@ export interface ExtensionsApi {
    *  fs 类翻转后 dispose 引擎使投影生效;mcp 的 live connect 由调用方按需衔接。 */
   setInstallState(receipt: InstallReceipt, state: "enabled" | "disabled", opts?: { confirmExpiredReview?: boolean }): Promise<ActionResult>
   /** True if this catalog entry is already installed (MCP via SDK truth; others via receipts). */
-  isInstalled(entry: CatalogEntry): boolean
+  isInstalled(entry: CatalogEntry | CatalogPackageViewV1): boolean
   /** which-check the entry's runtime deps; { ok:false, missing } if a binary is absent. #1564 AC3: the four
    *  first-party Office entries read main's bundled-runtime fact instead of the card's runtimeDep (uv). */
   checkRuntime(entry: CatalogEntry): Promise<RuntimeCheck>
@@ -904,19 +905,21 @@ export function useExtensions(
     return res
   }
 
-  function isInstalled(entry: CatalogEntry): boolean {
+  function isInstalled(entry: CatalogEntry | CatalogPackageViewV1): boolean {
     // MCP: live SDK truth (also covers pre-receipt installs). skill/agent/plugin/bundle: receipts,
     // matched by catalog id (bundle = all its required items present).
+    if ("catalogId" in entry || entry.type === "bundle") {
+      const required = "catalogId" in entry
+        ? entry.components.filter((component) => component.included && component.required).map((component) => component.componentId)
+        : (entry.bundleItems ?? []).filter((it) => !it.optional).map((it) => it.catalogEntryId)
+      return required.length > 0 && required.every((id) => store.receipts.some((r) => r.id === id) || mcpNameForId(id))
+    }
     if (entry.type === "mcp")
       return (
         store.receipts.some((receipt) => receipt.id === entry.id) ||
         (entry.name in store.mcp &&
           nameOnlyLiveMcpIsUnambiguousGlobal(entry.name, store.projectReceipts))
       )
-    if (entry.type === "bundle") {
-      const required = (entry.bundleItems ?? []).filter((it) => !it.optional).map((it) => it.catalogEntryId)
-      return required.length > 0 && required.every((id) => store.receipts.some((r) => r.id === id) || mcpNameForId(id))
-    }
     return store.receipts.some((r) => r.id === entry.id)
   }
 

@@ -90,7 +90,7 @@ export type HubViewService = {
 }
 
 /** `reloadable: false` = 核验没过,但重载修不好它(要授权 / 没有核验判据):落 installed + 原因,不出重载入口(`#1531`)。 */
-type Verdict = { ok: true } | { ok: false; detail: string; reloadable?: false }
+type Verdict = { ok: true } | { ok: false; detail: string; code?: HubStateReason["code"]; reloadable?: false }
 
 /** 原因细节:状态词原样;后台重连中的 pending 附上一次失败(`#1563`)。 */
 const mcpDetail = (label: string, status: McpVerification) =>
@@ -297,15 +297,15 @@ export function createHubViewService(deps: HubViewDeps): HubViewService {
     }
     if (row.kind === "cloud") {
       const status = await verifyInstalledMcp(CLOUD_MCP_SERVER_NAME, directory, deps.awaitServer, fetchImpl, { awaitServer: timeoutMs, status: timeoutMs })
-      if (status.status !== "connected") return { ok: false, detail: mcpDetail("cloud MCP", status) }
+      if (status.status !== "connected") return { ok: false, code: "cloud-connection", detail: mcpDetail("cloud MCP", status) }
       const inventory = await reads.toolInventory()
-      if (!inventory.ok) return { ok: false, detail: `tool list unreadable (${inventory.code})` }
+      if (!inventory.ok) return { ok: false, code: "cloud-tools", detail: `tool list unreadable (${inventory.code})` }
       const tool = inventory.inventory.services
         .filter((service) => service.source === "mcp" && service.origin === CLOUD_MCP_SERVER_NAME)
         .flatMap((service) => service.tools)
         .find((candidate) => candidate.identity.name === CLOUD_DISPATCH_TOOL)
-      if (!tool) return { ok: false, detail: `${CLOUD_DISPATCH_TOOL} is not in this directory's tool list` }
-      if (tool.effective.state !== "enabled") return { ok: false, detail: `${CLOUD_DISPATCH_TOOL} is ${tool.effective.state} by tool policy` }
+      if (!tool) return { ok: false, code: "cloud-tools", detail: `${CLOUD_DISPATCH_TOOL} is not in this directory's tool list` }
+      if (tool.effective.state !== "enabled") return { ok: false, code: "cloud-policy", detail: `${CLOUD_DISPATCH_TOOL} is ${tool.effective.state} by tool policy` }
       return { ok: true }
     }
     if (row.kind === "skill") {
@@ -389,7 +389,7 @@ export function createHubViewService(deps: HubViewDeps): HubViewService {
           // 云条目没有重载环节(基线 §2.5 云行):最高 installed,原因说清缺的是连接还是工具。重载修不好的(要授权 / 没有
           // 核验判据,`#1531`)同样落 installed + 原因 —— 给它一个「现在重载」只会打断会话而改不了状态。
           if (row.kind === "cloud" || verdict.reloadable === false)
-            return { ...base, installed: true, enabled: true, state: "installed", stateReason: { code: "not-loaded", detail: verdict.detail } }
+            return { ...base, installed: true, enabled: true, state: "installed", stateReason: { code: verdict.code ?? "not-loaded", detail: verdict.detail } }
           const reason: HubStateReason = pending ?? { code: "not-loaded", detail: verdict.detail }
           return { ...base, installed: true, enabled: true, state: "reload-pending", stateReason: reason }
         }),

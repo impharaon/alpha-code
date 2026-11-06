@@ -28,8 +28,9 @@ export type HubStateWord = (typeof HUB_STATE_WORDS)[number]
  *   reload-waiting 有在途重载(排队、等会话空闲、或引擎状态查不到)
  *   reload-failed  最近一次重载报告失败
  *   not-loaded     没有在途重载,但本目录的即时核验没过
+ *   cloud-connection / cloud-tools / cloud-policy 云核验未通过的具体步骤,不改变安装状态词
  */
-export const HUB_REASON_CODES = ["disabled", "reload-waiting", "reload-failed", "not-loaded"] as const
+export const HUB_REASON_CODES = ["disabled", "reload-waiting", "reload-failed", "not-loaded", "cloud-connection", "cloud-tools", "cloud-policy"] as const
 export type HubReasonCode = (typeof HUB_REASON_CODES)[number]
 export type HubStateReason = { code: HubReasonCode; detail?: string }
 

@@ -235,7 +235,7 @@ describe("hub-view 三档状态(§2.5)", () => {
     expect(row(view.rows, "skill:writer").state).toBe("available")
   })
 
-  test("云条目(基线 §2.5 云行 / DECIDE #1524):连接 ∧ cloud_dispatch 在列且 enabled 才可用;否则最高 installed + 缺什么,不取在途重载的原因", async () => {
+  test("#1658 AC3: 云连接、工具清单、权限策略分别给出原因码;状态最高 installed,不取在途重载的原因", async () => {
     const w = world("cloud")
     w.coordinator.request({ scope: "global", items: [], reason: "x" })
     w.engine.cloudDispatch = "ask"
@@ -243,18 +243,18 @@ describe("hub-view 三档状态(§2.5)", () => {
       installed: true,
       enabled: true,
       state: "installed",
-      stateReason: { code: "not-loaded", detail: "dispatch is ask by tool policy" },
+      stateReason: { code: "cloud-policy", detail: "dispatch is ask by tool policy" },
     })
     w.engine.cloudDispatch = undefined
     expect(row((await w.service.view(w.projectDir)).rows, "cloud:docs")).toMatchObject({
       state: "installed",
-      stateReason: { code: "not-loaded", detail: "dispatch is not in this directory's tool list" },
+      stateReason: { code: "cloud-tools", detail: "dispatch is not in this directory's tool list" },
     })
     w.engine.cloudDispatch = "enabled"
     w.engine.mcp.codepuppy = { status: "needs_auth" }
     expect(row((await w.service.view(w.projectDir)).rows, "cloud:docs")).toMatchObject({
       state: "installed",
-      stateReason: { code: "not-loaded", detail: "cloud MCP needs_auth" },
+      stateReason: { code: "cloud-connection", detail: "cloud MCP needs_auth" },
     })
     w.engine.mcp.codepuppy = { status: "connected" }
     expect(row((await w.service.view(w.projectDir)).rows, "cloud:docs").state).toBe("available")
@@ -306,7 +306,7 @@ describe("hub-view 三档状态(§2.5)", () => {
     w.engine.mcp.codepuppy = { status: "pending" }
     expect(row((await w.service.view(w.projectDir)).rows, "cloud:docs")).toMatchObject({
       state: "installed",
-      stateReason: { code: "not-loaded", detail: "cloud MCP pending" },
+      stateReason: { code: "cloud-connection", detail: "cloud MCP pending" },
     })
     w.engine.mcp.files = { status: "failed" }
     expect(row((await w.service.view(w.projectDir)).rows, "mcp:files")).toMatchObject({
@@ -437,7 +437,7 @@ describe("hub-view 三档状态(§2.5)", () => {
     expect(view.directory).toBe(w.workspace)
     for (const id of ["skill:writer", "mcp:files", "agent:planner"])
       expect(row(view.rows, id)).toMatchObject({ state: "reload-pending", stateReason: { code: "not-loaded" } })
-    expect(row(view.rows, "cloud:docs")).toMatchObject({ state: "installed", stateReason: { code: "not-loaded" } })
+    expect(row(view.rows, "cloud:docs")).toMatchObject({ state: "installed", stateReason: { code: "cloud-connection" } })
     expect(row(view.rows, "mcp:off").state).toBe("installed")
   })
 })

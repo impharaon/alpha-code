@@ -10,10 +10,10 @@
 //   CODEPUPPY_MCP_CALL_LOG          append "<tool>\n" when a tools/call starts
 //   CODEPUPPY_MCP_TOOLS_FILE        serve this JSON array of tool definitions instead of echo/slow (#1565: stand in for
 //                               a first-party Office server whose definitions come from its bundled manifest)
-import { appendFileSync, readFileSync, writeFileSync } from "node:fs"
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs"
 import { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
-import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js"
+import { CallToolRequestSchema, ErrorCode, McpError, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js"
 
 const env = process.env
 const mark = (value: string) => {
@@ -36,6 +36,9 @@ const server = new Server({ name: "codepuppy-mcp-startup", version: "1.0.0" }, {
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   if (env.CODEPUPPY_MCP_LIST_DELAY_MS) await Bun.sleep(Number(env.CODEPUPPY_MCP_LIST_DELAY_MS))
   mark("-")
+  // #1653: the SDK's real timeout error shape (shared/protocol.js), also used by the remote startup fixture.
+  if (env.CODEPUPPY_MCP_LIST_TIMEOUT_FILE && existsSync(env.CODEPUPPY_MCP_LIST_TIMEOUT_FILE))
+    throw new McpError(ErrorCode.RequestTimeout, "Request timed out")
   if (env.CODEPUPPY_MCP_TOOLS_FILE) return { tools: JSON.parse(readFileSync(env.CODEPUPPY_MCP_TOOLS_FILE, "utf8")) }
   return {
     tools: [

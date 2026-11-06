@@ -104,8 +104,10 @@ export function attachmentReadOf(meta: StagedAttachmentMeta, input: ReadInput): 
     return { kind: "failed", reason: /timed?[ _-]?out/i.test(error) ? "timeout" : "unreadable" }
   }
   if (calls.length > 0) return { kind: "saved" }
-  const service = input.services ? ((input.services[server] as { status?: unknown } | undefined)?.status ?? "absent") : undefined
-  if (service !== undefined && service !== "connected" && service !== "pending") return { kind: "failed", reason: "not-running" }
+  const entry = input.services?.[server] as { status?: unknown; error?: unknown } | undefined
+  const service = input.services ? (entry?.status ?? "absent") : undefined
+  if ((service !== undefined && service !== "connected" && service !== "pending") || (service === "pending" && entry?.error !== undefined))
+    return { kind: "failed", reason: "not-running" }
   if (!input.turnActive) return { kind: "not-read" }
   return service === "pending" ? { kind: "waiting" } : { kind: "saved" }
 }

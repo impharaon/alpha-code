@@ -1686,6 +1686,13 @@ describe("#1553 附件卡读取结果:只按会话里的真实读取调用与逐
     expect(readsOf(run(parts, { services: undefined, status: "busy", messages: running }))).toEqual(["saved"])
   })
 
+  test("#1653 audit: a reader backing off after tools/list timeout is unavailable, not waiting", () => {
+    const parts = { msg_u1: [textPart("prt_u", "msg_u1", "看看"), staged("prt_s", "msg_u1", docMeta)] }
+    const messages = [userMsg("msg_u1", 1000), assistantMsg("msg_a1", "msg_u1", { time: { created: 10 } })]
+    // MCP.index's sanitized status after SDK RequestTimeout; no extra protocol fields.
+    expect(readsOf(run(parts, { services: { "codepuppy-word": { status: "pending", error: "Failed to get tools (timeout)" } }, status: "busy", messages }))).toEqual(["failed:not-running"])
+  })
+
   test("文本「已随消息发出」、图片带缩略图源;重载(从持久化的 JSON 再投影一次)状态不变;读取结果变了行的 rev 跟着变", () => {
     const parts: Record<string, Part[]> = {
       msg_u1: [

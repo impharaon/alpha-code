@@ -408,3 +408,32 @@ it.instance(
     ),
   { config: { mcp: { third: thirdParty(slowStart(800)) } } },
 )
+
+
+const retrying = bundle("fixture")
+const listTimeoutFile = path.join(scratch, "list-timeout")
+it.instance(
+  "#1653 audit: backoff withdraws declared tools and binding authority; replace restores declarations for the next attempt",
+  () => withManifest(retrying.manifest, Effect.gen(function* () {
+    fs.writeFileSync(listTimeoutFile, "timeout")
+    const mcp = yield* MCP.Service
+    expect(keysOf(yield* mcp.tools(), "codepuppy-word")).toHaveLength(2)
+    yield* pollWithTimeout(statusOf("codepuppy-word").pipe(Effect.map((status) =>
+      status?.status === "pending" && status.error ? status : undefined,
+    )), "tools/list did not enter backoff")
+    expect(keysOf(yield* mcp.tools(), "codepuppy-word")).toEqual([])
+    expect((yield* mcp.bindingFacts!("codepuppy-word"))?.authority).toEqual({ kind: "not-asserted" })
+
+    fs.unlinkSync(listTimeoutFile)
+    // Manual and scheduled retries both cross replace; the existing independent-startup test covers the timer.
+    const reconnecting = yield* mcp.connect("codepuppy-word").pipe(Effect.forkChild)
+    yield* pollWithTimeout(statusOf("codepuppy-word").pipe(Effect.map((status) =>
+      status?.status === "pending" && !status.error ? status : undefined,
+    )), "next generation never started")
+    expect(keysOf(yield* mcp.tools(), "codepuppy-word")).toHaveLength(2)
+    expect((yield* mcp.bindingFacts!("codepuppy-word"))?.authority?.kind).toBe("codepuppy-bundled")
+    yield* Fiber.join(reconnecting)
+    expect(yield* statusOf("codepuppy-word")).toEqual({ status: "connected" })
+  })),
+  { config: { mcp: { "codepuppy-word": office(retrying, "word", { ...slowStart(300), CODEPUPPY_MCP_LIST_TIMEOUT_FILE: listTimeoutFile }) } } },
+)

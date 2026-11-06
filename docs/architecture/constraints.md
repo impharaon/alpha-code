@@ -38,3 +38,4 @@ review_after: 2027-04-30
 | `packages/ui-mac/src/main/index.ts`、`packages/ui-mac/src/main/source-text-anchors.ts:23-29` | 约束一节无对应编号:启动闸门接线的可执行验证缺口 | 当前 bun 1.3.14 无法链接 `index.ts` 的 `node:tls` 导出 `setDefaultCACertificates`;启动闸门接线只能靠源码锚或打包证据,可独立调用模块的行为测试不能证明这条接线。 | `#1632` |
 | `packages/ui-mac/src/main/catalog-channels.ts:1009` | 约束一节无对应编号:刷新结果与持久化结果不一致 | coherent set 写缓存时忽略 `writeState` 返回值;刷新可能返回 `source: "remote"`,但目录实际未写入,后续同步重读仍无法判定。 | `#1632` |
 | `packages/ui-mac/src/renderer/extensions/use-extensions.ts`、`packages/ui-mac/src/renderer/codepuppy-ui/permission-mount-ratchet.test.ts` | K2 | 定制中心启停成为 Permission surface 之外的第二个审批决定入口;白名单按文件 + token 放行,该入口只允许字面量 `reply: "reject"`。 | `#1652` |
+| `packages/opencode/src/mcp/index.ts` | 约束一节无对应编号:状态词复用 | MCP 的 `pending` 同时表示首次启动、退避中、重试中三种状态。 | `#1653` |

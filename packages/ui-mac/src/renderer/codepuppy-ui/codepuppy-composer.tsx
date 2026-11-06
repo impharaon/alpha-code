@@ -960,7 +960,7 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
   }
   const hasDragFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files")
 
-  // REQ-073 拍板③:模式是会话级的 —— home 是新会话入口,挂载即回默认(build)。
+  // home 挂载重置模型投影;助手和权限选择由下方的会话/草稿作用域接管。
   onMount(() => {
     if (props.mode !== "home") return
     setComposerModel(null)
@@ -968,10 +968,10 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
     resetComposerModelProjection()
   })
 
-  /* #570:上一行那句「会话级」此前只写在注释里 —— 档位信号是模块级的,会话页又不重置,于是它
+  /* #570:「会话级」此前只写在注释里 —— 档位信号是模块级的,会话页又不重置,于是它
      **跟着人跑**:在会话 A 开「计划」、点侧栏进会话 B,B 的 chip 照样显示「计划」,B 的下一条
      消息也真的以 agent=plan 发出。这里把作用域接上:进一个会话就接管它自己的档位(没开过 =
-     默认 build),离开就把当前档位交还给它。home 的作用域是 null(新会话入口,一律回默认)。
+     默认 build),离开就把当前档位交还给它。home 按 draftId 登记;无草稿身份才回默认。
      用 createEffect 而不是 onMount:生产的会话 composer 由 SessionComposerMount 按身份 keyed
      重挂,但同一实例内 sessionID 换代(模型链已按此换代)也必须换档位 —— 两种都盖住。
 
@@ -983,9 +983,9 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
      (`identityKey(serverKey, directory, sessionID)`,与草稿暂存/artifacts/review 同一把)。raw id
      不是永久身份:同一个 id 在不同 server 或不同目录下是两个会话,共用一条登记就会串档;会话删掉
      后同 id 再出现(导入/外部创建)也会未经用户操作就继承旧的只读档。身份三元组缺任何一段 = 身份
-     不成立,作用域按 null 处理(与首页同档:一律默认,不登记)。 */
+     不成立,作用域按 null 处理(无身份就回默认,不登记)。 */
   const composerScopeKey = (): string | null => {
-    if (props.mode === "home") return null
+    if (props.mode === "home") return props.draftId ? `draft:${props.draftId}` : null
     const sessionID = props.sessionID?.()
     const directory = props.directory()
     const serverKey = props.serverKey?.()
@@ -993,7 +993,6 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
     return identityKey({ serverKey, directory, sessionID }) ?? null
   }
   let composerScope: string | null = null
-  let composerPermScope: string | null = null
   let composerScopeHeld = false
   // adopt 发下来的租约(两份各自一张)。卸载时原样交回 —— 别的实例已经接管时,租约不匹配,
   // 本实例的 cleanup 就不会去清掉人家的持有权(同一个会话 id 的新旧实例只能靠它分开)。
@@ -1001,20 +1000,17 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
   let composerPermLease = 0
   const releaseComposerScope = () => {
     releaseComposerAgentScope(composerScope, composerAgentLease)
-    releaseComposerPermScope(composerPermScope, composerPermLease)
+    releaseComposerPermScope(composerScope, composerPermLease)
   }
   createEffect(() => {
     const next = composerScopeKey()
-    // #1657:草稿还没有 session 身份,但已有稳定的 draftId;复用档位登记,不把显式选择当默认值丢掉。
-    const nextPerm = props.draftId ? `draft:${props.draftId}` : next
     untrack(() => {
-      if (composerScopeHeld && next === composerScope && nextPerm === composerPermScope) return
+      if (composerScopeHeld && next === composerScope) return
       if (composerScopeHeld) releaseComposerScope()
       composerScope = next
-      composerPermScope = nextPerm
       composerScopeHeld = true
       composerAgentLease = adoptComposerAgentScope(next)
-      composerPermLease = adoptComposerPermScope(nextPerm)
+      composerPermLease = adoptComposerPermScope(next)
     })
   })
   onCleanup(() => {

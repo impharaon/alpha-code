@@ -178,6 +178,7 @@ Bun.plugin({
 const runtime = await import("../src/renderer/codepuppy-ui/session-timeline/session-timeline-test-runtime")
 const model = await import("../src/renderer/codepuppy-ui/session-timeline/timeline-model")
 const binding = await import("../src/renderer/codepuppy-ui/session-timeline/session-timeline")
+const composer = await import("../src/renderer/codepuppy-ui/composer-state")
 const previewFixture = await import("./inline-preview.fixture")
 const previewShell = await import("../src/renderer/codepuppy-ui/session-workspace/session-workspace-shell")
 const previewFiles = await import("../src/renderer/codepuppy-ui/session-rail/files/session-rail-files")
@@ -187,6 +188,8 @@ const i18n = await import("../src/renderer/i18n")
 const disposers: Array<() => void> = []
 
 beforeEach(() => {
+  composer.setComposerPerm("allow")
+  composer.setComposerAgent(null)
   runtime.resetTimelineHarness()
   IntersectionObserverStub.autoVisible = true
   engineRuns.count = 0
@@ -3105,20 +3108,23 @@ describe("#589 真实继续生成闸门(生产绑定层挂载,SDK 层观察)", (
     await new Promise((resolve) => setTimeout(resolve, 0))
   }
 
-  test.each(["build", "codepuppy-ask", "codepuppy-readonly", undefined])(
-    "#1638 AC3 继续生成沿用最后用户消息的 agent=%s,缺席则不带(#652)",
-    async (agent) => {
+  test.each([
+    ["ask", "plan", "codepuppy-ask"],
+    ["readonly", "plan", "codepuppy-readonly"],
+    ["allow", "plan", "plan"],
+    ["allow", null, undefined],
+  ] as const)(
+    "#1657 audit: 全部批准下停止后切到 %s,继续生成使用当前档位/助手 %s",
+    async (mode, selectedAgent, agent) => {
       primeInterruptedBinding()
-      // Reuse the interrupted binding fixture; earlier user and later assistant stay build.
-      const messages = bindingData.message[BINDING_SESSION_ID]!
-      const user = messages[0] as Record<string, unknown>
-      messages.unshift({ ...user, id: "msg_bu0" })
-      if (agent) user.agent = agent
-      else delete user.agent
+      // Existing interrupted v1 fixture remains build; selection changes only after the turn stopped.
       sdkPromptImpl = () => Promise.resolve({})
       v2PromptCalls.length = 0
       const host = mountBinding()
       await settle()
+      expect(composer.composerPerm()).toBe("allow")
+      composer.setComposerAgent(selectedAgent)
+      composer.setComposerPerm(mode) // Same write entry as PermChip.pick; keep the historical user unchanged.
 
       const cont = host.querySelector<HTMLButtonElement>(".a-tl-int-continue")
       expect(cont).not.toBeNull()
@@ -3134,6 +3140,22 @@ describe("#589 真实继续生成闸门(生产绑定层挂载,SDK 层观察)", (
       expect(host.querySelector(".a-tl-int-failed")).toBeNull()
     },
   )
+
+  test("#1657 audit: 回合错误卡的继续也使用当前请求审批档位", async () => {
+    primeInterruptedBinding()
+    // Same MessageOutputLengthError shape as the existing turn-error card fixture below.
+    Object.assign(bindingData.message[BINDING_SESSION_ID]![1]!, { error: { name: "MessageOutputLengthError", data: {} } })
+    const host = mountBinding()
+    await settle()
+    composer.setComposerPerm("ask")
+    const button = host.querySelector<HTMLButtonElement>("[data-codepuppy-turn-error-actions] button")!
+    expect(button.textContent).toBe("继续")
+    button.click()
+    await settle()
+    expect(sdkPromptCalls).toEqual([
+      { sessionID: BINDING_SESSION_ID, agent: "codepuppy-ask", parts: [{ type: "text", text: "继续", synthetic: true }] },
+    ])
+  })
 
   test("续发被引擎装进 { error } 信封时不当成功:就地失败提示(#652)", async () => {
     primeInterruptedBinding()

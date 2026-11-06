@@ -1138,6 +1138,60 @@ async function pickPerm(host: HTMLElement, mode: "ask" | "readonly" | "allow") {
 }
 
 describe("#1657 AC1 显式档位属于当前对话", () => {
+  test("#1657 audit: 新对话计划模式跨目标更新重挂,首发仍带 plan", async () => {
+    const api = projectsApi([project("alpha-code", "/ws/a"), project("beta", "/ws/b")])
+    const page = mountDisposable(() => createComponent(DraftLeaf, { projects: api }))
+    await flush()
+    const original = textarea(page.host)!
+    original.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true }))
+    expect(planChipOf(page.host)).not.toBeNull()
+    tabs.updateDraft("draft-1", { directory: "/ws/b" })
+    for (let i = 0; i < 20 && textarea(page.host) === original; i++) await flush()
+    expect(textarea(page.host)).not.toBe(original)
+    expect(planChipOf(page.host)).not.toBeNull()
+    type(textarea(page.host)!, "先给我一个方案")
+    const button = () => page.host.querySelector<HTMLButtonElement>(".a-comp-send")!
+    for (let i = 0; i < 60 && button().disabled; i++) await flush()
+    expect(button().disabled).toBe(false)
+    button().click()
+    for (let i = 0; i < 30 && promoteCalls.length === 0; i++) await flush()
+    expect(startChatOptions[0]).toMatchObject({ perm: "allow", agent: "plan" })
+    page.dispose()
+  })
+
+  test("#1657 audit: 首页重挂保留请求审批和计划,发送后下一份首页草稿回默认", async () => {
+    const api = projectsApi([project("alpha-code", "/ws/a")])
+    const home = () => mountDisposable(() => createComponent(CodePuppyHome, { projects: api, serverKey: () => STORE_SERVER_KEY }))
+    const first = home()
+    await flush()
+    textarea(first.host)!.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true }))
+    await pickPerm(first.host, "ask")
+    first.dispose()
+    const other = mountDisposable(() => createComponent(DraftLeaf, { projects: api }))
+    await flush()
+    expect(permChipOf(other.host)!.getAttribute("data-mode")).toBe("allow")
+    expect(planChipOf(other.host)).toBeNull()
+    other.dispose()
+    const back = home()
+    await flush()
+    expect(permChipOf(back.host)!.getAttribute("data-mode")).toBe("ask")
+    expect(planChipOf(back.host)).not.toBeNull()
+    type(textarea(back.host)!, "继续")
+    const button = () => back.host.querySelector<HTMLButtonElement>(".a-comp-send")!
+    for (let i = 0; i < 60 && button().disabled; i++) await flush()
+    expect(button().disabled).toBe(false)
+    button().click()
+    for (let i = 0; i < 30 && navigateCalls.length === 0; i++) await flush()
+    expect(startChatOptions[0]).toMatchObject({ perm: "ask", agent: "codepuppy-ask" })
+    expect(navigateCalls).toHaveLength(1)
+    back.dispose()
+    const fresh = home()
+    await flush()
+    expect(permChipOf(fresh.host)!.getAttribute("data-mode")).toBe("allow")
+    expect(planChipOf(fresh.host)).toBeNull()
+    fresh.dispose()
+  })
+
   for (const mode of ["ask", "readonly"] as const) {
     test(`空草稿选择 ${mode} 后失焦、目标更新重挂,首发及新会话仍使用所选档位`, async () => {
       const api = projectsApi([project("alpha-code", "/ws/a"), project("beta", "/ws/b")])

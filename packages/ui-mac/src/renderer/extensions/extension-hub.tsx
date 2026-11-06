@@ -202,11 +202,9 @@ export function ExtensionHub(props: {
     () => (props.open() && section() === "connectors" ? `${receiptFingerprint(ext.store.receipts)}` : null),
     () => ext.listInstalledPackages(),
   )
-  /** 这个包在界面上叫什么。**`#784` owner 裁决**:显示插件作者自己声明的名字;
-   *  存量图没有这个字段时才回退到 root 组件名(那是包里某个技能的名字,不是包名)。
-   *  空白 / 只有空格一律当缺席 —— 用户绝不该看到一张没有名字的卡。 */
-  const packLabel = (pack: { displayName: string | null; rootComponentName: string }): string =>
-    (pack.displayName ?? "").trim() || pack.rootComponentName
+  /** 存量图缺少显示名时,先取同 id 的目录名称,再回退到根组件名。 */
+  const packLabel = (pack: { packageId: string; displayName: string | null; rootComponentName: string }): string =>
+    (pack.displayName ?? "").trim() || catalog().packages?.find((view) => view.catalogId === pack.packageId)?.presentation.displayName.trim() || pack.rootComponentName
   /** 已装扩展包清单**读不出来**(与「一个都没装」是两件事)。 */
   const packagesUnreadable = () => {
     const state = installedPackages()
@@ -884,7 +882,7 @@ export function ExtensionHub(props: {
         key: `${r.type}:${r.name}`,
         type: r.type,
         name: r.name,
-        displayName: entry?.displayName ?? r.name,
+        displayName: entry?.displayName ?? catalog().packages?.find((view) => view.components.some((component) => component.role === "root" && component.componentId === r.id))?.presentation.displayName ?? r.name,
         source: entry?.source,
         version: r.version,
         receipt: r,
@@ -1457,6 +1455,7 @@ export function ExtensionHub(props: {
   // 点下去走既有的 runPackageAction —— 打开的就是原来那个填令牌 / 填数据库位置的确认屏。
   const PackageRow = (cp: { view: CatalogPackageViewV1; dim?: boolean }) => {
     const view = () => currentPackageView(cp.view)
+    const installed = () => ext.isInstalled(view())
     const needsSetup = () => view().action.kind === "resolve-prerequisite"
     return (
       <div
@@ -1488,13 +1487,13 @@ export function ExtensionHub(props: {
         <button
           class="codepuppy-ext-add"
           data-variant={needsSetup() ? "ghost" : "primary"}
-          disabled={!view().action.enabled || busy() === view().catalogId}
+          disabled={installed() || !view().action.enabled || busy() === view().catalogId}
           onClick={(event) => {
             event.stopPropagation()
             void runPackageAction(view())
           }}
         >
-          {needsSetup() ? t("codepuppy.ext.rowSetup") : t("codepuppy.ext.add")}
+          {installed() ? t("codepuppy.ext.installed") : needsSetup() ? t("codepuppy.ext.rowSetup") : t("codepuppy.ext.add")}
         </button>
       </div>
     )
@@ -1594,7 +1593,9 @@ export function ExtensionHub(props: {
           </div>
           {/* 裁决 B 的必然连带:装完默认全关 ⇒ 不说下一步,用户按完确认拿不到任何东西。有任意一个开了就换成计数。 */}
           <div class="codepuppy-ext-kit-desc">
-            {enabledCount() === 0
+            {pack.components.some((component) => component.kind !== "skill")
+              ? `${pack.components.map((component) => typeLabel(component.kind as InstallReceipt["type"])).join(" · ")} · ${enabledCount() === 0 ? t("codepuppy.ext.notOn") : t("codepuppy.ext.packageSomeEnabled", { count: String(enabledCount()) })}`
+              : enabledCount() === 0
               ? t("codepuppy.ext.packageAllOffRow", { count: String(pack.components.length) })
               : `${t("codepuppy.ext.packageSkillCount", { count: String(pack.components.length) })} · ${t("codepuppy.ext.packageSomeEnabled", { count: String(enabledCount()) })}`}
           </div>
@@ -1806,7 +1807,7 @@ export function ExtensionHub(props: {
           <Show
             when={projectMcpView()}
             fallback={
-              <div class="codepuppy-ext-kit-desc" data-err={line().err ? "" : undefined} data-hub-state={line().hub} title={line().detail}>
+              <div class="codepuppy-ext-kit-desc" data-err={line().err ? "" : undefined} data-hub-state={line().hub} title={row.type === "cloud" ? undefined : line().detail}>
                 {line().text}
               </div>
             }
@@ -1815,6 +1816,14 @@ export function ExtensionHub(props: {
               <div class="codepuppy-ext-kit-desc" data-project-mcp-state={project().state}>
                 {t(project().textKey)}
               </div>
+            )}
+          </Show>
+          <Show when={row.type === "cloud" && hubState()?.detail}>
+            {(detail) => (
+              <details class="codepuppy-ext-dprompt" onClick={(event) => event.stopPropagation()}>
+                <summary>{t("codepuppy.timeline.devDetails")}</summary>
+                <pre>{detail()}</pre>
+              </details>
             )}
           </Show>
           <Show when={updErr()[row.receipt.id]}>

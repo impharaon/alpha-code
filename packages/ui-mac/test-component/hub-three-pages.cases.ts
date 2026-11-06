@@ -18,8 +18,9 @@ import { GlobalRegistrator } from "@happy-dom/global-registrator"
 import presetSolid from "babel-preset-solid"
 import bundledCatalog from "../src/renderer/extensions/codepuppy-catalog.json"
 import { DEFAULT_BUILTIN_POLICY } from "../src/main/codepuppy-builtin-policy"
-import { packageActionForReason } from "../src/main/package-installability"
+import { evaluatePackageForHost, packageActionForReason } from "../src/main/package-installability"
 import type { CatalogPackageViewV1 } from "../src/shared/catalog-package-view"
+import type { InstalledPackageV1 } from "../src/preload/types"
 import { dict as zh } from "../src/renderer/i18n/zh"
 
 GlobalRegistrator.register()
@@ -53,6 +54,7 @@ type Receipt = { id: string; name: string; type: string; scope: "global"; instal
 let receipts: Receipt[] = []
 let inventoryRows: unknown[] = []
 let hubRows: unknown[] = []
+let installedPackages: InstalledPackageV1[] = []
 let factorySkillIds: string[] = []
 let remoteCatalog: unknown = { source: "none" }
 const calls = {
@@ -112,7 +114,7 @@ Object.defineProperty(window, "api", {
       factorySkillIds: async () => factorySkillIds,
       onSessionGrantsEnded: () => () => {},
       inventoryView: async () => ({ catalogVersion: null, catalogChannel: null, rows: inventoryRows, warnings: [] }),
-      installedPackages: async () => ({ ok: true as const, packages: [] }),
+      installedPackages: async () => ({ ok: true as const, packages: installedPackages }),
       advisoryActive: async () => ({ ids: [], fresh: true }),
       migrateScan: async () => ({ enabled: false, inventory: { skills: [], mcp: [], plugins: [] } }),
       remoteCatalog: async () => remoteCatalog,
@@ -209,6 +211,7 @@ function reset() {
   receipts = []
   inventoryRows = []
   hubRows = []
+  installedPackages = []
   factorySkillIds = []
   calls.importSkillFolder = 0
   for (const list of [calls.filePicker, calls.installCatalog, calls.setInstallState, calls.uninstall, calls.builtinApply]) list.length = 0
@@ -507,4 +510,68 @@ test("AC7 进不了详情页的默认关闭行:行上「开启」,「…」里�
   // 装完默认关闭的提示指向的正是这颗「开启」(原来指向已拆掉的「已安装」页签与开关)。
   expect(zh["codepuppy.ext.addedDisabled"]).toContain(zh["codepuppy.ext.turnOn"])
   expect(zh["codepuppy.ext.addedDisabled"]).not.toContain("开关")
+})
+
+// #1658: prod installs.json, captured read-only on 2026-11-06; package uses ext-ipc.ts's real projection.
+const cloudReceipt: Receipt = { id: "cloud:image", name: "image", type: "cloud", scope: "global", version: "1.0.0", installedAt: "2026-11-06T03:45:05.599Z", origin: "catalog" }
+const cloudPackage: InstalledPackageV1 = { packageId: "package:cloud-image", installedGraphDigest: "sha256:041379893d634d990cbff7aa630239eaf7d92cfd668c41f3bfebd6a4d58e1e19", displayName: null, rootComponentName: "image", version: "1.0.0", origin: "catalog", components: [{ componentId: "cloud:image", kind: "cloud", name: "image", required: true, desiredState: "enabled" }] }
+async function installedCloud() {
+  reset()
+  receipts = [cloudReceipt]
+  installedPackages = [structuredClone(cloudPackage)]
+  inventoryRows = [inventoryRow("cloud:image", "image", "cloud", "enabled")]
+  // Real bundled envelope + existing producer payload; rebind its digest to exercise the host's own view projection.
+  const envelope = structuredClone(bundledCatalog.packages.find((pack) => pack.prelude.packageId === cloudPackage.packageId)!)
+  const payload = new Uint8Array(await Bun.file(new URL("../src/main/fixtures/hub-cloud-payload.json", import.meta.url)).arrayBuffer())
+  envelope.components[0].payloadRef = { ...envelope.components[0].payloadRef, sha256: new Bun.CryptoHasher("sha256").update(payload).digest("hex"), bytes: payload.length }
+  const view = await evaluatePackageForHost(envelope, { fetchPayload: async () => payload })
+  expect(view.verdict).toBe("compatible")
+  remoteCatalog = { source: "remote", catalog: { version: bundledCatalog.version, entries: bundledCatalog.entries, packages: [view] } }
+}
+
+test("#1658 AC1 installed cloud package and component use catalog names and cloud type, including legacy graphs", async () => {
+  for (const displayName of [null, "云端图片生成"]) {
+    await installedCloud()
+    installedPackages[0].displayName = displayName
+    mount()
+    await waitFor(() => expect(q("[data-installed-package] b")?.textContent).toBe("云端图片生成"))
+    expect(q("[data-installed-row='cloud:image'] b")?.textContent).toBe("云端图片生成")
+    expect(q("[data-installed-package] .codepuppy-ext-kit-desc")?.textContent).toContain("云能力")
+    expect(q("[data-installed-package]")?.textContent).not.toContain("技能")
+  }
+})
+
+test("#1658 AC2 installed cloud catalog card says installed and cannot add again; missing receipt remains addable", async () => {
+  for (const installed of [true, false]) {
+    await installedCloud()
+    if (!installed) receipts = []
+    mount()
+    await waitFor(() => expect(q("[data-package-card] button")?.textContent).toBe(installed ? "已安装" : "添加"))
+    expect(q<HTMLButtonElement>("[data-package-card] button")?.disabled).toBe(installed)
+    if (installed) click(q("[data-package-card] button"))
+    expect(calls.installCatalog).toEqual([])
+  }
+})
+
+test("#1658 AC3 cloud verification identifies connection, tools or policy; raw details stay collapsed", async () => {
+  for (const [code, detail, text] of [
+    ["cloud-connection", "cloud MCP needs_auth", "云连接尚未通过核验"],
+    ["cloud-tools", "dispatch is not in this directory's tool list", "工具清单尚未通过核验"],
+    ["cloud-policy", "dispatch is ask by tool policy", "权限策略尚未通过核验"],
+  ]) {
+    await installedCloud()
+    hubRows = [{ ...hubRow("cloud:image", "image", "cloud", "installed"), stateReason: { code, detail } }]
+    mount()
+    await waitFor(() => expect(q("[data-installed-row='cloud:image'] .codepuppy-ext-kit-desc")?.textContent).toBe(`已安装 · ${text}`))
+    const row = q("[data-installed-row='cloud:image']")!
+    const details = q<HTMLDetailsElement>("details", row)!
+    expect(details.open).toBe(false)
+    expect(details.textContent).toContain(detail)
+    expect(q("summary", details)?.textContent).toBe("开发者详情")
+    const visible = document.createElement("div")
+    visible.append(row.cloneNode(true))
+    visible.querySelectorAll("details").forEach((node) => node.remove())
+    expect(visible.textContent).not.toContain(detail)
+    expect(q(".codepuppy-ext-kit-desc", row)?.getAttribute("title")).toBeNull()
+  }
 })

@@ -1232,6 +1232,7 @@ const conflictReason = (conflicts: PackageChildConflictV1[]): string =>
 function packageGraphOf(prepared: PreparedPackage, rootManifestDigest: string): PackageGraphV1 {
   const withoutDigest = {
     packageId: prepared.facts.envelope.prelude.packageId,
+    displayName: prepared.facts.envelope.presentation.displayName,
     envelopeDigest: `sha256:${prepared.binding.envelopeDigest}`,
     root: { ...graphNodeOf(prepared.root), required: true, manifestDigest: rootManifestDigest },
     children: prepared.components.slice(1).map(graphNodeOf),

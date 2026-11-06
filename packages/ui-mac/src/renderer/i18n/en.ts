@@ -2218,4 +2218,7 @@ export const dict = {
   "codepuppy.net.timeout": "Waiting for {{host}} timed out; try again later",
   "codepuppy.net.unattributed": "The connection dropped partway",
   "codepuppy.ext.connectorDisabled": "Connector disabled",
+  "codepuppy.ext.hubCloudConnection": "Cloud connection verification has not passed",
+  "codepuppy.ext.hubCloudTools": "Tool list verification has not passed",
+  "codepuppy.ext.hubCloudPolicy": "Permission policy verification has not passed",
 }

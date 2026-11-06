@@ -2186,4 +2186,7 @@ export const dict = {
   "codepuppy.net.timeout": "等待 {{host}} 超时,稍后重试",
   "codepuppy.net.unattributed": "连接中途断开了",
   "codepuppy.ext.connectorDisabled": "连接器已停用",
+  "codepuppy.ext.hubCloudConnection": "云连接尚未通过核验",
+  "codepuppy.ext.hubCloudTools": "工具清单尚未通过核验",
+  "codepuppy.ext.hubCloudPolicy": "权限策略尚未通过核验",
 }

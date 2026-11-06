@@ -266,6 +266,7 @@ test("real ext-install-catalog IPC binds preview, revalidates, then commits thro
   expect(ledger.packageGraphs).toEqual([
     {
       packageId: envelope.prelude.packageId,
+      displayName: envelope.presentation.displayName,
       envelopeDigest: `sha256:${preview.packageAuthorization.binding.envelopeDigest}`,
       installedGraphDigest: ledger.packageGraphs[0]!.installedGraphDigest,
       root: {
@@ -294,6 +295,7 @@ test("real ext-install-catalog IPC binds preview, revalidates, then commits thro
   const installedGraph = ledger.packageGraphs[0]!
   expect(Object.keys(installedGraph).sort()).toEqual([
     "children",
+    "displayName",
     "envelopeDigest",
     "installedGraphDigest",
     "packageId",

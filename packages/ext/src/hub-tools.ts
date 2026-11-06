@@ -155,7 +155,10 @@ function unreachable(failure: BridgeFailure): string {
 /** 给人 / agent 读的原因短句(§2.1 codepuppy_hub_status 行)。 */
 function reasonText(row: HubViewRow): string {
   const detail = row.stateReason?.detail
-  switch (row.stateReason?.code) {
+  const code = row.stateReason?.code
+  switch (code) {
+    case undefined:
+      return ""
     case "disabled":
       return "disabled by policy"
     case "reload-waiting":
@@ -164,9 +167,15 @@ function reasonText(row: HubViewRow): string {
       return `last reload failed: ${detail ?? "unknown reason"}`
     case "not-loaded":
       return `not loaded in this directory: ${detail ?? "unknown reason"}`
-    default:
-      return ""
+    case "cloud-connection":
+      return `cloud connection: ${detail ?? "unknown reason"}`
+    case "cloud-tools":
+      return `cloud tool list: ${detail ?? "unknown reason"}`
+    case "cloud-policy":
+      return `cloud tool policy: ${detail ?? "unknown reason"}`
   }
+  const exhaustive: never = code
+  return exhaustive
 }
 
 /** 一行一条 JSON(只含视图字段);云条目缺价格说明时末尾固定缺项句;main 的 warnings 不原样外发(可能带内部细节),只说视图可能不全。 */

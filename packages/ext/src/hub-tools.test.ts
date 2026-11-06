@@ -230,6 +230,25 @@ describe("I9:结局以 main 的阶段记录为准", () => {
 })
 
 describe("codepuppy_hub_search / codepuppy_hub_status", () => {
+  // stateReason snapshots from the real main service in ui-mac/src/main/hub-view.test.ts (#1658 AC3).
+  test.each([
+    ["cloud-connection", "cloud MCP needs_auth", "cloud connection"],
+    ["cloud-tools", "dispatch is not in this directory's tool list", "cloud tool list"],
+    ["cloud-policy", "dispatch is ask by tool policy", "cloud tool policy"],
+  ] as const)("#1658 audit: %s retains stage and detail in search, status and install settlement", async (code, detail, stage) => {
+    const item = row({ id: "cloud:docs", kind: "cloud", scope: "global", installed: true, enabled: true, state: "installed", stateReason: { code, detail } })
+    const { bridge } = bridgeWith({ views: [view([item])], record: { requestId: "x", catalogId: item.id, stage: "committed", scope: "global" } })
+    const tools = createHubTools(bridge)
+    const { ctx } = ctxWith(async () => {})
+    const expected = `${stage}: ${detail}`
+    for (const output of [
+      await tools.codepuppy_hub_search.execute({ query: "" }, ctx),
+      await tools.codepuppy_hub_status.execute({ catalogId: item.id }, ctx),
+    ]) expect(JSON.parse(outputOf(output).split("\n")[0]!).reason).toBe(expected)
+    expect(outputOf(await tools.codepuppy_hub_install.execute({ catalogId: item.id }, ctx)).split("\n")[0])
+      .toBe(`installed; not available in this directory yet (${expected})`)
+  })
+
   test("#1533:价格说明逐字输出;缺说明才给末尾缺项句(混合列表与 warnings 同样成立)", async () => {
     const priced = row({ id: "cloud:html", kind: "cloud", priceNote: "预留 US$1.00,按实际用量结算;失败时已产生的费用仍会结算" })
     const missing = row({ id: "cloud:docs", kind: "cloud" })

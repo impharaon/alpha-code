@@ -221,7 +221,7 @@ export function resetComposerAgentScopesForTests() {
  *    请求也不再带 `codepuppy-readonly`。ask 确实不会未经批准就写盘,但**是系统替用户把只读关掉了**,
  *    而用户从没做过这个动作。登记是「用户显式开过只读」的唯一凭据,不能有损。 */
 const permByScope = new Map<string, PermMode>()
-/** 当前持有只读档信号的会话身份键;null = 首页(新会话入口)、身份未定、或无人持有。 */
+/** 当前持有权限信号的会话身份键或 draft:草稿ID;null = 无草稿身份的首页、身份未定、或无人持有。 */
 let permScopeOwner: string | null = null
 /** 租约语义同档位那份(见 `agentScopeLease`)。两份各自持有,不共用计数器。 */
 let permScopeLease = 0
@@ -230,7 +230,7 @@ function rememberScopedPerm(scopeKey: string, value: PermMode) {
   permByScope.set(scopeKey, value)
 }
 
-/** 挂载:接管该身份的权限档(无登记 = `DEFAULT_PERM`)。`null` = 首页或身份未定,一律回默认。 */
+/** 挂载:接管该会话/草稿的权限档(无登记 = `DEFAULT_PERM`)。`null` = 无身份,回默认。 */
 export function adoptComposerPermScope(scopeKey: string | null): number {
   permScopeOwner = scopeKey
   permScopeLease += 1

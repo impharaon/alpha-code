@@ -686,6 +686,8 @@ export type CodePuppyComposerProps = {
   directory: () => string | undefined
   /** session 模式必传:目标会话。 */
   sessionID?: () => string | undefined
+  /** 新对话草稿的稳定身份;目标目录变化或重挂时保留显式权限选择。 */
+  draftId?: string
   /** #891:目标会话所属的 server 身份(`ServerConnection.key`)。与 `directory` / `sessionID` 合成
    *  仓内 canonical 的会话身份三元组 —— composer 的档位/只读档作用域就以它的 `identityKey` 为键
    *  (与草稿暂存、artifacts、review 同一把钥匙)。宿主各自给权威源:会话页给 live 身份的
@@ -973,7 +975,7 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
      用 createEffect 而不是 onMount:生产的会话 composer 由 SessionComposerMount 按身份 keyed
      重挂,但同一实例内 sessionID 换代(模型链已按此换代)也必须换档位 —— 两种都盖住。
 
-     #884:只读档(perm)走**同一把钥匙、同一处 adopt/release**。它不跟上就等于上面白改 ——
+     #884:已建会话的只读档(perm)走**同一把钥匙、同一处 adopt/release**。它不跟上就等于上面白改 ——
      `buildPromptRequest` 里 readonly 强制 codepuppy-readonly 并压过手选档位,只读档跨会话粘连时
      B 的档位照样被顶掉。两者的作用域生命周期完全一致,所以共用这一个 effect,不另起一条。
 
@@ -991,6 +993,7 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
     return identityKey({ serverKey, directory, sessionID }) ?? null
   }
   let composerScope: string | null = null
+  let composerPermScope: string | null = null
   let composerScopeHeld = false
   // adopt 发下来的租约(两份各自一张)。卸载时原样交回 —— 别的实例已经接管时,租约不匹配,
   // 本实例的 cleanup 就不会去清掉人家的持有权(同一个会话 id 的新旧实例只能靠它分开)。
@@ -998,17 +1001,20 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
   let composerPermLease = 0
   const releaseComposerScope = () => {
     releaseComposerAgentScope(composerScope, composerAgentLease)
-    releaseComposerPermScope(composerScope, composerPermLease)
+    releaseComposerPermScope(composerPermScope, composerPermLease)
   }
   createEffect(() => {
     const next = composerScopeKey()
+    // #1657:草稿还没有 session 身份,但已有稳定的 draftId;复用档位登记,不把显式选择当默认值丢掉。
+    const nextPerm = props.draftId ? `draft:${props.draftId}` : next
     untrack(() => {
-      if (composerScopeHeld && next === composerScope) return
+      if (composerScopeHeld && next === composerScope && nextPerm === composerPermScope) return
       if (composerScopeHeld) releaseComposerScope()
       composerScope = next
+      composerPermScope = nextPerm
       composerScopeHeld = true
       composerAgentLease = adoptComposerAgentScope(next)
-      composerPermLease = adoptComposerPermScope(next)
+      composerPermLease = adoptComposerPermScope(nextPerm)
     })
   })
   onCleanup(() => {

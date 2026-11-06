@@ -341,12 +341,12 @@ test("connected 的 MCP 行不出授权按钮", async () => {
 })
 
 // `#1563` 审计 F5:引擎在后台启动这台服务时报 pending —— 已安装行不能说「已停用」,说定制中心对同一状态的那句。
-test("`#1563` pending 的 MCP 行不说「已停用」,也不出授权按钮", async () => {
+test("#1653 AC1 connecting MCP displays 准备中 without authorization", async () => {
   reset()
   engineStatus = { [GENERIC_MCP]: { status: "pending" } }
   mount()
 
-  await waitFor(() => expect(document.body.textContent).toContain(zh["codepuppy.ext.hubReasonNotLoaded"]))
+  await waitFor(() => expect(document.body.textContent).toContain(zh["codepuppy.ext.mcpPreparing"]))
   expect(document.body.textContent).not.toContain(zh["codepuppy.ext.disabled"])
   expect(authorizeButtons().length).toBe(0)
 })
@@ -590,4 +590,26 @@ test.each(["list", "detail"])("#1645 AC4 首页 %s 保留 needs_auth,只有已�
   authorizeButtons()[0]!.click()
   await waitFor(() => expect(authenticateCalls).toEqual([{ name: "codepuppy" }]))
   await waitFor(() => expect(document.querySelector(".codepuppy-ext-cloudst")?.textContent).toBe(zh["codepuppy.ext.cloudConnDisconnected"]))
+})
+
+// 错误形状复用 codepuppy-remote-transport-retry.test.ts 的 Node 22 实测样本;#1653 R10 同属握手超时重试。
+test("#1653 AC1/AC2 retry error stays in details while the card says 准备中", async () => {
+  reset()
+  const error = "fetch failed: Connect Timeout Error (attempted address: alpha-cloud.tidelabs.click:443, timeout: 10000ms)"
+  engineStatus = { filesystem: { status: "pending", error } }
+  mount()
+  await waitFor(() => expect(document.querySelector('[data-installed-row="mcp:filesystem"] .codepuppy-ext-kit-desc')?.textContent).toBe(zh["codepuppy.ext.mcpPreparing"]))
+  expect(document.body.textContent).not.toContain(error)
+  expect(document.body.textContent).not.toContain(zh["codepuppy.ext.hubReloadNow"])
+  ;(document.querySelector('[data-installed-row="mcp:filesystem"]') as HTMLElement).click()
+  await waitFor(() => expect(document.querySelector(".codepuppy-ext-dhead")?.textContent).toContain(error))
+  expect(document.querySelector(".codepuppy-ext-dhead")?.textContent).toContain(zh["codepuppy.ext.mcpPreparing"])
+})
+
+test("#1653 AC3 disabled MCP keeps its existing status", async () => {
+  reset()
+  engineStatus = { [GENERIC_MCP]: { status: "disabled" } }
+  mount()
+  await waitFor(() => expect(document.querySelector(`[data-installed-row="mcp:${GENERIC_MCP}"] .codepuppy-ext-kit-desc`)?.textContent).toBe(zh["codepuppy.ext.disabled"]))
+  expect(document.body.textContent).not.toContain(zh["codepuppy.ext.mcpPreparing"])
 })

@@ -1464,7 +1464,14 @@ const layer = Layer.effect(
               }
             }
 
-            if (result === "stop") return "break" as const
+            if (result === "stop") {
+              // A rejected tool ends this turn, but prompts saved during it still need their own turn.
+              if (!handle.message.error) {
+                const next = yield* sessions.findMessage(sessionID, (message) => message.info.role === "user").pipe(Effect.orDie)
+                if (Option.isSome(next) && next.value.info.id !== lastUser.id) return "continue" as const
+              }
+              return "break" as const
+            }
             if (result === "compact") {
               yield* compaction.create({
                 sessionID,

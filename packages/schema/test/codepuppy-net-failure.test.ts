@@ -322,3 +322,11 @@ describe("isNetFailureLayer:读回来的层名只认九个", () => {
       expect(isNetFailureLayer(value)).toBe(false)
   })
 })
+
+// #1654 N11(a) 落库原文与 webfetch.ts 的 timeoutOrElse:普通 Error,不是 TimeoutError。
+test("#1654 AC1 webfetch Request timed out is an overall timeout on either path", () => {
+  for (const path of [PROXY, OTHER]) {
+    expect(classifyNetFailure(new Error("Request timed out"), path)).toEqual({ layer: "timeout", code: "timeout" })
+    expect(classifyNetFailure(new Error("Request timed out elsewhere"), path)).toBeUndefined()
+  }
+})

@@ -45,6 +45,7 @@ import {
   sdkMcpStatusForReceipt,
   nameOnlyLiveMcpIsUnambiguousGlobal,
   projectMcpStatusView,
+  hubStateView,
   projectReceiptResponseForRoute,
   uninstallIntentFor,
   withoutProjectOnlyLiveMcp,
@@ -234,4 +235,21 @@ describe("mcpRepair(#1564 AC6)", () => {
     expect(mcpRepair("codepuppy-word", { status: "pending", error: missingInterpreter.error })).toBeUndefined()
     expect(mcpRepair("codepuppy-word", { status: "connected" })).toBeUndefined()
   })
+})
+
+test("#1653 AC1 engine pending replaces not-loaded but preserves an explicit pending reload", () => {
+  // main hub-view.ts 的已安装 MCP 投影形状;pending 样本来自 #1653 R10。
+  const row = {
+    id: "mcp:files", scope: "global" as const, name: "files", kind: "mcp" as const,
+    displayName: "Files", description: "", installed: true, enabled: true, state: "installed" as const,
+    stateReason: { code: "not-loaded" as const, detail: "MCP pending" },
+  }
+  expect(hubStateView(row, { pending: true, error: "Connect Timeout Error" })).toMatchObject({
+    textKey: "codepuppy.ext.mcpPreparing", detail: "Connect Timeout Error", reloadNow: false,
+  })
+  expect(hubStateView({ ...row, state: "reload-pending" }, { pending: true })?.textKey).toBe("codepuppy.ext.mcpPreparing")
+  expect(hubStateView({ ...row, state: "reload-pending", stateReason: { code: "reload-waiting" } }, { pending: true })).toMatchObject({
+    textKey: "codepuppy.ext.hubStatePending", reasonKey: "codepuppy.ext.hubReasonWaiting", reloadNow: true,
+  })
+  expect(projectMcpStatusView("pending").textKey).toBe("codepuppy.ext.mcpPreparing")
 })

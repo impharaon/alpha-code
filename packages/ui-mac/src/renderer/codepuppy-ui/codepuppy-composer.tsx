@@ -95,6 +95,7 @@ import {
   type EngineModelRef,
 } from "./model-default-core"
 import { ModelPickPop } from "./codepuppy-composer-model"
+import { abortUserTurn } from "./session-workspace/user-stopped-turns"
 import { identityKey } from "./session-workspace/session-workspace-core"
 import { createModelContract, type ModelContract } from "./model-contract"
 import { byokEngineId, isByokEngineId } from "../../shared/codepuppy-model-types"
@@ -652,8 +653,9 @@ export type ComposerSlashCapture = {
  * 缺席(home/newSession 或测试)时组件按「无会话数据」诚实降级:无停止键、无 ring。
  */
 export type ComposerSessionDockApi = {
-  /** undefined = 消息尚未读回;空数组 = 已读回的新会话。 */
-  messages?: () => readonly { role: string; agent?: string }[] | undefined
+  /** 当前 sync 消息快照;首次读取是否完成由 messagesReady 给出。 */
+  messages?: () => readonly { role: string; agent?: string; id?: string; parentID?: string; time?: { created?: number; completed?: number } }[] | undefined
+  messagesReady?: () => boolean
   /** live 运行态(session_status typed 通道;不再轮询)。 */
   running: () => boolean
   /** 上下文用量百分比(0-100);null = 事实不足,ring 不渲染。 */
@@ -1013,11 +1015,11 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
     if (composerScopeHeld) releaseComposerScope()
   })
 
-  const permissionHistoryReady = () => !props.sessionDock?.messages || props.sessionDock.messages() !== undefined
+  const permissionHistoryReady = () => props.sessionDock?.messagesReady?.() ?? (!props.sessionDock?.messages || props.sessionDock.messages() !== undefined)
   createEffect(() => {
     const scope = composerScopeKey()
     const messages = props.sessionDock?.messages?.()
-    if (!scope || !messages) return
+    if (!scope || !permissionHistoryReady() || !messages) return
     const agent = messages.findLast((message) => message.role === "user")?.agent
     untrack(() => restoreComposerPermScope(scope, agent))
   })
@@ -1624,9 +1626,7 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
     const sid = props.sessionID?.()
     if (!c || !sid) return
     try {
-      const result = await c.session.abort({ sessionID: sid, directory: props.directory() } as any)
-      // throwOnError:false 档位的 { error } 信封同样是失败(审计 minor:4xx 不装停止成功)。
-      if ((result as { error?: unknown } | undefined)?.error !== undefined) throw new Error("abort rejected")
+      await abortUserTurn(props.sessionDock?.messages?.(), () => c.session.abort({ sessionID: sid, directory: props.directory() } as any))
     } catch {
       pushToast({ kind: "error", title: t("codepuppy.composer.abortFailed") })
     }

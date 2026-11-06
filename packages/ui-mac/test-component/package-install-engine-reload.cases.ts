@@ -54,6 +54,25 @@ let connectorRefreshes = 0
 let liveMcpCalls = 0
 let startup: { mcp?: Record<string, { enabled?: boolean }> } | undefined
 const services = () => startup ? { "codepuppy-pdf": { status: startup.mcp?.["codepuppy-pdf"]?.enabled === false ? "disabled" : "connected" } } : {}
+// N07(b) engine tool display: prt_1aeaf3f3c001sbAwc6IGaVcOvr (result-0126-e.md).
+// Request envelope follows the v1 sample in permission-dual-channel.test.ts; metadata is
+// produced by permission/codepuppy-tool-policy-gate.ts:confirm, also used by the approval card.
+const approvalRequest = (id: string, connector: string, sessionID: string) => ({
+  id, sessionID, permission: `mcp:${connector}:execute_sql`, patterns: [`call:${id}`], always: [],
+  metadata: {
+    identity: { source: "mcp", origin: connector, name: "execute_sql" },
+    authority: { kind: "not-asserted" }, location: { kind: "local" },
+  },
+  tool: { messageID: "msg_1aeaf3b3d0018M9RLjLp5ZvYc5", callID: id },
+})
+const projectA = "/tmp/approval-project-a"
+const projectB = "/tmp/approval-project-b"
+const directories = () => [projectA, projectB]
+let permissions: Record<string, ReturnType<typeof approvalRequest>[]> = {}
+const unavailable = new Set<string>()
+const operations: string[] = []
+let refuseState = false
+const permissionReplies: Array<{ requestID: string; reply: string; message: string; directory?: string }> = []
 const engineClient = {
   global: {
     dispose: async () => {
@@ -70,7 +89,24 @@ const engineClient = {
   },
   app: { agents: async () => ({ data: [] }) },
 }
-const createOpencodeClientStub = () => engineClient
+const createOpencodeClientStub = (options?: { directory?: string }) => ({
+  ...engineClient,
+  permission: {
+    list: async (input: { directory?: string }) => {
+      const directory = input.directory ?? options?.directory ?? "default"
+      if (unavailable.has(directory)) throw new Error("ECONNREFUSED")
+      return { data: permissions[directory] ?? [] }
+    },
+    reply: async (input: { requestID: string; reply: string; message: string; directory?: string }) => {
+      operations.push("reply")
+      permissionReplies.push(input)
+      const directory = input.directory ?? options?.directory ?? "default"
+      const session = permissions[directory]!.find((request) => request.id === input.requestID)!.sessionID
+      permissions[directory] = permissions[directory]!.filter((request) => request.sessionID !== session)
+      return { data: true }
+    },
+  },
+})
 mock.module("@opencode-ai/sdk/v2/client", () => ({ createOpencodeClient: createOpencodeClientStub }))
 
 // ── ② main 侧进程边界替身 ────────────────────────────────────────────────────────────────
@@ -248,10 +284,12 @@ type CentralCall = { catalogId: string; attemptId: string | undefined; authorize
 const centralCalls: CentralCall[] = []
 const realUseExtensionsModule = await import("../src/renderer/extensions/use-extensions")
 const realUseExtensions = realUseExtensionsModule.useExtensions
+let hubApi: ReturnType<typeof realUseExtensions>
 mock.module("../src/renderer/extensions/use-extensions", () => ({
   ...realUseExtensionsModule,
   useExtensions: ((...args: Parameters<typeof realUseExtensions>) => {
     const api = realUseExtensions(...args)
+    hubApi = api
     const realInstallCatalogIntent = api.installCatalogIntent
     // 收口方法缺席 ⇒ 大声炸掉。静默 undefined 会把「根本没有收口」伪装成一次无害的 no-op。
     if (typeof realInstallCatalogIntent !== "function")
@@ -273,7 +311,7 @@ mock.module("../src/renderer/extensions/use-extensions", () => ({
 // ── ⑥ 真 main:环境 + IPC 表 ─────────────────────────────────────────────────────────────
 const { initCodePuppyEnvironment } = await import("../src/main/codepuppy-environment")
 const { registerExtIpcHandlers } = await import("../src/main/ext-ipc")
-const { readPackageLedgerStateV1, upsertRecordV2 } = await import("../src/main/ext-receipt-v2")
+const { findRecordV2, readPackageLedgerStateV1, upsertRecordV2 } = await import("../src/main/ext-receipt-v2")
 const { injectDisabledOverrides } = await import("../src/main/ext-disabled-injection")
 const { restoreMcpLeaf } = await import("../src/main/ext-config")
 const { codepuppyOfficeInstallCommand } = await import("../src/shared/office-advisories")
@@ -332,7 +370,12 @@ const extBridge: Record<string, unknown> = {
   packageDetail: (catalogId: unknown) => call("ext-package-detail", catalogId),
   packageInstalled: (catalogId: unknown) => call("ext-package-installed", catalogId),
   installedPackages: () => call("ext-installed-packages"),
-  setInstallState: (intent: unknown) => call("ext-set-install-state", intent),
+  setInstallState: async (intent: unknown) => {
+    if (refuseState) return { ok: false, reason: "fixture write failure" }
+    const result = await call("ext-set-install-state", intent)
+    if ((result as { ok: boolean }).ok) operations.push("ledger")
+    return result
+  },
   persistMcp: (name: unknown, server: unknown, secrets: unknown) => call("ext-persist-mcp", name, server, secrets),
   listInstalls: (projectDir?: unknown) => call("ext-list-installs", projectDir),
   inventoryView: (projectDir?: unknown) => call("ext-inventory-view", projectDir),
@@ -381,7 +424,7 @@ document.body.append(root)
 const toastHost = document.body.appendChild(document.createElement("div"))
 const disposeToasts = render(() => createComponent(ToastViewport, {}), toastHost)
 const disposeHub = render(
-  () => createComponent(ExtensionHub, { server: () => ({ baseUrl: "http://127.0.0.1:39131" }), open: () => true, onClose: () => {} }),
+  () => createComponent(ExtensionHub, { server: () => ({ baseUrl: "http://127.0.0.1:39131" }), open: () => true, onClose: () => {}, directories }),
   root,
 )
 
@@ -677,4 +720,90 @@ test("#1646 AC4 custom connector waits for idle or reload-now and the new genera
     await waitFor(() => expect(connectorRefreshes).toBe(before + 1))
     expect(isEgressAuthorizedForSidecar(host, 443)).toBe(true)
   }
+})
+
+
+test("#1652 AC1/AC2 Hub disable rejects only this connector's pending approvals and waits for idle", async () => {
+  const name = "dbhub-readonly"
+  busy = true
+  const before = connectorRefreshes
+  expect(restoreMcpLeaf(name, { type: "local", command: ["fixture-db-server"], enabled: true }).ok).toBe(true)
+  expect(upsertRecordV2(globalRoot, {
+    id: `mcp:${name}`, name, kind: "mcp", origin: "catalog", environment: "dev", version: "1.0.0",
+    scope: { kind: "global" }, installedAt: "2026-11-05T10:40:00.000Z", desiredState: "enabled", configKey: `mcp.${name}`,
+  }).ok).toBe(true)
+  permissions = {
+    [projectA]: [approvalRequest("per_db_1", name, "ses_db_1")],
+    [projectB]: [approvalRequest("per_db_2", name, "ses_db_2"), approvalRequest("per_other", "another-connector", "ses_other")],
+  }
+  operations.length = 0
+  permissionReplies.length = 0
+  setHubSection("connectors")
+  await call("ext-reload-request", { scope: "global", items: [], reason: "fixture install completed" })
+  const row = () => q(`[data-installed-row="mcp:${name}"]`)
+  await waitFor(() => expect(row()).toBeInstanceOf(HTMLElement))
+  click(row()?.querySelector('[data-more]'))
+  click(row()?.querySelector('[data-menu-item="disable"]'))
+  await waitFor(() => expect(row()?.querySelector('[data-hub-reload-now]')).toBeInstanceOf(HTMLElement))
+  await waitFor(() => expect(permissionReplies).toHaveLength(2))
+  expect(permissionReplies).toEqual([
+    { requestID: "per_db_1", reply: "reject", message: "连接器已停用", directory: projectA },
+    { requestID: "per_db_2", reply: "reject", message: "连接器已停用", directory: projectB },
+  ])
+  expect(Object.values(permissions).flat().map((request) => request.id)).toEqual(["per_other"])
+  expect(operations).toEqual(["ledger", "reply", "reply"])
+  await scheduler.settled()
+  expect(connectorRefreshes).toBe(before)
+  expect(liveMcpCalls).toBe(0)
+  busy = false
+  scheduler.poke()
+  await scheduler.settled()
+  await waitFor(() => expect(connectorRefreshes).toBe(before + 1))
+  permissions = {}
+})
+
+
+test("#1652 audit: project A disable rejects project B approvals with the active locale after ledger commit", async () => {
+  const { setLocale } = await import("../src/renderer/i18n")
+  const [api, dispose] = solid.createRoot((dispose) => [realUseExtensions(
+    () => ({ baseUrl: "http://127.0.0.1:39131" }), () => true, () => projectA, directories,
+  ), dispose] as const)
+  await waitFor(() => expect(api.store.receipts.some((r) => r.name === "dbhub-readonly")).toBe(true))
+  const receipt = api.store.receipts.find((r) => r.name === "dbhub-readonly")!
+  permissions = { [projectA]: [approvalRequest("per_same", receipt.name, "ses_same")], [projectB]: [approvalRequest("per_same", receipt.name, "ses_same")] }
+  permissionReplies.length = 0
+  operations.length = 0
+  setLocale("en")
+  try {
+    expect((await api.setInstallState(receipt, "disabled")).ok).toBe(true)
+    expect(permissionReplies).toEqual([projectA, projectB].map((directory) => ({ directory, requestID: "per_same", reply: "reject", message: "Connector disabled" })))
+    expect(operations).toEqual(["ledger", "reply", "reply"])
+    expect(Object.values(permissions).flat()).toEqual([])
+  } finally { setLocale("zh"); dispose() }
+})
+
+for (const offline of [[projectA], [projectA, projectB]]) test(`#1652 audit: disable commits when permission lookup is offline in ${offline.length} directories`, async () => {
+  const receipt = hubApi.store.receipts.find((r) => r.name === "dbhub-readonly")!
+  permissions = { [projectB]: [approvalRequest("per_online", receipt.name, "ses_online")] }
+  offline.forEach((directory) => unavailable.add(directory))
+  permissionReplies.length = 0
+  operations.length = 0
+  try {
+    expect((await hubApi.setInstallState(receipt, "disabled")).ok).toBe(true)
+    expect(operations[0]).toBe("ledger")
+    expect(permissionReplies).toHaveLength(offline.includes(projectB) ? 0 : 1)
+    expect(findRecordV2(globalRoot, "mcp", receipt.name)?.desiredState).toBe("disabled")
+  } finally { unavailable.clear(); permissions = {} }
+})
+
+test("#1652 audit: a refused ledger write sends no permission rejection", async () => {
+  const receipt = hubApi.store.receipts.find((r) => r.name === "dbhub-readonly")!
+  permissions = { [projectA]: [approvalRequest("per_kept", receipt.name, "ses_kept")] }
+  permissionReplies.length = 0
+  refuseState = true
+  try {
+    expect((await hubApi.setInstallState(receipt, "disabled")).ok).toBe(false)
+    expect(permissionReplies).toEqual([])
+    expect(permissions[projectA]).toHaveLength(1)
+  } finally { refuseState = false; permissions = {} }
 })

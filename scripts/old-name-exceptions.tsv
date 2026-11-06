@@ -931,8 +931,8 @@ packages/ui-mac/src/renderer/codepuppy-ui/artifact-html-preview/index.ts	1	exter
 packages/ui-mac/src/renderer/codepuppy-ui/artifact-workbench/renderers/registry.ts	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/codepuppy-ui/brand-icon.tsx	4	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-composer.css	294	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-composer.tsx	464	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-composer.tsx	1064	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-composer.tsx	465	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-composer.tsx	1066	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search-test-runtime.tsx	29	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search-test-runtime.tsx	49	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search-test-runtime.tsx	52	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -955,10 +955,10 @@ packages/ui-mac/src/renderer/extensions/catalog-types.ts	80	external-anchor	GitH
 packages/ui-mac/src/renderer/extensions/extension-detail.tsx	42	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/i18n/en.ts	131	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/i18n/en.ts	165	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/renderer/i18n/en.ts	1406	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
+packages/ui-mac/src/renderer/i18n/en.ts	1407	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
 packages/ui-mac/src/renderer/i18n/zh.ts	129	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/i18n/zh.ts	159	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/renderer/i18n/zh.ts	1381	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
+packages/ui-mac/src/renderer/i18n/zh.ts	1382	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
 packages/ui-mac/src/renderer/logo-codepuppy.tsx	4	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	266	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	282	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改

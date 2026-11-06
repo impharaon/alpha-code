@@ -351,6 +351,7 @@ export const dict = {
   "codepuppy.ext.installFailed": "安装没有完成，请重试。",
   "codepuppy.ext.loading": "加载中…",
   "codepuppy.ext.pluginRestart": "已安装，正在加载。首次启用需要下载所需文件，请稍候。",
+  "codepuppy.ext.mcpPreparing": "准备中",
   "codepuppy.ext.hubStateAvailable": "可以使用",
   "codepuppy.ext.hubStateInstalled": "已安装",
   "codepuppy.ext.hubStatePending": "待生效",
@@ -1511,6 +1512,7 @@ export const dict = {
   "codepuppy.timeline.compacted": "上下文已压缩",
   "codepuppy.timeline.retainedHighlights": "保留要点",
   "codepuppy.timeline.interrupted": "已由你停止",
+  "codepuppy.timeline.interruptedUnknown": "这一轮已中断",
   "codepuppy.timeline.continueTurn": "继续生成",
   "codepuppy.timeline.continuePrompt": "继续",
   // REQ-160 AC3(`#1318`):助手回合跑完却零正文。**把内容安全审核放在明面上但不断言**
@@ -2182,4 +2184,5 @@ export const dict = {
   "codepuppy.net.http": "{{host}} 返回了错误",
   "codepuppy.net.timeout": "等待 {{host}} 超时,稍后重试",
   "codepuppy.net.unattributed": "连接中途断开了",
+  "codepuppy.ext.connectorDisabled": "连接器已停用",
 }

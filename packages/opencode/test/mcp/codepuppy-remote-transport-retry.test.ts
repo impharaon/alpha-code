@@ -105,8 +105,8 @@ it.instance("AC2: when every attempt fails the status carries the StreamableHTTP
     yield* mcp.add("cloud", cloud)
 
     const status = (yield* mcp.status()).cloud
-    expect(status?.status).toBe("failed")
-    const error = status?.status === "failed" ? status.error : ""
+    expect(status?.status).toBe("pending")
+    const error = status?.status === "pending" ? status.error : ""
     expect(error).toContain(CONNECT_TIMEOUT_TEXT)
     expect(error).not.toContain("405")
     // 首次 + 至少 2 次重试,之后才改用 SSE(GET)。

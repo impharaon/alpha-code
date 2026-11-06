@@ -1523,6 +1523,66 @@ it.instance("prompt submitted during an active run is included in the next LLM i
   }),
 )
 
+// #1655 W08 / ses_e511ca92effeQrOElaM45rm8gV:补充 user 已落库,旧 assistant 的工具拒绝后没有新 parentID。
+// 用真实 Permission.reply 与 SessionPrompt/Processor 重现收尾;工具换成本地 read,不调用现场云工具。
+for (const ending of ["reject with queued prompt", "reject without queued prompt", "cancel with queued prompt"] as const)
+  it.instance(`#1655 ${ending}`, () =>
+    Effect.gen(function* () {
+      const { dir, llm } = yield* useServerConfig(providerCfg)
+      const prompt = yield* SessionPrompt.Service
+      const sessions = yield* Session.Service
+      const permission = yield* Permission.Service
+      const status = yield* SessionStatus.Service
+      const chat = yield* sessions.create({
+        title: "Queued after permission",
+        permission: [{ permission: "builtin::read", pattern: "*", action: "ask" }],
+      })
+      yield* writeText(path.join(dir, "probe.txt"), "must not be read")
+      yield* llm.tool("read", { filePath: path.join(dir, "probe.txt") })
+      yield* llm.text("follow-up handled")
+      const first = yield* prompt.prompt({ sessionID: chat.id, agent: "build", model: ref, noReply: true, parts: [{ type: "text", text: "read" }] })
+      const a = yield* prompt.loop({ sessionID: chat.id }).pipe(Effect.forkChild)
+      const approval = yield* pollWithTimeout(
+        permission.list().pipe(Effect.map((requests) => requests.find((request) => request.sessionID === chat.id))),
+        "read never asked for permission",
+      )
+      const id = MessageID.ascending()
+      const b = ending === "reject without queued prompt" ? undefined : yield* prompt.prompt({
+        sessionID: chat.id, messageID: id, agent: "build", model: ref,
+        parts: [{ type: "text", text: "follow-up" }],
+      }).pipe(Effect.forkChild)
+      if (b) yield* pollWithTimeout(
+        sessions.messages({ sessionID: chat.id }).pipe(Effect.map((messages) => messages.some((message) => message.info.id === id) ? true : undefined)),
+        "queued prompt never persisted",
+      )
+      if (ending === "cancel with queued prompt") yield* prompt.cancel(chat.id)
+      else yield* permission.reply({ requestID: approval.id, reply: "reject" })
+      yield* Fiber.join(a)
+      if (b) yield* Fiber.join(b)
+      const messages = yield* sessions.messages({ sessionID: chat.id })
+      const assistants = messages.filter((message) => message.info.role === "assistant")
+      const previous = assistants[0]!
+      expect(previous.info).toMatchObject({ parentID: first.info.id, time: { completed: expect.any(Number) } })
+      expect(errorTool(previous.parts)).toBeDefined()
+      expect((yield* status.get(chat.id)).type).toBe("idle")
+      if (ending === "reject with queued prompt") {
+        expect(yield* llm.calls).toBe(2)
+        expect(assistants).toHaveLength(2)
+        expect(assistants[1]!.info).toMatchObject({ parentID: id })
+        expect(assistants[1]!.parts.some((part) => part.type === "text" && part.text === "follow-up handled")).toBe(true)
+        const inputs = yield* llm.inputs
+        expect(inputs[1]!.messages).toContainEqual({ role: "user", content: "follow-up" })
+        return
+      }
+      expect(yield* llm.calls).toBe(1)
+      expect(assistants).toHaveLength(1)
+      if (b) {
+        expect(messages.some((message) => message.info.id === id)).toBe(true)
+        expect(previous.info).toMatchObject({ error: { name: "MessageAbortedError" } })
+      }
+    }),
+  )
+
 it.instance("assertNotBusy fails with BusyError when loop running", () =>
   Effect.gen(function* () {
     const { llm } = yield* useServerConfig(providerCfg)

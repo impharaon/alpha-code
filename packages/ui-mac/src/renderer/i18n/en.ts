@@ -361,6 +361,7 @@ export const dict = {
   "codepuppy.ext.installFailed": "Installation did not complete. Try again.",
   "codepuppy.ext.loading": "Loading…",
   "codepuppy.ext.pluginRestart": "Installed and loading. The first use requires downloading additional files; please wait.",
+  "codepuppy.ext.mcpPreparing": "Preparing",
   "codepuppy.ext.hubStateAvailable": "Ready to use",
   "codepuppy.ext.hubStateInstalled": "Installed",
   "codepuppy.ext.hubStatePending": "Pending",
@@ -1538,6 +1539,7 @@ export const dict = {
   "codepuppy.timeline.compacted": "Context compacted",
   "codepuppy.timeline.retainedHighlights": "Highlights retained",
   "codepuppy.timeline.interrupted": "Stopped by you",
+  "codepuppy.timeline.interruptedUnknown": "This turn was interrupted",
   "codepuppy.timeline.continueTurn": "Continue",
   "codepuppy.timeline.continuePrompt": "Continue",
   // REQ-160 AC3 (`#1318`): the turn finished with no reply. Content safety review is named as a
@@ -2214,4 +2216,5 @@ export const dict = {
   "codepuppy.net.http": "{{host}} returned an error",
   "codepuppy.net.timeout": "Waiting for {{host}} timed out; try again later",
   "codepuppy.net.unattributed": "The connection dropped partway",
+  "codepuppy.ext.connectorDisabled": "Connector disabled",
 }

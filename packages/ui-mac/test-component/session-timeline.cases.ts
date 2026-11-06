@@ -2963,7 +2963,7 @@ describe("#589 中断态:左对齐安静行 + 继续生成", () => {
     expect(row).not.toBeNull()
     expect(row.classList.contains("a-tl-interrupted")).toBe(true)
     expect(row.querySelector(".a-tl-divider-pill")).toBeNull()
-    expect(row.textContent).toContain("已由你停止")
+    expect(row.textContent).toContain("这一轮已中断")
 
     const cont = row.querySelector<HTMLButtonElement>(".a-tl-int-continue")!
     expect(cont.textContent).toBe("继续生成")
@@ -2974,7 +2974,37 @@ describe("#589 中断态:左对齐安静行 + 继续生成", () => {
     runtime.setTimelineIntentsEnabled(false)
     await flush()
     expect(host.querySelector(".a-tl-int-continue")).toBeNull()
+    expect(host.querySelector(".a-tl-interrupted")!.textContent).toContain("这一轮已中断")
+  })
+
+  test("#1652 AC3 recorded user stop survives remount; missing, failed and evicted records stay unattributed", async () => {
+    const { abortUserTurn, userStoppedTurn } = await import("../src/renderer/codepuppy-ui/session-workspace/user-stopped-turns")
+    localStorage.clear()
+    await abortUserTurn([
+      { id: "msg_u1", role: "user" },
+      { id: "msg_a1", role: "assistant", parentID: "msg_u1", time: {} },
+      { id: "msg_queued", role: "user" },
+    ], async () => {
+      expect(userStoppedTurn("msg_u1")).toBe(true) // written before the stop request
+      expect(userStoppedTurn("msg_queued")).toBe(false)
+      return {}
+    })
+    const bytes = localStorage.getItem("codepuppy-user-stopped-turns-v1")!
+    localStorage.clear()
+    localStorage.setItem("codepuppy-user-stopped-turns-v1", bytes) // a new renderer reads only persisted bytes
+    const host = mount()
+    runtime.setTimelineRows(interruptedRows())
+    await flush()
     expect(host.querySelector(".a-tl-interrupted")!.textContent).toContain("已由你停止")
+    await expect(abortUserTurn([{ id: "msg_failed", role: "user" }], async () => ({ error: {} }))).rejects.toThrow()
+    expect(userStoppedTurn("msg_failed")).toBe(false)
+    for (let i = 0; i < 128; i++) await abortUserTurn([{ id: `msg_next_${i}`, role: "user" }], async () => ({}))
+    expect(userStoppedTurn("msg_u1")).toBe(false)
+    expect(userStoppedTurn("msg_next_127")).toBe(true)
+    expect(JSON.parse(localStorage.getItem("codepuppy-user-stopped-turns-v1")!)).toHaveLength(128)
+    await flush()
+    expect(host.querySelector(".a-tl-interrupted")!.textContent).toContain("这一轮已中断")
+    localStorage.clear()
   })
 
   test("压缩分隔具备已批图标/文案/展开指示;原生 button 支持键盘语义且鼠标展开既有摘要", async () => {

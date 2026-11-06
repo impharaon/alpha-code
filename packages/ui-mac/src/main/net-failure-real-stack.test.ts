@@ -2,7 +2,7 @@
 //   · Electron 内嵌 node(= 出货 sidecar 的 utilityProcess 运行时,undici 由 http.setGlobalProxyFromEnv 接上代理);
 //   · 真引擎:packages/opencode/script/build-node.ts 同一配方现打的 node bundle(出货 sidecar 的 virtual:opencode-server);
 //   · 真出网代理(生产 startEgressPolicyProxy;授权 / 拨号为测试注入,只认本文件的几个名字),env 由生产 sidecarEgressProxyEnv 给出;
-//   · 真 webfetch 入口:一个本机 OpenAI 兼容替身让模型一次调用五个 webfetch,引擎照常执行、照常结算、照常落库,
+//   · 真 webfetch 入口:一个本机 OpenAI 兼容替身让模型一次调用六个 webfetch,引擎照常执行、照常结算、照常落库,
 //     本文件再经引擎 HTTP API 读回**持久化的工具记录**。
 // 五种靶 ⇒ metadata.codepuppyNetFailure.layer:代理 403 ⇒ policy、`.invalid` ⇒ dns(503)、拒连 ⇒ tcp(502)、拨号黑洞 ⇒ tcp(504)、
 // 隧道开了上游只收不回 ⇒ tls-silent(undici 目标 TLS connector 10 s 先到,代理的 15 s 兜底还没到)。
@@ -24,6 +24,10 @@ import { dirname, join, resolve } from "node:path"
 import { __resetEgressGrantsForTests } from "./network-egress-grants"
 import { startEgressPolicyProxy, type EgressLogRecord, type EgressProxyHandle } from "./network-egress-proxy"
 import { sidecarEgressProxyEnv } from "./sidecar-env"
+import type { ToolPart } from "@opencode-ai/sdk/v2/client"
+import { toolCardBodyOf } from "../renderer/codepuppy-ui/session-timeline/cards/tool-card-model"
+import { netFailureCopy } from "../renderer/codepuppy-ui/net-failure-copy"
+import { setLocale } from "../renderer/i18n"
 
 const describeDarwin = process.platform === "darwin" ? describe : describe.skip
 const require = createRequire(import.meta.url)
@@ -37,6 +41,7 @@ const TARGETS = {
   refused: "ac1572-refused.test",
   blackhole: "ac1572-blackhole.test",
   silent: "ac1572-silent.test",
+  timeout: "ac1654-timeout.test",
 } as const
 
 type ToolRecord = { tool: string; state: { status: string; input: { url?: string }; error?: string; metadata?: Record<string, unknown> } }
@@ -97,13 +102,13 @@ describeDarwin("`#1572` AC4 真栈:Electron 内嵌 node + 真出网代理 + 真 
       dial: (host, port) => {
         if (host === TARGETS.refused) return net.connect(closedPort, "127.0.0.1")
         if (host === TARGETS.blackhole) return new net.Socket()
-        if (host === TARGETS.silent) return net.connect(silentPort, "127.0.0.1")
+        if (host === TARGETS.silent || host === TARGETS.timeout) return net.connect(silentPort, "127.0.0.1")
         return net.connect({ host, port, autoSelectFamily: true }) // .invalid:生产拨号,DNS 在代理进程里真失败
       },
       dialTimeoutMs: 1_000,
     })
 
-    // 模型替身(loopback,经 NO_PROXY 直连,不过出网代理):第一轮一次调用五个 webfetch,收到工具结果后收尾。
+    // 模型替身(loopback,经 NO_PROXY 直连,不过出网代理):第一轮一次调用六个 webfetch,收到工具结果后收尾。
     const llm = http.createServer((req, res) => {
       let body = ""
       req.on("data", (c: Buffer) => (body += c.toString()))
@@ -123,7 +128,7 @@ describeDarwin("`#1572` AC4 真栈:Electron 内嵌 node + 真出网代理 + 真 
                 index,
                 id: `call_${index}`,
                 type: "function",
-                function: { name: "webfetch", arguments: JSON.stringify({ url: `https://${host}/ac1572?token=SECRET-NEEDLE-1572` }) },
+                function: { name: "webfetch", arguments: JSON.stringify({ url: `https://${host}/ac1572?token=SECRET-NEEDLE-1572`, ...(host === TARGETS.timeout ? { timeout: 1 } : {}) }) },
               })),
             },
             null,
@@ -221,15 +226,15 @@ describeDarwin("`#1572` AC4 真栈:Electron 内嵌 node + 真出网代理 + 真 
     return record
   }
 
-  test("五个 webfetch 都经出网代理失败,并作为工具记录落库", () => {
-    expect(records).toHaveLength(5)
+  test("六个 webfetch 都经出网代理失败,并作为工具记录落库", () => {
+    expect(records).toHaveLength(6)
     for (const record of records) expect(record.state.status).toBe("error")
-    // 失败确实发生在出网代理上:policy 一条拒绝、三条拨号失败各自的码、silent 一条放行。
-    // (引擎启动时自己也会出网,例如 npm registry —— 只看本文件的五个名字。)
+    // 失败确实发生在出网代理上:policy 一条拒绝、三条拨号失败各自的码、silent / timeout 两条放行。
+    // (引擎启动时自己也会出网,例如 npm registry —— 只看本文件的六个名字。)
     const hosts: readonly string[] = Object.values(TARGETS)
     const connects = proxyLog.flatMap((r) => (r.event === "egress.connect" && hosts.includes(r.host ?? "") ? [`${r.host}:${r.status}`] : []))
     expect(connects.sort()).toEqual(
-      [`${TARGETS.blackhole}:504`, `${TARGETS.dns}:503`, `${TARGETS.policy}:403`, `${TARGETS.refused}:502`, `${TARGETS.silent}:200`].sort(),
+      [`${TARGETS.blackhole}:504`, `${TARGETS.dns}:503`, `${TARGETS.policy}:403`, `${TARGETS.refused}:502`, `${TARGETS.silent}:200`, `${TARGETS.timeout}:200`].sort(),
     )
   })
 
@@ -241,6 +246,18 @@ describeDarwin("`#1572` AC4 真栈:Electron 内嵌 node + 真出网代理 + 真 
     expect(recordFor(TARGETS.silent).state.metadata?.codepuppyNetFailure).toEqual({ layer: "tls-silent", code: "UND_ERR_CONNECT_TIMEOUT" })
     // 握手静默是客户端先超时(undici 10 s),不是代理的 15 s 兜底:隧道零回音地关掉,没有 tunnel-silent。
     expect(proxyLog.some((r) => r.event === "egress.tunnel-silent")).toBe(false)
+  })
+
+  // #1654 N11(a):同样由真实 webfetch.ts 抛普通 Error("Request timed out"),仅缩短测试中的期限。
+  test("#1654 AC1 real webfetch deadline persists timeout and the tool card names its host", () => {
+    const record = recordFor(TARGETS.timeout)
+    expect(record.state.error).toBe("Request timed out")
+    expect(record.state.metadata?.codepuppyNetFailure).toEqual({ layer: "timeout", code: "timeout" })
+    const body = toolCardBodyOf(record as ToolPart)
+    expect(body).toMatchObject({ type: "error", netLayer: "timeout", host: TARGETS.timeout })
+    if (body.type !== "error" || !body.netLayer) throw new Error("missing layered tool card")
+    setLocale("zh")
+    expect(netFailureCopy(body.netLayer, body.host)).toBe(`等待 ${TARGETS.timeout} 超时,稍后重试`)
   })
 
   test("AC6:落库的层只有层名与错误码,URL 查询里的令牌不进 codepuppyNetFailure", () => {

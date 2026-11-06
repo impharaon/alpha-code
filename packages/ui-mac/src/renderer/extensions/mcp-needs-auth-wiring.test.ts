@@ -17,7 +17,7 @@ test("needs_auth 从引擎状态一路走到用户能点的按钮(真 useExtensi
   // 「块替换吞掉一条 + 新增一条」时净数对上而看不见 —— `#765` 已经栽过。
   // `#1106`:13 → 17(kick 的 4 条,先单跑 cases 文件确认 17 pass 再改的这两个数)。
   // `#1563`:17 → 18(pending 行那 1 条,同样先单跑 cases 文件确认 18 pass)。
-  expect(output).toContain(" 21 pass")
+  expect(output).toContain(" 23 pass")
   expect(output).toContain(" 0 fail")
-  expect(output).toMatch(/Ran 21 tests across 1 file/)
+  expect(output).toMatch(/Ran 23 tests across 1 file/)
 })

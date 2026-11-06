@@ -495,7 +495,7 @@ it.instance("connect and disconnect fail for unknown servers", () =>
   }),
 )
 
-it.instance("unavailable remote server is marked failed without tools", () =>
+it.instance("unavailable remote server stays pending for retry without tools", () =>
   Effect.gen(function* () {
     const server = yield* Effect.acquireRelease(
       Effect.sync(() => Bun.serve({ port: 0, fetch: () => new Response("unavailable", { status: 503 }) })),
@@ -504,7 +504,7 @@ it.instance("unavailable remote server is marked failed without tools", () =>
     const mcp = yield* MCP.Service
     yield* mcp.add("unavailable", remote(server.url.toString(), 500))
 
-    expect((yield* mcp.status()).unavailable?.status).toBe("failed")
+    expect((yield* mcp.status()).unavailable?.status).toBe("pending")
     expect(yield* mcp.tools()).toEqual({})
   }),
 )
@@ -564,7 +564,7 @@ it.instance("remote timeout aborts every real HTTP transport attempt", () =>
     const mcp = yield* MCP.Service
     const result = yield* mcp.add("hanging-remote", remote(server.url, 100))
 
-    expect(statusName(result.status, "hanging-remote")).toBe("failed")
+    expect(statusName(result.status, "hanging-remote")).toBe("pending")
     yield* pollWithTimeout(
       Effect.sync(() => (server.aborted() >= 4 ? server.aborted() : undefined)),
       "remote transport requests were not aborted",

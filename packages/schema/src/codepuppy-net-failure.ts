@@ -119,7 +119,8 @@ function classifyNode(node: ErrorNode, path: NetFailurePath): NetFailure | undef
   const status = httpStatusOf(node)
   if (status !== undefined) return { layer: "http", code: String(status) }
   if (node.name === "TimeoutError") return { layer: "timeout", code: "TimeoutError" }
-  if (MCP_TIMEOUT.test(message)) return { layer: "timeout", code: "timeout" }
+  if (MCP_TIMEOUT.test(message) || (node.name === "Error" && message === "Request timed out"))
+    return { layer: "timeout", code: "timeout" }
   return undefined
 }
 

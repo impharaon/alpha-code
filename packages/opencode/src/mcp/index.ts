@@ -316,6 +316,8 @@ interface Server {
   status: Status | { status: "configured"; error?: string }
   /** Consecutive background reconnects since the last success (AC3 backoff). */
   retries: number
+  /** No live attempt during reconnect backoff: bundled declarations are unavailable. */
+  backoff?: boolean
   /** A client that already finished OAuth: the next lookup adopts it instead of connecting. */
   handoff?: MCPClient
   /** #1565: the generation whose tools were offered from the bundled declaration before it connected. */
@@ -782,7 +784,7 @@ const layer = Layer.effect(
         return
       }
       const previous = cacheKey(name, server.generation)
-      Object.assign(server, { entry, generation: server.generation + 1, status, handoff })
+      Object.assign(server, { entry, generation: server.generation + 1, status, handoff, backoff: false })
       yield* ScopedCache.invalidate(s.connections, previous)
     })
 
@@ -869,7 +871,10 @@ const layer = Layer.effect(
           })
         })
         if (isCurrent(s, name, generation)) {
-          server.status = failure.status
+          server.backoff = failure.reconnect && failure.status.status === "failed"
+          server.status = server.backoff && failure.status.status === "failed"
+            ? { status: "pending", error: failure.status.error }
+            : failure.status
           yield* Effect.logWarning("server unavailable", {
             key: name,
             type: server.entry.type,
@@ -877,7 +882,7 @@ const layer = Layer.effect(
             code: failure.status.status === "failed" ? failure.status.code : undefined,
             error: "error" in failure.status ? failure.status.error : undefined,
           })
-          // Readers re-read status on this event; without it a failed background start stays "pending" (audit F3).
+          // Readers re-read terminal failures and retry details on this event.
           yield* events.publish(ToolsChanged, { server: name }).pipe(Effect.ignore)
           if (failure.reconnect && failure.status.status === "failed")
             yield* reconnect(s, name, generation, failure.status.error)
@@ -1044,7 +1049,7 @@ const layer = Layer.effect(
       // identity it lists once connected; `callTool` checks the declaration against that listing. A third-party server
       // (or any entry not bound to the bundle) has no declaration and stays out until its first handshake (AC4).
       for (const [clientName, server] of Object.entries(s.servers)) {
-        if (server.refuted || server.status.status !== "pending") continue
+        if (server.refuted || server.backoff || server.status.status !== "pending") continue
         const declared = declaredDefs(clientName, server.entry)
         if (!declared) continue
         server.declaredAt = server.generation
@@ -1114,7 +1119,7 @@ const layer = Layer.effect(
         // #1578: a document tool offered from its bundled declaration (#1565) is decided before its server connects;
         // its current authority is the one that offer minted (same condition, same entry, same mint), so a class-level
         // 「Code Puppy 文档工具」record applies in that window too.
-        (server && !server.refuted && server.status.status === "pending" && server.declaredAt === server.generation
+        (server && !server.refuted && !server.backoff && server.status.status === "pending" && server.declaredAt === server.generation
           ? authorityForMcp(origin, server.entry)
           : undefined)
       if (entry === undefined && authority === undefined) return undefined

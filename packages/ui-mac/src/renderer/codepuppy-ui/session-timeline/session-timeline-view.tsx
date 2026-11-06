@@ -9,6 +9,7 @@ import { createEffect, createSignal, For, on, onCleanup, onMount, Show } from "s
 import { AUTOMATION_DEFAULTS } from "../../../shared/automation-types"
 import { t } from "../../i18n"
 import { ASK_AGENT, READONLY_AGENT } from "../composer-state"
+import { userStoppedTurn } from "../session-workspace/user-stopped-turns"
 import { CopyButton } from "../CopyButton"
 import { Tooltip } from "../Tooltip"
 import {
@@ -745,7 +746,7 @@ function MarkdownRow(props: { row: Extract<TimelineRow, { kind: "markdown" }> })
 function DividerRow(props: { row: Extract<TimelineRow, { kind: "divider" }> }) {
   // label 随行身份定格;compaction 的 rev 在完成态 summary 到达时变化,两种形态互不重建。
   const row = props.row
-  if (row.label === "interrupted") return <InterruptedRow />
+  if (row.label === "interrupted") return <InterruptedRow userMessageID={row.userMessageID} />
   if (row.label === "emptyTurn") return <EmptyTurnRow />
   const [open, setOpen] = createSignal(false)
   const expandable = () => row.summaryParts.length > 0
@@ -848,7 +849,7 @@ function EmptyTurnRow() {
 // (fail-closed,不给一个点不动的按钮)。发送失败(admission 前被拒/网络断开)不产生任何
 // session_status 事件,typed 通道呈现不了 —— rejection 在此就地给出失败提示,再点即重试
 // (审计 R1 Major:此前同步与异步错误全被吞掉,用户点了没反应)。
-function InterruptedRow() {
+function InterruptedRow(props: { userMessageID: string }) {
   const intents = useTimelineIntents()
   const [sendFailed, setSendFailed] = createSignal(false)
   return (
@@ -856,7 +857,7 @@ function InterruptedRow() {
       <svg class="a-tl-int-stop" viewBox="0 0 24 24" aria-hidden="true">
         <rect x="7" y="7" width="10" height="10" rx="2" />
       </svg>
-      <span>{t("codepuppy.timeline.interrupted")}</span>
+      <span>{t(userStoppedTurn(props.userMessageID) ? "codepuppy.timeline.interrupted" : "codepuppy.timeline.interruptedUnknown")}</span>
       <Show when={intents.continueTurn}>
         {(handler) => (
           <>

@@ -36,6 +36,8 @@ import type { SessionGrantRefusalCode, SessionGrantWire } from "../../shared/ext
 import type { HubViewRow, ReloadItem, ReloadScope } from "../../main/codepuppy-sidecar-messages"
 import { connectOutcome, grantsToReassert, sessionGrantKeyOf } from "./ext-session-toggle"
 import { extIpc } from "./ext-ipc"
+import { t } from "../i18n"
+import { approvalToolOf } from "../codepuppy-ui/session-timeline/cards/tool-card-model"
 import { subscribeRuntimeRecovery } from "../runtime-recovery"
 
 // Receipt provenance (REQ-018): catalog snapshot version recorded per install → update checks.
@@ -225,13 +227,13 @@ export function projectMcpStatusView(state: ProjectMcpState | undefined) {
       tone: "warn" as const,
       textKey: "codepuppy.ext.projectMcpShadowed" as const,
     }
-  // `#1563`:引擎还在后台启动它(准备中)。复用定制中心三档视图给同一状态的文案键,不新造文案(定稿归 T19)。
+  // #1653:连接和重试期间都显示准备中。
   if (state === "pending")
     return {
       state,
       connected: false,
       tone: "muted" as const,
-      textKey: "codepuppy.ext.hubReasonNotLoaded" as const,
+      textKey: "codepuppy.ext.mcpPreparing" as const,
     }
   return {
     state: "unverifiable" as const,
@@ -241,18 +243,21 @@ export function projectMcpStatusView(state: ProjectMcpState | undefined) {
   }
 }
 
-/** REQ-234 `#1529`:已安装列表上的三档状态呈现。状态与原因都是 main 给的(`extIpc.hubView`),这里只选文案键;
+/** REQ-234 `#1529`:已安装列表上的三档状态呈现。配置生效状态来自 main (`extIpc.hubView`),连接准备状态来自引擎;
  *  「现在重载」只给能靠重载修好的行(云条目没有重载环节)。未安装行不在已安装列表上出现 ⇒ undefined。 */
 export type HubStateView = {
   state: Exclude<HubViewRow["state"], "not-installed">
   tone: "ok" | "muted" | "warn"
-  textKey: "codepuppy.ext.hubStateAvailable" | "codepuppy.ext.hubStateInstalled" | "codepuppy.ext.hubStatePending"
+  textKey: "codepuppy.ext.hubStateAvailable" | "codepuppy.ext.hubStateInstalled" | "codepuppy.ext.hubStatePending" | "codepuppy.ext.mcpPreparing"
   reasonKey?: "codepuppy.ext.hubReasonWaiting" | "codepuppy.ext.hubReasonFailed" | "codepuppy.ext.hubReasonNotLoaded"
   /** main 给的技术细节,只进 title。 */
   detail?: string
   reloadNow: boolean
 }
-export function hubStateView(row: HubViewRow | undefined): HubStateView | undefined {
+export function hubStateView(row: HubViewRow | undefined, mcp?: Pick<InstalledState, "pending" | "error">): HubStateView | undefined {
+  // 显式配置变更仍等待生效;MCP 自己的重试不需要用户重载。
+  if (mcp?.pending && row?.stateReason?.code !== "reload-waiting" && row?.stateReason?.code !== "reload-failed")
+    return { state: "installed", tone: "muted", textKey: "codepuppy.ext.mcpPreparing", detail: mcp.error, reloadNow: false }
   if (!row || row.state === "not-installed") return undefined
   if (row.state === "available") return { state: row.state, tone: "ok", textKey: "codepuppy.ext.hubStateAvailable", reloadNow: false }
   // 已安装但没核验通过(云条目:缺连接或缺工具,基线 §2.5 云行)⇒ 说出原因;停用的行原因已由「未启用」徽标说了。
@@ -552,6 +557,7 @@ export function useExtensions(
   active?: Accessor<boolean>,
   /** REQ-099(#307)当前项目目录(hub 从路由解析);在场时 listInstalls 连带读项目账本。 */
   projectDir?: Accessor<string | undefined>,
+  directories?: Accessor<readonly string[]>,
 ): ExtensionsApi {
   const [store, setStore] = createStore<ExtensionsStore>({ mcp: {}, receipts: [], projectReceipts: [], agents: [], sessionGrants: [], sessionLink: {}, hubRows: [], ready: false, error: false })
 
@@ -967,6 +973,26 @@ export function useExtensions(
       ...(opts?.confirmExpiredReview ? { confirmExpiredReview: true } : {}),
     })
     if (!res.ok) return res
+    if (receipt.type === "mcp" && state === "disabled" && client) {
+      for (const directory of new Set([...(directories?.() ?? []), projectDir?.()].filter((dir): dir is string => !!dir))) {
+        try {
+          const { data } = await client.permission.list({ directory }, { throwOnError: true })
+          const replied = new Set<string>()
+          for (const request of data ?? []) {
+            const tool = approvalToolOf({
+              identity: request.metadata?.identity, authority: request.metadata?.authority,
+              location: request.metadata?.location, technicalId: request.permission,
+            })
+            if (tool?.connector !== receipt.name || replied.has(request.sessionID)) continue
+            await client.permission.reply({ directory, requestID: request.id, reply: "reject", message: t("codepuppy.ext.connectorDisabled") }, { throwOnError: true })
+            // The engine rejects the other pending requests in this session with the first rejection.
+            replied.add(request.sessionID)
+          }
+        } catch {
+          // The ledger is committed; an unavailable instance must not prevent disabling.
+        }
+      }
+    }
     await loadInstalls()
     // Codex r1 Blocker 3:账本已翻(committed),但 fs 类的运行面靠重载生效。REQ-234 `#1529`:重载交给 ext 调度器
     // (等会话空闲);请求没被受理才如实回 reload-pending,其余由该行的三档状态说。

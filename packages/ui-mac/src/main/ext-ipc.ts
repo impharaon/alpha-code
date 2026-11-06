@@ -1159,18 +1159,15 @@ export function registerExtIpcHandlers(
     const decoded = decodeSetStateIntent(intent)
     const firstParty = decoded.ok && decoded.intent.scope === "global" && decoded.intent.type === "mcp" && isCodePuppyOfficeCatalogId(`mcp:${decoded.intent.name}`)
     if ((official || firstParty) && !officialRuntime) return { ok: false, reason: "official connector runtime unavailable" }
-    if (official) await officialRuntime!.stop()
-    try {
-      const result = await setInstallStateByKey(intent, plannerDeps())
-      if (result.ok && firstParty) reloads.request({
+    const result = await setInstallStateByKey(intent, plannerDeps())
+    if (result.ok && decoded.ok && (official || firstParty)) {
+      reloads.request({
         scope: "global", items: [{ id: `mcp:${decoded.intent.name}`, scope: "global" }],
         reason: `set mcp ${decoded.intent.name} ${decoded.intent.state}`, connectorChange: true,
       })
-      return result
-    } finally {
-      if (official && !(await officialRuntime!.refresh()))
-        return { ok: false, reason: "official-connector-needs-reentry: runtime refresh failed" }
+      return { ...result, reason: "reload-pending" }
     }
+    return result
   }
   // ADR-030(#372):收回路径的残留检测(只读)与显式清理(journal 在场 fail-closed;
   // generation-aware —— 删受控 ext-store + 对应账本,绝不落 flat 删除)。

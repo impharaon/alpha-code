@@ -158,6 +158,7 @@ export function ExtensionHub(props: {
   server: Accessor<ServerInfo | undefined>
   open: Accessor<boolean>
   onClose: () => void
+  directories?: Accessor<readonly string[]>
 }) {
   let hubCloseButton: HTMLButtonElement | undefined
   // REQ-099(#307)项目上下文 = 当前路由的项目目录(route-manifest parseRoute 先例;
@@ -170,7 +171,7 @@ export function ExtensionHub(props: {
       return active?.sessionID === id ? active.directory : undefined
     })
   })
-  const ext = useExtensions(props.server, props.open, projectDir)
+  const ext = useExtensions(props.server, props.open, projectDir, props.directories)
   const section = hubSection
   // REQ-103(#195):governance 只读视图(逐扩展五维所有权 + availability/activation/health 三态)。
   // 唯一只读通道,零写面;keyed on open + 账本内容指纹 + 项目上下文(#307:传 projectDir 即出项目行)。
@@ -284,7 +285,7 @@ export function ExtensionHub(props: {
       return
     }
     let mcPending = false
-    if (args.type === "mcp" && !isCodePuppyOfficeCatalogId(args.receipt.id)) {
+    if (args.type === "mcp" && r.reason !== "reload-pending" && !isCodePuppyOfficeCatalogId(args.receipt.id)) {
       const mc = await ext.setMcpConnected(args.name, true)
       mcPending = mc.reason === "reload-pending"
     }
@@ -376,7 +377,7 @@ export function ExtensionHub(props: {
       return
     }
     let mcPending = false
-    if (args.type === "mcp" && !isCodePuppyOfficeCatalogId(args.receipt.id)) {
+    if (args.type === "mcp" && r.reason !== "reload-pending" && !isCodePuppyOfficeCatalogId(args.receipt.id)) {
       const mc = await ext.setMcpConnected(args.name, next === "enabled")
       mcPending = mc.reason === "reload-pending"
     }
@@ -1725,7 +1726,7 @@ export function ExtensionHub(props: {
     const isUpdatable = () =>
       updatable().some((r) => r.id === row.receipt.id && r.name === row.name && r.scope === row.receipt.scope)
     // REQ-234 `#1529`:三档状态(main 对当前目录即时算出,agent 读同一份)。合成的 live-only 行没有账本身份 ⇒ 不显示。
-    const hubState = createMemo(() => hubStateView(hubRowFor(ext.store.hubRows, row.receipt.id, row.receipt.scope)))
+    const hubState = createMemo(() => hubStateView(hubRowFor(ext.store.hubRows, row.receipt.id, row.receipt.scope), row.mcp))
     const [reloadBusy, setReloadBusy] = createSignal(false)
     const reloadNow = async () => {
       if (reloadBusy()) return
@@ -1748,7 +1749,7 @@ export function ExtensionHub(props: {
 
     // 一行状态:取最要紧的那一件。
     const line = (): { text: string; err?: boolean; hub?: string; detail?: string } => {
-      if (row.type === "mcp" && row.mcp?.error)
+      if (row.type === "mcp" && row.mcp?.error && !row.mcp.pending)
         return { text: row.mcp.repair === "reinstall-app" ? t("codepuppy.ext.officeRuntimeMissing") : row.mcp.error, err: true }
       // `#733`:`needs_auth` 不是「未连接」——它是一个用户能自己修好的状态。
       if (row.type === "mcp" && row.mcp?.needsAuth) return { text: t("codepuppy.ext.mcpNeedsAuth") }
@@ -1765,8 +1766,6 @@ export function ExtensionHub(props: {
       if (hs && hs.state !== "available") return { text: hubText, hub: hs.state, detail: hs.detail }
       const hp = health()
       if (hp && hp.tone === "warn") return { text: t(hp.textKey) }
-      // `#1563`:还在后台启动(准备中)不是「已停用」。
-      if (row.mcp?.pending) return { text: t("codepuppy.ext.hubReasonNotLoaded") }
       // REQ-105:上游归档(禁自动更新);REQ-135:已退役的社区 Office 连接器。
       if (officeAdvisoryFor({ id: row.receipt.id, name: row.name })) return { text: t("codepuppy.ext.advArchivedUnsupported") }
       if (retiredCommunityOfficeFor({ id: row.receipt.id, name: row.name })) return { text: t("codepuppy.ext.retiredCommunityChip") }

@@ -1802,6 +1802,7 @@ describe("#652 会话发送走 v1 promptAsync(与首页同一条)+ 停止键诚�
         command,
         modelContract: readyContract(),
         sessionDock: {
+          messages: () => [{ id: "msg_stop", role: "user" }],
           running,
           contextUsage: () => null,
           approvalPending: () => false,
@@ -1876,6 +1877,21 @@ describe("#652 会话发送走 v1 promptAsync(与首页同一条)+ 停止键诚�
     pressEnter(mounted.host.querySelector("textarea") as HTMLTextAreaElement)
     await waitFor(() => expect(sdk.promptAsyncCalls).toHaveLength(2))
     await waitFor(() => expect((mounted.host.querySelector("textarea") as HTMLTextAreaElement).value).toBe(""))
+    mounted.dispose()
+  })
+
+  test("#1652 AC3 stop button records the current turn before requesting abort", async () => {
+    installApi()
+    const { userStoppedTurn } = await import("../src/renderer/codepuppy-ui/session-workspace/user-stopped-turns")
+    const sdk = fakeSessionSdk({ abort: async () => {
+      expect(userStoppedTurn("msg_stop")).toBe(true)
+      return {}
+    } })
+    const mounted = sessionMount(sdk, () => true)
+    await waitFor(() => expect(mounted.host.querySelector(".a-comp-stop")).not.toBeNull())
+    click(mounted.host.querySelector(".a-comp-stop"))
+    await waitFor(() => expect(sdk.abortCalls).toHaveLength(1))
+    expect(userStoppedTurn("msg_stop")).toBe(true)
     mounted.dispose()
   })
 

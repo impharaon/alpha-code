@@ -751,6 +751,17 @@ test("real IPC previews/cancels without secrets, installs both recipes, stops be
     },
   )
   await ready.ledgerReady
+  let busy = true
+  const { createReloadScheduler } = await import("../../ext/src/reload-scheduler")
+  const scheduler = createReloadScheduler({
+    log: () => {}, error: () => {},
+    report: (report) => ready.codepuppySidecar.receive({ type: "codepuppy.reload.report", ...report }, () => {}),
+  })
+  scheduler.register(home, {
+    session: { status: async () => ({ data: busy ? { ses_pending_approval: { type: "busy" } } : {} }) },
+    instance: { dispose: async () => ({ data: true }) },
+  })
+  ready.codepuppySidecar.attach((request) => scheduler.request(request))
   const original = globalThis.fetch
   // Catalog fetch is the external seam: production admission and both registered IPC bodies run.
   globalThis.fetch = (async () => new Response(current.bytes, { status: 200 })) as typeof fetch
@@ -795,15 +806,33 @@ test("real IPC previews/cancels without secrets, installs both recipes, stops be
       const runtime = officialConnectorConfig(root, name, versions[0]!).file
       expect(readFileSync(runtime, "utf8")).toBe("") // disabled configs remain parseable without decrypting a secret
       expect(contents(home).some((bytes) => bytes.includes(value))).toBe(false)
+      // #1652 AC1: approval waits are busy; both directions defer until idle or explicit force.
+      busy = true
       expect(
         await handlers.get("ext-set-install-state")!({}, { type: "mcp", name, scope: "global", state: "enabled" }),
-      ).toMatchObject({ ok: true })
-      expect(readFileSync(officialConnectorConfig(root, name, versions[0]!).file, "utf8")).toBe(value)
+      ).toMatchObject({ ok: true, reason: "reload-pending" })
+      await scheduler.settled()
+      expect(events).toEqual([])
+      expect(readFileSync(runtime, "utf8")).toBe("")
+      busy = false
+      scheduler.poke()
+      await scheduler.settled()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(events).toEqual(["refresh"])
+      const enabledRuntime = officialConnectorConfig(root, name, versions[0]!).file
+      expect(readFileSync(enabledRuntime, "utf8")).toBe(value)
+      busy = true
       expect(
         await handlers.get("ext-set-install-state")!({}, { type: "mcp", name, scope: "global", state: "disabled" }),
-      ).toMatchObject({ ok: true })
+      ).toMatchObject({ ok: true, reason: "reload-pending" })
+      await scheduler.settled()
+      expect(events).toEqual(["refresh"])
+      expect(readFileSync(enabledRuntime, "utf8")).toBe(value)
+      await handlers.get("ext-reload-request")!({}, { scope: "global", items: [], reason: "user: reload now", force: true })
+      await scheduler.settled()
+      await new Promise((resolve) => setTimeout(resolve, 0))
       expect(readFileSync(officialConnectorConfig(root, name, versions[0]!).file, "utf8")).toBe("")
-      expect(events).toEqual(["stop", "refresh", "stop", "refresh"])
+      expect(events).toEqual(["refresh", "refresh"])
       events.length = 0
       // Make cleanup fail after configuration removal. The receipt must survive for retry.
       chmodSync(paths.secret, 0o755)

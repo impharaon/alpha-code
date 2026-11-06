@@ -151,6 +151,21 @@ describe("审批决定提交入口:单一引用面白名单棘轮(#619 R3 Blocke
       .replace(/\[["'`]/g, ".")
       .replace(/["'`]\]/g, "")
 
+  const rejectOnly = (source: string) => {
+    const calls = [...source.matchAll(/permission\.reply\(([^]*?)\},/g)]
+    return calls.length > 0 && calls.every((call) => /\breply:["']reject["'](?:,|$)/.test(call[1]!))
+      && calls.length === (source.match(/permission\.reply/g) ?? []).length
+  }
+
+  test("#1652 Hub permission exception accepts only literal reject decisions", () => {
+    const source = normalize(readFileSync(resolve(root, "packages/ui-mac/src/renderer/extensions/use-extensions.ts"), "utf8"))
+    const file = "packages/ui-mac/src/renderer/extensions/use-extensions.ts"
+    expect(sanctionedEntry(file, "permission.reply", source)).toBe(true)
+    for (const reply of ["once", "always", "decision"]) {
+      expect(sanctionedEntry(file, "permission.reply", source.replace('reply:"reject"', `reply:"${reply}"`))).toBe(false)
+    }
+  })
+
   const DECISION_ENTRY_TOKENS = ["permission.reply", "permission.respond"] as const
 
   /** 白名单 = 今天真实存在的引用面,一文件一 token,精确到形态。
@@ -202,12 +217,19 @@ describe("审批决定提交入口:单一引用面白名单棘轮(#619 R3 Blocke
    *     也没有 UI 挂在它上面),是所有 v2 提交入口在 v1 引擎上的物理出口;不登记它,上面 1)~4)
    *     的每一条在 v1 引擎上都发不出去。同一份 SOT 补丁把它原样带进来,alpha 零改动。 */
   const SANCTIONED_ENTRY_HOLDERS = [
+    // #1652 AC2 explicitly requires connector disable to reject its pending approvals via the existing API.
+    // This entry only sends reject; the real Hub test checks the exact reply and connector identity.
+    { file: "packages/ui-mac/src/renderer/extensions/use-extensions.ts", token: "permission.reply" },
     { file: "packages/app/src/context/permission-surface.tsx", token: "permission.reply" },
     { file: "packages/app/src/context/permission-v1-adapter.ts", token: "permission.reply" },
     { file: "packages/app/src/context/permission.tsx", token: "permission.reply" },
     { file: "packages/app/src/utils/server-compat.ts", token: "permission.reply" },
     { file: "packages/app/src/utils/server-compat.ts", token: "permission.respond" },
   ] as const
+
+  const sanctionedEntry = (file: string, token: string, source: string) =>
+    SANCTIONED_ENTRY_HOLDERS.some((holder) => holder.file === file && holder.token === token
+      && (file !== "packages/ui-mac/src/renderer/extensions/use-extensions.ts" || rejectOnly(source)))
 
   test("permission 决定提交入口(reply/respond,含方括号等义形态)只出现在白名单接线点", () => {
     const offenders: Array<{ file: string; token: string }> = []
@@ -218,7 +240,7 @@ describe("审批决定提交入口:单一引用面白名单棘轮(#619 R3 Blocke
         for (const token of DECISION_ENTRY_TOKENS) {
           if (!normalized.includes(token)) continue
           const file = relative(root, filePath)
-          if (SANCTIONED_ENTRY_HOLDERS.some((holder) => holder.file === file && holder.token === token)) {
+          if (sanctionedEntry(file, token, normalized)) {
             seen.add(`${file}::${token}`)
             continue
           }

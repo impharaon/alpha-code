@@ -36,6 +36,7 @@ import type { SessionGrantRefusalCode, SessionGrantWire } from "../../shared/ext
 import type { HubViewRow, ReloadItem, ReloadScope } from "../../main/codepuppy-sidecar-messages"
 import { connectOutcome, grantsToReassert, sessionGrantKeyOf } from "./ext-session-toggle"
 import { extIpc } from "./ext-ipc"
+import { t } from "../i18n"
 import { approvalToolOf } from "../codepuppy-ui/session-timeline/cards/tool-card-model"
 import { subscribeRuntimeRecovery } from "../runtime-recovery"
 
@@ -556,6 +557,7 @@ export function useExtensions(
   active?: Accessor<boolean>,
   /** REQ-099(#307)当前项目目录(hub 从路由解析);在场时 listInstalls 连带读项目账本。 */
   projectDir?: Accessor<string | undefined>,
+  directories?: Accessor<readonly string[]>,
 ): ExtensionsApi {
   const [store, setStore] = createStore<ExtensionsStore>({ mcp: {}, receipts: [], projectReceipts: [], agents: [], sessionGrants: [], sessionLink: {}, hubRows: [], ready: false, error: false })
 
@@ -963,24 +965,6 @@ export function useExtensions(
     opts?: { confirmExpiredReview?: boolean },
   ): Promise<ActionResult> {
     if (receipt.scope === "project") return { ok: false, reason: "project-scoped records have no enable switch" }
-    if (receipt.type === "mcp" && state === "disabled" && client) {
-      try {
-        const { data } = await client.permission.list({}, { throwOnError: true })
-        const replied = new Set<string>()
-        for (const request of data ?? []) {
-          const tool = approvalToolOf({
-            identity: request.metadata?.identity, authority: request.metadata?.authority,
-            location: request.metadata?.location, technicalId: request.permission,
-          })
-          if (tool?.connector !== receipt.name || replied.has(request.sessionID)) continue
-          await client.permission.reply({ requestID: request.id, reply: "reject", message: "连接器已停用" }, { throwOnError: true })
-          // The engine rejects the other pending requests in this session with the first rejection.
-          replied.add(request.sessionID)
-        }
-      } catch (error) {
-        return { ok: false, reason: String(error) }
-      }
-    }
     const res = await extIpc.setInstallState({
       type: receipt.type,
       name: receipt.name,
@@ -989,6 +973,26 @@ export function useExtensions(
       ...(opts?.confirmExpiredReview ? { confirmExpiredReview: true } : {}),
     })
     if (!res.ok) return res
+    if (receipt.type === "mcp" && state === "disabled" && client) {
+      for (const directory of new Set([...(directories?.() ?? []), projectDir?.()].filter((dir): dir is string => !!dir))) {
+        try {
+          const { data } = await client.permission.list({ directory }, { throwOnError: true })
+          const replied = new Set<string>()
+          for (const request of data ?? []) {
+            const tool = approvalToolOf({
+              identity: request.metadata?.identity, authority: request.metadata?.authority,
+              location: request.metadata?.location, technicalId: request.permission,
+            })
+            if (tool?.connector !== receipt.name || replied.has(request.sessionID)) continue
+            await client.permission.reply({ directory, requestID: request.id, reply: "reject", message: t("codepuppy.ext.connectorDisabled") }, { throwOnError: true })
+            // The engine rejects the other pending requests in this session with the first rejection.
+            replied.add(request.sessionID)
+          }
+        } catch {
+          // The ledger is committed; an unavailable instance must not prevent disabling.
+        }
+      }
+    }
     await loadInstalls()
     // Codex r1 Blocker 3:账本已翻(committed),但 fs 类的运行面靠重载生效。REQ-234 `#1529`:重载交给 ext 调度器
     // (等会话空闲);请求没被受理才如实回 reload-pending,其余由该行的三档状态说。

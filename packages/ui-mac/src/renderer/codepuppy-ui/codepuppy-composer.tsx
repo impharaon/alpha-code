@@ -653,8 +653,9 @@ export type ComposerSlashCapture = {
  * 缺席(home/newSession 或测试)时组件按「无会话数据」诚实降级:无停止键、无 ring。
  */
 export type ComposerSessionDockApi = {
-  /** undefined = 消息尚未读回;空数组 = 已读回的新会话。 */
+  /** 当前 sync 消息快照;首次读取是否完成由 messagesReady 给出。 */
   messages?: () => readonly { role: string; agent?: string; id?: string; parentID?: string; time?: { created?: number; completed?: number } }[] | undefined
+  messagesReady?: () => boolean
   /** live 运行态(session_status typed 通道;不再轮询)。 */
   running: () => boolean
   /** 上下文用量百分比(0-100);null = 事实不足,ring 不渲染。 */
@@ -1014,11 +1015,11 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
     if (composerScopeHeld) releaseComposerScope()
   })
 
-  const permissionHistoryReady = () => !props.sessionDock?.messages || props.sessionDock.messages() !== undefined
+  const permissionHistoryReady = () => props.sessionDock?.messagesReady?.() ?? (!props.sessionDock?.messages || props.sessionDock.messages() !== undefined)
   createEffect(() => {
     const scope = composerScopeKey()
     const messages = props.sessionDock?.messages?.()
-    if (!scope || !messages) return
+    if (!scope || !permissionHistoryReady() || !messages) return
     const agent = messages.findLast((message) => message.role === "user")?.agent
     untrack(() => restoreComposerPermScope(scope, agent))
   })

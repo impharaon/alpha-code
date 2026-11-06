@@ -93,7 +93,7 @@ const server = {
     return ACTIVE_SERVER_KEY
   },
 }
-const [dockMessages, setDockMessages] = solid.createSignal<Array<{ role: "user"; agent: string }> | undefined>([])
+const [dockMessages, setDockMessages] = solid.createSignal<Array<{ role: "user" | "assistant"; agent: string; id?: string; parentID?: string; time?: { created: number } }> | undefined>([])
 const [dockHistoryLoading, setDockHistoryLoading] = solid.createSignal(false)
 const [dockHistoryMore, setDockHistoryMore] = solid.createSignal(false)
 mock.module("@opencode-ai/app", () => ({
@@ -224,6 +224,7 @@ const promptAsyncCalls: Array<Record<string, unknown>> = []
 let commandListEntries: Array<Record<string, unknown>> = []
 /** #582:真走了引擎命令通道的调用(斜杠命中注册表时composer 走 session.command,不走 promptAsync)。 */
 const sessionCommandCalls: Array<Record<string, unknown>> = []
+let abortRecorded = false
 /** #894:让「会话创建在途」这段窗口真的存在 —— 生产上正是这段时间里用户可以切 server。 */
 let startChatGate: { promise: Promise<void>; release: () => void } | undefined
 function gateStartChat() {
@@ -249,6 +250,11 @@ function projectsApi(projects: CodePuppyProject[]): CodePuppyProjectsApi {
         vcs: { status: async () => ({ data: [] }) },
         // #652 起会话内发送与首页 startChat 同走 v1 session.promptAsync。
         session: {
+          abort: async () => {
+            const { userStoppedTurn } = await import("../src/renderer/codepuppy-ui/session-workspace/user-stopped-turns")
+            abortRecorded = userStoppedTurn("msg_stop_loading")
+            return {}
+          },
           promptAsync: async (args: Record<string, unknown>) => {
             promptAsyncCalls.push(args)
             return {}
@@ -1443,11 +1449,11 @@ describe("#925 上游入口建的 draft(带 active server)在唯一消费者处�
 describe("#582 斜杠 source 生产接线:composer 发送 → 真 dock 捕获 → 登记", () => {
   const SLASH_IDENTITY = { serverKey: STORE_SERVER_KEY, directory: DEFAULT_WORKSPACE, sessionID: "session-9" }
 
-  function mountRealDock(projects: CodePuppyProjectsApi) {
+  function mountRealDock(projects: CodePuppyProjectsApi, activity: "idle" | "running" = "idle") {
     return mountDisposable(() =>
       createComponent(SessionComposerDock, {
         live: {
-          current: () => ({ identity: SLASH_IDENTITY, project: "alpha-code", title: "会话", activity: "idle" }),
+          current: () => ({ identity: SLASH_IDENTITY, project: "alpha-code", title: "会话", activity }),
           accepts: (candidate: typeof SLASH_IDENTITY) =>
             candidate.serverKey === SLASH_IDENTITY.serverKey &&
             candidate.directory === SLASH_IDENTITY.directory &&
@@ -1485,6 +1491,21 @@ describe("#582 斜杠 source 生产接线:composer 发送 → 真 dock 捕获 �
     dock.host.querySelector<HTMLButtonElement>(".a-comp-send")!.click()
     for (let i = 0; i < 20 && promptAsyncCalls.length === 0; i++) await flush()
     expect(promptAsyncCalls[0]).toMatchObject({ sessionID: "session-9", agent: "codepuppy-ask" })
+  })
+
+  test("#1652 audit: stop during initial history loading records the raw serverSync turn", async () => {
+    // Same v1 user/assistant identity envelope used by the stop-button regression.
+    setDockMessages([{ role: "user", agent: "codepuppy-ask", id: "msg_stop_loading" },
+      { role: "assistant", agent: "codepuppy-ask", id: "msg_stop_assistant", parentID: "msg_stop_loading", time: { created: 1000 } }])
+    setDockHistoryLoading(true)
+    setDockHistoryMore(false)
+    abortRecorded = false
+    const dock = mountRealDock(projectsApi([project("alpha-code", "/ws/a")]), "running")
+    const stop = dock.host.querySelector<HTMLButtonElement>(".a-comp-stop")!
+    expect(stop.disabled).toBe(false)
+    stop.click()
+    for (let i = 0; i < 20 && !abortRecorded; i++) await flush()
+    expect(abortRecorded).toBe(true)
   })
 
   test("#1643 AC3 长对话加载更早消息时发送不被禁用,仍按当前请求审批发送", async () => {

@@ -2184,4 +2184,5 @@ export const dict = {
   "codepuppy.net.http": "{{host}} 返回了错误",
   "codepuppy.net.timeout": "等待 {{host}} 超时,稍后重试",
   "codepuppy.net.unattributed": "连接中途断开了",
+  "codepuppy.ext.connectorDisabled": "连接器已停用",
 }

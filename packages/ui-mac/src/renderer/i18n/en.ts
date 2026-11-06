@@ -2216,4 +2216,5 @@ export const dict = {
   "codepuppy.net.http": "{{host}} returned an error",
   "codepuppy.net.timeout": "Waiting for {{host}} timed out; try again later",
   "codepuppy.net.unattributed": "The connection dropped partway",
+  "codepuppy.ext.connectorDisabled": "Connector disabled",
 }

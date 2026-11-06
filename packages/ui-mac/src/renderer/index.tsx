@@ -561,7 +561,11 @@ render(() => {
               </CodePuppyBoundary>
               <SettingsSurface />
               <CodePuppyBoundary name="ExtensionHub">
-                <ExtensionHub server={sidebarServer} open={extHubOpen} onClose={() => setExtHubOpen(false)} />
+                <ExtensionHub server={sidebarServer} open={extHubOpen} onClose={() => setExtHubOpen(false)}
+                  directories={() => codepuppyProjects.store.projects.flatMap((project) => [
+                    ...project.directories.filter((directory) => directory !== "/"),
+                    ...project.sessions.map((session) => session.directory),
+                  ])} />
               </CodePuppyBoundary>
               <CodePuppyBoundary name="AutomationPanel">
                 {/* #925(第四个消费者):「回跳会话」。自动化 run 的会话由主进程建在内嵌

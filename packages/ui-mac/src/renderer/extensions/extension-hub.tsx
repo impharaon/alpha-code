@@ -158,6 +158,7 @@ export function ExtensionHub(props: {
   server: Accessor<ServerInfo | undefined>
   open: Accessor<boolean>
   onClose: () => void
+  directories?: Accessor<readonly string[]>
 }) {
   let hubCloseButton: HTMLButtonElement | undefined
   // REQ-099(#307)项目上下文 = 当前路由的项目目录(route-manifest parseRoute 先例;
@@ -170,7 +171,7 @@ export function ExtensionHub(props: {
       return active?.sessionID === id ? active.directory : undefined
     })
   })
-  const ext = useExtensions(props.server, props.open, projectDir)
+  const ext = useExtensions(props.server, props.open, projectDir, props.directories)
   const section = hubSection
   // REQ-103(#195):governance 只读视图(逐扩展五维所有权 + availability/activation/health 三态)。
   // 唯一只读通道,零写面;keyed on open + 账本内容指纹 + 项目上下文(#307:传 projectDir 即出项目行)。

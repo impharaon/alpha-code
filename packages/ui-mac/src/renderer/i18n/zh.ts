@@ -1612,6 +1612,7 @@ export const dict = {
   "codepuppy.timeline.turnErrorTitle": "这轮回复没有完成",
   // `#1588` AC3(批准稿 #turn-error):认得出的五类原因 —— 标题与出路。
   "codepuppy.timeline.turnErrorBilling": "余额或会员不足",
+  "codepuppy.timeline.turnErrorModelUnavailable": "这个模型暂时不可用,请换一个模型再试",
   "codepuppy.timeline.turnErrorAuth": "登录或 Key 无效",
   "codepuppy.timeline.turnErrorRateLimit": "请求太频繁,稍后再试",
   "codepuppy.timeline.turnErrorContextOverflow": "对话太长",

@@ -824,6 +824,7 @@ function turnNetCopy(row: Extract<TimelineRow, { kind: "turnError" }>): string |
 // 只进「开发者详情」。按钮的 intent 缺席即不出(fail-closed);「换模型」= 输入框模型选择器,composer 没登记时不出。
 const TURN_ERROR_TITLE: Record<TurnErrorCause, Parameters<typeof t>[0]> = {
   billing: "codepuppy.timeline.turnErrorBilling",
+  modelUnavailable: "codepuppy.timeline.turnErrorModelUnavailable",
   auth: "codepuppy.timeline.turnErrorAuth",
   rateLimit: "codepuppy.timeline.turnErrorRateLimit",
   contextOverflow: "codepuppy.timeline.turnErrorContextOverflow",
@@ -851,6 +852,7 @@ function TurnErrorActions(props: { cause: TurnErrorCause }) {
     }
   }
   const buttons = createMemo(() => {
+    if (props.cause === "modelUnavailable") return [action("codepuppy.timeline.turnErrorChooseModel", intents.chooseModel)]
     if (props.cause === "billing")
       return [
         action("codepuppy.timeline.turnErrorRecharge", intents.recharge),

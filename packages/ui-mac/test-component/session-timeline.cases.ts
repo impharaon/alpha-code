@@ -4570,6 +4570,47 @@ describe("#1588 AC3 回合错误卡:五类按错误名与状态码认,标题与�
     return clone.textContent ?? ""
   }
 
+  // Captured by executing alpha-platform@8a17df3 worker.ts:1153/2329 c.json expressions
+  // with its real withFailureCodeMark + Hono; reason input from agent-failure-code-232.test.ts.
+  const stoppedChat = '{"error":{"message":"预授权拒绝: 会员额度已用尽:本期额度窗口的额度已消费完。 [failure_code=route_usage_stopped]","code":"route_usage_stopped"}}'
+  const stoppedMessages = '{"type":"error","error":{"type":"insufficient_quota","message":"预授权拒绝: 会员额度已用尽:本期额度窗口的额度已消费完。 [failure_code=route_usage_stopped]"}}'
+  const walletChat = '{"error":{"message":"预授权拒绝: 会员额度已用尽:本期额度窗口的额度已消费完。 [failure_code=account_wallet_insufficient]","code":"account_wallet_insufficient"}}'
+
+  test("#1650 AC1: route_usage_stopped 402 shows model unavailable and only switches model", async () => {
+    const host = mount()
+    runtime.setTimelineIntentsEnabled(true)
+    for (const data of [
+      // Remove the marker to prove error.code alone works; other arms exercise each marker carrier.
+      { message: "Payment Required", responseBody: stoppedChat.replace(" [failure_code=route_usage_stopped]", "") },
+      { message: "Payment Required", responseBody: stoppedMessages },
+      { message: JSON.parse(stoppedMessages).error.message },
+    ]) {
+      runtime.getIntentLog().turnErrorExits.length = 0
+      runtime.setTimelineRows(causeRows({ name: "APIError", data: { ...data, statusCode: 402, isRetryable: false } }))
+      await flush()
+      expect(card(host).querySelector("b")!.textContent).toBe("这个模型暂时不可用,请换一个模型再试")
+      expect(visibleText(host)).not.toContain("余额或会员不足")
+      expect(card(host).textContent).not.toContain("充值")
+      expect(buttons(host).map((button) => button.textContent)).toEqual(["换模型"])
+      buttons(host)[0].click()
+      expect(runtime.getIntentLog().turnErrorExits).toEqual(["chooseModel"])
+    }
+  })
+
+  test("#1650 AC2: wallet refusal and 402 without a registered marker retain billing copy and recharge", async () => {
+    const host = mount()
+    runtime.setTimelineIntentsEnabled(true)
+    for (const responseBody of [walletChat, stoppedMessages.replace(" [failure_code=route_usage_stopped]", "")]) {
+      runtime.getIntentLog().turnErrorExits.length = 0
+      runtime.setTimelineRows(causeRows({ name: "APIError", data: { message: "Payment Required", responseBody, statusCode: 402, isRetryable: false } }))
+      await flush()
+      expect(card(host).querySelector("b")!.textContent).toBe("余额或会员不足")
+      expect(buttons(host).map((button) => button.textContent)).toEqual(["充值", "换模型"])
+      buttons(host)[0].click()
+      expect(runtime.getIntentLog().turnErrorExits).toEqual(["recharge"])
+    }
+  })
+
   const table = [
     { error: { name: "APIError", data: { message: RAW, statusCode: 402, isRetryable: false } }, title: "余额或会员不足", actions: ["充值", "换模型"], exits: ["recharge", "chooseModel"] },
     { error: { name: "APIError", data: { message: "Unauthorized", statusCode: 401, isRetryable: false } }, title: "登录或 Key 无效", actions: ["重新登录", "去设置"], exits: ["signIn", "openSettings"] },

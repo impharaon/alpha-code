@@ -1636,6 +1636,7 @@ export const dict = {
   "codepuppy.timeline.openSubtask": "Open subsession",
   "codepuppy.timeline.turnErrorTitle": "This reply didn't finish",
   "codepuppy.timeline.turnErrorBilling": "Not enough balance or membership",
+  "codepuppy.timeline.turnErrorModelUnavailable": "This model is temporarily unavailable. Please try another model.",
   "codepuppy.timeline.turnErrorAuth": "Sign-in or key is invalid",
   "codepuppy.timeline.turnErrorRateLimit": "Too many requests, try again later",
   "codepuppy.timeline.turnErrorContextOverflow": "This conversation is too long",

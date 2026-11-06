@@ -351,6 +351,7 @@ export const dict = {
   "codepuppy.ext.installFailed": "安装没有完成，请重试。",
   "codepuppy.ext.loading": "加载中…",
   "codepuppy.ext.pluginRestart": "已安装，正在加载。首次启用需要下载所需文件，请稍候。",
+  "codepuppy.ext.mcpPreparing": "准备中",
   "codepuppy.ext.hubStateAvailable": "可以使用",
   "codepuppy.ext.hubStateInstalled": "已安装",
   "codepuppy.ext.hubStatePending": "待生效",

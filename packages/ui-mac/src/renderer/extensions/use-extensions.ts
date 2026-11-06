@@ -226,13 +226,13 @@ export function projectMcpStatusView(state: ProjectMcpState | undefined) {
       tone: "warn" as const,
       textKey: "codepuppy.ext.projectMcpShadowed" as const,
     }
-  // `#1563`:引擎还在后台启动它(准备中)。复用定制中心三档视图给同一状态的文案键,不新造文案(定稿归 T19)。
+  // #1653:连接和重试期间都显示准备中。
   if (state === "pending")
     return {
       state,
       connected: false,
       tone: "muted" as const,
-      textKey: "codepuppy.ext.hubReasonNotLoaded" as const,
+      textKey: "codepuppy.ext.mcpPreparing" as const,
     }
   return {
     state: "unverifiable" as const,
@@ -242,18 +242,21 @@ export function projectMcpStatusView(state: ProjectMcpState | undefined) {
   }
 }
 
-/** REQ-234 `#1529`:已安装列表上的三档状态呈现。状态与原因都是 main 给的(`extIpc.hubView`),这里只选文案键;
+/** REQ-234 `#1529`:已安装列表上的三档状态呈现。配置生效状态来自 main (`extIpc.hubView`),连接准备状态来自引擎;
  *  「现在重载」只给能靠重载修好的行(云条目没有重载环节)。未安装行不在已安装列表上出现 ⇒ undefined。 */
 export type HubStateView = {
   state: Exclude<HubViewRow["state"], "not-installed">
   tone: "ok" | "muted" | "warn"
-  textKey: "codepuppy.ext.hubStateAvailable" | "codepuppy.ext.hubStateInstalled" | "codepuppy.ext.hubStatePending"
+  textKey: "codepuppy.ext.hubStateAvailable" | "codepuppy.ext.hubStateInstalled" | "codepuppy.ext.hubStatePending" | "codepuppy.ext.mcpPreparing"
   reasonKey?: "codepuppy.ext.hubReasonWaiting" | "codepuppy.ext.hubReasonFailed" | "codepuppy.ext.hubReasonNotLoaded"
   /** main 给的技术细节,只进 title。 */
   detail?: string
   reloadNow: boolean
 }
-export function hubStateView(row: HubViewRow | undefined): HubStateView | undefined {
+export function hubStateView(row: HubViewRow | undefined, mcp?: Pick<InstalledState, "pending" | "error">): HubStateView | undefined {
+  // 显式配置变更仍等待生效;MCP 自己的重试不需要用户重载。
+  if (mcp?.pending && row?.stateReason?.code !== "reload-waiting" && row?.stateReason?.code !== "reload-failed")
+    return { state: "installed", tone: "muted", textKey: "codepuppy.ext.mcpPreparing", detail: mcp.error, reloadNow: false }
   if (!row || row.state === "not-installed") return undefined
   if (row.state === "available") return { state: row.state, tone: "ok", textKey: "codepuppy.ext.hubStateAvailable", reloadNow: false }
   // 已安装但没核验通过(云条目:缺连接或缺工具,基线 §2.5 云行)⇒ 说出原因;停用的行原因已由「未启用」徽标说了。

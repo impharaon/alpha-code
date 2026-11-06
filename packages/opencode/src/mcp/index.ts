@@ -869,7 +869,9 @@ const layer = Layer.effect(
           })
         })
         if (isCurrent(s, name, generation)) {
-          server.status = failure.status
+          server.status = failure.reconnect && failure.status.status === "failed"
+            ? { status: "pending", error: failure.status.error }
+            : failure.status
           yield* Effect.logWarning("server unavailable", {
             key: name,
             type: server.entry.type,
@@ -877,7 +879,7 @@ const layer = Layer.effect(
             code: failure.status.status === "failed" ? failure.status.code : undefined,
             error: "error" in failure.status ? failure.status.error : undefined,
           })
-          // Readers re-read status on this event; without it a failed background start stays "pending" (audit F3).
+          // Readers re-read terminal failures and retry details on this event.
           yield* events.publish(ToolsChanged, { server: name }).pipe(Effect.ignore)
           if (failure.reconnect && failure.status.status === "failed")
             yield* reconnect(s, name, generation, failure.status.error)

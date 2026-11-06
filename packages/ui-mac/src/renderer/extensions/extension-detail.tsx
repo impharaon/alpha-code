@@ -516,7 +516,7 @@ export function ExtensionDetail(props: {
   // REQ-234 `#1529`:与已安装列表同一份三档状态(详情页只呈现 global 安装,与上面 receipt 的口径一致)。
   const hubState = createMemo(() => {
     const r = receipt()
-    return r && r.installedAt !== "" ? hubStateView(hubRowFor(props.ext.store.hubRows, r.id, r.scope)) : undefined
+    return hubStateView(r && r.installedAt !== "" ? hubRowFor(props.ext.store.hubRows, r.id, r.scope) : undefined, mcpLive())
   })
   const [reloadBusy, setReloadBusy] = createSignal(false)
   const [reloadRefused, setReloadRefused] = createSignal(false)
@@ -792,6 +792,9 @@ export function ExtensionDetail(props: {
             </Show>
             <Show when={installed()}>
               <span class="codepuppy-ext-dhead-installed">✓ {t("codepuppy.ext.installed")}</span>
+            </Show>
+            <Show when={mcpLive()?.pending && mcpLive()?.error}>
+              {(error) => <span class="codepuppy-ext-card-err">{error()}</span>}
             </Show>
             <Show when={hubState()}>
               {(hs) => (

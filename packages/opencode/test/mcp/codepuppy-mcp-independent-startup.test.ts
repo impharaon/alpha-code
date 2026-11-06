@@ -328,11 +328,17 @@ it.instance("AC3: a remote network failure reconnects in the background — 30 s
     const net = yield* remoteStandIn()
     const mcp = yield* MCP.Service
     const posts = () => net.posts
+    const changes: unknown[] = []
+    const listen = (event: { payload?: { type?: string; properties?: { server?: string } } }) => {
+      if (event.payload?.type === MCP.ToolsChanged.type && event.payload.properties?.server === "cloud") changes.push(event)
+    }
+    GlobalBus.on("event", listen)
+    yield* Effect.addFinalizer(() => Effect.sync(() => { GlobalBus.off("event", listen) }))
 
     yield* mcp.add("cloud", cloud)
     const first = yield* statusOf("cloud")
-    expect(first).toMatchObject({ status: "failed", code: "tcp" })
-    const firstError = first?.status === "failed" ? first.error : ""
+    expect(first).toMatchObject({ status: "pending" })
+    const firstError = first?.status === "pending" ? first.error : ""
     const n1 = posts()
 
     yield* TestClock.adjust("29 seconds")
@@ -343,14 +349,15 @@ it.instance("AC3: a remote network failure reconnects in the background — 30 s
     net.mode = "hold"
     yield* TestClock.adjust("1 second")
     const retrying = yield* settle(
-      statusOf("cloud").pipe(Effect.map((status) => (status?.status === "pending" ? status : undefined))),
+      statusOf("cloud").pipe(Effect.map((status) => (status?.status === "pending" && posts() > n1 ? status : undefined))),
       "no reconnect at 30 s",
     )
     expect(retrying).toEqual({ status: "pending", error: firstError })
+    const beforeFailure = changes.length
     net.mode = "refuse"
     net.release()
     yield* settle(
-      statusOf("cloud").pipe(Effect.map((status) => (status?.status === "failed" ? status : undefined))),
+      Effect.sync(() => changes.length > beforeFailure ? true : undefined),
       "the 30 s reconnect did not settle",
     )
     const n2 = posts()
@@ -378,7 +385,7 @@ it.instance("AC3: a remote network failure reconnects in the background — 30 s
     // 成功后复位:再失败一次(用户发起的连接),下一次后台重连又是 30 s。
     net.mode = "refuse"
     yield* mcp.connect("cloud")
-    expect(yield* statusOf("cloud")).toMatchObject({ status: "failed", code: "tcp" })
+    expect(yield* statusOf("cloud")).toMatchObject({ status: "pending" })
     const n3 = posts()
     yield* TestClock.adjust("29 seconds")
     yield* quiet
@@ -756,7 +763,7 @@ for (const kind of ["timeout", "network"] as const) {
       net.listFailure = kind
       const mcp = yield* MCP.Service
       yield* mcp.add("cloud", cloud)
-      expect(yield* statusOf("cloud")).toMatchObject({ status: "failed", code: kind === "timeout" ? "timeout" : "tcp" })
+      expect(yield* statusOf("cloud")).toMatchObject({ status: "pending" })
       const lists = net.lists
       net.listFailure = ""
       yield* TestClock.adjust("29 seconds")
@@ -796,3 +803,24 @@ for (const kind of ["auth", "validation"] as const) {
     )
   })
 }
+
+// #1653:真实 TCP 拒连形状复用上面的 Node 22 样本;退避不占住别的工具,失败缓存也不提前重连。
+it.instance("#1653 AC1 retry backoff stays pending without blocking ready tools or bypassing the cache", () =>
+  Effect.gen(function* () {
+    const net = yield* remoteStandIn()
+    const mcp = yield* MCP.Service
+    yield* mcp.add("ready", local())
+    yield* mcp.add("cloud", cloud)
+    expect(yield* statusOf("cloud")).toMatchObject({ status: "pending", error: expect.any(String) })
+    const posts = net.posts
+    const available = yield* mcp.tools().pipe(Effect.timeout("1 second"))
+    expect(Object.keys(available)).toEqual(["ready_echo", "ready_slow"])
+    const tool = available.ready_echo!
+    const result = yield* mcp.callTool!("ready", "echo", { text: "ready" }, tool).pipe(Effect.timeout("1 second"))
+    expect(result.content).toEqual([{ type: "text", text: "ready" }])
+    const unavailable = yield* mcp.callTool!("cloud", "probe", {}, { generation: 0 }).pipe(Effect.exit, Effect.timeout("1 second"))
+    expect(Exit.isFailure(unavailable)).toBe(true)
+    expect(net.posts).toBe(posts)
+    expect(yield* statusOf("ready")).toEqual({ status: "connected" })
+  }).pipe(Effect.provide(TestClock.layer())),
+)

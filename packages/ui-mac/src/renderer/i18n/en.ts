@@ -361,6 +361,7 @@ export const dict = {
   "codepuppy.ext.installFailed": "Installation did not complete. Try again.",
   "codepuppy.ext.loading": "Loading…",
   "codepuppy.ext.pluginRestart": "Installed and loading. The first use requires downloading additional files; please wait.",
+  "codepuppy.ext.mcpPreparing": "Preparing",
   "codepuppy.ext.hubStateAvailable": "Ready to use",
   "codepuppy.ext.hubStateInstalled": "Installed",
   "codepuppy.ext.hubStatePending": "Pending",

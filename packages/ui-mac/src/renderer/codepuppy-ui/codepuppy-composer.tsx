@@ -95,6 +95,7 @@ import {
   type EngineModelRef,
 } from "./model-default-core"
 import { ModelPickPop } from "./codepuppy-composer-model"
+import { abortUserTurn } from "./session-workspace/user-stopped-turns"
 import { identityKey } from "./session-workspace/session-workspace-core"
 import { createModelContract, type ModelContract } from "./model-contract"
 import { byokEngineId, isByokEngineId } from "../../shared/codepuppy-model-types"
@@ -653,7 +654,7 @@ export type ComposerSlashCapture = {
  */
 export type ComposerSessionDockApi = {
   /** undefined = 消息尚未读回;空数组 = 已读回的新会话。 */
-  messages?: () => readonly { role: string; agent?: string }[] | undefined
+  messages?: () => readonly { role: string; agent?: string; id?: string; parentID?: string; time?: { created?: number; completed?: number } }[] | undefined
   /** live 运行态(session_status typed 通道;不再轮询)。 */
   running: () => boolean
   /** 上下文用量百分比(0-100);null = 事实不足,ring 不渲染。 */
@@ -1624,9 +1625,7 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
     const sid = props.sessionID?.()
     if (!c || !sid) return
     try {
-      const result = await c.session.abort({ sessionID: sid, directory: props.directory() } as any)
-      // throwOnError:false 档位的 { error } 信封同样是失败(审计 minor:4xx 不装停止成功)。
-      if ((result as { error?: unknown } | undefined)?.error !== undefined) throw new Error("abort rejected")
+      await abortUserTurn(props.sessionDock?.messages?.(), () => c.session.abort({ sessionID: sid, directory: props.directory() } as any))
     } catch {
       pushToast({ kind: "error", title: t("codepuppy.composer.abortFailed") })
     }

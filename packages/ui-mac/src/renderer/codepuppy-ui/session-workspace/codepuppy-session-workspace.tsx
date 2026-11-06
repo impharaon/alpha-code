@@ -10,6 +10,7 @@ import { createContext, createEffect, createMemo, createSignal, onCleanup, untra
 import { parseRoute } from "../../../shared/route-manifest"
 import { t } from "../../i18n"
 import type { CodePuppyProjectsApi } from "../../sidebar/use-projects"
+import { abortUserTurn } from "./user-stopped-turns"
 import { pushToast } from "../Toast"
 import { SessionRailArtifacts } from "../session-rail/artifacts/session-rail-artifacts"
 import { SessionRailFiles } from "../session-rail/files/session-rail-files"
@@ -96,7 +97,10 @@ export function CodePuppySessionWorkspace(props: { projects: CodePuppyProjectsAp
     current,
     accepts: live.accepts,
     canEdit: (identity) => canEditUserMessageForSession(identity, serverSync().session.data.info[identity.sessionID]),
-    session: () => serverSDK().client.session,
+    session: () => ({
+      abort: (input) => abortUserTurn(serverSync().session.data.message[input.sessionID], () => serverSDK().client.session.abort(input)),
+      revert: (input) => serverSDK().client.session.revert(input),
+    }),
     apply: (request) => setEditRequest({ ...request, revision: ++composerRequestRevision }),
     reject: (error) => {
       console.warn("[alpha] edit resend revert failed", error)

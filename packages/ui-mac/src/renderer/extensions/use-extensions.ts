@@ -36,6 +36,7 @@ import type { SessionGrantRefusalCode, SessionGrantWire } from "../../shared/ext
 import type { HubViewRow, ReloadItem, ReloadScope } from "../../main/codepuppy-sidecar-messages"
 import { connectOutcome, grantsToReassert, sessionGrantKeyOf } from "./ext-session-toggle"
 import { extIpc } from "./ext-ipc"
+import { approvalToolOf } from "../codepuppy-ui/session-timeline/cards/tool-card-model"
 import { subscribeRuntimeRecovery } from "../runtime-recovery"
 
 // Receipt provenance (REQ-018): catalog snapshot version recorded per install → update checks.
@@ -959,6 +960,24 @@ export function useExtensions(
     opts?: { confirmExpiredReview?: boolean },
   ): Promise<ActionResult> {
     if (receipt.scope === "project") return { ok: false, reason: "project-scoped records have no enable switch" }
+    if (receipt.type === "mcp" && state === "disabled" && client) {
+      try {
+        const { data } = await client.permission.list({}, { throwOnError: true })
+        const replied = new Set<string>()
+        for (const request of data ?? []) {
+          const tool = approvalToolOf({
+            identity: request.metadata?.identity, authority: request.metadata?.authority,
+            location: request.metadata?.location, technicalId: request.permission,
+          })
+          if (tool?.connector !== receipt.name || replied.has(request.sessionID)) continue
+          await client.permission.reply({ requestID: request.id, reply: "reject", message: "连接器已停用" }, { throwOnError: true })
+          // The engine rejects the other pending requests in this session with the first rejection.
+          replied.add(request.sessionID)
+        }
+      } catch (error) {
+        return { ok: false, reason: String(error) }
+      }
+    }
     const res = await extIpc.setInstallState({
       type: receipt.type,
       name: receipt.name,

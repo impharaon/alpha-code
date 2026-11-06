@@ -293,7 +293,7 @@ export function approvalToolOf(facts: { identity: unknown; authority: unknown; l
   if (!snapshot) return undefined
   const dispatch = dispatchOfSnapshot(snapshot, () => ({}))
   const provenance = provenanceOfSnapshot(snapshot)
-  return { name: dispatch.name, titleKey: toolTitleKeyOf(dispatch), source: provenance.source, location: provenance.location }
+  return { name: dispatch.name, titleKey: toolTitleKeyOf(dispatch), source: provenance.source, location: provenance.location, connector: snapshot.identity.source === "mcp" ? snapshot.identity.origin : undefined }
 }
 
 function provenanceOfSnapshot(snapshot: DisplaySnapshot | undefined): ToolProvenance {

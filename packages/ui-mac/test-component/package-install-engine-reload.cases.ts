@@ -54,6 +54,19 @@ let connectorRefreshes = 0
 let liveMcpCalls = 0
 let startup: { mcp?: Record<string, { enabled?: boolean }> } | undefined
 const services = () => startup ? { "codepuppy-pdf": { status: startup.mcp?.["codepuppy-pdf"]?.enabled === false ? "disabled" : "connected" } } : {}
+// N07(b) engine tool display: prt_1aeaf3f3c001sbAwc6IGaVcOvr (result-0126-e.md).
+// Request envelope follows the v1 sample in permission-dual-channel.test.ts; metadata is
+// produced by permission/codepuppy-tool-policy-gate.ts:confirm, also used by the approval card.
+const approvalRequest = (id: string, connector: string, sessionID: string) => ({
+  id, sessionID, permission: `mcp:${connector}:execute_sql`, patterns: [`call:${id}`], always: [],
+  metadata: {
+    identity: { source: "mcp", origin: connector, name: "execute_sql" },
+    authority: { kind: "not-asserted" }, location: { kind: "local" },
+  },
+  tool: { messageID: "msg_1aeaf3b3d0018M9RLjLp5ZvYc5", callID: id },
+})
+let permissions: ReturnType<typeof approvalRequest>[] = []
+const permissionReplies: Array<{ requestID: string; reply: string; message: string }> = []
 const engineClient = {
   global: {
     dispose: async () => {
@@ -67,6 +80,15 @@ const engineClient = {
     add: async () => { liveMcpCalls++; return { data: {} } },
     connect: async () => { liveMcpCalls++; return { data: {} } },
     disconnect: async () => { liveMcpCalls++; return { data: {} } },
+  },
+  permission: {
+    list: async () => ({ data: permissions }),
+    reply: async (input: { requestID: string; reply: string; message: string }) => {
+      permissionReplies.push(input)
+      const session = permissions.find((request) => request.id === input.requestID)!.sessionID
+      permissions = permissions.filter((request) => request.sessionID !== session)
+      return { data: true }
+    },
   },
   app: { agents: async () => ({ data: [] }) },
 }
@@ -677,4 +699,39 @@ test("#1646 AC4 custom connector waits for idle or reload-now and the new genera
     await waitFor(() => expect(connectorRefreshes).toBe(before + 1))
     expect(isEgressAuthorizedForSidecar(host, 443)).toBe(true)
   }
+})
+
+
+test("#1652 AC1/AC2 Hub disable rejects only this connector's pending approvals and waits for idle", async () => {
+  const name = "dbhub-readonly"
+  busy = true
+  const before = connectorRefreshes
+  expect(restoreMcpLeaf(name, { type: "local", command: ["fixture-db-server"], enabled: true }).ok).toBe(true)
+  expect(upsertRecordV2(globalRoot, {
+    id: `mcp:${name}`, name, kind: "mcp", origin: "catalog", environment: "dev", version: "1.0.0",
+    scope: { kind: "global" }, installedAt: "2026-11-05T10:40:00.000Z", desiredState: "enabled", configKey: `mcp.${name}`,
+  }).ok).toBe(true)
+  permissions = [approvalRequest("per_db_1", name, "ses_db_1"), approvalRequest("per_db_2", name, "ses_db_2"), approvalRequest("per_other", "another-connector", "ses_other")]
+  permissionReplies.length = 0
+  setHubSection("connectors")
+  await call("ext-reload-request", { scope: "global", items: [], reason: "fixture install completed" })
+  const row = () => q(`[data-installed-row="mcp:${name}"]`)
+  await waitFor(() => expect(row()).toBeInstanceOf(HTMLElement))
+  click(row()?.querySelector('[data-more]'))
+  click(row()?.querySelector('[data-menu-item="disable"]'))
+  await waitFor(() => expect(row()?.querySelector('[data-hub-reload-now]')).toBeInstanceOf(HTMLElement))
+  await waitFor(() => expect(permissionReplies).toHaveLength(2))
+  expect(permissionReplies).toEqual([
+    { requestID: "per_db_1", reply: "reject", message: "连接器已停用" },
+    { requestID: "per_db_2", reply: "reject", message: "连接器已停用" },
+  ])
+  expect(permissions.map((request) => request.id)).toEqual(["per_other"])
+  await scheduler.settled()
+  expect(connectorRefreshes).toBe(before)
+  expect(liveMcpCalls).toBe(0)
+  busy = false
+  scheduler.poke()
+  await scheduler.settled()
+  await waitFor(() => expect(connectorRefreshes).toBe(before + 1))
+  permissions = []
 })

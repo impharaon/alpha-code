@@ -284,7 +284,7 @@ export function ExtensionHub(props: {
       return
     }
     let mcPending = false
-    if (args.type === "mcp" && !isCodePuppyOfficeCatalogId(args.receipt.id)) {
+    if (args.type === "mcp" && r.reason !== "reload-pending" && !isCodePuppyOfficeCatalogId(args.receipt.id)) {
       const mc = await ext.setMcpConnected(args.name, true)
       mcPending = mc.reason === "reload-pending"
     }
@@ -376,7 +376,7 @@ export function ExtensionHub(props: {
       return
     }
     let mcPending = false
-    if (args.type === "mcp" && !isCodePuppyOfficeCatalogId(args.receipt.id)) {
+    if (args.type === "mcp" && r.reason !== "reload-pending" && !isCodePuppyOfficeCatalogId(args.receipt.id)) {
       const mc = await ext.setMcpConnected(args.name, next === "enabled")
       mcPending = mc.reason === "reload-pending"
     }

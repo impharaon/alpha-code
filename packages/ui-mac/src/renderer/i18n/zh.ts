@@ -1511,6 +1511,7 @@ export const dict = {
   "codepuppy.timeline.compacted": "上下文已压缩",
   "codepuppy.timeline.retainedHighlights": "保留要点",
   "codepuppy.timeline.interrupted": "已由你停止",
+  "codepuppy.timeline.interruptedUnknown": "这一轮已中断",
   "codepuppy.timeline.continueTurn": "继续生成",
   "codepuppy.timeline.continuePrompt": "继续",
   // REQ-160 AC3(`#1318`):助手回合跑完却零正文。**把内容安全审核放在明面上但不断言**

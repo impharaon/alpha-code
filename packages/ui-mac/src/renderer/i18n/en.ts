@@ -1538,6 +1538,7 @@ export const dict = {
   "codepuppy.timeline.compacted": "Context compacted",
   "codepuppy.timeline.retainedHighlights": "Highlights retained",
   "codepuppy.timeline.interrupted": "Stopped by you",
+  "codepuppy.timeline.interruptedUnknown": "This turn was interrupted",
   "codepuppy.timeline.continueTurn": "Continue",
   "codepuppy.timeline.continuePrompt": "Continue",
   // REQ-160 AC3 (`#1318`): the turn finished with no reply. Content safety review is named as a

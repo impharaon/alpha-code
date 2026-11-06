@@ -202,6 +202,9 @@ describe("审批决定提交入口:单一引用面白名单棘轮(#619 R3 Blocke
    *     也没有 UI 挂在它上面),是所有 v2 提交入口在 v1 引擎上的物理出口;不登记它,上面 1)~4)
    *     的每一条在 v1 引擎上都发不出去。同一份 SOT 补丁把它原样带进来,alpha 零改动。 */
   const SANCTIONED_ENTRY_HOLDERS = [
+    // #1652 AC2 explicitly requires connector disable to reject its pending approvals via the existing API.
+    // This entry only sends reject; the real Hub test checks the exact reply and connector identity.
+    { file: "packages/ui-mac/src/renderer/extensions/use-extensions.ts", token: "permission.reply" },
     { file: "packages/app/src/context/permission-surface.tsx", token: "permission.reply" },
     { file: "packages/app/src/context/permission-v1-adapter.ts", token: "permission.reply" },
     { file: "packages/app/src/context/permission.tsx", token: "permission.reply" },

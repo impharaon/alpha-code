@@ -216,7 +216,6 @@ describe("REQ-128 #705 single-install builder parity", () => {
           // 也没有任何消费方。逐字钉死这份计划面就是为了让它再长回来时红。
           graphAfter: {
             packageId: "package:parity-skill",
-            displayName: "skill",
             envelopeDigest: (plan.items[0]!.packageMutation as { graphAfter: { envelopeDigest: string } }).graphAfter.envelopeDigest,
             installedGraphDigest: (plan.items[0]!.packageMutation as { graphAfter: { installedGraphDigest: string } }).graphAfter.installedGraphDigest,
             root: {

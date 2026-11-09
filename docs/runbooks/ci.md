@@ -260,6 +260,7 @@ bundle(逐字比对提交 sha,防篡改),推送凭据仅在最后一步临时配
    **禁止 squash / rebase** —— squash 不保留上游祖先,merge-base 不前移,下一次同步会再次命中同一批
    接管路径。机制见 [`docs/architecture/upstream-integration.md`](../architecture/upstream-integration.md)。
 4. 想把 local-first 变**强制** → 装 §6 的 pre-push 钩子。
+5. 任何上游更新(同步、升版本、换代、前端钉版前移)都按 [`upstream-update.md`](upstream-update.md) 核对 Code Puppy 权威一项不丢(ADR-048)。
 
 ## 5. CI 卡住了怎么办(排查手册)
 

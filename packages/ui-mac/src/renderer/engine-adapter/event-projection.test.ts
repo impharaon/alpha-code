@@ -10,7 +10,7 @@ import { applyDirectoryEvent } from "../../../../codepuppy-app/src/context/globa
 import readTool from "./fixtures/read-tool.json"
 import todo from "./fixtures/todo.json"
 import question from "./fixtures/question.json"
-import { createProjector, SNAPSHOT_EVENTS, TURN_DIFF_EVENTS, type V1Payload } from "./events"
+import { createProjector, SNAPSHOT_EVENTS, TURN_DIFF_EVENTS, TURN_END_EVENTS, type V1Payload } from "./events"
 import { toV1Messages } from "./v1-shapes"
 
 type Fixture = {
@@ -128,6 +128,25 @@ describe("#1668 2.x 事件 → v1 事件(按冻结 app 的归约器)", () => {
     expect(statuses[0]).toBe("busy")
     expect(statuses.at(-1)).toBe("idle")
     expect(events.some((event) => event.payload.type === "session.idle")).toBe(true)
+  })
+
+  test("忙闲:2.x 不发 session.status / session.idle,适配器由 execution.* 合成 —— 回合结束后 store 里是 idle", async () => {
+    const fixture = readTool as unknown as Fixture
+    expect(fixture.records.some((record) => record.frame.type === "session.status" || record.frame.type === "session.idle")).toBe(false)
+    const { store } = reduce(await project(fixture), fixture.directory)
+    expect(plain(store.session_status[fixture.sessionID])).toEqual({ type: "idle" })
+  })
+
+  test("反向臂:不合成回合结束 ⇒ 界面停在 busy(发送键一直是停止键)", async () => {
+    const fixture = readTool as unknown as Fixture
+    const removed = [...TURN_END_EVENTS]
+    for (const type of removed) TURN_END_EVENTS.delete(type)
+    try {
+      const { store } = reduce(await project(fixture), fixture.directory)
+      expect(plain(store.session_status[fixture.sessionID])).toEqual({ type: "busy" })
+    } finally {
+      for (const type of removed) TURN_END_EVENTS.add(type)
+    }
   })
 
   test("U1 任务清单:todowrite 的输入投影成 todo.updated,归约后清单三条、状态原样", async () => {

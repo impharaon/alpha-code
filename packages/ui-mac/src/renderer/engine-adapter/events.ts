@@ -81,6 +81,18 @@ const SESSION_INFO_EVENTS = new Set([
   "session.execution.interrupted",
 ])
 
+/**
+ * 回合结束。2.x core/server 不发 `session.status` / `session.idle`(只剩弃用的 schema 项);回合以
+ * `session.execution.succeeded|failed|interrupted` 收尾(schema/src/session-event.ts:248-259,上游自己在
+ * core/src/session/message-updater.ts:149-152 也这样映射成 idle)。冻结界面靠 v1 的 session.status / session.idle
+ * 判忙闲 —— 适配器在这里合成;回合开始由 `session.execution.started` 合成 busy。
+ */
+export const TURN_END_EVENTS = new Set([
+  "session.execution.succeeded",
+  "session.execution.failed",
+  "session.execution.interrupted",
+])
+
 /** REQ-142:回合改动在这些边界上按 2.x 的逐回合 diff 刷新(0.1.26 在第一步与每步结束时写 summary.diffs)。 */
 export const TURN_DIFF_EVENTS = new Set([
   "session.step.ended",
@@ -252,7 +264,7 @@ export function createProjector(api: OpenCodeClient, emit: Emit) {
         type: "session.error",
         properties: { sessionID, error: { name: "UnknownError", data: { message: data.error?.message ?? "" } } },
       })
-    if (type === "session.execution.succeeded" || type === "session.execution.failed" || type === "session.execution.interrupted") {
+    if (TURN_END_EVENTS.has(type)) {
       emit(directory, { type: "session.status", properties: { sessionID, status: { type: "idle" } } })
       emit(directory, { type: "session.idle", properties: { sessionID } })
     }

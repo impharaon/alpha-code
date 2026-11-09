@@ -39,6 +39,13 @@ if [ "${MODE}" = e3 ]; then
   if [ "${ARM}" = l1b ]; then
     cp "${L1B_DEST}/pristine/opencode.db" "${DB}"
     [ -e "${L1B_DEST}/pristine/opencode.db-wal" ] && cp "${L1B_DEST}/pristine/opencode.db-wal" "${DB}-wal"
+    # The conversion stats every unowned session directory (v1-migration.bun.ts resolveDirectory). A stat inside a
+    # macOS privacy-protected folder can put a permission prompt on the owner's screen, so in THIS CLONE those rows
+    # point at a temp path that does not exist (they stay under the global project; counts are unaffected).
+    # Prints the number of rows only, never a path.
+    H=${REAL_HOME}
+    n=$(sqlite3 "${DB}" "UPDATE session SET directory='${ISO_ROOT}/protected-dir-neutralized' WHERE directory LIKE '${H}/Desktop%' OR directory LIKE '${H}/Documents%' OR directory LIKE '${H}/Downloads%' OR directory LIKE '${H}/Library/Mobile Documents%' OR directory LIKE '/Volumes/%'; SELECT changes();")
+    echo "protected-folder session directories neutralized in the clone: ${n} rows"
   else
     cp "${T}/v1-seed/opencode-v1.db" "${DB}"
   fi

@@ -159,6 +159,7 @@ transform 找不到原调用,或者文件里又出现别的 `Bun.` 调用时,构
 | 6 | §2.4 H1 的代价一栏没写出网前提 | 补一条:2.x 的模型请求只有在 `http.setGlobalProxyFromEnv()` 之后才走 `HTTPS_PROXY`。L5 换引擎时必须保留 `sidecar.ts:148` 这一步,而且要在 import 引擎之前 | armC 对比 armCraw |
 | 7 | §2.7 配置一节没提构建渠道 | `start()` 的 `app.channel` 是 `local`/`dev` 时,`todo`/`schedules`/`media_blob`/`artifacts`/`background_compaction` 这几个实验开关默认打开。Code Puppy 必须传发布渠道,或者显式关掉 | `core/src/flag.ts:26,70`;`schema/src/config/flag.ts:6-17` |
 | 8 | §1.3 说 2.x 的 Node 目标是 26.4 + `--experimental-ffi` | 实测:用上游配置、把 target 改成 node24 构建,在 Electron 的 Node 24.15 里不带这两个参数也能跑 E1–E3,日志里没有 WARN 或 ERROR。基线 §9 第一条「没跑」可以划掉 | §3 |
+| 9 | §2.8 第 1 条「第一次以 2.x 启动时,DB 安全带看到 21 条待前进迁移,先做 `opencode-backup-*` 备份」 | **在真库副本上不成立**:库是 WAL 模式,干净关闭后没有 `-wal`/`-shm`,`db-safety` 的只读读法返回 exit 14,判定变成 `skip`,开机备份同样失败;既不拦截也不备份。判定逻辑本身(期望里含 alpha 两条)是对的 | §9.2;`db-safety.ts:58-79`、`db-safety-boot.ts:74-87` |
 
 ## 7. 没做,或仍是推断
 
@@ -268,3 +269,63 @@ rm -rf /private/tmp/ac1662-l1b
 owner 现在的库正是这个状态。所以很可能出现的情况是:每次在干净关闭之后启动,db-safety 都静默跳过,升级到 2.x 那一次既不拦截、也不备份。
 `db-safety.test.ts` 里用真 sqlite 跑的用例(`itSql`)建的都是非 WAL 库,所以这个情况一直没被覆盖。
 **这条目前只在合成库上实测过**;真库是不是 WAL、生产读会不会同样返回 14,下一轮的 `l1b-counts.sh`(journal_mode)和 `l1b-db-safety.ts`(production 一栏)会直接给出答案。
+
+## 9. L1b 结果:在 owner 真库的只读副本上实测(2026-11-09 01:13–01:17)
+
+按 §8.6 原样执行。整个过程只输出计数、表名和迁移 id,没有打印任何会话标题、正文或消息内容。原始输出:
+`/private/tmp/ac1662-l1/l1b-copy.out`、`l1b-db-safety.out`、`l1b-run.out`(都只有计数)。
+
+### 9.1 ① 真库的形态
+
+复制时的状态:Code Puppy 没在运行,没有进程占用这个库;源目录里只有 `opencode.db`(21,921,792 B),没有 `-wal`/`-shm`;第一次复制就稳定。
+
+| 项 | 实测 |
+| --- | --- |
+| journal_mode | **wal** |
+| integrity_check | ok |
+| 迁移记账 | **`migration` 表,40 行**;没有 `__drizzle_migrations` |
+| alpha 那两条 id | **两条都在**(`20260720085655_permission-decision-receipt`、`20260720094009_permission-request-admission`;最新一条就是后者) |
+| v1 计数 | `session` 119、`message` 597(user 198、assistant 399)、`part` 1,765 |
+| 其它 | `session_message` 35(都是 `model-switched`)、`project` 2、`permission_decision` 0、`permission_request` 0;没有 `session_v2` |
+
+### 9.2 ② db-safety 判定:只读打开失败在真库上复现了
+
+| 读法 | 读到的结果 | 期望 A(2.x 支持面,59 条) | 期望 B(A + alpha 两条) | 备份 |
+| --- | --- | --- | --- | --- |
+| 生产读(`db-safety-boot.ts:74-80` 原样调用,克隆和源库一样只有 `.db`) | `exit=14 unable to open database file` | **`skip`**(fail-open) | **`skip`**(fail-open) | 照开机流程备份:**失败**,`VACUUM INTO … exit=14` |
+| 可写克隆 | 40 条 id | `db-ahead`,unknown 就是 alpha 那两条 | `migrate-ahead`,pending 21 条 | 成功,21,553,152 B,`integrity_check` 通过 |
+
+**结论**:审计 F1 预期的判定逻辑在真库的 id 上成立。但在 owner 现在的状态下(干净关闭的 WAL 库),生产路径**连判定都走不到**:
+升级到 2.x 那次启动,db-safety 会静默跳过,既不拦截,也不做迁移前备份。
+另外,L2 生成的 `db-expected-migrations.json` 如果只列 2.x 的 59 条,读法一旦修好,启动就会被 `db-ahead` 拦住。所以 alpha 两条退役 id 要一起列进去(期望 B)。
+
+### 9.3 ③ node24 上游构建对副本做前进迁移和 v1 转换
+
+`ISO_BASE=/private/tmp/ac1662-l1b bash run-electron.sh l1b`:Electron 42.3.3 utilityProcess,没有围栏,用 `embed-v1mig.mjs`。
+
+- **启动**:0.35 s;转换状态从 `running 4/119` 变成 `completed`(轮询 2 次,整个臂跑完约 20 s);utility 日志 55 行,**WARN 0、ERROR 0**;没出现 `SecurityAgent`。
+- **schema 迁移**:`migration` 从 40 行变成 61 行(补了 2.x 缺的 21 条);alpha 两条 id 和 `permission_decision`/`permission_request` 两张表都还在;`integrity_check` ok。
+- **会话、消息前后对照**(以数据库计数为准):
+
+| | v1(转换前) | v2(转换后) |
+| --- | --- | --- |
+| 会话 | 119 | `session_v2` **119** |
+| 有消息的会话 | 118 | 118 |
+| 消息 | 597(user 198、assistant 399) | `session_message` **662**:user 196、assistant 399、synthetic 27、system 40 |
+| v1 原表 | — | 不变:119 / 597 / 1,765 |
+
+- **逐会话核对**:118 个有消息的会话里,116 个会话的「v2 user + assistant 条数」和 v1 消息条数相同。另外 2 个会话各有一条 v1 用户消息,
+  里面全是 synthetic 文本(全库正好 2 条),转换后成了 `synthetic` 行,不是 `user` 行。所以 v1 user 198 = v2 user 196 + 2,**没有消息丢失**。
+  `system` 40 条是给 40 个会话各加的一条「工具已改名」提示(§6 第 1 条);`project` 从 2 变成 4,是转换时为非 git 目录下的会话找到了归属项目。
+- HTTP 列表接口只回了 100 个会话,因为请求里写了 `limit=100`,不是丢了会话;以数据库计数为准。
+- **偏离(必要的脚本修正)**:转换会对每个没有归属项目的会话目录做 stat。副本里有 4 个会话(1 个不同目录)位于 macOS 隐私保护的文件夹下(`~/Documents`),
+  在那里 stat 可能让系统权限框弹到 owner 屏幕上。所以 `run-electron.sh l1b` 在**实验克隆**里把这 4 行的 `directory` 改成一个不存在的临时路径
+  (只打印行数,不打印路径)。影响:这 4 个会话留在 global 项目下,没有被解析到归属项目;会话数和消息数不受影响。`pristine/` 副本没有改动。
+
+### 9.4 ④ 快照与删除证明
+
+- `snapshot.sh l1b-before` 对比 `l1b-after-copy`:**SNAPSHOT IDENTICAL**,3,724 行全部一致,其中 `~/.local/share/opencode` 3,688 个条目。
+- 引擎跑完后再拍 `l1b-after-run` 对比 `l1b-before`:`~/.local/share/opencode` 一节仍然一致;唯一不同的是 `com.github.Electron.plist` 的 mtime,
+  这是 Electron 跑过之后的已知变化(§2)。`login.keychain-db` 没有变。
+- 删除:`du -sh` 显示 84M,`rm -rf /private/tmp/ac1662-l1b` 退出码 0,之后 `ls -la /private/tmp/ac1662-l1b` 输出
+  `No such file or directory`。`/private/tmp` 下名字以 `ac1662-l1b` 开头的只剩 `ac1662-l1b-proof`,里面全是合成数据。

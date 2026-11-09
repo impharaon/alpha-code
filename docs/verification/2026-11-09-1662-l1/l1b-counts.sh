@@ -25,4 +25,10 @@ for t in session message part session_v2 session_message project permission_deci
 done
 has session_message && echo "session_message by type: $(q "SELECT group_concat(type || '=' || n, ' ') FROM (SELECT type, COUNT(*) n FROM session_message GROUP BY type);")"
 has kv && echo "kv migration.v1-v2: $(q "SELECT value FROM kv WHERE key='migration.v1-v2';")"
+# The v2 conversion stats each unowned session's directory (resolveDirectory, v1-migration.bun.ts:768-797).
+# Count (never list) how many sit in macOS privacy-protected folders, where a stat can raise a permission prompt.
+if has session; then
+  H=${REAL_HOME:-$HOME}
+  echo "v1 session directories: distinct=$(q "SELECT COUNT(DISTINCT directory) FROM session;") in_protected_folders=$(q "SELECT COUNT(DISTINCT directory) FROM session WHERE directory LIKE '${H}/Desktop%' OR directory LIKE '${H}/Documents%' OR directory LIKE '${H}/Downloads%' OR directory LIKE '${H}/Library/Mobile Documents%' OR directory LIKE '/Volumes/%';")"
+fi
 exit 0

@@ -34,10 +34,12 @@ const finish = (code) => {
   console.log(`ac1662 wrote ${cfg.outFile}`)
   app.exit(code)
 }
+// L1b (countsOnly) converts a real-size database: give the conversion room before the watchdog.
+const watchdogMs = cfg.countsOnly ? 900_000 : 240_000
 setTimeout(() => {
-  results.watchdog = "fired after 240 s"
+  results.watchdog = `fired after ${watchdogMs / 1000} s`
   finish(2)
-}, 240_000).unref()
+}, watchdogMs).unref()
 
 app.whenReady().then(async () => {
   const child = utilityProcess.fork(join(dirname(fileURLToPath(import.meta.url)), "utility.mjs"), [], {
@@ -190,7 +192,7 @@ app.whenReady().then(async () => {
 
   if (cfg.mode === "e3") {
     await step("e3", async () => {
-      const deadline = Date.now() + 90_000
+      const deadline = Date.now() + (cfg.countsOnly ? 780_000 : 90_000)
       const statuses = []
       while (Date.now() < deadline) {
         const s = await http("GET", "/api/experimental/migration/v1")

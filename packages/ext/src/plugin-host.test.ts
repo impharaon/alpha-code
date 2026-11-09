@@ -8,6 +8,7 @@ import { join } from "node:path"
 import { LoadAPIKeyError } from "@ai-sdk/provider"
 import { Cause, Effect, Exit } from "effect"
 import { Agent } from "../../core/src/agent.ts"
+import { Location } from "../../core/src/location.ts"
 import { Command } from "../../core/src/command.ts"
 import { PluginHooks } from "../../core/src/plugin/hooks.ts"
 import { Skill } from "../../core/src/skill.ts"
@@ -342,5 +343,33 @@ it.live("权威 · 提示词接管(L3r):ext 的 agent.transform 换掉上游 exp
     expect((yield* agents.get(Agent.ID.make("explore")))?.system).toBe(CODEPUPPY_EXPLORE_PROMPT)
     expect((yield* agents.get(Agent.ID.make("docs")))?.mode).toBe("all")
     expect((yield* commands.list()).find((command) => command.name === "init")?.description).toBe(CODEPUPPY_INIT_DESCRIPTION)
+  }),
+)
+
+it.live("权威 · 项目可执行扩展的同意(C10 / P10):没同意 ⇒ 项目 MCP 不进引擎、项目插件不装,只加载说明类的 agent 字段;同意之后才装", () =>
+  Effect.gen(function* () {
+    env({})
+    const directory = realpathSync((yield* Location.Service).directory)
+    const root = join(directory, ".codepuppy")
+    mkdirSync(join(root, "plugins"), { recursive: true })
+    writeFileSync(
+      join(root, "codepuppy.jsonc"),
+      JSON.stringify({ mcp: { proj: { type: "local", command: ["proj-mcp"] } }, agent: { helper: { prompt: "project helper prompt", mode: "primary" } } }),
+    )
+    writeFileSync(join(root, "plugins", "probe.js"), `export default { id: "project.probe", setup() { globalThis.__codepuppyProjectProbe = (globalThis.__codepuppyProjectProbe ?? 0) + 1 } }\n`)
+    const probe = () => (globalThis as { __codepuppyProjectProbe?: number }).__codepuppyProjectProbe ?? 0
+    const agents = yield* Agent.Service
+    const untrusted = recordingMcp()
+    yield* activate(CodePuppyExt, { mcp: untrusted })
+    expect(untrusted.servers.has("proj")).toBe(false)
+    expect(probe()).toBe(0)
+    const helper = yield* agents.get(Agent.ID.make("helper"))
+    expect(helper?.system).toBe("project helper prompt")
+    expect(helper?.mode).toBe("all") // 控制字段(mode)在没同意时被剥掉
+    writeFileSync(join(root, "prefs.json"), JSON.stringify({ extensionsConsent: { version: 1, granted: true } }))
+    const trusted = recordingMcp()
+    yield* activate(CodePuppyExt, { mcp: trusted })
+    expect(trusted.servers.get("proj")).toEqual({ type: "local", command: ["proj-mcp"] })
+    expect(probe()).toBe(1)
   }),
 )

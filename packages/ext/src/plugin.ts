@@ -320,13 +320,13 @@ export const CodePuppyExt: Plugin.Plugin = {
       })
 
       // ── 项目插件扇出(P10):`.codepuppy/plugins/*.js`,信任门之后才加载;它们的钩子排在 ext 自己的之后、seal 之前;
-      //    它们注册的工具与已有工具同名 ⇒ 拒绝(ADR-041,projectPluginContext)──
+      //    它们只许动自己注册的工具:同名 add、改 / 删别人的工具 ⇒ 拒绝(ADR-041,projectPluginContext)──
       try {
         const consent = project ? readProjectExtensionsConsent(project) : false
         if (consent === null) error("[@codepuppy/ext] project plugin fan-out refused: project alpha root identity drifted")
         else
           cleanups.push(
-            ...(await loadProjectPlugins(project?.root ?? "", projectPluginContext(context, error), consent, {
+            ...(await loadProjectPlugins(project?.root ?? "", () => projectPluginContext(context, error), consent, {
               verifyIdentity: () => !!project && withProjectDirectoryIdentity(project, () => true).ok,
               existsSync,
               readdirSync,

@@ -6,12 +6,15 @@
 // 钩子之后、L4 `seal()` 那一段之前(接口 I3:被策略拒掉的调用不会先流过项目插件;链尾的执行闸看得到它们的改写)。
 // v1 的 `(input) => Promise<Hooks>` 形状在 2.x 里没有可派发的钩子表,一律不装并响亮记一行。
 //
-// ADR-041 名称冲突(编排器裁决 2026-11-09,#1666 c6737732975 第 3 条 (c)):项目插件经扇出注册工具时,有效名已存在 ⇒ 拒绝并记一行
-// (`projectPluginContext` 包住它拿到的 `tool.transform`)。不然一个项目插件就能用同名工具顶掉 Code Puppy、上游或 MCP 的工具
-// (2.x 的工具编辑器同名 add 即覆盖)。
+// ADR-041 名称冲突(编排器裁决 2026-11-09,#1666 c6737732975 第 3 条 (c);#1666 c6737930969):项目插件经扇出拿到的工具编辑器
+// (`projectPluginContext` 包住它的 `tool.transform`)只许动**它自己经这个编辑器注册的**工具:有效名已存在的 add、以及对别人工具的
+// update / remove,一律拒绝并记一行。不然一个项目插件就能顶掉、改写(比如包住 execute)或删掉 Code Puppy、上游或 MCP 的工具
+// (2.x 的工具编辑器同名 add 即覆盖,update / remove 不问归属)。每个项目插件各拿一份 Context,「自己的工具」不跨插件。
 //
 // 信任门(安全红线):项目 plugin = 可执行 JS,只在项目已 consent 时加载(loadProjectPlugins 门控)。
 // ADR-006:项目 plugins 必须是**自包含 ESM JS**(生 TS 桌面必崩)—— 只收 .js,加载失败 loud 不阻断。
+
+import type { ToolEditor } from "@opencode/plugin/promise/tool"
 
 export type ProjectPluginCleanup = () => Promise<void> | void
 
@@ -31,7 +34,7 @@ export type FanoutDeps = {
 type ProjectPlugin = { id: string; setup: (context: never) => unknown }
 
 type ToolLike = { readonly name: string; readonly options?: { readonly namespace?: string } }
-type ToolEditorLike = { add(tool: ToolLike): void; get(id: string): unknown }
+type ToolEditorLike = Pick<ToolEditor, "add" | "get" | "update" | "remove">
 type ToolDomainLike = { transform(callback: (editor: ToolEditorLike) => void): Promise<unknown> }
 
 /**
@@ -44,21 +47,33 @@ export function effectiveToolName(tool: ToolLike): string {
   return tool.options?.namespace === undefined ? name : `${tool.options.namespace.replaceAll(".", "_")}_${name}`
 }
 
-/** 给项目插件的插件 Context:`tool.transform` 拿到的编辑器在 add 一个已存在的有效名时拒绝(ADR-041),其余原样。 */
+/** 给一个项目插件的插件 Context:`tool.transform` 拿到的编辑器只许动它自己注册的工具(ADR-041),其余原样。 */
 export function projectPluginContext<C extends { readonly tool: ToolDomainLike }>(context: C, error: (m: string) => void): C {
+  /** 这个项目插件经本 Context 的编辑器注册成功的有效名(跨它的各次 transform 与重建)。 */
+  const own = new Set<string>()
+  const refuse = (what: string, id: string, why: string) => error(`[@codepuppy/ext] project plugin tool ${what} "${id}" refused: ${why} (ADR-041)`)
   const guard = (editor: ToolEditorLike): ToolEditorLike =>
     new Proxy(editor, {
-      get: (target, key, receiver) =>
-        key === "add"
-          ? (tool: ToolLike) => {
-              const id = effectiveToolName(tool)
-              if (target.get(id) !== undefined) {
-                error(`[@codepuppy/ext] project plugin tool "${id}" refused: a tool with that name already exists (ADR-041)`)
-                return
-              }
-              target.add(tool)
-            }
-          : Reflect.get(target, key, receiver),
+      get: (target, key, receiver) => {
+        if (key === "add")
+          return (tool: Parameters<ToolEditorLike["add"]>[0]) => {
+            const id = effectiveToolName(tool)
+            if (target.get(id) !== undefined && !own.has(id)) return refuse("add", id, "a tool with that name already exists")
+            target.add(tool)
+            own.add(id)
+          }
+        if (key === "update")
+          return (id: string, update: Parameters<ToolEditorLike["update"]>[1]) => {
+            if (!own.has(id)) return refuse("update", id, "the project plugin did not register it")
+            target.update(id, update)
+          }
+        if (key === "remove")
+          return (id: string) => {
+            if (!own.has(id)) return refuse("remove", id, "the project plugin did not register it")
+            target.remove(id)
+          }
+        return Reflect.get(target, key, receiver)
+      },
     })
   const tool = new Proxy(context.tool, {
     get: (target, key, receiver) =>
@@ -80,7 +95,8 @@ const isProjectPlugin = (value: unknown): value is ProjectPlugin => {
  */
 export async function loadProjectPlugins(
   codepuppyRoot: string,
-  context: unknown,
+  /** 每个项目插件各取一份插件 Context(ADR-041 的「自己的工具」按插件分)。 */
+  contextFor: () => unknown,
   trusted: boolean,
   deps: FanoutDeps,
 ): Promise<ProjectPluginCleanup[]> {
@@ -115,7 +131,7 @@ export async function loadProjectPlugins(
         )
         continue
       }
-      const cleanup = await plugin.setup(context as never)
+      const cleanup = await plugin.setup(contextFor() as never)
       if (typeof cleanup === "function") cleanups.push(cleanup as ProjectPluginCleanup)
       deps.log?.(`[@codepuppy/ext] project plugin loaded (fan-out): ${plugin.id} ← ${abs}`)
     } catch (error) {

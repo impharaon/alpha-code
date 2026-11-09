@@ -15,7 +15,7 @@ describe("loadProjectPlugins — trust gate + dynamic import", () => {
 
   test("untrusted → returns [] (executable not loaded)", async () => {
     let imported = 0
-    const cleanups = await loadProjectPlugins("/proj/.codepuppy", {}, false, {
+    const cleanups = await loadProjectPlugins("/proj/.codepuppy", () => ({}), false, {
       ...baseDeps,
       importModule: async () => (imported++, plugin("x")),
     })
@@ -27,7 +27,7 @@ describe("loadProjectPlugins — trust gate + dynamic import", () => {
     const seen: string[] = []
     const contexts: unknown[] = []
     const context = { location: { directory: "/proj" } }
-    const cleanups = await loadProjectPlugins("/proj/.codepuppy", context, true, {
+    const cleanups = await loadProjectPlugins("/proj/.codepuppy", () => context, true, {
       ...baseDeps,
       importModule: async (url) => {
         seen.push(url)
@@ -45,7 +45,7 @@ describe("loadProjectPlugins — trust gate + dynamic import", () => {
   test("dynamic import 紧前身份复验失败 → 整次 fan-out 拒绝且 import 零执行", async () => {
     let imported = 0
     let checks = 0
-    const cleanups = await loadProjectPlugins("/proj/.codepuppy", {}, true, {
+    const cleanups = await loadProjectPlugins("/proj/.codepuppy", () => ({}), true, {
       ...baseDeps,
       verifyIdentity: () => ++checks < 3,
       importModule: async () => (imported++, plugin("x")),
@@ -57,7 +57,7 @@ describe("loadProjectPlugins — trust gate + dynamic import", () => {
   test("a broken plugin (import or setup throws) is skipped loud, others still load", async () => {
     const errors: string[] = []
     const loaded: string[] = []
-    await loadProjectPlugins("/proj/.codepuppy", {}, true, {
+    await loadProjectPlugins("/proj/.codepuppy", () => ({}), true, {
       ...baseDeps,
       readdirSync: () => ["good.js", "bad.js", "throws.js"],
       importModule: async (url) => {
@@ -76,13 +76,13 @@ describe("loadProjectPlugins — trust gate + dynamic import", () => {
   })
 
   test("no plugins dir → []", async () => {
-    const cleanups = await loadProjectPlugins("/proj/.codepuppy", {}, true, { ...baseDeps, existsSync: () => false, importModule: async () => ({}) })
+    const cleanups = await loadProjectPlugins("/proj/.codepuppy", () => ({}), true, { ...baseDeps, existsSync: () => false, importModule: async () => ({}) })
     expect(cleanups).toEqual([])
   })
 
   test("v1 function plugin or a module without a { id, setup } default → skipped loud (2.x has no hook table to run it)", async () => {
     const errors: string[] = []
-    const cleanups = await loadProjectPlugins("/proj/.codepuppy", {}, true, {
+    const cleanups = await loadProjectPlugins("/proj/.codepuppy", () => ({}), true, {
       ...baseDeps,
       readdirSync: () => ["v1.js", "x.js"],
       importModule: async (url) => (url.includes("v1") ? { default: async () => ({ event: async () => {} }) } : { notAPlugin: 1 }),
@@ -108,10 +108,16 @@ describe("effectiveToolName 与上游 effectiveName 逐字同义(拼法漂移即
   })
 })
 
-describe("projectPluginContext:有效名已存在 ⇒ 拒绝;新名照常注册;别的 domain 与编辑器方法原样", () => {
+describe("projectPluginContext:有效名已存在 ⇒ 拒绝;新名照常注册;只许改 / 删自己注册的工具;别的 domain 原样", () => {
   test("同名(含 namespace 拼出来的同名)被拒并记一行;新名进编辑器", async () => {
     const tools = new Map<string, unknown>([["codepuppy_echo", { name: "codepuppy_echo" }], ["srv_read", { name: "read" }]])
-    const editor = { add: (tool: { name: string }) => void tools.set(effectiveToolName(tool), tool), get: (id: string) => tools.get(id), list: () => [...tools.values()] }
+    const editor = {
+      add: (tool: { name: string }) => void tools.set(effectiveToolName(tool), tool),
+      get: (id: string) => tools.get(id),
+      list: () => [...tools.values()],
+      update: (id: string, fn: (tool: Record<string, unknown>) => void) => fn(tools.get(id) as Record<string, unknown>),
+      remove: (id: string) => void tools.delete(id),
+    }
     const errors: string[] = []
     const base = {
       tool: { transform: async (callback: (e: typeof editor) => void) => (callback(editor), { dispose: async () => {} }) },
@@ -124,12 +130,20 @@ describe("projectPluginContext:有效名已存在 ⇒ 拒绝;新名照常注册;
       e.add({ name: "read", options: { namespace: "srv" } } as never)
       e.add({ name: "project_tool" } as never)
       expect(e.list()).toHaveLength(3)
+      e.update("codepuppy_echo", (tool: Record<string, unknown>) => void (tool.description = "rogue"))
+      e.remove("srv_read")
+      e.update("project_tool", (tool: Record<string, unknown>) => void (tool.description = "mine"))
     })
+    // 同一插件下一次 transform(或重建)里,自己的工具仍可改 / 删
+    await guarded.tool.transform((e) => e.remove("project_tool"))
     expect((tools.get("codepuppy_echo") as { description?: string }).description).toBeUndefined()
-    expect(tools.has("project_tool")).toBe(true)
+    expect(tools.has("srv_read")).toBe(true)
+    expect(tools.has("project_tool")).toBe(false)
     expect(errors).toEqual([
-      '[@codepuppy/ext] project plugin tool "codepuppy_echo" refused: a tool with that name already exists (ADR-041)',
-      '[@codepuppy/ext] project plugin tool "srv_read" refused: a tool with that name already exists (ADR-041)',
+      '[@codepuppy/ext] project plugin tool add "codepuppy_echo" refused: a tool with that name already exists (ADR-041)',
+      '[@codepuppy/ext] project plugin tool add "srv_read" refused: a tool with that name already exists (ADR-041)',
+      '[@codepuppy/ext] project plugin tool update "codepuppy_echo" refused: the project plugin did not register it (ADR-041)',
+      '[@codepuppy/ext] project plugin tool remove "srv_read" refused: the project plugin did not register it (ADR-041)',
     ])
   })
 })

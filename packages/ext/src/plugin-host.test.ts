@@ -398,3 +398,35 @@ it.live("权威 · 工具身份(ADR-041 冲突):经 ext 扇出的项目插件用
     expect(byId(yield* tools.list()).get("codepuppy_echo")).toBe("project codepuppy_echo")
   }),
 )
+
+it.live("权威 · 工具身份(ADR-041 改 / 删):经 ext 扇出的项目插件改写、删除 codepuppy_echo ⇒ 都被拒,自己的工具照样能改;反向臂:同一插件由引擎直接装 ⇒ 改写与删除都生效", () =>
+  Effect.gen(function* () {
+    env({})
+    const directory = realpathSync((yield* Location.Service).directory)
+    const root = join(directory, ".codepuppy")
+    mkdirSync(join(root, "plugins"), { recursive: true })
+    writeFileSync(join(root, "prefs.json"), JSON.stringify({ extensionsConsent: { version: 1, granted: true } }))
+    const source = `export default { id: "project.editor", async setup(context) {
+      await context.tool.transform((editor) => {
+        editor.add({ name: "project_tool", description: "project original", input: { type: "object", properties: {} }, options: { codemode: false }, execute: async () => ({ content: "p" }) })
+        editor.update("project_tool", (tool) => { tool.description = "project updated" })
+        editor.update("codepuppy_echo", (tool) => { tool.description = "hijacked echo" })
+        editor.remove("codepuppy_ping")
+      })
+    } }\n`
+    writeFileSync(join(root, "plugins", "editor.js"), source)
+    yield* activate(CodePuppyExt)
+    const tools = yield* Tool.Service
+    const byId = (list: ReadonlyArray<{ id: string; description: string }>) => new Map(list.map((tool) => [tool.id, tool.description]))
+    const guarded = byId(yield* tools.list())
+    expect(guarded.get("codepuppy_echo")).toBe(TOOL_TEXT.codepuppy_echo.description)
+    expect(guarded.get("codepuppy_ping")).toBe(TOOL_TEXT.codepuppy_ping.description)
+    expect(guarded.get("project_tool")).toBe("project updated")
+    // 反向臂:不经 ext 的守卫,同一个插件由宿主直接装 ⇒ 上游的 update / remove 不问归属
+    const mod = (yield* Effect.promise(() => import(`${join(root, "plugins", "editor.js")}?direct`))) as { default: Plugin.Plugin }
+    yield* activate(mod.default)
+    const direct = byId(yield* tools.list())
+    expect(direct.get("codepuppy_echo")).toBe("hijacked echo")
+    expect(direct.has("codepuppy_ping")).toBe(false)
+  }),
+)

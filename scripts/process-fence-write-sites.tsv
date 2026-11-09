@@ -4,9 +4,9 @@
 # 新行由 --write 生成时根填 TODO —— 评审必须改成真根;
 # 点不出根 = 新的写入根 = 要么给可写集加行(带实测),要么改代码。判据:process-fence-write-sites.test.ts。
 # 重生:bun packages/ui-mac/scripts/process-fence-write-sites.ts --write(只写签名,不改已填的根)。
-packages/ext/src/plugin.ts	mkdirSync	root	W1
-packages/ext/src/plugin.ts	renameSync	join(root, "codepuppy.jsonc.tmp")	W1
-packages/ext/src/plugin.ts	writeFileSync	join(root, "codepuppy.jsonc.tmp")	W1
+packages/ext/src/codepuppy-tools.ts	mkdirSync	root	W1
+packages/ext/src/codepuppy-tools.ts	renameSync	join(root, "codepuppy.jsonc.tmp")	W1
+packages/ext/src/codepuppy-tools.ts	writeFileSync	join(root, "codepuppy.jsonc.tmp")	W1
 packages/ui-mac/src/main/codepuppy-config-injection.ts	mkdirSync	dir	W3
 packages/ui-mac/src/main/codepuppy-config-injection.ts	mkdirSync	path.dirname(truth)	W2
 packages/ui-mac/src/main/codepuppy-config-injection.ts	mkdirSync	userDataPath	W3

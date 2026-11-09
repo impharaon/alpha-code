@@ -75,7 +75,7 @@ function ageEnv(days: number): Record<string, string> {
 /** 上游包下的普通文件 —— 不在 ADR-033 白名单里。 */
 const UPSTREAM_FILE = "packages/core/src/upstream-leaf.ts"
 /** ADR-033 白名单里的**被接管**文件:守卫按设计放行它,而度量必须照样把它算进去。 */
-const ADOPTED_FILE = "packages/core/src/permission.ts"
+const ADOPTED_FILE = "packages/core/src/oauth/page.ts"
 /** 上游路径下、alpha 这一侧**新增**的文件:`--diff-filter=DMR` 结构上不该点名它。 */
 const ADDED_FILE = "packages/core/src/brand-new-codepuppy-leaf.ts"
 /** carve-out ①:alpha 自有包。 */
@@ -180,30 +180,31 @@ describe("#1288 north-star 漂移度量:① 收编面", () => {
     expect(run.exitCode, `度量脚本非零退出:\n${run.output}`).toBe(0)
     const expected = whitelistEntriesFromGuardSource(GUARD_SOURCE)
     // 解析自检:一份解析退化成 0 的正则会让下面那条断言空对空地绿。
-    // `#1664`:过渡清单 15 条,下限随数据从 20 改到 10 —— 它只防解析退化。
-    expect(expected, "守卫白名单解析退化成空 —— 本次测量作废").toBeGreaterThanOrEqual(10)
+    // `#1662`:最终清单可以很短(F10 允许为空),解析自检改成两种独立读法互相核对。
+    const lines = GUARD_SOURCE.split("\n").filter((line) => /^\s+':\(exclude\)/.test(line)).length
+    expect(expected, "守卫白名单解析退化 —— 本次测量作废").toBe(lines)
     expect(readNumber(run.output, ADOPTION, "收编面条数")).toBe(expected)
   })
 
-  test("控制组:守卫少三条白名单 ⇒ 打印的条数跟着少三(杀掉「印一个写死的数」)", () => {
+  test("控制组:守卫少一条白名单 ⇒ 打印的条数跟着少一(杀掉「印一个写死的数」)", () => {
     const { work } = driftFixture(40)
     const full = readNumber(runMetrics(work).output, ADOPTION, "收编面条数")
 
-    // 只动**复制品**:删掉白名单数组里的前三条 `':(exclude)…'` 行。
+    // 只动**复制品**:删掉白名单数组里的第一条 `':(exclude)…'` 行(`#1662` 最终清单只有两条)。
     const guardPath = join(work, GUARD_REL)
     const lines = readFileSync(guardPath, "utf8").split("\n")
     let removed = 0
     const trimmed = lines.filter((line) => {
-      if (removed < 3 && /^\s+':\(exclude\)/.test(line)) {
+      if (removed < 1 && /^\s+':\(exclude\)/.test(line)) {
         removed += 1
         return false
       }
       return true
     })
-    expect(removed, "夹具没能从守卫复制品里删掉三条白名单 —— 本次测量作废").toBe(3)
+    expect(removed, "夹具没能从守卫复制品里删掉一条白名单 —— 本次测量作废").toBe(1)
     writeFileSync(guardPath, trimmed.join("\n"))
 
-    expect(readNumber(runMetrics(work).output, ADOPTION, "收编面条数")).toBe(full - 3)
+    expect(readNumber(runMetrics(work).output, ADOPTION, "收编面条数")).toBe(full - 1)
   })
 })
 

@@ -83,8 +83,9 @@ function parseExcludes(guard: string): string[] {
   const block = /^UPSTREAM_EXCLUDES=\(\n([\s\S]*?)^\)/m.exec(guard)?.[1]
   if (!block) throw new Error("测量作废:守卫里没解析到 UPSTREAM_EXCLUDES 数组")
   const items = [...block.matchAll(/^\s*':\(exclude\)([^']+)'/gm)].map((m) => m[1])
-  // `#1664`:过渡清单 15 条,下限随数据从 20 改到 10 —— 它只防解析退化。
-  if (items.length < 10) throw new Error(`测量作废:收编白名单只解析到 ${items.length} 条`)
+  // `#1662`:最终清单可以很短(F10 允许为空),不再用条数下限防解析退化,改用两种独立读法互相核对。
+  const lines = block.split("\n").filter((line) => /^\s+':\(exclude\)/.test(line)).length
+  if (items.length !== lines) throw new Error(`测量作废:收编白名单解析到 ${items.length} 条,逐行数到 ${lines} 条`)
   return items
 }
 
@@ -149,8 +150,8 @@ describe("#1376 sync-upstream 过滤表 与 north-star 守卫清单 的关系", 
       { path: "CHANGELOG.md", exact: true },
     ])
     expect(printJurisdiction(PROD_GUARD)).toEqual({ upstreamPaths: ["packages"], roundtrip: ["app", "ui"] })
-    // `#1664`:过渡清单 15 条,下限随数据从 20 改到 10 —— 它只防解析退化。
-    expect(parseExcludes(GUARD_SOURCE).length).toBeGreaterThanOrEqual(10)
+    // `#1662` 最终清单两条(ADR-042 的 OAuth 回调页及其测试);parseExcludes 自己核对两种读法一致。
+    expect(parseExcludes(GUARD_SOURCE)).toContain("packages/core/src/oauth/page.ts")
   })
 
   test("今天的生产文件满足三条关系", () => {
@@ -175,9 +176,9 @@ describe("#1376 sync-upstream 过滤表 与 north-star 守卫清单 的关系", 
   })
 
   test("变异臂 ③:过滤表吞掉一条收编文件 ⇒ 红且点名", () => {
-    const wf = mutateFilter(SYNC_WORKFLOW, (l) => l.replace("grep -v '^bun.lock$'", () => "grep -v '^bun.lock$' | grep -v '^packages/core/src/permission.ts$'"))
+    const wf = mutateFilter(SYNC_WORKFLOW, (l) => l.replace("grep -v '^bun.lock$'", () => "grep -v '^bun.lock$' | grep -v '^packages/core/src/oauth/page.ts$'"))
     const v = relationViolations(parseFilter(wf), printJurisdiction(PROD_GUARD), parseExcludes(GUARD_SOURCE))
-    expect(v.join("\n")).toContain("③ 收编路径 packages/core/src/permission.ts")
+    expect(v.join("\n")).toContain("③ 收编路径 packages/core/src/oauth/page.ts")
   })
 
   test("变异臂 ③:守卫在 roundtrip 包里新增一条收编(过滤表会吞掉它)⇒ 红", () => {

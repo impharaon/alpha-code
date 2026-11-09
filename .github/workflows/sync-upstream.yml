@@ -132,13 +132,26 @@ jobs:
         run: |
           guard="$(mktemp)"
           git show "$OLD_ALPHA:scripts/north-star-guard.sh" > "$guard"
+          # #1662 F10:清单可以合法为空(换代后的接管面可能收到零),这与「守卫没跑出结果」是两件事 ——
+          # 先读守卫自报的条数,读不出 ⇒ 守卫坏了,中止;条数为 0 ⇒ 没有接管文件要核对,照常继续。
+          jurisdiction="$(bash "$guard" --print-jurisdiction)"
+          count="$(awk -F'\t' '$1 == "UPSTREAM_EXCLUDES_COUNT" { print $2 }' <<< "$jurisdiction")"
+          case "$count" in
+            ''|*[!0-9]*)
+              echo "::error::守卫没有给出接管清单条数 —— $OLD_ALPHA 的 scripts/north-star-guard.sh --print-jurisdiction 读不出 UPSTREAM_EXCLUDES_COUNT,无法判断上游候选是否触及接管文件。Aborting sync."
+              exit 1 ;;
+          esac
           takeover="$(bash "$guard" --print-takeover)"
-          if [ -z "$takeover" ]; then
-            echo "::error::接管清单为空 —— $OLD_ALPHA 的 scripts/north-star-guard.sh --print-takeover 没给出任何路径,无法判断上游候选是否触及接管文件。Aborting sync."
+          paths=()
+          while IFS= read -r p; do [ -n "$p" ] && paths+=("$p"); done <<< "$takeover"
+          if [ "${#paths[@]}" -ne "$count" ]; then
+            echo "::error::守卫打印的接管路径(${#paths[@]} 条)与它自报的条数($count)不一致。Aborting sync."
             exit 1
           fi
-          paths=()
-          while IFS= read -r p; do paths+=("$p"); done <<< "$takeover"
+          if [ "$count" -eq 0 ]; then
+            echo "Takeover list is empty (UPSTREAM_EXCLUDES_COUNT=0): no takeover paths to check."
+            exit 0
+          fi
           MB="$(git merge-base "$OLD_ALPHA" "$NEW_DEV")"
           touched="$(git diff --name-only --no-renames "$MB" "$NEW_DEV" -- "${paths[@]}")"
           if [ -z "$touched" ]; then
@@ -298,13 +311,25 @@ jobs:
         run: |
           guard="$(mktemp)"
           git show "$OLD_ALPHA:scripts/north-star-guard.sh" > "$guard"
+          # #1662 F10:同 intake —— 条数读不出 ⇒ 中止;条数为 0 ⇒ 无可核对,照常继续。
+          jurisdiction="$(bash "$guard" --print-jurisdiction)"
+          count="$(awk -F'\t' '$1 == "UPSTREAM_EXCLUDES_COUNT" { print $2 }' <<< "$jurisdiction")"
+          case "$count" in
+            ''|*[!0-9]*)
+              echo "::error::守卫没有给出接管清单条数 —— 无法核对合并是否改动了接管路径。Aborting sync."
+              exit 1 ;;
+          esac
           takeover="$(bash "$guard" --print-takeover)"
-          if [ -z "$takeover" ]; then
-            echo "::error::接管清单为空 —— 无法核对合并是否改动了接管路径。Aborting sync."
+          paths=()
+          while IFS= read -r p; do [ -n "$p" ] && paths+=("$p"); done <<< "$takeover"
+          if [ "${#paths[@]}" -ne "$count" ]; then
+            echo "::error::守卫打印的接管路径(${#paths[@]} 条)与它自报的条数($count)不一致。Aborting sync."
             exit 1
           fi
-          paths=()
-          while IFS= read -r p; do paths+=("$p"); done <<< "$takeover"
+          if [ "$count" -eq 0 ]; then
+            echo "Takeover list is empty (UPSTREAM_EXCLUDES_COUNT=0): nothing the merge could have changed."
+            exit 0
+          fi
           changed="$(git diff --name-only --no-renames "$OLD_ALPHA" alpha -- "${paths[@]}")"
           if [ -n "$changed" ]; then
             echo "::error title=takeover changed by merge::合并改动了接管路径(相对合并前 $OLD_ALPHA)—— 接管内容不许被自动改写。Aborting sync:"

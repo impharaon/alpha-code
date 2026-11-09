@@ -127,27 +127,11 @@ done
 # 等),随之出清单(能力清点表 §9)。M0 把这 15 个文件也取成了上游原样;L4 逐条重判「退回 L0 / 重新接管」,
 # 定出最终清单并在 ADR-047「精确接管面」写理由。
 UPSTREAM_EXCLUDES=(
-  # ADR-033 §1 被接管 permission 表面(L3)
-  ':(exclude)packages/core/src/permission.ts'
-  ':(exclude)packages/core/src/permission'
-  ':(exclude)packages/server/src/handlers/permission.ts'
-  ':(exclude)packages/core/test/permission.test.ts'
-  ':(exclude)packages/core/test/database-migration.test.ts'
-  # ADR-033 §4 生成/快照(SOT = Code Puppy 拥有的迁移/协议/schema;静态 diff 会误报)
-  ':(exclude)packages/core/schema.json'
-  ':(exclude)packages/core/src/database/migration.gen.ts'
-  ':(exclude)packages/core/src/database/schema.gen.ts'
-  # ADR-033 §守卫盲区(#456 裁决)
-  ':(exclude)packages/protocol/src/groups/permission.ts'
-  ':(exclude)packages/schema/src/permission.ts'
-  ':(exclude)packages/schema/src/agent.ts'
-  ':(exclude)packages/schema/test/contract-hygiene.test.ts'
-  # ADR-041(#878,2026-08-09):工具身份与不可变显示快照。来源信息在这些注册/聚合/
-  # 权限/首次写入咽喉之后结构性丢失,L0-L2 无法从 alias 诚实反推。仅逐文件接管;
-  # 新的 codepuppy-tool-identity 闸门是新增文件,无需 exclude。
-  ':(exclude)packages/schema/src/v1/session.ts'
-  # ADR-042(#1047): OAuth loopback success/error HTML is product chrome; ADR-007
-  # Vite brand transform never reaches engine-served callback pages.
+  # #1662 L4(ADR-047「精确接管面」):换代后的最终清单。旧清单 49 条不继承 —— 34 条随文件消失删除,
+  # 仍存在的 15 条逐条重判,每条的去留、它握的决定与 2.x 上的握法登记在
+  # docs/architecture/codepuppy-authority-registry.json(判官 packages/ext/src/policy/authority-registry.test.ts)。
+  # ADR-042(#1047):OAuth 回环成功/失败页是产品外观;ADR-007 的 Vite 品牌变换到不了引擎直出的回调页,
+  # 插件也没有改写它的挂点 —— 2.x 上原样重新接管,改动面只有产品名与字标。
   ':(exclude)packages/core/src/oauth/page.ts'
   ':(exclude)packages/core/test/oauth-page.test.ts'
 )
@@ -199,7 +183,8 @@ if [ "$GUARD_MODE" = print-jurisdiction ]; then
   exit 0
 fi
 if [ "$GUARD_MODE" = print-takeover ]; then
-  for spec in "${UPSTREAM_EXCLUDES[@]}"; do
+  # `#1662` F10:清单可以为空;macOS 的 bash 3.2 在 `set -u` 下展开空数组报 unbound,用 `${a[@]+…}` 形式。
+  for spec in ${UPSTREAM_EXCLUDES[@]+"${UPSTREAM_EXCLUDES[@]}"}; do
     printf '%s\n' "${spec#:(exclude)}"
   done
   exit 0
@@ -348,13 +333,13 @@ fi
 # 照样冲突)。关掉改名检测后,同一次改名回到 `D`(旧路径)+ `A`(新路径):`D` 落进 DMR 被点名,
 # 点的还正好是真正受害的那条路径。north-star-guard.test.ts 里有一条专钉这个形状。
 if [ -n "$upstream_parent" ]; then
-  if ! committed="$(git diff --no-renames --name-only "$upstream_parent" HEAD -- $UPSTREAM_PATHS "${UPSTREAM_EXCLUDES[@]}" "${CARVEOUT_PATHSPECS[@]}")"; then
+  if ! committed="$(git diff --no-renames --name-only "$upstream_parent" HEAD -- $UPSTREAM_PATHS ${UPSTREAM_EXCLUDES[@]+"${UPSTREAM_EXCLUDES[@]}"} "${CARVEOUT_PATHSPECS[@]}")"; then
     echo "    ✗ 算不出与上游父 ${upstream_parent} 的树差 —— 本次守卫作废(不是通过)。"; exit 1
   fi
-elif ! committed="$(git diff --no-renames --diff-filter=DMR --name-only origin/alpha...HEAD -- $UPSTREAM_PATHS "${UPSTREAM_EXCLUDES[@]}" "${CARVEOUT_PATHSPECS[@]}")"; then
+elif ! committed="$(git diff --no-renames --diff-filter=DMR --name-only origin/alpha...HEAD -- $UPSTREAM_PATHS ${UPSTREAM_EXCLUDES[@]+"${UPSTREAM_EXCLUDES[@]}"} "${CARVEOUT_PATHSPECS[@]}")"; then
   echo "    ✗ 算不出与 origin/alpha 的提交差 —— 本次守卫作废(不是通过)。"; exit 1
 fi
-if ! worktree="$(git diff --no-renames --diff-filter=DMR --name-only HEAD -- $UPSTREAM_PATHS "${UPSTREAM_EXCLUDES[@]}" "${CARVEOUT_PATHSPECS[@]}")"; then
+if ! worktree="$(git diff --no-renames --diff-filter=DMR --name-only HEAD -- $UPSTREAM_PATHS ${UPSTREAM_EXCLUDES[@]+"${UPSTREAM_EXCLUDES[@]}"} "${CARVEOUT_PATHSPECS[@]}")"; then
   echo "    ✗ 算不出工作树差 —— 本次守卫作废(不是通过)。"; exit 1
 fi
 changed="$(printf '%s\n%s\n' "$committed" "$worktree" | sed '/^$/d' | sort -u)"

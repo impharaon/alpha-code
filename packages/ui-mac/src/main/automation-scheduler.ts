@@ -10,7 +10,8 @@
 import { join } from "node:path"
 import { BrowserWindow, Notification, powerMonitor } from "electron"
 // CLIENT subpath(纯 fetch,main 的 Node 环境同样适用;v2 barrel 的 Node-only 依赖问题是 renderer 限定)
-import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
+import { engineClient } from "./engine-client"
+import { promptAndWait } from "./engine-session-turn"
 import type { AutomationEvent, AutomationRunNowErrorCode, AutomationRunRecord, AutomationTask } from "../shared/automation-types"
 import { AUTOMATION_DEFAULTS } from "../shared/automation-types"
 import { rescheduleAfterGap, shouldTripBreaker } from "../shared/automation-schedule"
@@ -242,11 +243,8 @@ async function executeTask(task: AutomationTask): Promise<AutomationRunRecord> {
   const at = new Date().toISOString()
   const started = Date.now()
   const server = await awaitServer()
-  const headers =
-    server.username || server.password
-      ? { Authorization: `Basic ${Buffer.from(`${server.username ?? ""}:${server.password ?? ""}`).toString("base64")}` }
-      : undefined
-  const client = createOpencodeClient({ baseUrl: server.url, headers })
+  // `#1667`(清点表 S6 / S9):OpenCode 2 的客户端;口令由 engineClient 补成 Basic 头(I8:只在 main 里)。
+  const client = engineClient(server)
   const directory = task.target.projectDir
 
   let sessionID: string | undefined
@@ -256,7 +254,7 @@ async function executeTask(task: AutomationTask): Promise<AutomationRunRecord> {
     () => {
       timedOut = true
       controller.abort()
-      if (sessionID) void client.session.abort({ sessionID, directory } as never).catch(() => {})
+      if (sessionID) void client.session.interrupt({ sessionID }).catch(() => {})
     },
     task.budget.maxDurationMin * 60_000,
   )
@@ -269,35 +267,20 @@ async function executeTask(task: AutomationTask): Promise<AutomationRunRecord> {
     // 与界面上同一句人话。查在 `session.create` 之前:拦下的这次不该留下一个空会话。
     if (moderationBlocks(task.prompt))
       throw new Error(`这条任务没有发出去:${MODERATION_BLOCKED_REASON}。修改任务内容后可以重新运行。`)
-    const created = await client.session.create(
-      { directory, title: `⏱ 自动化 · ${task.name}` } as never,
-      { signal: controller.signal } as never,
-    )
-    const createdData = (created as { data?: { id?: string }; error?: unknown }).data
-    if ((created as { error?: unknown }).error || !createdData?.id) throw new Error("session.create failed")
-    sessionID = createdData.id
-
+    // 2.x 的 agent / 模型挂在会话上(prompt 的载荷里没有这两格),建会话时一并给。
     const model = parseModel(task.target.model)
-    const res = await client.session.prompt(
+    const created = await client.session.create(
       {
-        sessionID,
-        directory,
+        location: { directory },
+        title: `⏱ 自动化 · ${task.name}`,
         agent: task.target.agent,
-        ...(model ? { model } : {}),
-        parts: [{ type: "text", text: task.prompt }],
-      } as never,
-      { signal: controller.signal } as never,
+        ...(model ? { model: { providerID: model.providerID, id: model.modelID } } : {}),
+      },
+      { signal: controller.signal },
     )
-    if ((res as { error?: unknown }).error) throw new Error(`prompt failed: ${JSON.stringify((res as { error: unknown }).error).slice(0, 300)}`)
-    const parts = ((res as { data?: { parts?: { type?: string; text?: string }[] } }).data?.parts ?? []) as {
-      type?: string
-      text?: string
-    }[]
-    const reply = parts
-      .filter((p) => p.type === "text" && typeof p.text === "string")
-      .map((p) => p.text)
-      .join("\n\n")
-      .trim()
+    sessionID = created.id
+
+    const reply = await promptAndWait(client, { sessionID, text: task.prompt }, controller.signal)
 
     const finishedAt = new Date().toISOString()
     const runId = `auto-${task.id}-${runTimestamp(new Date(started))}`

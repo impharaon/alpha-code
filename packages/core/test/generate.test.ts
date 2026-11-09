@@ -11,7 +11,7 @@ import {
   RateLimitError,
   TransportError,
 } from "@opencode/ai/effect"
-import { RequestExecutor } from "@opencode/ai/route"
+import { Auth, RequestExecutor } from "@opencode/ai/route"
 import { OpenAIChat } from "@opencode/ai/protocols"
 import { TestLLM } from "@opencode/ai/testing"
 import { AISDK } from "@opencode/core/aisdk"
@@ -35,7 +35,12 @@ const selected = Info.make({
   ...Info.default(Provider.ID.make("test-provider"), ID.make("gemini")),
   package: Provider.aisdk("@ai-sdk/perplexity"),
 })
-const runtime = LanguageModel.make({ id: "gemini", provider: "test-provider", route: OpenAIChat.route })
+// codepuppy(#652): a keyless fixture declares Auth.none; an undeclared route refuses before the socket opens.
+const runtime = LanguageModel.make({
+  id: "gemini",
+  provider: "test-provider",
+  route: OpenAIChat.route.with({ auth: Auth.none }),
+})
 const reference = Ref.make({ providerID: selected.providerID, id: selected.id })
 
 const providers = Layer.mock(Provider.Service, {

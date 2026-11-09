@@ -88,6 +88,7 @@ OpenCode 共用服务、库与凭证。
 | --- | --- | --- | --- | --- |
 | `packages/core/src/oauth/page.ts`、`packages/core/test/oauth-page.test.ts`(ADR-042) | OAuth 回环成功/失败页由引擎直出,插件 Context 没有改写它的挂点;ADR-007 的 Vite 品牌变换到不了引擎页 | `scripts/north-star-guard.sh` 的 `UPSTREAM_EXCLUDES` 逐文件两条;`packages/core/test/oauth-page.test.ts` 的两条品牌用例对上游原版页会红 | 用 `33f94fce96` 的两个文件覆盖并从清单删掉两条(改动面只有产品名与字标) | L4(#1666);同步时按 `takeover upgrade review required` 人工移植 |
 | `packages/core/src/permission.ts`(ADR-038;v1 接管的是 `packages/opencode/src/permission/index.ts`) | 2.x `Permission.assert` 对回复无限期等待;插件只能改判定,改不了等多久;插件侧看门狗回 reject 会级联整个会话(ADR-038 否决过) | `UPSTREAM_EXCLUDES` 一条;改动只在 `codepuppy(ADR-038)` 标注块;`packages/ext/src/policy/ask-deadline.test.ts`(去掉有界等待 ⇒ 前两条红,改成级联 ⇒ 第二条红) | 用 `33f94fce96` 的文件覆盖并删掉清单一条;回到无期限等待 | L4(#1666) |
+| `packages/ai/src/route/{auth,client,decision}.ts`、`packages/ai/src/protocols/{openai-chat,openai-responses}.ts`;九个上游测试文件(`packages/ai/test/{adapter,compile,executor,route}.test.ts`、`packages/ai/test/provider/{explicit-compaction,openai-compatible-chat,openai-responses}.test.ts`、`packages/core/test/{generate,session-runner}.test.ts`)(#652) | 2.x 的 route 默认 auth 是 `Auth.none`,两个 OpenAI 协议模板还自带 `Auth.none`:未声明凭证的部署会发无鉴权请求,失败被推到远端 401;插件改不了 route 默认值 | `UPSTREAM_EXCLUDES` 十四条;源码改动只在 `codepuppy(#652)` 标注处;九个测试文件只给本来就无鉴权的夹具写明 `auth: Auth.none`(25 + 5 条上游用例依赖旧默认值);`packages/ai/test/codepuppy-auth-fail-closed.test.ts`(默认值改回 `Auth.none` ⇒ 前两条红;Responses 模板恢复 `Auth.none` ⇒ 第二条红;decision 默认值改回 ⇒ decision 条红;provider 声明 `Auth.none` ⇒ 审计钉红并点名) | 用 `33f94fce96` 的十四个文件覆盖并删掉清单十四条;未声明凭证的部署回到无鉴权发送 | L4(#1666) |
 
 清单为空时(将来某次重判把这一组也退回 L0),每日同步照常走:同步读守卫自报的 `UPSTREAM_EXCLUDES_COUNT`,条数为 0 即无可核对、继续;
 读不出条数才中止(与「守卫没跑出结果」分开,`sync-upstream-takeover-isolation.test.ts` 的 F10 三条)。
@@ -99,7 +100,7 @@ OpenCode 共用服务、库与凭证。
 判官 `packages/ext/src/policy/authority-registry.test.ts`:49 条旧接管每条都要映射到一项决定;已握住的项必须有机制文件与会在拿掉机制时变红的测试;
 未握住的项(blocked)让判官红,直到编排器裁决;删掉任何一项而没有带 owner 原话与日期的 `retired` 记录同样红。下表是登记册的摘要,以登记册为准。
 
-已握住 26 项:
+已握住 27 项:
 
 | 登记 id | 决定 | 2.x 上的握法(阶梯) | 证明它的测试 |
 | --- | --- | --- | --- |
@@ -129,8 +130,9 @@ OpenCode 共用服务、库与凭证。
 | `adr043-owned-file-predicate` | Code Puppy-owned files living under upstream paths are recognised by name or marker, and a copied marker does not exempt an upstream file (ADR-043). | `scripts/north-star-guard.sh`(guard predicate (L2)) | `north-star-guard.test.ts`「名字不合约定、靠文件里的 marker 自报家门 ⇒ 绿(migration / tool-identity.ts 那一类)」; `north-star-guard.test.ts`「把 marker 抄进一个真上游文件 ⇒ 仍然红(自报家门不是可伪造的通行证)」 |
 | `adr033-receipt-premises` | The OpenCode 2 engine facts Code Puppy's receipt derivation relies on stay true: a pending request's payload cannot change under its id, one reply emits a replied event for every request it resolves, and a second reply is NotFound (ruling item 1 measurements). | `packages/core/src/permission.ts`(upstream-native, pinned) | `permission-reply-premises.test.ts`「(i) a pending request's payload never changes under its id: a second admission with the same id is refused」; `permission-reply-premises.test.ts`「(ii) one always reply emits a replied event for every request it resolves, and only those」 等 |
 | `adr038-ask-deadline` | An unanswered approval request fails by name after a deadline (300 s default, CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS override, invalid values fall back to the default) and never auto-allows; only that request ends (#668). | `packages/core/src/permission.ts`(L3 (re-taken: the wait on the reply is inside the kernel; a plugin watchdog's reject cascades)) | `ask-deadline.test.ts`「an unanswered request fails by name at the deadline, its card is retracted, and nothing is allowed」; `ask-deadline.test.ts`「only that request ends: another pending request of the same session is still waiting (no cascade)」 等 |
+| `l2r-auth-fail-closed` | A model route whose deployment declared no credential refuses before the socket opens instead of sending an unauthenticated request (#652, owner ruling 2026-07-28 per the v1 source comment). | `packages/ai/src/route/client.ts`(L3 (re-taken: a plugin cannot change route defaults; Auth.unset in route/auth.ts, chat and decision defaults, no template-level Auth.none on the two OpenAI protocols)) | `codepuppy-auth-fail-closed.test.ts`「a route that never declared auth refuses before the socket opens」; `codepuppy-auth-fail-closed.test.ts`「the OpenAI Responses template deployed without auth refuses before the socket opens too」 等 |
 
-未握住、待编排器裁决 21 项(选项见登记册每项的 `blocked.options`):
+未握住、待编排器裁决 20 项(选项见登记册每项的 `blocked.options`):
 
 | 登记 id | 决定 | 为什么按现有接口握不住 | 归属 |
 | --- | --- | --- | --- |
@@ -152,7 +154,6 @@ OpenCode 共用服务、库与凭证。
 | `mcp-start-concurrency` | At most four MCP servers start (spawn + handshake + tools/list) at once (#1563 AC5). | OpenCode 2 starts servers with unbounded concurrency inside core; no plugin seam. | L4 (#1666) — needs orchestrator decision |
 | `mcp-declared-tools-before-connect` | A bundled Office server still starting is offered from its bundled declaration; a contradicting server drops the declaration (#1565). | OpenCode 2 registers MCP tools only after tools/list; offering declared tools needs MCP runtime support (or an extension-side tool.transform that proxies calls until the server connects — new machinery). | L4 (#1666) — needs orchestrator decision |
 | `mcp-net-failure-runtime` | MCP connection failures are classified with Code Puppy's layered network classifier (#1572 N1, #1547). | The classifier contract is restored (packages/schema/src/codepuppy-net-failure.ts) but OpenCode 2's MCP client does not call it and exposes no seam to. | L4 (#1666) — needs orchestrator decision |
-| `l2r-auth-fail-closed` | A model route whose deployment declared no credential refuses before the socket opens instead of sending an unauthenticated request (#652, owner ruling 2026-07-28 per the v1 source comment). | OpenCode 2's packages/ai/src/route/client.ts still defaults auth to Auth.none (lines 373, 403); a plugin cannot change route defaults, and judging credential presence per provider in http.request would hand-write provider knowledge. | L4 (#1666) — needs orchestrator decision |
 | `hub-install-ask` | Installing from the Customization Center always asks (and is denied to automated agents) (I10). | Owned by L3 (hub-tools.ts permission.assert + permission.hook.evaluate); not delivered on the integration branch this lane started from. | L3 (#1665) per lane seams I10 |
 | `sidecar-stop-drains` | Stopping the engine drains connections before exit (codepuppy-sidecar-stop; OOR-2: /global/dispose is 404 on 2.x). | Owned by L5 (sidecar-stop.ts); not delivered on the integration branch this lane started from. | L5 (#1667) |
 

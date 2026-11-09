@@ -138,6 +138,24 @@ UPSTREAM_EXCLUDES=(
   # 插件只能改判定(`permission.hook.evaluate`)改不了等多久;插件侧看门狗回 reject 会级联整个会话 ——
   # ADR-038 否决过的形状。接管面只有 `Deferred.await` 那一处的有界等待与具名失败(`codepuppy(ADR-038)` 标注块)。
   ':(exclude)packages/core/src/permission.ts'
+  # #652(#1662 裁决第 3 项):「拿不到凭证」不得降级为「发一个无鉴权请求」。2.x 的 route 默认 auth 是 Auth.none,
+  # 插件改不了 route 默认值。接管面:Auth.unset 本体、chat/decision 两处默认值、两个 OpenAI 协议模板去掉模板级
+  # Auth.none(`codepuppy(#652)` 标注);九个上游测试文件只给本来就无鉴权的夹具写明 `auth: Auth.none`。
+  # 判据 packages/ai/test/codepuppy-auth-fail-closed.test.ts(含全部 provider 入口的审计钉)。
+  ':(exclude)packages/ai/src/route/auth.ts'
+  ':(exclude)packages/ai/src/route/client.ts'
+  ':(exclude)packages/ai/src/route/decision.ts'
+  ':(exclude)packages/ai/src/protocols/openai-chat.ts'
+  ':(exclude)packages/ai/src/protocols/openai-responses.ts'
+  ':(exclude)packages/ai/test/adapter.test.ts'
+  ':(exclude)packages/ai/test/compile.test.ts'
+  ':(exclude)packages/ai/test/executor.test.ts'
+  ':(exclude)packages/ai/test/route.test.ts'
+  ':(exclude)packages/ai/test/provider/explicit-compaction.test.ts'
+  ':(exclude)packages/ai/test/provider/openai-compatible-chat.test.ts'
+  ':(exclude)packages/ai/test/provider/openai-responses.test.ts'
+  ':(exclude)packages/core/test/generate.test.ts'
+  ':(exclude)packages/core/test/session-runner.test.ts'
 )
 
 # ── UPSTREAM_PATHS 里住着的 Code Puppy 自有文件:结构性谓词,不是逐文件清单(`#1085` / ADR-043)──

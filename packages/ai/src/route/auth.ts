@@ -102,6 +102,29 @@ export const effect = (load: Effect.Effect<Redacted.Redacted, CredentialError>) 
 
 export const none = auth((input) => Effect.succeed(input.headers))
 
+// codepuppy(#652) ── the fail-closed default for a route whose deployment never declared an auth.
+// With `none` as the default, "we could not obtain a credential" became "send an unauthenticated request": the request
+// left the process, the remote answered 401, and a credential channel that went dark read as a remote rejection.
+// Refusing before the socket opens keeps the failure local and named (MissingCredentialError → the Authentication
+// reason). Sending a headerless request is a decision, so it has to be written down: a deployment that takes no
+// credential declares `auth: Auth.none` (providers do it for `apiKey: false`).
+export const unset = auth((input) => {
+  const model = (input.request as { readonly model?: { provider?: unknown; route?: { id?: unknown } } }).model
+  const where = [
+    typeof model?.provider === "string" ? `provider "${model.provider}"` : undefined,
+    typeof model?.route?.id === "string" ? `route "${model.route.id}"` : undefined,
+  ]
+    .filter((part): part is string => part !== undefined)
+    .join(" ")
+  return Effect.fail(
+    new MissingCredentialError(
+      "auth",
+      `no auth declared for ${where || "this route"} — refusing to send an unauthenticated request (declare Auth.none to opt in)`,
+    ),
+  )
+})
+// codepuppy(#652) ── end
+
 export const headers = (input: Headers.Input) =>
   auth((inputAuth) => Effect.succeed(Headers.setAll(inputAuth.headers, input)))
 

@@ -88,7 +88,7 @@ describe("request option precedence", () => {
   it.effect("keeps the last tool definition for duplicate names", () =>
     Effect.gen(function* () {
       const request = ai.request({
-        model: OpenAIChat.route.model({ id: "gpt-4o-mini" }),
+        model: OpenAIChat.route.with({ auth: Auth.none }).model({ id: "gpt-4o-mini" }), // codepuppy(#652)
         prompt: "Use a tool.",
       })
       const prepared = yield* compileRequest({
@@ -117,7 +117,7 @@ describe("request option precedence", () => {
     Effect.gen(function* () {
       const prepared = yield* compileRequest(
         ai.request({
-          model: OpenAIResponses.route.model({ id: "gpt-5.4" }),
+          model: OpenAIResponses.route.with({ auth: Auth.none }).model({ id: "gpt-5.4" }), // codepuppy(#652)
           prompt: "Hello",
           tools: [
             ToolDefinition.make({ name: "crm", description: "Top-level CRM tool", inputSchema: {} }),
@@ -172,7 +172,7 @@ describe("request option precedence", () => {
     Effect.gen(function* () {
       const prepared = yield* compileRequest(
         ai.request({
-          model: OpenAIChat.route.model({ id: "gpt-4o-mini" }),
+          model: OpenAIChat.route.with({ auth: Auth.none }).model({ id: "gpt-4o-mini" }), // codepuppy(#652)
           messages: [
             Message.assistant(ToolCallPart.make({ id: "call_1", name: "lookup", input: {} })),
             Message.user("Continue."),

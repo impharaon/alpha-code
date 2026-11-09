@@ -1065,15 +1065,54 @@
       "adr": [
         "ADR-047"
       ],
-      "lane": "L4 (#1666) — needs orchestrator decision",
-      "takeovers": [],
-      "blocked": {
-        "reason": "OpenCode 2's packages/ai/src/route/client.ts still defaults auth to Auth.none (lines 373, 403); a plugin cannot change route defaults, and judging credential presence per provider in http.request would hand-write provider knowledge.",
-        "options": [
-          "(a) Re-take packages/ai/src/route/{auth,client}.ts and the two OpenAI protocol routes (Auth.unset default) and port auth-fail-closed.test.ts; audit every 2.x route that relied on the default (L3).",
-          "(b) Owner retires the decision for OpenCode 2 (needs the owner's words)."
-        ]
-      }
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/ai/src/route/auth.ts",
+        "packages/ai/src/route/client.ts",
+        "packages/ai/src/route/decision.ts",
+        "packages/ai/src/protocols/openai-chat.ts",
+        "packages/ai/src/protocols/openai-responses.ts",
+        "packages/ai/test/adapter.test.ts",
+        "packages/ai/test/compile.test.ts",
+        "packages/ai/test/executor.test.ts",
+        "packages/ai/test/route.test.ts",
+        "packages/ai/test/provider/explicit-compaction.test.ts",
+        "packages/ai/test/provider/openai-compatible-chat.test.ts",
+        "packages/ai/test/provider/openai-responses.test.ts",
+        "packages/core/test/generate.test.ts",
+        "packages/core/test/session-runner.test.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ai/src/route/client.ts",
+        "ladder": "L3 (re-taken: a plugin cannot change route defaults; Auth.unset in route/auth.ts, chat and decision defaults, no template-level Auth.none on the two OpenAI protocols)"
+      },
+      "tests": [
+        {
+          "file": "packages/ai/test/codepuppy-auth-fail-closed.test.ts",
+          "name": "a route that never declared auth refuses before the socket opens"
+        },
+        {
+          "file": "packages/ai/test/codepuppy-auth-fail-closed.test.ts",
+          "name": "the OpenAI Responses template deployed without auth refuses before the socket opens too"
+        },
+        {
+          "file": "packages/ai/test/codepuppy-auth-fail-closed.test.ts",
+          "name": "a decision route that never declared auth refuses before the socket opens"
+        },
+        {
+          "file": "packages/ai/test/codepuppy-auth-fail-closed.test.ts",
+          "name": "an explicitly declared Auth.none still sends — the gate is a declaration, not a ban"
+        },
+        {
+          "file": "packages/ai/test/codepuppy-auth-fail-closed.test.ts",
+          "name": "a declared credential that resolves to nothing also refuses before the socket opens"
+        },
+        {
+          "file": "packages/ai/test/codepuppy-auth-fail-closed.test.ts",
+          "name": "every provider entry built with no credential sends nothing without one"
+        }
+      ],
+      "note": "Audit 2026-11-09: all 94 provider entries with a model factory already refused without a credential before the re-take; the other four protocol templates (anthropic-messages, gemini, google-interactions, mistral-chat) keep a template-level Auth.none that no production construction path reaches without its own credential (held by the pin). Not covered: packages/core/src/model-resolver.ts declares Auth.none itself for a configured provider with no key and no connection (keyless local providers) — an explicit engine-side declaration, reported to the coordinator."
     },
     {
       "id": "hub-install-ask",

@@ -44,13 +44,17 @@ function dataRoot(env: NodeJS.ProcessEnv) {
   return path.join(env.XDG_DATA_HOME || path.join(os.homedir(), ".local", "share"), "opencode")
 }
 
+/** #1644: grants partition per folder outside git (the global project) and per project inside git. */
+export function policyWorkspace(location: Plugin.Context["location"]): string {
+  return String(location.project.id) === "global" ? location.directory : String(location.project.id)
+}
+
 export async function registerPolicy(context: Plugin.Context): Promise<PolicyRegistration> {
   const env = process.env
   const store = createToolPolicyStore({
     baseDir: defaultPolicyBaseDir(dataRoot(env)),
     account: () => env.CODEPUPPY_POLICY_ACCOUNT || "anonymous",
-    workspace: () =>
-      String(context.location.project.id) === "global" ? context.location.directory : String(context.location.project.id),
+    workspace: () => policyWorkspace(context.location),
   })
   const extOrigin = extModulePath(import.meta.url)
   const bundled = loadBundledTools(import.meta.url, env)

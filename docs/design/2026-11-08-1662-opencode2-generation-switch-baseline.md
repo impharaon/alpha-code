@@ -37,9 +37,9 @@ ADR-029(主权阶梯 L0–L3)、ADR-034(前端 pin + SOT 补丁)、ADR-041 / ADR
    A(逐冲突移植)、B(重新 fork)、C(先过 1.19.5)的否决理由见 §2.2。
 3. **合并目标取 `33f94fce96`**(v2.2.6 在 dev 线上的父提交,代码与 v2.2.6 逐字相同,只差版本号与 CHANGELOG),
    不取 dev 头 `adb0053d09`,也不取 `v2.2.6` 标签(§2.1)。
-4. **引擎宿主默认保持「嵌在 Electron `utilityProcess` 里」**(进程围栏、ext 的 `parentPort` 桥、进程内调用都不换形状),
-   以 L1 实测为准;实测不过才改用「打包上游 bun 编译的 CLI,作为围栏内的私有子进程」(§2.4)。
-   嵌入式下,上游的「v1 旧对话转成 v2」只在 bun 下运行、在 Node 下是空实现 —— 这是本次最大的用户可见风险(§2.8)。
+4. **引擎宿主定为「嵌在 Electron `utilityProcess` 里」(H1,裁决书 R13,L1a 实测)**(进程围栏、ext 的 `parentPort` 桥、进程内调用都不换形状;
+   进程内接法取 `start()` + `Transform`,§2.4)。嵌入式下,上游的「v1 旧对话转成 v2」只在 bun 下运行、在 Node 下是空实现,原样不动就是旧对话
+   静默全不可见 —— 本次最大的用户可见风险;已定用 Node 薄适配接上(裁决书 R14,合成库实测通过,真库副本归 L1b,§2.8)。
 5. **前端在切换时跟引擎同一个 SHA**(之后保持同一代次),renderer 的数据层改用上游公开包 `@opencode/client/solid`,不再借 `packages/app` 内部导出(§2.6)。
 6. **一个 PR 进 `alpha`**(ADR-037 决策 2),7 条 lane 在整合分支上并行;量级估计 115–185 个 agent 小时、日历 2–3 周、
    owner 实机约 4–5 小时(§4.3,推断)。
@@ -112,9 +112,13 @@ node:ffi missing ERR_UNKNOWN_BUILTIN_MODULE
 ```
 
 - 2.x 的 Node 构建目标是 Node 26.4 加 `--experimental-ffi`(`v2:packages/cli/script/build-node.ts:20`、`v2:packages/cli/src/node/target.ts:34`)。
+  L1a 实测:按上游配置、把 target 改成 node24 构建,在 Electron 的 Node 24.15 里不带这两个参数也能跑通 E1–E3,日志无 WARN/ERROR
+  (勘破文档 `docs/architecture/2026-11-09-1662-l1-engine-host-spike.md` §6 第 8 条,分支 `spike/1662-l1-engine-host`、提交 `0bfbdfb205`,下文简称「L1a 勘破」)。
 - 2.x core 给运行时相关模块都留了 `node` 分支(`v2:packages/core/package.json` 的 `imports`:`#sqlite`→`sqlite.node.ts` 用 `node:sqlite`,
   `#pty`、`#fff`、`#photon-wasm`、`#persistent-pty-binary` 同),fff 缺失时回退(`v2:packages/core/src/filesystem/fff.node.ts:5`)。
 - **例外:`#v1-migration` 的 `node` 分支是空实现**(`package.json:67-73` → `v1-migration.noop.ts`,`status()`/`run()` 恒回 `completed`)。
+  用户看得到的后果(裁决书 R15 ③,L1a 勘破 e3noop 臂实测):上游原版 Node 构建下**旧对话一条都看不到**,而状态接口
+  `/api/experimental/migration/v1` 照样报 `completed` —— 静默失效,UI 拿不到任何「旧对话没接上」的信号。
 - 2.x 提供两种嵌入入口:`ServerProcess.start(options, …)`(`v2:packages/server/src/process.ts:50`,带监听;`Transform` 钩子在 `:40`)
   与 `ServerFetch.make`(`v2:packages/server/src/fetch.ts:43`,不监听端口,但自建一张应用图)。
 
@@ -127,14 +131,19 @@ node:ffi missing ERR_UNKNOWN_BUILTIN_MODULE
   `mcp-auth.json` 2 字节,**没有** `auth.json`;`which opencode` 无。
 - **2.x 迁移执行器**:库里有 `session` 或 `session_v2` 表 ⇒ 只跑未完成的迁移(`v2:packages/core/src/database/migration.ts:31-32`);
   旧的无名 `__drizzle_migrations` 表里有对不上已知迁移的时间戳 ⇒ 直接 die(`:84-100`);嵌入方自有表应以 `_` 开头(`:26-29`)。
+  **订正(裁决书 R15 ②,L1a 勘破 E3):** 1.18.35 建出的库用的是 `migration` 表,**没有**旧的无名 `__drizzle_migrations`,走不到 die 分支;
+  合成库上 2.x 只补缺的 21 条(`migration` 表 40 → 61 行),alpha 独有的两行迁移记录与 `permission_decision`/`permission_request` 两张表原样保留、
+  不报错。所以**引擎这一侧不会挡**,挡的是 Code Puppy 自己的 DB 安全带(与 §2.8 第 1 条的 F1 合看)。真库属于哪一种由 L1b 复核。
 - **迁移清单差异**(三方 `comm`):alpha 40 条、merge-base 38 条、2.x 59 条;alpha 独有两条
   (`20260720085655_permission-decision-receipt`、`20260720094009_permission-request-admission`,建 `permission_decision`/`permission_request`),
   2.x 不认识;2.x 在 merge-base 之后新增 21 条,建 `blob`、`blob_ref`、`job`、`schedule`、`session_inbox`、`session_part`、`workspace`、`worktree` 等,
   与 alpha 的两张表无重名。alpha 自己的 DB 安全带在「将前进迁移」时先备份、「库超前」时阻断(`db-safety.ts:85-106`)。
 - **v1 旧对话转 v2** 由 `v1-migration.bun.ts` 做(`transformSession` `:227`、`run` `:541`),只读写同库。它会删两样东西:
   `event` 表的行(`:562`),以及被转换会话在 `session_message` 里已有的行 —— 先删该会话的 `session_message` 再写转换结果(`:704`);
-  不删 v1 的 `message`/`part`。转换时把工具改名:`bash`→`shell`、`task`→`subagent`、`apply_patch`→`patch`(`:996`)。
-  (第 1 轮审计 F12 订正:初稿只写了 `event`。)
+  不删 v1 的 `message`/`part`。(第 1 轮审计 F12 订正:初稿只写了 `event`。)
+  **工具改名不改历史(裁决书 R15 ①,订正初稿):** `RENAMED_TOOLS`(`:996`:`bash`→`shell`、`task`→`subagent`、`apply_patch`→`patch`)只用来在
+  会话末尾追加一条给模型看的 `system` 提示(`legacyToolNotice`,`:1005-1030`);转换后的历史里工具项仍叫 `bash`。L1a 勘破 E3:v1 13 条消息转成 14 条,
+  多出的就是这条提示。所以 UI 工具卡与身份账本要**同时认新旧两个名字**(清点表 K5)。
 - **旧凭证导入**:2.x 迁移 `20260805200742_import_legacy_credentials` 读 `<data>/auth.json` 写进 `credential` 表
   (`v2:packages/core/src/database/migration/20260805200742_import_legacy_credentials.ts:39-52`)。
 
@@ -215,7 +224,7 @@ node:ffi missing ERR_UNKNOWN_BUILTIN_MODULE
 5. 整合分支通过 §5 的全部闸门后,开**一个** PR 进 `alpha`,标题主语是切换本身(ADR-037 决策 2),`gh pr merge --merge` 合入
    (禁止 squash/rebase,否则 M0 的上游祖先丢失,merge-base 不前移)。`git log --first-parent alpha` 上只多一个合并提交。
 
-### 2.4 引擎宿主:默认 H1(嵌入式),H3 兜底,H2 不用
+### 2.4 引擎宿主:H1(嵌入式,已定 —— 裁决书 R13),H3 兜底,H2 不用
 
 | 选项 | 是什么 | 好处 | 代价 |
 | --- | --- | --- | --- |
@@ -226,6 +235,17 @@ node:ffi missing ERR_UNKNOWN_BUILTIN_MODULE
 **H1 的退出条件(L1 实测,全部满足才定 H1):** ① 在打包形态的 `utilityProcess` 里、围栏已装的前提下,2.x 引擎起得来,
 `/api/session/:id/prompt` 能完成一条真实回复;② 拿到一个与监听**同一张应用图**的进程内 fetch(候选:`start()` 的 `Transform`);
 ③ §2.8 的旧对话转换在 Node 下有可行补法。任一不满足 ⇒ 改 H3,L3/L5 的 IPC 部分随之调整;这是整合分支内可回退的技术选择,不需要 owner 裁决。
+
+**已定 H1(裁决书 R13,依据 L1a 勘破 §0、§3、§4,合成数据):** 三条退出条件在 dev 版 Electron 二进制 + 未打包 main 上都满足
+(围栏下 0.32 s 起引擎、回复经生产出网代理;打包形态 —— asar、签名公证、hardened runtime —— 未测,归 L7)。实现必须同时守住:
+
+- **进程内接法取「`start()` + `Transform`」,并传 `lifecycle`**:钩子拿到的是监听端口的 dispatch app,转成 fetch 交给 ext(与监听同一张图,E2 实测);
+  传 `lifecycle` 才会在启动时续跑中断的会话(`v2:packages/server/src/process.ts:113-114`;CLI 默认模式不传)。**不取 `ServerFetch.make`**:
+  它要 Code Puppy 自己再写一层监听,且实测不跑 Schedule runner(L1a 勘破 §4)—— 取 `start()` 是消费上游宿主的决定,Code Puppy 侧少持有一层。
+- **出网代理的设置顺序(裁决书 R15 ④):** 装围栏之后、import 引擎之前调用 `http.setGlobalProxyFromEnv()`(今天的 `sidecar.ts:148,267-269`
+  `useEnvProxy`)。不调的话,2.x 的模型请求绕开 `HTTPS_PROXY` 直连目标,在围栏下 DNS 失败、代理一条记录都收不到(L1a 勘破 armC 对 armCraw)。
+- **以正式渠道启动**(见 §2.7)。
+- 引擎连自己的回环端口仍被围栏拒(EPERM,与 `#1531` 同形),ext 这类进程内调用方只能走上面那个进程内 fetch。
 
 ### 2.5 主权层怎么重建
 
@@ -261,7 +281,12 @@ node:ffi missing ERR_UNKNOWN_BUILTIN_MODULE
   `db-safety.ts:36-51` 共用**一个** Code Puppy 侧函数 —— 库在哪只算一次,不再造一份上游宿主的决定。
 - 防静默失效的测试改为断言**传给 `start()` / `ServerFetch.make` 的选项对象**(或把「找读者」的范围限定在宿主实际装载的模块);
   反向臂:一个只有 CLI 读的变量(例如 `OPENCODE_CONFIG_CONTENT`)按旧做法只设进环境,测试必须红。初稿「sidecar 环境里每个 `OPENCODE_*`
-  在引擎源码里都有读者」的写法会把 CLI 里的读者也算进去,在 H1 下是假闸,作废。
+  在引擎源码里都有读者」的写法会把 CLI 里的读者也算进去,在 H1 下是假闸,作废。裁决书 R13 已定 `start()`,这里的选项对象即传给 `start()` 的那份。
+- **以正式渠道启动(裁决书 R13、R15 ⑤):** 传给 `start()` 的 `app.channel` 用发布渠道值,不随 Code Puppy 自己的 dev 渠道构建变成 `dev`。
+  `local`/`dev` 会默认打开 `todo`、`schedules`、`media_blob`、`artifacts`、`background_compaction` 五个实验开关(`v2:packages/core/src/flag.ts:26,70`,
+  开关表 `v2:packages/schema/src/config/flag.ts:11-18`);库路径已由 `database.path` 显式给出,渠道值不再影响库文件名。判据:传 `local` 时这五个开关为开,
+  传发布渠道时为关(反向臂)。另:引擎还读环境变量 `OPENCODE_FLAGS` 作最高优先的覆盖(`v2:packages/core/src/flag.ts:22`),而 sidecar 的环境白名单按
+  `OPENCODE_` 前缀放行(清点表 E1),用户 shell 里的 `OPENCODE_FLAGS=all` 会绕过渠道默认值 —— L5 构造环境时把它排除出继承(读码,未跑)。
 
 ### 2.8 数据连续性
 
@@ -275,7 +300,15 @@ node:ffi missing ERR_UNKNOWN_BUILTIN_MODULE
    `v1-migration.bun.ts`,为其中两处 bun 专有调用提供 Node 薄适配 —— `:808` 动态 import `bun:sqlite`(只用于打开 `opencode-next.db`)
    与 `:1170` `Bun.CryptoHasher`(合成 id 的 sha256,换 `node:crypto`);`:17` 只是类型 import。主体走 `Database.Service`,不碰 bun;
    上游源码逐字不动。实测不通 ⇒ 改 H3(bun 运行时原生可用)。两条都不通 ⇒ owner 裁决 O1。
-3. **工具改名**(`bash`/`task`/`apply_patch`)在策略默认值、agent 规则、UI 工具卡、身份账本里一并改(清点表 K5)。
+   **已定:按这个 Node 薄适配做,O1 不触发(裁决书 R14,依据 L1a 勘破 E3,合成库):** 3 个会话 / 13 条消息全部转换为 3 / 14
+   (多一条改名提示);有围栏时结果相同。两处适配都做、都小、上游源码不动:
+   - `:1170`(`Bun.CryptoHasher`)**必做**:只在会话里用过被改名 / 改参数 / 删掉的工具、或用户消息带 synthetic 部分时才走到(`:371,455`);
+     去掉它,转换在第一个用过改名工具的会话上以 `Bun is not defined` 中断,其后的会话全部不转换(e3raw 臂)。
+     所以**夹具必须含带改名工具调用或合成 part 的会话** —— 纯文本会话走不到这一处,缺了也测不出来。
+   - `:808`(`bun:sqlite`)只在 `<data>/opencode-next.db` 存在时走到(`:799-830`);owner 数据目录按文件名看没有这个文件,保留适配(e3next 臂已测)。
+   - 上游原版 Node 构建下旧对话全不可见、状态仍报 `completed`(e3noop 臂,§1.3)—— 这条就是适配的反向臂。
+3. **工具改名**(`bash`/`task`/`apply_patch`)在策略默认值与 agent 规则里改成新名(引擎的工具从此叫新名);**UI 工具卡与身份账本同时认新旧两个名字**
+   —— 转换后的历史里工具项仍是旧名,转换只追加一条给模型的提示(§1.4,裁决书 R15 ①)(清点表 K5)。
 4. **alpha 自有两张权限表**随 K3 的结论定去留;新增的自有表按 2.x 约定用 `_` 前缀。
 
 ### 2.9 每日同步恢复(AC4)
@@ -328,11 +361,11 @@ L2 在整合分支上一并改:提示词绊线改指 `v2:packages/core/src/sessi
 
 | Lane | 类型 | 负责 AC | 边界(只动这些) | 不做 | 退出条件 |
 | --- | --- | --- | --- | --- | --- |
-| L1 引擎宿主与数据勘破 | DECIDE | AC1(前提)、AC3(前提) | 只读 + 临时实验分支;产物落 `docs/architecture/` 一篇勘破 | 不改产品代码 | §2.4 的三条退出条件逐条有实测结论(含命令与输出);真库**副本**上前进迁移与旧对话转换的结果(会话条数前后对照),且这次实验走 Code Puppy 的启动预检(DB 安全带),不只跑裸引擎(§2.8 第 1 条,F1);定 H1 或 H3 |
+| L1 引擎宿主与数据勘破 | DECIDE | AC1(前提)、AC3(前提) | 只读 + 临时实验分支;产物落 `docs/architecture/` 一篇勘破 | 不改产品代码 | §2.4 的三条退出条件逐条有实测结论(含命令与输出);真库**副本**上前进迁移与旧对话转换的结果(会话条数前后对照),且这次实验走 Code Puppy 的启动预检(DB 安全带),不只跑裸引擎(§2.8 第 1 条,F1);定 H1 或 H3。宿主那一半(裁决书记作 L1a)的结论见 L1a 勘破(提交 `0bfbdfb205`)与裁决书 R13–R15(定 H1);真库副本那一半(L1b)的结论另落勘破 |
 | L2 骨架:M0 与守卫、同步、构建接线 | CODE | AC1、AC4 | M0 合并提交(直推整合分支或 `--merge` 合入,F2);`scripts/north-star-guard.sh` 与其测试 —— 在含受审上游合并的分支上,`packages/` 辖区改以该合并的上游父(`33f94fce96`)为基准判,不再以 `origin/alpha` 为基准(守卫头注 `scripts/north-star-guard.sh:24` 起写的基准,F3);接管清单在 L2 用过渡清单判(F10);`scripts/engine-smoke.sh`;`.github/workflows/sync-upstream.yml`;`packages/ui-mac/scripts/prebuild.ts` 与 `gen-db-expected.ts`(含退役迁移 id 的冻结清单,以及 db-safety 那条「带两个退役 id 的夹具库 ⇒ 待前进」测试,F1);`frontend/frontend-pin.lock` | 不改 ext、ui-mac 业务代码;7 条 lane 的推送不得靠 `--no-verify` 过守卫(F3) | §2.3 第 4 步的两条机械判据(树、祖先)在整合分支上为真并有反向用例,其中祖先判据 `git merge-base --is-ancestor 33f94fce96 HEAD` 带「squash 重放后必须红」(F2);守卫两臂:M0 之后再改一个上游文件 ⇒ 红,M0 原样带来的上游改动 ⇒ 绿(F3);同步工作流的步骤体在 `sync-upstream-takeover-isolation.test.ts` 里对过渡清单跑通;合入 `alpha` 前列出将新出现的上游 workflow 清单(§2.3 第 2 步的 20 个),合入后逐个 `gh workflow disable`(F4) |
 | L3 ext 改成 2.x 插件 | CODE | AC1 | `packages/ext/**`;上下文注入快照 | 不改工具策略族的判定逻辑(L4) | 清点表 P1–P12、C10、L3r、L4r、L5r、M3 各行,以及 S7 的 ext 部分(`packages/ext/src/reload-scheduler.ts:51,58` 进程内调用的 `GET /session/status`、`POST /instance/dispose`,F11),状态变为已处置并写上新坐标;ext 的测试在 2.x 插件宿主里跑(不是替身) |
 | L4 主权文件搬家与接管重判 | CODE | AC1 | 清点表 K1–K8、L1r、L2r、M1、M2、M6、D3 的文件;新接管清单;ADR-047「精确接管面」一节 | 不改 renderer | 新接管清单每条在 ADR-047 有理由;`#725` 判据改指 2.x 并带摘线反向(S1);对最终清单重跑 `sync-upstream-takeover-isolation.test.ts` 与 `north-star-guard.test.ts`,并定好清单为空时同步怎么走 —— 今天 `sync-upstream.yml:131-133` 遇空清单直接 `exit 1`,最终清单若为空不得 `exit 1`,且要与「守卫没跑出结果」区分开(F10) |
-| L5 ui-mac 主进程接线 | CODE | AC1 | sidecar 宿主、`sidecar-env.ts`、`server.ts` 的环境投影、`codepuppy-config-injection.ts`、MCP 管理、provider/目录投影、健康探测 | 不改 renderer、不改 ext | 清点表 H1–H9、C1–C9、E1–E3、S7 的 main 部分已处置;sidecar 构造的 `ServerOptions` 有断言选项对象的测试,带「只设进环境的变量必须红」的反向臂,库路径与 `db-safety.ts:36-51` 共用一个函数(§2.7,F7);删掉 v2 配置桥后无残留引用 |
+| L5 ui-mac 主进程接线 | CODE | AC1 | sidecar 宿主 —— 按裁决书 R13 定的 H1:`start()` + `Transform` 取进程内 fetch 交给 ext,并传 `lifecycle`(启动时续跑中断会话),不用 `ServerFetch.make`;装围栏之后、import 引擎之前保留 `http.setGlobalProxyFromEnv()`(`sidecar.ts:148,267-269`);传给引擎的 `app.channel` 用发布渠道值(§2.4、§2.7)—— 以及 `sidecar-env.ts`、`server.ts` 的环境投影、`codepuppy-config-injection.ts`、MCP 管理、provider/目录投影、健康探测 | 不改 renderer、不改 ext | 清点表 H1–H9、C1–C9、E1–E3、S7 的 main 部分已处置;sidecar 构造的 `ServerOptions` 有断言选项对象的测试,带「只设进环境的变量必须红」的反向臂,库路径与 `db-safety.ts:36-51` 共用一个函数(§2.7,F7);删掉 v2 配置桥后无残留引用 |
 | L6 前端:pin、SOT 补丁、renderer 数据层 | CODE | AC1 | `frontend/`、`packages/{app,ui}` 投影、`packages/ui-mac/src/renderer/**` | 不做视觉改动(票面「不做」) | 三个发送入口同一代次(ADR-037 决策 5 的枚举写进 PR);清点表 S1–S6、S9、F1–F6、M4、M5 已处置 |
 | L7 打包版验证与撤回演练 | VERIFY | AC3、AC5(及 AC4 的合入后取证) | `docs/verification/` | 不改代码(发现缺陷回到对应 lane) | §5 的闸门全部有记录;§6 的演练做过一次并留证 |
 
@@ -433,16 +466,16 @@ owner 实机:0.1.25 那轮 36 格用了 200–230 分钟(alpha-work#129 票面�
 ## 7. 待 owner 裁决
 
 这几项都按 `owner-decision` 的要求在递给 owner 时补全前因后果。O2 已由编排器定、O3 已由 owner 裁决(来源见各条,均记在裁决书
-[`2026-11-08-1662-opencode2-rulings.md`](2026-11-08-1662-opencode2-rulings.md));**O1 仍未裁决**。
+[`2026-11-08-1662-opencode2-rulings.md`](2026-11-08-1662-opencode2-rulings.md));**O1 不触发**(裁决书 R14),目前没有需要 owner 拍板的项。
 
-**给 owner 的数据说明(不是待裁决项,随 O1 与撤回说明一起递;第 1 轮审计 F12):** 第一次以 2.x 启动时,会话库会发生三件事:
+**给 owner 的数据说明(不是待裁决项,随撤回说明一起递;第 1 轮审计 F12):** 第一次以 2.x 启动时,会话库会发生三件事:
 ① 前进 21 条迁移,之前先自动备份;② 每个旧对话转换成新格式写进新表 —— 写之前先删掉该对话在新表 `session_message` 里已有的行
 (`v2:packages/core/src/database/v1-migration.bun.ts:704`);③ 清掉 `event` 表(`:562`)。旧格式的 `message`/`part` 两张表不删。
 
-- **O1 旧对话接不上时怎么办(有条件:只有 §2.8 第 2 步的两条补法都不通时才问)。** 选项:
-  ① 接受旧对话不可见(数据还在库里,v1 表不删,以后补上仍能恢复)—— 用户升级后侧栏是空的,这是用户可见的退步;
-  ② 换回去用 H3 带 bun 运行时(多约 200 MB、多一个要签名公证的二进制、ext 的通信要重做)—— 工期加约一周;
-  ③ 暂停切换,等上游给 Node 下的转换 —— 每日同步继续坏着(`#1408`)。推荐:先做完 L1 再问;若到这一步,推荐 ②。
+- **O1 旧对话接不上时怎么办 —— 不触发(裁决书 R14):** 触发条件是「§2.8 第 2 步的两条补法都不通」,而 L1a 实测 Node 薄适配已在合成库上
+  把 3 个会话全部转换(含用过改名工具的会话),所以不递给 owner。若 L1b 在真库副本上推翻这个结论,按原条件重新走 O1,届时照 `owner-decision`
+  重写;原列的三个选项留作底稿:① 接受旧对话不可见(数据还在库里,v1 表不删)—— 用户可见的退步;② 改 H3 带 bun 运行时(多约 200 MB、
+  多一个要签名公证的二进制、ext 的通信要重做)—— 工期加约一周;③ 暂停切换 —— 每日同步继续坏着(`#1408`)。
 - **O2 Code Puppy 的会话与凭证要不要从 `~/.local/share/opencode` 搬到自己的目录(安全面 S7)—— 已定(编排器,裁决书 R5):本票不搬。**
   本票只做 S2 的「不导入不属于 Code Puppy 的凭证」与 S7 的启动告警;搬目录是一次独立的数据迁移,另行裁决。可回退:本票不改目录,撤回不涉及数据迁移。
   (原选项「本票一起搬」未采纳。)
@@ -463,11 +496,13 @@ owner 实机:0.1.25 那轮 36 格用了 200–230 分钟(alpha-work#129 票面�
 
 ## 9. 仍是推断、没跑过的断言
 
-- H1 能在 Electron 42 的 Node 24.15 里起 2.x 引擎并完成一条回复 —— 只读了运行时条件分支,没跑(L1 的第一件事)。
-- `start()` 的 `Transform` 能拿到与监听同一张图的进程内 fetch —— 读了签名,没跑。
-- `#v1-migration` 的构建期变换 + Node 薄适配能在 Node 下跑通旧对话转换 —— 没跑;只用 `grep -n -E 'bun:sqlite|from "bun"|Bun\.' v1-migration.bun.ts`
-  确认了 bun 专有调用只有 `:808`(`bun:sqlite`,打开 `opencode-next.db`)与 `:1170`(`Bun.CryptoHasher`),`:17` 是类型 import。
-- 2.x 对 Code Puppy 真库副本的前进迁移会成功 —— 只读了迁移执行器的代码路径;库里旧无名 `__drizzle_migrations` 表的有无没查。
+- ~~H1 能在 Electron 42 的 Node 24.15 里起 2.x 引擎并完成一条回复~~ —— 已实测(裁决书 R15 ⑥;L1a 勘破 §3 的 armC、armFfence:围栏下 0.32 s 起引擎,回复经生产出网代理)。
+  打包形态(asar、签名公证、hardened runtime)仍未测,归 L7。
+- ~~`start()` 的 `Transform` 能拿到与监听同一张图的进程内 fetch~~ —— 已实测(L1a 勘破 §4 E2,两条接法都过;裁决书 R13 取 `start()` + `Transform`)。
+  `start()` 传 `lifecycle` 后启动时续跑中断会话,只读了代码(`v2:packages/server/src/process.ts:113-114`),没跑。
+- ~~`#v1-migration` 的构建期变换 + Node 薄适配能在 Node 下跑通旧对话转换~~ —— 合成库上已实测(L1a 勘破 §5 E3;裁决书 R14);真库副本未测,归 L1b。
+- 2.x 对 Code Puppy **真库副本**的前进迁移会成功 —— 合成库上已实测 40 → 61、无旧无名 `__drizzle_migrations` 表(L1a 勘破 E3,裁决书 R15 ②);
+  真库属于哪一种、走 Code Puppy 启动预检时的结论,归 L1b。
 - ext 能被安排为 `execute.before` 钩子链的最后一个回调 —— 2.x 插件装载顺序没实测。
 - 插件 npm 自更新对本地路径插件不触发 —— 没读完 `plugin/update.ts` 的调用方。
 - `/global/health` → `/api/info`、`mcp.auth` 的 2.x 入口、`project.list` 的 2.x 对应 —— 映射未逐个核实。
@@ -476,3 +511,4 @@ owner 实机:0.1.25 那轮 36 格用了 200–230 分钟(alpha-work#129 票面�
 - Code Mode 目录闸的两种机制(snapshot 规则集注入 deny / 对 Code Puppy 管的 MCP server 注入 `codemode: false`)哪种可行(S1,F6)—— 只读了 `tool/mcp.ts:57` 与 `mcp/index.ts:490`,没跑。
 - §4.3 的工时与日历估计 —— 按计数外推,不是测量。
 - 本机 2.x 构建可用 `open -n --env XDG_DATA_HOME=…` 指向库副本 —— 没跑。
+- 用户 shell 里的 `OPENCODE_FLAGS` 经 sidecar 环境白名单进入引擎、绕过渠道默认值(§2.7)—— 只读了 `v2:packages/core/src/flag.ts:22` 与 `sidecar-env.ts:108`,没跑。

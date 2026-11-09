@@ -3,7 +3,7 @@
 // 独立进程运行:`mock.module("solid-js", …)` 会污染同进程其它测试文件(与
 // new-session-workspace.cases.ts 同因)。宿主见 `src/renderer/codepuppy-ui/draft-route-gate.component.test.ts`。
 //
-// 判据全部是**可观察结果**:真挂载 `packages/app/src/pages/draft-route-gate.tsx`(生产模块
+// 判据全部是**可观察结果**:真挂载 `packages/codepuppy-app/src/pages/draft-route-gate.tsx`(生产模块
 // 本体,不是这里重写一份等价物),对真 DOM 断言、对真回调断言。**不断言源码文本** ——
 // 源码文本断言对「守卫还在但渲染出空节点」照样通过(ADR-037 决策 4)。
 //
@@ -30,7 +30,7 @@ const { render } = solidWeb
 Bun.plugin({
   name: "draft-route-gate-component-tests",
   setup(builder) {
-    builder.onLoad({ filter: /packages\/(app|ui-mac)\/src\/.*\.tsx$/ }, async (args) => {
+    builder.onLoad({ filter: /packages\/(codepuppy-app|ui-mac)\/src\/.*\.tsx$/ }, async (args) => {
       const transformed = await transformAsync(await Bun.file(args.path).text(), {
         filename: args.path,
         presets: [
@@ -44,7 +44,7 @@ Bun.plugin({
   },
 })
 
-const { DraftRouteGate } = await import("../../app/src/pages/draft-route-gate")
+const { DraftRouteGate } = await import("../../codepuppy-app/src/pages/draft-route-gate")
 
 type Draft = { draftID: string; directory: string }
 

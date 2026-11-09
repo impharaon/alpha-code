@@ -18,7 +18,7 @@ import type {
 // #408:preload/index.ts 只许 import "./types"(ext-security-boundaries AC4③ 装载路径钉)—— wire 类型经此转口。
 export type { SessionGrantsEndedEventWire } from "../shared/ext-session-grant-wire"
 import type { ArtifactDescriptor } from "../shared/cloud-artifact-descriptor"
-import type { NetFailureLayer } from "@opencode-ai/schema/codepuppy-net-failure"
+import type { NetFailureLayer } from "@opencode/schema/codepuppy-net-failure"
 import type { ToolPolicyApi } from "../shared/tool-policy-wire"
 import type { CatalogPackageViewV1 } from "../shared/catalog-package-view"
 import type { OfficeRuntimeReadiness } from "../shared/office-advisories"
@@ -478,7 +478,7 @@ export type { CloudRunDeliveryFailure, CloudRunManifest, CloudRunOrigin, CloudRu
 /** SSE 进度事件(job.snapshot / job.started / job.running / workflow.step.completed / job.completed|failed|cancelled / error)。 */
 export type CloudJobEvent = { event: string; data: unknown; id?: string }
 /** Same shape as AccountResult; distinct alias for the cloud jobs surface.
- *  `#1572`:`error: "network"` 时可带 `netLayer`(卡在哪一层,@opencode-ai/schema/codepuppy-net-failure),`error` 码集合不变。 */
+ *  `#1572`:`error: "network"` 时可带 `netLayer`(卡在哪一层,@opencode/schema/codepuppy-net-failure),`error` 码集合不变。 */
 export type CloudResult<T> = T | { error: string; netLayer?: NetFailureLayer }
 export type UploadFindingKind = "contact" | "identity" | "credential" | "protected" | "unknown"
 export type UploadPreview = {

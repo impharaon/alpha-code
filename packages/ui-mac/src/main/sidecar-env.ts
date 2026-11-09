@@ -27,7 +27,7 @@
 // DEBUG and LD_PRELOAD, which the old copy-everything implementation deleted case-by-case, now fall
 // out via default-deny like everything else.
 
-import { EGRESS_PROXY_MARKER_ENV } from "@opencode-ai/schema/codepuppy-net-failure"
+import { EGRESS_PROXY_MARKER_ENV } from "@opencode/schema/codepuppy-net-failure"
 
 const EXACT = new Set([
   // POSIX/system basics the server, node, git and package managers need
@@ -53,7 +53,7 @@ const EXACT = new Set([
   "all_proxy",
   "no_proxy",
   // `#1572`:出网代理的决定者标记(值 = 出网代理 URL,非密钥)。只由下面的 sidecarEgressProxyEnv 写;
-  // 引擎据它判断代理变量是不是出网代理(@opencode-ai/schema/codepuppy-net-failure 的 engineNetFailurePath)。
+  // 引擎据它判断代理变量是不是出网代理(@opencode/schema/codepuppy-net-failure 的 engineNetFailurePath)。
   EGRESS_PROXY_MARKER_ENV,
   // node runtime knobs (non-secret)
   "NODE_ENV",

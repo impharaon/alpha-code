@@ -8,7 +8,7 @@
 // 陷阱且会带出一大片与本票无关的生成物漂移。四条路由形状固定,这里按 protocol 组的定义直接 fetch,
 // 并在 main 侧再 decode 一次 wire 契约(`parseToolPolicyInventory`)—— 与引擎侧 decode 同一份 schema,
 // 不手写第二份形状判据。
-import { parseToolPolicyInventory } from "@opencode-ai/schema/codepuppy-tool-inventory"
+import { parseToolPolicyInventory } from "@opencode/schema/codepuppy-tool-inventory"
 import type {
   ToolPolicyApi,
   ToolPolicyInventoryResult,

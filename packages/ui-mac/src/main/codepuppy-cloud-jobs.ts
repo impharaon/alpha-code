@@ -21,7 +21,7 @@ import { resolveEndpoints } from "./codepuppy-endpoints"
 import { getAccessToken } from "./codepuppy-auth"
 // [#918→#940] 平台拒绝 → 错误字符串的唯一咽喉(分类码优先,无码保持 http-<status> 不猜)。
 import { httpErrorCode } from "./platform-error-code"
-import { classifyNetFailure } from "@opencode-ai/schema/codepuppy-net-failure"
+import { classifyNetFailure } from "@opencode/schema/codepuppy-net-failure"
 import { guardCloudEnvelope } from "./cloud-envelope-guard"
 import {
   artifactDownloadFailureLog,

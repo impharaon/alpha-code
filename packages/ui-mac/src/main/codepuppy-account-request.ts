@@ -5,7 +5,7 @@ import type { RenewalResult } from "./codepuppy-auth"
 // `code`(实读 alpha-web app/api)⇒ 行为零变化(仍 http-<status>);哪天它加了稳定分类码,
 // 这里自动呈现,不再各写一份压平逻辑。纯函数,不进 deps 注入面。
 import { httpErrorCode } from "./platform-error-code"
-import { classifyNetFailure } from "@opencode-ai/schema/codepuppy-net-failure"
+import { classifyNetFailure } from "@opencode/schema/codepuppy-net-failure"
 
 export function createAuthedGet(deps: {
   accountBase: () => string

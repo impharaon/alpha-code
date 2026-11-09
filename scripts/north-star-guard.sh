@@ -224,7 +224,15 @@ declares_codepuppy_owned() {
   return 1
 }
 
+# `#1664`:含受审上游合并的分支上(upstream_parent 由下文判出),因子①改问**上游父**里有没有这条路径,
+# 不再问 origin/dev —— 镜像会陈旧(2026-11-09 仍是 1.x 的 055d95bb),2.x 新增的上游文件在它里面查不到,
+# 往里写一行 marker 就会被放行。上游父里存在的路径一律不豁免。
 is_codepuppy_owned() {
+  if [ -n "${upstream_parent:-}" ]; then
+    git cat-file -e "${upstream_parent}:$1" 2>/dev/null && return 1
+    declares_codepuppy_owned "$1"
+    return
+  fi
   [ "$mirror_ok" -eq 1 ] || return 1
   mirror_has "$1" && return 1
   declares_codepuppy_owned "$1"
@@ -378,7 +386,9 @@ CHANGED
 # 豁免必须**说出来**。一次静默的放行与一次没跑的门在输出上长得一模一样,而这道门的整个价值
 # 就在于「它今天绿」这句话有确定含义(`#913` 同一条纪律)。
 if [ -n "$exempt" ]; then
-  echo "    · Code Puppy 自有(住在上游包里,但 ${UPSTREAM_MIRROR} 从来没有过这条路径)—— 不算上游改动:"
+  origin_ref="$UPSTREAM_MIRROR"
+  [ -z "$upstream_parent" ] || origin_ref="上游父 $(git rev-parse --short "$upstream_parent")"
+  echo "    · Code Puppy 自有(住在上游包里,但 ${origin_ref} 从来没有过这条路径)—— 不算上游改动:"
   printf '%s' "$exempt" | sed 's/^/      /'
 fi
 if [ -n "$flagged" ]; then

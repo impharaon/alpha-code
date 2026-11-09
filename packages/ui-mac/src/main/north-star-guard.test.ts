@@ -903,6 +903,25 @@ describe("#1664 含受审上游合并的分支:packages/ 以那个合并的上�
     expect(dmr.exitCode, `控制组没绿 —— 上面那条红不是「新增也算」挣来的:\n${dmr.output}`).toBe(0)
   })
 
+  test("往 2.x 新增的上游文件里写 marker ⇒ 仍然红(因子①问上游父,不问陈旧的镜像;控制组:去掉那一行 ⇒ 被放行)", () => {
+    const { work } = upstreamMergeFixture()
+    // V2_ONLY 在上游父里有、在陈旧镜像(origin/dev = 分叉点)里没有 —— 只看镜像的因子①会把它当成「上游从没有过」。
+    commit(work, "forge the ownership marker inside a file upstream added in the next generation", {
+      [V2_ONLY]: `// ${OWNED_MARKER}\nexport const v2 = 999\n`,
+    })
+    const run = runGuard(work)
+    expect(run.exitCode, `往上游父里就有的文件写 marker 就被放行了:\n${run.output}`).not.toBe(0)
+    expect(run.output).toContain(V2_ONLY)
+
+    const lenient = runGuard(
+      work,
+      mutatedGuard("upstream-parent-factor-one", (s) =>
+        s.replace(`    git cat-file -e "\${upstream_parent}:$1" 2>/dev/null && return 1\n`, ""),
+      ),
+    )
+    expect(lenient.exitCode, `控制组没绿 —— 上面那条红不是「因子①问上游父」挣来的:\n${lenient.output}`).toBe(0)
+  })
+
   test("过渡接管清单里的文件在 M0 之后被改 ⇒ 绿且不点名", () => {
     const { work } = upstreamMergeFixture()
     commit(work, "re-take-over a file on the transitional list", { [TAKEN_OVER_FILE]: "export const permission = 2\n" })

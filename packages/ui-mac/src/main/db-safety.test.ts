@@ -266,15 +266,21 @@ describe("createVerifiedBackup(mock exec)", () => {
   const now = new Date(2026, 6, 5, 1, 2, 3)
   test("integrity 非 ok → 删 tmp + 报错", async () => {
     const { fs, files } = memFs({ "/data/opencode.db": "DB" })
+    const calls: string[][] = []
     const exec: Exec = async (args) => {
-      if (args[2]?.startsWith("VACUUM INTO")) {
+      calls.push(args)
+      // SQL 恒在最后一个参数(`#1664` 起 VACUUM INTO 走普通连接,参数里不再有 `-readonly`,位置不能写死)。
+      if (args.at(-1)?.startsWith("VACUUM INTO")) {
         files.set("/bk/opencode-backup-20260705-010203.db.tmp", "SNAP")
         return { code: 0, stdout: "", stderr: "" }
       }
       return { code: 0, stdout: "*** in database main ***\nPage 5 is never used\n", stderr: "" }
     }
     const r = await createVerifiedBackup({ dbPath: "/data/opencode.db", backupDir: "/bk", exec, fs, now })
+    // 校验那一次必须真的跑到 —— 否则这条用例红在 VACUUM 那一步,测的就不是「验不过即删」。
+    expect(calls.length, `只跑了 ${calls.length} 次 sqlite3,校验没跑到:${JSON.stringify(calls)}`).toBe(2)
     expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.error).toContain("快照验证失败")
     expect(files.has("/bk/opencode-backup-20260705-010203.db.tmp")).toBe(false)
     expect(files.has("/bk/opencode-backup-20260705-010203.db")).toBe(false)
   })
@@ -288,6 +294,8 @@ describe("createVerifiedBackup(mock exec)", () => {
 
 // ── 真 sqlite3 集成(macOS 本地 + GH ubuntu 均有;缺失则 skip)────────────────────
 const sqlite3 = Bun.which("sqlite3")
+if (!sqlite3)
+  console.warn("⚠️ db-safety.test: no sqlite3 on PATH — every real-sqlite3 case below (incl. the #1664 WAL cases) is SKIPPED")
 const itSql = test.skipIf(!sqlite3)
 
 const execReal: Exec = async (args) => {

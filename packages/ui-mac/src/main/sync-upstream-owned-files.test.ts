@@ -83,7 +83,8 @@ function parseExcludes(guard: string): string[] {
   const block = /^UPSTREAM_EXCLUDES=\(\n([\s\S]*?)^\)/m.exec(guard)?.[1]
   if (!block) throw new Error("测量作废:守卫里没解析到 UPSTREAM_EXCLUDES 数组")
   const items = [...block.matchAll(/^\s*':\(exclude\)([^']+)'/gm)].map((m) => m[1])
-  if (items.length < 20) throw new Error(`测量作废:收编白名单只解析到 ${items.length} 条`)
+  // `#1664`:过渡清单 15 条,下限随数据从 20 改到 10 —— 它只防解析退化。
+  if (items.length < 10) throw new Error(`测量作废:收编白名单只解析到 ${items.length} 条`)
   return items
 }
 
@@ -145,7 +146,8 @@ describe("#1376 sync-upstream 过滤表 与 north-star 守卫清单 的关系", 
       { path: "packages/ui/", exact: false },
     ])
     expect(printJurisdiction(PROD_GUARD)).toEqual({ upstreamPaths: ["packages"], roundtrip: ["app", "ui"] })
-    expect(parseExcludes(GUARD_SOURCE).length).toBeGreaterThanOrEqual(20)
+    // `#1664`:过渡清单 15 条,下限随数据从 20 改到 10 —— 它只防解析退化。
+    expect(parseExcludes(GUARD_SOURCE).length).toBeGreaterThanOrEqual(10)
   })
 
   test("今天的生产文件满足三条关系", () => {

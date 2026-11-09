@@ -177,11 +177,12 @@ export const CodePuppyExt: Plugin.Plugin = {
       })
 
       // ── 请求组装(P3 / P4 / P5 / P6)─────────────────────────────────────────────────────────
-      // 同一个回调挂在三条组装请求的钩子上:主循环(context)、压缩(compaction)、无工具生成(generate)。2.x 的压缩与生成
-      // 各走自己的钩子、不经 context(`SessionCompaction` / `SessionGenerate` 都扩展 `SessionContext`)—— 只挂 context
-      // = 压缩请求带着原样的图 / 暂存附件 / 未转写的系统提示词、按上游的 max tokens 出去(审计 R1 Major)。
+      // 同一个回调挂在四条组装模型请求的钩子上:主循环(context)、压缩(compaction)、无工具生成(generate)、起标题(title)。
+      // 2.x 这四种请求各走自己的钩子、互不经过(`session/model-request.ts`)—— v1 里 ext 的钩子每次 LLM 调用都跑,少挂一条
+      // = 那种请求带着原样的图 / 暂存附件 JSON / 未转写的系统提示词、在平台节点上照发 max tokens(审计 R1 Major;title 编排器裁决)。
+      // 入参取四者的公共部分(`SessionRequest`:sessionID / model / system / messages / options);回调不读 agent / tools / result。
       const rebrandWarned = new Set<string>()
-      const assembleRequest = async (event: Parameters<Parameters<typeof context.session.hook<"context">>[1]>[0]) => {
+      const assembleRequest = async (event: Omit<Parameters<Parameters<typeof context.session.hook<"title">>[1]>[0], "result">) => {
         // REQ-062 T1(路线A,ADR-015):系统提示词品牌转写 —— 精选子串对;失败 = 上游原样(外观级退化),绝不伤及请求。
         if (process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE !== "1") {
           try {
@@ -219,7 +220,7 @@ export const CodePuppyExt: Plugin.Plugin = {
           error(`[@codepuppy/ext] output cap skipped: ${describe(cause)}`)
         }
       }
-      for (const name of ["context", "compaction", "generate"] as const) await context.session.hook(name, assembleRequest)
+      for (const name of ["context", "compaction", "generate", "title"] as const) await context.session.hook(name, assembleRequest)
       // REQ-236 `#1562`:平台代理节点的凭据每次请求现读,续期热应用不必重启引擎;读不到就抛,请求不发出。
       await context.session.hook("model.request", (event) => {
         const authorization = platformCredentialHeader({ providerBaseURL: event.baseURL, env: process.env })

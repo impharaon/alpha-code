@@ -204,10 +204,15 @@ it.live("P3 / L3r:session.hook.context 的品牌转写只换登记过的上游�
   }),
 )
 
-it.live("权威 · 压缩请求的组装(审计 R1):session.hook.compaction 上同样 —— 看不了图的模型图片换成登记过的识图块、暂存附件部件换成读取指令、底座句转写、平台节点不发 maxTokens;反向臂:不装 ext ⇒ 图片 / 部件 / 底座 / maxTokens 原样进压缩请求", () =>
+/**
+ * 审计 R1 + 编排器裁决:2.x 的压缩与起标题请求各走自己的钩子、不经 context。v1 里 ext 的钩子每次 LLM 调用都跑,这里在真宿主上
+ * 按各自的真形状触发那条钩子:看不了图的模型图片换成登记过的识图块、暂存附件部件换成读取指令、底座句转写、平台节点不发 maxTokens;
+ * 反向臂:不装 ext ⇒ 图片 / 部件 / 底座 / maxTokens 原样进请求。
+ */
+const assembledOn = (hook: "compaction" | "title") =>
   Effect.gen(function* () {
     env({ CODEPUPPY_BASE_URL: "https://gateway.codepuppy.test/v1" })
-    // 平台代理节点上的纯文本模型:识图、附件、转写、输出上限四件事都该在压缩请求上发生。
+    // 平台代理节点上的纯文本模型:识图、附件、转写、输出上限四件事都该在这条请求上发生。
     yield* activate(providerPlugin("codepuppy", "https://gateway.codepuppy.test/v1", "route-a"))
     const hooks = yield* PluginHooks.Service
     const model = { providerID: "codepuppy", id: "route-a" }
@@ -217,13 +222,18 @@ it.live("权威 · 压缩请求的组装(审计 R1):session.hook.compaction 上�
     // composer 发的暂存附件部件,经上游真的渲染(toLLMMessages)存成 text/plain 的 inline 文件
     const part = stagedAttachmentPart({ v: 1, name: "季度复盘.docx", mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", size: 2048, path: "attachments/0b8c7f9e-1d2a-4c3b-9e8f-7a6b5c4d3e2f/季度复盘.docx", reader: "word" })
     const [staged] = toLLMMessages(
-      [{ id: "msg_compaction", time: { created: 1 }, type: "user", text: "读一下", files: [{ data: part.uri.slice(part.uri.indexOf(",") + 1), mime: "text/plain", name: part.name, source: { type: "inline" } }] } as never],
+      [{ id: `msg_${hook}`, time: { created: 1 }, type: "user", text: "读一下", files: [{ data: part.uri.slice(part.uri.indexOf(",") + 1), mime: "text/plain", name: part.name, source: { type: "inline" } }] } as never],
       model as never,
     )
-    const compaction = () => hooks.trigger("session", "compaction", { ...contextEvent([kimi], model), messages: [image, staged] as never })
+    // 各按 2.x 的真形状:压缩 = SessionContext(带 agent / tools);起标题 = SessionRequest(没有 agent / tools)
+    const { agent: _agent, tools: _tools, ...request } = { ...contextEvent([kimi], model), messages: [image, staged] as never }
+    const trigger = () =>
+      hook === "compaction"
+        ? hooks.trigger("session", "compaction", { ...request, agent: _agent, tools: _tools })
+        : hooks.trigger("session", "title", request)
     const textsOf = (message: unknown) => (message as { content: Array<{ type: string; text?: string }> }).content.map((p) => (p.type === "text" ? p.text! : `<${p.type}>`))
 
-    const untouched = yield* compaction()
+    const untouched = yield* trigger()
     expect(untouched.messages[0]).toBe(image)
     expect(untouched.messages[1]).toBe(staged!)
     expect(textsOf(untouched.messages[0])).toContain("<media>")
@@ -232,7 +242,7 @@ it.live("权威 · 压缩请求的组装(审计 R1):session.hook.compaction 上�
     expect(untouched.options.maxTokens).toBe(32000)
 
     yield* activate(CodePuppyExt)
-    const out = yield* compaction()
+    const out = yield* trigger()
     const [seen, read] = [textsOf(out.messages[0]), textsOf(out.messages[1])]
     expect(seen[0]).toBe("看图")
     expect(seen).not.toContain("<media>")
@@ -242,7 +252,14 @@ it.live("权威 · 压缩请求的组装(审计 R1):session.hook.compaction 上�
     expect(read.slice(1).map((text) => explainAttachmentBlock(text).ok)).toEqual([true])
     expect(out.system[0]!.text).toBe("You are Code Puppy, an interactive general AI agent running on a user's computer.")
     expect("maxTokens" in out.options).toBe(false)
-  }),
+  })
+
+it.live("权威 · 压缩请求的组装(审计 R1):session.hook.compaction 上同样 —— 看不了图的模型图片换成登记过的识图块、暂存附件部件换成读取指令、底座句转写、平台节点不发 maxTokens;反向臂:不装 ext ⇒ 图片 / 部件 / 底座 / maxTokens 原样进压缩请求", () =>
+  assembledOn("compaction"),
+)
+
+it.live("权威 · 起标题请求的组装(REQ-153 / I11'):session.hook.title 上同样 —— 平台节点不发 maxTokens、暂存附件 JSON 换成读取指令、图片换成识图块、底座句转写;反向臂:不装 ext ⇒ 原样进起标题请求", () =>
+  assembledOn("title"),
 )
 
 /** 测试用旁路插件:在真 provider / model 服务里登记一个 provider(端点 + 一个模型),供 ext 的 modelFacts 查。 */

@@ -146,9 +146,9 @@ afterEach(() => {
 })
 
 /** 本文件为之设了咽喉的通路。② 要求它与「真 CodePuppyExt 注册且分类为 context」的集合逐字相等。 */
-const THROATED = ["agent.transform", "command.transform", "mcp.transform", "session.compaction", "session.context", "session.generate", "skill.transform", "tool.execute.after", "tool.transform", "websearch.transform"].sort()
-/** 2.x 组装一次模型请求的三条钩子(`session/model-request.ts`:主循环 / 压缩 / 无工具生成各触发自己那条,互不经过)。 */
-const REQUEST_HOOKS = ["context", "compaction", "generate"] as const
+const THROATED = ["agent.transform", "command.transform", "mcp.transform", "session.compaction", "session.context", "session.generate", "session.title", "skill.transform", "tool.execute.after", "tool.transform", "websearch.transform"].sort()
+/** 2.x 组装一次模型请求的四条钩子(`session/model-request.ts`:主循环 / 压缩 / 无工具生成 / 起标题各触发自己那条,互不经过)。 */
+const REQUEST_HOOKS = ["context", "compaction", "generate", "title"] as const
 
 describe("② alpha 注册的每个载上下文通路都有咽喉", () => {
   test("注册集 ∩ context 分类 == 本文件设咽喉的集合;注册的每个通路都在分类表里", async () => {
@@ -161,7 +161,7 @@ describe("② alpha 注册的每个载上下文通路都有咽喉", () => {
     for (const k of registered) expect(Object.keys(HOOK_CONTEXT_CLASS), `通路 ${k} 不在 HOOK_CONTEXT_CLASS 里`).toContain(k)
     const ctx = registered.filter((k) => HOOK_CONTEXT_CLASS[k as keyof typeof HOOK_CONTEXT_CLASS] === "context").sort()
     expect(ctx).toEqual(THROATED)
-    // 三条请求钩子挂的是**同一个**回调:下面 ③b / ③h 在三条钩子上逐一过真宿主,这里再钉住它们不会各自漂移。
+    // 四条请求钩子挂的是**同一个**回调对象:下面 ③b / ③h 在四条钩子上逐一过真宿主,这里再钉住它们不会各自漂移。
     const [assemble, ...rest] = REQUEST_HOOKS.map((name) => recorded.hooks[`session.${name}`] ?? [])
     expect(assemble).toHaveLength(1)
     for (const other of rest) {
@@ -414,7 +414,7 @@ describe("③b system 咽喉:输出 == 输入 + 登记过的替换,一个字不�
     expect(registered.map((f) => f.id)).toEqual(REBRAND_RULES.map((r) => `rebrand.${r.id}`))
     expect(registered.map((f) => (f.kind === "rebrand" ? f.to : ""))).toEqual(REBRAND_RULES.map((r) => r.to))
   })
-  it.live("全部上游底座过真钩子(能看图的模型;context / compaction / generate 三条):零无解释差异,且至少一份真的被改写了(不是空跑)", () =>
+  it.live("全部上游底座过真钩子(能看图的模型;context / compaction / generate / title 四条):零无解释差异,且至少一份真的被改写了(不是空跑)", () =>
     Effect.gen(function* () {
       yield* activate(visionModels)
       yield* activate(CodePuppyExt)
@@ -594,7 +594,7 @@ function addedStrings(before: readonly unknown[], after: readonly unknown[]): st
 }
 
 describe("③h context 钩子的消息咽喉:只换不加,换进去的每段字都是登记过的识图块", () => {
-  it.live("看不了图 + 云端不可用:图片换成登记过的失败块,零别的新字;能看图:消息对象原样(context / compaction / generate 三条)", () =>
+  it.live("看不了图 + 云端不可用:图片换成登记过的失败块,零别的新字;能看图:消息对象原样(context / compaction / generate / title 四条)", () =>
     Effect.gen(function* () {
       yield* activate(visionModels)
       yield* activate(CodePuppyExt)

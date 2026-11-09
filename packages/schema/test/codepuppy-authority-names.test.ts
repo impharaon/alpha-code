@@ -2,8 +2,8 @@
 // schema 是唯一一份(#1662 起 OpenCode 2 不再有 SDK 生成副本)。删掉或回退 schema 里的任一取值,这里当场红。
 import { describe, expect, test } from "bun:test"
 import { Schema } from "effect"
-import { ToolClass } from "../src/codepuppy-tool-policy"
-import { ToolAuthority, ToolDisplaySnapshotV1 } from "../src/tool-identity"
+import { ToolClass } from "../src/codepuppy-tool-policy.js"
+import { ToolAuthority, ToolDisplaySnapshotV1 } from "../src/tool-identity.js"
 
 const DIGEST = `sha256:${"a".repeat(64)}`
 const kindsOf = (union: typeof ToolAuthority) =>

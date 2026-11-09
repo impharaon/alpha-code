@@ -21,7 +21,7 @@ import {
   engineNetFailurePath,
   isNetFailureLayer,
   type NetFailurePath,
-} from "../src/codepuppy-net-failure"
+} from "../src/codepuppy-net-failure.js"
 
 const PROXY: NetFailurePath = { via: "egress-proxy", proxyOrigin: "http://127.0.0.1:61234" }
 const OTHER: NetFailurePath = { via: "other" }

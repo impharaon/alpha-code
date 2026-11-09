@@ -250,7 +250,7 @@ describe("旧名扫描门 (#1570)", () => {
       "packages/ext/src/",
       "packages/ui-mac/src/main/",
       "packages/codepuppy-contracts-consumer/src/",
-      "packages/opencode/src/permission/",
+      "packages/ext/src/policy/",
       "packages/schema/src/",
       "scripts/",
       ".github/workflows/",

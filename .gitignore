@@ -12,8 +12,10 @@ node_modules
 playground
 tmp
 dist
+dist-node
 ts-dist
 .turbo
+.typecheck-profiles
 **/.serena
 .serena/
 **/.omo
@@ -25,6 +27,7 @@ Session.vim
 a.out
 target
 .scripts
+.cache
 .direnv/
 
 # Staged upstream contract checkouts consumed by
@@ -36,8 +39,11 @@ target
 
 # Local dev files
 opencode-dev
-UPCOMING_CHANGELOG.md
+RELEASE_REVIEW.md
 logs/
 *.bun-build
 tsconfig.tsbuildinfo
 /artifacts/
+
+# Legal drafts pending review are kept outside the repository; never copy them in.
+legal-drafts-private/

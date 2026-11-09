@@ -1,62 +1,45 @@
-import { Location } from "@opencode-ai/core/location"
-import { PermissionV2 } from "@opencode-ai/core/permission"
-import { CodePuppyToolPolicyApi } from "@opencode-ai/core/permission/codepuppy-tool-policy-api"
-import { PermissionSaved } from "@opencode-ai/core/permission/saved"
-import { Effect, Option } from "effect"
-import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
+import { Instance } from "@opencode/core/instance/service"
+import { Location } from "@opencode/core/location"
+import { Permission } from "@opencode/core/permission"
+import { PermissionSaved } from "@opencode/core/permission/saved"
+import { Session } from "@opencode/core/session"
+import { Effect } from "effect"
+import { HttpApiBuilder, HttpApiSchema } from "effect/http-api"
 import { Api } from "../api"
-import {
-  ConflictError,
-  PermissionNotFoundError,
-  ServiceUnavailableError,
-  SessionNotFoundError,
-  UnknownError,
-} from "@opencode-ai/protocol/errors"
-import { response } from "../location"
+import { ConflictError, PermissionNotFoundError, PermissionSavedNotFoundError } from "@opencode/protocol/errors"
+import { locationErrors, response, sessionInfo } from "../location"
+import { missingSession } from "./session-error"
 
-function missingRequest(id: PermissionV2.ID) {
+function missingRequest(id: Permission.ID) {
   return new PermissionNotFoundError({ requestID: id, message: `Permission request not found: ${id}` })
-}
-
-function conflictingRequest(id: PermissionV2.ID) {
-  return new ConflictError({ resource: id, message: `Permission request conflicts with the immutable request: ${id}` })
-}
-
-// ── REQ-131 / #1130:tool policy 面 ─────────────────────────────────────────────────────
-// 标签在 core,实现在 opencode(见 core 侧文件抬头)。用 serviceOption 而不是把它写进 handler 的 R:
-// R 一变,上游 `packages/server/src/routes.ts` 与 `packages/cli/.../serve.ts` 的 `toWebHandler`/`serve`
-// 约束当场红 —— 那两处不在收编名单里。没接线的宿主(standalone server)拿到的是 503,不是空清单。
-const toolPolicyApi = Effect.gen(function* () {
-  const api = yield* Effect.serviceOption(CodePuppyToolPolicyApi.Service)
-  if (Option.isNone(api)) {
-    return yield* new ServiceUnavailableError({
-      message: "tool policy api is not wired into this server",
-      service: CodePuppyToolPolicyApi.Service.key,
-    })
-  }
-  return api.value
-})
-
-// 写侧错误逐型映射:quarantined ⇒ 409(先 reset);io ⇒ 500。不解析 message。
-function toolPolicyWriteFailure(error: CodePuppyToolPolicyApi.WriteError) {
-  return error.kind === "quarantined"
-    ? new ConflictError({ resource: "tool-policy-document", message: error.message })
-    : new UnknownError({ message: error.message })
 }
 
 export const PermissionHandler = HttpApiBuilder.group(Api, "server.permission", (handlers) =>
   Effect.gen(function* () {
+    const instances = yield* Instance.Service
+    const sessions = yield* Session.Service
+    const requireOwnedRequest = Effect.fnUntraced(function* (
+      sessionID: Permission.Request["sessionID"],
+      requestID: Permission.ID,
+    ) {
+      const permission = yield* Permission.Service
+      const request = yield* permission.get(requestID)
+      if (!request || request.sessionID !== sessionID) return yield* missingRequest(requestID)
+      return { permission, request }
+    })
+
     return handlers
       .handle(
         "permission.request.list",
         Effect.fn(function* () {
-          return yield* response((yield* PermissionV2.Service).list())
+          const permission = yield* Permission.Service
+          return yield* response(permission.list())
         }),
       )
       .handle(
         "session.permission.create",
         Effect.fn(function* (ctx) {
-          const permission = yield* PermissionV2.Service
+          const permission = yield* Permission.Service
           return {
             data: yield* permission
               .ask({
@@ -69,104 +52,79 @@ export const PermissionHandler = HttpApiBuilder.group(Api, "server.permission", 
                 source: ctx.payload.source,
                 agent: ctx.payload.agent,
               })
-              .pipe(
-                Effect.catchTag("PermissionV2.ConflictError", (error) => conflictingRequest(error.requestID)),
-                Effect.catchTag(
-                  "Session.NotFoundError",
-                  (error) =>
-                    new SessionNotFoundError({
-                      sessionID: error.sessionID,
-                      message: `Session not found: ${error.sessionID}`,
-                    }),
-                ),
-              ),
+              .pipe(Effect.catchTag("Session.NotFoundError", missingSession)),
           }
         }),
       )
       .handle(
         "session.permission.list",
         Effect.fn(function* (ctx) {
-          const permission = yield* PermissionV2.Service
-          return { data: yield* permission.forSession(ctx.params.sessionID) }
+          const session = yield* sessionInfo(sessions, ctx.params.sessionID)
+          const requests = yield* Permission.Service.use((permission) =>
+            permission.forSession(ctx.params.sessionID),
+          ).pipe(instances.provide(session), locationErrors)
+          return { data: requests }
         }),
       )
       .handle(
         "session.permission.get",
         Effect.fn(function* (ctx) {
-          const request = yield* (yield* PermissionV2.Service).get(ctx.params.requestID)
-          if (!request || request.sessionID !== ctx.params.sessionID) return yield* missingRequest(ctx.params.requestID)
-          return { data: request }
+          const owned = yield* requireOwnedRequest(ctx.params.sessionID, ctx.params.requestID)
+          return { data: owned.request }
         }),
       )
       .handle(
         "session.permission.reply",
         Effect.fn(function* (ctx) {
-          const permission = yield* PermissionV2.Service
-          return {
-            data: yield* permission
-              .reply({ requestID: ctx.params.requestID, sessionID: ctx.params.sessionID, command: ctx.payload })
-              .pipe(
-                Effect.catchTag("PermissionV2.NotFoundError", () => missingRequest(ctx.params.requestID)),
-                Effect.catchTag("PermissionV2.ConflictError", () => conflictingRequest(ctx.params.requestID)),
-              ),
-          }
+          const owned = yield* requireOwnedRequest(ctx.params.sessionID, ctx.params.requestID)
+          yield* owned.permission
+            .reply({ requestID: ctx.params.requestID, reply: ctx.payload.decision, message: ctx.payload.message })
+            .pipe(Effect.catchTag("Permission.NotFoundError", () => missingRequest(ctx.params.requestID)))
+          return HttpApiSchema.NoContent.make()
         }),
       )
       .handle(
         "permission.saved.list",
         Effect.fn(function* (ctx) {
           const location = yield* Location.Service
+          const saved = yield* PermissionSaved.Service
           return {
-            data: yield* (yield* PermissionSaved.Service).list({
+            data: yield* saved.list({
               projectID: ctx.query.projectID ?? location.project.id,
             }),
           }
         }),
       )
       .handle(
+        "permission.saved.update",
+        Effect.fn(function* (ctx) {
+          const saved = yield* PermissionSaved.Service
+          return {
+            data: yield* saved
+              .update({ id: ctx.params.id, action: ctx.payload.action, resource: ctx.payload.resource })
+              .pipe(
+                Effect.catchTags({
+                  "PermissionSaved.NotFoundError": (error) =>
+                    new PermissionSavedNotFoundError({
+                      id: error.id,
+                      message: `Saved permission not found: ${error.id}`,
+                    }),
+                  "PermissionSaved.ConflictError": (error) =>
+                    new ConflictError({
+                      resource: error.id,
+                      message: `A saved permission already allows ${error.action} for ${error.resource}`,
+                    }),
+                }),
+              ),
+          }
+        }),
+      )
+      .handle(
         "permission.saved.remove",
         Effect.fn(function* (ctx) {
-          yield* (yield* PermissionSaved.Service).remove(ctx.params.id)
+          const saved = yield* PermissionSaved.Service
+          yield* saved.remove(ctx.params.id)
           return HttpApiSchema.NoContent.make()
-        }),
-      )
-      .handle(
-        "permission.tool-policy.inventory",
-        Effect.fn(function* () {
-          const location = yield* Location.Service
-          const api = yield* toolPolicyApi
-          return { data: yield* api.list({ directory: location.directory }) }
-        }),
-      )
-      .handle(
-        "permission.tool-policy.record.set",
-        Effect.fn(function* (ctx) {
-          const location = yield* Location.Service
-          const api = yield* toolPolicyApi
-          yield* api
-            .setRecord({ directory: location.directory, record: ctx.payload })
-            .pipe(Effect.mapError(toolPolicyWriteFailure))
-          return HttpApiSchema.NoContent.make()
-        }),
-      )
-      .handle(
-        "permission.tool-policy.record.remove",
-        Effect.fn(function* (ctx) {
-          const location = yield* Location.Service
-          const api = yield* toolPolicyApi
-          yield* api
-            .removeRecord({ directory: location.directory, selector: ctx.payload.selector })
-            .pipe(Effect.mapError(toolPolicyWriteFailure))
-          return HttpApiSchema.NoContent.make()
-        }),
-      )
-      .handle(
-        "permission.tool-policy.reset",
-        Effect.fn(function* () {
-          const location = yield* Location.Service
-          const api = yield* toolPolicyApi
-          const result = yield* api.reset({ directory: location.directory })
-          return { data: result.backup === undefined ? {} : { backup: result.backup } }
         }),
       )
   }),

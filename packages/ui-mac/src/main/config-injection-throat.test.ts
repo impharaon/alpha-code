@@ -40,8 +40,9 @@
 //   · `/commands/<name>/template|description`:逐字等于登记簿里 **id 为 `command.<name>.<field>`、sink 对应** 的那条登记文字
 //     (换名、换格、多一个字节都点名;`subagent` 是布尔,不是字符串叶子);
 //   · `/skills/<i>`:是目录路径,按**来源**放行(与 REQ-063 导入目录同理,不走登记簿 —— #1665 起登记簿删了 v1 的 `/skills/paths`
-//     引用):要么是这一轮交给注入的出厂目录(CODEPUPPY_FACTORY_SKILL_DIRS)之一,要么落在当前环境根的 `ext-store/` 之下;
-//     别的路径点名。目录里技能的正文是技能作者的字,不在这道咽喉里判。
+//     引用):要么是这一轮交给注入的出厂目录(CODEPUPPY_FACTORY_SKILL_DIRS)之一,要么是当前环境根下的稳定挂点目录
+//     `skills-live`;别的路径点名。目录里技能的正文是技能作者的字,不在这道咽喉里判。
+//   这两个键(与第一层 policies)从裁决 r1 / C7 重裁起写在显式文件里 —— 判官看「内联文档 + 显式文件里 Code Puppy 那一层」合起来那一份。
 // models.json(#857 的早到目录底表)只供目录,不进模型上下文 —— 本文件不判它。
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
@@ -200,13 +201,10 @@ function judge(before: unknown, after: unknown, importedDir: string): Judgement 
     const rel = path.relative(importedDir, file)
     return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel)
   }
-  // 技能目录的两个来源:这一轮交给注入的出厂目录(测试自己给的输入),与当前环境根的 ext-store。
+  // 技能目录的两个来源:这一轮交给注入的出厂目录(测试自己给的输入),与当前环境根下的稳定挂点目录 skills-live
+  // (`#1667` 裁决 r1 第 3 条:已安装技能经它下面的软链进引擎,生成目录本身不再列出)。
   const factorySkillDirs = JSON.parse(process.env.CODEPUPPY_FACTORY_SKILL_DIRS ?? "[]") as string[]
-  const storeRoot = path.join(codepuppyRoot, "ext-store")
-  const insideStore = (dir: string) => {
-    const rel = path.relative(storeRoot, dir)
-    return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel)
-  }
+  const liveDir = path.join(codepuppyRoot, "skills-live")
   const verb = (l: Leaf, set: readonly string[]) => {
     if (set.includes(l.value)) out.verbs++
     else out.bad.push({ pointer: l.pointer, reason: "not an engine verb" })
@@ -239,7 +237,7 @@ function judge(before: unknown, after: unknown, importedDir: string): Judgement 
       continue
     }
     if (top === "skills" && segs.length === 2) {
-      if (factorySkillDirs.includes(l.value) || insideStore(l.value)) out.skills.push(l.value)
+      if (factorySkillDirs.includes(l.value) || l.value === liveDir) out.skills.push(l.value)
       else out.bad.push({ pointer: l.pointer, reason: "not a declared skill source" })
       continue
     }
@@ -288,7 +286,16 @@ function run(extPluginPath?: string): Run {
   const before: Cfg = {}
   const result = injectCodePuppyConfig(userData, extPluginPath, "stable")
   expect(result.ok).toBe(true)
-  const after = JSON.parse(result.config.content) as Cfg
+  // `#1667`(裁决 r1 第 2 条、C7 重裁):main 交给引擎的字分两处 —— 内联文档,与显式文件里 Code Puppy 那一层(出厂命令、skills、
+  // 第一层 policies;显式文件里其余的是用户 codepuppy.jsonc 的字,按来源不判)。判官看两处合起来的那一份。
+  const inline = JSON.parse(result.config.content) as Cfg
+  const layer = result.explicit!.layer
+  expect(layer.policies).toEqual((inline.policies as unknown[] | undefined) ?? [])
+  const after: Cfg = {
+    ...inline,
+    ...(layer.skills.length ? { skills: layer.skills } : {}),
+    ...(Object.keys(layer.commands).length ? { commands: layer.commands } : {}),
+  }
   const importedDir = path.join(codepuppyRoot, "instructions")
   return {
     before,
@@ -390,8 +397,8 @@ describe("ui-mac 整份 config 咽喉:injectCodePuppyConfig 交给引擎的 cont
     expect(r.user).toEqual([])
     // 动词那条路真的被走过(不是「恰好没有动词叶子」)
     expect(r.verbs).toBeGreaterThanOrEqual(UI_MAC_AGENT_NAMES.length * 2)
-    expect(touched(r)).toEqual(["$schema", "agents", "commands", "instructions", "plugins", "policies", "providers"])
-    expect(r.skills).toEqual([])
+    expect(touched(r)).toEqual(["$schema", "agents", "commands", "instructions", "plugins", "policies", "providers", "skills"])
+    expect(r.skills).toEqual([path.join(codepuppyRoot, "skills-live")])
     // 生产写出的字与内容模块逐字(判官解释成功已蕴含逐字;这里把「哪段字」钉到具体 agent 上)。
     // `#1413`:没有 prompt 的 agent(codepuppy-ask)生产也**不许**写出 prompt 键 —— 写了(哪怕空串)就会顶掉底座。
     for (const name of UI_MAC_AGENT_NAMES) {
@@ -413,9 +420,11 @@ describe("ui-mac 整份 config 咽喉:injectCodePuppyConfig 交给引擎的 cont
     const r = run(EXT_BUNDLE)
     expect(r.bad).toEqual([])
     expect(touched(r)).toEqual(sorted(["$schema", "agents", "commands", "instructions", "mcp", "model", "plugins", "policies", "providers", "skills"]))
-    // 出厂目录与已启用技能的生成目录都写了,而且都按来源放行
-    expect(r.after.skills).toEqual([FACTORY_SKILL_DIR, liveGeneration])
-    expect(r.skills).toEqual([FACTORY_SKILL_DIR, liveGeneration])
+    // 出厂目录与稳定挂点目录都写了、都按来源放行;已启用技能的生成目录经挂点里的软链进引擎,本身不出现在 skills 里
+    const liveDir = path.join(codepuppyRoot, "skills-live")
+    expect(r.after.skills).toEqual([FACTORY_SKILL_DIR, liveDir])
+    expect(r.skills).toEqual([FACTORY_SKILL_DIR, liveDir])
+    expect(fs.readlinkSync(path.join(liveDir, "skill--throat"))).toBe(liveGeneration)
     // 每条 ui-mac 引用都真在登记簿里,且生产真的走到了每一条;生产走到的也没有超出这张表
     for (const id of UI_MAC_REFERENCE_IDS) expect(CONTEXT_INJECTIONS.find((f) => f.id === id)?.kind, id).toBe("reference")
     expect(r.refs).toEqual(sorted(UI_MAC_REFERENCE_IDS))

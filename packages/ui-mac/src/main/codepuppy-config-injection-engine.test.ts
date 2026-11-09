@@ -12,7 +12,11 @@
 //   ④ 出厂技能目录(接缝裁决 A):内联文档的 `skills` 列出的目录,启动后新写进去的技能不重启就出现(文件监听开着);
 //      反向臂:注入里没有这个目录 ⇒ 不出现。
 //   ⑤ 出厂 /init、/review(接缝裁决 C):真引擎跑命令,用户回合正文是 ext 登记的模板(参数由引擎代入),/review 在子会话里跑;
-//      反向臂:CODEPUPPY_PROMPT_REBRAND_DISABLE=1 不写 commands ⇒ 引擎自带的那两条。另量一条层序:同名时内联文档压过用户全局配置。
+//      反向臂:CODEPUPPY_PROMPT_REBRAND_DISABLE=1 不写 commands ⇒ 引擎自带的那两条。
+//   ⑥ `#1667` 裁决 r1 / C7 重裁:出厂命令、skills 与第一层 policies 在 main 合成的显式文件里 —— 项目里的同名 /init 胜过出厂的、
+//      不传显式文件回到上游内置;技能翻代 / 新装 / 停用经稳定软链不重启生效(反向臂:直接列生成目录 ⇒ 翻代不可见);
+//      运行中改 codepuppy.jsonc ⇒ 监听重写显式文件、引擎不重启看得见(反向臂:不监听 ⇒ 看不见);项目 opencode.json 里声明并
+//      allow 一个白名单外的 provider ⇒ 仍不可用(反向臂:显式文件里没有 policies ⇒ 可用)。
 // 引擎跑在临时 HOME/XDG 沙箱里(test-component/engine-sandbox.ts),绝不碰 owner 的数据目录。
 //
 // 宿主:真判据在 codepuppy-config-injection-engine.cases.ts(独立的 `bun test` 子进程 —— 引擎沙箱改的环境变量不出那个进程)。
@@ -20,14 +24,19 @@ import { expect, test } from "bun:test"
 
 import { join } from "node:path"
 
-test("注入产物交给真引擎:外部技能、provider 白名单、实验开关仍由 Code Puppy 决定;出厂技能与 /init、/review(codepuppy-config-injection-engine.cases.ts,12 条)", () => {
-  const result = Bun.spawnSync({
+// 子进程两条输出流并行读完再等退出:19 台真引擎的日志会写满 stderr 的管道缓冲,`Bun.spawnSync` 依次读两条流时子进程就卡在
+// 写上、整个宿主挂到超时(实测一次挂了 15 分钟,子进程日志停在第 6 台引擎)。
+test("注入产物交给真引擎:外部技能、provider 白名单、实验开关仍由 Code Puppy 决定;出厂技能、/init、/review、显式文件层(codepuppy-config-injection-engine.cases.ts,19 条)", async () => {
+  const child = Bun.spawn({
     cmd: [process.execPath, "test", "--timeout", "90000", join(import.meta.dir, "codepuppy-config-injection-engine.cases.ts")],
     cwd: join(import.meta.dir, "../.."),
     env: process.env,
+    stdout: "pipe",
+    stderr: "pipe",
   })
-  const output = `${result.stdout.toString()}${result.stderr.toString()}`
-  if (result.exitCode !== 0) throw new Error(output)
+  const [stdout, stderr, exitCode] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  const output = `${stdout}${stderr}`
+  if (exitCode !== 0) throw new Error(output)
   expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
-  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("12")
+  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("19")
 }, 300_000)

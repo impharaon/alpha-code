@@ -46,7 +46,8 @@ import { USER_DATA_LAYOUT } from "./user-data-layout"
 // `#1667`(#1665 L3 交回的接缝裁决 A / C,编排器 2026-11-09):出厂技能目录、技能生成的 live 目录与出厂 /init、/review 命令
 // 由 main 写进这份内联配置文档(2.x 插件接口给不了等价挂点)。路径与命令内容仍以 ext 那三个纯函数为唯一来源,这里只引用。
 import { injectFactorySkillPaths } from "../../../ext/src/factory-paths"
-import { skillGenerationLiveDirs } from "../../../ext/src/gen-skill-paths"
+import { syncSkillLiveLinks } from "./skill-live-links"
+import { explicitConfigPath, writeExplicitConfig, type ExplicitLayer } from "./engine-explicit-config"
 import { applyPromptTakeover } from "../../../ext/src/codepuppy-prompts"
 
 // Inject alpha-code's customizations into opencode via OPENCODE_CONFIG_CONTENT. This env var is
@@ -82,6 +83,11 @@ export type CodePuppyConfigInjectionFailure = { message: string; stack?: string 
 export type CodePuppyConfigInjectionOutput = {
   config: { content: string; file?: string }
   models: { file?: string }
+  /**
+   * `#1667`(编排器裁决 r1 第 2 条、C7 重裁):`config.file` 是 main 每次启动合成的显式文件(engine-explicit-config.ts)。
+   * sidecar 据此监听用户的 `codepuppy.jsonc`,它一变就重写合成文件。注入失败时没有这一项(显式槽直接给用户文件)。
+   */
+  explicit?: { file: string; userConfig?: string; layer: ExplicitLayer }
 }
 export type CodePuppyConfigInjectionResult = CodePuppyConfigInjectionOutput &
   ({ ok: true } | { ok: false; error: CodePuppyConfigInjectionFailure })
@@ -109,8 +115,6 @@ type EngineConfig = {
   agents?: Record<string, EngineAgent>
   permissions?: PermissionRule[]
   mcp?: { servers?: Record<string, unknown> }
-  skills?: string[]
-  commands?: Record<string, { template: string; description?: string; subagent?: boolean }>
 }
 
 /** 内置插件 `opencode.config.compatibility` 是 `.claude` 与 `.agents` 两类技能根的唯一装载者(裁决书 N3)。 */
@@ -267,30 +271,36 @@ export function injectCodePuppyConfig(
       /* unreadable dir → skip (imported instructions simply stay dark this fork) */
     }
 
+    // `#1667`(C7 重裁):显式文件层要写的三样,出自这一次计算(engine-explicit-config.ts 抬头讲层序)。
+    const layer: ExplicitLayer = { policies: [], commands: {}, skills: [] }
     const models = buildCodePuppyModelConfig(userDataPath)
     if (models) {
       // `#1667`:同一份投影,写成 2.x 的 `providers` / `policies`(`provider.use`)/ `model`(codepuppy-models.ts engineModelConfig)。
+      // `policies` 写两处:显式文件那份比项目配置先加载、项目里的 allow 盖不过(第一层);内联这份是第二层。
       const engine = engineModelConfig(models)
       config.providers = engine.providers
       config.policies = engine.policies
+      layer.policies = engine.policies
       if (engine.model) config.model = engine.model
     }
 
-    //   4b. `#1667`(接缝裁决 A):出厂技能目录(main 启动时算好、经 CODEPUPPY_FACTORY_SKILL_DIRS 传入)与技能生成的 live 目录
-    //       (`<当前环境根>/ext-store/skill--*/current.json` 指向的那一代,过账本 enabled 门)写成顶层 `skills`。2.x 每份配置文档都认
-    //       这个键(`packages/core/src/config/plugin/skill.ts` 的 sources),并对这些目录挂文件监听。
-    const skills = [
-      ...new Set([...injectFactorySkillPaths({}, process.env.CODEPUPPY_FACTORY_SKILL_DIRS), ...skillGenerationLiveDirs(codepuppyGlobalRoot())]),
-    ]
-    if (skills.length) config.skills = skills
+    //   4b. `#1667`(接缝裁决 A;编排器裁决 r1 第 3 条):出厂技能目录(main 启动时算好、经 CODEPUPPY_FACTORY_SKILL_DIRS 传入)
+    //       与已安装技能的稳定挂点目录 `<当前环境根>/skills-live`(每个已启用技能键一个软链,指向 live 那一代,skill-live-links.ts)
+    //       写成顶层 `skills`。2.x 每份配置文档都认这个键(`packages/core/src/config/plugin/skill.ts` 的 sources),并对这些目录挂
+    //       文件监听、跟随软链 —— 翻代、新装、停用不用重启。挂点同步失败只记日志:那一项看不见,不拖垮整份注入。
+    //       写进显式文件(编排器裁决 r1 第 2 条:集中在那一层)。
+    const live = syncSkillLiveLinks(codepuppyGlobalRoot())
+    for (const error of live.errors) console.warn(`[alpha-code#1667] skill live link: ${error}`)
+    layer.skills = [...new Set([...injectFactorySkillPaths({}, process.env.CODEPUPPY_FACTORY_SKILL_DIRS), live.dir])]
 
     //   4c. `#1667`(接缝裁决 C):出厂 /init、/review 的模板来自 ext 的 applyPromptTakeover(同一份文字),写成 `commands` 条目,
     //       由 core 自己的 `opencode.config.command` 实现模板文法与子任务(`review` 在子任务里跑:v1 的 `subtask: true`,2.x 原生键
     //       `subagent`)。逃生门与 ext 的提示词转写同一个:CODEPUPPY_PROMPT_REBRAND_DISABLE=1。
+    //       写进显式文件(编排器裁决 r1 第 2 条):项目里的同名命令胜过它,它胜过上游内置的。
     if (process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE !== "1") {
       const takeover: { command?: Record<string, { template: string; description?: string; subtask?: boolean }> } = {}
       applyPromptTakeover(takeover)
-      config.commands = Object.fromEntries(
+      layer.commands = Object.fromEntries(
         Object.entries(takeover.command ?? {}).map(([name, { subtask, ...command }]) => [name, { ...command, ...(subtask ? { subagent: true } : {}) }]),
       )
     }
@@ -602,7 +612,16 @@ export function injectCodePuppyConfig(
     })
 
     const modelsFile = models ? materializeGovernedModelsBase(userDataPath, models) : undefined
-    return { ok: true, config: { content: JSON.stringify(config), ...(file ? { file } : {}) }, models: modelsFile ? { file: modelsFile } : {} }
+    // 显式槽:用户的 codepuppy.jsonc(有的话)+ 上面那一层,合成一份写进 Code Puppy 自己的 userData(engine-explicit-config.ts)。
+    const explicitFile = explicitConfigPath(userDataPath)
+    const written = writeExplicitConfig(explicitFile, file, layer)
+    if (written.userError) console.warn(`[alpha-code#1667] ${file} is not valid (${written.userError}); the engine sees only Code Puppy's explicit layer`)
+    return {
+      ok: true,
+      config: { content: JSON.stringify(config), file: explicitFile },
+      models: modelsFile ? { file: modelsFile } : {},
+      explicit: { file: explicitFile, ...(file ? { userConfig: file } : {}), layer },
+    }
   } catch (error) {
     // #613:catch 保留(sidecar 照常起,候选形态③),但失败必须离开本进程:
     // warn 是 #607 反向闸门锁住的进程内出声,返回值是送往 main/renderer 的结构化事实。

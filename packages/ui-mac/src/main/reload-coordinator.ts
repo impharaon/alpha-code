@@ -67,6 +67,11 @@ export function createReloadCoordinator(deps: {
   /** 任何会改变「待重载」原因的事件之后调用(hub-view 据此推 `ext-hub-view-changed`)。 */
   onChange: () => void
   restartConnectors?: () => Promise<boolean>
+  /**
+   * `#1667`(编排器裁决 r1 第 3 条):每次请求重载之前同步执行一次(ext-ipc 接的是 skill-live-links 的 syncSkillLiveLinks ——
+   * 安装 / 启用 / 停用 / 卸载 / 「现在重载」翻过的技能代际在这里挂到稳定软链上)。抛错只记一行,不挡住这次请求。
+   */
+  beforeRequest?: () => void
   now?: () => number
 }): ReloadCoordinator {
   const now = deps.now ?? Date.now
@@ -95,6 +100,11 @@ export function createReloadCoordinator(deps: {
 
   const coordinator: ReloadCoordinator = {
     request(input) {
+      try {
+        deps.beforeRequest?.()
+      } catch (error) {
+        deps.log(`reload: pre-request step failed: ${String(error)}`)
+      }
       const record: GenerationRecord = {
         generation: ++seq,
         scope: input.scope,

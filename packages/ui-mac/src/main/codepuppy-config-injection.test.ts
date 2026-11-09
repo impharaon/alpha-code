@@ -150,11 +150,14 @@ type Injected = {
   mcp?: { servers?: Record<string, unknown> }
   skills?: string[]
   commands?: Record<string, { template: string; description?: string; subagent?: boolean; subtask?: boolean }>
+  command?: unknown
 }
 
 function inject(extPluginPath?: string) {
   const result = injectCodePuppyConfig(userData, extPluginPath, "stable")
-  return { result, config: JSON.parse(result.config.content) as Injected }
+  // `#1667`(编排器裁决 r1 第 2 条、C7 重裁):`config.file` 是 main 合成的显式文件;出厂命令、skills 与第一层 policies 在那里。
+  const explicit = result.config.file && fs.existsSync(result.config.file) ? (JSON.parse(fs.readFileSync(result.config.file, "utf8")) as Injected & { $schema?: string; command?: unknown }) : undefined
+  return { result, config: JSON.parse(result.config.content) as Injected, explicit }
 }
 
 const allows = (rules: Rule[] | undefined, action: string, resource = "*") =>
@@ -208,8 +211,9 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
 
     expect(result.ok).toBe(true)
     assertInjectedFacts(result.config.content, userData)
-    // 当前环境的 codepuppy.jsonc 经 `start()` 的 `config.file` 进引擎;治理过的模型目录快照经 `models.file`。
-    expect(result.config.file).toBe(path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "codepuppy.jsonc"))
+    // `config.file` 是 main 合成的显式文件(Code Puppy 自己的 userData 下),当前环境的 codepuppy.jsonc 在里面;治理过的模型目录快照经 `models.file`。
+    expect(result.config.file).toBe(path.join(userData, "codepuppy-engine-config", "codepuppy-explicit.json"))
+    expect(result.explicit?.userConfig).toBe(path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "codepuppy.jsonc"))
     expect(result.models.file).toBe(path.join(userData, "codepuppy-engine-config", "models.json"))
     // #857:早到的 models.dev 底表从**同一份**投影机械派生:每个 provider 的模型集合与注入的 providers 相同,带就绪标记,不带 key。
     const raw = fs.readFileSync(result.models.file!, "utf8")
@@ -238,13 +242,37 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     expect(result.config.content).not.toContain("inherited.example")
   })
 
-  test("C2:产物直接是 OpenCode 2 的配置键 —— 上游 normalize 零诊断、零改写,过 Config.Info 解码(登录 + BYOK 态,带出厂技能与命令)", () => {
+  test("C2:内联文档与显式文件都直接是 OpenCode 2 的配置键 —— 上游 normalize 零诊断、零改写,过 Config.Info 解码(登录 + BYOK 态,带出厂技能与命令)", () => {
     givenLoggedInWithByok()
     process.env.CODEPUPPY_FACTORY_SKILL_DIRS = JSON.stringify([path.join(tmp, "factory")])
-    const { result, config } = inject(EXT_DIR)
-    expect(config.skills).toEqual([path.join(tmp, "factory")])
-    expect(Object.keys(config.commands ?? {})).toEqual(["init", "review"])
+    const { result, config, explicit } = inject(EXT_DIR)
+    // 出厂命令与 skills 只在显式文件里(编排器裁决 r1 第 2 条),内联文档不再带
+    expect(config.skills).toBeUndefined()
+    expect(config.commands).toBeUndefined()
+    expect(explicit?.skills).toEqual([path.join(tmp, "factory"), path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "skills-live")])
+    expect(Object.keys(explicit?.commands ?? {})).toEqual(["init", "review"])
     assertNativeV2(result.config.content)
+    assertNativeV2(fs.readFileSync(result.config.file!, "utf8"))
+  })
+
+  test("C7(重裁):provider 白名单的 policies 写进显式文件(第一层),与内联文档里那份(第二层)逐条相同、出自同一次计算", () => {
+    givenLoggedInWithByok()
+    const { config, explicit } = inject(EXT_DIR)
+    expect(explicit?.policies).toEqual(config.policies)
+    expect(explicit?.policies?.[0]).toEqual({ action: "provider.use", resource: "*", effect: "deny" })
+    process.env.CODEPUPPY_MODELS_DISABLE = "1"
+    expect(inject(EXT_DIR).explicit?.policies).toBeUndefined()
+  })
+
+  test("显式文件里用户的 codepuppy.jsonc 原样在下:用户自己的 /init 不被出厂的覆盖;用户文件坏了 ⇒ 只放 Code Puppy 这一层", () => {
+    const truth = path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "codepuppy.jsonc")
+    fs.writeFileSync(truth, `{ "command": { "init": { "template": "my own init" } }, "mcp": { "tool": { "type": "local", "command": ["t"] } } }`)
+    const { explicit } = inject(EXT_DIR)
+    expect(explicit?.command).toEqual({ init: { template: "my own init" } })
+    expect(Object.keys(explicit?.commands ?? {})).toEqual(["review"])
+    expect(explicit?.mcp).toEqual({ tool: { type: "local", command: ["t"] } } as never)
+    fs.writeFileSync(truth, "{ broken")
+    expect(Object.keys(inject(EXT_DIR).explicit?.commands ?? {})).toEqual(["init", "review"])
   })
 
   test("I9:每一份注入的 permissions(顶层与各 agent)都能用 Permission.Ruleset 解码;动作名用 2.x 的,不出现 bash / task / apply_patch", () => {
@@ -288,25 +316,30 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     return dir
   }
 
-  test("接缝裁决 A:skills = 出厂技能目录(CODEPUPPY_FACTORY_SKILL_DIRS)+ 已启用技能的 live 生成目录;没启用的、没有输入时不写", () => {
-    expect(inject(EXT_DIR).config.skills).toBeUndefined()
+  test("接缝裁决 A / 裁决 r1 第 3 条:显式文件的 skills = 出厂技能目录 + 稳定挂点目录 skills-live;已启用的键在里面挂软链指向 live 那一代,没启用的不挂", () => {
+    const root = process.env.CODEPUPPY_GLOBAL_DIR!
+    const liveDir = path.join(root, "skills-live")
+    expect(inject(EXT_DIR).explicit?.skills).toEqual([liveDir])
     const factory = [path.join(tmp, "factory", "a"), path.join(tmp, "factory", "b")]
     process.env.CODEPUPPY_FACTORY_SKILL_DIRS = JSON.stringify(factory)
     const live = plantGeneration("skill--enabled-one", "gen-000001-abcdef", ["skill--enabled-one"])
     plantGeneration("skill--not-enabled", "gen-000002-abcdef", ["skill--enabled-one"])
-    expect(inject(EXT_DIR).config.skills).toEqual([...factory, live])
-    // 账本缺失 ⇒ 生成目录一个都不注入(ext 的 fail-closed 门原样生效),出厂目录照旧
-    fs.rmSync(path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "skills-enabled.json"))
-    expect(inject(EXT_DIR).config.skills).toEqual(factory)
+    expect(inject(EXT_DIR).explicit?.skills).toEqual([...factory, liveDir])
+    expect(fs.readlinkSync(path.join(liveDir, "skill--enabled-one"))).toBe(live)
+    expect(fs.existsSync(path.join(liveDir, "skill--not-enabled"))).toBe(false)
+    // 账本缺失 ⇒ 一个都不挂(ext 的 fail-closed 门原样生效),目录照旧列着
+    fs.rmSync(path.join(root, "skills-enabled.json"))
+    expect(inject(EXT_DIR).explicit?.skills).toEqual([...factory, liveDir])
+    expect(fs.readdirSync(liveDir)).toEqual([])
   })
 
-  test("接缝裁决 C:commands 写出厂 /init、/review —— 文字逐字来自 ext 登记的模板,review 用 2.x 原生键 subagent: true(不写 v1 的 subtask);CODEPUPPY_PROMPT_REBRAND_DISABLE=1 ⇒ 不写", () => {
-    expect(inject(EXT_DIR).config.commands).toEqual({
+  test("接缝裁决 C / 裁决 r1 第 2 条:显式文件的 commands 写出厂 /init、/review —— 文字逐字来自 ext 登记的模板,review 用 2.x 原生键 subagent: true;CODEPUPPY_PROMPT_REBRAND_DISABLE=1 ⇒ 不写", () => {
+    expect(inject(EXT_DIR).explicit?.commands).toEqual({
       init: { template: CODEPUPPY_INIT_TEMPLATE, description: CODEPUPPY_INIT_DESCRIPTION },
       review: { template: CODEPUPPY_REVIEW_TEMPLATE, description: CODEPUPPY_REVIEW_DESCRIPTION, subagent: true },
     })
     process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE = "1"
-    expect(inject(EXT_DIR).config.commands).toBeUndefined()
+    expect(inject(EXT_DIR).explicit?.commands).toBeUndefined()
   })
 
   test("CODEPUPPY_MODELS_DISABLE:不写 providers / policies,也不给 models.file", () => {

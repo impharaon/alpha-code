@@ -156,6 +156,13 @@ UPSTREAM_EXCLUDES=(
   ':(exclude)packages/ai/test/provider/openai-responses.test.ts'
   ':(exclude)packages/core/test/generate.test.ts'
   ':(exclude)packages/core/test/session-runner.test.ts'
+  # #1563 / #1565 / #1572 / ADR-041(#1662 裁决第 5 项):MCP 运行时没有插件挂点 —— 启动、重连、并发、连接前的随包声明、
+  # 失败归因都在 core 内部。v1 接管的是 packages/opencode/src/mcp/index.ts,这是同一权威换接法。规则本体在 Code Puppy
+  # 自有的 codepuppy-startup.ts / codepuppy-first-party-mcp.ts;三个上游文件只在 `codepuppy(...)` 标注处调用它们。
+  # 判据 packages/core/test/codepuppy-mcp-runtime.test.ts。
+  ':(exclude)packages/core/src/mcp/client.ts'
+  ':(exclude)packages/core/src/mcp/connection.ts'
+  ':(exclude)packages/core/src/mcp/index.ts'
 )
 
 # ── UPSTREAM_PATHS 里住着的 Code Puppy 自有文件:结构性谓词,不是逐文件清单(`#1085` / ADR-043)──

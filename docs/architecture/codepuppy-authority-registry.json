@@ -759,12 +759,13 @@
       ],
       "lane": "L4 (#1666) + L3 (#1665) per ruling item 3 (c)",
       "takeovers": [
-        "packages/core/test/codepuppy-browser-tool-names.test.ts"
+        "packages/core/test/codepuppy-browser-tool-names.test.ts",
+        "packages/core/src/mcp/index.ts"
       ],
       "blocked": {
-        "reason": "Ruling item 3 holds it by reachability: the non-builtin registration paths on OpenCode 2 are the extension's own tools and its project-plugin fan-out (L3 refuses duplicate effective names before registering), MCP tools (refused in L4's MCP re-take, ruling item 5) and the upstream Browser plugin (pinned: packages/core/test/codepuppy-browser-tool-names.test.ts). Registered as held once the MCP refusal lands and the orchestrator registers L3's fan-out mechanism at integration.",
+        "reason": "Ruling item 3 holds it by reachability: the non-builtin registration paths on OpenCode 2 are the extension's own tools and its project-plugin fan-out (L3 refuses duplicate effective names before registering), MCP tools (refused in L4's MCP re-take: packages/core/src/mcp/index.ts tools(), both members of a colliding pair) and the upstream Browser plugin (pinned: packages/core/test/codepuppy-browser-tool-names.test.ts). Registered as held once the orchestrator registers L3's fan-out mechanism at integration.",
         "options": [
-          "Register L3's fan-out refusal and L4's MCP refusal with their tests, plus the Browser pin, as one held entry at integration."
+          "Register L3's fan-out refusal with its test, L4's MCP refusal (packages/core/test/codepuppy-mcp-runtime.test.ts 'a.b/x and a_b/x share an effective name and are both refused; ab/x stays') and the Browser pin as one held entry at integration."
         ]
       }
     },
@@ -953,16 +954,20 @@
       "adr": [
         "ADR-047"
       ],
-      "lane": "L4 (#1666) — needs orchestrator decision",
+      "lane": "L4 (#1666)",
       "takeovers": [
         "packages/opencode/src/mcp/index.ts"
       ],
-      "blocked": {
-        "reason": "OpenCode 2 connects servers independently with a pending status (packages/core/src/mcp/index.ts), but no pin test proves it in this repo yet.",
-        "options": [
-          "(a) Pin it with a test against OpenCode 2's MCP layer (two stdio servers, one hanging) and mark it held upstream-native — a small L4 follow-up."
-        ]
-      }
+      "mechanism": {
+        "file": "packages/core/src/mcp/index.ts",
+        "ladder": "upstream-native on OpenCode 2 (asynchronous initial connections), pinned"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "ok is connected and listed while hang is still pending"
+        }
+      ]
     },
     {
       "id": "mcp-named-start-failures",
@@ -970,16 +975,19 @@
       "adr": [
         "ADR-047"
       ],
-      "lane": "L4 (#1666) — needs orchestrator decision",
+      "lane": "L4 (#1666) — SEAM-CHANGE-NEEDED",
       "takeovers": [
-        "packages/opencode/src/mcp/index.ts"
+        "packages/opencode/src/mcp/index.ts",
+        "packages/core/src/mcp/client.ts",
+        "packages/core/src/mcp/connection.ts",
+        "packages/core/src/mcp/index.ts"
       ],
       "blocked": {
-        "reason": "OpenCode 2 reports failed { error: string } with upstream wording; there is no plugin seam on MCP startup to classify it, and parsing upstream messages would be a stand-in for its grammar.",
+        "reason": "Re-taken and named at the source (client.ts ConnectError.code via codepuppy-startup.ts; drives the reconnect decision; test 'a missing working directory, a missing command, a refused remote'). Not yet visible to the desktop: the frozen seam (lane seams §4, MCP status kinds) forbids changing OpenCode 2's public Mcp.Status shape, and failed carries only { error }, so the Customization Center cannot read dependency_missing (#1564 AC6 reinstall action).",
         "options": [
-          "(a) Re-take the relevant packages/core/src/mcp/*.ts files and port the v1 behaviour (L3, large).",
-          "(b) Hold what an extension watcher can (status events + experimental connect API for backoff) and record the rest as residual.",
-          "(c) Owner retires the behaviour for OpenCode 2 (needs the owner's words)."
+          "(a) Seam change: optional `code` on Mcp.Status.Failed (re-take packages/schema/src/mcp.ts and regenerate packages/protocol/openapi.json and the client's generated types; L5/L6 read it).",
+          "(b) Seam-compatible convention: the re-taken runtime prefixes `error` with `<code>: ` and the L6 adapter reads Code Puppy's own prefix (documented in the seams doc).",
+          "(c) Expose the cause through a Code Puppy RPC next to the status list (new surface for L6)."
         ]
       }
     },
@@ -989,18 +997,27 @@
       "adr": [
         "ADR-047"
       ],
-      "lane": "L4 (#1666) — needs orchestrator decision",
+      "lane": "L4 (#1666)",
       "takeovers": [
-        "packages/opencode/src/mcp/index.ts"
+        "packages/opencode/src/mcp/index.ts",
+        "packages/core/src/mcp/client.ts",
+        "packages/core/src/mcp/connection.ts",
+        "packages/core/src/mcp/index.ts"
       ],
-      "blocked": {
-        "reason": "OpenCode 2 has no background reconnect (only credential-event reconnects); MCP connection lifecycle has no plugin seam.",
-        "options": [
-          "(a) Re-take the relevant packages/core/src/mcp/*.ts files and port the v1 behaviour (L3, large).",
-          "(b) Hold what an extension watcher can (status events + experimental connect API for backoff) and record the rest as residual.",
-          "(c) Owner retires the behaviour for OpenCode 2 (needs the owner's words)."
-        ]
-      }
+      "mechanism": {
+        "file": "packages/core/src/mcp/codepuppy-startup.ts",
+        "ladder": "L3 (re-taken packages/core/src/mcp/index.ts schedules it on failed/closed)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "a 5xx answer (501) reconnects after 30 s, then after 60 s more"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "an auth answer stays failed"
+        }
+      ]
     },
     {
       "id": "mcp-start-concurrency",
@@ -1008,18 +1025,23 @@
       "adr": [
         "ADR-047"
       ],
-      "lane": "L4 (#1666) — needs orchestrator decision",
+      "lane": "L4 (#1666)",
       "takeovers": [
-        "packages/opencode/src/mcp/index.ts"
+        "packages/opencode/src/mcp/index.ts",
+        "packages/core/src/mcp/client.ts",
+        "packages/core/src/mcp/connection.ts",
+        "packages/core/src/mcp/index.ts"
       ],
-      "blocked": {
-        "reason": "OpenCode 2 starts servers with unbounded concurrency inside core; no plugin seam.",
-        "options": [
-          "(a) Re-take the relevant packages/core/src/mcp/*.ts files and port the v1 behaviour (L3, large).",
-          "(b) Hold what an extension watcher can (status events + experimental connect API for backoff) and record the rest as residual.",
-          "(c) Owner retires the behaviour for OpenCode 2 (needs the owner's words)."
-        ]
-      }
+      "mechanism": {
+        "file": "packages/core/src/mcp/codepuppy-startup.ts",
+        "ladder": "L3 (re-taken packages/core/src/mcp/connection.ts takes the shared permit)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "six slow servers never overlap more than four deep"
+        }
+      ]
     },
     {
       "id": "mcp-declared-tools-before-connect",
@@ -1027,18 +1049,27 @@
       "adr": [
         "ADR-047"
       ],
-      "lane": "L4 (#1666) — needs orchestrator decision",
+      "lane": "L4 (#1666)",
       "takeovers": [
-        "packages/opencode/src/mcp/index.ts"
+        "packages/opencode/src/mcp/index.ts",
+        "packages/core/src/mcp/client.ts",
+        "packages/core/src/mcp/connection.ts",
+        "packages/core/src/mcp/index.ts"
       ],
-      "blocked": {
-        "reason": "OpenCode 2 registers MCP tools only after tools/list; offering declared tools needs MCP runtime support (or an extension-side tool.transform that proxies calls until the server connects — new machinery).",
-        "options": [
-          "(a) Re-take the relevant packages/core/src/mcp/*.ts files and port the v1 behaviour (L3, large).",
-          "(b) Hold what an extension watcher can (status events + experimental connect API for backoff) and record the rest as residual.",
-          "(c) Owner retires the behaviour for OpenCode 2 (needs the owner's words)."
-        ]
-      }
+      "mechanism": {
+        "file": "packages/core/src/mcp/codepuppy-first-party-mcp.ts",
+        "ladder": "L3 (re-taken packages/core/src/mcp/index.ts tools() / callTool)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "offered while starting; the third party is not; the listing replaces it once connected"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "a contradicting connection fails the planned call and drops the declaration"
+        }
+      ]
     },
     {
       "id": "mcp-net-failure-runtime",
@@ -1046,18 +1077,28 @@
       "adr": [
         "ADR-047"
       ],
-      "lane": "L4 (#1666) — needs orchestrator decision",
+      "lane": "L4 (#1666)",
       "takeovers": [
-        "packages/opencode/src/mcp/index.ts"
+        "packages/opencode/src/mcp/index.ts",
+        "packages/core/src/mcp/client.ts",
+        "packages/core/src/mcp/connection.ts",
+        "packages/core/src/mcp/index.ts"
       ],
-      "blocked": {
-        "reason": "The classifier contract is restored (packages/schema/src/codepuppy-net-failure.ts) but OpenCode 2's MCP client does not call it and exposes no seam to.",
-        "options": [
-          "(a) Re-take the relevant packages/core/src/mcp/*.ts files and port the v1 behaviour (L3, large).",
-          "(b) Hold what an extension watcher can (status events + experimental connect API for backoff) and record the rest as residual.",
-          "(c) Owner retires the behaviour for OpenCode 2 (needs the owner's words)."
-        ]
-      }
+      "mechanism": {
+        "file": "packages/core/src/mcp/codepuppy-startup.ts",
+        "ladder": "L3 (re-taken packages/core/src/mcp/client.ts calls classifyNetFailure at the source)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "a missing working directory, a missing command, a refused remote"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "an auth answer stays failed"
+        }
+      ],
+      "note": "The layer decides whether a background reconnect may help; showing it to the user shares the seam question of mcp-named-start-failures."
     },
     {
       "id": "l2r-auth-fail-closed",

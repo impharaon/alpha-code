@@ -365,3 +365,4 @@
 1	packages/opencode	test/server/codepuppy-sidecar-stop.test.ts	-	#1647 AC1:真实 Default app 的待审批回合经生产 sidecar 停止执行器释放,新实例读取工具 error/结束时间和助手 MessageAbortedError,真实 MCP tools/call 为零。去掉释放调用即红。
 3	packages/opencode	test/mcp/codepuppy-tool-discovery.test.ts	-	#1645:自有取清单函数复用上游分页,保留跨页 outputSchema 校验、SDK 错误类型和每次请求的超时原因;真实 MCP Server/Client,不修改上游 catalog。
 2	packages/core	test/codepuppy-browser-tool-names.test.ts	-	#1662 L4 裁决第 3 项(ADR-041 决定 2「重名一律拒,绝不后写覆盖」)的 Browser 插件那一路:真 Location 去掉 / 带上 opencode.browser 各启动一次,内置工具一个不变、Browser 新增的全在 browser 命名空间;反向臂证明比较器认得出「同名被盖掉」
+8	packages/core	test/codepuppy-mcp-runtime.test.ts	-	#1662 L4 裁决第 5 项:MCP 运行时在 OpenCode 2 生产 Mcp.Service 上的判据(真 stdio 子进程与真 HTTP 端点):AC1 一台不应答不拖住另一台(上游原生,钉住)、AC2 具名归因、AC3 后台重连 30 s 起翻倍且 auth 不重连、AC5 同时启动不超过 4、#1565 连接前的随包声明与矛盾即撤、ADR-041 MCP 重名双双拒绝;v1 的 AC4/AC6/AC7/#1645/#1653 不在本裁决内

@@ -31,6 +31,7 @@ import { ConfigMCP } from "@opencode/schema/config/mcp"
 import type { Session } from "@opencode/schema/session"
 import { isRecord } from "@opencode/util/record"
 import { McpStdio } from "./stdio.js"
+import { classifyStartFailure } from "./codepuppy-startup.js" // codepuppy(#1563)
 
 const DEFAULT_STARTUP_TIMEOUT = 30_000
 const DEFAULT_CATALOG_TIMEOUT = 30_000
@@ -91,6 +92,9 @@ export class ConnectError extends Schema.TaggedError<ConnectError>()("MCP.Connec
   message: Schema.String,
   /** The server was reached but refused or broke the handshake, so different connect options might succeed. */
   answered: Schema.optional(Schema.Boolean),
+  // codepuppy(#1563): the named cause (codepuppy-startup.ts) and whether a background reconnect may change it.
+  code: Schema.optional(Schema.String),
+  reconnect: Schema.optional(Schema.Boolean),
 }) {}
 
 /** A legacy Streamable HTTP server no longer recognizes this connection's session; the lifecycle reconnects. */
@@ -568,9 +572,26 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
     return yield* new ConnectError({
       server,
       message: `${error.message}; the server supports ${error.supported.join(", ")}. Set "protocol" for this server to one of those or to "legacy".`,
+      code: "protocol", // codepuppy(#1563)
+      reconnect: false,
     })
-  return yield* new ConnectError({ server, message: explain(error), answered: !repeats(error) })
+  return yield* new ConnectError({
+    server,
+    message: explain(error),
+    answered: !repeats(error),
+    ...startFailure(error, options.config), // codepuppy(#1563)
+  })
 })
+
+// codepuppy(#1563) ── the SDK-specific facts the Code Puppy classifier cannot see on its own.
+function startFailure(error: unknown, config: { readonly type: string; readonly url?: string }) {
+  const cause = error instanceof SdkError && error.code === SdkErrorCode.EraNegotiationFailed && error.cause !== undefined ? error.cause : error
+  return classifyStartFailure(cause, config, {
+    timedOut: cause instanceof SdkError && cause.code === SdkErrorCode.RequestTimeout,
+    httpStatus: cause instanceof SdkHttpError ? cause.status : undefined,
+  })
+}
+// codepuppy(#1563) ── end
 
 // Connecting again would fail the same way: the server could not be spawned or reached, did not answer in
 // time, is overloaded or down for now, or refused this client's access. A failed auto probe wraps the error it hit.

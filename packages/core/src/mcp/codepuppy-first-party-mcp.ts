@@ -55,3 +55,59 @@ export function declaredFirstPartyTools(
     return undefined
   }
 }
+
+/** A declared definition in the shape `tools/list` produces (packages/core/src/mcp/client.ts `Tool`). */
+export interface DeclaredTool {
+  readonly name: string
+  readonly title?: string
+  readonly description?: string
+  readonly inputSchema: { readonly type: "object"; readonly [key: string]: unknown }
+  readonly outputSchema?: Record<string, unknown>
+}
+
+const record = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
+/** The bundled declaration as listed tools, or undefined when the entry is not bound to the bundle. */
+export function declaredListedTools(
+  name: string,
+  entry: unknown,
+  env: Record<string, string | undefined>,
+  readFile: (file: string) => Uint8Array,
+): DeclaredTool[] | undefined {
+  const tools = declaredFirstPartyTools(name, entry, env, readFile)?.flatMap((tool): DeclaredTool[] => {
+    if (!record(tool) || typeof tool.name !== "string" || tool.name === "" || !record(tool.inputSchema)) return []
+    return [
+      {
+        name: tool.name,
+        ...(typeof tool.title === "string" ? { title: tool.title } : {}),
+        ...(typeof tool.description === "string" ? { description: tool.description } : {}),
+        inputSchema: { ...tool.inputSchema, type: "object" },
+        ...(record(tool.outputSchema) ? { outputSchema: tool.outputSchema } : {}),
+      },
+    ]
+  })
+  return tools && tools.length > 0 ? tools : undefined
+}
+
+const canonical = (value: unknown): string =>
+  JSON.stringify(value, (_key, item) =>
+    record(item) ? Object.fromEntries(Object.entries(item).filter(([, v]) => v !== undefined).sort(([a], [b]) => a.localeCompare(b))) : item,
+  )
+
+const definition = (tool: { name: string; description?: string; inputSchema: unknown; outputSchema?: unknown }) =>
+  canonical({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema, outputSchema: tool.outputSchema })
+
+/** Whether a connected server's listed tool is the declared one (what the model planned against). */
+export const sameTool = (
+  a: { name: string; description?: string; inputSchema: unknown; outputSchema?: unknown },
+  b: { name: string; description?: string; inputSchema: unknown; outputSchema?: unknown },
+) => definition(a) === definition(b)
+
+/** Whether a connected server lists exactly its declaration; anything else refutes the declaration. */
+export const listsDeclaration = (
+  declared: ReadonlyArray<DeclaredTool>,
+  listed: ReadonlyArray<{ name: string; description?: string; inputSchema: unknown; outputSchema?: unknown }>,
+) =>
+  declared.length === listed.length &&
+  declared.every((tool) => listed.some((live) => live.name === tool.name && sameTool(tool, live)))

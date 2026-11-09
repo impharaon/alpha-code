@@ -31,9 +31,41 @@ v1 路由读自 `origin/alpha:packages/sdk/js/src/v2/gen/sdk.gen.ts`;2.x 端点�
 判法的已知盲区:正则抽取不是类型分析;经别名变量(如把 client 存进别的名字)的调用会漏。主文 §5 的 `routes-coverage.test.ts` 把这一步落成测试,
 并以「冻结界面跑 V1–V12 时适配器收到的全部 501」作第二道核对(主文 §9 Q1)。
 
-## B. 1.17.13 客户端的路径在 2.2.6 里已删的 26 条
+## B. 1.17.13 客户端的路径在合并目标里不存在的(L6 实测重推)
 
-把两侧路径参数归一成 `:p`,`comm -23`:`/api/form/request`、`/api/generate`、`/api/health`、`/api/integration/:p/connect/oauth/:p/complete`、`/api/mcp/:p`、`/api/mcp/:p/connect`、`/api/mcp/:p/disconnect`、`/api/project`、`/api/project/:p/directories`、`/api/project/current`、`/api/question/request`、`/api/server`、`/api/service/stop`、`/api/session/:p/form/:p/cancel`、`/api/session/:p/form/:p/state`、`/api/session/:p/instructions/entries`、`/api/session/:p/instructions/entries/:p`、`/api/session/:p/pending`、`/api/session/:p/question`、`/api/session/:p/question/:p/reject`、`/api/session/:p/question/:p/reply`、`/api/session/:p/rename`、`/api/session/:p/revert/clear`、`/api/session/:p/skill`、`/api/session/:p/wait`、`/api/shell/:p/timeout`。
+**订正(L6 实测,编排器 2026-11-09 要求重推)**:原来这一节的「26 条已删」比对错了来源 —— 至少 `GET /api/project` 与
+`POST /api/integration/:p/connect/oauth/:p/complete` 在合并目标 `33f94fce96` 上都在。重推法:解析装着的 1.17.13 客户端
+`dist/promise/generated/client.js` 的「方法 + 路径」(107 条),对 `33f94fce96:packages/protocol/src/groups/*.ts` 的
+`HttpApiEndpoint.<verb>("<id>", <path>)`(170 条)逐条比,路径参数归一成 `:p`。合并目标上没有的 30 条:
+
+- **挪到 `/api/experimental/…`**:`POST /api/generate`、`POST /api/session/:p/skill`、`POST /api/session/:p/wait`、
+  `PUT|DELETE /api/mcp/:p`、`POST /api/mcp/:p/{connect,disconnect}`、`GET|PUT|DELETE /api/session/:p/instructions/entries[/:p]`。
+- **真删了**:`GET /api/health`(换成 `/api/info`)、`GET /api/server`、`POST /api/service/stop`、`GET /api/form/request`、
+  `GET /api/question/request`、`GET /api/project/current`、`GET /api/project/:p/directories`、`GET /api/session/:p/pending`、
+  `GET /api/session/:p/question`、`POST /api/session/:p/question/:p/{reply,reject}`、`POST /api/session/:p/rename`、
+  `POST /api/session/:p/revert/clear`(换成 `DELETE /api/session/:p/revert`)、`GET /api/session/:p/form/:p/state`、
+  `POST /api/session/:p/form/:p/cancel`(换成 `DELETE …/form/:p`)、`PATCH /api/shell/:p/timeout`、
+  `POST|DELETE /experimental/project/:p/copy`、`POST /experimental/project/:p/copy/refresh`。
+- **同一条路径换了写法**:`GET /api/fs/read/:p` 对 2.x 的 `GET /api/fs/read/*`。
+
+适配器的实际处置以路由表为准(`packages/ui-mac/src/engine-adapter/routes.ts` 的 ROUTES 与 UNSUPPORTED);
+`routes-coverage.test.ts` 从冻结源码里扫出全部调用(v1 SDK 68 个方法、1.17.13 客户端 28 个),逐条要求有路由或写明理由的不支持项。
+
+## C′. L6 实测对下表的订正
+
+| 行 | 下表原写 | 实测与处置 |
+| --- | --- | --- |
+| `project.list` / `project.update` | N:2.2.6 无 project 端点 | **D**:`GET /api/project`、`PATCH /api/project/:id` 都在;打开目录即登记项目、重启后仍在(U2 选 A,`canonical` → `worktree`) |
+| `project.current`(v1 `GET /project/current` 与 1.17.13 `GET /api/project/current`) | N | 由 `GET /api/location` 的 `project.id` 合成(冻结 app 引导时经 `bootstrap.ts:415-418` 调它,v1 模式下 `createCompatibleApi` 改走 v1 路由) |
+| `worktree.create` / `worktree.remove` | N | 2.x 有 `POST|DELETE /api/worktree`,但调用点只在上游 LegacyLayout(U4 到不了)⇒ 不支持;`worktree.reset` 2.x 没有 |
+| `integration.oauth.complete` | N:2.2.6 无 complete 端点 | 端点在(`POST …/connect/oauth/:attemptID/complete`)⇒ 直通;调用点在上游连接对话框,Code Puppy 界面挂不上 |
+| `mcp.auth.authenticate` | N?(待核) | **U6 是**:2.x 把每个远端 MCP 登记成 OAuth 集成(`core/src/mcp/index.ts:238-275`,`metadata.source === "mcp"`);适配器发起 OAuth、交浏览器、轮询终态再回 MCP 状态 |
+| `lsp.status` | N | 不支持;请求会由数据层发出,显示它的状态弹层在 Code Puppy 界面挂不上(U4,编排器认可) |
+| `session.todo` | N | U1:由会话里最近一次 `todowrite` 的输入合成(事件流同一来源投影 `todo.updated`) |
+| `path.get` | D?:字段要逐个核 | `location.get` 只有目录与项目;`home/state/config` 给空串(冻结 app v2 支路同一约定,`bootstrap.ts` loadPathQuery) |
+| `config.get` / `global.config.get` | D | 2.x 回配置文档数组、键名也换了;给空对象(冻结 app v2 支路同一约定);`global.config.update` 只被上游设置页调用 ⇒ 不支持 |
+| `permission.list` / `permission.asked` | D | 2.x 的工具来源是 `source.id`,冻结归一读 `source.callID` ⇒ 适配器补这一处(真引擎采样钉住);回复一侧等 L4 回执规格 |
+| `auth.*`、`provider.auth`、`provider.oauth.*`、`global.dispose` | D / N | U5 到不了(上游设置页与连接对话框)⇒ 不支持 |
 
 ## C. 全表
 

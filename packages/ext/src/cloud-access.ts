@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs"
-import { FILE_REF } from "@opencode-ai/plugin/alpha-cloud-authority"
+import { FILE_REF } from "@opencode/plugin/alpha-cloud-authority"
 import { CLOUD_MCP_DEF_ENV } from "./cloud-websearch-kill"
 import { CLOUD_ACCESS_LOGIN_HINT } from "./context-injection"
 

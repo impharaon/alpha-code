@@ -37,14 +37,14 @@ tool.codepuppy_ping.description                         text      tool-descripti
 tool.codepuppy_register.args.entry                      text      tool-arg-description      98    1024   10%
 tool.codepuppy_register.args.name                       text      tool-arg-description      70    1024    7%
 tool.codepuppy_register.args.type                       text      tool-arg-description      26    1024    3%
-tool.codepuppy_register.description                     text      tool-description         797    1024   78%
+tool.codepuppy_register.description                     text      tool-description         793    1024   77%
 tool.codepuppy_reload.args.reason                       text      tool-arg-description      43    1024    4%
 tool.codepuppy_reload.description                       text      tool-description         373    1024   36%
 vision.system-note-offline                              text      system                   251    1024   25%
-vision.tool.input-omitted                               text      vision-block              23    1024    2%
 vision.tool.refused                                     text      vision-block              24    1024    2%
 attachment.unavailable.failed                           template  attachment-block         227    1024   22%
 attachment.unavailable.missing                          template  attachment-block         289    1024   28%
+cloud-contract.refused                                  template  tool-output              159    1024   16%
 command.factory-denied.template                         template  command-template          80    1024    8%
 vision.failure.credential                               template  vision-block             108    1024   11%
 vision.failure.image-rejected                           template  vision-block              89    1024    9%
@@ -58,30 +58,21 @@ vision.failure.unsupported-format                       template  vision-block  
 vision.system-note                                      template  system                   460    1024   45%
 attachment.read                                         wrapper   attachment-block         242    1024   24%
 vision.transcript                                       wrapper   vision-block             119    1024   12%
-rebrand.docs-guidance-anthropic                         rebrand   system                   302     512   59%
-rebrand.docs-guidance-default                           rebrand   system                   237     512   46%
-rebrand.help-feedback-anthropic                         rebrand   system                     0     512    0%
-rebrand.help-feedback-default                           rebrand   system                     0     512    0%
-rebrand.identity-anthropic-codex                        rebrand   system                    56     512   11%
-rebrand.identity-beast                                  rebrand   system                    48     512    9%
-rebrand.identity-copilot                                rebrand   system                    23     512    4%
-rebrand.identity-default-trinity                        rebrand   system                    97     512   19%
-rebrand.identity-gemini                                 rebrand   system                    91     512   18%
-rebrand.identity-gpt                                    rebrand   system                    61     512   12%
+rebrand.identity-default                                rebrand   system                    66     512   13%
+rebrand.identity-gpt                                    rebrand   system                    66     512   13%
+rebrand.identity-gpt-astra                              rebrand   system                    66     512   13%
 rebrand.identity-kimi                                   rebrand   system                    81     512   16%
-rebrand.objectivity-anthropic                           rebrand   system                    82     512   16%
-fragments: 70; injected bytes: 27719; declared limits total: 130048
+rebrand.identity-meta                                   rebrand   system                    84     512   16%
+rebrand.identity-trinity                                rebrand   system                    97     512   19%
+rebrand.tool-use-meta                                   rebrand   system                    33     512    6%
+fragments: 65; injected bytes: 27266; declared limits total: 127488
 references (paths / verbs / definitions supplied by others — carry no Code Puppy text, not counted):
-  ref.skills.paths       /skills/paths      出厂技能目录 + skill generation live 目录(factory-paths.ts / gen-skill-paths.ts);技能正文是别人的字
-  ref.permission.skill   /permission/skill  REQ-067 出厂禁项的 "deny" 动词(factory-deny.ts)
-  ref.permission.codepuppy_hub_install /permission/codepuppy_hub_install REQ-234 #1531 定制中心安装确认框的 "ask" 动词
-  ref.agent.permission.codepuppy_hub_install /agent/*/permission/codepuppy_hub_install REQ-234 #1531 每个 agent 末位的 "ask"(无人值守的 codepuppy-automation* 为 "deny")
-  ref.mcp                /mcp               云 MCP server 定义(type / url / enabled / oauth / headers.Authorization = {file:} 引用):ext 经 env 装(cloud-websearch-kill.ts),ui-mac 主进程直写并对用户全局 MCP 钉 enabled:false(codepuppy-config-injection.ts / cloud-sidecar-config.ts / mcp-default-deny.ts / ext-disabled-injection.ts);工具表是远端 server 的字
+  ref.mcp                /mcp               云 MCP server 定义(type / url / oauth / headers.Authorization = {file:} 引用):ext 经 mcp.transform 装(cloud-websearch-kill.ts),项目 MCP 经同一 transform 补缺;ui-mac 主进程直写配置(codepuppy-config-injection.ts / cloud-sidecar-config.ts / mcp-default-deny.ts / ext-disabled-injection.ts);工具表是远端 server 的字
   ref.schema             /$schema           ui-mac 无继承 config 时种下的 JSON Schema URL(codepuppy-config-injection.ts:91)
   ref.plugin             /plugin            @codepuppy/ext 自包含 bundle 的绝对路径(codepuppy-config-injection.ts:105-109);bundle 里 alpha 的字各自登记在本簿
   ref.enabled_providers  /enabled_providers provider 白名单 id(codepuppy-models.ts,含用户 opencode.jsonc 里的 id);不进模型上下文
   ref.model              /model             默认模型 <providerID>/<modelID>(codepuppy-models.ts);引擎把选中模型的 id 原样写进 environment 段(session/system.ts:74),那是 catalog / 上游厂商的 id,不是 alpha 的字
   ref.provider           /provider          模型菜单:npm / 展示名 / baseURL / {file:} 密钥引用 / 档位 options(codepuppy-models.ts;模型与展示数据在已应用目录,BYOK 的 baseURL 在 byok-adapters.ts);展示名只进 picker,不进模型上下文
-context-bearing plugin hooks (from packages/plugin Hooks): config, tool, chat.message, command.execute.before, tool.execute.after, experimental.chat.messages.transform, experimental.chat.system.transform, experimental.session.compacting, experimental.text.complete, tool.definition
+context-bearing plugin hooks and transforms (OpenCode 2, from packages/plugin/src/promise): tool.execute.after, session.prompt, session.context, session.compaction, session.generate, session.title, session.http.request, session.experimental.ws.send, session.experimental.idle, aisdk.language, agent.transform, command.transform, mcp.transform, skill.transform, tool.transform, reference.transform, websearch.transform, artifact.transform
 instruction files (ui-mac main writes them into cfg.instructions; engine session/instruction.ts reads them into the system segment; identity has one row per reachable capability shape): instruction.codepuppy-behavior, instruction.codepuppy-identity, instruction.codepuppy-identity+cloudDispatch, instruction.codepuppy-identity+websearch, instruction.codepuppy-identity+websearch+cloudDispatch
 ui-mac agents (main writes cfg.agent.<name>.{prompt,description}; prompt replaces the base system prompt at llm/request.ts:64 — an agent without a prompt keeps the base prompt; description enters the subagent list): agent.codepuppy-automation.prompt, agent.codepuppy-automation.description, agent.codepuppy-readonly.prompt, agent.codepuppy-readonly.description, agent.codepuppy-automation-standard.prompt, agent.codepuppy-automation-standard.description, agent.codepuppy-ask.description

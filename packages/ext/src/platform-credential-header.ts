@@ -16,7 +16,7 @@
 
 import { readFileSync } from "node:fs"
 import { LoadAPIKeyError } from "@ai-sdk/provider"
-import { FILE_REF } from "@opencode-ai/plugin/alpha-cloud-authority"
+import { FILE_REF } from "@opencode/plugin/alpha-cloud-authority"
 import { isPlatformProvider } from "./platform-output-cap"
 
 export const PLATFORM_AUTH_REF_ENV = "CODEPUPPY_PLATFORM_AUTH_REF"

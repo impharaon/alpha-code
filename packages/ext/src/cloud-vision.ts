@@ -42,7 +42,6 @@ import {
   renderWrapper,
   type VisionFailureKind,
   visionFailureId,
-  VISION_TOOL_INPUT_OMITTED_ID,
   VISION_TOOL_REFUSED_ID,
   VISION_TRANSCRIPT_ID,
 } from "./context-injection"
@@ -192,11 +191,6 @@ export function visionToolRefusedText(): string {
   return contextText(VISION_TOOL_REFUSED_ID)
 }
 
-/** 历史里 `codepuppy_vision` 的 `input.image` 已是 base64 本体、原引用又不可考时,回放给模型的替换文本。 */
-export function visionToolInputOmittedText(): string {
-  return contextText(VISION_TOOL_INPUT_OMITTED_ID)
-}
-
 // ── 会话级登记簿 ──────────────────────────────────────────────────────────────────
 
 export type VisionImageEntry = {
@@ -232,7 +226,7 @@ export type RegisterImageInput = {
   readonly base64: string
   readonly label?: string
   readonly path?: string
-  /** 引擎 part id:同一 part 每次请求都会再经过登记簿(messages.transform 重建),用它免去重复哈希。 */
+  /** 引擎 part id(有则用它免去重复哈希);`#1665` 起 context 钩子按内容登记,不传。 */
   readonly partID?: string
 }
 
@@ -395,14 +389,7 @@ export async function transcribeEntry(session: VisionSession, entry: VisionImage
   return visionFailureBlock(label, outcome.kind)
 }
 
-// ── 引擎 part 的形状判定(只认本模块要用的字段)───────────────────────────────────
-
-export type ImageFilePartLike = { readonly id?: string; readonly type: "file"; readonly mime: string; readonly url: string; readonly filename?: string }
-
-export function isImageFilePart(part: unknown): part is ImageFilePartLike {
-  const p = part as { type?: unknown; mime?: unknown; url?: unknown } | null
-  return !!p && p.type === "file" && typeof p.mime === "string" && p.mime.startsWith("image/") && typeof p.url === "string" && p.url.startsWith("data:")
-}
+// ── 图片数据的形状判定 ─────────────────────────────────────────────────────────────
 
 /** `data:<mime>;base64,<payload>` → payload;不是 base64 data URL 就 undefined。 */
 export function dataUrlBase64(url: string): string | undefined {

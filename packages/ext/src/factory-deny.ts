@@ -56,3 +56,15 @@ export function applyFactoryDeny(cfg: Record<string, unknown>, deniedJson: strin
   }
   return applied
 }
+
+/** `CODEPUPPY_FACTORY_DENY_SKILLS`(JSON 数组)里的技能名;缺席 / 坏 / 空 ⇒ []。`#1665`:2.x 下禁用由 skill.transform 拿掉 +
+ *  permission.hook.evaluate 一律 deny 执行(不再写 `permission.skill`,2.x 没有整份配置的钩子)。 */
+export function factoryDeniedSkills(deniedJson: string | undefined): string[] {
+  if (!deniedJson) return []
+  try {
+    const names: unknown = JSON.parse(deniedJson)
+    return Array.isArray(names) ? names.filter((n): n is string => typeof n === "string" && n !== "") : []
+  } catch {
+    return []
+  }
+}

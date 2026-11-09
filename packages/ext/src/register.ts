@@ -13,11 +13,12 @@ import { PROJECT_HIDDEN_DIR } from "../../ui-mac/src/shared/project-hidden-dir"
 
 export const SAFE_NAME = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/
 
-/** 逐 type 字段白名单(与 ui-mac ext-config 的 SAFE_MCP_FIELDS 语义对齐;agent/command 对齐上游 v1 config 常用字段)。 */
+/** 逐 type 字段白名单(与 ui-mac ext-config 的 SAFE_MCP_FIELDS 语义对齐;agent/command 对齐上游 v1 config 常用字段)。
+ *  `#1665`:command 不再收 `subtask` —— 2.x 下项目命令由 ext 经插件 CommandEditor 注册,子任务语义插件接口给不了(编排器裁决 2026-11-09)。 */
 const ENTRY_FIELDS: Record<"mcp" | "agent" | "command", Set<string>> = {
   mcp: new Set(["type", "command", "args", "url", "environment", "headers", "enabled", "disabled", "cwd"]),
   agent: new Set(["description", "prompt", "mode", "model", "temperature", "top_p", "permission", "hidden", "disable", "tools", "color"]),
-  command: new Set(["template", "description", "agent", "model", "subtask"]),
+  command: new Set(["template", "description", "agent", "model"]),
 }
 
 export type RegisterType = "mcp" | "agent" | "command" | "skill"

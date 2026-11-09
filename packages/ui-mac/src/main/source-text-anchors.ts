@@ -204,6 +204,11 @@ export const DOWNGRADED_ANCHORS: Record<string, SourceTextEntry> = {
     evidence: "#1667",
     lines: 2,
   },
+  "packages/ui-mac/src/main/naming-before-v1-conversion.test.ts": {
+    why: "`#1667`(#1569 `l1r-naming-resume`)锚 index.ts 里 runNamingMigrationDbStep 的调用在两处 spawnLocalServer(boot / respawn)之前 —— 生产里「先改名、后起引擎转换」靠的是这个源码顺序。两个不会让它变红的变异:①改名一步挪进一个异步回调,回调在 spawnLocalServer 之后才执行(文本顺序不变);②在 index.ts 之外另开一条起 sidecar 的路径。index.ts 结构上进不了 bun;同文件第一条在沙箱真引擎上判顺序本身(生产顺序 ⇒ 2.x 里是新名,转换先跑 ⇒ 旧名留下)。",
+    evidence: "#1667",
+    lines: 1,
+  },
   "packages/ui-mac/src/main/sidecar-stop.test.ts": {
     why: "锚 sidecar.ts 的 stop 是否接在共享执行器上(含两条负全称:sidecar.ts 不得再出现 listener.stop(),sidecar.ts / sidecar-stop.ts 不得再出现 v1 的全局 dispose 路由 —— 2.x 下 404,`#1667` OOR-2)。两个不会让它变红的变异:①把 stopSidecarEngine 的实现改成直接 return;②在别的模块里再关一次引擎。sidecar.ts 顶层有副作用,import 不得;同 describe 里上面几条才是真行为判据,这一条只保证生产真的接在那上面。",
     evidence: "#911",

@@ -924,3 +924,45 @@ describe("#1664 含受审上游合并的分支:packages/ 以那个合并的上�
     expect(run.output).toContain(`上游父 ${upstream.slice(0, 7)}`)
   })
 })
+
+// ── `#1664`:scripts/assert-upstream-ancestor.sh —— 上游祖先不能被 squash / rebase 弄丢(裁决书 F2)────
+// 本仓 PR 默认 squash。squash 或 rebase 会把 M0 压成普通提交:树一字不差,上游祖先没了,merge-base 不前移。
+// 只比树的判据(上面的守卫、§2.3 第 4 步的树判据)看不出这件事,所以单列一条祖先判据,并在一个 squash 重放的
+// 夹具上证明它会红。夹具里的合并与 squash 都是测试数据。
+const ANCESTOR = resolve(REPO_ROOT, "scripts/assert-upstream-ancestor.sh")
+
+function runAncestor(repo: string, args: string[]): GuardRun {
+  const result = Bun.spawnSync(["bash", ANCESTOR, ...args], { cwd: repo, env: { ...GIT_ENV } })
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`
+  if (output.trim().length === 0) throw new Error("祖先检查一个字都没输出 —— 本次测量作废(不是通过)")
+  return { exitCode: result.exitCode, output }
+}
+
+describe("#1664 assert-upstream-ancestor.sh:上游合并必须留在历史里", () => {
+  test("真合并的分支 ⇒ 0;同一分支 squash 重放到 alpha 的临时副本上 ⇒ 1(树一字不差,祖先没了)", () => {
+    const { work, upstream } = upstreamMergeFixture()
+    commit(work, "a lane commit after M0", { [CODEPUPPY_FILE]: "export const codepuppyOwned = 2\n" })
+    const merged = runAncestor(work, [upstream])
+    expect(merged.exitCode, `真合并的分支被判成丢了祖先:\n${merged.output}`).toBe(0)
+
+    git(work, ["checkout", "-q", "-b", "alpha-copy", "origin/alpha"])
+    git(work, ["merge", "-q", "--squash", "feature"])
+    git(work, ["commit", "-q", "-m", "squash-merge the integration branch (the repo's default PR merge)"])
+    expect(git(work, ["rev-parse", "alpha-copy^{tree}"]), "squash 重放的树与原分支不同 —— 变异没构造对").toBe(
+      git(work, ["rev-parse", "feature^{tree}"]),
+    )
+    const squashed = runAncestor(work, [upstream])
+    expect(squashed.exitCode, `squash 重放之后祖先检查没红:\n${squashed.output}`).toBe(1)
+    expect(squashed.output).toContain("squash")
+
+    // 第二个参数是「合入后对 origin/alpha 再跑一次」那一跑的形状。
+    expect(runAncestor(work, [upstream, "feature"]).exitCode).toBe(0)
+  })
+
+  test("SHA 或 ref 解析不出、参数不对 ⇒ 2(测不到,不是通过)", () => {
+    const { work } = upstreamMergeFixture()
+    expect(runAncestor(work, ["0123456789abcdef0123456789abcdef01234567"]).exitCode).toBe(2)
+    expect(runAncestor(work, ["HEAD", "no-such-ref"]).exitCode).toBe(2)
+    expect(runAncestor(work, []).exitCode).toBe(2)
+  })
+})

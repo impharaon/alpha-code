@@ -59,6 +59,9 @@ describe("upstream rules the derivation restates", () => {
     for (const [action, resource] of [["mcp:policy:paid_action", "*"], ["mcp:other:x", "*"], ["builtin::read", "*"], ["edit", "src/a.ts"], ["edit", "docs/a.md"], ["unmatched", "x"]] as const)
       expect(evaluate(action, resource, rules)).toEqual(Permission.evaluate(action, resource, rules))
     expect(evaluate("anything", "x", [])).toEqual(Permission.evaluate("anything", "x", []))
+    // Several rulesets flatten in order, so a later ruleset's match wins (agent rules, then session rules).
+    const session = [{ action: "edit", resource: "src/*", effect: "allow" as const }]
+    expect(evaluate("edit", "src/a.ts", rules, session)).toEqual(Permission.evaluate("edit", "src/a.ts", rules, session))
   })
 })
 

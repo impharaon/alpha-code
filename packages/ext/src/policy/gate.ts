@@ -28,7 +28,11 @@ import { displaySnapshot } from "./display"
 /** Source name a ruleset-axis deny folds into the cap under (shown in Settings reasons). */
 export const RULESET_HARD_DENY_SOURCE = "permission-ruleset"
 
-/** OpenCode 2 `Permission.evaluate` (packages/core/src/permission.ts), restated; gate.test.ts pins it to upstream. */
+/**
+ * OpenCode 2 `Permission.evaluate` (packages/core/src/permission.ts), restated: that module imports the engine's bus,
+ * agents, session store and plugin hooks, so it is not a pure leaf the extension can import the way it imports
+ * `util/wildcard`. identity.test.ts compares the two case by case.
+ */
 export function evaluate(action: string, resource: string, ...rulesets: (readonly PermissionRule[])[]): PermissionRule {
   return (
     rulesets.flat().findLast((rule) => match(action, rule.action) && match(resource, rule.resource)) ?? {

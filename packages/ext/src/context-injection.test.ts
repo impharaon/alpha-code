@@ -1,15 +1,15 @@
-// REQ-157 `#1284` —— Alpha 注入模型上下文的咽喉(AC1)、上限响亮失败(AC2)、库存快照(AC3)。
+// REQ-157 `#1284` —— Alpha 注入模型上下文的咽喉(AC1)、上限响亮失败(AC2)、库存快照(AC3)。`#1665` 起对 OpenCode 2。
 //
-// 咽喉的完备性不靠「我列了四个注入点」这种散文,靠一条派生链,每一环都是可执行断言:
-//   ① `packages/plugin/src/index.ts` 的 `Hooks` 接口 = 插件能碰引擎的**全部**方式(单一权威)。
-//      从源码解析它的键集,与登记簿的 HOOK_CONTEXT_CLASS 键集比对 —— 上游加钩子、我们漏分类,即红。
-//   ② 真 CodePuppyExt 实现了的钩子里,分类为「载上下文」的那几个,集合必须逐字等于本文件设了咽喉的
-//      那几个 —— alpha 明天多实现一个 messages.transform 而没写咽喉,即红。
-//   ③ 每个咽喉:跑**真钩子**,把它送出去的每一个字符串与登记簿比对;并在同一测试里用一个
-//      **已知的坏**(包一层真钩子再多塞一段)证明判官看得见 —— 「先证明手段能测出已知的坏」。
+// 咽喉的完备性不靠「我列了几个注入点」这种散文,靠一条派生链,每一环都是可执行断言:
+//   ① 2.x 插件 Context 上的钩子(`packages/plugin/src/promise/` 的各 `*Hooks` 接口)与 transform domain = 插件能碰引擎的
+//      **全部**方式(单一权威)。从源码解析键集,与登记簿的 HOOK_CONTEXT_CLASS 键集比对 —— 上游加一个,我们漏分类,即红。
+//   ② 真 CodePuppyExt 注册了的通路里,分类为「载上下文」的那几个,集合必须逐字等于本文件设了咽喉的那几个 ——
+//      alpha 明天多注册一个 session.prompt 而没写咽喉,即红。
+//   ③ 每个咽喉:在**真插件宿主**里跑真钩子 / 真 transform,把它送出去的每一个字符串与登记簿比对;并在同一测试里用一个
+//      **已知的坏**(多塞一段)证明判官看得见 —— 「先证明手段能测出已知的坏」。
 //
-// ui-mac 经 cfg.instructions 写的两份 .md(`#1296`)与经 cfg.agent.* 写的三个 agent 的字(`#1299`)也在同一份登记簿里;
-// ui-mac 侧的咽喉(跑真 injectCodePuppyConfig、罩整份 config)在 packages/ui-mac/src/main/config-injection-throat.test.ts(`#1305`),
+// ui-mac 经 instructions 写的两份 .md(`#1296`)与经 agent 写的几个 agent 的字(`#1299`)也在同一份登记簿里;
+// ui-mac 侧的咽喉(跑真注入、罩整份 config)在 packages/ui-mac/src/main/config-injection-throat.test.ts(`#1305`),
 // 本文件只钉登记形状、判官与跨包前提(③e / ③f)。
 // 已知不覆盖:项目自己的 plugins / codepuppy.jsonc(用户的字);skills 正文与 MCP 工具表(别人的字)。
 
@@ -17,6 +17,11 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
+import { Effect } from "effect"
+import { PluginHooks } from "../../core/src/plugin/hooks.ts"
+import { Tool } from "../../core/src/tool.ts"
+import { Message } from "../../ai/src/schema/messages.ts"
+import * as Media from "../../ai/src/media.ts"
 import {
   applyRegisteredRebrands,
   BEHAVIOR_FRAGMENT_ID,
@@ -31,7 +36,6 @@ import {
   explainConfigReference,
   explainConfigString,
   explainInstructionBody,
-  explainAttachmentBlock,
   explainVisionBlock,
   HOOK_CONTEXT_CLASS,
   IDENTITY_FRAGMENT_ID,
@@ -45,7 +49,6 @@ import {
   uiMacAgentFragmentIds,
   VISION_SYSTEM_NOTE_OFFLINE_TEXT,
   VISION_SYSTEM_NOTE_TEMPLATE,
-  VISION_TOOL_INPUT_OMITTED_TEXT,
   VISION_TOOL_REFUSED_TEXT,
 } from "./context-injection"
 import { REBRAND_RULES } from "./prompt-rebrand"
@@ -53,44 +56,54 @@ import { CODEPUPPY_AGENT_TEXT } from "../../ui-mac/src/main/codepuppy-agents"
 import { CODEPUPPY_BEHAVIOR_MD } from "../../ui-mac/src/main/codepuppy-behavior"
 import { buildCodePuppyIdentity } from "../../ui-mac/src/main/codepuppy-identity"
 import { CLOUD_MCP_ARM_ENV, CLOUD_MCP_DEF_ENV, CLOUD_MCP_SERVER_ENV } from "./cloud-websearch-kill"
-import { ATTACHMENT_METADATA_KEY } from "../../ui-mac/src/shared/attachment-path"
+import CodePuppyExt from "./plugin"
+import { activate, it, recordingContext, recordingMcp } from "./plugin-host.harness"
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..", "..")
-const HOOKS_SOURCE = join(REPO_ROOT, "packages", "plugin", "src", "index.ts")
-const PROMPT_DIR = join(REPO_ROOT, "packages", "opencode", "src", "session", "prompt")
+const PROMISE_DIR = join(REPO_ROOT, "packages", "plugin", "src", "promise")
+const CORE_SRC = join(REPO_ROOT, "packages", "core", "src")
 const SNAPSHOT = join(import.meta.dir, "context-injection-inventory.snapshot.txt")
 
-// ── ① 单一权威:Hooks 接口的键集 ─────────────────────────────────────────────────
+// ── ① 单一权威:2.x 插件 Context 的钩子与 transform ────────────────────────────────
 
-function hooksInterfaceKeys(): string[] {
-  const src = readFileSync(HOOKS_SOURCE, "utf8")
-  const start = src.indexOf("export interface Hooks {")
-  if (start < 0) throw new Error(`Hooks 接口没找到:${HOOKS_SOURCE}`)
+/** 一个接口顶层成员的键(两格缩进;`readonly "a.b": …` 或 `name: …`)。 */
+function interfaceKeys(src: string, name: string): string[] {
+  const start = src.indexOf(`interface ${name} {`)
+  if (start < 0) throw new Error(`接口 ${name} 没找到`)
   const endMatch = /\n\}(\n|$)/.exec(src.slice(start))
-  if (!endMatch) throw new Error("Hooks 接口没有闭合")
-  const body = src.slice(start, start + endMatch.index)
+  if (!endMatch) throw new Error(`接口 ${name} 没有闭合`)
   const keys: string[] = []
-  for (const line of body.split("\n")) {
-    // 接口顶层成员 = 两格缩进 + 可选引号包住的键 + `?: `;嵌套成员缩进更深,注释不以标识符起头。
-    const m = /^ {2}"?([A-Za-z_][\w.]*)"?\?: /.exec(line)
-    if (m) keys.push(m[1])
+  for (const line of src.slice(start, start + endMatch.index).split("\n")) {
+    const m = /^ {2}(?:readonly )?"?([A-Za-z_][\w.]*)"?\??: /.exec(line)
+    if (m) keys.push(m[1]!)
   }
   return keys
 }
 
-describe("① 通路枚举派生自 packages/plugin 的 Hooks 接口", () => {
-  test("解析手段先测出已知的形状:≥15 个键、含三个已知钩子、无重复", () => {
-    const keys = hooksInterfaceKeys()
-    expect(keys.length).toBeGreaterThanOrEqual(15)
-    for (const k of ["config", "tool", "experimental.chat.system.transform", "chat.params"]) expect(keys).toContain(k)
+function pluginSurfaceKeys(): string[] {
+  const hookSpecs = { tool: "ToolHooks", session: "SessionHooks", permission: "PermissionHooks", shell: "ShellHooks", aisdk: "AISDKHooks" } as const
+  const keys = Object.entries(hookSpecs).flatMap(([domain, spec]) =>
+    interfaceKeys(readFileSync(join(PROMISE_DIR, `${domain}.ts`), "utf8"), spec).map((key) => `${domain}.${key}`),
+  )
+  for (const file of readdirSync(PROMISE_DIR).filter((f) => f.endsWith(".ts")).sort())
+    if (readFileSync(join(PROMISE_DIR, file), "utf8").includes("readonly transform: Transform<")) keys.push(`${file.slice(0, -3)}.transform`)
+  return keys
+}
+
+describe("① 通路枚举派生自 2.x 插件 Context(packages/plugin/src/promise)", () => {
+  test("解析手段先测出已知的形状:≥25 个键、含几个已知的钩子与 transform、无重复", () => {
+    const keys = pluginSurfaceKeys()
+    expect(keys.length).toBeGreaterThanOrEqual(25)
+    for (const k of ["tool.execute.before", "session.context", "session.model.request", "permission.evaluate", "aisdk.sdk", "agent.transform", "tool.transform"])
+      expect(keys).toContain(k)
     expect(new Set(keys).size).toBe(keys.length)
   })
-  test("HOOK_CONTEXT_CLASS 的键集与接口 1:1 —— 上游新增钩子而这里没分类,即红", () => {
-    expect([...hooksInterfaceKeys()].sort()).toEqual(Object.keys(HOOK_CONTEXT_CLASS).sort())
+  test("HOOK_CONTEXT_CLASS 的键集与源码 1:1 —— 上游新增钩子 / transform 而这里没分类,即红", () => {
+    expect([...pluginSurfaceKeys()].sort()).toEqual(Object.keys(HOOK_CONTEXT_CLASS).sort())
   })
 })
 
-// ── 真 CodePuppyExt 的装载夹具(与 platform-output-cap.test.ts 同形)────────────────────────
+// ── 夹具 ────────────────────────────────────────────────────────────────────────
 
 const SANITIZE = [
   "CODEPUPPY_FACTORY_SKILL_DIRS",
@@ -98,14 +111,13 @@ const SANITIZE = [
   "CODEPUPPY_PROMPT_REBRAND_DISABLE",
   "CODEPUPPY_EXT_VERBOSE",
   "CODEPUPPY_GLOBAL_DIR",
-  // `#1419`:云端识图的三个输入 —— 没有它们时 system.transform 走「云端不可用」那一句,chat.message 走失败块。
+  // `#1419`:云端识图的三个输入 —— 没有它们时 context 钩子走「云端不可用」那一句与失败块。
   "CODEPUPPY_BASE_URL",
   CLOUD_MCP_ARM_ENV,
   CLOUD_MCP_DEF_ENV,
   CLOUD_MCP_SERVER_ENV,
 ] as const
 
-type Hooks = Record<string, unknown>
 let root = ""
 const saved = new Map<string, string | undefined>()
 
@@ -129,45 +141,24 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true })
 })
 
-/** 引擎 `/provider` 的形状(Provider.ListResult 经 hey-api 信封):一个看不了图的模型、一个能看图的。 */
-const PROVIDER_LIST = {
-  data: {
-    all: [{ id: "alpha", models: { "glm-5": { capabilities: { input: { image: false } } }, "kimi-k3": { capabilities: { input: { image: true } } } } }],
-    default: {},
-    connected: [],
-  },
-}
+/** 本文件为之设了咽喉的通路。② 要求它与「真 CodePuppyExt 注册且分类为 context」的集合逐字相等。 */
+const THROATED = ["agent.transform", "command.transform", "mcp.transform", "session.context", "skill.transform", "tool.execute.after", "tool.transform"].sort()
 
-async function loadHooks(): Promise<Hooks> {
-  const { CodePuppyExt } = await import("./plugin")
-  return (await CodePuppyExt({
-    directory: join(root, "project"),
-    worktree: join(root, "project"),
-    client: { mcp: { status: async () => ({ data: {} }) }, instance: { dispose: async () => {} }, provider: { list: async () => PROVIDER_LIST } },
-  } as unknown as Parameters<typeof CodePuppyExt>[0])) as unknown as Hooks
-}
-
-/** 本文件为之设了咽喉的钩子。② 要求它与「真 CodePuppyExt 实现且分类为 context」的集合逐字相等。 */
-const THROATED = [
-  "chat.message",
-  "config",
-  "experimental.chat.messages.transform",
-  "experimental.chat.system.transform",
-  "tool",
-  "tool.execute.after",
-].sort()
-
-describe("② alpha 实现的每个载上下文钩子都有咽喉", () => {
-  test("实现集 ∩ context 分类 == 本文件设咽喉的集合;实现的每个钩子都在分类表里", async () => {
-    const hooks = await loadHooks()
-    const implemented = Object.keys(hooks)
-    for (const k of implemented) expect(Object.keys(HOOK_CONTEXT_CLASS), `钩子 ${k} 不在 HOOK_CONTEXT_CLASS 里`).toContain(k)
-    const ctx = implemented.filter((k) => HOOK_CONTEXT_CLASS[k as keyof typeof HOOK_CONTEXT_CLASS] === "context").sort()
+describe("② alpha 注册的每个载上下文通路都有咽喉", () => {
+  test("注册集 ∩ context 分类 == 本文件设咽喉的集合;注册的每个通路都在分类表里", async () => {
+    const recorded = recordingContext(join(root, "project"))
+    await CodePuppyExt.setup(recorded.context)
+    const registered = [
+      ...Object.keys(recorded.hooks),
+      ...Object.keys(recorded.transforms).map((domain) => `${domain}.transform`),
+    ]
+    for (const k of registered) expect(Object.keys(HOOK_CONTEXT_CLASS), `通路 ${k} 不在 HOOK_CONTEXT_CLASS 里`).toContain(k)
+    const ctx = registered.filter((k) => HOOK_CONTEXT_CLASS[k as keyof typeof HOOK_CONTEXT_CLASS] === "context").sort()
     expect(ctx).toEqual(THROATED)
   })
 })
 
-// ── ③a config 咽喉 ───────────────────────────────────────────────────────────────
+// ── ③a 配置域 transform 咽喉(agent / command / mcp / skill)────────────────────────
 
 type Leaf = { pointer: string; value: string }
 function stringLeaves(v: unknown, pointer = ""): Leaf[] {
@@ -179,109 +170,138 @@ function stringLeaves(v: unknown, pointer = ""): Leaf[] {
     )
   return []
 }
-/** 判官:hook 跑完后**新出现**的字符串叶子里,登记簿解释不了的那些。 */
-function unexplainedDelta(before: unknown, after: unknown): Leaf[] {
-  const had = new Set(stringLeaves(before).map((l) => `${l.pointer.length}:${l.pointer}${l.value}`))
-  return stringLeaves(after)
-    .filter((l) => !had.has(`${l.pointer.length}:${l.pointer}${l.value}`))
-    .filter((l) => !explainConfigString(l.pointer, l.value).ok)
+/**
+ * 执行命令时传的「用户参数」哨兵:发出的字里哨兵之外的部分才是 alpha 的字。用户敲的字不归登记簿(用户的字)。
+ * 判官先把哨兵换回模板占位符 `$ARGUMENTS`,再去掉「模板里没有占位符 ⇒ 用户的字接在后面」那一段,剩下的必须是登记过的模板
+ * (两头空白不算字:发出前整体 trim,与上游 `opencode.config.command` 同一规则)。
+ */
+const ARGS_SENTINEL = "⟦codepuppy-args⟧"
+function commandTemplateOf(sent: string): string {
+  return sent.replaceAll(ARGS_SENTINEL, "$ARGUMENTS").replace(/\n\n\$ARGUMENTS$/, "")
 }
-const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
-
-async function runConfig(cfg: Record<string, unknown>): Promise<{ before: unknown; after: Record<string, unknown> }> {
-  const hooks = await loadHooks()
-  const before = clone(cfg)
-  await (hooks.config as (c: unknown) => Promise<void>)(cfg)
-  return { before, after: cfg }
+function explainCommandText(sent: string): boolean {
+  const body = commandTemplateOf(sent)
+  return CONTEXT_INJECTIONS.some((f) => {
+    if (f.kind === "reference" || f.sink !== "command-template") return false
+    if (f.kind === "text") return f.text.trim() === body
+    if (f.kind === "template") {
+      const [head, tail] = f.template.trim().split("{name}")
+      return body.length >= head!.length + tail!.length && body.startsWith(head!) && body.endsWith(tail!)
+    }
+    return false
+  })
+}
+/** 判官:transform 之后新出现的叶子里登记簿解释不了的那些;`/commands/<name>/template` 按上面的命令文字判。 */
+function unexplainedWrites(after: unknown): Leaf[] {
+  return stringLeaves(after).filter((l) =>
+    /^\/commands\/[^/]+\/template$/.test(l.pointer) ? !explainCommandText(l.value) : !explainConfigString(l.pointer, l.value).ok,
+  )
 }
 
-describe("③a config 咽喉:hook 写进 cfg 的每个字符串都必须由登记簿解释", () => {
-  test("空 cfg:真 hook 注入之后零无解释叶子;且确实注入了(不是空跑)", async () => {
-    const { before, after } = await runConfig({})
+/**
+ * ext 经配置域 transform 写进引擎的东西,摊成一份「配置形状」:`/agents/<id>/{system,description}`、
+ * `/commands/<name>/{description,template}`(template = 用空参数执行该命令时发给会话的那段字)、`/mcp/<name>/…`。
+ * 只收字符串,所以 `mode` 一类枚举不进判官。transform 回调由本函数用记账的编辑器驱动(宿主里的接线在 plugin-host.test.ts)。
+ */
+async function extWrites(): Promise<Record<string, Record<string, Record<string, unknown>>>> {
+  const recorded = recordingContext(join(root, "project"))
+  await CodePuppyExt.setup(recorded.context)
+  const agents = new Map<string, Record<string, unknown>>()
+  for (const transform of recorded.transforms.agent ?? [])
+    transform({
+      get: (id: string) => agents.get(id),
+      update: (id: string, fn: (agent: Record<string, unknown>) => void) => {
+        const current = agents.get(id) ?? {}
+        fn(current)
+        agents.set(id, current)
+      },
+    } as never)
+  const definitions: Array<{ name: string; description?: string; execute: (input: unknown) => Promise<void> }> = []
+  for (const transform of recorded.transforms.command ?? []) transform({ add: (definition: never) => void definitions.push(definition) } as never)
+  const servers = new Map<string, unknown>()
+  for (const transform of recorded.transforms.mcp ?? [])
+    transform({
+      list: () => Array.from(servers),
+      get: (name: string) => servers.get(name),
+      set: (name: string, config: unknown) => void servers.set(name, config),
+      update: () => {},
+      remove: (name: string) => void servers.delete(name),
+    } as never)
+  const view: Record<string, Record<string, Record<string, unknown>>> = { agents: {}, commands: {}, mcp: {} }
+  for (const [id, agent] of agents)
+    view.agents[id] = Object.fromEntries(Object.entries(agent).filter(([key, value]) => (key === "system" || key === "description") && typeof value === "string"))
+  for (const definition of definitions) {
+    const before = recorded.invocations.length
+    await definition.execute({ sessionID: "ses_throat", prompt: { text: ARGS_SENTINEL }, delivery: "queue" })
+    const sent = recorded.invocations.slice(before).find((entry) => entry.call === "session.prompt")?.args[0] as { text?: string } | undefined
+    view.commands[definition.name] = { ...(definition.description ? { description: definition.description } : {}), ...(sent?.text !== undefined ? { template: sent.text } : {}) }
+  }
+  for (const [name, config] of servers) view.mcp[name] = config as Record<string, unknown>
+  return view
+}
+
+describe("③a 配置域 transform 咽喉:ext 写进 agent / command / mcp 的每个字符串都必须由登记簿解释", () => {
+  test("空项目:ext 写的零无解释叶子;且确实写了(不是空跑)", async () => {
+    const after = await extWrites()
     const leaves = stringLeaves(after)
     expect(leaves.length).toBeGreaterThanOrEqual(8)
-    for (const p of ["/command/init/template", "/command/review/template", "/agent/general/prompt", "/agent/docs/prompt", "/agent/docs/description"])
+    for (const p of ["/commands/init/template", "/commands/review/template", "/agents/general/system", "/agents/docs/system", "/agents/docs/description"])
       expect(leaves.map((l) => l.pointer)).toContain(p)
-    expect(unexplainedDelta(before, after)).toEqual([])
+    expect(unexplainedWrites(after)).toEqual([])
   })
   test("#1522 AC3:弃用占位只指向 /customize-codepuppy,不提供恢复路径", async () => {
-    const dir = join(root, "factory-skills")
-    mkdirSync(dir, { recursive: true })
     process.env.CODEPUPPY_FACTORY_DENY_SKILLS = JSON.stringify(["customize-opencode"])
-    process.env.CODEPUPPY_FACTORY_SKILL_DIRS = JSON.stringify([dir])
-    const { before, after } = await runConfig({})
-    const command = (after.command as Record<string, { description: string; template: string }>)["customize-opencode"]
+    const after = await extWrites()
+    const command = after.commands["customize-opencode"] as { description: string; template: string }
     expect(command.description).toBe("(已弃用)请使用 /customize-codepuppy")
-    expect(command.template).toBe("该技能(customize-opencode)已弃用。定制 Code Puppy 请改用 /customize-codepuppy。")
-    const pointers = stringLeaves(after).map((l) => l.pointer)
-    expect(pointers).toContain("/command/customize-opencode/template")
-    expect(pointers).toContain("/command/customize-opencode/description")
-    expect(pointers).toContain("/permission/skill/customize-opencode")
-    expect(pointers).toContain("/skills/paths/0")
-    expect(explainConfigString("/command/customize-opencode/template", (after.command as any)["customize-opencode"].template)).toEqual({
-      ok: true,
-      id: "command.factory-denied.template",
-      kind: "template",
-    })
-    expect(unexplainedDelta(before, after)).toEqual([])
+    expect(commandTemplateOf(command.template)).toBe("该技能(customize-opencode)已弃用。定制 Code Puppy 请改用 /customize-codepuppy。")
+    expect(explainConfigString("/commands/customize-opencode/template", commandTemplateOf(command.template))).toEqual({ ok: true, id: "command.factory-denied.template", kind: "template" })
+    expect(unexplainedWrites(after)).toEqual([])
   })
-  test("用户已有的字不是 alpha 的注入:判官只看 hook 新写入的叶子", async () => {
-    const { before, after } = await runConfig({
-      command: { init: { template: "user's own init", description: "mine" } },
-      agent: { general: { prompt: "user general" } },
-      instructions: ["/Users/someone/AGENTS.md"],
-    })
-    expect(unexplainedDelta(before, after)).toEqual([])
-    expect((after.command as any).init.template).toBe("user's own init")
+  test("云 MCP 定义落在声明过的引用 /mcp 下(ARM + DEF 在场时 ext 装进去)", async () => {
+    process.env[CLOUD_MCP_ARM_ENV] = "codepuppy"
+    process.env[CLOUD_MCP_DEF_ENV] = JSON.stringify({ type: "remote", url: "https://cloud.invalid/mcp", oauth: false })
+    const after = await extWrites()
+    expect(after.mcp.codepuppy).toEqual({ type: "remote", url: "https://cloud.invalid/mcp", oauth: false })
+    expect(unexplainedWrites(after)).toEqual([])
   })
-  test("已知的坏 ①:绕过登记簿写一个 agent prompt —— 判官点名那一条", async () => {
-    const { before, after } = await runConfig({})
-    ;(after.agent as Record<string, unknown>).rogue = { prompt: "rogue prompt written straight into cfg" }
-    expect(unexplainedDelta(before, after)).toEqual([{ pointer: "/agent/rogue/prompt", value: "rogue prompt written straight into cfg" }])
+  test("已知的坏 ①:绕过登记簿写一个 agent system —— 判官点名那一条", async () => {
+    const after = await extWrites()
+    after.agents.rogue = { system: "rogue prompt written straight into the agent" }
+    expect(unexplainedWrites(after)).toEqual([{ pointer: "/agents/rogue/system", value: "rogue prompt written straight into the agent" }])
   })
   test("已知的坏 ②:往一个登记簿从没声明过的键(instructions)塞东西 —— 不是白名单,新 pointer 照样红", async () => {
-    const { before, after } = await runConfig({})
-    after.instructions = ["/tmp/sneaky.md"]
-    expect(unexplainedDelta(before, after).map((l) => l.pointer)).toEqual(["/instructions/0"])
+    const after = (await extWrites()) as Record<string, unknown>
+    after.instructions = { 0: "/tmp/sneaky.md" }
+    expect(unexplainedWrites(after).map((l) => l.pointer)).toEqual(["/instructions/0"])
   })
   test("已知的坏 ③:登记过的文字被改动一个字节 —— 逐字比对,不是「像」", async () => {
-    const { before, after } = await runConfig({})
-    ;(after.command as any).init.template += "!"
-    expect(unexplainedDelta(before, after).map((l) => l.pointer)).toEqual(["/command/init/template"])
+    const after = await extWrites()
+    ;(after.commands.init as { template: string }).template += "!"
+    expect(unexplainedWrites(after).map((l) => l.pointer)).toEqual(["/commands/init/template"])
+    // 用户参数之外多出一段字(不是登记过的模板 + 用户的字)同样点名
+    ;(after.commands.init as { template: string }).template = "rogue " + ARGS_SENTINEL
+    expect(unexplainedWrites(after).map((l) => l.pointer)).toEqual(["/commands/init/template"])
   })
   test("已知的坏 ④:模板实例前后缀之外多了字 —— 模板识别是前后缀逐字,不是包含", () => {
     const good = renderTemplate("command.factory-denied.template", { name: "x" })
-    expect(explainConfigString("/command/x/template", good).ok).toBe(true)
-    expect(explainConfigString("/command/x/template", good + " and more").ok).toBe(false)
-    expect(explainConfigString("/command/x/template", "prefix " + good).ok).toBe(false)
+    expect(explainConfigString("/commands/x/template", good).ok).toBe(true)
+    expect(explainConfigString("/commands/x/template", good + " and more").ok).toBe(false)
+    expect(explainConfigString("/commands/x/template", "prefix " + good).ok).toBe(false)
   })
-  test("已知的坏 ⑤(`#1305`):explainConfigReference 只认引用 —— ui-mac 六条引用子树解释得通;登记过的文字放在没登记 sink 的位置不由它放行;/instructions 仍不是引用;段边界精确", () => {
+  test("已知的坏 ⑤(`#1305`):explainConfigReference 只认引用 —— ui-mac 的引用子树解释得通;登记过的文字放在没登记 sink 的位置不由它放行;/instructions 仍不是引用;段边界精确", () => {
     for (const p of ["/$schema", "/plugin/0", "/enabled_providers/1", "/model", "/provider/alpha/models/x/variants/高/reasoning/effort", "/mcp/cloud/headers/Authorization"])
       expect(explainConfigReference(p).ok, p).toBe(true)
     expect(explainConfigReference("/provider")).toEqual({ ok: true, id: "ref.provider", kind: "reference" })
-    for (const p of ["/command/x/template", "/instructions/0", "/agent/x/prompt", "/providers/x", "/provider_extra", "/models", "/permission/websearch", ""])
+    for (const p of ["/commands/x/template", "/instructions/0", "/agents/x/system", "/providers/x", "/provider_extra", "/models", "/permission/websearch", ""])
       expect(explainConfigReference(p).ok, p).toBe(false)
-    // 与 explainConfigString 的分工:后者还认文字与模板,前者只认引用 —— 同一段登记文字放在 /command/x/template 上,两者结论不同
-    expect(explainConfigString("/command/x/template", contextText("command.init.template")).ok).toBe(true)
-    expect(explainConfigReference("/command/x/template").ok).toBe(false)
+    expect(explainConfigString("/commands/x/template", contextText("command.init.template")).ok).toBe(true)
+    expect(explainConfigReference("/commands/x/template").ok).toBe(false)
   })
 })
 
-describe("③a′ `#1531`:codepuppy_hub_install 动词的两条引用", () => {
-  test("全局与每个 agent 末位的 codepuppy_hub_install 解释得通;单段通配只吃恰好一段,不放行同 agent 的别的键、多一段或空段", () => {
-    for (const p of ["/permission/codepuppy_hub_install", "/agent/build/permission/codepuppy_hub_install", "/agent/codepuppy-automation/permission/codepuppy_hub_install"])
-      expect(explainConfigReference(p).ok, p).toBe(true)
-    for (const p of ["/agent/build/permission/bash", "/agent/build/prompt", "/agent/permission/codepuppy_hub_install", "/agent//permission/codepuppy_hub_install", "/agent/a/b/permission/codepuppy_hub_install", "/permission/hub_installer"])
-      expect(explainConfigReference(p).ok, p).toBe(false)
-  })
-})
+// ── ③b session.hook.context 的 system 咽喉 ──────────────────────────────────────
 
-// ── ③b system.transform 咽喉 ────────────────────────────────────────────────────
-
-type SystemHook = (input: { sessionID?: string; model: unknown }, output: { system: string[] }) => Promise<void>
-/** 引擎递进来的 Provider.Model,这里只给判据要读的那一格:能看图 / 看不了图。 */
-const SEES_IMAGES = { id: "kimi-k3", providerID: "alpha", capabilities: { input: { image: true } } }
-const BLIND = { id: "glm-5", providerID: "alpha", capabilities: { input: { image: false } } }
 /** `#1419`:看不了图的模型末尾允许**恰好一段**登记过的 vision 系统说明(sink=system 的 text,或模板的渲染实例)。 */
 function isRegisteredVisionNote(segment: string): boolean {
   if (segment === VISION_SYSTEM_NOTE_OFFLINE_TEXT) return true
@@ -294,370 +314,264 @@ function unexplainedSystem(input: readonly string[], output: readonly string[]):
   const extra = output.length - input.length
   if (extra < 0 || extra > 1) bad.push(`segment count ${input.length} → ${output.length}`)
   for (let i = 0; i < Math.min(input.length, output.length); i++)
-    if (output[i] !== applyRegisteredRebrands(input[i])) bad.push(`segment ${i} differs from registered substitutions`)
+    if (output[i] !== applyRegisteredRebrands(input[i]!)) bad.push(`segment ${i} differs from registered substitutions`)
   if (extra === 1 && !isRegisteredVisionNote(output[output.length - 1]!)) bad.push("trailing segment is not a registered vision note")
   return bad
 }
-async function runSystem(system: string[], model: unknown = SEES_IMAGES): Promise<string[]> {
-  const hooks = await loadHooks()
-  const out = { system: [...system] }
-  await (hooks["experimental.chat.system.transform"] as SystemHook)({ model }, out)
-  return out.system
-}
 
-describe("③b system.transform 咽喉:输出 == 输入 + 登记过的替换,一个字不多", () => {
+/** 旁路插件:真 provider / model 服务里一个能看图、一个看不了图的模型。 */
+const visionModels = {
+  id: "test.ctx-models",
+  async setup(context: { provider: { transform: (cb: (editor: { add: (input: unknown) => void }) => void) => Promise<unknown> } }) {
+    await context.provider.transform((editor) =>
+      editor.add({
+        info: { id: "alpha", name: "alpha", activation: "auto", package: "@opencode/ai/providers/openai-compatible" },
+        models: [
+          ["glm-5", ["text"]],
+          ["kimi-k3", ["text", "image"]],
+        ].map(([id, input]) => ({ id, modelID: id, providerID: "alpha", name: id, capabilities: { tools: true, input, output: ["text"] }, variants: [], time: { released: 0 }, cost: [], status: "active", enabled: true, limit: { context: 128000, output: 32000 } })),
+      }),
+    )
+  },
+} as never
+const SEES = { providerID: "alpha", id: "kimi-k3" }
+const BLIND = { providerID: "alpha", id: "glm-5" }
+
+const runContext = (system: string[], model: unknown, messages: unknown[] = []) =>
+  Effect.gen(function* () {
+    const hooks = yield* PluginHooks.Service
+    return yield* hooks.trigger("session", "context", {
+      sessionID: "ses_throat" as never,
+      agent: "build" as never,
+      model: model as never,
+      system: system.map((text) => ({ type: "text" as const, text })),
+      messages: messages as never,
+      options: {},
+      tools: {},
+    })
+  })
+const systemOf = (event: { system: Array<{ text: string }> }) => event.system.map((part) => part.text)
+const baseFiles = () => [
+  "session/runner/prompt/system.txt",
+  ...readdirSync(join(CORE_SRC, "plugin/system-prompt"))
+    .filter((f) => f.endsWith(".txt"))
+    .sort()
+    .map((f) => `plugin/system-prompt/${f}`),
+]
+const readBase = (f: string) => readFileSync(join(CORE_SRC, f), "utf8").replaceAll("${OPENCODE_TOOL_GUIDANCE}", "")
+
+describe("③b system 咽喉:输出 == 输入 + 登记过的替换,一个字不多", () => {
   test("登记簿的 rebrand 集合与 REBRAND_RULES 1:1(id 与 to 逐字)", () => {
     const registered = CONTEXT_INJECTIONS.filter((f) => f.kind === "rebrand")
     expect(registered.map((f) => f.id)).toEqual(REBRAND_RULES.map((r) => `rebrand.${r.id}`))
     expect(registered.map((f) => (f.kind === "rebrand" ? f.to : ""))).toEqual(REBRAND_RULES.map((r) => r.to))
   })
-  test("全部上游底座 .txt 过真钩子:零无解释差异,且至少一份真的被改写了(不是空跑)", async () => {
-    const files = readdirSync(PROMPT_DIR).filter((f) => f.endsWith(".txt")).sort()
-    expect(files.length).toBeGreaterThanOrEqual(10)
-    let changed = 0
-    for (const f of files) {
-      const input = [readFileSync(join(PROMPT_DIR, f), "utf8")]
-      const output = await runSystem(input)
-      expect(unexplainedSystem(input, output), f).toEqual([])
-      if (output[0] !== input[0]) changed += 1
-    }
-    expect(changed).toBeGreaterThanOrEqual(1)
+  it.live("全部上游底座过真钩子(能看图的模型):零无解释差异,且至少一份真的被改写了(不是空跑)", () =>
+    Effect.gen(function* () {
+      yield* activate(visionModels)
+      yield* activate(CodePuppyExt)
+      const files = baseFiles()
+      expect(files.length).toBeGreaterThanOrEqual(7)
+      let changed = 0
+      for (const f of files) {
+        const input = [readBase(f)]
+        const output = systemOf(yield* runContext(input, SEES))
+        expect([f, unexplainedSystem(input, output)]).toEqual([f, []])
+        if (output[0] !== input[0]) changed += 1
+      }
+      expect(changed).toBeGreaterThanOrEqual(1)
+      expect(systemOf(yield* runContext([], SEES))).toEqual([])
+      expect(systemOf(yield* runContext(["nothing to rebrand here"], SEES))).toEqual(["nothing to rebrand here"])
+    }),
+  )
+  test("已知的坏:多推一段 / 多接几个字 —— 判官都点名", () => {
+    const input = [readBase("plugin/system-prompt/kimi.txt")]
+    const good = input.map(applyRegisteredRebrands)
+    expect(unexplainedSystem(input, [...good, "rogue extra segment"])).toEqual(["trailing segment is not a registered vision note"])
+    expect(unexplainedSystem(input, [...good, "rogue", "second rogue"])).toEqual(["segment count 1 → 3"])
+    expect(unexplainedSystem(input, [good[0] + " rogue tail"])).toEqual(["segment 0 differs from registered substitutions"])
   })
-  test("空输入与中性输入原样返回", async () => {
-    expect(await runSystem([])).toEqual([])
-    expect(await runSystem(["nothing to rebrand here"])).toEqual(["nothing to rebrand here"])
-  })
-  test("已知的坏:包一层真钩子再多推一段 / 多接几个字 —— 判官都点名", async () => {
-    const hooks = await loadHooks()
-    const real = hooks["experimental.chat.system.transform"] as SystemHook
-    const input = [readFileSync(join(PROMPT_DIR, "anthropic.txt"), "utf8")]
-    const pushed = { system: [...input] }
-    await real({ model: SEES_IMAGES }, pushed)
-    pushed.system.push("rogue extra segment")
-    expect(unexplainedSystem(input, pushed.system)).toEqual(["trailing segment is not a registered vision note"])
-    pushed.system.push("second rogue segment")
-    expect(unexplainedSystem(input, pushed.system)).toEqual(["segment count 1 → 3"])
-    const appended = { system: [...input] }
-    await real({ model: SEES_IMAGES }, appended)
-    appended.system[0] += " rogue tail"
-    expect(unexplainedSystem(input, appended.system)).toEqual(["segment 0 differs from registered substitutions"])
-  })
-  test("`#1419` 看不了图的模型:恰好多一段,且是登记过的说明;云端不可用 ⇒ 离线那一句,可用 ⇒ 带工具 id 的那一句;两句都不提 gemini", async () => {
-    const input = [readFileSync(join(PROMPT_DIR, "anthropic.txt"), "utf8")]
-    const offline = await runSystem(input, BLIND)
-    expect(unexplainedSystem(input, offline)).toEqual([])
-    expect(offline.length).toBe(2)
-    expect(offline[1]).toBe(VISION_SYSTEM_NOTE_OFFLINE_TEXT)
-    // 云端可用:CODEPUPPY_BASE_URL + 云 MCP 定义(带 {file:} 凭据,文件在场)+ server 名
-    const token = join(root, "mcp-token")
-    writeFileSync(token, "tok-throat\n")
-    process.env.CODEPUPPY_BASE_URL = "https://gateway.invalid/v1"
-    process.env[CLOUD_MCP_SERVER_ENV] = "codepuppy"
-    process.env[CLOUD_MCP_DEF_ENV] = JSON.stringify({ type: "remote", url: "https://cloud.invalid/mcp", enabled: true, headers: { Authorization: `Bearer {file:${token}}` }, oauth: false })
-    const online = await runSystem(input, BLIND)
-    expect(unexplainedSystem(input, online)).toEqual([])
-    expect(online.length).toBe(2)
-    expect(online[1]).toContain("codepuppy_vision")
-    for (const note of [offline[1]!, online[1]!]) expect(/gemini/i.test(note), note).toBe(false)
-    // 能力未知(引擎没给 capabilities)按看不了图处理 —— fail-closed,多一次识图不漏识
-    const unknown = await runSystem(input, {})
-    expect(unexplainedSystem(input, unknown)).toEqual([])
-    expect(unknown.length).toBe(2)
-    // 已知的坏:说明句被改一个字 / 说明之后又多一段 —— 判官都点名
-    const tampered = [...online]
-    tampered[1] += "!"
-    expect(unexplainedSystem(input, tampered)).toEqual(["trailing segment is not a registered vision note"])
-    expect(unexplainedSystem(input, [...online, "rogue"])).toEqual(["segment count 1 → 3"])
-  })
+  it.live("`#1419` 看不了图的模型:恰好多一段,且是登记过的说明;云端不可用 ⇒ 离线那一句,可用 ⇒ 带工具 id 的那一句;两句都不提 gemini;能力未知按看不了图", () =>
+    Effect.gen(function* () {
+      yield* activate(visionModels)
+      yield* activate(CodePuppyExt)
+      const input = [readBase("plugin/system-prompt/anthropic.txt")]
+      const offline = systemOf(yield* runContext(input, BLIND))
+      expect(unexplainedSystem(input, offline)).toEqual([])
+      expect(offline).toHaveLength(2)
+      expect(offline[1]).toBe(VISION_SYSTEM_NOTE_OFFLINE_TEXT)
+      const token = join(root, "mcp-token")
+      writeFileSync(token, "tok-throat\n")
+      process.env.CODEPUPPY_BASE_URL = "https://gateway.invalid/v1"
+      process.env[CLOUD_MCP_SERVER_ENV] = "codepuppy"
+      process.env[CLOUD_MCP_DEF_ENV] = JSON.stringify({ type: "remote", url: "https://cloud.invalid/mcp", headers: { Authorization: `Bearer {file:${token}}` }, oauth: false })
+      const online = systemOf(yield* runContext(input, BLIND))
+      expect(unexplainedSystem(input, online)).toEqual([])
+      expect(online[1]).toContain("codepuppy_vision")
+      for (const note of [offline[1]!, online[1]!]) expect(/gemini/i.test(note)).toBe(false)
+      const unknown = systemOf(yield* runContext(input, { providerID: "alpha", id: "ghost" }))
+      expect(unexplainedSystem(input, unknown)).toEqual([])
+      expect(unknown).toHaveLength(2)
+      const tampered = [...online]
+      tampered[1] += "!"
+      expect(unexplainedSystem(input, tampered)).toEqual(["trailing segment is not a registered vision note"])
+    }),
+  )
 })
 
 // ── ③c 工具表咽喉 ───────────────────────────────────────────────────────────────
 
-/** zod 4.1.8 实测:`.describe()` 后再 `.default()`,description 挂在 innerType 上 —— 顺链找。 */
-function zodDescription(schema: unknown): string | undefined {
-  let s = schema as { description?: unknown; _def?: { innerType?: unknown }; def?: { innerType?: unknown } } | undefined
-  for (let i = 0; i < 8 && s; i++) {
-    if (typeof s.description === "string") return s.description
-    s = (s._def?.innerType ?? s.def?.innerType) as typeof s
-  }
-  return undefined
-}
-type ToolMap = Record<string, { description: string; args: Record<string, unknown> }>
-/** 判官:每个工具的 description 与每个参数的 description 都必须是登记项;登记项也不许多出实际没有的工具。 */
-function unexplainedTools(tools: ToolMap): string[] {
+type ToolView = Record<string, { description: string; args: Record<string, string | undefined> }>
+/** 判官:每个工具的 description 与每个入参的 description 都必须是登记项;登记项也不许多出实际没有的工具。 */
+function unexplainedTools(tools: ToolView): string[] {
   const bad: string[] = []
   const byId = new Map(CONTEXT_INJECTIONS.filter((f) => f.kind === "text").map((f) => [f.id, f.kind === "text" ? f.text : ""]))
   for (const [name, t] of Object.entries(tools)) {
     if (byId.get(`tool.${name}.description`) !== t.description) bad.push(`tool.${name}.description`)
-    for (const [arg, schema] of Object.entries(t.args))
-      if (byId.get(`tool.${name}.args.${arg}`) !== zodDescription(schema)) bad.push(`tool.${name}.args.${arg}`)
+    for (const [arg, description] of Object.entries(t.args)) if (byId.get(`tool.${name}.args.${arg}`) !== description) bad.push(`tool.${name}.args.${arg}`)
   }
-  const actualIds = new Set(
-    Object.entries(tools).flatMap(([name, t]) => [`tool.${name}.description`, ...Object.keys(t.args).map((a) => `tool.${name}.args.${a}`)]),
-  )
+  const actualIds = new Set(Object.entries(tools).flatMap(([name, t]) => [`tool.${name}.description`, ...Object.keys(t.args).map((a) => `tool.${name}.args.${a}`)]))
   for (const id of byId.keys()) if (id.startsWith("tool.") && !actualIds.has(id)) bad.push(`stale registration ${id}`)
   return bad
 }
+/** 真宿主工具注册表里 ext 的工具 → 工具表上模型看到的 description 与每个入参的 description(JSON schema 的 properties)。 */
+const toolView = Effect.gen(function* () {
+  const tools = yield* Tool.Service
+  const view: ToolView = {}
+  for (const tool of yield* tools.list()) {
+    if (!(tool.id in TOOL_TEXT)) continue
+    const properties = ((tool.input as { properties?: Record<string, { description?: string }> }).properties ?? {}) as Record<string, { description?: string }>
+    view[tool.id] = { description: tool.description, args: Object.fromEntries(Object.entries(properties).map(([arg, schema]) => [arg, schema.description])) }
+  }
+  return view
+})
 
 describe("③c 工具表咽喉:每个 description 都是登记项,登记项也不许有实际没有的工具", () => {
-  test("真 CodePuppyExt 的工具:零无解释;且 TOOL_TEXT 的键集 == 实际工具名", async () => {
-    const hooks = await loadHooks()
-    const tools = hooks.tool as ToolMap
-    expect(Object.keys(tools).sort()).toEqual(Object.keys(TOOL_TEXT).sort())
-    // #1578 AC5:引擎只在旧式(默认导出一个函数)装载路径上挂随包清单证明(packages/opencode/src/plugin/index.ts
-    // applyPlugin);改成 V1 `{ server }` 导出 ⇒ 自有工具静默降级为第三方。构建期清单的工具名 = 上一行的 TOOL_TEXT 键。
-    expect(typeof (await import("./plugin")).default).toBe("function")
-    expect(unexplainedTools(tools)).toEqual([])
-  })
-  test("REQ-232 AC1 codepuppy_access is available without Cloud MCP and returns a login entry", async () => {
-    const hooks = await loadHooks()
-    const access = (hooks.tool as Record<string, { execute: () => Promise<{ output: string }> }>).codepuppy_access
-    expect(access).toBeDefined()
-    expect(JSON.parse((await access.execute()).output)).toEqual({
-      logged_in: false, state: "logged-out", cloud_tools_enabled: false,
-      login_hint: "在 CodePuppy 左侧栏账户区点「登录」,或打开定制中心的云端页点登录;登录完成后下一条消息起云端工具可用。",
-    })
-    process.env.CODEPUPPY_BASE_URL = "https://gateway.invalid/v1"
-    const { materializeCloudMcpConfig } = await import("../../ui-mac/src/main/cloud-sidecar-config")
-    // The real desktop producer; an existing directory makes a file-content read throw.
-    process.env[CLOUD_MCP_DEF_ENV] = JSON.stringify(materializeCloudMcpConfig("https://cloud.invalid/mcp", `{file:${root}}`))
-    const ready = JSON.parse((await access.execute()).output)
-    expect(ready).toMatchObject({ logged_in: true, state: "ready", cloud_tools_enabled: false })
-    expect(JSON.stringify(ready)).not.toContain(root)
-  })
-  test("zodDescription 先测出已知的形状:describe 后 default 也取得到", () => {
-    const { tool } = require("@opencode-ai/plugin") as typeof import("@opencode-ai/plugin")
-    expect(zodDescription(tool.schema.string().describe("d1").default(""))).toBe("d1")
-    expect(zodDescription(tool.schema.boolean().describe("d2").default(false))).toBe("d2")
-    expect(zodDescription(tool.schema.enum(["a", "b"]).describe("d3"))).toBe("d3")
-    expect(zodDescription(tool.schema.string())).toBeUndefined()
-  })
-  test("已知的坏:多一个未登记的工具 / 改一个 description / 登记簿多一条 —— 判官各点名", async () => {
-    const hooks = await loadHooks()
-    const tools = hooks.tool as ToolMap
-    expect(unexplainedTools({ ...tools, rogue: { description: "unregistered tool", args: {} } })).toEqual(["tool.rogue.description"])
-    expect(unexplainedTools({ ...tools, codepuppy_ping: { ...tools.codepuppy_ping, description: tools.codepuppy_ping.description + "!" } })).toEqual([
-      "tool.codepuppy_ping.description",
-    ])
-    const { codepuppy_ping: _drop, ...rest } = tools
-    expect(unexplainedTools(rest)).toEqual(["stale registration tool.codepuppy_ping.description", "stale registration tool.codepuppy_ping.args.note"])
-  })
+  it.live("真宿主里 ext 的工具:零无解释;且 TOOL_TEXT 的键集 == 实际工具名", () =>
+    Effect.gen(function* () {
+      yield* activate(CodePuppyExt)
+      const tools = yield* toolView
+      expect(Object.keys(tools).sort()).toEqual(Object.keys(TOOL_TEXT).sort())
+      expect(unexplainedTools(tools)).toEqual([])
+      // 已知的坏:多一个未登记的工具 / 改一个 description / 登记簿多一条 —— 判官各点名
+      expect(unexplainedTools({ ...tools, rogue: { description: "unregistered tool", args: {} } })).toEqual(["tool.rogue.description"])
+      expect(unexplainedTools({ ...tools, codepuppy_ping: { ...tools.codepuppy_ping!, description: tools.codepuppy_ping!.description + "!" } })).toEqual([
+        "tool.codepuppy_ping.description",
+      ])
+      const { codepuppy_ping: _drop, ...rest } = tools
+      expect(unexplainedTools(rest)).toEqual(["stale registration tool.codepuppy_ping.description", "stale registration tool.codepuppy_ping.args.note"])
+    }),
+  )
+  it.live("REQ-232 AC1 codepuppy_access is available without Cloud MCP and returns a login entry", () =>
+    Effect.gen(function* () {
+      yield* activate(CodePuppyExt)
+      const tools = yield* Tool.Service
+      const snapshot = yield* tools.snapshot()
+      const call = () =>
+        snapshot.execute({ sessionID: "ses_a" as never, agent: "build" as never, messageID: "msg_a" as never, call: { type: "tool-call", id: "call_a", name: "codepuppy_access", input: {} } })
+      const text = (result: { content: unknown }) => JSON.parse((result.content as Array<{ text: string }>)[0]!.text)
+      expect(text(yield* call())).toEqual({
+        logged_in: false,
+        state: "logged-out",
+        cloud_tools_enabled: false,
+        login_hint: "在 CodePuppy 左侧栏账户区点「登录」,或打开定制中心的云端页点登录;登录完成后下一条消息起云端工具可用。",
+      })
+      process.env.CODEPUPPY_BASE_URL = "https://gateway.invalid/v1"
+      const { materializeCloudMcpConfig } = yield* Effect.promise(() => import("../../ui-mac/src/main/cloud-sidecar-config"))
+      // The real desktop producer; an existing directory makes a file-content read throw.
+      process.env[CLOUD_MCP_DEF_ENV] = JSON.stringify(materializeCloudMcpConfig("https://cloud.invalid/mcp", `{file:${root}}`))
+      const ready = text(yield* call())
+      expect(ready).toMatchObject({ logged_in: true, state: "ready", cloud_tools_enabled: false })
+      expect(JSON.stringify(ready)).not.toContain(root)
+    }),
+  )
 })
 
 // ── ③d tool.execute.after 咽喉 ───────────────────────────────────────────────────
 
-type AfterHook = (
-  input: { tool: string; sessionID: string; callID: string; args: unknown },
-  output: { title: string; output: string; metadata: unknown; attachments?: unknown[]; content?: unknown[] },
-) => Promise<void>
-
-/** 一张真的 1×1 PNG(base64);这里的判据不需要它能被识别,只需要它是引擎会当图片附件的形状。 */
-const PNG_1x1 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
-const imagePart = (id: string, filename?: string) => ({ id, type: "file", mime: "image/png", url: `data:image/png;base64,${PNG_1x1}`, ...(filename ? { filename } : {}) })
-
-describe("③d tool.execute.after 咽喉:工具结果回模型的路上,alpha 加的每个字都由登记簿解释", () => {
-  test("非云工具的结果原样;已知的坏:包一层再改 output —— 判官点名", async () => {
-    const hooks = await loadHooks()
-    const real = hooks["tool.execute.after"] as AfterHook
-    const output = { title: "t", output: "tool said this", metadata: { a: 1 } }
-    const before = clone(output)
-    await real({ tool: "bash", sessionID: "s", callID: "c", args: {} }, output)
-    expect(output).toEqual(before)
-    const rogue: AfterHook = async (i, o) => {
-      await real(i, o)
-      o.output += "\n[alpha appended]"
-    }
-    const o2 = { title: "t", output: "tool said this", metadata: {} }
-    await rogue({ tool: "bash", sessionID: "s", callID: "c", args: {} }, o2)
-    expect(o2.output).not.toBe("tool said this")
-  })
-  test("`#1419` Read 读到图片、模型看不了图、云端不可用:output 尾部多出的每一行都是登记项(失败块);附件原样留着;metadata 打了标记", async () => {
-    const hooks = await loadHooks()
-    const real = hooks["tool.execute.after"] as AfterHook
-    const output = { title: "a.png", output: "Image read successfully", metadata: { preview: "x" }, attachments: [imagePart("prt_img1")] }
-    await real({ tool: "read", sessionID: "s-read", callID: "c", args: { filePath: "shots/a.png" } }, output)
-    const lines = output.output.split("\n")
-    expect(lines[0]).toBe("Image read successfully")
-    expect(lines.length).toBe(2)
-    expect(explainVisionBlock(lines[1]!)).toEqual({ ok: true, id: "vision.failure.not-logged-in", kind: "template" })
-    expect(output.attachments.length).toBe(1)
-    expect((output.metadata as Record<string, unknown>).codepuppy_vision).toBeDefined()
-    // 已知的坏:块尾多一个字节 / 整行换成散文 —— 判官都不解释
-    expect(explainVisionBlock(lines[1]! + "!").ok).toBe(false)
-    expect(explainVisionBlock("the image shows a login page").ok).toBe(false)
-  })
+describe("③d tool.execute.after 咽喉:工具结果回模型的路上,alpha 换进去的每个字都由登记簿解释", () => {
+  const after = (tool: string, result: unknown) =>
+    Effect.gen(function* () {
+      const hooks = yield* PluginHooks.Service
+      return yield* hooks.trigger("tool", "execute.after", {
+        tool,
+        sessionID: "ses_after" as never,
+        agent: "build" as never,
+        messageID: "msg_after" as never,
+        id: "call_after" as never,
+        input: {},
+        status: "completed",
+        result: result as never,
+      })
+    })
+  it.live("非云工具的结果原样;治理云工具的结果过不了契约 ⇒ 换成一句登记过的拒绝(sink=tool-output);已知的坏:改一个字即点名", () =>
+    Effect.gen(function* () {
+      process.env[CLOUD_MCP_SERVER_ENV] = "codepuppy"
+      process.env[CLOUD_MCP_DEF_ENV] = JSON.stringify({ type: "remote", url: "https://cloud.invalid/mcp" })
+      process.env[CLOUD_MCP_ARM_ENV] = "codepuppy"
+      const mcp = recordingMcp()
+      yield* activate(CodePuppyExt, { mcp })
+      const plain = { content: "tool said this", metadata: { a: 1 } }
+      expect((yield* after("shell", { ...plain })).result).toEqual(plain)
+      const refused = (yield* after("codepuppy_status", { output: { status: "not-a-real-status" } })) as { result: { content: string } }
+      const explain = (text: string) =>
+        CONTEXT_INJECTIONS.some((f) => {
+          if (f.kind !== "template" || f.sink !== "tool-output") return false
+          const [head, tail] = f.template.split("{name}")
+          return text.startsWith(head!) && text.endsWith(tail!)
+        })
+      expect(refused.result.content.startsWith("codepuppy_status ")).toBe(true)
+      expect(explain(refused.result.content)).toBe(true)
+      expect(explain(refused.result.content + " (and more)")).toBe(false)
+    }),
+  )
 })
 
-// ── ③g chat.message 咽喉(`#1419`)────────────────────────────────────────────────
-// 用户贴图时 alpha 往这条用户消息里追加的每个 part,都必须是 synthetic text、且 text 由 vision-block 登记簿解释;
-// 原有 part 逐字不变。这里的模型看不了图(PROVIDER_LIST 里 glm-5 的 capabilities.input.image=false)且云端不可用,
-// 所以追加的是失败块 —— 咽喉判的是「加的字是不是登记项」,不是识图本身(识图行为的判据在 cloud-vision 模块自己的行为测试里,
-// 那不是闸门文件:删掉它损失的是本模块的覆盖率,不是某条对模块之外的保证)。
+// ── ③h context 钩子的消息咽喉(`#1419`):只换不加,换进去的都是登记过的识图块 ─────────────
 
-type ChatHook = (input: { sessionID: string; model?: { providerID: string; modelID: string } }, output: { message: unknown; parts: unknown[] }) => Promise<void>
-const userParts = (sessionID: string, messageID: string) => [
-  { id: "prt_a", sessionID, messageID, type: "text", text: "看看这张图" },
-  { id: "prt_b", sessionID, messageID, type: "file", mime: "image/png", filename: "shot.png", url: `data:image/png;base64,${PNG_1x1}` },
-]
-/** 判官:原有 part 逐字不变;新 part 必须是 synthetic text 且 text 由登记簿解释(识图块 `#1419` / 附件读取指令 `#1553`)。 */
-function unexplainedNewParts(before: unknown[], after: unknown[]): string[] {
-  const bad: string[] = []
-  for (let i = 0; i < before.length; i++) if (JSON.stringify(after[i]) !== JSON.stringify(before[i])) bad.push(`part ${i} changed`)
-  for (const part of after.slice(before.length)) {
-    const p = part as { type?: unknown; synthetic?: unknown; text?: unknown }
-    if (p.type !== "text" || p.synthetic !== true) bad.push(`new part is not synthetic text: ${JSON.stringify(part)}`)
-    else if (!explainVisionBlock(String(p.text)).ok && !explainAttachmentBlock(String(p.text)).ok)
-      bad.push(`new part text is not a registered vision block or attachment instruction: ${String(p.text).slice(0, 40)}`)
-  }
-  return bad
+/** 本次请求里新出现的文字(消息里的 text 部件 + 工具结果里的 text 项),去掉原来就有的。 */
+function addedStrings(before: readonly unknown[], after: readonly unknown[]): string[] {
+  const collect = (messages: readonly unknown[]) =>
+    messages.flatMap((message) =>
+      ((message as { content?: unknown[] }).content ?? []).flatMap((part) => {
+        const p = part as { type?: string; text?: string; result?: { value?: unknown } }
+        if (p.type === "text" && typeof p.text === "string") return [p.text]
+        if (p.type === "tool-result") return [typeof p.result?.value === "string" ? p.result.value : JSON.stringify(p.result?.value ?? "")]
+        return []
+      }),
+    )
+  const had = new Set(collect(before))
+  return collect(after).filter((text) => !had.has(text))
 }
-/** `#1553`:composer 发来的暂存附件记录(synthetic 空文本 + metadata)。 */
-const stagedAttachmentPart = (sessionID: string, messageID: string) => ({
-  id: "prt_c",
-  sessionID,
-  messageID,
-  type: "text",
-  text: "",
-  synthetic: true,
-  metadata: {
-    [ATTACHMENT_METADATA_KEY]: { v: 1, name: "a.docx", mime: "application/x", size: 3, path: "attachments/0b8c7f9e-1d2a-4c3b-9e8f-7a6b5c4d3e2f/a.docx", reader: "word" },
-  },
+
+describe("③h context 钩子的消息咽喉:只换不加,换进去的每段字都是登记过的识图块", () => {
+  it.live("看不了图 + 云端不可用:图片换成登记过的失败块,零别的新字;能看图:消息对象原样", () =>
+    Effect.gen(function* () {
+      yield* activate(visionModels)
+      yield* activate(CodePuppyExt)
+      const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+      const messages = [Message.user([Message.text("看图"), Message.media(Media.base64(png, "image/png"), { filename: "a.png" })])]
+      const blind = yield* runContext(["base"], BLIND, [...messages])
+      const added = addedStrings(messages, blind.messages)
+      expect(added).toHaveLength(1)
+      expect(explainVisionBlock(added[0]!).ok).toBe(true)
+      expect(explainVisionBlock(added[0]! + "!").ok).toBe(false)
+      const sees = yield* runContext(["base"], SEES, [...messages])
+      expect(sees.messages[0]).toBe(messages[0]!)
+    }),
+  )
+  it.live("`#1447` B2:历史里 codepuppy_vision 的审核拒绝结果换成登记句(VISION_TOOL_REFUSED_TEXT),其余字符串一个不多", () =>
+    Effect.gen(function* () {
+      process.env[CLOUD_MCP_SERVER_ENV] = "codepuppy"
+      yield* activate(visionModels)
+      yield* activate(CodePuppyExt)
+      const refusal = Message.tool({ id: "call_v", name: "codepuppy_vision", result: { type: "error", value: "content_refused" } } as never)
+      const out = yield* runContext(["base"], SEES, [refusal])
+      const added = addedStrings([refusal], out.messages)
+      expect(added).toEqual([VISION_TOOL_REFUSED_TEXT])
+    }),
+  )
 })
-
-describe("③g chat.message 咽喉:追加进用户消息的每个 part 都是登记过的识图块", () => {
-  test("看不了图 + 云端不可用:恰好追加一个 synthetic text,text 是登记项,原有 part 不动;能看图:一个都不加", async () => {
-    const hooks = await loadHooks()
-    const real = hooks["chat.message"] as ChatHook
-    const parts = userParts("s-chat", "msg_1")
-    const before = clone(parts)
-    await real({ sessionID: "s-chat", model: { providerID: "alpha", modelID: "glm-5" } }, { message: { id: "msg_1", model: { providerID: "alpha", modelID: "glm-5" } }, parts })
-    expect(parts.length).toBe(3)
-    expect(unexplainedNewParts(before, parts)).toEqual([])
-    const seeing = userParts("s-chat-2", "msg_2")
-    await real({ sessionID: "s-chat-2", model: { providerID: "alpha", modelID: "kimi-k3" } }, { message: { id: "msg_2", model: { providerID: "alpha", modelID: "kimi-k3" } }, parts: seeing })
-    expect(seeing.length).toBe(2)
-  })
-  test("已知的坏:包一层真钩子再推一个非 synthetic 的 text / 一个散文 synthetic —— 判官各点名", async () => {
-    const hooks = await loadHooks()
-    const real = hooks["chat.message"] as ChatHook
-    const parts = userParts("s-chat-3", "msg_3")
-    const before = clone(parts)
-    await real({ sessionID: "s-chat-3", model: { providerID: "alpha", modelID: "glm-5" } }, { message: { id: "msg_3", model: { providerID: "alpha", modelID: "glm-5" } }, parts })
-    parts.push({ id: "prt_r1", sessionID: "s-chat-3", messageID: "msg_3", type: "text", text: "rogue visible text" } as never)
-    parts.push({ id: "prt_r2", sessionID: "s-chat-3", messageID: "msg_3", type: "text", text: "rogue synthetic prose", synthetic: true } as never)
-    const bad = unexplainedNewParts(before, parts)
-    expect(bad.length).toBe(2)
-    expect(bad[0]).toContain("not synthetic text")
-    expect(bad[1]).toContain("not a registered vision block")
-  })
-  test("`#1553` 暂存附件:恰好追加一个 synthetic 读取指令,text 是登记项(sink=attachment-block),原有 part 不动;判官不串格", async () => {
-    const hooks = await loadHooks()
-    const real = hooks["chat.message"] as ChatHook
-    const parts: unknown[] = [{ id: "prt_a", sessionID: "s-att", messageID: "msg_4", type: "text", text: "读一下" }, stagedAttachmentPart("s-att", "msg_4")]
-    const before = clone(parts)
-    await real({ sessionID: "s-att", model: { providerID: "alpha", modelID: "kimi-k3" } }, { message: { id: "msg_4", model: { providerID: "alpha", modelID: "kimi-k3" } }, parts })
-    expect(parts.length).toBe(3)
-    expect(unexplainedNewParts(before, parts)).toEqual([])
-    const instruction = String((parts[2] as { text: unknown }).text)
-    expect(explainAttachmentBlock(instruction).ok).toBe(true)
-    expect(explainVisionBlock(instruction).ok).toBe(false)
-    // 已知的坏:登记过的指令被改一个字 / 包一层真钩子再推一段散文 synthetic —— 判官各点名。
-    expect(explainAttachmentBlock(instruction.replace("如实", "随便")).ok).toBe(false)
-    parts.push({ id: "prt_r3", sessionID: "s-att", messageID: "msg_4", type: "text", text: "请读取附件 a.docx", synthetic: true } as never)
-    expect(unexplainedNewParts(before, parts)).toEqual([expect.stringContaining("not a registered vision block or attachment instruction")])
-  })
-})
-
-// ── ③h messages.transform 咽喉(`#1419`;`#1447` R1 B2 / m4 扩)────────────────────────
-// 这个钩子只许**剔**(看不了图时把已转写的图片 part / 附件从本次请求里拿掉),外加**恰好两句登记项**可以出现在副本里:
-// `codepuppy_vision` 被审核拒绝的部件 error 换成「这张图片无法识别」、已被原地改写成 base64 的 input.image 换成
-// 「(图片数据已省略)」(或换回本进程记得的原引用 —— 那是模型自己的字,判官按「hook 之前就存在」放行不了,所以这里
-// 用新实例,原引用不可考)。其它任何新字符串一律点名。
-
-type MessagesHook = (input: Record<string, never>, output: { messages: Array<{ info: unknown; parts: unknown[] }> }) => Promise<void>
-/** 判官:hook 之后出现的每个字符串值都必须在 hook 之前就存在(多重集包含),或是那两句登记项之一。 */
-const ALLOWED_REPLACEMENTS = new Set([VISION_TOOL_REFUSED_TEXT, VISION_TOOL_INPUT_OMITTED_TEXT])
-function addedStrings(before: unknown, after: unknown): string[] {
-  const count = new Map<string, number>()
-  for (const l of stringLeaves(before)) count.set(l.value, (count.get(l.value) ?? 0) + 1)
-  const added: string[] = []
-  for (const l of stringLeaves(after)) {
-    const n = count.get(l.value) ?? 0
-    if (n === 0) added.push(l.value)
-    else count.set(l.value, n - 1)
-  }
-  return added.filter((s) => !ALLOWED_REPLACEMENTS.has(s))
-}
-const history = (sessionID: string) => [
-  {
-    info: { id: "msg_u", role: "user", sessionID, model: { providerID: "alpha", modelID: "glm-5" } },
-    parts: [
-      ...userParts(sessionID, "msg_u"),
-      { id: "prt_b-vision", sessionID, messageID: "msg_u", type: "text", synthetic: true, text: "〔图片 #1 shot.png:这张图片无法识别〕", metadata: { codepuppy_vision: { hash: "h", number: 1, label: "shot.png" } } },
-    ],
-  },
-  {
-    info: { id: "msg_a", role: "assistant", sessionID },
-    parts: [{ id: "prt_t", type: "tool", tool: "read", state: { status: "completed", input: { filePath: "a.png" }, output: "Image read successfully", metadata: { codepuppy_vision: { images: [{ hash: "h", number: 1, label: "a.png" }] } }, attachments: [imagePart("prt_att")] } }],
-  },
-]
-
-describe("③h messages.transform 咽喉:只剔不加(外加两句登记的替换)", () => {
-  test("看不了图:图片 part 与附件被剔掉、零新增字符串、原消息对象不被改;能看图:逐字原样", async () => {
-    const hooks = await loadHooks()
-    const real = hooks["experimental.chat.messages.transform"] as MessagesHook
-    const msgs = history("s-msgs")
-    const original = msgs.map((m) => m.parts)
-    const before = clone(msgs)
-    await real({}, { messages: msgs })
-    expect(addedStrings(before, msgs)).toEqual([])
-    expect(msgs[0]!.parts.map((p) => (p as { type: string }).type)).toEqual(["text", "text"])
-    expect(((msgs[1]!.parts[0] as { state: { attachments: unknown[] } }).state.attachments).length).toBe(0)
-    expect(original[0]!.length).toBe(3)
-    expect(((original[1]![0] as { state: { attachments: unknown[] } }).state.attachments).length).toBe(1)
-    const seeing = history("s-msgs-2")
-    ;(seeing[0]!.info as { model: { modelID: string } }).model.modelID = "kimi-k3"
-    const seeingBefore = clone(seeing)
-    await real({}, { messages: seeing })
-    expect(seeing).toEqual(seeingBefore)
-  })
-  test("`#1447` B2 / m4:codepuppy_vision 出错部件的 error 与被改写成 base64 的 input.image 各换成一句登记项,其余字符串一个不多;已知的坏:替换句改一个字节即点名", async () => {
-    process.env[CLOUD_MCP_SERVER_ENV] = "codepuppy"
-    const hooks = await loadHooks()
-    const real = hooks["experimental.chat.messages.transform"] as MessagesHook
-    const base64 = Buffer.from(PNG_1x1, "base64")
-    const fakeBase64 = Buffer.concat([base64, Buffer.alloc(400, 7)]).toString("base64")
-    const msgs = [
-      history("s-msgs-4")[0]!,
-      {
-        info: { id: "msg_a", role: "assistant", sessionID: "s-msgs-4" },
-        parts: [
-          { id: "prt_v1", type: "tool", tool: "codepuppy_vision", callID: "c1", state: { status: "error", input: { image: "1" }, error: JSON.stringify({ error: { code: "content_refused", message: "x" } }), time: { start: 1, end: 2 } } },
-          { id: "prt_v2", type: "tool", tool: "codepuppy_vision", callID: "c2", state: { status: "completed", input: { image: fakeBase64, mime: "image/jpeg" }, output: "ok", metadata: {}, time: { start: 1, end: 2 } } },
-        ],
-      },
-    ]
-    const before = clone(msgs)
-    await real({}, { messages: msgs })
-    const states = msgs[1]!.parts.map((p) => (p as { state: { error?: string; input: { image: string } } }).state)
-    expect(states[0]!.error).toBe(VISION_TOOL_REFUSED_TEXT)
-    expect(states[1]!.input.image).toBe(VISION_TOOL_INPUT_OMITTED_TEXT)
-    expect(addedStrings(before, msgs)).toEqual([])
-    // 已知的坏:替换句多一个字节 ⇒ 不再是登记项,判官点名
-    ;(msgs[1]!.parts[0] as { state: { error: string } }).state.error += "!"
-    expect(addedStrings(before, msgs)).toEqual([VISION_TOOL_REFUSED_TEXT + "!"])
-  })
-  test("已知的坏:包一层真钩子再往消息里塞一个 text part —— 判官点名那段字", async () => {
-    const hooks = await loadHooks()
-    const real = hooks["experimental.chat.messages.transform"] as MessagesHook
-    const msgs = history("s-msgs-3")
-    const before = clone(msgs)
-    await real({}, { messages: msgs })
-    msgs[0]!.parts.push({ id: "prt_x", type: "text", text: "rogue injected line" })
-    expect(addedStrings(before, msgs)).toContain("rogue injected line")
-  })
-})
-
 // ── ③e instructions 通路(`#1296`):ui-mac 写 cfg.instructions 的两份文件 ────────────────
 // 真注入的咽喉在 ui-mac 那边(config-injection-throat.test.ts 跑真 injectCodePuppyConfig,8 组 env 矩阵
 // 与这里登记的形状集合双向比对)。这里钉三件登记簿自己的事:登记形状、判官能测出已知的坏、

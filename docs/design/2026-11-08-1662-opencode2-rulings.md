@@ -52,3 +52,11 @@ last_reviewed: 2026-11-09
 OPTIONAL 采纳两条:S2 删掉「在注入里让 providers 只认 Code Puppy 的条目」那一种实现(导入迁移不看配置,`20260805200742_import_legacy_credentials.ts`),只保留「首次以 2.x 启动前处置数据目录里的 `auth.json`」;§5.3 写明并行期 lane 与整合分支 base 比、最终推送与 `alpha` 比。其余 OPTIONAL 与 out-of-round 记残余,不改方案:`session.hook.context` 改名需经同意的插件才会发生;配置目录插件自动装载 v1 已有、非本次引入;`opencode-pty` 走 PATH 今天承受者为零。
 
 ARCH-NOTE:① ADR-047「前端 pin 与引擎同一 SHA」改为「切换时同一 SHA,之后保持同一代次」(与 ADR-034 月更不冲突);② `ServerFetch.make` 作为 H1 退出条件 ② 的候选,已横向传给 L1a 实测;③ 并入 F7。
+
+## L1a 实测后的裁决(2026-11-09;勘破文档在分支 `spike/1662-l1-engine-host` 的 `docs/architecture/2026-11-09-1662-l1-engine-host-spike.md`,提交 `0bfbdfb205`)
+
+| # | 裁决 | 依据 |
+| --- | --- | --- |
+| R13 | **引擎宿主定 H1。** 进程内接法取「`start()` + Transform」,并传 lifecycle(启动时恢复中断会话);不取 `ServerFetch.make`。必须同时守住:以正式渠道启动(`app.channel` 为 `local`/`dev` 会默认打开 `todo`/`schedules`/`media_blob`/`artifacts`/`background_compaction`,`core/src/flag.ts:26,70`);`http.setGlobalProxyFromEnv()` 留在引擎 import 之前(`sidecar.ts:148,267-269`)。 | L1a 实测:E1 有围栏经出网代理回复,对照臂无代理设置 `ENOTFOUND`;E2 两条接法都过,`ServerFetch.make` 不跑 Schedule runner。取 `start()` 是消费上游宿主的决定、Code Puppy 侧少持有一层(审计 ARCH-NOTE 3)。 |
+| R14 | **旧对话按 §2.8 的 Node 薄适配做**;O1 不触发。`:1170`(`Bun.CryptoHasher`)必做,夹具必须含改名工具或合成 part 的会话(纯文本会话走不到它);`:808`(`bun:sqlite`)只在存在 `opencode-next.db` 时走到,保留适配(两处都很小、上游源码不动)。 | L1a 实测 E3:3 会话 / 13 消息转换为 3 / 14(多一条改名提示);去掉 `:1170` 适配在工具会话处 `Bun is not defined` 中断;上游原版 Node 构建下旧对话全不可见而状态报 `completed`。 |
+| R15 | 基线事实订正(随第 1 轮回写一并改):① 转换不把历史里的 `bash` 改名为 `shell`,只追加一条给模型的提示(`v1-migration.bun.ts:1005-1030`),K5 的 UI 工具卡与身份账本要同时认两个名字;② 1.18.35 建的库用 `migration` 表、没有旧的无名 `__drizzle_migrations`,2.x 补 21 条(40 → 61)且不碰 alpha 的两行与两张表 —— 与 F1 合看:引擎侧不会挡,挡的是 Code Puppy 的 db-safety;③ §1.3 补「上游原版 Node 构建下旧对话静默不可见」;④ §2.4 补代理设置的顺序前提;⑤ §2.7 补正式渠道;⑥ §9 第 1 条(Node 24.15 下能起引擎)划掉,已实测。 | L1a 勘破文档与对照臂输出。 |

@@ -40,7 +40,7 @@ ADR-029(主权阶梯 L0–L3)、ADR-034(前端 pin + SOT 补丁)、ADR-041 / ADR
 4. **引擎宿主默认保持「嵌在 Electron `utilityProcess` 里」**(进程围栏、ext 的 `parentPort` 桥、进程内调用都不换形状),
    以 L1 实测为准;实测不过才改用「打包上游 bun 编译的 CLI,作为围栏内的私有子进程」(§2.4)。
    嵌入式下,上游的「v1 旧对话转成 v2」只在 bun 下运行、在 Node 下是空实现 —— 这是本次最大的用户可见风险(§2.8)。
-5. **前端跟引擎同一个 SHA**,renderer 的数据层改用上游公开包 `@opencode/client/solid`,不再借 `packages/app` 内部导出(§2.6)。
+5. **前端在切换时跟引擎同一个 SHA**(之后保持同一代次),renderer 的数据层改用上游公开包 `@opencode/client/solid`,不再借 `packages/app` 内部导出(§2.6)。
 6. **一个 PR 进 `alpha`**(ADR-037 决策 2),7 条 lane 在整合分支上并行;量级估计 115–185 个 agent 小时、日历 2–3 周、
    owner 实机约 4–5 小时(§4.3,推断)。
 
@@ -131,8 +131,10 @@ node:ffi missing ERR_UNKNOWN_BUILTIN_MODULE
   (`20260720085655_permission-decision-receipt`、`20260720094009_permission-request-admission`,建 `permission_decision`/`permission_request`),
   2.x 不认识;2.x 在 merge-base 之后新增 21 条,建 `blob`、`blob_ref`、`job`、`schedule`、`session_inbox`、`session_part`、`workspace`、`worktree` 等,
   与 alpha 的两张表无重名。alpha 自己的 DB 安全带在「将前进迁移」时先备份、「库超前」时阻断(`db-safety.ts:85-106`)。
-- **v1 旧对话转 v2** 由 `v1-migration.bun.ts` 做(`transformSession` `:227`、`run` `:541`),只读写同库,删的只有 `event` 表的行(`:562`),
-  不删 v1 的 `message`/`part`;转换时把工具改名:`bash`→`shell`、`task`→`subagent`、`apply_patch`→`patch`(`:996`)。
+- **v1 旧对话转 v2** 由 `v1-migration.bun.ts` 做(`transformSession` `:227`、`run` `:541`),只读写同库。它会删两样东西:
+  `event` 表的行(`:562`),以及被转换会话在 `session_message` 里已有的行 —— 先删该会话的 `session_message` 再写转换结果(`:704`);
+  不删 v1 的 `message`/`part`。转换时把工具改名:`bash`→`shell`、`task`→`subagent`、`apply_patch`→`patch`(`:996`)。
+  (第 1 轮审计 F12 订正:初稿只写了 `event`。)
 - **旧凭证导入**:2.x 迁移 `20260805200742_import_legacy_credentials` 读 `<data>/auth.json` 写进 `credential` 表
   (`v2:packages/core/src/database/migration/20260805200742_import_legacy_credentials.ts:39-52`)。
 
@@ -189,17 +191,27 @@ node:ffi missing ERR_UNKNOWN_BUILTIN_MODULE
 2. **M0 合并提交**:`git merge --no-ff --no-commit 33f94fce96`,然后按规则构造树,而不是逐个解冲突:
    - 上游路径(`north-star-guard.sh --print-jurisdiction` 的辖区,含所有冲突与非冲突文件):一律取 `33f94fce96` 的版本;上游删掉的就删
      (`packages/opencode`、`packages/llm`、`packages/sdk/js` 等整片消失)。
-   - Code Puppy 自有路径(`packages/ui-mac`、`packages/ext`、`packages/codepuppy-contracts-consumer`、`frontend/`、`scripts/`、`docs/`、
-     `.github/`、`.claude/`、仓根的 `AGENTS.md` 等):取 alpha 的版本。
+   - Code Puppy 自有包(`packages/ui-mac`、`packages/ext`、`packages/codepuppy-contracts-consumer`):取 alpha 的版本。
+   - **`packages/` 之外逐文件定归属**(第 1 轮审计 F4):上游来源的文件跟 `33f94fce96` 增删;Code Puppy 的文件(`frontend/`、`scripts/`、`docs/`、
+     `.claude/`、仓根 `AGENTS.md`、`sync-upstream*.yml`、`codepuppy-ci.yml` 等)跟 alpha。典型是 `.github/workflows/`:`33f94fce96` 有 21 个,
+     其中 20 个 alpha 今天没有(`comm -13 <(git ls-tree --name-only origin/alpha .github/workflows/ | sort) <(git ls-tree --name-only 33f94fce96 .github/workflows/ | sort)`:
+     `bot-docs-locale`、`bot-nix-hashes`、`check-bot-scope`、`check-docs`、`check-nix`、`check-process-daemon`、`check-test`、`check`、`deploy-files`、`deploy-site`、
+     `deploy-update`、`nightly-beta`、`release-dry-run`、`release-process-daemon`、`release`、`triage-close-issues`、`triage-close-prs`、`triage-compliance-close`、
+     `triage-contributor`、`triage-pr-standards`)。合入 `alpha` 后这些会被 GitHub 当新 workflow 启用,处置见 L2 退出条件。
    - alpha 加在上游包里的 80 个文件:M0 先**全部移出**(源码在 L3/L4 按清点表搬到新家,测试随行;没有新家的删掉)。
    - `packages/{app,ui}`:按 ADR-034 的投影规则,`frontend/frontend-pin.lock` 改指 `33f94fce96`,SOT 补丁在 M0 暂置空(L6 重建)。
    - `bun.lock` 重新生成。
    提交信息写明第二父 SHA。M0 之后 ui-mac / ext 编译不过是预期内的,整合分支上允许。
+   **M0 直接推到整合分支,或经 PR 以 `gh pr merge --merge` 合入;整合分支吸收 `alpha` 的新提交只用 `git merge`,禁止 squash / rebase**
+   (第 1 轮审计 F2:本仓 PR 默认 squash,squash 或 rebase 会丢掉 M0 的上游祖先)。
 3. 后续 lane 在整合分支上按清点表逐行处置(§4);每条 lane 合进整合分支前跑自己的相关测试。
 4. **M0 之后的机械判据(本地门怎么判真假):**
-   `git diff --name-only 33f94fce96 HEAD -- packages/ | grep -vE '^packages/(ui-mac|ext|codepuppy-contracts-consumer)/'`
-   的输出必须只剩「新接管清单」与 ADR-043 判为 alpha 自有的路径;多出任何一行 = 未登记的偏离。这条与 north-star 守卫同一辖区,
-   L2 把它写进守卫的测试(先用一个故意改坏的上游文件证明它会红)。
+   - 树:`git diff --name-only 33f94fce96 HEAD -- packages/ | grep -vE '^packages/(ui-mac|ext|codepuppy-contracts-consumer|app|ui)/'`
+     的输出必须只剩「接管清单」(L2 起用过渡清单,L4 定最终清单)与 ADR-043 判为 alpha 自有的路径;多出任何一行 = 未登记的偏离。
+     `packages/{app,ui}` 排除在外,由 `scripts/assert-frontend-patch-roundtrip.sh` 判(pin + SOT 补丁,守卫的 carve-out ② 本就含这两个包;第 1 轮审计 F9)。
+     这条由 L2 写进守卫本身(F3,见 L2 边界),先用一个故意改坏的上游文件证明它会红。
+   - 祖先(第 1 轮审计 F2):`git merge-base --is-ancestor 33f94fce96 HEAD` 必须为真;反向用例:把整合分支 squash 重放到 `alpha` 的一个临时副本上,同一条判据必须红。
+     L2 退出时、§5.3 每次推送、最终合并前各跑一次;合入后对 `origin/alpha` 再跑一次。
 5. 整合分支通过 §5 的全部闸门后,开**一个** PR 进 `alpha`,标题主语是切换本身(ADR-037 决策 2),`gh pr merge --merge` 合入
    (禁止 squash/rebase,否则 M0 的上游祖先丢失,merge-base 不前移)。`git log --first-parent alpha` 上只多一个合并提交。
 
@@ -227,7 +239,8 @@ node:ffi missing ERR_UNKNOWN_BUILTIN_MODULE
 
 ### 2.6 前端
 
-- `frontend/frontend-pin.lock` 与引擎**同一个 SHA**。前端停在 1.x 投影而引擎是 2.x,是同一条用户流程跨两代(ADR-037 决策 5)。
+- 切换时 `frontend/frontend-pin.lock` 与引擎**同一个 SHA**,之后前端与引擎**保持同一代次**、照 ADR-034 月更(第 1 轮 ARCH-NOTE ①)。
+  前端停在 1.x 投影而引擎是 2.x,是同一条用户流程跨两代(ADR-037 决策 5)。
 - renderer 的数据层改用上游公开包 `@opencode/client/solid`(`createData`、`createClientConnection`,`v2:packages/client/src/solid/data.ts:264`、
   `connection.ts:40`),不再经 `packages/app` 内部的 `useServerSync`/`useServerSDK`。理由:这是 2.x 的 app 自己用的数据层(13 个文件 import),
   是公开包而不是 app 内部,以后月更 pin 时耦合面更小。
@@ -239,13 +252,25 @@ node:ffi missing ERR_UNKNOWN_BUILTIN_MODULE
 
 - 只剩一个代次,配置只写一份:注入直接写 2.x 新键(清点表 C2),删掉为 v2 读侧另写的 `OPENCODE_CONFIG_DIR` 桥与它的剥 key 逻辑
   (`codepuppy-config-injection.ts:508-641`)。这是 AC1「不留半代次链路」的具体落点之一。
-- 12 个失效环境变量逐个换新机制或删除(清点表 E2),其中两个是安全相关的外部生态开关(C9)。新增一条测试:sidecar 环境里每个
-  `OPENCODE_*` 在引擎源码里都有读者 —— 下一次上游改名时它会红,而不是静默失效。
+- 12 个失效环境变量逐个换新机制或删除(清点表 E2),其中两个是安全相关的外部生态开关(C9)。
+- **H1 下由 sidecar 自己构造 `ServerOptions`**(第 1 轮审计 F7 + ARCH-NOTE ③)。嵌入 `@opencode/server/process` 时,上游 CLI 宿主不在路径上:
+  配置 content / file / directory、模型目录、库路径这些环境变量在 `packages/core/src` 与 `packages/server/src` 里零读者
+  (`git grep -n -E 'process\.env\.OPENCODE_(CONFIG_CONTENT|CONFIG|CONFIG_DIR|MODELS_PATH|MODELS_URL|DISABLE_MODELS_FETCH|DB)\b' -- packages/core/src packages/server/src`
+  → 0 行),是 CLI 在 `v2:packages/cli/src/server-process.ts:101-145` 把它们映射进 `start()` 的选项(库路径 `:114-115`),数据 / 配置目录的 `Global` 层
+  也是 CLI 提供的(`:33-41`)。所以 sidecar 直接构造 `ServerOptions` 与 `Global` 层,不靠设环境变量;这份映射里的库路径推导与
+  `db-safety.ts:36-51` 共用**一个** Code Puppy 侧函数 —— 库在哪只算一次,不再造一份上游宿主的决定。
+- 防静默失效的测试改为断言**传给 `start()` / `ServerFetch.make` 的选项对象**(或把「找读者」的范围限定在宿主实际装载的模块);
+  反向臂:一个只有 CLI 读的变量(例如 `OPENCODE_CONFIG_CONTENT`)按旧做法只设进环境,测试必须红。初稿「sidecar 环境里每个 `OPENCODE_*`
+  在引擎源码里都有读者」的写法会把 CLI 里的读者也算进去,在 H1 下是假闸,作废。
 
 ### 2.8 数据连续性
 
 1. **前进迁移有备份。** 第一次以 2.x 启动时,DB 安全带看到 21 条待前进迁移,先做 `opencode-backup-*` 备份(`db-safety.ts:85,215-240`)。
-   L2 让 `scripts/gen-db-expected.ts` 读 2.x 的 `migration.gen.ts`。
+   L2 让 `scripts/gen-db-expected.ts` 读 2.x 的 `migration.gen.ts`,**并把 alpha 自有的两条退役迁移 id**
+   (`20260720085655_permission-decision-receipt`、`20260720094009_permission-request-admission`)**以一份冻结清单并入 2.x 构建的
+   `db-expected-migrations.json`**(第 1 轮审计 F1)。不并的话,老用户库里这两个 id 对 2.x 构建是「未知」,而安全带先判未知 id、再判待前进
+   (`db-safety.ts:105-106`)⇒ 每次启动都弹「库比应用新」,且前进迁移之前不做备份。判据:db-safety 加一个带这两个 id 的夹具库,期望结论是
+   「待前进」(`migrate-ahead`)而不是「库超前」(`db-ahead`);L1 的真库副本实验(裁决书记作 L1b)要走 Code Puppy 的启动预检,不只跑裸引擎。
 2. **v1 旧对话在嵌入式下要我们自己接上。** 默认补法(L1 实测):以构建期变换(ADR-029 L1)让 `#v1-migration` 解析到上游的
    `v1-migration.bun.ts`,为其中两处 bun 专有调用提供 Node 薄适配 —— `:808` 动态 import `bun:sqlite`(只用于打开 `opencode-next.db`)
    与 `:1170` `Bun.CryptoHasher`(合成 id 的 sha256,换 `node:crypto`);`:17` 只是类型 import。主体走 `Database.Service`,不碰 bun;
@@ -284,13 +309,13 @@ L2 在整合分支上一并改:提示词绊线改指 `v2:packages/core/src/sessi
 
 | # | 不变量 | 换代后怎么会坏 | 实现必须守住的形状 | 判据(先证明会红) |
 | --- | --- | --- | --- | --- |
-| S1 | **权限咽喉**:模型看不到被拒的工具(目录闸);每次工具执行都过 Code Puppy 的判定(执行闸) | v1 的两处咽喉(`packages/opencode/src/permission/index.ts`、`session/tools.ts:263,347,428`)随包删除;2.x 钩子按注册顺序串行、互相改同一个事件对象(`hooks.ts:88-95`),后注册的插件能改写我们已经核准的输入或把 `evaluate` 的结论改回放行 | 到达工具执行的唯一通路是 `Tool.execute` 的 `execute.before`(`v2:packages/core/src/tool.ts:123-131`);Code Puppy 的执行闸挂在那里,对未知工具身份默认拒;**它必须是该钩子链上最后一个回调**,或在它之后的任何改写都会让调用被拒(实现选一种并写进 ADR-047);目录闸挂在 `session.hook.context` 的 `tools` 与 `tool.transform` 上 | 把 `#725` 的 23 条判据(A1–A4 目录闸、B1/B5/B7/B8 执行闸)改指 2.x 生产入口;摘掉我们的 `execute.before` 注册 ⇒ B 组翻红;再注册一个排在我们之后、改写入参的测试插件 ⇒ 必须仍被拒 |
-| S2 | **凭证只在钥匙串** | ① 2.x 迁移会把 `<data>/auth.json` 导进库里的 `credential` 表(§1.4);② `{file:}` 缺文件时替换成空串(`variable.ts:63`),云 MCP 会带空 token 发出;③ 2.x 自有凭证服务(`/api/credential`)可能被 UI 或插件写入明文 | 引擎可用的凭证只来自 Code Puppy 的注入(钥匙串 → 秘密文件 → `{file:}` 引用);首次以 2.x 启动前,数据目录里出现 `auth.json` ⇒ 不导入(实现可选:启动前检测并拒绝启动并说明,或在注入里让 `providers` 只认 Code Puppy 的条目);秘密文件缺席时不发对应定义(保住 `#1195` 的现形) | 临时数据目录放一个假 `auth.json` ⇒ 引擎的 provider 列表与 `credential` 表都不能出现它;删掉秘密文件 ⇒ 云 MCP 定义不出现在引擎配置里 |
+| S1 | **权限咽喉**:模型看不到被拒的工具(目录闸);每次工具执行都过 Code Puppy 的判定(执行闸) | v1 的两处咽喉(`packages/opencode/src/permission/index.ts`、`session/tools.ts:263,347,428`)随包删除;2.x 钩子按注册顺序串行、互相改同一个事件对象(`hooks.ts:88-95`),后注册的插件能改写我们已经核准的输入或把 `evaluate` 的结论改回放行 | 到达工具执行的唯一通路是 `Tool.execute` 的 `execute.before`(`v2:packages/core/src/tool.ts:123-131`);Code Puppy 的执行闸挂在那里,对未知工具身份默认拒;**它必须是该钩子链上最后一个回调**,或在它之后的任何改写都会让调用被拒(实现选一种并写进 ADR-047);目录闸挂在 `session.hook.context` 的 `tools` 与 `tool.transform` 上。**Code Mode 的目录**(第 1 轮审计 F6):MCP 工具默认进 Code Mode(`v2:packages/core/src/tool/mcp.ts:57` `codemode: tool.codemode !== false`,开关取自 MCP server 配置 `v2:packages/core/src/mcp/index.ts:490`),目录闸必须也盖住它 —— 二选一:往 Code Mode 的 snapshot 规则集注入 deny,或对 Code Puppy 管的 MCP server 注入 `codemode: false` | 把 `#725` 的 23 条判据(A1–A4 目录闸、B1/B5/B7/B8 执行闸)改指 2.x 生产入口;A 组同时断言 **Code Mode 目录里也没有被拒工具**,反向臂:去掉上面二选一的那项处置 ⇒ 被拒工具出现在 Code Mode 目录里;摘掉我们的 `execute.before` 注册 ⇒ B 组翻红;再注册一个排在我们之后、改写入参的测试插件 ⇒ 必须仍被拒 |
+| S2 | **凭证只在钥匙串** | ① 2.x 迁移会把 `<data>/auth.json` 导进库里的 `credential` 表(§1.4);② `{file:}` 缺文件时替换成空串(`variable.ts:63`),云 MCP 会带空 token 发出;③ 2.x 自有凭证服务(`/api/credential`)可能被 UI 或插件写入明文 | 引擎可用的凭证只来自 Code Puppy 的注入(钥匙串 → 秘密文件 → `{file:}` 引用);首次以 2.x 启动前处置数据目录里的 `auth.json`,使它不被导入(例如启动前检测并拒绝启动、说明原因)。初稿另一种实现「在注入里让 `providers` 只认 Code Puppy 的条目」删去(第 1 轮 OPTIONAL 采纳):导入迁移不看配置,`20260805200742_import_legacy_credentials.ts:39-52` 直接读文件写表,配置拦不住导入;秘密文件缺席时不发对应定义(保住 `#1195` 的现形) | 临时数据目录放一个假 `auth.json` ⇒ 引擎的 provider 列表与 `credential` 表都不能出现它;删掉秘密文件 ⇒ 云 MCP 定义不出现在引擎配置里 |
 | S3 | **进程与网络围栏** | 2.x 引擎可能派生新进程或新出网:持久终端二进制(`#persistent-pty-binary`)、插件 npm 自更新(`v2:packages/core/src/plugin/update.ts`,24h 一次)、models.dev 拉取、MCP | 围栏仍在 import 引擎之前装好(H1:`sidecar.ts:133-140`;H3:先装围栏再派生子进程);引擎派生的一切继承围栏;出网只经出网策略代理(`#1531` 的回环规则不变);插件自更新对本地路径插件不触发 | 重跑 `process-fence-apply.test.ts`、`network-egress-fence.test.ts`、`process-fence-engine.test.ts` 的现有臂(这两个文件在 bootstrap 过的 worktree 里因缺 Electron 二进制定点恒红,要在有二进制的环境跑);新增一臂:引擎派生的持久终端进程写围栏外路径被拒 |
 | S4 | **工具策略** | 工具改名(`bash`→`shell` 等)让按旧名写的策略、agent 规则、`tool-policy-default` 静默失配 —— 旧名的 deny 不再命中任何工具 | 策略按 canonical 工具身份匹配(ADR-041);改名在策略与 agent 规则里一次换完,未知名字的规则在加载时响亮报出,不静默丢弃 | 用旧名写一条 deny,加载时必须报错或告警;用新名 deny `shell` ⇒ 执行被拒 |
 | S5 | **云端准入** | 平台凭证头(v1 `chat.headers`)、云 MCP 的 `mcp_access` token、websearch 两条腿都挂在 v1 钩子上 | 平台头只在 `session.hook["model.request"]` 里、只对平台 provider 加;云 MCP 定义只由 ext 在代付态安装;ADR-046 的「账户信号只决定云腿在不在」不变 | 非平台 provider 的请求头里没有平台凭证(抓 `http.request` 钩子);未登录态引擎配置里没有云 MCP |
-| S6 | **外部生态隔离**(不继承 `~/.claude` 技能、项目插件要同意) | `OPENCODE_DISABLE_EXTERNAL_SKILLS`、`OPENCODE_DISABLE_CLAUDE_CODE_PROMPT` 在 2.x 无读者(`ecosystem-import.ts:28-32`),2.x 默认读 `.claude` 技能(`server-process.ts:126-131`);2.x 有自己的插件源装载 | 嵌入时显式 `config.claude = false`(逃生开关 `CODEPUPPY_ECOSYSTEM_INHERIT=1` 语义不变);第三方插件只经 ext 扇出且在同意之后装载,不经 2.x 自己的插件源 | 在临时 HOME 放 `~/.claude/skills/probe` ⇒ `GET /api/skill` 里没有它;把 `config.claude` 改回默认 ⇒ 判据翻红 |
-| S7 | **数据隔离**:Code Puppy 的会话与凭证不与用户自装的 OpenCode 混用 | 库与数据目录本就与独立 OpenCode 同路径(§1.4);2.x 多出共享的 `credential` 表和导入迁移,独立装的 OpenCode 2 也会对同一个库做 v1→v2 转换 | 本票不搬数据目录(那是一次数据迁移,另行裁决,见 O2);本票保证 S2 的「不导入不属于我们的凭证」,并在启动日志里报出「检测到同目录的其它 OpenCode 数据」 | 同 S2;另在临时数据目录预置一份由 2.x 独立 CLI 迁移过的库 ⇒ Code Puppy 能起、不报错丢数据,或按 DB 安全带阻断并说明 |
+| S6 | **外部生态隔离**(不继承 `~/.claude` 技能、项目插件要同意) | `OPENCODE_DISABLE_EXTERNAL_SKILLS`、`OPENCODE_DISABLE_CLAUDE_CODE_PROMPT` 在 2.x 无读者(`ecosystem-import.ts:28-32`),2.x 默认读 `.claude` 技能(`server-process.ts:126-131`);2.x 有自己的插件源装载 | 嵌入时显式 `config.claude = false`(逃生开关 `CODEPUPPY_ECOSYSTEM_INHERIT=1` 语义不变);第三方插件只经 ext 扇出且在同意之后装载,不经 2.x 自己的插件源。**`.agents` 两类技能根**(第 1 轮审计 F5):全局 `~/.agents` 与项目内 `.agents` 由内置插件 `opencode.config.compatibility` 与 `.claude` 一起装载(`v2:packages/core/src/config/plugin/compatibility.ts:44`),而 `config.claude = false` 只关 `.claude`,`.agents` 不受它管(`v2:packages/core/src/config/discovery.ts:152-166`)。处置在 L0(配置注入):在 `plugins` 里注入移除指令 `-opencode.config.compatibility`(移除语法 `v2:packages/core/src/config/plugin/source.ts:118-122`,执行 `v2:packages/core/src/plugin/supervisor.ts:34-40`;该插件不在不可移除名单 `v2:packages/core/src/plugin/internal.ts:309`);逃生开关置位时不注入(读码,未跑) | 在临时 HOME 放 `~/.claude/skills/probe` ⇒ `GET /api/skill` 里没有它;把 `config.claude` 改回默认 ⇒ 判据翻红。加两臂:临时 HOME 的 `~/.agents/skills/probe-global` 与临时项目里的 `.agents/skills/probe-project` ⇒ 都不在 `GET /api/skill` 里;去掉移除指令 ⇒ 两条都出现 |
+| S7 | **数据隔离**:Code Puppy 的会话与凭证不与用户自装的 OpenCode 混用 | 库与数据目录本就与独立 OpenCode 同路径(§1.4);2.x 多出共享的 `credential` 表和导入迁移,独立装的 OpenCode 2 也会对同一个库做 v1→v2 转换 | 本票不搬数据目录(编排器已定,裁决书 R5;搬目录是一次独立的数据迁移,另行裁决,见 §7 O2);本票保证 S2 的「不导入不属于我们的凭证」,并在启动日志里报出「检测到同目录的其它 OpenCode 数据」 | 同 S2;另在临时数据目录预置一份由 2.x 独立 CLI 迁移过的库 ⇒ Code Puppy 能起、不报错丢数据,或按 DB 安全带阻断并说明 |
 | S8 | **renderer 信任边界**:renderer 不拿引擎口令,不得直连 Node/秘密 | 2.x 引擎同样 Basic auth + CORS(`v2:packages/server/src/options.ts`);数据层换成 `@opencode/client/solid` 后,连接参数从哪来要重接 | 口令只在 main/sidecar;renderer 只拿到源地址,`Authorization` 由 main 在请求上补(上游桌面同款,`sidecar-credentials.ts:30-41`) | renderer 进程的全局对象与 IPC 返回值里搜不到口令(现有判据改指新接线) |
 
 ## 4. 子票切分与规模
@@ -303,11 +328,11 @@ L2 在整合分支上一并改:提示词绊线改指 `v2:packages/core/src/sessi
 
 | Lane | 类型 | 负责 AC | 边界(只动这些) | 不做 | 退出条件 |
 | --- | --- | --- | --- | --- | --- |
-| L1 引擎宿主与数据勘破 | DECIDE | AC1(前提)、AC3(前提) | 只读 + 临时实验分支;产物落 `docs/architecture/` 一篇勘破 | 不改产品代码 | §2.4 的三条退出条件逐条有实测结论(含命令与输出);真库**副本**上前进迁移与旧对话转换的结果(会话条数前后对照);定 H1 或 H3 |
-| L2 骨架:M0 与守卫、同步、构建接线 | CODE | AC1、AC4 | M0 合并提交;`scripts/north-star-guard.sh` 与其测试;`scripts/engine-smoke.sh`;`.github/workflows/sync-upstream.yml`;`packages/ui-mac/scripts/prebuild.ts` 与 `gen-db-expected.ts`;`frontend/frontend-pin.lock` | 不改 ext、ui-mac 业务代码 | §2.3 第 4 步的机械判据在整合分支上为真并有反向用例;同步工作流的步骤体在 `sync-upstream-takeover-isolation.test.ts` 里对新清单跑通 |
-| L3 ext 改成 2.x 插件 | CODE | AC1 | `packages/ext/**`;上下文注入快照 | 不改工具策略族的判定逻辑(L4) | 清点表 P1–P12、C10、L3r、L4r、L5r、M3 各行状态变为已处置并写上新坐标;ext 的测试在 2.x 插件宿主里跑(不是替身) |
-| L4 主权文件搬家与接管重判 | CODE | AC1 | 清点表 K1–K8、L1r、L2r、M1、M2、M6、D3 的文件;新接管清单;ADR-047「精确接管面」一节 | 不改 renderer | 新接管清单每条在 ADR-047 有理由;`#725` 判据改指 2.x 并带摘线反向(S1) |
-| L5 ui-mac 主进程接线 | CODE | AC1 | sidecar 宿主、`sidecar-env.ts`、`server.ts` 的环境投影、`codepuppy-config-injection.ts`、MCP 管理、provider/目录投影、健康探测 | 不改 renderer、不改 ext | 清点表 H1–H9、C1–C9、E1–E3、S7 的 main 部分已处置;「每个 `OPENCODE_*` 有读者」测试在位;删掉 v2 配置桥后无残留引用 |
+| L1 引擎宿主与数据勘破 | DECIDE | AC1(前提)、AC3(前提) | 只读 + 临时实验分支;产物落 `docs/architecture/` 一篇勘破 | 不改产品代码 | §2.4 的三条退出条件逐条有实测结论(含命令与输出);真库**副本**上前进迁移与旧对话转换的结果(会话条数前后对照),且这次实验走 Code Puppy 的启动预检(DB 安全带),不只跑裸引擎(§2.8 第 1 条,F1);定 H1 或 H3 |
+| L2 骨架:M0 与守卫、同步、构建接线 | CODE | AC1、AC4 | M0 合并提交(直推整合分支或 `--merge` 合入,F2);`scripts/north-star-guard.sh` 与其测试 —— 在含受审上游合并的分支上,`packages/` 辖区改以该合并的上游父(`33f94fce96`)为基准判,不再以 `origin/alpha` 为基准(守卫头注 `scripts/north-star-guard.sh:24` 起写的基准,F3);接管清单在 L2 用过渡清单判(F10);`scripts/engine-smoke.sh`;`.github/workflows/sync-upstream.yml`;`packages/ui-mac/scripts/prebuild.ts` 与 `gen-db-expected.ts`(含退役迁移 id 的冻结清单,以及 db-safety 那条「带两个退役 id 的夹具库 ⇒ 待前进」测试,F1);`frontend/frontend-pin.lock` | 不改 ext、ui-mac 业务代码;7 条 lane 的推送不得靠 `--no-verify` 过守卫(F3) | §2.3 第 4 步的两条机械判据(树、祖先)在整合分支上为真并有反向用例,其中祖先判据 `git merge-base --is-ancestor 33f94fce96 HEAD` 带「squash 重放后必须红」(F2);守卫两臂:M0 之后再改一个上游文件 ⇒ 红,M0 原样带来的上游改动 ⇒ 绿(F3);同步工作流的步骤体在 `sync-upstream-takeover-isolation.test.ts` 里对过渡清单跑通;合入 `alpha` 前列出将新出现的上游 workflow 清单(§2.3 第 2 步的 20 个),合入后逐个 `gh workflow disable`(F4) |
+| L3 ext 改成 2.x 插件 | CODE | AC1 | `packages/ext/**`;上下文注入快照 | 不改工具策略族的判定逻辑(L4) | 清点表 P1–P12、C10、L3r、L4r、L5r、M3 各行,以及 S7 的 ext 部分(`packages/ext/src/reload-scheduler.ts:51,58` 进程内调用的 `GET /session/status`、`POST /instance/dispose`,F11),状态变为已处置并写上新坐标;ext 的测试在 2.x 插件宿主里跑(不是替身) |
+| L4 主权文件搬家与接管重判 | CODE | AC1 | 清点表 K1–K8、L1r、L2r、M1、M2、M6、D3 的文件;新接管清单;ADR-047「精确接管面」一节 | 不改 renderer | 新接管清单每条在 ADR-047 有理由;`#725` 判据改指 2.x 并带摘线反向(S1);对最终清单重跑 `sync-upstream-takeover-isolation.test.ts` 与 `north-star-guard.test.ts`,并定好清单为空时同步怎么走 —— 今天 `sync-upstream.yml:131-133` 遇空清单直接 `exit 1`,最终清单若为空不得 `exit 1`,且要与「守卫没跑出结果」区分开(F10) |
+| L5 ui-mac 主进程接线 | CODE | AC1 | sidecar 宿主、`sidecar-env.ts`、`server.ts` 的环境投影、`codepuppy-config-injection.ts`、MCP 管理、provider/目录投影、健康探测 | 不改 renderer、不改 ext | 清点表 H1–H9、C1–C9、E1–E3、S7 的 main 部分已处置;sidecar 构造的 `ServerOptions` 有断言选项对象的测试,带「只设进环境的变量必须红」的反向臂,库路径与 `db-safety.ts:36-51` 共用一个函数(§2.7,F7);删掉 v2 配置桥后无残留引用 |
 | L6 前端:pin、SOT 补丁、renderer 数据层 | CODE | AC1 | `frontend/`、`packages/{app,ui}` 投影、`packages/ui-mac/src/renderer/**` | 不做视觉改动(票面「不做」) | 三个发送入口同一代次(ADR-037 决策 5 的枚举写进 PR);清点表 S1–S6、S9、F1–F6、M4、M5 已处置 |
 | L7 打包版验证与撤回演练 | VERIFY | AC3、AC5(及 AC4 的合入后取证) | `docs/verification/` | 不改代码(发现缺陷回到对应 lane) | §5 的闸门全部有记录;§6 的演练做过一次并留证 |
 
@@ -344,11 +369,11 @@ owner 实机:0.1.25 那轮 36 格用了 200–230 分钟(alpha-work#129 票面�
 | --- | --- | --- |
 | G1 发送 | 首页新对话、会话页输入框、时间线「继续」三个入口各连发三条,渲染出三条回复 | 任一入口指回旧路由 ⇒ 第二条起无回复 |
 | G2 审批 | 「请求审批」档下触发一次写文件,停靠区出卡;拒绝 ⇒ 文件系统侧无写入 | 摘掉 ext 的 `execute.before` 注册 ⇒ 写入发生 |
-| G3 工具策略 | 被拒工具不出现在模型请求的工具表里,强行调用被拒 | 同 S1 判据 |
+| G3 工具策略 | 被拒工具不出现在模型请求的工具表里,也不出现在 Code Mode 目录里(F6),强行调用被拒 | 同 S1 判据 |
 | G4 MCP / 云工具 | 第一方 MCP 与云 MCP 各调用一次成功(服务端计数) | 删秘密文件 ⇒ 云 MCP 定义不出现 |
 | G5 BYOK | 自带 Key 的 provider 真实发送一条(沿用 alpha-work#129 R22 的 DeepSeek Key 前提) | 去掉投影 ⇒ provider 不可选 |
 | G6 历史连续 | 切换前的旧对话在侧栏可见、可打开、可继续发送 | 关掉 §2.8 的转换 ⇒ 旧对话不可见 |
-| G7 生态隔离 | 临时 HOME 下 `~/.claude/skills/probe` 不出现在技能列表 | `config.claude` 改回默认 ⇒ 出现 |
+| G7 生态隔离 | 临时 HOME 下 `~/.claude/skills/probe`、`~/.agents/skills/probe-global` 与临时项目的 `.agents/skills/probe-project` 都不出现在技能列表(F5) | `config.claude` 改回默认 ⇒ `.claude` 那条出现;去掉 `-opencode.config.compatibility` ⇒ `.agents` 两条出现 |
 | G8 围栏 | 引擎派生进程写围栏外路径失败;出网全部经代理(netlog 分类) | 去掉围栏计划 ⇒ sidecar 拒绝启动(既有 fail-closed) |
 | G9 凭证不导入 | 临时数据目录的假 `auth.json` 不进 provider 列表 | 去掉 S2 的处置 ⇒ 出现 |
 
@@ -370,8 +395,9 @@ owner 实机:0.1.25 那轮 36 格用了 200–230 分钟(alpha-work#129 票面�
 
 ### 5.3 本地门(每条 lane 交回前、整合 PR 推送时)
 
-- 北极星:§2.3 第 4 步的机械判据 + `scripts/north-star-guard.sh`(新清单)。
-- 类型检查:三个自有包;单元:`bun test src`,只与整合分支 base 的失败集比。
+- 北极星:§2.3 第 4 步的两条机械判据(树、祖先 `git merge-base --is-ancestor 33f94fce96 HEAD`,F2)+ `scripts/north-star-guard.sh`(以受审合并的上游父为基准,F3)。
+- 类型检查:三个自有包;单元:`bun test src`,失败集的比较基准分两段(第 1 轮 OPTIONAL 采纳):**并行期**各 lane 与整合分支 base 比;
+  **最终推送**(整合分支 → `alpha` 的那个 PR)与 `alpha` 比。
 - 闸门文件登记(`scripts/assert-gate-files.sh`):lane 改了闸门文件就 `--update` 写回,改动进同一个提交。
 - 文档门:改了 Markdown 跑 `scripts/check-doc-links.py`。
 - 全量门只在整合 PR 推送时跑一次(dev-loop)。
@@ -388,30 +414,41 @@ owner 实机:0.1.25 那轮 36 格用了 200–230 分钟(alpha-work#129 票面�
 3. **重新落地**不是再合一次整合分支,而是 revert 那个 revert(git 对「撤回一个合并」的既定行为:被撤回的改动已在历史里,再合不会回来)。
 4. **本机数据:** 跑过 2.x 构建的机器,库已前进 21 条迁移;换回 1.x 构建时 DB 安全带报「库超前」并阻断(`db-safety.ts:86,105`)。处置 = 用安全带在
    第一次 2.x 启动前做的 `opencode-backup-*` 恢复;切换后新建的对话随之丢失(写进撤回 PR 与 owner 说明)。
+   **「库超前」时恢复界面不给「恢复备份」这个动作**(只有退出 / 备份后继续 / 继续启动,`packages/ui-mac/src/main/recovery-adapter.ts:58-74`;
+   恢复动作只出现在「库损坏」时),所以要**手工恢复**,步骤照 `restoreFromBackup`(`db-safety.ts:270-293`,第 1 轮审计 F8):
+   ① 完全退出应用;② 把主库 `opencode.db` 改名为 `opencode.db.corrupt-<时间戳>`;③ 把同目录的 `opencode.db-wal`、`opencode.db-shm`(若在)
+   一起改名为 `…corrupt-<时间戳>-wal` / `-shm` —— 留下旧 `-wal/-shm` 会被 sqlite 回放进恢复件;④ 把备份目录(`db-safety-boot.ts:44` 的
+   `backupDirOf(userData)`)里最新的 `opencode-backup-*.db` 先拷成 `opencode.db.restore-tmp`,再一次改名为 `opencode.db`;⑤ 启动 1.x 构建。
 
 ### 6.2 演练(L7 在整合分支上做一次)
 
 1. 复制一份真实会话库到临时目录(只复制,不碰原库);记录 1.x 打包版在该副本上看到的会话条数与最新一条对话。
-2. 以 2.x 打包版、`XDG_DATA_HOME` 指向该副本启动(`open -n --env XDG_DATA_HOME=<副本>` 或等价方式,沿用 `packaged-sample.sh` 不继承终端环境的约束),
-   记录:安全带备份文件名、迁移完成、会话条数、能否继续旧对话。
-3. 在一个临时分支上对「整合分支合进 `alpha`」的合并提交做 `git revert -m 1`,构建 1.x 打包版,对同一副本启动:应看到「库超前」阻断;按安全带恢复备份;
-   会话条数与第 1 步一致。
+2. 以 2.x 打包版、`XDG_DATA_HOME` 指向该副本启动(`open -n --env XDG_DATA_HOME=<副本>` 或等价方式,沿用 `packaged-sample.sh` 不继承终端环境的约束)。
+   **先确认安全带的备份文件确实生成**(备份目录里出现新的 `opencode-backup-*.db`,F8);没有就停下 —— 这正是 F1 要防的「库超前、不备份」形态。
+   再记录:迁移完成、会话条数、能否继续旧对话。
+3. 在一个临时分支上对「整合分支合进 `alpha`」的合并提交做 `git revert -m 1`,构建 1.x 打包版,对同一副本启动:应看到「库超前」阻断;按 §6.1 第 4 条的
+   手工步骤恢复备份;会话条数与第 1 步一致。
 4. 证据(每步命令、输出、截图)落 `docs/verification/<日期>-1662-opencode2/rollback-drill.md`;第 3 步的临时分支不推送。
 
 ## 7. 待 owner 裁决
 
-这几项都按 `owner-decision` 的要求在递给 owner 时补全前因后果;这里只列选项与后果,**没有一项已裁决**。
+这几项都按 `owner-decision` 的要求在递给 owner 时补全前因后果。O2 已由编排器定、O3 已由 owner 裁决(来源见各条,均记在裁决书
+[`2026-11-08-1662-opencode2-rulings.md`](2026-11-08-1662-opencode2-rulings.md));**O1 仍未裁决**。
+
+**给 owner 的数据说明(不是待裁决项,随 O1 与撤回说明一起递;第 1 轮审计 F12):** 第一次以 2.x 启动时,会话库会发生三件事:
+① 前进 21 条迁移,之前先自动备份;② 每个旧对话转换成新格式写进新表 —— 写之前先删掉该对话在新表 `session_message` 里已有的行
+(`v2:packages/core/src/database/v1-migration.bun.ts:704`);③ 清掉 `event` 表(`:562`)。旧格式的 `message`/`part` 两张表不删。
 
 - **O1 旧对话接不上时怎么办(有条件:只有 §2.8 第 2 步的两条补法都不通时才问)。** 选项:
   ① 接受旧对话不可见(数据还在库里,v1 表不删,以后补上仍能恢复)—— 用户升级后侧栏是空的,这是用户可见的退步;
   ② 换回去用 H3 带 bun 运行时(多约 200 MB、多一个要签名公证的二进制、ext 的通信要重做)—— 工期加约一周;
   ③ 暂停切换,等上游给 Node 下的转换 —— 每日同步继续坏着(`#1408`)。推荐:先做完 L1 再问;若到这一步,推荐 ②。
-- **O2 Code Puppy 的会话与凭证要不要从 `~/.local/share/opencode` 搬到自己的目录(安全面 S7)。** 今天就与用户自装的 OpenCode 共用,换代把共享面扩大到
-  2.x 的凭证表。选项:① 本票不搬,只做 S2 的「不导入」与启动告警(推荐:搬目录是一次独立的数据迁移,按「迁移设计逐次裁决」另开票);
-  ② 本票一起搬 —— 范围变大,撤回演练要多覆盖一次目录迁移。
-- **O3 「分享对话」菜单项下线(清点表 S5)。** 2.x 没有分享接口,上游 1.x 维护线也已停掉分享;侧栏菜单 `codepuppy-sidebar.tsx:989` 今天还在。
-  按 ADR-037 决策 3,缺项要在切换 ADR 里点名并由 owner 拍板。选项:① 随换代下线该菜单项(推荐);② 保留菜单但点了提示「已不可用」;
-  ③ 不切换。分享服务今天是否已经不可用,本方案没有实测(见 §9)。
+- **O2 Code Puppy 的会话与凭证要不要从 `~/.local/share/opencode` 搬到自己的目录(安全面 S7)—— 已定(编排器,裁决书 R5):本票不搬。**
+  本票只做 S2 的「不导入不属于 Code Puppy 的凭证」与 S7 的启动告警;搬目录是一次独立的数据迁移,另行裁决。可回退:本票不改目录,撤回不涉及数据迁移。
+  (原选项「本票一起搬」未采纳。)
+- **O3 「分享对话」菜单项下线(清点表 S5)—— 已裁决(owner 2026-11-09,原话「路一」,裁决书 R6):随换代拿掉侧栏「分享对话」菜单项。**
+  L6 按清点表 S5 处置,ADR-047 缺项清单点名;拿掉可恢复,以后要分享另立需求自建。裁决依据(编排器 2026-11-09 实测):`https://opncd.ai`
+  与 `/api/share` 均返回 `410`,上游 1.x 已于 `d320177aa4` 停掉分享 —— 0.1.26 里该功能今天已不可用,与换代无关。
 
 ## 8. 方案疑点(对编排器已定判断的核实结果)
 
@@ -422,6 +459,7 @@ owner 实机:0.1.25 那轮 36 格用了 200–230 分钟(alpha-work#129 票面�
 | 3 能力清点覆盖的轴 | 全部覆盖;额外加了「环境变量投影」与「持久化与数据」两轴,因为两处各有一个静默失效(12 个无读者变量;Node 下旧对话转换是空实现) | 清点表 §4、§10 |
 | 票面「现状」写「上游 dev = OpenCode 2(2.2.6,`adb0053d09`)」 | 小订正:`adb0053d09` 是 dev 头,不是 2.2.6;2.2.6 对应的 dev 线提交是 `33f94fce96` | §1.1 |
 | 票面「`origin/alpha` 自有提交 1097 个」 | 本方案实测 `git rev-list --count origin/alpha ^upstream/dev` = 990(非合并 884);口径不同,不影响结论 | §1.1 |
+| 第 1 轮 F4「合入 `alpha` 后对新出现的上游 workflow 逐个 `gh workflow disable`」(已按裁决回写,未改) | **依据成立**(`33f94fce96` 有 21 个 workflow,含两个 triage 文件;其中 20 个 alpha 今天没有)。**另有一处时序缺口,交编排器裁**:有几个上游 workflow 在合入 `alpha` **之前**就会跑。`pull_request_target` 用**目标分支**里的 workflow 定义:M0 推上整合分支后,每个进整合分支的 lane PR 都会触发 `triage-pr-standards.yml`(`opened/edited/synchronize`,`pull-requests: write`,会加标签)与 `triage-contributor.yml`(`opened`,`pull-requests: write`、`issues: write`)。`pull_request` 用 PR 自身(head)的定义:`check-bot-scope.yml` 不设分支过滤,对 lane PR 与最终 PR 都会跑;最终 PR 还会命中带路径过滤的 `check-docs.yml`、`check-process-daemon.yml`、`release-process-daemon.yml`、`release-dry-run.yml`(这些文件或被它们盯的路径在 PR 里是新增)。前两者带写权限,是本仓自己的流程(lane PR 进整合分支)走得到的状态 | 逐个读 `git show 33f94fce96:.github/workflows/<文件>` 的 `on:` 段与 `permissions:`;可选的处置方向(不在本方案里定):M0 先不带入上游 workflow 文件、等进 `alpha` 时再按 F4 一次处理;或 lane 不经 GitHub PR、在本机合进整合分支 |
 
 ## 9. 仍是推断、没跑过的断言
 
@@ -433,6 +471,8 @@ owner 实机:0.1.25 那轮 36 格用了 200–230 分钟(alpha-work#129 票面�
 - ext 能被安排为 `execute.before` 钩子链的最后一个回调 —— 2.x 插件装载顺序没实测。
 - 插件 npm 自更新对本地路径插件不触发 —— 没读完 `plugin/update.ts` 的调用方。
 - `/global/health` → `/api/info`、`mcp.auth` 的 2.x 入口、`project.list` 的 2.x 对应 —— 映射未逐个核实。
-- 分享服务今天是否已不可用 —— 没有实测。
+- 分享服务今天是否已不可用 —— 本方案员没跑;编排器 2026-11-09 实测 `https://opncd.ai`、`/api/share` 均返回 `410`(裁决书 R6),O3 据此已裁。
+- `plugins` 里注入 `-opencode.config.compatibility` 能关掉 `.claude` 与 `.agents` 两类技能根(S6,F5)—— 只读了 `source.ts`/`supervisor.ts`/`internal.ts`,没跑。
+- Code Mode 目录闸的两种机制(snapshot 规则集注入 deny / 对 Code Puppy 管的 MCP server 注入 `codemode: false`)哪种可行(S1,F6)—— 只读了 `tool/mcp.ts:57` 与 `mcp/index.ts:490`,没跑。
 - §4.3 的工时与日历估计 —— 按计数外推,不是测量。
 - 本机 2.x 构建可用 `open -n --env XDG_DATA_HOME=…` 指向库副本 —— 没跑。

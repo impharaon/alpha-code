@@ -199,6 +199,21 @@ export const HostLayer = AppNodeBuilder.build(
 
 export const it = testEffect(HostLayer)
 
+const { ProjectTable } = await load("src/project/sql.ts")
+const { Project } = await load("src/project.ts")
+
+/** The project row saved approvals reference (`permission.project_id`), as core's permission tests seed it. */
+export const seedProject = Effect.gen(function* () {
+  const location = yield* Location.Service
+  const { db } = yield* nodes.Database.Service
+  yield* db
+    .insert(ProjectTable)
+    .values({ id: Project.ID.global, worktree: location.directory, sandboxes: [] })
+    .onConflictDoNothing()
+    .run()
+    .pipe(Effect.orDie)
+})
+
 let generation = 0
 
 /**

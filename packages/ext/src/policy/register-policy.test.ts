@@ -16,6 +16,7 @@ import {
   promisePlugin,
   restoreEnvironment,
   ROOT,
+  seedProject,
   SchemaTool,
   Session,
   SessionContext,
@@ -57,6 +58,10 @@ interface Setup {
   readonly inside?: (ctx: any) => Promise<void>
   /** Skip the prompt hook, as a request that is not a prompt (a command) would. */
   readonly noPrompt?: boolean
+  /** Extra configured MCP servers (OpenCode's config plugin activates before the extension). */
+  readonly mcp?: Record<string, unknown>
+  /** Receives the MCP configuration as a plugin after the extension sees it. */
+  readonly seeMcp?: (servers: Record<string, unknown>) => void
 }
 
 const counts = { write: 0, probe: 0, paid: 0, free: 0 }
@@ -89,7 +94,10 @@ const setup = (options: Setup = {}) =>
           editor.add(tool(ALIAS_WRITE, "write", { options: { codemode: false } }))
           for (const name of options.builtins ?? []) editor.add(tool(name, "write", { options: { codemode: false } }))
         })
-        await ctx.mcp.transform((editor: any) => editor.set("policy", { type: "remote", url: POLICY_URL }))
+        await ctx.mcp.transform((editor: any) => {
+          editor.set("policy", { type: "remote", url: POLICY_URL })
+          for (const [name, config] of Object.entries(options.mcp ?? {})) editor.set(name, config)
+        })
       }),
       promisePlugin("codepuppy-ext", async (ctx: any) => {
         const policy = options.policy === false ? undefined : await registerPolicy(ctx)
@@ -111,6 +119,13 @@ const setup = (options: Setup = {}) =>
         )
       }),
       ...(options.after ? [options.after] : []),
+      ...(options.seeMcp
+        ? [
+            promisePlugin("mcp-observer", async (ctx: any) => {
+              await ctx.mcp.transform((editor: any) => options.seeMcp!(Object.fromEntries(editor.list())))
+            }),
+          ]
+        : []),
     ])
     yield* plugins.awaitActivation
     if (options.records?.length) {
@@ -121,6 +136,7 @@ const setup = (options: Setup = {}) =>
       })
       for (const record of options.records) yield* Effect.promise(() => store.setRecord(record as never))
     }
+    yield* seedProject
     const sessions = yield* Session.Service
     const session = yield* sessions.create({ location: { directory: location.directory }, agent: "build" } as never)
     // The engine's prompt flow triggers `session.hook.prompt` after plugin activation; the tail rules register there.
@@ -524,6 +540,87 @@ describe("display snapshot (I7b) — state.metadata.codepuppyDisplay", () => {
         technicalId: ALIAS_PAID,
         location: { kind: "remote", host: "mcp.example.test" },
       })
+    }),
+  )
+})
+
+describe("MCP argv and approval memory", () => {
+  it.live("{workspace} in a local MCP command becomes the Location directory (#1011); without the policy it stays literal", () =>
+    Effect.gen(function* () {
+      const office = { type: "local", command: ["python3", "server.py", "--root", "{workspace}"] }
+      let seen: any
+      yield* setup({ mcp: { office }, seeMcp: (servers) => (seen = servers) })
+      const location = yield* Location.Service
+      expect(seen.office.command).toEqual(["python3", "server.py", "--root", location.directory])
+
+      let raw: any
+      yield* setup({ policy: false, mcp: { office }, seeMcp: (servers) => (raw = servers) })
+      expect(raw.office.command).toEqual(["python3", "server.py", "--root", "{workspace}"])
+    }),
+  )
+
+  it.live("an always approval discharges the next ask for the same binding and revision; a policy write re-asks", () =>
+    Effect.gen(function* () {
+      const { session } = yield* setup({ records: [{ selector: { level: "tool", canonical: ID_MCP_PAID }, state: "ask" }] })
+      const permission = yield* Permission.Service
+      const first = yield* Effect.forkChild(callCodeMode(session.id, "policy.paid_action"))
+      const [request] = yield* pending
+      yield* permission.reply({ requestID: request!.id, reply: "always" })
+      yield* E.Fiber.join(first)
+      expect(counts.paid).toBe(1)
+
+      yield* callCodeMode(session.id, "policy.paid_action")
+      expect(counts.paid).toBe(2)
+      expect(yield* permission.list()).toEqual([])
+
+      // Any write to the document changes its revision, so the saved approval no longer matches.
+      const location = yield* Location.Service
+      const store = createToolPolicyStore({
+        baseDir: defaultPolicyBaseDir(path.join(ROOT, "data", "opencode")),
+        account: () => account,
+        workspace: () => location.directory,
+      })
+      yield* Effect.promise(() => store.setRecord(classEnabled("plugin") as never))
+      const third = yield* Effect.forkChild(callCodeMode(session.id, "policy.paid_action"))
+      const [again] = yield* pending
+      expect(again?.action).toBe(ID_MCP_PAID)
+      yield* permission.reply({ requestID: again!.id, reply: "reject" })
+      yield* E.Fiber.await(third)
+      expect(counts.paid).toBe(2)
+    }),
+  )
+
+  it.live("every approval request carries Code Puppy's risk classification, overriding what the tool reported (#1285)", () =>
+    Effect.gen(function* () {
+      const asker = promisePlugin("asking-tool", async (ctx: any) => {
+        await ctx.tool.transform((editor: any) =>
+          editor.add({
+            name: "fetchy",
+            options: { codemode: false },
+            description: "asks for webfetch",
+            input: { type: "object", properties: {} },
+            execute: async (_input: unknown, context: any) => {
+              await ctx.permission.assert({
+                sessionID: context.sessionID,
+                action: "webfetch",
+                resources: ["https://example.test/upload?token=sk-live-0123456789abcdef0123"],
+                save: [],
+                metadata: { url: "https://example.test/upload?token=sk-live-0123456789abcdef0123", codepuppyRisk: { level: "low" } },
+              })
+              return { content: "fetched" }
+            },
+          }),
+        )
+      })
+      const { session } = yield* setup({ records: NEUTRAL, after: asker, rules: [ALLOW_ALL, { action: "webfetch", resource: "*", effect: "ask" }] })
+      const permission = yield* Permission.Service
+      const fiber = yield* Effect.forkChild(callRaw(session.id, "fetchy"))
+      const requests = yield* pending
+      const webfetch = requests.find((request: any) => request.action === "webfetch")
+      expect(webfetch?.metadata?.codepuppyRisk?.level).not.toBe("low")
+      expect(webfetch?.metadata?.codepuppyRisk?.rules?.length).toBeGreaterThan(0)
+      for (const request of yield* permission.list()) yield* permission.reply({ requestID: request.id, reply: "reject" })
+      yield* E.Fiber.await(fiber)
     }),
   )
 })

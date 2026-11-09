@@ -19,7 +19,6 @@ import { getAuthIdentityTag } from "./codepuppy-auth"
 import { installationMachineId } from "./artifact-service"
 import { tryGetCodePuppyEnvironment } from "./codepuppy-environment"
 import { CLOUD_WEBSEARCH_DENY_ENV, LOCAL_WEBSEARCH_DENY_ENV } from "./cloud-web-search"
-import { applyEcosystemDefaultDeny } from "./ecosystem-import"
 import { resourcesRoot } from "./ext-fs-installer"
 import { secretFileRef, syncSecretFiles } from "./codepuppy-secret-files"
 import { customProviderSecretValues } from "./codepuppy-byok-keys"
@@ -322,69 +321,22 @@ export function setDefaultServerUrl(url: string | null) {
   getStore().delete(DEFAULT_SERVER_URL_KEY)
 }
 
-// ADR-009 B1/B2 的 4 个 keyless web search 专用 flag。umbrella(`OPENCODE_EXPERIMENTAL`)刻意不碰
-// ——「一开关一具名能力」,盲目 force-0 会连带关掉 references / code-mode 等无关实验能力。
-const KEYLESS_WEBSEARCH_FLAGS = [
-  "OPENCODE_ENABLE_EXA",
-  "OPENCODE_EXPERIMENTAL_EXA",
-  "OPENCODE_ENABLE_PARALLEL",
-  "OPENCODE_EXPERIMENTAL_PARALLEL",
-] as const
-type KeylessWebSearchFlag = (typeof KEYLESS_WEBSEARCH_FLAGS)[number]
-
-// 主权基线 = 被 force-off 覆盖**之前**的用户真值(shell export / 系统 env)。force-off 是覆盖写,
-// 会销毁原值;登出 respawn 要把 keyless 还回去(ADR-009 B1「登出/BYOK 保留 keyless」),故必须先留底。
-let keylessWebSearchBaseline: Partial<Record<KeylessWebSearchFlag, string>> = {}
-
-function captureKeylessWebSearchBaseline(source: Record<string, string | undefined>, reset = false) {
-  if (reset) keylessWebSearchBaseline = {}
-  for (const key of KEYLESS_WEBSEARCH_FLAGS) {
-    if (!(key in source)) continue
-    const value = source[key]
-    if (value === undefined) delete keylessWebSearchBaseline[key]
-    else keylessWebSearchBaseline[key] = value
-  }
-}
-
 /**
- * web search 的**本地腿**主权闸,**幂等**、可反复重算。唯一能关掉它的是 kill-switch。
+ * web search 主权判决,**幂等**、可反复重算,每次 fork 前落定;sidecar 只读不算。唯一能关掉两条腿的是 kill-switch
+ * (`CODEPUPPY_WEBSEARCH_DISABLE`);`#1411`(owner 2026-09-23):账户信号只决定云腿在不在,不决定本地腿。
+ * 判决经两个布尔 env 过河:`CODEPUPPY_CLOUD_WEBSEARCH_DENY` / `CODEPUPPY_LOCAL_WEBSEARCH_DENY`(两个方向都写)。
  *
- * **`#1411`(REQ-1414 CODE-1,owner 2026-09-23 裁决)**:本函数此前还读一个「平台代付」判据
- * (`CODEPUPPY_CLOUD_MCP_URL` + `CODEPUPPY_MCP_TOKEN` 密钥文件),登录即把四个 keyless flag 覆盖写 `"0"` 并
- * 置位 `CODEPUPPY_LOCAL_WEBSEARCH_DENY`(= ADR-009 B1「一登录就只走云端」)。那条边已被推翻:**账户
- * 信号只决定云腿在不在** —— 本地腿 keyless、不花钱,是云腿 402 / 网络故障时唯一的退路。**本函数
- * 因此不再接 `userDataPath`**(代付判据住在那底下的密钥文件里,参数没了就没人能顺手读回来);
- * #621 那条时序(代付判据要等 `initAuthEnv`)也随之不再相干。真判据是 `server.test.ts` 的
- * 「登录代付:两条腿同时在模型工具表里」那一组(真 fork → 真 `RuntimeFlags` → 真
- * `webSearchEnabled` → 真 `Permission.disabled`,带 kill-switch 反例臂)。
- *
- * 两个方向都写:kill-switch → 覆盖写 `"0"`(压过 shell export);否则 → 还原基线 + 桌面默认
- * (set-if-unset `OPENCODE_ENABLE_EXA=1`),否则一次 kill-switch 会把 keyless 永久哑掉到重启。
+ * `#1667`(#1662 L5,清点表 E2):v1 时代这里还把 4 个 keyless 专用 flag(`OPENCODE_ENABLE_EXA` /
+ * `OPENCODE_EXPERIMENTAL_EXA` / `OPENCODE_ENABLE_PARALLEL` / `OPENCODE_EXPERIMENTAL_PARALLEL`)覆盖写 "0"、登出时还原基线、
+ * 默认置 `OPENCODE_ENABLE_EXA=1`。这 4 个名字在 2.x 无读者(本地腿在 2.x 走 `websearch` 配置与插件 domain,处置归 L3),
+ * 写它们只会让人以为它们还在管事 —— 整套删除。
  */
 export function applyWebSearchSovereignty() {
   const killSwitch = Boolean(process.env.CODEPUPPY_WEBSEARCH_DISABLE)
-  // #223 R3:云侧判决与本地侧分开 —— 平台代付时云工具正是**权威**通道,只有 kill-switch 才关它。
-  // 与本地那条同纪律:两个方向都写,判决由 main 在每次 fork 前同步落定,sidecar 只读不算。
-  // 不让 ext 直接读 `CODEPUPPY_WEBSEARCH_DISABLE`:那样真值判定会在两个包里各写一份(main 用
-  // `Boolean(...)`,即 `"0"` 也算开),迟早漂移。
   if (killSwitch) process.env[CLOUD_WEBSEARCH_DENY_ENV] = "1"
   else delete process.env[CLOUD_WEBSEARCH_DENY_ENV]
-  if (killSwitch) {
-    for (const key of KEYLESS_WEBSEARCH_FLAGS) process.env[key] = "0"
-    // #223 R2(Blocker 1):env force-off 压不住 umbrella,注入的 permission deny 又能被后置的
-    // agent wildcard / 持久 session permission / approved 顶掉(R2 动态探针三条路径全变 allow)。
-    // 这个变量把主权判决直接送到工具自身(`packages/opencode/src/tool/websearch.ts` 的最终闸),
-    // 它不查 ruleset,因而没有任何 permission 规则能覆盖。与四个 flag 同纪律:两个方向都写。
-    process.env[LOCAL_WEBSEARCH_DENY_ENV] = "1"
-    return
-  }
-  delete process.env[LOCAL_WEBSEARCH_DENY_ENV]
-  for (const key of KEYLESS_WEBSEARCH_FLAGS) {
-    const baseline = keylessWebSearchBaseline[key]
-    if (baseline === undefined) delete process.env[key]
-    else process.env[key] = baseline
-  }
-  process.env.OPENCODE_ENABLE_EXA ??= "1"
+  if (killSwitch) process.env[LOCAL_WEBSEARCH_DENY_ENV] = "1"
+  else delete process.env[LOCAL_WEBSEARCH_DENY_ENV]
 }
 
 export function preferAppEnv(userDataPath: string) {
@@ -413,9 +365,6 @@ export function preferAppEnv(userDataPath: string) {
             )
           writeShellEnvCache(userDataPath, shell, cleanFresh, logShellEnvCache)
           Object.assign(process.env, cleanFresh)
-          // 新鲜 shell 值是「真 export」,它更新基线(只并入 cleanFresh 里真出现的键,不整体重取
-          // ——process.env 里那几个键此刻可能已是 force-off 写下的 "0")。
-          captureKeylessWebSearchBaseline(cleanFresh)
           applyWebSearchSovereignty()
           logger.log(`[server] Shell env refreshed in background (${Object.keys(cleanFresh).length} vars)`)
         })
@@ -426,39 +375,21 @@ export function preferAppEnv(userDataPath: string) {
       if (probed) writeShellEnvCache(userDataPath, shell, probed, logShellEnvCache)
     }
   }
-  // #223 对抗审计(2026-07-25):基线必须在**登录 shell env 合入之后**、首次主权计算之前取。
-  // 取早了(合入之前)的现场:Finder 首启 + 用户 `export OPENCODE_ENABLE_PARALLEL=1` →
-  // 基线先被重置为空 → 探测把真值写进 process.env 却不进基线 → 登出「还原基线」反而**删掉**
-  // 用户的 Parallel flag 并默认打开 Exa,即首启就用错 provider。缓存命中路同一窗口。
-  // 每次 preferAppEnv 重取(reset=true;单测逐例重置 env)。
-  captureKeylessWebSearchBaseline(process.env, true)
   // 2. Fill missing API keys (EXA_API_KEY, *_API_KEY, ...) from the codepuppy.env secrets file, so app
   //    users never have to touch ~/.zshrc. Never overrides anything already set in step 1.
   loadCodePuppySecrets(userDataPath, logger)
-  // 3. Desktop defaults. Logged-out/BYOK keeps keyless websearch available to every provider;
-  //    platform-pays makes cloud_web_search authoritative, while CODEPUPPY_WEBSEARCH_DISABLE is a
-  //    capability kill switch in every auth state. Both force-disable every specific Exa/Parallel
-  //    flag, including values imported from the user's login shell.
-  // B12 拍板(2026-07-05,S17 T5):实验 flag 改 set-if-unset —— 默认开(filewatcher 供「外部变更
-  // 感知」:外部编辑/外部 git 的文件树/分支刷新;agent 自身修改由工具主动发事件、不受影响),但尊重
-  // 用户显式 export(=false 可关;此前 Object.assign 硬覆盖,与上方「真 export 赢」注释矛盾)。
-  // watcher 内存压力主治 = B4 数据层减 Instance;上游本体(无 TTL/LRU)接受(R2)。
-  process.env.OPENCODE_EXPERIMENTAL_ICON_DISCOVERY ??= "true"
+  // 3. Desktop defaults(set-if-unset:用户 shell 的显式 export 优先)。`#1667`:H1 下引擎核心不读这两个名字,读它们的是
+  // sidecar 构造 `start()` 选项的 engineDesktopToggles(engine-server-options.ts)—— 它们从此是 Code Puppy 自己的开关:
+  //   · OPENCODE_EXPERIMENTAL_FILEWATCHER 默认开 → `fs.filewatcher`(B12 拍板,2026-07-05:「外部变更感知」);
+  //   · OPENCODE_DISABLE_MODELS_FETCH 默认 "1" → `models.fetch: false`(models.dev 在国内网络超时;随包快照够用,T1.7 / C4)。
+  // v1 时代这里另写的 OPENCODE_CLIENT=desktop(→ `app.name`)、OPENCODE_EXPERIMENTAL_ICON_DISCOVERY、OPENCODE_ENABLE_EXA 默认值、
+  // 外部生态的两个 flag(→ 注入的移除指令)在 2.x 无读者,已删除(清点表 E2)。
   process.env.OPENCODE_EXPERIMENTAL_FILEWATCHER ??= "true"
-  // REQ-063(ADR-024):外部生态继承 default-deny —— `.claude`/`.agents` skills 与 CLAUDE.md 不再
-  // 静默进上下文(提示注入面 + 破坏单一真源心智)。set-if-unset:shell 显式 export 优先
-  // (B21 同款纪律);CODEPUPPY_ECOSYSTEM_INHERIT=1 = 不注入两 flag,整机恢复上游继承且 alpha 不再
-  // 检测/弹窗(ADR-024 §5)。同意后的进入通道 = 安装期转换导入真源根(ecosystem-import.ts,global/project 两条臂),非重开继承。
-  applyEcosystemDefaultDeny(process.env)
   Object.assign(process.env, {
-    OPENCODE_CLIENT: "desktop",
     XDG_STATE_HOME: process.env.XDG_STATE_HOME ?? userDataPath,
-    // models.dev refresh times out / logs ERROR on CN networks; the bundled snapshot suffices. Default
-    // off, env-overridable (set OPENCODE_DISABLE_MODELS_FETCH=0 to re-enable). (T1.7 / C4)
     OPENCODE_DISABLE_MODELS_FETCH: process.env.OPENCODE_DISABLE_MODELS_FETCH ?? "1",
-    ...(process.env.CODEPUPPY_WEBSEARCH_DISABLE ? {} : { OPENCODE_ENABLE_EXA: process.env.OPENCODE_ENABLE_EXA ?? "1" }),
   })
-  // `#1411` 起本闸只认 kill-switch(纯 env);两处都跑是因为 shell 探测/基线还原会改写那四个 flag。
+  // `#1411` 起本闸只认 kill-switch(纯 env)。
   applyWebSearchSovereignty()
 }
 

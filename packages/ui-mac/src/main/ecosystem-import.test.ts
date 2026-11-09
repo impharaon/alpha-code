@@ -4,7 +4,6 @@ import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
 import {
-  applyEcosystemDefaultDeny,
   detectExternal,
   EXTERNAL_IMPORT_VERSION,
   hasExternalImportDecision,
@@ -18,6 +17,7 @@ import {
   writeGlobalGateMarker,
 } from "./ecosystem-import"
 import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
+import { ECOSYSTEM_COMPATIBILITY_PLUGIN, injectCodePuppyConfig } from "./codepuppy-config-injection"
 
 let tmp: string
 const savedEnv: Record<string, string | undefined> = {}
@@ -46,24 +46,22 @@ const mkSkill = (root: string, family: ".claude" | ".agents", name: string) => {
   return dir
 }
 
-describe("applyEcosystemDefaultDeny — T1(set-if-unset + 逃生)", () => {
-  test("默认注入两 flag = 1", () => {
-    const env: NodeJS.ProcessEnv = {}
-    applyEcosystemDefaultDeny(env)
-    expect(env.OPENCODE_DISABLE_EXTERNAL_SKILLS).toBe("1")
-    expect(env.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT).toBe("1")
+// `#1667`(裁决书 N3):default-deny 的唯一机制换成注入配置里的移除指令(v1 的两个进程级 flag 在 2.x 无读者,已删除);
+// 逃生开关 CODEPUPPY_ECOSYSTEM_INHERIT=1 仍是「整机恢复上游继承」。真引擎上的判据(三类技能根进不进 /api/skill)在
+// codepuppy-config-injection-engine.cases.ts。
+describe("外部生态 default-deny —— T1(注入的移除指令 + 逃生)", () => {
+  const plugins = () =>
+    (JSON.parse(injectCodePuppyConfig(path.join(tmp, "userdata"), undefined, "stable").config.content) as { plugins: string[] }).plugins
+  test("默认:注入配置的 plugins 里有 -opencode.config.compatibility(.claude / .agents 两类技能根的唯一装载者被移除)", () => {
+    expect(plugins()).toContain(`-${ECOSYSTEM_COMPATIBILITY_PLUGIN}`)
   })
-  test("shell 显式值优先(set-if-unset,B21 纪律)", () => {
-    const env: NodeJS.ProcessEnv = { OPENCODE_DISABLE_EXTERNAL_SKILLS: "0" }
-    applyEcosystemDefaultDeny(env)
-    expect(env.OPENCODE_DISABLE_EXTERNAL_SKILLS).toBe("0") // 用户显式恢复继承,尊重
-    expect(env.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT).toBe("1")
+  test("v1 的进程级 flag 不再是机制:用户 shell 里导出 OPENCODE_DISABLE_EXTERNAL_SKILLS=0 不改变注入的移除指令", () => {
+    process.env.OPENCODE_DISABLE_EXTERNAL_SKILLS = "0"
+    expect(plugins()).toContain(`-${ECOSYSTEM_COMPATIBILITY_PLUGIN}`)
   })
-  test("CODEPUPPY_ECOSYSTEM_INHERIT=1 → 不注入任何 flag(整机恢复上游行为)", () => {
-    const env: NodeJS.ProcessEnv = { CODEPUPPY_ECOSYSTEM_INHERIT: "1" }
-    applyEcosystemDefaultDeny(env)
-    expect(env.OPENCODE_DISABLE_EXTERNAL_SKILLS).toBeUndefined()
-    expect(env.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT).toBeUndefined()
+  test("CODEPUPPY_ECOSYSTEM_INHERIT=1 → 不写移除指令(整机恢复上游行为)", () => {
+    process.env.CODEPUPPY_ECOSYSTEM_INHERIT = "1"
+    expect(plugins()).not.toContain(`-${ECOSYSTEM_COMPATIBILITY_PLUGIN}`)
   })
 })
 

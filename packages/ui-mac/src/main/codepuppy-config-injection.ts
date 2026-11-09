@@ -43,6 +43,11 @@ import { materializeCloudMcpConfig } from "./cloud-sidecar-config"
 import type { ChannelName } from "./catalog-channels"
 import { CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID } from "../shared/codepuppy-config"
 import { USER_DATA_LAYOUT } from "./user-data-layout"
+// `#1667`(#1665 L3 交回的接缝裁决 A / C,编排器 2026-11-09):出厂技能目录、技能生成的 live 目录与出厂 /init、/review 命令
+// 由 main 写进这份内联配置文档(2.x 插件接口给不了等价挂点)。路径与命令内容仍以 ext 那三个纯函数为唯一来源,这里只引用。
+import { injectFactorySkillPaths } from "../../../ext/src/factory-paths"
+import { skillGenerationLiveDirs } from "../../../ext/src/gen-skill-paths"
+import { applyPromptTakeover } from "../../../ext/src/codepuppy-prompts"
 
 // Inject alpha-code's customizations into opencode via OPENCODE_CONFIG_CONTENT. This env var is
 // MERGED with the user's global/project config — it does NOT replace it (opencode config.ts
@@ -104,6 +109,8 @@ type EngineConfig = {
   agents?: Record<string, EngineAgent>
   permissions?: PermissionRule[]
   mcp?: { servers?: Record<string, unknown> }
+  skills?: string[]
+  commands?: Record<string, { template: string; description?: string; subagent?: boolean }>
 }
 
 /** 内置插件 `opencode.config.compatibility` 是 `.claude` 与 `.agents` 两类技能根的唯一装载者(裁决书 N3)。 */
@@ -267,6 +274,25 @@ export function injectCodePuppyConfig(
       config.providers = engine.providers
       config.policies = engine.policies
       if (engine.model) config.model = engine.model
+    }
+
+    //   4b. `#1667`(接缝裁决 A):出厂技能目录(main 启动时算好、经 CODEPUPPY_FACTORY_SKILL_DIRS 传入)与技能生成的 live 目录
+    //       (`<当前环境根>/ext-store/skill--*/current.json` 指向的那一代,过账本 enabled 门)写成顶层 `skills`。2.x 每份配置文档都认
+    //       这个键(`packages/core/src/config/plugin/skill.ts` 的 sources),并对这些目录挂文件监听。
+    const skills = [
+      ...new Set([...injectFactorySkillPaths({}, process.env.CODEPUPPY_FACTORY_SKILL_DIRS), ...skillGenerationLiveDirs(codepuppyGlobalRoot())]),
+    ]
+    if (skills.length) config.skills = skills
+
+    //   4c. `#1667`(接缝裁决 C):出厂 /init、/review 的模板来自 ext 的 applyPromptTakeover(同一份文字),写成 `commands` 条目,
+    //       由 core 自己的 `opencode.config.command` 实现模板文法与子任务(`review` 在子任务里跑:v1 的 `subtask: true`,2.x 原生键
+    //       `subagent`)。逃生门与 ext 的提示词转写同一个:CODEPUPPY_PROMPT_REBRAND_DISABLE=1。
+    if (process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE !== "1") {
+      const takeover: { command?: Record<string, { template: string; description?: string; subtask?: boolean }> } = {}
+      applyPromptTakeover(takeover)
+      config.commands = Object.fromEntries(
+        Object.entries(takeover.command ?? {}).map(([name, { subtask, ...command }]) => [name, { ...command, ...(subtask ? { subagent: true } : {}) }]),
+      )
     }
 
     //   5. 自动化 readonly agent(REQ-021 A1.5 / ADR-022)。无人值守执行的硬前提 = 零 ask:

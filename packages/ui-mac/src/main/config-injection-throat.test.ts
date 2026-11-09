@@ -36,6 +36,12 @@
 //   `/agents/<n>/permissions/<i>/effect`、`/permissions/<i>/effect` → 权限动词;`/policies/<i>/action|effect` → policy 动词。
 //   规则里的 `action` / `resource` 是 v1 时代的**对象键**(工具名、资源模式),v1 判官本来就不判键;2.x 里它们成了叶子,
 //   `action` 必须是标识符形状(不含空白),`resource` 是模式,同样不当成字。
+//   接缝裁决 A / C(#1665 交回,编排器 2026-11-09)之后 main 多写两个键,v1 时它们由 ext 的 config hook 写:
+//   · `/commands/<name>/template|description`:逐字等于登记簿里 **id 为 `command.<name>.<field>`、sink 对应** 的那条登记文字
+//     (换名、换格、多一个字节都点名;`subagent` 是布尔,不是字符串叶子);
+//   · `/skills/<i>`:是目录路径,按**来源**放行(与 REQ-063 导入目录同理,不走登记簿 —— #1665 起登记簿删了 v1 的 `/skills/paths`
+//     引用):要么是这一轮交给注入的出厂目录(CODEPUPPY_FACTORY_SKILL_DIRS)之一,要么落在当前环境根的 `ext-store/` 之下;
+//     别的路径点名。目录里技能的正文是技能作者的字,不在这道咽喉里判。
 // models.json(#857 的早到目录底表)只供目录,不进模型上下文 —— 本文件不判它。
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
@@ -86,6 +92,8 @@ const MANAGED = [
   "CODEPUPPY_DEFAULT_MODEL",
   "OPENCODE_ENABLE_EXA",
   "OPENCODE_EXPERIMENTAL",
+  "CODEPUPPY_FACTORY_SKILL_DIRS",
+  "CODEPUPPY_PROMPT_REBRAND_DISABLE",
 ] as const
 
 const saved: Record<string, string | undefined> = {}
@@ -150,7 +158,13 @@ function stringLeaves(v: unknown, pointer: string): Leaf[] {
 }
 const leafKey = (l: Leaf) => `${l.pointer.length}:${l.pointer}${l.value}`
 
-type Reason = "body not registered" | "unreadable" | "text not registered" | "not an engine verb" | "unexplained string leaf"
+type Reason =
+  | "body not registered"
+  | "unreadable"
+  | "text not registered"
+  | "not an engine verb"
+  | "unexplained string leaf"
+  | "not a declared skill source"
 type Verdict = { pointer: string; reason: Reason; file?: string }
 type Judgement = {
   /** 解释不了的叶子,按 config 遍历序点名。 */
@@ -163,6 +177,8 @@ type Judgement = {
   verbs: number
   /** 按来源放行的用户 instruction 文件。 */
   user: string[]
+  /** 按来源放行的技能目录。 */
+  skills: string[]
 }
 
 /** 2.x 布局 → 登记簿(v1 前缀)里的引用 pointer。只换前缀;不在表里的原样交给登记簿,解释不了就点名。 */
@@ -178,10 +194,17 @@ function registryPointer(segs: string[]): string {
 /** 判官:注入产物里新写入的每个字符串叶子 —— 登记文字、声明引用、引擎动词,或点名。 */
 function judge(before: unknown, after: unknown, importedDir: string): Judgement {
   const had = new Set(stringLeaves(before, "").map(leafKey))
-  const out: Judgement = { bad: [], explained: [], refs: [], verbs: 0, user: [] }
+  const out: Judgement = { bad: [], explained: [], refs: [], verbs: 0, user: [], skills: [] }
   const refs = new Set<string>()
   const insideImported = (file: string) => {
     const rel = path.relative(importedDir, file)
+    return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel)
+  }
+  // 技能目录的两个来源:这一轮交给注入的出厂目录(测试自己给的输入),与当前环境根的 ext-store。
+  const factorySkillDirs = JSON.parse(process.env.CODEPUPPY_FACTORY_SKILL_DIRS ?? "[]") as string[]
+  const storeRoot = path.join(codepuppyRoot, "ext-store")
+  const insideStore = (dir: string) => {
+    const rel = path.relative(storeRoot, dir)
     return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel)
   }
   const verb = (l: Leaf, set: readonly string[]) => {
@@ -213,6 +236,18 @@ function judge(before: unknown, after: unknown, importedDir: string): Judgement 
       const e = explainInstructionBody(body)
       if (e.ok) out.explained.push(e.id)
       else out.bad.push({ pointer: l.pointer, reason: "body not registered", file: l.value })
+      continue
+    }
+    if (top === "skills" && segs.length === 2) {
+      if (factorySkillDirs.includes(l.value) || insideStore(l.value)) out.skills.push(l.value)
+      else out.bad.push({ pointer: l.pointer, reason: "not a declared skill source" })
+      continue
+    }
+    if (top === "commands" && segs.length === 3 && (field === "template" || field === "description")) {
+      const id = `command.${segs[1]}.${field}`
+      const f = CONTEXT_INJECTIONS.find((x) => x.id === id)
+      if (f?.kind === "text" && f.sink === `command-${field}` && f.text === l.value) out.explained.push(id)
+      else out.bad.push({ pointer: l.pointer, reason: "text not registered" })
       continue
     }
     if (top === "agents" && segs.length === 3 && (field === "system" || field === "description")) {
@@ -287,9 +322,21 @@ const EXT_BUNDLE = "/Applications/Code Puppy.app/Contents/Resources/codepuppy-ex
 const PLATFORM_KEY = "sk-platform-config-throat"
 const BYOK_KEY = "sk-deepseek-config-throat"
 const DEFAULT_MODEL = "deepseek-byok/deepseek-v4-flash"
+const FACTORY_SKILL_DIR = "/Applications/Code Puppy.app/Contents/Resources/factory-skills/docx"
+
+/** 按 main 的 ext-transaction 姿势种一个已启用的技能生成目录;返回它的路径。 */
+function givenEnabledGeneration() {
+  const generation = "gen-000001-abcdef"
+  const dir = path.join(codepuppyRoot, "ext-store", "skill--throat", "generations", generation)
+  fs.mkdirSync(dir, { recursive: true })
+  fs.writeFileSync(path.join(codepuppyRoot, "ext-store", "skill--throat", "current.json"), JSON.stringify({ generation }))
+  fs.writeFileSync(path.join(codepuppyRoot, "skills-enabled.json"), JSON.stringify({ v: 1, keys: ["skill--throat"] }))
+  return dir
+}
 
 /** main 在 fork 时能给 sidecar 的全部输入一次到位:ext bundle 路径 + 平台密钥 + BYOK 密钥 + 默认模型 + 云 MCP 代付。 */
 function givenFullStack() {
+  process.env.CODEPUPPY_FACTORY_SKILL_DIRS = JSON.stringify([FACTORY_SKILL_DIR])
   plantSecret("CODEPUPPY_API_KEY", PLATFORM_KEY)
   plantSecret("DEEPSEEK_API_KEY", BYOK_KEY)
   process.env.CODEPUPPY_BASE_URL = "https://gateway.example.invalid/v1"
@@ -313,6 +360,8 @@ const DEFAULT_IDENTITY_ID = `${IDENTITY_FRAGMENT_ID}+websearch`
 const REGISTERED_AGENT_IDS = UI_MAC_AGENT_NAMES.flatMap((n) => uiMacAgentFragmentIds(n))
 const agentIdsOf = (names: readonly string[]) => names.flatMap((n) => uiMacAgentFragmentIds(n as (typeof UI_MAC_AGENT_NAMES)[number]))
 const sorted = (xs: readonly string[]) => [...xs].sort()
+// 接缝裁决 C:main 写的出厂 /init、/review 的四段字(独立字面量,不从登记簿反推)。
+const FACTORY_COMMAND_IDS = ["command.init.template", "command.init.description", "command.review.template", "command.review.description"] as const
 
 describe("ui-mac 整份 config 咽喉:injectCodePuppyConfig 交给引擎的 content 里每个字符串叶子都必须是登记文字、声明引用或引擎动词", () => {
   test("动词集合与引擎源码逐字一致(drift 锁):permission 动词 / agent mode / policy effect —— 引擎改了字面量而这里没跟,即红", () => {
@@ -334,14 +383,15 @@ describe("ui-mac 整份 config 咽喉:injectCodePuppyConfig 交给引擎的 cont
     expect(r.instructions.map((f) => path.basename(f))).toEqual(["codepuppy-identity.md", "codepuppy-behavior.md"])
     for (const f of r.instructions) expect(fs.existsSync(f), f).toBe(true)
     expect(sorted(Object.keys(r.agent))).toEqual(sorted(UI_MAC_AGENT_NAMES))
-    expect(sorted(r.explained)).toEqual(sorted([DEFAULT_IDENTITY_ID, BEHAVIOR_FRAGMENT_ID, ...REGISTERED_AGENT_IDS]))
+    expect(sorted(r.explained)).toEqual(sorted([...FACTORY_COMMAND_IDS, DEFAULT_IDENTITY_ID, BEHAVIOR_FRAGMENT_ID, ...REGISTERED_AGENT_IDS]))
     // `#1667`:没有 ext 目录时 plugins 里也有外部技能的移除指令(S6),它走 /plugin 引用;没有任何可用 provider 时
     // provider 白名单照样写(`provider.use` 先拒全部、只放行就绪标记 —— v1 的 `enabled_providers: []` 同义),走两条引用。
     expect(r.refs).toEqual(["ref.enabled_providers", "ref.plugin", "ref.provider", "ref.schema"])
     expect(r.user).toEqual([])
     // 动词那条路真的被走过(不是「恰好没有动词叶子」)
     expect(r.verbs).toBeGreaterThanOrEqual(UI_MAC_AGENT_NAMES.length * 2)
-    expect(touched(r)).toEqual(["$schema", "agents", "instructions", "plugins", "policies", "providers"])
+    expect(touched(r)).toEqual(["$schema", "agents", "commands", "instructions", "plugins", "policies", "providers"])
+    expect(r.skills).toEqual([])
     // 生产写出的字与内容模块逐字(判官解释成功已蕴含逐字;这里把「哪段字」钉到具体 agent 上)。
     // `#1413`:没有 prompt 的 agent(codepuppy-ask)生产也**不许**写出 prompt 键 —— 写了(哪怕空串)就会顶掉底座。
     for (const name of UI_MAC_AGENT_NAMES) {
@@ -357,11 +407,15 @@ describe("ui-mac 整份 config 咽喉:injectCodePuppyConfig 交给引擎的 cont
   // 因为「代付 ⇒ 本地 websearch 被钉 deny」而存在。owner 2026-09-23 推翻了那条边,代付态的注入面
   // 对 web search 一个字都不写,于是顶层 `permission` 整个键不再出现(下面有一条正向断言钉住它)。
   // 顶层 permission 那条路仍有用例覆盖:本文件「用户的字不判」那条走的是 kill-switch。
-  test("全栈 env(ext bundle + 平台密钥 + BYOK 密钥 + 默认模型 + 云 MCP 代付):八个顶层键全部真被写到、零点名;生产走到的引用集合 == 本文件点名的 ui-mac 引用集合(双向)", () => {
+  test("全栈 env(ext bundle + 平台密钥 + BYOK 密钥 + 默认模型 + 云 MCP 代付 + 出厂技能目录 + 一个已启用的技能生成目录):十个顶层键全部真被写到、零点名;生产走到的引用集合 == 本文件点名的 ui-mac 引用集合(双向)", () => {
     givenFullStack()
+    const liveGeneration = givenEnabledGeneration()
     const r = run(EXT_BUNDLE)
     expect(r.bad).toEqual([])
-    expect(touched(r)).toEqual(sorted(["$schema", "agents", "instructions", "mcp", "model", "plugins", "policies", "providers"]))
+    expect(touched(r)).toEqual(sorted(["$schema", "agents", "commands", "instructions", "mcp", "model", "plugins", "policies", "providers", "skills"]))
+    // 出厂目录与已启用技能的生成目录都写了,而且都按来源放行
+    expect(r.after.skills).toEqual([FACTORY_SKILL_DIR, liveGeneration])
+    expect(r.skills).toEqual([FACTORY_SKILL_DIR, liveGeneration])
     // 每条 ui-mac 引用都真在登记簿里,且生产真的走到了每一条;生产走到的也没有超出这张表
     for (const id of UI_MAC_REFERENCE_IDS) expect(CONTEXT_INJECTIONS.find((f) => f.id === id)?.kind, id).toBe("reference")
     expect(r.refs).toEqual(sorted(UI_MAC_REFERENCE_IDS))
@@ -376,7 +430,7 @@ describe("ui-mac 整份 config 咽喉:injectCodePuppyConfig 交给引擎的 cont
     expect(r.after.permissions).toBeUndefined()
     expect(r.verbs).toBeGreaterThanOrEqual(UI_MAC_AGENT_NAMES.length * 2)
     // identity 解释出的形状必须与 env 推出的能力事实一致(代付 + keyless)
-    expect(sorted(r.explained)).toEqual(sorted([`${IDENTITY_FRAGMENT_ID}+websearch+cloudDispatch`, BEHAVIOR_FRAGMENT_ID, ...REGISTERED_AGENT_IDS]))
+    expect(sorted(r.explained)).toEqual(sorted([...FACTORY_COMMAND_IDS, `${IDENTITY_FRAGMENT_ID}+websearch+cloudDispatch`, BEHAVIOR_FRAGMENT_ID, ...REGISTERED_AGENT_IDS]))
     // 密钥值不在任何字符串叶子里(A6;组合体层面的锁在 codepuppy-config-injection.test.ts,这里只证明判官看到的那份也没有)
     for (const l of stringLeaves(r.after, "")) {
       expect(l.value, l.pointer).not.toContain(PLATFORM_KEY)
@@ -432,7 +486,7 @@ describe("ui-mac 整份 config 咽喉:injectCodePuppyConfig 交给引擎的 cont
     expect(r.instructions).toContain(imported)
     expect(r.user).toEqual([imported])
     expect(r.bad).toEqual([])
-    expect(sorted(r.explained)).toEqual(sorted([`${IDENTITY_FRAGMENT_ID}`, BEHAVIOR_FRAGMENT_ID, ...REGISTERED_AGENT_IDS]))
+    expect(sorted(r.explained)).toEqual(sorted([...FACTORY_COMMAND_IDS, `${IDENTITY_FRAGMENT_ID}`, BEHAVIOR_FRAGMENT_ID, ...REGISTERED_AGENT_IDS]))
     const rules = (r.after.permissions as Array<{ action: string; effect: string }>).filter((rule) => rule.effect === "deny").map((rule) => rule.action)
     expect(rules).toEqual(expect.arrayContaining([LOCAL_WEB_SEARCH_TOOL_ID, CLOUD_WEB_SEARCH_TOOL_ID]))
     expect(r.verbs).toBeGreaterThanOrEqual(UI_MAC_AGENT_NAMES.length * 2 + 2)
@@ -454,7 +508,7 @@ describe("ui-mac 整份 config 咽喉:injectCodePuppyConfig 交给引擎的 cont
     let r = run()
     expect(r.instructions.map((f) => path.basename(f))).toEqual(["codepuppy-behavior.md"])
     expect(r.bad).toEqual([])
-    expect(sorted(r.explained)).toEqual(sorted([BEHAVIOR_FRAGMENT_ID, ...REGISTERED_AGENT_IDS]))
+    expect(sorted(r.explained)).toEqual(sorted([...FACTORY_COMMAND_IDS, BEHAVIOR_FRAGMENT_ID, ...REGISTERED_AGENT_IDS]))
 
     delete process.env.CODEPUPPY_IDENTITY_DISABLE
     process.env.CODEPUPPY_BEHAVIOR_DISABLE = "1"
@@ -462,7 +516,7 @@ describe("ui-mac 整份 config 咽喉:injectCodePuppyConfig 交给引擎的 cont
     r = run()
     expect(r.instructions.map((f) => path.basename(f))).toEqual(["codepuppy-identity.md"])
     expect(r.bad).toEqual([])
-    expect(sorted(r.explained)).toEqual(sorted([DEFAULT_IDENTITY_ID, ...REGISTERED_AGENT_IDS]))
+    expect(sorted(r.explained)).toEqual(sorted([...FACTORY_COMMAND_IDS, DEFAULT_IDENTITY_ID, ...REGISTERED_AGENT_IDS]))
   })
 
   test("逃生门 ②:CODEPUPPY_AUTOMATION_DISABLE 拿掉两个 automation,CODEPUPPY_READONLY_DISABLE 拿掉 readonly —— 剩下的仍零点名,解释出的正是剩下那些;codepuppy-ask 没有逃生门,两种 env 下都在(#1413)", () => {
@@ -470,7 +524,7 @@ describe("ui-mac 整份 config 咽喉:injectCodePuppyConfig 交给引擎的 cont
     let r = run()
     expect(sorted(Object.keys(r.agent))).toEqual(["codepuppy-ask", "codepuppy-readonly"])
     expect(r.bad).toEqual([])
-    expect(sorted(r.explained)).toEqual(sorted([DEFAULT_IDENTITY_ID, BEHAVIOR_FRAGMENT_ID, ...agentIdsOf(["codepuppy-readonly", "codepuppy-ask"])]))
+    expect(sorted(r.explained)).toEqual(sorted([...FACTORY_COMMAND_IDS, DEFAULT_IDENTITY_ID, BEHAVIOR_FRAGMENT_ID, ...agentIdsOf(["codepuppy-readonly", "codepuppy-ask"])]))
 
     delete process.env.CODEPUPPY_AUTOMATION_DISABLE
     process.env.CODEPUPPY_READONLY_DISABLE = "1"
@@ -479,7 +533,7 @@ describe("ui-mac 整份 config 咽喉:injectCodePuppyConfig 交给引擎的 cont
     expect(sorted(Object.keys(r.agent))).toEqual(["codepuppy-ask", "codepuppy-automation", "codepuppy-automation-standard"])
     expect(r.bad).toEqual([])
     expect(sorted(r.explained)).toEqual(
-      sorted([DEFAULT_IDENTITY_ID, BEHAVIOR_FRAGMENT_ID, ...agentIdsOf(["codepuppy-automation", "codepuppy-automation-standard", "codepuppy-ask"])]),
+      sorted([...FACTORY_COMMAND_IDS, DEFAULT_IDENTITY_ID, BEHAVIOR_FRAGMENT_ID, ...agentIdsOf(["codepuppy-automation", "codepuppy-automation-standard", "codepuppy-ask"])]),
     )
   })
 
@@ -520,7 +574,7 @@ describe("ui-mac 整份 config 咽喉:injectCodePuppyConfig 交给引擎的 cont
     fs.appendFileSync(behavior, "!")
     const v = judge(r.before, r.after, r.importedDir)
     expect(v.bad).toEqual([{ pointer: "/instructions/1", reason: "body not registered", file: behavior }])
-    expect(sorted(v.explained)).toEqual(sorted([DEFAULT_IDENTITY_ID, ...REGISTERED_AGENT_IDS]))
+    expect(sorted(v.explained)).toEqual(sorted([...FACTORY_COMMAND_IDS, DEFAULT_IDENTITY_ID, ...REGISTERED_AGENT_IDS]))
   })
 
   test("已知的坏 ③:多一个未登记的 agent / 已登记的 agent 多一个未登记的字符串字段 —— 判官各点名;字段那条走的是「解释不了」,不是 agent 专属白名单", () => {
@@ -539,7 +593,7 @@ describe("ui-mac 整份 config 咽喉:injectCodePuppyConfig 交给引擎的 cont
     const oneByte = { ...r.after, agents: { ...r.agent, "codepuppy-readonly": { ...r.agent["codepuppy-readonly"], system: CODEPUPPY_AGENT_TEXT["codepuppy-readonly"].prompt + "!" } } }
     const v1 = judge(r.before, oneByte, r.importedDir)
     expect(v1.bad).toEqual([{ pointer: "/agents/codepuppy-readonly/system", reason: "text not registered" }])
-    expect(sorted(v1.explained)).toEqual(sorted([DEFAULT_IDENTITY_ID, BEHAVIOR_FRAGMENT_ID, ...REGISTERED_AGENT_IDS.filter((id) => id !== uiMacAgentFragmentId("codepuppy-readonly", "prompt"))]))
+    expect(sorted(v1.explained)).toEqual(sorted([...FACTORY_COMMAND_IDS, DEFAULT_IDENTITY_ID, BEHAVIOR_FRAGMENT_ID, ...REGISTERED_AGENT_IDS.filter((id) => id !== uiMacAgentFragmentId("codepuppy-readonly", "prompt"))]))
     const crossSlot = { ...r.after, agents: { ...r.agent, "codepuppy-readonly": { ...r.agent["codepuppy-readonly"], system: CODEPUPPY_AGENT_TEXT["codepuppy-readonly"].description } } }
     expect(judge(r.before, crossSlot, r.importedDir).bad).toEqual([{ pointer: "/agents/codepuppy-readonly/system", reason: "text not registered" }])
   })
@@ -575,6 +629,30 @@ describe("ui-mac 整份 config 咽喉:injectCodePuppyConfig 交给引擎的 cont
       { pointer: "/permissions/0/effect", reason: "not an engine verb" },
       { pointer: "/permissions/1/action", reason: "not an engine verb" },
       { pointer: "/policies/0/effect", reason: "not an engine verb" },
+    ]))
+  })
+
+  test("已知的坏 ⑥(接缝裁决 A / C 的两个新键):commands 里塞登记过但不是这一格的字、两条出厂命令互换模板、多一条出厂命令、模板多一个字节;skills 里塞一个不是出厂目录、也不在 ext-store 下的路径 —— 各点名,其余照常", () => {
+    givenFullStack()
+    const r = run(EXT_BUNDLE)
+    expect(r.bad).toEqual([])
+    const commands = r.after.commands as Record<string, { template: string; description?: string }>
+    const mutated = {
+      ...r.after,
+      commands: {
+        init: { ...commands.init!, template: commands.review!.template },
+        review: { ...commands.review!, template: commands.review!.template + "!" },
+        sneaky: { template: CODEPUPPY_BEHAVIOR_MD, description: commands.init!.description },
+      },
+      skills: [...(r.after.skills as string[]), path.join(userData, "smuggled-skills")],
+    }
+    const byPointer = (xs: Verdict[]) => [...xs].sort((a, b) => a.pointer.localeCompare(b.pointer))
+    expect(byPointer(judge(r.before, mutated, r.importedDir).bad)).toEqual(byPointer([
+      { pointer: "/commands/init/template", reason: "text not registered" },
+      { pointer: "/commands/review/template", reason: "text not registered" },
+      { pointer: "/commands/sneaky/template", reason: "text not registered" },
+      { pointer: "/commands/sneaky/description", reason: "text not registered" },
+      { pointer: `/skills/${(r.after.skills as string[]).length}`, reason: "not a declared skill source" },
     ]))
   })
 })

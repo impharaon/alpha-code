@@ -47,6 +47,12 @@ import {
   WITHHELD_CLOUD_MCP,
 } from "./cloud-web-search"
 import { PLATFORM_API_KEY_PLACEHOLDER } from "./codepuppy-models"
+import {
+  CODEPUPPY_INIT_DESCRIPTION,
+  CODEPUPPY_INIT_TEMPLATE,
+  CODEPUPPY_REVIEW_DESCRIPTION,
+  CODEPUPPY_REVIEW_TEMPLATE,
+} from "../../../ext/src/codepuppy-prompts"
 const CLOUD_DISPATCH_TOOL_ID = cloudMcpToolId("cloud_dispatch")
 
 // 注入读到的每一个 env 输入 + 它自己写出的 env 输出:逐个快照/清空/还原,
@@ -75,6 +81,8 @@ const MANAGED = [
   "CODEPUPPY_CLOUD_MCP_SERVER",
   "CODEPUPPY_BASE_URL",
   "CODEPUPPY_DEFAULT_MODEL",
+  "CODEPUPPY_FACTORY_SKILL_DIRS",
+  "CODEPUPPY_PROMPT_REBRAND_DISABLE",
 ] as const
 
 const PLATFORM_KEY = "sk-platform-injection-gate"
@@ -140,6 +148,8 @@ type Injected = {
   agents?: Record<string, { permissions?: Rule[]; system?: string; disabled?: boolean }>
   permissions?: Rule[]
   mcp?: { servers?: Record<string, unknown> }
+  skills?: string[]
+  commands?: Record<string, { template: string; description?: string; subagent?: boolean; subtask?: boolean }>
 }
 
 function inject(extPluginPath?: string) {
@@ -228,9 +238,13 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     expect(result.config.content).not.toContain("inherited.example")
   })
 
-  test("C2:产物直接是 OpenCode 2 的配置键 —— 上游 normalize 零诊断、零改写,过 Config.Info 解码(登录 + BYOK 态)", () => {
+  test("C2:产物直接是 OpenCode 2 的配置键 —— 上游 normalize 零诊断、零改写,过 Config.Info 解码(登录 + BYOK 态,带出厂技能与命令)", () => {
     givenLoggedInWithByok()
-    assertNativeV2(inject(EXT_DIR).result.config.content)
+    process.env.CODEPUPPY_FACTORY_SKILL_DIRS = JSON.stringify([path.join(tmp, "factory")])
+    const { result, config } = inject(EXT_DIR)
+    expect(config.skills).toEqual([path.join(tmp, "factory")])
+    expect(Object.keys(config.commands ?? {})).toEqual(["init", "review"])
+    assertNativeV2(result.config.content)
   })
 
   test("I9:每一份注入的 permissions(顶层与各 agent)都能用 Permission.Ruleset 解码;动作名用 2.x 的,不出现 bash / task / apply_patch", () => {
@@ -262,6 +276,37 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
       background_compaction: false,
     })
     expect(ENGINE_EXPERIMENTAL_FLAGS.todo).toBe(true)
+  })
+
+  /** 按 main 的 ext-transaction 姿势种一个已启用的技能生成目录(current.json 指向这一代,skills-enabled.json 里有这个键)。 */
+  const plantGeneration = (key: string, generation: string, enabled: string[]) => {
+    const root = process.env.CODEPUPPY_GLOBAL_DIR!
+    const dir = path.join(root, "ext-store", key, "generations", generation)
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(root, "ext-store", key, "current.json"), JSON.stringify({ generation }))
+    fs.writeFileSync(path.join(root, "skills-enabled.json"), JSON.stringify({ v: 1, keys: enabled }))
+    return dir
+  }
+
+  test("接缝裁决 A:skills = 出厂技能目录(CODEPUPPY_FACTORY_SKILL_DIRS)+ 已启用技能的 live 生成目录;没启用的、没有输入时不写", () => {
+    expect(inject(EXT_DIR).config.skills).toBeUndefined()
+    const factory = [path.join(tmp, "factory", "a"), path.join(tmp, "factory", "b")]
+    process.env.CODEPUPPY_FACTORY_SKILL_DIRS = JSON.stringify(factory)
+    const live = plantGeneration("skill--enabled-one", "gen-000001-abcdef", ["skill--enabled-one"])
+    plantGeneration("skill--not-enabled", "gen-000002-abcdef", ["skill--enabled-one"])
+    expect(inject(EXT_DIR).config.skills).toEqual([...factory, live])
+    // 账本缺失 ⇒ 生成目录一个都不注入(ext 的 fail-closed 门原样生效),出厂目录照旧
+    fs.rmSync(path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "skills-enabled.json"))
+    expect(inject(EXT_DIR).config.skills).toEqual(factory)
+  })
+
+  test("接缝裁决 C:commands 写出厂 /init、/review —— 文字逐字来自 ext 登记的模板,review 用 2.x 原生键 subagent: true(不写 v1 的 subtask);CODEPUPPY_PROMPT_REBRAND_DISABLE=1 ⇒ 不写", () => {
+    expect(inject(EXT_DIR).config.commands).toEqual({
+      init: { template: CODEPUPPY_INIT_TEMPLATE, description: CODEPUPPY_INIT_DESCRIPTION },
+      review: { template: CODEPUPPY_REVIEW_TEMPLATE, description: CODEPUPPY_REVIEW_DESCRIPTION, subagent: true },
+    })
+    process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE = "1"
+    expect(inject(EXT_DIR).config.commands).toBeUndefined()
   })
 
   test("CODEPUPPY_MODELS_DISABLE:不写 providers / policies,也不给 models.file", () => {

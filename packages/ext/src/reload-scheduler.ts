@@ -72,7 +72,7 @@ export type ReloadScheduler = {
   register(directory: string, token: object): void
   unregister(directory: string, token: object): void
   request(input: ReloadRequestInput): void
-  /** 会话状态变了(`session.status` / `session.idle`)或别的值得重判的时刻。 */
+  /** 一轮执行结束了(`session.execution.succeeded` / `failed` / `interrupted`)或别的值得重判的时刻。 */
   poke(): void
   /** 当前一轮判定(含它触发的后续轮)全部结束。 */
   settled(): Promise<void>

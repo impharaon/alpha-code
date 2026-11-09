@@ -1,0 +1,5 @@
+[test]
+# `#1665` 审计 R1(硬约束):任何 ext 测试文件求值之前,先把 HOME / 全部 XDG_* / OPENCODE_DB 指到一个新建的临时目录。
+# 必须是预载:上游 `util/src/global-roots.ts` 在**模块求值时**就把全局路径算死了,测试里再改环境变量已经晚了。
+# 预载放在 src 外:它要建目录,而 ui-mac 的写盘登记簿(process-fence-write-sites)扫的是 ext/src 的生产源码。
+preload = ["./test/preload.ts"]

@@ -20,7 +20,11 @@ import type { Plugin } from "@opencode/plugin"
 import CodePuppyExt from "./plugin"
 import { activate, it, recordingMcp } from "./plugin-host.harness"
 import { CODEPUPPY_EXPLORE_PROMPT } from "./codepuppy-prompts"
-import { TOOL_TEXT } from "./context-injection"
+import { TOOL_TEXT, explainAttachmentBlock, explainVisionBlock } from "./context-injection"
+import { STAGED_ATTACHMENT_PART_NAME, stagedAttachmentPart } from "./staged-attachment-part"
+import { Message } from "../../ai/src/schema/messages.ts"
+import * as Media from "../../ai/src/media.ts"
+import { toLLMMessages } from "../../core/src/session/runner/to-llm-message.ts"
 
 const ENV_KEYS = [
   "CODEPUPPY_GLOBAL_DIR",
@@ -197,6 +201,47 @@ it.live("P3 / L3r:session.hook.context 的品牌转写只换登记过的上游�
       "You are Code Puppy, an interactive general AI agent running on a user's computer.",
       userText,
     ])
+  }),
+)
+
+it.live("权威 · 压缩请求的组装(审计 R1):session.hook.compaction 上同样 —— 看不了图的模型图片换成登记过的识图块、暂存附件部件换成读取指令、底座句转写、平台节点不发 maxTokens;反向臂:不装 ext ⇒ 图片 / 部件 / 底座 / maxTokens 原样进压缩请求", () =>
+  Effect.gen(function* () {
+    env({ CODEPUPPY_BASE_URL: "https://gateway.codepuppy.test/v1" })
+    // 平台代理节点上的纯文本模型:识图、附件、转写、输出上限四件事都该在压缩请求上发生。
+    yield* activate(providerPlugin("codepuppy", "https://gateway.codepuppy.test/v1", "route-a"))
+    const hooks = yield* PluginHooks.Service
+    const model = { providerID: "codepuppy", id: "route-a" }
+    const kimi = "You are OpenCode, an interactive general AI agent running on a user's computer."
+    const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+    const image = Message.user([Message.text("看图"), Message.media(Media.base64(png, "image/png"), { filename: "a.png" })])
+    // composer 发的暂存附件部件,经上游真的渲染(toLLMMessages)存成 text/plain 的 inline 文件
+    const part = stagedAttachmentPart({ v: 1, name: "季度复盘.docx", mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", size: 2048, path: "attachments/0b8c7f9e-1d2a-4c3b-9e8f-7a6b5c4d3e2f/季度复盘.docx", reader: "word" })
+    const [staged] = toLLMMessages(
+      [{ id: "msg_compaction", time: { created: 1 }, type: "user", text: "读一下", files: [{ data: part.uri.slice(part.uri.indexOf(",") + 1), mime: "text/plain", name: part.name, source: { type: "inline" } }] } as never],
+      model as never,
+    )
+    const compaction = () => hooks.trigger("session", "compaction", { ...contextEvent([kimi], model), messages: [image, staged] as never })
+    const textsOf = (message: unknown) => (message as { content: Array<{ type: string; text?: string }> }).content.map((p) => (p.type === "text" ? p.text! : `<${p.type}>`))
+
+    const untouched = yield* compaction()
+    expect(untouched.messages[0]).toBe(image)
+    expect(untouched.messages[1]).toBe(staged!)
+    expect(textsOf(untouched.messages[0])).toContain("<media>")
+    expect(textsOf(untouched.messages[1]).some((text) => text.includes(STAGED_ATTACHMENT_PART_NAME))).toBe(true)
+    expect(untouched.system.map((p) => p.text)).toEqual([kimi])
+    expect(untouched.options.maxTokens).toBe(32000)
+
+    yield* activate(CodePuppyExt)
+    const out = yield* compaction()
+    const [seen, read] = [textsOf(out.messages[0]), textsOf(out.messages[1])]
+    expect(seen[0]).toBe("看图")
+    expect(seen).not.toContain("<media>")
+    expect(seen.slice(1).map((text) => explainVisionBlock(text).ok)).toEqual([true])
+    expect(read[0]).toBe("读一下")
+    expect(read.some((text) => text.includes(STAGED_ATTACHMENT_PART_NAME))).toBe(false)
+    expect(read.slice(1).map((text) => explainAttachmentBlock(text).ok)).toEqual([true])
+    expect(out.system[0]!.text).toBe("You are Code Puppy, an interactive general AI agent running on a user's computer.")
+    expect("maxTokens" in out.options).toBe(false)
   }),
 )
 

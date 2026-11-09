@@ -73,8 +73,12 @@ processState()
 /** L5r:没有任何选择时 Code Puppy 定的本地 keyless 搜网供应商(2.x 内置 `opencode.websearch.exa`,不需要密钥)。 */
 const DEFAULT_WEBSEARCH_PROVIDER = "exa"
 
-/** 会话事件:状态变了 ⇒ 请调度器重判(它自己问引擎的 active,不信事件里的快照)。 */
-const RELOAD_POKE_EVENTS = ["session.idle", "session.status"] as const
+/**
+ * 会话事件:一轮执行结束了(成功 / 失败 / 被打断)⇒ 请调度器重判(它自己问引擎的 active,不信事件里的快照)。
+ * 2.x 的引擎在 `session/execution.ts`(及 `execution/restart.ts` 的 Failed)发这三条(上游 `warming.ts` 订的也是它们);`session.idle` / `session.status`
+ * 在 2.x 的事件清单里还登记着,但 core 里没有任何地方发 —— 订它们 = 调度器永远等不到"空闲了"(审计 R1 Blocker)。
+ */
+const RELOAD_POKE_EVENTS = ["session.execution.succeeded", "session.execution.failed", "session.execution.interrupted"] as const
 
 const log = (line: string) => console.log(line)
 const error = (line: string) => console.error(line)
@@ -173,8 +177,11 @@ export const CodePuppyExt: Plugin.Plugin = {
       })
 
       // ── 请求组装(P3 / P4 / P5 / P6)─────────────────────────────────────────────────────────
+      // 同一个回调挂在三条组装请求的钩子上:主循环(context)、压缩(compaction)、无工具生成(generate)。2.x 的压缩与生成
+      // 各走自己的钩子、不经 context(`SessionCompaction` / `SessionGenerate` 都扩展 `SessionContext`)—— 只挂 context
+      // = 压缩请求带着原样的图 / 暂存附件 / 未转写的系统提示词、按上游的 max tokens 出去(审计 R1 Major)。
       const rebrandWarned = new Set<string>()
-      await context.session.hook("context", async (event) => {
+      const assembleRequest = async (event: Parameters<Parameters<typeof context.session.hook<"context">>[1]>[0]) => {
         // REQ-062 T1(路线A,ADR-015):系统提示词品牌转写 —— 精选子串对;失败 = 上游原样(外观级退化),绝不伤及请求。
         if (process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE !== "1") {
           try {
@@ -211,7 +218,8 @@ export const CodePuppyExt: Plugin.Plugin = {
         } catch (cause) {
           error(`[@codepuppy/ext] output cap skipped: ${describe(cause)}`)
         }
-      })
+      }
+      for (const name of ["context", "compaction", "generate"] as const) await context.session.hook(name, assembleRequest)
       // REQ-236 `#1562`:平台代理节点的凭据每次请求现读,续期热应用不必重启引擎;读不到就抛,请求不发出。
       await context.session.hook("model.request", (event) => {
         const authorization = platformCredentialHeader({ providerBaseURL: event.baseURL, env: process.env })

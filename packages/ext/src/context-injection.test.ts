@@ -146,7 +146,9 @@ afterEach(() => {
 })
 
 /** 本文件为之设了咽喉的通路。② 要求它与「真 CodePuppyExt 注册且分类为 context」的集合逐字相等。 */
-const THROATED = ["agent.transform", "command.transform", "mcp.transform", "session.context", "skill.transform", "tool.execute.after", "tool.transform", "websearch.transform"].sort()
+const THROATED = ["agent.transform", "command.transform", "mcp.transform", "session.compaction", "session.context", "session.generate", "skill.transform", "tool.execute.after", "tool.transform", "websearch.transform"].sort()
+/** 2.x 组装一次模型请求的三条钩子(`session/model-request.ts`:主循环 / 压缩 / 无工具生成各触发自己那条,互不经过)。 */
+const REQUEST_HOOKS = ["context", "compaction", "generate"] as const
 
 describe("② alpha 注册的每个载上下文通路都有咽喉", () => {
   test("注册集 ∩ context 分类 == 本文件设咽喉的集合;注册的每个通路都在分类表里", async () => {
@@ -159,6 +161,13 @@ describe("② alpha 注册的每个载上下文通路都有咽喉", () => {
     for (const k of registered) expect(Object.keys(HOOK_CONTEXT_CLASS), `通路 ${k} 不在 HOOK_CONTEXT_CLASS 里`).toContain(k)
     const ctx = registered.filter((k) => HOOK_CONTEXT_CLASS[k as keyof typeof HOOK_CONTEXT_CLASS] === "context").sort()
     expect(ctx).toEqual(THROATED)
+    // 三条请求钩子挂的是**同一个**回调:下面 ③b / ③h 在三条钩子上逐一过真宿主,这里再钉住它们不会各自漂移。
+    const [assemble, ...rest] = REQUEST_HOOKS.map((name) => recorded.hooks[`session.${name}`] ?? [])
+    expect(assemble).toHaveLength(1)
+    for (const other of rest) {
+      expect(other).toHaveLength(1)
+      expect(other[0]).toBe(assemble![0]!)
+    }
   })
 })
 
@@ -376,10 +385,10 @@ const visionModels = {
 const SEES = { providerID: "alpha", id: "kimi-k3" }
 const BLIND = { providerID: "alpha", id: "glm-5" }
 
-const runContext = (system: string[], model: unknown, messages: unknown[] = []) =>
+const runContext = (system: string[], model: unknown, messages: unknown[] = [], hook: (typeof REQUEST_HOOKS)[number] = "context") =>
   Effect.gen(function* () {
     const hooks = yield* PluginHooks.Service
-    return yield* hooks.trigger("session", "context", {
+    return yield* hooks.trigger("session", hook, {
       sessionID: "ses_throat" as never,
       agent: "build" as never,
       model: model as never,
@@ -405,19 +414,20 @@ describe("③b system 咽喉:输出 == 输入 + 登记过的替换,一个字不�
     expect(registered.map((f) => f.id)).toEqual(REBRAND_RULES.map((r) => `rebrand.${r.id}`))
     expect(registered.map((f) => (f.kind === "rebrand" ? f.to : ""))).toEqual(REBRAND_RULES.map((r) => r.to))
   })
-  it.live("全部上游底座过真钩子(能看图的模型):零无解释差异,且至少一份真的被改写了(不是空跑)", () =>
+  it.live("全部上游底座过真钩子(能看图的模型;context / compaction / generate 三条):零无解释差异,且至少一份真的被改写了(不是空跑)", () =>
     Effect.gen(function* () {
       yield* activate(visionModels)
       yield* activate(CodePuppyExt)
       const files = baseFiles()
       expect(files.length).toBeGreaterThanOrEqual(7)
       let changed = 0
-      for (const f of files) {
-        const input = [readBase(f)]
-        const output = systemOf(yield* runContext(input, SEES))
-        expect([f, unexplainedSystem(input, output)]).toEqual([f, []])
-        if (output[0] !== input[0]) changed += 1
-      }
+      for (const f of files)
+        for (const hook of REQUEST_HOOKS) {
+          const input = [readBase(f)]
+          const output = systemOf(yield* runContext(input, SEES, [], hook))
+          expect([f, hook, unexplainedSystem(input, output)]).toEqual([f, hook, []])
+          if (output[0] !== input[0]) changed += 1
+        }
       expect(changed).toBeGreaterThanOrEqual(1)
       expect(systemOf(yield* runContext([], SEES))).toEqual([])
       expect(systemOf(yield* runContext(["nothing to rebrand here"], SEES))).toEqual(["nothing to rebrand here"])
@@ -584,19 +594,21 @@ function addedStrings(before: readonly unknown[], after: readonly unknown[]): st
 }
 
 describe("③h context 钩子的消息咽喉:只换不加,换进去的每段字都是登记过的识图块", () => {
-  it.live("看不了图 + 云端不可用:图片换成登记过的失败块,零别的新字;能看图:消息对象原样", () =>
+  it.live("看不了图 + 云端不可用:图片换成登记过的失败块,零别的新字;能看图:消息对象原样(context / compaction / generate 三条)", () =>
     Effect.gen(function* () {
       yield* activate(visionModels)
       yield* activate(CodePuppyExt)
       const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
       const messages = [Message.user([Message.text("看图"), Message.media(Media.base64(png, "image/png"), { filename: "a.png" })])]
-      const blind = yield* runContext(["base"], BLIND, [...messages])
-      const added = addedStrings(messages, blind.messages)
-      expect(added).toHaveLength(1)
-      expect(explainVisionBlock(added[0]!).ok).toBe(true)
-      expect(explainVisionBlock(added[0]! + "!").ok).toBe(false)
-      const sees = yield* runContext(["base"], SEES, [...messages])
-      expect(sees.messages[0]).toBe(messages[0]!)
+      for (const hook of REQUEST_HOOKS) {
+        const blind = yield* runContext(["base"], BLIND, [...messages], hook)
+        const added = addedStrings(messages, blind.messages)
+        expect([hook, added.length]).toEqual([hook, 1])
+        expect(explainVisionBlock(added[0]!).ok).toBe(true)
+        expect(explainVisionBlock(added[0]! + "!").ok).toBe(false)
+        const sees = yield* runContext(["base"], SEES, [...messages], hook)
+        expect(sees.messages[0]).toBe(messages[0]!)
+      }
     }),
   )
   it.live("`#1553` / I11':暂存附件部件在本次请求里换成一段登记过的读取指令(sink=attachment-block),零别的新字;已知的坏:改一个字即点名;反向臂:不装 ext ⇒ 原始部件原样进请求", () =>
@@ -611,17 +623,18 @@ describe("③h context 钩子的消息咽喉:只换不加,换进去的每段字�
       const rawText = (history[0] as unknown as { content: Array<{ text: string }> }).content[1]!.text
       expect(rawText.startsWith(`\n\nAttached file: ${STAGED_ATTACHMENT_PART_NAME}`)).toBe(true)
       yield* activate(visionModels)
-      const without = yield* runContext(["base"], SEES, [...history])
-      expect(without.messages[0]).toBe(history[0]!)
+      for (const hook of REQUEST_HOOKS) expect((yield* runContext(["base"], SEES, [...history], hook)).messages[0]).toBe(history[0]!)
       yield* activate(CodePuppyExt)
-      const out = yield* runContext(["base"], SEES, [...history])
-      const added = addedStrings(history, out.messages)
-      expect(added).toHaveLength(1)
-      expect(explainAttachmentBlock(added[0]!).ok).toBe(true)
-      expect(explainAttachmentBlock(added[0]! + "!").ok).toBe(false)
-      const texts = (out.messages[0] as unknown as { content: Array<{ text: string }> }).content.map((p) => p.text)
-      expect(texts[0]).toBe("读一下")
-      expect(texts.some((text) => text.includes(STAGED_ATTACHMENT_PART_NAME))).toBe(false)
+      for (const hook of REQUEST_HOOKS) {
+        const out = yield* runContext(["base"], SEES, [...history], hook)
+        const added = addedStrings(history, out.messages)
+        expect([hook, added.length]).toEqual([hook, 1])
+        expect(explainAttachmentBlock(added[0]!).ok).toBe(true)
+        expect(explainAttachmentBlock(added[0]! + "!").ok).toBe(false)
+        const texts = (out.messages[0] as unknown as { content: Array<{ text: string }> }).content.map((p) => p.text)
+        expect(texts[0]).toBe("读一下")
+        expect(texts.some((text) => text.includes(STAGED_ATTACHMENT_PART_NAME))).toBe(false)
+      }
     }),
   )
   it.live("`#1447` B2:历史里 codepuppy_vision 的审核拒绝结果换成登记句(VISION_TOOL_REFUSED_TEXT),其余字符串一个不多", () =>

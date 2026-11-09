@@ -8,7 +8,10 @@ import { mkdirSync, mkdtempSync, realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Effect } from "effect"
+import { SessionEvent } from "../../schema/src/session-event.ts"
+import { Bus } from "../../core/src/bus.ts"
 import { Location } from "../../core/src/location.ts"
+import { Session } from "../../core/src/session.ts"
 import { buildReloadRequest, parseCodePuppySidecarInbound } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
 import { publishInProcessEngine } from "../../ui-mac/src/main/in-process-engine"
 
@@ -38,6 +41,11 @@ const { activate, it } = await import("./plugin-host.harness")
 
 const reports = () => sent.map((message) => parseCodePuppySidecarInbound(message)).filter((m) => m?.type === "codepuppy.reload.report")
 const settled = () => Effect.promise(() => processState().reloads.settled())
+/** 事件经 bus → 插件的异步订阅 → 调度器,是异步的;最多等 2 秒,等不到就让下面的断言去红。 */
+const until = (done: () => boolean) =>
+  Effect.gen(function* () {
+    for (let waited = 0; waited < 2000 && !done(); waited += 20) yield* Effect.sleep("20 millis")
+  })
 
 it.live("main 的重载请求 ⇒ 等全部会话空闲 ⇒ 恰好一次 location/reload ⇒ 报 reloaded;Location 关掉之后不再算它", () =>
   Effect.gen(function* () {
@@ -52,8 +60,12 @@ it.live("main 的重载请求 ⇒ 等全部会话空闲 ⇒ 恰好一次 locatio
         expect(reports()).toEqual([
           { type: "codepuppy.reload.report", generation: 7, scope: "global", outcome: "waiting", directories: [directory], error: "1 session(s) busy" },
         ])
+        // 会话跑完:引擎经宿主 bus 发 2.x 的执行结束事件(不手动 poke)⇒ ext 的订阅叫醒调度器 ⇒ 重判、重载。
+        // 反向臂(审计 R1):订阅名换回 v1 的 `session.idle` / `session.status`,这条事件到不了 ext ⇒ 下面等不到重载 ⇒ 红。
         engine.busy = false
-        processState().reloads.poke()
+        const session = yield* (yield* Session.Service).create({ location: { directory }, title: "reload wiring" })
+        yield* (yield* Bus.Service).publish(SessionEvent.Execution.Succeeded, { sessionID: session.id })
+        yield* until(() => engine.reloads > 0)
         yield* settled()
         expect(engine.reloads).toBe(1)
         expect(reports().at(-1)).toEqual({ type: "codepuppy.reload.report", generation: 7, scope: "global", outcome: "reloaded", directories: [directory] })

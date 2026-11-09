@@ -194,6 +194,11 @@ export const DOWNGRADED_ANCHORS: Record<string, SourceTextEntry> = {
     evidence: "#1667",
     lines: 1,
   },
+  "packages/ui-mac/src/main/engine-legacy-credentials.test.ts": {
+    why: "`#1667` 最后一条锚 server.ts 在 fork 之前(打包态)调 legacyCredentialImportRefusal、拒绝即抛(基线 S2)。两个不会让它变红的变异:①把这段包进恒假条件(isPackaged 判断写反);②拒绝原因算出来却只记日志不抛。server.ts 的打包态分支在 bun 里走不到(isPackaged 由 electron 给);同文件其余几条真执行判定函数,子进程那条在沙箱真引擎上证明导入真的会发生。",
+    evidence: "#1667",
+    lines: 1,
+  },
   "packages/ui-mac/src/main/renderer-engine-auth.test.ts": {
     why: "`#1667` 最后一条锚 index.ts 的 awaitInitialization 返回 rendererEngineView(res)、index.ts 在 sidecar 起来时 setEngineConnection(connection)、windows.ts 的 onBeforeSendHeaders 经 withEngineRequestAuthorization 补头(接口文档 I8)。两个不会让它变红的变异:①在 return 之前把 res 换成另一个带口令的对象(文本仍在);②onBeforeSendHeaders 算出补过头的对象却把原始 details.requestHeaders 交给 callback。index.ts 结构上进不了 bun、windows.ts 顶层 import electron;同文件前三条真执行投影与补头函数。",
     evidence: "#1667",

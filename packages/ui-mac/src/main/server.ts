@@ -14,6 +14,7 @@ import * as electronNs from "electron"
 import type { Details } from "electron"
 import { resolveExtPluginPath } from "./codepuppy-ext-plugin"
 import { engineDatabasePath, engineGlobalConfigDirectory } from "./engine-paths"
+import { engineDataDirectory, foreignOpenCodeData, legacyCredentialImportRefusal } from "./engine-legacy-credentials"
 import { CHANNEL } from "./constants"
 import { getAuthIdentityTag } from "./codepuppy-auth"
 import { installationMachineId } from "./artifact-service"
@@ -515,6 +516,23 @@ export async function spawnLocalServer(
     }
     Object.assign(sidecarEnv, sidecarEgressProxyEnv(egressProxyPort))
   }
+  // `#1667`(基线 S2 / S7):会话库与全局配置目录由 main 算(与 db-safety / mcp-default-deny 同一推导),显式进 `start()` 的选项。
+  // 数据目录里的独立 OpenCode `auth.json` 会在 OpenCode 2 第一次跑导入迁移时进凭证表 ⇒ 拒 fork(fail-closed,原因可读)。
+  // 只在打包态查:非打包态(dev / 单测宿主)不碰真实数据目录,db-safety 的守卫范围同此(resolveDbPath 的「打包态 only」)。
+  const databasePath = engineDatabasePath({ packaged: electronNs.app.isPackaged, env: sidecarEnv, home: homedir(), channel: CHANNEL })
+  if (electronNs.app.isPackaged) {
+    const dataDir = engineDataDirectory(sidecarEnv, homedir())
+    const refusal = await legacyCredentialImportRefusal({ dataDir, databasePath })
+    if (refusal) {
+      getLogger()?.error(refusal)
+      throw new Error(refusal)
+    }
+    const foreign = foreignOpenCodeData(dataDir, databasePath)
+    if (foreign.length)
+      getLogger()?.warn(
+        `engine data directory ${dataDir} also holds other OpenCode data (${foreign.join(", ")}) — Code Puppy shares this directory with standalone OpenCode installs (S7); it reads only ${databasePath}`,
+      )
+  }
   let fence: ProcessFenceStartInput | undefined
   try {
     fence = (options.planFence ?? planProductionFence)({ userDataPath: options.userDataPath, sidecarEnv, egressProxyPort })
@@ -647,8 +665,7 @@ export async function spawnLocalServer(
       password,
       userDataPath: options.userDataPath,
       initialDirectory: codepuppyUserWorkspaceDir(),
-      // `#1667`:会话库与全局配置目录由 main 算(与 db-safety / mcp-default-deny 同一推导),显式进 `start()` 的选项。
-      databasePath: engineDatabasePath({ packaged: electronNs.app.isPackaged, env: sidecarEnv, home: homedir(), channel: CHANNEL }),
+      databasePath,
       configDirectory: engineGlobalConfigDirectory(sidecarEnv, homedir()),
       extPluginPath: ext.path,
       registryChannel,

@@ -36,6 +36,7 @@ import {
   explainConfigReference,
   explainConfigString,
   explainInstructionBody,
+  explainAttachmentBlock,
   explainVisionBlock,
   HOOK_CONTEXT_CLASS,
   IDENTITY_FRAGMENT_ID,
@@ -58,6 +59,8 @@ import { CODEPUPPY_BEHAVIOR_MD } from "../../ui-mac/src/main/codepuppy-behavior"
 import { buildCodePuppyIdentity } from "../../ui-mac/src/main/codepuppy-identity"
 import { CLOUD_MCP_ARM_ENV, CLOUD_MCP_DEF_ENV, CLOUD_MCP_SERVER_ENV } from "./cloud-websearch-kill"
 import CodePuppyExt from "./plugin"
+import { toLLMMessages } from "../../core/src/session/runner/to-llm-message.ts"
+import { STAGED_ATTACHMENT_PART_NAME, stagedAttachmentPart } from "./staged-attachment-part"
 import { activate, it, recordingContext, recordingMcp } from "./plugin-host.harness"
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..", "..")
@@ -594,6 +597,31 @@ describe("③h context 钩子的消息咽喉:只换不加,换进去的每段字�
       expect(explainVisionBlock(added[0]! + "!").ok).toBe(false)
       const sees = yield* runContext(["base"], SEES, [...messages])
       expect(sees.messages[0]).toBe(messages[0]!)
+    }),
+  )
+  it.live("`#1553` / I11':暂存附件部件在本次请求里换成一段登记过的读取指令(sink=attachment-block),零别的新字;已知的坏:改一个字即点名;反向臂:不装 ext ⇒ 原始部件原样进请求", () =>
+    Effect.gen(function* () {
+      const staged = { v: 1, name: "季度复盘.docx", mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", size: 2048, path: "attachments/0b8c7f9e-1d2a-4c3b-9e8f-7a6b5c4d3e2f/季度复盘.docx", reader: "word" }
+      const part = stagedAttachmentPart(staged)
+      // 上游真的渲染(toLLMMessages):composer 发的部件经引擎存成 text/plain 的 inline 文件
+      const history = toLLMMessages(
+        [{ id: "msg_i11", time: { created: 1 }, type: "user", text: "读一下", files: [{ data: part.uri.slice(part.uri.indexOf(",") + 1), mime: "text/plain", name: part.name, source: { type: "inline" } }] } as never],
+        BLIND as never,
+      )
+      const rawText = (history[0] as unknown as { content: Array<{ text: string }> }).content[1]!.text
+      expect(rawText.startsWith(`\n\nAttached file: ${STAGED_ATTACHMENT_PART_NAME}`)).toBe(true)
+      yield* activate(visionModels)
+      const without = yield* runContext(["base"], SEES, [...history])
+      expect(without.messages[0]).toBe(history[0]!)
+      yield* activate(CodePuppyExt)
+      const out = yield* runContext(["base"], SEES, [...history])
+      const added = addedStrings(history, out.messages)
+      expect(added).toHaveLength(1)
+      expect(explainAttachmentBlock(added[0]!).ok).toBe(true)
+      expect(explainAttachmentBlock(added[0]! + "!").ok).toBe(false)
+      const texts = (out.messages[0] as unknown as { content: Array<{ text: string }> }).content.map((p) => p.text)
+      expect(texts[0]).toBe("读一下")
+      expect(texts.some((text) => text.includes(STAGED_ATTACHMENT_PART_NAME))).toBe(false)
     }),
   )
   it.live("`#1447` B2:历史里 codepuppy_vision 的审核拒绝结果换成登记句(VISION_TOOL_REFUSED_TEXT),其余字符串一个不多", () =>

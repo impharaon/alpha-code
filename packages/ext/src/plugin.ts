@@ -37,6 +37,7 @@ import { createCodePuppyTools } from "./codepuppy-tools"
 import { applyAgents, applyProjectMcp, commandDefinitions } from "./engine-transforms"
 import { modelFacts } from "./model-facts"
 import { createCloudVisionHooks } from "./cloud-vision-hooks"
+import { createAttachmentReaderHooks } from "./attachment-reader-hooks"
 import { inProcessEngine } from "../../ui-mac/src/main/in-process-engine"
 
 // ── `#1665` I2:进程级对象(定制中心桥 + 重载调度器)──────────────────────────────────────────────
@@ -141,6 +142,14 @@ export const CodePuppyExt: Plugin.Plugin = {
         error,
       })
 
+      // `#1553`(REQ-236 §2.6)/ I11':暂存附件 ⇒ 本次请求里换成读取指令;逐服务状态取本 Location 的 MCP 列表。
+      const attachments = createAttachmentReaderHooks({
+        directory,
+        mcpStatus: async () =>
+          Object.fromEntries((await context.mcp.list()).data.map((server) => [server.name, { status: server.status.status }])),
+        error,
+      })
+
       // ── 执行钩子(P7)────────────────────────────────────────────────────────────────────────
       await context.tool.hook("execute.before", async (event) => {
         // #223 R3→R5 / L5r:web search 主权判决 —— 抛出即拒掉这次调用(2.x 只有 execute.before 允许失败,抛出被转成
@@ -182,6 +191,8 @@ export const CodePuppyExt: Plugin.Plugin = {
         }
         // `#1419`:登记簿重建、审核拒绝结果的替换;看不了图 ⇒ 图换成转写块并追加一段登记过的说明(绝不抛)。
         await vision.context(event)
+        // I11':暂存附件部件换成登记过的读取指令(绝不抛)。
+        await attachments.context(event)
         // 输出上限两条腿,都只改这一次请求:平台代理节点**不发** max tokens(网关按 route 上限填,REQ-153);
         // 直连 BYOK 节点按逐模型实读上限抬(REQ-156);其余原样(上游算的那个数)。
         try {

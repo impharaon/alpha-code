@@ -75,3 +75,50 @@ describe("attachmentInstruction", () => {
     expect(read(path.replace("季度复盘", "别的"))).toBe("not-read")
   })
 })
+
+// ── `#1665` I11':暂存附件随消息带一个小号 `data:` 文件部件,引擎渲染出的文本部件由 ext 认出 ─────────────────────────
+// 渲染用的是**上游真的** toLLMMessages(packages/core/src/session/runner/to-llm-message.ts),不是手写的替身:
+// 部件形状一变(比如引擎不再写「Attached file: <文件名>」),这里当场红。
+import { toLLMMessages } from "../../core/src/session/runner/to-llm-message.ts"
+import { STAGED_ATTACHMENT_PART_MIME, STAGED_ATTACHMENT_PART_NAME, stagedAttachmentPart } from "./staged-attachment-part"
+import { stagedAttachmentOfText } from "./attachment-reader-hooks"
+
+/** composer 发的那个部件,经引擎存成的样子(data:base64 解开、MIME 嗅成 text/plain、inline 来源)。 */
+const storedFile = (m: unknown, name = STAGED_ATTACHMENT_PART_NAME) => {
+  const part = stagedAttachmentPart(m)
+  return { data: part.uri.slice(part.uri.indexOf(",") + 1), mime: "text/plain", name, source: { type: "inline" } }
+}
+const rendered = (files: unknown[], text = "") =>
+  toLLMMessages([{ id: "msg_i11", time: { created: 1 }, type: "user", text, files } as never], { providerID: "p", id: "m" } as never)
+
+describe("I11' 暂存附件部件", () => {
+  test("构造器:data: URI 只装这条 StagedAttachmentMeta 的 JSON(UTF-8 文件名原样),MIME 是 text/plain,文件名是登记的固定值", () => {
+    const part = stagedAttachmentPart(meta())
+    expect(part.name).toBe("codepuppy-attachment.json")
+    expect(STAGED_ATTACHMENT_PART_MIME).toBe("text/plain")
+    expect(part.uri.startsWith("data:text/plain;base64,")).toBe(true)
+    expect(JSON.parse(Buffer.from(part.uri.slice(part.uri.indexOf(",") + 1), "base64").toString("utf8"))).toEqual(meta())
+  })
+
+  test("上游把它渲染成一段文本部件;只有附件的消息也留在请求里;ext 从这段字认回同一条 meta", () => {
+    const only = rendered([storedFile(meta())])
+    expect(only).toHaveLength(1)
+    const content = (only[0] as unknown as { content: Array<{ type: string; text: string }> }).content
+    expect(content.map((part) => part.type)).toEqual(["text"])
+    expect(content[0]!.text.startsWith(`\n\nAttached file: ${STAGED_ATTACHMENT_PART_NAME}\n\n`)).toBe(true)
+    expect(stagedAttachmentOfText(content[0]!.text)).toEqual(meta())
+    const withText = (rendered([storedFile(meta({ reader: "pdf", name: "a.pdf", path: `attachments/${UUID}/a.pdf` }))], "读一下") [0] as unknown as {
+      content: Array<{ text: string }>
+    }).content
+    expect(withText.map((part) => stagedAttachmentOfText(part.text)?.reader)).toEqual([undefined, "pdf"])
+  })
+
+  test("认不出就不动:别的文件名、坏 JSON、不合形的 meta(路径不在 attachments/<uuid>/ 下)、普通文字", () => {
+    const textOf = (files: unknown[]) => (rendered(files)[0] as unknown as { content: Array<{ text: string }> }).content[0]!.text
+    expect(stagedAttachmentOfText(textOf([storedFile(meta(), "notes.json")]))).toBeUndefined()
+    expect(stagedAttachmentOfText(textOf([{ ...storedFile(meta()), data: Buffer.from("{not json").toString("base64") }]))).toBeUndefined()
+    expect(stagedAttachmentOfText(textOf([storedFile(meta({ path: "../../etc/passwd" }))]))).toBeUndefined()
+    expect(stagedAttachmentOfText("Attached file: codepuppy-attachment.json")).toBeUndefined()
+    expect(stagedAttachmentOfText("hello")).toBeUndefined()
+  })
+})

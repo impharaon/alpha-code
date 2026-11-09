@@ -76,6 +76,12 @@ Choose exactly one and provide paths or a reason:
       必须与 `ext-receipt-v2.ts` 的 `RECORD_KINDS` 逐字相等。
 
 - [ ] 以上四面本 PR 都没碰。
+### Visual
+
+_Optional, for user-facing changes: a small looping animated SVG (240×72) of the change, shown in the desktop app's "What's new in beta". Replace the block below or delete this section._
+
+```svg
+```
 
 ### Screenshots / recordings
 

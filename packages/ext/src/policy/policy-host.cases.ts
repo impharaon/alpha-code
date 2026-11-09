@@ -21,19 +21,20 @@ const ISOLATED: Record<string, string> = {
   XDG_STATE_HOME: path.join(ROOT, "state"),
   OPENCODE_DB: ":memory:",
 }
-const saved = Object.fromEntries(Object.keys(ISOLATED).map((key) => [key, process.env[key]]))
-for (const [key, value] of Object.entries(ISOLATED)) {
-  fs.mkdirSync(value === ":memory:" ? ROOT : value, { recursive: true })
-  process.env[key] = value
-}
-
-/** Restores the caller's environment (call from `afterAll`). */
-export function restoreEnvironment() {
-  for (const [key, value] of Object.entries(saved)) {
-    if (value === undefined) delete process.env[key]
-    else process.env[key] = value
+/**
+ * Re-applies the isolated environment. Call it from `beforeAll` in every file that uses this host: bun runs test
+ * files in one process and caches this module, so a file that changed HOME / XDG after import would otherwise leave
+ * the next file's engine and policy reading the owner's real directories (the policy reads its data root at call
+ * time, as production does). The environment is never restored for the same reason.
+ */
+export function isolate() {
+  for (const [key, value] of Object.entries(ISOLATED)) {
+    fs.mkdirSync(value === ":memory:" ? ROOT : value, { recursive: true })
+    process.env[key] = value
   }
+  if (!process.env.XDG_DATA_HOME?.startsWith(ROOT)) throw new Error("policy host: isolated XDG_DATA_HOME was not applied")
 }
+isolate()
 
 const core = path.resolve(import.meta.dir, "../../../core")
 const load = (relative: string) => import(path.join(core, relative))

@@ -6,7 +6,7 @@
 // passes the evaluate hook", pinned on the engine source and on the `ask` path.
 import { readFileSync } from "node:fs"
 import path from "node:path"
-import { afterAll, describe, expect, test } from "bun:test"
+import { beforeAll, describe, expect, test } from "bun:test"
 import {
   classifyPermissionRequest,
   readRiskClassification,
@@ -15,11 +15,11 @@ import {
   withRiskClassification,
   type ClassifyInput,
 } from "./risk"
-import { E, it, Location, Permission, Plugin, promisePlugin, restoreEnvironment, seedProject, Session } from "./policy-host.cases"
+import { E, it, Location, Permission, Plugin, promisePlugin, isolate, seedProject, Session } from "./policy-host.cases"
 import { registerPolicy } from "./index"
 
 const { Effect, Exit, Cause, Fiber } = E
-afterAll(restoreEnvironment)
+beforeAll(isolate)
 
 const REPO_ROOT = path.resolve(import.meta.dir, "../../../..")
 const CLASSIFIER_SOURCE = "packages/ext/src/policy/risk.ts"

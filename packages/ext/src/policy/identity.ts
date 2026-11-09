@@ -133,7 +133,9 @@ export function toolFacts(tool: RegisteredTool, input: IdentityInput): ToolFacts
     return {
       technicalId,
       permission,
-      identity: { source: HOST_TOOLS.has(technicalId) ? "host" : "builtin", origin: "", name: technicalId },
+      identity: HOST_TOOLS.has(tool.name)
+        ? { source: "host", origin: "", name: tool.name }
+        : { source: "builtin", origin: "", name: technicalId },
       authority: { kind: "not-asserted" },
       bindingDigest: APP_BUILTIN_BINDING_DIGEST,
       location: { kind: "local" },

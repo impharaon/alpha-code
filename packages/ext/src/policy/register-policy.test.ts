@@ -3,7 +3,7 @@
 // sessions, session context). The #725 discipline carries over: production entries only (`SessionContext.select` is
 // what the model request is built from; the snapshot's `execute` is what the session runner calls), expected
 // identities are hand-written literals, and side effects are real counters inside the tools.
-import { afterAll, describe, expect } from "bun:test"
+import { beforeAll, describe, expect } from "bun:test"
 import path from "node:path"
 import {
   Agent,
@@ -14,7 +14,7 @@ import {
   Plugin,
   PluginHooks,
   promisePlugin,
-  restoreEnvironment,
+  isolate,
   ROOT,
   seedProject,
   SchemaTool,
@@ -27,7 +27,7 @@ import { createToolPolicyStore, defaultPolicyBaseDir } from "./resolver"
 import { canonicalJsonDigest } from "./store"
 
 const { Effect, Exit, Cause } = E
-afterAll(restoreEnvironment)
+beforeAll(isolate)
 
 // Hand-written expectations (never derived from production helpers).
 const ID_BUILTIN_WRITE = "builtin::probe_write"

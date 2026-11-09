@@ -42,6 +42,14 @@
         {
           "file": "packages/ext/src/policy/register-policy.test.ts",
           "name": "Code Mode child call to a denied tool is refused"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "post-seal hook on the extension's own Context never sees a denied call, which stays refused by name"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "post-seal known-bad arm: without registerPolicy the same late hooks rewrite the input and run the denied tool"
         }
       ]
     },
@@ -84,6 +92,10 @@
         {
           "file": "packages/ext/src/policy/register-policy.test.ts",
           "name": "reverse arm ② control: the same late plugin leaving input alone lets the call run"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "post-seal hook on the extension's own Context: a rewrite of the approved input cannot run the call"
         }
       ]
     },
@@ -127,7 +139,7 @@
     },
     {
       "id": "tool-policy-three-state-ask",
-      "decision": "A document-axis ask waits for the user through OpenCode's permission engine with Code Puppy's identity envelope; nothing runs before approval; once/always keep their meaning.",
+      "decision": "A document-axis ask waits for the user through OpenCode's permission engine with Code Puppy's identity envelope; nothing runs before approval; once/always keep their meaning; no other plugin's evaluate hook can turn Code Puppy's ask into allow.",
       "adr": [
         "ADR-047"
       ],
@@ -135,7 +147,7 @@
       "takeovers": [],
       "mechanism": {
         "file": "packages/ext/src/policy/catalog.ts",
-        "ladder": "L0"
+        "ladder": "L0 (tail ask rule; gate.ts holdAsk from the early evaluate hook)"
       },
       "tests": [
         {
@@ -149,8 +161,21 @@
         {
           "file": "packages/ext/src/policy/register-policy.test.ts",
           "name": "ruleset-axis ask ⇒ askedBy ruleset, a per-call resource, nothing saved"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "post-seal evaluate hook on the extension's own Context cannot turn Code Puppy's ask into allow"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "post-seal evaluate hook may still make Code Puppy's ask stricter: deny refuses without a prompt"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "post-seal evaluate known-bad arm: the same late hook does turn an ask that is not Code Puppy's into allow"
         }
-      ]
+      ],
+      "note": "An answer to the pending request itself is not held here: any plugin Context (including the extension's, which the project-plugin fan-out passes through) can call permission.reply on Code Puppy's request and the call runs (measured 2026-11-09); closing it belongs to the fan-out (L3), reported to the coordinator."
     },
     {
       "id": "tool-policy-session-grants",

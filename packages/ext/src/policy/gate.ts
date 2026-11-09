@@ -171,6 +171,26 @@ export function pin(event: { tool: string; input: unknown }) {
   Object.defineProperty(event, "input", { get: () => input, enumerable: true, configurable: false })
 }
 
+/**
+ * Holds the ask of Code Puppy's own gate request (`metadata.policy`) against every later `permission.hook.evaluate`
+ * callback. OpenCode 2 lets any evaluate hook rewrite `effect`, and hooks run in registration order, so a plugin
+ * activated after the extension — or one that registers through the extension's Context after `seal()` — could turn
+ * the ask into allow and the call would run without the user's answer. Stricter stays possible (a managed policy
+ * deny); looser is ignored. Runs from the extension's early evaluate hook, ahead of every configured plugin.
+ */
+export function holdAsk(event: { effect: string }) {
+  if (event.effect !== "ask") return
+  let effect: string = "ask"
+  Object.defineProperty(event, "effect", {
+    get: () => effect,
+    set: (next: unknown) => {
+      if (next === "deny") effect = "deny"
+    },
+    enumerable: true,
+    configurable: false,
+  })
+}
+
 function deepFreeze<T>(value: T): T {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
     Object.freeze(value)

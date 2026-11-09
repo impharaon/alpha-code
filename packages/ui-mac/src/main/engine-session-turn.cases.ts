@@ -23,7 +23,7 @@ const llm = Bun.serve({
   hostname: "127.0.0.1",
   port: 0,
   async fetch(request) {
-    if (new URL(request.url).pathname !== "/v1/chat/completions") return new Response("not found", { status: 404 })
+    if (!request.url.endsWith("/v1/chat/completions")) return new Response("not found", { status: 404 })
     model.calls++
     await new Promise((resolve) => setTimeout(resolve, model.delayMs))
     if (model.status !== 200) return Response.json({ error: { message: "cp-l5 model stub refused", type: "server_error" } }, { status: model.status })

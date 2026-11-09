@@ -27,7 +27,7 @@ const llm = Bun.serve({
   hostname: "127.0.0.1",
   port: 0,
   fetch: (request) =>
-    new URL(request.url).pathname === "/v1/chat/completions"
+    request.url.endsWith("/v1/chat/completions")
       ? new Response(chunk({ role: "assistant", content: REPLY }) + chunk({}, "stop") + "data: [DONE]\n\n", { headers: { "content-type": "text/event-stream" } })
       : new Response("not found", { status: 404 }),
 })

@@ -16,7 +16,8 @@
 //     一步失败即停 —— 与 Actions 的默认 `success()` 语义一致,于是「不出推送包」由真的
 //     `Build sync bundle artifact` 那一步有没有产出 `sync-artifact/` 来判。
 //   · **清单来自生产守卫本体**:夹具 alpha 树里放的是本仓 `scripts/north-star-guard.sh` 的原样副本,
-//     接管文件取清单里的真条目 `packages/opencode/src/session/llm/request.ts`(上面那次静默混入的文件)。
+//     接管文件取清单里的真条目 `packages/core/src/permission.ts`(`#1664` 起是过渡清单的 15 条之一;上面那次
+//     静默混入的 `session/llm/request.ts` 随 v1 引擎删除,已出清单)。
 //   · **先证明手段测得出已知的坏**:删掉 intake 步 ⇒ 无冲突那例被合并步静默合入;移植改用 squash ⇒
 //     下一次同步再次命中同一批路径;intake 改成执行工作树里的守卫 ⇒ 上游树里的脚本被执行。
 //
@@ -45,8 +46,8 @@ const FULL = [INTAKE, MERGE, POST, BUNDLE]
 const REVIEW_TITLE = "::error title=takeover upgrade review required::"
 const UNREGISTERED = "未登记的偏离:按 ADR-029 登记或还原"
 
-/** 接管清单里的真条目(`003f6f764` 静默混入的那个文件)。 */
-const TAKEOVER = "packages/opencode/src/session/llm/request.ts"
+/** 接管清单里的真条目(`#1664` 过渡清单:换代前 49 条里在 OpenCode 2 仍存在的 15 条之一)。 */
+const TAKEOVER = "packages/core/src/permission.ts"
 const ENGINE = "packages/opencode/src/engine.ts"
 
 const GIT_ENV = {

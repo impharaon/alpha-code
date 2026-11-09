@@ -180,7 +180,8 @@ describe("#1288 north-star 漂移度量:① 收编面", () => {
     expect(run.exitCode, `度量脚本非零退出:\n${run.output}`).toBe(0)
     const expected = whitelistEntriesFromGuardSource(GUARD_SOURCE)
     // 解析自检:一份解析退化成 0 的正则会让下面那条断言空对空地绿。
-    expect(expected, "守卫白名单解析退化成空 —— 本次测量作废").toBeGreaterThanOrEqual(20)
+    // `#1664`:过渡清单 15 条,下限随数据从 20 改到 10 —— 它只防解析退化。
+    expect(expected, "守卫白名单解析退化成空 —— 本次测量作废").toBeGreaterThanOrEqual(10)
     expect(readNumber(run.output, ADOPTION, "收编面条数")).toBe(expected)
   })
 

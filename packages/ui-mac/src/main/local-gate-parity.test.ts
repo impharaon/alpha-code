@@ -318,7 +318,8 @@ describe("#777 本地门与 codepuppy-ci 的对照表", () => {
       /^ROUNDTRIP_PACKAGES="([^"]+)"/m.exec(GUARD_SCRIPT)?.[1].trim().split(/\s+/).length,
       "守卫脚本里没解析到 ROUNDTRIP_PACKAGES",
     ).toBeGreaterThanOrEqual(2)
-    expect(bashArrayItems(GUARD_SCRIPT, "UPSTREAM_EXCLUDES").length, "守卫脚本里的 ADR-033 收编白名单没解析到").toBeGreaterThanOrEqual(20)
+    // `#1664`:过渡清单 15 条,下限随数据从 20 改到 10 —— 它只防解析退化。
+    expect(bashArrayItems(GUARD_SCRIPT, "UPSTREAM_EXCLUDES").length, "守卫脚本里的 ADR-033 收编白名单没解析到").toBeGreaterThanOrEqual(10)
   })
 
   // ── `#1247` / ADR-044:两道门的边界必须是同一条线 ──────────────────────────────

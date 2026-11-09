@@ -781,14 +781,15 @@ describe("#1566 --print-takeover:接管清单只有守卫这一份", () => {
   test("逐行打印 UPSTREAM_EXCLUDES 的路径(去掉 :(exclude) 前缀),与数组逐条相同", () => {
     const printed = printTakeover()
     const expected = excludesFromSource(readFileSync(GUARD, "utf8"))
-    expect(expected.length, "白名单解析退化 —— 本次测量作废").toBeGreaterThanOrEqual(20)
+    // `#1664`:过渡清单 15 条(换代前 49 条里在 OpenCode 2 仍存在的),下限随数据从 20 改到 10 —— 它只防解析退化。
+    expect(expected.length, "白名单解析退化 —— 本次测量作废").toBeGreaterThanOrEqual(10)
     expect(printed).toEqual(expected)
     expect(printed.filter((p) => p.startsWith(":(")), "输出里残留 pathspec 前缀").toEqual([])
   })
 
   test("控制组:守卫复制品删掉一条白名单 ⇒ 打印的清单跟着少那一条", () => {
     const full = printTakeover()
-    const victim = "packages/opencode/src/session/llm/request.ts"
+    const victim = "packages/core/src/oauth/page.ts"
     expect(full, "前提:那条接管路径在生产清单里").toContain(victim)
     const trimmed = printTakeover(mutatedGuard("takeover-minus-one", (s) => s.replace(`  ':(exclude)${victim}'\n`, "")))
     expect(trimmed).toEqual(full.filter((p) => p !== victim))
@@ -800,5 +801,168 @@ describe("#1566 --print-takeover:接管清单只有守卫这一份", () => {
     expect(literalTakeoverPaths(text, takeover)).toEqual([])
     const copied = `${text}\n# paths: ${takeover[0]}\n`
     expect(literalTakeoverPaths(copied, takeover)).toContain(takeover[0])
+  })
+})
+
+// ── `#1664`:含受审上游合并的分支 —— packages/ 以那个合并的上游父为基准(#1662 裁决书 F3)────────
+//
+// 换代整合分支上有一个真合并提交 M0(第二父 = OpenCode 2 的上游提交),树按规则构造:上游路径取上游原样。
+// 守卫若仍拿 origin/alpha 当基准,M0 带来的上千个上游 D/M 会全部被点名(本分支实测 3502 行),并行的 lane
+// 只剩 `--no-verify`。所以这种分支上守卫判「packages/ 相对上游父有没有未登记的偏离」(基线 §2.3 第 4 步)。
+// 两臂:M0 原样带来的上游改动 ⇒ 绿;M0 之后再改一个上游文件 ⇒ 红。识别「上游合并」靠「另一个父的树里没有
+// 任何 Code Puppy 自有包」,不靠上游镜像 —— 镜像会陈旧(2026-11-09 的 origin/dev 仍是 1.x 的 055d95bb),
+// 夹具照这个样子把 dev 留在分叉点。
+const V1_ONLY = "packages/core/src/v1-only.ts"
+const V2_ONLY = "packages/core/src/v2-only.ts"
+/** 住在上游包里的 Code Puppy 文件 —— M0 按规则移出(基线 §2.3:alpha 加在上游包里的 80 个文件)。 */
+const CODEPUPPY_UNDER_UPSTREAM = "packages/core/src/codepuppy-moved-out.ts"
+
+/**
+ *   seed ──► dev        (上游镜像停在分叉点,不含上游父 —— 与真实的 origin/dev 同形)
+ *     ├──► upstream     (下一代:改 UPSTREAM_FILE、删 V1_ONLY、加 V2_ONLY;树里没有任何 Code Puppy 包)
+ *     └──► alpha        (Code Puppy 自有包 + 一个住在上游包里的 codepuppy-* 文件)
+ *              └──► feature = M0:`git merge --no-ff --no-commit origin/upstream`,上游路径取上游原样,
+ *                   住在上游包里的那个 Code Puppy 文件移出,然后提交 —— 夹具里的合并是测试数据。
+ */
+function upstreamMergeFixture() {
+  const origin = mkdtempSync(join(tmpdir(), "codepuppy-north-star-m0-origin-"))
+  git(origin, ["init", "-q", "-b", "alpha"])
+  commit(origin, "seed: the last commit alpha and upstream share", {
+    [UPSTREAM_FILE]: "export const leaf = 1\n",
+    [TAKEN_OVER_FILE]: "export const permission = 1\n",
+    [V1_ONLY]: "export const v1 = 1\n",
+  })
+  git(origin, ["branch", "dev"])
+  git(origin, ["checkout", "-q", "-b", "upstream"])
+  git(origin, ["rm", "-q", V1_ONLY])
+  const upstream = commit(origin, "upstream: the next generation", {
+    [UPSTREAM_FILE]: "export const leaf = 2 // next generation\n",
+    [V2_ONLY]: "export const v2 = 1\n",
+  })
+  git(origin, ["checkout", "-q", "alpha"])
+  commit(origin, "alpha: its own package, plus one codepuppy file under an upstream package", {
+    [CODEPUPPY_FILE]: "export const codepuppyOwned = 1\n",
+    [CODEPUPPY_UNDER_UPSTREAM]: "export const movedOut = 1\n",
+  })
+
+  const work = mkdtempSync(join(tmpdir(), "codepuppy-north-star-m0-work-"))
+  const cloned = Bun.spawnSync(["git", "clone", "-q", origin, work], { env: { ...GIT_ENV } })
+  if (cloned.exitCode !== 0) throw new Error(`git clone 失败:${cloned.stderr.toString()}`)
+  git(work, ["checkout", "-q", "-b", "feature", "origin/alpha"])
+  git(work, ["merge", "-q", "--no-ff", "--no-commit", "origin/upstream"])
+  git(work, ["rm", "-q", CODEPUPPY_UNDER_UPSTREAM])
+  git(work, ["commit", "-q", "-m", "M0: merge upstream, tree built by the rules"])
+  return { work, upstream }
+}
+
+describe("#1664 含受审上游合并的分支:packages/ 以那个合并的上游父为基准", () => {
+  test("M0 原样带来的上游改动 ⇒ 绿,并说出基准是上游父(控制组:关掉识别 ⇒ 红,点名 M0 带来的上游改动)", () => {
+    const { work, upstream } = upstreamMergeFixture()
+    const stale = Bun.spawnSync(["git", "merge-base", "--is-ancestor", upstream, "origin/dev"], { cwd: work, env: { ...GIT_ENV } })
+    expect(stale.exitCode, "前提:上游镜像不含上游父(真实的 origin/dev 就是这样)—— 夹具没造出来").toBe(1)
+
+    const run = runGuard(work)
+    expect(run.exitCode, `M0 原样带来的上游改动被点名了 —— 整合分支上这道门恒红:\n${run.output}`).toBe(0)
+    expect(run.output, `没说出这一跑以上游父为基准:\n${run.output}`).toContain(`上游父 ${upstream.slice(0, 7)}`)
+
+    // 控制组:识别关掉(候选范围变空)= 本票之前的守卫,同一棵树必须红,而且红在 M0 带来的上游改动上。
+    const legacy = runGuard(work, mutatedGuard("no-upstream-merge", (s) => s.replace("--merges origin/alpha..HEAD", "--merges HEAD..HEAD")))
+    expect(legacy.exitCode, `控制组没红 —— 夹具没造出「M0 让守卫恒红」的形状:\n${legacy.output}`).not.toBe(0)
+    expect(legacy.output).toContain(UPSTREAM_FILE)
+    expect(legacy.output).toContain(V1_ONLY)
+  })
+
+  test("M0 之后再改一个上游文件 ⇒ 红,且点名它", () => {
+    const { work } = upstreamMergeFixture()
+    commit(work, "touch an upstream file after M0", { [UPSTREAM_FILE]: "export const leaf = 999\n" })
+    const run = runGuard(work)
+    expect(run.exitCode, `M0 之后改上游文件被放行了:\n${run.output}`).not.toBe(0)
+    expect(run.output).toContain(UPSTREAM_FILE)
+  })
+
+  test("新增进上游包的文件:codepuppy-* ⇒ 绿且点名豁免;不自报家门 ⇒ 红(控制组:这一档加回 DMR ⇒ 漏掉)", () => {
+    const { work } = upstreamMergeFixture()
+    const owned = "packages/core/src/codepuppy-addition.ts"
+    commit(work, "add an owned file under an upstream package", { [owned]: "export const owned = 1\n" })
+    const ok = runGuard(work)
+    expect(ok.exitCode, `自报家门的新增文件被判成偏离:\n${ok.output}`).toBe(0)
+    expect(ok.output, `豁免了却没说:\n${ok.output}`).toContain(owned)
+
+    const bare = "packages/core/src/bare-addition.ts"
+    commit(work, "add an unmarked file under an upstream package", { [bare]: "export const bare = 1\n" })
+    const run = runGuard(work)
+    expect(run.exitCode, `不自报家门的新增文件被放行了 —— §2.3 第 4 步「多出任何一行」没生效:\n${run.output}`).not.toBe(0)
+    expect(run.output).toContain(bare)
+
+    const dmr = runGuard(
+      work,
+      mutatedGuard("upstream-merge-dmr", (s) =>
+        s.replace('--no-renames --name-only "$upstream_parent" HEAD', '--no-renames --diff-filter=DMR --name-only "$upstream_parent" HEAD'),
+      ),
+    )
+    expect(dmr.exitCode, `控制组没绿 —— 上面那条红不是「新增也算」挣来的:\n${dmr.output}`).toBe(0)
+  })
+
+  test("过渡接管清单里的文件在 M0 之后被改 ⇒ 绿且不点名", () => {
+    const { work } = upstreamMergeFixture()
+    commit(work, "re-take-over a file on the transitional list", { [TAKEN_OVER_FILE]: "export const permission = 2\n" })
+    const run = runGuard(work)
+    expect(run.exitCode, `过渡清单没生效:\n${run.output}`).toBe(0)
+    expect(run.output).not.toContain(TAKEN_OVER_FILE)
+  })
+
+  test("lane 合进整合分支的合并(另一个父带着 Code Puppy 包)不被认成上游合并", () => {
+    const { work, upstream } = upstreamMergeFixture()
+    git(work, ["checkout", "-q", "-b", "lane"])
+    commit(work, "lane edits an upstream file", { [UPSTREAM_FILE]: "export const leaf = 3 // lane\n" })
+    git(work, ["checkout", "-q", "feature"])
+    git(work, ["merge", "-q", "--no-ff", "lane", "-m", "integrate the lane"])
+    const run = runGuard(work)
+    // 把 lane 头错认成上游父的话,lane 那次改动就成了基准的一部分,这一跑会绿。
+    expect(run.exitCode, `lane 带进来的上游改动被放行了 —— 识别把 lane 头当成了上游父:\n${run.output}`).not.toBe(0)
+    expect(run.output).toContain(UPSTREAM_FILE)
+    expect(run.output).toContain(`上游父 ${upstream.slice(0, 7)}`)
+  })
+})
+
+// ── `#1664`:scripts/assert-upstream-ancestor.sh —— 上游祖先不能被 squash / rebase 弄丢(裁决书 F2)────
+// 本仓 PR 默认 squash。squash 或 rebase 会把 M0 压成普通提交:树一字不差,上游祖先没了,merge-base 不前移。
+// 只比树的判据(上面的守卫、§2.3 第 4 步的树判据)看不出这件事,所以单列一条祖先判据,并在一个 squash 重放的
+// 夹具上证明它会红。夹具里的合并与 squash 都是测试数据。
+const ANCESTOR = resolve(REPO_ROOT, "scripts/assert-upstream-ancestor.sh")
+
+function runAncestor(repo: string, args: string[]): GuardRun {
+  const result = Bun.spawnSync(["bash", ANCESTOR, ...args], { cwd: repo, env: { ...GIT_ENV } })
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`
+  if (output.trim().length === 0) throw new Error("祖先检查一个字都没输出 —— 本次测量作废(不是通过)")
+  return { exitCode: result.exitCode, output }
+}
+
+describe("#1664 assert-upstream-ancestor.sh:上游合并必须留在历史里", () => {
+  test("真合并的分支 ⇒ 0;同一分支 squash 重放到 alpha 的临时副本上 ⇒ 1(树一字不差,祖先没了)", () => {
+    const { work, upstream } = upstreamMergeFixture()
+    commit(work, "a lane commit after M0", { [CODEPUPPY_FILE]: "export const codepuppyOwned = 2\n" })
+    const merged = runAncestor(work, [upstream])
+    expect(merged.exitCode, `真合并的分支被判成丢了祖先:\n${merged.output}`).toBe(0)
+
+    git(work, ["checkout", "-q", "-b", "alpha-copy", "origin/alpha"])
+    git(work, ["merge", "-q", "--squash", "feature"])
+    git(work, ["commit", "-q", "-m", "squash-merge the integration branch (the repo's default PR merge)"])
+    expect(git(work, ["rev-parse", "alpha-copy^{tree}"]), "squash 重放的树与原分支不同 —— 变异没构造对").toBe(
+      git(work, ["rev-parse", "feature^{tree}"]),
+    )
+    const squashed = runAncestor(work, [upstream])
+    expect(squashed.exitCode, `squash 重放之后祖先检查没红:\n${squashed.output}`).toBe(1)
+    expect(squashed.output).toContain("squash")
+
+    // 第二个参数是「合入后对 origin/alpha 再跑一次」那一跑的形状。
+    expect(runAncestor(work, [upstream, "feature"]).exitCode).toBe(0)
+  })
+
+  test("SHA 或 ref 解析不出、参数不对 ⇒ 2(测不到,不是通过)", () => {
+    const { work } = upstreamMergeFixture()
+    expect(runAncestor(work, ["0123456789abcdef0123456789abcdef01234567"]).exitCode).toBe(2)
+    expect(runAncestor(work, ["HEAD", "no-such-ref"]).exitCode).toBe(2)
+    expect(runAncestor(work, []).exitCode).toBe(2)
   })
 })

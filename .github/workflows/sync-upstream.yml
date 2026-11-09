@@ -2,7 +2,10 @@
 #
 # alpha only ADDS files, so the ONLY expected merge conflict is `bun.lock`
 # (adding workspace packages necessarily updates it). That case is auto-resolved
-# by taking upstream's lockfile and re-running `bun install`.
+# by taking upstream's lockfile and re-running `bun install`. `#1664`: the root
+# `CHANGELOG.md` is the second expected conflict — upstream ships OpenCode 2's
+# release notes at that path, Code Puppy keeps its own release history there, so
+# it is always resolved to ours.
 #
 # `#1566`: the exception is the takeover list — upstream files alpha deliberately
 # edits, registered once in `scripts/north-star-guard.sh` (`UPSTREAM_EXCLUDES`).
@@ -67,10 +70,11 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # `#1664`:OpenCode 2 的根 package.json 写的是 bun@1.4.4,引擎冒烟跑的是 2.x 的 CLI。
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.3.14"
+          bun-version: "1.4.4"
 
       - name: Configure git + remotes
         run: |
@@ -97,9 +101,10 @@ jobs:
       # ADR-015 合并验证:Tier-3 行为层(codepuppy-behavior/identity/.opencode/agent)与上游 prompt 底座的
       # 矛盾不产生 git 冲突 → file-diff 守卫(ADR-004)测不出。当本次 sync 触碰上游 prompt/*.txt 或
       # agent/* 时,发一条 warning + step summary 要求人工语义复核(不阻断同步)。
+      # `#1664`:OpenCode 2 的系统提示与 agent 定义在 core 里(基线 §2.9;清点表 L3r)。
       - name: Prompt/agent tripwire (ADR-015 — human review required)
         run: |
-          paths="packages/opencode/src/session/prompt packages/opencode/src/agent"
+          paths="packages/core/src/session/system-prompt.ts packages/core/src/plugin/system-prompt packages/core/src/agent.ts"
           touched="$(git diff --name-only "$OLD_DEV".."$NEW_DEV" -- $paths || true)"
           if [ -n "$touched" ]; then
             {
@@ -216,20 +221,10 @@ jobs:
               echo "::error::REQ-088 C1 marker (./surface/session narrow export) missing after applying alpha frontend delta — pin/SOT drift. Aborting sync."
               exit 1
             fi
-            # 这一步刚 `rm -rf` 过 packages/app:pin 里没有、只存在于补丁里的**二进制**(vendored
-            # client tgz,被 packages/session-ui 以 file: 直接依赖)必须由补丁重建出来。普通 git diff
-            # 不携带二进制内容,漏了它 sync 会把这个包静默删掉 —— 所以在这里判死。
-            # 判据钉「被 file: 直接依赖的那个精确文件」而非「有没有随便一个 tgz」:版本换名而补丁
-            # 还带着旧的,通配判据照样绿,bun install 却装不上。
-            VENDORED="$(sed -n 's|.*"file:\.\./app/\(vendor/[^"]*\.tgz\)".*|\1|p' packages/session-ui/package.json | head -1)"
-            if [ -z "$VENDORED" ]; then
-              echo "::error::packages/session-ui/package.json 没有 file: 指向 packages/app/vendor 的依赖 —— 本判据已失效,须随依赖变更更新。Aborting sync."
-              exit 1
-            fi
-            if [ ! -f "packages/app/$VENDORED" ]; then
-              echo "::error::packages/app/$VENDORED missing after applying alpha frontend delta — SOT 补丁没带二进制(须用 git diff --binary 重生)。Aborting sync."
-              exit 1
-            fi
+            # `#1664`:原来这里还判「补丁带回了 packages/session-ui 以 file: 依赖的 vendored client tgz」。
+            # OpenCode 2 的 session-ui 直接依赖工作区包 `@opencode/client`(33f94fce96 的
+            # packages/session-ui/package.json:74),不再有随补丁带进来的 tarball,那条判据随之去掉(基线 §2.9);
+            # 留着它,第一次 2.x 同步就会以「本判据已失效」中止。
             git add packages/app packages/ui
             if ! git diff --cached --quiet -- packages/app packages/ui; then
               git commit -m "chore(frontend): re-apply alpha frontend delta on pinned upstream after sync (B: pin+patch)"
@@ -240,11 +235,17 @@ jobs:
             exit 0
           fi
           conflicts="$(git diff --name-only --diff-filter=U)"
-          unexpected="$(echo "$conflicts" | grep -v '^bun.lock$' | grep -v '^packages/app/' | grep -v '^packages/ui/' || true)"
+          unexpected="$(echo "$conflicts" | grep -v '^bun.lock$' | grep -v '^packages/app/' | grep -v '^packages/ui/' | grep -v '^CHANGELOG.md$' || true)"
           if [ -z "$unexpected" ]; then
             if echo "$conflicts" | grep -q '^bun.lock$'; then
               echo "Resolving expected bun.lock conflict by regenerating the lockfile."
               git checkout --theirs -- bun.lock
+            fi
+            # `#1664`(编排器裁决,#1664 评论 6734550342):根 CHANGELOG.md 是 Code Puppy 的用户可见发布历史,
+            # 上游同一路径是 OpenCode 2 的发布说明 —— 两份不相干的文档,一律取我方。
+            if echo "$conflicts" | grep -q '^CHANGELOG.md$'; then
+              echo "Resolving expected CHANGELOG.md conflict: keeping Code Puppy's release history."
+              git checkout --ours -- CHANGELOG.md
             fi
             # app/ui 路径冲突(B:pin+补丁):不能用 `checkout --ours`——上游在 app/ui 下**新增**的
             # 文件是 add/add 冲突、没有 ours 版本,--ours 报错跳过后残留冲突标记的 package.json 会令
@@ -267,6 +268,8 @@ jobs:
             # **正是为这一格写的**(它会说「须用 git diff --binary 重生」),却永远来不及打印。
             # 顺序因此必须是:结束合并 → 重贴补丁(vendored 资产就位;真漂移时那条判据在这里
             # 响亮失败)→ **最后**才 install,那时 lockfile 才是照着最终这棵树生成的。
+            # (`#1664`:OpenCode 2 没有 vendored tgz,VENDORED 判据已去掉;顺序照旧 —— lockfile 仍须照
+            # 补丁重贴之后的最终树生成。)
             # 行为闸:packages/ui-mac/src/main/sync-upstream-merge-order.test.ts —— 它从本文件解析出
             # 这一步的 run 体、在真 git 仓上跑它本体,并把下面这两行换回旧顺序证明它当场变红。
             git add -A

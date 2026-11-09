@@ -24,7 +24,7 @@ import type {
 } from "@opencode-ai/sdk/v2/client"
 import { STAGED_ATTACHMENT_PART_NAME, stagedAttachmentPart } from "../../../../ext/src/staged-attachment-part"
 import { ATTACHMENT_METADATA_KEY, type StagedAttachmentMeta } from "../../shared/attachment-path"
-import { normalizeProviderList, normalizeSessionMessages } from "./frozen-shapes"
+import { normalizePermissionRequest, normalizeProviderList, normalizeSessionMessages } from "./frozen-shapes"
 
 type FrozenSource = Parameters<typeof normalizeSessionMessages>[1]
 
@@ -303,4 +303,32 @@ export function todosOf(part: Part) {
   if (part.type !== "tool" || part.tool !== "todowrite") return undefined
   const input = (part.state as { input?: { todos?: Array<{ content: string; status: string }> } }).input
   return input?.todos?.map((item) => ({ content: item.content, status: item.status, priority: "medium" }))
+}
+
+/**
+ * I7a:2.x 审批请求 → v1。冻结 app 的 normalizePermissionRequest 按 1.17.13 的形状读工具来源(`source.callID`);
+ * 2.x 的来源是 `{ type: "tool", messageID, id }`(真引擎采样 fixtures/permission-asked.json,seams I7a)。这里只补这一处
+ * 漂移,其余字段(action → permission、resources → patterns、save → always、metadata 原样)仍由冻结函数映射。
+ */
+export function toV1PermissionRequest(request: { source?: { type: string; messageID?: string; id?: string } } & Record<string, unknown>) {
+  const source = request.source?.type === "tool" ? { ...request.source, callID: request.source.id } : request.source
+  return normalizePermissionRequest({ ...request, source } as never)
+}
+
+/**
+ * REQ-142 回合改动:0.1.26 的引擎把每个回合改了哪些文件写进那个回合的**用户消息** `summary.diffs`,右栏审阅面板
+ * 经 `turnDiffsOf`(session-rail/review/review-turn-diffs.ts)从 store 里读最近一个回合的。2.x 把它做成按回合的
+ * `GET /api/session/:id/diff?from=<用户消息>`(FileDiffInfo 与 v1 SnapshotFileDiff 同形)。这里把取回的回合改动挂回
+ * 那条 v1 用户消息,面板与 turnDiffsOf 不用改。
+ */
+export function withTurnDiffs(messages: V1MessageWithParts[], diffs: ReadonlyMap<string, readonly unknown[]>) {
+  return messages.map((item) => {
+    const found = item.info.role === "user" ? diffs.get(item.info.id) : undefined
+    return found ? { ...item, info: { ...item.info, summary: { diffs: [...found] } } as Message } : item
+  })
+}
+
+/** 最近一个回合的用户消息 id(turnDiffsOf 只读它)。 */
+export function latestUserMessageID(messages: readonly V1MessageWithParts[]) {
+  return messages.findLast((item) => item.info.role === "user")?.info.id
 }

@@ -14,10 +14,20 @@
 // 不认识的事件丢弃(它们在 v1 没有对应,冻结界面也不读)。
 import type { OpenCodeClient, OpenCodeEvent } from "@opencode/client/promise"
 import type { Part } from "@opencode-ai/sdk/v2/client"
-import { normalizePermissionRequest, normalizeSessionInfo } from "./frozen-shapes"
+import { normalizeSessionInfo } from "./frozen-shapes"
 import type { RouteContext } from "./routes"
 import { recentMessages, rememberSessionDirectory, sessionDirectory } from "./session-cache"
-import { contentKeys, partID, todosOf, toV1Messages, toV1Project, toV1Question } from "./v1-shapes"
+import {
+  contentKeys,
+  latestUserMessageID,
+  partID,
+  todosOf,
+  toV1Messages,
+  toV1PermissionRequest,
+  toV1Project,
+  toV1Question,
+  withTurnDiffs,
+} from "./v1-shapes"
 
 export type V1Payload = { type: string; properties: unknown }
 type Emit = (directory: string, payload: V1Payload) => void
@@ -71,6 +81,14 @@ const SESSION_INFO_EVENTS = new Set([
   "session.execution.interrupted",
 ])
 
+/** REQ-142:回合改动在这些边界上按 2.x 的逐回合 diff 刷新(0.1.26 在第一步与每步结束时写 summary.diffs)。 */
+export const TURN_DIFF_EVENTS = new Set([
+  "session.step.ended",
+  "session.execution.succeeded",
+  "session.execution.failed",
+  "session.execution.interrupted",
+])
+
 const PASS_THROUGH = new Set([
   "pty.created",
   "pty.updated",
@@ -89,6 +107,8 @@ export function createProjector(api: OpenCodeClient, emit: Emit) {
   /** 已发出的 v1 对象(按 id)的 JSON,用于只发变化。 */
   const emitted = new Map<string, string>()
   const sessions = new Map<string, unknown>()
+  /** 用户消息 → 它那个回合的改动(REQ-142),快照发 message.updated 时挂回去。 */
+  const turnDiffs = new Map<string, readonly unknown[]>()
 
   const remember = (key: string, value: unknown) => {
     const encoded = JSON.stringify(value)
@@ -98,12 +118,18 @@ export function createProjector(api: OpenCodeClient, emit: Emit) {
     return true
   }
 
-  async function snapshot(directory: string, sessionID: string) {
+  async function snapshot(directory: string, sessionID: string, refreshTurnDiff = false) {
     const page = await recentMessages(api, sessionID, { limit: SNAPSHOT_WINDOW })
     for (const message of page.context) {
       if (message.type === "assistant") blocks.set(message.id, contentKeys(message.content as never))
     }
-    for (const { info, parts } of toV1Messages(sessionID, page.context)) {
+    const listed = toV1Messages(sessionID, page.context)
+    const latest = latestUserMessageID(listed)
+    if (refreshTurnDiff && latest) {
+      const diff = await api.session.diff({ sessionID, from: latest }).catch(() => undefined)
+      if (diff) turnDiffs.set(latest, diff)
+    }
+    for (const { info, parts } of withTurnDiffs(listed, turnDiffs)) {
       if (remember(`message:${info.id}`, info)) emit(directory, { type: "message.updated", properties: { info } })
       for (const part of parts) {
         if (remember(`part:${part.id}`, part)) emit(directory, { type: "message.part.updated", properties: { part } })
@@ -161,7 +187,7 @@ export function createProjector(api: OpenCodeClient, emit: Emit) {
     if (type === "agent.updated" || type === "command.updated" || type === "skill.updated")
       return emit(directory, { type: "catalog.updated", properties: {} })
     if (type === "project.updated") return emit(directory, { type, properties: toV1Project(data as never) })
-    if (type === "permission.asked") return emit(directory, { type, properties: normalizePermissionRequest(data as never) })
+    if (type === "permission.asked") return emit(directory, { type, properties: toV1PermissionRequest(data as never) })
     if (type === "permission.replied") return emit(directory, { type, properties: data })
     if (type === "form.created") {
       const question = toV1Question(data.form)
@@ -212,7 +238,7 @@ export function createProjector(api: OpenCodeClient, emit: Emit) {
     if (type === "session.tool.input.started") {
       await streamPartID(sessionID, data.assistantMessageID, `tool:${data.id}`)
     }
-    if (SNAPSHOT_EVENTS.has(type)) await snapshot(directory, sessionID)
+    if (SNAPSHOT_EVENTS.has(type) || TURN_DIFF_EVENTS.has(type)) await snapshot(directory, sessionID, TURN_DIFF_EVENTS.has(type))
     if (SESSION_INFO_EVENTS.has(type)) await sessionInfo(directory, sessionID, "session.updated")
 
     if (type === "session.execution.started") return emit(directory, { type: "session.status", properties: { sessionID, status: { type: "busy" } } })

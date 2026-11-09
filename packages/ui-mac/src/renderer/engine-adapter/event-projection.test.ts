@@ -10,7 +10,7 @@ import { applyDirectoryEvent } from "../../../../codepuppy-app/src/context/globa
 import readTool from "./fixtures/read-tool.json"
 import todo from "./fixtures/todo.json"
 import question from "./fixtures/question.json"
-import { createProjector, SNAPSHOT_EVENTS, type V1Payload } from "./events"
+import { createProjector, SNAPSHOT_EVENTS, TURN_DIFF_EVENTS, type V1Payload } from "./events"
 import { toV1Messages } from "./v1-shapes"
 
 type Fixture = {
@@ -32,6 +32,7 @@ function replayApi(fixture: Fixture) {
       },
     },
     session: {
+      diff: async () => [],
       get: async ({ sessionID }: { sessionID: string }) => ({
         id: sessionID,
         projectID: created?.projectID ?? "p",
@@ -67,6 +68,7 @@ function reduce(events: Array<{ directory: string; payload: V1Payload }>, direct
     permission: {},
     question: {},
     message: {},
+    session_message: {},
     part: {},
     part_text_accum_delta: {},
     limit: 50,
@@ -174,7 +176,9 @@ describe("#1668 2.x 事件 → v1 事件(按冻结 app 的归约器)", () => {
   test("反向臂:只靠流式增量、不按存储重取 ⇒ 工具 part 到不了完成态,与重新加载不一致", async () => {
     const fixture = readTool as unknown as Fixture
     const removed = [...SNAPSHOT_EVENTS].filter((type) => type !== "session.inbox.delivered")
+    const turnBoundaries = [...TURN_DIFF_EVENTS]
     for (const type of removed) SNAPSHOT_EVENTS.delete(type)
+    for (const type of turnBoundaries) TURN_DIFF_EVENTS.delete(type)
     try {
       const { store } = reduce(await project(fixture), fixture.directory)
       const assistant = toV1Messages(fixture.sessionID, fixture.final).find((item) => item.info.role === "assistant")!
@@ -182,6 +186,7 @@ describe("#1668 2.x 事件 → v1 事件(按冻结 app 的归约器)", () => {
       expect(tool?.state.status).not.toBe("completed")
     } finally {
       for (const type of removed) SNAPSHOT_EVENTS.add(type)
+      for (const type of turnBoundaries) TURN_DIFF_EVENTS.add(type)
     }
   })
 })

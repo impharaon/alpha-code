@@ -1,0 +1,82 @@
+{
+ "_source": "Sampled 2026-11-09 by alpha-code#1668 (L6), same engine and mock as read-tool.json: the build agent's `read *.env` ask rule fired on a mock `read .env` tool call. `frame` is the raw /api/event permission.asked frame; `list` is GET /api/permission/request right after it. The engine here runs without ext, so metadata is empty; the four I7a keys (identity/authority/location/policy, seams doc I7a) are added by the test.",
+ "frame": {
+  "id": "evt_1bfe4dad7002UdNOuLS4ZdnPRh",
+  "created": 1794220808919,
+  "type": "permission.asked",
+  "location": {
+   "directory": "/tmp/l6-probe.F4Lu/proj"
+  },
+  "data": {
+   "id": "per_1bfe4dad7001GVEAbd2QmgvYK0",
+   "sessionID": "ses_e401b25edffeCu0lVMSfOHVElU",
+   "action": "read",
+   "resources": [
+    ".env"
+   ],
+   "save": [
+    "*"
+   ],
+   "source": {
+    "type": "tool",
+    "messageID": "msg_1bfe4da1a001rJc1eIcie5tYjG",
+    "id": "call_mock_env_kpta4"
+   }
+  }
+ },
+ "list": {
+  "location": {
+   "directory": "/tmp/l6-probe.F4Lu/proj"
+  },
+  "data": [
+   {
+    "id": "per_1bfe2e7b6001tOzUdcL8a2CISj",
+    "sessionID": "ses_e401d1911ffehjN9nhtKQ5FO0g",
+    "action": "read",
+    "resources": [
+     ".env"
+    ],
+    "save": [
+     "*"
+    ],
+    "source": {
+     "type": "tool",
+     "messageID": "msg_1bfe2e6f7001wOHzAoluu4X4T2",
+     "id": "call_mock_env_0g361"
+    }
+   },
+   {
+    "id": "per_1bfe3f6e6001aHNb6GHPzKtOBf",
+    "sessionID": "ses_e401c09e4ffeT0olOnBt7lX057",
+    "action": "read",
+    "resources": [
+     ".env"
+    ],
+    "save": [
+     "*"
+    ],
+    "source": {
+     "type": "tool",
+     "messageID": "msg_1bfe3f622001vcX45ZxbLDZfA5",
+     "id": "call_mock_env_823pq"
+    }
+   },
+   {
+    "id": "per_1bfe4dad7001GVEAbd2QmgvYK0",
+    "sessionID": "ses_e401b25edffeCu0lVMSfOHVElU",
+    "action": "read",
+    "resources": [
+     ".env"
+    ],
+    "save": [
+     "*"
+    ],
+    "source": {
+     "type": "tool",
+     "messageID": "msg_1bfe4da1a001rJc1eIcie5tYjG",
+     "id": "call_mock_env_kpta4"
+    }
+   }
+  ]
+ }
+}

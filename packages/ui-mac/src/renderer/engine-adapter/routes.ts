@@ -7,7 +7,7 @@
 // 已删或挪走的改写。
 import type { OpenCodeClient } from "@opencode/client/promise"
 import type { QuestionRequest } from "@opencode-ai/sdk/v2/client"
-import { normalizeAgentList, normalizePermissionRequest, normalizeSessionInfo } from "./frozen-shapes"
+import { normalizeAgentList, normalizeSessionInfo } from "./frozen-shapes"
 import { projectEventStream } from "./events"
 import { recentMessages, sessionDirectory } from "./session-cache"
 import {
@@ -19,10 +19,13 @@ import {
   toV1McpStatus,
   toV1Messages,
   toV1Path,
+  toV1PermissionRequest,
   toV1Project,
   toV1ProviderList,
   toV1Question,
   todosOf,
+  latestUserMessageID,
+  withTurnDiffs,
   type V1PromptBody,
 } from "./v1-shapes"
 
@@ -116,7 +119,11 @@ async function messages(context: RouteContext) {
   const limit = number(context.query.get("limit"))
   const before = context.query.get("before") ?? undefined
   const page = await recentMessages(context.api, sessionID, { limit, cursor: before })
-  const response = json(toV1Messages(sessionID, page.context).filter((item) => page.ids.has(baseID(item.info.id))))
+  const listed = toV1Messages(sessionID, page.context).filter((item) => page.ids.has(baseID(item.info.id)))
+  // REQ-142:最近一个回合的改动挂回它的用户消息(只在最新一页取,turnDiffsOf 只读最近一个回合)。
+  const latest = before ? undefined : latestUserMessageID(listed)
+  const diff = latest ? await context.api.session.diff({ sessionID, from: latest }).catch(() => undefined) : undefined
+  const response = json(latest && diff ? withTurnDiffs(listed, new Map([[latest, diff]])) : listed)
   if (page.next) response.headers.set("x-next-cursor", page.next)
   return response
 }
@@ -351,7 +358,8 @@ export const ROUTES: readonly Route[] = [
       ...(dirs === "true" ? { type: "directory" as const } : dirs === "false" ? { type: "file" as const } : {}),
       ...(number(context.query.get("limit")) !== undefined ? { limit: number(context.query.get("limit")) } : {}),
     })
-    return json(found.data.map((entry) => entry.path))
+    // 2.x 的结果里带搜索根本身(`/`),它不是一个匹配项。
+    return json(found.data.flatMap((entry) => (entry.path === "/" || entry.path === "" ? [] : [entry.path])))
   }),
 
   // ── MCP 连接(2.x 在 /api/experimental 下)与授权(U6:2.x 把远端 MCP 登记成 OAuth 集成)──
@@ -375,7 +383,7 @@ export const ROUTES: readonly Route[] = [
 
   // ── 权限 ──
   route("GET", "/permission", async (context) =>
-    json((await context.api.permission.request.list(at(context))).data.map((item) => normalizePermissionRequest(item as never))),
+    json((await context.api.permission.request.list(at(context))).data.map((item) => toV1PermissionRequest(item as never))),
   ),
   route("POST", "/permission/:requestID/reply", permissionReplyPending),
   route("POST", "/session/:sessionID/permissions/:permissionID", permissionReplyPending),
@@ -424,7 +432,18 @@ export const ROUTES: readonly Route[] = [
     return ok()
   }),
   route("POST", "/pty/:ptyID/connect-token", async (context) =>
-    json((await context.api.pty.connect.token({ ...at(context), ptyID: context.params.ptyID! })).data),
+    // 2.x 与 v1 一样要求调用方带 `x-opencode-ticket`(防跨站取票);冻结终端带着它,原样转过去。
+    json(
+      (
+        await context.api.pty.connect.token({
+          ...at(context),
+          ptyID: context.params.ptyID!,
+          ...(context.request.headers.get("x-opencode-ticket")
+            ? { "x-opencode-ticket": context.request.headers.get("x-opencode-ticket")! }
+            : {}),
+        })
+      ).data,
+    ),
   ),
 
   // ── `/api/…`:v1 SDK 的 v2 命名空间与 1.17.13 客户端;2.x 路径与形状仍在的直通 ──

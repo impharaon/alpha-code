@@ -99,8 +99,13 @@ export function parseRecord(value: unknown): ToolPolicyRecord {
   return parseToolPolicyDocument({ version: 1, partition: { account: "-", workspace: "-" }, records: [value] }).records[0]!
 }
 
-const ANY = {} as const
-const OBJECT = { type: "object" } as const
+/**
+ * Pass-through Standard Schema: the engine's RPC registry validates with it (a JSON schema `{}` rejects an absent
+ * value, which every no-output method and every data-less error is), and the handlers decode with the contract
+ * modules' own parsers instead.
+ */
+const ANY = { "~standard": { version: 1, vendor: "codepuppy", validate: (value: unknown) => ({ value }) } } as const
+const OBJECT = ANY
 const ERRORS = {
   [TOOL_POLICY_RPC.errors.quarantined]: ANY,
   [TOOL_POLICY_RPC.errors.invalidRecord]: ANY,

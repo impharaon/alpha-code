@@ -26,7 +26,7 @@
 // gate is a gate that gets deleted:
 //   * a second consumer reached WITHOUT naming the factory — `mod["createDeepLink" + "Consumer"]`,
 //     a dynamic `import()` with an assembled specifier, any name produced at runtime;
-//   * a re-export planted outside the two roots scanned here (`packages/app/src` and this package's
+//   * a re-export planted outside the two roots scanned here (`packages/codepuppy-app/src` and this package's
 //     `src`) — a third workspace package, generated code, a patched dependency;
 //   * a second consumer MOUNTED somewhere other than layout.tsx's `onMount` — an object property, a
 //     JSX inline handler, another component, an effect in a different file;
@@ -60,18 +60,18 @@ const workspaceRoot = join(packageRoot, "../..")
 // end to end (the manifest decodes; that module only consumes — including the dispatch, which is
 // why it lives there and not inline in layout.tsx). Being Alpha's own module, it takes the FULL
 // rule set: a hand-assembled `/${…}/session` for a delivery is a violation there.
-const upstreamDeepLinkModule = join(workspaceRoot, "packages/app/src/pages/layout/deep-links.ts")
+const upstreamDeepLinkModule = join(workspaceRoot, "packages/codepuppy-app/src/pages/layout/deep-links.ts")
 // The rest of that directory is upstream's: its sidebar legitimately writes its own route
 // literals, so it takes only the deep-link codec rules. That layer is contracted by path SHAPE in
 // route-upstream-shape.test.ts instead.
-const upstreamLayoutRoot = join(workspaceRoot, "packages/app/src/pages/layout")
+const upstreamLayoutRoot = join(workspaceRoot, "packages/codepuppy-app/src/pages/layout")
 // layout.tsx is upstream's too, but it is where the deep-link consumer used to live. It may call
 // the module; it may not re-become the consumer, because then the hand-assembled href would be
 // back in a file the full rule set cannot police.
-const upstreamLayoutFile = join(workspaceRoot, "packages/app/src/pages/layout.tsx")
+const upstreamLayoutFile = join(workspaceRoot, "packages/codepuppy-app/src/pages/layout.tsx")
 // The whole upstream renderer source: the search space for a module that re-exports the consumer
 // factory under a second name, which is the one alias route the call-site judgement cannot see.
-const upstreamAppRoot = join(workspaceRoot, "packages/app/src")
+const upstreamAppRoot = join(workspaceRoot, "packages/codepuppy-app/src")
 const ratchetPath = join(import.meta.dir, "route-authority-ratchet.test.ts")
 const routeManifestPath = join(import.meta.dir, "route-manifest.ts")
 const surfaceLedgerPath = join(import.meta.dir, "frontend-surface-manifest.ts")
@@ -440,7 +440,7 @@ function bindingsOf(source: string, name: string) {
  * naming the factory at all still shows up here — including R7's reverse alias, which renames some
  * OTHER export into this name and would otherwise have read as an ordinary import.
  *
- * Bounded to `packages/app/src` and this package's `src` — see the header for what that leaves out.
+ * Bounded to `packages/codepuppy-app/src` and this package's `src` — see the header for what that leaves out.
  */
 function factoryMentionsIn(source: string) {
   const clean = withoutComments(source)
@@ -885,8 +885,8 @@ describe("Alpha route authority ratchet", () => {
     const sources = [...(await sourcesUnder(upstreamAppRoot)), ...(await sourcesUnder(sourceRoot))]
 
     expect(factoryNameSites(sources)).toEqual([
-      { path: "packages/app/src/pages/layout.tsx", mentions: ["imported", "applied"] },
-      { path: "packages/app/src/pages/layout/deep-links.ts", mentions: ["declared"] },
+      { path: "packages/codepuppy-app/src/pages/layout.tsx", mentions: ["imported", "applied"] },
+      { path: "packages/codepuppy-app/src/pages/layout/deep-links.ts", mentions: ["declared"] },
     ])
   })
 
@@ -913,7 +913,7 @@ describe("Alpha route authority ratchet", () => {
     // caught where it is CREATED.
     expect(deepLinkWiringIn(source).usage).toEqual({ listener: true, invoked: true, singleBinding: true })
     expect(factoryNameSites([{ path: upstreamLayoutFile, source }])).toEqual([
-      { path: "packages/app/src/pages/layout.tsx", mentions: ["aliased", "applied"] },
+      { path: "packages/codepuppy-app/src/pages/layout.tsx", mentions: ["aliased", "applied"] },
     ])
   })
 
@@ -943,7 +943,7 @@ describe("Alpha route authority ratchet", () => {
     // it is created.
     expect(deepLinkWiringIn(source).usage).toEqual({ listener: true, invoked: true, singleBinding: true })
     expect(factoryNameSites([{ path: upstreamLayoutFile, source }])).toEqual([
-      { path: "packages/app/src/pages/layout.tsx", mentions: ["aliased", "applied"] },
+      { path: "packages/codepuppy-app/src/pages/layout.tsx", mentions: ["aliased", "applied"] },
     ])
   })
 
@@ -965,7 +965,7 @@ describe("Alpha route authority ratchet", () => {
 
     expect(deepLinkWiringIn(source).usage).toEqual({ listener: true, invoked: true, singleBinding: true })
     expect(factoryNameSites([{ path: upstreamLayoutFile, source }])).toEqual([
-      { path: "packages/app/src/pages/layout.tsx", mentions: ["imported", "applied"] },
+      { path: "packages/codepuppy-app/src/pages/layout.tsx", mentions: ["imported", "applied"] },
     ])
   })
 
@@ -977,7 +977,7 @@ describe("Alpha route authority ratchet", () => {
     const source = `${await Bun.file(upstreamDeepLinkModule).text()}\nexport { createDeepLinkConsumer as buildConsumer }\n`
 
     expect(factoryNameSites([{ path: upstreamDeepLinkModule, source }])).toEqual([
-      { path: "packages/app/src/pages/layout/deep-links.ts", mentions: ["declared", "aliased"] },
+      { path: "packages/codepuppy-app/src/pages/layout/deep-links.ts", mentions: ["declared", "aliased"] },
     ])
   })
 
@@ -1006,7 +1006,7 @@ describe("Alpha route authority ratchet", () => {
           source: `export { createDeepLinkConsumer as buildConsumer } from "./deep-links"`,
         },
       ]),
-    ).toEqual([{ path: "packages/app/src/pages/layout/consumer-alias.ts", mentions: ["aliased"] }])
+    ).toEqual([{ path: "packages/codepuppy-app/src/pages/layout/consumer-alias.ts", mentions: ["aliased"] }])
   })
 
   test("the consumer detector bites when dispatch moves back into layout.tsx", () => {
@@ -1045,7 +1045,7 @@ describe("Alpha route authority ratchet", () => {
     ].join("\n")
 
     expect(factoryNameSites([{ path: upstreamLayoutFile, source }])).toEqual([
-      { path: "packages/app/src/pages/layout.tsx", mentions: ["imported", "applied"] },
+      { path: "packages/codepuppy-app/src/pages/layout.tsx", mentions: ["imported", "applied"] },
     ])
   })
 })

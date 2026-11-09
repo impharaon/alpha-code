@@ -10,7 +10,7 @@ import { trackDeepLinkRenderer } from "./deep-links"
 import { exportDebugLogs, write as writeLog } from "./logging"
 import { cspPlatformEligible } from "./platform"
 import { corsRelaxAllowed, createCodePuppyOriginRegistry, RENDERER_CSP } from "./renderer-security"
-import { withEngineRequestAuthorization, type EngineConnection } from "./engine-authorization"
+import { engineConnectionFor, withEngineRequestAuthorization, type EngineConnection } from "./engine-authorization"
 import { HTML_PREVIEW_SCHEME } from "../shared/html-preview"
 import { safeErrorName, safeRouteLabel } from "./renderer-diagnostic-redaction"
 import { getStore } from "./store"
@@ -84,6 +84,12 @@ const minZoomLevel = 0.2
  * 见 index.ts 的 doRespawnSidecar),renderer 会话的 onBeforeSendHeaders 据它给发往引擎源的请求补 Authorization。
  */
 let engineConnection: EngineConnection | undefined
+/** I8:每个就绪的 WSL 引擎的连接(带口令),按 WSL 服务 id;renderer 只拿到它的 `url`(wsl/servers.ts)。 */
+const wslEngineConnections = new Map<string, EngineConnection>()
+export function setWslEngineConnection(id: string, connection: EngineConnection | undefined) {
+  if (connection) wslEngineConnections.set(id, connection)
+  else wslEngineConnections.delete(id)
+}
 export function setEngineConnection(connection: EngineConnection) {
   engineConnection = connection
 }
@@ -228,7 +234,7 @@ export function createMainWindow() {
 
   win.webContents.session.webRequest.onBeforeSendHeaders((details, callback) => {
     // I8(`#1667`):renderer 不持有引擎口令;发往引擎源的请求由 main 在这里补 Authorization,别的源不补。
-    const requestHeaders = withEngineRequestAuthorization(details.url, details.requestHeaders, engineConnection) as typeof details.requestHeaders
+    const requestHeaders = withEngineRequestAuthorization(details.url, details.requestHeaders, engineConnectionFor(details.url, [engineConnection, ...wslEngineConnections.values()])) as typeof details.requestHeaders
     if (corsRelaxAllowed(details.url, process.platform, codepuppyOriginRegistry))
       upsertKeyValue(requestHeaders, "Access-Control-Allow-Origin", ["*"])
     callback({ requestHeaders })

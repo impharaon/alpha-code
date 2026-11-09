@@ -77,6 +77,7 @@ import {
   setBackgroundColor,
   setDockIcon,
   setEngineConnection,
+  setWslEngineConnection,
 } from "./windows"
 import { createWslServersController } from "./wsl/servers"
 import { registerWslIpcHandlers } from "./wsl/ipc"
@@ -530,6 +531,8 @@ const main = Effect.gen(function* () {
         log: (message, meta) => logger.log(message, meta),
         error: (message, meta) => logger.error(message, meta),
       },
+      // `#1667` I8:WSL 引擎的口令只留在 main,由 windows.ts 按源补头。
+      onEngineConnection: (id, connection) => setWslEngineConnection(id, connection),
     },
   )
   const stopSidecars = async () => {

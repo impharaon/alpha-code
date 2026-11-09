@@ -41,6 +41,28 @@ export function withEngineRequestAuthorization(
   return { ...next, Authorization: engineAuthorization(connection.password) }
 }
 
+/**
+ * I8(编排器 2026-11-09 补:WSL 引擎同样适用):main 持有不止一个引擎连接(本机 sidecar + 每个就绪的 WSL 引擎)。
+ * 按请求的源挑出那一个;一个都对不上 ⇒ undefined(不补头)。
+ */
+export function engineConnectionFor(requestUrl: string, connections: Iterable<EngineConnection | undefined>): EngineConnection | undefined {
+  let target: string
+  try {
+    target = new URL(requestUrl).origin
+  } catch {
+    return undefined
+  }
+  for (const connection of connections) {
+    if (!connection) continue
+    try {
+      if (new URL(connection.url).origin === target) return connection
+    } catch {
+      continue
+    }
+  }
+  return undefined
+}
+
 export function engineAuthorization(password: string): string {
   return `Basic ${Buffer.from(`opencode:${password}`).toString("base64")}`
 }

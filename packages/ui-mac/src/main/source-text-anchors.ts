@@ -200,7 +200,7 @@ export const DOWNGRADED_ANCHORS: Record<string, SourceTextEntry> = {
     lines: 1,
   },
   "packages/ui-mac/src/main/renderer-engine-auth.test.ts": {
-    why: "`#1667` 最后一条锚 index.ts 的 awaitInitialization 返回 rendererEngineView(res)、index.ts 在 sidecar 起来时 setEngineConnection(connection)、windows.ts 的 onBeforeSendHeaders 经 withEngineRequestAuthorization 补头(接口文档 I8)。两个不会让它变红的变异:①在 return 之前把 res 换成另一个带口令的对象(文本仍在);②onBeforeSendHeaders 算出补过头的对象却把原始 details.requestHeaders 交给 callback。index.ts 结构上进不了 bun、windows.ts 顶层 import electron;同文件前三条真执行投影与补头函数。",
+    why: "`#1667` 最后一条锚 index.ts 的 awaitInitialization 返回 rendererEngineView(res)、index.ts 在 sidecar 起来时 setEngineConnection(connection)、index.ts 把 WSL 引擎的连接经 onEngineConnection 交给 windows.ts、windows.ts 的 onBeforeSendHeaders 按源挑连接(engineConnectionFor)经 withEngineRequestAuthorization 补头(接口文档 I8)。两个不会让它变红的变异:①在 return 之前把 res 换成另一个带口令的对象(文本仍在);②onBeforeSendHeaders 算出补过头的对象却把原始 details.requestHeaders 交给 callback。index.ts 结构上进不了 bun、windows.ts 顶层 import electron;同文件前三条真执行投影与补头函数。",
     evidence: "#1667",
     lines: 2,
   },

@@ -60,6 +60,7 @@ export const { SessionContext } = await load("src/session/context.ts")
 export const { Location } = await load("src/location.ts")
 export const { Rpc } = await load("src/rpc.ts")
 export const { Mcp } = await load("src/mcp/index.ts")
+export const { Bus } = await load("src/bus.ts")
 export const { fromPromise } = await resolve("@opencode/plugin/promise/adapter")
 export const SchemaTool = (await resolve("@opencode/schema/tool")).Tool
 

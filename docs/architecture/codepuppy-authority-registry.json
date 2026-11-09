@@ -630,12 +630,43 @@
       ]
     },
     {
-      "id": "adr033-decision-receipt",
-      "decision": "Code Puppy owns the approval reply contract: admitted-request snapshot with sha256 fingerprint, a DecisionReceipt for every reply (including the requests it resolved), idempotent replies, 409 on a fingerprint mismatch, and persisted permission_request / permission_decision rows (#433 / REQ-090 AC3/AC8).",
+      "id": "adr033-receipt-premises",
+      "decision": "The OpenCode 2 engine facts Code Puppy's receipt derivation relies on stay true: a pending request's payload cannot change under its id, one reply emits a replied event for every request it resolves, and a second reply is NotFound (ruling item 1 measurements).",
       "adr": [
         "ADR-033"
       ],
-      "lane": "L4 (#1666) — needs orchestrator decision",
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/core/src/permission.ts",
+        "ladder": "upstream-native, pinned"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/permission-reply-premises.test.ts",
+          "name": "(i) a pending request's payload never changes under its id: a second admission with the same id is refused"
+        },
+        {
+          "file": "packages/ext/src/policy/permission-reply-premises.test.ts",
+          "name": "(ii) one always reply emits a replied event for every request it resolves, and only those"
+        },
+        {
+          "file": "packages/ext/src/policy/permission-reply-premises.test.ts",
+          "name": "(ii) a reject cascades to every pending request of the same session, each with its own replied event"
+        },
+        {
+          "file": "packages/ext/src/policy/permission-reply-premises.test.ts",
+          "name": "(iii) a second reply to the same id is NotFound: the engine keeps no reply history"
+        }
+      ]
+    },
+    {
+      "id": "adr033-decision-receipt",
+      "decision": "Code Puppy owns the approval reply contract: a sha256 fingerprint of the displayed request, a DecisionReceipt for every reply listing the requests it resolved, idempotent replay, and a 409 on a stale reply (#433 / REQ-090 AC3/AC8).",
+      "adr": [
+        "ADR-033"
+      ],
+      "lane": "L6 (#1668) per ruling item 1",
       "takeovers": [
         "packages/core/src/permission.ts",
         "packages/core/src/permission",
@@ -659,11 +690,9 @@
         "packages/client/src/generated/types.ts"
       ],
       "blocked": {
-        "reason": "OpenCode 2's permission kernel replies with 204 and keeps requests in memory; a plugin cannot change the reply route's response shape, add persistence, or bind replies to a fingerprint (permission domain exposes assert/list/get/reply/hook only; hook.evaluate changes effect/message only). The renderer's session-permission-feed.ts reads PermissionV2DecisionReceipt today.",
+        "reason": "Held by derivation in the L6 adapter (measurements passed, no kernel re-take; no production reader needs persisted history after a restart): spec in docs/architecture/2026-11-09-1662-permission-reply-measurements.md. Waiting on L6 to implement it.",
         "options": [
-          "(a) Re-take packages/core/src/permission.ts, packages/core/src/permission/** (+ a `_`-prefixed table migration), packages/server/src/handlers/permission.ts, packages/protocol/src/groups/permission.ts, packages/schema/src/permission.ts and port #433 (L3, large; Rule/Ruleset shape must stay — lane seams I9).",
-          "(b) Hold the user-visible part at L0 + L6: the renderer derives the resolved set from OpenCode 2's per-request permission.replied events; record that a fingerprint 409 is unreachable on 2.x (request ids are single-use, pending requests are in memory) and retire persisted receipts if no consumer remains — retirement needs the owner's words.",
-          "(c) Keep the decision open and land with this entry red (the switch cannot merge)."
+          "Register L6's adapter file and its tests (re-read 409, replied-event resolved set, decisionID cache, each with a known-bad arm) when #1668 lands."
         ]
       }
     },

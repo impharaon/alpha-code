@@ -8,11 +8,24 @@
 // fail depending on which unrelated test file's electron mock ran first. A namespace import always links;
 // tests mock THIS module (one function, a key set we own) and the real store logic runs on top of it.
 // Absent backend (no Electron, or a mock without safeStorage) ⇒ `undefined` ⇒ the store refuses (fail closed).
+//
+// `#1667`: and the import is LAZY (resolved on the first call, not when this module loads). An eager import — even a
+// namespace one — instantiates the REAL electron module in any test process that merely imports this module's
+// importers (codepuppy-config-injection → ext-disabled-injection → ext-curation-policy → remote-catalog →
+// package-installability → official-connector-recipes → here). The real module is CJS whose only export is the binary
+// path, so bun pins electron's export-name set to `{ default }`; every LATER test file's `mockElectron(...)` then
+// cannot add `app` & co., and their `import { app } from "electron"` fails to link ("Export named 'app' not found",
+// reported as an unhandled error between tests — seen when the config-injection tests run before
+// codepuppy-sidecar-wiring / sidecar-stop / server in one `bun test`). `createRequire` honors `mock.module` (probed),
+// and main's ESM bundle already carries the same createRequire shim (electron.vite.config.ts banner).
 
-import * as electron from "electron"
+import { createRequire } from "node:module"
+import type * as Electron from "electron"
 
-export type KeychainBackend = Pick<typeof electron.safeStorage, "isEncryptionAvailable" | "encryptString" | "decryptString">
+export type KeychainBackend = Pick<typeof Electron.safeStorage, "isEncryptionAvailable" | "encryptString" | "decryptString">
+
+const requireModule = createRequire(import.meta.url)
 
 export function keychainBackend(): KeychainBackend | undefined {
-  return electron.safeStorage
+  return (requireModule("electron") as typeof Electron).safeStorage
 }

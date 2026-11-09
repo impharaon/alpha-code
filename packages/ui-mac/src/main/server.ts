@@ -13,6 +13,8 @@ import { fileURLToPath } from "node:url"
 import * as electronNs from "electron"
 import type { Details } from "electron"
 import { resolveExtPluginPath } from "./codepuppy-ext-plugin"
+import { engineDatabasePath, engineGlobalConfigDirectory } from "./engine-paths"
+import { CHANNEL } from "./constants"
 import { getAuthIdentityTag } from "./codepuppy-auth"
 import { installationMachineId } from "./artifact-service"
 import { tryGetCodePuppyEnvironment } from "./codepuppy-environment"
@@ -528,7 +530,7 @@ export async function spawnLocalServer(
   // 不再依赖 syncSecretFiles 的落盘结果;留在这里是因为它必须晚于 preferAppEnv 的基线还原。
   applyWebSearchSovereignty()
 
-  // B6(=G1):解析 @codepuppy/ext bundle 路径,经 StartCommand 传 sidecar(不走 env,免动 A6 白名单)。
+  // B6(=G1):解析 @codepuppy/ext 插件目录,经 StartCommand 传 sidecar(不走 env,免动 A6 白名单)。
   // 缺文件 loud warn(anti-B11:否则表现为「codepuppy_ping 工具静默不在」);CODEPUPPY_EXT_DISABLE=1 静默跳过。
   const ext = resolveExtPluginPath({
     packaged: electronNs.app.isPackaged,
@@ -566,7 +568,7 @@ export async function spawnLocalServer(
     sidecarEnv.CODEPUPPY_POLICY_ACCOUNT = `acct:${createHash("sha256").update(`${installation}:${policyAccount}`).digest("hex")}`
   // #1578 AC5:随包扩展插件的清单(ext 构建写在 plugin.js 旁边:模块 sha256 + 自有工具名)。引擎只信这条 env 指的那份,
   // 不看被装载插件旁边有什么(packages/opencode/src/plugin/codepuppy-bundled-plugin.ts)。路径不是秘密。
-  if (ext.path) sidecarEnv.CODEPUPPY_EXT_BUNDLED_MANIFEST = join(dirname(ext.path), "bundled-tools.json")
+  if (ext.path) sidecarEnv.CODEPUPPY_EXT_BUNDLED_MANIFEST = join(ext.path, "bundled-tools.json")
   // REQ-137 `#1379`:这一代的 BYOK 放行集合。平台无关(代理只在 darwin 起,但「放行集合 = 这一代的配置」
   // 这条不该长两个样子),排在密钥文件落定之后、fork 之前。
   refreshConfiguredEgressDestinations(options.userDataPath)
@@ -714,6 +716,9 @@ export async function spawnLocalServer(
       password,
       userDataPath: options.userDataPath,
       initialDirectory: codepuppyUserWorkspaceDir(),
+      // `#1667`:会话库与全局配置目录由 main 算(与 db-safety / mcp-default-deny 同一推导),显式进 `start()` 的选项。
+      databasePath: engineDatabasePath({ packaged: electronNs.app.isPackaged, env: sidecarEnv, home: homedir(), channel: CHANNEL }),
+      configDirectory: engineGlobalConfigDirectory(sidecarEnv, homedir()),
       extPluginPath: ext.path,
       registryChannel,
       // REQ-159:profile 全文 + 模块路径。sidecar 在 import 引擎之前 apply;缺席(darwin)即拒绝启动。

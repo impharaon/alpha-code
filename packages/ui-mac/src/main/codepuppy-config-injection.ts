@@ -14,7 +14,6 @@
 
 import * as fs from "node:fs"
 import * as path from "node:path"
-import { parse as parseJsonc, type ParseError } from "jsonc-parser"
 // `#1299`(REQ-157):三个 alpha agent 的 description / prompt 是 alpha 的字,住在零依赖的
 // codepuppy-agents.ts,由 packages/ext 的登记簿 import 并声明上限;这里只取,不再内联字面量。
 import { CODEPUPPY_AGENT_TEXT } from "./codepuppy-agents"
@@ -70,13 +69,24 @@ import { USER_DATA_LAYOUT } from "./user-data-layout"
 // R1 Blocker 1)= v1 已写出、但 picker 唯一读取的 v2 目录缺席。两端的用户可见症状同为
 // 模型全灰,故一律 {ok:false} 上报 —— 不存在「可忽略的局部降级」。
 export type CodePuppyConfigInjectionFailure = { message: string; stack?: string }
-export type CodePuppyConfigInjectionResult = { ok: true } | { ok: false; error: CodePuppyConfigInjectionFailure }
+/**
+ * `#1667`(#1662 L5,基线 §2.7):注入产物不再写进环境变量 —— H1 下引擎核心不读 `OPENCODE_CONFIG_CONTENT` /
+ * `OPENCODE_CONFIG` / `OPENCODE_MODELS_PATH`(读它们的是不在路径上的上游 CLI 宿主)。结果里带着 sidecar 要放进
+ * `start()` 选项的三样:`config.content`、`config.file`、`models.file`(engine-server-options.ts)。
+ */
+export type CodePuppyConfigInjectionOutput = {
+  config: { content: string; file?: string }
+  models: { file?: string }
+}
+export type CodePuppyConfigInjectionResult = CodePuppyConfigInjectionOutput &
+  ({ ok: true } | { ok: false; error: CodePuppyConfigInjectionFailure })
 
 export function injectCodePuppyConfig(
   userDataPath: string,
   extPluginPath?: string,
   registryChannel?: ChannelName,
 ): CodePuppyConfigInjectionResult {
+  let file: string | undefined
   try {
     // REQ-059 G1:引擎经 OPENCODE_CONFIG 加载当前环境的 codepuppy.jsonc(mcp/plugin/
     // provider/治理键)。文件通道 → dispose 重建重读文件 = 安装免重启;merge 序 XDG 后(压 provider)/
@@ -89,11 +99,10 @@ export function injectCodePuppyConfig(
       if (!fs.existsSync(truth)) {
         fs.writeFileSync(truth, JSON.stringify({ $schema: "https://opencode.ai/config.json" }, null, 2))
       }
-      process.env.OPENCODE_CONFIG = truth
+      file = truth
     }
 
-    const existing = process.env.OPENCODE_CONFIG_CONTENT
-    const config = existing ? JSON.parse(existing) : { $schema: "https://opencode.ai/config.json" }
+    const config: Record<string, any> = { $schema: "https://opencode.ai/config.json" }
     // ADR-009 B1 的「平台代付」判据(云 MCP URL + 密钥文件同在)。caps 事实、云 MCP 注册与
     // web search 主权 deny 三处共用同一个判据,不许各算各的。`#1195` 起判据文件从
     // `CODEPUPPY_CLOUD_TOKEN`(错受众的 platform_access,只当在场性证据)换轴到
@@ -490,9 +499,8 @@ export function injectCodePuppyConfig(
       injectedMcpNames,
     })
 
-    process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify(config)
-    materializeV2EngineConfig(userDataPath, config, Boolean(models))
-    return { ok: true }
+    const modelsFile = models ? materializeGovernedModelsBase(userDataPath, config) : undefined
+    return { ok: true, config: { content: JSON.stringify(config), ...(file ? { file } : {}) }, models: modelsFile ? { file: modelsFile } : {} }
   } catch (error) {
     // #613:catch 保留(sidecar 照常起,候选形态③),但失败必须离开本进程:
     // warn 是 #607 反向闸门锁住的进程内出声,返回值是送往 main/renderer 的结构化事实。
@@ -500,28 +508,20 @@ export function injectCodePuppyConfig(
     return {
       ok: false,
       error: error instanceof Error ? { message: error.message, stack: error.stack } : { message: String(error) },
+      config: { content: JSON.stringify({}), ...(file ? { file } : {}) },
+      models: {},
     }
   }
 }
 
-// 2026-07-23 上游 sync 断层修补:v2 Config.Service(packages/core/config.ts)只读
-// `OPENCODE_CONFIG_DIR ?? ~/.config/opencode` 目录下的 opencode.json/opencode.jsonc 文件 ——
-// OPENCODE_CONFIG_CONTENT 与 OPENCODE_CONFIG(codepuppy.jsonc)它一概不读。而 picker 已切 v2
-// `/api/model`(model-contract.ts → catalog.model.available()),于是 v1 注入再成功,v2 目录里
-// 也没有 alpha/BYOK provider → 全部「当前不可用」。此桥把 v2 需要的最小子集物化成文件:
-//   opencode.json  ← codepuppy.jsonc 去掉 `provider` 键后的拷贝(先加载)。`#1392` 之前是原样拷贝,理由是「用户自定义节点住在
-//                    那里」;现在它们住在围栏写不到的真源里、经注入的 provider 表进 v2(下一行),而 v2 的 catalog 可用性
-//                    (packages/core/src/catalog.ts available())**不看 enabled_providers** —— 原样拷贝会让配置文件里的 provider
-//                    块(围栏内的引擎树写得了)直接出现在 picker 读的 v2 model.list 里。基线 I1:配置文件的 provider.* 不参与注入面。
-//   opencode.jsonc ← { $schema, model, provider }(注入的 provider 表,后加载压过用户同名项)
-// 并设 OPENCODE_CONFIG_DIR 指向该 alpha 自有目录。v1 加载读的是 Global.Path.config 静态路径,
-// 不受此 env 影响;推理仍走 v1(有 {file:}/{env:} 解析),故 v2 文件一律剥掉 apiKey —— v2 无
-// 变量解析,catalog 可用性判定也不需要 key(no-integration 路径)。
-// 失败不自吞(#613 R1 Blocker 1):picker 只经 v2 目录读模型,桥失败(磁盘满/权限/目录不可写)
-// = alpha/BYOK 模型全灰 = 票面事故症状,「只损失 v2 目录」不是可忽略的局部降级 —— 桥内不设
-// catch,抛错经 injectCodePuppyConfig 外层 catch 以 {ok:false} 离开进程。桥排在
-// OPENCODE_CONFIG_CONTENT 写出**之后**,抛错不撤销已就位的 v1 注入
-// (顺序由反向闸门锁死:codepuppy-config-injection.test.ts 的 v2 桥用例)。
+// #857:Code Puppy 的模型治理生效时,注入的 provider 表已经描述了每一个可用的内置 provider / 模型。让 ModelsDev 落回随包快照,
+// 第一次请求还要先解码并物化 6,132 条无关条目(签名打包矩阵里 2.8-6.1 s)。所以从**同一份**投影机械地物化一份最小的
+// models.dev 底表,经 `start()` 的 `models.file` 交给引擎(`#1667`;v1 时代经 `OPENCODE_MODELS_PATH`)。投影里缺了某个已启用的
+// 用户 / 文件 provider 时 governedModelsBase 返回 {}、不带就绪标记 —— 这时不给文件,保留保守的晚到屏障,而不是先露出半套。
+// 空底表也必须不给:ModelsDev 把磁盘上的 `{}` 当作有值,会绕过随包快照。这里不读也不写任何 key 字段。
+// CODEPUPPY_MODELS_DISABLE 仍是真逃生门:那时根本不进这里。
+// (2026-07-23 为 v2 读侧另写 `OPENCODE_CONFIG_DIR/opencode.json(c)` 的半代次桥已随 `#1667` 删除,清点表 C4:只剩一个代次,
+// 配置只写一份,就是上面的注入。)
 type V1ProjectedModel = { name?: unknown }
 type V1ProjectedProvider = {
   name?: unknown
@@ -594,74 +594,18 @@ function governedModelsBase(config: { enabled_providers?: unknown; provider?: un
   return base
 }
 
-/** codepuppy.jsonc 解析后去掉 `provider` 键(见 v2 桥抬头);缺失 / 读失败 / 解析不出 / 不是对象 ⇒ undefined(调用方清掉旧拷贝)。 */
-function codepuppyJsoncWithoutProviders(): Record<string, unknown> | undefined {
-  let text: string
-  try {
-    text = fs.readFileSync(codepuppyJsoncPath(), "utf8")
-  } catch {
+function materializeGovernedModelsBase(
+  userDataPath: string,
+  config: { enabled_providers?: unknown; provider?: unknown },
+): string | undefined {
+  const dir = path.join(userDataPath, USER_DATA_LAYOUT.engineConfig)
+  const modelsPath = path.join(dir, "models.json")
+  const base = governedModelsBase(config)
+  if (!Object.keys(base).length) {
+    fs.rmSync(modelsPath, { force: true })
     return undefined
   }
-  const errors: ParseError[] = []
-  const parsed: unknown = parseJsonc(text, errors, { allowTrailingComma: true })
-  if (errors.length || !parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined
-  const { provider: _provider, ...rest } = parsed as Record<string, unknown>
-  return rest
-}
-
-function materializeV2EngineConfig(
-  userDataPath: string,
-  config: { model?: unknown; enabled_providers?: unknown; provider?: unknown },
-  governedModels: boolean,
-) {
-  const dir = path.join(userDataPath, USER_DATA_LAYOUT.engineConfig)
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
-  const userCopy = path.join(dir, "opencode.json")
-  const stripped = codepuppyJsoncWithoutProviders()
-  if (stripped === undefined) fs.rmSync(userCopy, { force: true }) // 无真源(或读不出)则清掉旧拷贝,不留陈尸
-  else fs.writeFileSync(userCopy, `${JSON.stringify(stripped, null, 2)}\n`, { mode: 0o600 })
-  const provider: Record<string, unknown> = Object.fromEntries(
-    Object.entries((config.provider ?? {}) as Record<string, { options?: Record<string, unknown> }>).map(
-      ([id, def]) => {
-        const { apiKey: _apiKey, ...options } = def.options ?? {}
-        return [id, { ...def, ...(Object.keys(options).length ? { options } : { options: undefined }) }]
-      },
-    ),
-  )
-  provider[CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID] = {
-    name: "Code Puppy catalog readiness marker",
-    env: [],
-  }
-  const v2 = {
-    $schema: "https://opencode.ai/config.json",
-    ...(typeof config.model === "string" ? { model: config.model } : {}),
-    provider,
-  }
-  fs.writeFileSync(path.join(dir, "opencode.jsonc"), JSON.stringify(v2, null, 2), { mode: 0o600 })
-  process.env.OPENCODE_CONFIG_DIR = dir
-
-  // #857:when Code Puppy model governance is active, every available built-in provider/model is already
-  // described by the provider projection above. Letting ModelsDev fall through to the bundled
-  // snapshot still makes the first V2 request decode and materialize 6,132 unrelated rows before
-  // ConfigProvider commits (2.8-6.1s in the signed packaged matrix). Materialize a minimal ModelsDev
-  // base mechanically from that SAME projection so the earlier ModelsDevPlugin commit carries the
-  // exact governed identities and readiness marker. ConfigProvider remains authoritative for the
-  // richer late metadata/variants. If an enabled user/file provider is absent from this in-memory
-  // projection, governedModelsBase returns {} WITHOUT the marker, preserving the conservative late
-  // barrier instead of exposing a partial first set. An empty base must also leave
-  // OPENCODE_MODELS_PATH unset: ModelsDev treats an on-disk `{}` as truthy and would otherwise
-  // short-circuit its bundled snapshot instead of reaching the conservative late barrier. No key
-  // field is read or written here.
-  // Preserve CODEPUPPY_MODELS_DISABLE as a real escape hatch by leaving any inherited path untouched.
-  if (governedModels) {
-    const modelsPath = path.join(dir, "models.json")
-    const base = governedModelsBase(config)
-    if (Object.keys(base).length) {
-      fs.writeFileSync(modelsPath, `${JSON.stringify(base, null, 2)}\n`, { mode: 0o600 })
-      process.env.OPENCODE_MODELS_PATH = modelsPath
-    } else {
-      fs.rmSync(modelsPath, { force: true })
-      delete process.env.OPENCODE_MODELS_PATH
-    }
-  }
+  fs.writeFileSync(modelsPath, `${JSON.stringify(base, null, 2)}\n`, { mode: 0o600 })
+  return modelsPath
 }

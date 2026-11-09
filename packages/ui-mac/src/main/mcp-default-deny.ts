@@ -5,15 +5,15 @@
 // `#1381`:codepuppy.jsonc 自己的 `type:"remote"` 条目同样压成 `{enabled:false}`(除非它正是本轮从真源注入的名字)——
 // 见函数体内的说明。
 //
-// `OPENCODE_CONFIG_DIR` 会在同一 fork 尾部被 v2 bridge 改指 alpha 自有目录,不能拿它做枚举
-// 真源。这里镜像 core Global.Path.config 使用的 xdg-basedir 规则:
-// `XDG_CONFIG_HOME || ~/.config`,再拼 `opencode`。读取/解析逐文件 best-effort,任何坏文件只
+// `#1667`:枚举的目录 = sidecar 经 `start()` 的 `config.directory` 交给引擎的那一个(engine-paths.ts 的
+// engineGlobalConfigDirectory,同一个函数)。读取/解析逐文件 best-effort,任何坏文件只
 // loud 跳过自身,不得把 sidecar 上方已经完成的 provider/identity/permission 注入一起炸掉。
 
 import { readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { parse, type ParseError } from "jsonc-parser"
+import { engineGlobalConfigDirectory } from "./engine-paths"
 
 const GLOBAL_CONFIG_FILES = ["config.json", "opencode.json", "opencode.jsonc"]
 
@@ -23,7 +23,7 @@ export function injectMcpDefaultDeny(
   config: Config,
   options: {
     codepuppyConfigPath: string
-    /** 仅测试/隔离注入;生产缺省严格镜像 Global.Path.config,绝不看 OPENCODE_CONFIG_DIR。 */
+    /** 仅测试/隔离注入;生产缺省 = engineGlobalConfigDirectory(引擎真正读的全局配置目录)。 */
     userConfigDir?: string
     /** 本轮 injectCodePuppyConfig 新放入 config.mcp 的名称;不得把继承 env 当成治理来源。 */
     injectedMcpNames?: Iterable<string>
@@ -37,9 +37,7 @@ export function injectMcpDefaultDeny(
     const readFile = options.readFile ?? ((file: string) => readFileSync(file, "utf8"))
     const alpha = readConfig(options.codepuppyConfigPath, "alpha", readFile, logError)
     const codepuppyMcp = asRecord(alpha?.mcp)
-    const userConfigDir =
-      options.userConfigDir ??
-      join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "opencode")
+    const userConfigDir = options.userConfigDir ?? engineGlobalConfigDirectory(process.env, homedir())
     const globalMcp = GLOBAL_CONFIG_FILES.map((name) =>
       readConfig(join(userConfigDir, name), "user-global", readFile, logError),
     )

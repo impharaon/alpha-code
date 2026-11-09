@@ -2,6 +2,7 @@ import * as fs from "node:fs"
 import { registerHooks } from "node:module"
 import * as http from "node:http"
 import * as tls from "node:tls"
+import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 // #607:注入组合体住在自己的模块里 —— 本文件的第一个 import(registerHooks)与顶层
 // getParentPort() 让 sidecar.ts 无法被测试 import,注入因此长期零覆盖。见 codepuppy-config-injection.ts。
@@ -12,15 +13,15 @@ import { buildReadyMessage, type SidecarReadyMessage } from "./sidecar-ready-mes
 // #858:停止命令的形状与执行住在 sidecar-stop.ts —— 本文件顶层的
 // registerHooks / getParentPort() 让它无法被测试 import(与 #607 同因),真判据必须在可 import
 // 的模块里跑(见 sidecar-stop.test.ts)。
-import {
-  parseSidecarStopCommand,
-  stopSidecarListener,
-  type SidecarStopCommand,
-  type StoppableListener,
-} from "./sidecar-stop"
+import { parseSidecarStopCommand, stopSidecarEngine, type SidecarStopCommand, type StoppableEngine } from "./sidecar-stop"
 import type { ChannelName } from "./catalog-channels"
 import { prewarmInitialLocation } from "./sidecar-location-prewarm"
-import { publishInProcessEngine } from "./in-process-engine"
+import { publishInProcessEngine, type EngineFetch } from "./in-process-engine"
+// `#1667`(#1662 L5):OpenCode 2 嵌入 —— 选项对象、口令包装、ext 就绪判定各住在可 import 的模块里(本文件顶层副作用让它
+// 无法被测试 import),真判据见 engine-server-options.test.ts、sidecar-engine-host.test.ts、sidecar-ext-ready.test.ts。
+import { buildEngineServerOptions, engineDesktopToggles } from "./engine-server-options"
+import { withEngineAuthorization } from "./engine-authorization"
+import { assertExtPluginActive } from "./sidecar-ext-ready"
 // REQ-159 `#1321`:进程围栏。本进程在 import 引擎之前把自己关进 seatbelt,之后派生的一切继承。
 // profile 由 main 渲染 + 试编译(process-fence-plan.ts),这里原样 apply;装不上 = 本进程不起
 // (fail-closed,原因经 error IPC 报给 main)。判据在 process-fence-apply.test.ts(真 .node / 真 seatbelt /
@@ -77,8 +78,15 @@ type StartCommand = {
   port: number
   password: string
   userDataPath: string
-  /** B6(=G1):@codepuppy/ext 自包含 bundle 的绝对路径(main 解析,见 codepuppy-ext-plugin.ts);缺省不装载。 */
+  /**
+   * B6(=G1):@codepuppy/ext 的插件**目录**绝对路径(main 解析,见 codepuppy-ext-plugin.ts;2.x 只装目录形式的本地插件,
+   * 入口 `server.js`)。缺席 = 不装 ext ⇒ sidecar 拒绝报 ready(I4,sidecar-ext-ready.ts)。
+   */
   extPluginPath?: string
+  /** `#1667`:引擎会话库的绝对路径(main 用 engine-paths.ts 的 engineDatabasePath 算,与 db-safety 同一推导)。 */
+  databasePath: string
+  /** `#1667`:引擎全局配置目录(main 用 engine-paths.ts 的 engineGlobalConfigDirectory 算)。 */
+  configDirectory: string
   /** #397 override 注入用的 catalog 通道。必须由 main 从冻结环境快照取好传入 —— 本进程从不跑
    *  initCodePuppyEnvironment,在这里调 catalogRegistryChannel() 会抛,且曾把整个 injectCodePuppyConfig
    *  连同 provider 注入一起炸掉(2026-07-23 打包端「全模型当前不可用」事故)。缺省 = loud 跳过
@@ -109,11 +117,8 @@ type ParentPort = {
   on(event: "message", listener: (event: { data: unknown }) => void): void
 }
 
-type Listener = StoppableListener
-
 const parentPort = getParentPort()
-let listener: Listener | undefined
-let engine: Parameters<typeof stopSidecarListener>[1]
+let engine: StoppableEngine | undefined
 
 parentPort.on("message", (event) => {
   const command = parseCommand(event.data)
@@ -136,54 +141,61 @@ async function start(command: StartCommand) {
     // 走下面的 catch:error IPC + exit(1),main 据此宣告这一代失败(响亮,不静默降级成无围栏服务)。
     installProcessFence(command)
     // #613:注入结果必须捕获并随 ready 上报 —— 注入失败 = 引擎起来了但整份 alpha 配置丢失
-    // (模型全灰),不上报则 main/renderer 无从与「引擎未就绪」区分。
-    const injection = prepareSidecarEnv(
-      command.password,
-      command.userDataPath,
-      command.extPluginPath,
-      command.registryChannel,
-    )
+    // (模型全灰),不上报则 main/renderer 无从与「引擎未就绪」区分。`#1667`:注入不再经环境变量交给引擎
+    // (H1 下引擎核心不读 `OPENCODE_CONFIG_CONTENT` 一类变量),结果里带着要放进 `start()` 选项的配置。
+    const injection = prepareSidecarEnv(command.userDataPath, command.extPluginPath, command.registryChannel)
     ensureLoopbackNoProxy()
     useSystemCertificates()
+    // 裁决书 R15 ④ / L1a armC 对 armCraw:必须在 import 引擎之前,否则 2.x 的模型请求绕开 HTTPS_PROXY 直连,在围栏下 DNS 失败。
     useEnvProxy()
-    const { Server } = await import("virtual:opencode-server")
-    // REQ-234 `#1531`(审计 R1 Major 1):把引擎**进程内**的 app.fetch 交给 ext(与下面 prewarm 同一调用方式,不经 TCP)。
-    // 围栏只放行出网代理端口,ext 拿到的 input.client 在引擎监听后走 TCP 连自己 —— 出货形态下被拒,重载调度器就永远查不到
-    // 会话状态、零 dispose。交接点与判据见 in-process-engine.ts / process-fence-engine.test.ts 的 #1531 三臂。
-    engine = { fetch: (request) => Server.Default().app.fetch(request), password: command.password }
-    publishInProcessEngine(engine.fetch)
+    const { startEngine, ENGINE_VERSION } = await import("virtual:opencode-server")
     // REQ-234 `#1531`:@codepuppy/ext 在**模块装载时**挂 parentPort 监听(定制中心桥 + 重载调度器),而 main 只在 ready
-    // 那一刻重发排队的重载代际。引擎要等第一个 v1 实例初始化插件才 import 它 —— 常常晚于 ready,那一批就丢了。这里先 import
-    // 引擎稍后要 import 的**同一个 URL**(引擎解析路径插件 = pathToFileURL(path).href;ESM 按 URL 缓存 ⇒ 同一个模块记录、
-    // 同一份调度器),ready 之前它一定已经在听。失败只记一行、不拦 ready:引擎稍后照常再装载一次,结局由它报。
+    // 那一刻重发排队的重载代际。引擎要等某个 Location 装插件时才 import 它 —— 常常晚于 ready,那一批就丢了。所以在
+    // `start()` 之前先预载 ext 的入口(I2;2.x 每个 Location 用带 `__opencode_reload` 的新 URL 各求值一次,进程级对象
+    // 由 ext 挂在 globalThis 上复用,不靠同一个 URL)。失败只记一行:是否装上由下面的 I4 判定说了算。
     const extPreload = command.extPluginPath
-      ? import(pathToFileURL(command.extPluginPath).href).then(
+      ? import(pathToFileURL(join(command.extPluginPath, "server.js")).href).then(
           () => undefined,
           (error: unknown) => console.warn("@codepuppy/ext preload before ready failed — reload requests re-sent at ready may be lost", error),
         )
       : Promise.resolve()
 
-    // Start the real per-location graph through the embedded server's authenticated in-process app
-    // before socket-listen finishes. Code Puppy's strict generated-output patch pins the fixed Electron
-    // listener to this app's routes and memo map, so the marker and real model handler settle before
-    // the renderer's first V2 model call. Start the request before
-    // listen so both builds progress in parallel, but do not publish ready until the local prewarm
-    // settles:starting the renderer earlier starves the graph build enough to miss #857's 2 s gate.
-    const prewarm = prewarmInitialLocation(Server.Default().app, command.initialDirectory, {
-      password: command.password,
-    })
+    // 裁决书 R13 / N1:`start()` + `Transform`,不传 lifecycle。REQ-234 `#1531`(I1):`Transform` 那一刻同步发布进程内 fetch
+    // —— 监听端口那张应用图的 dispatch app,外面包一层补口令。围栏拒掉连自己回环端口的连接,ext 只能走这一条。
+    let inProcess: EngineFetch | undefined
+    const toggles = engineDesktopToggles(process.env)
+    const started = await startEngine(
+      buildEngineServerOptions({
+        hostname: command.hostname,
+        port: command.port,
+        password: command.password,
+        engineVersion: ENGINE_VERSION,
+        databasePath: command.databasePath,
+        configDirectory: command.configDirectory,
+        config: injection.config,
+        models: { file: injection.models.file, fetch: toggles.modelsFetch },
+        filewatcher: toggles.filewatcher,
+        platform: process.platform,
+      }),
+      {
+        onDispatch: (dispatch) => {
+          inProcess = withEngineAuthorization(dispatch, command.password)
+          publishInProcessEngine(inProcess)
+        },
+      },
+    )
+    engine = started
+    const fetch = inProcess!
 
-    listener = await Server.listen({
-      port: command.port,
-      hostname: command.hostname,
-      username: "opencode",
+    // #857:在 renderer 第一次要模型之前,经进程内 fetch 把初始 Location 与模型目录拉起来;不论结局都随 ready 上报(#881)。
+    const prewarmResult = await prewarmInitialLocation({ request: fetch }, command.initialDirectory, {
       password: command.password,
-      cors: ["oc://renderer"],
     })
-    const prewarmResult = await prewarm
     await extPreload
     if (prewarmResult.outcome === "ready") console.log("initial governed catalog location prewarmed")
     else console.warn("initial governed catalog location prewarm did not become ready", prewarmResult)
+    // I4(裁决书 R22):ext 在初始目录上没装上 = 那里没有 Code Puppy 的执行闸 ⇒ 不报 ready,走下面同一条 fail-closed 路。
+    await assertExtPluginActive(fetch, command.initialDirectory, command.extPluginPath)
     parentPort.postMessage(buildReadyMessage(injection, prewarmResult))
   } catch (error) {
     parentPort.postMessage({ type: "error", error: serializeError(error) })
@@ -193,9 +205,8 @@ async function start(command: StartCommand) {
 
 async function stop() {
   try {
-    await stopSidecarListener(listener, engine)
+    await stopSidecarEngine(engine)
   } finally {
-    listener = undefined
     engine = undefined
     parentPort.postMessage({ type: "stopped" })
     setImmediate(() => process.exit(0))
@@ -220,16 +231,13 @@ function installProcessFence(command: StartCommand) {
 }
 
 function prepareSidecarEnv(
-  password: string,
   userDataPath: string,
   extPluginPath?: string,
   registryChannel?: ChannelName,
 ): CodePuppyConfigInjectionResult {
-  Object.assign(process.env, {
-    OPENCODE_SERVER_USERNAME: "opencode",
-    OPENCODE_SERVER_PASSWORD: password,
-    XDG_STATE_HOME: process.env.XDG_STATE_HOME ?? userDataPath,
-  })
+  // `XDG_*` 必须在 import 引擎之前定好:上游在模块装载时就按它们算全局根目录(`@opencode/util/global-roots`,裁决书 N4)。
+  // 口令不再进本进程环境(I1):ext 走进程内 fetch,包装层补口令;环境里的值会被引擎派生的每个 shell / MCP 子进程继承。
+  process.env.XDG_STATE_HOME = process.env.XDG_STATE_HOME ?? userDataPath
   return injectCodePuppyConfig(userDataPath, extPluginPath, registryChannel)
 }
 
@@ -283,6 +291,8 @@ function parseCommand(value: unknown): SidecarCommand | undefined {
   if (typeof command.password !== "string") return
   if (typeof command.userDataPath !== "string") return
   if (typeof command.initialDirectory !== "string") return
+  if (typeof command.databasePath !== "string") return
+  if (typeof command.configDirectory !== "string") return
   const fence = parseFence(command.fence)
   return {
     type: "start",
@@ -291,6 +301,8 @@ function parseCommand(value: unknown): SidecarCommand | undefined {
     password: command.password,
     userDataPath: command.userDataPath,
     initialDirectory: command.initialDirectory,
+    databasePath: command.databasePath,
+    configDirectory: command.configDirectory,
     ...(fence ? { fence } : {}),
     ...(typeof command.extPluginPath === "string" ? { extPluginPath: command.extPluginPath } : {}),
     ...(command.registryChannel === "stable" ||

@@ -151,7 +151,8 @@ const getBase = (appId: string): Configuration => ({
       // main 经 CODEPUPPY_EXT_BUNDLED_MANIFEST 指给引擎;漏了它不会红在打包,而是自有工具全部按第三方插件显示。
       from: "../ext/dist/",
       to: "codepuppy-ext/",
-      filter: ["plugin.js", "*.wasm", "bundled-tools.json"],
+      // `#1667`:2.x 只装目录形式的本地插件,目录入口是 `server.js`(L3 的构建产出);<resources>/codepuppy-ext 整个目录交给引擎。
+      filter: ["server.js", "plugin.js", "*.wasm", "bundled-tools.json"],
     },
     {
       // S17 T3(C17):构建期生成的 DB 迁移支持面清单(scripts/gen-db-expected.ts,prebuild 保证新鲜)。

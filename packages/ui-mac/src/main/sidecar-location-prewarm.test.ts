@@ -67,18 +67,18 @@ describe("sidecar initial location prewarm", () => {
   })
 
   // 分类与「这处锚守不住什么」登记在 ./source-text-anchors.ts(`#968` 第 ⑤ 层机械校验)。
-  test("ANCHOR (not a gate): production starts prewarm before listen and withholds ready until it settles", () => {
+  // `#1667`:2.x 的 `start()` 先绑端口、建好应用图才返回(没有 v1 那种「先 prewarm 再 listen」的两套图可抢);prewarm 改在
+  // start() 之后、经进程内 fetch 打同一张图,ready 仍压在它之后(#881:结局随 ready 上车)。
+  test("ANCHOR (not a gate): production prewarms through the in-process fetch after start() and withholds ready until it settles", () => {
     const source = readFileSync(import.meta.dir + "/sidecar.ts", "utf8")
-    const start = source.indexOf("const prewarm = prewarmInitialLocation(")
-    const listen = source.indexOf("listener = await Server.listen(")
-    const settled = source.indexOf("const prewarmResult = await prewarm")
+    const started = source.indexOf("const started = await startEngine(")
+    const settled = source.indexOf("const prewarmResult = await prewarmInitialLocation({ request: fetch }, command.initialDirectory")
     // #881:prewarm 的结局整体随 ready 上车,所以锚跟着换成两参形态(值真的上车的判据在
     // sidecar-ready-message.test.ts,这里只锁 bun 跑不到的接线顺序)。
     const ready = source.indexOf("parentPort.postMessage(buildReadyMessage(injection, prewarmResult))")
 
-    expect(start).toBeGreaterThanOrEqual(0)
-    expect(listen).toBeGreaterThan(start)
-    expect(settled).toBeGreaterThan(listen)
+    expect(started).toBeGreaterThanOrEqual(0)
+    expect(settled).toBeGreaterThan(started)
     expect(ready).toBeGreaterThan(settled)
   })
 

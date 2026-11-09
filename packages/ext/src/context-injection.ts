@@ -1,32 +1,29 @@
 // context-injection — REQ-157 `#1284`:Code Puppy 往模型上下文里塞的每一段文字,都在这里登记并声明上限。
 //
-// 问题(票面 2026-09-08 实读):ext 至少从四处把 alpha 自己写的文字送进模型上下文 ——
-//   · `codepuppy-prompts.ts` 经 config hook 写 `cfg.command.*.template` / `cfg.agent.*.prompt|description`
-//     (引擎:`command/index.ts:98` 把 template 当用户回合;`agent/agent.ts:277` 的 prompt 在
-//     `llm/request.ts:64` **整段顶替**底座提示词);
-//   · `prompt-rebrand.ts` 经 `experimental.chat.system.transform` 改写 system 段(`to` 侧是 alpha 的字);
-//   · `factory-deny.ts` 经 config hook 写被禁技能的占位 command(description + 含技能名的 template);
-//   · `plugin.ts` 的 `tool()` —— description 与每个参数的 describe() 逐字进每次请求的工具表
-//     (`tool/registry.ts:161`)。
-// 四处都没有长度上限,也没有一处能列全「塞了什么、各多大」。这文件就是那一处。
+// ext 把 alpha 自己写的文字送进模型上下文的通路(`#1665` 起是 OpenCode 2 的插件 Context,`packages/plugin/src/promise/`):
+//   · `codepuppy-prompts.ts` 经 `agent.transform` 写 agent 的 `system` / `description`(agent 有自己的 system 时上游不再跑
+//     底座,`packages/core/src/session/model-request.ts`),经 `command.transform` 注册命令 —— 执行时把模板当用户回合发出;
+//   · `prompt-rebrand.ts` 经 `session.hook.context` 改写 system 段(`to` 侧是 alpha 的字);
+//   · `factory-deny.ts` 经 `command.transform` 注册被禁技能的占位命令(description + 含技能名的模板);
+//   · `codepuppy-tools.ts` / `hub-tools.ts` 经 `tool.transform` 注册工具 —— description 与每个入参的 description 逐字进每次请求的工具表;
+//   · `cloud-vision-hooks.ts` 经 `session.hook.context` 把图换成识图块、追加 system 说明;`plugin.ts` 在 `tool.hook["execute.after"]`
+//     里把过不了契约的云工具结果换成一句登记过的拒绝。
+// 这文件就是能列全「塞了什么、各多大」的那一处。
 //
 // 三条纪律(每条都有判据钉着,见 context-injection.test.ts):
 //   1. **登记即校验,超限即抛,绝不裁剪**(AC2)。`defineText/defineTemplate/defineRebrand` 在模块装载时
 //      量 UTF-8 字节数,超过声明的 `maxBytes` 直接 throw。本模块被 plugin.ts import ⇒ 超限的片段让整个
-//      ext 装不上(上游 `plugin/index.ts:237` 记 `failed to load plugin` 后继续),而不是悄悄截掉一段
-//      发出去。这个状态在出货代码里到不了:ext 单测、库存快照测试、codepuppy-check 第 [12/12] 步三道门
-//      都会先红。
-//   2. **咽喉在测试,不在散文**(AC1)。「到达上下文的通路」从 `packages/plugin/src/index.ts` 的
-//      `Hooks` 接口派生 —— 那是插件能碰引擎的**全部**方式。`HOOK_CONTEXT_CLASS` 给接口的每一个键分类;
-//      测试把接口键集与分类键集比对(上游新增钩子即红),再把真 CodePuppyExt 实现了的「载上下文」钩子
-//      逐个过咽喉:config 钩子跑完之后 cfg 里每一个字符串叶子都必须能被本登记簿解释(登记的文字、
-//      模板的渲染实例、或声明过的**引用**);system.transform 的输出必须逐字等于「输入 + 登记过的
-//      替换」;工具表里每个 description 都必须是登记项。绕过登记簿的注入 = 解释不了的叶子 = 红。
+//      ext 装不上(2.x 记该插件 failed,sidecar 据此不报 ready),而不是悄悄截掉一段发出去。这个状态在出货代码里到不了:
+//      ext 单测、库存快照测试、codepuppy-check 第 [12/12] 步三道门都会先红。
+//   2. **咽喉在测试,不在散文**(AC1)。「到达上下文的通路」从 2.x 插件 Context 的钩子与 transform 派生 —— 那是插件能碰
+//      引擎的**全部**方式。`HOOK_CONTEXT_CLASS` 给每一个分类;测试把源码解析出的键集与分类键集比对(上游新增即红),
+//      再把真 CodePuppyExt 实现了的「载上下文」通路在真插件宿主里逐个过咽喉:transform 写进去的每一个字符串都必须能被
+//      本登记簿解释(登记的文字、模板的渲染实例、或声明过的**引用**);system 段的输出必须逐字等于「输入 + 登记过的替换」;
+//      工具表里每个 description 都必须是登记项。绕过登记簿的注入 = 解释不了的字 = 红。
 //   3. **计量单位是 UTF-8 字节,只此一种。** 不引入分词器(仓内没有,票面也不要精确 token);
 //      字节 → token 的换算与编码器有关、本仓未实测,库存里不打印 token 数。
 //
-// 「引用」不是文字:`cfg.shell`(wrapper 路径)、`cfg.skills.paths`(目录)、`cfg.permission.skill.*`
-// (`"deny"` 动词)、`cfg.mcp.*`(main 经 env 交来的 server 定义)—— 它们让引擎去别处装东西,
+// 「引用」不是文字:`mcp.*`(main 经 env 交来的 server 定义、项目 MCP)以及 ui-mac 写的路径 / id / 模型菜单 —— 它们让引擎去别处装东西,
 // 装进来的内容是用户/出厂技能/远端 server 的,预算归上游,不归本登记簿。它们仍然**必须**在这里
 // 声明,否则 config 咽喉会把它们当成解释不了的叶子拦下 —— 声明的意义是「我知道这条通路存在」。
 //
@@ -349,6 +346,11 @@ export const TOOL_TEXT = {
   },
 } as const
 
+/** `#1665`:云工具结果过不了契约时,换进工具结果的那一句(2.x 的 execute.after 不允许失败,不能像 v1 那样抛)。 */
+export const CLOUD_CONTRACT_REFUSED_ID = "cloud-contract.refused"
+export const CLOUD_CONTRACT_REFUSED_TEMPLATE =
+  "{name} returned a result this app cannot verify against its contract; it was discarded. Do not rely on it — tell the user the cloud tool needs an app update."
+
 export const CLOUD_ACCESS_LOGIN_HINT = "在 CodePuppy 左侧栏账户区点「登录」,或打开定制中心的云端页点登录;登录完成后下一条消息起云端工具可用。"
 
 /** REQ-067 被禁技能的占位 command(`factory-deny.ts` 从这里取)。 */
@@ -399,9 +401,6 @@ export const VISION_FAILURE_TEXT: Readonly<Record<VisionFailureKind, string>> = 
 })
 export const VISION_TOOL_REFUSED_ID = "vision.tool.refused"
 export const VISION_TOOL_REFUSED_TEXT = "这张图片无法识别"
-/** `#1447` R1 m4:历史里 `codepuppy_vision` 调用的 `input.image` 若已被原地改写成 base64 本体,回放给模型时换成这一句(原引用已知时用原引用)。 */
-export const VISION_TOOL_INPUT_OMITTED_ID = "vision.tool.input-omitted"
-export const VISION_TOOL_INPUT_OMITTED_TEXT = "(图片数据已省略)"
 export const VISION_SYSTEM_NOTE_ID = "vision.system-note"
 /** `{name}` = 云端识图工具在引擎里的 id(`codepuppy_vision`,由 CODEPUPPY_CLOUD_MCP_SERVER 拼出,不写死)。 */
 export const VISION_SYSTEM_NOTE_TEMPLATE =
@@ -417,7 +416,6 @@ function visionFragments(): (TextFragment | TemplateFragment | WrapperFragment)[
       defineTemplate({ id: visionFailureId(kind), sink: "vision-block", template: VISION_FAILURE_TEXT[kind], maxBytes: CAP_DESCRIPTION }),
     ),
     defineText({ id: VISION_TOOL_REFUSED_ID, sink: "vision-block", text: VISION_TOOL_REFUSED_TEXT, maxBytes: CAP_DESCRIPTION }),
-    defineText({ id: VISION_TOOL_INPUT_OMITTED_ID, sink: "vision-block", text: VISION_TOOL_INPUT_OMITTED_TEXT, maxBytes: CAP_DESCRIPTION }),
     defineTemplate({ id: VISION_SYSTEM_NOTE_ID, sink: "system", template: VISION_SYSTEM_NOTE_TEMPLATE, maxBytes: CAP_DESCRIPTION }),
     defineText({ id: VISION_SYSTEM_NOTE_OFFLINE_ID, sink: "system", text: VISION_SYSTEM_NOTE_OFFLINE_TEXT, maxBytes: CAP_DESCRIPTION }),
   ]
@@ -472,6 +470,7 @@ export const CONTEXT_INJECTIONS: readonly ContextInjection[] = Object.freeze([
   // ── plugin.ts:工具表 ───────────────────────────────────────────────────────────
   ...toolFragments(),
   defineText({ id: "cloud-access.login-hint", sink: "tool-output", text: CLOUD_ACCESS_LOGIN_HINT, maxBytes: CAP_DESCRIPTION }),
+  defineTemplate({ id: CLOUD_CONTRACT_REFUSED_ID, sink: "tool-output", template: CLOUD_CONTRACT_REFUSED_TEMPLATE, maxBytes: CAP_DESCRIPTION }),
   // ── prompt-rebrand.ts:system.transform 子串替换 ────────────────────────────────
   ...rebrandFragments(),
   // ── cloud-vision.ts:识图结果块 + 看不了图的模型的系统说明(`#1419`)────────────────
@@ -487,19 +486,13 @@ export const CONTEXT_INJECTIONS: readonly ContextInjection[] = Object.freeze([
   // 引用是**整棵子树**的声明(与 pointer 相等或以 `<pointer>/` 开头都算),粒度与 ext 既有的 `/mcp` 相同 —— 子树里
   // 的字符串是路径 / id / server 定义 / `{file:}` 密钥引用 / 请求参数,没有一条通往模型上下文;唯一进 prompt 的是
   // 引擎自己把选中模型的 **id**(不是展示名)写进 environment 段(`session/system.ts:74`),那是 catalog / 上游厂商的 id。
-  // ext config hook 写的三类(`#1295` 时是四类;REQ-159 `#1321` 把 REQ-138 的 `/shell` 引用拆掉了 —— 围栏上移到
-  // 引擎进程本身,ext 不再写 cfg.shell):
-  defineReference({ id: "ref.skills.paths", pointer: "/skills/paths", note: "出厂技能目录 + skill generation live 目录(factory-paths.ts / gen-skill-paths.ts);技能正文是别人的字" }),
-  defineReference({ id: "ref.permission.skill", pointer: "/permission/skill", note: "REQ-067 出厂禁项的 \"deny\" 动词(factory-deny.ts)" }),
-  // REQ-234 `#1531` I3:`codepuppy_hub_install` 的 ask / deny 动词钉在全局与每个 agent 的末位(hub-tools.ts pinHubInstallPermission)。
-  // agent 名是用户 / 出厂配置的键,所以第二条用单段通配 `*`(只匹配恰好一段,见 explainConfigReference)。
-  defineReference({ id: "ref.permission.codepuppy_hub_install", pointer: "/permission/codepuppy_hub_install", note: "REQ-234 #1531 定制中心安装确认框的 \"ask\" 动词" }),
-  defineReference({ id: "ref.agent.permission.codepuppy_hub_install", pointer: "/agent/*/permission/codepuppy_hub_install", note: "REQ-234 #1531 每个 agent 末位的 \"ask\"(无人值守的 codepuppy-automation* 为 \"deny\")" }),
+  // `#1665`:ext 不再写配置(2.x 没有整份配置的钩子)—— v1 时 ext 写的 `/skills/paths`、`/permission/skill`、两条
+  // `codepuppy_hub_install` 动词引用随之删除;出厂禁项与安装确认改由 skill.transform / permission.hook.evaluate 执行,不写字。
   // ext 与 ui-mac 主进程都写的一类:
   defineReference({
     id: "ref.mcp",
     pointer: "/mcp",
-    note: "云 MCP server 定义(type / url / enabled / oauth / headers.Authorization = {file:} 引用):ext 经 env 装(cloud-websearch-kill.ts),ui-mac 主进程直写并对用户全局 MCP 钉 enabled:false(codepuppy-config-injection.ts / cloud-sidecar-config.ts / mcp-default-deny.ts / ext-disabled-injection.ts);工具表是远端 server 的字",
+    note: "云 MCP server 定义(type / url / oauth / headers.Authorization = {file:} 引用):ext 经 mcp.transform 装(cloud-websearch-kill.ts),项目 MCP 经同一 transform 补缺;ui-mac 主进程直写配置(codepuppy-config-injection.ts / cloud-sidecar-config.ts / mcp-default-deny.ts / ext-disabled-injection.ts);工具表是远端 server 的字",
   }),
   // ui-mac 主进程写的五类(`#1305`,整份 config 咽喉;ui-mac 写进顶层 /permission 与 agent 的动词不是引用,由咽喉按引擎字面量判):
   defineReference({ id: "ref.schema", pointer: "/$schema", note: "ui-mac 无继承 config 时种下的 JSON Schema URL(codepuppy-config-injection.ts:91)" }),
@@ -639,32 +632,44 @@ export function applyRegisteredRebrands(segment: string): string {
   return t
 }
 
-// ── 钩子面分类:`packages/plugin/src/index.ts` `Hooks` 接口的每一个键 ─────────────────
-// "context" = 这个钩子能把字节送进模型上下文(改 cfg 里会变成提示词/工具表的键、改 system、改
-// messages、改工具结果、改工具定义、改 compaction 提示);"no-context" = 只碰参数/头/权限/事件。
-// 键集必须与接口 1:1(context-injection.test.ts 从源码解析比对):上游加一个钩子,这里不分类即红。
+// ── 钩子面分类:OpenCode 2 插件 Context 上能注册的每一个钩子与 transform(`#1665`)─────────────────
+// 来源是 `packages/plugin/src/promise/` —— 钩子 = 各 `*Hooks` 接口(tool / session / permission / shell / aisdk)的每个键,
+// 记成 `<domain>.<键>`;transform = 每个带 `readonly transform: Transform<…>` 的 domain,记成 `<domain>.transform`。
+// "context" = 能把字节送进模型上下文(提示词 / 工具表 / 消息 / 工具结果 / 请求体);"no-context" = 只碰参数 / 头 / 权限 / 进程。
+// 键集必须与源码 1:1(context-injection.test.ts 从源码解析比对):上游加一个钩子或一个 transform domain,这里不分类即红。
 export const HOOK_CONTEXT_CLASS = Object.freeze({
-  dispose: "no-context",
-  event: "no-context",
-  config: "context",
-  tool: "context",
-  auth: "no-context",
-  provider: "no-context",
-  "chat.message": "context",
-  "chat.params": "no-context", // 温度/topP/maxOutputTokens/provider options —— 参数,不是内容
-  "chat.headers": "no-context",
-  "permission.ask": "no-context",
-  "command.execute.before": "context",
-  "tool.execute.before": "no-context", // 改的是模型→工具方向的 args;模型看到的调用已经发出
-  "shell.env": "no-context",
+  "tool.execute.before": "no-context", // 改的是模型→工具方向的入参;模型看到的调用已经发出
   "tool.execute.after": "context", // 工具结果回到模型
-  "experimental.chat.messages.transform": "context",
-  "experimental.chat.system.transform": "context",
-  "experimental.provider.small_model": "no-context",
-  "experimental.session.compacting": "context",
-  "experimental.compaction.autocontinue": "no-context",
-  "experimental.text.complete": "context",
-  "tool.definition": "context",
+  "session.prompt": "context", // 用户消息
+  "session.context": "context", // system / messages / 工具表 / 生成参数
+  "session.compaction": "context",
+  "session.generate": "context",
+  "session.title": "context",
+  "session.model.request": "no-context", // 端点与请求头
+  "session.http.request": "context", // 可以换掉请求体
+  "session.http.response": "no-context",
+  "session.experimental.ws.handshake": "no-context",
+  "session.experimental.ws.send": "context", // 可以换掉发出的帧
+  "session.experimental.ws.receive": "no-context",
+  "session.retry": "no-context",
+  "session.experimental.idle": "context", // 可以准入一条合成消息
+  "permission.evaluate": "no-context", // effect 与给人看的提示
+  "shell.create.before": "no-context",
+  "aisdk.sdk": "no-context",
+  "aisdk.language": "context", // 可以换掉整个语言模型
+  "agent.transform": "context", // agent 的 system / description
+  "command.transform": "context", // 命令执行时发出的提示文字
+  "mcp.transform": "context", // server 定义 ⇒ 远端工具表
+  "skill.transform": "context",
+  "tool.transform": "context", // 工具描述与入参 schema
+  "reference.transform": "context",
+  "websearch.transform": "context", // 搜索结果回到模型
+  "artifact.transform": "context",
+  "provider.transform": "no-context",
+  "model.transform": "no-context",
+  "integration.transform": "no-context",
+  "vcs.transform": "no-context",
+  "worktree.transform": "no-context",
 } as const satisfies Record<string, "context" | "no-context">)
 
 export type InventoryRow = {
@@ -708,7 +713,7 @@ export function renderInventory(): string {
   const ctx = Object.entries(HOOK_CONTEXT_CLASS)
     .filter(([, c]) => c === "context")
     .map(([k]) => k)
-  lines.push(`context-bearing plugin hooks (from packages/plugin Hooks): ${ctx.join(", ")}`)
+  lines.push(`context-bearing plugin hooks and transforms (OpenCode 2, from packages/plugin/src/promise): ${ctx.join(", ")}`)
   const instr = rows.filter((r) => r.sink === "instruction").map((r) => r.id)
   lines.push(
     `instruction files (ui-mac main writes them into cfg.instructions; engine session/instruction.ts reads them into the system segment; identity has one row per reachable capability shape): ${instr.join(", ")}`,

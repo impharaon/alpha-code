@@ -7,7 +7,7 @@ import {
   type StagedAttachmentMeta,
 } from "../../ui-mac/src/shared/attachment-path"
 import { attachmentReadOf } from "../../ui-mac/src/renderer/codepuppy-ui/session-timeline/timeline-attachments"
-import { attachmentInstruction, createAttachmentReaderHooks } from "./attachment-reader-hooks"
+import { attachmentInstruction } from "./attachment-reader-hooks"
 import { mcpEngineToolId } from "./cloud-websearch-kill"
 import { explainAttachmentBlock } from "./context-injection"
 
@@ -73,51 +73,5 @@ describe("attachmentInstruction", () => {
     expect(read(path)).toBe("read")
     expect(read(path.replace("/attachments/", "//attachments/./"))).toBe("read")
     expect(read(path.replace("季度复盘", "别的"))).toBe("not-read")
-  })
-})
-
-describe("chat.message 钩子", () => {
-  test("每个暂存附件恰好追加一个 synthetic 指令 part(紧跟它,id 带后缀);原有 part 不动;不是暂存记录的 part 不理", async () => {
-    let asked = 0
-    const hooks = createAttachmentReaderHooks({ directory: DIR, mcpStatus: async () => ((asked += 1), { data: connected }) })
-    const parts: unknown[] = [
-      { id: "prt_01", type: "text", text: "看看这份" },
-      stagedPart(meta()),
-      { id: "prt_03", type: "text", text: "", synthetic: true, metadata: { other: true } },
-      stagedPart(meta({ name: "a.pdf", reader: "pdf", path: `attachments/${UUID}/a.pdf` }), "prt_04"),
-    ]
-    const before = JSON.stringify(parts)
-    await hooks.chatMessage({ sessionID: "ses_1" }, { message: { id: "msg_1" }, parts })
-    expect(JSON.stringify(parts.slice(0, 4))).toBe(before)
-    expect(parts.length).toBe(6)
-    expect(asked).toBe(1)
-    const added = parts.slice(4) as Array<Record<string, unknown>>
-    expect(added.map((p) => [p.id, p.type, p.synthetic, p.messageID, p.sessionID])).toEqual([
-      ["prt_02-read", "text", true, "msg_1", "ses_1"],
-      ["prt_04-read", "text", true, "msg_1", "ses_1"],
-    ])
-    expect(String(added[1]!.text)).toContain("codepuppy-pdf_read_pdf")
-    for (const p of added) expect(explainAttachmentBlock(String(p.text)).ok).toBe(true)
-  })
-  test("没有暂存附件:不问状态、一个 part 都不加;状态接口抛错也绝不抛出,照常叫模型去读", async () => {
-    let asked = 0
-    const quiet = createAttachmentReaderHooks({ directory: DIR, mcpStatus: async () => ((asked += 1), {}) })
-    const plain: unknown[] = [{ id: "prt_01", type: "text", text: "hi" }]
-    await quiet.chatMessage({ sessionID: "s" }, { message: {}, parts: plain })
-    expect([plain.length, asked]).toEqual([1, 0])
-
-    const errors: string[] = []
-    const broken = createAttachmentReaderHooks({
-      directory: DIR,
-      mcpStatus: async () => {
-        throw new Error("engine unreachable")
-      },
-      error: (m) => errors.push(m),
-    })
-    const parts: unknown[] = [stagedPart(meta())]
-    await broken.chatMessage({ sessionID: "s" }, { message: { id: "msg_1" }, parts })
-    expect(parts.length).toBe(2)
-    expect(explainAttachmentBlock(String((parts[1] as { text: unknown }).text))).toMatchObject({ id: "attachment.read" })
-    expect(errors.join("\n")).toContain("engine unreachable")
   })
 })

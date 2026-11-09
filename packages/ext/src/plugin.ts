@@ -1,24 +1,28 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs"
+import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
-import type { Plugin } from "@opencode-ai/plugin"
-import { tool } from "@opencode-ai/plugin"
-import { mergeProjectConfig, projectDirectoryIdentity, requireCodePuppyGlobalRoot, withProjectDirectoryIdentity } from "./project-config"
-import { loadProjectPlugins, mergeHooks } from "./plugin-fanout"
-import { applyRegister, type RegisterType } from "./register"
+import type { Plugin } from "@opencode/plugin"
+import { registerPolicy } from "./policy-stub"
+import {
+  projectDirectoryIdentity,
+  readProjectExtensionsConsent,
+  requireCodePuppyGlobalRoot,
+  withProjectDirectoryIdentity,
+  type ProjectRoot,
+} from "./project-config"
+import { mergeProjectConfig } from "./project-config"
+import { loadProjectPlugins } from "./plugin-fanout"
 import { applyPromptTakeover } from "./codepuppy-prompts"
-import { applyFactoryDeny } from "./factory-deny"
-import { injectFactorySkillPaths } from "./factory-paths"
-import { injectSkillGenerationPaths } from "./gen-skill-paths"
+import { applyFactoryDeny, factoryDeniedSkills } from "./factory-deny"
 import { rebrandSystem } from "./prompt-rebrand"
 import { validateCloudToolInput, validateCloudToolOutput } from "./cloud-contract-hook"
 import { platformOutputCap } from "./platform-output-cap"
 import { platformCredentialHeader } from "./platform-credential-header"
 import { byokOutputCap } from "./byok-output-cap"
 // REQ-157 `#1284`:alpha 送进模型上下文的每段字都在 context-injection.ts 登记并声明上限。import 本身就是
-// 一道闸 —— 任何片段超限,登记簿在模块装载时抛出,ext 整个装不上(上游记 failed to load plugin),
-// 而不是悄悄截一段发出去。工具表文字从这里取,不再内联字面量(内联 = 绕过登记簿,咽喉测试当场红)。
-import { TOOL_TEXT, renderInventory } from "./context-injection"
+// 一道闸 —— 任何片段超限,登记簿在模块装载时抛出,ext 整个装不上(2.x 记该插件 failed,`#1665` I4 让 sidecar 不报 ready),
+// 而不是悄悄截一段发出去。
+import { CLOUD_CONTRACT_REFUSED_ID, renderInventory, renderTemplate } from "./context-injection"
 import {
   assertWebSearchToolAllowed,
   computeMcpOwnership,
@@ -26,467 +30,299 @@ import {
   UNVERIFIED_MCP_OWNERSHIP,
   type McpOwnership,
 } from "./cloud-websearch-kill"
+import { createHubBridge, processParentPort, type HubBridge } from "./hub-bridge"
+import { createHubTools, hubInstallEvaluate } from "./hub-tools"
+import { createReloadScheduler, type ReloadScheduler } from "./reload-scheduler"
+import { createCodePuppyTools } from "./codepuppy-tools"
+import { applyAgents, applyProjectMcp, commandDefinitions } from "./engine-transforms"
+import { modelFacts } from "./model-facts"
 import { createCloudVisionHooks } from "./cloud-vision-hooks"
-import { createAttachmentReaderHooks } from "./attachment-reader-hooks"
-import { cloudAccessState } from "./cloud-access"
-import { createHubBridge, processParentPort } from "./hub-bridge"
-import { createHubTools, pinHubInstallPermission } from "./hub-tools"
-import { createReloadScheduler, inProcessEngineRequest, inProcessReloadClient } from "./reload-scheduler"
 import { inProcessEngine } from "../../ui-mac/src/main/in-process-engine"
 
-// REQ-234 `#1531`:一个引擎进程一份(插件模块被 import 缓存)—— 定制中心的 parentPort 桥与重载调度器(唯一执行者)。
-// 桥的 parentPort 监听在**这里、模块装载时**挂上:main 只在 sidecar ready 那一刻重发排队的重载代际(基线 §2.6)。
-const hubBridge = createHubBridge(processParentPort())
-const reloads = createReloadScheduler({
-  report: (report) => hubBridge.report(report),
-  log: (line) => console.log(line),
-  error: (line) => console.error(line),
-})
-hubBridge.onReloadRequest((message) =>
-  reloads.request({ generation: message.generation, scope: message.scope, reason: message.reason, force: message.force === true }),
-)
+// ── `#1665` I2:进程级对象(定制中心桥 + 重载调度器)──────────────────────────────────────────────
+// OpenCode 2 给**每个 Location** 各求值一次本模块(开工实测:两个目录 ⇒ 求值 2 次、setup 2 次;重载后再各 1 次;Node 下
+// URL 还带递增的 `?__opencode_reload=`),没有一次与 sidecar 预载的 URL 是同一个模块记录。所以进程级对象挂在 globalThis 的
+// 一个注册符号上:第一次求值创建,之后的求值直接复用 —— parentPort 上只挂一个监听,一条重载请求只入队一次。
+// 监听仍在**模块求值时**挂上(sidecar 在 `start()` 之前预载本模块):main 只在 sidecar ready 那一刻重发排队的重载代际,
+// 监听晚挂一步,那一批就丢了。
+export const PROCESS_STATE_KEY = Symbol.for("codepuppy.ext.process")
+export type ProcessState = { readonly hubBridge: HubBridge; readonly reloads: ReloadScheduler }
+
+export function processState(): ProcessState {
+  const holder = globalThis as { [PROCESS_STATE_KEY]?: ProcessState }
+  const existing = holder[PROCESS_STATE_KEY]
+  if (existing) return existing
+  const hubBridge = createHubBridge(processParentPort())
+  const reloads = createReloadScheduler({
+    // I1 第 3 条:进程内引擎只在 setup 之后取(预载那次求值早于 `start()`)—— 调度器每轮现取。
+    engine: inProcessEngine,
+    report: (report) => hubBridge.report(report),
+    log: (line) => console.log(line),
+    error: (line) => console.error(line),
+  })
+  hubBridge.onReloadRequest((message) =>
+    reloads.request({ generation: message.generation, scope: message.scope, reason: message.reason, force: message.force === true }),
+  )
+  const state: ProcessState = { hubBridge, reloads }
+  holder[PROCESS_STATE_KEY] = state
+  return state
+}
+processState()
+
+/** 会话事件:状态变了 ⇒ 请调度器重判(它自己问引擎的 active,不信事件里的快照)。 */
+const RELOAD_POKE_EVENTS = ["session.idle", "session.status"] as const
+
+const log = (line: string) => console.log(line)
+const error = (line: string) => console.error(line)
+const describe = (cause: unknown) => (cause instanceof Error ? cause.message : String(cause))
 
 /**
- * Code Puppy backend isolation extension.
+ * Code Puppy 后端隔离扩展 —— OpenCode 2 的 promise 插件(清点表 P1:`default` 导出 `{ id, setup }`,
+ * `packages/plugin/src/promise/plugin.ts`)。由 sidecar 注入配置的 `plugins` 以**目录**登记(入口 `dist/server.js`)。
  *
- * A zero-edit opencode server plugin. In the fork model this package is a NATIVE
- * workspace member, so `@opencode-ai/plugin` resolves via `workspace:*` with no
- * symlink hacks. It is loaded into the embedded server through
- * OPENCODE_CONFIG_CONTENT injected by ui-mac's sidecar — opencode's own files are
- * never touched.
- *
- * Contract (packages/plugin/src/index.ts):
- *   Plugin = (input: PluginInput, options?) => Promise<Hooks>
+ * `setup` 每个 Location 跑一次。次序是冻结接口(I3):第一句 `registerPolicy(context)`,让 L4 的执行闸排在 ext 自己的钩子
+ * 与项目插件扇出之前;最后一句 `seal()`,让链尾那一段排在所有改写之后。`registerPolicy` 之后任何会因项目数据失败的步骤
+ * 都就地吞掉并记日志 —— `setup` reject 会撤掉本插件已挂的闸。
  */
-export const CodePuppyExt: Plugin = async (input) => {
-  // REQ-036 生效闭环(S18 X9 实测):/instance/dispose 会**打断进行中的流式回复**。REQ-234 `#1531` 起不再由本实例
-  // 自己按「登记会话 idle」去 dispose,而是登记进进程级调度器(reload-scheduler.ts):等**同一实例上所有会话**空闲、
-  // 查询失败不动手,只因本插件的 dispose 钩子注销。
-  // 审计 R1 Major 1:调度器问引擎走**进程内**(sidecar 交来的 app.fetch);围栏下 input.client 的 TCP 连不上自己。
-  // 没有交接(CLI / 测试宿主,不在围栏里)才退回 input.client。注销按同一个对象,所以登记时就定下来。
-  const engine = inProcessEngine()
-  const reloadClient = engine ? inProcessReloadClient(engine, input.directory) : input.client
-  reloads.register(input.directory, reloadClient)
-  // REQ-062 T1:转写残留 warning 去重(每进程每签名一次)
-  const rebrandWarned = new Set<string>()
-  // REQ-157 `#1284`:装载回执 —— 登记簿在 import 时已按上限校验过;这里只在 VERBOSE 下把库存打出来。
-  if (process.env.CODEPUPPY_EXT_VERBOSE) console.log(`[@codepuppy/ext] context injections:\n${renderInventory()}`)
-
-  // sidecar 初始化批次先复验 main 派生 root 的 canonical 身份；缺失、相对、退休根或 alias 都拒绝。
-  const globalCodePuppyRoot = requireCodePuppyGlobalRoot()
-  const projectRootFor = (directory: string) => {
-    const identity = projectDirectoryIdentity(directory)
-    return identity.status === "project" ? identity : null
-  }
-
-  // #223 R7 Blocker:MCP 治理归属是**本实例**的状态,不是模块的。插件模块由 Bun 动态 import
-  // **缓存**(一个引擎进程一份),而 Plugin / MCP 状态按 directory 建实例 —— 快照存在模块级变量上
-  // 时,后跑的实例会覆盖先跑的:实例 B 记录一个 foreign `cloud_web` 后,实例 A 的 `cloud_web_search`
-  // 立刻被误拒(跨项目串扰,回归见 cloud-websearch-kill.test.ts「跨实例隔离」)。因此归属只活在
-  // 这个闭包里,由本实例的 config 钩子写、显式传给本实例的执行钩子,模块侧不留任何可变状态。
-  let mcpOwnership: McpOwnership = UNVERIFIED_MCP_OWNERSHIP
-
-  // 进程内问本实例的引擎(同 reloadClient 的理由:围栏下 input.client 的 TCP 连不上自己,`#1531`);
-  // 没有交接(CLI / 测试宿主,不在围栏里)才退回 input.client。云识图与附件读取指令都经它读引擎。
-  const engineRequest = engine ? inProcessEngineRequest(engine, input.directory) : undefined
-
-  // `#1419`(REQ-228):看不了图的模型 —— 贴图与 Read 读到的图自动送云端识图,模型可按编号 / 路径追问。
-  // 状态按实例(同 mcpOwnership 的理由);能力真源走引擎 `/provider` 与钩子递进来的 Model 对象。
-  // `#1553` 审计 r1:两次读引擎改走进程内 —— 经 input.client 时围栏下必然失败,能看图的模型也被当成看不了(fail-closed)。
-  const vision = createCloudVisionHooks({
-    directory: input.directory,
-    listProviders: async () => (engineRequest ? engineRequest("GET", "/provider") : input.client.provider.list()),
-    // `#1447` R1 M1:进程重启后登记簿是空的 —— 第一次碰到某会话时从它的历史消息恢复(转写正文与原图哈希都在持久化标记里)。
-    listMessages: async (sessionID) =>
-      engineRequest
-        ? engineRequest("GET", `/session/${encodeURIComponent(sessionID)}/message`)
-        : input.client.session.messages({ path: { id: sessionID } }),
-    log: (m) => console.log(m),
-    error: (m) => console.error(m),
-  })
-
-  // `#1553`(REQ-236):暂存附件 ⇒ 追加读取指令(本机读取工具可用时叫模型去读,不可用时如实说明)。逐服务状态同样走进程内引擎。
-  const attachments = createAttachmentReaderHooks({
-    directory: input.directory,
-    mcpStatus: async () => (engineRequest ? engineRequest("GET", "/mcp") : input.client.mcp.status()),
-    error: (m) => console.error(m),
-  })
-
-  const ownHooks: Awaited<ReturnType<Plugin>> = {
-    "chat.message": async (hookInput, output) => {
-      await vision.chatMessage(hookInput, output)
-      await attachments.chatMessage(hookInput, output)
-    },
-    "tool.execute.before": async (hookInput, output) => {
-      // #223 R3→R5:web search 主权判决在 **MCP 工具**一侧的最终闸,必须是本钩子的第一句 ——
-      // 引擎在 `ctx.ask` 之前触发本钩子(普通 MCP 与 code-mode 两条路都是),抛出即终止调用,
-      // 且完全不查 permission ruleset。命中面覆盖**任何** MCP server 上的 web search 形态
-      // (含用户自己配置的 remote MCP,例如 `exa_web_search_exa`),alpha 治理的云 server 例外
-      // 只在 kill-switch 下关 —— 「是不是治理云 server」按 config 钩子核验过的**端点身份**判,
-      // 不是名字前缀(#223 R6),且核验结果取**本实例**的那一份(#223 R7)。理由、产品语义与
-      // 边界见 cloud-websearch-kill.ts。
-      assertWebSearchToolAllowed(hookInput.tool, process.env, mcpOwnership)
-      validateCloudToolInput(hookInput.tool, output.args, process.env, mcpOwnership)
-      // `#1419`:模型追问 —— `codepuppy_vision` 的 args.image 由引用原地换成压缩后的 base64。
-      await vision.toolBefore(hookInput, output)
-    },
-    "tool.execute.after": async (hookInput, output) => {
-      validateCloudToolOutput(hookInput.tool, output, process.env, mcpOwnership)
-      // `#1419`:Read 读到的图片走自动转写;cloud_vision 被审核拒绝 ⇒「这张图片无法识别」。
-      await vision.toolAfter(hookInput, output)
-    },
-    // `#1419`:每次请求前重建图片登记簿;看不了图的模型收到的消息里,已转写的图片不再重复出现。
-    "experimental.chat.messages.transform": async (hookInput, output) => {
-      await vision.messagesTransform(hookInput, output)
-    },
-    // 输出上限两条腿,都跑在 transform 之后(request.ts:118),都只改这一次请求:
-    //   · 平台代理节点(REQ-153 #1238):**不发** `max_tokens`,由网关按 route 上限填(platform-output-cap.ts);
-    //   · 直连 BYOK 节点(REQ-156):没有网关替它填,按**逐模型实读上限**写(byok-output-cap.ts);
-    //   · 用户自定义节点、以及本表没有读数的 BYOK 模型:原样(上游的 32000)。
-    "chat.params": async (hookInput, output) => {
-      const decision = platformOutputCap({
-        providerBaseURL: hookInput.provider.options?.baseURL,
-        codepuppyBaseURL: process.env.CODEPUPPY_BASE_URL,
-      })
-      if (decision.omit) {
-        output.maxOutputTokens = undefined
-        return
+export const CodePuppyExt: Plugin.Plugin = {
+  id: "codepuppy.ext",
+  async setup(context) {
+    const policy = await registerPolicy(context)
+    const directory = context.location.directory
+    const { hubBridge, reloads } = processState()
+    const registration = {}
+    reloads.register(directory, registration)
+    const cleanups: Array<() => Promise<void> | void> = [() => reloads.unregister(directory, registration)]
+    const cleanup = async () => {
+      for (const run of cleanups.splice(0).reverse()) {
+        try {
+          await run()
+        } catch (cause) {
+          error(`[@codepuppy/ext] cleanup failed: ${describe(cause)}`)
+        }
       }
-      // REQ-156:直连 BYOK 节点没有网关替它填,于是它一直发上游默认的 32000。查得到实读上限就抬到
-      // 那个数(逐模型、只抬不降、无读数不动),理由与三点实打证据见 byok-output-cap.ts。
-      // `?.` 不是防御性洁癖:本钩子里抛出去会**打死整条请求**(比不抬上限严重得多),而 `model` 是
-      // 引擎递进来的对象 —— 类型说 `api` 必在,但类型不是运行时保证。取不到就查不到读数 ⇒ 不改,
-      // 正是 fail-closed 想要的那一支。
-      const byok = byokOutputCap({
-        engineProviderID: hookInput.model?.providerID,
-        apiModelID: hookInput.model?.api?.id,
-        providerBaseURL: hookInput.provider.options?.baseURL,
-        current: output.maxOutputTokens,
+    }
+    try {
+      // REQ-157 `#1284`:装载回执 —— 登记簿在 import 时已按上限校验过;这里只在 VERBOSE 下把库存打出来。
+      if (process.env.CODEPUPPY_EXT_VERBOSE) log(`[@codepuppy/ext] context injections:\n${renderInventory()}`)
+      // sidecar 初始化批次先复验 main 派生 root 的 canonical 身份;缺失、相对、退休根或 alias 都拒绝(环境错 = 结构性失败,让本插件 failed)。
+      requireCodePuppyGlobalRoot()
+      const projectRootFor = (target: string): ProjectRoot | null => {
+        const identity = projectDirectoryIdentity(target)
+        return identity.status === "project" ? identity : null
+      }
+      const project = projectRootFor(directory)
+
+      // #223 R7:MCP 治理归属是**本 Location** 的状态 —— 由本 Location 的 mcp.transform 写、显式传给本 Location 的执行钩子;
+      // 模块侧不留可变状态(I2 的进程级对象里只有桥与调度器)。没算出来 = 没有治理 server = 豁免不给(fail-closed)。
+      let mcpOwnership: McpOwnership = UNVERIFIED_MCP_OWNERSHIP
+
+      // ── 工具表(P8)──────────────────────────────────────────────────────────────────────────
+      await context.tool.transform((editor) => {
+        for (const tool of createCodePuppyTools({ context, reloads, projectRootFor, readConsent: readProjectExtensionsConsent }))
+          editor.add(tool)
+        for (const tool of createHubTools(hubBridge, context)) editor.add(tool)
       })
-      if (byok.raise) output.maxOutputTokens = byok.value
-    },
-    // REQ-236 `#1562`:平台代理节点的凭据每次请求现读(platform-credential-header.ts),续期热应用不必重启引擎;
-    // 读不到就抛 LoadAPIKeyError,请求在发出前以认证错误失败,不回落任何旧值。
-    "chat.headers": async (hookInput, output) => {
-      const authorization = platformCredentialHeader({
-        providerBaseURL: hookInput.provider.options?.baseURL,
-        env: process.env,
+
+      // `#1419`(REQ-228):看不了图的模型 —— 图片送云端识图,模型可按编号 / 路径追问。登记簿按本 Location 建
+      // (#223 R7 的纪律);能力真源是引擎目录里的模型(modelFacts);转写正文跨重启缓存在插件存储里。
+      const vision = createCloudVisionHooks({
+        directory,
+        // 目录查不到(或查询失败)⇒ undefined ⇒ 按看不了图处理(基线 §2-B 第 6 条)。
+        seesImages: (model) =>
+          modelFacts(context, model).then(
+            (facts) => facts.image,
+            () => undefined,
+          ),
+        storage: { get: (key) => context.storage.get(key), set: (key, value) => context.storage.set(key, value) },
+        error,
       })
-      if (authorization) output.headers.authorization = authorization
-    },
-    // REQ-060 项目级扩展物 `.codepuppy`-only:config hook 按 instance 读 `<directory>/.codepuppy/codepuppy.jsonc`
-    // 并把项目级 mcp / agent / command / skills.paths 合并进 cfg —— 引擎经 config 消费,项目不产生
-    // `.opencode`(零桥)。变异可见性由真机 spike 验(hook "Notify" 语义,T0 gate)。dispose 重建重
-    // 触发 = 免重启。信任门(项目自带 mcp/plugin = 加载可执行物)= T1 后续,当前 spike 只验通道。
-    async config(cfg) {
-      // #223 R4→R5:ext 装载回执,必须是本钩子的**第一句** —— 下面的项目配置分支有多条 early
-      // return(身份漂移 / 读失败),排在它们之后就会让「项目配置读不了」顺带把云工具一起关掉。
-      // 本句能执行 = 插件已返回 hooks = 同一对象上的 `tool.execute.before` 闸已注册,于是注入面
-      // 托管的云 MCP server 定义现在可以安全**装进配置**。R4 那版把定义先写成 `enabled:false`
-      // 再由本句翻开 —— R5 判其为回归:`/mcp/:name/connect` 会无条件把它复制成 `enabled:true`。
-      // 现在定义在 ext 确认之前根本不在配置里(理由见 cloud-websearch-kill.ts)。
-      const installed = installCloudMcp(cfg)
-      if (installed)
-        console.log(
-          `[@codepuppy/ext] cloud MCP server "${installed}" installed — the web search sovereignty gate is registered in this engine process`,
-        )
-      // REQ-159 `#1321`:这里曾经是 REQ-138 的 wrapEngineShell —— 把 cfg.shell 包成 sandbox-exec wrapper。
-      // 围栏已上移到引擎进程本身(ui-mac sidecar 在 import 引擎前自打 seatbelt,process-fence-*.ts),
-      // 派生的 shell / MCP / LSP / PTY 全部继承;两层并存实测 `sandbox_apply: Operation not permitted`、
-      // HTTP 200 而零执行(勘破 §6.5 / §8.4),所以那层与外层**同一次变更**拆装(基线 I2)。
-      // 本钩子从此**不碰 cfg.shell**,判据在 codepuppy-ext-no-shell-layer.test.ts。
-      // #223 R7:归属在**本实例全部配置合并完成之后**才算 —— 下面的项目 codepuppy.jsonc 合并还会往
-      // `cfg.mcp` 里加 server,先算就会漏掉它们(漏掉 foreign ⇒ 豁免可能错给)。放在 finally 里,
-      // 上面那些 early return 也照样重算;合并中途**抛错**则 cfg 只合了一半,倒向 fail-closed。
-      let merged = true
-      try {
-        const project = projectRootFor(input.directory)
-        if (project) {
-          const f = join(project.root, "codepuppy.jsonc")
-          const present = withProjectDirectoryIdentity(project, (root) => existsSync(join(root, "codepuppy.jsonc")))
-          if (!present.ok) {
-            console.error(`[@codepuppy/ext] project config refused: ${present.reason}`)
+
+      // ── 执行钩子(P7)────────────────────────────────────────────────────────────────────────
+      await context.tool.hook("execute.before", async (event) => {
+        // #223 R3→R5 / L5r:web search 主权判决 —— 抛出即拒掉这次调用(2.x 只有 execute.before 允许失败,抛出被转成
+        // Tool.Error,只结束这一次调用)。命中面:任何 MCP server 上看起来是 web search 的工具,以及 2.x 内置的 `websearch`;
+        // 治理云 server 的豁免按本 Location 核验过的端点身份判。理由与边界见 cloud-websearch-kill.ts。
+        assertWebSearchToolAllowed(event.tool, process.env, mcpOwnership)
+        validateCloudToolInput(event.tool, event.input, process.env, mcpOwnership)
+        // `#1419`:模型追问 —— `codepuppy_vision` 的 image 由引用换成压缩后的 base64。
+        await vision.toolBefore(event)
+      })
+      await context.tool.hook("execute.after", (event) => {
+        if (event.status !== "completed") return
+        // 2.x 的 execute.after 不允许失败(`packages/core/src/plugin/hooks.ts:23`):契约不符时把结果换成一句响亮的拒绝,
+        // 不让一份没核过的结果原样回到模型。
+        try {
+          validateCloudToolOutput(event.tool, event.result, process.env, mcpOwnership)
+        } catch (cause) {
+          error(`[@codepuppy/ext] cloud tool ${event.tool} result refused: ${describe(cause)}`)
+          event.result = { content: renderTemplate(CLOUD_CONTRACT_REFUSED_ID, { name: event.tool }), metadata: { codepuppy: { contractRefused: true } } }
+        }
+      })
+
+      // ── 请求组装(P3 / P4 / P5 / P6)─────────────────────────────────────────────────────────
+      const rebrandWarned = new Set<string>()
+      await context.session.hook("context", async (event) => {
+        // REQ-062 T1(路线A,ADR-015):系统提示词品牌转写 —— 精选子串对;失败 = 上游原样(外观级退化),绝不伤及请求。
+        if (process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE !== "1") {
+          try {
+            const r = rebrandSystem(event.system.map((part) => part.text))
+            if (r.changed) event.system.splice(0, event.system.length, ...event.system.map((part, index) => ({ ...part, text: r.system[index]! })))
+            for (const w of r.warnings) {
+              if (rebrandWarned.has(w)) continue
+              rebrandWarned.add(w)
+              console.warn(`[@codepuppy/ext] prompt-rebrand: ${w}`)
+            }
+          } catch (cause) {
+            error(`[@codepuppy/ext] prompt-rebrand failed: ${describe(cause)}`)
+          }
+        }
+        // `#1419`:登记簿重建、审核拒绝结果的替换;看不了图 ⇒ 图换成转写块并追加一段登记过的说明(绝不抛)。
+        await vision.context(event)
+        // 输出上限两条腿,都只改这一次请求:平台代理节点**不发** max tokens(网关按 route 上限填,REQ-153);
+        // 直连 BYOK 节点按逐模型实读上限抬(REQ-156);其余原样(上游算的那个数)。
+        try {
+          const facts = await modelFacts(context, event.model)
+          if (platformOutputCap({ providerBaseURL: facts.baseURL, codepuppyBaseURL: process.env.CODEPUPPY_BASE_URL }).omit) {
+            delete event.options.maxTokens
             return
           }
-          if (present.value) {
-            // 信任门:项目自带 mcp(可执行连接器)只在项目已 consent 时加载。consent 落 `.codepuppy/prefs.json`
-            // 的 extensionsConsent(版本化,ADR-021 模式);未 consent → mcp 被 gated,记 loud 供 renderer 弹窗。
-            const trustExecutable = readProjectExtensionsConsent(project)
-            if (trustExecutable === null) {
-              console.error("[@codepuppy/ext] project config refused: project alpha root identity drifted")
-              return
-            }
-            const configRead = withProjectDirectoryIdentity(project, (root) => readFileSync(join(root, "codepuppy.jsonc"), "utf8"))
-            if (!configRead.ok) {
-              console.error(`[@codepuppy/ext] project config refused: ${configRead.reason}`)
-              return
-            }
-            const { added, gatedExecutable } = mergeProjectConfig(cfg as Record<string, unknown>, configRead.value, {
-              trustExecutable,
-              directory: project.directory,
-            })
-            if (gatedExecutable.length)
-              console.log(
-                `[@codepuppy/ext] project has UNTRUSTED executable extensions (${gatedExecutable.join(", ")}) — not loaded until consent: ${input.directory}`,
-              )
-            if (process.env.CODEPUPPY_EXT_VERBOSE && added.length)
-              console.log(`[@codepuppy/ext] project config merged from ${f}: ${added.join(", ")}`)
-          }
+          const byok = byokOutputCap({
+            engineProviderID: event.model.providerID,
+            apiModelID: facts.modelID,
+            providerBaseURL: facts.baseURL,
+            current: event.options.maxTokens,
+          })
+          if (byok.raise) event.options.maxTokens = byok.value
+        } catch (cause) {
+          error(`[@codepuppy/ext] output cap skipped: ${describe(cause)}`)
         }
-        // REQ-065 修订:出厂技能路径内存注入(main 经 env 传入;codepuppy.jsonc 只放用户自己的东西,
-        // 磁盘零系统路径 —— 用户拍板 2026-07-08,对齐 Claude Code「内置能力不进用户配置」心智)。
-        const factoryAdded = injectFactorySkillPaths(cfg as Record<string, unknown>, process.env.CODEPUPPY_FACTORY_SKILL_DIRS)
-        if (process.env.CODEPUPPY_EXT_VERBOSE && factoryAdded.length)
-          console.log(`[@codepuppy/ext] factory skill paths injected in-memory: ${factoryAdded.length}`)
-        // REQ-100 #310:把 skill generation 的 live 目录(ext-store/skill--*/current.json)投影进
-        // skills.paths —— 从磁盘现读,每次 config 重建反映最新安装,current.json 是唯一原子真源。
-        const genAdded = injectSkillGenerationPaths(cfg as Record<string, unknown>, globalCodePuppyRoot)
-        if (process.env.CODEPUPPY_EXT_VERBOSE && genAdded.length)
-          console.log(`[@codepuppy/ext] skill generation paths injected in-memory: ${genAdded.length}`)
-        // REQ-067:上游默认禁项零明文 —— main 算 effective(出厂清单 − 用户解禁)经 env 传入,内存注入
-        // permission.skill deny + 键入兜底占位(同为「出厂内置行为不进用户配置」口径)。
-        const denied = applyFactoryDeny(cfg as Record<string, unknown>, process.env.CODEPUPPY_FACTORY_DENY_SKILLS)
-        if (process.env.CODEPUPPY_EXT_VERBOSE && denied.length)
-          console.log(`[@codepuppy/ext] factory-denied skills injected in-memory: ${denied.join(", ")}`)
-        // REQ-062 T3/T6:alpha 内容层 set-if-absent 接管(/init /review 模板 + general/explore prompt)。
-        // 置于项目 merge 之后 → 项目/全局/治理任何层的同名配置都先落位、alpha 出厂让位(优先级:
-        // 用户治理 > alpha 出厂 > 上游内置)。与 T1 转写同一逃生门 = 路线A 一键整体回退。
-        if (process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE !== "1") {
-          const takeover = applyPromptTakeover(cfg as Record<string, unknown>)
-          if (process.env.CODEPUPPY_EXT_VERBOSE && takeover.applied.length)
-            console.log(`[@codepuppy/ext] prompt takeover applied: ${takeover.applied.join(", ")}`)
-        }
-      } catch (error) {
-        merged = false
-        console.error(`[@codepuppy/ext] project config hook failed: ${error instanceof Error ? error.message : String(error)}`)
-      } finally {
-        // #223 R6 Blocker:治理豁免绑定的是**端点身份**,不是名字前缀 —— 拿本实例已合并完成的 cfg
-        // 核验「哪个 server 名真的是 alpha 那份定义」。#223 R7 Blocker:结果写进**本实例的闭包**,
-        // 不是模块级变量,否则并存的另一个项目实例会覆盖它。核不上(或这一句没跑到)就没有任何
-        // server 拿得到豁免 —— fail-closed。
-        mcpOwnership = merged ? computeMcpOwnership(cfg) : UNVERIFIED_MCP_OWNERSHIP
-        // REQ-234 `#1531` I3:确认框一定会出现 —— 放在 finally:项目配置分支的 early return / 抛错都不许跳过它。
-        pinHubInstallPermission(cfg as Record<string, unknown>)
-        if (process.env.CODEPUPPY_EXT_VERBOSE)
-          console.log(`[@codepuppy/ext] MCP ownership (${input.directory}): ${JSON.stringify(mcpOwnership)}`)
-      }
-    },
-    // REQ-062 T1(路线A):系统提示词品牌转写 —— 精选子串对(见 prompt-rebrand.ts 纪律说明)。
-    // experimental hook(NON_GOALS#4 标注,ADR-015 修订成文):签名漂移/失效最坏退化 = 品牌未转写
-    // (外观级,不伤功能);逃生 CODEPUPPY_PROMPT_REBRAND_DISABLE=1。warning 每进程每签名一次(防刷屏)。
-    "experimental.chat.system.transform": async (hookInput, output) => {
-      if (process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE !== "1") {
+      })
+      // REQ-236 `#1562`:平台代理节点的凭据每次请求现读,续期热应用不必重启引擎;读不到就抛,请求不发出。
+      await context.session.hook("model.request", (event) => {
+        const authorization = platformCredentialHeader({ providerBaseURL: event.baseURL, env: process.env })
+        if (authorization) event.headers.authorization = authorization
+      })
+
+      // ── 配置域(C10 / L3r / M3)────────────────────────────────────────────────────────────
+      // 项目 `.codepuppy/codepuppy.jsonc` + 出厂禁项 + 提示词接管,算成一份 v1 形状的小对象(既有纯函数),再按域翻译。
+      // 每次 transform 重跑时现读(项目文件被 codepuppy_register 改过之后,重载即生效)。读不了 ⇒ 记日志、不加(项目数据不让 setup 失败)。
+      const extConfig = () => {
+        const cfg: Record<string, unknown> = {}
         try {
-          const r = rebrandSystem(output.system)
-          if (r.changed) {
-            output.system.length = 0
-            output.system.push(...r.system)
+          if (project) {
+            const present = withProjectDirectoryIdentity(project, (root) => existsSync(join(root, "codepuppy.jsonc")))
+            if (!present.ok) error(`[@codepuppy/ext] project config refused: ${present.reason}`)
+            else if (present.value) {
+              // 信任门:项目自带可执行物(mcp、agent 的控制字段)只在项目已 consent 时加载。
+              const trustExecutable = readProjectExtensionsConsent(project)
+              const configRead = withProjectDirectoryIdentity(project, (root) => readFileSync(join(root, "codepuppy.jsonc"), "utf8"))
+              if (trustExecutable === null) error("[@codepuppy/ext] project config refused: project alpha root identity drifted")
+              else if (!configRead.ok) error(`[@codepuppy/ext] project config refused: ${configRead.reason}`)
+              else {
+                const { added, gatedExecutable } = mergeProjectConfig(cfg, configRead.value, { trustExecutable, directory: project.directory })
+                if (gatedExecutable.length)
+                  log(`[@codepuppy/ext] project has UNTRUSTED executable extensions (${gatedExecutable.join(", ")}) — not loaded until consent: ${directory}`)
+                if (process.env.CODEPUPPY_EXT_VERBOSE && added.length) log(`[@codepuppy/ext] project config merged: ${added.join(", ")}`)
+              }
+            }
           }
-          for (const w of r.warnings) {
-            if (rebrandWarned.has(w)) continue
-            rebrandWarned.add(w)
-            console.warn(`[@codepuppy/ext] prompt-rebrand: ${w}`)
-          }
-        } catch (error) {
-          // 转写失败 = 保底上游原样(外观级退化),绝不让 hook 异常伤及请求主链
-          console.error(`[@codepuppy/ext] prompt-rebrand failed: ${error instanceof Error ? error.message : String(error)}`)
+          // REQ-067:上游默认禁项零明文 —— main 算 effective 名单经 env 传入;禁用由下面的 skill / permission 钩子执行。
+          applyFactoryDeny(cfg, process.env.CODEPUPPY_FACTORY_DENY_SKILLS)
+          // REQ-062 T3/T6:alpha 内容层接管(/init /review 模板 + general/explore/docs prompt),置于项目合并之后 ⇒ 项目同名让位。
+          if (process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE !== "1") applyPromptTakeover(cfg)
+        } catch (cause) {
+          error(`[@codepuppy/ext] project config failed: ${describe(cause)}`)
         }
+        return cfg
       }
-      // `#1419`:看不了图的模型多一段登记过的说明(不受 rebrand 逃生门影响;不提 gemini)。
-      await vision.systemTransform(hookInput, output)
-    },
-    // tool map: key === final tool id verbatim (no namespace prefix).
-    tool: {
-      codepuppy_reload: tool({
-        description: TOOL_TEXT.codepuppy_reload.description,
-        args: {
-          reason: tool.schema.string().describe(TOOL_TEXT.codepuppy_reload.args.reason).default(""),
-        },
-        async execute(args, ctx) {
-          reloads.request({ scope: { directory: input.directory }, reason: args.reason ? `codepuppy_reload: ${args.reason}` : "codepuppy_reload" })
-          return {
-            title: "codepuppy_reload",
-            output:
-              "reload scheduled — it runs as soon as no reply is in progress in this workspace (this one included); newly created skills/agents/commands are available from the NEXT message in this session." +
-              (args.reason ? `\nreason: ${args.reason}` : ""),
-            metadata: { ok: true, scheduled: true, directory: ctx.directory, sessionID: ctx.sessionID },
-          }
-        },
-      }),
-      codepuppy_register: tool({
-        description: TOOL_TEXT.codepuppy_register.description,
-        args: {
-          type: tool.schema.enum(["mcp", "agent", "command", "skill"]).describe(TOOL_TEXT.codepuppy_register.args.type),
-          name: tool.schema.string().describe(TOOL_TEXT.codepuppy_register.args.name).default(""),
-          entry: tool.schema.string().describe(TOOL_TEXT.codepuppy_register.args.entry).default(""),
-        },
-        async execute(args, ctx) {
-          const project = projectRootFor(ctx.directory)
-          if (!project)
-            return {
-              title: "codepuppy_register",
-              output: "refused: the session directory identity cannot be confirmed as a project. Global installs go through the Extension Hub.",
-              metadata: { ok: false },
-            }
-          let entry: Record<string, unknown> | undefined
-          if (args.entry.trim()) {
-            try {
-              const parsed: unknown = JSON.parse(args.entry)
-              if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object")
-              entry = parsed as Record<string, unknown>
-            } catch {
-              return { title: "codepuppy_register", output: "refused: entry is not a valid JSON object string", metadata: { ok: false } }
-            }
-          }
-          const present = withProjectDirectoryIdentity(project, (root) => existsSync(join(root, "codepuppy.jsonc")))
-          if (!present.ok)
-            return { title: "codepuppy_register", output: `refused: ${present.reason}`, metadata: { ok: false } }
-          const currentRead = present.value
-            ? withProjectDirectoryIdentity(project, (root) => readFileSync(join(root, "codepuppy.jsonc"), "utf8"))
-            : { ok: true as const, value: null }
-          if (!currentRead.ok)
-            return { title: "codepuppy_register", output: `refused: ${currentRead.reason}`, metadata: { ok: false } }
-          const current = currentRead.value
-          const r = applyRegister(current, args.type as RegisterType, args.name, entry)
-          if (!r.ok) return { title: "codepuppy_register", output: `refused: ${r.reason}`, metadata: { ok: false } }
-          const trusted = args.type === "mcp" ? readProjectExtensionsConsent(project) : true
-          if (trusted === null)
-            return { title: "codepuppy_register", output: "refused: project Code Puppy root identity drifted", metadata: { ok: false } }
-          try {
-            const created = withProjectDirectoryIdentity(project, (root) => mkdirSync(root, { recursive: true }))
-            if (!created.ok)
-              return { title: "codepuppy_register", output: `refused: ${created.reason}`, metadata: { ok: false } }
-            const written = withProjectDirectoryIdentity(project, (root) =>
-              writeFileSync(join(root, "codepuppy.jsonc.tmp"), r.next),
-            )
-            if (!written.ok)
-              return { title: "codepuppy_register", output: `refused: ${written.reason}`, metadata: { ok: false } }
-            const committed = withProjectDirectoryIdentity(project, (root) =>
-              renameSync(join(root, "codepuppy.jsonc.tmp"), join(root, "codepuppy.jsonc")),
-            )
-            if (!committed.ok)
-              return { title: "codepuppy_register", output: `refused: ${committed.reason}`, metadata: { ok: false } }
-          } catch (error) {
-            return {
-              title: "codepuppy_register",
-              output: `write failed: ${error instanceof Error ? error.message : String(error)}`,
-              metadata: { ok: false },
-            }
-          }
-          reloads.request({ scope: { directory: input.directory }, reason: `codepuppy_register ${args.type} ${args.name}`.trim() })
-          const consentNote =
-            args.type === "mcp" && !trusted
-              ? "\nnote: this project has not yet been granted permission to load executable extensions — the connector stays gated until the user confirms the trust dialog (it appears when the project session is opened)."
-              : ""
-          return {
-            title: "codepuppy_register",
-            output: `${r.summary}\nreload scheduled — available from the NEXT message.${consentNote}`,
-            metadata: { ok: true, type: args.type, name: args.name, directory: ctx.directory },
-          }
-        },
-      }),
-      ...createHubTools(hubBridge),
-      codepuppy_echo: tool({
-        description: TOOL_TEXT.codepuppy_echo.description,
-        args: {
-          text: tool.schema.string().describe(TOOL_TEXT.codepuppy_echo.args.text),
-          shout: tool.schema.boolean().describe(TOOL_TEXT.codepuppy_echo.args.shout).default(false),
-        },
-        async execute(args, ctx) {
-          const echoed = args.shout ? args.text.toUpperCase() : args.text
-          return {
-            title: "codepuppy_echo",
-            output: `codepuppy_echo: ${echoed}`,
-            metadata: { sessionID: ctx.sessionID, directory: ctx.directory, shout: args.shout },
-          }
-        },
-      }),
-      codepuppy_access: tool({
-        description: TOOL_TEXT.codepuppy_access.description,
-        args: {},
-        async execute() {
-          const access = cloudAccessState()
-          const status = await (engineRequest ? engineRequest("GET", "/mcp") : input.client.mcp.status()).catch(() => undefined)
-          const data = status?.error ? undefined : status?.data
-          const cloud = data && typeof data === "object" && "codepuppy" in data ? data.codepuppy : undefined
-          return {
-            title: "codepuppy_access",
-            output: JSON.stringify({
-              logged_in: access.state === "ready",
-              state: access.state,
-              cloud_tools_enabled: !!cloud && typeof cloud === "object" && "status" in cloud && cloud.status === "connected",
-              login_hint: access.loginHint,
-            }),
-            metadata: {},
-          }
-        },
-      }),
-      codepuppy_ping: tool({
-        description: TOOL_TEXT.codepuppy_ping.description,
-        args: {
-          note: tool.schema.string().describe(TOOL_TEXT.codepuppy_ping.args.note).default(""),
-        },
-        async execute(args, ctx) {
-          const suffix = args.note ? ` (${args.note})` : ""
-          return {
-            title: "codepuppy_ping",
-            output: `pong${suffix}\ndirectory: ${ctx.directory}\nworktree: ${ctx.worktree}`,
-            metadata: { directory: ctx.directory, worktree: ctx.worktree },
-          }
-        },
-      }),
-    },
-    // event hook: ① 会话状态变了 ⇒ 请调度器重判(它自己查每个相关实例的 session.status,不信事件里的快照);
-    // ② liveness proof(CODEPUPPY_EXT_VERBOSE 时打印事件)。
-    async event({ event }) {
-      if (process.env.CODEPUPPY_EXT_VERBOSE) console.log(`[@codepuppy/ext] event: ${event.type}`)
-      if (event.type === "session.status" || event.type === "session.idle") reloads.poke()
-    },
-    // REQ-234 `#1531`:实例销毁(dispose / global dispose / 重建)时引擎逐插件调用 —— 调度器只在这里注销本实例。
-    async dispose() {
-      reloads.unregister(input.directory, reloadClient)
-    },
-  }
 
-  // REQ-060 plugin host fan-out:加载项目 `.codepuppy/plugins/*.js`(信任门:未 consent 不加载可执行物)
-  // 并与 ownHooks 合并 return —— 项目插件的 hook 经引擎照常派发,项目零 `.opencode`/零 config.plugin[]。
-  const project = projectRootFor(input.directory)
-  const consent = project ? readProjectExtensionsConsent(project) : false
-  if (consent === null) {
-    console.error("[@codepuppy/ext] project plugin fan-out refused: project alpha root identity drifted")
-    return ownHooks
-  }
-  const projectHooks = await loadProjectPlugins(project?.root ?? "", input, consent, {
-    verifyIdentity: () => !!project && withProjectDirectoryIdentity(project, () => true).ok,
-    existsSync,
-    readdirSync,
-    importModule: (u) => import(u),
-    pathToFileURL: (p) => pathToFileURL(p).href,
-    join,
-    log: (m) => console.log(m),
-    error: (m) => console.error(m),
-  })
-  return (projectHooks.length ? mergeHooks(ownHooks as Record<string, unknown>, projectHooks) : ownHooks) as Awaited<
-    ReturnType<Plugin>
-  >
-}
+      await context.mcp.transform((editor) => {
+        // #223 R5 / M3:云 MCP 的完整定义只由 ext 在这里装 —— 本句能执行 = 本 Location 的 ext 已装上、上面的执行闸已注册。
+        try {
+          const installed = installCloudMcp(editor)
+          if (installed) log(`[@codepuppy/ext] cloud MCP server "${installed}" installed — the web search sovereignty gate is registered in this Location`)
+        } catch (cause) {
+          error(`[@codepuppy/ext] cloud MCP install failed: ${describe(cause)}`)
+        }
+        let merged = true
+        try {
+          applyProjectMcp(editor, extConfig().mcp, error)
+        } catch (cause) {
+          merged = false
+          error(`[@codepuppy/ext] project MCP merge failed: ${describe(cause)}`)
+        } finally {
+          // #223 R6/R7:归属在本 Location 的 MCP 定义全部就位之后才算;合并中途出错 ⇒ fail-closed。
+          mcpOwnership = merged ? computeMcpOwnership({ mcp: Object.fromEntries(editor.list()) }) : UNVERIFIED_MCP_OWNERSHIP
+          if (process.env.CODEPUPPY_EXT_VERBOSE) log(`[@codepuppy/ext] MCP ownership (${directory}): ${JSON.stringify(mcpOwnership)}`)
+        }
+      })
+      await context.agent.transform((editor) => {
+        try {
+          applyAgents(editor, extConfig().agent)
+        } catch (cause) {
+          error(`[@codepuppy/ext] agent transform failed: ${describe(cause)}`)
+        }
+      })
+      await context.command.transform((editor) => {
+        try {
+          for (const definition of commandDefinitions(extConfig().command, context.session, error)) editor.add(definition)
+        } catch (cause) {
+          error(`[@codepuppy/ext] command transform failed: ${describe(cause)}`)
+        }
+      })
+      // REQ-067 / #1522:出厂禁用的技能 —— 从技能目录里拿掉(上游内置的那些在 ext 之前注册),并在权限评估里一律 deny
+      // (覆盖之后才由配置目录装进来的同名技能)。
+      await context.skill.transform((editor) => {
+        for (const id of factoryDeniedSkills(process.env.CODEPUPPY_FACTORY_DENY_SKILLS)) editor.remove(id)
+      })
+      await context.permission.hook("evaluate", (event) => {
+        // I10:定制中心安装恒弹框(自动化 agent 恒拒)。注册在 registerPolicy 之后 ⇒ 按注册顺序它说了算。
+        hubInstallEvaluate(event)
+        if (event.action === "skill" && event.resources.some((id) => factoryDeniedSkills(process.env.CODEPUPPY_FACTORY_DENY_SKILLS).includes(id)))
+          event.effect = "deny"
+      })
 
-/** 项目扩展信任门 consent:`<dir>/.codepuppy/prefs.json` 的 `extensionsConsent.granted === true`(版本化,
- *  ADR-021 模式)。缺失/坏/未授 = 不信任(默认拒绝可执行物,安全红线)。 */
-function readProjectExtensionsConsent(
-  project: Extract<ReturnType<typeof projectDirectoryIdentity>, { status: "project" }>,
-): boolean | null {
-  const present = withProjectDirectoryIdentity(project, (root) => existsSync(join(root, "prefs.json")))
-  if (!present.ok) return null
-  if (!present.value) return false
-  try {
-    const read = withProjectDirectoryIdentity(project, (root) => readFileSync(join(root, "prefs.json"), "utf8"))
-    if (!read.ok) return null
-    const prefs = JSON.parse(read.value) as { extensionsConsent?: { granted?: unknown } }
-    return prefs?.extensionsConsent?.granted === true
-  } catch {
-    return false
-  }
+      // ── 会话事件(P12):状态变了 ⇒ 调度器重判 ───────────────────────────────────────────────
+      const events = new AbortController()
+      cleanups.push(() => events.abort())
+      void (async () => {
+        for await (const event of context.event.subscribe({ types: [...RELOAD_POKE_EVENTS], signal: events.signal })) {
+          if (process.env.CODEPUPPY_EXT_VERBOSE) log(`[@codepuppy/ext] event: ${event.type}`)
+          reloads.poke()
+        }
+      })().catch((cause) => {
+        if (!events.signal.aborted) error(`[@codepuppy/ext] event subscription ended: ${describe(cause)}`)
+      })
+
+      // ── 项目插件扇出(P10):`.codepuppy/plugins/*.js`,信任门之后才加载;它们的钩子排在 ext 自己的之后、seal 之前 ──
+      try {
+        const consent = project ? readProjectExtensionsConsent(project) : false
+        if (consent === null) error("[@codepuppy/ext] project plugin fan-out refused: project alpha root identity drifted")
+        else
+          cleanups.push(
+            ...(await loadProjectPlugins(project?.root ?? "", context, consent, {
+              verifyIdentity: () => !!project && withProjectDirectoryIdentity(project, () => true).ok,
+              existsSync,
+              readdirSync,
+              importModule: (url) => import(url),
+              pathToFileURL: (path) => pathToFileURL(path).href,
+              join,
+              log,
+              error,
+            })),
+          )
+      } catch (cause) {
+        error(`[@codepuppy/ext] project plugin fan-out failed: ${describe(cause)}`)
+      }
+    } catch (cause) {
+      await cleanup()
+      throw cause
+    }
+
+    await policy.seal()
+    return cleanup
+  },
 }
 
 export default CodePuppyExt

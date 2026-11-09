@@ -53,3 +53,38 @@ export const activate = (plugin: PromisePlugin.Plugin, options: { mcp?: ReturnTy
     const host = yield* PluginHost.make(plugins, plugin.id)
     yield* PluginPromise.fromPromise(plugin).effect(host)
   }).pipe(options.mcp ? Effect.provideService(Mcp.Service, options.mcp.service) : (effect) => effect)
+
+/**
+ * 记账的插件 Context(不是宿主):记下 ext 对每个 domain 的注册,transform / hook 的回调留给用例自己驱动。
+ * 用于只关心 ext 自己做了什么的用例(注册次序、身份漂移时零触达);真宿主行为用上面的 `activate`。
+ */
+export function recordingContext(directory: string) {
+  const calls: string[] = []
+  const invocations: Array<{ call: string; args: unknown[] }> = []
+  const transforms: Record<string, Array<(editor: never) => void>> = {}
+  const hooks: Record<string, Array<(event: never) => unknown>> = {}
+  const domain = (name: string) =>
+    new Proxy(
+      {},
+      {
+        get: (_target, method: string) => {
+          if (name === "event" && method === "subscribe")
+            return () => ({
+              [Symbol.asyncIterator]: () => ({ next: () => new Promise(() => {}), return: async () => ({ done: true, value: undefined }) }),
+            })
+          return async (...args: unknown[]) => {
+            calls.push(`${name}.${method}`)
+            invocations.push({ call: `${name}.${method}`, args })
+            if (method === "transform") (transforms[name] ??= []).push(args[0] as never)
+            if (method === "hook") (hooks[`${name}.${String(args[0])}`] ??= []).push(args[1] as never)
+            return { dispose: async () => {} }
+          }
+        },
+      },
+    )
+  const context = new Proxy(
+    { location: { directory, project: { id: "global", directory, canonical: directory } } },
+    { get: (target, key: string) => (key in target ? (target as Record<string, unknown>)[key] : domain(key)) },
+  )
+  return { context: context as never, calls, invocations, transforms, hooks }
+}

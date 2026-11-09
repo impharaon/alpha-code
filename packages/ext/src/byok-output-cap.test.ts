@@ -4,10 +4,7 @@
 //   ③ **双向漂移锁**:实读表 ↔ 出货目录 `codepuppy-models.json`。`#1265` 的教训是只锁一个方向等于没锁 ——
 //      表里多出目录没有的条目(读数发给一个已下架的模型)与目录新增而没人量它(静默留在 32000),
 //      两个方向都必须红。
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { describe, expect, test } from "bun:test"
 import { BYOK_OUTPUT_CAP_READINGS, BYOK_OUTPUT_CAP_UNREAD, byokOutputCap } from "./byok-output-cap"
 import catalog from "../../ui-mac/src/main/codepuppy-models.json"
 // `#1556`:出货目录 = 随包 BYOK 首启引导(模型)× App 内置适配器表(baseURL)。
@@ -59,96 +56,8 @@ describe("byokOutputCap —— 判据形状域", () => {
   })
 })
 
-describe("真 CodePuppyExt 的 chat.params 钩子", () => {
-  let root = ""
-  let savedBase: string | undefined
-  let savedGlobal: string | undefined
-  beforeEach(() => {
-    root = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-byokcap-")))
-    const global = join(root, "global", "env", "dev")
-    mkdirSync(global, { recursive: true })
-    mkdirSync(join(root, "project"), { recursive: true })
-    savedBase = process.env.CODEPUPPY_BASE_URL
-    savedGlobal = process.env.CODEPUPPY_GLOBAL_DIR
-    process.env.CODEPUPPY_GLOBAL_DIR = global
-    process.env.CODEPUPPY_BASE_URL = "https://gw.example/v1"
-  })
-  afterEach(() => {
-    if (savedBase === undefined) delete process.env.CODEPUPPY_BASE_URL
-    else process.env.CODEPUPPY_BASE_URL = savedBase
-    if (savedGlobal === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
-    else process.env.CODEPUPPY_GLOBAL_DIR = savedGlobal
-    rmSync(root, { recursive: true, force: true })
-  })
-
-  type ChatParams = (
-    input: { sessionID: string; agent: string; model: unknown; provider: { options?: Record<string, unknown> }; message: unknown },
-    output: { temperature?: number; topP?: number; topK?: number; maxOutputTokens: number | undefined; options: Record<string, unknown> },
-  ) => Promise<void>
-
-  const load = async () => {
-    const { CodePuppyExt } = await import("./plugin")
-    const hooks = await CodePuppyExt({
-      directory: join(root, "project"),
-      worktree: join(root, "project"),
-      client: { instance: { dispose: async () => {} } },
-    } as unknown as Parameters<typeof CodePuppyExt>[0])
-    return (hooks as unknown as Record<string, unknown>)["chat.params"] as ChatParams
-  }
-  const call = async (hook: ChatParams, providerID: string, modelID: string, baseURL: string) => {
-    const output = { temperature: 0.6, topP: 0.95, topK: 20, maxOutputTokens: 32000 as number | undefined, options: { reasoningEffort: "high" } }
-    await hook(
-      { sessionID: "s", agent: "build", model: { providerID, api: { id: modelID } }, provider: { options: { baseURL, apiKey: "sk" } }, message: {} },
-      output,
-    )
-    return output
-  }
-
-  test("直连 BYOK 节点(有读数):32000 → 该模型的实读上限,其它参数原样", async () => {
-    const out = await call(await load(), "zhipuai-byok", "glm-5.2", ZHIPU)
-    expect(out.maxOutputTokens).toBe(131072)
-    expect({ temperature: out.temperature, topP: out.topP, topK: out.topK, options: out.options }).toEqual({
-      temperature: 0.6,
-      topP: 0.95,
-      topK: 20,
-      options: { reasoningEffort: "high" },
-    })
-  })
-
-  test("同一个 provider 的两个模型各拿各的数", async () => {
-    const hook = await load()
-    expect((await call(hook, "zhipuai-byok", "glm-4.5-air", ZHIPU)).maxOutputTokens).toBe(98304)
-    expect((await call(hook, "deepseek-byok", "deepseek-flash", DEEPSEEK)).maxOutputTokens).toBe(393216)
-  })
-
-  test("无读数的 BYOK 模型 / 用户自定义节点:仍是上游的 32000", async () => {
-    const hook = await load()
-    expect((await call(hook, "moonshot-byok", "kimi-k3", "https://api.moonshot.cn/v1")).maxOutputTokens).toBe(32000)
-    expect((await call(hook, "my-own", "glm-5.2", "https://my.proxy.example/v1")).maxOutputTokens).toBe(32000)
-  })
-
-  test("平台代理节点仍然走 #1238 那条路(置空),BYOK 那一问不得把它改回一个数", async () => {
-    const out = await call(await load(), "alpha", "glm-5.2", "https://gw.example/v1")
-    expect(out.maxOutputTokens).toBeUndefined()
-  })
-
-  // 本钩子里抛异常 = 整条请求死。`model` 缺 `api`(或整个缺席)必须走到「查不到读数 ⇒ 不改」,
-  // 而不是 TypeError —— 这一格是本仓 platform-output-cap.test.ts 先抓到的,补进来当回归。
-  test("model 形状残缺(无 api / 无 model)时不抛,退回上游的 32000", async () => {
-    const hook = await load()
-    const bare = (model: unknown) => {
-      const output = { maxOutputTokens: 32000 as number | undefined, options: {} }
-      return hook(
-        { sessionID: "s", agent: "build", model, provider: { options: { baseURL: ZHIPU, apiKey: "sk" } }, message: {} },
-        output,
-      ).then(() => output)
-    }
-    expect((await bare({})).maxOutputTokens).toBe(32000)
-    expect((await bare({ providerID: "zhipuai-byok" })).maxOutputTokens).toBe(32000)
-    expect((await bare(undefined)).maxOutputTokens).toBe(32000)
-  })
-})
-
+// `#1665`:真宿主里的接线(OpenCode 2 的 `session.hook.context` options,BYOK 抬到实读上限 / 平台置空 / 查不到不改)
+// 在 plugin-host.test.ts 的 P5 用例。
 describe("双向漂移锁:实读表 ↔ 出货目录 codepuppy-models.json", () => {
   const byok = catalog.byokCatalog.providers.map((p) => ({
     id: p.id,

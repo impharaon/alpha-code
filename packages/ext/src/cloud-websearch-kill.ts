@@ -111,6 +111,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { readFileSync } from "node:fs"
+import type { MCPEditor } from "@opencode/plugin/promise/mcp"
+import { toServerConfig } from "./engine-transforms"
 import {
   CLOUD_MCP_DEF_ENV,
   CLOUD_MCP_SERVER_ENV,
@@ -118,7 +120,7 @@ import {
   type McpOwnership,
   resolveFileRefs,
   UNVERIFIED_MCP_OWNERSHIP,
-} from "@opencode-ai/plugin/alpha-cloud-authority"
+} from "@opencode/plugin/alpha-cloud-authority"
 
 export {
   CLOUD_MCP_DEF_ENV,
@@ -126,7 +128,7 @@ export {
   computeMcpOwnership,
   type McpOwnership,
   UNVERIFIED_MCP_OWNERSHIP,
-} from "@opencode-ai/plugin/alpha-cloud-authority"
+} from "@opencode/plugin/alpha-cloud-authority"
 
 /** main 每次 fork 前落定的**云侧**主权判决通道(`ui-mac/src/main/cloud-web-search.ts` 同名同义)。 */
 export const CLOUD_WEBSEARCH_DENY_ENV = "CODEPUPPY_CLOUD_WEBSEARCH_DENY"
@@ -219,19 +221,19 @@ export function isWebSearchToolId(tool: string): boolean {
 }
 
 /** alpha 自己注册的云 MCP server 名(注入面经 `CODEPUPPY_CLOUD_MCP_SERVER` 告知,见 ui-mac 同名常量)。 */
-/** `McpCatalog.sanitize`(`opencode/src/mcp/catalog.ts:117`)逐字同义 —— 工具 id 的前缀就是它的产物。 */
+/** 2.x `normalizedName`(`packages/core/src/tool/runtime.ts`;v1 是 `McpCatalog.sanitize`)逐字同义 —— 工具 id 的前缀就是它的产物。 */
 function sanitizeMcpName(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]/g, "_")
 }
 
 /**
- * 引擎给远端 MCP 工具起的 id,`McpCatalog.toolName`(`opencode/src/mcp/catalog.ts:119`)逐字同义:
+ * 引擎给远端 MCP 工具起的 id,2.x `McpTool.name`(`packages/core/src/tool/mcp.ts`;v1 是 `McpCatalog.toolName`)逐字同义:
  * `sanitize(server) + "_" + sanitize(remote)`。
  *
  * **#650**:`remoteName` 是远端 server **自己** advertise 的名字,不是引擎里的 id。云 worker 的
  * 远端名自带 `cloud_` 前缀(`cloud_web_search` / `cloud_dispatch` …),拼上 server 名 `cloud` 之后
  * 真实 id 是 `cloud_cloud_*` —— 把远端名当 id 用过的地方,闸一次都没生效过。ext 不依赖 opencode,
- * 拼法只能在这里再写一份;漂移由 `cloud-contract-hook.test.ts` 用**真的** `McpCatalog.toolName` 钉住。
+ * 拼法只能在这里再写一份;漂移由 `cloud-contract-hook.test.ts` 用**真的** `McpTool.name` 钉住。
  */
 export function mcpEngineToolId(server: string, remoteName: string): string {
   return `${sanitizeMcpName(server)}_${sanitizeMcpName(remoteName)}`
@@ -388,28 +390,26 @@ export const CLOUD_MCP_ARM_ENV = "CODEPUPPY_CLOUD_MCP_ARM"
  * 下面的 `resolveFileRefs` 对它**真的在解析**:读不到引用文件就整个不装(fail-closed),
  * 这条把关是解析后 Bearer 值进引擎前的唯一一跳。
  */
-type McpHost = { mcp?: Record<string, unknown> }
 
-// `{file:/abs/path}` 解析:文法与实现住在 @opencode-ai/plugin/alpha-cloud-authority(alpha 代码里唯一一份),
+// `{file:/abs/path}` 解析:文法与实现住在 @opencode/plugin/alpha-cloud-authority(alpha 代码里唯一一份),
 // 这里转出给 ext 内既有的调用方(installCloudMcp、cloud-vision)。
 export { resolveFileRefs }
 
 /**
- * 把注入面托管的云 MCP server 定义装进配置。返回被装上的 server 名(没有可装的则 undefined)。
+ * 把注入面托管的云 MCP server 定义装进本 Location 的 MCP 配置(`#1665`:2.x 的 `mcp.transform` 编辑器,清点表 M3)。
+ * 返回被装上的 server 名(没有可装的则 undefined)。同名的既有条目(注入面的中和条目、或任何继承来的同名定义)被整条替换。
  *
- * 只在 ARM 与 DEF **同时**在场时动手 —— 两个都由 sidecar 内的 `injectCodePuppyConfig` 在每次 fork
- * 时置位或删除,外部伪造一个进不去(见 ui-mac `cloud-web-search.ts` 的通道说明)。
+ * 只在 ARM 与 DEF **同时**在场时动手 —— 两个都由 sidecar 内的注入在每次 fork 时置位或删除,外部伪造一个进不去
+ * (见 ui-mac `cloud-web-search.ts` 的通道说明)。
  */
 export function installCloudMcp(
-  cfg: unknown,
+  editor: Pick<MCPEditor, "set">,
   env: Record<string, string | undefined> = process.env,
   readFile: (path: string) => string = (path) => readFileSync(path, "utf8"),
 ): string | undefined {
   const name = env[CLOUD_MCP_ARM_ENV]
   const raw = env[CLOUD_MCP_DEF_ENV]
   if (!name || !raw) return undefined
-  const host = cfg as McpHost | null | undefined
-  if (!host || typeof host !== "object") return undefined
 
   let definition: unknown
   try {
@@ -437,6 +437,11 @@ export function installCloudMcp(
     return undefined
   }
 
-  host.mcp = { ...(host.mcp ?? {}), [name]: { ...resolved, enabled: true } }
+  const config = toServerConfig({ ...resolved, enabled: true })
+  if (!config) {
+    console.error(`[@codepuppy/ext] cloud MCP server "${name}" NOT installed: ${CLOUD_MCP_DEF_ENV} is not a remote server definition`)
+    return undefined
+  }
+  editor.set(name, config)
   return name
 }

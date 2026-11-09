@@ -4,8 +4,9 @@
 // 合并语义:项目级条目补进 cfg 的命名域(mcp/agent/command),existing(全局)优先不覆盖(项目「新增」
 // 而非「覆盖全局」的语义在此阶段——覆盖策略留 T1 信任门后细化);skills 走 { paths:[] } object 并集
 // (与全局 REQ-059 同一 schema 教训,数组会被引擎拒)。plugin 不在此(走 host fan-out,ADR-006 生 TS 雷)。
+// `#1665`(OpenCode 2):合并结果是一份 v1 形状的小对象,由 engine-transforms.ts 翻译进 2.x 的按域 transform。
 
-import { lstatSync, realpathSync } from "node:fs"
+import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs"
 import { homedir } from "node:os"
 import { isAbsolute, join, normalize, relative, resolve } from "node:path"
 import { PROJECT_HIDDEN_DIR } from "../../ui-mac/src/shared/project-hidden-dir"
@@ -18,6 +19,9 @@ export type ProjectDirectoryIdentity =
   | { status: "project"; directory: string; root: string }
   | { status: "retired-home"; reason: string }
   | { status: "unknown"; reason: string }
+
+/** 已验证的项目根(`projectDirectoryIdentity` 的 project 分支)。 */
+export type ProjectRoot = Extract<ProjectDirectoryIdentity, { status: "project" }>
 
 /** home 项目边界三态：project 分支携带唯一可供消费者使用的已验证 `.codepuppy` root。 */
 export function projectDirectoryIdentity(directory: string, homeDir: string = homedir()): ProjectDirectoryIdentity {
@@ -254,6 +258,22 @@ export function stripJsonc(text: string): string {
 function isRealDirectory(path: string): boolean {
   try {
     return lstatSync(path).isDirectory()
+  } catch {
+    return false
+  }
+}
+
+/** 项目扩展信任门 consent:`<dir>/.codepuppy/prefs.json` 的 `extensionsConsent.granted === true`(版本化,
+ *  ADR-021 模式)。缺失/坏/未授 = 不信任(默认拒绝可执行物,安全红线);身份漂移 = null。 */
+export function readProjectExtensionsConsent(project: ProjectRoot): boolean | null {
+  const present = withProjectDirectoryIdentity(project, (root) => existsSync(join(root, "prefs.json")))
+  if (!present.ok) return null
+  if (!present.value) return false
+  try {
+    const read = withProjectDirectoryIdentity(project, (root) => readFileSync(join(root, "prefs.json"), "utf8"))
+    if (!read.ok) return null
+    const prefs = JSON.parse(read.value) as { extensionsConsent?: { granted?: unknown } }
+    return prefs?.extensionsConsent?.granted === true
   } catch {
     return false
   }

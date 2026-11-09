@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { mergeProjectConfig, projectDirectoryIdentity, requireCodePuppyGlobalRoot, withProjectDirectoryIdentity } from "./project-config"
 import { CodePuppyExt } from "./plugin"
+import { recordingContext } from "./plugin-host.harness"
 import { PROJECT_HIDDEN_DIR } from "../../ui-mac/src/shared/project-hidden-dir"
 
 const j = (o: unknown) => JSON.stringify(o)
@@ -256,7 +257,10 @@ describe("project/root identity fail-closed", () => {
     const config = JSON.stringify({ agent: { retired: { prompt: "must not load" } } })
     writeFileSync(join(retired, "codepuppy.jsonc"), config)
     writeFileSync(join(retired, "prefs.json"), JSON.stringify({ extensionsConsent: { version: 1, granted: true } }))
-    writeFileSync(join(retired, "plugins", "retired.js"), "export default async () => ({ tool: { retired_tool: {} } })")
+    writeFileSync(
+      join(retired, "plugins", "retired.js"),
+      'export default { id: "retired", async setup(context) { await context.tool.hook("execute.before", () => {}) } }',
+    )
     writeFileSync(join(retired, "sentinel"), "untouched")
     symlinkSync(retired, join(project, PROJECT_HIDDEN_DIR), "dir")
 
@@ -265,23 +269,25 @@ describe("project/root identity fail-closed", () => {
     const previous = process.env.CODEPUPPY_GLOBAL_DIR
     process.env.CODEPUPPY_GLOBAL_DIR = realpathSync(global)
     try {
-      const hooks = await CodePuppyExt({
-        directory: project,
-        worktree: project,
-        client: { instance: { dispose: async () => {} } },
-      } as unknown as Parameters<typeof CodePuppyExt>[0])
-      const exposed = hooks as unknown as {
-        config: (cfg: Record<string, unknown>) => Promise<void>
-        tool: Record<string, { execute: (args: { type: "agent"; name: string; entry: string }, ctx: { directory: string; sessionID: string }) => Promise<{ metadata: { ok: boolean } }> }>
-      }
-      const cfg: Record<string, unknown> = {}
-      await exposed.config(cfg)
-      expect((cfg.agent as Record<string, unknown>).retired).toBeUndefined()
-      expect(exposed.tool.retired_tool).toBeUndefined()
-
-      const registered = await exposed.tool.codepuppy_register.execute(
+      // `#1665`:OpenCode 2 下 ext 按 Location 跑 setup —— 驱动它注册的 agent / tool transform 与执行钩子。
+      const recorded = recordingContext(project)
+      await CodePuppyExt.setup(recorded.context)
+      const agents = new Map<string, unknown>()
+      for (const transform of recorded.transforms.agent ?? [])
+        transform({ get: (id: string) => agents.get(id), update: (id: string, fn: (a: Record<string, unknown>) => void) => {
+          const current = (agents.get(id) as Record<string, unknown> | undefined) ?? {}
+          fn(current)
+          agents.set(id, current)
+        } } as never)
+      expect(agents.has("retired")).toBe(false)
+      // 项目插件扇出没跑:执行钩子只有 ext 自己的那一个
+      expect(recorded.hooks["tool.execute.before"]).toHaveLength(1)
+      const tools: Array<{ name: string; execute: (args: unknown, ctx: unknown) => Promise<{ metadata: { ok: boolean } }> }> = []
+      for (const transform of recorded.transforms.tool ?? []) transform({ add: (tool: never) => void tools.push(tool) } as never)
+      expect(tools.some((tool) => tool.name === "retired_tool")).toBe(false)
+      const registered = await tools.find((tool) => tool.name === "codepuppy_register")!.execute(
         { type: "agent", name: "new-agent", entry: JSON.stringify({ prompt: "write" }) },
-        { directory: project, sessionID: "s1" },
+        { sessionID: "s1" },
       )
       expect(registered.metadata.ok).toBe(false)
       expect(readFileSync(join(retired, "codepuppy.jsonc"), "utf8")).toBe(config)

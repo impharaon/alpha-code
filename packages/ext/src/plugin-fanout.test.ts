@@ -1,50 +1,7 @@
+// REQ-060 项目插件扇出(plugin-fanout.ts),`#1665` 起项目插件是 OpenCode 2 的 promise 插件(`{ id, setup }`):
+// ext 用同一个插件 Context 调它们的 setup,收集它们的 Cleanup。排序(夹在 registerPolicy 与 seal 之间)在 plugin-setup-order.test.ts。
 import { describe, expect, test } from "bun:test"
-import { loadProjectPlugins, mergeHooks } from "./plugin-fanout"
-
-describe("mergeHooks — host + project plugin hooks", () => {
-  test("tool maps shallow-merged, own keys win", () => {
-    const own = { tool: { codepuppy_ping: "OWN", shared: "OWN" } }
-    const other = { tool: { proj_tool: "P", shared: "PROJ" } }
-    const m = mergeHooks(own, [other])
-    expect(m.tool).toEqual({ codepuppy_ping: "OWN", shared: "OWN", proj_tool: "P" }) // shared: own wins
-  })
-
-  test("function hooks forwarded — own first, then each project plugin", async () => {
-    const calls: string[] = []
-    const own = { async event() { calls.push("own") } }
-    const p1 = { async event() { calls.push("p1") } }
-    const p2 = { async event() { calls.push("p2") } }
-    const m = mergeHooks(own, [p1, p2])
-    await (m.event as () => Promise<void>)()
-    expect(calls).toEqual(["own", "p1", "p2"])
-  })
-
-  test("config hook forwarded with shared args (cfg mutation chains)", async () => {
-    const own = { async config(cfg: Record<string, unknown>) { cfg.own = true } }
-    const proj = { async config(cfg: Record<string, unknown>) { cfg.proj = true } }
-    const m = mergeHooks(own, [proj])
-    const cfg: Record<string, unknown> = {}
-    await (m.config as (c: Record<string, unknown>) => Promise<void>)(cfg)
-    expect(cfg).toEqual({ own: true, proj: true })
-  })
-
-  test("hook present only in project plugin still forwarded", async () => {
-    const calls: string[] = []
-    const own = {}
-    const proj = { async "chat.message"() { calls.push("proj") } }
-    const m = mergeHooks(own, [proj])
-    expect(typeof m["chat.message"]).toBe("function")
-    await (m["chat.message"] as () => Promise<void>)()
-    expect(calls).toEqual(["proj"])
-  })
-
-  test("no others → own returned intact", () => {
-    const own = { tool: { a: 1 }, async event() {} }
-    const m = mergeHooks(own, [])
-    expect(m.tool).toEqual({ a: 1 })
-    expect(typeof m.event).toBe("function")
-  })
-})
+import { loadProjectPlugins } from "./plugin-fanout"
 
 describe("loadProjectPlugins — trust gate + dynamic import", () => {
   const baseDeps = {
@@ -54,71 +11,84 @@ describe("loadProjectPlugins — trust gate + dynamic import", () => {
     pathToFileURL: (p: string) => `file://${p}`,
     join: (...parts: string[]) => parts.join("/"),
   }
+  const plugin = (id: string, onSetup: (context: unknown) => unknown = () => undefined) => ({ default: { id, setup: onSetup } })
 
   test("untrusted → returns [] (executable not loaded)", async () => {
     let imported = 0
-    const hooks = await loadProjectPlugins("/proj/.alpha", {}, false, {
+    const cleanups = await loadProjectPlugins("/proj/.codepuppy", {}, false, {
       ...baseDeps,
-      importModule: async () => (imported++, { default: async () => ({}) }),
+      importModule: async () => (imported++, plugin("x")),
     })
-    expect(hooks).toEqual([])
+    expect(cleanups).toEqual([])
     expect(imported).toBe(0)
   })
 
-  test("trusted → imports only .js, calls Plugin(input), collects hooks", async () => {
+  test("trusted → imports only .js, calls setup(同一个插件 Context), collects the Cleanups it returns", async () => {
     const seen: string[] = []
-    const hooks = await loadProjectPlugins("/proj/.alpha", { directory: "/proj" }, true, {
+    const contexts: unknown[] = []
+    const context = { location: { directory: "/proj" } }
+    const cleanups = await loadProjectPlugins("/proj/.codepuppy", context, true, {
       ...baseDeps,
       importModule: async (url) => {
         seen.push(url)
-        return { default: async () => ({ tool: { [`t_${url.slice(-4)}`]: 1 } }) }
+        return plugin(url, (ctx) => {
+          contexts.push(ctx)
+          return url.endsWith("a.js") ? () => {} : undefined
+        })
       },
     })
-    expect(seen).toEqual(["file:///proj/.alpha/plugins/a.js", "file:///proj/.alpha/plugins/b.js"]) // notjs.ts skipped
-    expect(hooks.length).toBe(2)
+    expect(seen).toEqual(["file:///proj/.codepuppy/plugins/a.js", "file:///proj/.codepuppy/plugins/b.js"]) // notjs.ts skipped
+    expect(contexts).toEqual([context, context])
+    expect(cleanups).toHaveLength(1)
   })
 
   test("dynamic import 紧前身份复验失败 → 整次 fan-out 拒绝且 import 零执行", async () => {
     let imported = 0
     let checks = 0
-    const hooks = await loadProjectPlugins("/proj/.alpha", {}, true, {
+    const cleanups = await loadProjectPlugins("/proj/.codepuppy", {}, true, {
       ...baseDeps,
       verifyIdentity: () => ++checks < 3,
-      importModule: async () => (imported++, { default: async () => ({}) }),
+      importModule: async () => (imported++, plugin("x")),
     })
-    expect(hooks).toEqual([])
+    expect(cleanups).toEqual([])
     expect(imported).toBe(0)
   })
 
-  test("a broken plugin is skipped loud, others still load", async () => {
+  test("a broken plugin (import or setup throws) is skipped loud, others still load", async () => {
     const errors: string[] = []
-    const hooks = await loadProjectPlugins("/proj/.alpha", {}, true, {
+    const loaded: string[] = []
+    await loadProjectPlugins("/proj/.codepuppy", {}, true, {
       ...baseDeps,
-      readdirSync: () => ["good.js", "bad.js"],
+      readdirSync: () => ["good.js", "bad.js", "throws.js"],
       importModule: async (url) => {
         if (url.includes("bad")) throw new Error("boom")
-        return { default: async () => ({ event: async () => {} }) }
+        if (url.includes("throws"))
+          return plugin("throws", () => {
+            throw new Error("setup exploded")
+          })
+        return plugin("good", () => void loaded.push("good"))
       },
       error: (m) => errors.push(m),
     })
-    expect(hooks.length).toBe(1)
+    expect(loaded).toEqual(["good"])
     expect(errors.some((e) => e.includes("bad.js"))).toBe(true)
+    expect(errors.some((e) => e.includes("throws.js") && e.includes("setup exploded"))).toBe(true)
   })
 
   test("no plugins dir → []", async () => {
-    const hooks = await loadProjectPlugins("/proj/.alpha", {}, true, { ...baseDeps, existsSync: () => false, importModule: async () => ({}) })
-    expect(hooks).toEqual([])
+    const cleanups = await loadProjectPlugins("/proj/.codepuppy", {}, true, { ...baseDeps, existsSync: () => false, importModule: async () => ({}) })
+    expect(cleanups).toEqual([])
   })
 
-  test("module without default fn → skipped loud", async () => {
+  test("v1 function plugin or a module without a { id, setup } default → skipped loud (2.x has no hook table to run it)", async () => {
     const errors: string[] = []
-    const hooks = await loadProjectPlugins("/proj/.alpha", {}, true, {
+    const cleanups = await loadProjectPlugins("/proj/.codepuppy", {}, true, {
       ...baseDeps,
-      readdirSync: () => ["x.js"],
-      importModule: async () => ({ notAPlugin: 1 }),
+      readdirSync: () => ["v1.js", "x.js"],
+      importModule: async (url) => (url.includes("v1") ? { default: async () => ({ event: async () => {} }) } : { notAPlugin: 1 }),
       error: (m) => errors.push(m),
     })
-    expect(hooks).toEqual([])
-    expect(errors.some((e) => e.includes("no default export"))).toBe(true)
+    expect(cleanups).toEqual([])
+    expect(errors.filter((e) => e.includes("must be an OpenCode 2 plugin { id, setup }"))).toHaveLength(2)
   })
 })

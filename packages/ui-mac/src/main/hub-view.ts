@@ -10,15 +10,16 @@
 //   否则                              ⇒ reload-pending,原因按序:在途重载(reload-coordinator)⇒ 即时核验没过的细节
 //                                        (云条目除外,见下)
 // 核验按种类(全部带 directory,全部可失败;**核不了 = 不标 available**):
-//   mcp(global)  该目录 mcp.status[name] = connected(verifyInstalledMcp)
+// (`#1667`:OpenCode 2 的 `/api/*` 路由,目录经 `location[directory]` 选 Location)
+//   mcp(global)  该目录 `/api/mcp` 里 name 那一项 = connected(verifyInstalledMcp)
 //   mcp(project) 既有 D-scoped 判据 = active(信任门 + probeProjectMcpActivation)
 //   cloud        云 MCP 在该目录 connected ∧ tool-policy inventory 里云服务的 dispatch 在列且 enabled
 //                (DECIDE `#1524` 结论,基线 §2.5 云行)。没有重载环节:核验不过时**最高 installed**,原因写明缺的是
 //                连接还是工具,不出重载入口、不取在途重载的原因
-//   skill        GET /skill?directory 有同名,且 location 落在 main 为它安装的目录里(generation live 目录,
+//   skill        GET /api/skill 有同名,且 path 落在 main 为它安装的目录里(generation live 目录,
 //                否则账本根下的 skills/<name>)—— 身份,不只名字
-//   agent        GET /agent?directory 有同名且 disable !== true
-//   command      GET /command?directory 有同名
+//   agent        GET /api/agent 有同名(id 或 name)且没有 disabled
+//   command      GET /api/command 有同名
 //   其它种类      核不了 —— 落 installed + 原因(重载修不好「没有判据」),不出重载入口(`#1531`)
 //   MCP 要授权    needs_auth / needs_client_registration 同上:installed + 原状态词,不出重载入口(`#1531`)
 //   MCP 准备中    pending(引擎后台启动中)同上;后台重连时细节附上次失败(`#1563`)
@@ -27,7 +28,7 @@
 
 import { realpathSync } from "node:fs"
 import { isAbsolute, join, relative } from "node:path"
-import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
+import { engineClient, type EngineClient } from "./engine-client"
 import type { EngineConnection } from "./engine-authorization"
 import type { CatalogEntry } from "../renderer/extensions/catalog-types"
 import { installableCatalogEntries, installableCatalogPackages } from "../renderer/extensions/catalog-installable-view"
@@ -150,24 +151,25 @@ export function wildcardMatch(input: string, pattern: string): boolean {
   return new RegExp("^" + escaped + "$", process.platform === "win32" ? "si" : "s").test(normalized)
 }
 
-type Rule = { permission: string; pattern: string; action: string }
+/** `#1667`:OpenCode 2 的权限规则 `{ action, resource, effect }`(`packages/schema/src/permission.ts` 的 `Permission.Rule`)。 */
+type Rule = { action: string; resource: string; effect: string }
 function asRuleset(value: unknown): Rule[] | undefined {
   if (!Array.isArray(value)) return
   const rules: Rule[] = []
   for (const rule of value) {
-    if (!isRecord(rule) || typeof rule.permission !== "string" || typeof rule.pattern !== "string" || typeof rule.action !== "string")
+    if (!isRecord(rule) || typeof rule.action !== "string" || typeof rule.resource !== "string" || typeof rule.effect !== "string")
       return
-    rules.push({ permission: rule.permission, pattern: rule.pattern, action: rule.action })
+    rules.push({ action: rule.action, resource: rule.resource, effect: rule.effect })
   }
   return rules
 }
 
-/** 引擎的求值:agent ruleset ++ session ruleset 扁平拼接,findLast(permission/index.ts `evaluate`)。 */
+/** 引擎的求值:agent ruleset ++ session ruleset 扁平拼接,findLast(`packages/core/src/permission.ts` 的 `evaluate`)。 */
 export function skillActionFor(name: string, agentRules: readonly Rule[], sessionRules: readonly Rule[]): string {
   const rule = [...agentRules, ...sessionRules].findLast(
-    (r) => wildcardMatch("skill", r.permission) && wildcardMatch(name, r.pattern),
+    (r) => wildcardMatch("skill", r.action) && wildcardMatch(name, r.resource),
   )
-  return rule?.action ?? "ask"
+  return rule?.effect ?? "ask"
 }
 
 function packageRowsFor(views: CatalogPackageViewV1[], rows: HubViewRow[], globalRoot: string, warnings: string[]): HubViewRow[] {
@@ -223,28 +225,22 @@ export function createHubViewService(deps: HubViewDeps): HubViewService {
   const fetchImpl = deps.fetch ?? fetch
   const toolPolicy = createToolPolicyClient({ awaitServer: deps.awaitServer, fetch: fetchImpl, timeoutMs })
 
-  /** 一次计算内的引擎读(每种只读一次)。 */
+  /** 一次计算内的引擎读(每种只读一次)。`#1667`:OpenCode 2 的 `/api/skill` / `/api/agent` / `/api/command`(`{ location, data }`)
+   *  与 `/api/session/:id`,经上游客户端 `@opencode/client`;目录经 `location[directory]` 选 Location。 */
   function engineReads(directory: string) {
-    let client: Promise<ReturnType<typeof createOpencodeClient>> | undefined
+    let client: Promise<EngineClient> | undefined
     const getClient = () =>
       (client ??= withTimeout(deps.awaitServer(), timeoutMs, "timed out waiting for the engine").then((server) =>
-        createOpencodeClient({
-          baseUrl: server.url,
-          fetch: fetchImpl,
-          headers:
-            server.username || server.password
-              ? { Authorization: `Basic ${Buffer.from(`${server.username ?? ""}:${server.password ?? ""}`).toString("base64")}` }
-              : undefined,
-        }),
+        engineClient(server, fetchImpl),
       ))
-    const list = (label: string, call: (c: ReturnType<typeof createOpencodeClient>) => Promise<unknown>) => {
+    const location = { directory }
+    const list = (label: string, call: (c: EngineClient) => Promise<{ data: readonly unknown[] }>) => {
       let memo: Promise<Read> | undefined
       return () =>
         (memo ??= (async (): Promise<Read> => {
           try {
             const response = await withTimeout(getClient().then(call), timeoutMs, `timed out reading ${label}`)
-            if (!isRecord(response) || response.error !== undefined || !Array.isArray(response.data))
-              return { ok: false, detail: `${label} unreadable` }
+            if (!isRecord(response) || !Array.isArray(response.data)) return { ok: false, detail: `${label} unreadable` }
             return { ok: true, items: response.data.filter(isRecord) }
           } catch (error) {
             return { ok: false, detail: error instanceof Error ? error.message : String(error) }
@@ -253,19 +249,19 @@ export function createHubViewService(deps: HubViewDeps): HubViewService {
     }
     let inventory: ReturnType<typeof toolPolicy.inventory> | undefined
     return {
-      skills: list("skills", (c) => c.app.skills({ directory })),
-      agents: list("agents", (c) => c.app.agents({ directory })),
-      commands: list("commands", (c) => c.command.list({ directory })),
+      skills: list("skills", (c) => c.skill.list({ location })),
+      agents: list("agents", (c) => c.agent.list({ location })),
+      commands: list("commands", (c) => c.command.list({ location })),
       toolInventory: () => (inventory ??= toolPolicy.inventory({ directory })),
       session: async (sessionID: string): Promise<Rule[] | undefined> => {
         try {
-          const response = await withTimeout(
-            getClient().then((c) => c.session.get({ sessionID, directory })),
+          const session = await withTimeout(
+            getClient().then((c) => c.session.get({ sessionID })),
             timeoutMs,
             "timed out reading the session",
           )
-          if (!isRecord(response) || response.error !== undefined || !isRecord(response.data)) return
-          return response.data.permission === undefined ? [] : asRuleset(response.data.permission)
+          if (!isRecord(session)) return
+          return session.permissions === undefined ? [] : asRuleset(session.permissions)
         } catch {
           return
         }
@@ -316,14 +312,14 @@ export function createHubViewService(deps: HubViewDeps): HubViewService {
       if (!skills.ok) return { ok: false, detail: skills.detail }
       const loaded = skills.items.find((skill) => skill.name === row.name)
       if (!loaded) return { ok: false, detail: "skill not loaded" }
-      if (typeof loaded.location !== "string" || !isInside(loaded.location, installDir))
+      if (typeof loaded.path !== "string" || !isInside(loaded.path, installDir))
         return { ok: false, detail: "a different skill with this name is loaded" }
       return { ok: true }
     }
     if (row.kind === "agent") {
       const agents = await reads.agents()
       if (!agents.ok) return { ok: false, detail: agents.detail }
-      return agents.items.some((agent) => agent.name === row.name && agent.disable !== true)
+      return agents.items.some((agent) => (agent.id === row.name || agent.name === row.name) && agent.disabled !== true)
         ? { ok: true }
         : { ok: false, detail: "agent not loaded" }
     }
@@ -427,8 +423,8 @@ export function createHubViewService(deps: HubViewDeps): HubViewService {
       let sessionRules: Rule[] | undefined
       if (request.sessionID && request.agent) {
         const agents = await reads.agents()
-        const agent = agents.ok ? agents.items.find((item) => item.name === request.agent) : undefined
-        agentRules = agent ? asRuleset(agent.permission) : undefined
+        const agent = agents.ok ? agents.items.find((item) => item.id === request.agent || item.name === request.agent) : undefined
+        agentRules = agent ? asRuleset(agent.permissions) : undefined
         sessionRules = await reads.session(request.sessionID)
       }
       return {

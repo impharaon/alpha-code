@@ -62,10 +62,10 @@ const record = (root: string, over: Partial<UpsertInput> & Pick<UpsertInput, "id
 
 type Engine = {
   mcp: Record<string, { status: string; error?: string }>
-  skills: Array<{ name: string; location: string }>
+  skills: Array<{ name: string; path: string }>
   agents: Array<Record<string, unknown>>
   commands: Array<{ name: string }>
-  sessions: Record<string, { permission?: unknown }>
+  sessions: Record<string, { permissions?: unknown }>
   cloudDispatch?: "enabled" | "ask" | "disabled"
 }
 
@@ -73,19 +73,21 @@ function engineFetch(engine: Engine, seen: string[]): typeof fetch {
   return (async (input: RequestInfo | URL, init?: RequestInit) => {
     const request = new Request(input, init)
     const url = new URL(request.url)
-    const directory = url.searchParams.get("directory") ?? decodeURIComponent(request.headers.get("x-opencode-directory") ?? "")
+    // `#1667`:OpenCode 2 的路由与形状 —— 列表是 `{ location, data }`,目录经 `location[directory]`(或 RPC 的目录头)。
+    const directory = url.searchParams.get("location[directory]") ?? decodeURIComponent(request.headers.get("x-opencode-directory") ?? "")
     seen.push(`${url.pathname}@${directory}`)
-    if (url.pathname === "/mcp") return Response.json(engine.mcp)
-    if (url.pathname === "/skill") return Response.json(engine.skills)
-    if (url.pathname === "/agent") return Response.json(engine.agents)
-    if (url.pathname === "/command") return Response.json(engine.commands)
-    if (url.pathname.startsWith("/session/")) {
-      const session = engine.sessions[url.pathname.slice("/session/".length)]
-      return session ? Response.json({ id: "x", ...session }) : Response.json({ message: "not found" }, { status: 404 })
+    const located = (data: unknown) => Response.json({ location: { directory }, data })
+    if (url.pathname === "/api/mcp") return located(Object.entries(engine.mcp).map(([name, status]) => ({ name, status })))
+    if (url.pathname === "/api/skill") return located(engine.skills.map((skill) => ({ id: skill.name, content: "", ...skill })))
+    if (url.pathname === "/api/agent") return located(engine.agents)
+    if (url.pathname === "/api/command") return located(engine.commands)
+    if (url.pathname.startsWith("/api/session/")) {
+      const session = engine.sessions[url.pathname.slice("/api/session/".length)]
+      return session ? Response.json({ data: { id: "x", ...session } }) : Response.json({ message: "not found" }, { status: 404 })
     }
-    if (url.pathname === "/api/permission/tool-policy/inventory")
+    if (url.pathname === "/api/rpc/codepuppy.tool-policy/inventory")
       return Response.json({
-        data: {
+        output: {
           version: 1,
           partition: { account: "anonymous", workspace: "prj_1" },
           user: { status: "absent" },
@@ -146,10 +148,10 @@ function world(
   const engine: Engine = {
     mcp: { files: { status: "connected" }, codepuppy: { status: "connected" } },
     skills: [
-      { name: "writer", location: join(skillDir, "SKILL.md") },
-      { name: "twin", location: join(elsewhere, "SKILL.md") },
+      { name: "writer", path: join(skillDir, "SKILL.md") },
+      { name: "twin", path: join(elsewhere, "SKILL.md") },
     ],
-    agents: [{ name: "planner", mode: "subagent", permission: [], options: {} }],
+    agents: [{ id: "planner", name: "planner", mode: "subagent", permissions: [] }],
     commands: [],
     sessions: {},
     cloudDispatch: "enabled",
@@ -229,7 +231,7 @@ describe("hub-view 三档状态(§2.5)", () => {
     view = await w.service.view(w.projectDir)
     expect(row(view.rows, "skill:writer").stateReason).toEqual({ code: "not-loaded", detail: "skill not loaded" })
     // 核验通过就是可用,与在途重载无关
-    w.engine.skills = [{ name: "writer", location: join(w.globalRoot, "skills", "writer", "SKILL.md") }]
+    w.engine.skills = [{ name: "writer", path: join(w.globalRoot, "skills", "writer", "SKILL.md") }]
     w.coordinator.request({ scope: "global", items: [], reason: "again" })
     view = await w.service.view(w.projectDir)
     expect(row(view.rows, "skill:writer").state).toBe("available")
@@ -267,8 +269,9 @@ describe("hub-view 三档状态(§2.5)", () => {
     const w = world("not-reloadable")
     record(w.globalRoot, { id: "plugin:legacy", name: "legacy", kind: "plugin" })
     w.coordinator.request({ scope: "global", items: [], reason: "x" })
-    for (const status of ["needs_auth", "needs_client_registration"]) {
-      w.engine.mcp.files = { status }
+    // `#1667`:2.x 的 `Mcp.Status` 只有五种,要授权只剩 needs_auth(v1 的 needs_client_registration 不存在了)。
+    for (const status of ["needs_auth"]) {
+      w.engine.mcp.files = { status, error: "login required" }
       expect(row((await w.service.view(w.projectDir)).rows, "mcp:files")).toMatchObject({
         installed: true,
         enabled: true,
@@ -286,8 +289,9 @@ describe("hub-view 三档状态(§2.5)", () => {
   })
 
   // `#1563`:引擎在后台启动 MCP 时报 pending。它是准备中,不是失败 —— 落 installed、不出重载入口、不取在途重载
-  // 的原因(重载修不好「还没连上」);后台重连的那次带着上一次失败,细节里附上。对照:failed 仍是待重载。
-  test("#1563:pending 的 MCP / 云条目 ⇒ installed(准备中),不出重载入口;后台重连附上次失败", async () => {
+  // 的原因(重载修不好「还没连上」)。对照:failed 仍是待重载。`#1667`:2.x 的 pending 不带上一次失败(`Mcp.Status`
+  // 的 pending 只有 status),引擎给什么细节就显示什么 —— 多余的字段不再拼进原因。
+  test("#1563:pending 的 MCP / 云条目 ⇒ installed(准备中),不出重载入口", async () => {
     const w = world("pending")
     w.coordinator.request({ scope: "global", items: [], reason: "x" })
     w.engine.mcp.files = { status: "pending" }
@@ -298,10 +302,7 @@ describe("hub-view 三档状态(§2.5)", () => {
       stateReason: { code: "not-loaded", detail: "MCP pending" },
     })
     w.engine.mcp.files = { status: "pending", error: "fetch failed: connect ECONNREFUSED 127.0.0.1:443" }
-    expect(row((await w.service.view(w.projectDir)).rows, "mcp:files").stateReason).toEqual({
-      code: "not-loaded",
-      detail: "MCP pending (last failure: fetch failed: connect ECONNREFUSED 127.0.0.1:443)",
-    })
+    expect(row((await w.service.view(w.projectDir)).rows, "mcp:files").stateReason).toEqual({ code: "not-loaded", detail: "MCP pending" })
     w.engine.cloudDispatch = "enabled"
     w.engine.mcp.codepuppy = { status: "pending" }
     expect(row((await w.service.view(w.projectDir)).rows, "cloud:docs")).toMatchObject({
@@ -411,7 +412,7 @@ describe("hub-view 三档状态(§2.5)", () => {
       state: "reload-pending",
       stateReason: { code: "not-loaded", detail: "skill kit-skill: skill not loaded" },
     })
-    w.engine.skills.push({ name: "kit-skill", location: join(kitDir, "SKILL.md") })
+    w.engine.skills.push({ name: "kit-skill", path: join(kitDir, "SKILL.md") })
     const after = await w.service.view(w.projectDir)
     expect(row(after.rows, "package:kit")).toMatchObject({ scope: "global", installed: true, state: "available" })
     // 定制中心那一侧读的是同一档(I4)
@@ -445,12 +446,12 @@ describe("hub-view 三档状态(§2.5)", () => {
 describe("I4:定制中心与 agent 读同一档,会话只进 agentNote", () => {
   test("同一夹具两侧逐行同档同原因;agent 侧多出的只有技能行的 agentNote", async () => {
     const w = world("i4")
-    w.engine.skills = [{ name: "writer", location: join(w.globalRoot, "skills", "writer", "SKILL.md") }]
+    w.engine.skills = [{ name: "writer", path: join(w.globalRoot, "skills", "writer", "SKILL.md") }]
     w.engine.agents = [
-      { name: "planner", mode: "subagent", permission: [], options: {} },
-      { name: "build", mode: "primary", permission: [{ permission: "*", pattern: "*", action: "allow" }], options: {} },
+      { id: "planner", name: "planner", mode: "subagent", permissions: [] },
+      { id: "build", name: "build", mode: "primary", permissions: [{ action: "*", resource: "*", effect: "allow" }] },
     ]
-    w.engine.sessions = { ses_1: { permission: [{ permission: "skill", pattern: "writ*", action: "deny" }] } }
+    w.engine.sessions = { ses_1: { permissions: [{ action: "skill", resource: "writ*", effect: "deny" }] } }
     const hub = await w.service.view(w.projectDir)
     const agent = await w.service.viewForAgent({ directory: w.projectDir, sessionID: "ses_1", agent: "build" })
     const strip = (rows: HubViewRow[]) => rows.map(({ agentNote: _note, ...rest }) => rest)
@@ -486,9 +487,9 @@ describe("I4:定制中心与 agent 读同一档,会话只进 agentNote", () => {
   })
 
   test("技能权限求值与引擎同规则:扁平拼接 + findLast,通用 * 规则参与;wildcard 与上游 match 逐例一致", () => {
-    expect(skillActionFor("writer", [{ permission: "*", pattern: "*", action: "allow" }], [])).toBe("allow")
-    expect(skillActionFor("writer", [{ permission: "*", pattern: "*", action: "deny" }], [{ permission: "skill", pattern: "writer", action: "allow" }])).toBe("allow")
-    expect(skillActionFor("writer", [{ permission: "skill", pattern: "writer", action: "allow" }], [{ permission: "*", pattern: "*", action: "deny" }])).toBe("deny")
+    expect(skillActionFor("writer", [{ action: "*", resource: "*", effect: "allow" }], [])).toBe("allow")
+    expect(skillActionFor("writer", [{ action: "*", resource: "*", effect: "deny" }], [{ action: "skill", resource: "writer", effect: "allow" }])).toBe("allow")
+    expect(skillActionFor("writer", [{ action: "skill", resource: "writer", effect: "allow" }], [{ action: "*", resource: "*", effect: "deny" }])).toBe("deny")
     expect(skillActionFor("writer", [], [])).toBe("ask")
     const cases: Array<[string, string]> = [
       ["skill", "*"], ["skill", "skill"], ["skill", "sk?ll"], ["skill", "skills"], ["writer", "wr*"], ["a.b", "a.b"], ["axb", "a.b"],

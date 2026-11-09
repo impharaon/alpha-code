@@ -41,7 +41,7 @@ CI_STEPS=(
   "typecheck|typecheck @codepuppy/contracts-consumer|MIRRORED"
   "typecheck|typecheck @codepuppy/ext|MIRRORED"
   "typecheck|typecheck ui-mac|MIRRORED"
-  "typecheck|typecheck opencode (alpha 自有判据住在上游包里)|MIRRORED"
+  "typecheck|typecheck plugin (alpha 自有判据住在上游包里)|MIRRORED"
   "typecheck|typecheck core (alpha 自有判据住在上游包里)|MIRRORED"
   "typecheck|typecheck schema (alpha 自有判据住在上游包里)|MIRRORED"
   "test|verify immutable Code Puppy contract vendor lock|SUPERSET:开发机有兄弟仓 ⇒ 跑的是 provenance 已验档,CI 是降级档(#769)"
@@ -123,7 +123,7 @@ else
   echo "    ✗ literal NUL bytes found"; fail=1
 fi
 
-echo "▶ [4/14] typecheck (alpha packages: contracts-consumer + ext + ui-mac + opencode + core + schema)"
+echo "▶ [4/14] typecheck (alpha packages: contracts-consumer + ext + ui-mac + plugin + core + schema)"
 # REQ-027:flag 必须在 `run` 之后 —— `bun --cwd X run Y` 在 bun 1.3.x 打印 usage 后静默退出 0(不执行脚本)。
 # `#1134`:opencode 也在这里。它是上游包,但 alpha 自有的判据文件(ADR-043 谓词:不在 origin/dev
 # 里 ∧ 自报家门)住在它的 test/ 下,而该包的 tsconfig **不排除** *.test.ts / *.cases.ts ⇒ 那些文件
@@ -132,10 +132,13 @@ echo "▶ [4/14] typecheck (alpha packages: contracts-consumer + ext + ui-mac + 
 # `#1222`:同一形态又发生在 core(与 schema 一起补进来)。`packages/sdk/js` **刻意不加** ——
 # 实测它的 tsconfig 是 `"include": ["src"]`,alpha 自有的 test/ 结构性不在 program 里,
 # 加进来是安慰剂闸;缺口具名留在 `#1222`。
+# `#1664`:OpenCode 2 没有 packages/opencode,它的位置换成 packages/plugin —— ext 与 ui-mac 编译依赖
+# `@opencode/plugin`,alpha 自有的 `src/alpha-cloud-authority.ts` 住在它里面(接口冻结 I6);往那个文件注入
+# 已知类型错误,该包 typecheck 当场红(TS2322),不是安慰剂。
 if bun run --cwd packages/codepuppy-contracts-consumer typecheck \
   && bun run --cwd packages/ext typecheck \
   && bun run --cwd packages/ui-mac typecheck \
-  && bun run --cwd packages/opencode typecheck \
+  && bun run --cwd packages/plugin typecheck \
   && bun run --cwd packages/core typecheck \
   && bun run --cwd packages/schema typecheck; then
   echo "    ✓ typecheck"

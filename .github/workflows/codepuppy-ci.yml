@@ -195,9 +195,11 @@ jobs:
       # 还让另一条 lane 把它误诊成自己引入的。本机实测该包 typecheck 4 秒。
       # 口径(为什么是「收进」而不是对齐 ui-mac 的 exclude)见
       # docs/architecture/quality-gate-environments.md §3.11。
-      - name: typecheck opencode (alpha 自有判据住在上游包里)
+      # `#1664`:OpenCode 2 没有 packages/opencode;这一格换成 packages/plugin(ext / ui-mac 编译依赖它,
+      # alpha 自有的 src/alpha-cloud-authority.ts 住在里面),与 scripts/codepuppy-check.sh 第 [4/14] 步同一行。
+      - name: typecheck plugin (alpha 自有判据住在上游包里)
         if: needs.detect.outputs.code == 'true'
-        run: bun run --cwd packages/opencode typecheck
+        run: bun run --cwd packages/plugin typecheck
       # `#1222`:`#1134` 同一类的第二、三个实例。按 ADR-043 谓词枚举「上游包里的 alpha 自有
       # 文件」:opencode 24 · core 4 · schema 4 · sdk/js 1 · 其余四包 0。core 与 schema 此前
       # 不在任何门里 —— 2026-09-02 alpha 上 `packages/core` 一条真红(#223 主权闸判据文件)

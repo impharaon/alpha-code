@@ -30,7 +30,7 @@ import { tierAgent, v1CommandModelFields, v1PromptModelFields, type PermMode } f
 
 /**
  * I8:renderer 只拿到引擎源地址;认证头由 main 对引擎源补上(`#1668`)。`fetch` 是壳层传下来的引擎适配器
- * (renderer/index.tsx 的 engineFetch,v1 请求 → OpenCode 2),由壳注入而不是在这里 import —— 侧栏、定制中心、
+ * (renderer/index.tsx 的 engineFetch,v1 请求 → 2.x 引擎),由壳注入而不是在这里 import —— 侧栏、定制中心、
  * 云运行的组件测试运行时不必把适配器连同冻结 app 一起打包。
  */
 export interface ServerInfo {
@@ -107,7 +107,6 @@ export interface CodePuppyProjectsApi {
    *  resolve `false` on a transport failure so the caller can surface a toast (B11 row 13); a no-op
    *  (empty title) still resolves `true` — it is a cancel, not a failure to report. */
   renameSession(id: string, title: string): Promise<boolean>
-  shareSession(id: string, directory: string): Promise<string | undefined>
   deleteSession(id: string): Promise<boolean>
   /** Fetch the session's messages and format them as markdown text for copy-to-clipboard. */
   copySession(id: string): Promise<string | undefined>
@@ -543,16 +542,6 @@ export function useCodePuppyProjects(
       return false
     }
   }
-  async function shareSession(id: string, directory: string): Promise<string | undefined> {
-    const c = client
-    if (!c) return undefined
-    try {
-      const { data } = await c.session.share({ sessionID: id, directory } as any)
-      return (data as any)?.share?.url ?? (data as any)?.url
-    } catch {
-      return undefined
-    }
-  }
   async function deleteSession(id: string): Promise<boolean> {
     const c = client
     if (!c) return false
@@ -804,7 +793,6 @@ export function useCodePuppyProjects(
     startChat,
     sdk: () => client,
     renameSession,
-    shareSession,
     deleteSession,
     copySession,
     ensureDefaultWorkspace,

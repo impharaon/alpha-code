@@ -184,7 +184,7 @@ export function CodePuppySidebar(props: {
   // effect,整棵子树的 onMount 会在渲染结束后一起排队触发,时间戳全挤在同一刻 —— 那样分不出
   // 「上游壳挂了多久」与「路由树挂了多久」。组件体是渲染期,拿到的才是这一段的真实边界。
   markStartupTimeline("renderer.sidebar.setup")
-  const { store, reload, createSession, renameSession, shareSession, deleteSession, copySession } = props.projects
+  const { store, reload, createSession, renameSession, deleteSession, copySession } = props.projects
   const routerNavigate = useNavigate()
   const location = useLocation()
   const command = useCommand()
@@ -978,39 +978,7 @@ export function CodePuppySidebar(props: {
                 </svg>
                 <span>{t("codepuppy.sidebar.rename")}</span>
               </button>
-              <button
-                type="button"
-                class="codepuppy-project-menu-item"
-                role="menuitem"
-                onClick={() => {
-                  const session = m()
-                  dismissMenu(() => setSessionMenu(null), sessionMenuTrigger)
-                  void (async () => {
-                    const url = await shareSession(session.id, session.directory)
-                    if (!url) {
-                      pushToast({ kind: "error", title: t("codepuppy.sidebar.shareFailed") })
-                      return
-                    }
-                    const ok = await copyText(url)
-                    pushToast(
-                      ok
-                        ? { kind: "success", title: t("codepuppy.sidebar.shareCopied"), detail: url }
-                        : { kind: "success", title: t("codepuppy.sidebar.shareCreated"), detail: url },
-                    )
-                  })()
-                }}
-              >
-                <svg class="codepuppy-project-menu-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path
-                    d="M8 10V2.5M5.5 5 8 2.5 10.5 5M3 9v3.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V9"
-                    stroke="currentColor"
-                    stroke-width="1.2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
-                <span>{t("codepuppy.sidebar.share")}</span>
-              </button>
+              {/* `#1668` R6:owner 裁定拿掉「分享对话」(2.x 引擎没有会话分享;不把会话发到任何外部地址)。 */}
               <button
                 type="button"
                 class="codepuppy-project-menu-item"

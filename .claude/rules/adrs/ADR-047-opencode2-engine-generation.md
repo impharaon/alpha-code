@@ -33,14 +33,16 @@ OpenCode 2 删除了 Code Puppy 今天运行的整个 v1 引擎包(`packages/ope
 ## 决策 2 —— 集成形状:树按上游重建,历史照常合并
 
 一次受审上游集成,落在一个真合并提交上,第二父是选定的上游 dev SHA(ci.md §4 第 3 条)。合并提交的树按规则构造:上游路径取上游原样
-(上游删除的就删除),Code Puppy 自有路径取 alpha;此后在同一整合分支上把主权层改挂到 OpenCode 2 的接缝上;整条分支以
-`gh pr merge --merge` 一次合进 `alpha`。
+(上游删除的就删除),Code Puppy 自有路径取 alpha;此后在同一整合分支上把主权层改挂到 OpenCode 2 的接缝上。lane 不在 GitHub 上开 PR,
+由编排器在本机整合,整合分支只推非分支引用 `refs/backup/1662/engine` 做备份(不触发 workflow);落地是**一个**进 `alpha` 的最终 PR,
+`gh pr merge --merge` 合入 —— `alpha` 的 first-parent 上只多一个合并提交,撤回时 `revert -m 1` 有对象(裁决书 R16、N5)。
 
 - 合并目标取最新发布标签在 dev 线上的父提交(今天是 v2.2.6 → `33f94fce96`),不取 dev 头,也不取标签本身。
-- 上游祖先不得丢:合并提交直推整合分支或以 `gh pr merge --merge` 合入;整合分支吸收 `alpha` 只用 merge,禁止 squash / rebase;
+- 上游祖先不得丢:合并提交在本机整合分支上直接提交;整合分支吸收 `alpha` 只用 merge,禁止 squash / rebase;
   `git merge-base --is-ancestor <上游 SHA> HEAD` 在每次推送与最终合并前为真,且有「squash 重放后必须红」的反向用例。
 - 含受审上游合并的分支上,north-star 守卫的 `packages/` 辖区以该合并的上游父为基准判(不再以 `origin/alpha` 为基准);lane 推送不靠 `--no-verify`。
-- `packages/` 之外逐文件定归属:上游来源的跟上游 SHA 增删,Code Puppy 的跟 alpha;随合并新出现的上游 workflow 在合入前列清单、合入后逐个 `gh workflow disable`。
+- `packages/` 之外逐文件定归属:上游来源的跟上游 SHA 增删,Code Puppy 的跟 alpha。随合并新出现的上游 workflow 先列清单(名称 + 触发器 + 权限);
+  推最终 PR 的 head 分支之前逐个判它在 head 推送与 PR 上会不会以写权限触发,有则先处置;合入后立即逐个 `gh workflow disable` 并读回状态。
 - 被否决:逐冲突移植(冲突表不是能力清点,且自动合入会静默混入旧改动);重新 fork(断掉 990 个提交的历史与 merge-base);
   先过 1.19.5(它在 1.x 维护线上,对到达 2.x 零推进)。
 
@@ -49,13 +51,16 @@ OpenCode 2 删除了 Code Puppy 今天运行的整个 v1 引擎包(`packages/ope
 在已装进程围栏的 `utilityProcess` 里 import `@opencode/server/process` 并启动(进程围栏、ext 的 `parentPort` 桥、进程内调用形状不变)。
 L1a 实测(合成数据,勘破文档 `docs/architecture/2026-11-09-1662-l1-engine-host-spike.md`,提交 `0bfbdfb205`)在 Electron 42 的 Node 24.15 上
 满足「能起并完成回复 / 进程内调用与监听共用一张应用图 / 旧对话转换可在 Node 下运行」三条,宿主据此定为嵌入式(裁决书 R13);
-「打包上游 bun 编译的 CLI 作为围栏内私有子进程」只在这三条被推翻时才启用。实现必须同时守住:进程内接法取 `start()` + `Transform`
-并传 `lifecycle`(启动时续跑中断会话),不取 `ServerFetch.make`;`http.setGlobalProxyFromEnv()` 留在 import 引擎之前,否则模型请求绕开出网代理;
-传给引擎的渠道是发布渠道(`local`/`dev` 会默认打开五个实验开关)。**不得**使用上游的 `serve --service` 机器级共享服务:它与用户自装的
+「打包上游 bun 编译的 CLI 作为围栏内私有子进程」只在这三条被推翻时才启用。实现必须同时守住:进程内接法取 `start()` + `Transform`,
+**`start()` 不传 `lifecycle`**(裁决书 N1:传了会每次启动自动续跑未释放执行认领的会话 —— 平台计费、「全部批准」档下工具照常执行,今天 v1 没有
+这条路 —— 且启动失败变成永久挂起;不传即上游 CLI 默认模式、L1a 实测形态),不取 `ServerFetch.make`;`http.setGlobalProxyFromEnv()` 与 `XDG_*`
+都在 import 引擎之前定好,否则模型请求绕开出网代理、全局目录按错的根算;传给引擎的渠道是发布渠道,注入配置对五个实验开关显式写值,
+继承给引擎的环境去掉 `OPENCODE_FLAGS`(`local`/`dev` 渠道、用户配置的 `experimental.*` / `all_flags`、环境变量 `OPENCODE_FLAGS` 都会打开它们;
+裁决书 R13、R17、OOR-1)。**不得**使用上游的 `serve --service` 机器级共享服务:它与用户自装的
 OpenCode 共用服务、库与凭证。
 
-嵌入式下上游 CLI 宿主不在路径上(配置、模型目录、库路径的环境变量在 core 与 server 里没有读者,是 CLI 映射进 `start()` 的选项),
-所以由 sidecar 自己构造 `ServerOptions` 与 `Global` 层;其中库路径的推导与 Code Puppy 的 DB 安全带共用一个函数,不再造一份上游宿主的决定。
+嵌入式下上游 CLI 宿主不在路径上,它做的「环境变量 → 选项」映射由 sidecar 自己做:构造 `ServerOptions`(含 `config.directory`、`database.path`,
+服务端据 `config.directory` 自己建全局目录层);其中库路径的推导与 Code Puppy 的 DB 安全带共用一个函数,不再造一份上游宿主的决定(裁决书 N4)。
 
 ## 决策 4 —— 主权层的挂载与接管
 
@@ -68,8 +73,9 @@ OpenCode 共用服务、库与凭证。
   snapshot 规则集注入 deny,或对 Code Puppy 管的 MCP server 注入 `codemode: false`,实现二选一。
 - 工具改名(`bash`→`shell`、`task`→`subagent`、`apply_patch`→`patch`):策略与 agent 规则一次换成新名;身份账本([[ADR-041]])与 UI
   同时认新旧两个名字 —— 旧对话转换不改历史里的工具名,只追加一条给模型的提示。未知名字的规则加载时响亮报出。
-- 外部生态默认拒绝不变:嵌入时显式关闭 OpenCode 2 对 `.claude` 的读取;`~/.agents` 与项目 `.agents` 两类技能根不受这个开关管,
-  在 L0 以配置 `plugins` 的移除指令 `-opencode.config.compatibility` 关掉;第三方插件只经 ext 扇出、在同意之后装载。
+- 外部生态默认拒绝不变:`.claude` 与 `~/.agents`、项目 `.agents` 两类技能只由内置插件 `opencode.config.compatibility` 装载,**唯一机制**是在注入配置的
+  `plugins` 里写移除指令 `-opencode.config.compatibility`(L0;逃生开关置位时不注入;不另设 `config.claude = false`,裁决书 N3);
+  第三方插件只经 ext 扇出、在同意之后装载。
 - 引擎可用的凭证只来自 Code Puppy 的注入;不导入数据目录里不属于 Code Puppy 的凭证文件 —— 做法是首次以 OpenCode 2 启动前处置
   数据目录里的 `auth.json`(导入迁移不看配置,配置拦不住)。
 
@@ -79,11 +85,13 @@ OpenCode 共用服务、库与凭证。
 
 ## 决策 5 —— 数据
 
-- 第一次以 OpenCode 2 启动前由 DB 安全带做前进迁移备份;构建期迁移清单改由 OpenCode 2 的 `migration.gen.ts` 派生,并把 Code Puppy
-  两条退役迁移的 id 以冻结清单并入 —— 否则安全带把老用户的库判为「库比应用新」,每次启动都阻断且前进前不备份。
+- 第一次以 OpenCode 2 启动前由 DB 安全带做前进迁移备份;构建期迁移清单改由 OpenCode 2 的 `migration.gen.ts` 派生,Code Puppy 两条退役迁移的 id
+  单列一个字段,只用来排除出「未知 id」、不计入「待前进」(裁决书 N2)—— 不排除,安全带把老用户的库判为「库比应用新」,每次启动都阻断且前进前不备份;
+  若并进待前进,新装的 2.x 库每次启动都整库备份。DB 安全带在干净关闭的 WAL 库上只读打开失败、静默跳过的既有缺陷在本票内修(裁决书 R18)。
+  owner 真库的只读副本上已实测:排除两个退役 id 后给出「待前进」21 条、备份成功(裁决书 R19)。
 - v1 旧对话在新代次可见、可继续。OpenCode 2 的转换只在 bun 条件下运行、Node 条件下是空实现;嵌入式宿主下由构建期变换接上
   (上游源码逐字不动):`#v1-migration` 改指上游的 bun 实现,两处 bun 专有调用做 Node 薄适配,其中 `Bun.CryptoHasher` 那处必做
-  (裁决书 R14;L1a 合成库实测全部转换)。上游原版 Node 构建下旧对话静默全不可见而状态报 `completed`,所以这一步不可省。转换会删 `event` 表的行,并对每个
+  (裁决书 R14;L1a 合成库实测全部转换;owner 真库的只读副本上会话 119 → 119、597 条用户 + 助手消息全部保留,裁决书 R19)。上游原版 Node 构建下旧对话静默全不可见而状态报 `completed`,所以这一步不可省。转换会删 `event` 表的行,并对每个
   被转换的会话先删它在 `session_message` 里已有的行再写入转换结果;旧格式的 `message`/`part` 不删。
 - 新增的 Code Puppy 自有表名以 `_` 开头(OpenCode 2 约定嵌入方自有表用该前缀)。
 

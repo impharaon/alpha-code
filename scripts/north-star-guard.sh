@@ -53,7 +53,7 @@ cd "$(git rev-parse --show-toplevel)"
 
 # ── `#1288`:只读模式 `--print-jurisdiction` —— 把辖区说出来,而不是让别人再抄一份 ────
 # 漂移度量步(codepuppy-check 第 [13/14] 步,scripts/north-star-drift-metrics.sh)要回答的是
-# 「我们现在**总共**偏离上游多少」。它需要的四样东西 —— 辖区、两张 carve-out、上游镜像 ref、
+# 「我们现在**总共**偏离上游多少」。它需要的四样东西 —— 辖区、carve-out、上游镜像 ref、
 # 收编白名单有多长 —— 全都住在本文件里,而本文件是它们的**唯一真源**(`#889`)。
 # 让度量步自己再写一份 = `#637` 那个已经咬过我们一次的形状:两份清单各自漂移,而没有任何
 # 东西会变红。所以这里开一个只读模式:打印这些值然后退出,**一个 git 命令都不跑、一个字节
@@ -72,7 +72,7 @@ case "${1:-}" in
 esac
 [ "$#" -eq 0 ] || { echo "✗ 多余参数:$*" >&2; exit 2; }
 
-# ── 辖区 = `packages/` 全树 −(两张显式 carve-out)。ADR-044 / `#1247` ────────────────
+# ── 辖区 = `packages/` 全树 −(Code Puppy 自有包 carve-out)。ADR-044 / `#1247` ─────────────
 #
 # 缺陷(2026-09-06 实测):辖区原本是一张 8 个包的枚举
 # `packages/{opencode,core,server,tui,sdk,protocol,schema,client}`,而上游镜像 `origin/dev`
@@ -92,31 +92,25 @@ esac
 # 已知的坏。防漂断言在 packages/ui-mac/src/main/local-gate-parity.test.ts。
 UPSTREAM_PATHS="packages"
 
-# carve-out ①:Code Puppy 自有的 workspace 包 —— `origin/dev` 里**根本没有**这三条路径
-# (ADR-004 后果②:新增 workspace 包必然改写根 bun.lock;ADR-016 前端接管;REQ-224 契约消费者)。
+# carve-out:Code Puppy 自有的 workspace 包 —— `origin/dev` 里**根本没有**这些路径
+# (ADR-004 后果②:新增 workspace 包必然改写根 bun.lock;ADR-016 前端接管;REQ-224 契约消费者;
+# `#1668` 冻结前端的五个落点 `codepuppy-{app,ui,session-ui,sdk-v1,core-util}`,其中 `codepuppy-{app,ui}`
+# 另由 ADR-034 的 pin + SOT 补丁 roundtrip 门逐字节判 —— 那道门比本门更强,连「改了但没重生补丁」都红)。
 # 为什么是整包豁免、而不是走 ADR-043 的逐文件谓词:那个谓词要求每个文件**自报家门**
-# (`codepuppy-*` 命名或写一行 marker),而这三个包里成千上万个文件全是 Code Puppy 写的 —— 逐文件登记
+# (`codepuppy-*` 命名或写一行 marker),而这些包里成千上万个文件全归 Code Puppy 管 —— 逐文件登记
 # 只会把「改自己的代码」变成一道恒红门。
 # **这张清单由下面的运行期自检逐条对着上游镜像验一遍**:把一个真上游包写进来,是绕开整道门
 # 最便宜的一步(一行配置换一整个包的豁免),它不能只靠人看。
-CODEPUPPY_OWNED_PACKAGES="ext ui-mac codepuppy-contracts-consumer"
+CODEPUPPY_OWNED_PACKAGES="ext ui-mac codepuppy-contracts-consumer codepuppy-app codepuppy-ui codepuppy-session-ui codepuppy-sdk-v1 codepuppy-core-util"
 
-# carve-out ②:由 ADR-034 的 pin + SOT 补丁 roundtrip 盖住的前端包。
-# 它们**不是** Code Puppy 自有(`origin/dev` 里有,alpha 也确实在改),但覆盖它们的不是本门:
-#   · 无空档 —— `scripts/assert-frontend-patch-roundtrip.sh` 判的是「HEAD 的这两棵树必须能由
-#     `frontend/frontend-pin.lock` 的 pin + `frontend/codepuppy-patches/codepuppy-frontend.patch`
-#     **逐字节重建**」(比 tree sha),它比本门**更强**:连「改了但没重生补丁」都当场红,
-#     而本门只判「有没有改」。它跑在 codepuppy-ci 的同一个 job 里,且刻意用 `if: !cancelled()`。
-#   · 无重复 —— 本门若也盖它们,ADR-034 明写的日常工作流(改 seam = 改补丁 + 重生那两棵树)
-#     每一次都会被判成破北极星 ⇒ 恒红门 ⇒ `--no-verify` ⇒ 十道门一起关掉(`#754` 形态)。
-# 两处清单相同由 local-gate-parity.test.ts 判(有人把 roundtrip 门的 PACKAGES 改小 = 空档,即红)。
-ROUNDTRIP_PACKAGES="app ui"
+# `#1668`:原来的 carve-out ②(ROUNDTRIP_PACKAGES="app ui")已撤。冻结前端搬到上面的 `codepuppy-{app,ui}`
+# 落点之后,`packages/{app,ui}` 是上游 2.x 原样、Code Puppy 不用,回到普通上游路径,本门照常判。
 
-# 两张 carve-out 落成 pathspec。刻意**不**并进下面的 UPSTREAM_EXCLUDES:那张表的语义是
+# carve-out 落成 pathspec。刻意**不**并进下面的 UPSTREAM_EXCLUDES:那张表的语义是
 # 「ADR-033/035/038/041/042 逐文件**收编**」,与「这个包根本不归本门管」不是一回事,混在
 # 一起会让「新增收编须自己的 ADR」这条纪律在阅读时失焦。
 CARVEOUT_PATHSPECS=()
-for pkg in $CODEPUPPY_OWNED_PACKAGES $ROUNDTRIP_PACKAGES; do
+for pkg in $CODEPUPPY_OWNED_PACKAGES; do
   CARVEOUT_PATHSPECS+=(":(exclude)packages/$pkg")
 done
 # 被接管/生成文件的例外,与 codepuppy-ci.yml 的 `excludes=()` 逐条对齐。新增收编须自己的 ADR,
@@ -193,7 +187,6 @@ CODEPUPPY_OWNED_MARKER="north-star:codepuppy-owned"
 if [ "$GUARD_MODE" = print-jurisdiction ]; then
   printf 'UPSTREAM_PATHS\t%s\n' "$UPSTREAM_PATHS"
   printf 'CODEPUPPY_OWNED_PACKAGES\t%s\n' "$CODEPUPPY_OWNED_PACKAGES"
-  printf 'ROUNDTRIP_PACKAGES\t%s\n' "$ROUNDTRIP_PACKAGES"
   printf 'UPSTREAM_MIRROR\t%s\n' "$UPSTREAM_MIRROR"
   printf 'UPSTREAM_EXCLUDES_COUNT\t%s\n' "${#UPSTREAM_EXCLUDES[@]}"
   exit 0
@@ -393,7 +386,7 @@ if [ -n "$flagged" ]; then
   exit 1
 fi
 # 绿也要说清「这一跑量的是什么」(`#913` 同一条纪律):辖区不再是读者背得出来的 8 个包,
-# 而是「整棵 packages/ 减两张 carve-out」—— 不把 carve-out 打出来,「今天绿」就又变成隐含知识。
+# 而是「整棵 packages/ 减 carve-out」—— 不把 carve-out 打出来,「今天绿」就又变成隐含知识。
 baseline="origin/alpha"
 [ -z "$upstream_parent" ] || baseline="上游父 $(git rev-parse --short "$upstream_parent")"
-echo "✓ zero upstream package edits (辖区 = packages/ 全树 − Code Puppy 自有包 [${CODEPUPPY_OWNED_PACKAGES}] − ADR-034 roundtrip 包 [${ROUNDTRIP_PACKAGES}];baseline ${baseline};ADR-033 收编白名单 + ADR-043 Code Puppy 自有谓词除外)"
+echo "✓ zero upstream package edits (辖区 = packages/ 全树 − Code Puppy 自有包 [${CODEPUPPY_OWNED_PACKAGES}];baseline ${baseline};ADR-033 收编白名单 + ADR-043 Code Puppy 自有谓词除外)"

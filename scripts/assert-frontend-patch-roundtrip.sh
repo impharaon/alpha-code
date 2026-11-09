@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
 #
-# `#976` —— packages/{app,ui} 的 round-trip 闸:**HEAD 的那两棵树,必须能由 pin + SOT 补丁
-# 逐字重建出来**。
+# `#976` —— 冻结前端的 round-trip 闸:**HEAD 的 packages/codepuppy-{app,ui} 那两棵树,必须能由
+# pin + SOT 补丁逐字重建出来**。
 #
-# 这道门守的是什么(大白话):ADR-034 起 `packages/{app,ui}` 不是 alpha 自己的代码,而是
+# 落点(`#1668`):补丁里的路径仍是相对 pin 的 `packages/app/…`、`packages/ui/…`;树里的落点是
+# Code Puppy 自有路径 `packages/codepuppy-{app,ui}`(上游 2.x 的 packages/{app,ui} 原样留在原位、
+# Code Puppy 不用)。所以比较是「重建树的 packages/app ↔ HEAD 的 packages/codepuppy-app」,ui 同。
+#
+# 这道门守的是什么(大白话):ADR-034 起冻结前端不是凭空的一份代码,而是
 # 「上游 pin(frontend/frontend-pin.lock)+ 一份补丁(frontend/codepuppy-patches/codepuppy-frontend.patch)」
-# 的**投影**。两个地方会把这个投影**当真**并据此重写那两个目录:
-#   ① .github/workflows/sync-upstream.yml 的 `apply_codepuppy_frontend_delta` ——
-#      `rm -rf packages/app packages/ui` → `git checkout $PIN --` → `git apply` 补丁;
-#   ② frontend/README.md 的月更 bump 块 1 —— `git checkout $NEWPIN -- packages/app packages/ui`。
-# 也就是说:**改了 packages/{app,ui} 而没把改动重生进补丁,那份改动会被静默删除** ——
-# 不是报错,是下一次 sync 之后它就不在了。
+# 的**投影**;补丁是冻结前端相对 pin 的唯一改动记录。**改了 packages/codepuppy-{app,ui} 而没把
+# 改动重生进补丁,任何按 pin + 补丁重建冻结前端的人都会把那份改动静默删掉。**
+# (`#1668` 之前,sync-upstream.yml 的 `apply_codepuppy_frontend_delta` 与月更 bump 块 1 会据此
+# 重写 packages/{app,ui};落点搬到 codepuppy-* 之后两者都已撤掉,判据本身不变。)
 #
 # 这不是理论风险,已合并历史上真的发生过:f420fe2bb / cea23d639 / 0061eec19 / 7281627ed
 # (2026-07-24→07-26)四个提交上,补丁里没有 `packages/app/vendor/opencode-ai-client-1.17.13.tgz`
@@ -51,9 +53,10 @@ cd "$ROOT" || exit 1
 
 LOCK="frontend/frontend-pin.lock"
 PATCH="frontend/codepuppy-patches/codepuppy-frontend.patch"
-PACKAGES="packages/app packages/ui"
+# 「补丁里的路径:树里的落点」(`#1668`)
+PACKAGES="packages/app:packages/codepuppy-app packages/ui:packages/codepuppy-ui"
 
-echo "▸ round-trip 判据:HEAD 的 packages/{app,ui} == pin + ${PATCH}(锚在 **HEAD**,不含未提交改动)"
+echo "▸ round-trip 判据:HEAD 的 packages/codepuppy-{app,ui} == pin + ${PATCH}(锚在 **HEAD**,不含未提交改动)"
 
 # ── 前置自检:先证明这次测量的材料齐备,再谈结论 ───────────────────────────────
 # 「测不到」必须说「测量作废」,不能因为比较步没红就报绿(`#890`/`#946` 同款语义)。
@@ -97,7 +100,8 @@ if ! git cat-file -e "${PIN}^{commit}" 2>/dev/null; then
 fi
 # pin 里必须真的有这两个目录 —— 否则 read-tree 出来的基底根本不是这道门要比的东西,
 # 「重建树 != HEAD 树」会以一个看似有意义的形式红出来,而真正的原因是 lock 指错了提交。
-for p in $PACKAGES; do
+for pair in $PACKAGES; do
+  p="${pair%%:*}"
   if ! git cat-file -e "${PIN}:${p}" 2>/dev/null; then
     echo "::error::pin ${PIN} 里没有 ${p} —— lock 指向的提交不是一个能当基底的上游前端提交,本次测量作废。"
     exit 1
@@ -134,11 +138,13 @@ fi
 
 # ── 比较:两个包各自的 tree sha,逐字 ────────────────────────────────────────────
 drift=0
-for p in $PACKAGES; do
+for pair in $PACKAGES; do
+  p="${pair%%:*}"
+  dst="${pair##*:}"
   rebuilt="$(git rev-parse --verify --quiet "${rt}:${p}" || true)"
-  head_tree="$(git rev-parse --verify --quiet "HEAD:${p}" || true)"
+  head_tree="$(git rev-parse --verify --quiet "HEAD:${dst}" || true)"
   if [ -z "$head_tree" ]; then
-    echo "::error::HEAD 里没有 ${p} —— 整个目录被删掉了(ADR-034 的投影没了),本次测量作废。"
+    echo "::error::HEAD 里没有 ${dst} —— 整个目录被删掉了(ADR-034 的投影没了),本次测量作废。"
     drift=1
     continue
   fi
@@ -148,12 +154,12 @@ for p in $PACKAGES; do
     continue
   fi
   if [ "$rebuilt" = "$head_tree" ]; then
-    echo "    ✓ ${p}  pin+patch == HEAD  (${head_tree})"
+    echo "    ✓ ${dst}  pin+patch(${p}) == HEAD  (${head_tree})"
     continue
   fi
   drift=1
-  echo "::error::${p} 漂移:pin+patch 重建出 ${rebuilt},HEAD 是 ${head_tree}"
-  named="$(git diff-tree -r --name-status "$rebuilt" "$head_tree" | awk -v pkg="$p" -F'\t' 'NF>=2 { print "::error::    " $1 "\t" pkg "/" $2 }')"
+  echo "::error::${dst} 漂移:pin+patch 重建出 ${rebuilt},HEAD 是 ${head_tree}"
+  named="$(git diff-tree -r --name-status "$rebuilt" "$head_tree" | awk -v pkg="$dst" -F'\t' 'NF>=2 { print "::error::    " $1 "\t" pkg "/" $2 }')"
   if [ -z "$named" ]; then
     # tree sha 不等而逐路径 diff 一条都没有 = 观测手段自己坏了,别给一个看似有意义的清单。
     echo "::error::    (两棵树的 sha 不同,而 diff-tree 一条路径都没点名 —— 本次点名作废,请手工比对)"
@@ -162,21 +168,22 @@ for p in $PACKAGES; do
   fi
 done
 
-dirty="$(git --no-optional-locks status --porcelain -- packages/app packages/ui frontend/codepuppy-patches frontend/frontend-pin.lock 2>/dev/null || true)"
+dirty="$(git --no-optional-locks status --porcelain -- packages/codepuppy-app packages/codepuppy-ui frontend/codepuppy-patches frontend/frontend-pin.lock 2>/dev/null || true)"
 if [ -n "$dirty" ]; then
   echo "    注:下列文件有**未提交**改动,本判据锚在 HEAD ⇒ 它们不在本次比较里:"
   printf '%s\n' "$dirty" | sed 's/^/      /'
 fi
 
 if [ "$drift" -ne 0 ]; then
-  echo "::error::packages/{app,ui} 与 SOT 不一致 —— 下一次 sync-upstream(rm -rf + checkout pin + apply patch)"
-  echo "::error::  或月更 bump 会把上面点名的改动**静默删掉**。"
+  echo "::error::packages/codepuppy-{app,ui} 与 SOT 不一致 —— 补丁是这两个冻结包唯一的改动记录,"
+  echo "::error::  不重生它,上面点名的改动在下一次按 pin + 补丁重建时会被**静默删掉**。"
   echo "::error::  修法(frontend/README.md 块 4,与源码改动放在**同一个提交**里):"
-  echo "::error::    git diff --binary ${PIN} -- packages/app packages/ui > ${PATCH}"
+  echo "::error::    在临时 index 里把 pin 的 packages/{app,ui} 换成 HEAD 的 packages/codepuppy-{app,ui},"
+  echo "::error::    再 git diff --binary ${PIN} <那棵树> -- packages/app packages/ui > ${PATCH}"
   echo "::error::  --binary 不可省:packages/app/vendor/*.tgz 被 packages/session-ui 以 file: 直接依赖,"
   echo "::error::  普通 git diff 不携带二进制内容 ⇒ 补丁看似完整实则重建不出可安装的树。"
   exit 1
 fi
 
-echo "    ✓ round-trip:packages/{app,ui} 恒等于 pin ${PIN} + ${PATCH}(补丁覆盖 ${patch_files} 个文件)"
+echo "    ✓ round-trip:packages/codepuppy-{app,ui} 恒等于 pin ${PIN} + ${PATCH}(补丁覆盖 ${patch_files} 个文件)"
 exit 0

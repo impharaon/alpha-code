@@ -1,9 +1,9 @@
 // `#976` —— `scripts/assert-frontend-patch-roundtrip.sh` 的**行为闸**。
 //
-// 这道门守的是什么(大白话):ADR-034 起 `packages/{app,ui}` 是「上游 pin + 一份 SOT 补丁」的
-// 投影。sync-upstream 每次合并后 `rm -rf packages/app packages/ui` → `git checkout $PIN --` →
-// `git apply <补丁>`;月更 bump 的第一块也用 pin 覆盖这两个目录。⇒ **改了这两个包而没把改动
-// 重生进补丁,那份改动会被静默删除**,不是报错。已合并历史上真的发生过(f420fe2bb…7281627ed,
+// 这道门守的是什么(大白话):ADR-034 起冻结前端是「上游 pin + 一份 SOT 补丁」的投影;`#1668` 起
+// 投影的落点是 `packages/codepuppy-{app,ui}`(补丁里的路径仍相对 pin:`packages/app/…`、`packages/ui/…`),
+// 上游 2.x 的 `packages/{app,ui}` 原样留在原位。⇒ **改了落点而没把改动重生进补丁,任何按 pin + 补丁
+// 重建冻结前端的人都会把那份改动静默删掉**,不是报错。已合并历史上真的发生过(f420fe2bb…7281627ed,
 // 补丁缺 vendored `.tgz`,存活两天、零变红)。
 //
 // 为什么判据必须长这样:
@@ -70,45 +70,75 @@ function commitAll(repo: string, message: string): string {
 const LOCK = "frontend/frontend-pin.lock"
 const PATCH = "frontend/codepuppy-patches/codepuppy-frontend.patch"
 
-/** 上游 pin 里就有的文件(alpha 会改它)。 */
-const UPSTREAM_LEAF = "packages/app/src/context/terminal.tsx"
+/** 冻结 app / ui 的落点(`#1668`);补丁与 pin 里的对应路径是 `packages/app`、`packages/ui`。 */
+const APP = "packages/codepuppy-app"
+const UI = "packages/codepuppy-ui"
+/** 上游 pin 里就有的文件(alpha 会改它)—— pin 里的路径。 */
+const PIN_LEAF = "packages/app/src/context/terminal.tsx"
+/** 同一个文件在落点上的路径。 */
+const UPSTREAM_LEAF = `${APP}/src/context/terminal.tsx`
 /** alpha 自己加的 seam(只存在于补丁里)。 */
-const CODEPUPPY_SEAM = "packages/app/src/surface/codepuppy-seam.ts"
-/** alpha 加的 **二进制**:真实世界里是 packages/session-ui 以 `file:` 直接依赖的 vendored tgz。 */
-const CODEPUPPY_VENDORED = "packages/app/vendor/codepuppy-client-1.0.0.tgz"
-/** packages/ui 半场 —— 生产脚本枚举写成只有 packages/app 时,只有它会红。 */
-const UI_LEAF = "packages/ui/src/button.tsx"
-const CODEPUPPY_UI = "packages/ui/src/codepuppy-overlay.ts"
+const CODEPUPPY_SEAM = `${APP}/src/surface/codepuppy-seam.ts`
+/** alpha 加的 **二进制**:真实世界里是 packages/codepuppy-session-ui 以 `file:` 直接依赖的 vendored tgz。 */
+const CODEPUPPY_VENDORED = `${APP}/vendor/codepuppy-client-1.0.0.tgz`
+/** ui 半场 —— 生产脚本枚举写成只有 app 时,只有它会红。 */
+const PIN_UI_LEAF = "packages/ui/src/button.tsx"
+const CODEPUPPY_UI = `${UI}/src/codepuppy-overlay.ts`
 
 /** 二进制内容(含不可打印字节)——只写进临时夹具目录,不进本仓。 */
 const VENDORED_BYTES = new Uint8Array([0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xca, 0x48])
 
-/** 按 frontend/README.md 块 4 的写法重生 SOT 补丁(生成半场留在 runbook,判据半场在生产脚本)。 */
-function regeneratePatch(repo: string, pin: string) {
-  const result = Bun.spawnSync(["git", "diff", "--binary", pin, "--", "packages/app", "packages/ui"], {
-    cwd: repo,
-    env: { ...GIT_ENV },
-  })
+/**
+ * 按 frontend/README.md 块 4 的写法重生 SOT 补丁(生成半场留在 runbook,判据半场在生产脚本):
+ * 临时 index 里把 HEAD 的落点子树放回补丁路径,再对 pin 做 `git diff --binary`。
+ */
+function regeneratePatch(repo: string, pin: string, opts: { binary?: boolean } = {}) {
+  const index = join(mkdtempSync(join(tmpdir(), "codepuppy-roundtrip-regen-")), "index")
+  const env = { ...GIT_ENV, GIT_INDEX_FILE: index }
+  for (const args of [
+    ["read-tree", "--empty"],
+    ["read-tree", "--prefix=packages/app/", `HEAD:${APP}`],
+    ["read-tree", "--prefix=packages/ui/", `HEAD:${UI}`],
+  ]) {
+    const step = Bun.spawnSync(["git", ...args], { cwd: repo, env })
+    if (step.exitCode !== 0) throw new Error(`重生补丁失败(git ${args.join(" ")}):${step.stderr.toString()}`)
+  }
+  const tree = Bun.spawnSync(["git", "write-tree"], { cwd: repo, env }).stdout.toString().trim()
+  const result = Bun.spawnSync(
+    ["git", "diff", ...(opts.binary === false ? [] : ["--binary"]), "--abbrev=9", pin, tree, "--", "packages/app", "packages/ui"],
+    { cwd: repo, env: { ...GIT_ENV } },
+  )
   if (result.exitCode !== 0) throw new Error(`重生补丁失败:${result.stderr.toString()}`)
   write(repo, PATCH, result.stdout.toString())
+}
+
+/** 把 pin 里的 `packages/<from>` 原样复制到落点(真实世界:C1 的 `git read-tree --prefix`)。 */
+function copyPinTree(repo: string, pin: string, from: string, to: string) {
+  for (const path of git(repo, ["ls-tree", "-r", "--name-only", pin, "--", from]).split("\n").filter(Boolean)) {
+    write(repo, path.replace(from, to), git(repo, ["show", `${pin}:${path}`]) + "\n")
+  }
 }
 
 /**
  * 夹具形状 —— 真实世界的缩比:
  *
  *   pin 提交        packages/{app,ui} = 纯上游态(没有 alpha seam、没有 vendored tgz)
- *   alpha 提交      改上游叶 + 加 seam + 加二进制 + 改/加 ui  ⇒ 补丁 = 两者之差
+ *   alpha 提交      packages/codepuppy-{app,ui} = pin 的两棵树 + 改上游叶 + 加 seam + 加二进制 + 加 ui
+ *                   ⇒ 补丁 = 两者之差;packages/{app,ui} 原样留着(真实世界:上游 2.x 原样,Code Puppy 不用)
  *   SOT 提交        frontend/{frontend-pin.lock, codepuppy-patches/codepuppy-frontend.patch}
  *
- * frontend/ 在 packages/{app,ui} 之外 ⇒ 提交它不改变被比较的两棵树。
+ * frontend/ 在落点之外 ⇒ 提交它不改变被比较的两棵树。
  */
 function fixture(): { repo: string; pin: string } {
   const repo = mkdtempSync(join(tmpdir(), "codepuppy-roundtrip-"))
   git(repo, ["init", "-q", "-b", "alpha"])
-  write(repo, UPSTREAM_LEAF, "export const terminal = 1\n")
+  write(repo, PIN_LEAF, "export const terminal = 1\n")
   write(repo, "packages/app/src/app.tsx", "export const app = 1\n")
-  write(repo, UI_LEAF, "export const button = 1\n")
+  write(repo, PIN_UI_LEAF, "export const button = 1\n")
   const pin = commitAll(repo, "upstream pin")
+
+  copyPinTree(repo, pin, "packages/app", APP)
+  copyPinTree(repo, pin, "packages/ui", UI)
 
   write(repo, UPSTREAM_LEAF, "export const terminal = 2 // alpha seam\n")
   write(repo, CODEPUPPY_SEAM, "export const seam = 1\n")
@@ -133,7 +163,7 @@ function runGate(repo: string, extraEnv: Record<string, string> = {}): Run {
   return { exitCode: result.exitCode, output }
 }
 
-describe("#976 packages/{app,ui} round-trip 判据的行为", () => {
+describe("#976 冻结前端(packages/codepuppy-{app,ui})round-trip 判据的行为", () => {
   test("一致态(树 == pin + 补丁)⇒ exit 0 —— 没有这条对照组,一个恒红的空壳能满足下面全部红向断言", () => {
     const { repo } = fixture()
     const run = runGate(repo)
@@ -168,11 +198,11 @@ describe("#976 packages/{app,ui} round-trip 判据的行为", () => {
 
   test("committed 一个补丁里没有的新文件(含二进制)⇒ exit 1 且点名 —— f420fe2bb 那次真实事故的形状", () => {
     const { repo } = fixture()
-    write(repo, "packages/app/vendor/codepuppy-client-2.0.0.tgz", VENDORED_BYTES)
+    write(repo, `${APP}/vendor/codepuppy-client-2.0.0.tgz`, VENDORED_BYTES)
     commitAll(repo, "add a vendored binary without regenerating the patch")
     const run = runGate(repo)
     expect(run.exitCode, `新增文件不被点名 —— 2026-07-24 丢 vendored tgz 的那一类原样复活:\n${run.output}`).toBe(1)
-    expect(run.output).toContain("packages/app/vendor/codepuppy-client-2.0.0.tgz")
+    expect(run.output).toContain(`${APP}/vendor/codepuppy-client-2.0.0.tgz`)
   })
 
   test("删掉一个补丁里有的文件、补丁没跟 ⇒ exit 1 且点名(只比双方交集的实现在这条上是绿的)", () => {
@@ -220,16 +250,12 @@ describe("#976 packages/{app,ui} round-trip 判据的行为", () => {
 
   test("补丁重生时漏了 --binary ⇒ exit 1(vendored tgz 在 pin 里不存在,普通 git diff 不携带它)", () => {
     const { repo, pin } = fixture()
-    const noBinary = Bun.spawnSync(["git", "diff", pin, "--", "packages/app", "packages/ui"], {
-      cwd: repo,
-      env: { ...GIT_ENV },
-    })
-    expect(noBinary.exitCode, "夹具没生成出无 --binary 的补丁").toBe(0)
-    write(repo, PATCH, noBinary.stdout.toString())
+    regeneratePatch(repo, pin, { binary: false })
+    expect(readFileSync(join(repo, PATCH), "utf8"), "夹具没生成出无 --binary 的补丁").toContain("Binary files")
     commitAll(repo, "regenerate the patch without --binary")
     const run = runGate(repo)
     // 这一条接住 frontend/README.md 块 4 里那句 `test -f "$RT/packages/app/$VENDORED"` 的语义:
-    // 补丁没带二进制 ⇒ 重建不出可安装的树。生产侧 sync-upstream.yml 另有一条 VENDORED loud-fail。
+    // 补丁没带二进制 ⇒ 重建不出可安装的树。
     expect(run.exitCode, `没带二进制的补丁被判成好的 —— bun install 会装不上 vendored 依赖:\n${run.output}`).toBe(1)
     expect(run.output, `红了但没说清是二进制没带:\n${run.output}`).toContain("--binary")
   })
@@ -309,35 +335,18 @@ describe("#976 生产接线(减速带,不是闸门)", () => {
     ).toBe(true)
   })
 
-  // 这道门要比**哪些包**写死在生产脚本的 `PACKAGES=` 那一行,而**决定 sync 会重写哪些目录**的
-  // 真源是 .github/workflows/sync-upstream.yml 的 `rm -rf …` 那一行。两处今天一致,但仓内没有
-  // 任何东西断言它们相同 ⇒ 有人按 ADR 加第三个前端包、改了 sync 的删除范围而没改这里,
-  // 「改了那两个目录必须重生补丁」这句话在新成员上就不成立:sync 会重写它、本门不比它,
-  // `#976` 要消灭的静默删除在新成员上原样复活,而所有门全绿。枚举漏是九形态④,同形先例
-  // `#889`/`#637`(UPSTREAM_PATHS 与收编白名单两处副本只同步了一半)。
-  // ⚠️ **诚实边界**:这一条比的是两份**源码文本**,是减速带不是闸门 —— 它只钉住「这两行互相
-  // 一致」,钉不住「sync 的删除范围是不是真的等于 sync 实际重写的目录」(那要跑整条 workflow)。
-  // 仓内另有两份可各自漂移的副本(frontend/README.md 块 4 的补丁 pathspec、
-  // scripts/verify-freeze-restore.sh),本条不覆盖它们。
-  test("闸门枚举的包 == sync-upstream 会 rm -rf 的目录(两处一改就红)", () => {
+  // `#1668`:冻结前端搬到 packages/codepuppy-{app,ui} 之后,每日同步不再按 pin + 补丁重写任何前端目录
+  // (原来的 `apply_codepuppy_frontend_delta` 已删),本门是冻结前端唯一的投影判据。这条钉住「sync 不碰
+  // 冻结前端」:有人把还原步搬回来(读 pin、或写落点),它就红。
+  // ⚠️ **诚实边界**:比的是 workflow 的**源码文本**,是减速带不是闸门 —— 钉不住经别的脚本间接写落点的情形。
+  test("sync-upstream 不重写冻结前端:workflow 里不读 pin、不碰落点(`#1668`)", () => {
     const gate = readFileSync(SCRIPT, "utf8")
     const declared = /^PACKAGES="([^"]+)"$/m.exec(gate)
-    // 读不出就说「测量作废」,不能因为下面的 includes 没红就报绿(`#890`/`#946` 同款语义)。
-    expect(
-      declared,
-      "从 scripts/assert-frontend-patch-roundtrip.sh 里读不出 `PACKAGES=\"…\"` —— 本条测量作废(不是通过),枚举的写法变了就要改这条判据",
-    ).not.toBeNull()
-    const packages = declared![1]
+    expect(declared, "从 scripts/assert-frontend-patch-roundtrip.sh 里读不出 `PACKAGES=\"…\"` —— 本条测量作废(不是通过)").not.toBeNull()
+    const landings = declared![1].split(/\s+/).map((pair) => pair.split(":")[1])
+    expect(landings, "PACKAGES 不再是「补丁路径:落点」对 —— 本条测量作废").toEqual([APP, UI])
     const sync = readFileSync(resolve(REPO_ROOT, ".github/workflows/sync-upstream.yml"), "utf8")
-    // **整行相等**,不是 `includes`。子串匹配在这里粗一格,而且恰好对本条要抓的那个方向失明:
-    // sync 加第三个包写成 `rm -rf packages/app packages/ui packages/next` 时,
-    // `includes("rm -rf packages/app packages/ui")` 仍为真 ⇒ 判据全绿而新成员无人比。
-    // (2026-08-15 实测:先写的 includes 版在「缩小」方向红、在「新增」方向绿。)
-    const rmLine = new RegExp(String.raw`^[ \t]*rm -rf ${packages.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[ \t]*$`, "m")
-    expect(
-      rmLine.test(sync),
-      `sync-upstream.yml 里没有**恰好** \`rm -rf ${packages}\` 这一行 —— 本门枚举的包与 sync 实际重写的目录已经漂开:` +
-        "受 sync 重写而本门不比的那些目录上,改动仍会被静默删除,而所有门全绿。两处要一起改。",
-    ).toBe(true)
+    for (const landing of landings) expect(sync, `sync-upstream.yml 又碰了冻结前端落点 ${landing}`).not.toContain(landing!)
+    expect(sync, "sync-upstream.yml 又读了前端 pin —— 还原步被搬回来了").not.toContain("frontend-pin.lock")
   })
 })

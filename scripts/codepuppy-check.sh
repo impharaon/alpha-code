@@ -88,10 +88,10 @@ else
   fail=1
 fi
 
-echo "▶ [2/14] packages/{app,ui} == pin + SOT 补丁(round-trip,#976)"
-# `#976`:ADR-034 起 packages/{app,ui} 是「上游 pin + frontend/codepuppy-patches/codepuppy-frontend.patch」
-# 的投影。sync-upstream 的还原步(`rm -rf` → `checkout $PIN --` → `git apply`)与月更 bump 的
-# 第一块都会**据此重写那两个目录** ⇒ 改了它们而没重生补丁,改动会被**静默删除**(不是报错)。
+echo "▶ [2/14] packages/codepuppy-{app,ui} == pin + SOT 补丁(round-trip,#976)"
+# `#976`:ADR-034 起冻结前端(`#1668` 起落点 packages/codepuppy-{app,ui})是「上游 pin +
+# frontend/codepuppy-patches/codepuppy-frontend.patch」的投影,补丁是它唯一的改动记录 ⇒ 改了那两个
+# 目录而没重生补丁,任何按 pin + 补丁重建的人都会把改动**静默删除**(不是报错)。
 # 这在已合并历史上真的发生过:f420fe2bb…7281627ed 四个提交补丁缺 vendored `.tgz`,存活两天、
 # 零变红;没出事只因为 sync 那阵子一直红着没跑到还原步。
 #
@@ -107,7 +107,7 @@ frontend_roundtrip_rc=$?
 case "$frontend_roundtrip_rc" in
 0) ;; # 脚本自己打了 ✓
 2) unverified=1 ;; # 脚本自己打了「未比对」
-*) echo "    ✗ packages/{app,ui} 与 SOT 补丁不一致 —— 下一次 sync/月更 bump 会把上面点名的改动静默删掉"; fail=1 ;;
+*) echo "    ✗ packages/codepuppy-{app,ui} 与 SOT 补丁不一致 —— 按 pin + 补丁重建时会把上面点名的改动静默删掉"; fail=1 ;;
 esac
 unset frontend_roundtrip_rc
 

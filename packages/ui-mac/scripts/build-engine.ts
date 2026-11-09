@@ -9,6 +9,8 @@
 //   · `#v1-migration` 指到上游的 bun 实现,外加两处 Node 薄适配(裁决书 R14):`bun:sqlite` → 基于 `node:sqlite` 的 shim,
 //     `new Bun.CryptoHasher("sha256")` → `node:crypto` 的 `createHash`。上游原版 Node 构建这里是空实现,旧对话**一条都看不到**
 //     而状态接口照样报 `completed`(L1a e3noop);找不到原调用或又出现别的 `Bun.` 调用时构建直接失败,不静默产出空实现。
+//     同一处改写还把 v1 工具 part 的显示快照 `display` 搬进 2.x 的 `state.metadata.codepuppyDisplay`(ADR-041;
+//     改写本体与理由在 engine/v1-migration-transform.ts)。
 // 原生资源(node-pty、parcel watcher、fff、photon wasm …)按上游清单拷到产物旁的 `assets/`(前导代码按 `import.meta.url`
 // 找它们);electron.vite.config.ts 再把它们拷到 out/main/chunks/assets。
 import { copyFile, mkdir, readFile, rm } from "node:fs/promises"
@@ -18,6 +20,7 @@ import { mainConfig } from "../../cli/vite.node.config"
 import { nodeTarget } from "../../cli/src/node/target"
 import { collectNodeAssets, hashNodeAssets } from "../../cli/script/node-assets"
 import { bundledModelsSnapshot } from "../../core/script/models-snapshot"
+import { transformV1MigrationSource } from "../engine/v1-migration-transform"
 
 const uiMac = path.resolve(import.meta.dirname, "..")
 export const ENGINE_OUT_DIR = path.join(uiMac, "dist-engine")
@@ -56,10 +59,7 @@ config.plugins = [
     },
     transform(code: string, id: string) {
       if (path.resolve(id) !== v1Migration) return
-      const next = code.replace('new Bun.CryptoHasher("sha256")', '__codepuppyCreateHash("sha256")')
-      if (next === code) throw new Error("Bun.CryptoHasher call site not found in v1-migration.bun.ts — upstream moved; re-read it")
-      if (/\bBun\./.test(next)) throw new Error("another Bun.* call appeared in v1-migration.bun.ts — the Node shim set is stale")
-      return `import { createHash as __codepuppyCreateHash } from "node:crypto"\n${next}`
+      return transformV1MigrationSource(code)
     },
   },
   ...(config.plugins ?? []).filter((plugin) => !(plugin && "name" in plugin && plugin.name === "opencode:simulation-graph")),

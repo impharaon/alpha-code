@@ -305,6 +305,10 @@
           "name": "inventory returns a document that decodes as ToolPolicyInventoryV1"
         },
         {
+          "file": "packages/ext/src/policy/inventory.test.ts",
+          "name": "I2 the badge tells the truth: a tool the inventory shows disabled is refused by the production executor"
+        },
+        {
           "file": "packages/ext/src/policy/tool-policy-rpc.test.ts",
           "name": "a quarantined document ⇒ setRecord fails with type quarantined"
         },
@@ -547,8 +551,12 @@
       },
       "tests": [
         {
-          "file": "packages/ext/src/policy/identity.test.ts",
-          "name": "#793: a root-branched MCP input schema reaches the model unchanged (OpenCode 2 adds no additionalProperties:false)"
+          "file": "packages/ext/src/policy/upstream-pins.test.ts",
+          "name": "a root-branched schema reaches the model unchanged and forbids none of its branch fields"
+        },
+        {
+          "file": "packages/ext/src/policy/upstream-pins.test.ts",
+          "name": "the check is not empty: the v1-style closed root names every branch field it forbade"
         }
       ]
     },

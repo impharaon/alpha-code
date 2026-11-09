@@ -176,12 +176,3 @@ describe("authority minting (ADR-041 §5)", () => {
     })
   })
 })
-
-describe("upstream behaviour a v1 takeover used to supply", () => {
-  test("#793: a root-branched MCP input schema reaches the model unchanged (OpenCode 2 adds no additionalProperties:false)", () => {
-    const inputSchema = { type: "object", oneOf: [{ properties: { a: { type: "string" } }, required: ["a"] }, { properties: { b: { type: "number" } }, required: ["b"] }] }
-    const definition = runtime.definition({ name: "dispatch", description: "d", input: inputSchema })
-    expect(definition.inputSchema).toEqual(inputSchema)
-    expect(definition.inputSchema).not.toHaveProperty("additionalProperties")
-  })
-})

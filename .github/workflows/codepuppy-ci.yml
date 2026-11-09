@@ -196,7 +196,7 @@ jobs:
       # 口径(为什么是「收进」而不是对齐 ui-mac 的 exclude)见
       # docs/architecture/quality-gate-environments.md §3.11。
       # `#1664`:OpenCode 2 没有 packages/opencode;这一格换成 packages/plugin(ext / ui-mac 编译依赖它,
-      # alpha 自有的 src/alpha-cloud-authority.ts 住在里面),与 scripts/codepuppy-check.sh 第 [4/14] 步同一行。
+      # 接口冻结 I6 的一个 Code Puppy 自有契约模块住在它的 src/ 下),与 scripts/codepuppy-check.sh 第 [4/14] 步同一行。
       - name: typecheck plugin (alpha 自有判据住在上游包里)
         if: needs.detect.outputs.code == 'true'
         run: bun run --cwd packages/plugin typecheck

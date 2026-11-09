@@ -133,7 +133,7 @@ echo "▶ [4/14] typecheck (alpha packages: contracts-consumer + ext + ui-mac + 
 # 实测它的 tsconfig 是 `"include": ["src"]`,alpha 自有的 test/ 结构性不在 program 里,
 # 加进来是安慰剂闸;缺口具名留在 `#1222`。
 # `#1664`:OpenCode 2 没有 packages/opencode,它的位置换成 packages/plugin —— ext 与 ui-mac 编译依赖
-# `@opencode/plugin`,alpha 自有的 `src/alpha-cloud-authority.ts` 住在它里面(接口冻结 I6);往那个文件注入
+# `@opencode/plugin`,接口冻结 I6 把一个 Code Puppy 自有的契约模块放在它的 src/ 下;往那个文件注入
 # 已知类型错误,该包 typecheck 当场红(TS2322),不是安慰剂。
 if bun run --cwd packages/codepuppy-contracts-consumer typecheck \
   && bun run --cwd packages/ext typecheck \

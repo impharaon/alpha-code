@@ -698,22 +698,33 @@
     },
     {
       "id": "adr038-ask-deadline",
-      "decision": "An unanswered approval request fails by name after a deadline (300 s default, overridable by environment) and never auto-allows (#668).",
+      "decision": "An unanswered approval request fails by name after a deadline (300 s default, CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS override, invalid values fall back to the default) and never auto-allows; only that request ends (#668).",
       "adr": [
-        "ADR-038"
+        "ADR-038",
+        "ADR-047"
       ],
-      "lane": "L4 (#1666) — needs orchestrator decision",
+      "lane": "L4 (#1666)",
       "takeovers": [
         "packages/opencode/src/permission/index.ts"
       ],
-      "blocked": {
-        "reason": "OpenCode 2's Permission.assert awaits the reply with no timeout (packages/core/src/permission.ts, Deferred.await). A plugin watchdog that replies reject reproduces ADR-038's rejected L0 shape: 2.x reject cascades to every pending request of the session.",
-        "options": [
-          "(a) Re-take packages/core/src/permission.ts (same file as adr033) and add the bounded wait with a named failure (L3, small on top of the re-take).",
-          "(b) Bound only Code Puppy's own identity-axis asks in the extension (Promise.race + reply reject) and accept the cascade for those; builtin tools' own asks stay unbounded.",
-          "(c) Owner retires the deadline for OpenCode 2 (needs the owner's words)."
-        ]
-      }
+      "mechanism": {
+        "file": "packages/core/src/permission.ts",
+        "ladder": "L3 (re-taken: the wait on the reply is inside the kernel; a plugin watchdog's reject cascades)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/ask-deadline.test.ts",
+          "name": "an unanswered request fails by name at the deadline, its card is retracted, and nothing is allowed"
+        },
+        {
+          "file": "packages/ext/src/policy/ask-deadline.test.ts",
+          "name": "only that request ends: another pending request of the same session is still waiting (no cascade)"
+        },
+        {
+          "file": "packages/ext/src/policy/ask-deadline.test.ts",
+          "name": "the default is 300 s and every invalid override falls back to it, never to no deadline"
+        }
+      ]
     },
     {
       "id": "adr041-collision-rejection",

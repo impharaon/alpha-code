@@ -81,12 +81,13 @@ OpenCode 共用服务、库与凭证。
 
 ### 精确接管面
 
-#1662 L4 落定(2026-11-09)。旧清单 49 条不继承:34 条随文件消失删除;仍存在的 15 条逐条重判,只有下面这一组重新接管,
-其余 14 条在 M0 之后已是上游原样、出清单 —— 它们承载的决定逐条登记在下方「权威保持表」里,没有一条被静默放弃。
+#1662 L4 落定(2026-11-09;编排器裁决 #1666 评论 6737732975)。旧清单 49 条不继承:34 条随文件消失删除;仍存在的 15 条逐条重判。
+下表是换代后的全部接管:v1 已接管过的文件,在 2.x 上接管它的对应文件,是同一个权威换个接法。它们承载的决定逐条登记在下方「权威保持表」里,没有一条被静默放弃。
 
 | 路径 | 为什么挂不了钩子 | 守卫 | 回滚 | 归属 |
 | --- | --- | --- | --- | --- |
 | `packages/core/src/oauth/page.ts`、`packages/core/test/oauth-page.test.ts`(ADR-042) | OAuth 回环成功/失败页由引擎直出,插件 Context 没有改写它的挂点;ADR-007 的 Vite 品牌变换到不了引擎页 | `scripts/north-star-guard.sh` 的 `UPSTREAM_EXCLUDES` 逐文件两条;`packages/core/test/oauth-page.test.ts` 的两条品牌用例对上游原版页会红 | 用 `33f94fce96` 的两个文件覆盖并从清单删掉两条(改动面只有产品名与字标) | L4(#1666);同步时按 `takeover upgrade review required` 人工移植 |
+| `packages/core/src/permission.ts`(ADR-038;v1 接管的是 `packages/opencode/src/permission/index.ts`) | 2.x `Permission.assert` 对回复无限期等待;插件只能改判定,改不了等多久;插件侧看门狗回 reject 会级联整个会话(ADR-038 否决过) | `UPSTREAM_EXCLUDES` 一条;改动只在 `codepuppy(ADR-038)` 标注块;`packages/ext/src/policy/ask-deadline.test.ts`(去掉有界等待 ⇒ 前两条红,改成级联 ⇒ 第二条红) | 用 `33f94fce96` 的文件覆盖并删掉清单一条;回到无期限等待 | L4(#1666) |
 
 清单为空时(将来某次重判把这一组也退回 L0),每日同步照常走:同步读守卫自报的 `UPSTREAM_EXCLUDES_COUNT`,条数为 0 即无可核对、继续;
 读不出条数才中止(与「守卫没跑出结果」分开,`sync-upstream-takeover-isolation.test.ts` 的 F10 三条)。
@@ -98,7 +99,7 @@ OpenCode 共用服务、库与凭证。
 判官 `packages/ext/src/policy/authority-registry.test.ts`:49 条旧接管每条都要映射到一项决定;已握住的项必须有机制文件与会在拿掉机制时变红的测试;
 未握住的项(blocked)让判官红,直到编排器裁决;删掉任何一项而没有带 owner 原话与日期的 `retired` 记录同样红。下表是登记册的摘要,以登记册为准。
 
-已握住 24 项:
+已握住 26 项:
 
 | 登记 id | 决定 | 2.x 上的握法(阶梯) | 证明它的测试 |
 | --- | --- | --- | --- |
@@ -126,13 +127,14 @@ OpenCode 共用服务、库与凭证。
 | `mcp-tool-list-tolerance` | One malformed MCP tool does not drop the server's other tools (codepuppy-tool-discovery.ts tolerant listing). | `packages/core/src/mcp/client.ts`(upstream-native, pinned by upstream's own test) | `mcp.test.ts`「skips unusable tools and keeps the rest of the server's tools」 |
 | `adr042-oauth-brand` | OAuth loopback success/error pages show the Code Puppy product identity (#1047). | `packages/core/src/oauth/page.ts`(L3 (re-taken: no plugin seam reaches engine-served callback HTML)) | `oauth-page.test.ts`「#1047: success page uses the Code Puppy product identity, not OpenCode」; `oauth-page.test.ts`「#1047: error page uses the Code Puppy product identity」 |
 | `adr043-owned-file-predicate` | Code Puppy-owned files living under upstream paths are recognised by name or marker, and a copied marker does not exempt an upstream file (ADR-043). | `scripts/north-star-guard.sh`(guard predicate (L2)) | `north-star-guard.test.ts`「名字不合约定、靠文件里的 marker 自报家门 ⇒ 绿(migration / tool-identity.ts 那一类)」; `north-star-guard.test.ts`「把 marker 抄进一个真上游文件 ⇒ 仍然红(自报家门不是可伪造的通行证)」 |
+| `adr033-receipt-premises` | The OpenCode 2 engine facts Code Puppy's receipt derivation relies on stay true: a pending request's payload cannot change under its id, one reply emits a replied event for every request it resolves, and a second reply is NotFound (ruling item 1 measurements). | `packages/core/src/permission.ts`(upstream-native, pinned) | `permission-reply-premises.test.ts`「(i) a pending request's payload never changes under its id: a second admission with the same id is refused」; `permission-reply-premises.test.ts`「(ii) one always reply emits a replied event for every request it resolves, and only those」 等 |
+| `adr038-ask-deadline` | An unanswered approval request fails by name after a deadline (300 s default, CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS override, invalid values fall back to the default) and never auto-allows; only that request ends (#668). | `packages/core/src/permission.ts`(L3 (re-taken: the wait on the reply is inside the kernel; a plugin watchdog's reject cascades)) | `ask-deadline.test.ts`「an unanswered request fails by name at the deadline, its card is retracted, and nothing is allowed」; `ask-deadline.test.ts`「only that request ends: another pending request of the same session is still waiting (no cascade)」 等 |
 
-未握住、待编排器裁决 22 项(选项见登记册每项的 `blocked.options`):
+未握住、待编排器裁决 21 项(选项见登记册每项的 `blocked.options`):
 
 | 登记 id | 决定 | 为什么按现有接口握不住 | 归属 |
 | --- | --- | --- | --- |
-| `adr033-decision-receipt` | Code Puppy owns the approval reply contract: admitted-request snapshot with sha256 fingerprint, a DecisionReceipt for every reply (including the requests it resolved), idempotent replies, 409 on a fingerprint mismatch, and persisted permission_request / permission_decision rows (#433 / REQ-090 AC3/AC8). | OpenCode 2's permission kernel replies with 204 and keeps requests in memory; a plugin cannot change the reply route's response shape, add persistence, or bind replies to a fingerprint (permission domain exposes assert/list/get/reply/hook only; hook.evaluate changes effect/message only). The renderer's session-permission-feed.ts reads PermissionV2DecisionReceipt today. | L4 (#1666) — needs orchestrator decision |
-| `adr038-ask-deadline` | An unanswered approval request fails by name after a deadline (300 s default, overridable by environment) and never auto-allows (#668). | OpenCode 2's Permission.assert awaits the reply with no timeout (packages/core/src/permission.ts, Deferred.await). A plugin watchdog that replies reject reproduces ADR-038's rejected L0 shape: 2.x reject cascades to every pending request of the session. | L4 (#1666) — needs orchestrator decision |
+| `adr033-decision-receipt` | Code Puppy owns the approval reply contract: a sha256 fingerprint of the displayed request, a DecisionReceipt for every reply listing the requests it resolved, idempotent replay, and a 409 on a stale reply (#433 / REQ-090 AC3/AC8). | Held by derivation in the L6 adapter (measurements passed, no kernel re-take; no production reader needs persisted history after a restart): spec in docs/architecture/2026-11-09-1662-permission-reply-measurements.md. Waiting on L6 to implement it. | L6 (#1668) per ruling item 1 |
 | `adr041-collision-rejection` | Alias / identity collisions are rejected, never last-wins (ADR-041 decision 2). | OpenCode 2's tool registry keys tools by effective name and keeps the last registration (packages/core/src/tool.ts commit → Map.set) without recording which plugin registered it; the promise API's tool.list() returns fresh executor wrappers, so a plugin cannot tell a replaced tool from the original. | L4 (#1666) — needs orchestrator decision |
 | `adr041-history-display-conversion` | Display snapshots persisted on v1 tool parts stay attached to those calls after the move to OpenCode 2 (ADR-041 §4: never overwritten, never inferred). | The v1→v2 conversion (v1-migration.bun.ts, run through the Node shim R14) reads v1 parts with the upstream v1 schema; Code Puppy's part.display is not carried into v2 state.metadata, so converted history loses its provenance. | L4/L5 — needs orchestrator decision |
 | `adr035-websearch` | Web search fails honestly (E7) and the cloud leg exists only when the account signal says so; the sovereignty gate covers every executable copy (ADR-035 / ADR-046). | Owned by L3 on OpenCode 2 (websearch.transform / execute.before in the extension); not delivered on the integration branch this lane started from. | L3 (#1665) per lane seams §5 (L5r) |

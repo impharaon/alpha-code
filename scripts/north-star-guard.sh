@@ -134,6 +134,10 @@ UPSTREAM_EXCLUDES=(
   # 插件也没有改写它的挂点 —— 2.x 上原样重新接管,改动面只有产品名与字标。
   ':(exclude)packages/core/src/oauth/page.ts'
   ':(exclude)packages/core/test/oauth-page.test.ts'
+  # ADR-038(#668;#1662 裁决第 2 项):审批请求的应答期限。2.x 的 `Permission.assert` 对回复无限期等待,
+  # 插件只能改判定(`permission.hook.evaluate`)改不了等多久;插件侧看门狗回 reject 会级联整个会话 ——
+  # ADR-038 否决过的形状。接管面只有 `Deferred.await` 那一处的有界等待与具名失败(`codepuppy(ADR-038)` 标注块)。
+  ':(exclude)packages/core/src/permission.ts'
 )
 
 # ── UPSTREAM_PATHS 里住着的 Code Puppy 自有文件:结构性谓词,不是逐文件清单(`#1085` / ADR-043)──

@@ -294,6 +294,8 @@ describe("createVerifiedBackup(mock exec)", () => {
 
 // ── 真 sqlite3 集成(macOS 本地 + GH ubuntu 均有;缺失则 skip)────────────────────
 const sqlite3 = Bun.which("sqlite3")
+if (!sqlite3)
+  console.warn("⚠️ db-safety.test: no sqlite3 on PATH — every real-sqlite3 case below (incl. the #1664 WAL cases) is SKIPPED")
 const itSql = test.skipIf(!sqlite3)
 
 const execReal: Exec = async (args) => {

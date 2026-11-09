@@ -41,7 +41,10 @@ ADR-029(主权阶梯 L0–L3)、ADR-034(前端 pin + SOT 补丁)、ADR-041 / ADR
 4. **引擎宿主定为「嵌在 Electron `utilityProcess` 里」(H1,裁决书 R13,L1a 实测)**(进程围栏、ext 的 `parentPort` 桥、进程内调用都不换形状;
    进程内接法取 `start()` + `Transform`,§2.4)。嵌入式下,上游的「v1 旧对话转成 v2」只在 bun 下运行、在 Node 下是空实现,原样不动就是旧对话
    静默全不可见 —— 本次最大的用户可见风险;已定用 Node 薄适配接上(裁决书 R14,合成库实测通过,真库副本归 L1b,§2.8)。
-5. **前端在切换时跟引擎同一个 SHA**(之后保持同一代次),renderer 的数据层改用上游公开包 `@opencode/client/solid`,不再借 `packages/app` 内部导出(§2.6)。
+5. **界面不换代,保持当前 alpha**(owner 2026-11-09「界面当前的 alpha 才是唯一权威」,修订本条原文「前端跟引擎同一个 SHA」):前端 pin 留在 `e11dbd02`、
+   SOT 补丁取 `origin/alpha`,冻结界面落在 Code Puppy 自有路径;renderer 里一层 Code Puppy 自有的引擎适配器把界面的 v1 请求翻成 2.x `/api/*`。
+   换代后界面与 0.1.26 一致,只拿掉「分享对话」(R6)(§2.6,L6 实施方案)。谁是权威见 ADR-047「权威划分」:界面与产品决定归 Code Puppy、
+   引擎内部归 OpenCode、2.x 新增能力默认归 OpenCode 且本次不接线。
 6. **一个 PR 进 `alpha`**(ADR-037 决策 2),7 条 lane 在整合分支上并行;量级估计 115–185 个 agent 小时、日历 2–3 周、
    owner 实机约 4–5 小时(§4.3,推断)。
 
@@ -174,6 +177,10 @@ node:ffi missing ERR_UNKNOWN_BUILTIN_MODULE
 
 ## 2. 选定方案与被否决的替代
 
+本节各条都服从 ADR-047「权威划分」(`.claude/rules/adrs/ADR-047-opencode2-engine-generation.md`):Code Puppy 已从上游拿回的权威
+(界面、执行闸与目录闸、档位、工具身份、注入内容、计费与云准入、定制中心、数据与凭证归属)换代后仍归 Code Puppy,只换接法、不交回;
+引擎内部消费 OpenCode 的决定;2.x 新增能力默认由 OpenCode 持有,本次不接线。
+
 ### 2.1 合并目标 SHA:`33f94fce96`
 
 - **选它的理由:** owner 要的是「OpenCode 2 最新版本」,最新发布是 v2.2.6(§1.1 ls-remote);`33f94fce96` 的代码与 v2.2.6 逐字相同,
@@ -267,16 +274,21 @@ node:ffi missing ERR_UNKNOWN_BUILTIN_MODULE
 - **红旗检查:** 凡是方案里出现「跟上游逐点保持一致」的地方(典型是重新接管 `packages/core/src/permission.ts`),先问能不能改成挂钩子;
   挂不了才接管,并在 ADR-047 里承认这份维护成本。
 
-### 2.6 前端
+### 2.6 前端(2026-11-09 修订:界面保持当前 alpha)
 
-- 切换时 `frontend/frontend-pin.lock` 与引擎**同一个 SHA**,之后前端与引擎**保持同一代次**、照 ADR-034 月更(第 1 轮 ARCH-NOTE ①)。
-  前端停在 1.x 投影而引擎是 2.x,是同一条用户流程跨两代(ADR-037 决策 5)。
-- renderer 的数据层改用上游公开包 `@opencode/client/solid`(`createData`、`createClientConnection`,`v2:packages/client/src/solid/data.ts:264`、
-  `connection.ts:40`),不再经 `packages/app` 内部的 `useServerSync`/`useServerSDK`。理由:这是 2.x 的 app 自己用的数据层(13 个文件 import),
-  是公开包而不是 app 内部,以后月更 pin 时耦合面更小。
-- SOT 补丁在新 pin 上重建,只保留 renderer 仍然需要从 `packages/app` 拿、又拿不到公开出口的那部分(清点表 F3 的 18 个缺失符号逐个判)。
-- 被否决:前端保持旧 pin、只换引擎 —— 旧前端打的全是 v1 路由,在 2.x 上没有一条存在;renderer 自写一套 SDK 绕开 `@opencode/client` ——
-  手写上游协议的替身,正是「勘破先于闸门设计」点名的形态。
+- **界面是 Code Puppy 权威,不随引擎换代**(owner 2026-11-09,#1662 评论 6736266548;ADR-047 决策 1 与「权威划分」)。换代后界面与 0.1.26 一致,
+  唯一例外是拿掉「分享对话」(R6)。上游 2.x 的界面(`packages/{app,ui,session-ui,desktop,gui-plugins}`)不进 Code Puppy。
+- **冻结界面的落点**:pin 留在 `e11dbd02`、SOT 补丁取 `origin/alpha` 原样,落点从 `packages/{app,ui}` 改到 `packages/codepuppy-{app,ui}`
+  (包名不变);0.1.26 用到的 `session-ui`、v1 SDK、五个 core 工具文件一并冻结在 `packages/codepuppy-{session-ui,sdk-v1,core-util}`。
+  原位放回会让 2.x 工作区 `bun install` 失败(7 个上游包依赖 `@opencode/{ui,app}`,实测见 L6 方案 §1.3)。上游 `packages/{app,ui}` 因此逐字等于上游,
+  north-star carve-out ② 撤掉,每日同步不再还原前端。
+- **数据与连接层**:冻结界面始终走它在 0.1.26 里实际跑的 v1 数据路径;renderer 里一层 Code Puppy 自有的引擎适配器(`packages/ui-mac/src/renderer/engine-adapter/`)
+  经冻结 app 的宿主接缝 `Platform.fetch` 接入,按路由表把 v1 请求与 v1 事件流翻成 2.x `/api/*`(经 `@opencode/client`),表外请求响亮失败。
+  冻结代码只改三处(事件流的回环例外、终端 WebSocket 地址、一处 `@opencode-ai/schema` import)与两份清单的依赖钉版。
+- 依赖规模、逐条落点、L6 新退出条件、L7 截图比对格、做不到长相不变的界面清单:[L6 实施方案](2026-11-09-1668-l6-ui-stays-alpha.md)
+  与[依赖清单](2026-11-09-1668-l6-engine-dependency-inventory.md)。§4.1 的 L6 行以 L6 方案 §6 为准。
+- 被否决:前端与引擎同一 SHA、renderer 改用 `@opencode/client/solid`(本节原文;上游界面不进,owner 裁);让冻结 app 跑它自带的 v2 支路
+  (0.1.26 从没跑过,组件读另一套 store);复活 v1 引擎(ADR-037 决策 5)。
 
 ### 2.7 配置与环境变量
 

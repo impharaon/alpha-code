@@ -1,0 +1,80 @@
+{
+ "afterFirst": 1,
+ "afterSame": 1,
+ "afterOther": 2,
+ "asks": [
+  {
+   "id": "per_1bfe582a2001JYFrSQiHTu2C5T",
+   "sessionID": "ses_e401a7e32ffe3qIzUzVaegOA9Z",
+   "action": "read",
+   "resources": [
+    ".env"
+   ],
+   "save": [
+    "*"
+   ],
+   "source": {
+    "type": "tool",
+    "messageID": "msg_1bfe581e2001d5V4dzy9JU7tq2",
+    "id": "call_mock_env_e8uv4"
+   }
+  },
+  {
+   "id": "per_1bfe585c70019KsLB8Jkq94kqP",
+   "sessionID": "ses_e401a7e32ffe3qIzUzVaegOA9Z",
+   "action": "read",
+   "resources": [
+    "other.env"
+   ],
+   "save": [
+    "*"
+   ],
+   "source": {
+    "type": "tool",
+    "messageID": "msg_1bfe585070018bCMVfjq1rFR0Y",
+    "id": "call_mock_other_l2vzc"
+   }
+  }
+ ],
+ "session": {
+  "data": {
+   "id": "ses_e401a7e32ffe3qIzUzVaegOA9Z",
+   "projectID": "2f75c35fff47cd29a46d1f66d0f0e43ce1644a58",
+   "cost": 0,
+   "tokens": {
+    "input": 75,
+    "output": 23,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "outcome": "succeeded",
+   "time": {
+    "created": 1794220851666,
+    "updated": 1794220852694,
+    "busy": 1794220852484,
+    "idle": 1794220852458
+   },
+   "title": "Mock title",
+   "subpath": "../../../../tmp/l6-probe.F4Lu/proj",
+   "permissions": [
+    {
+     "action": "read",
+     "resource": ".env",
+     "effect": "allow"
+    }
+   ],
+   "location": {
+    "directory": "/tmp/l6-probe.F4Lu/proj"
+   }
+  }
+ },
+ "reads": [
+  ".env:completed",
+  ".env:completed",
+  "other.env:error"
+ ],
+ "_source": "Sampled 2026-11-09 by alpha-code#1668 (L6), same engine and mock as read-tool.json. One session: read .env (the build agent asks for *.env) -> PATCH /api/session/:id {permissions:[...current, {action, resource: <asked pattern>, effect: allow}]} + reply {decision:'once'}; read .env again -> no ask; read other.env -> asked again (rejected). afterFirst/afterSame/afterOther = ask counts."
+}

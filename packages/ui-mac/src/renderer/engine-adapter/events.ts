@@ -25,7 +25,7 @@ type Emit = (directory: string, payload: V1Payload) => void
 const SNAPSHOT_WINDOW = 20
 
 /** 结构性的消息事件:之后按存储重取最近一页并发出变化。 */
-const SNAPSHOT_EVENTS = new Set([
+export const SNAPSHOT_EVENTS = new Set([
   "session.inbox.delivered",
   "session.step.started",
   "session.step.streamed",

@@ -79,3 +79,18 @@ ARCH-NOTE:① ADR-047「前端 pin 与引擎同一 SHA」改为「切换时同�
 | # | 裁决 | 依据 |
 | --- | --- | --- |
 | R19 | **数据连续性按方案成立,不改路线。** R18 的缺陷在真库上复现,维持在 L2 内修。F1 的修法(两条退役 id 进支持面)在真库上验证成立。另记一格给 L7:首次以 2.x 启动、转换旧对话时,会检查每个会话所在的磁盘目录;位于 `~/Documents` 等受 macOS 隐私保护目录下的会话可能触发一次系统授权框。L7 在打包版上实测首启表现,并记录拒绝授权时这些会话的归属(只影响项目归属,不影响会话与消息条数)。不为此改代码,除非 L7 实测出用户可见的错误。 | 真库只读副本实测:WAL 库、`migration` 表 40 行、含 alpha 两条 id;只读打开 `exit=14`、两种期望都 `skip`;可写克隆路径下 2.x 清单 → `db-ahead`(未知 = alpha 两条),加两条 → `migrate-ahead`(21 条待前进)、备份成功;node24 上游构建转换后会话 119 → 119,v1 的 597 条用户 + 助手消息全部保留(另增 27 条合成、40 条改名提示),引擎 0 警告 0 错误;owner 数据目录 3688 条快照前后一致,副本已删。 |
+
+## 方案审第 2 轮处置(2026-11-09,最后一轮;F1–F12 全部 FIXED)
+
+预算 2/2 已用完,不再送审:以下由方案作者回写,编排器核关键处后定稿(codex-review-watchdog「未获批时的默认动作」)。
+
+| # | 处置(要回写的地方) | 依据 |
+| --- | --- | --- |
+| N1 Major → **R13 修订** | **`start()` 不传 `lifecycle`**(撤回 R13 里「并传 lifecycle」)。传了会①每次启动自动续跑未释放执行认领的会话(平台模型计费、「全部批准」档下工具照常执行,今天 v1 没有这条路),②启动失败变成永久挂起、main 60 秒后才报笼统错误。不传 = 上游 CLI 默认模式 = L1a 实测形态。回写 B §2.4、§2.7、L5 边界,A 决策 3。 | 审计读码:`v2:packages/server/src/process.ts:113-117,130-148,229-237,245-249`、`session/execution/restart.ts:34,76-83`;L1a 勘破 :120-121 实测未传。编排器错把 L1a 的 OPTIONAL 当成要求,此处订正。 |
+| N2 Minor | F1 的修法改为:退役 id 单列一个字段,只用于排除「未知 id」,**不计入待前进**;加测试「2.x 新建的 59 条库 ⇒ 直接放行、不备份」。回写 B §2.8、I D2、A 决策 5。 | `db-safety.ts:84-86`;新装、清空数据、临时目录实例否则每次启动都整库备份,备份失败即拒启。 |
+| N3 Minor | S6 以移除指令 `-opencode.config.compatibility` 为**唯一机制**,不再保留 `config.claude=false`;反向臂改为「去掉移除指令 ⇒ `.claude` 与 `.agents` 技能都出现」。回写 B S6、G7,I C9,A 决策 4。 | `v2:packages/core/src/config/plugin/compatibility.ts:44-56`:两类技能只由该插件装载。 |
+| N4 Minor | 改写为「sidecar 构造 `ServerOptions`(含 `config.directory`、`database.path`);`XDG_*` 在 import 引擎之前定好」;删掉「core/server 里零读者」的断言(`v1-migration.bun.ts:801` 读 `OPENCODE_DB`)与「构造 Global 层」。回写 B §2.7、I E3、A 决策 3。 | `v2:packages/server/src/routes.ts:135`、`util/src/global-roots.ts:5-8`。 |
+| N5 Minor → **R16 修订** | **落地 = 一个进 `alpha` 的最终 PR,`gh pr merge --merge` 合入**(`alpha` 上 first-parent 只多一个合并提交,撤回 `revert -m 1` 成立,ADR-037 决策 2「独立 PR」与 AC1 的 PR 正文证据有落点)。lane 仍不开 GitHub PR、本机整合、`refs/backup/1662/engine` 备份(R16 其余不变)。推最终 PR 的 head 分支之前,依 L2 列出的「上游 workflow 名称 + 触发器 + 权限」清单逐个判它在 head 推送与 PR 上会不会以写权限触发,有则先处置再推;合入后立即停用新出现的上游 workflow 并读回。回写 B §0、§2.3、§5、§6,A 决策 2。 | 审计:base 为 `alpha` 时 `pull_request_target` 类读 `alpha` 自己的定义;快进直推则 §2.3.5 与 §6 的合并提交不存在。 |
+| OOR-1 | 采纳:Code Puppy 注入的配置对正式渠道的五个开关(`todo`/`schedules`/`media_blob`/`artifacts`/`background_compaction`)显式写值,堵住用户 `opencode.json` 的 `experimental.*` / `all_flags`(注入层优先级高于项目与全局)。并入 L5(与 R13、R17 同一调用链)。订正坐标 `flag.ts:31,35`。 | `v2:packages/core/src/flag.ts:57-70`。 |
+| OOR-2 | 采纳:清点表 S7 补 `packages/ui-mac/src/main/sidecar-stop.ts:38` 的 `POST /global/dispose`(2.x 下 404 会让停止在排空连接前抛错);L5 退出条件点名它。 | 审计读码。 |
+| OOR-3 | 采纳:§6.2 撤回演练用独立的 userData 与数据目录,不碰 owner 真实备份目录(否则 `BACKUP_KEEP=5` 轮转掉真实备份,且 2.x 写下的自有状态会被日用 1.x 读到)。 | `db-safety.ts:14,226-227`。 |

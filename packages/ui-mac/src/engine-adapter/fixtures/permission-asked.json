@@ -1,15 +1,15 @@
 {
- "_source": "Sampled 2026-11-09 by alpha-code#1668 (L6), same engine and mock as read-tool.json: the build agent's `read *.env` ask rule fired on a mock `read .env` tool call. `frame` is the raw /api/event permission.asked frame; `list` is GET /api/permission/request right after it. The engine here runs without ext, so metadata is empty; the four I7a keys (identity/authority/location/policy, seams doc I7a) are added by the test.",
+ "_source": "Sampled by `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts` (alpha-code#1668 L6) at 023507c5c0: a real OpenCode 2 engine from this repo's packages/cli `serve`, isolated HOME/XDG, one git project, and the scripted OpenAI-compatible mock model next to the sampler. The build agent's `read *.env` ask fired on a mock `read .env`. `frame` is the raw permission.asked frame; `list` is GET /api/permission/request right after it. No ext runs here, so metadata is empty; tests add the four I7a keys.",
  "frame": {
-  "id": "evt_1bfe4dad7002UdNOuLS4ZdnPRh",
-  "created": 1794220808919,
+  "id": "evt_1c00498a2002zNj0zuAhhooBeh",
+  "created": 1794222889122,
   "type": "permission.asked",
   "location": {
-   "directory": "/tmp/l6-probe.F4Lu/proj"
+   "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-c1DEpw/proj"
   },
   "data": {
-   "id": "per_1bfe4dad7001GVEAbd2QmgvYK0",
-   "sessionID": "ses_e401b25edffeCu0lVMSfOHVElU",
+   "id": "per_1c00498a2001jakpBtGeYvlVqy",
+   "sessionID": "ses_e3ffb6837ffed9wdgoiJAUnsUm",
    "action": "read",
    "resources": [
     ".env"
@@ -19,19 +19,19 @@
    ],
    "source": {
     "type": "tool",
-    "messageID": "msg_1bfe4da1a001rJc1eIcie5tYjG",
-    "id": "call_mock_env_kpta4"
+    "messageID": "msg_1c00497e3001o3XJrm69qXJ94Z",
+    "id": "call_mock_env_o2wdv"
    }
   }
  },
  "list": {
   "location": {
-   "directory": "/tmp/l6-probe.F4Lu/proj"
+   "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-c1DEpw/proj"
   },
   "data": [
    {
-    "id": "per_1bfe2e7b6001tOzUdcL8a2CISj",
-    "sessionID": "ses_e401d1911ffehjN9nhtKQ5FO0g",
+    "id": "per_1c00498a2001jakpBtGeYvlVqy",
+    "sessionID": "ses_e3ffb6837ffed9wdgoiJAUnsUm",
     "action": "read",
     "resources": [
      ".env"
@@ -41,40 +41,8 @@
     ],
     "source": {
      "type": "tool",
-     "messageID": "msg_1bfe2e6f7001wOHzAoluu4X4T2",
-     "id": "call_mock_env_0g361"
-    }
-   },
-   {
-    "id": "per_1bfe3f6e6001aHNb6GHPzKtOBf",
-    "sessionID": "ses_e401c09e4ffeT0olOnBt7lX057",
-    "action": "read",
-    "resources": [
-     ".env"
-    ],
-    "save": [
-     "*"
-    ],
-    "source": {
-     "type": "tool",
-     "messageID": "msg_1bfe3f622001vcX45ZxbLDZfA5",
-     "id": "call_mock_env_823pq"
-    }
-   },
-   {
-    "id": "per_1bfe4dad7001GVEAbd2QmgvYK0",
-    "sessionID": "ses_e401b25edffeCu0lVMSfOHVElU",
-    "action": "read",
-    "resources": [
-     ".env"
-    ],
-    "save": [
-     "*"
-    ],
-    "source": {
-     "type": "tool",
-     "messageID": "msg_1bfe4da1a001rJc1eIcie5tYjG",
-     "id": "call_mock_env_kpta4"
+     "messageID": "msg_1c00497e3001o3XJrm69qXJ94Z",
+     "id": "call_mock_env_o2wdv"
     }
    }
   ]

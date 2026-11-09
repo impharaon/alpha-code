@@ -1,0 +1,109 @@
+// `#1668`:引擎适配器夹具采样用的假模型 —— 一个 OpenAI 兼容的 `/v1/chat/completions`(流式),按用户最后一句话里的
+// 关键词给出固定剧本。只用来驱动隔离的 2.x 引擎跑出真事件与真消息;不进任何门。用法见同目录 README.md。
+//
+// 剧本(最后一条消息不是工具结果时):
+//   含 "todo"   ⇒ 调 todowrite(三条任务)
+//   含 "ask"    ⇒ 调 question(一个单选题 Red / Blue)
+//   含 "write"  ⇒ 调 write b.txt
+//   含 "other"  ⇒ 调 read other.env
+//   含 "secret" ⇒ 调 read .env(build agent 对 *.env 询问)
+//   其余        ⇒ 思考 + 正文 + 调 read a.txt
+// 最后一条是工具结果 ⇒ 一句收尾正文。
+
+type Message = { role: string; content: unknown }
+
+const base = { id: "chatcmpl-1", object: "chat.completion.chunk", created: 1, model: "m" }
+const delta = (value: unknown, finish: string | null = null) => ({ ...base, choices: [{ index: 0, delta: value, finish_reason: finish }] })
+const usage = (prompt: number, completion: number) => ({
+  ...base,
+  choices: [],
+  usage: { prompt_tokens: prompt, completion_tokens: completion, total_tokens: prompt + completion },
+})
+
+function sse(chunks: unknown[]) {
+  return new Response(
+    new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder()
+        for (const chunk of chunks) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`))
+          await Bun.sleep(30)
+        }
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"))
+        controller.close()
+      },
+    }),
+    { headers: { "content-type": "text/event-stream" } },
+  )
+}
+
+const toolCall = (id: string, name: string, args: unknown) => [
+  delta({ role: "assistant", content: "" }),
+  delta({ content: `Calling ${name}.` }),
+  delta({ tool_calls: [{ index: 0, id, type: "function", function: { name, arguments: "" } }] }),
+  delta({ tool_calls: [{ index: 0, function: { arguments: JSON.stringify(args) } }] }),
+  delta({}, "tool_calls"),
+  usage(5, 5),
+]
+
+const suffix = () => Math.random().toString(36).slice(2, 7)
+
+function script(messages: Message[]) {
+  const last = messages.at(-1)
+  const afterTool = last?.role === "tool"
+  const user = JSON.stringify(messages.filter((message) => message.role === "user").at(-1)?.content ?? "")
+  if (user.includes("title")) return [delta({ role: "assistant", content: "Mock title" }), delta({}, "stop")]
+  if (afterTool)
+    return [delta({ role: "assistant", content: "" }), delta({ content: "The file " }), delta({ content: "says hi." }), delta({}, "stop"), usage(30, 4)]
+  if (user.includes("todo"))
+    return toolCall("call_mock_todo_1", "todowrite", {
+      todos: [
+        { content: "Step one", status: "in_progress" },
+        { content: "Step two", status: "pending" },
+        { content: "Step three", status: "pending" },
+      ],
+    })
+  if (user.includes("ask"))
+    return toolCall("call_mock_question_1", "question", {
+      questions: [
+        {
+          question: "Which color?",
+          header: "Color",
+          options: [
+            { label: "Red", description: "warm" },
+            { label: "Blue", description: "cool" },
+          ],
+          multiple: false,
+        },
+      ],
+    })
+  if (user.includes("write")) return toolCall(`call_mock_write_${suffix()}`, "write", { path: "b.txt", content: "hello from the turn\n" })
+  if (user.includes("other")) return toolCall(`call_mock_other_${suffix()}`, "read", { path: "other.env" })
+  if (user.includes("secret")) return toolCall(`call_mock_env_${suffix()}`, "read", { path: ".env" })
+  return [
+    delta({ role: "assistant", content: "" }),
+    delta({ reasoning_content: "Thinking about " }),
+    delta({ reasoning_content: "the file." }),
+    delta({ content: "I'll read " }),
+    delta({ content: "the file." }),
+    delta({ tool_calls: [{ index: 0, id: "call_mock_read_1", type: "function", function: { name: "read", arguments: "" } }] }),
+    delta({ tool_calls: [{ index: 0, function: { arguments: '{"path":' } }] }),
+    delta({ tool_calls: [{ index: 0, function: { arguments: '"a.txt"}' } }] }),
+    delta({}, "tool_calls"),
+    usage(12, 7),
+  ]
+}
+
+export function startMockModel(port: number) {
+  return Bun.serve({
+    port,
+    hostname: "127.0.0.1",
+    async fetch(request) {
+      const url = new URL(request.url)
+      if (url.pathname.endsWith("/models")) return Response.json({ object: "list", data: [{ id: "m", object: "model" }] })
+      if (!url.pathname.endsWith("/chat/completions")) return new Response("not found", { status: 404 })
+      const body = (await request.json()) as { messages: Message[] }
+      return sse(script(body.messages))
+    },
+  })
+}

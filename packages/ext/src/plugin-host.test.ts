@@ -12,6 +12,7 @@ import { Command } from "../../core/src/command.ts"
 import { PluginHooks } from "../../core/src/plugin/hooks.ts"
 import { Skill } from "../../core/src/skill.ts"
 import { Tool } from "../../core/src/tool.ts"
+import { WebSearch } from "../../core/src/websearch.ts"
 import { Session } from "../../schema/src/session.ts"
 import { SessionMessage } from "../../schema/src/session-message.ts"
 import type { Plugin } from "@opencode/plugin"
@@ -100,6 +101,31 @@ it.live("权威 · 联网搜索准入(L5r):kill-switch 下 2.x 内置 websearch 
     }
     // 兄弟工具不误杀(AC4)
     expect(Exit.isSuccess(yield* before("codepuppy_dispatch"))).toBe(true)
+  }),
+)
+
+it.live("权威 · 本地 keyless 搜网的供应商(L5r):没有任何选择时 ext 定为 exa,上游不必弹选择表单;用户 / 上游已选的不动;反向臂:不装 ext ⇒ 无默认", () =>
+  Effect.gen(function* () {
+    env({})
+    yield* activate({
+      id: "test.websearch-providers",
+      async setup(context) {
+        await context.websearch.transform((editor) => {
+          for (const id of ["exa", "parallel"]) editor.add({ id, name: id, execute: async () => [] })
+        })
+      },
+    })
+    const websearch = yield* WebSearch.Service
+    expect(yield* websearch.default()).toBeUndefined()
+    yield* activate(CodePuppyExt)
+    expect((yield* websearch.default())?.id).toBe("exa")
+    yield* activate({
+      id: "test.user-websearch-choice",
+      async setup(context) {
+        await context.websearch.transform((editor) => editor.default.set("parallel"))
+      },
+    })
+    expect((yield* websearch.default())?.id).toBe("parallel")
   }),
 )
 

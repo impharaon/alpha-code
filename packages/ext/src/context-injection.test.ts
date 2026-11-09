@@ -142,7 +142,7 @@ afterEach(() => {
 })
 
 /** 本文件为之设了咽喉的通路。② 要求它与「真 CodePuppyExt 注册且分类为 context」的集合逐字相等。 */
-const THROATED = ["agent.transform", "command.transform", "mcp.transform", "session.context", "skill.transform", "tool.execute.after", "tool.transform"].sort()
+const THROATED = ["agent.transform", "command.transform", "mcp.transform", "session.context", "skill.transform", "tool.execute.after", "tool.transform", "websearch.transform"].sort()
 
 describe("② alpha 注册的每个载上下文通路都有咽喉", () => {
   test("注册集 ∩ context 分类 == 本文件设咽喉的集合;注册的每个通路都在分类表里", async () => {
@@ -297,6 +297,24 @@ describe("③a 配置域 transform 咽喉:ext 写进 agent / command / mcp 的�
       expect(explainConfigReference(p).ok, p).toBe(false)
     expect(explainConfigString("/commands/x/template", contextText("command.init.template")).ok).toBe(true)
     expect(explainConfigReference("/commands/x/template").ok).toBe(false)
+  })
+})
+
+describe("③a″ skill / websearch transform 不写字:只拿掉出厂禁项、只选供应商", () => {
+  test("skill.transform 只调 remove;websearch.transform 只在没有选择时调 default.set(供应商 id),不加任何带字的供应商", async () => {
+    process.env.CODEPUPPY_FACTORY_DENY_SKILLS = JSON.stringify(["customize-opencode"])
+    const recorded = recordingContext(join(root, "project"))
+    await CodePuppyExt.setup(recorded.context)
+    const calls: string[] = []
+    for (const transform of recorded.transforms.skill ?? [])
+      transform({ remove: (id: string) => void calls.push(`skill.remove ${id}`), add: () => void calls.push("skill.add"), update: () => void calls.push("skill.update") } as never)
+    for (const transform of recorded.transforms.websearch ?? [])
+      transform({
+        add: () => void calls.push("websearch.add"),
+        remove: () => void calls.push("websearch.remove"),
+        default: { get: () => undefined, set: (selection: unknown) => void calls.push(`websearch.default ${String(selection)}`) },
+      } as never)
+    expect(calls).toEqual(["skill.remove customize-opencode", "websearch.default exa"])
   })
 })
 

@@ -69,6 +69,9 @@ export function processState(): ProcessState {
 }
 processState()
 
+/** L5r:没有任何选择时 Code Puppy 定的本地 keyless 搜网供应商(2.x 内置 `opencode.websearch.exa`,不需要密钥)。 */
+const DEFAULT_WEBSEARCH_PROVIDER = "exa"
+
 /** 会话事件:状态变了 ⇒ 请调度器重判(它自己问引擎的 active,不信事件里的快照)。 */
 const RELOAD_POKE_EVENTS = ["session.idle", "session.status"] as const
 
@@ -270,6 +273,12 @@ export const CodePuppyExt: Plugin.Plugin = {
         } catch (cause) {
           error(`[@codepuppy/ext] command transform failed: ${describe(cause)}`)
         }
+      })
+      // L5r(ADR-035 / ADR-046):本地 keyless 搜网由 Code Puppy 选供应商 —— 没有任何选择时定为 exa(keyless,v1 的本地腿之一),
+      // 不让上游第一次搜网时弹它自己的「允许 OpenCode 搜网 / 选供应商」表单。用户配置的 `websearch` 由排在 ext 之后的
+      // `opencode.config.websearch` 应用,照样优先;kill-switch 由上面的 execute.before 拒,与这里的选择无关。
+      await context.websearch.transform((editor) => {
+        if (editor.default.get() === undefined) editor.default.set(DEFAULT_WEBSEARCH_PROVIDER)
       })
       // REQ-067 / #1522:出厂禁用的技能 —— 从技能目录里拿掉(上游内置的那些在 ext 之前注册),并在权限评估里一律 deny
       // (覆盖之后才由配置目录装进来的同名技能)。

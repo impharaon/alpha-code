@@ -214,28 +214,35 @@ describe("websearch 执行副本普查(#223 R3 · R4 起降为纵深)", () => {
       expect(allowlist).not.toContain(`"${name}"`)
   })
 
-  test("云侧最终闸是 ext 钩子的第一句(排在契约校验与 ctx.ask 之前)", () => {
+  // `#1667`(#1665 L3 交回):2.x 的执行钩子是 `context.tool.hook("execute.before", …)`(只有它允许失败,抛出即拒掉这次调用)。
+  test("云侧最终闸是 ext 执行钩子的第一句(排在契约校验与 ctx.ask 之前)", () => {
     const plugin = read("packages/ext/src/plugin.ts")
-    const hook = plugin.indexOf('"tool.execute.before"')
+    const hook = plugin.indexOf('context.tool.hook("execute.before"')
     expect(hook).toBeGreaterThanOrEqual(0)
     // #223 R7:归属实参从模块级默认值改成本实例闭包(`, process.env, mcpOwnership`),故只钉调用点。
-    const gate = plugin.indexOf("assertWebSearchToolAllowed(hookInput.tool", hook)
+    const gate = plugin.indexOf("assertWebSearchToolAllowed(event.tool", hook)
     const contract = plugin.indexOf("validateCloudToolInput(", hook)
     expect(gate).toBeGreaterThan(hook)
     expect(gate).toBeLessThan(contract)
+    // 钩子体里闸之前没有别的语句(只允许注释)
+    const body = plugin.slice(plugin.indexOf("{", hook) + 1, gate)
+    expect(body.replace(/\/\/[^\n]*/g, "").trim()).toBe("")
   })
 
-  // #223 R4:ext 装载回执必须是 config 钩子的第一句 —— 它后面那些项目配置分支有 early return,
-  // 排在它们之后会让「项目 codepuppy.jsonc 读不了」顺带把云工具一起关掉。
-  // R5:回执从「翻开 enabled:false」改成「把定义装进配置」(`installCloudMcp`),位置要求不变。
-  test("ext 装载回执是 config 钩子的第一句", () => {
+  // #223 R4:ext 装载回执必须排在项目配置之前 —— 项目配置的分支会失败,排在它们之后会让「项目 codepuppy.jsonc 读不了」
+  // 顺带把云工具一起关掉。R5:回执从「翻开 enabled:false」改成「把定义装进配置」(`installCloudMcp`),位置要求不变。
+  // `#1667`(#1665 L3 交回):2.x 没有整份 config 钩子,云 MCP 定义经本 Location 的 `context.mcp.transform` 编辑器装;
+  // 回执是这个 transform 的第一句,排在项目 MCP 合并(`applyProjectMcp`,会抛)之前。
+  test("ext 装载回执是 mcp.transform 的第一句(排在项目 MCP 合并之前)", () => {
     const plugin = read("packages/ext/src/plugin.ts")
-    const hook = plugin.indexOf("async config(cfg) {")
-    expect(hook).toBeGreaterThanOrEqual(0)
-    const install = plugin.indexOf("installCloudMcp(cfg)", hook)
+    const transform = plugin.indexOf("context.mcp.transform((editor) => {")
+    expect(transform).toBeGreaterThanOrEqual(0)
+    const install = plugin.indexOf("installCloudMcp(editor)", transform)
+    const project = plugin.indexOf("applyProjectMcp(editor", transform)
+    expect(install).toBeGreaterThan(transform)
+    expect(project).toBeGreaterThan(install)
     // 只找**语句**形态的 return(行首缩进后紧跟 return),否则注释里的字眼会误判位置。
-    const firstReturn = hook + plugin.slice(hook).search(/\n\s*return[\s;]/)
-    expect(install).toBeGreaterThan(hook)
+    const firstReturn = transform + plugin.slice(transform).search(/\n\s*return[\s;]/)
     expect(install).toBeLessThan(firstReturn)
   })
 
@@ -247,10 +254,11 @@ describe("websearch 执行副本普查(#223 R3 · R4 起降为纵深)", () => {
   // 这里钉住静态形状:kill-switch 下写进 config.mcp 的**只能**是中和条目。
   test("kill-switch 分支写的是中和条目,真定义只经 ARM/DEF 托管", () => {
     const injection = read("packages/ui-mac/src/main/codepuppy-config-injection.ts")
-    // `#1195` 起赋值是 platformPays 三分支(缺凭证 ⇒ 工厂给的无引用 enabled:false 形状),
+    // `#1195` 起赋值是 platformPays 三分支(缺凭证 ⇒ 工厂给的无引用 disabled 形状),
     // 但 kill-switch 臂**必须**仍是中和条目且排在最前(缺凭证判定不得把真 URL 放回 kill-switch 态)。
+    // `#1667`:2.x 的 MCP 条目在 `mcp.servers` 下(上游 `Config.Info` 的 `mcp.servers`)。
     const assign = injection.match(
-      /config\.mcp = \{\n\s*\.\.\.\(config\.mcp \?\? \{\}\),\n\s*\[CLOUD_MCP_SERVER_NAME\]: killSwitch\n\s*\? \{ \.\.\.WITHHELD_CLOUD_MCP \}\n\s*: platformPays\n\s*\? cloud\n\s*: materializeCloudMcpConfig\(mcpUrl, undefined\),\n\s*\}/,
+      /config\.mcp = \{\n\s*\.\.\.config\.mcp,\n\s*servers: \{\n\s*\.\.\.config\.mcp\?\.servers,\n\s*\[CLOUD_MCP_SERVER_NAME\]: killSwitch\n\s*\? \{ \.\.\.WITHHELD_CLOUD_MCP \}\n\s*: platformPays\n\s*\? cloud\n\s*: materializeCloudMcpConfig\(mcpUrl, undefined\),\n\s*\},\n\s*\}/,
     )
     expect(assign).not.toBeNull()
     const branch = injection.indexOf("if (killSwitch) {")

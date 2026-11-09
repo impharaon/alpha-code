@@ -33,6 +33,12 @@ import { secretFilePath, secretFileRef } from "./codepuppy-secret-files"
 // 继承):只断 main 的 config / DEF = 断中间产物。这里 import 生产件本体,让最后一跳真的执行。
 import { installCloudMcp } from "../../../ext/src/cloud-websearch-kill"
 
+/** 2.x `mcp.transform` 编辑器的最小面(installCloudMcp 只用 set):起点是注入面写进配置的那几条。 */
+function mcpEditor(initial: Record<string, unknown>) {
+  const entries = new Map(Object.entries(initial))
+  return { editor: { set: (name: string, config: unknown) => void entries.set(name, config) }, get: (name: string) => entries.get(name) }
+}
+
 const CLOUD_URL = "https://cloud.example/mcp"
 const MCP_SECRET = "SECRET-MCP-TOKEN-VALUE"
 const CLOUD_SECRET = "SECRET-CLOUD-TOKEN-VALUE"
@@ -204,18 +210,19 @@ describe("`#1195` 生产注入面", () => {
     // 注入面这一半:kill-switch 下配置里只有中和条目。
     expect(injectedMcp().codepuppy).toEqual({ ...WITHHELD_CLOUD_MCP })
 
-    // ext 那一半:真 installCloudMcp + 真 readFileSync(默认参数)读**真密钥文件**。
-    const cfg: { mcp?: Record<string, unknown> } = { mcp: { codepuppy: injectedMcp().codepuppy } }
-    expect(installCloudMcp(cfg, process.env)).toBe("codepuppy")
-    // `#1667`:DEF 托管的是 2.x `Mcp.RemoteConfig` 形状;ext 怎么把它装进 2.x(mcp.transform)归 L3,这里只钉 main 这一侧
-    // 负责的事实:凭证解析成 Bearer 值、OAuth 不复活、端点就是 DEF 里那个。
-    expect(cfg.mcp!.codepuppy).toMatchObject({
+    // ext 那一半:真 installCloudMcp + 真 readFileSync(默认参数)读**真密钥文件**。`#1667`(#1665 L3):2.x 里它写的是本 Location
+    // `mcp.transform` 的编辑器(同名条目整条替换);这里给它一个装着注入面中和条目的编辑器。
+    const servers = mcpEditor({ codepuppy: injectedMcp().codepuppy })
+    expect(installCloudMcp(servers.editor, process.env)).toBe("codepuppy")
+    // DEF 托管的是 2.x `Mcp.RemoteConfig` 形状:凭证解析成 Bearer 值、OAuth 不复活、端点就是 DEF 里那个,而且引擎自己的 schema 解得开。
+    expect(servers.get("codepuppy")).toEqual({
       type: "remote",
       url: CLOUD_URL,
       headers: { Authorization: `Bearer ${MCP_SECRET}` },
       oauth: false,
     })
-    expect(JSON.stringify(cfg.mcp!.codepuppy)).not.toContain("clientId")
+    expect(Schema.decodeUnknownSync(EngineRemoteSchema)(servers.get("codepuppy")).disabled).toBeUndefined()
+    expect(JSON.stringify(servers.get("codepuppy"))).not.toContain("clientId")
   })
 
   test("B1 缺席臂:kill-switch + 文件缺席 ⇒ installCloudMcp 响亮不装,留下中和条目(fail-closed)", () => {
@@ -225,16 +232,16 @@ describe("`#1195` 生产注入面", () => {
     const original = console.error
     console.error = (...args: unknown[]) => void errors.push(args)
     let installed: string | undefined
-    let cfg: { mcp?: Record<string, unknown> }
+    let servers: ReturnType<typeof mcpEditor>
     try {
       expect(inject().ok).toBe(true)
-      cfg = { mcp: { codepuppy: injectedMcp().codepuppy } }
-      installed = installCloudMcp(cfg, process.env)
+      servers = mcpEditor({ codepuppy: injectedMcp().codepuppy })
+      installed = installCloudMcp(servers.editor, process.env)
     } finally {
       console.error = original
     }
     expect(installed).toBeUndefined()
     expect(errors.flat().join("\n")).toContain("unresolved {file:} reference")
-    expect(cfg!.mcp!.codepuppy).toEqual({ ...WITHHELD_CLOUD_MCP })
+    expect(servers!.get("codepuppy")).toEqual({ ...WITHHELD_CLOUD_MCP })
   })
 })

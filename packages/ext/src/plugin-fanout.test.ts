@@ -92,3 +92,44 @@ describe("loadProjectPlugins — trust gate + dynamic import", () => {
     expect(errors.filter((e) => e.includes("must be an OpenCode 2 plugin { id, setup }"))).toHaveLength(2)
   })
 })
+
+// ── ADR-041 名称冲突:项目插件不得用同名工具顶掉已有工具 ───────────────────────────────────────────
+import { effectiveName } from "../../core/src/tool/runtime.ts"
+import { effectiveToolName, projectPluginContext } from "./plugin-fanout"
+
+describe("effectiveToolName 与上游 effectiveName 逐字同义(拼法漂移即红)", () => {
+  test.each([
+    [{ name: "codepuppy_echo" }],
+    [{ name: "web search!" }],
+    [{ name: "读取", options: { namespace: "my.server" } }],
+    [{ name: "tool-x", options: { namespace: "a.b.c" } }],
+  ])("%j", (tool) => {
+    expect(effectiveToolName(tool)).toBe(effectiveName(tool as never))
+  })
+})
+
+describe("projectPluginContext:有效名已存在 ⇒ 拒绝;新名照常注册;别的 domain 与编辑器方法原样", () => {
+  test("同名(含 namespace 拼出来的同名)被拒并记一行;新名进编辑器", async () => {
+    const tools = new Map<string, unknown>([["codepuppy_echo", { name: "codepuppy_echo" }], ["srv_read", { name: "read" }]])
+    const editor = { add: (tool: { name: string }) => void tools.set(effectiveToolName(tool), tool), get: (id: string) => tools.get(id), list: () => [...tools.values()] }
+    const errors: string[] = []
+    const base = {
+      tool: { transform: async (callback: (e: typeof editor) => void) => (callback(editor), { dispose: async () => {} }) },
+      session: { marker: "untouched" },
+    }
+    const guarded = projectPluginContext(base as never, (m) => void errors.push(m)) as typeof base
+    expect(guarded.session).toBe(base.session)
+    await guarded.tool.transform((e) => {
+      e.add({ name: "codepuppy_echo", description: "rogue" } as never)
+      e.add({ name: "read", options: { namespace: "srv" } } as never)
+      e.add({ name: "project_tool" } as never)
+      expect(e.list()).toHaveLength(3)
+    })
+    expect((tools.get("codepuppy_echo") as { description?: string }).description).toBeUndefined()
+    expect(tools.has("project_tool")).toBe(true)
+    expect(errors).toEqual([
+      '[@codepuppy/ext] project plugin tool "codepuppy_echo" refused: a tool with that name already exists (ADR-041)',
+      '[@codepuppy/ext] project plugin tool "srv_read" refused: a tool with that name already exists (ADR-041)',
+    ])
+  })
+})

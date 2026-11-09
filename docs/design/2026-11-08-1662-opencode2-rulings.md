@@ -67,3 +67,9 @@ ARCH-NOTE:① ADR-047「前端 pin 与引擎同一 SHA」改为「切换时同�
 | --- | --- | --- |
 | R16 | **整合过程不在 GitHub 上开 lane PR**:各 lane 提交在自己的分支,由编排器(或 `integrator`)在本机 merge 进 `engine/1662-opencode2`;整合分支以非分支引用 `refs/backup/1662/engine` 推到远端做跨机备份(非 `refs/heads/*` 不触发 workflow)。**落地方式**:整合分支 HEAD 本机全量门绿后,按 `docs/runbooks/ci.md` §4.3「或直接推这个合并提交」推进 `alpha`,紧接着用 L2 事先列好的清单逐个 `gh workflow disable` 新出现的上游 workflow 并读回状态。L2 的退出条件加:清单(名称 + 触发器)与停用脚本在位。 | 方案员实测:M0 推上 GitHub 后,`triage-pr-standards.yml`(opened/edited/sync)、`triage-contributor.yml`(opened)带写令牌对指向整合分支的 PR 触发;`check-bot-scope.yml` 无分支过滤。2026-11-02 已有改名 workflow 被自动启用的事故。 |
 | R17 | 采纳方案员补充:L5 从继承给引擎的环境里去掉 `OPENCODE_FLAGS`(它是引擎的最高优先级覆盖,`v2:packages/core/src/flag.ts:22`,会绕过 R13 的正式渠道默认值)。 | 读码;修法一行、同一调用链(R13)。 |
+
+## L1b 第一步后的裁决(2026-11-09;做法在分支 `spike/1662-l1-engine-host` 的勘破文档 §8,提交 `fba14db89d`)
+
+| # | 裁决 | 依据 |
+| --- | --- | --- |
+| R18 | **db-safety 在 WAL 库上只读打开失败而静默跳过,是既有缺陷,但挡住本票(F1 的修法、前进前备份、AC5 撤回都依赖它),在 #1662 内修,归 L2。** 修法由 L2 定,判据写死:一份「WAL 模式、正常关闭后无 `-wal`/`-shm`」的真 SQLite 夹具库,启动预检必须给出 `db-ahead` / `migrate-ahead` 而不是 `skip`,备份必须成功并通过校验;反向臂:把读法改回 `-readonly` 直开,该测试必须红。不用 `immutable=1` 读有活写入者的库(L1a 实测会丢 WAL 行)。 | 实测(编排器):`packages/ui-mac/src/main/db-safety.ts:64` 读 id、`:197`/`:203` 备份都用 `sqlite3 -readonly`;owner 的 `~/.local/share/opencode/opencode.db` 旁当前无 `-wal`/`-shm`。L1a 在同形态合成库上实测 `exit=14 unable to open database file`、两种期望都回 `skip`;`db-safety.test.ts` 的真 SQLite 用例只建非 WAL 库。真库是否复现由 L1b 第二步确认。 |

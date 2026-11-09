@@ -81,34 +81,30 @@ describe("applyPromptTakeover — set-if-absent", () => {
 // 本票只承诺一个**结构事实**:文档任务不再跑基座提示词。它**不**承诺输出变长/变好
 // (方案基线 docs/design/req-153-output-capability.md §6.1:该行为结果零 A/B 实测)。
 //
-// 那个结构事实由四条断言合起来成立,缺一条就变成一句自说自话:
-//   ① 上游 `llm/request.ts` 仍然在 `input.agent.prompt` 与 `SystemPrompt.provider(model)` 之间
-//      **二选一** —— 这条是**读上游原文**,不是我们手写一个它的替身(本仓最贵的返工形态);
-//   ② `default.txt` 里那几条长度压制仍然逐字节在(否则「不含特征串」测的是一个不存在的东西);
+// 那个结构事实由四条断言合起来成立,缺一条就变成一句自说自话(`#1665` 起读 OpenCode 2 的原文):
+//   ① 上游 `session/model-request.ts` 仍然在 `agent.system` 与默认底座之间**二选一**,且按模型选底座的
+//      `opencode.prompt.*` 插件(`plugin/optimize.ts`)在 agent 有自己的 system 时不动它 —— 这条是**读上游原文**,
+//      不是我们手写一个它的替身(本仓最贵的返工形态);
+//   ② 默认底座里那条简短要求仍然逐字节在(否则「不含特征串」测的是一个不存在的东西);
 //   ③ `CODEPUPPY_DOCS_PROMPT` 一条特征串都不含;
-//   ④ `applyPromptTakeover` 真的把它写进 `agent.docs.prompt`(非空 ⇒ ① 的左支成立)。
+//   ④ `applyPromptTakeover` 真的把它写进 `agent.docs.prompt`(ext 译成 2.x 的 `system`,非空 ⇒ ① 的左支成立)。
 const REPO_ROOT = join(import.meta.dir, "../../..")
-const readUpstream = (rel: string) => readFileSync(join(REPO_ROOT, "packages/opencode/src", rel), "utf8")
+const readUpstream = (rel: string) => readFileSync(join(REPO_ROOT, "packages/core/src", rel), "utf8")
 
-/** `default.txt` 的长度压制特征串。挑的都是**不被 prompt-rebrand 改写**的句子(见 REBRAND_RULES:
- *  它只动身份行、help/feedback 段与 docs 指引段),所以它们在最终 system 段里也是逐字节的。 */
-const DEFAULT_TXT_MARKERS = [
-  "minimize output tokens as much as possible",
-  "You MUST answer concisely with fewer than 4 lines",
-  "Remember that your output will be displayed on a command line interface.",
-] as const
+/** 2.x 默认底座(`session/runner/prompt/system.txt`)的简短要求。挑的是**不被 prompt-rebrand 改写**的句子
+ *  (REBRAND_RULES 只动自指句),所以它在最终 system 段里也是逐字节的。 */
+const DEFAULT_TXT_MARKERS = ["Keep responses clear and concise, and avoid unnecessary technical jargon."] as const
 
 describe("#1241 drift 锁 —— 结论所依赖的上游事实今天仍然成立", () => {
-  test("request.ts 仍在 agent.prompt 与 provider 底座之间二选一(基座整段不跑的机制)", () => {
-    const requestTs = readUpstream("session/llm/request.ts")
-    expect(requestTs.includes("...(input.agent.prompt ? [input.agent.prompt] : SystemPrompt.provider(input.model)),")).toBe(true)
+  test("model-request.ts 仍在 agent.system 与默认底座之间二选一(基座整段不跑的机制)", () => {
+    expect(readUpstream("session/model-request.ts")).toMatch(/input\.agent\.system\s*\?\s*input\.agent\.system\s*:\s*SessionSystemPrompt\.make\(/)
   })
-  test("system.ts 的兜底仍是 default.txt(16/25 网关模型落在这一支)", () => {
-    expect(readUpstream("session/system.ts").includes("return [PROMPT_DEFAULT]")).toBe(true)
+  test("按模型选底座的插件在 agent 有自己的 system 时不改写它", () => {
+    expect(readUpstream("plugin/optimize.ts").includes("if ((yield* ctx.agent.get({ agentID: event.agent })).data.system) return")).toBe(true)
   })
   for (const marker of DEFAULT_TXT_MARKERS) {
-    test(`default.txt 仍逐字节含:${marker.slice(0, 40)}…`, () => {
-      expect(readUpstream("session/prompt/default.txt").includes(marker)).toBe(true)
+    test(`默认底座仍逐字节含:${marker.slice(0, 40)}…`, () => {
+      expect(readUpstream("session/runner/prompt/system.txt").includes(marker)).toBe(true)
     })
   }
 })
@@ -119,7 +115,7 @@ describe("#1241 docs agent —— 装配出的 system 段不含 default.txt 特�
       expect(CODEPUPPY_DOCS_PROMPT.includes(marker), `docs prompt 里混进了基座特征串:${marker}`).toBe(false)
     }
   })
-  test("接管真的落到 agent.docs.prompt 且非空(⇒ request.ts 走左支,底座整段不跑)", () => {
+  test("接管真的落到 agent.docs.prompt 且非空(⇒ model-request.ts 走左支,底座整段不跑)", () => {
     const cfg: Record<string, unknown> = {}
     applyPromptTakeover(cfg)
     const docs = (cfg.agent as Record<string, Record<string, unknown>>).docs

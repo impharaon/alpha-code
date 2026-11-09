@@ -6,11 +6,13 @@
 // 本文件只做 IO:订阅引擎事件、读回消息、发那一个 multipart 请求、按归类结果决定重发还是推进。
 //
 // ── 时机 ────────────────────────────────────────────────────────────────────────────────────
-// 主进程自己起一条 `/global/event` SSE(主进程此前没有;renderer 那条在
-// `packages/ui-mac/src/renderer/sidebar/use-projects.ts:569-624`,是跨 directory 的火龙带,
-// 帧形状 `{ directory, project, workspace, payload: { type, properties } }`)。收到
-// `session.idle`(`packages/opencode/src/session/status.ts:43` 在状态转 idle 时发)后读该会话消息,
-// 把游标之后、`time.completed` 已置的 user→assistant 对逐轮发上去。
+// 主进程自己起一条引擎事件流(renderer 那条在它自己的进程里,拿不到 archive_access_token)。
+// `#1667`(#1662 L5):OpenCode 2 的事件流是 `GET /api/event?types=…`(SSE,帧 `{ type, data, location? }`),而且**不再发**
+// v1 的 `session.idle` / `session.status` —— 一轮结束是 `session.execution.succeeded | failed | interrupted`
+// (`packages/schema/src/session-event.ts` 的 `Execution`,`data.sessionID`)。只订阅这三种(ARCHIVE_WAKE_EVENTS);
+// 收到后读该会话消息,把游标之后、`time.completed` 已置的 user→assistant 对逐轮发上去。
+// 会话读 `GET /api/session/:id`,消息读 `GET /api/session/:id/message`(新的在前、按 `cursor.next` 往回翻),
+// 消息形状经 chat-archive-turn.ts 的 `fromEngineV2Messages` 投影后切轮。
 //
 // ── 失败不阻断对话(父票 AC6)────────────────────────────────────────────────────────────────
 // 本模块任何路径都不往调用方抛:上报是旁路。5xx / 网络错 / 429 在一次 idle 内退避重发有限次,
@@ -28,7 +30,7 @@
 
 import { CODEPUPPY_PATHS } from "../shared/codepuppy-config"
 import { backoffMs, parseFrame } from "./codepuppy-cloud-events-core"
-import { buildTurns, billingPathFor, type ArchiveTurn, type EngineMessage } from "./chat-archive-turn"
+import { buildTurns, billingPathFor, fromEngineV2Messages, type ArchiveTurn, type EngineMessage } from "./chat-archive-turn"
 import { classifyArchiveResponse, type ChatArchiveCursorStore } from "./chat-archive-cursor"
 
 export type ChatArchiveServerInfo = { url: string; username: string | null; password: string | null }
@@ -66,10 +68,18 @@ const IDLE_STREAM_TIMEOUT_MS = 90_000
 
 const noopLog: ChatArchiveLog = { info: () => {}, warn: () => {} }
 
+/** 唤醒上报的引擎事件:OpenCode 2 里一轮执行结束的三种结局(v1 的 `session.idle` 在 2.x 里没人发)。 */
+export const ARCHIVE_WAKE_EVENTS = ["session.execution.succeeded", "session.execution.failed", "session.execution.interrupted"] as const
+
 function basicAuth(server: ChatArchiveServerInfo): Record<string, string> {
   if (!server.username && !server.password) return {}
   const token = Buffer.from(`${server.username ?? ""}:${server.password ?? ""}`).toString("base64")
   return { authorization: `Basic ${token}` }
+}
+
+/** 2.x 用请求头 `x-opencode-directory` 指定位置(不读 `?directory=`);没有目录就只带凭据。 */
+function locationHeaders(server: ChatArchiveServerInfo, directory?: string): Record<string, string> {
+  return { ...basicAuth(server), ...(directory ? { "x-opencode-directory": encodeURIComponent(directory) } : {}) }
 }
 
 /** 服务端每个拒绝只有一个原因,错误码一码一因(契约 §Responses 共 16 行)。原样记进日志。 */
@@ -89,7 +99,7 @@ async function readErrorCode(response: Response): Promise<string> {
 export type ChatArchiveUploader = {
   /** 一次 idle 的完整处理。永不抛。同一会话串行,不并发重入。 */
   onSessionIdle: (sessionId: string, directory?: string) => Promise<void>
-  /** 订阅引擎 `/global/event`;返回退订。 */
+  /** 订阅引擎事件流里的 ARCHIVE_WAKE_EVENTS;返回退订。 */
   start: () => () => void
 }
 
@@ -110,7 +120,8 @@ export function createChatArchiveUploader(deps: ChatArchiveUploaderDeps): ChatAr
    * 子代理(task 工具)会建一条 `parentID` 指向父会话的**子会话**
    * (`packages/opencode/src/tool/task.ts:156-172`),并往里发一条 user 消息 —— 而那条消息的
    * 文字是**父模型写出来的 prompt**(`packages/opencode/src/session/prompt.ts` 不给它打
-   * `synthetic`),引擎对子会话照样发 `session.idle`(`session/processor.ts:627,639`)。
+   * `synthetic`),引擎对子会话照样发一轮结束的事件(v1 的 `session.idle`;2.x 的子代理、`/review` 子任务同样建子会话、
+   * 同样发 `session.execution.*`)。
    * 不拦的话,模型自己写的话会以「用户说的」进证据库,并被服务端按 AC2 复判关键词 ——
    * 可能对用户开出一张人工处置单。
    *
@@ -119,19 +130,18 @@ export function createChatArchiveUploader(deps: ChatArchiveUploaderDeps): ChatAr
    */
   async function isArchivableSession(sessionId: string, directory?: string): Promise<boolean | null> {
     const server = await deps.awaitServer()
-    const url = new URL(`${server.url.replace(/\/$/, "")}/session/${encodeURIComponent(sessionId)}`)
-    if (directory) url.searchParams.set("directory", directory)
-    const response = await doFetch(url.toString(), { headers: basicAuth(server), signal: AbortSignal.timeout(timeoutMs) })
+    const url = new URL(`${server.url.replace(/\/$/, "")}/api/session/${encodeURIComponent(sessionId)}`)
+    const response = await doFetch(url.toString(), { headers: locationHeaders(server, directory), signal: AbortSignal.timeout(timeoutMs) })
     if (!response.ok) {
       log.warn("chat-archive: session read failed", { sessionId, status: response.status })
       return null
     }
-    const info: unknown = await response.json()
+    const info: unknown = ((await response.json()) as { data?: unknown } | null)?.data
     if (!info || typeof info !== "object" || Array.isArray(info)) {
       log.warn("chat-archive: session read returned an unexpected shape", { sessionId })
       return null
     }
-    // `SessionInfo.parentID` 是可选字段(`packages/schema/src/v1/session.ts:567`);在场 = 子会话。
+    // `Session.Info.parentID` 是可选字段;在场 = 子会话(2.x 的子代理与 /review 子任务都建这种会话)。
     const parentId = (info as { parentID?: unknown }).parentID
     return typeof parentId === "string" && parentId.length > 0 ? false : true
   }
@@ -150,13 +160,12 @@ export function createChatArchiveUploader(deps: ChatArchiveUploaderDeps): ChatAr
   /**
    * 读回这一会话**待上报范围内**的消息(时间升序)。
    *
-   * 引擎那条路由给的是**最新** N 条(`limit` ⇒ `MessageV2.page` 按 time_created/id 倒序取再翻正,
-   * `packages/opencode/src/session/message-v2.ts:425-466`),还有更旧的就带一个 `X-Next-Cursor`
-   * (`server/routes/instance/httpapi/handlers/session.ts:139-145`)。
+   * `#1667`:2.x 的 `GET /api/session/:id/message?order=desc&limit=N` 给**最新** N 条(新的在前),还有更旧的就在
+   * `cursor.next` 里给一个游标(`packages/protocol/src/groups/message.ts`);这里每页翻正成时间升序。
    *
    * R1 审计 MAJOR:只读一页就切轮,在积压 > 一页时会**跳过窗口外的旧轮次** —— 登出期间用 BYOK
    * continue 聊、或 alpha-web 故障期的长会话都到得了这个状态,而游标一旦跳到最新那几轮,
-   * 窗口外的永远不会再发。所以这里按 `X-Next-Cursor` 往回翻,直到翻过游标(或翻过 enabled_at)。
+   * 窗口外的永远不会再发。所以这里按 `cursor.next` 往回翻,直到翻过游标(或翻过 enabled_at)。
    */
   async function readMessages(
     sessionId: string,
@@ -167,25 +176,26 @@ export function createChatArchiveUploader(deps: ChatArchiveUploaderDeps): ChatAr
     const collected: EngineMessage[] = []
     let before: string | undefined
     for (let page = 1; page <= maxMessagePages; page++) {
-      const url = new URL(`${server.url.replace(/\/$/, "")}/session/${encodeURIComponent(sessionId)}/message`)
+      const url = new URL(`${server.url.replace(/\/$/, "")}/api/session/${encodeURIComponent(sessionId)}/message`)
       url.searchParams.set("limit", String(messageWindow))
-      if (before) url.searchParams.set("before", before)
-      if (directory) url.searchParams.set("directory", directory)
+      // 游标自带方向:2.x 拒绝「cursor 与 order 同时给」(`InvalidCursorError`),所以 order 只在第一页给。
+      if (before) url.searchParams.set("cursor", before)
+      else url.searchParams.set("order", "desc")
       const response = await doFetch(url.toString(), {
-        headers: basicAuth(server),
+        headers: locationHeaders(server, directory),
         signal: AbortSignal.timeout(timeoutMs),
       })
       if (!response.ok) {
         log.warn("chat-archive: engine message read failed", { sessionId, status: response.status, page })
         return null
       }
-      const nextCursor = response.headers.get("x-next-cursor")
-      const body: unknown = await response.json()
-      if (!Array.isArray(body)) {
+      const body = (await response.json()) as { data?: unknown; cursor?: { next?: unknown } } | null
+      if (!body || !Array.isArray(body.data)) {
         log.warn("chat-archive: engine message read returned an unexpected shape", { sessionId, page })
         return null
       }
-      const items = body as EngineMessage[]
+      const nextCursor = typeof body.cursor?.next === "string" && body.cursor.next ? body.cursor.next : undefined
+      const items = fromEngineV2Messages([...body.data].reverse())
       collected.unshift(...items) // 后取到的是更旧的一页,接在前面
       if (items.length === 0 || !nextCursor) break // 没有更旧的了
       if (!stillInScope(items[0], scope)) break // 这一页最旧的一条已经出了范围
@@ -356,7 +366,9 @@ export function createChatArchiveUploader(deps: ChatArchiveUploaderDeps): ChatAr
         try {
           const server = await deps.awaitServer()
           bumpIdle()
-          const response = await doFetch(`${server.url.replace(/\/$/, "")}/global/event`, {
+          const url = new URL(`${server.url.replace(/\/$/, "")}/api/event`)
+          for (const type of ARCHIVE_WAKE_EVENTS) url.searchParams.append("types", type)
+          const response = await doFetch(url.toString(), {
             headers: { ...basicAuth(server), accept: "text/event-stream" },
             signal: controller.signal,
           })
@@ -380,13 +392,13 @@ export function createChatArchiveUploader(deps: ChatArchiveUploaderDeps): ChatAr
               buffer = buffer.slice(index + 2)
               const event = parseFrame(frame)
               if (!event) continue
-              const envelope = event.data as { directory?: unknown; payload?: { type?: unknown; properties?: unknown } }
+              const envelope = event.data as { type?: unknown; data?: { sessionID?: unknown }; location?: { directory?: unknown } }
               if (!envelope || typeof envelope !== "object") continue
-              if (envelope.payload?.type !== "session.idle") continue
-              const properties = envelope.payload.properties as { sessionID?: unknown } | undefined
-              const sessionId = properties?.sessionID
+              if (!(ARCHIVE_WAKE_EVENTS as readonly unknown[]).includes(envelope.type)) continue
+              const sessionId = envelope.data?.sessionID
               if (typeof sessionId !== "string" || !sessionId) continue
-              void onSessionIdle(sessionId, typeof envelope.directory === "string" ? envelope.directory : undefined)
+              const directory = envelope.location?.directory
+              void onSessionIdle(sessionId, typeof directory === "string" ? directory : undefined)
             }
             if (stopped) break
           }

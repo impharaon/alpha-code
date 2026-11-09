@@ -6,7 +6,7 @@
 
 import { describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { buildTurns, billingPathFor, decodeDataUrl, type EngineMessage } from "./chat-archive-turn"
+import { buildTurns, billingPathFor, decodeDataUrl, fromEngineV2Messages, type EngineMessage } from "./chat-archive-turn"
 
 const PNG = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex")
 const PNG_DATA_URL = `data:image/png;base64,${PNG.toString("base64")}`
@@ -255,5 +255,60 @@ describe("REQ-160 #1324 —— 附件", () => {
     expect(turns[0]?.body.attachments).toHaveLength(8)
     expect(turns[0]?.attachmentBytes).toHaveLength(8)
     expect(skipped.filter((s) => s.reason.includes("over 8")).length).toBe(2)
+  })
+})
+
+// `#1667`(#1662 L5):OpenCode 2 的消息列表经 fromEngineV2Messages 投影成切轮消费的窄形状(切轮判据不变)。
+describe("#1667 OpenCode 2 消息 → 切轮", () => {
+  const PNG_B64 = Buffer.from("89504e470d0a1a0a", "hex").toString("base64")
+  const user = (id: string, created: number, text: string, files?: unknown[]) => ({ id, type: "user", time: { created }, text, ...(files ? { files } : {}) })
+  const assistant = (id: string, created: number, completed: number, text: string) => ({
+    id,
+    type: "assistant",
+    agent: "build",
+    model: { providerID: "deepseek-byok", id: "deepseek-chat" },
+    time: { created, completed },
+    content: [{ type: "reasoning", text: "thinking" }, { type: "text", text }, { type: "tool", id: "call_1", name: "read", state: { status: "completed" } }],
+    finish: "stop",
+    tokens: { input: 1, output: 9, reasoning: 0, cache: { read: 0, write: 0 } },
+  })
+
+  test("user 的 provider_id / model_id 取紧跟它的 assistant;只取 text 内容;inline 附件转成字节,uri 引用不算附件", () => {
+    const messages = fromEngineV2Messages([
+      { id: "msg_0000", type: "model-switched", time: { created: 1 }, model: { providerID: "deepseek-byok", id: "deepseek-chat" } },
+      user("msg_0001", 2_000, "看图", [
+        { data: PNG_B64, mime: "image/png", name: "shot.png", source: { type: "inline" } },
+        { data: PNG_B64, mime: "image/png", name: "ref.png", source: { type: "uri", uri: "file:///repo/ref.png" } },
+      ]),
+      { id: "msg_0001b", type: "agent-switched", time: { created: 2_001 }, agent: "build" },
+      assistant("msg_0002", 2_002, 2_005, "是一只猫"),
+      { id: "msg_0003", type: "idle", time: { created: 2_006 }, outcome: "succeeded" },
+    ])
+    const { turns, skipped } = buildTurns({ engineSessionId: "ses_1", messages, enabledAt: 1_000 })
+    expect(skipped).toEqual([])
+    expect(turns).toHaveLength(1)
+    expect(turns[0]!.body.messages).toEqual([
+      { engine_message_id: "msg_0001", role: "user", text: "看图", provider_id: "deepseek-byok", model_id: "deepseek-chat" },
+      { engine_message_id: "msg_0002", role: "assistant", text: "是一只猫", provider_id: "deepseek-byok", model_id: "deepseek-chat", finish: "stop", tokens_output: 9 },
+    ])
+    expect(turns[0]!.body.attachments.map((item) => item.filename)).toEqual(["shot.png"])
+  })
+
+  test("引擎自发的记录夹在 user 与 assistant 之间(synthetic 提醒 / compaction)⇒ 这条 assistant 没有 user 直接前驱,整轮跳过", () => {
+    for (const blocker of [
+      { id: "msg_0001s", type: "synthetic", time: { created: 2_001 }, text: "continue" },
+      { id: "msg_0001c", type: "compaction", time: { created: 2_001 }, status: "completed" },
+    ]) {
+      const messages = fromEngineV2Messages([user("msg_0001", 2_000, "问"), blocker, assistant("msg_0002", 2_002, 2_005, "答")])
+      const { turns, skipped } = buildTurns({ engineSessionId: "ses_1", messages, enabledAt: 1_000 })
+      expect([blocker.type, turns]).toEqual([blocker.type, []])
+      expect(skipped).toEqual([{ messageId: "msg_0002", reason: "assistant has no user predecessor" }])
+    }
+  })
+
+  test("user 后面不是 assistant(这一轮还没回 / 失败)⇒ user 不拿 model,也不成轮", () => {
+    const messages = fromEngineV2Messages([user("msg_0001", 2_000, "问"), { id: "msg_0002", type: "idle", time: { created: 2_001 }, outcome: "failed" }])
+    expect(messages[0]!.info!.model).toBeUndefined()
+    expect(buildTurns({ engineSessionId: "ses_1", messages, enabledAt: 1_000 }).turns).toEqual([])
   })
 })

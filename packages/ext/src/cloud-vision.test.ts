@@ -197,6 +197,18 @@ describe("context 钩子 —— 看不了图 ⇒ 自动转写", () => {
     }),
   )
 
+  it.live("权威 · 反向臂:不装 ext ⇒ 看不了图的模型这一次请求里图片原样留着(之后由上游换成一句报错),零识图调用、不加说明", () =>
+    Effect.gen(function* () {
+      yield* activate(models)
+      const hooks = yield* PluginHooks.Service
+      const original = Message.user([Message.text("看看"), image(screenshot, "a.png")])
+      const out = yield* contextOf(hooks, "ses_v0", GLM, [original])
+      expect(requests.length).toBe(0)
+      expect(out.messages[0]).toBe(original)
+      expect(out.system.map((part) => part.text)).toEqual(["base"])
+    }),
+  )
+
   it.live("能看图 ⇒ 零调用、消息对象原样、不加说明;反向臂:看不了图的模型同一份历史 ⇒ 图被换掉", () =>
     Effect.gen(function* () {
       const hooks = yield* load

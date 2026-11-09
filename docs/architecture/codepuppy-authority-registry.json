@@ -1,0 +1,1036 @@
+{
+  "$comment": [
+    "Code Puppy authority registry (#1662 L4; coordinator instruction 2026-11-09: 'every decision Code Puppy makes today must still be Code Puppy's after the OpenCode 2 switch').",
+    "One entry per decision. Held entries name the OpenCode 2 mechanism file and the tests that turn red when the mechanism is removed; blocked entries carry the reason and the options awaiting the orchestrator.",
+    "An entry is never deleted: retiring one needs `retired: { quote, date, by }` with the owner's words. Judge: packages/ext/src/policy/authority-registry.test.ts (coverage of the 49 pre-switch takeovers, files and test names exist, no blocked entry, no deletion)."
+  ],
+  "anchor": {
+    "takeoverListRevision": "e56ae0c036",
+    "note": "origin/alpha before the switch; `scripts/north-star-guard.sh --print-takeover` there is the 49-path list every takeover must map to."
+  },
+  "entries": [
+    {
+      "id": "tool-policy-execution-gate",
+      "decision": "Every tool call passes Code Puppy's tool policy before it runs; a deny is a named refusal decided before any other hook or side effect (#725 B, #1129).",
+      "adr": [
+        "ADR-041",
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/opencode/src/session/tools.ts",
+        "packages/opencode/test/session/tools.test.ts",
+        "packages/opencode/src/tool/code-mode.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/policy/gate.ts",
+        "ladder": "L0 (execute.before via registerPolicy)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "B1 MCP deny ⇒ named refusal and the call never reaches the tool"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "deny is decided first: the extension's own execute.before never sees a denied call"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "reverse arm ①: without registerPolicy the same denied calls execute (group B would be red)"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "Code Mode child call to a denied tool is refused"
+        }
+      ]
+    },
+    {
+      "id": "tool-policy-unknown-identity",
+      "decision": "A call whose tool identity cannot be established is refused (baseline S1: unknown identity defaults to deny).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/policy/gate.ts",
+        "ladder": "L0"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "unknown tool identity is refused by default"
+        }
+      ]
+    },
+    {
+      "id": "tool-policy-approved-input-pinned",
+      "decision": "Hooks running after Code Puppy's approval cannot rewrite the approved tool or input (baseline S1, ruling R8 option 2).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/policy/gate.ts",
+        "ladder": "L0 (seal tail + pin)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "reverse arm ②: a plugin after seal() that rewrites the input cannot run the call"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "reverse arm ② control: the same late plugin leaving input alone lets the call run"
+        }
+      ]
+    },
+    {
+      "id": "tool-policy-catalog-gate",
+      "decision": "The model never sees a tool the policy denies, neither as a direct tool nor in the Code Mode catalog (#725 A, ruling F6).",
+      "adr": [
+        "ADR-041",
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/opencode/src/permission/index.ts",
+        "packages/opencode/src/tool/registry.ts",
+        "packages/opencode/src/tool/code-mode.ts",
+        "packages/opencode/test/tool/code-mode.test.ts",
+        "packages/opencode/test/tool/code-mode-integration.test.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/policy/catalog.ts",
+        "ladder": "L0 (agent rules after configured ones + session.hook.context)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "A4 + F6: one MCP tool denied ⇒ gone from the Code Mode catalog too; its sibling stays"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "F6 reverse arm: without Code Puppy's catalog rules the denied MCP tool is back in Code Mode"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "first request before the tail rules exist: denied direct tools are pruned, Code Mode is withheld"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "A6 ask never changes the catalog"
+        }
+      ]
+    },
+    {
+      "id": "tool-policy-three-state-ask",
+      "decision": "A document-axis ask waits for the user through OpenCode's permission engine with Code Puppy's identity envelope; nothing runs before approval; once/always keep their meaning.",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/policy/catalog.ts",
+        "ladder": "L0"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "document-axis ask ⇒ one identity request with the I7a envelope; reject keeps the count at 0"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "approved once ⇒ the call runs exactly once"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "ruleset-axis ask ⇒ askedBy ruleset, a per-call resource, nothing saved"
+        }
+      ]
+    },
+    {
+      "id": "tool-policy-session-grants",
+      "decision": "An always approval is bound to the service binding and the policy revision; any policy write asks again (#1128, #1574).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/policy/gate.ts",
+        "ladder": "L0"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "an always approval discharges the next ask for the same binding and revision; a policy write re-asks"
+        }
+      ]
+    },
+    {
+      "id": "tool-policy-deny-ceiling",
+      "decision": "Deny is a ceiling: a ruleset deny on the exact identity folds into the cap, and no user enable or saved approval opens it (#1128 / #724 §4).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/opencode/src/permission/index.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/policy/gate.ts",
+        "ladder": "L0"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "ruleset-axis identity deny (agent rule on the canonical) hides the tool the same way"
+        },
+        {
+          "file": "packages/ext/src/policy/resolver.test.ts",
+          "name": "R8/R9/R10/R11 fail-closed 族:非法 identity / quarantine / managed unreadable / 冲突记录 ⇒ disabled"
+        }
+      ]
+    },
+    {
+      "id": "tool-policy-managed-cap",
+      "decision": "Organisation (managed / MDM) denies are an unbreakable cap — a project agent rule cannot out-rank them.",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/policy/managed.ts",
+        "ladder": "L0 (reads OpenCode 2 managed documents itself)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/resolver.test.ts",
+          "name": "M1 a managed deny is a cap even when the merged agent ruleset ends with a project allow (why the reader exists)"
+        },
+        {
+          "file": "packages/ext/src/policy/resolver.test.ts",
+          "name": "M4 a corrupt managed file, or a JSONC one this reader cannot parse, makes the whole layer unreadable ⇒ disabled"
+        }
+      ]
+    },
+    {
+      "id": "tool-policy-document",
+      "decision": "The user policy document: three states, exact tool > service > class, binding guard, whole-document quarantine on any bad record (#1128 / #724 §2–§5).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/policy/resolver.ts",
+        "ladder": "L0"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/resolver.test.ts",
+          "name": "R6 binding guard:service/tool enabled 只在 digest 逐字相等时生效,变了/缺了回 ask(§5)"
+        },
+        {
+          "file": "packages/ext/src/policy/resolver.test.ts",
+          "name": "T3 坏文档整份 quarantine:损坏 JSON / 未知版本 / 部分非法记录 / 分区不符 / selector 重复"
+        }
+      ]
+    },
+    {
+      "id": "tool-policy-partitions",
+      "decision": "Policy is partitioned per signed-in account and per folder (outside git) / per project (inside git) (#1575, #1644).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/policy/index.ts",
+        "ladder": "L0"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/resolver.test.ts",
+          "name": "AC2 subdirectories of one git project share its grant; different git projects stay isolated"
+        },
+        {
+          "file": "packages/ext/src/policy/resolver.test.ts",
+          "name": "VI1 the account partition follows CODEPUPPY_POLICY_ACCOUNT: account B never reads account A's enable"
+        }
+      ]
+    },
+    {
+      "id": "tool-policy-tier-default",
+      "decision": "The composer tier's tool-policy-default decides whether class-default asks apply (I9, #1638).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/policy/catalog.ts",
+        "ladder": "L0"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "I9: tool-policy-default allow waives the class-default ask; ask keeps it"
+        }
+      ]
+    },
+    {
+      "id": "tool-policy-settings-api",
+      "decision": "Settings reads and writes the tool policy through Code Puppy's API (v1 routes /api/permission/tool-policy/*; OpenCode 2 plugin RPC codepuppy.tool-policy, I5).",
+      "adr": [
+        "ADR-033",
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/opencode/src/server/routes/instance/httpapi/public.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/policy/rpc.ts",
+        "ladder": "L0 (plugin RPC)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/tool-policy-rpc.test.ts",
+          "name": "inventory returns a document that decodes as ToolPolicyInventoryV1"
+        },
+        {
+          "file": "packages/ext/src/policy/tool-policy-rpc.test.ts",
+          "name": "a quarantined document ⇒ setRecord fails with type quarantined"
+        },
+        {
+          "file": "packages/ext/src/policy/tool-policy-rpc.test.ts",
+          "name": "reverse arm: without registerPolicy the RPC is unavailable"
+        }
+      ]
+    },
+    {
+      "id": "tool-renames",
+      "decision": "Renamed builtins (bash→shell, task→subagent, apply_patch→patch): saved records under the old name keep applying and are reported; classification knows both names (K5 / S4).",
+      "adr": [
+        "ADR-041",
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/policy/resolver.ts",
+        "ladder": "L0"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "a saved deny under the v1 name refuses the renamed tool, and the record is reported"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "a deny under the new name refuses the call"
+        }
+      ]
+    },
+    {
+      "id": "risk-classification",
+      "decision": "Every approval request carries Code Puppy's rule-based risk classification, overriding what a tool reports (#1285 / REQ-158).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/opencode/src/permission/index.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/policy/risk.ts",
+        "ladder": "L0 (permission.hook.evaluate)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/risk.test.ts",
+          "name": "a forged metadata.codepuppyRisk is overwritten: shell `rm -rf /` claims low, the pending request says high/destructive"
+        },
+        {
+          "file": "packages/ext/src/policy/risk.test.ts",
+          "name": "the premise check is not empty: a synthetic engine that creates a request without evaluating fails it"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "every approval request carries Code Puppy's risk classification, overriding what the tool reported (#1285)"
+        }
+      ]
+    },
+    {
+      "id": "adr041-identity-derivation",
+      "decision": "Each tool's identity (source, origin, name) is decided by Code Puppy from registration facts, never from aliases or titles.",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/opencode/src/tool/registry.ts",
+        "packages/core/src/tool/registry.ts",
+        "packages/core/src/tool/application-tools.ts",
+        "packages/opencode/src/plugin/index.ts",
+        "packages/opencode/test/tool/registry.test.ts",
+        "packages/opencode/test/provider/transform.test.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/policy/identity.ts",
+        "ladder": "L0 (early registry + MCP config + bundled manifest)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/identity.test.ts",
+          "name": "an MCP tool: config key as origin, remote tool name, de-secreted binding, remote location and transport"
+        },
+        {
+          "file": "packages/ext/src/policy/identity.test.ts",
+          "name": "a tool in the early registry is a builtin with the constant application binding and local location"
+        },
+        {
+          "file": "packages/ext/src/policy/identity.test.ts",
+          "name": "the MCP rule wins over the early registry (a server whose tools registered before the extension is still MCP)"
+        }
+      ],
+      "note": "Derived from observable facts; collision/shadow detection is a separate, blocked entry (adr041-collision-rejection)."
+    },
+    {
+      "id": "adr041-authority-minting",
+      "decision": "Only Code Puppy mints codepuppy-cloud / codepuppy-bundled authority, and only from the verified definition or the bundled manifest (ADR-041 §5, #1578).",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/opencode/src/mcp/index.ts",
+        "packages/opencode/src/plugin/index.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/policy/identity.ts",
+        "ladder": "L0"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/identity.test.ts",
+          "name": "the exact verified cloud definition mints codepuppy-cloud with a sha256 evidence digest"
+        },
+        {
+          "file": "packages/ext/src/policy/identity.test.ts",
+          "name": "a look-alike (same URL, other key; or same key, other URL) is not asserted"
+        },
+        {
+          "file": "packages/ext/src/policy/identity.test.ts",
+          "name": "the exact bundled Office command next to the attested server.py mints codepuppy-bundled"
+        },
+        {
+          "file": "packages/ext/src/policy/bundled-plugin.test.ts",
+          "name": "listed own tools of a module whose digest matches get codepuppy-bundled; a project tool merged in does not"
+        }
+      ]
+    },
+    {
+      "id": "adr041-display-snapshot",
+      "decision": "Each tool call carries Code Puppy's immutable display snapshot (identity, technicalId, authority, location) — OpenCode 2 state.metadata.codepuppyDisplay (I7b).",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/opencode/src/session/processor.ts",
+        "packages/opencode/test/session/processor-effect.test.ts",
+        "packages/sdk/js/src/gen/types.gen.ts",
+        "packages/sdk/js/src/v2/gen/types.gen.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/policy/display.ts",
+        "ladder": "L0 (tool.transform progress + execute.after + deny metadata)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "running (progress) and completed (result metadata) carry the snapshot"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "a refused call's error carries the snapshot"
+        },
+        {
+          "file": "packages/ext/src/policy/identity.test.ts",
+          "name": "the display snapshot is the schema's ToolDisplaySnapshotV1: identity + technicalId + authority + location"
+        }
+      ]
+    },
+    {
+      "id": "adr041-location",
+      "decision": "Where a tool runs (local, or the remote MCP host) is decided by Code Puppy from the de-secreted effective definition (#1576, #1617).",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/policy/identity.ts",
+        "ladder": "L0"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/identity.test.ts",
+          "name": "a local MCP tool: local location, command transport, binding over command + cwd"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "document-axis ask ⇒ one identity request with the I7a envelope; reject keeps the count at 0"
+        }
+      ]
+    },
+    {
+      "id": "contract-authority-names",
+      "decision": "Authority and class values are codepuppy-* only, and the schema is their single definition (#1568 AC3).",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/schema/src/tool-identity.ts",
+        "ladder": "Code Puppy-owned file (ADR-043)"
+      },
+      "tests": [
+        {
+          "file": "packages/schema/test/codepuppy-authority-names.test.ts",
+          "name": "OpenCode 2's generated client types carry no copy of ToolAuthority (the schema is the only one)"
+        }
+      ]
+    },
+    {
+      "id": "mcp-workspace-argv",
+      "decision": "A {workspace} token in an MCP command is replaced with the current folder when the server starts (#1011 / REQ-134).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/opencode/test/mcp/lifecycle.test.ts",
+        "packages/opencode/test/fixture/mcp-lifecycle-stdio.ts",
+        "packages/opencode/src/mcp/index.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/policy/index.ts",
+        "ladder": "L0 (mcp.transform)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "{workspace} in a local MCP command becomes the Location directory (#1011); without the policy it stays literal"
+        }
+      ]
+    },
+    {
+      "id": "mcp-branched-schema",
+      "decision": "MCP tools whose input schema branches at the root stay usable by the model (#793).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/core/src/tool/runtime.ts",
+        "ladder": "upstream-native (OpenCode 2 passes JSON schemas through), pinned"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/identity.test.ts",
+          "name": "#793: a root-branched MCP input schema reaches the model unchanged (OpenCode 2 adds no additionalProperties:false)"
+        }
+      ]
+    },
+    {
+      "id": "mcp-tool-list-tolerance",
+      "decision": "One malformed MCP tool does not drop the server's other tools (codepuppy-tool-discovery.ts tolerant listing).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/core/src/mcp/client.ts",
+        "ladder": "upstream-native, pinned by upstream's own test"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/mcp.test.ts",
+          "name": "skips unusable tools and keeps the rest of the server's tools"
+        }
+      ]
+    },
+    {
+      "id": "adr042-oauth-brand",
+      "decision": "OAuth loopback success/error pages show the Code Puppy product identity (#1047).",
+      "adr": [
+        "ADR-042",
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/core/src/oauth/page.ts",
+        "packages/core/test/oauth-page.test.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/oauth/page.ts",
+        "ladder": "L3 (re-taken: no plugin seam reaches engine-served callback HTML)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/oauth-page.test.ts",
+          "name": "#1047: success page uses the Code Puppy product identity, not OpenCode"
+        },
+        {
+          "file": "packages/core/test/oauth-page.test.ts",
+          "name": "#1047: error page uses the Code Puppy product identity"
+        }
+      ]
+    },
+    {
+      "id": "adr043-owned-file-predicate",
+      "decision": "Code Puppy-owned files living under upstream paths are recognised by name or marker, and a copied marker does not exempt an upstream file (ADR-043).",
+      "adr": [
+        "ADR-043"
+      ],
+      "lane": "L2 (#1664)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "scripts/north-star-guard.sh",
+        "ladder": "guard predicate (L2)"
+      },
+      "tests": [
+        {
+          "file": "packages/ui-mac/src/main/north-star-guard.test.ts",
+          "name": "名字不合约定、靠文件里的 marker 自报家门 ⇒ 绿(migration / tool-identity.ts 那一类)"
+        },
+        {
+          "file": "packages/ui-mac/src/main/north-star-guard.test.ts",
+          "name": "把 marker 抄进一个真上游文件 ⇒ 仍然红(自报家门不是可伪造的通行证)"
+        }
+      ]
+    },
+    {
+      "id": "adr033-decision-receipt",
+      "decision": "Code Puppy owns the approval reply contract: admitted-request snapshot with sha256 fingerprint, a DecisionReceipt for every reply (including the requests it resolved), idempotent replies, 409 on a fingerprint mismatch, and persisted permission_request / permission_decision rows (#433 / REQ-090 AC3/AC8).",
+      "adr": [
+        "ADR-033"
+      ],
+      "lane": "L4 (#1666) — needs orchestrator decision",
+      "takeovers": [
+        "packages/core/src/permission.ts",
+        "packages/core/src/permission",
+        "packages/server/src/handlers/permission.ts",
+        "packages/opencode/src/server/routes/instance/httpapi/public.ts",
+        "packages/core/test/permission.test.ts",
+        "packages/core/test/database-migration.test.ts",
+        "packages/opencode/test/server/httpapi-exercise",
+        "packages/opencode/test/server/httpapi-public-openapi.test.ts",
+        "packages/core/schema.json",
+        "packages/core/src/database/migration.gen.ts",
+        "packages/core/src/database/schema.gen.ts",
+        "packages/sdk/js/src/v2/gen/sdk.gen.ts",
+        "packages/sdk/js/src/v2/gen/types.gen.ts",
+        "packages/protocol/src/groups/permission.ts",
+        "packages/schema/src/permission.ts",
+        "packages/schema/src/agent.ts",
+        "packages/schema/test/contract-hygiene.test.ts",
+        "packages/client/src/generated/client.ts",
+        "packages/client/src/generated-effect/client.ts",
+        "packages/client/src/generated/types.ts"
+      ],
+      "blocked": {
+        "reason": "OpenCode 2's permission kernel replies with 204 and keeps requests in memory; a plugin cannot change the reply route's response shape, add persistence, or bind replies to a fingerprint (permission domain exposes assert/list/get/reply/hook only; hook.evaluate changes effect/message only). The renderer's session-permission-feed.ts reads PermissionV2DecisionReceipt today.",
+        "options": [
+          "(a) Re-take packages/core/src/permission.ts, packages/core/src/permission/** (+ a `_`-prefixed table migration), packages/server/src/handlers/permission.ts, packages/protocol/src/groups/permission.ts, packages/schema/src/permission.ts and port #433 (L3, large; Rule/Ruleset shape must stay — lane seams I9).",
+          "(b) Hold the user-visible part at L0 + L6: the renderer derives the resolved set from OpenCode 2's per-request permission.replied events; record that a fingerprint 409 is unreachable on 2.x (request ids are single-use, pending requests are in memory) and retire persisted receipts if no consumer remains — retirement needs the owner's words.",
+          "(c) Keep the decision open and land with this entry red (the switch cannot merge)."
+        ]
+      }
+    },
+    {
+      "id": "adr038-ask-deadline",
+      "decision": "An unanswered approval request fails by name after a deadline (300 s default, overridable by environment) and never auto-allows (#668).",
+      "adr": [
+        "ADR-038"
+      ],
+      "lane": "L4 (#1666) — needs orchestrator decision",
+      "takeovers": [
+        "packages/opencode/src/permission/index.ts"
+      ],
+      "blocked": {
+        "reason": "OpenCode 2's Permission.assert awaits the reply with no timeout (packages/core/src/permission.ts, Deferred.await). A plugin watchdog that replies reject reproduces ADR-038's rejected L0 shape: 2.x reject cascades to every pending request of the session.",
+        "options": [
+          "(a) Re-take packages/core/src/permission.ts (same file as adr033) and add the bounded wait with a named failure (L3, small on top of the re-take).",
+          "(b) Bound only Code Puppy's own identity-axis asks in the extension (Promise.race + reply reject) and accept the cascade for those; builtin tools' own asks stay unbounded.",
+          "(c) Owner retires the deadline for OpenCode 2 (needs the owner's words)."
+        ]
+      }
+    },
+    {
+      "id": "adr041-collision-rejection",
+      "decision": "Alias / identity collisions are rejected, never last-wins (ADR-041 decision 2).",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L4 (#1666) — needs orchestrator decision",
+      "takeovers": [],
+      "blocked": {
+        "reason": "OpenCode 2's tool registry keys tools by effective name and keeps the last registration (packages/core/src/tool.ts commit → Map.set) without recording which plugin registered it; the promise API's tool.list() returns fresh executor wrappers, so a plugin cannot tell a replaced tool from the original.",
+        "options": [
+          "(a) Re-take packages/core/src/tool.ts to record the registering plugin and refuse duplicate effective names (L3 on a hot upstream file).",
+          "(b) Upstream an owner field on registry entries and consume it (no Code Puppy fork; timing depends on upstream).",
+          "(c) Accept the L0 approximation (early registry = builtin; with only ext activated as a configured plugin, collisions can only come from ext's own fan-out, which L3 can refuse) and record the residual."
+        ]
+      }
+    },
+    {
+      "id": "adr041-history-display-conversion",
+      "decision": "Display snapshots persisted on v1 tool parts stay attached to those calls after the move to OpenCode 2 (ADR-041 §4: never overwritten, never inferred).",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L4/L5 — needs orchestrator decision",
+      "takeovers": [
+        "packages/schema/src/v1/session.ts"
+      ],
+      "blocked": {
+        "reason": "The v1→v2 conversion (v1-migration.bun.ts, run through the Node shim R14) reads v1 parts with the upstream v1 schema; Code Puppy's part.display is not carried into v2 state.metadata, so converted history loses its provenance.",
+        "options": [
+          "(a) Extend the R14 build-time transform so the converter copies part.display into state.metadata.codepuppyDisplay (L1; owner of the transform: L5's build).",
+          "(b) Accept that converted history shows 'source unknown' (ADR-041 allows absent history) — needs the owner's words because it drops existing evidence."
+        ]
+      }
+    },
+    {
+      "id": "adr035-websearch",
+      "decision": "Web search fails honestly (E7) and the cloud leg exists only when the account signal says so; the sovereignty gate covers every executable copy (ADR-035 / ADR-046).",
+      "adr": [
+        "ADR-035",
+        "ADR-046"
+      ],
+      "lane": "L3 (#1665) per lane seams §5 (L5r)",
+      "takeovers": [
+        "packages/opencode/src/tool/websearch.ts",
+        "packages/opencode/src/tool/mcp-websearch.ts",
+        "packages/core/src/tool/websearch.ts"
+      ],
+      "blocked": {
+        "reason": "Owned by L3 on OpenCode 2 (websearch.transform / execute.before in the extension); not delivered on the integration branch this lane started from.",
+        "options": [
+          "Register L3's mechanism file and proof test here when #1665 lands."
+        ]
+      }
+    },
+    {
+      "id": "l1r-platform-credential-header",
+      "decision": "The platform credential header is added only to platform-provider requests (P6 / S5).",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L3 (#1665) per lane seams §5 (L1r)",
+      "takeovers": [
+        "packages/opencode/src/session/llm.ts",
+        "packages/opencode/src/session/llm/request.ts"
+      ],
+      "blocked": {
+        "reason": "Request assembly belongs to L3 on OpenCode 2 (session.hook model.request / http.request / context); if a hook cannot hold it, L3 hands it back for an L4 re-take. Not delivered on the integration branch this lane started from.",
+        "options": [
+          "Register L3's mechanism and proof test when #1665 lands, or route back to L4 for a re-take with ADR-047 reasoning."
+        ]
+      }
+    },
+    {
+      "id": "l1r-output-caps",
+      "decision": "Platform and BYOK output caps (temperature / max output) are applied by Code Puppy (P5).",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L3 (#1665) per lane seams §5 (L1r)",
+      "takeovers": [
+        "packages/opencode/src/session/llm/request.ts",
+        "packages/opencode/test/provider/transform.test.ts"
+      ],
+      "blocked": {
+        "reason": "Request assembly belongs to L3 on OpenCode 2 (session.hook model.request / http.request / context); if a hook cannot hold it, L3 hands it back for an L4 re-take. Not delivered on the integration branch this lane started from.",
+        "options": [
+          "Register L3's mechanism and proof test when #1665 lands, or route back to L4 for a re-take with ADR-047 reasoning."
+        ]
+      }
+    },
+    {
+      "id": "l1r-net-failure-settle",
+      "decision": "Network failures of a model request settle with Code Puppy's named classification (#1572 settle).",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L3 (#1665) per lane seams §5 (L1r)",
+      "takeovers": [
+        "packages/opencode/src/session/processor.ts",
+        "packages/opencode/src/session/llm.ts"
+      ],
+      "blocked": {
+        "reason": "Request assembly belongs to L3 on OpenCode 2 (session.hook model.request / http.request / context); if a hook cannot hold it, L3 hands it back for an L4 re-take. Not delivered on the integration branch this lane started from.",
+        "options": [
+          "Register L3's mechanism and proof test when #1665 lands, or route back to L4 for a re-take with ADR-047 reasoning."
+        ]
+      }
+    },
+    {
+      "id": "l1r-naming-resume",
+      "decision": "Session naming resumes per Code Puppy's rules (codepuppy-naming-resume).",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L3 (#1665) per lane seams §5 (L1r)",
+      "takeovers": [
+        "packages/opencode/src/session/prompt.ts",
+        "packages/opencode/test/session/compaction.test.ts"
+      ],
+      "blocked": {
+        "reason": "Request assembly belongs to L3 on OpenCode 2 (session.hook model.request / http.request / context); if a hook cannot hold it, L3 hands it back for an L4 re-take. Not delivered on the integration branch this lane started from.",
+        "options": [
+          "Register L3's mechanism and proof test when #1665 lands, or route back to L4 for a re-take with ADR-047 reasoning."
+        ]
+      }
+    },
+    {
+      "id": "l1r-telemetry-credential",
+      "decision": "Telemetry never carries the credential (codepuppy-telemetry-credential).",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L3 (#1665) per lane seams §5 (L1r)",
+      "takeovers": [
+        "packages/opencode/src/session/llm.ts"
+      ],
+      "blocked": {
+        "reason": "Request assembly belongs to L3 on OpenCode 2 (session.hook model.request / http.request / context); if a hook cannot hold it, L3 hands it back for an L4 re-take. Not delivered on the integration branch this lane started from.",
+        "options": [
+          "Register L3's mechanism and proof test when #1665 lands, or route back to L4 for a re-take with ADR-047 reasoning."
+        ]
+      }
+    },
+    {
+      "id": "l1r-subtask-attachment-policy",
+      "decision": "Subtask attachments follow Code Puppy's attachment policy (codepuppy-subtask-attachment-policy).",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L3 (#1665) per lane seams §5 (L1r)",
+      "takeovers": [
+        "packages/opencode/src/session/prompt.ts"
+      ],
+      "blocked": {
+        "reason": "Request assembly belongs to L3 on OpenCode 2 (session.hook model.request / http.request / context); if a hook cannot hold it, L3 hands it back for an L4 re-take. Not delivered on the integration branch this lane started from.",
+        "options": [
+          "Register L3's mechanism and proof test when #1665 lands, or route back to L4 for a re-take with ADR-047 reasoning."
+        ]
+      }
+    },
+    {
+      "id": "l1r-review-turn-supply",
+      "decision": "Review turns are supplied per Code Puppy's rules (codepuppy-review-turn-supply).",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L3 (#1665) per lane seams §5 (L1r)",
+      "takeovers": [
+        "packages/opencode/src/session/prompt.ts"
+      ],
+      "blocked": {
+        "reason": "Request assembly belongs to L3 on OpenCode 2 (session.hook model.request / http.request / context); if a hook cannot hold it, L3 hands it back for an L4 re-take. Not delivered on the integration branch this lane started from.",
+        "options": [
+          "Register L3's mechanism and proof test when #1665 lands, or route back to L4 for a re-take with ADR-047 reasoning."
+        ]
+      }
+    },
+    {
+      "id": "l1r-command-model-priority",
+      "decision": "A model the user explicitly picked out-ranks a command's or its agent's recommended model (#1560).",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L3 (#1665) per lane seams §5 (L1r)",
+      "takeovers": [
+        "packages/opencode/src/session/prompt.ts",
+        "packages/opencode/test/session/prompt.test.ts"
+      ],
+      "blocked": {
+        "reason": "Request assembly belongs to L3 on OpenCode 2 (session.hook model.request / http.request / context); if a hook cannot hold it, L3 hands it back for an L4 re-take. Not delivered on the integration branch this lane started from.",
+        "options": [
+          "Register L3's mechanism and proof test when #1665 lands, or route back to L4 for a re-take with ADR-047 reasoning."
+        ]
+      }
+    },
+    {
+      "id": "mcp-independent-startup",
+      "decision": "One MCP server failing or hanging never blocks the others; a starting server is visible as starting (#1563 AC1).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666) — needs orchestrator decision",
+      "takeovers": [
+        "packages/opencode/src/mcp/index.ts"
+      ],
+      "blocked": {
+        "reason": "OpenCode 2 connects servers independently with a pending status (packages/core/src/mcp/index.ts), but no pin test proves it in this repo yet.",
+        "options": [
+          "(a) Pin it with a test against OpenCode 2's MCP layer (two stdio servers, one hanging) and mark it held upstream-native — a small L4 follow-up."
+        ]
+      }
+    },
+    {
+      "id": "mcp-named-start-failures",
+      "decision": "A server that cannot start fails with a named cause (workspace_missing / dependency_missing / spawn_failed / handshake_timeout …) (#1563 AC2).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666) — needs orchestrator decision",
+      "takeovers": [
+        "packages/opencode/src/mcp/index.ts"
+      ],
+      "blocked": {
+        "reason": "OpenCode 2 reports failed { error: string } with upstream wording; there is no plugin seam on MCP startup to classify it, and parsing upstream messages would be a stand-in for its grammar.",
+        "options": [
+          "(a) Re-take the relevant packages/core/src/mcp/*.ts files and port the v1 behaviour (L3, large).",
+          "(b) Hold what an extension watcher can (status events + experimental connect API for backoff) and record the rest as residual.",
+          "(c) Owner retires the behaviour for OpenCode 2 (needs the owner's words)."
+        ]
+      }
+    },
+    {
+      "id": "mcp-reconnect-backoff",
+      "decision": "A failed server reconnects in the background after 30 s, doubling to 10 min (#1563 AC3).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666) — needs orchestrator decision",
+      "takeovers": [
+        "packages/opencode/src/mcp/index.ts"
+      ],
+      "blocked": {
+        "reason": "OpenCode 2 has no background reconnect (only credential-event reconnects); MCP connection lifecycle has no plugin seam.",
+        "options": [
+          "(a) Re-take the relevant packages/core/src/mcp/*.ts files and port the v1 behaviour (L3, large).",
+          "(b) Hold what an extension watcher can (status events + experimental connect API for backoff) and record the rest as residual.",
+          "(c) Owner retires the behaviour for OpenCode 2 (needs the owner's words)."
+        ]
+      }
+    },
+    {
+      "id": "mcp-start-concurrency",
+      "decision": "At most four MCP servers start (spawn + handshake + tools/list) at once (#1563 AC5).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666) — needs orchestrator decision",
+      "takeovers": [
+        "packages/opencode/src/mcp/index.ts"
+      ],
+      "blocked": {
+        "reason": "OpenCode 2 starts servers with unbounded concurrency inside core; no plugin seam.",
+        "options": [
+          "(a) Re-take the relevant packages/core/src/mcp/*.ts files and port the v1 behaviour (L3, large).",
+          "(b) Hold what an extension watcher can (status events + experimental connect API for backoff) and record the rest as residual.",
+          "(c) Owner retires the behaviour for OpenCode 2 (needs the owner's words)."
+        ]
+      }
+    },
+    {
+      "id": "mcp-declared-tools-before-connect",
+      "decision": "A bundled Office server still starting is offered from its bundled declaration; a contradicting server drops the declaration (#1565).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666) — needs orchestrator decision",
+      "takeovers": [
+        "packages/opencode/src/mcp/index.ts"
+      ],
+      "blocked": {
+        "reason": "OpenCode 2 registers MCP tools only after tools/list; offering declared tools needs MCP runtime support (or an extension-side tool.transform that proxies calls until the server connects — new machinery).",
+        "options": [
+          "(a) Re-take the relevant packages/core/src/mcp/*.ts files and port the v1 behaviour (L3, large).",
+          "(b) Hold what an extension watcher can (status events + experimental connect API for backoff) and record the rest as residual.",
+          "(c) Owner retires the behaviour for OpenCode 2 (needs the owner's words)."
+        ]
+      }
+    },
+    {
+      "id": "mcp-net-failure-runtime",
+      "decision": "MCP connection failures are classified with Code Puppy's layered network classifier (#1572 N1, #1547).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666) — needs orchestrator decision",
+      "takeovers": [
+        "packages/opencode/src/mcp/index.ts"
+      ],
+      "blocked": {
+        "reason": "The classifier contract is restored (packages/schema/src/codepuppy-net-failure.ts) but OpenCode 2's MCP client does not call it and exposes no seam to.",
+        "options": [
+          "(a) Re-take the relevant packages/core/src/mcp/*.ts files and port the v1 behaviour (L3, large).",
+          "(b) Hold what an extension watcher can (status events + experimental connect API for backoff) and record the rest as residual.",
+          "(c) Owner retires the behaviour for OpenCode 2 (needs the owner's words)."
+        ]
+      }
+    },
+    {
+      "id": "l2r-auth-fail-closed",
+      "decision": "A model route whose deployment declared no credential refuses before the socket opens instead of sending an unauthenticated request (#652, owner ruling 2026-07-28 per the v1 source comment).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666) — needs orchestrator decision",
+      "takeovers": [],
+      "blocked": {
+        "reason": "OpenCode 2's packages/ai/src/route/client.ts still defaults auth to Auth.none (lines 373, 403); a plugin cannot change route defaults, and judging credential presence per provider in http.request would hand-write provider knowledge.",
+        "options": [
+          "(a) Re-take packages/ai/src/route/{auth,client}.ts and the two OpenAI protocol routes (Auth.unset default) and port auth-fail-closed.test.ts; audit every 2.x route that relied on the default (L3).",
+          "(b) Owner retires the decision for OpenCode 2 (needs the owner's words)."
+        ]
+      }
+    },
+    {
+      "id": "hub-install-ask",
+      "decision": "Installing from the Customization Center always asks (and is denied to automated agents) (I10).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L3 (#1665) per lane seams I10",
+      "takeovers": [],
+      "blocked": {
+        "reason": "Owned by L3 (hub-tools.ts permission.assert + permission.hook.evaluate); not delivered on the integration branch this lane started from.",
+        "options": [
+          "Register L3's mechanism and proof test when #1665 lands."
+        ]
+      }
+    },
+    {
+      "id": "sidecar-stop-drains",
+      "decision": "Stopping the engine drains connections before exit (codepuppy-sidecar-stop; OOR-2: /global/dispose is 404 on 2.x).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L5 (#1667)",
+      "takeovers": [],
+      "blocked": {
+        "reason": "Owned by L5 (sidecar-stop.ts); not delivered on the integration branch this lane started from.",
+        "options": [
+          "Register L5's mechanism and proof test when #1667 lands."
+        ]
+      }
+    }
+  ]
+}

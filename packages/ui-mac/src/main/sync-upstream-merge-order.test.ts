@@ -30,6 +30,11 @@
 //   · **install 不许被「删掉了事」。** 冲突分支取的是上游的 `bun.lock`(`--theirs`),不重生就会把
 //     一份不含 alpha workspace 的 lockfile 推上 alpha。所以有一条专门断言重生结果**落进了提交**。
 //
+// `#1664`(OpenCode 2,基线 §2.9):2.x 的 session-ui 直接依赖工作区 `@opencode/client`,不再有随补丁带进来的
+// vendored tgz,workflow 里那条 tarball 判据(VENDORED)随之去掉;「补丁先于 install」的顺序照旧(lockfile 仍须照
+// 最终这棵树生成)。本文件原先断言 VENDORED loud-fail 的两条改成断言新行为,另加两条:2.x 形状的冲突分支照常走完
+// (控制组:把旧判据放回去 ⇒ 以「本判据已失效」中止),以及根 CHANGELOG.md 的冲突一律取我方(编排器裁决)。
+//
 // 删掉本文件会失去什么:那一步退回零行为判据 —— 顺序换回去、install 被删掉、
 // `apply_codepuppy_frontend_delta` 的 loud-fail 被吞、no-conflict 分支被改成也跑 install,
 // 都不会有任何东西变红(那条 workflow 只在 GitHub 上、只在有冲突时才走到这几行)。
@@ -67,6 +72,8 @@ const TGZ_BYTES = new Uint8Array([0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00
 
 const SEAM_MARKER = "AppSurfaces"
 const NARROW_EXPORT = '"./surface/session": "./src/pages/session.tsx"'
+/** Code Puppy 自己的发布历史(根 CHANGELOG.md 的我方版本)。 */
+const CODEPUPPY_CHANGELOG = "# Changelog\n\n> 只记用户可见变化。\n\n## [0.1.26] - 2026-11-05\n"
 
 // ── 生产 body 的取出与变异 ──────────────────────────────────────────────────────
 
@@ -97,6 +104,28 @@ function preFixOrder(body: string): string {
   return mutated
 }
 
+/**
+ * `#1664` 控制组:把 `#1664` 之前那段 tarball 判据原样放回 `apply_codepuppy_frontend_delta`(「已知该失败的输入」),
+ * 证明 2.x 形状的夹具确实会被它以「本判据已失效」挡下。
+ */
+const LEGACY_TARBALL_CHECK = `            VENDORED="$(sed -n 's|.*"file:\\.\\./app/\\(vendor/[^"]*\\.tgz\\)".*|\\1|p' packages/session-ui/package.json | head -1)"
+            if [ -z "$VENDORED" ]; then
+              echo "::error::packages/session-ui/package.json 没有 file: 指向 packages/app/vendor 的依赖 —— 本判据已失效,须随依赖变更更新。Aborting sync."
+              exit 1
+            fi
+            if [ ! -f "packages/app/$VENDORED" ]; then
+              echo "::error::packages/app/$VENDORED missing after applying alpha frontend delta — SOT 补丁没带二进制(须用 git diff --binary 重生)。Aborting sync."
+              exit 1
+            fi
+`
+
+function withLegacyTarballCheck(body: string): string {
+  // 函数体里那一行(YAML 去掉块缩进后是两格);冲突分支里还有一行四格的同名命令,不能碰它。
+  const anchor = "\n  git add packages/app packages/ui\n"
+  if (body.split(anchor).length !== 2) throw new Error("生产 body 里找不到唯一的 `git add packages/app packages/ui` —— 控制组构造不出来,本次测量作废")
+  return body.replace(anchor, `\n${LEGACY_TARBALL_CHECK}${anchor.slice(1)}`)
+}
+
 // ── 夹具 ────────────────────────────────────────────────────────────────────────
 
 type Fixture = { repo: string; work: string; bin: string; log: string }
@@ -105,6 +134,10 @@ type Shape = {
   conflict: "app" | "none" | "unexpected"
   /** 上游把 `file:` 依赖换名(补丁仍带旧名)—— `ac#1248` 撞上的那个形状 */
   drift?: boolean
+  /** `#1664`:OpenCode 2 的形状 —— session-ui 直接依赖工作区 `@opencode/client`,alpha 的补丁里没有 vendored tgz */
+  workspaceClient?: boolean
+  /** `#1664`:alpha 与上游都改了根 CHANGELOG.md(两份不相干的文档)—— 冲突必然发生 */
+  changelog?: boolean
 }
 
 function git(cwd: string, args: string[]): string {
@@ -189,8 +222,15 @@ function fixture(shape: Shape): Fixture {
   write(repo, "packages/app/src/app.tsx", "export function App() {\n  return null // upstream\n}\n")
   write(repo, "packages/app/package.json", `${JSON.stringify({ name: "app", exports: { "./index": "./src/app.tsx" } }, null, 2)}\n`)
   write(repo, "packages/ui/src/button.tsx", "export const button = 1\n")
-  write(repo, "packages/session-ui/package.json", sessionUiPackageJson(VENDOR_TGZ))
+  write(
+    repo,
+    "packages/session-ui/package.json",
+    shape.workspaceClient
+      ? `${JSON.stringify({ name: "session-ui", dependencies: { "@opencode/client": "workspace:*" } }, null, 2)}\n`
+      : sessionUiPackageJson(VENDOR_TGZ),
+  )
   write(repo, "packages/opencode/src/engine.ts", "export const engine = 1\n")
+  if (shape.changelog) write(repo, "CHANGELOG.md", "# Changelog\n\nRelease notes for OpenCode V2, newest first.\n")
   write(repo, "bun.lock", '{\n  "lockfileVersion": 1,\n  "upstream": true\n}\n')
   const pin = commitAll(repo, "upstream pin")
 
@@ -201,7 +241,7 @@ function fixture(shape: Shape): Fixture {
     "packages/app/package.json",
     `${JSON.stringify({ name: "app", exports: { "./index": "./src/app.tsx", "./surface/session": "./src/pages/session.tsx" } }, null, 2)}\n`,
   )
-  write(repo, `packages/app/${VENDOR_TGZ}`, TGZ_BYTES)
+  if (!shape.workspaceClient) write(repo, `packages/app/${VENDOR_TGZ}`, TGZ_BYTES)
   write(repo, "packages/ui/src/codepuppy-overlay.ts", "export const overlay = 1\n")
   commitAll(repo, "alpha frontend delta")
 
@@ -214,6 +254,7 @@ function fixture(shape: Shape): Fixture {
   write(repo, "frontend/codepuppy-patches/codepuppy-frontend.patch", diff.stdout.toString())
   write(repo, "bun.lock", '{\n  "lockfileVersion": 1,\n  "codepuppy-workspaces": true\n}\n')
   if (shape.conflict === "unexpected") write(repo, "packages/opencode/src/engine.ts", "export const engine = 2 // alpha\n")
+  if (shape.changelog) write(repo, "CHANGELOG.md", CODEPUPPY_CHANGELOG)
   commitAll(repo, "record SOT")
 
   git(repo, ["checkout", "-q", "dev"])
@@ -224,6 +265,7 @@ function fixture(shape: Shape): Fixture {
   if (shape.conflict === "unexpected") write(repo, "packages/opencode/src/engine.ts", "export const engine = 3 // upstream\n")
   if (shape.conflict === "none") write(repo, "packages/opencode/src/engine.ts", "export const engine = 9 // upstream only\n")
   if (shape.drift) write(repo, "packages/session-ui/package.json", sessionUiPackageJson(VENDOR_TGZ_V2))
+  if (shape.changelog) write(repo, "CHANGELOG.md", "# Changelog\n\nRelease notes for OpenCode V2, newest first.\n\n## v2.2.7\n")
   commitAll(repo, "upstream advances")
 
   return { repo, work, bin, log }
@@ -290,14 +332,17 @@ describe("#1272 sync-upstream 冲突分支:补丁必须先于 install", () => {
     )
   })
 
-  test("冲突 + `file:` 换名漂移 ⇒ 以 workflow 自己那句**可读**的 loud-fail 失败,且 install **一次都没跑**", () => {
+  test("冲突 + `file:` 换名漂移 ⇒ tarball 判据已去掉(`#1664`):补丁照常先重贴,install 在补丁之后才跑并报出漂移", () => {
     const fx = fixture({ conflict: "app", drift: true })
     const run = runStep(fx, mergeStepBody())
-    expect(run.exitCode, `漂移被放行了:\n${run.output}`).toBe(1)
-    expect(run.calls, `补丁还没贴稳就跑了 install —— 顺序又反了:\n${run.output}`).toHaveLength(0)
-    expect(run.output, `失败了但没给出可操作的原因:\n${run.output}`).toContain("missing after applying alpha frontend delta")
-    expect(run.output, `没点名到那个精确文件,人得自己去猜:\n${run.output}`).toContain(`packages/app/${VENDOR_TGZ_V2}`)
-    expect(run.output, `可读的失败仍然掺着 bun 的天书 —— 说明还是先 install 了:\n${run.output}`).not.toContain("failed to resolve")
+    expect(run.exitCode, `漂移被放行了:\n${run.output}`).not.toBe(0)
+    expect(run.output, `合并步里那条 tarball 判据还在 —— 第一次 2.x 同步会被它挡下:\n${run.output}`).not.toContain(
+      "missing after applying alpha frontend delta",
+    )
+    // 顺序照旧:补丁先重贴并提交,install 在那之后才跑(资产缺席是因为补丁带的是旧名)。
+    expect(showFile(fx.repo, "alpha", "packages/app/src/app.tsx"), `install 之前补丁没贴上:\n${run.output}`).toContain(SEAM_MARKER)
+    expect(run.calls, `install 的调用记录不对:\n${run.output}`).toEqual([`install|MISSING|${VENDOR_TGZ_V2}`])
+    expect(run.output).toContain("failed to resolve")
   })
 
   test("变异臂 + 同一漂移 ⇒ 正是 2026-09-06 手工复演撞到的那一格:`failed to resolve`,可读原因永远不打印", () => {
@@ -332,14 +377,13 @@ describe("#1272 sync-upstream 冲突分支:补丁必须先于 install", () => {
     expect(showFile(fx.repo, "alpha", `packages/app/${VENDOR_TGZ}`), "干净合并后 vendored 资产没被补丁重建出来").not.toBeNull()
   })
 
-  test("没有冲突 + 同一漂移 ⇒ 两条分支给出**同一句**可读 loud-fail(人不该因为走了哪条分支而看见两种话)", () => {
+  test("没有冲突 + 同一漂移 ⇒ 这一步不再判 tarball(`#1664`):照常重贴补丁、不跑 install(漂移留给后面 Engine smoke 的 install)", () => {
     const fx = fixture({ conflict: "none", drift: true })
     const run = runStep(fx, mergeStepBody())
-    expect(run.exitCode, `no-conflict 分支把漂移放行了:\n${run.output}`).toBe(1)
-    expect(run.output, `no-conflict 分支的 loud-fail 措辞与冲突分支不一致:\n${run.output}`).toContain(
-      "missing after applying alpha frontend delta",
-    )
+    expect(run.exitCode, `no-conflict 分支被 tarball 判据挡下了 —— 那条判据应已去掉:\n${run.output}`).toBe(0)
+    expect(run.output).not.toContain("missing after applying alpha frontend delta")
     expect(run.calls, `no-conflict 分支不该碰 install:\n${run.output}`).toHaveLength(0)
+    expect(showFile(fx.repo, "alpha", "packages/app/src/app.tsx"), "干净合并后没重贴补丁").toContain(SEAM_MARKER)
   })
 
   test("意外冲突(落在 app/ui 之外)⇒ 点名、abort、exit 1,且 install 一次都不跑", () => {
@@ -356,6 +400,36 @@ describe("#1272 sync-upstream 冲突分支:补丁必须先于 install", () => {
       env: { PATH: process.env.PATH ?? "/usr/bin:/bin", ...GIT_ENV },
     })
     expect(merging.exitCode, "merge 没有被 abort,树停在半合并状态").not.toBe(0)
+  })
+
+  test("`#1664` 2.x 形状(session-ui 依赖工作区 @opencode/client,补丁里没有 tgz)⇒ 冲突分支照常走完;控制组:放回旧 tarball 判据 ⇒ 以「本判据已失效」中止", () => {
+    const fx = fixture({ conflict: "app", workspaceClient: true })
+    const run = runStep(fx, mergeStepBody())
+    expect(run.exitCode, `2.x 形状的冲突分支没跑通:\n${run.output}`).toBe(0)
+    expect(run.calls, `install 没在补丁之后跑那一次:\n${run.output}`).toEqual(["install|NO-FILE-DEP|"])
+    expect(showFile(fx.repo, "alpha", "packages/app/src/app.tsx"), "终态没有重贴补丁").toContain(SEAM_MARKER)
+
+    const legacy = runStep(fixture({ conflict: "app", workspaceClient: true }), withLegacyTarballCheck(mergeStepBody()))
+    expect(legacy.exitCode, `控制组没中止 —— 夹具测不出「旧判据会挡下 2.x 同步」:\n${legacy.output}`).toBe(1)
+    expect(legacy.output).toContain("本判据已失效")
+    expect(legacy.calls, `旧判据中止前就跑了 install:\n${legacy.output}`).toHaveLength(0)
+  })
+
+  test("`#1664` 根 CHANGELOG.md 冲突 ⇒ 取我方(Code Puppy 发布历史)、照常合并;控制组:去掉这条登记 ⇒ 以「未登记的偏离」中止并点名它", () => {
+    const fx = fixture({ conflict: "none", changelog: true })
+    const run = runStep(fx, mergeStepBody())
+    expect(run.exitCode, `CHANGELOG.md 冲突没被当成预期冲突:\n${run.output}`).toBe(0)
+    expect(showFile(fx.repo, "alpha", "CHANGELOG.md"), "合并后的 CHANGELOG.md 不是我方那份").toBe(CODEPUPPY_CHANGELOG)
+    expect(showFile(fx.repo, "alpha", "packages/opencode/src/engine.ts"), "上游的其它改动没合进来").toContain("upstream only")
+
+    const unregistered = fixture({ conflict: "none", changelog: true })
+    const body = mergeStepBody()
+    const mutated = body.replace(" | grep -v '^CHANGELOG.md$'", "")
+    if (mutated === body) throw new Error("变异没改到过滤表 —— 本次测量作废,不是通过")
+    const legacy = runStep(unregistered, mutated)
+    expect(legacy.exitCode, `控制组没中止 —— 夹具没造出 CHANGELOG.md 冲突:\n${legacy.output}`).toBe(1)
+    expect(legacy.output).toContain("未登记的偏离:按 ADR-029 登记或还原")
+    expect(legacy.output).toContain("CHANGELOG.md")
   })
 })
 

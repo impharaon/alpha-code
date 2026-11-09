@@ -139,11 +139,14 @@ function guardCopy(edit: (src: string) => string): string {
 const PROD_GUARD = resolve(REPO_ROOT, GUARD_REL)
 
 describe("#1376 sync-upstream 过滤表 与 north-star 守卫清单 的关系", () => {
-  test("解析自检:三份输入都解析得到,且过滤表今天就是勘破记下的那三条", () => {
+  test("解析自检:三份输入都解析得到,且过滤表今天就是勘破记下的那三条,外加 `#1664` 的 CHANGELOG.md", () => {
+    // `#1664`(编排器裁决,#1664 评论 6734550342):根 CHANGELOG.md 登记为第二个预期冲突(取我方)。它在守卫辖区
+    // (packages/)之外,满足下面的关系 ②;也不在收编白名单里,满足 ③。
     expect(parseFilter(SYNC_WORKFLOW)).toEqual([
       { path: "bun.lock", exact: true },
       { path: "packages/app/", exact: false },
       { path: "packages/ui/", exact: false },
+      { path: "CHANGELOG.md", exact: true },
     ])
     expect(printJurisdiction(PROD_GUARD)).toEqual({ upstreamPaths: ["packages"], roundtrip: ["app", "ui"] })
     // `#1664`:过渡清单 15 条,下限随数据从 20 改到 10 —— 它只防解析退化。

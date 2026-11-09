@@ -774,3 +774,31 @@ describe("spawnLocalServer", () => {
     await result.listener.stop()
   })
 })
+
+// `#1667`(#1662 L5;编排器裁决 alpha-code#1666 评论 6737930969 第 2 条 `l1r-telemetry-credential`,#1562):fork 时真交给
+// sidecar 的那份环境(createSidecarEnv 之上 server.ts 再加 UV_CACHE_DIR、清单路径、代理变量……)里没有任何 `OTEL_*` ——
+// OpenCode 2 唯一的遥测导出(OTLP)只认环境变量。白名单本身的反向臂(把 OTEL_ 加进前缀 ⇒ 红)在 sidecar-env-otel.test.ts。
+describe("#1562 fork 给 sidecar 的环境里没有 OTEL_*", () => {
+  const OTEL = ["OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_HEADERS", "OTEL_RESOURCE_ATTRIBUTES", "OTEL_SERVICE_NAME"] as const
+  const saved: Record<string, string | undefined> = {}
+  beforeEach(() => {
+    for (const key of OTEL) saved[key] = process.env[key]
+    process.env.OTEL_EXPORTER_OTLP_ENDPOINT = "https://collector.example/v1"
+    process.env.OTEL_EXPORTER_OTLP_HEADERS = "authorization=Bearer sk-not-a-real-collector-key"
+    process.env.OTEL_RESOURCE_ATTRIBUTES = "deployment.environment=prod"
+    process.env.OTEL_SERVICE_NAME = "codepuppy"
+  })
+  afterEach(() => {
+    for (const key of OTEL) {
+      if (saved[key] === undefined) delete process.env[key]
+      else process.env[key] = saved[key]
+    }
+  })
+
+  test("main 自己的环境里带着整套 OTLP 变量,fork 出去的 sidecar 环境里一个都没有", async () => {
+    preferAppEnv(userDataPath)
+    const env = await forkSidecar()
+    expect(env.PATH).toBeDefined() // 拿到的确实是 fork 用的那份环境
+    expect(Object.keys(env).filter((name) => /^otel_/i.test(name))).toEqual([])
+  })
+})

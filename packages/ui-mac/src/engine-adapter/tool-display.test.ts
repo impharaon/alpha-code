@@ -1,7 +1,7 @@
 // `#1668` I7b(ADR-041):工具卡的来源快照。L4 把它写进 2.x 工具状态的 `metadata.codepuppyDisplay`,v1 时间线读
 // `part.display`。消息取自真引擎采样的读文件回合(fixtures/read-tool.json),只在工具状态上补那个键(引擎没装 ext)。
 import { describe, expect, test } from "bun:test"
-import { toolCardDispatchOf } from "../codepuppy-ui/session-timeline/cards/tool-card-model"
+import { toolCardDispatchOf } from "../renderer/codepuppy-ui/session-timeline/cards/tool-card-model"
 import readTool from "./fixtures/read-tool.json"
 import { toV1Messages } from "./v1-shapes"
 

@@ -175,7 +175,7 @@ const HOST_BUILTIN_RULES = new Map<string, ToolCardKind>([
   ["apply_patch", "apply_patch"],
   ["skill", "skill"],
   ["task", "task"],
-  // `#1668` K5:OpenCode 2 的内建工具改了名(bash → shell、task → subagent、apply_patch → patch;
+  // `#1668` K5:2.x 引擎的内建工具改了名(bash → shell、task → subagent、apply_patch → patch;
   // v2:packages/core/src/database/v1-migration.bun.ts:996)。新旧名同一张卡 —— 旧会话里的 `bash` 照旧显示。
   ["shell", "bash"],
   ["subagent", "task"],

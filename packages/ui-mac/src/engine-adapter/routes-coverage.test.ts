@@ -13,7 +13,7 @@ import { join, resolve } from "node:path"
 import { matchRoute } from "./index"
 import { UNSUPPORTED } from "./routes"
 
-const PACKAGES = resolve(import.meta.dir, "../../../..")
+const PACKAGES = resolve(import.meta.dir, "../../..")
 
 type Descriptor = [verb: string, path: string]
 
@@ -123,8 +123,7 @@ function sourceFiles() {
     for (const name of readdirSync(dir)) {
       const path = join(dir, name)
       if (statSync(path).isDirectory()) {
-        // engine-adapter 自己是 2.x 一侧的调用方(`context.api` = 2.x 客户端),不是冻结界面的引擎调用。
-        if (!["test", "e2e", "node_modules", "fixtures", "engine-adapter"].includes(name)) walk(path)
+        if (!["test", "e2e", "node_modules"].includes(name)) walk(path)
         continue
       }
       if (!/\.(ts|tsx)$/.test(name) || /\.test\.|test-runtime|\.cases\.ts$|-stub\.ts$/.test(name)) continue

@@ -8,11 +8,11 @@
 // 这是适配器**唯一**直引冻结 app 源码的文件:相对路径而不经 `@opencode-ai/app` barrel,与
 // docs/architecture/constraints.md 里 `PermissionDialog.tsx:12`(`alpha-code#1575`)同一种已登记偏离 ——
 // barrel 会把整个 app 拖进测试运行时,给冻结 app 加子路径导出又被 surface-seam-contract.test.ts 禁止。
-export { normalizeSessionMessages } from "../../../../codepuppy-app/src/utils/session-message"
-export { normalizeSessionInfo } from "../../../../codepuppy-app/src/utils/session"
+export { normalizeSessionMessages } from "../../../codepuppy-app/src/utils/session-message"
+export { normalizeSessionInfo } from "../../../codepuppy-app/src/utils/session"
 export {
   normalizeAgentList,
   normalizePermissionRequest,
   normalizeProjectInfo,
   normalizeProviderList,
-} from "../../../../codepuppy-app/src/context/global-sync/utils"
+} from "../../../codepuppy-app/src/context/global-sync/utils"

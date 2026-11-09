@@ -87,7 +87,7 @@ function part(
   }
 }
 
-describe("`#1668` K5:OpenCode 2 的内建工具新名与旧名同一张卡", () => {
+describe("`#1668` K5:2.x 引擎的内建工具新名与旧名同一张卡", () => {
   test("shell / subagent / patch 分派到 bash / task / apply_patch 卡;旧名照旧(旧会话)", () => {
     const pairs: Array<[string, ToolCardKind]> = [
       ["shell", "bash"],

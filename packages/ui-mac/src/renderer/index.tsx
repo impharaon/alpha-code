@@ -64,7 +64,7 @@ import { CODEPUPPY_THEME, CODEPUPPY_THEME_ID } from "./theme-codepuppy"
 import { composeRoutes } from "./route-composition"
 import { installShellBootTimeline } from "./codepuppy-ui/shell-boot-timeline"
 import { markStartupTimeline } from "./startup-timeline"
-import { engineFetch, registerEngineOrigin } from "./engine-adapter"
+import { engineFetch, registerEngineOrigin } from "../engine-adapter"
 
 // Every route composes exactly one Code Puppy surface. There is no second release state and no
 // runtime switch: a fatal render goes to Code Puppy Recovery (SurfaceBoundary), never to an
@@ -327,7 +327,7 @@ const createPlatform = (): Platform => {
       }
     },
 
-    // `#1668`:冻结 app 的全部引擎客户端经这里出网 —— 引擎源地址的请求进适配器(v1 → OpenCode 2),别的源原样。
+    // `#1668`:冻结 app 的全部引擎客户端经这里出网 —— 引擎源地址的请求进适配器(v1 → 2.x 引擎),别的源原样。
     fetch: (input, init) => engineFetch(input, init),
 
     getDefaultServer: async () => {

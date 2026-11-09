@@ -4,8 +4,8 @@
 // mime,引擎按字节嗅探存成 `text/plain`、文件名原样)。往返测试把 composer 真正发出的 part(buildAttachmentParts 的
 // 生产函数)送进适配器的发送翻译,再按引擎的存法落成 2.x 用户消息,经读回投影比对。
 import { describe, expect, test } from "bun:test"
-import { STAGED_ATTACHMENT_PART_NAME } from "../../../../ext/src/staged-attachment-part"
-import { buildAttachmentParts } from "../codepuppy-ui/composer-attachments-core"
+import { STAGED_ATTACHMENT_PART_NAME } from "../../../ext/src/staged-attachment-part"
+import { buildAttachmentParts } from "../renderer/codepuppy-ui/composer-attachments-core"
 import readTool from "./fixtures/read-tool.json"
 import { toPrompt, toV1Messages } from "./v1-shapes"
 

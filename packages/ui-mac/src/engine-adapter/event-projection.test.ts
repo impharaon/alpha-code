@@ -6,7 +6,7 @@
 // 重新加载这个会话时看到的一样。反向臂:拿掉 `*.ended` / 工具终态之后的快照重取 ⇒ 工具 part 停在中间态 ⇒ 红。
 import { describe, expect, test } from "bun:test"
 import { createStore } from "solid-js/store"
-import { applyDirectoryEvent } from "../../../../codepuppy-app/src/context/global-sync/event-reducer"
+import { applyDirectoryEvent } from "../../../codepuppy-app/src/context/global-sync/event-reducer"
 import readTool from "./fixtures/read-tool.json"
 import todo from "./fixtures/todo.json"
 import question from "./fixtures/question.json"

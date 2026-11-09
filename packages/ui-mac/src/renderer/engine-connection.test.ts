@@ -4,7 +4,7 @@
 import { describe, expect, test } from "bun:test"
 import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
 import { createApiForServer, createSdkForServer } from "../../../codepuppy-app/src/utils/server"
-import { createEngineFetch } from "./engine-adapter"
+import { createEngineFetch } from "../engine-adapter"
 import { readyWslConnections } from "./wsl/connections"
 
 const ENGINE = "http://127.0.0.1:47004"

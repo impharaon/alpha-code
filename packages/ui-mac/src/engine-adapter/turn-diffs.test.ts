@@ -5,8 +5,8 @@
 // 夹具 fixtures/turn-diff.json:真 2.x 引擎里一个写 b.txt 的回合,带每个步结束时的 `GET /api/session/:id/diff?from=`。
 import { describe, expect, test } from "bun:test"
 import { createStore } from "solid-js/store"
-import { applyDirectoryEvent } from "../../../../codepuppy-app/src/context/global-sync/event-reducer"
-import { turnDiffsOf } from "../codepuppy-ui/session-rail/review/review-turn-diffs"
+import { applyDirectoryEvent } from "../../../codepuppy-app/src/context/global-sync/event-reducer"
+import { turnDiffsOf } from "../renderer/codepuppy-ui/session-rail/review/review-turn-diffs"
 import fixture from "./fixtures/turn-diff.json"
 import { createProjector, TURN_DIFF_EVENTS, type V1Payload } from "./events"
 import { createEngineFetch } from "./index"

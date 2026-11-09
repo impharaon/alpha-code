@@ -52,6 +52,7 @@ import {
   VISION_TOOL_REFUSED_TEXT,
 } from "./context-injection"
 import { REBRAND_RULES } from "./prompt-rebrand"
+import { applyPromptTakeover } from "./codepuppy-prompts"
 import { CODEPUPPY_AGENT_TEXT } from "../../ui-mac/src/main/codepuppy-agents"
 import { CODEPUPPY_BEHAVIOR_MD } from "../../ui-mac/src/main/codepuppy-behavior"
 import { buildCodePuppyIdentity } from "../../ui-mac/src/main/codepuppy-identity"
@@ -241,13 +242,25 @@ async function extWrites(): Promise<Record<string, Record<string, Record<string,
 }
 
 describe("③a 配置域 transform 咽喉:ext 写进 agent / command / mcp 的每个字符串都必须由登记簿解释", () => {
-  test("空项目:ext 写的零无解释叶子;且确实写了(不是空跑)", async () => {
+  test("空项目:ext 写的零无解释叶子;且确实写了(不是空跑);出厂 /init /review 不由 ext 写(归 L5 内联配置)", async () => {
     const after = await extWrites()
     const leaves = stringLeaves(after)
-    expect(leaves.length).toBeGreaterThanOrEqual(8)
-    for (const p of ["/commands/init/template", "/commands/review/template", "/agents/general/system", "/agents/docs/system", "/agents/docs/description"])
+    expect(leaves.length).toBeGreaterThanOrEqual(4)
+    for (const p of ["/agents/general/system", "/agents/explore/system", "/agents/docs/system", "/agents/docs/description"])
       expect(leaves.map((l) => l.pointer)).toContain(p)
+    expect(Object.keys(after.commands)).toEqual([])
     expect(unexplainedWrites(after)).toEqual([])
+  })
+  test("L5 写进内联配置的出厂命令来自同一个纯函数:applyPromptTakeover 产出的每个命令字符串都是登记项(review 带 subtask)", () => {
+    const cfg: Record<string, unknown> = {}
+    applyPromptTakeover(cfg)
+    const commands = cfg.command as Record<string, Record<string, unknown>>
+    expect(Object.keys(commands).sort()).toEqual(["init", "review"])
+    expect(commands.review!.subtask).toBe(true)
+    const leaves = stringLeaves({ command: commands })
+    expect(leaves.filter((l) => !explainConfigString(l.pointer, l.value).ok)).toEqual([])
+    // 已知的坏:模板多一个字 ⇒ 解释不了
+    expect(explainConfigString("/command/init/template", `${commands.init!.template}!`).ok).toBe(false)
   })
   test("#1522 AC3:弃用占位只指向 /customize-codepuppy,不提供恢复路径", async () => {
     process.env.CODEPUPPY_FACTORY_DENY_SKILLS = JSON.stringify(["customize-opencode"])
@@ -277,11 +290,16 @@ describe("③a 配置域 transform 咽喉:ext 写进 agent / command / mcp 的�
   })
   test("已知的坏 ③:登记过的文字被改动一个字节 —— 逐字比对,不是「像」", async () => {
     const after = await extWrites()
-    ;(after.commands.init as { template: string }).template += "!"
-    expect(unexplainedWrites(after).map((l) => l.pointer)).toEqual(["/commands/init/template"])
-    // 用户参数之外多出一段字(不是登记过的模板 + 用户的字)同样点名
-    ;(after.commands.init as { template: string }).template = "rogue " + ARGS_SENTINEL
-    expect(unexplainedWrites(after).map((l) => l.pointer)).toEqual(["/commands/init/template"])
+    ;(after.agents.general as { system: string }).system += "!"
+    expect(unexplainedWrites(after).map((l) => l.pointer)).toEqual(["/agents/general/system"])
+  })
+  test("已知的坏 ③′:命令发出的字在用户参数之外多一段(不是登记过的模板 + 用户的字)⇒ 点名", async () => {
+    process.env.CODEPUPPY_FACTORY_DENY_SKILLS = JSON.stringify(["customize-opencode"])
+    const after = await extWrites()
+    const command = after.commands["customize-opencode"] as { template: string }
+    expect(unexplainedWrites(after)).toEqual([])
+    command.template = "rogue " + command.template
+    expect(unexplainedWrites(after).map((l) => l.pointer)).toEqual(["/commands/customize-opencode/template"])
   })
   test("已知的坏 ④:模板实例前后缀之外多了字 —— 模板识别是前后缀逐字,不是包含", () => {
     const good = renderTemplate("command.factory-denied.template", { name: "x" })

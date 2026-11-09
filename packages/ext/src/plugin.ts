@@ -232,8 +232,12 @@ export const CodePuppyExt: Plugin.Plugin = {
           }
           // REQ-067:上游默认禁项零明文 —— main 算 effective 名单经 env 传入;禁用由下面的 skill / permission 钩子执行。
           applyFactoryDeny(cfg, process.env.CODEPUPPY_FACTORY_DENY_SKILLS)
-          // REQ-062 T3/T6:alpha 内容层接管(/init /review 模板 + general/explore/docs prompt),置于项目合并之后 ⇒ 项目同名让位。
-          if (process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE !== "1") applyPromptTakeover(cfg)
+          // REQ-062 T3/T6:alpha 内容层接管(general/explore/docs prompt),置于项目合并之后 ⇒ 项目同名让位。
+          // 出厂 /init 与 /review 不在这里注册(编排器裁决 2026-11-09):L5 用同一个纯函数把它们写进主进程的内联配置文档,
+          // 由上游 `opencode.config.command` 实现模板文法与 `review` 的子任务语义 —— 插件的 CommandEditor 给不了这两样。
+          if (process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE !== "1")
+            for (const applied of applyPromptTakeover(cfg).applied)
+              if (applied.startsWith("command.")) delete (cfg.command as Record<string, unknown>)[applied.slice("command.".length)]
         } catch (cause) {
           error(`[@codepuppy/ext] project config failed: ${describe(cause)}`)
         }

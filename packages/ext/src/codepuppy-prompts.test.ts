@@ -8,7 +8,9 @@ import {
   CODEPUPPY_DOCS_PROMPT,
   CODEPUPPY_EXPLORE_PROMPT,
   CODEPUPPY_GENERAL_PROMPT,
+  CODEPUPPY_INIT_DESCRIPTION,
   CODEPUPPY_INIT_TEMPLATE,
+  CODEPUPPY_REVIEW_DESCRIPTION,
   CODEPUPPY_REVIEW_TEMPLATE,
   applyPromptTakeover,
 } from "./codepuppy-prompts"
@@ -45,6 +47,13 @@ describe("applyPromptTakeover — set-if-absent", () => {
     expect((cfg.agent as any).explore.prompt).toBe(CODEPUPPY_EXPLORE_PROMPT)
     expect((cfg.agent as any).docs.prompt).toBe(CODEPUPPY_DOCS_PROMPT)
     expect((cfg.agent as any).docs.description).toBe(CODEPUPPY_DOCS_DESCRIPTION)
+  })
+  test("`#1665`:L5 用本纯函数构造内联配置文档的 command 条目 —— review 带 subtask: true(上游 opencode.config.command 据此以子任务执行),init 不带", () => {
+    const cfg: Record<string, unknown> = {}
+    applyPromptTakeover(cfg)
+    const command = cfg.command as Record<string, Record<string, unknown>>
+    expect(command.review).toEqual({ template: CODEPUPPY_REVIEW_TEMPLATE, description: CODEPUPPY_REVIEW_DESCRIPTION, subtask: true })
+    expect(command.init).toEqual({ template: CODEPUPPY_INIT_TEMPLATE, description: CODEPUPPY_INIT_DESCRIPTION })
   })
   test("用户已配同名 command.review → 让位(用户治理 > alpha 出厂)", () => {
     const cfg: Record<string, unknown> = { command: { review: { template: "user's own review" } } }

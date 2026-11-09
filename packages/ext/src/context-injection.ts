@@ -297,7 +297,7 @@ export const TOOL_TEXT = {
     readable: "codepuppy:register",
     description:
       `Register a project-scoped extension entry into <project>/${PROJECT_HIDDEN_DIR}/codepuppy.jsonc (the ONLY alpha directory in a project — never create .opencode). ` +
-      "Use type=agent|command with an entry object (agent: {description,prompt,mode,...}; command: {template,description,...}); " +
+      "Use type=agent|command with an entry object (agent: {description,prompt,mode,...}; command: {template,description}); " +
       "type=mcp with the connector config (loading executable connectors additionally requires the user's per-project consent dialog); " +
       `type=skill takes no entry — it registers the ./${PROJECT_HIDDEN_DIR}/skills path; write the skill itself to ${PROJECT_HIDDEN_DIR}/skills/<name>/SKILL.md. ` +
       `Plugins are NOT registered here: drop a self-contained ESM .js into ${PROJECT_HIDDEN_DIR}/plugins/ (raw TypeScript is rejected). ` +

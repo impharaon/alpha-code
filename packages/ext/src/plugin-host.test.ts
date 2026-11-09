@@ -19,7 +19,7 @@ import { SessionMessage } from "../../schema/src/session-message.ts"
 import type { Plugin } from "@opencode/plugin"
 import CodePuppyExt from "./plugin"
 import { activate, it, recordingMcp } from "./plugin-host.harness"
-import { CODEPUPPY_EXPLORE_PROMPT, CODEPUPPY_INIT_DESCRIPTION } from "./codepuppy-prompts"
+import { CODEPUPPY_EXPLORE_PROMPT } from "./codepuppy-prompts"
 import { TOOL_TEXT } from "./context-injection"
 
 const ENV_KEYS = [
@@ -325,7 +325,7 @@ it.live("权威 · 出厂禁用技能(REQ-067):禁项的 skill 权限评估一�
   }),
 )
 
-it.live("权威 · 提示词接管(L3r):ext 的 agent.transform 换掉上游 explore 的 system、新增 docs;command.transform 盖过上游 init;反向臂:不装 ext ⇒ 上游原样", () =>
+it.live("权威 · 提示词接管(L3r):ext 的 agent.transform 换掉上游 explore 的 system、新增 docs;出厂 /init /review 不由 ext 注册(归 L5 内联配置);反向臂:不装 ext ⇒ 上游原样", () =>
   Effect.gen(function* () {
     env({})
     yield* activate({
@@ -338,11 +338,14 @@ it.live("权威 · 提示词接管(L3r):ext 的 agent.transform 换掉上游 exp
     const agents = yield* Agent.Service
     const commands = yield* Command.Service
     expect((yield* agents.get(Agent.ID.make("explore")))?.system).toBe("upstream explore prompt")
-    expect((yield* commands.list()).find((command) => command.name === "init")?.description).toBe("upstream init")
     yield* activate(CodePuppyExt)
     expect((yield* agents.get(Agent.ID.make("explore")))?.system).toBe(CODEPUPPY_EXPLORE_PROMPT)
     expect((yield* agents.get(Agent.ID.make("docs")))?.mode).toBe("all")
-    expect((yield* commands.list()).find((command) => command.name === "init")?.description).toBe(CODEPUPPY_INIT_DESCRIPTION)
+    // 编排器裁决 2026-11-09:出厂 /init /review 由 L5 写进主进程的内联配置文档(上游 opencode.config.command 实现模板与子任务),
+    // ext 不再 editor.add 它们 —— 这里看到的仍是宿主里原有的那一条,ext 也没有加 review。
+    const listed = yield* commands.list()
+    expect(listed.find((command) => command.name === "init")?.description).toBe("upstream init")
+    expect(listed.some((command) => command.name === "review")).toBe(false)
   }),
 )
 

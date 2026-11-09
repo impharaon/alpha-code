@@ -7,8 +7,9 @@
 // `codepuppy_register` 也这样写),所以翻译是一次性的、按字段的,不解释上游的任何文法。
 //
 // 优先级靠 2.x 的插件激活顺序(`packages/core/src/plugin/internal.ts`:internal.pre → 按配置装载的插件 → internal.post):
-//   · 上游内置的 agent(general / explore …)与命令(init / review)在 pre 里注册 ⇒ ext 的 transform 在它们之后跑,
-//     alpha 出厂的接管盖过上游内置;
+//   · 上游内置的 agent(general / explore …)在 pre 里注册 ⇒ ext 的 agent.transform 在它们之后跑,alpha 出厂的接管盖过上游内置;
+//     出厂命令 /init /review 不经 ext(编排器裁决 2026-11-09):L5 用 `applyPromptTakeover` 把它们写进主进程的内联配置文档,
+//     由上游 `opencode.config.command` 实现模板文法与 `review` 的子任务语义;ext 的 command.transform 只注册项目命令与出厂禁项占位;
 //   · 用户配置的 agents / commands 由 post 里的 `opencode.config.agent` / `opencode.config.command` 注册 ⇒ 在 ext 之后,
 //     按字段合并 / 同名覆盖 —— 「用户治理 > alpha 出厂 > 上游内置」这条次序由结构保证;
 //   · 用户配置的 MCP 由 pre 里的 `opencode.config.mcp` 写入 ⇒ ext 的 mcp.transform 看得到,项目 MCP 只补缺(全局优先)。
@@ -16,9 +17,10 @@
 // 做不到的(写在这里,不假装):
 //   · `skills.paths`(项目 / 出厂 / 技能生成目录):2.x 的 `SkillEditor` 只收已解析的 `Skill.Info`,扫描与解析在上游 core
 //     内部(`config/plugin/skill-scan.ts`、`skill-file.ts`),插件接口上没有「加一个技能目录」的挂点 —— 交编排器(见收工报告)。
-//   · 项目命令模板只认 `$ARGUMENTS`(alpha 自己的 init / review 模板也只用它);上游配置命令的 `$1…$N` 位置参数与
-//     `` !`cmd` `` shell 插值属于上游 `opencode.config.command` 的文法,插件接口不给,ext 不另写一份(含 shell 的模板原文发出,
-//     并记一行日志)。
+//   · 项目命令模板只认 `$ARGUMENTS`;上游配置命令的 `$1…$N` 位置参数与 `` !`cmd` `` shell 插值属于上游
+//     `opencode.config.command` 的文法,插件接口不给,ext 不另写一份(含 shell 的模板原文发出,并记一行日志)。项目命令的
+//     `agent` / `model` 也不生效:插件提交消息的接口(`POST /api/session/:id/prompt` 的载荷)没有这两个字段;`subtask` 插件接口给不了,
+//     `codepuppy_register` 已不收它(编排器裁决 2026-11-09,承受者 0)。
 
 import type { Plugin } from "@opencode/plugin"
 import type { AgentEditor } from "@opencode/plugin/promise/agent"

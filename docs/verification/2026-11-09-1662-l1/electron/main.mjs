@@ -24,7 +24,12 @@ const results = { arm: cfg.arm, startedAt: new Date().toISOString(), steps: {} }
 const utilityLog = []
 const finish = (code) => {
   results.finishedAt = new Date().toISOString()
-  writeFileSync(cfg.outFile.replace(/\.json$/, ".utility.log"), utilityLog.join(""))
+  // countsOnly (L1b, owner data): engine logs can echo titles/text — keep line counts only, never the lines.
+  const lines = utilityLog.join("").split("\n")
+  if (cfg.countsOnly) {
+    delete results.utilityLog
+    results.utilityLogCounts = { lines: lines.length, warn: lines.filter((l) => / WARN /.test(l)).length, error: lines.filter((l) => / ERROR /.test(l)).length }
+  } else writeFileSync(cfg.outFile.replace(/\.json$/, ".utility.log"), utilityLog.join(""))
   writeFileSync(cfg.outFile, JSON.stringify(results, null, 2))
   console.log(`ac1662 wrote ${cfg.outFile}`)
   app.exit(code)
@@ -199,9 +204,9 @@ app.whenReady().then(async () => {
       for (const s of sessions) {
         const m = await http("GET", `/api/session/${s.id}/message`)
         const data = m.body?.data ?? []
-        perSession.push({ id: s.id, title: s.title, messages: data.length, types: data.map((x) => x.type) })
+        perSession.push(cfg.countsOnly ? { messages: data.length, types: data.map((x) => x.type) } : { id: s.id, title: s.title, messages: data.length, types: data.map((x) => x.type) })
       }
-      return { statuses: statuses.slice(-3), statusPolls: statuses.length, listStatus: list.status, sessionCount: sessions.length, perSession, sample: perSession.length ? (await http("GET", `/api/session/${sessions[0].id}/message`)).body : null }
+      return { statuses: statuses.slice(-3), statusPolls: statuses.length, listStatus: list.status, sessionCount: sessions.length, perSession, sample: perSession.length && !cfg.countsOnly ? (await http("GET", `/api/session/${sessions[0].id}/message`)).body : null }
     })
   }
 

@@ -2,6 +2,7 @@
 # alpha-code#1662 L1a — isolation snapshot. Metadata only (stat), never file contents.
 #   bash snapshot.sh before    → ${T}/snap-before.txt
 #   bash snapshot.sh after     → ${T}/snap-after.txt, then diffs against before (exit 1 on any difference)
+#   bash snapshot.sh <label> <earlier-label>   → ${T}/snap-<label>.txt, diffed against snap-<earlier-label>.txt (L1b)
 set -euo pipefail
 . "$(dirname "$0")/env.sh"
 label=${1:?before|after}
@@ -30,6 +31,8 @@ H=${REAL_HOME}
   git -C "${WT}" config --get core.hooksPath || echo "core.hooksPath unset"
 } >"$out"
 echo "wrote $out ($(wc -l <"$out") lines)"
-if [ "$label" = after ]; then
-  if diff -u "${T}/snap-before.txt" "$out"; then echo "SNAPSHOT IDENTICAL"; else echo "SNAPSHOT DIFFERS"; exit 1; fi
+base=${2:-}
+[ "$label" = after ] && base=before
+if [ -n "${base}" ]; then
+  if diff -u "${T}/snap-${base}.txt" "$out"; then echo "SNAPSHOT IDENTICAL"; else echo "SNAPSHOT DIFFERS"; exit 1; fi
 fi

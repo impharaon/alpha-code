@@ -166,3 +166,105 @@ transform 找不到原调用,或者文件里又出现别的 `Bun.` 调用时,构
 - ext 插件没装进 2.x;插件装载顺序(S1「最后一个回调」)没测。
 - 真库副本的前进迁移和转换(L1b)没做;owner 数据只按文件名和元数据看过。
 - 重启续跑的差异(§4)只读了代码。
+
+## 8. L1b 做法:在 owner 真库的只读副本上实测(本轮只交做法,没有复制、没有打开 owner 的任何数据文件)
+
+下一轮要回答三件事:①真库用的是哪种迁移记账,各有多少行,有没有 alpha 那两条 id;②用 §3 的 node24 上游构建对副本做前进迁移和 v1 转换,
+会话数、消息数前后对照;③用 Code Puppy 的 `db-safety`(`decidePlan` 一族)判副本,分别用「2.x 支持面」和「2.x 支持面 + alpha 两条退役 id」两种期望。
+本节每一步都**先在合成库上跑过**(`l1b-copy-proof.sh`、`l1b-copy-dryrun.sh`、`run-electron.sh l1b`),下面写的是实测结果。
+
+### 8.1 要复制的源文件
+
+2026-11-09 01:10 用 `ls -la ~/.local/share/opencode/` 只看了文件名、大小和时间:
+
+| 文件 | 大小 | mtime | 处置 |
+| --- | --- | --- | --- |
+| `opencode.db` | 21,921,792 B | 11-06 04:01 | 复制(打包版 Code Puppy 的库就是这个:`db-safety.ts:46-50` `resolveDbPath`) |
+| `opencode.db-wal` | 当时不存在 | — | 复制那一刻如果存在,一起复制(里面有还没写回主库的提交) |
+| `opencode.db-shm` | 当时不存在 | — | **不复制**。它只是共享内存索引,SQLite 打开副本时会从 `-wal` 重建 |
+
+不复制:同目录下其它 `opencode-<分支名>.db`(dev 和各 lane 的库,不是 Code Puppy 正式版的)、`mcp-auth.json`、`auth.json`(当时也不存在)。
+
+### 8.2 复制方式:只用 `cp` 读源文件
+
+`l1b-copy-proof.sh` 在合成 WAL 库上实测了四种做法,源库分两种状态。「安静」是干净关闭、没有 `-wal`/`-shm`,和 owner 现在的状态一样;
+「在写」是另一个进程开着库,`-wal` 里有还没写回主库的行。「源库不变」的判法是三个文件的大小和纳秒级 mtime 前后一致:
+
+| 做法 | 安静:能不能复制 | 安静:源库不变 | 在写:副本完整(应为 1500 行) | 在写:源库不变 |
+| --- | --- | --- | --- | --- |
+| **`cp opencode.db [opencode.db-wal]`** | 能 | 是 | **1500** | 是 |
+| `sqlite3 -readonly … "VACUUM INTO"`(Code Puppy 自己的备份写法) | **失败**:`unable to open database file (14)` | 是 | 1500 | 是 |
+| `sqlite3 'file:…?mode=ro' .backup` | **失败**:同上 | 是 | 1500 | 是 |
+| `sqlite3 'file:…?mode=ro&immutable=1' .backup` | 能 | 是 | **1000,少了 `-wal` 里的提交** | 是 |
+
+结论是用 `cp`:它不经 SQLite 打开源库,不加锁,不写任何东西,两种状态下都完整。只读打开的两种做法在 owner 现在的状态下根本打不开;
+`immutable=1` 在应用正在写时会漏数据。
+
+`l1b-copy.sh` 的步骤:
+
+1. 目标必须在 `/private/tmp` 下,而且不能已经存在,建成 0700,建完核一次权限。
+2. 看 owner 应用,只查进程表:`pgrep -f "/Applications/Code Puppy.app/Contents/MacOS/Code Puppy"`,外加 `lsof -t -- <源库>`。
+   lsof 只读内核的文件表,不打开源库。dry run 证明它能查到占用者:在写那一档报出了写进程的 PID。
+3. 复制前后各记一次源库的指纹(主库和 `-wal` 的大小加纳秒 mtime),然后 `cp` 主库,有 `-wal` 就一起 `cp`。
+   前后指纹一致才算这次复制成功;不一致就等 2 秒重试,最多 5 次。5 次都不一致就报 `BLOCKED`,让下一轮另找时间,**不碰 owner 的应用**。
+4. 复制出来的文件 chmod 600,放在 `pristine/`,**之后谁都不打开它**。要读就从它克隆一份到 `work/` 或实验目录,每次读都有自己的克隆:
+   SQLite 打开一个文件就会改变它的文件组成(比如生成 `-wal`/`-shm`),一改,db-safety 的生产读法就测不准了(见 8.6)。
+
+**Code Puppy 正式版正在运行时怎么办**:照样走上面的流程。`cp` 不拿 SQLite 的锁,不会挡住应用,也不会被应用挡住。
+应用要是正在写,指纹比对会让这次复制作废并重试;重试成功之后,副本还要在 `work/` 克隆上过 `PRAGMA integrity_check`,结果必须是 `ok`。
+不要求 owner 关应用,也不替他关;5 次都不稳定,就停下改天再来。
+
+两种状态的 dry run(`l1b-copy-dryrun.sh`,合成源库按 owner 的目录结构摆放):两次都是第一次就稳定、`integrity_check: ok`、源库指纹不变;
+在写那一档的副本里有写进程新建的表,说明 `-wal` 里的内容一起进来了。
+
+### 8.3 副本放在哪,怎么输出,怎么删
+
+- 根目录 `/private/tmp/ac1662-l1b/`,权限 0700(`l1b-copy.sh` 自己建,也自己核)。下面有 `pristine/`(不打开)、`work/`(数数用的克隆),
+  以及引擎实验目录 `iso-l1b/`(`ISO_BASE=/private/tmp/ac1662-l1b bash run-electron.sh l1b`;脚本发现 `ISO_BASE` 不对就拒绝运行)。
+- 只输出计数和表名:`l1b-counts.sh` 只打印 journal_mode、integrity_check、表名、两种记账表的行数和 alpha 两条 id 在不在、各表行数、
+  `session_message` 按类型的计数,不打印任何一行内容;路径不在 `/private/tmp` 下就拒绝运行。
+  `run-electron.sh l1b` 打开只计数模式:不写会话标题,不取消息样本,utility 日志只留行数和 WARN/ERROR 的条数,不落盘原文。
+  在合成副本上验证过:用已知的合成标题、用户原文和工具输出去 grep 只计数模式的全部输出文件,命中 0 个;同样的 grep 在普通 e3 臂上命中 1 个(对照组)。
+- 做完删掉:`rm -rf /private/tmp/ac1662-l1b`(写死的路径)。
+
+### 8.4 前后快照
+
+沿用 `snapshot.sh`(只用 stat):复制前 `bash snapshot.sh l1b-before`,复制后**马上**、在启动 Electron 之前 `bash snapshot.sh l1b-after-copy l1b-before`。
+判定标准:`~/.local/share/opencode` 那一节(今天是 3,688 个条目)必须逐行一致。
+快照里另外两行会因为别人变化,要单独说明来源:`login.keychain-db` 会被机器上别的 agent 改(§2);`com.github.Electron.plist` 只在 Electron 跑过之后才会变。
+
+### 8.5 可能碰到钥匙串或 owner 应用的地方,以及怎么避开
+
+| 步骤 | 碰到什么 | 怎么避开 |
+| --- | --- | --- |
+| `cp` 源文件 | 只读源文件 | 不经 SQLite,不加锁;源文件不会出现新的 `-wal`/`-shm` |
+| `pgrep` / `lsof` | 只读进程表和内核文件表 | 不连接、不发信号给 owner 的应用 |
+| 2.x 引擎跑在副本上(Electron) | Chromium 的 OSCrypt 会读钥匙串 | 和 §2 一样:必须带 `--use-mock-keychain`,`HOME`/`XDG_*` 必须在临时目录下,否则守卫拒绝运行;不建窗口,不用 `session`/`net`/`safeStorage`;不设 `CFFIXED_USER_HOME` |
+| 2.x 迁移 `20260805200742_import_legacy_credentials` | 会读 `<data>/auth.json` | 实验数据目录里没有这个文件(不复制,源目录里本来也没有),所以导入不到任何东西 |
+| db-safety 判定 | 调用 `/usr/bin/sqlite3` | 只对 `/private/tmp` 下的克隆调用(`l1b-db-safety.ts` 和 `l1b-counts.sh` 都会拒绝别的路径) |
+| Code Puppy 正式版 | — | 不启动、不关闭、不替换 `/Applications/Code Puppy.app`;不跑 ui-mac 主进程,所以不走 Code Puppy 的凭证读取路径 |
+
+### 8.6 下一轮的命令顺序,和一个已经在合成库上测出来的问题
+
+```bash
+cd docs/verification/2026-11-09-1662-l1
+bash snapshot.sh l1b-before
+bash l1b-copy.sh                                            # 回答①:记账表、行数、alpha 两条 id、会话/消息/部件计数
+bash snapshot.sh l1b-after-copy l1b-before                  # 只看 ~/.local/share/opencode 那一节
+/private/tmp/ac1662-l1/bun-1.4.4/bin/bun l1b-db-safety.ts /private/tmp/ac1662-l1b/pristine/opencode.db /private/tmp/ac1662-l1/oc2 /private/tmp/ac1662-l1b/backups   # 回答③
+ISO_BASE=/private/tmp/ac1662-l1b bash run-electron.sh l1b   # 回答②:迁移、转换,以及转换后的计数
+rm -rf /private/tmp/ac1662-l1b
+```
+
+`l1b-db-safety.ts` 会报两种读法,而这两种读法在合成库上给出的答案**不一样**:
+
+- **逻辑读**:用可写的克隆读出 id,再交给 `decidePlan`。合成库(40 条 id,含 alpha 两条)的结果:期望 A 得到 `db-ahead`,unknown 正好是 alpha 那两条 id;
+  期望 B 得到 `migrate-ahead`,pending 21 条;备份成功。这正是审计 F1 预期的结果。
+- **生产读**:和 `db-safety-boot.ts:74-80` 完全一样,对一个按源库结构摆放(只有 `.db`)的克隆跑 `sqlite3 -readonly … "SELECT id FROM migration"`。
+  结果是 `exit=14 unable to open database file`,期望 A 和 B **都得到 `skip`**(「水位读取失败,fail-open」);
+  照开机流程做的那次备份也失败了(`VACUUM INTO 失败:exit=14`)。
+
+原因:引擎把库设成了 WAL 模式(`packages/core/src/database/database.ts:27`)。干净关闭之后,`-wal`/`-shm` 被删掉,而只读连接打不开没有这两个文件的 WAL 库。
+owner 现在的库正是这个状态。所以很可能出现的情况是:每次在干净关闭之后启动,db-safety 都静默跳过,升级到 2.x 那一次既不拦截、也不备份。
+`db-safety.test.ts` 里用真 sqlite 跑的用例(`itSql`)建的都是非 WAL 库,所以这个情况一直没被覆盖。
+**这条目前只在合成库上实测过**;真库是不是 WAL、生产读会不会同样返回 14,下一轮的 `l1b-counts.sh`(journal_mode)和 `l1b-db-safety.ts`(production 一栏)会直接给出答案。

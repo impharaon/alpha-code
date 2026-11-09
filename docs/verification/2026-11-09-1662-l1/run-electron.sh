@@ -11,11 +11,16 @@
 #   bash run-electron.sh e3noop    control: same copy, upstream's node build (`#v1-migration` → noop)
 #   bash run-electron.sh e3next    E3 + a non-v2 opencode-next.db beside it (exercises the bun:sqlite adapter)
 #   bash run-electron.sh e3raw     control: bun impl WITHOUT the Bun.CryptoHasher shim (must fail on the tool session)
+#   ISO_BASE=/private/tmp/ac1662-l1b bash run-electron.sh l1b
+#                                  L1b: E3 on a clone of l1b-copy.sh's pristine copy; COUNTS ONLY (no titles, no
+#                                  message text, utility log reduced to line counts); everything lives under ISO_BASE
 # Every process is started in its own process group and reaped by PGID.
 set -euo pipefail
 set -m
 . "$(dirname "$0")/env.sh"
 ARM=${1:?arm}
+L1B_DEST=${L1B_DEST:-/private/tmp/ac1662-l1b}
+if [ "${ARM}" = l1b ] && [ "${ISO_BASE:-}" != "${L1B_DEST}" ]; then echo "refusing: l1b needs ISO_BASE=${L1B_DEST}"; exit 2; fi
 eval "$(iso_env "${ARM}")"
 OUT="${ISO_ROOT}/out"
 mkdir -p "${OUT}" "${ISO_ROOT}/userData/engine-scratch-cwd" "${XDG_DATA_HOME}/opencode"
@@ -25,12 +30,18 @@ case "${ARM}" in
   e3noop) MODE=e3; BUNDLE="${OC2}/packages/cli/dist-node/embed.mjs" ;;
   e3 | e3fence | e3next) MODE=e3; BUNDLE="${OC2}/packages/cli/dist-node/embed-v1mig.mjs" ;;
   e3raw) MODE=e3; BUNDLE="${OC2}/packages/cli/dist-node/embed-v1mig-raw.mjs" ;;
+  l1b) MODE=e3; BUNDLE="${OC2}/packages/cli/dist-node/embed-v1mig.mjs" ;;
   *) echo "unknown arm ${ARM}"; exit 2 ;;
 esac
 DB="${XDG_DATA_HOME}/opencode/opencode.db"
 if [ "${MODE}" = e3 ]; then
   rm -f "${DB}" "${DB}-wal" "${DB}-shm"
-  cp "${T}/v1-seed/opencode-v1.db" "${DB}"
+  if [ "${ARM}" = l1b ]; then
+    cp "${L1B_DEST}/pristine/opencode.db" "${DB}"
+    [ -e "${L1B_DEST}/pristine/opencode.db-wal" ] && cp "${L1B_DEST}/pristine/opencode.db-wal" "${DB}-wal"
+  else
+    cp "${T}/v1-seed/opencode-v1.db" "${DB}"
+  fi
   [ "${ARM}" = e3next ] && sqlite3 "${XDG_DATA_HOME}/opencode/opencode-next.db" 'CREATE TABLE unrelated(x);'
   echo "before: $(sqlite3 "${DB}" "SELECT 'v1 session=' || (SELECT COUNT(*) FROM session) || ' message=' || (SELECT COUNT(*) FROM message) || ' part=' || (SELECT COUNT(*) FROM part)")"
 fi
@@ -84,7 +95,7 @@ const env = {
 const stub = (baseURL, model) => ({ name: "ac1662 " + model, package: "@opencode/ai/providers/openai-compatible",
   settings: { baseURL, apiKey: "ac1662-placeholder-not-a-key" }, models: { [model]: { name: model } } })
 fs.writeFileSync(process.argv[2], JSON.stringify({
-  arm: "${ARM}", mode: "${MODE}", tempRoot: "${T}", port: ${PORT}, password: "ac1662-" + Math.random().toString(36).slice(2),
+  arm: "${ARM}", mode: "${MODE}", tempRoot: "${ISO_BASE:-${T}}", countsOnly: "${ARM}" === "l1b", port: ${PORT}, password: "ac1662-" + Math.random().toString(36).slice(2),
   stubReply: "ac1662-stub-reply: hello from the loopback stub",
   electronPaths: { userData: "${ISO_ROOT}/electron/userData", sessionData: "${ISO_ROOT}/electron/session", logs: "${ISO_ROOT}/electron/logs", crashDumps: "${ISO_ROOT}/electron/crash" },
   utilityEnv: env, utilityCwd: "${ISO_ROOT}/userData/engine-scratch-cwd", workspace: "${ISO_ROOT}/ws",
@@ -102,7 +113,10 @@ wait "${EL_PID}" && rc=0 || rc=$?
 kill -TERM -- "-${EL_PID}" 2>/dev/null || true
 echo "electron exit=${rc}"
 tail -5 "${OUT}/electron.log"
-if [ "${MODE}" = e3 ]; then
+if [ "${ARM}" = l1b ]; then
+  echo "## after (counts only)"
+  bash "${HERE}/l1b-counts.sh" "${DB}"
+elif [ "${MODE}" = e3 ]; then
   echo "after:  $(sqlite3 "${DB}" "SELECT 'v1 session=' || (SELECT COUNT(*) FROM session) || ' message=' || (SELECT COUNT(*) FROM message) || ' part=' || (SELECT COUNT(*) FROM part)")"
   sqlite3 "${DB}" "SELECT 'session_v2=' || COUNT(*) FROM session_v2;" 2>&1 || true
   sqlite3 "${DB}" "SELECT 'session_message ' || type || '=' || COUNT(*) FROM session_message GROUP BY type;" 2>&1 || true

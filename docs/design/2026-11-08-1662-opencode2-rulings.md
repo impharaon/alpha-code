@@ -29,3 +29,26 @@ last_reviewed: 2026-11-09
 | R11 | 接受方案员在 `.claude/rules/DECISIONS.md` 补的 ADR-047 索引行(该文件自身规则要求)。 | `29b8bf1fa4` diff。 |
 
 审计方的任务:找事实错误、走本仓代码与 runbook 到得了的失败状态、或同样满足全部 AC 的更简单解。只给另一种写法、更严或更全而没有上述三者的,维持原裁决。
+
+## 方案审第 1 轮处置(2026-11-09,auditor opus,RECOMMEND: FIX-THEN-MERGE)
+
+全部 12 条采纳(都走得到、都对应 AC 或闸门真假,修法取最小)。由方案作者回写基线、清点表与 ADR-047;第 2 轮只判这些条目闭合与回写 diff。
+
+| # | 采纳的修法(要回写的地方) | 依据(编排器核实) |
+| --- | --- | --- |
+| F1 Major | §2.8 与 L2:alpha 自有的两条退役迁移 id(`20260720085655_permission-decision-receipt`、`20260720094009_permission-request-admission`)进 2.x 构建的 DB 支持面(冻结清单并入 `db-expected-migrations.json`),否则老用户每次启动都弹「库比应用新」且前进前不备份;db-safety 加带这两个 id 的夹具库,期望走「待前进」;L1b 的真库副本实验走 Code Puppy 预检,不只跑裸引擎。 | 实测:两条迁移在 `origin/alpha:packages/core/src/database/migration/`;`db-safety.ts:105-106` 先判未知 id 再判待前进。 |
+| F2 Major | §2.3、L2、§5.3:M0 直推整合分支或 `--merge` 合入,整合分支只用 merge 吸收 `alpha`(禁止 squash/rebase);L2 退出条件、§5.3、最终合并前加 `git merge-base --is-ancestor 33f94fce96 HEAD`,并带「squash 重放后必须红」的反向用例。 | runbook 默认 squash(alpha-work `CLAUDE.md`、alpha-code `ci.md`);§2.3.4 只比树。 |
+| F3 Major | L2 边界与退出条件:守卫在含受审上游合并的分支上,`packages/` 辖区改以该合并的上游父为基准判;两臂:M0 后再改一个上游文件必须红,M0 原样的上游改动必须绿。不得靠 `--no-verify` 过 7 条 lane 的推送。 | 守卫头注 `scripts/north-star-guard.sh:24` 起:基准 = `origin/alpha`。 |
+| F4 Major | §2.3:`packages/` 之外的路径逐文件定归属(上游来源的跟 `33f94fce96` 增删,Code Puppy 的跟 alpha);L2 退出条件:合入后对新出现的上游 workflow 逐个 `gh workflow disable`,并在合入前列出清单。 | 实测 `upstream/dev:.github/workflows/` 21 个,含 `triage-compliance-close.yml`、`triage-pr-standards.yml`;2026-11-02 已有过一次「改名 workflow 被自动启用」的事故(`codepuppy-ci`)。 |
+| F5 Major | S6 形状点名 `~/.agents` 与项目 `.agents` 两类技能根的处置与所在主权阶梯层;判据加这两臂。 | `v2:core/src/config/discovery.ts:152-166`、`compatibility.ts:44-56`;本机今天无 `~/.agents/skills`,但属安全/同意类不变量,判据漏路即假闸。 |
+| F6 Major | S1 形状写明 Code Mode 工具的目录闸机制(往 snapshot 规则集注入 deny,或对 Code Puppy 管的 MCP server 注入 `codemode:false`,二选一);A 组判据同时断言 Code Mode 目录里没有被拒工具,并带反向臂。 | 实测 `v2:core/src/tool/mcp.ts:57` `codemode: tool.codemode !== false`。 |
+| F7 Major | 清点表 C1/C3/C6/E3 在 H1 下改记「改形:由 sidecar 构造 `ServerOptions`」;「每个 `OPENCODE_*` 有读者」测试改为断言传给 `start()`/`ServerFetch.make` 的选项对象(或把找读者范围限定在宿主实际装载的模块),反向臂:只有 CLI 读的变量必须红。宿主映射与 `db-safety.ts:36-51` 的库路径推导共用一个 Code Puppy 侧函数(ARCH-NOTE 3,避免再造上游宿主的决定)。 | 审计读码:`v2:cli/src/server-process.ts:101-145` 不在 H1 路径上。 |
+| F8 Minor | §6:写手工恢复步骤(照 `db-safety.ts:278-288`,连 `-wal/-shm` 一起挪);演练第 2 步先确认备份文件存在。 | 「库超前」时恢复动作不出现(`recovery-adapter.ts:58-74`)。 |
+| F9 Minor | §2.3.4 判据排除 `app|ui`(由 `assert-frontend-patch-roundtrip.sh` 覆盖)。 | 守卫 carve-out 已含二者。 |
+| F10 Minor | L2 用过渡清单判;L4 退出条件:对最终清单重跑 `sync-upstream-takeover-isolation.test.ts` 与 `north-star-guard.test.ts`,并定好清单为空时的同步行为(不得 `exit 1`)。 | `sync-upstream.yml:131-133`。 |
+| F11 Minor | L3 退出条件加「清点表 S7 的 ext 部分」(`reload-scheduler.ts` 的 `/session/status`、`/instance/dispose`)。 | 审计读码。 |
+| F12 Minor | 改正 §1.4 与 D4/D6:v1 转换会先删该会话在 `session_message` 的行再写转换结果;把这项与 `event` 删除一起写进给 owner 的说明。 | `v2:core/src/database/v1-migration.bun.ts:704`(审计读码)。 |
+
+OPTIONAL 采纳两条:S2 删掉「在注入里让 providers 只认 Code Puppy 的条目」那一种实现(导入迁移不看配置,`20260805200742_import_legacy_credentials.ts`),只保留「首次以 2.x 启动前处置数据目录里的 `auth.json`」;§5.3 写明并行期 lane 与整合分支 base 比、最终推送与 `alpha` 比。其余 OPTIONAL 与 out-of-round 记残余,不改方案:`session.hook.context` 改名需经同意的插件才会发生;配置目录插件自动装载 v1 已有、非本次引入;`opencode-pty` 走 PATH 今天承受者为零。
+
+ARCH-NOTE:① ADR-047「前端 pin 与引擎同一 SHA」改为「切换时同一 SHA,之后保持同一代次」(与 ADR-034 月更不冲突);② `ServerFetch.make` 作为 H1 退出条件 ② 的候选,已横向传给 L1a 实测;③ 并入 F7。

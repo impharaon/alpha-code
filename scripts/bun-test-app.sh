@@ -163,6 +163,7 @@ src/context/server-session-restart.test.ts 2
 src/context/terminal-command.test.ts 1
 src/pages/layout/helpers.test.ts 24
 src/utils/session-route.test.ts 10
+src/utils/terminal-websocket-url.test.ts 3
 "
 
 lookup_registered() {

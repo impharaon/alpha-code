@@ -128,3 +128,14 @@ export function createEngineFetch(options: {
     }
   }
 }
+
+// ── renderer 全局的那一个 engineFetch ─────────────────────────────────────────────────────────────
+// 冻结 app 经 `Platform.fetch` 建全部引擎客户端(server-sdk.tsx),renderer 自己的三个客户端(侧栏、定制中心、云运行)
+// 传同一个函数。引擎源地址在连接建立时登记(本机 sidecar、就绪的 WSL);别的源(高亮主题等)不经路由表。
+const engineOrigins = new Set<string>()
+
+export function registerEngineOrigin(url: string) {
+  engineOrigins.add(new URL(url).origin)
+}
+
+export const engineFetch: EngineFetch = createEngineFetch({ isEngineOrigin: (origin) => engineOrigins.has(origin) })

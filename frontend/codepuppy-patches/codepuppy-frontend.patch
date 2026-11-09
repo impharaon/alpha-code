@@ -789,7 +789,7 @@ index b3201b3ef..00d3ec2e6 100644
      params = { id: "session-1" }
      variant = "high"
 diff --git a/packages/app/src/components/prompt-input/submit.ts b/packages/app/src/components/prompt-input/submit.ts
-index c82c3a439..e5a1726d5 100644
+index c82c3a439..8a9a05ed3 100644
 --- a/packages/app/src/components/prompt-input/submit.ts
 +++ b/packages/app/src/components/prompt-input/submit.ts
 @@ -12,6 +12,9 @@ import { useLocal, type ModelSelection } from "@/context/local"
@@ -802,6 +802,15 @@ index c82c3a439..e5a1726d5 100644
  import { useSync, type DirectorySync } from "@/context/sync"
  import { Identifier } from "@/utils/id"
  import { Worktree as WorktreeState } from "@/utils/worktree"
+@@ -21,7 +24,7 @@ import { formatServerError } from "@/utils/server-errors"
+ import { ScopedKey } from "@/utils/server-scope"
+ import { createPromptSubmissionState } from "./submission-state"
+ import { normalizeSessionInfo } from "@/utils/session"
+-import { Event } from "@opencode-ai/schema/event"
++import { Event } from "@opencode/schema/event"
+ import { blobDataUrl } from "@/utils/draft-store"
+ 
+ type PendingPrompt = {
 @@ -234,6 +237,7 @@ type PromptSubmitInput = {
  export function createPromptSubmit(input: PromptSubmitInput) {
    const navigate = useNavigate()
@@ -1569,7 +1578,7 @@ index 0408b233f..edac2aa9a 100644
    updater?: UpdaterPlatform
  
 diff --git a/packages/app/src/context/server-sdk.tsx b/packages/app/src/context/server-sdk.tsx
-index 7dd2a6e59..ca30c3729 100644
+index 7dd2a6e59..d08336fb1 100644
 --- a/packages/app/src/context/server-sdk.tsx
 +++ b/packages/app/src/context/server-sdk.tsx
 @@ -3,7 +3,7 @@ import type { Event } from "@opencode-ai/sdk/v2/client"
@@ -1581,7 +1590,27 @@ index 7dd2a6e59..ca30c3729 100644
  import { createApiForServer, createSdkForServer, type ServerApi } from "@/utils/server"
  import { useLanguage } from "./language"
  import { usePlatform } from "./platform"
-@@ -378,9 +378,34 @@ export type ServerSDK = ServerSDKBase & {
+@@ -188,16 +188,9 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
+   const platform = usePlatform()
+   const abort = new AbortController()
+ 
+-  const eventFetch = (() => {
+-    if (!platform.fetch || !server) return
+-    try {
+-      const url = new URL(server.http.url)
+-      const loopback = url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "::1"
+-      if (url.protocol === "http:" && !loopback) return platform.fetch
+-    } catch {
+-      return
+-    }
+-  })()
++  // `#1668`:事件流也恒经宿主 fetch —— Code Puppy 的引擎适配器在 Platform.fetch 里,回环地址走 webview 自带 fetch
++  // 会绕过它(适配器把 2.x 的 /api/event 投影成这里订阅的 v1 /global/event)。
++  const eventFetch = platform.fetch
+ 
+   const eventApi = createApiForServer({ server: server.http, fetch: eventFetch })
+   const eventSdk = createSdkForServer({
+@@ -378,9 +371,34 @@ export type ServerSDK = ServerSDKBase & {
  
  export function createServerSdkContext(server: ServerConnection.Any, scope: ServerScope): ServerSDK {
    const sdk = createServerSdkContextBase(server, scope)
@@ -1618,7 +1647,7 @@ index 7dd2a6e59..ca30c3729 100644
  }
  
  export const { use: useServerSDK, provider: ServerSDKProvider } = createSimpleContext({
-@@ -417,10 +442,17 @@ function createDirSdkContext(directory: string, serverSDK: ServerSDKBase) {
+@@ -417,10 +435,17 @@ function createDirSdkContext(directory: string, serverSDK: ServerSDKBase) {
  
    const emitter = createGlobalEmitter<SDKEventMap>()
  
@@ -4580,6 +4609,47 @@ index 4721611d2..f1b05dbb9 100644
  }
  
  type SessionParent = { id: string; parentID?: string }
+diff --git a/packages/app/src/utils/terminal-websocket-url.ts b/packages/app/src/utils/terminal-websocket-url.ts
+index a32b239cc..8425c0fd3 100644
+--- a/packages/app/src/utils/terminal-websocket-url.ts
++++ b/packages/app/src/utils/terminal-websocket-url.ts
+@@ -1,5 +1,3 @@
+-import { authTokenFromCredentials } from "@/utils/server"
+-
+ export function terminalWebSocketURL(input: {
+   protocol?: "v1" | "v2"
+   url: string
+@@ -12,24 +10,13 @@ export function terminalWebSocketURL(input: {
+   password?: string
+   authToken?: boolean
+ }) {
+-  const isV1 = input.protocol === "v1"
+-  const next = new URL(`${input.url}${isV1 ? `/pty/${input.id}/connect` : `/api/pty/${input.id}/connect`}`)
+-  if (isV1) {
+-    next.searchParams.set("directory", input.directory)
+-  } else {
+-    next.searchParams.set("location[directory]", input.directory)
+-  }
++  // `#1668`:Code Puppy 的界面始终走 v1 数据路径,但终端 WebSocket 不经 fetch、适配器接不到 —— 不论协议都直接连
++  // OpenCode 2 的 `/api/pty/:id/connect`,目录走 `location[directory]`,凭 pty.connectToken 发的单次票据放行
++  // (renderer 不持有口令,不再拼 auth_token)。
++  const next = new URL(`${input.url}/api/pty/${input.id}/connect`)
++  next.searchParams.set("location[directory]", input.directory)
+   next.searchParams.set("cursor", String(input.cursor))
+   next.protocol = next.protocol === "https:" ? "wss:" : "ws:"
+-  if (input.ticket) {
+-    next.searchParams.set("ticket", input.ticket)
+-    return next
+-  }
+-  if (isV1 && input.password && (!input.sameOrigin || input.authToken)) {
+-    next.searchParams.set(
+-      "auth_token",
+-      authTokenFromCredentials({ username: input.username, password: input.password }),
+-    )
+-  }
++  if (input.ticket) next.searchParams.set("ticket", input.ticket)
+   return next
+ }
 diff --git a/packages/app/vendor/opencode-ai-client-1.17.13.tgz b/packages/app/vendor/opencode-ai-client-1.17.13.tgz
 new file mode 100644
 index 0000000000000000000000000000000000000000..5939f2cb39c27da205f1f37e9971009a669b83c2

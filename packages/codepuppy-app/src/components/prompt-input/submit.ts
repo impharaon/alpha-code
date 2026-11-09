@@ -24,7 +24,7 @@ import { formatServerError } from "@/utils/server-errors"
 import { ScopedKey } from "@/utils/server-scope"
 import { createPromptSubmissionState } from "./submission-state"
 import { normalizeSessionInfo } from "@/utils/session"
-import { Event } from "@opencode-ai/schema/event"
+import { Event } from "@opencode/schema/event"
 import { blobDataUrl } from "@/utils/draft-store"
 
 type PendingPrompt = {

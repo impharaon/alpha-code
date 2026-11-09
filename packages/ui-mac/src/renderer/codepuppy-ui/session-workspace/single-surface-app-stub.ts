@@ -15,7 +15,7 @@
 // #668:dock 的审批读面来自 `@opencode-ai/app` 的双通道适配器。这里**按相对路径再导出真身**
 // (而不是重写一个替身)—— 否则 harness 测的就不是生产适配逻辑了。alias 只替换 barrel 的
 // 那些 context hook,适配器本体照旧被打进 bundle。
-export { createPermissionChannelSource } from "../../../../../app/src/context/permission-v1-adapter"
+export { createPermissionChannelSource } from "../../../../../codepuppy-app/src/context/permission-v1-adapter"
 
 export type RecordedClientCall = { path: string; args: unknown[] }
 

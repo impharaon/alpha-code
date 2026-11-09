@@ -121,7 +121,7 @@ const require = __cjs_mod__.createRequire(import.meta.url);
       sentry,
     ],
     resolve: { alias: [UPSTREAM_LOGO_ALIAS] },
-    publicDir: "../../../app/public",
+    publicDir: "../../../codepuppy-app/public",
     root: "src/renderer",
     build: {
       sourcemap: true,

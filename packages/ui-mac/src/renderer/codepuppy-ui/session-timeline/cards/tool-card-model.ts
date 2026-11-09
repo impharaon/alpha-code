@@ -11,8 +11,10 @@
 // 命中规则的卡,字段先走类别 allowlist 与 typed
 // normalization(I2 防御读取),再过共享 redactor(tool-redactor);redactor
 // 任一步失败即隐藏整字段(AC5),不回退 raw string。
-import type { ToolAuthority, ToolIdentity, ToolLocation, ToolPart, ToolState } from "@opencode-ai/sdk/v2/client"
-import { isNetFailureLayer, type NetFailureLayer } from "@opencode-ai/schema/codepuppy-net-failure"
+import type { ToolPart, ToolState } from "@opencode-ai/sdk/v2/client"
+// seams I6:身份类型取自契约模块本身,不再借 SDK 生成类型。
+import type { ToolAuthority, ToolIdentity, ToolLocation } from "@opencode/schema/tool-identity"
+import { isNetFailureLayer, type NetFailureLayer } from "@opencode/schema/codepuppy-net-failure"
 import { DIFF_PATCH_MAX_CHARS } from "./tool-diff"
 import { redactPath, redactText, redactUrl, type RedactResult } from "./tool-redactor"
 
@@ -173,6 +175,11 @@ const HOST_BUILTIN_RULES = new Map<string, ToolCardKind>([
   ["apply_patch", "apply_patch"],
   ["skill", "skill"],
   ["task", "task"],
+  // `#1668` K5:OpenCode 2 的内建工具改了名(bash → shell、task → subagent、apply_patch → patch;
+  // v2:packages/core/src/database/v1-migration.bun.ts:996)。新旧名同一张卡 —— 旧会话里的 `bash` 照旧显示。
+  ["shell", "bash"],
+  ["subagent", "task"],
+  ["patch", "apply_patch"],
   // #1475 AC6:答完的内置提问。只有引擎铸造的 builtin identity 才命中 —— 第三方起名
   // question 仍是 metadata-only 降级(规则表的 key 是完整 identity,不是别名)。
   ["question", "question"],

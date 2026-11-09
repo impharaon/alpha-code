@@ -6,7 +6,7 @@
 // surface 全部顶替(REQ-085/086/125),于是全应用无人注册,按钮点了什么都不发生。
 //
 // 上游那个面板组件复用不了:`DialogHomeCommandPaletteV2` 只在
-// `packages/app/src/components/dialog-command-palette-v2.tsx` 内部导出,`@opencode-ai/app` 的
+// `packages/codepuppy-app/src/components/dialog-command-palette-v2.tsx` 内部导出,`@opencode-ai/app` 的
 // `exports` 无该子路径、`src/index.ts` 也不导出 —— 没有合法导入路径,改上游又触 north-star。
 // 所以 alpha 自建最小面板。
 //
@@ -16,7 +16,7 @@
 //  2. **跳转必须带结果来源的 server 身份**:用 server 限定的 canonical 路由
 //     `hrefFor.session(serverKey, id)`(`/server/:serverKey/session/:id`),**不用** legacy
 //     `sessionHref(dir, id)` —— 后者在无既有 tab 映射时回退到当前 active server
-//     (`packages/app/src/app.tsx:800-818`),当前 server 是 WSL/remote 时会把本地 sidecar 的
+//     (`packages/codepuppy-app/src/app.tsx:800-818`),当前 server 是 WSL/remote 时会把本地 sidecar 的
 //     搜索结果导向错误的服务器。
 //
 // 承诺面仅「按标题搜会话并跳转」:不做文件搜索、不做命令执行、不做跨服务器检索(上游三处

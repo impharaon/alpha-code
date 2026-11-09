@@ -24,7 +24,7 @@ import { pathToFileURL } from "node:url"
 import { build } from "vite"
 import type * as RuntimeModule from "./permission-dual-channel-test-runtime"
 
-const appSrc = resolve(import.meta.dir, "../../../../app/src")
+const appSrc = resolve(import.meta.dir, "../../../../codepuppy-app/src")
 const stub = join(import.meta.dir, "permission-dual-channel-stub.ts")
 const runtimeDirectory = mkdtempSync(join(tmpdir(), "codepuppy-permission-dual-channel-"))
 

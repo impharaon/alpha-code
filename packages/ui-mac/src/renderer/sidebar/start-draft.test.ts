@@ -25,7 +25,7 @@ import { dict as zh } from "../i18n/zh"
 
 type TestRuntime = typeof Runtime & { render: typeof render }
 
-const appSrc = join(import.meta.dir, "../../../../app/src")
+const appSrc = join(import.meta.dir, "../../../../codepuppy-app/src")
 
 // 与 Electron renderer 同一个 Solid vite 插件编译生产组件:bun 原生 TSX 变换是 React 形状的,
 // 会静默丢掉 Solid 的 ref 与响应式 DOM 表达式。

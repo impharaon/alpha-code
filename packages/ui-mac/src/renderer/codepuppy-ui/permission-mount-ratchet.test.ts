@@ -4,21 +4,21 @@ import { join, relative, resolve } from "node:path"
 import { frontendSurfaceById } from "../../shared/frontend-surface-manifest"
 
 const root = resolve(import.meta.dir, "../../../../..")
-const legacyDock = resolve(root, "packages/app/src/pages/session/composer/session-permission-dock.tsx")
+const legacyDock = resolve(root, "packages/codepuppy-app/src/pages/session/composer/session-permission-dock.tsx")
 const composerRegion = await Bun.file(
-  resolve(root, "packages/app/src/pages/session/composer/session-composer-region.tsx"),
+  resolve(root, "packages/codepuppy-app/src/pages/session/composer/session-composer-region.tsx"),
 ).text()
 const composerState = await Bun.file(
-  resolve(root, "packages/app/src/pages/session/composer/session-composer-state.ts"),
+  resolve(root, "packages/codepuppy-app/src/pages/session/composer/session-composer-state.ts"),
 ).text()
 const composerReskin = await Bun.file(
   resolve(root, "packages/ui-mac/src/renderer/codepuppy-ui/composer-reskin.css"),
 ).text()
 const renderer = await Bun.file(resolve(root, "packages/ui-mac/src/renderer/index.tsx")).text()
-const app = await Bun.file(resolve(root, "packages/app/src/app.tsx")).text()
+const app = await Bun.file(resolve(root, "packages/codepuppy-app/src/app.tsx")).text()
 // #668:PermissionSurfaceClient 工厂从 app.tsx 抽成模块(闸门要挂载生产接线点,见下方白名单
 // 注释)。挂载唯一性的判据因此在两份文件上一起数,不是换个地方就不数了。
-const permissionSurface = await Bun.file(resolve(root, "packages/app/src/context/permission-surface.tsx")).text()
+const permissionSurface = await Bun.file(resolve(root, "packages/codepuppy-app/src/context/permission-surface.tsx")).text()
 const watcher = await Bun.file(
   resolve(root, "packages/ui-mac/src/renderer/codepuppy-ui/permission-watcher.tsx"),
 ).text()
@@ -173,7 +173,7 @@ describe("审批决定提交入口:单一引用面白名单棘轮(#619 R3 Blocke
    *  ── #668 显式更新(owner 2026-07-28 裁决半场 A;这条棘轮是刻意设的,悄悄绕过它是本仓
    *     最常见的失败形态,所以下面写清"为什么这次放行是对的")──────────────────────
    *
-   *  变更:`packages/app/src/app.tsx` 退场,换成两个文件;新增一个 v1 提交入口。
+   *  变更:`packages/codepuppy-app/src/app.tsx` 退场,换成两个文件;新增一个 v1 提交入口。
    *
    *  1) `context/permission-surface.tsx` 顶替 app.tsx 持有 `permission.reply`。
    *     这**不是**新增入口,是同一个入口原样搬家:app.tsx 里那段 PermissionSurfaceClient
@@ -220,11 +220,11 @@ describe("审批决定提交入口:单一引用面白名单棘轮(#619 R3 Blocke
     // #1652 AC2 explicitly requires connector disable to reject its pending approvals via the existing API.
     // This entry only sends reject; the real Hub test checks the exact reply and connector identity.
     { file: "packages/ui-mac/src/renderer/extensions/use-extensions.ts", token: "permission.reply" },
-    { file: "packages/app/src/context/permission-surface.tsx", token: "permission.reply" },
-    { file: "packages/app/src/context/permission-v1-adapter.ts", token: "permission.reply" },
-    { file: "packages/app/src/context/permission.tsx", token: "permission.reply" },
-    { file: "packages/app/src/utils/server-compat.ts", token: "permission.reply" },
-    { file: "packages/app/src/utils/server-compat.ts", token: "permission.respond" },
+    { file: "packages/codepuppy-app/src/context/permission-surface.tsx", token: "permission.reply" },
+    { file: "packages/codepuppy-app/src/context/permission-v1-adapter.ts", token: "permission.reply" },
+    { file: "packages/codepuppy-app/src/context/permission.tsx", token: "permission.reply" },
+    { file: "packages/codepuppy-app/src/utils/server-compat.ts", token: "permission.reply" },
+    { file: "packages/codepuppy-app/src/utils/server-compat.ts", token: "permission.respond" },
   ] as const
 
   const sanctionedEntry = (file: string, token: string, source: string) =>
@@ -234,7 +234,7 @@ describe("审批决定提交入口:单一引用面白名单棘轮(#619 R3 Blocke
   test("permission 决定提交入口(reply/respond,含方括号等义形态)只出现在白名单接线点", () => {
     const offenders: Array<{ file: string; token: string }> = []
     const seen = new Set<string>()
-    for (const scanRoot of [resolve(root, "packages/app/src"), resolve(root, "packages/ui-mac/src")]) {
+    for (const scanRoot of [resolve(root, "packages/codepuppy-app/src"), resolve(root, "packages/ui-mac/src")]) {
       for (const filePath of walkProduction(scanRoot)) {
         const normalized = normalize(readFileSync(filePath, "utf8"))
         for (const token of DECISION_ENTRY_TOKENS) {

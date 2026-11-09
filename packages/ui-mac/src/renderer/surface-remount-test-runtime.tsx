@@ -434,11 +434,7 @@ export function CodePuppySurfaceShell() {
           displayName: "Local Server",
           type: "sidecar",
           variant: "base",
-          http: {
-            url: data.url,
-            username: data.username ?? undefined,
-            password: data.password ?? undefined,
-          },
+          http: { url: data.url },
         })
       }
       list.push(...readyWslConnections(wslServers.data))
@@ -447,7 +443,7 @@ export function CodePuppySurfaceShell() {
     const sidebarServer = createMemo(() => {
       const data = initializationData(sidecar)
       if (!data) return undefined
-      return { baseUrl: data.url, username: data.username ?? undefined, password: data.password ?? undefined }
+      return { baseUrl: data.url }
     })
     const effectiveDefaultServer = createMemo(() =>
       ServerConnection.Key.make(availableStartupServer(defaultServer.latest, wslServers.data)),

@@ -28,10 +28,14 @@ import { markStartupTimeline } from "../startup-timeline"
 import { nextEngineRetryDelay } from "../codepuppy-ui/model-picker-logic"
 import { tierAgent, v1CommandModelFields, v1PromptModelFields, type PermMode } from "../codepuppy-ui/composer-state"
 
+/**
+ * I8:renderer 只拿到引擎源地址;认证头由 main 对引擎源补上(`#1668`)。`fetch` 是壳层传下来的引擎适配器
+ * (renderer/index.tsx 的 engineFetch,v1 请求 → OpenCode 2),由壳注入而不是在这里 import —— 侧栏、定制中心、
+ * 云运行的组件测试运行时不必把适配器连同冻结 app 一起打包。
+ */
 export interface ServerInfo {
   baseUrl: string
-  username?: string
-  password?: string
+  fetch?: typeof fetch
 }
 
 export interface CodePuppySession {
@@ -114,12 +118,6 @@ export interface CodePuppyProjectsApi {
 }
 
 type Client = ReturnType<typeof createOpencodeClient>
-
-function authHeaders(info: ServerInfo): Record<string, string> | undefined {
-  if (!info.username && !info.password) return undefined
-  const token = btoa(`${info.username ?? ""}:${info.password ?? ""}`)
-  return { Authorization: `Basic ${token}` }
-}
 
 function toSession(raw: any): CodePuppySession | undefined {
   if (!raw || typeof raw.id !== "string") return undefined
@@ -671,10 +669,7 @@ export function useCodePuppyProjects(
     abortRef.abort()
     abortRef = new AbortController()
     connectedSidecarGeneration = sidecarGeneration
-    client = createOpencodeClient({
-      baseUrl: info.baseUrl,
-      headers: authHeaders(info),
-    })
+    client = createOpencodeClient({ baseUrl: info.baseUrl, ...(info.fetch ? { fetch: info.fetch } : {}) })
     markStartupTimeline("renderer.projects.connect", { reason, generation: sidecarGeneration })
 
     void loadProjects()
@@ -692,10 +687,7 @@ export function useCodePuppyProjects(
     probeOverrides?.probe ??
     (async (info: ServerInfo): Promise<boolean> => {
       try {
-        const res = await fetch(new URL("/global/health", info.baseUrl), {
-          headers: authHeaders(info),
-          signal: AbortSignal.timeout(2_000),
-        })
+        const res = await (info.fetch ?? fetch)(new URL("/global/health", info.baseUrl), { signal: AbortSignal.timeout(2_000) })
         return res.ok
       } catch {
         return false

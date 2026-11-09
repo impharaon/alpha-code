@@ -30,7 +30,7 @@ import type * as Runtime from "./surface-remount-test-runtime"
 
 type TestRuntime = typeof Runtime & { render: typeof render }
 
-const appSrc = join(import.meta.dir, "../../../app/src")
+const appSrc = join(import.meta.dir, "../../../codepuppy-app/src")
 
 // 与 Electron renderer 同一个 Solid vite 插件编译生产组件(bun 原生 TSX 变换是 React 形状的,
 // 会静默丢掉 Solid 的响应式 DOM 表达式);alias 是消歧不是替身(见 start-draft.test.ts)。

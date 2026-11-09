@@ -309,7 +309,7 @@ const { composerModel, setComposerModel, setComposerAgent, resetComposerModelPro
 const { createModelContract } = await import("../src/renderer/codepuppy-ui/model-contract")
 const { CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID } = await import("../src/shared/codepuppy-config")
 
-const serverInfo: ServerInfo = { baseUrl: "http://127.0.0.1:19099", username: "u", password: "p" }
+const serverInfo: ServerInfo = { baseUrl: "http://127.0.0.1:19099" }
 const tick = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms))
 async function waitFor(assertion: () => void, timeoutMs = 3_000) {
   const deadline = Date.now() + timeoutMs

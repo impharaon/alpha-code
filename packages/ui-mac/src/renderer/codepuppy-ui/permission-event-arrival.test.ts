@@ -21,7 +21,7 @@ import { pathToFileURL } from "node:url"
 import { build, type PluginOption } from "vite"
 import type * as RuntimeModule from "./permission-event-arrival-test-runtime"
 
-const appSrc = resolve(import.meta.dir, "../../../../app/src")
+const appSrc = resolve(import.meta.dir, "../../../../codepuppy-app/src")
 const stub = join(import.meta.dir, "permission-event-arrival-stub.ts")
 const runtimeDirectory = mkdtempSync(join(tmpdir(), "codepuppy-permission-event-arrival-"))
 

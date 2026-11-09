@@ -4,7 +4,7 @@ import { COMPOSER_PLACEHOLDER, COMPOSER_PLACEHOLDER_UPSTREAM_LITERAL } from "../
 
 // Build-time brand substitution for opencode's shared UI strings.
 //
-// The app i18n dictionaries live in upstream @opencode-ai/app (packages/app/src/i18n/*.ts).
+// The app i18n dictionaries live in upstream @opencode-ai/app (packages/codepuppy-app/src/i18n/*.ts).
 // Per the only-add discipline (.claude/rules/DECISIONS.md ADR-005/007) we must NOT edit them
 // on disk — that would conflict on every upstream sync. Instead we rewrite the string literals
 // during the renderer bundle: the git-tracked source stays byte-identical to upstream (so
@@ -31,11 +31,11 @@ const REPLACEMENTS: Record<string, ReadonlyArray<readonly [string, string]>> = {
   // en/zh/zht values to the SAME text the alpha home composer uses — ONE constant serves both surfaces
   // (src/shared/composer-copy.ts, REQ-038 目标⑥). Zero disk edit (ADR-005/007). The key is prefixed
   // with `packages/` so it cannot match a same-named file under another package.
-  "packages/ui/src/i18n/en.ts": [[COMPOSER_PLACEHOLDER_UPSTREAM_LITERAL, JSON.stringify(COMPOSER_PLACEHOLDER)]],
-  "packages/ui/src/i18n/zh.ts": [
+  "packages/codepuppy-ui/src/i18n/en.ts": [[COMPOSER_PLACEHOLDER_UPSTREAM_LITERAL, JSON.stringify(COMPOSER_PLACEHOLDER)]],
+  "packages/codepuppy-ui/src/i18n/zh.ts": [
     ['"随便问点什么， {{slash}} 可查看命令， {{at}} 可添加上下文..."', JSON.stringify(COMPOSER_PLACEHOLDER)],
   ],
-  "packages/ui/src/i18n/zht.ts": [
+  "packages/codepuppy-ui/src/i18n/zht.ts": [
     ['"想問什麼都可以， {{slash}} 可使用命令， {{at}} 可加入上下文..."', JSON.stringify(COMPOSER_PLACEHOLDER)],
   ],
   // Crash screen (C28): rewrite the OpenCode-branded feedback link + Discord icon in the

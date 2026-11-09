@@ -40,7 +40,7 @@ await build({
   configFile: false,
   logLevel: "silent",
   plugins: [appPlugin.at(-1)!],
-  resolve: { alias: { "@": join(import.meta.dir, "../../../../app/src") } },
+  resolve: { alias: { "@": join(import.meta.dir, "../../../../codepuppy-app/src") } },
   worker: { format: "es" },
   build: {
     emptyOutDir: true,

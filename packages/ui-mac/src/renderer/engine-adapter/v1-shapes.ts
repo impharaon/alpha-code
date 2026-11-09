@@ -162,10 +162,21 @@ export function toV1Messages(sessionID: string, source: readonly SessionMessageI
     const renumbered = parts.map((part, index) => {
       const restored = restoreStagedAttachment(part)
       const position = keys ? keys.indexOf(semanticKey(info.id, part)) : -1
-      return { ...restored, id: partID(info.id, position >= 0 ? position : index) } as Part
+      return { ...restored, ...displayOf(restored), id: partID(info.id, position >= 0 ? position : index) } as Part
     })
     return { info, parts: renumbered.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) }
   })
+}
+
+/**
+ * I7b(ADR-041):工具卡的来源快照。L4 把它写进 2.x 工具状态的 `metadata.codepuppyDisplay`(running / completed /
+ * error 三态都带,streaming 没有);v1 时间线读 `part.display`(tool-card-model.ts 的 displaySnapshotOf)。原样搬过去,
+ * 缺席就不带(时间线按「来源未知」降级,与今天同一条回落)。
+ */
+function displayOf(part: Part) {
+  if (part.type !== "tool") return {}
+  const display = (part.state as { metadata?: { codepuppyDisplay?: unknown } }).metadata?.codepuppyDisplay
+  return display === undefined ? {} : { display }
 }
 
 function semanticKey(messageID: string, part: Part) {

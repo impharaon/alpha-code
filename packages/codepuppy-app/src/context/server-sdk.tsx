@@ -188,16 +188,9 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
   const platform = usePlatform()
   const abort = new AbortController()
 
-  const eventFetch = (() => {
-    if (!platform.fetch || !server) return
-    try {
-      const url = new URL(server.http.url)
-      const loopback = url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "::1"
-      if (url.protocol === "http:" && !loopback) return platform.fetch
-    } catch {
-      return
-    }
-  })()
+  // `#1668`:事件流也恒经宿主 fetch —— Code Puppy 的引擎适配器在 Platform.fetch 里,回环地址走 webview 自带 fetch
+  // 会绕过它(适配器把 2.x 的 /api/event 投影成这里订阅的 v1 /global/event)。
+  const eventFetch = platform.fetch
 
   const eventApi = createApiForServer({ server: server.http, fetch: eventFetch })
   const eventSdk = createSdkForServer({

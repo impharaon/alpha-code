@@ -15,7 +15,7 @@ import { CodePuppySettingsTools } from "./settings-tools"
 import { t } from "../i18n"
 import { SHELL_KEYBINDS } from "../sidebar/shell-keybinds"
 // 只读取上游命令层的默认面板键位与键帽格式化(与真正解析按键的是同一份代码),不改上游。
-import { DEFAULT_PALETTE_KEYBIND, formatKeybindParts } from "../../../../app/src/context/command"
+import { DEFAULT_PALETTE_KEYBIND, formatKeybindParts } from "../../../../codepuppy-app/src/context/command"
 import "./settings.css"
 
 type SettingsSection = "general" | "shortcuts" | "storage" | "tools"

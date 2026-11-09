@@ -459,12 +459,6 @@ export interface ExtensionsApi {
   enableCloud(entry: CatalogEntry, authorization?: AuthorizationConfirmationWire, hubRequestId?: string): Promise<ActionResult>
 }
 
-function authHeaders(info: ServerInfo): Record<string, string> | undefined {
-  if (!info.username && !info.password) return undefined
-  const token = btoa(`${info.username ?? ""}:${info.password ?? ""}`)
-  return { Authorization: `Basic ${token}` }
-}
-
 // MCP status is a discriminated union (connected/disabled/failed/needs_auth/…). We don't hard-code
 // the exact discriminant field name — derive a tag defensively so a schema tweak can't crash us.
 function statusTag(info: unknown): string {
@@ -1065,7 +1059,7 @@ export function useExtensions(
     activated = true
     const gen = ++generation
     abortRef = new AbortController()
-    client = createOpencodeClient({ baseUrl: info.baseUrl, directory: projectDir?.(), headers: authHeaders(info) })
+    client = createOpencodeClient({ baseUrl: info.baseUrl, directory: projectDir?.(), ...(info.fetch ? { fetch: info.fetch } : {}) })
     setStore("mcp", {})
     void loadStatus()
     void loadInstalls()

@@ -3,7 +3,7 @@ import { createDeepLinkPublisher, type DeepLinkBufferTarget } from "./deep-link-
 import { DEEP_LINK_EVENT, decodeDeepLink, type DeepLinkDelivery } from "../shared/route-manifest"
 // The receiving half lives in the upstream renderer. Importing the real drain (instead of
 // restating it) is what makes this an end-to-end exactly-once proof across the package boundary.
-import { drainPendingDeepLinks } from "../../../app/src/pages/layout/deep-links"
+import { drainPendingDeepLinks } from "../../../codepuppy-app/src/pages/layout/deep-links"
 
 const delivery = (url: string): DeepLinkDelivery => {
   const decoded = decodeDeepLink(url)

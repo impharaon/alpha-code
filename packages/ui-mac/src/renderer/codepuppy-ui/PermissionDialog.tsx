@@ -9,7 +9,7 @@ import { createStore } from "solid-js/store"
 import { Portal } from "solid-js/web"
 // 只取这一个纯函数模块(零运行时依赖),不经 `@opencode-ai/app` barrel:barrel 会把整个 app 拖进
 // 审批卡的测试运行时(实测 vite 解析 `@/index.css` 失败)。与 barrel 导出的是同一个文件、同一份实现。
-import { isPermissionV1Fingerprint } from "../../../../app/src/context/permission-v1-adapter"
+import { isPermissionV1Fingerprint } from "../../../../codepuppy-app/src/context/permission-v1-adapter"
 import type { ToolPolicyApi } from "../../shared/tool-policy-wire"
 import { approvalToolOf, PROVENANCE_SOURCE_KEYS } from "./session-timeline/cards/tool-card-model"
 import { Button } from "./Button"

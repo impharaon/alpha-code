@@ -219,9 +219,9 @@ export const DOWNGRADED_ANCHORS: Record<string, SourceTextEntry> = {
  */
 export const KEPT_SOURCE_TEXT_READS: Record<string, SourceTextEntry> = {
   "packages/ui-mac/src/main/config-injection-throat.test.ts": {
-    why: "REQ-157 #1305 ui-mac 整份 config 咽喉的 drift 锁(#1299 的 agent 咽喉并入后同一份):判官把 cfg.agent.<name>.mode / cfg.agent.<name>.permission.** / 顶层 cfg.permission.** 槽里的值按引擎的声明式字面量(packages/core/src/v1/config/permission.ts 的 Literals([\"ask\", \"allow\", \"deny\"])、packages/opencode/src/agent/agent.ts 的 Literals([\"subagent\", \"primary\", \"all\"]))判成动词,其余当成字点名。主语就是那两段字面量文本本身 —— 引擎哪天加一个动词而这里没跟,生产写出的合法新动词会被判官当成未登记的字(fail-closed,红而不是假绿),这两行读取让「没跟上」在引擎源码改动的同一次 diff 里就红。两个引擎模块在 bun 侧 import 会把 effect Schema 拉进来,值断言没有更便宜的入口。路径字面量必须与读调用同一行(#1304 踩过:放进 const 让本层谓词零命中)。守不住:引擎在别处又定义一套同义动词而这两处字面量不动 —— 那时判官仍按旧集合判,新动词照样被点名,仍是红。",
+    why: "REQ-157 #1305 ui-mac 整份 config 咽喉的 drift 锁(#1299 的 agent 咽喉并入后同一份):判官把 agents.<name>.mode / agents.<name>.permissions[i].effect / 顶层 permissions[i].effect / policies[i].effect 槽里的值按引擎的声明式字面量(`#1667` 起读 OpenCode 2:packages/schema/src/permission.ts 的 Literals([\"allow\", \"deny\", \"ask\"])、packages/schema/src/config/agent.ts 的 Literals([\"subagent\", \"primary\", \"all\"])、packages/schema/src/config/policy.ts 的 Literals([\"allow\", \"deny\"]))判成动词,其余当成字点名。主语就是那三段字面量文本本身 —— 引擎哪天加一个动词而这里没跟,生产写出的合法新动词会被判官当成未登记的字(fail-closed,红而不是假绿),这三行读取让「没跟上」在引擎源码改动的同一次 diff 里就红。路径字面量必须与读调用同一行(#1304 踩过:放进 const 让本层谓词零命中)。守不住:引擎在别处又定义一套同义动词而这三处字面量不动 —— 那时判官仍按旧集合判,新动词照样被点名,仍是红。",
     evidence: "#1305",
-    lines: 2,
+    lines: 3,
   },
   "packages/ui-mac/src/main/boot-dangling-onboarding-wiring.test.ts": {
     why: "主语是负全称加唯一性:index.ts 每个 `if (!TEST_ONBOARDING)` 块不得包含 boot dangling sweep;REQ-059/065/104 与 ecosystem gate 必须仍在该守卫内;runBootDanglingSweep 恰好一次且排在首个 spawnLocalServer 之前。index.ts 结构上进不了 bun,这份布局就是接线契约。删掉 sweep 调用会由 boot-dangling-sweep.test.ts 的可执行闸变红,本条守的是「调用点不在 skip 里」。第 2 处(#1036,REQ-053 A2)锚 bootEnforcementGap 分支里 TEST_ONBOARDING 早退(app.exit(1))先于 dialog.showErrorBox 的下标先后 —— 按本分类法它是位置锚:把早退包进恒假条件、或把 app.exit(1) 换成只写日志,被比的文本仍在,断言照绿;A2 的行为真相在打包 VERIFY(#1034)。文件主判据仍是上面的负全称+唯一性文本闸,照 websearch-copies 先例如实登记混合、不整体降级(整体降级会把 #1031 那道真文本闸一并逐出 gate-files.tsv 的删除保护)。",

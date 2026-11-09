@@ -11,20 +11,20 @@
 // 四条退出条件在此逐条有闸(票面 `ac#1195`):
 //   ① header = `Bearer {file:…CODEPUPPY_MCP_TOKEN}` + `oauth:false`,token 字面量不进
 //      `OPENCODE_CONFIG_CONTENT`(I3);
-//   ② 字段/文件缺席 ⇒ `enabled:false` 且**无任何回退**(不回 `CODEPUPPY_CLOUD_TOKEN` header、
+//   ② 字段/文件缺席 ⇒ `disabled:true` 且**无任何回退**(不回 `CODEPUPPY_CLOUD_TOKEN` header、
 //      不回交互式 OAuth,I6);
 //   ③ 第三方 MCP 定义注入路径回归逐项不变(AC3 静态半边)—— 错误实现(把第三方也改走
 //      header 通道 / 动第三方的 oauth 对象)在「第三方条目逐字节不变」上当场红;
 //   ④ 仅 cloud 定义携带该文件引用(I4)。
+// `#1667`:定义是 OpenCode 2 的 `Mcp.RemoteConfig` 形状(v1 的 `enabled:false` → `disabled:true`,启用态不写),
+// 裁判换成上游 2.x 的 schema;注入产物从结果里读(不再经 OPENCODE_CONFIG_CONTENT 环境变量)。
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { Schema } from "effect"
-// 相对路径跨包 import:ui-mac 没有 `@opencode-ai/core` 的解析入口(实测 Cannot find module),
-// 而这个模块是"引擎会怎么读"的**唯一**真源。测试文件不进 ui-mac 的 typecheck,
-// 也不会让生产代码多出一条对上游的依赖。
-import { Remote as EngineRemoteSchema } from "../../../core/src/v1/config/mcp"
+import { Mcp } from "@opencode/schema/mcp"
+const EngineRemoteSchema = Mcp.RemoteConfig
 import { materializeCloudMcpConfig } from "./cloud-sidecar-config"
 import { injectCodePuppyConfig } from "./codepuppy-config-injection"
 import { CLOUD_MCP_ARM_ENV, CLOUD_MCP_DEF_ENV, WITHHELD_CLOUD_MCP } from "./cloud-web-search"
@@ -45,7 +45,6 @@ describe("`#1195` 云 MCP header 通道的纯工厂形状", () => {
     expect(cfg).toEqual({
       type: "remote",
       url: CLOUD_URL,
-      enabled: true,
       headers: { Authorization: "Bearer {file:/ud/codepuppy-secrets/CODEPUPPY_MCP_TOKEN}" },
       oauth: false,
     })
@@ -62,21 +61,21 @@ describe("`#1195` 云 MCP header 通道的纯工厂形状", () => {
     )
     expect(decoded.type).toBe("remote")
     expect(decoded.url).toBe(CLOUD_URL)
-    expect(decoded.enabled).toBe(true)
+    expect(decoded.disabled).toBeUndefined()
     expect(decoded.headers).toEqual({ Authorization: "Bearer {file:/ud/codepuppy-secrets/CODEPUPPY_MCP_TOKEN}" })
     expect(decoded.oauth).toBe(false)
   })
 
-  test("缺席(ref=undefined):enabled:false、零凭证通道、零 {file:} 引用(引擎对缺席文件的引用会 fail-loud 掉整个 config 装载)", () => {
+  test("缺席(ref=undefined):disabled:true、零凭证通道、零 {file:} 引用(引擎对缺席文件的引用会 fail-loud 掉整个 config 装载)", () => {
     const cfg = materializeCloudMcpConfig(CLOUD_URL, undefined)
-    expect(cfg).toEqual({ type: "remote", url: CLOUD_URL, enabled: false, oauth: false })
+    expect(cfg).toEqual({ type: "remote", url: CLOUD_URL, disabled: true, oauth: false })
     const serialized = JSON.stringify(cfg)
     expect(serialized).not.toContain("Authorization")
     expect(serialized).not.toContain("Bearer")
     expect(serialized).not.toContain("{file:")
     expect(serialized).not.toContain("clientId")
-    // enabled:false 的 Remote 是 schema 合法条目(boot 时 MCP.create 直接 DISABLED_RESULT)。
-    expect(Schema.decodeUnknownSync(EngineRemoteSchema)(cfg).enabled).toBe(false)
+    // disabled:true 的 Remote 是 schema 合法条目(MCP 服务对它直接记 disabled,不连)。
+    expect(Schema.decodeUnknownSync(EngineRemoteSchema)(cfg).disabled).toBe(true)
   })
 })
 
@@ -114,18 +113,24 @@ describe("`#1195` 生产注入面", () => {
     fs.rmSync(tmp, { recursive: true, force: true })
   })
 
+  let lastContent = ""
+  const inject = (extPluginPath?: string) => {
+    const result = injectCodePuppyConfig(userData, extPluginPath, "stable")
+    lastContent = result.config.content
+    return result
+  }
   const injectedMcp = () => {
-    const config = JSON.parse(process.env.OPENCODE_CONFIG_CONTENT!) as { mcp?: Record<string, unknown> }
-    return config.mcp ?? {}
+    const config = JSON.parse(lastContent) as { mcp?: { servers?: Record<string, unknown> } }
+    return config.mcp?.servers ?? {}
   }
 
   test("①/④ 注入的 cloud 定义 = Bearer {file:…CODEPUPPY_MCP_TOKEN} + oauth:false;token 字面量不进 config;引用只在 cloud 一处", () => {
-    expect(injectCodePuppyConfig(userData, undefined, "stable")).toEqual({ ok: true })
+    expect(inject().ok).toBe(true)
 
     const cloud = injectedMcp().codepuppy as Record<string, unknown>
     const decoded = Schema.decodeUnknownSync(EngineRemoteSchema)(cloud)
     expect(decoded.url).toBe(CLOUD_URL)
-    expect(decoded.enabled).toBe(true)
+    expect(decoded.disabled).toBeUndefined()
     expect(decoded.oauth).toBe(false)
     // 引用逐字面量重建(独立于生产的 secretFileRef 拼接也一致 —— 双轴)。
     const expectedRef = `{file:${path.join(userData, "codepuppy-secrets", "CODEPUPPY_MCP_TOKEN")}}`
@@ -133,7 +138,7 @@ describe("`#1195` 生产注入面", () => {
     expect(decoded.headers).toEqual({ Authorization: `Bearer ${expectedRef}` })
 
     // I3:整份 config 文本里没有 token 值、没有 OAuth 对象残影。
-    const content = process.env.OPENCODE_CONFIG_CONTENT!
+    const content = lastContent
     expect(content).not.toContain(MCP_SECRET)
     expect(content).not.toContain(CLOUD_SECRET)
     expect(content).not.toContain("clientId")
@@ -147,45 +152,39 @@ describe("`#1195` 生产注入面", () => {
     expect(process.env[CLOUD_MCP_DEF_ENV]).not.toContain(MCP_SECRET)
   })
 
-  test("② 文件缺席 ⇒ enabled:false 且无任何回退(CODEPUPPY_CLOUD_TOKEN 在场也不回退;不回交互式 OAuth)", () => {
+  test("② 文件缺席 ⇒ disabled:true 且无任何回退(CODEPUPPY_CLOUD_TOKEN 在场也不回退;不回交互式 OAuth)", () => {
     fs.rmSync(secretFilePath(userData, "CODEPUPPY_MCP_TOKEN"))
-    expect(injectCodePuppyConfig(userData, undefined, "stable")).toEqual({ ok: true })
+    expect(inject().ok).toBe(true)
 
     // toEqual 排他:没有 headers、没有 oauth 对象、没有 {file:} 引用 —— 一个回退通道都不存在。
-    expect(injectedMcp().codepuppy).toEqual({ type: "remote", url: CLOUD_URL, enabled: false, oauth: false })
+    expect(injectedMcp().codepuppy).toEqual({ type: "remote", url: CLOUD_URL, disabled: true, oauth: false })
     // config 文本里连引用名都不出现(引擎对缺席文件的 {file:} 引用 fail-loud 掉整个装载)。
-    expect(process.env.OPENCODE_CONFIG_CONTENT!).not.toContain("CODEPUPPY_MCP_TOKEN")
+    expect(lastContent).not.toContain("CODEPUPPY_MCP_TOKEN")
     // 缺凭证 ⇒ 不代付 ⇒ 本地 keyless websearch 不被 deny(主权判据同轴,ADR-009 B1)。
-    const config = JSON.parse(process.env.OPENCODE_CONFIG_CONTENT!) as { permission?: Record<string, unknown> }
-    expect(config.permission?.websearch).toBeUndefined()
+    const config = JSON.parse(lastContent) as { permissions?: Array<{ action: string; effect: string }> }
+    expect(config.permissions?.some((rule) => rule.action === "websearch" && rule.effect === "deny") ?? false).toBe(false)
     // DEF 身份通道仍是真定义(带引用):ext 端 installCloudMcp 读不到文件会响亮不装(fail-closed)。
     expect(process.env[CLOUD_MCP_DEF_ENV]).toContain("CODEPUPPY_MCP_TOKEN")
   })
 
   test("反向:旧轴文件 CODEPUPPY_CLOUD_TOKEN 缺席不再影响云 MCP(判据已整体换轴)", () => {
     fs.rmSync(secretFilePath(userData, "CODEPUPPY_CLOUD_TOKEN"))
-    expect(injectCodePuppyConfig(userData, undefined, "stable")).toEqual({ ok: true })
-    expect((injectedMcp().codepuppy as Record<string, unknown>).enabled).toBe(true)
+    expect(inject().ok).toBe(true)
+    expect((injectedMcp().codepuppy as Record<string, unknown>).disabled).toBeUndefined()
   })
 
-  test("③ AC3:第三方 MCP 定义(oauth 对象 / local)逐字节不变 —— 分叉只在 cloud 一格", () => {
-    const partner = {
-      type: "remote",
-      url: "https://partner.example/mcp",
-      enabled: true,
-      oauth: { clientId: "https://partner.example/cimd.json", redirectUri: "http://127.0.0.1:9999/cb" },
-    }
-    const localTool = { type: "local", command: ["partner-mcp", "--stdio"] }
-    process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify({ mcp: { partner, "local-tool": localTool } })
+  // `#1667`:注入不再从继承的 OPENCODE_CONFIG_CONTENT 起步(引擎也不读它),第三方定义只可能来自配置文件或 main 才写得了的真源;
+  // 这里用真源里的一条第三方远程 server(自带 headers)钉住同一件事:分叉只在 cloud 一格,第三方条目不带我们的凭证引用。
+  test("③ AC3:第三方 MCP 定义逐字节照真源注入 —— 分叉只在 cloud 一格", () => {
+    const truthFile = path.join(tmp, "codepuppy-state", "mcp-servers", "dev.json")
+    process.env.CODEPUPPY_GLOBAL_DIR = path.join(tmp, "codepuppy-state", "env", "dev")
+    fs.mkdirSync(path.dirname(truthFile), { recursive: true })
+    fs.writeFileSync(truthFile, JSON.stringify({ v: 1, servers: [{ name: "partner", url: "https://partner.example/mcp", headers: { "X-Partner": "p" } }] }))
 
-    expect(injectCodePuppyConfig(userData, undefined, "stable")).toEqual({ ok: true })
+    expect(inject().ok).toBe(true)
 
     const mcp = injectedMcp()
-    // 第三方两条:oauth 对象原样、无 headers、无 {file:} —— 错误实现(第三方也改走 header
-    // 通道 / 顺手关第三方 oauth)在 toEqual 上当场红。
-    expect(mcp.partner).toEqual(partner)
-    expect(mcp["local-tool"]).toEqual(localTool)
-    // cloud 是 alpha 自己的定义(带引用),与第三方互不串门。
+    expect(mcp.partner).toEqual({ type: "remote", url: "https://partner.example/mcp", headers: { "X-Partner": "p" } })
     expect(JSON.stringify(mcp.codepuppy)).toContain("CODEPUPPY_MCP_TOKEN")
     expect(JSON.stringify(mcp.partner)).not.toContain("CODEPUPPY_MCP_TOKEN")
   })
@@ -197,7 +196,7 @@ describe("`#1195` 生产注入面", () => {
     const original = console.error
     console.error = (...args: unknown[]) => void errors.push(args)
     try {
-      expect(injectCodePuppyConfig(userData, path.join(tmp, "ext.js"), "stable")).toEqual({ ok: true })
+      expect(inject(path.join(tmp, "codepuppy-ext")).ok).toBe(true)
     } finally {
       console.error = original
     }
@@ -208,10 +207,11 @@ describe("`#1195` 生产注入面", () => {
     // ext 那一半:真 installCloudMcp + 真 readFileSync(默认参数)读**真密钥文件**。
     const cfg: { mcp?: Record<string, unknown> } = { mcp: { codepuppy: injectedMcp().codepuppy } }
     expect(installCloudMcp(cfg, process.env)).toBe("codepuppy")
-    expect(cfg.mcp!.codepuppy).toEqual({
+    // `#1667`:DEF 托管的是 2.x `Mcp.RemoteConfig` 形状;ext 怎么把它装进 2.x(mcp.transform)归 L3,这里只钉 main 这一侧
+    // 负责的事实:凭证解析成 Bearer 值、OAuth 不复活、端点就是 DEF 里那个。
+    expect(cfg.mcp!.codepuppy).toMatchObject({
       type: "remote",
       url: CLOUD_URL,
-      enabled: true,
       headers: { Authorization: `Bearer ${MCP_SECRET}` },
       oauth: false,
     })
@@ -227,7 +227,7 @@ describe("`#1195` 生产注入面", () => {
     let installed: string | undefined
     let cfg: { mcp?: Record<string, unknown> }
     try {
-      expect(injectCodePuppyConfig(userData, undefined, "stable")).toEqual({ ok: true })
+      expect(inject().ok).toBe(true)
       cfg = { mcp: { codepuppy: injectedMcp().codepuppy } }
       installed = installCloudMcp(cfg, process.env)
     } finally {

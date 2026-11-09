@@ -5,93 +5,29 @@
 //   · ext 装了但 setup 抛错 ⇒ 拒绝(状态 failed);
 //   · 配置里没有 ext ⇒ 拒绝(找不到这一项);main 没解析出 ext 目录 ⇒ 拒绝。
 // 反向臂:去掉这道判定(下面最后一条 ANCHOR 钉住 sidecar.ts 在发 ready 之前 await 它)⇒ 后两种情况照样报 ready。
-import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
+//
+// 宿主:真判据在 sidecar-ext-ready.cases.ts(独立的 `bun test` 子进程 —— 引擎沙箱改的环境变量不出那个进程)。
+import { expect, test } from "bun:test"
+import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { assertEngineSandboxed, engineSandbox, engineSlot } from "../../test-component/engine-sandbox"
-import { buildEngineServerOptions } from "./engine-server-options"
-import { withEngineAuthorization } from "./engine-authorization"
-import { assertExtPluginActive } from "./sidecar-ext-ready"
-import type { EngineFetch } from "./in-process-engine"
 
-const sandbox = engineSandbox()
-const PASSWORD = "cp-l5-ext-ready"
-const engines: Array<{ close: () => Promise<void> }> = []
-
-beforeAll(async () => {
-  await assertEngineSandboxed(sandbox)
-})
-
-afterAll(async () => {
-  for (const engine of engines.reverse()) await engine.close().catch(() => undefined)
-})
-
-function stubPlugin(name: string, setupBody: string) {
-  const dir = join(sandbox.root, "ext-stubs", name)
-  mkdirSync(dir, { recursive: true })
-  writeFileSync(join(dir, "server.js"), `export default { id: "codepuppy.ext.stub.${name}", setup: async () => { ${setupBody} } }\n`)
-  return dir
-}
-
-async function engineWithPlugins(name: string, plugins: string[]) {
-  const { startEngine } = await import("../../engine/engine-embed")
-  const slot = engineSlot(sandbox, name)
-  let fetch: EngineFetch | undefined
-  const engine = await startEngine(
-    buildEngineServerOptions({
-      hostname: "127.0.0.1",
-      port: 0,
-      password: PASSWORD,
-      engineVersion: "test",
-      databasePath: slot.databasePath,
-      configDirectory: slot.configDirectory,
-      config: { content: JSON.stringify({ plugins }) },
-      models: { fetch: false },
-      filewatcher: false,
-      platform: process.platform,
-    }),
-    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, PASSWORD)) },
-  )
-  engines.push(engine)
-  return { fetch: fetch!, directory: slot.projectDirectory }
-}
-
-describe("I4 ext 没装上时 sidecar 不报 ready", () => {
-  test("ext 是 active ⇒ 放行", async () => {
-    const ext = stubPlugin("active", "")
-    const { fetch, directory } = await engineWithPlugins("ext-active", [ext])
-    await expect(assertExtPluginActive(fetch, directory, ext)).resolves.toBeUndefined()
-  }, 30_000)
-
-  test("ext 是 failed(setup 抛错)⇒ 拒绝 ready", async () => {
-    const ext = stubPlugin("failed", `throw new Error("cp-l5 stub setup failure")`)
-    const { fetch, directory } = await engineWithPlugins("ext-failed", [ext])
-    await expect(assertExtPluginActive(fetch, directory, ext)).rejects.toThrow("failed to activate")
-  }, 30_000)
-
-  test("ext 那一项缺席(配置里没有它)⇒ 拒绝 ready", async () => {
-    const ext = stubPlugin("absent", "")
-    const { fetch, directory } = await engineWithPlugins("ext-absent", [])
-    await expect(assertExtPluginActive(fetch, directory, ext)).rejects.toThrow("is not loaded")
-  }, 30_000)
-
-  test("配置里写的是文件路径(不是目录)⇒ 2.x 丢弃它,判为缺席", async () => {
-    const ext = stubPlugin("file-path", "")
-    const { fetch, directory } = await engineWithPlugins("ext-file-path", [join(ext, "server.js")])
-    await expect(assertExtPluginActive(fetch, directory, ext)).rejects.toThrow("is not loaded")
-  }, 30_000)
-
-  test("main 没解析出 ext 目录 ⇒ 拒绝 ready(2.x 下没有 ext 就没有执行闸)", async () => {
-    const { fetch, directory } = await engineWithPlugins("ext-unresolved", [])
-    await expect(assertExtPluginActive(fetch, directory, undefined)).rejects.toThrow("was not resolved")
-  }, 30_000)
-
-  // 分类与「这处锚守不住什么」登记在 ./source-text-anchors.ts。
-  test("ANCHOR (not a gate): sidecar.ts 在发 ready 之前 await assertExtPluginActive(初始目录、ext 目录)", () => {
-    const source = readFileSync(join(import.meta.dir, "sidecar.ts"), "utf8")
-    const gate = source.indexOf("await assertExtPluginActive(fetch, command.initialDirectory, command.extPluginPath)")
-    const ready = source.indexOf("parentPort.postMessage(buildReadyMessage(injection, prewarmResult))")
-    expect(gate).toBeGreaterThan(-1)
-    expect(ready).toBeGreaterThan(gate)
+test("I4:ext 没装上时 sidecar 不报 ready —— 真引擎 + 桩插件(sidecar-ext-ready.cases.ts,5 条)", () => {
+  const result = Bun.spawnSync({
+    cmd: [process.execPath, "test", "--timeout", "90000", join(import.meta.dir, "sidecar-ext-ready.cases.ts")],
+    cwd: join(import.meta.dir, "../.."),
+    env: process.env,
   })
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`
+  if (result.exitCode !== 0) throw new Error(output)
+  expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
+  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("5")
+}, 300_000)
+
+// 分类与「这处锚守不住什么」登记在 ./source-text-anchors.ts。
+test("ANCHOR (not a gate): sidecar.ts 在发 ready 之前 await assertExtPluginActive(初始目录、ext 目录)", () => {
+  const source = readFileSync(join(import.meta.dir, "sidecar.ts"), "utf8")
+  const gate = source.indexOf("await assertExtPluginActive(fetch, command.initialDirectory, command.extPluginPath)")
+  const ready = source.indexOf("parentPort.postMessage(buildReadyMessage(injection, prewarmResult))")
+  expect(gate).toBeGreaterThan(-1)
+  expect(ready).toBeGreaterThan(gate)
 })

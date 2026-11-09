@@ -246,7 +246,11 @@ export function isSecretish(name: string): boolean {
 // process.platform branch: a DENY rule that is uniformly case-insensitive cannot be wrong, and on
 // POSIX a lowercase twin is inert to the engine anyway (it reads the exact uppercase name), so
 // dropping it costs nothing. The ALLOW rules below stay case-sensitive on purpose — see the loop.
-const NEVER_INHERIT = new Set(["opencode_config_content"])
+// `#1667`(#1662 L5,裁决书 R17,基线 §2.7):`OPENCODE_FLAGS` 是 OpenCode 2 实验开关的**最高优先级**覆盖
+// (`packages/core/src/flag.ts` 的 `Overrides`,压过配置里的 `experimental.*` 与渠道默认值)。用户 shell 里的
+// `OPENCODE_FLAGS=all` 经上面的 `OPENCODE_` 前缀规则进来,就会绕过 Code Puppy 在注入里对五个开关写的显式值 ——
+// 所以它与 OPENCODE_CONFIG_CONTENT 同列,永不继承。
+const NEVER_INHERIT = new Set(["opencode_config_content", "opencode_flags"])
 
 export function createSidecarEnv(source: NodeJS.ProcessEnv = process.env): Record<string, string> {
   const extra = new Set(

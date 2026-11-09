@@ -19,7 +19,7 @@ import * as path from "node:path"
 import { CODEPUPPY_AGENT_TEXT } from "./codepuppy-agents"
 import { CODEPUPPY_BEHAVIOR_MD } from "./codepuppy-behavior"
 import { buildCodePuppyCapabilities, buildCodePuppyIdentity } from "./codepuppy-identity"
-import { buildCodePuppyModelConfig } from "./codepuppy-models"
+import { buildCodePuppyModelConfig, engineModelConfig, type CodePuppyModelConfig } from "./codepuppy-models"
 // `#1195`(REQ-144 T2):`secretFileRef` 回来了 —— 云 MCP 的 Authorization 头装的是登录铸
 // `mcp_access` token 的 `{file:…CODEPUPPY_MCP_TOKEN}` 引用(A6 通道,值不进 config 字面量)。
 // `hasSecretFile` 同时是 ADR-009 的「平台代付」判据(见下方 `platformPays`,`#1195` 起换轴到
@@ -81,6 +81,76 @@ export type CodePuppyConfigInjectionOutput = {
 export type CodePuppyConfigInjectionResult = CodePuppyConfigInjectionOutput &
   ({ ok: true } | { ok: false; error: CodePuppyConfigInjectionFailure })
 
+// `#1667`(#1662 L5,清点表 C2,接口文档 I9):注入直接写 OpenCode 2 的配置键(`packages/schema/src/config.ts` 的 `Config.Info`),
+// 不靠上游 normalize 的旧键兼容层(带诊断、语义不保证一一对应)。判据:codepuppy-config-injection.test.ts 用上游的
+// normalize 与 `Config.Info` 解码这份产物,零诊断、零改写。
+type PermissionRule = { action: string; resource: string; effect: "allow" | "deny" | "ask" }
+type EngineAgent = {
+  description?: string
+  hidden?: boolean
+  mode?: "primary" | "subagent" | "all"
+  system?: string
+  disabled?: boolean
+  permissions?: PermissionRule[]
+}
+type EngineConfig = {
+  $schema: string
+  plugins: string[]
+  experimental: Record<string, boolean>
+  instructions?: string[]
+  model?: string
+  providers?: Record<string, unknown>
+  policies?: Array<{ action: string; resource: string; effect: "allow" | "deny" }>
+  agents?: Record<string, EngineAgent>
+  permissions?: PermissionRule[]
+  mcp?: { servers?: Record<string, unknown> }
+}
+
+/** 内置插件 `opencode.config.compatibility` 是 `.claude` 与 `.agents` 两类技能根的唯一装载者(裁决书 N3)。 */
+export const ECOSYSTEM_COMPATIBILITY_PLUGIN = "opencode.config.compatibility"
+
+/**
+ * 正式渠道下 Code Puppy 对 2.x 五个实验开关的显式取值(裁决书 OOR-1:注入层压在项目与全局之上,显式值压过用户
+ * `opencode.json` 的 `experimental.*` / `all_flags`)。`todo` 打开:会话页的任务清单卡要它(编排器 2026-11-09 裁决 U1,
+ * #1668 评论 6736872128,可撤回);其余四个固定关。
+ */
+export const ENGINE_EXPERIMENTAL_FLAGS = {
+  todo: true,
+  schedules: false,
+  media_blob: false,
+  artifacts: false,
+  background_compaction: false,
+} as const
+
+/**
+ * 不论注入成败都要在的治理底线:
+ *   · `plugins`:ext 的插件**目录**(2.x 只装目录形式的本地插件,接口文档 I2);外加移除指令 `-opencode.config.compatibility`
+ *     —— S6 的唯一机制(裁决书 N3):不继承用户的 `~/.claude` / `~/.agents` / 项目 `.agents` 技能。逃生开关
+ *     `CODEPUPPY_ECOSYSTEM_INHERIT=1` 置位时不写移除指令(ADR-024 §5,整机恢复上游继承)。
+ *   · `experimental`:五个实验开关的显式值(见上)。
+ */
+function governanceFloor(extPluginPath: string | undefined): Pick<EngineConfig, "plugins" | "experimental"> {
+  return {
+    plugins: [
+      ...(extPluginPath ? [extPluginPath] : []),
+      ...(process.env.CODEPUPPY_ECOSYSTEM_INHERIT === "1" ? [] : [`-${ECOSYSTEM_COMPATIBILITY_PLUGIN}`]),
+    ],
+    experimental: { ...ENGINE_EXPERIMENTAL_FLAGS },
+  }
+}
+
+/**
+ * 把「动作 → 效果 | { 资源模式: 效果 }」的有序表展开成 2.x 的 `Permission.Ruleset`(有序数组,求值取最后一条命中)。
+ * 动作名一律用 2.x 的工具名(`shell` / `subagent`,不是 v1 的 `bash` / `task`;I9)。
+ */
+function rules(table: Array<[string, PermissionRule["effect"] | Record<string, PermissionRule["effect"]>]>): PermissionRule[] {
+  return table.flatMap(([action, value]) =>
+    typeof value === "string"
+      ? [{ action, resource: "*", effect: value }]
+      : Object.entries(value).map(([resource, effect]) => ({ action, resource, effect })),
+  )
+}
+
 export function injectCodePuppyConfig(
   userDataPath: string,
   extPluginPath?: string,
@@ -102,7 +172,7 @@ export function injectCodePuppyConfig(
       file = truth
     }
 
-    const config: Record<string, any> = { $schema: "https://opencode.ai/config.json" }
+    const config: EngineConfig = { $schema: "https://opencode.ai/config.json", ...governanceFloor(extPluginPath) }
     // ADR-009 B1 的「平台代付」判据(云 MCP URL + 密钥文件同在)。caps 事实、云 MCP 注册与
     // web search 主权 deny 三处共用同一个判据,不许各算各的。`#1195` 起判据文件从
     // `CODEPUPPY_CLOUD_TOKEN`(错受众的 platform_access,只当在场性证据)换轴到
@@ -120,12 +190,6 @@ export function injectCodePuppyConfig(
     const cloudMcpEnabled = Boolean(mcpUrl) && !killSwitch && platformPays
     // 只记录本轮函数自己新放进 mcp 的名字;继承来的 OPENCODE_CONFIG_CONTENT 不是治理授权。
     const injectedMcpNames = new Set<string>()
-
-    if (extPluginPath) {
-      const plugins: string[] = Array.isArray(config.plugin) ? config.plugin : []
-      if (!plugins.includes(extPluginPath)) plugins.push(extPluginPath)
-      config.plugin = plugins
-    }
 
     const wantIdentity = !process.env.CODEPUPPY_IDENTITY_DISABLE
     const wantBehavior = !process.env.CODEPUPPY_BEHAVIOR_DISABLE
@@ -157,12 +221,13 @@ export function injectCodePuppyConfig(
         //   · 云腿在场性读上方的 `cloudMcpEnabled`(与写 `config.mcp` 那个三分支同源),外加它有没有被 deny。
         //   · `cloud.*` 那一行**刻意**仍只看代付:kill-switch 下完整定义经 ARM/DEF 托管给 ext,ext 真装上
         //     兄弟工具就在,而「ext 这一 fork 装没装」注入面判不了 —— 那一行的措辞本来就带条件。
-        const denyProbe: { permission?: Record<string, unknown> } = {}
+        //   · `#1667`:v1 时代还读 `OPENCODE_ENABLE_EXA`;那个变量 2.x 无读者(清点表 E2),工具在不在场不再取决于它,读它只会说假话。
+        const denyProbe: { permissions?: PermissionRule[] } = {}
         applyWebSearchDenies(denyProbe, { killSwitch, platformPays }, () => {})
-        const deniedByGate = (toolId: string) => denyProbe.permission?.[toolId] === "deny"
+        const deniedByGate = (toolId: string) => denyProbe.permissions?.some((rule) => rule.action === toolId && rule.effect === "deny") === true
         const cloudDispatch = platformPays
         const caps = buildCodePuppyCapabilities({
-          localWebSearch: !deniedByGate(LOCAL_WEB_SEARCH_TOOL_ID) && process.env.OPENCODE_ENABLE_EXA !== "0",
+          localWebSearch: !deniedByGate(LOCAL_WEB_SEARCH_TOOL_ID),
           cloudWebSearch: !deniedByGate(CLOUD_WEB_SEARCH_TOOL_ID) && cloudMcpEnabled,
           cloudDispatch,
         })
@@ -197,9 +262,11 @@ export function injectCodePuppyConfig(
 
     const models = buildCodePuppyModelConfig(userDataPath)
     if (models) {
-      config.enabled_providers = models.enabled_providers
-      if (models.model) config.model = models.model
-      config.provider = { ...(config.provider ?? {}), ...models.provider }
+      // `#1667`:同一份投影,写成 2.x 的 `providers` / `policies`(`provider.use`)/ `model`(codepuppy-models.ts engineModelConfig)。
+      const engine = engineModelConfig(models)
+      config.providers = engine.providers
+      config.policies = engine.policies
+      if (engine.model) config.model = engine.model
     }
 
     //   5. 自动化 readonly agent(REQ-021 A1.5 / ADR-022)。无人值守执行的硬前提 = 零 ask:
@@ -207,30 +274,30 @@ export function injectCodePuppyConfig(
     //      read 全放但 *.env* 保持 deny(密钥文件不进上下文);edit/bash/外部目录一律 deny;
     //      question deny(无人在场没人答);doom_loop deny(异常循环直接断)。逃生:CODEPUPPY_AUTOMATION_DISABLE。
     if (!process.env.CODEPUPPY_AUTOMATION_DISABLE) {
-      config.agent = {
-        ...(config.agent ?? {}),
+      config.agents = {
+        ...config.agents,
         "codepuppy-automation": {
           description: CODEPUPPY_AGENT_TEXT["codepuppy-automation"].description,
-          // REQ-055:对选择器隐藏(上游 agent.ts 原生 hidden 字段,仅影响可见列表;调度器按名 prompt 不受影响)
+          // REQ-055:对选择器隐藏(上游 agent 原生 hidden 字段,仅影响可见列表;调度器按名 prompt 不受影响)
           hidden: true,
           mode: "primary",
-          prompt: CODEPUPPY_AGENT_TEXT["codepuppy-automation"].prompt,
-          permission: {
-            "tool-policy-default": "ask",
-            read: { "*": "allow", "*.env*": "deny" },
-            glob: "allow",
-            grep: "allow",
-            list: "allow",
-            webfetch: "allow",
-            websearch: "allow",
-            skill: "allow",
-            edit: "deny",
-            bash: "deny",
-            external_directory: "deny",
-            doom_loop: "deny",
-            question: "deny",
-            task: "deny",
-          },
+          system: CODEPUPPY_AGENT_TEXT["codepuppy-automation"].prompt,
+          permissions: rules([
+            ["tool-policy-default", "ask"],
+            ["read", { "*": "allow", "*.env*": "deny" }],
+            ["glob", "allow"],
+            ["grep", "allow"],
+            ["list", "allow"],
+            ["webfetch", "allow"],
+            ["websearch", "allow"],
+            ["skill", "allow"],
+            ["edit", "deny"],
+            ["shell", "deny"],
+            ["external_directory", "deny"],
+            ["doom_loop", "deny"],
+            ["question", "deny"],
+            ["subagent", "deny"],
+          ]),
         },
       }
     }
@@ -244,29 +311,29 @@ export function injectCodePuppyConfig(
     //       第三方 MCP 与插件工具每次询问(方案 §2.0 D1):身份轴闸用本规则集求值,设置里启用了也问。
     //       逃生:CODEPUPPY_READONLY_DISABLE。治理保护名单同 codepuppy-automation(X2,codepuppy-governance.ts)。
     if (!process.env.CODEPUPPY_READONLY_DISABLE) {
-      config.agent = {
-        ...(config.agent ?? {}),
+      config.agents = {
+        ...config.agents,
         "codepuppy-readonly": {
           description: CODEPUPPY_AGENT_TEXT["codepuppy-readonly"].description,
           // REQ-055:对选择器隐藏;CodePuppyComposer 只读档改为提交时 agent 参数,不再依赖可见列表轮转
           hidden: true,
           mode: "primary",
-          prompt: CODEPUPPY_AGENT_TEXT["codepuppy-readonly"].prompt,
-          permission: {
-            read: { "*": "allow", "*.env*": "deny" },
-            glob: "allow",
-            grep: "allow",
-            list: "allow",
-            webfetch: "allow",
-            websearch: "allow",
-            skill: "allow",
-            edit: "deny",
-            bash: "deny",
-            external_directory: "deny",
-            task: { "*": "deny", "codepuppy-readonly": "allow" },
-            "mcp:*": "ask",
-            "plugin:*": "ask",
-          },
+          system: CODEPUPPY_AGENT_TEXT["codepuppy-readonly"].prompt,
+          permissions: rules([
+            ["read", { "*": "allow", "*.env*": "deny" }],
+            ["glob", "allow"],
+            ["grep", "allow"],
+            ["list", "allow"],
+            ["webfetch", "allow"],
+            ["websearch", "allow"],
+            ["skill", "allow"],
+            ["edit", "deny"],
+            ["shell", "deny"],
+            ["external_directory", "deny"],
+            ["subagent", { "*": "deny", "codepuppy-readonly": "allow" }],
+            ["mcp:*", "ask"],
+            ["plugin:*", "ask"],
+          ]),
         },
       }
     }
@@ -288,25 +355,25 @@ export function injectCodePuppyConfig(
     //       不设逃生 env:composer 选了这档就发 `agent: "codepuppy-ask"`,agent 缺席 = 引擎具名报错(fail-closed),
     //       不是静默回到全放行。治理保护名单同 codepuppy-readonly(CODEPUPPY_INJECTED_AGENTS)。
     //       常驻闸:packages/opencode/test/permission/codepuppy-composer-tiers.test.ts(真 Agent + 真 Permission.ask)。
-    config.agent = {
-      ...(config.agent ?? {}),
+    config.agents = {
+      ...config.agents,
       "codepuppy-ask": {
         description: CODEPUPPY_AGENT_TEXT["codepuppy-ask"].description,
         hidden: true,
         mode: "primary",
-        permission: {
-          "tool-policy-default": "ask",
-          question: "allow",
-          plan_enter: "allow",
+        permissions: rules([
+          ["tool-policy-default", "ask"],
+          ["question", "allow"],
+          ["plan_enter", "allow"],
           // 与另外三个 alpha agent 同形:显式写 websearch allow(defaults 的 `*` 本来就 allow,求值结果不变),
           // 让 #223 的主权闸(applyWebSearchDenies 按 agent 钉 deny / keyless 下逐 agent 核 allow)对它一视同仁。
-          websearch: "allow",
-          edit: "ask",
-          bash: "ask",
-          task: { "*": "ask", "codepuppy-ask": "allow" },
-          doom_loop: "ask",
-          read: { "*.env": "ask", "*.env.*": "ask", "*.env.example": "allow" },
-        },
+          ["websearch", "allow"],
+          ["edit", "ask"],
+          ["shell", "ask"],
+          ["subagent", { "*": "ask", "codepuppy-ask": "allow" }],
+          ["doom_loop", "ask"],
+          ["read", { "*.env": "ask", "*.env.*": "ask", "*.env.example": "allow" }],
+        ]),
       },
     }
 
@@ -314,61 +381,64 @@ export function injectCodePuppyConfig(
     //       (question/task/doom_loop deny,零 ask 硬前提);差异 = edit allow + bash 受限 allow
     //       (破坏类命令模式 deny —— 模式黑名单**非穷尽**,UI 启用时有显式风险确认,不谎称安全)。
     if (!process.env.CODEPUPPY_AUTOMATION_DISABLE) {
-      config.agent = {
-        ...(config.agent ?? {}),
+      config.agents = {
+        ...config.agents,
         "codepuppy-automation-standard": {
           description: CODEPUPPY_AGENT_TEXT["codepuppy-automation-standard"].description,
           // REQ-055:对选择器隐藏(同 codepuppy-automation)
           hidden: true,
           mode: "primary",
-          prompt: CODEPUPPY_AGENT_TEXT["codepuppy-automation-standard"].prompt,
-          permission: {
-            "tool-policy-default": "ask",
-            read: { "*": "allow", "*.env*": "deny" },
-            glob: "allow",
-            grep: "allow",
-            list: "allow",
-            webfetch: "allow",
-            websearch: "allow",
-            skill: "allow",
-            edit: "allow",
-            bash: {
-              "*": "allow",
-              // 破坏类直呼(codex 审计加固:绝对路径/包装器/嵌套 shell/find -delete/git clean 常见绕法补拦;
-              // 黑名单仍非穷尽 —— UI 风险确认与 agent prompt 如实声明,根治=沙箱化(后续)):
-              "rm *": "deny",
-              "*/rm *": "deny",
-              "command *": "deny",
-              "exec *": "deny",
-              "env *": "deny",
-              "xargs *": "deny",
-              "sh *": "deny",
-              "bash *": "deny",
-              "zsh *": "deny",
-              "eval *": "deny",
-              "find * -delete*": "deny",
-              "find * -exec *": "deny",
-              "git clean*": "deny",
-              "git reset --hard*": "deny",
-              "sudo *": "deny",
-              "chmod *": "deny",
-              "chown *": "deny",
-              "dd *": "deny",
-              "mkfs*": "deny",
-              "shutdown*": "deny",
-              "reboot*": "deny",
-              "kill *": "deny",
-              "killall *": "deny",
-              "git push*": "deny",
-              "npm publish*": "deny",
-              "curl * | *": "deny",
-              "wget * | *": "deny",
-            },
-            external_directory: "deny",
-            doom_loop: "deny",
-            question: "deny",
-            task: "deny",
-          },
+          system: CODEPUPPY_AGENT_TEXT["codepuppy-automation-standard"].prompt,
+          permissions: rules([
+            ["tool-policy-default", "ask"],
+            ["read", { "*": "allow", "*.env*": "deny" }],
+            ["glob", "allow"],
+            ["grep", "allow"],
+            ["list", "allow"],
+            ["webfetch", "allow"],
+            ["websearch", "allow"],
+            ["skill", "allow"],
+            ["edit", "allow"],
+            [
+              "shell",
+              {
+                "*": "allow",
+                // 破坏类直呼(codex 审计加固:绝对路径/包装器/嵌套 shell/find -delete/git clean 常见绕法补拦;
+                // 黑名单仍非穷尽 —— UI 风险确认与 agent prompt 如实声明,根治=沙箱化(后续)):
+                "rm *": "deny",
+                "*/rm *": "deny",
+                "command *": "deny",
+                "exec *": "deny",
+                "env *": "deny",
+                "xargs *": "deny",
+                "sh *": "deny",
+                "bash *": "deny",
+                "zsh *": "deny",
+                "eval *": "deny",
+                "find * -delete*": "deny",
+                "find * -exec *": "deny",
+                "git clean*": "deny",
+                "git reset --hard*": "deny",
+                "sudo *": "deny",
+                "chmod *": "deny",
+                "chown *": "deny",
+                "dd *": "deny",
+                "mkfs*": "deny",
+                "shutdown*": "deny",
+                "reboot*": "deny",
+                "kill *": "deny",
+                "killall *": "deny",
+                "git push*": "deny",
+                "npm publish*": "deny",
+                "curl * | *": "deny",
+                "wget * | *": "deny",
+              },
+            ],
+            ["external_directory", "deny"],
+            ["doom_loop", "deny"],
+            ["question", "deny"],
+            ["subagent", "deny"],
+          ]),
         },
       }
     }
@@ -425,12 +495,15 @@ export function injectCodePuppyConfig(
           `[alpha-code#1195] cloud MCP has no login-minted mcp_access credential (CODEPUPPY_MCP_TOKEN secret file absent) — injected a credential-free enabled:false definition; no fallback to CODEPUPPY_CLOUD_TOKEN or interactive OAuth`,
         )
       config.mcp = {
-        ...(config.mcp ?? {}),
-        [CLOUD_MCP_SERVER_NAME]: killSwitch
-          ? { ...WITHHELD_CLOUD_MCP }
-          : platformPays
-            ? cloud
-            : materializeCloudMcpConfig(mcpUrl, undefined),
+        ...config.mcp,
+        servers: {
+          ...config.mcp?.servers,
+          [CLOUD_MCP_SERVER_NAME]: killSwitch
+            ? { ...WITHHELD_CLOUD_MCP }
+            : platformPays
+              ? cloud
+              : materializeCloudMcpConfig(mcpUrl, undefined),
+        },
       }
       injectedMcpNames.add(CLOUD_MCP_SERVER_NAME)
       if (killSwitch) {
@@ -468,8 +541,11 @@ export function injectCodePuppyConfig(
         continue
       }
       config.mcp = {
-        ...(config.mcp ?? {}),
-        [server.name]: { type: "remote", url: server.url, ...(server.headers ? { headers: server.headers } : {}), enabled: true },
+        ...config.mcp,
+        servers: {
+          ...config.mcp?.servers,
+          [server.name]: { type: "remote", url: server.url, ...(server.headers ? { headers: server.headers } : {}) },
+        },
       }
       injectedMcpNames.add(server.name)
     }
@@ -499,7 +575,7 @@ export function injectCodePuppyConfig(
       injectedMcpNames,
     })
 
-    const modelsFile = models ? materializeGovernedModelsBase(userDataPath, config) : undefined
+    const modelsFile = models ? materializeGovernedModelsBase(userDataPath, models) : undefined
     return { ok: true, config: { content: JSON.stringify(config), ...(file ? { file } : {}) }, models: modelsFile ? { file: modelsFile } : {} }
   } catch (error) {
     // #613:catch 保留(sidecar 照常起,候选形态③),但失败必须离开本进程:
@@ -508,7 +584,9 @@ export function injectCodePuppyConfig(
     return {
       ok: false,
       error: error instanceof Error ? { message: error.message, stack: error.stack } : { message: String(error) },
-      config: { content: JSON.stringify({}), ...(file ? { file } : {}) },
+      // 注入失败也不让治理底线跟着丢:ext 目录、外部技能移除指令、五个实验开关照样写进去(governanceFloor)。
+      // 没有 ext 的话 sidecar 的 I4 判定会拒绝 ready,而不是带着一个没有执行闸的引擎上线。
+      config: { content: JSON.stringify({ $schema: "https://opencode.ai/config.json", ...governanceFloor(extPluginPath) }), ...(file ? { file } : {}) },
       models: {},
     }
   }
@@ -594,10 +672,7 @@ function governedModelsBase(config: { enabled_providers?: unknown; provider?: un
   return base
 }
 
-function materializeGovernedModelsBase(
-  userDataPath: string,
-  config: { enabled_providers?: unknown; provider?: unknown },
-): string | undefined {
+function materializeGovernedModelsBase(userDataPath: string, config: CodePuppyModelConfig): string | undefined {
   const dir = path.join(userDataPath, USER_DATA_LAYOUT.engineConfig)
   const modelsPath = path.join(dir, "models.json")
   const base = governedModelsBase(config)

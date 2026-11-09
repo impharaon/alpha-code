@@ -31,6 +31,9 @@ import { projectPlatformModels, readAppliedByokCatalog, readAppliedPlatformSnaps
 import { byokAdapter } from "./byok-adapters"
 import { customProviderSecretName, hasSecretFile, secretFileRef } from "./codepuppy-secret-files"
 import { readCustomProviderRecords } from "./custom-provider-records"
+import { CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID } from "../shared/codepuppy-config"
+// `#1667`:上游自己的「AI SDK openai-compatible 选项 → 2.x settings / body」划分(纯函数,无诊断)。消费它,不手抄那张键表。
+import { ConfigProviderOptionsV1 } from "@opencode/core/v1/config/provider-options"
 // NOTE: this module is loaded by the SIDECAR (utilityProcess) via buildCodePuppyModelConfig, so it must
 // stay electron-free. getProviderKeyStatus (which reads the safeStorage keychain) lives in the
 // main-only codepuppy-provider-status.ts for that reason — do NOT import codepuppy-byok-keys here.
@@ -255,5 +258,75 @@ export function buildCodePuppyModelConfig(userDataPath: string): CodePuppyModelC
     enabled_providers: enabled,
     ...(model ? { model } : {}),
     provider,
+  }
+}
+
+// ── `#1667`(#1662 L5,清点表 C2 / C7):把上面这份投影写成 OpenCode 2 的配置键 ──────────────────────────────
+// 投影本身(哪些 provider、哪些模型、哪个端点、Key 走哪个 `{file:}` 引用)仍只在 buildCodePuppyModelConfig 里决定一次,
+// network-egress-derived.ts 也读那一份;这里只换「写法」:
+//   · `provider.<id>` → `providers.<id>`:`npm` → `package`(`aisdk:` 前缀,上游 `Provider.aisdk`),`options.baseURL/apiKey`
+//     → `settings`;模型的 `modalities.input` → `capabilities.input`,`reasoning: true` → `capabilities.reasoning.supported`,
+//     `variants` 表 → `variants: [{ id, settings, body }]`(openai-compatible 的选项按上游划分拆成 settings / body)。
+//   · `enabled_providers` → `policies` 的 `provider.use`:先拒全部、再逐个放行(上游 normalize 对同一语义生成的就是这组语句)。
+//     2.x 的 catalog 可用性看 policies,所以就绪标记 provider 也放行(v1 时代它住在另一座桥里,不受 enabled_providers 管)。
+//   · `model: "<provider>/<model>"` 原样(2.x 的 `ConfigModel.Selection` 接受这种短写)。
+type V1Model = { name: string; reasoning?: boolean; variants?: Record<string, Record<string, unknown>>; modalities?: { input: string[] } }
+type V1Provider = { npm?: string; name?: string; options?: { baseURL?: unknown; apiKey?: unknown }; models?: Record<string, V1Model> }
+
+const AISDK_PREFIX = "aisdk:"
+const OPENAI_COMPATIBLE = "@ai-sdk/openai-compatible"
+
+function engineModel(model: V1Model, npm: string | undefined) {
+  const split = (options: Record<string, unknown>) => {
+    if (npm !== OPENAI_COMPATIBLE) return { settings: options }
+    const { settings, body } = ConfigProviderOptionsV1.compatibleModel(options)
+    return { ...(Object.keys(settings).length ? { settings } : {}), ...(body ? { body } : {}) }
+  }
+  return {
+    name: model.name,
+    capabilities: {
+      ...(model.modalities ? { input: model.modalities.input } : {}),
+      ...(model.reasoning ? { reasoning: { supported: true as const } } : {}),
+    },
+    ...(model.variants
+      ? { variants: Object.entries(model.variants).map(([id, options]) => ({ id, ...split(options) })) }
+      : {}),
+  }
+}
+
+export type CodePuppyEngineModelConfig = {
+  providers: Record<string, unknown>
+  policies: Array<{ action: "provider.use"; resource: string; effect: "allow" | "deny" }>
+  model?: string
+}
+
+export function engineModelConfig(models: CodePuppyModelConfig): CodePuppyEngineModelConfig {
+  const providers: Record<string, unknown> = {}
+  for (const [id, raw] of Object.entries(models.provider)) {
+    const provider = raw as V1Provider
+    const settings = {
+      ...(typeof provider.options?.baseURL === "string" ? { baseURL: provider.options.baseURL } : {}),
+      ...(typeof provider.options?.apiKey === "string" ? { apiKey: provider.options.apiKey } : {}),
+    }
+    providers[id] = {
+      ...(provider.name ? { name: provider.name } : {}),
+      ...(provider.npm ? { package: `${AISDK_PREFIX}${provider.npm}` } : {}),
+      ...(Object.keys(settings).length ? { settings } : {}),
+      models: Object.fromEntries(Object.entries(provider.models ?? {}).map(([modelID, model]) => [modelID, engineModel(model, provider.npm)])),
+    }
+  }
+  // #857 的就绪标记:renderer / catalog-liveness 以 `/api/provider/<它>` 答 200 判「治理目录已提交」(与 models.file 底表里那一条同名)。
+  providers[CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID] = { name: "Code Puppy catalog readiness marker", env: [] }
+  return {
+    providers,
+    policies: [
+      { action: "provider.use", resource: "*", effect: "deny" },
+      ...[...models.enabled_providers, CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID].map((resource) => ({
+        action: "provider.use" as const,
+        resource,
+        effect: "allow" as const,
+      })),
+    ],
+    ...(models.model ? { model: models.model } : {}),
   }
 }

@@ -75,7 +75,7 @@ export const CLOUD_WEBSEARCH_DENY_ENV = "CODEPUPPY_CLOUD_WEBSEARCH_DENY"
 export const WITHHELD_CLOUD_MCP = {
   type: "remote" as const,
   url: "http://127.0.0.1:1/codepuppy-cloud-withheld",
-  enabled: false as const,
+  disabled: true as const,
   oauth: false as const,
 }
 
@@ -128,11 +128,13 @@ export const CLOUD_MCP_ARM_ENV = "CODEPUPPY_CLOUD_MCP_ARM"
  */
 export const CLOUD_MCP_DEF_ENV = "CODEPUPPY_CLOUD_MCP_DEF"
 
-type AgentConfig = { permission?: Record<string, unknown> }
+// `#1667`:OpenCode 2 的权限规则是有序数组 `{ action, resource, effect }[]`(`Permission.Ruleset`,求值取 `findLast`)。
+type Rule = { action: string; resource: string; effect: "allow" | "deny" | "ask" }
+type AgentConfig = { permissions?: Rule[] }
 
 type EngineConfig = {
-  permission?: Record<string, unknown>
-  agent?: Record<string, AgentConfig | undefined>
+  permissions?: Rule[]
+  agents?: Record<string, AgentConfig | undefined>
 }
 
 /** web search 的两个主权判据,由 `injectCodePuppyConfig` 从 sidecar 自己的 env/密钥文件推导。 */
@@ -198,24 +200,22 @@ export function applyWebSearchDenies(
       `[alpha-code#223] denying the local ${LOCAL_WEB_SEARCH_TOOL_ID} tool (kill switch) — the four keyless env flags cannot suppress it under OPENCODE_EXPERIMENTAL=1`,
     )
 
-  config.permission = pinDeny({ ...config.permission }, denied)
-  for (const agent of Object.values(config.agent ?? {})) {
+  config.permissions = pinDeny(config.permissions ?? [], denied)
+  for (const agent of Object.values(config.agents ?? {})) {
     if (!agent) continue
     // #223 R2:以前只改**已有**的精确 `websearch` 键 —— 一个只写 `"*": "allow"` 的 agent 因此
     // 完全不被压平,而它的 wildcard 排在全局 deny 之后就赢。现在无条件写(并钉到末位)。
-    agent.permission = pinDeny({ ...(agent.permission ?? {}) }, denied)
+    agent.permissions = pinDeny(agent.permissions ?? [], denied)
   }
 }
 
 /**
- * 把 deny 钉成表里的**最后一条**规则。`Permission.fromConfig` 按对象插入序展开、
- * `Permission.evaluate` 取 `findLast`,所以「只改值不动位置」不够:写在前面的
- * `websearch: "deny"` 会被同一张表里后面的 `"*": "allow"` 顶掉。删键再写回 = 移到末位。
+ * 把 deny 钉成规则表的**最后一条**。2.x 的 `Permission.evaluate` 取 `findLast`(`packages/core/src/permission.ts`),
+ * 写在前面的 deny 会被同一张表里后面的 `*` allow 顶掉。先删掉同一动作的旧规则再追加 = 移到末位。
  */
-function pinDeny(permission: Record<string, unknown>, denied: string[]) {
-  for (const id of denied) {
-    delete permission[id]
-    permission[id] = "deny"
-  }
-  return permission
+function pinDeny(rules: Rule[], denied: string[]): Rule[] {
+  return [
+    ...rules.filter((rule) => !denied.includes(rule.action)),
+    ...denied.map((action) => ({ action, resource: "*", effect: "deny" as const })),
+  ]
 }

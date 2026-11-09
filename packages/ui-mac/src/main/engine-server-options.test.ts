@@ -9,13 +9,10 @@ import { describe, expect, test } from "bun:test"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { Schema } from "effect"
-import { engineSandbox } from "../../test-component/engine-sandbox"
+import { ServerOptions } from "@opencode/server/options"
 import { buildEngineServerOptions, engineDesktopToggles, ENGINE_RELEASE_CHANNEL } from "./engine-server-options"
 import { engineDatabasePath, engineGlobalConfigDirectory } from "./engine-paths"
 import { resolveDbPath } from "./db-safety"
-
-// 上游模块在装载时就按 XDG_* / HOME 算全局根目录:先把环境改指沙箱,再动态 import(同一进程里后面的引擎测试复用这一份)。
-engineSandbox()
 
 const input = {
   hostname: "127.0.0.1",
@@ -33,8 +30,7 @@ const input = {
 describe("传给 start() 的选项对象:v1 的每个 OPENCODE_* 落到哪一格", () => {
   const options = buildEngineServerOptions(input)
 
-  test("过上游 ServerOptions schema 的解码(形状不漂)", async () => {
-    const { ServerOptions } = await import("@opencode/server/options")
+  test("过上游 ServerOptions schema 的解码(形状不漂)", () => {
     expect(() => Schema.decodeUnknownSync(ServerOptions)(options)).not.toThrow()
   })
 

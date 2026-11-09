@@ -1,8 +1,8 @@
 // #535 / REQ-109 T6,启动可用性基线 §② G1、§③:
-// 用户全局 opencode 配置是外部输入面。sidecar fork 时只枚举引擎真实的 XDG 全局目录,
-// 把不在 alpha 治理集的 mcp 以 lone `{enabled:false}` 写进末序 OPENCODE_CONFIG_CONTENT;
+// 用户全局 opencode 配置是外部输入面。sidecar fork 时只枚举引擎真实的全局配置目录,
+// 把不在 alpha 治理集的 mcp 以中和条目(`disabled:true`,见 NEUTRALIZED_MCP_SERVER)写进注入配置;
 // 治理内 server 不复制、不改写。项目配置面、上游 MCP 实现均不动。
-// `#1381`:codepuppy.jsonc 自己的 `type:"remote"` 条目同样压成 `{enabled:false}`(除非它正是本轮从真源注入的名字)——
+// `#1381`:codepuppy.jsonc 自己的 `type:"remote"` 条目同样压成中和条目(除非它正是本轮从真源注入的名字)——
 // 见函数体内的说明。
 //
 // `#1667`:枚举的目录 = sidecar 经 `start()` 的 `config.directory` 交给引擎的那一个(engine-paths.ts 的
@@ -17,7 +17,20 @@ import { engineGlobalConfigDirectory } from "./engine-paths"
 
 const GLOBAL_CONFIG_FILES = ["config.json", "opencode.json", "opencode.jsonc"]
 
-type Config = { mcp?: Record<string, unknown> }
+/**
+ * `#1667`:OpenCode 2 里高层配置按名字**整条替换**低层的 MCP server(`packages/core/src/config/plugin/mcp.ts`:后加载的文档
+ * `servers.set(name, server)` 覆盖前一个),v1 那种「只写一片 `enabled:false` 叶子、深合并进原定义」的写法在 2.x 被丢弃并出诊断
+ * (`config/normalize.ts` 的 "omitted enabled-only legacy MCP entry")。所以要关掉一个 server,注入面写一条**完整而连不上**的
+ * 中和条目:`disabled: true`,端点指向 127.0.0.1:1(与 kill-switch 下的 WITHHELD_CLOUD_MCP 同一手法)。
+ */
+export const NEUTRALIZED_MCP_SERVER = {
+  type: "remote" as const,
+  url: "http://127.0.0.1:1/codepuppy-mcp-disabled",
+  disabled: true as const,
+  oauth: false as const,
+}
+
+type Config = { mcp?: { servers?: Record<string, unknown> } }
 
 export function injectMcpDefaultDeny(
   config: Config,
@@ -64,12 +77,12 @@ export function injectMcpDefaultDeny(
       .filter((name) => !governed.has(name))
       .sort()
 
-    denied.forEach((name) => setLeaf(config, name, "enabled", false))
+    denied.forEach((name) => neutralize(config, name))
     if (denied.length)
       logError(`[req109-535] default-denied user-global MCP names=${JSON.stringify(denied)}`)
 
     const deniedRemote = codepuppyRemote.filter((name) => !injected.has(name)).sort()
-    deniedRemote.forEach((name) => setLeaf(config, name, "enabled", false))
+    deniedRemote.forEach((name) => neutralize(config, name))
     if (deniedRemote.length)
       logError(
         `[alpha-code#1381] default-denied remote MCP entries in ${options.codepuppyConfigPath} (not in the main-only truth file, so neither injected nor authorized) names=${JSON.stringify(deniedRemote)}`,
@@ -113,13 +126,6 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>
 }
 
-function setLeaf(config: Config, name: string, field: "enabled", value: boolean): void {
-  const map = asRecord(config.mcp)
-  config.mcp = {
-    ...map,
-    [name]: {
-      ...asRecord(map[name]),
-      [field]: value,
-    },
-  }
+function neutralize(config: Config, name: string): void {
+  config.mcp = { ...config.mcp, servers: { ...config.mcp?.servers, [name]: { ...NEUTRALIZED_MCP_SERVER } } }
 }

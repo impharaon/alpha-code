@@ -94,3 +94,12 @@ ARCH-NOTE:① ADR-047「前端 pin 与引擎同一 SHA」改为「切换时同�
 | OOR-1 | 采纳:Code Puppy 注入的配置对正式渠道的五个开关(`todo`/`schedules`/`media_blob`/`artifacts`/`background_compaction`)显式写值,堵住用户 `opencode.json` 的 `experimental.*` / `all_flags`(注入层优先级高于项目与全局)。并入 L5(与 R13、R17 同一调用链)。订正坐标 `flag.ts:31,35`。 | `v2:packages/core/src/flag.ts:57-70`。 |
 | OOR-2 | 采纳:清点表 S7 补 `packages/ui-mac/src/main/sidecar-stop.ts:38` 的 `POST /global/dispose`(2.x 下 404 会让停止在排空连接前抛错);L5 退出条件点名它。 | 审计读码。 |
 | OOR-3 | 采纳:§6.2 撤回演练用独立的 userData 与数据目录,不碰 owner 真实备份目录(否则 `BACKUP_KEEP=5` 轮转掉真实备份,且 2.x 写下的自有状态会被日用 1.x 读到)。 | `db-safety.ts:14,226-227`。 |
+
+## 跨线接口冻结后的裁决(2026-11-09;接口文档 `docs/design/2026-11-09-1662-lane-seams.md`,`11d8d5d4ae`)
+
+| # | 裁决 | 依据 |
+| --- | --- | --- |
+| R20 | **方案 §5.3「每条 lane 交回前跑本地门」作废**:开发 lane 只跑改动相关、点名测试文件的测试与改到包的类型检查;整包单测与全量门只在最终 PR 推送时由编排器跑一次。任何合并(M0、lane 并入整合分支、最终合入 `alpha`)只由 `integrator` 或编排器做。M0 采用 integrator 独立重建的 `6bc3001fa6`;L2 开发 lane 做出的 `f47f2b354a` 作废。 | owner 2026-11-09:「新的开发技能开发只能做开发以及它相关的测试不可以跑全量测试」「为什么又让开发agent 执行合并」「改，严格约束开发子代理严谨跑全量ci 和全量测试。」orchestrate §6 已加同句(agent-config-sync `b5a7c2d`),`lane-full-gate` 钩子加硬中。integrator 重建与 `f47f2b354a` 只差三处写法(并集顺序 ×2、pin 日期注释)。 |
+| R21 | 接口文档 Q1 → **选 b**:5 个被 ui-mac 与 ext import 的契约模块按 I6 的位置恢复,并加 I5 的 `TOOL_POLICY_RPC` 常量;作为 L2 的最后一个单独提交,L3–L6 从含它的整合分支开工。 | 接口文档 Q1;M0 按规则移出了全部 80 个 alpha 文件。 |
+| R22 | 接口文档 Q2 → **I4(ext 没装上时 sidecar 不报 ready)写进 L5 的退出条件**;非初始目录单独装不上的情况记残余风险。L3 开工第一步实测「2.x 每个目录各加载一次本地插件」(Q3),成立且失败形态可达时再回来裁是否在配置层加底线规则。 | 接口文档 Q2、Q3;基线 S1「未知默认拒」。 |
+| R23 | 接口文档 Q6 → **采纳文档第 5 节对 K5、L5r、L1r 的切法**,写进各 lane 派发书。Q3、Q5、Q8 分别作为 L3、L3、L4 开工第一步的实测项;Q4 计入 L5、L6 的工作量;Q7 随 I4 与 L5 的 S6 一并核。文档顺带发现的两处重复定义(`CODEPUPPY_CLOUD_MCP_DEF`/`_ARM`、定制中心 `requestId` 校验)由碰到它的 lane 用一条命令核实后登记进 `docs/architecture/constraints.md`。 | 接口文档 §5 与 ③。 |

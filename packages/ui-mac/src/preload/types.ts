@@ -77,11 +77,12 @@ export type {
   WslServersState,
 } from "@opencode-ai/app/wsl/types"
 
-export type ServerReadyData = {
-  url: string
-  username: string | null
-  password: string | null
-}
+/**
+ * `#1667`(#1662 接口文档 I8,基线 S8):renderer 能看到的只有引擎的源地址。口令留在 main,renderer 发往这个源的请求由
+ * main 在 `onBeforeSendHeaders` 里补 `Authorization`(windows.ts);main 内部带口令的类型是 `main/engine-authorization.ts`
+ * 的 `EngineConnection`,不经 IPC 出去。
+ */
+export type ServerReadyData = { url: string }
 
 export type SidecarGenerationReason = "boot" | "structural"
 

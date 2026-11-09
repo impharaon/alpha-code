@@ -711,10 +711,14 @@ export async function spawnLocalServer(
   }
 }
 
+/**
+ * 健康 / 就绪探测(清点表 H7,`#1667`):OpenCode 2 的 `GET /api/info` —— 启动中 503 + `retry-after`、就绪 200、启动失败 500
+ * (`packages/server/src/process.ts` 的 `infoResponse`)。v1 的 `/global/health` 在 2.x 不存在。
+ */
 export async function checkHealth(url: string, password?: string | null): Promise<boolean> {
   let healthUrl: URL
   try {
-    healthUrl = new URL("/global/health", url)
+    healthUrl = new URL("/api/info", url)
   } catch {
     return false
   }

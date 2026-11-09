@@ -194,6 +194,11 @@ export const DOWNGRADED_ANCHORS: Record<string, SourceTextEntry> = {
     evidence: "#1667",
     lines: 1,
   },
+  "packages/ui-mac/src/main/renderer-engine-auth.test.ts": {
+    why: "`#1667` 最后一条锚 index.ts 的 awaitInitialization 返回 rendererEngineView(res)、index.ts 在 sidecar 起来时 setEngineConnection(connection)、windows.ts 的 onBeforeSendHeaders 经 withEngineRequestAuthorization 补头(接口文档 I8)。两个不会让它变红的变异:①在 return 之前把 res 换成另一个带口令的对象(文本仍在);②onBeforeSendHeaders 算出补过头的对象却把原始 details.requestHeaders 交给 callback。index.ts 结构上进不了 bun、windows.ts 顶层 import electron;同文件前三条真执行投影与补头函数。",
+    evidence: "#1667",
+    lines: 2,
+  },
   "packages/ui-mac/src/main/sidecar-stop.test.ts": {
     why: "锚 sidecar.ts 的 stop 是否接在共享执行器上(含两条负全称:sidecar.ts 不得再出现 listener.stop(),sidecar.ts / sidecar-stop.ts 不得再出现 v1 的全局 dispose 路由 —— 2.x 下 404,`#1667` OOR-2)。两个不会让它变红的变异:①把 stopSidecarEngine 的实现改成直接 return;②在别的模块里再关一次引擎。sidecar.ts 顶层有副作用,import 不得;同 describe 里上面几条才是真行为判据,这一条只保证生产真的接在那上面。",
     evidence: "#911",

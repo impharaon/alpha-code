@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto"
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http"
 import type { AddressInfo } from "node:net"
 import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
-import type { ServerReadyData } from "../preload/types"
+import type { EngineConnection } from "./engine-authorization"
 import {
   evaluatePackageMcpOauthStatusV1,
   type PackageMcpOauthAttemptV1,
@@ -325,7 +325,7 @@ export async function probePackageMcpOauthPrerequisiteV1(
  * so "main talks to an authenticated engine" is one shape everywhere.
  */
 export function createPackageMcpOauthEngineV1(
-  awaitServer: () => Promise<ServerReadyData>,
+  awaitServer: () => Promise<EngineConnection>,
   fetchImpl: typeof fetch = fetch,
 ): PackageMcpOauthEngineV1 {
   async function client() {

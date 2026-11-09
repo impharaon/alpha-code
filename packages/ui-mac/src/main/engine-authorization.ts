@@ -5,6 +5,41 @@
 //   · I8:main 在 `onBeforeSendHeaders` 里给 renderer 发往引擎源的请求补同一个头(windows.ts),renderer 只拿 `{ url }`。
 // 用户名恒为 `opencode`(`packages/server/src/process.ts` 的 `dispatch`)。
 import type { EngineFetch } from "./in-process-engine"
+import type { ServerReadyData } from "../preload/types"
+
+/**
+ * main 内部持有的引擎连接(带口令)。I8:它只在 main 里流转(index.ts 的 serverReady、ext / MCP / 自动化 / 工具策略这些
+ * main 侧调用方),**不经 IPC 出去** —— renderer 拿到的是 `rendererEngineView` 投影出的 `{ url }`。
+ */
+export type EngineConnection = { url: string; username: string | null; password: string | null }
+
+/** I8:`await-initialization` 给 renderer 的只有引擎源地址。 */
+export function rendererEngineView(connection: EngineConnection): ServerReadyData {
+  return { url: connection.url }
+}
+
+/**
+ * I8:main 在 renderer 会话的 `onBeforeSendHeaders` 里调用。请求的源与引擎源相同才补 `Authorization`(覆盖 renderer
+ * 自己带的),别的源一律原样放过 —— 口令不跟着请求流到第三方(上游桌面版同款:`packages/desktop/src/main/windows/security.ts`)。
+ */
+export function withEngineRequestAuthorization(
+  requestUrl: string,
+  headers: Record<string, string | string[]>,
+  connection: EngineConnection | undefined,
+): Record<string, string | string[]> {
+  if (!connection?.password) return headers
+  let target: string
+  let engine: string
+  try {
+    target = new URL(requestUrl).origin
+    engine = new URL(connection.url).origin
+  } catch {
+    return headers
+  }
+  if (target !== engine) return headers
+  const next = Object.fromEntries(Object.entries(headers).filter(([name]) => name.toLowerCase() !== "authorization"))
+  return { ...next, Authorization: engineAuthorization(connection.password) }
+}
 
 export function engineAuthorization(password: string): string {
   return `Basic ${Buffer.from(`opencode:${password}`).toString("base64")}`

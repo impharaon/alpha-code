@@ -19,7 +19,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
     }),
   ])
 }
-import type { ServerReadyData } from "../preload/types"
+import type { EngineConnection } from "./engine-authorization"
 
 export type ProjectMcpActivationVerdict = "active" | "shadowed" | "pending" | "unverifiable"
 
@@ -31,7 +31,7 @@ export type ProjectMcpActivationVerdict = "active" | "shadowed" | "pending" | "u
 export async function probeProjectMcpActivation(
   name: string,
   directory: string,
-  awaitServer: () => Promise<ServerReadyData>,
+  awaitServer: () => Promise<EngineConnection>,
   options: {
     fetch?: typeof fetch
     timeoutMs?: { awaitServer: number; globalConfig: number; effectiveConfig: number; status: number }
@@ -194,7 +194,7 @@ export type McpVerification = {
 export async function verifyInstalledMcp(
   name: string,
   directory: string,
-  awaitServer: () => Promise<ServerReadyData>,
+  awaitServer: () => Promise<EngineConnection>,
   fetchImpl: typeof fetch = fetch,
   timeoutMs = { awaitServer: 5_000, status: 10_000 },
 ): Promise<McpVerification> {

@@ -28,7 +28,7 @@
 import { realpathSync } from "node:fs"
 import { isAbsolute, join, relative } from "node:path"
 import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
-import type { ServerReadyData } from "../preload/types"
+import type { EngineConnection } from "./engine-authorization"
 import type { CatalogEntry } from "../renderer/extensions/catalog-types"
 import { installableCatalogEntries, installableCatalogPackages } from "../renderer/extensions/catalog-installable-view"
 import type { CatalogPackageViewV1 } from "../shared/catalog-package-view"
@@ -73,7 +73,7 @@ export type HubViewDeps = {
   defaultDirectory(): string
   /** 项目 MCP 的既有 D-scoped 判据(信任门 + probeProjectMcpActivation);`active` 才算可用。 */
   projectMcpState(name: string, projectDir: string): Promise<string>
-  awaitServer(): Promise<ServerReadyData>
+  awaitServer(): Promise<EngineConnection>
   /** reload-coordinator.pendingFor。 */
   pendingFor(directory: string, itemID?: string): HubStateReason | undefined
   fetch?: typeof fetch

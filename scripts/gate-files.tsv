@@ -364,3 +364,4 @@
 7	packages/ui-mac	src/main/ext-boot-safety.test.ts	-	#1632:旧版真实缓存经全量验签刷新后放行;断网、篡改、15 秒超时继续拒绝;其它 gap 不刷新且保留原文案;重判锁忙拒绝;真实 session-grant 强制连续重判幂等。超时用真实计时器验证事件循环可继续执行。
 1	packages/opencode	test/server/codepuppy-sidecar-stop.test.ts	-	#1647 AC1:真实 Default app 的待审批回合经生产 sidecar 停止执行器释放,新实例读取工具 error/结束时间和助手 MessageAbortedError,真实 MCP tools/call 为零。去掉释放调用即红。
 3	packages/opencode	test/mcp/codepuppy-tool-discovery.test.ts	-	#1645:自有取清单函数复用上游分页,保留跨页 outputSchema 校验、SDK 错误类型和每次请求的超时原因;真实 MCP Server/Client,不修改上游 catalog。
+2	packages/core	test/codepuppy-browser-tool-names.test.ts	-	#1662 L4 裁决第 3 项(ADR-041 决定 2「重名一律拒,绝不后写覆盖」)的 Browser 插件那一路:真 Location 去掉 / 带上 opencode.browser 各启动一次,内置工具一个不变、Browser 新增的全在 browser 命名空间;反向臂证明比较器认得出「同名被盖掉」

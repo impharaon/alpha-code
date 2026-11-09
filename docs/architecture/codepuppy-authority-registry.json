@@ -757,14 +757,14 @@
       "adr": [
         "ADR-041"
       ],
-      "lane": "L4 (#1666) — needs orchestrator decision",
-      "takeovers": [],
+      "lane": "L4 (#1666) + L3 (#1665) per ruling item 3 (c)",
+      "takeovers": [
+        "packages/core/test/codepuppy-browser-tool-names.test.ts"
+      ],
       "blocked": {
-        "reason": "OpenCode 2's tool registry keys tools by effective name and keeps the last registration (packages/core/src/tool.ts commit → Map.set) without recording which plugin registered it; the promise API's tool.list() returns fresh executor wrappers, so a plugin cannot tell a replaced tool from the original.",
+        "reason": "Ruling item 3 holds it by reachability: the non-builtin registration paths on OpenCode 2 are the extension's own tools and its project-plugin fan-out (L3 refuses duplicate effective names before registering), MCP tools (refused in L4's MCP re-take, ruling item 5) and the upstream Browser plugin (pinned: packages/core/test/codepuppy-browser-tool-names.test.ts). Registered as held once the MCP refusal lands and the orchestrator registers L3's fan-out mechanism at integration.",
         "options": [
-          "(a) Re-take packages/core/src/tool.ts to record the registering plugin and refuse duplicate effective names (L3 on a hot upstream file).",
-          "(b) Upstream an owner field on registry entries and consume it (no Code Puppy fork; timing depends on upstream).",
-          "(c) Accept the L0 approximation (early registry = builtin; with only ext activated as a configured plugin, collisions can only come from ext's own fan-out, which L3 can refuse) and record the residual."
+          "Register L3's fan-out refusal and L4's MCP refusal with their tests, plus the Browser pin, as one held entry at integration."
         ]
       }
     },

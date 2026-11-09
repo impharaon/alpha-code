@@ -7,10 +7,10 @@
   "exports": {
     ".": {
       "types": "./src/plugin.ts",
-      "default": "./dist/plugin.js"
+      "default": "./dist/server.js"
     }
   },
-  "main": "./dist/plugin.js",
+  "main": "./dist/server.js",
   "files": [
     "dist"
   ],
@@ -23,5 +23,9 @@
     "@codepuppy/contracts-consumer": "workspace:*",
     "@opencode/plugin": "workspace:*",
     "@silvia-odwyer/photon-node": "0.3.4"
+  },
+  "devDependencies": {
+    "@opencode/core": "workspace:*",
+    "effect": "catalog:"
   }
 }

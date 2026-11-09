@@ -4,10 +4,10 @@
 //
 // Why bundle at all:
 //   The desktop server runs under Electron's Node. Node type-strips `.ts` but does NOT
-//   remap `.js`→`.ts` import specifiers. `@opencode-ai/plugin` ships only TS source whose
+//   remap `.js`→`.ts` import specifiers. `@opencode/plugin` ships only TS source whose
 //   files import each other with `.js` specifiers (the nodenext convention), so loading it
 //   raw under Node dies with ERR_MODULE_NOT_FOUND (.../tool.js from .../index.ts).
-//   Bundling inlines `@opencode-ai/plugin` (+ the zod it pulls in) into one plain `.js`,
+//   Bundling inlines `@opencode/plugin` (+ the effect it pulls in) into one plain `.js`,
 //   so the server only ever imports already-resolved JS.
 import { createHash } from "node:crypto"
 import { readFileSync, rmSync, writeFileSync } from "node:fs"
@@ -25,7 +25,12 @@ const result = await Bun.build({
   target: "node", // Node-compatible output; Node built-ins stay external automatically
   format: "esm",
   sourcemap: "linked",
-  // No `external`: inline EVERYTHING (incl. @opencode-ai/plugin + zod) so the embedded
+  // `#1665` (I2, seam change 2026-11-09): OpenCode 2 loads a configured local plugin only by its DIRECTORY
+  // (`packages/core/src/config/plugin/source.ts` drops a file path with a warning) and resolves the server
+  // entry by the conventional name `server` inside it (`packages/plugin/src/host.ts` resolve()). `dist/` has
+  // no package.json, so the entry file must be `server.js`; main lists the directory in `plugins`.
+  naming: "server.js",
+  // No `external`: inline EVERYTHING (incl. @opencode/plugin + effect) so the embedded
   // Node server never has to resolve a raw `.ts` at runtime — the whole point of ADR-006.
   //
   // Known G1 caveat: the opencode server bundle carries its OWN zod/effect copy, so the
@@ -40,14 +45,14 @@ if (!result.success) {
   process.exit(1)
 }
 
-// #1578 AC5 (REQ-236 §2.6-7): the trusted bundled manifest, shipped next to plugin.js (electron-builder `codepuppy-ext/`).
+// #1578 AC5 (REQ-236 §2.6-7): the trusted bundled manifest, shipped next to server.js (electron-builder `codepuppy-ext/`).
 // The engine gives `codepuppy-bundled` only to these tool names, and only when the plugin module it loaded hashes to this
 // digest (packages/opencode/src/plugin/codepuppy-bundled-plugin.ts). Tool names = TOOL_TEXT's keys, which
 // src/context-injection.test.ts pins to the real CodePuppyExt's own tool set; project plugins merged in at runtime are
 // never listed.
 // #1568 AC5: `readable` = each listed tool's display identifier (`codepuppy:<action>`), declared in TOOL_TEXT.
 const manifest = {
-  moduleSha256: createHash("sha256").update(readFileSync("dist/plugin.js")).digest("hex"),
+  moduleSha256: createHash("sha256").update(readFileSync("dist/server.js")).digest("hex"),
   tools: Object.keys(TOOL_TEXT).sort(),
   readable: Object.fromEntries(Object.entries(TOOL_TEXT).map(([name, text]) => [name, text.readable])),
 }

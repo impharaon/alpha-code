@@ -17,7 +17,7 @@ last_reviewed: 2026-11-10
 
 ## 来源
 
-- [RQ-downloads](https://github.com/impharaon/alpha-work/blob/27d104dfb0bb8d36f6d050277255861c4927416c/docs/requests/RQ-downloads.md#需求点)。
+- [impharaon/alpha-work:RQ-downloads](https://github.com/impharaon/alpha-work/blob/27d104dfb0bb8d36f6d050277255861c4927416c/docs/requests/RQ-downloads.md#需求点)。
 - [历史需求 alpha-code#1207](https://github.com/impharaon/alpha-code/issues/1207) · [Epic alpha-work#144](https://github.com/impharaon/alpha-work/issues/144)。
 
 ## 用户与范围

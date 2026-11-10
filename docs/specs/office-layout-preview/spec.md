@@ -17,7 +17,7 @@ Office 文件在隔离预览里显示真实版式。已有能力及其剩余证�
 
 ## 来源
 
-- [RQ-preview](https://github.com/impharaon/alpha-work/blob/27d104dfb0bb8d36f6d050277255861c4927416c/docs/requests/RQ-preview.md#需求点)。
+- [impharaon/alpha-work:RQ-preview](https://github.com/impharaon/alpha-work/blob/27d104dfb0bb8d36f6d050277255861c4927416c/docs/requests/RQ-preview.md#需求点)。
 - [历史需求 alpha-code#1229](https://github.com/impharaon/alpha-code/issues/1229) · [Epic alpha-work#146](https://github.com/impharaon/alpha-work/issues/146)。
 - [范围与交付证据](https://github.com/impharaon/alpha-code/pull/1230)。
 

@@ -17,7 +17,7 @@ last_reviewed: 2026-11-10
 
 ## 来源
 
-- [RQ-billing](https://github.com/impharaon/alpha-work/blob/27d104dfb0bb8d36f6d050277255861c4927416c/docs/requests/RQ-billing.md#需求点)。
+- [impharaon/alpha-work:RQ-billing](https://github.com/impharaon/alpha-work/blob/27d104dfb0bb8d36f6d050277255861c4927416c/docs/requests/RQ-billing.md#需求点)。
 - [历史需求 alpha-code#1194](https://github.com/impharaon/alpha-code/issues/1194) · [Epic alpha-work#136](https://github.com/impharaon/alpha-work/issues/136)。
 - [范围与交付证据](https://github.com/impharaon/alpha-code/issues/1194#issuecomment-5474188488)。
 

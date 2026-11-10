@@ -17,7 +17,7 @@ last_reviewed: 2026-11-10
 
 ## 来源
 
-- [RQ-artifacts](https://github.com/impharaon/alpha-work/blob/27d104dfb0bb8d36f6d050277255861c4927416c/docs/requests/RQ-artifacts.md#需求点)。
+- [impharaon/alpha-work:RQ-artifacts](https://github.com/impharaon/alpha-work/blob/27d104dfb0bb8d36f6d050277255861c4927416c/docs/requests/RQ-artifacts.md#需求点)。
 - [历史需求 alpha-code#1163](https://github.com/impharaon/alpha-code/issues/1163) · [Epic alpha-work#148](https://github.com/impharaon/alpha-work/issues/148)。
 - [范围与交付证据](https://github.com/impharaon/alpha-code/pull/1168)。
 

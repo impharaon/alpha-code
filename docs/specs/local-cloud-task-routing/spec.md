@@ -34,7 +34,7 @@ last_reviewed: 2026-11-10
 ## 业务规则
 
 - **BR-01** 出厂技能 `cloud-capabilities`(可作 `/cloud` 调用)取代 `cloud-dispatch`,覆盖方案 §2.8 的判断规则;技能里出现的每个云工具名都存在于 Cloud MCP 工具注册表(单一权威 `alpha-platform:packages/gateway/src/lib/mcp-tool-registry.ts`),由测试从注册表派生核对。
-- **BR-02** `office-docs` 技能含云端分支:从零生成要排版的文件走云、读改本机已有文件走本机。
+- **BR-02** Word / Excel / PowerPoint / PDF 使用本机工具，网页 / HTML 在本机项目目录生成；不再派发已停用的云端 Office / HTML。依据：[2026-10-27 owner 裁决及交付](https://github.com/impharaon/alpha-platform/issues/552#issuecomment-6439355753)。
 
 规则据下表原条款摘录；历史删改与后续裁决仍按「用户与范围」限定。
 
@@ -45,12 +45,12 @@ last_reviewed: 2026-11-10
 | ID | Given / When / Then（历史原文） | 依据 |
 | --- | --- | --- |
 | AC-01 | 出厂技能 `cloud-capabilities`(可作 `/cloud` 调用)取代 `cloud-dispatch`,覆盖方案 §2.8 的判断规则;技能里出现的每个云工具名都存在于 Cloud MCP 工具注册表(单一权威 `alpha-platform:packages/gateway/src/lib/mcp-tool-registry.ts`),由测试从注册表派生核对 | [原票](https://github.com/impharaon/alpha-code/issues/1520) · [最后裁决](https://github.com/impharaon/alpha-code/issues/1520#issuecomment-6206081298) |
-| AC-02 | `office-docs` 技能含云端分支:从零生成要排版的文件走云、读改本机已有文件走本机 | [原票](https://github.com/impharaon/alpha-code/issues/1520) · [最后裁决](https://github.com/impharaon/alpha-code/issues/1520#issuecomment-6206081298) |
+| AC-02 | 已退出，不复用编号：~~`office-docs` 技能含云端分支:从零生成要排版的文件走云、读改本机已有文件走本机~~。已由 BR-02 所引 2026-10-27 本机优先裁决取代。 | [原票](https://github.com/impharaon/alpha-code/issues/1520) · [最后裁决](https://github.com/impharaon/alpha-code/issues/1520#issuecomment-6206081298) |
 | AC-03 | 固定回归集(≥20 条,含反例)上评测 agent 的本机/云端选择(每例重复 3 次):① **隐私底线**——凡「用云端处理本机私有文件」类题,在用户同意前把文件内容送上云的次数为 0;② 改后(cloud-capabilities)整体按次正确率不低于改前(cloud-dispatch)。(2026-10-15 owner 批准改写:原「改后高于改前且差值超出噪声带」在 28 题 × 3 次的样本量下分辨不出约 7 个百分点的差别,两轮均卡在噪声带边界。) | [原票](https://github.com/impharaon/alpha-code/issues/1520) · [最后裁决](https://github.com/impharaon/alpha-code/issues/1520#issuecomment-6206081298) |
 
 ## 待决
 
-历史 AC2 云端生成 Office 的前提已被 2026-10-27 停用裁决推翻；保留历史评测和隐私底线，不再以原 AC2 声称当前支持云端 Office。
+原 AC2 的退出已有 owner 裁决，不需重新作产品选择。原 AC3 的评测是停用前的固定回归集；未找到停用后重新验证该评测适用范围的记录，因此整份现行规格继续保留草稿。
 
 ## 批准记录
 

@@ -22,6 +22,7 @@
 - `alpha` = `dev` + 自有新增(产品/开发分支)。
 - 自动:`.github/workflows/sync-upstream.yml` 每天同步 dev → merge 进 alpha。
 - 手动升级:`gh repo sync jinjunnn/alpha-code --branch dev` → `git checkout alpha && git merge dev`。
+- 上游同步、升级或替换的方案,先列出 Alpha 已从上游收编的权威,并逐条写明在新上游上怎么继续持有(见 [`docs/architecture/upstream-integration.md`](docs/architecture/upstream-integration.md) 与北极星收编白名单 [ADR-033](.claude/rules/adrs/ADR-033-permission-kernel-takeover.md));UI 保持当前官方版本;已收编的权威绝不退回上游默认。
 
 ## 关键事实速查
 - opencode = 27 包 Bun monorepo;脊柱 = `@opencode-ai/sdk`(契约)+ `@opencode-ai/core`(地基)。

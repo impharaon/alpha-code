@@ -1,11 +1,11 @@
 # alpha-code documents
 
-<!-- documentation-contract: v3 -->
+<!-- documentation-contract: v4 -->
 
-Active work is owned only by [alpha-code Issues](https://github.com/jinjunnn/alpha-code/issues)
-and [Alpha Delivery](https://github.com/users/jinjunnn/projects/2). Current
+Active work is owned only by [alpha-code Issues](https://github.com/impharaon/alpha-code/issues)
+and [Alpha Delivery](https://github.com/users/impharaon/projects/2). Current
 runtime behavior comes from code, tests, schemas, packaged resources, and
-accepted contracts. Follow the [Code Puppy Documentation Contract](https://github.com/jinjunnn/alpha-work/blob/main/governance/documentation-standard.md).
+accepted contracts. Follow the [Code Puppy Documentation Contract](https://github.com/impharaon/alpha-work/blob/main/governance/documentation-standard.md).
 
 | Need                                                                 | Canonical source                                                     |
 | -------------------------------------------------------------------- | -------------------------------------------------------------------- |
@@ -95,3 +95,296 @@ authority. `understanding.md`, `extension-seams.md`, and the diagram corpus are
 protected point-in-time cartography/knowledge assets; use them for provenance,
 not for current package versions, synchronization rules, or implementation
 status.
+
+[模块地图](architecture/modules.md) · [工作过程规格](specs/conversation-process-fold/spec.md) · [对话浮层规格](specs/conversation-overlays/spec.md)
+
+## 文档索引
+
+<!-- docs-index:start -->
+
+<!-- 由 docs_index.py 从各文件 frontmatter 生成,不要手改;改文件的 summary 后重跑 --write。 -->
+
+### architecture
+
+| id | 文件 | 做什么 | 状态 |
+| --- | --- | --- | --- |
+| `⚠️ 缺 id` | [architecture/2026-08-10-catalog-readiness-signals.md](architecture/2026-08-10-catalog-readiness-signals.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [architecture/2026-08-10-packaged-first-launch-catalog-cost.md](architecture/2026-08-10-packaged-first-launch-catalog-cost.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [architecture/2026-08-23-codex-harness-comparison.md](architecture/2026-08-23-codex-harness-comparison.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [architecture/2026-08-23-network-timeout-recon.md](architecture/2026-08-23-network-timeout-recon.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [architecture/2026-08-23-shell-sandbox-seam.md](architecture/2026-08-23-shell-sandbox-seam.md) | ⚠️ 缺 summary | superseded |
+| `⚠️ 缺 id` | [architecture/2026-08-25-network-egress-seam.md](architecture/2026-08-25-network-egress-seam.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [architecture/2026-09-03-electron-pdf-viewer-session.md](architecture/2026-09-03-electron-pdf-viewer-session.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [architecture/2026-09-03-office-layout-isolation.md](architecture/2026-09-03-office-layout-isolation.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [architecture/2026-09-06-external-skills-inheritance-decision.md](architecture/2026-09-06-external-skills-inheritance-decision.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [architecture/2026-09-06-model-variant-reachability.md](architecture/2026-09-06-model-variant-reachability.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [architecture/2026-09-08-context-injection-registry.md](architecture/2026-09-08-context-injection-registry.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [architecture/2026-09-08-derived-process-spawn-paths.md](architecture/2026-09-08-derived-process-spawn-paths.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [architecture/2026-09-08-managed-policy-and-hook-abort-decision.md](architecture/2026-09-08-managed-policy-and-hook-abort-decision.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [architecture/2026-09-08-permission-prompt-classification-seam.md](architecture/2026-09-08-permission-prompt-classification-seam.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [architecture/2026-09-09-multi-workspace-fence-decision.md](architecture/2026-09-09-multi-workspace-fence-decision.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [architecture/2026-09-09-req159-process-fence.md](architecture/2026-09-09-req159-process-fence.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [architecture/2026-09-09-req159-u1-native-addon-signed-load.md](architecture/2026-09-09-req159-u1-native-addon-signed-load.md) | ⚠️ 缺 summary | accepted |
+| `⚠️ 缺 id` | [architecture/2026-09-10-network-egress-on-process-fence.md](architecture/2026-09-10-network-egress-on-process-fence.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [architecture/2026-09-17-memory-injection-seam.md](architecture/2026-09-17-memory-injection-seam.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [architecture/2026-09-17-tool-policy-transport-seam.md](architecture/2026-09-17-tool-policy-transport-seam.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [architecture/2026-09-23-bun-electron-mock-link-abort.md](architecture/2026-09-23-bun-electron-mock-link-abort.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [architecture/2026-09-23-native-tool-gate-inventory.md](architecture/2026-09-23-native-tool-gate-inventory.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [architecture/2026-09-23-runtime-permission-tiers.md](architecture/2026-09-23-runtime-permission-tiers.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [architecture/2026-09-23-web-tools-account-routing-recon.md](architecture/2026-09-23-web-tools-account-routing-recon.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [architecture/2026-09-23-webfetch-egress-decision-chain.md](architecture/2026-09-23-webfetch-egress-decision-chain.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [architecture/2026-09-24-cloud-vision-client-seam.md](architecture/2026-09-24-cloud-vision-client-seam.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [architecture/2026-09-24-exa-mcp-failure-signal-recon.md](architecture/2026-09-24-exa-mcp-failure-signal-recon.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [architecture/2026-09-27-exa-entry-shape-fail-open-recon.md](architecture/2026-09-27-exa-entry-shape-fail-open-recon.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [architecture/claude-plugin-corpus-component-scale.md](architecture/claude-plugin-corpus-component-scale.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [architecture/codepuppy-connection-lifetime.md](architecture/codepuppy-connection-lifetime.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [architecture/constraints.md](architecture/constraints.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [architecture/engine-command-and-event-surface.md](architecture/engine-command-and-event-surface.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [architecture/extension-seams.md](architecture/extension-seams.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [architecture/frontend-surfaces.md](architecture/frontend-surfaces.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [architecture/host-extension-package-contract-boundary.md](architecture/host-extension-package-contract-boundary.md) | ⚠️ 缺 summary | active |
+| `ARCH-modules` | [architecture/modules.md](architecture/modules.md) | 标明桌面宿主、引擎、共享契约和上游工作区包的边界。 | active |
+| `⚠️ 缺 id` | [architecture/overview.md](architecture/overview.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [architecture/package-mcp-oauth-boundary.md](architecture/package-mcp-oauth-boundary.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [architecture/quality-gate-environments.md](architecture/quality-gate-environments.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [architecture/understanding.md](architecture/understanding.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [architecture/upstream-integration.md](architecture/upstream-integration.md) | ⚠️ 缺 summary | active |
+
+### audits
+
+| id | 文件 | 做什么 | 状态 |
+| --- | --- | --- | --- |
+| `⚠️ 缺 id` | [audits/2026-06-28-timeline-overhaul.md](audits/2026-06-28-timeline-overhaul.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-02-register-verification.md](audits/2026-07-02-register-verification.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-02-startup-perf-audit.md](audits/2026-07-02-startup-perf-audit.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-03-b3-cloud-loop.md](audits/2026-07-03-b3-cloud-loop.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-03-frontend-reskin-regression.md](audits/2026-07-03-frontend-reskin-regression.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-03-realmachine-verify.md](audits/2026-07-03-realmachine-verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-03-req002-proxy-e2e.md](audits/2026-07-03-req002-proxy-e2e.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-03-req003-sse-robustness.md](audits/2026-07-03-req003-sse-robustness.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-03-req004-alpha-bridge-spike.md](audits/2026-07-03-req004-alpha-bridge-spike.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-04-c14-coupling-convergence.md](audits/2026-07-04-c14-coupling-convergence.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-04-s11-ship-visual-verify.md](audits/2026-07-04-s11-ship-visual-verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-04-s12-ext-hub-m1-verify.md](audits/2026-07-04-s12-ext-hub-m1-verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-04-s13-acceptance.md](audits/2026-07-04-s13-acceptance.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-04-s13-t1t2-visual-verify/verify.md](audits/2026-07-04-s13-t1t2-visual-verify/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-04-s13-t3-visual-verify/verify.md](audits/2026-07-04-s13-t3-visual-verify/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-04-s13-t4-t5-visual-verify/verify.md](audits/2026-07-04-s13-t4-t5-visual-verify/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-04-s13-t6-visual-verify/verify.md](audits/2026-07-04-s13-t6-visual-verify/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-04-s13-t7-t9-visual-verify/verify.md](audits/2026-07-04-s13-t7-t9-visual-verify/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-04-silent-failure-rescan.md](audits/2026-07-04-silent-failure-rescan.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-05-req016-realmachine-batch/verify.md](audits/2026-07-05-req016-realmachine-batch/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-05-s17-t4-c28/verify.md](audits/2026-07-05-s17-t4-c28/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-05-s18-t1-req038/verify.md](audits/2026-07-05-s18-t1-req038/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-05-s18-t10-req032/verify.md](audits/2026-07-05-s18-t10-req032/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-05-s18-t2-req036/verify.md](audits/2026-07-05-s18-t2-req036/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-05-s18-t3-req037/verify.md](audits/2026-07-05-s18-t3-req037/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-05-s18-t7-req028/verify.md](audits/2026-07-05-s18-t7-req028/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-06-realmachine-vnext3/req024-run-report.md](audits/2026-07-06-realmachine-vnext3/req024-run-report.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-06-realmachine-vnext3/verify.md](audits/2026-07-06-realmachine-vnext3/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-06-s20-realmachine-vnext/verify.md](audits/2026-07-06-s20-realmachine-vnext/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-06-s21-realmachine-vnext2-challenge.md](audits/2026-07-06-s21-realmachine-vnext2-challenge.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-06-s21-realmachine-vnext2/verify.md](audits/2026-07-06-s21-realmachine-vnext2/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-07-b21-byok-realkey/verify.md](audits/2026-07-07-b21-byok-realkey/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-07-inperson-batch/verify.md](audits/2026-07-07-inperson-batch/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-07-req053-home-instance-loop.md](audits/2026-07-07-req053-home-instance-loop.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-07-req055-dev-verify/verify.md](audits/2026-07-07-req055-dev-verify/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-07-req059-060-t0-spike/verify.md](audits/2026-07-07-req059-060-t0-spike/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-07-req059-t1t3-realmachine/verify.md](audits/2026-07-07-req059-t1t3-realmachine/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-07-req060-confighook-spike/verify.md](audits/2026-07-07-req060-confighook-spike/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-07-req060-fanout-realmachine/verify.md](audits/2026-07-07-req060-fanout-realmachine/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-07-s29-verify/verify.md](audits/2026-07-07-s29-verify/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-08-g6-realmachine-batch/verify.md](audits/2026-07-08-g6-realmachine-batch/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-08-s30-req060-realmachine/verify.md](audits/2026-07-08-s30-req060-realmachine/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-08-shipped-verify-batch/verify.md](audits/2026-07-08-shipped-verify-batch/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-09-s33-realmachine/verify.md](audits/2026-07-09-s33-realmachine/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-09-s34-realmachine/verify.md](audits/2026-07-09-s34-realmachine/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-09-s37-req078/verify.md](audits/2026-07-09-s37-req078/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-09-s38-supply-baseline/verify.md](audits/2026-07-09-s38-supply-baseline/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-09-windows-portability-audit.md](audits/2026-07-09-windows-portability-audit.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-10-s39-req083/verify.md](audits/2026-07-10-s39-req083/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-12-req005-legacy-baseline.md](audits/2026-07-12-req005-legacy-baseline.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-12-req087-legacy-session-adapter.md](audits/2026-07-12-req087-legacy-session-adapter.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-13-s48-req088-t2-session-workspace.md](audits/2026-07-13-s48-req088-t2-session-workspace.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-13-s48-req088-t3t4-live-adapter-comparison.md](audits/2026-07-13-s48-req088-t3t4-live-adapter-comparison.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-13-s48-req088-t6-takeover-coexistence.md](audits/2026-07-13-s48-req088-t6-takeover-coexistence.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-13-s49-req102a-cas-seed-gc.md](audits/2026-07-13-s49-req102a-cas-seed-gc.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-13-s50-req103-slice1-ownership-datamodel.md](audits/2026-07-13-s50-req103-slice1-ownership-datamodel.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-13-s50-req103-slice2a-governance-ipc-ac3-ac4.md](audits/2026-07-13-s50-req103-slice2a-governance-ipc-ac3-ac4.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-14-s50-rename-acceptance-o4-phantom-ledger.md](audits/2026-07-14-s50-rename-acceptance-o4-phantom-ledger.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [audits/2026-07-18-req395-engine-config-load.md](audits/2026-07-18-req395-engine-config-load.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [audits/2026-07-21-north-star-guard-upstream-delta.md](audits/2026-07-21-north-star-guard-upstream-delta.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [audits/2026-07-28-652-engine-generation-split-incident.md](audits/2026-07-28-652-engine-generation-split-incident.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [audits/2026-08-05-claude-plugin-agent-frontmatter-distribution.md](audits/2026-08-05-claude-plugin-agent-frontmatter-distribution.md) | ⚠️ 缺 summary | ? |
+
+### contracts
+
+| id | 文件 | 做什么 | 状态 |
+| --- | --- | --- | --- |
+| `⚠️ 缺 id` | [contracts/artifact-office-open-gate.md](contracts/artifact-office-open-gate.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [contracts/byok-availability.md](contracts/byok-availability.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [contracts/catalog-channel-consumption.md](contracts/catalog-channel-consumption.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [contracts/desktop-release-manifest.md](contracts/desktop-release-manifest.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [contracts/engine-config-channels.md](contracts/engine-config-channels.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [contracts/extension-capability-authorization.md](contracts/extension-capability-authorization.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [contracts/extension-cas-seed.md](contracts/extension-cas-seed.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [contracts/extension-install-ledger.md](contracts/extension-install-ledger.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [contracts/extension-package-lifecycle.md](contracts/extension-package-lifecycle.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [contracts/host-extension-package-v1.md](contracts/host-extension-package-v1.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [contracts/permission-risk-classification.md](contracts/permission-risk-classification.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [contracts/platform-endpoint-discovery.md](contracts/platform-endpoint-discovery.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [contracts/platform-integration.md](contracts/platform-integration.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [contracts/recovery-adapter.md](contracts/recovery-adapter.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [contracts/session-permission.md](contracts/session-permission.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [contracts/settings-and-extension-storage-adapters.md](contracts/settings-and-extension-storage-adapters.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [contracts/tool-policy.md](contracts/tool-policy.md) | ⚠️ 缺 summary | active |
+
+### design
+
+| id | 文件 | 做什么 | 状态 |
+| --- | --- | --- | --- |
+| `⚠️ 缺 id` | [design/2026-06-22-arch-extension-hub.md](design/2026-06-22-arch-extension-hub.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [design/2026-06-25-cool-graphite-visual-system.md](design/2026-06-25-cool-graphite-visual-system.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [design/2026-06-27-model-picker-redesign/spec.md](design/2026-06-27-model-picker-redesign/spec.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [design/2026-06-29-llm-auth-routing/design.md](design/2026-06-29-llm-auth-routing/design.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [design/2026-07-03-frontend-decoupling-options.md](design/2026-07-03-frontend-decoupling-options.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [design/2026-07-04-extension-hub-v3-universal.md](design/2026-07-04-extension-hub-v3-universal.md) | ⚠️ 缺 summary | approved-direction |
+| `⚠️ 缺 id` | [design/2026-07-05-db-safety-belt.md](design/2026-07-05-db-safety-belt.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [design/2026-07-07-project-alpha-only-extensions.md](design/2026-07-07-project-alpha-only-extensions.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [design/2026-07-09-supply-baseline-curation-proposal.md](design/2026-07-09-supply-baseline-curation-proposal.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [design/2026-07-15-capability-authorize-dialog/design.md](design/2026-07-15-capability-authorize-dialog/design.md) | ⚠️ 缺 summary | accepted(2026-07-15 用户批准:Q1 场景化文案、Q2 首装必弹、Q3 bundle 全有或全无均接受;实现落 PR 见 |
+| `⚠️ 缺 id` | [design/2026-07-21-req053-bootstrap-loop-hardening.md](design/2026-07-21-req053-bootstrap-loop-hardening.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [design/2026-07-22-c21-a11y-baseline/baseline.md](design/2026-07-22-c21-a11y-baseline/baseline.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [design/2026-07-22-e7-cloud-web-search-baseline.md](design/2026-07-22-e7-cloud-web-search-baseline.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [design/2026-07-22-req089-route-manifest-authority/baseline.md](design/2026-07-22-req089-route-manifest-authority/baseline.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [design/2026-07-22-upload-consent-ux/design.md](design/2026-07-22-upload-consent-ux/design.md) | ⚠️ 缺 summary | draft(等 owner 评审;实现票见 alpha-code#225 / 父需求 alpha-work#10) |
+| `⚠️ 缺 id` | [design/2026-07-23-startup-availability-baseline.md](design/2026-07-23-startup-availability-baseline.md) | ⚠️ 缺 summary | approved |
+| `⚠️ 缺 id` | [design/2026-07-24-session-seam-baseline.md](design/2026-07-24-session-seam-baseline.md) | ⚠️ 缺 summary | frozen |
+| `⚠️ 缺 id` | [design/2026-07-28-req126-artifacts-cross-run.md](design/2026-07-28-req126-artifacts-cross-run.md) | ⚠️ 缺 summary | draft |
+| `⚠️ 缺 id` | [design/2026-07-28-req126-shell-navigation-baseline.md](design/2026-07-28-req126-shell-navigation-baseline.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [design/2026-07-30-req128-extension-package-baseline.md](design/2026-07-30-req128-extension-package-baseline.md) | ⚠️ 缺 summary | accepted |
+| `⚠️ 缺 id` | [design/2026-07-31-tool-identity-baseline.md](design/2026-07-31-tool-identity-baseline.md) | ⚠️ 缺 summary | accepted |
+| `⚠️ 缺 id` | [design/2026-08-02-req128-phase3-local-claude-plugin-import.md](design/2026-08-02-req128-phase3-local-claude-plugin-import.md) | ⚠️ 缺 summary | accepted |
+| `⚠️ 缺 id` | [design/2026-08-03-req128-phase4-managed-npm-plugin.md](design/2026-08-03-req128-phase4-managed-npm-plugin.md) | ⚠️ 缺 summary | superseded |
+| `⚠️ 缺 id` | [design/2026-08-04-external-package-adapter-baseline.md](design/2026-08-04-external-package-adapter-baseline.md) | ⚠️ 缺 summary | draft |
+| `⚠️ 缺 id` | [design/2026-08-08-req125-tool-card-provenance/design.md](design/2026-08-08-req125-tool-card-provenance/design.md) | ⚠️ 缺 summary | accepted |
+| `⚠️ 缺 id` | [design/2026-08-25-req131-settings-tool-policy/design.md](design/2026-08-25-req131-settings-tool-policy/design.md) | ⚠️ 缺 summary | approved |
+| `⚠️ 缺 id` | [design/2026-08-28-req108-rail-file-viewer/design.md](design/2026-08-28-req108-rail-file-viewer/design.md) | ⚠️ 缺 summary | proposed |
+| `⚠️ 缺 id` | [design/2026-08-28-req140-rail-width/design.md](design/2026-08-28-req140-rail-width/design.md) | ⚠️ 缺 summary | proposed |
+| `⚠️ 缺 id` | [design/2026-08-29-req123-office-extraction/baseline.md](design/2026-08-29-req123-office-extraction/baseline.md) | ⚠️ 缺 summary | proposed |
+| `⚠️ 缺 id` | [design/2026-09-09-req159-process-fence-baseline.md](design/2026-09-09-req159-process-fence-baseline.md) | ⚠️ 缺 summary | accepted |
+| `⚠️ 缺 id` | [design/2026-09-10-req159-sandbox-disclosure/design.md](design/2026-09-10-req159-sandbox-disclosure/design.md) | ⚠️ 缺 summary | accepted |
+| `⚠️ 缺 id` | [design/2026-09-11-req160-empty-turn-row/design.md](design/2026-09-11-req160-empty-turn-row/design.md) | ⚠️ 缺 summary | accepted |
+| `⚠️ 缺 id` | [design/2026-09-17-req226-custom-provider-keychain-baseline.md](design/2026-09-17-req226-custom-provider-keychain-baseline.md) | ⚠️ 缺 summary | accepted |
+| `⚠️ 缺 id` | [design/2026-09-19-req160-send-blocked-notice/design.md](design/2026-09-19-req160-send-blocked-notice/design.md) | ⚠️ 缺 summary | accepted |
+| `⚠️ 缺 id` | [design/2026-09-21-1383-custom-provider-address-truth-baseline.md](design/2026-09-21-1383-custom-provider-address-truth-baseline.md) | ⚠️ 缺 summary | accepted |
+| `⚠️ 缺 id` | [design/2026-09-22-1399-turn-running-indicator/design.md](design/2026-09-22-1399-turn-running-indicator/design.md) | ⚠️ 缺 summary | accepted |
+| `⚠️ 缺 id` | [design/2026-09-23-1414-web-tools-account-routing-baseline.md](design/2026-09-23-1414-web-tools-account-routing-baseline.md) | ⚠️ 缺 summary | proposed |
+| `⚠️ 缺 id` | [design/2026-09-23-model-chosen-egress-baseline.md](design/2026-09-23-model-chosen-egress-baseline.md) | ⚠️ 缺 summary | accepted |
+| `⚠️ 缺 id` | [design/2026-09-29-req106-unsigned-windows-manual-distribution.md](design/2026-09-29-req106-unsigned-windows-manual-distribution.md) | ⚠️ 缺 summary | accepted |
+| `⚠️ 缺 id` | [design/2026-10-10-timeline-process-fold/design.md](design/2026-10-10-timeline-process-fold/design.md) | ⚠️ 缺 summary | accepted |
+| `⚠️ 缺 id` | [design/2026-10-14-req234-hub-agent-install-baseline.md](design/2026-10-14-req234-hub-agent-install-baseline.md) | ⚠️ 缺 summary | proposed |
+| `⚠️ 缺 id` | [design/2026-10-14-req235-cloud-capability-profile-baseline.md](design/2026-10-14-req235-cloud-capability-profile-baseline.md) | ⚠️ 缺 summary | proposed |
+| `⚠️ 缺 id` | [design/2026-10-30-req236-permission-cards/notes.md](design/2026-10-30-req236-permission-cards/notes.md) | ⚠️ 缺 summary | draft |
+| `⚠️ 缺 id` | [design/2026-10-30-req236-ux-config-pages/audit.md](design/2026-10-30-req236-ux-config-pages/audit.md) | ⚠️ 缺 summary | draft |
+| `⚠️ 缺 id` | [design/2026-10-30-req236-ux-core-pages/audit.md](design/2026-10-30-req236-ux-core-pages/audit.md) | ⚠️ 缺 summary | draft |
+| `⚠️ 缺 id` | [design/PAGE-MAP.md](design/PAGE-MAP.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [design/codepuppy-runtime-authority.md](design/codepuppy-runtime-authority.md) | ⚠️ 缺 summary | draft |
+| `⚠️ 缺 id` | [design/consume-alpha-contracts-v1.plan.md](design/consume-alpha-contracts-v1.plan.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [design/create-upload-manifest-v1.plan.md](design/create-upload-manifest-v1.plan.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [design/current/artifact-workbench/components.md](design/current/artifact-workbench/components.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [design/current/composer/components.md](design/current/composer/components.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [design/current/conversation-timeline/components.md](design/current/conversation-timeline/components.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [design/current/customization-center/components.md](design/current/customization-center/components.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [design/current/model-picker/components.md](design/current/model-picker/components.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [design/current/session-workspace/components.md](design/current/session-workspace/components.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [design/current/settings/components.md](design/current/settings/components.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [design/debates/2026-07-05-c28-honest-controls-brief.md](design/debates/2026-07-05-c28-honest-controls-brief.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [design/debates/2026-07-05-req008-positioning-briefs.md](design/debates/2026-07-05-req008-positioning-briefs.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [design/extension-hub.md](design/extension-hub.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [design/req-133-office-four-format-hub.md](design/req-133-office-four-format-hub.md) | ⚠️ 缺 summary | accepted |
+| `⚠️ 缺 id` | [design/req-134-mcp-workspace-follows-instance.md](design/req-134-mcp-workspace-follows-instance.md) | ⚠️ 缺 summary | accepted |
+| `⚠️ 缺 id` | [design/req-135-retire-community-excel.md](design/req-135-retire-community-excel.md) | ⚠️ 缺 summary | accepted |
+| `⚠️ 缺 id` | [design/req-136-project-mcp-install.md](design/req-136-project-mcp-install.md) | ⚠️ 缺 summary | accepted |
+| `⚠️ 缺 id` | [design/req-144-login-minted-mcp-access.md](design/req-144-login-minted-mcp-access.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [design/req-153-output-capability.md](design/req-153-output-capability.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [design/req-155-office-connector-follows-instance.md](design/req-155-office-connector-follows-instance.md) | ⚠️ 缺 summary | accepted |
+| `⚠️ 缺 id` | [design/req236-catalog-and-model.md](design/req236-catalog-and-model.md) | ⚠️ 缺 summary | draft |
+| `⚠️ 缺 id` | [design/req236-engine-lifecycle.md](design/req236-engine-lifecycle.md) | ⚠️ 缺 summary | draft |
+| `⚠️ 缺 id` | [design/req236-network-diagnosis.md](design/req236-network-diagnosis.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [design/req236-permissions-and-provenance.md](design/req236-permissions-and-provenance.md) | ⚠️ 缺 summary | draft |
+| `⚠️ 缺 id` | [design/req236-results-and-attachments.md](design/req236-results-and-attachments.md) | ⚠️ 缺 summary | draft |
+| `⚠️ 缺 id` | [design/system/color.md](design/system/color.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [design/system/components.md](design/system/components.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [design/system/contributing.md](design/system/contributing.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [design/system/patterns.md](design/system/patterns.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [design/system/principles.md](design/system/principles.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [design/system/replacing-opencode.md](design/system/replacing-opencode.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [design/system/tokens.md](design/system/tokens.md) | ⚠️ 缺 summary | active |
+
+### retrospectives
+
+| id | 文件 | 做什么 | 状态 |
+| --- | --- | --- | --- |
+| `⚠️ 缺 id` | [retrospectives/2026-07-02-upstream-sync-546.md](retrospectives/2026-07-02-upstream-sync-546.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [retrospectives/2026-07-05-s12-s17-arc.md](retrospectives/2026-07-05-s12-s17-arc.md) | ⚠️ 缺 summary | ? |
+
+### runbooks
+
+| id | 文件 | 做什么 | 状态 |
+| --- | --- | --- | --- |
+| `⚠️ 缺 id` | [runbooks/artifact-quota-reservation-recovery.md](runbooks/artifact-quota-reservation-recovery.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [runbooks/ci.md](runbooks/ci.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [runbooks/distribution.md](runbooks/distribution.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [runbooks/extension-tx-journal.md](runbooks/extension-tx-journal.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [runbooks/model-catalog-updates.md](runbooks/model-catalog-updates.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [runbooks/naming-migration.md](runbooks/naming-migration.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [runbooks/settings-storage-recovery.md](runbooks/settings-storage-recovery.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [runbooks/uninstall.md](runbooks/uninstall.md) | ⚠️ 缺 summary | ? |
+
+### specs
+
+| id | 文件 | 做什么 | 状态 |
+| --- | --- | --- | --- |
+| `SPEC-conversation-overlays` | [specs/conversation-overlays/spec.md](specs/conversation-overlays/spec.md) | 统一对话浮层交互，并让用户批准工具时还能翻看时间线。 | approved |
+| `SPEC-conversation-process-fold` | [specs/conversation-process-fold/spec.md](specs/conversation-process-fold/spec.md) | 把回答前的工作步骤收成一行，用户可展开核对，回答和待处理操作保持可见。 | approved |
+
+### verification
+
+| id | 文件 | 做什么 | 状态 |
+| --- | --- | --- | --- |
+| `⚠️ 缺 id` | [verification/2026-07-06-realmachine-vnext3-plan.md](verification/2026-07-06-realmachine-vnext3-plan.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [verification/2026-07-07-shipped-verification-matrix.md](verification/2026-07-07-shipped-verification-matrix.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [verification/2026-07-17-packaged-macos-rc-smoke.md](verification/2026-07-17-packaged-macos-rc-smoke.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [verification/2026-07-22-d5-playwright-kernel/c1-c2-download-observations.md](verification/2026-07-22-d5-playwright-kernel/c1-c2-download-observations.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [verification/2026-07-22-d5-playwright-kernel/verify.md](verification/2026-07-22-d5-playwright-kernel/verify.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [verification/2026-07-22-e7-deploy-probe.md](verification/2026-07-22-e7-deploy-probe.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [verification/2026-07-22-req005-packaged-evidence-index.md](verification/2026-07-22-req005-packaged-evidence-index.md) | ⚠️ 缺 summary | superseded |
+| `⚠️ 缺 id` | [verification/2026-07-24-req109-110-pr3-longrun.md](verification/2026-07-24-req109-110-pr3-longrun.md) | ⚠️ 缺 summary | final |
+| `⚠️ 缺 id` | [verification/2026-07-24-req109-110-t7-matrix.md](verification/2026-07-24-req109-110-t7-matrix.md) | ⚠️ 缺 summary | partial |
+| `⚠️ 缺 id` | [verification/2026-07-24-req109-t1-startup-timelines.md](verification/2026-07-24-req109-t1-startup-timelines.md) | ⚠️ 缺 summary | final |
+| `⚠️ 缺 id` | [verification/2026-07-24-req109-t6-mcp-default-deny.md](verification/2026-07-24-req109-t6-mcp-default-deny.md) | ⚠️ 缺 summary | final |
+| `⚠️ 缺 id` | [verification/2026-07-24-req125-session-visual/harness-plan.md](verification/2026-07-24-req125-session-visual/harness-plan.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [verification/2026-07-24-req125-session-visual/invariant-checks.md](verification/2026-07-24-req125-session-visual/invariant-checks.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [verification/2026-07-24-req125-session-visual/matrix.md](verification/2026-07-24-req125-session-visual/matrix.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [verification/2026-07-25-startup-availability-packaged-smoke.md](verification/2026-07-25-startup-availability-packaged-smoke.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [verification/2026-07-28-652-packaged-three-sends.md](verification/2026-07-28-652-packaged-three-sends.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [verification/2026-07-30-req679-pricing-visual/matrix.md](verification/2026-07-30-req679-pricing-visual/matrix.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [verification/2026-07-31-req128-package-detail/matrix.md](verification/2026-07-31-req128-package-detail/matrix.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [verification/2026-08-02-req128-phase3-gate-bypass-matrix.md](verification/2026-08-02-req128-phase3-gate-bypass-matrix.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [verification/2026-08-02-req128-phase3-packaged-l2.md](verification/2026-08-02-req128-phase3-packaged-l2.md) | ⚠️ 缺 summary | partial |
+| `⚠️ 缺 id` | [verification/2026-08-02-req128-t2-gate-bypass-experiments.md](verification/2026-08-02-req128-t2-gate-bypass-experiments.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [verification/2026-08-02-req128-t4-gate-bypass-experiments.md](verification/2026-08-02-req128-t4-gate-bypass-experiments.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [verification/2026-08-05-844-gate-exact-registry/verify.md](verification/2026-08-05-844-gate-exact-registry/verify.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [verification/2026-08-11-detect-failure-required-checks.md](verification/2026-08-11-detect-failure-required-checks.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [verification/2026-10-13-hub-copy-review.md](verification/2026-10-13-hub-copy-review.md) | ⚠️ 缺 summary | accepted |
+| `⚠️ 缺 id` | [verification/2026-10-15-req233-cloud-routing-eval/results-2026-10-15-real-report.md](verification/2026-10-15-req233-cloud-routing-eval/results-2026-10-15-real-report.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [verification/2026-10-15-req233-cloud-routing-eval/results-2026-10-15-real-round2-report.md](verification/2026-10-15-req233-cloud-routing-eval/results-2026-10-15-real-round2-report.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [verification/2026-10-15-req233-cloud-routing-eval/results-2026-10-15T10-01-09-000Z.md](verification/2026-10-15-req233-cloud-routing-eval/results-2026-10-15T10-01-09-000Z.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [verification/2026-10-15-req233-cloud-routing-eval/results-2026-10-15T10-16-14-438Z.md](verification/2026-10-15-req233-cloud-routing-eval/results-2026-10-15T10-16-14-438Z.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [verification/2026-10-15-req233-cloud-routing-eval/results-2026-10-15T10-23-48Z-real-sample.md](verification/2026-10-15-req233-cloud-routing-eval/results-2026-10-15T10-23-48Z-real-sample.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [verification/2026-10-15-req233-cloud-routing-eval/results-2026-10-15T10-26-00Z-real-aborted.md](verification/2026-10-15-req233-cloud-routing-eval/results-2026-10-15T10-26-00Z-real-aborted.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [verification/2026-10-15-req233-cloud-routing-eval/results-2026-10-15T10-41-11Z-real-full.md](verification/2026-10-15-req233-cloud-routing-eval/results-2026-10-15T10-41-11Z-real-full.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [verification/2026-10-15-req233-cloud-routing-eval/results-2026-10-15T11-43-27Z-real-round2.md](verification/2026-10-15-req233-cloud-routing-eval/results-2026-10-15T11-43-27Z-real-round2.md) | ⚠️ 缺 summary | ? |
+
+<!-- docs-index:end -->

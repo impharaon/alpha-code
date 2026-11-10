@@ -1,4 +1,6 @@
 ---
+id: ARCH-alpha-code-2026-08-23-codex-harness-comparison
+summary: "openai/codex 与本仓 harness 的对照(哪些机制值得吸收,哪些结构上不能换)"
 title: openai/codex 与本仓 harness 的对照(哪些机制值得吸收,哪些结构上不能换)
 kind: architecture
 status: active

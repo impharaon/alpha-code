@@ -1,4 +1,6 @@
 ---
+id: ARCH-alpha-code-2026-09-10-network-egress-on-process-fence
+summary: "网络轴在整进程围栏上重勘破:老裁决的那两行会让引擎起不来"
 title: 网络轴在整进程围栏上重勘破:老裁决的那两行会让引擎起不来
 kind: architecture
 status: active

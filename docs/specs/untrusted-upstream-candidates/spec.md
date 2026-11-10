@@ -17,7 +17,7 @@ last_reviewed: 2026-11-10
 
 ## 来源
 
-- [原需求与处置 impharaon/alpha-work:RQ-engineering](https://github.com/impharaon/alpha-work/blob/d4a80d9c2ef0df32c58173310d9e368fa7bc9069/docs/requests/RQ-engineering.md)。
+- [原需求与处置 impharaon/alpha-work:RQ-engineering/N-04](https://github.com/impharaon/alpha-work/blob/27d104dfb0bb8d36f6d050277255861c4927416c/docs/requests/RQ-engineering.md#需求点)。
 - 历史身份：[impharaon/alpha-code#227](https://github.com/impharaon/alpha-code/issues/227)；原题名与编号保留，当前交付状态以 GitHub 为准。
 - Epic：[能力分组](https://github.com/impharaon/alpha-work/issues/154)。
 - [有效范围或验收依据 2026-08-10](https://github.com/impharaon/alpha-code/issues/227#issuecomment-5239321162)。

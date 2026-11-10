@@ -1,3 +1,10 @@
+---
+id: ARCH-alpha-code-2026-09-27-exa-entry-shape-fail-open-recon
+title: Exa 条目形状 × fail-open —— 认得出才说一句,认不出一律放行(2026-09-27)
+kind: architecture
+status: active
+summary: "Exa 条目形状 × fail-open —— 认得出才说一句,认不出一律放行(2026-09-27)"
+---
 # Exa 条目形状 × fail-open —— 认得出才说一句,认不出一律放行(2026-09-27)
 
 `alpha-code#1445` 的第三轮勘破。前两轮(见 [`2026-09-24-exa-mcp-failure-signal-recon.md`](2026-09-24-exa-mcp-failure-signal-recon.md))

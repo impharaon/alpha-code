@@ -18,7 +18,7 @@ last_reviewed: 2026-11-10
 
 ## 来源
 
-- [impharaon/alpha-work:RQ-desktop](https://github.com/impharaon/alpha-work/blob/d4a80d9c2ef0df32c58173310d9e368fa7bc9069/docs/requests/RQ-desktop.md)。
+- [impharaon/alpha-work:RQ-desktop/N-12](https://github.com/impharaon/alpha-work/blob/27d104dfb0bb8d36f6d050277255861c4927416c/docs/requests/RQ-desktop.md#需求点)。
 - [原票](https://github.com/impharaon/alpha-code/issues/237)；原 AC 编号不变。
 
 ## 用户与范围

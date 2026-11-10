@@ -17,6 +17,8 @@ last_reviewed: 2026-11-10
 
 ## 来源
 
+- [impharaon/alpha-work:RQ-conversation](https://github.com/impharaon/alpha-work/blob/27d104dfb0bb8d36f6d050277255861c4927416c/docs/requests/RQ-conversation.md#需求点)。
+
 - Story：[alpha-code#1472](https://github.com/impharaon/alpha-code/issues/1472)，引用 [2026-10-10 已批准设计](https://github.com/impharaon/alpha-code/blob/0c70875c996f6a2221e8093014268836b79ca823/docs/design/2026-10-10-timeline-process-fold/design.md)。
 - [原关闭记录](https://github.com/impharaon/alpha-code/issues/1472#issuecomment-6096473537) · [v0.1.18 发布](https://github.com/impharaon/alpha-code/releases/tag/v0.1.18)。
 

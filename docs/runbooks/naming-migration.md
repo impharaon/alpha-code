@@ -1,3 +1,10 @@
+---
+id: RUNBOOK-alpha-code-naming-migration
+title: 升级到新名字:首次启动的数据迁移与回退
+kind: runbook
+status: active
+summary: "升级到新名字:首次启动的数据迁移与回退"
+---
 # 升级到新名字:首次启动的数据迁移与回退
 
 > 适用:从 0.1.24 及更早版本升级到第一个使用新名字(`codepuppy`)的版本。实现:#1569

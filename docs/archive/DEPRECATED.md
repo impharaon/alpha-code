@@ -15,9 +15,12 @@ and [Alpha Delivery](https://github.com/users/jinjunnn/projects/2). Original
 content is recoverable at commit
 [`3024732c1e8cbc541df67abeea1f5d7693867023`](https://github.com/jinjunnn/alpha-code/tree/3024732c1e8cbc541df67abeea1f5d7693867023/docs).
 
+| 旧 ID | 旧路径 | 废弃理由 | 替代 | 固定恢复链接 |
+| --- | --- | --- | --- | --- |
+| `ARCH-legacy-shell-sandbox-seam` | `docs/architecture/2026-08-23-shell-sandbox-seam.md` | C1 已由整进程围栏替代；[原件](assets/architecture/2026-08-23-shell-sandbox-seam.md)保留，原路径只作证据导航 | `ARCH-alpha-code-2026-09-09-req159-process-fence` | [原件固定版本](https://github.com/impharaon/alpha-code/blob/e56ae0c03603a6540cd01043d64d590c6f7e2930/docs/architecture/2026-08-23-shell-sandbox-seam.md) |
+
 | Former path or namespace | Class | Disposition | Promoted authority |
 | --- | --- | --- | --- |
-| `LEGACY-SHELL-SANDBOX-SEAM` · `docs/architecture/2026-08-23-shell-sandbox-seam.md` | 退役架构方案 | C1 方案已由整进程围栏替代。原路径被既有验收证据引用，保留实测原件。 | [当前围栏架构](../architecture/2026-09-09-req159-process-fence.md) · [原件固定版本](https://github.com/impharaon/alpha-code/blob/e56ae0c03603a6540cd01043d64d590c6f7e2930/docs/architecture/2026-08-23-shell-sandbox-seam.md) |
 | `docs/BACKLOG.md`, `docs/harness-extension-backlog.md` | delivery | removed after Issue migration | GitHub Issues and Alpha Delivery |
 | `docs/requirements/**`, `docs/sprints/**`, `docs/plans/**` | delivery | removed; no local status mirror remains | GitHub Issues, fixed verification in `docs/audits/` |
 | `docs/PROCESS.md` | historical process | retired pre-GitHub workflow | root `AGENTS.md`, portfolio delivery and documentation standards |

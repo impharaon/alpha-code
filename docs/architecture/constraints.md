@@ -1,4 +1,6 @@
 ---
+id: ARCH-alpha-code-constraints
+summary: "Architecture constraints and known deviations"
 title: Architecture constraints and known deviations
 kind: architecture
 status: active

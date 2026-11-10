@@ -1,4 +1,6 @@
 ---
+id: ARCH-alpha-code-2026-08-10-packaged-first-launch-catalog-cost
+summary: "打包首启 sidecar-ready 之后的目录就绪成本（归因）"
 title: 打包首启 sidecar-ready 之后的目录就绪成本（归因）
 kind: architecture
 status: active

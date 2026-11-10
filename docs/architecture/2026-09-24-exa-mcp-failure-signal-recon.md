@@ -1,3 +1,10 @@
+---
+id: ARCH-alpha-code-2026-09-24-exa-mcp-failure-signal-recon
+title: Exa MCP 的失败信号 —— 实读(2026-09-24)
+kind: architecture
+status: active
+summary: "Exa MCP 的失败信号 —— 实读(2026-09-24)"
+---
 # Exa MCP 的失败信号 —— 实读(2026-09-24)
 
 本地搜网的出厂默认路径是无 key 的 Exa 免费额度。`alpha-code#1445` 的问题是:

@@ -1,3 +1,10 @@
+---
+id: ARCH-alpha-code-claude-plugin-corpus-component-scale
+title: 真实 Claude 插件语料的组件规模(勘破)
+kind: architecture
+status: active
+summary: "真实 Claude 插件语料的组件规模(勘破)"
+---
 # 真实 Claude 插件语料的组件规模(勘破)
 
 ADR-040 把 **Bundle** 定成扩展安装的唯一形状,于是「一个真实插件会变成几个组件」

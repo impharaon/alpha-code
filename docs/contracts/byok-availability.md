@@ -1,4 +1,6 @@
 ---
+id: CONTRACT-alpha-code-byok-availability
+summary: "BYOK selectability and executability (two predicates)"
 title: BYOK selectability and executability (two predicates)
 kind: contract
 status: active

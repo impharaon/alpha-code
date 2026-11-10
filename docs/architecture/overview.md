@@ -1,4 +1,6 @@
 ---
+id: ARCH-alpha-code-overview
+summary: "Code Puppy architecture overview"
 title: Code Puppy architecture overview
 kind: architecture
 status: active

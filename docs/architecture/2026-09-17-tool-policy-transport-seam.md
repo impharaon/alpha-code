@@ -1,4 +1,6 @@
 ---
+id: ARCH-alpha-code-2026-09-17-tool-policy-transport-seam
+summary: "引擎 tool policy 面走出引擎进程的接缝(REQ-131 /"
 title: 引擎 tool policy 面走出引擎进程的接缝(REQ-131 / #1130 路线 B)
 kind: architecture
 status: active

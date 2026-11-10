@@ -108,47 +108,47 @@ status.
 
 | id | 文件 | 做什么 | 状态 |
 | --- | --- | --- | --- |
-| `⚠️ 缺 id` | [architecture/2026-08-10-catalog-readiness-signals.md](architecture/2026-08-10-catalog-readiness-signals.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [architecture/2026-08-10-packaged-first-launch-catalog-cost.md](architecture/2026-08-10-packaged-first-launch-catalog-cost.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [architecture/2026-08-23-codex-harness-comparison.md](architecture/2026-08-23-codex-harness-comparison.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [architecture/2026-08-23-network-timeout-recon.md](architecture/2026-08-23-network-timeout-recon.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [architecture/2026-08-23-shell-sandbox-seam.md](architecture/2026-08-23-shell-sandbox-seam.md) | ⚠️ 缺 summary | superseded |
-| `⚠️ 缺 id` | [architecture/2026-08-25-network-egress-seam.md](architecture/2026-08-25-network-egress-seam.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [architecture/2026-09-03-electron-pdf-viewer-session.md](architecture/2026-09-03-electron-pdf-viewer-session.md) | ⚠️ 缺 summary | ? |
-| `⚠️ 缺 id` | [architecture/2026-09-03-office-layout-isolation.md](architecture/2026-09-03-office-layout-isolation.md) | ⚠️ 缺 summary | ? |
-| `⚠️ 缺 id` | [architecture/2026-09-06-external-skills-inheritance-decision.md](architecture/2026-09-06-external-skills-inheritance-decision.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [architecture/2026-09-06-model-variant-reachability.md](architecture/2026-09-06-model-variant-reachability.md) | ⚠️ 缺 summary | ? |
-| `⚠️ 缺 id` | [architecture/2026-09-08-context-injection-registry.md](architecture/2026-09-08-context-injection-registry.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [architecture/2026-09-08-derived-process-spawn-paths.md](architecture/2026-09-08-derived-process-spawn-paths.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [architecture/2026-09-08-managed-policy-and-hook-abort-decision.md](architecture/2026-09-08-managed-policy-and-hook-abort-decision.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [architecture/2026-09-08-permission-prompt-classification-seam.md](architecture/2026-09-08-permission-prompt-classification-seam.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [architecture/2026-09-09-multi-workspace-fence-decision.md](architecture/2026-09-09-multi-workspace-fence-decision.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [architecture/2026-09-09-req159-process-fence.md](architecture/2026-09-09-req159-process-fence.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [architecture/2026-09-09-req159-u1-native-addon-signed-load.md](architecture/2026-09-09-req159-u1-native-addon-signed-load.md) | ⚠️ 缺 summary | accepted |
-| `⚠️ 缺 id` | [architecture/2026-09-10-network-egress-on-process-fence.md](architecture/2026-09-10-network-egress-on-process-fence.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [architecture/2026-09-17-memory-injection-seam.md](architecture/2026-09-17-memory-injection-seam.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [architecture/2026-09-17-tool-policy-transport-seam.md](architecture/2026-09-17-tool-policy-transport-seam.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [architecture/2026-09-23-bun-electron-mock-link-abort.md](architecture/2026-09-23-bun-electron-mock-link-abort.md) | ⚠️ 缺 summary | ? |
-| `⚠️ 缺 id` | [architecture/2026-09-23-native-tool-gate-inventory.md](architecture/2026-09-23-native-tool-gate-inventory.md) | ⚠️ 缺 summary | ? |
-| `⚠️ 缺 id` | [architecture/2026-09-23-runtime-permission-tiers.md](architecture/2026-09-23-runtime-permission-tiers.md) | ⚠️ 缺 summary | ? |
-| `⚠️ 缺 id` | [architecture/2026-09-23-web-tools-account-routing-recon.md](architecture/2026-09-23-web-tools-account-routing-recon.md) | ⚠️ 缺 summary | ? |
-| `⚠️ 缺 id` | [architecture/2026-09-23-webfetch-egress-decision-chain.md](architecture/2026-09-23-webfetch-egress-decision-chain.md) | ⚠️ 缺 summary | ? |
-| `⚠️ 缺 id` | [architecture/2026-09-24-cloud-vision-client-seam.md](architecture/2026-09-24-cloud-vision-client-seam.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [architecture/2026-09-24-exa-mcp-failure-signal-recon.md](architecture/2026-09-24-exa-mcp-failure-signal-recon.md) | ⚠️ 缺 summary | ? |
-| `⚠️ 缺 id` | [architecture/2026-09-27-exa-entry-shape-fail-open-recon.md](architecture/2026-09-27-exa-entry-shape-fail-open-recon.md) | ⚠️ 缺 summary | ? |
-| `⚠️ 缺 id` | [architecture/claude-plugin-corpus-component-scale.md](architecture/claude-plugin-corpus-component-scale.md) | ⚠️ 缺 summary | ? |
-| `⚠️ 缺 id` | [architecture/codepuppy-connection-lifetime.md](architecture/codepuppy-connection-lifetime.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [architecture/constraints.md](architecture/constraints.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [architecture/engine-command-and-event-surface.md](architecture/engine-command-and-event-surface.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [architecture/extension-seams.md](architecture/extension-seams.md) | ⚠️ 缺 summary | ? |
-| `⚠️ 缺 id` | [architecture/frontend-surfaces.md](architecture/frontend-surfaces.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [architecture/host-extension-package-contract-boundary.md](architecture/host-extension-package-contract-boundary.md) | ⚠️ 缺 summary | active |
+| `ARCH-alpha-code-2026-08-10-catalog-readiness-signals` | [architecture/2026-08-10-catalog-readiness-signals.md](architecture/2026-08-10-catalog-readiness-signals.md) | 目录目录就绪有哪些信号（勘破） | active |
+| `ARCH-alpha-code-2026-08-10-packaged-first-launch-catalog-cost` | [architecture/2026-08-10-packaged-first-launch-catalog-cost.md](architecture/2026-08-10-packaged-first-launch-catalog-cost.md) | 打包首启 sidecar-ready 之后的目录就绪成本（归因） | active |
+| `ARCH-alpha-code-2026-08-23-codex-harness-comparison` | [architecture/2026-08-23-codex-harness-comparison.md](architecture/2026-08-23-codex-harness-comparison.md) | openai/codex 与本仓 harness 的对照(哪些机制值得吸收,哪些结构上不能换) | active |
+| `ARCH-alpha-code-2026-08-23-network-timeout-recon` | [architecture/2026-08-23-network-timeout-recon.md](architecture/2026-08-23-network-timeout-recon.md) | 两处网络等待形态到底会挂多久（勘破） | active |
+| `ARCH-shell-sandbox-evidence-pointer` | [architecture/2026-08-23-shell-sandbox-seam.md](architecture/2026-08-23-shell-sandbox-seam.md) | 为不可变验收记录保留旧路径，指向归档原件与现役整进程围栏。 | active |
+| `ARCH-alpha-code-2026-08-25-network-egress-seam` | [architecture/2026-08-25-network-egress-seam.md](architecture/2026-08-25-network-egress-seam.md) | 本机出网要在哪一层拦住(勘破) | active |
+| `ARCH-alpha-code-2026-09-03-electron-pdf-viewer-session` | [architecture/2026-09-03-electron-pdf-viewer-session.md](architecture/2026-09-03-electron-pdf-viewer-session.md) | Chromium 内置 PDF viewer 在 Electron 隔离 session 里的真实行为 | active |
+| `ARCH-alpha-code-2026-09-03-office-layout-isolation` | [architecture/2026-09-03-office-layout-isolation.md](architecture/2026-09-03-office-layout-isolation.md) | Office 版式渲染:在既有隔离载体里跑第三方渲染库 | active |
+| `ARCH-alpha-code-2026-09-06-external-skills-inheritance-decision` | [architecture/2026-09-06-external-skills-inheritance-decision.md](architecture/2026-09-06-external-skills-inheritance-decision.md) | 外部技能目录(~/.claude/skills 等)维持关闭 —— 勘破与裁决 | active |
+| `ARCH-alpha-code-2026-09-06-model-variant-reachability` | [architecture/2026-09-06-model-variant-reachability.md](architecture/2026-09-06-model-variant-reachability.md) | 推理档位(`variant`)的可达面:谁能设、设错了会不会被告知 | active |
+| `ARCH-alpha-code-2026-09-08-context-injection-registry` | [architecture/2026-09-08-context-injection-registry.md](architecture/2026-09-08-context-injection-registry.md) | Code Puppy 注入模型上下文的登记簿与咽喉(REQ-157) | active |
+| `ARCH-alpha-code-2026-09-08-derived-process-spawn-paths` | [architecture/2026-09-08-derived-process-spawn-paths.md](architecture/2026-09-08-derived-process-spawn-paths.md) | 引擎到底从哪些地方派生出会落盘的进程(勘破) | active |
+| `ARCH-alpha-code-2026-09-08-managed-policy-and-hook-abort-decision` | [architecture/2026-09-08-managed-policy-and-hook-abort-decision.md](architecture/2026-09-08-managed-policy-and-hook-abort-decision.md) | 托管层与「失败即中止」—— 两样都已经在跑,缺的是租户身份;托管 hook 暂不做 | active |
+| `ARCH-alpha-code-2026-09-08-permission-prompt-classification-seam` | [architecture/2026-09-08-permission-prompt-classification-seam.md](architecture/2026-09-08-permission-prompt-classification-seam.md) | 风险分类挂在哪个接缝上(勘破)—— 真正弹到用户面前的那一问,不是执行咽喉发起的那一问 | active |
+| `ARCH-alpha-code-2026-09-09-multi-workspace-fence-decision` | [architecture/2026-09-09-multi-workspace-fence-decision.md](architecture/2026-09-09-multi-workspace-fence-decision.md) | REQ-159 U2 裁决:一个被围栏的引擎怎么服务多个工作区 | active |
+| `ARCH-alpha-code-2026-09-09-req159-process-fence` | [architecture/2026-09-09-req159-process-fence.md](architecture/2026-09-09-req159-process-fence.md) | 引擎进程围栏:sidecar 自打 seatbelt 的落地形状(REQ-159) | active |
+| `ARCH-alpha-code-2026-09-09-req159-u1-native-addon-signed-load` | [architecture/2026-09-09-req159-u1-native-addon-signed-load.md](architecture/2026-09-09-req159-u1-native-addon-signed-load.md) | REQ-159 U1 决定书:自己写的原生模块在签名后的正式包里加载得了 | accepted |
+| `ARCH-alpha-code-2026-09-10-network-egress-on-process-fence` | [architecture/2026-09-10-network-egress-on-process-fence.md](architecture/2026-09-10-network-egress-on-process-fence.md) | 网络轴在整进程围栏上重勘破:老裁决的那两行会让引擎起不来 | active |
+| `ARCH-alpha-code-2026-09-17-memory-injection-seam` | [architecture/2026-09-17-memory-injection-seam.md](architecture/2026-09-17-memory-injection-seam.md) | 长期记忆怎样进入对话:v1 引擎上的注入接缝勘破(alpha-code#427) | active |
+| `ARCH-alpha-code-2026-09-17-tool-policy-transport-seam` | [architecture/2026-09-17-tool-policy-transport-seam.md](architecture/2026-09-17-tool-policy-transport-seam.md) | 引擎 tool policy 面走出引擎进程的接缝(REQ-131 / | active |
+| `ARCH-alpha-code-2026-09-23-bun-electron-mock-link-abort` | [architecture/2026-09-23-bun-electron-mock-link-abort.md](architecture/2026-09-23-bun-electron-mock-link-abort.md) | 整份测试文件在链接期夭折 —— bun 的 electron mock 与「没有名字的失败」(`#1423`) | active |
+| `ARCH-alpha-code-2026-09-23-native-tool-gate-inventory` | [architecture/2026-09-23-native-tool-gate-inventory.md](architecture/2026-09-23-native-tool-gate-inventory.md) | 引擎原生工具的全表:每一个今天在出货桌面端里能不能用,被哪一道挡住(`#1414`) | active |
+| `ARCH-alpha-code-2026-09-23-runtime-permission-tiers` | [architecture/2026-09-23-runtime-permission-tiers.md](architecture/2026-09-23-runtime-permission-tiers.md) | 运行权限档位的地面真相(`alpha-code#1413` 勘破) | active |
+| `ARCH-alpha-code-2026-09-23-web-tools-account-routing-recon` | [architecture/2026-09-23-web-tools-account-routing-recon.md](architecture/2026-09-23-web-tools-account-routing-recon.md) | 本地腿与云腿、按账户选路:今天的地面真相(`#1414` 只读勘破) | active |
+| `ARCH-alpha-code-2026-09-23-webfetch-egress-decision-chain` | [architecture/2026-09-23-webfetch-egress-decision-chain.md](architecture/2026-09-23-webfetch-egress-decision-chain.md) | 一次网页抓取到底经过哪几道判定,在哪一道被拒(`#1412`) | active |
+| `ARCH-alpha-code-2026-09-24-cloud-vision-client-seam` | [architecture/2026-09-24-cloud-vision-client-seam.md](architecture/2026-09-24-cloud-vision-client-seam.md) | 云端识图的客户端半场:凭据从哪来、图走哪条钩子、看不了图的模型怎么被喂(REQ-228 `#1419`) | active |
+| `ARCH-alpha-code-2026-09-24-exa-mcp-failure-signal-recon` | [architecture/2026-09-24-exa-mcp-failure-signal-recon.md](architecture/2026-09-24-exa-mcp-failure-signal-recon.md) | Exa MCP 的失败信号 —— 实读(2026-09-24) | active |
+| `ARCH-alpha-code-2026-09-27-exa-entry-shape-fail-open-recon` | [architecture/2026-09-27-exa-entry-shape-fail-open-recon.md](architecture/2026-09-27-exa-entry-shape-fail-open-recon.md) | Exa 条目形状 × fail-open —— 认得出才说一句,认不出一律放行(2026-09-27) | active |
+| `ARCH-alpha-code-claude-plugin-corpus-component-scale` | [architecture/claude-plugin-corpus-component-scale.md](architecture/claude-plugin-corpus-component-scale.md) | 真实 Claude 插件语料的组件规模(勘破) | active |
+| `ARCH-alpha-code-codepuppy-connection-lifetime` | [architecture/codepuppy-connection-lifetime.md](architecture/codepuppy-connection-lifetime.md) | Code Puppy Connection record lifetime | active |
+| `ARCH-alpha-code-constraints` | [architecture/constraints.md](architecture/constraints.md) | Architecture constraints and known deviations | active |
+| `ARCH-alpha-code-engine-command-and-event-surface` | [architecture/engine-command-and-event-surface.md](architecture/engine-command-and-event-surface.md) | 引擎的 command 与事件面（勘破） | active |
+| `ARCH-alpha-code-extension-seams` | [architecture/extension-seams.md](architecture/extension-seams.md) | opencode 扩展接缝操作手册 | active |
+| `ARCH-alpha-code-frontend-surfaces` | [architecture/frontend-surfaces.md](architecture/frontend-surfaces.md) | Frontend surface composition | active |
+| `ARCH-alpha-code-host-extension-package-contract-boundary` | [architecture/host-extension-package-contract-boundary.md](architecture/host-extension-package-contract-boundary.md) | Host extension package contract boundary | active |
 | `ARCH-modules` | [architecture/modules.md](architecture/modules.md) | 标明桌面宿主、引擎、共享契约和上游工作区包的边界。 | active |
-| `⚠️ 缺 id` | [architecture/overview.md](architecture/overview.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [architecture/package-mcp-oauth-boundary.md](architecture/package-mcp-oauth-boundary.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [architecture/quality-gate-environments.md](architecture/quality-gate-environments.md) | ⚠️ 缺 summary | ? |
-| `⚠️ 缺 id` | [architecture/understanding.md](architecture/understanding.md) | ⚠️ 缺 summary | ? |
-| `⚠️ 缺 id` | [architecture/upstream-integration.md](architecture/upstream-integration.md) | ⚠️ 缺 summary | active |
+| `ARCH-alpha-code-overview` | [architecture/overview.md](architecture/overview.md) | Code Puppy architecture overview | active |
+| `ARCH-alpha-code-package-mcp-oauth-boundary` | [architecture/package-mcp-oauth-boundary.md](architecture/package-mcp-oauth-boundary.md) | Package MCP OAuth ownership boundary | active |
+| `ARCH-alpha-code-quality-gate-environments` | [architecture/quality-gate-environments.md](architecture/quality-gate-environments.md) | 质量门 × 运行环境 —— 每道门在每个环境里的真实状态 | active |
+| `ARCH-alpha-code-understanding` | [architecture/understanding.md](architecture/understanding.md) | 理解 opencode(为 alpha-code 制图) | active |
+| `ARCH-alpha-code-upstream-integration` | [architecture/upstream-integration.md](architecture/upstream-integration.md) | Code Puppy upstream integration | active |
 
 ### audits
 
@@ -221,23 +221,23 @@ status.
 
 | id | 文件 | 做什么 | 状态 |
 | --- | --- | --- | --- |
-| `⚠️ 缺 id` | [contracts/artifact-office-open-gate.md](contracts/artifact-office-open-gate.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [contracts/byok-availability.md](contracts/byok-availability.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [contracts/catalog-channel-consumption.md](contracts/catalog-channel-consumption.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [contracts/desktop-release-manifest.md](contracts/desktop-release-manifest.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [contracts/engine-config-channels.md](contracts/engine-config-channels.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [contracts/extension-capability-authorization.md](contracts/extension-capability-authorization.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [contracts/extension-cas-seed.md](contracts/extension-cas-seed.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [contracts/extension-install-ledger.md](contracts/extension-install-ledger.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [contracts/extension-package-lifecycle.md](contracts/extension-package-lifecycle.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [contracts/host-extension-package-v1.md](contracts/host-extension-package-v1.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [contracts/permission-risk-classification.md](contracts/permission-risk-classification.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [contracts/platform-endpoint-discovery.md](contracts/platform-endpoint-discovery.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [contracts/platform-integration.md](contracts/platform-integration.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [contracts/recovery-adapter.md](contracts/recovery-adapter.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [contracts/session-permission.md](contracts/session-permission.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [contracts/settings-and-extension-storage-adapters.md](contracts/settings-and-extension-storage-adapters.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [contracts/tool-policy.md](contracts/tool-policy.md) | ⚠️ 缺 summary | active |
+| `CONTRACT-alpha-code-artifact-office-open-gate` | [contracts/artifact-office-open-gate.md](contracts/artifact-office-open-gate.md) | Artifact Office external-open gate | active |
+| `CONTRACT-alpha-code-byok-availability` | [contracts/byok-availability.md](contracts/byok-availability.md) | BYOK selectability and executability (two predicates) | active |
+| `CONTRACT-alpha-code-catalog-channel-consumption` | [contracts/catalog-channel-consumption.md](contracts/catalog-channel-consumption.md) | Catalog channel consumption (A-side routing & fallback) | active |
+| `CONTRACT-alpha-code-desktop-release-manifest` | [contracts/desktop-release-manifest.md](contracts/desktop-release-manifest.md) | Desktop release manifest v1 (signed, machine-consumable) | active |
+| `CONTRACT-alpha-code-engine-config-channels` | [contracts/engine-config-channels.md](contracts/engine-config-channels.md) | Engine config channels (v1/v2 dual-generation contract) | active |
+| `CONTRACT-alpha-code-extension-capability-authorization` | [contracts/extension-capability-authorization.md](contracts/extension-capability-authorization.md) | Extension capability authorization (capability→authorize gate) | active |
+| `CONTRACT-alpha-code-extension-cas-seed` | [contracts/extension-cas-seed.md](contracts/extension-cas-seed.md) | Extension CAS, packaged seed and GC (REQ-102 A-side) | active |
+| `CONTRACT-alpha-code-extension-install-ledger` | [contracts/extension-install-ledger.md](contracts/extension-install-ledger.md) | Extension install ledger ownership and fail-closed commit | active |
+| `CONTRACT-alpha-code-extension-package-lifecycle` | [contracts/extension-package-lifecycle.md](contracts/extension-package-lifecycle.md) | Extension package lifecycle — update, uninstall, and shared-child claims | active |
+| `CONTRACT-alpha-code-host-extension-package-v1` | [contracts/host-extension-package-v1.md](contracts/host-extension-package-v1.md) | HostExtensionPackageV1 artifact index | active |
+| `CONTRACT-alpha-code-permission-risk-classification` | [contracts/permission-risk-classification.md](contracts/permission-risk-classification.md) | 授权提示的风险分类(v1 `metadata.codepuppyRisk`) | active |
+| `CONTRACT-alpha-code-platform-endpoint-discovery` | [contracts/platform-endpoint-discovery.md](contracts/platform-endpoint-discovery.md) | Code Puppy platform endpoint and model discovery | active |
+| `CONTRACT-alpha-code-platform-integration` | [contracts/platform-integration.md](contracts/platform-integration.md) | Code Puppy platform integration | active |
+| `CONTRACT-alpha-code-recovery-adapter` | [contracts/recovery-adapter.md](contracts/recovery-adapter.md) | Recovery adapter contract | active |
+| `CONTRACT-alpha-code-session-permission` | [contracts/session-permission.md](contracts/session-permission.md) | Session permission contract | active |
+| `CONTRACT-alpha-code-settings-and-extension-storage-adapters` | [contracts/settings-and-extension-storage-adapters.md](contracts/settings-and-extension-storage-adapters.md) | Settings and extension storage typed adapters | active |
+| `CONTRACT-alpha-code-tool-policy` | [contracts/tool-policy.md](contracts/tool-policy.md) | Hierarchical tool policy contract (REQ-131) | active |
 
 ### design
 
@@ -333,23 +333,73 @@ status.
 
 | id | 文件 | 做什么 | 状态 |
 | --- | --- | --- | --- |
-| `⚠️ 缺 id` | [runbooks/artifact-quota-reservation-recovery.md](runbooks/artifact-quota-reservation-recovery.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [runbooks/ci.md](runbooks/ci.md) | ⚠️ 缺 summary | ? |
-| `⚠️ 缺 id` | [runbooks/distribution.md](runbooks/distribution.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [runbooks/extension-tx-journal.md](runbooks/extension-tx-journal.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [runbooks/model-catalog-updates.md](runbooks/model-catalog-updates.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [runbooks/naming-migration.md](runbooks/naming-migration.md) | ⚠️ 缺 summary | ? |
-| `⚠️ 缺 id` | [runbooks/settings-storage-recovery.md](runbooks/settings-storage-recovery.md) | ⚠️ 缺 summary | active |
-| `⚠️ 缺 id` | [runbooks/uninstall.md](runbooks/uninstall.md) | ⚠️ 缺 summary | ? |
+| `RUNBOOK-alpha-code-artifact-quota-reservation-recovery` | [runbooks/artifact-quota-reservation-recovery.md](runbooks/artifact-quota-reservation-recovery.md) | Artifact quota reservation recovery | active |
+| `RUNBOOK-alpha-code-ci` | [runbooks/ci.md](runbooks/ci.md) | CI 规范（Code Puppy） | active |
+| `RUNBOOK-alpha-code-distribution` | [runbooks/distribution.md](runbooks/distribution.md) | Mac release runbook (signing, notarization, auto-update) | active |
+| `RUNBOOK-alpha-code-extension-tx-journal` | [runbooks/extension-tx-journal.md](runbooks/extension-tx-journal.md) | Extension transaction journal diagnosis | active |
+| `RUNBOOK-alpha-code-model-catalog-updates` | [runbooks/model-catalog-updates.md](runbooks/model-catalog-updates.md) | Model catalog updates (platform proxy & BYOK) | active |
+| `RUNBOOK-alpha-code-naming-migration` | [runbooks/naming-migration.md](runbooks/naming-migration.md) | 升级到新名字:首次启动的数据迁移与回退 | active |
+| `RUNBOOK-alpha-code-settings-storage-recovery` | [runbooks/settings-storage-recovery.md](runbooks/settings-storage-recovery.md) | Settings storage recovery | active |
+| `RUNBOOK-alpha-code-uninstall` | [runbooks/uninstall.md](runbooks/uninstall.md) | 卸载 Code Puppy 与数据残留清单(C16) | active |
 
 ### specs
 
 | id | 文件 | 做什么 | 状态 |
 | --- | --- | --- | --- |
+| `SPEC-account-balance-presentation` | [specs/account-balance-presentation/spec.md](specs/account-balance-presentation/spec.md) | 账户面板按订阅与余额显示真实状态，按历史条文与实际证明登记范围。 | approved |
 | `SPEC-agent-approved-extension-install` | [specs/agent-approved-extension-install/spec.md](specs/agent-approved-extension-install/spec.md) | 目录查询、授权确认、安装状态和当前会话中后续使用。 | draft |
+| `SPEC-atomic-extension-lifecycle` | [specs/atomic-extension-lifecycle/spec.md](specs/atomic-extension-lifecycle/spec.md) | 扩展安装失败可恢复且不会留下半装状态，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-bounded-artifact-preview` | [specs/bounded-artifact-preview/spec.md](specs/bounded-artifact-preview/spec.md) | 常见产物按安全边界预览，超限有明确说明，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-build-identity` | [specs/build-identity/spec.md](specs/build-identity/spec.md) | 报问题时能复制准确的构建身份，验收边界来自原始需求。 | draft |
+| `SPEC-byok-output-limits` | [specs/byok-output-limits/spec.md](specs/byok-output-limits/spec.md) | 自带密钥的模型按自己的实测上限输出，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-child-process-write-fence` | [specs/child-process-write-fence/spec.md](specs/child-process-write-fence/spec.md) | 连接器与语言服务的子进程也受写入范围约束，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-cloud-job-desktop-notifications` | [specs/cloud-job-desktop-notifications/spec.md](specs/cloud-job-desktop-notifications/spec.md) | 用户能收到任务结果并在桌面设置里关闭通知。 | draft |
+| `SPEC-connector-workspace-following` | [specs/connector-workspace-following/spec.md](specs/connector-workspace-following/spec.md) | 连接器跟随当前会话所在项目目录，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-context-injection-budgets` | [specs/context-injection-budgets/spec.md](specs/context-injection-budgets/spec.md) | 应用注入的对话内容有明确大小上限，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-conversation-overlays` | [specs/conversation-overlays/spec.md](specs/conversation-overlays/spec.md) | 统一对话浮层交互，并让用户批准工具时还能翻看时间线。 | approved |
 | `SPEC-conversation-process-fold` | [specs/conversation-process-fold/spec.md](specs/conversation-process-fold/spec.md) | 把回答前的工作步骤收成一行，用户可展开核对，回答和待处理操作保持可见。 | approved |
+| `SPEC-current-turn-file-review` | [specs/current-turn-file-review/spec.md](specs/current-turn-file-review/spec.md) | 右栏审查显示本回合的真实文件修改，按历史条文与实际证明登记范围。 | draft |
+| `SPEC-custom-provider-keychain` | [specs/custom-provider-keychain/spec.md](specs/custom-provider-keychain/spec.md) | 自定义模型密钥由系统安全存储保护，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-desktop-navigation` | [specs/desktop-navigation/spec.md](specs/desktop-navigation/spec.md) | 新对话、项目切换和搜索入口真正可用，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-document-authoring-guidance` | [specs/document-authoring-guidance/spec.md](specs/document-authoring-guidance/spec.md) | 文档任务使用完整的产出质量指导，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-draft-to-session` | [specs/draft-to-session/spec.md](specs/draft-to-session/spec.md) | 未发送草稿可在正式路由里转成对话，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-extension-environments` | [specs/extension-environments/spec.md](specs/extension-environments/spec.md) | 开发、测试与正式扩展状态相互隔离，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-extension-install-intents` | [specs/extension-install-intents/spec.md](specs/extension-install-intents/spec.md) | 扩展安装由主程序校验并按项目隔离，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-extension-ownership-and-grants` | [specs/extension-ownership-and-grants/spec.md](specs/extension-ownership-and-grants/spec.md) | 扩展来源与授权范围可准确判断和管控，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-extension-presentation-metadata` | [specs/extension-presentation-metadata/spec.md](specs/extension-presentation-metadata/spec.md) | 定制中心条目显示开发者与说明等来源信息，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-home-session-creation` | [specs/home-session-creation/spec.md](specs/home-session-creation/spec.md) | 用户从首页可靠开始新对话，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-isolated-html-preview` | [specs/isolated-html-preview/spec.md](specs/isolated-html-preview/spec.md) | 网页产物可静态查看且不能访问应用或网络，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-large-project-directories` | [specs/large-project-directories/spec.md](specs/large-project-directories/spec.md) | 打开巨大目录不会启动无界扫描，保留历史条款、有效裁决和交付证据边界。 | draft |
+| `SPEC-local-cloud-task-routing` | [specs/local-cloud-task-routing/spec.md](specs/local-cloud-task-routing/spec.md) | 助手根据任务选择本机或云端处理，保留历史条款、有效裁决和交付证据边界。 | draft |
+| `SPEC-local-memory` | [specs/local-memory/spec.md](specs/local-memory/spec.md) | 本机记忆可查看、修改、删除并按项目用于对话，保留历史条款、有效裁决和交付证据边界。 | draft |
+| `SPEC-office-content-preview` | [specs/office-content-preview/spec.md](specs/office-content-preview/spec.md) | Office 文件内容可在应用内安全查看，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-office-layout-preview` | [specs/office-layout-preview/spec.md](specs/office-layout-preview/spec.md) | Office 文件在隔离预览里显示真实版式，按历史条文与实际证明登记范围。 | approved |
+| `SPEC-opencode-generation-switch` | [specs/opencode-generation-switch/spec.md](specs/opencode-generation-switch/spec.md) | 升级引擎后保留当前桌面体验与整体撤回能力，保留历史条款、有效裁决和交付证据边界。 | draft |
+| `SPEC-owned-route-surfaces` | [specs/owned-route-surfaces/spec.md](specs/owned-route-surfaces/spec.md) | 应用页面通过受控入口接入导航，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-owned-session-page` | [specs/owned-session-page/spec.md](specs/owned-session-page/spec.md) | 会话页保持自己的完整交互与工具卡，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-owned-settings-and-dialogs` | [specs/owned-settings-and-dialogs/spec.md](specs/owned-settings-and-dialogs/spec.md) | 设置、模型选择、审批与恢复使用一致交互，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-permission-risk-classification` | [specs/permission-risk-classification/spec.md](specs/permission-risk-classification/spec.md) | 高风险动作在执行前先完成分类，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-permission-risk-display` | [specs/permission-risk-display/spec.md](specs/permission-risk-display/spec.md) | 用户在授权时能看出动作的风险档位，保留历史条款、有效裁决和交付证据边界。 | draft |
+| `SPEC-project-mcp-installation` | [specs/project-mcp-installation/spec.md](specs/project-mcp-installation/spec.md) | 连接器可装到全局或当前项目并保持隔离，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-puppy-brand-icons` | [specs/puppy-brand-icons/spec.md](specs/puppy-brand-icons/spec.md) | 应用和各渠道使用一致的小狗标志，保留历史条款、有效裁决和交付证据边界。 | draft |
+| `SPEC-remote-database-connector` | [specs/remote-database-connector/spec.md](specs/remote-database-connector/spec.md) | 用户可在安全边界内连接自己的远程数据库，保留历史条款、有效裁决和交付证据边界。 | draft |
+| `SPEC-resident-project-watchers` | [specs/resident-project-watchers/spec.md](specs/resident-project-watchers/spec.md) | 长期使用项目时监听与内存保持受控，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-responsive-session-rail` | [specs/responsive-session-rail/spec.md](specs/responsive-session-rail/spec.md) | 右栏可以调宽并为聊天区保留空间，按历史条文与实际证明登记范围。 | approved |
+| `SPEC-route-manifest-authority` | [specs/route-manifest-authority/spec.md](specs/route-manifest-authority/spec.md) | 应用导航由一份页面清单决定，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-session-results-workspace` | [specs/session-results-workspace/spec.md](specs/session-results-workspace/spec.md) | 会话右栏统一查看文件、产物和修改，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-startup-model-availability` | [specs/startup-model-availability/spec.md](specs/startup-model-availability/spec.md) | 启动时及时出现可用模型且不显示虚假失败，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-timeline-artifact-links` | [specs/timeline-artifact-links/spec.md](specs/timeline-artifact-links/spec.md) | 对话中的本地产物可以直接打开右栏预览，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-tool-card-provenance` | [specs/tool-card-provenance/spec.md](specs/tool-card-provenance/spec.md) | 工具卡按真实来源展示调用并保护敏感字段，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-tool-inventory-identity` | [specs/tool-inventory-identity/spec.md](specs/tool-inventory-identity/spec.md) | 工具清单和授权身份随实际来源变化，保留历史条款、有效裁决和交付证据边界。 | draft |
+| `SPEC-tool-network-egress` | [specs/tool-network-egress/spec.md](specs/tool-network-egress/spec.md) | 本机工具只连接获准的网络目的地，保留历史条款、有效裁决和交付证据边界。 | draft |
+| `SPEC-tool-permission-policy` | [specs/tool-permission-policy/spec.md](specs/tool-permission-policy/spec.md) | 用户可按来源、服务和工具设置停用、询问或允许，保留历史条款、有效裁决和交付证据边界。 | draft |
+| `SPEC-tool-policy-settings` | [specs/tool-policy-settings/spec.md](specs/tool-policy-settings/spec.md) | 用户在设置里管理并保存工具权限，保留历史条款、有效裁决和交付证据边界。 | draft |
+| `SPEC-tool-write-fence` | [specs/tool-write-fence/spec.md](specs/tool-write-fence/spec.md) | 工具派生进程越界写文件时会失败，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-untrusted-upstream-candidates` | [specs/untrusted-upstream-candidates/spec.md](specs/untrusted-upstream-candidates/spec.md) | 上游候选代码无法取得仓库推送凭据，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-visible-update-state` | [specs/visible-update-state/spec.md](specs/visible-update-state/spec.md) | 检查更新的状态与重启安装入口可见，按历史条文与实际证明登记范围。 | draft |
+| `SPEC-windows-renderer-origins` | [specs/windows-renderer-origins/spec.md](specs/windows-renderer-origins/spec.md) | Windows 界面只能读取受准许的服务来源，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-word-layout-and-typography` | [specs/word-layout-and-typography/spec.md](specs/word-layout-and-typography/spec.md) | 生成的 Word 有正确中文字体、标题与纸张设置，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-workspace-file-preview` | [specs/workspace-file-preview/spec.md](specs/workspace-file-preview/spec.md) | 用户在会话右栏安全查看工作区文件，保留历史条款、有效裁决和交付证据边界。 | approved |
 
 ### verification
 

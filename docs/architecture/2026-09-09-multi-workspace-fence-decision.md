@@ -1,4 +1,6 @@
 ---
+id: ARCH-alpha-code-2026-09-09-multi-workspace-fence-decision
+summary: "REQ-159 U2 裁决:一个被围栏的引擎怎么服务多个工作区"
 title: REQ-159 U2 裁决:一个被围栏的引擎怎么服务多个工作区
 kind: architecture
 status: active

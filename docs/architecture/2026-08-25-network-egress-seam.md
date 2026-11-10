@@ -1,4 +1,6 @@
 ---
+id: ARCH-alpha-code-2026-08-25-network-egress-seam
+summary: "本机出网要在哪一层拦住(勘破)"
 title: 本机出网要在哪一层拦住(勘破)
 kind: architecture
 status: active

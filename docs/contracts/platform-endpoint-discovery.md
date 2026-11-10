@@ -1,4 +1,6 @@
 ---
+id: CONTRACT-alpha-code-platform-endpoint-discovery
+summary: "Code Puppy platform endpoint and model discovery"
 title: Code Puppy platform endpoint and model discovery
 kind: contract
 status: active

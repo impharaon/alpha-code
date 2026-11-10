@@ -17,7 +17,7 @@ last_reviewed: 2026-11-10
 
 ## 来源
 
-- [原需求与处置 impharaon/alpha-work:RQ-identity](https://github.com/impharaon/alpha-work/blob/d4a80d9c2ef0df32c58173310d9e368fa7bc9069/docs/requests/RQ-identity.md)。
+- [原需求与处置 impharaon/alpha-work:RQ-identity/N-02](https://github.com/impharaon/alpha-work/blob/27d104dfb0bb8d36f6d050277255861c4927416c/docs/requests/RQ-identity.md#需求点)。
 - 历史身份：[impharaon/alpha-code#226](https://github.com/impharaon/alpha-code/issues/226)；原题名与编号保留，当前交付状态以 GitHub 为准。
 - Epic：[能力分组](https://github.com/impharaon/alpha-work/issues/137)。
 - [有效范围或验收依据 2026-09-17](https://github.com/impharaon/alpha-code/issues/226#issuecomment-5708462906)。

@@ -1,4 +1,6 @@
 ---
+id: ARCH-alpha-code-2026-09-24-cloud-vision-client-seam
+summary: "云端识图的客户端半场:凭据从哪来、图走哪条钩子、看不了图的模型怎么被喂(REQ-228 `#1419`)"
 title: 云端识图的客户端半场:凭据从哪来、图走哪条钩子、看不了图的模型怎么被喂(REQ-228 `#1419`)
 kind: architecture
 status: active

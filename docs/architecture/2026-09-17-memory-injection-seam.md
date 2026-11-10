@@ -1,4 +1,6 @@
 ---
+id: ARCH-alpha-code-2026-09-17-memory-injection-seam
+summary: "长期记忆怎样进入对话:v1 引擎上的注入接缝勘破(alpha-code#427)"
 title: 长期记忆怎样进入对话:v1 引擎上的注入接缝勘破(alpha-code#427)
 kind: architecture
 status: active

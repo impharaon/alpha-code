@@ -346,6 +346,7 @@ status.
 
 | id | 文件 | 做什么 | 状态 |
 | --- | --- | --- | --- |
+| `SPEC-cloud-job-desktop-notifications` | [specs/cloud-job-desktop-notifications/spec.md](specs/cloud-job-desktop-notifications/spec.md) | 用户能收到任务结果并在桌面设置里关闭通知。 | draft |
 | `SPEC-conversation-overlays` | [specs/conversation-overlays/spec.md](specs/conversation-overlays/spec.md) | 统一对话浮层交互，并让用户批准工具时还能翻看时间线。 | approved |
 | `SPEC-conversation-process-fold` | [specs/conversation-process-fold/spec.md](specs/conversation-process-fold/spec.md) | 把回答前的工作步骤收成一行，用户可展开核对，回答和待处理操作保持可见。 | approved |
 

@@ -4,16 +4,10 @@
 - The default branch in this repo is `alpha`.
 - Local `main` ref may not exist; use `alpha` or `origin/alpha` for diffs.
 - Before pushing, run `bash scripts/north-star-guard.sh` and `cd packages/ui-mac && bun test src/main/old-name-scan.test.ts` in addition to the related tests.
-- GitHub Issues and Alpha Delivery are the only live delivery state.
-- `docs/README.md` is the current documentation entry point. Keep current
-  architecture, contracts, runbooks, selected audits, and release history;
-  delete superseded plans and trackers from the default branch.
-- Knowledge, design, audit, decision, and runtime-rule corpora are protected
-  assets. Documentation maintenance may index and validate them, but must not
-  delete, rewrite, relocate, archive, or deduplicate them without explicit
-  owner approval for that exact mutation.
-- Runtime-loaded `.claude/rules/` is an execution asset, not ordinary docs.
-  Report conflicts with code/contracts; do not silently rewrite the rules.
+- Development process (issues, AC, closure, PRs, gates, docs) is the user-level standard:
+  `requirement-management`, `cross-repo-delivery` (profile
+  `impharaon/alpha-work/governance/delivery-profile.yml`), `dev-loop`, `maintain-repository-docs`.
+  `docs/README.md` is this repository's documentation entry point.
 - Repointing any production path from one engine generation's API to another
   (v1 `session.*` ↔ v2 `v2.session.*`, config channels, permission events, and
   the rest) is its own Issue, its own PR, its own ADR, and its own behavioral

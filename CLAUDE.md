@@ -29,7 +29,7 @@
 - `ui-mac` 镜像 `packages/desktop` 的原生 Electron 模式;Tailwind/CSS/solid 原生解析(实测产物 475KB CSS)。
 - 新增 `/api/*` 路由是唯一会改 upstream 文件的场景 → 用 sidecar 规避。
 - 架构理解见 `docs/architecture/understanding.md`;扩展接缝手册见 `docs/architecture/extension-seams.md`;code-graph 见 `docs/architecture/diagrams/opencode-codegraph.svg`。
-- **交付治理**:GitHub Issues + [`Alpha Delivery`](https://github.com/users/jinjunnn/projects/2) 是活跃需求、状态、优先级与 Sprint 的唯一真源。单仓工作建在 `jinjunnn/alpha-code`;跨仓父需求建在 `jinjunnn/alpha-work`。旧交付追踪器(BACKLOG、requirements、sprints,已退役至 `docs/archive/DEPRECATED.md`)是迁移前历史,不得再翻状态或从中抽取新 Sprint。统一规则见 `jinjunnn/alpha-work/governance/delivery-standard.md`;用户可见发布历史仍写 `CHANGELOG.md`。
+- **交付治理**:开票、AC、关闭、PR 与门按用户级 `requirement-management` / `cross-repo-delivery` / `dev-loop`;portfolio 事实见 `impharaon/alpha-work/governance/delivery-standard.md`。旧交付追踪器(BACKLOG、requirements、sprints,已退役至 `docs/archive/DEPRECATED.md`)是迁移前历史,不得再翻状态或从中抽取新 Sprint。用户可见发布历史仍写 `CHANGELOG.md`。
 
 ## 前端设计(设计系统 + 入口铁律)
 

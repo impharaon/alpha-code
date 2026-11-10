@@ -24,7 +24,7 @@ accepted contracts. Follow the [Code Puppy Documentation Contract](https://githu
 | What the engine's `command` is, what its event/hook surface is, and how Claude's hooks actually map | [`architecture/engine-command-and-event-surface.md`](architecture/engine-command-and-event-surface.md) |
 | Which signals really say a directory's model catalog converged (and which only look like they do) | [`architecture/2026-08-10-catalog-readiness-signals.md`](architecture/2026-08-10-catalog-readiness-signals.md) |
 | What the packaged first launch actually spends after sidecar ready (measured split, and what is still unverified) | [`architecture/2026-08-10-packaged-first-launch-catalog-cost.md`](architecture/2026-08-10-packaged-first-launch-catalog-cost.md) |
-| Which layer can actually contain tool-spawned processes, and which candidate seams cost an upstream adoption(**superseded** 2026-09-09:C1 接缝已随 REQ-159 拆掉,勘破证据保留) | [`architecture/2026-08-23-shell-sandbox-seam.md`](architecture/2026-08-23-shell-sandbox-seam.md) |
+| 工具子进程的当前边界与已退役的 shell 围栏方案 | [当前围栏架构](architecture/2026-09-09-req159-process-fence.md) · [废弃台账](archive/DEPRECATED.md) |
 | How long the two outbound fetch chains in `packages/core` can actually block, and which shipped shapes never reach them | [`architecture/2026-08-23-network-timeout-recon.md`](architecture/2026-08-23-network-timeout-recon.md) |
 | 为什么 Chromium 内置 PDF viewer 在隔离 session 里画不出页面(两条独立成因,都不报错) | [`architecture/2026-09-03-electron-pdf-viewer-session.md`](architecture/2026-09-03-electron-pdf-viewer-session.md) |
 | 第三方 Office 渲染库放在哪里跑,为此放宽了什么(以及负向控制证明没削弱 HTML 那条路) | [`architecture/2026-09-03-office-layout-isolation.md`](architecture/2026-09-03-office-layout-isolation.md) |
@@ -346,6 +346,7 @@ status.
 
 | id | 文件 | 做什么 | 状态 |
 | --- | --- | --- | --- |
+| `SPEC-agent-approved-extension-install` | [specs/agent-approved-extension-install/spec.md](specs/agent-approved-extension-install/spec.md) | 目录查询、授权确认、安装状态和当前会话中后续使用。 | draft |
 | `SPEC-cloud-job-desktop-notifications` | [specs/cloud-job-desktop-notifications/spec.md](specs/cloud-job-desktop-notifications/spec.md) | 用户能收到任务结果并在桌面设置里关闭通知。 | draft |
 | `SPEC-conversation-overlays` | [specs/conversation-overlays/spec.md](specs/conversation-overlays/spec.md) | 统一对话浮层交互，并让用户批准工具时还能翻看时间线。 | approved |
 | `SPEC-conversation-process-fold` | [specs/conversation-process-fold/spec.md](specs/conversation-process-fold/spec.md) | 把回答前的工作步骤收成一行，用户可展开核对，回答和待处理操作保持可见。 | approved |

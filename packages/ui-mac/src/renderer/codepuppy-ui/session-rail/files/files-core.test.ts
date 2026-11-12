@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 // Real upstream implementations, imported only here to prove the parity clones stay honest.
-import { base64Encode } from "../../../../../../core/src/util/encode"
+import { base64Encode } from "../../../../../../codepuppy-core-util/src/util/encode"
 import { createPathHelpers } from "../../../../../../codepuppy-app/src/context/file/path"
 import { SessionRouteKey, SessionStateKey, type ServerScope } from "../../../../../../codepuppy-app/src/utils/server-scope"
 import {

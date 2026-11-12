@@ -30,38 +30,18 @@
 // 第一方路径的 basename 也用同一个判据判一次,命中记为第 0 行。这一层**不排除**测试文件与字节副本:
 // 它们的内容可以合法地写旧名或由别人生产,名字却是我们放进仓里的。
 //
-// 登记表:scripts/old-name-exceptions.tsv(`文件 ⇥ 行号 ⇥ 类别 ⇥ 理由`;文件名命中写行号 0)。行号随上方增删行漂移时,
-// 先确认那一处今天仍然该留着,再改行号 —— 不要只把数字改对。
+// 登记表:scripts/old-name-exceptions.tsv(`文件 ⇥ 命中词元 ⇥ 处数 ⇥ 类别 ⇥ 理由`;文件名命中的词元写「文件名」)。
+// 一处命中的身份是「文件 + 这一行里的旧名词元」(I-09,`./old-name-scan.ts` 的 hitTokens),不含行号:文件里增删
+// 不相干的行,登记表不用动。判官按 (文件, 命中词元) 把登记处数加起来,与扫描到的行数逐键比对。
 
 import { readFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { describe, expect, test } from "bun:test"
+import { FILE_NAME_HIT, OLD_NAME, hitTokens } from "./old-name-scan"
 import { isCodePuppyOwned } from "./wall-clock-assertions"
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..", "..", "..")
 const REGISTRY = "scripts/old-name-exceptions.tsv"
-
-/**
- * 旧名判据。前九支逐字取自方案 §1.3 的 P(`sk-alpha-` 与 `code-puppy` 两支随 owner 裁决 D4 / F5 加入);
- * 第十支 `.alpha` 承接被取代的 `#1206` 门 —— 不收它,`~/.alpha` / `<proj>/.alpha` 这类退役根写法就从此无人拦;
- * 它要求 `.alpha` 前面不是标识符字符,否则 CSS 里表示透明度的 `.chip.alpha` 这类类名也会被判成旧名。
- * 独立 `Alpha` 分支拦住用户与模型可见的退役品牌词(#1635),包括英文所有格。
- */
-const OLD_NAME = new RegExp(
-  [
-    "cloud_cloud_",
-    "(^|[^A-Za-z0-9])alpha[-_][a-z]",
-    "(^|[^A-Za-z0-9_])ALPHA_[A-Z0-9]",
-    "(^|[^A-Za-z0-9])alphacode([^A-Za-z0-9]|$)",
-    "@alpha-code/",
-    "vnd\\.alpha\\.",
-    '"alpha\\.[a-z]',
-    "sk-alpha-",
-    "code-puppy",
-    "(^|[^A-Za-z0-9_])\\.alpha([^-A-Za-z0-9_]|$)",
-    "(^|[^A-Za-z0-9])Alpha([^A-Za-z0-9]|$)",
-  ].join("|"),
-)
 
 /** 规范 §5 的固定枚举,外加编排器裁决的 `pending`(在途票接手改名的旧名;理由里必须写接手票号)。 */
 const CATEGORIES = new Set([
@@ -195,45 +175,83 @@ function isFirstParty(path: string): boolean {
 const SCANNED = ALL_LISTED.filter(inScope)
 const NAME_SCANNED = ALL_LISTED.filter(isFirstParty)
 
-type Hit = { path: string; line: number; text: string }
+/** 一处命中:`line` 只用于报错时给坐标,不参与身份;身份是 `key`(文件 + 命中词元)。 */
+type Hit = { path: string; line: number; text: string; key: string }
+
+const hitKey = (path: string, tokens: string) => `${path}\t${tokens}`
+
+/** 一个文件内容里的全部命中 —— 真扫描与下面的反例走同一个函数。 */
+function fileHits(path: string, text: string): Hit[] {
+  return text
+    .split("\n")
+    .flatMap((line, i) => (OLD_NAME.test(line) ? [{ path, line: i + 1, text: line, key: hitKey(path, hitTokens(line)) }] : []))
+}
 
 function scan(): Hit[] {
   const contentHits = SCANNED.flatMap((path) => {
     const text = readText(path)
-    if (text === undefined) return []
-    return text.split("\n").flatMap((line, i) => (OLD_NAME.test(line) ? [{ path, line: i + 1, text: line }] : []))
+    return text === undefined ? [] : fileHits(path, text)
   })
   return [...contentHits, ...nameHits(NAME_SCANNED)]
 }
 
-/** 文件名这一层:basename 用同一个判据判一次,命中记为第 0 行(登记表里写 `路径 ⇥ 0`)。 */
+/** 文件名这一层:basename 用同一个判据判一次,命中记为第 0 行,词元写「文件名」。 */
 function nameHits(paths: string[]): Hit[] {
   return paths.flatMap((path) => {
     const base = path.slice(path.lastIndexOf("/") + 1)
-    return OLD_NAME.test(base) ? [{ path, line: 0, text: base }] : []
+    return OLD_NAME.test(base) ? [{ path, line: 0, text: base, key: hitKey(path, FILE_NAME_HIT) }] : []
   })
 }
 
 // 自检不过就不测量:一个退化成恒不命中的判据会让两个方向一起「通过」。
 const HITS = SELF_TEST.length === 0 ? scan() : []
-const HIT_KEYS = new Set(HITS.map((h) => `${h.path}:${h.line}`))
 
-type Row = { path: string; line: number; category: string; reason: string; n: number }
+type Row = { path: string; tokens: string; count: number; category: string; reason: string; n: number; key: string }
 
-function registry(): Row[] {
-  return readFileSync(join(REPO_ROOT, REGISTRY), "utf8")
-    .split("\n")
-    .flatMap((raw, i) => {
-      if (!raw || raw.startsWith("#")) return []
-      const parts = raw.split("\t")
-      if (parts.length !== 4) throw new Error(`${REGISTRY}:${i + 1} 不是四列(文件⇥行号⇥类别⇥理由):${raw}`)
-      if (!/^[0-9]+$/.test(parts[1]!)) throw new Error(`${REGISTRY}:${i + 1} 行号不是数字:${raw}`)
-      return [{ path: parts[0]!, line: Number(parts[1]), category: parts[2]!, reason: parts[3]!, n: i + 1 }]
-    })
+function parseRegistry(body: string): Row[] {
+  return body.split("\n").flatMap((raw, i) => {
+    if (!raw || raw.startsWith("#")) return []
+    const parts = raw.split("\t")
+    if (parts.length !== 5) throw new Error(`${REGISTRY}:${i + 1} 不是五列(文件⇥命中词元⇥处数⇥类别⇥理由):${raw}`)
+    if (!/^[1-9][0-9]*$/.test(parts[2]!)) throw new Error(`${REGISTRY}:${i + 1} 处数不是正整数:${raw}`)
+    const [path, tokens, count, category, reason] = parts as [string, string, string, string, string]
+    return [{ path, tokens, count: Number(count), category, reason, n: i + 1, key: hitKey(path, tokens) }]
+  })
 }
 
-const ROWS = registry()
-const ROW_KEYS = new Set(ROWS.map((r) => `${r.path}:${r.line}`))
+const ROWS = parseRegistry(readFileSync(join(REPO_ROOT, REGISTRY), "utf8"))
+
+/**
+ * 两个方向的唯一判据:逐个 (文件, 命中词元) 比「扫描到几行」与「登记了几处」。
+ * 多出来的命中 ⇒ 未登记(方向 A);多出来的登记 ⇒ 僵尸(方向 B)。真树与反例用同一个函数。
+ */
+function compareHits(hits: Hit[], rows: Row[]): { unregistered: string[]; stale: string[] } {
+  const registered = new Map<string, number>()
+  for (const row of rows) registered.set(row.key, (registered.get(row.key) ?? 0) + row.count)
+  const found = new Map<string, Hit[]>()
+  for (const hit of hits) found.set(hit.key, [...(found.get(hit.key) ?? []), hit])
+  const unregistered: string[] = []
+  for (const [key, list] of found) {
+    const allowed = registered.get(key) ?? 0
+    if (list.length > allowed)
+      // 行文只取前 120 个字符:bun 会把超长字符串从中间截断,连坐标一起截掉。
+      unregistered.push(
+        `${list[0]!.path} [${key.slice(key.indexOf("\t") + 1)}] 实测 ${list.length} 处 > 登记 ${allowed} 处:` +
+          list.map((h) => `${h.line}: ${h.text.trim().slice(0, 120)}`).join(" | "),
+      )
+  }
+  const stale: string[] = []
+  for (const [key, count] of registered) {
+    const actual = found.get(key)?.length ?? 0
+    if (count > actual) {
+      const where = rows.filter((r) => r.key === key).map((r) => `${REGISTRY}:${r.n}`)
+      stale.push(`${where.join(",")} → ${key.replace("\t", " [")}] 登记 ${count} 处 > 实测 ${actual} 处`)
+    }
+  }
+  return { unregistered, stale }
+}
+
+const RESULT = compareHits(HITS, ROWS)
 
 describe("旧名扫描门 (#1570)", () => {
   test("自检:已知旧名全部命中、普通词零命中(不过 ⇒ 本次测量作废)", () => {
@@ -273,15 +291,15 @@ describe("旧名扫描门 (#1570)", () => {
   test("文件名层:内容干净的 alpha-x.ts 照样被点名,且不在登记表里 ⇒ 方向 A 会红", () => {
     const clean = "packages/ext/src/alpha-x.ts"
     expect(isFirstParty(clean)).toBe(true)
-    expect(nameHits([clean])).toEqual([{ path: clean, line: 0, text: "alpha-x.ts" }])
-    expect(ROW_KEYS.has(`${clean}:0`)).toBe(false)
+    expect(nameHits([clean])).toEqual([{ path: clean, line: 0, text: "alpha-x.ts", key: hitKey(clean, FILE_NAME_HIT) }])
+    expect(compareHits(nameHits([clean]), ROWS).unregistered).toHaveLength(1)
     // 控制组:新名字不命中;扫描面真的包含测试文件的名字(F1 漏网的正是两个测试文件)
     expect(nameHits(["packages/ext/src/codepuppy-x.ts"])).toEqual([])
     expect(NAME_SCANNED.some((path) => IS_TEST_CODE.test(path))).toBe(true)
     expect(HITS.some((h) => h.line === 0)).toBe(true)
   })
 
-  test("登记表合形:类别取自固定枚举、理由非空、pending 写明接手票、无重复行", () => {
+  test("登记表合形:类别取自固定枚举、理由非空、pending 写明接手票、(文件, 命中词元, 类别) 不重复", () => {
     expect(ROWS.length).toBeGreaterThan(0)
     for (const row of ROWS) {
       expect(CATEGORIES.has(row.category), `${REGISTRY}:${row.n} 类别 "${row.category}" 不在固定枚举里`).toBe(true)
@@ -292,38 +310,66 @@ describe("旧名扫描门 (#1570)", () => {
         expect(/(^|[^A-Za-z0-9-])#1570(?![0-9])/.test(row.reason), `${REGISTRY}:${row.n} pending 不许指向本票 #1570`).toBe(false)
       }
     }
-    expect(ROW_KEYS.size, "登记表里有重复的 文件:行号").toBe(ROWS.length)
+    expect(new Set(ROWS.map((r) => `${r.key}\t${r.category}`)).size, "登记表里有重复的 (文件, 命中词元, 类别)").toBe(ROWS.length)
   })
 
   test("方向 A —— 每一处扫描命中都登记在册(新写进来的旧名会被拦住)", () => {
     expect(SELF_TEST, "自检未过,本次测量作废").toEqual([])
-    const unregistered = HITS.filter((h) => !ROW_KEYS.has(`${h.path}:${h.line}`)).map(
-      // 行文只取前 120 个字符:bun 会把超长字符串从中间截断,连坐标一起截掉。
-      (h) => `${h.path}:${h.line}: ${h.text.trim().slice(0, 120)}`,
-    )
     expect(
-      unregistered,
+      RESULT.unregistered,
       [
-        `这些位置写着旧名,但不在 ${REGISTRY} 里。`,
+        `这些位置写着旧名,但 ${REGISTRY} 里没有登记(或登记的处数不够)。`,
         "先问:它是 Code Puppy 自己的名字吗?是 ⇒ 按命名规范 §3 改成 codepuppy 形式。",
-        "不是 ⇒ 登记进表,类别取自规范 §5(historical / third-party / user-content / upstream /",
-        "migration-source / retired-guard / external-anchor)或 pending(写接手票号),并写清为什么它必须保留。",
+        "不是 ⇒ 登记进表(同一文件同一命中词元已有登记的,把处数加一),类别取自规范 §5(historical /",
+        "third-party / user-content / upstream / migration-source / retired-guard / external-anchor)或 pending",
+        "(写接手票号),并写清为什么它必须保留。",
       ].join("\n"),
     ).toEqual([])
   })
 
-  test("方向 B —— 每一条登记都对应一处真实命中(表项失效后不会变成僵尸)", () => {
+  test("方向 B —— 每一条登记都对应真实命中(表项失效后不会变成僵尸)", () => {
     expect(SELF_TEST, "自检未过,本次测量作废").toEqual([])
-    const stale = ROWS.filter((r) => !HIT_KEYS.has(`${r.path}:${r.line}`)).map(
-      (r) => `${REGISTRY}:${r.n} → ${r.path}:${r.line} [${r.category}]`,
-    )
     expect(
-      stale,
+      RESULT.stale,
       [
-        "这些登记项在源码里扫不到对应的旧名。",
-        "常见成因:那一处已被改名(⇒ 删掉这一行),或该文件上方增删了行导致行号漂移",
-        "(⇒ 先确认那一处今天仍然该留着,再改行号 —— 不要只把数字改对)。",
+        "这些登记项在源码里扫不到(或扫到的处数比登记的少)。",
+        "那一处已被改名 ⇒ 删掉这一行或把处数减一;那一行内容改过、旧名还在 ⇒ 方向 A 会同时报出新的命中词元,",
+        "先确认它今天仍然该留着,再按新词元登记。",
       ].join("\n"),
     ).toEqual([])
+  })
+
+  // ── 反例(I-09):三条判据各自能红。都在真文件内容上做,走生产的 fileHits + compareHits。──
+  const ANCHOR_FILE = "docs/runbooks/ci.md"
+  const anchorText = () => readText(ANCHOR_FILE) ?? ""
+
+  test("反例 · 方向 A:真文件里多出一行新旧名 ⇒ 点名那一行", () => {
+    const rows = ROWS.filter((r) => r.path === ANCHOR_FILE)
+    expect(compareHits(fileHits(ANCHOR_FILE, anchorText()), rows).unregistered).toEqual([])
+    const injected = `${anchorText()}\n运行 alpha-foo 之前先读本节\n`
+    const { unregistered, stale } = compareHits(fileHits(ANCHOR_FILE, injected), rows)
+    expect(unregistered).toHaveLength(1)
+    expect(unregistered[0]).toContain("[alpha-foo]")
+    expect(stale).toEqual([])
+  })
+
+  test("反例 · 方向 B:登记了一处真树上不存在的命中 ⇒ 点名那一条", () => {
+    const rows = ROWS.filter((r) => r.path === ANCHOR_FILE)
+    const top = rows[0]!
+    const extra = [...rows.slice(1), { ...top, count: top.count + 1 }]
+    const { unregistered, stale } = compareHits(fileHits(ANCHOR_FILE, anchorText()), extra)
+    expect(unregistered).toEqual([])
+    expect(stale).toHaveLength(1)
+    expect(stale[0]).toContain(`登记 ${top.count + 1} 处 > 实测 ${top.count} 处`)
+  })
+
+  test("回归 · 给登记在册的文件前面插 7 行(2026-11-12 那次 front matter):登记表不用动", () => {
+    const rows = ROWS.filter((r) => r.path === ANCHOR_FILE)
+    expect(rows.length).toBeGreaterThan(0)
+    const before = fileHits(ANCHOR_FILE, anchorText())
+    const shifted = fileHits(ANCHOR_FILE, ["---", "id: x", "title: x", "kind: runbook", "status: active", "owners: [x]", "---", anchorText()].join("\n"))
+    // 行号确实整体移了 7 —— 旧格式(按行号登记)下这里的每一处都会同时报「未登记」与「僵尸」
+    expect(shifted.map((h) => h.line)).toEqual(before.map((h) => h.line + 7))
+    expect(compareHits(shifted, rows)).toEqual({ unregistered: [], stale: [] })
   })
 })

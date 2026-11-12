@@ -23,7 +23,7 @@ last_reviewed: 2026-11-12
 ## 段 1 — 旧名登记表按内容定位
 
 - 依据:无 spec、无 design。owner 2026-11-12 批准 I-09(U-04「同意，I-09 检查登记表自动对账也做」),见 alpha-work `docs/intents/INT-upstream-upgrade-readiness.md` I-09;Issue impharaon/alpha-code#1662;派发书 AC1、AC3(旧名半)。
-- 核对:<实施轮第一次提交时按 resume brief 的 `Phase:` 行填写>
+- 核对:`1bc9195100` · 编排器 · 通过(共享模块 `old-name-scan.ts` 与 `naming-migration-wiring.test.ts` 消费方获准;三个 websearch 测试文件按「有 2.x 替代或记录在案的理由才删,否则保留并列出」获准编辑)。
 
 ### 本段的局部选择(派发书留给计划决定)
 
@@ -75,7 +75,7 @@ last_reviewed: 2026-11-12
 ## 段 2 — 闸门文件登记簿对账
 
 - 依据:同段 1;派发书 AC2、AC3(闸门半)。
-- 核对:<同上>
+- 核对:同段 1。
 
 ### AC2 选型:(a) 保留精确条数,扩展已有的 `--update`
 

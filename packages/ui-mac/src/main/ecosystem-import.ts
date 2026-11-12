@@ -2,7 +2,9 @@
 //
 // 上游静默继承面只有两类(源码钉死,skill/index.ts:21-22 + instruction.ts:62-66):
 //   skill(~/.claude/skills、~/.agents/skills、项目同名目录)与 CLAUDE.md(全局 + 项目)。
-// default-deny 由 applyEcosystemDefaultDeny 注入上游进程级 flag;本模块承载 consent 之后的
+// default-deny `#1667` 起由注入配置里的移除指令 `-opencode.config.compatibility` 承担(裁决书 N3,codepuppy-config-injection.ts
+// 的 governanceFloor;v1 的两个进程级 flag OPENCODE_DISABLE_EXTERNAL_SKILLS / OPENCODE_DISABLE_CLAUDE_CODE_PROMPT 在 2.x
+// 无读者,随之删除;2.x 核心也不读 CLAUDE.md,指令文件只认 AGENTS.md)。本模块承载 consent 之后的
 // **转换导入**(ADR-023 一脉:产物为原生 alpha 资产,与外部目录脱钩 —— 快照语义,重导入是唯一
 // 更新通道):
 //   - skill  → importSkillFolder(既有 REQ-033 管线:frontmatter 校验/防逃逸/receipts),
@@ -23,13 +25,6 @@ import { importSkillFolder } from "./ext-fs-installer"
 import type { InstallTarget } from "../preload/types"
 
 export const EXTERNAL_IMPORT_VERSION = 1
-
-/** T1:default-deny flags(set-if-unset;逃生 CODEPUPPY_ECOSYSTEM_INHERIT=1 不注入)。 */
-export function applyEcosystemDefaultDeny(env: NodeJS.ProcessEnv): void {
-  if (env.CODEPUPPY_ECOSYSTEM_INHERIT === "1") return
-  env.OPENCODE_DISABLE_EXTERNAL_SKILLS ??= "1"
-  env.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT ??= "1"
-}
 
 export function ecosystemInheritEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.CODEPUPPY_ECOSYSTEM_INHERIT === "1"

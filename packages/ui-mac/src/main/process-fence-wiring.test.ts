@@ -13,6 +13,7 @@
 // (用户自己的 HTTP(S)_PROXY / NO_PROXY 不能存活 —— 唯一通路);代理起不来 ⇒ 拒 fork、零 fork;缺省提供者真起监听。
 // 非 darwin:没有围栏就不装策略层 —— 不起代理、env 照旧。
 
+import { isolateEngineHome } from "../../test-component/isolated-engine-home"
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { EventEmitter } from "node:events"
 import { createHash } from "node:crypto"
@@ -27,6 +28,9 @@ import { buildOfficeRuntime } from "../../scripts/build-office-runtime"
 import { startEgressPolicyProxy, type EgressLogRecord, type EgressProxyHandle } from "./network-egress-proxy"
 import { renderProcessFenceProfile, resolveEngineRoots } from "./process-fence-profile"
 import { upsertRecordV2 } from "./ext-receipt-v2"
+
+// 在 server.ts 被 import、spawnLocalServer 跑之前:旧凭证检查只看临时根,不碰本机真实数据目录(isolated-engine-home.ts)。
+isolateEngineHome()
 
 const appEvents = new EventEmitter()
 
@@ -56,9 +60,20 @@ mock.module("./logging", () => ({
   write: () => {},
   rotateServerLogs: () => {},
 }))
+// `#1667`(裁决 r3 第 2 条之后):自定义节点只在有可用 key 时注入、才进出网授权。`#1392` 那条用例的节点要带 key ——
+// key 走生产的钥匙串库(store → fork 前 customProviderSecretValues → syncSecretFiles 写 key 文件);只把库那一个 Electron
+// 接缝换成能落盘的假钥匙串,与 server.test.ts 同形(codepuppy-keychain-backend.ts 抬头写明测试替换的就是它)。
+mock.module("./codepuppy-keychain-backend", () => ({
+  keychainBackend: () => ({
+    isEncryptionAvailable: () => true,
+    encryptString: (value: string) => Buffer.from(value, "utf8"),
+    decryptString: (value: Buffer) => value.toString("utf8"),
+  }),
+}))
 
 // 陷阱:`await import("./server")` 必须排在 mock.module("electron", ...) **之后**,否则真 electron 会被拉起来。
 const { spawnLocalServer } = await import("./server")
+const { clearByokKeys, initByokKeys, storeByokKey } = await import("./codepuppy-byok-keys")
 const { creditDanglingSweepForSpawn, resetDanglingSweepLatchForTests } = await import("./dangling-sweep-latch")
 const { SIDECAR_EGRESS_NO_PROXY } = await import("./sidecar-env")
 const { isEgressAuthorizedForSidecar, setConfiguredEgressDestinations } = await import("./network-egress-derived")
@@ -592,6 +607,11 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
         [{ id: "my-openai", name: "My OpenAI", compat: "openai", baseURL: "https://api.openai.com/v1", models: ["gpt-5.4"] }],
         fs,
       )
+      // `#1667`(裁决 r3 第 2 条):用户加节点时同时存了 key(模型选择器的添加流程两样一起写)。没有 key 的节点不注入
+      // (codepuppy-models.ts 的 hasUsableKey),出网放行跟着注入走,调不了的节点也就不放行 —— 去掉这把 key,下面
+      // api.openai.com 那一行就红(实测)。这里判的是带 key 的真源节点整条生产路径放行。
+      initByokKeys(userDataPath)
+      expect(storeByokKey("my-openai", "test-value-not-a-real-key-Mo42")).toEqual({ ok: true })
       // `#1381`:同一状态根下的兄弟真源(mcp-servers/dev.json)里一条用户自配的远程 MCP 服务器。
       writeMcpServerTruth(join(realpathSync(userDataPath), "codepuppy-state", "mcp-servers", "dev.json"), [{ name: "my-mcp", url: "https://mcp.example.com/mcp" }], fs)
       __resetIgnoredConfigProvidersLogForTests()
@@ -636,6 +656,7 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
       ])
       await result.listener.stop()
     } finally {
+      clearByokKeys()
       setConfiguredEgressDestinations([])
       for (const k of savedEnvKeys) {
         if (before[k] === undefined) delete process.env[k]

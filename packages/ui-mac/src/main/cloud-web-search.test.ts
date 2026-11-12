@@ -2,10 +2,12 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, test } from "bun:test"
 // #650:工具 id 一律从**引擎自己的**拼名规则推导。手喂字面量正是让这道闸空了整整一个需求的原因,
-// 所以这里装的是真的 `McpCatalog` 与真的 `Permission`,不是替身。
-import { McpCatalog } from "../../../opencode/src/mcp/catalog"
+// 所以这里装的是真的拼名函数与真的权限求值,不是替身。`#1667`:引擎换成 OpenCode 2 —— 拼名是 `@opencode/core/tool/mcp`
+// 的 `name(server, tool)`(MCP 工具的注册名与权限动作名同一个),求值是 `@opencode/core/permission` 的 `evaluate`
+// (有序规则表,取最后一条命中);注入写的是 2.x 的 `permissions` / `agents.<name>.permissions` 规则数组。
+import { McpTool } from "@opencode/core/tool/mcp"
+import { Permission } from "@opencode/core/permission"
 import { CLOUD_MCP_TOOLS } from "./fixtures/cloud-mcp-tools"
-import { Permission } from "../../../opencode/src/permission/index"
 import {
   applyWebSearchDenies,
   CLOUD_MCP_SERVER_NAME,
@@ -25,117 +27,92 @@ const siblingRemoteTools = [
   "cloud_schedule_list",
   "cloud_schedule_delete",
 ] as const
-/** 远端名 → 引擎 id,走引擎自己的 `McpCatalog.toolName`(#650:不得手写第二份)。 */
-const engineToolId = (remoteName: string) => McpCatalog.toolName(CLOUD_MCP_SERVER_NAME, remoteName)
+/** 远端名 → 引擎 id,走引擎自己的 `McpTool.name`(#650:不得手写第二份)。 */
+const engineToolId = (remoteName: string) => McpTool.name(CLOUD_MCP_SERVER_NAME, remoteName)
 const siblingCloudTools = siblingRemoteTools.map(engineToolId)
 const registeredCloudTools = [CLOUD_WEB_SEARCH_TOOL_ID, ...siblingCloudTools]
 
-/** alpha 注入的三个 agent 都显式 `websearch: "allow"`(codepuppy-config-injection.ts)。 */
-const codepuppyAgents = () => ({
-  "codepuppy-automation": { permission: { websearch: "allow", bash: "deny" } },
-  "codepuppy-readonly": { permission: { websearch: "allow", edit: "deny" } },
-  "codepuppy-automation-standard": { permission: { websearch: "allow", edit: "allow" } },
+type Rule = { action: string; resource: string; effect: "allow" | "deny" | "ask" }
+const rule = (action: string, effect: Rule["effect"], resource = "*"): Rule => ({ action, resource, effect })
+/** alpha 注入的三个 agent 都显式 `websearch` allow(codepuppy-config-injection.ts)。 */
+const codepuppyAgents = (): Record<string, { permissions?: Rule[] }> => ({
+  "codepuppy-automation": { permissions: [rule("websearch", "allow"), rule("shell", "deny")] },
+  "codepuppy-readonly": { permissions: [rule("websearch", "allow"), rule("edit", "deny")] },
+  "codepuppy-automation-standard": { permissions: [rule("websearch", "allow"), rule("edit", "allow")] },
 })
+/** 引擎的求值:取最后一条命中(`packages/core/src/permission.ts` 的 `evaluate`)。 */
+const effectOf = (tool: string, ...rulesets: Rule[][]) => Permission.evaluate(tool, "*", ...rulesets).effect
 
 describe("web search sovereignty denies", () => {
   test("kill switch removes both web search tools while the cloud server and sibling tools remain live", () => {
     const diagnostics: string[] = []
     const config = {
-      mcp: { codepuppy: { type: "remote", url: "https://cloud.example/mcp", enabled: true } },
-      permission: { [CLOUD_WEB_SEARCH_TOOL_ID]: "allow", bash: "allow" },
-      agent: codepuppyAgents(),
+      mcp: { servers: { codepuppy: { type: "remote", url: "https://cloud.example/mcp" } } },
+      permissions: [rule(CLOUD_WEB_SEARCH_TOOL_ID, "allow"), rule("shell", "allow")],
+      agents: codepuppyAgents(),
     }
 
     applyWebSearchDenies(config, { killSwitch: true, platformPays: false }, (message) => diagnostics.push(message))
 
-    expect(config.mcp.codepuppy.enabled).toBe(true)
-    expect(registeredCloudTools.filter((tool) => config.permission[tool] === "deny")).toEqual([
-      CLOUD_WEB_SEARCH_TOOL_ID,
-    ])
-    expect(config.permission).toEqual({
-      [CLOUD_WEB_SEARCH_TOOL_ID]: "deny",
-      [LOCAL_WEB_SEARCH_TOOL_ID]: "deny",
-      bash: "allow",
-    })
+    expect(config.mcp.servers.codepuppy).toEqual({ type: "remote", url: "https://cloud.example/mcp" })
+    expect(registeredCloudTools.filter((tool) => effectOf(tool, config.permissions) === "deny")).toEqual([CLOUD_WEB_SEARCH_TOOL_ID])
+    expect(config.permissions).toEqual([rule("shell", "allow"), rule(CLOUD_WEB_SEARCH_TOOL_ID, "deny"), rule(LOCAL_WEB_SEARCH_TOOL_ID, "deny")])
     expect(diagnostics).toHaveLength(2)
     expect(diagnostics.join("\n")).toContain("remote MCP config has no per-tool deny")
   })
 
-  // `#1411`(REQ-1414 CODE-1,owner 2026-09-23 裁决)—— 这条臂以前是
-  // 「platform pays denies the local websearch tool」:代付即把本地 `websearch` 钉进 deny 表。
-  // 那是 ADR-009 B1「一登录就只走云端」的落点,已被推翻:**账户信号只决定云腿在不在,不决定本地腿
-  // 在不在**。本地腿 keyless、不花钱,是云腿 402 / 网络故障时唯一的退路。
-  //
-  // 这条臂现在是那条边被重新接上时**当场翻红**的反回归断言 —— 它也是 `WebSearchSovereignty` 保留
-  // `platformPays` 字段的理由:字段删了就写不出这条断言。
+  // `#1411`(REQ-1414 CODE-1,owner 2026-09-23 裁决):账户信号只决定云腿在不在,不决定本地腿在不在。
+  // 这条臂是那条边被重新接上时**当场翻红**的反回归断言。
   test("platform pays denies nothing — 代付不动本地腿,两条腿都留在模型工具表里", () => {
-    const config = {
-      permission: { bash: "allow" },
-      agent: codepuppyAgents(),
-    }
+    const config = { permissions: [rule("shell", "allow")], agents: codepuppyAgents() }
     const diagnostics: string[] = []
 
     applyWebSearchDenies(config, { killSwitch: false, platformPays: true }, (message) => diagnostics.push(message))
 
-    // 一个字都不写:既不是「写了 allow」也不是「写了 deny」—— 注入面在代付态对 web search 无话可说。
-    expect(config.permission).toEqual({ bash: "allow" })
-    expect(config.agent).toEqual(codepuppyAgents())
+    expect(config.permissions).toEqual([rule("shell", "allow")])
+    expect(config.agents).toEqual(codepuppyAgents())
     expect(diagnostics).toEqual([])
   })
 
-  // agent 级规则在引擎里排在全局规则**之后**(agent/agent.ts 的 merge 序 + evaluate 的 findLast),
-  // 所以不压平这三个 agent 的话,全局 deny 对它们无效 —— 闸只对 build/plan 之类原生 agent 成立。
+  // agent 级规则排在全局规则**之后**(evaluate 取 findLast),不压平这三个 agent 的话,全局 deny 对它们无效。
   test("no injected agent may re-allow a denied web search tool", () => {
-    // `#1411`:`{ killSwitch: false, platformPays: true }` 从这张表里移出去了 —— 那一态现在**没有**
-    // 被 deny 的 web search 工具,「不许 re-allow」对它无意义。代付态的断言在上面那条专门的臂里。
     for (const state of [
       { killSwitch: true, platformPays: false },
       { killSwitch: true, platformPays: true },
     ]) {
-      const config = { permission: {}, agent: codepuppyAgents() }
+      const config = { permissions: [] as Rule[], agents: codepuppyAgents() }
       applyWebSearchDenies(config, state, () => {})
-      for (const agent of Object.values(config.agent)) {
-        expect(agent.permission[LOCAL_WEB_SEARCH_TOOL_ID]).toBe("deny")
-        expect(agent.permission[CLOUD_WEB_SEARCH_TOOL_ID]).not.toBe("allow")
+      for (const agent of Object.values(config.agents)) {
+        expect(effectOf(LOCAL_WEB_SEARCH_TOOL_ID, config.permissions, agent.permissions!)).toBe("deny")
+        expect(effectOf(CLOUD_WEB_SEARCH_TOOL_ID, config.permissions, agent.permissions!)).toBe("deny")
       }
     }
   })
 
   test("agent rules unrelated to web search stay untouched", () => {
-    const config = { permission: {}, agent: codepuppyAgents() }
+    const config = { permissions: [] as Rule[], agents: codepuppyAgents() }
     applyWebSearchDenies(config, { killSwitch: true, platformPays: true }, () => {})
-    expect(config.agent["codepuppy-automation-standard"].permission.edit).toBe("allow")
-    expect(config.agent["codepuppy-readonly"].permission.edit).toBe("deny")
+    expect(effectOf("edit", config.agents["codepuppy-automation-standard"]!.permissions!)).toBe("allow")
+    expect(effectOf("edit", config.agents["codepuppy-readonly"]!.permissions!)).toBe("deny")
   })
 
-  // #223 R2 Blocker 1(路径 ①):`applyWebSearchDenies` 以前只改**已有的精确** `websearch` 键 ——
-  // 一个只写 `"*": "allow"` 的 agent 完全不被压平,而它的 wildcard 排在全局 deny 之后就赢
-  // (`Permission.fromConfig` 按插入序展开 + `evaluate` 取 `findLast`)。同一张表里的顺序也算数,
-  // 所以 deny 必须被钉到**末位**,不能只改值。
+  // #223 R2 Blocker 1:一个只写 `*` allow 的 agent 必须也被压平;同一张表里的顺序也算数,deny 必须钉到**末位**。
   test("an agent wildcard cannot re-allow a denied web search tool", () => {
     const config = {
-      permission: { [LOCAL_WEB_SEARCH_TOOL_ID]: "allow", "*": "allow" },
-      agent: {
-        "wildcard-only": { permission: { "*": "allow" } },
-        "wildcard-after-deny": { permission: { [LOCAL_WEB_SEARCH_TOOL_ID]: "allow", "*": "allow" } },
+      permissions: [rule(LOCAL_WEB_SEARCH_TOOL_ID, "allow"), rule("*", "allow")],
+      agents: {
+        "wildcard-only": { permissions: [rule("*", "allow")] },
+        "wildcard-after-deny": { permissions: [rule(LOCAL_WEB_SEARCH_TOOL_ID, "allow"), rule("*", "allow")] },
         "no-permission-block": {},
-      },
+      } as Record<string, { permissions?: Rule[] }>,
     }
 
-    // `#1411`:驱动态从代付换成 kill-switch —— 被测行为(deny 必须钉到末位)一个字没变,只是现在
-    // 唯一能产生 deny 的状态是 kill-switch。
     applyWebSearchDenies(config, { killSwitch: true, platformPays: false }, () => {})
 
-    const lastRuleWins = (permission: Record<string, unknown>) => {
-      // 引擎语义的最小复刻:精确键与 `"*"` 都能匹配 `websearch`,取最后一条。
-      const matching = Object.keys(permission).filter((key) => key === LOCAL_WEB_SEARCH_TOOL_ID || key === "*")
-      return permission[matching[matching.length - 1]!]
-    }
-
-    expect(lastRuleWins(config.permission)).toBe("deny")
-    for (const agent of Object.values(config.agent) as { permission?: Record<string, unknown> }[]) {
-      expect(agent.permission?.[LOCAL_WEB_SEARCH_TOOL_ID]).toBe("deny")
-      expect(lastRuleWins(agent.permission!)).toBe("deny")
+    expect(effectOf(LOCAL_WEB_SEARCH_TOOL_ID, config.permissions)).toBe("deny")
+    for (const agent of Object.values(config.agents)) {
+      expect(agent.permissions?.at(-1)).toEqual(rule(LOCAL_WEB_SEARCH_TOOL_ID, "deny"))
+      expect(effectOf(LOCAL_WEB_SEARCH_TOOL_ID, config.permissions, agent.permissions!)).toBe("deny")
     }
   })
 
@@ -154,18 +131,18 @@ describe("web search sovereignty denies", () => {
 
   test("logged-out/BYOK leaves cloud tool registration and existing permissions unchanged", () => {
     const config = {
-      mcp: { codepuppy: { type: "remote", url: "https://cloud.example/mcp", enabled: true } },
-      permission: { bash: "allow" },
-      agent: codepuppyAgents(),
+      mcp: { servers: { codepuppy: { type: "remote", url: "https://cloud.example/mcp" } } },
+      permissions: [rule("shell", "allow")],
+      agents: codepuppyAgents(),
     }
 
     const diagnostics: string[] = []
     applyWebSearchDenies(config, { killSwitch: false, platformPays: false }, (message) => diagnostics.push(message))
 
     expect(config).toEqual({
-      mcp: { codepuppy: { type: "remote", url: "https://cloud.example/mcp", enabled: true } },
-      permission: { bash: "allow" },
-      agent: codepuppyAgents(),
+      mcp: { servers: { codepuppy: { type: "remote", url: "https://cloud.example/mcp" } } },
+      permissions: [rule("shell", "allow")],
+      agents: codepuppyAgents(),
     })
     expect(diagnostics).toEqual([])
   })
@@ -188,7 +165,7 @@ describe("web search sovereignty denies", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe("#650 云 web search 闸按引擎真实 id 命中", () => {
   test("生产常量 = 引擎的拼名规则算出来的 id,而不是远端工具名", () => {
-    expect(CLOUD_WEB_SEARCH_TOOL_ID).toBe(McpCatalog.toolName(CLOUD_MCP_SERVER_NAME, CLOUD_WEB_SEARCH_REMOTE_TOOL))
+    expect(CLOUD_WEB_SEARCH_TOOL_ID).toBe(McpTool.name(CLOUD_MCP_SERVER_NAME, CLOUD_WEB_SEARCH_REMOTE_TOOL))
     // 远端名自带 `cloud_` 前缀,两者长得几乎一样 —— 正是这一点让缺陷活了一个需求。
     expect(CLOUD_WEB_SEARCH_TOOL_ID).not.toBe(CLOUD_WEB_SEARCH_REMOTE_TOOL)
   })
@@ -208,9 +185,9 @@ describe("#650 云 web search 闸按引擎真实 id 命中", () => {
     // 取证里的两个名字仍由同一个 McpCatalog.toolName 互推;今天的远端名由 vendored 平台清单担保
     // (`cloud-remote-names-pin.test.ts`),打包版重新取证归 T23。
     expect(evidence.remoteWebSearchToolName).toBe("cloud_web_search")
-    expect(evidence.derivedEngineToolId).toBe(McpCatalog.toolName("cloud", evidence.remoteWebSearchToolName!))
+    expect(evidence.derivedEngineToolId).toBe(McpTool.name("cloud", evidence.remoteWebSearchToolName!))
     expect(CLOUD_MCP_TOOLS).toContain(CLOUD_WEB_SEARCH_REMOTE_TOOL)
-    expect(CLOUD_WEB_SEARCH_TOOL_ID).toBe(McpCatalog.toolName("codepuppy", "web_search"))
+    expect(CLOUD_WEB_SEARCH_TOOL_ID).toBe(McpTool.name("codepuppy", "web_search"))
   })
 
   /**
@@ -221,64 +198,35 @@ describe("#650 云 web search 闸按引擎真实 id 命中", () => {
   const registeredTools = () => [
     ...[CLOUD_WEB_SEARCH_REMOTE_TOOL, ...siblingRemoteTools].map(engineToolId),
     LOCAL_WEB_SEARCH_TOOL_ID,
-    "bash",
+    "shell",
   ]
   /** 期望被隐藏的那个 id,同样从远端名推导。 */
   const cloudWebSearchEngineId = () => engineToolId(CLOUD_WEB_SEARCH_REMOTE_TOOL)
+  const hidden = (...rulesets: Rule[][]) => new Set(registeredTools().filter((tool) => effectOf(tool, ...rulesets) === "deny"))
 
-  test("kill-switch:引擎真的把云 web search 滤出模型工具表,兄弟云工具一个不少", () => {
-    const config: { permission: Record<string, unknown>; agent: ReturnType<typeof codepuppyAgents> } = {
-      permission: { bash: "allow" },
-      agent: codepuppyAgents(),
-    }
+  test("kill-switch:引擎的求值真的拒掉云 web search,兄弟云工具一个不少", () => {
+    const config = { permissions: [rule("shell", "allow")], agents: codepuppyAgents() }
     applyWebSearchDenies(config, { killSwitch: true, platformPays: false }, () => {})
-
-    // 判据 = 引擎自己算出来的隐藏集(`session/tools.ts` 经 `Permission.visibleTools` 消费同一个函数)。
-    const hidden = Permission.disabled(registeredTools(), Permission.fromConfig(config.permission as never))
-    expect([...hidden].sort()).toEqual([cloudWebSearchEngineId(), LOCAL_WEB_SEARCH_TOOL_ID].sort())
+    expect([...hidden(config.permissions)].sort()).toEqual([cloudWebSearchEngineId(), LOCAL_WEB_SEARCH_TOOL_ID].sort())
   })
 
   test("kill-switch:alpha 注入的 agent 也压得住(agent 规则排在全局之后,取 findLast)", () => {
-    const config: { permission: Record<string, unknown>; agent: ReturnType<typeof codepuppyAgents> } = {
-      permission: {},
-      agent: codepuppyAgents(),
-    }
+    const config = { permissions: [] as Rule[], agents: codepuppyAgents() }
     applyWebSearchDenies(config, { killSwitch: true, platformPays: false }, () => {})
-
-    for (const [name, agent] of Object.entries(config.agent)) {
-      // `agent/agent.ts`:自定义 agent 的规则接在全局之后,`evaluate`/`disabled` 都取 findLast。
-      const ruleset = Permission.merge(
-        Permission.fromConfig(config.permission as never),
-        Permission.fromConfig(agent.permission as never),
-      )
-      const hidden = Permission.disabled(registeredTools(), ruleset)
-      expect([name, hidden.has(cloudWebSearchEngineId())]).toEqual([name, true])
-      expect([name, hidden.has(McpCatalog.toolName(CLOUD_MCP_SERVER_NAME, "cloud_dispatch"))]).toEqual([name, false])
+    for (const [name, agent] of Object.entries(config.agents)) {
+      const hiddenHere = hidden(config.permissions, agent.permissions!)
+      expect([name, hiddenHere.has(cloudWebSearchEngineId())]).toEqual([name, true])
+      expect([name, hiddenHere.has(McpTool.name(CLOUD_MCP_SERVER_NAME, "cloud_dispatch"))]).toEqual([name, false])
     }
   })
 
-  // `#1411`:以前这条断言的期望值是 `[LOCAL_WEB_SEARCH_TOOL_ID]`(代付 ⇒ 本地腿被引擎藏起来)。
-  // owner 2026-09-23 推翻之后,代付态**两条腿都不许被藏**:云腿是权威通道,本地腿是退路。
-  // 判据仍然是引擎自己的 `Permission.fromConfig` + `Permission.disabled`,不是「config 里那个键等于
-  // 某字符串」;期望值仍然从远端名经 `McpCatalog.toolName` 推导,不写第二份字面量。
-  test("代付但无 kill-switch:两条腿都在模型工具表里,引擎一个都不许藏", () => {
-    const config: { permission: Record<string, unknown>; agent: ReturnType<typeof codepuppyAgents> } = {
-      permission: {},
-      agent: codepuppyAgents(),
-    }
+  test("代付但无 kill-switch:两条腿都不被拒,引擎一个都不许藏", () => {
+    const config = { permissions: [] as Rule[], agents: codepuppyAgents() }
     applyWebSearchDenies(config, { killSwitch: false, platformPays: true }, () => {})
-
-    const hidden = Permission.disabled(registeredTools(), Permission.fromConfig(config.permission as never))
-    expect([...hidden]).toEqual([])
-    // agent 级规则排在全局之后(`evaluate`/`disabled` 取 findLast)—— 那一层也不许把两条腿藏掉。
-    // 只判这两个 id:`codepuppy-automation` 自己写着 `bash: "deny"`,那是它该藏的,与本票无关。
+    expect([...hidden(config.permissions)]).toEqual([])
     const webSearchIds = [cloudWebSearchEngineId(), LOCAL_WEB_SEARCH_TOOL_ID]
-    for (const [name, agent] of Object.entries(config.agent)) {
-      const ruleset = Permission.merge(
-        Permission.fromConfig(config.permission as never),
-        Permission.fromConfig(agent.permission as never),
-      )
-      const hiddenHere = Permission.disabled(registeredTools(), ruleset)
+    for (const [name, agent] of Object.entries(config.agents)) {
+      const hiddenHere = hidden(config.permissions, agent.permissions!)
       expect([name, webSearchIds.filter((id) => hiddenHere.has(id))]).toEqual([name, []])
     }
   })

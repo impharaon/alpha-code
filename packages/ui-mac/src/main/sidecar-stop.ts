@@ -1,19 +1,18 @@
 // #858 —— main 与 sidecar 之间「怎么停」的唯一形状。
 //
-// main 用 `SIDECAR_STOP_COMMAND` 写,sidecar 用 `parseSidecarStopCommand` 读、用 `stopSidecarListener` 执行。
+// main 用 `SIDECAR_STOP_COMMAND` 写,sidecar 用 `parseSidecarStopCommand` 读、用 `stopSidecarEngine` 执行。
 // 两侧共用一份,免得形状在两个包里各写一遍然后漂移。
 //
-// 停止一律排空(引擎 listener 的 `stop()` 不传强关参数,活动连接自然收口)。#858 曾为 token-only 换血加过
-// 「强关活动连接」一档;REQ-236 `#1562` 起令牌续期热应用凭据文件、不再重启引擎,那一档没有任何生产者,随之删除。
-
-import type { EngineFetch } from "./in-process-engine"
+// `#1667`(#1662 L5,裁决书 OOR-2):v1 时代先打引擎的全局 dispose 路由再停 listener;那条路由 2.x 没有(404 会让停止
+// 在收尾之前就抛错)。2.x 的收尾就是关掉 `start()` 的作用域(engine-embed.ts 的 `close`):上游在那里的 finalizer 里把状态
+// 转成 stopping、释放应用层与各 Location、关监听。Code Puppy 不再自己拼「先释放运行时、再排空」两步。
 
 export const SIDECAR_DRAIN_TIMEOUT_MS = 5_000
 
 export type SidecarStopCommand = { type: "stop" }
 
-/** 引擎 listener 里本模块用得到的那一面(`Server.listen()` 的返回值满足它)。 */
-export type StoppableListener = { stop(close?: boolean): void | Promise<void> }
+/** 引擎里本模块用得到的那一面(engine-embed.ts 的 `startEngine()` 返回值满足它)。 */
+export type StoppableEngine = { close(): Promise<void> }
 
 export const SIDECAR_STOP_COMMAND: SidecarStopCommand = { type: "stop" }
 
@@ -24,27 +23,12 @@ export function parseSidecarStopCommand(value: unknown): SidecarStopCommand | un
   return SIDECAR_STOP_COMMAND
 }
 
-/** Release the shared runtime before draining HTTP; stay inside main's six-second kill fallback. */
-export async function stopSidecarListener(
-  listener: StoppableListener | undefined,
-  engine?: { fetch: EngineFetch; password: string },
-) {
+/** 关掉引擎;停在 main 六秒兜底预算之内(到点不等,sidecar 随后自己退出)。 */
+export async function stopSidecarEngine(engine: StoppableEngine | undefined) {
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     await Promise.race([
-      (async () => {
-        if (engine) {
-          const response = await engine.fetch(
-            new Request("http://codepuppy-sidecar.invalid/global/dispose", {
-              method: "POST",
-              headers: { Authorization: `Basic ${Buffer.from(`opencode:${engine.password}`).toString("base64")}` },
-            }),
-          )
-          await response.arrayBuffer()
-          if (!response.ok) throw new Error(`Runtime disposal failed (${response.status})`)
-        }
-        await listener?.stop()
-      })(),
+      engine?.close(),
       new Promise<void>((resolve) => {
         timer = setTimeout(resolve, SIDECAR_DRAIN_TIMEOUT_MS)
       }),

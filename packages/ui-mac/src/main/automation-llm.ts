@@ -2,7 +2,8 @@
 // (shared/automation-nl.ts)解析不出时由用户显式点击触发(省 token);临时会话一次抽取后即删,
 // 不污染会话列表。执行链只走 SDK(ADR-002);预览确认流不变 —— LLM 产物只是填表,存前仍过
 // 存储层硬校验(interval 下限/档位白名单)。
-import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
+import { engineClient } from "./engine-client"
+import { promptAndWait } from "./engine-session-turn"
 import type { AutomationParseErrorCode, AutomationSchedule } from "../shared/automation-types"
 import type { AutomationServerInfo } from "./automation-scheduler"
 import { getLogger } from "./logging"
@@ -43,30 +44,21 @@ export async function llmParseAutomation(text: string, projectDir: string): Prom
   if (moderationBlocks(text)) return { ok: false, code: "automation-parse-blocked", reason: MODERATION_BLOCKED_REASON }
   if (!awaitServer) return unavailable("引擎未就绪")
   const server = await awaitServer()
-  const headers =
-    server.username || server.password
-      ? { Authorization: `Basic ${Buffer.from(`${server.username ?? ""}:${server.password ?? ""}`).toString("base64")}` }
-      : undefined
-  const client = createOpencodeClient({ baseUrl: server.url, headers })
-  const directory = projectDir
+  // `#1667`(清点表 S6 / S9):OpenCode 2 的客户端;口令由 engineClient 补成 Basic 头(I8:只在 main 里)。
+  const client = engineClient(server)
   let sessionID: string | undefined
   try {
-    const created = await client.session.create({ directory, title: "⏱ 自动化解析(临时)" } as never)
-    const createdData = (created as { data?: { id?: string }; error?: unknown }).data
-    if ((created as { error?: unknown }).error || !createdData?.id) return unavailable("临时会话创建失败")
-    sessionID = createdData.id
-    const res = await client.session.prompt({
-      sessionID,
-      directory,
-      parts: [{ type: "text", text: EXTRACT_INSTRUCTION + text }],
-    } as never)
-    if ((res as { error?: unknown }).error) return unavailable("模型调用失败")
-    const parts = ((res as { data?: { parts?: { type?: string; text?: string }[] } }).data?.parts ?? []) as { type?: string; text?: string }[]
-    const reply = parts
-      .filter((p) => p.type === "text" && typeof p.text === "string")
-      .map((p) => p.text)
-      .join("\n")
-      .trim()
+    try {
+      sessionID = (await client.session.create({ location: { directory: projectDir }, title: "⏱ 自动化解析(临时)" })).id
+    } catch {
+      return unavailable("临时会话创建失败")
+    }
+    let reply: string
+    try {
+      reply = await promptAndWait(client, { sessionID, text: EXTRACT_INSTRUCTION + text })
+    } catch {
+      return unavailable("模型调用失败")
+    }
     // 容错:剥代码围栏 / 取首个 {...} 块
     const m = reply.match(/\{[\s\S]*\}/)
     if (!m) return noSchedule("模型未返回可解析的 JSON")
@@ -85,7 +77,8 @@ export async function llmParseAutomation(text: string, projectDir: string): Prom
   } finally {
     // 临时会话即删(best-effort;失败只留一条日志,不影响结果)
     if (sessionID) {
-      const del = () => (client.session as unknown as { delete(args: unknown): Promise<unknown> }).delete({ sessionID, directory })
+      const id = sessionID
+      const del = () => client.session.remove({ sessionID: id })
       try {
         await del()
       } catch {

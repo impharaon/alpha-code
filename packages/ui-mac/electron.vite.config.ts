@@ -7,7 +7,9 @@ import { patchUpstreamPlugin } from "./scripts/patch-upstream"
 import { UPSTREAM_LOGO_ALIAS } from "./scripts/upstream-logo-alias"
 import { nodePtyPackage, resolveTargetArch } from "./scripts/target-arch"
 
-const OPENCODE_SERVER_DIST = "../opencode/dist/node"
+// `#1667`(#1662 L5,清点表 H2):嵌进 sidecar 的 OpenCode 2 引擎包,由 prebuild 里的 scripts/build-engine.ts 用上游 Node 构建配置
+// 产出(入口 engine/engine-embed.ts);原生资源在它旁边的 assets/,前导代码按 `import.meta.url` 找。
+const ENGINE_DIST = "./dist-engine"
 
 const channel = (() => {
   const raw = process.env.OPENCODE_CHANNEL
@@ -84,16 +86,14 @@ const require = __cjs_mod__.createRequire(import.meta.url);
         name: "opencode:virtual-server-module",
         enforce: "pre",
         resolveId(id) {
-          if (id === "virtual:opencode-server") return this.resolve(`${OPENCODE_SERVER_DIST}/node.js`)
+          if (id === "virtual:opencode-server") return this.resolve(`${ENGINE_DIST}/engine.mjs`)
         },
       },
       {
+        // 引擎包被打进 out/main/chunks 的某个 chunk,它的 `import.meta.url` 随之落在 chunks/,所以 assets/ 跟着拷到那里。
         name: "opencode:copy-server-assets",
         async writeBundle() {
-          for (const l of await fs.readdir(OPENCODE_SERVER_DIST)) {
-            if (!l.endsWith(".wasm")) continue
-            await fs.writeFile(`./out/main/chunks/${l}`, await fs.readFile(`${OPENCODE_SERVER_DIST}/${l}`))
-          }
+          await fs.cp(`${ENGINE_DIST}/assets`, "./out/main/chunks/assets", { recursive: true })
         },
       },
     ],

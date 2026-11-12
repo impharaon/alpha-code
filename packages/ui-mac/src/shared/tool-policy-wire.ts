@@ -1,7 +1,7 @@
 // REQ-131 / #1130 —— Settings「工具」节的 IPC wire(main ↔ preload ↔ renderer)。
 //
 // 数据形状**不在这里重述**:inventory / record / selector 全部是引擎 wire 契约
-// (`@opencode-ai/schema/codepuppy-tool-inventory` / `codepuppy-tool-policy`)的类型再导出,renderer 与
+// (`@opencode/schema/codepuppy-tool-inventory` / `codepuppy-tool-policy`)的类型再导出,renderer 与
 // main 拿到的就是引擎 decode 过的那份;本文件只补 IPC 一层的结果包装(成功 / 稳定失败码)。
 // 失败码是闭集且不携带路径、栈或引擎原文 —— renderer 只需要决定「显示哪句人话」。
 import type {
@@ -10,13 +10,13 @@ import type {
   ToolPolicyInventoryServiceV1,
   ToolPolicyInventoryToolV1,
   ToolPolicyInventoryV1,
-} from "@opencode-ai/schema/codepuppy-tool-inventory"
+} from "@opencode/schema/codepuppy-tool-inventory"
 import type {
   ToolClass,
   ToolPolicyRecord,
   ToolPolicySelector,
   ToolPolicyState,
-} from "@opencode-ai/schema/codepuppy-tool-policy"
+} from "@opencode/schema/codepuppy-tool-policy"
 
 export type {
   EffectiveToolPolicyReasonV1,

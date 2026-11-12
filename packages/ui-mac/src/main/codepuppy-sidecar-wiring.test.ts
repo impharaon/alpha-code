@@ -2,6 +2,7 @@
 //   · 子进程发来的 `codepuppy.*` 进 receive,应答经同一个子进程发回;write-probe 的应答**不**进 receive(两条接收者并列);
 //   · ready 之后才 attach(在途重载在这一刻重发),子进程退出时断开的是**这一次**连接。
 // harness 与 process-fence-wiring.test.ts 同形:mock electron / logging,假子进程记录线上消息。
+import { isolateEngineHome } from "../../test-component/isolated-engine-home"
 import { afterEach, beforeEach, expect, mock, test } from "bun:test"
 import { EventEmitter } from "node:events"
 import { mkdtempSync, readFileSync, rmSync } from "node:fs"
@@ -9,6 +10,9 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { mockElectron } from "../../test-component/electron-mock"
 import type { CodePuppySidecarOutbound } from "./codepuppy-sidecar-messages"
+
+// 在 server.ts 被 import、spawnLocalServer 跑之前:旧凭证检查只看临时根,不碰本机真实数据目录(isolated-engine-home.ts)。
+isolateEngineHome()
 
 const appEvents = new EventEmitter()
 let userDataPath = ""
@@ -282,23 +286,22 @@ test("ANCHOR (not a gate): #1578 server.ts 写进 sidecar env 的随包扩展清
 })
 
 // `#1531`:ext 的 parentPort 监听必须在 ready **之前**挂上(main 只在 ready 那一刻重发在途代际)。sidecar.ts 顶层的 registerHooks /
-// getParentPort() 让它不能被 import,接线只能锚源码:ext 预载在引擎 import 之后开始、在 ready 上报之前 await 完;
-// 预载的 URL 形状与引擎解析路径插件的形状逐字相同(上游 plugin/shared.ts 的 resolvePathPluginTarget),否则会装出第二份模块。
-test("ANCHOR (not a gate): sidecar.ts 在 ready 之前预载 ext 的同一个 URL", async () => {
+// getParentPort() 让它不能被 import,接线只能锚源码。`#1667`(接口文档 I1 / I2 改形):2.x 每个 Location 用带 `__opencode_reload`
+// 的新 URL 各求值一次 ext,不再靠「预载同一个 URL」拿到同一份模块(进程级对象由 ext 挂在 globalThis 上);这里锚的顺序是
+// 引擎 import → 预载 ext 的目录入口 `server.js` → `start()`(Transform 里同步发布进程内 fetch)→ await 预载 → ready。
+test("ANCHOR (not a gate): sidecar.ts 在 start() 之前预载 ext 的目录入口,Transform 里发布进程内 fetch,ready 之前 await 预载", async () => {
   const source = await Bun.file(join(import.meta.dir, "sidecar.ts")).text()
-  const engine = source.indexOf('const { Server } = await import("virtual:opencode-server")')
-  const preload = source.indexOf("import(pathToFileURL(command.extPluginPath).href)")
-  // 审计 R1 Major 1:进程内交接在引擎 import 之后、ext 预载之前挂上(ext 的重载调度器登记实例时就要用到)
-  const handoff = source.indexOf("publishInProcessEngine(engine.fetch)")
-  expect(handoff).toBeGreaterThan(engine)
-  expect(preload).toBeGreaterThan(handoff)
+  const engine = source.indexOf('const { startEngine, ENGINE_VERSION } = await import("virtual:opencode-server")')
+  const preload = source.indexOf('import(pathToFileURL(join(command.extPluginPath, "server.js")).href)')
+  const started = source.indexOf("const started = await startEngine(")
+  const handoff = source.indexOf("publishInProcessEngine(inProcess)")
   const joined = source.indexOf("await extPreload")
   const ready = source.indexOf("parentPort.postMessage(buildReadyMessage(injection, prewarmResult))")
   expect(engine).toBeGreaterThan(0)
   expect(preload).toBeGreaterThan(engine)
-  expect(joined).toBeGreaterThan(preload)
+  expect(started).toBeGreaterThan(preload)
+  // 交接写在 startEngine 的 onDispatch 回调里(Transform 那一刻同步执行),所以文本上在 startEngine( 之后、await 预载之前。
+  expect(handoff).toBeGreaterThan(started)
+  expect(joined).toBeGreaterThan(handoff)
   expect(ready).toBeGreaterThan(joined)
-  const shared = await Bun.file(join(import.meta.dir, "../../../opencode/src/plugin/shared.ts")).text()
-  const resolver = shared.slice(shared.indexOf("export async function resolvePathPluginTarget"), shared.indexOf("export async function checkPluginCompatibility"))
-  expect(resolver).toContain("return pathToFileURL(file).href")
 })

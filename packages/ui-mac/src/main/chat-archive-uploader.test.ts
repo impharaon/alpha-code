@@ -33,42 +33,46 @@ afterEach(() => {
 
 type Call = { url: string; init?: RequestInit }
 
-function engineMessages(options: { attachment?: boolean; extra?: unknown[] } = {}) {
-  const userParts: unknown[] = [{ type: "text", text: "你好" }]
-  if (options.attachment) {
-    userParts.push({
-      type: "file",
-      mime: "image/png",
-      filename: "shot.png",
-      url: `data:image/png;base64,${PNG.toString("base64")}`,
-    })
+// `#1667`:引擎是 OpenCode 2 —— 消息是带 `type` 的记录(`packages/schema/src/session-message.ts`),user 没有 model,
+// assistant 带 `model: { providerID, id }` 与 `content`;附件是 `files` 里 `source.type === "inline"` 的 base64。
+function user(id: string, created: number, text: string, files?: unknown[]) {
+  return { id, type: "user", time: { created }, text, ...(files ? { files } : {}) }
+}
+function assistant(
+  id: string,
+  created: number,
+  completed: number,
+  text: string,
+  options: { providerID?: string; model?: string; finish?: string; output?: number } = {},
+) {
+  return {
+    id,
+    type: "assistant",
+    agent: "build",
+    model: { providerID: options.providerID ?? "alpha", id: options.model ?? "gpt-5" },
+    time: { created, completed },
+    content: [{ type: "text", text }],
+    ...(options.finish ? { finish: options.finish } : {}),
+    ...(options.output === undefined ? {} : { tokens: { input: 0, output: options.output, reasoning: 0, cache: { read: 0, write: 0 } } }),
   }
+}
+
+function engineMessages(options: { attachment?: boolean; extra?: unknown[] } = {}) {
+  const files = options.attachment
+    ? [{ data: PNG.toString("base64"), mime: "image/png", name: "shot.png", source: { type: "inline" } }]
+    : undefined
   return [
     ...(options.extra ?? []),
-    {
-      info: { id: "msg_0001", role: "user", time: { created: 4_990 }, model: { providerID: "alpha", modelID: "gpt-5" } },
-      parts: userParts,
-    },
-    {
-      info: {
-        id: "msg_0002",
-        role: "assistant",
-        time: { created: 4_995, completed: 5_000 },
-        providerID: "alpha",
-        modelID: "gpt-5",
-        finish: "stop",
-        tokens: { output: 7 },
-      },
-      parts: [{ type: "text", text: "你也好" }],
-    },
+    user("msg_0001", 4_990, "你好", files),
+    assistant("msg_0002", 4_995, 5_000, "你也好", { finish: "stop", output: 7 }),
   ]
 }
 
 /**
  * 脚本化的 fetch,三个目的地各自可控:
- *   · `GET {engine}/session/{id}`        → `sessionInfo`(`null` = 这一读失败,走 fail-closed)
- *   · `GET {engine}/session/{id}/message` → `pages`,按 `before=cur-<i>` 取第 i 页,
- *                                           还有更旧的就带 `X-Next-Cursor`(与引擎那条路由同形)
+ *   · `GET {engine}/api/session/{id}`         → `{ data: sessionInfo }`(`null` = 这一读失败,走 fail-closed)
+ *   · `GET {engine}/api/session/{id}/message` → `pages`,按 `cursor=cur-<i>` 取第 i 页,新的在前(`order=desc`),
+ *                                               还有更旧的就在 `cursor.next` 里给游标(与 2.x 那条路由同形)
  *   · `POST {web}/api/chat-archive/turns` → `archiveResponses` 依次答复(用尽后循环最后一个)
  * 令牌放在可变的 `tokenRef` 里,好让一条用例跑两趟 idle、中间把过期令牌换成新的。
  */
@@ -111,15 +115,20 @@ function harness(options: {
       if (!url.includes("/message")) {
         // 会话准入这一读。
         if (options.sessionInfo === null) return new Response("nope", { status: 500 })
-        return new Response(JSON.stringify(options.sessionInfo ?? { id: "ses_1", title: "t" }), { status: 200 })
+        return new Response(JSON.stringify({ data: options.sessionInfo ?? { id: "ses_1", title: "t" } }), { status: 200 })
       }
-      const before = new URL(url).searchParams.get("before")
-      const index = before ? Number(before.replace("cur-", "")) : 0
+      const params = new URL(url).searchParams
+      const cursor = params.get("cursor")
+      // 与 2.x 那条路由同一条规则:第一页 order=desc;带游标时不许再带 order(引擎答 InvalidCursorError)。
+      if (cursor ? params.has("order") : params.get("order") !== "desc") return new Response("bad order/cursor", { status: 400 })
+      const index = cursor ? Number(cursor.replace("cur-", "")) : 0
       const page = pagesRef.current[index]
       if (!page) return new Response("no such page", { status: 404 })
-      const headers: Record<string, string> = { "content-type": "application/json" }
-      if (index + 1 < pagesRef.current.length) headers["x-next-cursor"] = `cur-${index + 1}`
-      return new Response(JSON.stringify(page.items), { status: 200, headers })
+      const next = index + 1 < pagesRef.current.length ? `cur-${index + 1}` : undefined
+      return new Response(JSON.stringify({ data: [...page.items].reverse(), cursor: { ...(next ? { next } : {}) } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })
     }
     archiveCalls.push({ url, init })
     const next = options.archiveResponses[Math.min(archiveIndex, options.archiveResponses.length - 1)]!
@@ -186,16 +195,16 @@ describe("REQ-160 #1324 —— 上报面的请求形状", () => {
     expect(Object.keys(h.archiveCalls[0]?.init?.headers as Record<string, string>)).not.toContain("content-type")
   })
 
-  test("引擎那一读是 limit 有界的消息列表,带 Basic 凭据", async () => {
+  test("引擎那一读是 limit 有界的消息列表(2.x 路由,新的在前),带 Basic 凭据与位置头", async () => {
     const h = harness({ archiveResponses: [ok] })
     await h.uploader.onSessionIdle("ses_1", "/repo")
-    const engineCall = h.calls.find((c) => c.url.includes("/session/ses_1/message"))
-    expect(engineCall?.url).toContain("/session/ses_1/message")
+    const engineCall = h.calls.find((c) => c.url.includes("/api/session/ses_1/message"))
+    expect(engineCall?.url).toContain("/api/session/ses_1/message")
     expect(engineCall?.url).toContain("limit=")
-    expect(engineCall?.url).toContain("directory=%2Frepo")
-    expect((engineCall?.init?.headers as Record<string, string>).authorization).toBe(
-      `Basic ${Buffer.from("opencode:secret").toString("base64")}`,
-    )
+    expect(engineCall?.url).toContain("order=desc")
+    const headers = engineCall?.init?.headers as Record<string, string>
+    expect(headers["x-opencode-directory"]).toBe(encodeURIComponent("/repo"))
+    expect(headers.authorization).toBe(`Basic ${Buffer.from("opencode:secret").toString("base64")}`)
   })
 
   test("没有 archive_access_token 时一条请求都不发,游标不动", async () => {
@@ -284,21 +293,8 @@ describe("REQ-160 #1324 —— 429 不是终态(数据丢失的那条)", () => {
   test("前一轮没拿到结论时,后一轮不得抢先把游标推过去", async () => {
     const twoTurns = [
       ...engineMessages(),
-      {
-        info: { id: "msg_0003", role: "user", time: { created: 5_990 }, model: { providerID: "alpha", modelID: "gpt-5" } },
-        parts: [{ type: "text", text: "再问一句" }],
-      },
-      {
-        info: {
-          id: "msg_0004",
-          role: "assistant",
-          time: { created: 5_995, completed: 6_000 },
-          providerID: "alpha",
-          modelID: "gpt-5",
-          tokens: { output: 3 },
-        },
-        parts: [{ type: "text", text: "再答一句" }],
-      },
+      user("msg_0003", 5_990, "再问一句"),
+      assistant("msg_0004", 5_995, 6_000, "再答一句", { output: 3 }),
     ]
     const h = harness({
       messages: twoTurns,
@@ -316,21 +312,8 @@ describe("REQ-160 #1324 —— 401 也不是终态(R1 BLOCKER)", () => {
     // 两轮积压。旧口径(4xx 一律终态)会把两轮都推过去,而服务端一条都没存。
     const twoTurns = [
       ...engineMessages(),
-      {
-        info: { id: "msg_0003", role: "user", time: { created: 5_990 }, model: { providerID: "alpha", modelID: "gpt-5" } },
-        parts: [{ type: "text", text: "再问一句" }],
-      },
-      {
-        info: {
-          id: "msg_0004",
-          role: "assistant",
-          time: { created: 5_995, completed: 6_000 },
-          providerID: "alpha",
-          modelID: "gpt-5",
-          tokens: { output: 3 },
-        },
-        parts: [{ type: "text", text: "再答一句" }],
-      },
+      user("msg_0003", 5_990, "再问一句"),
+      assistant("msg_0004", 5_995, 6_000, "再答一句", { output: 3 }),
     ]
     const h = harness({ messages: twoTurns, archiveResponses: [refuse(401, "unauthorized"), ok] })
 
@@ -359,40 +342,14 @@ describe("REQ-160 #1324 —— 401 也不是终态(R1 BLOCKER)", () => {
 })
 
 describe("REQ-160 #1324 —— 积压超过一页时不得跳过旧轮次(R1 MAJOR)", () => {
-  test("读回条数填满一页且首条仍在范围内 ⇒ 按 X-Next-Cursor 往回翻到游标为止", async () => {
+  test("读回条数填满一页且首条仍在范围内 ⇒ 按 cursor.next 往回翻到游标为止", async () => {
     const older = [
-      {
-        info: { id: "msg_0001", role: "user", time: { created: 4_990 }, model: { providerID: "alpha", modelID: "gpt-5" } },
-        parts: [{ type: "text", text: "旧问" }],
-      },
-      {
-        info: {
-          id: "msg_0002",
-          role: "assistant",
-          time: { created: 4_995, completed: 5_000 },
-          providerID: "alpha",
-          modelID: "gpt-5",
-          tokens: { output: 1 },
-        },
-        parts: [{ type: "text", text: "旧答" }],
-      },
+      user("msg_0001", 4_990, "旧问"),
+      assistant("msg_0002", 4_995, 5_000, "旧答", { output: 1 }),
     ]
     const newer = [
-      {
-        info: { id: "msg_0003", role: "user", time: { created: 5_990 }, model: { providerID: "alpha", modelID: "gpt-5" } },
-        parts: [{ type: "text", text: "新问" }],
-      },
-      {
-        info: {
-          id: "msg_0004",
-          role: "assistant",
-          time: { created: 5_995, completed: 6_000 },
-          providerID: "alpha",
-          modelID: "gpt-5",
-          tokens: { output: 2 },
-        },
-        parts: [{ type: "text", text: "新答" }],
-      },
+      user("msg_0003", 5_990, "新问"),
+      assistant("msg_0004", 5_995, 6_000, "新答", { output: 2 }),
     ]
     // 引擎给的是**最新**那一页;窗口 = 2 条 ⇒ 第一页恰好填满 ⇒ 还有更旧的。
     const h = harness({ pages: [{ items: newer }, { items: older }], archiveResponses: [ok], messageWindow: 2 })
@@ -405,10 +362,10 @@ describe("REQ-160 #1324 —— 积压超过一页时不得跳过旧轮次(R1 MAJ
       .map((t) => t.messages[1]!.engine_message_id)
     expect(sent).toEqual(["msg_0002", "msg_0004"])
     expect(h.cursor.lastReported("ses_1")).toBe("msg_0004")
-    // 两页都读了,第二页带着 before= 游标。
+    // 两页都读了,第二页带着 cursor= 游标。
     const messageReads = h.calls.filter((c) => c.url.includes("/message"))
     expect(messageReads).toHaveLength(2)
-    expect(messageReads[1]?.url).toContain("before=cur-1")
+    expect(messageReads[1]?.url).toContain("cursor=cur-1")
   })
 
   test("翻到游标那一页就停,不会把整条会话史都拖回来", async () => {
@@ -436,27 +393,41 @@ describe("REQ-160 #1324 —— 积压超过一页时不得跳过旧轮次(R1 MAJ
     // 后果不是回填越界(`buildTurns` 的 completed <= enabledAt 仍挡着),是**全新安装遇上
     // 长历史会话时每次 idle 都翻到 20 页上界** —— 每条 idle 多打十几次引擎。
     const ancient = [
-      {
-        info: { id: "msg_0001", role: "user", time: { created: 500 }, model: { providerID: "alpha", modelID: "gpt-5" } },
-        parts: [{ type: "text", text: "启用之前的老对话" }],
-      },
-      {
-        info: {
-          id: "msg_0002",
-          role: "assistant",
-          time: { created: 600, completed: 700 },
-          providerID: "alpha",
-          modelID: "gpt-5",
-          tokens: { output: 1 },
-        },
-        parts: [{ type: "text", text: "老回答" }],
-      },
+      user("msg_0001", 500, "启用之前的老对话"),
+      assistant("msg_0002", 600, 700, "老回答", { output: 1 }),
     ]
-    // 还有更旧的一页可翻(带 X-Next-Cursor),但这一页最旧的一条已早于 enabled_at=1000。
+    // 还有更旧的一页可翻(带 cursor.next),但这一页最旧的一条已早于 enabled_at=1000。
     const h = harness({ pages: [{ items: ancient }, { items: ancient }], archiveResponses: [ok], messageWindow: 2 })
     await h.uploader.onSessionIdle("ses_1")
     expect(h.calls.filter((c) => c.url.includes("/message"))).toHaveLength(1)
     expect(h.archiveCalls).toHaveLength(0) // 启用之前完成的轮次照旧不回填
+  })
+
+  // 审计 R1 第 4 条:2.x 的一轮是 user → assistant → idle 三条记录;70 轮积压 = 210 条,默认每页 100 条 ⇒ 三页。
+  // 逐页投影时:没有游标 ⇒ 第一页最旧的一条是 idle,投影丢了它的时间,只发出 33 轮就停翻;有游标 ⇒ 第 4 轮的 user 与
+  // assistant 分在两页,user 拿不到模型信息被丢掉,发出 69 轮。两种情况游标都推到最新,漏掉的再也不会发。
+  test("70 轮积压跨三页(默认每页 100 条,每轮 user/assistant/idle 三条):有没有会话游标都 70 轮全发、按序、游标停在最后一轮", async () => {
+    const id = (n: number) => `msg_${String(n).padStart(4, "0")}`
+    const all: unknown[] = []
+    for (let turn = 1; turn <= 70; turn++) {
+      const base = 2_000 + turn * 10
+      all.push(user(id(turn * 3 - 2), base, `问 ${turn}`))
+      all.push(assistant(id(turn * 3 - 1), base + 1, base + 2, `答 ${turn}`, { finish: "stop", output: 1 }))
+      all.push({ id: id(turn * 3), type: "idle", time: { created: base + 3 }, outcome: "succeeded" })
+    }
+    const pages = [{ items: all.slice(110) }, { items: all.slice(10, 110) }, { items: all.slice(0, 10) }]
+    const expected = Array.from({ length: 70 }, (_, index) => id((index + 1) * 3 - 1))
+    for (const cursorState of ["none", "before-first"] as const) {
+      const h = harness({ pages, archiveResponses: [ok] })
+      if (cursorState === "before-first") h.cursor.advance("ses_1", id(0))
+      await h.uploader.onSessionIdle("ses_1")
+      const sent = h.archiveCalls
+        .map((c) => JSON.parse((c.init!.body as FormData).get("turn") as string) as { messages: Array<{ engine_message_id: string }> })
+        .map((t) => t.messages[1]!.engine_message_id)
+      expect({ cursorState, sent }).toEqual({ cursorState, sent: expected })
+      expect(h.calls.filter((c) => c.url.includes("/message"))).toHaveLength(3)
+      expect(h.cursor.lastReported("ses_1")).toBe(id(209))
+    }
   })
 
   test("翻页有上界,到顶时如实记一行(不静默丢弃)", async () => {
@@ -522,21 +493,8 @@ describe("REQ-160 #1324 —— 游标绑账号(R1 MAJOR)", () => {
       {
         items: [
           ...engineMessages(),
-          {
-            info: { id: "msg_0003", role: "user", time: { created: 5_990 }, model: { providerID: "x-byok", modelID: "m" } },
-            parts: [{ type: "text", text: "登出之后说的话" }],
-          },
-          {
-            info: {
-              id: "msg_0004",
-              role: "assistant",
-              time: { created: 5_995, completed: 6_000 },
-              providerID: "x-byok",
-              modelID: "m",
-              tokens: { output: 2 },
-            },
-            parts: [{ type: "text", text: "登出之后的回答" }],
-          },
+          user("msg_0003", 5_990, "登出之后说的话"),
+          assistant("msg_0004", 5_995, 6_000, "登出之后的回答", { providerID: "x-byok", model: "m", output: 2 }),
         ],
       },
     ]
@@ -604,8 +562,8 @@ describe("REQ-160 #1324 —— 不阻断对话 / 事件接线", () => {
         const url = String(input)
         calls.push({ url })
         // 会话准入那一读放行(否则先卡在它上面,测不到消息列表这一读的失败路径)。
-        if (url.startsWith(`${ENGINE}/session/`) && !url.includes("/message")) {
-          return new Response(JSON.stringify({ id: "ses_1", title: "t" }), { status: 200 })
+        if (url.startsWith(`${ENGINE}/api/session/`) && !url.includes("/message")) {
+          return new Response(JSON.stringify({ data: { id: "ses_1", title: "t" } }), { status: 200 })
         }
         return new Response("nope", { status: 500 })
       }) as unknown as typeof fetch,
@@ -616,9 +574,13 @@ describe("REQ-160 #1324 —— 不阻断对话 / 事件接线", () => {
     expect(logs.some((m) => m.includes("engine message read failed"))).toBe(true)
   })
 
-  test("/global/event 上的 session.idle 才触发上报;心跳与别的事件不触发", async () => {
+  // `#1667`:OpenCode 2 不发 v1 的 `session.idle` / `session.status`;一轮结束是 `session.execution.succeeded|failed|interrupted`。
+  // 真引擎上的同一件事(真执行事件唤醒、旧名字一条都不出现)在 chat-archive-engine.test.ts。
+  test("事件流上只有一轮结束的执行事件才触发上报;连接帧、开始事件、v1 的 session.idle 都不触发", async () => {
     const dir = tempDir()
     const archiveCalls: Call[] = []
+    const engineReads: string[] = []
+    let eventUrl = ""
     let posted: (() => void) | undefined
     const postedOnce = new Promise<void>((resolve) => {
       posted = resolve
@@ -627,9 +589,11 @@ describe("REQ-160 #1324 —— 不阻断对话 / 事件接线", () => {
     let eventStreamServed = 0
 
     const frames = [
-      `data: ${JSON.stringify({ payload: { id: "e1", type: "server.connected", properties: {} } })}`,
-      `data: ${JSON.stringify({ payload: { id: "e2", type: "server.heartbeat", properties: {} } })}`,
-      `data: ${JSON.stringify({ directory: "/repo", payload: { type: "session.idle", properties: { sessionID: "ses_1" } } })}`,
+      `data: ${JSON.stringify({ id: "e1", type: "server.connected", data: {} })}`,
+      `data: ${JSON.stringify({ id: "e2", type: "session.execution.started", data: { sessionID: "ses_started" } })}`,
+      `data: ${JSON.stringify({ directory: "/repo", payload: { type: "session.idle", properties: { sessionID: "ses_v1" } } })}`,
+      `data: ${JSON.stringify({ id: "e3", type: "session.idle", data: { sessionID: "ses_v1_flat" } })}`,
+      `data: ${JSON.stringify({ id: "e4", type: "session.execution.succeeded", data: { sessionID: "ses_1" }, location: { directory: "/repo" } })}`,
     ].join("\n\n")
 
     const uploader = createChatArchiveUploader({
@@ -639,7 +603,8 @@ describe("REQ-160 #1324 —— 不阻断对话 / 事件接线", () => {
       cursor: openChatArchiveCursor({ userDataPath: dir, now: () => 1_000 }),
       fetch: (async (input: string | URL | Request, init?: RequestInit) => {
         const url = String(input instanceof Request ? input.url : input)
-        if (url.includes("/global/event")) {
+        if (url.startsWith(`${ENGINE}/api/event`)) {
+          eventUrl = url
           eventStreamServed++
           if (eventStreamServed > 1) {
             stop?.()
@@ -654,11 +619,10 @@ describe("REQ-160 #1324 —— 不阻断对话 / 事件接线", () => {
             }),
           )
         }
-        if (url.startsWith(`${ENGINE}/session/`) && !url.includes("/message")) {
-          return new Response(JSON.stringify({ id: "ses_1", title: "t" }), { status: 200 })
-        }
-        if (url.startsWith(`${ENGINE}/session/`)) {
-          return new Response(JSON.stringify(engineMessages()), { status: 200 })
+        if (url.startsWith(`${ENGINE}/api/session/`)) {
+          engineReads.push(url)
+          if (!url.includes("/message")) return new Response(JSON.stringify({ data: { id: "ses_1", title: "t" } }), { status: 200 })
+          return new Response(JSON.stringify({ data: [...engineMessages()].reverse(), cursor: {} }), { status: 200 })
         }
         archiveCalls.push({ url, init })
         posted?.()
@@ -671,8 +635,14 @@ describe("REQ-160 #1324 —— 不阻断对话 / 事件接线", () => {
     stop = uploader.start()
     await postedOnce
     stop()
+    // 订阅时就只要三种结局事件
+    expect(new URL(eventUrl).searchParams.getAll("types").sort()).toEqual(
+      ["session.execution.failed", "session.execution.interrupted", "session.execution.succeeded"],
+    )
     expect(archiveCalls).toHaveLength(1)
     const turn = JSON.parse((archiveCalls[0]!.init!.body as FormData).get("turn") as string) as { engine_session_id: string }
     expect(turn.engine_session_id).toBe("ses_1")
+    // 只有 ses_1 被读过 —— 开始事件与 v1 名字的事件一个都没唤醒上报
+    expect(engineReads.every((url) => url.includes("/api/session/ses_1"))).toBe(true)
   })
 })

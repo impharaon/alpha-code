@@ -27,18 +27,7 @@ await $`bun ./scripts/build-office-runtime.ts`
 // without resolving raw TS at runtime (see .claude/rules/DECISIONS.md ADR-006).
 await $`cd ../ext && bun run build`
 
-await $`cd ../opencode && bun script/build-node.ts`
-
-// A4: patch the freshly-built embedded server so InstallationVersion isn't "local"
-// (else @opencode-ai/plugin@local install fails for any .opencode-plugin project). See the script.
-await $`bun ./scripts/patch-server-version.ts`
-
-// #857: Default's in-process app and Server.listen normally build different route layers
-// and memo maps. Pin only the fixed Electron listener to the singleton pair so its
-// authenticated location prewarm reaches the exact socket listener production graph.
-await $`bun ./scripts/patch-sidecar-shared-routes.ts`
-
-// #857: publish the complete governed models.dev base before the remaining internal
-// plugins finish their outer State.batch. This patches only the generated embedded
-// server output and fails closed if upstream's compiled shape drifts.
-await $`bun ./scripts/patch-plugin-internal-models.ts`
+// `#1667`(#1662 L5,清点表 H2 / H3):OpenCode 2 引擎包(上游 Node 构建配置 + Code Puppy 的嵌入入口,见脚本头)。
+// v1 时代的三个产物补丁(版本号、#857 共享路由层、内部模型目录先发布)随 v1 产物一起删除:版本由构建期 define 写入;
+// 「进程内调用与监听共用一张图」由 `start()` 的 Transform 直接拿到(sidecar-engine-host.test.ts)。
+await $`bun ./scripts/build-engine.ts`

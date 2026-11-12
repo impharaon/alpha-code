@@ -5,7 +5,7 @@
 // `status.json`,摘要用与界面上同一句人话。
 //
 // 这里走的是**生产** `runAutomationNow` → `executeTask`,词表也是**真的** `createModerationKeywordStore`
-// (由一个假 fetch 喂一条真响应);假的只有引擎 SDK 与落盘。判据是「引擎那一侧一次都没被调用」
+// (由一个假 fetch 喂一条真响应);假的只有引擎客户端与落盘。判据是「引擎那一侧一次都没被调用」
 // 而不是某个标志位 —— 后者在把检查接到 `session.create` **之后**时照样绿,而那会留下一串空会话。
 //
 // mock.module 是进程级的,会污染同进程其它测试文件 ⇒ 由 moderation-automation.test.ts 起子进程跑。
@@ -41,20 +41,32 @@ mock.module("./codepuppy-workdir", () => ({
     return { ok: true as const, dir: join(ROOT, "runs", runId) }
   },
 }))
-mock.module("@opencode-ai/sdk/v2/client", () => ({
-  createOpencodeClient: () => ({
+// `#1667`:main 经 OpenCode 2 的客户端(engine-client.ts)打引擎 —— 建会话直接返回会话、非 2xx 抛错;回复由
+// engine-session-turn.ts 从 prompt → wait → 消息列表(新的在前)里读。替身照这个形状。
+mock.module("./engine-client", () => ({
+  engineClient: () => ({
     session: {
       create: async (args: unknown) => {
-        // [#1592] 引擎建不出临时会话(SDK 非 2xx 的真实形状:`{ error }`、无 data)。
-        if (engine.down) return { error: { name: "UnknownError" } }
+        // [#1592] 引擎建不出临时会话(2.x 客户端对非 2xx 抛 ClientError)。
+        if (engine.down) throw new Error("UnexpectedStatus")
         engine.created.push(args)
-        return { data: { id: `sess-${engine.created.length}` } }
+        return { id: `sess-${engine.created.length}` }
       },
       prompt: async (args: unknown) => {
         engine.prompted.push(args)
-        return { data: { parts: [{ type: "text", text: "done" }] } }
+        return {}
       },
-      abort: async () => ({}),
+      interrupt: async () => ({ interrupted: true }),
+      remove: async () => undefined,
+    },
+    experimental: { session: { wait: async () => undefined } },
+    message: {
+      list: async () => ({
+        data: [
+          { type: "idle", outcome: "succeeded" },
+          { type: "assistant", content: [{ type: "text", text: "done" }] },
+        ],
+      }),
     },
   }),
 }))

@@ -1,7 +1,10 @@
 // REQ-131 / #1130 —— main 侧 tool policy 客户端:每个引擎状态码都映射到一个**闭集**结果码,
 // 且 inventory 在 main 侧再 decode 一次(形状漂移 ⇒ invalid-shape,不把解释不了的对象交给 renderer)。
+// `#1667`(#1662 接口文档 I5):2.x 下经插件 RPC `POST /api/rpc/codepuppy.tool-policy/<method>`,请求体 `{ input }`、
+// 成功体 `{ output }`;RPC 错误(400 `RpcError { type }` / 500)按冻结的映射表逐行翻回现有失败码。
+// 反向臂:URL 改回 v1 的 `/api/permission/tool-policy/*` ⇒ 第一组断言红。
 import { describe, expect, test } from "bun:test"
-import { createToolPolicyClient, TOOL_POLICY_ROUTES } from "./tool-policy-client"
+import { createToolPolicyClient, toolPolicyRpcRoute } from "./tool-policy-client"
 
 const server = { url: "http://127.0.0.1:39117", username: "opencode", password: "route-password" }
 const directory = "/Users/kai/app/kama bot"
@@ -53,95 +56,83 @@ const inventoryBody = {
   invalid: { count: 0, entries: [] },
 }
 
-describe("tool policy client (main)", () => {
-  test("inventory: sends Basic auth + encoded directory to the inventory route and decodes the wire shape", async () => {
-    const { fetch, seen } = fetchFor(() => json(200, { data: inventoryBody }))
+describe("tool policy client (main) —— 插件 RPC", () => {
+  const rpcError = (type: string) => json(400, { _tag: "RpcError", type, message: type })
+
+  test("inventory: POST /api/rpc/codepuppy.tool-policy/inventory,Basic 口令 + 编码过的目录头,body {};decode { output }", async () => {
+    const { fetch, seen } = fetchFor(() => json(200, { output: inventoryBody }))
     const client = createToolPolicyClient({ awaitServer: async () => server, fetch })
     const result = await client.inventory({ directory })
     expect(result).toMatchObject({ ok: true })
     if (!result.ok) throw new Error("expected ok")
     expect(result.inventory.services[0]!.tools[0]!.canonical).toBe("builtin::write")
     expect(seen).toHaveLength(1)
-    expect(seen[0]!.url.pathname).toBe(TOOL_POLICY_ROUTES.inventory)
-    expect(seen[0]!.method).toBe("GET")
+    expect(seen[0]!.url.pathname).toBe("/api/rpc/codepuppy.tool-policy/inventory")
+    expect(seen[0]!.url.pathname).toBe(toolPolicyRpcRoute("inventory"))
+    expect(seen[0]!.url.pathname.startsWith("/api/permission/tool-policy")).toBe(false)
+    expect(seen[0]!.method).toBe("POST")
+    expect(JSON.parse(seen[0]!.body!)).toEqual({})
     expect(seen[0]!.headers.Authorization).toBe(`Basic ${Buffer.from("opencode:route-password").toString("base64")}`)
     expect(seen[0]!.headers["x-opencode-directory"]).toBe(encodeURIComponent(directory))
   })
 
-  test("inventory: a 200 whose body drifts from the wire contract is invalid-shape, not a partial list", async () => {
+  test("setRecord / removeRecord / reset 的路由与 { input } 请求体", async () => {
+    const record = { selector: { level: "class", class: "plugin" }, state: "ask" } as const
+    const selector = { level: "tool", canonical: "builtin::write" } as const
+    const { fetch, seen } = fetchFor(({ url }) => json(200, url.pathname.endsWith("/reset") ? { output: { backup: "/x/policy.json.quarantined-1" } } : {}))
+    const client = createToolPolicyClient({ awaitServer: async () => server, fetch })
+    expect(await client.setRecord({ directory, record })).toEqual({ ok: true })
+    expect(await client.removeRecord({ directory, selector })).toEqual({ ok: true })
+    expect(await client.reset({ directory })).toEqual({ ok: true, backup: "/x/policy.json.quarantined-1" })
+    expect(seen.map((s) => [s.method, s.url.pathname, JSON.parse(s.body!)])).toEqual([
+      ["POST", "/api/rpc/codepuppy.tool-policy/setRecord", { input: record }],
+      ["POST", "/api/rpc/codepuppy.tool-policy/removeRecord", { input: { selector } }],
+      ["POST", "/api/rpc/codepuppy.tool-policy/reset", {}],
+    ])
+    expect(seen[0]!.headers["content-type"]).toBe("application/json")
+  })
+
+  test("inventory: a 200 whose output drifts from the wire contract is invalid-shape, not a partial list", async () => {
     const drifted = { ...inventoryBody, services: [{ ...inventoryBody.services[0], tools: [{ canonical: 1 }] }] }
-    const { fetch } = fetchFor(() => json(200, { data: drifted }))
+    const { fetch } = fetchFor(() => json(200, { output: drifted }))
     const client = createToolPolicyClient({ awaitServer: async () => server, fetch })
     expect(await client.inventory({ directory })).toEqual({ ok: false, code: "invalid-shape" })
   })
 
-  test("inventory: 503 is not-wired, other non-200 is request-failed, engine not ready is engine-unavailable", async () => {
-    const notWired = createToolPolicyClient({
-      awaitServer: async () => server,
-      fetch: fetchFor(() => json(503, { _tag: "ServiceUnavailableError" })).fetch,
+  // 冻结映射表(接口文档 I5)逐行:[引擎回的, inventory, setRecord / removeRecord, reset]
+  const table: Array<[string, () => Response, string, string, string]> = [
+    ["503(引擎还在启动)", () => json(503, { code: "service_starting" }), "engine-unavailable", "engine-unavailable", "engine-unavailable"],
+    ["400 rpc.unavailable(这个 Location 没注册 RPC)", () => rpcError("rpc.unavailable"), "not-wired", "not-wired", "not-wired"],
+    ["400 quarantined", () => rpcError("quarantined"), "request-failed", "quarantined", "write-failed"],
+    ["400 invalid-record", () => rpcError("invalid-record"), "request-failed", "invalid-record", "request-failed"],
+    ["400 rpc.invalid_input", () => rpcError("rpc.invalid_input"), "request-failed", "invalid-record", "request-failed"],
+    ["400 write-failed", () => rpcError("write-failed"), "request-failed", "write-failed", "write-failed"],
+    ["500 RpcInternalError", () => json(500, { _tag: "RpcInternalError", type: "rpc.internal", message: "x" }), "request-failed", "write-failed", "write-failed"],
+  ]
+  for (const [label, response, read, write, reset] of table)
+    test(`映射:${label} ⇒ inventory ${read} / 写 ${write} / reset ${reset}`, async () => {
+      const client = createToolPolicyClient({ awaitServer: async () => server, fetch: fetchFor(response).fetch })
+      const record = { selector: { level: "class", class: "plugin" }, state: "ask" } as const
+      expect(await client.inventory({ directory })).toEqual({ ok: false, code: read })
+      expect(await client.setRecord({ directory, record })).toEqual({ ok: false, code: write })
+      expect(await client.removeRecord({ directory, selector: { level: "tool", canonical: "builtin::write" } })).toEqual({ ok: false, code: write })
+      expect(await client.reset({ directory })).toEqual({ ok: false, code: reset })
     })
-    expect(await notWired.inventory({ directory })).toEqual({ ok: false, code: "not-wired" })
 
-    const failed = createToolPolicyClient({
-      awaitServer: async () => server,
-      fetch: fetchFor(() => new Response("nope", { status: 401 })).fetch,
-    })
-    expect(await failed.inventory({ directory })).toEqual({ ok: false, code: "request-failed" })
-
-    const down = createToolPolicyClient({
-      awaitServer: () => Promise.reject(new Error("no engine")),
-      fetch: fetchFor(() => json(200, { data: inventoryBody })).fetch,
-    })
+  test("拿不到地址 ⇒ engine-unavailable;传输失败 ⇒ request-failed(同 v1)", async () => {
+    const down = createToolPolicyClient({ awaitServer: () => Promise.reject(new Error("no engine")), fetch: fetchFor(() => json(200, {})).fetch })
     expect(await down.inventory({ directory })).toEqual({ ok: false, code: "engine-unavailable" })
-  })
-
-  test("setRecord: PUTs the record verbatim; 204 ok, 409 quarantined, 400 invalid-record, 500 write-failed", async () => {
-    const record = { selector: { level: "class", class: "plugin" }, state: "ask" } as const
-    const statuses: number[] = []
-    const { fetch, seen } = fetchFor(() => new Response(null, { status: statuses.shift() ?? 204 }))
-    const client = createToolPolicyClient({ awaitServer: async () => server, fetch })
-
-    statuses.push(204)
-    expect(await client.setRecord({ directory, record })).toEqual({ ok: true })
-    expect(seen[0]!.method).toBe("PUT")
-    expect(seen[0]!.url.pathname).toBe(TOOL_POLICY_ROUTES.record)
-    expect(JSON.parse(seen[0]!.body!)).toEqual(record)
-    expect(seen[0]!.headers["content-type"]).toBe("application/json")
-
-    statuses.push(409)
-    expect(await client.setRecord({ directory, record })).toEqual({ ok: false, code: "quarantined" })
-    statuses.push(400)
-    expect(await client.setRecord({ directory, record })).toEqual({ ok: false, code: "invalid-record" })
-    statuses.push(500)
-    expect(await client.setRecord({ directory, record })).toEqual({ ok: false, code: "write-failed" })
-  })
-
-  test("removeRecord: POSTs { selector } to the remove route", async () => {
-    const selector = { level: "tool", canonical: "builtin::write" } as const
-    const { fetch, seen } = fetchFor(() => new Response(null, { status: 204 }))
-    const client = createToolPolicyClient({ awaitServer: async () => server, fetch })
-    expect(await client.removeRecord({ directory, selector })).toEqual({ ok: true })
-    expect(seen[0]!.method).toBe("POST")
-    expect(seen[0]!.url.pathname).toBe(TOOL_POLICY_ROUTES.recordRemove)
-    expect(JSON.parse(seen[0]!.body!)).toEqual({ selector })
-  })
-
-  test("reset: returns the backup path the engine reports; 503 not-wired", async () => {
-    const { fetch, seen } = fetchFor(() => json(200, { data: { backup: "/x/policy.json.quarantined-1" } }))
-    const client = createToolPolicyClient({ awaitServer: async () => server, fetch })
-    expect(await client.reset({ directory })).toEqual({ ok: true, backup: "/x/policy.json.quarantined-1" })
-    expect(seen[0]!.method).toBe("POST")
-    expect(seen[0]!.url.pathname).toBe(TOOL_POLICY_ROUTES.reset)
-
-    const notWired = createToolPolicyClient({
+    const broken = createToolPolicyClient({
       awaitServer: async () => server,
-      fetch: fetchFor(() => json(503, {})).fetch,
+      fetch: (async () => {
+        throw new Error("socket hang up")
+      }) as unknown as typeof fetch,
     })
-    expect(await notWired.reset({ directory })).toEqual({ ok: false, code: "not-wired" })
+    expect(await broken.setRecord({ directory, record: { selector: { level: "class", class: "plugin" }, state: "ask" } })).toEqual({ ok: false, code: "request-failed" })
   })
 
   test("every method refuses an empty directory before touching the engine (partition needs an instance)", async () => {
-    const { fetch, seen } = fetchFor(() => json(200, { data: inventoryBody }))
+    const { fetch, seen } = fetchFor(() => json(200, { output: inventoryBody }))
     const client = createToolPolicyClient({ awaitServer: async () => server, fetch })
     expect(await client.inventory({ directory: "" })).toEqual({ ok: false, code: "request-failed" })
     expect(await client.reset({ directory: "   " })).toEqual({ ok: false, code: "request-failed" })

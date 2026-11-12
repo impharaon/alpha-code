@@ -16,7 +16,8 @@ import { toolProbe } from "./platform"
 import { extensionsGranted, hasExtensionsDecision, listProjectExecutables, withExtensionsConsent } from "./codepuppy-ext-trust"
 import { readProjectPrefs, writeProjectPrefs } from "./codepuppy-workdir"
 import { projectIpcHandler, resolveProjectIpcEntry, withProjectIpcEntryIdentity } from "./ext-project-entry"
-import type { InstalledPackagesResultV1, InstallTarget, ProjectMcpState, ServerReadyData } from "../preload/types"
+import type { InstalledPackagesResultV1, InstallTarget, ProjectMcpState } from "../preload/types"
+import type { EngineConnection } from "./engine-authorization"
 import { isExtensionName } from "../shared/extension-name"
 import { codepuppyGlobalRoot, findReceipt, listInstalls } from "./codepuppy-installs"
 import { claimMcpSecretVersionDir, mcpSecretVersionedRef, removeMcpSecretVersionDir, removeMcpServerSecrets, removeMcpServerSecretsStrict, writeMcpSecretVersioned } from "./codepuppy-mcp-secrets"
@@ -109,7 +110,7 @@ const hiddenDirConflictsShown = new Set<string>()
 export function registerExtIpcHandlers(
   userDataPath: string,
   registryChannel: "stable" | "preview" | "dev",
-  awaitServer: () => Promise<ServerReadyData>,
+  awaitServer: () => Promise<EngineConnection>,
   homeDir: string = homedir(),
   officialRuntime?: { stop(): Promise<void>; refresh(): Promise<boolean> },
 ) {

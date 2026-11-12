@@ -1,22 +1,26 @@
-// #858 —— main → sidecar 的停止合同。REQ-236 `#1562` 起停止只有一种:排空(令牌续期不再重启引擎,#858 为
-// token-only 换血加的「强关活动连接」一档没有生产者,已删除)。这里钉三件事:
+// #858 —— main → sidecar 的停止合同。REQ-236 `#1562` 起停止只有一种(令牌续期不再重启引擎)。这里钉三件事:
 //   ① 生产 spawnLocalServer 线上只发 `{ type: "stop" }`;
-//   ② sidecar 侧(生产 parseSidecarStopCommand + stopSidecarListener)把它翻成引擎 listener 的 `stop()`(不传强关);
+//   ② sidecar 侧(生产 parseSidecarStopCommand + stopSidecarEngine)把它翻成关掉引擎 —— `#1667`(裁决书 OOR-2):
+//      2.x 没有 v1 的 `POST /global/dispose`(404 会让停止在收尾前抛错),收尾就是关掉 `start()` 的作用域;
 //   ③ 无响应的 sidecar 由 6s 兜底预算收口(到期才 SIGTERM)。
 //
 // harness 说明:sidecar.ts 顶层有 registerHooks 与 getParentPort(),结构上无法被 import
 // (与 #607 同因)。所以这里让假子进程用**生产的** parseSidecarStopCommand +
-// stopSidecarListener 消费消息 —— main→线上形状→sidecar 执行这一整条是真的在跑,
+// stopSidecarEngine 消费消息 —— main→线上形状→sidecar 执行这一整条是真的在跑,
 // 只有「sidecar.ts 确实调用了这两个函数」这一跳靠文末的接线锚守。
 
+import { isolateEngineHome } from "../../test-component/isolated-engine-home"
 import { afterEach, beforeEach, describe, expect, mock, test, vi } from "bun:test"
 import { EventEmitter } from "node:events"
 import { mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { parseSidecarStopCommand, stopSidecarListener } from "./sidecar-stop"
+import { parseSidecarStopCommand, stopSidecarEngine } from "./sidecar-stop"
 import { mockElectron } from "../../test-component/electron-mock"
+
+// 在 server.ts 被 import、spawnLocalServer 跑之前:旧凭证检查只看临时根,不碰本机真实数据目录(isolated-engine-home.ts)。
+isolateEngineHome()
 
 const appEvents = new EventEmitter()
 
@@ -49,18 +53,18 @@ const { creditDanglingSweepForSpawn, resetDanglingSweepLatchForTests } = await i
 
 /**
  * 假 sidecar 子进程。stop 分支就是 sidecar.ts 的那两行(parse → 交给共享执行器),
- * 引擎 listener 换成记录器(记下每次 `stop` 收到的参数)。
+ * 引擎换成记录器(记下 `close` 被调了几次)。
  */
 class SidecarChild extends EventEmitter {
   stdout = new EventEmitter()
   stderr = new EventEmitter()
   kills = 0
   wire: unknown[] = []
-  listenerStopArgs: Array<boolean | undefined> = []
+  engineCloses = 0
 
-  private listener = {
-    stop: (close?: boolean) => {
-      this.listenerStopArgs.push(close)
+  private engine = {
+    close: () => {
+      this.engineCloses++
       return Promise.resolve()
     },
   }
@@ -74,7 +78,7 @@ class SidecarChild extends EventEmitter {
     const command = parseSidecarStopCommand(message)
     if (!command) return
     // sidecar.ts 的 finally:关完就自己退(那里是 process.exit(0))。
-    void stopSidecarListener(this.listener).then(() => this.emit("exit", 0))
+    void stopSidecarEngine(this.engine).then(() => this.emit("exit", 0))
   }
 
   kill() {
@@ -136,15 +140,15 @@ async function spawn(child: SidecarChild | DeafChild, port: number) {
   return result
 }
 
-describe("#858 停止合同:一律排空", () => {
-  test("线上只发 { type: \"stop\" },引擎 listener 收到不带强关的 stop(),进程自己退出(一次 kill 都没有)", async () => {
+describe("#858 停止合同:关掉引擎", () => {
+  test("线上只发 { type: \"stop\" },引擎被关一次(2.x 的收尾),进程自己退出(一次 kill 都没有)", async () => {
     const child = new SidecarChild()
     const result = await spawn(child, 4310)
 
     await result.listener.stop()
 
     expect(child.wire.at(-1)).toEqual({ type: "stop" })
-    expect(child.listenerStopArgs).toEqual([undefined])
+    expect(child.engineCloses).toBe(1)
     expect(child.kills).toBe(0)
   })
 
@@ -174,33 +178,35 @@ describe("#858 停止合同:一律排空", () => {
   })
 
   // 分类与「这处锚守不住什么」登记在 ./source-text-anchors.ts(`#968` 第 ⑤ 层机械校验)。
-  test("ANCHOR (not a gate): sidecar.ts 的 stop 走共享执行器,不再自己决定关不关连接", () => {
+  test("ANCHOR (not a gate): sidecar.ts 的 stop 走共享执行器,不再打 v1 的 /global/dispose", () => {
     // sidecar.ts 顶层的 registerHooks / getParentPort() 让它无法被 import,所以这一跳只能锚源码。
     // 上面三条才是行为判据 —— 这一条只保证生产真的接在那上面。
     const source = readFileSync(join(import.meta.dir, "sidecar.ts"), "utf8")
-    expect(source).toContain("await stopSidecarListener(listener, engine)")
+    expect(source).toContain("await stopSidecarEngine(engine)")
     expect(source).toContain("return parseSidecarStopCommand(value)")
-    // 本地再决定一次 = 合同有两个真源,迟早漂移。
+    // 本地再决定一次 = 合同有两个真源,迟早漂移;v1 的释放路由在 2.x 是 404(OOR-2)。
     expect(source).not.toMatch(/listener\??\.stop\(/)
+    expect(source).not.toContain("/global/dispose")
+    expect(readFileSync(join(import.meta.dir, "sidecar-stop.ts"), "utf8")).not.toContain("/global/dispose")
   })
 })
 
-test.each(["runtime", "listener"] as const)("#1647 AC2 %s draining stays inside the five-second stop budget", async (phase) => {
+test("#1647 AC2 a hung engine close stays inside the five-second stop budget", async () => {
   vi.useFakeTimers()
   try {
     let done = false
-    let stopped = false
-    const stopping = stopSidecarListener({ stop: () => { stopped = true; return new Promise<void>(() => {}) } }, {
-      fetch: () => phase === "runtime" ? new Promise<Response>(() => {}) : Response.json(true), password: "fixture",
-    }).then(() => { done = true })
+    const stopping = stopSidecarEngine({ close: () => new Promise<void>(() => {}) }).then(() => {
+      done = true
+    })
     for (let tick = 0; tick < 8; tick++) await Promise.resolve()
     vi.advanceTimersByTime(4_999)
     await Promise.resolve()
     expect(done).toBe(false)
-    expect(stopped).toBe(phase === "listener")
     vi.advanceTimersByTime(1)
     for (let tick = 0; tick < 4; tick++) await Promise.resolve()
     expect(done).toBe(true)
     await stopping
-  } finally { vi.useRealTimers() }
+  } finally {
+    vi.useRealTimers()
+  }
 })

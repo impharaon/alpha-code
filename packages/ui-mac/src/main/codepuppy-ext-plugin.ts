@@ -14,7 +14,7 @@ import { join } from "node:path"
 export type ExtPluginResolveInput = {
   /** app.isPackaged */
   packaged: boolean
-  /** process.resourcesPath(打包后 extraResources 落点 <resources>/codepuppy-ext/plugin.js) */
+  /** process.resourcesPath(打包后 extraResources 落点 <resources>/codepuppy-ext/server.js) */
   resourcesPath: string
   /** 调用方模块目录(dev 下 = packages/ui-mac/out/main,与 windows.ts 的 root 同法) */
   moduleDir: string
@@ -25,14 +25,21 @@ export type ExtPluginResolveInput = {
 
 export type ExtPluginResolveResult = { path?: string; reason?: string }
 
+/** 2.x 插件目录的服务端入口文件名(上游按 `server` → `index` 解析目录入口)。 */
+export const EXT_PLUGIN_ENTRY = "server.js"
+
+/**
+ * `#1667`(#1662 L5,接口文档 I2 改形 2026-11-09):OpenCode 2 **只装目录形式的本地插件**(配置里写文件路径会被丢弃,只留一条
+ * WARN,`packages/core/src/config/plugin/source.ts`)。所以这里返回的 `path` 是 ext 所在**目录**;在场判据是目录里有入口文件。
+ */
 export function resolveExtPluginPath(input: ExtPluginResolveInput): ExtPluginResolveResult {
   if (input.disabled) return { reason: "CODEPUPPY_EXT_DISABLE=1" }
   const path = input.packaged
-    ? join(input.resourcesPath, "codepuppy-ext", "plugin.js")
-    : // dev:out/main → ui-mac → packages → ext/dist/plugin.js(镜像 windows.ts iconsDir 的相对法)
-      join(input.moduleDir, "..", "..", "..", "ext", "dist", "plugin.js")
-  if (!input.exists(path)) {
-    return { reason: `ext bundle missing at ${path}(预期 prebuild/predev 已构建;打包态 = extraResources codepuppy-ext/)` }
+    ? join(input.resourcesPath, "codepuppy-ext")
+    : // dev:out/main → ui-mac → packages → ext/dist(镜像 windows.ts iconsDir 的相对法)
+      join(input.moduleDir, "..", "..", "..", "ext", "dist")
+  if (!input.exists(join(path, EXT_PLUGIN_ENTRY))) {
+    return { reason: `ext plugin entry missing at ${join(path, EXT_PLUGIN_ENTRY)}(预期 prebuild/predev 已构建;打包态 = extraResources codepuppy-ext/)` }
   }
   return { path }
 }

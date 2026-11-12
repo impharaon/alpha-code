@@ -5,7 +5,14 @@
 // 实现依据),可执行真相是那边的 `lib/chat-archive.ts` / `app/api/chat-archive/turns/route.ts`。
 // 本文件只做一件事:**把引擎的形状投影到那份线契约**,不发明第二份判据。
 //
-// ── 供数方为什么是「旧那一代」的 `/session/:id/message`,不是 `/api/session/:id/message` ──────────
+// ── `#1667`(#1662 L5):OpenCode 2 只有 `/api/session/:id/message` 这一代 ────────────────────────────
+// 下面这一节是 v1 时代的理由(v1 有两代路由,旧代的 user 消息带 model)。2.x 只剩新代,它的 user 消息**结构上没有 model**
+// (`packages/schema/src/session-message.ts` 的 `User`:text / files / agents / skills),旧代那一份也随 v1 引擎一起没了。
+// 现在的做法:读 2.x 的消息列表,经 `fromEngineV2Messages` 投影成本模块一直消费的那个窄形状(切轮与线契约的判据不动),
+// user 消息的 `provider_id` / `model_id` 取紧跟它的那条 assistant 的 `model` —— 回答这条 user 消息的就是发送时会话选中的
+// 模型,也就是 v1 记在 user 消息上的那一个(只有一轮中途换模型 / 回退时两者不同;这条取舍写在交回的方案疑点里)。
+//
+// ── (v1 时代)供数方为什么是「旧那一代」的 `/session/:id/message`,不是 `/api/session/:id/message` ──────────
 // 引擎同时挂着两代会话 API(`packages/opencode/src/server/routes/instance/httpapi/public.ts:186`
 // 按 `/api` 前缀区分)。上报面**两条消息都必填 `provider_id` / `model_id`**,而:
 //   · 旧代 `packages/schema/src/v1/session.ts:364-368` 的 `UserMessage.model` 是**必填** Struct
@@ -304,4 +311,66 @@ export function billingPathFor(providerId: string): "platform" | "byok" | "custo
   if (providerId === "codepuppy") return "platform"
   if (providerId.endsWith("-byok")) return "byok"
   return "custom"
+}
+
+
+// ── `#1667`:OpenCode 2 消息列表 → 本模块的窄形状 ───────────────────────────────────────────────────
+// 2.x 的消息是一条条有 `type` 的记录(`packages/schema/src/session-message.ts`)。投影规则:
+//   · `user` → role user;正文 `text` 一段;`files` 里 `source.type === "inline"` 的(composer 随消息上传的字节)转成
+//     data URL 的 file part,别的来源(`uri` 一类的引用)不是随消息上传的字节,不投影 —— 与 v1 只认 data URL 同义;
+//   · `assistant` → role assistant;`model.providerID` / `model.id`、`time.completed`、`finish`、`tokens.output` 原样;
+//     只投影 `text` 内容(推理与工具调用不进存档,与 v1 只取 text part 同义);
+//   · 选择记录(`agent-switched` / `model-switched` / `location-switched`)丢掉 —— 它们落在发送之前,不是一轮里的话;
+//   · 其余任何类型(`synthetic` 引擎注入的提醒、`compaction`、`system`、`skill`、`shell`、`idle` …)保留成一条**挡板**:
+//     它夹在 user 与 assistant 之间时,这条 assistant 就没有 user 直接前驱,整轮跳过(引擎自发的回合不冒充用户说的话)。
+//   · user 的 model 取紧跟它的 assistant 的 model(见文件抬头);后面不是 assistant 就不给,由切轮按「缺 provider_id」跳过。
+type V2Message = {
+  type?: unknown
+  id?: unknown
+  time?: { created?: unknown; completed?: unknown }
+  text?: unknown
+  files?: ReadonlyArray<{ data?: unknown; mime?: unknown; name?: unknown; source?: { type?: unknown } }>
+  model?: { id?: unknown; providerID?: unknown }
+  content?: ReadonlyArray<{ type?: unknown; text?: unknown }>
+  finish?: unknown
+  tokens?: { output?: unknown }
+}
+
+const SELECTION_RECORDS = new Set(["agent-switched", "model-switched", "location-switched"])
+
+export function fromEngineV2Messages(items: readonly unknown[]): EngineMessage[] {
+  const out: EngineMessage[] = []
+  for (const item of items) {
+    const message = (item && typeof item === "object" ? item : {}) as V2Message
+    if (typeof message.type === "string" && SELECTION_RECORDS.has(message.type)) continue
+    if (message.type === "user") {
+      const parts: EngineMessagePart[] = typeof message.text === "string" && message.text ? [{ type: "text", text: message.text }] : []
+      for (const file of message.files ?? []) {
+        if (file?.source?.type !== "inline" || typeof file.data !== "string" || typeof file.mime !== "string") continue
+        parts.push({ type: "file", mime: file.mime, filename: file.name, url: `data:${file.mime};base64,${file.data}` })
+      }
+      out.push({ info: { id: message.id, role: "user", time: { created: message.time?.created } }, parts })
+      continue
+    }
+    if (message.type === "assistant") {
+      const model = { providerID: message.model?.providerID, modelID: message.model?.id }
+      const previous = out.at(-1)
+      if (previous?.info?.role === "user") previous.info.model = model
+      out.push({
+        info: {
+          id: message.id,
+          role: "assistant",
+          time: { created: message.time?.created, completed: message.time?.completed },
+          providerID: model.providerID,
+          modelID: model.modelID,
+          finish: message.finish,
+          tokens: { output: message.tokens?.output },
+        },
+        parts: (message.content ?? []).filter((part) => part?.type === "text").map((part) => ({ type: "text", text: part.text })),
+      })
+      continue
+    }
+    out.push({ info: { id: message.id, role: typeof message.type === "string" ? message.type : "unknown" }, parts: [] })
+  }
+  return out
 }

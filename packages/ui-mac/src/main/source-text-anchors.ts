@@ -100,9 +100,9 @@ export const DOWNGRADED_ANCHORS: Record<string, SourceTextEntry> = {
     lines: 1,
   },
   "packages/ui-mac/src/main/codepuppy-sidecar-wiring.test.ts": {
-    why: "`#1531` 那一条锚 sidecar.ts 里「引擎 import → 进程内交接(publishInProcessEngine)→ ext 预载开始 → await 预载 → ready 上报」的下标先后,外加上游 plugin/shared.ts 解析路径插件的 URL 形状(pathToFileURL(file).href)—— 两边同一个 URL 才是同一个模块记录。两个不会让它变红的变异:①把预载的 import 换成另一个指向同一文件但带查询串的 URL(文本里那一段仍在,模块却装出第二份,监听挂在没人用的那份上);②在 await extPreload 之前加一条早退 return。sidecar.ts 顶层有副作用,import 不得;同文件另两条(真 spawnLocalServer + 假子进程)是行为判据。`#1578` 第 3 处读 server.ts:写 sidecar env 随包扩展清单的那一句,键名必须等于引擎 codepuppy-bundled-plugin.ts 的 EXT_BUNDLED_MANIFEST_ENV、值指向 bundled-tools.json —— 任一侧改名(一个字母)即红,这一半主语是跨包逐字一致。守不住的:①那一句被包进恒假分支或 ext.path 永远为空(键从不写,文本仍在);②main 写对了但 sidecar 之后又把这个键剥掉。行为判据要走 spawnLocalServer 看 fork env,而 dev 下 ext.path 依赖未入库的 packages/ext/dist,门不保证它在。",
+    why: "`#1531` 那一条锚 sidecar.ts 里「引擎 import → ext 目录入口预载开始 → start()(Transform 里发布进程内 fetch)→ await 预载 → ready 上报」的下标先后(`#1667`:2.x 每个 Location 用新 URL 各求值一次 ext,不再锚「同一个 URL」)。两个不会让它变红的变异:①把 onDispatch 里的 publishInProcessEngine 改成发布一个不相干的函数(文本里那一段仍在);②在 await extPreload 之前加一条早退 return。sidecar.ts 顶层有副作用,import 不得;同文件另两条(真 spawnLocalServer + 假子进程)是行为判据。`#1578` 第 3 处读 server.ts:写 sidecar env 随包扩展清单的那一句,键名必须等于引擎 codepuppy-bundled-plugin.ts 的 EXT_BUNDLED_MANIFEST_ENV、值指向 bundled-tools.json —— 任一侧改名(一个字母)即红,这一半主语是跨包逐字一致。守不住的:①那一句被包进恒假分支或 ext.path 永远为空(键从不写,文本仍在);②main 写对了但 sidecar 之后又把这个键剥掉。行为判据要走 spawnLocalServer 看 fork env,而 dev 下 ext.path 依赖未入库的 packages/ext/dist,门不保证它在。",
     evidence: "#1531",
-    lines: 3,
+    lines: 2,
   },
   "packages/ui-mac/src/main/codepuppy-contract-health.test.ts": {
     why: "锚的是 renderer 三个文件里「那几个标识符在不在」。它证不了 banner 真的渲染、也证不了 role=alert 真的可达。两个不会让它变红的变异:①把 <ContractFailureBanner /> 挪进一个恒假分支;②把 providers 里的订阅回调改成不更新状态。真判据要走组件测试道(本文件今天没有)。",
@@ -159,11 +159,6 @@ export const DOWNGRADED_ANCHORS: Record<string, SourceTextEntry> = {
     evidence: "#356",
     lines: 1,
   },
-  "packages/ui-mac/src/main/plugin-internal-boot-order.test.ts": {
-    why: "锚构建脚本 prebuild.ts 里两段字符串的先后。两个不会让它变红的变异:①把 patch 调用放进一个 if (process.env.SKIP) 分支;②把 patch 改成失败时静默跳过。真判据是打包产物里那段代码有没有被改写,本仓没有那道门。",
-    evidence: "#870",
-    lines: 1,
-  },
   "packages/ui-mac/src/main/renderer-diagnostic-redaction.test.ts": {
     why: "2 处读 windows.ts / logging.ts,锚四条崩溃/故障通道确实调用 safeRouteLabel/safeErrorName(而不是直落 win.webContents.getURL()/details/error/preloadPath)以及 spyRendererConsole 被关闭。两个不会让它变红的变异:①在同一条 writeLog 调用里,除已断言的 safeRouteLabel(...) 字段外再并列新增一个字段直接塞回原始 URL/details(正则只咬旧形态的精确并列写法,咬不到新增的第三个字段);②把 safeRouteLabel/safeErrorName 本身改坏成直接回传入参 —— 调用点文本一字不改,只有本文件的 behavior describe 块(真实调用两个函数并断言输出)才会为此变红。",
     evidence: "#900",
@@ -185,19 +180,44 @@ export const DOWNGRADED_ANCHORS: Record<string, SourceTextEntry> = {
     lines: 1,
   },
   "packages/ui-mac/src/main/sidecar-location-prewarm.test.ts": {
-    why: "锚 sidecar.ts 里 prewarm → listen → settle → ready 四段的下标先后。两个不会让它变红的变异:①把 await prewarm 的结果丢掉;②把 prewarmInitialLocation 换成立刻 resolve 的空实现。sidecar.ts 顶层有副作用,import 不得。",
+    why: "锚 sidecar.ts 里 start() → prewarm settle → ready 三段的下标先后(`#1667`:2.x 的 start() 建好应用图才返回,prewarm 经进程内 fetch 打同一张图)。两个不会让它变红的变异:①把 await prewarm 的结果丢掉;②把 prewarmInitialLocation 换成立刻 resolve 的空实现。sidecar.ts 顶层有副作用,import 不得。",
     evidence: "#881",
     lines: 1,
   },
-  "packages/ui-mac/src/main/sidecar-shared-location-map.test.ts": {
-    why: "锚构建脚本 prebuild.ts 里三段字符串的先后。两个不会让它变红的变异:①把 patch 调用包进条件分支;②让 patch 在匹配不到时静默跳过而不是抛。真判据是打包产物,本仓没有那道门。",
-    evidence: "#870",
+  "packages/ui-mac/src/main/sidecar-engine-host.test.ts": {
+    why: "`#1667` 最后一条锚 engine/engine-embed.ts:调 start() 时 lifecycle 位传 undefined(裁决书 N1)、Transform 里同步交出 dispatch(I1 第 3 条)、不 import ServerFetch。两个不会让它变红的变异:①在 start() 之外另调一次带 lifecycle 的 start();②在 onDispatch 之前插一个 await(文本仍匹配,但交接不再同步)。同文件前几条在真引擎上是行为判据(同一张图、口令包装、配置只经选项对象、库路径)。",
+    evidence: "#1667",
+    lines: 1,
+  },
+  "packages/ui-mac/src/main/sidecar-ext-ready.test.ts": {
+    why: "`#1667` 最后一条锚 sidecar.ts:发 ready 之前 await assertExtPluginActive(初始目录、ext 目录)(接口文档 I4)。两个不会让它变红的变异:①把这一句包进 try/catch 吞掉;②在它之前加一条早退并照发 ready。sidecar.ts 顶层有副作用,import 不得;同文件前几条在真引擎 + 桩插件上是行为判据。",
+    evidence: "#1667",
+    lines: 1,
+  },
+  "packages/ui-mac/src/main/engine-legacy-credentials.test.ts": {
+    why: "`#1667` 最后一条锚 server.ts 在 fork 之前(每种运行形态)调 legacyCredentialImportRefusal、拒绝即抛(基线 S2)。两个不会让它变红的变异:①把这段包进只在打包态成立的条件;②拒绝原因算出来却只记日志不抛。两者的行为判据在子进程那条:非打包态的生产 spawnLocalServer 对着沙箱真库拒绝、零 fork,同一条用例在沙箱真引擎上证明导入真的会发生;同文件其余几条真执行判定函数。",
+    evidence: "#1667",
+    lines: 1,
+  },
+  "packages/ui-mac/src/main/renderer-engine-auth.test.ts": {
+    why: "`#1667` 最后一条锚 index.ts 的 awaitInitialization 返回 rendererEngineView(res)、index.ts 在 sidecar 起来时 setEngineConnection(connection)、index.ts 把 WSL 引擎的连接经 onEngineConnection 交给 windows.ts、windows.ts 的 onBeforeSendHeaders 按源挑连接(engineConnectionFor)经 withEngineRequestAuthorization 补头(接口文档 I8)。两个不会让它变红的变异:①在 return 之前把 res 换成另一个带口令的对象(文本仍在);②onBeforeSendHeaders 算出补过头的对象却把原始 details.requestHeaders 交给 callback。index.ts 结构上进不了 bun、windows.ts 顶层 import electron;同文件前三条真执行投影与补头函数。",
+    evidence: "#1667",
+    lines: 2,
+  },
+  "packages/ui-mac/src/main/naming-before-v1-conversion.test.ts": {
+    why: "`#1667`(#1569 `l1r-naming-resume`)锚 index.ts 里 runNamingMigrationDbStep 的调用在两处 spawnLocalServer(boot / respawn)之前 —— 生产里「先改名、后起引擎转换」靠的是这个源码顺序。两个不会让它变红的变异:①改名一步挪进一个异步回调,回调在 spawnLocalServer 之后才执行(文本顺序不变);②在 index.ts 之外另开一条起 sidecar 的路径。index.ts 结构上进不了 bun;同文件第一条在沙箱真引擎上判顺序本身(生产顺序 ⇒ 2.x 里是新名,转换先跑 ⇒ 旧名留下)。",
+    evidence: "#1667",
+    lines: 1,
+  },
+  "packages/ui-mac/src/main/engine-explicit-config.test.ts": {
+    why: "`#1667`(裁决 r1 第 2 条)最后一条锚 sidecar.ts 拿到注入结果之后、import 引擎之前调用 watchExplicitSources —— codepuppy.jsonc 运行中被改时由它重写合成的显式文件。两个不会让它变红的变异:①调用写在了一个永远不执行的分支里(文本顺序不变);②传给它的 layer 不是注入那一次算出的那份。sidecar.ts 顶层有副作用,import 不得;同文件前几条真执行合成与重写,真引擎上的「改了不用重启就看得见」在 codepuppy-config-injection-engine.cases.ts。",
+    evidence: "#1667",
     lines: 1,
   },
   "packages/ui-mac/src/main/sidecar-stop.test.ts": {
-    why: "锚 sidecar.ts 的 stop 是否接在共享执行器上(含一条负全称:本文件不得再出现 listener.stop()。两个不会让它变红的变异:①把 stopSidecarListener 的实现改成直接 return;②在别的模块里再关一次连接。sidecar.ts 顶层有副作用,import 不得;同 describe 里上面四条才是真行为判据,这一条只保证生产真的接在那上面。",
+    why: "锚 sidecar.ts 的 stop 是否接在共享执行器上(含两条负全称:sidecar.ts 不得再出现 listener.stop(),sidecar.ts / sidecar-stop.ts 不得再出现 v1 的全局 dispose 路由 —— 2.x 下 404,`#1667` OOR-2)。两个不会让它变红的变异:①把 stopSidecarEngine 的实现改成直接 return;②在别的模块里再关一次引擎。sidecar.ts 顶层有副作用,import 不得;同 describe 里上面几条才是真行为判据,这一条只保证生产真的接在那上面。",
     evidence: "#911",
-    lines: 1,
+    lines: 2,
   },
   "packages/ui-mac/src/main/process-fence-wiring.test.ts": {
     why: "四处源码文本锚,各自都有真行为判据在别处兜底,这里只钉「生产真的接在那上面」。①REQ-159 `#1321`:sidecar.ts 里 installProcessFence(command) 的位置(早于 prepareSidecarEnv 与 import 引擎)与 darwin 缺席即抛那句话;不会让它变红的变异:把 installProcessFence 的函数体改成直接 return(调用行文本一字不变),或把 applyProcessFence 的结果丢掉、throw 包进恒假条件。②③④ `#1394`(围栏输入搬出围栏可写处)同一条 ANCHOR 用例里的三段:server.ts 的 planProductionFence 只读真源、正文里不出现 TABS_KEY / getStore(;ipc.ts 的 store-set / store-delete / store-clear 三个通道各自在自己那段里通知 tracker;index.ts 的 bootFenceWorkspaceTruth 落在 runTabsPreclean 之后、registerIpcHandlers 之前。不会让这三段变红的变异:把 noteRendererStoreSet 的实现改成直接 return(调用行仍在),或让 bootFenceWorkspaceTruth 在播种时静默失败(调用位置不变)。真行为判据在本文件前面那几条端到端用例(伪造记录真写进 opencode.global.dat ⇒ 生产计划器的 profile 不含它;写进真源 ⇒ 含它;真源坏了 ⇒ 只剩 ~/code-puppy)与 process-fence-apply.test.ts 的 C1–C5。sidecar.ts 顶层 registerHooks/getParentPort 让它 import 不得,所以只能读文本。",
@@ -219,9 +239,9 @@ export const DOWNGRADED_ANCHORS: Record<string, SourceTextEntry> = {
  */
 export const KEPT_SOURCE_TEXT_READS: Record<string, SourceTextEntry> = {
   "packages/ui-mac/src/main/config-injection-throat.test.ts": {
-    why: "REQ-157 #1305 ui-mac 整份 config 咽喉的 drift 锁(#1299 的 agent 咽喉并入后同一份):判官把 cfg.agent.<name>.mode / cfg.agent.<name>.permission.** / 顶层 cfg.permission.** 槽里的值按引擎的声明式字面量(packages/core/src/v1/config/permission.ts 的 Literals([\"ask\", \"allow\", \"deny\"])、packages/opencode/src/agent/agent.ts 的 Literals([\"subagent\", \"primary\", \"all\"]))判成动词,其余当成字点名。主语就是那两段字面量文本本身 —— 引擎哪天加一个动词而这里没跟,生产写出的合法新动词会被判官当成未登记的字(fail-closed,红而不是假绿),这两行读取让「没跟上」在引擎源码改动的同一次 diff 里就红。两个引擎模块在 bun 侧 import 会把 effect Schema 拉进来,值断言没有更便宜的入口。路径字面量必须与读调用同一行(#1304 踩过:放进 const 让本层谓词零命中)。守不住:引擎在别处又定义一套同义动词而这两处字面量不动 —— 那时判官仍按旧集合判,新动词照样被点名,仍是红。",
+    why: "REQ-157 #1305 ui-mac 整份 config 咽喉的 drift 锁(#1299 的 agent 咽喉并入后同一份):判官把 agents.<name>.mode / agents.<name>.permissions[i].effect / 顶层 permissions[i].effect / policies[i].effect 槽里的值按引擎的声明式字面量(`#1667` 起读 OpenCode 2:packages/schema/src/permission.ts 的 Literals([\"allow\", \"deny\", \"ask\"])、packages/schema/src/config/agent.ts 的 Literals([\"subagent\", \"primary\", \"all\"])、packages/schema/src/config/policy.ts 的 Literals([\"allow\", \"deny\"]))判成动词,其余当成字点名。主语就是那三段字面量文本本身 —— 引擎哪天加一个动词而这里没跟,生产写出的合法新动词会被判官当成未登记的字(fail-closed,红而不是假绿),这三行读取让「没跟上」在引擎源码改动的同一次 diff 里就红。路径字面量必须与读调用同一行(#1304 踩过:放进 const 让本层谓词零命中)。守不住:引擎在别处又定义一套同义动词而这三处字面量不动 —— 那时判官仍按旧集合判,新动词照样被点名,仍是红。",
     evidence: "#1305",
-    lines: 2,
+    lines: 3,
   },
   "packages/ui-mac/src/main/boot-dangling-onboarding-wiring.test.ts": {
     why: "主语是负全称加唯一性:index.ts 每个 `if (!TEST_ONBOARDING)` 块不得包含 boot dangling sweep;REQ-059/065/104 与 ecosystem gate 必须仍在该守卫内;runBootDanglingSweep 恰好一次且排在首个 spawnLocalServer 之前。index.ts 结构上进不了 bun,这份布局就是接线契约。删掉 sweep 调用会由 boot-dangling-sweep.test.ts 的可执行闸变红,本条守的是「调用点不在 skip 里」。第 2 处(#1036,REQ-053 A2)锚 bootEnforcementGap 分支里 TEST_ONBOARDING 早退(app.exit(1))先于 dialog.showErrorBox 的下标先后 —— 按本分类法它是位置锚:把早退包进恒假条件、或把 app.exit(1) 换成只写日志,被比的文本仍在,断言照绿;A2 的行为真相在打包 VERIFY(#1034)。文件主判据仍是上面的负全称+唯一性文本闸,照 websearch-copies 先例如实登记混合、不整体降级(整体降级会把 #1031 那道真文本闸一并逐出 gate-files.tsv 的删除保护)。",

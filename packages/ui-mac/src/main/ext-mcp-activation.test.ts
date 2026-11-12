@@ -48,64 +48,43 @@ function fetchFor(
 
 const emptyGlobalNames = () => ({ ok: true as const, names: [] as string[] })
 
+// `#1667`:OpenCode 2 的形状 —— `GET /api/config` 给这个 Location 的配置文档数组,`GET /api/mcp` 给 `{ location, data: Mcp.Server[] }`;
+// 目录经 `location[directory]` 查询参数选 Location(上游客户端 `@opencode/client` 的编码)。
+const doc = (servers?: Record<string, unknown>) => ({ type: "document", info: servers ? { mcp: { servers } } : {} })
+const mcpList = (servers: Record<string, Record<string, unknown>>) =>
+  Response.json({ location: { directory: "x" }, data: Object.entries(servers).map(([name, status]) => ({ name, status })) })
+const at = (url: URL) => url.searchParams.get("location[directory]")
+
 describe("project MCP activation provenance probe (REQ-136 C5)", () => {
-  test("returns active only after global absence + exact D leaf + D-scoped connected status", async () => {
+  test("returns active only after config-document absence + D-scoped connected status", async () => {
     const requests: URL[] = []
     const verdict = await probeProjectMcpActivation("demo", project, ready, {
       configuredGlobalNames: emptyGlobalNames,
       fetch: fetchFor((url) => {
-        if (url.pathname === "/global/config") return Response.json({})
-        if (url.pathname === "/config") return Response.json({ mcp: { demo: durableLeaf } })
-        if (url.pathname === "/mcp") return Response.json({ demo: { status: "connected" } })
-        return new Response("not found", { status: 404 })
+        if (url.pathname === "/api/config") return Response.json([doc(), { type: "directory", path: "/x" }])
+        if (url.pathname === "/api/mcp") return mcpList({ demo: { status: "connected" } })
+        return new Response(null, { status: 404 })
       }, requests),
     })
-
     expect(verdict).toBe("active")
-    expect(requests.map((url) => url.pathname)).toEqual(["/global/config", "/config", "/mcp"])
-    expect(requests.at(1)?.searchParams.get("directory")).toBe(project)
-    expect(requests.at(2)?.searchParams.get("directory")).toBe(project)
-    expect(JSON.stringify(verdict)).not.toContain("demo-mcp")
+    expect(requests.map((url) => url.pathname)).toEqual(["/api/config", "/api/mcp"])
+    expect(requests.map(at)).toEqual([project, project])
   })
 
-  // 审计 F2:引擎还在后台启动这台项目 MCP(pending)—— 判据给独立的 pending,不折成「核验不了」。
   test("#1563: a provenance-proven D leaf whose engine status is pending is pending, not unverifiable", async () => {
     const verdict = await probeProjectMcpActivation("demo", project, ready, {
       configuredGlobalNames: emptyGlobalNames,
-      fetch: fetchFor((url) => {
-        if (url.pathname === "/global/config") return Response.json({})
-        if (url.pathname === "/config") return Response.json({ mcp: { demo: durableLeaf } })
-        if (url.pathname === "/mcp") return Response.json({ demo: { status: "pending" } })
-        return new Response("not found", { status: 404 })
-      }, []),
+      fetch: fetchFor((url) => (url.pathname === "/api/config" ? Response.json([doc()]) : mcpList({ demo: { status: "pending" } })), []),
     })
-
     expect(verdict).toBe("pending")
   })
 
-  test("accepts JSONC trailing commas in both the durable project file and injected global config", async () => {
-    writeFileSync(
-      join(project, PROJECT_HIDDEN_DIR, "codepuppy.jsonc"),
-      `{
-        "mcp": {
-          "demo": {
-            "type": "local",
-            "command": ["npx", "-y", "demo-mcp@1.0.0",],
-          },
-        },
-      }`,
-    )
-    process.env.OPENCODE_CONFIG_CONTENT = '{"mcp":{},}'
-
+  test("accepts JSONC trailing commas in the durable project file", async () => {
+    writeFileSync(join(project, PROJECT_HIDDEN_DIR, "codepuppy.jsonc"), `{"mcp":{"demo":${JSON.stringify(durableLeaf)},},}`)
     const verdict = await probeProjectMcpActivation("demo", project, ready, {
       configuredGlobalNames: emptyGlobalNames,
-      fetch: fetchFor((url) => {
-        if (url.pathname === "/global/config") return Response.json({})
-        if (url.pathname === "/config") return Response.json({ mcp: { demo: durableLeaf } })
-        return Response.json({ demo: { status: "connected" } })
-      }, []),
+      fetch: fetchFor((url) => (url.pathname === "/api/config" ? Response.json([doc()]) : mcpList({ demo: { status: "connected" } })), []),
     })
-
     expect(verdict).toBe("active")
   })
 
@@ -124,45 +103,29 @@ describe("project MCP activation provenance probe (REQ-136 C5)", () => {
     expect(awaitCalls).toBe(0)
   })
 
-  test("engine global hit shadows even an identical leaf and skips effective/status reads", async () => {
-    const requests: URL[] = []
-    const verdict = await probeProjectMcpActivation("demo", project, ready, {
-      configuredGlobalNames: emptyGlobalNames,
-      fetch: fetchFor((url) => {
-        if (url.pathname === "/global/config") return Response.json({ mcp: { demo: durableLeaf } })
-        return Response.json({ demo: { status: "connected" } })
-      }, requests),
-    })
-    expect(verdict).toBe("shadowed")
-    expect(requests.map((url) => url.pathname)).toEqual(["/global/config"])
+  test("any config document defining the name shadows (even an identical leaf, even the injected neutralized one) and skips the status read", async () => {
+    for (const servers of [{ demo: durableLeaf }, { demo: { type: "remote", url: "http://127.0.0.1:1/codepuppy-mcp-disabled", disabled: true } }]) {
+      const requests: URL[] = []
+      const verdict = await probeProjectMcpActivation("demo", project, ready, {
+        configuredGlobalNames: emptyGlobalNames,
+        fetch: fetchFor((url) => (url.pathname === "/api/config" ? Response.json([doc(), doc(servers)]) : mcpList({ demo: { status: "connected" } })), requests),
+      })
+      expect(verdict).toBe("shadowed")
+      expect(requests.map((url) => url.pathname)).toEqual(["/api/config"])
+    }
   })
 
-  test("effective D leaf mismatch is shadowed and never consults the name-only status map", async () => {
-    const requests: URL[] = []
-    const verdict = await probeProjectMcpActivation("demo", project, ready, {
-      configuredGlobalNames: emptyGlobalNames,
-      fetch: fetchFor((url) => {
-        if (url.pathname === "/global/config") return Response.json({})
-        if (url.pathname === "/config")
-          return Response.json({ mcp: { demo: { type: "local", command: ["npx", "other-owner"] } } })
-        return Response.json({ demo: { status: "connected" } })
-      }, requests),
-    })
-    expect(verdict).toBe("shadowed")
-    expect(requests.map((url) => url.pathname)).toEqual(["/global/config", "/config"])
-  })
-
-  test("unreadable global/effective facts are unverifiable and never become connected", async () => {
+  test("unreadable config documents are unverifiable and never become connected", async () => {
     const requests: URL[] = []
     const verdict = await probeProjectMcpActivation("demo", project, ready, {
       configuredGlobalNames: emptyGlobalNames,
       fetch: fetchFor((url) =>
-        url.pathname === "/global/config"
+        url.pathname === "/api/config"
           ? Response.json({ error: "unreadable" }, { status: 500 })
-          : Response.json({ demo: { status: "connected" } }), requests),
+          : mcpList({ demo: { status: "connected" } }), requests),
     })
     expect(verdict).toBe("unverifiable")
-    expect(requests.map((url) => url.pathname)).toEqual(["/global/config"])
+    expect(requests.map((url) => url.pathname)).toEqual(["/api/config"])
 
     writeFileSync(join(project, PROJECT_HIDDEN_DIR, "codepuppy.jsonc"), '{"mcp":{"demo":')
     const malformed = await probeProjectMcpActivation("demo", project, ready, {
@@ -200,41 +163,35 @@ describe("project MCP activation provenance probe (REQ-136 C5)", () => {
     const verdict = await probeProjectMcpActivation("demo", project, ready, {
       configuredGlobalNames: emptyGlobalNames,
       fetch: fetchFor((url) => {
-        if (url.pathname === "/global/config") return Response.json({})
-        if (url.pathname === "/config") return Response.json({ mcp: { demo: durableLeaf } })
-        if (url.pathname === "/mcp" && url.searchParams.get("directory") === null)
-          return Response.json({ demo: { status: "connected" } })
-        return Response.json({ demo: { status: "failed" } })
+        if (url.pathname === "/api/config") return Response.json([doc()])
+        if (url.pathname === "/api/mcp" && at(url) === null) return mcpList({ demo: { status: "connected" } })
+        return mcpList({ demo: { status: "failed", error: "boom" } })
       }, requests),
     })
     expect(verdict).toBe("unverifiable")
-    expect(requests.at(-1)?.pathname).toBe("/mcp")
-    expect(requests.at(-1)?.searchParams.get("directory")).toBe(project)
+    expect(requests.at(-1)?.pathname).toBe("/api/mcp")
+    expect(at(requests.at(-1)!)).toBe(project)
   })
 })
 
-// `#1563`:引擎后台启动 MCP,进行中报 `pending`(后台重连时带上一次失败的 `error`)。它是「准备中」,不能被核验
-// 读成 failed —— 读成 failed 时定制中心会把一台正在连的服务当失败、给出只会打断会话的「现在重载」。
+// `#1563`:引擎后台启动 MCP,进行中报 `pending`。它是「准备中」,不能被核验读成 failed —— 读成 failed 时定制中心会把一台
+// 正在连的服务当失败、给出只会打断会话的「现在重载」。`#1667`:2.x 的 `Mcp.Status` pending 不带上一次失败(`error` 只在
+// failed / needs_auth 上),所以 v1 时代「后台重连附上次失败」那一格不再有来源。
 describe("installed MCP verification reads the engine's pending phase (#1563)", () => {
-  const verify = (body: unknown) =>
-    verifyInstalledMcp("demo", project, ready, fetchFor(() => Response.json(body), []), { awaitServer: 1_000, status: 1_000 })
+  const verify = (servers: Record<string, Record<string, unknown>>) =>
+    verifyInstalledMcp("demo", project, ready, fetchFor(() => mcpList(servers), []), { awaitServer: 1_000, status: 1_000 })
 
-  test("pending stays pending (准备中), first attempt without a last failure", async () => {
+  test("pending stays pending (准备中)", async () => {
     expect(await verify({ demo: { status: "pending" } })).toEqual({ reference: "demo", status: "pending" })
   })
 
-  test("a background reconnect carries the previous failure", async () => {
-    expect(await verify({ demo: { status: "pending", error: "fetch failed: connect ECONNREFUSED" } })).toEqual({
-      reference: "demo",
-      status: "pending",
-      lastFailure: "fetch failed: connect ECONNREFUSED",
-    })
+  test("needs_auth passes through; disabled stays disabled", async () => {
+    expect(await verify({ demo: { status: "needs_auth", error: "login" } })).toEqual({ reference: "demo", status: "needs_auth" })
+    expect(await verify({ demo: { status: "disabled" } })).toEqual({ reference: "demo", status: "disabled" })
   })
 
-  test("control: a failed server is still failed", async () => {
-    expect(await verify({ demo: { status: "failed", error: "boom", code: "spawn_failed" } })).toEqual({
-      reference: "demo",
-      status: "failed",
-    })
+  test("control: a failed server is still failed; an absent server is failed", async () => {
+    expect(await verify({ demo: { status: "failed", error: "boom" } })).toEqual({ reference: "demo", status: "failed" })
+    expect(await verify({ other: { status: "connected" } })).toEqual({ reference: "demo", status: "failed" })
   })
 })

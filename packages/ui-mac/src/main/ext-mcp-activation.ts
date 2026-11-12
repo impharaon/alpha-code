@@ -1,4 +1,3 @@
-import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
 import { lstatSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { isDeepStrictEqual } from "node:util"
@@ -19,7 +18,8 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
     }),
   ])
 }
-import type { ServerReadyData } from "../preload/types"
+import type { EngineConnection } from "./engine-authorization"
+import { engineClient } from "./engine-client"
 
 export type ProjectMcpActivationVerdict = "active" | "shadowed" | "pending" | "unverifiable"
 
@@ -31,7 +31,7 @@ export type ProjectMcpActivationVerdict = "active" | "shadowed" | "pending" | "u
 export async function probeProjectMcpActivation(
   name: string,
   directory: string,
-  awaitServer: () => Promise<ServerReadyData>,
+  awaitServer: () => Promise<EngineConnection>,
   options: {
     fetch?: typeof fetch
     timeoutMs?: { awaitServer: number; globalConfig: number; effectiveConfig: number; status: number }
@@ -65,59 +65,32 @@ export async function probeProjectMcpActivation(
       timeoutMs.awaitServer,
       "timed out waiting for the engine before project MCP activation probe",
     )
-    const client = createOpencodeClient({
-      baseUrl: server.url,
-      fetch: options.fetch ?? fetch,
-      headers:
-        server.username || server.password
-          ? {
-              Authorization: `Basic ${Buffer.from(`${server.username ?? ""}:${server.password ?? ""}`).toString(
-                "base64",
-              )}`,
-            }
-          : undefined,
-    })
+    const client = engineClient(server, options.fetch ?? fetch)
+    const location = { directory: project.projectDir }
 
-    // `/global/config` covers the engine's global config service; the strict main-side name read
-    // above additionally covers Code Puppy's OPENCODE_CONFIG truth and retained legacy files.
-    const globalResponse = responseData(
-      await withTimeout(
-        client.global.config.get(),
-        timeoutMs.globalConfig,
-        "timed out reading global config for project MCP activation probe",
-      ),
+    // `#1667`(OpenCode 2):`GET /api/config` 给的是这个 Location 的配置**文档**(全局目录、显式文件、项目、注入那一层……),
+    // 不再是 v1 那份合并后的配置;2.x 里高层文档按名字整条替换低层的 MCP server。项目 codepuppy.jsonc 的条目不是配置文档,
+    // 它经 ext 进引擎(清点表 C10,归 L3)。所以:任何一份配置文档定义了这个名字 ⇒ 引擎里那台同名 server 不是 D 的(含注入面
+    // 对用户全局同名条目写的中和条目),判 shadowed;没有 ⇒ 只剩 ext 装的那一份,才去看按名字的实时状态。
+    const entries = await withTimeout(
+      client.config.get({ location }),
+      Math.max(timeoutMs.globalConfig, timeoutMs.effectiveConfig),
+      "timed out reading the location's config documents for project MCP activation probe",
     )
-    if (!globalResponse.ok) return "unverifiable"
-    const global = mcpLeafFromConfig(globalResponse.data, name)
-    if (!global.ok) return "unverifiable"
-    if (global.value !== undefined) return "shadowed"
+    if (!Array.isArray(entries)) return "unverifiable"
+    for (const entry of entries as unknown[]) {
+      if (!isRecord(entry) || entry.type !== "document") continue
+      const servers = isRecord(entry.info) && isRecord(entry.info.mcp) ? entry.info.mcp.servers : undefined
+      if (isRecord(servers) && servers[name] !== undefined) return "shadowed"
+    }
 
-    const effectiveResponse = responseData(
-      await withTimeout(
-        client.config.get({ directory: project.projectDir }),
-        timeoutMs.effectiveConfig,
-        "timed out reading effective project config for MCP activation probe",
-      ),
-    )
-    if (!effectiveResponse.ok) return "unverifiable"
-    const effective = mcpLeafFromConfig(effectiveResponse.data, name)
-    if (!effective.ok) return "unverifiable"
-    if (effective.value === undefined || !isDeepStrictEqual(effective.value, durable.value)) return "shadowed"
-
-    // Only a provenance-proven D leaf may consult the name-keyed live status map, and the request
+    // Only a provenance-proven D leaf may consult the name-keyed live status, and the request
     // itself remains directory-scoped. All non-connected/ambiguous outcomes collapse closed.
-    const statusResponse = responseData(
-      await withTimeout(
-        client.mcp.status({ directory: project.projectDir }),
-        timeoutMs.status,
-        "timed out reading directory-scoped MCP status",
-      ),
-    )
-    if (!statusResponse.ok || !isRecord(statusResponse.data)) return "unverifiable"
-    const status = statusResponse.data[name]
-    if (isRecord(status) && status.status === "connected") return "active"
+    const listed = await withTimeout(client.mcp.list({ location }), timeoutMs.status, "timed out reading directory-scoped MCP status")
+    const status = Array.isArray(listed?.data) ? listed.data.find((server) => server.name === name)?.status : undefined
+    if (status?.status === "connected") return "active"
     // `#1563`:引擎还在后台启动这台服务 —— 准备中,不是「核验不了」。
-    if (isRecord(status) && status.status === "pending") return "pending"
+    if (status?.status === "pending") return "pending"
     return "unverifiable"
   } catch {
     return "unverifiable"
@@ -165,12 +138,6 @@ function mcpLeafFromConfig(
   return isRecord(leaf) ? { ok: true, value: leaf } : { ok: false }
 }
 
-function responseData(response: unknown): { ok: true; data: unknown } | { ok: false } {
-  if (!isRecord(response) || response.error !== undefined || !Object.hasOwn(response, "data"))
-    return { ok: false }
-  return { ok: true, data: response.data }
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value)
 }
@@ -194,7 +161,7 @@ export type McpVerification = {
 export async function verifyInstalledMcp(
   name: string,
   directory: string,
-  awaitServer: () => Promise<ServerReadyData>,
+  awaitServer: () => Promise<EngineConnection>,
   fetchImpl: typeof fetch = fetch,
   timeoutMs = { awaitServer: 5_000, status: 10_000 },
 ): Promise<McpVerification> {
@@ -204,35 +171,18 @@ export async function verifyInstalledMcp(
       timeoutMs.awaitServer,
       "timed out waiting for the engine before MCP verification",
     )
-    const client = createOpencodeClient({
-      baseUrl: server.url,
-      fetch: fetchImpl,
-      headers:
-        server.username || server.password
-          ? {
-              Authorization: `Basic ${Buffer.from(`${server.username ?? ""}:${server.password ?? ""}`).toString(
-                "base64",
-              )}`,
-            }
-          : undefined,
-    })
-    const status = await withTimeout(
-      client.mcp.status({ directory }),
+    // `#1667`:OpenCode 2 的 `GET /api/mcp`(`{ location, data: Mcp.Server[] }`,状态是上游 `Mcp.Status` 的五种)。
+    const listed = await withTimeout(
+      engineClient(server, fetchImpl).mcp.list({ location: { directory } }),
       timeoutMs.status,
       "timed out reading directory-scoped MCP status",
     )
-    if ((status as { error?: unknown }).error) return { reference: name, status: "unverifiable" }
-    const entry = (status as { data?: Record<string, { status?: unknown; error?: unknown }> }).data?.[name]
-    const state = entry?.status
-    if (state === "connected") return { reference: name, status: "connected" }
-    if (state === "pending")
-      return {
-        reference: name,
-        status: "pending",
-        ...(typeof entry?.error === "string" ? { lastFailure: entry.error } : {}),
-      }
-    if (state === "disabled") return { reference: name, status: "disabled" }
-    if (state === "needs_auth" || state === "needs_client_registration") return { reference: name, status: state }
+    if (!Array.isArray(listed?.data)) return { reference: name, status: "unverifiable" }
+    const entry = listed.data.find((server) => server.name === name)?.status
+    if (entry?.status === "connected") return { reference: name, status: "connected" }
+    if (entry?.status === "pending") return { reference: name, status: "pending" }
+    if (entry?.status === "disabled") return { reference: name, status: "disabled" }
+    if (entry?.status === "needs_auth") return { reference: name, status: "needs_auth" }
     return { reference: name, status: "failed" }
   } catch {
     return { reference: name, status: "unverifiable" }

@@ -13,7 +13,7 @@ import { app, BrowserWindow, dialog, ipcMain, powerMonitor } from "electron"
 import { Deferred, Effect } from "effect"
 import contextMenu from "electron-context-menu"
 
-import type { ServerReadyData } from "../preload/types"
+import { rendererEngineView, type EngineConnection } from "./engine-authorization"
 import { DEEP_LINK_SCHEMES, isDeepLink } from "../shared/route-manifest"
 // Deep-link ingress. The manifest DECODES here and only the decoded delivery crosses into the
 // arm's-length upstream renderer, so no second URL codec can exist downstream. Queue-vs-live
@@ -76,6 +76,8 @@ import {
   setRelaunchHandler,
   setBackgroundColor,
   setDockIcon,
+  setEngineConnection,
+  setWslEngineConnection,
 } from "./windows"
 import { createWslServersController } from "./wsl/servers"
 import { registerWslIpcHandlers } from "./wsl/ipc"
@@ -529,6 +531,8 @@ const main = Effect.gen(function* () {
         log: (message, meta) => logger.log(message, meta),
         error: (message, meta) => logger.error(message, meta),
       },
+      // `#1667` I8:WSL 引擎的口令只留在 main,由 windows.ts 按源补头。
+      onEngineConnection: (id, connection) => setWslEngineConnection(id, connection),
     },
   )
   const stopSidecars = async () => {
@@ -737,7 +741,8 @@ const main = Effect.gen(function* () {
     })
   }
 
-  const serverReady = Deferred.makeUnsafe<ServerReadyData, unknown>()
+  // I8:main 内部的连接(带口令);renderer 经 await-initialization 只拿到 rendererEngineView 投影出的 `{ url }`。
+  const serverReady = Deferred.makeUnsafe<EngineConnection, unknown>()
   let authScheduler: ReturnType<typeof createAuthRenewalScheduler> | null = null
   let pendingAuthRespawn: SidecarRespawnTrigger | null = null
 
@@ -992,7 +997,7 @@ const main = Effect.gen(function* () {
         logger.log("awaiting server ready")
         const res = yield* Deferred.await(serverReady)
         logger.log("server ready", { url: res.url })
-        return res
+        return rendererEngineView(res)
       },
       (e) => Effect.runPromise(e),
     ),
@@ -1468,11 +1473,10 @@ const main = Effect.gen(function* () {
     server = listener
     armEngineRunawayMeter(spawnGen)
     sessionGrantRegistry.beginSession(spawnGen) // #408:新会话空集起步(grant 面绑本代)
-    yield* Deferred.succeed(serverReady, {
-      url,
-      username: "opencode",
-      password,
-    })
+    const connection: EngineConnection = { url, username: "opencode", password }
+    // I8:renderer 发往引擎源的请求由 main 补口令(windows.ts 的 onBeforeSendHeaders);重启时地址与口令不变。
+    setEngineConnection(connection)
+    yield* Deferred.succeed(serverReady, connection)
 
     if (process.platform === "win32") {
       void wslServers.initialize().catch((error) => logger.error("wsl server initialization failed", error))

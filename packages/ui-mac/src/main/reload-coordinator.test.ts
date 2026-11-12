@@ -101,29 +101,48 @@ describe("reload-coordinator", () => {
 })
 
 // Existing ext scheduler is the only busy/idle authority; main only completes the full generation.
+// `#1667`(#1665 L3 交回):ext 的调度器在 OpenCode 2 上只问一次**进程级**的 `GET /api/session/active`、只打一次
+// `POST /api/location/reload`(重建全部已加载的 Location),经 sidecar 发布的进程内 fetch 进引擎 —— 下面的引擎桩只回这两条路由,
+// 别的路由一律 404(调度器若改打别的路由,这里会以「查不到 ⇒ 零重载」红掉,而不是假绿)。
+type EngineStub = { busy: boolean; reloads: number; reload?: () => Response }
+function engineStub(state: EngineStub) {
+  return async (request: Request) => {
+    const url = new URL(request.url)
+    if (request.method === "GET" && url.pathname === "/api/session/active")
+      return Response.json({ data: state.busy ? { ses_1: { type: "running" } } : {} })
+    if (request.method === "POST" && url.pathname === "/api/location/reload") {
+      state.reloads++
+      return state.reload?.() ?? new Response(null, { status: 204 })
+    }
+    return new Response("not found", { status: 404 })
+  }
+}
+
 test("#1646 AC1 waits for all instances to be idle, then keeps pending until connector generation is ready", async () => {
   const { createReloadScheduler } = await import("../../../ext/src/reload-scheduler")
-  let busy = true
+  const engine: EngineStub = { busy: true, reloads: 0 }
   let refreshes = 0
   let finish!: (ok: boolean) => void
   const coordinator = createReloadCoordinator({ log: () => {}, onChange: () => {}, restartConnectors: () => {
     refreshes++
     return new Promise<boolean>((resolve) => { finish = resolve })
   } })
-  const scheduler = createReloadScheduler({ log: () => {}, error: () => {}, report: (report) => coordinator.receiveReport({ type: "codepuppy.reload.report", ...report }) })
-  for (const dir of ["/current", "/other"]) scheduler.register(dir, {
-    session: { status: async () => ({ data: dir === "/other" && busy ? { ses_1: { type: "busy" } } : {} }) },
-    instance: { dispose: async () => ({ data: true }) },
+  const scheduler = createReloadScheduler({
+    engine: () => engineStub(engine),
+    log: () => {},
+    error: () => {},
+    report: (report) => coordinator.receiveReport({ type: "codepuppy.reload.report", ...report }),
   })
+  for (const dir of ["/current", "/other"]) scheduler.register(dir, {})
   coordinator.attach((request) => scheduler.request(request))
   coordinator.request({ scope: "global", items: [{ id: "mcp:codepuppy-pdf", scope: "global" }], reason: "set mcp codepuppy-pdf disabled", connectorChange: true })
   await scheduler.settled()
-  expect(refreshes).toBe(0)
+  expect([engine.reloads, refreshes]).toEqual([0, 0])
   expect(coordinator.pendingFor("/current")?.code).toBe("reload-waiting")
-  busy = false
+  engine.busy = false
   scheduler.poke()
   await scheduler.settled()
-  expect(refreshes).toBe(1)
+  expect([engine.reloads, refreshes]).toEqual([1, 1])
   expect(coordinator.pendingFor("/current")?.code).toBe("reload-waiting")
   const replay: unknown[] = []
   coordinator.attach((request) => replay.push(request))
@@ -135,24 +154,30 @@ test("#1646 AC1 waits for all instances to be idle, then keeps pending until con
 
 test("#1646 AC2 reload-now forces a queued connector change and a failed generation remains retryable", async () => {
   const { createReloadScheduler } = await import("../../../ext/src/reload-scheduler")
+  const engine: EngineStub = { busy: true, reloads: 0 }
   let refreshes = 0
   let succeeds = false
   const coordinator = createReloadCoordinator({ log: () => {}, onChange: () => {}, restartConnectors: async () => { refreshes++; return succeeds } })
-  const scheduler = createReloadScheduler({ log: () => {}, error: () => {}, report: (report) => coordinator.receiveReport({ type: "codepuppy.reload.report", ...report }) })
-  scheduler.register("/current", { session: { status: async () => ({ data: { ses_1: { type: "busy" } } }) }, instance: { dispose: async () => ({ data: true }) } })
+  const scheduler = createReloadScheduler({
+    engine: () => engineStub(engine),
+    log: () => {},
+    error: () => {},
+    report: (report) => coordinator.receiveReport({ type: "codepuppy.reload.report", ...report }),
+  })
+  scheduler.register("/current", {})
   coordinator.attach((request) => scheduler.request(request))
   coordinator.request({ scope: "global", items: [], reason: "enable PDF", connectorChange: true })
   await scheduler.settled()
-  expect(refreshes).toBe(0)
+  expect([engine.reloads, refreshes]).toEqual([0, 0])
   coordinator.request({ scope: "global", items: [], reason: "user: reload now", force: true })
   await scheduler.settled()
   for (let n = 0; n < 8; n++) await Promise.resolve()
-  expect(refreshes).toBe(1)
+  expect([engine.reloads, refreshes]).toEqual([1, 1])
   expect(coordinator.pendingFor("/current")?.code).toBe("reload-failed")
   succeeds = true
   coordinator.request({ scope: "global", items: [], reason: "user: reload now", force: true })
   await scheduler.settled()
   for (let n = 0; n < 8; n++) await Promise.resolve()
-  expect(refreshes).toBe(2)
+  expect([engine.reloads, refreshes]).toEqual([2, 2])
   expect(coordinator.pendingFor("/current")).toBeUndefined()
 })

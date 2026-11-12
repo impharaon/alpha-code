@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, mock, test, vi } from "bun:test"
+import { isolateEngineHome } from "../../test-component/isolated-engine-home"
+import { afterEach, beforeAll, beforeEach, describe, expect, mock, test, vi } from "bun:test"
 import { ConfigProvider, Effect, Layer } from "effect"
 import { EventEmitter } from "node:events"
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs"
@@ -6,6 +7,9 @@ import { homedir, tmpdir } from "node:os"
 import { join, parse, resolve } from "node:path"
 import { writeCustomProviderTruth } from "./custom-provider-truth-write"
 import { mockElectron } from "../../test-component/electron-mock"
+
+// 在 server.ts 被 import、spawnLocalServer 跑之前:旧凭证检查只看临时根,不碰本机真实数据目录(isolated-engine-home.ts)。
+isolateEngineHome()
 
 class FakeChild extends EventEmitter {
   stdout = new EventEmitter()
@@ -74,11 +78,13 @@ const { creditDanglingSweepForSpawn, resetDanglingSweepLatchForTests } = await i
 // `#1411`(REQ-1414 CODE-1):下面「模型工具表」那一组用的四个**生产**供数方。全部动态 import ——
 // 它们要么经 ui-mac 的 main 面(必须排在 electron mock 之后),要么是引擎/注入面的真模块。
 const { injectCodePuppyConfig } = await import("./codepuppy-config-injection")
-const { webSearchEnabled } = await import("../../../opencode/src/tool/registry")
-const { RuntimeFlags } = await import("../../../opencode/src/effect/runtime-flags")
-const { Permission } = await import("../../../opencode/src/permission/index")
-const { AppNodeBuilder } = await import("../../../core/src/effect/app-node-builder")
-const { ProviderV2 } = await import("../../../core/src/provider")
+// `#1667`:v1 引擎的四个模块(RuntimeFlags / webSearchEnabled / Permission / ProviderV2)只有下面「`#1411` 模型工具表」那一组用,
+// 而它们随 v1 引擎一起不在了 —— 挪进那一组的 beforeAll,免得整份文件在 import 阶段就夭折(本地腿在 2.x 的处置归 L3)。
+let webSearchEnabled: any
+let RuntimeFlags: any
+let Permission: any
+let AppNodeBuilder: any
+let ProviderV2: any
 const {
   CLOUD_MCP_ARM_ENV,
   CLOUD_MCP_DEF_ENV,
@@ -170,119 +176,58 @@ function applyAuthEnvLikeLogout() {
   delete process.env.CODEPUPPY_MCP_TOKEN
 }
 
-function webSearchToolSnapshot(env: Record<string, string | undefined>) {
-  const local = keylessWebSearchFlags.some((key) => env[key] === "1")
-  return [
-    ...(local ? ["websearch"] : []),
-    ...(process.env.CODEPUPPY_CLOUD_MCP_URL && hasSecretFile(userDataPath, "CODEPUPPY_MCP_TOKEN")
-      ? ["cloud_web_search"]
-      : []),
-  ]
-}
-
-const allFlagsOff = Object.fromEntries(keylessWebSearchFlags.map((key) => [key, "0"]))
-
 function keylessFlagsOf(env: Record<string, string | undefined>) {
   return Object.fromEntries(keylessWebSearchFlags.map((key) => [key, env[key]]))
 }
+const noKeylessFlags = Object.fromEntries(keylessWebSearchFlags.map((key) => [key, undefined]))
 
 describe("web search sovereignty at sidecar fork (#621)", () => {
-  // `#1411`(REQ-1414 CODE-1,owner 2026-09-23 裁决)—— 这两条以前断言的是相反的事:
-  // 「登录 ⇒ fork 时把四个 keyless flag 覆盖写 "0"」「登录 ⇒ 压掉用户 shell export」。
-  // 那是 ADR-009 B1 的落点,已被推翻:**账户信号只决定云腿在不在,不决定本地腿在不在**。
-  test("登录用户冷启动:本地 keyless 腿在 fork 时不被关掉,两条腿一起进 sidecar", async () => {
-    // 真实顺序:preferAppEnv 先跑,此刻 initAuthEnv 还没写 CODEPUPPY_CLOUD_MCP_URL/token。
+  // `#1667`(#1662 L5,清点表 E2):v1 时代这几条断言 main 在 fork 时怎么写 4 个 keyless 专用 flag(force-off / 还原基线 /
+  // 默认 OPENCODE_ENABLE_EXA=1)。这 4 个名字在 2.x 无读者,main 不再写它们;新事实是:main 一个都不写,用户 shell 里导出的
+  // 照旧原样经 `OPENCODE_` 前缀进 sidecar(在 2.x 里是惰性的),kill-switch 的判决只走下面那两个 CODEPUPPY_*_DENY 通道。
+  test("登录用户冷启动:main 不写任何 keyless flag;两条腿的拒绝判决都不置位", async () => {
     preferAppEnv(userDataPath)
-    expect(process.env.OPENCODE_ENABLE_EXA).toBe("1")
+    expect(keylessFlagsOf(process.env)).toEqual(noKeylessFlags)
 
     applyAuthEnvLikeLogin()
 
     const env = await forkSidecar()
-    // `#1411` 之前这里是 `toEqual(allFlagsOff)`。
-    expect(env.OPENCODE_ENABLE_EXA).toBe("1")
+    expect(keylessFlagsOf(env)).toEqual(noKeylessFlags)
     expect(env.CODEPUPPY_LOCAL_WEBSEARCH_DENY).toBeUndefined()
-    expect(webSearchToolSnapshot(env)).toEqual(["websearch", "cloud_web_search"])
+    expect(env.CODEPUPPY_CLOUD_WEBSEARCH_DENY).toBeUndefined()
   })
 
-  test("登录用户冷启动:用户 shell export 的 keyless flag 照旧原样进 sidecar", async () => {
+  test("用户 shell export 的 keyless flag 照旧原样进 sidecar —— kill-switch 也不再改写它(判决走 DENY 通道)", async () => {
     process.env.OPENCODE_ENABLE_PARALLEL = "1"
 
     preferAppEnv(userDataPath)
     applyAuthEnvLikeLogin()
+    expect((await forkSidecar()).OPENCODE_ENABLE_PARALLEL).toBe("1")
 
-    const env = await forkSidecar()
-    // `#1411` 之前这里是 `toBe("0")`。
-    expect(env.OPENCODE_ENABLE_PARALLEL).toBe("1")
-    expect(webSearchToolSnapshot(env)).toEqual(["websearch", "cloud_web_search"])
-  })
-
-  test.each(keylessWebSearchFlags)("disable overrides a shell-exported %s flag in every auth state", async (flag) => {
     process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
-    process.env[flag] = "1"
-
-    preferAppEnv(userDataPath)
-
-    const env = await forkSidecar()
-    expect(keylessFlagsOf(env)).toEqual(allFlagsOff)
-    expect(webSearchToolSnapshot(env)).toEqual([])
+    const disabled = await forkSidecar()
+    expect(disabled.OPENCODE_ENABLE_PARALLEL).toBe("1")
+    expect(disabled.CODEPUPPY_LOCAL_WEBSEARCH_DENY).toBe("1")
+    expect(disabled.CODEPUPPY_CLOUD_WEBSEARCH_DENY).toBe("1")
   })
 
-  test("disable wins over all shell-exported keyless flags even when cloud is registered", async () => {
-    process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
-    Object.assign(process.env, Object.fromEntries(keylessWebSearchFlags.map((key) => [key, "1"])))
-
-    preferAppEnv(userDataPath)
-    applyAuthEnvLikeLogin()
-
-    const env = await forkSidecar()
-    expect(keylessFlagsOf(env)).toEqual(allFlagsOff)
-  })
-
-  test("logged-out/BYOK forks with the unchanged local keyless websearch", async () => {
+  test("logged-out/BYOK:main 不写任何 keyless flag,也不置位拒绝判决", async () => {
     process.env.CODEPUPPY_CLOUD_MCP_URL = "https://cloud.example/mcp" // URL 在场但无密钥文件 = 未登录
 
     preferAppEnv(userDataPath)
 
     const env = await forkSidecar()
-    expect(webSearchToolSnapshot(env)).toEqual(["websearch"])
-    expect(env.OPENCODE_ENABLE_EXA).toBe("1")
-    expect(env.OPENCODE_EXPERIMENTAL_EXA).toBeUndefined()
-    expect(env.OPENCODE_ENABLE_PARALLEL).toBeUndefined()
-    expect(env.OPENCODE_EXPERIMENTAL_PARALLEL).toBeUndefined()
-  })
-
-  // `#1411`:驱动态从「登录 → 登出」换成「kill-switch 开 → 关」—— 被测机制(force-off 会销毁用户
-  // 真值,所以必须先留底再还原)一个字没变,只是现在唯一会 force-off 的是 kill-switch。
-  // 登录/登出那一半改为断言它**根本不动**这四个 flag。
-  test("kill-switch 关掉之后 respawn 还回 keyless 基线,而不是把它永久哑在 \"0\"", async () => {
-    process.env.OPENCODE_ENABLE_PARALLEL = "1" // 用户 shell 的真 export
-
-    preferAppEnv(userDataPath)
-    applyAuthEnvLikeLogin()
-    expect(keylessFlagsOf(await forkSidecar()).OPENCODE_ENABLE_PARALLEL).toBe("1")
-
-    process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
-    expect(keylessFlagsOf(await forkSidecar())).toEqual(allFlagsOff)
-
-    delete process.env.CODEPUPPY_WEBSEARCH_DISABLE
-
-    const env = await forkSidecar()
-    expect(env.OPENCODE_ENABLE_PARALLEL).toBe("1")
-    expect(env.OPENCODE_ENABLE_EXA).toBe("1")
-    expect(webSearchToolSnapshot(env)).toEqual(["websearch", "cloud_web_search"])
-
-    applyAuthEnvLikeLogout()
-
-    const loggedOut = await forkSidecar()
-    expect(loggedOut.OPENCODE_ENABLE_PARALLEL).toBe("1")
-    expect(webSearchToolSnapshot(loggedOut)).toEqual(["websearch"])
+    expect(keylessFlagsOf(env)).toEqual(noKeylessFlags)
+    expect(env.CODEPUPPY_LOCAL_WEBSEARCH_DENY).toBeUndefined()
   })
 
   test("re-forking without an auth change is idempotent", async () => {
     preferAppEnv(userDataPath)
     applyAuthEnvLikeLogin()
 
-    expect(keylessFlagsOf(await forkSidecar())).toEqual(keylessFlagsOf(await forkSidecar()))
+    const first = await forkSidecar()
+    const second = await forkSidecar()
+    expect([keylessFlagsOf(first), first.CODEPUPPY_LOCAL_WEBSEARCH_DENY]).toEqual([keylessFlagsOf(second), second.CODEPUPPY_LOCAL_WEBSEARCH_DENY])
   })
 
   // #223 R2 Blocker 1:env force-off 与注入的 permission deny 都能被后置规则顶掉(agent wildcard /
@@ -307,16 +252,15 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
     expect(env.CODEPUPPY_CLOUD_WEBSEARCH_DENY).toBeUndefined()
   })
 
-  test("`#1195` 判据换轴:登录但无 mcp_access(旧轴文件在、新轴文件缺)不算代付,keyless 保持可用", async () => {
+  test("`#1195` 判据换轴:登录但无 mcp_access(旧轴文件在、新轴文件缺)不算代付,本地腿不被拒", async () => {
     // pre-T1 服务端 / 信封未带字段的真实形态:applyAuthEnv 写了 CODEPUPPY_CLOUD_TOKEN,没写 CODEPUPPY_MCP_TOKEN。
-    // 旧轴(CODEPUPPY_CLOUD_TOKEN)的错误实现会在这里把 keyless 关掉 —— 当场红。
     preferAppEnv(userDataPath)
     applyAuthEnvLikeLogin()
     delete process.env.CODEPUPPY_MCP_TOKEN
 
     const env = await forkSidecar()
     expect(env.CODEPUPPY_LOCAL_WEBSEARCH_DENY).toBeUndefined()
-    expect(webSearchToolSnapshot(env)).toEqual(["websearch"])
+    expect(hasSecretFile(userDataPath, "CODEPUPPY_MCP_TOKEN")).toBe(false)
   })
 
   // `#1411`:同上,驱动态换成 kill-switch —— 「判决必须两个方向都写」这条纪律没变,变的是唯一能
@@ -390,9 +334,16 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
 //     一律按「已注册」处理,再由 permission deny 兜住,两条路径结论相同(都不在表里)。
 // ─────────────────────────────────────────────────────────────────────────────
 describe("`#1411` 模型工具表:两条腿按账户态的真实在场性", () => {
+  beforeAll(async () => {
+    ;({ webSearchEnabled } = await import("../../../opencode/src/tool/registry" as string))
+    ;({ RuntimeFlags } = await import("../../../opencode/src/effect/runtime-flags" as string))
+    ;({ Permission } = await import("../../../opencode/src/permission/index" as string))
+    ;({ AppNodeBuilder } = await import("../../../core/src/effect/app-node-builder" as string))
+    ;({ ProviderV2 } = await import("../../../core/src/provider" as string))
+  })
   /** 非平台 provider —— 用它是为了让「本地腿在不在」真的由那四个 keyless flag 决定:
    *  `webSearchEnabled()` 对 `opencode`/`opencode-go` 无条件放行,拿它当被测 provider 会让①②③恒真。 */
-  const BYOK_PROVIDER = ProviderV2.ID.make("deepseek-byok")
+  const BYOK_PROVIDER = () => ProviderV2.ID.make("deepseek-byok")
 
   /** 引擎自己怎么解释这份 env(真 `RuntimeFlags`,真 `ConfigProvider`)。 */
   const engineFlags = (env: Record<string, string | undefined>) =>
@@ -445,7 +396,7 @@ describe("`#1411` 模型工具表:两条腿按账户态的真实在场性", () =
     const flags = engineFlags(forkEnv)
     const injected = injectUnderSidecarEnv(forkEnv)
     const registered = [
-      ...(webSearchEnabled(BYOK_PROVIDER, flags) ? [LOCAL_WEB_SEARCH_TOOL_ID] : []),
+      ...(webSearchEnabled(BYOK_PROVIDER(), flags) ? [LOCAL_WEB_SEARCH_TOOL_ID] : []),
       ...(cloudLegRegistered(injected) ? [CLOUD_WEB_SEARCH_TOOL_ID] : []),
     ]
     const hidden = Permission.disabled(registered, Permission.fromConfig((injected.config.permission ?? {}) as never))
@@ -552,7 +503,7 @@ describe("`#1411` 模型工具表:两条腿按账户态的真实在场性", () =
 // 靠 `SHELL=nu` 跳过真实 shell 导入(`loadShellEnv` 对 nushell 直接 return null),又在
 // `preferAppEnv` 之前手写 `process.env` —— 于是整条真实导入序零覆盖,缺陷从测试面前溜过去了。
 // 这组换成**真实登录 shell 探测**:SHELL 指向一个真脚本,由 spawnSync 真跑、真回吐 `env -0`。
-describe("keyless baseline vs the real login-shell import (#223 Major 3)", () => {
+describe("login-shell import vs the keyless flags (#223 Major 3)", () => {
   /** 写一个真能被 `spawnSync(shell, ["-il","-c","env -0"])` 跑起来的登录 shell 替身。 */
   function fakeLoginShell(name: string, exported: Record<string, string>) {
     const script = join(userDataPath, name)
@@ -564,11 +515,9 @@ describe("keyless baseline vs the real login-shell import (#223 Major 3)", () =>
     return script
   }
 
-  // `#1411`:驱动 force-off 的状态从「登录」换成 kill-switch(登录不再关本地腿),被测的
-  // 「基线必须在真实 shell 导入**之后**截取」这条 Major 3 判据一个字没变 —— 只是换了驱动它的开关。
-  // 顺带钉住新事实:登录/登出这一整圈根本不该动那四个 flag。
-  test("a shell-exported keyless flag survives the kill-switch on → off round trip", async () => {
-    // 用户 rc 里 `export OPENCODE_ENABLE_PARALLEL=1`,当前进程 env 里没有它 —— 只有真实导入能带进来。
+  // `#1667`(清点表 E2):v1 时代这里钉的是「force-off 之前截取的基线必须是真实 shell 导入之后的值」。main 不再写这 4 个 flag
+  // 之后,那套基线不复存在;新事实更简单:真实 shell 导入的值原样留在 env 里,登录、登出、kill-switch 开关一整圈都不改写它。
+  test("a shell-exported keyless flag is never rewritten: login, logout and the kill-switch round trip all leave it alone", async () => {
     process.env.SHELL = fakeLoginShell("login-shell.sh", {
       PATH: "/usr/bin:/bin",
       OPENCODE_ENABLE_PARALLEL: "1",
@@ -576,30 +525,21 @@ describe("keyless baseline vs the real login-shell import (#223 Major 3)", () =>
     expect(process.env.OPENCODE_ENABLE_PARALLEL).toBeUndefined()
 
     preferAppEnv(userDataPath)
-    // ① Finder 首启(已登出)就必须用用户真值。基线取早了的话,「还原基线」会把它直接删掉,
-    //    再默认打开 Exa —— 首次启动就换错了 provider。
     expect(process.env.OPENCODE_ENABLE_PARALLEL).toBe("1")
-    expect(webSearchToolSnapshot(await forkSidecar())).toEqual(["websearch"])
+    expect((await forkSidecar()).OPENCODE_ENABLE_PARALLEL).toBe("1")
 
-    // ②(`#1411`)登录/登出整圈不动这四个 flag —— 本地腿与账户状态解耦。
     applyAuthEnvLikeLogin()
     expect((await forkSidecar()).OPENCODE_ENABLE_PARALLEL).toBe("1")
     applyAuthEnvLikeLogout()
     expect((await forkSidecar()).OPENCODE_ENABLE_PARALLEL).toBe("1")
 
     process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
-    expect(keylessFlagsOf(await forkSidecar())).toEqual(allFlagsOff)
-
+    expect((await forkSidecar()).OPENCODE_ENABLE_PARALLEL).toBe("1")
     delete process.env.CODEPUPPY_WEBSEARCH_DISABLE
-    // ③ kill-switch 关掉后 respawn 还原的必须是用户真值,而不是「探测之前的空基线」。
-    const env = await forkSidecar()
-    expect(env.OPENCODE_ENABLE_PARALLEL).toBe("1")
-    expect(webSearchToolSnapshot(env)).toEqual(["websearch"])
+    expect((await forkSidecar()).OPENCODE_ENABLE_PARALLEL).toBe("1")
   })
 
-  test("the cached shell env path has the same baseline truth", async () => {
-    // 生产上的常见路径是缓存命中(0ms 套用)。故意让脚本非零退出:缓存照常命中并套用,
-    // 而后台异步刷新拿不到结果(`if (!fresh) return`),用例保持确定性。
+  test("the cached shell env path behaves the same", async () => {
     const shell = join(userDataPath, "broken-shell.sh")
     writeFileSync(shell, "#!/bin/sh\nexit 1\n")
     chmodSync(shell, 0o755)
@@ -609,13 +549,8 @@ describe("keyless baseline vs the real login-shell import (#223 Major 3)", () =>
     preferAppEnv(userDataPath)
     expect(process.env.OPENCODE_ENABLE_PARALLEL).toBe("1")
 
-    // `#1411`:同上 —— 登录不再 force-off,能 force-off 的只有 kill-switch。
-    applyAuthEnvLikeLogin()
-    expect((await forkSidecar()).OPENCODE_ENABLE_PARALLEL).toBe("1")
-
     process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
-    expect(keylessFlagsOf(await forkSidecar())).toEqual(allFlagsOff)
-
+    expect((await forkSidecar()).OPENCODE_ENABLE_PARALLEL).toBe("1")
     delete process.env.CODEPUPPY_WEBSEARCH_DISABLE
     expect((await forkSidecar()).OPENCODE_ENABLE_PARALLEL).toBe("1")
   })
@@ -841,5 +776,33 @@ describe("spawnLocalServer", () => {
     expect(result.injectionFailure).toEqual({ message: "ENOTDIR: mkdir userdata" })
 
     await result.listener.stop()
+  })
+})
+
+// `#1667`(#1662 L5;编排器裁决 alpha-code#1666 评论 6737930969 第 2 条 `l1r-telemetry-credential`,#1562):fork 时真交给
+// sidecar 的那份环境(createSidecarEnv 之上 server.ts 再加 UV_CACHE_DIR、清单路径、代理变量……)里没有任何 `OTEL_*` ——
+// OpenCode 2 唯一的遥测导出(OTLP)只认环境变量。白名单本身的反向臂(把 OTEL_ 加进前缀 ⇒ 红)在 sidecar-env-otel.test.ts。
+describe("#1562 fork 给 sidecar 的环境里没有 OTEL_*", () => {
+  const OTEL = ["OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_HEADERS", "OTEL_RESOURCE_ATTRIBUTES", "OTEL_SERVICE_NAME"] as const
+  const saved: Record<string, string | undefined> = {}
+  beforeEach(() => {
+    for (const key of OTEL) saved[key] = process.env[key]
+    process.env.OTEL_EXPORTER_OTLP_ENDPOINT = "https://collector.example/v1"
+    process.env.OTEL_EXPORTER_OTLP_HEADERS = "authorization=Bearer sk-not-a-real-collector-key"
+    process.env.OTEL_RESOURCE_ATTRIBUTES = "deployment.environment=prod"
+    process.env.OTEL_SERVICE_NAME = "codepuppy"
+  })
+  afterEach(() => {
+    for (const key of OTEL) {
+      if (saved[key] === undefined) delete process.env[key]
+      else process.env[key] = saved[key]
+    }
+  })
+
+  test("main 自己的环境里带着整套 OTLP 变量,fork 出去的 sidecar 环境里一个都没有", async () => {
+    preferAppEnv(userDataPath)
+    const env = await forkSidecar()
+    expect(env.PATH).toBeDefined() // 拿到的确实是 fork 用的那份环境
+    expect(Object.keys(env).filter((name) => /^otel_/i.test(name))).toEqual([])
   })
 })

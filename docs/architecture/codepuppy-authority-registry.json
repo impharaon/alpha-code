@@ -1564,6 +1564,37 @@
           "name": "with main's switch off, a project file publishes nothing"
         }
       ]
+    },
+    {
+      "id": "test-isolation-default",
+      "decision": "Every test is isolated from the user's real data directory: HOME, every XDG_*, OPENCODE_DB and TMPDIR point into a fresh temp root before any test module loads, so no test reads or writes the user's real engine data, config, state or logs (I-08).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "I-08 (INT-upstream-upgrade-readiness, #1662 follow-up)",
+      "takeovers": [
+        "packages/core/bunfig.toml"
+      ],
+      "approval": {
+        "quote": "工具服务提示选 A，核心包测试配置同意接管",
+        "date": "2026-11-12",
+        "by": "owner (relayed by the orchestrator in the I-08 step 4 dispatch)",
+        "reason": "Bun reads only the package's own bunfig.toml, and upstream's global roots are fixed when their module first evaluates, so only a preload listed in core's bunfig isolates every core test, including mixed runs; a per-file import cannot."
+      },
+      "mechanism": {
+        "file": "scripts/test-isolation/preload.ts",
+        "ladder": "L3 (re-taken bunfig.toml: one preload entry before upstream's own test/preload.ts; ext, ui-mac, schema, ai and plugin load the same preload from Code Puppy-owned bunfig files)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-test-isolation.test.ts",
+          "name": "the preload is in place: isolation keys and every engine Global path resolve inside the fresh temp root"
+        },
+        {
+          "file": "packages/core/test/codepuppy-test-isolation.test.ts",
+          "name": "known-bad: without the preload, with the real HOME / XDG_*, the engine roots land under the real home (paths only); an isolatedEnv() child stays inside"
+        }
+      ]
     }
   ]
 }

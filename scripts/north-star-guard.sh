@@ -163,6 +163,10 @@ UPSTREAM_EXCLUDES=(
   # 变化(0.1.26 在主进程打开 OPENCODE_EXPERIMENTAL_FILEWATCHER 时监视整个项目);2.x 的 LocationWatcher 只监视分支文件,没有插件挂点。
   # 接管面只在 `codepuppy(UI parity)` 标注块,开关与忽略表在自有的 codepuppy-project-watch.ts。判据 packages/core/test/codepuppy-project-watch.test.ts。
   ':(exclude)packages/core/src/filesystem/location-watcher.ts'
+  # I-08(INT-upstream-upgrade-readiness;owner 2026-11-12 经编排器转达:「工具服务提示选 A，核心包测试配置同意接管」):每个测试都与
+  # 用户真实数据目录隔离。bun 只读当前目录的 bunfig,core 的测试预载只能写在这里;接管面只有预载列表前插共享预载
+  # scripts/test-isolation/preload.ts 那一行,上游自己的 test/preload.ts 照旧跟在后面。判据 packages/core/test/codepuppy-test-isolation.test.ts。
+  ':(exclude)packages/core/bunfig.toml'
 )
 
 # ── UPSTREAM_PATHS 里住着的 Code Puppy 自有文件:结构性谓词,不是逐文件清单(`#1085` / ADR-043)──

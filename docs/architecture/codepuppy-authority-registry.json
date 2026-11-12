@@ -1131,6 +1131,10 @@
         {
           "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
           "name": "an auth answer to tools/list is named auth and not retried"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "does not fire after a manual reconnect ended in an auth answer"
         }
       ]
     },

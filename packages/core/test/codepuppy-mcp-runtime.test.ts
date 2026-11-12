@@ -236,6 +236,30 @@ describe("AC3: background reconnect", () => {
   )
 })
 
+// Review R1 #6: a reconnect timer belongs to the failure that scheduled it. 501 schedules one; a manual reconnect then
+// gets an auth answer (401, never retried); the old timer must not send a third request when its 30 s come.
+describe("AC3: a reconnect timer from an earlier failure", () => {
+  const answer = { status: 501, hits: 0 }
+  const endpoint = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => (answer.hits++, new Response("no", { status: answer.status })) })
+  testEffect(mcpLayer({ flip: new ConfigMCP.Remote({ type: "remote", url: `http://127.0.0.1:${endpoint.port}/mcp`, oauth: false }) })).effect(
+    "does not fire after a manual reconnect ended in an auth answer",
+    () =>
+      Effect.gen(function* () {
+        const failed = () => until(statusOf("flip").pipe(Effect.map((s: any) => (s?.status === "failed" ? s : undefined))), "flip failed")
+        yield* until(Effect.sync(() => (answer.hits > 0 ? true : undefined)), "first attempt")
+        yield* failed()
+        answer.status = 401
+        yield* (yield* Mcp.Service).connect("flip")
+        const status: any = yield* failed()
+        expect(parseFailureCode(status.error)?.code).toBe("auth")
+        const hits = answer.hits
+        yield* TestClock.adjust("31 seconds")
+        yield* Effect.promise(() => Bun.sleep(300))
+        expect(answer.hits).toBe(hits)
+      }).pipe(Effect.ensuring(Effect.sync(() => endpoint.stop(true)))),
+  )
+})
+
 // ── AC5 ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 // Red if the shared start permit is removed: six slow handshakes overlap six deep.
 describe("AC5: at most four servers start at once", () => {

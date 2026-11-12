@@ -116,6 +116,8 @@ type ServerEntry = {
   // codepuppy(#1563): why the last attempt failed, and consecutive failures for the background reconnect backoff.
   cause?: StartFailure
   failures?: number
+  // codepuppy(#1563 AC3, review R1 #6): bumped on every settled attempt; a reconnect timer runs only for its own.
+  generation?: number
   // codepuppy(#1565): the bundled declaration offered while the server starts, until a connection contradicts it.
   readonly declared?: ReadonlyArray<DeclaredTool>
   refuted?: boolean
@@ -401,11 +403,14 @@ export const layer = (options?: Options) =>
       // Runs only if the entry is still the live one and still failed when its turn comes.
       const scheduleReconnect = (name: ServerName, entry: ServerEntry) => {
         entry.failures = (entry.failures ?? 0) + 1
+        const generation = entry.generation
         fork(
           Effect.sleep(reconnectDelay(entry.failures)).pipe(
             Effect.andThen(
               Effect.gen(function* () {
                 if (entries.get(name) !== entry || entry.status.status !== "failed" || entry.config.disabled) return
+                // A later attempt (a manual reconnect, a credential switch) settled since: its own outcome decides.
+                if (entry.generation !== generation || !entry.cause?.reconnect) return
                 yield* entry.connection.stop
                 yield* entry.connection.start
               }).pipe(locks.withLock(name)),
@@ -475,6 +480,7 @@ export const layer = (options?: Options) =>
               connected: Effect.gen(function* () {
                 entry.status = { status: "connected" }
                 // codepuppy(#1563 AC3, #1565): a success resets the backoff; a listing other than the declaration refutes it.
+                entry.generation = (entry.generation ?? 0) + 1
                 entry.failures = 0
                 entry.cause = undefined
                 if (entry.declared && !entry.refuted && !listsDeclaration(entry.declared, entry.connection.tools ?? []))
@@ -494,6 +500,7 @@ export const layer = (options?: Options) =>
                   entry.status =
                     failure.status === "failed" && cause ? { ...failure, error: withFailureCode(cause.code, failure.error) } : failure
                   entry.cause = cause // codepuppy(#1563)
+                  entry.generation = (entry.generation ?? 0) + 1 // codepuppy(review R1 #6)
                   yield* Effect.logWarning("mcp connect failed", { server: name, status: entry.status, code: cause?.code })
                   yield* bus.publish(McpEvent.StatusChanged, { server: name })
                   if (failure.status === "failed" && cause?.reconnect) scheduleReconnect(name, entry) // codepuppy(#1563)
@@ -509,6 +516,7 @@ export const layer = (options?: Options) =>
                   // codepuppy(#1563, #1564): a remote connection that drops reconnects in the background; a local process
                   // does not. The failed status carries that cause for the desktop.
                   entry.cause = { code: entry.config.type === "remote" ? "transport" : "spawn_failed", reconnect: entry.config.type === "remote" }
+                  entry.generation = (entry.generation ?? 0) + 1 // codepuppy(review R1 #6)
                   entry.status = { status: "failed", error: withFailureCode(entry.cause.code, reason) }
                   yield* entry.connection.stop
                   yield* bus.publish(McpEvent.StatusChanged, { server: name })

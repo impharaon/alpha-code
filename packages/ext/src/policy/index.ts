@@ -187,6 +187,9 @@ export async function registerPolicy(context: Plugin.Context): Promise<PolicyReg
       // Tail of the chain: ask with the input the implementation will receive, then pin it.
       await context.tool.hook("execute.before", async (event) => {
         try {
+          // Review R1 #1: a tool registered after the rules were last computed (a late MCP server) gets its catalog
+          // rules before the identity-axis ask is evaluated, so a document-axis ask holds for it too.
+          await catalog.refresh()
           const decision = await decide(deps, event)
           await confirm(deps, decision, event)
           displays.set(event.id, displaySnapshot(decision.facts))

@@ -119,6 +119,8 @@ export function createCatalog(deps: CatalogDeps) {
     /** `session.hook.context` body. */
     async prune(event: { tools: Record<string, unknown> }, denied: (name: string) => Promise<boolean>) {
       const registeredNow = await ensureTail()
+      // Tools registered after the first prompt (an MCP server that connected later) get their rules now (review R1 #1).
+      if (!registeredNow) await refresh()
       for (const name of Object.keys(event.tools)) {
         if (name === CODE_MODE_TOOL) continue
         if (await denied(name)) delete event.tools[name]

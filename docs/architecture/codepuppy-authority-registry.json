@@ -173,6 +173,10 @@
         {
           "file": "packages/ext/src/policy/register-policy.test.ts",
           "name": "post-seal evaluate known-bad arm: the same late hook does turn an ask that is not Code Puppy's into allow"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "a document-axis ask on an MCP tool registered after the first prompt asks before it runs; reject keeps it at 0"
         }
       ],
       "note": "An answer to the pending request itself is not held here: any plugin Context (including the extension's, which the project-plugin fan-out passes through) can call permission.reply on Code Puppy's request and the call runs (measured 2026-11-09); closing it belongs to the fan-out (L3), reported to the coordinator."

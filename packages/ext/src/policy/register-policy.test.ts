@@ -590,6 +590,32 @@ describe("three-state ask (I7a) — nothing runs before approval", () => {
     }),
   )
 
+  // Review R1 #1: an MCP tool registered after the first prompt (its server connected later) is asked about too.
+  it.live("a document-axis ask on an MCP tool registered after the first prompt asks before it runs; reject keeps it at 0", () =>
+    Effect.gen(function* () {
+      const ID_LATE = "mcp:policy:late_action"
+      const { session } = yield* setup({ records: [...NEUTRAL, { selector: { level: "tool", canonical: ID_LATE }, state: "ask" }] })
+      let late = 0
+      yield* (yield* Tool.Service).transform((editor: any) =>
+        editor.add({
+          name: "late_action",
+          description: "late_action",
+          options: { namespace: "policy", codemode: false },
+          input: { type: "object", properties: {} },
+          execute: () => E.Effect.sync(() => (late += 1, { output: "late ran" })),
+        } as never),
+      )
+      const permission = yield* Permission.Service
+      const fiber = yield* Effect.forkChild(callRaw(session.id, "policy_late_action"))
+      const [request] = yield* pending
+      expect(request?.action).toBe(ID_LATE)
+      expect(late).toBe(0)
+      yield* permission.reply({ requestID: request!.id, reply: "reject" })
+      yield* E.Fiber.join(fiber)
+      expect(late).toBe(0)
+    }),
+  )
+
   it.live("approved once ⇒ the call runs exactly once", () =>
     Effect.gen(function* () {
       const { session } = yield* setup({ records: [{ selector: { level: "tool", canonical: ID_MCP_PAID }, state: "ask" }] })

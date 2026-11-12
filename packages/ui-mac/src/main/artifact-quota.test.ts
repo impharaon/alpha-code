@@ -745,6 +745,7 @@ describe("finalizeArtifactWithQuota", () => {
     })
     let rereadEntered = false
     let closeEntered = false
+    let releaseClose = () => {}
     const result = await write("bounded-return.bin", "x", {
       limits: limits({ runMaxBytes: 1, projectMaxBytes: 1 }),
       now: () => new Date(RACE_STARTED_AT),
@@ -752,15 +753,20 @@ describe("finalizeArtifactWithQuota", () => {
       testHooks: {
         waitPolicy: { deadlineMs: 10, maxRounds: 250, intervalMs: 1 },
         returnPolicy: { reservationDeadlineMs: 10, stagedCloseDeadlineMs: 10 },
-        // 两个钩子都永不返回:返回路径若真的等它们,本用例不会结束(由套件超时判红);
+        // 两个钩子在 write 返回之前都不返回:返回路径若真的等它们,本用例不会结束(由套件超时判红);
         // 它结束了 ⇒ 两段各自的期限计时器收了尾,而且是在钩子被触到之后。这里不冻时钟:
         // 两段各自在武装计时器之后第一件事就是触钩子,中间没有能先到期的复核。
         beforeReservationCleanupRead: hang(() => {
           rereadEntered = true
         }),
-        beforeStagedHandleClose: hang(() => {
+        // close 钩子在断言之后放行,让被放弃的那次 close 真的关掉 staged fd。永不放行 ⇒ 这个 FileHandle
+        // 只能被 GC 关;bun 1.4 起那是一个未捕获错误,落在之后正好赶上 GC 的那条用例头上(10,000 条那条)。
+        beforeStagedHandleClose: () => {
           closeEntered = true
-        }),
+          return new Promise<void>((resolve) => {
+            releaseClose = resolve
+          })
+        },
       },
     })
 
@@ -774,6 +780,9 @@ describe("finalizeArtifactWithQuota", () => {
     expect(existsSync(target("bounded-return.bin"))).toBe(false)
     expect(reservations()).toHaveLength(2)
     expect(stagingResidue()).toEqual([])
+    releaseClose()
+    // 一个宏任务之后,钩子之后的 `staged.handle.close()` 已经发出。
+    await new Promise((resolve) => setTimeout(resolve, 0))
   })
 
   test("timed-out reservation deletion is abandoned without changing the retryable error", async () => {

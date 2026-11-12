@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { basename, join } from "node:path"
-import { injectMcpDefaultDeny, NEUTRALIZED_MCP_SERVER } from "./mcp-default-deny"
+import { ConfigNormalize } from "@opencode/core/config/normalize"
+import { engineMcpServerNames, injectMcpDefaultDeny, NEUTRALIZED_MCP_SERVER } from "./mcp-default-deny"
 
 // `#1667`:OpenCode 2 形状 —— 注入写在 `mcp.servers` 下;关掉一个 server 写完整的中和条目(2.x 按名字整条替换,
 // v1 的 lone `{enabled:false}` 叶子会被上游丢弃并出诊断)。
@@ -111,6 +112,52 @@ describe("injectMcpDefaultDeny — G1 default-deny", () => {
 
   // #223 R6 Major:名字不是治理凭据。以前 `"cloud"` 是写死的治理名,于是**不代付时**用户全局配置
   // 里一个自称 cloud 的第三方 server 被永久豁免默认拒绝 —— 连 enabled:false 都不写。
+  // 审计 R1 第 2 条:2.x 原生写法 `mcp.servers.<name>` 以前被当成一台叫 `servers` 的 server,真正的那台照常启用。
+  // 判据用上游自己的归一化(引擎 parseInfo 用的同一个函数):用户全局文档里它是一台启用的 server,注入的文档(加载在全局之后、
+  // 按名字整条替换)里它是 disabled。v1 写法放在另一个文件里,同一轮一起拒。
+  test("用户全局里 2.x 原生的 mcp.servers.ungoverned 与 v1 写法的条目都被拒:引擎眼里注入后是 disabled", () => {
+    const native = { mcp: { servers: { ungoverned: { type: "remote", url: "https://ungoverned.example/mcp" } } } }
+    writeFileSync(join(userConfigDir, "opencode.jsonc"), JSON.stringify(native))
+    writeFileSync(join(userConfigDir, "opencode.json"), JSON.stringify({ mcp: { legacy_one: { type: "local", command: ["legacy-mcp"] } } }))
+    const before = ConfigNormalize.normalize(native)
+    if (before.type !== "normalized") throw new Error("upstream rejected the native user-global document")
+    expect((before.encoded.mcp as { servers: Record<string, { disabled?: boolean }> }).servers.ungoverned?.disabled).toBeUndefined()
+
+    const config: Config = {}
+    apply(config)
+
+    const after = ConfigNormalize.normalize(config)
+    if (after.type !== "normalized") throw new Error("upstream rejected the injected document")
+    const servers = (after.encoded.mcp as { servers: Record<string, { disabled?: boolean }> }).servers
+    expect(servers.ungoverned?.disabled).toBe(true)
+    expect(servers.legacy_one?.disabled).toBe(true)
+    expect(Object.keys(servers).sort()).toEqual(["legacy_one", "ungoverned"])
+    expect(logs).toEqual(['[req109-535] default-denied user-global MCP names=["legacy_one","ungoverned"]'])
+  })
+
+  // 名单规则与上游归一化逐例比对(上游 normalize 本身做判官):原生表、v1 键、混写 + 超时、v1 里恰好叫 servers / timeout 的
+  // server、只写 enabled 的叶子。上游丢掉的「解不出来」的条目这里多算进来(多拒无害),只要求上游的名单是它的子集。
+  test("engineMcpServerNames 与上游 ConfigNormalize.normalize 得出的 server 名单一致", () => {
+    const corpus: Array<Record<string, unknown>> = [
+      { mcp: { servers: { a: { type: "remote", url: "https://a.example/mcp" }, b: { type: "local", command: ["b"] } } } },
+      { mcp: { c: { type: "local", command: ["c"] }, d: { type: "remote", url: "https://d.example/mcp" } } },
+      { mcp: { timeout: 5000, servers: { e: { type: "local", command: ["e"] } }, f: { type: "local", command: ["f"] } } },
+      { mcp: { servers: { type: "local", command: ["named-servers"] } } },
+      { mcp: { timeout: { type: "remote", url: "https://named-timeout.example/mcp" } } },
+      { mcp: { g: { enabled: false }, h: { type: "local", command: ["h"], enabled: false } } },
+      {},
+    ]
+    const upstream = (document: Record<string, unknown>) => {
+      const normalized = ConfigNormalize.normalize(document)
+      if (normalized.type !== "normalized") throw new Error(`upstream rejected ${JSON.stringify(document)}`)
+      return Object.keys((normalized.encoded.mcp as { servers?: Record<string, unknown> } | undefined)?.servers ?? {}).sort()
+    }
+    for (const document of corpus) expect(engineMcpServerNames(document).sort(), JSON.stringify(document)).toEqual(upstream(document))
+    const undecodable = { mcp: { broken: { type: "local" } } }
+    expect(upstream(undecodable)).toEqual([])
+    expect(engineMcpServerNames(undecodable)).toEqual(["broken"])
+  })
+
   test("回归:注入面这一轮没放 cloud 时,用户全局的同名 server 照样进默认拒绝", () => {
     writeFileSync(codepuppyConfigPath, JSON.stringify({ mcp: {} }))
     writeFileSync(

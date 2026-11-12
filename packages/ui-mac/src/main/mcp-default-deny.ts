@@ -51,14 +51,13 @@ export function injectMcpDefaultDeny(
     const alpha = readConfig(options.codepuppyConfigPath, "alpha", readFile, logError)
     const codepuppyMcp = asRecord(alpha?.mcp)
     const userConfigDir = options.userConfigDir ?? engineGlobalConfigDirectory(process.env, homedir())
-    const globalMcp = GLOBAL_CONFIG_FILES.map((name) =>
-      readConfig(join(userConfigDir, name), "user-global", readFile, logError),
+    // 审计 R1 第 2 条:用户全局文件里的 server 名单按上游归一化的规则取 —— 2.x 原生的 `mcp.servers.<name>` 与 v1 的
+    // `mcp.<name>` 都认(见 engineMcpServerNames)。
+    const globalNames = new Set(
+      GLOBAL_CONFIG_FILES.flatMap((name) =>
+        engineMcpServerNames(readConfig(join(userConfigDir, name), "user-global", readFile, logError)),
+      ),
     )
-      .flatMap((source) => Object.entries(asRecord(source?.mcp)))
-      .reduce<Record<string, unknown>>((result, [name, leaf]) => {
-        result[name] = { ...asRecord(result[name]), ...asRecord(leaf) }
-        return result
-      }, Object.create(null) as Record<string, unknown>)
     // #223 R6 Major:治理集只认「codepuppy.jsonc 里真有的」与「本轮注入面真放进去的」。以前这里写死
     // 一个 `"cloud"` 字面量,于是**不代付时**用户全局配置里一个叫 cloud 的第三方 server 被永久
     // 当成治理来源、连 enabled:false 都不写 —— 名字不是治理凭据。代付两条分支下注入面都会把
@@ -73,9 +72,7 @@ export function injectMcpDefaultDeny(
       .filter(([, leaf]) => asRecord(leaf).type === "remote")
       .map(([name]) => name)
     const governed = new Set([...Object.keys(codepuppyMcp).filter((name) => !codepuppyRemote.includes(name)), ...injected])
-    const denied = Object.keys(globalMcp)
-      .filter((name) => !governed.has(name))
-      .sort()
+    const denied = [...globalNames].filter((name) => !governed.has(name)).sort()
 
     denied.forEach((name) => neutralize(config, name))
     if (denied.length)
@@ -119,6 +116,25 @@ function readConfig(
     return
   }
   return asRecord(value)
+}
+
+/**
+ * 引擎会为这份配置文档起哪些 MCP server 的名字:上游 `packages/core/src/config/normalize.ts` 的 `normalizeMcp` 的分派规则
+ * (`mcp.servers` 不是一台 v1 server 时是 2.x 的 server 表;`mcp.timeout` 同理是超时;只写 enabled 的 v1 叶子被丢弃;其余键是
+ * v1 server)。不在 main 里直接调上游的 `normalize`:它经 `v1/config/migrate.ts` 牵进引擎的 provider / model 整张图(ui-mac 的
+ * 类型检查与主进程打包都会把它带进来)。上游丢掉的「解不出来」的条目这里照样算进来 —— 多拒一个引擎本来就不会起的名字无害,
+ * 漏掉一个它会起的才有害。与上游的一致性由 mcp-default-deny.test.ts 用上游 `normalize` 本身逐例比对。
+ */
+export function engineMcpServerNames(document: Record<string, unknown> | undefined): string[] {
+  const names: string[] = []
+  for (const [name, value] of Object.entries(asRecord(document?.mcp))) {
+    const leaf = asRecord(value)
+    const directLegacy = leaf.type === "local" || leaf.type === "remote"
+    if (name === "servers" && !directLegacy) names.push(...Object.keys(leaf))
+    else if (name === "timeout" && !directLegacy) continue
+    else if (Object.hasOwn(leaf, "type") || typeof leaf.enabled !== "boolean") names.push(name)
+  }
+  return names
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

@@ -10,6 +10,7 @@ import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs"
 import { homedir } from "node:os"
 import { isAbsolute, join, normalize, relative, resolve } from "node:path"
 import { PROJECT_HIDDEN_DIR } from "../../ui-mac/src/shared/project-hidden-dir"
+import { parseProjectJsonc } from "../../ui-mac/src/shared/project-jsonc"
 
 // #1569 AC7:旧项目隐藏目录。改名由 main 在解析项目时做;sidecar 这边只判不写 —— 旧目录还在就不认项目根,
 // 免得在 main 迁完之前往新目录里写东西,造成「新旧并存」。
@@ -132,12 +133,9 @@ export function mergeProjectConfig(
   projectJsoncText: string,
   opts: { trustExecutable?: boolean; directory?: string } = {},
 ): MergeResult {
-  let proj: unknown
-  try {
-    proj = JSON.parse(stripJsonc(projectJsoncText))
-  } catch {
-    return { added: [], gatedExecutable: [] } // 项目文件坏,不注入(诚实降级,调用方已 loud)
-  }
+  const read = parseProjectJsonc(projectJsoncText)
+  if (!read.ok) return { added: [], gatedExecutable: [] } // 项目文件坏,不注入(诚实降级,调用方已 loud)
+  const proj = read.value
   if (!isObj(proj)) return { added: [], gatedExecutable: [] }
   const added: string[] = []
   const gatedExecutable: string[] = []
@@ -214,45 +212,6 @@ function mergeNamed(cfg: Record<string, unknown>, src: Record<string, unknown>, 
   }
   if (touched) cfg[key] = cur
   return touched
-}
-
-/** 极简 jsonc → json:去 // 行注释与 /* *​/ 块注释 + 尾逗号。够用于 alpha 自写的项目 codepuppy.jsonc。 */
-export function stripJsonc(text: string): string {
-  let out = ""
-  let inStr = false
-  let strCh = ""
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i]
-    const n = text[i + 1]
-    if (inStr) {
-      out += c
-      if (c === "\\") {
-        out += n ?? ""
-        i++
-      } else if (c === strCh) inStr = false
-      continue
-    }
-    if (c === '"' || c === "'") {
-      inStr = true
-      strCh = c
-      out += c
-      continue
-    }
-    if (c === "/" && n === "/") {
-      while (i < text.length && text[i] !== "\n") i++
-      out += "\n"
-      continue
-    }
-    if (c === "/" && n === "*") {
-      i += 2
-      while (i < text.length && !(text[i] === "*" && text[i + 1] === "/")) i++
-      i++
-      continue
-    }
-    out += c
-  }
-  // 尾逗号:`,` 后跟(空白)`}` 或 `]`
-  return out.replace(/,(\s*[}\]])/g, "$1")
 }
 
 function isRealDirectory(path: string): boolean {

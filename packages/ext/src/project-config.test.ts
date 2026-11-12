@@ -50,6 +50,13 @@ describe("mergeProjectConfig — text-class domains (agent/command/skills, alway
     expect(cfg.agent.a).toEqual({ prompt: "x" })
   })
 
+  test("#1662: a `,}` / `,]` inside a string survives the read (the engine's JSONC parser, not a regex over the text)", () => {
+    const cfg: Record<string, any> = {}
+    mergeProjectConfig(cfg, `{ "command": { "c": { "template": "x,}" } }, "agent": { "a": { "prompt": "[1, 2,]" } }, }`, { trustExecutable: true })
+    expect(cfg.command.c.template).toBe("x,}")
+    expect(cfg.agent.a.prompt).toBe("[1, 2,]")
+  })
+
   test("plugin domain NOT merged here (goes via host fan-out, ADR-006)", () => {
     const cfg: Record<string, any> = {}
     const { added } = mergeProjectConfig(cfg, j({ plugin: ["/proj/.codepuppy/plugins/x.js"] }), { trustExecutable: true })

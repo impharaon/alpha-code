@@ -69,6 +69,20 @@ describe("applyRegister — codepuppy_register 纯逻辑(REQ-060 T2)", () => {
     expect(applyRegister("{ broken", "agent", "a", { prompt: "p" }).ok).toBe(false)
   })
 
+  test("#1662:字符串里的 `,}` / `,]` 原样往返 —— 读进来再写回,不被尾逗号处理改掉(与引擎同一个 JSONC 解析器)", () => {
+    const existing = `{
+      // 项目命令
+      "command": { "c": { "template": "x,}", "description": "list [a, b,]" }, },
+    }`
+    const r = applyRegister(existing, "agent", "a", { prompt: "p" })
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      const cfg = JSON.parse(r.next)
+      expect(cfg.command.c).toEqual({ template: "x,}", description: "list [a, b,]" })
+      expect(cfg.agent.a.prompt).toBe("p")
+    }
+  })
+
   test("entry 非对象拒绝", () => {
     expect(applyRegister(null, "agent", "a", undefined).ok).toBe(false)
   })

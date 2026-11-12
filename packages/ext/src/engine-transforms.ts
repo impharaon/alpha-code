@@ -48,13 +48,47 @@ export function toServerConfig(entry: unknown): Mcp.ServerConfig | undefined {
   return undefined
 }
 
+/**
+ * 项目文档里的 v1 MCP 条目 → 2.x `Mcp.ServerConfig`,照上游读用户文件时的同一套翻译(`packages/core/src/v1/config/migrate.ts`
+ * `migrateMcp`,抄本 —— 那个模块顶层 import 引擎服务,不能打进 ext 的自包含 bundle;与装着的上游逐字段对比的判据在
+ * engine-transforms.test.ts):在 `toServerConfig` 之上补 `cwd`、`codemode`、`enabled: true` ⇒ `disabled: false`;v1 的单个
+ * `timeout` 毫秒数管三个阶段;OAuth 的驼峰字段换成 2.x 运行时读的下划线字段(`core/src/mcp/oauth.ts`)。
+ * 云 MCP 不走这里:它的定义由 main 按 2.x 形状写好,装进去后要与定义逐字相等才铸 `codepuppy-cloud`(`toServerConfig`)。
+ */
+export function projectServerConfig(entry: unknown): Mcp.ServerConfig | undefined {
+  const base = toServerConfig(entry)
+  if (!base || !isObj(entry)) return base
+  return {
+    ...base,
+    ...(base.type === "local" && typeof entry.cwd === "string" ? { cwd: entry.cwd } : {}),
+    ...(base.type === "remote" ? oauthOf(entry.oauth) : {}),
+    ...(entry.enabled === true ? { disabled: false } : {}),
+    ...(typeof entry.codemode === "boolean" ? { codemode: entry.codemode } : {}),
+    ...(typeof entry.timeout === "number" ? { timeout: { startup: entry.timeout, catalog: entry.timeout, execution: entry.timeout } } : {}),
+  } as Mcp.ServerConfig
+}
+
+/** v1 OAuth(驼峰)→ 2.x(下划线);`false` 原样;只搬给了的字段。 */
+function oauthOf(oauth: unknown) {
+  if (oauth === false) return { oauth: false as const }
+  if (!isObj(oauth)) return {}
+  const fields: Array<[string, string]> = [
+    ["clientId", "client_id"],
+    ["clientSecret", "client_secret"],
+    ["scope", "scope"],
+    ["callbackPort", "callback_port"],
+    ["redirectUri", "redirect_uri"],
+  ]
+  return { oauth: Object.fromEntries(fields.filter(([from]) => oauth[from] !== undefined).map(([from, to]) => [to, oauth[from]])) }
+}
+
 /** 项目 MCP 只补缺:引擎里已有同名条目(用户全局配置)就不动它。返回补进去的名字。 */
 export function applyProjectMcp(editor: MCPEditor, servers: unknown, error: (line: string) => void): string[] {
   if (!isObj(servers)) return []
   const added: string[] = []
   for (const [name, entry] of Object.entries(servers)) {
     if (editor.get(name)) continue
-    const config = toServerConfig(entry)
+    const config = projectServerConfig(entry)
     if (!config) {
       error(`[@codepuppy/ext] project MCP server "${name}" skipped: neither a local (command[]) nor a remote (url) definition`)
       continue
@@ -65,17 +99,55 @@ export function applyProjectMcp(editor: MCPEditor, servers: unknown, error: (lin
   return added
 }
 
-/** `"<providerID>/<modelID>"` → 2.x `Model.Ref`;不是这个形状 ⇒ undefined。 */
+/**
+ * OpenCode 2 退役的 provider id → 现在的 id。上游读用户配置时对 agent / 命令 / 顶层 model 做同样的改名(`packages/core/src/v1/config/migrate.ts`
+ * `providerID`,抄本 —— 那个模块顶层 import 引擎服务,不能打进 ext 的自包含 bundle;与上游函数的漂移锁在 engine-transforms.test.ts)。
+ */
+export const RETIRED_PROVIDER_IDS: Readonly<Record<string, string>> = {
+  "azure-cognitive-services": "azure",
+  "google-vertex-anthropic": "google-vertex",
+}
+
+/** `"<providerID>/<modelID>"` → 2.x `Model.Ref`(退役的 provider id 按引擎的规则改名);不是这个形状 ⇒ undefined。 */
 function modelRef(value: unknown) {
   if (typeof value !== "string") return undefined
   const slash = value.indexOf("/")
   if (slash <= 0 || slash === value.length - 1) return undefined
-  return { providerID: value.slice(0, slash), id: value.slice(slash + 1) }
+  const providerID = value.slice(0, slash)
+  return { providerID: RETIRED_PROVIDER_IDS[providerID] ?? providerID, id: value.slice(slash + 1) }
 }
 
 /**
- * v1 形状的 agent 条目 → `AgentEditor.update`。`prompt` 是 2.x 的 `system`。只写条目里**给了**的字段;
- * `permission` / `tools` 一律不写(方案基线 §3.5:借配 agent 之名改审批面是禁止的;项目 agent 的控制字段由信任门剥离)。
+ * v1 permission 的键 → 2.x 的权限动作(上游读用户配置时同样改名:`packages/core/src/v1/config/migrate.ts` `normalizeAction`,抄本 ——
+ * 那个模块顶层 import 引擎服务,不能打进 ext 的自包含 bundle;与上游归一化逐条对比的判据在 engine-transforms.test.ts)。
+ */
+function permissionAction(key: string) {
+  if (key === "write" || key === "patch" || key === "apply_patch") return "edit"
+  if (key === "task") return "subagent"
+  if (key === "bash") return "shell"
+  return key
+}
+
+const PERMISSION_EFFECTS = new Set(["ask", "allow", "deny"])
+
+/**
+ * v1 的 agent `permission`(一个动作值,或「键 → 动作值 / 模式 → 动作值」的对象)→ 2.x 规则,按书写顺序(规则后写者胜;上游同样按
+ * `Object.entries` 保序,`core/src/v1/config/permission.ts`)。认不出的值跳过。
+ */
+function permissionRules(permission: unknown) {
+  const source = typeof permission === "string" ? { "*": permission } : permission
+  if (!isObj(source)) return []
+  return Object.entries(source).flatMap(([key, rule]) => {
+    const action = permissionAction(key)
+    const pairs = typeof rule === "string" ? [["*", rule] as const] : isObj(rule) ? Object.entries(rule) : []
+    return pairs.filter(([, effect]) => typeof effect === "string" && PERMISSION_EFFECTS.has(effect)).map(([resource, effect]) => ({ action, resource, effect }))
+  })
+}
+
+/**
+ * v1 形状的 agent 条目 → `AgentEditor.update`。`prompt` 是 2.x 的 `system`。只写条目里**给了**的字段。
+ * `permission` 照 0.1.26 生效:翻成规则推在该 agent 已有规则之后;它只在项目已同意时还在 —— 没同意时 `mergeProjectConfig` 已剥掉
+ * `permission/model/disable/mode`(REQ-236 P1)。`tools` 不写。
  * 新建的 agent(上游与配置里都没有)按 v1 config agent 的默认取 `mode: "all"`。
  */
 export function applyAgents(editor: AgentEditor, agents: unknown): string[] {
@@ -91,6 +163,8 @@ export function applyAgents(editor: AgentEditor, agents: unknown): string[] {
       if (entry.mode === "subagent" || entry.mode === "primary" || entry.mode === "all") agent.mode = entry.mode
       const model = modelRef(entry.model)
       if (model) agent.model = model as typeof agent.model
+      const rules = permissionRules(entry.permission)
+      if (rules.length > 0) agent.permissions.push(...(rules as typeof agent.permissions))
     })
     applied.push(id)
   }

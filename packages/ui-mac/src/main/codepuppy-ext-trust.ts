@@ -9,6 +9,7 @@
 // 版本化:告知内容实质变更时 bump EXTENSIONS_CONSENT_VERSION → 旧决策失效、重新弹。
 
 import type { ProjectPrefs } from "./codepuppy-cloud-consent"
+import { parseProjectJsonc } from "../shared/project-jsonc"
 
 export const EXTENSIONS_CONSENT_VERSION = 1
 
@@ -39,53 +40,14 @@ export type ProjectExecutables = { mcp: string[]; plugins: string[] }
 export function listProjectExecutables(jsoncText: string | null | undefined, pluginFiles: string[]): ProjectExecutables {
   let mcp: string[] = []
   if (jsoncText) {
-    try {
-      const parsed: unknown = JSON.parse(stripJsonc(jsoncText))
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        const m = (parsed as Record<string, unknown>).mcp
-        if (m && typeof m === "object" && !Array.isArray(m)) mcp = Object.keys(m as Record<string, unknown>)
-      }
-    } catch {
-      /* 项目文件坏 → 引擎侧也不会注入,无可执行物 */
+    // 项目文件坏 → 引擎侧也不会注入,无可执行物(同一个读法:shared/project-jsonc.ts)
+    const read = parseProjectJsonc(jsoncText)
+    const parsed = read.ok ? read.value : undefined
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const m = (parsed as Record<string, unknown>).mcp
+      if (m && typeof m === "object" && !Array.isArray(m)) mcp = Object.keys(m as Record<string, unknown>)
     }
   }
   return { mcp, plugins: pluginFiles.filter((f) => f.endsWith(".js")) }
 }
 
-/** 极简 jsonc → json(与 @codepuppy/ext project-config 同款):去注释 + 尾逗号。 */
-function stripJsonc(text: string): string {
-  let out = ""
-  let inStr = false
-  let strCh = ""
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i]
-    const n = text[i + 1]
-    if (inStr) {
-      out += c
-      if (c === "\\") {
-        out += n ?? ""
-        i++
-      } else if (c === strCh) inStr = false
-      continue
-    }
-    if (c === '"' || c === "'") {
-      inStr = true
-      strCh = c
-      out += c
-      continue
-    }
-    if (c === "/" && n === "/") {
-      while (i < text.length && text[i] !== "\n") i++
-      out += "\n"
-      continue
-    }
-    if (c === "/" && n === "*") {
-      i += 2
-      while (i < text.length && !(text[i] === "*" && text[i + 1] === "/")) i++
-      i++
-      continue
-    }
-    out += c
-  }
-  return out.replace(/,(\s*[}\]])/g, "$1")
-}

@@ -7,9 +7,15 @@ import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSy
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { LoadAPIKeyError } from "@ai-sdk/provider"
-import { Cause, Effect, Exit, Fiber } from "effect"
+import { Cause, Effect, Exit, Fiber, Layer } from "effect"
 import { Agent } from "../../core/src/agent.ts"
 import { Location } from "../../core/src/location.ts"
+import { FileMutation } from "../../core/src/file-mutation.ts"
+import { FileWrite } from "../../core/src/file-write.ts"
+import { Formatter } from "../../core/src/formatter.ts"
+import { Plugin as Plugins } from "../../core/src/plugin.ts"
+import { PluginHost } from "../../core/src/plugin/host.ts"
+import { EditTool } from "../../core/src/tool/plugin/edit.ts"
 import { Permission } from "../../core/src/permission.ts"
 import { Session as Sessions } from "../../core/src/session.ts"
 import { Command } from "../../core/src/command.ts"
@@ -609,7 +615,7 @@ it.live("权威 · 项目可执行扩展的同意(C10 / P10):没同意 ⇒ 项�
     mkdirSync(join(root, "plugins"), { recursive: true })
     writeFileSync(
       join(root, "codepuppy.jsonc"),
-      JSON.stringify({ mcp: { proj: { type: "local", command: ["proj-mcp"] } }, agent: { helper: { prompt: "project helper prompt", mode: "primary" } } }),
+      JSON.stringify({ mcp: { proj: { type: "local", command: ["proj-mcp"], cwd: "./tools", timeout: 7000 } }, agent: { helper: { prompt: "project helper prompt", mode: "primary" } } }),
     )
     writeFileSync(join(root, "plugins", "probe.js"), `export default { id: "project.probe", setup() { globalThis.__codepuppyProjectProbe = (globalThis.__codepuppyProjectProbe ?? 0) + 1 } }\n`)
     const probe = () => (globalThis as { __codepuppyProjectProbe?: number }).__codepuppyProjectProbe ?? 0
@@ -624,7 +630,8 @@ it.live("权威 · 项目可执行扩展的同意(C10 / P10):没同意 ⇒ 项�
     writeFileSync(join(root, "prefs.json"), JSON.stringify({ extensionsConsent: { version: 1, granted: true } }))
     const trusted = recordingMcp()
     yield* activate(CodePuppyExt, { mcp: trusted })
-    expect(trusted.servers.get("proj")).toEqual({ type: "local", command: ["proj-mcp"] })
+    // #1662:cwd 与 timeout 按 2.x 读的形状进引擎(与上游读用户文件同一翻译,engine-transforms.test.ts)
+    expect(trusted.servers.get("proj")).toEqual({ type: "local", command: ["proj-mcp"], cwd: "./tools", timeout: { startup: 7000, catalog: 7000, execution: 7000 } })
     expect(probe()).toBe(1)
   }),
 )
@@ -687,6 +694,74 @@ it.live("权威 · 工具身份(ADR-041 改 / 删):经 ext 扇出的项目插件
  * 同一个宿主,但权限是上游**真的**服务(`Permission.node`,连同它的依赖)—— 上游测试层把权限换成了永远答 ask 的桩,
  * 那里没有「待批的请求」可回复。
  */
+
+/**
+ * 上游真实的 `edit` 工具装进真宿主(同内置插件,在 ext 之前)。它要的 FileWrite / FileMutation / Formatter 不在插件测试层里:取这三个节点自己的
+ * 实现层(`mapLayer` 交出的那一层),其余依赖(Environment、FileAccess、Permission、Location …)用宿主里同一份 —— 权限断言落在宿主的真权限服务上。
+ */
+const realEditTool = Effect.gen(function* () {
+  const implementation = (node: { mapLayer: (f: (layer: any) => any) => unknown }) => {
+    let found: Layer.Layer<any, any, any> | undefined
+    node.mapLayer((layer) => ((found = layer), layer))
+    return found!
+  }
+  const files = implementation(FileWrite.node as never).pipe(
+    Layer.provideMerge(Layer.mergeAll(implementation(FileMutation.node as never), implementation(Formatter.node as never))),
+  )
+  const plugins = yield* Plugins.Service
+  yield* EditTool.Plugin.effect(yield* PluginHost.make(plugins, EditTool.Plugin.id)).pipe(Effect.provide(files)) as Effect.Effect<void>
+})
+
+/**
+ * 项目文档里 agent-creator 写的「只读助手」(packages/ui-mac/resources/factory-skills/agent-creator/SKILL.md 第 40 行的样本);`consent` 决定项目是否已同意。
+ * 装好之后由这个 agent 用真 `edit` 工具改项目里的 a.txt,回 `{exit, text}`。
+ */
+const readerEdits = (consent: boolean) =>
+  Effect.gen(function* () {
+    env({})
+    const directory = realpathSync((yield* Location.Service).directory)
+    const root = join(directory, ".codepuppy")
+    mkdirSync(root, { recursive: true })
+    const reader = { description: "reads", mode: "subagent", prompt: "read only", permission: { edit: "deny", bash: "deny", read: { "*": "allow", "*.env*": "deny" } } }
+    writeFileSync(join(root, "codepuppy.jsonc"), JSON.stringify({ agent: { reader } }))
+    if (consent) writeFileSync(join(root, "prefs.json"), JSON.stringify({ extensionsConsent: { version: 1, granted: true } }))
+    writeFileSync(join(directory, "a.txt"), "hello\n")
+    yield* realEditTool
+    yield* activate(CodePuppyExt)
+    const session = yield* (yield* Sessions.Service).create({ location: { directory }, title: "reader" })
+    const snapshot = yield* (yield* Tool.Service).snapshot()
+    const exit = yield* snapshot
+      .execute({
+        sessionID: session.id,
+        agent: "reader" as never,
+        messageID: SessionMessage.ID.make("msg_reader_edit"),
+        call: { type: "tool-call", id: "call_reader_edit", name: "edit", input: { path: "a.txt", oldString: "hello", newString: "changed" } },
+      })
+      .pipe(Effect.exit)
+    const rules = (yield* (yield* Agent.Service).get(Agent.ID.make("reader")))?.permissions ?? []
+    return { exit, text: readFileSync(join(directory, "a.txt"), "utf8"), rules }
+  })
+
+itWithPermission.live("权威 · 项目 agent 的权限(0.1.26 同意后生效):已同意的项目里,agent-creator 写的只读助手用真 edit 工具改文件 ⇒ 被拒,文件不变", () =>
+  Effect.gen(function* () {
+    const { exit, text, rules } = yield* readerEdits(true)
+    expect(rules).toEqual(expect.arrayContaining([{ action: "edit", resource: "*", effect: "deny" }, { action: "shell", resource: "*", effect: "deny" }]))
+    expect(Exit.isFailure(exit)).toBe(true)
+    // 拒它的是项目 agent 的 `edit: deny`(真权限服务的 BlockedError,断言的动作是 edit、资源是 a.txt)
+    expect(JSON.stringify(exit)).toContain('"_tag":"Permission.BlockedError"')
+    expect(JSON.stringify(exit)).toContain('{"action":"edit","resource":"*","effect":"deny"}')
+    expect(text).toBe("hello\n")
+  }),
+)
+
+itWithPermission.live("项目 agent 的权限 · 反向臂:同一份文档、项目未同意 ⇒ 权限规则不进引擎,同一次编辑生效(未同意的项目不得用 agent 改审批面,0.1.26 同样剥掉)", () =>
+  Effect.gen(function* () {
+    const { exit, text, rules } = yield* readerEdits(false)
+    expect(rules.some((rule: { effect: string }) => rule.effect === "deny" && ["edit", "shell"].includes((rule as { action: string }).action))).toBe(false)
+    expect(Exit.isSuccess(exit)).toBe(true)
+    expect(text).toBe("changed\n")
+  }),
+)
 
 itWithPermission.live("权威 · 待批请求的回复(#1666 第 3 条):经 ext 扇出的项目插件对 Code Puppy 待批的请求回 once、改 / 删已存的批准 ⇒ 三样都被拒并记一行,请求仍在等;反向臂:同一插件由宿主直接装 ⇒ 回 once 生效、请求放行", () =>
   Effect.gen(function* () {

@@ -131,13 +131,21 @@ function permissionAction(key: string) {
 const PERMISSION_EFFECTS = new Set(["ask", "allow", "deny"])
 
 /**
- * v1 的 agent `permission`(一个动作值,或「键 → 动作值 / 模式 → 动作值」的对象)→ 2.x 规则,按书写顺序(规则后写者胜;上游同样按
- * `Object.entries` 保序,`core/src/v1/config/permission.ts`)。认不出的值跳过。
+ * v1 的 agent `tools`(已弃用的「工具 → true / false」)与 `permission`(一个动作值,或「键 → 动作值 / 模式 → 动作值」的对象)→ 2.x 规则。
+ * 先照上游读 v1 agent 时的合并(`core/src/v1/config/agent.ts` `normalize`,抄本 —— 它没有导出,只能经那里的 effect Schema 解码得到,
+ * 而 ext 的生产代码不 import effect 与 core;与上游归一化逐条对比的判据在 engine-transforms.test.ts)合成一张「键 → 规则」表:`tools` 先写,true ⇒ allow、false ⇒ deny,`write` / `patch` 并成 `edit`;
+ * `permission` 后写,同键时盖掉 `tools` 那条,位置仍在 `tools` 写下的地方(Map 同键 set 不挪位置,与上游同一个做法)。
+ * 再按表的顺序翻成规则(规则后写者胜;上游同样按 `Object.entries` 保序,`core/src/v1/config/permission.ts`)。认不出的值跳过。
  */
-function permissionRules(permission: unknown) {
+function permissionRules(tools: unknown, permission: unknown) {
+  const toolEntries = isObj(tools)
+    ? Object.entries(tools)
+        .filter(([, enabled]) => typeof enabled === "boolean")
+        .map(([tool, enabled]) => [tool === "write" || tool === "patch" ? "edit" : tool, enabled ? "allow" : "deny"] as const)
+    : []
   const source = typeof permission === "string" ? { "*": permission } : permission
-  if (!isObj(source)) return []
-  return Object.entries(source).flatMap(([key, rule]) => {
+  const table = new Map<string, unknown>([...toolEntries, ...(isObj(source) ? Object.entries(source) : [])])
+  return [...table].flatMap(([key, rule]) => {
     const action = permissionAction(key)
     const pairs = typeof rule === "string" ? [["*", rule] as const] : isObj(rule) ? Object.entries(rule) : []
     return pairs.filter(([, effect]) => typeof effect === "string" && PERMISSION_EFFECTS.has(effect)).map(([resource, effect]) => ({ action, resource, effect }))
@@ -146,8 +154,8 @@ function permissionRules(permission: unknown) {
 
 /**
  * v1 形状的 agent 条目 → `AgentEditor.update`。`prompt` 是 2.x 的 `system`。只写条目里**给了**的字段。
- * `permission` 照 0.1.26 生效:翻成规则推在该 agent 已有规则之后;它只在项目已同意时还在 —— 没同意时 `mergeProjectConfig` 已剥掉
- * `permission/model/disable/mode`(REQ-236 P1)。`tools` 不写。
+ * `permission` 照 0.1.26 生效,`tools` 照上游换成同一串规则(#1693):翻成规则推在该 agent 已有规则之后;两者只在项目已同意时还在 ——
+ * 没同意时 `mergeProjectConfig` 已剥掉 `permission/tools/model/disable/mode`(REQ-236 P1)。
  * 新建的 agent(上游与配置里都没有)按 v1 config agent 的默认取 `mode: "all"`。
  */
 export function applyAgents(editor: AgentEditor, agents: unknown): string[] {
@@ -163,7 +171,7 @@ export function applyAgents(editor: AgentEditor, agents: unknown): string[] {
       if (entry.mode === "subagent" || entry.mode === "primary" || entry.mode === "all") agent.mode = entry.mode
       const model = modelRef(entry.model)
       if (model) agent.model = model as typeof agent.model
-      const rules = permissionRules(entry.permission)
+      const rules = permissionRules(entry.tools, entry.permission)
       if (rules.length > 0) agent.permissions.push(...(rules as typeof agent.permissions))
     })
     applied.push(id)

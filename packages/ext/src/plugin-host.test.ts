@@ -713,16 +713,16 @@ const realEditTool = Effect.gen(function* () {
 })
 
 /**
- * 项目文档里 agent-creator 写的「只读助手」(packages/ui-mac/resources/factory-skills/agent-creator/SKILL.md 第 40 行的样本);`consent` 决定项目是否已同意。
- * 装好之后由这个 agent 用真 `edit` 工具改项目里的 a.txt,回 `{exit, text}`。
+ * 项目文档里 agent-creator 写的「只读助手」(packages/ui-mac/resources/factory-skills/agent-creator/SKILL.md 第 40 行的样本);`consent` 决定项目是否已同意,
+ * `reader` 换掉这个 agent 条目(默认即样本)。装好之后由这个 agent 用真 `edit` 工具改项目里的 a.txt,回 `{exit, text}`。
  */
-const readerEdits = (consent: boolean) =>
+const READER_SAMPLE = { description: "reads", mode: "subagent", prompt: "read only", permission: { edit: "deny", bash: "deny", read: { "*": "allow", "*.env*": "deny" } } }
+const readerEdits = (consent: boolean, reader: Record<string, unknown> = READER_SAMPLE) =>
   Effect.gen(function* () {
     env({})
     const directory = realpathSync((yield* Location.Service).directory)
     const root = join(directory, ".codepuppy")
     mkdirSync(root, { recursive: true })
-    const reader = { description: "reads", mode: "subagent", prompt: "read only", permission: { edit: "deny", bash: "deny", read: { "*": "allow", "*.env*": "deny" } } }
     writeFileSync(join(root, "codepuppy.jsonc"), JSON.stringify({ agent: { reader } }))
     if (consent) writeFileSync(join(root, "prefs.json"), JSON.stringify({ extensionsConsent: { version: 1, granted: true } }))
     writeFileSync(join(directory, "a.txt"), "hello\n")
@@ -758,6 +758,29 @@ itWithPermission.live("项目 agent 的权限 · 反向臂:同一份文档、项
   Effect.gen(function* () {
     const { exit, text, rules } = yield* readerEdits(false)
     expect(rules.some((rule: { effect: string }) => rule.effect === "deny" && ["edit", "shell"].includes((rule as { action: string }).action))).toBe(false)
+    expect(Exit.isSuccess(exit)).toBe(true)
+    expect(text).toBe("changed\n")
+  }),
+)
+
+/** 只用 v1 的 `tools` 关掉改文件的助手(#1693;没有 `permission`)。 */
+const TOOLS_ONLY_READER = { description: "reads", mode: "subagent", prompt: "read only", tools: { edit: false } }
+
+itWithPermission.live("权威 · 项目 agent 的 tools(#1693 AC-01):已同意的项目里,写了 tools: {edit: false} 的助手用真 edit 工具改文件 ⇒ 被拒,文件不变", () =>
+  Effect.gen(function* () {
+    const { exit, text, rules } = yield* readerEdits(true, TOOLS_ONLY_READER)
+    expect(rules).toEqual(expect.arrayContaining([{ action: "edit", resource: "*", effect: "deny" }]))
+    expect(Exit.isFailure(exit)).toBe(true)
+    expect(JSON.stringify(exit)).toContain('"_tag":"Permission.BlockedError"')
+    expect(JSON.stringify(exit)).toContain('{"action":"edit","resource":"*","effect":"deny"}')
+    expect(text).toBe("hello\n")
+  }),
+)
+
+itWithPermission.live("项目 agent 的 tools · 反向臂(#1693 AC-03):同一份文档、项目未同意 ⇒ tools 不进引擎,同一次编辑生效(与没写 tools 一样)", () =>
+  Effect.gen(function* () {
+    const { exit, text, rules } = yield* readerEdits(false, TOOLS_ONLY_READER)
+    expect(rules.some((rule: { effect: string; action: string }) => rule.effect === "deny" && rule.action === "edit")).toBe(false)
     expect(Exit.isSuccess(exit)).toBe(true)
     expect(text).toBe("changed\n")
   }),

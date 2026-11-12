@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { ConfigNormalize } from "../../core/src/config/normalize.ts"
 import { ConfigMigrateV1 } from "../../core/src/v1/config/migrate.ts"
+import { Permission } from "../../core/src/permission.ts"
 import { applyAgents, projectServerConfig, RETIRED_PROVIDER_IDS } from "./engine-transforms"
 
 /** `applyAgents` 写进编辑器的结果(编辑器按 2.x `AgentEditor` 的 get / update 形状;新 agent 从空对象起)。 */
@@ -97,5 +98,25 @@ describe("项目 agent 的权限规则 = 引擎读同一条 v1 agent 的规则",
     const ours = agentsAfter(entries)
     expect(ours.get("a")?.permissions).toEqual(engine.a.permissions)
     expect(ours.get("b")?.permissions).toEqual(engine.b.permissions)
+  })
+})
+
+describe("项目 agent 的 tools(#1693)= 引擎读同一条 v1 agent 的规则", () => {
+  test("AC-04 · 键名改写与先后顺序与上游归一化逐条相同(write / patch 先并成 edit、apply_patch 另占一键;bash ⇒ shell、task ⇒ subagent;通配键原样;permission 同键盖掉 tools、位置不动)", () => {
+    const entries = {
+      toolsOnly: { tools: { read: true, write: false, bash: false, task: false, patch: true, apply_patch: false, "mymcp_*": false, edit: true } },
+      mixed: { tools: { bash: false, edit: false, webfetch: false }, permission: { edit: "ask", bash: { "git *": "allow" }, write: "allow", read: "deny" } },
+    }
+    const engine = normalized({ agent: entries }).agents
+    const ours = agentsAfter(entries)
+    expect(ours.get("toolsOnly")?.permissions).toEqual(engine.toolsOnly.permissions)
+    expect(ours.get("mixed")?.permissions).toEqual(engine.mixed.permissions)
+  })
+  test("AC-02 · tools: {bash: false} 与允许 bash 的 permission 同写 ⇒ 以 permission 为准,命令可执行(上游的权限求值);只写 tools ⇒ 被拒", () => {
+    const entries = { both: { tools: { bash: false }, permission: { bash: "allow" } }, toolsOnly: { tools: { bash: false } } }
+    const ours = agentsAfter(entries)
+    expect(ours.get("both")?.permissions).toEqual(normalized({ agent: entries }).agents.both.permissions)
+    expect(Permission.evaluate("shell", "ls -la", ours.get("both")?.permissions ?? []).effect).toBe("allow")
+    expect(Permission.evaluate("shell", "ls -la", ours.get("toolsOnly")?.permissions ?? []).effect).toBe("deny")
   })
 })

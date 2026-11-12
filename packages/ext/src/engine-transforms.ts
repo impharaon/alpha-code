@@ -118,8 +118,36 @@ function modelRef(value: unknown) {
 }
 
 /**
- * v1 形状的 agent 条目 → `AgentEditor.update`。`prompt` 是 2.x 的 `system`。只写条目里**给了**的字段;
- * `permission` / `tools` 一律不写(方案基线 §3.5:借配 agent 之名改审批面是禁止的;项目 agent 的控制字段由信任门剥离)。
+ * v1 permission 的键 → 2.x 的权限动作(上游读用户配置时同样改名:`packages/core/src/v1/config/migrate.ts` `normalizeAction`,抄本 ——
+ * 那个模块顶层 import 引擎服务,不能打进 ext 的自包含 bundle;与上游归一化逐条对比的判据在 engine-transforms.test.ts)。
+ */
+function permissionAction(key: string) {
+  if (key === "write" || key === "patch" || key === "apply_patch") return "edit"
+  if (key === "task") return "subagent"
+  if (key === "bash") return "shell"
+  return key
+}
+
+const PERMISSION_EFFECTS = new Set(["ask", "allow", "deny"])
+
+/**
+ * v1 的 agent `permission`(一个动作值,或「键 → 动作值 / 模式 → 动作值」的对象)→ 2.x 规则,按书写顺序(规则后写者胜;上游同样按
+ * `Object.entries` 保序,`core/src/v1/config/permission.ts`)。认不出的值跳过。
+ */
+function permissionRules(permission: unknown) {
+  const source = typeof permission === "string" ? { "*": permission } : permission
+  if (!isObj(source)) return []
+  return Object.entries(source).flatMap(([key, rule]) => {
+    const action = permissionAction(key)
+    const pairs = typeof rule === "string" ? [["*", rule] as const] : isObj(rule) ? Object.entries(rule) : []
+    return pairs.filter(([, effect]) => typeof effect === "string" && PERMISSION_EFFECTS.has(effect)).map(([resource, effect]) => ({ action, resource, effect }))
+  })
+}
+
+/**
+ * v1 形状的 agent 条目 → `AgentEditor.update`。`prompt` 是 2.x 的 `system`。只写条目里**给了**的字段。
+ * `permission` 照 0.1.26 生效:翻成规则推在该 agent 已有规则之后;它只在项目已同意时还在 —— 没同意时 `mergeProjectConfig` 已剥掉
+ * `permission/model/disable/mode`(REQ-236 P1)。`tools` 不写。
  * 新建的 agent(上游与配置里都没有)按 v1 config agent 的默认取 `mode: "all"`。
  */
 export function applyAgents(editor: AgentEditor, agents: unknown): string[] {
@@ -135,6 +163,8 @@ export function applyAgents(editor: AgentEditor, agents: unknown): string[] {
       if (entry.mode === "subagent" || entry.mode === "primary" || entry.mode === "all") agent.mode = entry.mode
       const model = modelRef(entry.model)
       if (model) agent.model = model as typeof agent.model
+      const rules = permissionRules(entry.permission)
+      if (rules.length > 0) agent.permissions.push(...(rules as typeof agent.permissions))
     })
     applied.push(id)
   }

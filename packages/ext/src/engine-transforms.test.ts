@@ -79,3 +79,23 @@ describe("项目 agent 的模型:退役 provider id 按引擎的规则改名", (
     expect(RETIRED_PROVIDER_IDS).toEqual(upstream)
   })
 })
+
+describe("项目 agent 的权限规则 = 引擎读同一条 v1 agent 的规则", () => {
+  // 出厂技能 agent-creator 指导模型登记的「只读助手」(packages/ui-mac/resources/factory-skills/agent-creator/SKILL.md 第 40 行)
+  const reader = {
+    description: "reads",
+    mode: "subagent",
+    prompt: "read only",
+    permission: { edit: "deny", bash: "deny", read: { "*": "allow", "*.env*": "deny" } },
+  }
+  test("agent-creator 的样本:规则逐条相同(bash ⇒ shell、read 的两条模式规则、书写顺序)", () => {
+    expect(agentsAfter({ reader }).get("reader")?.permissions).toEqual(normalized({ agent: { reader } }).agents.reader.permissions)
+  })
+  test("一个动作值 ⇒ 对所有动作的一条规则;task / write / patch 照上游改名", () => {
+    const entries = { a: { permission: "ask" }, b: { permission: { task: "deny", write: "ask", patch: "deny", apply_patch: "allow" } } }
+    const engine = normalized({ agent: entries }).agents
+    const ours = agentsAfter(entries)
+    expect(ours.get("a")?.permissions).toEqual(engine.a.permissions)
+    expect(ours.get("b")?.permissions).toEqual(engine.b.permissions)
+  })
+})

@@ -133,3 +133,10 @@ last_reviewed: 2026-11-12
   (`cloud-websearch-kill.ts:440`,传入 main 按 2.x 形状写好的定义并加 `enabled: true`),装进去的条目要与定义逐字相等才铸 `codepuppy-cloud`
   (`packages/plugin/src/alpha-cloud-authority.ts` `governedMcpEvidence`);改共用函数会让它多出 `disabled: false`、OAuth 换名,云工具的权威就铸不出来(实测:三条云测试红)。
   同一原因,只有项目条目照上游把 `enabled: true` 写成 `disabled: false` · 第 3 项提交。
+- 2026-11-12 · 第 1 项:上游真实的 `edit` 工具接进了宿主,没有走退路 —— FileWrite / FileMutation / Formatter 取各自节点的实现层(`mapLayer` 交出的那一层),
+  其余依赖用宿主里同一份,所以 `edit` 的权限断言落在宿主的真权限服务上;已同意那一臂被拒的是 `Permission.BlockedError`(动作 `edit`、资源 `a.txt`)。
+  证明拆成两个用例(已同意 / 未同意反向臂),各用一个新宿主,避免同一宿主里装两次 ext · 第 1 项提交。
+- 2026-11-12 · 第 1 项:按编排器核对,规则先后保持 2.x(用户自己的顶层 `permission` 压过项目 agent 的规则,与 0.1.26 相反;R1),同意后项目 agent 可放宽照 0.1.26(R2),
+  都不修;两点写进登记册新条目 `project-agent-permissions` 的 note(该条目登记本项恢复的决定,机制 `engine-transforms.ts`,证明即上面两个宿主用例与规则对比)。
+  ADR-047 的权威保持表是登记册的摘要,本段没有同步它的条数 · 第 1 项提交。
+- 2026-11-12 · 第 1 项提交里另加接缝文档 §4 一行(第 8 个 ext import 的 ui-mac 模块 `shared/project-jsonc`),按编排器核对 · 第 1 项提交。

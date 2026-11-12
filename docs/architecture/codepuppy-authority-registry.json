@@ -1595,6 +1595,34 @@
           "name": "known-bad: without the preload, with the real HOME / XDG_*, the engine roots land under the real home (paths only); an isolatedEnv() child stays inside"
         }
       ]
+    },
+    {
+      "id": "project-agent-permissions",
+      "decision": "A consented project's agent permission rules (`.codepuppy/codepuppy.jsonc` agent.<name>.permission) apply as in 0.1.26, so a read-only project agent cannot edit files; an unconsented project's rules are stripped and never reach the engine (REQ-236 P1).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "#1662 project-config",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/engine-transforms.ts",
+        "ladder": "L0 (agent.transform: applyAgents translates the v1 permission as upstream's v1 config migration does and pushes the rules after the agent's existing ones; mergeProjectConfig in packages/ext/src/project-config.ts strips permission/model/disable/mode without consent)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "权威 · 项目 agent 的权限(0.1.26 同意后生效):已同意的项目里,agent-creator 写的只读助手用真 edit 工具改文件 ⇒ 被拒,文件不变"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "项目 agent 的权限 · 反向臂:同一份文档、项目未同意 ⇒ 权限规则不进引擎,同一次编辑生效"
+        },
+        {
+          "file": "packages/ext/src/engine-transforms.test.ts",
+          "name": "agent-creator 的样本:规则逐条相同(bash ⇒ shell、read 的两条模式规则、书写顺序)"
+        }
+      ],
+      "note": "Two differences from 0.1.26, both kept by orchestrator decision (2026-11-12, #1662 project-config): (1) order against the user's own top-level permission rules — OpenCode 2's config agent plugin appends them after the extension's agent.transform (packages/core/src/config/plugin/agent.ts:71), so the user's global rules outrank a project agent's, whereas 0.1.26 laid the agent's rules over the global ones (origin/alpha packages/opencode/src/agent/agent.ts:293); the user's own rules winning is the safer direction; (2) unchanged from 0.1.26 and recorded only: a consented project's agent may also loosen permissions, consent being the gate."
     }
   ]
 }

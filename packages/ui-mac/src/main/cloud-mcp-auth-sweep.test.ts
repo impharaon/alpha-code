@@ -91,9 +91,12 @@ describe("#1196 interactive-OAuth retirement ratchet", () => {
     expect(src.includes("cloud-mcp-oauth-gate")).toBe(false)
   })
 
-  test("引擎 authenticate 路径对 inflight 标记零引用(正样本:waitForCallback 在场)", () => {
-    const src = read("packages/opencode/src/mcp/index.ts")
-    expect(src.includes("waitForCallback")).toBe(true) // 手段自证:第三方交互路仍在
+  // `#1662`:OpenCode 2 的交互式登录住在 packages/core/src/mcp/oauth.ts(authorize 起本机回调监听、回调页
+  // OauthCallbackPage);v1 的 packages/opencode/src/mcp/index.ts(waitForCallback)随换代删除。
+  test("引擎 authenticate 路径对 inflight 标记零引用(正样本:authorize 的本机回调页在场)", () => {
+    const src = read("packages/core/src/mcp/oauth.ts")
+    expect(src.includes("export const authorize")).toBe(true) // 手段自证:第三方交互路仍在
+    expect(src.includes("OauthCallbackPage.error(")).toBe(true)
     expect(src.includes("cloud-mcp-oauth-inflight")).toBe(false)
     expect(src.includes("clearInflight")).toBe(false)
   })

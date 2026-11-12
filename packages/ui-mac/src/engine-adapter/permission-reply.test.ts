@@ -4,8 +4,9 @@
 // 回执交给冻结的 replyPermissionV1 / createPermissionV2Feed / permissionDecisionSubmitError /
 // createPermissionDecisionCommand,v2 入口按 permission-surface.tsx:73-80 的取法读 `result.data.data`。
 // 引擎一侧是假的 HTTP 引擎:请求、replied 帧、404 体都取自真 2.x 引擎采样(fixtures/permission-reply.json,
-// 同一份采样里适配器对真引擎的 reject 收据列出 A1+A2、重放同一张、再回一次 404);回复语义照 L4 实测的前提
-// (packages/core/src/permission.ts reply():先发目标的 replied,reject 再逐条连带同会话的待审)。
+// 同一份采样里适配器对真引擎的 reject 收据列出 A1+A2、重放同一张、再回一次 404);回复语义照 L4 实测的前提与
+// I-05 契约 A(packages/core/src/permission.ts reply():先发目标的 replied;reject 再逐条连带同会话的待审;always 给
+// 本会话记放行,再逐条连带同会话里新放行覆盖的待审)。
 // 每条都带反向臂:拿掉那条规则时会出什么错。
 import { describe, expect, spyOn, test } from "bun:test"
 import { createOpencodeClient, type PermissionV2DecisionCommand, type PermissionV2DecisionReceipt } from "@opencode-ai/sdk/v2/client"
@@ -19,10 +20,9 @@ import { createPermissionV2Feed } from "../renderer/codepuppy-ui/session-workspa
 import fixture from "./fixtures/permission-reply.json"
 import { createProjector, type V1Payload } from "./events"
 import { createEngineFetch } from "./index"
-import { createPermissionReplies, evaluateRules, requestFingerprint, wildcardMatch } from "./permission-replies"
-// 假引擎的规则判定直接用引擎原件(测试进程有 `process`;renderer 里的适配器用的是移植件,下面逐条比对)。
+import { createPermissionReplies, requestFingerprint } from "./permission-replies"
+// 假引擎的规则判定直接用引擎原件(测试进程有 `process`)。
 import { evaluate as engineEvaluate } from "../../../core/src/permission"
-import { Wildcard } from "../../../core/src/util/wildcard"
 
 const ORIGIN = "http://127.0.0.1:47003"
 const { sessionA, sessionB, a1, a2, b1 } = fixture.ids
@@ -40,6 +40,8 @@ const AGENT_RULES: Rule[] = [
 
 function fakeEngine(options: { repliedAfterResponse?: boolean } = {}) {
   const pending = new Map(ASKED.map((request) => [request.id, structuredClone(request)]))
+  /** 内核 I-05 块的本会话放行(只在内存,按会话)。 */
+  const grants = new Map<string, Rule[]>()
   const sessionRules = new Map<string, Rule[]>()
   const streams = new Set<ReadableStreamDefaultController<Uint8Array>>()
   const replies: Array<{ requestID: string; decision: string; message?: string }> = []
@@ -59,16 +61,28 @@ function fakeEngine(options: { repliedAfterResponse?: boolean } = {}) {
   const notFound = (requestID: string) =>
     Response.json({ ...fixture.replyAgain.body, requestID, message: `Permission request not found: ${requestID}` }, { status: 404 })
 
-  /** permission.ts reply():目标的 replied 先发;reject 连带同会话的每一条待审;once 只了结目标。 */
+  const allowed = (sessionID: string, action: string, resource: string) =>
+    evaluate([...AGENT_RULES, ...(sessionRules.get(sessionID) ?? []), ...(grants.get(sessionID) ?? [])], action, resource) === "allow"
+
+  /**
+   * permission.ts reply():目标的 replied 先发;reject 连带同会话的每一条待审;always(有 save)给本会话记放行,再连带
+   * 同会话里此刻判为 allow 的待审(跳过 Code Puppy 策略请求);once 只了结目标。
+   */
   function reply(target: EngineRequest, decision: string) {
     const frames = [{ sessionID: target.sessionID, requestID: target.id, reply: decision }]
     pending.delete(target.id)
-    if (decision === "reject")
-      for (const [id, item] of pending) {
-        if (item.sessionID !== target.sessionID) continue
-        frames.push({ sessionID: item.sessionID, requestID: id, reply: "reject" })
-        pending.delete(id)
-      }
+    if (decision === "always" && target.save?.length)
+      grants.set(target.sessionID, [
+        ...(grants.get(target.sessionID) ?? []),
+        ...target.save.map((resource) => ({ action: target.action, resource, effect: "allow" as const })),
+      ])
+    for (const [id, item] of pending) {
+      if (item.sessionID !== target.sessionID || decision === "once") continue
+      if (decision === "always" && (!target.save?.length || item.metadata?.policy !== undefined)) continue
+      if (decision === "always" && !item.resources.every((resource) => allowed(item.sessionID, item.action, resource))) continue
+      frames.push({ sessionID: item.sessionID, requestID: id, reply: decision })
+      pending.delete(id)
+    }
     // repliedAfterResponse:SSE 与回复响应走两条连接,帧可以晚于响应、而且一条一条地到(目标在前)。
     if (options.repliedAfterResponse)
       frames.forEach((frame, index) => setTimeout(() => publish("permission.replied", frame), 30 * (index + 1)))
@@ -134,8 +148,9 @@ function fakeEngine(options: { repliedAfterResponse?: boolean } = {}) {
     return Response.json({ name: "FakeEngineUnknownRoute", data: { method, pathname } }, { status: 599 })
   }
 
-  /** 引擎问一次权限:规则放行就不问;要问就挂起并发 permission.asked。 */
+  /** 引擎问一次权限:规则或本会话放行就不问;要问就挂起并发 permission.asked。 */
   function ask(sessionID: string, action: string, resource: string) {
+    if (allowed(sessionID, action, resource)) return "allow"
     const effect = evaluate([...AGENT_RULES, ...(sessionRules.get(sessionID) ?? [])], action, resource)
     if (effect !== "ask") return effect
     const request = { id: `per_fake_${++sequence}`, sessionID, action, resources: [resource], save: ["*"] }
@@ -144,7 +159,7 @@ function fakeEngine(options: { repliedAfterResponse?: boolean } = {}) {
     return effect
   }
 
-  return { fetch: fetch as typeof globalThis.fetch, pending, replies, patches, sessionRules, ask }
+  return { fetch: fetch as typeof globalThis.fetch, pending, replies, patches, grants, ask }
 }
 
 function setup(options?: { repliedAfterResponse?: boolean }) {
@@ -340,58 +355,46 @@ describe("#1668 审批回执:reject 的连带", () => {
   })
 })
 
-describe("#1668 「本次会话内允许」:按 save 模式记会话规则 + once,放行已覆盖的待审,从不发 2.x always", () => {
-  /** 同一会话里一条新规则覆盖不到的待审(另一种动作)。 */
+describe("#1662 I-05 「本次会话内允许」:原样发 always,内核记本会话放行并只连带同会话被覆盖的待审", () => {
+  /** 同一会话里放行覆盖不到的待审(另一种动作)。 */
   const BASH = { id: "per_fake_bash", sessionID: sessionA, action: "bash", resources: ["rm -rf build"], save: ["rm *"] }
 
-  test("会话卡(.env,save [\"*\"])点「本次会话内允许」⇒ 每个 save 模式一条会话 allow(已有规则保留)再回 once;同会话的 other.env 待审被放行,之后再读 other.env 也不问", async () => {
+  test("会话卡(.env,save [\"*\"])点「本次会话内允许」⇒ 引擎收到 always,不写会话规则、不回 once;同会话的 other.env 由引擎连带了结,之后再读也不问,另一会话照问", async () => {
     const { engine, cards, replyV1 } = setup()
-    const existing: Rule = { action: "bash", resource: "git status", effect: "allow" }
-    engine.sessionRules.set(sessionA, [existing])
     engine.pending.set(BASH.id, structuredClone(BASH))
     const feed = await loadedFeed(() => cards(sessionA), replyV1(sessionA))
     const card = feed.state.requests.find((request) => request.id === a1)!
     expect(card.save).toEqual(["*"])
     await feed.reply(a1, createPermissionDecisionCommand(card, "always", "proj_1"))
-    expect(engine.patches).toEqual([{ permissions: [existing, { action: "read", resource: "*", effect: "allow" }] }])
-    expect(engine.replies).toEqual([
-      { requestID: a1, decision: "once" },
-      { requestID: a2, decision: "once" },
-    ])
+    expect(engine.replies).toEqual([{ requestID: a1, decision: "always" }])
+    expect(engine.patches).toEqual([])
     expect([...engine.pending.keys()].sort()).toEqual([b1, BASH.id].sort())
-    expect(engine.ask(sessionA, "read", ".env")).toBe("allow")
     expect(engine.ask(sessionA, "read", "other.env")).toBe("allow")
     expect(engine.ask(sessionB, "read", ".env")).toBe("ask")
   })
 
-  test("收据:resolvedRequestIDs = 目标 + 被放行的同会话待审(覆盖不到的 bash 不在其中),冻结 feed 据此一并收卡", async () => {
-    const { engine, cards, replyV2, fingerprint } = setup()
+  test("收据:resolvedRequestIDs = 目标 + 引擎同会话连带的 replied(覆盖不到的 bash 不在其中;连带帧晚于回复响应到达也收齐)", async () => {
+    const { engine, cards, replyV2, fingerprint } = setup({ repliedAfterResponse: true })
     engine.pending.set(BASH.id, structuredClone(BASH))
     const feed = await loadedFeed(() => cards(sessionA), replyV2(sessionA))
     expect(ids(feed).sort()).toEqual([a1, a2, BASH.id].sort())
     const receipt = await feed.reply(a1, { requestFingerprint: await fingerprint(a1), decisionID: "pdec_always", decision: "always", grantScope: { kind: "project", projectID: "proj_1" }, grantExpiresAt: null })
     expect(receipt).toMatchObject({ requestID: a1, decision: "always", resolvedRequestIDs: [a1, a2] })
     expect(ids(feed)).toEqual([BASH.id])
-    expect(engine.replies.map((item) => item.decision)).toEqual(["once", "once"])
+    expect(engine.replies.map((item) => item.decision)).toEqual(["always"])
 
-    // 同一流程对真 2.x 引擎(采样):收据列出 C1+C2,C 里不再有待审,会话上是 `read *` allow,再问 other.env 直接 allow。
+    // 同一流程对真 2.x 引擎(采样器 `permission` 剧本,经适配器 v2 入口):C1 a.env、C2 ab.env 都 save ["a*"],对 C1 回
+    // always ⇒ 收据列出 C1+C2、C 里不再有待审、会话规则没被写;C 里再问 a.env 直接 allow,再问 b.env 仍要问,另一会话问 a.env 仍要问。
     const real = fixture.sessionAlways
     expect(real.allowed.body.data.resolvedRequestIDs).toEqual([real.ids.c1, real.ids.c2])
     expect(real.pendingAfter.body.data).toEqual([])
-    expect(real.rules).toEqual([{ action: "read", resource: "*", effect: "allow" }])
-    expect(real.askOtherAgain.body.data.effect).toBe("allow")
+    expect(real.rules ?? []).toEqual([])
+    expect(real.askSame.body.data.effect).toBe("allow")
+    expect(real.askOther.body.data.effect).toBe("ask")
+    expect(real.askOtherSession.body.data.effect).toBe("ask")
   })
 
-  test("反向臂:只记所问的那个资源(.env)⇒ 再读 other.env 照样问,适配器也不会放行 other.env 的待审", () => {
-    const exact: Rule = { action: "read", resource: ".env", effect: "allow" }
-    expect(evaluate([...AGENT_RULES, exact], "read", "other.env")).toBe("ask")
-    expect(evaluateRules([exact], "read", "other.env")).toBe("ask")
-    const save: Rule = { action: "read", resource: "*", effect: "allow" }
-    expect(evaluate([...AGENT_RULES, save], "read", "other.env")).toBe("allow")
-    expect(evaluateRules([save], "read", "other.env")).toBe("allow")
-  })
-
-  test("请求没有 save ⇒ 409,不写规则、不回复(0.1.26 的卡此时不给这个按钮,内核也以冲突拒)", async () => {
+  test("请求没有 save ⇒ 409,不回复(0.1.26 的卡此时不给这个按钮,内核也以冲突拒)", async () => {
     const { engine, replyV2 } = setup()
     engine.pending.set(BASH.id, { ...structuredClone(BASH), save: [] })
     const command = {
@@ -405,29 +408,5 @@ describe("#1668 「本次会话内允许」:按 save 模式记会话规则 + onc
     expect(permissionDecisionSubmitError(error).kind).toBe("conflict")
     expect(engine.patches).toEqual([])
     expect(engine.replies).toEqual([])
-  })
-
-  test("适配器的规则判定与引擎原件逐条一致(renderer 没有 process,只能用移植件)", () => {
-    const vectors: Array<[string, string]> = [
-      ["other.env", "*"],
-      ["other.env", "*.env"],
-      [".env", "*.env"],
-      ["src/a.ts", "src/*"],
-      ["src\\a.ts", "src/*"],
-      ["a.ts", "a.t?"],
-      ["a.tsx", "a.t?"],
-      ["git status", "git status *"],
-      ["git status --short", "git status *"],
-      ["git statusx", "git status *"],
-      ["rm -rf build", "rm *"],
-      ["(x)+[y]", "(x)+[y]"],
-      ["a$b^c", "a$b^c"],
-      ["READ", "read"],
-      ["line1\nline2", "line1*"],
-    ]
-    for (const [input, pattern] of vectors) expect([input, pattern, wildcardMatch(input, pattern)]).toEqual([input, pattern, Wildcard.match(input, pattern)])
-    const rules: Rule[] = [...AGENT_RULES, { action: "bash", resource: "git *", effect: "allow" }, { action: "bash", resource: "git push *", effect: "deny" }]
-    for (const [action, resource] of [["read", "a.txt"], ["read", "x.env"], ["bash", "git status"], ["bash", "git push origin"], ["edit", "a.txt"]])
-      expect([action, resource, evaluateRules(rules, action!, resource!)]).toEqual([action, resource, evaluate(rules, action!, resource!)])
   })
 })

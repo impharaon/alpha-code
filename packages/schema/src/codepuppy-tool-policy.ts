@@ -231,3 +231,17 @@ export const TOOL_POLICY_RPC = {
   methods: { inventory: "inventory", setRecord: "setRecord", removeRecord: "removeRecord", reset: "reset" },
   errors: { quarantined: "quarantined", invalidRecord: "invalid-record", writeFailed: "write-failed" },
 } as const
+
+/**
+ * I-05 contract A(design upgrade-fewer-takeovers §4):扩展闸门发出或改写的审批请求在 metadata 里带的键;写方只有
+ * ext 闸门(gate.ts 的 confirm 与 gateWithoutToolCall)。
+ */
+export const TOOL_POLICY_REQUEST_KEY = "policy"
+
+/**
+ * 这条审批请求是不是 Code Puppy 工具策略的请求。读方:权限内核 always 连带的筛(packages/core/src/permission.ts 的
+ * `codepuppy(I-05)`)与 ext evaluate 钩子的分流(packages/ext/src/policy/index.ts)。键名只在这里定义,改名不会让筛悄悄失效。
+ */
+export function isCodePuppyPolicyRequest(metadata: unknown): boolean {
+  return typeof metadata === "object" && metadata !== null && TOOL_POLICY_REQUEST_KEY in metadata
+}

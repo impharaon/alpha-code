@@ -2,7 +2,8 @@
 //
 // 起一个隔离的 2.x 引擎(本仓 packages/cli `serve`,临时 HOME/XDG、临时 git 项目)与同目录的假模型,跑五个剧本,
 // 每条 `/api/event` 帧之后立刻读一次该会话的消息页(适配器投影器那一刻读到的),写成夹具;再经适配器实测会话级
-// 「总是允许」(打印结果,不写夹具)与 reject 连带、重放、二次回复(写 permission-reply.json)。
+// 「总是允许」(打印结果,不写夹具)与 reject 连带、重放、二次回复、会话内放行(写 permission-reply.json;
+// 只重采这一份:`bun sample.ts permission`)。
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
@@ -267,9 +268,11 @@ try {
       final: await finalOf(turn),
       diff: await call("GET", `/api/session/${turn}/diff?from=${userOf.get(turn)}`),
     })
+  }
 
-    // 6. 会话级「总是允许」,经适配器:界面的 v1 回复 `/permission/:id/reply {reply:"always"}` ⇒ 适配器按请求的 save 模式
-    //    (build 档位读 .env 时是 `*`)给会话追加 allow 规则 + 回 once。同一资源、另一资源都不再问(打印,不写夹具)。
+  if (run("base") || run("permission")) {
+    // 6. 会话级「总是允许」,经适配器:界面的 v1 回复 `/permission/:id/reply {reply:"always"}` ⇒ 适配器原样发 always,
+    //    内核给这个会话记 save 的每一项(build 档位读 .env 时是 `*`)。同一资源、另一资源都不再问(打印,不写夹具)。
     const always = await create()
     const asks: any[] = []
     const alwaysReplies: unknown[] = []
@@ -314,10 +317,13 @@ try {
     const pendingB = await exchange("GET", `/api/session/${sessionB}/permission`)
     const settled = await exchange("POST", `/api/session/${sessionB}/permission/${b1}/reply`, { decision: "once" })
     await Bun.sleep(300)
-    // 会话内允许放行已覆盖的待审:C1 .env、C2 other.env(save ["*"]),经适配器 v2 入口对 C1 回 always ⇒ 收据应列 C1+C2、
-    // 会话上多一条 `read *` allow;之后在 C 里再问一次 other.env,引擎直接判 allow(不挂起)。
+    // 会话内允许(I-05 契约 A):C1 a.env、C2 ab.env(save ["a*"]),经适配器 v2 入口对 C1 回 always ⇒ 收据应列 C1+C2、
+    // 会话规则不被写;之后在 C 里再问 a.env 直接 allow,再问 b.env(save 覆盖不到)仍要问,另一会话 D 问 a.env 仍要问。
+    const askSaving = (sessionID: string, path: string) =>
+      exchange("POST", `/api/session/${sessionID}/permission`, { agent: "build", action: "read", resources: [path], save: ["a*"] })
     const sessionC = await create()
-    const [c1, c2] = [await askVia(sessionC, ".env"), await askVia(sessionC, "other.env")].map((item) => item.body.data.id as string)
+    const sessionD = await create()
+    const [c1, c2] = [await askSaving(sessionC, "a.env"), await askSaving(sessionC, "ab.env")].map((item) => item.body.data.id as string)
     await Bun.sleep(300)
     await viaAdapter("GET", `/permission?directory=${encodeURIComponent(project)}`)
     const getC1 = await exchange("GET", `/api/session/${sessionC}/permission/${c1}`)
@@ -330,12 +336,14 @@ try {
     }
     const allowed = await viaAdapter("POST", `/api/session/${sessionC}/permission/${c1}/reply`, alwaysCommand)
     const sessionAlways = {
-      ids: { sessionC, c1, c2 },
+      ids: { sessionC, c1, c2, sessionD },
       command: alwaysCommand,
       allowed,
       pendingAfter: await exchange("GET", `/api/session/${sessionC}/permission`),
       rules: (await call("GET", `/api/session/${sessionC}`)).data.permissions,
-      askOtherAgain: await askVia(sessionC, "other.env"),
+      askSame: await askSaving(sessionC, "a.env"),
+      askOther: await askSaving(sessionC, "b.env"),
+      askOtherSession: await askSaving(sessionD, "a.env"),
     }
     const frames = records
       .map((record) => record.frame)
@@ -346,8 +354,9 @@ try {
           "`frames` = every permission.asked / permission.replied frame of A and B in arrival order. `pendingA` / `getA1` are the raw engine reads before replying; " +
           "`rejected` / `replay` are the adapter's v2 reply route for A1 (reject, then the same command again); `replyAgain` is a raw second engine reply to A1; " +
           "`pendingB` is B's list after the reject; `settled` is the raw once reply to B1. " +
-          "`sessionAlways`: C1 .env and C2 other.env (same ask shape) in session C; `allowed` is the adapter's v2 reply route for C1 with decision always; " +
-          "`pendingAfter` / `rules` are C's pending list and session rules right after; `askOtherAgain` is a fresh POST /api/session/:id/permission for other.env in C.",
+          "`sessionAlways`: C1 a.env and C2 ab.env (save [\"a*\"]) in session C; `allowed` is the adapter's v2 reply route for C1 with decision always; " +
+          "`pendingAfter` / `rules` are C's pending list and session rules right after; `askSame` / `askOther` are fresh POST /api/session/:id/permission for a.env / b.env in C, " +
+          "`askOtherSession` the same for a.env in a new session D.",
       ),
       ids: { sessionA, sessionB, a1, a2, b1 },
       created,

@@ -54,6 +54,7 @@ export const { Plugin } = await load("src/plugin.ts")
 export const { PluginHooks } = await load("src/plugin/hooks.ts")
 export const { Tool } = await load("src/tool.ts")
 export const { Permission } = await load("src/permission.ts")
+export const { PermissionSaved } = await load("src/permission/saved.ts")
 export const { Agent } = await load("src/agent.ts")
 export const { Session } = await load("src/session.ts")
 export const { SessionContext } = await load("src/session/context.ts")
@@ -192,6 +193,7 @@ export const HostLayer = AppNodeBuilder.build(
     nodes.PersistentPty.node,
     nodes.LocationServiceMap.node,
     Permission.node,
+    PermissionSaved.node,
     PluginHooks.node,
     nodes.Reference.node,
     Rpc.node,

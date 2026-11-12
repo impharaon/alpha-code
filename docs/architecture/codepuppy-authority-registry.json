@@ -672,7 +672,7 @@
     },
     {
       "id": "adr033-receipt-premises",
-      "decision": "The OpenCode 2 engine facts Code Puppy's receipt derivation relies on stay true: a pending request's payload cannot change under its id, one reply emits a replied event for every request it resolves, and a second reply is NotFound (ruling item 1 measurements).",
+      "decision": "The OpenCode 2 engine facts Code Puppy's receipt derivation relies on stay true: a pending request's payload cannot change under its id, one reply emits a replied event for every request it resolves (always and reject both cascade within the replying session only — always through the permission-session-grant block), and a second reply is NotFound (ruling item 1 measurements).",
       "adr": [
         "ADR-033"
       ],
@@ -689,7 +689,7 @@
         },
         {
           "file": "packages/ext/src/policy/permission-reply-premises.test.ts",
-          "name": "(ii) one always reply emits a replied event for every request it resolves, and only those"
+          "name": "(ii) one always reply emits a replied event for every request it resolves: the covered requests of its own session only"
         },
         {
           "file": "packages/ext/src/policy/permission-reply-premises.test.ts",
@@ -798,6 +798,60 @@
           "name": "the default is 300 s and every invalid override falls back to it, never to no deadline"
         }
       ]
+    },
+    {
+      "id": "permission-session-grant",
+      "decision": "\"Allow for this session\" behaves as in the current release 0.1.26: an always reply grants (action, each save item) to that session only, in memory; a configured deny still wins; another session and a child session created later still ask; nothing is written to the session row or the project's saved approvals, and the grant is gone when the engine stops; the reply's cascade releases only pending requests of the same session and never a Code Puppy policy ask (metadata.policy), which only its own card answers (I-05 contract A, design upgrade-fewer-takeovers §4).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "I-05 (#1662)",
+      "takeovers": [
+        "packages/opencode/src/permission/index.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/permission.ts",
+        "ladder": "L3 (re-taken: the codepuppy(#1128 §4.4, I-05) block — session grants in the permission service's memory, merged after the configured-deny check; the always cascade filters by session and skips requests isCodePuppyPolicyRequest recognises, packages/schema/src/codepuppy-tool-policy.ts)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/session-grant.test.ts",
+          "name": "an always reply grants the request's save patterns for its action in this session; a resource outside them and another action still ask"
+        },
+        {
+          "file": "packages/ext/src/policy/session-grant.test.ts",
+          "name": "an always reply to a request without save grants nothing: the same request asks again"
+        },
+        {
+          "file": "packages/ext/src/policy/session-grant.test.ts",
+          "name": "a configured deny outranks the grant; the same allow written as a session rule overrides it (known-bad arm)"
+        },
+        {
+          "file": "packages/ext/src/policy/session-grant.test.ts",
+          "name": "another session and a child session created after the grant still ask; a session rule is inherited by that child (known-bad arm)"
+        },
+        {
+          "file": "packages/ext/src/policy/session-grant.test.ts",
+          "name": "the grant writes neither the session's rules nor a saved approval"
+        },
+        {
+          "file": "packages/ext/src/policy/session-grant.test.ts",
+          "name": "the always cascade leaves another session's pending request pending even when it now evaluates to allow"
+        },
+        {
+          "file": "packages/ext/src/policy/session-grant-restart.test.ts",
+          "name": "an always grant is gone after the embedded engine restarts; a session rule in the same database survives the restart (control)"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "an always reply to a read leaves the pending /review policy ask pending: no replied event and no child session"
+        },
+        {
+          "file": "packages/ext/src/policy/session-grant-upstream-reds.test.ts",
+          "name": "exactly the ten pinned upstream cases fail in those three files; every other case passes"
+        }
+      ],
+      "note": "Known red by design (orchestrator ruling 2026-11-12, option 甲: not taken over). Upstream tests asserting that an always reply writes a project-level saved approval: packages/core/test/permission.test.ts \"stores and removes saved resources for a project\" and the seven \"<fixture>: always allow covers repeat execution and narrows prefix scope\" cases (numeric npm script prefix, numeric AWS option prefix, substitution prefix, redirect prefix, assignment redirect prefix, PowerShell method prefix, PowerShell tab prefix); packages/core/test/tool-shell.test.ts \"declarations reuse approvals while substitutions retain reject/once/always behavior\"; packages/server/test/permission-saved.test.ts \"edits saved permissions through PATCH\". Reproduce: cd packages/core && bun test test/permission.test.ts test/tool-shell.test.ts; cd packages/server && bun test test/permission-saved.test.ts. session-grant-upstream-reds.test.ts requires exactly these to fail (tool-shell's two pre-existing \"conditional substitutions respect once|always\" reds tolerated). Rollback: never revert permission.ts alone while the adapter sends always as it is — \"allow for this session\" would become a permanent project-level approval; revert the I-05 slice as one commit."
     },
     {
       "id": "adr041-collision-rejection",

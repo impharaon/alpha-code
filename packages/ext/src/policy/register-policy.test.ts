@@ -11,6 +11,7 @@ import { pathToFileURL } from "node:url"
 import {
   Agent,
   AgentPlugin,
+  Bus,
   Command,
   Config,
   ConfigCommandPlugin,
@@ -1210,6 +1211,48 @@ describe("E6: a subtask command passes the same decision as the subagent tool", 
       expect(yield* children(session.id)).toEqual([])
       yield* permission.reply({ requestID: request!.id, reply: "reject" })
       expect(Exit.isFailure(yield* E.Fiber.join(fiber))).toBe(true)
+      expect(yield* children(session.id)).toEqual([])
+    }),
+  )
+
+  // I-05 contract A invariant 6 (design upgrade-fewer-takeovers, review R1 #1): an always reply's cascade re-evaluates
+  // the session's other pending requests; a Code Puppy policy ask that the rules themselves allow (the extension made
+  // it ask) re-evaluates to allow there, so the kernel must skip it. Only its own card answers it.
+  it.live("an always reply to a read leaves the pending /review policy ask pending: no replied event and no child session", () =>
+    Effect.gen(function* () {
+      const { session } = yield* setup({
+        internal,
+        rules: [ALLOW_ALL, { action: "read", resource: "*", effect: "ask" }],
+        records: [...NEUTRAL, { selector: { level: "tool", canonical: "builtin::subagent" }, state: "ask" }],
+      })
+      const permission = yield* Permission.Service
+      const replied: { requestID: string }[] = []
+      const unsubscribe = yield* (yield* Bus.Service).listen((event: any) => {
+        if (event.type === Permission.Event.Replied.type) replied.push(event.data)
+        return Effect.void
+      })
+      yield* Effect.addFinalizer(() => unsubscribe)
+      const subtask = yield* Effect.forkChild(review(session.id))
+      const [policyAsk] = yield* pending
+      expect(policyAsk?.metadata).toMatchObject({ policy: { canonical: "builtin::subagent", askedBy: "policy" } })
+      const reading = yield* Effect.forkChild(
+        permission.assert({ sessionID: session.id, agent: "build", action: "read", resources: ["notes.md"], save: ["*"], metadata: {} } as never),
+      )
+      let read: any
+      for (let i = 0; i < 100 && !read; i += 1) {
+        read = (yield* permission.list()).find((request: any) => request.action === "read")
+        if (!read) yield* Effect.sleep("10 millis")
+      }
+      // Premise: re-evaluated now, the policy ask is allowed — so only the kernel's skip keeps it pending.
+      const { id: _id, message: _message, ...asked } = policyAsk as any
+      expect(yield* permission.allows({ ...asked, agent: "build" })).toBe(true)
+      yield* permission.reply({ requestID: read.id, reply: "always" })
+      yield* E.Fiber.join(reading)
+      expect((yield* permission.list()).map((request: any) => request.id)).toEqual([policyAsk!.id])
+      expect(replied.map((event) => event.requestID)).toEqual([read.id])
+      expect(yield* children(session.id)).toEqual([])
+      yield* permission.reply({ requestID: policyAsk!.id, reply: "reject" })
+      expect(Exit.isFailure(yield* E.Fiber.join(subtask))).toBe(true)
       expect(yield* children(session.id)).toEqual([])
     }),
   )

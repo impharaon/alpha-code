@@ -9,17 +9,17 @@
 //   2. 回复前重读 `GET /api/session/:sessionID/permission/:requestID`:不在了 ⇒ 404(过期,什么都不发);
 //      指纹变了 ⇒ 409(什么都不发)。
 //   3. 了结集合取自 `permission.replied`:发出前先订阅 `/api/event`(等到 `server.connected` 才算订上),回复之后
-//      收齐 —— 目标自己那条,加上 reject 在同一会话里连带了结的每一条(引擎先发目标、再逐条发连带,前提 ii)。
-//      SSE 与回复的 HTTP 响应走两条连接,谁先到不保证:回复前先记下同会话的待审请求,回复后等到它们各自的
-//      replied 到齐(或 SETTLE_MS 到点)再出收据,而不是赌「响应到时事件已经到了」。
+//      收齐 —— 目标自己那条,加上这次回复在同一会话里连带了结的每一条(reject 连带同会话全部待审;always 连带同会话里
+//      新放行覆盖的待审;引擎先发目标、再逐条发连带,前提 ii)。SSE 与回复的 HTTP 响应走两条连接,谁先到不保证:
+//      回复前记下同会话的待审,回复返回后再读一次;「回复前在、回复后不在」的每一条等到它的 replied(或 SETTLE_MS
+//      到点)再出收据,到点仍未确认的不进收据 —— 不赌「响应到时事件已经到了」,也不猜。
 //   4. 幂等:收据按请求记一辈子(窗口寿命,不落盘 —— 引擎重启后挂起请求全没了,前提 iii)。同一个 decisionID
 //      再来一次 ⇒ 原样交回那张收据,不再碰引擎;同一请求换了 decisionID 或决定 ⇒ 409。v1 的两个回复入口不带
 //      decisionID,按请求派生 `pdec_v1_<id>`(与冻结 adaptPermissionV1Receipt 的缺省同名)。
 //
-// 「本次会话内允许」(v1 `always`)不用 2.x 的 `always`(那是项目级持久授权),照 0.1.26 的 v1 `always` 做(编排器
-// 2026-11-12 裁决;界面权威是当前正式版):给会话按请求的每个 `save` 模式追加一条 allow 规则 —— 审批卡「将记住」
-// 的文案就是逐项写的 `save`(PermissionDialog.tsx rememberedText)—— 再回 `once`;然后把同一会话里新规则已覆盖的
-// 其余待审请求逐条回 `once`,它们的 id 进收据的 resolvedRequestIDs(0.1.26 内核 reply() 的同一步)。
+// 「本次会话内允许」(v1 `always`)原样发 2.x 的 `always`:Code Puppy 接管的权限内核把它做成 0.1.26 的会话内放行
+// (只限本会话、只在内存、赢不过已配置的 deny,连带只了结同会话被覆盖的待审、不碰 Code Puppy 策略请求 —— I-05 契约 A,
+// design upgrade-fewer-takeovers §4)。这里不判定、不改会话规则。
 import type { OpenCodeClient, PermissionRequest } from "@opencode/client/promise"
 import type { PermissionV2Decision, PermissionV2DecisionReceipt } from "@opencode-ai/sdk/v2/client"
 import { toV1PermissionRequest } from "./v1-shapes"
@@ -134,78 +134,14 @@ async function openRepliedWindow(api: OpenCodeClient) {
         })
       }
       wake = undefined
-      // 连带只有 reject(同一会话);`once` 不连带,`always` 从不发给引擎。窗口里别处的 once/reject 不算这次的。
-      const cascade =
-        input.decision === "reject"
-          ? seen.filter(
-              (item) =>
-                item.afterSend && item.reply === "reject" && item.sessionID === input.sessionID && item.requestID !== input.target,
-            )
-          : []
+      // 连带 = 发出后到达、同一会话、reply 等于本次决定的 replied(`once` 不连带)。窗口里别处的回复不算这次的。
+      const cascade = seen.filter(
+        (item) => item.afterSend && item.reply === input.decision && item.sessionID === input.sessionID && item.requestID !== input.target,
+      )
       return [input.target, ...new Set(cascade.map((item) => item.requestID))]
     },
     close: () => controller.abort(),
   }
-}
-
-type Rule = { action: string; resource: string; effect: "allow" | "deny" | "ask" }
-
-/**
- * 2.x 引擎的 `Wildcard.match`(packages/core/src/util/wildcard.ts)与 `evaluate`(packages/core/src/permission.ts:94-104)。
- * 不能直接引那两个文件:wildcard.ts 读 `process.platform`,renderer 是 sandbox + contextIsolation(main/windows.ts:182-184),
- * 没有 `process`,一调用就 ReferenceError;permission.ts 带着整个 Effect 服务层。这里只去掉 win32 的大小写不敏感分支 ——
- * 引擎只跑在 macOS 本机与 WSL(Linux)上,两者都走大小写敏感那一支。与引擎原件逐条比对的测试在 permission-reply.test.ts。
- */
-export function wildcardMatch(input: string, pattern: string) {
-  const normalized = input.replaceAll("\\", "/")
-  let escaped = pattern
-    .replaceAll("\\", "/")
-    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-    .replace(/\*/g, ".*")
-    .replace(/\?/g, ".")
-  if (escaped.endsWith(" .*")) escaped = escaped.slice(0, -3) + "( .*)?"
-  return new RegExp("^" + escaped + "$", "s").test(normalized)
-}
-
-/** 最后一条命中的规则说了算;都不命中 ⇒ ask。 */
-export function evaluateRules(rules: readonly Rule[], action: string, resource: string): Rule["effect"] {
-  return rules.findLast((rule) => wildcardMatch(action, rule.action) && wildcardMatch(resource, rule.resource))?.effect ?? "ask"
-}
-
-/** 「本次会话内允许」:每个 `save` 模式一条 allow 规则追加到会话上(已有规则原样保留);交回写入后的会话规则。 */
-async function allowForSession(api: OpenCodeClient, request: PermissionRequest) {
-  const session = await api.session.get({ sessionID: request.sessionID })
-  const permissions: Rule[] = [
-    ...(session.permissions ?? []),
-    ...(request.save ?? []).map((resource) => ({ action: request.action, resource, effect: "allow" as const })),
-  ]
-  await api.session.update({ sessionID: request.sessionID, permissions })
-  return permissions
-}
-
-/**
- * 同一会话里其余待审请求,凡每个资源都被会话规则判为 allow 的,逐条回 `once`。只看会话这一层就够:引擎的判定顺序是
- * 档位规则 → 会话规则 → 项目保存的规则(只有 allow),取最后命中的一条 —— 会话层判 allow,重问一次引擎也是 allow。
- * 尽力而为:目标已经回复过了,这里某一条失败(别处先答了 ⇒ 404,或断网)只是不进收据,不让整张收据作废。
- */
-async function releaseCovered(api: OpenCodeClient, sessionID: string, target: string, rules: readonly Rule[]) {
-  const released: string[] = []
-  const pending = await api.permission.list({ sessionID }).catch((error) => {
-    console.error("[engine-adapter] could not list pending permissions to release", sessionID, error)
-    return []
-  })
-  for (const item of pending) {
-    if (item.id === target || !item.resources.every((resource) => evaluateRules(rules, item.action, resource) === "allow")) continue
-    const ok = await api.permission.reply({ sessionID, requestID: item.id, decision: "once" }).then(
-      () => true,
-      (error) => {
-        if (!isNotFound(error)) console.error("[engine-adapter] could not release a covered permission", item.id, error)
-        return false
-      },
-    )
-    if (ok) released.push(item.id)
-  }
-  return released
 }
 
 function sameDecision(receipt: PermissionV2DecisionReceipt, input: DecisionInput) {
@@ -250,15 +186,14 @@ export function createPermissionReplies() {
     // 0.1.26 的 v2 内核对没有 save 的 always 也回冲突。
     if (input.decision === "always" && !current.save?.length) return { type: "conflict" }
 
-    const engineDecision = input.decision === "always" ? "once" : input.decision
     const window = await openRepliedWindow(api)
     try {
-      const sessionRules = input.decision === "always" ? await allowForSession(api, current) : undefined
-      const expectedCascade =
-        engineDecision === "reject" ? (await api.permission.list({ sessionID })).map((item) => item.id).filter((id) => id !== requestID) : []
+      // 同会话的其余待审:回复之后「前在后不在」的才是这次连带了结的(`once` 不连带)。
+      const before =
+        input.decision === "once" ? [] : (await api.permission.list({ sessionID })).map((item) => item.id).filter((id) => id !== requestID)
       window.markSent()
       const sent = await api.permission
-        .reply({ sessionID, requestID, decision: engineDecision, ...(input.message ? { message: input.message } : {}) })
+        .reply({ sessionID, requestID, decision: input.decision, ...(input.message ? { message: input.message } : {}) })
         .then(
           () => true,
           (error) => {
@@ -267,9 +202,22 @@ export function createPermissionReplies() {
           },
         )
       if (!sent) return { type: "expired" }
-      const released = sessionRules ? await releaseCovered(api, sessionID, requestID, sessionRules) : []
-      const settled = await window.settle({ target: requestID, sessionID, decision: engineDecision, expected: expectedCascade })
-      const resolvedRequestIDs = [...settled, ...released]
+      // 回复已落定:重读失败不让这张收据作废,改为等「回复前在」的每一条(仍以 SETTLE_MS 为限,到点未确认的不进收据)。
+      const after = before.length
+        ? await api.permission.list({ sessionID }).then(
+            (items) => new Set(items.map((item) => item.id)),
+            (error) => {
+              console.error("[engine-adapter] could not re-read pending permissions after a reply", sessionID, error)
+              return new Set<string>()
+            },
+          )
+        : new Set<string>()
+      const resolvedRequestIDs = await window.settle({
+        target: requestID,
+        sessionID,
+        decision: input.decision,
+        expected: before.filter((id) => !after.has(id)),
+      })
       const receipt: PermissionV2DecisionReceipt = {
         requestID,
         sessionID,

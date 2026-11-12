@@ -22,7 +22,7 @@ last_reviewed: 2026-11-12
 - 依据:无 spec(内部工作;意图 [INT-upstream-upgrade-readiness @ 4c1b2c6](https://github.com/impharaon/alpha-work/blob/4c1b2c624b53619de97fa6bfa5679024d07abf17/docs/intents/INT-upstream-upgrade-readiness.md) I-05 / U-03 (a))。
   设计 @ `0a1d9d2fdd`:§4 契约 A(代码块、不变式 1–9、证明、消费方)、§5「A 的写入边界」「A 的连带」「已写入的会话规则」、§6 安全面、§9 A、§10 R-01–R-03、R-12–R-14;
   编排器派发书 `par-i05-slices`(2026-11-12)。Issue alpha-code#1662 正文 2026-11-12T06:42:12Z 版只作归属。下文 A1–A6 = 契约 A 不变式 1–6,A-消费方 = 契约 A「消费方」四条。
-- 核对:(实施会话在第一个实施提交里按编排器的核对结果填写)
+- 核对:`ed81202805` · 编排器 · 通过(每条不变式有带已知坏臂的证明、范围守住、未重述决定;裁决:上游测试按甲并加一条钉住清单的 Code Puppy 测试,切片 B 删尽文本回落与 P6;设计已获 owner 批准,2026-11-12「同意，界面数据约定和减少改上游文件两份方案都批准」)
 
 ### 改动
 
@@ -32,10 +32,11 @@ last_reviewed: 2026-11-12
 | `packages/core/src/permission.ts` | 第二个标注块 `codepuppy(#1128 §4.4, I-05)`:服务闭包里的 `sessionGrants`(`:183` 旁);`reply` 的 always 分支以写 `sessionGrants` 取代 `saved.add`(`:402-408`);`evaluateInput` 的 `all` 末尾并入本会话放行(`:229`,deny 判定 `:228` 不动);连带循环头两道筛(`:413`);`close` 里清空(`:186-198`)。单行插入用行尾 `// codepuppy(I-05)`,import 同。`savedRules` 只读不写,保持 |
 | `packages/ext/src/policy/gate.ts` | `confirm`(`:146`)与 `gateWithoutToolCall`(`:199`)写 `metadata` 的键改用 `TOOL_POLICY_REQUEST_KEY`(不变式 9) |
 | `packages/ext/src/policy/index.ts` | evaluate 钩子的分流(`:167`)改用 `isCodePuppyPolicyRequest` |
-| `packages/ext/src/policy/policy-host.cases.ts` | 多导出 `PermissionSaved`(只用于断言「没写项目级保存」) |
+| `packages/ext/src/policy/policy-host.cases.ts` | 多导出 `PermissionSaved` 并把它的节点放进宿主层(只用于断言「没写项目级保存」) |
 | `packages/ext/src/policy/session-grant.test.ts`(新) | A1–A5 在真插件宿主上的证明(生产内核 + Session + Agent + 插件钩子),每条带一条能红的对照臂;本会话 / 另一会话 / 之后建的子会话 / 已配置 deny / 不写会话行与保存 / 审查场景 2 |
 | `packages/ext/src/policy/session-grant-restart.test.ts`(新) | A4 的重启半场:真嵌入式引擎(`packages/ui-mac/engine/engine-embed.ts` 的 `startEngine` + 生产 `buildEngineServerOptions` / `withEngineAuthorization`,沿用 ext 测试预载的隔离根并先过 `assertEngineSandboxed`),同一个库文件关掉再起 |
 | `packages/ext/src/policy/register-policy.test.ts` | E6 子任务命令段加 A6(审查场景 1),复用该段的 `/review` 配置、`children`、`pending` |
+| `packages/ext/src/policy/session-grant-upstream-reds.test.ts`(新,裁决甲) | 跑下一节的三个上游文件,要求恰好登记的 10 条红、其余全绿(`tool-shell` 两条 I-05 前就红的容忍);判官先对合成 junit 证明会红 |
 | `packages/ext/src/policy/permission-reply-premises.test.ts` | premise (ii) 按设计 §4 消费方末条改写:`(ii) one always reply emits …` 与 `(ii) one always reply publishes …` 两条的连带请求改在同一会话,另一会话的覆盖请求照旧待审;头注同步。条数不变(6) |
 | `packages/ui-mac/src/engine-adapter/permission-replies.ts` | 「本次会话内允许」原样发 `always`;删 `allowForSession`、`releaseCovered`、`wildcardMatch`、`evaluateRules` 与 `Rule`;收窗改成契约 A 消费方第 2 条(回复前记本会话待审 → HTTP 回复返回后重读 → 「回复前在、回复后不在」的每条都收到 replied 或到 `SETTLE_MS` 收窗;`always` 与 `reject` 同一条);回执 = 目标 + 发出后到达、同会话、`reply` 等于本次决定的 replied;头注第 19–22 行改写。指纹、404、409、幂等、无 `save` 的 `always` 回冲突不动 |
 | `packages/ui-mac/src/engine-adapter/permission-reply.test.ts` | 假引擎按内核新语义回 `always`(本会话放行 + 只连带同会话、发 `replied{always}`),PATCH 只记录不生效;「本次会话内允许」一段改写;删匹配器逐条比对与只测 `evaluateRules` 的反向臂(被测函数已删);真引擎断言换成重采的夹具 |
@@ -44,9 +45,9 @@ last_reviewed: 2026-11-12
 | `docs/architecture/2026-11-09-1662-permission-reply-measurements.md` | 推导规格第 3 条「for `always` across sessions」改为同一会话,第 5 条去掉「always ruling 另行处理」(设计 §4 消费方末条点名) |
 | `docs/architecture/codepuppy-authority-registry.json` | 新在役项 `permission-session-grant`(机制 = `permission.ts` 的 I-05 标注块,L3;takeovers 记 v1 `packages/opencode/src/permission/index.ts`,F-01 的会话放行就在那里;证明 = 上面三个测试文件的具名用例);`adr033-receipt-premises` 的决定文字(always 只连带本会话)与改名的测试名 |
 | `.claude/rules/adrs/ADR-047-opencode2-engine-generation.md` | 「精确接管面」`permission.ts` 一行:两个标注块、守卫加本段测试、回滚写明不得只回退本文件(设计 §9 A);权威保持表 52 → 53 项、新增一行、`adr033` 一行同步 |
-| `scripts/gate-files.tsv` | 新增 `session-grant.test.ts`、`session-grant-restart.test.ts` 两行(精确条数;都是登记册证明文件,`assert-authority-proofs.sh` 要求有行);`register-policy.test.ts` 行 58 → 59 |
+| `scripts/gate-files.tsv` | 新增 `session-grant.test.ts`(6)、`session-grant-restart.test.ts`(1)、`session-grant-upstream-reds.test.ts`(2)三行(精确条数;都是登记册证明文件,`assert-authority-proofs.sh` 要求有行);`register-policy.test.ts` 行 58 → 59 |
 
-### 需要编排器裁决:十条上游测试随契约 A 转红
+### 编排器已裁决(甲):十条上游测试随契约 A 转红,不接管
 
 契约 A 不变式 4 不再写 `PermissionSaved`;上游自己的测试断言「回 always 就写项目级保存」。临时目录里用 Bun 装载插件把 `packages/core/src/permission.ts` 换成契约 A 草稿(工作树不动)实跑:
 
@@ -62,7 +63,7 @@ last_reviewed: 2026-11-12
 | 乙 | 三个文件成对接管(先例:`session-runner-retry.test.ts` 随 `to-session-error.ts`),只在 `codepuppy(I-05)` 标注处改那几条断言 | 接管 12 → 15;`tool-shell.test.ts` 上游 90 天 43 次改动,每日同步会更常停下等人工移植 |
 | 丙 | 只接管 `packages/core/test/permission.test.ts`(ADR-047 第 59 行本就写它随 `permission.ts` 归组),其余两条按甲登记 | 接管 12 → 13;8/10 条回绿 |
 
-未裁决前按甲实施;乙、丙要动 `UPSTREAM_EXCLUDES` 与 ADR-047 接管表,只在编排器裁决后做。
+裁决(编排器 2026-11-12):甲。在 ADR-047 与登记册新项里写明具名清单与复现命令,另加一条 Code Puppy 测试钉住清单(上表 `session-grant-upstream-reds.test.ts`)。
 
 ### 顺序
 
@@ -97,16 +98,23 @@ last_reviewed: 2026-11-12
 | 不变式 9 | `git grep -n 'policy: {\|"policy" in' -- packages/ext/src/policy/gate.ts packages/ext/src/policy/index.ts packages/core/src/permission.ts` 由今天的 3 处(`gate.ts:146`、`:199`、`index.ts:167`)变为零(`askedBy` 的取值 `"policy"` 不是这个键,不动;命令与输出进回执);行为上 A6 走生产写方与内核筛 | 写方另用字面量而筛用常量 ⇒ A6 的场景里筛认不出,红 |
 | premise (ii) | `permission-reply-premises.test.ts`「(ii) one always reply emits a replied event for every request it resolves: the covered requests of its own session only」与「(ii) one always reply publishes the target's replied event first, then the cascaded ones」 | 旧内核 ⇒ 另一会话的覆盖请求也被放行,红 |
 | A-消费方 | `permission-reply.test.ts`「本次会话内允许」段:引擎收到 `{decision:"always"}`、无 PATCH、无 once;回执 = 目标 + 同会话连带(覆盖不到的 bash 不在其中,连带帧晚于响应也收齐);无 save ⇒ 409 不发;真引擎夹具 `sessionAlways`:回执 `[c1, c2]`、C 无待审、会话规则 `[]`、`a.env` 再问 allow、`b.env` 再问 ask、另一会话问 `a.env` ask | 适配器仍走旧路径 ⇒ 引擎收到 once 与 PATCH,红;收窗不重读 ⇒ 连带 id 缺失或被 bash 拖满 2 s 后缺失,回执断言红 |
+| 已知为红的上游测试 | `session-grant-upstream-reds.test.ts`「exactly the ten pinned upstream cases fail in those three files; every other case passes」与判官自检「the judge is not empty…」 | 上游改了这 10 条(改名、删、改成通过)或三个文件出新红 ⇒ 红;旧内核 ⇒ 10 条全变绿 ⇒ 「now passes」,红 |
 | 端到端(采样器) | `sample.ts permission` 剧本 6 打印 `sessionScopedAlways` 与 `expected` 一致;剧本 7 的夹具即上一行的真引擎数据 | 采样直接读真引擎,不经测试替身 |
 
 ### 偏离记录
 
-暂无
+- 2026-11-12 · 裁决甲新增 `session-grant-upstream-reds.test.ts` 与它的登记行、登记册 / ADR-047 里的具名清单 · 编排器核对时的裁决 · 本切片提交。
+- 2026-11-12 · `policy-host.cases.ts` 除导出外还把 `PermissionSaved.node` 放进宿主层(不在层里时测试拿不到这个服务)· 同上。
+- 2026-11-12 · 重启测试起引擎后先等 build agent 带上 `read *.env` 的 ask 再问(插件在启动后才激活,之前问到的是缺 agent 的 deny,两头都证明不了)· 同上。
+- 2026-11-12 · 适配器回复后重读待审失败时,记一行错误并改等「回复前在」的每一条(仍以 `SETTLE_MS` 为限),不让已落定的回复因为重读失败而报错 · 同上。
+- 2026-11-12 · `permission-reply.test.ts` 的 v1 卡片用例不再断言 feed 收卡:v1 回复入口的收据只列目标,连带经投影的 replied 帧到达 feed(该文件 reject 段第三条覆盖);v2 用例断言收据含连带 · 同上。
+- 合并时要调的登记行(本分支没有这些行):整合分支 `scripts/gate-files.tsv` 的 `packages/ui-mac src/engine-adapter/permission-reply.test.ts` 16 → 14(「本次会话内允许」段 5 条改为 3 条),描述里会话规则 + once 的说法改为原样发 always。
+
 
 ## 切片 C — 失败码前缀的统一读法
 
 - 依据:设计 @ `0a1d9d2fdd` §4 契约 C、F-08、§10 R-05、R-07、R-14;派发书 Slice C。
-- 核对:(同上)
+- 核对:`ed81202805` · 编排器 · 通过(每条不变式有带已知坏臂的证明、范围守住、未重述决定;裁决:上游测试按甲并加一条钉住清单的 Code Puppy 测试,切片 B 删尽文本回落与 P6;设计已获 owner 批准,2026-11-12「同意，界面数据约定和减少改上游文件两份方案都批准」)
 
 ### 改动
 
@@ -141,7 +149,7 @@ last_reviewed: 2026-11-12
 ## 切片 B — 读目录卡由扩展从结构化结果生成
 
 - 依据:设计 @ `0a1d9d2fdd` §4 契约 B、§5「B 的写入边界」「历史(B)」、§9 B、§10 R-04;F-06、F-07;派发书 Slice B。
-- 核对:(同上)
+- 核对:`ed81202805` · 编排器 · 通过(每条不变式有带已知坏臂的证明、范围守住、未重述决定;裁决:上游测试按甲并加一条钉住清单的 Code Puppy 测试,切片 B 删尽文本回落与 P6;设计已获 owner 批准,2026-11-12「同意，界面数据约定和减少改上游文件两份方案都批准」)
 
 ### 需要编排器确认:旧记录的文本回落删不删
 

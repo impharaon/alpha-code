@@ -31,6 +31,7 @@ import { createToolPolicyStore, defaultPolicyBaseDir, type McpEntry } from "./re
 import { classifyPermissionRequest, RISK_METADATA_KEY } from "./risk"
 import { TOOL_POLICY_RPC_DEFINITION, toolPolicyHandlers } from "./rpc"
 import type { ToolDisplaySnapshotV1 } from "../../../schema/src/tool-identity"
+import { isCodePuppyPolicyRequest } from "../../../schema/src/codepuppy-tool-policy"
 import { HUB_INSTALL_ACTION } from "../hub-tools"
 
 export interface PolicyRegistration {
@@ -164,7 +165,7 @@ export async function registerPolicy(context: Plugin.Context): Promise<PolicyReg
   // Code Puppy's own gate requests already carry theirs (`confirm`); their ask is held so no later evaluate hook can
   // turn it into allow (`holdAsk`).
   await context.permission.hook("evaluate", async (event) => {
-    if (event.metadata && "policy" in event.metadata) return holdAsk(event)
+    if (isCodePuppyPolicyRequest(event.metadata)) return holdAsk(event)
     // A tool's permission action asserted without a tool call (a subtask command, review R1 #2) is decided like the
     // tool's call; a tool call's own assert already passed confirm() in execute.before.
     if (event.source === undefined) {

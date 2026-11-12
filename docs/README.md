@@ -398,6 +398,7 @@ status.
 | `SPEC-owned-settings-and-dialogs` | [specs/owned-settings-and-dialogs/spec.md](specs/owned-settings-and-dialogs/spec.md) | 设置、模型选择、审批与恢复使用一致交互，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-permission-risk-classification` | [specs/permission-risk-classification/spec.md](specs/permission-risk-classification/spec.md) | 高风险动作在执行前先完成分类，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-permission-risk-display` | [specs/permission-risk-display/spec.md](specs/permission-risk-display/spec.md) | 用户在授权时能看出动作的风险档位，保留历史条款、有效裁决和交付证据边界。 | draft |
+| `SPEC-project-agent-fields` | [specs/project-agent-fields/spec.md](specs/project-agent-fields/spec.md) | 项目文档里给 agent 写的 disable、tools、temperature 等字段在新引擎上重新生效,用不上的字段有记录可查 | draft |
 | `SPEC-project-mcp-installation` | [specs/project-mcp-installation/spec.md](specs/project-mcp-installation/spec.md) | 连接器可装到全局或当前项目并保持隔离，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-puppy-brand-icons` | [specs/puppy-brand-icons/spec.md](specs/puppy-brand-icons/spec.md) | 应用和各渠道使用一致的小狗标志，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-remote-database-connector` | [specs/remote-database-connector/spec.md](specs/remote-database-connector/spec.md) | 用户可在安全边界内连接自己的远程数据库，保留历史条款、有效裁决和交付证据边界。 | draft |
@@ -413,10 +414,12 @@ status.
 | `SPEC-tool-permission-policy` | [specs/tool-permission-policy/spec.md](specs/tool-permission-policy/spec.md) | 用户可按来源、服务和工具设置停用、询问或允许，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-tool-policy-settings` | [specs/tool-policy-settings/spec.md](specs/tool-policy-settings/spec.md) | 用户在设置里管理并保存工具权限，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-tool-write-fence` | [specs/tool-write-fence/spec.md](specs/tool-write-fence/spec.md) | 工具派生进程越界写文件时会失败，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-unattended-run-permissions` | [specs/unattended-run-permissions/spec.md](specs/unattended-run-permissions/spec.md) | 自动化任务遇到需要批准的工具时立即按权限裁决,允许的直接执行,不允许的立即说明原因,不再等 300 秒后失败 | draft |
 | `SPEC-untrusted-upstream-candidates` | [specs/untrusted-upstream-candidates/spec.md](specs/untrusted-upstream-candidates/spec.md) | 上游候选代码无法取得仓库推送凭据，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `DESIGN-upgrade-bootstrap-config` | [specs/upgrade-bootstrap-config/design.md](specs/upgrade-bootstrap-config/design.md) | 主进程今天经二十多个 CODEPUPPY_* 环境变量、启动命令、sidecar 进程内环境把决定交给 sidecar、引擎与 ext;收成一份有类型、有版本、每代 sidecar 一份、只在内存里的启动文档,环境变量只留给非 Code Puppy 的读者;最后一片给引擎换上 Code Puppy 自有的全局配置目录,首次切换时把独立 OpenCode 的全局内容复制一份过来 | approved |
 | `DESIGN-upgrade-extension-manifest` | [specs/upgrade-extension-manifest/design.md](specs/upgrade-extension-manifest/design.md) | Code Puppy 带进引擎的工具、MCP、插件、agent、技能、命令,今天经十条路径、五个读法、两套 v1→2.x 翻译进入引擎;收成一份 Code Puppy 自有的登记集合(内存里一个类型)、一份文档字段表与一个读取器、一张准入表和每类一个登记器;磁盘上的文件不改形状,用户文档照 I-07 G4 由引擎直接读,项目文档改用引擎自己的归一化读 | approved |
 | `DESIGN-upgrade-fewer-takeovers` | [specs/upgrade-fewer-takeovers/design.md](specs/upgrade-fewer-takeovers/design.md) | 逐项裁定 12 个上游接管文件与文本级权宜做法的去留;「本次会话内允许」做进已接管的权限内核(连带只限本会话、不放行 Code Puppy 策略请求),读目录卡改由扩展从结构化结果生成;失败码保留文字前缀并统一读法;接管块形状与记录在案的上游基准、构建期改写登记与上游挂点需求清单 | approved |
+| `PLAN-upgrade-fewer-takeovers` | [specs/upgrade-fewer-takeovers/plan.md](specs/upgrade-fewer-takeovers/plan.md) | I-05 本 lane 的三个切片:A「本次会话内允许」进已接管的权限内核(连带只限本会话、不放行 Code Puppy 策略请求,适配器删替身);C 失败码前缀的统一读法;B 读目录卡由扩展从结构化结果生成。切片 D 不在本 lane | active |
 | `DESIGN-upgrade-ui-contract` | [specs/upgrade-ui-contract/design.md](specs/upgrade-ui-contract/design.md) | 界面与引擎之间的请求、事件、错误和形状定成 Code Puppy 自有的一份约定;引擎适配器拆成代际无关的约定与管道加每代一个翻译器;翻译器不再引冻结界面内部函数,Code Puppy 自有代码只经约定模块接触冻结的两个客户端包;冻结界面零字节改动 | approved |
 | `PLAN-upstream-upgrade-readiness-i08` | [specs/upstream-upgrade-readiness/plan-i08.md](specs/upstream-upgrade-readiness/plan-i08.md) | INT-upstream-upgrade-readiness I-08 的隔离一半——ext、ui-mac 与 core / schema / plugin / ai 里的 Code Puppy 测试,在任何模块求值之前就把 HOME、XDG_*、OPENCODE_DB、TMPDIR 指进新建的临时根;每个包一条守卫测试 | active |
 | `PLAN-upstream-upgrade-readiness-i09` | [specs/upstream-upgrade-readiness/plan-i09.md](specs/upstream-upgrade-readiness/plan-i09.md) | INT-upstream-upgrade-readiness I-09 的两段计划:旧名例外登记表改按内容定位(不再按行号);闸门文件登记簿的写回模式能处理已删文件,并把本分支的两道登记闸带回全绿 | active |

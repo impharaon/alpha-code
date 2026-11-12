@@ -147,3 +147,45 @@ describe("projectPluginContext:有效名已存在 ⇒ 拒绝;新名照常注册;
     ])
   })
 })
+
+describe("projectPluginContext:permission 不给回复待批请求、不给改 / 删已存的批准(#1666 第 3 条);assert / hook / list 原样", () => {
+  test("reply / saved.update / saved.remove 被拒并按 ADR-041 同一格式记一行,一个都不到下面;别的成员是同一个对象", async () => {
+    const reached: string[] = []
+    const base = {
+      tool: { transform: async () => ({ dispose: async () => {} }) },
+      permission: {
+        reply: async () => void reached.push("reply"),
+        assert: async () => void reached.push("assert"),
+        hook: async () => ({ dispose: async () => {} }),
+        list: async () => [],
+        saved: { list: async () => [], update: async () => void reached.push("saved.update"), remove: async () => void reached.push("saved.remove") },
+      },
+    }
+    const errors: string[] = []
+    const guarded = projectPluginContext(base as never, (m) => void errors.push(m)) as typeof base
+    expect(await guarded.permission.reply({ sessionID: "ses_1", requestID: "per_1", decision: "once" } as never)).toBeUndefined()
+    expect(await guarded.permission.saved.update({ id: "per_saved_1", effect: "allow" } as never)).toBeUndefined()
+    expect(await guarded.permission.saved.remove({ id: "per_saved_2" } as never)).toBeUndefined()
+    expect(guarded.permission.assert).toBe(base.permission.assert)
+    expect(guarded.permission.hook).toBe(base.permission.hook)
+    expect(guarded.permission.list).toBe(base.permission.list)
+    expect(guarded.permission.saved.list).toBe(base.permission.saved.list)
+    await guarded.permission.assert()
+    expect(reached).toEqual(["assert"])
+    expect(errors).toEqual([
+      '[@codepuppy/ext] project plugin permission reply "per_1" refused: approvals belong to the user, not to a project plugin (ADR-041)',
+      '[@codepuppy/ext] project plugin permission saved.update "per_saved_1" refused: approvals belong to the user, not to a project plugin (ADR-041)',
+      '[@codepuppy/ext] project plugin permission saved.remove "per_saved_2" refused: approvals belong to the user, not to a project plugin (ADR-041)',
+    ])
+  })
+  test("2.x 的 Context 今天没有 permission.saved:拦截照样在(上游加上也不漏)", async () => {
+    const errors: string[] = []
+    const base = { tool: { transform: async () => ({ dispose: async () => {} }) }, permission: { reply: async () => {} } }
+    const guarded = projectPluginContext(base as never, (m) => void errors.push(m)) as unknown as {
+      permission: { saved: { update: (input: unknown) => Promise<void>; list?: unknown } }
+    }
+    await guarded.permission.saved.update({ id: "per_saved_3" })
+    expect(guarded.permission.saved.list).toBeUndefined()
+    expect(errors).toEqual(['[@codepuppy/ext] project plugin permission saved.update "per_saved_3" refused: approvals belong to the user, not to a project plugin (ADR-041)'])
+  })
+})

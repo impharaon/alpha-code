@@ -11,6 +11,11 @@
 // update / remove,一律拒绝并记一行。不然一个项目插件就能顶掉、改写(比如包住 execute)或删掉 Code Puppy、上游或 MCP 的工具
 // (2.x 的工具编辑器同名 add 即覆盖,update / remove 不问归属)。每个项目插件各拿一份 Context,「自己的工具」不跨插件。
 //
+// 待批请求的回复(编排器裁决,#1666 c6756103246 第 3 条):L4 实测,透传出去的 Context 能对 Code Puppy 待批的请求直接回 once,
+// 调用随即执行。所以项目插件拿到的 `permission` 不给 `reply`,也不给 `saved.update` / `saved.remove`(改 / 删已存的批准):
+// 调用一律拒绝并按上面同一格式记一行,返回 undefined、不抛(与工具的拒绝同口径,不让项目插件的钩子在宿主里变成缺陷)。
+// 它自己的 `permission.assert` 与 `permission.hook` 原样;它的 evaluate 钩子由 L4 的 holdAsk 约束(policy/,不在本文件)。
+//
 // 信任门(安全红线):项目 plugin = 可执行 JS,只在项目已 consent 时加载(loadProjectPlugins 门控)。
 // ADR-006:项目 plugins 必须是**自包含 ESM JS**(生 TS 桌面必崩)—— 只收 .js,加载失败 loud 不阻断。
 
@@ -47,11 +52,16 @@ export function effectiveToolName(tool: ToolLike): string {
   return tool.options?.namespace === undefined ? name : `${tool.options.namespace.replaceAll(".", "_")}_${name}`
 }
 
-/** 给一个项目插件的插件 Context:`tool.transform` 拿到的编辑器只许动它自己注册的工具(ADR-041),其余原样。 */
+/**
+ * 给一个项目插件的插件 Context:`tool.transform` 拿到的编辑器只许动它自己注册的工具(ADR-041);`permission` 不给回复待批请求、
+ * 不给改 / 删已存的批准(#1666 第 3 条);其余原样。
+ */
 export function projectPluginContext<C extends { readonly tool: ToolDomainLike }>(context: C, error: (m: string) => void): C {
   /** 这个项目插件经本 Context 的编辑器注册成功的有效名(跨它的各次 transform 与重建)。 */
   const own = new Set<string>()
-  const refuse = (what: string, id: string, why: string) => error(`[@codepuppy/ext] project plugin tool ${what} "${id}" refused: ${why} (ADR-041)`)
+  const report = (domain: string, what: string, id: string, why: string) =>
+    error(`[@codepuppy/ext] project plugin ${domain} ${what} "${id}" refused: ${why} (ADR-041)`)
+  const refuse = (what: string, id: string, why: string) => report("tool", what, id, why)
   const guard = (editor: ToolEditorLike): ToolEditorLike =>
     new Proxy(editor, {
       get: (target, key, receiver) => {
@@ -81,7 +91,31 @@ export function projectPluginContext<C extends { readonly tool: ToolDomainLike }
         ? (callback: (editor: ToolEditorLike) => void) => target.transform((editor) => callback(guard(editor)))
         : Reflect.get(target, key, receiver),
   })
-  return new Proxy(context, { get: (target, key, receiver) => (key === "tool" ? tool : Reflect.get(target, key, receiver)) })
+  const approvals = "approvals belong to the user, not to a project plugin"
+  const idOf = (input: unknown, key: string) => String((input as Record<string, unknown> | undefined)?.[key] ?? "")
+  const refusing = (what: string, key: string) => async (input: unknown) => void report("permission", what, idOf(input, key), approvals)
+  const inner = (context as { readonly permission?: object }).permission
+  // `saved` 今天不在 2.x promise 插件 Context 上(adapter.ts 的 permission 只有 hook / list / get / reply / assert);
+  // 这里照样拦住它的 update / remove,上游哪天加上也不会漏过去,list / get 之类原样透传。
+  const saved = (target: object | undefined) =>
+    new Proxy(target ?? {}, {
+      get: (savedTarget, key, receiver) =>
+        key === "update" ? refusing("saved.update", "id") : key === "remove" ? refusing("saved.remove", "id") : Reflect.get(savedTarget, key, receiver),
+    })
+  const permission =
+    inner &&
+    new Proxy(inner, {
+      get: (target, key, receiver) =>
+        key === "reply"
+          ? refusing("reply", "requestID")
+          : key === "saved"
+            ? saved(Reflect.get(target, key, receiver) as object | undefined)
+            : Reflect.get(target, key, receiver),
+    })
+  return new Proxy(context, {
+    get: (target, key, receiver) =>
+      key === "tool" ? tool : key === "permission" && permission ? permission : Reflect.get(target, key, receiver),
+  })
 }
 
 const isProjectPlugin = (value: unknown): value is ProjectPlugin => {

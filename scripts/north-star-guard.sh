@@ -68,7 +68,8 @@ case "${1:-}" in
   '') ;;
   --print-jurisdiction) GUARD_MODE=print-jurisdiction; shift ;;
   --print-takeover) GUARD_MODE=print-takeover; shift ;;
-  *) echo "✗ 未知参数:$1(本脚本只接受 --print-jurisdiction / --print-takeover)" >&2; exit 2 ;;
+  --print-upstream-parent) GUARD_MODE=print-upstream-parent; shift ;;
+  *) echo "✗ 未知参数:$1(本脚本只接受 --print-jurisdiction / --print-takeover / --print-upstream-parent)" >&2; exit 2 ;;
 esac
 [ "$#" -eq 0 ] || { echo "✗ 多余参数:$*" >&2; exit 2; }
 
@@ -207,11 +208,44 @@ CODEPUPPY_OWNED_MARKER="north-star:codepuppy-owned"
 # 的一部分 —— 度量步在拿不到 origin/dev 时要自己判「未测量」,它不能先被守卫的 fetch/降级
 # 逻辑改写状态。行为判据在 packages/ui-mac/src/main/north-star-drift-metrics.test.ts:那里把
 # 本脚本复制一份、只删掉三条 exclude,断言度量步打印的条数**跟着变**(杀掉「印一个写死的数」)。
+# ── 受审上游合并的判定(`#1664`,说明见下文「含受审上游合并的分支」一段):写成函数,守卫与只读模式
+# `--print-upstream-parent` 共用这一份。只读模式不 fetch,用本地已有的 origin/alpha(陈旧只会把窗口撑宽,
+# 合并照样认得出);origin/alpha 取不到时什么都不印,调用方按「没有上游父」处理(全量扫,过报不漏报)。
+tree_has_codepuppy_package() { # $1 = commit
+  local pkg
+  for pkg in $CODEPUPPY_OWNED_PACKAGES; do
+    git cat-file -e "${1}:packages/${pkg}" 2>/dev/null && return 0
+  done
+  return 1
+}
+detect_upstream_merge() {
+upstream_merge=""
+upstream_parent=""
+for merge in $(git rev-list --topo-order --merges origin/alpha..HEAD); do
+  for parent in $(git rev-list --no-walk --parents "$merge" | cut -d' ' -f3-); do
+    if ! tree_has_codepuppy_package "$parent"; then
+      upstream_merge="$merge"
+      upstream_parent="$parent"
+      break 2
+    fi
+  done
+done
+}
+
 if [ "$GUARD_MODE" = print-jurisdiction ]; then
   printf 'UPSTREAM_PATHS\t%s\n' "$UPSTREAM_PATHS"
   printf 'CODEPUPPY_OWNED_PACKAGES\t%s\n' "$CODEPUPPY_OWNED_PACKAGES"
   printf 'UPSTREAM_MIRROR\t%s\n' "$UPSTREAM_MIRROR"
   printf 'UPSTREAM_EXCLUDES_COUNT\t%s\n' "${#UPSTREAM_EXCLUDES[@]}"
+  exit 0
+fi
+if [ "$GUARD_MODE" = print-upstream-parent ]; then
+  # I-09:文档类闸(scripts/docs-gates.sh)在含受审上游合并的分支上只判 Code Puppy 的地盘 —— 与上游父逐字节
+  # 相同的路径是上游的,不归我们 lint。上游父怎么认只在这里定义一次。
+  if git rev-parse --verify --quiet origin/alpha >/dev/null; then
+    detect_upstream_merge
+    [ -z "$upstream_parent" ] || printf '%s\n' "$upstream_parent"
+  fi
   exit 0
 fi
 if [ "$GUARD_MODE" = print-takeover ]; then
@@ -343,24 +377,7 @@ fi
 # 吸收 alpha 的合并,另一个父都带着这些包,不会被认错。不用 UPSTREAM_MIRROR 判:它会陈旧 —— 2026-11-09 的
 # origin/dev 仍停在 1.x 的 `055d95bb`,不含 `33f94fce96`。离 HEAD 最近的那个算数(`--topo-order` 先列子提交)。
 # 合入 alpha 之后 M0 已在 origin/alpha 里,这里找不到候选,行为回到上面的 origin/alpha 基准,逐字不变。
-tree_has_codepuppy_package() { # $1 = commit
-  local pkg
-  for pkg in $CODEPUPPY_OWNED_PACKAGES; do
-    git cat-file -e "${1}:packages/${pkg}" 2>/dev/null && return 0
-  done
-  return 1
-}
-upstream_merge=""
-upstream_parent=""
-for merge in $(git rev-list --topo-order --merges origin/alpha..HEAD); do
-  for parent in $(git rev-list --no-walk --parents "$merge" | cut -d' ' -f3-); do
-    if ! tree_has_codepuppy_package "$parent"; then
-      upstream_merge="$merge"
-      upstream_parent="$parent"
-      break 2
-    fi
-  done
-done
+detect_upstream_merge
 if [ -n "$upstream_parent" ]; then
   echo "    · 本分支含受审上游合并 $(git rev-parse --short "$upstream_merge")(上游父 $(git rev-parse --short "$upstream_parent"))—— packages/ 以上游父为基准判,新增文件也算(基线 §2.3 第 4 步,\`#1664\`)"
 fi

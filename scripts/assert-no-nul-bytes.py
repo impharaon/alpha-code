@@ -34,7 +34,12 @@
 把字面 NUL 换成转义写法 `\\u0000`。它在 TS/JS 的 `"..."`、`'...'` 与模板字面量 `` `...` ``
 里都合法,运行时**逐字节等价**,而且 grep 看得见。
 
-用法:python3 scripts/assert-no-nul-bytes.py
+用法:python3 scripts/assert-no-nul-bytes.py [--skip-identical-to <上游父>]
+
+`--skip-identical-to`(I-09):含受审上游合并的分支上,与那个上游父**逐字节相同**的文件是上游原样,不归本仓
+lint(上游二进制资源里的 NUL 不是我们的缺陷,也不是我们能改的)。只跳过「索引 blob 与上游父同路径 blob 相同、
+工作树也没改」的文件;自有包、文档、脚本、接管文件与上游父不同(或上游没有),照常扫。上游父由
+`scripts/north-star-guard.sh --print-upstream-parent` 给出(scripts/docs-gates.sh 传进来),本文件不另认。
 """
 
 from __future__ import annotations
@@ -178,6 +183,26 @@ def read_content(root: str, rel_path: str) -> bytes | None:
     return done.stdout if done.returncode == 0 else None
 
 
+def identical_to(root: str, rev: str) -> set[str]:
+    """与 `rev` 同路径 blob 逐字节相同、且工作树没改的路径。git 失败即抛 —— 认不出上游父不能变成「少扫」。"""
+    def z(args: list[str]) -> list[bytes]:
+        out = subprocess.run(["git", "-C", root, *args], capture_output=True, check=True, env=git_env()).stdout
+        return [x for x in out.split(bytes((NUL_BYTE,))) if x]
+
+    upstream: dict[str, bytes] = {}
+    for entry in z(["ls-tree", "-r", "-z", rev]):
+        meta, _, path = entry.partition(b"\t")
+        upstream[path.decode("utf-8", "surrogateescape")] = meta.split(b" ")[2]
+    modified = {p.decode("utf-8", "surrogateescape") for p in z(["diff", "--name-only", "-z"])}
+    same: set[str] = set()
+    for entry in z(["ls-files", "-s", "-z"]):
+        meta, _, path = entry.partition(b"\t")
+        rel = path.decode("utf-8", "surrogateescape")
+        if upstream.get(rel) == meta.split(b" ")[1] and rel not in modified:
+            same.add(rel)
+    return same
+
+
 def self_check() -> list[str]:
     """开扫之前先证明探测器**真的能探到**,以及默认方向没被写反。
 
@@ -222,12 +247,28 @@ def main() -> int:
         print(f"::error::{problem}", file=sys.stderr)
         return 1
 
+    upstream_same: set[str] = set()
+    args = sys.argv[1:]
+    if args:
+        if len(args) != 2 or args[0] != "--skip-identical-to" or not args[1]:
+            print("::error::用法:assert-no-nul-bytes.py [--skip-identical-to <rev>]", file=sys.stderr)
+            return 2
+        try:
+            upstream_same = identical_to(root, args[1])
+        except subprocess.CalledProcessError as error:
+            print(f"::error::认不出与 {args[1]} 相同的文件(git 失败:{error})—— 本次测量作废,不是通过", file=sys.stderr)
+            return 1
+
     scanned = 0
     skipped = 0
     unreadable = 0
     findings: list[tuple[str, int, int, int]] = []
 
+    upstream_skipped = 0
     for rel_path in tracked_files(root):
+        if rel_path in upstream_same:
+            upstream_skipped += 1
+            continue
         if not should_scan(rel_path):
             skipped += 1
             continue
@@ -264,7 +305,9 @@ def main() -> int:
 
     print(
         f"✓ {scanned} 个版本控制文件零字面 NUL 字节 "
-        f"(跳过 {skipped} 个已登记二进制,{unreadable} 个非文本条目)"
+        f"(跳过 {skipped} 个已登记二进制,{unreadable} 个非文本条目"
+        + (f",{upstream_skipped} 个与上游父逐字节相同的文件" if upstream_same else "")
+        + ")"
     )
     return 0
 

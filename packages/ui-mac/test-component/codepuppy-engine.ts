@@ -105,8 +105,8 @@ export type HostOptions = {
   projectFiles?: Record<string, string>
   /** 引擎的库文件(默认按 engineSlot 分配);升级迁移要让 main 改写的库与引擎打开的库是同一个文件。 */
   databasePath?: string
-  /** 平台节点的模型表(默认只有一个 `m`)。 */
-  platformModels?: Record<string, unknown>
+  /** 平台节点的模型表(默认只有一个 `m`;`null` = 用注入从已应用目录算出的那份,不改)。 */
+  platformModels?: Record<string, unknown> | null
   /** false ⇒ 注入时不给 ext 目录(反向臂:同一份配置去掉 ext)。默认装。 */
   ext?: boolean
   /** 引擎的文件监听(生产默认开;默认这里关,要判「不重启就生效」时打开)。 */
@@ -162,7 +162,7 @@ export function codepuppyEngine(options: HostOptions) {
   const content = JSON.parse(injection.config.content) as { plugins: string[]; providers: Record<string, { models?: Record<string, unknown> }> }
   content.plugins = [...content.plugins, probeDir]
   // 沙箱里没有已应用的平台目录,平台节点的模型表是空的(`#1556`);补一个模型只为能发出请求
-  content.providers.codepuppy!.models = options.platformModels ?? { m: { name: "m" } }
+  if (options.platformModels !== null) content.providers.codepuppy!.models = options.platformModels ?? { m: { name: "m" } }
 
   const slot = { ...engineSlot(sandbox, name), ...(options.databasePath ? { databasePath: options.databasePath } : {}) }
   for (const [file, body] of Object.entries(options.projectFiles ?? {})) fs.writeFileSync(path.join(slot.projectDirectory, file), body)
@@ -205,7 +205,7 @@ export function codepuppyEngine(options: HostOptions) {
     if (withExt && (await status("codepuppy.ext")) !== "active") throw new Error("the real ext is not active in the embedded engine")
     return { send, close: () => engine.close() }
   }
-  return { start, slot, projectDirectory: slot.projectDirectory, userData, injection }
+  return { start, slot, projectDirectory: slot.projectDirectory, userData, injection, content }
 }
 
 /** ext 的策略存储(数据根 / 账户 / 工作区与 registerPolicy 同一套);ext 模块在沙箱就位之后才装载。 */

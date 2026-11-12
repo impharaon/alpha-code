@@ -72,7 +72,7 @@ describe("S7 同目录的其它 OpenCode 数据", () => {
   })
 
   // 分类与「这处锚守不住什么」登记在 ./source-text-anchors.ts。
-  test("ANCHOR (not a gate): server.ts 在 fork 之前(打包态)调 legacyCredentialImportRefusal,拒绝即抛", () => {
+  test("ANCHOR (not a gate): server.ts 在 fork 之前(每种运行形态)调 legacyCredentialImportRefusal,拒绝即抛", () => {
     const source = readFileSync(join(import.meta.dir, "server.ts"), "utf8")
     const check = source.indexOf("const refusal = await legacyCredentialImportRefusal({ dataDir, databasePath })")
     const fork = source.indexOf("(options.fork ?? electronNs.utilityProcess.fork)(sidecar")

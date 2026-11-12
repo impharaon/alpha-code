@@ -518,21 +518,20 @@ export async function spawnLocalServer(
   }
   // `#1667`(基线 S2 / S7):会话库与全局配置目录由 main 算(与 db-safety / mcp-default-deny 同一推导),显式进 `start()` 的选项。
   // 数据目录里的独立 OpenCode `auth.json` 会在 OpenCode 2 第一次跑导入迁移时进凭证表 ⇒ 拒 fork(fail-closed,原因可读)。
-  // 只在打包态查:非打包态(dev / 单测宿主)不碰真实数据目录,db-safety 的守卫范围同此(resolveDbPath 的「打包态 only」)。
+  // 每种运行形态都查,对着引擎这次真要打开的库与数据目录:非打包态(`bun run dev`)的引擎同样读真实数据目录,
+  // `OPENCODE_DB=<旧库副本>` 时同样会补跑导入迁移(审计 R1 第 1 条)。
   const databasePath = engineDatabasePath({ packaged: electronNs.app.isPackaged, env: sidecarEnv, home: homedir(), channel: CHANNEL })
-  if (electronNs.app.isPackaged) {
-    const dataDir = engineDataDirectory(sidecarEnv, homedir())
-    const refusal = await legacyCredentialImportRefusal({ dataDir, databasePath })
-    if (refusal) {
-      getLogger()?.error(refusal)
-      throw new Error(refusal)
-    }
-    const foreign = foreignOpenCodeData(dataDir, databasePath)
-    if (foreign.length)
-      getLogger()?.warn(
-        `engine data directory ${dataDir} also holds other OpenCode data (${foreign.join(", ")}) — Code Puppy shares this directory with standalone OpenCode installs (S7); it reads only ${databasePath}`,
-      )
+  const dataDir = engineDataDirectory(sidecarEnv, homedir())
+  const refusal = await legacyCredentialImportRefusal({ dataDir, databasePath })
+  if (refusal) {
+    getLogger()?.error(refusal)
+    throw new Error(refusal)
   }
+  const foreign = foreignOpenCodeData(dataDir, databasePath)
+  if (foreign.length)
+    getLogger()?.warn(
+      `engine data directory ${dataDir} also holds other OpenCode data (${foreign.join(", ")}) — Code Puppy shares this directory with standalone OpenCode installs (S7); it reads only ${databasePath}`,
+    )
   let fence: ProcessFenceStartInput | undefined
   try {
     fence = (options.planFence ?? planProductionFence)({ userDataPath: options.userDataPath, sidecarEnv, egressProxyPort })

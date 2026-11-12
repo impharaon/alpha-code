@@ -195,7 +195,7 @@ export const DOWNGRADED_ANCHORS: Record<string, SourceTextEntry> = {
     lines: 1,
   },
   "packages/ui-mac/src/main/engine-legacy-credentials.test.ts": {
-    why: "`#1667` 最后一条锚 server.ts 在 fork 之前(打包态)调 legacyCredentialImportRefusal、拒绝即抛(基线 S2)。两个不会让它变红的变异:①把这段包进恒假条件(isPackaged 判断写反);②拒绝原因算出来却只记日志不抛。server.ts 的打包态分支在 bun 里走不到(isPackaged 由 electron 给);同文件其余几条真执行判定函数,子进程那条在沙箱真引擎上证明导入真的会发生。",
+    why: "`#1667` 最后一条锚 server.ts 在 fork 之前(每种运行形态)调 legacyCredentialImportRefusal、拒绝即抛(基线 S2)。两个不会让它变红的变异:①把这段包进只在打包态成立的条件;②拒绝原因算出来却只记日志不抛。两者的行为判据在子进程那条:非打包态的生产 spawnLocalServer 对着沙箱真库拒绝、零 fork,同一条用例在沙箱真引擎上证明导入真的会发生;同文件其余几条真执行判定函数。",
     evidence: "#1667",
     lines: 1,
   },

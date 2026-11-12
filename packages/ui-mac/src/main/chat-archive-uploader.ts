@@ -146,14 +146,18 @@ export function createChatArchiveUploader(deps: ChatArchiveUploaderDeps): ChatAr
     return typeof parentId === "string" && parentId.length > 0 ? false : true
   }
 
-  /** 把「这条消息还在本次要看的范围里吗」写成一个地方 —— 翻页的停止条件与切轮的筛选同源。 */
-  function stillInScope(oldest: EngineMessage | undefined, scope: { after?: string; enabledAt: number }): boolean {
-    const info = oldest?.info
-    if (!info) return false // 形状不认得 ⇒ 不再往回翻(fail-safe,不是无限翻)
+  /**
+   * 把「这条消息还在本次要看的范围里吗」写成一个地方 —— 翻页的停止条件与切轮的筛选同源(`id` 与 `time.created`)。
+   * 判的是引擎给的**原始**记录(审计 R1 第 4 条):2.x 的每种消息记录都带 `id` 与 `time.created`,而投影会丢掉 `idle` 等
+   * 记录的时间,拿投影判会在一页恰好从 `idle` 开始时提前停翻。
+   */
+  function stillInScope(oldest: unknown, scope: { after?: string; enabledAt: number }): boolean {
+    const record = oldest && typeof oldest === "object" ? (oldest as { id?: unknown; time?: { created?: unknown } }) : undefined
+    if (!record) return false // 形状不认得 ⇒ 不再往回翻(fail-safe,不是无限翻)
     if (scope.after !== undefined) {
-      return typeof info.id === "string" && info.id > scope.after
+      return typeof record.id === "string" && record.id > scope.after
     }
-    const created = info.time?.created
+    const created = record.time?.created
     return typeof created === "number" && created > scope.enabledAt
   }
 
@@ -166,6 +170,8 @@ export function createChatArchiveUploader(deps: ChatArchiveUploaderDeps): ChatAr
    * R1 审计 MAJOR:只读一页就切轮,在积压 > 一页时会**跳过窗口外的旧轮次** —— 登出期间用 BYOK
    * continue 聊、或 alpha-web 故障期的长会话都到得了这个状态,而游标一旦跳到最新那几轮,
    * 窗口外的永远不会再发。所以这里按 `cursor.next` 往回翻,直到翻过游标(或翻过 enabled_at)。
+   * 页边界只按原始记录判;全部收齐之后**一次**投影(审计 R1 第 4 条:逐页投影时,跨页的 user / assistant 对里 user 拿不到
+   * assistant 的模型信息,那一轮被切轮层丢掉,游标却照样越过它)。
    */
   async function readMessages(
     sessionId: string,
@@ -173,7 +179,7 @@ export function createChatArchiveUploader(deps: ChatArchiveUploaderDeps): ChatAr
     scope: { after?: string; enabledAt: number },
   ): Promise<EngineMessage[] | null> {
     const server = await deps.awaitServer()
-    const collected: EngineMessage[] = []
+    const collected: unknown[] = []
     let before: string | undefined
     for (let page = 1; page <= maxMessagePages; page++) {
       const url = new URL(`${server.url.replace(/\/$/, "")}/api/session/${encodeURIComponent(sessionId)}/message`)
@@ -195,7 +201,7 @@ export function createChatArchiveUploader(deps: ChatArchiveUploaderDeps): ChatAr
         return null
       }
       const nextCursor = typeof body.cursor?.next === "string" && body.cursor.next ? body.cursor.next : undefined
-      const items = fromEngineV2Messages([...body.data].reverse())
+      const items = [...body.data].reverse()
       collected.unshift(...items) // 后取到的是更旧的一页,接在前面
       if (items.length === 0 || !nextCursor) break // 没有更旧的了
       if (!stillInScope(items[0], scope)) break // 这一页最旧的一条已经出了范围
@@ -212,7 +218,7 @@ export function createChatArchiveUploader(deps: ChatArchiveUploaderDeps): ChatAr
         })
       }
     }
-    return collected
+    return fromEngineV2Messages(collected)
   }
 
   async function postTurn(turn: ArchiveTurn, token: string): Promise<Response> {

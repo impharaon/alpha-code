@@ -403,6 +403,33 @@ describe("REQ-160 #1324 —— 积压超过一页时不得跳过旧轮次(R1 MAJ
     expect(h.archiveCalls).toHaveLength(0) // 启用之前完成的轮次照旧不回填
   })
 
+  // 审计 R1 第 4 条:2.x 的一轮是 user → assistant → idle 三条记录;70 轮积压 = 210 条,默认每页 100 条 ⇒ 三页。
+  // 逐页投影时:没有游标 ⇒ 第一页最旧的一条是 idle,投影丢了它的时间,只发出 33 轮就停翻;有游标 ⇒ 第 4 轮的 user 与
+  // assistant 分在两页,user 拿不到模型信息被丢掉,发出 69 轮。两种情况游标都推到最新,漏掉的再也不会发。
+  test("70 轮积压跨三页(默认每页 100 条,每轮 user/assistant/idle 三条):有没有会话游标都 70 轮全发、按序、游标停在最后一轮", async () => {
+    const id = (n: number) => `msg_${String(n).padStart(4, "0")}`
+    const all: unknown[] = []
+    for (let turn = 1; turn <= 70; turn++) {
+      const base = 2_000 + turn * 10
+      all.push(user(id(turn * 3 - 2), base, `问 ${turn}`))
+      all.push(assistant(id(turn * 3 - 1), base + 1, base + 2, `答 ${turn}`, { finish: "stop", output: 1 }))
+      all.push({ id: id(turn * 3), type: "idle", time: { created: base + 3 }, outcome: "succeeded" })
+    }
+    const pages = [{ items: all.slice(110) }, { items: all.slice(10, 110) }, { items: all.slice(0, 10) }]
+    const expected = Array.from({ length: 70 }, (_, index) => id((index + 1) * 3 - 1))
+    for (const cursorState of ["none", "before-first"] as const) {
+      const h = harness({ pages, archiveResponses: [ok] })
+      if (cursorState === "before-first") h.cursor.advance("ses_1", id(0))
+      await h.uploader.onSessionIdle("ses_1")
+      const sent = h.archiveCalls
+        .map((c) => JSON.parse((c.init!.body as FormData).get("turn") as string) as { messages: Array<{ engine_message_id: string }> })
+        .map((t) => t.messages[1]!.engine_message_id)
+      expect({ cursorState, sent }).toEqual({ cursorState, sent: expected })
+      expect(h.calls.filter((c) => c.url.includes("/message"))).toHaveLength(3)
+      expect(h.cursor.lastReported("ses_1")).toBe(id(209))
+    }
+  })
+
   test("翻页有上界,到顶时如实记一行(不静默丢弃)", async () => {
     const h = harness({
       pages: [{ items: engineMessages() }, { items: engineMessages() }, { items: engineMessages() }],

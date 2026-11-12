@@ -1,7 +1,7 @@
 ---
 id: PLAN-1662-opencode2
 title: OpenCode 2 换代 实施计划
-summary: alpha-code#1662 各实施线的分段计划;目前含 L4(#1666)Unit B —— MCP 具名启动失败与模型请求的网络失败分类让桌面看得见
+summary: alpha-code#1662 各实施线的分段计划;目前含 L4(#1666)Unit B(具名失败原因到桌面)与 Unit C(MCP 与内置重名、子任务与附件、命令模型优先级、工具网络失败标记)
 kind: plan
 status: active
 spec: ""
@@ -70,3 +70,57 @@ last_reviewed: 2026-11-12
 - 2026-11-12 · 多改 `client.ts`(`ConnectError.code` 的类型)· `StartFailure.code` 收窄为登记码后,源头的 `string` 过不了 typecheck · 本提交。
 - 2026-11-12 · settle 测试加头部计时器 ⇒ timeout 一条(共 4 条)· 随实施轮第 3 项 · 本段会话结算提交。
 - 2026-11-12 · 多改 stdio 夹具与 runtime 测试的 AC1 收尾、`until` 类型 · 编排器实施轮第 4 项:AC1 收尾在等 `hang` 的握手超时(收尾时长随 `timeout.startup` 走:8 s ⇒ 10.3 s,默认 30 s ⇒ 32 s);同文件既有的 7 条 typecheck 错误一并修掉 · 本提交。
+
+## Unit C — MCP/builtin collision, subtask & attachment, command model priority, tool net-failure metadata(L4 #1666)
+
+- 依据:无 spec。Issue [alpha-code#1666](https://github.com/impharaon/alpha-code/issues/1666) 正文(2026-11-10T10:35:55Z 版);裁决评论 [6756103246](https://github.com/impharaon/alpha-code/issues/1666#issuecomment-6756103246) 第 4 项(MCP 与内置撞名)、[6737930969](https://github.com/impharaon/alpha-code/issues/1666#issuecomment-6737930969)(`l1r-subtask-attachment-policy` E6/E7、`l1r-command-model-priority` 归 L4);编排器 Unit C 派发书(webfetch 网络失败标记要握住)。登记册 [`codepuppy-authority-registry.json`](../../architecture/codepuppy-authority-registry.json) 的 `adr041-collision-rejection`、`l1r-subtask-attachment-policy`、`l1r-command-model-priority`;[ADR-047](../../../.claude/rules/adrs/ADR-047-opencode2-engine-generation.md)「精确接管面」。以上均取 `lane/1666-l4-takeover` @ `e737b760ca`。基线:`register-policy.test.ts` 35 过;core `config/command`、`config/reload`、`schedule`、`mcp-attach`、`mcp-instructions` 共 101 过;`mcp.test.ts` 107 过。
+- 核对:待编排器核对。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/core/src/tool/mcp.ts`(新的最小接管) | **第 1 项**。注册转换里,一个发现到的 MCP 工具,如果它的有效名(沿用上游 `name(server, tool)` → `effectiveName`)已经被更早的转换注册,就拒掉它、不注册,并用层内的 fork 运行时记一条 `logError`(与 `mcp/index.ts` 的 `refuseCollisions` 同法)。标注块 `codepuppy(ADR-041)`。原因:上游 `editor.add` 是后写覆盖(`tool.ts:213,377`),转换按注册顺序执行(`state.ts:197`)。 |
+| `packages/core/src/config/plugin/command.ts`(新的最小接管) | **第 3 项**。直接执行路径(第 99–103 行):命令带 agent 或 model 时读一次会话;会话已有 `model`(用户选定的)时不再 `switchModel`,其余照旧。子任务路径(第 80 行):子会话模型改为 `parent.model ?? model ?? selected.info?.model`,用户选定的模型排在命令和 agent 推荐之前。会话里有 model 时,运行器先用它、不用 agent 的模型(`runner/model.ts:79-98`),所以切换 agent 不会盖掉用户的选择。标注块 `codepuppy(#1560)`。 |
+| `packages/ext/src/policy/display.ts`、`packages/ext/src/policy/index.ts` | **第 4 项**,不接管 core。在 `seal()` 已有的 `execute.after` 里(`index.ts:196`),对 error 状态调一次新的 `attachNetFailure(event)`:用 `classifyNetFailure(event.error.error ?? event.error, engineNetFailurePath(input.url, process.env))` 分类;认出了层,就在替换后的 `Tool.Error` 的 metadata 上加 `codepuppyNetFailure: { layer, code }`(v1 的键,渲染层 `tool-card-model.ts:1050` 读的就是它),原有 metadata 保留;认不出就不动。数据是结构化的,不用文本前缀。可行的依据:`ToolFailure` 继承 `Tool.Error`(`ai errors.ts:245`),所以 webfetch 保留了原因的失败(`webfetch.ts:196`)能走到 `execute.after`(`tool.ts` 的 `catchTag("Tool.Error")`);替换后的 error 的 metadata 由 `step.ts:127` 写进工具部件;display 现在就是这样写快照的(`display.ts:70-76`)。分类器从 schema 契约模块 import(相对路径,与 `display.ts:12` 引 tool-identity 同法)。 |
+| `packages/ext/src/policy/policy-host.cases.ts` | 宿主图加 `SubagentJob.node`:真 `subagent` 插件需要它(`subagent.ts:73`)。 |
+| `packages/ext/src/policy/register-policy.test.ts` | `setup` 加 `internal` 选项:让上游真插件和 builtins 一起、在扩展之前激活,包法同 `internal.ts:316`,插件 effect 用测试的上下文 provide,因为激活时只给 Scope(`plugin.ts:83-87`)。新增:**E6** 三条、**E7** 两条、**第 4 项**两条(见「证明」)。 |
+| `packages/core/test/codepuppy-mcp-tool-collision.test.ts`(新,Code Puppy 自有) | **第 1 项**。生产 `Tool.node` + `McpTool.node`,`Mcp` 用替身(上游 `mcp.test.ts:619` 的接法)。 |
+| `packages/core/test/codepuppy-command-model-priority.test.ts`(新,Code Puppy 自有) | **第 3 项**。沿用上游 `config/command.test.ts` 的宿主:真 Command、Session、Agent、SubagentJob 服务,`SessionExecution` 用 noop。 |
+| `docs/architecture/codepuppy-authority-registry.json` | `l1r-subtask-attachment-policy`、`l1r-command-model-priority` 去掉 `blocked`,补机制与测试。新增 `tool-net-failure-metadata`(决定:「A tool call that fails at the network layer carries Code Puppy's classification (layer and code) in its metadata (#1572 AC4).」;takeovers 填 v1 的 `packages/opencode/src/session/processor.ts`)。`adr041-collision-rejection` 的 blocked 原因补上 MCP 与内置撞名的机制与测试,其余不动(见风险第 1 条)。 |
+| `.claude/rules/adrs/ADR-047-opencode2-engine-generation.md` | 接管表加 `tool/mcp.ts`、`config/plugin/command.ts` 两行;保持表加三行、未握住表减两行,计数改为 37 / 11;`adr041-collision-rejection` 的原因同步。 |
+| `scripts/north-star-guard.sh` | `UPSTREAM_EXCLUDES` 加 `packages/core/src/tool/mcp.ts`、`packages/core/src/config/plugin/command.ts`,并写明理由。 |
+| `scripts/gate-files.tsv` | `register-policy.test.ts` 35 → 新条数;新增两个 core 测试的行;v1 的 `packages/opencode test/session/codepuppy-subtask-attachment-policy.test.ts`(4)写退役注释,指向 E6/E7;Unit B 写的 settle 退役注释里「webfetch 无对应用例」改为指向第 4 项的用例。 |
+
+### 顺序
+
+1. **第 1 项**:改 `tool/mcp.ts`、加新测试,同步守卫、ADR、登记册与 gate-files 各一处。跑 `packages/core` 的 `bun test test/codepuppy-mcp-tool-collision.test.ts test/mcp.test.ts test/mcp-attach.test.ts test/mcp-instructions.test.ts test/schedule.test.ts` 和 `bun run typecheck`。反向臂:去掉检查,「内置先注册」那条必须变红,然后恢复。
+2. **第 3 项**:改 `command.ts`、加新测试,同步守卫、ADR、登记册与 gate-files。跑 `bun test test/codepuppy-command-model-priority.test.ts test/config/command.test.ts test/config/reload.test.ts` 和 typecheck。反向臂:撤掉接管,「已选定」两条与子任务那条必须变红,然后恢复。
+3. **第 2 项**:改宿主(`SubagentJob.node` 与 `internal` 选项),加 E6/E7,同步登记册、ADR 与 gate-files(含 v1 退役)。跑 `packages/ext` 的 `bun test src/policy/register-policy.test.ts`,外加 `ask-deadline`、`risk`、`identity` 三个用同一宿主的测试文件,确认宿主改动没有带坏它们。
+4. **第 4 项**:改 `display.ts` / `index.ts`,加两条用例,同步登记册、ADR、gate-files。跑 `register-policy.test.ts`。反向臂:去掉 `attachNetFailure` 调用,tcp 那条必须变红,然后恢复。
+5. 收尾:跑 ext 的 `authority-registry.test.ts`(问题清单里只剩 blocked 项,且不含本段三项)、ui-mac 的 `gate-file-registry.test.ts`(只有原有的 3 红)、`north-star-guard.sh --print-takeover`。
+
+### 风险
+
+- **第 1 项的事实修正,以及登记状态**:裁决举的例子 `apply_patch` 是 v1 的名字,2.x 已改名为 `patch`(`v1-migration.bun.ts:996`)。2.x 上真正走得到的撞名是:带 `namespace: "opencode"` 注册的 17 个内置工具(`tool/plugin/{artifact,mcp-resource,opencode,schedule}.ts`)(如 `opencode_session_rename`、`opencode_worktree_create`)对上名为 `opencode` 的 MCP 服务器;`experimental_image_generate` 对上服务器 `experimental` 的工具 `image_generate`。测试用前一种。`adr041-collision-rejection` 按它现在的 blocked 原因,要等你整合时登记 L3 的 fan-out 才能翻成已握住,所以本段只更新原因、不翻状态。你想现在翻的话,说一声即可。
+- **第 1 项的顺序**:内置工具的转换如果注册在 MCP 之后,上游本来就是内置赢;本段补的是「内置先注册、MCP 后注册」这一序。测试两种顺序都钉。上游 `mcp.test.ts` 里「插件在 MCP 之后覆盖 MCP 工具」那条是上游有意保留的(后写的覆盖 MCP),本段不碰,跑一遍确认。
+- **第 1 项的日志**:转换是同步的,所以拒绝日志要 fork 出去写。每次重建都会再记一次,与 `index.ts` 的 `refuseCollisions` 相同。
+- **第 3 项的前提**:「用户明确选定的模型」按裁决原话取会话的 `model`。2.x 上它只经 create / `switchModel` 写入(用户、命令、子任务都会写)。一个用户从没选过模型的会话,第一次跑带模型的命令后,这个模型此后也算「已选定」;这是取会话 `model` 的固有结果,也意味着桌面要在用户选模型时写入会话 model(L6 的契约,不在本段)。
+- **宿主能不能跑真插件**:真 `subagent` 插件要能一路走到它自己的权限检查(`subagent.ts:145`),这需要 `general` agent 能解析、Config 可读;真 webfetch 要 HttpClient,宿主里有 `LayerNodePlatform.httpClient`。E6 用替身就证明不了「排在上游检查之前」,所以真插件激活不了时,我停下报告,不换替身。第 4 项允许退一步:换一个同样包法的内置工具(真 Effect HTTP 请求 + `new ToolFailure({ message, error })`),改动记入偏离。
+- **E7 的入口**:用 `SessionPrompt.prepare`(`prompt.ts:34`,`session.ts:171` 的 `Session.prompt` 就调它),不走 `Session.prompt`,因为后者的准入外壳要 Instance,宿主里没有。物化附件就发生在 `prepare` 里。
+- **第 4 项的范围**:按 v1 的做法,任何工具失败都分类,不只限 webfetch(v1 `processor.ts` 的 `failToolCall`);认不出就不加,遵守模块的 I4 纪律。被拒的调用到不了 `execute.after`,不受影响。
+- **文件数**:约 11 个,在预估之内。
+
+### 证明
+
+| AC | 测试/证据 | 缺少行为为什么会失败 |
+| --- | --- | --- |
+| `adr041-collision-rejection`(MCP 与内置) | `codepuppy-mcp-tool-collision.test.ts`:内置 `opencode/session_rename` 先注册,MCP 服务器 `opencode` 的 `session_rename` 被拒,该名字执行的是内置、MCP 调用次数为 0;内置后注册,结果相同;近似名 `opencode/session_renamed` 两个都在 | 去掉检查,内置先注册的那一序里 MCP 覆盖内置:执行到 MCP,调用次数为 1 |
+| `l1r-subtask-attachment-policy` E6 | `register-policy.test.ts`,真 `subagent` 插件:① Code Puppy deny `builtin::subagent` 时,`callRaw` 得到具名拒绝,待批请求为零、子会话为零;② Code Puppy ask,且 agent 规则也对 `subagent` ask 时,第一条待批是 Code Puppy 的身份请求,拒绝后从未出现上游的 `subagent` 请求,子会话为零;③ 反向臂:不装策略时,待批的是上游 `subagent` 那一条 | 策略不在上游检查之前跑:①会建出子会话或出现上游请求;②第一条待批是上游的;③证明这个判据分得清两种请求 |
+| `l1r-subtask-attachment-policy` E7 | `register-policy.test.ts`:`SessionPrompt.prepare` 带一个真文件附件,同时禁用 `builtin::read`、agent 规则 deny `read`;探针插件数到的 `execute.before` 与 `permission` evaluate 都是 0,附件字节完整;前提臂:一次真 `callRaw` 让计数加 1 | 有人把工具或权限调用接进附件物化:计数大于 0,或附件被拒;前提臂证明计数器不是瞎的 |
+| `l1r-command-model-priority` | `codepuppy-command-model-priority.test.ts`:已选定 + `command.model` 时不调 `switchModel`、照常发 prompt;已选定 + agent 带模型时同样不调;未选定时用命令模型 `switchModel`(上游行为保留);子任务命令下子会话模型等于父会话选定的;父会话未选定时用命令模型 | 撤掉接管:前两条会调 `switchModel`,子任务那条拿到的是命令模型 |
+| `tool-net-failure-metadata`(#1572 AC4) | `register-policy.test.ts`,真 webfetch 请求刚关掉的本机端口:调用失败,error 的 metadata 带 `codepuppyNetFailure = { layer: "tcp", code: "ECONNREFUSED" }`,且不含 URL;非网络失败(`ftp://` 被 `assertHttpUrl` 拒)不带这个键 | 去掉 `attachNetFailure`:第一条缺键;对认不出的失败乱加:第二条变红 |
+
+### 偏离记录
+
+暂无

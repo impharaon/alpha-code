@@ -61,8 +61,9 @@ globalThis.fetch = (async (input: Request | string | URL, init?: RequestInit) =>
   if (FAKE_HOSTS.has(url.hostname)) {
     const authorization = (input instanceof Request ? input.headers : new Headers(init?.headers)).get("authorization")
     const hit: Hit = authorization === `Bearer ${TOKEN_A}` ? "A" : authorization === `Bearer ${PLATFORM_API_KEY_PLACEHOLDER}` ? "placeholder" : authorization ? "other" : "none"
-    wire.push({ host: url.hostname, path: url.pathname, hit })
-    if (!url.pathname.endsWith("/chat/completions")) return new Response("not found", { status: 404 })
+    const path = url.pathname
+    wire.push({ host: url.hostname, path, hit })
+    if (!path.endsWith("/chat/completions")) return new Response("not found", { status: 404 })
     if (hit !== "A") return Response.json({ error: { message: "invalid credential", type: "invalid_request_error" } }, { status: 401 })
     return new Response(chunk({ role: "assistant", content: "ok" }) + chunk({}, "stop") + "data: [DONE]\n\n", { headers: { "content-type": "text/event-stream" } })
   }

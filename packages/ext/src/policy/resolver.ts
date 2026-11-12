@@ -176,15 +176,21 @@ export function policyRevision(load: PolicyLoadResult): string {
  */
 export const RENAMED_BUILTINS: Readonly<Record<string, string>> = { bash: "shell", task: "subagent", apply_patch: "patch" }
 
+/** A tool-level selector under a v1 builtin name, as the renamed tool's selector; anything else unchanged. */
+export function renamedSelector(selector: ToolPolicySelector): ToolPolicySelector {
+  if (selector.level !== "tool") return selector
+  const match = /^builtin::(.+)$/.exec(selector.canonical)
+  const next = match ? RENAMED_BUILTINS[match[1]!] : undefined
+  return next ? { level: "tool", canonical: `builtin::${next}` } : selector
+}
+
 export function renamedRecords(records: readonly ToolPolicyRecord[]): { records: ToolPolicyRecord[]; renamed: string[] } {
   const renamed: string[] = []
   const out = records.map((record) => {
-    if (record.selector.level !== "tool") return record
-    const match = /^builtin::(.+)$/.exec(record.selector.canonical)
-    const next = match ? RENAMED_BUILTINS[match[1]!] : undefined
-    if (!next) return record
-    renamed.push(record.selector.canonical)
-    return { ...record, selector: { level: "tool" as const, canonical: `builtin::${next}` } }
+    const selector = renamedSelector(record.selector)
+    if (selector === record.selector) return record
+    if (record.selector.level === "tool") renamed.push(record.selector.canonical)
+    return { ...record, selector }
   })
   return { records: out, renamed }
 }
@@ -257,13 +263,21 @@ export function createToolPolicyStore(options: ToolPolicyStoreOptions): ToolPoli
 
   return {
     snapshot,
+    // Review R1 #9: writes and deletes compare selectors after the K5 rename, as reads do, so a record saved under the
+    // v1 name is replaced or removed through the new name instead of surviving next to it (a conflict ⇒ disabled).
     setRecord: (record) =>
-      mutate("write a record", (records) => [
-        ...records.filter((item) => selectorKey(item.selector) !== selectorKey(record.selector)),
-        record,
-      ]),
+      mutate("write a record", (records) => {
+        const key = selectorKey(renamedSelector(record.selector))
+        return [
+          ...renamedRecords(records).records.filter((item) => selectorKey(item.selector) !== key),
+          { ...record, selector: renamedSelector(record.selector) },
+        ]
+      }),
     removeRecord: (selector) =>
-      mutate("remove a record", (records) => records.filter((item) => selectorKey(item.selector) !== selectorKey(selector))),
+      mutate("remove a record", (records) => {
+        const key = selectorKey(renamedSelector(selector))
+        return renamedRecords(records).records.filter((item) => selectorKey(item.selector) !== key)
+      }),
     reset: async () => resetPolicyDocument(options.baseDir, partition()),
   }
 }

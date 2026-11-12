@@ -364,6 +364,10 @@
         {
           "file": "packages/ext/src/policy/register-policy.test.ts",
           "name": "a deny under the new name refuses the call"
+        },
+        {
+          "file": "packages/ext/src/policy/resolver.test.ts",
+          "name": "V1b with a v1-name record on disk, writing the new name leaves one record and removing it leaves none"
         }
       ]
     },

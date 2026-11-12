@@ -502,6 +502,23 @@ describe("store service (what registerPolicy and the RPC share)", () => {
     expect((await resolveWith(policy, mcpSubject())).state).toBe("ask")
   })
 
+  // Review R1 #9 (K5): a record saved under the v1 name `builtin::bash` is replaced and removed through `builtin::shell`.
+  test("V1b with a v1-name record on disk, writing the new name leaves one record and removing it leaves none", async () => {
+    const baseDir = tmpdir("codepuppy-policy-service-")
+    const partition = { account: "acct-service", workspace: "ws-service" }
+    savePolicyDocument(baseDir, partition, [{ selector: { level: "tool", canonical: "builtin::bash" }, state: "disabled" }])
+    const policy = store(baseDir)
+    await policy.setRecord({ selector: { level: "tool", canonical: "builtin::shell" }, state: "ask" })
+    const written = loadPolicyDocument(baseDir, partition)
+    expect(written.status === "ok" ? written.doc.records : written).toEqual([{ selector: { level: "tool", canonical: "builtin::shell" }, state: "ask" }])
+    const snapshot = await policy.snapshot()
+    expect(snapshot.user).toEqual({ status: "ok", records: [{ selector: { level: "tool", canonical: "builtin::shell" }, state: "ask" }] })
+    savePolicyDocument(baseDir, partition, [{ selector: { level: "tool", canonical: "builtin::bash" }, state: "disabled" }])
+    await policy.removeRecord({ level: "tool", canonical: "builtin::shell" })
+    const removed = loadPolicyDocument(baseDir, partition)
+    expect(removed.status === "ok" ? removed.doc.records : removed).toEqual([])
+  })
+
   test("V2 a quarantined document refuses writes until reset; resolution stays disabled meanwhile", async () => {
     const baseDir = tmpdir("codepuppy-policy-service-")
     const policy = store(baseDir)

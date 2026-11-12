@@ -38,7 +38,7 @@ import {
 } from "./policy-host.cases"
 import { registerPolicy } from "./index"
 import { createToolPolicyStore, defaultPolicyBaseDir } from "./resolver"
-import { canonicalJsonDigest } from "./store"
+import { canonicalJsonDigest, savePolicyDocument } from "./store"
 
 const { Effect, Exit, Cause } = E
 beforeAll(isolate)
@@ -787,7 +787,10 @@ describe("tool renames (S4)", () => {
       const warn = console.warn
       console.warn = (...args: unknown[]) => void warnings.push(args.map(String).join(" "))
       try {
-        const { session } = yield* setup({ builtins: ["shell"], records: [disabled("builtin::bash")] })
+        const { session } = yield* setup({ builtins: ["shell"] })
+        // A document v1 saved: written as it is on disk (the store's writes already use the new name, review R1 #9).
+        const location = yield* Location.Service
+        savePolicyDocument(defaultPolicyBaseDir(path.join(ROOT, "data", "opencode")), { account, workspace: location.directory }, [disabled("builtin::bash")] as never)
         expect(failure(yield* callRaw(session.id, "shell"))?.message).toContain("builtin::shell")
         expect(counts.write).toBe(0)
       } finally {

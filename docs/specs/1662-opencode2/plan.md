@@ -192,4 +192,4 @@ last_reviewed: 2026-11-12
 
 ### 偏离记录
 
-暂无
+- 2026-11-12 · #9 顺带改了 `register-policy.test.ts`「a saved deny under the v1 name…」的夹具:store 的写入现在一律存新名,v1 留在盘上的文档改为直接写盘再读 · #9 提交。

@@ -13,7 +13,7 @@
 // 本文件只钉登记形状、判官与跨包前提(③e / ③f)。
 // 已知不覆盖:项目自己的 plugins / codepuppy.jsonc(用户的字);skills 正文与 MCP 工具表(别人的字)。
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
@@ -146,7 +146,7 @@ afterEach(() => {
 })
 
 /** 本文件为之设了咽喉的通路。② 要求它与「真 CodePuppyExt 注册且分类为 context」的集合逐字相等。 */
-const THROATED = ["agent.transform", "command.transform", "mcp.transform", "session.compaction", "session.context", "session.generate", "session.title", "skill.transform", "tool.execute.after", "tool.transform", "websearch.transform"].sort()
+const THROATED = ["agent.transform", "command.transform", "mcp.transform", "session.compaction", "session.context", "session.generate", "session.prompt", "session.title", "skill.transform", "tool.execute.after", "tool.transform", "websearch.transform"].sort()
 /** 2.x 组装一次模型请求的四条钩子(`session/model-request.ts`:主循环 / 压缩 / 无工具生成 / 起标题各触发自己那条,互不经过)。 */
 const REQUEST_HOOKS = ["context", "compaction", "generate", "title"] as const
 
@@ -162,11 +162,14 @@ describe("② alpha 注册的每个载上下文通路都有咽喉", () => {
     const ctx = registered.filter((k) => HOOK_CONTEXT_CLASS[k as keyof typeof HOOK_CONTEXT_CLASS] === "context").sort()
     expect(ctx).toEqual(THROATED)
     // 四条请求钩子挂的是**同一个**回调对象:下面 ③b / ③h 在四条钩子上逐一过真宿主,这里再钉住它们不会各自漂移。
-    const [assemble, ...rest] = REQUEST_HOOKS.map((name) => recorded.hooks[`session.${name}`] ?? [])
-    expect(assemble).toHaveLength(1)
+    // session.context 上另有 L4 策略的目录闸(registerPolicy 里先注册,只删工具表条目、不写字;③b / ③h 的真宿主链里同在);
+    // ext 自己的组装回调是那里的最后一个。
+    const [context, ...rest] = REQUEST_HOOKS.map((name) => recorded.hooks[`session.${name}`] ?? [])
+    expect(context).toHaveLength(2)
+    const assemble = context!.at(-1)!
     for (const other of rest) {
       expect(other).toHaveLength(1)
-      expect(other[0]).toBe(assemble![0]!)
+      expect(other[0]).toBe(assemble)
     }
   })
 })
@@ -649,6 +652,35 @@ describe("③h context 钩子的消息咽喉:只换不加,换进去的每段字�
     }),
   )
 })
+// ── ③i session.prompt 通路(#1662 整合):L4 策略在用户消息钩子上只登记目录尾规则,不往消息里写字 ──────────
+describe("③i session.prompt 咽喉:用户消息上 alpha 一个字不加", () => {
+  it.live("真宿主:ext(含 L4 策略的 prompt 钩子)装上后,用户消息的每个字符串叶子与输入逐字相同,且钩子真跑了;已知的坏:之后的插件往消息里塞一段 ⇒ 判官点名", () =>
+    Effect.gen(function* () {
+      yield* activate(CodePuppyExt)
+      const hooks = yield* PluginHooks.Service
+      const input = () => ({ sessionID: "ses_prompt_throat", messageID: "msg_prompt_throat", prompt: { text: "帮我看一下 a.txt" }, delivery: "queue" })
+      const leaves = (event: unknown) => stringLeaves(event).map((leaf) => `${leaf.pointer}=${leaf.value}`)
+      const added = (event: unknown) => leaves(event).filter((leaf) => !leaves(input()).includes(leaf))
+      const info = spyOn(console, "info").mockImplementation(() => {})
+      try {
+        const out = yield* hooks.trigger("session", "prompt", input() as never)
+        expect(added(out)).toEqual([])
+        // 不是空跑:策略的 prompt 钩子在这一次登记了目录尾规则
+        expect(info.mock.calls.some((call) => String(call[0]).includes("tool policy catalog rules active"))).toBe(true)
+      } finally {
+        info.mockRestore()
+      }
+      yield* activate({
+        id: "test.prompt-writer",
+        async setup(context) {
+          await context.session.hook("prompt", (event) => void ((event.prompt as { text: string }).text += " 多一段"))
+        },
+      })
+      expect(added(yield* hooks.trigger("session", "prompt", input() as never))).toEqual(["/prompt/text=帮我看一下 a.txt 多一段"])
+    }),
+  )
+})
+
 // ── ③e instructions 通路(`#1296`):ui-mac 写 cfg.instructions 的两份文件 ────────────────
 // 真注入的咽喉在 ui-mac 那边(config-injection-throat.test.ts 跑真 injectCodePuppyConfig,8 组 env 矩阵
 // 与这里登记的形状集合双向比对)。这里钉三件登记簿自己的事:登记形状、判官能测出已知的坏、

@@ -26,6 +26,8 @@ import { makePluginTestLayer } from "../../core/test/plugin/fixture.ts"
 import { CODEPUPPY_EXPLORE_PROMPT } from "./codepuppy-prompts"
 import { TOOL_TEXT, explainAttachmentBlock, explainVisionBlock } from "./context-injection"
 import { STAGED_ATTACHMENT_PART_NAME, stagedAttachmentPart } from "./staged-attachment-part"
+import { policyWorkspace } from "./policy/index"
+import { createToolPolicyStore, defaultPolicyBaseDir } from "./policy/resolver"
 import { Message } from "../../ai/src/schema/messages.ts"
 import * as Media from "../../ai/src/media.ts"
 import { toLLMMessages } from "../../core/src/session/runner/to-llm-message.ts"
@@ -41,6 +43,7 @@ const ENV_KEYS = [
   "CODEPUPPY_PLATFORM_AUTH_REF",
   "CODEPUPPY_FACTORY_DENY_SKILLS",
   "CODEPUPPY_PROMPT_REBRAND_DISABLE",
+  "CODEPUPPY_POLICY_ACCOUNT",
 ] as const
 const saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]))
 let scratch = ""
@@ -70,6 +73,30 @@ const before = (tool: string, input: unknown = {}) =>
     const hooks = yield* PluginHooks.Service
     return yield* hooks.trigger("tool", "execute.before", { tool, ...ids, id: "call_1" as never, input }).pipe(Effect.exit)
   })
+/**
+ * 工具表里先有这些工具(生产里由上游内置插件 / MCP 运行时注册;装 ext 之前激活,同内置插件的次序)。L4 的策略按工具表认
+ * 身份,没注册过的名字按「未知身份默认拒」先被它拒掉 —— 直接触发 execute.before 的用例要判的是 ext 自己的钩子,所以先注册。
+ */
+const registered = (...names: string[]) =>
+  activate({
+    id: "test.registered-tools",
+    async setup(context) {
+      await context.tool.transform((editor) => {
+        for (const name of names)
+          editor.add({ name, description: name, input: { type: "object", properties: {} }, options: { codemode: false }, execute: async () => ({ content: name }) })
+      })
+    },
+  })
+/** main 注入的 Code Puppy agent(生产里由内联配置写入;L4 的策略按调用所属 agent 读规则)。 */
+const injectedAgents = (...names: string[]) =>
+  activate({
+    id: "test.injected-agents",
+    async setup(context) {
+      await context.agent.transform((editor) => {
+        for (const name of names) editor.update(name as never, (agent) => void (agent.mode = "subagent"))
+      })
+    },
+  })
 const contextEvent = (system: string[], model = { providerID: "stub", id: "stub-model" }) => ({
   ...ids,
   model: model as never,
@@ -78,6 +105,52 @@ const contextEvent = (system: string[], model = { providerID: "stub", id: "stub-
   options: { maxTokens: 32000 } as Record<string, unknown>,
   tools: {},
 })
+
+it.live("权威 · 工具策略(I3):ext 的默认导出装上后,Code Puppy 策略停用的工具被具名拒绝、实现零执行;反向臂:不装 ext ⇒ 同一条停用记录下照样执行", () =>
+  Effect.gen(function* () {
+    env({ CODEPUPPY_POLICY_ACCOUNT: `t-${Math.random().toString(36).slice(2)}` })
+    // 用户的停用记录经生产的策略存储写进 ext 读的那个位置(数据根 / 账户 / 工作区与 registerPolicy 同一套)
+    const location = yield* Location.Service
+    const store = createToolPolicyStore({
+      baseDir: defaultPolicyBaseDir(join(process.env.XDG_DATA_HOME!, "opencode")),
+      account: () => process.env.CODEPUPPY_POLICY_ACCOUNT!,
+      workspace: () => policyWorkspace(location as never),
+    })
+    yield* Effect.promise(() => store.setRecord({ selector: { level: "tool", canonical: "builtin::probe_tool" }, state: "disabled" } as never))
+    // 生产里由上游内置插件注册的工具(装 ext 之前):策略认作 builtin
+    let runs = 0
+    yield* activate({
+      id: "test.builtin-probe",
+      async setup(context) {
+        await context.tool.transform((editor) =>
+          editor.add({
+            name: "probe_tool",
+            description: "probe",
+            input: { type: "object", properties: {} },
+            options: { codemode: false },
+            execute: async () => {
+              runs += 1
+              return { content: "probe ran" }
+            },
+          }),
+        )
+      },
+    })
+    const tools = yield* Tool.Service
+    const call = Effect.gen(function* () {
+      const snapshot = yield* tools.snapshot()
+      return yield* snapshot.execute({ ...ids, call: { type: "tool-call", id: `call_probe_${runs}`, name: "probe_tool", input: {} } }).pipe(Effect.exit)
+    })
+    // 反向臂:不装 ext ⇒ 停用记录没人执行,工具照样跑
+    expect(Exit.isSuccess(yield* call)).toBe(true)
+    expect(runs).toBe(1)
+    yield* activate(CodePuppyExt)
+    const refused = yield* call
+    expect(Exit.isFailure(refused)).toBe(true)
+    expect(JSON.stringify(refused)).toContain("Code Puppy tool policy denied builtin::probe_tool")
+    expect(runs).toBe(1)
+  }),
+)
 
 it.live("P1 / P8:真宿主装上 ext 的默认导出 —— 八个 codepuppy 工具进工具表(一等工具,不进 Code Mode),codepuppy_echo 经真工具执行返回", () =>
   Effect.gen(function* () {
@@ -100,6 +173,7 @@ it.live("P1 / P8:真宿主装上 ext 的默认导出 —— 八个 codepuppy 工
 it.live("权威 · 联网搜索准入(L5r):kill-switch 下 2.x 内置 websearch 与第三方 web search MCP 在 execute.before 被拒;反向臂:不装 ext ⇒ 放行", () =>
   Effect.gen(function* () {
     env({ CODEPUPPY_LOCAL_WEBSEARCH_DENY: "1", CODEPUPPY_CLOUD_WEBSEARCH_DENY: "1" })
+    yield* registered("websearch", "exa_web_search_exa", "codepuppy_dispatch")
     const baseline = yield* before("websearch", { query: "x" })
     expect(Exit.isSuccess(baseline)).toBe(true)
     yield* activate(CodePuppyExt)
@@ -141,6 +215,7 @@ it.live("权威 · 本地 keyless 搜网的供应商(L5r):没有任何选择时 
 it.live("联网搜索:不在 kill-switch(代付 / 登出)⇒ 内置 websearch 照常放行(ADR-046 D1)", () =>
   Effect.gen(function* () {
     env({})
+    yield* registered("websearch")
     yield* activate(CodePuppyExt)
     expect(Exit.isSuccess(yield* before("websearch", { query: "x" }))).toBe(true)
   }),
@@ -183,9 +258,13 @@ it.live("权威 · 云工具准入:治理云 server 上的 web search 只按本 
     // 只置 LOCAL:第三方 web search 关,治理云 server 的 web search 豁免(只有 CLOUD 信号关它)。
     env({ CODEPUPPY_CLOUD_MCP_ARM: "cloud", CODEPUPPY_CLOUD_MCP_DEF: JSON.stringify(definition), CODEPUPPY_CLOUD_MCP_SERVER: "cloud", CODEPUPPY_LOCAL_WEBSEARCH_DENY: "1" })
     const mcp = recordingMcp({ cloud_attacker: { type: "remote", url: "https://evil.example/mcp" } })
+    yield* registered("cloud_web_search", "cloud_attacker_web_search")
     yield* activate(CodePuppyExt, { mcp })
     expect(Exit.isSuccess(yield* before("cloud_web_search"))).toBe(true)
-    expect(Exit.isFailure(yield* before("cloud_attacker_web_search"))).toBe(true)
+    const attacker = yield* before("cloud_attacker_web_search")
+    expect(Exit.isFailure(attacker)).toBe(true)
+    // 拒它的是联网搜索的主权闸,不是策略的「未知身份」
+    expect(JSON.stringify(attacker)).toContain("is unavailable")
   }),
 )
 
@@ -360,6 +439,7 @@ it.live("权威 · 定制中心安装(I10):codepuppy_hub_install 的权限评估
     const hooks = yield* PluginHooks.Service
     const evaluation = (agent: string) => ({ sessionID: ids.sessionID, agent: agent as never, action: "codepuppy_hub_install", resources: ["mcp:github"], effect: "allow" as const })
     expect((yield* hooks.trigger("permission", "evaluate", evaluation("build"))).effect).toBe("allow")
+    yield* injectedAgents("codepuppy-automation-standard")
     yield* activate(CodePuppyExt)
     expect((yield* hooks.trigger("permission", "evaluate", evaluation("build"))).effect).toBe("ask")
     expect((yield* hooks.trigger("permission", "evaluate", evaluation("codepuppy-automation-standard"))).effect).toBe("deny")

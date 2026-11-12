@@ -280,10 +280,19 @@ describe("project/root identity fail-closed", () => {
           agents.set(id, current)
         } } as never)
       expect(agents.has("retired")).toBe(false)
-      // 项目插件扇出没跑:执行钩子只有 ext 自己的那一个
-      expect(recorded.hooks["tool.execute.before"]).toHaveLength(1)
+      // 项目插件扇出没跑:执行钩子只有 L4 策略的头、尾两条(registerPolicy / seal)与 ext 自己的一条;扇出跑了就是 4 条
+      expect(recorded.hooks["tool.execute.before"]).toHaveLength(3)
       const tools: Array<{ name: string; execute: (args: unknown, ctx: unknown) => Promise<{ metadata: { ok: boolean } }> }> = []
-      for (const transform of recorded.transforms.tool ?? []) transform({ add: (tool: never) => void tools.push(tool) } as never)
+      // 工具编辑器按 2.x 的形状给全 add / list / update(L4 策略的 transform 读工具表、给执行包一层显示快照)
+      const editor = {
+        add: (tool: never) => void tools.push(tool),
+        list: () => tools.map((tool) => ({ ...tool, id: tool.name })),
+        update: (id: string, fn: (tool: unknown) => void) => {
+          const found = tools.find((tool) => tool.name === id)
+          if (found) fn(found)
+        },
+      }
+      for (const transform of recorded.transforms.tool ?? []) transform(editor as never)
       expect(tools.some((tool) => tool.name === "retired_tool")).toBe(false)
       const registered = await tools.find((tool) => tool.name === "codepuppy_register")!.execute(
         { type: "agent", name: "new-agent", entry: JSON.stringify({ prompt: "write" }) },

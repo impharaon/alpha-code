@@ -142,9 +142,23 @@ const models: Plugin.Plugin = {
   },
 }
 
+/**
+ * 云 MCP 的识图工具 `codepuppy_vision`(生产里由 MCP 运行时在插件激活之后注册)。L4 的策略按工具表认身份,没注册的名字
+ * 按「未知身份默认拒」先被它拒掉;这里要判的是 ext 自己的追问钩子,所以先让工具在表里。
+ */
+const visionTool: Plugin.Plugin = {
+  id: "test.cloud-vision-tool",
+  async setup(context) {
+    await context.tool.transform((editor) =>
+      editor.add({ name: "codepuppy_vision", description: "vision", input: { type: "object", properties: {} }, options: { codemode: false }, execute: async () => ({ content: "vision" }) }),
+    )
+  },
+}
+
 const load = Effect.gen(function* () {
   yield* activate(models)
   yield* activate(CodePuppyExt)
+  yield* activate(visionTool)
   return yield* PluginHooks.Service
 })
 

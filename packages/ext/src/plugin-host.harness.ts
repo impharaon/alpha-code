@@ -10,8 +10,10 @@
 
 import type { Plugin as PromisePlugin } from "@opencode/plugin"
 import { Effect } from "effect"
+import { Agent } from "../../core/src/agent.ts"
 import { Mcp } from "../../core/src/mcp/index.ts"
 import { Plugin } from "../../core/src/plugin.ts"
+import { AgentPlugin } from "../../core/src/plugin/agent.ts"
 import { PluginHost } from "../../core/src/plugin/host.ts"
 import { PluginPromise } from "../../core/src/plugin/promise.ts"
 import { testEffect } from "../../core/test/lib/effect.ts"
@@ -46,9 +48,23 @@ export function recordingMcp(initial: Record<string, unknown> = {}) {
   return { servers, service, rerun: () => callbacks.forEach((callback) => callback(editor)) }
 }
 
-/** 在真宿主里激活一个 promise 插件(ext 本体或测试用的旁路插件)。 */
+/**
+ * 上游内置 agent(`opencode.agent`:build / plan / general / explore …)。生产里内置插件先于任何配置插件激活;L4 的策略按调用所属
+ * agent 读它的规则(`agent.get`),没有这些 agent 的宿主会让每次调用以 `Agent not found` 失败。每个宿主(Agent 服务实例)只装一次。
+ */
+const seeded = new WeakSet<object>()
+const builtinAgents = Effect.gen(function* () {
+  const agents = yield* Agent.Service
+  if (seeded.has(agents)) return
+  seeded.add(agents)
+  const plugins = yield* Plugin.Service
+  yield* AgentPlugin.Plugin.effect(yield* PluginHost.make(plugins, AgentPlugin.Plugin.id))
+})
+
+/** 在真宿主里激活一个 promise 插件(ext 本体或测试用的旁路插件);上游内置 agent 先于它(同生产的激活次序)。 */
 export const activate = (plugin: PromisePlugin.Plugin, options: { mcp?: ReturnType<typeof recordingMcp> } = {}) =>
   Effect.gen(function* () {
+    yield* builtinAgents
     const plugins = yield* Plugin.Service
     const host = yield* PluginHost.make(plugins, plugin.id)
     yield* PluginPromise.fromPromise(plugin).effect(host)
@@ -77,6 +93,8 @@ export function recordingContext(directory: string) {
             invocations.push({ call: `${name}.${method}`, args })
             if (method === "transform") (transforms[name] ??= []).push(args[0] as never)
             if (method === "hook") (hooks[`${name}.${String(args[0])}`] ??= []).push(args[1] as never)
+            // 读类调用回真宿主的空形状(工具表是数组,客户端 API 回 `{ data }`):L4 的 registerPolicy 在 setup / seal 里读它们。
+            if (method === "list") return name === "tool" ? [] : { data: [] }
             return { dispose: async () => {} }
           }
         },

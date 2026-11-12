@@ -566,16 +566,21 @@ describe("跨 Location 隔离:治理归属按 setup 闭包,不串扰(#223 R7 Blo
     }
   })
 
-  /** 一个 Location:记下 ext 注册的 execute.before 与 mcp.transform,其余注册吞掉。 */
+  /**
+   * 一个 Location:记下注册的全部 execute.before 与 mcp.transform(ext 的 setup 先后装了 L4 策略的头与尾),其余注册吞掉。
+   * 工具表里有被问的那个工具(策略按它认身份);裁决按宿主的链:execute.before 依注册顺序逐个跑。
+   */
   const location = async (directory: string) => {
-    let before: ((event: { tool: string; input: unknown }) => unknown) | undefined
-    let mcpTransform: ((editor: unknown) => void) | undefined
+    const befores: Array<(event: Record<string, unknown>) => unknown> = []
+    const mcpTransforms: Array<(editor: unknown) => void> = []
     const noop = async () => ({ dispose: async () => {} })
     const domain = (name: string) =>
       new Proxy({}, {
         get: (_t, method: string) => {
-          if (name === "tool" && method === "hook") return async (hook: string, callback: never) => (hook === "execute.before" && (before = callback), { dispose: async () => {} })
-          if (name === "mcp" && method === "transform") return async (callback: never) => ((mcpTransform = callback), { dispose: async () => {} })
+          if (name === "tool" && method === "hook") return async (hook: string, callback: never) => (hook === "execute.before" && befores.push(callback), { dispose: async () => {} })
+          if (name === "tool" && method === "list") return async () => [{ id: "cloud_web_search", name: "cloud_web_search" }]
+          if (name === "plugin" && method === "list") return async () => ({ data: [] })
+          if (name === "mcp" && method === "transform") return async (callback: never) => (mcpTransforms.push(callback), { dispose: async () => {} })
           if (name === "event" && method === "subscribe") return () => ({ [Symbol.asyncIterator]: () => ({ next: () => new Promise(() => {}) }) })
           return noop
         },
@@ -587,11 +592,12 @@ describe("跨 Location 隔离:治理归属按 setup 闭包,不串扰(#223 R7 Blo
     return {
       configure: (servers: Record<string, unknown>) => {
         const map = new Map(Object.entries(servers))
-        mcpTransform!({ list: () => Array.from(map), get: (n: string) => map.get(n), set: (n: string, c: unknown) => map.set(n, c), update: () => {}, remove: (n: string) => map.delete(n) })
+        const editor = { list: () => Array.from(map), get: (n: string) => map.get(n), set: (n: string, c: unknown) => map.set(n, c), update: () => {}, remove: (n: string) => map.delete(n) }
+        for (const transform of mcpTransforms) transform(editor)
       },
       verdict: async (tool: string) => {
         try {
-          await before!({ tool, input: {} })
+          for (const before of befores) await before({ tool, input: {}, sessionID: "ses_xtalk", agent: "build", messageID: "msg_xtalk", id: "call_xtalk" })
           return null
         } catch (error) {
           return error instanceof Error ? error.name : String(error)

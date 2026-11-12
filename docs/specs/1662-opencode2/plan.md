@@ -268,4 +268,8 @@ last_reviewed: 2026-11-12
 
 ### 偏离记录
 
-暂无。
+- 2026-11-12 · 第 3 项:`turnAnchor` 只改「idle 之后的 synthetic」那一支;synthetic 之前既无 user 也无 idle(会话以 synthetic 开头)仍回 `undefined`,不扩到 AC 之外 · `b32116b2bc`。
+- 2026-11-12 · 第 1 项:`plugin.ts` 的 import 写成 `./policy/index`(与该文件其余 import 同样不带扩展名);`plugin-setup-order.cases.ts` 的 mock 目标随之是 `./policy/index` · 第 1 项提交。
+- 2026-11-12 · 第 1 项另改两处计划没点名的断言,都是真策略多注册的钩子让「最后一个 / 只有一个」不再成立:`cloud-websearch-kill.test.ts` 跨 Location 那条自带的 Context 原先取「最后注册的」execute.before 与 mcp.transform(此刻是策略的尾),改为按宿主的链依次跑全部 execute.before、依次喂全部 mcp.transform,工具表给出被问的工具;`context-injection.test.ts` ② 的 `session.context` 上有策略的目录闸 + ext 的组装回调两条,断言改为两条、组装回调取最后一条,其余三条请求钩子仍须是同一个回调 · 第 1 项提交。
+- 2026-11-12 · 第 1 项:I10 用例另需宿主里有 main 注入的 `codepuppy-automation-standard` agent(策略按调用所属 agent 读规则),用一个旁路插件按生产形状建出;云工具准入那条加断言拒绝来自主权闸(`is unavailable`),防止它因策略的「未知身份」而假绿;新增 I3 用例的探针工具在装 ext 之前注册(同内置插件),策略认作 `builtin::probe_tool` · 第 1 项提交。
+- 2026-11-12 · 第 1 项:`gate-files.tsv` 的 `context-injection.test.ts` 行在基线就是 41 而文件实跑 36(已过期,属 unit 2 那一类),按本提交实测改为 37;`cloud-websearch-kill.test.ts` 行 47 对实跑 30 同样过期,本段没改它的条数,留给 unit 2 · 第 1 项提交。

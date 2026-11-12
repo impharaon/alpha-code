@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import type { Plugin } from "@opencode/plugin"
-import { registerPolicy } from "./policy-stub"
+import { registerPolicy } from "./policy/index"
 import {
   projectDirectoryIdentity,
   readProjectExtensionsConsent,

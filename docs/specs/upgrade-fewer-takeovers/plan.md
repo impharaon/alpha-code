@@ -133,18 +133,18 @@ last_reviewed: 2026-11-12
 ### 风险
 
 真引擎上造前缀要走 Transport 失败,会话运行器按退避重试约 67–101 s(`packages/core/src/model-retry.ts:22-36`),不适合进门;所以用桩客户端,前缀由生产 `withFailureCode` 生成、形状与 `engine-session-turn.cases.ts` 的真引擎 idle 一致。
-`packages/ui-mac/src/main` 的体积棘轮在基线上已是 65083 > 64700(与本段无关),本段净增 1 行 import。
+`packages/ui-mac/src/main` 的体积棘轮在基线上已是 65083 > 64700(与本段无关),本段净增 2 行(import 与取原文那一行)。
 
 ### 证明
 
 | AC | 测试/证据 | 缺少行为为什么会失败 |
 | --- | --- | --- |
-| C | `engine-session-turn.test.ts` 新用例(名按实现定,写进本段) | 不经 `parseFailureCode` ⇒ 异常(即自动化失败摘要)含 `[codepuppy:tcp]`,红(先红后绿) |
+| C | `engine-session-turn.test.ts`「引擎记下的失败带登记码前缀 ⇒ 抛出的原因是去掉前缀的原文(自动化失败摘要里不出现 [codepuppy:…]);没有前缀的原样」 | 不经 `parseFailureCode` ⇒ 异常(即自动化失败摘要)含 `[codepuppy:tcp]`,红(先红后绿) |
 | C 读方完整 | 上面 `git grep` 的命令与结果进回执 | — |
 
 ### 偏离记录
 
-暂无
+- 2026-11-12 · 体积棘轮的净增行数由 1 改为 2(取原文单独成一行,比内联进模板串更好读)· 本切片提交。
 
 ## 切片 B — 读目录卡由扩展从结构化结果生成
 

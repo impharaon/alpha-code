@@ -4,6 +4,7 @@
 // prompt 在返回前 `execution.wake`);`POST /api/experimental/session/:id/wait` 等这一轮跑到空闲;回复从消息列表里读。
 // 这一轮的结局在最新那条 `idle` 消息上(`succeeded` / `failed` / `interrupted`,失败带 `error`)。
 // 前提:会话是调用方刚建的(两个入口都是),所以「最新的 idle / assistant」就是这一轮的。
+import { parseFailureCode } from "@opencode/schema/codepuppy-net-failure"
 import type { EngineClient } from "./engine-client"
 
 type Content = { type: string; text?: string }
@@ -16,7 +17,8 @@ export async function promptAndWait(client: EngineClient, input: { sessionID: st
   const page = await client.message.list({ sessionID: input.sessionID, order: "desc", limit: 50 }, { signal })
   const messages = (page as { data: Listed[] }).data
   const idle = messages.find((message) => message.type === "idle")
-  if (idle?.outcome !== "succeeded") throw new Error(`engine turn ${idle?.outcome ?? "did not finish"}${idle?.error?.message ? `: ${idle.error.message}` : ""}`)
+  const reason = idle?.error?.message ? (parseFailureCode(idle.error.message)?.text ?? idle.error.message) : undefined
+  if (idle?.outcome !== "succeeded") throw new Error(`engine turn ${idle?.outcome ?? "did not finish"}${reason ? `: ${reason}` : ""}`)
   const reply = messages.find((message) => message.type === "assistant")
   return (reply?.content ?? [])
     .filter((item) => item.type === "text" && typeof item.text === "string")

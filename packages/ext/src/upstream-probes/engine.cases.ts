@@ -9,7 +9,7 @@
 // form 2.x loads) that records what plugins see: the four request hooks ext uses (`context`, `compaction`,
 // `generate`, `title`, with the request messages) and `model.request` — read them with `hookCalls()`.
 //
-// Isolation: packages/ext/test/preload.ts already points HOME / XDG_* / TMPDIR / OPENCODE_DB at a fresh temp root
+// Isolation: the shared test preload (scripts/test-isolation/preload.ts, via packages/ext/bunfig.toml) already points HOME / XDG_* / TMPDIR / OPENCODE_DB at a fresh temp root
 // before any file loads. `startProbeEngine` first proves, with the engine's own `Global.Path`, that the engine's
 // directories are inside that root (`assertEngineSandboxed`) and refuses to boot otherwise — so a probe can never
 // touch the owner's ~/.local/share/opencode.
@@ -18,7 +18,7 @@
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
-import { TEST_ROOT_KEY } from "../../test/isolated-env"
+import { TEST_ROOT_KEY } from "../../../../scripts/test-isolation/env"
 import { assertEngineSandboxed } from "../../../ui-mac/test-component/engine-sandbox"
 import { startEngine } from "../../../ui-mac/engine/engine-embed"
 import { buildEngineServerOptions, engineDesktopToggles } from "../../../ui-mac/src/main/engine-server-options"

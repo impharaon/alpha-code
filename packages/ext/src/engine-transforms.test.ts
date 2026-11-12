@@ -3,8 +3,28 @@
 // ext 里的翻译是上游 `core/src/v1/config/migrate.ts` 三个小函数的抄本(那个模块顶层 import 引擎服务,不能打进 ext 的 bundle);
 // 上游一改,这里逐字段对比就红。
 import { describe, expect, test } from "bun:test"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import { ConfigNormalize } from "../../core/src/config/normalize.ts"
-import { projectServerConfig } from "./engine-transforms"
+import { ConfigMigrateV1 } from "../../core/src/v1/config/migrate.ts"
+import { applyAgents, projectServerConfig, RETIRED_PROVIDER_IDS } from "./engine-transforms"
+
+/** `applyAgents` 写进编辑器的结果(编辑器按 2.x `AgentEditor` 的 get / update 形状;新 agent 从空对象起)。 */
+function agentsAfter(entries: Record<string, unknown>) {
+  const agents = new Map<string, Record<string, any>>()
+  applyAgents(
+    {
+      get: (id: string) => agents.get(id),
+      update: (id: string, fn: (agent: Record<string, any>) => void) => {
+        const agent = agents.get(id) ?? { permissions: [] }
+        fn(agent)
+        agents.set(id, agent)
+      },
+    } as never,
+    entries,
+  )
+  return agents
+}
 
 /** 引擎读这份 v1 文档后得到的配置(诊断为空才算读通)。 */
 function normalized(document: Record<string, unknown>) {
@@ -31,4 +51,31 @@ describe("项目 MCP 条目 = 引擎读同一条 v1 条目的结果", () => {
     test(`${name}:cwd / timeout / codemode / enabled / OAuth 与上游归一化逐字段相同`, () => {
       expect(projectServerConfig(entry)).toEqual(normalized({ mcp: { s: entry } }).mcp.servers.s)
     })
+})
+
+describe("项目 agent 的模型:退役 provider id 按引擎的规则改名", () => {
+  const entries = {
+    azure: { prompt: "a", model: "azure-cognitive-services/gpt-x" },
+    vertex: { prompt: "v", model: "google-vertex-anthropic/claude-y" },
+    plain: { prompt: "p", model: "openai/gpt-z" },
+  }
+  test("每个 agent 的 provider 与上游归一化的 model.providerID 相同,模型名不变", () => {
+    const engine = normalized({ agent: entries }).agents
+    const ours = agentsAfter(entries)
+    for (const name of Object.keys(entries)) {
+      expect([name, ours.get(name)?.model?.providerID]).toEqual([name, engine[name].model.providerID])
+      expect([name, ours.get(name)?.model?.id]).toEqual([name, engine[name].model.model])
+    }
+    expect(ours.get("azure")?.model?.providerID).toBe("azure")
+  })
+
+  test("漂移锁:抄本的改名表 = 上游 providerID 函数里会改名的全部 id(从上游源码取字面量,再用上游函数判)", () => {
+    const source = readFileSync(join(import.meta.dir, "../../core/src/v1/config/migrate.ts"), "utf8")
+    const body = source.match(/export function providerID\(input: string\) \{([\s\S]*?)\n\}/)?.[1]
+    expect(body, "upstream providerID moved — re-read core/src/v1/config/migrate.ts").toBeDefined()
+    const literals = [...body!.matchAll(/"([^"]+)"/g)].map((match) => match[1]!)
+    expect(literals.length).toBeGreaterThan(0)
+    const upstream = Object.fromEntries(literals.filter((id) => ConfigMigrateV1.providerID(id) !== id).map((id) => [id, ConfigMigrateV1.providerID(id)]))
+    expect(RETIRED_PROVIDER_IDS).toEqual(upstream)
+  })
 })

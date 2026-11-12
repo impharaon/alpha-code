@@ -99,12 +99,22 @@ export function applyProjectMcp(editor: MCPEditor, servers: unknown, error: (lin
   return added
 }
 
-/** `"<providerID>/<modelID>"` → 2.x `Model.Ref`;不是这个形状 ⇒ undefined。 */
+/**
+ * OpenCode 2 退役的 provider id → 现在的 id。上游读用户配置时对 agent / 命令 / 顶层 model 做同样的改名(`packages/core/src/v1/config/migrate.ts`
+ * `providerID`,抄本 —— 那个模块顶层 import 引擎服务,不能打进 ext 的自包含 bundle;与上游函数的漂移锁在 engine-transforms.test.ts)。
+ */
+export const RETIRED_PROVIDER_IDS: Readonly<Record<string, string>> = {
+  "azure-cognitive-services": "azure",
+  "google-vertex-anthropic": "google-vertex",
+}
+
+/** `"<providerID>/<modelID>"` → 2.x `Model.Ref`(退役的 provider id 按引擎的规则改名);不是这个形状 ⇒ undefined。 */
 function modelRef(value: unknown) {
   if (typeof value !== "string") return undefined
   const slash = value.indexOf("/")
   if (slash <= 0 || slash === value.length - 1) return undefined
-  return { providerID: value.slice(0, slash), id: value.slice(slash + 1) }
+  const providerID = value.slice(0, slash)
+  return { providerID: RETIRED_PROVIDER_IDS[providerID] ?? providerID, id: value.slice(slash + 1) }
 }
 
 /**

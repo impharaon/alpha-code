@@ -13,6 +13,11 @@
 //      反向臂:注入里没有这个目录 ⇒ 不出现。
 //   ⑤ 出厂 /init、/review(接缝裁决 C):真引擎跑命令,用户回合正文是 ext 登记的模板(参数由引擎代入),/review 在子会话里跑;
 //      反向臂:CODEPUPPY_PROMPT_REBRAND_DISABLE=1 不写 commands ⇒ 引擎自带的那两条。另量一条层序:同名时内联文档压过用户全局配置。
+//   ⑧ 项目导入的技能(编排器裁决 2026-11-12):显式文件 `skills` 里那一条相对路径 `./.codepuppy/skills`,2.x 按会话所在的项目目录
+//      解析 —— 项目 A 经 ecosystem-import 导入后不重启就可用;没有该目录的项目 B 没有;A 看不到 B 导入的;反向臂(今天的代码,
+//      显式文件里没有这一条)⇒ A 导入的技能不可用。不看 consent(与 v1 同:ext 的信任门只管 mcp 与 agent 控制字段)。
+//      与 v1 的三处差别(已裁决接受):① 目录在、项目 codepuppy.jsonc 里没写注册,也会加载;② 项目在 skills.paths 里写的其它条目
+//      不生效;③ ext 的项目身份检查不适用 —— 软链照跟,会话位置是 HOME 时读 `~/.codepuppy/skills`。
 // 引擎跑在临时 HOME/XDG 沙箱里(test-component/engine-sandbox.ts),绝不碰 owner 的数据目录。
 //
 // 本文件由同名 `.test.ts` 宿主起一个独立的 `bun test` 子进程来跑(仓内 `*.cases.ts` 惯例):沙箱要把 HOME / XDG_* / TMPDIR
@@ -25,7 +30,8 @@ import { assertEngineSandboxed, engineSandbox, engineSlot } from "../../test-com
 import { buildEngineServerOptions, ENGINE_RELEASE_CHANNEL } from "./engine-server-options"
 import { withEngineAuthorization } from "./engine-authorization"
 import { explicitSkillDirs, injectCodePuppyConfig } from "./codepuppy-config-injection"
-import { watchExplicitSources } from "./engine-explicit-config"
+import { registerProjectSkillsPath } from "./ecosystem-import"
+import { watchExplicitSources, writeExplicitConfig } from "./engine-explicit-config"
 import { customProviderSecretName, secretFilePath } from "./codepuppy-secret-files"
 import { PLATFORM_API_KEY_PLACEHOLDER } from "./codepuppy-models"
 import { createSidecarEnv } from "./sidecar-env"
@@ -102,13 +108,14 @@ async function engineWith(
     { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, PASSWORD)) },
   )
   engines.push(engine)
-  const get = async (route: string) => {
+  const getAt = async (directory: string, route: string) => {
     const response = await fetch!(
-      new Request(`http://codepuppy-sidecar.invalid${route}`, { headers: { "x-opencode-directory": encodeURIComponent(slot.projectDirectory) } }),
+      new Request(`http://codepuppy-sidecar.invalid${route}`, { headers: { "x-opencode-directory": encodeURIComponent(directory) } }),
     )
     expect(response.status).toBe(200)
     return (await response.json()) as { data: Array<{ id: string; name?: string }> }
   }
+  const get = (route: string) => getAt(slot.projectDirectory, route)
   const send = async (method: string, route: string, body?: unknown) =>
     fetch!(
       new Request(`http://codepuppy-sidecar.invalid${route}`, {
@@ -117,7 +124,7 @@ async function engineWith(
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       }),
     )
-  return { get, send, slot }
+  return { get, getAt, send, slot }
 }
 
 const skillFile = (dir: string, name: string) => {
@@ -321,7 +328,7 @@ describe("接缝裁决 A / 裁决 r3 第 1 条:技能目录经显式文件的 sk
       const g2 = generation("skill--cp-l5-a", "gen-000002-bbbbbb", "cp-l5-a-two")
       expect(await appears(engine.get, "cp-l5-a-two", 10_000)).toBe(true)
       expect(await gone(engine.get, "cp-l5-a-one", 5_000)).toBe(true)
-      expect((JSON.parse(fs.readFileSync(injection.config.file!, "utf8")) as { skills: string[] }).skills).toEqual([g2])
+      expect((JSON.parse(fs.readFileSync(injection.config.file!, "utf8")) as { skills: string[] }).skills).toEqual([g2, "./.codepuppy/skills"])
 
       generation("skill--cp-l5-b", "gen-000001-cccccc", "cp-l5-b-one")
       enable("skill--cp-l5-a", "skill--cp-l5-b")
@@ -342,6 +349,59 @@ describe("接缝裁决 A / 裁决 r3 第 1 条:技能目录经显式文件的 sk
     generation("skill--cp-l5-c", "gen-000002-eeeeee", "cp-l5-c-two")
     expect(await appears(engine.get, "cp-l5-c-two", 4_000)).toBe(false)
     expect((await engine.get("/api/skill")).data.some((skill) => skill.name === "cp-l5-c-one")).toBe(true)
+  }, 60_000)
+})
+
+describe("编排器裁决 2026-11-12:项目导入的技能经显式文件那一条相对路径进引擎(按会话所在项目解析,不看 consent)", () => {
+  type Engine = Awaited<ReturnType<typeof engineWith>>
+  const has = async (engine: Engine, directory: string, name: string) =>
+    (await engine.getAt(directory, "/api/skill")).data.some((skill) => skill.name === name)
+  /** 在 ms 之内出现过 ⇒ true。 */
+  const appearsAt = async (engine: Engine, directory: string, name: string, ms: number) => {
+    const until = Date.now() + ms
+    while (Date.now() < until) {
+      if (await has(engine, directory, name)) return true
+      await new Promise((resolve) => setTimeout(resolve, 200))
+    }
+    return false
+  }
+  /** 「没有」要盯一段时间才算数:位置第一次被访问时技能插件是异步装的。 */
+  const absentFor = async (engine: Engine, directory: string, name: string, ms: number) => !(await appearsAt(engine, directory, name, ms))
+  const importInto = (projectDirectory: string, name: string) => {
+    // 与 ecosystem-import 的项目导入同一形态:技能文件夹落 `.codepuppy/skills/<name>`,再由生产的 registerProjectSkillsPath 写注册。
+    skillFile(path.join(projectDirectory, ".codepuppy", "skills", name), name)
+    registerProjectSkillsPath(projectDirectory)
+  }
+
+  test("项目 A 导入后不重启就可用;没有该目录的项目 B 没有;B 导入的 A 看不到", async () => {
+    const injection = injectCodePuppyConfig(userData, undefined, "stable")
+    expect(injection.explicit!.layer.skills).toContain("./.codepuppy/skills")
+    const engine = await engineWith("project-skills", injection.config, undefined, { filewatcher: true })
+    const projectA = engine.slot.projectDirectory
+    const projectB = path.join(sandbox.root, "projects", "project-skills-b")
+    fs.mkdirSync(projectB, { recursive: true })
+
+    expect(await has(engine, projectA, "cp-l5-project-a")).toBe(false) // 先让位置 A 起来,导入发生在引擎运行中
+    importInto(projectA, "cp-l5-project-a")
+    expect(await appearsAt(engine, projectA, "cp-l5-project-a", 15_000)).toBe(true)
+    expect(await absentFor(engine, projectB, "cp-l5-project-a", 3_000)).toBe(true)
+
+    importInto(projectB, "cp-l5-project-b")
+    expect(await appearsAt(engine, projectB, "cp-l5-project-b", 15_000)).toBe(true)
+    expect(await absentFor(engine, projectA, "cp-l5-project-b", 3_000)).toBe(true)
+    expect(await has(engine, projectA, "cp-l5-project-a")).toBe(true)
+  }, 90_000)
+
+  test("反向臂(今天的代码):显式文件的 skills 里没有那一条 ⇒ 项目 A 已导入的技能不可用", async () => {
+    const injection = injectCodePuppyConfig(userData, undefined, "stable")
+    const explicit = injection.explicit!
+    writeExplicitConfig(injection.config.file!, explicit.userConfig, { ...explicit.layer, skills: explicit.layer.skills.filter((entry) => entry !== "./.codepuppy/skills") })
+    expect(fs.readFileSync(injection.config.file!, "utf8")).not.toContain(".codepuppy/skills")
+    const projectA = path.join(sandbox.root, "projects", "project-skills-today")
+    fs.mkdirSync(projectA, { recursive: true })
+    importInto(projectA, "cp-l5-project-today")
+    const engine = await engineWith("project-skills-today", injection.config, undefined, { filewatcher: true })
+    expect(await absentFor(engine, projectA, "cp-l5-project-today", 8_000)).toBe(true)
   }, 60_000)
 })
 

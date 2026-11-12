@@ -41,6 +41,7 @@ const INTAKE = "Takeover intake check"
 const MERGE = "Merge `dev` into `alpha`"
 const POST = "Takeover paths unchanged by merge"
 const BUNDLE = "Build sync bundle artifact"
+const JUDGE = "Authority registry judge"
 const FULL = [INTAKE, MERGE, POST, BUNDLE]
 
 const REVIEW_TITLE = "::error title=takeover upgrade review required::"
@@ -133,7 +134,10 @@ type Fixture = { repo: string; work: string; oldDev: string; newDev: string; old
  * 改过的接管文件;dev 前进一步。结束时工作树停在 dev —— 与生产里 intake 运行时一致
  * (上一步 `Fast-forward dev` 刚 checkout 了它)。
  */
-function fixture(shape: Shape, opts: { evilGuardInDev?: boolean; guard?: (source: string) => string } = {}): Fixture {
+function fixture(
+  shape: Shape,
+  opts: { evilGuardInDev?: boolean; guard?: (source: string) => string; alphaFiles?: Record<string, string> } = {},
+): Fixture {
   const work = mkdtempSync(join(tmpdir(), "codepuppy-sync-takeover-"))
   const repo = join(work, "repo")
   mkdirSync(repo, { recursive: true })
@@ -174,6 +178,7 @@ function fixture(shape: Shape, opts: { evilGuardInDev?: boolean; guard?: (source
   if (opts.guard) write(repo, "scripts/north-star-guard.sh", opts.guard(readFileSync(GUARD, "utf8")))
   write(repo, TAKEOVER, takeoverBody(CODEPUPPY_EDIT))
   if (shape === "unregistered") write(repo, ENGINE, "export const engine = 2 // alpha\n")
+  for (const [path, body] of Object.entries(opts.alphaFiles ?? {})) write(repo, path, body)
   const oldAlpha = commitAll(repo, "alpha: SOT + takeover")
 
   git(repo, ["checkout", "-q", "dev"])
@@ -458,5 +463,82 @@ describe("#1662 F10 空接管清单照常同步;守卫读不出条数才中止",
     expect(run.failedAt).toBe(INTAKE)
     expect(run.output).toContain("守卫没有给出接管清单条数")
     expect(bundleProduced(fx)).toBe(false)
+  })
+})
+
+// ── `#1662`:合并后的树上权威登记册判官不绿 ⇒ 不出推送包 ─────────────────────────────────────
+// 生产判官(packages/ext/src/policy/authority-registry.test.ts)要读真仓历史与锚点修订,在缩比夹具里跑不起来;
+// 这里换成同一路径上的合成判官(两条用例),跑的是生产的那一步 body 与 scripts/bun-test-floor.sh 原样副本,
+// 条数来自夹具里的 scripts/gate-files.tsv 登记行 —— 被测的是「这一步怎么消费判官的结局」,判官自身的
+// 判据由它自己的文件证明(每条规则先在合成登记册上判红)。
+
+const JUDGE_FILE = "packages/ext/src/policy/authority-registry.test.ts"
+const judgeSource = (cases: string[]) => `import { test, expect } from "bun:test"\n${cases.join("\n")}\n`
+const GREEN = ['test("held a", () => expect(1).toBe(1))', 'test("held b", () => expect(1).toBe(1))']
+const RED = ['test("held a", () => expect(1).toBe(1))', 'test("blocked b", () => expect(["b: blocked"]).toEqual([]))']
+const ONE_SHORT = ['test("held a", () => expect(1).toBe(1))', 'test.skip("held b", () => expect(1).toBe(1))']
+const gateRow = (count: string) => `${count}\tpackages/ext\tsrc/policy/authority-registry.test.ts\t-\tfixture\n`
+
+function judgeFixture(cases: string[], row: string = gateRow("2")): Fixture {
+  return fixture("plain", {
+    alphaFiles: {
+      [JUDGE_FILE]: judgeSource(cases),
+      "scripts/gate-files.tsv": row,
+      "scripts/bun-test-floor.sh": readFileSync(resolve(REPO_ROOT, "scripts/bun-test-floor.sh"), "utf8"),
+    },
+  })
+}
+const WITH_JUDGE = [INTAKE, MERGE, POST, JUDGE, BUNDLE]
+
+describe("#1662 合并后的树上有权威没握住 ⇒ 判官步中止,不出推送包", () => {
+  test("判官全绿 ⇒ 照常出推送包;判官有一条红 ⇒ 在判官步中止、具名报错、不出推送包", () => {
+    const ok = judgeFixture(GREEN)
+    const passed = runSteps(ok, WITH_JUDGE)
+    expect(passed.failedAt, `判官全绿不该让同步失败:\n${passed.output}`).toBeNull()
+    expect(bundleProduced(ok)).toBe(true)
+
+    const bad = judgeFixture(RED)
+    const failed = runSteps(bad, WITH_JUDGE)
+    expect(failed.failedAt, failed.output).toBe(JUDGE)
+    expect(failed.output).toContain("::error title=authority not held::")
+    expect(failed.output, "没把判官的逐条原因带进日志").toContain("b: blocked")
+    expect(bundleProduced(bad), "判官红了却产出了推送包").toBe(false)
+  })
+
+  test("判官少跑一条(被 skip / 删掉)⇒ 同样中止;变异臂:退回裸 `bun test` ⇒ 同一夹具放行", () => {
+    const fx = judgeFixture(ONE_SHORT)
+    const run = runSteps(fx, WITH_JUDGE)
+    expect(run.failedAt, run.output).toBe(JUDGE)
+    expect(run.output).toContain("实际 1 条 < 登记 2 条")
+    expect(bundleProduced(fx)).toBe(false)
+
+    const bare = 'cd packages/ext && bun test src/policy/authority-registry.test.ts\n'
+    const fx2 = judgeFixture(ONE_SHORT)
+    const mutated = runSteps(fx2, WITH_JUDGE, { [JUDGE]: bare })
+    expect(mutated.failedAt, `裸 bun test 应当放过少一条的判官 —— 否则这条变异臂证明不了条数核对有用:\n${mutated.output}`).toBeNull()
+  })
+
+  test("gate-files.tsv 里读不出判官的登记条数 ⇒ 测量作废,中止", () => {
+    for (const row of ["", gateRow(">=2"), "2\tpackages/ext\tsrc/policy/other.test.ts\t-\tfixture\n"]) {
+      const fx = judgeFixture(GREEN, row)
+      const run = runSteps(fx, WITH_JUDGE)
+      expect(run.failedAt, `登记行「${row.trim()}」:\n${run.output}`).toBe(JUDGE)
+      expect(run.output).toContain("读不出")
+      expect(bundleProduced(fx)).toBe(false)
+    }
+  })
+
+  test("生产 workflow 里判官步排在合并之后、推送包之前,且没有让它被跳过或失败被吞的开关", () => {
+    const steps = candidateSteps()
+    const at = (name: string) => steps.findIndex((s: any) => typeof s?.name === "string" && s.name.startsWith(name))
+    const judge = at(JUDGE)
+    expect(judge, "sync-upstream.yml 里找不到判官步").toBeGreaterThanOrEqual(0)
+    expect(judge, "判官步排在合并之前 —— 它判的不是合并后的树").toBeGreaterThan(at(MERGE))
+    expect(judge, "判官步排在推送包之后 —— 红了推送包也已经出了").toBeLessThan(at(BUNDLE))
+    expect(at(MERGE)).toBeGreaterThanOrEqual(0)
+    expect(steps[judge].if, "判官步带了 if: —— 默认 success() 之外的条件会让它被跳过").toBeUndefined()
+    expect(steps[judge]["continue-on-error"], "判官步带了 continue-on-error —— 红了也照样出推送包").toBeUndefined()
+    expect(stepBody(JUDGE)).toContain("src/policy/authority-registry.test.ts")
+    expect(existsSync(resolve(REPO_ROOT, JUDGE_FILE)), "判官步点名的生产判官文件不在仓里").toBe(true)
   })
 })

@@ -18,7 +18,7 @@ import {
 } from "./codepuppy-live-allowlist"
 import { BYOK_ADAPTERS } from "./byok-adapters"
 import bundledCatalog from "./codepuppy-models.json"
-import { buildCodePuppyModelConfig, getModelCatalog, PLATFORM_API_KEY_PLACEHOLDER } from "./codepuppy-models"
+import { buildCodePuppyModelConfig, engineModelConfig, getModelCatalog, PLATFORM_API_KEY_PLACEHOLDER } from "./codepuppy-models"
 import type { EffectiveCatalog } from "../shared/codepuppy-model-types"
 import { buildModelPickerRows } from "../renderer/codepuppy-ui/model-picker-core"
 import { customProviderSecretName, secretFilePath, secretFileRef, syncSecretFiles } from "./codepuppy-secret-files"
@@ -915,8 +915,9 @@ describe("REQ-153 #1236:目录 `reasoning` 转发进引擎配置,徽标与引擎
 //     的逐格读数;本票对 qwen 经 OR 的 N=3 复打记在 docs/architecture/2026-09-06-model-variant-reachability.md §8);
 //   · 本机无凭据、一格没打成的模型(qwen / kimi / minimax 直连)**显式**列入无档清单并断言它真的被注入且无档 ——
 //     否则下一个人会顺手照 models.dev 文案给它们补上,那正是 v1 作废的形态;
-//   · 上游 `transform.smallOptions()` 把档位表**第一项**喂给标题等辅助调用(`request.ts:88-89`,基线 §3.8a),
-//     所以凡有显式关闭档的模型,「关」必须排第一 —— 判据在这里,机制本身由 codepuppy-reasoning-badge-parity 用真引擎证。
+//   · 标题等辅助调用取档位表**第一项**(基线 §3.8a;0.1.26 是上游 `transform.smallOptions()`,`request.ts:88-89`;OpenCode 2 上是
+//     engineModelConfig 在档位表末尾多写的 `none` 档 = 第一档的拷贝,由 2.x 的标题选档挑中),所以凡有显式关闭档的模型,「关」必须排第一
+//     —— 判据在这里,机制本身由 codepuppy-reasoning-badge-parity 用真引擎证(每一档、含没选档,标题请求体 == 第一档)。
 // 判官是纯函数,先用已知的坏证明它会红(v1 的 GLM 形状、给未验模型补档、关闭档写错值、关档不在第一位、
 // 实打表登记的档位从注入里消失),再判出货目录。
 describe("REQ-153 #1237:档位形状逐腿取自实打表;未实打的模型钉在无档", () => {
@@ -1015,7 +1016,7 @@ describe("REQ-153 #1237:档位形状逐腿取自实打表;未实打的模型钉�
           const labels = Object.keys(model.variants)
           const off = labels.filter((label) => isOffTier(model.variants![label]!))
           if (off.length > 0 && !isOffTier(model.variants[labels[0]!]!))
-            failures.push(`${key}: 有显式关闭档 ${JSON.stringify(off)} 却把 ${JSON.stringify(labels[0])} 排在第一位 —— 上游 smallOptions() 会把它喂给标题等辅助调用(基线 §3.8a)`)
+            failures.push(`${key}: 有显式关闭档 ${JSON.stringify(off)} 却把 ${JSON.stringify(labels[0])} 排在第一位 —— 标题等辅助调用取第一档(0.1.26 的 smallOptions();2.x 上是 engineModelConfig 多写的 none 档,基线 §3.8a)`)
         } else if (verified) {
           failures.push(`${key}: 实打表登记了档位 ${JSON.stringify(verified.variants)},注入配置里却没有 variants`)
         }
@@ -1097,6 +1098,44 @@ describe("REQ-153 #1237:档位形状逐腿取自实打表;未实打的模型钉�
     const dropped = clone(base) // 实打表登记了档位,注入却没有 —— 目录被人退回无档
     delete dropped.provider.codepuppy!.models["qwen3.7-plus"]!.variants
     expect(judgeTierProvenance(dropped)).toEqual([`codepuppy:qwen3.7-plus: 实打表登记了档位 ${JSON.stringify(VERIFIED_TIERS["codepuppy:qwen3.7-plus"]!.variants)},注入配置里却没有 variants`])
+  })
+
+  // `#1662`:「标题取第一档」在 OpenCode 2 上的实现 —— 2.x 的标题选档只认 id 为 none / minimal / low 的档,所以引擎配置给有档位的模型
+  // 在档位表末尾多写一档 `none` = 第一档的原样拷贝(两类参数:settings 一类与请求体一类)。目录自己已有 `none` 档 ⇒ 原样;无档 ⇒ 不加。
+  // 出货目录里没有 id 为 `none` 的档,所以「已有就不加」只能用合成输入判。真引擎那一格在 codepuppy-reasoning-badge-parity。
+  test("#1662:有档位的模型在引擎配置末尾多一档 none = 第一档的拷贝;目录已有 none ⇒ 原样;无档 ⇒ 不加", () => {
+    const engine = engineModelConfig({
+      enabled_providers: ["p"],
+      provider: {
+        p: {
+          npm: "@ai-sdk/openai-compatible",
+          name: "P",
+          options: { baseURL: "https://p.invalid/v1" },
+          models: {
+            toggle: { name: "toggle", reasoning: true, variants: { 关: { thinking: { type: "disabled" } }, 开: { thinking: { type: "enabled" } } } },
+            effort: { name: "effort", reasoning: true, variants: { 低: { reasoningEffort: "low" }, 高: { reasoningEffort: "high" } } },
+            own: { name: "own", reasoning: true, variants: { 高: { reasoningEffort: "high" }, none: { reasoningEffort: "none" } } },
+            plain: { name: "plain" },
+          },
+        },
+      },
+    })
+    const models = (engine.providers.p as { models: Record<string, { variants?: unknown }> }).models
+    expect(models.toggle!.variants).toEqual([
+      { id: "关", body: { thinking: { type: "disabled" } } },
+      { id: "开", body: { thinking: { type: "enabled" } } },
+      { id: "none", body: { thinking: { type: "disabled" } } },
+    ])
+    expect(models.effort!.variants).toEqual([
+      { id: "低", settings: { reasoningEffort: "low" } },
+      { id: "高", settings: { reasoningEffort: "high" } },
+      { id: "none", settings: { reasoningEffort: "low" } },
+    ])
+    expect(models.own!.variants).toEqual([
+      { id: "高", settings: { reasoningEffort: "high" } },
+      { id: "none", settings: { reasoningEffort: "none" } },
+    ])
+    expect("variants" in models.plain!).toBe(false)
   })
 })
 

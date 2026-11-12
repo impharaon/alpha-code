@@ -64,6 +64,12 @@ export const byokEngineId = (id: string): string => `${id}-byok`
  *  it does not depend on platform login/entitlement or on the engine's model list being loaded". */
 export const isByokEngineId = (providerID: string): boolean => providerID.endsWith("-byok")
 
+/** `#1662`(REQ-153 #1237 的标题规则):引擎配置给每个有档位的模型多写的一档,内容是档位表第一档的原样拷贝。
+ *  0.1.26 的标题等辅助调用取第一档;2.x 的标题选档只认 id 为 none / minimal / low 的档(packages/core/src/session/context.ts
+ *  的 MINIMAL_REASONING_VARIANTS),所以 id 必须逐字是 `none`。写它的是 main/codepuppy-models.ts `engineModel`,
+ *  剥它的是 engine-adapter/v1-shapes.ts `toV1ProviderList`(用户看不见、选不到)。 */
+export const TITLE_VARIANT_ALIAS = "none"
+
 /** BYOK 行的展示名、推理能力与**推理档位**的**唯一**派生函数,只读 BYOK 目录自己的逐模型元数据
  *  (`ByokProvider.modelMeta`)。REQ-237 `#1556`:此前没有槽的模型借**平台同名条目**的 name/reasoning/variants ——
  *  与目录自己的 `_variantsNote`「同一模型经直连与经 OpenRouter 形状不同,不得跨腿套用」矛盾;两类目录从此不互相借数据。

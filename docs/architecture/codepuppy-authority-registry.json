@@ -984,7 +984,7 @@
         },
         {
           "file": "packages/ui-mac/src/main/token-hot-apply.engine.test.ts",
-          "name": "续期热应用:令牌 A ⇒ A、热应用 B ⇒ B、删文件 ⇒ 具名失败零请求、令牌不进日志与响应;不装 ext ⇒ 占位值被拒(token-hot-apply.engine.cases.ts,2 条)"
+          "name": "续期热应用:令牌 A ⇒ A、热应用 B ⇒ B、删文件 ⇒ 具名失败零请求、令牌不进日志与响应;不装 ext ⇒ 占位值被拒;平台地址的写法变体都带令牌、像而不是的地址收不到(token-hot-apply.engine.cases.ts,3 条)"
         },
         {
           "file": "packages/ui-mac/src/main/platform-credential-error.engine.test.ts",

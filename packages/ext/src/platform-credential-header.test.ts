@@ -85,5 +85,25 @@ describe("platformRequestCredentialHeader —— http.request 上按请求地址
     expect(platformRequestCredentialHeader({ requestURL: `${GW}evil/chat/completions`, env, readFile })).toBeUndefined()
     expect(reads).toEqual(["/token"])
   })
+
+  test("`#1662` r6:平台节点写成大写主机 / 显式默认端口 / 末尾斜杠 / 主机末尾一个点 ⇒ 规范化后的请求地址仍认;像而不是的主机与兄弟路径不认", () => {
+    const readFile = () => "tok"
+    const request = "https://gw.example/v1/chat/completions"
+    for (const base of ["https://GW.example/v1", "https://gw.example:443/v1", "https://gw.example/v1/", "https://gw.example./v1"]) {
+      const env = { CODEPUPPY_BASE_URL: base, CODEPUPPY_PLATFORM_AUTH_REF: "{file:/token}" }
+      expect([base, platformRequestCredentialHeader({ requestURL: new Request(base.replace(/\/?$/, "/chat/completions")).url, env, readFile })]).toEqual([base, "Bearer tok"])
+      expect([base, platformRequestCredentialHeader({ requestURL: request, env, readFile })]).toEqual([base, "Bearer tok"])
+    }
+    const env = { CODEPUPPY_BASE_URL: GW, CODEPUPPY_PLATFORM_AUTH_REF: "{file:/token}" }
+    for (const requestURL of [
+      "https://gw.example.evil/v1/chat/completions",
+      new Request("https://gw.example@evil/v1/chat/completions").url,
+      "https://gw.example/v1x/chat/completions",
+      "http://gw.example/v1/chat/completions",
+      "https://gw.example:8443/v1/chat/completions",
+      "not a url",
+    ])
+      expect([requestURL, platformRequestCredentialHeader({ requestURL, env, readFile })]).toEqual([requestURL, undefined])
+  })
 })
 

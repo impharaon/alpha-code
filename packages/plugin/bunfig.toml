@@ -1,0 +1,5 @@
+# north-star:codepuppy-owned —— Code Puppy 自有文件(上游镜像里没有这个路径;ADR-043)。
+[test]
+# I-08:任何测试文件求值之前,HOME / 全部 XDG_* / OPENCODE_DB / TMPDIR 已指进新建的临时根,Code Puppy 的 codepuppy-* 测试
+# 不碰开发机的真实数据目录。实现与理由在 scripts/test-isolation/preload.ts,判据 test/codepuppy-test-isolation.test.ts。
+preload = ["../../scripts/test-isolation/preload.ts"]

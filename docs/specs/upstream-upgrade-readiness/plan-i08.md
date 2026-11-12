@@ -108,4 +108,4 @@ core 的预载只能写在上游的 `packages/core/bunfig.toml` 里(bun 只读�
 - 2026-11-12 · 第 1 步 · 新增 `scripts/test-isolation/guard.ts`:六条守卫共用的两组断言(本进程、子进程 + 已知坏臂)放在这里,守卫文件只传各包自己的引擎路径;原计划只说「`rootsInChild` 与真环境读取放进 `env.ts`」,断言本身若写在每个守卫里就是六份副本。· `54b620bb22`
 - 2026-11-12 · 第 1 步 · 「上游 core 入口(`OPENCODE_TEST_HOME`)视为已隔离」那一支挪到第 4 步再写:第 1–3 步接上预载的五个包里没有任何东西以 `OPENCODE_TEST_HOME` 起子 `bun test`,先写就是到不了的分支。· `54b620bb22`
 - 2026-11-12 · 第 1 步 · ext 的 `typecheck` 脚本调用的 `tsgo` 在这棵树里没有装(另一条 lane 正在加这个依赖),改用仓根 `node_modules/.bin/tsc`(TypeScript 7.1.0-beta,同一个原生编译器)`--noEmit -p packages/ext`;没碰 `bun.lock`。· `54b620bb22`
-- 2026-11-12 · 第 2 步 · 子进程臂改用子 `bun test`(新 fixture `test-component/test-isolation-child.cases.ts`),不用计划里写的 `bun --preload … -e`:预载要在测试运行器里注册整次运行结束时的清理(`afterAll`),在 `bun -e` 下实测直接报「Cannot use afterAll() outside of the test runner」。子 `bun test` 也正是 57 个 host 起子进程的真实形状。· 本提交
+- 2026-11-12 · 第 2 步 · 子进程臂改用子 `bun test`(新 fixture `test-component/test-isolation-child.cases.ts`),不用计划里写的 `bun --preload … -e`:预载要在测试运行器里注册整次运行结束时的清理(`afterAll`),在 `bun -e` 下实测直接报「Cannot use afterAll() outside of the test runner」。子 `bun test` 也正是 57 个 host 起子进程的真实形状。· `22fb9ba389`

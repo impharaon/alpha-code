@@ -10,10 +10,11 @@
 // 判官看的是**生产自己写出来的两样东西**,不是两份都由本文件算的期望值:
 //   · 「提示里那一行」= 真 `injectCodePuppyConfig` 写到盘上的 `codepuppy-identity.md` 正文里,
 //     有没有生产 `buildCodePuppyIdentity` 的 web search 那一行(行本身也从生产取,不抄措辞);
-//   · 「工具表的在场性」= 同一次注入写进 `OPENCODE_CONFIG_CONTENT` 的 permission deny 表
-//     (引擎 `Permission.disabled` 按它把工具从模型工具表里摘掉,
-//     `packages/opencode/src/session/llm/request.ts:234-244`)与 `mcp.cloud` 的 `enabled`。
+//   · 「工具表的在场性」= 同一次注入交给引擎的配置(`#1662` 起是结果里的 `config.content`,sidecar 放进
+//     `start()` 的选项)里的 `permissions` 规则表(顶层与各 agent;2.x `Permission.evaluate` 取 findLast,
+//     末条 deny 即把工具从模型工具表里摘掉)与 `mcp.servers.<云>` 在不在、有没有 `disabled:true`。
 // 两边来自**不同的代码路径**,所以「它们相等」不是自指等价链。
+// 真引擎上的工具表本身(真 fork env → 模型第一次请求)由 websearch-account-tool-table.engine.test.ts 判;本文件判的是提示那一行与它相符。
 //
 // 四格 = 登出/BYOK · 登录有额度 · 登录无额度 · kill-switch。
 // **「有额度 / 无额度」在桌面侧是同一组输入**,这不是取巧:基线 §二选定的形状就是
@@ -25,6 +26,8 @@
 // keyless flag(`OPENCODE_ENABLE_EXA`)不写死成某一格的常量,而是**当成自由变量跑两遍** ——
 // 它的值由 main 的 `applyWebSearchSovereignty` 落定,而那一处正是 `#1411`/CODE-1 要改的地方。
 // 把它量化掉,本闸门对 CODE-1 前后两种 base 都成立,也就不会变成一条「迎合当下」的期望值。
+// `#1662`(OpenCode 2):这个变量 2.x 无读者(`#1667` 清点表 E2)—— 本地 `websearch` 在不在场只看 deny。两遍照跑,
+// 期望在两个取值上相同:提示若还读它,keyless=0 那一遍当场红(「工具在而提示没说」)。
 //
 // **与 CODE-1(`#1411` / PR `#1442`,已合)的分工**:代付态下本地 `websearch` 到底在不在工具表里
 // 由它决定,它自己也有一条从真 fork env 一路跑到真 `Permission.disabled` 的闸。本文件因此**不重跑
@@ -129,33 +132,41 @@ const CLOUD_DISPATCH_LINE = lineAddedBy({ cloudDispatch: true })[0]
 
 type Cfg = Record<string, any>
 
+type Rule = { action: string; resource: string; effect: string }
+type Injected = ReturnType<typeof injectCodePuppyConfig>
+
+/** 注入一次;产物是结果里的 `config.content`(`#1667` 起不再写进环境变量)。 */
+const inject = (): Injected => silently(() => injectCodePuppyConfig(userData, undefined, "stable"))
+
 /** 一次真注入之后,生产写出来的两样东西。 */
-function observe() {
-  const config: Cfg = JSON.parse(process.env.OPENCODE_CONFIG_CONTENT!)
+function observe(result: Injected) {
+  const config: Cfg = JSON.parse(result.config.content)
   const identityFile = (config.instructions as string[]).find((f) => f.endsWith("codepuppy-identity.md"))!
   const identity = fs.readFileSync(identityFile, "utf8")
 
-  // 一个工具在不在模型工具表里:顶层 deny 摘掉它,agent 级规则排在全局之后(`Permission.evaluate`
-  // 取 findLast),所以任一层 deny 都等于「模型看不到」。
+  // 一个工具在不在模型工具表里:2.x 的 `Permission.evaluate` 在一张规则表里取 findLast(动作名精确或 `*`),
+  // 末条是 deny 就摘掉;agent 级规则排在全局之后,所以任一层的判决是 deny 都等于「模型看不到」。
+  const deniedIn = (rules: Rule[] | undefined, toolId: string) =>
+    rules?.findLast((rule) => rule.action === toolId || rule.action === "*")?.effect === "deny"
   const denied = (toolId: string) => {
-    const top = (config.permission as Cfg | undefined)?.[toolId] === "deny"
-    const agents = Object.values((config.agent as Record<string, Cfg | undefined> | undefined) ?? {})
-    const anyAgent = agents.some((a) => (a?.permission as Cfg | undefined)?.[toolId] === "deny")
+    const top = deniedIn(config.permissions as Rule[] | undefined, toolId)
+    const agents = Object.values((config.agents as Record<string, Cfg | undefined> | undefined) ?? {})
+    const anyAgent = agents.some((a) => deniedIn(a?.permissions as Rule[] | undefined, toolId))
     return { top, anyAgent, either: top || anyAgent }
   }
   const localDeny = denied(LOCAL_WEB_SEARCH_TOOL_ID)
   const cloudDeny = denied(CLOUD_WEB_SEARCH_TOOL_ID)
-  const cloudServer = (config.mcp as Cfg | undefined)?.[CLOUD_MCP_SERVER_NAME] as Cfg | undefined
+  const cloudServer = (config.mcp as Cfg | undefined)?.servers?.[CLOUD_MCP_SERVER_NAME] as Cfg | undefined
 
   return {
     config,
     identity,
     promptClaimsWebSearch: identity.includes(WEBSEARCH_LINE),
     promptClaimsCloudDispatch: identity.includes(CLOUD_DISPATCH_LINE),
-    // 本地腿还要先被引擎注册才谈得上在场(`opencode/src/tool/registry.ts` 的 `webSearchEnabled`),
-    // keyless flag 是 main 在 fork 前两个方向都写的那一个。
-    localWebSearchPresent: !localDeny.either && process.env.OPENCODE_ENABLE_EXA !== "0",
-    cloudWebSearchPresent: !cloudDeny.either && cloudServer?.enabled === true,
+    // 2.x 的 `websearch` 是内置工具,ext 默认选 exa 供应商(plugin.ts 的 DEFAULT_WEBSEARCH_PROVIDER),不看 keyless flag。
+    localWebSearchPresent: !localDeny.either,
+    // 2.x `Mcp.RemoteConfig`:启用态不写 `disabled`,停用态是 `disabled:true`(cloud-sidecar-config.ts)。
+    cloudWebSearchPresent: !cloudDeny.either && cloudServer !== undefined && cloudServer.disabled !== true,
     localDeny,
     cloudDeny,
     cloudServer,
@@ -204,12 +215,11 @@ describe("S4:系统提示里的「能搜网」与模型工具表的在场性,在
 
   for (const keyless of KEYLESS_ARMS) {
     describe(`OPENCODE_ENABLE_EXA=${keyless}`, () => {
-      test("① 登出 / BYOK:本地腿在场(随 keyless),云腿整条不在;提示与工具表相符", () => {
+      test("① 登出 / BYOK:本地腿在场(2.x 不随 keyless),云腿整条不在;提示与工具表相符", () => {
         givenLoggedOut()
         process.env.OPENCODE_ENABLE_EXA = keyless
 
-        silently(() => injectCodePuppyConfig(userData, undefined, "stable"))
-        const o = observe()
+        const o = observe(inject())
 
         // 真闸:登出态一个 deny 都不写(不误伤登出兜底)
         expect(o.localDeny.either).toBe(false)
@@ -217,10 +227,10 @@ describe("S4:系统提示里的「能搜网」与模型工具表的在场性,在
         // 云腿整条不在:没有 URL ⇒ 连 server 定义都不写
         expect(o.cloudServer).toBeUndefined()
         expect(o.cloudWebSearchPresent).toBe(false)
-        expect(o.localWebSearchPresent).toBe(keyless === "1")
+        expect(o.localWebSearchPresent).toBe(true)
         // 相符
         expect(o.promptClaimsWebSearch).toBe(o.localWebSearchPresent || o.cloudWebSearchPresent)
-        expect(o.promptClaimsWebSearch).toBe(keyless === "1")
+        expect(o.promptClaimsWebSearch).toBe(true)
         expect(o.promptClaimsCloudDispatch).toBe(false)
       })
 
@@ -228,11 +238,11 @@ describe("S4:系统提示里的「能搜网」与模型工具表的在场性,在
         givenLoggedIn()
         process.env.OPENCODE_ENABLE_EXA = keyless
 
-        silently(() => injectCodePuppyConfig(userData, undefined, "stable"))
-        const o = observe()
+        const o = observe(inject())
 
         // 云腿这一半 CODE-1 一个字不改(基线 §二 落地方向 2)
-        expect(o.cloudServer?.enabled).toBe(true)
+        expect(o.cloudServer).toBeDefined()
+        expect(o.cloudServer?.disabled).toBeUndefined()
         expect(o.cloudDeny.either).toBe(false)
         expect(o.cloudWebSearchPresent).toBe(true)
         // 本地腿:`#1411`(PR `#1442`)之后代付态**一个 local deny 都不产生**,所以它只随 keyless
@@ -241,7 +251,7 @@ describe("S4:系统提示里的「能搜网」与模型工具表的在场性,在
         // 这一条在 `#1411` 之前是红的(那时代付即 deny),不是一条迎合现状的期望值。
         expect(o.localDeny.top).toBe(false)
         expect(o.localDeny.anyAgent).toBe(false)
-        expect(o.localWebSearchPresent).toBe(keyless === "1")
+        expect(o.localWebSearchPresent).toBe(true)
         // 相符
         expect(o.promptClaimsWebSearch).toBe(o.localWebSearchPresent || o.cloudWebSearchPresent)
         expect(o.promptClaimsWebSearch).toBe(true)
@@ -251,22 +261,20 @@ describe("S4:系统提示里的「能搜网」与模型工具表的在场性,在
       test("③ 登录(无额度):额度信号进不了桌面 ⇒ 注入产物与有额度态逐字相同,提示不多说也不少说", () => {
         givenLoggedIn()
         process.env.OPENCODE_ENABLE_EXA = keyless
-        silently(() => injectCodePuppyConfig(userData, undefined, "stable"))
-        const withQuota = observe()
+        const withQuota = observe(inject())
 
-        // 换一份干净的起点重跑,唯一的差别是环境里多了「这个账户没钱了」的信号。
-        delete process.env.OPENCODE_CONFIG_CONTENT
+        // 重跑一次,唯一的差别是环境里多了「这个账户没钱了」的信号。
         process.env.CODEPUPPY_ACCOUNT_BALANCE_FEN = "0"
         process.env.CODEPUPPY_ACCOUNT_PLAN_STATUS = "expired"
         try {
-          silently(() => injectCodePuppyConfig(userData, undefined, "stable"))
-          const noQuota = observe()
+          const noQuota = observe(inject())
 
           // 桌面对额度结构性失明:同一组桌面输入 ⇒ 同一份产物。基线 §二否决 A —— 桌面持有额度判据
           // 会造出第二个权威,而且必然过期(fork 时算、整个会话恒定,充值也不会变)。
           expect(noQuota.identity).toBe(withQuota.identity)
           expect(noQuota.promptClaimsWebSearch).toBe(withQuota.promptClaimsWebSearch)
-          expect(noQuota.config.permission).toEqual(withQuota.config.permission)
+          expect(noQuota.config.permissions).toEqual(withQuota.config.permissions)
+          expect(noQuota.config.agents).toEqual(withQuota.config.agents)
           expect(noQuota.config.mcp).toEqual(withQuota.config.mcp)
           // 而且仍然相符:拒绝发生在调用那一刻(gateway 的 402),不是在工具表里
           expect(noQuota.cloudWebSearchPresent).toBe(true)
@@ -282,15 +290,14 @@ describe("S4:系统提示里的「能搜网」与模型工具表的在场性,在
         process.env.OPENCODE_ENABLE_EXA = keyless
         process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
 
-        silently(() => injectCodePuppyConfig(userData, undefined, "stable"))
-        const o = observe()
+        const o = observe(inject())
 
         // kill-switch 半场逐字保留(基线 §三 S3):两个工具 id 都被钉 deny,云 server 是中和条目
         expect(o.localDeny.top).toBe(true)
         expect(o.localDeny.anyAgent).toBe(true)
         expect(o.cloudDeny.top).toBe(true)
         expect(o.cloudDeny.anyAgent).toBe(true)
-        expect(o.cloudServer?.enabled).toBe(false)
+        expect(o.cloudServer?.disabled).toBe(true)
         expect(o.localWebSearchPresent).toBe(false)
         expect(o.cloudWebSearchPresent).toBe(false)
         expect(o.promptClaimsWebSearch).toBe(false)
@@ -310,14 +317,12 @@ describe("S4:系统提示里的「能搜网」与模型工具表的在场性,在
       for (const keyless of KEYLESS_ARMS) {
         // 每一轮换一份干净的 userData 与 config 起点
         userData = fs.mkdtempSync(path.join(tmp, "ud-"))
-        delete process.env.OPENCODE_CONFIG_CONTENT
         delete process.env.CODEPUPPY_CLOUD_MCP_URL
         delete process.env.CODEPUPPY_WEBSEARCH_DISABLE
         arrange()
         process.env.OPENCODE_ENABLE_EXA = keyless
 
-        silently(() => injectCodePuppyConfig(userData, undefined, "stable"))
-        const o = observe()
+        const o = observe(inject())
         const truth = o.localWebSearchPresent || o.cloudWebSearchPresent
         // 生产(已修)必须与真相一致
         expect(o.promptClaimsWebSearch, `${label}/keyless=${keyless}`).toBe(truth)
@@ -326,6 +331,7 @@ describe("S4:系统提示里的「能搜网」与模型工具表的在场性,在
       }
     }
 
-    expect(mismatches).toEqual(["kill-switch/keyless=1"])
+    // 2.x 上 keyless flag 无读者:登出 / keyless=0 那格工具其实在,假判据说没有;kill-switch / keyless=1 那格反过来。
+    expect(mismatches).toEqual(["登出/keyless=0", "kill-switch/keyless=1"])
   })
 })

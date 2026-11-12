@@ -9,16 +9,18 @@
 //
 // 三种结局:放行(调用直接通过 / 工具真执行)、询问(引擎的待批列表里出现一条;经引擎自己的回复路由拒绝后零副作用)、
 // 拒绝(具名拒绝、没有待批请求、零副作用)。
-//   · 能力轴(R1 R3 R4 R5 R6a R8,R2 只读格):探针插件上下文的 `permission.assert`,即工具体内调用的同一个服务,动作名与资源
+//   · 能力轴(R1 R2 R3 R4 R5 R6a R8):探针插件上下文的 `permission.assert`,即工具体内调用的同一个服务,动作名与资源
 //     取 2.x 工具真实断言的(read 的相对路径、external_directory 的 `<目录>/*`、shell 的命令、subagent 的目标 agent)。
 //   · 工具表(R4 R5 只读「不进工具表」):模型桩记下的这一轮请求的 tools。
 //   · 入口(R6b 带 agent 附件的 prompt、R6c 自带其它助手的非子任务命令、R6d 子任务命令):走引擎的 HTTP 路由。
-//   · 身份轴(R11 插件工具、R12 设置里停用):模型桩发出真工具调用,经 ext 的执行闸。
+//   · 身份轴(R10 第三方 MCP 工具、R11 插件工具、R12 设置里停用):模型桩发出真工具调用,经 ext 的执行闸。
+//   · 审批请求的整条路径:ext 造出的每一种待批请求(身份轴的规则集询问 / 策略询问、内置工具的设置询问、子任务命令的询问、
+//     定制中心安装)都能经引擎自己的 `GET /api/session/:id/permission` 列出来(桌面审批面读的就是它),且任何一层都没有 undefined。
 // 已知的坏:「全部批准」列就是对照 —— 另两档与它不同的每一格,换成 build 都变放行,证明三种结局分得开;R6c 的反向臂是
 // 同一条命令在 build 档里照样换了助手(探针看得见「换了」)。
-// 不在本文件判的格:R7(出网围栏与总闸,不是规则层);R2 的「全部批准 / 请求审批 ⇒ 询问」两格 —— 2.x 上实测不成立(底座
-// `*: allow` 放行 external_directory),见 docs/specs/1662-opencode2/plan-parity.md 第 3 项;R9 / R10(云工具、第三方 MCP)的
-// 身份轴与 R11 同一道执行闸,按来源派生身份由 packages/ext/src/policy/register-policy.test.ts 判。
+// 不在本文件判的格:R7(出网围栏与总闸,不是规则层);R9(云工具)—— 与 R10 / R11 同一道执行闸,区别只在身份派生
+// (codepuppy-cloud 权威只从核验过的定义铸,packages/ext/src/policy/register-policy.test.ts 与 plugin-host.test.ts 判),
+// 在这里起一台受治理的远端 MCP 要 ARM / DEF 与云凭据整套,不在本文件做。
 //
 // 本文件由同名 `.test.ts` 宿主起独立 `bun test` 子进程跑。HOME / XDG 全在临时沙箱里,绝不碰 owner 的数据目录。
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
@@ -30,9 +32,13 @@ import { withEngineAuthorization } from "./engine-authorization"
 import { injectCodePuppyConfig } from "./codepuppy-config-injection"
 import { secretFilePath, secretFileRef } from "./codepuppy-secret-files"
 import type { EngineFetch } from "./in-process-engine"
+import { buildHubRequestReply, buildHubViewReply } from "./codepuppy-sidecar-messages"
 
 const sandbox = engineSandbox()
 const PASSWORD = "cp-parity-tiers"
+const FACTORY_SKILLS = path.join(sandbox.root, "factory-skills")
+const MCP_FIXTURE = path.resolve(import.meta.dir, "../../../core/test/fixture/codepuppy-mcp-startup-stdio.ts")
+const MCP_CALLS = path.join(sandbox.root, "tiers-mcp-calls.log")
 const BUILD = "build"
 const ASK = "codepuppy-ask"
 const READONLY = "codepuppy-readonly"
@@ -75,6 +81,8 @@ const probe = () => (globalThis as { __cpTierProbe?: Probe }).__cpTierProbe!
 let fetch: EngineFetch
 let projectDirectory = ""
 let engine: { close: () => Promise<void> } | undefined
+let store: { setRecord: (record: never) => Promise<unknown>; removeRecord: (selector: never) => Promise<unknown> } | undefined
+const policyStore = () => store!
 
 const send = async (method: string, route: string, body?: unknown) => {
   const response = await fetch(
@@ -100,6 +108,30 @@ beforeAll(async () => {
   process.env.CODEPUPPY_BASE_URL = `http://127.0.0.1:${llm.port}/v1`
   process.env.CODEPUPPY_PLATFORM_AUTH_REF = secretFileRef(userData, "CODEPUPPY_API_KEY")
   process.env.CODEPUPPY_POLICY_ACCOUNT = `t-tiers-${Math.random().toString(36).slice(2)}`
+  // R2:出厂技能目录(main 启动时算好、经这个变量交给注入)
+  fs.mkdirSync(FACTORY_SKILLS, { recursive: true })
+  process.env.CODEPUPPY_FACTORY_SKILL_DIRS = JSON.stringify([FACTORY_SKILLS])
+  // R10:用户在 Code Puppy 里加的本地 MCP(codepuppy.jsonc;引擎经显式文件读它),真 stdio MCP 服务器,只列一个 echo 工具
+  fs.writeFileSync(
+    path.join(process.env.CODEPUPPY_GLOBAL_DIR, "codepuppy.jsonc"),
+    JSON.stringify({ mcp: { probe: { type: "local", command: [process.execPath, MCP_FIXTURE], environment: { CODEPUPPY_MCP_CALL_LOG: MCP_CALLS } } } }),
+  )
+  // 定制中心安装要问 main 要目录视图:main 由一个假 parentPort 扮演(ext 在装载时取它,同 packages/ext/src/plugin-host.test.ts)
+  const listeners: Array<(event: { data: unknown }) => void> = []
+  const row = { id: "mcp:github", scope: null, name: "github", kind: "mcp", displayName: "GitHub", description: "repos", installed: false, enabled: false, state: "not-installed", authorization: "none" }
+  ;(process as unknown as { parentPort?: unknown }).parentPort = {
+    postMessage: (message: { type: string; id: number; directory?: string }) =>
+      queueMicrotask(() => {
+        const reply =
+          message.type === "codepuppy.hub.view.request"
+            ? buildHubViewReply(message.id, { view: { directory: message.directory ?? "", rows: [row as never], warnings: [] } })
+            : message.type === "codepuppy.hub.request.request"
+              ? buildHubRequestReply(message.id, { record: null })
+              : undefined
+        if (reply) for (const listener of listeners) listener({ data: reply })
+      }),
+    on: (_event: string, listener: (event: { data: unknown }) => void) => void listeners.push(listener),
+  }
 
   // 真 ext:2.x 只装目录形式的本地插件,入口 server.js 的 default 导出(packages/core/src/plugin/module.ts)
   const ext = path.join(sandbox.root, "tiers-ext")
@@ -167,7 +199,7 @@ beforeAll(async () => {
   const { createToolPolicyStore, defaultPolicyBaseDir } = await import("../../../ext/src/policy/resolver")
   const { policyWorkspace } = await import("../../../ext/src/policy/index")
   // R12:用户在设置里停用 cp_disabled —— 经生产的策略存储写进 ext 读的那个位置(数据根 / 账户 / 工作区与 registerPolicy 同一套)
-  const store = createToolPolicyStore({
+  store = createToolPolicyStore({
     baseDir: defaultPolicyBaseDir(path.join(process.env.XDG_DATA_HOME!, "opencode")),
     account: () => process.env.CODEPUPPY_POLICY_ACCOUNT!,
     workspace: () => policyWorkspace(probe().ctx.location),
@@ -241,6 +273,24 @@ async function toolTurn(agent: Tier, name: string, args: Record<string, unknown>
 
 const expected = (table: Record<Tier, Outcome>) => table
 
+/** 第三方 MCP 服务器连上(它的工具才进目录;MCP 工具默认进 Code Mode,模型经 `execute` 的程序调它)。 */
+async function mcpConnected() {
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const servers = ((await send("GET", "/api/mcp")).json?.data ?? []) as Array<{ name: string; status: { status: string } }>
+    if (servers.find((server) => server.name === "probe")?.status.status === "connected") return
+    await Bun.sleep(50)
+  }
+  throw new Error(`the probe MCP server never connected: ${JSON.stringify((await send("GET", "/api/mcp")).json)}`)
+}
+const ECHO_PROGRAM = { code: 'return await tools.probe.echo({ text: "hi" })' }
+
+/** 任何一层出现 undefined 的路径(JSON 里没有 undefined;引擎的 HTTP 编码器遇到它就整张列表失败)。 */
+function undefinedPaths(value: unknown, at = "$"): string[] {
+  if (value === undefined) return [at]
+  if (value === null || typeof value !== "object") return []
+  return Object.entries(value).flatMap(([key, item]) => undefinedPaths(item, `${at}.${key}`))
+}
+
 // ── 能力轴 ────────────────────────────────────────────────────────────────────────────────────────
 describe("能力轴:真注入的三档规则 + 引擎底座 + ext 的 evaluate 钩子(R1 R3 R4 R5 R6a R8)", () => {
   const cells: Array<[string, string, string, Record<Tier, Outcome>]> = [
@@ -264,9 +314,28 @@ describe("能力轴:真注入的三档规则 + 引擎底座 + ext 的 evaluate �
     expect(await capability(READONLY, "subagent", ASK)).toBe("deny")
   }, 30_000)
 
-  test("R2 只读档:工作区外的目录 ⇒ 拒绝", async () => {
-    expect(await capability(READONLY, "external_directory", `${path.join(sandbox.root, "outside")}/*`)).toBe("deny")
-  }, 30_000)
+  // v1(`origin/alpha` codepuppy-tier-tool-matrix.test.ts「R2 external_directory」⇒ ASK / ASK / DENY;v1 引擎默认 agent 的白名单:
+  // 截断输出目录、引擎临时目录、技能目录)。放行目录的期望值取引擎自己算的路径(`Global.Path`),不取注入的推导。
+  test("R2 工作区外的目录:全部批准 / 请求审批先问,只读拒绝;引擎的工具输出目录、临时目录与出厂技能目录在前两档放行,只读档仍拒绝", async () => {
+    const { Global } = await import("@opencode/util/global")
+    const dirs = {
+      outside: `${path.join(sandbox.root, "outside")}/*`,
+      toolOutput: `${path.join(Global.Path.data, "tool-output", "ses_x")}/*`,
+      tmp: `${path.join(fs.realpathSync(Global.Path.tmp), "work")}/*`,
+      skill: `${path.join(FACTORY_SKILLS, "probe-skill")}/*`,
+    }
+    const got: Record<string, Record<string, Outcome>> = {}
+    for (const [label, resource] of Object.entries(dirs)) {
+      got[label] = {}
+      for (const tier of TIERS) got[label][tier] = await capability(tier, "external_directory", resource)
+    }
+    expect(got).toEqual({
+      outside: expected({ build: "ask", "codepuppy-ask": "ask", "codepuppy-readonly": "deny" }),
+      toolOutput: expected({ build: "allow", "codepuppy-ask": "allow", "codepuppy-readonly": "deny" }),
+      tmp: expected({ build: "allow", "codepuppy-ask": "allow", "codepuppy-readonly": "deny" }),
+      skill: expected({ build: "allow", "codepuppy-ask": "allow", "codepuppy-readonly": "deny" }),
+    })
+  }, 60_000)
 })
 
 // ── 工具表 ────────────────────────────────────────────────────────────────────────────────────────
@@ -375,12 +444,35 @@ describe("委派入口与直接路径同判(R6b / R6c / R6d)", () => {
 })
 
 // ── 身份轴 ────────────────────────────────────────────────────────────────────────────────────────
-describe("身份轴:模型发出的真工具调用经 ext 的执行闸(R11 插件工具的全部批准格 / R12 设置里停用)", () => {
-  test("R11 无记录的插件工具:全部批准档直接执行、不问", async () => {
-    const start = probe().runs.cp_probe
+describe("身份轴:模型发出的真工具调用经 ext 的执行闸(R10 第三方 MCP 工具 / R11 插件工具 / R12 设置里停用)", () => {
+  test("R11 无记录的插件工具:全部批准档直接执行;请求审批档按 Code Puppy 策略问(askedBy policy);只读档每次问且不可始终允许(askedBy ruleset、save 为空);拒绝后零执行", async () => {
+    const runs = () => probe().runs.cp_probe
+    const start = runs()
     const build = await toolTurn(BUILD, "cp_probe", {})
     expect(build.asked).toEqual([])
-    expect(probe().runs.cp_probe).toBe(start + 1)
+    expect(runs()).toBe(start + 1)
+
+    const ask = await toolTurn(ASK, "cp_probe", {})
+    expect(ask.asked.map((request) => [request.action, request.metadata?.policy?.askedBy])).toEqual([["plugin::cp_probe", "policy"]])
+
+    const readonly = await toolTurn(READONLY, "cp_probe", {})
+    expect(readonly.asked.map((request) => [request.action, request.metadata?.policy?.askedBy, request.save])).toEqual([["plugin::cp_probe", "ruleset", []]])
+    expect(runs()).toBe(start + 1)
+  }, 60_000)
+
+  test("R10 用户加的第三方 MCP 工具(真 stdio 服务器,经 Code Mode 调):全部批准档直接执行;请求审批档按策略问;只读档每次问且不可始终允许;拒绝后服务器零调用", async () => {
+    const calls = () => (fs.existsSync(MCP_CALLS) ? fs.readFileSync(MCP_CALLS, "utf8").split("\n").filter(Boolean).length : 0)
+    await mcpConnected()
+    const build = await toolTurn(BUILD, "execute", ECHO_PROGRAM)
+    expect(build.asked).toEqual([])
+    expect(calls()).toBe(1)
+
+    const ask = await toolTurn(ASK, "execute", ECHO_PROGRAM)
+    expect(ask.asked.map((request) => [request.action, request.metadata?.policy?.askedBy])).toEqual([["mcp:probe:echo", "policy"]])
+
+    const readonly = await toolTurn(READONLY, "execute", ECHO_PROGRAM)
+    expect(readonly.asked.map((request) => [request.action, request.metadata?.policy?.askedBy, request.save])).toEqual([["mcp:probe:echo", "ruleset", []]])
+    expect(calls()).toBe(1)
   }, 60_000)
 
   test("R12 设置里停用的工具:三档都具名拒绝、不问、零执行", async () => {
@@ -391,3 +483,91 @@ describe("身份轴:模型发出的真工具调用经 ext 的执行闸(R11 插�
     expect(probe().runs.cp_disabled).toBe(0)
   }, 60_000)
 })
+
+// ── 审批请求的整条路径 ─────────────────────────────────────────────────────────────────────────────
+describe("ext 造出的每一种待批请求都能经引擎路由列出,且 JSON 往返无损、任何一层没有 undefined", () => {
+  /** 等这一轮出现待批请求:引擎持有的那份(插件上下文)与 HTTP 路由列出的那份都要在,两者一致。 */
+  async function listed(sessionID: string) {
+    for (const until = Date.now() + 8000; Date.now() < until; ) {
+      const held = (await probe().ctx.permission.list({ sessionID })) as Array<Record<string, unknown>>
+      if (held.length) {
+        const route = await send("GET", `/api/session/${sessionID}/permission`)
+        return { held, route }
+      }
+      await Bun.sleep(25)
+    }
+    throw new Error(`no pending request appeared in ${sessionID}`)
+  }
+  async function check(sessionID: string, action: string) {
+    const { held, route } = await listed(sessionID)
+    const request = held.find((item) => item.action === action)
+    expect(request, JSON.stringify(held)).toBeDefined()
+    expect(undefinedPaths(request)).toEqual([])
+    expect(JSON.parse(JSON.stringify(request))).toEqual(request)
+    expect([action, route.status]).toEqual([action, 200])
+    expect((route.json.data as Array<Record<string, unknown>>).find((item) => item.id === request!.id)).toEqual(request)
+    for (const item of held) await reject(sessionID, String(item.id))
+  }
+  /** 发一轮,模型桩发出这次工具调用;不等它结束(它停在审批上)。 */
+  async function turn(agent: Tier, name: string, args: Record<string, unknown>) {
+    const owner = await session(agent)
+    await send("POST", `/api/session/${owner.id}/prompt`, { text: `CP-CALL ${JSON.stringify({ name, args })}` })
+    return owner
+  }
+
+  test("身份轴的规则集询问(只读档 × 插件工具)与策略询问(请求审批档 × 插件工具)", async () => {
+    const readonly = await turn(READONLY, "cp_probe", {})
+    await check(readonly.id, "plugin::cp_probe")
+    await idle(readonly.id)
+    const ask = await turn(ASK, "cp_probe", {})
+    await check(ask.id, "plugin::cp_probe")
+    await idle(ask.id)
+  }, 60_000)
+
+  test("内置工具在设置里设为询问(全部批准档 × glob)", async () => {
+    await policyStore().setRecord({ selector: { level: "tool", canonical: "builtin::glob" }, state: "ask" } as never)
+    const owner = await turn(BUILD, "glob", { pattern: "*.txt" })
+    await check(owner.id, "builtin::glob")
+    await idle(owner.id)
+  }, 60_000)
+
+  test("子任务命令在 Code Puppy 策略里设为询问(evaluate 钩子写进身份信封)", async () => {
+    await policyStore().setRecord({ selector: { level: "tool", canonical: "builtin::subagent" }, state: "ask" } as never)
+    const owner = await session(BUILD)
+    const running = send("POST", `/api/session/${owner.id}/command`, { name: "cp-as-general", text: "" })
+    await check(owner.id, "subagent")
+    await running
+    await policyStore().removeRecord({ level: "tool", canonical: "builtin::subagent" } as never)
+  }, 60_000)
+
+  test("定制中心安装:调用前的身份询问与安装确认两条", async () => {
+    const owner = await turn(ASK, "codepuppy_hub_install", { catalogId: "mcp:github" })
+    const first = await listed(owner.id)
+    expect(first.held.map((item) => item.action)).toEqual(["plugin::codepuppy_hub_install"])
+    expect(first.route.status).toBe(200)
+    await send("POST", `/api/session/${owner.id}/permission/${String(first.held[0]!.id)}/reply`, { decision: "once" })
+    for (let i = 0; i < 200 && !((await probe().ctx.permission.list({ sessionID: owner.id })) as Array<{ action: string }>).some((item) => item.action === "codepuppy_hub_install"); i++)
+      await Bun.sleep(25)
+    await check(owner.id, "codepuppy_hub_install")
+    await idle(owner.id)
+  }, 60_000)
+
+  test("已知的坏:同一条路由上,metadata 里藏一层 undefined 的请求列不出来(判据看得见这一类)", async () => {
+    const owner = await session(ASK)
+    const settled = Promise.resolve(
+      probe().ctx.permission.assert({ sessionID: owner.id, agent: ASK, action: "shell", resources: ["ls"], save: ["ls"], metadata: { policy: { canonical: "x", bindingDigest: undefined } } }),
+    ).catch(() => undefined)
+    // 请求确实建了(引擎的待批表里有它),但两条读法都过同一个编码器,都在 metadata.policy 上失败:
+    // 插件上下文的 list 拒绝,HTTP 路由回 5xx。拒不掉它也无妨 —— 引擎关闭时待批请求一律以拒绝收尾。
+    let refused = ""
+    for (const until = Date.now() + 8000; Date.now() < until && !refused; await Bun.sleep(25))
+      await Promise.resolve(probe().ctx.permission.list({ sessionID: owner.id })).then(
+        (held: unknown[]) => void (held.length && (refused = "listed")),
+        (error: unknown) => void (refused = String((error as { message?: string })?.message ?? error)),
+      )
+    expect(refused).toContain("Expected JSON value")
+    expect((await send("GET", `/api/session/${owner.id}/permission`)).status).toBeGreaterThanOrEqual(500)
+    void settled
+  }, 30_000)
+})
+

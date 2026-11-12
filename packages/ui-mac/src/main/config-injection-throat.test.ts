@@ -395,7 +395,9 @@ describe("ui-mac 整份 config 咽喉:injectCodePuppyConfig 交给引擎的 cont
     expect(r.bad).toEqual([])
     expect(r.instructions.map((f) => path.basename(f))).toEqual(["codepuppy-identity.md", "codepuppy-behavior.md"])
     for (const f of r.instructions) expect(fs.existsSync(f), f).toBe(true)
-    expect(sorted(Object.keys(r.agent))).toEqual(sorted(UI_MAC_AGENT_NAMES))
+    // 引擎自己的 build(「全部批准」)只被追加 R2 的 external_directory 规则(#1662 parity),不带任何文字
+    expect(sorted(Object.keys(r.agent))).toEqual(sorted([...UI_MAC_AGENT_NAMES, "build"]))
+    expect(Object.keys(r.agent.build!)).toEqual(["permissions"])
     expect(sorted(r.explained)).toEqual(sorted([...FACTORY_COMMAND_IDS, DEFAULT_IDENTITY_ID, BEHAVIOR_FRAGMENT_ID, ...REGISTERED_AGENT_IDS]))
     // `#1667`:没有 ext 目录时 plugins 里也有外部技能的移除指令(S6),它走 /plugin 引用;没有任何可用 provider 时
     // provider 白名单照样写(`provider.use` 先拒全部、只放行就绪标记 —— v1 的 `enabled_providers: []` 同义),走两条引用。
@@ -536,7 +538,7 @@ describe("ui-mac 整份 config 咽喉:injectCodePuppyConfig 交给引擎的 cont
   test("逃生门 ②:CODEPUPPY_AUTOMATION_DISABLE 拿掉两个 automation,CODEPUPPY_READONLY_DISABLE 拿掉 readonly —— 剩下的仍零点名,解释出的正是剩下那些;codepuppy-ask 没有逃生门,两种 env 下都在(#1413)", () => {
     process.env.CODEPUPPY_AUTOMATION_DISABLE = "1"
     let r = run()
-    expect(sorted(Object.keys(r.agent))).toEqual(["codepuppy-ask", "codepuppy-readonly"])
+    expect(sorted(Object.keys(r.agent))).toEqual(["build", "codepuppy-ask", "codepuppy-readonly"])
     expect(r.bad).toEqual([])
     expect(sorted(r.explained)).toEqual(sorted([...FACTORY_COMMAND_IDS, DEFAULT_IDENTITY_ID, BEHAVIOR_FRAGMENT_ID, ...agentIdsOf(["codepuppy-readonly", "codepuppy-ask"])]))
 
@@ -544,7 +546,7 @@ describe("ui-mac 整份 config 咽喉:injectCodePuppyConfig 交给引擎的 cont
     process.env.CODEPUPPY_READONLY_DISABLE = "1"
     freshRound()
     r = run()
-    expect(sorted(Object.keys(r.agent))).toEqual(["codepuppy-ask", "codepuppy-automation", "codepuppy-automation-standard"])
+    expect(sorted(Object.keys(r.agent))).toEqual(["build", "codepuppy-ask", "codepuppy-automation", "codepuppy-automation-standard"])
     expect(r.bad).toEqual([])
     expect(sorted(r.explained)).toEqual(
       sorted([...FACTORY_COMMAND_IDS, DEFAULT_IDENTITY_ID, BEHAVIOR_FRAGMENT_ID, ...agentIdsOf(["codepuppy-automation", "codepuppy-automation-standard", "codepuppy-ask"])]),

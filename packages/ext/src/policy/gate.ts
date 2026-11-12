@@ -143,7 +143,9 @@ export async function confirm(deps: GateDeps, decision: GateDecision, call: Gate
     ...(facts.transport ? { transport: facts.transport } : {}),
     ...(facts.location && facts.identity.source === "mcp" ? { location: facts.location } : {}),
     ...(call.input !== undefined ? { args: call.input } : {}),
-    policy: { directory: deps.directory(), canonical, bindingDigest, askedBy },
+    // No digest (plugin and builtin tools) ⇒ no key: the engine lists pending requests over HTTP, and its encoder rejects
+    // `undefined` at any depth, so the approval surface would never see this request.
+    policy: { directory: deps.directory(), canonical, ...(bindingDigest ? { bindingDigest } : {}), askedBy },
   }
   await deps.assert({
     sessionID: call.sessionID,
@@ -196,7 +198,7 @@ export async function gateWithoutToolCall(
     Object.assign(event.metadata, {
       identity: facts.identity,
       authority: facts.authority,
-      policy: { directory: deps.directory(), canonical, bindingDigest, askedBy },
+      policy: { directory: deps.directory(), canonical, ...(bindingDigest ? { bindingDigest } : {}), askedBy },
     })
   event.effect = "ask"
   holdAsk(event)

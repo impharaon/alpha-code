@@ -501,8 +501,11 @@ describe("web search 主权在 2.x 权限规则里仍成立(#223)", () => {
     expect(allows(config.permissions, CLOUD_WEB_SEARCH_TOOL_ID)).toBeUndefined()
     expect(config.mcp?.servers?.codepuppy).toMatchObject({ type: "remote", url: "https://cloud.example/mcp" })
     expect(config.mcp?.servers?.codepuppy).not.toHaveProperty("disabled")
+    // Code Puppy 自己的 agent 显式放行 websearch;引擎自己的 build 只被追加 R2 的 external_directory 规则(#1662 parity),
+    // 它的 websearch 由底座决定,kill-switch 下照样被 applyWebSearchDenies 钉 deny(下一条)。
     for (const [name, agent] of Object.entries(config.agents ?? {}))
-      expect([name, allows(agent.permissions, "websearch")]).toEqual([name, "allow"])
+      if (name !== "build") expect([name, allows(agent.permissions, "websearch")]).toEqual([name, "allow"])
+    expect(new Set(config.agents?.build?.permissions?.map((rule) => rule.action))).toEqual(new Set(["external_directory"]))
     assertNativeV2(JSON.stringify(config))
   })
 

@@ -786,6 +786,21 @@ itWithPermission.live("项目 agent 的 tools · 反向臂(#1693 AC-03):同一�
   }),
 )
 
+it.live("项目 agent 的 tools · 写坏的 tools(#1693 R1/1):已同意的项目里 explore 写了 tools: {edit: true, read: \"false\"} ⇒ 整条不装(上游同样丢掉这条 v1 agent),explore 内置的规则对 edit 仍是 deny", () =>
+  Effect.gen(function* () {
+    env({})
+    const directory = realpathSync((yield* Location.Service).directory)
+    const root = join(directory, ".codepuppy")
+    mkdirSync(root, { recursive: true })
+    writeFileSync(join(root, "codepuppy.jsonc"), '{"agent":{"explore":{"tools":{"edit":true,"read":"false"}}}}')
+    writeFileSync(join(root, "prefs.json"), JSON.stringify({ extensionsConsent: { version: 1, granted: true } }))
+    yield* activate(CodePuppyExt)
+    const rules = (yield* (yield* Agent.Service).get(Agent.ID.make("explore")))?.permissions ?? []
+    expect(rules.length).toBeGreaterThan(0)
+    expect(Permission.evaluate("edit", "a.txt", rules).effect).toBe("deny")
+  }),
+)
+
 itWithPermission.live("权威 · 待批请求的回复(#1666 第 3 条):经 ext 扇出的项目插件对 Code Puppy 待批的请求回 once、改 / 删已存的批准 ⇒ 三样都被拒并记一行,请求仍在等;反向臂:同一插件由宿主直接装 ⇒ 回 once 生效、请求放行", () =>
   Effect.gen(function* () {
     env({})

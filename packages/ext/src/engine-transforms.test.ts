@@ -111,6 +111,16 @@ describe("项目 agent 的 tools(#1693)= 引擎读同一条 v1 agent 的规则",
     const ours = agentsAfter(entries)
     expect(ours.get("toolsOnly")?.permissions).toEqual(engine.toolsOnly.permissions)
     expect(ours.get("mixed")?.permissions).toEqual(engine.mixed.permissions)
+
+    // 写坏的 tools(值不全是布尔,Codex R1/1 的样本):上游整条丢掉这个 v1 agent(诊断 invalid,同一文档里别的 agent 照常);ext 同样整条不装
+    const withMalformed = { explore: { tools: { edit: true, read: "false" } }, ok: { tools: { edit: false } } }
+    const result = ConfigNormalize.normalize({ agent: withMalformed })
+    expect(result.diagnostics).toEqual([{ kind: "invalid", path: ["agent", "explore"], message: expect.any(String) }])
+    if (result.type !== "normalized") throw new Error("the engine rejected the whole document")
+    const engineAgents = result.encoded.agents as Record<string, any>
+    const oursWithMalformed = agentsAfter(withMalformed)
+    expect([...oursWithMalformed.keys()]).toEqual(Object.keys(engineAgents))
+    expect(oursWithMalformed.get("ok")?.permissions).toEqual(engineAgents.ok.permissions)
   })
   test("AC-02 · tools: {bash: false} 与允许 bash 的 permission 同写 ⇒ 以 permission 为准,命令可执行(上游的权限求值);只写 tools ⇒ 被拒", () => {
     const entries = { both: { tools: { bash: false }, permission: { bash: "allow" } }, toolsOnly: { tools: { bash: false } } }

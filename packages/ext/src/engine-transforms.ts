@@ -135,13 +135,12 @@ const PERMISSION_EFFECTS = new Set(["ask", "allow", "deny"])
  * 先照上游读 v1 agent 时的合并(`core/src/v1/config/agent.ts` `normalize`,抄本 —— 它没有导出,只能经那里的 effect Schema 解码得到,
  * 而 ext 的生产代码不 import effect 与 core;与上游归一化逐条对比的判据在 engine-transforms.test.ts)合成一张「键 → 规则」表:`tools` 先写,true ⇒ allow、false ⇒ deny,`write` / `patch` 并成 `edit`;
  * `permission` 后写,同键时盖掉 `tools` 那条,位置仍在 `tools` 写下的地方(Map 同键 set 不挪位置,与上游同一个做法)。
- * 再按表的顺序翻成规则(规则后写者胜;上游同样按 `Object.entries` 保序,`core/src/v1/config/permission.ts`)。认不出的值跳过。
+ * 再按表的顺序翻成规则(规则后写者胜;上游同样按 `Object.entries` 保序,`core/src/v1/config/permission.ts`)。认不出的 `permission` 值跳过;
+ * 写坏的 `tools` 到不了这里(`applyAgents` 整条不装)。
  */
 function permissionRules(tools: unknown, permission: unknown) {
   const toolEntries = isObj(tools)
-    ? Object.entries(tools)
-        .filter(([, enabled]) => typeof enabled === "boolean")
-        .map(([tool, enabled]) => [tool === "write" || tool === "patch" ? "edit" : tool, enabled ? "allow" : "deny"] as const)
+    ? Object.entries(tools).map(([tool, enabled]) => [tool === "write" || tool === "patch" ? "edit" : tool, enabled ? "allow" : "deny"] as const)
     : []
   const source = typeof permission === "string" ? { "*": permission } : permission
   const table = new Map<string, unknown>([...toolEntries, ...(isObj(source) ? Object.entries(source) : [])])
@@ -156,6 +155,8 @@ function permissionRules(tools: unknown, permission: unknown) {
  * v1 形状的 agent 条目 → `AgentEditor.update`。`prompt` 是 2.x 的 `system`。只写条目里**给了**的字段。
  * `permission` 照 0.1.26 生效,`tools` 照上游换成同一串规则(#1693):翻成规则推在该 agent 已有规则之后;两者只在项目已同意时还在 ——
  * 没同意时 `mergeProjectConfig` 已剥掉 `permission/tools/model/disable/mode`(REQ-236 P1)。
+ * 写了 `tools` 却不是「键 → 布尔」的条目整条不装:上游按 schema 校验整条 v1 agent(`core/src/v1/config/agent.ts`),不过就丢掉这一条、
+ * 别的 agent 照常(`core/src/config/normalize.ts` `decodeMap`)—— 只装其余字段会让它比引擎读同一份文档时更宽(#1693 Codex R1/1)。
  * 新建的 agent(上游与配置里都没有)按 v1 config agent 的默认取 `mode: "all"`。
  */
 export function applyAgents(editor: AgentEditor, agents: unknown): string[] {
@@ -163,6 +164,7 @@ export function applyAgents(editor: AgentEditor, agents: unknown): string[] {
   const applied: string[] = []
   for (const [id, entry] of Object.entries(agents)) {
     if (!isObj(entry)) continue
+    if (entry.tools !== undefined && !(isObj(entry.tools) && Object.values(entry.tools).every((enabled) => typeof enabled === "boolean"))) continue
     const existed = editor.get(id) !== undefined
     editor.update(id, (agent) => {
       if (!existed) agent.mode = "all"

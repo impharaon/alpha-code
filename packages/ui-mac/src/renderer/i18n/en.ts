@@ -38,6 +38,8 @@ export const dict = {
   "codepuppy.problems.title": "Unresolved problems",
   "codepuppy.problems.hint": "Removed automatically once resolved",
   "codepuppy.problems.view": "View",
+  "codepuppy.problems.connectorFailed": "{{name}} couldn’t connect",
+  "codepuppy.problems.connectorNeedsAuth": "{{name}} needs you to sign in again",
   "codepuppy.sidebar.hide": "Hide sidebar",
   "codepuppy.sidebar.home": "Home",
   "codepuppy.sidebar.back": "Back",

@@ -136,3 +136,45 @@ last_reviewed: 2026-11-12
 - 2026-11-12 · 设计文档带入范围:除 `frames/error-lifetime.css`、`components.md` 外,一并带入 `frames/*.html`、`frames/error-lifetime.js`、`design.html` 的两节锚与增量稿目录 —— `components.md` 的相对链接与「锚」列指向它们,只带两个文件会断链。
 - 2026-11-12 · 英文入口文案用「Unresolved problems: N」避免单复数;中文照帧。
 - 2026-11-12 · 帧对照用无头 Chrome 渲染:帧页(spec 分支原样)与实现页(同一帧外框,入口与弹层换成真组件在测试运行时里产出的 DOM,样式来自本分支 `sidebar.css`,帧 CSS 已不含这些规则)并排,明暗各一,目视一致;截图在临时目录,不入仓。
+
+## 段三:工具服务连接来源(spec v2,只进入口)
+
+- 依据:`SPEC-error-message-lifetime` v2 —— owner 2026-11-12 裁决 R4:「工具服务提示选 A，核心包测试配置同意接管」(选 A = 连不上的工具服务不弹提示,只进「未恢复问题」入口,重连后自动移除)。v2 改写的 AC-01、AC-05、AC-06 以编排器转来的措辞为准(规格文本由编排器更新,本段不复述);其余 AC 与段一、段二相同。
+- 核对:编排器 R4 放行(段一 `867aab286b`、段二 `d2201d2a37` 已验收并合入 `engine/1662-opencode2`;无操作的需要用户处理项随换页离开的读法已接受)· 只进入口的接法、首读在静默窗口之后、`needs_auth` 为要用户动手的项。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `codepuppy-ui/background-problem-watcher.tsx`(新) | 无界面子组件:静默窗口结束后才建 SDK 客户端、读一次 `mcp.status`,之后在引擎事件 `mcp*` / `server.instance.disposed` 与运行时恢复 `ready` 时重读。失败(非已连接、非停用、非启动中、非需登录)→ `putProblem({ attention: false })`,原因「「名字」未能连接」,操作「查看」打开定制中心连接器页;`needs_auth` → 要用户动手的项,操作「去授权」直接调引擎授权后重读;下一次读不到或已恢复 → `resolveProblem`。名字取随包目录的显示名,找不到用服务名。事件用自己的一条全局订阅(见风险)。 |
+| `codepuppy-ui/Toast.tsx` | 加 `startupQuietEnded()`(窗口结束的 promise;没开窗口则立即),供来源推迟启动期读取。 |
+| `extensions/use-extensions.ts` | 把 `isConnected` / `isDisabled` / `needsAuth` / `isPending` 由私有改为导出,观察件复用同一套状态判别,不复制。 |
+| `index.tsx` | 挂 `BackgroundProblemWatcher`(与目录来源同层)。 |
+| `i18n/zh.ts`、`i18n/en.ts` | `codepuppy.problems.connectorFailed`「「{{name}}」未能连接」、`codepuppy.problems.connectorNeedsAuth`「「{{name}}」需要重新登录」;操作文字复用 `codepuppy.problems.view`、`codepuppy.ext.mcpAuthorize`。 |
+| `codepuppy-ui/background-problem-watcher.test.ts`(新)、`toast-lifetime-test-runtime.tsx` | 真挂观察件 + 提示视口 + 入口;状态来源是替身 fetch(`GET /mcp` 状态表、`GET /global/event` 可推送的 SSE),走观察件真实用的 SDK 客户端与订阅。 |
+
+### 顺序
+
+1. 一个提交:观察件 + 窗口结束 promise + 导出判别函数 + 挂载 + 文案 + 用例;跑 `background-problem-watcher.test.ts`、`problems-entry.test.ts`、`toast-lifetime.test.ts`、`locale-regression.test.ts`、`tsgo -b`,以及 `use-extensions` 的现有用例。
+
+### 风险
+
+- 订阅不共享:定制中心那条事件订阅活在 `useExtensions` 里、直到定制中心第一次打开才建立(`use-extensions.ts` 的 A2 lazy),没有应用级订阅可共享;观察件在窗口结束后自建第二条全局订阅(与 `cloud-run-watcher.tsx` 同法)。启动期零新增请求由用例钉住。
+- 断开的发现依赖事件:引擎在服务断开时若不发 `mcp*` 事件,入口要等下一次事件 / 实例释放 / 运行时恢复才更新;重连会发 `mcp.tools.changed`,所以「重连即移除」不受影响。
+- 「查看」打开的是定制中心连接器页(已安装一组在页顶),不是定位到那一行:定制中心今天没有按行定位的入口,加它是定制中心的新能力,不在本段。
+- `needs_auth` 条目做了操作即离开(R2);授权没成功时,下一次读状态会把它放回来。
+
+### 证明
+
+| AC | 测试/证据 | 缺少行为为什么会失败 |
+| --- | --- | --- |
+| AC-01 (v2) | `background-problem-watcher.test.ts`「a disconnected connector is listed without a toast; on reconnect it leaves the entry within 1 s」:已连接 → 事件后读到 failed → 入口计 1、原因与「查看」、推进 30 秒仍无提示;再报 connected + 事件 → 1 秒内入口消失 | 改用先提示接法(`reportProblem`)→ 出现提示,红;不 resolve → 入口残留,红;不跟事件 → 读不到重连,红 |
+| AC-01 (v2) 操作 | 同文件「查看 opens the Customization Center on its connectors page」:先把分区置为技能,点「查看」→ 定制中心打开且在连接器页,条目仍在 | 不切分区 → 红 |
+| AC-05 (v2) | 同文件:窗口内两个服务 failed、第 9 秒起 connected;0–9 秒逐秒断言零 `GET /mcp`、无提示、无入口;9–30 秒仍无提示、无入口;窗口后确有读取 | 窗口内就读状态 → 零请求断言红 |
+| AC-06 (v2) | 同文件:一直 failed;第 9999 毫秒零请求、无入口;第 10000 毫秒首读,入口计 1、原因与操作;全程无提示 | 窗口内读 → 红;改用先提示接法 → 红 |
+| needs_auth | 同文件:条目文字「需要重新登录」,点「去授权」→ 引擎收到授权请求,条目离开 | 当成后台失败 → 文字与操作不符,红 |
+| 生产挂载 | 同文件末条:`index.tsx` 在 `AppInterface` 内挂 `BackgroundProblemWatcher` | 删挂载行 → 红 |
+
+### 偏离记录
+
+暂无。

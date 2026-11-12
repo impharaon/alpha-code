@@ -37,6 +37,8 @@ export const dict = {
   "codepuppy.problems.title": "未恢复的问题",
   "codepuppy.problems.hint": "恢复后自动移除",
   "codepuppy.problems.view": "查看",
+  "codepuppy.problems.connectorFailed": "「{{name}}」未能连接",
+  "codepuppy.problems.connectorNeedsAuth": "「{{name}}」需要重新登录",
   "codepuppy.sidebar.hide": "隐藏侧边栏",
   "codepuppy.sidebar.home": "首页",
   "codepuppy.sidebar.back": "后退",

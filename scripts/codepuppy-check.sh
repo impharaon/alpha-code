@@ -37,7 +37,7 @@ CI_STEPS=(
   # pin 对象取不到时本地判「未比对」(exit 2)只记 unverified、不拦 push;CI 侧 ROUNDTRIP_REQUIRE_PIN=1,
   # 同一状态硬红(CI 自己控制 checkout 深度,取不到 pin 是接线坏了)。登记成 MIRRORED 会让
   # 「本地绿 ⇒ CI 会绿」的依据变假 —— 那正是 `#777` 治的病。
-  "upstream-guard|Assert packages/app + packages/ui == pinned upstream + SOT patch (#976)|DEGRADED:本地 pin 取不到时判「未比对」(exit 2)不拦 push;CI 侧 ROUNDTRIP_REQUIRE_PIN=1,同一状态硬红"
+  "upstream-guard|Assert packages/codepuppy-app + packages/codepuppy-ui == pinned upstream + SOT patch (#976)|DEGRADED:本地 pin 取不到时判「未比对」(exit 2)不拦 push;CI 侧 ROUNDTRIP_REQUIRE_PIN=1,同一状态硬红"
   "typecheck|typecheck @codepuppy/contracts-consumer|MIRRORED"
   "typecheck|typecheck @codepuppy/ext|MIRRORED"
   "typecheck|typecheck ui-mac|MIRRORED"

@@ -79,19 +79,18 @@ const MENTION = /runForEachWhile/
  * —— 下面逐个断言,清单本身不构成豁免。
  * 想新增一项?先证明你的用法不是这个缺陷,再来改这个清单;不要为了让 CI 变绿而加条目。
  */
-const REGISTERED_MENTIONS = [
-  "packages/opencode/src/tool/read.ts", // 第一次:当场发现,教训只留在注释里
-  "packages/opencode/src/tool/mcp-websearch.ts", // 第二次:#489 引入 → 静默截断发版 → #647 修
-]
+// `#1662` parity B3:两处事故现场(v1 的 packages/opencode/src/tool/read.ts 与 mcp-websearch.ts)随 OpenCode 2 换代删除;
+// 2.x 的生产源码里没有任何文件提到这个名字(实测),清单为空 —— 新出现的提及照样要先分类。
+const REGISTERED_MENTIONS: string[] = []
 
 /**
  * 根 `package.json` 的 workspace 通配符 —— 钉住它,是因为**新增一个 workspace 根**正是上一版
  * 漏扫的成因。这里对不上就说明仓库布局变了:停下来确认枚举确实覆盖到新根,再更新本清单。
  */
-const KNOWN_WORKSPACE_GLOBS = ["packages/*", "packages/console/*", "packages/stats/*", "packages/sdk/js", "packages/slack"]
+const KNOWN_WORKSPACE_GLOBS = ["packages/*", "packages/plugins/*", "services/*", "packages/stats/*"]
 
 /** 每个 workspace 根都必须**真的**有文件进到 FILES 里 —— 「漏扫某个根」由此变成可观测。 */
-const WORKSPACE_ROOT_PREFIXES = ["packages/console/", "packages/stats/", "packages/sdk/js/", "packages/slack/"]
+const WORKSPACE_ROOT_PREFIXES = ["packages/plugins/", "services/", "packages/stats/"]
 
 describe("Stream.runForEachWhile 类级禁令 (#647)", () => {
   // ── 覆盖面:先证明这个闸不是空的,且没有漏扫 ──────────────────────────────
@@ -117,12 +116,11 @@ describe("Stream.runForEachWhile 类级禁令 (#647)", () => {
       const hits = FILES.filter((file) => file.path.startsWith(prefix))
       expect(hits.length, `workspace 根 ${prefix} 一个文件都没被扫到 —— 枚举漏了这一块`).toBeGreaterThan(0)
     }
-    // 上一版可绕过的那个嵌套根里的文件,现在必须在集合里。原锚点 src/ingest.ts 已被上游
-    // dc3182800(remove s3 lake ingestion)删除,锚点移到同一嵌套根里仍在的文件。
-    expect(FILES.map((file) => file.path)).toContain("packages/stats/server/src/stat-sync.ts")
-    // 两次事故现场同样必须在集合里。
-    expect(FILES.map((file) => file.path)).toContain("packages/opencode/src/tool/read.ts")
-    expect(FILES.map((file) => file.path)).toContain("packages/opencode/src/tool/mcp-websearch.ts")
+    // 上一版可绕过的那个嵌套根里的文件,现在必须在集合里。原锚点 src/ingest.ts 已被上游 dc3182800 删除,
+    // packages/stats/server/src/stat-sync.ts 又随 OpenCode 2 换代删除(`#1662` parity B3),锚点移到同一嵌套根里仍在的文件。
+    expect(FILES.map((file) => file.path)).toContain("packages/stats/app/src/i18n.ts")
+    // 2.x 上那条有界读取的正确形态(runForEach + 超限中止)必须在集合里。
+    expect(FILES.map((file) => file.path)).toContain("packages/core/src/tool/http-body.ts")
   })
 
   test("检测器确实认得出违规写法(自我变异)", () => {
@@ -141,9 +139,9 @@ describe("Stream.runForEachWhile 类级禁令 (#647)", () => {
       callers,
       [
         "`Stream.runForEachWhile` 只消费第一个 chunk 就停(effect 4.0.0-beta.83),静默截断,无异常。",
-        "本仓已因此踩过两次:read.ts(当场发现)与 mcp-websearch.ts(#489 引入、静默截断发了版、#647 修)。",
+        "本仓已因此踩过两次:v1 的 read.ts(当场发现)与 mcp-websearch.ts(#489 引入、静默截断发了版、#647 修)。",
         "正确形态:`Stream.runForEach` + tagged error,在需要停的那一刻中止上游流 ——",
-        "  参考 packages/opencode/src/tool/read.ts:146 与 packages/opencode/src/tool/mcp-websearch.ts。",
+        "  参考 packages/core/src/tool/http-body.ts 的 collectBoundedResponseBody。",
         "若真需要「读到条件不满足就停」,用 runForEach + tagged error 表达,不要用这个 API。",
       ].join("\n"),
     ).toEqual([])

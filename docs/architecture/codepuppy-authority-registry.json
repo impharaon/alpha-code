@@ -1013,7 +1013,7 @@
       "tests": [
         {
           "file": "packages/ui-mac/src/main/cloud-credential-hot.engine.test.ts",
-          "name": "云连接器:令牌 A ⇒ A、热应用 B 后重连 ⇒ B、删文件 ⇒ 认证失败零请求(cloud-credential-hot.engine.cases.ts,3 条)"
+          "name": "云连接器:同一条连接上令牌 A ⇒ A、热应用 B ⇒ 下一个 POST 与重连的 GET 流带 B、会话过期 ⇒ 重新 initialize 带 C、删文件 ⇒ 不出网(cloud-credential-hot.engine.cases.ts,5 条)"
         }
       ]
     },

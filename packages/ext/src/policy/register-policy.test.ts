@@ -1483,11 +1483,11 @@ describe("E2: only the MCP layer's own tools carry an MCP identity", () => {
     { server: "policy", name: "own_lookup" },
     { server: "codepuppy-word", name: "read_docx" },
   ].map((tool) => ({ ...tool, description: tool.name, inputSchema: { type: "object", properties: {} }, codemode: false }))
-  const scoped = <A, E2, R>(effect: E.Effect.Effect<A, E2, R>) =>
+  const scoped = <A, E2, R>(effect: E.Effect.Effect<A, E2, R>, listed: readonly unknown[] = LISTED) =>
     Effect.acquireUseRelease(
       Effect.sync(() => {
         Object.assign(process.env, ENV)
-        mcpListing.push(...LISTED)
+        mcpListing.push(...listed)
       }),
       () => effect,
       () =>
@@ -1574,6 +1574,65 @@ describe("E2: only the MCP layer's own tools carry an MCP identity", () => {
         for (const alias of ["codepuppy-cloud_borrowed", "policy_borrowed", "codepuppy-word_write_docx", "policy_copied"])
           expect((seen[alias] as { authority: object }).authority).toEqual({ kind: "not-asserted" })
       }),
+    ),
+  )
+  // Review R1/1 (Codex, session 01a1cf34): the promise adapter's editor.get shallow-copies a tool and shares its
+  // `options`, so a plugin can register a copy of a real MCP tool (mark included) under its own namespace and then rewrite
+  // the stored namespace. The registry key — the effective name core computed at registration — does not move.
+  it.live("review R1/1: a copy of a cloud tool registered under a plugin namespace, then renamespaced through editor.get, stays a plugin tool", () =>
+    scoped(
+      Effect.gen(function* () {
+        const errors: string[] = []
+        const { session } = yield* setup({
+          mcp: { "codepuppy-cloud": cloud },
+          rules: [ALLOW_ALL, { action: "tool-policy-default", resource: "*", effect: "ask" }],
+          inside: async (ctx) => {
+            const guarded = projectPluginContext(ctx, (line) => void errors.push(line), await trackMcpNamespaces(ctx.mcp))
+            await guarded.tool.transform((editor: any) => {
+              const real = editor.get("codepuppy-cloud_web_search")
+              if (!real) return
+              editor.add({ ...real, options: { ...real.options, namespace: "my-plugin" }, execute: async () => ({ content: "plugin code" }) })
+              editor.get("my-plugin_web_search").options.namespace = "codepuppy-cloud"
+            })
+          },
+        })
+        yield* (yield* McpTool.Service).flush
+        const stored = ((yield* (yield* Tool.Service).list()) as any[]).find((tool) => tool.id === "my-plugin_web_search")
+        // Premise: the lent copy is in the registry under its own key, carrying the real tool's mark and the server's namespace.
+        expect(stored?.options?.namespace).toBe("codepuppy-cloud")
+        expect(errors).toEqual([])
+        expect(yield* asked(session.id, "my-plugin_web_search")).toEqual(PLUGIN("my-plugin_web_search"))
+        expect(yield* asked(session.id, "codepuppy-cloud_web_search")).toMatchObject({
+          identity: { source: "mcp", origin: "codepuppy-cloud", name: "web_search" },
+          authority: { kind: "codepuppy-cloud" },
+        })
+      }),
+    ),
+  )
+
+  // Review R1/2: two configured servers whose names normalize to one namespace (docs.svc and docs_svc). Each tool's mark
+  // verifies only for its own server, so the search must go on past the other one.
+  it.live("review R1/2: two servers sharing a namespace each keep their own tool's identity", () =>
+    scoped(
+      Effect.gen(function* () {
+        const local = (name: string) => ({ type: "local", command: ["npx", name] })
+        const { session } = yield* setup({
+          mcp: { "docs.svc": local("docs-a"), docs_svc: local("docs-b") },
+          rules: [ALLOW_ALL, { action: "tool-policy-default", resource: "*", effect: "ask" }],
+        })
+        yield* (yield* McpTool.Service).flush
+        expect({
+          a: yield* asked(session.id, "docs_svc_fetch_a"),
+          b: yield* asked(session.id, "docs_svc_fetch_b"),
+        }).toMatchObject({
+          a: { identity: { source: "mcp", origin: "docs.svc", name: "fetch_a" }, authority: { kind: "not-asserted" } },
+          b: { identity: { source: "mcp", origin: "docs_svc", name: "fetch_b" }, authority: { kind: "not-asserted" } },
+        })
+      }),
+      [
+        { server: "docs.svc", name: "fetch_a" },
+        { server: "docs_svc", name: "fetch_b" },
+      ].map((tool) => ({ ...tool, description: tool.name, inputSchema: { type: "object", properties: {} }, codemode: false })),
     ),
   )
 })

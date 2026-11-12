@@ -137,18 +137,22 @@ export function toolFacts(tool: RegisteredTool, input: IdentityInput): ToolFacts
   const namespace = tool.options?.namespace
   let borrowed = false
   if (namespace !== undefined) {
+    // Several configured servers can normalize to one namespace (`docs.svc`, `docs_svc`): each is tried; the tool is a
+    // plugin tool only when none of them registered it (review R1/2).
     for (const [server, entry] of input.mcp) {
       if (mcpNamespace(server) !== namespace.replaceAll(".", "_")) continue
-      // slice E2 (ADR-041): not registered by the MCP layer for this server ⇒ not that server's tool.
-      if (!registeredByMcpLayer(tool, server, tool.name)) {
+      // slice E2 (ADR-041): registered by the MCP layer for this server, under the effective name the registry gave it
+      // then. The key does not move afterwards, while a listed tool's `options` (namespace included) is shared and
+      // writable through a plugin's editor.get (review R1/1) — so the key, not the namespace, says whose tool it is.
+      if (technicalId !== mcpEffectiveName(server, tool.name) || !registeredByMcpLayer(tool, server, tool.name)) {
         borrowed = true
-        break
+        continue
       }
       const { authority, declared } = mcpAuthority(server, entry, input.env)
       // slice E (ADR-041): not one of the tools the bundled server's MCP layer registers ⇒ not that server's tool.
       if (declared && !declared.has(tool.name)) {
         borrowed = true
-        break
+        continue
       }
       return {
         technicalId,

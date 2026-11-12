@@ -278,4 +278,8 @@ last_reviewed: 2026-11-12
 
 ### 偏离记录
 
-暂无
+- 2026-11-12 · Codex 审查 R1(会话 01a1cf34,范围 `4198d1a484..20f340e1c0`)两条 Major,编排器采纳,同一提交修:
+  R1/1 标记可借给另一个插件工具 —— promise 适配层 `editor.get` 浅拷贝、共享 `options`,插件把真工具的副本以自己的 namespace 注册后改回服务器
+  namespace,就拿到服务器身份;修法:授予 MCP 身份还要求注册表键(登记时定下、之后改不了)等于 `mcpEffectiveName(server, tool.name)`。
+  R1/2 同一 namespace 的第一个服务器核验不过即 `break`,另一台服务器的真工具丢身份;修法:核验不过继续试同 namespace 的其余服务器,都不过才判插件工具。
+  两条先在真注册表(真适配层、真扇出、真 MCP 层)上复现再修;slice E 的未声明 Office 工具那条照旧绿。`register-policy.test.ts` 66 → 68。

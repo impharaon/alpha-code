@@ -1,0 +1,250 @@
+{
+ "_source": "Sampled by `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts` (alpha-code#1668 L6) at 2a4201af30: a real OpenCode 2 engine from this repo's packages/cli `serve`, isolated HOME/XDG, one git project, and the scripted OpenAI-compatible mock model next to the sampler. Three asks created with POST /api/session/:id/permission (agent build, read, save [\"*\"]): A1 .env and A2 other.env in session A, B1 .env in session B. `frames` = every permission.asked / permission.replied frame of A and B in arrival order. `pendingA` / `getA1` are the raw engine reads before replying; `rejected` / `replay` are the adapter's v2 reply route for A1 (reject, then the same command again); `replyAgain` is a raw second engine reply to A1; `pendingB` is B's list after the reject; `settled` is the raw once reply to B1.",
+ "ids": {
+  "sessionA": "ses_e31c539f2ffePFsO4EvLldAf9i",
+  "sessionB": "ses_e31c539f0ffe2TmRHxgm0LWM7f",
+  "a1": "per_1ce3ac612001hSkGL0ANGvffYw",
+  "a2": "per_1ce3ac613001RfAznJEBqZ4GgY",
+  "b1": "per_1ce3ac6140016DxEPlOudyf60G"
+ },
+ "created": [
+  {
+   "status": 200,
+   "body": {
+    "data": {
+     "id": "per_1ce3ac612001hSkGL0ANGvffYw",
+     "effect": "ask"
+    }
+   }
+  },
+  {
+   "status": 200,
+   "body": {
+    "data": {
+     "id": "per_1ce3ac613001RfAznJEBqZ4GgY",
+     "effect": "ask"
+    }
+   }
+  },
+  {
+   "status": 200,
+   "body": {
+    "data": {
+     "id": "per_1ce3ac6140016DxEPlOudyf60G",
+     "effect": "ask"
+    }
+   }
+  }
+ ],
+ "pendingA": {
+  "status": 200,
+  "body": {
+   "data": [
+    {
+     "id": "per_1ce3ac612001hSkGL0ANGvffYw",
+     "sessionID": "ses_e31c539f2ffePFsO4EvLldAf9i",
+     "action": "read",
+     "resources": [
+      ".env"
+     ],
+     "save": [
+      "*"
+     ]
+    },
+    {
+     "id": "per_1ce3ac613001RfAznJEBqZ4GgY",
+     "sessionID": "ses_e31c539f2ffePFsO4EvLldAf9i",
+     "action": "read",
+     "resources": [
+      "other.env"
+     ],
+     "save": [
+      "*"
+     ]
+    }
+   ]
+  }
+ },
+ "getA1": {
+  "status": 200,
+  "body": {
+   "data": {
+    "id": "per_1ce3ac612001hSkGL0ANGvffYw",
+    "sessionID": "ses_e31c539f2ffePFsO4EvLldAf9i",
+    "action": "read",
+    "resources": [
+     ".env"
+    ],
+    "save": [
+     "*"
+    ]
+   }
+  }
+ },
+ "command": {
+  "requestFingerprint": "2f46c806c251bb1b8cc6db3ecfe7e33406255d4435e473d3f4e80a260bfd8a90",
+  "decisionID": "pdec_sampler_reject",
+  "decision": "reject"
+ },
+ "rejected": {
+  "status": 200,
+  "body": {
+   "data": {
+    "requestID": "per_1ce3ac612001hSkGL0ANGvffYw",
+    "sessionID": "ses_e31c539f2ffePFsO4EvLldAf9i",
+    "requestFingerprint": "2f46c806c251bb1b8cc6db3ecfe7e33406255d4435e473d3f4e80a260bfd8a90",
+    "decisionID": "pdec_sampler_reject",
+    "decision": "reject",
+    "committedAt": 1794461321033,
+    "resolvedRequestIDs": [
+     "per_1ce3ac612001hSkGL0ANGvffYw",
+     "per_1ce3ac613001RfAznJEBqZ4GgY"
+    ]
+   }
+  }
+ },
+ "replay": {
+  "status": 200,
+  "body": {
+   "data": {
+    "requestID": "per_1ce3ac612001hSkGL0ANGvffYw",
+    "sessionID": "ses_e31c539f2ffePFsO4EvLldAf9i",
+    "requestFingerprint": "2f46c806c251bb1b8cc6db3ecfe7e33406255d4435e473d3f4e80a260bfd8a90",
+    "decisionID": "pdec_sampler_reject",
+    "decision": "reject",
+    "committedAt": 1794461321033,
+    "resolvedRequestIDs": [
+     "per_1ce3ac612001hSkGL0ANGvffYw",
+     "per_1ce3ac613001RfAznJEBqZ4GgY"
+    ]
+   }
+  }
+ },
+ "replyAgain": {
+  "status": 404,
+  "body": {
+   "_tag": "PermissionNotFoundError",
+   "requestID": "per_1ce3ac612001hSkGL0ANGvffYw",
+   "message": "Permission request not found: per_1ce3ac612001hSkGL0ANGvffYw"
+  }
+ },
+ "pendingB": {
+  "status": 200,
+  "body": {
+   "data": [
+    {
+     "id": "per_1ce3ac6140016DxEPlOudyf60G",
+     "sessionID": "ses_e31c539f0ffe2TmRHxgm0LWM7f",
+     "action": "read",
+     "resources": [
+      ".env"
+     ],
+     "save": [
+      "*"
+     ]
+    }
+   ]
+  }
+ },
+ "settled": {
+  "status": 204
+ },
+ "frames": [
+  {
+   "id": "evt_1ce3ac612002kpbBooANIElUhx",
+   "created": 1794461320722,
+   "type": "permission.asked",
+   "location": {
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-DJfRlO/proj"
+   },
+   "data": {
+    "id": "per_1ce3ac612001hSkGL0ANGvffYw",
+    "sessionID": "ses_e31c539f2ffePFsO4EvLldAf9i",
+    "action": "read",
+    "resources": [
+     ".env"
+    ],
+    "save": [
+     "*"
+    ]
+   }
+  },
+  {
+   "id": "evt_1ce3ac613002rAY23ZSpaparNW",
+   "created": 1794461320723,
+   "type": "permission.asked",
+   "location": {
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-DJfRlO/proj"
+   },
+   "data": {
+    "id": "per_1ce3ac613001RfAznJEBqZ4GgY",
+    "sessionID": "ses_e31c539f2ffePFsO4EvLldAf9i",
+    "action": "read",
+    "resources": [
+     "other.env"
+    ],
+    "save": [
+     "*"
+    ]
+   }
+  },
+  {
+   "id": "evt_1ce3ac614002I1mWqCGWgwFRrE",
+   "created": 1794461320724,
+   "type": "permission.asked",
+   "location": {
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-DJfRlO/proj"
+   },
+   "data": {
+    "id": "per_1ce3ac6140016DxEPlOudyf60G",
+    "sessionID": "ses_e31c539f0ffe2TmRHxgm0LWM7f",
+    "action": "read",
+    "resources": [
+     ".env"
+    ],
+    "save": [
+     "*"
+    ]
+   }
+  },
+  {
+   "id": "evt_1ce3ac749001KP8oEFTyVgUq9n",
+   "created": 1794461321033,
+   "type": "permission.replied",
+   "location": {
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-DJfRlO/proj"
+   },
+   "data": {
+    "sessionID": "ses_e31c539f2ffePFsO4EvLldAf9i",
+    "requestID": "per_1ce3ac612001hSkGL0ANGvffYw",
+    "reply": "reject"
+   }
+  },
+  {
+   "id": "evt_1ce3ac749002DVujGyWpIWNtC8",
+   "created": 1794461321033,
+   "type": "permission.replied",
+   "location": {
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-DJfRlO/proj"
+   },
+   "data": {
+    "sessionID": "ses_e31c539f2ffePFsO4EvLldAf9i",
+    "requestID": "per_1ce3ac613001RfAznJEBqZ4GgY",
+    "reply": "reject"
+   }
+  },
+  {
+   "id": "evt_1ce3ac74d001MGNTRdiYyivUwM",
+   "created": 1794461321037,
+   "type": "permission.replied",
+   "location": {
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-DJfRlO/proj"
+   },
+   "data": {
+    "sessionID": "ses_e31c539f0ffe2TmRHxgm0LWM7f",
+    "requestID": "per_1ce3ac6140016DxEPlOudyf60G",
+    "reply": "once"
+   }
+  }
+ ]
+}

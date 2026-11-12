@@ -15,6 +15,7 @@
 import type { OpenCodeClient, OpenCodeEvent } from "@opencode/client/promise"
 import type { Part } from "@opencode-ai/sdk/v2/client"
 import { normalizeSessionInfo } from "./frozen-shapes"
+import type { PermissionReplies } from "./permission-replies"
 import type { RouteContext } from "./routes"
 import { recentMessages, rememberSessionDirectory, sessionDirectory } from "./session-cache"
 import {
@@ -23,7 +24,6 @@ import {
   partID,
   todosOf,
   toV1Messages,
-  toV1PermissionRequest,
   toV1Project,
   toV1Question,
   withTurnDiffs,
@@ -113,7 +113,7 @@ const PASS_THROUGH = new Set([
   "global.disposed",
 ])
 
-export function createProjector(api: OpenCodeClient, emit: Emit) {
+export function createProjector(api: OpenCodeClient, emit: Emit, permissions: PermissionReplies) {
   /** 助手消息 → content 块的语义键(按出现顺序 = content 下标),流式 part 的 id 由它定。 */
   const blocks = new Map<string, string[]>()
   /** 已发出的 v1 对象(按 id)的 JSON,用于只发变化。 */
@@ -199,7 +199,7 @@ export function createProjector(api: OpenCodeClient, emit: Emit) {
     if (type === "agent.updated" || type === "command.updated" || type === "skill.updated")
       return emit(directory, { type: "catalog.updated", properties: {} })
     if (type === "project.updated") return emit(directory, { type, properties: toV1Project(data as never) })
-    if (type === "permission.asked") return emit(directory, { type, properties: toV1PermissionRequest(data as never) })
+    if (type === "permission.asked") return emit(directory, { type, properties: permissions.show(data as never) })
     if (type === "permission.replied") return emit(directory, { type, properties: data })
     if (type === "form.created") {
       const question = toV1Question(data.form)
@@ -283,7 +283,7 @@ export function projectEventStream(context: RouteContext): Response {
         if (controller.signal.aborted) return
         sink.enqueue(encoder.encode(`data: ${JSON.stringify({ directory, payload })}\n\n`))
       }
-      const project = createProjector(context.api, emit)
+      const project = createProjector(context.api, emit, context.permissions)
       void (async () => {
         try {
           for await (const event of context.api.event.subscribe({ signal: controller.signal })) {

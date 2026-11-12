@@ -6,9 +6,15 @@
 // 的 `v2.*` 命名空间与冻结 app 自带的 1.17.13 客户端发的,在 2.x 合并目标 `33f94fce96` 上路径与形状仍在的直通,
 // 已删或挪走的改写。
 import type { OpenCodeClient } from "@opencode/client/promise"
-import type { QuestionRequest } from "@opencode-ai/sdk/v2/client"
+import type {
+  PermissionV2Decision,
+  PermissionV2DecisionCommand,
+  PermissionV2DecisionReceipt,
+  QuestionRequest,
+} from "@opencode-ai/sdk/v2/client"
 import { normalizeAgentList, normalizeSessionInfo } from "./frozen-shapes"
 import { projectEventStream } from "./events"
+import { v1DecisionID, type DecisionInput, type DecisionOutcome, type PermissionReplies } from "./permission-replies"
 import { recentMessages, sessionDirectory } from "./session-cache"
 import {
   syntheticText,
@@ -19,7 +25,6 @@ import {
   toV1McpStatus,
   toV1Messages,
   toV1Path,
-  toV1PermissionRequest,
   toV1Project,
   toV1ProviderList,
   toV1Question,
@@ -38,6 +43,8 @@ export type RouteContext = {
   signal: AbortSignal
   api: OpenCodeClient
   origin: string
+  /** 这个引擎源的审批快照与收据(permission-replies.ts)。 */
+  permissions: PermissionReplies
   /** 对引擎源地址发一个原始请求(SSE、二进制读文件这类不经类型化客户端的)。 */
   upstream: (path: string, init?: RequestInit) => Promise<Response>
   /** 把这次请求原样转给引擎(2.x 上路径与形状都没变的那些)。 */
@@ -67,16 +74,31 @@ async function allSessions(api: OpenCodeClient, input: Parameters<OpenCodeClient
   }
 }
 
-// ── 权限回复(I7a):暂缓,等 L4 的回执规格(编排器 2026-11-09,#1666 评论 6737732975)───────────────────
-// 冻结界面读 PermissionV2DecisionReceipt(session-permission-feed.ts、PermissionDialog.tsx、permission-surface.tsx、
-// permission-v1-adapter.ts);2.x 的回复语义由 L4 实测后给出回执规格,适配器照规格合成。在那之前这里是
-// **明确标注的桩**:回复请求一律 501,不猜回执形状、不静默吞掉。
-const PERMISSION_REPLY_PENDING = "permission reply awaits the L4 receipt spec (#1666)"
-const permissionReplyPending = (context: RouteContext) => {
-  console.error(`[engine-adapter] ${PERMISSION_REPLY_PENDING}: ${context.request.method} ${new URL(context.request.url).pathname}`)
-  return Promise.resolve(
-    json({ name: "CodePuppyEngineAdapterUnsupported", data: { reason: PERMISSION_REPLY_PENDING } }, { status: 501 }),
-  )
+// ── 权限回复(I7a):回执按 L4 的推导规格合成(permission-replies.ts)──────────────────────────────────────
+// 三个回复入口:v1 `/permission/:id/reply`(审批卡、定制中心、连接器停用)、v1 旧 `/session/:id/permissions/:id`
+// (冻结 app 的自动允许,经 server-compat 的 legacy 客户端)、0.1.26 的 v2 `/api/session/:id/permission/:id/reply`
+// (带命令,回收据)。错误体与 0.1.26 同形:过期 404 PermissionNotFoundError,陈旧 409 ConflictError(审批卡的
+// permissionDecisionSubmitError 据 409 判为冲突)。
+const DECISIONS = new Set(["once", "always", "reject"])
+
+function decisionResponse(outcome: DecisionOutcome, requestID: string, success: (receipt: PermissionV2DecisionReceipt) => Response) {
+  if (outcome.type === "expired")
+    return json(
+      { _tag: "PermissionNotFoundError", requestID, message: `Permission request not found: ${requestID}` },
+      { status: 404 },
+    )
+  if (outcome.type === "conflict")
+    return json(
+      { _tag: "ConflictError", resource: requestID, message: `Permission request conflicts with the immutable request: ${requestID}` },
+      { status: 409 },
+    )
+  return success(outcome.receipt)
+}
+
+async function decide(context: RouteContext, input: DecisionInput, success: (receipt: PermissionV2DecisionReceipt) => Response) {
+  if (!DECISIONS.has(input.decision) || !input.decisionID)
+    return json({ name: "BadRequest", data: { message: "invalid permission decision" } }, { status: 400 })
+  return decisionResponse(await context.permissions.decide(context.api, input), input.requestID, success)
 }
 
 /** 提问(2.x 表单)的 requestID → sessionID:v1 回答只带 requestID,2.x 要会话。先查列表,再查全局。 */
@@ -383,12 +405,41 @@ export const ROUTES: readonly Route[] = [
 
   // ── 权限 ──
   route("GET", "/permission", async (context) =>
-    json((await context.api.permission.request.list(at(context))).data.map((item) => toV1PermissionRequest(item as never))),
+    json((await context.api.permission.request.list(at(context))).data.map((item) => context.permissions.show(item))),
   ),
-  route("POST", "/permission/:requestID/reply", permissionReplyPending),
-  route("POST", "/session/:sessionID/permissions/:permissionID", permissionReplyPending),
-  route("POST", "/api/session/:sessionID/permission/:requestID/reply", permissionReplyPending),
-  passthrough("GET", "/api/session/:sessionID/permission"),
+  route("POST", "/permission/:requestID/reply", (context) => {
+    const requestID = context.params.requestID!
+    const body = (context.body ?? {}) as { reply: PermissionV2Decision; message?: string }
+    return decide(context, { requestID, decision: body.reply, message: body.message, decisionID: v1DecisionID(requestID) }, ok)
+  }),
+  route("POST", "/session/:sessionID/permissions/:permissionID", (context) => {
+    const requestID = context.params.permissionID!
+    const body = (context.body ?? {}) as { response: PermissionV2Decision }
+    return decide(
+      context,
+      { requestID, sessionID: context.params.sessionID!, decision: body.response, decisionID: v1DecisionID(requestID) },
+      ok,
+    )
+  }),
+  route("POST", "/api/session/:sessionID/permission/:requestID/reply", (context) => {
+    const command = (context.body ?? {}) as PermissionV2DecisionCommand
+    return decide(
+      context,
+      {
+        requestID: context.params.requestID!,
+        sessionID: context.params.sessionID!,
+        decision: command.decision,
+        message: command.message,
+        decisionID: command.decisionID,
+        requestFingerprint: command.requestFingerprint,
+      },
+      (receipt) => json({ data: receipt }),
+    )
+  }),
+  // 0.1.26 的 v2 审批通道(`permission.v2.*`)在 2.x 上没有对应:引擎只有一条审批栈,请求全部经 v1 通道交给界面
+  // (卡片种类 —— 会话内 / 项目内 / 每次确认 —— 由 `engine-v1:` 指纹决定,与 0.1.26 一致)。这里若照搬 2.x 列表,
+  // 同一请求会以缺 subject/scope 的 v2 形状再进一次审批面,严格核验不过即被**自动拒绝**(PermissionDialog onMount)。
+  route("GET", "/api/session/:sessionID/permission", () => Promise.resolve(json({ data: [] }))),
 
   // ── 提问(2.x 表单)──
   route("GET", "/question", async (context) => {

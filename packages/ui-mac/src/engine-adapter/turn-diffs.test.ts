@@ -9,6 +9,7 @@ import { applyDirectoryEvent } from "../../../codepuppy-app/src/context/global-s
 import { turnDiffsOf } from "../renderer/codepuppy-ui/session-rail/review/review-turn-diffs"
 import fixture from "./fixtures/turn-diff.json"
 import { createProjector, TURN_DIFF_EVENTS, type V1Payload } from "./events"
+import { createPermissionReplies } from "./permission-replies"
 import { createEngineFetch } from "./index"
 
 type Record_ = { frame: { type: string; data: Record<string, any> }; snapshot?: { data: any[] }; diff?: { data: unknown[] } }
@@ -35,9 +36,13 @@ async function viaEvents() {
     },
   }
   const events: V1Payload[] = []
-  const projector = createProjector(api as never, (directory, payload) => {
-    if (directory === fixture.directory) events.push(payload)
-  })
+  const projector = createProjector(
+    api as never,
+    (directory, payload) => {
+      if (directory === fixture.directory) events.push(payload)
+    },
+    createPermissionReplies(),
+  )
   for (const record of records) {
     current = record
     await projector(record.frame as never)

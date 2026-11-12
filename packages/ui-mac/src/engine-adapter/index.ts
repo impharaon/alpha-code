@@ -6,8 +6,10 @@
 // `globalThis.fetch`。
 //
 // 适配器不做任何决定(审批、档位、目录闸都在引擎与 ext),不持有口令(I8:`Authorization` 由 main 的
-// `onBeforeSendHeaders` 对引擎源补上),不缓存、不重放回复。
+// `onBeforeSendHeaders` 对引擎源补上)。审批这一侧只保留回执状态(permission-replies.ts:交出过的请求快照指纹、
+// 已出的收据,窗口寿命、不落盘),那是 0.1.26 回执合同要的幂等与 409,不重放引擎数据。
 import { OpenCode, type OpenCodeClient } from "@opencode/client/promise"
+import { createPermissionReplies, type PermissionReplies } from "./permission-replies"
 import { ROUTES, type Route, type RouteContext } from "./routes"
 
 export const UNSUPPORTED_ERROR_NAME = "CodePuppyEngineAdapterUnsupported"
@@ -94,6 +96,14 @@ export function createEngineFetch(options: {
     clients.set(origin, created)
     return created
   }
+  const replies = new Map<string, PermissionReplies>()
+  const repliesFor = (origin: string) => {
+    const existing = replies.get(origin)
+    if (existing) return existing
+    const created = createPermissionReplies()
+    replies.set(origin, created)
+    return created
+  }
 
   return async (input, init) => {
     const request = new Request(input, init)
@@ -117,6 +127,7 @@ export function createEngineFetch(options: {
       signal: request.signal,
       api: clientFor(url.origin),
       origin: url.origin,
+      permissions: repliesFor(url.origin),
       upstream: (path, next) => upstreamFetch(new URL(path, url.origin), next),
       passthrough: () => upstreamFetch(request),
     }

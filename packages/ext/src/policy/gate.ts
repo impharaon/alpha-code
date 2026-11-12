@@ -18,6 +18,7 @@
 // rejects the call (S1, option 2: plugins activated after the extension cannot be ordered behind it).
 import { Error as ToolError } from "@opencode/plugin/promise/tool"
 import { canonicalToolIdentity } from "../../../schema/src/tool-identity"
+import { TOOL_POLICY_REQUEST_KEY } from "../../../schema/src/codepuppy-tool-policy"
 import { match } from "../../../core/src/util/wildcard"
 import type { PermissionRule } from "./managed"
 import { resolveToolPolicy, subjectBindingDigest, type EffectiveToolPolicy, type ToolPolicyStore } from "./resolver"
@@ -143,7 +144,7 @@ export async function confirm(deps: GateDeps, decision: GateDecision, call: Gate
     ...(facts.transport ? { transport: facts.transport } : {}),
     ...(facts.location && facts.identity.source === "mcp" ? { location: facts.location } : {}),
     ...(call.input !== undefined ? { args: call.input } : {}),
-    policy: { directory: deps.directory(), canonical, bindingDigest, askedBy },
+    [TOOL_POLICY_REQUEST_KEY]: { directory: deps.directory(), canonical, bindingDigest, askedBy },
   }
   await deps.assert({
     sessionID: call.sessionID,
@@ -196,7 +197,7 @@ export async function gateWithoutToolCall(
     Object.assign(event.metadata, {
       identity: facts.identity,
       authority: facts.authority,
-      policy: { directory: deps.directory(), canonical, bindingDigest, askedBy },
+      [TOOL_POLICY_REQUEST_KEY]: { directory: deps.directory(), canonical, bindingDigest, askedBy },
     })
   event.effect = "ask"
   holdAsk(event)

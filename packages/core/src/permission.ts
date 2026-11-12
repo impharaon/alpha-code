@@ -15,6 +15,7 @@ import { PermissionSaved } from "./permission/saved.js"
 import { PluginHooks } from "./plugin/hooks.js"
 // codepuppy(ADR-038, #668): the deadline failure ends the step and shows its own message, as a question dismissal does.
 import { QuestionTool } from "./tool/plugin/question.js"
+import { isCodePuppyPolicyRequest } from "@opencode/schema/codepuppy-tool-policy" // codepuppy(I-05)
 
 const PermissionEffect = Permission.Effect
 export { PermissionEffect as Effect }
@@ -181,6 +182,12 @@ const layer = Layer.effect(
     const saved = yield* PermissionSaved.Service
     const hooks = yield* PluginHooks.Service
     const pending = new Map<ID, Pending>()
+    // codepuppy(#1128 §4.4, I-05) ── "allow for this session" as in 0.1.26: an always reply grants (action, each save
+    // item) to its session only, in this service's memory — never the session row, never the project's saved approvals,
+    // not inherited by sessions created later, gone when the engine stops. It settles asks only: configured denies are
+    // decided before it is merged (evaluateInput). Design upgrade-fewer-takeovers §4 contract A.
+    const sessionGrants = new Map<SessionSchema.ID, Permission.Rule[]>()
+    // codepuppy ── end
     let closed = false
 
     const close = Effect.gen(function* () {
@@ -195,6 +202,7 @@ const layer = Layer.effect(
           .pipe(Effect.ensuring(Deferred.fail(item.deferred, new DeclinedError()))),
       )
       pending.clear()
+      sessionGrants.clear() // codepuppy(I-05)
     }).pipe(Effect.uninterruptible)
     yield* Effect.addFinalizer(() => close)
 
@@ -226,7 +234,7 @@ const layer = Layer.effect(
     const evaluateInput = Effect.fnUntraced(function* (input: AssertInput) {
       const rules = yield* configured(input.sessionID, input.agent)
       if (denied(input, rules)) return { effect: "deny" as const, rules }
-      const all = [...rules, ...(yield* savedRules())]
+      const all = [...rules, ...(yield* savedRules()), ...(sessionGrants.get(input.sessionID) ?? [])] // codepuppy(I-05)
       const effects = input.resources.map((resource) => evaluate(input.action, resource, all).effect)
       const effect: Permission.Effect = effects.includes("ask") ? "ask" : "allow"
       const event = yield* hooks.trigger("permission", "evaluate", {
@@ -400,17 +408,18 @@ const layer = Layer.effect(
           }
 
           if (input.reply === "always" && existing.request.save?.length) {
-            yield* saved.add({
-              projectID: location.project.id,
-              action: existing.request.action,
-              resources: existing.request.save,
-            })
+            // codepuppy(#1128 §4.4, I-05) ── the session's in-memory grant replaces upstream's project-level saved approval.
+            const added = existing.request.save.map((resource) => ({ action: existing.request.action, resource, effect: "allow" as const }))
+            sessionGrants.set(existing.request.sessionID, [...(sessionGrants.get(existing.request.sessionID) ?? []), ...added])
+            // codepuppy ── end
           }
           yield* Deferred.succeed(existing.deferred, undefined)
           pending.delete(input.requestID)
           if (input.reply !== "always" || !existing.request.save?.length) return
 
           for (const [id, item] of pending) {
+            if (item.request.sessionID !== existing.request.sessionID) continue // codepuppy(I-05): the cascade stays in the session
+            if (isCodePuppyPolicyRequest(item.request.metadata)) continue // codepuppy(I-05): only its own card settles a Code Puppy policy ask
             const result = yield* evaluateInput({ ...item.request, agent: item.agent }).pipe(
               Effect.catchTag("Session.NotFoundError", () => Effect.undefined),
             )

@@ -129,8 +129,20 @@ describe("#1668 0.1.26 对照:读目录与运行中的 shell", () => {
     shell: { sessionID: string; records: Session["records"]; pages: Array<{ cursor: number; page: { data: { output: string; cursor: number } } }> }
   }
 
-  test("读目录:正文铸回 0.1.26 的 metadata.display,冻结卡走目录网格(共 3 项,目录带标记)", () => {
-    const part = toolPart(fixture.dir.sessionID, fixture.dir.final, "read")
+  // I-05 契约 B:目录卡的 `metadata.display` 由 ext 在 execute.after 从 read 的结构化结果写进存下的工具状态
+  // (packages/ext/src/policy/display.ts,真上游 read 的证明在 register-policy.test.ts「I-05 B」);适配器原样透传、不再反解正文。
+  /** 真引擎采样里的那条目录读取;`display` 是 ext 对同一目录(sub:inner/、one.txt、two.txt)写的那份(手写字面量)。 */
+  const dirRead = (display?: Record<string, unknown>) => {
+    const messages = JSON.parse(JSON.stringify(fixture.dir.final))
+    if (display)
+      for (const message of messages)
+        for (const item of message.type === "assistant" ? message.content : [])
+          if (item.type === "tool" && item.name === "read") item.state.metadata = { ...item.state.metadata, display }
+    return toolPart(fixture.dir.sessionID, messages, "read")
+  }
+
+  test("读目录:存下的 read 带 ext 写的 metadata.display ⇒ 原样透传,冻结卡走目录网格(共 3 项,目录带标记)", () => {
+    const part = dirRead({ type: "directory", path: "sub", entries: ["inner/", "one.txt", "two.txt"], offset: 1, truncated: false, totalEntries: 3 })
     expect(toolCardDispatchOf(part)).toMatchObject({ kind: "list", metadataOnly: false })
     expect(toolCardHeadOf(part)).toMatchObject({ kind: "list", target: "sub", count: { unit: "items", value: 3 } })
     expect(toolCardBodyOf(part)).toEqual({
@@ -142,6 +154,12 @@ describe("#1668 0.1.26 对照:读目录与运行中的 shell", () => {
       ],
       truncated: false,
     })
+  })
+
+  test("读目录:同一条不带 display ⇒ 不反解模型正文,卡片回落读文件卡", () => {
+    const part = dirRead()
+    expect((part as { state: { metadata: Record<string, unknown> } }).state.metadata.display).toBeUndefined()
+    expect(toolCardDispatchOf(part)).not.toMatchObject({ kind: "list" })
   })
 
   test(

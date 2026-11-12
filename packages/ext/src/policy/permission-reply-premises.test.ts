@@ -3,7 +3,9 @@
 // premise pins: the adapter spec (docs/architecture/2026-11-09-1662-permission-reply-measurements.md) is only correct
 // while these hold, so an upstream change that breaks one turns this file red.
 //   (i)   a pending request's payload cannot change under its id;
-//   (ii)  one reply emits a `permission.replied` event for every request it resolves (always / reject cascades);
+//   (ii)  one reply emits a `permission.replied` event for every request it resolves (always / reject cascades). Both
+//         cascades stay in the replying session: reject upstream, always through Code Puppy's kernel block (I-05 contract A,
+//         design upgrade-fewer-takeovers §4 — the grant is the session's, and the cascade loop filters by session);
 //   (iii) a second reply to the same id is NotFound (the kernel keeps no reply history).
 import { beforeAll, describe, expect } from "bun:test"
 import { Bus, E, isolate, it, Location, Permission, Plugin, promisePlugin, seedProject, Session } from "./policy-host.cases"
@@ -75,7 +77,7 @@ describe("[packages/ui-mac/src/engine-adapter/permission-replies.ts] OpenCode 2 
     }),
   )
 
-  it.live("(ii) one always reply emits a replied event for every request it resolves, and only those", () =>
+  it.live("(ii) one always reply emits a replied event for every request it resolves: the covered requests of its own session only", () =>
     Effect.gen(function* () {
       const { permission, a, b, replied } = yield* engine(ASK_EDIT)
       const ask = (sessionID: string, action: string, resource: string) =>
@@ -85,17 +87,21 @@ describe("[packages/ui-mac/src/engine-adapter/permission-replies.ts] OpenCode 2 
       const f2 = yield* ask(b, "edit", "src/two.ts")
       yield* awaitPending(2)
       const f3 = yield* ask(a, "shell", "ls")
-      const list = yield* awaitPending(3)
+      yield* awaitPending(3)
+      const f4 = yield* ask(a, "edit", "src/three.ts")
+      const list = yield* awaitPending(4)
       const one = list.find((request: any) => request.resources[0] === "src/one.ts")!
       const two = list.find((request: any) => request.resources[0] === "src/two.ts")!
+      const three = list.find((request: any) => request.resources[0] === "src/three.ts")!
       const shell = list.find((request: any) => request.action === "shell")!
       yield* permission.reply({ requestID: one.id, reply: "always" })
       yield* Fiber.join(f1)
-      yield* Fiber.join(f2)
-      expect(replied.filter((event) => event.reply === "always").map((event) => event.requestID).sort()).toEqual([one.id, two.id].sort())
-      expect(replied.some((event) => event.requestID === shell.id)).toBe(false)
-      expect((yield* permission.list()).map((request: any) => request.id)).toEqual([shell.id])
-      yield* permission.reply({ requestID: shell.id, reply: "reject" })
+      yield* Fiber.join(f4)
+      expect(replied.filter((event) => event.reply === "always").map((event) => event.requestID).sort()).toEqual([one.id, three.id].sort())
+      expect(replied.some((event) => event.requestID === shell.id || event.requestID === two.id)).toBe(false)
+      expect((yield* permission.list()).map((request: any) => request.id).sort()).toEqual([two.id, shell.id].sort())
+      for (const request of [two, shell]) yield* permission.reply({ requestID: request.id, reply: "reject" })
+      yield* Fiber.await(f2)
       yield* Fiber.await(f3)
     }),
   )
@@ -129,13 +135,13 @@ describe("[packages/ui-mac/src/engine-adapter/permission-replies.ts] OpenCode 2 
   for (const reply of ["always", "reject"] as const)
     it.live(`(ii) one ${reply} reply publishes the target's replied event first, then the cascaded ones`, () =>
       Effect.gen(function* () {
-        const { permission, a, b, replied } = yield* engine(ASK_EDIT)
+        const { permission, a, replied } = yield* engine(ASK_EDIT)
         const ask = (sessionID: string, action: string, resource: string) =>
           Effect.forkChild(permission.assert({ sessionID, agent: "build", action, resources: [resource], save: ["src/*"], metadata: {} }))
         const fibers = [yield* ask(a, "edit", "src/target.ts")]
         yield* awaitPending(1)
-        // always cascades to the same pattern in any session; reject to every pending request of the same session.
-        fibers.push(reply === "always" ? yield* ask(b, "edit", "src/cascade.ts") : yield* ask(a, "shell", "ls"))
+        // always cascades to the requests of the same session its grant covers; reject to every pending request of the same session.
+        fibers.push(reply === "always" ? yield* ask(a, "edit", "src/cascade.ts") : yield* ask(a, "shell", "ls"))
         const list = yield* awaitPending(2)
         const target = list.find((request: any) => request.resources[0] === "src/target.ts")!
         const cascade = list.find((request: any) => request.id !== target.id)!

@@ -11,7 +11,7 @@ import {
   type ProjectRoot,
 } from "./project-config"
 import { mergeProjectConfig } from "./project-config"
-import { loadProjectPlugins, projectPluginContext } from "./plugin-fanout"
+import { loadProjectPlugins, projectPluginContext, trackMcpNamespaces } from "./plugin-fanout"
 import { applyPromptTakeover } from "./codepuppy-prompts"
 import { applyFactoryDeny, factoryDeniedSkills } from "./factory-deny"
 import { rebrandSystem } from "./prompt-rebrand"
@@ -333,9 +333,10 @@ export const CodePuppyExt: Plugin.Plugin = {
       try {
         const consent = project ? readProjectExtensionsConsent(project) : false
         if (consent === null) error("[@codepuppy/ext] project plugin fan-out refused: project alpha root identity drifted")
-        else
+        else {
+          const mcpNamespaceTaken = consent ? await trackMcpNamespaces(context.mcp) : () => false
           cleanups.push(
-            ...(await loadProjectPlugins(project?.root ?? "", () => projectPluginContext(context, error), consent, {
+            ...(await loadProjectPlugins(project?.root ?? "", () => projectPluginContext(context, error, mcpNamespaceTaken), consent, {
               verifyIdentity: () => !!project && withProjectDirectoryIdentity(project, () => true).ok,
               existsSync,
               readdirSync,
@@ -346,6 +347,7 @@ export const CodePuppyExt: Plugin.Plugin = {
               error,
             })),
           )
+        }
       } catch (cause) {
         error(`[@codepuppy/ext] project plugin fan-out failed: ${describe(cause)}`)
       }

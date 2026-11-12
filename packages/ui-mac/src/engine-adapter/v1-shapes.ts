@@ -191,8 +191,8 @@ export function toV1Messages(sessionID: string, source: readonly SessionMessageI
 // ── 工具 part:2.x 内建工具的入参 / metadata → 冻结工具卡读的 v1 键 ───────────────────────────────────────
 // 冻结的 tool-card-model.ts 按 0.1.26 引擎的键读卡面;2.x 的同一工具改了名(K5,卡片分派已认新名)也改了键。逐个对过
 // 卡片的读取点(真引擎采样 fixtures/tools.json):
-//   · read      入参 `path`                         → 卡头 / 「已探索」行读 `filePath`;读目录时正文 → `metadata.display`
-//               (目录网格卡,见 directoryDisplay);
+//   · read      入参 `path`                         → 卡头 / 「已探索」行读 `filePath`;读目录的 `metadata.display`(目录网格卡)
+//               由 ext 在 execute.after 从结构化结果写好(I-05 契约 B,packages/ext/src/policy/display.ts),原样透传;
 //   · edit      metadata.files[].patch              → 展开的 diff 读 `metadata.diff`(filediff 冻结投影已给);
 //   · patch     metadata.files[] {file, status}     → 文件行读 `relativePath|filePath` + `type`(add/update/delete);
 //   · subagent  入参 `agent`、metadata.sessionID     → 任务卡读 `subagent_type`、`sessionId`(「打开子会话」)、`background`。
@@ -200,31 +200,6 @@ export function toV1Messages(sessionID: string, source: readonly SessionMessageI
 // websearch 的 query,skill 的 metadata.name,question 的 questions / answers,write 的 path → filePath 由冻结投影给)
 // 键名两代相同,不动。
 const PATCH_TYPES: Record<string, string> = { added: "add", deleted: "delete", modified: "update" }
-
-// 读目录:0.1.26 的 read 给渲染层铸了 `metadata.display`(type directory + entries,目录项带尾随 `/`),冻结卡据此改派目录网格卡
-// (tool-card-model.ts dirDisplayOf)。2.x 的 read 存下的只有模型正文(结构化的 ListPage 不落库,metadata 只剩 truncated),
-// 正文由引擎的 toModelContent 写成「Read directory <path>, entries a-b」+ 每行一项(目录带 `/`)+ 截断时末尾一行续读提示
-// (core/src/tool/plugin/read.ts)。按这个首行认出目录读取、照 0.1.26 的形状铸回;首行认不出就不铸(卡片退回读文件卡)。
-const DIRECTORY_HEADER = /^Read directory .*, (?:entries \d+-\d+|0 entries)$/
-const CONTINUE_LINE = /^\[Output truncated\. Continue reading with offset: \d+\]$/
-
-function directoryDisplay(state: { status: string; output?: unknown; metadata?: Record<string, unknown> }, path: string, rawOffset: unknown) {
-  if (state.status !== "completed" || typeof state.output !== "string") return undefined
-  const [header, ...lines] = state.output.split("\n")
-  if (!header || !DIRECTORY_HEADER.test(header)) return undefined
-  const truncated = state.metadata?.truncated === true
-  const entries = truncated && CONTINUE_LINE.test(lines.at(-1) ?? "") ? lines.slice(0, -1) : lines
-  const offset = typeof rawOffset === "number" && rawOffset > 0 ? rawOffset : 1
-  return {
-    type: "directory" as const,
-    path,
-    entries,
-    offset,
-    // 0.1.26 的总项数;截断时 2.x 不告诉总数,不编
-    ...(truncated ? {} : { totalEntries: offset - 1 + entries.length }),
-    truncated,
-  }
-}
 
 function toV1ToolPart(part: Part): Part {
   if (part.type !== "tool") return part
@@ -241,10 +216,7 @@ function toV1ToolPart(part: Part): Part {
         ...(changes.metadata ? { metadata: { ...metadata, ...changes.metadata } } : {}),
       },
     }) as Part
-  if (part.tool === "read" && typeof input.path === "string" && input.filePath === undefined) {
-    const display = metadata?.display === undefined ? directoryDisplay(state, input.path, input.offset) : undefined
-    return next({ input: { filePath: input.path }, ...(display ? { metadata: { display } } : {}) })
-  }
+  if (part.tool === "read" && typeof input.path === "string" && input.filePath === undefined) return next({ input: { filePath: input.path } })
   if (part.tool === "edit" && files && metadata?.diff === undefined)
     return next({ metadata: { diff: files.flatMap((file) => (typeof file.patch === "string" ? [file.patch] : [])).join("\n") } })
   if (part.tool === "patch" && files)

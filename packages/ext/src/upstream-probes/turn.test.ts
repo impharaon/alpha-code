@@ -4,9 +4,9 @@
 //   P1  A turn ends with exactly one `session.execution.succeeded | failed | interrupted` frame, and the engine never
 //       sends v1 `session.status` / `session.idle` (schema/src/session-event.ts:248-259). The adapter synthesizes
 //       busy / idle from these (packages/ui-mac/src/engine-adapter/events.ts).
-//   P6  `read` on a directory stores model text `Read directory <p>, entries a-b` + one entry per line
-//       (core/src/tool/plugin/read.ts toModelContent); the adapter parses it back into the directory card
-//       (packages/ui-mac/src/engine-adapter/v1-shapes.ts directoryDisplay).
+//   (P6, the stored read-directory text, retired with I-05 contract B: the adapter no longer parses it; the directory
+//   card's display comes from the read tool's structured listing, pinned on the real upstream read tool by
+//   packages/ext/src/policy/register-policy.test.ts "I-05 B".)
 //   P7  A `data:` attachment is stored with the sniffed mime `text/plain` and its name, and reaches the request hooks as a text
 //       part `Attached file: <name>` + content (core/src/session/runner/to-llm-message.ts textAttachment). ext
 //       recognizes it there (packages/ext/src/attachment-reader-hooks.ts) and the adapter restores the card from the
@@ -16,8 +16,6 @@
 //
 // Each probe also feeds its checker a known-bad copy of the real sample, so a checker that cannot fail is caught here.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import fs from "node:fs"
-import path from "node:path"
 import { toV1Messages } from "../../../ui-mac/src/engine-adapter/v1-shapes"
 import { ATTACHMENT_METADATA_KEY } from "../../../ui-mac/src/shared/attachment-path"
 import { stagedAttachmentOfText } from "../attachment-reader-hooks"
@@ -29,11 +27,7 @@ let directory: string
 
 beforeAll(async () => {
   engine = await startProbeEngine()
-  directory = engine.project("turns", (dir) => {
-    fs.mkdirSync(path.join(dir, "sub/inner"), { recursive: true })
-    fs.writeFileSync(path.join(dir, "sub/one.txt"), "1\n")
-    fs.writeFileSync(path.join(dir, "sub/two.txt"), "2\n")
-  })
+  directory = engine.project("turns")
 }, 60_000)
 
 afterAll(async () => {
@@ -84,42 +78,6 @@ describe("P1 turn end events", () => {
     const own = engine.frames.filter((frame) => frame.data?.sessionID === id)
     expect(turnEndProblems([...own, { type: "session.idle", data: { sessionID: id } }], id, "session.execution.succeeded").length).toBeGreaterThan(0)
     expect(turnEndProblems(own.filter((frame) => !TERMINAL.includes(frame.type)), id, "session.execution.succeeded").length).toBeGreaterThan(0)
-  })
-})
-
-// ── P6 ────────────────────────────────────────────────────────────────────────────────────────────────────────────
-/** The directory card the adapter mints for the session's read call, or undefined when it falls back. */
-function directoryCard(sessionID: string, messages: any[]) {
-  const part = toV1Messages(sessionID, messages)
-    .flatMap((message) => message.parts)
-    .find((item: any) => item.type === "tool" && item.tool === "read") as any
-  const display = part?.state?.metadata?.display
-  return display?.type === "directory" ? (display as { entries: string[] }) : undefined
-}
-
-describe("P6 directory read text", () => {
-  let sessionID: string
-  let messages: any[]
-
-  beforeAll(async () => {
-    sessionID = await engine.createSession(directory)
-    await engine.prompt(sessionID, directory, { text: "list the folder" })
-    await engine.turnEnded(sessionID)
-    messages = await engine.messages(sessionID, directory)
-  }, 60_000)
-
-  test("[packages/ui-mac/src/engine-adapter/v1-shapes.ts] the stored read-directory text parses into the directory card with the entries on disk", () => {
-    const onDisk = fs
-      .readdirSync(path.join(directory, "sub"), { withFileTypes: true })
-      .map((entry) => (entry.isDirectory() ? `${entry.name}/` : entry.name))
-      .sort()
-    expect(directoryCard(sessionID, messages)?.entries.toSorted()).toEqual(onDisk)
-  })
-
-  test("[packages/ui-mac/src/engine-adapter/v1-shapes.ts] known bad: one changed word in the header and the card falls back", () => {
-    const reworded = JSON.parse(JSON.stringify(messages).replace(/Read directory sub/g, "Listed directory sub"))
-    expect(JSON.stringify(reworded)).not.toBe(JSON.stringify(messages))
-    expect(directoryCard(sessionID, reworded)).toBeUndefined()
   })
 })
 

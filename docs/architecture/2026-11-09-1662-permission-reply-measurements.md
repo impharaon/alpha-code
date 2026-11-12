@@ -75,8 +75,10 @@ same layer (`adaptPermissionV1Receipt`); this extends that idea to OpenCode 2 re
    reply before the HTTP response returns (ii), **target first, then each request the reply cascaded to** (measured
    order `[target, cascade…]`, pinned by `permission-reply-premises.test.ts`). So the window does **not** close at the
    target's own event: `resolvedRequestIDs` = the target id plus every id whose `permission.replied` carries the same
-   `reply` value and arrives after sending, until the cascade of that reply has arrived — for `always` across
-   sessions, for `reject` within the session. The L6 adapter closes the window when no request of the same session
+   `reply` value and arrives after sending, until the cascade of that reply has arrived — within the session for
+   both: `reject` upstream, `always` through Code Puppy's kernel block (I-05 contract A, design upgrade-fewer-takeovers
+   §4: the grant is the session's and the cascade loop filters by session; corrected 2026-11-12, the text before read
+   "for `always` across sessions", upstream's project-level behaviour). The L6 adapter closes the window when no request of the same session
    that was pending before the reply is still pending (re-read of the session's pending list), waiting at most 2 s;
    anything still unconfirmed then is left out of the receipt rather than guessed. (Corrected 2026-11-12, #1666
    review R1 #7: the earlier text ended the window at the target's event and would have dropped every cascaded id.)
@@ -84,7 +86,7 @@ same layer (`adaptPermissionV1Receipt`); this extends that idea to OpenCode 2 re
    `decisionID` returns the cached receipt without calling the engine; a different `decisionID` for an id that
    already has a receipt is a conflict. No persistence (iv): after a restart there is nothing left to decide (iii).
 5. **Receipt shape.** `{ requestID, sessionID, requestFingerprint, decisionID, decision, message?, committedAt,
-   resolvedRequestIDs }` (plus `grantScope` for `always`, per the "always" ruling the L6 adapter handles separately).
+   resolvedRequestIDs }` (plus `grantScope` for `always`; the adapter sends `always` as it is since I-05).
 
 Pins that keep the derivation honest: `packages/ext/src/policy/permission-reply-premises.test.ts` (engine
 premises, owned by L4). L6 owns the adapter and its tests: the four rules above, each with a known-bad arm (no

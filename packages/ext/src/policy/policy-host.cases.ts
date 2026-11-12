@@ -54,18 +54,26 @@ export const { Plugin } = await load("src/plugin.ts")
 export const { PluginHooks } = await load("src/plugin/hooks.ts")
 export const { Tool } = await load("src/tool.ts")
 export const { Permission } = await load("src/permission.ts")
+export const { PermissionSaved } = await load("src/permission/saved.ts")
 export const { Agent } = await load("src/agent.ts")
 export const { Session } = await load("src/session.ts")
 export const { SessionContext } = await load("src/session/context.ts")
 export const { Location } = await load("src/location.ts")
 export const { Rpc } = await load("src/rpc.ts")
 export const { Mcp } = await load("src/mcp/index.ts")
+// OpenCode 2's MCP layer: registers each listed MCP tool into the tool registry (slice E2: and marks it as its own).
+export const { McpTool } = await load("src/tool/mcp.ts")
+// The MCP layer's mark (slice E2). Tests that stand in for the MCP layer with a plugin take the mark from this, the same
+// module instance the real layer uses; a real plugin has no way to issue one.
+export const { mcpToolMark } = await load("src/tool/codepuppy-mcp-tool-mint.ts")
 export const { Bus } = await load("src/bus.ts")
 // Upstream tool plugins activated as builtins by the E6 / #1572 cases (register-policy.test.ts `internal`).
 export const { SubagentTool } = await load("src/tool/plugin/subagent.ts")
 // The builtin agents (`general` is the subagent the E6 cases ask for).
 export const { AgentPlugin } = await load("src/plugin/agent.ts")
 export const { WebFetchTool } = await load("src/tool/plugin/webfetch.ts")
+// The upstream read tool (I-05 contract B: the directory card is built from its structured listing).
+export const { ReadTool } = await load("src/tool/plugin/read.ts")
 export const { McpResourceTools } = await load("src/tool/plugin/mcp-resource.ts")
 // Subtask commands (#1129 E6): the config command plugin, the Command service, a config with commands, a shell picker.
 export const { ConfigCommandPlugin } = await load("src/config/plugin/command.ts")
@@ -100,6 +108,8 @@ const nodes = {
   SubagentJob: (await load("src/session/subagent-job.ts")).SubagentJob,
   InstructionEntry: (await load("src/session/instruction-entry.ts")).InstructionEntry,
   PersistentPty: (await load("src/persistent-pty.ts")).PersistentPty,
+  ReadToolFileSystem: (await load("src/tool/read-filesystem.ts")).ReadToolFileSystem,
+  SessionInstructions: (await load("src/session/instructions.ts")).SessionInstructions,
   LocationServiceMap: (await load("src/location-service-map.ts")).LocationServiceMap,
   Reference: (await load("src/reference.ts")).Reference,
   Skill: (await load("src/skill.ts")).Skill,
@@ -133,6 +143,12 @@ const generateLayer = Layer.succeed(
 const configLayer = nodes.Config.testLayer()
 
 /**
+ * The tools the MCP runtime reports as listed by its servers (`Mcp.tools()`); empty unless a test fills it. The real
+ * MCP layer (`McpTool`) registers them into the registry on `flush`. A test that fills it empties it again.
+ */
+export const mcpListing: unknown[] = []
+
+/**
  * MCP with a real configuration state (core `State`, the editor semantics of packages/core/src/mcp/index.ts) and no
  * runtime: plugins' `mcp.transform` callbacks run and see each other's servers in order; nothing connects.
  */
@@ -151,7 +167,7 @@ const configuredMcpLayer = Layer.sync(Mcp.Service, () => {
       remove: (name: string) => void editor.servers.delete(name),
     }),
   })
-  return Mcp.Service.of({ ...emptyMcp, transform: state.transform, reload: state.reload })
+  return Mcp.Service.of({ ...emptyMcp, transform: state.transform, reload: state.reload, tools: () => Effect.sync(() => [...mcpListing]) })
 })
 
 /** Core's plugin test graph with the production permission engine and the session context added. */
@@ -186,12 +202,16 @@ export const HostLayer = AppNodeBuilder.build(
     Mcp.node,
     Session.node,
     SessionContext.node,
+    McpTool.node,
     nodes.SubagentJob.node,
     nodes.SharedCache.node,
     nodes.InstructionEntry.node,
     nodes.PersistentPty.node,
+    nodes.ReadToolFileSystem.node,
+    nodes.SessionInstructions.node,
     nodes.LocationServiceMap.node,
     Permission.node,
+    PermissionSaved.node,
     PluginHooks.node,
     nodes.Reference.node,
     Rpc.node,

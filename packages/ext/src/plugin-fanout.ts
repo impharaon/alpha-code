@@ -10,6 +10,9 @@
 // (`projectPluginContext` 包住它的 `tool.transform`)只许动**它自己经这个编辑器注册的**工具:有效名已存在的 add、以及对别人工具的
 // update / remove,一律拒绝并记一行。不然一个项目插件就能顶掉、改写(比如包住 execute)或删掉 Code Puppy、上游或 MCP 的工具
 // (2.x 的工具编辑器同名 add 即覆盖,update / remove 不问归属)。每个项目插件各拿一份 Context,「自己的工具」不跨插件。
+// 新名也不许挂在别人的 namespace 下(I-05 slice E,design review):namespace 等于某个已配置 MCP 服务器的名字、或是 OpenCode
+// (`opencode`)与 Code Puppy(`codepuppy`、`codepuppy-*`)保留的,一律拒绝并按同一格式记一行 —— 否则身份推导会把它当成那台
+// 服务器的工具,带上那台服务器的 authority(ADR-041:身份由 Code Puppy 铸,不由工具自己说)。
 //
 // 待批请求的回复(编排器裁决,#1666 c6756103246 第 3 条):L4 实测,透传出去的 Context 能对 Code Puppy 待批的请求直接回 once,
 // 调用随即执行。所以项目插件拿到的 `permission` 不给 `reply`,也不给 `saved.update` / `saved.remove`(改 / 删已存的批准):
@@ -20,6 +23,7 @@
 // ADR-006:项目 plugins 必须是**自包含 ESM JS**(生 TS 桌面必崩)—— 只收 .js,加载失败 loud 不阻断。
 
 import type { ToolEditor } from "@opencode/plugin/promise/tool"
+import { mcpNamespace } from "./policy/identity"
 
 export type ProjectPluginCleanup = () => Promise<void> | void
 
@@ -52,11 +56,37 @@ export function effectiveToolName(tool: ToolLike): string {
   return tool.options?.namespace === undefined ? name : `${tool.options.namespace.replaceAll(".", "_")}_${name}`
 }
 
+/** OpenCode 自己(`opencode`,内置工具)与 Code Puppy(`codepuppy` 云端、`codepuppy-<格式>` 随包 Office)用的工具 namespace。 */
+export function reservedToolNamespace(namespace: string): boolean {
+  const normalized = namespace.replaceAll(".", "_")
+  return normalized === "opencode" || normalized === "codepuppy" || normalized.startsWith("codepuppy-") || normalized.startsWith("codepuppy_")
+}
+
+/**
+ * 已配置 MCP 服务器的 namespace(随 MCP 配置每次重建刷新)。只读的 `mcp.transform`:项目插件的工具 transform 每次重建都会再跑,
+ * 拿到的总是当时的服务器名单。
+ */
+export async function trackMcpNamespaces(mcp: {
+  transform(callback: (editor: { list(): readonly (readonly [string, unknown])[] }) => void): Promise<unknown>
+}): Promise<(namespace: string) => boolean> {
+  const namespaces = new Set<string>()
+  await mcp.transform((editor) => {
+    namespaces.clear()
+    for (const [name] of editor.list()) namespaces.add(mcpNamespace(name))
+  })
+  return (namespace) => namespaces.has(namespace.replaceAll(".", "_"))
+}
+
 /**
  * 给一个项目插件的插件 Context:`tool.transform` 拿到的编辑器只许动它自己注册的工具(ADR-041);`permission` 不给回复待批请求、
  * 不给改 / 删已存的批准(#1666 第 3 条);其余原样。
  */
-export function projectPluginContext<C extends { readonly tool: ToolDomainLike }>(context: C, error: (m: string) => void): C {
+export function projectPluginContext<C extends { readonly tool: ToolDomainLike }>(
+  context: C,
+  error: (m: string) => void,
+  /** True for a configured MCP server's namespace (`trackMcpNamespaces`). */
+  mcpNamespaceTaken: (namespace: string) => boolean,
+): C {
   /** 这个项目插件经本 Context 的编辑器注册成功的有效名(跨它的各次 transform 与重建)。 */
   const own = new Set<string>()
   const report = (domain: string, what: string, id: string, why: string) =>
@@ -68,6 +98,9 @@ export function projectPluginContext<C extends { readonly tool: ToolDomainLike }
         if (key === "add")
           return (tool: Parameters<ToolEditorLike["add"]>[0]) => {
             const id = effectiveToolName(tool)
+            const namespace = tool.options?.namespace
+            if (namespace !== undefined && (reservedToolNamespace(namespace) || mcpNamespaceTaken(namespace)))
+              return refuse("add", id, `namespace "${namespace}" belongs to an MCP server, OpenCode or Code Puppy`)
             if (target.get(id) !== undefined && !own.has(id)) return refuse("add", id, "a tool with that name already exists")
             target.add(tool)
             own.add(id)

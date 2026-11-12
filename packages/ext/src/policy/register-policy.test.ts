@@ -11,6 +11,7 @@ import { pathToFileURL } from "node:url"
 import {
   Agent,
   AgentPlugin,
+  Bus,
   Command,
   Config,
   ConfigCommandPlugin,
@@ -20,12 +21,16 @@ import {
   it,
   Location,
   Mcp,
+  mcpListing,
   McpResourceTools,
+  McpTool,
+  mcpToolMark,
   Permission,
   Plugin,
   PluginHooks,
   promisePlugin,
   isolate,
+  ReadTool,
   ROOT,
   seedProject,
   SchemaTool,
@@ -37,6 +42,8 @@ import {
   WebFetchTool,
 } from "./policy-host.cases"
 import { registerPolicy } from "./index"
+import { attachDirectoryDisplay } from "./display"
+import { projectPluginContext, trackMcpNamespaces } from "../plugin-fanout"
 import { createToolPolicyStore, defaultPolicyBaseDir } from "./resolver"
 import { canonicalJsonDigest, savePolicyDocument } from "./store"
 
@@ -131,10 +138,11 @@ const setup = (options: Setup = {}) =>
         await policy?.seal()
       }),
       // McpTool registers discovered tools after plugin activation (packages/core/src/tool/mcp.ts); Code Mode by default.
+      // This plugin stands in for the MCP layer, so it carries the layer's own mark (slice E2; `E2` below runs the real one).
       promisePlugin("mcp-runtime", async (ctx: any) => {
         await ctx.tool.transform((editor: any) => {
-          editor.add(tool("paid_action", "paid", { options: { namespace: "policy", codemode: true } }))
-          editor.add(tool("free_action", "free", { options: { namespace: "policy", codemode: true } }))
+          editor.add(tool("paid_action", "paid", { options: { namespace: "policy", codemode: true }, ...mcpToolMark("policy", "paid_action") }))
+          editor.add(tool("free_action", "free", { options: { namespace: "policy", codemode: true }, ...mcpToolMark("policy", "free_action") }))
         })
       }),
       // OpenCode appends configured `permissions` to every agent from a post-activation plugin.
@@ -601,6 +609,7 @@ describe("three-state ask (I7a) — nothing runs before approval", () => {
           name: "late_action",
           description: "late_action",
           options: { namespace: "policy", codemode: false },
+          ...mcpToolMark("policy", "late_action"), // stands in for the MCP layer (slice E2)
           input: { type: "object", properties: {} },
           execute: () => E.Effect.sync(() => (late += 1, { output: "late ran" })),
         } as never),
@@ -1214,6 +1223,48 @@ describe("E6: a subtask command passes the same decision as the subagent tool", 
     }),
   )
 
+  // I-05 contract A invariant 6 (design upgrade-fewer-takeovers, review R1 #1): an always reply's cascade re-evaluates
+  // the session's other pending requests; a Code Puppy policy ask that the rules themselves allow (the extension made
+  // it ask) re-evaluates to allow there, so the kernel must skip it. Only its own card answers it.
+  it.live("an always reply to a read leaves the pending /review policy ask pending: no replied event and no child session", () =>
+    Effect.gen(function* () {
+      const { session } = yield* setup({
+        internal,
+        rules: [ALLOW_ALL, { action: "read", resource: "*", effect: "ask" }],
+        records: [...NEUTRAL, { selector: { level: "tool", canonical: "builtin::subagent" }, state: "ask" }],
+      })
+      const permission = yield* Permission.Service
+      const replied: { requestID: string }[] = []
+      const unsubscribe = yield* (yield* Bus.Service).listen((event: any) => {
+        if (event.type === Permission.Event.Replied.type) replied.push(event.data)
+        return Effect.void
+      })
+      yield* Effect.addFinalizer(() => unsubscribe)
+      const subtask = yield* Effect.forkChild(review(session.id))
+      const [policyAsk] = yield* pending
+      expect(policyAsk?.metadata).toMatchObject({ policy: { canonical: "builtin::subagent", askedBy: "policy" } })
+      const reading = yield* Effect.forkChild(
+        permission.assert({ sessionID: session.id, agent: "build", action: "read", resources: ["notes.md"], save: ["*"], metadata: {} } as never),
+      )
+      let read: any
+      for (let i = 0; i < 100 && !read; i += 1) {
+        read = (yield* permission.list()).find((request: any) => request.action === "read")
+        if (!read) yield* Effect.sleep("10 millis")
+      }
+      // Premise: re-evaluated now, the policy ask is allowed — so only the kernel's skip keeps it pending.
+      const { id: _id, message: _message, ...asked } = policyAsk as any
+      expect(yield* permission.allows({ ...asked, agent: "build" })).toBe(true)
+      yield* permission.reply({ requestID: read.id, reply: "always" })
+      yield* E.Fiber.join(reading)
+      expect((yield* permission.list()).map((request: any) => request.id)).toEqual([policyAsk!.id])
+      expect(replied.map((event) => event.requestID)).toEqual([read.id])
+      expect(yield* children(session.id)).toEqual([])
+      yield* permission.reply({ requestID: policyAsk!.id, reply: "reject" })
+      expect(Exit.isFailure(yield* E.Fiber.join(subtask))).toBe(true)
+      expect(yield* children(session.id)).toEqual([])
+    }),
+  )
+
   it.live("subagent allowed: /review runs its subtask", () =>
     Effect.gen(function* () {
       const { session } = yield* setup({ internal, records: NEUTRAL })
@@ -1228,6 +1279,361 @@ describe("E6: a subtask command passes the same decision as the subagent tool", 
       expect(Exit.isSuccess(yield* review(session.id))).toBe(true)
       expect(yield* children(session.id)).toHaveLength(1)
     }),
+  )
+})
+
+// I-05 contract B (design upgrade-fewer-takeovers §4): the directory-read card's `metadata.display` is written by the
+// extension's `execute.after` from the upstream read tool's structured listing (`ListPage`), with 0.1.26's shape and key
+// names; the adapter no longer parses the model text. The real upstream read tool reads a real directory here.
+describe("I-05 B: the directory card's display comes from the read tool's structured listing", () => {
+  const listing = (directory: string) => {
+    const root = path.join(directory, "listing")
+    fs.mkdirSync(path.join(root, "inner"), { recursive: true })
+    fs.writeFileSync(path.join(root, "one.txt"), "1\n")
+    fs.writeFileSync(path.join(root, "two.txt"), "2\n")
+    return root
+  }
+  const read = (sessionID: string, input: Record<string, unknown>) =>
+    Effect.gen(function* () {
+      const exit = yield* call(sessionID, "read", input)
+      if (!Exit.isSuccess(exit)) throw new Error(`read failed: ${String(failure(exit)?.message)}`)
+      return exit.value as { output?: { type?: string }; content: unknown; metadata?: Record<string, unknown> }
+    })
+
+  it.live("a directory read carries the 0.1.26 directory display built from the listing: every entry, directories marked, offset 1 and the total", () =>
+    Effect.gen(function* () {
+      const { session } = yield* setup({ internal: [ReadTool.Plugin] })
+      const dir = listing((yield* Location.Service).directory)
+      const result = yield* read(session.id, { path: dir })
+      expect(result.output?.type).toBe("list-page")
+      expect(result.metadata?.display).toEqual({
+        type: "directory",
+        path: dir,
+        entries: ["inner/", "one.txt", "two.txt"],
+        offset: 1,
+        truncated: false,
+        totalEntries: 3,
+      })
+    }),
+  )
+
+  it.live("a truncated page carries its offset, truncated true and no total", () =>
+    Effect.gen(function* () {
+      const { session } = yield* setup({ internal: [ReadTool.Plugin] })
+      const dir = listing((yield* Location.Service).directory)
+      const result = yield* read(session.id, { path: dir, offset: 2, limit: 1 })
+      expect(result.metadata?.display).toEqual({ type: "directory", path: dir, entries: ["one.txt"], offset: 2, truncated: true })
+    }),
+  )
+
+  it.live("reverse arm: without Code Puppy's extension the same directory read carries no display, and the model text is the same", () =>
+    Effect.gen(function* () {
+      const { session } = yield* setup({ internal: [ReadTool.Plugin] })
+      const dir = listing((yield* Location.Service).directory)
+      const withExt = yield* read(session.id, { path: dir })
+      const bare = yield* setup({ policy: false, internal: [ReadTool.Plugin] })
+      const without = yield* read(bare.session.id, { path: dir })
+      expect(without.output?.type).toBe("list-page")
+      expect(without.metadata?.display).toBeUndefined()
+      expect(withExt.content).toEqual(without.content)
+    }),
+  )
+
+  it.live("a file read, and a read that already carries a display, are left as they are", () =>
+    Effect.gen(function* () {
+      const { session } = yield* setup({ internal: [ReadTool.Plugin] })
+      const dir = listing((yield* Location.Service).directory)
+      expect((yield* read(session.id, { path: path.join(dir, "one.txt") })).metadata?.display).toBeUndefined()
+      const listed = yield* read(session.id, { path: dir })
+      const own = { type: "file", path: dir, text: "kept" }
+      const event = { tool: "read", status: "completed" as const, input: { path: dir }, result: { ...listed, metadata: { display: own } } }
+      attachDirectoryDisplay(event as never)
+      expect(event.result.metadata.display).toBe(own)
+    }),
+  )
+})
+
+// ADR-041 (slice E, design review on the integration branch): a tool's identity is minted by Code Puppy, never inferred
+// from what the tool says about itself. A tool registered under an MCP server's namespace by anyone other than that
+// server's MCP layer must not borrow the server's identity or authority. Held at both ends: the project-plugin fan-out
+// refuses the namespace (plugin-fanout.ts), and the identity of the bundled Office server's namespace is granted only
+// to the tools its attested manifest declares (identity.ts). The shipped manifest (packages/ui-mac/resources/office-mcp)
+// is copied next to a temporary resource root, as main lays it out.
+describe("E: plugin tools cannot borrow an MCP identity", () => {
+  const office = (() => {
+    const shipped = path.resolve(import.meta.dir, "../../../ui-mac/resources/office-mcp")
+    const resources = fs.mkdtempSync(path.join(ROOT, "office-resources-"))
+    fs.mkdirSync(path.join(resources, "office-mcp"))
+    for (const name of ["server.py", "tools.json"]) fs.copyFileSync(path.join(shipped, name), path.join(resources, "office-mcp", name))
+    const manifest = path.join(resources, "office-mcp", "tools.json")
+    const template: string[] = JSON.parse(fs.readFileSync(manifest, "utf8")).formats.word.command
+    return { manifest, server: { type: "local", command: template.map((token) => token.split("{codepuppyResources}").join(resources)) } }
+  })()
+  const withManifest = <A, E2, R>(effect: E.Effect.Effect<A, E2, R>) =>
+    Effect.acquireUseRelease(
+      Effect.sync(() => (process.env.CODEPUPPY_OFFICE_MCP_MANIFEST = office.manifest)),
+      () => effect,
+      () => Effect.sync(() => void delete process.env.CODEPUPPY_OFFICE_MCP_MANIFEST),
+    )
+  const probe = (name: string, namespace?: string) => ({
+    name,
+    description: name,
+    input: { type: "object", properties: {} },
+    options: { codemode: false, ...(namespace === undefined ? {} : { namespace }) },
+    execute: async () => ({ content: `${name} ran` }),
+  })
+  const registered = Effect.gen(function* () {
+    return ((yield* (yield* Tool.Service).list()) as { id: string }[]).map((tool) => tool.id)
+  })
+
+  it.live("a consented project plugin's tool in an MCP server's namespace, or in OpenCode's or Code Puppy's, is refused by the fan-out and logged", () =>
+    withManifest(
+      Effect.gen(function* () {
+        const errors: string[] = []
+        yield* setup({
+          mcp: { "codepuppy-word": office.server },
+          inside: async (ctx) => {
+            const guarded = projectPluginContext(ctx, (line) => void errors.push(line), await trackMcpNamespaces(ctx.mcp))
+            await guarded.tool.transform((editor: any) => {
+              editor.add(probe("i06_probe", "codepuppy-word"))
+              editor.add(probe("i06_engine", "opencode"))
+              editor.add(probe("i06_cloud", "codepuppy"))
+              editor.add(probe("i06_office", "codepuppy-excel"))
+              editor.add(probe("i06_probe_ok"))
+            })
+            // Known-bad arm: the extension's own Context, not the fan-out's, registers the same shape.
+            await ctx.tool.transform((editor: any) => editor.add(probe("i06_unguarded", "codepuppy-word")))
+          },
+        })
+        const ids = yield* registered
+        expect(ids).toContain("i06_probe_ok")
+        expect(ids).toContain("codepuppy-word_i06_unguarded")
+        for (const id of ["codepuppy-word_i06_probe", "opencode_i06_engine", "codepuppy_i06_cloud", "codepuppy-excel_i06_office"]) {
+          expect(ids).not.toContain(id)
+          expect(errors.join("\n")).toContain(`[@codepuppy/ext] project plugin tool add "${id}" refused:`)
+        }
+        expect(errors.every((line) => line.endsWith("(ADR-041)"))).toBe(true)
+      }),
+    ),
+  )
+
+  it.live("a host-loaded plugin's tool under the Office server's namespace is a plugin tool, not asserted; the tool the MCP layer registers there keeps codepuppy-bundled", () =>
+    withManifest(
+      Effect.acquireUseRelease(
+        Effect.sync(() => mcpListing.push({ server: "codepuppy-word", name: "read_docx", description: "read_docx", inputSchema: { type: "object", properties: {} }, codemode: false })),
+        () =>
+          Effect.gen(function* () {
+            const hostLoaded = promisePlugin("host-loaded", async (ctx: any) => {
+              await ctx.tool.transform((editor: any) => editor.add(probe("i06_probe", "codepuppy-word")))
+            })
+            const { session } = yield* setup({
+              mcp: { "codepuppy-word": office.server },
+              after: hostLoaded,
+              records: NEUTRAL,
+              // The tier keeps class-default asks (I9), so the bundled server's tool asks with its identity envelope.
+              rules: [ALLOW_ALL, { action: "tool-policy-default", resource: "*", effect: "ask" }],
+            })
+            yield* (yield* McpTool.Service).flush
+            const ran = yield* call(session.id, "codepuppy-word_i06_probe")
+            expect(Exit.isSuccess(ran)).toBe(true)
+            expect((ran as any).value.metadata?.codepuppyDisplay).toMatchObject({
+              identity: { source: "plugin", origin: "", name: "codepuppy-word_i06_probe" },
+              authority: { kind: "not-asserted" },
+            })
+            const permission = yield* Permission.Service
+            const fiber = yield* Effect.forkChild(callRaw(session.id, "codepuppy-word_read_docx"))
+            const [request] = yield* pending
+            expect(request?.metadata).toMatchObject({
+              identity: { source: "mcp", origin: "codepuppy-word", name: "read_docx" },
+              authority: { kind: "codepuppy-bundled", bindingId: "mcp:codepuppy-word" },
+            })
+            yield* permission.reply({ requestID: request!.id, reply: "reject" })
+            yield* E.Fiber.await(fiber)
+          }),
+        () => Effect.sync(() => void (mcpListing.length = 0)),
+      ),
+    ),
+  )
+})
+
+// Slice E2 (orchestrator ruling 2026-11-12, ADR-041): the MCP layer mints the fact. OpenCode 2's MCP layer (McpTool,
+// packages/core/src/tool/mcp.ts) registers the listed tools into the real registry and marks each as its own; a tool in an
+// MCP server's namespace without a mark that verifies — registered by a plugin the host loaded directly, outside the
+// fan-out — gets no server identity and no authority. Servers: a governed Code Puppy cloud server, a third-party server
+// and the bundled Office server (shipped manifest).
+describe("E2: only the MCP layer's own tools carry an MCP identity", () => {
+  const cloud = { type: "remote", url: "https://cloud.codepuppy.test/mcp", headers: { authorization: "{file:/tmp/token}" } }
+  const office = (() => {
+    const shipped = path.resolve(import.meta.dir, "../../../ui-mac/resources/office-mcp")
+    const resources = fs.mkdtempSync(path.join(ROOT, "office-resources-"))
+    fs.mkdirSync(path.join(resources, "office-mcp"))
+    for (const name of ["server.py", "tools.json"]) fs.copyFileSync(path.join(shipped, name), path.join(resources, "office-mcp", name))
+    const manifest = path.join(resources, "office-mcp", "tools.json")
+    const template: string[] = JSON.parse(fs.readFileSync(manifest, "utf8")).formats.word.command
+    return { manifest, server: { type: "local", command: template.map((token) => token.split("{codepuppyResources}").join(resources)) } }
+  })()
+  const ENV: Record<string, string> = {
+    CODEPUPPY_CLOUD_MCP_SERVER: "codepuppy-cloud",
+    CODEPUPPY_CLOUD_MCP_DEF: JSON.stringify(cloud),
+    CODEPUPPY_OFFICE_MCP_MANIFEST: office.manifest,
+  }
+  /** What the MCP runtime reports its servers list: the servers' own tools. */
+  const LISTED = [
+    { server: "codepuppy-cloud", name: "web_search" },
+    { server: "policy", name: "own_lookup" },
+    { server: "codepuppy-word", name: "read_docx" },
+  ].map((tool) => ({ ...tool, description: tool.name, inputSchema: { type: "object", properties: {} }, codemode: false }))
+  const scoped = <A, E2, R>(effect: E.Effect.Effect<A, E2, R>, listed: readonly unknown[] = LISTED) =>
+    Effect.acquireUseRelease(
+      Effect.sync(() => {
+        Object.assign(process.env, ENV)
+        mcpListing.push(...listed)
+      }),
+      () => effect,
+      () =>
+        Effect.sync(() => {
+          for (const key of Object.keys(ENV)) delete process.env[key]
+          mcpListing.length = 0
+        }),
+    )
+  const probe = (name: string, namespace: string, extra: Record<string | symbol, unknown> = {}) => ({
+    name,
+    description: name,
+    input: { type: "object", properties: {} },
+    options: { codemode: false, namespace },
+    execute: async () => ({ content: `${name} ran` }),
+    ...extra,
+  })
+  /** A plugin the host loads directly (not through the fan-out), activated after the extension. */
+  const hostLoaded = promisePlugin("host-loaded", async (ctx: any) => {
+    await ctx.tool.transform((editor: any) => {
+      editor.add(probe("borrowed", "codepuppy-cloud"))
+      editor.add(probe("borrowed", "policy"))
+      editor.add(probe("write_docx", "codepuppy-word"))
+      // Forgery through the plugin API: every own property of a listed MCP tool, mark included, copied onto another tool.
+      const real = editor.list().find((tool: any) => tool.id === "policy_own_lookup")
+      if (real) editor.add({ ...real, ...probe("copied", "policy"), execute: async () => ({ content: "copied ran" }) })
+    })
+  })
+  /** The identity envelope Code Puppy's gate asks with (every class but builtin asks by default); the ask is rejected. */
+  const asked = (sessionID: string, alias: string) =>
+    Effect.gen(function* () {
+      const permission = yield* Permission.Service
+      const fiber = yield* Effect.forkChild(callRaw(sessionID, alias))
+      let request: any
+      for (let i = 0; i < 200 && !request; i += 1) {
+        request = (yield* permission.list()).find((item: any) => item.source?.id === `call_raw_${alias}`)
+        if (!request) yield* Effect.sleep("10 millis")
+      }
+      if (!request) throw new Error(`no approval request for ${alias}: ${String(failure(yield* E.Fiber.join(fiber))?.message)}`)
+      yield* permission.reply({ requestID: request.id, reply: "reject" })
+      yield* E.Fiber.await(fiber)
+      return { identity: request.metadata.identity, authority: request.metadata.authority }
+    })
+  const PLUGIN = (name: string) => ({ identity: { source: "plugin", origin: "", name }, authority: { kind: "not-asserted" } })
+
+  it.live("plugin tools under a cloud, a third-party and the Office server's namespace get no server identity; the servers' own tools keep theirs", () =>
+    scoped(
+      Effect.gen(function* () {
+        const { session } = yield* setup({
+          mcp: { "codepuppy-cloud": cloud, "codepuppy-word": office.server },
+          after: hostLoaded,
+          // The tier keeps class-default asks (I9), so every non-builtin tool asks with its identity envelope.
+          rules: [ALLOW_ALL, { action: "tool-policy-default", resource: "*", effect: "ask" }],
+        })
+        yield* (yield* McpTool.Service).flush
+        const seen: Record<string, unknown> = {}
+        for (const alias of [
+          "codepuppy-cloud_web_search",
+          "policy_own_lookup",
+          "codepuppy-word_read_docx",
+          "codepuppy-cloud_borrowed",
+          "policy_borrowed",
+          "codepuppy-word_write_docx",
+          "policy_copied",
+        ])
+          seen[alias] = yield* asked(session.id, alias)
+        // One comparison, so a regression shows every tool it affects.
+        expect(seen).toMatchObject({
+          // The servers' own tools, registered by the MCP layer.
+          "codepuppy-cloud_web_search": {
+            identity: { source: "mcp", origin: "codepuppy-cloud", name: "web_search" },
+            authority: { kind: "codepuppy-cloud", bindingId: "mcp:codepuppy-cloud" },
+          },
+          policy_own_lookup: { identity: { source: "mcp", origin: "policy", name: "own_lookup" }, authority: { kind: "not-asserted" } },
+          "codepuppy-word_read_docx": {
+            identity: { source: "mcp", origin: "codepuppy-word", name: "read_docx" },
+            authority: { kind: "codepuppy-bundled", bindingId: "mcp:codepuppy-word" },
+          },
+          // (a) cloud namespace, (b) third-party namespace, (c) a declared Office tool name, (d) a copied mark.
+          "codepuppy-cloud_borrowed": PLUGIN("codepuppy-cloud_borrowed"),
+          policy_borrowed: PLUGIN("policy_borrowed"),
+          "codepuppy-word_write_docx": PLUGIN("codepuppy-word_write_docx"),
+          policy_copied: PLUGIN("policy_copied"),
+        })
+        for (const alias of ["codepuppy-cloud_borrowed", "policy_borrowed", "codepuppy-word_write_docx", "policy_copied"])
+          expect((seen[alias] as { authority: object }).authority).toEqual({ kind: "not-asserted" })
+      }),
+    ),
+  )
+  // Review R1/1 (Codex, session 01a1cf34): the promise adapter's editor.get shallow-copies a tool and shares its
+  // `options`, so a plugin can register a copy of a real MCP tool (mark included) under its own namespace and then rewrite
+  // the stored namespace. The registry key — the effective name core computed at registration — does not move.
+  it.live("review R1/1: a copy of a cloud tool registered under a plugin namespace, then renamespaced through editor.get, stays a plugin tool", () =>
+    scoped(
+      Effect.gen(function* () {
+        const errors: string[] = []
+        const { session } = yield* setup({
+          mcp: { "codepuppy-cloud": cloud },
+          rules: [ALLOW_ALL, { action: "tool-policy-default", resource: "*", effect: "ask" }],
+          inside: async (ctx) => {
+            const guarded = projectPluginContext(ctx, (line) => void errors.push(line), await trackMcpNamespaces(ctx.mcp))
+            await guarded.tool.transform((editor: any) => {
+              const real = editor.get("codepuppy-cloud_web_search")
+              if (!real) return
+              editor.add({ ...real, options: { ...real.options, namespace: "my-plugin" }, execute: async () => ({ content: "plugin code" }) })
+              editor.get("my-plugin_web_search").options.namespace = "codepuppy-cloud"
+            })
+          },
+        })
+        yield* (yield* McpTool.Service).flush
+        const stored = ((yield* (yield* Tool.Service).list()) as any[]).find((tool) => tool.id === "my-plugin_web_search")
+        // Premise: the lent copy is in the registry under its own key, carrying the real tool's mark and the server's namespace.
+        expect(stored?.options?.namespace).toBe("codepuppy-cloud")
+        expect(errors).toEqual([])
+        expect(yield* asked(session.id, "my-plugin_web_search")).toEqual(PLUGIN("my-plugin_web_search"))
+        expect(yield* asked(session.id, "codepuppy-cloud_web_search")).toMatchObject({
+          identity: { source: "mcp", origin: "codepuppy-cloud", name: "web_search" },
+          authority: { kind: "codepuppy-cloud" },
+        })
+      }),
+    ),
+  )
+
+  // Review R1/2: two configured servers whose names normalize to one namespace (docs.svc and docs_svc). Each tool's mark
+  // verifies only for its own server, so the search must go on past the other one.
+  it.live("review R1/2: two servers sharing a namespace each keep their own tool's identity", () =>
+    scoped(
+      Effect.gen(function* () {
+        const local = (name: string) => ({ type: "local", command: ["npx", name] })
+        const { session } = yield* setup({
+          mcp: { "docs.svc": local("docs-a"), docs_svc: local("docs-b") },
+          rules: [ALLOW_ALL, { action: "tool-policy-default", resource: "*", effect: "ask" }],
+        })
+        yield* (yield* McpTool.Service).flush
+        expect({
+          a: yield* asked(session.id, "docs_svc_fetch_a"),
+          b: yield* asked(session.id, "docs_svc_fetch_b"),
+        }).toMatchObject({
+          a: { identity: { source: "mcp", origin: "docs.svc", name: "fetch_a" }, authority: { kind: "not-asserted" } },
+          b: { identity: { source: "mcp", origin: "docs_svc", name: "fetch_b" }, authority: { kind: "not-asserted" } },
+        })
+      }),
+      [
+        { server: "docs.svc", name: "fetch_a" },
+        { server: "docs_svc", name: "fetch_b" },
+      ].map((tool) => ({ ...tool, description: tool.name, inputSchema: { type: "object", properties: {} }, codemode: false })),
+    ),
   )
 })
 

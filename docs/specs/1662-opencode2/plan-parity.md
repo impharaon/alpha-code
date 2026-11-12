@@ -153,7 +153,7 @@ B1、B3 属 web search 一组;B4 属凭据一组;B2、B5、B6 单独一组。每
 | `packages/core/src/config/plugin/command.ts` | 第 3 项 E4(编排器裁决授权):现有 `codepuppy` 标注块里,换助手之前走 subagent 的权限路径 |
 | `packages/ui-mac/src/main/codepuppy-config-injection.ts`(+ `config-injection-throat.test.ts`、`codepuppy-config-injection.test.ts`) | 第 3 项 R2(编排器裁决授权):build 与 codepuppy-ask 追加 v1 的 `external_directory` 规则 |
 | `packages/ext/src/policy/gate.ts` | 第 3 项 R11(编排器裁决授权):没有绑定摘要时不写 `metadata.policy.bindingDigest` |
-| `packages/core/test/codepuppy-memory-seam.test.ts`(新) | 第 4 项:2.x 配置 instructions 接缝的前提探针 |
+| `packages/ui-mac/src/main/memory-seam.engine.{test,cases}.ts`(新;原计划 core 测试,见偏离记录) | 第 4 项:2.x 配置 instructions 接缝的前提探针 |
 | `packages/ui-mac/src/main/platform-credential-error.engine.{test,cases}.ts`(新) | 第 6 项 |
 | `packages/ui-mac/src/main/naming-resume.engine.{test,cases}.ts`(新) | 第 7 项 |
 | `packages/ui-mac/src/main/sidecar-stop-pending-approval.engine.{test,cases}.ts`(新,仅当第 8 项成立) | 第 8 项 |
@@ -192,7 +192,7 @@ B1、B3 属 web search 一组;B4 属凭据一组;B2、B5、B6 单独一组。每
 | 1 | H3 探针输出(命令 + 三条 in-band 实抓件的模型面文字),无提交 | —(报告项) |
 | 2 | 同一探针的「结局 → 模型面文字」表 | —(报告项) |
 | 3 | `composer-tier-matrix.engine.test.ts`(21 条);四处变异实测 | 注入的档位规则被放宽,对应询问 / 拒绝格当场变放行;build 列证明三种结局分得开 |
-| 4 | `codepuppy-memory-seam.test.ts` | 接缝不在,配置里的文件不进上下文或删了仍在,①②红;对照臂证明判官看得见「没接」 |
+| 4 | `memory-seam.engine.test.ts`(2 条) | 接缝不在,配置里的文件不进上下文或删了仍在,①②红;对照臂证明判官看得见「没接」 |
 | 5 | H2 实测(或成立时的 `cloud-credential-hot.engine`) | 热写后仍发旧令牌 ⇒ 记录里出现 A |
 | 6 | `platform-credential-error.engine` | 被退避重试 ⇒ 请求数 > 1 或耗时 ≥ 2 秒;503 臂证明计数看得见重试 |
 | 7 | `naming-resume.engine` | 反向顺序留下旧名 ⇒ 续写具名失败 |
@@ -206,4 +206,5 @@ B1、B3 属 web search 一组;B4 属凭据一组;B2、B5、B6 单独一组。每
 - 2026-11-12 · 第 3 项 E4 实测不成立(只读档会话跑 `agent: build` 的非子任务命令 ⇒ 204、会话 agent 变成 build、零询问),按编排器裁决在 `command.ts` 的 `codepuppy(#1560)` 块里加 `codepuppy(#1573 E4)`:换助手之前以会话自己的 agent 走 subagent 权限断言。去掉它 ⇒ R6c 两条红(实测)。
 - 2026-11-12 · 第 3 项两处格子在 2.x 上实测未握住,不进矩阵、交编排器:① R2「全部批准 / 请求审批 ⇒ 询问」—— 两档对 `external_directory`(`<目录>/*`)都直接放行,来源是引擎底座的 `*: allow`(只读档拒绝照常);② R11 请求审批档与只读档的询问格 —— 引擎确实建了待批请求,但 `GET /api/session/:id/permission` 编码失败(`Expected JSON value at ["data"][0]["metadata"]["policy"]`),因为 `packages/ext/src/policy/gate.ts:146` / `:199` 对没有绑定摘要的工具(插件、内置)写了 `bindingDigest: undefined`,引擎只剥掉 metadata 顶层的 undefined;桌面的审批面经 `v2.session.permission.list` 读这条列表(`packages/codepuppy-app/src/context/permission-v1-adapter.ts:163`)。R9 / R10 的身份轴与 R11 同一道执行闸,本文件不另起云 MCP / 第三方 MCP。
 - 2026-11-12 · 编排器裁决(第二轮)后补齐上面两处:① R2 照现行正式版 —— v1(`origin/alpha` 的矩阵测试 R2 = ASK / ASK / DENY;v1 引擎默认 agent 的 `external_directory: { "*": "ask", <截断输出、临时、技能、引用目录>: "allow" }`)⇒ 注入给 build 与 codepuppy-ask 追加同一条规则(`externalDirectoryAsk`:引擎的 `tool-output`、解析过符号链接的 `os.tmpdir()/opencode`、注入时的出厂与已启用技能目录;注入没有配引用目录,不列);`config-injection-throat.test.ts` 与 `codepuppy-config-injection.test.ts` 机械同步 build 这一项(build 只带 permissions)。已知局限:技能翻代后新一代的目录要到下一次注入(fork)才放行,在那之前读它会问,不会静默放行。② R11 —— `gate.ts` 两处在没有摘要时不写 `bindingDigest`,补两个询问格;另加「审批请求的整条路径」一组(5 条)。坏的状态下实测事件流照常送达 `permission.asked`(事件编码时 undefined 键被丢掉),只有列表路由 500;桌面的通道源在列表失败时抛错(`permission-v1-adapter.ts:163-166`),卡片能否只凭事件出现没有实测。R10 加一格(用户在 codepuppy.jsonc 里加的本地 stdio MCP,MCP 工具默认进 Code Mode,模型经 `execute` 调);R9 不起受治理的远端 MCP,理由写在登记册 note。矩阵 15 → 21 条。
+- 2026-11-12 · 第 4 项宿主由 H3 风格的 core 测试改为 H2:`packages/ui-mac/src/main/memory-seam.engine.{test,cases}.ts`(嵌入式引擎 + 模型桩,判模型请求本身;编排器要求在嵌入式引擎上量)。实测:配置里的文件进上下文;原地改写、改名替换都生效;删掉 ⇒ 新会话里没有,在跑的会话旧正文留在基线里、下一次请求带 `<system-update>` 的「不再适用」(与 v1 每步重读不同);**删掉后再写回同一路径不会被重新装载**(10 秒内的新会话都没有),不断言,交编排器(#425 的渲染器清空时应写空文件)。
 - 2026-11-12 · 变异实测从两处改为三处:去掉 E4 断言(R6c 两条红)、`codepuppy-ask` 的 `shell` 改 allow 并删掉只读档的 `subagent` 规则(6 条红)。

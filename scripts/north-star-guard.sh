@@ -127,29 +127,48 @@ done
 # 等),随之出清单(能力清点表 §9)。M0 把这 15 个文件也取成了上游原样;L4 逐条重判「退回 L0 / 重新接管」,
 # 定出最终清单并在 ADR-047「精确接管面」写理由。
 UPSTREAM_EXCLUDES=(
-  # ADR-033 §1 被接管 permission 表面(L3)
-  ':(exclude)packages/core/src/permission.ts'
-  ':(exclude)packages/core/src/permission'
-  ':(exclude)packages/server/src/handlers/permission.ts'
-  ':(exclude)packages/core/test/permission.test.ts'
-  ':(exclude)packages/core/test/database-migration.test.ts'
-  # ADR-033 §4 生成/快照(SOT = Code Puppy 拥有的迁移/协议/schema;静态 diff 会误报)
-  ':(exclude)packages/core/schema.json'
-  ':(exclude)packages/core/src/database/migration.gen.ts'
-  ':(exclude)packages/core/src/database/schema.gen.ts'
-  # ADR-033 §守卫盲区(#456 裁决)
-  ':(exclude)packages/protocol/src/groups/permission.ts'
-  ':(exclude)packages/schema/src/permission.ts'
-  ':(exclude)packages/schema/src/agent.ts'
-  ':(exclude)packages/schema/test/contract-hygiene.test.ts'
-  # ADR-041(#878,2026-08-09):工具身份与不可变显示快照。来源信息在这些注册/聚合/
-  # 权限/首次写入咽喉之后结构性丢失,L0-L2 无法从 alias 诚实反推。仅逐文件接管;
-  # 新的 codepuppy-tool-identity 闸门是新增文件,无需 exclude。
-  ':(exclude)packages/schema/src/v1/session.ts'
-  # ADR-042(#1047): OAuth loopback success/error HTML is product chrome; ADR-007
-  # Vite brand transform never reaches engine-served callback pages.
+  # #1662 L4(ADR-047「精确接管面」):换代后的最终清单。旧清单 49 条不继承 —— 34 条随文件消失删除,
+  # 仍存在的 15 条逐条重判,每条的去留、它握的决定与 2.x 上的握法登记在
+  # docs/architecture/codepuppy-authority-registry.json(判官 packages/ext/src/policy/authority-registry.test.ts)。
+  # ADR-042(#1047):OAuth 回环成功/失败页是产品外观;ADR-007 的 Vite 品牌变换到不了引擎直出的回调页,
+  # 插件也没有改写它的挂点 —— 2.x 上原样重新接管,改动面只有产品名与字标。
   ':(exclude)packages/core/src/oauth/page.ts'
   ':(exclude)packages/core/test/oauth-page.test.ts'
+  # ADR-038(#668;#1662 裁决第 2 项):审批请求的应答期限。2.x 的 `Permission.assert` 对回复无限期等待,
+  # 插件只能改判定(`permission.hook.evaluate`)改不了等多久;插件侧看门狗回 reject 会级联整个会话 ——
+  # ADR-038 否决过的形状。接管面只有 `Deferred.await` 那一处的有界等待与具名失败(`codepuppy(ADR-038)` 标注块)。
+  ':(exclude)packages/core/src/permission.ts'
+  # #1563 / #1565 / #1572 / ADR-041(#1662 裁决第 5 项):MCP 运行时没有插件挂点 —— 启动、重连、并发、连接前的随包声明、
+  # 失败归因都在 core 内部。v1 接管的是 packages/opencode/src/mcp/index.ts,这是同一权威换接法。规则本体在 Code Puppy
+  # 自有的 codepuppy-startup.ts / codepuppy-first-party-mcp.ts;三个上游文件只在 `codepuppy(...)` 标注处调用它们。
+  # 判据 packages/core/test/codepuppy-mcp-runtime.test.ts。
+  ':(exclude)packages/core/src/mcp/client.ts'
+  ':(exclude)packages/core/src/mcp/connection.ts'
+  ':(exclude)packages/core/src/mcp/index.ts'
+  # #1572 settle(#1666 裁决 6737930969、6756103246 第 2 项 (b)):模型请求的网络失败在 toSessionError 结算,插件到不了 ——
+  # `session.hook.retry` 的 `error` 是只读的。接管面只有 Transport 分支(`codepuppy(#1572)` 标注块):调 Code Puppy 自有的
+  # 分类器,把层作为登记码前缀写进 message(packages/schema/src/codepuppy-net-failure.ts)。上游
+  # session-runner-retry.test.ts 那条 toSessionError 断言写的正是被替换的旧文本,随源文件成对接管(先例:oauth 的 page.ts 与它的测试)。
+  # 判据 packages/core/test/codepuppy-net-failure-settle.test.ts。
+  ':(exclude)packages/core/src/session/to-session-error.ts'
+  ':(exclude)packages/core/test/session-runner-retry.test.ts'
+  # ADR-041 决策 2(#1666 裁决 6756103246 第 4 项):MCP 工具与内置工具撞有效名时拒掉 MCP 那一个,不许后写覆盖。McpTool 的注册
+  # 走上游工具注册表的后写覆盖,没有插件挂点;接管面只有注册循环的 `codepuppy(ADR-041)` 标注块。
+  # 判据 packages/core/test/codepuppy-mcp-tool-collision.test.ts。
+  ':(exclude)packages/core/src/tool/mcp.ts'
+  # #1560(#1666 裁决 6737930969):用户为会话选定的模型优先于命令和命令 agent 推荐的模型。命令在执行体里自己 switchModel、
+  # 自己给子任务子会话定模型,没有插件挂点;接管面是两处 `codepuppy(#1560)` 标注,外加 #1129 E6(#1666 Unit E):子任务命令
+  # 建子会话前走 subagent 工具的权限路径(`codepuppy(#1129 E6)` 标注),由扩展策略追加的 deny 规则决定。
+  # 判据 packages/core/test/codepuppy-command-model-priority.test.ts。
+  ':(exclude)packages/core/src/config/plugin/command.ts'
+  # 界面与当前正式版一致(#1666 Unit F;owner 2026-11-12 经编排器转达:「同意，多接管两个上游文件，需要再唯一权威中记录多接管的内容。」):审阅面板要显示引擎以 synthetic
+  # 消息开启的回合(后台子任务空闲后完成)的改动;SessionDiff.turn 只认 user 锚点,插件改不了。接管面三处 `codepuppy(UI parity)` 标注。
+  # 判据 packages/core/test/codepuppy-session-diff-synthetic.test.ts。
+  ':(exclude)packages/core/src/session/diff.ts'
+  # 界面与当前正式版一致(#1666 Unit F;owner 2026-11-12 经编排器转达:「同意，多接管两个上游文件，需要再唯一权威中记录多接管的内容。」):文件面板要收到整个项目的文件
+  # 变化(0.1.26 在主进程打开 OPENCODE_EXPERIMENTAL_FILEWATCHER 时监视整个项目);2.x 的 LocationWatcher 只监视分支文件,没有插件挂点。
+  # 接管面只在 `codepuppy(UI parity)` 标注块,开关与忽略表在自有的 codepuppy-project-watch.ts。判据 packages/core/test/codepuppy-project-watch.test.ts。
+  ':(exclude)packages/core/src/filesystem/location-watcher.ts'
 )
 
 # ── UPSTREAM_PATHS 里住着的 Code Puppy 自有文件:结构性谓词,不是逐文件清单(`#1085` / ADR-043)──
@@ -199,7 +218,8 @@ if [ "$GUARD_MODE" = print-jurisdiction ]; then
   exit 0
 fi
 if [ "$GUARD_MODE" = print-takeover ]; then
-  for spec in "${UPSTREAM_EXCLUDES[@]}"; do
+  # `#1662` F10:清单可以为空;macOS 的 bash 3.2 在 `set -u` 下展开空数组报 unbound,用 `${a[@]+…}` 形式。
+  for spec in ${UPSTREAM_EXCLUDES[@]+"${UPSTREAM_EXCLUDES[@]}"}; do
     printf '%s\n' "${spec#:(exclude)}"
   done
   exit 0
@@ -356,13 +376,13 @@ fi
 # 照样冲突)。关掉改名检测后,同一次改名回到 `D`(旧路径)+ `A`(新路径):`D` 落进 DMR 被点名,
 # 点的还正好是真正受害的那条路径。north-star-guard.test.ts 里有一条专钉这个形状。
 if [ -n "$upstream_parent" ]; then
-  if ! committed="$(git diff --no-renames --name-only "$upstream_parent" HEAD -- $UPSTREAM_PATHS "${UPSTREAM_EXCLUDES[@]}" "${CARVEOUT_PATHSPECS[@]}")"; then
+  if ! committed="$(git diff --no-renames --name-only "$upstream_parent" HEAD -- $UPSTREAM_PATHS ${UPSTREAM_EXCLUDES[@]+"${UPSTREAM_EXCLUDES[@]}"} "${CARVEOUT_PATHSPECS[@]}")"; then
     echo "    ✗ 算不出与上游父 ${upstream_parent} 的树差 —— 本次守卫作废(不是通过)。"; exit 1
   fi
-elif ! committed="$(git diff --no-renames --diff-filter=DMR --name-only origin/alpha...HEAD -- $UPSTREAM_PATHS "${UPSTREAM_EXCLUDES[@]}" "${CARVEOUT_PATHSPECS[@]}")"; then
+elif ! committed="$(git diff --no-renames --diff-filter=DMR --name-only origin/alpha...HEAD -- $UPSTREAM_PATHS ${UPSTREAM_EXCLUDES[@]+"${UPSTREAM_EXCLUDES[@]}"} "${CARVEOUT_PATHSPECS[@]}")"; then
   echo "    ✗ 算不出与 origin/alpha 的提交差 —— 本次守卫作废(不是通过)。"; exit 1
 fi
-if ! worktree="$(git diff --no-renames --diff-filter=DMR --name-only HEAD -- $UPSTREAM_PATHS "${UPSTREAM_EXCLUDES[@]}" "${CARVEOUT_PATHSPECS[@]}")"; then
+if ! worktree="$(git diff --no-renames --diff-filter=DMR --name-only HEAD -- $UPSTREAM_PATHS ${UPSTREAM_EXCLUDES[@]+"${UPSTREAM_EXCLUDES[@]}"} "${CARVEOUT_PATHSPECS[@]}")"; then
   echo "    ✗ 算不出工作树差 —— 本次守卫作废(不是通过)。"; exit 1
 fi
 changed="$(printf '%s\n%s\n' "$committed" "$worktree" | sed '/^$/d' | sort -u)"

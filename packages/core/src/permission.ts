@@ -13,6 +13,8 @@ import { SessionStore } from "./session/store.js"
 import { Wildcard } from "./util/wildcard.js"
 import { PermissionSaved } from "./permission/saved.js"
 import { PluginHooks } from "./plugin/hooks.js"
+// codepuppy(ADR-038, #668): the deadline failure ends the step and shows its own message, as a question dismissal does.
+import { QuestionTool } from "./tool/plugin/question.js"
 
 const PermissionEffect = Permission.Effect
 export { PermissionEffect as Effect }
@@ -90,6 +92,46 @@ export class NotFoundError extends Schema.TaggedError<NotFoundError>()("Permissi
 }) {}
 
 export type Error = BlockedError | CorrectedError
+
+// codepuppy(ADR-038, #668) ── an approval request nobody answers fails by name after a deadline; it never allows.
+// 300 s by default; CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS (a positive integer of milliseconds) overrides it, and any
+// other value falls back to the default — never to "no deadline". Read on every request.
+export const ASK_TIMEOUT_MS_DEFAULT = 300_000
+
+export function askTimeoutMs(env: Record<string, string | undefined> = process.env): number {
+  const raw = env["CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS"]
+  if (raw === undefined || raw === "") return ASK_TIMEOUT_MS_DEFAULT
+  const parsed = Number(raw)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : ASK_TIMEOUT_MS_DEFAULT
+}
+
+type UnansweredInput = { action: string; resources: ReadonlyArray<string>; timeoutMs: number }
+let unansweredClass: (new (input: UnansweredInput) => QuestionTool.CancelledError) | undefined
+
+/**
+ * The named deadline failure. It extends the question tool's dismissal so the session runner ends the step and
+ * writes this message on the tool call (`session/runner/step.ts` passes a dismissal's message through; a plain
+ * decline would read "The user declined this tool call", which is not what happened). Created on first use: the
+ * question module imports this one, so its class is only touched at call time.
+ */
+export function unansweredError(input: UnansweredInput): QuestionTool.CancelledError {
+  unansweredClass ??= class UnansweredError extends QuestionTool.CancelledError {
+    readonly unanswered = true as const
+    readonly detail: string
+    constructor(value: UnansweredInput) {
+      super()
+      this.detail =
+        `This approval request waited ${Math.round(value.timeoutMs / 1000)} s with no answer and was closed: ` +
+        `the action was NOT allowed (${value.action} ${JSON.stringify(value.resources)}). ` +
+        `Usually the session with the approval card was not open. Open that session and retry the action.`
+    }
+    override get message() {
+      return this.detail
+    }
+  }
+  return new unansweredClass(input)
+}
+// codepuppy(ADR-038) ── end
 
 export function evaluate(action: string, resource: string, ...rulesets: Permission.Ruleset[]): Permission.Rule {
   return (
@@ -269,7 +311,27 @@ const layer = Layer.effect(
             }
             if (result.effect === "allow") return
             const item = yield* create(request(input, result.message), input.agent)
-            return yield* restore(Deferred.await(item.deferred)).pipe(
+            // codepuppy(ADR-038): bounded wait; at the deadline only this request ends (no cascade), its card is
+            // retracted with a replied event, and the call fails by name.
+            const timeoutMs = askTimeoutMs()
+            const bounded = Deferred.await(item.deferred).pipe(
+              Effect.timeoutOrElse({
+                duration: timeoutMs,
+                orElse: () =>
+                  Effect.gen(function* () {
+                    if (!pending.delete(item.request.id)) return yield* Deferred.await(item.deferred)
+                    yield* bus.publish(Permission.Event.Replied, {
+                      sessionID: item.request.sessionID,
+                      requestID: item.request.id,
+                      reply: "reject",
+                    })
+                    return yield* Effect.die(
+                      unansweredError({ action: item.request.action, resources: item.request.resources, timeoutMs }),
+                    )
+                  }),
+              }),
+            )
+            return yield* restore(bounded).pipe(
               // Deliberate defect tunnel: leaves wrap execution in blanket `mapError`, which
               // must not convert a user's decline into model-facing tool output. The decline
               // resurfaces as a typed failure at SessionModelRequest.executeTool. A decline

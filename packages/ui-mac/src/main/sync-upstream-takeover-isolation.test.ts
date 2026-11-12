@@ -16,7 +16,7 @@
 //     一步失败即停 —— 与 Actions 的默认 `success()` 语义一致,于是「不出推送包」由真的
 //     `Build sync bundle artifact` 那一步有没有产出 `sync-artifact/` 来判。
 //   · **清单来自生产守卫本体**:夹具 alpha 树里放的是本仓 `scripts/north-star-guard.sh` 的原样副本,
-//     接管文件取清单里的真条目 `packages/core/src/permission.ts`(`#1664` 起是过渡清单的 15 条之一;上面那次
+//     接管文件取清单里的真条目 `packages/core/src/oauth/page.ts`(`#1662` 最终清单的两条之一;上面那次
 //     静默混入的 `session/llm/request.ts` 随 v1 引擎删除,已出清单)。
 //   · **先证明手段测得出已知的坏**:删掉 intake 步 ⇒ 无冲突那例被合并步静默合入;移植改用 squash ⇒
 //     下一次同步再次命中同一批路径;intake 改成执行工作树里的守卫 ⇒ 上游树里的脚本被执行。
@@ -46,8 +46,8 @@ const FULL = [INTAKE, MERGE, POST, BUNDLE]
 const REVIEW_TITLE = "::error title=takeover upgrade review required::"
 const UNREGISTERED = "未登记的偏离:按 ADR-029 登记或还原"
 
-/** 接管清单里的真条目(`#1664` 过渡清单:换代前 49 条里在 OpenCode 2 仍存在的 15 条之一)。 */
-const TAKEOVER = "packages/core/src/permission.ts"
+/** 接管清单里的真条目(`#1662` 最终清单:ADR-042 的 OAuth 回调页)。 */
+const TAKEOVER = "packages/core/src/oauth/page.ts"
 const ENGINE = "packages/opencode/src/engine.ts"
 
 const GIT_ENV = {
@@ -133,7 +133,7 @@ type Fixture = { repo: string; work: string; oldDev: string; newDev: string; old
  * 改过的接管文件;dev 前进一步。结束时工作树停在 dev —— 与生产里 intake 运行时一致
  * (上一步 `Fast-forward dev` 刚 checkout 了它)。
  */
-function fixture(shape: Shape, opts: { evilGuardInDev?: boolean } = {}): Fixture {
+function fixture(shape: Shape, opts: { evilGuardInDev?: boolean; guard?: (source: string) => string } = {}): Fixture {
   const work = mkdtempSync(join(tmpdir(), "codepuppy-sync-takeover-"))
   const repo = join(work, "repo")
   mkdirSync(repo, { recursive: true })
@@ -171,6 +171,7 @@ function fixture(shape: Shape, opts: { evilGuardInDev?: boolean } = {}): Fixture
   // 生产守卫的原样副本 —— 接管清单只有它一份。
   mkdirSync(join(repo, "scripts"), { recursive: true })
   copyFileSync(GUARD, join(repo, "scripts/north-star-guard.sh"))
+  if (opts.guard) write(repo, "scripts/north-star-guard.sh", opts.guard(readFileSync(GUARD, "utf8")))
   write(repo, TAKEOVER, takeoverBody(CODEPUPPY_EDIT))
   if (shape === "unregistered") write(repo, ENGINE, "export const engine = 2 // alpha\n")
   const oldAlpha = commitAll(repo, "alpha: SOT + takeover")
@@ -416,5 +417,46 @@ describe("#1566 AC5 候选 job 不持有推送凭据;新步骤只执行 alpha �
     const fx3 = fixture("takeover-clean", { evilGuardInDev: true })
     runSteps(fx3, [INTAKE], { [INTAKE]: src.replace(fromTree, "cat scripts/north-star-guard.sh") })
     expect(canary(fx3), "变异臂没执行到工作树脚本 —— 这条判据测不出已知的坏").toBe(true)
+  })
+})
+
+// ── `#1662` F10:最终清单可以为空;空清单与「守卫没给出结果」必须分得开 ─────────────────────────────
+
+/** 守卫复制品:接管数组清空(合法的空清单)。 */
+const emptyList = (source: string) => {
+  const start = source.indexOf("UPSTREAM_EXCLUDES=(\n")
+  const end = source.indexOf("\n)\n", start) + 3
+  if (start < 0 || end < 3) throw new Error("守卫里找不到 UPSTREAM_EXCLUDES 数组 —— 本次测量作废")
+  return `${source.slice(0, start)}UPSTREAM_EXCLUDES=(\n)\n${source.slice(end)}`
+}
+
+describe("#1662 F10 空接管清单照常同步;守卫读不出条数才中止", () => {
+  test("清单为空(UPSTREAM_EXCLUDES_COUNT=0)⇒ intake 与合并后核对都放行,照常合并、出推送包", () => {
+    const fx = fixture("plain", { guard: emptyList })
+    const run = runSteps(fx, FULL)
+    expect(run.failedAt, `空清单不该让同步失败:\n${run.output}`).toBeNull()
+    expect(run.output).toContain("Takeover list is empty (UPSTREAM_EXCLUDES_COUNT=0)")
+    expect(bundleProduced(fx)).toBe(true)
+  })
+
+  test("变异臂:intake 退回旧写法(空输出即 exit 1)⇒ 同一个空清单让同步失败", () => {
+    const fx = fixture("plain", { guard: emptyList })
+    const legacy = stepBody(INTAKE).replace(
+      /# #1662 F10[\s\S]*?MB="\$\(git merge-base/,
+      'takeover="$(bash "$guard" --print-takeover)"\nif [ -z "$takeover" ]; then echo "::error::接管清单为空"; exit 1; fi\npaths=()\nwhile IFS= read -r p; do paths+=("$p"); done <<< "$takeover"\nMB="$(git merge-base',
+    )
+    expect(legacy, "变异没落上 —— 本次测量作废").not.toBe(stepBody(INTAKE))
+    const run = runSteps(fx, FULL, { [INTAKE]: legacy })
+    expect(run.failedAt).toBe(INTAKE)
+  })
+
+  test("守卫不报条数(没跑出结果)⇒ intake 以「没有给出接管清单条数」中止,不出推送包", () => {
+    const fx = fixture("plain", {
+      guard: (source) => source.replace(/^\s*printf 'UPSTREAM_EXCLUDES_COUNT\\t%s\\n'.*$/m, "  :"),
+    })
+    const run = runSteps(fx, FULL)
+    expect(run.failedAt).toBe(INTAKE)
+    expect(run.output).toContain("守卫没有给出接管清单条数")
+    expect(bundleProduced(fx)).toBe(false)
   })
 })

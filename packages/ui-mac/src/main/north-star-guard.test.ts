@@ -87,8 +87,8 @@ function daysAgo(days: number): string {
 
 /** 上游包(真实 UPSTREAM_PATHS 之一)下的一个普通文件 —— 不在 ADR-033 白名单里。 */
 const UPSTREAM_FILE = "packages/core/src/upstream-leaf.ts"
-/** ADR-033 §1 白名单里的被接管文件 —— 改它是**有意的收编**,守卫必须放行。 */
-const TAKEN_OVER_FILE = "packages/core/src/permission.ts"
+/** 接管清单里的被接管文件(`#1662` 最终清单:ADR-042 的 OAuth 回调页)—— 改它是**有意的收编**,守卫必须放行。 */
+const TAKEN_OVER_FILE = "packages/core/src/oauth/page.ts"
 /** alpha 自有包 —— 守卫的范围之外。 */
 const CODEPUPPY_FILE = "packages/ui-mac/src/main/codepuppy-owned.ts"
 /**
@@ -781,8 +781,10 @@ describe("#1566 --print-takeover:接管清单只有守卫这一份", () => {
   test("逐行打印 UPSTREAM_EXCLUDES 的路径(去掉 :(exclude) 前缀),与数组逐条相同", () => {
     const printed = printTakeover()
     const expected = excludesFromSource(readFileSync(GUARD, "utf8"))
-    // `#1664`:过渡清单 15 条(换代前 49 条里在 OpenCode 2 仍存在的),下限随数据从 20 改到 10 —— 它只防解析退化。
-    expect(expected.length, "白名单解析退化 —— 本次测量作废").toBeGreaterThanOrEqual(10)
+    // `#1662` 最终清单可以很短、将来甚至为空(F10),所以不再用条数下限防解析退化,改用两种独立读法互相核对:
+    // 数组块的正则解析,与逐行数 `  ':(exclude)` 开头的行。
+    const lines = readFileSync(GUARD, "utf8").split("\n").filter((line) => /^\s+':\(exclude\)/.test(line)).length
+    expect(expected.length, "白名单解析退化 —— 本次测量作废").toBe(lines)
     expect(printed).toEqual(expected)
     expect(printed.filter((p) => p.startsWith(":(")), "输出里残留 pathspec 前缀").toEqual([])
   })

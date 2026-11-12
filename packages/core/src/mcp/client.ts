@@ -31,6 +31,8 @@ import { ConfigMCP } from "@opencode/schema/config/mcp"
 import type { Session } from "@opencode/schema/session"
 import { isRecord } from "@opencode/util/record"
 import { McpStdio } from "./stdio.js"
+import { classifyStartFailure } from "./codepuppy-startup.js" // codepuppy(#1563)
+import { isCodepuppyFailureCode } from "@opencode/schema/codepuppy-net-failure" // codepuppy(#1564)
 
 const DEFAULT_STARTUP_TIMEOUT = 30_000
 const DEFAULT_CATALOG_TIMEOUT = 30_000
@@ -52,6 +54,22 @@ const describe = (error: unknown) => {
         : undefined
   return detail && !error.message.includes(detail) ? `${error.message} (${detail})` : error.message
 }
+
+// codepuppy(#1645) ── what logs and a failed status may say about a failure (v1 kept the typed code only): an HTTP
+// failure is its status, a local server that exited is its exit, never the remote body or the server's stderr tail
+// (packages/core/src/mcp/stdio.ts appends it). Errors the client wrapped keep the SDK error as their cause.
+const STDIO_EXIT = /^MCP server process exited(?: with code -?\d+)?/
+export function safeDescription(error: unknown): string {
+  const source =
+    error instanceof Error && !(error instanceof SdkError) && !(error instanceof SdkHttpError) && error.cause instanceof Error
+      ? error.cause
+      : error
+  if (source instanceof SdkHttpError) return `HTTP ${source.status}`
+  const exit = source instanceof Error ? STDIO_EXIT.exec(source.message) : null
+  if (exit) return exit[0]
+  return describe(source)
+}
+// codepuppy(#1645) ── end
 
 // Overloaded or restarting servers and dropped connections usually recover within a second.
 // Fetch reports network failures as a TypeError carrying a system error code.
@@ -91,6 +109,9 @@ export class ConnectError extends Schema.TaggedError<ConnectError>()("MCP.Connec
   message: Schema.String,
   /** The server was reached but refused or broke the handshake, so different connect options might succeed. */
   answered: Schema.optional(Schema.Boolean),
+  // codepuppy(#1563): the named cause (codepuppy-startup.ts) and whether a background reconnect may change it.
+  code: Schema.optional(Schema.declare(isCodepuppyFailureCode)),
+  reconnect: Schema.optional(Schema.Boolean),
 }) {}
 
 /** A legacy Streamable HTTP server no longer recognizes this connection's session; the lifecycle reconnects. */
@@ -233,6 +254,11 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
     error instanceof SdkError && error.code === SdkErrorCode.ConnectionClosed && lastError
       ? `${describe(error)}: ${lastError}`
       : describe(error)
+  // codepuppy(#1645): the same, for what reaches a log or the failed status (lastError is already body-free).
+  const safeExplain = (error: unknown) =>
+    error instanceof SdkError && error.code === SdkErrorCode.ConnectionClosed && lastError
+      ? `${describe(error)}: ${lastError}`
+      : safeDescription(error)
 
   // Two more attempts, 250 ms and 1 s later, while the failure is transient and the deadline has not passed.
   const retrying = <A, E>(what: string, effect: Effect.Effect<A, E>, deadline = Infinity) =>
@@ -243,7 +269,7 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
         Schedule.while(({ input, now, duration }) =>
           !isTransient(input) || now + Duration.toMillis(duration) >= deadline
             ? Effect.succeed(false)
-            : Effect.logWarning(`retrying ${what}`, { server, error: describe(input) }).pipe(Effect.as(true)),
+            : Effect.logWarning(`retrying ${what}`, { server, error: safeDescription(input) }).pipe(Effect.as(true)), // codepuppy(#1645)
         ),
       ),
     )
@@ -271,7 +297,7 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
     // Background work such as the standalone SSE stream reports failures only here; aborts come from close.
     client.onerror = (error) => {
       if (error.name === "AbortError") return
-      lastError = describe(error)
+      lastError = safeDescription(error) // codepuppy(#1645)
       runFork(Effect.logWarning("mcp transport error", { server, error: lastError }))
     }
     if (options.roots !== false)
@@ -308,13 +334,14 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
   const failure = (error: unknown) => {
     // A tool call that relists first can fail with the list's already mapped expiry.
     if (error instanceof SessionExpiredError) return error
-    if (!(error instanceof SdkHttpError) || session.transport?.sessionId === undefined) return new Error(explain(error))
+    // codepuppy(#1645): the SDK error stays the cause, so a failed listing is named with its HTTP status (startFailure).
+    if (!(error instanceof SdkHttpError) || session.transport?.sessionId === undefined) return new Error(explain(error), { cause: error })
     const expired =
       error.status === 404 ||
       (error.status === 400 &&
         typeof error.data.text === "string" &&
         error.data.text.includes("Bad Request: Server not initialized"))
-    if (!expired) return new Error(explain(error))
+    if (!expired) return new Error(explain(error), { cause: error }) // codepuppy(#1645)
     if (!session.reported) {
       session.reported = true
       session.expired?.()
@@ -385,7 +412,7 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
               orElse: () => Effect.fail(new Error(`Timed out after ${TERMINATE_TIMEOUT}ms`)),
             }),
             Effect.tapError((error) =>
-              Effect.logWarning("failed to terminate MCP session", { server, error: error.message }),
+              Effect.logWarning("failed to terminate MCP session", { server, error: safeDescription(error) }), // codepuppy(#1645)
             ),
             Effect.ignore,
           )
@@ -397,13 +424,13 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
     const execution = timeout?.execution ?? DEFAULT_EXECUTION_TIMEOUT
     const request = <A>(what: string, run: (signal: AbortSignal) => Promise<A>) =>
       Effect.tryPromise({ try: run, catch: failure }).pipe(
-        Effect.tapError((error) => Effect.logWarning(`failed to ${what}`, { server, error: error.message })),
+        Effect.tapError((error) => Effect.logWarning(`failed to ${what}`, { server, error: safeDescription(error) })), // codepuppy(#1645)
       )
     // Listing is read-only, so a transient failure is safe to retry.
     const list = <A>(what: string, run: (signal: AbortSignal) => Promise<A>) =>
       retrying(what, Effect.tryPromise({ try: run, catch: (error) => error })).pipe(
         Effect.mapError(failure),
-        Effect.tapError((error) => Effect.logWarning(`failed to ${what}`, { server, error: error.message })),
+        Effect.tapError((error) => Effect.logWarning(`failed to ${what}`, { server, error: safeDescription(error) })), // codepuppy(#1645)
       )
     // The SDK answers a list for an unadvertised capability with a console.debug line plus an empty
     // result, so refreshing a tools-only server prints to stdout on every catalog load. Negotiate
@@ -539,7 +566,7 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
             () => connection.tools().pipe(Effect.andThen(call)),
           ),
           Effect.mapError(failure),
-          Effect.tapError((error) => Effect.logWarning("failed to call MCP tool", { server, error: error.message })),
+          Effect.tapError((error) => Effect.logWarning("failed to call MCP tool", { server, error: safeDescription(error) })), // codepuppy(#1645)
           Effect.map(toCallToolResult),
         )
       },
@@ -568,9 +595,28 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
     return yield* new ConnectError({
       server,
       message: `${error.message}; the server supports ${error.supported.join(", ")}. Set "protocol" for this server to one of those or to "legacy".`,
+      code: "protocol", // codepuppy(#1563)
+      reconnect: false,
     })
-  return yield* new ConnectError({ server, message: explain(error), answered: !repeats(error) })
+  return yield* new ConnectError({
+    server,
+    message: safeExplain(error), // codepuppy(#1645): body-free, it becomes the failed status
+    answered: !repeats(error),
+    ...startFailure(error, options.config), // codepuppy(#1563)
+  })
 })
+
+// codepuppy(#1563, #1645) ── the SDK-specific facts the Code Puppy classifier cannot see on its own. Also names a failed
+// listing (connection.ts), whose SDK error arrives as the cause of the client's own Error.
+export function startFailure(error: unknown, config: { readonly type: string; readonly url?: string }) {
+  const listed = !(error instanceof SdkError) && error instanceof Error && (error.cause instanceof SdkError || error.cause instanceof SdkHttpError) ? error.cause : error
+  const cause = listed instanceof SdkError && listed.code === SdkErrorCode.EraNegotiationFailed && listed.cause !== undefined ? listed.cause : listed
+  return classifyStartFailure(cause, config, {
+    timedOut: cause instanceof SdkError && cause.code === SdkErrorCode.RequestTimeout,
+    httpStatus: cause instanceof SdkHttpError ? cause.status : undefined,
+  })
+}
+// codepuppy(#1563) ── end
 
 // Connecting again would fail the same way: the server could not be spawned or reached, did not answer in
 // time, is overloaded or down for now, or refused this client's access. A failed auto probe wraps the error it hit.

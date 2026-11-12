@@ -37,6 +37,13 @@ import { State } from "../state.js"
 import type { McpClient } from "./client.js"
 import { McpConnection } from "./connection.js"
 import { McpPool } from "./pool.js"
+// codepuppy(#1563, #1564, #1565, ADR-041) ── Code Puppy's startup rules, named causes, bundled declarations, refused name collisions.
+import { readFileSync } from "node:fs"
+import { withFailureCode } from "@opencode/schema/codepuppy-net-failure"
+import { declaredListedTools, listsDeclaration, sameTool, type DeclaredTool } from "./codepuppy-first-party-mcp.js"
+import { reconnectDelay, type StartFailure } from "./codepuppy-startup.js"
+import { effectiveName, normalizedName } from "../tool/runtime.js"
+// codepuppy ── end
 
 export const ServerName = Schema.String.pipe(Schema.brand("MCP.ServerName"))
 export type ServerName = typeof ServerName.Type
@@ -106,6 +113,15 @@ type ServerEntry = {
   // Set when a remote server is registered as an OAuth integration; the credential lives in the global store.
   integrationID?: Integration.ID
   registration?: State.Registration
+  // codepuppy(#1563): why the last attempt failed, and consecutive failures for the background reconnect backoff.
+  cause?: StartFailure
+  failures?: number
+  // codepuppy(#1563 AC3, review R1 #6): bumped on every settled attempt; a reconnect timer runs only for its own.
+  generation?: number
+  // codepuppy(#1565): the bundled declaration offered while the server starts, until a connection contradicts it.
+  readonly declared?: ReadonlyArray<DeclaredTool>
+  refuted?: boolean
+  declaredTools?: ReadonlyArray<Tool>
 }
 
 // A client-hosted MCP server attached over a connection the client opened. Internal: never listed,
@@ -383,6 +399,27 @@ export const layer = (options?: Options) =>
           }),
       }
 
+      // codepuppy(#1563 AC3) ── a failed remote server reconnects in the background: 30 s, doubling, capped at 10 min.
+      // Runs only if the entry is still the live one and still failed when its turn comes.
+      const scheduleReconnect = (name: ServerName, entry: ServerEntry) => {
+        entry.failures = (entry.failures ?? 0) + 1
+        const generation = entry.generation
+        fork(
+          Effect.sleep(reconnectDelay(entry.failures)).pipe(
+            Effect.andThen(
+              Effect.gen(function* () {
+                if (entries.get(name) !== entry || entry.status.status !== "failed" || entry.config.disabled) return
+                // A later attempt (a manual reconnect, a credential switch) settled since: its own outcome decides.
+                if (entry.generation !== generation || !entry.cause?.reconnect) return
+                yield* entry.connection.stop
+                yield* entry.connection.start
+              }).pipe(locks.withLock(name)),
+            ),
+          ),
+        )
+      }
+      // codepuppy ── end
+
       const makeEntry = (name: ServerName, config: Mcp.ServerConfig, started: number): ServerEntry => {
         // Local servers run on this Location's execution plane, so only Locations on the host share them.
         const pooled =
@@ -410,6 +447,7 @@ export const layer = (options?: Options) =>
           })
         const entry: ServerEntry = {
           config,
+          declared: declaredListedTools(name, config, process.env, readFileSync), // codepuppy(#1565)
           status: { status: "pending" },
           startup: Latch.makeUnsafe(),
           attempt: { started, settled: Latch.makeUnsafe() },
@@ -441,6 +479,12 @@ export const layer = (options?: Options) =>
               }),
               connected: Effect.gen(function* () {
                 entry.status = { status: "connected" }
+                // codepuppy(#1563 AC3, #1565): a success resets the backoff; a listing other than the declaration refutes it.
+                entry.generation = (entry.generation ?? 0) + 1
+                entry.failures = 0
+                entry.cause = undefined
+                if (entry.declared && !entry.refuted && !listsDeclaration(entry.declared, entry.connection.tools ?? []))
+                  entry.refuted = true
                 yield* Effect.logInfo("mcp connected", { server: name, tools: entry.connection.tools?.length })
                 // Announce every list a consumer may read, since each reads them only on these events. A
                 // connection another Location already holds has loaded its prompts, and no later change
@@ -450,11 +494,16 @@ export const layer = (options?: Options) =>
                 yield* bus.publish(PromptsChanged, { server: name })
                 yield* bus.publish(McpEvent.StatusChanged, { server: name })
               }),
-              failed: (failure) =>
+              failed: (failure, _answered, cause) =>
                 Effect.gen(function* () {
-                  entry.status = failure
-                  yield* Effect.logWarning("mcp connect failed", { server: name, status: entry.status })
+                  // codepuppy(#1564): the failed status carries the named cause the desktop reads back (parseFailureCode).
+                  entry.status =
+                    failure.status === "failed" && cause ? { ...failure, error: withFailureCode(cause.code, failure.error) } : failure
+                  entry.cause = cause // codepuppy(#1563)
+                  entry.generation = (entry.generation ?? 0) + 1 // codepuppy(review R1 #6)
+                  yield* Effect.logWarning("mcp connect failed", { server: name, status: entry.status, code: cause?.code })
                   yield* bus.publish(McpEvent.StatusChanged, { server: name })
+                  if (failure.status === "failed" && cause?.reconnect) scheduleReconnect(name, entry) // codepuppy(#1563)
                 }),
               // Every start runs under the server lock, so the attempt read here is the one it began.
               settled: Effect.suspend(() => {
@@ -464,9 +513,14 @@ export const layer = (options?: Options) =>
               }),
               closed: (reason) =>
                 Effect.gen(function* () {
-                  entry.status = { status: "failed", error: reason }
+                  // codepuppy(#1563, #1564): a remote connection that drops reconnects in the background; a local process
+                  // does not. The failed status carries that cause for the desktop.
+                  entry.cause = { code: entry.config.type === "remote" ? "transport" : "spawn_failed", reconnect: entry.config.type === "remote" }
+                  entry.generation = (entry.generation ?? 0) + 1 // codepuppy(review R1 #6)
+                  entry.status = { status: "failed", error: withFailureCode(entry.cause.code, reason) }
                   yield* entry.connection.stop
                   yield* bus.publish(McpEvent.StatusChanged, { server: name })
+                  if (entry.cause.reconnect) scheduleReconnect(name, entry)
                 }),
               changed: (kind) => bus.publish(changes[kind], { server: name }),
             },
@@ -475,11 +529,28 @@ export const layer = (options?: Options) =>
         return entry
       }
 
+      // codepuppy(#1565) ── while a first-party server starts, its bundled declaration stands in for its listing.
+      const declaredFor = (name: ServerName, entry: ServerEntry): ReadonlyArray<Tool> => {
+        if (!entry.declared || entry.refuted || entry.status.status !== "pending") return []
+        entry.declaredTools ??= entry.declared.map((tool): Tool => ({ ...tool, server: name, codemode: entry.config.codemode }))
+        return entry.declaredTools
+      }
+      // codepuppy(ADR-041) ── two MCP tools that would share an effective name are both refused, never last-wins.
+      const refuseCollisions = (tools: ReadonlyArray<Tool>) => {
+        const key = (tool: Tool) => effectiveName({ name: tool.name, options: { namespace: normalizedName({ name: tool.server }) } })
+        const groups = Map.groupBy(tools, key)
+        const refused = [...groups].filter(([, group]) => group.length > 1)
+        for (const [alias, group] of refused)
+          fork(Effect.logError("mcp tool name collision refused", { alias, tools: group.map((tool) => `${tool.server}/${tool.name}`) }))
+        return refused.length === 0 ? [...tools] : tools.filter((tool) => (groups.get(key(tool))?.length ?? 0) === 1)
+      }
+      // codepuppy ── end
+
       // MCP.tools() runs every step and the tool registry compares tools by identity, so tag the
       // connection's list once per listing instead of on every read.
       const serverTools = (name: ServerName, entry: ServerEntry) => {
         const source = entry.connection.tools
-        if (!source) return []
+        if (!source) return declaredFor(name, entry) // codepuppy(#1565)
         if (entry.tagged?.source !== source)
           entry.tagged = {
             source,
@@ -789,12 +860,12 @@ export const layer = (options?: Options) =>
           const clients = Array.from(attached.values()).flatMap((stack) => stack.at(-1)?.tools ?? [])
           // Match callTool: an attached client's tool shadows a configured server's tool of the same name.
           const shadowed = new Set(clients.map((tool) => `${tool.server}\0${tool.name}`))
-          return [
+          return refuseCollisions([
             ...Array.from(entries)
               .flatMap(([name, entry]) => serverTools(name, entry))
               .filter((tool) => !shadowed.has(`${tool.server}\0${tool.name}`)),
             ...clients,
-          ].toSorted((a, b) => a.server.localeCompare(b.server) || a.name.localeCompare(b.name))
+          ]).toSorted((a, b) => a.server.localeCompare(b.server) || a.name.localeCompare(b.name)) // codepuppy(ADR-041)
         }),
         awaitStartup: Effect.fn("MCP.awaitStartup")(function* () {
           const now = yield* Clock.currentTimeMillis
@@ -825,6 +896,14 @@ export const layer = (options?: Options) =>
           const client = attached.get(server)?.at(-1)
           if (client && (client.tools.some((tool) => tool.name === input.name) || !entries.has(server)))
             return yield* call(client.client).pipe(failed("client"))
+          // codepuppy(#1565): a call planned against the bundled declaration waits for this server's own attempt, and
+          // runs only if the connection lists the declared definition; otherwise it fails and the declaration is dropped.
+          const planned = entries.get(server)
+          const declared =
+            planned && !planned.refuted && planned.status.status === "pending"
+              ? planned.declared?.find((tool) => tool.name === input.name)
+              : undefined
+          if (declared && planned?.attempt) yield* planned.attempt.settled.await
           const target = yield* connected(server)
           if (!target.client)
             return yield* new ToolCallError({
@@ -832,7 +911,42 @@ export const layer = (options?: Options) =>
               tool: input.name,
               message: unavailable(server, target.entry.status),
             })
-          return yield* target.entry.connection.recovering(target.client, call).pipe(failed("server"))
+          if (declared) {
+            const live = target.entry.connection.tools?.find((tool) => tool.name === input.name)
+            if (!live || !sameTool(declared, live)) {
+              target.entry.refuted = true
+              yield* bus.publish(McpEvent.ToolsChanged, { server })
+              return yield* new ToolCallError({
+                server,
+                tool: input.name,
+                message: `MCP tool "${input.name}" on server "${server}" changed after it was offered from the bundled declaration; it was not run. Use the tool as the server now lists it.`,
+              })
+            }
+          }
+          // codepuppy(#1563 AC6) ── the retry after a recovered session (a new server generation) is sent only if the
+          // server still lists the definition the first send went out under; otherwise nothing more is sent.
+          const basis = target.entry.connection.tools?.find((tool) => tool.name === input.name)
+          const changed = new Error(
+            `MCP tool "${input.name}" on server "${server}" changed after this request was prepared; it was not run. Use the tool as the server now lists it.`,
+          )
+          let sends = 0
+          const send = (connection: McpClient.Connection) =>
+            Effect.suspend(() => {
+              sends += 1
+              if (sends === 1 || !basis) return call(connection)
+              const live = target.entry.connection.tools?.find((tool) => tool.name === input.name)
+              return live && sameTool(basis, live) ? call(connection) : Effect.fail(changed)
+            })
+          return yield* target.entry.connection.recovering(target.client, send).pipe(
+            Effect.mapError((error: Error) =>
+              error === changed ? new ToolCallError({ server, tool: input.name, message: changed.message }) : error,
+            ),
+            Effect.catchIf(
+              (error): error is Error => !(error instanceof ToolCallError),
+              (error) => failed("server")(Effect.fail(error)),
+            ),
+          )
+          // codepuppy ── end
         }),
         instructions: Effect.fn("MCP.instructions")(function* () {
           return Array.from(entries)

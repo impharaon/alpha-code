@@ -2,7 +2,7 @@ export * as McpTool from "./mcp.js"
 
 import { ToolFailure } from "@opencode/ai/effect"
 import { McpEvent } from "@opencode/schema/mcp-event"
-import { Context, Effect, Fiber, type JsonSchema, Layer, Option, PubSub, Schema, Semaphore, Stream } from "effect"
+import { Context, Effect, Fiber, FiberSet, type JsonSchema, Layer, Option, PubSub, Schema, Semaphore, Stream } from "effect"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { extension } from "mime-types"
 import { Bus } from "../bus.js"
@@ -14,6 +14,7 @@ import { Tool } from "../tool.js"
 import { ToolOutput } from "../tool-output.js"
 import { ReadToolFileSystem } from "./read-filesystem.js"
 import { effectiveName, normalizedName } from "./runtime.js"
+import { sameTool } from "../mcp/codepuppy-first-party-mcp.js" // codepuppy(#1563 AC6)
 
 const decodeJson = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))
 
@@ -44,6 +45,7 @@ export const layer = Layer.effect(
     const toolOutput = yield* ToolOutput.Service
     const lock = Semaphore.makeUnsafe(1)
     let discovered: Mcp.Tool[] = []
+    const fork = yield* FiberSet.makeRuntime<never, void, never>() // codepuppy(ADR-041)
 
     // Register once after initial discovery; only subsequent updates need a debounced reload.
     const initial = yield* lock
@@ -52,6 +54,13 @@ export const layer = Layer.effect(
           discovered = yield* mcp.tools()
           yield* tools.transform((editor) => {
             for (const tool of discovered) {
+              // codepuppy(ADR-041) ── an MCP tool whose effective name an earlier registration (a builtin) already holds is
+              // refused, never last-wins: the call keeps running what the name meant before the server listed its tool.
+              if (editor.get(name(tool.server, tool.name)) !== undefined) {
+                fork(Effect.logError("mcp tool name collision refused", { alias: name(tool.server, tool.name), tool: `${tool.server}/${tool.name}` }))
+                continue
+              }
+              // codepuppy ── end
               editor.add({
                 name: tool.name,
                 options: { namespace: namespace(tool.server), codemode: tool.codemode !== false },
@@ -67,6 +76,16 @@ export const layer = Layer.effect(
                       metadata: { input: input ?? {} },
                       ...Permission.invocation(context),
                     })
+                    // codepuppy(#1563 AC6) ── checked after the approval wait, right before the send: a call planned against
+                    // this definition goes out only if the server still lists the same one; after a server generation
+                    // changed the tool it fails by name instead of sending arguments shaped for the old schema (as #1565
+                    // does for a bundled declaration; the retry after a recovered session is checked in mcp/index.ts).
+                    const live = (yield* mcp.tools()).find((item) => item.server === tool.server && item.name === tool.name)
+                    if (live && !sameTool(tool, live))
+                      return yield* new ToolFailure({
+                        message: `MCP tool "${tool.name}" on server "${tool.server}" changed after this request was prepared; it was not run. Use the tool as the server now lists it.`,
+                      })
+                    // codepuppy ── end
                     const result = yield* mcp
                       .callTool({
                         server: tool.server,

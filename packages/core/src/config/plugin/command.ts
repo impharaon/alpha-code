@@ -12,6 +12,7 @@ import { Config } from "../../config.js"
 import { Location } from "../../location.js"
 import { Session } from "../../session.js"
 import { SubagentJob } from "../../session/subagent-job.js"
+import { SubagentTool } from "../../tool/plugin/subagent.js" // codepuppy(#1129)
 import { ShellSelect } from "../../shell/select.js"
 import { FSUtil } from "@opencode/util/fs-util"
 import { ConfigMarkdown } from "../markdown.js"
@@ -73,11 +74,24 @@ export const Plugin = define({
                 if (subagent ?? commandAgent?.mode === "subagent") {
                   const parent = yield* sessions.get(input.sessionID)
                   const selected = yield* agents.select(agent ?? parent.agent)
+                  // codepuppy(#1129 E6) ── a subtask command is a delegation without a tool call, so it takes the subagent
+                  // tool's own permission path (tool/plugin/subagent.ts) before any child session exists: the extension's
+                  // policy decides it like the tool's call (deny, or ask with its identity envelope), no second policy here.
+                  yield* ctx.permission.assert({
+                    sessionID: parent.id,
+                    agent: parent.agent,
+                    action: SubagentTool.name,
+                    resources: [selected.id],
+                    save: [selected.id],
+                    metadata: {},
+                  })
+                  // codepuppy ── end
                   const child = yield* sessions.create({
                     parentID: parent.id,
                     title: command.description ?? name,
                     agent: selected.id,
-                    model: model ?? selected.info?.model ?? parent.model,
+                    // codepuppy(#1560): the model the user picked for the parent session out-ranks the command's and its agent's.
+                    model: parent.model ?? model ?? selected.info?.model,
                   })
                   yield* sessions.prompt({
                     ...input.prompt,
@@ -96,11 +110,16 @@ export const Plugin = define({
                   yield* subagents.background(recovery)
                   return
                 }
-                if (agent !== undefined) {
+                // codepuppy(#1560) ── a model the user picked for this session (its `model`) out-ranks the command's and its
+                // agent's: the command switches the model only in a session that has none.
+                if (agent !== undefined || model !== undefined) {
                   const session = yield* ctx.session.get({ sessionID: input.sessionID })
-                  if (session.agent !== agent) yield* ctx.session.switchAgent({ sessionID: input.sessionID, agent })
+                  if (agent !== undefined && session.agent !== agent)
+                    yield* ctx.session.switchAgent({ sessionID: input.sessionID, agent })
+                  if (model !== undefined && session.model === undefined)
+                    yield* ctx.session.switchModel({ sessionID: input.sessionID, model })
                 }
-                if (model !== undefined) yield* ctx.session.switchModel({ sessionID: input.sessionID, model })
+                // codepuppy ── end
                 yield* ctx.session.prompt({
                   ...input.prompt,
                   sessionID: input.sessionID,

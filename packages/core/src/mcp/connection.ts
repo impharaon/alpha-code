@@ -7,6 +7,7 @@ import { FetchHttpClient } from "effect/http"
 import { Environment } from "../environment/index.js"
 import { KeyedMutex } from "../effect/keyed-mutex.js"
 import type { McpClient } from "./client.js"
+import { startPermits, type StartFailure } from "./codepuppy-startup.js" // codepuppy(#1563)
 
 export type Failure = Extract<Mcp.Status, { readonly status: "failed" | "needs_auth" }>
 
@@ -27,7 +28,8 @@ export interface Events {
   /** The attempt connected and listed its tools. */
   readonly connected: Effect.Effect<void>
   /** `answered` is true when the server was reached but refused or broke the handshake. */
-  readonly failed: (failure: Failure, answered: boolean) => Effect.Effect<void>
+  // codepuppy(#1563): `cause` names why (codepuppy-startup.ts) and whether a background reconnect may help.
+  readonly failed: (failure: Failure, answered: boolean, cause?: StartFailure) => Effect.Effect<void>
   /** The attempt ended, however it ended. */
   readonly settled: Effect.Effect<void>
   /** The live connection closed on its own. Runs under the lock; the owner decides how to stop. */
@@ -195,6 +197,8 @@ export function make(input: Input): Connection {
         Effect.provideService(Environment.Service, input.environment),
         Effect.provideService(FetchHttpClient.Fetch, input.fetch),
         Scope.provide(scope),
+        // codepuppy(#1563 AC5): at most four starts (spawn or connect, handshake, tools/list) at once, process-wide.
+        startPermits.withPermit,
         (effect) => (config.type === "remote" && !input.shared ? endpointLoads.withLock(config.url)(effect) : effect),
         Effect.exit,
       )
@@ -218,8 +222,14 @@ export function make(input: Input): Connection {
       yield* input.events.failed(
         error instanceof McpClient.NeedsAuthError
           ? { status: "needs_auth", error: error.message }
-          : { status: "failed", error: error instanceof Error ? error.message : String(error) },
+          : { status: "failed", error: McpClient.safeDescription(error) }, // codepuppy(#1645): no remote body
         error instanceof McpClient.ConnectError && error.answered === true,
+        // codepuppy(#1563): connect failures arrive named by the client; a tools/list failure is named here.
+        error instanceof McpClient.NeedsAuthError
+          ? { code: "auth", reconnect: false }
+          : error instanceof McpClient.ConnectError && error.code !== undefined
+            ? { code: error.code, reconnect: error.reconnect === true }
+            : McpClient.startFailure(error, config), // codepuppy(#1645): with the SDK's HTTP status
       )
     }).pipe(
       Effect.ensuring(input.events.settled),

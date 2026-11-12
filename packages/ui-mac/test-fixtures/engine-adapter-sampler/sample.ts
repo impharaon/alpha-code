@@ -258,8 +258,8 @@ try {
     diff: await call("GET", `/api/session/${turn}/diff?from=${userOf.get(turn)}`),
   })
 
-  // 6. 会话级「总是允许」,经适配器:界面的 v1 回复 `/permission/:id/reply {reply:"always"}` ⇒ 适配器给会话追加只覆盖
-  //    所问动作与资源的规则 + 回 once。同一资源不再问,另一资源照样问(打印,不写夹具)。
+  // 6. 会话级「总是允许」,经适配器:界面的 v1 回复 `/permission/:id/reply {reply:"always"}` ⇒ 适配器按请求的 save 模式
+  //    (build 档位读 .env 时是 `*`)给会话追加 allow 规则 + 回 once。同一资源、另一资源都不再问(打印,不写夹具)。
   const always = await create()
   const asks: any[] = []
   const alwaysReplies: unknown[] = []
@@ -281,7 +281,7 @@ try {
   const rules = (await call("GET", `/api/session/${always}`)).data.permissions
   console.log(
     JSON.stringify({
-      sessionScopedAlways: { afterFirst, afterSame, afterOther: asks.length, expected: { afterFirst: 1, afterSame: 1, afterOther: 2 }, alwaysReplies, rules },
+      sessionScopedAlways: { afterFirst, afterSame, afterOther: asks.length, expected: { afterFirst: 1, afterSame: 1, afterOther: 1 }, alwaysReplies, rules },
     }),
   )
 
@@ -304,6 +304,29 @@ try {
   const pendingB = await exchange("GET", `/api/session/${sessionB}/permission`)
   const settled = await exchange("POST", `/api/session/${sessionB}/permission/${b1}/reply`, { decision: "once" })
   await Bun.sleep(300)
+  // 会话内允许放行已覆盖的待审:C1 .env、C2 other.env(save ["*"]),经适配器 v2 入口对 C1 回 always ⇒ 收据应列 C1+C2、
+  // 会话上多一条 `read *` allow;之后在 C 里再问一次 other.env,引擎直接判 allow(不挂起)。
+  const sessionC = await create()
+  const [c1, c2] = [await askVia(sessionC, ".env"), await askVia(sessionC, "other.env")].map((item) => item.body.data.id as string)
+  await Bun.sleep(300)
+  await viaAdapter("GET", `/permission?directory=${encodeURIComponent(project)}`)
+  const getC1 = await exchange("GET", `/api/session/${sessionC}/permission/${c1}`)
+  const alwaysCommand = {
+    requestFingerprint: await requestFingerprint(getC1.body.data),
+    decisionID: "pdec_sampler_always",
+    decision: "always",
+    grantScope: { kind: "project", projectID: "unused-by-the-adapter" },
+    grantExpiresAt: null,
+  }
+  const allowed = await viaAdapter("POST", `/api/session/${sessionC}/permission/${c1}/reply`, alwaysCommand)
+  const sessionAlways = {
+    ids: { sessionC, c1, c2 },
+    command: alwaysCommand,
+    allowed,
+    pendingAfter: await exchange("GET", `/api/session/${sessionC}/permission`),
+    rules: (await call("GET", `/api/session/${sessionC}`)).data.permissions,
+    askOtherAgain: await askVia(sessionC, "other.env"),
+  }
   const frames = records
     .map((record) => record.frame)
     .filter((frame) => /^permission\.(asked|replied)$/.test(frame.type) && [sessionA, sessionB].includes(frame.data?.sessionID))
@@ -312,7 +335,9 @@ try {
       "Three asks created with POST /api/session/:id/permission (agent build, read, save [\"*\"]): A1 .env and A2 other.env in session A, B1 .env in session B. " +
         "`frames` = every permission.asked / permission.replied frame of A and B in arrival order. `pendingA` / `getA1` are the raw engine reads before replying; " +
         "`rejected` / `replay` are the adapter's v2 reply route for A1 (reject, then the same command again); `replyAgain` is a raw second engine reply to A1; " +
-        "`pendingB` is B's list after the reject; `settled` is the raw once reply to B1.",
+        "`pendingB` is B's list after the reject; `settled` is the raw once reply to B1. " +
+        "`sessionAlways`: C1 .env and C2 other.env (same ask shape) in session C; `allowed` is the adapter's v2 reply route for C1 with decision always; " +
+        "`pendingAfter` / `rules` are C's pending list and session rules right after; `askOtherAgain` is a fresh POST /api/session/:id/permission for other.env in C.",
     ),
     ids: { sessionA, sessionB, a1, a2, b1 },
     created,
@@ -325,6 +350,7 @@ try {
     pendingB,
     settled,
     frames,
+    sessionAlways,
   })
   console.log(`fixtures written to ${OUT}`)
 } finally {

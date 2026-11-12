@@ -19,7 +19,10 @@ import { createPermissionV2Feed } from "../renderer/codepuppy-ui/session-workspa
 import fixture from "./fixtures/permission-reply.json"
 import { createProjector, type V1Payload } from "./events"
 import { createEngineFetch } from "./index"
-import { createPermissionReplies, requestFingerprint } from "./permission-replies"
+import { createPermissionReplies, evaluateRules, requestFingerprint, wildcardMatch } from "./permission-replies"
+// 假引擎的规则判定直接用引擎原件(测试进程有 `process`;renderer 里的适配器用的是移植件,下面逐条比对)。
+import { evaluate as engineEvaluate } from "../../../core/src/permission"
+import { Wildcard } from "../../../core/src/util/wildcard"
 
 const ORIGIN = "http://127.0.0.1:47003"
 const { sessionA, sessionB, a1, a2, b1 } = fixture.ids
@@ -27,14 +30,8 @@ type EngineRequest = { id: string; sessionID: string; action: string; resources:
 type Rule = { action: string; resource: string; effect: "allow" | "deny" | "ask" }
 const ASKED = fixture.frames.filter((frame) => frame.type === "permission.asked").map((frame) => frame.data as EngineRequest)
 
-/** 2.x `Wildcard.match`(packages/core/src/util/wildcard.ts)与 `evaluate`(permission.ts:94-104):最后一条命中的规则说了算。 */
-function wildcard(input: string, pattern: string) {
-  let escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".")
-  if (escaped.endsWith(" .*")) escaped = escaped.slice(0, -3) + "( .*)?"
-  return new RegExp(`^${escaped}$`, "s").test(input)
-}
-const evaluate = (rules: readonly Rule[], action: string, resource: string) =>
-  rules.findLast((rule) => wildcard(action, rule.action) && wildcard(resource, rule.resource))?.effect ?? "ask"
+/** 引擎的 `evaluate`(packages/core/src/permission.ts:94-104):最后一条命中的规则说了算。 */
+const evaluate = (rules: readonly Rule[], action: string, resource: string) => engineEvaluate(action, resource, rules as never).effect
 /** build 档位对 `*.env` 询问(采样里那三条询问就是它问的)。 */
 const AGENT_RULES: Rule[] = [
   { action: "read", resource: "*", effect: "allow" },
@@ -343,24 +340,94 @@ describe("#1668 审批回执:reject 的连带", () => {
   })
 })
 
-describe("#1668 「本次会话内允许」:会话规则 + once,从不发 2.x always", () => {
-  test("会话卡点「本次会话内允许」⇒ 追加只覆盖所问动作与资源的 allow(已有规则保留)再回 once;同一资源不再问,另一资源照问", async () => {
+describe("#1668 「本次会话内允许」:按 save 模式记会话规则 + once,放行已覆盖的待审,从不发 2.x always", () => {
+  /** 同一会话里一条新规则覆盖不到的待审(另一种动作)。 */
+  const BASH = { id: "per_fake_bash", sessionID: sessionA, action: "bash", resources: ["rm -rf build"], save: ["rm *"] }
+
+  test("会话卡(.env,save [\"*\"])点「本次会话内允许」⇒ 每个 save 模式一条会话 allow(已有规则保留)再回 once;同会话的 other.env 待审被放行,之后再读 other.env 也不问", async () => {
     const { engine, cards, replyV1 } = setup()
     const existing: Rule = { action: "bash", resource: "git status", effect: "allow" }
     engine.sessionRules.set(sessionA, [existing])
+    engine.pending.set(BASH.id, structuredClone(BASH))
     const feed = await loadedFeed(() => cards(sessionA), replyV1(sessionA))
     const card = feed.state.requests.find((request) => request.id === a1)!
+    expect(card.save).toEqual(["*"])
     await feed.reply(a1, createPermissionDecisionCommand(card, "always", "proj_1"))
-    expect(engine.patches).toEqual([{ permissions: [existing, { action: "read", resource: ".env", effect: "allow" }] }])
-    expect(engine.replies).toEqual([{ requestID: a1, decision: "once" }])
+    expect(engine.patches).toEqual([{ permissions: [existing, { action: "read", resource: "*", effect: "allow" }] }])
+    expect(engine.replies).toEqual([
+      { requestID: a1, decision: "once" },
+      { requestID: a2, decision: "once" },
+    ])
+    expect([...engine.pending.keys()].sort()).toEqual([b1, BASH.id].sort())
     expect(engine.ask(sessionA, "read", ".env")).toBe("allow")
-    expect(engine.ask(sessionA, "read", "other.env")).toBe("ask")
+    expect(engine.ask(sessionA, "read", "other.env")).toBe("allow")
     expect(engine.ask(sessionB, "read", ".env")).toBe("ask")
   })
 
-  test("反向臂:照 v1 `always` 记 save 模式(`*`)⇒ 另一资源也不再问 —— 上面「另一资源照问」那一条会红", () => {
-    const saveRule: Rule = { action: "read", resource: "*", effect: "allow" }
-    expect(evaluate([...AGENT_RULES, saveRule], "read", "other.env")).toBe("allow")
-    expect(evaluate([...AGENT_RULES, { action: "read", resource: ".env", effect: "allow" }], "read", "other.env")).toBe("ask")
+  test("收据:resolvedRequestIDs = 目标 + 被放行的同会话待审(覆盖不到的 bash 不在其中),冻结 feed 据此一并收卡", async () => {
+    const { engine, cards, replyV2, fingerprint } = setup()
+    engine.pending.set(BASH.id, structuredClone(BASH))
+    const feed = await loadedFeed(() => cards(sessionA), replyV2(sessionA))
+    expect(ids(feed).sort()).toEqual([a1, a2, BASH.id].sort())
+    const receipt = await feed.reply(a1, { requestFingerprint: await fingerprint(a1), decisionID: "pdec_always", decision: "always", grantScope: { kind: "project", projectID: "proj_1" }, grantExpiresAt: null })
+    expect(receipt).toMatchObject({ requestID: a1, decision: "always", resolvedRequestIDs: [a1, a2] })
+    expect(ids(feed)).toEqual([BASH.id])
+    expect(engine.replies.map((item) => item.decision)).toEqual(["once", "once"])
+
+    // 同一流程对真 2.x 引擎(采样):收据列出 C1+C2,C 里不再有待审,会话上是 `read *` allow,再问 other.env 直接 allow。
+    const real = fixture.sessionAlways
+    expect(real.allowed.body.data.resolvedRequestIDs).toEqual([real.ids.c1, real.ids.c2])
+    expect(real.pendingAfter.body.data).toEqual([])
+    expect(real.rules).toEqual([{ action: "read", resource: "*", effect: "allow" }])
+    expect(real.askOtherAgain.body.data.effect).toBe("allow")
+  })
+
+  test("反向臂:只记所问的那个资源(.env)⇒ 再读 other.env 照样问,适配器也不会放行 other.env 的待审", () => {
+    const exact: Rule = { action: "read", resource: ".env", effect: "allow" }
+    expect(evaluate([...AGENT_RULES, exact], "read", "other.env")).toBe("ask")
+    expect(evaluateRules([exact], "read", "other.env")).toBe("ask")
+    const save: Rule = { action: "read", resource: "*", effect: "allow" }
+    expect(evaluate([...AGENT_RULES, save], "read", "other.env")).toBe("allow")
+    expect(evaluateRules([save], "read", "other.env")).toBe("allow")
+  })
+
+  test("请求没有 save ⇒ 409,不写规则、不回复(0.1.26 的卡此时不给这个按钮,内核也以冲突拒)", async () => {
+    const { engine, replyV2 } = setup()
+    engine.pending.set(BASH.id, { ...structuredClone(BASH), save: [] })
+    const command = {
+      requestFingerprint: await requestFingerprint(engine.pending.get(BASH.id)! as never),
+      decisionID: "pdec_nosave",
+      decision: "always" as const,
+      grantScope: { kind: "project" as const, projectID: "proj_1" },
+      grantExpiresAt: null,
+    }
+    const error = await replyV2(sessionA)(BASH.id, command).catch((caught) => caught)
+    expect(permissionDecisionSubmitError(error).kind).toBe("conflict")
+    expect(engine.patches).toEqual([])
+    expect(engine.replies).toEqual([])
+  })
+
+  test("适配器的规则判定与引擎原件逐条一致(renderer 没有 process,只能用移植件)", () => {
+    const vectors: Array<[string, string]> = [
+      ["other.env", "*"],
+      ["other.env", "*.env"],
+      [".env", "*.env"],
+      ["src/a.ts", "src/*"],
+      ["src\\a.ts", "src/*"],
+      ["a.ts", "a.t?"],
+      ["a.tsx", "a.t?"],
+      ["git status", "git status *"],
+      ["git status --short", "git status *"],
+      ["git statusx", "git status *"],
+      ["rm -rf build", "rm *"],
+      ["(x)+[y]", "(x)+[y]"],
+      ["a$b^c", "a$b^c"],
+      ["READ", "read"],
+      ["line1\nline2", "line1*"],
+    ]
+    for (const [input, pattern] of vectors) expect([input, pattern, wildcardMatch(input, pattern)]).toEqual([input, pattern, Wildcard.match(input, pattern)])
+    const rules: Rule[] = [...AGENT_RULES, { action: "bash", resource: "git *", effect: "allow" }, { action: "bash", resource: "git push *", effect: "deny" }]
+    for (const [action, resource] of [["read", "a.txt"], ["read", "x.env"], ["bash", "git status"], ["bash", "git push origin"], ["edit", "a.txt"]])
+      expect([action, resource, evaluateRules(rules, action!, resource!)]).toEqual([action, resource, evaluate(rules, action!, resource!)])
   })
 })

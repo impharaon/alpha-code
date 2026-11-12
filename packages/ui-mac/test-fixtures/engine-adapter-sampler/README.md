@@ -19,10 +19,11 @@
 2. 跑五个剧本,覆盖写入 `read-tool.json`、`todo.json`、`question.json`、`permission-asked.json`、`turn-diff.json`,
    每个文件的 `_source` 写明采样命令与当时的提交;
 3. 经适配器(`createEngineFetch`,口令由包一层的 fetch 补)实测一次会话级「总是允许」:界面的
-   `/permission/:id/reply {reply:"always"}` ⇒ 适配器追加只覆盖所问动作与资源的会话规则 + 回复 `once`。把三次询问计数、
+   `/permission/:id/reply {reply:"always"}` ⇒ 适配器按请求的 `save` 模式追加会话规则 + 回复 `once`。把三次询问计数、
    两次回复的状态码和会话规则打印出来,不写夹具;
 4. 同一会话两条待审、另一会话一条,经适配器的 v2 入口 reject 第一条(收据应列同会话两条)、同一命令重放、再直接对引擎
-   回一次(404),原始帧与响应写成 `permission-reply.json`;
+   回一次(404);再在第三个会话里挂两条读、对第一条回「总是允许」(收据应列两条、另一资源再问直接 allow)。原始帧与
+   响应写成 `permission-reply.json`;
 5. 停掉引擎与假模型。
 
 端口被占时用 `SAMPLER_ENGINE_PORT` / `SAMPLER_MODEL_PORT` 改。重采后跑适配器的测试确认夹具仍能用:

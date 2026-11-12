@@ -192,4 +192,7 @@ last_reviewed: 2026-11-12
 
 ### 偏离记录
 
+- 2026-11-12 · #2 的判定放在扩展的 `permission.hook.evaluate`(`gate.ts` `gateWithoutToolCall`):没有工具调用来源、动作是某个工具权限名的请求,按该工具的身份轴判定(deny 具名拒绝;ask 带 Code Puppy 身份信封并 holdAsk);core 的 `command.ts` 只改注释。这样 core 不写第二份策略 · `155a095c76`。
+- 2026-11-12 · #3 不改 `Mcp.callTool` 的入参(上游 `mcp.test.ts` 逐字断言它):审批后、发送前的比对在 `tool/mcp.ts`;恢复会话后的重发在 `mcp/index.ts` 以首次发送时的定义为基准比对;`codepuppy-mcp-tool-generation.test.ts` 改为真 MCP 服务 + 真 stdio 服务器 · `06ea8ab4db`。
+- 2026-11-12 · #10 的反向臂把 Global 换成只设 data 的版本跑过一次,log / repos 落到真实数据目录;两个目录早已存在(2026-07-06 创建,修改时间未变),mkdir 是空操作 · `547a5d1963`。
 - 2026-11-12 · #9 顺带改了 `register-policy.test.ts`「a saved deny under the v1 name…」的夹具:store 的写入现在一律存新名,v1 留在盘上的文档改为直接写盘再读 · #9 提交。

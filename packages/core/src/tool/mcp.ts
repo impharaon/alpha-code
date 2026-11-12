@@ -14,6 +14,7 @@ import { Tool } from "../tool.js"
 import { ToolOutput } from "../tool-output.js"
 import { ReadToolFileSystem } from "./read-filesystem.js"
 import { effectiveName, normalizedName } from "./runtime.js"
+import { sameTool } from "../mcp/codepuppy-first-party-mcp.js" // codepuppy(#1563 AC6)
 
 const decodeJson = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))
 
@@ -68,6 +69,15 @@ export const layer = Layer.effect(
                 output: (tool.outputSchema ?? {}) as JsonSchema.JsonSchema,
                 execute: (input, context) =>
                   Effect.gen(function* () {
+                    // codepuppy(#1563 AC6) ── a call planned against this definition runs only if the server still lists
+                    // the same one: after a server generation changed the tool, the call fails by name instead of sending
+                    // arguments shaped for the old schema (as #1565 does for a bundled declaration, mcp/index.ts).
+                    const live = (yield* mcp.tools()).find((item) => item.server === tool.server && item.name === tool.name)
+                    if (live && !sameTool(tool, live))
+                      return yield* new ToolFailure({
+                        message: `MCP tool "${tool.name}" on server "${tool.server}" changed after this request was prepared; it was not run. Use the tool as the server now lists it.`,
+                      })
+                    // codepuppy ── end
                     yield* permission.assert({
                       action: name(tool.server, tool.name),
                       resources: ["*"],

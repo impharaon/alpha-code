@@ -591,3 +591,76 @@ describe("#777 本地门与 codepuppy-ci 的对照表", () => {
     }
   })
 })
+
+// ── `#1662`:本地门先核对 bun 版本 ────────────────────────────────────────────────
+// 仓库钉 bun 的唯一一处是根 package.json 的 `packageManager`(换代后 bun@1.4.4)。门此前用 PATH 上
+// 碰巧是哪个 bun 就跑哪个 —— 本机是 1.3.14,它藏住过一处真红。scripts/codepuppy-check.sh 的
+// [preflight] 步在版本不符时当场停下、两个版本都点名。下面跑的是**那个脚本本体**:复制进一棵临时
+// git 仓,`bun` 用 PATH 注入换成一个报指定版本号的假 bun(生产脚本里没有「用哪个 bun」的开关)。
+describe("`#1662` 本地门的 bun 版本前置步", () => {
+  function runCheck(opts: { bunVersion: string | null; packageManager?: string }) {
+    const root = mkdtempSync(join(tmpdir(), "codepuppy-bun-preflight-"))
+    const bin = join(root, ".fake-bin")
+    const calls = join(root, "bun-calls.txt")
+    try {
+      mkdirSync(join(root, "scripts"), { recursive: true })
+      mkdirSync(bin, { recursive: true })
+      copyFileSync(resolve(REPO_ROOT, "scripts/codepuppy-check.sh"), join(root, "scripts/codepuppy-check.sh"))
+      const pkg = opts.packageManager === undefined ? readFileSync(resolve(REPO_ROOT, "package.json"), "utf8") : opts.packageManager
+      writeFileSync(join(root, "package.json"), pkg)
+      if (opts.bunVersion !== null) {
+        // 只认 --version;其余调用记账后失败 —— 「版本不对时一步都没跑」由账本判。
+        writeFileSync(
+          join(bin, "bun"),
+          `#!/bin/sh\nif [ "$1" = "--version" ]; then echo ${opts.bunVersion}; exit 0; fi\necho "$*" >> ${JSON.stringify(calls)}\nexit 1\n`,
+        )
+        chmodSync(join(bin, "bun"), 0o755)
+      }
+      const env = { PATH: `${bin}:/usr/bin:/bin`, HOME: root, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" }
+      expect(Bun.spawnSync(["git", "init", "-q"], { cwd: root, env }).exitCode).toBe(0)
+      const r = Bun.spawnSync(["bash", "scripts/codepuppy-check.sh"], { cwd: root, env: { ...env, CODEPUPPY_HOOKS_DISABLE: "1" } })
+      return {
+        exitCode: r.exitCode ?? -1,
+        out: `${r.stdout.toString()}${r.stderr.toString()}`,
+        otherBunCalls: existsSync(calls) ? readFileSync(calls, "utf8") : "",
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  }
+  const PINNED = /^bun@(.+)$/.exec(JSON.parse(readFileSync(resolve(REPO_ROOT, "package.json"), "utf8")).packageManager ?? "")?.[1]
+
+  test("PATH 上的 bun 与 packageManager 不符 ⇒ 当场停、两个版本都点名、后面一步都不跑;相符 ⇒ 放行", () => {
+    expect(PINNED, "根 package.json 没有 packageManager: bun@<版本> —— 本次测量作废").toBeTruthy()
+    // 已知的坏:本机实测的那个旧版本。
+    const bad = runCheck({ bunVersion: "1.3.14" })
+    expect(bad.exitCode, bad.out).toBe(1)
+    expect(bad.out).toContain("1.3.14")
+    expect(bad.out).toContain(`bun@${PINNED}`)
+    expect(bad.out, "版本不对却继续跑了后面的门").not.toContain("[1/14]")
+    expect(bad.otherBunCalls, "版本不对却用这个 bun 跑了别的命令").toBe("")
+    // 控制组:同一夹具、版本相符 ⇒ 前置步放行,走进 [1/14](后面的门在空夹具里各自失败,与本条无关)。
+    // 期望值取自本文件对真 package.json 的 JSON 解析 —— 脚本用 sed 读同一个字段,两个解析器必须一致。
+    const good = runCheck({ bunVersion: PINNED! })
+    expect(good.out, good.out).toContain(`✓ bun ${PINNED}`)
+    expect(good.out).toContain("[1/14]")
+  })
+
+  test("钉的版本取自 package.json,不是脚本里的常量", () => {
+    const r = runCheck({ bunVersion: PINNED!, packageManager: '{\n  "packageManager": "bun@9.9.9"\n}\n' })
+    expect(r.exitCode, r.out).toBe(1)
+    expect(r.out).toContain("bun@9.9.9")
+    expect(r.out).not.toContain("[1/14]")
+  })
+
+  test("PATH 上没有 bun、或 package.json 读不出钉的版本 ⇒ 同样当场停", () => {
+    const missing = runCheck({ bunVersion: null })
+    expect(missing.exitCode, missing.out).toBe(1)
+    expect(missing.out).toContain("不在 PATH 上")
+    expect(missing.out).not.toContain("[1/14]")
+    const unpinned = runCheck({ bunVersion: PINNED!, packageManager: '{\n  "name": "x"\n}\n' })
+    expect(unpinned.exitCode, unpinned.out).toBe(1)
+    expect(unpinned.out).toContain("读不出")
+    expect(unpinned.out).not.toContain("[1/14]")
+  })
+})

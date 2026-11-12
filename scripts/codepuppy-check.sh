@@ -37,7 +37,7 @@ CI_STEPS=(
   # pin 对象取不到时本地判「未比对」(exit 2)只记 unverified、不拦 push;CI 侧 ROUNDTRIP_REQUIRE_PIN=1,
   # 同一状态硬红(CI 自己控制 checkout 深度,取不到 pin 是接线坏了)。登记成 MIRRORED 会让
   # 「本地绿 ⇒ CI 会绿」的依据变假 —— 那正是 `#777` 治的病。
-  "upstream-guard|Assert packages/app + packages/ui == pinned upstream + SOT patch (#976)|DEGRADED:本地 pin 取不到时判「未比对」(exit 2)不拦 push;CI 侧 ROUNDTRIP_REQUIRE_PIN=1,同一状态硬红"
+  "upstream-guard|Assert packages/codepuppy-app + packages/codepuppy-ui == pinned upstream + SOT patch (#976)|DEGRADED:本地 pin 取不到时判「未比对」(exit 2)不拦 push;CI 侧 ROUNDTRIP_REQUIRE_PIN=1,同一状态硬红"
   "typecheck|typecheck @codepuppy/contracts-consumer|MIRRORED"
   "typecheck|typecheck @codepuppy/ext|MIRRORED"
   "typecheck|typecheck ui-mac|MIRRORED"
@@ -67,6 +67,28 @@ if [ "${CODEPUPPY_HOOKS_DISABLE:-}" != "1" ]; then
   fi
   unset current_codepuppy_hooks_path
 fi
+
+echo "▶ [preflight] bun on PATH == package.json packageManager"
+# `#1662`:下面每一步都用 PATH 上的 `bun`。仓库钉 bun 的地方只有一处 —— 根 package.json 的
+# `packageManager`;换代后它是 bun@1.4.4,而开发机 PATH 上可能还是旧版(实测 1.3.14),那一次
+# 旧版 bun 藏住了一处真红。版本不对时后面十四步的结论全都不可信,所以这里不记 fail 接着跑,
+# 而是当场停下。判据:packages/ui-mac/src/main/local-gate-parity.test.ts(PATH 注入一个报别的
+# 版本号的假 bun,跑本脚本本体)。
+pinned_bun="$(sed -n 's/^[[:space:]]*"packageManager":[[:space:]]*"bun@\([^"]*\)".*/\1/p' package.json | head -1)"
+actual_bun="$(bun --version 2>/dev/null || true)"
+if [ -z "$pinned_bun" ]; then
+  echo "    ✗ package.json 里读不出 \"packageManager\": \"bun@<版本>\" —— 不知道该用哪个 bun,本次运行作废"
+  exit 1
+fi
+if [ "$actual_bun" != "$pinned_bun" ]; then
+  echo "    ✗ PATH 上的 bun 是 ${actual_bun:-<没有>}($(command -v bun || echo '不在 PATH 上')),仓库钉的是 bun@${pinned_bun}(package.json packageManager)"
+  echo "      版本不对时后面的门会给出不可信的结论(真红被藏住或冒出假红),所以一步都没跑。"
+  echo "      修法:把 bun ${pinned_bun} 的 bin 目录放到 PATH 最前面再重跑;本机没有就先装:"
+  echo "        curl -fsSL https://bun.sh/install | bash -s \"bun-v${pinned_bun}\""
+  exit 1
+fi
+echo "    ✓ bun ${actual_bun}"
+unset pinned_bun actual_bun
 
 fail=0
 # `#890`:「本次没能比对真源」是**第三种**结局,不是绿也不是红 —— 见第 [10/14] 步。

@@ -320,6 +320,34 @@ jobs:
           bun install
           bash scripts/engine-smoke.sh
 
+      # `#1662`:Code Puppy 权威登记册(docs/architecture/codepuppy-authority-registry.json)列着换代前
+      # Code Puppy 握着的每一个决定、以及它现在由哪个机制文件 + 哪条证明测试握住。判官
+      # packages/ext/src/policy/authority-registry.test.ts 在**合并后的树**上跑:有决定没映射、机制文件
+      # 或证明测试不见了、项处于 blocked、或项被删却没有 owner 原话的 retired 记录 ⇒ 红 ⇒ 不出推送包。
+      # 判官只核对机制文件与证明测试**在位**(测试名在那个文件里),不执行证明测试本身。
+      # 条数取自 scripts/gate-files.tsv 的登记行(本地门第 [6/14] 步用同一行):判官被清空或用例被删
+      # 时 bun 照样 exit 0,只看退出码会放行。行为闸:packages/ui-mac/src/main/sync-upstream-takeover-isolation.test.ts。
+      - name: Authority registry judge (#1662 — every Code Puppy authority held or owner-retired, else abort)
+        run: |
+          judge="src/policy/authority-registry.test.ts"
+          count="$(awk -F'\t' -v f="$judge" '$2 == "packages/ext" && $3 == f { print $1 }' scripts/gate-files.tsv)"
+          case "$count" in
+            ''|*[!0-9]*)
+              echo "::error::scripts/gate-files.tsv 里读不出 packages/ext $judge 的登记条数(读到:'$count')—— 判官该跑几条无从核对,本次测量作废。Aborting sync."
+              exit 1 ;;
+          esac
+          if ! bash scripts/bun-test-floor.sh "=$count" packages/ext "$judge"; then
+            echo "::error title=authority not held::合并后的树上有 Code Puppy 权威没被握住(或判官本身没跑满 $count 条)—— 逐条原因见上面的测试输出。不出推送包。Aborting sync."
+            exit 1
+          fi
+
+      # `#1662`(INT-upstream-upgrade-readiness I-02):判官只核对证明测试在位;这一步把登记册里每个已握住的
+      # 权威的证明测试**真的跑一遍**(清单取自登记册 JSON,条数取自 scripts/gate-files.tsv,逐文件经
+      # bun-test-floor.sh)。任何一个红、缺失、没登记或没跑满 ⇒ 点名受影响的权威 id ⇒ 不出推送包。
+      # 2026-11-12 本机实测(bun 1.4.4,21 个文件)约 72 秒。行为闸:packages/ui-mac/src/main/sync-upstream-takeover-isolation.test.ts。
+      - name: Authority proofs pass (#1662 — an authority that loses its passing proof stops the sync)
+        run: bash scripts/assert-authority-proofs.sh
+
       # `#899`(SEC):产出**不可变**的推送候选——把这次 sync 验证过的 `dev`/`alpha` 提交打包成
       # git bundle。推送阶段只会解包并推送这些确切的 commit object,不会重新执行任何合并/安装/
       # 冒烟逻辑(那些只发生在本 job、本 job 从不持有推送凭据)。范围严格限定在这次 sync 新增的

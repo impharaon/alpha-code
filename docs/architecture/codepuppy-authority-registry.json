@@ -913,7 +913,7 @@
       ],
       "mechanism": {
         "file": "packages/ext/src/cloud-websearch-kill.ts",
-        "ladder": "L0 (the extension's execute.before refuses web search by the account signals and the verified governed server; websearch.transform picks the keyless provider)"
+        "ladder": "L0 plugin hooks (the extension's execute.before refuses web search by the account signals and the verified governed server; websearch.transform picks the keyless provider and installs Code Puppy's exa provider (packages/ext/src/exa-websearch.ts) under the same id in place of upstream's, so an in-band isError, a non-2xx status and a 200 notice without results reach the model as Code Puppy's named failure or the provider's own words; execute.after restores that message over the websearch tool's generic wrapper)"
       },
       "tests": [
         {
@@ -939,6 +939,10 @@
         {
           "file": "packages/ext/src/cloud-websearch-kill.test.ts",
           "name": "kill-switch 下 cloud_web_search 到不了传输(评估恒 allow 也一样);兄弟云工具照常执行"
+        },
+        {
+          "file": "packages/ui-mac/src/main/websearch-honest.engine.test.ts",
+          "name": "Exa 结局诚实:出错 ⇒ 具名失败、D ⇒ 原文、零命中 ⇒ 没搜到、429 ⇒ 具名失败,两两不同;不装 ext ⇒ 塌成没搜到(websearch-honest.engine.cases.ts,7 条)"
         }
       ]
     },

@@ -121,6 +121,9 @@ function classifyNode(node: ErrorNode, path: NetFailurePath): NetFailure | undef
   if (node.name === "TimeoutError") return { layer: "timeout", code: "TimeoutError" }
   if (MCP_TIMEOUT.test(message) || (node.name === "Error" && message === "Request timed out"))
     return { layer: "timeout", code: "timeout" }
+  // OpenCode 2 模型请求自己的头部 / 分块计时器到点(@opencode/ai route/transport/http.ts):`code: "Timeout"`、不带 cause。
+  // 带 cause 的同码错误交给 cause 链判(#1666 Unit B,v1 把 AbortSignal 超时记作 timeout)。
+  if (code === "Timeout" && node.cause === undefined) return { layer: "timeout", code }
   return undefined
 }
 
@@ -169,4 +172,49 @@ export function engineNetFailurePath(
   const bypass = (env.NO_PROXY ?? env.no_proxy ?? "").split(",").map((item) => item.trim().toLowerCase())
   if (bypass.includes(host)) return { via: "other" }
   return { via: "egress-proxy", proxyOrigin: new URL(proxy).origin }
+}
+
+// ── 具名失败码前缀(#1662 L4 Unit B;#1666 裁决 6756103246 第 2 项 (b))──────────────────────────────────────────
+// OpenCode 2 的公开形状(`Mcp.Status.Failed.error`、`Session.StructuredError.message`)只有一段文本。我们接管的引擎代码
+// 在这段文本前加一个登记过的码,桌面的适配层用 `parseFailureCode` 读回。前缀的字面形状只在这里定义,两侧都 import 这里。
+
+/** MCP 启动失败里不是网络层的那些原因(#1563 AC2);网络层沿用上面的九个层名。 */
+export type McpStartFailureCode =
+  | "workspace_missing"
+  | "dependency_missing"
+  | "spawn_failed"
+  | "handshake_timeout"
+  | "auth"
+  | "protocol"
+  | "transport"
+
+/** 引擎可以写进前缀的全部码。 */
+export type CodepuppyFailureCode = NetFailureLayer | McpStartFailureCode
+
+const MCP_START_CODES: Record<McpStartFailureCode, true> = {
+  workspace_missing: true,
+  dependency_missing: true,
+  spawn_failed: true,
+  handshake_timeout: true,
+  auth: true,
+  protocol: true,
+  transport: true,
+}
+
+export function isCodepuppyFailureCode(value: unknown): value is CodepuppyFailureCode {
+  return isNetFailureLayer(value) || (typeof value === "string" && Object.hasOwn(MCP_START_CODES, value))
+}
+
+const FAILURE_PREFIX = /^\[codepuppy:([a-z_-]+)\] /
+
+/** 生产方:把登记码加在原文前面。 */
+export function withFailureCode(code: CodepuppyFailureCode, text: string): string {
+  return `[codepuppy:${code}] ${text}`
+}
+
+/** 消费方:读出登记码与去掉前缀后的原文;没有前缀、码没登记都返回 undefined(认不出就不归因)。 */
+export function parseFailureCode(text: string): { code: CodepuppyFailureCode; text: string } | undefined {
+  const match = FAILURE_PREFIX.exec(text)
+  if (!match || !isCodepuppyFailureCode(match[1])) return undefined
+  return { code: match[1], text: text.slice(match[0].length) }
 }

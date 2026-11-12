@@ -532,7 +532,6 @@ try {
     await idle(shell)
 
     const background = await create()
-    diffSessions.add(background)
     await call("POST", `/api/session/${background}/prompt`, { text: "slow background" })
     await idle(background, 2)
     await Bun.sleep(500)
@@ -567,7 +566,7 @@ try {
       directory: project,
       dir: { sessionID: dir, final: await finalOf(dir) },
       shell: { sessionID: shell, records: recordsOf(shell), pages, final: await finalOf(shell) },
-      background: { sessionID: background, records: recordsOf(background), final: backgroundFinal, diffs: backgroundDiffs },
+      background: { sessionID: background, final: backgroundFinal, diffs: backgroundDiffs },
       watches,
       createdFrames,
       unlinkFrames: fsFrames(unlinkFrom),

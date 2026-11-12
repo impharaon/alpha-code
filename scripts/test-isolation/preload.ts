@@ -1,5 +1,5 @@
 // I-08(由 `#1665` 审计 R1 的 ext 版升格):测试不许读写开发机真实的 HOME / XDG 目录 / 引擎库。
-// packages/{ext,ui-mac,schema,ai,plugin}/bunfig.toml 的 `[test] preload` 在任何测试文件求值之前装本文件 —— 必须是预载:
+// packages/{ext,ui-mac,core,schema,ai,plugin}/bunfig.toml 的 `[test] preload` 在任何测试文件求值之前装本文件 —— 必须是预载:
 // `bun test` 把一个包的很多文件跑在同一个进程里,而上游 `util/src/global-roots.ts` 在**模块求值时**就把全局路径算死,
 // 测试文件里再改环境变量已经晚了;逐文件函数在混跑时会被别的文件抢先或还原(ui-mac `#1667` 实测)。
 //
@@ -9,13 +9,23 @@
 // 不受影响(守卫断言的正是这些推导)。子进程启动时拿到的是隔离后的 HOME,完全跟着走。`os.tmpdir()` 跟运行时 TMPDIR。
 //
 // 子进程:环境里已有临时根标记 ⇒ 本进程是被一个已隔离的进程起的,环境原样沿用(起它的测试显式写的值照样生效),不新建根。
+// 上游 core 自己的入口 `bun run test`(packages/core/script/test.ts)同理:它起的子 `bun test` 已经带着 HOME / XDG_* / TMPDIR
+// 全隔离的环境与 `OPENCODE_TEST_HOME`,本预载把那个目录当作临时根、环境原样沿用 —— 盖掉它的 HOME,上游 preload.test.ts
+// 在那条路上就红。那条路上预载之前的 HOME 已被入口换掉;真 HOME 取自系统账户,只给已知坏臂比较路径。bun 的 `os.userInfo().homedir`
+// 也跟着 HOME 环境变量走(实测),所以在一个不带 HOME 的子进程里问 —— 没有 HOME 时 bun 才回落到账户记录(实测)。
 import { afterAll } from "bun:test"
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs"
 import os from "node:os"
 import { join } from "node:path"
 import { ISOLATED_KEYS, REAL_HOME_KEY, REAL_XDG_KEY, REMOVED_KEYS, TEST_ROOT_KEY, isInside } from "./env"
 
-if (!process.env[TEST_ROOT_KEY]) {
+if (!process.env[TEST_ROOT_KEY] && process.env.OPENCODE_TEST_HOME) {
+  process.env[TEST_ROOT_KEY] = process.env.OPENCODE_TEST_HOME
+  process.env[REAL_HOME_KEY] ??= Bun.spawnSync({ cmd: [process.execPath, "-e", "console.log(require('os').userInfo().homedir)"], env: {} })
+    .stdout.toString()
+    .trim()
+  process.env[REAL_XDG_KEY] ??= "{}"
+} else if (!process.env[TEST_ROOT_KEY]) {
   // 根放在原 TMPDIR 下、名字短:macOS 的套接字路径上限 104 字节,测试还会在 TMPDIR 里再建自己的目录。
   const root = realpathSync(mkdtempSync(join(os.tmpdir(), "cp-test-")))
   const home = join(root, "home")

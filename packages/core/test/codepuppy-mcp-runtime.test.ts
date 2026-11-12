@@ -22,7 +22,7 @@
 //   #1565 with the shipped manifest: the command main writes ({workspace} marker) and the one the engine sees after the
 //        extension substitutes the folder both get the declaration; the real python server lists exactly it (#1666 Unit E)
 //
-// HOME, XDG_* and the database are isolated before any engine module loads.
+// HOME, XDG_*, TMPDIR and the database are isolated by the shared test preload (bunfig.toml, I-08) before any module loads.
 import { afterAll, beforeAll, describe, expect } from "bun:test"
 import { createHash } from "node:crypto"
 import fs from "node:fs"
@@ -30,11 +30,6 @@ import os from "node:os"
 import path from "node:path"
 
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-mcp-runtime-"))
-for (const [key, dir] of Object.entries({ HOME: "home", XDG_CONFIG_HOME: "config", XDG_DATA_HOME: "data", XDG_CACHE_HOME: "cache", XDG_STATE_HOME: "state" })) {
-  fs.mkdirSync(path.join(ROOT, dir), { recursive: true })
-  process.env[key] = path.join(ROOT, dir)
-}
-process.env.OPENCODE_DB = ":memory:"
 
 const { Effect, Exit, Fiber, Layer, Logger, Stream } = await import("effect")
 const { TestClock } = await import("effect/testing")

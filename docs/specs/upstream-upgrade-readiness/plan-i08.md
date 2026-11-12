@@ -22,7 +22,7 @@ last_reviewed: 2026-11-12
   - AC3 host 起的子测试进程拿到的是隔离后的环境,不是开发者 shell 的 `process.env`。
   - AC4 `packages/core/test` 里的上游测试行为不变(10 个具名上游测试文件改前 / 改后逐条对比)。
   - AC5 删掉被取代的逐文件隔离代码。
-- 核对:`ed01ebc87e` · 编排器 · 通过第 1–3 步(共享预载放 `scripts/test-isolation/`、子进程看根标记、每包一条守卫、删逐文件函数);第 4 步(core)等 owner 对接管 `packages/core/bunfig.toml` 的裁决,期间不做乙。
+- 核对:`ed01ebc87e` · 编排器 · 通过第 1–3 步(共享预载放 `scripts/test-isolation/`、子进程看根标记、每包一条守卫、删逐文件函数);第 4 步(core)等 owner 对接管 `packages/core/bunfig.toml` 的裁决,期间不做乙。第 4 步:owner 2026-11-12 经编排器转达「工具服务提示选 A，核心包测试配置同意接管」⇒ 走甲,登记进守卫例外表、ADR-047 接管表与登记册。
 
 ### 现状(决定所依据的事实)
 
@@ -31,14 +31,14 @@ last_reviewed: 2026-11-12
 - core 的 3 个 `codepuppy-*` 测试各自在文件顶上手写一段「建临时根、改 HOME / XDG_*、`OPENCODE_DB=:memory:`,再 `await import`」:`codepuppy-mcp-runtime.test.ts:32-37`、`codepuppy-browser-tool-names.test.ts:15-27`、`codepuppy-mcp-tool-generation.test.ts:18-23`。其余 5 个、schema 的 2 个、ai 的 1 个没有隔离。plugin 今天没有 `codepuppy-*` 测试(`git ls-files packages/plugin | grep codepuppy-` 为空)。
 - ai 的 `codepuppy-auth-fail-closed.test.ts` 建全部 provider 时,Vertex 的 ADC 查找会读 `~/.config/gcloud/application_default_credentials.json`(`packages/ai/src/providers/google-vertex-shared.ts:18-30` 与 google-auth-library 默认路径)——不隔离时结果随机器上有没有 gcloud 凭据而变。
 - 本机实测(bun 1.4.4,临时目录):预载里改 `os.homedir` 只影响默认导出与 `require("os")`;`import { homedir }` 与 `import * as os` 仍返回启动时的真 HOME。子进程的 `os.homedir()` 跟启动时的 HOME 环境变量。`os.tmpdir()` 跟运行时 TMPDIR。预载里注册的 `afterAll` 在整次运行结束时跑一次(两个文件都看得到临时根,之后被删掉)。
-- 上游 core 自己的入口 `bun run test`([`packages/core/script/test.ts`](../../../packages/core/script/test.ts))已经起一个 HOME / XDG / TMPDIR 全隔离、带 `OPENCODE_TEST_HOME` 的子 `bun test`;直接 `bun test`(闸门 `scripts/assert-gate-files.sh` 逐文件就是这样跑)绕过它。上游 [`test/preload.test.ts`](../../../packages/core/test/preload.test.ts) 只在 `OPENCODE_TEST_HOME` 存在时才断言隔离布局。
+- 上游 core 自己的入口 `bun run test`([`packages/core/script/test.ts`](../../../packages/core/script/test.ts))已经起一个 HOME / XDG / TMPDIR 全隔离、带 `OPENCODE_TEST_HOME` 的子 `bun test`;直接 `bun test`(闸门 `scripts/assert-gate-files.sh` 逐文件就是这样跑)绕过它。上游 [`test/preload.test.ts`](../../../packages/core/test/preload.test.ts) 的「isolates global home and XDG roots」先断言 `OPENCODE_TEST_HOME` 存在:直接 `bun test` 下它在基线上就是红的,只有走上游入口才绿(第 4 步实测订正,见偏离记录)。
 - core 的 [`bunfig.toml`](../../../packages/core/bunfig.toml) 是上游文件(在 `origin/dev` 与 `upstream/dev` 里都有);schema / ai / plugin 在两个镜像里都没有 `bunfig.toml`。
 
 ### 本段要定的四件事
 
 1. **每个包用 bunfig 预载,不用逐文件函数。** `bun test` 把一个包的很多文件跑在同一进程里,上游 `util/src/global-roots.ts` 在模块求值时就把路径算死;只有在任何测试文件求值之前生效的预载,才对混跑也成立。ext 的预载升格为唯一一份共享实现,六个包的 bunfig 都指向它。
    - 位置:[`scripts/test-isolation/`](../../../scripts)(`preload.ts` 有副作用,`env.ts` 只放键表与给测试用的函数)。`scripts/` 是 Code Puppy 自有目录(上游镜像里没有)、本来就放闸门工具,而且不在 ui-mac 写盘登记簿扫描的 sidecar 生产源码里。不留在 `packages/ext/test/`:它将服务六个包,而 ext 的键名与前缀(`CODEPUPPY_EXT_TEST_*`、`codepuppy-ext-test-`)本来就要改成通用的。
-   - 布局沿用 ext 现有的(HOME=`<根>/home`,四个 XDG_*_HOME 在 home 下,`XDG_RUNTIME_DIR` / `XDG_DATA_DIRS` / `XDG_CONFIG_DIRS` / TMPDIR / OPENCODE_DB 在根下,`os.homedir` 默认导出钉到 home),另加:删掉开发者 shell 里的 `OPENCODE_CONFIG_DIR` 与 `OPENCODE_CONFIG`(两者都是引擎配置路径的输入,留着就可能指回真目录);临时根在原 `os.tmpdir()` 下、名字短(macOS 套接字路径 104 字节上限);创建它的进程用预载级 `afterAll` 在整次运行结束时删掉它(替代 ui-mac 逐文件函数原有的清理)。不设 `OPENCODE_TEST_HOME`:设了会让上游 `preload.test.ts` 在直接 `bun test` 下从「不断言」变成「断言」,改变上游测试的行为。
+   - 布局沿用 ext 现有的(HOME=`<根>/home`,四个 XDG_*_HOME 在 home 下,`XDG_RUNTIME_DIR` / `XDG_DATA_DIRS` / `XDG_CONFIG_DIRS` / TMPDIR / OPENCODE_DB 在根下,`os.homedir` 默认导出钉到 home),另加:删掉开发者 shell 里的 `OPENCODE_CONFIG_DIR` 与 `OPENCODE_CONFIG`(两者都是引擎配置路径的输入,留着就可能指回真目录);临时根在原 `os.tmpdir()` 下、名字短(macOS 套接字路径 104 字节上限);创建它的进程用预载级 `afterAll` 在整次运行结束时删掉它(替代 ui-mac 逐文件函数原有的清理)。不设 `OPENCODE_TEST_HOME`:设了会让上游 `preload.test.ts` 在直接 `bun test` 下从「红」变成按布局与凭据环境变量断言,改变上游测试的行为。
    - 预载在第一次求值时记下真 HOME 与原 XDG_*(只给守卫的已知坏臂用),已经记过就不覆盖(子进程继承父进程记下的值)。
 2. **子进程:隔离由最外层进程决定一次,子进程沿用。** 预载发现自己的根标记(`CODEPUPPY_TEST_ROOT`)已在环境里 ⇒ 这个进程是被一个已隔离的进程起的,环境原样保留(包括起它的测试有意显式写的 HOME / XDG 值,ui-mac 预载「显式值恒胜」的约定)。上游 core 的 `bun run test` 子进程(环境里有 `OPENCODE_TEST_HOME`)同样视为已隔离、原样保留,并把根标记设成 `OPENCODE_TEST_HOME`——否则共享预载会盖掉上游入口的 HOME,上游 `preload.test.ts` 在那条路上转红。ui-mac 的 host 本来就以 `env: process.env` 起子 `bun test`(57 个文件),预载之后那就是隔离后的环境,不用改。ext 两个只传「PATH + 隔离键」的子进程用例继续用 `isolatedEnv()`(搬进 `env.ts`,键表加上根标记)。
 3. **守卫:每个包一条 `bun test` 能跑到的守卫文件**,断言同一组事:HOME、环境里每个 XDG_* 键、TMPDIR 在根内;OPENCODE_DB 在根内或是 `:memory:`(core 上游预载排在共享预载之后,仍把它改成 `:memory:`);上游 `global-roots` 的 data / cache / config / state 与(能导入时)`Global.Path` 全部路径(含 log)在根内;已知坏臂 = 在不装预载的子进程里用记下的真 HOME / XDG_* 求值 `global-roots`(只算路径、不建目录,沿用 ext 的 `rootsInChild` 写法),断言它们等于真 HOME 推出来的路径、不在根内。各包额外断言:ui-mac 把生产的 `createSidecarEnv()` → `engineDataDirectory` / `engineDatabasePath` / `engineGlobalConfigDirectory` 与日志目录的推导放进根内,并有子进程臂(带 `--preload` 起子进程:继承环境 ⇒ 沿用同一个根;去掉根标记 ⇒ 新建另一个根,证明这一臂测得出「没沿用」)。`rootsInChild` 与「记下的真环境」的读取放进 `env.ts` 共用,守卫文件本身只写断言。
@@ -109,3 +109,8 @@ core 的预载只能写在上游的 `packages/core/bunfig.toml` 里(bun 只读�
 - 2026-11-12 · 第 1 步 · 「上游 core 入口(`OPENCODE_TEST_HOME`)视为已隔离」那一支挪到第 4 步再写:第 1–3 步接上预载的五个包里没有任何东西以 `OPENCODE_TEST_HOME` 起子 `bun test`,先写就是到不了的分支。· `54b620bb22`
 - 2026-11-12 · 第 1 步 · ext 的 `typecheck` 脚本调用的 `tsgo` 在这棵树里没有装(另一条 lane 正在加这个依赖),改用仓根 `node_modules/.bin/tsc`(TypeScript 7.1.0-beta,同一个原生编译器)`--noEmit -p packages/ext`;没碰 `bun.lock`。· `54b620bb22`
 - 2026-11-12 · 第 2 步 · 子进程臂改用子 `bun test`(新 fixture `test-component/test-isolation-child.cases.ts`),不用计划里写的 `bun --preload … -e`:预载要在测试运行器里注册整次运行结束时的清理(`afterAll`),在 `bun -e` 下实测直接报「Cannot use afterAll() outside of the test runner」。子 `bun test` 也正是 57 个 host 起子进程的真实形状。· `22fb9ba389`
+- 2026-11-12 · 第 4 步 · 订正「现状」一条:上游 `preload.test.ts` 的隔离用例先 `expect(OPENCODE_TEST_HOME).toBeDefined()`,直接 `bun test` 下基线就红(不是「不断言」)。接上共享预载后仍是同一条红,结果不变;走上游入口两次都绿。· 本提交
+- 2026-11-12 · 第 4 步 · 上游入口那一支记真 HOME 时不用 `os.userInfo()`:bun 的 `os.userInfo().homedir` 跟着 HOME 环境变量走(实测返回入口的临时 home,已知坏臂因此红过一次);改为在不带 HOME 的子进程里问,bun 这时回落到账户记录(实测 `/Users/tide`)。· 本提交
+- 2026-11-12 · 第 4 步 · 共用断言(`guard.ts`)放宽到上游入口的布局也成立:去掉根目录名前缀 `cp-test-` 的断言;OPENCODE_DB 在根里或为 `:memory:`(core 上游预载排在后面改成内存库);XDG_* 只查环境里存在的(入口只设四个 *_HOME);两个配置路径键不存在或在根里(入口把 `OPENCODE_CONFIG_DIR` 设在自己的临时目录)。HOME、TMPDIR 与引擎路径「在根里」的断言不变,六条守卫重跑全绿。· 本提交
+- 2026-11-12 · 第 4 步 · `codepuppy-browser-tool-names.test.ts` 删掉环境块后 `ROOT` 与 `fs` / `os` / `path` 不再有人用,一并删掉(否则每次运行留一个空临时目录);另两个文件的 `ROOT` 仍当工作目录用,保留。· 本提交
+- 2026-11-12 · 第 4 步 · 登记除守卫例外表与登记册外,按编排器要求另加 ADR-047「精确接管面」一行与「权威保持表」一行(52 → 53 项);三个文件先取自 `engine/1662-opencode2`,再在其上编辑。登记册判官在本分支上红一条 `l1r-review-turn-supply`:它引用的 ui-mac 测试名只在集成分支的 `turn-diffs.test.ts` 里有,本分支落后,与本条无关;新条目本身判官不报。· 本提交

@@ -1,5 +1,5 @@
 // I-08(由 `#1665` 审计 R1 的 ext 版升格):测试隔离的键表与给测试用的函数。预载本体在 ./preload.ts,
-// 由 packages/{ext,ui-mac,schema,ai,plugin}/bunfig.toml 在任何测试文件求值之前装上。
+// 由 packages/{ext,ui-mac,core,schema,ai,plugin}/bunfig.toml 在任何测试文件求值之前装上。
 // 本文件没有副作用:守卫与子进程用例 import 它,不会再触发一次隔离。
 import path from "node:path"
 
@@ -17,7 +17,7 @@ export const ISOLATED_KEYS = [
   "TMPDIR",
 ] as const
 
-/** 预载删掉的键:引擎配置路径的输入,留着就可能把配置指回开发机的真目录。 */
+/** 预载删掉的键:引擎配置路径的输入,留着就可能把配置指回开发机的真目录(上游 core 入口把它设在自己的临时目录里,沿用)。 */
 export const REMOVED_KEYS = ["OPENCODE_CONFIG_DIR", "OPENCODE_CONFIG"] as const
 
 /**
@@ -40,7 +40,7 @@ export const isInside = (root: string, p: string) => p === root || p.startsWith(
 /** 子进程用例的环境:PATH + 根标记 + 隔离键(取本进程预载之后的值);不带开发机 shell 里的其它变量。 */
 export function isolatedEnv(extra: Record<string, string> = {}): Record<string, string> {
   const env: Record<string, string> = { PATH: process.env.PATH ?? "", [TEST_ROOT_KEY]: testRoot() }
-  for (const key of ISOLATED_KEYS) env[key] = process.env[key]!
+  for (const key of ISOLATED_KEYS) if (process.env[key] !== undefined) env[key] = process.env[key]!
   return { ...env, ...extra }
 }
 

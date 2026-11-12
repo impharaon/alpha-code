@@ -6,24 +6,8 @@
 // `remove` operation, as a user's config would write it) and one booted with it must agree on every built-in tool, and
 // everything the Browser plugin adds lives under its own `browser` namespace.
 //
-// HOME, XDG_* and the database are isolated before any engine module loads.
+// HOME, XDG_*, TMPDIR and the database are isolated by the shared test preload (bunfig.toml, I-08) before any module loads.
 import { describe, expect } from "bun:test"
-import fs from "node:fs"
-import os from "node:os"
-import path from "node:path"
-
-const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-browser-names-"))
-for (const [key, dir] of Object.entries({
-  HOME: "home",
-  XDG_CONFIG_HOME: "config",
-  XDG_DATA_HOME: "data",
-  XDG_CACHE_HOME: "cache",
-  XDG_STATE_HOME: "state",
-})) {
-  fs.mkdirSync(path.join(ROOT, dir), { recursive: true })
-  process.env[key] = path.join(ROOT, dir)
-}
-process.env.OPENCODE_DB = ":memory:"
 
 const { Duration, Effect, Layer, LayerMap, Stream } = await import("effect")
 const { App } = await import("@opencode/core/app")

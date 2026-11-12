@@ -9,18 +9,13 @@
 // is a gate the test opens, so the server generation can change while the call waits.
 //
 // Red if the check runs before the approval wait (review R1 #3: the old arguments were sent) or is removed.
-// HOME, XDG_* and the database are isolated before any engine module loads.
+// HOME, XDG_*, TMPDIR and the database are isolated by the shared test preload (bunfig.toml, I-08) before any module loads.
 import { describe, expect } from "bun:test"
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-mcp-generation-"))
-for (const [key, dir] of Object.entries({ HOME: "home", XDG_CONFIG_HOME: "config", XDG_DATA_HOME: "data", XDG_CACHE_HOME: "cache", XDG_STATE_HOME: "state" })) {
-  fs.mkdirSync(path.join(ROOT, dir), { recursive: true })
-  process.env[key] = path.join(ROOT, dir)
-}
-process.env.OPENCODE_DB = ":memory:"
 
 const { Deferred, Effect, Fiber, Layer, Stream } = await import("effect")
 const { Document, Info } = await import("@opencode/schema/config")

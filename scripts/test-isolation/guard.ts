@@ -2,8 +2,8 @@
 // 因此删掉某个包 bunfig 里的预载那一项,那个包的守卫就红(根标记不在、HOME 不在根内)。
 import { expect } from "bun:test"
 import os from "node:os"
-import { roots } from "../../packages/util/src/global-roots.ts"
-import { REMOVED_KEYS, expectedRealRoots, isInside, isolatedEnv, realEnv, rootsInChild, testRoot } from "./env"
+import { roots } from "../../packages/util/src/global-roots.js"
+import { REMOVED_KEYS, expectedRealRoots, isInside, isolatedEnv, realEnv, rootsInChild, testRoot } from "./env.js"
 
 /** 本进程:隔离键全在新建的临时根里,`os.homedir()` 跟着走,上游 global-roots 与调用方给的每条引擎路径也都在根里。 */
 export function expectIsolatedProcess(enginePaths: Record<string, string> = {}) {

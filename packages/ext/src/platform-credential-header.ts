@@ -41,7 +41,8 @@ export function platformCredentialHeader(input: {
 
 /**
  * OpenCode 2 的 `http.request` 钩子只给即将发出的请求(路由层已按 apiKey 写过 Authorization,`packages/ai/src/route/auth.ts`):
- * 请求地址在平台节点(`CODEPUPPY_BASE_URL`)之下 ⇒ 按平台节点判,同 `platformCredentialHeader`;前缀只按路径段认(`…/v1evil` 不算)。
+ * 请求地址在平台节点(`CODEPUPPY_BASE_URL`)之下 ⇒ 按平台节点判,同 `platformCredentialHeader`。
+ * 请求地址是 `Request` 规范化过的(主机小写、默认端口去掉),`CODEPUPPY_BASE_URL` 是原样写法,所以两边都解析了再比(`#1662` r6)。
  */
 export function platformRequestCredentialHeader(input: {
   requestURL: string
@@ -49,8 +50,28 @@ export function platformRequestCredentialHeader(input: {
   readFile?: (path: string) => string
 }): string | undefined {
   const base = input.env.CODEPUPPY_BASE_URL
-  const under = !!base && (input.requestURL === base || input.requestURL.startsWith(base.endsWith("/") ? base : `${base}/`))
+  const under = !!base && isUnderBase(input.requestURL, base)
   return platformCredentialHeader({ providerBaseURL: under ? base : undefined, env: input.env, readFile: input.readFile })
+}
+
+/** 同源(协议、主机不分大小写且末尾一个点不算、默认端口不算)且路径按段以平台节点的路径开头(`/v1x` 不算 `/v1` 之下)。 */
+function isUnderBase(requestURL: string, base: string): boolean {
+  const parse = (value: string) => {
+    try {
+      return new URL(value)
+    } catch {
+      return undefined
+    }
+  }
+  const request = parse(requestURL)
+  const root = parse(base)
+  if (!request || !root) return false
+  const host = (url: URL) => url.hostname.toLowerCase().replace(/\.$/, "")
+  if (request.protocol !== root.protocol || host(request) !== host(root) || request.port !== root.port) return false
+  const segments = (url: URL) => url.pathname.split("/").filter(Boolean)
+  const want = segments(root)
+  const have = segments(request)
+  return want.length <= have.length && want.every((segment, index) => segment === have[index])
 }
 
 /** 引用必须整串就是一个 `{file:}`(文法取 alpha 唯一的那份 FILE_REF);别的形状(含字面令牌)一律当读不到。 */

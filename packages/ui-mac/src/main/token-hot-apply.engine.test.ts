@@ -3,7 +3,7 @@
 import { expect, test } from "bun:test"
 import { join } from "node:path"
 
-test("续期热应用:令牌 A ⇒ A、热应用 B ⇒ B、删文件 ⇒ 具名失败零请求、令牌不进日志与响应;不装 ext ⇒ 占位值被拒(token-hot-apply.engine.cases.ts,2 条)", async () => {
+test("续期热应用:令牌 A ⇒ A、热应用 B ⇒ B、删文件 ⇒ 具名失败零请求、令牌不进日志与响应;不装 ext ⇒ 占位值被拒;平台地址的写法变体都带令牌、像而不是的地址收不到(token-hot-apply.engine.cases.ts,3 条)", async () => {
   const child = Bun.spawn({
     cmd: [process.execPath, "test", "--timeout", "150000", join(import.meta.dir, "token-hot-apply.engine.cases.ts")],
     cwd: join(import.meta.dir, "../.."),
@@ -15,5 +15,5 @@ test("续期热应用:令牌 A ⇒ A、热应用 B ⇒ B、删文件 ⇒ 具名�
   const output = `${stdout}${stderr}`
   if (exitCode !== 0) throw new Error(output)
   expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
-  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("2")
+  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("3")
 }, 300_000)

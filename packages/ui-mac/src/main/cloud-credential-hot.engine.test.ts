@@ -3,7 +3,7 @@
 import { expect, test } from "bun:test"
 import { join } from "node:path"
 
-test("云连接器:令牌 A ⇒ A、热应用 B 后重连 ⇒ B、删文件 ⇒ 认证失败零请求(cloud-credential-hot.engine.cases.ts,3 条)", async () => {
+test("云连接器:同一条连接上令牌 A ⇒ A、热应用 B ⇒ 下一个 POST 与重连的 GET 流带 B、会话过期 ⇒ 重新 initialize 带 C、删文件 ⇒ 不出网(cloud-credential-hot.engine.cases.ts,5 条)", async () => {
   const child = Bun.spawn({
     cmd: [process.execPath, "test", "--timeout", "90000", join(import.meta.dir, "cloud-credential-hot.engine.cases.ts")],
     cwd: join(import.meta.dir, "../.."),
@@ -15,5 +15,5 @@ test("云连接器:令牌 A ⇒ A、热应用 B 后重连 ⇒ B、删文件 ⇒ 
   const output = `${stdout}${stderr}`
   if (exitCode !== 0) throw new Error(output)
   expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
-  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("3")
+  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("5")
 }, 300_000)

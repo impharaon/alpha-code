@@ -27,7 +27,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import fs from "node:fs"
 import path from "node:path"
 import { assertEngineSandboxed, engineSandbox } from "../../test-component/engine-sandbox"
-import { codepuppyEngine, policyStore, probe, scriptedModel, type Running } from "../../test-component/codepuppy-engine"
+import { codepuppyEngine, policyStore, probe, scriptedModel, textOf, type Running } from "../../test-component/codepuppy-engine"
 import { explicitSkillDirs } from "./codepuppy-config-injection"
 import { watchExplicitSources } from "./engine-explicit-config"
 
@@ -87,8 +87,9 @@ afterAll(async () => {
 })
 
 /**
- * 生产里引擎的第一句 prompt 先于任何工具调用;ext 在那一刻注册排在配置规则之后的那部分(策略目录的尾规则、R2 的 external_directory)。
- * 这里的判据有的直接问权限服务、不经 prompt,所以每台引擎先跑一轮。
+ * 生产里引擎的第一句 prompt 先于任何工具调用;ext 在那一刻注册排在配置规则之后的策略目录尾规则(另一层在 context 钩子)。
+ * 这里的判据有的直接问权限服务、不经 prompt,所以主引擎先跑一轮。R2 的 external_directory 在激活时就在,不靠这一轮
+ * (下面 R2 一组的引擎都不跑它;第一句是 `/goal` 的那条另判)。
  */
 async function firstTurn(engine: Running, directory: string) {
   const sessionID = (await engine.send("POST", "/api/session", { location: { directory }, model: { id: "m", providerID: "codepuppy" } })).json.data.id as string
@@ -494,7 +495,6 @@ describe("R2:用户在四处写的 external_directory 放行照 v1 胜出(全部
       if (place === "全局 opencode.json 顶层") fs.writeFileSync(path.join(host.slot.configDirectory, "opencode.json"), JSON.stringify(userRule))
       const engine = await host.start()
       try {
-        await firstTurn(engine, host.projectDirectory)
         const got: Record<string, Outcome> = {}
         for (const tier of TIERS) got[tier] = await outcomeOn(engine, host.projectDirectory, tier, `${allowedDir}/*`)
         expect(got).toEqual(expected({ build: "allow", "codepuppy-ask": "allow", "codepuppy-readonly": "deny" }))
@@ -503,6 +503,53 @@ describe("R2:用户在四处写的 external_directory 放行照 v1 胜出(全部
         await engine.close()
       }
     }, 60_000)
+
+  // r6 Codex R1 Major 2:新 Location 的第一句是不带附件的 `/goal` ⇒ 引擎经 `session.synthetic` 起第一轮(packages/core/src/plugin/goal.ts),
+  // 不经过普通 prompt。每档各起一台引擎,`/goal` 是它收到的第一句、也是唯一一句;目标里的 `CP-CALL` 让模型桩在开场那一轮就读一个
+  // 工作区外的文件(read 工具先断言 external_directory)。结局看引擎的待批列表(询问)与模型下一次收到的工具消息(放行 = 文件内容到了模型,
+  // 拒绝 = 具名拒绝)。已知的坏(改之前实测):规则等第一句普通 prompt 才注册 ⇒ 全部批准与请求审批两档直接放行。
+  test("第一句是 /goal(经 session.synthetic 起第一轮)⇒ 读工作区外的文件:全部批准 / 请求审批先问,只读拒绝", async () => {
+    const outsideDir = path.join(sandbox.root, "goal-outside")
+    fs.mkdirSync(outsideDir, { recursive: true })
+    const outsideFile = path.join(outsideDir, "note.txt")
+    const CONTENT = `cp-goal-outside-${crypto.randomUUID()}`
+    fs.writeFileSync(outsideFile, `${CONTENT}\n`)
+    const got: Record<string, Outcome | "none"> = {}
+    for (const tier of TIERS) {
+      const host = codepuppyEngine({ sandbox, name: `tiers-goal-${tier}`, modelBaseURL: model.baseURL })
+      const engine = await host.start()
+      try {
+        const sessionID = (await engine.send("POST", "/api/session", { location: { directory: host.projectDirectory }, agent: tier, model: { id: "m", providerID: "codepuppy" } })).json.data.id as string
+        const before = model.requests.length
+        const started = await engine.send("POST", `/api/session/${sessionID}/command`, { name: "goal", text: `CP-CALL ${JSON.stringify({ name: "read", args: { path: outsideFile } })}` })
+        expect(started.status).toBeLessThan(300)
+        let outcome: Outcome | "none" = "none"
+        for (const until = Date.now() + 15_000; Date.now() < until && outcome === "none"; await Bun.sleep(50)) {
+          const pending = ((await engine.send("GET", `/api/session/${sessionID}/permission`)).json?.data ?? []) as Array<{ id: string; action: string }>
+          if (pending.some((request) => request.action === "external_directory")) {
+            outcome = "ask"
+            for (const request of pending) await engine.send("POST", `/api/session/${sessionID}/permission/${request.id}/reply`, { decision: "reject" })
+            break
+          }
+          const toolText = model.requests
+            .slice(before)
+            .flatMap((request) => request.messages)
+            .filter((message) => message.role === "tool")
+            .map((message) => textOf(message.content))
+            .join("\n")
+          if (toolText.includes(CONTENT)) outcome = "allow"
+          else if (/Permission denied: external_directory/.test(toolText)) outcome = "deny"
+        }
+        // 判官自检:这一轮确实由 goal 的开场白(synthetic)起的,模型桩收到过它
+        expect(model.requests.slice(before).some((request) => request.messages.some((message) => message.role === "user" && textOf(message.content).includes("CP-CALL")))).toBe(true)
+        got[tier] = outcome
+        await engine.send("POST", `/api/session/${sessionID}/command`, { name: "goal", text: "clear" }).catch(() => undefined)
+      } finally {
+        await engine.close()
+      }
+    }
+    expect(got).toEqual(expected({ build: "ask", "codepuppy-ask": "ask", "codepuppy-readonly": "deny" }))
+  }, 120_000)
 
   test("技能翻代:新一代的目录不必重新注入就放行(sidecar 的监听重写显式文件 ⇒ 引擎重载配置 ⇒ ext 的变换重算)", async () => {
     const name = "tiers-generation"
@@ -520,7 +567,6 @@ describe("R2:用户在四处写的 external_directory 放行照 v1 胜出(全部
     const stop = watchExplicitSources({ ...host.injection.explicit!, skills: explicitSkillDirs, log: () => {} })
     const engine = await host.start()
     try {
-      await firstTurn(engine, host.projectDirectory)
       expect(await outcomeOn(engine, host.projectDirectory, BUILD, `${g1}/*`)).toBe("allow")
       const g2 = generation("gen-000002-bbbbbb")
       let outcome: Outcome = "ask"

@@ -22,7 +22,7 @@ last_reviewed: 2026-11-12
   - AC3 host 起的子测试进程拿到的是隔离后的环境,不是开发者 shell 的 `process.env`。
   - AC4 `packages/core/test` 里的上游测试行为不变(10 个具名上游测试文件改前 / 改后逐条对比)。
   - AC5 删掉被取代的逐文件隔离代码。
-- 核对:<待编排器核对后由第一个实施提交回填>
+- 核对:`ed01ebc87e` · 编排器 · 通过第 1–3 步(共享预载放 `scripts/test-isolation/`、子进程看根标记、每包一条守卫、删逐文件函数);第 4 步(core)等 owner 对接管 `packages/core/bunfig.toml` 的裁决,期间不做乙。
 
 ### 现状(决定所依据的事实)
 
@@ -58,6 +58,7 @@ core 的预载只能写在上游的 `packages/core/bunfig.toml` 里(bun 只读�
 | --- | --- |
 | `scripts/test-isolation/preload.ts`(由 `packages/ext/test/preload.ts` 移来) | 唯一一份测试隔离预载:新建根或沿用已隔离的父进程环境;改写 / 删除上面列的键;钉 `os.homedir` 默认导出;记下真 HOME / XDG_*(已记过不覆盖);创建者在整次运行结束时删根;键不在根内就抛错。 |
 | `scripts/test-isolation/env.ts`(由 `packages/ext/test/isolated-env.ts` 移来) | 键表、根标记与真环境记录的键名(通用名)、`isolatedEnv()`、守卫共用的 `rootsInChild()` 与真环境读取。 |
+| `scripts/test-isolation/guard.ts`(新,见偏离记录) | 守卫共用的两组断言:本进程的键与引擎路径在根内;子进程隔离 + 已知坏臂。 |
 | `packages/ext/bunfig.toml` | 预载改指向共享文件。 |
 | `packages/ext/src/test-preload.test.ts`、`plugin-process-singleton.test.ts`、`plugin-reload-wiring.test.ts` | import 改到 `scripts/test-isolation/env.ts`;守卫按第 3 条的断言集对齐(ext 原有两条用例保留)。 |
 | `packages/ui-mac/bunfig.toml` | 预载列表前插共享预载(排在 `./scripts/test-preload.ts` 之前)。 |
@@ -103,4 +104,6 @@ core 的预载只能写在上游的 `packages/core/bunfig.toml` 里(bun 只读�
 
 ### 偏离记录
 
-暂无
+- 2026-11-12 · 第 1 步 · 新增 `scripts/test-isolation/guard.ts`:六条守卫共用的两组断言(本进程、子进程 + 已知坏臂)放在这里,守卫文件只传各包自己的引擎路径;原计划只说「`rootsInChild` 与真环境读取放进 `env.ts`」,断言本身若写在每个守卫里就是六份副本。· 本提交
+- 2026-11-12 · 第 1 步 · 「上游 core 入口(`OPENCODE_TEST_HOME`)视为已隔离」那一支挪到第 4 步再写:第 1–3 步接上预载的五个包里没有任何东西以 `OPENCODE_TEST_HOME` 起子 `bun test`,先写就是到不了的分支。· 本提交
+- 2026-11-12 · 第 1 步 · ext 的 `typecheck` 脚本调用的 `tsgo` 在这棵树里没有装(另一条 lane 正在加这个依赖),改用仓根 `node_modules/.bin/tsc`(TypeScript 7.1.0-beta,同一个原生编译器)`--noEmit -p packages/ext`;没碰 `bun.lock`。· 本提交

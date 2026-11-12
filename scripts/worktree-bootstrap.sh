@@ -174,6 +174,8 @@ echo "▶ bun install(worktree 本地依赖;CI 跑的是同一条命令)"
 # 刻意**不**在创建 worktree 之前预检 `bun` 在不在:那样失败就永远发生在「还没建东西」的时刻,
 # 下面这段回滚路径就永远不会被执行,而判据只要断言「失败时非零退出」就照样绿。
 # (本仓点名过的形态:断言粒度比缺陷粗一格。)
+# 在 subshell `cd` 之前就把共用脚本的绝对路径定下来(BASH_SOURCE 可能是相对路径)。
+NATIVE_PREPARE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/native-prepare.sh"
 INSTALL_RC=0
 set -m
 (
@@ -182,44 +184,9 @@ set -m
   # 共享配置停在 `.husky/_`,并发 lane 的 [3/6] 读到它就假红(2026-10-30 一个 session 撞三次)。
   # 下面的事后还原保留作兜底(HUSKY 被外部环境覆写、被打断等)。
   HUSKY=0 bun install || exit $?
-  # #1512:bare bun install 不下载 Electron,也不编译 darwin 围栏 addon。
-  [ "$(uname -s)" = Darwin ] && [ -f packages/ui-mac/scripts/build-fence-addon.ts ] || exit 0
-  ELECTRON="$TARGET/packages/ui-mac/node_modules/electron"
-  SOURCE="$MAIN/packages/ui-mac/node_modules/electron"
-  VERSION="$(bun -p 'require("./packages/ui-mac/node_modules/electron/package.json").version')" || exit 1
-  if [ ! -s "$ELECTRON/path.txt" ] || [ "$(cat "$ELECTRON/dist/version" 2>/dev/null)" != "$VERSION" ] ||
-    [ ! -x "$ELECTRON/dist/$(cat "$ELECTRON/path.txt" 2>/dev/null)" ]; then
-    rm -rf "$ELECTRON/dist" "$ELECTRON/path.txt"
-    if [ -f "$SOURCE/package.json" ] &&
-      [ "$(cd "$MAIN" && bun -p 'require("./packages/ui-mac/node_modules/electron/package.json").version')" = "$VERSION" ] &&
-      [ "$(cat "$SOURCE/dist/version" 2>/dev/null)" = "$VERSION" ] &&
-      [ -s "$SOURCE/path.txt" ] && [ -x "$SOURCE/dist/$(cat "$SOURCE/path.txt")" ]; then
-      echo "▶ 从主 checkout 复制 Electron $VERSION(dist + path.txt)"
-      cp -Rc "$SOURCE/dist" "$SOURCE/path.txt" "$ELECTRON/" || {
-        rm -rf "$ELECTRON/dist" "$ELECTRON/path.txt"
-        cp -R "$SOURCE/dist" "$SOURCE/path.txt" "$ELECTRON/"
-      }
-      electron_rc=$?
-    else
-      echo "▶ 主 checkout 无可用的同版本 Electron $VERSION —— 运行 electron/install.js"
-      node "$ELECTRON/install.js"
-      electron_rc=$?
-    fi
-    if [ "$electron_rc" -ne 0 ] || [ ! -s "$ELECTRON/path.txt" ] ||
-      [ "$(cat "$ELECTRON/dist/version" 2>/dev/null)" != "$VERSION" ] ||
-      [ ! -x "$ELECTRON/dist/$(cat "$ELECTRON/path.txt" 2>/dev/null)" ]; then
-      rm -rf "$ELECTRON/dist" "$ELECTRON/path.txt"
-      echo "✗ Electron $VERSION 复制/安装失败(rc=$electron_rc)—— 已清理半装的 dist/path.txt" >&2
-      exit 1
-    fi
-  fi
-  if [ ! -f packages/ui-mac/native/codepuppy-fence/build/codepuppy_fence.node ]; then
-    echo "▶ 编译 codepuppy-fence 原生 addon"
-    (cd packages/ui-mac && bun run scripts/build-fence-addon.ts) || {
-      echo "✗ codepuppy-fence 原生 addon 编译失败" >&2
-      exit 1
-    }
-  fi
+  # #1512:bare bun install 不下载 Electron,也不编译 darwin 围栏 addon —— 这一步与 bin/setup 共用
+  # 同一份(scripts/native-prepare.sh),取本脚本自己旁边的那份,不依赖新 worktree 的基线里有没有它。
+  bash "$NATIVE_PREPARE" "$TARGET" "$MAIN" || exit $?
 ) &
 INSTALL_PID=$!
 set +m

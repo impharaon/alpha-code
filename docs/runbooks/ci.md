@@ -12,7 +12,7 @@ summary: "CI 规范（Code Puppy）"
 
 ## 0. TL;DR — 全量门在 push 时跑一次
 
-全量门在 `git push` 时跑一次:pre-push 经 `gate pre-push` 调 `bin/check`(转调全量检查)并签 `check`,同一代码树不重跑;机器上没有 `gate` 时回落到直接运行 `scripts/codepuppy-check.sh`。开发中只跑相关测试,什么时候跑门归用户级规则(`dev-loop`)。诊断红门时手动跑:
+全量门在 `git push` 时跑一次:pre-push 经 `gate pre-push` 调 `bin/check`(转调全量检查)并签 `check`,同一代码树不重跑;机器上没有 `gate` 时回落到直接运行 `scripts/codepuppy-check.sh`。新 checkout / worktree 先跑 [`bin/setup`](../../bin/setup)(`bun install` 带 `HUSKY=0` + Electron 二进制 + 围栏 addon,幂等,失败非零并点名哪一步;Electron 与 addon 的步骤在 [`scripts/native-prepare.sh`](../../scripts/native-prepare.sh),与 `scripts/worktree-bootstrap.sh` 共用),`wt-new` 发现它会自动调用;缺围栏 addon 时 `process-fence-wiring` / `process-fence-apply` / `network-egress-fence` 三个测试文件恒红,红法像自己改坏了。开发中只跑相关测试,什么时候跑门归用户级规则(`dev-loop`)。诊断红门时手动跑:
 
 ```bash
 gate run

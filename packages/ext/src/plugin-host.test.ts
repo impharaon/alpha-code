@@ -2,7 +2,8 @@
 // 经上游真的钩子链 / 工具注册表 / transform 服务判结果。「权威保持」类用例都带反向臂:同一个输入在**不装 ext** 的宿主里
 // 走上游默认,结论必须相反 —— 去掉我们的钩子 ⇒ 这条用例红。
 import { afterEach, beforeAll, expect } from "bun:test"
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { createHash } from "node:crypto"
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { LoadAPIKeyError } from "@ai-sdk/provider"
@@ -19,7 +20,8 @@ import { WebSearch } from "../../core/src/websearch.ts"
 import { Session } from "../../schema/src/session.ts"
 import { SessionMessage } from "../../schema/src/session-message.ts"
 import type { Plugin } from "@opencode/plugin"
-import CodePuppyExt from "./plugin"
+import CodePuppyExt, { PROCESS_STATE_KEY } from "./plugin"
+import { buildHubRequestReply, buildHubViewReply } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
 import { activate, it, recordingMcp } from "./plugin-host.harness"
 import { testEffect } from "../../core/test/lib/effect.ts"
 import { makePluginTestLayer } from "../../core/test/plugin/fixture.ts"
@@ -44,6 +46,7 @@ const ENV_KEYS = [
   "CODEPUPPY_FACTORY_DENY_SKILLS",
   "CODEPUPPY_PROMPT_REBRAND_DISABLE",
   "CODEPUPPY_POLICY_ACCOUNT",
+  "CODEPUPPY_EXT_BUNDLED_MANIFEST",
 ] as const
 const saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]))
 let scratch = ""
@@ -68,6 +71,8 @@ const ids = {
   agent: "build" as never,
   messageID: SessionMessage.ID.make("msg_codepuppy_ext_host"),
 }
+/** 真权限服务(上游测试层默认的权限桩换回生产的 Permission)。 */
+const itWithPermission = testEffect(makePluginTestLayer(Permission.node as never))
 const before = (tool: string, input: unknown = {}) =>
   Effect.gen(function* () {
     const hooks = yield* PluginHooks.Service
@@ -84,16 +89,6 @@ const registered = (...names: string[]) =>
       await context.tool.transform((editor) => {
         for (const name of names)
           editor.add({ name, description: name, input: { type: "object", properties: {} }, options: { codemode: false }, execute: async () => ({ content: name }) })
-      })
-    },
-  })
-/** main 注入的 Code Puppy agent(生产里由内联配置写入;L4 的策略按调用所属 agent 读规则)。 */
-const injectedAgents = (...names: string[]) =>
-  activate({
-    id: "test.injected-agents",
-    async setup(context) {
-      await context.agent.transform((editor) => {
-        for (const name of names) editor.update(name as never, (agent) => void (agent.mode = "subagent"))
       })
     },
   })
@@ -433,19 +428,130 @@ it.live("P6 / S5:平台凭据头只对平台节点、每次现读;别的节点�
   }),
 )
 
-it.live("权威 · 定制中心安装(I10):codepuppy_hub_install 的权限评估恒 ask,自动化 agent 恒 deny,压过先注册的 allow;反向臂:不装 ext ⇒ allow 留着", () =>
+/**
+ * 定制中心安装的宿主:main 由一个假 parentPort 扮演(目录里有 mcp:github;请求记录查不到 —— 结局不归这里判),ext 的进程级对象
+ * 在本用例里按这个 port 重建、用完复原;`manifest` 时像打包版一样经 CODEPUPPY_EXT_BUNDLED_MANIFEST 核验 ext 自己的安装工具;
+ * main 注入的两个 Code Puppy agent 带上决定本用例的那条规则(codepuppy-config-injection.ts 的「tool-policy-default」ask)。
+ * 之后再装 ext。
+ */
+const hubHost = (options: { manifest: boolean }) =>
+  Effect.gen(function* () {
+    const holder = globalThis as Record<symbol, unknown>
+    const savedState = holder[PROCESS_STATE_KEY]
+    const listeners: Array<(event: { data: unknown }) => void> = []
+    const row = { id: "mcp:github", scope: null, name: "github", kind: "mcp", displayName: "GitHub", description: "repos", installed: false, enabled: false, state: "not-installed", authorization: "none" }
+    const port = {
+      postMessage: (message: { type: string; id: number; directory?: string }) =>
+        queueMicrotask(() => {
+          const reply =
+            message.type === "codepuppy.hub.view.request"
+              ? buildHubViewReply(message.id, { view: { directory: message.directory ?? "", rows: [row as never], warnings: [] } })
+              : message.type === "codepuppy.hub.request.request"
+                ? buildHubRequestReply(message.id, { record: null })
+                : undefined
+          if (reply) for (const listener of listeners) listener({ data: reply })
+        }),
+      on: (_event: string, listener: (event: { data: unknown }) => void) => void listeners.push(listener),
+    }
+    delete holder[PROCESS_STATE_KEY]
+    ;(process as unknown as { parentPort?: unknown }).parentPort = port
+    yield* Effect.addFinalizer(() =>
+      Effect.sync(() => {
+        delete (process as unknown as { parentPort?: unknown }).parentPort
+        holder[PROCESS_STATE_KEY] = savedState
+      }),
+    )
+    if (options.manifest) {
+      // 打包版里 ext 构建写的清单:被装载模块的 sha256 + 自有工具名(源码里这个模块就是 policy/index.ts,它用自己的 URL 核验)
+      const manifest = join(scratch, `bundled-tools-${Math.random().toString(36).slice(2)}.json`)
+      const moduleSha256 = createHash("sha256").update(readFileSync(join(import.meta.dir, "policy", "index.ts"))).digest("hex")
+      writeFileSync(manifest, JSON.stringify({ moduleSha256, tools: ["codepuppy_hub_install"], readable: { codepuppy_hub_install: "codepuppy:hub_install" } }))
+      process.env.CODEPUPPY_EXT_BUNDLED_MANIFEST = manifest
+    }
+    yield* activate({
+      id: "test.injected-tier-agents",
+      async setup(context) {
+        await context.agent.transform((editor) => {
+          for (const id of ["codepuppy-ask", "codepuppy-automation-standard"])
+            editor.update(id as never, (item) => void item.permissions.push({ action: "tool-policy-default", resource: "*", effect: "ask" } as never))
+        })
+      },
+    })
+  })
+
+/**
+ * 一次 `codepuppy_hub_install` 调用里用户看到的审批:每出现一条待批请求就记下并按 `answer` 回复,直到调用结束。
+ * 引擎的 prompt 流程先于工具调用触发 session.hook.prompt(策略的目录尾规则在这里登记)。
+ */
+const hubInstall = (agent: string, answer: "once" | "always" = "once") =>
+  Effect.gen(function* () {
+    const directory = realpathSync((yield* Location.Service).directory)
+    const session = yield* (yield* Sessions.Service).create({ location: { directory }, title: `hub install ${agent}` })
+    yield* (yield* PluginHooks.Service).trigger("session", "prompt", { sessionID: session.id, messageID: "msg_prompt", prompt: { text: "装 github" }, delivery: "queue" } as never)
+    const permission = yield* Permission.Service
+    const snapshot = yield* (yield* Tool.Service).snapshot()
+    const call = yield* snapshot
+      .execute({
+        sessionID: session.id,
+        agent: agent as never,
+        messageID: SessionMessage.ID.make("msg_hub_install"),
+        call: { type: "tool-call", id: "call_hub_install", name: "codepuppy_hub_install", input: { catalogId: "mcp:github" } },
+      })
+      .pipe(Effect.exit, Effect.forkChild)
+    const asks: Array<{ action: string; metadata: Record<string, unknown> }> = []
+    const seen = new Set<string>()
+    for (let waited = 0; waited < 5000 && !call.pollUnsafe(); waited += 20) {
+      for (const request of yield* permission.forSession(session.id)) {
+        if (seen.has(request.id)) continue
+        seen.add(request.id)
+        asks.push({ action: request.action, metadata: (request.metadata ?? {}) as Record<string, unknown> })
+        yield* permission.reply({ requestID: request.id, reply: answer })
+      }
+      yield* Effect.sleep("20 millis")
+    }
+    return { asks, exit: yield* Fiber.join(call) }
+  })
+
+itWithPermission.live("权威 · 定制中心安装(I10):codepuppy_hub_install 的权限评估恒 ask,自动化 agent 恒 deny,压过先注册的 allow;反向臂:不装 ext ⇒ allow 留着", () =>
   Effect.gen(function* () {
     env({})
+    yield* hubHost({ manifest: true })
     const hooks = yield* PluginHooks.Service
     const evaluation = (agent: string) => ({ sessionID: ids.sessionID, agent: agent as never, action: "codepuppy_hub_install", resources: ["mcp:github"], effect: "allow" as const })
     expect((yield* hooks.trigger("permission", "evaluate", evaluation("build"))).effect).toBe("allow")
-    yield* injectedAgents("codepuppy-automation-standard")
     yield* activate(CodePuppyExt)
     expect((yield* hooks.trigger("permission", "evaluate", evaluation("build"))).effect).toBe("ask")
     expect((yield* hooks.trigger("permission", "evaluate", evaluation("codepuppy-automation-standard"))).effect).toBe("deny")
     // 别的动作不碰
     const other = yield* hooks.trigger("permission", "evaluate", { ...evaluation("build"), action: "read" })
     expect(other.effect).toBe("allow")
+
+    // 一次安装,用户只看到一次审批,就是带安装详情的那一个(0.1.26 同样只问一次):全权档(build)与逐次询问档(codepuppy-ask)都是
+    const hubAsk = (asks: Array<{ action: string; metadata: Record<string, unknown> }>) =>
+      asks.map((ask) => ({ action: ask.action, catalogId: (ask.metadata.codepuppyHub as { catalogId?: string } | undefined)?.catalogId }))
+    for (const agent of ["build", "codepuppy-ask"]) {
+      const { asks, exit } = yield* hubInstall(agent)
+      expect([agent, hubAsk(asks)]).toEqual([agent, [{ action: "codepuppy_hub_install", catalogId: "mcp:github" }]])
+      expect(Exit.isSuccess(exit)).toBe(true)
+    }
+    // 永不记住:回「始终允许」之后,下一次安装照样问
+    expect((yield* hubInstall("codepuppy-ask", "always")).asks).toHaveLength(1)
+    expect(hubAsk((yield* hubInstall("codepuppy-ask")).asks)).toEqual([{ action: "codepuppy_hub_install", catalogId: "mcp:github" }])
+    // 自动化 agent:零审批,具名拒绝
+    const automation = yield* hubInstall("codepuppy-automation-standard")
+    expect(automation.asks).toEqual([])
+    expect(Exit.isFailure(automation.exit)).toBe(true)
+    expect(JSON.stringify(automation.exit)).toContain("Permission denied: codepuppy_hub_install")
+  }),
+)
+
+itWithPermission.live("定制中心安装:没经随包清单核验的同名工具(开发构建 / 冒名)照常在调用时先问一次,不享受「只问安装那一次」", () =>
+  Effect.gen(function* () {
+    env({})
+    yield* hubHost({ manifest: false })
+    yield* activate(CodePuppyExt)
+    const { asks } = yield* hubInstall("codepuppy-ask")
+    expect(asks.map((ask) => ask.action)).toEqual(["plugin::codepuppy_hub_install", "codepuppy_hub_install"])
   }),
 )
 
@@ -581,7 +687,6 @@ it.live("权威 · 工具身份(ADR-041 改 / 删):经 ext 扇出的项目插件
  * 同一个宿主,但权限是上游**真的**服务(`Permission.node`,连同它的依赖)—— 上游测试层把权限换成了永远答 ask 的桩,
  * 那里没有「待批的请求」可回复。
  */
-const itWithPermission = testEffect(makePluginTestLayer(Permission.node as never))
 
 itWithPermission.live("权威 · 待批请求的回复(#1666 第 3 条):经 ext 扇出的项目插件对 Code Puppy 待批的请求回 once、改 / 删已存的批准 ⇒ 三样都被拒并记一行,请求仍在等;反向臂:同一插件由宿主直接装 ⇒ 回 once 生效、请求放行", () =>
   Effect.gen(function* () {

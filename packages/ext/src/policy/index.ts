@@ -31,6 +31,7 @@ import { createToolPolicyStore, defaultPolicyBaseDir, type McpEntry } from "./re
 import { classifyPermissionRequest, RISK_METADATA_KEY } from "./risk"
 import { TOOL_POLICY_RPC_DEFINITION, toolPolicyHandlers } from "./rpc"
 import type { ToolDisplaySnapshotV1 } from "../../../schema/src/tool-identity"
+import { HUB_INSTALL_ACTION } from "../hub-tools"
 
 export interface PolicyRegistration {
   /** Last statement of the extension's `setup`: registers the parts that must see every earlier registration. */
@@ -48,6 +49,19 @@ function dataRoot(env: NodeJS.ProcessEnv) {
 /** #1644: grants partition per folder outside git (the global project) and per project inside git. */
 export function policyWorkspace(location: Plugin.Context["location"]): string {
   return String(location.project.id) === "global" ? location.directory : String(location.project.id)
+}
+
+/**
+ * I10: the extension's own, manifest-verified Customization Center install asks the user through its own
+ * `codepuppy_hub_install` assert (hub-tools.ts), carrying the install details. The evaluate hook below decides that assert
+ * on this tool's identity axis (`gateWithoutToolCall`: deny by name, or ask with Code Puppy's envelope) and hub-tools.ts
+ * pins it to ask — never remembered, denied to automation agents. Asking at the call as well would ask twice, the first
+ * time without the install details. Its call is still decided first (`decide`: a disabled tool is refused) and pinned;
+ * before the one ask it only reads the catalog view from the app. A tool of that name with any other identity is asked
+ * at the call like every tool.
+ */
+function asksForItself(facts: ToolFacts) {
+  return facts.technicalId === HUB_INSTALL_ACTION && facts.identity.source === "plugin" && facts.authority.kind === "codepuppy-bundled"
 }
 
 export async function registerPolicy(context: Plugin.Context): Promise<PolicyRegistration> {
@@ -191,7 +205,7 @@ export async function registerPolicy(context: Plugin.Context): Promise<PolicyReg
           // rules before the identity-axis ask is evaluated, so a document-axis ask holds for it too.
           await catalog.refresh()
           const decision = await decide(deps, event)
-          await confirm(deps, decision, event)
+          if (!asksForItself(decision.facts)) await confirm(deps, decision, event)
           displays.set(event.id, displaySnapshot(decision.facts))
           pin(event)
         } catch (error) {

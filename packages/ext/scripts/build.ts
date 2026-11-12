@@ -33,6 +33,21 @@ const result = await Bun.build({
   // No `external`: inline EVERYTHING (incl. @opencode/plugin + effect) so the embedded
   // Node server never has to resolve a raw `.ts` at runtime — the whole point of ADR-006.
   //
+  // `#1662`: jsonc-parser (ui-mac/src/shared/project-jsonc.ts) is resolved to its ESM entry. Its `main` is a UMD whose
+  // factory calls `require("./impl/format")` at run time; inlined, that path points next to dist/server.js and Electron's
+  // node refuses to load the ext ("Cannot find module './impl/format'"), so the sidecar never reports ready
+  // (net-failure-real-stack.test.ts loads this bundle there). Its `module` entry is plain ESM that bundles whole.
+  plugins: [
+    {
+      name: "codepuppy:jsonc-parser-esm",
+      setup(build) {
+        build.onResolve({ filter: /^jsonc-parser$/ }, (args) => ({
+          path: Bun.resolveSync("jsonc-parser/lib/esm/main.js", path.dirname(args.importer)),
+        }))
+      },
+    },
+  ],
+  //
   // Known G1 caveat: the opencode server bundle carries its OWN zod/effect copy, so the
   // schemas this plugin builds (via `tool.schema`) live on a DIFFERENT instance than the
   // server's. opencode's tool ingestion must treat plugin schemas structurally. Validate

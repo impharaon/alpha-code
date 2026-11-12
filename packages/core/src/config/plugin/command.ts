@@ -76,7 +76,7 @@ export const Plugin = define({
                   const selected = yield* agents.select(agent ?? parent.agent)
                   // codepuppy(#1129 E6) ── a subtask command is a delegation without a tool call, so it takes the subagent
                   // tool's own permission path (tool/plugin/subagent.ts) before any child session exists: the extension's
-                  // policy rules (a denied subagent is a deny rule on this action) decide it, no second policy here.
+                  // policy decides it like the tool's call (deny, or ask with its identity envelope), no second policy here.
                   yield* ctx.permission.assert({
                     sessionID: parent.id,
                     agent: parent.agent,

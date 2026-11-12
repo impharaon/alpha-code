@@ -164,6 +164,45 @@ export async function confirm(deps: GateDeps, decision: GateDecision, call: Gate
 }
 
 /**
+ * Review R1 #2 (#1129 E6): a request for a tool's own permission action made without a tool call — a subtask command
+ * asserting the subagent tool's permission (core config/plugin/command.ts) — gets that tool's identity-axis decision,
+ * as `decide` + `confirm` give a tool call: deny ⇒ denied by name; ask (document or ruleset axis) ⇒ asked with Code
+ * Puppy's identity envelope and held against later evaluate hooks; allow ⇒ OpenCode's own evaluation stands.
+ */
+export async function gateWithoutToolCall(
+  deps: GateDeps,
+  event: {
+    readonly sessionID: string
+    readonly agent?: string
+    readonly metadata?: Record<string, unknown>
+    effect: string
+    message?: string
+  },
+  facts: ToolFacts,
+  agent: string,
+): Promise<void> {
+  const [snapshot, ruleset] = await Promise.all([deps.store.snapshot(), deps.ruleset(event.sessionID, event.agent ?? agent)])
+  const effective = effectiveFor(facts, snapshot, ruleset)
+  if (effective.action === "deny") {
+    event.effect = "deny"
+    event.message = namedDeny(facts.technicalId, facts, effective.reason.kind).message
+    return
+  }
+  const canonical = canonicalToolIdentity(facts.identity)
+  const askedBy = rulesetIdentityEffect(canonical, ruleset) === "ask" ? "ruleset" : effective.action === "ask" ? "policy" : undefined
+  if (!askedBy) return
+  const bindingDigest = subjectBindingDigest({ identity: facts.identity, authority: facts.authority, bindingDigest: facts.bindingDigest })
+  if (event.metadata)
+    Object.assign(event.metadata, {
+      identity: facts.identity,
+      authority: facts.authority,
+      policy: { directory: deps.directory(), canonical, bindingDigest, askedBy },
+    })
+  event.effect = "ask"
+  holdAsk(event)
+}
+
+/**
  * Pins the approved call (S1 option 2): `tool` and `input` become read-only on the shared event, and the input is
  * deep-frozen, so any callback registered after this one that rewrites either throws, which rejects the call
  * (`execute.before` failures reject; packages/plugin/src/promise/adapter.ts `toolHook`).

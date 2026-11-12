@@ -1172,6 +1172,22 @@ describe("E6: a subtask command passes the same decision as the subagent tool", 
     }),
   )
 
+  // Review R1 #2: under a wildcard allow, Code Puppy's ask on builtin::subagent must still ask before the subtask.
+  it.live("subagent set to ask by Code Puppy: /review asks with the identity envelope first; rejected, no child session", () =>
+    Effect.gen(function* () {
+      const { session } = yield* setup({ internal, records: [...NEUTRAL, { selector: { level: "tool", canonical: "builtin::subagent" }, state: "ask" }] })
+      const permission = yield* Permission.Service
+      const fiber = yield* Effect.forkChild(review(session.id))
+      const [request] = yield* pending
+      expect(request?.action).toBe("subagent")
+      expect(request?.metadata).toMatchObject({ identity: { source: "builtin", name: "subagent" }, policy: { canonical: "builtin::subagent", askedBy: "policy" } })
+      expect(yield* children(session.id)).toEqual([])
+      yield* permission.reply({ requestID: request!.id, reply: "reject" })
+      expect(Exit.isFailure(yield* E.Fiber.join(fiber))).toBe(true)
+      expect(yield* children(session.id)).toEqual([])
+    }),
+  )
+
   it.live("subagent allowed: /review runs its subtask", () =>
     Effect.gen(function* () {
       const { session } = yield* setup({ internal, records: NEUTRAL })

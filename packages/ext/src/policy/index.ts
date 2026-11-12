@@ -16,7 +16,7 @@ import path from "node:path"
 import type { Plugin } from "@opencode/plugin"
 import { createCatalog } from "./catalog"
 import { attachNetFailure, attachTerminal, displaySnapshot, wrapForDisplay } from "./display"
-import { confirm, decide, effectiveFor, holdAsk, pin, type GateDeps } from "./gate"
+import { confirm, decide, effectiveFor, gateWithoutToolCall, holdAsk, pin, type GateDeps } from "./gate"
 import {
   codeModeFacts,
   CODE_MODE_TOOL,
@@ -149,8 +149,14 @@ export async function registerPolicy(context: Plugin.Context): Promise<PolicyReg
   // Risk facts on every approval request (#1285): Code Puppy's classification overrides what a tool reports.
   // Code Puppy's own gate requests already carry theirs (`confirm`); their ask is held so no later evaluate hook can
   // turn it into allow (`holdAsk`).
-  await context.permission.hook("evaluate", (event) => {
+  await context.permission.hook("evaluate", async (event) => {
     if (event.metadata && "policy" in event.metadata) return holdAsk(event)
+    // A tool's permission action asserted without a tool call (a subtask command, review R1 #2) is decided like the
+    // tool's call; a tool call's own assert already passed confirm() in execute.before.
+    if (event.source === undefined) {
+      const facts = (await allFacts()).find((item) => item.permission === event.action)
+      if (facts) await gateWithoutToolCall(deps, event as never, facts, "build")
+    }
     if (event.effect !== "ask" || !event.metadata) return
     ;(event.metadata as Record<string, unknown>)[RISK_METADATA_KEY] = classifyPermissionRequest({
       permission: event.action,

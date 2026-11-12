@@ -965,7 +965,7 @@
       ],
       "mechanism": {
         "file": "packages/ext/src/policy/gate.ts",
-        "ladder": "L0 (E6: the real upstream subagent tool meets registerPolicy's execute.before before its own permission check, packages/core/src/tool/plugin/subagent.ts:145, and before any child session); a subtask command, which creates its child without a tool call, takes the subagent tool's permission path in the re-taken packages/core/src/config/plugin/command.ts, where the policy's appended deny rule decides it) + upstream-native, pinned (E7: packages/core/src/session/prompt.ts materializes a prompt's attachments with no tool call or permission request)"
+        "ladder": "L0 (E6: the real upstream subagent tool meets registerPolicy's execute.before before its own permission check, packages/core/src/tool/plugin/subagent.ts:145, and before any child session); a subtask command, which creates its child without a tool call, takes the subagent tool's permission path in the re-taken packages/core/src/config/plugin/command.ts, where the policy's permission.hook.evaluate gives the request the subagent tool's identity-axis decision (gate.ts gateWithoutToolCall: deny by name, or ask with Code Puppy's identity envelope)) + upstream-native, pinned (E7: packages/core/src/session/prompt.ts materializes a prompt's attachments with no tool call or permission request)"
       },
       "tests": [
         {
@@ -999,6 +999,10 @@
         {
           "file": "packages/ext/src/policy/register-policy.test.ts",
           "name": "reverse arm: without Code Puppy's policy the same denied record does not stop /review"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "subagent set to ask by Code Puppy: /review asks with the identity envelope first; rejected, no child session"
         }
       ]
     },

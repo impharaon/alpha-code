@@ -353,6 +353,11 @@ body[data-codepuppy-sidebar="open"] .codepuppy-ext-page {
   border-color: var(--a-border-strong);
   box-shadow: var(--a-shadow-sm);
 }
+/* `#1691`:「查看」定位到的行 —— 同本页搜索框的聚焦态(`.codepuppy-ext-search:focus-within`),经上面的过渡消退。 */
+.codepuppy-ext-kit[data-located] {
+  border-color: var(--a-accent);
+  box-shadow: var(--a-ring-focus);
+}
 .codepuppy-ext-kit-ic {
   width: 42px;
   height: 42px;

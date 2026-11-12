@@ -15,7 +15,7 @@ import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
 import type { ServerInfo } from "../sidebar/use-projects"
 import { isConnected, isDisabled, isPending, needsAuth } from "../extensions/use-extensions"
 import { catalog } from "../extensions/catalog-source"
-import { setExtHubOpen, setHubSection } from "../extensions/ext-hub-state"
+import { installedRowKey, openExtHubAt } from "../extensions/ext-hub-state"
 import { extIpc } from "../extensions/ext-ipc"
 import { subscribeRuntimeRecovery } from "../runtime-recovery"
 import { t } from "../i18n"
@@ -43,9 +43,9 @@ function displayName(name: string): string {
   return catalog().entries.find((entry) => entry.type === "mcp" && entry.name === name)?.displayName ?? name
 }
 
-function openConnectors() {
-  setHubSection("connectors")
-  setExtHubOpen(true)
+/** 「查看」:打开连接器页并定位到这个服务的那一行(`#1691`)。 */
+function viewConnector(name: string) {
+  openExtHubAt("connectors", installedRowKey("mcp", name))
 }
 
 export function BackgroundProblemWatcher(props: { server: Accessor<ServerInfo | undefined> }) {
@@ -93,7 +93,7 @@ export function BackgroundProblemWatcher(props: { server: Accessor<ServerInfo | 
       putProblem({
         key: keyOf(name),
         title: t("codepuppy.problems.connectorFailed", { name: title }),
-        action: { label: t("codepuppy.problems.view"), run: openConnectors },
+        action: { label: t("codepuppy.problems.view"), run: () => viewConnector(name) },
         attention: false,
       })
     }

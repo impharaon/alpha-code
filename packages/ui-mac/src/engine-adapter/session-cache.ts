@@ -6,7 +6,8 @@
 // 只交回这一页的消息。
 import type { OpenCodeClient, SessionMessageInfo } from "@opencode/client/promise"
 
-const PAGE = 200
+/** 2.x 消息接口一页的条数上限。 */
+export const MESSAGE_PAGE = 200
 /** 能当回合起点的消息(冻结投影里会设 parentID 的那几种)。 */
 const startsTurn = (message: SessionMessageInfo) =>
   message.type === "user" ||
@@ -23,14 +24,14 @@ export async function recentMessages(
     const all: SessionMessageInfo[] = []
     let cursor: string | undefined
     for (;;) {
-      const page = await api.message.list({ sessionID, limit: PAGE, ...(cursor ? { cursor } : { order: "asc" }) })
+      const page = await api.message.list({ sessionID, limit: MESSAGE_PAGE, ...(cursor ? { cursor } : { order: "asc" }) })
       all.push(...page.data)
-      if (page.data.length < PAGE || !page.cursor.next) break
+      if (page.data.length < MESSAGE_PAGE || !page.cursor.next) break
       cursor = page.cursor.next
     }
     return { context: all, ids: new Set(all.map((message) => message.id)), next: undefined }
   }
-  const limit = options.limit ?? PAGE
+  const limit = options.limit ?? MESSAGE_PAGE
   const first = await api.message.list({
     sessionID,
     limit,
@@ -49,10 +50,10 @@ export async function recentMessages(
     return !!oldest && !startsTurn(oldest) && ![...older].some(startsTurn)
   }
   while (cursor && first.data.length >= limit && needsContext()) {
-    const more = await api.message.list({ sessionID, limit: PAGE, cursor })
+    const more = await api.message.list({ sessionID, limit: MESSAGE_PAGE, cursor })
     older.push(...more.data)
     if (options.through) for (const message of more.data) ids.add(message.id)
-    if (more.data.length < PAGE || !more.cursor.next) break
+    if (more.data.length < MESSAGE_PAGE || !more.cursor.next) break
     cursor = more.cursor.next
   }
   return { context: [...page, ...older].toReversed(), ids, next }

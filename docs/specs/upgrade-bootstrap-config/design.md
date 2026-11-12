@@ -3,12 +3,12 @@ id: DESIGN-upgrade-bootstrap-config
 title: 主进程交给引擎与插件的启动配置收成一份 技术设计
 summary: 主进程今天经二十多个 CODEPUPPY_* 环境变量、启动命令、sidecar 进程内环境把决定交给 sidecar、引擎与 ext;收成一份有类型、有版本、每代 sidecar 一份、只在内存里的启动文档,环境变量只留给非 Code Puppy 的读者;最后一片给引擎换上 Code Puppy 自有的全局配置目录,首次切换时把独立 OpenCode 的全局内容复制一份过来
 kind: tech-design
-status: draft
+status: approved
 spec: ""                 # 内部工作,无 spec。来源:impharaon/alpha-work:INT-upstream-upgrade-readiness I-07(owner U-02,2026-11-12)
 spec_version: ""
 review:
-  rounds: 1
-  reviewed_sha: "c5ca06786b"   # R1 审的设计版本(Codex gpt-6.1-sol,会话 01a1ced6);R1 结论 FIX-THEN-MERGE,六条全部采纳并已改,见 §10
+  rounds: 2
+  reviewed_sha: "e6da3448e4"   # R2 审的设计版本,范围 G4(Codex gpt-6.1-sol,会话 01a1cefe);R1 审 c5ca06786b 全文(会话 01a1ced6)。两轮均 FIX-THEN-MERGE,finding 全部采纳并已改,见 §10
   verdict: "pass-with-notes"
 owners: [owner]
 last_reviewed: 2026-11-12
@@ -38,7 +38,7 @@ last_reviewed: 2026-11-12
   - 「同意，启动配置方案批准，我希望做全局目录给我讲一下优点和缺点。」
   - 「做全局目录，按照这种方案，需要搬一份到 Code Puppy 自己的目录。以后想两边都生效的设置，要写两遍。可以，全局配置，将缺点收缩到最小。」
 - 含义:G1–G3 的启动配置方案(审过的 `5302c8a300`)获批;原「待 owner 决定」的自有全局配置目录改为要做,写成 G4,且要把缺点收到最小。
-- G4 是批准之后补写的一节,是否送审由编排器按 delivery-review §2 定;因此 frontmatter 仍为 `draft`,G4 定稿后改 `approved`。
+- G4 按 owner 这一决定补写,经 R2 审查(范围 G4,`e6da3448e4`)并按全部采纳的 finding 修正;编排器 2026-11-12 据上面两句原话把本设计标为 `approved`。
 
 ## 2. 地面真相
 
@@ -58,7 +58,7 @@ G4 另问:引擎全局层里有什么、按什么顺序生效;独立 OpenCode �
 | C1 | sidecar 进程环境 | main 每次 fork:`createSidecarEnv()` 白名单 + 直接赋值(`packages/ui-mac/src/main/server.ts:486-517`;白名单 `sidecar-env.ts:32-102`、前缀 `:108`、永不继承 `:253`、`CODEPUPPY_ENV_ALLOWLIST_EXTRA` 放行 `:273`)→ sidecar 注入、ext、引擎里 Code Puppy 的代码 | 每代 fork 定一次;**引擎派生的 shell / MCP / LSP 子进程整份继承**(`core/src/shell.ts:272` 无会话环境时用 `process.env`;`core/src/mcp/stdio.ts:31`)[读] | 只留非 Code Puppy 读者要的项(§4.5) |
 | C2 | 启动命令 `StartCommand`(parentPort) | main `server.ts:660-672` → `sidecar.ts:76-103`,`parseCommand` `:287-318` | 每代一次;已有类型,带口令与围栏,不进子进程 [读] | 承载启动文档(§4.2) |
 | C3 | 内联配置文档 `config.content` | sidecar 内 `injectCodePuppyConfig`(`codepuppy-config-injection.ts:191-660`)从 C1 + 真源文件算 → `start()` 选项(`engine-server-options.ts:49-53`)| 每代一次 | 保留(OpenCode 的配置接口);输入改读启动文档 |
-| C4 | 显式配置文件 `codepuppy-explicit.json` | 同一次注入合成(`engine-explicit-config.ts:37-83`);sidecar 监听当前环境根,用户 `codepuppy.jsonc`、`skills-enabled.json`、`ext-store/*/current.json` 一变就重写(`:86-142`),引擎再按显式文件重载 | **会变**(装东西、技能翻代 / 新装 / 停用) | G1–G3:保留,输入改读启动文档。G4:合成文件删除,出厂层改写进自有全局目录,监听只剩技能一半(§4.7) |
+| C4 | 显式配置文件 `codepuppy-explicit.json` | 同一次注入合成(`engine-explicit-config.ts:37-83`);sidecar 监听当前环境根,用户 `codepuppy.jsonc`、`skills-enabled.json`、`ext-store/*/current.json` 一变就重写(`:86-142`),引擎再按显式文件重载 | **会变**(装东西、技能翻代 / 新装 / 停用) | G1–G3:保留,输入改读启动文档。G4:合成文件删除,出厂层改写进自有全局目录;监听改为重写出厂层与维护用户层最后一份可用副本(§4.7) |
 | C5 | 模型底表 `models.file` | 注入(`codepuppy-config-injection.ts:742-753`)→ `start()` | 每代一次 | 保留 |
 | C6 | 密钥文件 `{file:}` | main 每次 fork 同步(`server.ts:416-449`,`codepuppy-secret-files.ts:82-127`);同身份续期原子重写(`codepuppy-auth.ts:9-14`)→ 引擎配置加载、ext 每次请求现读(`ext/src/plugin.ts:224-228`) | **会变**(续期) | 保留,唯一的密钥通道 |
 | C7 | sidecar 进程内环境总线 | sidecar 注入写 `CODEPUPPY_CLOUD_MCP_SERVER/DEF/ARM`(`codepuppy-config-injection.ts:546-579`)→ ext(`cloud-websearch-kill.ts:407-411`、`cloud-access.ts:7`、`cloud-vision.ts:64`、`cloud-contract-hook.ts:57`)、`plugin/src/alpha-cloud-authority.ts:24-25` | 每代一次;进程内任何代码可改;子进程继承 | 删除,并入启动文档 |
@@ -199,6 +199,21 @@ G4 另问:引擎全局层里有什么、按什么顺序生效;独立 OpenCode �
   `opencode.json`(`naming-migration.ts:326` 专门为它改写路径);当全局目录用,它会被当成一份配置文档装载。
 - **P-18 测试隔离**[读]:I-08 的共用预载(`scripts/test-isolation/preload.ts`,提交 `54b620bb22`)给每个包的测试换掉 HOME、全部 `XDG_*`、`OPENCODE_DB`、
   `TMPDIR`,并删掉 `OPENCODE_CONFIG_DIR` / `OPENCODE_CONFIG`。
+- **P-19 归一化会把旧键变回策略、插件与模型服务**[读]:`provider` → `providers`(`config/normalize.ts:168-176`)、`plugin` → `plugins`(`:185-190`)、
+  `enabled_providers` / `disabled_providers` → `provider.use` 策略(`:405-415`)。R2 审计方用生产函数做了内存探针:按原始键剔除后,白名单外的 `anthropic` 仍为 allow。
+- **P-20 项目发现只按「全局根」排除**[读]:`config/discovery.ts:115-125` 只把当前的系统目录、全局目录、`~/.claude`、`~/.agents` 及其配置文件(按解析后的真实路径)
+  排除在项目上溯之外;会话开在全局根里时不做项目上溯(`:76-80`)。换根后独立目录不再在这张表里。
+- **P-21 共享库里的登录会带来配置文档**[读]:well-known 来源列表与其缓存配置存在 KV(`wellknown.ts:105,139,209-213`),KV 在会话库里(`core/src/kv.ts:5-7,39`);
+  Console 连接由 `opencode.provider.opencode` 写成 integrated 文档(`plugin/provider/opencode.ts:272-298`);两者都排在全局层之前装载,
+  只有 managed 策略能扣下它们(`config.ts:336-362` 的 `supplies`),而该插件在移除指令的守护名单里(`plugin/internal.ts:304-306`)。
+- **P-22 扫描跟随软链接**[读]:命令与 agent 的扫描都带 `symlink: true`(`config/plugin/command.ts:143`、`agent.ts:137`)。
+- **P-23 引用的解析基准各不相同**[读]:`{file:}` 按所在文档目录(`config/variable.ts:42,61-62`);相对 `instructions` 在开着项目发现时从会话位置上溯到项目根
+  (`instruction.ts:96-114`);相对 `skills` 按会话位置(`skill.ts:96-101`)。
+- **P-24 缺策略即放行;今天运行中坏文件保留上一份**[读]:`ManagedPolicy.decision` 无匹配返回 `allow`(`managed-policy.ts:37-39`),
+  `tool.use`、`skill.use` 等都经它(`config/plugin/policy.ts:92-98`);今天合成监听在用户文件改坏时不重写(`engine-explicit-config.ts:113-117`)。
+- **P-25 配置健康检查用的是 v1 键表**[读]:`ext-config.ts:1499-1505` 的键表没有 `policies`、`agents` 等 2.x 键,根为 `[]` 时不报错(`:1525`)。
+- **P-26 引擎入口外层的 `Global` 另取配置根**[读]:`engine-embed.ts:48` 提供 `Global.node`,它取 `OPENCODE_CONFIG_DIR ?? Path.config` 并对配置根 mkdir
+  (`util/src/global.ts:68,79`);`start()` 的 `config.directory` 只替换服务端那一层(`server/src/routes.ts:134`)。
 
 ## 4. 接口契约
 
@@ -315,6 +330,7 @@ bundle 混在一起,只要形状或版本不同,就在第一次读时失败,而�
 格式校验的意图:`platform.credentialRef` 与 `cloudMcp.definition.headers.Authorization` 只容得下 `{file:<路径>}` 引用;两个 URL 字段只容得下无凭据 URL;
 其余字段是路径、布尔、整数、枚举与模型 id。密钥值写不进这份文档 —— 塞进去会在构建或解析时失败,不只靠约定。
 仅测试的重置入口沿用 `__resetCodePuppyEnvironmentForTests` 的先例(`codepuppy-environment.ts:386`)。
+G4 把版本升到 2,`paths` 多一个必填的 `standaloneConfigDirectory: string`(§4.7);上面是 G1–G3 落地时的 v1 形状。
 
 #### 4.2 启动命令与启动关口
 
@@ -433,7 +449,7 @@ EXACT 里的 `CODEPUPPY_*` 条目与 `EGRESS_PROXY_MARKER_ENV` 随各自的键�
 
 | 变化 | 怎么传 | 本设计改了什么 |
 | --- | --- | --- |
-| 技能翻代 / 新装 / 停用;main 或用户改 `codepuppy.jsonc` | C4 监听重写显式文件 → 引擎重载 | 监听的输入(`globalRoot`、`factoryDirs`、`userConfig`)改读文档。G4 起:`codepuppy.jsonc` 由引擎直接监听;技能变化时监听只重写出厂层文件(§4.7) |
+| 技能翻代 / 新装 / 停用;main 或用户改 `codepuppy.jsonc` | C4 监听重写显式文件 → 引擎重载 | 监听的输入(`globalRoot`、`factoryDirs`、`userConfig`)改读文档。G4 起:技能变化时监听重写出厂层文件;`codepuppy.jsonc` 变化时监听校验后更新 `codepuppy.engine.jsonc`,引擎按它重载(§4.7) |
 | 定制中心安装后的重载 | C8 `codepuppy.reload.request` | 无 |
 | 工具策略启停 | C9 插件 RPC | 无 |
 | 同身份续期 | C6 原子重写,每次请求现读 | 无(文档只带引用) |
@@ -443,20 +459,25 @@ EXACT 里的 `CODEPUPPY_*` 条目与 `EGRESS_PROXY_MARKER_ENV` 随各自的键�
 #### 4.7 Code Puppy 自有的引擎全局配置目录(G4)
 
 **目录**。`<globalRoot>/engine-global`,即 `<appData>/codepuppy-state/env/<env>/engine-global`:与 `codepuppy.jsonc`、技能账本同在当前环境的可变根下,
-随环境(prod / beta / dev)分开,在进程围栏的 W2 可写行内(`process-fence-profile.ts:47`)。不用 `<userData>/codepuppy-engine-config/`(P-17)。
-**只换配置根**:`start()` 的 `config.directory` 指向它;引擎的数据根、会话库(`database.path`)、缓存与状态目录都不动(P-05)。
+随环境(prod / beta / dev)分开,在进程围栏的 W2 可写行内(`process-fence-profile.ts:47,155`),不需要新写权限。不用 `<userData>/codepuppy-engine-config/`(P-17)。
+**只换配置根**:`start()` 的 `config.directory` 与引擎入口外层的 `Global` 都指向它(R2 第 9 条:`engine-embed.ts:48` 今天用 `Global.node`,
+按环境取 `~/.config/opencode` 并 mkdir,`util/src/global.ts:68,79`);引擎的数据根、会话库(`database.path`)、缓存与状态目录都不动(P-05)。
 
 **唯一推导处**。main 的 `engine-paths.ts` 是两个目录的唯一出处,P-16 的六处全部改为调用它:
 
 ```ts
 /** G4 起交给 start() 的 config.directory,也写进启动文档 paths.engineConfigDirectory。不看 OPENCODE_CONFIG_DIR。 */
 export function engineGlobalConfigDirectory(globalRoot: string): string        // join(globalRoot, "engine-global")
-/** 独立 OpenCode 的共享全局目录,今天的规则:OPENCODE_CONFIG_DIR > XDG_CONFIG_HOME/opencode > ~/.config/opencode。 */
+/** 独立 OpenCode 的共享全局目录,今天的规则:OPENCODE_CONFIG_DIR > XDG_CONFIG_HOME/opencode > ~/.config/opencode。也写进启动文档 paths.standaloneConfigDirectory。 */
 export function standaloneOpenCodeConfigDirectory(env: Record<string, string | undefined>, home: string): string
 export const ENGINE_GLOBAL_IMPORTED_FILE = "opencode.json"   // 首次切换导入的配置(与逃生阀写入);引擎先装载
 export const ENGINE_GLOBAL_FACTORY_FILE = "opencode.jsonc"   // Code Puppy 出厂层;引擎后装载,设置压过上面那份
 export const ENGINE_GLOBAL_IMPORT_RECORD = "codepuppy-import.json"
+export const USER_LAYER_LAST_GOOD_FILE = "codepuppy.engine.jsonc" // 与 codepuppy.jsonc 同目录:用户层最后一份引擎能装载的副本
 ```
+
+启动文档在 G4 加一个必填字段 `paths.standaloneConfigDirectory: string`(绝对路径),`CODEPUPPY_BOOTSTRAP_VERSION` 升到 2
+(G1–G3 可能已先出货;各 bundle 的严格解析本来也会拒掉形状不符,升版本让陈旧 bundle 的报错直接点出版本)。
 
 | P-16 的站点 | G4 后调用 |
 | --- | --- |
@@ -465,59 +486,112 @@ export const ENGINE_GLOBAL_IMPORT_RECORD = "codepuppy-import.json"
 | `engine-config-dangling.ts:178-187`(悬挂清扫的 `foreign` 目标) | `engineGlobalConfigDirectory` 下的 `ENGINE_GLOBAL_IMPORTED_FILE`,仍按 `foreign`(只判不改) |
 | `codepuppy-migrate.ts:28-32`(默认关的旧目录迁移) | `standaloneOpenCodeConfigDirectory` |
 | `engine-config-truth-boot.ts:47-58`(REQ-059 每次启动抬 `provider`) | 这一半退役:它存在是因为引擎读那个目录,G4 后不读了;`~/.opencode` 那一半不变 |
-| (新)首次切换导入的来源 | `standaloneOpenCodeConfigDirectory` |
+| (新)首次切换导入的来源、引擎侧的隔离规则 | `standaloneOpenCodeConfigDirectory` |
 
 **目录里有什么,删掉什么**。
 
 | 位置 | 内容 | 谁写、何时 |
 | --- | --- | --- |
-| `engine-global/opencode.json` | 首次切换导入的配置(下文规则过滤后) | main,首次切换时一次;逃生阀开着时 main 的安装 |
-| `engine-global/opencode.jsonc` | 出厂层:模型服务白名单 `policies`、出厂 `/init` `/review`(`commands`)、`skills`(出厂目录 + 已启用技能当前代的目录 + `./.codepuppy/skills`)—— 即今天 `ExplicitLayer` 的三样 | sidecar 注入时原子写;C4 的监听在技能翻代 / 新装 / 停用时只重写它 |
-| `engine-global/AGENTS.md`、`agent(s)/`、`mode(s)/`、`command(s)/`、`skill(s)/` 及其它用户文件 | 首次切换导入 | main,一次 |
-| `engine-global/codepuppy-import.json` | 导入记录 | main,一次 |
-| `start()` 的 `config.file` | 直接是用户的 `codepuppy.jsonc`(`paths.userConfig`);逃生阀置位时不给 | — |
+| `engine-global/opencode.json` | 首次切换导入的配置(下文的允许清单,归一化后的 2.x 形状) | main,首次切换时一次;逃生阀开着时 main 的安装 |
+| `engine-global/opencode.jsonc` | 出厂层:模型服务白名单 `policies`、出厂 `/init` `/review`(`commands`)、`skills`(出厂目录 + 已启用技能当前代的目录 + `./.codepuppy/skills`)—— 即今天 `ExplicitLayer` 的三样 | sidecar 注入时原子写;C4 的监听在技能翻代 / 新装 / 停用时重写它 |
+| `engine-global/AGENTS.md`、`agent(s)/`、`mode(s)/`、`command(s)/`、`skill(s)/` 及被引用的文件 | 首次切换导入的实体副本(不含软链接) | main,一次 |
+| `engine-global/codepuppy-import.json` | 导入记录 | main,与导入内容同一次发布 |
+| `<globalRoot>/codepuppy.engine.jsonc` | 用户 `codepuppy.jsonc` 最后一份引擎能装载的逐字副本 | sidecar:启动时与 `codepuppy.jsonc` 每次变化时校验后原子写 |
+| `start()` 的 `config.file` | `<globalRoot>/codepuppy.engine.jsonc`;逃生阀置位时不给 | — |
 
-删掉:合成的 `codepuppy-explicit.json`(G4 首次启动删掉旧文件)、`composeExplicitDocument`、C4 监听里「用户文件一变就重新合成」那一半与「坏了保留上一份」的分支。
-留下:C4 监听只剩技能一半(输入 `skills-enabled.json`、`ext-store/*/current.json`,输出出厂层文件);内联文档 C3 不变(其中白名单那份第二层副本照旧)。
+删掉:合成的 `codepuppy-explicit.json`(G4 首次启动删掉旧文件)与 `composeExplicitDocument` —— 用户层不再与出厂层合成一份。
+留下:C4 监听两件事 —— 技能输入变了重写出厂层文件;`codepuppy.jsonc` 变了先校验、能装载才更新最后一份可用副本,不能装载就保留上一份并记一行
+(R2 第 7 条:用户层里的 `tool.use` 等拒绝策略一旦随坏文件消失,`ManagedPolicy.decision` 缺省放行,`managed-policy.ts:38`、`config/plugin/policy.ts:92-98`;
+今天运行中保留上一份,`engine-explicit-config.ts:113-117`)。启动时 `codepuppy.jsonc` 不能装载而副本存在 ⇒ 用副本(比今天启动时只剩出厂层更严,用户的拒绝不丢);副本也没有(第一次 G4 启动时文件就是坏的)⇒ 不给 `config.file`,与今天启动时相同。
+副本与 `codepuppy.jsonc` 同目录,`{file:./x}` 与插件相对路径按同一目录解析(`config/variable.ts:42,61-62`)。内联文档 C3 不变。
 
-**层序**(P-12;G4 后独立 OpenCode 的全局目录不在任何一层里):
+「能装载」只有一个判法,由 Code Puppy 自有的 `core/src/config/codepuppy-document-check.ts` 给出,组合的是引擎 `parseInfo` 用的同一组上游函数
+(JSONC 解析、`ConfigNormalize.normalize`、按 `Info` 解码;`config.ts:136-166`):
+
+```ts
+export type EngineDocumentCheck =
+  | { status: "loaded"; ignored: string[] }   // ignored = 归一化诊断里被丢弃的字段路径,如 "$.agent.x.tools"
+  | { status: "rejected"; reason: "malformed" | "not-an-object" | "normalize-rejected" | "schema-rejected" }
+export function checkEngineConfigDocument(text: string): EngineDocumentCheck
+```
+
+它是对上游判法的复述,由 I-03 式的上游探针钉住:同一组夹具,探针断言它的结论与真引擎是否装载该文档逐一相同,上游一改即红(K2 偏离的既有处理方式,
+同 `ext/src/policy/gate.ts` 对 `Permission.evaluate` 的复述)。sidecar 的副本闸门、main 的配置健康检查、首次切换的导入都用它。
+
+**层序**(P-12;G4 后独立 OpenCode 的内容不在任何一层里):
 
 | 装载序 | 文档 | 设置(后者胜) | 策略(先者胜) |
 | --- | --- | --- | --- |
 | 1 | managed policies(系统目录 / MDM) | — | 最高 |
-| 2–3 | integrated、wellknown(Code Puppy 不连 Console) | 低 | 次高 |
-| 4a | `engine-global/opencode.json`(导入) | 低于出厂层 | 无(导入时剔除 `policies`) |
+| 2–3 | integrated、wellknown | **Code Puppy 下不装载**(下文「隔离」) | — |
+| 4a | `engine-global/opencode.json`(导入) | 低于出厂层 | 无(允许清单不含 `policies`) |
 | 4b | `engine-global/opencode.jsonc`(出厂层) | 压过导入内容 | **白名单在此,压过 5–8 的一切策略** |
-| 4c | `engine-global/` 目录条目(导入的 AGENTS.md、agent、命令、技能) | 同名命令后于 4b —— 所以导入时剔除与出厂命令同名者 | — |
-| 5 | 用户的 `codepuppy.jsonc` | 用户命令压过出厂命令(今天合成规则「用户已有的同名命令不覆盖」的同一结果) | 输给 4b |
-| 6–7 | 项目文件、项目 `.opencode` | 项目同名命令压过用户与出厂 | 输给 4b、5 |
+| 4c | `engine-global/` 目录条目(导入的 AGENTS.md、agent、命令、技能) | 同名命令后于 4b —— 所以导入时按解析后的内容剔除与出厂命令同名者 | — |
+| 5 | `codepuppy.engine.jsonc`(用户层最后一份可用副本) | 用户命令压过出厂命令(今天合成规则「用户已有的同名命令不覆盖」的同一结果) | 输给 4b |
+| 6–7 | 项目文件、项目 `.opencode`(不含独立目录的别名,下文「隔离」) | 项目同名命令压过用户与出厂 | 输给 4b、5 |
 | 8 | 内联文档(Code Puppy 的档位载体 agent、provider、权限 deny、实验开关) | 压过以上全部 | 输给前面所有层 |
 | 9 | managed settings | 最高 | — |
 
-结果:独立 OpenCode 的全局配置不再能压过 Code Puppy 的模型服务白名单(今天能,P-13)或出厂命令(今天就压不过,G4 后连装载都不装载);
-它的插件也不再装进 Code Puppy 的引擎(P-14)。技能:各层 `skills` 累加,目录条目先收集、文档条目按装载序后收集,同 id 后者胜(P-14,`skill.ts:80-101,152-157`)——
-导入的技能输给出厂层(与今天独立全局目录输给出厂层相同);用户 `codepuppy.jsonc` 里的技能路径与出厂层同 id 时,今天合成文件把出厂路径排在后面、出厂胜,
+技能:各层 `skills` 累加,目录条目先收集、文档条目按装载序后收集,同 id 后者胜(P-14,`skill.ts:80-101,152-157`)——
+导入的技能输给出厂层(与今天独立全局目录输给出厂层相同);用户层与出厂层同 id 时,今天合成文件把出厂路径排在后面、出厂胜,
 G4 后用户层在后、用户胜。这与命令一致,也是 `engine-explicit-config.ts:6-7` 写下的「用户治理 > 出厂 > 上游内置」;只在两边有同 id 技能时才看得出。
+
+**隔离:独立 OpenCode 的内容从哪几条路都进不来**(数据目录与会话库按既定决定仍共享)。
+
+| 路径 | 今天 | G4 的规则 | 机制 |
+| --- | --- | --- | --- |
+| 全局层 | 独立目录就是全局层;其策略压得过白名单(P-13) | 换根,不再装载 | `config.directory` 与外层 `Global` 指向自有目录 |
+| 项目发现里的别名 | 独立目录是全局根,项目发现排除它(`config/discovery.ts:121-125`) | 换根后它不再是全局根;某个项目的 `.opencode` 链到它、或会话就开在它里面时,会作为项目层装载插件、覆盖出厂命令(R2 第 2 条)⇒ **项目发现照旧排除独立目录的 canonical 身份及其配置文件别名**,会话开在它里面时不做项目上溯,与今天对全局根的处理逐字相同 | 接管 `core/src/config/discovery.ts`:在既有「Global sources must not re-enter through the project walk」判定里,把 `tryCodePuppyBootstrap()?.paths.standaloneConfigDirectory` 解析后并入被排除的根与文件;无文档宿主行为同上游 |
+| 共享库里的登录带来的远程配置 | 独立 CLI 登录写进共享库的 well-known 来源与 Console 连接,Code Puppy 照样装载其缓存配置,策略早于出厂层(`wellknown.ts:139,209`,`config.ts:336-362`;Console 文档经 `plugin/provider/opencode.ts:274`)| **Code Puppy 下不装载 integrated 与 wellknown 配置文档**:Code Puppy 不连 Console、也不用 well-known 来源(ADR-047 决策 4),这两类文档只能来自共享库里别人的登录 | 接管 `core/src/config.ts`:`load` 里有 Code Puppy 启动文档时 `integrated` 与 `wellknownDocuments` 为空;凭据与 KV 留在共享库里不动 |
+| 首次导入 | — | 允许清单、按解析后的内容判、不跟软链接出来源、引用按读方基准迁移(下文) | main 的导入 |
+
+两处接管都只加 `codepuppy(...)` 标注块、逻辑在 Code Puppy 自有文件 `core/src/config/codepuppy-isolation.ts`;按 ADR-047「精确接管面」登记(范围、守卫、回滚、归属),
+权威登记册加一条「Code Puppy 引擎的配置层里没有独立 OpenCode 的内容」,带反向臂测试(§9 证明义务 1)。两文件 90 天改动:`discovery.ts` 6 / 168、`config.ts` 32 / 529
+(`git log --since="90 days ago" 33f94fce96`);`config.ts` 较热,所以只在 `load` 返回前加一处过滤,不改它的结构。
+被否决:用移除指令关掉 Console 插件 —— `opencode.provider.opencode` 在守护名单里,移除指令跳过它(`plugin/internal.ts:304-306`);
+只接管 `wellknown.ts` —— 覆盖不到 Console 文档,而 Console 文档的唯一写入点 `opencode.ts` 90 天改动 53 次,更热。
 
 **首次切换:复制一份,不问用户**(owner「需要搬一份到 Code Puppy 自己的目录」「将缺点收缩到最小」)。
 
-- 时机:main 启动早期、第一次 fork 之前,与 REQ-059 的启动对账同一处;只在 `engine-global/codepuppy-import.json` 不存在时执行。来源目录不存在也写一份
+- 时机:main 启动早期、第一次 fork 之前,与 REQ-059 的启动对账同一处;只在 `engine-global/codepuppy-import.json` 不存在时执行。来源目录不存在也发布一份
   `imported` 为空的记录,之后不再扫描。
-- 复制什么:把来源目录镜像到 `engine-global/`,保持相对布局(这样 `AGENTS.md`、`instructions` 的相对条目、`{file:./x}` 引用照样指得到),但:
-  - 不复制可执行内容:`plugin/`、`plugins/`、`tool/`、`tools/`、`node_modules/`、`package.json` 与各类锁文件 —— 理由:插件在引擎进程里运行、能挂 Code Puppy 的钩子,
-    要装须经 Code Puppy 的同意路径(项目插件同意后扇出、定制中心安装;ADR-041 工具身份),不能借一次复制绕过;
-  - 不复制用了 Code Puppy 名字的条目:与出厂命令同名的 `command(s)/<name>.md`(今天是 `init`、`review`,`codepuppy-prompts.ts:301-308`)、`codepuppy-*` 开头的 agent ——
-    同名命令今天本就输给出厂层,从未在 Code Puppy 里生效,不复制不丢任何东西;同名 agent 会把字段并进 Code Puppy 的档位载体;
-  - 软链接原样复制为软链接,不跟进去(行为同今天:仍指向原目标)。
-- 配置文件:来源的 `opencode.json` 与 `opencode.jsonc`(两份都在时按引擎的语义合成一份:`opencode.jsonc` 按顶层键覆盖 `opencode.json`,`commands` / `agents` 按名字合并、
-  `skills` / `instructions` / `permissions` 前后拼接)写成 `engine-global/opencode.json`,**剔除**这几个顶层键:
-  `policies`(先加载者胜,导入就是在 Code Puppy 目录里重开 P-13 的洞)、`providers`(模型服务与凭据经 Code Puppy 平台)、`mcp`(Code Puppy 的 MCP 真源与默认拒绝)、
-  `plugins`(同上,可执行)、`model`、`default_agent`(模型与助手由 Code Puppy 的选择器决定)、`experimental`(开哪项由 owner 定,ADR-048 决定 2)、`enterprise`(Console)。
-  其余键原样带过去(`agents`、`commands`、`instructions`、`skills`、`permissions`、`lsp`、`formatter`、`websearch`、`shell`、`watcher` 等)——
-  它们今天就在全局层生效,带过去仍在全局层、仍低于出厂层与内联文档,压不过 Code Puppy 的任何决定。
-  指出来源目录之外的相对引用(`../x`)改写成原目标的绝对路径。
-- 写法:先写进 `engine-global/.import-staging/`,全部成功后逐项改名就位,最后写记录;中途失败 ⇒ 删掉暂存、不写记录、main 记一行原因,这次启动没有导入内容,
-  下次启动重来。来源目录只读,一个字节不改。
+- **配置:允许清单,判的是引擎归一化之后的文档**(R2 第 1 条:原始键黑名单漏掉 `enabled_providers`、`plugin`、`provider` 这类旧键,
+  引擎会把它们重新生成策略、插件与模型服务,`config/normalize.ts:168-176,185-190,405-415`)。来源的 `opencode.json`、`opencode.jsonc` 各自先过
+  `checkEngineConfigDocument` 的同一组函数得到 2.x 规范文档(不做 `{env:}` / `{file:}` 替换),再只取允许清单里的键:
+
+  | 导入的键 | 附加规则 |
+  | --- | --- |
+  | `agents` | 去掉 `codepuppy-*` id(会把字段并进 Code Puppy 的档位载体) |
+  | `commands` | 去掉与出厂层同名的(今天 `init`、`review`,`codepuppy-prompts.ts:301-308`;今天它们本就输给出厂层,从未生效) |
+  | `instructions`、`skills` | 引用按下表迁移 |
+  | `permissions`、`formatter`、`lsp`、`watcher`、`shell` | 原样 |
+
+  其余一切规范键(`policies`、`providers`、`mcp`、`plugins`、`model`、`default_agent`、`experimental`、`enterprise`、`websearch`、`compaction`、`references`……)
+  与归一化诊断里被丢弃的字段都不导入,逐条写进记录。允许清单里的键今天就在全局层生效,导入后仍在全局层、仍低于出厂层与内联文档,压不过 Code Puppy 的任何决定;
+  清单外的键哪怕今天无害也不带 —— 未知即不导入。两份都在时,`opencode.jsonc` 的同名键覆盖 `opencode.json`,`agents` / `commands` 按名字合并,
+  `instructions` / `skills` / `permissions` 前后拼接(与引擎按文档顺序收集的结果相同)。写成 `engine-global/opencode.json`。
+- **文件:按解析后的内容判,只产出实体副本**(R2 第 4 条:引擎扫描命令与 agent 时跟随软链接,`command.ts:143`、`agent.ts:137`;
+  链进来的目录里一个 `init.md` 就能在出厂层之后覆盖 `/init`)。复制的只有引擎会从配置根读的东西:`AGENTS.md`、`agent(s)/`、`mode(s)/`、`command(s)/`、`skill(s)/`,
+  以及允许清单里的引用指到的来源目录内文件。逐项先解析真实路径:
+  - 解析后落在来源目录内 ⇒ 复制为实体文件 / 目录(不保留软链接);
+  - 解析后落在来源目录外、或成环、或解析不了 ⇒ 不复制,写进记录(`link-outside-source` / `unresolvable`);
+  - 剔除规则作用在解析后的结果上:解析后的命令名等于出厂命令名、agent id 是 `codepuppy-*`、目录是 `plugin(s)/`、`tool(s)/`、`node_modules/` 或依赖文件,一律不复制;
+  - 其余文件(插件、工具、依赖、主题等)不复制,写进记录。
+- **引用:按各读方真正的基准迁移**(R2 第 5 条):
+
+  | 引用 | 引擎按什么解析 | 导入怎么处理 |
+  | --- | --- | --- |
+  | 允许键里的 `{file:…}` | 所在文档的目录(`config/variable.ts:42,61-62`) | 相对且在来源内 ⇒ 文本不动,被引文件随镜像复制;相对但逃出来源 ⇒ 改成原目标的绝对路径;绝对且在来源内 ⇒ 改指 `engine-global/` 里的副本;绝对且在来源外 ⇒ 不动 |
+  | `instructions` 条目 | 相对:从会话位置向上找到项目根(Code Puppy 开着项目发现,`instruction.ts:96-114`);绝对 / `~/`:字面 | 相对 ⇒ 不动(含义不变);绝对且在来源内 ⇒ 改指副本;在来源外 ⇒ 不动 |
+  | `skills` 条目 | 相对:按会话位置(`skill.ts:96-101`);`~/` 展开;绝对:字面 | 同上 |
+  | `AGENTS.md` | 配置根 | 复制 |
+
+  迁移后不再有任何引用指向独立目录;指向别处的绝对引用照旧读那里(那不是独立 OpenCode 的配置)。
+- **整批发布**(R2 第 6 条):完整结果先建在同级的 `engine-global.import-staging/`;若 `engine-global/` 已存在(前一次导入失败后引擎照常跑过),
+  把其中除出厂层文件以外的现有内容先并入暂存,同路径以现有为准(那是切换之后用户或逃生阀写的);记录作为暂存里最后写的文件;然后
+  `engine-global` → `engine-global.prev`、暂存 → `engine-global` 两次改名,成功后删 `prev`。第二次改名失败 ⇒ 把 `prev` 改回。
+  启动时见 `engine-global` 不在而 `engine-global.prev` 在 ⇒ 先改回再继续;见残留暂存 ⇒ 删掉重来。任何时刻引擎看到的要么是导入前的目录、要么是完整导入后的目录,
+  不会出现一半;重试不覆盖用户在切换后写的内容。来源目录只读,一个字节不改。
 - 记录(只写名字与路径,不写内容):
 
   ```ts
@@ -526,22 +600,25 @@ G4 后用户层在后、用户胜。这与命令一致,也是 `engine-explicit-c
     importedAt: string                 // ISO-8601 UTC
     source: string                     // 来源目录的绝对路径
     imported: string[]                 // 相对来源目录;配置键写作 "opencode.json#agents"
-    skipped: Array<{ path: string; reason: "code" | "code-puppy-decision" | "code-puppy-name" }>
-    rewritten: Array<{ from: string; to: string }>   // 改成绝对路径的相对引用
+    skipped: Array<{
+      path: string                     // 相对来源目录;配置键或被丢弃字段写作 "opencode.jsonc#providers"、"opencode.json#$.agent.x.tools"
+      reason: "not-allowed" | "code" | "code-puppy-name" | "link-outside-source" | "unresolvable" | "normalize-dropped"
+    }>
+    rewritten: Array<{ from: string; to: string }>   // 改写过的引用
   }
   ```
 
-- 用户看到什么:什么都不用做,界面上没有新东西。第一次启动后,他在独立 OpenCode 里写的全局指令、自定义 agent、命令、技能、权限规则照样在 Code Puppy 里生效。
-  不再生效的只有被剔除的那几类(多数今天本就不起作用:MCP 被默认拒绝、实验开关被注入盖过、模型在 Code Puppy 有默认模型时被盖过);它们逐条写进记录与一行日志。
-  之后在 `~/.config/opencode` 里的改动不再影响 Code Puppy —— owner 已接受「以后想两边都生效的设置，要写两遍」。
+- 用户看到什么:什么都不用做,界面上没有新东西。第一次启动后,他在独立 OpenCode 里写的全局指令、自定义 agent、命令、技能、权限规则、格式化与语言服务设置
+  照样在 Code Puppy 里生效。不在允许清单里的内容(插件、MCP、模型服务、策略、默认模型、实验开关、网页搜索、压缩等设置)与指向来源目录之外的软链接不带过来,
+  逐条写进记录与一行日志。之后在 `~/.config/opencode` 里的改动不再影响 Code Puppy —— owner 已接受「以后想两边都生效的设置，要写两遍」。
 
 **其它随之而定的**。
-- `OPENCODE_CONFIG_DIR` 不再改变 Code Puppy 引擎的配置目录(只决定导入从哪里读):否则一个导出就能让引擎丢掉出厂层与白名单。
-- 用户手改 `codepuppy.jsonc` 改坏时:引擎跳过这份文档、记警告(P-15),出厂层不受影响;今天合成文件会保留上一份好的结果,G4 后用户层在改坏期间不生效。
-- 首页「配置文件有语法错误」横幅(`config-broken-banner.tsx:12-17`,数据来自 `ext-config.ts:1509-1525` 的 `configHealth`)今天检查的是独立 OpenCode 的共享文件
-  (`ext-config.ts:106-113` 的 `userConfigPath`),因为引擎读它。G4 后它改查引擎真正装载、用户会写的那份:`paths.userConfig`(`codepuppy.jsonc`);
-  逃生阀置位时查 `ENGINE_GLOBAL_IMPORTED_FILE`。文案与按钮不变 —— 上一条「改坏期间用户层不生效」由它报出来。
-- 启动文档的形状不变,`paths.engineConfigDirectory` 的值换成新目录。
+- `OPENCODE_CONFIG_DIR` 不再改变 Code Puppy 引擎的配置目录(只决定导入从哪里读、隔离排除哪个目录):否则一个导出就能让引擎丢掉出厂层与白名单。
+- 首页「配置文件有语法错误」横幅(`config-broken-banner.tsx:12-17`,数据来自 `ext-config.ts:1509-1525` 的 `configHealth`)今天用 v1 键表判断独立 OpenCode 的共享文件
+  (`ext-config.ts:106-113`;合法的 `policies`、`agents` 会被报成整份忽略,根为 `[]` 却判健康,`ext-config.ts:1499,1525`)。G4 后它查 `codepuppy.jsonc`
+  (逃生阀置位时查 `ENGINE_GLOBAL_IMPORTED_FILE`),判法换成 `checkEngineConfigDocument`:`rejected` 才显示横幅,原因文字改为
+  「配置文件有错误,修好之前沿用上一次能用的版本」(与副本行为一致);`ignored` 的字段只进日志,不显示横幅。按钮不变。
+- 启动文档 v2:多 `paths.standaloneConfigDirectory`;`paths.engineConfigDirectory` 的值换成新目录。
 
 ## 5. 数据与失败
 
@@ -563,11 +640,11 @@ G4 后用户层在后、用户胜。这与命令一致,也是 `engine-explicit-c
 
   | 窗口 | 怎么到达 | 结果 |
   | --- | --- | --- |
-  | 导入中途失败(磁盘满、权限、来源里读不了的文件) | 首次切换那次启动 | 删暂存、不写记录、记一行原因;引擎照常启动但这次没有导入内容;下次启动重来。来源不动 |
-  | 导入写完、写记录之前进程被杀 | 同上 | 下次启动见无记录 ⇒ 删残留暂存、整次重来;已就位的条目被同样内容覆盖(幂等) |
+  | 导入中途失败(磁盘满、权限、来源里读不了的文件) | 首次切换那次启动 | 暂存未发布 ⇒ 删暂存、不写记录、记一行原因;引擎照常启动,看到的是导入前的目录;下次启动重来。来源不动 |
+  | 两次改名之间进程被杀 | 同上 | 下次启动见 `engine-global` 不在而 `engine-global.prev` 在 ⇒ 改回再重来;记录随整批发布,不会出现「内容在、记录缺」或反过来 |
   | 出厂层文件写失败 | sidecar 注入时 | 与今天合成文件写失败同一条路:#613 注入失败上报;引擎起来但没有白名单与出厂命令 ⇒ 这一代按 `injection-failed` 发布 |
-  | 用户改坏 `codepuppy.jsonc` | 手改 | 引擎跳过用户层并记警告,首页横幅报错(§4.7);出厂层与导入内容照常 |
-  | 来源目录里有指向别处的软链接 | 用户布局 | 原样复制为软链接;目标不存在时与今天一样由引擎按缺失处理 |
+  | 用户改坏 `codepuppy.jsonc` | 手改 | `checkEngineConfigDocument` 判 `rejected` ⇒ 不更新 `codepuppy.engine.jsonc`,引擎继续用上一份可用的用户层(含其中的拒绝策略);首页横幅报错;修好后下一次变化即更新 |
+  | 来源目录里的软链接指出来源、成环或解析不了 | 用户布局 | 不复制,写进记录;指在来源内的复制为实体副本 |
 
 ## 6. 架构落点
 
@@ -584,6 +661,10 @@ G4 后用户层在后、用户胜。这与命令一致,也是 `engine-explicit-c
 | G4:两个目录的唯一推导 | ui-mac 主进程 `engine-paths.ts`(已有) | — | 今天的推导规则原样搬进 `standaloneOpenCodeConfigDirectory` |
 | G4:首次切换导入 | ui-mac 主进程,启动早期与 REQ-059 对账同一处 | main → `engine-paths.ts` | 原子写法沿用 `writeSecretFileAtomic` / `ext-atomic-fs.ts` 的先写后改名形状 |
 | G4:出厂层文件的写入与技能变化时的重写 | ui-mac sidecar,取代 `engine-explicit-config.ts` 的合成 | sidecar → util | `explicitSkillDirs`、`applyPromptTakeover`、`engineModelConfig` 原样 |
+| G4:用户层最后一份可用副本 | ui-mac sidecar,同一个监听 | sidecar → core 自有文件 | `checkEngineConfigDocument` |
+| G4:「能装载」的唯一判法 `checkEngineConfigDocument` | `packages/core/src/config/codepuppy-document-check.ts`(Code Puppy 自有,新) | 只组合 core 已导出的 JSONC 解析、`ConfigNormalize`、`Info` | 引擎 `parseInfo` 的同一组函数(`config.ts:136-166`),由上游探针钉住 |
+| G4:隔离判定 | `packages/core/src/config/codepuppy-isolation.ts`(Code Puppy 自有,新);接管 `core/src/config/discovery.ts` 与 `core/src/config.ts` 各一处 `codepuppy(...)` 块 | → util(`tryCodePuppyBootstrap`) | 上游「全局根不经项目上溯重入」的同一判定(`discovery.ts:121-125`) |
+| G4:引擎入口外层 `Global` 用同一配置根 | `ui-mac/engine/engine-embed.ts`(Code Puppy 自有) | — | `Global.layerWith`(`util/src/global.ts:84`) |
 
 - **新模块**:本仓没有 `docs/architecture/modules.md`,落点理由记在这里:进程级发布 / 读取按 `packages/schema/AGENTS.md:8` 不能进 schema;
   util 是 main、sidecar、引擎 bundle、core、plugin 都已能 import、不加依赖边、也没有包规则限制的最低层(P-04),ext 用相对路径。
@@ -600,6 +681,9 @@ G4 后用户层在后、用户胜。这与命令一致,也是 `engine-explicit-c
   main 自己内部仍以 `process.env` 串接的部分(`applyAuthEnv` → 密钥同步、main 多处读逃生阀)不在本设计改动之列。
 - **架构约束**:K2 较现在更好;K1 不变。包规则:schema 只留纯函数(`engineNetFailurePath` 改成显式参数正是为此),发布 / 读取在 util。
   北极星:新增的是自有文件,不是接管;上游路径里的改动限于既有 `codepuppy(...)` 块(§4.3)。
+  G4 例外:新增两处接管(`core/src/config/discovery.ts`、`core/src/config.ts`,各一处 `codepuppy(...)` 块,理由与守卫见 §4.7「隔离」),
+  进 `UPSTREAM_EXCLUDES` 与 ADR-047「精确接管面」;`checkEngineConfigDocument` 是对上游 `parseInfo` 判法的复述,作为 K2 已知偏离记进 `constraints.md`,
+  守法同 `ext/src/policy/gate.ts`:上游探针逐例对真引擎钉住。
   ADR-048:登记册里机制文字引用了环境变量的四条(P-10)在迁移对应键组的那个提交里改写握法与测试名,决定本身不变,不退役任何条目。
 - **工程标准**:①用户可调的开关只在构建器一处读(无文档宿主的两项在兼容入口一处读),出厂禁用名单是常量不是配置;②一个值一个主人(上条);
   ⑤坏文档以具名错误 `CodePuppyBootstrapError` 失败,构建器与解析器的日志只写字段路径或变量名,不写值。
@@ -607,8 +691,10 @@ G4 后用户层在后、用户胜。这与命令一致,也是 `engine-explicit-c
   S1 启动文档里没有任何密钥值:两处引用字段只容得下 `{file:}` 引用,两个 URL 字段只容得下无凭据 URL(无 userinfo、无查询串、无片段),其余字段没有能装凭据的形状;
   S2 启动文档不进环境,子进程拿不到;S3 每个进程只发布一次、深冻结、读方不改;S4 引擎口令只在 `StartCommand`;
   S5 sidecar 环境里没有 `CODEPUPPY_*`(EXTRA 也放不回)。
-  G4 另加两条:S6 独立 OpenCode 的全局目录不在引擎的任何配置层里,它的策略、命令、插件都碰不到 Code Puppy(P-13 测到今天的洞);
-  S7 首次导入不带任何能压过 Code Puppy 决定或能执行代码的内容(`policies`、`providers`、`mcp`、`plugins`、插件 / 工具目录、`codepuppy-*` 名字、出厂命令名)。
+  G4 另加三条:S6 独立 OpenCode 的内容不在引擎的任何配置层里 —— 全局层换根、项目发现排除它的别名、共享库里别人登录带来的 integrated / wellknown 文档不装载;
+  它的策略、命令、插件都碰不到 Code Puppy(P-13 测到今天的洞);
+  S7 首次导入只带允许清单里的规范键,判在引擎归一化之后,未知即不带;文件按解析后的真实路径判,不跟软链接出来源,出厂命令名与 `codepuppy-*` 名字按解析后的内容剔除;
+  S8 用户层的拒绝策略不会因为一次改坏而消失(最后一份可用副本)。
   进程内的第三方代码本就能做任何事,这不是对它的隔离(与今天相同);它去掉的是「改一个环境变量就能翻掉 ext 的判决」这条随手可走的路。
 - **被否决的替代**:
   1. 写一个启动文档文件、环境变量里只放路径 —— 子进程照样能顺着路径读到,每代还多一次写盘与清理,比 IPC 多出东西而没有好处。
@@ -625,6 +711,10 @@ G4 后用户层在后、用户胜。这与命令一致,也是 `engine-explicit-c
   12. G4 让 main 在每次写技能账本时直接重写出厂层、删掉监听 —— 要穷举 `skills-enabled.json` 与 `current.json` 的每个写方,漏一个就悄悄过期;监听不管写方是谁。
   13. G4 继续读独立目录、只是把出厂层放进全局层 —— 两份全局目录引擎只认一个,读独立目录就放不进出厂层;这正是 owner 选「搬一份」的原因。
   14. G4 把全局目录设在 `<userData>/codepuppy-engine-config/` —— 见 P-17。
+  15. G4 导入用原始键黑名单(R2 前的写法)—— 旧键经归一化会变回策略、插件与模型服务(P-19);改为归一化后的允许清单。
+  16. G4 把软链接原样复制(R2 前的写法)—— 引擎扫描跟随软链接(P-22),出厂命令名的剔除就被绕过;改为解析后复制实体。
+  17. G4 让 `config.file` 直接指用户的 `codepuppy.jsonc`(R2 前的写法)—— 一次改坏就撤掉用户的拒绝策略(P-24);改为同目录的最后一份可用副本,不与出厂层合成。
+  18. G4 只接管 `wellknown.ts`、或用移除指令关 Console 插件 —— 见 §4.7「隔离」。
 
 ## 8. 拆分决定
 
@@ -647,21 +737,34 @@ G4 后用户层在后、用户胜。这与命令一致,也是 `engine-explicit-c
     G3 之后例外名单只剩 `CODEPUPPY_ENV_ALLOWLIST_EXTRA`,§4.5 的环境规则检查以最终形态落在这一组。
   - 三组在同一个 PR 里进 `alpha`;中间提交不单独出货。中间提交之间混用 bundle 会因形状不同在第一次读时失败(§4.1)。
 - **G4 —— Code Puppy 自有的引擎全局配置目录**(owner 2026-11-12 决定,§4.7):排在最后,单独一个 PR,可以单独回滚。依赖 G1–G3 已在 `alpha`
-  (启动文档的 `paths.engineConfigDirectory` 与 `paths.userConfig` 是它的输入),启动文档形状不变。
-  一个提交边界里同时完成:`engine-paths.ts` 的两个函数与六处改调、导入与记录、出厂层文件取代合成文件、监听只留技能一半、`config.file` 直接给 `codepuppy.jsonc`、
-  REQ-059 的独立目录那一半退役、配置健康检查改目标、I-03 探针 P3 / P5 的锚点从 `engine-explicit-config.ts` 移到新的出厂层写入处。
-- **G4 回滚**:revert 这个 PR ⇒ 引擎的 `config.directory` 回到独立 OpenCode 的共享目录,合成显式文件与完整监听回来(下一次启动重新生成)。
+  (启动文档的 `paths.engineConfigDirectory` 与 `paths.userConfig` 是它的输入);启动文档升到 v2,多 `paths.standaloneConfigDirectory`。
+  一个提交边界里同时完成:`engine-paths.ts` 的两个函数与六处改调、引擎入口外层 `Global` 换根、两处隔离接管与登记、导入与记录、出厂层文件取代合成文件、
+  用户层最后一份可用副本、`checkEngineConfigDocument` 及其上游探针、REQ-059 的独立目录那一半退役、配置健康检查改目标与判法、
+  I-03 探针 P3 / P5 的锚点从 `engine-explicit-config.ts` 移到新的出厂层写入处。
+- **G4 回滚**:revert 这个 PR ⇒ 引擎的 `config.directory` 回到独立 OpenCode 的共享目录,合成显式文件与完整监听回来(下一次启动重新生成),两处接管撤回。
   数据后果:导入从来只复制、不动来源,所以回滚后看到的就是切换前的那份共享目录,外加用户在切换期间写进去的东西;
-  `engine-global/` 原样留在磁盘上,回滚后的代码不读也不删它,导入的内容与记录都不丢。再次应用 G4 时记录在,不会重复导入,用户在 `engine-global/` 里的改动照样在。
-  切换期间只写进 `engine-global/` 的改动在回滚后不生效(它们本来就只属于 Code Puppy 的目录)。
+  `engine-global/` 与 `codepuppy.engine.jsonc` 原样留在磁盘上,回滚后的代码不读也不删它们,导入的内容与记录都不丢。再次应用 G4 时记录在,不会重复导入,
+  用户在 `engine-global/` 里的改动照样在。切换期间只写进 `engine-global/` 的改动在回滚后不生效(它们本来就只属于 Code Puppy 的目录)。
+  共享库里的 well-known 来源与 Console 连接从未被动过,回滚后照今天的方式装载。
 - **G4 的证明义务**(plan.md 落成会失败的测试;全部在 I-08 预载下跑,P-18):
-  1. 独立配置碰不到 Code Puppy:真引擎、临时 HOME / XDG,独立目录夹具里放 `policies` 放行 `*`、`commands.init`、`plugins`、`plugin/` 目录与 `command/init.md`;
-     以 G4 的目录启动 ⇒ 白名单外的模型服务不可用、`/init` 是出厂模板、夹具插件没有装载。反向臂:`config.directory` 指回夹具 ⇒ 白名单外的服务变可用(P-13 那个洞),测试红。
-  2. 导入的内容可用:夹具含 `AGENTS.md`、agent、命令、技能、相对的 `instructions` 条目与 `{file:./x}` 引用 ⇒ 导入后真引擎的 agent / 命令 / 技能 / 指令列表里都有;
-     被剔除的键、插件目录、`codepuppy-*` agent、与出厂命令同名的命令都不在导入结果里,且逐条出现在记录的 `skipped`。反向臂:去掉复制步骤 ⇒ 红。
-  3. 不读真实家目录:导入来源与引擎配置目录都解析在预载给的临时根之内;反向臂:撤掉预载对 HOME 的改写 ⇒ 守卫红。
-  4. 只复制一次、来源不动:第二次启动不导入;来源目录导入前后逐字节相同。
-  5. 逃生阀 `CODEPUPPY_LEGACY_INSTALL_ROOT` 的安装写进 `ENGINE_GLOBAL_IMPORTED_FILE`,从不写出厂层文件;出厂层重写不会抹掉它。
+  1. 独立内容碰不到 Code Puppy(真引擎、临时 HOME / XDG):独立目录夹具里放 `policies` 放行 `*`、旧键 `enabled_providers` 与 `plugin`、`commands.init`、`plugin/` 目录与
+     `command/init.md`;另造一个项目,其 `.opencode` 是指向夹具的软链接;共享库里写一条 well-known 来源及其缓存配置(放行 `*`)。以 G4 启动 ⇒ 白名单外的模型服务不可用、
+     `/init` 是出厂模板、夹具插件没有装载,在那个项目里也一样。反向臂各一条:`config.directory` 指回夹具 ⇒ 白名单外的服务变可用(P-13);撤掉项目发现的排除 ⇒
+     项目里 `/init` 变成夹具的;撤掉 integrated / wellknown 过滤 ⇒ 白名单外的服务变可用。
+  2. 导入只带允许清单、只认解析后的内容:夹具的 `providers` / `provider` / `enabled_providers` / `plugin` / `plugins` / `policies` 与清单外的键不进 `engine-global/opencode.json`,
+     逐条进记录;夹具里一个指向来源内另一目录的 `commands` 软链接,其中的 `init.md` 不被复制;指向来源外的软链接不被复制并记为 `link-outside-source`。
+     反向臂:改用原始键黑名单 ⇒ 导入后白名单外的服务可用;改为保留软链接 ⇒ `/init` 被覆盖。
+  3. 导入的内容可用:夹具含 `AGENTS.md`、agent、命令、技能、相对 / 来源内绝对的 `instructions` 与 `skills` 条目、`{file:./x}` 与 `{file:../y}` 引用 ⇒ 导入后真引擎的
+     agent / 命令 / 技能 / 指令列表里都有,且没有任何文件读取落在来源目录内(来源设为只读并在导入后改名,引擎照常)。反向臂:去掉复制步骤 ⇒ 红。
+  4. 整批发布:在发布第 N 步注入失败 ⇒ 引擎看到的是导入前的目录、没有记录,下一次启动完整导入;两次改名之间中断 ⇒ 下一次启动改回并完成;
+     切换后用户在 `engine-global/` 写的文件在重试中保留。
+  5. 用户层不因改坏而失效:`codepuppy.jsonc` 含一条 `tool.use` 拒绝,运行中写坏 ⇒ 该工具仍被拒、横幅显示;修好 ⇒ 副本更新。反向臂:副本闸门放行坏文档 ⇒ 工具变可用。
+     启动时文件已坏而副本在 ⇒ 用副本。
+  6. 健康检查与 `checkEngineConfigDocument` 同判:合法的 `policies`、`agents` 不报横幅;根为 `[]` 报横幅;上游探针在同一组夹具上把它的结论与真引擎是否装载逐一对齐。
+  7. 不读、不建独立目录:导入来源与引擎配置目录都解析在预载的临时根之内;以 G4 启动后,独立目录若原本不存在则仍不存在(外层 `Global` 不再 mkdir 它);
+     反向臂:撤掉预载对 HOME 的改写 ⇒ 守卫红。
+  8. 只复制一次、来源不动:第二次启动不导入;来源目录导入前后逐字节相同。
+  9. 逃生阀 `CODEPUPPY_LEGACY_INSTALL_ROOT` 的安装写进 `ENGINE_GLOBAL_IMPORTED_FILE`,从不写出厂层文件;出厂层重写不会抹掉它。
 
 ## 10. 裁决与审查结论
 
@@ -683,14 +786,19 @@ G4 后用户层在后、用户胜。这与命令一致,也是 `engine-explicit-c
 | R14 子测试进程在 import ext 前用生产解析器发布自己的文档(R1 后新增) | P-09 第 3 项;`plugin-reload-wiring.cases.ts:31` 先例 |
 | R15 迁移按键组 G1–G3 切,每组一个提交边界,文档只含已迁完的键组,无共存(R1 后改,原为「先接通、后搬键」两片) | R1 第 4 条;§9 |
 | R16 空串按键保留今天的含义:`OPENCODE_DISABLE_MODELS_FETCH=""` 拉取开、`OPENCODE_EXPERIMENTAL_FILEWATCHER=""` 监听关、`CODEPUPPY_DEFAULT_MODEL=""` 不设默认模型;其余键空串同未设(R1 后改,原为「空串当缺席」) | P-08 [测];`codepuppy-models.ts:274,278`;R1 第 5 条 |
-| R17 目录 = `<globalRoot>/engine-global`;只换配置根,数据根与会话库不动;`OPENCODE_CONFIG_DIR` 不再改变它 | P-05、P-17;W2(`process-fence-profile.ts:47`) |
+| R17 目录 = `<globalRoot>/engine-global`;`start()` 的 `config.directory` 与引擎入口外层 `Global` 都用它;只换配置根,数据根与会话库不动;`OPENCODE_CONFIG_DIR` 不再改变它(R2 后补外层 `Global`) | P-05、P-17、P-26;W2(`process-fence-profile.ts:47,155`);R2 第 9 条 |
 | R18 `engine-paths.ts` 是唯一推导处:`engineGlobalConfigDirectory` 与 `standaloneOpenCodeConfigDirectory`,六处按 §4.7 的表改调 | P-16 |
-| R19 出厂层(白名单 `policies`、出厂命令、`skills`)写进 `engine-global/opencode.jsonc`;`config.file` 直接给 `codepuppy.jsonc`;合成文件与监听的用户文件一半删除,监听只剩技能一半;同 id 技能改为用户层胜(与命令同序) | P-12、P-14、P-15;I-03 探针 P3 / P5 |
+| R19 出厂层(白名单 `policies`、出厂命令、`skills`)写进 `engine-global/opencode.jsonc`;合成文件删除;`config.file` 给与 `codepuppy.jsonc` 同目录的最后一份可用副本 `codepuppy.engine.jsonc`,监听校验后才更新;同 id 技能改为用户层胜(R2 后改,原为直接给 `codepuppy.jsonc`) | P-12、P-14、P-15、P-24;I-03 探针 P3 / P5;R2 第 7 条 |
 | R20 首次切换由 main 静默复制一份(镜像目录、过滤配置键、记录与日志),不弹提示、不要用户操作 | owner「需要搬一份」「将缺点收缩到最小」;开发原则 1「每增加一个步骤……必须考虑是否有价值」;被否决替代 10 |
-| R21 导入剔除 `policies`、`providers`、`mcp`、`plugins`、`model`、`default_agent`、`experimental`、`enterprise`,不复制插件 / 工具目录与依赖文件,不复制 `codepuppy-*` agent 与出厂命令同名的命令 | P-13 [测]:带上 `policies` 即重开洞;P-14(插件会装进引擎);ADR-048 决定 2 |
+| R21 导入是允许清单(`agents` 去 `codepuppy-*`、`commands` 去出厂名、`instructions`、`skills`、`permissions`、`formatter`、`lsp`、`watcher`、`shell`),判在引擎归一化之后;清单外与被丢弃的字段一律不带并逐条记下;文件只复制解析后落在来源内的实体,剔除规则作用在解析后的内容上(R2 后改,原为原始键黑名单与保留软链接) | P-13 [测]、P-19、P-22;R2 第 1、4 条 |
 | R22 导入写进 `opencode.json`(先装载)、出厂层写进 `opencode.jsonc`(后装载):导入内容在设置上低于出厂层,与今天「独立全局层低于显式层里的出厂内容」同序 | P-12(`config.ts:266-273`、`discovery.ts:12`) |
-| R23 REQ-059 抬独立目录 `provider` 的那一半退役;逃生阀写入改指自有目录的导入文件;配置健康检查改查 `codepuppy.jsonc` | P-16;`config-broken-banner.tsx:12-17`、`ext-config.ts:106-113,1509-1525` |
-| R24 回滚 = revert G4;导入只复制不动来源,`engine-global/` 留着不删,再应用不重复导入 | §9 |
+| R23 REQ-059 抬独立目录 `provider` 的那一半退役;逃生阀写入改指自有目录的导入文件;配置健康检查改查 `codepuppy.jsonc`,判法换成 `checkEngineConfigDocument`,只在整份不能装载时显示横幅(R2 后补判法) | P-16、P-25;`config-broken-banner.tsx:12-17`;R2 第 8 条 |
+| R24 回滚 = revert G4;导入只复制不动来源,`engine-global/` 与副本留着不删,再应用不重复导入;导入整批发布(暂存 → 两次改名 → 失败改回),记录随批发布(R2 后补整批发布) | §9;R2 第 6 条 |
+| R25 项目发现照旧排除独立目录的 canonical 身份及其配置文件别名;会话开在它里面时不做项目上溯 —— 接管 `config/discovery.ts` 一处(R2 后新增) | P-20;R2 第 2 条 |
+| R26 Code Puppy 下不装载 integrated 与 wellknown 配置文档(共享库里的凭据与 KV 不动)—— 接管 `core/src/config.ts` 一处;被否决:移除指令(Console 插件受守护)、只接管 `wellknown.ts`(覆盖不到 Console)(R2 后新增) | P-21;ADR-047 决策 4「不连 Console」;R2 第 3 条 |
+| R27 引用按各读方的真实基准迁移:`{file:}` 按文档目录;相对的 `instructions` / `skills` 不动;指向来源内的绝对引用改指副本;逃出来源的相对 `{file:}` 改成原目标绝对路径(R2 后新增) | P-23;R2 第 5 条 |
+| R28 「能装载」只有 `checkEngineConfigDocument` 一个判法,组合引擎 `parseInfo` 的同一组函数,由上游探针钉住;副本闸门、健康检查、导入共用(R2 后新增) | `config.ts:136-166`;K2 已知偏离的既有守法 |
+| R29 启动文档在 G4 升到 v2,加 `paths.standaloneConfigDirectory`(R2 后新增) | §4.1、§4.7 |
 
 **本设计带来的 owner 可见变化**(按派发书「行为变了必须点名」):
 
@@ -706,12 +814,14 @@ G4 后用户层在后、用户胜。这与命令一致,也是 `engine-explicit-c
 
 1. 什么都不用做,界面上没有新东西。独立 OpenCode 里写的全局指令(`AGENTS.md`)、自定义 agent、命令、技能、权限规则、格式化与语言服务设置,第一次启动时被复制进
    Code Puppy 自己的目录,照样生效。
-2. 不再进 Code Puppy 的:独立 OpenCode 的插件、MCP、模型服务与凭据设置、策略、默认模型 / 默认助手、实验开关、企业设置,以及占用 Code Puppy 名字的命令与 agent。
-   其中 MCP、模型与实验开关今天就被 Code Puppy 盖掉;策略今天能绕过模型服务白名单(P-13),之后不能;插件今天会装进来,之后要经 Code Puppy 的同意或定制中心。
-   每一条写进 `engine-global/codepuppy-import.json` 与一行日志。
+2. 只复制上面这几类(允许清单);其余都不带:插件、MCP、模型服务与凭据、策略、默认模型 / 默认助手、实验开关、企业设置、网页搜索与压缩等设置,
+   占用 Code Puppy 名字的命令与 agent,以及指向独立目录之外的软链接。其中 MCP、实验开关今天就被 Code Puppy 盖掉;策略今天能绕过模型服务白名单(P-13),之后不能;
+   插件今天会装进来,之后要经 Code Puppy 的同意或定制中心。每一条写进 `engine-global/codepuppy-import.json` 与一行日志。
 3. 之后在 `~/.config/opencode` 里的改动不再影响 Code Puppy;想两边都生效要写两遍(owner 原话「以后想两边都生效的设置，要写两遍」)。
 4. 导出 `OPENCODE_CONFIG_DIR` 不再改变 Code Puppy 读的配置目录。
-5. 首页「配置文件有语法错误」横幅改为检查 `codepuppy.jsonc`;手改把它改坏时,里面的内容在修好之前不生效(今天会沿用上一份好的)。
+5. 用独立 OpenCode 登录过 OpenCode Console 或其它 well-known 来源的话,那份登录带来的远程配置不再进 Code Puppy(登录本身留在共享数据里不动)。
+6. 首页「配置文件有错误」横幅改为检查 `codepuppy.jsonc`,判法与引擎一致(合法的新写法不再误报);手改把它改坏时,Code Puppy 沿用上一次能用的版本,
+   横幅文字改为「配置文件有错误,修好之前沿用上一次能用的版本」。今天这种情况在运行中也是沿用上一份,只是启动时会丢掉;之后启动时也沿用。
 
 **owner 已决定:做 Code Puppy 自有的引擎全局配置目录**(R11;2026-11-12,原话见批准记录)
 
@@ -728,10 +838,19 @@ G4 后用户层在后、用户胜。这与命令一致,也是 `engine-explicit-c
 | 同上 | 同上 | **M4 单通道规则与切片冲突**(A 片发完整 v1 时环境仍在传同名键;`sidecar-env.ts:273` 的 EXTRA 能放回已迁走的键)—— 采纳,修 | §9 改为 G1–G3 键组,每组一个提交边界,文档只含已迁完的键组;§4.5 `CODEPUPPY_` 前缀拒绝排在 EXTRA 之前,测试把旧键全部写进 EXTRA 仍断言不漏;R4、R15 | — |
 | 同上 | 同上 | **m1 行为清单漏了空串变化**(`engine-server-options.ts:67-68`)—— 采纳,修(按键保留原语义) | §4.4 表新增「导出为 `""`」一列;构建器直接调 `engineDesktopToggles`;`defaultModelOverride` 保留空串;R16。证据:P-08 [测],另查出 `CODEPUPPY_DEFAULT_MODEL=""` 同类(`codepuppy-models.ts:274,278`) | — |
 | 同上 | 同上 | **ARCH-NOTE 全局运行时注册表进了 schema**(`packages/schema/AGENTS.md:8` 禁止)—— 采纳,修 | 模块移到 `packages/util`(P-04、§6);`engineNetFailurePath` 的标记改为显式参数,schema 只留纯函数;R2 | — |
+| R2 · 设计 `e6da3448e4` 的 G4(§4.7、§9 G4 各条、R11、R17–R24、P-12–P-18)· 代码 `778f44a41c` · 结论 FIX-THEN-MERGE | Codex gpt-6.1-sol,会话 01a1cefe,只读静态审计;编排器裁决:全部采纳 | **M1 原始键黑名单漏掉会被归一化成策略 / 插件 / 模型服务的旧键**(`normalize.ts:168,185,410`;审计方内存探针:剔除后白名单外 `anthropic=allow`)—— 采纳,修 | §4.7 导入改为归一化后的允许清单,未知即不带并记下;R21;§9 义务 2。证据:P-19 | — |
+| 同上 | 同上 | **M2 链到独立目录的项目 `.opencode` 换根后不再被排除**(`discovery.ts:121`)—— 采纳,修 | §4.7「隔离」第二行:接管 `discovery.ts`,照旧排除独立目录的 canonical 身份与文件别名;R25;§9 义务 1。证据:P-20 | — |
+| 同上 | 同上 | **M3 「不连 Console」排除不了 well-known**(共享库里的登录与缓存配置,策略早于出厂层;`wellknown.ts:139,209`、`config.ts:348`)—— 采纳,修(并入同类的 Console integrated 文档) | §4.7「隔离」第三行:接管 `config.ts`,Code Puppy 下不装载 integrated / wellknown 文档,共享库不动;R26;§9 义务 1。证据:P-21 | — |
+| 同上 | 同上 | **M4 整目录软链接被原样复制,引擎跟随软链接,链进来的 `init.md` 能覆盖 `/init`**(`command.ts:143`)—— 采纳,修 | §4.7 文件只复制解析后落在来源内的实体,剔除作用在解析后的内容上,指出来源的不复制;R21;§9 义务 2。证据:P-22 | — |
+| 同上 | 同上 | **M5 引用统一按来源目录改写会读错位置,指向旧根的绝对引用继续读旧目录**(`skill.ts:101`、`instruction.ts:113`)—— 采纳,修 | §4.7 引用迁移表按各读方基准;R27;§9 义务 3。证据:P-23 | — |
+| 同上 | 同上 | **M6 逐项改名中途失败会留下一半已发布**(§5 旧行与之矛盾)—— 采纳,修 | §4.7 整批发布(暂存 → 两次改名 → 失败改回,记录随批);§5 失败表;R24;§9 义务 4 | — |
+| 同上 | 同上 | **M7 删掉「保留上一份」会让一次改坏撤掉用户的拒绝策略**(`policy.ts:98` 缺省放行;今天 `engine-explicit-config.ts:113` 保留)—— 采纳,修 | §4.7 用户层最后一份可用副本 `codepuppy.engine.jsonc`(同目录、不合成),启动时也用;R19;§9 义务 5。证据:P-24 | — |
+| 同上 | 同上 | **M8 健康检查仍用 v1 键表**(合法 `policies` / `agents` 误报,根为 `[]` 判健康;`ext-config.ts:1499,1525`)—— 采纳,修 | §4.7 改用 `checkEngineConfigDocument`,只在整份不能装载时显示横幅,忽略的字段进日志;R23、R28;§9 义务 6。证据:P-25 | — |
+| 同上 | 同上 | **M9 引擎入口外层 `Global.node` 仍按环境取配置根并 mkdir**(`engine-embed.ts:48`、`global.ts:68,79`)—— 采纳,修 | §4.7 外层 `Global` 用同一配置根;R17;§9 义务 7。证据:P-26 | — |
 
 修正后未再送审:按 delivery-review §2,采纳的 finding 以修正与证据收口,不自动开下一轮;是否冻结由编排器定。
 
-G4(§4.7、§9 的 G4 各条、R11、R17–R24、P-12–P-18)是 owner 批准后补写的,未经审查;它改的是引擎配置层序并复制用户数据,按 delivery-review §2 属于宜做对抗审查的风险项,是否送审由编排器定。
+G4 第一版(`e6da3448e4`)经 R2 审查(下表);R2 的修正以修正与证据收口,未再送审(delivery-review §2)。
 
 **留档**
 

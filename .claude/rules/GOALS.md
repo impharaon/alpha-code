@@ -2,9 +2,9 @@
 
 > 本文只记录长期产品目标、成功信号与边界,不记录当前 Sprint、Issue
 > 状态、优先级或完成比例。活跃交付见
-> [`alpha-code` Issues](https://github.com/jinjunnn/alpha-code/issues) 与
-> [`Alpha Delivery`](https://github.com/users/jinjunnn/projects/2);产品组合目标见
-> [`alpha-work/GOALS.md`](https://github.com/jinjunnn/alpha-work/blob/main/GOALS.md)。
+> [`alpha-code` Issues](https://github.com/impharaon/alpha-code/issues) 与
+> [`Alpha Delivery`](https://github.com/users/impharaon/projects/2);产品组合目标见
+> [`alpha-work/GOALS.md`](https://github.com/impharaon/alpha-work/blob/main/GOALS.md)。
 
 ## Mission
 

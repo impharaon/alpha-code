@@ -11,6 +11,7 @@ import { Location } from "../location.js"
 import { Plugin } from "../plugin.js"
 import { LocationWatcherPolicy } from "./location-watcher-policy.js"
 import { Watcher } from "./watcher.js"
+import { projectWatchEnabled, projectWatchIgnore } from "./codepuppy-project-watch.js" // codepuppy(UI parity)
 
 export interface Interface {}
 
@@ -77,19 +78,49 @@ const layer = Layer.effect(
           )
         }).pipe(Effect.withSpan("LocationWatcher.reconcile", { attributes: { directory: location.directory } })),
       )
+    // codepuppy(UI parity) ── the whole project is watched too, as Code Puppy 0.1.26 did, when main turned it on
+    // (codepuppy-project-watch.ts): files created, edited or deleted outside the app reach the file panel.
+    const projectWatch = projectWatchEnabled(process.env)
+    let project: { key: string; scope: Scope.Closeable } | undefined
+    const reconcileProject = () =>
+      lock.withPermit(
+        Effect.gen(function* () {
+          if (stopped || !projectWatch) return
+          const ignore = projectWatchIgnore(location.directory, policy.current())
+          const key = JSON.stringify(ignore)
+          if (project?.key === key) return
+          if (project) yield* Scope.close(project.scope, Exit.void)
+          const scope = yield* Scope.make()
+          project = { key, scope }
+          yield* Effect.gen(function* () {
+            const updates = yield* watcher.subscribe({ path: location.directory, type: "directory", ignore })
+            yield* Stream.runForEach(updates, publish)
+          }).pipe(
+            Effect.catchCauseIf(
+              (cause) => !Cause.hasInterrupts(cause),
+              (cause) => Effect.logError("project watcher subscription failed", { path: location.directory, cause }),
+            ),
+            Effect.forkIn(scope, { startImmediately: true }),
+          )
+        }),
+      )
+    const reconcileAll = () => reconcile().pipe(Effect.andThen(reconcileProject()))
+    // codepuppy ── end
     yield* Effect.addFinalizer(() =>
       lock.withPermit(
         Effect.gen(function* () {
           stopped = true
           if (active) yield* Scope.close(active.scope, Exit.void)
           active = undefined
+          if (project) yield* Scope.close(project.scope, Exit.void) // codepuppy(UI parity)
+          project = undefined
         }),
       ),
     )
-    yield* policy.observe(reconcile)
+    yield* policy.observe(reconcileAll) // codepuppy(UI parity): reconcileAll
     yield* Effect.gen(function* () {
       yield* Plugin.awaitActivation
-      yield* reconcile()
+      yield* reconcileAll() // codepuppy(UI parity)
     }).pipe(
       Effect.catchCauseIf(
         (cause) => !Cause.hasInterrupts(cause),

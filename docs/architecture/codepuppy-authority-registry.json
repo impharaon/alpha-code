@@ -1351,6 +1351,37 @@
           "name": "user, assistant, idle, synthetic, assistant (b.txt), idle, then a later user turn"
         }
       ]
+    },
+    {
+      "id": "project-file-change-events",
+      "decision": "Files created, edited or deleted anywhere in the project, including outside the app, reach the file panel as file change events, as the current release does (0.1.26 project-wide watch).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666) Unit F",
+      "takeovers": [
+        "packages/core/src/filesystem/location-watcher.ts"
+      ],
+      "approval": {
+        "quote": "同意，多接管两个上游文件，需要再唯一权威中记录多接管的内容。",
+        "date": "2026-11-12",
+        "by": "owner (relayed by the orchestrator in the #1666 Unit F addendum)",
+        "reason": "The UI must match the current release (UI parity)."
+      },
+      "mechanism": {
+        "file": "packages/core/src/filesystem/codepuppy-project-watch.ts",
+        "ladder": "L3 (re-taken packages/core/src/filesystem/location-watcher.ts subscribes one recursive watch on the Location's folder when main's OPENCODE_EXPERIMENTAL_FILEWATCHER switch is on, with 0.1.26's ignore list plus configured watcher.ignore, and publishes filesystem.changed)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-project-watch.test.ts",
+          "name": "a file and a file in a subfolder: created, modified and deleted each publish their kind; .git and node_modules publish nothing"
+        },
+        {
+          "file": "packages/core/test/codepuppy-project-watch.test.ts",
+          "name": "with main's switch off, a project file publishes nothing"
+        }
+      ]
     }
   ]
 }

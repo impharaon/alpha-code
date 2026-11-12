@@ -165,6 +165,10 @@ UPSTREAM_EXCLUDES=(
   # 消息开启的回合(后台子任务空闲后完成)的改动;SessionDiff.turn 只认 user 锚点,插件改不了。接管面三处 `codepuppy(UI parity)` 标注。
   # 判据 packages/core/test/codepuppy-session-diff-synthetic.test.ts。
   ':(exclude)packages/core/src/session/diff.ts'
+  # 界面与当前正式版一致(#1666 Unit F;owner 2026-11-12 经编排器转达:「同意，多接管两个上游文件，需要再唯一权威中记录多接管的内容。」):文件面板要收到整个项目的文件
+  # 变化(0.1.26 在主进程打开 OPENCODE_EXPERIMENTAL_FILEWATCHER 时监视整个项目);2.x 的 LocationWatcher 只监视分支文件,没有插件挂点。
+  # 接管面只在 `codepuppy(UI parity)` 标注块,开关与忽略表在自有的 codepuppy-project-watch.ts。判据 packages/core/test/codepuppy-project-watch.test.ts。
+  ':(exclude)packages/core/src/filesystem/location-watcher.ts'
 )
 
 # ── UPSTREAM_PATHS 里住着的 Code Puppy 自有文件:结构性谓词,不是逐文件清单(`#1085` / ADR-043)──

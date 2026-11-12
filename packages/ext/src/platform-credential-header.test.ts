@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { LoadAPIKeyError } from "@ai-sdk/provider"
-import { platformCredentialHeader } from "./platform-credential-header"
+import { platformCredentialHeader, platformRequestCredentialHeader } from "./platform-credential-header"
 
 const GW = "https://gw.example/v1"
 const SENTINEL = "SENTINEL-PLATFORM-CREDENTIAL-41b7"
@@ -74,3 +74,16 @@ describe("platformCredentialHeader —— 判据", () => {
     expect(reads).toBe(0)
   })
 })
+
+describe("platformRequestCredentialHeader —— http.request 上按请求地址判平台节点", () => {
+  test("地址在平台节点之下 ⇒ 与 platformCredentialHeader 同一结果;别的主机、只是前缀相同的路径段 ⇒ 不动", () => {
+    const reads: string[] = []
+    const env = { CODEPUPPY_BASE_URL: GW, CODEPUPPY_PLATFORM_AUTH_REF: "{file:/token}" }
+    const readFile = (file: string) => (reads.push(file), "tok")
+    expect(platformRequestCredentialHeader({ requestURL: `${GW}/chat/completions`, env, readFile })).toBe("Bearer tok")
+    expect(platformRequestCredentialHeader({ requestURL: "https://api.deepseek.com/v1/chat/completions", env, readFile })).toBeUndefined()
+    expect(platformRequestCredentialHeader({ requestURL: `${GW}evil/chat/completions`, env, readFile })).toBeUndefined()
+    expect(reads).toEqual(["/token"])
+  })
+})
+

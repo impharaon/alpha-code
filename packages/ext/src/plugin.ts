@@ -17,7 +17,7 @@ import { applyFactoryDeny, factoryDeniedSkills } from "./factory-deny"
 import { rebrandSystem } from "./prompt-rebrand"
 import { validateCloudToolInput, validateCloudToolOutput } from "./cloud-contract-hook"
 import { platformOutputCap } from "./platform-output-cap"
-import { platformCredentialHeader } from "./platform-credential-header"
+import { platformRequestCredentialHeader } from "./platform-credential-header"
 import { byokOutputCap } from "./byok-output-cap"
 // REQ-157 `#1284`:alpha 送进模型上下文的每段字都在 context-injection.ts 登记并声明上限。import 本身就是
 // 一道闸 —— 任何片段超限,登记簿在模块装载时抛出,ext 整个装不上(2.x 记该插件 failed,`#1665` I4 让 sidecar 不报 ready),
@@ -222,9 +222,11 @@ export const CodePuppyExt: Plugin.Plugin = {
       }
       for (const name of ["context", "compaction", "generate", "title"] as const) await context.session.hook(name, assembleRequest)
       // REQ-236 `#1562`:平台代理节点的凭据每次请求现读,续期热应用不必重启引擎;读不到就抛,请求不发出。
-      await context.session.hook("model.request", (event) => {
-        const authorization = platformCredentialHeader({ providerBaseURL: event.baseURL, env: process.env })
-        if (authorization) event.headers.authorization = authorization
+      // 写在 http.request:2.x 的路由层在 model.request 之后才按 apiKey 写 Authorization(packages/ai/src/route/auth.ts),
+      // 那里加的头会被注入的占位 apiKey 盖掉;http.request 拿到的是鉴权之后、即将发出的请求(#1662 parity B4)。
+      await context.session.hook("http.request", (event) => {
+        const authorization = platformRequestCredentialHeader({ requestURL: event.request.url, env: process.env })
+        if (authorization) event.request.headers.set("authorization", authorization)
       })
 
       // ── 配置域(C10 / L3r / M3)────────────────────────────────────────────────────────────

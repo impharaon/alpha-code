@@ -955,12 +955,16 @@
       ],
       "mechanism": {
         "file": "packages/ext/src/platform-credential-header.ts",
-        "ladder": "L0 (session.hook model / http request in the extension)"
+        "ladder": "L0 (session.hook[\"http.request\"] in the extension: the outgoing request after the route layer's apiKey auth, so the credential, not the injected placeholder, reaches the wire; #1662 parity B4)"
       },
       "tests": [
         {
           "file": "packages/ext/src/plugin-host.test.ts",
           "name": "P6 / S5:平台凭据头只对平台节点、每次现读;别的节点不带;反向臂:不装 ext ⇒ 不带"
+        },
+        {
+          "file": "packages/ui-mac/src/main/token-hot-apply.engine.test.ts",
+          "name": "续期热应用:令牌 A ⇒ A、热应用 B ⇒ B、删文件 ⇒ 具名失败零请求、令牌不进日志与响应;不装 ext ⇒ 占位值被拒(token-hot-apply.engine.cases.ts,2 条)"
         }
       ]
     },

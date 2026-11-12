@@ -107,6 +107,8 @@ export type HostOptions = {
   databasePath?: string
   /** 平台节点的模型表(默认只有一个 `m`)。 */
   platformModels?: Record<string, unknown>
+  /** false ⇒ 注入时不给 ext 目录(反向臂:同一份配置去掉 ext)。默认装。 */
+  ext?: boolean
 }
 
 export type Running = {
@@ -153,7 +155,8 @@ export function codepuppyEngine(options: HostOptions) {
 } }\n`,
   )
 
-  const injection = injectCodePuppyConfig(userData, ext, "stable")
+  const withExt = options.ext !== false
+  const injection = injectCodePuppyConfig(userData, withExt ? ext : undefined, "stable")
   const content = JSON.parse(injection.config.content) as { plugins: string[]; providers: Record<string, { models?: Record<string, unknown> }> }
   content.plugins = [...content.plugins, probeDir]
   // 沙箱里没有已应用的平台目录,平台节点的模型表是空的(`#1556`);补一个模型只为能发出请求
@@ -195,11 +198,12 @@ export function codepuppyEngine(options: HostOptions) {
     // Location 在第一次带目录的请求时才起,插件随之装载:轮询到 ext 与探针都装上
     const status = async (id: string) =>
       (((await send("GET", "/api/plugin")).json?.data ?? []) as Array<{ id: string; state: { status: string } }>).find((plugin) => plugin.id === id)?.state.status
-    for (let i = 0; i < 200 && ((await status("codepuppy.ext")) !== "active" || (await status("codepuppy.test.engine-probe")) !== "active"); i++) await Bun.sleep(50)
-    if ((await status("codepuppy.ext")) !== "active") throw new Error("the real ext is not active in the embedded engine")
+    const ready = async () => (!withExt || (await status("codepuppy.ext")) === "active") && (await status("codepuppy.test.engine-probe")) === "active"
+    for (let i = 0; i < 200 && !(await ready()); i++) await Bun.sleep(50)
+    if (withExt && (await status("codepuppy.ext")) !== "active") throw new Error("the real ext is not active in the embedded engine")
     return { send, close: () => engine.close() }
   }
-  return { start, slot, projectDirectory: slot.projectDirectory }
+  return { start, slot, projectDirectory: slot.projectDirectory, userData }
 }
 
 /** ext 的策略存储(数据根 / 账户 / 工作区与 registerPolicy 同一套);ext 模块在沙箱就位之后才装载。 */

@@ -53,10 +53,6 @@ const result = await Bun.build({
   // schemas this plugin builds (via `tool.schema`) live on a DIFFERENT instance than the
   // server's. opencode's tool ingestion must treat plugin schemas structurally. Validate
   // when wiring G1: load ext → `codepuppy_ping` appears in the tool list AND executes.
-}))
-      },
-    },
-  ],
 })
 
 if (!result.success) {

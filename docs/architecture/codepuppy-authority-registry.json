@@ -314,6 +314,28 @@
       ]
     },
     {
+      "id": "composer-tier-matrix",
+      "decision": "The three composer tiers (Approve all = build, Ask = codepuppy-ask, Read-only = codepuppy-readonly) give each tool class the outcome REQ-236 §2.2 sets (R1, R3–R6, R8, R11 build, R12, R2 read-only); a delegation (a prompt carrying an agent, a non-subtask command that runs as another agent, a subtask command) gets the same decision as the direct subagent call, decided by the session's own agent (#1573).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "#1662 parity",
+      "takeovers": [
+        "packages/opencode/src/session/prompt.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ui-mac/src/main/codepuppy-config-injection.ts",
+        "ladder": "main (injected tier agents) + the re-taken packages/core/src/config/plugin/command.ts (codepuppy(#1573 E4): a command that runs as another agent takes the subagent permission path before switching)"
+      },
+      "tests": [
+        {
+          "file": "packages/ui-mac/src/main/composer-tier-matrix.engine.test.ts",
+          "name": "三档 × R1–R12 与三条委派入口(composer-tier-matrix.engine.cases.ts,15 条)"
+        }
+      ],
+      "note": "Not held on OpenCode 2 (measured 2026-11-12, reported to the coordinator): R2 for Approve all and Ask — the engine's base rule * allow lets external_directory through without asking; R11 ask cells for Ask and Read-only — the engine asks, but the pending request cannot be listed (GET /api/session/:id/permission fails to encode metadata.policy.bindingDigest = undefined from packages/ext/src/policy/gate.ts)."
+    },
+    {
       "id": "tool-policy-settings-api",
       "decision": "Settings reads and writes the tool policy through Code Puppy's API (v1 routes /api/permission/tool-policy/*; OpenCode 2 plugin RPC codepuppy.tool-policy, I5).",
       "adr": [

@@ -15,7 +15,7 @@ last_reviewed: 2026-11-12
 由实施会话在计划阶段写,编排器核对后由同一会话实施。每项一节;决定只链接、不重述;实施中偏离某节,在同一个提交里改那一节。
 
 - 依据:Issue [alpha-code#1662](https://github.com/impharaon/alpha-code/issues/1662)(正文 updatedAt 2026-11-12T06:42:12Z);派发书 `par-parity`(九项 + 六个坏测试);owner 2026-11-09 原话(编排器转述):「不可以因为 opencode 更新把经 codepuppy 拿回的唯一权威再封掉」。v1 的位置一律取 `origin/alpha` @ `9ca7514ca7`;退役注释在 `scripts/gate-files.tsv`(第 192–213、358–378 行一带)与 [plan-i09](../upstream-upgrade-readiness/plan-i09.md)。基点 `lane/1662-parity-proofs` @ `ab31da3d24`。
-- 核对:<计划提交 · 编排器与模型 · 通过或退回的缺口。实施的第一个提交按续派发书的 `Phase:` 行填写。>
+- 核对:`a1dcc2f276` · 编排器 · 通过(续派发书「IMPLEMENT plan a1dcc2f276」:先实测再定,实测不成立的项不提交证明;第 3 项 E4、第 8 项按裁决修;第 1–2、5 项先报告;第 4 项只写接缝前提探针;按组交回)。
 
 ## 共用约定
 
@@ -149,7 +149,8 @@ B1、B3 属 web search 一组;B4 属凭据一组;B2、B5、B6 单独一组。每
 
 | 文件 | 改什么 |
 | --- | --- |
-| `packages/ext/src/policy/tier-matrix.test.ts`(新) | 第 3 项:三档 × R1–R12 与 E2 / E4,真注入的 agent 段经 2.x 配置 → agent 路径进 H1 |
+| `packages/ui-mac/src/main/composer-tier-matrix.engine.{test,cases}.ts`(新;原计划 `packages/ext/src/policy/tier-matrix.test.ts`,见偏离记录) | 第 3 项:三档 × R1–R12 与 E2 / E4,在 H2 的嵌入式引擎上判 |
+| `packages/core/src/config/plugin/command.ts` | 第 3 项 E4(编排器裁决授权):现有 `codepuppy` 标注块里,换助手之前走 subagent 的权限路径 |
 | `packages/core/test/codepuppy-memory-seam.test.ts`(新) | 第 4 项:2.x 配置 instructions 接缝的前提探针 |
 | `packages/ui-mac/src/main/platform-credential-error.engine.{test,cases}.ts`(新) | 第 6 项 |
 | `packages/ui-mac/src/main/naming-resume.engine.{test,cases}.ts`(新) | 第 7 项 |
@@ -188,7 +189,7 @@ B1、B3 属 web search 一组;B4 属凭据一组;B2、B5、B6 单独一组。每
 | --- | --- | --- |
 | 1 | H3 探针输出(命令 + 三条 in-band 实抓件的模型面文字),无提交 | —(报告项) |
 | 2 | 同一探针的「结局 → 模型面文字」表 | —(报告项) |
-| 3 | `tier-matrix.test.ts`;两处变异实测 | 注入的档位规则被放宽,对应询问 / 拒绝格当场变放行;build 列证明三种结局分得开 |
+| 3 | `composer-tier-matrix.engine.test.ts`(15 条);三处变异实测 | 注入的档位规则被放宽,对应询问 / 拒绝格当场变放行;build 列证明三种结局分得开 |
 | 4 | `codepuppy-memory-seam.test.ts` | 接缝不在,配置里的文件不进上下文或删了仍在,①②红;对照臂证明判官看得见「没接」 |
 | 5 | H2 实测(或成立时的 `cloud-credential-hot.engine`) | 热写后仍发旧令牌 ⇒ 记录里出现 A |
 | 6 | `platform-credential-error.engine` | 被退避重试 ⇒ 请求数 > 1 或耗时 ≥ 2 秒;503 臂证明计数看得见重试 |
@@ -199,4 +200,7 @@ B1、B3 属 web search 一组;B4 属凭据一组;B2、B5、B6 单独一组。每
 
 ## 偏离记录
 
-暂无
+- 2026-11-12 · 第 3 项的宿主由 H1 改为 H2,文件改为 `packages/ui-mac/src/main/composer-tier-matrix.engine.{test,cases}.ts` · 实测嵌入式引擎里 agent 的有效规则(`GET /api/agent`)前面有 H1 不装的底座 `*: allow` 与 `.env` 询问,H1 判的会是一份生产不用的规则集(「夹具顶替供数方」);编排器也要求 E4 在嵌入式引擎上实测。能力轴改走探针插件上下文的 `permission.assert`(工具体内同一个服务),入口走引擎 HTTP 路由,身份轴走模型桩发出的真工具调用经 ext 执行闸;真 ext 以本地目录插件装进引擎(入口 `server.js` 转出 `packages/ext/src/plugin.ts`)。
+- 2026-11-12 · 第 3 项 E4 实测不成立(只读档会话跑 `agent: build` 的非子任务命令 ⇒ 204、会话 agent 变成 build、零询问),按编排器裁决在 `command.ts` 的 `codepuppy(#1560)` 块里加 `codepuppy(#1573 E4)`:换助手之前以会话自己的 agent 走 subagent 权限断言。去掉它 ⇒ R6c 两条红(实测)。
+- 2026-11-12 · 第 3 项两处格子在 2.x 上实测未握住,不进矩阵、交编排器:① R2「全部批准 / 请求审批 ⇒ 询问」—— 两档对 `external_directory`(`<目录>/*`)都直接放行,来源是引擎底座的 `*: allow`(只读档拒绝照常);② R11 请求审批档与只读档的询问格 —— 引擎确实建了待批请求,但 `GET /api/session/:id/permission` 编码失败(`Expected JSON value at ["data"][0]["metadata"]["policy"]`),因为 `packages/ext/src/policy/gate.ts:146` / `:199` 对没有绑定摘要的工具(插件、内置)写了 `bindingDigest: undefined`,引擎只剥掉 metadata 顶层的 undefined;桌面的审批面经 `v2.session.permission.list` 读这条列表(`packages/codepuppy-app/src/context/permission-v1-adapter.ts:163`)。R9 / R10 的身份轴与 R11 同一道执行闸,本文件不另起云 MCP / 第三方 MCP。
+- 2026-11-12 · 变异实测从两处改为三处:去掉 E4 断言(R6c 两条红)、`codepuppy-ask` 的 `shell` 改 allow 并删掉只读档的 `subagent` 规则(6 条红)。

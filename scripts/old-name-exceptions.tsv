@@ -44,10 +44,8 @@ ALPHA.md	38	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-plat
 ALPHA.md	61	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 ALPHA.md	66	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 CLAUDE.md	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-CLAUDE.md	5	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-CLAUDE.md	9	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-CLAUDE.md	24	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-CLAUDE.md	32	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+CLAUDE.md	3	external-anchor	别的仓现存的文档 / 组合名 Alpha(alpha-work 的 Alpha intents、Alpha 组合),本文只引用该名字,不是本产品显示品牌
+CLAUDE.md	15	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/README.md	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/README.md	5	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/README.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -55,385 +53,498 @@ docs/README.md	38	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alph
 docs/README.md	41	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 docs/README.md	56	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 docs/README.md	57	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-08-10-catalog-readiness-signals.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-08-10-catalog-readiness-signals.md	13	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-08-10-catalog-readiness-signals.md	24	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-08-10-packaged-first-launch-catalog-cost.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-08-10-packaged-first-launch-catalog-cost.md	13	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-08-10-packaged-first-launch-catalog-cost.md	32	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-08-23-codex-harness-comparison.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-08-23-codex-harness-comparison.md	28	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-08-23-codex-harness-comparison.md	89	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-08-23-codex-harness-comparison.md	90	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	103	external-anchor	别的仓现存的文档 / 组合名 Alpha(alpha-work 的 Alpha intents、Alpha 组合),本文只引用该名字,不是本产品显示品牌
+docs/README.md	113	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	114	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	115	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	116	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	118	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	119	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	120	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	121	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	122	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	123	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	124	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	125	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	126	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	127	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	128	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	129	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	130	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	131	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	132	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	133	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	134	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	135	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	136	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	137	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	138	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	139	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	140	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	141	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	142	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	143	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	144	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	145	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	146	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	147	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	149	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	150	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	151	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	152	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	153	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	167	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
+docs/README.md	226	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	227	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	228	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	229	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	230	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	231	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	232	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	233	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	234	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	235	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	236	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	237	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	238	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	239	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	240	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	241	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	242	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	255	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
+docs/README.md	262	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
+docs/README.md	295	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
+docs/README.md	338	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	339	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	340	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	341	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	342	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	343	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	344	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/README.md	345	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-08-10-catalog-readiness-signals.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-08-10-catalog-readiness-signals.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-08-10-catalog-readiness-signals.md	15	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-08-10-catalog-readiness-signals.md	26	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-08-10-packaged-first-launch-catalog-cost.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-08-10-packaged-first-launch-catalog-cost.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-08-10-packaged-first-launch-catalog-cost.md	15	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-08-10-packaged-first-launch-catalog-cost.md	34	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-08-23-codex-harness-comparison.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-08-23-codex-harness-comparison.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-08-23-codex-harness-comparison.md	30	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-08-23-codex-harness-comparison.md	91	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-08-23-codex-harness-comparison.md	92	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-08-23-codex-harness-comparison.md	93	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-08-23-codex-harness-comparison.md	94	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-08-23-codex-harness-comparison.md	95	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-08-23-codex-harness-comparison.md	96	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-08-23-codex-harness-comparison.md	119	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-08-23-network-timeout-recon.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-08-23-network-timeout-recon.md	38	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-08-23-shell-sandbox-seam.md	7	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-08-23-shell-sandbox-seam.md	38	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-08-23-shell-sandbox-seam.md	124	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-08-23-shell-sandbox-seam.md	125	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-08-23-shell-sandbox-seam.md	134	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-08-23-shell-sandbox-seam.md	135	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-08-23-shell-sandbox-seam.md	186	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-08-23-shell-sandbox-seam.md	206	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-08-23-shell-sandbox-seam.md	212	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-08-23-shell-sandbox-seam.md	242	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-08-23-shell-sandbox-seam.md	243	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-08-23-shell-sandbox-seam.md	284	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-08-23-shell-sandbox-seam.md	291	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-08-23-shell-sandbox-seam.md	294	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-08-23-shell-sandbox-seam.md	297	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-08-23-shell-sandbox-seam.md	299	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-08-23-shell-sandbox-seam.md	302	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-08-25-network-egress-seam.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-08-25-network-egress-seam.md	35	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-08-25-network-egress-seam.md	286	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-08-25-network-egress-seam.md	287	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-03-electron-pdf-viewer-session.md	51	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-09-06-external-skills-inheritance-decision.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-06-external-skills-inheritance-decision.md	70	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
-docs/architecture/2026-09-06-external-skills-inheritance-decision.md	82	historical	记录退役根 .alpha(已退役、零读写)的历史说明
-docs/architecture/2026-09-06-external-skills-inheritance-decision.md	83	historical	记录退役根 .alpha(已退役、零读写)的历史说明
-docs/architecture/2026-09-06-model-variant-reachability.md	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-06-model-variant-reachability.md	168	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-06-model-variant-reachability.md	171	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-06-model-variant-reachability.md	240	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-context-injection-registry.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-context-injection-registry.md	13	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-context-injection-registry.md	56	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-08-context-injection-registry.md	73	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-08-context-injection-registry.md	93	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-08-context-injection-registry.md	97	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-08-context-injection-registry.md	131	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
-docs/architecture/2026-09-08-context-injection-registry.md	187	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-08-context-injection-registry.md	188	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-08-context-injection-registry.md	220	historical	带日期的调研 / 决策记录,记录的是当时的名字
+docs/architecture/2026-08-23-codex-harness-comparison.md	97	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-08-23-codex-harness-comparison.md	98	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-08-23-codex-harness-comparison.md	121	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-08-23-network-timeout-recon.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-08-23-network-timeout-recon.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-08-23-network-timeout-recon.md	40	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-08-25-network-egress-seam.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-08-25-network-egress-seam.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-08-25-network-egress-seam.md	37	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-08-25-network-egress-seam.md	288	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-08-25-network-egress-seam.md	289	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-03-electron-pdf-viewer-session.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-03-electron-pdf-viewer-session.md	58	historical	带日期的调研 / 决策记录,记录的是当时的名字
+docs/architecture/2026-09-03-office-layout-isolation.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-06-external-skills-inheritance-decision.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-06-external-skills-inheritance-decision.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-06-external-skills-inheritance-decision.md	72	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
+docs/architecture/2026-09-06-external-skills-inheritance-decision.md	84	historical	记录退役根 .alpha(已退役、零读写)的历史说明
+docs/architecture/2026-09-06-external-skills-inheritance-decision.md	85	historical	记录退役根 .alpha(已退役、零读写)的历史说明
+docs/architecture/2026-09-06-model-variant-reachability.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-06-model-variant-reachability.md	10	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-06-model-variant-reachability.md	175	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-06-model-variant-reachability.md	178	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-06-model-variant-reachability.md	247	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-context-injection-registry.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-context-injection-registry.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-context-injection-registry.md	15	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-context-injection-registry.md	58	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-08-context-injection-registry.md	75	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-08-context-injection-registry.md	95	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-08-context-injection-registry.md	99	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-08-context-injection-registry.md	133	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
+docs/architecture/2026-09-08-context-injection-registry.md	189	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-08-context-injection-registry.md	190	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 docs/architecture/2026-09-08-context-injection-registry.md	222	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-09-08-context-injection-registry.md	225	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-08-context-injection-registry.md	226	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-08-context-injection-registry.md	270	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-09-08-context-injection-registry.md	271	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	13	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	31	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	311	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	351	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	386	historical	出货事实的证据记录:当时实测的 bundle id / 应用名(#1571 已改成 com.tide.codepuppy / Code Puppy),记录保持原样
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	657	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	658	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	713	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	727	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	728	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	839	historical	带日期的调研记录里引用的当时探针输出(文件名),记录的是当时的名字
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	856	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	868	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	871	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	872	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	875	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	876	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	891	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	969	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	973	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	991	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	993	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	994	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
+docs/architecture/2026-09-08-context-injection-registry.md	224	historical	带日期的调研 / 决策记录,记录的是当时的名字
+docs/architecture/2026-09-08-context-injection-registry.md	227	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-08-context-injection-registry.md	228	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-08-context-injection-registry.md	272	historical	带日期的调研 / 决策记录,记录的是当时的名字
+docs/architecture/2026-09-08-context-injection-registry.md	273	historical	带日期的调研 / 决策记录,记录的是当时的名字
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	15	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	33	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	313	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	353	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	388	historical	出货事实的证据记录:当时实测的 bundle id / 应用名(#1571 已改成 com.tide.codepuppy / Code Puppy),记录保持原样
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	659	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	660	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	715	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	729	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	730	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	841	historical	带日期的调研记录里引用的当时探针输出(文件名),记录的是当时的名字
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	858	historical	带日期的调研 / 决策记录,记录的是当时的名字
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	870	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	873	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	874	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	877	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	878	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	893	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	971	historical	带日期的调研 / 决策记录,记录的是当时的名字
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	975	historical	带日期的调研 / 决策记录,记录的是当时的名字
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	993	historical	带日期的调研 / 决策记录,记录的是当时的名字
 docs/architecture/2026-09-08-derived-process-spawn-paths.md	995	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	1018	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	1024	migration-source	清理用户盘上旧版留下的 *.alpha-bak-* 残留文件,识别旧名才能删掉它们
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	1027	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	1080	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	1085	historical	出货事实的证据记录:当时实测的 bundle id / 应用名(#1571 已改成 com.tide.codepuppy / Code Puppy),记录保持原样
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	1163	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	1206	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	1225	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	1227	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	1233	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	1234	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	1249	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-08-derived-process-spawn-paths.md	1381	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	13	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	14	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	49	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	56	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	59	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	142	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	244	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	250	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	292	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	358	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	377	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	378	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	394	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	407	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-permission-prompt-classification-seam.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-permission-prompt-classification-seam.md	13	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-permission-prompt-classification-seam.md	46	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-permission-prompt-classification-seam.md	108	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-permission-prompt-classification-seam.md	279	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
-docs/architecture/2026-09-08-permission-prompt-classification-seam.md	294	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
-docs/architecture/2026-09-08-permission-prompt-classification-seam.md	328	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-permission-prompt-classification-seam.md	417	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-08-permission-prompt-classification-seam.md	649	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-09-multi-workspace-fence-decision.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-09-multi-workspace-fence-decision.md	28	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-09-multi-workspace-fence-decision.md	147	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-09-multi-workspace-fence-decision.md	148	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
-docs/architecture/2026-09-09-multi-workspace-fence-decision.md	165	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-09-multi-workspace-fence-decision.md	372	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
-docs/architecture/2026-09-09-multi-workspace-fence-decision.md	378	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	996	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	997	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	1020	historical	带日期的调研 / 决策记录,记录的是当时的名字
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	1026	migration-source	清理用户盘上旧版留下的 *.alpha-bak-* 残留文件,识别旧名才能删掉它们
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	1029	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	1082	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	1087	historical	出货事实的证据记录:当时实测的 bundle id / 应用名(#1571 已改成 com.tide.codepuppy / Code Puppy),记录保持原样
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	1165	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	1208	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	1227	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	1229	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	1235	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	1236	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	1251	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-08-derived-process-spawn-paths.md	1383	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	15	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	16	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	51	historical	带日期的调研 / 决策记录,记录的是当时的名字
+docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	58	historical	带日期的调研 / 决策记录,记录的是当时的名字
+docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	61	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	144	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	246	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	252	historical	带日期的调研 / 决策记录,记录的是当时的名字
+docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	294	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	360	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	379	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	380	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	396	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-managed-policy-and-hook-abort-decision.md	409	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-permission-prompt-classification-seam.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-permission-prompt-classification-seam.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-permission-prompt-classification-seam.md	15	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-permission-prompt-classification-seam.md	48	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-permission-prompt-classification-seam.md	110	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-permission-prompt-classification-seam.md	281	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
+docs/architecture/2026-09-08-permission-prompt-classification-seam.md	296	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
+docs/architecture/2026-09-08-permission-prompt-classification-seam.md	330	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-permission-prompt-classification-seam.md	419	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-08-permission-prompt-classification-seam.md	651	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-09-multi-workspace-fence-decision.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-09-multi-workspace-fence-decision.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-09-multi-workspace-fence-decision.md	30	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-09-multi-workspace-fence-decision.md	149	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-09-multi-workspace-fence-decision.md	150	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
+docs/architecture/2026-09-09-multi-workspace-fence-decision.md	167	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-09-multi-workspace-fence-decision.md	374	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
 docs/architecture/2026-09-09-multi-workspace-fence-decision.md	380	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
-docs/architecture/2026-09-09-req159-process-fence.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-09-req159-process-fence.md	18	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-09-req159-process-fence.md	87	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
-docs/architecture/2026-09-09-req159-process-fence.md	110	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
-docs/architecture/2026-09-09-req159-process-fence.md	115	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
-docs/architecture/2026-09-09-req159-process-fence.md	188	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
-docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	13	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	48	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	56	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	88	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	93	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	110	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	119	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	120	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	122	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	123	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	173	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-09-10-network-egress-on-process-fence.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-10-network-egress-on-process-fence.md	28	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-10-network-egress-on-process-fence.md	30	historical	出货事实的证据记录:当时实测的 bundle id / 应用名(#1571 已改成 com.tide.codepuppy / Code Puppy),记录保持原样
-docs/architecture/2026-09-10-network-egress-on-process-fence.md	109	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-10-network-egress-on-process-fence.md	220	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
-docs/architecture/2026-09-10-network-egress-on-process-fence.md	338	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
+docs/architecture/2026-09-09-multi-workspace-fence-decision.md	382	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
+docs/architecture/2026-09-09-req159-process-fence.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-09-req159-process-fence.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-09-req159-process-fence.md	20	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-09-req159-process-fence.md	89	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
+docs/architecture/2026-09-09-req159-process-fence.md	112	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
+docs/architecture/2026-09-09-req159-process-fence.md	117	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
+docs/architecture/2026-09-09-req159-process-fence.md	190	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
+docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	15	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	50	historical	带日期的调研 / 决策记录,记录的是当时的名字
+docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	58	historical	带日期的调研 / 决策记录,记录的是当时的名字
+docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	90	historical	带日期的调研 / 决策记录,记录的是当时的名字
+docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	95	historical	带日期的调研 / 决策记录,记录的是当时的名字
+docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	112	historical	带日期的调研 / 决策记录,记录的是当时的名字
+docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	121	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	122	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	124	historical	带日期的调研 / 决策记录,记录的是当时的名字
+docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	125	historical	带日期的调研 / 决策记录,记录的是当时的名字
+docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	175	historical	带日期的调研 / 决策记录,记录的是当时的名字
+docs/architecture/2026-09-10-network-egress-on-process-fence.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-10-network-egress-on-process-fence.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-10-network-egress-on-process-fence.md	30	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-10-network-egress-on-process-fence.md	32	historical	出货事实的证据记录:当时实测的 bundle id / 应用名(#1571 已改成 com.tide.codepuppy / Code Puppy),记录保持原样
+docs/architecture/2026-09-10-network-egress-on-process-fence.md	111	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-10-network-egress-on-process-fence.md	222	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
+docs/architecture/2026-09-10-network-egress-on-process-fence.md	340	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
 docs/architecture/2026-09-17-memory-injection-seam.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-17-memory-injection-seam.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-17-memory-injection-seam.md	11	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-17-memory-injection-seam.md	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-17-memory-injection-seam.md	4	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-17-memory-injection-seam.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-09-17-memory-injection-seam.md	13	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-17-memory-injection-seam.md	14	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-17-memory-injection-seam.md	108	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
-docs/architecture/2026-09-17-memory-injection-seam.md	112	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
-docs/architecture/2026-09-17-tool-policy-transport-seam.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-23-native-tool-gate-inventory.md	20	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-23-native-tool-gate-inventory.md	61	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-native-tool-gate-inventory.md	154	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-23-native-tool-gate-inventory.md	350	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
-docs/architecture/2026-09-23-native-tool-gate-inventory.md	391	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-native-tool-gate-inventory.md	392	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
-docs/architecture/2026-09-23-native-tool-gate-inventory.md	393	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-native-tool-gate-inventory.md	463	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
-docs/architecture/2026-09-23-native-tool-gate-inventory.md	464	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
-docs/architecture/2026-09-23-native-tool-gate-inventory.md	480	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
-docs/architecture/2026-09-23-native-tool-gate-inventory.md	524	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-native-tool-gate-inventory.md	590	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
-docs/architecture/2026-09-23-native-tool-gate-inventory.md	591	historical	带日期的调研 / 决策记录,记录的是当时的名字
-docs/architecture/2026-09-23-native-tool-gate-inventory.md	835	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
-docs/architecture/2026-09-23-native-tool-gate-inventory.md	860	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
-docs/architecture/2026-09-23-native-tool-gate-inventory.md	862	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
-docs/architecture/2026-09-23-runtime-permission-tiers.md	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-23-runtime-permission-tiers.md	61	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-runtime-permission-tiers.md	83	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-runtime-permission-tiers.md	84	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-runtime-permission-tiers.md	106	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-runtime-permission-tiers.md	107	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-runtime-permission-tiers.md	108	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-runtime-permission-tiers.md	117	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-runtime-permission-tiers.md	135	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-runtime-permission-tiers.md	160	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-runtime-permission-tiers.md	191	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-runtime-permission-tiers.md	196	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-runtime-permission-tiers.md	216	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-runtime-permission-tiers.md	218	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-runtime-permission-tiers.md	226	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-runtime-permission-tiers.md	227	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-runtime-permission-tiers.md	228	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-runtime-permission-tiers.md	229	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-runtime-permission-tiers.md	230	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-runtime-permission-tiers.md	231	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-runtime-permission-tiers.md	232	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-17-memory-injection-seam.md	15	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-17-memory-injection-seam.md	16	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-17-memory-injection-seam.md	110	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
+docs/architecture/2026-09-17-memory-injection-seam.md	114	historical	带日期的历史勘破 / 决策记录:写的是当时的项目隐藏目录名,存档不改(现名由 #1569 改为 .codepuppy)
+docs/architecture/2026-09-17-tool-policy-transport-seam.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-17-tool-policy-transport-seam.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-23-bun-electron-mock-link-abort.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-23-native-tool-gate-inventory.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-23-native-tool-gate-inventory.md	27	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-23-native-tool-gate-inventory.md	68	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-native-tool-gate-inventory.md	161	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-23-native-tool-gate-inventory.md	357	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
+docs/architecture/2026-09-23-native-tool-gate-inventory.md	398	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-native-tool-gate-inventory.md	399	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
+docs/architecture/2026-09-23-native-tool-gate-inventory.md	400	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-native-tool-gate-inventory.md	470	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
+docs/architecture/2026-09-23-native-tool-gate-inventory.md	471	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
+docs/architecture/2026-09-23-native-tool-gate-inventory.md	487	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
+docs/architecture/2026-09-23-native-tool-gate-inventory.md	531	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-native-tool-gate-inventory.md	597	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
+docs/architecture/2026-09-23-native-tool-gate-inventory.md	598	historical	带日期的调研 / 决策记录,记录的是当时的名字
+docs/architecture/2026-09-23-native-tool-gate-inventory.md	842	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
+docs/architecture/2026-09-23-native-tool-gate-inventory.md	867	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
+docs/architecture/2026-09-23-native-tool-gate-inventory.md	869	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
+docs/architecture/2026-09-23-runtime-permission-tiers.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-23-runtime-permission-tiers.md	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-23-runtime-permission-tiers.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-23-runtime-permission-tiers.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-23-runtime-permission-tiers.md	68	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-runtime-permission-tiers.md	90	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-runtime-permission-tiers.md	91	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-runtime-permission-tiers.md	113	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-runtime-permission-tiers.md	114	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-runtime-permission-tiers.md	115	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-runtime-permission-tiers.md	124	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-runtime-permission-tiers.md	142	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-runtime-permission-tiers.md	167	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-runtime-permission-tiers.md	198	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-runtime-permission-tiers.md	203	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-runtime-permission-tiers.md	223	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-runtime-permission-tiers.md	225	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 docs/architecture/2026-09-23-runtime-permission-tiers.md	233	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 docs/architecture/2026-09-23-runtime-permission-tiers.md	234	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-runtime-permission-tiers.md	235	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-runtime-permission-tiers.md	236	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-runtime-permission-tiers.md	237	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-runtime-permission-tiers.md	238	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-runtime-permission-tiers.md	239	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 docs/architecture/2026-09-23-runtime-permission-tiers.md	240	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-runtime-permission-tiers.md	358	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-runtime-permission-tiers.md	478	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-runtime-permission-tiers.md	517	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-runtime-permission-tiers.md	545	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-23-runtime-permission-tiers.md	551	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-runtime-permission-tiers.md	552	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-runtime-permission-tiers.md	556	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-runtime-permission-tiers.md	562	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-web-tools-account-routing-recon.md	21	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-23-web-tools-account-routing-recon.md	22	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-23-web-tools-account-routing-recon.md	23	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-23-web-tools-account-routing-recon.md	26	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
-docs/architecture/2026-09-23-web-tools-account-routing-recon.md	87	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
-docs/architecture/2026-09-23-web-tools-account-routing-recon.md	92	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
+docs/architecture/2026-09-23-runtime-permission-tiers.md	241	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-runtime-permission-tiers.md	247	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-runtime-permission-tiers.md	365	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-runtime-permission-tiers.md	485	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-runtime-permission-tiers.md	524	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-runtime-permission-tiers.md	552	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-23-runtime-permission-tiers.md	558	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-runtime-permission-tiers.md	559	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-runtime-permission-tiers.md	563	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-runtime-permission-tiers.md	569	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-web-tools-account-routing-recon.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-23-web-tools-account-routing-recon.md	28	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-23-web-tools-account-routing-recon.md	29	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-23-web-tools-account-routing-recon.md	30	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-23-web-tools-account-routing-recon.md	33	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
 docs/architecture/2026-09-23-web-tools-account-routing-recon.md	94	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
-docs/architecture/2026-09-23-web-tools-account-routing-recon.md	120	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-23-web-tools-account-routing-recon.md	248	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-web-tools-account-routing-recon.md	270	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	10	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	11	historical	出货事实的证据记录:当时实测的 bundle id / 应用名(#1571 已改成 com.tide.codepuppy / Code Puppy),记录保持原样
-docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	26	historical	出货事实的证据记录:当时实测的 bundle id / 应用名(#1571 已改成 com.tide.codepuppy / Code Puppy),记录保持原样
-docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	27	historical	出货事实的证据记录:当时实测的 bundle id / 应用名(#1571 已改成 com.tide.codepuppy / Code Puppy),记录保持原样
-docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	61	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
-docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	84	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
-docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	116	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
-docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	201	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
-docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	260	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
-docs/architecture/2026-09-24-cloud-vision-client-seam.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-24-cloud-vision-client-seam.md	13	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-24-cloud-vision-client-seam.md	14	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-24-cloud-vision-client-seam.md	27	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-24-cloud-vision-client-seam.md	33	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-24-cloud-vision-client-seam.md	52	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-24-cloud-vision-client-seam.md	53	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-web-tools-account-routing-recon.md	99	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
+docs/architecture/2026-09-23-web-tools-account-routing-recon.md	101	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
+docs/architecture/2026-09-23-web-tools-account-routing-recon.md	127	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-23-web-tools-account-routing-recon.md	255	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-web-tools-account-routing-recon.md	277	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	17	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	18	historical	出货事实的证据记录:当时实测的 bundle id / 应用名(#1571 已改成 com.tide.codepuppy / Code Puppy),记录保持原样
+docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	33	historical	出货事实的证据记录:当时实测的 bundle id / 应用名(#1571 已改成 com.tide.codepuppy / Code Puppy),记录保持原样
+docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	34	historical	出货事实的证据记录:当时实测的 bundle id / 应用名(#1571 已改成 com.tide.codepuppy / Code Puppy),记录保持原样
+docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	68	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
+docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	91	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
+docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	123	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
+docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	208	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
+docs/architecture/2026-09-23-webfetch-egress-decision-chain.md	267	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
+docs/architecture/2026-09-24-cloud-vision-client-seam.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-24-cloud-vision-client-seam.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-24-cloud-vision-client-seam.md	15	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-24-cloud-vision-client-seam.md	16	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-24-cloud-vision-client-seam.md	29	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-24-cloud-vision-client-seam.md	35	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-09-24-cloud-vision-client-seam.md	54	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/2026-09-24-exa-mcp-failure-signal-recon.md	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-24-exa-mcp-failure-signal-recon.md	106	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-24-exa-mcp-failure-signal-recon.md	136	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/2026-09-27-exa-entry-shape-fail-open-recon.md	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/claude-plugin-corpus-component-scale.md	288	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/codepuppy-connection-lifetime.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/constraints.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/constraints.md	24	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/constraints.md	25	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-24-cloud-vision-client-seam.md	55	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-24-cloud-vision-client-seam.md	56	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/2026-09-24-exa-mcp-failure-signal-recon.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-24-exa-mcp-failure-signal-recon.md	10	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-24-exa-mcp-failure-signal-recon.md	113	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-24-exa-mcp-failure-signal-recon.md	143	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-27-exa-entry-shape-fail-open-recon.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-09-27-exa-entry-shape-fail-open-recon.md	10	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/claude-plugin-corpus-component-scale.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/claude-plugin-corpus-component-scale.md	295	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/codepuppy-connection-lifetime.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/codepuppy-connection-lifetime.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/constraints.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/constraints.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/constraints.md	26	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/constraints.md	27	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/constraints.md	28	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/constraints.md	29	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/constraints.md	30	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/constraints.md	31	upstream	导出路径由未接管的上游文件 packages/plugin/package.json 声明,改名要先接管那个文件(另需 ADR)
+docs/architecture/constraints.md	31	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/constraints.md	32	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/constraints.md	33	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/constraints.md	33	upstream	导出路径由未接管的上游文件 packages/plugin/package.json 声明,改名要先接管那个文件(另需 ADR)
 docs/architecture/constraints.md	34	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/constraints.md	35	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/constraints.md	36	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/constraints.md	37	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/engine-command-and-event-surface.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/engine-command-and-event-surface.md	14	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/engine-command-and-event-surface.md	25	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/engine-command-and-event-surface.md	37	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/engine-command-and-event-surface.md	121	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/engine-command-and-event-surface.md	125	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/engine-command-and-event-surface.md	126	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/architecture/engine-command-and-event-surface.md	358	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/extension-seams.md	9	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/extension-seams.md	52	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/frontend-surfaces.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/host-extension-package-contract-boundary.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/host-extension-package-contract-boundary.md	66	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/constraints.md	38	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/constraints.md	39	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/engine-command-and-event-surface.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/engine-command-and-event-surface.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/engine-command-and-event-surface.md	16	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/engine-command-and-event-surface.md	27	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/engine-command-and-event-surface.md	39	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/engine-command-and-event-surface.md	123	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/engine-command-and-event-surface.md	127	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/engine-command-and-event-surface.md	128	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/architecture/engine-command-and-event-surface.md	360	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/extension-seams.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/extension-seams.md	16	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/extension-seams.md	59	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/frontend-surfaces.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/frontend-surfaces.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/host-extension-package-contract-boundary.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/host-extension-package-contract-boundary.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/host-extension-package-contract-boundary.md	68	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/host-extension-package-contract-boundary.md	137	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/overview.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/overview.md	15	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/overview.md	25	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/overview.md	26	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/host-extension-package-contract-boundary.md	70	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/host-extension-package-contract-boundary.md	139	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/overview.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/overview.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/overview.md	17	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/overview.md	27	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/overview.md	37	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/overview.md	38	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/package-mcp-oauth-boundary.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/quality-gate-environments.md	20	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/quality-gate-environments.md	136	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/quality-gate-environments.md	585	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/quality-gate-environments.md	619	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/understanding.md	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/understanding.md	15	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/understanding.md	18	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/architecture/upstream-integration.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/artifact-office-open-gate.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/byok-availability.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/byok-availability.md	121	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/byok-availability.md	122	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/catalog-channel-consumption.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/catalog-channel-consumption.md	13	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/catalog-channel-consumption.md	78	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/catalog-channel-consumption.md	79	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/desktop-release-manifest.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/desktop-release-manifest.md	11	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/desktop-release-manifest.md	14	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/desktop-release-manifest.md	31	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/desktop-release-manifest.md	114	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/engine-config-channels.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/engine-config-channels.md	76	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
-docs/contracts/engine-config-channels.md	86	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
-docs/contracts/engine-config-channels.md	102	migration-source	旧版配置文件里的钥匙串标记识别器(PROVIDER_KEYCHAIN_MARKER),派发书判断点 1:持久化取值不改值
-docs/contracts/engine-config-channels.md	170	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
-docs/contracts/engine-config-channels.md	184	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/extension-capability-authorization.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/extension-capability-authorization.md	208	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/extension-cas-seed.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/extension-cas-seed.md	13	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/extension-cas-seed.md	14	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/overview.md	28	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/overview.md	29	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/overview.md	39	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/overview.md	40	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/package-mcp-oauth-boundary.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/package-mcp-oauth-boundary.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/quality-gate-environments.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/quality-gate-environments.md	27	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/quality-gate-environments.md	143	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/quality-gate-environments.md	592	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/quality-gate-environments.md	626	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/understanding.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/understanding.md	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/understanding.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/understanding.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/understanding.md	22	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/understanding.md	25	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/upstream-integration.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/upstream-integration.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/artifact-office-open-gate.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/artifact-office-open-gate.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/byok-availability.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/byok-availability.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/byok-availability.md	123	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/byok-availability.md	124	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/catalog-channel-consumption.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/catalog-channel-consumption.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/catalog-channel-consumption.md	15	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/catalog-channel-consumption.md	80	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/catalog-channel-consumption.md	81	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/desktop-release-manifest.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/desktop-release-manifest.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/desktop-release-manifest.md	13	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/desktop-release-manifest.md	16	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/desktop-release-manifest.md	33	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/desktop-release-manifest.md	116	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/engine-config-channels.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/engine-config-channels.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/engine-config-channels.md	78	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
+docs/contracts/engine-config-channels.md	88	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
+docs/contracts/engine-config-channels.md	104	migration-source	旧版配置文件里的钥匙串标记识别器(PROVIDER_KEYCHAIN_MARKER),派发书判断点 1:持久化取值不改值
+docs/contracts/engine-config-channels.md	172	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
+docs/contracts/engine-config-channels.md	186	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/extension-capability-authorization.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/extension-capability-authorization.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/extension-capability-authorization.md	210	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/extension-cas-seed.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/extension-cas-seed.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/contracts/extension-cas-seed.md	15	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/extension-cas-seed.md	36	historical	记录退役根 .alpha(已退役、零读写)的历史说明
-docs/contracts/extension-cas-seed.md	47	historical	记录退役根 .alpha(已退役、零读写)的历史说明
-docs/contracts/extension-cas-seed.md	50	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-docs/contracts/extension-cas-seed.md	76	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/extension-install-ledger.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/extension-package-lifecycle.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/extension-package-lifecycle.md	237	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/host-extension-package-v1.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/host-extension-package-v1.md	36	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/host-extension-package-v1.md	44	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/host-extension-package-v1.md	56	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/host-extension-package-v1.md	57	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/extension-cas-seed.md	16	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/extension-cas-seed.md	17	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/extension-cas-seed.md	38	historical	记录退役根 .alpha(已退役、零读写)的历史说明
+docs/contracts/extension-cas-seed.md	49	historical	记录退役根 .alpha(已退役、零读写)的历史说明
+docs/contracts/extension-cas-seed.md	52	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/contracts/extension-cas-seed.md	78	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/extension-install-ledger.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/extension-install-ledger.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/extension-package-lifecycle.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/extension-package-lifecycle.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/extension-package-lifecycle.md	239	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/host-extension-package-v1.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/host-extension-package-v1.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/host-extension-package-v1.md	38	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/host-extension-package-v1.md	46	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/contracts/host-extension-package-v1.md	58	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/host-extension-package-v1.md	69	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/host-extension-package-v1.md	74	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/host-extension-package-v1.md	77	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/host-extension-package-v1.md	89	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/permission-risk-classification.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/permission-risk-classification.md	13	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/platform-endpoint-discovery.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/platform-endpoint-discovery.md	15	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/platform-endpoint-discovery.md	26	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/platform-endpoint-discovery.md	33	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
+docs/contracts/host-extension-package-v1.md	59	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/host-extension-package-v1.md	60	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/host-extension-package-v1.md	71	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/host-extension-package-v1.md	76	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/host-extension-package-v1.md	79	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/host-extension-package-v1.md	91	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/permission-risk-classification.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/permission-risk-classification.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/permission-risk-classification.md	15	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-endpoint-discovery.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-endpoint-discovery.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-endpoint-discovery.md	17	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-endpoint-discovery.md	28	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/contracts/platform-endpoint-discovery.md	35	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
-docs/contracts/platform-endpoint-discovery.md	36	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
-docs/contracts/platform-endpoint-discovery.md	42	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/platform-endpoint-discovery.md	81	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/platform-integration.md	20	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/platform-integration.md	21	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-endpoint-discovery.md	37	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
+docs/contracts/platform-endpoint-discovery.md	38	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
+docs/contracts/platform-endpoint-discovery.md	44	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-endpoint-discovery.md	83	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-integration.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/contracts/platform-integration.md	22	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/contracts/platform-integration.md	23	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/contracts/platform-integration.md	24	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/contracts/platform-integration.md	25	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/contracts/platform-integration.md	26	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/platform-integration.md	29	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-integration.md	27	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-integration.md	28	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/contracts/platform-integration.md	31	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/platform-integration.md	39	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/platform-integration.md	40	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/platform-integration.md	47	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/platform-integration.md	61	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/platform-integration.md	73	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/platform-integration.md	74	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/platform-integration.md	80	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/platform-integration.md	117	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/platform-integration.md	118	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/platform-integration.md	127	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/platform-integration.md	128	historical	说明旧品牌受众 alpha-platform-api 已被拒收的契约文字(受众已在 alpha-web#283 改为 codepuppy-*)
-docs/contracts/platform-integration.md	160	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/platform-integration.md	238	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/platform-integration.md	239	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/platform-integration.md	286	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/platform-integration.md	360	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/platform-integration.md	416	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/platform-integration.md	423	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/platform-integration.md	494	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/recovery-adapter.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/session-permission.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/session-permission.md	101	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/settings-and-extension-storage-adapters.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/tool-policy.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/contracts/tool-policy.md	13	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-integration.md	33	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-integration.md	41	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-integration.md	42	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-integration.md	49	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-integration.md	63	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-integration.md	75	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-integration.md	76	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-integration.md	82	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-integration.md	119	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-integration.md	120	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-integration.md	129	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-integration.md	130	historical	说明旧品牌受众 alpha-platform-api 已被拒收的契约文字(受众已在 alpha-web#283 改为 codepuppy-*)
+docs/contracts/platform-integration.md	162	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-integration.md	240	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-integration.md	241	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-integration.md	288	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-integration.md	362	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-integration.md	418	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-integration.md	425	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-integration.md	496	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/recovery-adapter.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/recovery-adapter.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/session-permission.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/session-permission.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/session-permission.md	103	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/settings-and-extension-storage-adapters.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/settings-and-extension-storage-adapters.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/tool-policy.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/tool-policy.md	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/tool-policy.md	15	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/PAGE-MAP.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/PAGE-MAP.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/PAGE-MAP.md	62	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
@@ -501,11 +612,12 @@ docs/design/current/settings/components.md	34	historical	指向存档文件(已�
 docs/design/current/settings/design.html	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/current/settings/design.html	52	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/current/settings/design.html	448	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/design/current/shell-sidebar/components.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/current/shell-sidebar/design.html	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/current/shell-sidebar/design.html	12	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/current/shell-sidebar/design.html	49	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/design/current/shell-sidebar/design.html	103	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/design/current/shell-sidebar/design.html	272	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/design/current/shell-sidebar/design.html	113	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/design/current/shell-sidebar/design.html	292	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/system/README.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/system/README.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/system/README.md	13	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -518,59 +630,66 @@ docs/design/system/principles.md	6	external-anchor	GitHub 仓库名 alpha-code /
 docs/design/system/replacing-opencode.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/system/replacing-opencode.md	13	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/system/tokens.md	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/ci.md	139	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
-docs/runbooks/ci.md	168	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/ci.md	171	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/ci.md	174	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/ci.md	183	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/distribution.md	14	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/distribution.md	24	migration-source	一次性改名步骤:把 owner 本机旧签名目录 ~/.alpha-code-signing 与 signing.env 里的旧变量名改成 codepuppy 形式,要写出旧名才能找到它们;owner 本机改完后随下一版 runbook 删除
-docs/runbooks/distribution.md	25	migration-source	一次性改名步骤:把 owner 本机旧签名目录 ~/.alpha-code-signing 与 signing.env 里的旧变量名改成 codepuppy 形式,要写出旧名才能找到它们;owner 本机改完后随下一版 runbook 删除
-docs/runbooks/distribution.md	32	migration-source	一次性改名步骤:把 owner 本机旧签名目录 ~/.alpha-code-signing 与 signing.env 里的旧变量名改成 codepuppy 形式,要写出旧名才能找到它们;owner 本机改完后随下一版 runbook 删除
-docs/runbooks/distribution.md	40	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/distribution.md	73	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/distribution.md	76	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/distribution.md	81	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/distribution.md	82	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/artifact-quota-reservation-recovery.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/ci.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/ci.md	146	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
+docs/runbooks/ci.md	175	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/ci.md	178	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/ci.md	181	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/ci.md	190	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/distribution.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/distribution.md	16	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/distribution.md	26	migration-source	一次性改名步骤:把 owner 本机旧签名目录 ~/.alpha-code-signing 与 signing.env 里的旧变量名改成 codepuppy 形式,要写出旧名才能找到它们;owner 本机改完后随下一版 runbook 删除
+docs/runbooks/distribution.md	27	migration-source	一次性改名步骤:把 owner 本机旧签名目录 ~/.alpha-code-signing 与 signing.env 里的旧变量名改成 codepuppy 形式,要写出旧名才能找到它们;owner 本机改完后随下一版 runbook 删除
+docs/runbooks/distribution.md	34	migration-source	一次性改名步骤:把 owner 本机旧签名目录 ~/.alpha-code-signing 与 signing.env 里的旧变量名改成 codepuppy 形式,要写出旧名才能找到它们;owner 本机改完后随下一版 runbook 删除
+docs/runbooks/distribution.md	42	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/distribution.md	75	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/distribution.md	78	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/runbooks/distribution.md	83	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/distribution.md	130	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/distribution.md	138	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/distribution.md	143	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/distribution.md	250	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/distribution.md	84	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/distribution.md	85	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/distribution.md	132	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/distribution.md	140	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/distribution.md	145	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/runbooks/distribution.md	252	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/distribution.md	253	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/distribution.md	287	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
-docs/runbooks/model-catalog-updates.md	13	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/model-catalog-updates.md	14	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/distribution.md	254	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/distribution.md	255	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/distribution.md	289	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
+docs/runbooks/model-catalog-updates.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/model-catalog-updates.md	15	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/runbooks/model-catalog-updates.md	16	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/model-catalog-updates.md	20	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/model-catalog-updates.md	40	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/model-catalog-updates.md	70	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/model-catalog-updates.md	99	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/model-catalog-updates.md	103	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/model-catalog-updates.md	115	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/naming-migration.md	20	historical	0.1.24 及更早版本写下的旧名:升级迁移 runbook 点名迁移源与手工回退的目标(#1569)
-docs/runbooks/naming-migration.md	23	historical	0.1.24 及更早版本写下的旧名:升级迁移 runbook 点名迁移源与手工回退的目标(#1569)
-docs/runbooks/naming-migration.md	24	historical	0.1.24 及更早版本写下的旧名:升级迁移 runbook 点名迁移源与手工回退的目标(#1569)
-docs/runbooks/naming-migration.md	28	historical	0.1.24 及更早版本写下的旧名:升级迁移 runbook 点名迁移源与手工回退的目标(#1569)
-docs/runbooks/naming-migration.md	60	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/naming-migration.md	61	external-anchor	GitHub Release v0.1.24 已发布的安装包资产文件名,发布物不改名;回退步骤要按这个名字下载
-docs/runbooks/naming-migration.md	74	historical	0.1.24 及更早版本写下的旧名:升级迁移 runbook 点名迁移源与手工回退的目标(#1569)
-docs/runbooks/naming-migration.md	75	historical	0.1.24 及更早版本写下的旧名:升级迁移 runbook 点名迁移源与手工回退的目标(#1569)
-docs/runbooks/uninstall.md	14	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/uninstall.md	23	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/uninstall.md	24	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/uninstall.md	25	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/uninstall.md	26	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/uninstall.md	27	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/uninstall.md	28	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/uninstall.md	36	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/uninstall.md	48	historical	记录退役根 .alpha(已退役、零读写)的历史说明
-docs/runbooks/uninstall.md	51	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/uninstall.md	62	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/uninstall.md	64	historical	记录退役根 .alpha(已退役、零读写)的历史说明
-docs/runbooks/uninstall.md	88	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/uninstall.md	95	historical	记录退役根 .alpha(已退役、零读写)的历史说明
+docs/runbooks/model-catalog-updates.md	18	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/model-catalog-updates.md	22	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/model-catalog-updates.md	42	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/model-catalog-updates.md	72	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/model-catalog-updates.md	101	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/model-catalog-updates.md	105	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/model-catalog-updates.md	117	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/naming-migration.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/naming-migration.md	27	historical	0.1.24 及更早版本写下的旧名:升级迁移 runbook 点名迁移源与手工回退的目标(#1569)
+docs/runbooks/naming-migration.md	30	historical	0.1.24 及更早版本写下的旧名:升级迁移 runbook 点名迁移源与手工回退的目标(#1569)
+docs/runbooks/naming-migration.md	31	historical	0.1.24 及更早版本写下的旧名:升级迁移 runbook 点名迁移源与手工回退的目标(#1569)
+docs/runbooks/naming-migration.md	35	historical	0.1.24 及更早版本写下的旧名:升级迁移 runbook 点名迁移源与手工回退的目标(#1569)
+docs/runbooks/naming-migration.md	67	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/naming-migration.md	68	external-anchor	GitHub Release v0.1.24 已发布的安装包资产文件名,发布物不改名;回退步骤要按这个名字下载
+docs/runbooks/naming-migration.md	81	historical	0.1.24 及更早版本写下的旧名:升级迁移 runbook 点名迁移源与手工回退的目标(#1569)
+docs/runbooks/naming-migration.md	82	historical	0.1.24 及更早版本写下的旧名:升级迁移 runbook 点名迁移源与手工回退的目标(#1569)
+docs/runbooks/settings-storage-recovery.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/uninstall.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/uninstall.md	21	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/uninstall.md	30	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/uninstall.md	31	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/uninstall.md	32	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/uninstall.md	33	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/uninstall.md	34	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/uninstall.md	35	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/uninstall.md	43	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/uninstall.md	55	historical	记录退役根 .alpha(已退役、零读写)的历史说明
+docs/runbooks/uninstall.md	58	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/uninstall.md	69	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/uninstall.md	71	historical	记录退役根 .alpha(已退役、零读写)的历史说明
+docs/runbooks/uninstall.md	95	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/runbooks/uninstall.md	102	historical	记录退役根 .alpha(已退役、零读写)的历史说明
 packages/codepuppy-contracts-consumer/alpha-platform-cloud-mcp.lock.json	0	external-anchor	文件名由别的仓定义并按锁文件 / vendor 逐字节钉住:仓库名派生的锁文件名、alpha-platform 产出的 vendor 文件名,owner D3 未裁仓库名,不改
 packages/codepuppy-contracts-consumer/alpha-platform-cloud-mcp.lock.json	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-contracts-consumer/alpha-platform-contract.lock.json	0	external-anchor	文件名由别的仓定义并按锁文件 / vendor 逐字节钉住:仓库名派生的锁文件名、alpha-platform 产出的 vendor 文件名,owner D3 未裁仓库名,不改
@@ -1068,8 +1187,9 @@ scripts/known-fails-compare.py	33	external-anchor	GitHub 仓库名 alpha-code / 
 scripts/module-size-ratchet.tsv	29	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 scripts/worktree-link-deps.sh	84	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/scripts/target-arch.ts	40	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/distribution.md	34	migration-source	一次性改名步骤:把 owner 本机旧签名目录 ~/.alpha-code-signing 与 signing.env 里的旧变量名改成 codepuppy 形式,要写出旧名才能找到它们;owner 本机改完后随下一版 runbook 删除
-docs/runbooks/distribution.md	35	migration-source	一次性改名步骤:把 owner 本机旧签名目录 ~/.alpha-code-signing 与 signing.env 里的旧变量名改成 codepuppy 形式,要写出旧名才能找到它们;owner 本机改完后随下一版 runbook 删除
+docs/runbooks/distribution.md	36	migration-source	一次性改名步骤:把 owner 本机旧签名目录 ~/.alpha-code-signing 与 signing.env 里的旧变量名改成 codepuppy 形式,要写出旧名才能找到它们;owner 本机改完后随下一版 runbook 删除
+docs/runbooks/distribution.md	37	migration-source	一次性改名步骤:把 owner 本机旧签名目录 ~/.alpha-code-signing 与 signing.env 里的旧变量名改成 codepuppy 形式,要写出旧名才能找到它们;owner 本机改完后随下一版 runbook 删除
+docs/runbooks/extension-tx-journal.md	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/fixtures/catalog-boot-0.1.24.json	5	user-content	#1632:真实 0.1.24 状态与公开签名响应的原始字节夹具;改写会破坏签名或历史输入
 packages/ui-mac/src/main/fixtures/catalog-boot-0.1.24.json	10	user-content	#1632:真实 0.1.24 状态与公开签名响应的原始字节夹具;改写会破坏签名或历史输入
 packages/ui-mac/src/main/fixtures/catalog-boot-0.1.24.json	15	user-content	#1632:真实 0.1.24 状态与公开签名响应的原始字节夹具;改写会破坏签名或历史输入
@@ -1080,18 +1200,18 @@ packages/ui-mac/src/main/fixtures/catalog-boot-0.1.24.json	52	user-content	#1632
 ALPHA.md	18	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
 docs/README.md	6	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
 docs/README.md	52	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-docs/architecture/2026-08-23-codex-harness-comparison.md	19	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
-docs/architecture/2026-09-09-multi-workspace-fence-decision.md	21	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-docs/architecture/2026-09-09-multi-workspace-fence-decision.md	145	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-docs/architecture/2026-09-09-multi-workspace-fence-decision.md	158	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-docs/architecture/2026-09-09-multi-workspace-fence-decision.md	201	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-docs/architecture/2026-09-09-multi-workspace-fence-decision.md	253	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-docs/architecture/2026-09-09-multi-workspace-fence-decision.md	259	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-docs/architecture/2026-09-09-multi-workspace-fence-decision.md	270	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-docs/architecture/frontend-surfaces.md	28	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
-docs/architecture/overview.md	49	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
-docs/contracts/platform-integration.md	474	external-anchor	跨仓请求头 X-Alpha-Upload-Consent 的逐字协议标识，本票冻结标识符
-docs/contracts/platform-integration.md	673	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
+docs/architecture/2026-08-23-codex-harness-comparison.md	21	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
+docs/architecture/2026-09-09-multi-workspace-fence-decision.md	23	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+docs/architecture/2026-09-09-multi-workspace-fence-decision.md	147	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+docs/architecture/2026-09-09-multi-workspace-fence-decision.md	160	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+docs/architecture/2026-09-09-multi-workspace-fence-decision.md	203	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+docs/architecture/2026-09-09-multi-workspace-fence-decision.md	255	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+docs/architecture/2026-09-09-multi-workspace-fence-decision.md	261	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+docs/architecture/2026-09-09-multi-workspace-fence-decision.md	272	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+docs/architecture/frontend-surfaces.md	30	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
+docs/architecture/overview.md	51	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
+docs/contracts/platform-integration.md	476	external-anchor	跨仓请求头 X-Alpha-Upload-Consent 的逐字协议标识，本票冻结标识符
+docs/contracts/platform-integration.md	675	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
 docs/design/PAGE-MAP.md	32	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
 docs/design/current/slash-menu/design.html	98	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
 docs/design/system/replacing-opencode.md	17	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌

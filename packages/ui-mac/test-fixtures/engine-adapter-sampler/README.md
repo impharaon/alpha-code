@@ -28,9 +28,11 @@
    假模型 `gpt-5-mock` —— 2.x 只给 `gpt-` 模型 patch 工具)、`continue.json`(经适配器发时间线「继续」,带逐回合 diff;对照组是
    同一续写落成 2.x synthetic 后拿它当 diff 的 from)、`files.json`(助手写文件的回合、项目里外部增删、`fs.watch` 过的文件被改时
    各收到哪些 `filesystem.changed`)、`command.json`(配置命令 `hello`:直接对引擎发与经适配器发);
-6. 停掉引擎与假模型。
+6. `parity.json`(0.1.26 对照):读目录的正文、运行中 shell 按游标读到的输出页、慢的后台子代理让完成通知自己开一个回合后
+   各种 from 问到的 diff、`fs.watch` 对目录 / 根目录 / 文件的回应与外部增删时收到的帧;
+7. 停掉引擎与假模型。
 
-只重采其中几个剧本时把名字写在命令后面:`base`(上面 2–4 的全部)、`tools`、`continue`、`files`、`command`,例如
+只重采其中几个剧本时把名字写在命令后面:`base`(上面 2–4 的全部)、`tools`、`continue`、`files`、`command`、`parity`,例如
 `… sample.ts tools continue files command`;不写 = 全部。
 
 端口被占时用 `SAMPLER_ENGINE_PORT` / `SAMPLER_MODEL_PORT` 改。重采后跑适配器的测试确认夹具仍能用:

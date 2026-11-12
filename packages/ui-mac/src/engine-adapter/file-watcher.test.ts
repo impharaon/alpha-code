@@ -8,6 +8,7 @@ import { describe, expect, test } from "bun:test"
 import { createRoot } from "solid-js"
 import { createFilesPanelState } from "../renderer/codepuppy-ui/session-rail/files/files-state"
 import files from "./fixtures/files.json"
+import parity from "./fixtures/parity.json"
 import { createProjector, type V1Payload } from "./events"
 import { createPermissionReplies } from "./permission-replies"
 
@@ -111,6 +112,30 @@ describe("#1668 F3 文件面板的变化通知", () => {
     expect(events.map((event) => event.payload.properties)).toEqual([
       { file: "b.txt", event: "add" },
       { file: "b.txt", event: "unlink" },
+    ])
+  })
+})
+
+// 外部编辑(0.1.26 的整项目监视)在 2.x 上有没有来源:fixtures/parity.json 实测。2.x 只能看单个已存在的文件
+// (server/src/handlers/fs.ts 的 fs.watch 先过 FileSystem.read,core/src/filesystem.ts 对非文件回 NotFound),目录与根目录
+// 都回 404;看着 w.txt 时,同目录新建的 new.txt、子目录里新建的文件都没有帧;w.txt 被删有一条 unlink。
+describe("#1668 外部编辑的来源(实测记录)", () => {
+  const probe = parity as unknown as {
+    watches: Record<"directory" | "root" | "file", { status: number }>
+    createdFrames: Array<{ data: { file: string; event: string } }>
+    unlinkFrames: Array<{ type: string; location: { directory: string }; data: { file: string; event: string } }>
+  }
+
+  test("目录不能看;新建的文件没有任何帧;只有看着的文件被删才有 unlink(适配器照转)", async () => {
+    expect(probe.watches.directory.status).toBe(404)
+    expect(probe.watches.root.status).toBe(404)
+    expect(probe.watches.file.status).toBe(204)
+    expect(probe.createdFrames.filter((frame) => /new\.txt$|three\.txt$/.test(frame.data.file))).toEqual([])
+    const unlink = probe.unlinkFrames.find((frame) => frame.data.event === "unlink")!
+    const events: Array<{ directory: string; payload: V1Payload }> = []
+    await createProjector({} as never, (directory, payload) => events.push({ directory, payload }), createPermissionReplies())(unlink as never)
+    expect(events).toEqual([
+      { directory: unlink.location.directory, payload: { type: "file.watcher.updated", properties: { file: unlink.data.file, event: "unlink" } } },
     ])
   })
 })

@@ -30,7 +30,7 @@ import {
   toV1ProviderList,
   toV1Question,
   todosOf,
-  turnAnchorID,
+  turnAnchor,
   withTurnDiffs,
   CONTINUE_METADATA_KEY,
   type V1PromptBody,
@@ -152,15 +152,15 @@ async function messages(context: RouteContext) {
   const listed = toV1Messages(sessionID, page.context).filter((item) => page.ids.has(baseID(item.info.id)))
   // REQ-142:最近一个回合的改动挂回它的用户消息(只在最新一页取,turnDiffsOf 只读最近一个回合)。取不到改动不让整个会话
   // 打不开:记下(不静默),消息照回。
-  const anchor = before ? undefined : turnAnchorID(listed, page.context)
+  const anchor = before ? undefined : turnAnchor(listed, page.context)
   const diff = anchor
-    ? await context.api.session.diff({ sessionID, from: anchor }).catch((error) => {
+    ? await context.api.session.diff({ sessionID, from: anchor.from }).catch((error) => {
         if (context.signal.aborted) throw error
-        console.error("[engine-adapter] turn diff failed", sessionID, anchor, error)
+        console.error("[engine-adapter] turn diff failed", sessionID, anchor.from, error)
         return undefined
       })
     : undefined
-  const response = json(anchor && diff ? withTurnDiffs(listed, new Map([[anchor, diff]])) : listed)
+  const response = json(anchor && diff ? withTurnDiffs(listed, new Map([[anchor.attach, diff]])) : listed)
   if (page.next) response.headers.set("x-next-cursor", page.next)
   return response
 }

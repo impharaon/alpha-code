@@ -191,7 +191,8 @@ export function toV1Messages(sessionID: string, source: readonly SessionMessageI
 // ── 工具 part:2.x 内建工具的入参 / metadata → 冻结工具卡读的 v1 键 ───────────────────────────────────────
 // 冻结的 tool-card-model.ts 按 0.1.26 引擎的键读卡面;2.x 的同一工具改了名(K5,卡片分派已认新名)也改了键。逐个对过
 // 卡片的读取点(真引擎采样 fixtures/tools.json):
-//   · read      入参 `path`                         → 卡头 / 「已探索」行读 `filePath`;
+//   · read      入参 `path`                         → 卡头 / 「已探索」行读 `filePath`;读目录时正文 → `metadata.display`
+//               (目录网格卡,见 directoryDisplay);
 //   · edit      metadata.files[].patch              → 展开的 diff 读 `metadata.diff`(filediff 冻结投影已给);
 //   · patch     metadata.files[] {file, status}     → 文件行读 `relativePath|filePath` + `type`(add/update/delete);
 //   · subagent  入参 `agent`、metadata.sessionID     → 任务卡读 `subagent_type`、`sessionId`(「打开子会话」)、`background`。
@@ -200,9 +201,34 @@ export function toV1Messages(sessionID: string, source: readonly SessionMessageI
 // 键名两代相同,不动。
 const PATCH_TYPES: Record<string, string> = { added: "add", deleted: "delete", modified: "update" }
 
+// 读目录:0.1.26 的 read 给渲染层铸了 `metadata.display`(type directory + entries,目录项带尾随 `/`),冻结卡据此改派目录网格卡
+// (tool-card-model.ts dirDisplayOf)。2.x 的 read 存下的只有模型正文(结构化的 ListPage 不落库,metadata 只剩 truncated),
+// 正文由引擎的 toModelContent 写成「Read directory <path>, entries a-b」+ 每行一项(目录带 `/`)+ 截断时末尾一行续读提示
+// (core/src/tool/plugin/read.ts)。按这个首行认出目录读取、照 0.1.26 的形状铸回;首行认不出就不铸(卡片退回读文件卡)。
+const DIRECTORY_HEADER = /^Read directory .*, (?:entries \d+-\d+|0 entries)$/
+const CONTINUE_LINE = /^\[Output truncated\. Continue reading with offset: \d+\]$/
+
+function directoryDisplay(state: { status: string; output?: unknown; metadata?: Record<string, unknown> }, path: string, rawOffset: unknown) {
+  if (state.status !== "completed" || typeof state.output !== "string") return undefined
+  const [header, ...lines] = state.output.split("\n")
+  if (!header || !DIRECTORY_HEADER.test(header)) return undefined
+  const truncated = state.metadata?.truncated === true
+  const entries = truncated && CONTINUE_LINE.test(lines.at(-1) ?? "") ? lines.slice(0, -1) : lines
+  const offset = typeof rawOffset === "number" && rawOffset > 0 ? rawOffset : 1
+  return {
+    type: "directory" as const,
+    path,
+    entries,
+    offset,
+    // 0.1.26 的总项数;截断时 2.x 不告诉总数,不编
+    ...(truncated ? {} : { totalEntries: offset - 1 + entries.length }),
+    truncated,
+  }
+}
+
 function toV1ToolPart(part: Part): Part {
   if (part.type !== "tool") return part
-  const state = part.state as { status: string; input: Record<string, unknown>; metadata?: Record<string, unknown> }
+  const state = part.state as { status: string; input: Record<string, unknown>; output?: unknown; metadata?: Record<string, unknown> }
   const input = state.input
   const metadata = state.metadata
   const files = Array.isArray(metadata?.files) ? (metadata.files as Array<Record<string, unknown>>) : undefined
@@ -215,8 +241,10 @@ function toV1ToolPart(part: Part): Part {
         ...(changes.metadata ? { metadata: { ...metadata, ...changes.metadata } } : {}),
       },
     }) as Part
-  if (part.tool === "read" && typeof input.path === "string" && input.filePath === undefined)
-    return next({ input: { filePath: input.path } })
+  if (part.tool === "read" && typeof input.path === "string" && input.filePath === undefined) {
+    const display = metadata?.display === undefined ? directoryDisplay(state, input.path, input.offset) : undefined
+    return next({ input: { filePath: input.path }, ...(display ? { metadata: { display } } : {}) })
+  }
   if (part.tool === "edit" && files && metadata?.diff === undefined)
     return next({ metadata: { diff: files.flatMap((file) => (typeof file.patch === "string" ? [file.patch] : [])).join("\n") } })
   if (part.tool === "patch" && files)
@@ -430,11 +458,24 @@ export function withTurnDiffs(messages: V1MessageWithParts[], diffs: ReadonlyMap
 }
 
 /**
- * 最近一个回合的用户消息 id(turnDiffsOf 只读它),且它在 2.x 是一条真用户消息 —— 2.x 的逐回合 diff 只认 user 锚
- * (session/diff.ts 对别的类型回 TurnRangeError)。最近一条 v1 用户消息若是引擎自己发的 synthetic(带 description),
- * 那个回合在 2.x 没有可查的锚,不查(回 undefined),而不是发一个必然被拒的请求。
+ * REQ-142 的回合锚。turnDiffsOf 只读最近一条 v1 用户消息(`attach`,改动挂在它上面);2.x 的逐回合 diff 只认真用户消息当
+ * `from`(session/diff.ts 对别的类型回 TurnRangeError)。
+ *   · 最近一条 v1 用户消息本身是 2.x 用户消息(含「继续」):from = attach = 它;
+ *   · 它是引擎自己发的 synthetic(带 description,如后台子代理的完成通知)且是在回合里插进来的(它与前一条 2.x 用户消息之间
+ *     没有 idle 标记):那个回合的锚就是前一条用户消息,from = 那条,改动仍挂在 synthetic 上;
+ *   · synthetic 在 idle 之后自己开了一个回合:2.x 没有能查这个回合的锚(真引擎实测 fixtures/parity.json:从用户消息问是
+ *     上一回合、从 synthetic 问回 400),不查(回 undefined),而不是发一个必然被拒或答非所问的请求。
  */
-export function turnAnchorID(messages: readonly V1MessageWithParts[], source: readonly SessionMessageInfo[]) {
-  const latest = messages.findLast((item) => item.info.role === "user")?.info.id
-  return latest && source.some((message) => message.id === latest && message.type === "user") ? latest : undefined
+export function turnAnchor(messages: readonly V1MessageWithParts[], source: readonly SessionMessageInfo[]) {
+  const attach = messages.findLast((item) => item.info.role === "user")?.info.id
+  const index = attach ? source.findIndex((message) => message.id === attach) : -1
+  const latest = source[index]
+  if (!attach || !latest) return undefined
+  if (latest.type === "user") return { from: attach, attach }
+  if (latest.type !== "synthetic") return undefined
+  for (let at = index - 1; at >= 0; at--) {
+    if (source[at]!.type === "idle") return undefined
+    if (source[at]!.type === "user") return { from: source[at]!.id, attach }
+  }
+  return undefined
 }

@@ -7,9 +7,11 @@ import { describe, expect, test } from "bun:test"
 import {
   contextRowOf,
   taskCardInfoOf,
+  toolCardDispatchOf,
   toolCardBodyOf,
   toolCardHeadOf,
 } from "../renderer/codepuppy-ui/session-timeline/cards/tool-card-model"
+import parity from "./fixtures/parity.json"
 import readTool from "./fixtures/read-tool.json"
 import tools from "./fixtures/tools.json"
 import { createProjector, type V1Payload } from "./events"
@@ -117,4 +119,69 @@ describe("#1668 F1 2.x 工具 payload → 冻结工具卡", () => {
     expect(toolCardHeadOf(part)).toMatchObject({ kind: "bash", target: "echo hi", exit: 0 })
     expect(toolCardBodyOf(part)).toMatchObject({ type: "term", output: "hi\n" })
   })
+})
+
+// 0.1.26 对照(fixtures/parity.json,真 2.x 引擎):读目录、运行中 shell 的输出。
+describe("#1668 0.1.26 对照:读目录与运行中的 shell", () => {
+  const fixture = parity as unknown as {
+    directory: string
+    dir: { sessionID: string; final: any[] }
+    shell: { sessionID: string; records: Session["records"]; pages: Array<{ cursor: number; page: { data: { output: string; cursor: number } } }> }
+  }
+
+  test("读目录:正文铸回 0.1.26 的 metadata.display,冻结卡走目录网格(共 3 项,目录带标记)", () => {
+    const part = toolPart(fixture.dir.sessionID, fixture.dir.final, "read")
+    expect(toolCardDispatchOf(part)).toMatchObject({ kind: "list", metadataOnly: false })
+    expect(toolCardHeadOf(part)).toMatchObject({ kind: "list", target: "sub", count: { unit: "items", value: 3 } })
+    expect(toolCardBodyOf(part)).toEqual({
+      type: "dir",
+      entries: [
+        { name: "inner", dir: true },
+        { name: "one.txt", dir: false },
+        { name: "two.txt", dir: false },
+      ],
+      truncated: false,
+    })
+  })
+
+  test(
+    "运行中的 shell:按进度帧的 shellID 读输出,bash 卡运行态逐行出现(line1 → line1..line3)",
+    async () => {
+      const { sessionID, records, pages } = fixture.shell
+      let current: Session["records"][number] | undefined
+      let served = 0
+      const api = {
+        message: { list: async (input: { cursor?: string }) => (input.cursor ? { data: [], cursor: {} } : { data: withDisplay(current?.snapshot?.data ?? []), cursor: {} }) },
+        session: { get: async () => ({ id: sessionID, location: { directory: fixture.directory }, time: { created: 0, updated: 0 } }), diff: async () => [] },
+        shell: {
+          output: async ({ cursor }: { cursor: number }) => {
+            const page = pages[Math.min(served++, pages.length - 1)]!
+            expect(cursor).toBe(page.cursor)
+            return page.page
+          },
+        },
+      }
+      const outputs: string[] = []
+      const projector = createProjector(
+        api as never,
+        (_directory, payload: V1Payload) => {
+          const part = (payload.properties as { part?: any }).part
+          if (payload.type !== "message.part.updated" || part?.tool !== "shell" || part.state.status !== "running") return
+          const body = toolCardBodyOf(part)
+          if (body.type === "term" && body.streaming && body.output) outputs.push(body.output)
+        },
+        createPermissionReplies(),
+      )
+      const settled = records.findIndex((record) => record.frame.type === "session.tool.success")
+      for (const [index, record] of records.entries()) {
+        current = record
+        // 工具结束前,让轮询把采到的输出页读完(真引擎里它们在这段时间里陆续出现)
+        if (index === settled) while (served < pages.length) await new Promise((resolve) => setTimeout(resolve, 20))
+        await projector(record.frame as never)
+      }
+      expect(outputs[0]).toBe("line1\n")
+      expect(outputs.at(-1)).toBe("line1\nline2\nline3\n")
+    },
+    { timeout: 10_000 },
+  )
 })

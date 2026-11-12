@@ -9,6 +9,8 @@ import { applyDirectoryEvent } from "../../../codepuppy-app/src/context/global-s
 import { turnDiffsOf } from "../renderer/codepuppy-ui/session-rail/review/review-turn-diffs"
 import fixture from "./fixtures/turn-diff.json"
 import continued from "./fixtures/continue.json"
+import parity from "./fixtures/parity.json"
+import tools from "./fixtures/tools.json"
 import { createProjector, TURN_DIFF_EVENTS, type V1Payload } from "./events"
 import { createPermissionReplies } from "./permission-replies"
 import { createEngineFetch } from "./index"
@@ -203,5 +205,59 @@ describe("#1668 F2 「继续」之后的回合改动", () => {
     } finally {
       errors.mockRestore()
     }
+  })
+})
+
+// 0.1.26 对照:后台子代理的完成通知是引擎发的 2.x synthetic(带 description),冻结投影把它当成最近一条用户消息。
+describe("#1668 后台子代理完成通知之后的回合改动", () => {
+  const ENGINE = "http://127.0.0.1:47008"
+  const change = (fixture.diff.data as unknown[])[0]
+
+  test("通知插进还在跑的回合(fixtures/tools.json 后台会话):按前一条用户消息查,改动挂在通知上,面板读得到", async () => {
+    const session = (tools as unknown as { sessions: { background: { sessionID: string; final: any[] } } }).sessions.background
+    const user = session.final.find((message) => message.type === "user")!
+    const notice = session.final.find((message) => message.type === "synthetic")!
+    const froms: Array<string | null> = []
+    const engineFetch = createEngineFetch({
+      isEngineOrigin: (origin) => origin === ENGINE,
+      fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(new Request(input, init).url)
+        if (url.pathname.endsWith("/diff")) {
+          froms.push(url.searchParams.get("from"))
+          return Response.json({ data: [change] })
+        }
+        return Response.json({ data: [...session.final].reverse(), cursor: {} })
+      }) as typeof fetch,
+    })
+    const messages = (await (await engineFetch(`${ENGINE}/session/${session.sessionID}/message?limit=50`)).json()) as Array<{ info: any }>
+    expect(messages.filter((item) => item.info.role === "user").at(-1)!.info.id).toBe(notice.id)
+    expect(froms).toEqual([user.id])
+    expect(turnDiffsOf(messages.map((item) => item.info))).toEqual([change])
+    // 通知仍是 synthetic 正文(时间线不出气泡)
+    expect(toV1Messages(session.sessionID, session.final).find((item) => item.info.id === notice.id)!.parts).toEqual([
+      expect.objectContaining({ type: "text", synthetic: true }),
+    ])
+  })
+
+  test("通知在 idle 之后自己开回合(fixtures/parity.json):2.x 没有能查它的锚 —— 不发请求", async () => {
+    const background = (parity as unknown as { background: { sessionID: string; final: any[]; diffs: Record<string, { status: number; body: any }> } }).background
+    // 实测:这个回合写了 b.txt,但从用户消息 / 不带 from 问到的是上一回合(空),从通知问回 400。
+    const types = background.final.map((message) => message.type)
+    expect(types.indexOf("synthetic")).toBeGreaterThan(types.indexOf("idle"))
+    expect(background.final.some((message) => message.type === "assistant" && message.snapshot?.files?.includes("b.txt"))).toBe(true)
+    expect(background.diffs.latest.body.data).toEqual([])
+    expect(background.diffs.fromUser.body.data).toEqual([])
+    expect(background.diffs.fromSynthetic.status).toBe(400)
+    const calls: string[] = []
+    const engineFetch = createEngineFetch({
+      isEngineOrigin: (origin) => origin === ENGINE,
+      fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(new Request(input, init).url)
+        calls.push(url.pathname)
+        return Response.json({ data: [...background.final].reverse(), cursor: {} })
+      }) as typeof fetch,
+    })
+    await engineFetch(`${ENGINE}/session/${background.sessionID}/message?limit=50`)
+    expect(calls.filter((path) => path.endsWith("/diff"))).toEqual([])
   })
 })

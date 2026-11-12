@@ -26,7 +26,7 @@ import {
   toV1Messages,
   toV1Project,
   toV1Question,
-  turnAnchorID,
+  turnAnchor,
   v1ErrorData,
   withTurnDiffs,
 } from "./v1-shapes"
@@ -104,6 +104,11 @@ export const TURN_DIFF_EVENTS = new Set([
   "session.execution.interrupted",
 ])
 
+const SHELL_POLL_MS = 250
+/** 0.1.26 shell 工具的 metadata.output 截法(packages/opencode/src/tool/shell.ts preview):超过 3 万字只留尾部。 */
+const SHELL_PREVIEW_MAX = 30_000
+const shellPreview = (text: string) => (text.length <= SHELL_PREVIEW_MAX ? text : "...\n\n" + text.slice(-SHELL_PREVIEW_MAX))
+
 /** 2.x 回合改动的 status → v1 文件监视事件(files-core.ts watcherRefreshTarget:add / unlink 重列父目录)。 */
 const WATCH_EVENTS: Record<string, "add" | "unlink" | "change"> = { added: "add", deleted: "unlink", modified: "change" }
 
@@ -165,16 +170,16 @@ export function createProjector(api: OpenCodeClient, emit: Emit, permissions: Pe
       if (message.type === "assistant") blocks.set(message.id, contentKeys(message.content as never))
     }
     const listed = toV1Messages(sessionID, withProgress(page.context))
-    const anchor = turnAnchorID(listed, page.context)
+    const anchor = turnAnchor(listed, page.context)
     if (refreshTurnDiff && anchor) {
       // 取不到这一步的回合改动不该让消息也停更:记下(不静默),消息照发,下一个边界再取。
-      const diff = await api.session.diff({ sessionID, from: anchor }).catch((error) => {
-        console.error("[engine-adapter] turn diff failed", sessionID, anchor, error)
+      const diff = await api.session.diff({ sessionID, from: anchor.from }).catch((error) => {
+        console.error("[engine-adapter] turn diff failed", sessionID, anchor.from, error)
         return undefined
       })
       if (diff) {
-        turnDiffs.set(anchor, diff)
-        fileChanges(directory, sessionID, anchor, diff)
+        turnDiffs.set(anchor.attach, diff)
+        fileChanges(directory, sessionID, anchor.from, diff)
       }
     }
     for (const { info, parts } of withTurnDiffs(listed, turnDiffs)) {
@@ -206,6 +211,36 @@ export function createProjector(api: OpenCodeClient, emit: Emit, permissions: Pe
     for (const file of before.keys())
       if (!after.has(file)) emit(directory, { type: "file.watcher.updated", properties: { file, event: "unlink" } })
     reported.set(sessionID, { anchor, files: after })
+  }
+
+  /**
+   * 运行中 shell 的输出:0.1.26 的 bash 卡在运行中读 `metadata.output`(引擎边跑边写,超长只留尾部 3 万字)。2.x 的 shell 工具
+   * 只在进度帧里给 `shellID`,输出按字节游标从 `GET /api/shell/:id/output` 读(没有推送事件;真引擎采样 fixtures/parity.json)。
+   * 所以工具在跑期间按游标轮询,把读到的输出照 0.1.26 的截法并进进度(快照合并它),并直接重发那个工具 part;工具结束即停。
+   */
+  async function streamShell(directory: string, sessionID: string, messageID: string, callID: string, shellID: string) {
+    let cursor = 0
+    let output = ""
+    const id = await streamPartID(sessionID, messageID, `tool:${callID}`)
+    while (progress.has(callID)) {
+      const page = await api.shell.output({ id: shellID, cursor, location: { directory } }).catch((error) => {
+        if (progress.has(callID)) console.error("[engine-adapter] shell output read failed", shellID, error)
+        return undefined
+      })
+      if (!page || !progress.has(callID)) return
+      cursor = page.data.cursor
+      if (page.data.output) {
+        output = shellPreview(output + page.data.output)
+        progress.set(callID, { ...progress.get(callID), output })
+        const last = emitted.get(`part:${id}`)
+        const part = last ? (JSON.parse(last) as { state: { status: string; metadata?: Record<string, unknown> } }) : undefined
+        if (part?.state.status === "running") {
+          part.state.metadata = { ...part.state.metadata, output }
+          if (remember(`part:${id}`, part)) emit(directory, { type: "message.part.updated", properties: { part } })
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, SHELL_POLL_MS))
+    }
   }
 
   /** U1:todowrite 的输入就是清单,投影成 v1 todo.updated。 */
@@ -311,7 +346,11 @@ export function createProjector(api: OpenCodeClient, emit: Emit, permissions: Pe
     if (type === "session.tool.input.started") {
       await streamPartID(sessionID, data.assistantMessageID, `tool:${data.id}`)
     }
-    if (type === "session.tool.progress") progress.set(data.id, data.metadata ?? {})
+    if (type === "session.tool.progress") {
+      progress.set(data.id, data.metadata ?? {})
+      if (typeof data.metadata?.shellID === "string")
+        void streamShell(directory, sessionID, data.assistantMessageID, data.id, data.metadata.shellID)
+    }
     if (type === "session.tool.success" || type === "session.tool.failed") progress.delete(data.id)
     if (SNAPSHOT_EVENTS.has(type) || TURN_DIFF_EVENTS.has(type)) await snapshot(directory, sessionID, TURN_DIFF_EVENTS.has(type))
     if (SESSION_INFO_EVENTS.has(type)) await sessionInfo(directory, sessionID, "session.updated")

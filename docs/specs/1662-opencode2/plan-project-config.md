@@ -129,4 +129,7 @@ last_reviewed: 2026-11-12
 
 ## 偏离记录
 
-暂无。
+- 2026-11-12 · 第 3 项:翻译没有改 `toServerConfig` 本身,而是新加 `projectServerConfig`(在它之上补齐),只给项目 MCP 用。原因:云 MCP 的安装也调 `toServerConfig`
+  (`cloud-websearch-kill.ts:440`,传入 main 按 2.x 形状写好的定义并加 `enabled: true`),装进去的条目要与定义逐字相等才铸 `codepuppy-cloud`
+  (`packages/plugin/src/alpha-cloud-authority.ts` `governedMcpEvidence`);改共用函数会让它多出 `disabled: false`、OAuth 换名,云工具的权威就铸不出来(实测:三条云测试红)。
+  同一原因,只有项目条目照上游把 `enabled: true` 写成 `disabled: false` · 第 3 项提交。

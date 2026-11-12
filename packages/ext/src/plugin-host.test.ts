@@ -609,7 +609,7 @@ it.live("权威 · 项目可执行扩展的同意(C10 / P10):没同意 ⇒ 项�
     mkdirSync(join(root, "plugins"), { recursive: true })
     writeFileSync(
       join(root, "codepuppy.jsonc"),
-      JSON.stringify({ mcp: { proj: { type: "local", command: ["proj-mcp"] } }, agent: { helper: { prompt: "project helper prompt", mode: "primary" } } }),
+      JSON.stringify({ mcp: { proj: { type: "local", command: ["proj-mcp"], cwd: "./tools", timeout: 7000 } }, agent: { helper: { prompt: "project helper prompt", mode: "primary" } } }),
     )
     writeFileSync(join(root, "plugins", "probe.js"), `export default { id: "project.probe", setup() { globalThis.__codepuppyProjectProbe = (globalThis.__codepuppyProjectProbe ?? 0) + 1 } }\n`)
     const probe = () => (globalThis as { __codepuppyProjectProbe?: number }).__codepuppyProjectProbe ?? 0
@@ -624,7 +624,8 @@ it.live("权威 · 项目可执行扩展的同意(C10 / P10):没同意 ⇒ 项�
     writeFileSync(join(root, "prefs.json"), JSON.stringify({ extensionsConsent: { version: 1, granted: true } }))
     const trusted = recordingMcp()
     yield* activate(CodePuppyExt, { mcp: trusted })
-    expect(trusted.servers.get("proj")).toEqual({ type: "local", command: ["proj-mcp"] })
+    // #1662:cwd 与 timeout 按 2.x 读的形状进引擎(与上游读用户文件同一翻译,engine-transforms.test.ts)
+    expect(trusted.servers.get("proj")).toEqual({ type: "local", command: ["proj-mcp"], cwd: "./tools", timeout: { startup: 7000, catalog: 7000, execution: 7000 } })
     expect(probe()).toBe(1)
   }),
 )

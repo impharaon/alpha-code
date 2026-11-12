@@ -48,13 +48,47 @@ export function toServerConfig(entry: unknown): Mcp.ServerConfig | undefined {
   return undefined
 }
 
+/**
+ * 项目文档里的 v1 MCP 条目 → 2.x `Mcp.ServerConfig`,照上游读用户文件时的同一套翻译(`packages/core/src/v1/config/migrate.ts`
+ * `migrateMcp`,抄本 —— 那个模块顶层 import 引擎服务,不能打进 ext 的自包含 bundle;与装着的上游逐字段对比的判据在
+ * engine-transforms.test.ts):在 `toServerConfig` 之上补 `cwd`、`codemode`、`enabled: true` ⇒ `disabled: false`;v1 的单个
+ * `timeout` 毫秒数管三个阶段;OAuth 的驼峰字段换成 2.x 运行时读的下划线字段(`core/src/mcp/oauth.ts`)。
+ * 云 MCP 不走这里:它的定义由 main 按 2.x 形状写好,装进去后要与定义逐字相等才铸 `codepuppy-cloud`(`toServerConfig`)。
+ */
+export function projectServerConfig(entry: unknown): Mcp.ServerConfig | undefined {
+  const base = toServerConfig(entry)
+  if (!base || !isObj(entry)) return base
+  return {
+    ...base,
+    ...(base.type === "local" && typeof entry.cwd === "string" ? { cwd: entry.cwd } : {}),
+    ...(base.type === "remote" ? oauthOf(entry.oauth) : {}),
+    ...(entry.enabled === true ? { disabled: false } : {}),
+    ...(typeof entry.codemode === "boolean" ? { codemode: entry.codemode } : {}),
+    ...(typeof entry.timeout === "number" ? { timeout: { startup: entry.timeout, catalog: entry.timeout, execution: entry.timeout } } : {}),
+  } as Mcp.ServerConfig
+}
+
+/** v1 OAuth(驼峰)→ 2.x(下划线);`false` 原样;只搬给了的字段。 */
+function oauthOf(oauth: unknown) {
+  if (oauth === false) return { oauth: false as const }
+  if (!isObj(oauth)) return {}
+  const fields: Array<[string, string]> = [
+    ["clientId", "client_id"],
+    ["clientSecret", "client_secret"],
+    ["scope", "scope"],
+    ["callbackPort", "callback_port"],
+    ["redirectUri", "redirect_uri"],
+  ]
+  return { oauth: Object.fromEntries(fields.filter(([from]) => oauth[from] !== undefined).map(([from, to]) => [to, oauth[from]])) }
+}
+
 /** 项目 MCP 只补缺:引擎里已有同名条目(用户全局配置)就不动它。返回补进去的名字。 */
 export function applyProjectMcp(editor: MCPEditor, servers: unknown, error: (line: string) => void): string[] {
   if (!isObj(servers)) return []
   const added: string[] = []
   for (const [name, entry] of Object.entries(servers)) {
     if (editor.get(name)) continue
-    const config = toServerConfig(entry)
+    const config = projectServerConfig(entry)
     if (!config) {
       error(`[@codepuppy/ext] project MCP server "${name}" skipped: neither a local (command[]) nor a remote (url) definition`)
       continue

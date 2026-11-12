@@ -123,14 +123,14 @@ body{background:var(--a-bg-subtle);color:var(--a-text);font-family:var(--a-font-
 
 <section class="dz-intro">
   <h1>弹出提示跟着问题走</h1>
-  <p>后台出的问题:提示 8 秒后收起,还没恢复的留在侧栏底部「N 个问题未恢复」里,恢复了就自己消失。用户自己的操作失败了:提示一直留着,直到关掉。启动后 10 秒内,会自动重试的故障不弹。</p>
+  <p>后台出的问题:提示 8 秒后收起,还没恢复的留在侧栏底部「N 个问题未恢复」里,恢复了就自己消失。用户自己的操作失败了:提示一直留着,直到关掉。启动后 10 秒内不弹任何提示:会自动重试的故障先等重试结果,需要用户处理的直接计入入口。</p>
   <div class="dz-pick"><b>入口位置(推荐一处):侧栏底部、账户按钮上方。</b>每个页面都有、已经是放「更新已就绪」这类应用状态的地方,不占内容区;侧栏收起时由「显示侧边栏」按钮上的小点代替。</div>
   <div class="dz-rel">
     <h3>与上一稿的关系</h3>
     <ul>
       <li><b>起点</b>:弹出提示没有设计稿,起点是正式代码(<code>Toast.tsx</code> / <code>toast.css</code>);侧栏起点也是正式代码(<code>sidebar.css</code>、<code>account-popover.css</code>),不是 <code>current/shell-sidebar</code> 的旧稿 —— 旧稿的品牌名、底部账户区已和上线的不一样。本页帧内样式直接引用这些代码文件与 <code>tokens.css</code>。</li>
       <li><b>不变</b>:提示的外观、右下角位置、堆叠顺序、×;侧栏现有全部内容;账户按钮和它的弹层。新对话页只作背景,未改动。</li>
-      <li><b>改动</b>:① 后台故障提示 8 秒后收起,悬停或键盘聚焦时不计时;② 同一原因只留一条;③ 用户操作失败的提示保留到关闭或离开当前页面(外观不变);④ 侧栏底部新增「N 个问题未恢复」一行和向上弹层,尺寸同「更新已就绪」那一行,弹层外观同账户弹层;⑤ 侧栏收起时「显示侧边栏」按钮带一个小点;⑥ 启动后 10 秒内会自动重试的故障不弹,也不计入入口。</li>
+      <li><b>改动</b>:① 后台故障提示 8 秒后收起,悬停或键盘聚焦时不计时;② 同一原因只留一条;③ 用户操作失败的提示保留到关闭或离开当前页面(外观不变);④ 侧栏底部新增「N 个问题未恢复」一行和向上弹层,尺寸同「更新已就绪」那一行,弹层外观同账户弹层;⑤ 侧栏收起时「显示侧边栏」按钮带一个小点;⑥ 启动后 10 秒内不弹提示:会自动重试的故障先不计入入口,10 秒后仍失败才弹;需要用户处理的(如进入项目时的「部分内容未能导入」)不弹,直接计入入口。</li>
       <li><b>文字</b>:新文字只有「N 个问题未恢复」「未恢复的问题」「恢复后自动移除」「查看」;「重试」沿用现有。连接器未能连接目前没有现成的提示文字,帧里那句是示例;其余提示都是现有文字。</li>
     </ul>
   </div>
@@ -207,17 +207,19 @@ body{background:var(--a-bg-subtle);color:var(--a-text);font-family:var(--a-font-
 
 <section class="dz-sec" id="startup">
   <h2 class="dz-h2">⑦ 启动<small>默认窗口 1280 × 800</small></h2>
-  <p class="dz-sub">启动后头 10 秒,连接器、模型清单这类会自动重试的故障不弹提示,入口也不计;重试成功就什么都不出现。10 秒到了仍然失败的,才弹一条,8 秒后按 ① 收进入口。</p>
+  <p class="dz-sub">启动后头 10 秒屏幕上不弹任何提示。连接器、模型清单这类会自动重试的故障先等重试结果,不计入入口,重试成功就什么都不出现;进入项目时产生的、需要用户处理的提示不弹,直接计入入口。10 秒到了仍然失败的自动重试故障,才弹一条,8 秒后按 ① 收进入口。</p>
   <div class="dz-row">
     <div><p class="dz-cap"><b>现在 · 进入项目后</b>几条提示叠在一起,每条都要点 ×</p><div class="dz-scroll" data-frame="startup-before"></div></div>
   </div>
   <div class="dz-row" style="margin-top:20px">
-    <div><p class="dz-cap"><b>改后 · 头 10 秒</b>两个连接器还在重连,屏幕安静</p><div class="dz-scroll" data-frame="startup-quiet"></div></div>
+    <div><p class="dz-cap"><b>改后 · 头 10 秒</b>不弹提示;进入项目时的两条计入入口,两个连接器还在重连、不计</p><div class="dz-scroll" data-frame="startup-quiet"></div></div>
   </div>
   <div class="dz-row" style="margin-top:20px">
-    <div><p class="dz-cap"><b>改后 · 10 秒后仍有一个没连上</b>只弹这一条</p><div class="dz-scroll" data-frame="startup-one"></div></div>
+    <div><p class="dz-cap"><b>点开入口</b>这两条和它们的操作</p><div data-frame="startup-list"></div></div>
   </div>
-  <div class="dz-note"><b>注意</b>:「现在」那一帧里的几条是进入项目时的导入、保存提示(现有文字),它们要用户去检查或重试,按规格属于「需要用户处理」那一类,头 10 秒不会替它们静默;改后同一原因的两条「部分内容未能导入」合成一条,但仍会出现。是否让它们也等到启动之后再出现,规格没有定,本稿不替它定。</div>
+  <div class="dz-row" style="margin-top:20px">
+    <div><p class="dz-cap"><b>改后 · 10 秒后仍有一个连接器没连上</b>只弹这一条;8 秒后收进入口,数量变 3</p><div class="dz-scroll" data-frame="startup-one"></div></div>
+  </div>
 </section>
 
 <section class="dz-sec" id="rules">
@@ -228,9 +230,10 @@ body{background:var(--a-bg-subtle);color:var(--a-text);font-family:var(--a-font-
       <tr><td>后台故障出现</td><td>弹出;8 秒后收起;鼠标悬停或键盘聚焦时不计时,离开后接着计;点 × 立即收起</td><td>提示收起(或点 ×)时计入</td></tr>
       <tr><td>同一原因再次报告</td><td>正在显示:更新这一条,不重新计时;已收起:不再弹出</td><td>仍计 1,内容更新为最新一次</td></tr>
       <tr><td>问题恢复</td><td>正在显示的立即消失</td><td>立即移除;数量为 0 时这一行消失,开着的弹层随之关闭</td></tr>
-      <tr><td>启动后 10 秒内</td><td>会自动重试的故障不弹</td><td>不计;10 秒后仍失败才按第一行处理</td></tr>
-      <tr><td>用户操作失败 / 需要用户动手</td><td>一直显示,直到点 × 或离开当前页面</td><td>不计入</td></tr>
+      <tr><td>启动后 10 秒内</td><td>不弹任何提示</td><td>会自动重试的故障不计,10 秒后仍失败才按第一行处理;需要用户处理的直接计入</td></tr>
+      <tr><td>用户操作失败 / 需要用户动手(启动 10 秒之外)</td><td>一直显示,直到点 × 或离开当前页面</td><td>不计入</td></tr>
       <tr><td>侧栏收起</td><td>不变</td><td>「显示侧边栏」按钮右上角小点;悬停提示带数量</td></tr>
+      <tr><td>列表里每条的操作</td><td>—</td><td>取该问题现有的处理入口:「重试」= 现有的重试;「查看」= 打开它所在的位置</td></tr>
       <tr><td>键盘</td><td>Tab 能进提示,进入即暂停计时</td><td>入口是按钮(展开 / 收起);打开后焦点进第一条的操作;Esc 关闭并把焦点还给入口</td></tr>
     </tbody>
   </table>
@@ -261,6 +264,9 @@ const P = {
   github: { key: "github", kind: "error", title: "「GitHub」连接器未能连接", act: "查看" },
   catalog: { key: "catalog", kind: "error", title: "平台模型清单暂时取不到", detail: "网络连接失败", act: "重试" },
   records: { key: "records", kind: "info", title: "有 2 条安装记录无法读取，已跳过。当前列表可能不完整，请重新打开「已安装」检查。", act: "查看" },
+  /* 进入项目时、需要用户处理的提示(现有文字) */
+  skipped: { key: "skipped", kind: "error", title: "部分内容未能导入，请检查对应条目。", detail: "「飞书文档」未能导入。请检查该条目的格式和读取权限后重试。", act: "查看" },
+  trust: { key: "trust", kind: "error", title: "未能保存此项目的扩展选择，请重试。", act: "查看" },
 }
 const ACTION_FAIL = { kind: "error", title: "删除失败" }
 
@@ -393,8 +399,9 @@ const FRAMES = {
       { kind: "info", title: "有 2 条安装记录无法读取，已跳过。当前列表可能不完整，请重新打开「已安装」检查。" },
     ],
   },
-  "startup-quiet": { w: W, h: H },
-  "startup-one": { w: W, h: H, toasts: [P.github] },
+  "startup-quiet": { w: W, h: H, problems: [P.skipped, P.trust] },
+  "startup-list": { w: W, h: H, crop: { w: 600, h: 420, anchor: "bottom left" }, problems: [P.skipped, P.trust], open: true },
+  "startup-one": { w: W, h: H, toasts: [P.github], problems: [P.skipped, P.trust] },
 }
 function renderStatic() {
   document.querySelectorAll("[data-frame]").forEach((el) => mount(el, FRAMES[el.dataset.frame]))

@@ -27,6 +27,7 @@ import {
   toV1Messages,
   toV1Path,
   toV1Project,
+  toV1ModelList,
   toV1ProviderList,
   toV1Question,
   todosOf,
@@ -538,6 +539,9 @@ export const ROUTES: readonly Route[] = [
 
   // ── `/api/…`:v1 SDK 的 v2 命名空间与 1.17.13 客户端;2.x 路径与形状仍在的直通 ──
   passthrough("GET", "/api/agent"),
+  // composer 的模型清单(model-contract.ts 的 `client.v2.model.list`;不进 routes-coverage 的扫描 —— 调用跨行写)。`#1662`:漏了它
+  // composer 的模型链一直 recovering,发送按钮永远不亮。
+  route("GET", "/api/model", async (context) => json(toV1ModelList(await context.api.model.list(at(context))))),
   passthrough("GET", "/api/provider/:providerID"),
   passthrough("GET", "/api/reference"),
   passthrough("GET", "/api/session"),

@@ -17,7 +17,8 @@
 //      所选的档走,逐格点名红。
 //   2. 桌面提交层:chip 列出的每一档,buildPromptRequest 都真的带上 variant(本进程直接判生产函数)。
 //   3. 矩阵(子进程 2 条):生产 buildModelPickerRows 的每一行 × 默认 + chip 每一档,主请求体按判据逐格对上,标题辅助调用取
-//      第一档(0.1.26 规则);UI 侧:适配器给冻结界面的 v1 provider 列表里,每个模型的档位恰好是目录的(`none` 不可见)。
+//      第一档(0.1.26 规则);UI 侧:适配器给冻结界面的 v1 provider 列表与 composer 的模型清单(GET /api/model)里,每个模型的
+//      档位恰好是目录的(`none` 不可见)。
 //
 // 标题辅助调用(#1237):0.1.26 取档位表第一档(目录把「关」放第一位,辅助调用不思考)。2.x 的标题选档只认 none / minimal / low,
 // 所以 engineModelConfig 给有档位的模型多写一档 `none` = 第一档的拷贝,由 2.x 自己挑中;适配器把它从冻结界面的列表里剥掉。
@@ -150,6 +151,6 @@ test("桌面提交层:chip 列出的每一档,buildPromptRequest 都真的带上
   }
 })
 
-test("矩阵:有徽标 ⇒ 每一档请求带参数且值逐字对上;无徽标 ⇒ 零档且默认请求不带参数;标题调用取第一档;冻结界面的档位表 == 目录(codepuppy-reasoning-badge-parity.engine.cases.ts,2 条)", async () => {
+test("矩阵:有徽标 ⇒ 每一档请求带参数且值逐字对上;无徽标 ⇒ 零档且默认请求不带参数;标题调用取第一档;冻结界面与 composer 拿到的档位表 == 目录(codepuppy-reasoning-badge-parity.engine.cases.ts,2 条)", async () => {
   await engineCases("矩阵", 2)
 }, 600_000)

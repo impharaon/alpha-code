@@ -285,14 +285,25 @@ export function toV1ProviderList(
   models: ModelListOutput["data"],
   defaultModel: ModelDefaultOutput["data"] | undefined,
 ): ProviderListResponse {
-  const visible = models.map((model) => ({ ...model, variants: withoutTitleAlias(model.variants) }))
-  const normalized = normalizeProviderList(providers as never, visible as never, defaultModel as never)
+  const normalized = normalizeProviderList(providers as never, withoutTitleAliases(models) as never, defaultModel as never)
   return {
     all: [...normalized.all.values()],
     default: normalized.default,
     connected: normalized.connected,
   } as ProviderListResponse
 }
+
+/**
+ * `GET /api/model`(composer 的模型合同 `client.v2.model.list`,renderer/codepuppy-ui/model-contract.ts)。0.1.26 由 v1 引擎原生答
+ * (origin/alpha packages/protocol/src/groups/model.ts:10);2.x 同一路径、同一 location 信封(`{ location, data }`),Code Puppy 读的
+ * 字段(id / providerID / name / enabled / status / capabilities.input / variants[].id / limit)同名同义 —— 只剥标题用的 `none` 档。
+ */
+export function toV1ModelList<Listed extends { data: readonly { variants: readonly { id: string }[] }[] }>(listed: Listed) {
+  return { ...listed, data: withoutTitleAliases(listed.data) }
+}
+
+const withoutTitleAliases = <Model extends { variants: readonly { id: string }[] }>(models: readonly Model[]) =>
+  models.map((model) => ({ ...model, variants: withoutTitleAlias(model.variants) }))
 
 /**
  * `#1662`:引擎配置给有档位的模型在末尾多写的 `none`(第一档的拷贝,只为 2.x 的标题选档,main/codepuppy-models.ts `engineModel`)

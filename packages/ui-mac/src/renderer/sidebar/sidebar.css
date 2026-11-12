@@ -708,3 +708,30 @@ svg[viewBox="0 0 720.002 129.001"] {
 body[data-codepuppy-sidebar="collapsed"] .a-swk-topbar {
   padding-left: calc(var(--codepuppy-sidebar-w) + 14px);
 }
+
+/* ── `#1687` 未恢复问题入口(设计稿 shell-sidebar `#problems`,由 frames/error-lifetime.css 原样并入;只用 --a-*) ── */
+/* ① 未恢复问题入口:与「更新已就绪」那一行(.codepuppy-updater-note)同一尺寸,可点 */
+.codepuppy-problems-entry{display:flex;align-items:center;gap:var(--a-space-2);width:100%;margin:0 0 var(--a-space-1);padding:5px 8px;border:0;border-radius:var(--a-radius-md);background:var(--a-overlay-hover);color:var(--a-text-secondary);font:inherit;font-size:var(--a-text-xs);text-align:left;cursor:pointer;-webkit-app-region:no-drag;animation:codepuppy-problems-fade var(--a-dur-fast) var(--a-ease-out) both}
+.codepuppy-problems-entry:hover,.codepuppy-problems-entry[aria-expanded="true"]{background:var(--a-overlay-active);color:var(--a-text)}
+.codepuppy-problems-entry:focus-visible{outline:none;box-shadow:var(--a-ring-focus)}
+.codepuppy-problems-dot{flex:none;width:6px;height:6px;border-radius:var(--a-radius-full);background:var(--a-warning)}
+.codepuppy-problems-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.codepuppy-problems-chev{flex:none;width:12px;height:12px;color:var(--a-text-tertiary)}
+@keyframes codepuppy-problems-fade{from{opacity:0}}
+/* ② 向上弹层:与账户弹层(.codepuppy-acct-pop)同一外观与宽度 */
+.codepuppy-problems-pop{position:fixed;left:10px;width:312px;z-index:50;max-height:min(420px,calc(100% - 140px));overflow-y:auto;background:var(--a-surface-raised);border:1px solid var(--a-border);border-radius:var(--a-radius-xl);box-shadow:var(--a-shadow-overlay);padding:0 0 var(--a-space-1)}
+.codepuppy-problems-head{display:flex;align-items:baseline;gap:var(--a-space-2);padding:12px 14px 8px}
+.codepuppy-problems-head b{font-size:13.5px;font-weight:var(--a-weight-semibold)}
+.codepuppy-problems-head small{font-size:var(--a-text-xs);color:var(--a-text-tertiary)}
+.codepuppy-problems-list{list-style:none;margin:0;padding:0}
+.codepuppy-problems-item{display:flex;align-items:flex-start;gap:var(--a-space-3);padding:10px 14px;border-top:1px solid var(--a-border-faint)}
+.codepuppy-problems-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.codepuppy-problems-text b{font-size:var(--a-text-sm);font-weight:var(--a-weight-medium);line-height:var(--a-leading-snug);color:var(--a-text)}
+.codepuppy-problems-text small{font-size:var(--a-text-xs);color:var(--a-text-tertiary)}
+.codepuppy-problems-act{flex:none;margin:-3px -6px 0 0;padding:3px 8px;border:0;border-radius:var(--a-radius-sm);background:transparent;color:var(--a-accent);font:inherit;font-size:var(--a-text-xs);font-weight:var(--a-weight-semibold);cursor:pointer;white-space:nowrap}
+.codepuppy-problems-act:hover{background:var(--a-overlay-hover)}
+.codepuppy-problems-act:focus-visible{outline:none;box-shadow:var(--a-ring-focus)}
+/* ③ 侧栏收起时:「显示侧边栏」按钮右上角一个小点(同会话行未读点的写法) */
+.codepuppy-topbar-btn[data-problems]{position:relative}
+.codepuppy-topbar-btn[data-problems]::after{content:"";position:absolute;top:4px;right:5px;width:6px;height:6px;border-radius:var(--a-radius-full);background:var(--a-warning);box-shadow:0 0 0 2px var(--a-bg-canvas)}
+@media (prefers-reduced-motion: reduce){.codepuppy-problems-entry{animation:none}}

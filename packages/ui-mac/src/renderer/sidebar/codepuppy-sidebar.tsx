@@ -48,6 +48,8 @@ import { setExtHubOpen, toggleExtHub } from "../extensions/ext-hub-state"
 import { setAutomationOpen, toggleAutomation } from "../automations/automation-state"
 import { setSettingsOpen } from "../codepuppy-ui/settings-state"
 import { dismissMenu, dismissMenuOnEscape, focusFirstMenuItem } from "./menu-a11y"
+import { ProblemsEntry } from "./problems-entry"
+import { unresolvedProblems } from "../codepuppy-ui/problems"
 
 // Replicate opencode's getProjectAvatarVariant (context/layout.tsx) for projects that already
 // have a server-assigned color; otherwise pick a stable variant from the worktree so the
@@ -266,6 +268,14 @@ export function CodePuppySidebar(props: {
   // (alpha-platform) — shown as "待接入" placeholders, see ADR-016 / cloud topology.
   const theme = useTheme()
   const [menuOpen, setMenuOpen] = createSignal(false)
+  // `#1687`:侧栏收起时入口跟着收起,「显示侧边栏」按钮上留一个小点,悬停文字带数量。
+  const collapsedProblems = () => (sidebarCollapsed() ? unresolvedProblems().length : 0)
+  const sidebarToggleLabel = () =>
+    !sidebarCollapsed()
+      ? t("codepuppy.sidebar.hide")
+      : collapsedProblems()
+        ? t("codepuppy.sidebar.showWithProblems", { count: collapsedProblems() })
+        : t("codepuppy.sidebar.show")
   const plan = () => authState().account?.plan ?? ""
   const isPro = () => /pro|plus|team|max|paid/i.test(plan())
   const acctInitial = () => (authState().account?.email ?? "A").trim().charAt(0).toUpperCase() || "A"
@@ -1044,8 +1054,9 @@ export function CodePuppySidebar(props: {
         <button
           type="button"
           class="codepuppy-topbar-btn"
-          title={sidebarCollapsed() ? t("codepuppy.sidebar.show") : t("codepuppy.sidebar.hide")}
-          aria-label={sidebarCollapsed() ? t("codepuppy.sidebar.show") : t("codepuppy.sidebar.hide")}
+          data-problems={collapsedProblems() ? "" : undefined}
+          title={sidebarToggleLabel()}
+          aria-label={sidebarToggleLabel()}
           onClick={() => toggleSidebar()}
         >
           <Icon name="sidebar-right" />
@@ -1533,6 +1544,8 @@ export function CodePuppySidebar(props: {
                 </Show>
               </div>
             </Show>
+            {/* `#1687`:未恢复问题入口,账户按钮正上方(设计稿 `#problems`)。 */}
+            <ProblemsEntry />
             <button
               type="button"
               class="codepuppy-sidebar-account"

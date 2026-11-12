@@ -30,7 +30,9 @@ import "./styles.css"
 import "./sidebar/sidebar.css"
 import "./sidebar/account-popover.css"
 import "./codepuppy-ui/composer-reskin.css"
-import { ToastViewport } from "./codepuppy-ui/Toast"
+import { ToastViewport, beginStartupQuiet } from "./codepuppy-ui/Toast"
+import { CatalogProblemWatcher } from "./codepuppy-ui/catalog-problem-watcher"
+import { ToastRouteFollower } from "./codepuppy-ui/toast-route-follower"
 import { installHomeDraftDiscardNotice } from "./codepuppy-ui/home-draft-discard-notice"
 import { ContractFailureBanner } from "./codepuppy-ui/Banner"
 import { CodePuppyBoundary } from "./codepuppy-ui/codepuppy-boundary"
@@ -125,6 +127,9 @@ try {
     localStorage.setItem("opencode-theme-id", CODEPUPPY_THEME_ID)
   }
 } catch {}
+
+// `#1687` BR-04:启动后 10 秒的静默窗口从 renderer 启动这一刻算起。
+beginStartupQuiet()
 
 const root = document.getElementById("root")
 if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
@@ -583,6 +588,11 @@ render(() => {
               </CodePuppyBoundary>
               <CodePuppyBoundary name="ToastViewport">
                 <ToastViewport />
+                <ToastRouteFollower />
+              </CodePuppyBoundary>
+              {/* `#1687` R6:平台模型目录刷新失败也进「未恢复问题」(设计稿 `#problems`)。 */}
+              <CodePuppyBoundary name="CatalogProblemWatcher">
+                <CatalogProblemWatcher />
               </CodePuppyBoundary>
               <CodePuppyBoundary name="ContractFailureBanner">
                 <ContractFailureBanner />

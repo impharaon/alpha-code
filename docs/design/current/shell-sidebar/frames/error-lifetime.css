@@ -1,0 +1,54 @@
+/* 「弹出提示的去留」与「未恢复问题入口」两节子帧的共用样式。
+   来源:增量稿 docs/design/2026-11-12-error-message-lifetime/frame.html(owner 2026-11-12 批准),原样并入。
+   帧内其余样式由子帧直接引用正式代码 CSS(tokens / base / toast / sidebar / account-popover),不在这里复制。
+   只用 --a-* 令牌。 */
+
+/* ════════ 子帧排版(dz-) ════════ */
+html,body{margin:0}
+body{background:var(--a-bg-subtle);color:var(--a-text);font-family:var(--a-font-sans);font-size:var(--a-text-base);line-height:var(--a-leading-normal);-webkit-font-smoothing:antialiased}
+.dz-h3{margin:28px 0 4px;font-size:var(--a-text-lg);letter-spacing:var(--a-tracking-tight)}
+.dz-h3:first-child{margin-top:0}
+.dz-h3 small{margin-left:8px;font-size:var(--a-text-xs);font-weight:var(--a-weight-normal);color:var(--a-text-tertiary)}
+.dz-sub{margin:0 0 12px;max-width:96ch;color:var(--a-text-secondary);font-size:var(--a-text-sm);line-height:1.6}
+.dz-row{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start}
+.dz-row + .dz-row{margin-top:20px}
+.dz-row > div{max-width:100%}
+.dz-cap{margin:0 0 8px;font-size:var(--a-text-xs);color:var(--a-text-tertiary);line-height:1.5}
+.dz-cap b{display:block;font-size:var(--a-text-sm);color:var(--a-text);margin-bottom:1px}
+.dz-scroll{overflow-x:auto;padding-bottom:4px}
+.dz-table{border-collapse:collapse;font-size:var(--a-text-sm);background:var(--a-bg-canvas);border:1px solid var(--a-border);max-width:110ch}
+.dz-table th{background:var(--a-bg-subtle);text-align:left;font-size:var(--a-text-xs);color:var(--a-text-tertiary);font-weight:var(--a-weight-semibold);padding:8px 12px}
+.dz-table td{padding:9px 12px;border-top:1px solid var(--a-border-faint);color:var(--a-text-secondary);vertical-align:top;line-height:1.55}
+.dz-table td:first-child{color:var(--a-text);white-space:nowrap}
+
+/* ════════ 窗口外壳(帧):transform 让侧栏、提示、弹层的 fixed 定位落在窗口内 ════════ */
+.win{position:relative;transform:translateZ(0);overflow:hidden;flex:none;background:var(--a-bg-canvas);border:1px solid var(--a-border-strong);border-radius:10px;box-shadow:var(--a-shadow-md)}
+.crop{position:relative;overflow:hidden;flex:none;border:1px solid var(--a-border-strong);border-radius:10px;box-shadow:var(--a-shadow-md);background:var(--a-bg-canvas)}
+.crop>.win{position:absolute;border:0;border-radius:0;box-shadow:none}
+.crop[data-anchor~="bottom"]>.win{bottom:0}
+.crop[data-anchor~="top"]>.win{top:0}
+.crop[data-anchor~="left"]>.win{left:0}
+.crop[data-anchor~="right"]>.win{right:0}
+/* 系统红绿灯(macOS 原生,trafficLightPosition x12 y14),不是产品界面 */
+.win-lights{position:absolute;left:12px;top:14px;z-index:45;display:flex;gap:8px}
+.win-lights i{width:12px;height:12px;border-radius:50%;background:var(--a-border-strong)}
+/* 代码里这两处用 100vw 定位;帧内改用窗口宽,效果等同 */
+.win .codepuppy-topbar{right:calc(var(--win-w) - var(--codepuppy-sidebar-w) + 10px)}
+.win .a-toast-viewport{width:min(360px,calc(var(--win-w) - 32px))}
+.win .a-toast{animation:none}
+/* 上游 ProjectAvatar 的替身(上下文,未改动) */
+.dz-av{display:grid;place-items:center;border-radius:5px;background:var(--a-bg-inset);color:var(--a-text-secondary);font-weight:var(--a-weight-semibold);line-height:1}
+/* 主区:新对话页(上下文,未改动) */
+.dz-main{position:absolute;top:0;right:0;bottom:0;left:var(--codepuppy-sidebar-w);display:flex;align-items:center;justify-content:center;padding:40px 24px;background:var(--a-bg-canvas)}
+.win[data-sidebar="collapsed"] .dz-main{left:0}
+.dz-center{width:min(640px,100%);display:flex;flex-direction:column}
+.dz-greet{margin:0 0 var(--a-space-10);text-align:center;font-size:var(--a-text-2xl);font-weight:var(--a-weight-semibold);letter-spacing:var(--a-tracking-tight)}
+.dz-comp{border:1px solid var(--a-border);border-radius:var(--a-radius-2xl);background:var(--a-surface);box-shadow:var(--a-shadow-sm)}
+.dz-comp-in{min-height:54px;padding:16px 18px 6px;font-size:var(--a-text-md);color:var(--a-text-tertiary)}
+.dz-comp-bar{display:flex;align-items:center;gap:6px;min-height:46px;padding:0 10px 0 8px}
+.dz-chip{height:28px;padding:0 10px;display:inline-flex;align-items:center;border-radius:var(--a-radius-full);border:1px solid var(--a-border);font-size:var(--a-text-xs);color:var(--a-text-secondary)}
+.dz-send{margin-left:auto;width:30px;height:30px;border-radius:var(--a-radius-full);background:var(--a-bg-muted)}
+
+/* ════════ 本组件的样式 ════════
+   `.codepuppy-problems-*` 与 `.codepuppy-topbar-btn[data-problems]` 已随 alpha-code#1687 并入正式代码
+   packages/ui-mac/src/renderer/sidebar/sidebar.css(子帧经上面引用的 sidebar.css 取到),这里不再复制。 */

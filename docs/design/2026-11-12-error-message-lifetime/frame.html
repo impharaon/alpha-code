@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="zh-CN" data-color-scheme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>报错提示的去留 · 弹出提示与未恢复问题入口 · 增量稿</title>
+<!-- 帧内样式直接引用正式代码(alpha@039f7715e1):令牌、基础、侧栏、账户弹层、弹出提示。本稿不复制它们。 -->
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/codepuppy-ui/base.css" />
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/codepuppy-ui/toast.css" />
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/sidebar/sidebar.css" />
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/sidebar/account-popover.css" />
+<style>
+/* ════════ 帧外排版(dz-):只用 --a-* ════════ */
+html,body{margin:0}
+body{background:var(--a-bg-subtle);color:var(--a-text);font-family:var(--a-font-sans);font-size:var(--a-text-base);line-height:var(--a-leading-normal);-webkit-font-smoothing:antialiased}
+.dz-bar{position:sticky;top:0;z-index:2000;display:flex;align-items:center;gap:16px;padding:10px 24px;border-bottom:1px solid var(--a-border);background:color-mix(in srgb,var(--a-bg-canvas) 92%,transparent);backdrop-filter:blur(14px)}
+.dz-bar b{font-size:var(--a-text-sm)}
+.dz-bar nav{display:flex;gap:12px;flex-wrap:wrap;font-size:var(--a-text-xs)}
+.dz-bar nav a{color:var(--a-text-secondary);text-decoration:none}
+.dz-bar nav a:hover{color:var(--a-accent)}
+.dz-grow{flex:1}
+.dz-seg{display:inline-flex;padding:2px;gap:2px;background:var(--a-bg-muted);border-radius:var(--a-radius-sm)}
+.dz-seg button{border:0;background:transparent;font:inherit;font-size:var(--a-text-xs);padding:3px 10px;border-radius:var(--a-radius-xs);color:var(--a-text-secondary);cursor:pointer}
+.dz-seg button[data-on]{background:var(--a-surface);color:var(--a-text);box-shadow:var(--a-shadow-xs)}
+.dz-wrap{max-width:1340px;margin:0 auto;padding:28px 24px 96px}
+.dz-intro h1{margin:0 0 8px;font-size:var(--a-text-2xl);letter-spacing:var(--a-tracking-tight)}
+.dz-intro p{margin:0 0 6px;max-width:84ch;color:var(--a-text-secondary);font-size:var(--a-text-md);line-height:1.65}
+.dz-sec{scroll-margin-top:64px}
+.dz-h2{margin:48px 0 4px;font-size:var(--a-text-xl);letter-spacing:var(--a-tracking-tight)}
+.dz-h2 small{margin-left:8px;font-size:var(--a-text-xs);font-weight:var(--a-weight-normal);color:var(--a-text-tertiary)}
+.dz-sub{margin:0 0 14px;max-width:96ch;color:var(--a-text-secondary);font-size:var(--a-text-sm);line-height:1.6}
+.dz-rel,.dz-note{margin:16px 0 0;padding:14px 16px;border:1px solid var(--a-border);border-radius:var(--a-radius-md);background:var(--a-bg-canvas);font-size:var(--a-text-sm);line-height:1.65;color:var(--a-text-secondary);max-width:110ch}
+.dz-rel{border-left:3px solid var(--a-accent)}
+.dz-note{border-left:3px solid var(--a-text-tertiary)}
+.dz-rel h3{margin:0 0 6px;font-size:var(--a-text-md);color:var(--a-text)}
+.dz-rel b,.dz-note b{color:var(--a-text)}
+.dz-rel ul{margin:4px 0 0;padding-left:18px}
+.dz-rel code,.dz-note code{font-family:var(--a-font-mono);font-size:11px;color:var(--a-text)}
+.dz-pick{margin:14px 0 0;padding:12px 16px;border-radius:var(--a-radius-md);background:var(--a-accent-subtle);color:var(--a-text);font-size:var(--a-text-sm);line-height:1.6;max-width:110ch}
+.dz-row{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start}
+.dz-cap{margin:0 0 8px;font-size:var(--a-text-xs);color:var(--a-text-tertiary);line-height:1.5}
+.dz-cap b{display:block;font-size:var(--a-text-sm);color:var(--a-text);margin-bottom:1px}
+.dz-scroll{overflow-x:auto;padding-bottom:4px}
+.dz-table{border-collapse:collapse;font-size:var(--a-text-sm);background:var(--a-bg-canvas);border:1px solid var(--a-border);max-width:110ch}
+.dz-table th{background:var(--a-bg-subtle);text-align:left;font-size:var(--a-text-xs);color:var(--a-text-tertiary);font-weight:var(--a-weight-semibold);padding:8px 12px}
+.dz-table td{padding:9px 12px;border-top:1px solid var(--a-border-faint);color:var(--a-text-secondary);vertical-align:top;line-height:1.55}
+.dz-table td:first-child{color:var(--a-text);white-space:nowrap}
+/* 演示控件 */
+.dz-ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px}
+.dz-ctl button{height:30px;padding:0 12px;border:1px solid var(--a-border);border-radius:var(--a-radius-md);background:var(--a-surface);color:var(--a-text);font:inherit;font-size:var(--a-text-sm);cursor:pointer}
+.dz-ctl button:hover{background:var(--a-bg-muted)}
+.dz-ctl button:focus-visible{outline:none;box-shadow:var(--a-ring-focus)}
+.dz-live{font-family:var(--a-font-mono);font-size:11px;color:var(--a-text-tertiary);min-height:16px;margin:0 0 8px}
+
+/* ════════ 窗口外壳(帧):transform 让侧栏、提示、弹层的 fixed 定位落在窗口内 ════════ */
+.win{position:relative;transform:translateZ(0);overflow:hidden;flex:none;background:var(--a-bg-canvas);border:1px solid var(--a-border-strong);border-radius:10px;box-shadow:var(--a-shadow-md)}
+.crop{position:relative;overflow:hidden;flex:none;border:1px solid var(--a-border-strong);border-radius:10px;box-shadow:var(--a-shadow-md);background:var(--a-bg-canvas)}
+.crop>.win{position:absolute;border:0;border-radius:0;box-shadow:none}
+.crop[data-anchor~="bottom"]>.win{bottom:0}
+.crop[data-anchor~="top"]>.win{top:0}
+.crop[data-anchor~="left"]>.win{left:0}
+.crop[data-anchor~="right"]>.win{right:0}
+/* 系统红绿灯(macOS 原生,trafficLightPosition x12 y14),不是产品界面 */
+.win-lights{position:absolute;left:12px;top:14px;z-index:45;display:flex;gap:8px}
+.win-lights i{width:12px;height:12px;border-radius:50%;background:var(--a-border-strong)}
+/* 代码里这两处用 100vw 定位;帧内改用窗口宽,效果等同 */
+.win .codepuppy-topbar{right:calc(var(--win-w) - var(--codepuppy-sidebar-w) + 10px)}
+.win .a-toast-viewport{width:min(360px,calc(var(--win-w) - 32px))}
+.win .a-toast{animation:none}
+/* 上游 ProjectAvatar 的替身(上下文,未改动) */
+.dz-av{display:grid;place-items:center;border-radius:5px;background:var(--a-bg-inset);color:var(--a-text-secondary);font-weight:var(--a-weight-semibold);line-height:1}
+/* 主区:新对话页(上下文,未改动) */
+.dz-main{position:absolute;top:0;right:0;bottom:0;left:var(--codepuppy-sidebar-w);display:flex;align-items:center;justify-content:center;padding:40px 24px;background:var(--a-bg-canvas)}
+.win[data-sidebar="collapsed"] .dz-main{left:0}
+.dz-center{width:min(640px,100%);display:flex;flex-direction:column}
+.dz-greet{margin:0 0 var(--a-space-10);text-align:center;font-size:var(--a-text-2xl);font-weight:var(--a-weight-semibold);letter-spacing:var(--a-tracking-tight)}
+.dz-comp{border:1px solid var(--a-border);border-radius:var(--a-radius-2xl);background:var(--a-surface);box-shadow:var(--a-shadow-sm)}
+.dz-comp-in{min-height:54px;padding:16px 18px 6px;font-size:var(--a-text-md);color:var(--a-text-tertiary)}
+.dz-comp-bar{display:flex;align-items:center;gap:6px;min-height:46px;padding:0 10px 0 8px}
+.dz-chip{height:28px;padding:0 10px;display:inline-flex;align-items:center;border-radius:var(--a-radius-full);border:1px solid var(--a-border);font-size:var(--a-text-xs);color:var(--a-text-secondary)}
+.dz-send{margin-left:auto;width:30px;height:30px;border-radius:var(--a-radius-full);background:var(--a-bg-muted)}
+
+/* ════════ 本稿新增(提议的实现类名;只用 --a-*) ════════ */
+/* ① 未恢复问题入口:与「更新已就绪」那一行(.codepuppy-updater-note)同一尺寸,可点 */
+.codepuppy-problems-entry{display:flex;align-items:center;gap:var(--a-space-2);width:100%;margin:0 0 var(--a-space-1);padding:5px 8px;border:0;border-radius:var(--a-radius-md);background:var(--a-overlay-hover);color:var(--a-text-secondary);font:inherit;font-size:var(--a-text-xs);text-align:left;cursor:pointer;-webkit-app-region:no-drag;animation:dz-fade var(--a-dur-fast) var(--a-ease-out) both}
+.codepuppy-problems-entry:hover,.codepuppy-problems-entry[aria-expanded="true"]{background:var(--a-overlay-active);color:var(--a-text)}
+.codepuppy-problems-entry:focus-visible{outline:none;box-shadow:var(--a-ring-focus)}
+.codepuppy-problems-dot{flex:none;width:6px;height:6px;border-radius:var(--a-radius-full);background:var(--a-warning)}
+.codepuppy-problems-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.codepuppy-problems-chev{flex:none;width:12px;height:12px;color:var(--a-text-tertiary)}
+@keyframes dz-fade{from{opacity:0}}
+/* ② 向上弹层:与账户弹层(.codepuppy-acct-pop)同一外观与宽度 */
+.codepuppy-problems-pop{position:fixed;left:10px;width:312px;z-index:50;max-height:min(420px,calc(100% - 140px));overflow-y:auto;background:var(--a-surface-raised);border:1px solid var(--a-border);border-radius:var(--a-radius-xl);box-shadow:var(--a-shadow-overlay);padding:0 0 var(--a-space-1)}
+.codepuppy-problems-head{display:flex;align-items:baseline;gap:var(--a-space-2);padding:12px 14px 8px}
+.codepuppy-problems-head b{font-size:13.5px;font-weight:var(--a-weight-semibold)}
+.codepuppy-problems-head small{font-size:var(--a-text-xs);color:var(--a-text-tertiary)}
+.codepuppy-problems-list{list-style:none;margin:0;padding:0}
+.codepuppy-problems-item{display:flex;align-items:flex-start;gap:var(--a-space-3);padding:10px 14px;border-top:1px solid var(--a-border-faint)}
+.codepuppy-problems-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.codepuppy-problems-text b{font-size:var(--a-text-sm);font-weight:var(--a-weight-medium);line-height:var(--a-leading-snug);color:var(--a-text)}
+.codepuppy-problems-text small{font-size:var(--a-text-xs);color:var(--a-text-tertiary)}
+.codepuppy-problems-act{flex:none;margin:-3px -6px 0 0;padding:3px 8px;border:0;border-radius:var(--a-radius-sm);background:transparent;color:var(--a-accent);font:inherit;font-size:var(--a-text-xs);font-weight:var(--a-weight-semibold);cursor:pointer;white-space:nowrap}
+.codepuppy-problems-act:hover{background:var(--a-overlay-hover)}
+.codepuppy-problems-act:focus-visible{outline:none;box-shadow:var(--a-ring-focus)}
+/* ③ 侧栏收起时:「显示侧边栏」按钮右上角一个小点(同会话行未读点的写法) */
+.codepuppy-topbar-btn[data-problems]{position:relative}
+.codepuppy-topbar-btn[data-problems]::after{content:"";position:absolute;top:4px;right:5px;width:6px;height:6px;border-radius:var(--a-radius-full);background:var(--a-warning);box-shadow:0 0 0 2px var(--a-bg-canvas)}
+@media (prefers-reduced-motion: reduce){.codepuppy-problems-entry{animation:none}}
+</style>
+</head>
+<body>
+
+<div class="dz-bar">
+  <b>报错提示的去留</b>
+  <nav>
+    <a href="#demo">可操作演示</a><a href="#toast-fault">后台故障</a><a href="#toast-coalesce">同因合并</a><a href="#toast-action">操作失败</a><a href="#problems">未恢复问题</a><a href="#problems-recovered">恢复后</a><a href="#problems-collapsed">侧栏收起</a><a href="#startup">启动</a><a href="#rules">约定</a>
+  </nav>
+  <div class="dz-grow"></div>
+  <div class="dz-seg" id="themeSeg"><button data-theme="light" data-on>浅色</button><button data-theme="dark">深色</button></div>
+</div>
+
+<main class="dz-wrap">
+
+<section class="dz-intro">
+  <h1>弹出提示跟着问题走</h1>
+  <p>后台出的问题:提示 8 秒后收起,还没恢复的留在侧栏底部「N 个问题未恢复」里,恢复了就自己消失。用户自己的操作失败了:提示一直留着,直到关掉。启动后 10 秒内不弹任何提示:会自动重试的故障先等重试结果,需要用户处理的直接计入入口。</p>
+  <div class="dz-pick"><b>入口位置(推荐一处):侧栏底部、账户按钮上方。</b>每个页面都有、已经是放「更新已就绪」这类应用状态的地方,不占内容区;侧栏收起时由「显示侧边栏」按钮上的小点代替。</div>
+  <div class="dz-rel">
+    <h3>与上一稿的关系</h3>
+    <ul>
+      <li><b>起点</b>:弹出提示没有设计稿,起点是正式代码(<code>Toast.tsx</code> / <code>toast.css</code>);侧栏起点也是正式代码(<code>sidebar.css</code>、<code>account-popover.css</code>),不是 <code>current/shell-sidebar</code> 的旧稿 —— 旧稿的品牌名、底部账户区已和上线的不一样。本页帧内样式直接引用这些代码文件与 <code>tokens.css</code>。</li>
+      <li><b>不变</b>:提示的外观、右下角位置、堆叠顺序、×;侧栏现有全部内容;账户按钮和它的弹层。新对话页只作背景,未改动。</li>
+      <li><b>改动</b>:① 后台故障提示 8 秒后收起,悬停或键盘聚焦时不计时;② 同一原因只留一条;③ 用户操作失败的提示保留到关闭或离开当前页面(外观不变);④ 侧栏底部新增「N 个问题未恢复」一行和向上弹层,尺寸同「更新已就绪」那一行,弹层外观同账户弹层;⑤ 侧栏收起时「显示侧边栏」按钮带一个小点;⑥ 启动后 10 秒内不弹提示:会自动重试的故障先不计入入口,10 秒后仍失败才弹;需要用户处理的(如进入项目时的「部分内容未能导入」)不弹,直接计入入口。</li>
+      <li><b>文字</b>:新文字只有「N 个问题未恢复」「未恢复的问题」「恢复后自动移除」「查看」;「重试」沿用现有。连接器未能连接目前没有现成的提示文字,帧里那句是示例;其余提示都是现有文字。</li>
+    </ul>
+  </div>
+</section>
+
+<section class="dz-sec" id="demo">
+  <h2 class="dz-h2">可操作演示<small>默认窗口 1280 × 800</small></h2>
+  <p class="dz-sub">点按钮模拟。鼠标停在提示上时不计时;8 秒到了提示收起、入口出现;点入口看列表;「恢复一条」让最早那条消失。</p>
+  <div class="dz-ctl">
+    <button data-act="fault">后台出错</button>
+    <button data-act="repeat">同一原因再报一次</button>
+    <button data-act="action">操作失败</button>
+    <button data-act="recover">恢复一条</button>
+    <button data-act="reset">重置</button>
+  </div>
+  <div class="dz-live" id="demoLive">没有提示</div>
+  <div class="dz-scroll"><div id="demoStage"></div></div>
+</section>
+
+<section class="dz-sec" id="toast-lifetime">
+  <h2 class="dz-h2" id="toast-fault">① 后台故障:提示 8 秒后收起<small>1280 宽 · 窗口下半部</small></h2>
+  <p class="dz-sub">左:刚出现。鼠标停在提示上或键盘焦点在里面时不计时,离开后接着计。右:8 秒到了,提示收起,同一时刻侧栏底部出现「1 个问题未恢复」。点 × 也一样收进入口 —— × 表示「看到了」,不表示「解决了」。</p>
+  <div class="dz-row">
+    <div><p class="dz-cap"><b>0 秒 · 出现</b>入口还没有</p><div class="dz-scroll" data-frame="fault-shown"></div></div>
+    <div><p class="dz-cap"><b>8 秒后 · 收起</b>入口显示 1</p><div class="dz-scroll" data-frame="fault-folded"></div></div>
+  </div>
+</section>
+
+<section class="dz-sec" id="toast-coalesce">
+  <h2 class="dz-h2">② 同一原因只留一条<small>右下角提示区</small></h2>
+  <p class="dz-sub">同一来源、同一原因在短时间内报了 3 次。改后屏幕上只有一条,内容更新但不重新计时,所以反复重试失败也不会让它一直挂着;它收起后、问题还没恢复期间再报,不再弹出,只更新入口里那一条。入口同样只计 1。</p>
+  <div class="dz-row">
+    <div><p class="dz-cap"><b>现在</b>每报一次叠一条,都不会自己消失</p><div data-frame="coalesce-before"></div></div>
+    <div><p class="dz-cap"><b>改后</b>一条</p><div data-frame="coalesce-after"></div></div>
+  </div>
+</section>
+
+<section class="dz-sec" id="toast-action">
+  <h2 class="dz-h2">③ 用户操作失败:提示留着<small>1280 宽 · 窗口下半部</small></h2>
+  <p class="dz-sub">用户刚点了「删除」而失败,或者需要用户动手才能解决(重新登录、修配置、授权)。外观和现在一样,不受 8 秒限制,直到点 × 或离开当前页面;它不进入口。和后台故障同时出现时,8 秒后只有后台那条收起。</p>
+  <div class="dz-row">
+    <div><p class="dz-cap"><b>同时出现</b>上:后台故障 · 下:删除失败</p><div class="dz-scroll" data-frame="action-both"></div></div>
+    <div><p class="dz-cap"><b>8 秒后</b>后台那条收进入口,删除失败仍在</p><div class="dz-scroll" data-frame="action-after"></div></div>
+  </div>
+</section>
+
+<section class="dz-sec" id="problems">
+  <h2 class="dz-h2">④ 未恢复的问题:入口与列表<small>侧栏底部 · 1280 宽 · 窗口左下</small></h2>
+  <p class="dz-sub">没有未恢复的问题时这一行不存在。有的时候显示数量;点开向上弹出列表,每条写原因和能做的事。条目没有 ×:问题恢复了它自己走。点外面或按 Esc 收起。</p>
+  <div class="dz-row">
+    <div><p class="dz-cap"><b>没有未恢复的问题</b>和现在一样</p><div data-frame="entry-none"></div></div>
+    <div><p class="dz-cap"><b>有 3 个</b>收起时</p><div data-frame="entry-count"></div></div>
+    <div><p class="dz-cap"><b>点开</b>长文字换行,不截断</p><div data-frame="entry-open"></div></div>
+  </div>
+</section>
+
+<section class="dz-sec" id="problems-recovered">
+  <h2 class="dz-h2">⑤ 恢复后自己消失<small>侧栏底部</small></h2>
+  <p class="dz-sub">列表开着时,一条恢复就从列表里拿掉,数量跟着变;全部恢复后弹层关闭、这一行消失,侧栏回到原样。</p>
+  <div class="dz-row">
+    <div><p class="dz-cap"><b>3 个里恢复了 1 个</b>连接器那条消失,数量变 2</p><div data-frame="recover-one"></div></div>
+    <div><p class="dz-cap"><b>全部恢复</b>这一行消失</p><div data-frame="recover-all"></div></div>
+  </div>
+</section>
+
+<section class="dz-sec" id="problems-collapsed">
+  <h2 class="dz-h2">⑥ 侧栏收起时<small>窄窗口 480 宽(窗口窄于 768 时侧栏自动收起)</small></h2>
+  <p class="dz-sub">入口跟着侧栏一起收起,「显示侧边栏」按钮右上角留一个小点;鼠标停上去提示「显示侧边栏 · 1 个问题未恢复」。点它照常展开侧栏,入口就在底部。窄窗口下提示照样在右下角,宽度随窗口缩。</p>
+  <div class="dz-row">
+    <div><p class="dz-cap"><b>后台故障提示出现时</b></p><div data-frame="narrow-toast"></div></div>
+    <div><p class="dz-cap"><b>收起后</b>按钮上的小点</p><div data-frame="narrow-dot"></div></div>
+  </div>
+</section>
+
+<section class="dz-sec" id="startup">
+  <h2 class="dz-h2">⑦ 启动<small>默认窗口 1280 × 800</small></h2>
+  <p class="dz-sub">启动后头 10 秒屏幕上不弹任何提示。连接器、模型清单这类会自动重试的故障先等重试结果,不计入入口,重试成功就什么都不出现;进入项目时产生的、需要用户处理的提示不弹,直接计入入口。10 秒到了仍然失败的自动重试故障,才弹一条,8 秒后按 ① 收进入口。</p>
+  <div class="dz-row">
+    <div><p class="dz-cap"><b>现在 · 进入项目后</b>几条提示叠在一起,每条都要点 ×</p><div class="dz-scroll" data-frame="startup-before"></div></div>
+  </div>
+  <div class="dz-row" style="margin-top:20px">
+    <div><p class="dz-cap"><b>改后 · 头 10 秒</b>不弹提示;进入项目时的两条计入入口,两个连接器还在重连、不计</p><div class="dz-scroll" data-frame="startup-quiet"></div></div>
+  </div>
+  <div class="dz-row" style="margin-top:20px">
+    <div><p class="dz-cap"><b>点开入口</b>这两条和它们的操作</p><div data-frame="startup-list"></div></div>
+  </div>
+  <div class="dz-row" style="margin-top:20px">
+    <div><p class="dz-cap"><b>改后 · 10 秒后仍有一个连接器没连上</b>只弹这一条;8 秒后收进入口,数量变 3</p><div class="dz-scroll" data-frame="startup-one"></div></div>
+  </div>
+</section>
+
+<section class="dz-sec" id="rules">
+  <h2 class="dz-h2">交互约定<small>帧外</small></h2>
+  <table class="dz-table">
+    <thead><tr><th>情况</th><th>弹出提示</th><th>未恢复问题入口</th></tr></thead>
+    <tbody>
+      <tr><td>后台故障出现</td><td>弹出;8 秒后收起;鼠标悬停或键盘聚焦时不计时,离开后接着计;点 × 立即收起</td><td>提示收起(或点 ×)时计入</td></tr>
+      <tr><td>同一原因再次报告</td><td>正在显示:更新这一条,不重新计时;已收起:不再弹出</td><td>仍计 1,内容更新为最新一次</td></tr>
+      <tr><td>问题恢复</td><td>正在显示的立即消失</td><td>立即移除;数量为 0 时这一行消失,开着的弹层随之关闭</td></tr>
+      <tr><td>启动后 10 秒内</td><td>不弹任何提示</td><td>会自动重试的故障不计,10 秒后仍失败才按第一行处理;需要用户处理的直接计入</td></tr>
+      <tr><td>用户操作失败 / 需要用户动手(启动 10 秒之外)</td><td>一直显示,直到点 × 或离开当前页面</td><td>不计入</td></tr>
+      <tr><td>侧栏收起</td><td>不变</td><td>「显示侧边栏」按钮右上角小点;悬停提示带数量</td></tr>
+      <tr><td>列表里每条的操作</td><td>—</td><td>取该问题现有的处理入口:「重试」= 现有的重试;「查看」= 打开它所在的位置</td></tr>
+      <tr><td>键盘</td><td>Tab 能进提示,进入即暂停计时</td><td>入口是按钮(展开 / 收起);打开后焦点进第一条的操作;Esc 关闭并把焦点还给入口</td></tr>
+    </tbody>
+  </table>
+</section>
+
+</main>
+
+<script>
+/* ════════ 帧渲染:同一套标记生成静态帧与演示 ════════ */
+const BRAND = "../../../packages/ui-mac/src/renderer/brand/brand-mark.png"
+const ICON = {
+  plus: '<svg class="codepuppy-sidebar-nav-icon" viewBox="0 0 16 16" fill="none"><path d="M8 2.88867V13.1109" stroke="currentColor" stroke-linejoin="round"/><path d="M2.88867 8H13.1109" stroke="currentColor" stroke-linejoin="round"/></svg>',
+  search: '<svg class="codepuppy-sidebar-nav-icon" viewBox="0 0 16 16" fill="none"><path d="M14 14L10.3454 10.3454M6.88889 11.7778C9.58889 11.7778 11.7778 9.58889 11.7778 6.88889C11.7778 4.18889 9.58889 2 6.88889 2C4.18889 2 2 4.18889 2 6.88889C2 9.58889 4.18889 11.7778 6.88889 11.7778Z" stroke="currentColor"/></svg>',
+  grid: '<svg class="codepuppy-sidebar-nav-icon" viewBox="0 0 16 16" fill="none"><path d="M13.9948 11.668H9.32812M11.6641 9.33203V13.9987M6.66667 9.33203V13.9987H2V9.33203H6.66667ZM6.66667 2V6.66667H2V2H6.66667ZM13.9948 2V6.66667H9.32812V2H13.9948Z" stroke="currentColor" stroke-miterlimit="10" stroke-linecap="square"/></svg>',
+  clock: '<svg class="codepuppy-sidebar-nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.2" stroke="currentColor"/><path d="M8 4.8V8l2.4 1.6" stroke="currentColor" stroke-linecap="square"/></svg>',
+  chev: '<svg class="codepuppy-project-chevron" viewBox="0 0 16 16" fill="none"><path d="M5 6.5L8 9.5L11 6.5" stroke="currentColor"/></svg>',
+  chevC: '<svg class="codepuppy-project-chevron" data-collapsed viewBox="0 0 16 16" fill="none"><path d="M5 6.5L8 9.5L11 6.5" stroke="currentColor"/></svg>',
+  side: '<svg viewBox="0 0 20 20" fill="none"><path d="M2.91536 2.91406H2.36536V2.36406H2.91536V2.91406ZM2.91536 17.0807V17.6307H2.36536V17.0807H2.91536ZM17.082 17.0807H17.632V17.6307H17.082V17.0807ZM17.082 2.91406V2.36406H17.632V2.91406H17.082ZM6.9987 2.91406H6.4487V2.36406H6.9987V2.91406ZM6.9987 17.0807V17.6307H6.4487V17.0807H6.9987ZM2.91536 2.91406H3.46536V17.0807H2.91536H2.36536V2.91406H2.91536ZM2.91536 17.0807V16.5307H17.082V17.0807V17.6307H2.91536V17.0807ZM17.082 17.0807H16.532V2.91406H17.082H17.632V17.0807H17.082ZM17.082 2.91406V3.46406H2.91536V2.91406V2.36406H17.082V2.91406ZM6.9987 2.91406H7.5487V17.0807H6.9987H6.4487V2.91406H6.9987ZM17.082 17.0807L17.082 17.6307L6.9987 17.6307V17.0807V16.5307L17.082 16.5307L17.082 17.0807ZM6.9987 2.91406V2.36406H17.082V2.91406V3.46406H6.9987V2.91406Z" fill="currentColor"/></svg>',
+  back: '<svg viewBox="0 0 16 16" fill="none"><path d="M10 3.5 5.5 8 10 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  fwd: '<svg viewBox="0 0 16 16" fill="none"><path d="M6 3.5 10.5 8 6 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  up: '<svg viewBox="0 0 12 12" fill="none"><path d="M3 7.5L6 4.5L9 7.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+}
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c])
+
+/* 示例问题(后台状态类)。文字:连接器那条为示例,其余为现有文字。 */
+const P = {
+  feishu: { key: "feishu", kind: "error", title: "「飞书」连接器未能连接", act: "查看" },
+  github: { key: "github", kind: "error", title: "「GitHub」连接器未能连接", act: "查看" },
+  catalog: { key: "catalog", kind: "error", title: "平台模型清单暂时取不到", detail: "网络连接失败", act: "重试" },
+  records: { key: "records", kind: "info", title: "有 2 条安装记录无法读取，已跳过。当前列表可能不完整，请重新打开「已安装」检查。", act: "查看" },
+  /* 进入项目时、需要用户处理的提示(现有文字) */
+  skipped: { key: "skipped", kind: "error", title: "部分内容未能导入，请检查对应条目。", detail: "「飞书文档」未能导入。请检查该条目的格式和读取权限后重试。", act: "查看" },
+  trust: { key: "trust", kind: "error", title: "未能保存此项目的扩展选择，请重试。", act: "查看" },
+}
+const ACTION_FAIL = { kind: "error", title: "删除失败" }
+
+function sidebarHTML(o) {
+  const count = o.problems ? o.problems.length : 0
+  const entry = count
+    ? `<button type="button" class="codepuppy-problems-entry" aria-haspopup="dialog" aria-expanded="${o.open ? "true" : "false"}" data-entry>
+         <span class="codepuppy-problems-dot" aria-hidden="true"></span>
+         <span class="codepuppy-problems-label">${count} 个问题未恢复</span>
+         <span class="codepuppy-problems-chev" aria-hidden="true">${ICON.up}</span>
+       </button>`
+    : ""
+  return `<aside class="codepuppy-sidebar" aria-label="项目">
+    <div class="codepuppy-sidebar-titlebar"></div>
+    <header class="codepuppy-sidebar-brand"><button type="button" class="codepuppy-sidebar-brand-mark" title="首页"><svg class="codepuppy-sidebar-mark" viewBox="0 0 16 20" fill="none"><image href="${BRAND}" x="0" y="2" width="16" height="16"/></svg><span class="codepuppy-sidebar-wordmark">CODE PUPPY</span></button></header>
+    <nav class="codepuppy-sidebar-nav">
+      <button type="button" class="codepuppy-sidebar-nav-item">${ICON.plus}<span>新对话</span></button>
+      <button type="button" class="codepuppy-sidebar-nav-item">${ICON.search}<span>搜索</span></button>
+      <button type="button" class="codepuppy-sidebar-nav-item">${ICON.grid}<span>定制中心</span></button>
+      <button type="button" class="codepuppy-sidebar-nav-item">${ICON.clock}<span>自动化</span></button>
+    </nav>
+    <div class="codepuppy-sidebar-search"><span class="codepuppy-sidebar-search-icon">${ICON.search.replace("codepuppy-sidebar-nav-icon", "")}</span><input class="codepuppy-sidebar-search-input" type="text" placeholder="搜索项目 / 会话…" tabindex="-1" /></div>
+    <div class="codepuppy-sidebar-section">项目</div>
+    <div class="codepuppy-sidebar-scroll">
+      <div class="codepuppy-project" data-expanded>
+        <div class="codepuppy-project-row" data-active>${ICON.chev}<span class="codepuppy-project-avatar dz-av">W</span><span class="codepuppy-project-name">workspace</span></div>
+        <div class="codepuppy-project-sessions">
+          <div class="codepuppy-session-row"><a class="codepuppy-session" data-active>季度报表整理</a></div>
+          <div class="codepuppy-session-row"><a class="codepuppy-session">合同条款对比</a></div>
+          <div class="codepuppy-session-row"><a class="codepuppy-session">周会纪要整理成待办</a></div>
+        </div>
+      </div>
+      <div class="codepuppy-project"><div class="codepuppy-project-row">${ICON.chevC}<span class="codepuppy-project-avatar dz-av">市</span><span class="codepuppy-project-name">市场资料</span></div></div>
+      <div class="codepuppy-project"><div class="codepuppy-project-row">${ICON.chevC}<span class="codepuppy-project-avatar dz-av">笔</span><span class="codepuppy-project-name">个人笔记</span></div></div>
+    </div>
+    <footer class="codepuppy-sidebar-footer">
+      ${entry}
+      <button type="button" class="codepuppy-sidebar-account" data-auth="in">
+        <span class="codepuppy-acct-av">L</span>
+        <span class="codepuppy-sidebar-account-id"><span class="codepuppy-sidebar-account-name">lin@example.com</span><span class="codepuppy-sidebar-account-sub">PRO</span></span>
+        <svg class="codepuppy-acct-chev" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M3 7.5L6 4.5L9 7.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </footer>
+  </aside>`
+}
+
+function popHTML(o) {
+  if (!o.open || !o.problems || !o.problems.length) return ""
+  const items = o.problems
+    .map((p) => `<li class="codepuppy-problems-item"><div class="codepuppy-problems-text"><b>${esc(p.title)}</b>${p.detail ? `<small>${esc(p.detail)}</small>` : ""}</div><button type="button" class="codepuppy-problems-act">${esc(p.act)}</button></li>`)
+    .join("")
+  return `<div class="codepuppy-problems-pop" role="dialog" aria-label="未恢复的问题" data-pop>
+    <div class="codepuppy-problems-head"><b>未恢复的问题</b><small>恢复后自动移除</small></div>
+    <ul class="codepuppy-problems-list">${items}</ul>
+  </div>`
+}
+
+function toastsHTML(list) {
+  if (!list || !list.length) return ""
+  return `<div class="a-toast-viewport a-ui">${list
+    .map((t) => `<div class="a-toast" data-kind="${t.kind}" data-tid="${t.id ?? ""}" role="${t.kind === "error" ? "alert" : "status"}">
+      <span class="a-toast-ico" aria-hidden="true"></span>
+      <div class="a-toast-body"><b>${esc(t.title)}</b>${t.detail ? `<small>${esc(t.detail)}</small>` : ""}</div>
+      <button type="button" class="a-toast-x" aria-label="关闭" data-x="${t.id ?? ""}">×</button>
+    </div>`)
+    .join("")}</div>`
+}
+
+function winHTML(o) {
+  const collapsed = !!o.collapsed
+  const count = o.problems ? o.problems.length : 0
+  const dot = collapsed && count ? ` data-problems title="显示侧边栏 · ${count} 个问题未恢复" aria-label="显示侧边栏 · ${count} 个问题未恢复"` : ` title="${collapsed ? "显示侧边栏" : "隐藏侧边栏"}"`
+  return `<div class="win a-ui" data-sidebar="${collapsed ? "collapsed" : "open"}" style="--win-w:${o.w}px;width:${o.w}px;height:${o.h}px">
+    <div class="win-lights" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="codepuppy-topbar">
+      <button type="button" class="codepuppy-topbar-btn"${dot}>${ICON.side}</button>
+      <span class="codepuppy-topbar-divider" aria-hidden="true"></span>
+      <button type="button" class="codepuppy-topbar-btn" title="后退">${ICON.back}</button>
+      <button type="button" class="codepuppy-topbar-btn" title="前进">${ICON.fwd}</button>
+    </div>
+    ${collapsed ? "" : sidebarHTML(o)}
+    <div class="dz-main"><div class="dz-center">
+      <div class="dz-greet">新对话</div>
+      <div class="dz-comp"><div class="dz-comp-in">问点什么,输入 / 调命令,@ 引用上下文…</div><div class="dz-comp-bar"><span class="dz-chip">＋</span><span class="dz-chip">全部批准</span><span class="dz-chip">DeepSeek V3</span><span class="dz-send"></span></div></div>
+    </div></div>
+    ${toastsHTML(o.toasts)}
+    ${popHTML(o)}
+  </div>`
+}
+
+/* 弹层贴着入口上沿:按入口实际位置算 bottom(实现里同样按入口位置定位) */
+function placePop(root) {
+  const win = root.querySelector(".win")
+  const pop = root.querySelector("[data-pop]")
+  const entry = root.querySelector("[data-entry]")
+  if (!win || !pop || !entry) return
+  const wr = win.getBoundingClientRect()
+  const er = entry.getBoundingClientRect()
+  pop.style.bottom = `${Math.round(wr.bottom - er.top + 6)}px`
+}
+
+function mount(el, o) {
+  const inner = winHTML(o)
+  el.innerHTML = o.crop ? `<div class="crop" data-anchor="${o.crop.anchor}" style="width:${o.crop.w}px;height:${o.crop.h}px">${inner}</div>` : inner
+  placePop(el)
+}
+
+/* ════════ 静态帧 ════════ */
+const W = 1280, H = 800
+const FRAMES = {
+  "fault-shown": { w: W, h: H, crop: { w: 630, h: 300, anchor: "bottom right" }, toasts: [P.feishu] },
+  "fault-folded": { w: W, h: H, crop: { w: 630, h: 300, anchor: "bottom left" }, problems: [P.feishu] },
+  "coalesce-before": { w: W, h: H, crop: { w: 420, h: 250, anchor: "bottom right" }, toasts: [P.feishu, P.feishu, P.feishu] },
+  "coalesce-after": { w: W, h: H, crop: { w: 420, h: 250, anchor: "bottom right" }, toasts: [P.feishu] },
+  "action-both": { w: W, h: H, crop: { w: 630, h: 300, anchor: "bottom right" }, toasts: [P.feishu, ACTION_FAIL] },
+  "action-after": { w: W, h: H, crop: { w: 630, h: 300, anchor: "bottom right" }, toasts: [ACTION_FAIL] },
+  "entry-none": { w: W, h: H, crop: { w: 280, h: 420, anchor: "bottom left" } },
+  "entry-count": { w: W, h: H, crop: { w: 280, h: 420, anchor: "bottom left" }, problems: [P.feishu, P.catalog, P.records] },
+  "entry-open": { w: W, h: H, crop: { w: 600, h: 420, anchor: "bottom left" }, problems: [P.feishu, P.catalog, P.records], open: true },
+  "recover-one": { w: W, h: H, crop: { w: 600, h: 420, anchor: "bottom left" }, problems: [P.catalog, P.records], open: true },
+  "recover-all": { w: W, h: H, crop: { w: 280, h: 420, anchor: "bottom left" } },
+  "narrow-toast": { w: 480, h: 640, collapsed: true, toasts: [P.feishu] },
+  "narrow-dot": { w: 480, h: 640, collapsed: true, problems: [P.feishu] },
+  "startup-before": {
+    w: W, h: H,
+    toasts: [
+      { kind: "error", title: "部分内容未能导入，请检查对应条目。", detail: "「飞书文档」未能导入。请检查该条目的格式和读取权限后重试。" },
+      { kind: "error", title: "部分内容未能导入，请检查对应条目。", detail: "「周报助手」未能导入。请检查该条目的格式和读取权限后重试。" },
+      { kind: "error", title: "未能保存此项目的扩展选择，请重试。", detail: "未能保存此项目的扩展选择。请重新打开项目，核对当前选择后重试。" },
+      { kind: "info", title: "有 2 条安装记录无法读取，已跳过。当前列表可能不完整，请重新打开「已安装」检查。" },
+    ],
+  },
+  "startup-quiet": { w: W, h: H, problems: [P.skipped, P.trust] },
+  "startup-list": { w: W, h: H, crop: { w: 600, h: 420, anchor: "bottom left" }, problems: [P.skipped, P.trust], open: true },
+  "startup-one": { w: W, h: H, toasts: [P.github], problems: [P.skipped, P.trust] },
+}
+function renderStatic() {
+  document.querySelectorAll("[data-frame]").forEach((el) => mount(el, FRAMES[el.dataset.frame]))
+}
+
+/* ════════ 演示:计时、悬停暂停、同因合并、恢复 ════════ */
+const FAULT_MS = 8000
+const ORDER = [P.feishu, P.catalog, P.records]
+const demo = { toasts: [], problems: [], open: false, seq: 0, repeats: {} }
+const stage = document.getElementById("demoStage")
+const live = document.getElementById("demoLive")
+
+function demoRender() {
+  const folded = demo.problems.filter((p) => p.folded)
+  if (!folded.length) demo.open = false
+  mount(stage, { w: W, h: H, toasts: demo.toasts, problems: folded, open: demo.open })
+  stage.querySelectorAll(".a-toast").forEach((el) => {
+    const t = demo.toasts.find((x) => String(x.id) === el.dataset.tid)
+    if (!t) return
+    t.hover = el.matches(":hover")
+    el.addEventListener("mouseenter", () => (t.hover = true))
+    el.addEventListener("mouseleave", () => (t.hover = false))
+    el.addEventListener("focusin", () => (t.focus = true))
+    el.addEventListener("focusout", () => (t.focus = false))
+  })
+  stage.querySelectorAll("[data-x]").forEach((b) => b.addEventListener("click", () => closeToast(Number(b.dataset.x))))
+  const entry = stage.querySelector("[data-entry]")
+  if (entry) entry.addEventListener("click", () => { demo.open = !demo.open; demoRender(); if (demo.open) stage.querySelector(".codepuppy-problems-act")?.focus() })
+  stage.querySelectorAll(".codepuppy-problems-act").forEach((b) => b.addEventListener("click", (e) => e.stopPropagation()))
+  demoLive()
+}
+function foldToast(t) {
+  demo.toasts = demo.toasts.filter((x) => x !== t)
+  const p = demo.problems.find((x) => x.key === t.key)
+  if (p) p.folded = true
+}
+function closeToast(id) {
+  const t = demo.toasts.find((x) => x.id === id)
+  if (!t) return
+  if (t.key) foldToast(t)
+  else demo.toasts = demo.toasts.filter((x) => x !== t)
+  demoRender()
+}
+function report(src) {
+  demo.repeats[src.key] = (demo.repeats[src.key] ?? 0) + 1
+  const p = demo.problems.find((x) => x.key === src.key)
+  if (p) {
+    const t = demo.toasts.find((x) => x.key === src.key)
+    if (t) Object.assign(t, src, { id: t.id, remaining: t.remaining }) // 更新这一条,不重新计时
+    return demoRender()
+  }
+  demo.problems.push({ ...src, folded: false })
+  demo.toasts.push({ ...src, id: ++demo.seq, remaining: FAULT_MS })
+  demoRender()
+}
+const ACTS = {
+  fault() {
+    const next = ORDER.find((s) => !demo.problems.some((p) => p.key === s.key))
+    if (next) report(next)
+  },
+  repeat() {
+    const last = demo.problems[demo.problems.length - 1]
+    if (last) report(ORDER.find((s) => s.key === last.key))
+  },
+  action() {
+    demo.toasts.push({ ...ACTION_FAIL, id: ++demo.seq })
+    demoRender()
+  },
+  recover() {
+    const p = demo.problems.shift()
+    if (!p) return
+    demo.toasts = demo.toasts.filter((t) => t.key !== p.key)
+    delete demo.repeats[p.key]
+    demoRender()
+  },
+  reset() {
+    Object.assign(demo, { toasts: [], problems: [], open: false, repeats: {} })
+    demoRender()
+  },
+}
+document.querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", () => ACTS[b.dataset.act]()))
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && demo.open) { demo.open = false; demoRender(); stage.querySelector("[data-entry]")?.focus() }
+})
+document.addEventListener("click", (e) => {
+  if (demo.open && !e.target.closest("[data-pop]") && !e.target.closest("[data-entry]") && !e.target.closest("[data-act]")) { demo.open = false; demoRender() }
+})
+function demoLive() {
+  const short = (t) => (t.length > 12 ? `${t.slice(0, 12)}…` : t)
+  const parts = demo.toasts.map((t) => (t.key ? `${short(t.title)} ${t.hover || t.focus ? "暂停(悬停/聚焦)" : `剩 ${(t.remaining / 1000).toFixed(1)} 秒`}` : `${t.title} 保留到关闭`))
+  const folded = demo.problems.filter((p) => p.folded).length
+  const rep = Object.entries(demo.repeats).filter(([, n]) => n > 1).map(([k, n]) => `${short(P[k].title)} 已报告 ${n} 次,只算 1 条`)
+  live.textContent = [parts.join(" · ") || "没有提示", `入口 ${folded}`, ...rep].join("  |  ")
+}
+let last = performance.now()
+setInterval(() => {
+  const now = performance.now(), dt = now - last
+  last = now
+  let changed = false
+  for (const t of [...demo.toasts]) {
+    if (!t.key || t.hover || t.focus) continue
+    t.remaining -= dt
+    if (t.remaining <= 0) { foldToast(t); changed = true }
+  }
+  changed ? demoRender() : demoLive()
+}, 100)
+
+/* ════════ 主题 ════════ */
+function setTheme(theme) {
+  document.documentElement.dataset.colorScheme = theme
+  document.querySelectorAll("#themeSeg button").forEach((b) => (b.dataset.theme === theme ? b.setAttribute("data-on", "") : b.removeAttribute("data-on")))
+}
+document.querySelectorAll("#themeSeg button").forEach((b) => b.addEventListener("click", () => setTheme(b.dataset.theme)))
+setTheme(new URLSearchParams(location.search).get("theme") === "dark" ? "dark" : "light")
+
+renderStatic()
+demoRender()
+</script>
+</body>
+</html>

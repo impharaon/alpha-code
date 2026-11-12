@@ -10,7 +10,7 @@ import { createEffect, onCleanup, type Accessor } from "solid-js"
 import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
 import type { CodePuppyProjectsApi, ServerInfo } from "../sidebar/use-projects"
 import { extractCloudRunHit, runStateToast } from "./cloud-run-core"
-import { pushToast } from "./Toast"
+import { pushToast, reportProblem, resolveProblem } from "./Toast"
 import { t } from "../i18n"
 
 type Client = ReturnType<typeof createOpencodeClient>
@@ -40,6 +40,14 @@ export function CloudRunWatcher(props: { server: Accessor<ServerInfo | undefined
       const toast = runStateToast(state)
       if (!toast || watched.get(key) === state.delivery.status) return
       watched.set(key, state.delivery.status)
+      // `#1687` BR-01:保存失败是后台状态问题(8 秒收起、同一 run 只一条);同一 run 之后保存成功 = 恢复,
+      // 失败提示立即消失,再弹成功提示。
+      const problemKey = `cloud-run\0${key}`
+      if (state.delivery.status === "failed") {
+        reportProblem({ key: problemKey, kind: toast.kind, title: t(toast.key), detail: toast.detail })
+        return
+      }
+      resolveProblem(problemKey)
       pushToast({ kind: toast.kind, title: t(toast.key), detail: toast.detail })
     }),
   )

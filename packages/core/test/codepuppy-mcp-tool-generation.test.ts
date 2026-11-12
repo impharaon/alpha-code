@@ -7,9 +7,8 @@
 // Red if the comparison is removed: the old registration's call would reach the server with arguments shaped for the
 // definition it no longer lists.
 import { describe, expect } from "bun:test"
-import fs from "node:fs/promises"
 import os from "node:os"
-import path from "node:path"
+import fs from "node:fs"
 import { Effect, Layer, Stream } from "effect"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
@@ -22,6 +21,7 @@ import { Tool } from "@opencode/core/tool"
 import { McpTool } from "@opencode/core/tool/mcp"
 import { Global } from "@opencode/util/global"
 import { emptyMcp } from "./fixture/mcp"
+import { tempGlobalLayer } from "./fixture/global"
 import { imagePassthrough } from "./lib/image"
 import { testEffect } from "./lib/effect"
 import { executeTool, toolIdentity } from "./lib/tool"
@@ -43,15 +43,15 @@ const mcp = Layer.succeed(
       }),
   }),
 )
-const outputData = await fs.mkdtemp(path.join(os.tmpdir(), "codepuppy-mcp-generation-"))
 const it = testEffect(
-  AppNodeBuilder.build(LayerNode.group([Tool.node, McpTool.node]), [
+  AppNodeBuilder.build(LayerNode.group([Tool.node, McpTool.node, Global.node]), [
     Mcp.node.replace(mcp),
     Permission.node.replace(Layer.mock(Permission.Service, { assert: () => Effect.void })),
     // The bus never delivers, so the registry keeps the registration the call was planned against.
     Bus.node.replace(Layer.mock(Bus.Service, { subscribe: () => Stream.never })),
     Image.node.replace(imagePassthrough),
-    Global.node.replace(Global.layerWith({ data: outputData })),
+    // Every Global root (data, log, repos, cache, ...) in a temp folder, not only data (review R1 #10).
+    Global.node.replace(tempGlobalLayer),
   ]),
 )
 
@@ -86,6 +86,18 @@ describe("#1563 AC6: a call planned against a definition the server no longer li
       state.listing = [lookup({ id: { type: "string" } })]
       expect(yield* call(registry)).toMatchObject({ status: "completed" })
       expect(state.calls).toEqual([{ id: "r1" }])
+    }),
+  )
+})
+
+// Review R1 #10: no root of the engine's Global (data, log, repos, cache, config, state) is the real user directory.
+describe("test isolation", () => {
+  it.live("every Global root is under the temp folder", () =>
+    Effect.gen(function* () {
+      const global = yield* Global.Service
+      const temp = [os.tmpdir(), fs.realpathSync(os.tmpdir())]
+      for (const dir of [global.data, global.log, global.repos, global.cache, global.config, global.state])
+        expect(temp.some((root) => dir.startsWith(root))).toBe(true)
     }),
   )
 })

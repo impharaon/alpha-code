@@ -21,6 +21,8 @@ import { FileSystem } from "@opencode/schema/filesystem"
 import { Location } from "@opencode/core/location"
 import { PluginSupervisor } from "@opencode/core/plugin/supervisor"
 import { AbsolutePath } from "@opencode/core/schema"
+import { Global } from "@opencode/util/global"
+import { tempGlobalLayer } from "./fixture/global"
 import { location } from "./fixture/location"
 import { tmpdir } from "./fixture/tmpdir"
 import { testEffect } from "./lib/effect"
@@ -46,6 +48,8 @@ const watching = <A, E, R>(directory: string, body: (changes: Change[]) => Effec
         Config.node.replace(Config.testLayer()),
         Location.node.replace(Layer.succeed(Location.Service, Location.Service.of(location({ directory: AbsolutePath.make(directory) })))),
         PluginSupervisor.node.replace(Layer.empty),
+        // Every Global root in a temp folder (review R1 #10), should anything in the graph resolve it.
+        Global.node.replace(tempGlobalLayer),
       ]),
     ),
   )

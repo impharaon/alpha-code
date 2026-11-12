@@ -169,3 +169,27 @@ last_reviewed: 2026-11-12
 
 - 2026-11-12 · 第 2 项另改了 `boundaries` 的类型(加 `synthetic`),并另加「之后再来一个 user 回合」一臂;只改锚点不改回合起点时这条红 · `e27bec1704`。
 - 2026-11-12 · 第 3 项的测试按「每个动作都收到对应种类的事件」断言,不断言「恰好一条」(fs-events 会把创建与写入合并或拆分,逐条计数不稳),忽略目录按「零事件」断言 · 第 3 项提交。
+
+## Review R1 fixes(L4 #1666;Codex 审查 gpt-6-astra,编排器裁定 9 收 1 弃)
+
+- 依据:`~/.claude/orchestration/alpha-code/1662/l4-review.r2.out`(10 项 Major)与编排器 R1 派发书;基于 `fc06971055`。每项一个提交,测试走生产代码、带实际跑过的反向臂;编排器核对后合并,不再复审。
+- 核对:编排器派发即核对。
+
+### 逐项
+
+| # | 位置 | 修法 | 证明(反向臂) |
+| --- | --- | --- | --- |
+| 1 | `ext/src/policy/catalog.ts` | 工具集合变了就刷新追加的规则;执行前文档轴的 ask 必须已生效 | `register-policy.test.ts`:首个 prompt 之后才注册的 MCP 工具,文档轴 ask ⇒ 执行前有一条 Code Puppy 待批、拒绝后零执行;去掉刷新 ⇒ 直接执行 |
+| 2 | `core/src/config/plugin/command.ts` | 子任务命令走完整的身份轴判定与审批(与 `subagent` 工具同一条),不只查 `subagent` 动作 | `register-policy.test.ts`:`builtin::subagent` 为 ask ⇒ `/review` 先弹 Code Puppy 的审批,拒绝后零子会话;旧检查 ⇒ 直接建子会话 |
+| 3 | `core/src/tool/mcp.ts` | 定义比对挪到审批之后、真正发送之前(含恢复重试前) | `codepuppy-mcp-tool-generation.test.ts`:审批等待期间 schema 变了 ⇒ 具名失败、零发送;旧位置 ⇒ 发出旧参数 |
+| 4 | `core/src/mcp/client.ts` | 重试日志与其余失败日志都用无正文描述 | `codepuppy-mcp-runtime.test.ts`:503 正文带令牌、触发重试 ⇒ 所有日志行无令牌;旧代码 ⇒ 两条重试日志带正文 |
+| 5 | `connection.ts:32` / `pool.ts:163,316` | 弃:Code Puppy 从不设 `pool`(`packages/ui-mac/src`、`packages/ext/src` 中 `pool` 一词只出现在无关代码里,2026-11-12 实查) | 无 |
+| 6 | `core/src/mcp/index.ts` | 重连计时器绑定失败代次,触发时复核当前状态与重试资格,旧代次的计时器作废 | `codepuppy-mcp-runtime.test.ts`:501 ⇒ 手动重连得 401 ⇒ 再过 30 s 无第三次请求;旧代码 ⇒ 第三次请求 |
+| 7 | `docs/architecture/2026-11-09-1662-permission-reply-measurements.md` | 回执窗口改成实测顺序:收集到同一次回复的级联请求都到齐为止(L6 适配层等同一会话的待批集合,最长 2 s) | `permission-reply-premises.test.ts`:钉住真实事件顺序 `[target, cascade]`;按旧规则(在目标事件处截止)会漏掉级联那条 |
+| 8 | `ext/src/policy/display.ts` | 终态一律以本次决策保存的快照覆盖工具自报的 `codepuppyDisplay` | `register-policy.test.ts`:插件自报伪造快照 ⇒ 终态是可信快照;旧逻辑 ⇒ 保留伪造 |
+| 9 | `ext/src/policy/resolver.ts` | 写入与删除前先把旧名 selector 规范化为新名 | `resolver.test.ts`:已有 `builtin::bash`,写 `builtin::shell` ⇒ 只剩一条、不冲突;删新名 ⇒ 旧记录也没了;旧逻辑 ⇒ 两条 / 删不掉 |
+| 10 | 本线新增的 core 测试 | 改用完整的 `tempGlobalLayer`,逐个检查同类写法 | 改后 `Global.make` 的 log/repos 都在临时目录(断言) |
+
+### 偏离记录
+
+暂无

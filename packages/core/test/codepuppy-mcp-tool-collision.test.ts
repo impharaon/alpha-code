@@ -9,9 +9,8 @@
 // Red if mcp.ts stops refusing: with the builtin registered first, the MCP tool's later `editor.add` overwrites it
 // (tool.ts commit is last-wins) and the name holds the MCP tool.
 import { describe, expect } from "bun:test"
-import fs from "node:fs/promises"
 import os from "node:os"
-import path from "node:path"
+import fs from "node:fs"
 import { Deferred, Effect, Layer, Schema, Stream } from "effect"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
@@ -23,6 +22,7 @@ import { Tool } from "@opencode/core/tool"
 import { McpTool } from "@opencode/core/tool/mcp"
 import { Global } from "@opencode/util/global"
 import { emptyMcp } from "./fixture/mcp"
+import { tempGlobalLayer } from "./fixture/global"
 import { imagePassthrough } from "./lib/image"
 import { testEffect } from "./lib/effect"
 
@@ -39,14 +39,14 @@ const mcp = Layer.succeed(
     tools: () => Deferred.await(gate).pipe(Effect.as(CATALOG)),
   }),
 )
-const outputData = await fs.mkdtemp(path.join(os.tmpdir(), "codepuppy-mcp-collision-"))
 const it = testEffect(
-  AppNodeBuilder.build(LayerNode.group([Tool.node, McpTool.node]), [
+  AppNodeBuilder.build(LayerNode.group([Tool.node, McpTool.node, Global.node]), [
     Mcp.node.replace(mcp),
     Permission.node.replace(Layer.mock(Permission.Service, { assert: () => Effect.void })),
     Bus.node.replace(Layer.mock(Bus.Service, { subscribe: () => Stream.never })),
     Image.node.replace(imagePassthrough),
-    Global.node.replace(Global.layerWith({ data: outputData })),
+    // Every Global root (data, log, repos, cache, ...) in a temp folder, not only data (review R1 #10).
+    Global.node.replace(tempGlobalLayer),
   ]),
 )
 
@@ -97,6 +97,18 @@ describe("ADR-041: an MCP tool never takes a builtin's effective name", () => {
       yield* builtins(registry)
       yield* expectBuiltinsHold(registry)
       gate = Deferred.makeUnsafe<void>()
+    }),
+  )
+})
+
+// Review R1 #10: no root of the engine's Global (data, log, repos, cache, config, state) is the real user directory.
+describe("test isolation", () => {
+  it.live("every Global root is under the temp folder", () =>
+    Effect.gen(function* () {
+      const global = yield* Global.Service
+      const temp = [os.tmpdir(), fs.realpathSync(os.tmpdir())]
+      for (const dir of [global.data, global.log, global.repos, global.cache, global.config, global.state])
+        expect(temp.some((root) => dir.startsWith(root))).toBe(true)
     }),
   )
 })

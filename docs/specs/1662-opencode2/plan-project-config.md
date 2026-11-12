@@ -20,7 +20,7 @@ last_reviewed: 2026-11-12
   `docs/specs/upgrade-extension-manifest/design.md`(alpha-code-design-upgrade-i06-extension-manifest 工作树)§2 的 F-02、F-03、F-09、F-14 与 §10 审查记录 M2、M5、m1 和留档第 2 行。
   **只恢复 0.1.26 的行为**,不实现那份设计的新架构(登记器、启动文档交接 `ConfigNormalize`)。代码基线 `lane/1662-project-config` @ `778f44a41c`。
 - 不碰:`plugin-fanout.ts`、`policy/identity.ts`(项目插件命名空间缺陷在另一条线)。
-- 核对:(实施的第一个提交按编排器核对结果填写)
+- 核对:`39e6d55ca2` · 编排器 · 通过(抄上游三个小函数 + 比对测试登记为闸门文件;规则先后保持 2.x —— 用户自己的全局规则压过项目的,记偏离与登记册 note、不修;同意后项目 agent 可放宽,照 0.1.26 只记录;真 `edit` 工具先试接进宿主,退回须写明不证明什么;最后一个提交给接缝文档加第 8 个共享模块那一行)。
 
 ### 为什么照抄上游的三个小函数,而不是 import
 

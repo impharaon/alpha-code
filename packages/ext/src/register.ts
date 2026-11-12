@@ -8,7 +8,7 @@
 //            项目可移动)—— skill 本体是 `<proj>/.codepuppy/skills/<name>/SKILL.md` 文件,模型直接写盘;
 //   plugin 不在此注册:`.codepuppy/plugins/*.js` 由 host fan-out 自动发现(必须自包含 ESM .js,ADR-006)。
 
-import { stripJsonc } from "./project-config"
+import { parseProjectJsonc } from "../../ui-mac/src/shared/project-jsonc"
 import { PROJECT_HIDDEN_DIR } from "../../ui-mac/src/shared/project-hidden-dir"
 
 export const SAFE_NAME = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/
@@ -35,14 +35,12 @@ export function applyRegister(
 ): RegisterResult {
   let cfg: Record<string, unknown> = {}
   if (jsoncText && jsoncText.trim()) {
-    try {
-      const parsed: unknown = JSON.parse(stripJsonc(jsoncText))
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return { ok: false, reason: "existing codepuppy.jsonc is not an object" }
-      cfg = parsed as Record<string, unknown>
-    } catch {
-      // 现文件坏 → 拒绝写(覆盖坏文件可能吞用户内容;loud 让人修)
-      return { ok: false, reason: `existing ${PROJECT_HIDDEN_DIR}/codepuppy.jsonc is invalid JSONC — fix it manually first` }
-    }
+    const read = parseProjectJsonc(jsoncText)
+    // 现文件坏 → 拒绝写(覆盖坏文件可能吞用户内容;loud 让人修)
+    if (!read.ok) return { ok: false, reason: `existing ${PROJECT_HIDDEN_DIR}/codepuppy.jsonc is invalid JSONC — fix it manually first` }
+    const parsed = read.value
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return { ok: false, reason: "existing codepuppy.jsonc is not an object" }
+    cfg = parsed as Record<string, unknown>
   }
 
   if (type === "skill") {

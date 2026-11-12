@@ -52,6 +52,10 @@ describe("listProjectExecutables — 可执行物清单派生", () => {
     expect(r.plugins).toEqual(["p.js"])
   })
 
+  test("#1662:与 ext 同一个读法(shared/project-jsonc.ts)—— 名字里的 `,}` 原样列出,不被尾逗号处理改掉", () => {
+    expect(listProjectExecutables(`{ "mcp": { "srv,}": { "type": "local", "command": ["x"] }, }, }`, []).mcp).toEqual(["srv,}"])
+  })
+
   test("jsonc 坏/缺 → mcp 空(诚实降级,与 ext 侧一致)", () => {
     expect(listProjectExecutables("{ bad", ["p.js"]).mcp).toEqual([])
     expect(listProjectExecutables(null, []).mcp).toEqual([])

@@ -24,6 +24,7 @@ bun install
 bun run --cwd packages/ui-mac dev
 bash scripts/codepuppy-check.sh   # 完整门(14 步);git push 时经 .githooks/pre-push → gate 自动跑并签 `check`
 ```
+- 新 checkout / worktree 先跑 `bin/setup`(`bun install` + Electron 二进制 + 围栏 addon,幂等;`wt-new` 自动调用);缺围栏 addon 时 `process-fence-*` / `network-egress-fence` 三个测试文件恒红。
 - 门的规范与排查:`docs/runbooks/ci.md`;门的环境清单:`docs/architecture/quality-gate-environments.md`。
 - GitHub Actions 不判 PR:`codepuppy-ci` 已禁用。改名 workflow 文件会生成一个新的、启用的 workflow,改名后用 `gh workflow list --all` 核对。
 

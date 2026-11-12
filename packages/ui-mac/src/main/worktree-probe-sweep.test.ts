@@ -57,6 +57,8 @@ const REPO_ROOT = resolve(import.meta.dir, "..", "..", "..", "..")
 const SWEEP = resolve(REPO_ROOT, "scripts/worktree-probe-sweep.sh")
 const PROBE = resolve(REPO_ROOT, "scripts/assert-worktree-bootstrap.sh")
 const BOOTSTRAP = resolve(REPO_ROOT, "scripts/worktree-bootstrap.sh")
+/** bootstrap 与 bin/setup 共用的 Electron + 围栏 addon 步骤;bootstrap 按 `dirname $BASH_SOURCE` 找它,夹具仓里必须一并放进去。 */
+const NATIVE_PREPARE = resolve(REPO_ROOT, "scripts/native-prepare.sh")
 
 /**
  * 完全隔离的 git 环境(与 north-star-guard.test.ts 同源的理由):开发机的 ~/.gitconfig 不许
@@ -95,7 +97,7 @@ function git(cwd: string, args: string[], home: string): string {
 /**
  * 起一个真的 git 仓,scripts/ 下放的是**生产文件的字节**(不是重写一份替身),
  * 外加一个可控的 typecheck —— 被测脚本自己认 `dirname $BASH_SOURCE` 找同伴(SELF_ROOT),
- * 所以三份必须一起进夹具仓。
+ * 所以这几份必须一起进夹具仓。
  *
  * `install`(`#945`):给夹具仓一个模拟 husky 的根 `prepare` —— 真跑 `bun install` 时把
  * **共享** core.hooksPath 写成 `corruptTo`,睡 `holdSeconds` 秒,醒来**再写一次** corruptTo。
@@ -125,7 +127,7 @@ function initFixture(opts: {
   mkdirSync(home, { recursive: true })
   mkdirSync(join(repo, "scripts"), { recursive: true })
   mkdirSync(join(repo, "packages", "ui-mac"), { recursive: true })
-  for (const src of [PROBE, BOOTSTRAP, SWEEP]) {
+  for (const src of [PROBE, BOOTSTRAP, NATIVE_PREPARE, SWEEP]) {
     const r = Bun.spawnSync(["cp", src, join(repo, "scripts", src.split("/").pop()!)])
     if (r.exitCode !== 0) throw new Error(`夹具仓拷不进生产脚本:${src}`)
   }

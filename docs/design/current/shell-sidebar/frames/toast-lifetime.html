@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN" data-color-scheme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>弹出提示的去留 · 子帧</title>
+<!-- 帧内样式直接引用正式代码;本组件新增样式在 error-lifetime.css。嵌入:../design.html#toast-lifetime -->
+<link rel="stylesheet" href="../../../../../packages/ui-mac/src/renderer/codepuppy-ui/base.css" />
+<link rel="stylesheet" href="../../../../../packages/ui-mac/src/renderer/codepuppy-ui/toast.css" />
+<link rel="stylesheet" href="../../../../../packages/ui-mac/src/renderer/sidebar/sidebar.css" />
+<link rel="stylesheet" href="../../../../../packages/ui-mac/src/renderer/sidebar/account-popover.css" />
+<link rel="stylesheet" href="error-lifetime.css" />
+</head>
+<body>
+
+<h3 class="dz-h3" id="toast-fault">后台故障:提示 8 秒后收起<small>1280 宽 · 窗口下半部</small></h3>
+<p class="dz-sub">鼠标停在提示上或键盘焦点在里面时不计时,离开后接着计。8 秒到了提示收起,同一时刻侧栏底部出现「1 个问题未恢复」。点 × 只表示「看到了」,也是收进入口。问题恢复时,正在显示的提示立即消失。</p>
+<div class="dz-row">
+  <div><p class="dz-cap"><b>0 秒 · 出现</b>入口还没有</p><div class="dz-scroll" data-frame="fault-shown"></div></div>
+  <div><p class="dz-cap"><b>8 秒后 · 收起</b>入口显示 1</p><div class="dz-scroll" data-frame="fault-folded"></div></div>
+</div>
+
+<h3 class="dz-h3" id="toast-coalesce">同一原因只留一条<small>右下角提示区</small></h3>
+<p class="dz-sub">同一来源、同一原因再次发生:正在显示时更新这一条,不新增、不重新计时;已经收起而问题未恢复时,不再弹出,只更新入口里那一条。入口只计 1。</p>
+<div class="dz-row">
+  <div><p class="dz-cap"><b>短时间内报了 3 次</b>屏幕上一条</p><div data-frame="coalesce"></div></div>
+</div>
+
+<h3 class="dz-h3" id="toast-action">用户操作失败:提示留着<small>1280 宽 · 窗口下半部</small></h3>
+<p class="dz-sub">用户刚做的操作失败,或需要用户动手才能解决(重新登录、修配置、授权):外观不变,不受 8 秒限制,直到点 × 或离开当前页面;它不进入口。和后台故障同时出现时,8 秒后只有后台那条收起。</p>
+<div class="dz-row">
+  <div><p class="dz-cap"><b>同时出现</b>上:后台故障 · 下:删除失败</p><div class="dz-scroll" data-frame="action-both"></div></div>
+  <div><p class="dz-cap"><b>8 秒后</b>后台那条收进入口,删除失败仍在</p><div class="dz-scroll" data-frame="action-after"></div></div>
+</div>
+
+<h3 class="dz-h3" id="toast-startup">启动后 10 秒不弹提示<small>默认窗口 1280 × 800</small></h3>
+<p class="dz-sub">连接器、模型清单这类会自动重试的故障先等重试结果,不计入入口,重试成功就什么都不出现;进入项目时产生的、需要用户处理的提示不弹,直接计入入口。10 秒到了仍然失败的自动重试故障,才弹一条,8 秒后收进入口。</p>
+<div class="dz-row">
+  <div><p class="dz-cap"><b>头 10 秒</b>不弹提示;进入项目时的两条计入入口,两个连接器还在重连、不计</p><div class="dz-scroll" data-frame="startup-quiet"></div></div>
+</div>
+<div class="dz-row">
+  <div><p class="dz-cap"><b>点开入口</b>这两条和它们的操作</p><div data-frame="startup-list"></div></div>
+</div>
+<div class="dz-row">
+  <div><p class="dz-cap"><b>10 秒后仍有一个连接器没连上</b>只弹这一条;8 秒后收进入口,数量变 3</p><div class="dz-scroll" data-frame="startup-one"></div></div>
+</div>
+
+<h3 class="dz-h3" id="rules">提示与入口的去留约定</h3>
+<table class="dz-table">
+  <thead><tr><th>情况</th><th>弹出提示</th><th>未恢复问题入口</th></tr></thead>
+  <tbody>
+    <tr><td>后台故障出现</td><td>弹出;8 秒后收起;鼠标悬停或键盘聚焦时不计时,离开后接着计;点 × 立即收起</td><td>提示收起(或点 ×)时计入</td></tr>
+    <tr><td>同一原因再次报告</td><td>正在显示:更新这一条,不重新计时;已收起:不再弹出</td><td>仍计 1,内容更新为最新一次</td></tr>
+    <tr><td>问题恢复</td><td>正在显示的立即消失</td><td>立即移除;数量为 0 时这一行消失,开着的弹层随之关闭</td></tr>
+    <tr><td>启动后 10 秒内</td><td>不弹任何提示</td><td>会自动重试的故障不计,10 秒后仍失败才按第一行处理;需要用户处理的直接计入</td></tr>
+    <tr><td>用户操作失败 / 需要用户动手(启动 10 秒之外)</td><td>一直显示,直到点 × 或离开当前页面</td><td>不计入</td></tr>
+    <tr><td>侧栏收起</td><td>不变</td><td>「显示侧边栏」按钮右上角小点;悬停提示带数量</td></tr>
+    <tr><td>列表里每条的操作</td><td>—</td><td>取该问题现有的处理入口:「重试」= 现有的重试;「查看」= 打开它所在的位置</td></tr>
+    <tr><td>键盘</td><td>Tab 能进提示,进入即暂停计时</td><td>入口是按钮(展开 / 收起);打开后焦点进第一条的操作;Esc 关闭并把焦点还给入口</td></tr>
+  </tbody>
+</table>
+
+<script src="error-lifetime.js"></script>
+</body>
+</html>

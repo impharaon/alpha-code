@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN" data-color-scheme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>未恢复问题入口 · 子帧</title>
+<!-- 帧内样式直接引用正式代码;本组件新增样式在 error-lifetime.css。嵌入:../design.html#problems -->
+<link rel="stylesheet" href="../../../../../packages/ui-mac/src/renderer/codepuppy-ui/base.css" />
+<link rel="stylesheet" href="../../../../../packages/ui-mac/src/renderer/codepuppy-ui/toast.css" />
+<link rel="stylesheet" href="../../../../../packages/ui-mac/src/renderer/sidebar/sidebar.css" />
+<link rel="stylesheet" href="../../../../../packages/ui-mac/src/renderer/sidebar/account-popover.css" />
+<link rel="stylesheet" href="error-lifetime.css" />
+</head>
+<body>
+
+<h3 class="dz-h3" id="problems-entry">入口与列表<small>侧栏底部、账户按钮上方 · 1280 宽 · 窗口左下</small></h3>
+<p class="dz-sub">没有未恢复的问题时这一行不存在。有的时候显示「N 个问题未恢复」;点开向上弹出列表,每条写原因和能做的事。条目没有 ×,不能手动删除:问题恢复了它自己走。点外面或按 Esc 收起。</p>
+<div class="dz-row">
+  <div><p class="dz-cap"><b>没有未恢复的问题</b>侧栏原样</p><div data-frame="entry-none"></div></div>
+  <div><p class="dz-cap"><b>有 3 个</b>收起时</p><div data-frame="entry-count"></div></div>
+  <div><p class="dz-cap"><b>点开</b>长文字换行,不截断</p><div data-frame="entry-open"></div></div>
+</div>
+
+<h3 class="dz-h3" id="problems-recovered">恢复后自己消失</h3>
+<p class="dz-sub">列表开着时,一条恢复就从列表里拿掉,数量跟着变;全部恢复后弹层关闭、这一行消失。</p>
+<div class="dz-row">
+  <div><p class="dz-cap"><b>3 个里恢复了 1 个</b>连接器那条消失,数量变 2</p><div data-frame="recover-one"></div></div>
+  <div><p class="dz-cap"><b>全部恢复</b>这一行消失</p><div data-frame="recover-all"></div></div>
+</div>
+
+<h3 class="dz-h3" id="problems-768">侧栏仍展开的最窄宽度<small>768 宽(更窄时侧栏自动收起)</small></h3>
+<p class="dz-sub">弹层宽度同账户弹层,伸进内容区;右下角的提示不与它重叠。</p>
+<div class="dz-row">
+  <div><p class="dz-cap"><b>列表开着,同时有两条提示</b></p><div class="dz-scroll" data-frame="w768"></div></div>
+</div>
+
+<h3 class="dz-h3" id="problems-collapsed">侧栏收起时<small>480 宽</small></h3>
+<p class="dz-sub">入口跟着侧栏一起收起,「显示侧边栏」按钮右上角留一个小点;鼠标停上去提示「显示侧边栏 · 1 个问题未恢复」。点它照常展开侧栏,入口就在底部。提示照样在右下角,宽度随窗口缩。</p>
+<div class="dz-row">
+  <div><p class="dz-cap"><b>后台故障提示出现时</b></p><div data-frame="narrow-toast"></div></div>
+  <div><p class="dz-cap"><b>收起后</b>按钮上的小点</p><div data-frame="narrow-dot"></div></div>
+</div>
+
+<script src="error-lifetime.js"></script>
+</body>
+</html>

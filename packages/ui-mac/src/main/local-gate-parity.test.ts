@@ -17,7 +17,8 @@
 //   ③′ (`#889`)守卫的比较基准 = 这个 workflow 服务的那条分支,且 fetch 与 diff 用同一条 ref
 //       —— 守卫的**行为**判据不在本文件,在 packages/ui-mac/src/main/north-star-guard.test.ts;
 //   ④  `assert gate files` 这一步不得因为前一步红而被跳过(GitHub step 默认条件是 success())。
-//   ⑤  (`#717`)`alpha` 分支保护要求的每个 context,都必须等于 codepuppy-ci 某个 job 的 `name:`;
+//   ⑤  (`#717`)`alpha` 分支保护要求的每个 context,都必须等于 codepuppy-ci 某个 job 的 `name:`,
+//       或等于本地门签下的 commit status(docs/runbooks/ci.md 写明的 `check`);
 //       反过来每个 job 要么在那份记录里、要么在本文件里显式写明「不必需」。
 //   ⑥  (`#895`)每个必需 job 都必须在 `detect` 没给出结论时**照跑并变红**,而不是被 `needs`
 //       折成 skipped —— GitHub 把 skipped 记成「已满足」(实测,见下);
@@ -36,6 +37,8 @@ import { describe, expect, test } from "bun:test"
 const REPO_ROOT = resolve(import.meta.dir, "..", "..", "..", "..")
 const WORKFLOW = readFileSync(resolve(REPO_ROOT, ".github/workflows/codepuppy-ci.yml"), "utf8")
 const SCRIPT = readFileSync(resolve(REPO_ROOT, "scripts/codepuppy-check.sh"), "utf8")
+/** docs gate / NUL 闸的函数体:codepuppy-check.sh 与 bin/check-light 共用的那一份。 */
+const DOCS_GATES_LIB = readFileSync(resolve(REPO_ROOT, "scripts/docs-gates.sh"), "utf8")
 /** `#889`:north-star 守卫本体 —— CI 与本地跑的是同一份字节。 */
 const NORTH_STAR_GUARD = "scripts/north-star-guard.sh"
 const GUARD_SCRIPT = readFileSync(resolve(REPO_ROOT, NORTH_STAR_GUARD), "utf8")
@@ -43,6 +46,9 @@ const GUARD_SCRIPT = readFileSync(resolve(REPO_ROOT, NORTH_STAR_GUARD), "utf8")
 const ROUNDTRIP_GUARD = "scripts/assert-frontend-patch-roundtrip.sh"
 const ROUNDTRIP_GUARD_SCRIPT = readFileSync(resolve(REPO_ROOT, ROUNDTRIP_GUARD), "utf8")
 const REQUIRED_CONTEXTS_FILE = readFileSync(resolve(REPO_ROOT, ".github/required-contexts.txt"), "utf8")
+/** 本地门(`gate`)签在被推送提交上的 commit status 名 —— 分支保护要求的就是它;仓内只有 runbook 这句话。 */
+const CI_RUNBOOK = readFileSync(resolve(REPO_ROOT, "docs/runbooks/ci.md"), "utf8")
+const GATE_STATUS_CONTEXTS = [...CI_RUNBOOK.matchAll(/并签 `([^`]+)`/g)].map((m) => m[1])
 /** `#895` 的判据本体 —— 四个必需 job 的第一步跑的就是这个文件。 */
 const DETECT_CLASSIFIED_SCRIPT = "scripts/assert-detect-classified.sh"
 /** `#890` 的判据本体 —— codepuppy-check.sh 第 [8/8] 步跑的就是这个文件。 */
@@ -209,6 +215,15 @@ const NOT_REQUIRED_JOBS: Record<string, string> = {
   // 证据:docs/verification/2026-08-11-detect-failure-required-checks.md
   "detect changes":
     "分类步。它的产物(code/md)决定别的 job 跑不跑,但它自己不判任何东西。它红了不再等于「合并进不去」——`#895` 实测 skipped 被 GitHub 当成满足;真正拦住合并的是四个必需 job 各自的 Assert detect classified this diff 那一步(下面两条断言钉住它)。行为闸在 packages/ui-mac/src/main/ci-diff-scope.test.ts。",
+  // 分支保护改成只要求本地门签的 `check` 之后,下面四个原先的必需 job 不再是必需 context:
+  // codepuppy-ci 已停用,它们的判据由本地 codepuppy-check.sh 的同名步骤承担,通过后签 `check`。
+  // 仍保留它们的 !cancelled() + assert-detect-classified.sh 接线(`#895` 两条断言):workflow
+  // 若重新启用、这些 job 又被记回必需 context,那两条断言会立即重新覆盖它们。
+  "north-star guard (zero upstream edits)":
+    "本地门 `[1/14]` 承担(scripts/north-star-guard.sh);必需的是本地门签的 `check`,不再是这个 job 名。",
+  "typecheck (alpha packages)": "本地门 `[4/14]` 承担;必需的是本地门签的 `check`,不再是这个 job 名。",
+  "unit tests (alpha packages)": "本地门 `[5/14]` / `[6/14]` 承担;必需的是本地门签的 `check`,不再是这个 job 名。",
+  "docs gate": "本地门 `[8/14]` 承担;必需的是本地门签的 `check`,不再是这个 job 名。",
   "seed assets present":
     "B7 打包资源在位闸。合并前它的缺失不改变仓库正确性(打包期才吃到),历史上一直不在 required 里;要提必需是独立裁决,不在 `#717` 范围内。`#895` 刻意不给它加 !cancelled():它不是必需 context,detect 失败时它显示 skipped 不会让任何东西被误判成通过。",
 }
@@ -370,8 +385,11 @@ describe("#777 本地门与 codepuppy-ci 的对照表", () => {
     expect(ciFetch, "codepuppy-ci 的 `Ensure origin/… is available` 步取的不是守卫要用的那条 ref").toBe(target)
 
     // 同一个 codepuppy-check.sh 内部也不许再有第二套基准(`#889` 票面点名的那句「同一脚本两套基准」)。
-    const docsBaseline = /--diff-filter=d (\S+)\.\.\.HEAD/.exec(SCRIPT)?.[1]
-    expect(docsBaseline, "codepuppy-check.sh 的 docs gate 里没解析到比较基准").toBe(`origin/${target}`)
+    // docs gate 的函数体搬进了 scripts/docs-gates.sh(与 bin/check-light 共用),基准就在那里 —— 且 codepuppy-check.sh
+    // 自己不许另写一条。
+    const docsBaseline = /--diff-filter=d (\S+)\.\.\.HEAD/.exec(DOCS_GATES_LIB)?.[1]
+    expect(docsBaseline, "scripts/docs-gates.sh 的 docs gate 里没解析到比较基准").toBe(`origin/${target}`)
+    expect(/--diff-filter=d (\S+)\.\.\.HEAD/.test(SCRIPT), "codepuppy-check.sh 里又出现了第二套 docs gate 基准").toBe(false)
   })
 
   // ── `#717`:required context 名的防漂 ──────────────────────────────────────
@@ -388,11 +406,13 @@ describe("#777 本地门与 codepuppy-ci 的对照表", () => {
     const required = parseRequiredContexts(REQUIRED_CONTEXTS_FILE)
     // 解析自检:任一侧解析退化成空,下面的比对就会空对空地绿。
     expect(jobNames.length, "codepuppy-ci.yml 里一个 job name 都没解析到 —— 解析器坏了").toBeGreaterThanOrEqual(6)
-    expect(required.length, ".github/required-contexts.txt 一条都没解析到 —— 记录被清空或解析器坏了").toBeGreaterThanOrEqual(4)
-    const orphaned = required.filter((context) => !jobNames.includes(context))
+    expect(required.length, ".github/required-contexts.txt 一条都没解析到 —— 记录被清空或解析器坏了").toBeGreaterThanOrEqual(1)
+    // 本地门签名的锚点取自 runbook 那句「并签 `check`」,不是本文件里的常量(那是自指)。
+    expect(GATE_STATUS_CONTEXTS.length, "docs/runbooks/ci.md 里找不到(或有多处)「并签 `…`」—— 本地门签名名没有锚点").toBe(1)
+    const orphaned = required.filter((context) => !jobNames.includes(context) && !GATE_STATUS_CONTEXTS.includes(context))
     expect(
       orphaned,
-      "分支保护要求的 context 在 codepuppy-ci 里没有同名 job —— GitHub 永远等不到它,每个 PR 都在那一格永久 pending(`ebd29cda` 那一类)",
+      "分支保护要求的 context 既不是 codepuppy-ci 的某个 job 名、也不是 runbook 写明的本地门签名 —— GitHub 永远等不到它,每个 PR 都在那一格永久 pending(`ebd29cda` 那一类)",
     ).toEqual([])
   })
 
@@ -424,7 +444,7 @@ describe("#777 本地门与 codepuppy-ci 的对照表", () => {
   // 生产代码里没有「真源从哪来」的开关(那种开关自己就是绕过口)。
   test("`#890`:真源与记录逐条相同时绿 —— 先证明这个手段测得出「好」", () => {
     const required = parseRequiredContexts(REQUIRED_CONTEXTS_FILE)
-    expect(required.length, ".github/required-contexts.txt 一条都没解析到").toBeGreaterThanOrEqual(4)
+    expect(required.length, ".github/required-contexts.txt 一条都没解析到").toBeGreaterThanOrEqual(1)
     // 顺序打乱 + 首尾空白:GitHub 不保证顺序(文件抬头也这么写)。一个「顺序不同就报漂移」的
     // 实现会天天假红,进而被 --no-verify 掉 —— 恒红的门等于没有门。
     const noisy = [...required].reverse().map((c, i) => (i === 0 ? `  ${c}  ` : c))
@@ -581,8 +601,10 @@ describe("#777 本地门与 codepuppy-ci 的对照表", () => {
     const required = parseRequiredContexts(REQUIRED_CONTEXTS_FILE)
     // 解析自检:任一侧退化成空,下面的循环就一次都不跑,空对空地绿。
     expect(jobs.length, "codepuppy-ci.yml 一个 job 都没解析到 —— 解析器坏了").toBeGreaterThanOrEqual(6)
-    expect(required.length, ".github/required-contexts.txt 一条都没解析到").toBeGreaterThanOrEqual(4)
-    for (const context of required) {
+    expect(required.length, ".github/required-contexts.txt 一条都没解析到").toBeGreaterThanOrEqual(1)
+    // 本地门签名(`check`)不是 CI job,没有 detect → needs 的结构,不在这条的范围里;
+    // 其余必需 context 必须有同名 job —— 缺了就是上一条 `#717` 该红的情形,这里不替它放行。
+    for (const context of required.filter((c) => !GATE_STATUS_CONTEXTS.includes(c))) {
       const job = jobs.find((j) => j.name === context)
       expect(job, `必需 context「${context}」在 codepuppy-ci.yml 里没有同名 job`).toBeDefined()
       expect(

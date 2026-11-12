@@ -22,6 +22,8 @@ export const textOf = (content: unknown) =>
 
 /**
  * 模型桩。用户回合里写 `CP-CALL {"name":…,"args":…}` ⇒ 回一次那个工具调用;上一条是工具结果 ⇒ 回「done」;其余回「ok」。
+ * 引擎的压缩请求 ⇒ 回一份按模板标题写的摘要。
+ * 用户回合里写 `CP-OVERFLOW-ONCE` ⇒ 第一次这样的请求回 HTTP 400 `context_length_exceeded`(引擎认作上下文过长),之后照常。
  * 每次请求的工具表与消息都记在 `requests` 里。
  */
 export function scriptedModel() {
@@ -30,6 +32,7 @@ export function scriptedModel() {
     `data: ${JSON.stringify({ id: "chatcmpl-cp-engine", object: "chat.completion.chunk", created: 1, model: "m", choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`
   const text = (value: string) => chunk({ role: "assistant", content: value }) + chunk({}, "stop") + "data: [DONE]\n\n"
   let calls = 0
+  let overflowed = false
   const server = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
@@ -40,7 +43,18 @@ export function scriptedModel() {
       requests.push({ tools: (body.tools ?? []).map((tool) => String(tool.function?.name)), messages })
       const headers = { "content-type": "text/event-stream" }
       if (messages.at(-1)?.role === "tool") return new Response(text("done"), { headers })
-      const marker = textOf(messages.filter((message) => message.role === "user").at(-1)?.content).match(/CP-CALL (\{.*\})/)
+      const lastUser = textOf(messages.filter((message) => message.role === "user").at(-1)?.content)
+      if (lastUser.includes("CP-OVERFLOW-ONCE") && !overflowed) {
+        overflowed = true
+        return Response.json(
+          { error: { message: "This model's maximum context length is 8192 tokens.", type: "invalid_request_error", code: "context_length_exceeded" } },
+          { status: 400 },
+        )
+      }
+      // 引擎的压缩请求(core session/compaction.ts 的 SUMMARY_TEMPLATE):按模板的标题回一份摘要,否则压缩判失败
+      if (lastUser.includes("<template>") && lastUser.includes("## Objective"))
+        return new Response(text("## Objective\n- continue the user's work\n\n## Next Move\n1. (none)"), { headers })
+      const marker = lastUser.match(/CP-CALL (\{.*\})/)
       if (!marker) return new Response(text("ok"), { headers })
       const call = JSON.parse(marker[1]!) as { name: string; args: Record<string, unknown> }
       const id = `call_cp_engine_${++calls}`
@@ -89,6 +103,10 @@ export type HostOptions = {
   mcpCallLog?: string
   /** 项目目录里的文件(相对路径 → 内容),例如 `opencode.json`。 */
   projectFiles?: Record<string, string>
+  /** 引擎的库文件(默认按 engineSlot 分配);升级迁移要让 main 改写的库与引擎打开的库是同一个文件。 */
+  databasePath?: string
+  /** 平台节点的模型表(默认只有一个 `m`)。 */
+  platformModels?: Record<string, unknown>
 }
 
 export type Running = {
@@ -139,9 +157,9 @@ export function codepuppyEngine(options: HostOptions) {
   const content = JSON.parse(injection.config.content) as { plugins: string[]; providers: Record<string, { models?: Record<string, unknown> }> }
   content.plugins = [...content.plugins, probeDir]
   // 沙箱里没有已应用的平台目录,平台节点的模型表是空的(`#1556`);补一个模型只为能发出请求
-  content.providers.codepuppy!.models = { m: { name: "m" } }
+  content.providers.codepuppy!.models = options.platformModels ?? { m: { name: "m" } }
 
-  const slot = engineSlot(sandbox, name)
+  const slot = { ...engineSlot(sandbox, name), ...(options.databasePath ? { databasePath: options.databasePath } : {}) }
   for (const [file, body] of Object.entries(options.projectFiles ?? {})) fs.writeFileSync(path.join(slot.projectDirectory, file), body)
 
   const start = async (): Promise<Running> => {

@@ -1071,6 +1071,10 @@
         {
           "file": "packages/ui-mac/src/main/naming-before-v1-conversion.test.ts",
           "name": "#1569 会话库改名先于 v1 → 2.x 转换:生产顺序 ⇒ 新名;转换先跑 ⇒ 旧名留在 2.x(naming-before-v1-conversion.cases.ts,2 条)"
+        },
+        {
+          "file": "packages/ui-mac/src/main/naming-resume.engine.test.ts",
+          "name": "#1569 AC4:迁移后继续生成、压缩后续写、溢出后续写都能完成;反向顺序具名失败(naming-resume.engine.cases.ts,2 条)"
         }
       ]
     },

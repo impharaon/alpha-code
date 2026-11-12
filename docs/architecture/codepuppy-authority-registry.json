@@ -1324,6 +1324,33 @@
           "Register L5's mechanism and proof test when #1667 lands."
         ]
       }
+    },
+    {
+      "id": "review-diff-engine-started-turn",
+      "decision": "The review panel shows the changes of a turn the engine started with its own synthetic message (a background subagent's completion after idle), as the current release does.",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666) Unit F",
+      "takeovers": [
+        "packages/core/src/session/diff.ts"
+      ],
+      "approval": {
+        "quote": "同意，多接管两个上游文件，需要再唯一权威中记录多接管的内容。",
+        "date": "2026-11-12",
+        "by": "owner (relayed by the orchestrator in the #1666 Unit F addendum)",
+        "reason": "The UI must match the current release (UI parity)."
+      },
+      "mechanism": {
+        "file": "packages/core/src/session/diff.ts",
+        "ladder": "L3 (re-taken: resolve accepts a synthetic message as the anchor, and a synthetic message opens a turn's busy period; no plugin seam reaches the session diff)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-session-diff-synthetic.test.ts",
+          "name": "user, assistant, idle, synthetic, assistant (b.txt), idle, then a later user turn"
+        }
+      ]
     }
   ]
 }

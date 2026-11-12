@@ -50,7 +50,7 @@ export const turn = Effect.fn("SessionDiff.turn")(function* (
   const sessionID = input.session.id
   // Selecting only seq lets the (session_id, type, seq) index answer these without reading message rows,
   // which can be megabytes each. Matching the requested IDs here with OR would scan the whole Session.
-  const boundaries = (type: "user" | "idle") =>
+  const boundaries = (type: "user" | "idle" | "synthetic") => // codepuppy(UI parity): synthetic
     db
       .select({ seq: SessionMessageTable.seq })
       .from(SessionMessageTable)
@@ -63,6 +63,11 @@ export const turn = Effect.fn("SessionDiff.turn")(function* (
       )
   const users = yield* boundaries("user")
   const markers = yield* boundaries("idle")
+  // codepuppy(UI parity) ── a turn the engine starts with its own synthetic message (a background subagent's
+  // completion after idle) opens like a prompt: it can anchor a diff, and it starts its busy period.
+  const synthetics = yield* boundaries("synthetic")
+  const opening = [...users, ...synthetics].toSorted((a, b) => a - b)
+  // codepuppy ── end
   const resolve = Effect.fn(function* (field: "from" | "to", id: SessionMessage.ID) {
     const row = yield* db
       .select({ id: SessionMessageTable.id, type: SessionMessageTable.type, seq: SessionMessageTable.seq })
@@ -71,7 +76,7 @@ export const turn = Effect.fn("SessionDiff.turn")(function* (
       .get()
       .pipe(Effect.orDie)
     if (!row) return yield* new MessageNotFoundError({ sessionID, messageID: id })
-    if (row.type !== "user")
+    if (row.type !== "user" && row.type !== "synthetic") // codepuppy(UI parity)
       return yield* new TurnRangeError({ sessionID, field, message: `Message ${id} is not a user message` })
     return row
   })
@@ -93,7 +98,7 @@ export const turn = Effect.fn("SessionDiff.turn")(function* (
   const legacy = markers.length === 0
   // The turn opens with the first prompt after the previous idle marker; the anchor itself is the latest candidate.
   const opened = markers.findLast((seq) => seq < anchor.seq) ?? -1
-  const start = legacy ? anchor.seq : (users.find((seq) => seq > opened) ?? anchor.seq)
+  const start = legacy ? anchor.seq : (opening.find((seq) => seq > opened) ?? anchor.seq) // codepuppy(UI parity)
   const end = legacy ? users.find((seq) => seq > last.seq) : markers.find((seq) => seq > last.seq)
   const steps = yield* db
     .select({

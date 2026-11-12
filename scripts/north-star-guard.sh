@@ -161,6 +161,10 @@ UPSTREAM_EXCLUDES=(
   # 建子会话前走 subagent 工具的权限路径(`codepuppy(#1129 E6)` 标注),由扩展策略追加的 deny 规则决定。
   # 判据 packages/core/test/codepuppy-command-model-priority.test.ts。
   ':(exclude)packages/core/src/config/plugin/command.ts'
+  # 界面与当前正式版一致(#1666 Unit F;owner 2026-11-12 经编排器转达:「同意，多接管两个上游文件，需要再唯一权威中记录多接管的内容。」):审阅面板要显示引擎以 synthetic
+  # 消息开启的回合(后台子任务空闲后完成)的改动;SessionDiff.turn 只认 user 锚点,插件改不了。接管面三处 `codepuppy(UI parity)` 标注。
+  # 判据 packages/core/test/codepuppy-session-diff-synthetic.test.ts。
+  ':(exclude)packages/core/src/session/diff.ts'
 )
 
 # ── UPSTREAM_PATHS 里住着的 Code Puppy 自有文件:结构性谓词,不是逐文件清单(`#1085` / ADR-043)──

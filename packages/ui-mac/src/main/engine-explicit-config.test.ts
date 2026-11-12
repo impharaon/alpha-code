@@ -7,6 +7,7 @@ import * as path from "node:path"
 import { Schema } from "effect"
 import { Config as ConfigSchema } from "@opencode/schema/config"
 import { ConfigNormalize } from "@opencode/core/config/normalize"
+import { ensureSkillsPath } from "./engine-config-truth"
 import { composeExplicitDocument, watchExplicitSources, writeExplicitConfig, type ExplicitLayer } from "./engine-explicit-config"
 
 const LAYER: ExplicitLayer = {
@@ -55,6 +56,21 @@ describe("显式文件的合成", () => {
     expect(document.skills).toEqual(["/user/skills", ...LAYER.skills])
     expect(document.policies).toEqual([{ action: "provider.use", resource: "rogue", effect: "allow" }, ...LAYER.policies])
     expect(document.mcp).toEqual({ "local-tool": { type: "local", command: ["tool"] } })
+  })
+
+  // 审计 R1 第 3 条:生产 boot 的 ensureSkillsPath 写进 codepuppy.jsonc 的是 v1 形状 `{ skills: { paths: [...] } }`。
+  // 以前这里只认数组,有出厂技能时用出厂数组整个盖掉,用户技能目录从引擎眼里消失(上游 normalize 也不出诊断)。
+  test("用户文件是生产 ensureSkillsPath 写的 v1 形状 skills:用户目录(含 urls)与出厂的取并集,上游 normalize 零诊断", () => {
+    const user: Record<string, unknown> = { skills: { urls: ["https://skills.example/pack"] } }
+    expect(ensureSkillsPath(user, "/root/env/dev/skills")).toBe(true)
+    expect(user.skills).toEqual({ urls: ["https://skills.example/pack"], paths: ["/root/env/dev/skills"] })
+    const { document, userError } = composeExplicitDocument(JSON.stringify(user), LAYER)
+    expect(userError).toBeUndefined()
+    expect(document.skills).toEqual(["/root/env/dev/skills", "https://skills.example/pack", ...LAYER.skills])
+    const normalized = ConfigNormalize.normalize(document)
+    if (normalized.type !== "normalized") throw new Error("upstream rejected the explicit document")
+    expect(normalized.diagnostics).toEqual([])
+    expect(normalized.encoded.skills).toEqual(["/root/env/dev/skills", "https://skills.example/pack", ...LAYER.skills])
   })
 
   test("用户文件解析不了 ⇒ 只放我们这一层并给出原因(不把半份坏文件交给引擎)", () => {

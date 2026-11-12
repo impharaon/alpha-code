@@ -44,7 +44,10 @@ export function composeExplicitDocument(userText: string | undefined, layer: Exp
     else user = parsed
   }
   const document: Record<string, unknown> = { $schema: "https://opencode.ai/config.json", ...user }
-  const userSkills = Array.isArray(user.skills) ? user.skills.filter((item): item is string => typeof item === "string") : []
+  // 用户文件的 skills 可能还是 v1 形状 `{ paths, urls }`(生产 boot 的 ensureSkillsPath 就这么写):按上游 normalize 的同一规则
+  // 先摊成数组(paths 在前、urls 在后),再与出厂的取并集(审计 R1 第 3 条)。
+  const strings = (value: unknown) => (Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [])
+  const userSkills = isRecord(user.skills) ? [...strings(user.skills.paths), ...strings(user.skills.urls)] : strings(user.skills)
   const skills = [...new Set([...userSkills, ...layer.skills])]
   if (skills.length) document.skills = skills
   // 用户文件里已有的同名命令(v1 的 `command` 或 2.x 的 `commands`)不覆盖:同一份文档里 2.x 的键压过 v1 的键,出厂的不能借此挤掉用户的。

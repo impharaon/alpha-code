@@ -633,3 +633,44 @@ describe("#1662 I-02 权威失去通过的证明 ⇒ 证明步中止,点名权�
     expect(run2.output).toContain("authority proof failed::auth-b")
   })
 })
+
+// ── I-03 / I-09:上游行为探针步钉住 ─────────────────────────────────────────────────────────────
+// 探针(packages/ext/src/upstream-probes/)只在每日同步里跑才有用:上游一变当天就红,不出推送包。这一步被删掉、
+// 被挪到引擎冒烟之前(那时依赖还没装)、被加上跳过或吞失败的开关,都不会有别的东西变红 —— 所以在这里钉住。
+const SMOKE = "Engine runtime smoke"
+const PROBES = "Upstream behaviour probes"
+
+function probesStepProblems(steps: any[]): string[] {
+  const at = (name: string) => steps.findIndex((s: any) => typeof s?.name === "string" && s.name.startsWith(name))
+  const probes = at(PROBES)
+  if (probes < 0) return ["sync-upstream.yml 里找不到「Upstream behaviour probes」步 —— 同步不再跑上游行为探针"]
+  const problems: string[] = []
+  const smoke = at(SMOKE)
+  if (smoke < 0) problems.push("找不到引擎冒烟步,探针步的位置无从核对")
+  else if (probes < smoke) problems.push("探针步排在引擎冒烟之前 —— 那时 bun install 还没跑")
+  const bundle = at(BUNDLE)
+  if (bundle >= 0 && probes > bundle) problems.push("探针步排在推送包之后 —— 红了推送包也已经出了")
+  if (steps[probes].if !== undefined) problems.push("探针步带了 if: —— 默认 success() 之外的条件会让它被跳过")
+  if (steps[probes]["continue-on-error"] !== undefined) problems.push("探针步带了 continue-on-error —— 红了也照样出推送包")
+  const run = String(steps[probes].run ?? "")
+  for (const part of ["scripts/bun-test-floor.sh", "packages/ext", "src/upstream-probes", "src/policy/permission-reply-premises.test.ts"])
+    if (!run.includes(part)) problems.push(`探针步的命令里没有 ${part}`)
+  return problems
+}
+
+describe("I-03 每日同步在引擎冒烟之后跑上游行为探针", () => {
+  test("生产 workflow 的探针步在冒烟之后、推送包之前,无跳过开关;变异臂:删掉 / 挪到冒烟之前 / 加 continue-on-error ⇒ 各被点名", () => {
+    const steps = candidateSteps()
+    expect(probesStepProblems(steps)).toEqual([])
+    const probes = steps.findIndex((s: any) => typeof s?.name === "string" && s.name.startsWith(PROBES))
+    const smoke = steps.findIndex((s: any) => typeof s?.name === "string" && s.name.startsWith(SMOKE))
+    expect(probesStepProblems(steps.filter((_, i) => i !== probes))).toEqual([
+      "sync-upstream.yml 里找不到「Upstream behaviour probes」步 —— 同步不再跑上游行为探针",
+    ])
+    const moved = steps.filter((_, i) => i !== probes)
+    moved.splice(smoke, 0, steps[probes])
+    expect(probesStepProblems(moved)).toEqual(["探针步排在引擎冒烟之前 —— 那时 bun install 还没跑"])
+    const swallowed = steps.map((s, i) => (i === probes ? { ...s, "continue-on-error": true } : s))
+    expect(probesStepProblems(swallowed)).toEqual(["探针步带了 continue-on-error —— 红了也照样出推送包"])
+  })
+})

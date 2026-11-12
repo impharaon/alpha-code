@@ -152,6 +152,10 @@ UPSTREAM_EXCLUDES=(
   # 判据 packages/core/test/codepuppy-net-failure-settle.test.ts。
   ':(exclude)packages/core/src/session/to-session-error.ts'
   ':(exclude)packages/core/test/session-runner-retry.test.ts'
+  # ADR-041 决策 2(#1666 裁决 6756103246 第 4 项):MCP 工具与内置工具撞有效名时拒掉 MCP 那一个,不许后写覆盖。McpTool 的注册
+  # 走上游工具注册表的后写覆盖,没有插件挂点;接管面只有注册循环的 `codepuppy(ADR-041)` 标注块。
+  # 判据 packages/core/test/codepuppy-mcp-tool-collision.test.ts。
+  ':(exclude)packages/core/src/tool/mcp.ts'
 )
 
 # ── UPSTREAM_PATHS 里住着的 Code Puppy 自有文件:结构性谓词,不是逐文件清单(`#1085` / ADR-043)──

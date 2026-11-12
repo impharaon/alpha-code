@@ -74,7 +74,7 @@ last_reviewed: 2026-11-12
 ## Unit C — MCP/builtin collision, subtask & attachment, command model priority, tool net-failure metadata(L4 #1666)
 
 - 依据:无 spec。Issue [alpha-code#1666](https://github.com/impharaon/alpha-code/issues/1666) 正文(2026-11-10T10:35:55Z 版);裁决评论 [6756103246](https://github.com/impharaon/alpha-code/issues/1666#issuecomment-6756103246) 第 4 项(MCP 与内置撞名)、[6737930969](https://github.com/impharaon/alpha-code/issues/1666#issuecomment-6737930969)(`l1r-subtask-attachment-policy` E6/E7、`l1r-command-model-priority` 归 L4);编排器 Unit C 派发书(webfetch 网络失败标记要握住)。登记册 [`codepuppy-authority-registry.json`](../../architecture/codepuppy-authority-registry.json) 的 `adr041-collision-rejection`、`l1r-subtask-attachment-policy`、`l1r-command-model-priority`;[ADR-047](../../../.claude/rules/adrs/ADR-047-opencode2-engine-generation.md)「精确接管面」。以上均取 `lane/1666-l4-takeover` @ `e737b760ca`。基线:`register-policy.test.ts` 35 过;core `config/command`、`config/reload`、`schedule`、`mcp-attach`、`mcp-instructions` 共 101 过;`mcp.test.ts` 107 过。
-- 核对:待编排器核对。
+- 核对:`6bc34b3ce5` · 编排器 · 通过(撞名按 2.x 实例测;`adr041-collision-rejection` 本轮保持 blocked、补机制与测试,整合时翻;「明确选定」取会话 `model`,依赖 L6 每次发送前把会话模型切到所选)。
 
 ### 改动
 
@@ -115,7 +115,7 @@ last_reviewed: 2026-11-12
 
 | AC | 测试/证据 | 缺少行为为什么会失败 |
 | --- | --- | --- |
-| `adr041-collision-rejection`(MCP 与内置) | `codepuppy-mcp-tool-collision.test.ts`:内置 `opencode/session_rename` 先注册,MCP 服务器 `opencode` 的 `session_rename` 被拒,该名字执行的是内置、MCP 调用次数为 0;内置后注册,结果相同;近似名 `opencode/session_renamed` 两个都在 | 去掉检查,内置先注册的那一序里 MCP 覆盖内置:执行到 MCP,调用次数为 1 |
+| `adr041-collision-rejection`(MCP 与内置) | `codepuppy-mcp-tool-collision.test.ts`:内置 `opencode_session_rename`、`experimental_image_generate` 先注册时,MCP 服务器 `opencode` / `experimental` 的同名工具被拒,注册表在这两个名字下放的是内置;内置后注册,结果相同;近似名 `opencode_session_renamed`(MCP)照常注册 | 去掉检查,内置先注册的那一序里 MCP 覆盖内置:名字下放的是 MCP 工具 |
 | `l1r-subtask-attachment-policy` E6 | `register-policy.test.ts`,真 `subagent` 插件:① Code Puppy deny `builtin::subagent` 时,`callRaw` 得到具名拒绝,待批请求为零、子会话为零;② Code Puppy ask,且 agent 规则也对 `subagent` ask 时,第一条待批是 Code Puppy 的身份请求,拒绝后从未出现上游的 `subagent` 请求,子会话为零;③ 反向臂:不装策略时,待批的是上游 `subagent` 那一条 | 策略不在上游检查之前跑:①会建出子会话或出现上游请求;②第一条待批是上游的;③证明这个判据分得清两种请求 |
 | `l1r-subtask-attachment-policy` E7 | `register-policy.test.ts`:`SessionPrompt.prepare` 带一个真文件附件,同时禁用 `builtin::read`、agent 规则 deny `read`;探针插件数到的 `execute.before` 与 `permission` evaluate 都是 0,附件字节完整;前提臂:一次真 `callRaw` 让计数加 1 | 有人把工具或权限调用接进附件物化:计数大于 0,或附件被拒;前提臂证明计数器不是瞎的 |
 | `l1r-command-model-priority` | `codepuppy-command-model-priority.test.ts`:已选定 + `command.model` 时不调 `switchModel`、照常发 prompt;已选定 + agent 带模型时同样不调;未选定时用命令模型 `switchModel`(上游行为保留);子任务命令下子会话模型等于父会话选定的;父会话未选定时用命令模型 | 撤掉接管:前两条会调 `switchModel`,子任务那条拿到的是命令模型 |
@@ -123,4 +123,4 @@ last_reviewed: 2026-11-12
 
 ### 偏离记录
 
-暂无
+- 2026-11-12 · 第 1 项的测试读「注册表在该名字下放的是哪一个」(描述区分),不执行工具、不数 MCP 调用 · Code Mode 工具(`codemode: true`,真内置与 MCP 工具都是)不能按名字直接执行(`snapshot.execute` 回「No tool named …」);Code Mode 执行的就是该名字下注册的那一个 · 第 1 项提交。

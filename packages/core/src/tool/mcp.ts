@@ -2,7 +2,7 @@ export * as McpTool from "./mcp.js"
 
 import { ToolFailure } from "@opencode/ai/effect"
 import { McpEvent } from "@opencode/schema/mcp-event"
-import { Context, Effect, Fiber, type JsonSchema, Layer, Option, PubSub, Schema, Semaphore, Stream } from "effect"
+import { Context, Effect, Fiber, FiberSet, type JsonSchema, Layer, Option, PubSub, Schema, Semaphore, Stream } from "effect"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { extension } from "mime-types"
 import { Bus } from "../bus.js"
@@ -44,6 +44,7 @@ export const layer = Layer.effect(
     const toolOutput = yield* ToolOutput.Service
     const lock = Semaphore.makeUnsafe(1)
     let discovered: Mcp.Tool[] = []
+    const fork = yield* FiberSet.makeRuntime<never, void, never>() // codepuppy(ADR-041)
 
     // Register once after initial discovery; only subsequent updates need a debounced reload.
     const initial = yield* lock
@@ -52,6 +53,13 @@ export const layer = Layer.effect(
           discovered = yield* mcp.tools()
           yield* tools.transform((editor) => {
             for (const tool of discovered) {
+              // codepuppy(ADR-041) ── an MCP tool whose effective name an earlier registration (a builtin) already holds is
+              // refused, never last-wins: the call keeps running what the name meant before the server listed its tool.
+              if (editor.get(name(tool.server, tool.name)) !== undefined) {
+                fork(Effect.logError("mcp tool name collision refused", { alias: name(tool.server, tool.name), tool: `${tool.server}/${tool.name}` }))
+                continue
+              }
+              // codepuppy ── end
               editor.add({
                 name: tool.name,
                 options: { namespace: namespace(tool.server), codemode: tool.codemode !== false },

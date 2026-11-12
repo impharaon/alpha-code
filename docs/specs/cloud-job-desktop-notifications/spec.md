@@ -17,6 +17,7 @@ last_reviewed: 2026-11-10
 
 ## 来源
 
+- [impharaon/alpha-work:INT-cloud-job-desktop-notifications/I-01](https://github.com/impharaon/alpha-work/blob/a4b8beeac0196f02780a8c26364529b07e313acb/docs/intents/INT-cloud-job-desktop-notifications.md#意图点)。
 - [Story alpha-work#18](https://github.com/impharaon/alpha-work/issues/18) · [Epic alpha-work#143](https://github.com/impharaon/alpha-work/issues/143)。
 - [证据与范围记录](https://github.com/impharaon/alpha-work/issues/18#issuecomment-6731147162)。
 - [范围收窄裁决](https://github.com/impharaon/alpha-work/issues/18#issuecomment-5708410867)。

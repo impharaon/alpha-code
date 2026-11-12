@@ -19,6 +19,10 @@
 //      allow 一个白名单外的 provider ⇒ 仍不可用(反向臂:显式文件里没有 policies ⇒ 可用)。
 //   ⑦ `#1667` 裁决 r3 第 2 条:key 缺失或为空的自定义节点不在清单里、选它发一句端点收不到请求(反向臂:照旧写 `apiKey: ""` ⇒
 //      请求不带 Authorization 到达);平台节点照常可用(请求带着占位 Authorization 到达,真凭据由 ext 的请求头补)。
+//   ⑧ 编排器裁决 2026-11-12:项目导入的技能经显式文件 `skills` 里那一条相对路径 `./.codepuppy/skills` 进引擎(2.x 按会话所在的
+//      项目目录解析):项目 A 导入后不重启就可用、没有该目录的项目 B 没有、A 看不到 B 导入的;反向臂(今天的代码,没有这一条)⇒ 不可用。
+//      不看 consent(与 v1 同)。与 v1 的三处差别(已裁决接受):① 目录在、项目 codepuppy.jsonc 里没写注册,也会加载;② 项目在
+//      skills.paths 里写的其它条目不生效;③ ext 的项目身份检查不适用 —— 软链照跟,会话位置是 HOME 时读 `~/.codepuppy/skills`。
 // 引擎跑在临时 HOME/XDG 沙箱里(test-component/engine-sandbox.ts),绝不碰 owner 的数据目录。
 //
 // 宿主:真判据在 codepuppy-config-injection-engine.cases.ts(独立的 `bun test` 子进程 —— 引擎沙箱改的环境变量不出那个进程)。
@@ -28,7 +32,7 @@ import { join } from "node:path"
 
 // 子进程两条输出流并行读完再等退出:19 台真引擎的日志会写满 stderr 的管道缓冲,`Bun.spawnSync` 依次读两条流时子进程就卡在
 // 写上、整个宿主挂到超时(实测一次挂了 15 分钟,子进程日志停在第 6 台引擎)。
-test("注入产物交给真引擎:外部技能、provider 白名单、实验开关仍由 Code Puppy 决定;出厂技能、/init、/review、显式文件层(codepuppy-config-injection-engine.cases.ts,22 条)", async () => {
+test("注入产物交给真引擎:外部技能、provider 白名单、实验开关仍由 Code Puppy 决定;出厂技能、/init、/review、显式文件层、项目导入的技能(codepuppy-config-injection-engine.cases.ts,24 条)", async () => {
   const child = Bun.spawn({
     cmd: [process.execPath, "test", "--timeout", "90000", join(import.meta.dir, "codepuppy-config-injection-engine.cases.ts")],
     cwd: join(import.meta.dir, "../.."),
@@ -40,5 +44,5 @@ test("注入产物交给真引擎:外部技能、provider 白名单、实验开�
   const output = `${stdout}${stderr}`
   if (exitCode !== 0) throw new Error(output)
   expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
-  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("22")
+  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("24")
 }, 300_000)

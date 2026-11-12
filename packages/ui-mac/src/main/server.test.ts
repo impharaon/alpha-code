@@ -326,10 +326,11 @@ describe("`#1411` / `#1443` web search 按账户态的在场性", () => {
       process.env.XDG_DATA_HOME = join(userDataPath, "xdg-data")
       mkdirSync(process.env.CODEPUPPY_GLOBAL_DIR, { recursive: true })
       // 先证明注入真的跑成了 —— 它有一层函数级 catch,拿一份空配置当结论正是本文件要防的那类假绿。
-      expect(injectCodePuppyConfig(userDataPath, undefined, "stable")).toEqual({ ok: true })
-      const content = process.env.OPENCODE_CONFIG_CONTENT
-      expect(typeof content).toBe("string")
-      return { config: JSON.parse(content!) as EngineConfigShape, env: { ...process.env } }
+      // `#1662` parity B1:2.x 的注入返回 `{ config: { content, file }, explicit }`(内联文档交给 start(),不再写 OPENCODE_CONFIG_CONTENT)。
+      const { config } = injectCodePuppyConfig(userDataPath, undefined, "stable")
+      const parsed = JSON.parse(config.content) as EngineConfigShape
+      expect(Object.keys(parsed.agents ?? {}).length).toBeGreaterThan(0)
+      return { config: parsed, env: { ...process.env } }
     } finally {
       for (const key of Object.keys(process.env)) delete process.env[key]
       Object.assign(process.env, saved)
@@ -337,7 +338,7 @@ describe("`#1411` / `#1443` web search 按账户态的在场性", () => {
   }
 
   type McpEntry = { url?: string; enabled?: boolean }
-  type EngineConfigShape = { permission?: Record<string, unknown>; mcp?: Record<string, McpEntry | undefined> }
+  type EngineConfigShape = { agents?: Record<string, unknown>; mcp?: { servers?: Record<string, McpEntry | undefined> } }
 
   // 2026-11-12 I-09 退役本组四条 `#1411` 用例(登录代付两条腿同在 / 登出只剩本地腿 / kill-switch 两条都不在 / 关掉后回来):
   // 它们的供数方 ②③④ 是 v1 引擎的 RuntimeFlags、webSearchEnabled、Permission,随 OpenCode 2 换代删除(`44b6938b2a`)。
@@ -368,8 +369,9 @@ describe("`#1411` / `#1443` web search 按账户态的在场性", () => {
     /** 这一刻第三方 web search 调得动吗:生产判决函数的原话,`undefined` = 放行。 */
     function thirdPartyDenial(forkEnv: Record<string, string | undefined>) {
       const { config } = injectUnderSidecarEnv(forkEnv)
-      // 用户那份声明由引擎深合并进来(注入面只写 alpha 自己的那条),归属快照因此两边都要有。
-      const merged = { ...config, mcp: { ...(config.mcp ?? {}), ...THIRD_PARTY_SERVER } }
+      // 用户那份声明由引擎合并进来(注入面只写 Code Puppy 自己的那条),归属快照因此两边都要有;
+      // 形状同 ext 在 mcp.transform 里取的那份(plugin.ts:`computeMcpOwnership({ mcp: Object.fromEntries(editor.list()) })`)。
+      const merged = { mcp: { ...(config.mcp?.servers ?? {}), ...THIRD_PARTY_SERVER } }
       return webSearchToolDenial(THIRD_PARTY_TOOL, forkEnv, computeMcpOwnership(merged, forkEnv))
     }
 

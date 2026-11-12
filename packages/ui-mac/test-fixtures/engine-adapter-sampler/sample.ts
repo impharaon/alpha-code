@@ -496,6 +496,84 @@ try {
     })
   }
 
+  if (run("parity")) {
+    // 0.1.26 对照的四处差异:① 读目录;② 运行中 shell 的输出(进度帧给 shellID,按游标读 /api/shell/:id/output);
+    // ③ 慢的后台子会话:父会话先收尾,完成通知(2.x synthetic)再开一个写 b.txt 的回合 —— 分别拿各种 from 问 diff;
+    // ④ 外部编辑:fs.watch 能不能看目录、看着的文件被删 / 旁边新建文件各来什么帧。
+    autoAllow = true
+    mkdirSync(join(project, "sub/inner"), { recursive: true })
+    writeFileSync(join(project, "sub/one.txt"), "1\n")
+    writeFileSync(join(project, "sub/two.txt"), "2\n")
+    rmSync(join(project, "b.txt"), { force: true })
+
+    const dir = await create()
+    await call("POST", `/api/session/${dir}/prompt`, { text: "list the folder" })
+    await idle(dir)
+
+    const shell = await create()
+    const pages: Array<{ at: number; cursor: number; page: unknown }> = []
+    let shellDone = false
+    hooks.push(async (frame) => {
+      if (frame.data?.sessionID !== shell) return
+      if (frame.type === "session.tool.success" || frame.type === "session.tool.failed") shellDone = true
+      if (frame.type !== "session.tool.progress" || !frame.data.metadata?.shellID) return
+      const id = frame.data.metadata.shellID as string
+      void (async () => {
+        let cursor = 0
+        while (!shellDone) {
+          const page = await call("GET", `/api/shell/${id}/output?${loc}&cursor=${cursor}`)
+          pages.push({ at: Date.now(), cursor, page })
+          if (typeof page?.data?.cursor === "number") cursor = page.data.cursor
+          await Bun.sleep(150)
+        }
+      })()
+    })
+    await call("POST", `/api/session/${shell}/prompt`, { text: "slow shell" })
+    await idle(shell)
+
+    const background = await create()
+    diffSessions.add(background)
+    await call("POST", `/api/session/${background}/prompt`, { text: "slow background" })
+    await idle(background, 2)
+    await Bun.sleep(500)
+    const backgroundFinal = await finalOf(background)
+    const synthetic = backgroundFinal.findLast((message: any) => message.type === "synthetic")
+    const user = backgroundFinal.findLast((message: any) => message.type === "user")
+    const backgroundDiffs = {
+      latest: await exchange("GET", `/api/session/${background}/diff`),
+      fromUser: await exchange("GET", `/api/session/${background}/diff?from=${user?.id}`),
+      fromSynthetic: await exchange("GET", `/api/session/${background}/diff?from=${synthetic?.id}`),
+    }
+
+    const watchFrom = records.length
+    writeFileSync(join(project, "w.txt"), "w\n")
+    const watches = {
+      directory: await exchange("POST", `/api/experimental/fs/watch?${loc}`, { path: "sub" }),
+      root: await exchange("POST", `/api/experimental/fs/watch?${loc}`, { path: "." }),
+      file: await exchange("POST", `/api/experimental/fs/watch?${loc}`, { path: "w.txt" }),
+    }
+    writeFileSync(join(project, "sub/three.txt"), "3\n")
+    writeFileSync(join(project, "new.txt"), "n\n")
+    await Bun.sleep(1_500)
+    const createdFrames = fsFrames(watchFrom)
+    const unlinkFrom = records.length
+    rmSync(join(project, "w.txt"))
+    await Bun.sleep(1_500)
+    autoAllow = false
+    write("parity.json", {
+      _source: source(
+        "0.1.26 parity probes. `dir` = a session whose mock reads the directory sub (sub/one.txt, sub/two.txt, sub/inner/). `shell` = a session whose mock runs a shell printing line1..line3 0.4 s apart: records, plus `pages` = GET /api/shell/:id/output?cursor= every 150 ms from the tool's progress frame (metadata.shellID) until the tool settled. `background` = a background subagent whose child answers after 2.5 s, so the parent goes idle first and the completion notice (a 2.x synthetic) starts a turn that writes b.txt; `diffs` asks GET /api/session/:id/diff with no from, from the user message, and from the synthetic. `watches` = POST /api/experimental/fs/watch for a directory, for `.`, and for the file w.txt; `createdFrames` = filesystem.changed after sub/three.txt and new.txt are created from outside; `unlinkFrames` = after w.txt is removed from outside.",
+      ),
+      directory: project,
+      dir: { sessionID: dir, final: await finalOf(dir) },
+      shell: { sessionID: shell, records: recordsOf(shell), pages, final: await finalOf(shell) },
+      background: { sessionID: background, records: recordsOf(background), final: backgroundFinal, diffs: backgroundDiffs },
+      watches,
+      createdFrames,
+      unlinkFrames: fsFrames(unlinkFrom),
+    })
+  }
+
   console.log(`fixtures written to ${OUT}`)
 } finally {
   stop.abort()

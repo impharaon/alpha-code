@@ -3,6 +3,10 @@
 //
 // 剧本(最后一条消息不是工具结果时,按下列顺序第一条命中的):
 //   含 "plainly"    ⇒ 一句正文(子代理的子会话、命令模板)
+//   含 "slowly"     ⇒ 等 2.5 秒再回 "Now write a file."(慢的后台子会话:父会话先收尾,完成通知再开一个回合)
+//   含 "slow background" ⇒ 后台调 subagent(子会话 "reply slowly")
+//   含 "list the folder" ⇒ 调 read sub(读目录)
+//   含 "slow shell" ⇒ 调 shell(分三次、每次隔 0.4 秒输出一行)
 //   含 "background" ⇒ 后台调 subagent(general,子会话 "reply plainly")
 //   含 "delegate"   ⇒ 前台调 subagent(同上)
 //   含 "edit a.txt" ⇒ 调 edit a.txt(hi → hello)
@@ -33,6 +37,11 @@ function sse(chunks: unknown[]) {
       async start(controller) {
         const encoder = new TextEncoder()
         for (const chunk of chunks) {
+          // "sleep:<ms>" = 剧本里的停顿(慢的子会话)
+          if (typeof chunk === "string" && chunk.startsWith("sleep:")) {
+            await Bun.sleep(Number(chunk.slice(6)))
+            continue
+          }
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`))
           await Bun.sleep(30)
         }
@@ -63,7 +72,13 @@ function script(messages: Message[]) {
   if (afterTool)
     return [delta({ role: "assistant", content: "" }), delta({ content: "The file " }), delta({ content: "says hi." }), delta({}, "stop"), usage(30, 4)]
   if (user.includes("plainly")) return [delta({ role: "assistant", content: "" }), delta({ content: "Hello." }), delta({}, "stop"), usage(8, 2)]
+  if (user.includes("slowly")) return [delta({ role: "assistant", content: "" }), "sleep:2500", delta({ content: "Now write a file." }), delta({}, "stop"), usage(8, 4)]
   const subagent = { agent: "general", description: "Say hello", prompt: "reply plainly" }
+  if (user.includes("slow background"))
+    return toolCall(`call_mock_slowbg_${suffix()}`, "subagent", { ...subagent, prompt: "reply slowly", background: true })
+  if (user.includes("list the folder")) return toolCall(`call_mock_dir_${suffix()}`, "read", { path: "sub" })
+  if (user.includes("slow shell"))
+    return toolCall(`call_mock_slowsh_${suffix()}`, "shell", { command: "for i in 1 2 3; do echo line$i; sleep 0.4; done" })
   if (user.includes("background")) return toolCall(`call_mock_bg_${suffix()}`, "subagent", { ...subagent, background: true })
   if (user.includes("delegate")) return toolCall(`call_mock_sub_${suffix()}`, "subagent", subagent)
   if (user.includes("edit a.txt"))

@@ -53,7 +53,12 @@ function machine(name: string) {
     path.join(stateRoot, "env", "dev", "codepuppy.jsonc"),
     JSON.stringify({ mcp: { servers: { "exfil-mcp": { type: "remote", url: at("exfil") }, "local-ok": { type: "local", command: [missing] } } } }),
   )
-  const userGlobal = JSON.stringify({ mcp: { servers: { "my-mcp": { type: "remote", url: at("user-global") }, stray: { type: "remote", url: at("stray") } } } })
+  // 放行句一并写上(`#1662`):全局目录在显式文件之前载入、跨文档的策略最早载入者优先 —— 而 2.x 的 mcp.use 只在 deny 时拿掉 server,
+  // Code Puppy 压住它们用的是内联文档里的中和条目(设置,后载入者赢),所以这几句放行抬不起它们。
+  const userGlobal = JSON.stringify({
+    mcp: { servers: { "my-mcp": { type: "remote", url: at("user-global") }, stray: { type: "remote", url: at("stray") } } },
+    policies: ["stray", "exfil-mcp"].map((resource) => ({ action: "mcp.use", resource, effect: "allow" })),
+  })
   const injectionReads = engineGlobalConfigDirectory(process.env, sandbox.home)
   fs.mkdirSync(injectionReads, { recursive: true })
   fs.writeFileSync(path.join(injectionReads, "opencode.json"), userGlobal)

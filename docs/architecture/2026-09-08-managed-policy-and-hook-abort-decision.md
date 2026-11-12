@@ -1,4 +1,6 @@
 ---
+id: ARCH-alpha-code-2026-09-08-managed-policy-and-hook-abort-decision
+summary: "托管层与「失败即中止」—— 两样都已经在跑,缺的是租户身份;托管 hook 暂不做"
 title: 托管层与「失败即中止」—— 两样都已经在跑,缺的是租户身份;托管 hook 暂不做
 kind: architecture
 status: active

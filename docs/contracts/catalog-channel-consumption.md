@@ -1,4 +1,6 @@
 ---
+id: CONTRACT-alpha-code-catalog-channel-consumption
+summary: "Catalog channel consumption (A-side routing & fallback)"
 title: Catalog channel consumption (A-side routing & fallback)
 kind: contract
 status: active

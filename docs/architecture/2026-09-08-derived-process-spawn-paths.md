@@ -1,4 +1,6 @@
 ---
+id: ARCH-alpha-code-2026-09-08-derived-process-spawn-paths
+summary: "引擎到底从哪些地方派生出会落盘的进程(勘破)"
 title: 引擎到底从哪些地方派生出会落盘的进程(勘破)
 kind: architecture
 status: active

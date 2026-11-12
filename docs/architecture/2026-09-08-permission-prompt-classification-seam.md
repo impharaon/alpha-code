@@ -1,4 +1,6 @@
 ---
+id: ARCH-alpha-code-2026-09-08-permission-prompt-classification-seam
+summary: "风险分类挂在哪个接缝上(勘破)—— 真正弹到用户面前的那一问,不是执行咽喉发起的那一问"
 title: 风险分类挂在哪个接缝上(勘破)—— 真正弹到用户面前的那一问,不是执行咽喉发起的那一问
 kind: architecture
 status: active

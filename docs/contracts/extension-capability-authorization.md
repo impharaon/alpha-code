@@ -1,4 +1,6 @@
 ---
+id: CONTRACT-alpha-code-extension-capability-authorization
+summary: "Extension capability authorization (capability→authorize gate)"
 title: Extension capability authorization (capability→authorize gate)
 kind: contract
 status: active

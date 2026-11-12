@@ -1,4 +1,6 @@
 ---
+id: CONTRACT-alpha-code-artifact-office-open-gate
+summary: "Artifact Office external-open gate"
 title: Artifact Office external-open gate
 kind: contract
 status: active

@@ -1,3 +1,10 @@
+---
+id: ARCH-alpha-code-understanding
+title: 理解 opencode(为 alpha-code 制图)
+kind: architecture
+status: active
+summary: "理解 opencode(为 alpha-code 制图)"
+---
 # 理解 opencode(为 alpha-code 制图)
 
 > 产出方式:克隆 `anomalyco/opencode@7efade2` → 10-agent 并行 cartography 工作流(读全部 27 包,105 万 token)+ 主 Claude 独立复核关键文件。

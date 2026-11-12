@@ -1,4 +1,6 @@
 ---
+id: CONTRACT-alpha-code-recovery-adapter
+summary: "Recovery adapter contract"
 title: Recovery adapter contract
 kind: contract
 status: active

@@ -1,4 +1,6 @@
 ---
+id: ARCH-alpha-code-2026-08-10-catalog-readiness-signals
+summary: "目录目录就绪有哪些信号（勘破）"
 title: 目录目录就绪有哪些信号（勘破）
 kind: architecture
 status: active

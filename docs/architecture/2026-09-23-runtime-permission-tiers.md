@@ -1,3 +1,10 @@
+---
+id: ARCH-alpha-code-2026-09-23-runtime-permission-tiers
+title: 运行权限档位的地面真相(`alpha-code#1413` 勘破)
+kind: architecture
+status: active
+summary: "运行权限档位的地面真相(`alpha-code#1413` 勘破)"
+---
 # 运行权限档位的地面真相(`alpha-code#1413` 勘破)
 
 被测树:`alpha` @ `f56748c4f`(2026-09-23)。本文只记**跑出来的**事实与读出来的坐标,

@@ -1,4 +1,6 @@
 ---
+id: CONTRACT-alpha-code-settings-and-extension-storage-adapters
+summary: "Settings and extension storage typed adapters"
 title: Settings and extension storage typed adapters
 kind: contract
 status: active

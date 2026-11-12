@@ -1,3 +1,10 @@
+---
+id: RUNBOOK-alpha-code-uninstall
+title: 卸载 Code Puppy 与数据残留清单(C16)
+kind: runbook
+status: active
+summary: "卸载 Code Puppy 与数据残留清单(C16)"
+---
 # 卸载 Code Puppy 与数据残留清单(C16)
 
 > 单一真源声明:本清单与 app 内「数据 ▸ 清除数据…」的清除引擎同源

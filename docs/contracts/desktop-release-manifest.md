@@ -1,4 +1,6 @@
 ---
+id: CONTRACT-alpha-code-desktop-release-manifest
+summary: "Desktop release manifest v1 (signed, machine-consumable)"
 title: Desktop release manifest v1 (signed, machine-consumable)
 kind: contract
 status: active

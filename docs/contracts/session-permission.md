@@ -1,4 +1,6 @@
 ---
+id: CONTRACT-alpha-code-session-permission
+summary: "Session permission contract"
 title: Session permission contract
 kind: contract
 status: active

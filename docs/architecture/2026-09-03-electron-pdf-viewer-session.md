@@ -1,3 +1,10 @@
+---
+id: ARCH-alpha-code-2026-09-03-electron-pdf-viewer-session
+title: Chromium 内置 PDF viewer 在 Electron 隔离 session 里的真实行为
+kind: architecture
+status: active
+summary: "Chromium 内置 PDF viewer 在 Electron 隔离 session 里的真实行为"
+---
 # Chromium 内置 PDF viewer 在 Electron 隔离 session 里的真实行为
 
 *勘破日期 2026-09-03 · Electron 42.3.3(Chromium 142)· macOS 15 (darwin 25.3.0) · 票 `#1227`*

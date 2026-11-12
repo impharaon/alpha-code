@@ -1,4 +1,6 @@
 ---
+id: CONTRACT-alpha-code-extension-install-ledger
+summary: "Extension install ledger ownership and fail-closed commit"
 title: Extension install ledger ownership and fail-closed commit
 kind: contract
 status: active

@@ -268,11 +268,6 @@ export const KEPT_SOURCE_TEXT_READS: Record<string, SourceTextEntry> = {
     evidence: "#1196",
     lines: 3,
   },
-  "packages/ui-mac/src/main/cloud-web-search.test.ts": {
-    why: "主语是**跨包逐字一致**:主权信道名的声明点在传输层、叶子只转出,两侧字面量对不上就等于信道断掉而没有任何行为测试会红。其中一句 toContain 是接线锚,但同文件另有四条真实驱动拒绝路径的行为判据 ⇒ 它不是那条保证的唯一守卫。",
-    evidence: "#650",
-    lines: 2,
-  },
   "packages/ui-mac/src/main/ext-cas-gc-scheduler.test.ts": {
     why: "断言的是 electron.vite.config.ts 自己的**声明**(worker 第三入口)。配置文件的文本就是产物,不是行为的替身;bun 侧跑不了 electron-vite。残余:声明在而打包产物仍缺入口时本条不红 —— 那是打包级事实,本仓没有那道门。",
     evidence: "#367",
@@ -289,9 +284,9 @@ export const KEPT_SOURCE_TEXT_READS: Record<string, SourceTextEntry> = {
     lines: 3,
   },
   "packages/ui-mac/src/main/websearch-copies.test.ts": {
-    why: "10 处里 6 处是普查 / 负全称 / 跨包逐字一致(文本即产物);另 4 条是位置锚(闸是出网出口的第一句等)。这 4 条按本票分类法是减速带,但目标模块都是**可 import 的**,换真判据做得到 —— 而这份文件的 describe 自称 #223 R4 主判据,降不降级是那份已批基线的题目,不是本票的边界。如实登记为已知减速带,裁决在 #985。",
+    why: "10 处里 6 处是普查 / 负全称 / 跨包逐字一致(文本即产物);另 4 条是位置锚(闸是出网出口的第一句等)。这 4 条按本票分类法是减速带,但目标模块都是**可 import 的**,换真判据做得到 —— 而这份文件的 describe 自称 #223 R4 主判据,降不降级是那份已批基线的题目,不是本票的边界。如实登记为已知减速带,裁决在 #985。`#1662` I-09:v1 两条传输与普查网随 OpenCode 2 换代退役,剩 9 处(跨包逐字一致与 ext 钩子 / transform 的位置锚)。",
     evidence: "#985",
-    lines: 10,
+    lines: 9,
   },
   "packages/ui-mac/test-component/local-package-renderer.cases.ts": {
     why: "主语是 preload 暴露的通道名与 main 侧常量**逐字一致**(写错一个字母 = 功能死掉且什么都不红)。跨进程的字符串相等只能对文本断言,没有更细的粒度。",

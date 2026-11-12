@@ -1,6 +1,5 @@
 import { isolateEngineHome } from "../../test-component/isolated-engine-home"
-import { afterEach, beforeAll, beforeEach, describe, expect, mock, test, vi } from "bun:test"
-import { ConfigProvider, Effect, Layer } from "effect"
+import { afterEach, beforeEach, describe, expect, mock, test, vi } from "bun:test"
 import { EventEmitter } from "node:events"
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
@@ -78,21 +77,6 @@ const { creditDanglingSweepForSpawn, resetDanglingSweepLatchForTests } = await i
 // `#1411`(REQ-1414 CODE-1):下面「模型工具表」那一组用的四个**生产**供数方。全部动态 import ——
 // 它们要么经 ui-mac 的 main 面(必须排在 electron mock 之后),要么是引擎/注入面的真模块。
 const { injectCodePuppyConfig } = await import("./codepuppy-config-injection")
-// `#1667`:v1 引擎的四个模块(RuntimeFlags / webSearchEnabled / Permission / ProviderV2)只有下面「`#1411` 模型工具表」那一组用,
-// 而它们随 v1 引擎一起不在了 —— 挪进那一组的 beforeAll,免得整份文件在 import 阶段就夭折(本地腿在 2.x 的处置归 L3)。
-let webSearchEnabled: any
-let RuntimeFlags: any
-let Permission: any
-let AppNodeBuilder: any
-let ProviderV2: any
-const {
-  CLOUD_MCP_ARM_ENV,
-  CLOUD_MCP_DEF_ENV,
-  CLOUD_MCP_SERVER_NAME,
-  CLOUD_WEB_SEARCH_TOOL_ID,
-  LOCAL_WEB_SEARCH_TOOL_ID,
-  WITHHELD_CLOUD_MCP,
-} = await import("./cloud-web-search")
 // `#1443`:第三方 web-search MCP 的**唯一**闸就住在 ext 里(注入面的 permission deny 只点名
 // `websearch` 与 `cloud_cloud_web_search` 两个 id,够不着第三方)。下面那一组直接拿真判决函数判,
 // 不在 ui-mac 这边手写一份等价条件 —— 手写的那份正是本文件反复吃过亏的「夹具顶替供数方」。
@@ -333,30 +317,7 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
 //     ARM/DEF 交给 ext 的 `installCloudMcp()`,它读不到 `{file:}` 凭证时会响亮不装 —— 那半格这里
 //     一律按「已注册」处理,再由 permission deny 兜住,两条路径结论相同(都不在表里)。
 // ─────────────────────────────────────────────────────────────────────────────
-describe("`#1411` 模型工具表:两条腿按账户态的真实在场性", () => {
-  beforeAll(async () => {
-    ;({ webSearchEnabled } = await import("../../../opencode/src/tool/registry" as string))
-    ;({ RuntimeFlags } = await import("../../../opencode/src/effect/runtime-flags" as string))
-    ;({ Permission } = await import("../../../opencode/src/permission/index" as string))
-    ;({ AppNodeBuilder } = await import("../../../core/src/effect/app-node-builder" as string))
-    ;({ ProviderV2 } = await import("../../../core/src/provider" as string))
-  })
-  /** 非平台 provider —— 用它是为了让「本地腿在不在」真的由那四个 keyless flag 决定:
-   *  `webSearchEnabled()` 对 `opencode`/`opencode-go` 无条件放行,拿它当被测 provider 会让①②③恒真。 */
-  const BYOK_PROVIDER = () => ProviderV2.ID.make("deepseek-byok")
-
-  /** 引擎自己怎么解释这份 env(真 `RuntimeFlags`,真 `ConfigProvider`)。 */
-  const engineFlags = (env: Record<string, string | undefined>) =>
-    Effect.runSync(
-      RuntimeFlags.Service.useSync((flags) => ({ exa: flags.enableExa, parallel: flags.enableParallel })).pipe(
-        Effect.provide(
-          AppNodeBuilder.build(RuntimeFlags.node).pipe(
-            Layer.provide(ConfigProvider.layer(ConfigProvider.fromUnknown(env))),
-          ),
-        ),
-      ),
-    )
-
+describe("`#1411` / `#1443` web search 按账户态的在场性", () => {
   /** 在「sidecar 真正拿到的那份 env」下跑真注入面,拿它写出的引擎配置与它自己置位的 env。 */
   function injectUnderSidecarEnv(forkEnv: Record<string, string | undefined>) {
     const saved = { ...process.env }
@@ -382,59 +343,12 @@ describe("`#1411` 模型工具表:两条腿按账户态的真实在场性", () =
   type McpEntry = { url?: string; enabled?: boolean }
   type EngineConfigShape = { permission?: Record<string, unknown>; mcp?: Record<string, McpEntry | undefined> }
 
-  /** 云腿到底注册没注册:注入面写进配置的那条定义,或 ARM+DEF 一起交给 ext 装的那条(缺一 ext 不装)。 */
-  function cloudLegRegistered({ config, env }: { config: EngineConfigShape; env: Record<string, string | undefined> }) {
-    const connectable = (entry: McpEntry | undefined) =>
-      Boolean(entry) && entry!.enabled !== false && entry!.url !== WITHHELD_CLOUD_MCP.url
-    if (connectable(config.mcp?.[CLOUD_MCP_SERVER_NAME])) return true
-    const handed = env[CLOUD_MCP_ARM_ENV] && env[CLOUD_MCP_DEF_ENV] ? (JSON.parse(env[CLOUD_MCP_DEF_ENV]!) as McpEntry) : undefined
-    return connectable(handed)
-  }
-
-  /** 模型这一刻真正拿得到的那两个 web search 工具。 */
-  function modelWebSearchTools(forkEnv: Record<string, string | undefined>) {
-    const flags = engineFlags(forkEnv)
-    const injected = injectUnderSidecarEnv(forkEnv)
-    const registered = [
-      ...(webSearchEnabled(BYOK_PROVIDER(), flags) ? [LOCAL_WEB_SEARCH_TOOL_ID] : []),
-      ...(cloudLegRegistered(injected) ? [CLOUD_WEB_SEARCH_TOOL_ID] : []),
-    ]
-    const hidden = Permission.disabled(registered, Permission.fromConfig((injected.config.permission ?? {}) as never))
-    return registered.filter((id) => !hidden.has(id))
-  }
-
-  test("登录代付:`websearch` 与 `cloud_cloud_web_search` **同时**在模型工具表里", async () => {
-    preferAppEnv(userDataPath)
-    applyAuthEnvLikeLogin()
-
-    expect(modelWebSearchTools(await forkSidecar())).toEqual([LOCAL_WEB_SEARCH_TOOL_ID, CLOUD_WEB_SEARCH_TOOL_ID])
-  })
-
-  test("登出 / BYOK:只有本地腿在表里(云腿没有凭证,注入面给的是 enabled:false)", async () => {
-    preferAppEnv(userDataPath)
-
-    expect(modelWebSearchTools(await forkSidecar())).toEqual([LOCAL_WEB_SEARCH_TOOL_ID])
-  })
-
-  // 反例臂 —— 证明上面那两条不是「怎么测都绿」:同一条链在 kill-switch 下两条腿一个都不在表里。
-  test("kill-switch:同一条链下两条腿一个都不在表里(手段测得出已知的坏)", async () => {
-    process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
-    preferAppEnv(userDataPath)
-    applyAuthEnvLikeLogin()
-
-    expect(modelWebSearchTools(await forkSidecar())).toEqual([])
-  })
-
-  test("kill-switch 关掉之后,下一次 fork 两条腿一起回来", async () => {
-    process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
-    preferAppEnv(userDataPath)
-    applyAuthEnvLikeLogin()
-    expect(modelWebSearchTools(await forkSidecar())).toEqual([])
-
-    delete process.env.CODEPUPPY_WEBSEARCH_DISABLE
-
-    expect(modelWebSearchTools(await forkSidecar())).toEqual([LOCAL_WEB_SEARCH_TOOL_ID, CLOUD_WEB_SEARCH_TOOL_ID])
-  })
+  // 2026-11-12 I-09 退役本组四条 `#1411` 用例(登录代付两条腿同在 / 登出只剩本地腿 / kill-switch 两条都不在 / 关掉后回来):
+  // 它们的供数方 ②③④ 是 v1 引擎的 RuntimeFlags、webSearchEnabled、Permission,随 OpenCode 2 换代删除(`44b6938b2a`)。
+  // 2.x 的替代:packages/ext/src/plugin-host.test.ts「权威 · 联网搜索准入(L5r)」(kill-switch 下内置 websearch 与第三方
+  // web search MCP 在 execute.before 被拒,反向臂不装 ext 即放行)、「联网搜索:不在 kill-switch(代付 / 登出)⇒ 内置
+  // websearch 照常放行」、「权威 · 云工具接入(M3)」;fork 出的那份 env 两个方向都写由本文件上面那组照常判。
+  // 无对应用例:把「真 fork env → 引擎这一刻的模型工具表」合成成一张表来判(2.x 上两半各自有判据,合成没有)。
 
   // ───────────────────────────────────────────────────────────────────────────
   // `#1443`:同一条链上**用户自带的第三方 web-search MCP**(自己在配置里声明一个 exa 之类的

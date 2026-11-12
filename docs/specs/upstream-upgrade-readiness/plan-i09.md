@@ -136,4 +136,9 @@ last_reviewed: 2026-11-12
 
 ### 偏离记录
 
-暂无
+- 2026-11-12 · 三步合成一次提交 · 编排器要求每段一次提交。
+- 2026-11-12 · 多改了 `packages/ui-mac/src/main/source-text-anchors.ts` 两条(`cloud-web-search.test.ts` 不再读源码文本 ⇒ 删条目;`websearch-copies.test.ts` 10 → 9 行)· 第 ⑤ 层按精确行数比对,退役用例后机械同步。
+- 2026-11-12 · 编排器补充项:`cloud-websearch-kill.test.ts` 47 → 30,23 条 v1 用例的去向逐条写进该行;`reload-scheduler.test.ts` 改受托方时实测 9 → 11,一并写回。`context-injection.test.ts` 那一行按编排器要求不动。
+- 2026-11-12 · `server.test.ts` 去掉 v1 的 `beforeAll` 后,同组里此前被它连带挂掉、从不计数的 4 条 `#1443` 用例开始真跑,并且是红的:辅助函数 `injectUnderSidecarEnv` 还按 v1 的 `{ ok: true }` 与 `OPENCODE_CONFIG_CONTENT` 读注入结果,而 `#1667` 已把 `injectCodePuppyConfig` 改成返回 2.x 的 `{ config, explicit }`。它们不是 v1 用例,本线不改写,原样保留并在回执里列出。
+- 2026-11-12 · 「临时目录里的用例」实测 1.8 秒,风险没有发生。
+

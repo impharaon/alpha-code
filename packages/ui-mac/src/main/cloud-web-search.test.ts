@@ -14,7 +14,6 @@ import {
   CLOUD_WEB_SEARCH_REMOTE_TOOL,
   CLOUD_WEB_SEARCH_TOOL_ID,
   LOCAL_WEB_SEARCH_TOOL_ID,
-  LOCAL_WEBSEARCH_DENY_ENV,
 } from "./cloud-web-search"
 
 /** 云 worker **自己** advertise 的远端工具名(#643 P1.3 实测 `remoteToolNames`)。 */
@@ -116,18 +115,11 @@ describe("web search sovereignty denies", () => {
     }
   })
 
-  // 注入面够不着的三条绕过(别的 config 源后加载的 agent / 持久 session permission / approved)
-  // 由工具自身的最终闸兜底,判决靠这个 env 变量过河。两个包各写一份字面量 —— 这里钉住不许漂移。
-  test("the sovereignty env channel name matches the engine-side reader", () => {
-    expect(LOCAL_WEBSEARCH_DENY_ENV).toBe("CODEPUPPY_LOCAL_WEBSEARCH_DENY")
-    // #223 R4:声明点下沉到 `mcp-websearch.ts`(本引擎唯一的出网出口),叶子只转出。
-    const transport = readFileSync(join(import.meta.dir, "../../../opencode/src/tool/mcp-websearch.ts"), "utf8")
-    expect(transport).toContain(`export const LOCAL_WEBSEARCH_DENY_ENV = "${LOCAL_WEBSEARCH_DENY_ENV}"`)
-    expect(transport).toContain("if (localWebSearchDenied())")
-    const leaf = readFileSync(join(import.meta.dir, "../../../opencode/src/tool/websearch.ts"), "utf8")
-    expect(leaf).toContain("export const LOCAL_WEBSEARCH_DENY_ENV = McpWebSearch.LOCAL_WEBSEARCH_DENY_ENV")
-    expect(leaf).toContain("if (localWebSearchDenied())")
-  })
+  // 2026-11-12 I-09 退役「the sovereignty env channel name matches the engine-side reader」:它读 v1 引擎的
+  // packages/opencode/src/tool/mcp-websearch.ts 与 websearch.ts(随 OpenCode 2 换代删除,`44b6938b2a`)。2.x 上读这个信号的是
+  // ext 的执行钩子;字面量逐字一致由 websearch-copies.test.ts「主权信道名在 ui-mac / ext / plugin 逐字一致」判
+  // (packages/ext/src/cloud-websearch-kill.ts 的 LOCAL_WEBSEARCH_DENY_ENV),真宿主上的拒绝由 packages/ext/src/plugin-host.test.ts
+  // 「权威 · 联网搜索准入(L5r)」判。
 
   test("logged-out/BYOK leaves cloud tool registration and existing permissions unchanged", () => {
     const config = {
@@ -233,50 +225,11 @@ describe("#650 云 web search 闸按引擎真实 id 命中", () => {
 
   // 模型看得见的那句话里点名的工具必须真的存在,否则拒绝文案本身就是错误指路。
   //
-  // `#1411`:这条断言以前要求那句话**必须**点名 `codepuppy_web_search`(「本地腿被代付关掉 ⇒ 去用
-  // 云腿」)。代付不再关本地腿之后,`CODEPUPPY_LOCAL_WEBSEARCH_DENY` 只由 kill-switch 置位 —— 而上面两条
-  // kill-switch 断言已经证明那一态**云工具同样不在模型工具表里**。于是那句指路在唯一可达它的状态下
-  // 必然是错的。基线 S5:指不出在场的替代就明说没有。
-  test("两份拒绝文案在唯一可达它的状态(kill-switch)下不指向任何替代工具", async () => {
-    // 读的是**值**而不是文件正文 —— 正文匹配会被注释里的同形字样骗过去。
-    const [legacy, v2] = await Promise.all([
-      import("../../../opencode/src/tool/mcp-websearch"),
-      import("../../../core/src/tool/websearch"),
-    ])
-    // 两个包之间没有可共用的 alpha 依赖边,两份副本只能靠这条锁保持逐字一致。
-    expect(v2.LOCAL_WEBSEARCH_DENIED_MESSAGE).toBe(legacy.LOCAL_WEBSEARCH_DENIED_MESSAGE)
-    const message = legacy.LOCAL_WEBSEARCH_DENIED_MESSAGE
-    // 期望值从生产常量推导(引擎 id 与远端名都不许出现),不写第二份字面量。
-    expect(message).not.toContain(CLOUD_WEB_SEARCH_TOOL_ID)
-    expect(message).not.toContain(CLOUD_WEB_SEARCH_REMOTE_TOOL)
-    // 仍必须让模型停手并自己说明 —— 否则它会把「能力被关掉」当成瞬时故障反复调用。
-    expect(message).toContain("do not retry")
-    expect(message).toContain("Answer without web search and say so")
-    // 并且说清是谁关的:kill-switch 是唯一能到这里的原因。
-    expect(message.toLowerCase()).toContain("kill switch")
-  })
+  // 2026-11-12 I-09 退役两条拒绝文案用例(「两份拒绝文案在唯一可达它的状态(kill-switch)下不指向任何替代工具」与
+  // 「`#1461`:本地腿拒绝文案不再宣称关掉了每一个 web search 工具…」):它们 import 的两份文案住在 v1 引擎与 V2 core 副本的
+  // websearch 传输里,随 OpenCode 2 换代删除。2.x 上模型看到的拒绝文案由 ext 给,同口径的判据是
+  // packages/ext/src/cloud-websearch-kill.test.ts「拒绝理由在唯一可达它的状态(kill-switch)下只点名 kill-switch,不串名代付、
+  // 不指向任何替代」与「`#1461`:拒绝理由不再宣称关掉了每一个 web search 工具,只承认按名字认出的;仍叫模型别去找替代」;
+  // 内置 websearch 在 kill-switch 下确实走到这道钩子由 packages/ext/src/plugin-host.test.ts「权威 · 联网搜索准入(L5r)」判。
 
-  // `#1461` 实测(docs/verification/2026-09-27-1461-third-party-websearch-mcp-four-states/):同一个第三方
-  // 插件、同一格 kill-switch env,工具名 `web_search` 被拒、`search` 照常搜到 DuckDuckGo 结果 —— 第三方那道判决
-  // 的入口是工具名,认不出的结构上关不掉。于是这句本地腿文案里的「it turns off every web search tool — …alike」
-  // 在它唯一可达的状态下是假话。这里钉住:事实收窄到「alpha 自己的两条腿 + 按名字认出的」;「别找替代」保留为
-  // 指令,不再是穷尽的承诺。与 ext `cloud-websearch-kill.test.ts` 的同名用例同口径(`b82403112`)。
-  // 已知的坏:把任一副本改回带 `every web search tool` 的那句 ⇒ 第一条断言红(两份不同则上一条的逐字锁先红)。
-  test("`#1461`:本地腿拒绝文案不再宣称关掉了每一个 web search 工具,只承认按名字认出的;仍叫模型别去找替代", async () => {
-    const [legacy, v2] = await Promise.all([
-      import("../../../opencode/src/tool/mcp-websearch"),
-      import("../../../core/src/tool/websearch"),
-    ])
-    for (const message of [legacy.LOCAL_WEBSEARCH_DENIED_MESSAGE, v2.LOCAL_WEBSEARCH_DENIED_MESSAGE]) {
-      const lower = message.toLowerCase()
-      // 全称声称出局:开关关不掉名字认不出的第三方搜网工具(`duck_search` 反向臂)。
-      expect(lower).not.toContain("every web search tool")
-      // 范围要说出来:被关的是按名字认出的那些。
-      expect(lower).toMatch(/recogni[sz]e[sd]? .*by name/)
-      // 「别去找替代」保留,但作为指令而不是「找也没用」的承诺。
-      expect(lower).toContain("do not look for another web search tool")
-      // 刻意不给模型指绕过用户开关的路:文案里不许出现「认不出的 / 别的照常可用」一类的话。
-      expect(lower).not.toMatch(/still (work|available|usable)|remain(s)? available|not affected/)
-    }
-  })
 })

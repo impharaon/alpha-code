@@ -2,10 +2,11 @@
 //
 // 票面点名的假绿形态(已实证过一次):断言「引擎会读的那个文件」≠ 跑「引擎的读」——
 // 摘掉注入钩子,盘面/账本断言照样全绿,而用户下一条消息里找不到那个能力。
-// 所以本文件的主断言不读 codepuppy.jsonc、不读账本:它把**真实引擎**(workspace 源码,
-// `packages/opencode/src/index.ts serve`,与打包 sidecar 同一份 v1 `GET /command` 路由)
-// 在隔离 env 里拉起来,用 `OPENCODE_CONFIG` 指向生产事务写出的那份 codepuppy.jsonc,
-// 然后问引擎:`GET /command` 里有没有这条命令。
+// 所以本文件的主断言不读 codepuppy.jsonc、不读账本:它把**真实引擎**拉起来问。
+// `#1662`(OpenCode 2):v1 的 `packages/opencode/src/index.ts serve` + `GET /command` 随换代删除;引擎的读改在
+// package-command-engine-visibility.engine.cases.ts(独立 `bun test` 子进程,临时 HOME/XDG 沙箱):生产 `injectCodePuppyConfig`
+// 由生产事务写出的 codepuppy.jsonc 合成显式文件 → 嵌入式 OpenCode 2 → `GET /api/command` 有没有这条命令,有就真跑一次
+// (子任务 ⇒ 一个子会话,用户回合逐字是签名模板、`$ARGUMENTS` 由引擎代入)。
 //
 // 绕过配方(#840 AC):把 `buildCommandTxItems` 里那条 config TxPlanItem 摘掉(保留 receipt/账本)
 // ⇒ 安装"成功"、账本有记录,而本文件的引擎断言**当场红**。实测记录贴在 PR。
@@ -28,12 +29,10 @@ import { uninstallPackageV1, type PackageArtifactInstallersV1 } from "./ext-pack
 import { findRecordV2 } from "./ext-receipt-v2"
 import { runExtensionTransaction } from "./ext-transaction"
 
-const repoRoot = resolve(import.meta.dir, "../../../..")
-const engineEntry = resolve(repoRoot, "packages/opencode/src/index.ts")
+const ENGINE_CASES = resolve(import.meta.dir, "package-command-engine-visibility.engine.cases.ts")
 const snapshotDigest = "8".repeat(64)
-/** 全量并跑时有测试文件会改写/清空 `process.env.PATH` —— 引擎子进程因此必须:
+/** 全量并跑时有测试文件会改写/清空 `process.env.PATH` —— 子进程因此必须:
  *  ① 用 `process.execPath`(绝对 bun 路径)而不是名字 "bun";② PATH 在模块装载期快照。 */
-const BUN_EXEC = process.execPath
 const PATH_AT_LOAD = process.env.PATH ?? ""
 
 const PACKAGE_ID = "package:command-probe"
@@ -106,7 +105,6 @@ beforeEach(() => {
   root = join(tmp, "global")
   userData = join(tmp, "user-data")
   mkdirSync(root, { recursive: true })
-  for (const dir of ["home", "xdg-config", "xdg-data", "xdg-cache"]) mkdirSync(join(tmp, dir), { recursive: true })
   process.env.CODEPUPPY_GLOBAL_DIR = root
 })
 
@@ -153,58 +151,25 @@ async function installCommandPackage(fixture: ReturnType<typeof commandFixture>,
   })
 }
 
-/** 起真引擎(隔离 HOME/XDG + OPENCODE_CONFIG),取一次 `GET /command`,一定杀干净。 */
-async function engineCommandList(configPath: string): Promise<Array<Record<string, unknown>>> {
-  const port = 4600 + Math.floor(Math.random() * 2000)
-  const proc = Bun.spawn(
-    [BUN_EXEC, "run", engineEntry, "serve", "--port", String(port), "--hostname", "127.0.0.1"],
-    {
-      cwd: repoRoot,
-      env: {
-        PATH: PATH_AT_LOAD,
-        HOME: join(tmp, "home"),
-        XDG_CONFIG_HOME: join(tmp, "xdg-config"),
-        XDG_DATA_HOME: join(tmp, "xdg-data"),
-        XDG_CACHE_HOME: join(tmp, "xdg-cache"),
-        OPENCODE_CONFIG: configPath,
-        NO_COLOR: "1",
-      },
-      stdout: "pipe",
-      stderr: "pipe",
-    },
-  )
-  try {
-    const deadline = Date.now() + 90_000
-    let buffered = ""
-    const reader = proc.stdout.getReader()
-    const decoder = new TextDecoder()
-    while (!buffered.includes("listening")) {
-      if (Date.now() > deadline) {
-        const err = await new Response(proc.stderr).text().catch(() => "")
-        throw new Error(`engine did not reach listening state; stdout=${buffered.slice(0, 400)} stderr=${err.slice(0, 400)}`)
-      }
-      const chunk = await Promise.race([
-        reader.read(),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("engine stdout read timeout")), 90_000)),
-      ])
-      if (chunk.done) {
-        const err = await new Response(proc.stderr).text().catch(() => "")
-        throw new Error(`engine exited before listening; stdout=${buffered.slice(0, 400)} stderr=${err.slice(0, 400)}`)
-      }
-      buffered += decoder.decode(chunk.value)
-    }
-    const response = await fetch(`http://127.0.0.1:${port}/command`)
-    if (!response.ok) throw new Error(`GET /command -> ${response.status}`)
-    return (await response.json()) as Array<Record<string, unknown>>
-  } finally {
-    proc.kill()
-    await proc.exited.catch(() => {})
-  }
+/**
+ * 引擎的读:起 package-command-engine-visibility.engine.cases.ts(独立 `bun test` 子进程,嵌入式 OpenCode 2 在临时沙箱里),
+ * 让它对本测试的 `root` 判这条命令在 / 不在;子进程的输出原样抬出来,并钉住 1 pass / 0 fail。
+ */
+function engineReads(expectation: "present" | "absent") {
+  const result = Bun.spawnSync({
+    cmd: [process.execPath, "test", "--timeout", "120000", ENGINE_CASES],
+    cwd: resolve(import.meta.dir, "../.."),
+    env: { ...process.env, PATH: PATH_AT_LOAD, CP840_GLOBAL_DIR: root, CP840_EXPECT: expectation },
+  })
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`
+  if (result.exitCode !== 0) throw new Error(output)
+  expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
+  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("1")
 }
 
 describe("#840 engine visibility —— 判据是引擎真的读它的那条路", () => {
   test(
-    "签名 command 包:装上 ⇒ 真引擎 GET /command 可见;整包卸载 ⇒ 引擎不可见且 config 叶恢复",
+    "签名 command 包:装上 ⇒ 真引擎 GET /api/command 可见且真跑出签名模板;整包卸载 ⇒ 引擎不可见且 config 叶恢复",
     async () => {
       const fixture = commandFixture()
       const outcome = await installCommandPackage(fixture, "attempt-engine-gate")
@@ -216,16 +181,8 @@ describe("#840 engine visibility —— 判据是引擎真的读它的那条路"
       expect(record?.configKey).toBe(`command.${COMMAND_NAME}`)
       expect(record?.id).toBe(COMPONENT_ID)
 
-      // ── 主断言:真实引擎读到了这条命令(名字/模板逐字/来源/子任务/hints)──────────────
-      const configPath = join(root, "codepuppy.jsonc")
-      const listed = await engineCommandList(configPath)
-      const command = listed.find((entry) => entry.name === COMMAND_NAME)
-      expect(command, `engine GET /command lacks ${COMMAND_NAME}: ${JSON.stringify(listed.map((entry) => entry.name))}`).toBeDefined()
-      expect(command!.template).toBe(TEMPLATE_MD)
-      expect(command!.source).toBe("command")
-      expect(command!.subtask).toBe(true)
-      expect(command!.description).toBe("req840 engine gate command")
-      expect(command!.hints).toEqual(["$ARGUMENTS"])
+      // ── 主断言:真实引擎读到了这条命令(名字/描述在列表里;模板逐字、子任务、`$ARGUMENTS` 由真跑判,见 engine.cases)──
+      engineReads("present")
 
       // ── 整包卸载:同一批生产原语(removeCommandEntry / removeInstallGrants 与 ext-ipc
       //    的 packageArtifactInstallers 逐字同一函数);command-only 包不许碰其它臂 —— 抛错即红。
@@ -249,8 +206,7 @@ describe("#840 engine visibility —— 判据是引擎真的读它的那条路"
       expect(await Bun.file(capabilityGrantPath(root, `command--${COMMAND_NAME}`)).exists()).toBe(false)
 
       // ── 主断言(卸载半场):重新起真引擎,这条命令必须不在了。
-      const listedAfter = await engineCommandList(configPath)
-      expect(listedAfter.find((entry) => entry.name === COMMAND_NAME)).toBeUndefined()
+      engineReads("absent")
     },
     300_000,
   )

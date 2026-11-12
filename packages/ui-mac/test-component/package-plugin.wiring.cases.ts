@@ -420,24 +420,24 @@ test("对照:同一个包去掉 plugin 组件后照常装成 —— 四个 profi
   expect(readConfigStrict().plugin).toBeUndefined()
 })
 
-test("@codepuppy/ext 不受影响:引擎侧接缝走 OPENCODE_CONFIG_CONTENT,与磁盘 plugin[] 无关", async () => {
+test("@codepuppy/ext 不受影响:引擎侧接缝走 start() 的 config.content,与磁盘 plugin[] 无关", async () => {
   resetDisk()
   // 生产注入面(`injectCodePuppyConfig`)在 sidecar 里跑,这里只需证明它**不经过**被封死的那条路:
-  // 它把 alpha 自己的 ext 绝对路径合进 env 通道的对象,磁盘上的 codepuppy.jsonc 一个字节都不写。
+  // 它把 alpha 自己的 ext 路径合进交给引擎的配置对象,磁盘上的 codepuppy.jsonc 一个字节都不写。
+  // `#1662`(OpenCode 2,`#1667` L5):注入产物不再写进 OPENCODE_CONFIG_CONTENT,而是作为结果里的 `config.content`
+  // 由 sidecar 放进 `start()` 的选项(engine-server-options.ts);2.x 的键是 `plugins`(复数),治理底线还会追加
+  // 一条以 `-` 开头的移除指令(`-opencode.config.compatibility`),它不是插件。
   const { injectCodePuppyConfig } = await import("../src/main/codepuppy-config-injection")
-  const extPath = join(tmp, "codepuppy-ext", "index.js")
-  mkdirSync(join(tmp, "codepuppy-ext"), { recursive: true })
-  writeFileSync(extPath, "export default {}\n")
-  const prevContent = process.env.OPENCODE_CONFIG_CONTENT
-  delete process.env.OPENCODE_CONFIG_CONTENT
+  const extPath = join(tmp, "codepuppy-ext")
+  mkdirSync(extPath, { recursive: true })
+  writeFileSync(join(extPath, "server.js"), "export default {}\n")
   const injected = injectCodePuppyConfig(userData, extPath, "dev")
   expect(injected.ok).toBe(true)
-  const envConfig = JSON.parse(process.env.OPENCODE_CONFIG_CONTENT!) as { plugin?: unknown[] }
-  // ① alpha 自有 ext 确实进了引擎会读的那份配置(env 通道);
-  expect(envConfig.plugin).toEqual([extPath])
+  const engineConfig = JSON.parse(injected.config.content) as { plugins?: string[] }
+  // ① alpha 自有 ext 确实进了引擎会读的那份配置(start() 的 config.content),且是唯一的插件;
+  expect(engineConfig.plugins?.filter((entry) => !entry.startsWith("-"))).toEqual([extPath])
   // ② 而磁盘上的 `codepuppy.jsonc` 里没有它 —— 注入只 seed 了一个 `{$schema}`。
   //    咽喉若误伤这条接缝,①会红;咽喉若其实拦不住磁盘写,②会红。
   expect(readConfigStrict().plugin).toBeUndefined()
-  if (prevContent === undefined) delete process.env.OPENCODE_CONFIG_CONTENT
-  else process.env.OPENCODE_CONFIG_CONTENT = prevContent
+  expect(readConfigStrict().plugins).toBeUndefined()
 })

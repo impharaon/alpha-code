@@ -299,18 +299,20 @@ describe("package secret prerequisite", () => {
   })
 
   // `#1529`:安装体不再 dispose;main 只剩**核验**那一半(按目录读一次 status)。重载归 ext 调度器。
+  // `#1662`(OpenCode 2,`#1667`):读的是 `GET /api/mcp`(`{ location, data: Mcp.Server[] }`,目录经 `location[directory]`
+  // 查询参数),状态是上游 `Mcp.Status` 的五种。v1 的 `needs_client_registration` 不是 2.x 的状态,那一格换成 2.x 的第五种 `pending`。
   test.each([
     ["connected", "connected"],
     ["disabled", "disabled"],
     ["failed", "failed"],
-    // `#1531`:要授权的两种原样透传(重载修不好它们,呈现面据此不出「现在重载」)
+    // `#1531`:要授权的原样透传(重载修不好它,呈现面据此不出「现在重载」)
     ["needs_auth", "needs_auth"],
-    ["needs_client_registration", "needs_client_registration"],
+    ["pending", "pending"],
     ["error", "unverifiable"],
   ] as const)(
     "main verification maps engine status %s to %s, never disposes, and returns status only",
     async (engineStatus, expectedStatus) => {
-      const requests: Array<{ path: string; method: string; authorization: string | null }> = []
+      const requests: Array<{ path: string; method: string; authorization: string | null; directory: string | null }> = []
       const fetchImpl = (async (request: RequestInfo | URL, init?: RequestInit) => {
         const normalized = new Request(request, init)
         const url = new URL(normalized.url)
@@ -318,11 +320,15 @@ describe("package secret prerequisite", () => {
           path: url.pathname,
           method: normalized.method,
           authorization: normalized.headers.get("authorization"),
+          directory: url.searchParams.get("location[directory]"),
         })
-        if (url.pathname === "/mcp")
+        if (url.pathname === "/api/mcp")
           return engineStatus === "error"
             ? Response.json({ message: "cold start failed" }, { status: 500 })
-            : Response.json({ demo: { status: engineStatus } })
+            : Response.json({
+                location: { directory: "/work/project" },
+                data: [{ name: "demo", status: engineStatus === "failed" || engineStatus === "needs_auth" ? { status: engineStatus, error: "x" } : { status: engineStatus } }],
+              })
         return new Response("not found", { status: 404 })
       }) as typeof fetch
       const result = await verifyInstalledMcp(
@@ -337,7 +343,7 @@ describe("package secret prerequisite", () => {
       )
       expect(result).toEqual({ reference: "demo", status: expectedStatus })
       expect(JSON.stringify(result)).not.toContain(secretValue)
-      expect(requests.map(({ path, method }) => ({ path, method }))).toEqual([{ path: "/mcp", method: "GET" }])
+      expect(requests.map(({ path, method, directory }) => ({ path, method, directory }))).toEqual([{ path: "/api/mcp", method: "GET", directory: "/work/project" }])
       expect(
         requests.every(
           (request) => request.authorization === `Basic ${Buffer.from("opencode:route-password").toString("base64")}`,

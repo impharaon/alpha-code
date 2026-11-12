@@ -52,8 +52,9 @@ pinShippedPlatform()
 let disposeCalls = 0
 let connectorRefreshes = 0
 let liveMcpCalls = 0
-let startup: { mcp?: Record<string, { enabled?: boolean }> } | undefined
-const services = () => startup ? { "codepuppy-pdf": { status: startup.mcp?.["codepuppy-pdf"]?.enabled === false ? "disabled" : "connected" } } : {}
+// `#1662`(#1667):启动投影是 OpenCode 2 形状 —— 停用的 MCP 在 `mcp.servers.<名字>` 写整条中和条目(`disabled: true`),不是 v1 的 `mcp.<名字>.enabled: false`。
+let startup: { mcp?: { servers?: Record<string, { disabled?: boolean }> } } | undefined
+const services = () => startup ? { "codepuppy-pdf": { status: startup.mcp?.servers?.["codepuppy-pdf"]?.disabled === true ? "disabled" : "connected" } } : {}
 // N07(b) engine tool display: prt_1aeaf3f3c001sbAwc6IGaVcOvr (result-0126-e.md).
 // Request envelope follows the v1 sample in permission-dual-channel.test.ts; metadata is
 // produced by permission/codepuppy-tool-policy-gate.ts:confirm, also used by the approval card.
@@ -626,7 +627,15 @@ test("⑤ 出站计数相等:到达 IPC 的每一次安装都经过了收口方�
 // #1646 uses the same real Hub → IPC → ledger. Only process launch is substituted;
 // startup projections use production producers, never a hand-written ledger.
 let busy = true
+// `#1662`(#1665):2.x 的调度器问进程内引擎的 `GET /api/session/active`(进程级忙闲),重载打 `POST /api/location/reload`;
+// 登记只认目录。v1 那种按实例的 `session.status` / `instance.dispose` 客户端已不存在。
 const scheduler = createReloadScheduler({
+  engine: () => async (request: Request) => {
+    const url = new URL(request.url)
+    if (request.method === "GET" && url.pathname === "/api/session/active") return Response.json({ data: busy ? { ses_1: { type: "running" } } : {} })
+    if (request.method === "POST" && url.pathname === "/api/location/reload") return new Response(null, { status: 204 })
+    return new Response("not found", { status: 404 })
+  },
   log: () => {}, error: () => {},
   report: (report) => codepuppySidecar.receive({ type: "codepuppy.reload.report", ...report }, () => {}),
 })
@@ -643,10 +652,7 @@ test("#1646 AC1 disable PDF waits for idle, then the fresh runtime blocks readin
     scope: { kind: "global" }, installedAt: "2026-11-05T10:40:00.000Z", desiredState: "enabled", configKey: "mcp.codepuppy-pdf",
   }).ok).toBe(true)
   startup = {}
-  scheduler.register(join(tmp, "project"), {
-    session: { status: async () => ({ data: busy ? { ses_1: { type: "busy" } } : {} }) },
-    instance: { dispose: async () => ({ data: true }) },
-  })
+  scheduler.register(join(tmp, "project"), {})
   codepuppySidecar.attach((request) => scheduler.request(request))
   setHubSection("connectors")
   document.dispatchEvent(new Event("visibilitychange"))
@@ -662,7 +668,7 @@ test("#1646 AC1 disable PDF waits for idle, then the fresh runtime blocks readin
   scheduler.poke()
   await scheduler.settled()
   await waitFor(() => expect(connectorRefreshes).toBe(1))
-  expect(startup.mcp?.["codepuppy-pdf"]?.enabled).toBe(false)
+  expect(startup.mcp?.servers?.["codepuppy-pdf"]?.disabled).toBe(true)
   const { attachmentInstruction } = await import("../../ext/src/attachment-reader-hooks")
   expect(attachmentInstruction(meta, tmp, services())).not.toContain("codepuppy-pdf_read_pdf")
   const { attachmentReadOf } = await import("../src/renderer/codepuppy-ui/session-timeline/timeline-attachments")
@@ -679,16 +685,16 @@ test("#1646 AC2 enable from a disabled boot plus reload-now removes the startup 
   click(pdfRow().querySelector('[data-enable-row]'))
   await waitFor(() => expect(pdfRow().querySelector('[data-hub-reload-now]')).toBeInstanceOf(HTMLElement))
   expect(connectorRefreshes).toBe(1)
-  expect(startup?.mcp?.["codepuppy-pdf"]?.enabled).toBe(false)
+  expect(startup?.mcp?.servers?.["codepuppy-pdf"]?.disabled).toBe(true)
   click(pdfRow().querySelector('[data-hub-reload-now]'))
   await waitFor(() => expect(connectorRefreshes).toBe(2))
-  expect(startup?.mcp?.["codepuppy-pdf"]).toBeUndefined()
+  expect(startup?.mcp?.servers?.["codepuppy-pdf"]).toBeUndefined()
   expect(liveMcpCalls).toBe(0)
   const { attachmentInstruction } = await import("../../ext/src/attachment-reader-hooks")
   expect(attachmentInstruction(meta, tmp, services())).toContain("codepuppy-pdf_read_pdf")
   await call("ext-reload-request", { scope: "global", items: [], reason: "user: reload now", force: true })
   await scheduler.settled()
-  expect(startup?.mcp?.["codepuppy-pdf"]).toBeUndefined()
+  expect(startup?.mcp?.servers?.["codepuppy-pdf"]).toBeUndefined()
   expect(attachmentInstruction(meta, tmp, services())).toContain("codepuppy-pdf_read_pdf")
 })
 

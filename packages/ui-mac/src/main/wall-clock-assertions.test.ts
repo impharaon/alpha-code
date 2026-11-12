@@ -65,7 +65,8 @@ describe("登记簿 == 扫描(全仓测试文件)", () => {
   test("扫描集合与登记簿都非空,且扫描真的走到了上游包(扫到 0 个 = 扫描器瞎了,不是仓里没有)", () => {
     expect(hits.length).toBeGreaterThan(0)
     expect(ledger.length).toBeGreaterThan(0)
-    expect(hits.some((h) => h.file.startsWith("packages/opencode/test/"))).toBe(true)
+    // `#1662`:上游引擎的测试树是 OpenCode 2 的 packages/core/test(v1 的 packages/opencode 随换代删除)。
+    expect(hits.some((h) => h.file.startsWith("packages/core/test/"))).toBe(true)
     expect(ledger.some((r) => r.disposition === "upstream")).toBe(true)
   })
 
@@ -96,7 +97,7 @@ describe("登记簿 == 扫描(全仓测试文件)", () => {
     expect(files).toContain("packages/ui-mac/src/main/gate-file-registry.test.ts")
     expect(files.some((f) => f.endsWith(".cases.ts"))).toBe(true)
     expect(files.some((f) => f.startsWith("packages/ui-mac/test-live/"))).toBe(true)
-    expect(files.some((f) => f.startsWith("packages/opencode/test/"))).toBe(true)
+    expect(files.some((f) => f.startsWith("packages/core/test/"))).toBe(true)
     expect(files.filter((f) => f.includes("node_modules"))).toEqual([])
   })
 })
@@ -208,7 +209,8 @@ describe("控制臂:处置合法性(默认拒)", () => {
       "packages/ext/src/synthetic.test.ts",
       "packages/codepuppy-contracts-consumer/src/synthetic.test.ts",
       "packages/ui-mac/test-component/synthetic.cases.ts",
-      "packages/llm/test/auth-fail-closed.test.ts",
+      // gate-files 点名、但不在上面四个前缀里的文件(`#1662` 起 #652 的审计钉在 packages/ai)。
+      "packages/ai/test/codepuppy-auth-fail-closed.test.ts",
     ])
       expect(dispositionError(row({ file, disposition: "load-sensitive", reason: "负载敏感" }), repoContext), file).toContain("load-sensitive")
   })

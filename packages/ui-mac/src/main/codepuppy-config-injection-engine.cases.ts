@@ -26,7 +26,8 @@ import { buildEngineServerOptions, ENGINE_RELEASE_CHANNEL } from "./engine-serve
 import { withEngineAuthorization } from "./engine-authorization"
 import { explicitSkillDirs, injectCodePuppyConfig } from "./codepuppy-config-injection"
 import { watchExplicitSources } from "./engine-explicit-config"
-import { secretFilePath } from "./codepuppy-secret-files"
+import { customProviderSecretName, secretFilePath } from "./codepuppy-secret-files"
+import { PLATFORM_API_KEY_PLACEHOLDER } from "./codepuppy-models"
 import { createSidecarEnv } from "./sidecar-env"
 import type { EngineFetch } from "./in-process-engine"
 import { CODEPUPPY_INIT_TEMPLATE, CODEPUPPY_REVIEW_TEMPLATE } from "../../../ext/src/codepuppy-prompts"
@@ -500,5 +501,88 @@ describe("C7(重裁):provider 白名单的第一层在显式文件里,项目里�
     const engine = await engineWith("c7-project-allow-bare", { content: injection.config.content, file }, injection.models.file, { projectConfig: rogue })
     const ids = await settledIds(engine.get, "/api/provider")
     expect(ids).toContain("cp-l5-rogue")
+  }, 60_000)
+})
+
+// `#1667`(编排器裁决 r3 第 2 条):BYOK / 自定义节点的 key 缺失或为空时整个不注入。OpenCode 2 把空 key 当「不鉴权」
+// (`packages/core/src/model-resolver.ts`:没有凭据、没有配置的鉴权 ⇒ `Auth.none`),照旧写 `apiKey: ""` 就会把请求不带凭据
+// 发到用户的端点。判据:本机 OpenAI 兼容端点数请求、看有没有 Authorization 头。
+describe("裁决 r3 第 2 条:key 缺失或为空的 BYOK / 自定义节点不可选、不可调", () => {
+  const hits: Array<{ authorization: string | null }> = []
+  const chunk = (delta: Record<string, unknown>, finish: string | null = null) =>
+    `data: ${JSON.stringify({ id: "chatcmpl-cp-l5", object: "chat.completion.chunk", created: 1, model: "m", choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`
+  const endpoint = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch(request) {
+      if (!request.url.endsWith("/chat/completions")) return new Response("not found", { status: 404 })
+      hits.push({ authorization: request.headers.get("authorization") })
+      return new Response(chunk({ role: "assistant", content: "ok" }) + chunk({}, "stop") + "data: [DONE]\n\n", { headers: { "content-type": "text/event-stream" } })
+    },
+  })
+  afterAll(() => void endpoint.stop(true))
+  const baseURL = () => `http://127.0.0.1:${endpoint.port}/v1`
+  const record = () => {
+    const truth = path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "..", "..", "custom-providers", "dev.json")
+    fs.mkdirSync(path.dirname(truth), { recursive: true })
+    fs.writeFileSync(truth, JSON.stringify({ v: 1, providers: [{ id: "cp-l5-keyless", name: "Keyless", compat: "openai", baseURL: baseURL(), models: ["m"] }] }))
+  }
+  /** 用这个模型建会话、发一句、等这一轮跑完(成败都行),返回期间端点收到的请求。 */
+  async function call(engine: Awaited<ReturnType<typeof engineWith>>, providerID: string) {
+    const before = hits.length
+    const created = await engine.send("POST", "/api/session", { location: { directory: engine.slot.projectDirectory }, model: { id: "m", providerID } })
+    if (created.status !== 200) return { created: created.status, requests: hits.slice(before) }
+    const session = ((await created.json()) as { data: { id: string } }).data
+    await engine.send("POST", `/api/session/${session.id}/prompt`, { text: "hello" })
+    await engine.send("POST", `/api/experimental/session/${session.id}/wait`)
+    return { created: created.status, requests: hits.slice(before) }
+  }
+
+  test("自定义节点没有 key 文件 / key 文件是空的 ⇒ 不在 /api/provider 里,选它发一句,端点一个请求都收不到", async () => {
+    record()
+    for (const [label, plant] of [["missing", undefined], ["empty", " \n"]] as const) {
+      if (plant !== undefined) {
+        const file = secretFilePath(userData, customProviderSecretName("cp-l5-keyless"))
+        fs.mkdirSync(path.dirname(file), { recursive: true })
+        fs.writeFileSync(file, plant, { mode: 0o600 })
+      }
+      const injection = injectCodePuppyConfig(userData, undefined, "stable")
+      const engine = await engineWith(`keyless-${label}`, injection.config, injection.models.file)
+      const ids = await settledIds(engine.get, "/api/provider")
+      expect([label, ids.includes("cp-l5-keyless")]).toEqual([label, false])
+      expect([label, (await call(engine, "cp-l5-keyless")).requests]).toEqual([label, []])
+    }
+  }, 90_000)
+
+  test("反向臂:照旧写 `apiKey: \"\"` 并放行 ⇒ 请求不带 Authorization 发到了端点", async () => {
+    record()
+    const injection = injectCodePuppyConfig(userData, undefined, "stable")
+    const content = JSON.parse(injection.config.content) as { providers?: Record<string, unknown>; policies?: unknown[] }
+    content.providers = { ...content.providers, "cp-l5-keyless": { package: "aisdk:@ai-sdk/openai-compatible", settings: { baseURL: baseURL(), apiKey: "" }, models: { m: { name: "m" } } } }
+    content.policies = [...(content.policies ?? []), { action: "provider.use", resource: "cp-l5-keyless", effect: "allow" }]
+    const explicit = JSON.parse(fs.readFileSync(injection.config.file!, "utf8")) as { policies?: unknown[] }
+    explicit.policies = [...(explicit.policies ?? []), { action: "provider.use", resource: "cp-l5-keyless", effect: "allow" }]
+    const file = path.join(sandbox.root, "explicit-keyless-allowed.json")
+    fs.writeFileSync(file, JSON.stringify(explicit))
+    const engine = await engineWith("keyless-legacy", { content: JSON.stringify(content), file }, injection.models.file)
+    const { requests } = await call(engine, "cp-l5-keyless")
+    expect(requests.length).toBeGreaterThan(0)
+    expect(requests.every((request) => request.authorization === null)).toBe(true)
+  }, 60_000)
+
+  test("平台节点(占位 apiKey,真凭据由 ext 的请求头补)照常可用:在 /api/provider 里,请求带着 Authorization 到达端点", async () => {
+    const key = secretFilePath(userData, "CODEPUPPY_API_KEY")
+    fs.mkdirSync(path.dirname(key), { recursive: true })
+    fs.writeFileSync(key, "sk-platform-engine-gate", { mode: 0o600 })
+    process.env.CODEPUPPY_BASE_URL = baseURL()
+    const injection = injectCodePuppyConfig(userData, undefined, "stable")
+    // 沙箱里没有已应用的平台目录,平台节点的模型表是空的(`#1556`);补一个模型只为能发出一次请求,鉴权形状原样。
+    const content = JSON.parse(injection.config.content) as { providers: Record<string, { models?: Record<string, unknown> }> }
+    content.providers.codepuppy!.models = { m: { name: "m" } }
+    const engine = await engineWith("platform-usable", { content: JSON.stringify(content), file: injection.config.file }, injection.models.file)
+    expect(await settledIds(engine.get, "/api/provider")).toContain("codepuppy")
+    const { requests } = await call(engine, "codepuppy")
+    expect(requests.length).toBeGreaterThan(0)
+    expect(requests[0]!.authorization).toBe(`Bearer ${PLATFORM_API_KEY_PLACEHOLDER}`)
   }, 60_000)
 })

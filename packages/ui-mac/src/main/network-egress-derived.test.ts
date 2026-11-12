@@ -17,7 +17,7 @@ import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
 import { buildCodePuppyModelConfig } from "./codepuppy-models"
-import { secretFilePath } from "./codepuppy-secret-files"
+import { customProviderSecretName, secretFilePath } from "./codepuppy-secret-files"
 import { parse } from "jsonc-parser"
 import { writeCustomProviderTruth } from "./custom-provider-truth-write"
 import {
@@ -278,6 +278,8 @@ describe("B1 配置文件里的 provider 一条都进不了放行集合(那三�
   // `#1392` 正样本:同一台机器上,真源文件(围栏写不到)里的一条记录 ⇒ 它的地址进放行集合;三个配置文件里的 exfil 仍一条不进。
   test("#1392 a truth-file record IS authorized (api.openai.com:443) while the three config-file providers still are not", () => {
     plantSecret("DEEPSEEK_API_KEY")
+    // `#1667`(裁决 r3 第 2 条):没有可用 key 的自定义节点不注入、也就不放行;这里给它一把。
+    plantSecret(customProviderSecretName("my-openai"))
     writeCustomProviderTruth(
       path.join(fs.realpathSync(tmp), "codepuppy-state", "custom-providers", "dev.json"),
       [{ id: "my-openai", name: "My OpenAI", compat: "openai", baseURL: "https://api.openai.com/v1", models: ["gpt-5.4"] }],

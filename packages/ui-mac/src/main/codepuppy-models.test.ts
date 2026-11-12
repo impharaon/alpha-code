@@ -329,18 +329,14 @@ describe("buildCodePuppyModelConfig — default model + user providers", () => {
     expect(cfg.provider).toEqual({})
   })
 
-  test("#1392 a truth-file record is a FULL provider block in the allowlist (npm / name / baseURL / models; {file:} only when the key file exists); sidecar-style location = env-derived", () => {
+  test("#1392 a truth-file record is a FULL provider block in the allowlist (npm / name / baseURL / models; {file:} ref) once its key file exists — none before; sidecar-style location = env-derived", () => {
     // 无快照(sidecar 的处境):位置由 CODEPUPPY_GLOBAL_DIR 逆映射得出,与手写的期望路径逐字相同。
     expect(resolveCustomProviderTruthLocation()).toEqual({ ok: true, path: truthPath(), casBaseRoot: path.join(fs.realpathSync(tmp), "codepuppy-state"), environment: "dev" })
     writeCustomProviderTruth(truthPath(), [{ id: "my-openai", name: "My OpenAI", compat: "openai", baseURL: "https://api.openai.com/v1", models: ["gpt-5.4", "gpt-5.4-mini"] }], fs)
+    // `#1667`(裁决 r3 第 2 条):没有可用 key ⇒ 整个不注入(OpenCode 2 把空 key 当「不鉴权」,请求会不带凭据发出去)。
     const before = buildCodePuppyModelConfig(userData)!
-    expect(before.enabled_providers).toEqual(["my-openai"])
-    expect(before.provider["my-openai"]).toEqual({
-      npm: "@ai-sdk/openai-compatible",
-      name: "My OpenAI",
-      options: { baseURL: "https://api.openai.com/v1", apiKey: "" },
-      models: { "gpt-5.4": { name: "gpt-5.4", modalities: { input: ["text"] } }, "gpt-5.4-mini": { name: "gpt-5.4-mini", modalities: { input: ["text"] } } },
-    })
+    expect(before.enabled_providers).toEqual([])
+    expect(before.provider["my-openai"]).toBeUndefined()
     plantSecret(customProviderSecretName("my-openai"), SECRET)
     const after = buildCodePuppyModelConfig(userData)!
     expect((after.provider["my-openai"] as { options: { apiKey: string } }).options.apiKey).toBe(secretFileRef(userData, customProviderSecretName("my-openai")))
@@ -354,6 +350,7 @@ describe("buildCodePuppyModelConfig — default model + user providers", () => {
       ],
       fs,
     )
+    plantSecret(customProviderSecretName("my-claude"), SECRET)
     const two = buildCodePuppyModelConfig(userData)!
     expect(two.enabled_providers).toEqual(["my-openai", "my-claude"])
     expect((two.provider["my-claude"] as { npm: string }).npm).toBe("@ai-sdk/anthropic")

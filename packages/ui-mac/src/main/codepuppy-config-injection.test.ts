@@ -35,7 +35,7 @@ import { Permission } from "@opencode/schema/permission"
 import { ConfigNormalize } from "@opencode/core/config/normalize"
 import { CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID } from "../shared/codepuppy-config"
 import { ECOSYSTEM_COMPATIBILITY_PLUGIN, ENGINE_EXPERIMENTAL_FLAGS, injectCodePuppyConfig } from "./codepuppy-config-injection"
-import { secretFilePath } from "./codepuppy-secret-files"
+import { customProviderSecretName, secretFilePath } from "./codepuppy-secret-files"
 import { writeMcpServerTruth } from "./mcp-server-truth-write"
 import { NEUTRALIZED_MCP_SERVER } from "./mcp-default-deny"
 import {
@@ -370,6 +370,8 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
       truthPath,
       JSON.stringify({ v: 1, providers: [{ id: "my-openai", name: "My OpenAI", compat: "openai", baseURL: "https://api.openai.com/v1", models: ["gpt-5.4"] }] }),
     )
+    // `#1667`(裁决 r3 第 2 条):自定义节点只在有可用 key 时注入。
+    plantSecret(customProviderSecretName("my-openai"), "sk-custom-injection-gate")
 
     const { result, config } = inject(EXT_DIR)
     expect(result.ok).toBe(true)
@@ -379,13 +381,32 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     expect(config.providers?.["my-openai"]).toEqual({
       name: "My OpenAI",
       package: "aisdk:@ai-sdk/openai-compatible",
-      settings: { baseURL: "https://api.openai.com/v1", apiKey: "" },
+      settings: { baseURL: "https://api.openai.com/v1", apiKey: `{file:${secretFilePath(userData, customProviderSecretName("my-openai"))}}` },
       models: { "gpt-5.4": { name: "gpt-5.4", capabilities: { input: ["text"] } } },
     })
     expect(result.config.content).not.toContain("exfil.example")
     const base = JSON.parse(fs.readFileSync(result.models.file!, "utf8")) as Record<string, { models: Record<string, { provider?: unknown }> }>
     expect(base["user-file-provider"]).toBeUndefined()
     expect(base["my-openai"]!.models["gpt-5.4"]!.provider).toEqual({ npm: "@ai-sdk/openai-compatible", api: "https://api.openai.com/v1" })
+  })
+
+  test("`#1667` 裁决 r3 第 2 条:BYOK / 自定义节点的 key 缺失或为空 ⇒ 整个不注入(不在 providers、不在 provider.use 放行里);平台节点(占位 apiKey,凭据走 ext 请求头)照常注入", () => {
+    givenLoggedInWithByok()
+    const truthPath = path.join(tmp, "codepuppy-state", "custom-providers", "dev.json")
+    fs.mkdirSync(path.dirname(truthPath), { recursive: true })
+    fs.writeFileSync(truthPath, JSON.stringify({ v: 1, providers: [{ id: "keyless", name: "Keyless", compat: "openai", baseURL: "https://keyless.example/v1", models: ["m"] }] }))
+    const absent = (config: Injected, id: string) => {
+      expect(config.providers?.[id]).toBeUndefined()
+      expect(config.policies).not.toContainEqual({ action: "provider.use", resource: id, effect: "allow" })
+    }
+    absent(inject(EXT_DIR).config, "keyless")
+    plantSecret(customProviderSecretName("keyless"), "  \n")
+    absent(inject(EXT_DIR).config, "keyless")
+    plantSecret("DEEPSEEK_API_KEY", "")
+    absent(inject(EXT_DIR).config, "deepseek-byok")
+    const { config } = inject(EXT_DIR)
+    expect(config.providers?.codepuppy?.settings?.apiKey).toBe(PLATFORM_API_KEY_PLACEHOLDER)
+    expect(config.policies).toContainEqual({ action: "provider.use", resource: "codepuppy", effect: "allow" })
   })
 
   test("反向闸门:注入内部抛错时失败必须出声、以 ok:false 离开,产物只剩治理底线,且正向闸门的断言体真的转红", () => {

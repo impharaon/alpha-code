@@ -157,7 +157,7 @@ test("真 host + 真协调器:阶段查询经子进程往返;退出 ⇒ pendingF
 // 拿这份 env 认得出 main 写策略写下的四条命令(两边对资源根的解析一致、清单与模板逐 token 对上)。
 // 删掉注入 ⇒ env 里没有这个键;注入的路径与写策略的资源根解析不一致 ⇒ 四条都拿不到声明定义。
 test("#1565: fork 注入 CODEPUPPY_OFFICE_MCP_MANIFEST,引擎据它认出写策略写下的四条文档工具命令", async () => {
-  const { OFFICE_MCP_MANIFEST_ENV, declaredFirstPartyTools } = await import("../../../opencode/src/mcp/codepuppy-first-party-mcp")
+  const { OFFICE_MCP_MANIFEST_ENV, declaredFirstPartyTools } = await import("../../../core/src/mcp/codepuppy-first-party-mcp")
   const { applyMcpWritePolicy } = await import("./ext-mcp-policy")
   const { CODEPUPPY_OFFICE_CONNECTORS } = await import("../shared/office-advisories")
   const child = new RecordingChild()
@@ -270,11 +270,11 @@ test("#1575: fork 按登录账户 × 本安装写 CODEPUPPY_POLICY_ACCOUNT(同�
 })
 
 // #1578 AC5:main 写进 sidecar env 的随包扩展清单键必须就是引擎读的那个常量 —— 任一侧改名,线上 ext 自有工具全部静默回第三方,
-// 而 opencode/test/plugin/codepuppy-bundled-plugin.test.ts 自己给 env 赋值照样绿。dev 下 ext.path 取决于未入库的 packages/ext/dist
+// 而 packages/ext/src/policy/bundled-plugin.test.ts(`#1662` 起读这个键的是 ext)自己给 env 赋值照样绿。dev 下 ext.path 取决于未入库的 packages/ext/dist
 // (门不保证它在,上面那条生产 spawn 里这个键可能根本不写),所以锚源码:server.ts 写这个键的那一句,键名取引擎常量,
 // 指向 plugin.js 旁边的 bundled-tools.json。任一侧字面量改一个字母 ⇒ 找不到这一句,当场红。
 test("ANCHOR (not a gate): #1578 server.ts 写进 sidecar env 的随包扩展清单键 = 引擎读的常量", async () => {
-  const { EXT_BUNDLED_MANIFEST_ENV } = await import("../../../opencode/src/plugin/codepuppy-bundled-plugin")
+  const { EXT_BUNDLED_MANIFEST_ENV } = await import("../../../ext/src/policy/bundled-plugin")
   const source = await Bun.file(join(import.meta.dir, "server.ts")).text()
   const line = source.split("\n").find((text) => text.includes(`sidecarEnv.${EXT_BUNDLED_MANIFEST_ENV} =`))
   expect(line).toBeDefined()
@@ -282,23 +282,22 @@ test("ANCHOR (not a gate): #1578 server.ts 写进 sidecar env 的随包扩展清
 })
 
 // `#1531`:ext 的 parentPort 监听必须在 ready **之前**挂上(main 只在 ready 那一刻重发在途代际)。sidecar.ts 顶层的 registerHooks /
-// getParentPort() 让它不能被 import,接线只能锚源码:ext 预载在引擎 import 之后开始、在 ready 上报之前 await 完;
-// 预载的 URL 形状与引擎解析路径插件的形状逐字相同(上游 plugin/shared.ts 的 resolvePathPluginTarget),否则会装出第二份模块。
-test("ANCHOR (not a gate): sidecar.ts 在 ready 之前预载 ext 的同一个 URL", async () => {
+// getParentPort() 让它不能被 import,接线只能锚源码。`#1667`(接口文档 I1 / I2 改形):2.x 每个 Location 用带 `__opencode_reload`
+// 的新 URL 各求值一次 ext,不再靠「预载同一个 URL」拿到同一份模块(进程级对象由 ext 挂在 globalThis 上);这里锚的顺序是
+// 引擎 import → 预载 ext 的目录入口 `server.js` → `start()`(Transform 里同步发布进程内 fetch)→ await 预载 → ready。
+test("ANCHOR (not a gate): sidecar.ts 在 start() 之前预载 ext 的目录入口,Transform 里发布进程内 fetch,ready 之前 await 预载", async () => {
   const source = await Bun.file(join(import.meta.dir, "sidecar.ts")).text()
-  const engine = source.indexOf('const { Server } = await import("virtual:opencode-server")')
-  const preload = source.indexOf("import(pathToFileURL(command.extPluginPath).href)")
-  // 审计 R1 Major 1:进程内交接在引擎 import 之后、ext 预载之前挂上(ext 的重载调度器登记实例时就要用到)
-  const handoff = source.indexOf("publishInProcessEngine(engine.fetch)")
-  expect(handoff).toBeGreaterThan(engine)
-  expect(preload).toBeGreaterThan(handoff)
+  const engine = source.indexOf('const { startEngine, ENGINE_VERSION } = await import("virtual:opencode-server")')
+  const preload = source.indexOf('import(pathToFileURL(join(command.extPluginPath, "server.js")).href)')
+  const started = source.indexOf("const started = await startEngine(")
+  const handoff = source.indexOf("publishInProcessEngine(inProcess)")
   const joined = source.indexOf("await extPreload")
   const ready = source.indexOf("parentPort.postMessage(buildReadyMessage(injection, prewarmResult))")
   expect(engine).toBeGreaterThan(0)
   expect(preload).toBeGreaterThan(engine)
-  expect(joined).toBeGreaterThan(preload)
+  expect(started).toBeGreaterThan(preload)
+  // 交接写在 startEngine 的 onDispatch 回调里(Transform 那一刻同步执行),所以文本上在 startEngine( 之后、await 预载之前。
+  expect(handoff).toBeGreaterThan(started)
+  expect(joined).toBeGreaterThan(handoff)
   expect(ready).toBeGreaterThan(joined)
-  const shared = await Bun.file(join(import.meta.dir, "../../../opencode/src/plugin/shared.ts")).text()
-  const resolver = shared.slice(shared.indexOf("export async function resolvePathPluginTarget"), shared.indexOf("export async function checkPluginCompatibility"))
-  expect(resolver).toContain("return pathToFileURL(file).href")
 })

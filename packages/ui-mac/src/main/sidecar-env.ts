@@ -27,7 +27,7 @@
 // DEBUG and LD_PRELOAD, which the old copy-everything implementation deleted case-by-case, now fall
 // out via default-deny like everything else.
 
-import { EGRESS_PROXY_MARKER_ENV } from "@opencode-ai/schema/codepuppy-net-failure"
+import { EGRESS_PROXY_MARKER_ENV } from "@opencode/schema/codepuppy-net-failure"
 
 const EXACT = new Set([
   // POSIX/system basics the server, node, git and package managers need
@@ -53,7 +53,7 @@ const EXACT = new Set([
   "all_proxy",
   "no_proxy",
   // `#1572`:出网代理的决定者标记(值 = 出网代理 URL,非密钥)。只由下面的 sidecarEgressProxyEnv 写;
-  // 引擎据它判断代理变量是不是出网代理(@opencode-ai/schema/codepuppy-net-failure 的 engineNetFailurePath)。
+  // 引擎据它判断代理变量是不是出网代理(@opencode/schema/codepuppy-net-failure 的 engineNetFailurePath)。
   EGRESS_PROXY_MARKER_ENV,
   // node runtime knobs (non-secret)
   "NODE_ENV",
@@ -246,7 +246,11 @@ export function isSecretish(name: string): boolean {
 // process.platform branch: a DENY rule that is uniformly case-insensitive cannot be wrong, and on
 // POSIX a lowercase twin is inert to the engine anyway (it reads the exact uppercase name), so
 // dropping it costs nothing. The ALLOW rules below stay case-sensitive on purpose — see the loop.
-const NEVER_INHERIT = new Set(["opencode_config_content"])
+// `#1667`(#1662 L5,裁决书 R17,基线 §2.7):`OPENCODE_FLAGS` 是 OpenCode 2 实验开关的**最高优先级**覆盖
+// (`packages/core/src/flag.ts` 的 `Overrides`,压过配置里的 `experimental.*` 与渠道默认值)。用户 shell 里的
+// `OPENCODE_FLAGS=all` 经上面的 `OPENCODE_` 前缀规则进来,就会绕过 Code Puppy 在注入里对五个开关写的显式值 ——
+// 所以它与 OPENCODE_CONFIG_CONTENT 同列,永不继承。
+const NEVER_INHERIT = new Set(["opencode_config_content", "opencode_flags"])
 
 export function createSidecarEnv(source: NodeJS.ProcessEnv = process.env): Record<string, string> {
   const extra = new Set(

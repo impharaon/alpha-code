@@ -87,8 +87,8 @@ function daysAgo(days: number): string {
 
 /** 上游包(真实 UPSTREAM_PATHS 之一)下的一个普通文件 —— 不在 ADR-033 白名单里。 */
 const UPSTREAM_FILE = "packages/core/src/upstream-leaf.ts"
-/** ADR-033 §1 白名单里的被接管文件 —— 改它是**有意的收编**,守卫必须放行。 */
-const TAKEN_OVER_FILE = "packages/core/src/permission.ts"
+/** 接管清单里的被接管文件(`#1662` 最终清单:ADR-042 的 OAuth 回调页)—— 改它是**有意的收编**,守卫必须放行。 */
+const TAKEN_OVER_FILE = "packages/core/src/oauth/page.ts"
 /** alpha 自有包 —— 守卫的范围之外。 */
 const CODEPUPPY_FILE = "packages/ui-mac/src/main/codepuppy-owned.ts"
 /**
@@ -510,7 +510,9 @@ describe("#1570 过渡期结束:旧前缀、旧 marker、旧包目录不再被�
 
     const restored = runGuard(
       work,
-      mutatedGuard("legacy-package", (src) => src.replace(' codepuppy-contracts-consumer"', ' codepuppy-contracts-consumer alpha-contracts-consumer"')),
+      mutatedGuard("legacy-package", (src) =>
+        src.replace(/^(CODEPUPPY_OWNED_PACKAGES="[^"]*)"/m, '$1 alpha-contracts-consumer"'),
+      ),
     )
     expect(restored.exitCode, `写回旧目录名之后仍是红:\n${restored.output}`).toBe(0)
   })
@@ -575,45 +577,56 @@ describe("#913 fetch 失败降级时,基准的身份与年龄必须可读", () =
 // 缺陷(2026-09-06 实测):`UPSTREAM_PATHS` 原本是
 // `packages/{opencode,core,server,tui,sdk,protocol,schema,client}` —— **8 个包**,而上游镜像
 // `origin/dev` 当天有 **32** 个(`git ls-tree --name-only origin/dev packages/ | wc -l`)。
-// 24 个包在辖区外,其中 `app`/`ui` 由 ADR-034 的 pin+补丁 roundtrip 门盖住,其余 **22 个零机制**:
+// 24 个包在辖区外,其中 `app`/`ui` 当时由 ADR-034 的 pin+补丁 roundtrip 门盖住,其余 **22 个零机制**:
 // 往 `packages/plugin/src/index.ts`(**Hooks 契约本体**)与 `packages/llm/src/index.ts` 各写一行,
 // 守卫报 `✓ zero upstream package edits` 且 `exit 0`。这不是少拦一个坏输入 —— 是这道门(alpha
 // 分支保护上的必需 context)对一大半地盘根本没在看,而下一次 fork-sync 照样冲突。
 //
 // 根因是**数据模型**,不是某一行写错:辖区是一张枚举,枚举对**新成员默认放行** —— 上游每加
 // 一个包就多一个盲区,而没有任何东西会变红。ADR-043(`#1079` owner CHOICE=2)在**文件**这一层
-// 已经因为同一条理由否掉过逐文件 exclude 清单。所以辖区改成「`packages/` 全树 − 两张显式
+// 已经因为同一条理由否掉过逐文件 exclude 清单。所以辖区改成「`packages/` 全树 − 显式
 // carve-out」:例外默认拒,新成员默认覆盖。
 //
 // 判据为什么长这样:
 //   · **每条正向断言都带控制组** —— 把生产脚本复制一份、只把被测的那一格改回缺陷态(辖区换回
-//     8 包 / 抹掉 alpha 自有包 carve-out / 抹掉 roundtrip carve-out),先证明这个夹具**测得出
+//     8 包 / 抹掉 alpha 自有包 carve-out / 放回 `#1668` 撤掉的 roundtrip carve-out),先证明这个夹具**测得出
 //     已知的坏**,再用它判未知的好。没有控制组的「它红了」可能只是夹具在别处红。
 //   · 夹具的上游镜像里放一个守卫**从没听说过**的包(`brand-new-upstream-pkg`)。它钉的正是
 //     「上游明天加一个包,谁会变红」—— 枚举式辖区对它默认放行。
-//   · **carve-out 也要有反向判据**。`app`/`ui` 不被本门点名是**有意**的(ADR-034:那两个包是
-//     `frontend/frontend-pin.lock` 的 pin + `frontend/codepuppy-patches/codepuppy-frontend.patch` 的投影,
-//     由 `scripts/assert-frontend-patch-roundtrip.sh` 用 **tree sha 逐字节**判,比本门更强;
-//     本门若也盖它们,每一次合法的 seam 变更都会被判成破北极星 ⇒ 恒红门 ⇒ `--no-verify`)。
-//     没有控制组的话,一个「辖区根本没生效」的实现也能满足「app/ui 不被点名」。
-//     两处清单相同由 packages/ui-mac/src/main/local-gate-parity.test.ts 判(空档即红)。
+//   · **`#1668`:`app`/`ui` 回到辖区**。冻结前端(pin + SOT 补丁)搬到 Code Puppy 自有落点
+//     `packages/codepuppy-{app,ui}` 之后,`packages/{app,ui}` 是上游 2.x 原样、Code Puppy 不用,原来的
+//     roundtrip carve-out(②)撤掉,改它们就是改上游。落点整包豁免(在自有清单里),落点的投影判据由
+//     `scripts/assert-frontend-patch-roundtrip.sh` 用 **tree sha 逐字节**判;落点都在自有清单里由
+//     packages/ui-mac/src/main/local-gate-parity.test.ts 判(空档即红)。
 //   · **把一个真上游包写进 alpha 自有清单**是绕开整道门最便宜的一步:一行配置换一整个包的
 //     豁免,而上面每一条断言照样绿。所以守卫自己拿上游镜像验那张清单,这里钉住它真的会红。
 
-/** ADR-034 pin+补丁 roundtrip 覆盖的前端包 —— 本门刻意不盖(理由见上)。 */
-const ROUNDTRIP_PACKAGES = ["app", "ui"]
-/** alpha 自有的 workspace 包 —— `origin/dev` 里根本没有这三条路径(2026-09-06 实测)。 */
-const CODEPUPPY_OWNED_PACKAGES = ["ext", "ui-mac", "codepuppy-contracts-consumer"]
+/** `#1668` 之前由 roundtrip carve-out(②)豁免、现已回到辖区的上游前端包。 */
+const FORMER_ROUNDTRIP_PACKAGES = ["app", "ui"]
+/**
+ * alpha 自有的 workspace 包 —— `origin/dev` 里根本没有这些路径(2026-09-06 实测前三个;
+ * `#1668` 加冻结前端的五个落点)。
+ */
+const CODEPUPPY_OWNED_PACKAGES = [
+  "ext",
+  "ui-mac",
+  "codepuppy-contracts-consumer",
+  "codepuppy-app",
+  "codepuppy-ui",
+  "codepuppy-session-ui",
+  "codepuppy-sdk-v1",
+  "codepuppy-core-util",
+]
 /** `#1247` 之前的辖区,控制组用 —— 逐字来自被本票替换掉的那一行。 */
 const PRE_1247_JURISDICTION =
   "packages/opencode packages/core packages/server packages/tui packages/sdk packages/protocol packages/schema packages/client"
 /**
  * 夹具里上游镜像 `dev` 拥有的包:`core` 是 `#1247` 之前就在辖区里的对照,中间五个是实测盲区
  * (`plugin` = Hooks 契约本体),`brand-new-upstream-pkg` 是「上游明天新加的那个包」,
- * 最后两个是 ADR-034 的 carve-out。
+ * 最后两个是 `#1668` 撤掉 carve-out 之后回到辖区的上游前端包。
  */
 const BLIND_SPOT_PACKAGES = ["plugin", "llm", "desktop", "session-ui", "web", "brand-new-upstream-pkg"]
-const MIRROR_PACKAGES = ["core", ...BLIND_SPOT_PACKAGES, ...ROUNDTRIP_PACKAGES]
+const MIRROR_PACKAGES = ["core", ...BLIND_SPOT_PACKAGES, ...FORMER_ROUNDTRIP_PACKAGES]
 
 const leafOf = (pkg: string) => `packages/${pkg}/src/leaf.ts`
 
@@ -676,7 +689,6 @@ describe("#1247 辖区覆盖上游镜像里的每一个包", () => {
     const run = runGuard(work)
     expect(run.exitCode, `改了每一个上游包,守卫却放行:\n${run.output}`).not.toBe(0)
     for (const pkg of MIRROR_PACKAGES) {
-      if (ROUNDTRIP_PACKAGES.includes(pkg)) continue
       expect(run.output, `packages/${pkg} 仍在辖区外 —— 改它没有任何东西变红:\n${run.output}`).toContain(leafOf(pkg))
     }
   })
@@ -706,7 +718,11 @@ describe("#1247 辖区覆盖上游镜像里的每一个包", () => {
     // ADR-043 的逐文件谓词接不住 —— 所以「整包豁免」这一层不是冗余。
     const without = runGuard(
       work,
-      mutatedGuard("no-codepuppy-pkgs", (s) => s.replace(/^CODEPUPPY_OWNED_PACKAGES="[^"]*"$/m, 'CODEPUPPY_OWNED_PACKAGES=""')),
+      // 换成一个不存在的包名而不是清空:清空后 pathspec 数组为空,bash 3.2 的 `set -u` 会在展开处
+      // 直接崩(那是控制组自己坏了,不是「carve-out 没了」)。
+      mutatedGuard("no-codepuppy-pkgs", (s) =>
+        s.replace(/^CODEPUPPY_OWNED_PACKAGES="[^"]*"$/m, 'CODEPUPPY_OWNED_PACKAGES="no-such-package"'),
+      ),
     )
     expect(without.exitCode, `抹掉 carve-out 之后还是绿 —— 上面那条绿不是 carve-out 挣来的:\n${without.output}`).not.toBe(0)
     for (const pkg of CODEPUPPY_OWNED_PACKAGES) {
@@ -714,26 +730,27 @@ describe("#1247 辖区覆盖上游镜像里的每一个包", () => {
     }
   })
 
-  test("ADR-034 roundtrip 包不由本门覆盖 ⇒ 绿(控制组:抹掉 carve-out 即红且点名)", () => {
+  test("#1668:roundtrip carve-out 已撤 —— 改上游 packages/{app,ui} ⇒ 红且点名(控制组:放回 carve-out 即绿)", () => {
     const { work } = allPackagesFixture()
     const edits: Record<string, string> = {}
-    for (const pkg of ROUNDTRIP_PACKAGES) edits[leafOf(pkg)] = "export const leaf = 3\n"
-    commit(work, "change the frontend seam (ADR-034 pin + patch governs those two packages)", edits)
+    for (const pkg of FORMER_ROUNDTRIP_PACKAGES) edits[leafOf(pkg)] = "export const leaf = 3\n"
+    commit(work, "edit the upstream frontend packages in place", edits)
 
     const run = runGuard(work)
-    expect(run.exitCode, `合法的 seam 变更被本门判红 —— ADR-034 的日常工作流会恒红:\n${run.output}`).toBe(0)
-    for (const pkg of ROUNDTRIP_PACKAGES) {
-      expect(run.output, `carve-out 的包不该出现在本门的输出里:\n${run.output}`).not.toContain(leafOf(pkg))
+    expect(run.exitCode, `改上游 packages/{app,ui} 被放行 —— 撤掉 carve-out 没生效:\n${run.output}`).not.toBe(0)
+    for (const pkg of FORMER_ROUNDTRIP_PACKAGES) {
+      expect(run.output, `packages/${pkg} 仍在辖区外:\n${run.output}`).toContain(leafOf(pkg))
     }
 
-    const without = runGuard(
+    // 控制组:把 `#1668` 之前的 carve-out ②(`app ui` 进 pathspec 排除)放回去,同一棵树必须绿 ——
+    // 证明上面那条红是撤掉 carve-out 挣来的,不是夹具在别处红。
+    const restored = runGuard(
       work,
-      mutatedGuard("no-roundtrip", (s) => s.replace(/^ROUNDTRIP_PACKAGES="[^"]*"$/m, 'ROUNDTRIP_PACKAGES=""')),
+      mutatedGuard("restore-roundtrip", (s) =>
+        s.replace("for pkg in $CODEPUPPY_OWNED_PACKAGES; do\n  CARVEOUT_PATHSPECS", "for pkg in $CODEPUPPY_OWNED_PACKAGES app ui; do\n  CARVEOUT_PATHSPECS"),
+      ),
     )
-    expect(without.exitCode, `抹掉 carve-out 之后还是绿 —— 那上面那条绿说明的是「辖区没生效」:\n${without.output}`).not.toBe(0)
-    for (const pkg of ROUNDTRIP_PACKAGES) {
-      expect(without.output, `控制组没点名 packages/${pkg}:\n${without.output}`).toContain(leafOf(pkg))
-    }
+    expect(restored.exitCode, `放回 carve-out 之后仍是红 —— 夹具在别处红,本条测量作废:\n${restored.output}`).toBe(0)
   })
 
   test("把真上游包写进 alpha 自有清单 ⇒ 守卫自己红并点名那条声明,不是发一整个包的豁免", () => {
@@ -781,14 +798,17 @@ describe("#1566 --print-takeover:接管清单只有守卫这一份", () => {
   test("逐行打印 UPSTREAM_EXCLUDES 的路径(去掉 :(exclude) 前缀),与数组逐条相同", () => {
     const printed = printTakeover()
     const expected = excludesFromSource(readFileSync(GUARD, "utf8"))
-    expect(expected.length, "白名单解析退化 —— 本次测量作废").toBeGreaterThanOrEqual(20)
+    // `#1662` 最终清单可以很短、将来甚至为空(F10),所以不再用条数下限防解析退化,改用两种独立读法互相核对:
+    // 数组块的正则解析,与逐行数 `  ':(exclude)` 开头的行。
+    const lines = readFileSync(GUARD, "utf8").split("\n").filter((line) => /^\s+':\(exclude\)/.test(line)).length
+    expect(expected.length, "白名单解析退化 —— 本次测量作废").toBe(lines)
     expect(printed).toEqual(expected)
     expect(printed.filter((p) => p.startsWith(":(")), "输出里残留 pathspec 前缀").toEqual([])
   })
 
   test("控制组:守卫复制品删掉一条白名单 ⇒ 打印的清单跟着少那一条", () => {
     const full = printTakeover()
-    const victim = "packages/opencode/src/session/llm/request.ts"
+    const victim = "packages/core/src/oauth/page.ts"
     expect(full, "前提:那条接管路径在生产清单里").toContain(victim)
     const trimmed = printTakeover(mutatedGuard("takeover-minus-one", (s) => s.replace(`  ':(exclude)${victim}'\n`, "")))
     expect(trimmed).toEqual(full.filter((p) => p !== victim))
@@ -800,5 +820,187 @@ describe("#1566 --print-takeover:接管清单只有守卫这一份", () => {
     expect(literalTakeoverPaths(text, takeover)).toEqual([])
     const copied = `${text}\n# paths: ${takeover[0]}\n`
     expect(literalTakeoverPaths(copied, takeover)).toContain(takeover[0])
+  })
+})
+
+// ── `#1664`:含受审上游合并的分支 —— packages/ 以那个合并的上游父为基准(#1662 裁决书 F3)────────
+//
+// 换代整合分支上有一个真合并提交 M0(第二父 = OpenCode 2 的上游提交),树按规则构造:上游路径取上游原样。
+// 守卫若仍拿 origin/alpha 当基准,M0 带来的上千个上游 D/M 会全部被点名(本分支实测 3502 行),并行的 lane
+// 只剩 `--no-verify`。所以这种分支上守卫判「packages/ 相对上游父有没有未登记的偏离」(基线 §2.3 第 4 步)。
+// 两臂:M0 原样带来的上游改动 ⇒ 绿;M0 之后再改一个上游文件 ⇒ 红。识别「上游合并」靠「另一个父的树里没有
+// 任何 Code Puppy 自有包」,不靠上游镜像 —— 镜像会陈旧(2026-11-09 的 origin/dev 仍是 1.x 的 055d95bb),
+// 夹具照这个样子把 dev 留在分叉点。
+const V1_ONLY = "packages/core/src/v1-only.ts"
+const V2_ONLY = "packages/core/src/v2-only.ts"
+/** 住在上游包里的 Code Puppy 文件 —— M0 按规则移出(基线 §2.3:alpha 加在上游包里的 80 个文件)。 */
+const CODEPUPPY_UNDER_UPSTREAM = "packages/core/src/codepuppy-moved-out.ts"
+
+/**
+ *   seed ──► dev        (上游镜像停在分叉点,不含上游父 —— 与真实的 origin/dev 同形)
+ *     ├──► upstream     (下一代:改 UPSTREAM_FILE、删 V1_ONLY、加 V2_ONLY;树里没有任何 Code Puppy 包)
+ *     └──► alpha        (Code Puppy 自有包 + 一个住在上游包里的 codepuppy-* 文件)
+ *              └──► feature = M0:`git merge --no-ff --no-commit origin/upstream`,上游路径取上游原样,
+ *                   住在上游包里的那个 Code Puppy 文件移出,然后提交 —— 夹具里的合并是测试数据。
+ */
+function upstreamMergeFixture() {
+  const origin = mkdtempSync(join(tmpdir(), "codepuppy-north-star-m0-origin-"))
+  git(origin, ["init", "-q", "-b", "alpha"])
+  commit(origin, "seed: the last commit alpha and upstream share", {
+    [UPSTREAM_FILE]: "export const leaf = 1\n",
+    [TAKEN_OVER_FILE]: "export const permission = 1\n",
+    [V1_ONLY]: "export const v1 = 1\n",
+  })
+  git(origin, ["branch", "dev"])
+  git(origin, ["checkout", "-q", "-b", "upstream"])
+  git(origin, ["rm", "-q", V1_ONLY])
+  const upstream = commit(origin, "upstream: the next generation", {
+    [UPSTREAM_FILE]: "export const leaf = 2 // next generation\n",
+    [V2_ONLY]: "export const v2 = 1\n",
+  })
+  git(origin, ["checkout", "-q", "alpha"])
+  commit(origin, "alpha: its own package, plus one codepuppy file under an upstream package", {
+    [CODEPUPPY_FILE]: "export const codepuppyOwned = 1\n",
+    [CODEPUPPY_UNDER_UPSTREAM]: "export const movedOut = 1\n",
+  })
+
+  const work = mkdtempSync(join(tmpdir(), "codepuppy-north-star-m0-work-"))
+  const cloned = Bun.spawnSync(["git", "clone", "-q", origin, work], { env: { ...GIT_ENV } })
+  if (cloned.exitCode !== 0) throw new Error(`git clone 失败:${cloned.stderr.toString()}`)
+  git(work, ["checkout", "-q", "-b", "feature", "origin/alpha"])
+  git(work, ["merge", "-q", "--no-ff", "--no-commit", "origin/upstream"])
+  git(work, ["rm", "-q", CODEPUPPY_UNDER_UPSTREAM])
+  git(work, ["commit", "-q", "-m", "M0: merge upstream, tree built by the rules"])
+  return { work, upstream }
+}
+
+describe("#1664 含受审上游合并的分支:packages/ 以那个合并的上游父为基准", () => {
+  test("M0 原样带来的上游改动 ⇒ 绿,并说出基准是上游父(控制组:关掉识别 ⇒ 红,点名 M0 带来的上游改动)", () => {
+    const { work, upstream } = upstreamMergeFixture()
+    const stale = Bun.spawnSync(["git", "merge-base", "--is-ancestor", upstream, "origin/dev"], { cwd: work, env: { ...GIT_ENV } })
+    expect(stale.exitCode, "前提:上游镜像不含上游父(真实的 origin/dev 就是这样)—— 夹具没造出来").toBe(1)
+
+    const run = runGuard(work)
+    expect(run.exitCode, `M0 原样带来的上游改动被点名了 —— 整合分支上这道门恒红:\n${run.output}`).toBe(0)
+    expect(run.output, `没说出这一跑以上游父为基准:\n${run.output}`).toContain(`上游父 ${upstream.slice(0, 7)}`)
+
+    // 控制组:识别关掉(候选范围变空)= 本票之前的守卫,同一棵树必须红,而且红在 M0 带来的上游改动上。
+    const legacy = runGuard(work, mutatedGuard("no-upstream-merge", (s) => s.replace("--merges origin/alpha..HEAD", "--merges HEAD..HEAD")))
+    expect(legacy.exitCode, `控制组没红 —— 夹具没造出「M0 让守卫恒红」的形状:\n${legacy.output}`).not.toBe(0)
+    expect(legacy.output).toContain(UPSTREAM_FILE)
+    expect(legacy.output).toContain(V1_ONLY)
+  })
+
+  test("M0 之后再改一个上游文件 ⇒ 红,且点名它", () => {
+    const { work } = upstreamMergeFixture()
+    commit(work, "touch an upstream file after M0", { [UPSTREAM_FILE]: "export const leaf = 999\n" })
+    const run = runGuard(work)
+    expect(run.exitCode, `M0 之后改上游文件被放行了:\n${run.output}`).not.toBe(0)
+    expect(run.output).toContain(UPSTREAM_FILE)
+  })
+
+  test("新增进上游包的文件:codepuppy-* ⇒ 绿且点名豁免;不自报家门 ⇒ 红(控制组:这一档加回 DMR ⇒ 漏掉)", () => {
+    const { work } = upstreamMergeFixture()
+    const owned = "packages/core/src/codepuppy-addition.ts"
+    commit(work, "add an owned file under an upstream package", { [owned]: "export const owned = 1\n" })
+    const ok = runGuard(work)
+    expect(ok.exitCode, `自报家门的新增文件被判成偏离:\n${ok.output}`).toBe(0)
+    expect(ok.output, `豁免了却没说:\n${ok.output}`).toContain(owned)
+
+    const bare = "packages/core/src/bare-addition.ts"
+    commit(work, "add an unmarked file under an upstream package", { [bare]: "export const bare = 1\n" })
+    const run = runGuard(work)
+    expect(run.exitCode, `不自报家门的新增文件被放行了 —— §2.3 第 4 步「多出任何一行」没生效:\n${run.output}`).not.toBe(0)
+    expect(run.output).toContain(bare)
+
+    const dmr = runGuard(
+      work,
+      mutatedGuard("upstream-merge-dmr", (s) =>
+        s.replace('--no-renames --name-only "$upstream_parent" HEAD', '--no-renames --diff-filter=DMR --name-only "$upstream_parent" HEAD'),
+      ),
+    )
+    expect(dmr.exitCode, `控制组没绿 —— 上面那条红不是「新增也算」挣来的:\n${dmr.output}`).toBe(0)
+  })
+
+  test("往 2.x 新增的上游文件里写 marker ⇒ 仍然红(因子①问上游父,不问陈旧的镜像;控制组:去掉那一行 ⇒ 被放行)", () => {
+    const { work } = upstreamMergeFixture()
+    // V2_ONLY 在上游父里有、在陈旧镜像(origin/dev = 分叉点)里没有 —— 只看镜像的因子①会把它当成「上游从没有过」。
+    commit(work, "forge the ownership marker inside a file upstream added in the next generation", {
+      [V2_ONLY]: `// ${OWNED_MARKER}\nexport const v2 = 999\n`,
+    })
+    const run = runGuard(work)
+    expect(run.exitCode, `往上游父里就有的文件写 marker 就被放行了:\n${run.output}`).not.toBe(0)
+    expect(run.output).toContain(V2_ONLY)
+
+    const lenient = runGuard(
+      work,
+      mutatedGuard("upstream-parent-factor-one", (s) =>
+        s.replace(`    git cat-file -e "\${upstream_parent}:$1" 2>/dev/null && return 1\n`, ""),
+      ),
+    )
+    expect(lenient.exitCode, `控制组没绿 —— 上面那条红不是「因子①问上游父」挣来的:\n${lenient.output}`).toBe(0)
+  })
+
+  test("过渡接管清单里的文件在 M0 之后被改 ⇒ 绿且不点名", () => {
+    const { work } = upstreamMergeFixture()
+    commit(work, "re-take-over a file on the transitional list", { [TAKEN_OVER_FILE]: "export const permission = 2\n" })
+    const run = runGuard(work)
+    expect(run.exitCode, `过渡清单没生效:\n${run.output}`).toBe(0)
+    expect(run.output).not.toContain(TAKEN_OVER_FILE)
+  })
+
+  test("lane 合进整合分支的合并(另一个父带着 Code Puppy 包)不被认成上游合并", () => {
+    const { work, upstream } = upstreamMergeFixture()
+    git(work, ["checkout", "-q", "-b", "lane"])
+    commit(work, "lane edits an upstream file", { [UPSTREAM_FILE]: "export const leaf = 3 // lane\n" })
+    git(work, ["checkout", "-q", "feature"])
+    git(work, ["merge", "-q", "--no-ff", "lane", "-m", "integrate the lane"])
+    const run = runGuard(work)
+    // 把 lane 头错认成上游父的话,lane 那次改动就成了基准的一部分,这一跑会绿。
+    expect(run.exitCode, `lane 带进来的上游改动被放行了 —— 识别把 lane 头当成了上游父:\n${run.output}`).not.toBe(0)
+    expect(run.output).toContain(UPSTREAM_FILE)
+    expect(run.output).toContain(`上游父 ${upstream.slice(0, 7)}`)
+  })
+})
+
+// ── `#1664`:scripts/assert-upstream-ancestor.sh —— 上游祖先不能被 squash / rebase 弄丢(裁决书 F2)────
+// 本仓 PR 默认 squash。squash 或 rebase 会把 M0 压成普通提交:树一字不差,上游祖先没了,merge-base 不前移。
+// 只比树的判据(上面的守卫、§2.3 第 4 步的树判据)看不出这件事,所以单列一条祖先判据,并在一个 squash 重放的
+// 夹具上证明它会红。夹具里的合并与 squash 都是测试数据。
+const ANCESTOR = resolve(REPO_ROOT, "scripts/assert-upstream-ancestor.sh")
+
+function runAncestor(repo: string, args: string[]): GuardRun {
+  const result = Bun.spawnSync(["bash", ANCESTOR, ...args], { cwd: repo, env: { ...GIT_ENV } })
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`
+  if (output.trim().length === 0) throw new Error("祖先检查一个字都没输出 —— 本次测量作废(不是通过)")
+  return { exitCode: result.exitCode, output }
+}
+
+describe("#1664 assert-upstream-ancestor.sh:上游合并必须留在历史里", () => {
+  test("真合并的分支 ⇒ 0;同一分支 squash 重放到 alpha 的临时副本上 ⇒ 1(树一字不差,祖先没了)", () => {
+    const { work, upstream } = upstreamMergeFixture()
+    commit(work, "a lane commit after M0", { [CODEPUPPY_FILE]: "export const codepuppyOwned = 2\n" })
+    const merged = runAncestor(work, [upstream])
+    expect(merged.exitCode, `真合并的分支被判成丢了祖先:\n${merged.output}`).toBe(0)
+
+    git(work, ["checkout", "-q", "-b", "alpha-copy", "origin/alpha"])
+    git(work, ["merge", "-q", "--squash", "feature"])
+    git(work, ["commit", "-q", "-m", "squash-merge the integration branch (the repo's default PR merge)"])
+    expect(git(work, ["rev-parse", "alpha-copy^{tree}"]), "squash 重放的树与原分支不同 —— 变异没构造对").toBe(
+      git(work, ["rev-parse", "feature^{tree}"]),
+    )
+    const squashed = runAncestor(work, [upstream])
+    expect(squashed.exitCode, `squash 重放之后祖先检查没红:\n${squashed.output}`).toBe(1)
+    expect(squashed.output).toContain("squash")
+
+    // 第二个参数是「合入后对 origin/alpha 再跑一次」那一跑的形状。
+    expect(runAncestor(work, [upstream, "feature"]).exitCode).toBe(0)
+  })
+
+  test("SHA 或 ref 解析不出、参数不对 ⇒ 2(测不到,不是通过)", () => {
+    const { work } = upstreamMergeFixture()
+    expect(runAncestor(work, ["0123456789abcdef0123456789abcdef01234567"]).exitCode).toBe(2)
+    expect(runAncestor(work, ["HEAD", "no-such-ref"]).exitCode).toBe(2)
+    expect(runAncestor(work, []).exitCode).toBe(2)
   })
 })

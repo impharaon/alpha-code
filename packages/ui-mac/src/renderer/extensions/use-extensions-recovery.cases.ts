@@ -10,14 +10,34 @@ import solid from "vite-plugin-solid"
 import type { createRoot } from "solid-js"
 import type { SidecarGenerationState } from "../../preload/types"
 import type { useExtensions } from "./use-extensions"
+import { assertEngineSandboxed, engineSandbox, engineSlot } from "../../../test-component/engine-sandbox"
+import { buildEngineServerOptions } from "../../main/engine-server-options"
+import { engineAuthorization } from "../../main/engine-authorization"
+import { createEngineFetch } from "../../engine-adapter"
+
+// `#1662` parity B6:v1 版起的是已删的 `packages/opencode/src/index.ts serve`。现在引擎是嵌进 sidecar 的那台 2.x 引擎
+// (沙箱里、本进程内、真监听端口);冻结界面的 v1 SDK 请求经生产的引擎适配器(src/engine-adapter,`engineFetch` 的同一个
+// createEngineFetch)译成 2.x 的 `/api/*` 再到引擎,口令由这里按 main 的做法补上。沙箱必须在任何引擎模块装载之前就位。
+const sandbox = engineSandbox()
+const PASSWORD = "cp-parity-recovery"
 
 const transport = fetch
 const root = await mkdtemp(join(tmpdir(), "codepuppy-1505-"))
 const listeners = new Set<(state: SidecarGenerationState) => void>()
 let generation = 0
 let runtime: { createRoot: typeof createRoot; useExtensions: typeof useExtensions }
-let engine: ReturnType<typeof Bun.spawn>
+let engine: { url: string; close: () => Promise<void> } | undefined
 let engineUrl: string
+let projectDirectory: string
+/** 生产的引擎适配器:v1 路径 → 2.x `/api/*`;出网前补上引擎口令(生产里由 main 的 onBeforeSendHeaders 补)。 */
+const adapter = createEngineFetch({
+  isEngineOrigin: (origin) => origin === new URL(engineUrl).origin,
+  fetch: (input, init) => {
+    const request = new Request(input, init)
+    request.headers.set("authorization", engineAuthorization(PASSWORD))
+    return transport(request)
+  },
+})
 let statusPath: string
 let captured: Record<string, { status: string }>
 const disposers: (() => void)[] = []
@@ -49,8 +69,8 @@ function recover(port: number) {
     hostname: "127.0.0.1", port,
     fetch: (request) => {
       const url = new URL(new URL(request.url).pathname, engineUrl)
-      url.searchParams.set("directory", join(root, "project"))
-      return transport(new Request(url, request))
+      url.searchParams.set("directory", projectDirectory)
+      return adapter(new Request(url, request))
     },
   }))
   emit("ready")
@@ -85,35 +105,34 @@ function mount(port: number, delayFailure?: Promise<void>) {
 }
 
 beforeAll(async () => {
-  await mkdir(join(root, "project"))
-  // Own configuration bytes; the asserted response shape is captured from the real /mcp below.
-  await Bun.write(join(root, "project/opencode.json"), JSON.stringify({
+  await assertEngineSandboxed(sandbox)
+  const slot = engineSlot(sandbox, "recovery")
+  projectDirectory = slot.projectDirectory
+  // Own configuration bytes; the asserted response shape is captured from the real status route below.
+  await Bun.write(join(projectDirectory, "opencode.json"), JSON.stringify({
     mcp: { "recovery-sample": { type: "remote", url: "http://127.0.0.1:1", enabled: false } },
   }))
-  const port = closedPort()
-  engineUrl = `http://127.0.0.1:${port}`
-  engine = Bun.spawn({
-    cmd: [process.execPath, "run", resolve(import.meta.dir, "../../../../opencode/src/index.ts"), "serve", "--port", String(port), "--hostname", "127.0.0.1"],
-    cwd: join(root, "project"),
-    env: {
-      ...process.env,
-      OPENCODE_TEST_HOME: root,
-      XDG_DATA_HOME: join(root, "data"), XDG_CONFIG_HOME: join(root, "config"),
-      XDG_CACHE_HOME: join(root, "cache"), XDG_STATE_HOME: join(root, "state"),
-      OPENCODE_DISABLE_MODELS_FETCH: "1", OPENCODE_DISABLE_DEFAULT_PLUGINS: "1",
-      OPENCODE_DISABLE_PROJECT_CONFIG: "1", OPENCODE_DISABLE_EXTERNAL_SKILLS: "1", OPENCODE_PURE: "1",
-      OPENCODE_SERVER_PASSWORD: "", OPENCODE_CONFIG: join(root, "project/opencode.json"),
-      OPENCODE_CONFIG_DIR: join(root, "config/opencode"), OPENCODE_CONFIG_CONTENT: "{}",
-    },
-    stdout: Bun.file(join(root, "engine.log")), stderr: Bun.file(join(root, "engine.log")),
+  const { startEngine } = await import("../../../engine/engine-embed")
+  engine = await startEngine(buildEngineServerOptions({
+    hostname: "127.0.0.1", port: 0, password: PASSWORD, engineVersion: "test",
+    databasePath: slot.databasePath, configDirectory: slot.configDirectory, config: { content: "{}" },
+    models: { fetch: false }, filewatcher: false, platform: process.platform,
+  }))
+  engineUrl = engine.url
+  // The 2.x engine boots a Location (and loads its MCP configuration) on the first request for that directory: wait for
+  // the project's server to be listed before capturing the shape the hook will be compared against.
+  await until(async () => {
+    const listed = await transport(new Request(`${engineUrl}/api/mcp`, {
+      headers: { authorization: engineAuthorization(PASSWORD), "x-opencode-directory": encodeURIComponent(projectDirectory) },
+    }))
+    return ((await listed.json()) as { data?: Array<{ name: string }> }).data?.some((server) => server.name === "recovery-sample") === true
   })
-  await until(async () => (await Bun.file(join(root, "engine.log")).text()).includes(`listening on ${engineUrl}`))
   // Derive the observed HTTP path from the SDK operation that the production hook uses.
   const client = createOpencodeClient({ baseUrl: engineUrl, fetch: async (request) => {
     statusPath = new URL(request instanceof Request ? request.url : String(request)).pathname
-    return transport(request)
+    return adapter(request)
   } })
-  const response = await client.mcp.status({ directory: join(root, "project") }, { signal: AbortSignal.timeout(10_000) })
+  const response = await client.mcp.status({ directory: projectDirectory }, { signal: AbortSignal.timeout(10_000) })
   expect(response.response.ok).toBe(true)
   captured = response.data!
   expect(captured["recovery-sample"]).toEqual({ status: "disabled" })
@@ -133,7 +152,11 @@ beforeAll(async () => {
       rollupOptions: { output: { inlineDynamicImports: true } },
     },
   })
+  // happy-dom brings its own fetch-layer globals; the engine adapter (and Bun's fetch it calls) run on the runtime's
+  // own Request / Headers / AbortSignal, as in the renderer's real browser. Keep those.
+  const native = { Request, Response, Headers, AbortController, AbortSignal, URL, URLSearchParams, ReadableStream, Blob, FormData }
   GlobalRegistrator.register()
+  Object.assign(globalThis, native)
   Object.defineProperty(window, "api", { value: {
     sidecarGeneration: { subscribe: (listener: (state: SidecarGenerationState) => void) => {
       listeners.add(listener)
@@ -158,8 +181,7 @@ afterEach(() => {
 })
 
 afterAll(async () => {
-  engine?.kill("SIGKILL")
-  if (engine) await engine.exited
+  await engine?.close().catch(() => undefined)
   if (typeof window !== "undefined") await GlobalRegistrator.unregister()
   await rm(root, { recursive: true, force: true })
 })

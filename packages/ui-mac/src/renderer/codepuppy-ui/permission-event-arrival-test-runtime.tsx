@@ -16,11 +16,11 @@
 
 import { createRoot } from "solid-js"
 import { render } from "solid-js/web"
-import { PlatformProvider, type Platform } from "../../../../app/src/context/platform"
-import { createServerSdkContext, type ServerSDK } from "../../../../app/src/context/server-sdk"
-import type { DirectorySDK } from "../../../../app/src/context/sdk"
-import { ServerScope } from "../../../../app/src/utils/server-scope"
-import { createPermissionChannelSource } from "../../../../app/src/context/permission-v1-adapter"
+import { PlatformProvider, type Platform } from "../../../../codepuppy-app/src/context/platform"
+import { createServerSdkContext, type ServerSDK } from "../../../../codepuppy-app/src/context/server-sdk"
+import type { DirectorySDK } from "../../../../codepuppy-app/src/context/sdk"
+import { ServerScope } from "../../../../codepuppy-app/src/utils/server-scope"
+import { createPermissionChannelSource } from "../../../../codepuppy-app/src/context/permission-v1-adapter"
 import { createPermissionV2Feed, type PermissionV2Feed } from "./session-workspace/session-permission-feed"
 
 export type DirHandle = { sdk: DirectorySDK; dispose: () => void }

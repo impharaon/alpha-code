@@ -6,8 +6,13 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { Effect } from "effect"
+import { FSUtil } from "@opencode/util/fs-util"
+import { LayerNode } from "@opencode/util/effect/layer-node"
 import { ConfigMarkdown } from "../../../core/src/config/markdown"
-import { Glob } from "../../../core/src/util/glob"
+import { SkillFile } from "../../../core/src/config/plugin/skill-file"
+import { SkillScan } from "../../../core/src/config/plugin/skill-scan"
+import { AppNodeBuilder } from "../../../core/src/effect/app-node-builder"
 import { FACTORY_SKILL_IDS, factorySkillIds, factorySkillSources, isCodePuppyFactoryLink, reconcileFactorySkills } from "./factory-skills"
 import { CLOUD_MCP_TOOLS } from "./fixtures/cloud-mcp-tools"
 import { cloudMcpToolId } from "./cloud-web-search"
@@ -216,9 +221,24 @@ describe("isCodePuppyFactoryLink — 自有链判定(同名 + alpha 资源布局
   })
 })
 
+// `#1662`:OpenCode 2 对 skills 里每条路径的发现 —— 同一个扫描(config/plugin/skill-scan.ts)与同一个解析(skill-file.ts),
+// 与 ConfigSkillPlugin.load 一样逐条路径走;v1 的 Glob `**/SKILL.md` 随换代删除。
+async function engineSkills(directories: string[]) {
+  const layer = AppNodeBuilder.build(LayerNode.group([FSUtil.node]))
+  const skills: Array<{ file: string; name: string; content: string }> = []
+  for (const directory of directories)
+    for (const file of await Effect.runPromise(SkillScan.scan(directory).pipe(Effect.provide(layer)))) {
+      const parsed = SkillFile.parse(directory, file, readFileSync(file, "utf8"))
+      if (parsed._tag === "Parsed") skills.push({ file, name: parsed.skill.name, content: parsed.skill.content })
+    }
+  return skills
+}
+
 // These assertions guard shipped model instructions, not model behavior (AC3 is a separate live eval).
 describe("REQ-233 cloud skill instructions", () => {
   const dev = factorySkillSources({ packaged: false, resourcesPath: "/ignored", moduleDir: import.meta.dir })
+  // 生产交给引擎的出厂路径(index.ts → CODEPUPPY_FACTORY_SKILL_DIRS → 显式文件 skills)
+  const shipped = () => reconcileFactorySkills(dev, roots).paths
   const cloud = ConfigMarkdown.parse(readFileSync(join(dev["cloud-capabilities"], "SKILL.md"), "utf8"))
   const office = ConfigMarkdown.parse(readFileSync(join(dev["office-docs"], "SKILL.md"), "utf8"))
 
@@ -230,13 +250,10 @@ describe("REQ-233 cloud skill instructions", () => {
     expect(existsSync(join(dev["cloud-capabilities"], "../cloud-dispatch"))).toBe(false)
     expect(cloud.data.name).toBe("cloud-capabilities")
 
-    // Same recursive scan and frontmatter parser as engine Skill discovery; names become slash commands.
-    const entries = await Promise.all(
-      (await Glob.scan("**/SKILL.md", { cwd: dev["cloud-capabilities"], absolute: true, include: "file", symlink: true }))
-        .map(async (file) => ConfigMarkdown.parse(await Bun.file(file).text())),
-    )
-    expect(entries.map((entry) => entry.data.name).sort()).toEqual(["cloud", "cloud-capabilities"])
-    expect(entries.find((entry) => entry.data.name === "cloud")?.content).toContain("加载并遵循 `cloud-capabilities` 技能")
+    // The engine's own discovery over the factory paths production hands it; names become slash commands.
+    const entries = (await engineSkills(shipped())).filter((entry) => entry.file.startsWith(dev["cloud-capabilities"]!))
+    expect(entries.map((entry) => entry.name).sort()).toEqual(["cloud", "cloud-capabilities"])
+    expect(entries.find((entry) => entry.name === "cloud")?.content).toContain("加载并遵循 `cloud-capabilities` 技能")
     expect(entries.every((entry) => !classifySkill(entry.content).placeholder)).toBe(true)
   })
 
@@ -291,10 +308,10 @@ describe("REQ-233 cloud skill instructions", () => {
   // alpha-code#1568:技能里写的是模型真正收到的函数名(服务器键 + 平台远端名,`codepuppy_dispatch`),
   // 由生产拼名函数从 vendored 平台清单推出;第一方插件工具(`codepuppy_access` 等)是另一张表。
   test("AC1 every cloud tool named in shipped instructions is a model-facing name of a tool in the pinned platform list", async () => {
-    const texts = await Promise.all([
-      ...await Glob.scan("**/SKILL.md", { cwd: dev["cloud-capabilities"], absolute: true, include: "file", symlink: true }),
-      join(dev["office-docs"], "SKILL.md"),
-    ].map((file) => Bun.file(file).text()))
+    const texts = (await engineSkills(shipped()))
+      .filter((entry) => entry.file.startsWith(dev["cloud-capabilities"]!) || entry.file === join(dev["office-docs"]!, "SKILL.md"))
+      .map((entry) => readFileSync(entry.file, "utf8"))
+    expect(texts.length).toBe(3)
     const names = [...new Set(texts.flatMap((text) => text.match(/\b(?:codepuppy|cloud)_[a-z][a-z0-9_]*\b/g) ?? []))]
     const modelFacing = new Set([...CLOUD_MCP_TOOLS.map(cloudMcpToolId), ...Object.keys(TOOL_TEXT)])
     expect(names).toContain("codepuppy_account_status")
@@ -324,8 +341,9 @@ describe("REQ-233 cloud skill instructions", () => {
   // alpha-platform#552 AC4: web pages are written locally; no shipped skill steers them to cloud html-generate.
   test("AC4 web pages are written locally and no factory skill steers them to cloud html-generate", async () => {
     expect(cloud.content).toContain("网页 / HTML 由本机直接写文件：不要派发云端 `html-generate`，用户明确要求云端时也如实说明并改为本机生成")
-    const files = await Glob.scan("**/SKILL.md", { cwd: join(dev["cloud-capabilities"], ".."), absolute: true, include: "file", symlink: true })
-    expect(files).toContain(join(dev["office-docs"], "SKILL.md"))
+    const files = (await engineSkills(shipped())).map((entry) => entry.file)
+    expect(files).toContain(join(dev["office-docs"]!, "SKILL.md"))
+    expect(files).toContain(join(dev["cloud-capabilities"]!, "cloud", "SKILL.md"))
     for (const file of files) {
       const text = await Bun.file(file).text()
       expect(text).not.toContain("| `html-generate` |")

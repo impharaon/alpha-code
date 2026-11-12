@@ -1,8 +1,8 @@
 // #668 双通道审批闸门的**最小宿主替身**(只替换 solid 上下文与传输,不替换被测逻辑)。
 //
 // 被测的是生产三件套原样组合:
-//   packages/app/src/context/permission-surface.tsx(接线点:list/subscribe/reply 路由)
-// × packages/app/src/context/permission-v1-adapter.ts(v1↔审批面形状适配)
+//   packages/codepuppy-app/src/context/permission-surface.tsx(接线点:list/subscribe/reply 路由)
+// × packages/codepuppy-app/src/context/permission-v1-adapter.ts(v1↔审批面形状适配)
 // × packages/ui-mac/.../permission-watcher.tsx + PermissionDialog.tsx(呈现与决定)
 // 这里只把 `useParams` / `useSDK` / `useSync` 换成可驱动的替身,并把 SDK 出口录音 —— 于是
 // "点了按钮之后到底有没有一个真的请求发出去、发到哪条通道"是可观测的,而不是"函数被调用了"。

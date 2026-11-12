@@ -1,0 +1,6 @@
+{
+  "name": "ac1662-l1-probe",
+  "private": true,
+  "type": "module",
+  "main": "main.mjs"
+}

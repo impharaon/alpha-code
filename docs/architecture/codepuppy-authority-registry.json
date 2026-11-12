@@ -1,0 +1,1815 @@
+{
+  "$comment": [
+    "Code Puppy authority registry (#1662 L4; coordinator instruction 2026-11-09: 'every decision Code Puppy makes today must still be Code Puppy's after the OpenCode 2 switch').",
+    "One entry per decision. Held entries name the OpenCode 2 mechanism file and the tests that turn red when the mechanism is removed; blocked entries carry the reason and the options awaiting the orchestrator.",
+    "An entry is never deleted: retiring one needs `retired: { quote, date, by }` with the owner's words. Judge: packages/ext/src/policy/authority-registry.test.ts (coverage of the 49 pre-switch takeovers, files and test names exist, no blocked entry, no deletion)."
+  ],
+  "anchor": {
+    "takeoverListRevision": "e56ae0c036",
+    "note": "origin/alpha before the switch; `scripts/north-star-guard.sh --print-takeover` there is the 49-path list every takeover must map to."
+  },
+  "entries": [
+    {
+      "id": "tool-policy-execution-gate",
+      "decision": "Every tool call passes Code Puppy's tool policy before it runs; a deny is a named refusal decided before any other hook or side effect (#725 B, #1129).",
+      "adr": [
+        "ADR-041",
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/opencode/src/session/tools.ts",
+        "packages/opencode/test/session/tools.test.ts",
+        "packages/opencode/src/tool/code-mode.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/policy/gate.ts",
+        "ladder": "L0 (execute.before via registerPolicy)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "B1 MCP deny ⇒ named refusal and the call never reaches the tool"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "deny is decided first: the extension's own execute.before never sees a denied call"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "reverse arm ①: without registerPolicy the same denied calls execute (group B would be red)"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "Code Mode child call to a denied tool is refused"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "post-seal hook on the extension's own Context never sees a denied call, which stays refused by name"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "post-seal known-bad arm: without registerPolicy the same late hooks rewrite the input and run the denied tool"
+        }
+      ]
+    },
+    {
+      "id": "tool-policy-unknown-identity",
+      "decision": "A call whose tool identity cannot be established is refused (baseline S1: unknown identity defaults to deny).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/policy/gate.ts",
+        "ladder": "L0"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "unknown tool identity is refused by default"
+        }
+      ]
+    },
+    {
+      "id": "tool-policy-approved-input-pinned",
+      "decision": "Hooks running after Code Puppy's approval cannot rewrite the approved tool or input (baseline S1, ruling R8 option 2).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/policy/gate.ts",
+        "ladder": "L0 (seal tail + pin)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "reverse arm ②: a plugin after seal() that rewrites the input cannot run the call"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "reverse arm ② control: the same late plugin leaving input alone lets the call run"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "post-seal hook on the extension's own Context: a rewrite of the approved input cannot run the call"
+        }
+      ]
+    },
+    {
+      "id": "tool-policy-catalog-gate",
+      "decision": "The model never sees a tool the policy denies, neither as a direct tool nor in the Code Mode catalog (#725 A, ruling F6).",
+      "adr": [
+        "ADR-041",
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/opencode/src/permission/index.ts",
+        "packages/opencode/src/tool/registry.ts",
+        "packages/opencode/src/tool/code-mode.ts",
+        "packages/opencode/test/tool/code-mode.test.ts",
+        "packages/opencode/test/tool/code-mode-integration.test.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/policy/catalog.ts",
+        "ladder": "L0 (agent rules after configured ones + session.hook.context)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "A4 + F6: one MCP tool denied ⇒ gone from the Code Mode catalog too; its sibling stays"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "F6 reverse arm: without Code Puppy's catalog rules the denied MCP tool is back in Code Mode"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "first request before the tail rules exist: denied direct tools are pruned, Code Mode is withheld"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "A6 ask never changes the catalog"
+        }
+      ]
+    },
+    {
+      "id": "tool-policy-three-state-ask",
+      "decision": "A document-axis ask waits for the user through OpenCode's permission engine with Code Puppy's identity envelope; nothing runs before approval; once/always keep their meaning; no other plugin's evaluate hook can turn Code Puppy's ask into allow.",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/policy/catalog.ts",
+        "ladder": "L0 (tail ask rule; gate.ts holdAsk from the early evaluate hook)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "document-axis ask ⇒ one identity request with the I7a envelope; reject keeps the count at 0"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "approved once ⇒ the call runs exactly once"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "ruleset-axis ask ⇒ askedBy ruleset, a per-call resource, nothing saved"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "post-seal evaluate hook on the extension's own Context cannot turn Code Puppy's ask into allow"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "post-seal evaluate hook may still make Code Puppy's ask stricter: deny refuses without a prompt"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "post-seal evaluate known-bad arm: the same late hook does turn an ask that is not Code Puppy's into allow"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "a document-axis ask on an MCP tool registered after the first prompt asks before it runs; reject keeps it at 0"
+        },
+        {
+          "file": "packages/ui-mac/src/main/composer-tier-matrix.engine.test.ts",
+          "name": "三档 × R1–R12、三条委派入口与审批请求的整条路径(composer-tier-matrix.engine.cases.ts,27 条)"
+        }
+      ],
+      "note": "An answer to the pending request itself is not held here: any plugin Context (including the extension's, which the project-plugin fan-out passes through) can call permission.reply on Code Puppy's request and the call runs (measured 2026-11-09); closing it belongs to the fan-out (L3), reported to the coordinator."
+    },
+    {
+      "id": "tool-policy-session-grants",
+      "decision": "An always approval is bound to the service binding and the policy revision; any policy write asks again (#1128, #1574).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/policy/gate.ts",
+        "ladder": "L0"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "an always approval discharges the next ask for the same binding and revision; a policy write re-asks"
+        }
+      ]
+    },
+    {
+      "id": "tool-policy-deny-ceiling",
+      "decision": "Deny is a ceiling: a ruleset deny on the exact identity folds into the cap, and no user enable or saved approval opens it (#1128 / #724 §4).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/opencode/src/permission/index.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/policy/gate.ts",
+        "ladder": "L0"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "ruleset-axis identity deny (agent rule on the canonical) hides the tool the same way"
+        },
+        {
+          "file": "packages/ext/src/policy/resolver.test.ts",
+          "name": "R8/R9/R10/R11 fail-closed 族:非法 identity / quarantine / managed unreadable / 冲突记录 ⇒ disabled"
+        }
+      ]
+    },
+    {
+      "id": "tool-policy-managed-cap",
+      "decision": "Organisation (managed / MDM) denies are an unbreakable cap — a project agent rule cannot out-rank them.",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/policy/managed.ts",
+        "ladder": "L0 (reads OpenCode 2 managed documents itself)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/resolver.test.ts",
+          "name": "M1 a managed deny is a cap even when the merged agent ruleset ends with a project allow (why the reader exists)"
+        },
+        {
+          "file": "packages/ext/src/policy/resolver.test.ts",
+          "name": "M4 a corrupt managed file, or a JSONC one this reader cannot parse, makes the whole layer unreadable ⇒ disabled"
+        }
+      ]
+    },
+    {
+      "id": "tool-policy-document",
+      "decision": "The user policy document: three states, exact tool > service > class, binding guard, whole-document quarantine on any bad record (#1128 / #724 §2–§5).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/policy/resolver.ts",
+        "ladder": "L0"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/resolver.test.ts",
+          "name": "R6 binding guard:service/tool enabled 只在 digest 逐字相等时生效,变了/缺了回 ask(§5)"
+        },
+        {
+          "file": "packages/ext/src/policy/resolver.test.ts",
+          "name": "T3 坏文档整份 quarantine:损坏 JSON / 未知版本 / 部分非法记录 / 分区不符 / selector 重复"
+        }
+      ]
+    },
+    {
+      "id": "tool-policy-partitions",
+      "decision": "Policy is partitioned per signed-in account and per folder (outside git) / per project (inside git) (#1575, #1644).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/policy/index.ts",
+        "ladder": "L0"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/resolver.test.ts",
+          "name": "AC2 subdirectories of one git project share its grant; different git projects stay isolated"
+        },
+        {
+          "file": "packages/ext/src/policy/resolver.test.ts",
+          "name": "VI1 the account partition follows CODEPUPPY_POLICY_ACCOUNT: account B never reads account A's enable"
+        }
+      ]
+    },
+    {
+      "id": "tool-policy-tier-default",
+      "decision": "The composer tier's tool-policy-default decides whether class-default asks apply (I9, #1638).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/policy/catalog.ts",
+        "ladder": "L0"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "I9: tool-policy-default allow waives the class-default ask; ask keeps it"
+        }
+      ]
+    },
+    {
+      "id": "composer-tier-matrix",
+      "decision": "The three composer tiers (Approve all = build, Ask = codepuppy-ask, Read-only = codepuppy-readonly) give each tool class the outcome REQ-236 §2.2 sets (R1–R6, R8, R10–R12; R2 asks outside the workspace in the first two tiers with v1's allowances for the engine's tool output, temp and skill directories, and a user's own external_directory rule out-ranks that ask as on v1, while Read-only's deny stays last); a delegation (a prompt carrying an agent, a non-subtask command that runs as another agent, a subtask command) gets the same decision as the direct subagent call, decided by the session's own agent (#1573).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "#1662 parity",
+      "takeovers": [
+        "packages/opencode/src/session/prompt.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ui-mac/src/main/codepuppy-config-injection.ts",
+        "ladder": "main (injected tier agents) + ext agent transform registered at the first prompt (packages/ext/src/external-directory-rule.ts: the R2 external_directory ask after the engine's base rules, before every config rule) + the re-taken packages/core/src/config/plugin/command.ts (codepuppy(#1573 E4): a command that runs as another agent takes the subagent permission path before switching)"
+      },
+      "tests": [
+        {
+          "file": "packages/ui-mac/src/main/composer-tier-matrix.engine.test.ts",
+          "name": "三档 × R1–R12、三条委派入口与审批请求的整条路径(composer-tier-matrix.engine.cases.ts,27 条)"
+        }
+      ],
+      "note": "R7 (egress fence and kill switch) is not a rule-layer cell. R9 (cloud tools) passes the same execution gate as R10 / R11 and differs only in identity derivation (codepuppy-cloud authority minted from the verified definition), judged by packages/ext/src/policy/register-policy.test.ts and plugin-host.test.ts; a governed remote MCP in the engine sandbox would need the ARM / DEF and cloud credential setup."
+    },
+    {
+      "id": "tool-policy-settings-api",
+      "decision": "Settings reads and writes the tool policy through Code Puppy's API (v1 routes /api/permission/tool-policy/*; OpenCode 2 plugin RPC codepuppy.tool-policy, I5).",
+      "adr": [
+        "ADR-033",
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/opencode/src/server/routes/instance/httpapi/public.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/policy/rpc.ts",
+        "ladder": "L0 (plugin RPC)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/tool-policy-rpc.test.ts",
+          "name": "inventory returns a document that decodes as ToolPolicyInventoryV1"
+        },
+        {
+          "file": "packages/ext/src/policy/inventory.test.ts",
+          "name": "I2 the badge tells the truth: a tool the inventory shows disabled is refused by the production executor"
+        },
+        {
+          "file": "packages/ext/src/policy/tool-policy-rpc.test.ts",
+          "name": "a quarantined document ⇒ setRecord fails with type quarantined"
+        },
+        {
+          "file": "packages/ext/src/policy/tool-policy-rpc.test.ts",
+          "name": "reverse arm: without registerPolicy the RPC is unavailable"
+        }
+      ]
+    },
+    {
+      "id": "tool-renames",
+      "decision": "Renamed builtins (bash→shell, task→subagent, apply_patch→patch): saved records under the old name keep applying and are reported; classification knows both names (K5 / S4).",
+      "adr": [
+        "ADR-041",
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/policy/resolver.ts",
+        "ladder": "L0"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "a saved deny under the v1 name refuses the renamed tool, and the record is reported"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "a deny under the new name refuses the call"
+        },
+        {
+          "file": "packages/ext/src/policy/resolver.test.ts",
+          "name": "V1b with a v1-name record on disk, writing the new name leaves one record and removing it leaves none"
+        }
+      ]
+    },
+    {
+      "id": "risk-classification",
+      "decision": "Every approval request carries Code Puppy's rule-based risk classification, overriding what a tool reports (#1285 / REQ-158).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/opencode/src/permission/index.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/policy/risk.ts",
+        "ladder": "L0 (permission.hook.evaluate)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/risk.test.ts",
+          "name": "a forged metadata.codepuppyRisk is overwritten: shell `rm -rf /` claims low, the pending request says high/destructive"
+        },
+        {
+          "file": "packages/ext/src/policy/risk.test.ts",
+          "name": "the premise check is not empty: a synthetic engine that creates a request without evaluating fails it"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "every approval request carries Code Puppy's risk classification, overriding what the tool reported (#1285)"
+        }
+      ]
+    },
+    {
+      "id": "adr041-identity-derivation",
+      "decision": "Each tool's identity (source, origin, name) is decided by Code Puppy from registration facts, never from aliases or titles.",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/opencode/src/tool/registry.ts",
+        "packages/core/src/tool/registry.ts",
+        "packages/core/src/tool/application-tools.ts",
+        "packages/opencode/src/plugin/index.ts",
+        "packages/opencode/test/tool/registry.test.ts",
+        "packages/opencode/test/provider/transform.test.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/policy/identity.ts",
+        "ladder": "L0 (early registry + MCP config + bundled manifest)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/identity.test.ts",
+          "name": "an MCP tool: config key as origin, remote tool name, de-secreted binding, remote location and transport"
+        },
+        {
+          "file": "packages/ext/src/policy/identity.test.ts",
+          "name": "a tool in the early registry is a builtin with the constant application binding and local location"
+        },
+        {
+          "file": "packages/ext/src/policy/identity.test.ts",
+          "name": "the MCP rule wins over the early registry (a server whose tools registered before the extension is still MCP)"
+        }
+      ],
+      "note": "Derived from observable facts; collision/shadow detection is a separate, blocked entry (adr041-collision-rejection)."
+    },
+    {
+      "id": "adr041-authority-minting",
+      "decision": "Only Code Puppy mints codepuppy-cloud / codepuppy-bundled authority, and only from the verified definition or the bundled manifest (ADR-041 §5, #1578).",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/opencode/src/mcp/index.ts",
+        "packages/opencode/src/plugin/index.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/policy/identity.ts",
+        "ladder": "L0"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/identity.test.ts",
+          "name": "the exact verified cloud definition mints codepuppy-cloud with a sha256 evidence digest"
+        },
+        {
+          "file": "packages/ext/src/policy/identity.test.ts",
+          "name": "a look-alike (same URL, other key; or same key, other URL) is not asserted"
+        },
+        {
+          "file": "packages/ext/src/policy/identity.test.ts",
+          "name": "the exact bundled Office command next to the attested server.py mints codepuppy-bundled"
+        },
+        {
+          "file": "packages/ext/src/policy/bundled-plugin.test.ts",
+          "name": "listed own tools of a module whose digest matches get codepuppy-bundled; a project tool merged in does not"
+        },
+        {
+          "file": "packages/ext/src/policy/identity.test.ts",
+          "name": "the shipped Office command, with {workspace} already replaced by the folder, mints codepuppy-bundled"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "a consented project plugin's tool in an MCP server's namespace, or in OpenCode's or Code Puppy's, is refused by the fan-out and logged"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "a host-loaded plugin's tool under the Office server's namespace is a plugin tool, not asserted; the tool the MCP layer registers there keeps codepuppy-bundled"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "plugin tools under a cloud, a third-party and the Office server's namespace get no server identity; the servers' own tools keep theirs"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "review R1/1: a copy of a cloud tool registered under a plugin namespace, then renamespaced through editor.get, stays a plugin tool"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "review R1/2: two servers sharing a namespace each keep their own tool's identity"
+        }
+      ],
+      "note": "Slice E (I-05 lane, 2026-11-12; design review reproduced it with the real bundled manifest): a tool registered under an MCP server's namespace by anyone other than that server's MCP layer must not borrow the server's identity or authority. Held at two ends: the project-plugin fan-out refuses a tool whose namespace is a configured MCP server's or a reserved one (opencode, codepuppy, codepuppy-*), logged in the ADR-041 refusal format (packages/ext/src/plugin-fanout.ts); and identity.ts gives a bundled Office server's namespace only to the tools its attested manifest declares — any other tool there is a plugin tool of unknown origin, not asserted. Slice E2 (orchestrator ruling 2026-11-12): the MCP layer mints the fact — packages/core/src/tool/mcp.ts adds to every tool it registers a mark issued by packages/core/src/tool/codepuppy-mcp-tool-mint.ts and bound to that server and tool; the verifier is published read-only (MCP_TOOL_VERIFIER, packages/schema/src/codepuppy-tool-policy.ts) and identity.ts gives mcp:<server>:<tool> and any codepuppy-cloud / codepuppy-bundled authority only to a tool whose mark verifies. A plugin tool under a cloud, third-party or Office server's namespace, under a declared Office tool name, or carrying a mark copied from a listed MCP tool is a plugin tool of unknown origin, not asserted (register-policy E2, on the real MCP layer). The mark must also sit on the registry entry whose key is that server's effective name for the tool: the key is fixed at registration, whereas a listed tool's options (namespace included) are shared and writable through a plugin's editor.get, so a copied mark on a tool re-namespaced after registration does not verify (Codex review R1/1). Servers whose names normalize to one namespace are each tried before a tool is judged a plugin tool (R1/2). Still not held, and not new: a plugin that registers the very effective name of a live MCP tool after it, copying that tool's mark, replaces it last-wins and keeps its identity — the replacement limit recorded on adr041-registration-identity; and code that rewrites process globals outside the plugin API is beyond any in-process check."
+    },
+    {
+      "id": "adr041-display-snapshot",
+      "decision": "Each tool call carries Code Puppy's immutable display snapshot (identity, technicalId, authority, location) — OpenCode 2 state.metadata.codepuppyDisplay (I7b).",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/opencode/src/session/processor.ts",
+        "packages/opencode/test/session/processor-effect.test.ts",
+        "packages/sdk/js/src/gen/types.gen.ts",
+        "packages/sdk/js/src/v2/gen/types.gen.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/policy/display.ts",
+        "ladder": "L0 (tool.transform progress + execute.after + deny metadata)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "running (progress) and completed (result metadata) carry the snapshot"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "a refused call's error carries the snapshot"
+        },
+        {
+          "file": "packages/ext/src/policy/identity.test.ts",
+          "name": "the display snapshot is the schema's ToolDisplaySnapshotV1: identity + technicalId + authority + location"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "a tool's self-reported codepuppyDisplay is replaced by the decision's snapshot"
+        }
+      ]
+    },
+    {
+      "id": "adr041-location",
+      "decision": "Where a tool runs (local, or the remote MCP host) is decided by Code Puppy from the de-secreted effective definition (#1576, #1617).",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/policy/identity.ts",
+        "ladder": "L0"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/identity.test.ts",
+          "name": "a local MCP tool: local location, command transport, binding over command + cwd"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "document-axis ask ⇒ one identity request with the I7a envelope; reject keeps the count at 0"
+        }
+      ]
+    },
+    {
+      "id": "contract-authority-names",
+      "decision": "Authority and class values are codepuppy-* only, and the schema is their single definition (#1568 AC3).",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/schema/src/tool-identity.ts",
+        "ladder": "Code Puppy-owned file (ADR-043)"
+      },
+      "tests": [
+        {
+          "file": "packages/schema/test/codepuppy-authority-names.test.ts",
+          "name": "OpenCode 2's generated client types carry no copy of ToolAuthority (the schema is the only one)"
+        }
+      ]
+    },
+    {
+      "id": "mcp-workspace-argv",
+      "decision": "A {workspace} token in an MCP command is replaced with the current folder when the server starts (#1011 / REQ-134).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/opencode/test/mcp/lifecycle.test.ts",
+        "packages/opencode/test/fixture/mcp-lifecycle-stdio.ts",
+        "packages/opencode/src/mcp/index.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/policy/index.ts",
+        "ladder": "L0 (mcp.transform)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "{workspace} in a local MCP command becomes the Location directory (#1011); without the policy it stays literal"
+        }
+      ]
+    },
+    {
+      "id": "mcp-branched-schema",
+      "decision": "MCP tools whose input schema branches at the root stay usable by the model (#793).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/core/src/tool/runtime.ts",
+        "ladder": "upstream-native (OpenCode 2 passes JSON schemas through), pinned"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/upstream-pins.test.ts",
+          "name": "a root-branched schema reaches the model unchanged and forbids none of its branch fields"
+        },
+        {
+          "file": "packages/ext/src/policy/upstream-pins.test.ts",
+          "name": "the check is not empty: the v1-style closed root names every branch field it forbade"
+        }
+      ]
+    },
+    {
+      "id": "mcp-tool-list-tolerance",
+      "decision": "One malformed MCP tool does not drop the server's other tools (codepuppy-tool-discovery.ts tolerant listing).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/core/src/mcp/client.ts",
+        "ladder": "upstream-native, pinned by upstream's own test"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/mcp.test.ts",
+          "name": "skips unusable tools and keeps the rest of the server's tools"
+        }
+      ]
+    },
+    {
+      "id": "adr042-oauth-brand",
+      "decision": "OAuth loopback success/error pages show the Code Puppy product identity (#1047).",
+      "adr": [
+        "ADR-042",
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/core/src/oauth/page.ts",
+        "packages/core/test/oauth-page.test.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/oauth/page.ts",
+        "ladder": "L3 (re-taken: no plugin seam reaches engine-served callback HTML)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/oauth-page.test.ts",
+          "name": "#1047: success page uses the Code Puppy product identity, not OpenCode"
+        },
+        {
+          "file": "packages/core/test/oauth-page.test.ts",
+          "name": "#1047: error page uses the Code Puppy product identity"
+        }
+      ]
+    },
+    {
+      "id": "adr043-owned-file-predicate",
+      "decision": "Code Puppy-owned files living under upstream paths are recognised by name or marker, and a copied marker does not exempt an upstream file (ADR-043).",
+      "adr": [
+        "ADR-043"
+      ],
+      "lane": "L2 (#1664)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "scripts/north-star-guard.sh",
+        "ladder": "guard predicate (L2)"
+      },
+      "tests": [
+        {
+          "file": "packages/ui-mac/src/main/north-star-guard.test.ts",
+          "name": "名字不合约定、靠文件里的 marker 自报家门 ⇒ 绿(migration / tool-identity.ts 那一类)"
+        },
+        {
+          "file": "packages/ui-mac/src/main/north-star-guard.test.ts",
+          "name": "把 marker 抄进一个真上游文件 ⇒ 仍然红(自报家门不是可伪造的通行证)"
+        }
+      ]
+    },
+    {
+      "id": "adr033-receipt-premises",
+      "decision": "The OpenCode 2 engine facts Code Puppy's receipt derivation relies on stay true: a pending request's payload cannot change under its id, one reply emits a replied event for every request it resolves (always and reject both cascade within the replying session only — always through the permission-session-grant block), and a second reply is NotFound (ruling item 1 measurements).",
+      "adr": [
+        "ADR-033"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/core/src/permission.ts",
+        "ladder": "upstream-native, pinned"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/permission-reply-premises.test.ts",
+          "name": "(i) a pending request's payload never changes under its id: a second admission with the same id is refused"
+        },
+        {
+          "file": "packages/ext/src/policy/permission-reply-premises.test.ts",
+          "name": "(ii) one always reply emits a replied event for every request it resolves: the covered requests of its own session only"
+        },
+        {
+          "file": "packages/ext/src/policy/permission-reply-premises.test.ts",
+          "name": "(ii) a reject cascades to every pending request of the same session, each with its own replied event"
+        },
+        {
+          "file": "packages/ext/src/policy/permission-reply-premises.test.ts",
+          "name": "(iii) a second reply to the same id is NotFound: the engine keeps no reply history"
+        },
+        {
+          "file": "packages/ext/src/policy/permission-reply-premises.test.ts",
+          "name": "publishes the target's replied event first, then the cascaded ones"
+        }
+      ]
+    },
+    {
+      "id": "adr033-decision-receipt",
+      "decision": "Code Puppy owns the approval reply contract: a sha256 fingerprint of the displayed request, a DecisionReceipt for every reply listing the requests it resolved, idempotent replay, and a 409 on a stale reply (#433 / REQ-090 AC3/AC8).",
+      "adr": [
+        "ADR-033"
+      ],
+      "lane": "L6 (#1668) per ruling item 1",
+      "takeovers": [
+        "packages/core/src/permission.ts",
+        "packages/core/src/permission",
+        "packages/server/src/handlers/permission.ts",
+        "packages/opencode/src/server/routes/instance/httpapi/public.ts",
+        "packages/core/test/permission.test.ts",
+        "packages/core/test/database-migration.test.ts",
+        "packages/opencode/test/server/httpapi-exercise",
+        "packages/opencode/test/server/httpapi-public-openapi.test.ts",
+        "packages/core/schema.json",
+        "packages/core/src/database/migration.gen.ts",
+        "packages/core/src/database/schema.gen.ts",
+        "packages/sdk/js/src/v2/gen/sdk.gen.ts",
+        "packages/sdk/js/src/v2/gen/types.gen.ts",
+        "packages/protocol/src/groups/permission.ts",
+        "packages/schema/src/permission.ts",
+        "packages/schema/src/agent.ts",
+        "packages/schema/test/contract-hygiene.test.ts",
+        "packages/client/src/generated/client.ts",
+        "packages/client/src/generated-effect/client.ts",
+        "packages/client/src/generated/types.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ui-mac/src/engine-adapter/permission-replies.ts",
+        "ladder": "L6 adapter (derivation per docs/architecture/2026-11-09-1662-permission-reply-measurements.md: the receipt is synthesized from the displayed snapshot's fingerprint, the replied events of the reply's cascade window and a decision cache; no kernel re-take)"
+      },
+      "tests": [
+        {
+          "file": "packages/ui-mac/src/engine-adapter/permission-reply.test.ts",
+          "name": "v1 通道(审批卡的实际路径):once 经 replyPermissionV1 落到引擎,冻结 feed 收卡;v2 入口回 `{data: 收据}`,收据各字段齐"
+        },
+        {
+          "file": "packages/ui-mac/src/engine-adapter/permission-reply.test.ts",
+          "name": "反向臂:没有适配器合成收据(2.x 回复只回 204)⇒ permission-surface 的取法当场报缺收据"
+        },
+        {
+          "file": "packages/ui-mac/src/engine-adapter/permission-reply.test.ts",
+          "name": "交出后引擎里同一 id 的内容变了 ⇒ 409 ConflictError,卡片判为冲突,什么都不发;对照:内容没变照常发出"
+        },
+        {
+          "file": "packages/ui-mac/src/engine-adapter/permission-reply.test.ts",
+          "name": "v2 命令的指纹不是那份快照 ⇒ 409;这个窗口从没交出过的请求 ⇒ 409(决定没绑在显示过的快照上)"
+        },
+        {
+          "file": "packages/ui-mac/src/engine-adapter/permission-reply.test.ts",
+          "name": "同一命令再来一次 ⇒ 同一张收据,引擎只收到一次;反向臂:真引擎对同一 id 的第二次回复是 404(采样)"
+        },
+        {
+          "file": "packages/ui-mac/src/engine-adapter/permission-reply.test.ts",
+          "name": "reject A1 ⇒ 收据列出 A1 与同会话的 A2,另一会话的 B1 不动;replied 帧晚于回复响应到达也不漏(与真引擎采样的收据一致)"
+        },
+        {
+          "file": "packages/ui-mac/src/engine-adapter/permission-reply.test.ts",
+          "name": "反向臂:收据只列目标(没有事件窗口)⇒ 冻结 feed 里同会话的 A2 一直挂着"
+        }
+      ]
+    },
+    {
+      "id": "adr038-ask-deadline",
+      "decision": "An unanswered approval request fails by name after a deadline (300 s default, CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS override, invalid values fall back to the default) and never auto-allows; only that request ends (#668).",
+      "adr": [
+        "ADR-038",
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/opencode/src/permission/index.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/permission.ts",
+        "ladder": "L3 (re-taken: the wait on the reply is inside the kernel; a plugin watchdog's reject cascades)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/ask-deadline.test.ts",
+          "name": "an unanswered request fails by name at the deadline, its card is retracted, and nothing is allowed"
+        },
+        {
+          "file": "packages/ext/src/policy/ask-deadline.test.ts",
+          "name": "only that request ends: another pending request of the same session is still waiting (no cascade)"
+        },
+        {
+          "file": "packages/ext/src/policy/ask-deadline.test.ts",
+          "name": "the default is 300 s and every invalid override falls back to it, never to no deadline"
+        },
+        {
+          "file": "packages/ui-mac/src/main/permission-ask-timeout.engine.test.ts",
+          "name": "审批超时:到期的工具部件经桌面适配器被卡片分类为审批超时,模型读到同一句(permission-ask-timeout.engine.cases.ts,1 条)"
+        }
+      ]
+    },
+    {
+      "id": "permission-session-grant",
+      "decision": "\"Allow for this session\" behaves as in the current release 0.1.26: an always reply grants (action, each save item) to that session only, in memory; a configured deny still wins; another session and a child session created later still ask; nothing is written to the session row or the project's saved approvals, and the grant is gone when the engine stops; the reply's cascade releases only pending requests of the same session and never a Code Puppy policy ask (metadata.policy), which only its own card answers (I-05 contract A, design upgrade-fewer-takeovers §4).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "I-05 (#1662)",
+      "takeovers": [
+        "packages/opencode/src/permission/index.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/permission.ts",
+        "ladder": "L3 (re-taken: the codepuppy(#1128 §4.4, I-05) block — session grants in the permission service's memory, merged after the configured-deny check; the always cascade filters by session and skips requests isCodePuppyPolicyRequest recognises, packages/schema/src/codepuppy-tool-policy.ts)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/session-grant.test.ts",
+          "name": "an always reply grants the request's save patterns for its action in this session; a resource outside them and another action still ask"
+        },
+        {
+          "file": "packages/ext/src/policy/session-grant.test.ts",
+          "name": "an always reply to a request without save grants nothing: the same request asks again"
+        },
+        {
+          "file": "packages/ext/src/policy/session-grant.test.ts",
+          "name": "a configured deny outranks the grant; the same allow written as a session rule overrides it (known-bad arm)"
+        },
+        {
+          "file": "packages/ext/src/policy/session-grant.test.ts",
+          "name": "another session and a child session created after the grant still ask; a session rule is inherited by that child (known-bad arm)"
+        },
+        {
+          "file": "packages/ext/src/policy/session-grant.test.ts",
+          "name": "the grant writes neither the session's rules nor a saved approval"
+        },
+        {
+          "file": "packages/ext/src/policy/session-grant.test.ts",
+          "name": "the always cascade leaves another session's pending request pending even when it now evaluates to allow"
+        },
+        {
+          "file": "packages/ext/src/policy/session-grant-restart.test.ts",
+          "name": "an always grant is gone after the embedded engine restarts; a session rule in the same database survives the restart (control)"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "an always reply to a read leaves the pending /review policy ask pending: no replied event and no child session"
+        },
+        {
+          "file": "packages/ext/src/policy/session-grant-upstream-reds.test.ts",
+          "name": "exactly the ten pinned upstream cases fail in those three files; every other case passes"
+        }
+      ],
+      "note": "Known red by design (orchestrator ruling 2026-11-12, option 甲: not taken over). Upstream tests asserting that an always reply writes a project-level saved approval: packages/core/test/permission.test.ts \"stores and removes saved resources for a project\" and the seven \"<fixture>: always allow covers repeat execution and narrows prefix scope\" cases (numeric npm script prefix, numeric AWS option prefix, substitution prefix, redirect prefix, assignment redirect prefix, PowerShell method prefix, PowerShell tab prefix); packages/core/test/tool-shell.test.ts \"declarations reuse approvals while substitutions retain reject/once/always behavior\"; packages/server/test/permission-saved.test.ts \"edits saved permissions through PATCH\". Reproduce: cd packages/core && bun test test/permission.test.ts test/tool-shell.test.ts; cd packages/server && bun test test/permission-saved.test.ts. session-grant-upstream-reds.test.ts requires exactly these to fail (tool-shell's two pre-existing \"conditional substitutions respect once|always\" reds tolerated). Rollback: never revert permission.ts alone while the adapter sends always as it is — \"allow for this session\" would become a permanent project-level approval; revert the I-05 slice as one commit."
+    },
+    {
+      "id": "adr041-collision-rejection",
+      "decision": "Alias / identity collisions are rejected, never last-wins (ADR-041 decision 2).",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L4 (#1666) + L3 (#1665) per ruling item 3 (c)",
+      "takeovers": [
+        "packages/core/test/codepuppy-browser-tool-names.test.ts",
+        "packages/core/src/mcp/index.ts",
+        "packages/core/src/tool/mcp.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/plugin-fanout.ts",
+        "ladder": "L0 (the extension's project-plugin fan-out refuses add over an existing name and update / remove of tools the plugin did not register) + L3 (re-taken packages/core/src/mcp/index.ts tools() refuses both members of a colliding MCP pair; re-taken packages/core/src/tool/mcp.ts refuses an MCP tool whose effective name a builtin holds) + upstream-native, pinned (the Browser plugin's tool names)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "权威 · 工具身份(ADR-041 冲突):经 ext 扇出的项目插件用同名工具顶 codepuppy_echo ⇒ 被拒,新名照常注册;反向臂:同一插件由引擎直接装 ⇒ 顶掉"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "权威 · 工具身份(ADR-041 改 / 删):经 ext 扇出的项目插件改写、删除 codepuppy_echo ⇒ 都被拒,自己的工具照样能改;反向臂:同一插件由引擎直接装 ⇒ 改写与删除都生效"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "a.b/x and a_b/x share an effective name and are both refused; ab/x stays"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-tool-collision.test.ts",
+          "name": "builtins registered first: the MCP tools with their names are refused; the near miss stays"
+        },
+        {
+          "file": "packages/core/test/codepuppy-browser-tool-names.test.ts",
+          "name": "booting with the Browser plugin changes no built-in tool and adds only browser-namespaced ones"
+        },
+        {
+          "file": "packages/core/test/codepuppy-browser-tool-names.test.ts",
+          "name": "known-bad arm: a browser tool registered under a built-in's effective name is reported"
+        }
+      ]
+    },
+    {
+      "id": "adr041-history-display-conversion",
+      "decision": "Display snapshots persisted on v1 tool parts stay attached to those calls after the move to OpenCode 2 (ADR-041 §4: never overwritten, never inferred).",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L5 (#1667) per ruling item 6 (option (a))",
+      "takeovers": [
+        "packages/schema/src/v1/session.ts",
+        "packages/core/src/database/v1-migration.bun.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ui-mac/engine/v1-migration-transform.ts",
+        "ladder": "Build-time rewrite, takeover-equivalent (R14; ruling #1666 comment 6737732975 item 6, option (a)): the sidecar engine build rewrites upstream packages/core/src/database/v1-migration.bun.ts so the decoder keeps a v1 tool part's display and migrateTool writes it to state.metadata.codepuppyDisplay; never inferred, never overwritten; each rewritten source text must appear exactly once or the build fails"
+      },
+      "tests": [
+        {
+          "file": "packages/ui-mac/src/main/engine-v1-history-display.test.ts",
+          "name": "真引擎 + 夹具库:套了改写 ⇒ 快照在 state.metadata.codepuppyDisplay(engine-v1-history-display.cases.ts,1 条)"
+        },
+        {
+          "file": "packages/ui-mac/src/main/engine-v1-history-display.test.ts",
+          "name": "反向臂:上游转换器原样 ⇒ 同一份夹具的快照全丢(同一文件,CODEPUPPY_TEST_V1_DISPLAY_TRANSFORM=off)"
+        },
+        {
+          "file": "packages/ui-mac/src/main/engine-v1-history-display.test.ts",
+          "name": "已知的坏:上游改了原文 —— 少了 decodePart / migrateTool / CryptoHasher 任一处,或某处出现两次 ⇒ 抛错"
+        }
+      ]
+    },
+    {
+      "id": "adr035-websearch",
+      "decision": "Web search fails honestly (E7) and the cloud leg exists only when the account signal says so; the sovereignty gate covers every executable copy (ADR-035 / ADR-046).",
+      "adr": [
+        "ADR-035",
+        "ADR-046"
+      ],
+      "lane": "L3 (#1665) per lane seams §5 (L5r)",
+      "takeovers": [
+        "packages/opencode/src/tool/websearch.ts",
+        "packages/opencode/src/tool/mcp-websearch.ts",
+        "packages/core/src/tool/websearch.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/cloud-websearch-kill.ts",
+        "ladder": "L0 plugin hooks (the extension's execute.before refuses web search by the account signals and the verified governed server; websearch.transform picks the keyless provider and installs Code Puppy's exa provider (packages/ext/src/exa-websearch.ts) under the same id in place of upstream's, so an in-band isError, a non-2xx status and a 200 notice without results reach the model as Code Puppy's named failure or the provider's own words; execute.after restores that message over the websearch tool's generic wrapper)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "权威 · 联网搜索准入(L5r):kill-switch 下 2.x 内置 websearch 与第三方 web search MCP 在 execute.before 被拒;反向臂:不装 ext ⇒ 放行"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "联网搜索:不在 kill-switch(代付 / 登出)⇒ 内置 websearch 照常放行(ADR-046 D1)"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "权威 · 云工具准入:治理云 server 上的 web search 只按本 Location 核验过的端点身份豁免;冒名 server 上的同形工具照样被拒"
+        },
+        {
+          "file": "packages/ext/src/cloud-websearch-kill.test.ts",
+          "name": "#1507 AC1:搜网拒绝理由使用 Code Puppy,ADR 原因码不变"
+        },
+        {
+          "file": "packages/ext/src/cloud-websearch-kill.test.ts",
+          "name": "`#1461`:拒绝理由不再宣称关掉了每一个 web search 工具,只承认按名字认出的;仍叫模型别去找替代"
+        },
+        {
+          "file": "packages/ext/src/cloud-websearch-kill.test.ts",
+          "name": "kill-switch 下 cloud_web_search 到不了传输(评估恒 allow 也一样);兄弟云工具照常执行"
+        },
+        {
+          "file": "packages/ui-mac/src/main/websearch-honest.engine.test.ts",
+          "name": "Exa 结局诚实:出错 ⇒ 具名失败、D ⇒ 原文、零命中 ⇒ 没搜到、429 ⇒ 具名失败,两两不同;不装 ext ⇒ 塌成没搜到(websearch-honest.engine.cases.ts,7 条)"
+        },
+        {
+          "file": "packages/ui-mac/src/main/websearch-copies.test.ts",
+          "name": "网 A:注册 web search 供应商或消费 WebSearch.Service 的生产文件,恰好是分好类的那些(新增即停下来分类)"
+        },
+        {
+          "file": "packages/ui-mac/src/main/websearch-copies.test.ts",
+          "name": "网 B:写着供应商端点的生产文件,恰好是五份上游供应商、ext 的 exa 供应商与登记过的纯说明"
+        },
+        {
+          "file": "packages/ui-mac/src/main/websearch-account-tool-table.engine.test.ts",
+          "name": "账户态工具表:代付两条都在、登出只剩本地、kill-switch 两条都不在;去掉注入的 deny 即回来(websearch-account-tool-table.engine.cases.ts,4 条)"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "联网搜索 · random 下 Exa 429:换同伴一次并成功、记下冷却;只选 Exa ⇒ 具名的限流失败"
+        }
+      ]
+    },
+    {
+      "id": "l1r-platform-credential-header",
+      "decision": "The platform credential header is added only to platform-provider requests (P6 / S5).",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L3 (#1665) per lane seams §5 (L1r)",
+      "takeovers": [
+        "packages/opencode/src/session/llm.ts",
+        "packages/opencode/src/session/llm/request.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/platform-credential-header.ts",
+        "ladder": "L0 (session.hook[\"http.request\"] in the extension: the outgoing request after the route layer's apiKey auth, so the credential, not the injected placeholder, reaches the wire; #1662 parity B4)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "P6 / S5:平台凭据头只对平台节点、每次现读;别的节点不带;反向臂:不装 ext ⇒ 不带"
+        },
+        {
+          "file": "packages/ui-mac/src/main/token-hot-apply.engine.test.ts",
+          "name": "续期热应用:令牌 A ⇒ A、热应用 B ⇒ B、删文件 ⇒ 具名失败零请求、令牌不进日志与响应;不装 ext ⇒ 占位值被拒;平台地址的写法变体都带令牌、像而不是的地址收不到(token-hot-apply.engine.cases.ts,3 条)"
+        },
+        {
+          "file": "packages/ui-mac/src/main/platform-credential-error.engine.test.ts",
+          "name": "平台凭据出错:读不到 ⇒ 零请求具名失败;401 / 403 ⇒ 一次 provider.auth;503 对照 ⇒ 看得见重试(platform-credential-error.engine.cases.ts,5 条)"
+        }
+      ]
+    },
+    {
+      "id": "cloud-connector-credential-per-request",
+      "decision": "Code Puppy's governed cloud connector reads its credential file on every request, so a same-identity renewal applied hot (no engine restart) is used by the next request, and a missing file fails with an auth error without sending (#1562).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "#1662 parity",
+      "takeovers": [
+        "packages/opencode/src/mcp/index.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/mcp/client.ts",
+        "ladder": "L3 (re-taken: the remote connection's fetch goes through the plugin package's governedCredentialFetch for the governed entry, codepuppy(#1562) block)"
+      },
+      "tests": [
+        {
+          "file": "packages/ui-mac/src/main/cloud-credential-hot.engine.test.ts",
+          "name": "云连接器:同一条连接上令牌 A ⇒ A、热应用 B ⇒ 下一个 POST 与重连的 GET 流带 B、会话过期 ⇒ 重新 initialize 带 C、删文件 ⇒ 不出网(cloud-credential-hot.engine.cases.ts,5 条)"
+        }
+      ]
+    },
+    {
+      "id": "l1r-output-caps",
+      "decision": "Platform and BYOK output caps are applied by Code Puppy (P5): a platform-proxy request sends no max output tokens (the gateway fills the route cap); a direct BYOK request is raised to that model's measured cap; any other request keeps upstream's value.",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L3 (#1665) per lane seams §5 (L1r)",
+      "takeovers": [
+        "packages/opencode/src/session/llm/request.ts",
+        "packages/opencode/test/provider/transform.test.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/platform-output-cap.ts",
+        "ladder": "L0 (session.hook context / compaction / generate / title in the extension; BYOK raise in packages/ext/src/byok-output-cap.ts)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "P5:平台代理节点 ⇒ 不发 maxTokens(网关按 route 上限填);别的节点 ⇒ 原样;反向臂:不装 ext ⇒ maxTokens 留着"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "P5:直连 BYOK 节点按逐模型实读上限抬(同一 provider 的两个模型各拿各的数);无读数 / 端点不符 / 目录里查不到 ⇒ 原样;未登录(无 CODEPUPPY_BASE_URL)谁都不置空"
+        }
+      ],
+      "note": "Narrowed at integration (#1662 integration unit 1) to what the proofs show: the v1 wording also named temperature, which v1 only asserted to be left untouched; no OpenCode 2 test asserts that, so it is not claimed."
+    },
+    {
+      "id": "l1r-net-failure-settle",
+      "decision": "Network failures of a model request settle with Code Puppy's named classification (#1572 settle).",
+      "adr": [
+        "ADR-041",
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666) per rulings 6737930969 and 6756103246 item 2",
+      "takeovers": [
+        "packages/opencode/src/session/processor.ts",
+        "packages/opencode/src/session/llm.ts",
+        "packages/core/src/session/to-session-error.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/session/to-session-error.ts",
+        "ladder": "L3 (re-taken Transport branch: classifyNetFailure attributes the layer and withFailureCode leads Session.StructuredError.message with it; the L6 adapter reads it back with parseFailureCode — packages/schema/src/codepuppy-net-failure.ts; session.hook.retry's error is read-only, so no plugin can hold it)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-net-failure-settle.test.ts",
+          "name": "a refused request settles as provider.transport with tcp ahead of upstream's text"
+        },
+        {
+          "file": "packages/core/test/codepuppy-net-failure-settle.test.ts",
+          "name": "a host that does not resolve keeps the unreachable wording and carries dns"
+        },
+        {
+          "file": "packages/core/test/codepuppy-net-failure-settle.test.ts",
+          "name": "the request's own header timer settles as timeout"
+        },
+        {
+          "file": "packages/core/test/codepuppy-net-failure-settle.test.ts",
+          "name": "a transport failure the classifier does not attribute keeps upstream's text, with no code"
+        }
+      ]
+    },
+    {
+      "id": "tool-net-failure-metadata",
+      "decision": "A tool call that fails at the network layer carries Code Puppy's classification (layer and code) in its metadata (#1572 AC4).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666) Unit C",
+      "takeovers": [
+        "packages/opencode/src/session/processor.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/policy/display.ts",
+        "ladder": "L0 (the policy's execute.after classifies a failed call's original cause with classifyNetFailure, packages/schema/src/codepuppy-net-failure.ts, and puts codepuppyNetFailure on the replaced Tool.Error's metadata, which the session publisher stores on the failed tool part)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "webfetch to a refused port: the failure carries tcp / ECONNREFUSED and nothing of the URL"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "a failure that is not the network's carries no layer"
+        }
+      ]
+    },
+    {
+      "id": "l1r-naming-resume",
+      "decision": "Session naming resumes per Code Puppy's rules (codepuppy-naming-resume).",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L5 (#1667) per ruling #1666 comment 6737930969 item 1",
+      "takeovers": [
+        "packages/opencode/src/session/prompt.ts",
+        "packages/opencode/test/session/compaction.test.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ui-mac/src/main/naming-migration-db.ts",
+        "ladder": "main (runNamingMigrationDbStep rewrites the v1 tables before index.ts starts the engine, whose v1 → 2.x conversion runs once; source order pinned by the host's ANCHOR)"
+      },
+      "tests": [
+        {
+          "file": "packages/ui-mac/src/main/naming-before-v1-conversion.test.ts",
+          "name": "#1569 会话库改名先于 v1 → 2.x 转换:生产顺序 ⇒ 新名;转换先跑 ⇒ 旧名留在 2.x(naming-before-v1-conversion.cases.ts,2 条)"
+        },
+        {
+          "file": "packages/ui-mac/src/main/naming-resume.engine.test.ts",
+          "name": "#1569 AC4:迁移后继续生成、压缩后续写、溢出后续写都能完成;反向顺序具名失败(naming-resume.engine.cases.ts,2 条)"
+        }
+      ]
+    },
+    {
+      "id": "l1r-telemetry-credential",
+      "decision": "Telemetry never carries the credential (codepuppy-telemetry-credential).",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L5 (#1667) per ruling #1666 comment 6737930969 item 2",
+      "takeovers": [
+        "packages/opencode/src/session/llm.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ui-mac/src/main/sidecar-env.ts",
+        "ladder": "main (the sidecar environment allow-list lets no OTEL_* through; OpenCode 2's only telemetry export is OTLP configured from those variables)"
+      },
+      "tests": [
+        {
+          "file": "packages/ui-mac/src/main/sidecar-env-otel.test.ts",
+          "name": "原样:sidecar 环境白名单挡住整套 OTLP 变量(sidecar-env-otel.cases.ts,1 条)"
+        },
+        {
+          "file": "packages/ui-mac/src/main/sidecar-env-otel.test.ts",
+          "name": "反向臂:把 OTEL_ 加进前缀白名单 ⇒ 同一条断言变红"
+        }
+      ]
+    },
+    {
+      "id": "l1r-subtask-attachment-policy",
+      "decision": "Subtask attachments follow Code Puppy's attachment policy (codepuppy-subtask-attachment-policy).",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L4 (#1666) per ruling 6737930969",
+      "takeovers": [
+        "packages/opencode/src/session/prompt.ts",
+        "packages/core/src/config/plugin/command.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/policy/gate.ts",
+        "ladder": "L0 (E6: the real upstream subagent tool meets registerPolicy's execute.before before its own permission check, packages/core/src/tool/plugin/subagent.ts:145, and before any child session); a subtask command, which creates its child without a tool call, takes the subagent tool's permission path in the re-taken packages/core/src/config/plugin/command.ts, where the policy's permission.hook.evaluate gives the request the subagent tool's identity-axis decision (gate.ts gateWithoutToolCall: deny by name, or ask with Code Puppy's identity envelope)) + upstream-native, pinned (E7: packages/core/src/session/prompt.ts materializes a prompt's attachments with no tool call or permission request)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "a Code Puppy deny refuses the call by name: no approval request and no child session"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "a Code Puppy ask comes first; rejecting it never reaches upstream's subagent check or a child session"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "reverse arm: without Code Puppy's policy the call meets upstream's own subagent check first"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "a prompt's file attachment is materialized with read denied twice over, and no tool or permission call happens"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "premise: the same probe counts a real tool call and its permission evaluation"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "subagent denied by Code Puppy: /review is refused by name and no child session exists"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "subagent allowed: /review runs its subtask"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "reverse arm: without Code Puppy's policy the same denied record does not stop /review"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "subagent set to ask by Code Puppy: /review asks with the identity envelope first; rejected, no child session"
+        }
+      ]
+    },
+    {
+      "id": "l1r-review-turn-supply",
+      "decision": "Review turns are supplied per Code Puppy's rules (codepuppy-review-turn-supply).",
+      "adr": [
+        "ADR-041"
+      ],
+      "lane": "L6 (#1668)",
+      "takeovers": [
+        "packages/opencode/src/session/prompt.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ui-mac/src/engine-adapter/v1-shapes.ts",
+        "ladder": "L6 adapter (at each turn boundary events.ts / routes.ts fetch GET /api/session/:id/diff?from=<turnAnchor> and attach it to the turn's v1 user message for turnDiffsOf)"
+      },
+      "tests": [
+        {
+          "file": "packages/ui-mac/src/engine-adapter/turn-diffs.test.ts",
+          "name": "事件流 → 冻结归约器 → turnDiffsOf:读到 2.x 这个回合的改动(b.txt 新增一行)"
+        },
+        {
+          "file": "packages/ui-mac/src/engine-adapter/turn-diffs.test.ts",
+          "name": "反向臂:不在回合边界取 2.x 的逐回合 diff ⇒ 面板读到空(审阅面板显示「没有改动」)"
+        },
+        {
+          "file": "packages/ui-mac/src/engine-adapter/turn-diffs.test.ts",
+          "name": "通知在 idle 之后自己开回合(fixtures/parity.json):从通知取这个回合的改动,面板读得到"
+        }
+      ]
+    },
+    {
+      "id": "l1r-command-model-priority",
+      "decision": "A model the user explicitly picked out-ranks a command's or its agent's recommended model (#1560).",
+      "adr": [
+        "ADR-041",
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666) per ruling 6737930969",
+      "takeovers": [
+        "packages/opencode/src/session/prompt.ts",
+        "packages/opencode/test/session/prompt.test.ts",
+        "packages/core/src/config/plugin/command.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/config/plugin/command.ts",
+        "ladder": "L3 (re-taken: the command switches the session model only when the session has none; a subtask child runs on the parent's model before the command's or its agent's. No plugin seam reaches the command's switchModel)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "a picked session: the command's own model does not switch it; the command still runs"
+        },
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "a picked session: the command agent's model does not switch it either"
+        },
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "a subtask command: the child session runs on the parent's picked model"
+        }
+      ],
+      "note": "The pick is the session's `model`. L6 contract: Code Puppy's adapter switches the session model to the composer's pick before every send, so the field always carries the user's choice (orchestrator, plan 6bc34b3ce5). Upstream-native and kept: a session with no model takes a command's model, which then stays the session's model."
+    },
+    {
+      "id": "mcp-independent-startup",
+      "decision": "One MCP server failing or hanging never blocks the others; a starting server is visible as starting (#1563 AC1).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/opencode/src/mcp/index.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/mcp/index.ts",
+        "ladder": "upstream-native on OpenCode 2 (asynchronous initial connections), pinned"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "ok is connected and listed while hang is still pending"
+        }
+      ]
+    },
+    {
+      "id": "mcp-named-start-failures",
+      "decision": "A server that cannot start fails with a named cause (workspace_missing / dependency_missing / spawn_failed / handshake_timeout …) (#1563 AC2).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/opencode/src/mcp/index.ts",
+        "packages/core/src/mcp/client.ts",
+        "packages/core/src/mcp/connection.ts",
+        "packages/core/src/mcp/index.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/mcp/codepuppy-startup.ts",
+        "ladder": "L3 (re-taken packages/core/src/mcp/client.ts names the cause at the source; re-taken index.ts prefixes Mcp.Status.Failed.error with it through withFailureCode, and the L6 adapter reads it back with parseFailureCode — both in packages/schema/src/codepuppy-net-failure.ts; ruling #1666 6756103246 item 2 (b))"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "a missing working directory, a missing command, a refused remote"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "the failed status the desktop reads carries the named cause"
+        }
+      ],
+      "note": "An invalid remote URL carries no named cause: upstream's own text names it and it never reconnects, so the re-take keeps upstream's form there and upstream packages/core/test/mcp.test.ts stays untaken (orchestrator decision on plan 33d68fd266)."
+    },
+    {
+      "id": "mcp-reconnect-backoff",
+      "decision": "A failed server reconnects in the background after 30 s, doubling to 10 min (#1563 AC3).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/opencode/src/mcp/index.ts",
+        "packages/core/src/mcp/client.ts",
+        "packages/core/src/mcp/connection.ts",
+        "packages/core/src/mcp/index.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/mcp/codepuppy-startup.ts",
+        "ladder": "L3 (re-taken packages/core/src/mcp/index.ts schedules it on failed/closed)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "a 5xx answer (501) reconnects after 30 s, then after 60 s more"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "an auth answer stays failed"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "an auth answer to tools/list is named auth and not retried"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "does not fire after a manual reconnect ended in an auth answer"
+        }
+      ]
+    },
+    {
+      "id": "mcp-start-concurrency",
+      "decision": "At most four MCP servers start (spawn + handshake + tools/list) at once (#1563 AC5).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/opencode/src/mcp/index.ts",
+        "packages/core/src/mcp/client.ts",
+        "packages/core/src/mcp/connection.ts",
+        "packages/core/src/mcp/index.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/mcp/codepuppy-startup.ts",
+        "ladder": "L3 (re-taken packages/core/src/mcp/connection.ts takes the shared permit)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "six slow servers never overlap more than four deep"
+        }
+      ]
+    },
+    {
+      "id": "mcp-declared-tools-before-connect",
+      "decision": "A bundled Office server still starting is offered from its bundled declaration; a contradicting server drops the declaration (#1565).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/opencode/src/mcp/index.ts",
+        "packages/core/src/mcp/client.ts",
+        "packages/core/src/mcp/connection.ts",
+        "packages/core/src/mcp/index.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/mcp/codepuppy-first-party-mcp.ts",
+        "ladder": "L3 (re-taken packages/core/src/mcp/index.ts tools() / callTool)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "offered while starting; the third party is not; the listing replaces it once connected"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "a contradicting connection fails the planned call and drops the declaration"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "the command main writes and the one after the folder substitution both get the declaration"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "the real server.py, started as the engine starts it, lists exactly the shipped declaration"
+        }
+      ]
+    },
+    {
+      "id": "mcp-generation-changed-call",
+      "decision": "A call planned against an MCP tool's definition fails loudly when a later server generation changed that tool; an unchanged definition runs on the new connection (#1563 AC6).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666) Unit E",
+      "takeovers": [
+        "packages/opencode/src/mcp/index.ts",
+        "packages/core/src/tool/mcp.ts",
+        "packages/core/src/mcp/index.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/tool/mcp.ts",
+        "ladder": "L3 (re-taken: the McpTool call compares the definition it was offered under with the server's current listing after the approval wait, right before the send; re-taken packages/core/src/mcp/index.ts sends the retry after a recovered session only if the tool's definition is unchanged; sameTool from packages/core/src/mcp/codepuppy-first-party-mcp.ts)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-mcp-tool-generation.test.ts",
+          "name": "the next server generation changed the tool's schema: the call fails by name and never reaches the server"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-tool-generation.test.ts",
+          "name": "the next server generation lists the same definition: the call runs on it"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "the new generation changed the tool: the retry is not sent and the call fails by name"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "the new generation lists the same tool: the retry runs"
+        }
+      ]
+    },
+    {
+      "id": "mcp-net-failure-runtime",
+      "decision": "MCP connection failures are classified with Code Puppy's layered network classifier (#1572 N1, #1547).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666)",
+      "takeovers": [
+        "packages/opencode/src/mcp/index.ts",
+        "packages/core/src/mcp/client.ts",
+        "packages/core/src/mcp/connection.ts",
+        "packages/core/src/mcp/index.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/mcp/codepuppy-startup.ts",
+        "ladder": "L3 (re-taken packages/core/src/mcp/client.ts calls classifyNetFailure at the source)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "a missing working directory, a missing command, a refused remote"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "an auth answer stays failed"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "the failed status the desktop reads carries the named cause"
+        }
+      ]
+    },
+    {
+      "id": "mcp-failure-no-remote-text",
+      "decision": "An MCP failure's logs and public failed status carry Code Puppy's named cause with the HTTP status or process exit, never the remote server's response body or the local server's stderr (#1645).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666) Unit F",
+      "takeovers": [
+        "packages/opencode/src/mcp/index.ts",
+        "packages/core/src/mcp/client.ts",
+        "packages/core/src/mcp/connection.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/mcp/client.ts",
+        "ladder": "L3 (re-taken: safeDescription / safeExplain give logs and the failed status only the HTTP status or the process exit; re-taken connection.ts builds the failed status from it)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "a remote refusal: the body is in no log line and not in the status, which reads auth and HTTP 401"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "a local server that writes a secret to stderr and exits: it is in no log line and not in the status"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "a 503 the client retries: the body is in no retry log line and not in the status"
+        }
+      ]
+    },
+    {
+      "id": "l2r-auth-fail-closed",
+      "decision": "A model route whose deployment declared no credential refuses before the socket opens instead of sending an unauthenticated request (#652, owner ruling 2026-07-28 per the v1 source comment).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666); ruling B, #1666 comment 6756103246",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ai/src/route/auth-options.ts",
+        "ladder": "upstream-native on OpenCode 2: every provider entry resolves its credential with Auth.optional / Auth.config, which fail before the socket opens; pinned"
+      },
+      "tests": [
+        {
+          "file": "packages/ai/test/codepuppy-auth-fail-closed.test.ts",
+          "name": "the provider entries are enumerated (an empty list would make the pin vacuous)"
+        },
+        {
+          "file": "packages/ai/test/codepuppy-auth-fail-closed.test.ts",
+          "name": "every provider entry built with no credential sends nothing without one"
+        }
+      ],
+      "note": "Audit 2026-11-09: all 94 provider entries with a model factory refuse without a credential on unmodified OpenCode 2 routes (7 entries have no model factory; media routes take auth as a required field). The route default (Auth.none) is not re-taken. The engine's keyless inference for a configured provider with no key and no connection (packages/core/src/model-resolver.ts) is kept from an absent BYOK key file by L5's BYOK fix."
+    },
+    {
+      "id": "hub-install-ask",
+      "decision": "Installing from the Customization Center always asks (and is denied to automated agents) (I10).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L3 (#1665) per lane seams I10",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/hub-tools.ts",
+        "ladder": "L0 (permission.assert from codepuppy_hub_install + hubInstallEvaluate on permission.hook.evaluate, registered after registerPolicy)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "权威 · 定制中心安装(I10):codepuppy_hub_install 的权限评估恒 ask,自动化 agent 恒 deny,压过先注册的 allow;反向臂:不装 ext ⇒ allow 留着"
+        },
+        {
+          "file": "packages/ext/src/hub-tools.test.ts",
+          "name": "hubInstallEvaluate:codepuppy_hub_install 恒 ask(压过 allow),codepuppy-automation* 恒 deny,别的动作不碰"
+        },
+        {
+          "file": "packages/ext/src/hub-tools.test.ts",
+          "name": "规则被绕过(assert 直接放行)⇒ 查不到记录 ⇒ not installed: no confirmation box ran;assert 入参逐字段是冻结的形状"
+        }
+      ]
+    },
+    {
+      "id": "sidecar-stop-drains",
+      "decision": "Stopping the engine drains connections before exit (codepuppy-sidecar-stop; OOR-2: /global/dispose is 404 on 2.x).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L5 (#1667)",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ui-mac/src/main/sidecar-stop.ts",
+        "ladder": "main → sidecar (the stop message closes the engine's start() scope once, OOR-2; a 6 s backstop kills an unresponsive sidecar)"
+      },
+      "tests": [
+        {
+          "file": "packages/ui-mac/src/main/sidecar-stop.test.ts",
+          "name": "引擎被关一次(2.x 的收尾),进程自己退出(一次 kill 都没有)"
+        },
+        {
+          "file": "packages/ui-mac/src/main/sidecar-stop.test.ts",
+          "name": "#1647 AC2 a hung engine close stays inside the five-second stop budget"
+        },
+        {
+          "file": "packages/ui-mac/src/main/sidecar-stop-pending-approval.engine.test.ts",
+          "name": "#1647 AC1:等审批时停引擎 ⇒ 这一轮被释放、工具零执行(sidecar-stop-pending-approval.engine.cases.ts,3 条)"
+        }
+      ]
+    },
+    {
+      "id": "review-diff-engine-started-turn",
+      "decision": "The review panel shows the changes of a turn the engine started with its own synthetic message (a background subagent's completion after idle), as the current release does.",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666) Unit F",
+      "takeovers": [
+        "packages/core/src/session/diff.ts"
+      ],
+      "approval": {
+        "quote": "同意，多接管两个上游文件，需要再唯一权威中记录多接管的内容。",
+        "date": "2026-11-12",
+        "by": "owner (relayed by the orchestrator in the #1666 Unit F addendum)",
+        "reason": "The UI must match the current release (UI parity)."
+      },
+      "mechanism": {
+        "file": "packages/core/src/session/diff.ts",
+        "ladder": "L3 (re-taken: resolve accepts a synthetic message as the anchor, and a synthetic message opens a turn's busy period; no plugin seam reaches the session diff)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-session-diff-synthetic.test.ts",
+          "name": "user, assistant, idle, synthetic, assistant (b.txt), idle, then a later user turn"
+        }
+      ]
+    },
+    {
+      "id": "project-file-change-events",
+      "decision": "Files created, edited or deleted anywhere in the project, including outside the app, reach the file panel as file change events, as the current release does (0.1.26 project-wide watch).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666) Unit F",
+      "takeovers": [
+        "packages/core/src/filesystem/location-watcher.ts"
+      ],
+      "approval": {
+        "quote": "同意，多接管两个上游文件，需要再唯一权威中记录多接管的内容。",
+        "date": "2026-11-12",
+        "by": "owner (relayed by the orchestrator in the #1666 Unit F addendum)",
+        "reason": "The UI must match the current release (UI parity)."
+      },
+      "mechanism": {
+        "file": "packages/core/src/filesystem/codepuppy-project-watch.ts",
+        "ladder": "L3 (re-taken packages/core/src/filesystem/location-watcher.ts subscribes one recursive watch on the Location's folder when main's OPENCODE_EXPERIMENTAL_FILEWATCHER switch is on, with 0.1.26's ignore list plus configured watcher.ignore, and publishes filesystem.changed)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-project-watch.test.ts",
+          "name": "a file and a file in a subfolder: created, modified and deleted each publish their kind; .git and node_modules publish nothing"
+        },
+        {
+          "file": "packages/core/test/codepuppy-project-watch.test.ts",
+          "name": "with main's switch off, a project file publishes nothing"
+        }
+      ]
+    },
+    {
+      "id": "test-isolation-default",
+      "decision": "Every test is isolated from the user's real data directory: HOME, every XDG_*, OPENCODE_DB and TMPDIR point into a fresh temp root before any test module loads, so no test reads or writes the user's real engine data, config, state or logs (I-08).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "I-08 (INT-upstream-upgrade-readiness, #1662 follow-up)",
+      "takeovers": [
+        "packages/core/bunfig.toml"
+      ],
+      "approval": {
+        "quote": "工具服务提示选 A，核心包测试配置同意接管",
+        "date": "2026-11-12",
+        "by": "owner (relayed by the orchestrator in the I-08 step 4 dispatch)",
+        "reason": "Bun reads only the package's own bunfig.toml, and upstream's global roots are fixed when their module first evaluates, so only a preload listed in core's bunfig isolates every core test, including mixed runs; a per-file import cannot."
+      },
+      "mechanism": {
+        "file": "scripts/test-isolation/preload.ts",
+        "ladder": "L3 (re-taken bunfig.toml: one preload entry before upstream's own test/preload.ts; ext, ui-mac, schema, ai and plugin load the same preload from Code Puppy-owned bunfig files)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-test-isolation.test.ts",
+          "name": "the preload is in place: isolation keys and every engine Global path resolve inside the fresh temp root"
+        },
+        {
+          "file": "packages/core/test/codepuppy-test-isolation.test.ts",
+          "name": "known-bad: without the preload, with the real HOME / XDG_*, the engine roots land under the real home (paths only); an isolatedEnv() child stays inside"
+        }
+      ]
+    },
+    {
+      "id": "project-agent-permissions",
+      "decision": "A consented project's agent permission rules (`.codepuppy/codepuppy.jsonc` agent.<name>.permission) apply as in 0.1.26, so a read-only project agent cannot edit files; an unconsented project's rules are stripped and never reach the engine (REQ-236 P1).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "#1662 project-config",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/engine-transforms.ts",
+        "ladder": "L0 (agent.transform: applyAgents translates the v1 permission as upstream's v1 config migration does and pushes the rules after the agent's existing ones; mergeProjectConfig in packages/ext/src/project-config.ts strips permission/model/disable/mode without consent)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "权威 · 项目 agent 的权限(0.1.26 同意后生效):已同意的项目里,agent-creator 写的只读助手用真 edit 工具改文件 ⇒ 被拒,文件不变"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "项目 agent 的权限 · 反向臂:同一份文档、项目未同意 ⇒ 权限规则不进引擎,同一次编辑生效"
+        },
+        {
+          "file": "packages/ext/src/engine-transforms.test.ts",
+          "name": "agent-creator 的样本:规则逐条相同(bash ⇒ shell、read 的两条模式规则、书写顺序)"
+        }
+      ],
+      "note": "Two differences from 0.1.26, both kept by orchestrator decision (2026-11-12, #1662 project-config): (1) order against the user's own top-level permission rules — OpenCode 2's config agent plugin appends them after the extension's agent.transform (packages/core/src/config/plugin/agent.ts:71), so the user's global rules outrank a project agent's, whereas 0.1.26 laid the agent's rules over the global ones (origin/alpha packages/opencode/src/agent/agent.ts:293); the user's own rules winning is the safer direction; (2) unchanged from 0.1.26 and recorded only: a consented project's agent may also loosen permissions, consent being the gate."
+    },
+    {
+      "id": "provider-allowlist",
+      "decision": "Only the providers Code Puppy injects (the platform node, BYOK providers with a key, custom providers from Code Puppy's own truth file, the catalog-readiness marker) are listed and usable. A provider block written in any config file, including the engine's global folder (~/.config/opencode) together with its own provider.use allow line, is neither listed by GET /api/provider nor usable for a request, as in 0.1.26 where the injected enabled_providers replaced the merged list (#1392 baseline I1; #1662 orchestrator decision 2026-11-12).",
+      "lane": "#1662 green-b r2",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/provider-allow.ts",
+        "ladder": "L0 plugin hooks. The injection (packages/ui-mac/src/main/codepuppy-config-injection.ts) writes the provider.use policies (deny * then allow each injected id) into the explicit file and the inline document, and the same allow list into CODEPUPPY_PROVIDER_ALLOW in the sidecar process. The policies alone are outranked by the global folder: OpenCode 2 evaluates cross-document policies earliest-loaded first and loads the global folder before the explicit file (packages/core/src/config.ts). The extension therefore refuses a model request for any other provider in session.hook(\"model.request\"), and once plugin activation has settled (opencode.config.policy appears in the plugin list; config providers are added by that post-phase) registers a provider.transform that removes every other provider, re-placed last after each plugin re-activation. The managed-policy layer is not reachable from the embedding host: start() options carry no config.system (packages/server/src/options.ts, routes.ts)."
+      },
+      "tests": [
+        {
+          "file": "packages/ui-mac/src/main/custom-provider-derivation.test.ts",
+          "name": "宿主:嵌入式引擎的清单里有真源节点、没有 codepuppy.jsonc / 全局配置目录里的 exfil 块(带放行句也不行,选它发不出请求);追加放行 ⇒ 出现;请求那一道单独拒;撤掉 ext 的白名单 ⇒ 全局目录那条出现(custom-provider-derivation.engine.cases.ts,4 条)"
+        },
+        {
+          "file": "packages/ext/src/provider-allow.test.ts",
+          "name": "集合外的一律拿掉,只把已配置的那些报出来;集合外的请求抛错且点名,集合内的放行"
+        },
+        {
+          "file": "packages/ui-mac/src/main/codepuppy-config-injection.test.ts",
+          "name": "`#1662` 供应商白名单交给 ext:写进本进程 CODEPUPPY_PROVIDER_ALLOW 的集合逐条等于策略里放行的那些(同一次计算);注入关着 ⇒ 撤掉"
+        }
+      ],
+      "note": "Residual window: between the end of plugin activation and the transform being placed (one poll of the plugin list, about 20 ms) GET /api/provider can still list such a provider; OpenCode's own provider.use policy is likewise not in effect before activation ends. A request in that window is refused by the model.request hook. Egress (measured 2026-11-12, before this fix): a request to a non-whitelisted provider's host does not leave through the egress proxy (403 unregistered, zero dials) unless the user grants the host in the #1412 prompt or the block points at a host that is already authorized."
+    }
+  ]
+}

@@ -1,21 +1,13 @@
 // alpha-code#1568 AC3:来源证明 / 来源分类的取值是 `codepuppy-cloud` / `codepuppy-bundled`,
-// schema 与两份 SDK 生成类型逐字一致。删掉或回退 schema 里的任一取值、或只改其中一份生成物,这里当场红。
+// schema 是唯一一份(#1662 起 OpenCode 2 不再有 SDK 生成副本)。删掉或回退 schema 里的任一取值,这里当场红。
 import { describe, expect, test } from "bun:test"
 import { Schema } from "effect"
-import { ToolClass } from "../src/codepuppy-tool-policy"
-import { ToolAuthority, ToolDisplaySnapshotV1 } from "../src/tool-identity"
+import { ToolClass } from "../src/codepuppy-tool-policy.js"
+import { ToolAuthority, ToolDisplaySnapshotV1 } from "../src/tool-identity.js"
 
 const DIGEST = `sha256:${"a".repeat(64)}`
 const kindsOf = (union: typeof ToolAuthority) =>
   (union.members as ReadonlyArray<{ fields: { kind: { literal: string } } }>).map((member) => member.fields.kind.literal)
-
-/** 生成物里 `export type ToolAuthority = …` 那一段的全部 `kind: "<x>"`。 */
-async function generatedKinds(path: string) {
-  const text = await Bun.file(new URL(path, import.meta.url)).text()
-  const block = text.match(/export type ToolAuthority =[\s\S]*?(?=\nexport type )/)?.[0]
-  if (!block) throw new Error(`${path}: ToolAuthority declaration missing`)
-  return Array.from(block.matchAll(/kind: "([^"]+)"/g), (match) => match[1])
-}
 
 describe("#1568 AC3 来源证明取值", () => {
   test("schema 的 authority kind 与 tool class 只用 codepuppy 取值", () => {
@@ -34,18 +26,22 @@ describe("#1568 AC3 来源证明取值", () => {
     }
   })
 
-  test("两份 SDK 生成类型的 ToolAuthority 与 schema 逐项一致", async () => {
-    for (const path of ["../../sdk/js/src/gen/types.gen.ts", "../../sdk/js/src/v2/gen/types.gen.ts"]) {
-      expect(await generatedKinds(path)).toEqual(kindsOf(ToolAuthority))
-    }
+  // #1662: OpenCode 2 has no generated SDK copy of these types — the renderer reads `codepuppyDisplay` through
+  // `@opencode/schema/tool-identity` (lane seams I6/I7b). The premise "two generated copies match the schema" became
+  // "no generated copy exists to drift": each case first proves its scanner finds a known declaration.
+  test("OpenCode 2's generated client types carry no copy of ToolAuthority (the schema is the only one)", async () => {
+    const declares = (text: string) => /export (type|interface) ToolAuthority\b/.test(text)
+    expect(declares('export type ToolAuthority = { kind: "not-asserted" }')).toBe(true)
+    const generated = await Bun.file(new URL("../../client/src/promise/generated/types.ts", import.meta.url)).text()
+    expect(generated.length).toBeGreaterThan(1000)
+    expect(declares(generated)).toBe(false)
   })
 
-  // #1568 AC5:显示快照多一项可选 `readable`(第一方插件工具的 codepuppy:<动作>);两份 SDK 生成类型同样带上。
-  test("显示快照的可选 readable:schema 认,两份 SDK 生成类型都有", async () => {
+  test("the display snapshot's optional readable lives in the schema, with no generated copy to drift", async () => {
     expect(Object.keys(ToolDisplaySnapshotV1.fields)).toContain("readable")
-    for (const path of ["../../sdk/js/src/gen/types.gen.ts", "../../sdk/js/src/v2/gen/types.gen.ts"]) {
-      const text = await Bun.file(new URL(path, import.meta.url)).text()
-      expect(text.match(/export type ToolDisplaySnapshotV1 = \{[\s\S]*?\n\}/)?.[0]).toContain("readable?: string")
-    }
+    const declares = (text: string) => /export (type|interface) ToolDisplaySnapshotV1\b/.test(text)
+    expect(declares("export type ToolDisplaySnapshotV1 = {\n  readable?: string\n}")).toBe(true)
+    const generated = await Bun.file(new URL("../../client/src/promise/generated/types.ts", import.meta.url)).text()
+    expect(declares(generated)).toBe(false)
   })
 })

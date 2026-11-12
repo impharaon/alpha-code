@@ -18,7 +18,7 @@ export function base64UrlDecode(value: string): string {
 
 // #925:这里曾有 `sessionHref(directory, sessionID)` —— legacy 会话 href(`/{目录}/session/{id}`,
 // 路径里没有 server 段)在 ui-mac 的**唯一**产生器。它产出的 href 逼着壳事后反推 server
-// (`packages/app/src/utils/session-route.ts` 的 `legacySessionServer`:同 id 的 tab,否则回落到
+// (`packages/codepuppy-app/src/utils/session-route.ts` 的 `legacySessionServer`:同 id 的 tab,否则回落到
 // 「完成时的 active server」),多 server(WSL/remote)下会把会话导向没有它的机器;那台机器上若
 // 恰好有同 id 会话,打开并污染的是那个无关会话(#894 修的首页那一条,与本器的四个消费者同形)。
 // 咽喉在产生器:该导出已**删除**,不是改签名 —— 两个参数都是 string,改签名会让漏改的调用点把

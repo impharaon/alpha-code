@@ -1,14 +1,14 @@
 // REQ-236 AC3(`#1562`)—— 平台模型请求的凭据在请求边界现读;读不到 ⇒ 抛 `@ai-sdk/provider` 的 `LoadAPIKeyError`
-// (引擎归为 ProviderAuthError,请求不发出),绝不回落。两层:①纯判据 platformCredentialHeader;②真 CodePuppyExt 的
-// `chat.headers` 钩子(与引擎装它的方式同款),证明判据接在钩子上。端到端(真引擎、网关零请求)在 ui-mac
-// token-hot-apply.engine.test.ts。令牌用可识别哨兵串,任何错误消息里都不得出现它或文件路径。
+// (请求不发出),绝不回落。这里是纯判据 platformCredentialHeader;`#1665` 起它接在 OpenCode 2 的
+// `session.hook["model.request"]` 上,真宿主里的判据(只对平台节点、每次现读、读不到即抛、不装 ext 不带)在 plugin-host.test.ts。
+// 令牌用可识别哨兵串,任何错误消息里都不得出现它或文件路径。
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { LoadAPIKeyError } from "@ai-sdk/provider"
-import { platformCredentialHeader } from "./platform-credential-header"
+import { platformCredentialHeader, platformRequestCredentialHeader } from "./platform-credential-header"
 
 const GW = "https://gw.example/v1"
 const SENTINEL = "SENTINEL-PLATFORM-CREDENTIAL-41b7"
@@ -75,62 +75,35 @@ describe("platformCredentialHeader —— 判据", () => {
   })
 })
 
-describe("真 CodePuppyExt 的 chat.headers 钩子", () => {
-  let saved: Record<string, string | undefined> = {}
-  const KEYS = ["CODEPUPPY_BASE_URL", "CODEPUPPY_GLOBAL_DIR", "CODEPUPPY_PLATFORM_AUTH_REF"]
-  beforeEach(() => {
-    saved = Object.fromEntries(KEYS.map((key) => [key, process.env[key]]))
-    const global = join(root, "global", "env", "dev")
-    mkdirSync(global, { recursive: true })
-    mkdirSync(join(root, "project"), { recursive: true })
-    process.env.CODEPUPPY_GLOBAL_DIR = global
-    process.env.CODEPUPPY_BASE_URL = GW
-    process.env.CODEPUPPY_PLATFORM_AUTH_REF = `{file:${keyFile}}`
-  })
-  afterEach(() => {
-    KEYS.forEach((key) => {
-      if (saved[key] === undefined) delete process.env[key]
-      else process.env[key] = saved[key]
-    })
+describe("platformRequestCredentialHeader —— http.request 上按请求地址判平台节点", () => {
+  test("地址在平台节点之下 ⇒ 与 platformCredentialHeader 同一结果;别的主机、只是前缀相同的路径段 ⇒ 不动", () => {
+    const reads: string[] = []
+    const env = { CODEPUPPY_BASE_URL: GW, CODEPUPPY_PLATFORM_AUTH_REF: "{file:/token}" }
+    const readFile = (file: string) => (reads.push(file), "tok")
+    expect(platformRequestCredentialHeader({ requestURL: `${GW}/chat/completions`, env, readFile })).toBe("Bearer tok")
+    expect(platformRequestCredentialHeader({ requestURL: "https://api.deepseek.com/v1/chat/completions", env, readFile })).toBeUndefined()
+    expect(platformRequestCredentialHeader({ requestURL: `${GW}evil/chat/completions`, env, readFile })).toBeUndefined()
+    expect(reads).toEqual(["/token"])
   })
 
-  type ChatHeaders = (
-    input: { sessionID: string; agent: string; model: unknown; provider: { options?: Record<string, unknown> }; message: unknown },
-    output: { headers: Record<string, string> },
-  ) => Promise<void>
-
-  const load = async () => {
-    const { CodePuppyExt } = await import("./plugin")
-    const hooks = await CodePuppyExt({
-      directory: join(root, "project"),
-      worktree: join(root, "project"),
-      client: { instance: { dispose: async () => {} } },
-    } as unknown as Parameters<typeof CodePuppyExt>[0])
-    const hook = (hooks as unknown as Record<string, unknown>)["chat.headers"]
-    expect(typeof hook).toBe("function")
-    return hook as ChatHeaders
-  }
-  const call = async (hook: ChatHeaders, baseURL: string) => {
-    const output = { headers: {} as Record<string, string> }
-    await hook({ sessionID: "s", agent: "build", model: {}, provider: { options: { baseURL, apiKey: "placeholder" } }, message: {} }, output)
-    return output.headers
-  }
-
-  test("平台节点:写请求级 authorization;文件删掉后钩子抛 LoadAPIKeyError(请求被终止)", async () => {
-    writeFileSync(keyFile, SENTINEL)
-    const hook = await load()
-    expect(await call(hook, GW)).toEqual({ authorization: `Bearer ${SENTINEL}` })
-    rmSync(keyFile)
-    const thrown = await call(hook, GW).then(
-      () => undefined,
-      (error: unknown) => error,
-    )
-    expect(LoadAPIKeyError.isInstance(thrown)).toBe(true)
-    expect(String((thrown as Error).message)).not.toContain(SENTINEL)
-  })
-
-  test("直连 BYOK 节点:钩子不碰请求头", async () => {
-    writeFileSync(keyFile, SENTINEL)
-    expect(await call(await load(), "https://api.deepseek.com/v1")).toEqual({})
+  test("`#1662` r6:平台节点写成大写主机 / 显式默认端口 / 末尾斜杠 / 主机末尾一个点 ⇒ 规范化后的请求地址仍认;像而不是的主机与兄弟路径不认", () => {
+    const readFile = () => "tok"
+    const request = "https://gw.example/v1/chat/completions"
+    for (const base of ["https://GW.example/v1", "https://gw.example:443/v1", "https://gw.example/v1/", "https://gw.example./v1"]) {
+      const env = { CODEPUPPY_BASE_URL: base, CODEPUPPY_PLATFORM_AUTH_REF: "{file:/token}" }
+      expect([base, platformRequestCredentialHeader({ requestURL: new Request(base.replace(/\/?$/, "/chat/completions")).url, env, readFile })]).toEqual([base, "Bearer tok"])
+      expect([base, platformRequestCredentialHeader({ requestURL: request, env, readFile })]).toEqual([base, "Bearer tok"])
+    }
+    const env = { CODEPUPPY_BASE_URL: GW, CODEPUPPY_PLATFORM_AUTH_REF: "{file:/token}" }
+    for (const requestURL of [
+      "https://gw.example.evil/v1/chat/completions",
+      new Request("https://gw.example@evil/v1/chat/completions").url,
+      "https://gw.example/v1x/chat/completions",
+      "http://gw.example/v1/chat/completions",
+      "https://gw.example:8443/v1/chat/completions",
+      "not a url",
+    ])
+      expect([requestURL, platformRequestCredentialHeader({ requestURL, env, readFile })]).toEqual([requestURL, undefined])
   })
 })
+

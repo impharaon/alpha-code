@@ -459,12 +459,6 @@ export interface ExtensionsApi {
   enableCloud(entry: CatalogEntry, authorization?: AuthorizationConfirmationWire, hubRequestId?: string): Promise<ActionResult>
 }
 
-function authHeaders(info: ServerInfo): Record<string, string> | undefined {
-  if (!info.username && !info.password) return undefined
-  const token = btoa(`${info.username ?? ""}:${info.password ?? ""}`)
-  return { Authorization: `Basic ${token}` }
-}
-
 // MCP status is a discriminated union (connected/disabled/failed/needs_auth/…). We don't hard-code
 // the exact discriminant field name — derive a tag defensively so a schema tweak can't crash us.
 function statusTag(info: unknown): string {
@@ -473,20 +467,20 @@ function statusTag(info: unknown): string {
   const raw = (o.status ?? o._tag ?? o.type ?? "") as string
   return String(raw).toLowerCase()
 }
-function isConnected(info: unknown): boolean {
+export function isConnected(info: unknown): boolean {
   return statusTag(info).includes("connected")
 }
-function isDisabled(info: unknown): boolean {
+export function isDisabled(info: unknown): boolean {
   return statusTag(info).includes("disabled")
 }
 /** `#733`:引擎的 `needs_auth` 臂 —— 该 server 走 OAuth 但当前没有可用令牌。
  *  判等而不是 `includes`:`needs_client_registration` 是**另一件事**(配置里缺 clientId,
  *  用户点一百次授权也没用),把两者折在一起会给用户一颗按了必失败的按钮。 */
-function needsAuth(info: unknown): boolean {
+export function needsAuth(info: unknown): boolean {
   return statusTag(info) === "needs_auth"
 }
 /** `#1563`:引擎还在后台启动这台服务(`pending`)—— 判等,与上面一样不靠子串。 */
-function isPending(info: unknown): boolean {
+export function isPending(info: unknown): boolean {
   return statusTag(info) === "pending"
 }
 /** `#1564` AC6:第一方文档工具的随包解释器不在 ⇒ 引擎报 failed / dependency_missing(spawn ENOENT),修复动作是
@@ -1065,7 +1059,7 @@ export function useExtensions(
     activated = true
     const gen = ++generation
     abortRef = new AbortController()
-    client = createOpencodeClient({ baseUrl: info.baseUrl, directory: projectDir?.(), headers: authHeaders(info) })
+    client = createOpencodeClient({ baseUrl: info.baseUrl, directory: projectDir?.(), ...(info.fetch ? { fetch: info.fetch } : {}) })
     setStore("mcp", {})
     void loadStatus()
     void loadInstalls()

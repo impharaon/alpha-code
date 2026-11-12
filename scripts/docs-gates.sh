@@ -6,9 +6,19 @@
 # 两边调同一个函数,所以「轻量门漏了某一步」或「全量门改了口径而轻量门没跟」不会发生。
 # 调用方负责 cd 到仓库根(两处都用相对路径 scripts/…)并处理返回值。
 
+# I-09:含受审上游合并的分支(换代整合分支)上,两道文档闸只判 Code Puppy 的地盘。上游父怎么认由 north-star 守卫
+# 定义(`--print-upstream-parent`,不另抄一份);与上游父逐字节相同的路径是上游原样,不归我们 lint —— 自有包、
+# 文档、脚本、接管文件与它们不同(或上游没有),照常判。没有上游父(普通分支、alpha 本身)⇒ 空串,行为逐字不变。
+docs_gate_upstream_parent() {
+  bash scripts/north-star-guard.sh --print-upstream-parent 2>/dev/null || true
+}
+
 # [3/14] 字面 NUL 字节(#760):NUL 让 grep 对整个文件静默失明。
 docs_gate_nul() {
-  if python3 scripts/assert-no-nul-bytes.py; then
+  local parent
+  parent="$(docs_gate_upstream_parent)"
+  [ -z "$parent" ] || echo "    · 含受审上游合并:与上游父 ${parent:0:10} 逐字节相同的文件不扫"
+  if python3 scripts/assert-no-nul-bytes.py ${parent:+--skip-identical-to "$parent"}; then
     echo "    ✓ no literal NUL bytes"
   else
     echo "    ✗ literal NUL bytes found"
@@ -24,6 +34,16 @@ docs_gate_links() {
   md_worktree="$(git diff --name-only --diff-filter=d HEAD -- '*.md' 2>/dev/null || true)"
   md_untracked="$(git ls-files --others --exclude-standard -- '*.md' 2>/dev/null || true)"
   md_list="$(printf '%s\n%s\n%s\n' "$md_committed" "$md_worktree" "$md_untracked" | sed '/^$/d' | sort -u)"
+  local parent
+  parent="$(docs_gate_upstream_parent)"
+  if [ -n "$parent" ] && [ -n "$md_list" ]; then
+    # 只留与上游父不同的(含上游没有的);未跟踪文件 git diff 看不见,按新增照留。
+    local differing
+    # shellcheck disable=SC2086
+    differing="$(git diff --name-only "$parent" -- $md_list 2>/dev/null || true)"
+    md_list="$(printf '%s\n%s\n' "$differing" "$md_untracked" | sed '/^$/d' | sort -u)"
+    echo "    · 含受审上游合并:与上游父 ${parent:0:10} 逐字节相同的 Markdown 不判"
+  fi
   if [ -z "$md_list" ]; then
     echo "    ✓ no Markdown changed — docs gate is a no-op (与 CI 同)"
     return 0

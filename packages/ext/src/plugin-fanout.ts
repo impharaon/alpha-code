@@ -1,47 +1,38 @@
-// REQ-060 plugin host fan-out:项目级 plugin(`<dir>/.codepuppy/plugins/*.js`)不能经 config.plugin[] 加载
-// —— config hook 是引擎「插件已加载完」后的 Notify,改 plugin[] 太晚(鸡生蛋)。故由 host 插件
-// (@codepuppy/ext)在 per-instance init 时动态 import 项目插件、拿到它们的 Hooks,与自身 Hooks **合并**
-// 后一并 return,引擎照常派发 —— 项目插件的 hook 得以生效,项目零 `.opencode`、零 config.plugin[]。
+// REQ-060 plugin host fan-out:项目级 plugin(`<dir>/.codepuppy/plugins/*.js`)由 ext 代为装载 —— 项目零 `.opencode`、
+// 零引擎 `plugins` 配置项。
+//
+// `#1665`(OpenCode 2,清点表 P10):项目插件写成 2.x 的 promise 插件形状(`default` 导出 `{ id, setup }`),ext 在本 Location
+// 的 `setup` 里用**同一个插件 Context** 调它们的 `setup` —— 它们注册的钩子与 transform 挂在 ext 的作用域上,排在 ext 自己的
+// 钩子之后、L4 `seal()` 那一段之前(接口 I3:被策略拒掉的调用不会先流过项目插件;链尾的执行闸看得到它们的改写)。
+// v1 的 `(input) => Promise<Hooks>` 形状在 2.x 里没有可派发的钩子表,一律不装并响亮记一行。
+//
+// ADR-041 名称冲突(编排器裁决 2026-11-09,#1666 c6737732975 第 3 条 (c);#1666 c6737930969):项目插件经扇出拿到的工具编辑器
+// (`projectPluginContext` 包住它的 `tool.transform`)只许动**它自己经这个编辑器注册的**工具:有效名已存在的 add、以及对别人工具的
+// update / remove,一律拒绝并记一行。不然一个项目插件就能顶掉、改写(比如包住 execute)或删掉 Code Puppy、上游或 MCP 的工具
+// (2.x 的工具编辑器同名 add 即覆盖,update / remove 不问归属)。每个项目插件各拿一份 Context,「自己的工具」不跨插件。
+// 新名也不许挂在别人的 namespace 下(I-05 slice E,design review):namespace 等于某个已配置 MCP 服务器的名字、或是 OpenCode
+// (`opencode`)与 Code Puppy(`codepuppy`、`codepuppy-*`)保留的,一律拒绝并按同一格式记一行 —— 否则身份推导会把它当成那台
+// 服务器的工具,带上那台服务器的 authority(ADR-041:身份由 Code Puppy 铸,不由工具自己说)。
+//
+// 待批请求的回复(编排器裁决,#1666 c6756103246 第 3 条):L4 实测,透传出去的 Context 能对 Code Puppy 待批的请求直接回 once,
+// 调用随即执行。所以项目插件拿到的 `permission` 不给 `reply`,也不给 `saved.update` / `saved.remove`(改 / 删已存的批准):
+// 调用一律拒绝并按上面同一格式记一行,返回 undefined、不抛(与工具的拒绝同口径,不让项目插件的钩子在宿主里变成缺陷)。
+// 它自己的 `permission.assert` 与 `permission.hook` 原样;它的 evaluate 钩子由 L4 的 holdAsk 约束(policy/,不在本文件)。
 //
 // 信任门(安全红线):项目 plugin = 可执行 JS,只在项目已 consent 时加载(loadProjectPlugins 门控)。
 // ADR-006:项目 plugins 必须是**自包含 ESM JS**(生 TS 桌面必崩)—— 只收 .js,加载失败 loud 不阻断。
 
-/** Hooks 合并(纯逻辑,单测覆盖):tool = map 浅并(own 优先,保护 alpha 工具不被项目覆盖);其余 hook
- *  = 函数,转发为「依次调用 own 再各项目插件」(event/config/chat.* 等都是通知或变异 output/cfg,
- *  串行调用语义正确)。own 的 hook 永远先跑。 */
-export function mergeHooks(
-  own: Record<string, unknown>,
-  others: Record<string, unknown>[],
-): Record<string, unknown> {
-  const merged: Record<string, unknown> = { ...own }
+import type { ToolEditor } from "@opencode/plugin/promise/tool"
+import { mcpNamespace } from "./policy/identity"
 
-  // tool:map 浅并,own 键优先(项目插件不得覆盖 codepuppy_reload/echo/ping)
-  const toolMap: Record<string, unknown> = { ...((own.tool as Record<string, unknown>) ?? {}) }
-  for (const h of others) {
-    const t = h.tool as Record<string, unknown> | undefined
-    if (t) for (const [k, v] of Object.entries(t)) if (!(k in toolMap)) toolMap[k] = v
-  }
-  if (Object.keys(toolMap).length > 0) merged.tool = toolMap
-
-  // 其余 hook:收集所有函数型 key,转发为串行调用(own 先)。
-  const keys = new Set<string>()
-  for (const h of [own, ...others]) for (const k of Object.keys(h)) if (k !== "tool") keys.add(k)
-  for (const k of keys) {
-    const fns = [own[k], ...others.map((h) => h[k])].filter((f): f is (...a: unknown[]) => unknown => typeof f === "function")
-    if (fns.length === 0) continue
-    merged[k] = async (...args: unknown[]) => {
-      for (const fn of fns) await fn(...args)
-    }
-  }
-  return merged
-}
+export type ProjectPluginCleanup = () => Promise<void> | void
 
 export type FanoutDeps = {
-  /** 每次项目路径 I/O 紧前复验准入时 root；失败时整次 fan-out 拒绝。 */
+  /** 每次项目路径 I/O 紧前复验准入时 root;失败时整次 fan-out 拒绝。 */
   verifyIdentity: () => boolean
   existsSync: (p: string) => boolean
   readdirSync: (p: string) => string[]
-  /** dynamic import of a self-contained ESM plugin file → module (default/CodePuppyExt = Plugin fn). */
+  /** dynamic import of a self-contained ESM plugin file → module. */
   importModule: (fileUrl: string) => Promise<Record<string, unknown>>
   pathToFileURL: (p: string) => string
   join: (...parts: string[]) => string
@@ -49,21 +40,137 @@ export type FanoutDeps = {
   error?: (m: string) => void
 }
 
+type ProjectPlugin = { id: string; setup: (context: never) => unknown }
+
+type ToolLike = { readonly name: string; readonly options?: { readonly namespace?: string } }
+type ToolEditorLike = Pick<ToolEditor, "add" | "get" | "update" | "remove">
+type ToolDomainLike = { transform(callback: (editor: ToolEditorLike) => void): Promise<unknown> }
+
 /**
- * 加载项目 `.codepuppy/plugins/*.js` 并调用得到 Hooks[]。信任门:trusted=false → 直接返回 []
- * (可执行物未 consent 不加载)。逐个 import + 调用 Plugin(input);失败 loud 跳过(不阻断整体)。
+ * 工具的有效名(工具表上的名字),与上游 `effectiveName`(`packages/core/src/tool/runtime.ts`)逐字同义:
+ * `[^a-zA-Z0-9_-]` → `_`,有 namespace 时前缀 `<namespace 里 . 换 _>_`。插件拿不到上游的函数,拼法在这里写一份,
+ * 漂移由 plugin-fanout.test.ts 拿**真的** `effectiveName` 钉住(与 cloud-websearch-kill.ts 的 mcpEngineToolId 同一纪律)。
+ */
+export function effectiveToolName(tool: ToolLike): string {
+  const name = tool.name.replace(/[^a-zA-Z0-9_-]/g, "_")
+  return tool.options?.namespace === undefined ? name : `${tool.options.namespace.replaceAll(".", "_")}_${name}`
+}
+
+/** OpenCode 自己(`opencode`,内置工具)与 Code Puppy(`codepuppy` 云端、`codepuppy-<格式>` 随包 Office)用的工具 namespace。 */
+export function reservedToolNamespace(namespace: string): boolean {
+  const normalized = namespace.replaceAll(".", "_")
+  return normalized === "opencode" || normalized === "codepuppy" || normalized.startsWith("codepuppy-") || normalized.startsWith("codepuppy_")
+}
+
+/**
+ * 已配置 MCP 服务器的 namespace(随 MCP 配置每次重建刷新)。只读的 `mcp.transform`:项目插件的工具 transform 每次重建都会再跑,
+ * 拿到的总是当时的服务器名单。
+ */
+export async function trackMcpNamespaces(mcp: {
+  transform(callback: (editor: { list(): readonly (readonly [string, unknown])[] }) => void): Promise<unknown>
+}): Promise<(namespace: string) => boolean> {
+  const namespaces = new Set<string>()
+  await mcp.transform((editor) => {
+    namespaces.clear()
+    for (const [name] of editor.list()) namespaces.add(mcpNamespace(name))
+  })
+  return (namespace) => namespaces.has(namespace.replaceAll(".", "_"))
+}
+
+/**
+ * 给一个项目插件的插件 Context:`tool.transform` 拿到的编辑器只许动它自己注册的工具(ADR-041);`permission` 不给回复待批请求、
+ * 不给改 / 删已存的批准(#1666 第 3 条);其余原样。
+ */
+export function projectPluginContext<C extends { readonly tool: ToolDomainLike }>(
+  context: C,
+  error: (m: string) => void,
+  /** True for a configured MCP server's namespace (`trackMcpNamespaces`). */
+  mcpNamespaceTaken: (namespace: string) => boolean,
+): C {
+  /** 这个项目插件经本 Context 的编辑器注册成功的有效名(跨它的各次 transform 与重建)。 */
+  const own = new Set<string>()
+  const report = (domain: string, what: string, id: string, why: string) =>
+    error(`[@codepuppy/ext] project plugin ${domain} ${what} "${id}" refused: ${why} (ADR-041)`)
+  const refuse = (what: string, id: string, why: string) => report("tool", what, id, why)
+  const guard = (editor: ToolEditorLike): ToolEditorLike =>
+    new Proxy(editor, {
+      get: (target, key, receiver) => {
+        if (key === "add")
+          return (tool: Parameters<ToolEditorLike["add"]>[0]) => {
+            const id = effectiveToolName(tool)
+            const namespace = tool.options?.namespace
+            if (namespace !== undefined && (reservedToolNamespace(namespace) || mcpNamespaceTaken(namespace)))
+              return refuse("add", id, `namespace "${namespace}" belongs to an MCP server, OpenCode or Code Puppy`)
+            if (target.get(id) !== undefined && !own.has(id)) return refuse("add", id, "a tool with that name already exists")
+            target.add(tool)
+            own.add(id)
+          }
+        if (key === "update")
+          return (id: string, update: Parameters<ToolEditorLike["update"]>[1]) => {
+            if (!own.has(id)) return refuse("update", id, "the project plugin did not register it")
+            target.update(id, update)
+          }
+        if (key === "remove")
+          return (id: string) => {
+            if (!own.has(id)) return refuse("remove", id, "the project plugin did not register it")
+            target.remove(id)
+          }
+        return Reflect.get(target, key, receiver)
+      },
+    })
+  const tool = new Proxy(context.tool, {
+    get: (target, key, receiver) =>
+      key === "transform"
+        ? (callback: (editor: ToolEditorLike) => void) => target.transform((editor) => callback(guard(editor)))
+        : Reflect.get(target, key, receiver),
+  })
+  const approvals = "approvals belong to the user, not to a project plugin"
+  const idOf = (input: unknown, key: string) => String((input as Record<string, unknown> | undefined)?.[key] ?? "")
+  const refusing = (what: string, key: string) => async (input: unknown) => void report("permission", what, idOf(input, key), approvals)
+  const inner = (context as { readonly permission?: object }).permission
+  // `saved` 今天不在 2.x promise 插件 Context 上(adapter.ts 的 permission 只有 hook / list / get / reply / assert);
+  // 这里照样拦住它的 update / remove,上游哪天加上也不会漏过去,list / get 之类原样透传。
+  const saved = (target: object | undefined) =>
+    new Proxy(target ?? {}, {
+      get: (savedTarget, key, receiver) =>
+        key === "update" ? refusing("saved.update", "id") : key === "remove" ? refusing("saved.remove", "id") : Reflect.get(savedTarget, key, receiver),
+    })
+  const permission =
+    inner &&
+    new Proxy(inner, {
+      get: (target, key, receiver) =>
+        key === "reply"
+          ? refusing("reply", "requestID")
+          : key === "saved"
+            ? saved(Reflect.get(target, key, receiver) as object | undefined)
+            : Reflect.get(target, key, receiver),
+    })
+  return new Proxy(context, {
+    get: (target, key, receiver) =>
+      key === "tool" ? tool : key === "permission" && permission ? permission : Reflect.get(target, key, receiver),
+  })
+}
+
+const isProjectPlugin = (value: unknown): value is ProjectPlugin => {
+  const plugin = value as { id?: unknown; setup?: unknown } | null
+  return !!plugin && typeof plugin === "object" && typeof plugin.id === "string" && typeof plugin.setup === "function"
+}
+
+/**
+ * 加载项目 `.codepuppy/plugins/*.js`,以本 Location 的插件 Context 逐个调 `setup`,返回它们的 Cleanup(由 ext 的 Cleanup 一并调)。
+ * 信任门:trusted=false → 直接返回 [](可执行物未 consent 不加载)。失败 loud 跳过(不阻断整体,也不让 ext 的 setup 失败)。
  */
 export async function loadProjectPlugins(
   codepuppyRoot: string,
-  pluginInput: unknown,
+  /** 每个项目插件各取一份插件 Context(ADR-041 的「自己的工具」按插件分)。 */
+  contextFor: () => unknown,
   trusted: boolean,
   deps: FanoutDeps,
-): Promise<Record<string, unknown>[]> {
+): Promise<ProjectPluginCleanup[]> {
   if (!trusted) return []
   const dir = deps.join(codepuppyRoot, "plugins")
   if (!deps.verifyIdentity()) return []
   if (!deps.existsSync(dir)) return []
-  const hooks: Record<string, unknown>[] = []
   let files: string[]
   try {
     if (!deps.verifyIdentity()) return []
@@ -78,22 +185,25 @@ export async function loadProjectPlugins(
   } catch {
     return []
   }
+  const cleanups: ProjectPluginCleanup[] = []
   for (const f of files) {
     const abs = deps.join(dir, f)
     try {
-      if (!deps.verifyIdentity()) return []
+      if (!deps.verifyIdentity()) return cleanups
       const mod = await deps.importModule(deps.pathToFileURL(abs))
-      const plugin = (mod.default ?? mod.CodePuppyExt ?? mod.plugin) as ((i: unknown) => Promise<unknown>) | undefined
-      if (typeof plugin !== "function") {
-        deps.error?.(`[@codepuppy/ext] project plugin ${f} has no default export function — skipped`)
+      const plugin = mod.default
+      if (!isProjectPlugin(plugin)) {
+        deps.error?.(
+          `[@codepuppy/ext] project plugin ${f} skipped: its default export must be an OpenCode 2 plugin { id, setup } (a v1 function plugin has no hooks to run here)`,
+        )
         continue
       }
-      const h = await plugin(pluginInput)
-      if (h && typeof h === "object") hooks.push(h as Record<string, unknown>)
-      deps.log?.(`[@codepuppy/ext] project plugin loaded (fan-out): ${abs}`)
+      const cleanup = await plugin.setup(contextFor() as never)
+      if (typeof cleanup === "function") cleanups.push(cleanup as ProjectPluginCleanup)
+      deps.log?.(`[@codepuppy/ext] project plugin loaded (fan-out): ${plugin.id} ← ${abs}`)
     } catch (error) {
       deps.error?.(`[@codepuppy/ext] project plugin ${f} failed to load: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
-  return hooks
+  return cleanups
 }

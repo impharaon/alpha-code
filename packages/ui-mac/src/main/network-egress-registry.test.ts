@@ -8,6 +8,10 @@
 // `#1415` 追加一节:websearch 那两行的**值**不归本表所有 —— 它是两条传输里的源码常量。
 // 独立字面量锚仍然留在 EXPECTED_INITIAL_SET(评审读的是那份 diff),但另有三条从**那两个文件的
 // 源码**派生期望值再比对,于是「引擎改了端点而白名单没跟」不再是一条无人变红的静默漂移。
+// `#1662`(OpenCode 2):v1 的两条传输(packages/opencode/src/tool/mcp-websearch.ts 与旧 core 的 tool/websearch.ts)
+// 随换代删除;2.x 上这两个端点各在一处:Exa = Code Puppy 自己的 exa 供应商(packages/ext/src/exa-websearch.ts,
+// L5r 的默认本地 keyless 供应商,与上游 packages/core/src/plugin/websearch/exa.ts 同值由 ext 的 exa-websearch.test.ts 钉住),
+// Parallel = 上游供应商(packages/core/src/plugin/websearch/parallel.ts,用户在 websearch 配置里选它时走)。
 
 import { readFileSync } from "node:fs"
 import { join, resolve } from "node:path"
@@ -40,26 +44,28 @@ const EXPECTED_INITIAL_SET = [
   "www.eclipse.org:443",
 ]
 
-// ── `#1415`:websearch 两个端点的真源 = 两条传输里的 URL 常量 ─────────────────────────
+// ── `#1415`:websearch 两个端点的真源 = 传输里的 URL 常量 ─────────────────────────────
 // 注册表里那两行不许是「第二份手写清单」。这里的期望值因此**从那两个文件的源码读出来**,
-// 而不是再抄一次域名:任一侧改了端点而另一侧没跟,下面三条里至少一条当场红。
-// (两条传输都是 ADR-035 收编面;它们各自的主权闸判据在 websearch-copies.test.ts。)
-const WEBSEARCH_TRANSPORTS = ["packages/opencode/src/tool/mcp-websearch.ts", "packages/core/src/tool/websearch.ts"] as const
+// 而不是再抄一次域名:任一侧改了端点而注册表没跟,下面三条里至少一条当场红。
+// (2.x 的搜网执行面普查在 websearch-copies.test.ts;kill-switch 由 ext 的 execute.before 拒。)
+const WEBSEARCH_TRANSPORTS = ["packages/ext/src/exa-websearch.ts", "packages/core/src/plugin/websearch/parallel.ts"] as const
 const REPO_ROOT = resolve(import.meta.dir, "..", "..", "..", "..")
 
 /**
  * 一个传输文件里出现的全部 https 端点 host(去重、排序)。
- * **先证明手段测得出已知的坏**:抓不到 ≥2 条字面量就判「本次测量作废」而不是给一个空集 ——
+ * **先证明手段测得出已知的坏**:一条字面量都抓不到就判「本次测量作废」而不是给一个空集 ——
  * 空集会让下面每一条断言都空对空地绿(本仓《观测手段自己有盲区》那一类)。
  */
 function websearchHostsOf(relativePath: string): string[] {
   const body = readFileSync(join(REPO_ROOT, relativePath), "utf8")
   const urls = body.match(/https:\/\/[^"'`\s)}]+/g) ?? []
-  expect(urls.length, `${relativePath}: 抓不到 https 端点字面量 —— 本次测量作废,不是「没有端点」`).toBeGreaterThanOrEqual(2)
-  // `EXA_URL` 有一支是带 `${…}` 的模板串,占位符替成常量再解析(只取 host,query 不参与登记)。
+  expect(urls.length, `${relativePath}: 抓不到 https 端点字面量 —— 本次测量作废,不是「没有端点」`).toBeGreaterThanOrEqual(1)
+  // 占位符(`${…}`)替成常量再解析(只取 host,query 不参与登记)。
   const hosts = urls.map((url) => new URL(url.replaceAll(/\$\{[^}]*\}/g, "X")).hostname.toLowerCase())
   return [...new Set(hosts)].sort()
 }
+/** 两条传输派生出的端点集合(去重、排序)。 */
+const websearchHosts = () => [...new Set(WEBSEARCH_TRANSPORTS.flatMap(websearchHostsOf))].sort()
 
 describe("AC2 注册表:初值与形状", () => {
   test("初值 = 勘破 §2.2 清单(按今日代码坐标校正),一行不多一行不少", () => {
@@ -126,14 +132,15 @@ test("本机目的地不得登记(owner 2026-09-10 裁决)—— 围栏只放行
 })
 
 describe("`#1415` websearch 目的地:期望值从两条传输的源码派生,本表不自持第二份端点", () => {
-  test("两条传输给出同一组端点(派生自检:抓不到字面量即判测量作废)", () => {
-    const [legacy, v2] = WEBSEARCH_TRANSPORTS.map(websearchHostsOf)
-    expect(legacy).toEqual(v2!)
-    expect(legacy!.length, "websearch 端点应恰好两个(Exa + Parallel)").toBe(2)
+  test("两条传输各给出一个端点,合起来恰好两个(派生自检:抓不到字面量即判测量作废)", () => {
+    const [exa, parallel] = WEBSEARCH_TRANSPORTS.map(websearchHostsOf)
+    expect(exa!.length, `${WEBSEARCH_TRANSPORTS[0]} 应恰好一个端点(Exa)`).toBe(1)
+    expect(parallel!.length, `${WEBSEARCH_TRANSPORTS[1]} 应恰好一个端点(Parallel)`).toBe(1)
+    expect(websearchHosts().length, "websearch 端点应恰好两个(Exa + Parallel)").toBe(2)
   })
 
   test("AC1:派生出来的每个端点都被静态表放行 —— 登出 / BYOK 态不再 403 unregistered", () => {
-    for (const host of websearchHostsOf(WEBSEARCH_TRANSPORTS[0])) {
+    for (const host of websearchHosts()) {
       expect(isEgressAuthorized(host, 443), `${host}:443 应由静态表放行(否则 websearch 每次必失败)`).toBe(true)
       // 端口是键的一部分:放行 443 不等于放行别的端口。
       expect(isEgressAuthorized(host, 80), `${host}:80 不该被放行`).toBe(false)
@@ -141,7 +148,7 @@ describe("`#1415` websearch 目的地:期望值从两条传输的源码派生,�
   })
 
   test("反向:表里挂在这两条传输名下的行恰好是派生出来的那些(多一行 / 少一行 / 改域名都红)", () => {
-    const rows = EGRESS_REGISTRY.filter((entry) => entry.source.includes("mcp-websearch.ts"))
-    expect(rows.map((entry) => egressKey(entry.host, entry.port)).sort()).toEqual(websearchHostsOf(WEBSEARCH_TRANSPORTS[0]).map((host) => `${host}:443`))
+    const rows = EGRESS_REGISTRY.filter((entry) => WEBSEARCH_TRANSPORTS.some((file) => entry.source.includes(file)))
+    expect(rows.map((entry) => egressKey(entry.host, entry.port)).sort()).toEqual(websearchHosts().map((host) => `${host}:443`))
   })
 })

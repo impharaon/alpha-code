@@ -18,7 +18,7 @@ import type {
 // #408:preload/index.ts 只许 import "./types"(ext-security-boundaries AC4③ 装载路径钉)—— wire 类型经此转口。
 export type { SessionGrantsEndedEventWire } from "../shared/ext-session-grant-wire"
 import type { ArtifactDescriptor } from "../shared/cloud-artifact-descriptor"
-import type { NetFailureLayer } from "@opencode-ai/schema/codepuppy-net-failure"
+import type { NetFailureLayer } from "@opencode/schema/codepuppy-net-failure"
 import type { ToolPolicyApi } from "../shared/tool-policy-wire"
 import type { CatalogPackageViewV1 } from "../shared/catalog-package-view"
 import type { OfficeRuntimeReadiness } from "../shared/office-advisories"
@@ -77,11 +77,12 @@ export type {
   WslServersState,
 } from "@opencode-ai/app/wsl/types"
 
-export type ServerReadyData = {
-  url: string
-  username: string | null
-  password: string | null
-}
+/**
+ * `#1667`(#1662 接口文档 I8,基线 S8):renderer 能看到的只有引擎的源地址。口令留在 main,renderer 发往这个源的请求由
+ * main 在 `onBeforeSendHeaders` 里补 `Authorization`(windows.ts);main 内部带口令的类型是 `main/engine-authorization.ts`
+ * 的 `EngineConnection`,不经 IPC 出去。
+ */
+export type ServerReadyData = { url: string }
 
 export type SidecarGenerationReason = "boot" | "structural"
 
@@ -478,7 +479,7 @@ export type { CloudRunDeliveryFailure, CloudRunManifest, CloudRunOrigin, CloudRu
 /** SSE 进度事件(job.snapshot / job.started / job.running / workflow.step.completed / job.completed|failed|cancelled / error)。 */
 export type CloudJobEvent = { event: string; data: unknown; id?: string }
 /** Same shape as AccountResult; distinct alias for the cloud jobs surface.
- *  `#1572`:`error: "network"` 时可带 `netLayer`(卡在哪一层,@opencode-ai/schema/codepuppy-net-failure),`error` 码集合不变。 */
+ *  `#1572`:`error: "network"` 时可带 `netLayer`(卡在哪一层,@opencode/schema/codepuppy-net-failure),`error` 码集合不变。 */
 export type CloudResult<T> = T | { error: string; netLayer?: NetFailureLayer }
 export type UploadFindingKind = "contact" | "identity" | "credential" | "protected" | "unknown"
 export type UploadPreview = {
@@ -843,6 +844,9 @@ export type ElectronAPI = {
     officeRuntime: () => Promise<OfficeRuntimeReadiness>
     // B11/B23:全局配置健康(broken=引擎会整份忽略用户配置)
     configHealth: () => Promise<{ broken: boolean; reason?: string; path?: string }>
+    /** `#1687`:云服务此刻是否被 kill-switch 扣下(引擎配置里是中和条目;main 注入时的同一判决)。
+     *  被扣下的云服务补连后报 `failed`,「未恢复问题」入口据此不把它当成故障。 */
+    cloudWithheld: () => Promise<boolean>
     /** REQ-036 出厂技能名单(skills.paths 注入的技能名;CODEPUPPY_FACTORY_SKILLS_DISABLE 时为空)——
      *  hub 用来把对应 catalog 条目标成「出厂内置」而非「可安装」(S18 X1)。 */
     factorySkillIds: () => Promise<string[]>

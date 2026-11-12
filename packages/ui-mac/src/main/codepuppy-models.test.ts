@@ -18,7 +18,7 @@ import {
 } from "./codepuppy-live-allowlist"
 import { BYOK_ADAPTERS } from "./byok-adapters"
 import bundledCatalog from "./codepuppy-models.json"
-import { buildCodePuppyModelConfig, getModelCatalog, PLATFORM_API_KEY_PLACEHOLDER } from "./codepuppy-models"
+import { buildCodePuppyModelConfig, engineModelConfig, getModelCatalog, PLATFORM_API_KEY_PLACEHOLDER } from "./codepuppy-models"
 import type { EffectiveCatalog } from "../shared/codepuppy-model-types"
 import { buildModelPickerRows } from "../renderer/codepuppy-ui/model-picker-core"
 import { customProviderSecretName, secretFilePath, secretFileRef, syncSecretFiles } from "./codepuppy-secret-files"
@@ -329,18 +329,14 @@ describe("buildCodePuppyModelConfig — default model + user providers", () => {
     expect(cfg.provider).toEqual({})
   })
 
-  test("#1392 a truth-file record is a FULL provider block in the allowlist (npm / name / baseURL / models; {file:} only when the key file exists); sidecar-style location = env-derived", () => {
+  test("#1392 a truth-file record is a FULL provider block in the allowlist (npm / name / baseURL / models; {file:} ref) once its key file exists — none before; sidecar-style location = env-derived", () => {
     // 无快照(sidecar 的处境):位置由 CODEPUPPY_GLOBAL_DIR 逆映射得出,与手写的期望路径逐字相同。
     expect(resolveCustomProviderTruthLocation()).toEqual({ ok: true, path: truthPath(), casBaseRoot: path.join(fs.realpathSync(tmp), "codepuppy-state"), environment: "dev" })
     writeCustomProviderTruth(truthPath(), [{ id: "my-openai", name: "My OpenAI", compat: "openai", baseURL: "https://api.openai.com/v1", models: ["gpt-5.4", "gpt-5.4-mini"] }], fs)
+    // `#1667`(裁决 r3 第 2 条):没有可用 key ⇒ 整个不注入(OpenCode 2 把空 key 当「不鉴权」,请求会不带凭据发出去)。
     const before = buildCodePuppyModelConfig(userData)!
-    expect(before.enabled_providers).toEqual(["my-openai"])
-    expect(before.provider["my-openai"]).toEqual({
-      npm: "@ai-sdk/openai-compatible",
-      name: "My OpenAI",
-      options: { baseURL: "https://api.openai.com/v1", apiKey: "" },
-      models: { "gpt-5.4": { name: "gpt-5.4", modalities: { input: ["text"] } }, "gpt-5.4-mini": { name: "gpt-5.4-mini", modalities: { input: ["text"] } } },
-    })
+    expect(before.enabled_providers).toEqual([])
+    expect(before.provider["my-openai"]).toBeUndefined()
     plantSecret(customProviderSecretName("my-openai"), SECRET)
     const after = buildCodePuppyModelConfig(userData)!
     expect((after.provider["my-openai"] as { options: { apiKey: string } }).options.apiKey).toBe(secretFileRef(userData, customProviderSecretName("my-openai")))
@@ -354,6 +350,7 @@ describe("buildCodePuppyModelConfig — default model + user providers", () => {
       ],
       fs,
     )
+    plantSecret(customProviderSecretName("my-claude"), SECRET)
     const two = buildCodePuppyModelConfig(userData)!
     expect(two.enabled_providers).toEqual(["my-openai", "my-claude"])
     expect((two.provider["my-claude"] as { npm: string }).npm).toBe("@ai-sdk/anthropic")
@@ -681,6 +678,8 @@ describe("buildCodePuppyModelConfig — REQ-001 edition 白名单(catalog LKG)",
     writeCatalogSnapshot(userData, { ...liveBase, models: [] })
     pinAppliedCatalog(userData, 1) // `#1555`:引擎配置只读 fork 前钉住的已应用目录
     writeCustomProviderTruth(truthPath(), [{ id: "myco", name: "MyCo", compat: "openai", baseURL: "https://myco.invalid/v1", models: ["m"] }], fs)
+    // `#1667`(裁决 r3 第 2 条,431ce4ba2e):没有可用 key 的自定义节点整个不注入;本条判的是白名单,先种 key。
+    plantSecret(customProviderSecretName("myco"), SECRET)
     expect(buildCodePuppyModelConfig(userData)!.enabled_providers).toContain("myco")
   })
 
@@ -916,8 +915,9 @@ describe("REQ-153 #1236:目录 `reasoning` 转发进引擎配置,徽标与引擎
 //     的逐格读数;本票对 qwen 经 OR 的 N=3 复打记在 docs/architecture/2026-09-06-model-variant-reachability.md §8);
 //   · 本机无凭据、一格没打成的模型(qwen / kimi / minimax 直连)**显式**列入无档清单并断言它真的被注入且无档 ——
 //     否则下一个人会顺手照 models.dev 文案给它们补上,那正是 v1 作废的形态;
-//   · 上游 `transform.smallOptions()` 把档位表**第一项**喂给标题等辅助调用(`request.ts:88-89`,基线 §3.8a),
-//     所以凡有显式关闭档的模型,「关」必须排第一 —— 判据在这里,机制本身由 codepuppy-reasoning-badge-parity 用真引擎证。
+//   · 标题等辅助调用取档位表**第一项**(基线 §3.8a;0.1.26 是上游 `transform.smallOptions()`,`request.ts:88-89`;OpenCode 2 上是
+//     engineModelConfig 在档位表末尾多写的 `none` 档 = 第一档的拷贝,由 2.x 的标题选档挑中),所以凡有显式关闭档的模型,「关」必须排第一
+//     —— 判据在这里,机制本身由 codepuppy-reasoning-badge-parity 用真引擎证(每一档、含没选档,标题请求体 == 第一档)。
 // 判官是纯函数,先用已知的坏证明它会红(v1 的 GLM 形状、给未验模型补档、关闭档写错值、关档不在第一位、
 // 实打表登记的档位从注入里消失),再判出货目录。
 describe("REQ-153 #1237:档位形状逐腿取自实打表;未实打的模型钉在无档", () => {
@@ -1016,7 +1016,7 @@ describe("REQ-153 #1237:档位形状逐腿取自实打表;未实打的模型钉�
           const labels = Object.keys(model.variants)
           const off = labels.filter((label) => isOffTier(model.variants![label]!))
           if (off.length > 0 && !isOffTier(model.variants[labels[0]!]!))
-            failures.push(`${key}: 有显式关闭档 ${JSON.stringify(off)} 却把 ${JSON.stringify(labels[0])} 排在第一位 —— 上游 smallOptions() 会把它喂给标题等辅助调用(基线 §3.8a)`)
+            failures.push(`${key}: 有显式关闭档 ${JSON.stringify(off)} 却把 ${JSON.stringify(labels[0])} 排在第一位 —— 标题等辅助调用取第一档(0.1.26 的 smallOptions();2.x 上是 engineModelConfig 多写的 none 档,基线 §3.8a)`)
         } else if (verified) {
           failures.push(`${key}: 实打表登记了档位 ${JSON.stringify(verified.variants)},注入配置里却没有 variants`)
         }
@@ -1098,6 +1098,44 @@ describe("REQ-153 #1237:档位形状逐腿取自实打表;未实打的模型钉�
     const dropped = clone(base) // 实打表登记了档位,注入却没有 —— 目录被人退回无档
     delete dropped.provider.codepuppy!.models["qwen3.7-plus"]!.variants
     expect(judgeTierProvenance(dropped)).toEqual([`codepuppy:qwen3.7-plus: 实打表登记了档位 ${JSON.stringify(VERIFIED_TIERS["codepuppy:qwen3.7-plus"]!.variants)},注入配置里却没有 variants`])
+  })
+
+  // `#1662`:「标题取第一档」在 OpenCode 2 上的实现 —— 2.x 的标题选档只认 id 为 none / minimal / low 的档,所以引擎配置给有档位的模型
+  // 在档位表末尾多写一档 `none` = 第一档的原样拷贝(两类参数:settings 一类与请求体一类)。目录自己已有 `none` 档 ⇒ 原样;无档 ⇒ 不加。
+  // 出货目录里没有 id 为 `none` 的档,所以「已有就不加」只能用合成输入判。真引擎那一格在 codepuppy-reasoning-badge-parity。
+  test("#1662:有档位的模型在引擎配置末尾多一档 none = 第一档的拷贝;目录已有 none ⇒ 原样;无档 ⇒ 不加", () => {
+    const engine = engineModelConfig({
+      enabled_providers: ["p"],
+      provider: {
+        p: {
+          npm: "@ai-sdk/openai-compatible",
+          name: "P",
+          options: { baseURL: "https://p.invalid/v1" },
+          models: {
+            toggle: { name: "toggle", reasoning: true, variants: { 关: { thinking: { type: "disabled" } }, 开: { thinking: { type: "enabled" } } } },
+            effort: { name: "effort", reasoning: true, variants: { 低: { reasoningEffort: "low" }, 高: { reasoningEffort: "high" } } },
+            own: { name: "own", reasoning: true, variants: { 高: { reasoningEffort: "high" }, none: { reasoningEffort: "none" } } },
+            plain: { name: "plain" },
+          },
+        },
+      },
+    })
+    const models = (engine.providers.p as { models: Record<string, { variants?: unknown }> }).models
+    expect(models.toggle!.variants).toEqual([
+      { id: "关", body: { thinking: { type: "disabled" } } },
+      { id: "开", body: { thinking: { type: "enabled" } } },
+      { id: "none", body: { thinking: { type: "disabled" } } },
+    ])
+    expect(models.effort!.variants).toEqual([
+      { id: "低", settings: { reasoningEffort: "low" } },
+      { id: "高", settings: { reasoningEffort: "high" } },
+      { id: "none", settings: { reasoningEffort: "low" } },
+    ])
+    expect(models.own!.variants).toEqual([
+      { id: "高", settings: { reasoningEffort: "high" } },
+      { id: "none", settings: { reasoningEffort: "none" } },
+    ])
+    expect("variants" in models.plain!).toBe(false)
   })
 })
 

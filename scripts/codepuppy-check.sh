@@ -37,11 +37,11 @@ CI_STEPS=(
   # pin 对象取不到时本地判「未比对」(exit 2)只记 unverified、不拦 push;CI 侧 ROUNDTRIP_REQUIRE_PIN=1,
   # 同一状态硬红(CI 自己控制 checkout 深度,取不到 pin 是接线坏了)。登记成 MIRRORED 会让
   # 「本地绿 ⇒ CI 会绿」的依据变假 —— 那正是 `#777` 治的病。
-  "upstream-guard|Assert packages/app + packages/ui == pinned upstream + SOT patch (#976)|DEGRADED:本地 pin 取不到时判「未比对」(exit 2)不拦 push;CI 侧 ROUNDTRIP_REQUIRE_PIN=1,同一状态硬红"
+  "upstream-guard|Assert packages/codepuppy-app + packages/codepuppy-ui == pinned upstream + SOT patch (#976)|DEGRADED:本地 pin 取不到时判「未比对」(exit 2)不拦 push;CI 侧 ROUNDTRIP_REQUIRE_PIN=1,同一状态硬红"
   "typecheck|typecheck @codepuppy/contracts-consumer|MIRRORED"
   "typecheck|typecheck @codepuppy/ext|MIRRORED"
   "typecheck|typecheck ui-mac|MIRRORED"
-  "typecheck|typecheck opencode (alpha 自有判据住在上游包里)|MIRRORED"
+  "typecheck|typecheck plugin (alpha 自有判据住在上游包里)|MIRRORED"
   "typecheck|typecheck core (alpha 自有判据住在上游包里)|MIRRORED"
   "typecheck|typecheck schema (alpha 自有判据住在上游包里)|MIRRORED"
   "test|verify immutable Code Puppy contract vendor lock|SUPERSET:开发机有兄弟仓 ⇒ 跑的是 provenance 已验档,CI 是降级档(#769)"
@@ -68,6 +68,28 @@ if [ "${CODEPUPPY_HOOKS_DISABLE:-}" != "1" ]; then
   unset current_codepuppy_hooks_path
 fi
 
+echo "▶ [preflight] bun on PATH == package.json packageManager"
+# `#1662`:下面每一步都用 PATH 上的 `bun`。仓库钉 bun 的地方只有一处 —— 根 package.json 的
+# `packageManager`;换代后它是 bun@1.4.4,而开发机 PATH 上可能还是旧版(实测 1.3.14),那一次
+# 旧版 bun 藏住了一处真红。版本不对时后面十四步的结论全都不可信,所以这里不记 fail 接着跑,
+# 而是当场停下。判据:packages/ui-mac/src/main/local-gate-parity.test.ts(PATH 注入一个报别的
+# 版本号的假 bun,跑本脚本本体)。
+pinned_bun="$(sed -n 's/^[[:space:]]*"packageManager":[[:space:]]*"bun@\([^"]*\)".*/\1/p' package.json | head -1)"
+actual_bun="$(bun --version 2>/dev/null || true)"
+if [ -z "$pinned_bun" ]; then
+  echo "    ✗ package.json 里读不出 \"packageManager\": \"bun@<版本>\" —— 不知道该用哪个 bun,本次运行作废"
+  exit 1
+fi
+if [ "$actual_bun" != "$pinned_bun" ]; then
+  echo "    ✗ PATH 上的 bun 是 ${actual_bun:-<没有>}($(command -v bun || echo '不在 PATH 上')),仓库钉的是 bun@${pinned_bun}(package.json packageManager)"
+  echo "      版本不对时后面的门会给出不可信的结论(真红被藏住或冒出假红),所以一步都没跑。"
+  echo "      修法:把 bun ${pinned_bun} 的 bin 目录放到 PATH 最前面再重跑;本机没有就先装:"
+  echo "        curl -fsSL https://bun.sh/install | bash -s \"bun-v${pinned_bun}\""
+  exit 1
+fi
+echo "    ✓ bun ${actual_bun}"
+unset pinned_bun actual_bun
+
 # shellcheck source=scripts/docs-gates.sh
 source scripts/docs-gates.sh
 
@@ -91,10 +113,10 @@ else
   fail=1
 fi
 
-echo "▶ [2/14] packages/{app,ui} == pin + SOT 补丁(round-trip,#976)"
-# `#976`:ADR-034 起 packages/{app,ui} 是「上游 pin + frontend/codepuppy-patches/codepuppy-frontend.patch」
-# 的投影。sync-upstream 的还原步(`rm -rf` → `checkout $PIN --` → `git apply`)与月更 bump 的
-# 第一块都会**据此重写那两个目录** ⇒ 改了它们而没重生补丁,改动会被**静默删除**(不是报错)。
+echo "▶ [2/14] packages/codepuppy-{app,ui} == pin + SOT 补丁(round-trip,#976)"
+# `#976`:ADR-034 起冻结前端(`#1668` 起落点 packages/codepuppy-{app,ui})是「上游 pin +
+# frontend/codepuppy-patches/codepuppy-frontend.patch」的投影,补丁是它唯一的改动记录 ⇒ 改了那两个
+# 目录而没重生补丁,任何按 pin + 补丁重建的人都会把改动**静默删除**(不是报错)。
 # 这在已合并历史上真的发生过:f420fe2bb…7281627ed 四个提交补丁缺 vendored `.tgz`,存活两天、
 # 零变红;没出事只因为 sync 那阵子一直红着没跑到还原步。
 #
@@ -110,7 +132,7 @@ frontend_roundtrip_rc=$?
 case "$frontend_roundtrip_rc" in
 0) ;; # 脚本自己打了 ✓
 2) unverified=1 ;; # 脚本自己打了「未比对」
-*) echo "    ✗ packages/{app,ui} 与 SOT 补丁不一致 —— 下一次 sync/月更 bump 会把上面点名的改动静默删掉"; fail=1 ;;
+*) echo "    ✗ packages/codepuppy-{app,ui} 与 SOT 补丁不一致 —— 按 pin + 补丁重建时会把上面点名的改动静默删掉"; fail=1 ;;
 esac
 unset frontend_roundtrip_rc
 
@@ -123,7 +145,7 @@ echo "▶ [3/14] no literal NUL bytes in version-controlled files"
 # 函数体在 scripts/docs-gates.sh —— 与 bin/check-light 共用同一份,不各抄一遍。
 docs_gate_nul || fail=1
 
-echo "▶ [4/14] typecheck (alpha packages: contracts-consumer + ext + ui-mac + opencode + core + schema)"
+echo "▶ [4/14] typecheck (alpha packages: contracts-consumer + ext + ui-mac + plugin + core + schema)"
 # REQ-027:flag 必须在 `run` 之后 —— `bun --cwd X run Y` 在 bun 1.3.x 打印 usage 后静默退出 0(不执行脚本)。
 # `#1134`:opencode 也在这里。它是上游包,但 alpha 自有的判据文件(ADR-043 谓词:不在 origin/dev
 # 里 ∧ 自报家门)住在它的 test/ 下,而该包的 tsconfig **不排除** *.test.ts / *.cases.ts ⇒ 那些文件
@@ -132,10 +154,13 @@ echo "▶ [4/14] typecheck (alpha packages: contracts-consumer + ext + ui-mac + 
 # `#1222`:同一形态又发生在 core(与 schema 一起补进来)。`packages/sdk/js` **刻意不加** ——
 # 实测它的 tsconfig 是 `"include": ["src"]`,alpha 自有的 test/ 结构性不在 program 里,
 # 加进来是安慰剂闸;缺口具名留在 `#1222`。
+# `#1664`:OpenCode 2 没有 packages/opencode,它的位置换成 packages/plugin —— ext 与 ui-mac 编译依赖
+# `@opencode/plugin`,接口冻结 I6 把一个 Code Puppy 自有的契约模块放在它的 src/ 下;往那个文件注入
+# 已知类型错误,该包 typecheck 当场红(TS2322),不是安慰剂。
 if bun run --cwd packages/codepuppy-contracts-consumer typecheck \
   && bun run --cwd packages/ext typecheck \
   && bun run --cwd packages/ui-mac typecheck \
-  && bun run --cwd packages/opencode typecheck \
+  && bun run --cwd packages/plugin typecheck \
   && bun run --cwd packages/core typecheck \
   && bun run --cwd packages/schema typecheck; then
   echo "    ✓ typecheck"

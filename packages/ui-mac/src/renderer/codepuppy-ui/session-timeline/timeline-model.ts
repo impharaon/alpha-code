@@ -25,7 +25,7 @@ import type {
   UserMessage,
 } from "@opencode-ai/sdk/v2/client"
 import { egressPolicyDenialOf } from "../../../shared/egress-denial"
-import { isNetFailureLayer, type NetFailureLayer } from "@opencode-ai/schema/codepuppy-net-failure"
+import { isNetFailureLayer, type NetFailureLayer } from "@opencode/schema/codepuppy-net-failure"
 import { isCloudFacadeToolPart } from "../cloud-facade-identity"
 import type { CodePuppySessionIdentity } from "../session-workspace/session-workspace-core"
 import { toolCardDispatchOf, toolTitleKeyOf } from "./cards/tool-card-model"

@@ -494,6 +494,9 @@ if [ -z "$BUN_BIN" ]; then
 fi
 BUN_DIR="${BUN_BIN%/*}"
 # 从 PATH 里摘掉 bun 所在目录(只摘它,别的工具照旧可用 —— git/curl 还得能跑)。
+# 摘的是**每一个**放着可执行 bun 的目录,不只 `command -v` 找到的第一个:本机常见两份 bun 同在 PATH
+# (钉版本的 ~/.bun-versions/<v>/bin 排在前面,shell profile 的 ~/.bun/bin 在后面),只摘第一个时第二份照样
+# 解析得到 ⇒ 下面那条自证判「故障注入无效」、本步硬红 —— 测的是机器上装了几份 bun,不是 bootstrap(I-09 实测)。
 # 按 `IFS=':'` 分词而不是 `read -d ':'`:后者在 herestring 末尾会多读出一个换行字段,
 # 于是 RESTRICTED 末尾挂上一个空/换行目录项(不报错,只是悄悄多一段)。
 RESTRICTED=""
@@ -503,6 +506,7 @@ IFS=':'
 for p in $PATH; do
   [ -n "$p" ] || continue
   [ "$p" = "$BUN_DIR" ] && continue
+  [ -x "$p/bun" ] && continue
   RESTRICTED="${RESTRICTED:+$RESTRICTED:}$p"
 done
 IFS="$_saved_ifs"

@@ -45,12 +45,15 @@
 #
 # 判据不在这段散文里:north-star-guard.test.ts 造一个「只在 dev 窗口里、不在 alpha 窗口里」
 # 的上游改动,断言守卫**不**点名它 —— 把基准还原成 origin/dev,那一条当场红。
+#
+# 例外(`#1664`):分支上含受审上游合并(换代整合分支的 M0)时,packages/ 以那个合并的**上游父**为基准,
+# 见下文「含受审上游合并的分支」一节。
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 # ── `#1288`:只读模式 `--print-jurisdiction` —— 把辖区说出来,而不是让别人再抄一份 ────
 # 漂移度量步(codepuppy-check 第 [13/14] 步,scripts/north-star-drift-metrics.sh)要回答的是
-# 「我们现在**总共**偏离上游多少」。它需要的四样东西 —— 辖区、两张 carve-out、上游镜像 ref、
+# 「我们现在**总共**偏离上游多少」。它需要的四样东西 —— 辖区、carve-out、上游镜像 ref、
 # 收编白名单有多长 —— 全都住在本文件里,而本文件是它们的**唯一真源**(`#889`)。
 # 让度量步自己再写一份 = `#637` 那个已经咬过我们一次的形状:两份清单各自漂移,而没有任何
 # 东西会变红。所以这里开一个只读模式:打印这些值然后退出,**一个 git 命令都不跑、一个字节
@@ -65,11 +68,12 @@ case "${1:-}" in
   '') ;;
   --print-jurisdiction) GUARD_MODE=print-jurisdiction; shift ;;
   --print-takeover) GUARD_MODE=print-takeover; shift ;;
-  *) echo "✗ 未知参数:$1(本脚本只接受 --print-jurisdiction / --print-takeover)" >&2; exit 2 ;;
+  --print-upstream-parent) GUARD_MODE=print-upstream-parent; shift ;;
+  *) echo "✗ 未知参数:$1(本脚本只接受 --print-jurisdiction / --print-takeover / --print-upstream-parent)" >&2; exit 2 ;;
 esac
 [ "$#" -eq 0 ] || { echo "✗ 多余参数:$*" >&2; exit 2; }
 
-# ── 辖区 = `packages/` 全树 −(两张显式 carve-out)。ADR-044 / `#1247` ────────────────
+# ── 辖区 = `packages/` 全树 −(Code Puppy 自有包 carve-out)。ADR-044 / `#1247` ─────────────
 #
 # 缺陷(2026-09-06 实测):辖区原本是一张 8 个包的枚举
 # `packages/{opencode,core,server,tui,sdk,protocol,schema,client}`,而上游镜像 `origin/dev`
@@ -89,114 +93,81 @@ esac
 # 已知的坏。防漂断言在 packages/ui-mac/src/main/local-gate-parity.test.ts。
 UPSTREAM_PATHS="packages"
 
-# carve-out ①:Code Puppy 自有的 workspace 包 —— `origin/dev` 里**根本没有**这三条路径
-# (ADR-004 后果②:新增 workspace 包必然改写根 bun.lock;ADR-016 前端接管;REQ-224 契约消费者)。
+# carve-out:Code Puppy 自有的 workspace 包 —— `origin/dev` 里**根本没有**这些路径
+# (ADR-004 后果②:新增 workspace 包必然改写根 bun.lock;ADR-016 前端接管;REQ-224 契约消费者;
+# `#1668` 冻结前端的五个落点 `codepuppy-{app,ui,session-ui,sdk-v1,core-util}`,其中 `codepuppy-{app,ui}`
+# 另由 ADR-034 的 pin + SOT 补丁 roundtrip 门逐字节判 —— 那道门比本门更强,连「改了但没重生补丁」都红)。
 # 为什么是整包豁免、而不是走 ADR-043 的逐文件谓词:那个谓词要求每个文件**自报家门**
-# (`codepuppy-*` 命名或写一行 marker),而这三个包里成千上万个文件全是 Code Puppy 写的 —— 逐文件登记
+# (`codepuppy-*` 命名或写一行 marker),而这些包里成千上万个文件全归 Code Puppy 管 —— 逐文件登记
 # 只会把「改自己的代码」变成一道恒红门。
 # **这张清单由下面的运行期自检逐条对着上游镜像验一遍**:把一个真上游包写进来,是绕开整道门
 # 最便宜的一步(一行配置换一整个包的豁免),它不能只靠人看。
-CODEPUPPY_OWNED_PACKAGES="ext ui-mac codepuppy-contracts-consumer"
+CODEPUPPY_OWNED_PACKAGES="ext ui-mac codepuppy-contracts-consumer codepuppy-app codepuppy-ui codepuppy-session-ui codepuppy-sdk-v1 codepuppy-core-util"
 
-# carve-out ②:由 ADR-034 的 pin + SOT 补丁 roundtrip 盖住的前端包。
-# 它们**不是** Code Puppy 自有(`origin/dev` 里有,alpha 也确实在改),但覆盖它们的不是本门:
-#   · 无空档 —— `scripts/assert-frontend-patch-roundtrip.sh` 判的是「HEAD 的这两棵树必须能由
-#     `frontend/frontend-pin.lock` 的 pin + `frontend/codepuppy-patches/codepuppy-frontend.patch`
-#     **逐字节重建**」(比 tree sha),它比本门**更强**:连「改了但没重生补丁」都当场红,
-#     而本门只判「有没有改」。它跑在 codepuppy-ci 的同一个 job 里,且刻意用 `if: !cancelled()`。
-#   · 无重复 —— 本门若也盖它们,ADR-034 明写的日常工作流(改 seam = 改补丁 + 重生那两棵树)
-#     每一次都会被判成破北极星 ⇒ 恒红门 ⇒ `--no-verify` ⇒ 十道门一起关掉(`#754` 形态)。
-# 两处清单相同由 local-gate-parity.test.ts 判(有人把 roundtrip 门的 PACKAGES 改小 = 空档,即红)。
-ROUNDTRIP_PACKAGES="app ui"
+# `#1668`:原来的 carve-out ②(ROUNDTRIP_PACKAGES="app ui")已撤。冻结前端搬到上面的 `codepuppy-{app,ui}`
+# 落点之后,`packages/{app,ui}` 是上游 2.x 原样、Code Puppy 不用,回到普通上游路径,本门照常判。
 
-# 两张 carve-out 落成 pathspec。刻意**不**并进下面的 UPSTREAM_EXCLUDES:那张表的语义是
+# carve-out 落成 pathspec。刻意**不**并进下面的 UPSTREAM_EXCLUDES:那张表的语义是
 # 「ADR-033/035/038/041/042 逐文件**收编**」,与「这个包根本不归本门管」不是一回事,混在
 # 一起会让「新增收编须自己的 ADR」这条纪律在阅读时失焦。
 CARVEOUT_PATHSPECS=()
-for pkg in $CODEPUPPY_OWNED_PACKAGES $ROUNDTRIP_PACKAGES; do
+for pkg in $CODEPUPPY_OWNED_PACKAGES; do
   CARVEOUT_PATHSPECS+=(":(exclude)packages/$pkg")
 done
 # 被接管/生成文件的例外,与 codepuppy-ci.yml 的 `excludes=()` 逐条对齐。新增收编须自己的 ADR,
 # 不得静默加 exclude(ADR-029 §3)。两处逐条相同由 local-gate-parity.test.ts 判(`#637`)。
+#
+# `#1664`(换代 #1662 的 L2,裁决书 F10):下面是**过渡清单** —— 换代前 49 条里在 OpenCode 2 合并目标
+# `33f94fce96` 仍然存在的 15 条。另 34 条所在的文件随 v1 引擎整包删除(`packages/opencode`、`packages/sdk/js`
+# 等),随之出清单(能力清点表 §9)。M0 把这 15 个文件也取成了上游原样;L4 逐条重判「退回 L0 / 重新接管」,
+# 定出最终清单并在 ADR-047「精确接管面」写理由。
 UPSTREAM_EXCLUDES=(
-  # ADR-033 §1 被接管 permission 表面(L3)
-  ':(exclude)packages/core/src/permission.ts'
-  ':(exclude)packages/core/src/permission'
-  ':(exclude)packages/server/src/handlers/permission.ts'
-  ':(exclude)packages/opencode/src/server/routes/instance/httpapi/public.ts'
-  ':(exclude)packages/core/test/permission.test.ts'
-  ':(exclude)packages/core/test/database-migration.test.ts'
-  ':(exclude)packages/opencode/test/server/httpapi-exercise'
-  ':(exclude)packages/opencode/test/server/httpapi-public-openapi.test.ts'
-  # ADR-033 §4 生成/快照(SOT = Code Puppy 拥有的迁移/协议/schema;静态 diff 会误报)
-  ':(exclude)packages/core/schema.json'
-  ':(exclude)packages/core/src/database/migration.gen.ts'
-  ':(exclude)packages/core/src/database/schema.gen.ts'
-  ':(exclude)packages/sdk/js/src/v2/gen/sdk.gen.ts'
-  ':(exclude)packages/sdk/js/src/v2/gen/types.gen.ts'
-  # ADR-033 §守卫盲区(#456 裁决)
-  ':(exclude)packages/protocol/src/groups/permission.ts'
-  ':(exclude)packages/schema/src/permission.ts'
-  ':(exclude)packages/schema/src/agent.ts'
-  ':(exclude)packages/schema/test/contract-hygiene.test.ts'
-  ':(exclude)packages/client/src/generated/client.ts'
-  ':(exclude)packages/client/src/generated-effect/client.ts'
-  ':(exclude)packages/client/src/generated/types.ts'
-  # ADR-035(#489):E7 web search 失败诚实所需的两文件接管(L3)。上游
-  # test/tool/websearch.test.ts **不**接管(#223 修复轮):新增失败测试落 Code Puppy 自有的
-  # test/tool/codepuppy-websearch-failure.test.ts(新增文件不触发 --diff-filter=DMR,无需 exclude)。
-  ':(exclude)packages/opencode/src/tool/websearch.ts'
-  ':(exclude)packages/opencode/src/tool/mcp-websearch.ts'
-  # ADR-035 §1 追加(#223 R3 Blocker 1,2026-07-26):打包 sidecar 同时挂载 V2 Location 服务,
-  # core 的 BuiltInTools 里是**第二份已挂载的同名 websearch 注册**。主权最终闸必须覆盖每一份
-  # 执行副本,故同类叶子再收一个;接管面仅 execute 首行的闸。
-  ':(exclude)packages/core/src/tool/websearch.ts'
-  # ADR-038(#668,2026-07-28):v1 审批请求的应答期限。上游 `Permission.ask` 的
-  # `Deferred.await` 无超时 ⇒ 无人应答即无限期挂起(ADR-036 把会话发送退回 v1 后成为
-  # 高频路径)。期限只能落在 Deferred 所在的这一处;L0 接缝只能改判定、壳侧看门狗会连带
-  # 拒绝同会话全部 pending、L1/L2 无法 loud-fail 承载安全语义(逐条证据见 ADR-038 §2)。
-  # 接管面刻意压到这一个文件;新增闸门落 Code Puppy 自有的
-  # test/permission/codepuppy-ask-deadline.test.ts(新增文件不触发 --diff-filter=DMR)。
-  ':(exclude)packages/opencode/src/permission/index.ts'
-  # ADR-041(#878,2026-08-09):工具身份与不可变显示快照。来源信息在这些注册/聚合/
-  # 权限/首次写入咽喉之后结构性丢失,L0-L2 无法从 alias 诚实反推。仅逐文件接管;
-  # 新的 codepuppy-tool-identity 闸门是新增文件,无需 exclude。permission/index.ts 已由
-  # ADR-038 接管,不重复列。
-  ':(exclude)packages/schema/src/v1/session.ts'
-  ':(exclude)packages/sdk/js/src/gen/types.gen.ts'
-  ':(exclude)packages/opencode/src/mcp/index.ts'
-  # REQ-134 #1011: argv observation for `{workspace}` → InstanceState.directory must live next to
-  # connectLocal. New files under packages/opencode/test would still be DMR-modified siblings.
-  ':(exclude)packages/opencode/test/mcp/lifecycle.test.ts'
-  ':(exclude)packages/opencode/test/fixture/mcp-lifecycle-stdio.ts'
-  ':(exclude)packages/opencode/src/plugin/index.ts'
-  ':(exclude)packages/opencode/src/tool/registry.ts'
-  ':(exclude)packages/opencode/src/tool/code-mode.ts'
-  ':(exclude)packages/opencode/src/session/tools.ts'
-  ':(exclude)packages/opencode/src/session/processor.ts'
-  ':(exclude)packages/opencode/src/session/llm.ts'
-  ':(exclude)packages/opencode/src/session/llm/request.ts'
-  ':(exclude)packages/opencode/src/session/prompt.ts'
-  ':(exclude)packages/opencode/test/session/compaction.test.ts'
-  ':(exclude)packages/opencode/test/session/processor-effect.test.ts'
-  ':(exclude)packages/opencode/test/session/prompt.test.ts'
-  ':(exclude)packages/opencode/test/provider/transform.test.ts'
-  ':(exclude)packages/opencode/test/tool/code-mode-integration.test.ts'
-  ':(exclude)packages/opencode/test/tool/code-mode.test.ts'
-  ':(exclude)packages/opencode/test/tool/registry.test.ts'
-  ':(exclude)packages/core/src/tool/application-tools.ts'
-  ':(exclude)packages/core/src/tool/registry.ts'
-  # ADR-041 订正 · 2026-09-22(#1370 一次性追平上游 e11dbd020..fe3f3a41f,PR #1401):上游
-  # 2026-09-01 新增的 test/session/tools.test.ts 手写 mock 按上游接口写,而上面 ADR-038 / ADR-041 /
-  # #1129 收编的 permission/index.ts(clearGrants)、tool/registry.ts(RegisteredTool)、
-  # session/processor.ts(registerToolDisplay)、session/tools.ts(CodePuppyToolPolicy 依赖)把接口扩宽
-  # ⇒ 它在 alpha 上 typecheck 红。接管面 = 只补 mock 缺的成员,生产签名不动;它是上面那几份收编的
-  # **测试兄弟**,owner 裁决并入 ADR-041(「精确 L3 接管面」已列入,不另开 ADR)。
-  ':(exclude)packages/opencode/test/session/tools.test.ts'
-  # ADR-042(#1047): OAuth loopback success/error HTML is product chrome; ADR-007
-  # Vite brand transform never reaches engine-served callback pages.
+  # #1662 L4(ADR-047「精确接管面」):换代后的最终清单。旧清单 49 条不继承 —— 34 条随文件消失删除,
+  # 仍存在的 15 条逐条重判,每条的去留、它握的决定与 2.x 上的握法登记在
+  # docs/architecture/codepuppy-authority-registry.json(判官 packages/ext/src/policy/authority-registry.test.ts)。
+  # ADR-042(#1047):OAuth 回环成功/失败页是产品外观;ADR-007 的 Vite 品牌变换到不了引擎直出的回调页,
+  # 插件也没有改写它的挂点 —— 2.x 上原样重新接管,改动面只有产品名与字标。
   ':(exclude)packages/core/src/oauth/page.ts'
   ':(exclude)packages/core/test/oauth-page.test.ts'
+  # ADR-038(#668;#1662 裁决第 2 项):审批请求的应答期限。2.x 的 `Permission.assert` 对回复无限期等待,
+  # 插件只能改判定(`permission.hook.evaluate`)改不了等多久;插件侧看门狗回 reject 会级联整个会话 ——
+  # ADR-038 否决过的形状。接管面只有 `Deferred.await` 那一处的有界等待与具名失败(`codepuppy(ADR-038)` 标注块)。
+  ':(exclude)packages/core/src/permission.ts'
+  # #1563 / #1565 / #1572 / ADR-041(#1662 裁决第 5 项):MCP 运行时没有插件挂点 —— 启动、重连、并发、连接前的随包声明、
+  # 失败归因都在 core 内部。v1 接管的是 packages/opencode/src/mcp/index.ts,这是同一权威换接法。规则本体在 Code Puppy
+  # 自有的 codepuppy-startup.ts / codepuppy-first-party-mcp.ts;三个上游文件只在 `codepuppy(...)` 标注处调用它们。
+  # 判据 packages/core/test/codepuppy-mcp-runtime.test.ts。
+  ':(exclude)packages/core/src/mcp/client.ts'
+  ':(exclude)packages/core/src/mcp/connection.ts'
+  ':(exclude)packages/core/src/mcp/index.ts'
+  # #1572 settle(#1666 裁决 6737930969、6756103246 第 2 项 (b)):模型请求的网络失败在 toSessionError 结算,插件到不了 ——
+  # `session.hook.retry` 的 `error` 是只读的。接管面只有 Transport 分支(`codepuppy(#1572)` 标注块):调 Code Puppy 自有的
+  # 分类器,把层作为登记码前缀写进 message(packages/schema/src/codepuppy-net-failure.ts)。上游
+  # session-runner-retry.test.ts 那条 toSessionError 断言写的正是被替换的旧文本,随源文件成对接管(先例:oauth 的 page.ts 与它的测试)。
+  # 判据 packages/core/test/codepuppy-net-failure-settle.test.ts。
+  ':(exclude)packages/core/src/session/to-session-error.ts'
+  ':(exclude)packages/core/test/session-runner-retry.test.ts'
+  # ADR-041 决策 2(#1666 裁决 6756103246 第 4 项):MCP 工具与内置工具撞有效名时拒掉 MCP 那一个,不许后写覆盖。McpTool 的注册
+  # 走上游工具注册表的后写覆盖,没有插件挂点;接管面只有注册循环的 `codepuppy(ADR-041)` 标注块。
+  # 判据 packages/core/test/codepuppy-mcp-tool-collision.test.ts。
+  ':(exclude)packages/core/src/tool/mcp.ts'
+  # #1560(#1666 裁决 6737930969):用户为会话选定的模型优先于命令和命令 agent 推荐的模型。命令在执行体里自己 switchModel、
+  # 自己给子任务子会话定模型,没有插件挂点;接管面是两处 `codepuppy(#1560)` 标注,外加 #1129 E6(#1666 Unit E):子任务命令
+  # 建子会话前走 subagent 工具的权限路径(`codepuppy(#1129 E6)` 标注),由扩展策略追加的 deny 规则决定。
+  # 判据 packages/core/test/codepuppy-command-model-priority.test.ts。
+  ':(exclude)packages/core/src/config/plugin/command.ts'
+  # 界面与当前正式版一致(#1666 Unit F;owner 2026-11-12 经编排器转达:「同意，多接管两个上游文件，需要再唯一权威中记录多接管的内容。」):审阅面板要显示引擎以 synthetic
+  # 消息开启的回合(后台子任务空闲后完成)的改动;SessionDiff.turn 只认 user 锚点,插件改不了。接管面三处 `codepuppy(UI parity)` 标注。
+  # 判据 packages/core/test/codepuppy-session-diff-synthetic.test.ts。
+  ':(exclude)packages/core/src/session/diff.ts'
+  # 界面与当前正式版一致(#1666 Unit F;owner 2026-11-12 经编排器转达:「同意，多接管两个上游文件，需要再唯一权威中记录多接管的内容。」):文件面板要收到整个项目的文件
+  # 变化(0.1.26 在主进程打开 OPENCODE_EXPERIMENTAL_FILEWATCHER 时监视整个项目);2.x 的 LocationWatcher 只监视分支文件,没有插件挂点。
+  # 接管面只在 `codepuppy(UI parity)` 标注块,开关与忽略表在自有的 codepuppy-project-watch.ts。判据 packages/core/test/codepuppy-project-watch.test.ts。
+  ':(exclude)packages/core/src/filesystem/location-watcher.ts'
+  # I-08(INT-upstream-upgrade-readiness;owner 2026-11-12 经编排器转达:「工具服务提示选 A，核心包测试配置同意接管」):每个测试都与
+  # 用户真实数据目录隔离。bun 只读当前目录的 bunfig,core 的测试预载只能写在这里;接管面只有预载列表前插共享预载
+  # scripts/test-isolation/preload.ts 那一行,上游自己的 test/preload.ts 照旧跟在后面。判据 packages/core/test/codepuppy-test-isolation.test.ts。
+  ':(exclude)packages/core/bunfig.toml'
 )
 
 # ── UPSTREAM_PATHS 里住着的 Code Puppy 自有文件:结构性谓词,不是逐文件清单(`#1085` / ADR-043)──
@@ -237,16 +208,49 @@ CODEPUPPY_OWNED_MARKER="north-star:codepuppy-owned"
 # 的一部分 —— 度量步在拿不到 origin/dev 时要自己判「未测量」,它不能先被守卫的 fetch/降级
 # 逻辑改写状态。行为判据在 packages/ui-mac/src/main/north-star-drift-metrics.test.ts:那里把
 # 本脚本复制一份、只删掉三条 exclude,断言度量步打印的条数**跟着变**(杀掉「印一个写死的数」)。
+# ── 受审上游合并的判定(`#1664`,说明见下文「含受审上游合并的分支」一段):写成函数,守卫与只读模式
+# `--print-upstream-parent` 共用这一份。只读模式不 fetch,用本地已有的 origin/alpha(陈旧只会把窗口撑宽,
+# 合并照样认得出);origin/alpha 取不到时什么都不印,调用方按「没有上游父」处理(全量扫,过报不漏报)。
+tree_has_codepuppy_package() { # $1 = commit
+  local pkg
+  for pkg in $CODEPUPPY_OWNED_PACKAGES; do
+    git cat-file -e "${1}:packages/${pkg}" 2>/dev/null && return 0
+  done
+  return 1
+}
+detect_upstream_merge() {
+upstream_merge=""
+upstream_parent=""
+for merge in $(git rev-list --topo-order --merges origin/alpha..HEAD); do
+  for parent in $(git rev-list --no-walk --parents "$merge" | cut -d' ' -f3-); do
+    if ! tree_has_codepuppy_package "$parent"; then
+      upstream_merge="$merge"
+      upstream_parent="$parent"
+      break 2
+    fi
+  done
+done
+}
+
 if [ "$GUARD_MODE" = print-jurisdiction ]; then
   printf 'UPSTREAM_PATHS\t%s\n' "$UPSTREAM_PATHS"
   printf 'CODEPUPPY_OWNED_PACKAGES\t%s\n' "$CODEPUPPY_OWNED_PACKAGES"
-  printf 'ROUNDTRIP_PACKAGES\t%s\n' "$ROUNDTRIP_PACKAGES"
   printf 'UPSTREAM_MIRROR\t%s\n' "$UPSTREAM_MIRROR"
   printf 'UPSTREAM_EXCLUDES_COUNT\t%s\n' "${#UPSTREAM_EXCLUDES[@]}"
   exit 0
 fi
+if [ "$GUARD_MODE" = print-upstream-parent ]; then
+  # I-09:文档类闸(scripts/docs-gates.sh)在含受审上游合并的分支上只判 Code Puppy 的地盘 —— 与上游父逐字节
+  # 相同的路径是上游的,不归我们 lint。上游父怎么认只在这里定义一次。
+  if git rev-parse --verify --quiet origin/alpha >/dev/null; then
+    detect_upstream_merge
+    [ -z "$upstream_parent" ] || printf '%s\n' "$upstream_parent"
+  fi
+  exit 0
+fi
 if [ "$GUARD_MODE" = print-takeover ]; then
-  for spec in "${UPSTREAM_EXCLUDES[@]}"; do
+  # `#1662` F10:清单可以为空;macOS 的 bash 3.2 在 `set -u` 下展开空数组报 unbound,用 `${a[@]+…}` 形式。
+  for spec in ${UPSTREAM_EXCLUDES[@]+"${UPSTREAM_EXCLUDES[@]}"}; do
     printf '%s\n' "${spec#:(exclude)}"
   done
   exit 0
@@ -271,7 +275,15 @@ declares_codepuppy_owned() {
   return 1
 }
 
+# `#1664`:含受审上游合并的分支上(upstream_parent 由下文判出),因子①改问**上游父**里有没有这条路径,
+# 不再问 origin/dev —— 镜像会陈旧(2026-11-09 仍是 1.x 的 055d95bb),2.x 新增的上游文件在它里面查不到,
+# 往里写一行 marker 就会被放行。上游父里存在的路径一律不豁免。
 is_codepuppy_owned() {
+  if [ -n "${upstream_parent:-}" ]; then
+    git cat-file -e "${upstream_parent}:$1" 2>/dev/null && return 1
+    declares_codepuppy_owned "$1"
+    return
+  fi
   [ "$mirror_ok" -eq 1 ] || return 1
   mirror_has "$1" && return 1
   declares_codepuppy_owned "$1"
@@ -353,6 +365,23 @@ if [ "$mirror_ok" -eq 1 ]; then
   fi
 fi
 
+# ── 含受审上游合并的分支:packages/ 以那个合并的上游父为基准(`#1664`,#1662 裁决书 F3)────────────
+# 换代整合分支上有一个真合并提交 M0,第二父是 OpenCode 2 的上游提交(`33f94fce96`),树按规则构造:上游路径
+# 取上游原样。拿 origin/alpha 当基准,M0 带来的上千个上游 D/M 全部被点名 —— 这道门在整合分支上恒红,
+# 并行的 lane 只剩 `--no-verify` 一条路(`#754` 形态)。所以在这种分支上,问题换成「packages/ 相对**上游父**
+# 有没有未登记的偏离」(基线 §2.3 第 4 步的树判据):M0 原样带来的上游改动不点名,M0 之后再改一个上游文件
+# 照样点名。这一档**不带** `--diff-filter`:新增文件也必须被下面 ADR-043 的谓词认作 Code Puppy 自有,
+# 否则就是「多出来的一行」(§2.3 第 4 步:多出任何一行 = 未登记的偏离)。
+# 怎么认「上游合并」:origin/alpha 还没有的某个合并,它的某个非第一父的树里**一个 Code Puppy 自有包都没有**
+# (自有包按定义只在 alpha 一侧,上面的自检就是拿这条验 carve-out 的)。lane 合进整合分支的合并、整合分支
+# 吸收 alpha 的合并,另一个父都带着这些包,不会被认错。不用 UPSTREAM_MIRROR 判:它会陈旧 —— 2026-11-09 的
+# origin/dev 仍停在 1.x 的 `055d95bb`,不含 `33f94fce96`。离 HEAD 最近的那个算数(`--topo-order` 先列子提交)。
+# 合入 alpha 之后 M0 已在 origin/alpha 里,这里找不到候选,行为回到上面的 origin/alpha 基准,逐字不变。
+detect_upstream_merge
+if [ -n "$upstream_parent" ]; then
+  echo "    · 本分支含受审上游合并 $(git rev-parse --short "$upstream_merge")(上游父 $(git rev-parse --short "$upstream_parent"))—— packages/ 以上游父为基准判,新增文件也算(基线 §2.3 第 4 步,\`#1664\`)"
+fi
+
 # committed delta (mirrors CI) ∪ working-tree edits (earlier local feedback)
 # 同一条理由:diff 本身失败也是「测不到」,不是「没有改动」。宁可当场红。
 # `--no-renames` 是**判据的一部分**,不是风格(`#1085`)。默认开着的改名检测会把一次改名压成
@@ -360,10 +389,14 @@ fi
 # 在下面的谓词里两个因子全中,被当成 Code Puppy 自有放行,而上游那条路径其实已经消失(fork-sync
 # 照样冲突)。关掉改名检测后,同一次改名回到 `D`(旧路径)+ `A`(新路径):`D` 落进 DMR 被点名,
 # 点的还正好是真正受害的那条路径。north-star-guard.test.ts 里有一条专钉这个形状。
-if ! committed="$(git diff --no-renames --diff-filter=DMR --name-only origin/alpha...HEAD -- $UPSTREAM_PATHS "${UPSTREAM_EXCLUDES[@]}" "${CARVEOUT_PATHSPECS[@]}")"; then
+if [ -n "$upstream_parent" ]; then
+  if ! committed="$(git diff --no-renames --name-only "$upstream_parent" HEAD -- $UPSTREAM_PATHS ${UPSTREAM_EXCLUDES[@]+"${UPSTREAM_EXCLUDES[@]}"} "${CARVEOUT_PATHSPECS[@]}")"; then
+    echo "    ✗ 算不出与上游父 ${upstream_parent} 的树差 —— 本次守卫作废(不是通过)。"; exit 1
+  fi
+elif ! committed="$(git diff --no-renames --diff-filter=DMR --name-only origin/alpha...HEAD -- $UPSTREAM_PATHS ${UPSTREAM_EXCLUDES[@]+"${UPSTREAM_EXCLUDES[@]}"} "${CARVEOUT_PATHSPECS[@]}")"; then
   echo "    ✗ 算不出与 origin/alpha 的提交差 —— 本次守卫作废(不是通过)。"; exit 1
 fi
-if ! worktree="$(git diff --no-renames --diff-filter=DMR --name-only HEAD -- $UPSTREAM_PATHS "${UPSTREAM_EXCLUDES[@]}" "${CARVEOUT_PATHSPECS[@]}")"; then
+if ! worktree="$(git diff --no-renames --diff-filter=DMR --name-only HEAD -- $UPSTREAM_PATHS ${UPSTREAM_EXCLUDES[@]+"${UPSTREAM_EXCLUDES[@]}"} "${CARVEOUT_PATHSPECS[@]}")"; then
   echo "    ✗ 算不出工作树差 —— 本次守卫作废(不是通过)。"; exit 1
 fi
 changed="$(printf '%s\n%s\n' "$committed" "$worktree" | sed '/^$/d' | sort -u)"
@@ -387,16 +420,24 @@ CHANGED
 # 豁免必须**说出来**。一次静默的放行与一次没跑的门在输出上长得一模一样,而这道门的整个价值
 # 就在于「它今天绿」这句话有确定含义(`#913` 同一条纪律)。
 if [ -n "$exempt" ]; then
-  echo "    · Code Puppy 自有(住在上游包里,但 ${UPSTREAM_MIRROR} 从来没有过这条路径)—— 不算上游改动:"
+  origin_ref="$UPSTREAM_MIRROR"
+  [ -z "$upstream_parent" ] || origin_ref="上游父 $(git rev-parse --short "$upstream_parent")"
+  echo "    · Code Puppy 自有(住在上游包里,但 ${origin_ref} 从来没有过这条路径)—— 不算上游改动:"
   printf '%s' "$exempt" | sed 's/^/      /'
 fi
 if [ -n "$flagged" ]; then
-  echo "    ✗ upstream files modified/deleted/renamed (fork-sync would conflict):"
+  if [ -n "$upstream_parent" ]; then
+    echo "    ✗ packages/ 相对上游父 $(git rev-parse --short "$upstream_parent") 有未登记的偏离(改 / 删 / 新增;基线 §2.3 第 4 步):"
+  else
+    echo "    ✗ upstream files modified/deleted/renamed (fork-sync would conflict):"
+  fi
   printf '%s' "$flagged" | sed 's/^/      /'
   echo "      → revert; extend via Code Puppy files (packages/ext, packages/ui-mac) or seams (ADR-002/005)."
   echo "      → 它其实是 Code Puppy 自有文件?命名成 codepuppy-*,或在文件里写一行 '${CODEPUPPY_OWNED_MARKER}'(ADR-043)。"
   exit 1
 fi
 # 绿也要说清「这一跑量的是什么」(`#913` 同一条纪律):辖区不再是读者背得出来的 8 个包,
-# 而是「整棵 packages/ 减两张 carve-out」—— 不把 carve-out 打出来,「今天绿」就又变成隐含知识。
-echo "✓ zero upstream package edits (辖区 = packages/ 全树 − Code Puppy 自有包 [${CODEPUPPY_OWNED_PACKAGES}] − ADR-034 roundtrip 包 [${ROUNDTRIP_PACKAGES}];baseline origin/alpha;ADR-033 收编白名单 + ADR-043 Code Puppy 自有谓词除外)"
+# 而是「整棵 packages/ 减 carve-out」—— 不把 carve-out 打出来,「今天绿」就又变成隐含知识。
+baseline="origin/alpha"
+[ -z "$upstream_parent" ] || baseline="上游父 $(git rev-parse --short "$upstream_parent")"
+echo "✓ zero upstream package edits (辖区 = packages/ 全树 − Code Puppy 自有包 [${CODEPUPPY_OWNED_PACKAGES}];baseline ${baseline};ADR-033 收编白名单 + ADR-043 Code Puppy 自有谓词除外)"

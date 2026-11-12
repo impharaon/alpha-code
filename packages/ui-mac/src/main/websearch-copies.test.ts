@@ -34,8 +34,30 @@
 //      来的新工具是现实里唯一见过的形态,它会带字面量端点,两张网看得见。任何一张网变化 = 有人
 //      加了新的 web search 执行面,停下来分类,而不是让它静默上线。
 
-import { readdirSync, readFileSync, statSync } from "node:fs"
-import { join, relative, resolve, sep } from "node:path"
+// ── 2026-11-12 I-09:OpenCode 2 上本文件剩下什么 ─────────────────────────────────────────────
+// 上面说的两条传输(packages/opencode/src/tool/mcp-websearch.ts、packages/core/src/tool/websearch.ts)和两份叶子随
+// OpenCode 2 换代删除(`44b6938b2a`)。2.x 的 websearch 注册与传输都是上游的(packages/core/src/tool/plugin/websearch.ts、
+// packages/core/src/plugin/websearch/*),本仓不改上游文件;本地腿的主权判决改在 ext 的 `execute.before` 钩子第一句按工具名下
+// (下面「云侧最终闸是 ext 执行钩子的第一句」照常判位置)。于是退役六条:
+//   · 「<两条传输>:闸是出网出口的第一句」×2、「出网出口是导出的」—— 替代:packages/ext/src/plugin-host.test.ts
+//     「权威 · 联网搜索准入(L5r)」(真宿主里 kill-switch 下 2.x 内置 websearch 与第三方 web search MCP 在 execute.before
+//     被拒,反向臂不装 ext 即放行);
+//   · 普查网三条(「全仓注册为 websearch 的工具恰好是这两份」「每一份注册的叶子闸…」「直接引用 Exa/Parallel 端点的文件…」)——
+//     对象是本仓自己持有的副本,2.x 上本仓不再持有任何一份;按名字认出 web search 工具由 packages/ext/src/cloud-websearch-kill.test.ts
+//     的 R6 / R7 两条(合法改名都命中、不相邻不命中)判。无对应用例:「上游 sync 带进来一份自带新端点的副本 ⇒ 停下来分类」
+//     这张纵深网在 2.x 上没有对应物(新副本若起的名字认不出,ext 的名字判决关不掉它,见 `#1461`)。
+// 「主权信道名…逐字一致」一条去掉两条传输的半句,其余照常判。
+//
+// ── 2026-11-12 `#1662` parity 第 9 项:普查网在 2.x 上重建 ────────────────────────────────────────
+// 2.x 上能执行 web search 的地方都挂在同一个 `websearch` 工具后面(供应商经 `WebSearch.Service` 注册),主权判决在 ext 的
+// execute.before 按工具名下;本仓自己持有的一份是 ext 的 exa 供应商(packages/ext/src/exa-websearch.ts,顶替上游那份)。纵深网照旧
+// 只抓一件事:**新的执行面**(新注册一个供应商 / 新消费 WebSearch.Service / 新写一个供应商端点)出现时停下来分类,不让它静默上线。
+//   网 A:生产源码里注册 web search 供应商或消费 WebSearch.Service 的文件,恰好是下面分好类的那些;
+//   网 B:生产源码里写着某个供应商端点的文件,恰好是五份上游供应商、ext 的 exa 供应商与登记过的纯说明。
+// 两张网各有一条已知的坏:往真树的文件集合里多放一个这样的文件,网必须点名它。
+
+import { readFileSync } from "node:fs"
+import { join, resolve } from "node:path"
 import { describe, expect, test } from "bun:test"
 import {
   CLOUD_MCP_ARM_ENV,
@@ -46,80 +68,10 @@ import {
 } from "./cloud-web-search"
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..", "..", "..")
-const SKIP_DIRS = new Set(["node_modules", "dist", "build", "out", ".git", "gen", "generated"])
-
-function sourceFiles(): string[] {
-  const found: string[] = []
-  const walk = (dir: string) => {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      if (entry.isDirectory()) {
-        if (SKIP_DIRS.has(entry.name)) continue
-        walk(join(dir, entry.name))
-        continue
-      }
-      if (!entry.isFile()) continue
-      if (!/\.tsx?$/.test(entry.name)) continue
-      if (/\.(test|spec)\.tsx?$/.test(entry.name)) continue
-      found.push(join(dir, entry.name))
-    }
-  }
-  for (const pkg of readdirSync(join(REPO_ROOT, "packages"), { withFileTypes: true })) {
-    if (!pkg.isDirectory() || SKIP_DIRS.has(pkg.name)) continue
-    const src = join(REPO_ROOT, "packages", pkg.name, "src")
-    try {
-      if (!statSync(src).isDirectory()) continue
-    } catch {
-      continue
-    }
-    walk(src)
-  }
-  return found
-}
-
-const FILES = sourceFiles().map((path) => ({ path: relative(REPO_ROOT, path).split(sep).join("/"), body: readFileSync(path, "utf8") }))
 const read = (path: string) => readFileSync(join(REPO_ROOT, path), "utf8")
-
-/**
- * 两条出网出口。`egress` = 该文件里发起 HTTP 请求的那个导出函数;闸必须排在它体内、
- * 且在第一次构造请求之前。
- */
-const GATED_TRANSPORTS = [
-  { path: "packages/opencode/src/tool/mcp-websearch.ts", egress: "export const call = " },
-  { path: "packages/core/src/tool/websearch.ts", egress: "export const callMcp = " },
-] as const
-
-describe("本地 web search 主权闸落在共同执行边界(#223 R4 主判据 · 静态半场)", () => {
-  for (const transport of GATED_TRANSPORTS)
-    test(`${transport.path}:闸是出网出口的第一句`, () => {
-      const body = read(transport.path)
-      const egress = body.indexOf(transport.egress)
-      expect(egress, `${transport.path} 找不到出网出口 ${transport.egress}`).toBeGreaterThanOrEqual(0)
-      const gate = body.indexOf("if (localWebSearchDenied())", egress)
-      const request = body.indexOf("HttpClientRequest.post(", egress)
-      expect(gate, `${transport.path} 的出网出口里没有主权闸`).toBeGreaterThan(egress)
-      expect(request, `${transport.path} 的出网出口里找不到请求构造`).toBeGreaterThan(egress)
-      expect(gate, `${transport.path}: 闸必须早于构造请求(零出网)`).toBeLessThan(request)
-    })
-
-  test("出网出口是导出的 —— 「复用传输」才是新副本的正确写法(复用即带闸)", () => {
-    for (const transport of GATED_TRANSPORTS) expect(read(transport.path)).toContain(transport.egress)
-  })
-})
 
 // ── 以下是纵深,不是主判据 ────────────────────────────────────────────────────
 
-/** 「注册了一个叫 websearch 的工具」的三种现行写法(legacy `Tool.define` / V2 模块名约定 / 插件工具表)。 */
-const REGISTRATION = [
-  /Tool\.define\(\s*["'`]websearch["'`]/,
-  /export const name\s*=\s*["'`]websearch["'`]/,
-  /(^|[\s{,])websearch\s*:\s*(tool|Tool\.make)\(/m,
-]
-/** 主权闸必须排在这些「第一次真做事」的调用之前。 */
-const FIRST_EFFECT = [/permission\.assert\(/, /ctx\.ask\(/, /callMcp\(/, /callProvider\(/]
-
-const registrations = FILES.filter((file) => REGISTRATION.some((pattern) => pattern.test(file.body)))
-const providerCallers = FILES.filter((file) => /mcp\.exa\.ai|search\.parallel\.ai/.test(file.body))
-const transportPaths = GATED_TRANSPORTS.map((transport) => transport.path as string)
 /**
  * 提到端点但**不出网**的文件。网 ② 抓的是「谁能打到 Exa/Parallel」,一段引用端点的**说明**不是
  * 执行面 —— 但它同样让集合变化,所以按「新增即分类」显式登记,并由下面那条断言证明它确实不出网
@@ -136,32 +88,67 @@ const DOCUMENTED_MENTIONS = [
 ]
 const EGRESS_PRIMITIVES = [/HttpClientRequest\./, /\bfetch\s*\(/, /\.callTool\s*\(/, /new\s+Request\s*\(/]
 
+/** 生产源码:各包 `src/` 下 git 可见的 .ts / .tsx,去掉测试、cases 与类型声明。 */
+function productionSources(): Array<{ path: string; text: string }> {
+  const listed = Bun.spawnSync(["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "packages"], { cwd: REPO_ROOT })
+  return listed.stdout
+    .toString()
+    .split("\0")
+    .filter((path) => /^packages\/[^/]+\/src\/.*\.tsx?$/.test(path) && !/\.(test|spec|cases)\.tsx?$|\.d\.ts$/.test(path))
+    .map((path) => ({ path, text: read(path) }))
+}
+const sources = productionSources()
+
+/** 网 A:注册 web search 供应商(上游 helper / 任何 `websearch.transform`)或消费 `WebSearch.Service` 的文件。 */
+const WEBSEARCH_SURFACE = [/WebSearchProvider\.register\(/, /\bwebsearch\.transform\(/, /\bWebSearch\.Service\b/]
+const surfaceOf = (files: Array<{ path: string; text: string }>) => files.filter((file) => WEBSEARCH_SURFACE.some((pattern) => pattern.test(file.text))).map((file) => file.path).sort()
+const CLASSIFIED_SURFACE: Record<string, string> = {
+  "packages/core/src/plugin/websearch/exa.ts": "上游 exa 供应商(ext 以同一个 id 顶替)",
+  "packages/core/src/plugin/websearch/firecrawl.ts": "上游供应商,需要用户自己的 key",
+  "packages/core/src/plugin/websearch/parallel.ts": "上游供应商",
+  "packages/core/src/plugin/websearch/tavily.ts": "上游供应商,需要用户自己的 key",
+  "packages/core/src/plugin/websearch/tinyfish.ts": "上游供应商",
+  "packages/core/src/plugin/websearch/provider.ts": "上游供应商的注册 helper",
+  "packages/core/src/plugin/provider/opencode.ts": "上游 OpenCode Console 的托管搜网,只在连了 Console 账户且远端配置开了它时注册",
+  "packages/core/src/tool/plugin/websearch.ts": "唯一的 `websearch` 工具(ext 的 execute.before 按这个名字下主权判决)",
+  "packages/core/src/config/plugin/websearch.ts": "用户配置的供应商选择",
+  "packages/core/src/config/plugin/policy.ts": "托管策略删供应商后重载",
+  "packages/core/src/plugin/host.ts": "插件上下文的 websearch 域(转交给服务)",
+  "packages/core/src/plugin/internal.ts": "内置插件清单:把 WebSearch.Service 交给内置插件(供应商与工具都在上面列着)",
+  "packages/plugin/src/promise/adapter.ts": "promise 插件适配层(转交给服务)",
+  "packages/server/src/handlers/websearch.ts": "HTTP 路由 `/api/websearch`(转交给服务,同一个服务、同一批供应商)",
+  "packages/ext/src/plugin.ts": "ext:默认选 exa、装 Code Puppy 的 exa 供应商(exa-websearch.ts)",
+}
+
+/** 网 B:写着某个供应商端点的文件。 */
+const ENDPOINT = /mcp\.exa\.ai|search\.parallel\.ai|api\.tavily\.com|mcp\.firecrawl\.dev|agent\.tinyfish\.ai/
+const endpointHolders = (files: Array<{ path: string; text: string }>) => files.filter((file) => ENDPOINT.test(file.text)).map((file) => file.path).sort()
+const CLASSIFIED_ENDPOINTS = [
+  "packages/core/src/plugin/websearch/exa.ts",
+  "packages/core/src/plugin/websearch/firecrawl.ts",
+  "packages/core/src/plugin/websearch/parallel.ts",
+  "packages/core/src/plugin/websearch/tavily.ts",
+  "packages/core/src/plugin/websearch/tinyfish.ts",
+  "packages/ext/src/exa-websearch.ts",
+  ...DOCUMENTED_MENTIONS,
+]
+
 describe("websearch 执行副本普查(#223 R3 · R4 起降为纵深)", () => {
-  test("全仓注册为 websearch 的工具恰好是这两份", () => {
-    expect(registrations.map((file) => file.path).sort()).toEqual([
-      "packages/core/src/tool/websearch.ts",
-      "packages/opencode/src/tool/websearch.ts",
-    ])
+  test("网 A:注册 web search 供应商或消费 WebSearch.Service 的生产文件,恰好是分好类的那些(新增即停下来分类)", () => {
+    expect(surfaceOf(sources)).toEqual(Object.keys(CLASSIFIED_SURFACE).sort())
   })
 
-  test("每一份注册的叶子闸(纵深)仍排在任何 permission 交互/出网调用之前", () => {
-    expect(registrations.length).toBeGreaterThan(0)
-    for (const file of registrations) {
-      // 只在 execute 体内比较位置:文件顶部的辅助函数**定义**不是「做事」。
-      const body = file.body.indexOf("execute:")
-      expect(body, `${file.path} 没有可识别的 execute 入口`).toBeGreaterThanOrEqual(0)
-      const gate = file.body.indexOf("if (localWebSearchDenied())", body)
-      expect(gate, `${file.path} 的 execute 里缺少主权闸(纵深那一道)`).toBeGreaterThanOrEqual(0)
-      for (const pattern of FIRST_EFFECT) {
-        const match = pattern.exec(file.body.slice(body))
-        if (!match) continue
-        expect(gate, `${file.path}: 闸必须早于 ${pattern.source}`).toBeLessThan(body + match.index)
-      }
-    }
+  test("网 B:写着供应商端点的生产文件,恰好是五份上游供应商、ext 的 exa 供应商与登记过的纯说明", () => {
+    expect(endpointHolders(sources)).toEqual([...CLASSIFIED_ENDPOINTS].sort())
   })
 
-  test("直接引用 Exa/Parallel 端点的文件恰好是两条带闸的传输 + 已登记的纯说明(新增即分类)", () => {
-    expect(providerCallers.map((file) => file.path).sort()).toEqual([...transportPaths, ...DOCUMENTED_MENTIONS].sort())
+  test("已知的坏:多一个注册供应商的文件、多一个写着端点的文件,两张网都点名它", () => {
+    const planted = { path: "packages/ext/src/planted-search.ts", text: 'await ctx.websearch.transform((editor) => editor.add({ id: "x" }))\nconst url = "https://mcp.exa.ai/mcp"' }
+    expect(surfaceOf([...sources, planted])).toContain(planted.path)
+    expect(surfaceOf([...sources, planted])).not.toEqual(Object.keys(CLASSIFIED_SURFACE).sort())
+    expect(endpointHolders([...sources, planted])).toContain(planted.path)
+    // 判官自检:真树确实扫到了文件(不是空集合对空集合)
+    expect(sources.length).toBeGreaterThan(1000)
   })
 
   test("登记为「纯说明」的文件确实不出网(否则它就该按传输分类)", () => {
@@ -172,17 +159,10 @@ describe("websearch 执行副本普查(#223 R3 · R4 起降为纵深)", () => {
     }
   })
 
-  test("主权信道名在四个包里逐字一致;MCP authority 共享唯一核验源", () => {
+  test("主权信道名在 ui-mac / ext / plugin 逐字一致;MCP authority 共享唯一核验源", () => {
     expect(LOCAL_WEBSEARCH_DENY_ENV).toBe("CODEPUPPY_LOCAL_WEBSEARCH_DENY")
     expect(CLOUD_WEBSEARCH_DENY_ENV).toBe("CODEPUPPY_CLOUD_WEBSEARCH_DENY")
     expect(CLOUD_MCP_ARM_ENV).toBe("CODEPUPPY_CLOUD_MCP_ARM")
-    // 本地信号的**声明点**已下沉到两条传输(叶子只转出),这条锁跟着下沉。
-    for (const transport of GATED_TRANSPORTS)
-      expect(read(transport.path)).toContain(`export const LOCAL_WEBSEARCH_DENY_ENV = "${LOCAL_WEBSEARCH_DENY_ENV}"`)
-    // legacy 叶子不再自己声明字面量,而是从传输转出 —— 转出丢了就等于两处漂移。
-    expect(read("packages/opencode/src/tool/websearch.ts")).toContain(
-      "export const LOCAL_WEBSEARCH_DENY_ENV = McpWebSearch.LOCAL_WEBSEARCH_DENY_ENV",
-    )
     expect(read("packages/ext/src/cloud-websearch-kill.ts")).toContain(
       `export const CLOUD_WEBSEARCH_DENY_ENV = "${CLOUD_WEBSEARCH_DENY_ENV}"`,
     )
@@ -198,7 +178,8 @@ describe("websearch 执行副本普查(#223 R3 · R4 起降为纵深)", () => {
       expect(authority).toContain(`export const ${identifier} = "${name}"`)
       expect(extGate).toContain(`${identifier},`)
     }
-    expect(extGate).toContain('from "@opencode-ai/plugin/alpha-cloud-authority"')
+    // 2.x 的上游插件包名是 @opencode/plugin(v1 是 @opencode-ai/plugin)。
+    expect(extGate).toContain('from "@opencode/plugin/alpha-cloud-authority"')
     // 本地判决在 ext 侧也必须逐字一致 —— R5 起 ext 的闸靠它拦第三方 web-search MCP。
     expect(read("packages/ext/src/cloud-websearch-kill.ts")).toContain(
       `export const LOCAL_WEBSEARCH_DENY_ENV = "${LOCAL_WEBSEARCH_DENY_ENV}"`,
@@ -214,28 +195,35 @@ describe("websearch 执行副本普查(#223 R3 · R4 起降为纵深)", () => {
       expect(allowlist).not.toContain(`"${name}"`)
   })
 
-  test("云侧最终闸是 ext 钩子的第一句(排在契约校验与 ctx.ask 之前)", () => {
+  // `#1667`(#1665 L3 交回):2.x 的执行钩子是 `context.tool.hook("execute.before", …)`(只有它允许失败,抛出即拒掉这次调用)。
+  test("云侧最终闸是 ext 执行钩子的第一句(排在契约校验与 ctx.ask 之前)", () => {
     const plugin = read("packages/ext/src/plugin.ts")
-    const hook = plugin.indexOf('"tool.execute.before"')
+    const hook = plugin.indexOf('context.tool.hook("execute.before"')
     expect(hook).toBeGreaterThanOrEqual(0)
     // #223 R7:归属实参从模块级默认值改成本实例闭包(`, process.env, mcpOwnership`),故只钉调用点。
-    const gate = plugin.indexOf("assertWebSearchToolAllowed(hookInput.tool", hook)
+    const gate = plugin.indexOf("assertWebSearchToolAllowed(event.tool", hook)
     const contract = plugin.indexOf("validateCloudToolInput(", hook)
     expect(gate).toBeGreaterThan(hook)
     expect(gate).toBeLessThan(contract)
+    // 钩子体里闸之前没有别的语句(只允许注释)
+    const body = plugin.slice(plugin.indexOf("{", hook) + 1, gate)
+    expect(body.replace(/\/\/[^\n]*/g, "").trim()).toBe("")
   })
 
-  // #223 R4:ext 装载回执必须是 config 钩子的第一句 —— 它后面那些项目配置分支有 early return,
-  // 排在它们之后会让「项目 codepuppy.jsonc 读不了」顺带把云工具一起关掉。
-  // R5:回执从「翻开 enabled:false」改成「把定义装进配置」(`installCloudMcp`),位置要求不变。
-  test("ext 装载回执是 config 钩子的第一句", () => {
+  // #223 R4:ext 装载回执必须排在项目配置之前 —— 项目配置的分支会失败,排在它们之后会让「项目 codepuppy.jsonc 读不了」
+  // 顺带把云工具一起关掉。R5:回执从「翻开 enabled:false」改成「把定义装进配置」(`installCloudMcp`),位置要求不变。
+  // `#1667`(#1665 L3 交回):2.x 没有整份 config 钩子,云 MCP 定义经本 Location 的 `context.mcp.transform` 编辑器装;
+  // 回执是这个 transform 的第一句,排在项目 MCP 合并(`applyProjectMcp`,会抛)之前。
+  test("ext 装载回执是 mcp.transform 的第一句(排在项目 MCP 合并之前)", () => {
     const plugin = read("packages/ext/src/plugin.ts")
-    const hook = plugin.indexOf("async config(cfg) {")
-    expect(hook).toBeGreaterThanOrEqual(0)
-    const install = plugin.indexOf("installCloudMcp(cfg)", hook)
+    const transform = plugin.indexOf("context.mcp.transform((editor) => {")
+    expect(transform).toBeGreaterThanOrEqual(0)
+    const install = plugin.indexOf("installCloudMcp(editor)", transform)
+    const project = plugin.indexOf("applyProjectMcp(editor", transform)
+    expect(install).toBeGreaterThan(transform)
+    expect(project).toBeGreaterThan(install)
     // 只找**语句**形态的 return(行首缩进后紧跟 return),否则注释里的字眼会误判位置。
-    const firstReturn = hook + plugin.slice(hook).search(/\n\s*return[\s;]/)
-    expect(install).toBeGreaterThan(hook)
+    const firstReturn = transform + plugin.slice(transform).search(/\n\s*return[\s;]/)
     expect(install).toBeLessThan(firstReturn)
   })
 
@@ -247,12 +235,16 @@ describe("websearch 执行副本普查(#223 R3 · R4 起降为纵深)", () => {
   // 这里钉住静态形状:kill-switch 下写进 config.mcp 的**只能**是中和条目。
   test("kill-switch 分支写的是中和条目,真定义只经 ARM/DEF 托管", () => {
     const injection = read("packages/ui-mac/src/main/codepuppy-config-injection.ts")
-    // `#1195` 起赋值是 platformPays 三分支(缺凭证 ⇒ 工厂给的无引用 enabled:false 形状),
+    // `#1195` 起赋值是 platformPays 三分支(缺凭证 ⇒ 工厂给的无引用 disabled 形状),
     // 但 kill-switch 臂**必须**仍是中和条目且排在最前(缺凭证判定不得把真 URL 放回 kill-switch 态)。
+    // `#1667`:2.x 的 MCP 条目在 `mcp.servers` 下(上游 `Config.Info` 的 `mcp.servers`)。
     const assign = injection.match(
-      /config\.mcp = \{\n\s*\.\.\.\(config\.mcp \?\? \{\}\),\n\s*\[CLOUD_MCP_SERVER_NAME\]: killSwitch\n\s*\? \{ \.\.\.WITHHELD_CLOUD_MCP \}\n\s*: platformPays\n\s*\? cloud\n\s*: materializeCloudMcpConfig\(mcpUrl, undefined\),\n\s*\}/,
+      /config\.mcp = \{\n\s*\.\.\.config\.mcp,\n\s*servers: \{\n\s*\.\.\.config\.mcp\?\.servers,\n\s*\[CLOUD_MCP_SERVER_NAME\]: cloudMcpWithheld\n\s*\? \{ \.\.\.WITHHELD_CLOUD_MCP \}\n\s*: platformPays\n\s*\? cloud\n\s*: materializeCloudMcpConfig\(mcpUrl, undefined\),\n\s*\},\n\s*\}/,
     )
     expect(assign).not.toBeNull()
+    // #1687:三元的条件改名为 cloudMcpWithheld(报错入口要读它);它必须恰好是 killSwitch,且在赋值前一行定下、除复位成 false 外全文件只赋这一次。
+    expect(injection).toMatch(/cloudMcpWithheld = killSwitch\n\s*config\.mcp = \{/)
+    expect(injection.match(/cloudMcpWithheld = (?!false\b)/g)?.length).toBe(1)
     const branch = injection.indexOf("if (killSwitch) {")
     expect(branch).toBeGreaterThanOrEqual(0)
     const elseAt = injection.indexOf("\n      } else {", branch)

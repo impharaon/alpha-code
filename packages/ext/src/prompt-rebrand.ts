@@ -1,21 +1,22 @@
 // prompt-rebrand — REQ-062 路线A(T1):系统提示词品牌转写(ADR-015 2026-07-08 修订)。
 //
-// 机制:`experimental.chat.system.transform` 是唯一能触及 provider 底座 + environment 的零-fork
-// 接缝(packages/plugin/src/index.ts:291-296;request.ts 触发)。到手的 system 段是
-// 「底座 + environment + 用户 instructions(AGENTS.md/CLAUDE.md)+ skills」**join 后的单串** ——
-// 因此绝不做全局词替换(会篡改用户自己的文本 = 对模型撒谎),只做**精选子串对**转写
-// (ADR-007 brand-i18n 同款纪律):每条 from 都是上游底座 .txt 的逐字节原文,用户文本撞上的
-// 概率趋零;上游改版导致 from 失配 = 该句不再出现 → 由 residual 审计 warn 兜底(不静默)。
+// 机制(`#1665` 起,OpenCode 2):上游按模型选底座提示词的是 internal.pre 里的 `opencode.prompt.*` 插件
+// (`packages/core/src/plugin/optimize.ts`),它们在 `session.hook.context` 里把底座推进 `system`;ext 的同名钩子注册在
+// 它们之后,拿到的 `system` 是**逐段**的(底座、环境、用户 instructions 各自一段)。仍然绝不做全局词替换(会篡改用户
+// 自己的文本 = 对模型撒谎),只做**精选子串对**转写(ADR-007 brand-i18n 同款纪律):每条 from 都是上游底座 .txt 的逐字节
+// 原文,用户文本撞上的概率趋零;上游改版导致 from 失配 = 该句不再出现 → 由 residual 审计 warn 兜底(不静默)。
 //
 // 纪律(REQ-062):
-//   - 真实事物名不转:opencode.json(c) / .opencode 路径 / @opencode-ai 包名 / CLI 等实体引用
+//   - 真实事物名不转:opencode.json(c) / .opencode 路径 / @opencode 包名 / CLI 等实体引用
 //     (本模块只按整句替换,天然不触及);
 //   - 漏改 warn:转写后残留「You are opencode」行首句 / anomalyco 仓指引 / opencode.ai 文档域 →
 //     报 warning(每进程每签名一次,防每条消息刷屏);用户 instructions 里的合法提及也会触发
 //     (如 alpha-code 仓自身),warning 是诚实提示而非错误;
 //   - 逃生 CODEPUPPY_PROMPT_REBRAND_DISABLE=1(hook 侧判,本模块纯函数);
 //   - 底座改版复核:tests 逐条断言 from 子串仍存在于上游 .txt(sync 后红 = 清单需复核,
-//     与 ADR-015 合并验证 / sync tripwire 呼应)。
+//     与 ADR-015 合并验证 / sync tripwire 呼应)。`#1665` 按 2.x 的六份底座重新清点:v1 的 anthropic / beast / gemini /
+//     copilot 自指句、help/feedback 块、产品问答指引、anthropic 客观性段在 2.x 底座里都已不存在(anthropic.txt 不再自指),
+//     这些规则随之删除;新增 gpt / gpt-astra 与 meta 的自指句。
 
 export const REBRAND_TO = "Code Puppy"
 
@@ -24,86 +25,54 @@ export type RebrandRule = {
   /** 上游底座逐字节原文(tests 断言仍在;失配 = 上游改版,该条静默不再命中 → residual 审计接手)。 */
   from: string
   to: string
-  /** 断言 from 存在的上游文件(相对 packages/opencode/src/session/prompt/),供 drift 锁测。 */
+  /** 断言 from 存在的上游文件(相对 packages/core/src/),供 drift 锁测。 */
   file: string
 }
 
 export const REBRAND_RULES: readonly RebrandRule[] = [
-  // ── 自指首句(8 底座 + copilot)────────────────────────────────────────────
+  // ── 自指首句(2.x 的默认底座 + 六份按模型选的底座里自指的五份;anthropic.txt 不自指)──────
   {
-    id: "identity-anthropic-codex",
-    from: "You are OpenCode, the best coding agent on the planet.",
-    to: "You are Code Puppy, the best coding agent on the planet.",
-    file: "anthropic.txt",
+    id: "identity-gpt",
+    from: "You are an AI agent running in OpenCode, a coding agent harness.",
+    to: "You are an AI agent running in Code Puppy, a coding agent harness.",
+    file: "plugin/system-prompt/gpt.txt",
   },
   {
-    id: "identity-default-trinity",
+    // 没有按模型选中任何底座时的默认底座(`packages/core/src/session/model-request.ts` → SessionSystemPrompt.make)。
+    id: "identity-default",
+    from: "You are an AI agent running in OpenCode, a coding agent harness.",
+    to: "You are an AI agent running in Code Puppy, a coding agent harness.",
+    file: "session/runner/prompt/system.txt",
+  },
+  {
+    id: "identity-gpt-astra",
+    from: "You are an AI agent running in OpenCode, a coding agent harness.",
+    to: "You are an AI agent running in Code Puppy, a coding agent harness.",
+    file: "plugin/system-prompt/gpt-astra.txt",
+  },
+  {
+    id: "identity-trinity",
     from: "You are opencode, an interactive CLI tool that helps users with software engineering tasks.",
     to: "You are Code Puppy, an interactive coding agent that helps users with software engineering tasks.",
-    file: "default.txt",
-  },
-  {
-    id: "identity-beast",
-    from: "You are opencode, an agent - please keep going",
-    to: "You are Code Puppy, an agent - please keep going",
-    file: "beast.txt",
+    file: "plugin/system-prompt/trinity.txt",
   },
   {
     id: "identity-kimi",
     from: "You are OpenCode, an interactive general AI agent running on a user's computer.",
     to: "You are Code Puppy, an interactive general AI agent running on a user's computer.",
-    file: "kimi.txt",
+    file: "plugin/system-prompt/kimi.txt",
   },
   {
-    id: "identity-gpt",
-    from: "You are OpenCode, You and the user share the same workspace",
-    to: "You are Code Puppy, You and the user share the same workspace",
-    file: "gpt.txt",
+    id: "identity-meta",
+    from: "You are OpenCode, a coding agent that helps users with software engineering tasks.",
+    to: "You are Code Puppy, a coding agent that helps users with software engineering tasks.",
+    file: "plugin/system-prompt/meta.txt",
   },
   {
-    id: "identity-gemini",
-    from: "You are opencode, an interactive CLI agent specializing in software engineering tasks.",
-    to: "You are Code Puppy, an interactive coding agent specializing in software engineering tasks.",
-    file: "gemini.txt",
-  },
-  {
-    id: "identity-copilot",
-    from: "Your name is opencode",
-    to: "Your name is Code Puppy",
-    file: "copilot-gpt-5.txt",
-  },
-  // ── help/feedback 指引块(指向上游 TUI 快捷键与 GitHub 仓,对 alpha 用户全部失实 → 整块剔除)──
-  {
-    id: "help-feedback-anthropic",
-    from: "If the user asks for help or wants to give feedback inform them of the following:\n- ctrl+p to list available actions\n- To give feedback, users should report the issue at\n  https://github.com/anomalyco/opencode\n\n",
-    to: "",
-    file: "anthropic.txt",
-  },
-  {
-    id: "help-feedback-default",
-    from: "If the user asks for help or wants to give feedback inform them of the following:\n- /help: Get help with using opencode\n- To give feedback, users should report the issue at https://github.com/anomalyco/opencode/issues\n\n",
-    to: "",
-    file: "default.txt",
-  },
-  // ── 产品问答指引(原文指向 opencode.ai 文档 → 改为按会话可观测事实自答,不指外部文档)──
-  {
-    id: "docs-guidance-anthropic",
-    from: 'When the user directly asks about OpenCode (eg. "can OpenCode do...", "does OpenCode have..."), or asks in second person (eg. "are you able...", "can you do..."), or asks how to use a specific OpenCode feature (eg. implement a hook, write a slash command, or install an MCP server), use the WebFetch tool to gather information to answer the question from OpenCode docs. The list of available docs is available at https://opencode.ai/docs',
-    to: 'When the user directly asks about this product (eg. "can it do...", "does it have..."), or asks in second person (eg. "are you able...", "can you do..."), answer as Code Puppy from what you can observe in this session and its configuration; do not point the user at external docs you have not verified.',
-    file: "anthropic.txt",
-  },
-  {
-    id: "docs-guidance-default",
-    from: "When the user directly asks about opencode (eg 'can opencode do...', 'does opencode have...') or asks in second person (eg 'are you able...', 'can you do...'), first use the WebFetch tool to gather information to answer the question from opencode docs at https://opencode.ai",
-    to: "When the user directly asks about this product (eg 'can it do...', 'does it have...') or asks in second person (eg 'are you able...', 'can you do...'), answer as Code Puppy from what you can observe in this session and its configuration.",
-    file: "default.txt",
-  },
-  // ── 正文自指(anthropic 客观性段)──────────────────────────────────────────
-  {
-    id: "objectivity-anthropic",
-    from: "It is best for the user if OpenCode honestly applies the same rigorous standards",
-    to: "It is best for the user if Code Puppy honestly applies the same rigorous standards",
-    file: "anthropic.txt",
+    id: "tool-use-meta",
+    from: "# Tool Use - OpenCode Specifics",
+    to: "# Tool Use - Code Puppy Specifics",
+    file: "plugin/system-prompt/meta.txt",
   },
 ] as const
 
@@ -113,6 +82,7 @@ const RESIDUAL_PATTERNS: ReadonlyArray<{ id: string; re: RegExp }> = [
   { id: "name-line", re: /^your name is opencode\b/im },
   { id: "upstream-repo", re: /github\.com\/anomalyco\/opencode/i },
   { id: "upstream-docs", re: /https?:\/\/opencode\.ai/i },
+  { id: "harness-line", re: /\brunning in opencode\b/i },
 ]
 
 export type RebrandResult = { system: string[]; changed: boolean; warnings: string[] }

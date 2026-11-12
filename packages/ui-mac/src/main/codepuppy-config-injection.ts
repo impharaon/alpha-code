@@ -14,13 +14,12 @@
 
 import * as fs from "node:fs"
 import * as path from "node:path"
-import { parse as parseJsonc, type ParseError } from "jsonc-parser"
 // `#1299`(REQ-157):三个 alpha agent 的 description / prompt 是 alpha 的字,住在零依赖的
 // codepuppy-agents.ts,由 packages/ext 的登记簿 import 并声明上限;这里只取,不再内联字面量。
 import { CODEPUPPY_AGENT_TEXT } from "./codepuppy-agents"
 import { CODEPUPPY_BEHAVIOR_MD } from "./codepuppy-behavior"
 import { buildCodePuppyCapabilities, buildCodePuppyIdentity } from "./codepuppy-identity"
-import { buildCodePuppyModelConfig } from "./codepuppy-models"
+import { buildCodePuppyModelConfig, engineModelConfig, type CodePuppyModelConfig } from "./codepuppy-models"
 // `#1195`(REQ-144 T2):`secretFileRef` 回来了 —— 云 MCP 的 Authorization 头装的是登录铸
 // `mcp_access` token 的 `{file:…CODEPUPPY_MCP_TOKEN}` 引用(A6 通道,值不进 config 字面量)。
 // `hasSecretFile` 同时是 ADR-009 的「平台代付」判据(见下方 `platformPays`,`#1195` 起换轴到
@@ -43,7 +42,15 @@ import { readMcpServerRecords } from "./mcp-server-records"
 import { materializeCloudMcpConfig } from "./cloud-sidecar-config"
 import type { ChannelName } from "./catalog-channels"
 import { CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID } from "../shared/codepuppy-config"
+import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 import { USER_DATA_LAYOUT } from "./user-data-layout"
+// `#1667`(#1665 L3 交回的接缝裁决 A / C,编排器 2026-11-09):出厂技能目录、技能生成的 live 目录与出厂 /init、/review 命令
+// 由 main 写进这份内联配置文档(2.x 插件接口给不了等价挂点)。路径与命令内容仍以 ext 那三个纯函数为唯一来源,这里只引用。
+import { injectFactorySkillPaths } from "../../../ext/src/factory-paths"
+import { PROVIDER_ALLOW_ENV } from "../../../ext/src/provider-allow"
+import { skillGenerationLiveDirs } from "../../../ext/src/gen-skill-paths"
+import { explicitConfigPath, writeExplicitConfig, type ExplicitLayer } from "./engine-explicit-config"
+import { applyPromptTakeover } from "../../../ext/src/codepuppy-prompts"
 
 // Inject alpha-code's customizations into opencode via OPENCODE_CONFIG_CONTENT. This env var is
 // MERGED with the user's global/project config — it does NOT replace it (opencode config.ts
@@ -70,13 +77,139 @@ import { USER_DATA_LAYOUT } from "./user-data-layout"
 // R1 Blocker 1)= v1 已写出、但 picker 唯一读取的 v2 目录缺席。两端的用户可见症状同为
 // 模型全灰,故一律 {ok:false} 上报 —— 不存在「可忽略的局部降级」。
 export type CodePuppyConfigInjectionFailure = { message: string; stack?: string }
-export type CodePuppyConfigInjectionResult = { ok: true } | { ok: false; error: CodePuppyConfigInjectionFailure }
+/**
+ * `#1667`(#1662 L5,基线 §2.7):注入产物不再写进环境变量 —— H1 下引擎核心不读 `OPENCODE_CONFIG_CONTENT` /
+ * `OPENCODE_CONFIG` / `OPENCODE_MODELS_PATH`(读它们的是不在路径上的上游 CLI 宿主)。结果里带着 sidecar 要放进
+ * `start()` 选项的三样:`config.content`、`config.file`、`models.file`(engine-server-options.ts)。
+ */
+export type CodePuppyConfigInjectionOutput = {
+  config: { content: string; file?: string }
+  models: { file?: string }
+  /**
+   * `#1667`(编排器裁决 r1 第 2 条、C7 重裁):`config.file` 是 main 每次启动合成的显式文件(engine-explicit-config.ts)。
+   * sidecar 据此监听用户的 `codepuppy.jsonc`,它一变就重写合成文件。注入失败时没有这一项(显式槽直接给用户文件)。
+   */
+  explicit?: { file: string; root: string; userConfig?: string; layer: ExplicitLayer }
+}
+
+/**
+ * `#1667`(编排器裁决 2026-11-12):项目技能目录。2.x 把显式文件里**相对**的 `skills` 条目按会话所在的项目目录解析
+ * (`packages/core/src/config/plugin/skill.ts` 的 `sources()`)并监听它,所以这一条让每个项目看到、也只看到自己的
+ * `.codepuppy/skills`(ecosystem-import 把项目导入的技能放在那里),导入后不用重启。v1 由 ext 合并项目 `codepuppy.jsonc` 的
+ * `skills.paths`,不看 consent(ext `project-config.ts` 的信任门只管 mcp 与 agent 的控制字段);2.x 的插件接口没有加技能目录的挂点。
+ * 与 v1 的三处差别(已裁决接受):① 目录在、项目 `codepuppy.jsonc` 里没写注册,也会加载;② 项目在 `skills.paths` 里写的其它条目
+ * 不生效;③ ext 的项目身份检查不适用 —— 软链照跟,会话位置是 HOME 时读 `~/.codepuppy/skills`。
+ */
+export const PROJECT_SKILLS_ENTRY = `./${PROJECT_HIDDEN_DIR}/skills`
+
+/**
+ * `#1667`(编排器裁决 r3 第 1 条):显式文件 `skills` 的唯一算法 —— 出厂技能目录(main 启动时算好、经 CODEPUPPY_FACTORY_SKILL_DIRS
+ * 传入)+ 已启用技能当前那一代的真实目录(ext 的 skillGenerationLiveDirs:过账本 enabled 门、读 `current.json`)+ 项目技能目录
+ * (PROJECT_SKILLS_ENTRY)。注入时算一次,sidecar 的监听在翻代 / 新装 / 停用时再算(engine-explicit-config.ts 的 watchExplicitSources)。
+ */
+export function explicitSkillDirs(): string[] {
+  return [
+    ...new Set([
+      ...injectFactorySkillPaths({}, process.env.CODEPUPPY_FACTORY_SKILL_DIRS),
+      ...skillGenerationLiveDirs(codepuppyGlobalRoot()),
+      PROJECT_SKILLS_ENTRY,
+    ]),
+  ]
+}
+export type CodePuppyConfigInjectionResult = CodePuppyConfigInjectionOutput &
+  ({ ok: true } | { ok: false; error: CodePuppyConfigInjectionFailure })
+
+// `#1667`(#1662 L5,清点表 C2,接口文档 I9):注入直接写 OpenCode 2 的配置键(`packages/schema/src/config.ts` 的 `Config.Info`),
+// 不靠上游 normalize 的旧键兼容层(带诊断、语义不保证一一对应)。判据:codepuppy-config-injection.test.ts 用上游的
+// normalize 与 `Config.Info` 解码这份产物,零诊断、零改写。
+type PermissionRule = { action: string; resource: string; effect: "allow" | "deny" | "ask" }
+type EngineAgent = {
+  description?: string
+  hidden?: boolean
+  mode?: "primary" | "subagent" | "all"
+  system?: string
+  disabled?: boolean
+  permissions?: PermissionRule[]
+}
+type EngineConfig = {
+  $schema: string
+  plugins: string[]
+  experimental: Record<string, boolean>
+  instructions?: string[]
+  model?: string
+  providers?: Record<string, unknown>
+  policies?: Array<{ action: string; resource: string; effect: "allow" | "deny" }>
+  agents?: Record<string, EngineAgent>
+  permissions?: PermissionRule[]
+  mcp?: { servers?: Record<string, unknown> }
+}
+
+/** 内置插件 `opencode.config.compatibility` 是 `.claude` 与 `.agents` 两类技能根的唯一装载者(裁决书 N3)。 */
+export const ECOSYSTEM_COMPATIBILITY_PLUGIN = "opencode.config.compatibility"
+
+/**
+ * 正式渠道下 Code Puppy 对 2.x 五个实验开关的显式取值(裁决书 OOR-1:注入层压在项目与全局之上,显式值压过用户
+ * `opencode.json` 的 `experimental.*` / `all_flags`)。`todo` 打开:会话页的任务清单卡要它(编排器 2026-11-09 裁决 U1,
+ * #1668 评论 6736872128,可撤回);其余四个固定关。
+ */
+export const ENGINE_EXPERIMENTAL_FLAGS = {
+  todo: true,
+  schedules: false,
+  media_blob: false,
+  artifacts: false,
+  background_compaction: false,
+} as const
+
+/**
+ * 不论注入成败都要在的治理底线:
+ *   · `plugins`:ext 的插件**目录**(2.x 只装目录形式的本地插件,接口文档 I2);外加移除指令 `-opencode.config.compatibility`
+ *     —— S6 的唯一机制(裁决书 N3):不继承用户的 `~/.claude` / `~/.agents` / 项目 `.agents` 技能。逃生开关
+ *     `CODEPUPPY_ECOSYSTEM_INHERIT=1` 置位时不写移除指令(ADR-024 §5,整机恢复上游继承)。
+ *   · `experimental`:五个实验开关的显式值(见上)。
+ */
+function governanceFloor(extPluginPath: string | undefined): Pick<EngineConfig, "plugins" | "experimental"> {
+  return {
+    plugins: [
+      ...(extPluginPath ? [extPluginPath] : []),
+      ...(process.env.CODEPUPPY_ECOSYSTEM_INHERIT === "1" ? [] : [`-${ECOSYSTEM_COMPATIBILITY_PLUGIN}`]),
+    ],
+    experimental: { ...ENGINE_EXPERIMENTAL_FLAGS },
+  }
+}
+
+/**
+ * 把「动作 → 效果 | { 资源模式: 效果 }」的有序表展开成 2.x 的 `Permission.Ruleset`(有序数组,求值取最后一条命中)。
+ * 动作名一律用 2.x 的工具名(`shell` / `subagent`,不是 v1 的 `bash` / `task`;I9)。
+ */
+function rules(table: Array<[string, PermissionRule["effect"] | Record<string, PermissionRule["effect"]>]>): PermissionRule[] {
+  return table.flatMap(([action, value]) =>
+    typeof value === "string"
+      ? [{ action, resource: "*", effect: value }]
+      : Object.entries(value).map(([resource, effect]) => ({ action, resource, effect })),
+  )
+}
+
+/**
+ * `#1687`(owner R4 选 A,编排器裁决接法 A):云服务此刻是否被 kill-switch 扣下 —— 即最近一次注入
+ * 在配置里写的是中和条目 `WITHHELD_CLOUD_MCP`。值由下面写 `config.mcp` 的那一处**同一个判决**赋值,
+ * 不另算;引擎跑的就是最近一次注入的配置,所以它与引擎眼里的云服务一致。renderer 经
+ * `ext.cloudWithheld()` 只读取它:被扣下的云服务在定制中心补连后会报 `failed`(2.x `connect` 不看
+ * `disabled`),状态里没有区分字段,「未恢复问题」入口靠这个值不把它当成故障。
+ */
+let cloudMcpWithheld = false
+
+export function isCloudMcpWithheld(): boolean {
+  return cloudMcpWithheld
+}
 
 export function injectCodePuppyConfig(
   userDataPath: string,
   extPluginPath?: string,
   registryChannel?: ChannelName,
 ): CodePuppyConfigInjectionResult {
+  let file: string | undefined
+  // 本轮没走到写云服务那一处(无云 URL / 注入失败)⇒ 配置里没有中和条目。
+  cloudMcpWithheld = false
   try {
     // REQ-059 G1:引擎经 OPENCODE_CONFIG 加载当前环境的 codepuppy.jsonc(mcp/plugin/
     // provider/治理键)。文件通道 → dispose 重建重读文件 = 安装免重启;merge 序 XDG 后(压 provider)/
@@ -89,11 +222,10 @@ export function injectCodePuppyConfig(
       if (!fs.existsSync(truth)) {
         fs.writeFileSync(truth, JSON.stringify({ $schema: "https://opencode.ai/config.json" }, null, 2))
       }
-      process.env.OPENCODE_CONFIG = truth
+      file = truth
     }
 
-    const existing = process.env.OPENCODE_CONFIG_CONTENT
-    const config = existing ? JSON.parse(existing) : { $schema: "https://opencode.ai/config.json" }
+    const config: EngineConfig = { $schema: "https://opencode.ai/config.json", ...governanceFloor(extPluginPath) }
     // ADR-009 B1 的「平台代付」判据(云 MCP URL + 密钥文件同在)。caps 事实、云 MCP 注册与
     // web search 主权 deny 三处共用同一个判据,不许各算各的。`#1195` 起判据文件从
     // `CODEPUPPY_CLOUD_TOKEN`(错受众的 platform_access,只当在场性证据)换轴到
@@ -111,12 +243,6 @@ export function injectCodePuppyConfig(
     const cloudMcpEnabled = Boolean(mcpUrl) && !killSwitch && platformPays
     // 只记录本轮函数自己新放进 mcp 的名字;继承来的 OPENCODE_CONFIG_CONTENT 不是治理授权。
     const injectedMcpNames = new Set<string>()
-
-    if (extPluginPath) {
-      const plugins: string[] = Array.isArray(config.plugin) ? config.plugin : []
-      if (!plugins.includes(extPluginPath)) plugins.push(extPluginPath)
-      config.plugin = plugins
-    }
 
     const wantIdentity = !process.env.CODEPUPPY_IDENTITY_DISABLE
     const wantBehavior = !process.env.CODEPUPPY_BEHAVIOR_DISABLE
@@ -148,12 +274,13 @@ export function injectCodePuppyConfig(
         //   · 云腿在场性读上方的 `cloudMcpEnabled`(与写 `config.mcp` 那个三分支同源),外加它有没有被 deny。
         //   · `cloud.*` 那一行**刻意**仍只看代付:kill-switch 下完整定义经 ARM/DEF 托管给 ext,ext 真装上
         //     兄弟工具就在,而「ext 这一 fork 装没装」注入面判不了 —— 那一行的措辞本来就带条件。
-        const denyProbe: { permission?: Record<string, unknown> } = {}
+        //   · `#1667`:v1 时代还读 `OPENCODE_ENABLE_EXA`;那个变量 2.x 无读者(清点表 E2),工具在不在场不再取决于它,读它只会说假话。
+        const denyProbe: { permissions?: PermissionRule[] } = {}
         applyWebSearchDenies(denyProbe, { killSwitch, platformPays }, () => {})
-        const deniedByGate = (toolId: string) => denyProbe.permission?.[toolId] === "deny"
+        const deniedByGate = (toolId: string) => denyProbe.permissions?.some((rule) => rule.action === toolId && rule.effect === "deny") === true
         const cloudDispatch = platformPays
         const caps = buildCodePuppyCapabilities({
-          localWebSearch: !deniedByGate(LOCAL_WEB_SEARCH_TOOL_ID) && process.env.OPENCODE_ENABLE_EXA !== "0",
+          localWebSearch: !deniedByGate(LOCAL_WEB_SEARCH_TOOL_ID),
           cloudWebSearch: !deniedByGate(CLOUD_WEB_SEARCH_TOOL_ID) && cloudMcpEnabled,
           cloudDispatch,
         })
@@ -186,11 +313,37 @@ export function injectCodePuppyConfig(
       /* unreadable dir → skip (imported instructions simply stay dark this fork) */
     }
 
+    // `#1667`(C7 重裁):显式文件层要写的三样,出自这一次计算(engine-explicit-config.ts 抬头讲层序)。
+    const layer: ExplicitLayer = { policies: [], commands: {}, skills: [] }
     const models = buildCodePuppyModelConfig(userDataPath)
     if (models) {
-      config.enabled_providers = models.enabled_providers
-      if (models.model) config.model = models.model
-      config.provider = { ...(config.provider ?? {}), ...models.provider }
+      // `#1667`:同一份投影,写成 2.x 的 `providers` / `policies`(`provider.use`)/ `model`(codepuppy-models.ts engineModelConfig)。
+      // `policies` 写两处:显式文件那份比项目配置先加载、项目里的 allow 盖不过(第一层);内联这份是第二层。
+      const engine = engineModelConfig(models)
+      config.providers = engine.providers
+      config.policies = engine.policies
+      layer.policies = engine.policies
+      if (engine.model) config.model = engine.model
+      // `#1662`:同一份放行集合交给 ext 在供应商表上再执行一次 —— 全局配置目录在显式文件之前载入,它的放行句压得过上面的策略
+      // (packages/ext/src/provider-allow.ts)。sidecar 里注入与引擎同进程,env 是本进程的。
+      process.env[PROVIDER_ALLOW_ENV] = JSON.stringify(engine.policies.filter((policy) => policy.effect === "allow").map((policy) => policy.resource))
+    } else delete process.env[PROVIDER_ALLOW_ENV]
+
+    //   4b. `#1667`(接缝裁决 A;编排器裁决 r1 第 2 条、r3 第 1 条):出厂技能目录与已安装技能当前那一代的**真实目录**写成显式文件的
+    //       `skills`(explicitSkillDirs)。翻代 / 新装 / 停用时 sidecar 的监听重算并重写显式文件(engine-explicit-config.ts),
+    //       2.x 的技能插件在配置更新时重新取源 —— 不重启就生效(沙箱真引擎实测)。不用软链(owner 2026-07-07「不用 symlink」)。
+    layer.skills = explicitSkillDirs()
+
+    //   4c. `#1667`(接缝裁决 C):出厂 /init、/review 的模板来自 ext 的 applyPromptTakeover(同一份文字),写成 `commands` 条目,
+    //       由 core 自己的 `opencode.config.command` 实现模板文法与子任务(`review` 在子任务里跑:v1 的 `subtask: true`,2.x 原生键
+    //       `subagent`)。逃生门与 ext 的提示词转写同一个:CODEPUPPY_PROMPT_REBRAND_DISABLE=1。
+    //       写进显式文件(编排器裁决 r1 第 2 条):项目里的同名命令胜过它,它胜过上游内置的。
+    if (process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE !== "1") {
+      const takeover: { command?: Record<string, { template: string; description?: string; subtask?: boolean }> } = {}
+      applyPromptTakeover(takeover)
+      layer.commands = Object.fromEntries(
+        Object.entries(takeover.command ?? {}).map(([name, { subtask, ...command }]) => [name, { ...command, ...(subtask ? { subagent: true } : {}) }]),
+      )
     }
 
     //   5. 自动化 readonly agent(REQ-021 A1.5 / ADR-022)。无人值守执行的硬前提 = 零 ask:
@@ -198,30 +351,30 @@ export function injectCodePuppyConfig(
     //      read 全放但 *.env* 保持 deny(密钥文件不进上下文);edit/bash/外部目录一律 deny;
     //      question deny(无人在场没人答);doom_loop deny(异常循环直接断)。逃生:CODEPUPPY_AUTOMATION_DISABLE。
     if (!process.env.CODEPUPPY_AUTOMATION_DISABLE) {
-      config.agent = {
-        ...(config.agent ?? {}),
+      config.agents = {
+        ...config.agents,
         "codepuppy-automation": {
           description: CODEPUPPY_AGENT_TEXT["codepuppy-automation"].description,
-          // REQ-055:对选择器隐藏(上游 agent.ts 原生 hidden 字段,仅影响可见列表;调度器按名 prompt 不受影响)
+          // REQ-055:对选择器隐藏(上游 agent 原生 hidden 字段,仅影响可见列表;调度器按名 prompt 不受影响)
           hidden: true,
           mode: "primary",
-          prompt: CODEPUPPY_AGENT_TEXT["codepuppy-automation"].prompt,
-          permission: {
-            "tool-policy-default": "ask",
-            read: { "*": "allow", "*.env*": "deny" },
-            glob: "allow",
-            grep: "allow",
-            list: "allow",
-            webfetch: "allow",
-            websearch: "allow",
-            skill: "allow",
-            edit: "deny",
-            bash: "deny",
-            external_directory: "deny",
-            doom_loop: "deny",
-            question: "deny",
-            task: "deny",
-          },
+          system: CODEPUPPY_AGENT_TEXT["codepuppy-automation"].prompt,
+          permissions: rules([
+            ["tool-policy-default", "ask"],
+            ["read", { "*": "allow", "*.env*": "deny" }],
+            ["glob", "allow"],
+            ["grep", "allow"],
+            ["list", "allow"],
+            ["webfetch", "allow"],
+            ["websearch", "allow"],
+            ["skill", "allow"],
+            ["edit", "deny"],
+            ["shell", "deny"],
+            ["external_directory", "deny"],
+            ["doom_loop", "deny"],
+            ["question", "deny"],
+            ["subagent", "deny"],
+          ]),
         },
       }
     }
@@ -235,29 +388,29 @@ export function injectCodePuppyConfig(
     //       第三方 MCP 与插件工具每次询问(方案 §2.0 D1):身份轴闸用本规则集求值,设置里启用了也问。
     //       逃生:CODEPUPPY_READONLY_DISABLE。治理保护名单同 codepuppy-automation(X2,codepuppy-governance.ts)。
     if (!process.env.CODEPUPPY_READONLY_DISABLE) {
-      config.agent = {
-        ...(config.agent ?? {}),
+      config.agents = {
+        ...config.agents,
         "codepuppy-readonly": {
           description: CODEPUPPY_AGENT_TEXT["codepuppy-readonly"].description,
           // REQ-055:对选择器隐藏;CodePuppyComposer 只读档改为提交时 agent 参数,不再依赖可见列表轮转
           hidden: true,
           mode: "primary",
-          prompt: CODEPUPPY_AGENT_TEXT["codepuppy-readonly"].prompt,
-          permission: {
-            read: { "*": "allow", "*.env*": "deny" },
-            glob: "allow",
-            grep: "allow",
-            list: "allow",
-            webfetch: "allow",
-            websearch: "allow",
-            skill: "allow",
-            edit: "deny",
-            bash: "deny",
-            external_directory: "deny",
-            task: { "*": "deny", "codepuppy-readonly": "allow" },
-            "mcp:*": "ask",
-            "plugin:*": "ask",
-          },
+          system: CODEPUPPY_AGENT_TEXT["codepuppy-readonly"].prompt,
+          permissions: rules([
+            ["read", { "*": "allow", "*.env*": "deny" }],
+            ["glob", "allow"],
+            ["grep", "allow"],
+            ["list", "allow"],
+            ["webfetch", "allow"],
+            ["websearch", "allow"],
+            ["skill", "allow"],
+            ["edit", "deny"],
+            ["shell", "deny"],
+            ["external_directory", "deny"],
+            ["subagent", { "*": "deny", "codepuppy-readonly": "allow" }],
+            ["mcp:*", "ask"],
+            ["plugin:*", "ask"],
+          ]),
         },
       }
     }
@@ -274,30 +427,31 @@ export function injectCodePuppyConfig(
     //       也问一次 —— 子会话不继承本 agent 的 ask,不问就等于整段跳过「逐次询问」;同档自身不问。
     //       另把 defaults 里 `doom_loop` 与 `read *.env*` 的 ask **原样重写一遍**:agent 自己的键排在
     //       配置顶层 `permission` 之后,项目配置放宽不了它们(`*.env.example` 照 defaults 仍放行)。
-    //       刻意不写 `external_directory`:追加 `{"*":"ask"}` 会压掉 defaults 的临时/技能目录白名单。
+    //       `external_directory`(R2:工作区外先问)不写在这里:写进配置会排在用户自己的规则之后、压过它们;由 ext 的 agent 变换
+    //       插在引擎底座之后(packages/ext/src/external-directory-rule.ts,`#1662` parity)。
     //       没有 prompt(见 codepuppy-agents.ts 抬头:给了 prompt 就会顶掉整份底座)。
     //       不设逃生 env:composer 选了这档就发 `agent: "codepuppy-ask"`,agent 缺席 = 引擎具名报错(fail-closed),
     //       不是静默回到全放行。治理保护名单同 codepuppy-readonly(CODEPUPPY_INJECTED_AGENTS)。
     //       常驻闸:packages/opencode/test/permission/codepuppy-composer-tiers.test.ts(真 Agent + 真 Permission.ask)。
-    config.agent = {
-      ...(config.agent ?? {}),
+    config.agents = {
+      ...config.agents,
       "codepuppy-ask": {
         description: CODEPUPPY_AGENT_TEXT["codepuppy-ask"].description,
         hidden: true,
         mode: "primary",
-        permission: {
-          "tool-policy-default": "ask",
-          question: "allow",
-          plan_enter: "allow",
+        permissions: rules([
+          ["tool-policy-default", "ask"],
+          ["question", "allow"],
+          ["plan_enter", "allow"],
           // 与另外三个 alpha agent 同形:显式写 websearch allow(defaults 的 `*` 本来就 allow,求值结果不变),
           // 让 #223 的主权闸(applyWebSearchDenies 按 agent 钉 deny / keyless 下逐 agent 核 allow)对它一视同仁。
-          websearch: "allow",
-          edit: "ask",
-          bash: "ask",
-          task: { "*": "ask", "codepuppy-ask": "allow" },
-          doom_loop: "ask",
-          read: { "*.env": "ask", "*.env.*": "ask", "*.env.example": "allow" },
-        },
+          ["websearch", "allow"],
+          ["edit", "ask"],
+          ["shell", "ask"],
+          ["subagent", { "*": "ask", "codepuppy-ask": "allow" }],
+          ["doom_loop", "ask"],
+          ["read", { "*.env": "ask", "*.env.*": "ask", "*.env.example": "allow" }],
+        ]),
       },
     }
 
@@ -305,61 +459,64 @@ export function injectCodePuppyConfig(
     //       (question/task/doom_loop deny,零 ask 硬前提);差异 = edit allow + bash 受限 allow
     //       (破坏类命令模式 deny —— 模式黑名单**非穷尽**,UI 启用时有显式风险确认,不谎称安全)。
     if (!process.env.CODEPUPPY_AUTOMATION_DISABLE) {
-      config.agent = {
-        ...(config.agent ?? {}),
+      config.agents = {
+        ...config.agents,
         "codepuppy-automation-standard": {
           description: CODEPUPPY_AGENT_TEXT["codepuppy-automation-standard"].description,
           // REQ-055:对选择器隐藏(同 codepuppy-automation)
           hidden: true,
           mode: "primary",
-          prompt: CODEPUPPY_AGENT_TEXT["codepuppy-automation-standard"].prompt,
-          permission: {
-            "tool-policy-default": "ask",
-            read: { "*": "allow", "*.env*": "deny" },
-            glob: "allow",
-            grep: "allow",
-            list: "allow",
-            webfetch: "allow",
-            websearch: "allow",
-            skill: "allow",
-            edit: "allow",
-            bash: {
-              "*": "allow",
-              // 破坏类直呼(codex 审计加固:绝对路径/包装器/嵌套 shell/find -delete/git clean 常见绕法补拦;
-              // 黑名单仍非穷尽 —— UI 风险确认与 agent prompt 如实声明,根治=沙箱化(后续)):
-              "rm *": "deny",
-              "*/rm *": "deny",
-              "command *": "deny",
-              "exec *": "deny",
-              "env *": "deny",
-              "xargs *": "deny",
-              "sh *": "deny",
-              "bash *": "deny",
-              "zsh *": "deny",
-              "eval *": "deny",
-              "find * -delete*": "deny",
-              "find * -exec *": "deny",
-              "git clean*": "deny",
-              "git reset --hard*": "deny",
-              "sudo *": "deny",
-              "chmod *": "deny",
-              "chown *": "deny",
-              "dd *": "deny",
-              "mkfs*": "deny",
-              "shutdown*": "deny",
-              "reboot*": "deny",
-              "kill *": "deny",
-              "killall *": "deny",
-              "git push*": "deny",
-              "npm publish*": "deny",
-              "curl * | *": "deny",
-              "wget * | *": "deny",
-            },
-            external_directory: "deny",
-            doom_loop: "deny",
-            question: "deny",
-            task: "deny",
-          },
+          system: CODEPUPPY_AGENT_TEXT["codepuppy-automation-standard"].prompt,
+          permissions: rules([
+            ["tool-policy-default", "ask"],
+            ["read", { "*": "allow", "*.env*": "deny" }],
+            ["glob", "allow"],
+            ["grep", "allow"],
+            ["list", "allow"],
+            ["webfetch", "allow"],
+            ["websearch", "allow"],
+            ["skill", "allow"],
+            ["edit", "allow"],
+            [
+              "shell",
+              {
+                "*": "allow",
+                // 破坏类直呼(codex 审计加固:绝对路径/包装器/嵌套 shell/find -delete/git clean 常见绕法补拦;
+                // 黑名单仍非穷尽 —— UI 风险确认与 agent prompt 如实声明,根治=沙箱化(后续)):
+                "rm *": "deny",
+                "*/rm *": "deny",
+                "command *": "deny",
+                "exec *": "deny",
+                "env *": "deny",
+                "xargs *": "deny",
+                "sh *": "deny",
+                "bash *": "deny",
+                "zsh *": "deny",
+                "eval *": "deny",
+                "find * -delete*": "deny",
+                "find * -exec *": "deny",
+                "git clean*": "deny",
+                "git reset --hard*": "deny",
+                "sudo *": "deny",
+                "chmod *": "deny",
+                "chown *": "deny",
+                "dd *": "deny",
+                "mkfs*": "deny",
+                "shutdown*": "deny",
+                "reboot*": "deny",
+                "kill *": "deny",
+                "killall *": "deny",
+                "git push*": "deny",
+                "npm publish*": "deny",
+                "curl * | *": "deny",
+                "wget * | *": "deny",
+              },
+            ],
+            ["external_directory", "deny"],
+            ["doom_loop", "deny"],
+            ["question", "deny"],
+            ["subagent", "deny"],
+          ]),
         },
       }
     }
@@ -415,13 +572,17 @@ export function injectCodePuppyConfig(
         console.log(
           `[alpha-code#1195] cloud MCP has no login-minted mcp_access credential (CODEPUPPY_MCP_TOKEN secret file absent) — injected a credential-free enabled:false definition; no fallback to CODEPUPPY_CLOUD_TOKEN or interactive OAuth`,
         )
+      cloudMcpWithheld = killSwitch
       config.mcp = {
-        ...(config.mcp ?? {}),
-        [CLOUD_MCP_SERVER_NAME]: killSwitch
-          ? { ...WITHHELD_CLOUD_MCP }
-          : platformPays
-            ? cloud
-            : materializeCloudMcpConfig(mcpUrl, undefined),
+        ...config.mcp,
+        servers: {
+          ...config.mcp?.servers,
+          [CLOUD_MCP_SERVER_NAME]: cloudMcpWithheld
+            ? { ...WITHHELD_CLOUD_MCP }
+            : platformPays
+              ? cloud
+              : materializeCloudMcpConfig(mcpUrl, undefined),
+        },
       }
       injectedMcpNames.add(CLOUD_MCP_SERVER_NAME)
       if (killSwitch) {
@@ -459,8 +620,11 @@ export function injectCodePuppyConfig(
         continue
       }
       config.mcp = {
-        ...(config.mcp ?? {}),
-        [server.name]: { type: "remote", url: server.url, ...(server.headers ? { headers: server.headers } : {}), enabled: true },
+        ...config.mcp,
+        servers: {
+          ...config.mcp?.servers,
+          [server.name]: { type: "remote", url: server.url, ...(server.headers ? { headers: server.headers } : {}) },
+        },
       }
       injectedMcpNames.add(server.name)
     }
@@ -490,38 +654,42 @@ export function injectCodePuppyConfig(
       injectedMcpNames,
     })
 
-    process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify(config)
-    materializeV2EngineConfig(userDataPath, config, Boolean(models))
-    return { ok: true }
+    const modelsFile = models ? materializeGovernedModelsBase(userDataPath, models) : undefined
+    // 显式槽:用户的 codepuppy.jsonc(有的话)+ 上面那一层,合成一份写进 Code Puppy 自己的 userData(engine-explicit-config.ts)。
+    const explicitFile = explicitConfigPath(userDataPath)
+    const written = writeExplicitConfig(explicitFile, file, layer)
+    if (written.userError) console.warn(`[alpha-code#1667] ${file} is not valid (${written.userError}); the engine sees only Code Puppy's explicit layer`)
+    return {
+      ok: true,
+      config: { content: JSON.stringify(config), file: explicitFile },
+      models: modelsFile ? { file: modelsFile } : {},
+      explicit: { file: explicitFile, root: codepuppyGlobalRoot(), ...(file ? { userConfig: file } : {}), layer },
+    }
   } catch (error) {
     // #613:catch 保留(sidecar 照常起,候选形态③),但失败必须离开本进程:
     // warn 是 #607 反向闸门锁住的进程内出声,返回值是送往 main/renderer 的结构化事实。
     console.warn("failed to inject alpha config", error)
+    // 失败的配置里没有注入的供应商与策略:放行集合跟着撤掉,ext 与它同口径(provider-allow.ts:没写 = 本代没治理)。
+    delete process.env[PROVIDER_ALLOW_ENV]
     return {
       ok: false,
       error: error instanceof Error ? { message: error.message, stack: error.stack } : { message: String(error) },
+      // 注入失败也不让治理底线跟着丢:ext 目录、外部技能移除指令、五个实验开关照样写进去(governanceFloor)。
+      // 没有 ext 的话 sidecar 的 I4 判定会拒绝 ready,而不是带着一个没有执行闸的引擎上线。
+      config: { content: JSON.stringify({ $schema: "https://opencode.ai/config.json", ...governanceFloor(extPluginPath) }), ...(file ? { file } : {}) },
+      models: {},
     }
   }
 }
 
-// 2026-07-23 上游 sync 断层修补:v2 Config.Service(packages/core/config.ts)只读
-// `OPENCODE_CONFIG_DIR ?? ~/.config/opencode` 目录下的 opencode.json/opencode.jsonc 文件 ——
-// OPENCODE_CONFIG_CONTENT 与 OPENCODE_CONFIG(codepuppy.jsonc)它一概不读。而 picker 已切 v2
-// `/api/model`(model-contract.ts → catalog.model.available()),于是 v1 注入再成功,v2 目录里
-// 也没有 alpha/BYOK provider → 全部「当前不可用」。此桥把 v2 需要的最小子集物化成文件:
-//   opencode.json  ← codepuppy.jsonc 去掉 `provider` 键后的拷贝(先加载)。`#1392` 之前是原样拷贝,理由是「用户自定义节点住在
-//                    那里」;现在它们住在围栏写不到的真源里、经注入的 provider 表进 v2(下一行),而 v2 的 catalog 可用性
-//                    (packages/core/src/catalog.ts available())**不看 enabled_providers** —— 原样拷贝会让配置文件里的 provider
-//                    块(围栏内的引擎树写得了)直接出现在 picker 读的 v2 model.list 里。基线 I1:配置文件的 provider.* 不参与注入面。
-//   opencode.jsonc ← { $schema, model, provider }(注入的 provider 表,后加载压过用户同名项)
-// 并设 OPENCODE_CONFIG_DIR 指向该 alpha 自有目录。v1 加载读的是 Global.Path.config 静态路径,
-// 不受此 env 影响;推理仍走 v1(有 {file:}/{env:} 解析),故 v2 文件一律剥掉 apiKey —— v2 无
-// 变量解析,catalog 可用性判定也不需要 key(no-integration 路径)。
-// 失败不自吞(#613 R1 Blocker 1):picker 只经 v2 目录读模型,桥失败(磁盘满/权限/目录不可写)
-// = alpha/BYOK 模型全灰 = 票面事故症状,「只损失 v2 目录」不是可忽略的局部降级 —— 桥内不设
-// catch,抛错经 injectCodePuppyConfig 外层 catch 以 {ok:false} 离开进程。桥排在
-// OPENCODE_CONFIG_CONTENT 写出**之后**,抛错不撤销已就位的 v1 注入
-// (顺序由反向闸门锁死:codepuppy-config-injection.test.ts 的 v2 桥用例)。
+// #857:Code Puppy 的模型治理生效时,注入的 provider 表已经描述了每一个可用的内置 provider / 模型。让 ModelsDev 落回随包快照,
+// 第一次请求还要先解码并物化 6,132 条无关条目(签名打包矩阵里 2.8-6.1 s)。所以从**同一份**投影机械地物化一份最小的
+// models.dev 底表,经 `start()` 的 `models.file` 交给引擎(`#1667`;v1 时代经 `OPENCODE_MODELS_PATH`)。投影里缺了某个已启用的
+// 用户 / 文件 provider 时 governedModelsBase 返回 {}、不带就绪标记 —— 这时不给文件,保留保守的晚到屏障,而不是先露出半套。
+// 空底表也必须不给:ModelsDev 把磁盘上的 `{}` 当作有值,会绕过随包快照。这里不读也不写任何 key 字段。
+// CODEPUPPY_MODELS_DISABLE 仍是真逃生门:那时根本不进这里。
+// (2026-07-23 为 v2 读侧另写 `OPENCODE_CONFIG_DIR/opencode.json(c)` 的半代次桥已随 `#1667` 删除,清点表 C4:只剩一个代次,
+// 配置只写一份,就是上面的注入。)
 type V1ProjectedModel = { name?: unknown }
 type V1ProjectedProvider = {
   name?: unknown
@@ -594,74 +762,15 @@ function governedModelsBase(config: { enabled_providers?: unknown; provider?: un
   return base
 }
 
-/** codepuppy.jsonc 解析后去掉 `provider` 键(见 v2 桥抬头);缺失 / 读失败 / 解析不出 / 不是对象 ⇒ undefined(调用方清掉旧拷贝)。 */
-function codepuppyJsoncWithoutProviders(): Record<string, unknown> | undefined {
-  let text: string
-  try {
-    text = fs.readFileSync(codepuppyJsoncPath(), "utf8")
-  } catch {
+function materializeGovernedModelsBase(userDataPath: string, config: CodePuppyModelConfig): string | undefined {
+  const dir = path.join(userDataPath, USER_DATA_LAYOUT.engineConfig)
+  const modelsPath = path.join(dir, "models.json")
+  const base = governedModelsBase(config)
+  if (!Object.keys(base).length) {
+    fs.rmSync(modelsPath, { force: true })
     return undefined
   }
-  const errors: ParseError[] = []
-  const parsed: unknown = parseJsonc(text, errors, { allowTrailingComma: true })
-  if (errors.length || !parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined
-  const { provider: _provider, ...rest } = parsed as Record<string, unknown>
-  return rest
-}
-
-function materializeV2EngineConfig(
-  userDataPath: string,
-  config: { model?: unknown; enabled_providers?: unknown; provider?: unknown },
-  governedModels: boolean,
-) {
-  const dir = path.join(userDataPath, USER_DATA_LAYOUT.engineConfig)
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
-  const userCopy = path.join(dir, "opencode.json")
-  const stripped = codepuppyJsoncWithoutProviders()
-  if (stripped === undefined) fs.rmSync(userCopy, { force: true }) // 无真源(或读不出)则清掉旧拷贝,不留陈尸
-  else fs.writeFileSync(userCopy, `${JSON.stringify(stripped, null, 2)}\n`, { mode: 0o600 })
-  const provider: Record<string, unknown> = Object.fromEntries(
-    Object.entries((config.provider ?? {}) as Record<string, { options?: Record<string, unknown> }>).map(
-      ([id, def]) => {
-        const { apiKey: _apiKey, ...options } = def.options ?? {}
-        return [id, { ...def, ...(Object.keys(options).length ? { options } : { options: undefined }) }]
-      },
-    ),
-  )
-  provider[CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID] = {
-    name: "Code Puppy catalog readiness marker",
-    env: [],
-  }
-  const v2 = {
-    $schema: "https://opencode.ai/config.json",
-    ...(typeof config.model === "string" ? { model: config.model } : {}),
-    provider,
-  }
-  fs.writeFileSync(path.join(dir, "opencode.jsonc"), JSON.stringify(v2, null, 2), { mode: 0o600 })
-  process.env.OPENCODE_CONFIG_DIR = dir
-
-  // #857:when Code Puppy model governance is active, every available built-in provider/model is already
-  // described by the provider projection above. Letting ModelsDev fall through to the bundled
-  // snapshot still makes the first V2 request decode and materialize 6,132 unrelated rows before
-  // ConfigProvider commits (2.8-6.1s in the signed packaged matrix). Materialize a minimal ModelsDev
-  // base mechanically from that SAME projection so the earlier ModelsDevPlugin commit carries the
-  // exact governed identities and readiness marker. ConfigProvider remains authoritative for the
-  // richer late metadata/variants. If an enabled user/file provider is absent from this in-memory
-  // projection, governedModelsBase returns {} WITHOUT the marker, preserving the conservative late
-  // barrier instead of exposing a partial first set. An empty base must also leave
-  // OPENCODE_MODELS_PATH unset: ModelsDev treats an on-disk `{}` as truthy and would otherwise
-  // short-circuit its bundled snapshot instead of reaching the conservative late barrier. No key
-  // field is read or written here.
-  // Preserve CODEPUPPY_MODELS_DISABLE as a real escape hatch by leaving any inherited path untouched.
-  if (governedModels) {
-    const modelsPath = path.join(dir, "models.json")
-    const base = governedModelsBase(config)
-    if (Object.keys(base).length) {
-      fs.writeFileSync(modelsPath, `${JSON.stringify(base, null, 2)}\n`, { mode: 0o600 })
-      process.env.OPENCODE_MODELS_PATH = modelsPath
-    } else {
-      fs.rmSync(modelsPath, { force: true })
-      delete process.env.OPENCODE_MODELS_PATH
-    }
-  }
+  fs.writeFileSync(modelsPath, `${JSON.stringify(base, null, 2)}\n`, { mode: 0o600 })
+  return modelsPath
 }

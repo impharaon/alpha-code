@@ -201,6 +201,8 @@ ADR-029 defines the only supported ways to change upstream behavior:
 There is no direct-edit level for a still-synchronized file. Moving a path to
 L2 or L3 requires an accepted ADR naming scope, guard, rollback, and ownership.
 
+Every upstream update must keep each Code Puppy authority (ADR-048); the checklist is [`docs/runbooks/upstream-update.md`](../runbooks/upstream-update.md).
+
 ## Shell-level registrations when Code Puppy replaces an upstream leaf
 
 Upstream keeps command registrations (`command.register`) inside the page leaves

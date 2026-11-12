@@ -1,0 +1,318 @@
+{
+ "_source": "Sampled by `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts` (alpha-code#1668 L6) at ed81202805: a real OpenCode 2 engine from this repo's packages/cli `serve`, isolated HOME/XDG, one git project, and the scripted OpenAI-compatible mock model next to the sampler. Three asks created with POST /api/session/:id/permission (agent build, read, save [\"*\"]): A1 .env and A2 other.env in session A, B1 .env in session B. `frames` = every permission.asked / permission.replied frame of A and B in arrival order. `pendingA` / `getA1` are the raw engine reads before replying; `rejected` / `replay` are the adapter's v2 reply route for A1 (reject, then the same command again); `replyAgain` is a raw second engine reply to A1; `pendingB` is B's list after the reject; `settled` is the raw once reply to B1. `sessionAlways`: C1 a.env and C2 ab.env (save [\"a*\"]) in session C; `allowed` is the adapter's v2 reply route for C1 with decision always; `pendingAfter` / `rules` are C's pending list and session rules right after; `askSame` / `askOther` are fresh POST /api/session/:id/permission for a.env / b.env in C, `askOtherSession` the same for a.env in a new session D.",
+ "ids": {
+  "sessionA": "ses_e30fc4c6affecAyIDsCeYq4k9V",
+  "sessionB": "ses_e30fc4c68ffeIPjlrD5tI2WWt2",
+  "a1": "per_1cf03b3990018igdVecb2X8Z2Y",
+  "a2": "per_1cf03b3990032zk5YCpmZm7L57",
+  "b1": "per_1cf03b39a001JgoRDSkl5VkQVQ"
+ },
+ "created": [
+  {
+   "status": 200,
+   "body": {
+    "data": {
+     "id": "per_1cf03b3990018igdVecb2X8Z2Y",
+     "effect": "ask"
+    }
+   }
+  },
+  {
+   "status": 200,
+   "body": {
+    "data": {
+     "id": "per_1cf03b3990032zk5YCpmZm7L57",
+     "effect": "ask"
+    }
+   }
+  },
+  {
+   "status": 200,
+   "body": {
+    "data": {
+     "id": "per_1cf03b39a001JgoRDSkl5VkQVQ",
+     "effect": "ask"
+    }
+   }
+  }
+ ],
+ "pendingA": {
+  "status": 200,
+  "body": {
+   "data": [
+    {
+     "id": "per_1cf03b3990018igdVecb2X8Z2Y",
+     "sessionID": "ses_e30fc4c6affecAyIDsCeYq4k9V",
+     "action": "read",
+     "resources": [
+      ".env"
+     ],
+     "save": [
+      "*"
+     ]
+    },
+    {
+     "id": "per_1cf03b3990032zk5YCpmZm7L57",
+     "sessionID": "ses_e30fc4c6affecAyIDsCeYq4k9V",
+     "action": "read",
+     "resources": [
+      "other.env"
+     ],
+     "save": [
+      "*"
+     ]
+    }
+   ]
+  }
+ },
+ "getA1": {
+  "status": 200,
+  "body": {
+   "data": {
+    "id": "per_1cf03b3990018igdVecb2X8Z2Y",
+    "sessionID": "ses_e30fc4c6affecAyIDsCeYq4k9V",
+    "action": "read",
+    "resources": [
+     ".env"
+    ],
+    "save": [
+     "*"
+    ]
+   }
+  }
+ },
+ "command": {
+  "requestFingerprint": "0619f54dabd276ac6448d862319615911a0f92807fbffbdd2a4f0f282804b672",
+  "decisionID": "pdec_sampler_reject",
+  "decision": "reject"
+ },
+ "rejected": {
+  "status": 200,
+  "body": {
+   "data": {
+    "requestID": "per_1cf03b3990018igdVecb2X8Z2Y",
+    "sessionID": "ses_e30fc4c6affecAyIDsCeYq4k9V",
+    "requestFingerprint": "0619f54dabd276ac6448d862319615911a0f92807fbffbdd2a4f0f282804b672",
+    "decisionID": "pdec_sampler_reject",
+    "decision": "reject",
+    "committedAt": 1794474489042,
+    "resolvedRequestIDs": [
+     "per_1cf03b3990018igdVecb2X8Z2Y",
+     "per_1cf03b3990032zk5YCpmZm7L57"
+    ]
+   }
+  }
+ },
+ "replay": {
+  "status": 200,
+  "body": {
+   "data": {
+    "requestID": "per_1cf03b3990018igdVecb2X8Z2Y",
+    "sessionID": "ses_e30fc4c6affecAyIDsCeYq4k9V",
+    "requestFingerprint": "0619f54dabd276ac6448d862319615911a0f92807fbffbdd2a4f0f282804b672",
+    "decisionID": "pdec_sampler_reject",
+    "decision": "reject",
+    "committedAt": 1794474489042,
+    "resolvedRequestIDs": [
+     "per_1cf03b3990018igdVecb2X8Z2Y",
+     "per_1cf03b3990032zk5YCpmZm7L57"
+    ]
+   }
+  }
+ },
+ "replyAgain": {
+  "status": 404,
+  "body": {
+   "_tag": "PermissionNotFoundError",
+   "requestID": "per_1cf03b3990018igdVecb2X8Z2Y",
+   "message": "Permission request not found: per_1cf03b3990018igdVecb2X8Z2Y"
+  }
+ },
+ "pendingB": {
+  "status": 200,
+  "body": {
+   "data": [
+    {
+     "id": "per_1cf03b39a001JgoRDSkl5VkQVQ",
+     "sessionID": "ses_e30fc4c68ffeIPjlrD5tI2WWt2",
+     "action": "read",
+     "resources": [
+      ".env"
+     ],
+     "save": [
+      "*"
+     ]
+    }
+   ]
+  }
+ },
+ "settled": {
+  "status": 204
+ },
+ "frames": [
+  {
+   "id": "evt_1cf03b399002Qp6BK4puoVWJrE",
+   "created": 1794474488729,
+   "type": "permission.asked",
+   "location": {
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-m6IHHA/proj"
+   },
+   "data": {
+    "id": "per_1cf03b3990018igdVecb2X8Z2Y",
+    "sessionID": "ses_e30fc4c6affecAyIDsCeYq4k9V",
+    "action": "read",
+    "resources": [
+     ".env"
+    ],
+    "save": [
+     "*"
+    ]
+   }
+  },
+  {
+   "id": "evt_1cf03b399004YfaPZGMp3yEqAX",
+   "created": 1794474488729,
+   "type": "permission.asked",
+   "location": {
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-m6IHHA/proj"
+   },
+   "data": {
+    "id": "per_1cf03b3990032zk5YCpmZm7L57",
+    "sessionID": "ses_e30fc4c6affecAyIDsCeYq4k9V",
+    "action": "read",
+    "resources": [
+     "other.env"
+    ],
+    "save": [
+     "*"
+    ]
+   }
+  },
+  {
+   "id": "evt_1cf03b39a002UTXJfn6TKSOaPa",
+   "created": 1794474488730,
+   "type": "permission.asked",
+   "location": {
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-m6IHHA/proj"
+   },
+   "data": {
+    "id": "per_1cf03b39a001JgoRDSkl5VkQVQ",
+    "sessionID": "ses_e30fc4c68ffeIPjlrD5tI2WWt2",
+    "action": "read",
+    "resources": [
+     ".env"
+    ],
+    "save": [
+     "*"
+    ]
+   }
+  },
+  {
+   "id": "evt_1cf03b4d1001yPAfYQR7oPqjax",
+   "created": 1794474489041,
+   "type": "permission.replied",
+   "location": {
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-m6IHHA/proj"
+   },
+   "data": {
+    "sessionID": "ses_e30fc4c6affecAyIDsCeYq4k9V",
+    "requestID": "per_1cf03b3990018igdVecb2X8Z2Y",
+    "reply": "reject"
+   }
+  },
+  {
+   "id": "evt_1cf03b4d1002ukNkQbv2IkNpzI",
+   "created": 1794474489041,
+   "type": "permission.replied",
+   "location": {
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-m6IHHA/proj"
+   },
+   "data": {
+    "sessionID": "ses_e30fc4c6affecAyIDsCeYq4k9V",
+    "requestID": "per_1cf03b3990032zk5YCpmZm7L57",
+    "reply": "reject"
+   }
+  },
+  {
+   "id": "evt_1cf03b4d8001c42ygzkFflpb1C",
+   "created": 1794474489048,
+   "type": "permission.replied",
+   "location": {
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-m6IHHA/proj"
+   },
+   "data": {
+    "sessionID": "ses_e30fc4c68ffeIPjlrD5tI2WWt2",
+    "requestID": "per_1cf03b39a001JgoRDSkl5VkQVQ",
+    "reply": "once"
+   }
+  }
+ ],
+ "sessionAlways": {
+  "ids": {
+   "sessionC": "ses_e30fc49f8ffeEaEEJTzylTpe09",
+   "c1": "per_1cf03b60b001pbvXurt94GO6Df",
+   "c2": "per_1cf03b60b003KiuV247orw2aN8",
+   "sessionD": "ses_e30fc49f6ffebkznSv31DJr0K9"
+  },
+  "command": {
+   "requestFingerprint": "0e981266875dd511240e79017e71cb4c8e36ab1756c8d19ae0db5696e7a229c1",
+   "decisionID": "pdec_sampler_always",
+   "decision": "always",
+   "grantScope": {
+    "kind": "project",
+    "projectID": "unused-by-the-adapter"
+   },
+   "grantExpiresAt": null
+  },
+  "allowed": {
+   "status": 200,
+   "body": {
+    "data": {
+     "requestID": "per_1cf03b60b001pbvXurt94GO6Df",
+     "sessionID": "ses_e30fc49f8ffeEaEEJTzylTpe09",
+     "requestFingerprint": "0e981266875dd511240e79017e71cb4c8e36ab1756c8d19ae0db5696e7a229c1",
+     "decisionID": "pdec_sampler_always",
+     "decision": "always",
+     "committedAt": 1794474489663,
+     "resolvedRequestIDs": [
+      "per_1cf03b60b001pbvXurt94GO6Df",
+      "per_1cf03b60b003KiuV247orw2aN8"
+     ]
+    }
+   }
+  },
+  "pendingAfter": {
+   "status": 200,
+   "body": {
+    "data": []
+   }
+  },
+  "askSame": {
+   "status": 200,
+   "body": {
+    "data": {
+     "id": "per_1cf03b741001xGpHxBb6ZrlEtS",
+     "effect": "allow"
+    }
+   }
+  },
+  "askOther": {
+   "status": 200,
+   "body": {
+    "data": {
+     "id": "per_1cf03b741002aG3SKqEzhyJMID",
+     "effect": "ask"
+    }
+   }
+  },
+  "askOtherSession": {
+   "status": 200,
+   "body": {
+    "data": {
+     "id": "per_1cf03b742001xE7DjlqmTfT5Ro",
+     "effect": "ask"
+    }
+   }
+  }
+ }
+}

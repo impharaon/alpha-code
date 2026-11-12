@@ -68,7 +68,8 @@
 // 和「不是闸门」两张表里而无人吭声 —— 登记簿会随时间腐烂,且腐烂时没有任何别的东西会红。
 // 本文件自身也登记在 `gate-files.tsv` 里,所以它不能被静默删掉。
 
-import { existsSync, readFileSync } from "node:fs"
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { describe, expect, test } from "bun:test"
 import {
@@ -158,19 +159,22 @@ function manifestRows(): Row[] {
  * 在闸门文件正文里出现、但**刻意不登记**的测试文件。每条必须写明理由。
  * 这是「发现绊线」的出口 —— 不是豁免后门:写在这里等于公开声明「这条保证今天没有 CI 在跑」。
  */
+// 2026-11-12 I-09 移除五条:它们指向的文件随 OpenCode 2 换代删除(`44b6938b2a` removed packages/opencode),
+// 「本条引用的文件真的存在」那条因此红。去向:
+//   · opencode/test/tool/codepuppy-mcp-websearch-gate.test.ts(v1 通用 Remote MCP 钳制点,#649 未纳入 CI)——
+//     2.x 由 packages/ext/src/cloud-websearch-kill.test.ts「放行覆盖不了 kill-switch(2.x 真宿主)」在真宿主上握住;
+//   · opencode/test/mcp/codepuppy-cloud-mcp-multisource.test.ts、codepuppy-cloud-mcp-revival.test.ts(v1 云 MCP
+//     lifecycle,#649 未纳入 CI)—— 2.x 云工具接入由 packages/ext/src/plugin-host.test.ts「权威 · 云工具接入(M3)」承接;
+//   · opencode/test/tool/websearch.test.ts、opencode/test/plugin/trigger.test.ts —— 上游 v1 测试,从来不是本仓的闸门。
 const REFERENCED_BUT_UNREGISTERED: Record<string, string> = {
-  "packages/opencode/test/tool/codepuppy-mcp-websearch-gate.test.ts":
-    "真委派(通用 Remote MCP 钳制点的证据),但 owner 明确指示不在本 PR 纳入 CI;纳入与否在 #649 评估(23s 耗时 + Bun.serve 超时告警需先定性)。",
-  "packages/opencode/test/mcp/codepuppy-cloud-mcp-multisource.test.ts":
-    "真委派(云 MCP 多源继承的真实 lifecycle 断言),纳入与否同样在 #649 评估。",
-  "packages/opencode/test/mcp/codepuppy-cloud-mcp-revival.test.ts":
-    "真委派(云 MCP 复活路径的真实 lifecycle 断言),纳入与否同样在 #649 评估。",
   "packages/core/test/tool-websearch.test.ts":
     "上游测试文件。codepuppy-websearch-sovereignty 的抬头只是说明自己的 harness 与它**同源**,不是把判据委派给它;packages/core 是上游包,该文件由 north-star 守卫保护。",
-  "packages/opencode/test/tool/websearch.test.ts":
-    "上游测试文件,不是 alpha 的闸门 —— alpha 刻意不接管它(见 codepuppy-ci.yml 的 ADR-035 注释),它由 north-star 守卫保护不被 alpha 改动。",
-  "packages/opencode/test/plugin/trigger.test.ts":
-    "上游测试文件。ADR-045/#427 的探针 codepuppy-427-memory-seam-probe.test.ts 只是说明自己的 harness 与它**同形**(真 Config、file:// 插件、临时 instance)并拿它当退路 ② 的对照,不把判据委派给它;它由 north-star 守卫保护不被 alpha 改动。",
+  "packages/core/test/tool-shell.test.ts":
+    "上游测试文件,不在全量门里。session-grant-upstream-reds 点名它,是因为「本次会话内允许」做进权限内核后(I-05 契约 A),它里面断言「always 写项目级保存的批准」的用例按设计变红;那份钉住测试自己跑这些用例并断言红的条数,判据在它那里,不委派给这个文件。",
+  "packages/server/test/permission-saved.test.ts":
+    "上游测试文件,不在全量门里。session-grant-upstream-reds 点名它,是因为「本次会话内允许」做进权限内核后(I-05 契约 A),它里面断言「always 写项目级保存的批准」的用例按设计变红;那份钉住测试自己跑这些用例并断言红的条数,判据在它那里,不委派给这个文件。",
+  "packages/core/test/permission.test.ts":
+    "上游测试文件,不在全量门里。session-grant-upstream-reds 点名它,是因为「本次会话内允许」做进权限内核后(I-05 契约 A),它里面断言「always 写项目级保存的批准」的用例按设计变红;那份钉住测试自己跑这些用例并断言红的条数,判据在它那里,不委派给这个文件。",
 }
 
 const ALL_TESTS = gitListedTests()
@@ -631,4 +635,68 @@ describe("闸门文件登记簿完备性 (#647)", () => {
     // 自指:本文件正文里必然写着谓词的正例夹具,不排除自己就把自己算成命中方。
     expect([...SOURCE_TEXT_HITS.keys()]).not.toContain(SELF)
   })
+})
+
+// I-09:`assert-gate-files.sh --update` 遇到已删的测试文件 —— 有退役注释才删行,没有就整体中止;检查模式照样红。
+// 在临时目录里跑**真脚本**(两个脚本原样复制,ROOT 由脚本自己的位置推出),登记簿 26 行(脚本要求至少 25 行)。
+describe("--update 处理已删的闸门文件 (I-09)", () => {
+  const ROWS_N = 26
+  const name = (i: number) => `gate-retire-probe-${String(i).padStart(2, "0")}.test.ts`
+  const gone = `pkg/${name(3)}`
+  const testBody = (n: number) =>
+    `import { test } from "bun:test"\n${Array.from({ length: n }, (_, i) => `test("t${i}", () => {})`).join("\n")}\n`
+
+  function sandbox(): { root: string; manifest: string; run: (...args: string[]) => { code: number; out: string } } {
+    const root = mkdtempSync(join(tmpdir(), "i09-gate-update-"))
+    mkdirSync(join(root, "scripts"))
+    mkdirSync(join(root, "pkg"))
+    for (const script of ["assert-gate-files.sh", "bun-test-floor.sh"])
+      cpSync(join(REPO_ROOT, "scripts", script), join(root, "scripts", script))
+    const rows: string[] = []
+    for (let i = 1; i <= ROWS_N; i++) {
+      writeFileSync(join(root, "pkg", name(i)), testBody(1))
+      rows.push(["1", "pkg", name(i), "-", `probe ${i}`].join("\t"))
+    }
+    const manifest = join(root, "scripts", "gate-files.tsv")
+    writeFileSync(manifest, `# probe registry\n${rows.join("\n")}\n`)
+    const run = (...args: string[]) => {
+      const env = { ...process.env }
+      for (const key of Object.keys(env)) if (key.startsWith("CODEPUPPY_")) delete env[key]
+      const r = Bun.spawnSync(["bash", join(root, "scripts", "assert-gate-files.sh"), ...args], { cwd: root, env })
+      return { code: r.exitCode, out: `${r.stdout.toString()}${r.stderr.toString()}` }
+    }
+    return { root, manifest, run }
+  }
+
+  test("没写退役注释 ⇒ --update 退出 1、点名该行、登记簿一个字节不改;写了注释 ⇒ 删掉那一行并打印 diff;检查模式照样红", () => {
+    const { root, manifest, run } = sandbox()
+    try {
+      rmSync(join(root, gone))
+      writeFileSync(join(root, "pkg", name(5)), testBody(2)) // 同一次写回里顺带一条条数增加
+      const before = readFileSync(manifest, "utf8")
+
+      const refused = run("--update")
+      expect(refused.code, refused.out).toBe(1)
+      expect(refused.out).toContain(gone)
+      expect(readFileSync(manifest, "utf8")).toBe(before)
+
+      writeFileSync(manifest, `# 2026-11-12 退役(#0):${gone}(1)。替代:pkg/${name(4)}「t0」\n${before}`)
+      const written = run("--update")
+      expect(written.code, written.out).toBe(0)
+      const after = readFileSync(manifest, "utf8")
+      expect(after).not.toContain(`\t${name(3)}\t`)
+      expect(after).toContain(`退役(#0):${gone}`)
+      expect(after).toContain(["2", "pkg", name(5)].join("\t"))
+      expect(written.out).toContain(`-${["1", "pkg", name(3)].join("\t")}`)
+      expect(written.out).toContain(`+${["2", "pkg", name(5)].join("\t")}`)
+
+      // G1:写回前的同一状态(行还在、文件已删、注释在册)下,检查模式必须红 —— 注释不是免检牌。
+      writeFileSync(manifest, `# 2026-11-12 退役(#0):${gone}(1)。替代:pkg/${name(4)}「t0」\n${before}`)
+      const checked = run()
+      expect(checked.code, checked.out).toBe(1)
+      expect(checked.out).toContain(name(3))
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  }, 120_000)
 })

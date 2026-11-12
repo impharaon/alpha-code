@@ -4,44 +4,26 @@
 // 它对的,但它停在 config 这一层。#1239 矩阵实打之后,两个方向都翻了:
 //   ① 有徽标 ⇒ 拿不到档:桌面档位 chip 只读目录 JSON 的 `variants`,deepseek-v4-pro / glm-5.2
 //      (平台 + 直连)在 chip 上一档都选不到,默认发出去的主请求体**零**推理参数(#1266);
-//   ② 无徽标 ⇒ 却在推理:上游 `transform.options()` 不看 `capabilities.reasoning` 就给 gpt-5*
+//   ② 无徽标 ⇒ 却在推理:v1 上游 `transform.options()` 不看 `capabilities.reasoning` 就给 gpt-5*
 //      写 `reasoning_effort: medium`、给 zhipuai* 写 `thinking: enabled`(#1267)。
 // 两个方向单独锁任何一边都看不见另一边,所以这里一次判两边。
 //
-// 判据形状(每一行 picker 行都过):
-//   有徽标 ⇒ chip 列出 ≥1 档;**每一档**经真引擎发出的主请求体与档位声明逐字对上:声明 `reasoningEffort: x`
-//           ⇒ 请求体 `reasoning_effort === x`;声明 `thinking: { type: t }` ⇒ 请求体 `thinking.type === t`;
-//           除显式关闭档(`t === "disabled"`,#1267)外每一档都必须真的带推理控制参数,而显式关闭档必须
-//           **零**推理控制参数且 `thinking.type` 逐字是 `disabled`(智谱实打:`type` 写错会被上游静默忽略并继续
-//           思考,见 docs/architecture/2026-09-06-model-variant-reachability.md)。桌面提交层 buildPromptRequest 真的带上它。
-//   无徽标 ⇒ chip 零档;默认发出的主请求体**不带**任何推理控制参数。
+// `#1662`(2026-11-12)起「真引擎」= 嵌进 sidecar 的 OpenCode 2:v1 版跑的是已删的 `packages/opencode/src/index.ts run --variant`,
+// 现在真判据在 codepuppy-reasoning-badge-parity.engine.cases.ts(独立 `bun test` 子进程:沙箱里的嵌入式引擎 + 生产
+// injectCodePuppyConfig + 真 ext + 本机桩;发送走生产 buildPromptRequest + v1PromptModelFields → 生产引擎适配器
+// → switchModel 带 variant → prompt,与桌面 composer 同一个请求)。本文件三条:
+//   1. 手段自证(子进程 5 条):桩的捕获不是恒空;注入丢了推理转发(整张档位表 / 档位内容)⇒ 逐档点名红;无此能力的模型亮徽标
+//      ⇒ 点名红;无徽标却被注入无条件的 thinking:enabled(#1267 方向)⇒ 点名红;注入里去掉标题用的 `none` 那一档 ⇒ 标题跟着
+//      所选的档走,逐格点名红。
+//   2. 桌面提交层:chip 列出的每一档,buildPromptRequest 都真的带上 variant(本进程直接判生产函数)。
+//   3. 矩阵(子进程 2 条):生产 buildModelPickerRows 的每一行 × 默认 + chip 每一档,主请求体按判据逐格对上,标题辅助调用取
+//      第一档(0.1.26 规则);UI 侧:适配器给冻结界面的 v1 provider 列表与 composer 的模型清单(GET /api/model)里,每个模型的
+//      档位恰好是目录的(`none` 不可见)。
 //
-// 「真引擎」= 本仓 `packages/opencode/src/index.ts run`(与打包 sidecar 同一份 v1 请求装配:
-// provider.ts 的 config 合并 → transform.variants()/options() → session/llm/request.ts 的 mergeOptions),
-// 配置由**生产** `buildCodePuppyModelConfig` 生成(只把 baseURL 改指向本进程起的假上游)。桌面端与 CLI
-// 在这一段共用同一条链:composer 发的 `model.variant` 就是 CLI `--variant` 落到的同一个字段
-// (`request.ts:84-87`),所以 CLI 是引擎侧的忠实代理;桌面自己那一头(chip 列表 / 提交层)在本文件
-// 用生产函数直接判。
-//
-// 手段自证先于矩阵:①假上游先吃一个探针请求证明捕获不是恒空;②`codepuppy/glm-5-turbo --variant high`
-// (目录未标 reasoning、上游黑名单)必须**不**带参数 —— 判据会红,不是恒真;③`zhipuai-byok/glm-4.5-air`
-// 硬塞一个目录里不存在的档 ⇒ 上游 `transform.options()` 的无条件 `thinking: enabled` 原样出现,把这个请求体
-// 交给「关」档的判据必须红 —— 证明显式关闭档的判据测得出已知的坏(#1267)。
-//
-// #1267(2026-09-06 已修):`zhipuai-byok/glm-4.5-air` 是 BYOK-only 的 id(平台目录没有同名条目),此前无徽标却带
-// `thinking: enabled`。修法是 BYOK 目录的逐模型元数据槽(`byokProviders[].modelMeta`,shared/codepuppy-model-types.ts):
-// 徽标 + 开/关两档,同一个 byokModelMeta 派生进 picker 行与 sidecar 注入。原先登记它的 KNOWN_UNFIXED 已按其
-// 自带的过期断言删除;本文件不再有任何已知不修的行。
-//
-// #1237(2026-09-06):上游黑名单族里 wire 形状已实打的三个平台模型拿到档位 —— `codepuppy/glm-5-turbo` 走 zhipu 直连腿的
-// `thinking:{type}` 开/关(直连对 reasoning_effort accepted-and-ignored,网关拒转),`codepuppy/qwen3.7-max|plus` 走 OR 腿的
-// `reasoning_effort` 关(none,0 reasoning tokens)/ 开(medium)。形状与出处钉在 codepuppy-models.test.ts 的 #1237 节;本文件
-// 负责两件只有真引擎能证的事:①每一档的主请求体逐字带上那条腿的形状(矩阵原有判据自动覆盖新行);②上游
-// `transform.smallOptions()` 把档位表**第一项**喂给标题等辅助调用(`request.ts:88-89`,基线 §3.8a)—— 有徽标的每一行,
-// 默认那次 run 捕到的标题请求体必须与第一档声明逐字对上;目录把「关」放第一位正是为了让辅助调用不思考。
-// 手段自证的「已知的坏」随之换成 `minimax-byok/MiniMax-M2`(仍是黑名单族、目录未标 reasoning、本机无凭据 ⇒ #1237 钉在无档)。
+// 标题辅助调用(#1237):0.1.26 取档位表第一档(目录把「关」放第一位,辅助调用不思考)。2.x 的标题选档只认 none / minimal / low,
+// 所以 engineModelConfig 给有档位的模型多写一档 `none` = 第一档的拷贝,由 2.x 自己挑中;适配器把它从冻结界面的列表里剥掉。
 
-import { afterAll, beforeAll, describe, expect, test } from "bun:test"
+import { afterAll, beforeAll, expect, test } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
@@ -49,74 +31,35 @@ import type { ModelV2Info } from "@opencode-ai/sdk/v2/client"
 import type { EffectiveCatalog } from "../shared/codepuppy-model-types"
 import { buildModelPickerRows, type ModelPickerRow } from "../renderer/codepuppy-ui/model-picker-core"
 import { buildPromptRequest } from "../renderer/codepuppy-ui/composer-state"
-import { byokModelMeta, isByokEngineId } from "../shared/codepuppy-model-types"
 import { buildCodePuppyModelConfig, getModelCatalog } from "./codepuppy-models"
 import { pinAppliedCatalog, writeCatalogSnapshot } from "./codepuppy-live-allowlist"
 import { v3Snapshot } from "../../test-component/effective-catalog.fixture"
 import { secretFilePath } from "./codepuppy-secret-files"
 
-const repoRoot = path.resolve(import.meta.dir, "../../../..")
-const engineEntry = path.resolve(repoRoot, "packages/opencode/src/index.ts")
-// 真快照(4.9 MB / 159 providers),让引擎离线也装得出 models.dev 目录;alpha 注入的 provider 不在其中,
-// 走的是 config 路径 —— 与打包 sidecar 相同。
-const modelsFixture = path.resolve(repoRoot, "packages/opencode/test/tool/fixtures/models-api.json")
-/** 全量并跑时有测试文件会改写 `process.env.PATH`:引擎子进程用绝对 bun 路径 + 装载期 PATH 快照。 */
-const BUN_EXEC = process.execPath
-const PATH_AT_LOAD = process.env.PATH ?? ""
+const CASES = path.join(import.meta.dir, "codepuppy-reasoning-badge-parity.engine.cases.ts")
 
-/** 引擎请求体里算作「推理控制」的键(与 #1239 判据同一张表,去掉 `top_k` —— 那是采样参数)。
- *  `thinking: { type: "disabled" }` 是显式关闭,不算「在推理」。 */
-const REASONING_KEYS = [
-  "reasoning_effort",
-  "reasoning",
-  "thinking",
-  "enable_thinking",
-  "chat_template_kwargs",
-  "chat_template_args",
-  "effort",
-  "thinkingConfig",
-  "reasoning_summary",
-] as const
-
-function reasoningControls(body: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = {}
-  for (const key of REASONING_KEYS) {
-    if (!(key in body)) continue
-    const value = body[key]
-    if (key === "thinking" && typeof value === "object" && value !== null && (value as { type?: unknown }).type === "disabled") continue
-    out[key] = value
-  }
-  return out
+/** 子进程跑 cases 里名字匹配 `pattern` 的那几条,钉住 pass / fail 条数。 */
+async function engineCases(pattern: string, pass: number) {
+  const child = Bun.spawn({
+    cmd: [process.execPath, "test", "--timeout", "300000", "-t", pattern, CASES],
+    cwd: path.join(import.meta.dir, "../.."),
+    env: process.env,
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  const [stdout, stderr, exitCode] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  const output = `${stdout}${stderr}`
+  if (exitCode !== 0) throw new Error(output)
+  expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
+  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe(String(pass))
 }
 
 const MANAGED = ["CODEPUPPY_MODELS_DISABLE", "CODEPUPPY_BASE_URL", "CODEPUPPY_DEFAULT_MODEL", "CODEPUPPY_GLOBAL_DIR", "OPENCODE_CONFIG_DIR"]
 const saved: Record<string, string | undefined> = {}
-
-type Captured = { path: string; body: Record<string, unknown> }
-const captures = new Map<string, Captured[]>()
 let root = ""
 let userData = ""
-let server: ReturnType<typeof Bun.serve> | undefined
-let upstream = ""
 
-function sse(text: string) {
-  const enc = new TextEncoder()
-  const chunk = (delta: Record<string, unknown>, finish: string | null, usage?: Record<string, number>) =>
-    `data: ${JSON.stringify({ id: "c1", object: "chat.completion.chunk", created: 1, model: "fake", choices: [{ index: 0, delta, finish_reason: finish }], ...(usage ? { usage } : {}) })}\n\n`
-  const chunks = [
-    chunk({ role: "assistant", content: text }, null),
-    chunk({}, "stop", { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 }),
-    "data: [DONE]\n\n",
-  ]
-  return new ReadableStream({
-    start(controller) {
-      for (const item of chunks) controller.enqueue(enc.encode(item))
-      controller.close()
-    },
-  })
-}
-
-beforeAll(async () => {
+beforeAll(() => {
   for (const key of MANAGED) {
     saved[key] = process.env[key]
     delete process.env[key]
@@ -136,148 +79,17 @@ beforeAll(async () => {
   fs.mkdirSync(process.env.CODEPUPPY_GLOBAL_DIR, { recursive: true })
   process.env.OPENCODE_CONFIG_DIR = path.join(root, "config-dir")
   fs.mkdirSync(process.env.OPENCODE_CONFIG_DIR, { recursive: true })
-
-  // 假上游:按路径前缀 `/run/<tag>/…` 归档每一个请求,所以多条引擎并跑也能逐条归因。
-  server = Bun.serve({
-    port: 0,
-    hostname: "127.0.0.1",
-    idleTimeout: 30,
-    async fetch(request) {
-      const url = new URL(request.url)
-      const tag = /^\/run\/([^/]+)\//.exec(url.pathname)?.[1] ?? "<untagged>"
-      let body: Record<string, unknown> = {}
-      if (request.method === "POST") {
-        try {
-          body = JSON.parse(await request.text()) as Record<string, unknown>
-        } catch {
-          body = { "<unparsable>": true }
-        }
-      }
-      const list = captures.get(tag) ?? []
-      list.push({ path: url.pathname, body })
-      captures.set(tag, list)
-      if (url.pathname.endsWith("/models")) return Response.json({ object: "list", data: [] })
-      return new Response(sse("ok"), { headers: { "content-type": "text/event-stream", "cache-control": "no-cache" } })
-    },
-  })
-  upstream = `http://127.0.0.1:${server.port}`
-  process.env.CODEPUPPY_BASE_URL = `${upstream}/v1`
+  // 平台节点要有地址才注入;本进程只判纯函数,这个地址从不被访问。
+  process.env.CODEPUPPY_BASE_URL = "http://127.0.0.1:9/v1"
 })
 
 afterAll(() => {
-  server?.stop(true)
   for (const key of MANAGED) {
     if (saved[key] === undefined) delete process.env[key]
     else process.env[key] = saved[key]
   }
   fs.rmSync(root, { recursive: true, force: true })
 })
-
-/** 路径前缀 + 目录名两用,所以只留 `[A-Za-z0-9_.-]`;档位标签是中文,按 UTF-8 hex 编码(不能用 `%` 转义 ——
- *  引擎会把 `--dir` 里的百分号序列解码回去,目录就对不上了,实测 ENOENT)。 */
-const tagOf = (providerID: string, id: string, variant?: string) => {
-  const safe = (text: string) => (/^[A-Za-z0-9_.-]+$/.test(text) ? text : `x${Buffer.from(text, "utf8").toString("hex")}`)
-  return `${safe(providerID)}__${safe(id)}${variant ? `__${safe(variant)}` : ""}`
-}
-
-/** 生产 `buildCodePuppyModelConfig` 的产物,只把每个 provider 的 baseURL 指到本进程假上游的 `/run/<tag>/` 前缀。 */
-function configFor(tag: string) {
-  const cfg = buildCodePuppyModelConfig(userData)
-  if (!cfg) throw new Error("buildCodePuppyModelConfig 返回 undefined —— CODEPUPPY_MODELS_DISABLE 漏清?")
-  for (const [id, provider] of Object.entries(cfg.provider as Record<string, { options: { baseURL: string } }>)) {
-    provider.options.baseURL = id === "codepuppy" ? `${upstream}/run/${tag}/v1` : `${upstream}/run/${tag}/byok/${id}/v1`
-  }
-  return cfg
-}
-
-type RunResult = { tag: string; rc: number; main: Record<string, unknown> | null; title: Record<string, unknown> | null; posts: number; log: string }
-
-/** 一次真引擎 `run`:隔离 HOME/XDG/DB,stdin 关死(打开不关的管道会让 run 在 session 建立前无限挂住)。 */
-async function engineRun(providerID: string, id: string, variant?: string): Promise<RunResult> {
-  const tag = tagOf(providerID, id, variant)
-  // #1237:同一 (provider, model, variant) 可能跑两次(手段自证 + 矩阵)。捕获桶按 tag 累加,不清空的话第二次
-  // 会看到 4 条 POST / 2 条主请求 ⇒ main=null ⇒ 「测量作废」—— 那是判据自己的坑,不是引擎的。每次 run 从空桶开始。
-  captures.delete(tag)
-  const dir = path.join(root, "runs", tag)
-  for (const sub of ["home", "xdg-config", "xdg-data", "xdg-cache", "xdg-state", "proj"]) fs.mkdirSync(path.join(dir, sub), { recursive: true })
-  const configPath = path.join(dir, "config.json")
-  fs.writeFileSync(configPath, JSON.stringify(configFor(tag)))
-  const proc = Bun.spawn(
-    [
-      BUN_EXEC,
-      "run",
-      engineEntry,
-      "run",
-      "--print-logs",
-      "--dir",
-      path.join(dir, "proj"),
-      "--model",
-      `${providerID}/${id}`,
-      ...(variant ? ["--variant", variant] : []),
-      "hi",
-    ],
-    {
-      cwd: repoRoot,
-      stdin: "ignore",
-      stdout: "pipe",
-      stderr: "pipe",
-      env: {
-        PATH: PATH_AT_LOAD,
-        HOME: path.join(dir, "home"),
-        XDG_CONFIG_HOME: path.join(dir, "xdg-config"),
-        XDG_DATA_HOME: path.join(dir, "xdg-data"),
-        XDG_CACHE_HOME: path.join(dir, "xdg-cache"),
-        XDG_STATE_HOME: path.join(dir, "xdg-state"),
-        NO_PROXY: "127.0.0.1,localhost",
-        no_proxy: "127.0.0.1,localhost",
-        NO_COLOR: "1",
-        CODEPUPPY_BASE_URL: process.env.CODEPUPPY_BASE_URL!,
-        CODEPUPPY_GLOBAL_DIR: process.env.CODEPUPPY_GLOBAL_DIR!,
-        OPENCODE_CONFIG: configPath,
-        OPENCODE_DISABLE_PROJECT_CONFIG: "1",
-        OPENCODE_MODELS_PATH: modelsFixture,
-        OPENCODE_DISABLE_MODELS_FETCH: "1",
-        OPENCODE_DB: path.join(dir, "engine.db"),
-      },
-    },
-  )
-  const killer = setTimeout(() => proc.kill(), 90_000)
-  const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()])
-  const rc = await proc.exited
-  clearTimeout(killer)
-  const posts = (captures.get(tag) ?? []).filter((entry) => Array.isArray(entry.body.messages))
-  // 引擎每次 run 还会发一条标题生成的辅助调用(走 smallOptions,不是用户那条);主请求 = 非标题那条。
-  const isTitle = (body: Record<string, unknown>) =>
-    (body.messages as Array<{ role?: string; content?: unknown }>).some(
-      (message) => message.role === "system" && String(message.content).slice(0, 200).includes("title generator"),
-    )
-  const mains = posts.filter((entry) => !isTitle(entry.body))
-  // #1237:标题那条也留下 —— 它走 smallOptions(),带的是档位表第一项,与用户选档无关。
-  const titles = posts.filter((entry) => isTitle(entry.body))
-  return {
-    tag,
-    rc,
-    main: mains.length === 1 ? mains[0]!.body : null,
-    title: titles.length === 1 ? titles[0]!.body : null,
-    posts: posts.length,
-    log: `${stdout}\n${stderr}`.slice(-1200),
-  }
-}
-
-async function pool<T, R>(items: T[], size: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const out: R[] = new Array(items.length)
-  let next = 0
-  await Promise.all(
-    Array.from({ length: Math.min(size, items.length) }, async () => {
-      for (;;) {
-        const index = next++
-        if (index >= items.length) return
-        out[index] = await fn(items[index]!)
-      }
-    }),
-  )
-  return out
-}
 
 const rowKey = (row: ModelPickerRow) => `${row.model.providerID}:${row.model.id}`
 
@@ -323,164 +135,22 @@ function pickerRows(): ModelPickerRow[] {
   })
 }
 
-/** 目录里该档位声明的 wire 值,与生产同一份派生:平台行读已应用平台快照的条目;BYOK 行经 byokModelMeta
- *  (BYOK 目录自己的逐模型元数据,`#1556` 起不借平台同名条目)。`reasoningEffort: x` → 请求体 `reasoning_effort: x`;`thinking: { type: t }` → 请求体
- *  `thinking.type: t`(openai-compatible 原样透传,#1239 捕获实证);其它形状只判「有参数」。 */
-function declaredControl(row: ModelPickerRow, variant: string): { reasoningEffort?: string; thinkingType?: string } {
-  const catalog = getModelCatalog(userData)
-  const declared = isByokEngineId(row.model.providerID)
-    ? byokModelMeta(catalog, row.model.providerID, row.model.id).variants?.[variant]
-    : catalog.platformModels.find((model) => model.id === row.model.id)?.variants?.[variant]
-  const thinking = declared?.thinking as { type?: unknown } | undefined
-  return {
-    ...(typeof declared?.reasoningEffort === "string" ? { reasoningEffort: declared.reasoningEffort } : {}),
-    ...(typeof thinking?.type === "string" ? { thinkingType: thinking.type } : {}),
+test("手段自证:捕获不是恒空;丢了推理转发 / 无此能力亮徽标 / 无徽标却带推理参数 / 去掉标题用的 none 档 ⇒ 判据点名红(codepuppy-reasoning-badge-parity.engine.cases.ts,5 条)", async () => {
+  await engineCases("手段自证", 5)
+}, 600_000)
+
+test("桌面提交层:chip 列出的每一档,buildPromptRequest 都真的带上 variant(C28 不把它当未知档丢掉)", () => {
+  const rows = pickerRows()
+  const withVariants = rows.filter((row) => row.model.variants.length > 0)
+  expect(withVariants.length).toBeGreaterThan(0)
+  for (const row of withVariants) {
+    for (const variant of row.model.variants) {
+      const request = buildPromptRequest({ text: "hi", model: row.model, effort: variant, perm: "ask", agent: null })
+      expect({ row: rowKey(row), variant, sent: request.model?.variant }).toEqual({ row: rowKey(row), variant, sent: variant })
+    }
   }
-}
-
-/** 一格的判据(纯函数,手段自证与矩阵共用)。返回失败文案;空数组 = 这一格通过。 */
-function judge(row: ModelPickerRow, variant: string | undefined, body: Record<string, unknown>): string[] {
-  const key = rowKey(row)
-  const label = variant ? `${key}@${variant}` : `${key}(默认)`
-  const controls = reasoningControls(body)
-  const carried = Object.keys(controls).length > 0
-  const failures: string[] = []
-  if (row.reasoning) {
-    if (variant === undefined) {
-      if (row.model.variants.length === 0) failures.push(`${label}: 有徽标但档位 chip 一档都没有(#1266)`)
-      return failures
-    }
-    const declared = declaredControl(row, variant)
-    const wireThinking = (body.thinking as { type?: unknown } | undefined)?.type
-    if (declared.thinkingType === "disabled") {
-      // 显式关闭档(#1267):必须逐字 disabled 落到请求体,且零推理控制参数 —— 上游会静默忽略写错的 type 并继续思考。
-      if (wireThinking !== "disabled") failures.push(`${label}: 档位声明 thinking.type=disabled,请求体 thinking.type=${String(wireThinking)}`)
-      if (carried) failures.push(`${label}: 显式关闭档的请求体却带 ${JSON.stringify(controls)}(#1267)`)
-      return failures
-    }
-    if (!carried) failures.push(`${label}: 有徽标、选了档,主请求体却零推理参数(#1266)`)
-    if (declared.reasoningEffort !== undefined && body.reasoning_effort !== declared.reasoningEffort)
-      failures.push(`${label}: 档位声明 reasoningEffort=${declared.reasoningEffort},请求体 reasoning_effort=${String(body.reasoning_effort)}`)
-    if (declared.thinkingType !== undefined && wireThinking !== declared.thinkingType)
-      failures.push(`${label}: 档位声明 thinking.type=${declared.thinkingType},请求体 thinking.type=${String(wireThinking)}`)
-    return failures
-  }
-  if (variant !== undefined) failures.push(`${label}: 无徽标却列出了档位`)
-  else if (carried) failures.push(`${label}: 无徽标,默认请求却带 ${JSON.stringify(controls)}(#1267)`)
-  return failures
-}
-
-/** #1237:辅助调用(标题)的判据 —— 上游 smallOptions() 取档位表第一项,所以标题请求体必须与**第一档**的声明逐字对上。
- *  这条把「目录把关放第一位」从散文变成机制事实:第一档是关 ⇒ 标题调用不思考。 */
-function judgeAux(row: ModelPickerRow, title: Record<string, unknown>): string[] {
-  const key = rowKey(row)
-  const first = row.model.variants[0]
-  if (!row.reasoning || first === undefined) return []
-  const declared = declaredControl(row, first)
-  const controls = reasoningControls(title)
-  const wireThinking = (title.thinking as { type?: unknown } | undefined)?.type
-  const failures: string[] = []
-  if (declared.reasoningEffort !== undefined && title.reasoning_effort !== declared.reasoningEffort)
-    failures.push(`${key}(标题辅助调用): 第一档 ${first} 声明 reasoningEffort=${declared.reasoningEffort},标题请求体 reasoning_effort=${String(title.reasoning_effort)}`)
-  if (declared.thinkingType !== undefined && wireThinking !== declared.thinkingType)
-    failures.push(`${key}(标题辅助调用): 第一档 ${first} 声明 thinking.type=${declared.thinkingType},标题请求体 thinking.type=${String(wireThinking)}`)
-  if (declared.thinkingType === "disabled" && Object.keys(controls).length > 0)
-    failures.push(`${key}(标题辅助调用): 第一档是显式关闭,标题请求体却带 ${JSON.stringify(controls)}`)
-  if (declared.reasoningEffort === undefined && declared.thinkingType === undefined && Object.keys(controls).length === 0)
-    failures.push(`${key}(标题辅助调用): 第一档 ${first} 应带推理参数,标题请求体却零推理参数`)
-  return failures
-}
-
-describe("REQ-153 #1266/#1267:徽标集合 == 引擎实际带推理参数的集合(真引擎 · 假上游 · 双向)", () => {
-  test("手段自证:假上游的捕获不是恒空;无徽标模型 + --variant high 不带参数(判据会红)", async () => {
-    const probe = await fetch(`${upstream}/run/__probe__/v1/chat/completions`, {
-      method: "POST",
-      body: JSON.stringify({ probe: "KNOWN-GOOD", messages: [] }),
-    })
-    expect(probe.ok).toBe(true)
-    expect(captures.get("__probe__")?.[0]?.body.probe).toBe("KNOWN-GOOD")
-
-    // 已知的坏:目录未标 reasoning 的 MiniMax-M2(上游黑名单族;本机无凭据未实打 ⇒ #1237 钉在无档)硬塞 --variant high
-    // ⇒ 主请求体零推理键。(#1237 前这一格用的是 alpha/glm-5-turbo,它现在有档了。)
-    const control = await engineRun("minimax-byok", "MiniMax-M2", "high")
-    expect({ rc: control.rc, main: control.main !== null, log: control.main ? "" : control.log }).toEqual({ rc: 0, main: true, log: "" })
-    expect(reasoningControls(control.main!)).toEqual({})
-
-    // 已知的坏(#1237 方向):把 qwen3.7-max「开」档(reasoning_effort=medium)那次 run 的**主**请求体冒充标题请求体交给
-    // judgeAux —— 第一档是「关」(none),判据必须点名 medium ≠ none。证明「标题调用取第一档」的判据测得出错档。
-    const qwen = pickerRows().find((row) => rowKey(row) === "codepuppy:qwen3.7-max")
-    expect({ found: qwen !== undefined, badge: qwen?.reasoning, chip: qwen?.model.variants }).toEqual({ found: true, badge: true, chip: ["关", "开"] })
-    const on = await engineRun("codepuppy", "qwen3.7-max", "开")
-    expect({ rc: on.rc, main: on.main !== null, title: on.title !== null, log: on.main ? "" : on.log }).toEqual({ rc: 0, main: true, title: true, log: "" })
-    expect(on.main!.reasoning_effort).toBe("medium")
-    expect(judgeAux(qwen!, on.main!)).toEqual(["codepuppy:qwen3.7-max(标题辅助调用): 第一档 关 声明 reasoningEffort=none,标题请求体 reasoning_effort=medium"])
-    // 而真正的标题请求体带的是第一档(关):这一格同时是 #1237 对基线 §3.8a 的实证。
-    expect(judgeAux(qwen!, on.title!)).toEqual([])
-
-    // 已知的坏(#1267 方向):glm-4.5-air 硬塞一个目录里没有的档 ⇒ 引擎查不到 variant、只剩上游无条件写的
-    // thinking:enabled(#1267 票面缺陷的原样)。把这个请求体交给「关」档的判据,必须点名 thinking.type 不对。
-    const air = pickerRows().find((row) => rowKey(row) === "zhipuai-byok:glm-4.5-air")
-    expect({ found: air !== undefined, badge: air?.reasoning, chip: air?.model.variants }).toEqual({ found: true, badge: true, chip: ["关", "开"] }) // #1237:关调到第一位(smallOptions 取第一项)
-    const stuck = await engineRun("zhipuai-byok", "glm-4.5-air", "x-not-a-tier")
-    expect({ rc: stuck.rc, main: stuck.main !== null, log: stuck.main ? "" : stuck.log }).toEqual({ rc: 0, main: true, log: "" })
-    expect((stuck.main!.thinking as { type?: unknown } | undefined)?.type).toBe("enabled")
-    expect(judge(air!, "关", stuck.main!)).toEqual([
-      "zhipuai-byok:glm-4.5-air@关: 档位声明 thinking.type=disabled,请求体 thinking.type=enabled",
-      'zhipuai-byok:glm-4.5-air@关: 显式关闭档的请求体却带 {"thinking":{"type":"enabled","clear_thinking":false}}(#1267)',
-    ])
-  }, 180_000)
-
-  test("桌面提交层:chip 列出的每一档,buildPromptRequest 都真的带上 variant(C28 不把它当未知档丢掉)", () => {
-    const rows = pickerRows()
-    const withVariants = rows.filter((row) => row.model.variants.length > 0)
-    expect(withVariants.length).toBeGreaterThan(0)
-    for (const row of withVariants) {
-      for (const variant of row.model.variants) {
-        const request = buildPromptRequest({ text: "hi", model: row.model, effort: variant, perm: "ask", agent: null })
-        expect({ row: rowKey(row), variant, sent: request.model?.variant }).toEqual({ row: rowKey(row), variant, sent: variant })
-      }
-    }
-  })
-
-  test("矩阵:有徽标 ⇒ 每一档请求带参数且值逐字对上;无徽标 ⇒ 零档且默认请求不带参数", async () => {
-    const rows = pickerRows()
-    expect(rows.length).toBeGreaterThan(0)
-    // 空集会让下面所有断言空转 —— 先钉住两侧都非空。
-    expect(rows.some((row) => row.reasoning)).toBe(true)
-    expect(rows.some((row) => !row.reasoning)).toBe(true)
-
-    const jobs = rows.flatMap((row) => [
-      { row, variant: undefined as string | undefined },
-      ...row.model.variants.map((variant) => ({ row, variant })),
-    ])
-    const results = await pool(jobs, 6, async (job) => ({ ...job, result: await engineRun(job.row.model.providerID, job.row.model.id, job.variant) }))
-
-    const failures: string[] = []
-    const harness: string[] = []
-    const verdicts: string[] = []
-    for (const { row, variant, result } of results) {
-      const key = rowKey(row)
-      const label = variant ? `${key}@${variant}` : `${key}(默认)`
-      if (result.rc !== 0 || !result.main) {
-        harness.push(`${label}: 引擎 rc=${result.rc} 主请求=${result.main ? 1 : 0} posts=${result.posts}\n${result.log}`)
-        continue
-      }
-      // 逐格结论里同时记「算作推理控制的键」与 `thinking` 原文 —— 显式关闭档在前者里是空,后者才看得见它落没落地。
-      verdicts.push(
-        `${label} badge=${row.reasoning} chip=[${row.model.variants.join("|")}] request=${JSON.stringify(reasoningControls(result.main))} thinking=${JSON.stringify(result.main.thinking ?? null)}`,
-      )
-      failures.push(...judge(row, variant, result.main))
-      // #1237:有档位的行,默认那次 run 的标题辅助调用必须带第一档 —— 没捕到标题请求 = 本格测量作废,不是通过。
-      if (variant === undefined && row.reasoning && row.model.variants.length > 0) {
-        if (!result.title) harness.push(`${label}: 标题辅助调用未捕获(posts=${result.posts})—— 第一档判据本格作废`)
-        else {
-          verdicts.push(`${label} title=${JSON.stringify(reasoningControls(result.title))} title.thinking=${JSON.stringify(result.title.thinking ?? null)}`)
-          failures.push(...judgeAux(row, result.title))
-        }
-      }
-    }
-    // 引擎没跑起来 / 没捕到主请求 = 本次测量作废,不是通过也不是红 —— 单独报,先于判据。
-    expect(harness, "引擎侧 harness 故障(测量作废)").toEqual([])
-    expect(failures, `逐格结论:\n${verdicts.join("\n")}`).toEqual([])
-  }, 600_000)
 })
+
+test("矩阵:有徽标 ⇒ 每一档请求带参数且值逐字对上;无徽标 ⇒ 零档且默认请求不带参数;标题调用取第一档;冻结界面与 composer 拿到的档位表 == 目录(codepuppy-reasoning-badge-parity.engine.cases.ts,2 条)", async () => {
+  await engineCases("矩阵", 2)
+}, 600_000)

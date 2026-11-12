@@ -19,6 +19,6 @@
   "devDependencies": {
     "@types/bun": "catalog:",
     "@types/node": "catalog:",
-    "@typescript/native-preview": "catalog:"
+    "@typescript/native-preview": "7.0.0-dev.20251207.1"
   }
 }

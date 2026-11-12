@@ -1,0 +1,50 @@
+{
+ "_source": "Sampled by `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts` (alpha-code#1668 L6) at 023507c5c0: a real OpenCode 2 engine from this repo's packages/cli `serve`, isolated HOME/XDG, one git project, and the scripted OpenAI-compatible mock model next to the sampler. The build agent's `read *.env` ask fired on a mock `read .env`. `frame` is the raw permission.asked frame; `list` is GET /api/permission/request right after it. No ext runs here, so metadata is empty; tests add the four I7a keys.",
+ "frame": {
+  "id": "evt_1c00498a2002zNj0zuAhhooBeh",
+  "created": 1794222889122,
+  "type": "permission.asked",
+  "location": {
+   "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-c1DEpw/proj"
+  },
+  "data": {
+   "id": "per_1c00498a2001jakpBtGeYvlVqy",
+   "sessionID": "ses_e3ffb6837ffed9wdgoiJAUnsUm",
+   "action": "read",
+   "resources": [
+    ".env"
+   ],
+   "save": [
+    "*"
+   ],
+   "source": {
+    "type": "tool",
+    "messageID": "msg_1c00497e3001o3XJrm69qXJ94Z",
+    "id": "call_mock_env_o2wdv"
+   }
+  }
+ },
+ "list": {
+  "location": {
+   "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-c1DEpw/proj"
+  },
+  "data": [
+   {
+    "id": "per_1c00498a2001jakpBtGeYvlVqy",
+    "sessionID": "ses_e3ffb6837ffed9wdgoiJAUnsUm",
+    "action": "read",
+    "resources": [
+     ".env"
+    ],
+    "save": [
+     "*"
+    ],
+    "source": {
+     "type": "tool",
+     "messageID": "msg_1c00497e3001o3XJrm69qXJ94Z",
+     "id": "call_mock_env_o2wdv"
+    }
+   }
+  ]
+ }
+}

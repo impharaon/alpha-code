@@ -129,6 +129,8 @@ const runtime = await import("../src/renderer/sidebar/overlay-close-test-runtime
 const { hrefFor } = await import("../src/shared/route-manifest")
 const extHubState = await import("../src/renderer/extensions/ext-hub-state")
 const automationState = await import("../src/renderer/automations/automation-state")
+const toastApi = await import("../src/renderer/codepuppy-ui/Toast")
+const sidebarState = await import("../src/renderer/sidebar/sidebar-state")
 
 const DIR = "/Users/tester/proj-a"
 const CURRENT_SESSION = "ses-current"
@@ -311,4 +313,52 @@ describe("REQ-126 AC2:覆盖层随导航关闭(真实宿主 × 真实点击)", (
       })
     }
   }
+})
+
+// `#1687`:未恢复问题入口挂在**生产**侧栏里(同一真实组合体)—— footer 里账户按钮正上方;
+// 侧栏收起时「显示侧边栏」按钮带小点与数量。入口自身的行为判据在
+// src/renderer/codepuppy-ui/problems-entry.test.ts;这里只钉生产挂载位置与收起态的小点。
+describe("#1687 未恢复问题入口在真实侧栏里", () => {
+  const KEY = "overlay-close:#1687"
+  afterEach(() => {
+    toastApi.resolveProblem(KEY)
+    sidebarState.setSidebarCollapsed(false)
+  })
+
+  /** 报一条后台问题,在生产提示视口里点 × 收起(生产里视口与侧栏同是 AppInterface 下的兄弟)。 */
+  async function foldOneProblem() {
+    const host = document.createElement("div")
+    document.body.append(host)
+    disposers.push(solidWeb.render(() => toastApi.ToastViewport(), host))
+    toastApi.reportProblem({ key: KEY, title: "「飞书」连接器未能连接" })
+    await flush()
+    query<HTMLButtonElement>(".a-toast .a-toast-x").click()
+    await flush()
+  }
+
+  test("入口在 footer 里、紧挨账户按钮之上;恢复后消失", async () => {
+    await mount(CURRENT_HREF)
+    expect(document.querySelector(".codepuppy-problems-entry")).toBeNull()
+    await foldOneProblem()
+    const entry = query<HTMLButtonElement>(".codepuppy-sidebar-footer > .codepuppy-problems-entry")
+    expect(entry.textContent).toContain(zh["codepuppy.problems.entry"].replace("{{count}}", "1"))
+    expect(entry.nextElementSibling?.classList.contains("codepuppy-sidebar-account")).toBe(true)
+    toastApi.resolveProblem(KEY)
+    await flush()
+    expect(document.querySelector(".codepuppy-problems-entry")).toBeNull()
+  })
+
+  test("侧栏收起时「显示侧边栏」按钮带小点,悬停文字带数量;全部恢复后小点消失", async () => {
+    await mount(CURRENT_HREF)
+    await foldOneProblem()
+    sidebarState.setSidebarCollapsed(true)
+    await flush()
+    const toggle = query<HTMLButtonElement>(".codepuppy-topbar .codepuppy-topbar-btn")
+    expect(toggle.hasAttribute("data-problems")).toBe(true)
+    expect(toggle.getAttribute("aria-label")).toBe(zh["codepuppy.sidebar.showWithProblems"].replace("{{count}}", "1"))
+    toastApi.resolveProblem(KEY)
+    await flush()
+    expect(toggle.hasAttribute("data-problems")).toBe(false)
+    expect(toggle.getAttribute("aria-label")).toBe(zh["codepuppy.sidebar.show"])
+  })
 })

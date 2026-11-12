@@ -6,7 +6,7 @@
 // 其余一行不改。
 
 import { render } from "solid-js/web"
-import { createPermissionSurfaceMount } from "../../../../app/src/context/permission-surface"
+import { createPermissionSurfaceMount } from "../../../../codepuppy-app/src/context/permission-surface"
 import { PermissionWatcher } from "./permission-watcher"
 
 export { render }

@@ -138,6 +138,9 @@ status.
 | `ARCH-alpha-code-2026-09-24-cloud-vision-client-seam` | [architecture/2026-09-24-cloud-vision-client-seam.md](architecture/2026-09-24-cloud-vision-client-seam.md) | 云端识图的客户端半场:凭据从哪来、图走哪条钩子、看不了图的模型怎么被喂(REQ-228 `#1419`) | active |
 | `ARCH-alpha-code-2026-09-24-exa-mcp-failure-signal-recon` | [architecture/2026-09-24-exa-mcp-failure-signal-recon.md](architecture/2026-09-24-exa-mcp-failure-signal-recon.md) | Exa MCP 的失败信号 —— 实读(2026-09-24) | active |
 | `ARCH-alpha-code-2026-09-27-exa-entry-shape-fail-open-recon` | [architecture/2026-09-27-exa-entry-shape-fail-open-recon.md](architecture/2026-09-27-exa-entry-shape-fail-open-recon.md) | Exa 条目形状 × fail-open —— 认得出才说一句,认不出一律放行(2026-09-27) | active |
+| `⚠️ 缺 id` | [architecture/2026-11-09-1662-l1-engine-host-spike.md](architecture/2026-11-09-1662-l1-engine-host-spike.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [architecture/2026-11-09-1662-permission-reply-measurements.md](architecture/2026-11-09-1662-permission-reply-measurements.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [architecture/2026-11-12-1662-takeover-candidates.md](architecture/2026-11-12-1662-takeover-candidates.md) | ⚠️ 缺 summary | ? |
 | `ARCH-alpha-code-claude-plugin-corpus-component-scale` | [architecture/claude-plugin-corpus-component-scale.md](architecture/claude-plugin-corpus-component-scale.md) | 真实 Claude 插件语料的组件规模(勘破) | active |
 | `ARCH-alpha-code-codepuppy-connection-lifetime` | [architecture/codepuppy-connection-lifetime.md](architecture/codepuppy-connection-lifetime.md) | Code Puppy Connection record lifetime | active |
 | `ARCH-alpha-code-constraints` | [architecture/constraints.md](architecture/constraints.md) | Architecture constraints and known deviations | active |
@@ -290,6 +293,12 @@ status.
 | `⚠️ 缺 id` | [design/2026-10-30-req236-permission-cards/notes.md](design/2026-10-30-req236-permission-cards/notes.md) | ⚠️ 缺 summary | draft |
 | `⚠️ 缺 id` | [design/2026-10-30-req236-ux-config-pages/audit.md](design/2026-10-30-req236-ux-config-pages/audit.md) | ⚠️ 缺 summary | draft |
 | `⚠️ 缺 id` | [design/2026-10-30-req236-ux-core-pages/audit.md](design/2026-10-30-req236-ux-core-pages/audit.md) | ⚠️ 缺 summary | draft |
+| `⚠️ 缺 id` | [design/2026-11-08-1662-opencode2-capability-inventory.md](design/2026-11-08-1662-opencode2-capability-inventory.md) | ⚠️ 缺 summary | proposed |
+| `⚠️ 缺 id` | [design/2026-11-08-1662-opencode2-generation-switch-baseline.md](design/2026-11-08-1662-opencode2-generation-switch-baseline.md) | ⚠️ 缺 summary | proposed |
+| `⚠️ 缺 id` | [design/2026-11-08-1662-opencode2-rulings.md](design/2026-11-08-1662-opencode2-rulings.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [design/2026-11-09-1662-lane-seams.md](design/2026-11-09-1662-lane-seams.md) | ⚠️ 缺 summary | proposed |
+| `⚠️ 缺 id` | [design/2026-11-09-1668-l6-engine-dependency-inventory.md](design/2026-11-09-1668-l6-engine-dependency-inventory.md) | ⚠️ 缺 summary | proposed |
+| `⚠️ 缺 id` | [design/2026-11-09-1668-l6-ui-stays-alpha.md](design/2026-11-09-1668-l6-ui-stays-alpha.md) | ⚠️ 缺 summary | proposed |
 | `⚠️ 缺 id` | [design/PAGE-MAP.md](design/PAGE-MAP.md) | ⚠️ 缺 summary | active |
 | `⚠️ 缺 id` | [design/codepuppy-runtime-authority.md](design/codepuppy-runtime-authority.md) | ⚠️ 缺 summary | draft |
 | `⚠️ 缺 id` | [design/consume-alpha-contracts-v1.plan.md](design/consume-alpha-contracts-v1.plan.md) | ⚠️ 缺 summary | ? |
@@ -301,6 +310,7 @@ status.
 | `⚠️ 缺 id` | [design/current/model-picker/components.md](design/current/model-picker/components.md) | ⚠️ 缺 summary | active |
 | `⚠️ 缺 id` | [design/current/session-workspace/components.md](design/current/session-workspace/components.md) | ⚠️ 缺 summary | active |
 | `⚠️ 缺 id` | [design/current/settings/components.md](design/current/settings/components.md) | ⚠️ 缺 summary | active |
+| `⚠️ 缺 id` | [design/current/shell-sidebar/components.md](design/current/shell-sidebar/components.md) | ⚠️ 缺 summary | active |
 | `⚠️ 缺 id` | [design/debates/2026-07-05-c28-honest-controls-brief.md](design/debates/2026-07-05-c28-honest-controls-brief.md) | ⚠️ 缺 summary | ? |
 | `⚠️ 缺 id` | [design/debates/2026-07-05-req008-positioning-briefs.md](design/debates/2026-07-05-req008-positioning-briefs.md) | ⚠️ 缺 summary | ? |
 | `⚠️ 缺 id` | [design/extension-hub.md](design/extension-hub.md) | ⚠️ 缺 summary | ? |
@@ -343,11 +353,15 @@ status.
 | `RUNBOOK-alpha-code-naming-migration` | [runbooks/naming-migration.md](runbooks/naming-migration.md) | 升级到新名字:首次启动的数据迁移与回退 | active |
 | `RUNBOOK-alpha-code-settings-storage-recovery` | [runbooks/settings-storage-recovery.md](runbooks/settings-storage-recovery.md) | Settings storage recovery | active |
 | `RUNBOOK-alpha-code-uninstall` | [runbooks/uninstall.md](runbooks/uninstall.md) | 卸载 Code Puppy 与数据残留清单(C16) | active |
+| `⚠️ 缺 id` | [runbooks/upstream-update.md](runbooks/upstream-update.md) | ⚠️ 缺 summary | active |
 
 ### specs
 
 | id | 文件 | 做什么 | 状态 |
 | --- | --- | --- | --- |
+| `DESIGN-1662-opencode2` | [specs/1662-opencode2/design.md](specs/1662-opencode2/design.md) | alpha-code#1662 各实施线需要冻结的技术决定,按决定分段;目前含「MCP OAuth on OpenCode 2」—— 远端 MCP 登录改走引擎 2.x 的集成 OAuth,围栏不开口,回调页沿用 ADR-042 接管 | draft |
+| `PLAN-1662-opencode2-project-config` | [specs/1662-opencode2/plan-project-config.md](specs/1662-opencode2/plan-project-config.md) | alpha-code#1662 跟进(lane/1662-project-config)——项目 `.codepuppy/codepuppy.jsonc` 的四个缺陷:同意后项目 agent 的权限规则不生效、JSONC 读法改坏字符串、项目 MCP 字段丢失或形状不对、项目 agent 的旧 provider id 不改名 | active |
+| `PLAN-1662-opencode2` | [specs/1662-opencode2/plan.md](specs/1662-opencode2/plan.md) | alpha-code#1662 各实施线的分段计划;目前含 L4(#1666)Unit B(具名失败原因到桌面)与 Unit C(MCP 与内置重名、子任务与附件、命令模型优先级、工具网络失败标记);以及整合 Unit 1(真策略进 ext、登记册握满、引擎开启回合的审阅 diff、接缝文档补记) | active |
 | `SPEC-account-balance-presentation` | [specs/account-balance-presentation/spec.md](specs/account-balance-presentation/spec.md) | 账户面板按订阅与余额显示真实状态，按历史条文与实际证明登记范围。 | approved |
 | `SPEC-agent-approved-extension-install` | [specs/agent-approved-extension-install/spec.md](specs/agent-approved-extension-install/spec.md) | 目录查询、授权确认、安装状态和当前会话中后续使用。 | approved |
 | `SPEC-atomic-extension-lifecycle` | [specs/atomic-extension-lifecycle/spec.md](specs/atomic-extension-lifecycle/spec.md) | 扩展安装失败可恢复且不会留下半装状态，保留历史条款、有效裁决和交付证据边界。 | approved |
@@ -365,6 +379,8 @@ status.
 | `SPEC-desktop-navigation` | [specs/desktop-navigation/spec.md](specs/desktop-navigation/spec.md) | 新对话、项目切换和搜索入口真正可用，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-document-authoring-guidance` | [specs/document-authoring-guidance/spec.md](specs/document-authoring-guidance/spec.md) | 文档任务使用完整的产出质量指导，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-draft-to-session` | [specs/draft-to-session/spec.md](specs/draft-to-session/spec.md) | 未发送草稿可在正式路由里转成对话，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `PLAN-error-message-lifetime` | [specs/error-message-lifetime/plan.md](specs/error-message-lifetime/plan.md) | alpha-code#1687 两段:弹出提示的去留与同因合并;未恢复问题入口与启动静默 | active |
+| `SPEC-error-message-lifetime` | [specs/error-message-lifetime/spec.md](specs/error-message-lifetime/spec.md) | 桌面端用户看到的报错,恢复了就自己消失,没恢复的收进一个安静的入口,启动时不再冒出一堆 | approved |
 | `SPEC-extension-environments` | [specs/extension-environments/spec.md](specs/extension-environments/spec.md) | 开发、测试与正式扩展状态相互隔离，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-extension-install-intents` | [specs/extension-install-intents/spec.md](specs/extension-install-intents/spec.md) | 扩展安装由主程序校验并按项目隔离，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-extension-ownership-and-grants` | [specs/extension-ownership-and-grants/spec.md](specs/extension-ownership-and-grants/spec.md) | 扩展来源与授权范围可准确判断和管控，保留历史条款、有效裁决和交付证据边界。 | approved |
@@ -398,6 +414,13 @@ status.
 | `SPEC-tool-policy-settings` | [specs/tool-policy-settings/spec.md](specs/tool-policy-settings/spec.md) | 用户在设置里管理并保存工具权限，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-tool-write-fence` | [specs/tool-write-fence/spec.md](specs/tool-write-fence/spec.md) | 工具派生进程越界写文件时会失败，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-untrusted-upstream-candidates` | [specs/untrusted-upstream-candidates/spec.md](specs/untrusted-upstream-candidates/spec.md) | 上游候选代码无法取得仓库推送凭据，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `DESIGN-upgrade-bootstrap-config` | [specs/upgrade-bootstrap-config/design.md](specs/upgrade-bootstrap-config/design.md) | 主进程今天经二十多个 CODEPUPPY_* 环境变量、启动命令、sidecar 进程内环境把决定交给 sidecar、引擎与 ext;收成一份有类型、有版本、每代 sidecar 一份、只在内存里的启动文档,环境变量只留给非 Code Puppy 的读者;最后一片给引擎换上 Code Puppy 自有的全局配置目录,首次切换时把独立 OpenCode 的全局内容复制一份过来 | approved |
+| `DESIGN-upgrade-extension-manifest` | [specs/upgrade-extension-manifest/design.md](specs/upgrade-extension-manifest/design.md) | Code Puppy 带进引擎的工具、MCP、插件、agent、技能、命令,今天经十条路径、五个读法、两套 v1→2.x 翻译进入引擎;收成一份 Code Puppy 自有的登记集合(内存里一个类型)、一份文档字段表与一个读取器、一张准入表和每类一个登记器;磁盘上的文件不改形状,用户文档照 I-07 G4 由引擎直接读,项目文档改用引擎自己的归一化读 | approved |
+| `DESIGN-upgrade-fewer-takeovers` | [specs/upgrade-fewer-takeovers/design.md](specs/upgrade-fewer-takeovers/design.md) | 逐项裁定 12 个上游接管文件与文本级权宜做法的去留;「本次会话内允许」做进已接管的权限内核(连带只限本会话、不放行 Code Puppy 策略请求),读目录卡改由扩展从结构化结果生成;失败码保留文字前缀并统一读法;接管块形状与记录在案的上游基准、构建期改写登记与上游挂点需求清单 | approved |
+| `DESIGN-upgrade-ui-contract` | [specs/upgrade-ui-contract/design.md](specs/upgrade-ui-contract/design.md) | 界面与引擎之间的请求、事件、错误和形状定成 Code Puppy 自有的一份约定;引擎适配器拆成代际无关的约定与管道加每代一个翻译器;翻译器不再引冻结界面内部函数,Code Puppy 自有代码只经约定模块接触冻结的两个客户端包;冻结界面零字节改动 | approved |
+| `PLAN-upstream-upgrade-readiness-i08` | [specs/upstream-upgrade-readiness/plan-i08.md](specs/upstream-upgrade-readiness/plan-i08.md) | INT-upstream-upgrade-readiness I-08 的隔离一半——ext、ui-mac 与 core / schema / plugin / ai 里的 Code Puppy 测试,在任何模块求值之前就把 HOME、XDG_*、OPENCODE_DB、TMPDIR 指进新建的临时根;每个包一条守卫测试 | active |
+| `PLAN-upstream-upgrade-readiness-i09` | [specs/upstream-upgrade-readiness/plan-i09.md](specs/upstream-upgrade-readiness/plan-i09.md) | INT-upstream-upgrade-readiness I-09 的两段计划:旧名例外登记表改按内容定位(不再按行号);闸门文件登记簿的写回模式能处理已删文件,并把本分支的两道登记闸带回全绿 | active |
+| `PLAN-upstream-upgrade-readiness` | [specs/upstream-upgrade-readiness/plan.md](specs/upstream-upgrade-readiness/plan.md) | INT-upstream-upgrade-readiness 先做批(I-02、I-03、I-08、I-09)的分段计划;目前含 I-03 上游行为探针 | active |
 | `SPEC-visible-update-state` | [specs/visible-update-state/spec.md](specs/visible-update-state/spec.md) | 检查更新的状态与重启安装入口可见，按历史条文与实际证明登记范围。 | approved |
 | `SPEC-windows-renderer-origins` | [specs/windows-renderer-origins/spec.md](specs/windows-renderer-origins/spec.md) | Windows 界面只能读取受准许的服务来源，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-word-layout-and-typography` | [specs/word-layout-and-typography/spec.md](specs/word-layout-and-typography/spec.md) | 生成的 Word 有正确中文字体、标题与纸张设置，保留历史条款、有效裁决和交付证据边界。 | approved |
@@ -440,5 +463,6 @@ status.
 | `⚠️ 缺 id` | [verification/2026-10-15-req233-cloud-routing-eval/results-2026-10-15T10-26-00Z-real-aborted.md](verification/2026-10-15-req233-cloud-routing-eval/results-2026-10-15T10-26-00Z-real-aborted.md) | ⚠️ 缺 summary | ? |
 | `⚠️ 缺 id` | [verification/2026-10-15-req233-cloud-routing-eval/results-2026-10-15T10-41-11Z-real-full.md](verification/2026-10-15-req233-cloud-routing-eval/results-2026-10-15T10-41-11Z-real-full.md) | ⚠️ 缺 summary | ? |
 | `⚠️ 缺 id` | [verification/2026-10-15-req233-cloud-routing-eval/results-2026-10-15T11-43-27Z-real-round2.md](verification/2026-10-15-req233-cloud-routing-eval/results-2026-10-15T11-43-27Z-real-round2.md) | ⚠️ 缺 summary | ? |
+| `⚠️ 缺 id` | [verification/2026-11-09-1664-l2/upstream-workflows.md](verification/2026-11-09-1664-l2/upstream-workflows.md) | ⚠️ 缺 summary | active |
 
 <!-- docs-index:end -->

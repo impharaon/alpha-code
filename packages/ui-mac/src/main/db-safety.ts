@@ -55,13 +55,18 @@ export type WatermarkRead =
   | { ok: true; ids: string[]; legacy: boolean }
   | { ok: false; kind: "missing" | "corrupt" | "error"; detail: string }
 
+// `#1664`(#1662 裁决书 R18):读水位与做备份都不用 `-readonly`。引擎把库设成 WAL,干净关闭后 `-wal`/`-shm` 被删掉,
+// 而只读连接打不开没有这两个文件的 WAL 库(`unable to open database file`,exit 14)—— 预检因此静默 skip、备份也失败
+// (owner 真库的副本上复现,L1 勘破 §9.2)。改用普通连接:读水位时加 `PRAGMA query_only=1`,这条连接写不了任何数据;
+// VACUUM INTO 只读源库、写到新文件。不用 `immutable=1`:它无视活写入者,会丢掉 WAL 里的行(L1a 实测)。
+// macOS 的 /usr/bin/sqlite3 关库后保留 `-wal`/`-shm`(持久 WAL),对 SQLite 无害,引擎关库时会删掉。
 export async function readDbMigrationIds(
   dbPath: string,
   exec: Exec,
   exists: (p: string) => boolean,
 ): Promise<WatermarkRead> {
   if (!exists(dbPath)) return { ok: false, kind: "missing", detail: "db file not found" }
-  const res = await exec(["-readonly", dbPath, "SELECT id FROM migration ORDER BY id;"])
+  const res = await exec([dbPath, "PRAGMA query_only=1; SELECT id FROM migration ORDER BY id;"])
   if (res.code === 0) {
     const ids = res.stdout
       .split("\n")
@@ -78,12 +83,18 @@ export async function readDbMigrationIds(
 }
 
 // ── 判定(F2/F3)──────────────────────────────────────────────────────────────
-export function diffWatermarks(appIds: string[], dbIds: string[]) {
+/** 构建期清单:`ids` = 本应用的引擎会执行的迁移;`retired` = 退役的 Code Puppy 迁移(只用来排除出「未知」)。 */
+export type ExpectedMigrations = { ids: string[]; retired: string[] }
+
+// `#1664`(#1662 裁决书 N2):退役 id 不计入 pending —— 计入的话,2.x 新建的库(没有这两条)每次启动都被判成
+// 「将前进」、整库备份,备份失败即拒启;也不能算 unknown —— 那样老用户的库每次启动都被判成「库比应用新」。
+export function diffWatermarks(appIds: string[], dbIds: string[], retired: string[]) {
   const app = new Set(appIds)
   const db = new Set(dbIds)
+  const gone = new Set(retired)
   return {
     pending: appIds.filter((id) => !db.has(id)), // 引擎本次启动将前进 → pre-migration 备份时点
-    unknown: dbIds.filter((id) => !app.has(id)), // DB 超前于 app → 阻断对话框
+    unknown: dbIds.filter((id) => !app.has(id) && !gone.has(id)), // DB 超前于 app → 阻断对话框
   }
 }
 
@@ -94,14 +105,14 @@ export type PreflightPlan =
   | { kind: "db-ahead"; unknown: string[]; latest: string }
   | { kind: "corrupt"; detail: string }
 
-export function decidePlan(read: WatermarkRead, appIds: string[] | null): PreflightPlan {
+export function decidePlan(read: WatermarkRead, expected: ExpectedMigrations | null): PreflightPlan {
   if (!read.ok) {
     if (read.kind === "missing") return { kind: "skip", reason: "fresh install(无 DB 文件)" }
     if (read.kind === "corrupt") return { kind: "corrupt", detail: read.detail }
     return { kind: "skip", reason: `水位读取失败,fail-open:${read.detail}` }
   }
-  if (!appIds || appIds.length === 0) return { kind: "skip", reason: "app 支持面清单缺失,fail-open" }
-  const { pending, unknown } = diffWatermarks(appIds, read.ids)
+  if (!expected || expected.ids.length === 0) return { kind: "skip", reason: "app 支持面清单缺失,fail-open" }
+  const { pending, unknown } = diffWatermarks(expected.ids, read.ids, expected.retired)
   if (unknown.length > 0) return { kind: "db-ahead", unknown, latest: unknown[unknown.length - 1]! }
   if (pending.length > 0) return { kind: "migrate-ahead", pending }
   return { kind: "proceed" }
@@ -112,20 +123,22 @@ export function loadExpectedIds(opts: {
   resourcesPath: string
   exists: (p: string) => boolean
   readText: (p: string) => string
-}): string[] | null {
+}): ExpectedMigrations | null {
   try {
     const p = join(opts.resourcesPath, "db-expected-migrations.json")
     if (!opts.exists(p)) return null
-    const parsed = JSON.parse(opts.readText(p)) as { v?: number; ids?: unknown[] }
+    const parsed = JSON.parse(opts.readText(p)) as { v?: number; ids?: unknown[]; retired?: unknown[] }
     if (parsed?.v !== 1 || !Array.isArray(parsed.ids)) return null
     const ids = parsed.ids.filter((x): x is string => typeof x === "string")
-    return ids.length > 0 ? ids : null
+    if (ids.length === 0) return null
+    const retired = Array.isArray(parsed.retired) ? parsed.retired.filter((x): x is string => typeof x === "string") : []
+    return { ids, retired }
   } catch {
     return null
   }
 }
 
-// ── 备份(F7:唯一可靠形态 = readonly 会话 VACUUM INTO + 必验,验不过即删)────
+// ── 备份(F7:VACUUM INTO + 必验,验不过即删;源库用普通连接打开,见上面 `#1664` 一段)────
 export function timestamp(d: Date): string {
   const p = (n: number) => String(n).padStart(2, "0")
   return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
@@ -194,7 +207,7 @@ function* vacuumAndVerify(opts: {
   fs: FsDeps
 }): ExecSteps<{ ok: true } | { ok: false; error: string }> {
   if (opts.fs.exists(opts.tmpPath)) opts.fs.remove(opts.tmpPath)
-  const vac = yield ["-readonly", opts.dbPath, `VACUUM INTO ${sqlQuote(opts.tmpPath)}`]
+  const vac = yield [opts.dbPath, `VACUUM INTO ${sqlQuote(opts.tmpPath)}`]
   if (vac.code !== 0 || !opts.fs.exists(opts.tmpPath)) {
     if (opts.fs.exists(opts.tmpPath)) opts.fs.remove(opts.tmpPath)
     return { ok: false, error: `VACUUM INTO 失败:exit=${vac.code} ${(vac.stderr || vac.stdout).trim()}` }

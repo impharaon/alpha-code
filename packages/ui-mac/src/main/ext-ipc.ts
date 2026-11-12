@@ -1,4 +1,5 @@
 import { isCodePuppyOfficeCatalogId } from "../shared/office-advisories"
+import { isCloudMcpWithheld } from "./codepuppy-config-injection"
 import { isOfficialConnector } from "./official-connector-recipes"
 import { removeOfficialConnector, releaseOfficialConnectorResources } from "./official-connector-resources"
 // Extension Hub IPC handlers (main process). Mirrors ipc.ts's ipcMain.handle pattern. Three thin
@@ -16,7 +17,8 @@ import { toolProbe } from "./platform"
 import { extensionsGranted, hasExtensionsDecision, listProjectExecutables, withExtensionsConsent } from "./codepuppy-ext-trust"
 import { readProjectPrefs, writeProjectPrefs } from "./codepuppy-workdir"
 import { projectIpcHandler, resolveProjectIpcEntry, withProjectIpcEntryIdentity } from "./ext-project-entry"
-import type { InstalledPackagesResultV1, InstallTarget, ProjectMcpState, ServerReadyData } from "../preload/types"
+import type { InstalledPackagesResultV1, InstallTarget, ProjectMcpState } from "../preload/types"
+import type { EngineConnection } from "./engine-authorization"
 import { isExtensionName } from "../shared/extension-name"
 import { codepuppyGlobalRoot, findReceipt, listInstalls } from "./codepuppy-installs"
 import { claimMcpSecretVersionDir, mcpSecretVersionedRef, removeMcpSecretVersionDir, removeMcpServerSecrets, removeMcpServerSecretsStrict, writeMcpSecretVersioned } from "./codepuppy-mcp-secrets"
@@ -109,7 +111,7 @@ const hiddenDirConflictsShown = new Set<string>()
 export function registerExtIpcHandlers(
   userDataPath: string,
   registryChannel: "stable" | "preview" | "dev",
-  awaitServer: () => Promise<ServerReadyData>,
+  awaitServer: () => Promise<EngineConnection>,
   homeDir: string = homedir(),
   officialRuntime?: { stop(): Promise<void>; refresh(): Promise<boolean> },
 ) {
@@ -182,6 +184,8 @@ export function registerExtIpcHandlers(
   }
   // B11/B23:全局配置健康探测(语法错/未知顶键 → 引擎会整份清零)
   ipcMain.handle("ext-config-health", () => configHealth())
+  // `#1687`:云服务是否被 kill-switch 扣下 —— 只读最近一次注入写配置时的判决,不另算。
+  ipcMain.handle("ext-cloud-withheld", () => isCloudMcpWithheld())
   ipcMain.handle("ext-check-runtime", (_event: IpcMainInvokeEvent, tool: string) => checkRuntime(tool))
   // #1564 AC3:四个第一方 Office 条目的准备检查读这条随包运行时事实,不读卡片 runtimeDep(uv)。
   ipcMain.handle("ext-office-runtime", () => officeRuntimeReadiness())

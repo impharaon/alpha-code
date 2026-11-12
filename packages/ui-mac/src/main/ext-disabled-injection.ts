@@ -14,9 +14,10 @@ import { codepuppyGlobalRoot } from "./codepuppy-installs"
 import { readSessionGrantIdsSync, type SessionGrantOracle } from "./ext-curation-policy"
 import { readLedgerV2 } from "./ext-receipt-v2"
 import type { ChannelName } from "./catalog-channels"
+import { NEUTRALIZED_MCP_SERVER } from "./mcp-default-deny"
 
 export function injectDisabledOverrides(
-  config: { mcp?: Record<string, unknown>; agent?: Record<string, unknown>; mode?: Record<string, unknown> },
+  config: { mcp?: { servers?: Record<string, unknown> }; agents?: Record<string, unknown> },
   opts: {
     userDataPath: string
     channel: ChannelName
@@ -35,10 +36,13 @@ export function injectDisabledOverrides(
         `[req104-397] session-grant determination unavailable in injection (${oracle.reason}) — forcing only the bundled-recognizable subset (boot reconcile holds the fail-closed gate)`,
       )
     const sessionGrantIds = oracle.ok ? oracle.ids : oracle.partialIds
-    const setLeaf = (bucket: "mcp" | "agent" | "mode", name: string, field: string, value: unknown) => {
-      const map = config[bucket]
+    // `#1667`:OpenCode 2 形状。MCP 按名字整条替换(只写 `enabled:false` 叶子会被丢弃),所以写完整的中和条目
+    // (NEUTRALIZED_MCP_SERVER);agent 的字段全可选,`{ disabled: true }` 本身就是合法条目。2.x 没有 v1 的 `mode` 键,
+    // 也就没有「mode 折叠回 agent 压掉 disable」那条路(Codex r12 B1 的那一面随之不再需要)。
+    const disableAgent = (name: string) => {
+      const map = config.agents
       const cur = map && typeof map[name] === "object" && map[name] ? (map[name] as Record<string, unknown>) : {}
-      config[bucket] = { ...(map ?? {}), [name]: { ...cur, [field]: value } }
+      config.agents = { ...(map ?? {}), [name]: { ...cur, disabled: true } }
     }
     for (const r of records) {
       if (r.scope.kind !== "global") continue
@@ -48,14 +52,8 @@ export function injectDisabledOverrides(
         console.error(
           `[req104-397] ${r.kind} "${r.name}" is session-grant per curation but the ledger says enabled — forcing disabled in injection (persistent enable is illegal; per-session activation = #408)`,
         )
-      if (r.kind === "mcp") setLeaf("mcp", r.name, "enabled", false)
-      else if (r.kind === "agent") {
-        setLeaf("agent", r.name, "disable", true)
-        // Codex r12 B1:引擎在合并末尾把 deprecated `mode[name]` 折叠回 `agent[name]`(config.ts:536-542,
-        // 在 step 6 之后)—— 若项目 `mode[name].disable=false` 会覆盖注入的 agent.disable。故 mode 面也
-        // 注入 disable:true(step 6 是最后的 mode 源,折叠时压过);两面齐才真权威。
-        setLeaf("mode", r.name, "disable", true)
-      }
+      if (r.kind === "mcp") config.mcp = { ...config.mcp, servers: { ...config.mcp?.servers, [r.name]: { ...NEUTRALIZED_MCP_SERVER } } }
+      else if (r.kind === "agent") disableAgent(r.name)
     }
   } catch (error) {
     console.warn("[req395] disabled-override injection skipped (ledger unreadable)", error)

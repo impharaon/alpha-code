@@ -8,7 +8,10 @@
 // 唯一的替身是反向闸门里拦截 `console.warn` 这个**日志 sink** —— 它证明生产代码调用了 warn,
 // 不证明真实 stderr 输出。不写「零替身」:那句话与下方的拦截冲突,而交付物不得声称未达成的状态
 // (rev2c ③″3-6/12)。
-//   · 正向闸门:content 必须携带 model / enabled_providers / provider / 三个 alpha agent / {file:} ref。
+//   · 正向闸门:content 必须携带 model / policies(provider.use)/ providers / 四个 alpha agent / {file:} ref。
+//   · `#1667`(#1662 L5,清点表 C2 / C4 / C9,接口文档 I9):注入直接写 OpenCode 2 的配置键,不经环境变量交给引擎
+//     (结果里带着 `config.content` / `config.file` / `models.file`,sidecar 放进 `start()` 的选项);判据用上游自己的
+//     normalize 与 `Config.Info` / `Permission.Ruleset` 解码,零诊断、零改写;v2 读侧的那座 `OPENCODE_CONFIG_DIR` 桥已删除。
 //   · 反向闸门(rev2c ③″3-7):用真实故障(userDataPath 的父级是普通文件 → 生产代码 mkdirSync 抛
 //     ENOTDIR)触发那层 catch,并要求 ①失败必须出声 ②正向闸门的断言体在这条路径上**真的转红**。
 //
@@ -23,20 +26,18 @@
 // 变异实证绕过);留在本文件的源码锚只锁 bun 无法运行时验证的接线事实(唯一通路 + 捕获值整体入参)。
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { Config } from "../../../core/src/config"
-import { ModelV2 } from "../../../core/src/model"
-import { Provider as ModelsDevProvider } from "../../../core/src/models-dev"
-import { ProviderV2 } from "../../../core/src/provider"
-import { ConfigV1 } from "../../../core/src/v1/config/config"
-import { ConfigMigrateV1 } from "../../../core/src/v1/config/migrate"
 import { Schema } from "effect"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
+import { Config as ConfigSchema } from "@opencode/schema/config"
+import { Permission } from "@opencode/schema/permission"
+import { ConfigNormalize } from "@opencode/core/config/normalize"
 import { CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID } from "../shared/codepuppy-config"
-import { injectCodePuppyConfig } from "./codepuppy-config-injection"
-import { secretFilePath } from "./codepuppy-secret-files"
+import { ECOSYSTEM_COMPATIBILITY_PLUGIN, ENGINE_EXPERIMENTAL_FLAGS, injectCodePuppyConfig, isCloudMcpWithheld } from "./codepuppy-config-injection"
+import { customProviderSecretName, secretFilePath } from "./codepuppy-secret-files"
 import { writeMcpServerTruth } from "./mcp-server-truth-write"
+import { NEUTRALIZED_MCP_SERVER } from "./mcp-default-deny"
 import {
   CLOUD_MCP_ARM_ENV,
   CLOUD_MCP_DEF_ENV,
@@ -46,11 +47,13 @@ import {
   WITHHELD_CLOUD_MCP,
 } from "./cloud-web-search"
 import { PLATFORM_API_KEY_PLACEHOLDER } from "./codepuppy-models"
-import { McpCatalog } from "../../../opencode/src/mcp/catalog"
-import { canonicalToolIdentity } from "../../../schema/src/tool-identity"
-import { CLOUD_DISPATCH_TOOL } from "./hub-view"
-// #650:云工具 id 从远端工具名**推导**(引擎按 `McpCatalog.toolName(server, remote)` 拼)。
-// 这里以前手写 `cloud_web_search` / `cloud_dispatch` 字面量,与生产代码同错,于是恒绿。
+import {
+  CODEPUPPY_INIT_DESCRIPTION,
+  CODEPUPPY_INIT_TEMPLATE,
+  CODEPUPPY_REVIEW_DESCRIPTION,
+  CODEPUPPY_REVIEW_TEMPLATE,
+} from "../../../ext/src/codepuppy-prompts"
+import { PROVIDER_ALLOW_ENV } from "../../../ext/src/provider-allow"
 const CLOUD_DISPATCH_TOOL_ID = cloudMcpToolId("cloud_dispatch")
 
 // 注入读到的每一个 env 输入 + 它自己写出的 env 输出:逐个快照/清空/还原,
@@ -60,6 +63,7 @@ const MANAGED = [
   "CODEPUPPY_LEGACY_INSTALL_ROOT",
   "CODEPUPPY_GLOBAL_DIR",
   "CODEPUPPY_OPENCODE_HOME",
+  "CODEPUPPY_ECOSYSTEM_INHERIT",
   "XDG_CONFIG_HOME",
   "OPENCODE_CONFIG",
   "OPENCODE_CONFIG_CONTENT",
@@ -71,23 +75,22 @@ const MANAGED = [
   "CODEPUPPY_AUTOMATION_DISABLE",
   "CODEPUPPY_READONLY_DISABLE",
   "CODEPUPPY_WEBSEARCH_DISABLE",
-  "OPENCODE_ENABLE_EXA",
-  "OPENCODE_EXPERIMENTAL",
   "CODEPUPPY_CLOUD_MCP_URL",
-  // `#1106`:注入面读引擎凭证库 `<engineData>/mcp-auth.json` 判云连接是否注定 needs_auth,
-  // 而 engineDataDir 先看 XDG_DATA_HOME —— 不钉住它,断言就在读宿主机的真实凭证库。
   "XDG_DATA_HOME",
-  // #223 R4/R5:注入面自己置位/删除的 ext 装载握手通道 + 云 server 身份(输出之三)。
   "CODEPUPPY_CLOUD_MCP_ARM",
   "CODEPUPPY_CLOUD_MCP_DEF",
+  PROVIDER_ALLOW_ENV,
   "CODEPUPPY_CLOUD_MCP_SERVER",
   "CODEPUPPY_BASE_URL",
   "CODEPUPPY_DEFAULT_MODEL",
+  "CODEPUPPY_FACTORY_SKILL_DIRS",
+  "CODEPUPPY_PROMPT_REBRAND_DISABLE",
 ] as const
 
 const PLATFORM_KEY = "sk-platform-injection-gate"
 const BYOK_KEY = "sk-deepseek-injection-gate"
 const DEFAULT_MODEL = "deepseek/deepseek-chat"
+const EXT_DIR = "/Applications/Code Puppy.app/Contents/Resources/codepuppy-ext"
 
 const saved: Record<string, string | undefined> = {}
 let tmp = ""
@@ -106,14 +109,11 @@ beforeEach(() => {
     delete process.env[k]
   }
   tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-inject-")))
-  // 当前环境根(codepuppy.jsonc 真源 = OPENCODE_CONFIG 的注入目标)。
   process.env.CODEPUPPY_GLOBAL_DIR = path.join(tmp, "codepuppy-state", "env", "dev")
   fs.mkdirSync(process.env.CODEPUPPY_GLOBAL_DIR, { recursive: true })
-  // 用户全局引擎配置面(injectMcpDefaultDeny 的枚举源)—— 指向空目录,
-  // 宿主机 ~/.config/opencode 与 ~/.opencode 不得渗进断言。
+  // 用户全局引擎配置面(injectMcpDefaultDeny 的枚举源)—— 指向空目录,宿主机 ~/.config/opencode 不得渗进断言。
   process.env.XDG_CONFIG_HOME = path.join(tmp, "xdg")
   process.env.CODEPUPPY_OPENCODE_HOME = path.join(tmp, "opencode-home")
-  // `#1106`:引擎数据目录(mcp-auth.json 的家)同样钉进 tmp —— 默认无凭证库文件。
   process.env.XDG_DATA_HOME = path.join(tmp, "xdg-data")
   for (const d of [process.env.XDG_CONFIG_HOME, process.env.CODEPUPPY_OPENCODE_HOME, process.env.XDG_DATA_HOME])
     fs.mkdirSync(d, { recursive: true })
@@ -133,7 +133,6 @@ afterEach(() => {
   }
 })
 
-/** main 在 fork 时给 sidecar 的那组输入,种成真实的盘上/env 状态(见 sidecar-env.ts 的转发清单)。 */
 const givenLoggedInWithByok = () => {
   plantSecret("CODEPUPPY_API_KEY", PLATFORM_KEY)
   plantSecret("DEEPSEEK_API_KEY", BYOK_KEY)
@@ -141,137 +140,230 @@ const givenLoggedInWithByok = () => {
   process.env.CODEPUPPY_DEFAULT_MODEL = DEFAULT_MODEL
 }
 
+type Rule = { action: string; resource: string; effect: string }
+type Injected = {
+  plugins?: string[]
+  experimental?: Record<string, boolean>
+  model?: unknown
+  policies?: Rule[]
+  providers?: Record<string, { settings?: { apiKey?: unknown; baseURL?: unknown }; package?: string; models?: Record<string, any> }>
+  agents?: Record<string, { permissions?: Rule[]; system?: string; disabled?: boolean }>
+  permissions?: Rule[]
+  mcp?: { servers?: Record<string, unknown> }
+  skills?: string[]
+  commands?: Record<string, { template: string; description?: string; subagent?: boolean; subtask?: boolean }>
+  command?: unknown
+}
+
+function inject(extPluginPath?: string) {
+  const result = injectCodePuppyConfig(userData, extPluginPath, "stable")
+  // `#1667`(编排器裁决 r1 第 2 条、C7 重裁):`config.file` 是 main 合成的显式文件;出厂命令、skills 与第一层 policies 在那里。
+  const explicit = result.config.file && fs.existsSync(result.config.file) ? (JSON.parse(fs.readFileSync(result.config.file, "utf8")) as Injected & { $schema?: string; command?: unknown }) : undefined
+  return { result, config: JSON.parse(result.config.content) as Injected, explicit }
+}
+
+const allows = (rules: Rule[] | undefined, action: string, resource = "*") =>
+  rules?.filter((rule) => rule.action === action && rule.resource === resource).at(-1)?.effect
+
 /**
- * 正向闸门的断言体。**反向用例会把同一个函数对着「注入抛错之后」的 env 再跑一遍并要求它抛** ——
+ * 正向闸门的断言体。**反向用例会把同一个函数对着「注入抛错之后」的产物再跑一遍并要求它抛** ——
  * 所以这里每一条 expect 既是正向锁也是反向锁,不得改成宽松断言(改宽 = 两个闸门同时失效)。
  */
-function assertInjectedFacts(content: string | undefined, userDataPath: string): void {
-  expect(content).toBeDefined()
-  const config: {
-    model?: unknown
-    enabled_providers?: unknown
-    provider?: Record<string, { options?: { apiKey?: unknown } }>
-    agent?: Record<string, unknown>
-  } = JSON.parse(content!)
-  // model:picker 的默认模型(main 经 sidecar-env 转发 CODEPUPPY_DEFAULT_MODEL)。
+function assertInjectedFacts(content: string, userDataPath: string): void {
+  const config = JSON.parse(content) as Injected
   expect(config.model).toBe(DEFAULT_MODEL)
-  // enabled_providers:引擎对该键是 REPLACE 而非 union —— 表空/缺项 = 模型全灰。
-  expect(config.enabled_providers).toEqual(expect.arrayContaining(["codepuppy", "deepseek-byok"]))
-  // provider:白名单里的每个 id 必须真有节点定义,否则白名单是空头支票。
-  expect(Object.keys(config.provider ?? {})).toEqual(expect.arrayContaining(["codepuppy", "deepseek-byok"]))
-  // 四个 alpha agent(automation 只读 / composer 只读 / automation 可写 / composer 请求审批 #1413)。
-  expect(Object.keys(config.agent ?? {})).toEqual(
+  // provider.use:先拒全部、再逐个放行 —— 2.x 的 provider 白名单(v1 的 enabled_providers)。
+  expect(config.policies?.[0]).toEqual({ action: "provider.use", resource: "*", effect: "deny" })
+  for (const id of ["codepuppy", "deepseek-byok", CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID])
+    expect(config.policies).toContainEqual({ action: "provider.use", resource: id, effect: "allow" })
+  // 白名单里的每个 id 必须真有节点定义,否则白名单是空头支票。
+  expect(Object.keys(config.providers ?? {})).toEqual(expect.arrayContaining(["codepuppy", "deepseek-byok"]))
+  expect(Object.keys(config.agents ?? {})).toEqual(
     expect.arrayContaining(["codepuppy-automation", "codepuppy-readonly", "codepuppy-automation-standard", "codepuppy-ask"]),
   )
-  expect(config.agent?.["codepuppy-ask"]).toMatchObject({ permission: { "tool-policy-default": "ask" } })
-  for (const agent of ["codepuppy-automation", "codepuppy-automation-standard"])
-    expect(config.agent?.[agent]).toMatchObject({ permission: { "tool-policy-default": "ask" } })
-  // A6:BYOK 密钥以 {file:} ref 进 content,明文永不进(此处是**组合体**层面的锁,
-  // codepuppy-models.test.ts 锁的是单件 buildCodePuppyModelConfig)。REQ-236 `#1562`:平台 provider 只带非凭据占位值,
-  // 凭据由 ext 的 chat.headers 每次请求现读。
-  expect(config.provider!.codepuppy.options!.apiKey).toBe(PLATFORM_API_KEY_PLACEHOLDER)
-  expect(config.provider!["deepseek-byok"].options!.apiKey).toBe(
-    `{file:${secretFilePath(userDataPath, "DEEPSEEK_API_KEY")}}`,
-  )
+  for (const agent of ["codepuppy-ask", "codepuppy-automation", "codepuppy-automation-standard"])
+    expect(allows(config.agents?.[agent]?.permissions, "tool-policy-default")).toBe("ask")
+  // A6:BYOK 密钥以 {file:} ref 进 content,明文永不进;平台 provider 只带非凭据占位值(REQ-236 `#1562`)。
+  expect(config.providers!.codepuppy.settings!.apiKey).toBe(PLATFORM_API_KEY_PLACEHOLDER)
+  expect(config.providers!["deepseek-byok"].settings!.apiKey).toBe(`{file:${secretFilePath(userDataPath, "DEEPSEEK_API_KEY")}}`)
   expect(content).not.toContain(PLATFORM_KEY)
   expect(content).not.toContain(BYOK_KEY)
 }
 
+/**
+ * C2 判据:上游 normalize 对这份产物零诊断、除 `model` 的短写被规范成 `{ providerID, model }` 之外零改写(短写是 2.x 自己的
+ * 合法写法,`ConfigModel.Selection`),并且过 `Config.Info` 解码。写回 v1 的任何一个旧键(`provider` / `agent` / `permission` /
+ * `plugin` / `enabled_providers` / lone `enabled:false` 的 MCP 叶子…)都会在这里变成诊断或改写。
+ */
+function assertNativeV2(content: string) {
+  const input = JSON.parse(content)
+  const normalized = ConfigNormalize.normalize(input)
+  expect(normalized.type).toBe("normalized")
+  expect(normalized.diagnostics).toEqual([])
+  const decoded = Schema.decodeUnknownSync(ConfigSchema.Info)(input)
+  if (normalized.type === "normalized")
+    expect(normalized.encoded).toEqual(input.model === undefined ? input : { ...input, model: { ...decoded.model } })
+}
+
 describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)", () => {
-  test("正向闸门:生产 composition 跑通,content 携带 model/enabled_providers/provider/三个 alpha agent/{file:} ref", () => {
+  test("正向闸门:生产 composition 跑通,结果携带 model/policies/providers/四个 alpha agent/{file:} ref", () => {
     givenLoggedInWithByok()
 
-    const result = injectCodePuppyConfig(userData, undefined, "stable")
+    const { result } = inject(EXT_DIR)
 
-    // #613:成功路径返回 ok —— sidecar 据此不在 ready IPC 上挂 injectionFailure。
-    expect(result).toEqual({ ok: true })
-    assertInjectedFacts(process.env.OPENCODE_CONFIG_CONTENT, userData)
-    // 组合体的另外两个 env 产物:v1 文件通道(codepuppy.jsonc)与 v2 目录桥,缺一都会让引擎看不见 provider。
-    expect(process.env.OPENCODE_CONFIG).toBe(path.join(process.env.CODEPUPPY_GLOBAL_DIR, "codepuppy.jsonc"))
-    expect(process.env.OPENCODE_CONFIG_DIR).toBe(path.join(userData, "codepuppy-engine-config"))
-    expect(process.env.OPENCODE_MODELS_PATH).toBe(path.join(userData, "codepuppy-engine-config", "models.json"))
-
-    // I7 是「v2 桥目录已物化」,不是「env 里有那个字符串」(#607 R1)。只断言 OPENCODE_CONFIG_DIR
-    // 的值,会让「删掉写 opencode.jsonc 的 writeFileSync、保留下一行赋值」全绿通过 ——
-    // 而 v2 `/api/model` 实际读的正是那份文件,缺了它 alpha/BYOK 模型照样全灰。
-    // 锁行为不锁形状(rev2c ③″3-2):读回生成的文件,断言它真带着 model 与必需 provider 节点。
-    const v2Path = path.join(process.env.OPENCODE_CONFIG_DIR, "opencode.jsonc")
-    expect(fs.existsSync(v2Path)).toBe(true)
-    const v2 = JSON.parse(fs.readFileSync(v2Path, "utf8"))
-    expect(typeof v2.model).toBe("string")
-    expect(v2.model.length).toBeGreaterThan(0)
-    expect(Object.keys(v2.provider ?? {})).toEqual(expect.arrayContaining(["codepuppy", "deepseek-byok"]))
-    // #857:internal V2-only marker is committed by ConfigProvider in the same local batch as the
-    // governed catalog. Empty env + zero models keeps it unavailable and invisible to model.list.
-    expect(v2.provider[CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID]).toEqual({
-      name: "Code Puppy catalog readiness marker",
-      env: [],
-    })
-    const decodedV1 = Schema.decodeUnknownSync(ConfigV1.Info)(v2)
-    const decodedV2 = Schema.decodeUnknownSync(Config.Info)(ConfigMigrateV1.migrate(decodedV1))
-    expect(decodedV2.providers?.[CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID]?.env).toEqual([])
-    const v1 = JSON.parse(process.env.OPENCODE_CONFIG_CONTENT ?? "")
-    expect(v1.provider?.[CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID]).toBeUndefined()
-    // v2 投影是**刻意 keyless** 的(契约 docs/contracts/engine-config-channels.md:41-42):
-    // 推理走 v1 的 {file:} 通道,v2 只供 picker 列目录,所以这份文件里既不该有明文密钥,
-    // 也不该有 apiKey 字段本身。断言两者,而不是断言「有 {file: ref」——
-    // (作者第一版就把 v1 的形态套到了 v2 上,被这条断言当场证伪。)
-    const v2Raw = fs.readFileSync(v2Path, "utf8")
-    expect(v2Raw).not.toContain(PLATFORM_KEY)
-    expect(v2Raw).not.toContain(BYOK_KEY)
-    expect(v2Raw).not.toContain("apiKey")
-    // #857:the first request must not pay to decode the bundled 6,132-row models.dev snapshot or
-    // wait for the late ConfigProvider commit. The early base is mechanically derived from the
-    // SAME provider projection; it carries exact identities + marker, never a key or second policy.
-    const modelsBaseRaw = fs.readFileSync(process.env.OPENCODE_MODELS_PATH!, "utf8")
-    const modelsBase = JSON.parse(modelsBaseRaw) as Record<string, any>
-    expect(Object.keys(modelsBase).sort()).toEqual(
-      ["codepuppy", "deepseek-byok", CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID].sort(),
-    )
-    expect(modelsBase[CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID]).toEqual({
-      id: CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID,
-      name: "Code Puppy catalog readiness marker",
-      env: [],
-      models: {},
-    })
-    for (const id of ["codepuppy", "deepseek-byok"]) {
-      expect(Object.keys(modelsBase[id].models).sort()).toEqual(Object.keys(v2.provider[id].models).sort())
-      for (const [modelID, early] of Object.entries(modelsBase[id].models) as Array<[string, any]>) {
-        // These providers are custom config projections, so before #857 their settled catalog rows
-        // started from ModelV2.Info.empty() and ConfigProvider overlaid only declared fields. Keep
-        // the early ModelsDev base capability/limit values byte-for-byte equivalent to that prior
-        // settled default; this prevents the fast first commit from inventing a second metadata
-        // authority while still proving it did not regress the final catalog.
-        const settledDefault = ModelV2.Info.empty(ProviderV2.ID.make(id), ModelV2.ID.make(modelID))
-        expect({
-          tool_call: early.tool_call,
-          limit: early.limit,
-          modalities: early.modalities,
-          released: Date.parse(early.release_date),
-        }).toEqual({
-          tool_call: settledDefault.capabilities.tools,
-          limit: settledDefault.limit,
-          modalities: {
-            input: settledDefault.capabilities.input,
-            output: settledDefault.capabilities.output,
-          },
-          released: settledDefault.time.released,
-        })
-      }
-      Schema.decodeUnknownSync(ModelsDevProvider)(modelsBase[id])
-    }
-    Schema.decodeUnknownSync(ModelsDevProvider)(modelsBase[CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID])
-    expect(modelsBaseRaw).not.toContain(PLATFORM_KEY)
-    expect(modelsBaseRaw).not.toContain(BYOK_KEY)
-    expect(modelsBaseRaw).not.toContain("apiKey")
+    expect(result.ok).toBe(true)
+    assertInjectedFacts(result.config.content, userData)
+    // `config.file` 是 main 合成的显式文件(Code Puppy 自己的 userData 下),当前环境的 codepuppy.jsonc 在里面;治理过的模型目录快照经 `models.file`。
+    expect(result.config.file).toBe(path.join(userData, "codepuppy-engine-config", "codepuppy-explicit.json"))
+    expect(result.explicit?.userConfig).toBe(path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "codepuppy.jsonc"))
+    expect(result.models.file).toBe(path.join(userData, "codepuppy-engine-config", "models.json"))
+    // #857:早到的 models.dev 底表从**同一份**投影机械派生:每个 provider 的模型集合与注入的 providers 相同,带就绪标记,不带 key。
+    const raw = fs.readFileSync(result.models.file!, "utf8")
+    const base = JSON.parse(raw) as Record<string, { models: Record<string, unknown> }>
+    expect(Object.keys(base).sort()).toEqual(["codepuppy", "deepseek-byok", CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID].sort())
+    for (const id of ["codepuppy", "deepseek-byok"])
+      expect(Object.keys(base[id]!.models).sort()).toEqual(Object.keys(JSON.parse(result.config.content).providers[id].models).sort())
+    expect(raw).not.toContain(PLATFORM_KEY)
+    expect(raw).not.toContain(BYOK_KEY)
+    expect(raw).not.toContain("apiKey")
   })
 
-  // `#1392`(基线 I1):这条用例的上一版(#857)钉的是「codepuppy.jsonc 里的 provider 进了 enabled_providers 但没有完整投影 ⇒ 保守晚屏障」。
-  // 那个前提现在**在生产里到不了**:配置文件的 provider 块不再进 enabled_providers(注入面只认真源),governedModelsBase 那个保守
-  // 分支只剩防御作用。翻面钉住三个面:①content 的 enabled_providers / provider 没有它;②v2 桥的 opencode.json 拷贝**去掉了
-  // provider 键**(v2 catalog 的可用性不看 enabled_providers,原样拷贝会让它直接进 picker 的 v2 model.list);③governed models base
-  // 照常物化,里面没有它。同一份状态下真源一条记录走完整链:三个面都有它(npm / api 逐字)。
-  test("#1392 a provider block in codepuppy.jsonc reaches none of content / v2 copy / models.json; a truth-file record reaches all three", () => {
+  test("C4:不再经环境变量交给引擎,也不再写 v2 读侧的桥目录", () => {
+    givenLoggedInWithByok()
+    inject(EXT_DIR)
+    for (const name of ["OPENCODE_CONFIG", "OPENCODE_CONFIG_CONTENT", "OPENCODE_CONFIG_DIR", "OPENCODE_MODELS_PATH"])
+      expect([name, process.env[name]]).toEqual([name, undefined])
+    expect(fs.existsSync(path.join(userData, "codepuppy-engine-config", "opencode.jsonc"))).toBe(false)
+    expect(fs.existsSync(path.join(userData, "codepuppy-engine-config", "opencode.json"))).toBe(false)
+  })
+
+  test("继承来的 OPENCODE_CONFIG_CONTENT 不是起点(每次 fork 从零起;引擎本来也不读这个变量)", () => {
+    givenLoggedInWithByok()
+    process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify({ mcp: { codepuppy: { type: "remote", url: "https://inherited.example/mcp" } } })
+    const { result } = inject(EXT_DIR)
+    expect(result.config.content).not.toContain("inherited.example")
+  })
+
+  test("C2:内联文档与显式文件都直接是 OpenCode 2 的配置键 —— 上游 normalize 零诊断、零改写,过 Config.Info 解码(登录 + BYOK 态,带出厂技能与命令)", () => {
+    givenLoggedInWithByok()
+    process.env.CODEPUPPY_FACTORY_SKILL_DIRS = JSON.stringify([path.join(tmp, "factory")])
+    const { result, config, explicit } = inject(EXT_DIR)
+    // 出厂命令与 skills 只在显式文件里(编排器裁决 r1 第 2 条),内联文档不再带
+    expect(config.skills).toBeUndefined()
+    expect(config.commands).toBeUndefined()
+    expect(explicit?.skills).toEqual([path.join(tmp, "factory"), "./.codepuppy/skills"])
+    expect(Object.keys(explicit?.commands ?? {})).toEqual(["init", "review"])
+    assertNativeV2(result.config.content)
+    assertNativeV2(fs.readFileSync(result.config.file!, "utf8"))
+  })
+
+  test("C7(重裁):provider 白名单的 policies 写进显式文件(第一层),与内联文档里那份(第二层)逐条相同、出自同一次计算", () => {
+    givenLoggedInWithByok()
+    const { config, explicit } = inject(EXT_DIR)
+    expect(explicit?.policies).toEqual(config.policies)
+    expect(explicit?.policies?.[0]).toEqual({ action: "provider.use", resource: "*", effect: "deny" })
+    process.env.CODEPUPPY_MODELS_DISABLE = "1"
+    expect(inject(EXT_DIR).explicit?.policies).toBeUndefined()
+  })
+
+  test("`#1662` 供应商白名单交给 ext:写进本进程 CODEPUPPY_PROVIDER_ALLOW 的集合逐条等于策略里放行的那些(同一次计算);注入关着 ⇒ 撤掉", () => {
+    givenLoggedInWithByok()
+    const { config } = inject(EXT_DIR)
+    const allowed = (config.policies ?? []).filter((policy) => policy.effect === "allow").map((policy) => policy.resource)
+    expect(allowed.length).toBeGreaterThan(1)
+    expect(JSON.parse(process.env[PROVIDER_ALLOW_ENV]!)).toEqual(allowed)
+    process.env.CODEPUPPY_MODELS_DISABLE = "1"
+    inject(EXT_DIR)
+    expect(process.env[PROVIDER_ALLOW_ENV]).toBeUndefined()
+  })
+
+  test("显式文件里用户的 codepuppy.jsonc 原样在下:用户自己的 /init 不被出厂的覆盖;用户文件坏了 ⇒ 只放 Code Puppy 这一层", () => {
+    const truth = path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "codepuppy.jsonc")
+    fs.writeFileSync(truth, `{ "command": { "init": { "template": "my own init" } }, "mcp": { "tool": { "type": "local", "command": ["t"] } } }`)
+    const { explicit } = inject(EXT_DIR)
+    expect(explicit?.command).toEqual({ init: { template: "my own init" } })
+    expect(Object.keys(explicit?.commands ?? {})).toEqual(["review"])
+    expect(explicit?.mcp).toEqual({ tool: { type: "local", command: ["t"] } } as never)
+    fs.writeFileSync(truth, "{ broken")
+    expect(Object.keys(inject(EXT_DIR).explicit?.commands ?? {})).toEqual(["init", "review"])
+  })
+
+  test("I9:每一份注入的 permissions(顶层与各 agent)都能用 Permission.Ruleset 解码;动作名用 2.x 的,不出现 bash / task / apply_patch", () => {
+    givenLoggedInWithByok()
+    process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
+    const { config } = inject(EXT_DIR)
+    const rulesets = [config.permissions ?? [], ...Object.values(config.agents ?? {}).map((agent) => agent.permissions ?? [])]
+    expect(rulesets.length).toBeGreaterThan(4)
+    for (const ruleset of rulesets) expect(() => Schema.decodeUnknownSync(Permission.Ruleset)(ruleset)).not.toThrow()
+    const actions = rulesets.flat().map((rule) => rule.action)
+    for (const legacy of ["bash", "task", "apply_patch"]) expect(actions).not.toContain(legacy)
+    expect(actions).toEqual(expect.arrayContaining(["shell", "subagent", "tool-policy-default"]))
+    // 档位载体的伪动作原样保留(接口文档 I9):L4 的执行闸读 `{ action: "tool-policy-default", resource: "*" }`。
+    expect(config.agents?.["codepuppy-ask"]?.permissions).toContainEqual({ action: "tool-policy-default", resource: "*", effect: "ask" })
+  })
+
+  test("S6 / C9:plugins 写 ext 目录与移除指令 -opencode.config.compatibility;CODEPUPPY_ECOSYSTEM_INHERIT=1 时不写移除指令", () => {
+    expect(inject(EXT_DIR).config.plugins).toEqual([EXT_DIR, `-${ECOSYSTEM_COMPATIBILITY_PLUGIN}`])
+    process.env.CODEPUPPY_ECOSYSTEM_INHERIT = "1"
+    expect(inject(EXT_DIR).config.plugins).toEqual([EXT_DIR])
+  })
+
+  test("OOR-1 / U1:五个实验开关显式写值 —— todo 开,其余四个关", () => {
+    expect(inject(EXT_DIR).config.experimental).toEqual({
+      todo: true,
+      schedules: false,
+      media_blob: false,
+      artifacts: false,
+      background_compaction: false,
+    })
+    expect(ENGINE_EXPERIMENTAL_FLAGS.todo).toBe(true)
+  })
+
+  /** 按 main 的 ext-transaction 姿势种一个已启用的技能生成目录(current.json 指向这一代,skills-enabled.json 里有这个键)。 */
+  const plantGeneration = (key: string, generation: string, enabled: string[]) => {
+    const root = process.env.CODEPUPPY_GLOBAL_DIR!
+    const dir = path.join(root, "ext-store", key, "generations", generation)
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(root, "ext-store", key, "current.json"), JSON.stringify({ generation }))
+    fs.writeFileSync(path.join(root, "skills-enabled.json"), JSON.stringify({ v: 1, keys: enabled }))
+    return dir
+  }
+
+  test("接缝裁决 A / 裁决 r3 第 1 条:显式文件的 skills = 出厂技能目录 + 已启用技能当前那一代的真实目录 + 项目技能目录(编排器裁决 2026-11-12);没启用的不写", () => {
+    // 项目技能目录那一条相对路径恒在(2.x 按会话所在的项目目录解析它),没有任何其它输入时就只有它
+    expect(inject(EXT_DIR).explicit?.skills).toEqual(["./.codepuppy/skills"])
+    const factory = [path.join(tmp, "factory", "a"), path.join(tmp, "factory", "b")]
+    process.env.CODEPUPPY_FACTORY_SKILL_DIRS = JSON.stringify(factory)
+    const live = plantGeneration("skill--enabled-one", "gen-000001-abcdef", ["skill--enabled-one"])
+    plantGeneration("skill--not-enabled", "gen-000002-abcdef", ["skill--enabled-one"])
+    expect(inject(EXT_DIR).explicit?.skills).toEqual([...factory, live, "./.codepuppy/skills"])
+    // 不再有任何软链(owner 2026-07-07「不用 symlink」)
+    expect(fs.existsSync(path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "skills-live"))).toBe(false)
+    // 账本缺失 ⇒ 生成目录一个都不写(ext 的 fail-closed 门原样生效),出厂目录照旧
+    fs.rmSync(path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "skills-enabled.json"))
+    expect(inject(EXT_DIR).explicit?.skills).toEqual([...factory, "./.codepuppy/skills"])
+  })
+
+  test("接缝裁决 C / 裁决 r1 第 2 条:显式文件的 commands 写出厂 /init、/review —— 文字逐字来自 ext 登记的模板,review 用 2.x 原生键 subagent: true;CODEPUPPY_PROMPT_REBRAND_DISABLE=1 ⇒ 不写", () => {
+    expect(inject(EXT_DIR).explicit?.commands).toEqual({
+      init: { template: CODEPUPPY_INIT_TEMPLATE, description: CODEPUPPY_INIT_DESCRIPTION },
+      review: { template: CODEPUPPY_REVIEW_TEMPLATE, description: CODEPUPPY_REVIEW_DESCRIPTION, subagent: true },
+    })
+    process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE = "1"
+    expect(inject(EXT_DIR).explicit?.commands).toBeUndefined()
+  })
+
+  test("CODEPUPPY_MODELS_DISABLE:不写 providers / policies,也不给 models.file", () => {
+    process.env.CODEPUPPY_MODELS_DISABLE = "1"
+    const { result, config } = inject(EXT_DIR)
+    expect(result.ok).toBe(true)
+    expect(config.providers).toBeUndefined()
+    expect(config.policies).toBeUndefined()
+    expect(result.models.file).toBeUndefined()
+    expect(fs.existsSync(path.join(userData, "codepuppy-engine-config", "models.json"))).toBe(false)
+  })
+
+  test("#1392 codepuppy.jsonc 里的 provider 块不进注入面;真源一条记录以 2.x 形状进 providers 与 provider.use", () => {
     givenLoggedInWithByok()
     fs.writeFileSync(
       path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "codepuppy.jsonc"),
@@ -284,7 +376,6 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
             models: { "user-model": { name: "User Model" } },
           },
         },
-        mcp: { keep: { type: "remote", url: "https://mcp.example/keep" } },
       }),
     )
     const truthPath = path.join(tmp, "codepuppy-state", "custom-providers", "dev.json")
@@ -293,47 +384,48 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
       truthPath,
       JSON.stringify({ v: 1, providers: [{ id: "my-openai", name: "My OpenAI", compat: "openai", baseURL: "https://api.openai.com/v1", models: ["gpt-5.4"] }] }),
     )
+    // `#1667`(裁决 r3 第 2 条):自定义节点只在有可用 key 时注入。
+    plantSecret(customProviderSecretName("my-openai"), "sk-custom-injection-gate")
 
-    expect(injectCodePuppyConfig(userData, undefined, "stable")).toEqual({ ok: true })
-    // ① content
-    const content = JSON.parse(process.env.OPENCODE_CONFIG_CONTENT!) as { enabled_providers: string[]; provider: Record<string, unknown> }
-    expect(content.enabled_providers).not.toContain("user-file-provider")
-    expect(content.provider["user-file-provider"]).toBeUndefined()
-    expect(content.enabled_providers).toContain("my-openai")
-    expect(content.provider["my-openai"]).toEqual({
-      npm: "@ai-sdk/openai-compatible",
+    const { result, config } = inject(EXT_DIR)
+    expect(result.ok).toBe(true)
+    expect(config.providers?.["user-file-provider"]).toBeUndefined()
+    expect(config.policies).not.toContainEqual({ action: "provider.use", resource: "user-file-provider", effect: "allow" })
+    expect(config.policies).toContainEqual({ action: "provider.use", resource: "my-openai", effect: "allow" })
+    expect(config.providers?.["my-openai"]).toEqual({
       name: "My OpenAI",
-      options: { baseURL: "https://api.openai.com/v1", apiKey: "" },
-      models: { "gpt-5.4": { name: "gpt-5.4", modalities: { input: ["text"] } } },
+      package: "aisdk:@ai-sdk/openai-compatible",
+      settings: { baseURL: "https://api.openai.com/v1", apiKey: `{file:${secretFilePath(userData, customProviderSecretName("my-openai"))}}` },
+      models: { "gpt-5.4": { name: "gpt-5.4", capabilities: { input: ["text"] } } },
     })
-    // ② v2 桥:opencode.json 拷贝没有 provider 键(其余键原样),opencode.jsonc 的注入表有真源节点、没有配置文件节点
-    const v2Dir = process.env.OPENCODE_CONFIG_DIR!
-    const copy = JSON.parse(fs.readFileSync(path.join(v2Dir, "opencode.json"), "utf8"))
-    expect(copy).toEqual({ $schema: "https://opencode.ai/config.json", mcp: { keep: { type: "remote", url: "https://mcp.example/keep" } } })
-    expect(fs.readFileSync(path.join(v2Dir, "opencode.json"), "utf8")).not.toContain("exfil.example")
-    const v2 = JSON.parse(fs.readFileSync(path.join(v2Dir, "opencode.jsonc"), "utf8")) as { provider: Record<string, unknown> }
-    expect(v2.provider["user-file-provider"]).toBeUndefined()
-    expect(v2.provider["my-openai"]).toEqual({ npm: "@ai-sdk/openai-compatible", name: "My OpenAI", options: { baseURL: "https://api.openai.com/v1" }, models: { "gpt-5.4": { name: "gpt-5.4", modalities: { input: ["text"] } } } })
-    // ③ governed models base 照常物化(每个 enabled id 都有完整投影),真源节点在、配置文件节点不在
-    expect(process.env.OPENCODE_MODELS_PATH).toBe(path.join(v2Dir, "models.json"))
-    const modelsBase = JSON.parse(fs.readFileSync(path.join(v2Dir, "models.json"), "utf8")) as Record<string, { models: Record<string, { provider?: unknown }> }>
-    expect(modelsBase["user-file-provider"]).toBeUndefined()
-    expect(Object.keys(modelsBase["my-openai"]!.models)).toEqual(["gpt-5.4"])
-    expect(modelsBase["my-openai"]!.models["gpt-5.4"]!.provider).toEqual({ npm: "@ai-sdk/openai-compatible", api: "https://api.openai.com/v1" })
+    expect(result.config.content).not.toContain("exfil.example")
+    const base = JSON.parse(fs.readFileSync(result.models.file!, "utf8")) as Record<string, { models: Record<string, { provider?: unknown }> }>
+    expect(base["user-file-provider"]).toBeUndefined()
+    expect(base["my-openai"]!.models["gpt-5.4"]!.provider).toEqual({ npm: "@ai-sdk/openai-compatible", api: "https://api.openai.com/v1" })
   })
 
-  test("CODEPUPPY_MODELS_DISABLE preserves the upstream models path escape hatch", () => {
-    process.env.CODEPUPPY_MODELS_DISABLE = "1"
-    process.env.OPENCODE_MODELS_PATH = "/operator/upstream-models.json"
-
-    expect(injectCodePuppyConfig(userData, undefined, "stable")).toEqual({ ok: true })
-    expect(process.env.OPENCODE_MODELS_PATH).toBe("/operator/upstream-models.json")
-    expect(fs.existsSync(path.join(userData, "codepuppy-engine-config", "models.json"))).toBe(false)
-  })
-
-  test("反向闸门:注入内部抛错时失败必须出声,且正向闸门的断言体真的转红(函数级 catch 不再能瞒过测试)", () => {
+  test("`#1667` 裁决 r3 第 2 条:BYOK / 自定义节点的 key 缺失或为空 ⇒ 整个不注入(不在 providers、不在 provider.use 放行里);平台节点(占位 apiKey,凭据走 ext 请求头)照常注入", () => {
     givenLoggedInWithByok()
-    // 真实故障、零模块/依赖 mock(仅拦截日志 sink,见下):userDataPath 的父级是一个普通文件 → 生产代码里的
+    const truthPath = path.join(tmp, "codepuppy-state", "custom-providers", "dev.json")
+    fs.mkdirSync(path.dirname(truthPath), { recursive: true })
+    fs.writeFileSync(truthPath, JSON.stringify({ v: 1, providers: [{ id: "keyless", name: "Keyless", compat: "openai", baseURL: "https://keyless.example/v1", models: ["m"] }] }))
+    const absent = (config: Injected, id: string) => {
+      expect(config.providers?.[id]).toBeUndefined()
+      expect(config.policies).not.toContainEqual({ action: "provider.use", resource: id, effect: "allow" })
+    }
+    absent(inject(EXT_DIR).config, "keyless")
+    plantSecret(customProviderSecretName("keyless"), "  \n")
+    absent(inject(EXT_DIR).config, "keyless")
+    plantSecret("DEEPSEEK_API_KEY", "")
+    absent(inject(EXT_DIR).config, "deepseek-byok")
+    const { config } = inject(EXT_DIR)
+    expect(config.providers?.codepuppy?.settings?.apiKey).toBe(PLATFORM_API_KEY_PLACEHOLDER)
+    expect(config.policies).toContainEqual({ action: "provider.use", resource: "codepuppy", effect: "allow" })
+  })
+
+  test("反向闸门:注入内部抛错时失败必须出声、以 ok:false 离开,产物只剩治理底线,且正向闸门的断言体真的转红", () => {
+    givenLoggedInWithByok()
+    // 真实故障、零模块/依赖 mock(仅拦截日志 sink):userDataPath 的父级是一个普通文件 → 生产代码里的
     // `fs.mkdirSync(userDataPath, { recursive: true })` 抛 ENOTDIR,正落进那层函数级 catch。
     const parentIsAFile = path.join(tmp, "not-a-directory")
     fs.writeFileSync(parentIsAFile, "")
@@ -346,62 +438,36 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     }
     let result: ReturnType<typeof injectCodePuppyConfig>
     try {
-      result = injectCodePuppyConfig(brokenUserData, undefined, "stable")
+      result = injectCodePuppyConfig(brokenUserData, EXT_DIR, "stable")
     } finally {
       console.warn = originalWarn
     }
 
-    // ① 失败必须出声。catch 本身保持不删(裸崩溃被票面禁止),但它不得静音。
     expect(warned.some((w) => w.includes("failed to inject alpha config"))).toBe(true)
-    // ①′ #613 反向闸门(退出条件 1 的第一环):失败必须以结构化返回值离开本进程 ——
-    //     把 catch 改回「只 warn 不返回」(生产侧重新沉默),本断言当场转红。
     expect(result.ok).toBe(false)
-    if (!result.ok) {
-      expect(result.error.message.length).toBeGreaterThan(0)
-    }
-    // ② catch 的真实爆炸半径:整个注入丢失 —— content 与 v2 桥都没写出去。
-    //    这正是「模型全灰 / 正在同步」的成因,不是局部降级。
-    expect(process.env.OPENCODE_CONFIG_CONTENT).toBeUndefined()
-    expect(process.env.OPENCODE_CONFIG_DIR).toBeUndefined()
-    // ③ 本票的核心:把正向闸门的断言体对着这条被吞掉的路径再跑一遍,它**必须**转红。
-    //    于是「注入内部抛错 ⇒ 有测试变红」每次 CI 都被现场证明一遍,而不是一句声称(rev2c ③″3-8)。
-    expect(() => assertInjectedFacts(process.env.OPENCODE_CONFIG_CONTENT, brokenUserData)).toThrow()
+    if (!result.ok) expect(result.error.message.length).toBeGreaterThan(0)
+    // 治理底线不随注入失败丢掉:ext 目录、外部技能移除指令、实验开关照样在(没有 ext ⇒ sidecar 的 I4 拒绝 ready)。
+    const floor = JSON.parse(result.config.content) as Injected
+    expect(floor.plugins).toEqual([EXT_DIR, `-${ECOSYSTEM_COMPATIBILITY_PLUGIN}`])
+    expect(floor.experimental).toEqual({ ...ENGINE_EXPERIMENTAL_FLAGS })
+    assertNativeV2(result.config.content)
+    // 把正向闸门的断言体对着这条被吞掉的路径再跑一遍,它**必须**转红。
+    expect(() => assertInjectedFacts(result.config.content, brokenUserData)).toThrow()
   })
 
-  // #613 R1 Blocker 1 反向闸门:v1 全部成功、只有 v2 桥失败 —— 这条真实失败路径曾被
-  // materializeV2EngineConfig 的自吞 catch 报成 {ok:true}。权威契约(engine-config-channels.md):
-  // picker 只经 v2 目录读模型,丢 v2 = alpha/BYOK 模型全灰 = 票面事故症状,
-  // 「只损失 v2 目录」不是可忽略的局部降级。把那层自吞 catch 加回去,断言①当场转红。
-  test("#613 反向闸门:v2 桥失败必须以 ok:false 离开进程,且不得撤销已写出的 v1 注入", () => {
+  test("#613 反向闸门:models.json 写不进去 ⇒ ok:false(不是可忽略的局部降级),错误自证抛点", () => {
     givenLoggedInWithByok()
-    // 真实故障、零模块/依赖 mock(仅拦截日志 sink):v2 桥的目标目录位置被一个普通文件占住 →
-    // 生产代码 `fs.mkdirSync(<userData>/codepuppy-engine-config, { recursive: true })` 抛 EEXIST。
-    // 走到桥时上方 v1 注入(OPENCODE_CONFIG / OPENCODE_CONFIG_CONTENT)已全部完成 —— 正是 R1 实证的路径。
     fs.writeFileSync(path.join(userData, "codepuppy-engine-config"), "")
-
-    const warned: string[] = []
     const originalWarn = console.warn
-    console.warn = (...args: unknown[]) => {
-      warned.push(args.map((a) => String(a)).join(" "))
-    }
+    console.warn = () => {}
     let result: ReturnType<typeof injectCodePuppyConfig>
     try {
-      result = injectCodePuppyConfig(userData, undefined, "stable")
+      result = injectCodePuppyConfig(userData, EXT_DIR, "stable")
     } finally {
       console.warn = originalWarn
     }
-
-    // ① 失败以结构化结果离开进程(→ ready IPC 的 injectionFailure → "injection-failed" 终态)。
     expect(result.ok).toBe(false)
-    // ①′ 错误信息自证抛点(fs 错误自带路径),main 的 error 日志无需猜是哪层死的。
     if (!result.ok) expect(result.error.message).toContain("codepuppy-engine-config")
-    // ② 失败出声(外层 catch 的 warn;桥内不再有自己的静音 console.error)。
-    expect(warned.some((w) => w.includes("failed to inject alpha config"))).toBe(true)
-    // ③ 顺序锁:桥排在 content 写出之后,失败不得撤销已就位的 v1 注入 ——
-    //    把 materializeV2EngineConfig 挪到 content 写出之前,本断言体当场转红。
-    assertInjectedFacts(process.env.OPENCODE_CONFIG_CONTENT, userData)
-    // ④ 半成品目录不得被指为权威:OPENCODE_CONFIG_DIR 保持未设置。
-    expect(process.env.OPENCODE_CONFIG_DIR).toBeUndefined()
   })
 
   // #613 接线锚(R1 后收窄):sidecar.ts 无法被 bun import(首个 import 即 registerHooks,
@@ -433,250 +499,150 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
   })
 })
 
-// #223 对抗审计 Blocker(2026-07-25):`OPENCODE_EXPERIMENTAL=1` 绕过 web search 主权闸。
-// 上游 `runtime-flags.ts` 的 `enableExa = OPENCODE_EXPERIMENTAL || OPENCODE_ENABLE_EXA ||
-// OPENCODE_EXPERIMENTAL_EXA`,所以 main 把四个 keyless 专用 flag 覆盖写 `"0"` 之后 umbrella 仍
-// 让 `webSearchEnabled()` 注册本地 `websearch` —— 代付态本地+云双活,kill-switch 下云暗而本地仍活。
-// 这里跑的是**真实生产 composition**(真 injectCodePuppyConfig、真密钥文件、真 env),
-// 不预置 config.permission。
-describe("web search 主权在 umbrella 下仍成立(#223 Blocker)", () => {
-  /** main 侧 syncSecretFiles 落盘的登录态 + 主权闸对四个 keyless flag 的 force-off。
-   *  `#1195`:代付判据 = `CODEPUPPY_MCP_TOKEN` 密钥文件(登录铸 mcp_access);无凭证
-   *  (⇒ enabled:false)各臂归 cloud-mcp-header.test.ts。 */
-  const givenPlatformPaysUnderUmbrella = () => {
+describe("web search 主权在 2.x 权限规则里仍成立(#223)", () => {
+  const givenPlatformPays = () => {
     givenLoggedInWithByok()
     plantSecret("CODEPUPPY_CLOUD_TOKEN", "cloud-token")
     plantSecret("CODEPUPPY_MCP_TOKEN", "mcp-token-value")
     process.env.CODEPUPPY_CLOUD_MCP_URL = "https://cloud.example/mcp"
-    process.env.OPENCODE_EXPERIMENTAL = "1" // 用户 shell 的真 export —— env 层压不掉
-    process.env.OPENCODE_ENABLE_EXA = "0" // 主权闸已经写过 "0",仍不足以关闭工具
   }
 
-  /** ext bundle 的真实落点替身(注入只把路径合并进 config.plugin,不读文件内容)。 */
-  const extPluginPath = () => {
-    const file = path.join(tmp, "codepuppy-ext", "plugin.js")
-    fs.mkdirSync(path.dirname(file), { recursive: true })
-    fs.writeFileSync(file, "export default async () => ({})\n")
-    return file
-  }
-
-  const injectedPermissions = () => {
-    const config: {
-      permission?: Record<string, unknown>
-      agent?: Record<string, { permission?: Record<string, unknown> }>
-      mcp?: Record<string, unknown>
-    } = JSON.parse(process.env.OPENCODE_CONFIG_CONTENT!)
-    return config
-  }
-
-  // `#1411`(REQ-1414 CODE-1,owner 2026-09-23 裁决):这条用例以前叫「平台代付:本地 websearch 被
-  // deny」。代付不再关本地腿 —— 账户信号只决定云腿在不在。**真实生产 composition** 下的新事实是:
-  // 代付态的注入面对 web search 一个字都不写(顶层与三个 agent 都没有 web search 的 permission 键)。
-  test("平台代付:两条腿都留着 —— 注入面不写任何 web search permission,云 server 照常在册", () => {
-    givenPlatformPaysUnderUmbrella()
-
-    injectCodePuppyConfig(userData, undefined, "stable")
-
-    const config = injectedPermissions()
-    expect(config.permission?.websearch).toBeUndefined()
-    // 云工具是代付态的权威 web search —— 不许被顺手关掉。
-    expect(config.permission?.[CLOUD_WEB_SEARCH_TOOL_ID]).toBeUndefined()
-    expect(config.mcp?.codepuppy).toBeDefined()
-    // agent 级规则排在全局之后。三个 alpha agent 自己写的就是 `websearch: "allow"`,代付态没有任何
-    // deny 被钉到它们后面 —— 这正是「本地腿在场」在 permission 层的样子。
-    for (const [name, agent] of Object.entries(config.agent ?? {}))
-      expect([name, agent.permission?.websearch]).toEqual([name, "allow"])
+  test("平台代付:两条腿都留着 —— 注入面不写任何 web search 的 deny,云 server 照常在册", () => {
+    givenPlatformPays()
+    const { config } = inject(EXT_DIR)
+    expect(allows(config.permissions, "websearch")).toBeUndefined()
+    expect(allows(config.permissions, CLOUD_WEB_SEARCH_TOOL_ID)).toBeUndefined()
+    expect(config.mcp?.servers?.codepuppy).toMatchObject({ type: "remote", url: "https://cloud.example/mcp" })
+    expect(config.mcp?.servers?.codepuppy).not.toHaveProperty("disabled")
+    for (const [name, agent] of Object.entries(config.agents ?? {}))
+      expect([name, allows(agent.permissions, "websearch")]).toEqual([name, "allow"])
+    assertNativeV2(JSON.stringify(config))
   })
 
-  // alpha-code#1568 AC1:从注入面出发 —— 注入面真的把云 server 注册在 `codepuppy` 键下(配置与 ext 握手 env 同值),
-  // 引擎拿这个键与平台远端名拼出的模型函数名是 `codepuppy_dispatch`,identity 是 `mcp:codepuppy:dispatch`。
-  // 拼名与 identity 都走引擎 / schema 自己的函数(McpCatalog.toolName、canonicalToolIdentity),不写第二份。
-  // 把注入面的键改回 `cloud`(或任何别的值)⇒ 第一行就红;平台远端名回到 `cloud_dispatch` ⇒ 后两行红。
-  test("#1568 AC1:注入面注册的云 server 键是 codepuppy;派发工具的模型函数名 codepuppy_dispatch、identity mcp:codepuppy:dispatch", () => {
-    givenPlatformPaysUnderUmbrella()
-    injectCodePuppyConfig(userData, undefined, "stable")
-    const server = process.env[CLOUD_MCP_SERVER_ENV]!
-    expect([server, Object.keys(injectedPermissions().mcp ?? {}).includes(server)]).toEqual(["codepuppy", true])
-    expect(McpCatalog.toolName(server, CLOUD_DISPATCH_TOOL)).toBe("codepuppy_dispatch")
-    expect(canonicalToolIdentity({ source: "mcp", origin: server, name: CLOUD_DISPATCH_TOOL })).toBe("mcp:codepuppy:dispatch")
-  })
-
-  // #223 R4→R5:kill-switch 下云 server 的**完整定义根本不进配置**,只经 ARM/DEF 两个 env 托管给
-  // @codepuppy/ext(见 packages/ext/src/cloud-websearch-kill.ts)。R4 那版写一个 `enabled:false`
-  // 的条目 —— R5 判其为回归:`MCP.connect()` 会无条件把它复制成 `enabled:true`,而该能力公开为
-  // `/mcp/:name/connect` 且产品 UI 真的在调,于是 ext 缺席时用户点一下就能热连起来。
   for (const [name, ext] of [
-    ["ext bundle 路径已解析", true],
-    ["ext bundle 路径缺席", false],
+    ["ext 目录已解析", true],
+    ["ext 目录缺席", false],
   ] as const)
-    test(`kill-switch(${name}):配置里没有云 server 定义,本地与云两个 web search 都被 deny`, () => {
-      givenPlatformPaysUnderUmbrella()
+    test(`kill-switch(${name}):配置里只有中和条目,本地与云两个 web search 都被 deny 并钉在规则表末位`, () => {
+      givenPlatformPays()
       process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
-      const errors: unknown[][] = []
       const original = console.error
+      const errors: unknown[][] = []
       console.error = (...args: unknown[]) => void errors.push(args)
+      let config: Injected
       try {
-        injectCodePuppyConfig(userData, ext ? extPluginPath() : undefined, "stable")
+        config = inject(ext ? EXT_DIR : undefined).config
       } finally {
         console.error = original
       }
-
-      const config = injectedPermissions()
-      expect(config.permission?.websearch).toBe("deny")
-      expect(config.permission?.[CLOUD_WEB_SEARCH_TOOL_ID]).toBe("deny")
-      expect(config.permission?.[CLOUD_DISPATCH_TOOL_ID]).toBeUndefined()
-      // 一个字节的可复活定义都不留:配置里只有那份中和条目(#223 R6 Major:它必须在,
-      // 否则继承来源里的同名定义压根不会被覆盖),没有真 URL、没有 Authorization 头。
-      expect(config.mcp?.codepuppy).toEqual({ ...WITHHELD_CLOUD_MCP })
-      expect(process.env.OPENCODE_CONFIG_CONTENT).not.toContain("cloud.example")
-      expect(process.env.OPENCODE_CONFIG_CONTENT).not.toContain("Authorization")
-      // 定义只在 env 里托管,ext 的 config 钩子跑起来才装。
+      expect(config.permissions?.slice(-2)).toEqual([
+        { action: CLOUD_WEB_SEARCH_TOOL_ID, resource: "*", effect: "deny" },
+        { action: "websearch", resource: "*", effect: "deny" },
+      ])
+      expect(allows(config.permissions, CLOUD_DISPATCH_TOOL_ID)).toBeUndefined()
+      for (const agent of Object.values(config.agents ?? {})) expect(agent.permissions?.at(-1)).toEqual({ action: "websearch", resource: "*", effect: "deny" })
+      expect(config.mcp?.servers?.codepuppy).toEqual({ ...WITHHELD_CLOUD_MCP })
+      const content = JSON.stringify(config)
+      expect(content).not.toContain("cloud.example")
+      expect(content).not.toContain("Authorization")
       expect(process.env[CLOUD_MCP_ARM_ENV]).toBe("codepuppy")
-      expect(JSON.parse(process.env[CLOUD_MCP_DEF_ENV]!)).toMatchObject({
+      // DEF 托管的是 2.x `Mcp.RemoteConfig` 形状的真定义(带 {file:} 引用,不带 token 值)。
+      expect(JSON.parse(process.env[CLOUD_MCP_DEF_ENV]!)).toEqual({
         type: "remote",
         url: "https://cloud.example/mcp",
+        headers: { Authorization: `Bearer {file:${secretFilePath(userData, "CODEPUPPY_MCP_TOKEN")}}` },
+        oauth: false,
       })
-      // `#1195`:托管定义带 {file:} 引用(ext 的 installCloudMcp 自己解析,读不到响亮不装),
-      // 但**绝不带 token 值** —— A6 的「引用而非明文」在 env 托管通道同样成立。
-      expect(process.env[CLOUD_MCP_DEF_ENV]).toContain("{file:")
-      expect(process.env[CLOUD_MCP_DEF_ENV]).toContain("CODEPUPPY_MCP_TOKEN")
       expect(process.env[CLOUD_MCP_DEF_ENV]).not.toContain("mcp-token-value")
-      expect(process.env[CLOUD_MCP_DEF_ENV]).not.toContain("cloud-token")
       expect(process.env[CLOUD_MCP_SERVER_ENV]).toBe("codepuppy")
       expect(errors.flat().join("\n")).toContain("WITHHELD from the engine config")
+      assertNativeV2(content)
     })
 
-  // #223 R6 Major:R5 只从继承来的 OPENCODE_CONFIG_CONTENT 对象里删键,而引擎的深合并里
-  // 「缺少 cloud 键」不会删除 global / codepuppy.jsonc / 项目 / managed 里先前来源的定义。所以现在
-  // 写的是一份压过去的中和条目 —— 深合并里它覆盖的是**连接控制字段**(type/url/enabled/oauth;
-  // 继承的 headers/timeout 会留下,#223 R7 措辞更正,URL 已不可用故无处可发)。多源那一半由
-  // packages/opencode/test/mcp/codepuppy-cloud-mcp-multisource.test.ts 用真实 Config 加载证。
-  test("kill-switch:继承来的同名云条目被中和条目压掉(连接控制字段)", () => {
-    givenPlatformPaysUnderUmbrella()
-    process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
-    process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify({
-      mcp: {
-        codepuppy: {
-          type: "remote",
-          url: "https://inherited.example/mcp",
-          enabled: true,
-          headers: { Authorization: "Bearer inherited" },
-        },
-      },
-    })
-
-    injectCodePuppyConfig(userData, undefined, "stable")
-
-    expect(injectedPermissions().mcp?.codepuppy).toEqual({ ...WITHHELD_CLOUD_MCP })
-    expect(process.env.OPENCODE_CONFIG_CONTENT).not.toContain("inherited.example")
-    expect(process.env.OPENCODE_CONFIG_CONTENT).not.toContain("Bearer inherited")
+  // `#1687`:renderer 经 `ext.cloudWithheld()` 读到的值,必须就是这一轮写进配置的那个判决 ——
+  // 写了中和条目 ⇔ 值为 true。逐条分支核对(含先扣下再放开:值随最近一次注入走,不残留)。
+  test("isCloudMcpWithheld equals the verdict used for the cloud config entry on every branch", () => {
+    const scenarios: Array<[string, () => void]> = [
+      ["kill-switch + 代付", () => (givenPlatformPays(), (process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"))],
+      ["代付", () => givenPlatformPays()],
+      ["kill-switch + 不代付", () => (givenLoggedInWithByok(), (process.env.CODEPUPPY_CLOUD_MCP_URL = "https://cloud.example/mcp"), (process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"))],
+      ["不代付", () => (givenLoggedInWithByok(), (process.env.CODEPUPPY_CLOUD_MCP_URL = "https://cloud.example/mcp"))],
+      ["kill-switch + 无云 URL", () => (givenLoggedInWithByok(), (process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"))],
+    ]
+    const verdicts: Array<[string, boolean]> = []
+    const original = console.error
+    console.error = () => {}
+    try {
+      for (const [name, given] of scenarios) {
+        delete process.env.CODEPUPPY_WEBSEARCH_DISABLE
+        delete process.env.CODEPUPPY_CLOUD_MCP_URL
+        given()
+        const { config } = inject(EXT_DIR)
+        const wroteWithheld = JSON.stringify(config.mcp?.servers?.codepuppy) === JSON.stringify({ ...WITHHELD_CLOUD_MCP })
+        expect([name, isCloudMcpWithheld()]).toEqual([name, wroteWithheld])
+        verdicts.push([name, isCloudMcpWithheld()])
+      }
+    } finally {
+      console.error = original
+    }
+    // 判据自证:两个值都真的出现过(否则恒等式可以恒假地成立)。
+    expect(verdicts).toEqual([
+      ["kill-switch + 代付", true],
+      ["代付", false],
+      ["kill-switch + 不代付", true],
+      ["不代付", false],
+      ["kill-switch + 无云 URL", false],
+    ])
   })
 
-  test("代付但无 kill-switch 时:云 server 直接可用,只托管 def 身份、不置位 arm(不依赖 ext 装载)", () => {
-    givenPlatformPaysUnderUmbrella()
-
-    injectCodePuppyConfig(userData, undefined, "stable")
-
-    expect(injectedPermissions().mcp?.codepuppy).toMatchObject({ type: "remote", enabled: true })
-    // ARM 不置位 ⇒ ext 的 installCloudMcp 什么都不装(ARM/DEF 必须成对)。
-    expect(process.env[CLOUD_MCP_ARM_ENV]).toBeUndefined()
-    // #223 R6 Blocker:治理豁免绑定的是 DEF 里那份定义的端点身份,所以代付两条分支都托管它。
-    expect(JSON.parse(process.env[CLOUD_MCP_DEF_ENV]!)).toMatchObject({
-      type: "remote",
-      url: "https://cloud.example/mcp",
-    })
-    // `#1195`:同上 —— 托管定义带 {file:} 引用,不带 token 值。
-    expect(process.env[CLOUD_MCP_DEF_ENV]).toContain("{file:")
-    expect(process.env[CLOUD_MCP_DEF_ENV]).toContain("CODEPUPPY_MCP_TOKEN")
-    expect(process.env[CLOUD_MCP_DEF_ENV]).not.toContain("mcp-token-value")
-    expect(process.env[CLOUD_MCP_DEF_ENV]).not.toContain("cloud-token")
-    // 闸要能把「alpha 治理的云 server」与用户自带的 web-search MCP 区分开(R5 Blocker)。
-    expect(process.env[CLOUD_MCP_SERVER_ENV]).toBe("codepuppy")
+  test("不代付(登出 / BYOK)且有云 URL:云 server 是无凭证的 disabled 定义,不带任何凭证通道", () => {
+    givenLoggedInWithByok()
+    process.env.CODEPUPPY_CLOUD_MCP_URL = "https://cloud.example/mcp"
+    const { config } = inject(EXT_DIR)
+    expect(config.mcp?.servers?.codepuppy).toEqual({ type: "remote", url: "https://cloud.example/mcp", disabled: true, oauth: false })
   })
 
-  // 握手通道的可信度**不**来自 sidecar-env 白名单(逃生阀 CODEPUPPY_ENV_ALLOWLIST_EXTRA 能放行它,
-  // 见 sidecar-env.test.ts 的同名事实),而来自:注入面在每次 fork 的每条分支上覆盖或删除它们。
   test("继承/伪造的 arm+def 变量在每条分支上都被注入面覆盖或清掉", () => {
-    givenPlatformPaysUnderUmbrella()
+    givenPlatformPays()
     process.env[CLOUD_MCP_ARM_ENV] = "forged"
     process.env[CLOUD_MCP_DEF_ENV] = JSON.stringify({ type: "remote", url: "https://attacker.example/mcp" })
     process.env[CLOUD_MCP_SERVER_ENV] = "forged"
-
-    // ① 代付、无 kill-switch:ARM 被删,DEF/SERVER 被覆盖成 alpha 自己的值(伪造的 URL 不剩)。
-    injectCodePuppyConfig(userData, undefined, "stable")
+    inject(EXT_DIR)
     expect(process.env[CLOUD_MCP_ARM_ENV]).toBeUndefined()
     expect(process.env[CLOUD_MCP_DEF_ENV]).not.toContain("attacker.example")
-    expect(process.env[CLOUD_MCP_DEF_ENV]).toContain("cloud.example")
     expect(process.env[CLOUD_MCP_SERVER_ENV]).toBe("codepuppy")
-
-    // ② kill-switch:被覆盖成 alpha 自己的名字与定义,伪造的 URL 一点不剩。
-    process.env[CLOUD_MCP_ARM_ENV] = "forged"
-    process.env[CLOUD_MCP_DEF_ENV] = JSON.stringify({ type: "remote", url: "https://attacker.example/mcp" })
-    process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
-    injectCodePuppyConfig(userData, undefined, "stable")
-    expect(process.env[CLOUD_MCP_ARM_ENV]).toBe("codepuppy")
-    expect(process.env[CLOUD_MCP_DEF_ENV]).not.toContain("attacker.example")
-
-    // ③ 登出 / BYOK(不代付):三个都被删,伪造的通道彻底失效。
     delete process.env.CODEPUPPY_CLOUD_MCP_URL
-    injectCodePuppyConfig(userData, undefined, "stable")
+    inject(EXT_DIR)
     expect(process.env[CLOUD_MCP_ARM_ENV]).toBeUndefined()
     expect(process.env[CLOUD_MCP_DEF_ENV]).toBeUndefined()
     expect(process.env[CLOUD_MCP_SERVER_ENV]).toBeUndefined()
   })
-
-  test("登出/BYOK:keyless 本地 websearch 保持可用(不误伤登出兜底)", () => {
-    givenLoggedInWithByok()
-    process.env.OPENCODE_EXPERIMENTAL = "1"
-
-    injectCodePuppyConfig(userData, undefined, "stable")
-
-    const config = injectedPermissions()
-    expect(config.permission?.websearch).toBeUndefined()
-    for (const agent of Object.values(config.agent ?? {})) expect(agent.permission?.websearch).toBe("allow")
-  })
 })
 
-// ── `#1381`:远程 MCP 服务器从 main 才写得了的真源注入 ────────────────────────────────────
-describe("`#1381` 远程 MCP 从真源注入(mcp-servers/<env>.json),codepuppy.jsonc 的远程条目压成 enabled:false", () => {
+describe("`#1381` 远程 MCP 从真源注入;codepuppy.jsonc 与用户全局里不受治理的条目压成中和条目", () => {
   const truthFile = () => path.join(tmp, "codepuppy-state", "mcp-servers", "dev.json")
-  const captureErrors = (run: () => void): string[] => {
-    const lines: string[] = []
+
+  test("真源一条 ⇒ 注入完整的 2.x 条目;codepuppy.jsonc 的远程条目、用户全局的非治理条目 ⇒ 中和条目;本地条目不动", () => {
+    writeMcpServerTruth(truthFile(), [{ name: "my-mcp", url: "https://mcp.example.com/mcp", headers: { "X-Token": "t" } }], fs)
+    fs.writeFileSync(
+      path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "codepuppy.jsonc"),
+      JSON.stringify({ mcp: { "exfil-mcp": { type: "remote", url: "https://exfil-mcp.example/mcp" }, "local-ok": { type: "local", command: ["x"] } } }),
+    )
+    const xdg = path.join(process.env.XDG_CONFIG_HOME!, "opencode")
+    fs.mkdirSync(xdg, { recursive: true })
+    fs.writeFileSync(path.join(xdg, "config.json"), JSON.stringify({ mcp: { "my-mcp": { type: "remote", url: "https://user-global.example/mcp" }, stray: { type: "remote", url: "https://stray.example/mcp" } } }))
     const original = console.error
-    console.error = (...args: unknown[]) => void lines.push(args.map(String).join(" "))
+    console.error = () => {}
+    let config: Injected
     try {
-      run()
+      config = inject(EXT_DIR).config
     } finally {
       console.error = original
     }
-    return lines
-  }
-  const injectedMcp = (): Record<string, unknown> => (JSON.parse(process.env.OPENCODE_CONFIG_CONTENT!) as { mcp?: Record<string, unknown> }).mcp ?? {}
-
-  test("真源一条 ⇒ 注入完整条目(type / url / headers,enabled:true)且是治理来源;codepuppy.jsonc 的远程条目 ⇒ enabled:false 并出声;真源坏了 ⇒ 一条不注入 + 一行原因", () => {
-    writeMcpServerTruth(truthFile(), [{ name: "my-mcp", url: "https://mcp.example.com/mcp", headers: { "X-Token": "t" } }], fs)
-    fs.writeFileSync(path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "codepuppy.jsonc"), JSON.stringify({ mcp: { "exfil-mcp": { type: "remote", url: "https://exfil-mcp.example/mcp" }, "local-ok": { type: "local", command: ["x"] } } }))
-    // 用户全局同名条目:真源条目是治理来源,所以它不进默认拒绝(它的字段被我们末序注入的完整条目压住)。
-    const xdg = path.join(process.env.XDG_CONFIG_HOME!, "opencode")
-    fs.mkdirSync(xdg, { recursive: true })
-    fs.writeFileSync(path.join(xdg, "config.json"), JSON.stringify({ mcp: { "my-mcp": { type: "remote", url: "https://user-global.example/mcp" } } }))
-
-    const errors = captureErrors(() => expect(injectCodePuppyConfig(userData, undefined, "stable")).toEqual({ ok: true }))
-    expect(injectedMcp()["my-mcp"]).toEqual({ type: "remote", url: "https://mcp.example.com/mcp", headers: { "X-Token": "t" }, enabled: true })
-    expect(injectedMcp()["exfil-mcp"]).toEqual({ enabled: false })
-    expect(injectedMcp()["local-ok"]).toBeUndefined()
-    expect(errors.filter((l) => l.includes("#1381"))).toEqual([
-      `[alpha-code#1381] default-denied remote MCP entries in ${path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "codepuppy.jsonc")} (not in the main-only truth file, so neither injected nor authorized) names=["exfil-mcp"]`,
-    ])
-
-    fs.writeFileSync(truthFile(), JSON.stringify({ v: 1, servers: [{ name: "my-mcp", url: "https://mcp.example.com/mcp", enabled: true }] }))
-    delete process.env.OPENCODE_CONFIG_CONTENT // 上一轮注入的产物不是治理来源(#223);每次 fork 都从零起
-    const errors2 = captureErrors(() => expect(injectCodePuppyConfig(userData, undefined, "stable")).toEqual({ ok: true }))
-    // 真源坏了 ⇒ 这一轮没有注入 my-mcp ⇒ 它不再是治理来源 ⇒ 用户全局(XDG)里同名的那条按默认拒绝压成 lone enabled:false;
-    // 真源里那条完整条目(type / url / headers)一个字不进配置。
-    expect(injectedMcp()["my-mcp"]).toEqual({ enabled: false })
-    expect(errors2.filter((l) => l.startsWith("remote MCP servers: truth file"))).toEqual([
-      `remote MCP servers: truth file ${truthFile()} rejected — servers[0] has unexpected key(s): enabled; nothing is derived from it (this is "unanswerable", not an empty list) until the app rewrites it`,
-    ])
+    expect(config.mcp?.servers?.["my-mcp"]).toEqual({ type: "remote", url: "https://mcp.example.com/mcp", headers: { "X-Token": "t" } })
+    expect(config.mcp?.servers?.["exfil-mcp"]).toEqual({ ...NEUTRALIZED_MCP_SERVER })
+    expect(config.mcp?.servers?.stray).toEqual({ ...NEUTRALIZED_MCP_SERVER })
+    expect(config.mcp?.servers?.["local-ok"]).toBeUndefined()
+    assertNativeV2(JSON.stringify(config))
   })
 })

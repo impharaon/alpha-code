@@ -75,14 +75,14 @@ function ageEnv(days: number): Record<string, string> {
 /** 上游包下的普通文件 —— 不在 ADR-033 白名单里。 */
 const UPSTREAM_FILE = "packages/core/src/upstream-leaf.ts"
 /** ADR-033 白名单里的**被接管**文件:守卫按设计放行它,而度量必须照样把它算进去。 */
-const ADOPTED_FILE = "packages/core/src/permission.ts"
+const ADOPTED_FILE = "packages/core/src/oauth/page.ts"
 /** 上游路径下、alpha 这一侧**新增**的文件:`--diff-filter=DMR` 结构上不该点名它。 */
 const ADDED_FILE = "packages/core/src/brand-new-codepuppy-leaf.ts"
-/** carve-out ①:alpha 自有包。 */
+/** carve-out:alpha 自有包。 */
 const CODEPUPPY_PKG_FILE = "packages/ui-mac/src/main/codepuppy-owned.ts"
 const EXT_PKG_FILE = "packages/ext/src/codepuppy-ext-leaf.ts"
-/** carve-out ②:ADR-034 roundtrip 包。 */
-const ROUNDTRIP_FILE = "packages/app/src/frontend-leaf.ts"
+/** carve-out:冻结前端的落点(`#1668` 起也是 alpha 自有包;原来的 roundtrip carve-out ② 已撤)。 */
+const FROZEN_FRONTEND_FILE = "packages/codepuppy-app/src/frontend-leaf.ts"
 
 /** 夹具里那次**已知大小**的上游漂移:两个文件、+2 增、−1 删。 */
 const EXPECTED_DRIFT_FILES = 2
@@ -108,7 +108,7 @@ function driftFixture(forkAgeDays: number) {
       [ADOPTED_FILE]: "p1\np2\n",
       [CODEPUPPY_PKG_FILE]: "codepuppy1\n",
       [EXT_PKG_FILE]: "ext1\n",
-      [ROUNDTRIP_FILE]: "front1\n",
+      [FROZEN_FRONTEND_FILE]: "front1\n",
     },
     ageEnv(forkAgeDays),
   )
@@ -125,10 +125,10 @@ function driftFixture(forkAgeDays: number) {
       [ADOPTED_FILE]: "p1\n",
       // ③ 新增文件:DMR 不该点名(否则 alpha 自己写的判据文件会被算成上游漂移)
       [ADDED_FILE]: "brand\nnew\nfile\n",
-      // ④⑤⑥ 三张 carve-out:各改一行,都不该计入
+      // ④⑤⑥ 三个自有包:各改一行,都不该计入
       [CODEPUPPY_PKG_FILE]: "codepuppy1\nalpha2\nalpha3\n",
       [EXT_PKG_FILE]: "ext1\next2\next3\n",
-      [ROUNDTRIP_FILE]: "front1\nfront2\nfront3\n",
+      [FROZEN_FRONTEND_FILE]: "front1\nfront2\nfront3\n",
     },
     ageEnv(0),
   )
@@ -180,29 +180,31 @@ describe("#1288 north-star 漂移度量:① 收编面", () => {
     expect(run.exitCode, `度量脚本非零退出:\n${run.output}`).toBe(0)
     const expected = whitelistEntriesFromGuardSource(GUARD_SOURCE)
     // 解析自检:一份解析退化成 0 的正则会让下面那条断言空对空地绿。
-    expect(expected, "守卫白名单解析退化成空 —— 本次测量作废").toBeGreaterThanOrEqual(20)
+    // `#1662`:最终清单可以很短(F10 允许为空),解析自检改成两种独立读法互相核对。
+    const lines = GUARD_SOURCE.split("\n").filter((line) => /^\s+':\(exclude\)/.test(line)).length
+    expect(expected, "守卫白名单解析退化 —— 本次测量作废").toBe(lines)
     expect(readNumber(run.output, ADOPTION, "收编面条数")).toBe(expected)
   })
 
-  test("控制组:守卫少三条白名单 ⇒ 打印的条数跟着少三(杀掉「印一个写死的数」)", () => {
+  test("控制组:守卫少一条白名单 ⇒ 打印的条数跟着少一(杀掉「印一个写死的数」)", () => {
     const { work } = driftFixture(40)
     const full = readNumber(runMetrics(work).output, ADOPTION, "收编面条数")
 
-    // 只动**复制品**:删掉白名单数组里的前三条 `':(exclude)…'` 行。
+    // 只动**复制品**:删掉白名单数组里的第一条 `':(exclude)…'` 行(`#1662` 最终清单只有两条)。
     const guardPath = join(work, GUARD_REL)
     const lines = readFileSync(guardPath, "utf8").split("\n")
     let removed = 0
     const trimmed = lines.filter((line) => {
-      if (removed < 3 && /^\s+':\(exclude\)/.test(line)) {
+      if (removed < 1 && /^\s+':\(exclude\)/.test(line)) {
         removed += 1
         return false
       }
       return true
     })
-    expect(removed, "夹具没能从守卫复制品里删掉三条白名单 —— 本次测量作废").toBe(3)
+    expect(removed, "夹具没能从守卫复制品里删掉一条白名单 —— 本次测量作废").toBe(1)
     writeFileSync(guardPath, trimmed.join("\n"))
 
-    expect(readNumber(runMetrics(work).output, ADOPTION, "收编面条数")).toBe(full - 3)
+    expect(readNumber(runMetrics(work).output, ADOPTION, "收编面条数")).toBe(full - 1)
   })
 })
 
@@ -242,11 +244,10 @@ describe("#1288 north-star 漂移度量:② 上游漂移", () => {
     const guardPath = join(work, GUARD_REL)
     const patched = readFileSync(guardPath, "utf8")
       .replace(/^CODEPUPPY_OWNED_PACKAGES="[^"]+"/m, 'CODEPUPPY_OWNED_PACKAGES="carveout-gone"')
-      .replace(/^ROUNDTRIP_PACKAGES="[^"]+"/m, 'ROUNDTRIP_PACKAGES="roundtrip-gone"')
     writeFileSync(guardPath, patched)
 
     const after = readNumber(runMetrics(work).output, /② 上游漂移:(\d+) 个文件/, "漂移文件数")
-    // 三张 carve-out 各一个被改的文件 ⇒ 抹掉之后正好多三个。
+    // 三个自有包各一个被改的文件 ⇒ 抹掉之后正好多三个。
     expect(after, "抹掉 carve-out 之后数字没变 —— 要么夹具没造 carve-out 改动,要么度量根本没用辖区").toBe(before + 3)
   })
 

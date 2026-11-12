@@ -38,7 +38,8 @@
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
-WORKDIR="packages/app"
+# `#1668`:冻结 app 的落点是 packages/codepuppy-app;补丁里的路径仍是相对 pin 的 packages/app/…。
+WORKDIR="packages/codepuppy-app"
 PATCH="frontend/codepuppy-patches/codepuppy-frontend.patch"
 # 地板语义与 ui-mac 的 3000/3085 同款:抓灾难性丢失,刻意留大余量(当前 CI=1 实测 623)。
 FLOOR=600
@@ -124,8 +125,8 @@ fi
 if ! git cat-file -e "${pin}^{commit}" 2>/dev/null; then
   echo "⚠️  未比对:pin ${pin} 的对象本地取不到(浅克隆/未 fetch)—— 补丁清单这一轴**本次没有交叉验证**。"
 else
-  tree_tests="$(git diff --name-only "$pin" -- packages/app \
-    | grep -aE '^packages/app/.*\.test\.(ts|tsx)$' | sed 's|^packages/app/||' | sort -u || true)"
+  tree_tests="$(git diff --name-only "${pin}:packages/app" "HEAD:packages/codepuppy-app" \
+    | grep -aE '\.test\.(ts|tsx)$' | sort -u || true)"
   patch_tests_sorted="$(printf '%s\n' "$delta_tests" | sort -u)"
   if [ "$tree_tests" != "$patch_tests_sorted" ]; then
     echo "::error::两轴不一致 —— 补丁枚举出的 alpha 判据文件与「树 vs pin ${pin}」算出来的不同,本次测量作废。"
@@ -160,8 +161,11 @@ src/components/prompt-input/submit.test.ts 9
 src/context/permission-auto-respond.test.ts 12
 src/context/server-session-restart.test.ts 2
 src/context/terminal-command.test.ts 1
+src/i18n/parity.test.ts 5
 src/pages/layout/helpers.test.ts 24
 src/utils/session-route.test.ts 10
+src/utils/terminal-websocket-url.test.ts 3
+test-browser/prompt-attachments.test.ts 6
 "
 
 lookup_registered() {
@@ -190,7 +194,9 @@ for t in $delta_tests; do
       exit 1 ;;
   esac
   set +e
-  run_bun_test "$t"
+  # `./` = 按路径点名而非按名过滤:package.json 的 test root 是 ./src,裸过滤点不到
+  # test-browser/ 下的判据文件(bun 报 "did not match",files=0)。
+  run_bun_test "./$t"
   status=$?
   set -e
   # `|| true`:文件被删时 bun 不打汇总行,grep 空手而归 —— pipefail+set -e 会让脚本在这行

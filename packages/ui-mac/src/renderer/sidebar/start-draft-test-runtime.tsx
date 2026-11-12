@@ -127,7 +127,6 @@ const projects: CodePuppyProjectsApi = {
   startChat: async () => undefined,
   sdk: () => undefined,
   renameSession: async () => true,
-  shareSession: async () => undefined,
   deleteSession: async () => true,
   copySession: async () => undefined,
   ensureDefaultWorkspace: async (worktree: string) => {

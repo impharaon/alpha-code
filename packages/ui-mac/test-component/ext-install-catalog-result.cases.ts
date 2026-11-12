@@ -397,27 +397,27 @@ test("#1531 金丝雀:agent 安装的密钥只落在 main 的密钥文件里,工
     { log: () => {} },
   )
   const asks: unknown[] = []
-  const ctx = {
-    sessionID: "ses_canary",
-    messageID: "msg_canary",
-    agent: "build",
-    directory: join(root, "workspace"),
-    worktree: join(root, "workspace"),
-    abort: new AbortController().signal,
-    metadata: () => {},
-    // 守望者:先记阶段再出站,框里填的密钥只进 install 意图的 grants。
-    ask: async (input: { metadata: { codepuppyHub: { catalogId: string; requestId: string } } }) => {
-      asks.push(input)
-      const { catalogId, requestId } = input.metadata.codepuppyHub
-      expect(await stage({ sender: { id: 1 } }, { requestId, stage: "confirming", catalogId })).toEqual({ ok: true })
-      expect(await stage({ sender: { id: 1 } }, { requestId, stage: "submitted" })).toEqual({ ok: true })
-      const result = await installTwice({ catalogId, scope: { scope: "global" }, grants: { secrets: { DSN: value } }, hubRequestId: requestId })
-      expect(result.ok, JSON.stringify(result)).toBe(true)
+  // `#1665`(OpenCode 2,接口 I10):确认请求经插件 Context 的 `permission.assert` 运输,目录取本 Location(2.x 的工具上下文没有 directory)。
+  const context = {
+    location: { directory: join(root, "workspace") },
+    permission: {
+      // 守望者:先记阶段再出站,框里填的密钥只进 install 意图的 grants。
+      assert: async (input: { metadata: { codepuppyHub: { catalogId: string; requestId: string } } }) => {
+        asks.push(input)
+        const { catalogId, requestId } = input.metadata.codepuppyHub
+        expect(await stage({ sender: { id: 1 } }, { requestId, stage: "confirming", catalogId })).toEqual({ ok: true })
+        expect(await stage({ sender: { id: 1 } }, { requestId, stage: "submitted" })).toEqual({ ok: true })
+        const result = await installTwice({ catalogId, scope: { scope: "global" }, grants: { secrets: { DSN: value } }, hubRequestId: requestId })
+        expect(result.ok, JSON.stringify(result)).toBe(true)
+      },
     },
   }
+  const ctx = { sessionID: "ses_canary", messageID: "msg_canary", agent: "build", id: "call_canary", signal: new AbortController().signal, progress: async () => {} }
   const args = { catalogId: canaryEntry.id }
-  const result = (await createHubTools(bridge).codepuppy_hub_install.execute(args, ctx as never)) as { output: string; metadata: unknown }
-  expect(result.output.split("\n")[0]).toBe("installed; available")
+  const install = createHubTools(bridge, context as never).find((tool) => tool.name === "codepuppy_hub_install")!
+  const result = (await install.execute(args, ctx as never)) as { content: string; metadata: unknown }
+  expect(asks.length).toBe(1)
+  expect(result.content.split("\n")[0]).toBe("installed; available")
   for (const surface of [args, result, asks, wire, toSidecar]) expect(JSON.stringify(surface)).not.toContain(value)
   expect(wire.some((m) => (m as { type?: string }).type === "codepuppy.hub.request.reply")).toBe(true)
 

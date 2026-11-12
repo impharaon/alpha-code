@@ -27,7 +27,7 @@
 //   503 dial-failed       登记了但域名解析不了(ENOTFOUND / EAI_AGAIN / EAI_NONAME)
 //   502 dial-failed       登记了但拒连 / 不可达(ECONNREFUSED / EHOSTUNREACH …)
 //   504 dial-failed       登记了但拨号超时(dialTimeoutMs 内既不通也不拒)
-// 三种 dial-failed 都**不是**策略拒绝,别混。`#1572`:它们按层用不同状态码(@opencode-ai/schema/codepuppy-net-failure 的
+// 三种 dial-failed 都**不是**策略拒绝,别混。`#1572`:它们按层用不同状态码(@opencode/schema/codepuppy-net-failure 的
 // EGRESS_DIAL_FAILURE_STATUS)—— node 的 undici 把 CONNECT 的非 200 正文丢掉、只留状态码,状态码本身就得把层分开。
 // 拒绝体带可识别前缀:bun 的 fetch 会把代理的 403 当目标响应返回(§4.2),正文是应用侧唯一的归因线索。
 //
@@ -42,7 +42,7 @@
 
 import * as http from "node:http"
 import * as net from "node:net"
-import { classifyNetFailure, EGRESS_DIAL_FAILURE_STATUS } from "@opencode-ai/schema/codepuppy-net-failure"
+import { classifyNetFailure, EGRESS_DIAL_FAILURE_STATUS } from "@opencode/schema/codepuppy-net-failure"
 import { egressDenialLine } from "../shared/egress-denial"
 import { isEgressAuthorizedForSidecar } from "./network-egress-derived"
 import { requestUserEgressGrant, type EgressGrantOutcome } from "./network-egress-grants"

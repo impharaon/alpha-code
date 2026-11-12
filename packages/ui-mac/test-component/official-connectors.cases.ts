@@ -12,10 +12,21 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs"
-import { tmpdir, userInfo } from "node:os"
+import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { Database } from "bun:sqlite"
 import { createRequire } from "node:module"
+
+// `#1662`(OpenCode 2):v1 引擎 packages/opencode 随换代删除。「引擎真的那份 {file:} 实现」换成 2.x 的
+// `@opencode/core/config/variable`(Effect,读文件走 FSUtil);MCP 客户端换成 2.x 引擎自己用的 `@modelcontextprotocol/client`。
+async function substituteWithEngine(input: { type: "virtual"; source: string; dir: string; text: string }): Promise<string> {
+  const { Effect } = await import("effect")
+  const { ConfigVariable } = await import("@opencode/core/config/variable")
+  const { AppNodeBuilder } = await import("@opencode/core/effect/app-node-builder")
+  const { FSUtil } = await import("@opencode/util/fs-util")
+  return Effect.runPromise(ConfigVariable.substitute(input).pipe(Effect.provide(AppNodeBuilder.build(FSUtil.node))))
+}
+const engineRequire = createRequire(resolve(import.meta.dir, "../../core/package.json"))
 
 // The OS keychain boundary is replaced with real AES-GCM, not a plaintext/base64 stand-in.
 const key = randomBytes(32)
@@ -361,9 +372,13 @@ test("prepared journal crash recovery removes only uncommitted official versions
 })
 
 test("DBHub 1.5.0 real stdio SELECT 1 succeeds, writes fail, only execute_sql exists, and uninstall preserves the database", async () => {
-  // Only this newly-created test directory is touched under actual HOME: the production
-  // profile grants all system temp writes, so a temp-only test cannot prove TOML protection.
-  const ownedHome = mkdtempSync(join(userInfo().homedir, ".connector-256-fixture-"))
+  // The production profile grants all system temp writes, so a temp-only test cannot prove TOML protection.
+  // `#1662`: under the shared test-isolation preload (I-08) both HOME and `userInfo().homedir` point into the
+  // temp root, so the fixture lives in this package's git-ignored node_modules/.cache instead: outside every
+  // writable root of the profile, and outside the developer's real HOME directories.
+  const scratch = join(import.meta.dir, "..", "node_modules", ".cache")
+  mkdirSync(scratch, { recursive: true })
+  const ownedHome = mkdtempSync(join(scratch, "connector-256-fixture-"))
   try {
     __resetCodePuppyEnvironmentForTests()
     delete process.env.CODEPUPPY_GLOBAL_DIR
@@ -390,18 +405,16 @@ test("DBHub 1.5.0 real stdio SELECT 1 succeeds, writes fail, only execute_sql ex
       readFileSync(join(officialConnectorPaths(root, "dbhub-readonly", "v-sqlite").config, "dbhub.toml"), "utf8"),
     ).toBe(DBHUB_READONLY_TOML)
     // Consume the engine's actual {file:} implementation; no test-owned interpolation algorithm.
-    const { ConfigVariable } = await import(resolve(import.meta.dir, "../../opencode/src/config/variable.ts"))
     const config = JSON.parse(
-      await ConfigVariable.substitute({
+      await substituteWithEngine({
         type: "virtual",
         source: "official-test",
         dir: root,
         text: JSON.stringify(recipe.config),
       }),
     )
-    const require = createRequire(resolve(import.meta.dir, "../../opencode/package.json"))
-    const { Client } = await import(require.resolve("@modelcontextprotocol/sdk/client/index.js"))
-    const { StdioClientTransport } = await import(require.resolve("@modelcontextprotocol/sdk/client/stdio.js"))
+    const { Client } = await import(engineRequire.resolve("@modelcontextprotocol/client"))
+    const { StdioClientTransport } = await import(engineRequire.resolve("@modelcontextprotocol/client/stdio"))
     const client = new Client({ name: "codepuppy-256-test", version: "1.0.0" })
     // Acquire the pinned npm fixture outside the fence, using only this test's empty npm
     // configs. Then run the real recipe offline inside the fence (no DB network permission).
@@ -569,9 +582,8 @@ test("GitHub recipe decrypts through actual engine file substitution into HTTP h
   expect(setDesiredStateV2(root, "mcp", "github-official", "enabled").ok).toBe(true)
   restoreCommittedOfficialConnectors()
   const recipe = officialConnectorConfig(root, "github-official", "v-http")
-  const { ConfigVariable } = await import(resolve(import.meta.dir, "../../opencode/src/config/variable.ts"))
   const config = JSON.parse(
-    await ConfigVariable.substitute({
+    await substituteWithEngine({
       type: "virtual",
       source: "official-test",
       dir: root,
@@ -613,11 +625,7 @@ test("GitHub recipe decrypts through actual engine file substitution into HTTP h
       })
     },
   })
-  const require = createRequire(resolve(import.meta.dir, "../../opencode/package.json"))
-  const { Client } = await import(require.resolve("@modelcontextprotocol/sdk/client/index.js"))
-  const { StreamableHTTPClientTransport } = await import(
-    require.resolve("@modelcontextprotocol/sdk/client/streamableHttp.js")
-  )
+  const { Client, StreamableHTTPClientTransport } = await import(engineRequire.resolve("@modelcontextprotocol/client"))
   const client = new Client({ name: "official-doc-fixture", version: "1.0.0" })
   try {
     await client.connect(new StreamableHTTPClientTransport(server.url, { requestInit: { headers: config.headers } }))
@@ -753,14 +761,20 @@ test("real IPC previews/cancels without secrets, installs both recipes, stops be
   await ready.ledgerReady
   let busy = true
   const { createReloadScheduler } = await import("../../ext/src/reload-scheduler")
+  // `#1662`(#1665):2.x 的调度器问进程内引擎的 `GET /api/session/active`(进程级忙闲),重载打 `POST /api/location/reload`;
+  // 登记只认目录。v1 那种按实例的 `session.status` / `instance.dispose` 客户端已不存在。
   const scheduler = createReloadScheduler({
+    engine: () => async (request: Request) => {
+      const url = new URL(request.url)
+      if (request.method === "GET" && url.pathname === "/api/session/active")
+        return Response.json({ data: busy ? { ses_pending_approval: { type: "running" } } : {} })
+      if (request.method === "POST" && url.pathname === "/api/location/reload") return new Response(null, { status: 204 })
+      return new Response("not found", { status: 404 })
+    },
     log: () => {}, error: () => {},
     report: (report) => ready.codepuppySidecar.receive({ type: "codepuppy.reload.report", ...report }, () => {}),
   })
-  scheduler.register(home, {
-    session: { status: async () => ({ data: busy ? { ses_pending_approval: { type: "busy" } } : {} }) },
-    instance: { dispose: async () => ({ data: true }) },
-  })
+  scheduler.register(home, {})
   ready.codepuppySidecar.attach((request) => scheduler.request(request))
   const original = globalThis.fetch
   // Catalog fetch is the external seam: production admission and both registered IPC bodies run.

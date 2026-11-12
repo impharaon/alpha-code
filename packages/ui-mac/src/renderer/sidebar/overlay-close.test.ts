@@ -19,8 +19,8 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
 
-/** 2 条前提自检 + 2 覆盖层 × 7 导航路径 = 16。等于实际条数,不留余量(见抬头)。 */
-const CASE_FLOOR = 16
+/** 2 条前提自检 + 2 覆盖层 × 7 导航路径 = 16,加 `#1687` 未恢复问题入口挂载 2 条 = 18。等于实际条数,不留余量(见抬头)。 */
+const CASE_FLOOR = 18
 
 test(
   "覆盖层随导航关闭:真实宿主 × 真实点击的参数化矩阵",

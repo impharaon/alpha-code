@@ -3,7 +3,8 @@
 //
 // 只覆盖本票改名的层:MCP 服务器键、扩展插件工具(id 与可读标识)、模式 / agent、来源分类与来源证明、模型供应商 id。
 // 每一层都**直接 import 它的权威**(不扫描、不手抄),外加 vendored 平台公开工具清单与随包 Office 工具清单,
-// 推出模型真正收到的函数名(引擎自己的 `McpCatalog.toolName`)。断言三条:
+// 推出模型真正收到的函数名(引擎自己的命名:OpenCode 2 的 `packages/core/src/tool/mcp.ts` `name()` 由 runtime.ts 的
+// `effectiveName` / `normalizedName` 组成,这里用同两个函数;v1 的 `McpCatalog.toolName` 随换代删除)。断言三条:
 //   ① 这些层里零旧名(`alpha` 品牌、旧云服务器键 `cloud`、重复拼接 `cloud_cloud_`、不带品牌的 `hub_*`),
 //      第一方名字以 `codepuppy` 开头且品牌只出现一次;
 //   ② 第一方插件动作集 ∩ 平台工具集 = ∅(否则插件工具与云工具拼出同一个模型函数名,引擎别名账本整轮装配失败);
@@ -15,7 +16,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { VISION_MARKER } from "../../ext/src/cloud-vision-hooks"
 import { TOOL_TEXT } from "../../ext/src/context-injection"
-import { McpCatalog } from "../../opencode/src/mcp/catalog"
+import { effectiveName, normalizedName } from "../../core/src/tool/runtime"
 import { ToolClass } from "../../schema/src/codepuppy-tool-policy"
 import { ToolAuthority } from "../../schema/src/tool-identity"
 import { CODEPUPPY_AGENT_TEXT } from "../src/main/codepuppy-agents"
@@ -45,10 +46,13 @@ const MODEL_FUNCTION_NAME = /^[a-z0-9_-]{1,64}$/
 type OfficeManifest = { formats: Record<string, { tools: Array<{ name: string }> }> }
 const OFFICE_TOOLS = join(import.meta.dir, "../resources/office-mcp/tools.json")
 
+/** 引擎给 MCP 工具起的模型函数名(packages/core/src/tool/mcp.ts 的 `name(server, tool)` 同式)。 */
+const mcpToolName = (server: string, tool: string) => effectiveName({ name: tool, options: { namespace: normalizedName({ name: server }) } })
+
 export function exportCodepuppyNames(): CodepuppyNames {
   const office = JSON.parse(readFileSync(OFFICE_TOOLS, "utf8")) as OfficeManifest
   const officeFunctions = CODEPUPPY_OFFICE_CONNECTORS.flatMap((connector) =>
-    (office.formats[connector.format]?.tools ?? []).map((tool) => McpCatalog.toolName(connector.name, tool.name)),
+    (office.formats[connector.format]?.tools ?? []).map((tool) => mcpToolName(connector.name, tool.name)),
   )
   const authorityMembers = ToolAuthority.members as ReadonlyArray<{ fields: { kind: { literal: string } } }>
   return {
@@ -61,7 +65,7 @@ export function exportCodepuppyNames(): CodepuppyNames {
     platformTools: [...CLOUD_MCP_TOOLS],
     modelFunctionNames: [
       ...Object.keys(TOOL_TEXT),
-      ...CLOUD_MCP_TOOLS.map((tool) => McpCatalog.toolName(CLOUD_MCP_SERVER_NAME, tool)),
+      ...CLOUD_MCP_TOOLS.map((tool) => mcpToolName(CLOUD_MCP_SERVER_NAME, tool)),
       ...officeFunctions,
     ],
   }

@@ -18,7 +18,7 @@ import type { createPermissionDecisionCommand, PermissionDialog } from "./Permis
 import type { PermissionWatcher } from "./permission-watcher"
 import { dict as en } from "../i18n/en"
 import { dict as zh } from "../i18n/zh"
-import { adaptPermissionV1Request } from "../../../../app/src/context/permission-v1-adapter"
+import { adaptPermissionV1Request } from "../../../../codepuppy-app/src/context/permission-v1-adapter"
 
 type TestRuntime = {
   createComponent: typeof createComponent

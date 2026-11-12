@@ -23,8 +23,10 @@ import {
   timestamp,
   type Exec,
   type ExecSync,
+  type ExpectedMigrations,
   type FsDeps,
 } from "./db-safety"
+import { expectedMigrations, RETIRED_MIGRATION_IDS } from "../../scripts/gen-db-expected"
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 function memFs(initial: Record<string, string> = {}) {
@@ -97,20 +99,20 @@ describe("diffWatermarks + decidePlan", () => {
   const C = "20260303000000_c"
 
   test("pending only(app 超前 DB)", () => {
-    const d = diffWatermarks([A, B, C], [A, B])
+    const d = diffWatermarks([A, B, C], [A, B], [])
     expect(d.pending).toEqual([C])
     expect(d.unknown).toEqual([])
   })
   test("unknown only(DB 超前 app)", () => {
-    const d = diffWatermarks([A, B], [A, B, C])
+    const d = diffWatermarks([A, B], [A, B, C], [])
     expect(d.unknown).toEqual([C])
     expect(d.pending).toEqual([])
   })
   test("相等 → proceed", () => {
-    expect(decidePlan({ ok: true, ids: [A, B], legacy: false }, [A, B])).toEqual({ kind: "proceed" })
+    expect(decidePlan({ ok: true, ids: [A, B], legacy: false }, { ids: [A, B], retired: [] })).toEqual({ kind: "proceed" })
   })
   test("db-ahead:latest = 最末未知 id", () => {
-    const plan = decidePlan({ ok: true, ids: [A, B, C], legacy: false }, [A])
+    const plan = decidePlan({ ok: true, ids: [A, B, C], legacy: false }, { ids: [A], retired: [] })
     expect(plan.kind).toBe("db-ahead")
     if (plan.kind === "db-ahead") {
       expect(plan.unknown).toEqual([B, C])
@@ -118,28 +120,34 @@ describe("diffWatermarks + decidePlan", () => {
     }
   })
   test("migrate-ahead:pending 列表齐全", () => {
-    const plan = decidePlan({ ok: true, ids: [A], legacy: false }, [A, B, C])
+    const plan = decidePlan({ ok: true, ids: [A], legacy: false }, { ids: [A, B, C], retired: [] })
     expect(plan).toEqual({ kind: "migrate-ahead", pending: [B, C] })
   })
   test("legacy(无 migration 表旧库)→ 全量 pending = migrate-ahead", () => {
-    const plan = decidePlan({ ok: true, ids: [], legacy: true }, [A, B])
+    const plan = decidePlan({ ok: true, ids: [], legacy: true }, { ids: [A, B], retired: [] })
     expect(plan).toEqual({ kind: "migrate-ahead", pending: [A, B] })
   })
   test("missing → skip(fresh install)", () => {
-    const plan = decidePlan({ ok: false, kind: "missing", detail: "" }, [A])
+    const plan = decidePlan({ ok: false, kind: "missing", detail: "" }, { ids: [A], retired: [] })
     expect(plan.kind).toBe("skip")
   })
   test("corrupt → corrupt", () => {
-    const plan = decidePlan({ ok: false, kind: "corrupt", detail: "file is not a database" }, [A])
+    const plan = decidePlan({ ok: false, kind: "corrupt", detail: "file is not a database" }, { ids: [A], retired: [] })
     expect(plan.kind).toBe("corrupt")
   })
   test("读取 error → skip(fail-open,守卫不伤启动)", () => {
-    const plan = decidePlan({ ok: false, kind: "error", detail: "locked" }, [A])
+    const plan = decidePlan({ ok: false, kind: "error", detail: "locked" }, { ids: [A], retired: [] })
     expect(plan.kind).toBe("skip")
   })
   test("支持面清单缺失 → skip(fail-open)", () => {
     expect(decidePlan({ ok: true, ids: [A], legacy: false }, null).kind).toBe("skip")
-    expect(decidePlan({ ok: true, ids: [A], legacy: false }, []).kind).toBe("skip")
+    expect(decidePlan({ ok: true, ids: [A], legacy: false }, { ids: [], retired: [] }).kind).toBe("skip")
+  })
+  test("退役 id(#1664,裁决书 N2):库里有 ⇒ 不算 unknown;库里没有 ⇒ 不算 pending", () => {
+    const R = "20260720085655_retired"
+    expect(diffWatermarks([A, B], [A, B, R], [R])).toEqual({ pending: [], unknown: [] })
+    expect(diffWatermarks([A, B], [A, B], [R])).toEqual({ pending: [], unknown: [] })
+    expect(diffWatermarks([A, B], [A, B, R], [])).toEqual({ pending: [], unknown: [R] })
   })
 })
 
@@ -191,7 +199,11 @@ describe("loadExpectedIds", () => {
   })
   test("正常 → ids(滤掉非字符串)", () => {
     const { fs } = memFs({ [P]: JSON.stringify({ v: 1, ids: ["a", 42, "b"] }) })
-    expect(loadExpectedIds({ resourcesPath: "/res", exists: fs.exists, readText: fs.readText })).toEqual(["a", "b"])
+    expect(loadExpectedIds({ resourcesPath: "/res", exists: fs.exists, readText: fs.readText })).toEqual({ ids: ["a", "b"], retired: [] })
+  })
+  test("retired 字段原样读出(滤掉非字符串);旧产物没有这个字段 ⇒ [](上一条)", () => {
+    const { fs } = memFs({ [P]: JSON.stringify({ v: 1, ids: ["a"], retired: ["r", 7] }) })
+    expect(loadExpectedIds({ resourcesPath: "/res", exists: fs.exists, readText: fs.readText })).toEqual({ ids: ["a"], retired: ["r"] })
   })
 })
 
@@ -254,15 +266,21 @@ describe("createVerifiedBackup(mock exec)", () => {
   const now = new Date(2026, 6, 5, 1, 2, 3)
   test("integrity 非 ok → 删 tmp + 报错", async () => {
     const { fs, files } = memFs({ "/data/opencode.db": "DB" })
+    const calls: string[][] = []
     const exec: Exec = async (args) => {
-      if (args[2]?.startsWith("VACUUM INTO")) {
+      calls.push(args)
+      // SQL 恒在最后一个参数(`#1664` 起 VACUUM INTO 走普通连接,参数里不再有 `-readonly`,位置不能写死)。
+      if (args.at(-1)?.startsWith("VACUUM INTO")) {
         files.set("/bk/opencode-backup-20260705-010203.db.tmp", "SNAP")
         return { code: 0, stdout: "", stderr: "" }
       }
       return { code: 0, stdout: "*** in database main ***\nPage 5 is never used\n", stderr: "" }
     }
     const r = await createVerifiedBackup({ dbPath: "/data/opencode.db", backupDir: "/bk", exec, fs, now })
+    // 校验那一次必须真的跑到 —— 否则这条用例红在 VACUUM 那一步,测的就不是「验不过即删」。
+    expect(calls.length, `只跑了 ${calls.length} 次 sqlite3,校验没跑到:${JSON.stringify(calls)}`).toBe(2)
     expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.error).toContain("快照验证失败")
     expect(files.has("/bk/opencode-backup-20260705-010203.db.tmp")).toBe(false)
     expect(files.has("/bk/opencode-backup-20260705-010203.db")).toBe(false)
   })
@@ -276,6 +294,8 @@ describe("createVerifiedBackup(mock exec)", () => {
 
 // ── 真 sqlite3 集成(macOS 本地 + GH ubuntu 均有;缺失则 skip)────────────────────
 const sqlite3 = Bun.which("sqlite3")
+if (!sqlite3)
+  console.warn("⚠️ db-safety.test: no sqlite3 on PATH — every real-sqlite3 case below (incl. the #1664 WAL cases) is SKIPPED")
 const itSql = test.skipIf(!sqlite3)
 
 const execReal: Exec = async (args) => {
@@ -408,5 +428,156 @@ describe("integration(real sqlite3)", () => {
     expect(existsSync(restored.damagedPath)).toBe(true)
     expect(existsSync(`${restored.damagedPath}-wal`)).toBe(true)
     expect(existsSync(`${db}-wal`)).toBe(false)
+  })
+})
+
+// ── `#1664`:OpenCode 2 的支持面清单 + 干净关闭的 WAL 库(#1662 裁决书 F1 / N2 / R18)────────────────────
+// owner 的库是 WAL 模式、干净关闭后没有 -wal/-shm;只读直开这种库失败(exit 14),预检曾因此静默 skip、备份也失败
+// (L1 勘破 §9.2,真库副本复现)。夹具照这个形态造:建库、TRUNCATE 检查点、关库、删掉 -wal/-shm —— 干净关闭留下的
+// 就是这个样子(macOS 的 sqlite3 关库后会保留它们,所以要删)。支持面清单取生产生成器从本树 core 的 migration.gen.ts
+// 算出的那份,经生产的 loadExpectedIds 读回。
+const REPO_ROOT = join(import.meta.dir, "..", "..", "..", "..")
+/**
+ * 1.18.35 形态的库:`git ls-tree --name-only e56ae0c036 packages/core/src/database/migration/` 的 40 个 id
+ * (= owner 真库副本 migration 表的 40 行,L1 勘破 §9.1):38 条上游迁移 + Code Puppy 自己的 2 条。
+ */
+const DB_1_18_35_IDS = [
+  "20260127222353_familiar_lady_ursula",
+  "20260211171708_add_project_commands",
+  "20260213144116_wakeful_the_professor",
+  "20260225215848_workspace",
+  "20260227213759_add_session_workspace_id",
+  "20260228203230_blue_harpoon",
+  "20260303231226_add_workspace_fields",
+  "20260309230000_move_org_to_state",
+  "20260312043431_session_message_cursor",
+  "20260323234822_events",
+  "20260410174513_workspace-name",
+  "20260413175956_chief_energizer",
+  "20260423070820_add_icon_url_override",
+  "20260427172553_slow_nightmare",
+  "20260428004200_add_session_path",
+  "20260501142318_next_venus",
+  "20260504145000_add_sync_owner",
+  "20260507164347_add_workspace_time",
+  "20260510033149_session_usage",
+  "20260511000411_data_migration_state",
+  "20260511173437_session-metadata",
+  "20260601010001_normalize_storage_paths",
+  "20260601202201_amazing_prowler",
+  "20260602002951_lowly_union_jack",
+  "20260602182828_add_project_directories",
+  "20260603001617_session_message_projection_indexes",
+  "20260603040000_session_message_projection_order",
+  "20260603141458_session_input_inbox",
+  "20260603160727_jittery_ezekiel_stane",
+  "20260604172448_event_sourced_session_input",
+  "20260605003541_add_session_context_snapshot",
+  "20260605042240_add_context_epoch_agent",
+  "20260611035744_credential",
+  "20260611192811_lush_chimera",
+  "20260612174303_project_dir_strategy",
+  "20260622142730_simplify_session_context_epoch",
+  "20260622170816_reset_v2_session_state",
+  "20260622202450_simplify_session_input",
+  "20260720085655_permission-decision-receipt",
+  "20260720094009_permission-request-admission",
+]
+
+async function makeCleanWalDb(path: string, ids: string[]) {
+  const values = ids.map((id) => `('${id}', 1)`).join(",")
+  const res = await execReal([
+    path,
+    `PRAGMA journal_mode=WAL; CREATE TABLE migration(id TEXT PRIMARY KEY, time_completed INTEGER NOT NULL); INSERT INTO migration VALUES ${values}; CREATE TABLE session(id TEXT); PRAGMA wal_checkpoint(TRUNCATE);`,
+  ])
+  if (res.code !== 0) throw new Error(`fixture failed: ${res.stderr}`)
+  rmSync(`${path}-wal`, { force: true })
+  rmSync(`${path}-shm`, { force: true })
+  // 夹具自检:文件头第 18/19 字节都是 2 才是 WAL 库,且旁边没有 -wal/-shm。
+  const header = readFileSync(path).subarray(18, 20)
+  if (header[0] !== 2 || header[1] !== 2 || existsSync(`${path}-wal`) || existsSync(`${path}-shm`))
+    throw new Error("夹具不是「干净关闭的 WAL 库」—— 本次测量作废")
+}
+
+function expectedFromGenerator(): ExpectedMigrations {
+  const resources = mkdtempSync(join(tmpRoot, "resources-"))
+  writeFileSync(
+    join(resources, "db-expected-migrations.json"),
+    JSON.stringify(expectedMigrations(join(REPO_ROOT, "packages/core/src/database"))),
+  )
+  const loaded = loadExpectedIds({ resourcesPath: resources, exists: existsSync, readText: (p) => readFileSync(p, "utf8") })
+  if (!loaded) throw new Error("生成器的产物经 loadExpectedIds 读不回来 —— 本次测量作废")
+  return loaded
+}
+
+describe("#1664 OpenCode 2 支持面 + 干净关闭的 WAL 库", () => {
+  test("生成器:清单取自 core 的 migration.gen.ts;退役的两条单列、不在支持面里;1.18.35 的其余 38 条都在", () => {
+    const expected = expectedFromGenerator()
+    expect(expected.retired).toEqual(RETIRED_MIGRATION_IDS)
+    expect(expected.ids.filter((id) => expected.retired.includes(id))).toEqual([])
+    expect(DB_1_18_35_IDS.filter((id) => !expected.ids.includes(id))).toEqual(RETIRED_MIGRATION_IDS)
+  })
+
+  itSql("1.18.35 形态的干净关闭 WAL 库 ⇒ migrate-ahead(不是 skip、不是 db-ahead);控制组:只读直开 ⇒ skip", async () => {
+    const expected = expectedFromGenerator()
+    const db = join(tmpRoot, "wal-1.18.35.db")
+    await makeCleanWalDb(db, DB_1_18_35_IDS)
+
+    // 控制组 = 读法改回 `-readonly` 直开。必须先跑:普通连接读过之后,macOS 的 sqlite3 会把 -wal/-shm 留在盘上,
+    // 只读直开就不再失败了。
+    const viaReadonly = await readDbMigrationIds(db, (args) => execReal(["-readonly", ...args]), existsSync)
+    expect(decidePlan(viaReadonly, expected).kind, `控制组没 skip —— 夹具不是只读直开打不开的那种库:${JSON.stringify(viaReadonly)}`).toBe("skip")
+
+    const read = await readDbMigrationIds(db, execReal, existsSync)
+    const plan = decidePlan(read, expected)
+    expect(plan.kind, `干净关闭的 WAL 库没走到「待前进」:${JSON.stringify(plan)}`).toBe("migrate-ahead")
+    if (plan.kind !== "migrate-ahead") return
+    expect(plan.pending.length).toBeGreaterThan(0)
+    expect(plan.pending).toEqual(expected.ids.filter((id) => !DB_1_18_35_IDS.includes(id)))
+    // 不单列退役 id(只给 2.x 的支持面)⇒ db-ahead,未知的正好是那两条 —— 退役字段挡的就是这个。
+    expect(decidePlan(read, { ids: expected.ids, retired: [] })).toEqual({
+      kind: "db-ahead",
+      unknown: RETIRED_MIGRATION_IDS,
+      latest: RETIRED_MIGRATION_IDS[1]!,
+    })
+  })
+
+  itSql("干净关闭的 WAL 库直接备份(前进前备份、菜单「立即备份」都走它)⇒ 成功并通过校验;控制组:只读会话的 VACUUM INTO ⇒ 失败", async () => {
+    // 每一臂各用一份新夹具、之前不读水位:普通连接读过之后 macOS 的 sqlite3 留下 -wal/-shm,只读会话的备份也就不再失败。
+    const control = join(tmpRoot, "wal-backup-control.db")
+    await makeCleanWalDb(control, DB_1_18_35_IDS)
+    const viaReadonly = await createVerifiedBackup({
+      dbPath: control,
+      backupDir: join(tmpRoot, "wal-backups-control"),
+      exec: (args) => execReal(["-readonly", ...args]),
+      fs: realFs,
+      now: new Date(2026, 10, 9),
+    })
+    expect(viaReadonly.ok, `控制组的只读备份居然成功了 —— 夹具测不出要修的那条缺陷:${JSON.stringify(viaReadonly)}`).toBe(false)
+
+    const db = join(tmpRoot, "wal-backup.db")
+    await makeCleanWalDb(db, DB_1_18_35_IDS)
+    const backup = await createVerifiedBackup({
+      dbPath: db,
+      backupDir: join(tmpRoot, "wal-backups"),
+      exec: execReal,
+      fs: realFs,
+      now: new Date(2026, 10, 9),
+    })
+    expect(backup.ok, `干净关闭的 WAL 库备份失败:${JSON.stringify(backup)}`).toBe(true)
+    if (!backup.ok) return
+    expect(await readDbMigrationIds(backup.path, execReal, existsSync)).toEqual({ ok: true, ids: DB_1_18_35_IDS, legacy: false })
+  })
+
+  itSql("2.x 新建的库(支持面全部 id,没有退役那两条)⇒ proceed:不前进、不备份(控制组:退役 id 并进支持面 ⇒ 每次启动 migrate-ahead)", async () => {
+    const expected = expectedFromGenerator()
+    const db = join(tmpRoot, "wal-2x.db")
+    await makeCleanWalDb(db, expected.ids)
+    const read = await readDbMigrationIds(db, execReal, existsSync)
+    expect(decidePlan(read, expected)).toEqual({ kind: "proceed" })
+    expect(decidePlan(read, { ids: [...expected.ids, ...expected.retired], retired: [] })).toEqual({
+      kind: "migrate-ahead",
+      pending: RETIRED_MIGRATION_IDS,
+    })
   })
 })

@@ -1,3 +1,13 @@
+# Bun 1.4.4: tsconfig `"jsx": "preserve"` + `jsxImportSource: "solid-js"` now compiles to the automatic
+# runtime (`jsxDEV` from solid-js/jsx-dev-runtime), and solid-js exports no runtime there -> every test that
+# merely imports a .tsx module dies at link time. Bun 1.3.x compiled the same tsconfig to classic
+# `React.createElement`, which links fine and is never executed in-process. This restores that.
+# Not upstream's `../ui/test/solid-jsx.ts` preload: a preload onLoad plugin outranks the babel-preset-solid
+# plugin the test-component/*.cases.ts subprocesses register, so it would replace the production compiler
+# there (measured: catalog-failure-banner / attachment-cards go red). Real rendering stays with those cases.
+# Top-level on purpose: under [test] Bun ignores it (measured).
+jsx = "react"
+
 [test]
 # Pin the UI locale to zh before any test file evaluates. The real-Solid-render suites
 # (PermissionDialog / Recovery / settings) and the model-picker cases assert zh product
@@ -5,7 +15,9 @@
 # the strings to t(...)). Setting the env here — one producer — is consumed by the single
 # detectLocale() override, covering both the inlined per-bundle i18n instances and the
 # subprocess in codepuppy-composer-model.component.test.ts (it inherits process.env).
-preload = ["./scripts/test-preload.ts"]
+# I-08:共享的测试隔离预载排第一 —— 任何测试文件求值之前,HOME / 全部 XDG_* / OPENCODE_DB / TMPDIR 已指进新建的临时根;
+# host 起的子 `bun test` 继承到根标记就沿用同一个根。实现与理由在 scripts/test-isolation/preload.ts,判据 src/main/test-isolation.test.ts。
+preload = ["../../scripts/test-isolation/preload.ts", "./scripts/test-preload.ts"]
 
 # alpha-code#1558:选择器 / 输入框的品牌图标经上游 ProviderIcon 引用 `provider-icons/sprite.svg`。生产构建(vite)把
 # `import sprite from "*.svg"` 解析成资源 URL;bun 没有 .svg 的默认 loader,会把它当 JSX 解析而整份组件套件挂掉。

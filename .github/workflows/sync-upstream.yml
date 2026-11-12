@@ -2,7 +2,10 @@
 #
 # alpha only ADDS files, so the ONLY expected merge conflict is `bun.lock`
 # (adding workspace packages necessarily updates it). That case is auto-resolved
-# by taking upstream's lockfile and re-running `bun install`.
+# by taking upstream's lockfile and re-running `bun install`. `#1664`: the root
+# `CHANGELOG.md` is the second expected conflict — upstream ships OpenCode 2's
+# release notes at that path, Code Puppy keeps its own release history there, so
+# it is always resolved to ours.
 #
 # `#1566`: the exception is the takeover list — upstream files alpha deliberately
 # edits, registered once in `scripts/north-star-guard.sh` (`UPSTREAM_EXCLUDES`).
@@ -35,9 +38,8 @@
 name: sync-upstream
 
 on:
-  # 定时同步重开(2026-07-21,ADR-034 B 方案迁移完成):日常 sync 只进引擎,apply_codepuppy_frontend_delta
-  # 把 app/ui 恒还原为 frontend-pin.lock 的 pin + SOT 补丁——不再擦 alpha seam、不再丢上游前端。
-  # 前端前进由月更 bump(见 frontend/README.md)。#465 曾暂停本 cron 止血,机制已 B-safe,恢复。
+  # 定时同步(2026-07-21 重开):日常 sync 只进引擎。`#1668` 起冻结前端住在 packages/codepuppy-{app,ui}
+  # (pin + SOT 补丁,见 frontend/README.md),上游 packages/{app,ui} 原样跟着上游走,sync 不再还原前端。
   schedule:
     - cron: "0 6 * * *" # daily 06:00 UTC
   workflow_dispatch: {}
@@ -67,10 +69,11 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # `#1664`:OpenCode 2 的根 package.json 写的是 bun@1.4.4,引擎冒烟跑的是 2.x 的 CLI。
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.3.14"
+          bun-version: "1.4.4"
 
       - name: Configure git + remotes
         run: |
@@ -97,9 +100,10 @@ jobs:
       # ADR-015 合并验证:Tier-3 行为层(codepuppy-behavior/identity/.opencode/agent)与上游 prompt 底座的
       # 矛盾不产生 git 冲突 → file-diff 守卫(ADR-004)测不出。当本次 sync 触碰上游 prompt/*.txt 或
       # agent/* 时,发一条 warning + step summary 要求人工语义复核(不阻断同步)。
+      # `#1664`:OpenCode 2 的系统提示与 agent 定义在 core 里(基线 §2.9;清点表 L3r)。
       - name: Prompt/agent tripwire (ADR-015 — human review required)
         run: |
-          paths="packages/opencode/src/session/prompt packages/opencode/src/agent"
+          paths="packages/core/src/session/system-prompt.ts packages/core/src/plugin/system-prompt packages/core/src/agent.ts"
           touched="$(git diff --name-only "$OLD_DEV".."$NEW_DEV" -- $paths || true)"
           if [ -n "$touched" ]; then
             {
@@ -127,13 +131,26 @@ jobs:
         run: |
           guard="$(mktemp)"
           git show "$OLD_ALPHA:scripts/north-star-guard.sh" > "$guard"
+          # #1662 F10:清单可以合法为空(换代后的接管面可能收到零),这与「守卫没跑出结果」是两件事 ——
+          # 先读守卫自报的条数,读不出 ⇒ 守卫坏了,中止;条数为 0 ⇒ 没有接管文件要核对,照常继续。
+          jurisdiction="$(bash "$guard" --print-jurisdiction)"
+          count="$(awk -F'\t' '$1 == "UPSTREAM_EXCLUDES_COUNT" { print $2 }' <<< "$jurisdiction")"
+          case "$count" in
+            ''|*[!0-9]*)
+              echo "::error::守卫没有给出接管清单条数 —— $OLD_ALPHA 的 scripts/north-star-guard.sh --print-jurisdiction 读不出 UPSTREAM_EXCLUDES_COUNT,无法判断上游候选是否触及接管文件。Aborting sync."
+              exit 1 ;;
+          esac
           takeover="$(bash "$guard" --print-takeover)"
-          if [ -z "$takeover" ]; then
-            echo "::error::接管清单为空 —— $OLD_ALPHA 的 scripts/north-star-guard.sh --print-takeover 没给出任何路径,无法判断上游候选是否触及接管文件。Aborting sync."
+          paths=()
+          while IFS= read -r p; do [ -n "$p" ] && paths+=("$p"); done <<< "$takeover"
+          if [ "${#paths[@]}" -ne "$count" ]; then
+            echo "::error::守卫打印的接管路径(${#paths[@]} 条)与它自报的条数($count)不一致。Aborting sync."
             exit 1
           fi
-          paths=()
-          while IFS= read -r p; do paths+=("$p"); done <<< "$takeover"
+          if [ "$count" -eq 0 ]; then
+            echo "Takeover list is empty (UPSTREAM_EXCLUDES_COUNT=0): no takeover paths to check."
+            exit 0
+          fi
           MB="$(git merge-base "$OLD_ALPHA" "$NEW_DEV")"
           touched="$(git diff --name-only --no-renames "$MB" "$NEW_DEV" -- "${paths[@]}")"
           if [ -z "$touched" ]; then
@@ -193,92 +210,37 @@ jobs:
       - name: Merge `dev` into `alpha` (local only, no push)
         run: |
           git checkout alpha
-          # B 方案(月更 pin+补丁,supersede ADR-020 冻结;owner 2026-07-21 拍板):packages/{app,ui}
-          # 恒等于 `frontend/frontend-pin.lock` 记录的上游 pin + alpha 前端 SOT 补丁
-          # `frontend/codepuppy-patches/codepuppy-frontend.patch`。日常 sync 只进引擎;前端前进由月更 bump
-          # workflow 升 pin。每次 sync 合并后把 app/ui **还原为 pin+补丁态**(而非旧冻结基):不再丢
-          # 弃上游前端(pin 就是近期上游)、也不再擦 alpha seam(补丁是唯一 SOT,改 seam=改补丁)。
-          # 补丁 3-way apply 失败 = pin/补丁漂移,loud-fail 阻断整个 sync。seam marker 校验保留。
-          apply_codepuppy_frontend_delta() {
-            PIN="$(sed -n 's/^pin=\([0-9a-f]\{7,40\}\).*/\1/p' frontend/frontend-pin.lock)"
-            if [ -z "$PIN" ]; then echo "::error::frontend/frontend-pin.lock 缺 pin=<sha>,无法还原前端。Aborting sync."; exit 1; fi
-            rm -rf packages/app packages/ui
-            git checkout "$PIN" -- packages/app packages/ui
-            if ! git apply --binary --3way --whitespace=nowarn frontend/codepuppy-patches/codepuppy-frontend.patch; then
-              echo "::error::alpha 前端 SOT 补丁在 pin $PIN 上 3-way apply 失败 —— pin 与补丁漂移。需跑月更 bump 重生补丁。Aborting sync."
-              exit 1
-            fi
-            if ! grep -q "AppSurfaces" packages/app/src/app.tsx; then
-              echo "::error::ADR-027/ADR-033 seam marker (AppSurfaces) missing after applying alpha frontend delta — pin/SOT drift. Aborting sync."
-              exit 1
-            fi
-            if ! grep -qF '"./surface/session": "./src/pages/session.tsx"' packages/app/package.json; then
-              echo "::error::REQ-088 C1 marker (./surface/session narrow export) missing after applying alpha frontend delta — pin/SOT drift. Aborting sync."
-              exit 1
-            fi
-            # 这一步刚 `rm -rf` 过 packages/app:pin 里没有、只存在于补丁里的**二进制**(vendored
-            # client tgz,被 packages/session-ui 以 file: 直接依赖)必须由补丁重建出来。普通 git diff
-            # 不携带二进制内容,漏了它 sync 会把这个包静默删掉 —— 所以在这里判死。
-            # 判据钉「被 file: 直接依赖的那个精确文件」而非「有没有随便一个 tgz」:版本换名而补丁
-            # 还带着旧的,通配判据照样绿,bun install 却装不上。
-            VENDORED="$(sed -n 's|.*"file:\.\./app/\(vendor/[^"]*\.tgz\)".*|\1|p' packages/session-ui/package.json | head -1)"
-            if [ -z "$VENDORED" ]; then
-              echo "::error::packages/session-ui/package.json 没有 file: 指向 packages/app/vendor 的依赖 —— 本判据已失效,须随依赖变更更新。Aborting sync."
-              exit 1
-            fi
-            if [ ! -f "packages/app/$VENDORED" ]; then
-              echo "::error::packages/app/$VENDORED missing after applying alpha frontend delta — SOT 补丁没带二进制(须用 git diff --binary 重生)。Aborting sync."
-              exit 1
-            fi
-            git add packages/app packages/ui
-            if ! git diff --cached --quiet -- packages/app packages/ui; then
-              git commit -m "chore(frontend): re-apply alpha frontend delta on pinned upstream after sync (B: pin+patch)"
-            fi
-          }
+          # `#1668`:冻结前端搬到 packages/codepuppy-{app,ui}(上游没有这两条路径),packages/{app,ui} 是上游原样、
+          # Code Puppy 不用 —— 原来合并后把它们还原成 pin + 补丁的 `apply_codepuppy_frontend_delta` 已删。
+          # 那两个目录上的冲突不再是「预期冲突」:alpha 不改它们,冲突即未登记的偏离(下面的 else 分支)。
           if git merge --no-edit --no-ff dev -m "chore(sync): merge upstream dev into alpha"; then
-            apply_codepuppy_frontend_delta
             exit 0
           fi
           conflicts="$(git diff --name-only --diff-filter=U)"
-          unexpected="$(echo "$conflicts" | grep -v '^bun.lock$' | grep -v '^packages/app/' | grep -v '^packages/ui/' || true)"
+          unexpected="$(echo "$conflicts" | grep -v '^bun.lock$' | grep -v '^CHANGELOG.md$' || true)"
           if [ -z "$unexpected" ]; then
             if echo "$conflicts" | grep -q '^bun.lock$'; then
               echo "Resolving expected bun.lock conflict by regenerating the lockfile."
               git checkout --theirs -- bun.lock
             fi
-            # app/ui 路径冲突(B:pin+补丁):不能用 `checkout --ours`——上游在 app/ui 下**新增**的
-            # 文件是 add/add 冲突、没有 ours 版本,--ours 报错跳过后残留冲突标记的 package.json 会令
-            # 后续 bun install 直接失败(2026-07-07 run 28847116400 实锤)。改为直接取 pin 的 app/ui
-            # 解冲突,SOT 补丁由下方 apply_codepuppy_frontend_delta 统一重贴。
-            if echo "$conflicts" | grep -qE '^packages/(app|ui)/'; then
-              echo "Resolving app/ui conflicts (B: pin+patch): checking out pinned upstream app/ui; SOT patch re-applied below."
-              PIN_RES="$(sed -n 's/^pin=\([0-9a-f]\{7,40\}\).*/\1/p' frontend/frontend-pin.lock)"
-              git rm -rf -q --ignore-unmatch -- packages/app packages/ui
-              git checkout "$PIN_RES" -- packages/app packages/ui
-              git add packages/app packages/ui
+            # `#1664`(编排器裁决,#1664 评论 6734550342):根 CHANGELOG.md 是 Code Puppy 的用户可见发布历史,
+            # 上游同一路径是 OpenCode 2 的发布说明 —— 两份不相干的文档,一律取我方。
+            if echo "$conflicts" | grep -q '^CHANGELOG.md$'; then
+              echo "Resolving expected CHANGELOG.md conflict: keeping Code Puppy's release history."
+              git checkout --ours -- CHANGELOG.md
             fi
-            # `#1272`:**顺序是判据的一部分**。走到这里时 packages/{app,ui} 还是**纯 pin** —— alpha 的
-            # SOT 补丁尚未重贴,而 packages/session-ui 以 `file:../app/vendor/*.tgz` 直接依赖的那个
-            # 二进制**只存在于补丁里**(pin 里没有 packages/app/vendor;2026-09-06 实测
-            # `git ls-tree 849c2598 packages/app/vendor` 输出为空)。所以在这一格 `bun install` 必然
-            # `failed to resolve`(2026-09-06 手工复演 ac#1248 实锤,原文
-            # `@opencode-ai/client@file:../app/vendor/opencode-ai-client-1.17.13-v2.tgz failed to resolve`),
-            # 而那句话不告诉任何人该做什么 —— 上面 apply_codepuppy_frontend_delta 里的 VENDORED 判据
-            # **正是为这一格写的**(它会说「须用 git diff --binary 重生」),却永远来不及打印。
-            # 顺序因此必须是:结束合并 → 重贴补丁(vendored 资产就位;真漂移时那条判据在这里
-            # 响亮失败)→ **最后**才 install,那时 lockfile 才是照着最终这棵树生成的。
+            # 结束合并之后才 install:lockfile 要照着最终这棵树生成。
             # 行为闸:packages/ui-mac/src/main/sync-upstream-merge-order.test.ts —— 它从本文件解析出
-            # 这一步的 run 体、在真 git 仓上跑它本体,并把下面这两行换回旧顺序证明它当场变红。
+            # 这一步的 run 体、在真 git 仓上跑它本体。
             git add -A
             git commit --no-edit
-            apply_codepuppy_frontend_delta
             bun install
-            # 上面 `--theirs` 取的是上游的 bun.lock,它不含 alpha 的 workspace 包 —— 只有跑在补丁
-            # 重贴之后的这次 install 才按最终这棵树重生它。变了就单独落一个提交,否则这次 sync
+            # 上面 `--theirs` 取的是上游的 bun.lock,它不含 alpha 的 workspace 包 —— 只有结束合并之后
+            # 的这次 install 才按最终这棵树重生它。变了就单独落一个提交,否则这次 sync
             # 会把一份对不上的 lockfile 推上 alpha。
             if ! git diff --quiet -- bun.lock; then
               git add bun.lock
-              git commit -m "chore(sync): regenerate bun.lock after conflict resolution (B: pin+patch)"
+              git commit -m "chore(sync): regenerate bun.lock after conflict resolution"
             fi
           else
             # `#1566`:走到这里时 Takeover intake check 已证明上游候选没碰接管清单,所以剩下的冲突
@@ -295,13 +257,25 @@ jobs:
         run: |
           guard="$(mktemp)"
           git show "$OLD_ALPHA:scripts/north-star-guard.sh" > "$guard"
+          # #1662 F10:同 intake —— 条数读不出 ⇒ 中止;条数为 0 ⇒ 无可核对,照常继续。
+          jurisdiction="$(bash "$guard" --print-jurisdiction)"
+          count="$(awk -F'\t' '$1 == "UPSTREAM_EXCLUDES_COUNT" { print $2 }' <<< "$jurisdiction")"
+          case "$count" in
+            ''|*[!0-9]*)
+              echo "::error::守卫没有给出接管清单条数 —— 无法核对合并是否改动了接管路径。Aborting sync."
+              exit 1 ;;
+          esac
           takeover="$(bash "$guard" --print-takeover)"
-          if [ -z "$takeover" ]; then
-            echo "::error::接管清单为空 —— 无法核对合并是否改动了接管路径。Aborting sync."
+          paths=()
+          while IFS= read -r p; do [ -n "$p" ] && paths+=("$p"); done <<< "$takeover"
+          if [ "${#paths[@]}" -ne "$count" ]; then
+            echo "::error::守卫打印的接管路径(${#paths[@]} 条)与它自报的条数($count)不一致。Aborting sync."
             exit 1
           fi
-          paths=()
-          while IFS= read -r p; do paths+=("$p"); done <<< "$takeover"
+          if [ "$count" -eq 0 ]; then
+            echo "Takeover list is empty (UPSTREAM_EXCLUDES_COUNT=0): nothing the merge could have changed."
+            exit 0
+          fi
           changed="$(git diff --name-only --no-renames "$OLD_ALPHA" alpha -- "${paths[@]}")"
           if [ -n "$changed" ]; then
             echo "::error title=takeover changed by merge::合并改动了接管路径(相对合并前 $OLD_ALPHA)—— 接管内容不许被自动改写。Aborting sync:"
@@ -345,6 +319,39 @@ jobs:
         run: |
           bun install
           bash scripts/engine-smoke.sh
+
+      # INT-upstream-upgrade-readiness I-03:Code Puppy 依赖的上游行为探针,跑在合并后的树上。任一条红 ⇒ 本 job 红、
+      # 不出推送包(同引擎冒烟);失败行开头的 [路径] 是依赖那条行为的 Code Puppy 文件。sync-upstream-alert 照常开告警。
+      - name: Upstream behaviour probes (I-03)
+        run: bash scripts/bun-test-floor.sh 1 packages/ext src/upstream-probes src/policy/permission-reply-premises.test.ts
+
+      # `#1662`:Code Puppy 权威登记册(docs/architecture/codepuppy-authority-registry.json)列着换代前
+      # Code Puppy 握着的每一个决定、以及它现在由哪个机制文件 + 哪条证明测试握住。判官
+      # packages/ext/src/policy/authority-registry.test.ts 在**合并后的树**上跑:有决定没映射、机制文件
+      # 或证明测试不见了、项处于 blocked、或项被删却没有 owner 原话的 retired 记录 ⇒ 红 ⇒ 不出推送包。
+      # 判官只核对机制文件与证明测试**在位**(测试名在那个文件里),不执行证明测试本身。
+      # 条数取自 scripts/gate-files.tsv 的登记行(本地门第 [6/14] 步用同一行):判官被清空或用例被删
+      # 时 bun 照样 exit 0,只看退出码会放行。行为闸:packages/ui-mac/src/main/sync-upstream-takeover-isolation.test.ts。
+      - name: Authority registry judge (#1662 — every Code Puppy authority held or owner-retired, else abort)
+        run: |
+          judge="src/policy/authority-registry.test.ts"
+          count="$(awk -F'\t' -v f="$judge" '$2 == "packages/ext" && $3 == f { print $1 }' scripts/gate-files.tsv)"
+          case "$count" in
+            ''|*[!0-9]*)
+              echo "::error::scripts/gate-files.tsv 里读不出 packages/ext $judge 的登记条数(读到:'$count')—— 判官该跑几条无从核对,本次测量作废。Aborting sync."
+              exit 1 ;;
+          esac
+          if ! bash scripts/bun-test-floor.sh "=$count" packages/ext "$judge"; then
+            echo "::error title=authority not held::合并后的树上有 Code Puppy 权威没被握住(或判官本身没跑满 $count 条)—— 逐条原因见上面的测试输出。不出推送包。Aborting sync."
+            exit 1
+          fi
+
+      # `#1662`(INT-upstream-upgrade-readiness I-02):判官只核对证明测试在位;这一步把登记册里每个已握住的
+      # 权威的证明测试**真的跑一遍**(清单取自登记册 JSON,条数取自 scripts/gate-files.tsv,逐文件经
+      # bun-test-floor.sh)。任何一个红、缺失、没登记或没跑满 ⇒ 点名受影响的权威 id ⇒ 不出推送包。
+      # 2026-11-12 本机实测(bun 1.4.4,21 个文件)约 72 秒。行为闸:packages/ui-mac/src/main/sync-upstream-takeover-isolation.test.ts。
+      - name: Authority proofs pass (#1662 — an authority that loses its passing proof stops the sync)
+        run: bash scripts/assert-authority-proofs.sh
 
       # `#899`(SEC):产出**不可变**的推送候选——把这次 sync 验证过的 `dev`/`alpha` 提交打包成
       # git bundle。推送阶段只会解包并推送这些确切的 commit object,不会重新执行任何合并/安装/

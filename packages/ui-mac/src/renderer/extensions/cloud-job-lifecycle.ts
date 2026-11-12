@@ -7,7 +7,7 @@ import { onCleanup } from "solid-js"
 import { t } from "../i18n"
 import type { CloudDispatchResult, CloudJobEnvelope } from "../../preload/types"
 import { failureCodeFromEvent, failureCopy } from "./cloud-failure-copy"
-import type { NetFailureLayer } from "@opencode-ai/schema/codepuppy-net-failure"
+import type { NetFailureLayer } from "@opencode/schema/codepuppy-net-failure"
 import { netFailureCopy } from "../codepuppy-ui/net-failure-copy"
 
 export type CloudJobPhase = "idle" | "dispatching" | "running" | "done" | "failed"

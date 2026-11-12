@@ -25,8 +25,8 @@
 //   「计费:按用量 / 未知」                  ⇒ `tools[].billing`(缺失 ⇒ 显示「未知」,§8)
 //   「N 项注册身份无法核验」                 ⇒ `invalid.count`(owner 已裁:暴露计数;原因归开发者详情 ⇒ `invalid.entries[].detail`)
 import { Schema, Types } from "effect"
-import { ToolAuthority, ToolBillingFact, ToolIdentity, ToolIdentitySource } from "./tool-identity"
-import { BindingDigest, ToolClass, ToolPolicyPartition, ToolPolicyRecord, ToolPolicyState } from "./codepuppy-tool-policy"
+import { ToolAuthority, ToolBillingFact, ToolIdentity, ToolIdentitySource } from "./tool-identity.js"
+import { BindingDigest, ToolClass, ToolPolicyPartition, ToolPolicyRecord, ToolPolicyState } from "./codepuppy-tool-policy.js"
 
 /** resolver 的 9 型 reason(#1128 `EffectiveToolPolicyReason` 的 wire 镜像;一型不落)。 */
 export const EffectiveToolPolicyReasonV1 = Schema.Union([

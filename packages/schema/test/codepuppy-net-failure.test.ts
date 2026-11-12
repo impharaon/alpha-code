@@ -13,15 +13,18 @@
 import { describe, expect, test } from "bun:test"
 import { lookup } from "node:dns/promises"
 import { connect, createServer, type AddressInfo } from "node:net"
-import { HttpClientError, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
+import { HttpClientError, HttpClientRequest, HttpClientResponse } from "effect/http"
 import {
   classifyNetFailure,
   EGRESS_DIAL_FAILURE_STATUS,
   EGRESS_PROXY_MARKER_ENV,
   engineNetFailurePath,
+  isCodepuppyFailureCode,
   isNetFailureLayer,
+  parseFailureCode,
+  withFailureCode,
   type NetFailurePath,
-} from "../src/codepuppy-net-failure"
+} from "../src/codepuppy-net-failure.js"
 
 const PROXY: NetFailurePath = { via: "egress-proxy", proxyOrigin: "http://127.0.0.1:61234" }
 const OTHER: NetFailurePath = { via: "other" }
@@ -204,6 +207,17 @@ describe("AC3 映射表:经出网代理 / 其它路径两列", () => {
     }
   })
 
+  // 形状取自 packages/ai/src/route/transport/http.ts:99(头部计时器;分块计时器 :124 同形,另带 http 上下文)。
+  test("OpenCode 2 模型请求自己的计时器:code Timeout 且不带 cause ⇒ timeout;带 cause 时由 cause 决定", () => {
+    const header = { name: "AI.Error.Transport", message: "Timed out waiting for response headers", code: "Timeout" }
+    const chunk = { ...header, message: "Timed out waiting for response data", http: { status: 200 } }
+    for (const path of [PROXY, OTHER]) {
+      expect(classifyNetFailure(header, path)).toEqual({ layer: "timeout", code: "Timeout" })
+      expect(classifyNetFailure(chunk, path)).toEqual({ layer: "timeout", code: "Timeout" })
+      expect(classifyNetFailure({ ...header, cause: new Error("boom") }, path)).toBeUndefined()
+    }
+  })
+
   test("认不出 ⇒ undefined(I4)", () => {
     for (const value of [
       new Error("boom"),
@@ -320,6 +334,50 @@ describe("isNetFailureLayer:读回来的层名只认九个", () => {
       expect(isNetFailureLayer(layer)).toBe(true)
     for (const value of ["transport", "unattributed", "toString", "constructor", "", 1, null, undefined, {}])
       expect(isNetFailureLayer(value)).toBe(false)
+  })
+})
+
+// #1666 Unit B:引擎写进 `error` / `message` 的登记码前缀,桌面适配层读回。
+describe("具名失败码前缀:引擎写、适配层读", () => {
+  const codes = [
+    "policy",
+    "dns",
+    "tcp",
+    "connect-timeout",
+    "tls-silent",
+    "tls-failed",
+    "tls-cert",
+    "http",
+    "timeout",
+    "workspace_missing",
+    "dependency_missing",
+    "spawn_failed",
+    "handshake_timeout",
+    "auth",
+    "protocol",
+    "transport",
+  ] as const
+
+  test("每个登记码都能往返,原文原样回来", () => {
+    for (const code of codes) {
+      const text = `spawn python3 ENOENT: ${code}`
+      expect(parseFailureCode(withFailureCode(code, text))).toEqual({ code, text })
+    }
+  })
+
+  test("上游原文、未登记的码、不合格式的前缀一律读不出", () => {
+    for (const text of [
+      "Invalid MCP server URL: not a url",
+      "dns: getaddrinfo ENOTFOUND example.test",
+      "[codepuppy:unattributed] x",
+      "[codepuppy:toString] x",
+      "[codepuppy:dns]x",
+      " [codepuppy:dns] x",
+      "[failure_code=route_usage_stopped] x",
+      "",
+    ])
+      expect(parseFailureCode(text)).toBeUndefined()
+    for (const value of ["toString", "unattributed", "invalid_url", "", 1, null]) expect(isCodepuppyFailureCode(value)).toBe(false)
   })
 })
 

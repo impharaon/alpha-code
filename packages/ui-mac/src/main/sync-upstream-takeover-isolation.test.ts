@@ -16,7 +16,8 @@
 //     一步失败即停 —— 与 Actions 的默认 `success()` 语义一致,于是「不出推送包」由真的
 //     `Build sync bundle artifact` 那一步有没有产出 `sync-artifact/` 来判。
 //   · **清单来自生产守卫本体**:夹具 alpha 树里放的是本仓 `scripts/north-star-guard.sh` 的原样副本,
-//     接管文件取清单里的真条目 `packages/opencode/src/session/llm/request.ts`(上面那次静默混入的文件)。
+//     接管文件取清单里的真条目 `packages/core/src/oauth/page.ts`(`#1662` 最终清单的两条之一;上面那次
+//     静默混入的 `session/llm/request.ts` 随 v1 引擎删除,已出清单)。
 //   · **先证明手段测得出已知的坏**:删掉 intake 步 ⇒ 无冲突那例被合并步静默合入;移植改用 squash ⇒
 //     下一次同步再次命中同一批路径;intake 改成执行工作树里的守卫 ⇒ 上游树里的脚本被执行。
 //
@@ -40,13 +41,15 @@ const INTAKE = "Takeover intake check"
 const MERGE = "Merge `dev` into `alpha`"
 const POST = "Takeover paths unchanged by merge"
 const BUNDLE = "Build sync bundle artifact"
+const JUDGE = "Authority registry judge"
+const PROOFS = "Authority proofs pass"
 const FULL = [INTAKE, MERGE, POST, BUNDLE]
 
 const REVIEW_TITLE = "::error title=takeover upgrade review required::"
 const UNREGISTERED = "未登记的偏离:按 ADR-029 登记或还原"
 
-/** 接管清单里的真条目(`003f6f764` 静默混入的那个文件)。 */
-const TAKEOVER = "packages/opencode/src/session/llm/request.ts"
+/** 接管清单里的真条目(`#1662` 最终清单:ADR-042 的 OAuth 回调页)。 */
+const TAKEOVER = "packages/core/src/oauth/page.ts"
 const ENGINE = "packages/opencode/src/engine.ts"
 
 const GIT_ENV = {
@@ -132,7 +135,10 @@ type Fixture = { repo: string; work: string; oldDev: string; newDev: string; old
  * 改过的接管文件;dev 前进一步。结束时工作树停在 dev —— 与生产里 intake 运行时一致
  * (上一步 `Fast-forward dev` 刚 checkout 了它)。
  */
-function fixture(shape: Shape, opts: { evilGuardInDev?: boolean } = {}): Fixture {
+function fixture(
+  shape: Shape,
+  opts: { evilGuardInDev?: boolean; guard?: (source: string) => string; alphaFiles?: Record<string, string> } = {},
+): Fixture {
   const work = mkdtempSync(join(tmpdir(), "codepuppy-sync-takeover-"))
   const repo = join(work, "repo")
   mkdirSync(repo, { recursive: true })
@@ -170,8 +176,10 @@ function fixture(shape: Shape, opts: { evilGuardInDev?: boolean } = {}): Fixture
   // 生产守卫的原样副本 —— 接管清单只有它一份。
   mkdirSync(join(repo, "scripts"), { recursive: true })
   copyFileSync(GUARD, join(repo, "scripts/north-star-guard.sh"))
+  if (opts.guard) write(repo, "scripts/north-star-guard.sh", opts.guard(readFileSync(GUARD, "utf8")))
   write(repo, TAKEOVER, takeoverBody(CODEPUPPY_EDIT))
   if (shape === "unregistered") write(repo, ENGINE, "export const engine = 2 // alpha\n")
+  for (const [path, body] of Object.entries(opts.alphaFiles ?? {})) write(repo, path, body)
   const oldAlpha = commitAll(repo, "alpha: SOT + takeover")
 
   git(repo, ["checkout", "-q", "dev"])
@@ -415,5 +423,254 @@ describe("#1566 AC5 候选 job 不持有推送凭据;新步骤只执行 alpha �
     const fx3 = fixture("takeover-clean", { evilGuardInDev: true })
     runSteps(fx3, [INTAKE], { [INTAKE]: src.replace(fromTree, "cat scripts/north-star-guard.sh") })
     expect(canary(fx3), "变异臂没执行到工作树脚本 —— 这条判据测不出已知的坏").toBe(true)
+  })
+})
+
+// ── `#1662` F10:最终清单可以为空;空清单与「守卫没给出结果」必须分得开 ─────────────────────────────
+
+/** 守卫复制品:接管数组清空(合法的空清单)。 */
+const emptyList = (source: string) => {
+  const start = source.indexOf("UPSTREAM_EXCLUDES=(\n")
+  const end = source.indexOf("\n)\n", start) + 3
+  if (start < 0 || end < 3) throw new Error("守卫里找不到 UPSTREAM_EXCLUDES 数组 —— 本次测量作废")
+  return `${source.slice(0, start)}UPSTREAM_EXCLUDES=(\n)\n${source.slice(end)}`
+}
+
+describe("#1662 F10 空接管清单照常同步;守卫读不出条数才中止", () => {
+  test("清单为空(UPSTREAM_EXCLUDES_COUNT=0)⇒ intake 与合并后核对都放行,照常合并、出推送包", () => {
+    const fx = fixture("plain", { guard: emptyList })
+    const run = runSteps(fx, FULL)
+    expect(run.failedAt, `空清单不该让同步失败:\n${run.output}`).toBeNull()
+    expect(run.output).toContain("Takeover list is empty (UPSTREAM_EXCLUDES_COUNT=0)")
+    expect(bundleProduced(fx)).toBe(true)
+  })
+
+  test("变异臂:intake 退回旧写法(空输出即 exit 1)⇒ 同一个空清单让同步失败", () => {
+    const fx = fixture("plain", { guard: emptyList })
+    const legacy = stepBody(INTAKE).replace(
+      /# #1662 F10[\s\S]*?MB="\$\(git merge-base/,
+      'takeover="$(bash "$guard" --print-takeover)"\nif [ -z "$takeover" ]; then echo "::error::接管清单为空"; exit 1; fi\npaths=()\nwhile IFS= read -r p; do paths+=("$p"); done <<< "$takeover"\nMB="$(git merge-base',
+    )
+    expect(legacy, "变异没落上 —— 本次测量作废").not.toBe(stepBody(INTAKE))
+    const run = runSteps(fx, FULL, { [INTAKE]: legacy })
+    expect(run.failedAt).toBe(INTAKE)
+  })
+
+  test("守卫不报条数(没跑出结果)⇒ intake 以「没有给出接管清单条数」中止,不出推送包", () => {
+    const fx = fixture("plain", {
+      guard: (source) => source.replace(/^\s*printf 'UPSTREAM_EXCLUDES_COUNT\\t%s\\n'.*$/m, "  :"),
+    })
+    const run = runSteps(fx, FULL)
+    expect(run.failedAt).toBe(INTAKE)
+    expect(run.output).toContain("守卫没有给出接管清单条数")
+    expect(bundleProduced(fx)).toBe(false)
+  })
+})
+
+// ── `#1662`:合并后的树上权威登记册判官不绿 ⇒ 不出推送包 ─────────────────────────────────────
+// 生产判官(packages/ext/src/policy/authority-registry.test.ts)要读真仓历史与锚点修订,在缩比夹具里跑不起来;
+// 这里换成同一路径上的合成判官(两条用例),跑的是生产的那一步 body 与 scripts/bun-test-floor.sh 原样副本,
+// 条数来自夹具里的 scripts/gate-files.tsv 登记行 —— 被测的是「这一步怎么消费判官的结局」,判官自身的
+// 判据由它自己的文件证明(每条规则先在合成登记册上判红)。
+
+const JUDGE_FILE = "packages/ext/src/policy/authority-registry.test.ts"
+const judgeSource = (cases: string[]) => `import { test, expect } from "bun:test"\n${cases.join("\n")}\n`
+const GREEN = ['test("held a", () => expect(1).toBe(1))', 'test("held b", () => expect(1).toBe(1))']
+const RED = ['test("held a", () => expect(1).toBe(1))', 'test("blocked b", () => expect(["b: blocked"]).toEqual([]))']
+const ONE_SHORT = ['test("held a", () => expect(1).toBe(1))', 'test.skip("held b", () => expect(1).toBe(1))']
+const gateRow = (count: string) => `${count}\tpackages/ext\tsrc/policy/authority-registry.test.ts\t-\tfixture\n`
+
+function judgeFixture(cases: string[], row: string = gateRow("2")): Fixture {
+  return fixture("plain", {
+    alphaFiles: {
+      [JUDGE_FILE]: judgeSource(cases),
+      "scripts/gate-files.tsv": row,
+      "scripts/bun-test-floor.sh": readFileSync(resolve(REPO_ROOT, "scripts/bun-test-floor.sh"), "utf8"),
+    },
+  })
+}
+const WITH_JUDGE = [INTAKE, MERGE, POST, JUDGE, BUNDLE]
+
+describe("#1662 合并后的树上有权威没握住 ⇒ 判官步或证明步中止,不出推送包", () => {
+  test("判官全绿 ⇒ 照常出推送包;判官有一条红 ⇒ 在判官步中止、具名报错、不出推送包", () => {
+    const ok = judgeFixture(GREEN)
+    const passed = runSteps(ok, WITH_JUDGE)
+    expect(passed.failedAt, `判官全绿不该让同步失败:\n${passed.output}`).toBeNull()
+    expect(bundleProduced(ok)).toBe(true)
+
+    const bad = judgeFixture(RED)
+    const failed = runSteps(bad, WITH_JUDGE)
+    expect(failed.failedAt, failed.output).toBe(JUDGE)
+    expect(failed.output).toContain("::error title=authority not held::")
+    expect(failed.output, "没把判官的逐条原因带进日志").toContain("b: blocked")
+    expect(bundleProduced(bad), "判官红了却产出了推送包").toBe(false)
+  })
+
+  test("判官少跑一条(被 skip / 删掉)⇒ 同样中止;变异臂:退回裸 `bun test` ⇒ 同一夹具放行", () => {
+    const fx = judgeFixture(ONE_SHORT)
+    const run = runSteps(fx, WITH_JUDGE)
+    expect(run.failedAt, run.output).toBe(JUDGE)
+    expect(run.output).toContain("实际 1 条 < 登记 2 条")
+    expect(bundleProduced(fx)).toBe(false)
+
+    const bare = 'cd packages/ext && bun test src/policy/authority-registry.test.ts\n'
+    const fx2 = judgeFixture(ONE_SHORT)
+    const mutated = runSteps(fx2, WITH_JUDGE, { [JUDGE]: bare })
+    expect(mutated.failedAt, `裸 bun test 应当放过少一条的判官 —— 否则这条变异臂证明不了条数核对有用:\n${mutated.output}`).toBeNull()
+  })
+
+  test("gate-files.tsv 里读不出判官的登记条数 ⇒ 测量作废,中止", () => {
+    for (const row of ["", gateRow(">=2"), "2\tpackages/ext\tsrc/policy/other.test.ts\t-\tfixture\n"]) {
+      const fx = judgeFixture(GREEN, row)
+      const run = runSteps(fx, WITH_JUDGE)
+      expect(run.failedAt, `登记行「${row.trim()}」:\n${run.output}`).toBe(JUDGE)
+      expect(run.output).toContain("读不出")
+      expect(bundleProduced(fx)).toBe(false)
+    }
+  })
+
+  test("生产 workflow 里判官步排在合并之后、推送包之前,且没有让它被跳过或失败被吞的开关", () => {
+    const steps = candidateSteps()
+    const at = (name: string) => steps.findIndex((s: any) => typeof s?.name === "string" && s.name.startsWith(name))
+    const judge = at(JUDGE)
+    expect(judge, "sync-upstream.yml 里找不到判官步").toBeGreaterThanOrEqual(0)
+    expect(judge, "判官步排在合并之前 —— 它判的不是合并后的树").toBeGreaterThan(at(MERGE))
+    expect(judge, "判官步排在推送包之后 —— 红了推送包也已经出了").toBeLessThan(at(BUNDLE))
+    expect(at(MERGE)).toBeGreaterThanOrEqual(0)
+    expect(steps[judge].if, "判官步带了 if: —— 默认 success() 之外的条件会让它被跳过").toBeUndefined()
+    expect(steps[judge]["continue-on-error"], "判官步带了 continue-on-error —— 红了也照样出推送包").toBeUndefined()
+    expect(stepBody(JUDGE)).toContain("src/policy/authority-registry.test.ts")
+    expect(existsSync(resolve(REPO_ROOT, JUDGE_FILE)), "判官步点名的生产判官文件不在仓里").toBe(true)
+    // 证明步:判官之后、推送包之前,同样没有跳过/吞失败的开关,跑的是仓里那份脚本。
+    const proofs = at(PROOFS)
+    expect(proofs, "sync-upstream.yml 里找不到证明步").toBeGreaterThan(judge)
+    expect(proofs, "证明步排在推送包之后 —— 红了推送包也已经出了").toBeLessThan(at(BUNDLE))
+    expect(steps[proofs].if, "证明步带了 if:").toBeUndefined()
+    expect(steps[proofs]["continue-on-error"], "证明步带了 continue-on-error").toBeUndefined()
+    expect(stepBody(PROOFS)).toContain("scripts/assert-authority-proofs.sh")
+  })
+})
+
+// ── `#1662` I-02:权威失去通过的证明 ⇒ 证明步中止 ─────────────────────────────────────────────
+// 夹具里放合成登记册与合成证明文件,外加生产的 scripts/assert-authority-proofs.sh 与 bun-test-floor.sh 原样副本;
+// 证明文件清单只来自登记册 JSON,条数只来自夹具的 gate-files.tsv —— 改登记册即改判决,证明清单没有第二份。
+
+const PROOF_A = "packages/ext/src/policy/proof-a.test.ts"
+const PROOF_B = "packages/core/test/proof-b.test.ts"
+const PROOF_RETIRED = "packages/ext/src/policy/proof-retired.test.ts"
+const passing = (name: string) => judgeSource([`test("${name}", () => expect(1).toBe(1))`])
+const failing = (name: string) => judgeSource([`test("${name}", () => expect("proof broke").toBe("held"))`])
+
+function proofFixture(opts: { b?: string | null; registerB?: boolean; extraEntries?: object[] } = {}): Fixture {
+  const entries = [
+    { id: "auth-a", decision: "a", tests: [{ file: PROOF_A, name: "holds a" }] },
+    { id: "auth-b", decision: "b", tests: [{ file: PROOF_B, name: "holds b" }] },
+    // 已由 owner 退役的项:它的证明不再握住同步 —— 夹具里故意放一个红的,跑了就会把绿那例判红。
+    { id: "auth-retired", decision: "r", tests: [{ file: PROOF_RETIRED, name: "gone" }], retired: { quote: "不要了", date: "2026-11-09", by: "owner" } },
+    ...(opts.extraEntries ?? []),
+  ]
+  const rows = [gateRow("2"), `1\tpackages/ext\tsrc/policy/proof-a.test.ts\t-\tfixture\n`]
+  if (opts.registerB !== false) rows.push(`1\tpackages/core\ttest/proof-b.test.ts\t-\tfixture\n`)
+  const files: Record<string, string> = {
+    [JUDGE_FILE]: judgeSource(GREEN),
+    "scripts/gate-files.tsv": rows.join(""),
+    "scripts/bun-test-floor.sh": readFileSync(resolve(REPO_ROOT, "scripts/bun-test-floor.sh"), "utf8"),
+    "scripts/assert-authority-proofs.sh": readFileSync(resolve(REPO_ROOT, "scripts/assert-authority-proofs.sh"), "utf8"),
+    "docs/architecture/codepuppy-authority-registry.json": `${JSON.stringify({ anchor: { takeoverListRevision: "x" }, entries }, null, 2)}\n`,
+    [PROOF_A]: passing("holds a"),
+    [PROOF_RETIRED]: failing("gone"),
+  }
+  if (opts.b !== null) files[PROOF_B] = opts.b ?? passing("holds b")
+  return fixture("plain", { alphaFiles: files })
+}
+const WITH_PROOFS = [INTAKE, MERGE, POST, JUDGE, PROOFS, BUNDLE]
+
+describe("#1662 I-02 权威失去通过的证明 ⇒ 证明步中止,点名权威,不出推送包", () => {
+  test("证明全绿 ⇒ 出推送包(退役项的证明不跑);一个证明红 ⇒ 在证明步中止、点名那项权威;变异臂:没有证明步 ⇒ 同一夹具出包", () => {
+    const ok = proofFixture()
+    const passed = runSteps(ok, WITH_PROOFS)
+    expect(passed.failedAt, `证明全绿不该让同步失败:\n${passed.output}`).toBeNull()
+    expect(passed.output, "退役项的证明被执行了").not.toContain("proof-retired")
+    expect(bundleProduced(ok)).toBe(true)
+
+    const bad = proofFixture({ b: failing("holds b") })
+    const failed = runSteps(bad, WITH_PROOFS)
+    expect(failed.failedAt, failed.output).toBe(PROOFS)
+    expect(failed.output).toContain(`::error title=authority proof failed::auth-b —— 证明测试没通过(或没跑满 1 条):${PROOF_B}`)
+    expect(failed.output, "绿的那项被误点名").not.toContain("authority proof failed::auth-a")
+    expect(bundleProduced(bad), "证明红了却产出了推送包").toBe(false)
+
+    // 已知的坏:判官只核对在位 —— 去掉证明步,同一个红证明一路放行到推送包。
+    const judgeOnly = proofFixture({ b: failing("holds b") })
+    const through = runSteps(judgeOnly, [INTAKE, MERGE, POST, JUDGE, BUNDLE])
+    expect(through.failedAt, through.output).toBeNull()
+    expect(bundleProduced(judgeOnly)).toBe(true)
+  })
+
+  test("证明文件不存在 ⇒ 中止并点名;登记册新增一项指向它 ⇒ 判决跟着变(清单来自登记册)", () => {
+    const missing = proofFixture({ b: null })
+    const run = runSteps(missing, WITH_PROOFS)
+    expect(run.failedAt, run.output).toBe(PROOFS)
+    expect(run.output).toContain(`::error title=authority proof missing::auth-b —— 证明文件不存在:${PROOF_B}`)
+    expect(bundleProduced(missing)).toBe(false)
+
+    const added = proofFixture({ extraEntries: [{ id: "auth-new", decision: "n", tests: [{ file: "packages/ext/src/policy/proof-new.test.ts", name: "n" }] }] })
+    const run2 = runSteps(added, WITH_PROOFS)
+    expect(run2.failedAt, run2.output).toBe(PROOFS)
+    expect(run2.output).toContain("authority proof missing::auth-new")
+  })
+
+  test("证明文件没在 gate-files.tsv 登记、或少跑了一条 ⇒ 中止并点名(条数无从核对 / 被 skip 掉)", () => {
+    const unregistered = proofFixture({ registerB: false })
+    const run = runSteps(unregistered, WITH_PROOFS)
+    expect(run.failedAt, run.output).toBe(PROOFS)
+    expect(run.output).toContain("::error title=authority proof unregistered::auth-b")
+
+    const skipped = proofFixture({ b: judgeSource(['test.skip("holds b", () => expect(1).toBe(1))']) })
+    const run2 = runSteps(skipped, WITH_PROOFS)
+    expect(run2.failedAt, run2.output).toBe(PROOFS)
+    expect(run2.output).toContain("实际 0 条 < 登记 1 条")
+    expect(run2.output).toContain("authority proof failed::auth-b")
+  })
+})
+
+// ── I-03 / I-09:上游行为探针步钉住 ─────────────────────────────────────────────────────────────
+// 探针(packages/ext/src/upstream-probes/)只在每日同步里跑才有用:上游一变当天就红,不出推送包。这一步被删掉、
+// 被挪到引擎冒烟之前(那时依赖还没装)、被加上跳过或吞失败的开关,都不会有别的东西变红 —— 所以在这里钉住。
+const SMOKE = "Engine runtime smoke"
+const PROBES = "Upstream behaviour probes"
+
+function probesStepProblems(steps: any[]): string[] {
+  const at = (name: string) => steps.findIndex((s: any) => typeof s?.name === "string" && s.name.startsWith(name))
+  const probes = at(PROBES)
+  if (probes < 0) return ["sync-upstream.yml 里找不到「Upstream behaviour probes」步 —— 同步不再跑上游行为探针"]
+  const problems: string[] = []
+  const smoke = at(SMOKE)
+  if (smoke < 0) problems.push("找不到引擎冒烟步,探针步的位置无从核对")
+  else if (probes < smoke) problems.push("探针步排在引擎冒烟之前 —— 那时 bun install 还没跑")
+  const bundle = at(BUNDLE)
+  if (bundle >= 0 && probes > bundle) problems.push("探针步排在推送包之后 —— 红了推送包也已经出了")
+  if (steps[probes].if !== undefined) problems.push("探针步带了 if: —— 默认 success() 之外的条件会让它被跳过")
+  if (steps[probes]["continue-on-error"] !== undefined) problems.push("探针步带了 continue-on-error —— 红了也照样出推送包")
+  const run = String(steps[probes].run ?? "")
+  for (const part of ["scripts/bun-test-floor.sh", "packages/ext", "src/upstream-probes", "src/policy/permission-reply-premises.test.ts"])
+    if (!run.includes(part)) problems.push(`探针步的命令里没有 ${part}`)
+  return problems
+}
+
+describe("I-03 每日同步在引擎冒烟之后跑上游行为探针", () => {
+  test("生产 workflow 的探针步在冒烟之后、推送包之前,无跳过开关;变异臂:删掉 / 挪到冒烟之前 / 加 continue-on-error ⇒ 各被点名", () => {
+    const steps = candidateSteps()
+    expect(probesStepProblems(steps)).toEqual([])
+    const probes = steps.findIndex((s: any) => typeof s?.name === "string" && s.name.startsWith(PROBES))
+    const smoke = steps.findIndex((s: any) => typeof s?.name === "string" && s.name.startsWith(SMOKE))
+    expect(probesStepProblems(steps.filter((_, i) => i !== probes))).toEqual([
+      "sync-upstream.yml 里找不到「Upstream behaviour probes」步 —— 同步不再跑上游行为探针",
+    ])
+    const moved = steps.filter((_, i) => i !== probes)
+    moved.splice(smoke, 0, steps[probes])
+    expect(probesStepProblems(moved)).toEqual(["探针步排在引擎冒烟之前 —— 那时 bun install 还没跑"])
+    const swallowed = steps.map((s, i) => (i === probes ? { ...s, "continue-on-error": true } : s))
+    expect(probesStepProblems(swallowed)).toEqual(["探针步带了 continue-on-error —— 红了也照样出推送包"])
   })
 })

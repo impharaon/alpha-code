@@ -50,7 +50,7 @@ export function CodePuppyNewSession(props: {
   const { store } = props.projects
 
   // #925 审计 Major:draft 的生产者不止 codepuppy-sidebar 一个 —— 上游 Titlebar 的「+ 新标签」/
-  // mod+t(packages/app/src/components/titlebar.tsx `openNewTab`,五个分支)建的 draft 带的是
+  // mod+t(packages/codepuppy-app/src/components/titlebar.tsx `openNewTab`,五个分支)建的 draft 带的是
   // active(或兜底)server,而本页的会话恒经 `props.projects.startChat` 建在 projects store
   // 连着的 server 上。逐个生产者补不完,在唯一消费者这里收口:两者不同即把 draft 的 server 段
   // 钉回 projects key。上游 `createDraftRoute` 按 `${server}\0${directory}` keyed ⇒ 这次写入会

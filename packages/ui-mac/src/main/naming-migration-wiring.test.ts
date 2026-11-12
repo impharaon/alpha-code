@@ -214,34 +214,28 @@ const MAPPED = new Set([
   VISION_MARKER_KEY[1],
 ])
 
-/** 例外登记表里登记为「保留旧值」的行(非 pending)的源码行文本。 */
-function keptOldValueLines(): string[] {
+/** 例外登记表里登记为「保留旧值」的行(非 pending)的命中词元(I-09 起登记表按「文件 ⇥ 命中词元 ⇥ 处数 ⇥ 类别 ⇥ 理由」)。 */
+function keptOldValueTokens(): string[] {
   return readFileSync(join(REPO, "scripts/old-name-exceptions.tsv"), "utf8")
     .split("\n")
     .filter((line) => line && !line.startsWith("#"))
     .map((line) => line.split("\t"))
-    .filter((cols) => cols[2] !== "pending")
-    .flatMap((cols) => {
-      try {
-        return [readFileSync(join(REPO, cols[0]!), "utf8").split("\n")[Number(cols[1]) - 1] ?? ""]
-      } catch {
-        return []
-      }
-    })
+    .filter((cols) => cols[3] !== "pending")
+    .flatMap((cols) => (cols[1] ?? "").split(" "))
 }
 
 /** 带品牌的持久化取值:新名 ⇒ 映射表里必须有它的旧名;旧名 ⇒ 例外登记表里必须登记为保留。不带品牌的中性名不判。 */
 function persistedLeaks(values: string[], mapped: ReadonlySet<string>, kept: string[]): string[] {
   return values.flatMap((value) => {
     if (value.includes("codepuppy")) return mapped.has(value) ? [] : [`${value}: new name with no old name in naming-migration-map.ts`]
-    if (/alpha|code-puppy/.test(value)) return kept.some((line) => line.includes(JSON.stringify(value))) ? [] : [`${value}: old value kept but not registered in old-name-exceptions.tsv`]
+    if (/alpha|code-puppy/.test(value)) return kept.includes(value) ? [] : [`${value}: old value kept but not registered in old-name-exceptions.tsv`]
     return []
   })
 }
 
 describe("R8 —— 导出器「持久化取值」类的每个名字,要么能从旧名迁过来,要么登记为保留旧值", () => {
   const values = exportCodepuppyPersistedValues()
-  const kept = keptOldValueLines()
+  const kept = keptOldValueTokens()
 
   test("真树零漏", () => {
     expect(values.length).toBeGreaterThan(5)

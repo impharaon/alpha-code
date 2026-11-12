@@ -1,7 +1,7 @@
 import { createSignal, onMount } from "solid-js"
 import { createStore } from "solid-js/store"
 import { render } from "solid-js/web"
-import { MarkedProvider } from "../../../ui/src/context/marked"
+import { MarkedProvider } from "../../../codepuppy-ui/src/context/marked"
 import { setLocale } from "../../src/renderer/i18n"
 import { SessionTimelineView } from "../../src/renderer/codepuppy-ui/session-timeline/session-timeline-view"
 import type { TimelineRow } from "../../src/renderer/codepuppy-ui/session-timeline/timeline-model"

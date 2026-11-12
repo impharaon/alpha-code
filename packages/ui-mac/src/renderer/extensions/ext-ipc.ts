@@ -33,13 +33,25 @@
 // 不阻断。若日后 owner 要把这类 warning 收进 Banner,换的是本文件这一处呈现函数,咽喉形状不变。
 //
 // 想要短命 toast 的地方照旧直接 `pushToast(...)`(hub 的 `flash()`),那条路不经过这里。
+//
+// `#1687`(SPEC-error-message-lifetime BR-05):这类 warning 没有恢复信号、要用户处理,所以仍是常驻的
+// 用户操作类提示 —— 留到用户按 × 或离开当前页面;同一条文字同一时间只显示一条(Toast.tsx 同键合并)。
 import { extensionWarning } from "./ext-presentation"
 import type { ElectronAPI } from "../../preload/types"
 import { pushToast } from "../codepuppy-ui/Toast"
 import { warningPresentingExt } from "./ext-ipc-warning"
+import { setExtHubOpen } from "./ext-hub-state"
+import { t } from "../i18n"
 
 export const extIpc: ElectronAPI["ext"] = warningPresentingExt<ElectronAPI["ext"]>(
   () => window.api.ext,
   // `duration: 0` = 不装拆除定时器,只能由用户按 × 关掉(见 Toast.tsx)。
-  (warning) => pushToast({ kind: "info", title: extensionWarning(warning), duration: 0 }),
+  (warning) =>
+    pushToast({
+      kind: "info",
+      title: extensionWarning(warning),
+      duration: 0,
+      // `#1687`:启动静默窗口内进「未恢复问题」入口时,「查看」打开定制中心(已安装一组在每页顶部)。
+      action: { label: t("codepuppy.problems.view"), run: () => setExtHubOpen(true) },
+    }),
 )

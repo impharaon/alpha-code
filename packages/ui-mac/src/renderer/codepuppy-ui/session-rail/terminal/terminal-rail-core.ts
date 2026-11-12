@@ -4,8 +4,8 @@
 // alpha 只自持外壳(页签条 / 圆角深底输出区外框 / 脚条)。引擎经下方
 // `CodePuppyTerminalEngineChannel` typed seam 进入,本目录零 import 上游模块。
 //
-// 地面真相:上游引擎 = `packages/app/src/components/terminal.tsx`(ghostty-web WASM +
-// PTY WebSocket 数据通道)+ `packages/app/src/context/terminal.tsx`(workspace 级 PTY
+// 地面真相:上游引擎 = `packages/codepuppy-app/src/components/terminal.tsx`(ghostty-web WASM +
+// PTY WebSocket 数据通道)+ `packages/codepuppy-app/src/context/terminal.tsx`(workspace 级 PTY
 // 页签状态,`SessionProviders` 已将其挂在 alpha session 叶之上)。两者经 ADR-027 修订
 // (2026-07-24,#554)的窄导出 `./surface/terminal` 进入,唯一消费点 =
 // `terminal-engine-adapter.tsx`(静态断言钉死);channel 缺席时面板仍 fail-closed 落空态。

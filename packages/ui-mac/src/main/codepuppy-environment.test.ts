@@ -524,7 +524,8 @@ describe("AC#6 renderer 不可伪造环境", () => {
     const allowed = new Set(["codepuppy-environment.ts", "index.ts"])
     const offenders: string[] = []
     for (const f of fs.readdirSync(mainDir)) {
-      if (!f.endsWith(".ts") || f.endsWith(".test.ts")) continue
+      // 测试代码不进产物:`*.cases.ts` 与 `*.test.ts` 同被 tsconfig.json 排除(子进程宿主跑的用例在沙箱里自置环境根)
+      if (!f.endsWith(".ts") || f.endsWith(".test.ts") || f.endsWith(".cases.ts")) continue
       const src = fs.readFileSync(path.join(mainDir, f), "utf8")
       if (/\.CODEPUPPY_GLOBAL_DIR\s*=[^=]/.test(src) && !allowed.has(f)) offenders.push(f)
     }

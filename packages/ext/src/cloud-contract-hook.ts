@@ -3,7 +3,7 @@
 // `ArtifactListV1` 校验一次也没执行过(不是「偶尔漏」,是恒不命中):
 //
 //   远端名(worker 自己 advertise;platform#560 起只说动作)   dispatch
-//   引擎 id(McpCatalog.toolName(server, remote))           codepuppy_dispatch   ← plugin.ts 传进来的
+//   引擎 id(McpTool.name(server, remote),2.x)         codepuppy_dispatch   ← plugin.ts 传进来的
 //
 // 现在 id 一律**推导**:server 名取注入面在本次 fork 写进 env 的那个(`CODEPUPPY_CLOUD_MCP_SERVER`,
 // 与 `cloud-websearch-kill.ts` 的治理豁免同源),远端名是下面这张表。仓里不许再出现第二份 id 字面量。
@@ -73,11 +73,14 @@ export function validateCloudToolInput(
   decodeContract("CloudJobRequestV1", args, "cloud-mcp")
 }
 
+/**
+ * `#1665`:2.x 工具结果的形状(`Tool.Result`)。MCP 工具的 `output` = 远端的 structuredContent,没有时是文本(像 JSON 的
+ * 先解析成对象),都没有时是 null(`packages/core/src/tool/mcp.ts`);`content` 是文本或内容部件数组。
+ */
 type CloudToolOutput = {
-  output?: string
-  metadata?: unknown
-  structuredContent?: unknown
-  content?: Array<{ type?: unknown; text?: unknown }>
+  readonly output?: unknown
+  readonly metadata?: unknown
+  readonly content?: string | ReadonlyArray<{ readonly type?: unknown; readonly text?: unknown }>
 }
 
 export function validateCloudToolOutput(
@@ -100,17 +103,20 @@ export function validateCloudToolOutput(
 }
 
 function validateOutputContract(contract: ContractName, output: CloudToolOutput) {
-  if (output.structuredContent !== undefined && output.structuredContent !== null) {
-    decodeContract(contract, output.structuredContent, "cloud-mcp")
-    return
-  }
-  const text = output.content?.find((item) => item.type === "text" && typeof item.text === "string")?.text
-  if (typeof text === "string") {
-    decodeJsonContract(contract, text, "cloud-mcp")
+  if (output.output !== undefined && output.output !== null && typeof output.output === "object") {
+    decodeContract(contract, output.output, "cloud-mcp")
     return
   }
   if (typeof output.output === "string") {
     decodeJsonContract(contract, output.output, "cloud-mcp")
+    return
+  }
+  const text =
+    typeof output.content === "string"
+      ? output.content
+      : output.content?.find((item) => item.type === "text" && typeof item.text === "string")?.text
+  if (typeof text === "string") {
+    decodeJsonContract(contract, text, "cloud-mcp")
     return
   }
   if (output.metadata && typeof output.metadata === "object" && !Array.isArray(output.metadata)) {

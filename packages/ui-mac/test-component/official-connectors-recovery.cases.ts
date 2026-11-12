@@ -6,6 +6,7 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { Database } from "bun:sqlite"
 import { createElectronStub } from "./req053-electron-stub"
+
 let home = "",
   root = "",
   scratch = ""

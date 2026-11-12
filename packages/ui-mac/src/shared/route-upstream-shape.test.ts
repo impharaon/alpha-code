@@ -1,6 +1,6 @@
 // Upstream path-shape ratchet (REQ-089 基线 §2 的红旗对策)。
 //
-// 上游 `packages/app/src/app.tsx` 仍然拥有那棵 `<Route>` 树。把整棵树(含 provider / layout 嵌套)
+// 上游 `packages/codepuppy-app/src/app.tsx` 仍然拥有那棵 `<Route>` 树。把整棵树(含 provider / layout 嵌套)
 // 镜像进 manifest 是每次上游 bump 都要重新对表的 re-sync 无底洞,基线明确否决。本文件只钉**一层
 // seam**:上游暴露的 **path 形状集合** == manifest 声明的 path 形状集合。上游改了路由形状 → 这里
 // 响亮地红;上游改了 provider / layout / 组件 → 这里一声不吭。
@@ -13,7 +13,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { DEEP_LINK_EVENT, ROUTE_MANIFEST, manifestPathTemplate } from "./route-manifest"
 
-const APP_SRC = join(import.meta.dir, "../../../app/src")
+const APP_SRC = join(import.meta.dir, "../../../codepuppy-app/src")
 const appTsx = readFileSync(join(APP_SRC, "app.tsx"), "utf8")
 const deepLinksTs = readFileSync(join(APP_SRC, "pages/layout/deep-links.ts"), "utf8")
 

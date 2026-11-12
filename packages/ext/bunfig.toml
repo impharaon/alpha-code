@@ -1,0 +1,5 @@
+[test]
+# I-08(`#1665` 审计 R1 的硬约束升格为全仓默认):任何 ext 测试文件求值之前,先把 HOME / 全部 XDG_* / OPENCODE_DB / TMPDIR
+# 指到一个新建的临时根。实现与理由在 scripts/test-isolation/preload.ts(ext、ui-mac、schema、ai、plugin 共用这一份)。
+# 预载在 src 外:它要建目录,而 ui-mac 的写盘登记簿(process-fence-write-sites)扫的是 ext/src 的生产源码。
+preload = ["../../scripts/test-isolation/preload.ts"]

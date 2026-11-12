@@ -10,11 +10,8 @@ export function readyWslConnections(state?: WslServersState) {
         type: "sidecar" as const,
         variant: "wsl" as const,
         distro: item.config.distro,
-        http: {
-          url: item.runtime.url,
-          username: item.runtime.username ?? undefined,
-          password: item.runtime.password ?? undefined,
-        },
+        // I8:renderer 不持有引擎口令(WSL 引擎的认证头同样由 main 补)。
+        http: { url: item.runtime.url },
       },
     ]
   })

@@ -43,7 +43,8 @@ describe("sidebar menu accessibility behavior", () => {
     expect(source.match(/ref=\{focusFirstMenuItem\}/g)).toHaveLength(2)
     expect(source.match(/onKeyDown=\{\(event\) => dismissMenuOnEscape/g)).toHaveLength(2)
     expect(source.match(/dismissMenu\(\(\) => setMenuFor\(null\), projectMenuTrigger\)/g)).toHaveLength(3)
-    expect(source.match(/dismissMenu\(\(\) => setSessionMenu\(null\), sessionMenuTrigger\)/g)).toHaveLength(4)
+    // `#1668` R6:会话菜单拿掉「分享对话」后,dismissMenu 调用点剩背景遮罩、复制、删除三处。
+    expect(source.match(/dismissMenu\(\(\) => setSessionMenu\(null\), sessionMenuTrigger\)/g)).toHaveLength(3)
   })
 
   test("activating a menu item closes the menu and restores trigger focus", async () => {

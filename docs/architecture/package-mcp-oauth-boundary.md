@@ -6,70 +6,92 @@ kind: architecture
 status: active
 owners:
   - alpha-code maintainers
-last_reviewed: 2026-08-19
-review_after: 2027-02-19
+last_reviewed: 2026-11-12
+review_after: 2027-05-12
 ---
 
 # Package MCP OAuth ownership boundary
 
 ## Why this document exists
 
-A package whose remote MCP declares `auth.kind: "mcp-oauth"` is authorised by
-the *engine's* OAuth stack, not by anything compiled into this app. That split
-is easy to erode from either side — main "just parsing" a token response once,
-or the engine being asked to open browsers on main's behalf — so the ownership
-table and the two non-obvious mechanisms below are pinned here.
+Signing in to a remote MCP server on OpenCode 2 is the engine's integration
+OAuth. The engine owns the whole flow and every secret. The renderer drives it
+through the engine's routes. Main only opens the browser, adds the engine
+password, and asks the engine whether a package's required sign-in is ready
+before installing it. The decisions and measurements are in the design,
+section "MCP OAuth on OpenCode 2" of
+[`docs/specs/1662-opencode2/design.md`](../specs/1662-opencode2/design.md).
+
+Until #1667, main also owned a sign-in coordinator for v1 (begin / status /
+cancel, its own loopback listener and state check). Nothing in production ever
+called it. It was deleted with the switch to OpenCode 2. Do not bring back a
+main-side attempt: on 2.x the engine always opens its own callback listener, so
+main would end up with a second copy of state the engine already holds.
 
 Its sibling for the other authorization kind is
-[`codepuppy-connection-lifetime.md`](codepuppy-connection-lifetime.md). The two are
-separate subsystems on purpose: a Code Puppy Connection's durable record is
-main-owned; an MCP OAuth credential's durable record is the engine's
-`mcp-auth.json` (`0600 + flock`, the accepted boundary for REQ-128 — not
-safeStorage, not a migration rider).
+[`codepuppy-connection-lifetime.md`](codepuppy-connection-lifetime.md). They are
+separate on purpose: main owns a Code Puppy Connection's durable record, while
+the engine's `credential` table owns an MCP OAuth credential.
 
 ## The ownership table
 
 | Fact | Owner | Where |
 | --- | --- | --- |
-| Discovery, DCR, PKCE, state nonce, token exchange, token store | engine | `packages/opencode/src/mcp/**`, reached only via authenticated typed routes |
-| Attempt (which signed prerequisite, which loopback redirect, state check) | main | `packages/ui-mac/src/main/package-mcp-oauth.ts` |
+| Discovery, DCR, PKCE, state, loopback callback listener, token exchange, credential store | engine | `packages/core/src/mcp/oauth.ts`, `packages/core/src/integration.ts`; one integration per remote MCP, keyed on name + URL |
+| Callback page (success and failure) | engine | `packages/core/src/oauth/page.ts` ([ADR-042](../../.claude/rules/adrs/ADR-042-oauth-callback-brand.md)) |
+| Driving a sign-in (list, get, `connect/oauth`, open the browser, poll the attempt, wait for the MCP to leave `pending`) | renderer adapter | the U6 route behind v1 `POST /mcp/:name/auth/authenticate` in `packages/ui-mac/src/engine-adapter/routes.ts` |
+| Opening the browser | main | the `open-link` IPC in `packages/ui-mac/src/main/ipc.ts` (http / https / mailto only) |
+| Engine password | main | I8: `packages/ui-mac/src/main/engine-authorization.ts`; the renderer never holds it |
 | Prerequisite projection from the signed payload | shared decoder | `packages/ui-mac/src/shared/package-mcp-oauth.ts` |
-| Readiness at admission time | engine, asked each time | `resolveMcpOauthBinding` in `package-admission.ts` → `POST /mcp` probe |
-| Browser | renderer, given `browserUrl` by main | attempt `begin` outcome |
-| Token↔server binding | engine (`getForUrl(name, url)`) | probed against the **re-validated signed envelope URL** |
+| Readiness at admission time | engine, asked each time | `resolveMcpOauthBinding` in `package-admission.ts` → `probePackageMcpOauthPrerequisiteV1` in `package-mcp-oauth.ts` |
 
-Main's engine seam has exactly three verbs — `add`, `authStart`,
-`authCallback` — and deliberately no credential-removal verb. Revocation is a
-separate explicit user action, never a side effect of cancel, install failure
-or uninstall (`uninstallPackageV1`'s installer surface has no OAuth verb at
-all).
-
-## The loopback callback ownership trick
-
-The engine's `startAuth` registers a pending PKCE transport but no callback
-waiter (only its browser-opening `authenticate` does that, and `authenticate`
-cannot hand a renderer the URL). So main points the ephemeral instance config's
-`oauth.redirectUri` at a per-attempt loopback listener (`127.0.0.1:<random>`),
-**bound before `authStart` is called**: the engine's callback-server helper
-checks whether the port is in use and stands down when it is. That order is
-load-bearing — listener first, then `authStart` — and it is what lets main
-verify the provider's `state` against *this attempt* before forwarding only the
-authorization code to the engine's typed callback route.
-
-`POST /mcp` writes engine **instance state only** (nothing durable, nothing in
-`plugin[]` — ADR-040 is untouched); the durable `mcp.<name>` config lands later
-through the normal package transaction and binds the same signed URL.
+Main stores no attempt, opens no listener and never handles a code, verifier,
+state or token. Its engine seam has one verb, `add`, and no way to remove a
+credential. Removing a credential is a separate, explicit user action. It is
+never a side effect of a failed install or an uninstall
+(`uninstallPackageV1`'s installer surface has no OAuth verb at all).
 
 ## Readiness is asked, never cached
 
-There is no main-side "OAuth is ready" record. Admission's required-OAuth gate
-(`§2.7`: zero transaction calls before ready) re-probes the engine with the
-re-validated signed URL on every attempt, so a token minted for one server can
-never follow a tampered or re-pointed envelope to another — the engine's
-`getForUrl` refuses the entry and the gate refuses the install. "Cannot ask the
-engine" (seam absent, engine unreachable) is treated exactly as "asked and told
-no": required refuses, optional installs disabled with
+Main keeps no "OAuth is ready" record. Before the installer runs, admission's
+required-OAuth gate asks the engine again, using the URL from the re-validated
+signed envelope:
+
+1. `PUT /api/experimental/mcp/:server` with `{ type: "remote", url }` adds the
+   server to the engine's runtime state only; nothing is written to disk. The
+   durable `mcp.<name>` config lands later through the normal package
+   transaction and points at the same signed URL.
+2. `GET /api/mcp` is read until that server is no longer `pending`, for at most
+   30 seconds (the engine's own MCP startup timeout).
+
+The engine keys each remote MCP's integration, and so its credential, on
+name + URL (`packages/core/src/mcp/index.ts`, `register`). The same name and
+URL as a past sign-in reports `connected`. The same URL under another name
+reports `needs_auth` (measured), and so does the same name pointing at another
+URL, because that is a different integration with no credential. A credential
+therefore never follows a tampered or re-pointed envelope to a different
+server. If main cannot
+ask the engine (seam absent, engine unreachable or refusing, still `pending`
+after the limit), it treats that exactly like being told no: a required
+prerequisite refuses the install, and an optional one installs disabled with
 `mcpOauthUnavailable: true`.
 
-Every named behaviour above is pinned by
-`packages/ui-mac/src/main/package-mcp-oauth.wiring.test.ts`.
+## The process fence is unchanged
+
+Sign-in needs no fence exception. The engine's callback listener binds
+`127.0.0.1` and the browser reaches it from outside the fence (N2 / N3). The
+engine reaches the MCP and authorization servers through the egress proxy:
+derived from the user's MCP record, or approved by the user (N4). The only
+thing the fence refuses is the engine connecting to a loopback OAuth server
+(N1). Only test doubles do that, because local destinations are not supported.
+
+## Pinned by
+
+- `packages/ui-mac/src/main/package-mcp-oauth.engine.test.ts`: a real OpenCode 2
+  engine in a sandbox. Before sign-in the probe reports `needs_auth`. After the
+  engine's own integration sign-in, the same name and URL report `connected`
+  and a renamed server reports `needs_auth`. An engine that refuses the request
+  gives `ok: false`. v1's `POST /mcp` returns no status.
+- `packages/ui-mac/src/main/package-mcp-oauth.wiring.test.ts`: the admission
+  gate (required refuses with zero transaction calls, optional installs
+  disabled, credential retained across a failed install and an uninstall).

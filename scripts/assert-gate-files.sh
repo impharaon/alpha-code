@@ -37,6 +37,10 @@ usage() {
 --update   从实测**自动写回**登记簿:逐条跑,全部绿之后把每行的登记条数改成实测值
            (all-or-nothing:任何一条测试失败就一条都不写回)。幂等 —— 登记与实测
            一致时零改动。给闸门文件加/删用例后跑这一条即可,让评审读 TSV 的 diff。
+           测试文件已不在盘上的行:登记簿里必须已有一条同时含「退役」与 `<工作目录>/<路径>`
+           的注释行(写明替代测试或理由),有就在写回时删掉这一行,没有就一次列出全部缺注释
+           的行并中止(一行都不写回)。写回后打印新旧登记簿的 diff。检查模式不受影响:文件
+           消失照样判红。
 
 例外语法:登记簿第 1 列写 `>=N`(而不是 `N`)= 该行退回下界语义。例外必须具名:
            该行 guarantee 列必须含完整且理由有非空白字符的 `[例外:<理由>]`,否则判红。
@@ -73,7 +77,32 @@ checked=0
 updates="$(mktemp)"
 countfile="$(mktemp)"
 seenfile="$(mktemp)"
-trap 'rm -f "$updates" "$countfile" "$seenfile"' EXIT
+retired="$(mktemp)"
+trap 'rm -f "$updates" "$countfile" "$seenfile" "$retired"' EXIT
+
+# I-09:--update 遇到已删的测试文件不再在第一条就中止 —— 先把它们一次找全。理由不由工具代写:
+# 每一行都要求人已经在登记簿里写了退役注释(「退役」+ `<工作目录>/<路径>`,同一行),有注释的行
+# 写回时删掉,缺注释的一次列全后中止。检查模式不走这里:文件消失仍由下面的逐条点名判红(保证 G1)。
+if [ "$MODE" = update ]; then
+  missing_notes=""
+  while IFS=$'\t' read -r floor workdir path _rest || [ -n "${floor:-}" ]; do
+    case "${floor:-}" in ''|\#*) continue ;; esac
+    [ -n "${workdir:-}" ] && [ -n "${path:-}" ] || continue
+    [ -e "$ROOT/$workdir/$path" ] && continue
+    if grep -E '^[[:space:]]*#' "$MANIFEST" | grep -F '退役' | grep -Fq -- "$workdir/$path"; then
+      printf '%s\t%s\n' "$workdir" "$path" >> "$retired"
+    else
+      missing_notes="${missing_notes}  · $workdir/$path"$'\n'
+    fi
+  done < "$MANIFEST"
+  if [ -n "$missing_notes" ]; then
+    echo "::error::--update 中止:下列登记行的测试文件已不在盘上,登记簿里也没有它们的退役注释 —— 一行都不写回:"
+    printf '%s' "$missing_notes"
+    echo "  先在登记簿里为每一行写一条注释再重跑,例如:"
+    echo "  # $(date +%Y-%m-%d) 退役(<票号>):<工作目录>/<路径>(<原条数>)。替代:<测试文件>「<用例名>」。无对应用例:<理由>"
+    exit 1
+  fi
+fi
 
 # `#1153`:平台条件闸的运行平台。词表 = process.platform 取值(登记标注用同一词表,
 # 于是「登记的平台」与「测试文件自己 gate 的 process.platform」说的是同一种话)。
@@ -88,6 +117,10 @@ na_names=""
 while IFS=$'\t' read -r floor workdir path delegates guarantee || [ -n "${floor:-}" ]; do
   case "${floor:-}" in ''|\#*) continue ;; esac
   [ -n "${workdir:-}" ] && [ -n "${path:-}" ] || { echo "::error::登记簿格式错误:$floor $workdir $path"; failed=1; continue; }
+  if [ "$MODE" = update ] && grep -Fqx -- "${workdir}"$'\t'"${path}" "$retired"; then
+    echo "── retire $workdir/$path(测试文件已删,退役注释在册)—— 写回时删掉这一行"
+    continue
+  fi
   # delegates_to 默认拒:没有委派也必须显式写 `-`,留空即红。
   [ -n "${delegates:-}" ] || { echo "::error::$workdir/$path 的 delegates_to 列为空 —— 没有委派请显式写 '-'"; failed=1; continue; }
 
@@ -219,7 +252,7 @@ if [ "$MODE" = update ]; then
     echo "::error::--update 中止:登记簿存在非法行(见上方 ::error::)—— 先修登记簿,all-or-nothing,一条都不写回"
     exit 1
   fi
-  if [ ! -s "$updates" ]; then
+  if [ ! -s "$updates" ] && [ ! -s "$retired" ]; then
     if [ "$na_count" -gt 0 ]; then
       echo "✓ 登记簿与实测一致($((checked - na_count)) 条;另 $na_count 条平台条件闸本平台不适用 —— 已验证自报 0 条,未测量、未改动),零改动"
     else
@@ -228,12 +261,14 @@ if [ "$MODE" = update ]; then
     exit 0
   fi
   awk -F'\t' -v OFS='\t' '
-    NR == FNR { m[$1 FS $2] = $3; next }
+    FILENAME == ARGV[1] { gone[$1 FS $2] = 1; next }
+    FILENAME == ARGV[2] { m[$1 FS $2] = $3; next }
     /^[[:space:]]*#/ || NF < 3 { print; next }
-    { key = $2 FS $3; if (key in m) $1 = m[key]; print }
-  ' "$updates" "$MANIFEST" > "$MANIFEST.tmp"
+    { key = $2 FS $3; if (key in gone) next; if (key in m) $1 = m[key]; print }
+  ' "$retired" "$updates" "$MANIFEST" > "$MANIFEST.tmp"
+  diff -u --label "gate-files.tsv(写回前)" --label "gate-files.tsv(写回后)" "$MANIFEST" "$MANIFEST.tmp" || true
   mv "$MANIFEST.tmp" "$MANIFEST"
-  echo "✓ 已按实测写回 $(wc -l < "$updates" | tr -d ' ') 行;重跑 bash scripts/assert-gate-files.sh 复核,并让评审读 TSV 的 diff"
+  echo "✓ 已按实测写回 $(wc -l < "$updates" | tr -d ' ') 行、删掉 $(wc -l < "$retired" | tr -d ' ') 行已退役的登记;上面是 diff,重跑 bash scripts/assert-gate-files.sh 复核"
   exit 0
 fi
 

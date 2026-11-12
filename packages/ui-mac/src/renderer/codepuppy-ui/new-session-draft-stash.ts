@@ -1,7 +1,7 @@
 // 新对话页 composer 的跨重挂暂存(REQ-126 CODE-D / 基线 §3 不变量 6「不吞内容」)。
 //
 // 为什么必须存在:draft 叶在上游以 `server\0directory` keyed
-// (`packages/app/src/app.tsx` 的 `createDraftRoute`),**切目录 = 整叶重挂** —— 连
+// (`packages/codepuppy-app/src/app.tsx` 的 `createDraftRoute`),**切目录 = 整叶重挂** —— 连
 // CodePuppyNewSession 自己都被卸载重建,而 composer 的文本/mention/附件都是组件本地信号。没有叶
 // **之外**的暂存,用户在新对话页输了一半再换项目 = 无声清空。
 //
@@ -19,7 +19,7 @@
 // **这里刻意没有任何容量帽和长度帽**:两者都是「静默丢用户内容」,正是本票要消灭的东西。
 // 生命周期改由**存在性**收敛:取回即消费 + 晋升即 `forget()` + 每次读写按「tabs 里还活着的
 // draftID」`prune()`。上游关闭 draft 的路径只清 tabs/persisted draft、不通知这里
-// (`packages/app/src/context/tabs.tsx` 的 `removeTab`,上游只读不改),所以剪枝是唯一能让
+// (`packages/codepuppy-app/src/context/tabs.tsx` 的 `removeTab`,上游只读不改),所以剪枝是唯一能让
 // 「建 draft → 输入 → 关掉」重复做不至于无界堆积(单条还可能挂着附件 dataURL)的收口点。
 // 剪掉的只可能是**已经不存在的 draft**,不是还活着的用户内容 —— 与被否掉的静默 LRU 不同。
 

@@ -29,6 +29,11 @@ describe("applyRegister — codepuppy_register 纯逻辑(REQ-060 T2)", () => {
     if (!r.ok) expect(r.reason).toContain("evil")
   })
 
+  test("`#1665`:command 不再收 subtask(2.x 插件注册的命令没有子任务语义,工具说明也不承诺)", () => {
+    const r = applyRegister(null, "command", "rev", { template: "review $ARGUMENTS", subtask: true })
+    expect(r).toEqual({ ok: false, reason: "field not allowed for command: subtask (allowed: template, description, agent, model)" })
+    expect(applyRegister(null, "command", "rev", { template: "review $ARGUMENTS", description: "d" }).ok).toBe(true)
+  })
   test("mcp 字段白名单对齐 ext-config(environment/headers 可,任意键不可)", () => {
     const ok = applyRegister(null, "mcp", "projdb", { type: "local", command: ["npx", "x"], environment: { A: "1" } })
     expect(ok.ok).toBe(true)
@@ -62,6 +67,20 @@ describe("applyRegister — codepuppy_register 纯逻辑(REQ-060 T2)", () => {
       expect(cfg.agent.a.prompt).toBe("p")
     }
     expect(applyRegister("{ broken", "agent", "a", { prompt: "p" }).ok).toBe(false)
+  })
+
+  test("#1662:字符串里的 `,}` / `,]` 原样往返 —— 读进来再写回,不被尾逗号处理改掉(与引擎同一个 JSONC 解析器)", () => {
+    const existing = `{
+      // 项目命令
+      "command": { "c": { "template": "x,}", "description": "list [a, b,]" }, },
+    }`
+    const r = applyRegister(existing, "agent", "a", { prompt: "p" })
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      const cfg = JSON.parse(r.next)
+      expect(cfg.command.c).toEqual({ template: "x,}", description: "list [a, b,]" })
+      expect(cfg.agent.a.prompt).toBe("p")
+    }
   })
 
   test("entry 非对象拒绝", () => {

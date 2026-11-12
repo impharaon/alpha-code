@@ -45,6 +45,11 @@ type ControllerLogger = {
 
 type WslServersControllerOptions = {
   logger?: ControllerLogger
+  /**
+   * `#1667`(I8,编排器 2026-11-09):WSL 引擎的口令只留在 main。就绪时交出这个服务的连接(main 在 renderer 会话的
+   * onBeforeSendHeaders 里按源补 Basic 头),停止 / 退出 / 失败时交出 undefined;发给 renderer 的运行态只有 `url`。
+   */
+  onEngineConnection?: (id: string, connection: { url: string; username: string | null; password: string } | undefined) => void
   readServers?: () => WslServerConfig[]
   writeServers?: (servers: WslServerConfig[]) => void
   probeDistro?: typeof probeWslDistro
@@ -238,15 +243,12 @@ export function createWslServersController(
         return
       }
       sidecars.set(id, sidecar)
-      setRuntime(id, {
-        kind: "ready",
-        url: sidecar.url,
-        username: sidecar.username,
-        password: sidecar.password,
-      })
+      options?.onEngineConnection?.(id, { url: sidecar.url, username: sidecar.username, password: sidecar.password })
+      setRuntime(id, { kind: "ready", url: sidecar.url } as WslServerRuntime)
       sidecar.listener.onExit((code, signal) => {
         if (sidecars.get(id) !== sidecar) return
         sidecars.delete(id)
+        options?.onEngineConnection?.(id, undefined)
         const message = startupFailure(code, signal)
         setRuntime(id, { kind: "failed", message })
         logger?.error("wsl sidecar exited", { id, distro: item.config.distro, code, signal })
@@ -268,6 +270,7 @@ export function createWslServersController(
     const existing = sidecars.get(id)
     if (!existing) return
     sidecars.delete(id)
+    options?.onEngineConnection?.(id, undefined)
     try {
       existing.listener.stop()
     } catch {
@@ -408,6 +411,7 @@ export function createWslServersController(
 
     stopAll() {
       for (const item of state.servers) invalidateStartAttempt(item.config.id)
+      for (const id of sidecars.keys()) options?.onEngineConnection?.(id, undefined)
       for (const existing of sidecars.values()) {
         try {
           existing.listener.stop()

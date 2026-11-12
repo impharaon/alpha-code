@@ -150,8 +150,9 @@ export function writeSecretFileAtomic(dir: string, name: string, value: string):
   }
 }
 
-/** 续期热应用只重写这两份:平台模型请求(ext `chat.headers` 经 `CODEPUPPY_PLATFORM_AUTH_REF`)与云 MCP
- *  (引擎 fetch 包装经 `CODEPUPPY_CLOUD_MCP_DEF` 里的引用)在请求边界现读它们。 */
+/** 续期热应用只重写这两份:平台模型请求(ext 的 `session.hook["http.request"]` 经 `CODEPUPPY_PLATFORM_AUTH_REF`)与云 MCP
+ *  (core `packages/core/src/mcp/client.ts` 的 codepuppy(#1562) 块经 `governedCredentialFetch` 读 `CODEPUPPY_CLOUD_MCP_DEF` 里的引用)
+ *  在请求边界现读它们。 */
 const HOT_CREDENTIALS = ["CODEPUPPY_API_KEY", "CODEPUPPY_MCP_TOKEN"] as const
 
 export type HotApplyOutcome = "applied" | "needs-structural"

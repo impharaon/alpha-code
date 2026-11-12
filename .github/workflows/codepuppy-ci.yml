@@ -131,16 +131,16 @@ jobs:
         # 不存在。行为判据 = packages/ui-mac/src/main/north-star-guard.test.ts(起真 git 仓、
         # 造真的上游改动、跑这个脚本本体,断言它真的点名了那个文件)。
         run: bash scripts/north-star-guard.sh
-      # `#976`:第三条源码卫生断言 —— `packages/{app,ui}` 必须能由 pin + SOT 补丁逐字重建。
+      # `#976`:第三条源码卫生断言 —— 冻结前端 `packages/codepuppy-{app,ui}`(`#1668` 起的落点)必须能由 pin + SOT 补丁逐字重建。
       # 它落在**这个** job 而不是 test job:test 的 checkout 是浅的(fetch-depth 默认 1),
       # 而 scripts/bun-test-app.sh 里那半边同类判据因此在 CI 上**从来没执行过** —— 实测 CI 日志
       # 原文「未比对:pin 849c2598 的对象本地取不到(浅克隆/未 fetch)」。这里 fetch-depth: 0,
       # 且 pin 是 alpha 历史的祖先 ⇒ 对象必然在,取不到只可能是接线坏了,故 ROUNDTRIP_REQUIRE_PIN=1
       # 关掉本地那一档 exit 2 逃生门。
-      # `if:` 刻意**不是** `needs.detect.outputs.code == 'true'`:`packages/{app,ui}` 下有 6 个
-      # tracked 的 .md,纯 .md 变更被 detect 判成 code=false,而它们同样在 sync 的 `rm -rf` 覆盖面里。
+      # `if:` 刻意**不是** `needs.detect.outputs.code == 'true'`:`packages/codepuppy-{app,ui}` 下有 tracked 的 .md,
+      # 纯 .md 变更被 detect 判成 code=false,而它们同样是补丁投影的一部分。
       # 本门的判据面是「pin+patch 重建出来的那棵树」,与 detect 的代码/文档分类不是同一个集合。
-      - name: Assert packages/app + packages/ui == pinned upstream + SOT patch (#976)
+      - name: Assert packages/codepuppy-app + packages/codepuppy-ui == pinned upstream + SOT patch (#976)
         if: ${{ !cancelled() }}
         env:
           ROUNDTRIP_REQUIRE_PIN: "1"
@@ -195,9 +195,11 @@ jobs:
       # 还让另一条 lane 把它误诊成自己引入的。本机实测该包 typecheck 4 秒。
       # 口径(为什么是「收进」而不是对齐 ui-mac 的 exclude)见
       # docs/architecture/quality-gate-environments.md §3.11。
-      - name: typecheck opencode (alpha 自有判据住在上游包里)
+      # `#1664`:OpenCode 2 没有 packages/opencode;这一格换成 packages/plugin(ext / ui-mac 编译依赖它,
+      # 接口冻结 I6 的一个 Code Puppy 自有契约模块住在它的 src/ 下),与 scripts/codepuppy-check.sh 第 [4/14] 步同一行。
+      - name: typecheck plugin (alpha 自有判据住在上游包里)
         if: needs.detect.outputs.code == 'true'
-        run: bun run --cwd packages/opencode typecheck
+        run: bun run --cwd packages/plugin typecheck
       # `#1222`:`#1134` 同一类的第二、三个实例。按 ADR-043 谓词枚举「上游包里的 alpha 自有
       # 文件」:opencode 24 · core 4 · schema 4 · sdk/js 1 · 其余四包 0。core 与 schema 此前
       # 不在任何门里 —— 2026-09-02 alpha 上 `packages/core` 一条真红(#223 主权闸判据文件)

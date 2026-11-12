@@ -2,7 +2,7 @@
 //
 // 为什么需要它:设置面(`<SettingsSurface/>`)是 `AppInterface` 的 children,渲染在 `ServerShell`
 // (QueryProvider + SharedProviders)里,而 `ServerSyncProvider` 只挂在**路由子树**上
-// (`packages/app/src/app.tsx` 的 `TargetServerRoute` / `SelectedServerProviders` / 草稿路由)。
+// (`packages/codepuppy-app/src/app.tsx` 的 `TargetServerRoute` / `SelectedServerProviders` / 草稿路由)。
 // 所以设置面**结构上**拿不到 `useServerSync()` —— 会话页认的那份目录真相
 // (`serverSync().session.data.info[id].directory`)它读不到,只能读侧栏项目清单;而那份清单被
 // `sidebar/worktree-filter.ts` 按设计过滤(归档项目 / 以家目录为根 / 全局 `/` 桶),于是

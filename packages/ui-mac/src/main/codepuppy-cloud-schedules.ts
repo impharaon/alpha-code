@@ -27,7 +27,7 @@ import { cloudScheduleEnvelopeFor, cloudScheduleRegistrationFor } from "./cloud-
 import { resolveEndpoints } from "./codepuppy-endpoints"
 import { getAccessToken } from "./codepuppy-auth"
 import { httpErrorCode } from "./platform-error-code"
-import { classifyNetFailure, type NetFailureLayer } from "@opencode-ai/schema/codepuppy-net-failure"
+import { classifyNetFailure, type NetFailureLayer } from "@opencode/schema/codepuppy-net-failure"
 
 // [#963] HTTP 拒绝的错误形状:`error` 是呈现槽(经 platform-error-code 咽喉的分类码或
 // http-<status>,进 UI),`status` 是结构槽(原始 HTTP status,给幂等一类的控制流判定用)。

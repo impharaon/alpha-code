@@ -1,0 +1,2357 @@
+{
+ "_source": "Sampled by `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts` (alpha-code#1668 L6) at d60a30c32e: a real OpenCode 2 engine from this repo's packages/cli `serve`, isolated HOME/XDG, one git project, and the scripted OpenAI-compatible mock model next to the sampler. `turnFrames` = every filesystem.changed frame (any session or none) during a turn whose mock call writes b.txt; `externalFrames` = the same while ext.txt is created then removed in the project from outside; `watch` = POST /api/experimental/fs/watch {path: a.txt}, `watchedFrames` = filesystem.changed frames after a.txt is then rewritten from outside. Records / final / diff as in turn-diff.json for the b.txt turn.",
+ "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-VDkmrT/proj",
+ "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+ "records": [
+  {
+   "frame": {
+    "id": "evt_1ce702c420025bS04cxUrr2jR9",
+    "created": 1794464820290,
+    "type": "session.created",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-VDkmrT/proj"
+    },
+    "data": {
+     "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "slug": "mighty-panda",
+     "version": "local",
+     "projectID": "ba82d24c773ae1e8fd9019c65defa00cdbce45d1",
+     "location": {
+      "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-VDkmrT/proj"
+     },
+     "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-VDkmrT/proj"
+    },
+    "durable": {
+     "aggregateID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "seq": 0,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+      "time": {
+       "created": 1794464820294
+      },
+      "text": "write a file",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1ce702c44001XHI1UGexigE5J2",
+    "created": 1794464820292,
+    "type": "session.inbox.enqueued",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-VDkmrT/proj"
+    },
+    "data": {
+     "inboxID": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+     "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "item": {
+      "type": "user",
+      "payload": {
+       "text": "write a file"
+      },
+      "delivery": "steer"
+     }
+    },
+    "durable": {
+     "aggregateID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "seq": 1,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+      "time": {
+       "created": 1794464820294
+      },
+      "text": "write a file",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1ce702c44002s0NvYopAnZNZJe",
+    "created": 1794464820292,
+    "type": "session.execution.started",
+    "data": {
+     "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy"
+    },
+    "durable": {
+     "aggregateID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "seq": 2,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+      "time": {
+       "created": 1794464820294
+      },
+      "text": "write a file",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1ce702c45001u3uxyN1Qyph7ir",
+    "created": 1794464820293,
+    "metadata": {
+     "instructions": {
+      "initial": true
+     }
+    },
+    "type": "session.instructions.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-VDkmrT/proj"
+    },
+    "data": {
+     "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "delta": {
+      "core/codemode": "70364fb91a447e61e71df243f6e958f57fed40a08c42fdc97085c5c1764350c7",
+      "core/skill-guidance": "8394362d28c82fa4d13c7a9f5568c05680f6687e07db8f426a0e3c92f3027dc9",
+      "core/date": "a7e13a150687c80c4d0443d32fcf7d9efe5c87e5523d17f39302e1f532dde9d8",
+      "core/environment": "d5b8d749981a2f2fb79cfafec87fcaa21c38d6cfa5cd96cc7aa2dec8c295cbea"
+     }
+    },
+    "durable": {
+     "aggregateID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "seq": 3,
+     "version": 2
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+      "time": {
+       "created": 1794464820294
+      },
+      "text": "write a file",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1ce702c46001zOdGD6X47yZlZF",
+    "created": 1794464820294,
+    "type": "session.inbox.delivered",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-VDkmrT/proj"
+    },
+    "data": {
+     "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "inboxID": "msg_1ce702c430012wefiZ5Z4Kh2v0"
+    },
+    "durable": {
+     "aggregateID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "seq": 4,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+      "time": {
+       "created": 1794464820294
+      },
+      "text": "write a file",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1ce702c69001I5YuX8OlqI7Imr",
+    "created": 1794464820329,
+    "type": "session.step.started",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-VDkmrT/proj"
+    },
+    "data": {
+     "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "agent": "build",
+     "model": {
+      "id": "m",
+      "providerID": "mock"
+     },
+     "assistantMessageID": "msg_1ce702c49001tIz4TAfIKosrx7",
+     "snapshot": "64490f4efc0b1108e09bd3e7e3a3533793ea62f5",
+     "started": 1794464820298
+    },
+    "durable": {
+     "aggregateID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "seq": 5,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1ce702c49001tIz4TAfIKosrx7",
+      "time": {
+       "created": 1794464820298
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": ""
+       }
+      ],
+      "snapshot": {
+       "start": "64490f4efc0b1108e09bd3e7e3a3533793ea62f5"
+      }
+     },
+     {
+      "id": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+      "time": {
+       "created": 1794464820294
+      },
+      "text": "write a file",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xY2U3MDJjNDkwMDF0SXo0VEFmSUtvc3J4NyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1ce702c6a00183mm12mCvnpe5s",
+    "created": 1794464820330,
+    "type": "session.text.started",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-VDkmrT/proj"
+    },
+    "data": {
+     "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "assistantMessageID": "msg_1ce702c49001tIz4TAfIKosrx7",
+     "ordinal": 0
+    },
+    "durable": {
+     "aggregateID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "seq": 6,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1ce702c49001tIz4TAfIKosrx7",
+      "time": {
+       "created": 1794464820298
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": ""
+       }
+      ],
+      "snapshot": {
+       "start": "64490f4efc0b1108e09bd3e7e3a3533793ea62f5"
+      }
+     },
+     {
+      "id": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+      "time": {
+       "created": 1794464820294
+      },
+      "text": "write a file",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xY2U3MDJjNDkwMDF0SXo0VEFmSUtvc3J4NyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1ce702c88001mZwFE5Qvy3OOJg",
+    "created": 1794464820360,
+    "type": "session.usage.updated",
+    "data": {
+     "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "cost": 0,
+     "tokens": {
+      "input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1ce702c49001tIz4TAfIKosrx7",
+      "time": {
+       "created": 1794464820298
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": ""
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_write_ww43y",
+        "name": "write",
+        "state": {
+         "status": "streaming",
+         "input": ""
+        },
+        "time": {
+         "created": 1794464820360
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "64490f4efc0b1108e09bd3e7e3a3533793ea62f5"
+      }
+     },
+     {
+      "id": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+      "time": {
+       "created": 1794464820294
+      },
+      "text": "write a file",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xY2U3MDJjNDkwMDF0SXo0VEFmSUtvc3J4NyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1ce702c88002c1fvP1aSCawlJL",
+    "created": 1794464820360,
+    "type": "session.renamed",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-VDkmrT/proj"
+    },
+    "data": {
+     "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "title": "Mock title"
+    },
+    "durable": {
+     "aggregateID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "seq": 8,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1ce702c49001tIz4TAfIKosrx7",
+      "time": {
+       "created": 1794464820298
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": ""
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_write_ww43y",
+        "name": "write",
+        "state": {
+         "status": "streaming",
+         "input": ""
+        },
+        "time": {
+         "created": 1794464820360
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "64490f4efc0b1108e09bd3e7e3a3533793ea62f5"
+      }
+     },
+     {
+      "id": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+      "time": {
+       "created": 1794464820294
+      },
+      "text": "write a file",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xY2U3MDJjNDkwMDF0SXo0VEFmSUtvc3J4NyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1ce702c88003xxmLWhdowKSRqY",
+    "created": 1794464820360,
+    "type": "session.text.delta",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-VDkmrT/proj"
+    },
+    "data": {
+     "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "assistantMessageID": "msg_1ce702c49001tIz4TAfIKosrx7",
+     "ordinal": 0,
+     "delta": "Calling write."
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1ce702c49001tIz4TAfIKosrx7",
+      "time": {
+       "created": 1794464820298
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": ""
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_write_ww43y",
+        "name": "write",
+        "state": {
+         "status": "streaming",
+         "input": ""
+        },
+        "time": {
+         "created": 1794464820360
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "64490f4efc0b1108e09bd3e7e3a3533793ea62f5"
+      }
+     },
+     {
+      "id": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+      "time": {
+       "created": 1794464820294
+      },
+      "text": "write a file",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xY2U3MDJjNDkwMDF0SXo0VEFmSUtvc3J4NyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1ce702c88004EMg7Glv9szP2Yf",
+    "created": 1794464820360,
+    "type": "session.tool.input.started",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-VDkmrT/proj"
+    },
+    "data": {
+     "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "assistantMessageID": "msg_1ce702c49001tIz4TAfIKosrx7",
+     "id": "call_mock_write_ww43y",
+     "name": "write"
+    },
+    "durable": {
+     "aggregateID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "seq": 9,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1ce702c49001tIz4TAfIKosrx7",
+      "time": {
+       "created": 1794464820298
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": ""
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_write_ww43y",
+        "name": "write",
+        "state": {
+         "status": "streaming",
+         "input": ""
+        },
+        "time": {
+         "created": 1794464820360
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "64490f4efc0b1108e09bd3e7e3a3533793ea62f5"
+      }
+     },
+     {
+      "id": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+      "time": {
+       "created": 1794464820294
+      },
+      "text": "write a file",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xY2U3MDJjNDkwMDF0SXo0VEFmSUtvc3J4NyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1ce702d0300151NjAXiuKI26w1",
+    "created": 1794464820483,
+    "type": "session.tool.input.ended",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-VDkmrT/proj"
+    },
+    "data": {
+     "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "assistantMessageID": "msg_1ce702c49001tIz4TAfIKosrx7",
+     "id": "call_mock_write_ww43y",
+     "text": "{\"path\":\"b.txt\",\"content\":\"hello from the turn\\n\"}"
+    },
+    "durable": {
+     "aggregateID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "seq": 10,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1ce702c49001tIz4TAfIKosrx7",
+      "time": {
+       "created": 1794464820298,
+       "streamed": 1794464820485
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Calling write."
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_write_ww43y",
+        "name": "write",
+        "executed": false,
+        "state": {
+         "status": "running",
+         "input": {
+          "path": "b.txt",
+          "content": "hello from the turn\n"
+         },
+         "metadata": {}
+        },
+        "time": {
+         "created": 1794464820360,
+         "ran": 1794464820484
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "64490f4efc0b1108e09bd3e7e3a3533793ea62f5"
+      }
+     },
+     {
+      "id": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+      "time": {
+       "created": 1794464820294
+      },
+      "text": "write a file",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xY2U3MDJjNDkwMDF0SXo0VEFmSUtvc3J4NyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1ce702d040012iXNI3RBcqHDMp",
+    "created": 1794464820484,
+    "type": "session.tool.called",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-VDkmrT/proj"
+    },
+    "data": {
+     "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "assistantMessageID": "msg_1ce702c49001tIz4TAfIKosrx7",
+     "id": "call_mock_write_ww43y",
+     "input": {
+      "path": "b.txt",
+      "content": "hello from the turn\n"
+     },
+     "executed": false
+    },
+    "durable": {
+     "aggregateID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "seq": 11,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1ce702c49001tIz4TAfIKosrx7",
+      "time": {
+       "created": 1794464820298,
+       "streamed": 1794464820485
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Calling write."
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_write_ww43y",
+        "name": "write",
+        "executed": false,
+        "state": {
+         "status": "running",
+         "input": {
+          "path": "b.txt",
+          "content": "hello from the turn\n"
+         },
+         "metadata": {}
+        },
+        "time": {
+         "created": 1794464820360,
+         "ran": 1794464820484
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "64490f4efc0b1108e09bd3e7e3a3533793ea62f5"
+      }
+     },
+     {
+      "id": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+      "time": {
+       "created": 1794464820294
+      },
+      "text": "write a file",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xY2U3MDJjNDkwMDF0SXo0VEFmSUtvc3J4NyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1ce702d04002Cdx8dHlDcjI8B4",
+    "created": 1794464820484,
+    "type": "session.text.ended",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-VDkmrT/proj"
+    },
+    "data": {
+     "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "assistantMessageID": "msg_1ce702c49001tIz4TAfIKosrx7",
+     "ordinal": 0,
+     "text": "Calling write."
+    },
+    "durable": {
+     "aggregateID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "seq": 12,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1ce702c49001tIz4TAfIKosrx7",
+      "time": {
+       "created": 1794464820298,
+       "streamed": 1794464820485
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Calling write."
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_write_ww43y",
+        "name": "write",
+        "executed": false,
+        "state": {
+         "status": "running",
+         "input": {
+          "path": "b.txt",
+          "content": "hello from the turn\n"
+         },
+         "metadata": {}
+        },
+        "time": {
+         "created": 1794464820360,
+         "ran": 1794464820484
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "64490f4efc0b1108e09bd3e7e3a3533793ea62f5"
+      }
+     },
+     {
+      "id": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+      "time": {
+       "created": 1794464820294
+      },
+      "text": "write a file",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xY2U3MDJjNDkwMDF0SXo0VEFmSUtvc3J4NyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1ce702d05001pF7T0Ur1TnveKM",
+    "created": 1794464820485,
+    "type": "session.step.streamed",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-VDkmrT/proj"
+    },
+    "data": {
+     "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "assistantMessageID": "msg_1ce702c49001tIz4TAfIKosrx7"
+    },
+    "durable": {
+     "aggregateID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "seq": 13,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1ce702c49001tIz4TAfIKosrx7",
+      "time": {
+       "created": 1794464820298,
+       "streamed": 1794464820485
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Calling write."
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_write_ww43y",
+        "name": "write",
+        "executed": false,
+        "state": {
+         "status": "completed",
+         "input": {
+          "path": "b.txt",
+          "content": "hello from the turn\n"
+         },
+         "content": [
+          {
+           "type": "text",
+           "text": "Created file successfully: b.txt"
+          }
+         ],
+         "metadata": {
+          "truncated": false
+         }
+        },
+        "time": {
+         "created": 1794464820360,
+         "ran": 1794464820484,
+         "completed": 1794464820487
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "64490f4efc0b1108e09bd3e7e3a3533793ea62f5"
+      }
+     },
+     {
+      "id": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+      "time": {
+       "created": 1794464820294
+      },
+      "text": "write a file",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xY2U3MDJjNDkwMDF0SXo0VEFmSUtvc3J4NyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1ce702d07001O5ESineBLjMvxI",
+    "created": 1794464820487,
+    "type": "session.tool.success",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-VDkmrT/proj"
+    },
+    "data": {
+     "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "assistantMessageID": "msg_1ce702c49001tIz4TAfIKosrx7",
+     "id": "call_mock_write_ww43y",
+     "content": [
+      {
+       "type": "text",
+       "text": "Created file successfully: b.txt"
+      }
+     ],
+     "metadata": {
+      "truncated": false
+     },
+     "executed": false
+    },
+    "durable": {
+     "aggregateID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "seq": 14,
+     "version": 2
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1ce702c49001tIz4TAfIKosrx7",
+      "time": {
+       "created": 1794464820298,
+       "streamed": 1794464820485
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Calling write."
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_write_ww43y",
+        "name": "write",
+        "executed": false,
+        "state": {
+         "status": "completed",
+         "input": {
+          "path": "b.txt",
+          "content": "hello from the turn\n"
+         },
+         "content": [
+          {
+           "type": "text",
+           "text": "Created file successfully: b.txt"
+          }
+         ],
+         "metadata": {
+          "truncated": false
+         }
+        },
+        "time": {
+         "created": 1794464820360,
+         "ran": 1794464820484,
+         "completed": 1794464820487
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "64490f4efc0b1108e09bd3e7e3a3533793ea62f5"
+      }
+     },
+     {
+      "id": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+      "time": {
+       "created": 1794464820294
+      },
+      "text": "write a file",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xY2U3MDJjNDkwMDF0SXo0VEFmSUtvc3J4NyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1ce702d2f001zWXbmIzIOsj1Yf",
+    "created": 1794464820527,
+    "type": "session.step.ended",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-VDkmrT/proj"
+    },
+    "data": {
+     "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "assistantMessageID": "msg_1ce702c49001tIz4TAfIKosrx7",
+     "finish": "tool-calls",
+     "rawFinish": "tool_calls",
+     "tokens": {
+      "input": 5,
+      "output": 5,
+      "reasoning": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     },
+     "cost": 0,
+     "snapshot": "1b6cdb344ad4f7bd6a39aca1fe9ae1aea4536e8f",
+     "files": [
+      "b.txt"
+     ]
+    },
+    "durable": {
+     "aggregateID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "seq": 15,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1ce702c49001tIz4TAfIKosrx7",
+      "time": {
+       "created": 1794464820298,
+       "streamed": 1794464820485,
+       "completed": 1794464820527
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Calling write."
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_write_ww43y",
+        "name": "write",
+        "executed": false,
+        "state": {
+         "status": "completed",
+         "input": {
+          "path": "b.txt",
+          "content": "hello from the turn\n"
+         },
+         "content": [
+          {
+           "type": "text",
+           "text": "Created file successfully: b.txt"
+          }
+         ],
+         "metadata": {
+          "truncated": false
+         }
+        },
+        "time": {
+         "created": 1794464820360,
+         "ran": 1794464820484,
+         "completed": 1794464820487
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "64490f4efc0b1108e09bd3e7e3a3533793ea62f5",
+       "end": "1b6cdb344ad4f7bd6a39aca1fe9ae1aea4536e8f",
+       "files": [
+        "b.txt"
+       ]
+      },
+      "finish": "tool-calls",
+      "rawFinish": "tool_calls",
+      "cost": 0,
+      "tokens": {
+       "input": 5,
+       "output": 5,
+       "reasoning": 0,
+       "cache": {
+        "read": 0,
+        "write": 0
+       }
+      }
+     },
+     {
+      "id": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+      "time": {
+       "created": 1794464820294
+      },
+      "text": "write a file",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xY2U3MDJjNDkwMDF0SXo0VEFmSUtvc3J4NyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   },
+   "diff": {
+    "data": [
+     {
+      "file": "b.txt",
+      "patch": "diff --git a/b.txt b/b.txt\nnew file mode 100644\nindex 0000000..64cdf3a\n--- /dev/null\n+++ b/b.txt\n@@ -0,0 +1 @@\n+hello from the turn\n",
+      "additions": 1,
+      "deletions": 0,
+      "status": "added"
+     }
+    ]
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1ce702d30001alNjO3LwL7rQRM",
+    "created": 1794464820528,
+    "type": "session.usage.updated",
+    "data": {
+     "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "cost": 0,
+     "tokens": {
+      "input": 5,
+      "output": 5,
+      "reasoning": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1ce702c49001tIz4TAfIKosrx7",
+      "time": {
+       "created": 1794464820298,
+       "streamed": 1794464820485,
+       "completed": 1794464820527
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Calling write."
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_write_ww43y",
+        "name": "write",
+        "executed": false,
+        "state": {
+         "status": "completed",
+         "input": {
+          "path": "b.txt",
+          "content": "hello from the turn\n"
+         },
+         "content": [
+          {
+           "type": "text",
+           "text": "Created file successfully: b.txt"
+          }
+         ],
+         "metadata": {
+          "truncated": false
+         }
+        },
+        "time": {
+         "created": 1794464820360,
+         "ran": 1794464820484,
+         "completed": 1794464820487
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "64490f4efc0b1108e09bd3e7e3a3533793ea62f5",
+       "end": "1b6cdb344ad4f7bd6a39aca1fe9ae1aea4536e8f",
+       "files": [
+        "b.txt"
+       ]
+      },
+      "finish": "tool-calls",
+      "rawFinish": "tool_calls",
+      "cost": 0,
+      "tokens": {
+       "input": 5,
+       "output": 5,
+       "reasoning": 0,
+       "cache": {
+        "read": 0,
+        "write": 0
+       }
+      }
+     },
+     {
+      "id": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+      "time": {
+       "created": 1794464820294
+      },
+      "text": "write a file",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xY2U3MDJjNDkwMDF0SXo0VEFmSUtvc3J4NyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1ce702d54001FTN5AcVEQdTM82",
+    "created": 1794464820564,
+    "type": "session.step.started",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-VDkmrT/proj"
+    },
+    "data": {
+     "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "agent": "build",
+     "model": {
+      "id": "m",
+      "providerID": "mock"
+     },
+     "assistantMessageID": "msg_1ce702d33001sdGnG5ax7TQOmn",
+     "snapshot": "1b6cdb344ad4f7bd6a39aca1fe9ae1aea4536e8f",
+     "started": 1794464820532
+    },
+    "durable": {
+     "aggregateID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "seq": 16,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1ce702d33001sdGnG5ax7TQOmn",
+      "time": {
+       "created": 1794464820532
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": ""
+       }
+      ],
+      "snapshot": {
+       "start": "1b6cdb344ad4f7bd6a39aca1fe9ae1aea4536e8f"
+      }
+     },
+     {
+      "id": "msg_1ce702c49001tIz4TAfIKosrx7",
+      "time": {
+       "created": 1794464820298,
+       "streamed": 1794464820485,
+       "completed": 1794464820527
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Calling write."
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_write_ww43y",
+        "name": "write",
+        "executed": false,
+        "state": {
+         "status": "completed",
+         "input": {
+          "path": "b.txt",
+          "content": "hello from the turn\n"
+         },
+         "content": [
+          {
+           "type": "text",
+           "text": "Created file successfully: b.txt"
+          }
+         ],
+         "metadata": {
+          "truncated": false
+         }
+        },
+        "time": {
+         "created": 1794464820360,
+         "ran": 1794464820484,
+         "completed": 1794464820487
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "64490f4efc0b1108e09bd3e7e3a3533793ea62f5",
+       "end": "1b6cdb344ad4f7bd6a39aca1fe9ae1aea4536e8f",
+       "files": [
+        "b.txt"
+       ]
+      },
+      "finish": "tool-calls",
+      "rawFinish": "tool_calls",
+      "cost": 0,
+      "tokens": {
+       "input": 5,
+       "output": 5,
+       "reasoning": 0,
+       "cache": {
+        "read": 0,
+        "write": 0
+       }
+      }
+     },
+     {
+      "id": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+      "time": {
+       "created": 1794464820294
+      },
+      "text": "write a file",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xY2U3MDJkMzMwMDFzZEduRzVheDdUUU9tbiIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1ce702d55001qR3UW6CFAlwvLf",
+    "created": 1794464820565,
+    "type": "session.text.started",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-VDkmrT/proj"
+    },
+    "data": {
+     "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "assistantMessageID": "msg_1ce702d33001sdGnG5ax7TQOmn",
+     "ordinal": 0
+    },
+    "durable": {
+     "aggregateID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "seq": 17,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1ce702d33001sdGnG5ax7TQOmn",
+      "time": {
+       "created": 1794464820532
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": ""
+       }
+      ],
+      "snapshot": {
+       "start": "1b6cdb344ad4f7bd6a39aca1fe9ae1aea4536e8f"
+      }
+     },
+     {
+      "id": "msg_1ce702c49001tIz4TAfIKosrx7",
+      "time": {
+       "created": 1794464820298,
+       "streamed": 1794464820485,
+       "completed": 1794464820527
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Calling write."
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_write_ww43y",
+        "name": "write",
+        "executed": false,
+        "state": {
+         "status": "completed",
+         "input": {
+          "path": "b.txt",
+          "content": "hello from the turn\n"
+         },
+         "content": [
+          {
+           "type": "text",
+           "text": "Created file successfully: b.txt"
+          }
+         ],
+         "metadata": {
+          "truncated": false
+         }
+        },
+        "time": {
+         "created": 1794464820360,
+         "ran": 1794464820484,
+         "completed": 1794464820487
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "64490f4efc0b1108e09bd3e7e3a3533793ea62f5",
+       "end": "1b6cdb344ad4f7bd6a39aca1fe9ae1aea4536e8f",
+       "files": [
+        "b.txt"
+       ]
+      },
+      "finish": "tool-calls",
+      "rawFinish": "tool_calls",
+      "cost": 0,
+      "tokens": {
+       "input": 5,
+       "output": 5,
+       "reasoning": 0,
+       "cache": {
+        "read": 0,
+        "write": 0
+       }
+      }
+     },
+     {
+      "id": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+      "time": {
+       "created": 1794464820294
+      },
+      "text": "write a file",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xY2U3MDJkMzMwMDFzZEduRzVheDdUUU9tbiIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1ce702dbb001Ip7oSAyGNtJTkg",
+    "created": 1794464820667,
+    "type": "session.text.delta",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-VDkmrT/proj"
+    },
+    "data": {
+     "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "assistantMessageID": "msg_1ce702d33001sdGnG5ax7TQOmn",
+     "ordinal": 0,
+     "delta": "The file says hi."
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1ce702d33001sdGnG5ax7TQOmn",
+      "time": {
+       "created": 1794464820532
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": ""
+       }
+      ],
+      "snapshot": {
+       "start": "1b6cdb344ad4f7bd6a39aca1fe9ae1aea4536e8f"
+      }
+     },
+     {
+      "id": "msg_1ce702c49001tIz4TAfIKosrx7",
+      "time": {
+       "created": 1794464820298,
+       "streamed": 1794464820485,
+       "completed": 1794464820527
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Calling write."
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_write_ww43y",
+        "name": "write",
+        "executed": false,
+        "state": {
+         "status": "completed",
+         "input": {
+          "path": "b.txt",
+          "content": "hello from the turn\n"
+         },
+         "content": [
+          {
+           "type": "text",
+           "text": "Created file successfully: b.txt"
+          }
+         ],
+         "metadata": {
+          "truncated": false
+         }
+        },
+        "time": {
+         "created": 1794464820360,
+         "ran": 1794464820484,
+         "completed": 1794464820487
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "64490f4efc0b1108e09bd3e7e3a3533793ea62f5",
+       "end": "1b6cdb344ad4f7bd6a39aca1fe9ae1aea4536e8f",
+       "files": [
+        "b.txt"
+       ]
+      },
+      "finish": "tool-calls",
+      "rawFinish": "tool_calls",
+      "cost": 0,
+      "tokens": {
+       "input": 5,
+       "output": 5,
+       "reasoning": 0,
+       "cache": {
+        "read": 0,
+        "write": 0
+       }
+      }
+     },
+     {
+      "id": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+      "time": {
+       "created": 1794464820294
+      },
+      "text": "write a file",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xY2U3MDJkMzMwMDFzZEduRzVheDdUUU9tbiIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1ce702dcf001CYLqjYhFUTstQ4",
+    "created": 1794464820687,
+    "type": "session.text.ended",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-VDkmrT/proj"
+    },
+    "data": {
+     "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "assistantMessageID": "msg_1ce702d33001sdGnG5ax7TQOmn",
+     "ordinal": 0,
+     "text": "The file says hi."
+    },
+    "durable": {
+     "aggregateID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "seq": 18,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1ce702d33001sdGnG5ax7TQOmn",
+      "time": {
+       "created": 1794464820532,
+       "streamed": 1794464820688
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "The file says hi."
+       }
+      ],
+      "snapshot": {
+       "start": "1b6cdb344ad4f7bd6a39aca1fe9ae1aea4536e8f"
+      }
+     },
+     {
+      "id": "msg_1ce702c49001tIz4TAfIKosrx7",
+      "time": {
+       "created": 1794464820298,
+       "streamed": 1794464820485,
+       "completed": 1794464820527
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Calling write."
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_write_ww43y",
+        "name": "write",
+        "executed": false,
+        "state": {
+         "status": "completed",
+         "input": {
+          "path": "b.txt",
+          "content": "hello from the turn\n"
+         },
+         "content": [
+          {
+           "type": "text",
+           "text": "Created file successfully: b.txt"
+          }
+         ],
+         "metadata": {
+          "truncated": false
+         }
+        },
+        "time": {
+         "created": 1794464820360,
+         "ran": 1794464820484,
+         "completed": 1794464820487
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "64490f4efc0b1108e09bd3e7e3a3533793ea62f5",
+       "end": "1b6cdb344ad4f7bd6a39aca1fe9ae1aea4536e8f",
+       "files": [
+        "b.txt"
+       ]
+      },
+      "finish": "tool-calls",
+      "rawFinish": "tool_calls",
+      "cost": 0,
+      "tokens": {
+       "input": 5,
+       "output": 5,
+       "reasoning": 0,
+       "cache": {
+        "read": 0,
+        "write": 0
+       }
+      }
+     },
+     {
+      "id": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+      "time": {
+       "created": 1794464820294
+      },
+      "text": "write a file",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xY2U3MDJkMzMwMDFzZEduRzVheDdUUU9tbiIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1ce702dd0001A3vOR8o45vpBmP",
+    "created": 1794464820688,
+    "type": "session.step.streamed",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-VDkmrT/proj"
+    },
+    "data": {
+     "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "assistantMessageID": "msg_1ce702d33001sdGnG5ax7TQOmn"
+    },
+    "durable": {
+     "aggregateID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "seq": 19,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1ce702d33001sdGnG5ax7TQOmn",
+      "time": {
+       "created": 1794464820532,
+       "streamed": 1794464820688
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "The file says hi."
+       }
+      ],
+      "snapshot": {
+       "start": "1b6cdb344ad4f7bd6a39aca1fe9ae1aea4536e8f"
+      }
+     },
+     {
+      "id": "msg_1ce702c49001tIz4TAfIKosrx7",
+      "time": {
+       "created": 1794464820298,
+       "streamed": 1794464820485,
+       "completed": 1794464820527
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Calling write."
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_write_ww43y",
+        "name": "write",
+        "executed": false,
+        "state": {
+         "status": "completed",
+         "input": {
+          "path": "b.txt",
+          "content": "hello from the turn\n"
+         },
+         "content": [
+          {
+           "type": "text",
+           "text": "Created file successfully: b.txt"
+          }
+         ],
+         "metadata": {
+          "truncated": false
+         }
+        },
+        "time": {
+         "created": 1794464820360,
+         "ran": 1794464820484,
+         "completed": 1794464820487
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "64490f4efc0b1108e09bd3e7e3a3533793ea62f5",
+       "end": "1b6cdb344ad4f7bd6a39aca1fe9ae1aea4536e8f",
+       "files": [
+        "b.txt"
+       ]
+      },
+      "finish": "tool-calls",
+      "rawFinish": "tool_calls",
+      "cost": 0,
+      "tokens": {
+       "input": 5,
+       "output": 5,
+       "reasoning": 0,
+       "cache": {
+        "read": 0,
+        "write": 0
+       }
+      }
+     },
+     {
+      "id": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+      "time": {
+       "created": 1794464820294
+      },
+      "text": "write a file",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xY2U3MDJkMzMwMDFzZEduRzVheDdUUU9tbiIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1ce702dd8001cVKS8M98M9P58G",
+    "created": 1794464820696,
+    "type": "session.step.ended",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-VDkmrT/proj"
+    },
+    "data": {
+     "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "assistantMessageID": "msg_1ce702d33001sdGnG5ax7TQOmn",
+     "finish": "stop",
+     "rawFinish": "stop",
+     "tokens": {
+      "input": 30,
+      "output": 4,
+      "reasoning": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     },
+     "cost": 0,
+     "snapshot": "1b6cdb344ad4f7bd6a39aca1fe9ae1aea4536e8f",
+     "files": []
+    },
+    "durable": {
+     "aggregateID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "seq": 20,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1ce702dd9002iOj06WfMzEQUSD",
+      "time": {
+       "created": 1794464820697
+      },
+      "type": "idle",
+      "outcome": "succeeded"
+     },
+     {
+      "id": "msg_1ce702d33001sdGnG5ax7TQOmn",
+      "time": {
+       "created": 1794464820532,
+       "streamed": 1794464820688,
+       "completed": 1794464820696
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "The file says hi."
+       }
+      ],
+      "snapshot": {
+       "start": "1b6cdb344ad4f7bd6a39aca1fe9ae1aea4536e8f",
+       "end": "1b6cdb344ad4f7bd6a39aca1fe9ae1aea4536e8f",
+       "files": []
+      },
+      "finish": "stop",
+      "rawFinish": "stop",
+      "cost": 0,
+      "tokens": {
+       "input": 30,
+       "output": 4,
+       "reasoning": 0,
+       "cache": {
+        "read": 0,
+        "write": 0
+       }
+      }
+     },
+     {
+      "id": "msg_1ce702c49001tIz4TAfIKosrx7",
+      "time": {
+       "created": 1794464820298,
+       "streamed": 1794464820485,
+       "completed": 1794464820527
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Calling write."
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_write_ww43y",
+        "name": "write",
+        "executed": false,
+        "state": {
+         "status": "completed",
+         "input": {
+          "path": "b.txt",
+          "content": "hello from the turn\n"
+         },
+         "content": [
+          {
+           "type": "text",
+           "text": "Created file successfully: b.txt"
+          }
+         ],
+         "metadata": {
+          "truncated": false
+         }
+        },
+        "time": {
+         "created": 1794464820360,
+         "ran": 1794464820484,
+         "completed": 1794464820487
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "64490f4efc0b1108e09bd3e7e3a3533793ea62f5",
+       "end": "1b6cdb344ad4f7bd6a39aca1fe9ae1aea4536e8f",
+       "files": [
+        "b.txt"
+       ]
+      },
+      "finish": "tool-calls",
+      "rawFinish": "tool_calls",
+      "cost": 0,
+      "tokens": {
+       "input": 5,
+       "output": 5,
+       "reasoning": 0,
+       "cache": {
+        "read": 0,
+        "write": 0
+       }
+      }
+     },
+     {
+      "id": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+      "time": {
+       "created": 1794464820294
+      },
+      "text": "write a file",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xY2U3MDJkZDkwMDJpT2owNldmTXpFUVVTRCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   },
+   "diff": {
+    "data": [
+     {
+      "file": "b.txt",
+      "patch": "diff --git a/b.txt b/b.txt\nnew file mode 100644\nindex 0000000..64cdf3a\n--- /dev/null\n+++ b/b.txt\n@@ -0,0 +1 @@\n+hello from the turn\n",
+      "additions": 1,
+      "deletions": 0,
+      "status": "added"
+     }
+    ]
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1ce702dd9001IMC4anstyqTzus",
+    "created": 1794464820697,
+    "type": "session.usage.updated",
+    "data": {
+     "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "cost": 0,
+     "tokens": {
+      "input": 35,
+      "output": 9,
+      "reasoning": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1ce702dd9002iOj06WfMzEQUSD",
+      "time": {
+       "created": 1794464820697
+      },
+      "type": "idle",
+      "outcome": "succeeded"
+     },
+     {
+      "id": "msg_1ce702d33001sdGnG5ax7TQOmn",
+      "time": {
+       "created": 1794464820532,
+       "streamed": 1794464820688,
+       "completed": 1794464820696
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "The file says hi."
+       }
+      ],
+      "snapshot": {
+       "start": "1b6cdb344ad4f7bd6a39aca1fe9ae1aea4536e8f",
+       "end": "1b6cdb344ad4f7bd6a39aca1fe9ae1aea4536e8f",
+       "files": []
+      },
+      "finish": "stop",
+      "rawFinish": "stop",
+      "cost": 0,
+      "tokens": {
+       "input": 30,
+       "output": 4,
+       "reasoning": 0,
+       "cache": {
+        "read": 0,
+        "write": 0
+       }
+      }
+     },
+     {
+      "id": "msg_1ce702c49001tIz4TAfIKosrx7",
+      "time": {
+       "created": 1794464820298,
+       "streamed": 1794464820485,
+       "completed": 1794464820527
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Calling write."
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_write_ww43y",
+        "name": "write",
+        "executed": false,
+        "state": {
+         "status": "completed",
+         "input": {
+          "path": "b.txt",
+          "content": "hello from the turn\n"
+         },
+         "content": [
+          {
+           "type": "text",
+           "text": "Created file successfully: b.txt"
+          }
+         ],
+         "metadata": {
+          "truncated": false
+         }
+        },
+        "time": {
+         "created": 1794464820360,
+         "ran": 1794464820484,
+         "completed": 1794464820487
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "64490f4efc0b1108e09bd3e7e3a3533793ea62f5",
+       "end": "1b6cdb344ad4f7bd6a39aca1fe9ae1aea4536e8f",
+       "files": [
+        "b.txt"
+       ]
+      },
+      "finish": "tool-calls",
+      "rawFinish": "tool_calls",
+      "cost": 0,
+      "tokens": {
+       "input": 5,
+       "output": 5,
+       "reasoning": 0,
+       "cache": {
+        "read": 0,
+        "write": 0
+       }
+      }
+     },
+     {
+      "id": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+      "time": {
+       "created": 1794464820294
+      },
+      "text": "write a file",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xY2U3MDJkZDkwMDJpT2owNldmTXpFUVVTRCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1ce702dd9002iOj06WfMzEQUSD",
+    "created": 1794464820697,
+    "type": "session.execution.succeeded",
+    "data": {
+     "sessionID": "ses_e318fd3bdffeQHVajTJ108Bljy"
+    },
+    "durable": {
+     "aggregateID": "ses_e318fd3bdffeQHVajTJ108Bljy",
+     "seq": 21,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1ce702dd9002iOj06WfMzEQUSD",
+      "time": {
+       "created": 1794464820697
+      },
+      "type": "idle",
+      "outcome": "succeeded"
+     },
+     {
+      "id": "msg_1ce702d33001sdGnG5ax7TQOmn",
+      "time": {
+       "created": 1794464820532,
+       "streamed": 1794464820688,
+       "completed": 1794464820696
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "The file says hi."
+       }
+      ],
+      "snapshot": {
+       "start": "1b6cdb344ad4f7bd6a39aca1fe9ae1aea4536e8f",
+       "end": "1b6cdb344ad4f7bd6a39aca1fe9ae1aea4536e8f",
+       "files": []
+      },
+      "finish": "stop",
+      "rawFinish": "stop",
+      "cost": 0,
+      "tokens": {
+       "input": 30,
+       "output": 4,
+       "reasoning": 0,
+       "cache": {
+        "read": 0,
+        "write": 0
+       }
+      }
+     },
+     {
+      "id": "msg_1ce702c49001tIz4TAfIKosrx7",
+      "time": {
+       "created": 1794464820298,
+       "streamed": 1794464820485,
+       "completed": 1794464820527
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Calling write."
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_write_ww43y",
+        "name": "write",
+        "executed": false,
+        "state": {
+         "status": "completed",
+         "input": {
+          "path": "b.txt",
+          "content": "hello from the turn\n"
+         },
+         "content": [
+          {
+           "type": "text",
+           "text": "Created file successfully: b.txt"
+          }
+         ],
+         "metadata": {
+          "truncated": false
+         }
+        },
+        "time": {
+         "created": 1794464820360,
+         "ran": 1794464820484,
+         "completed": 1794464820487
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "64490f4efc0b1108e09bd3e7e3a3533793ea62f5",
+       "end": "1b6cdb344ad4f7bd6a39aca1fe9ae1aea4536e8f",
+       "files": [
+        "b.txt"
+       ]
+      },
+      "finish": "tool-calls",
+      "rawFinish": "tool_calls",
+      "cost": 0,
+      "tokens": {
+       "input": 5,
+       "output": 5,
+       "reasoning": 0,
+       "cache": {
+        "read": 0,
+        "write": 0
+       }
+      }
+     },
+     {
+      "id": "msg_1ce702c430012wefiZ5Z4Kh2v0",
+      "time": {
+       "created": 1794464820294
+      },
+      "text": "write a file",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xY2U3MDJkZDkwMDJpT2owNldmTXpFUVVTRCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xY2U3MDJjNDMwMDEyd2VmaVo1WjRLaDJ2MCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   },
+   "diff": {
+    "data": [
+     {
+      "file": "b.txt",
+      "patch": "diff --git a/b.txt b/b.txt\nnew file mode 100644\nindex 0000000..64cdf3a\n--- /dev/null\n+++ b/b.txt\n@@ -0,0 +1 @@\n+hello from the turn\n",
+      "additions": 1,
+      "deletions": 0,
+      "status": "added"
+     }
+    ]
+   }
+  }
+ ],
+ "diff": {
+  "data": [
+   {
+    "file": "b.txt",
+    "patch": "diff --git a/b.txt b/b.txt\nnew file mode 100644\nindex 0000000..64cdf3a\n--- /dev/null\n+++ b/b.txt\n@@ -0,0 +1 @@\n+hello from the turn\n",
+    "additions": 1,
+    "deletions": 0,
+    "status": "added"
+   }
+  ]
+ },
+ "turnFrames": [],
+ "externalFrames": [],
+ "watch": {
+  "status": 204
+ },
+ "watchedFrames": [
+  {
+   "id": "evt_1ce703dee001M57M85eoIfHVEu",
+   "created": 1794464824814,
+   "type": "filesystem.changed",
+   "location": {
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-VDkmrT/proj"
+   },
+   "data": {
+    "file": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-VDkmrT/proj/a.txt",
+    "event": "change"
+   }
+  }
+ ]
+}

@@ -4,12 +4,13 @@
 // **与当前用的是哪个模型无关**。它**不**承诺「输出会更长/更好」—— 方案基线
 // (docs/design/req-153-output-capability.md §6.1)记着那条行为结果零 A/B 实测。
 //
-// 为什么「与模型无关」需要一条真判据,而不是一句注释:上游 `session/system.ts:29-42` 按
-// `model.api.id` 子串路由底座提示词(25 个网关模型 16 个落 `default.txt`),于是「这条要求
+// 为什么「与模型无关」需要一条真判据,而不是一句注释:上游按模型 id 子串路由底座提示词(OpenCode 2:
+// `packages/core/src/plugin/optimize.ts` 的 `opencode.prompt.*` 插件,不命中的落默认底座
+// `session/runner/prompt/system.txt`;v1 时是 `session/system.ts:29-42`),于是「这条要求
 // 到底覆盖了几个模型」是一个真会变的量。本文件跑**真的** `injectCodePuppyConfig`,用三个**分别
 // 落在三份不同底座**上的模型 id 各跑一遍,断言写出的 `codepuppy-behavior.md` 逐字节相同 ——
 // 任何按模型分叉的实现都会当场红。「这三个 id 真的落三份底座」不靠我记得:下面的 drift 锁
-// 直接读上游 `system.ts` 的路由原文(同 `packages/ext/src/prompt-rebrand.test.ts` 的做法)。
+// 直接读上游的路由原文(同 `packages/ext/src/prompt-rebrand.test.ts` 的做法)。
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import * as fs from "node:fs"
@@ -86,8 +87,9 @@ afterEach(() => {
 /** 跑一次生产注入,返回引擎会看到的 instructions 与真正落盘的 behavior 正文。 */
 function inject(): { instructions: string[]; model: unknown; behaviorFile: string; behaviorBody: string | null } {
   const result = injectCodePuppyConfig(userData, undefined, "stable")
-  expect(result).toEqual({ ok: true })
-  const config = JSON.parse(process.env.OPENCODE_CONFIG_CONTENT!) as { instructions?: string[]; model?: unknown }
+  expect(result.ok ? true : result.error).toBe(true)
+  // `#1667`:注入产物不再进环境变量,引擎从结果的 `config.content` 拿(sidecar 放进 `start()` 的选项)。
+  const config = JSON.parse(result.config.content) as { instructions?: string[]; model?: unknown }
   const behaviorFile = path.join(userData, "codepuppy-behavior.md")
   return {
     instructions: config.instructions ?? [],
@@ -97,28 +99,26 @@ function inject(): { instructions: string[]; model: unknown; behaviorFile: strin
   }
 }
 
-// 三个模型 id,分别落在上游 `system.ts` 路由的三个不同分支(claude / gpt / 兜底 default)。
+// 三个模型 id,分别落在上游底座路由的三个不同分支(claude 追加 / gpt 替换 / 兜底默认)。
 // 下面的 drift 锁证明这三条分支今天仍然存在 —— 否则「跨三份底座都成立」是一句空话。
 const ROUTED_MODELS = [
-  { model: "deepseek/deepseek-chat", route: "default.txt(兜底)" },
-  { model: "alpha/claude-sonnet-4-5", route: "anthropic.txt" },
+  { model: "deepseek/deepseek-chat", route: "runner/prompt/system.txt(兜底)" },
+  { model: "alpha/claude-sonnet-4-5", route: "system.txt + anthropic.txt" },
   { model: "alpha/gpt-5", route: "gpt.txt" },
 ] as const
 
-describe("drift 锁 —— 上游按 model.api.id 分叉底座这件事仍然成立", () => {
-  const systemTs = fs.readFileSync(
-    path.join(import.meta.dir, "../../../opencode/src/session/system.ts"),
-    "utf8",
-  )
-  for (const needle of [
-    'model.api.id.includes("claude")',
-    'model.api.id.includes("gpt")',
-    "return [PROMPT_DEFAULT]",
-  ]) {
-    test(`system.ts 仍含 ${needle}`, () => {
-      expect(systemTs.includes(needle)).toBe(true)
-    })
-  }
+describe("drift 锁 —— 上游按模型 id 分叉底座这件事仍然成立", () => {
+  // 读的是上游路由的**文本**,登记为减速带(source-text-anchors.ts):它只证明三条分支的原文还在,证不了它们真的生效。
+  test("ANCHOR (not a gate): 上游底座路由原文仍按 claude / gpt / 兜底分三支", () => {
+    const coreSrc = path.join(import.meta.dir, "../../../core/src")
+    const optimize = fs.readFileSync(path.join(coreSrc, "plugin/optimize.ts"), "utf8")
+    const systemPrompt = fs.readFileSync(path.join(coreSrc, "session/system-prompt.ts"), "utf8")
+    expect([
+      optimize.includes('if (!id.includes("claude")) return undefined'),
+      optimize.includes('if (!id.includes("gpt")) return undefined'),
+      systemPrompt.includes('import PROMPT from "./runner/prompt/system.txt"'),
+    ]).toEqual([true, true, true])
+  })
 })
 
 describe("codepuppy-behavior 质量基线 —— 注入链路(#1240)", () => {

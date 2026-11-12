@@ -9,9 +9,22 @@ import {
   modelJson,
   modelMarkdown,
 } from "./lib/agent-formats"
-import { fromPathname, LOCALE_HEADER, pageUrl, parseLocale, prefersMarkdown, route, strip } from "./lib/language"
+import {
+  basePath,
+  cookie,
+  fromPathname,
+  LOCALE_HEADER,
+  localeFromRequest,
+  pageUrl,
+  parseLocale,
+  prefersMarkdown,
+  route,
+  strip,
+} from "./lib/language"
+import { noindexOutsideProduction } from "./lib/noindex"
 import { loadComparePage, loadHomePage, loadLabPage, loadModelPage } from "./lib/page-data"
 import { canonicalModelEntry, catalogModelPath, findModelCatalogLab, loadModelCatalog } from "./routes/model-catalog"
+import { statsPageCacheControl } from "./routes/stats-cache"
 
 type Format = "markdown" | "json" | "text"
 type Target =
@@ -28,7 +41,6 @@ type Rendered = {
 }
 
 const reservedSegments = new Set(["api", "_server", "_build", "stats", "sitemap.xml", "banner.jpg", "banner.png"])
-const pageCacheControl = "public, max-age=60, s-maxage=300, stale-while-revalidate=86400"
 const extensionFormats = { ".md": "markdown", ".json": "json" } as const satisfies Record<string, Format>
 const contentTypes = {
   markdown: "text/markdown",
@@ -36,11 +48,13 @@ const contentTypes = {
   text: "text/plain",
 } as const satisfies Record<Format, string>
 
-export default createMiddleware({
+const pageMiddleware = createMiddleware({
   onRequest: async (event) => {
     const request = event.request
     if (request.method !== "GET" && request.method !== "HEAD") return
     const url = new URL(request.url)
+    const localized = localizedRedirect(request, url)
+    if (localized) return localized
     const path = strip(url.pathname)
     const parsed = parsePath(path)
     if (!parsed) return
@@ -68,6 +82,46 @@ export default createMiddleware({
     return formatResponse(await render(parsed.target, format), format, { negotiated, head: request.method === "HEAD" })
   },
 })
+
+// The noindex header outside production first (lib/noindex.ts), so every response carries it.
+export default [noindexOutsideProduction, ...pageMiddleware]
+
+// Unprefixed pages redirect to the visitor's language from their cookie or Accept-Language. /en/data stays put so
+// English remains reachable for visitors whose browser prefers another language.
+function localizedRedirect(request: Request, url: URL) {
+  if (fromPathname(url.pathname)) return undefined
+  if (url.pathname !== basePath && !url.pathname.startsWith(`${basePath}/`)) return undefined
+  if (isDataBypassPath(url.pathname)) return undefined
+  const accept = request.headers.get("accept")
+  // Agents asking for Markdown get the English page in place.
+  if (prefersMarkdown(accept)) return undefined
+  if (accept && !accept.includes("text/html") && !accept.includes("*/*")) return undefined
+  const locale = localeFromRequest(request)
+  if (locale === "en") return undefined
+  const headers = new Headers({
+    // route() normalizes /data to /data/, so keep the visitor's own trailing slash.
+    Location: `${url.pathname === basePath ? `/${locale}${basePath}` : route(locale, url.pathname)}${url.search}`,
+    "Cache-Control": "private, no-store",
+    Vary: "Accept, Accept-Language, Cookie",
+  })
+  headers.append("Set-Cookie", cookie(locale))
+  return new Response(null, { status: 308, headers })
+}
+
+function isDataBypassPath(pathname: string) {
+  return (
+    pathname.startsWith(`${basePath}/_build/`) ||
+    pathname.startsWith(`${basePath}/api/`) ||
+    pathname.startsWith(`${basePath}/stats/`) ||
+    pathname.startsWith(`${basePath}/_server`) ||
+    pathname === `${basePath}/banner.jpg` ||
+    pathname === `${basePath}/banner.png` ||
+    pathname === `${basePath}/sitemap.xml` ||
+    pathname.endsWith("/llms.txt") ||
+    pathname.endsWith(".md") ||
+    pathname.endsWith(".json")
+  )
+}
 
 function parsePath(path: string) {
   const segments = path.split("/").filter(Boolean).slice(1)
@@ -144,7 +198,7 @@ async function render(target: Target, format: Format): Promise<Rendered> {
 function formatResponse(rendered: Rendered, format: Format, options: { negotiated: boolean; head: boolean }) {
   const headers = new Headers({
     "Content-Type": `${contentTypes[format]}; charset=utf-8`,
-    "Cache-Control": pageCacheControl,
+    "Cache-Control": statsPageCacheControl,
   })
   if (options.negotiated) headers.set("Vary", "Accept")
   if (rendered.path) headers.set("Link", `<${pageUrl(rendered.path)}>; rel="canonical"`)

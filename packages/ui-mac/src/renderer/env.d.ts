@@ -1,6 +1,6 @@
 // `window.api` 在 ui-mac 的 program 里被声明**两遍**,两份互不兼容(#932):
 //   ① 本文件:`api: ElectronAPI`(alpha 自己的完整面,renderer 有 160+ 个使用点);
-//   ② 上游 `packages/app/src/app.tsx`(经项目引用产出的 `.ts-dist/src/app.d.ts`):
+//   ② 上游 `packages/codepuppy-app/src/app.tsx`(经项目引用产出的 `.ts-dist/src/app.d.ts`):
 //      `api?: { setTitlebar?; exportDebugLogs? }` —— 极简且整枝可选。
 // 两处都是 `.d.ts`,`skipLibCheck: true` 把本该报在声明处的 TS2717 一起吞掉 ⇒ **没有任何红**,
 // 而合并后 `Window["api"]` 取的是**先进 program 的那一份**。实测(2026-08-11,见 PR):

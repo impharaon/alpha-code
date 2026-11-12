@@ -22,6 +22,8 @@ import type { ComposerModel } from "../src/renderer/codepuppy-ui/composer-state"
 import type { ModelContract } from "../src/renderer/codepuppy-ui/model-contract"
 import { codepuppyJsoncPath } from "../src/main/engine-config-truth"
 import { buildCodePuppyModelConfig } from "../src/main/codepuppy-models"
+import { syncSecretFiles } from "../src/main/codepuppy-secret-files"
+import { readCustomProviderRecords } from "../src/main/custom-provider-records"
 import { dict as zh } from "../src/renderer/i18n/zh"
 import { dict as enDict } from "../src/renderer/i18n/en"
 // `#1374`:共享 `window.api` 桩。它只 import 类型,运行期零依赖 —— 与上面两份 dict 同理,
@@ -57,7 +59,7 @@ mock.module("../src/main/logging", () => ({
   rotateServerLogs: () => {},
 }))
 const { persistProviderAndRefresh, setProviderKeyAndRetireLegacyKey, setProviderLifecycleDeps } = await import("../src/main/provider-lifecycle")
-const { clearByokKeys, getByokKey, initByokKeys } = await import("../src/main/codepuppy-byok-keys")
+const { clearByokKeys, customProviderSecretValues, getByokKey, initByokKeys } = await import("../src/main/codepuppy-byok-keys")
 // zh 产品文案的 locale pin 由 bunfig.toml 的 test preload(scripts/test-preload.ts 设
 // CODEPUPPY_UI_LOCALE=zh)统一提供 —— 本文件被 codepuppy-composer-model.component.test.ts 以子进程
 // spawn,继承父进程 env,i18n 的 detectLocale() 直接读到 zh,无需再逐文件 setLocale。
@@ -69,7 +71,7 @@ const activeDisposals: Array<() => void> = []
 Bun.plugin({
   name: "solid-component-tests",
   setup(builder) {
-    builder.onLoad({ filter: /packages\/(ui|ui-mac)\/src\/.*\.tsx$/ }, async (args) => {
+    builder.onLoad({ filter: /packages\/(codepuppy-ui|ui-mac)\/src\/.*\.tsx$/ }, async (args) => {
       const transformed = await transformAsync(await Bun.file(args.path).text(), {
         filename: args.path,
         presets: [
@@ -1560,6 +1562,9 @@ describe("ModelPickPop production component", () => {
     setProviderLifecycleDeps({
       refreshRuntime: async () => {
         refreshes++
+        // 生产的刷新 = respawn,fork 前 server.ts 先把「真源 id ∩ 钥匙串库」的 Key 写进 {file:} 通道;`#1667` 起
+        // buildCodePuppyModelConfig 只注入 Key 文件非空的自定义节点 —— 替身少了这一步,注入就是空的。
+        syncSecretFiles(userData, {}, customProviderSecretValues(readCustomProviderRecords().map((record) => record.id)))
         const nextFork = buildCodePuppyModelConfig(userData)!
         expect(nextFork.enabled_providers).toContain("custom-node")
         const block = nextFork.provider["custom-node"] as { options: { baseURL: string }; models: Record<string, { name: string }> }

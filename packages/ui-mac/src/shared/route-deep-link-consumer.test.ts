@@ -13,7 +13,7 @@
 // up as a different target. The text rules in route-authority-ratchet.test.ts remain, but only as
 // the fallback that pins the one adapter line this test cannot reach into.
 import { describe, expect, test } from "bun:test"
-import { createDeepLinkConsumer } from "../../../app/src/pages/layout/deep-links"
+import { createDeepLinkConsumer } from "../../../codepuppy-app/src/pages/layout/deep-links"
 import { decodeDeepLink, deepLinkFor, encodeDirectory, hrefFor } from "./route-manifest"
 
 // A space and a non-ASCII character: if any hop re-encodes or re-assembles the target instead of

@@ -319,9 +319,9 @@ describe("#777 本地门与 codepuppy-ci 的对照表", () => {
 
     // 清单本身必须真的在脚本里(解析自检:脚本被清空时上面两条会空对空地绿)。
     // `#1247`/ADR-044:辖区不再是一张枚举(枚举对上游**新增的包默认放行** —— 实测 8 个包
-    // 对 32 个包,22 个零机制),而是「整棵 packages/ 减两张显式 carve-out」。所以这里钉的
-    // 不再是「枚举有多长」,而是**三样东西都在**:辖区就是 `packages`、两张 carve-out 都解析
-    // 得到。谁把辖区改回一张枚举,这一条当场红。
+    // 对 32 个包,22 个零机制),而是「整棵 packages/ 减显式 carve-out」。所以这里钉的
+    // 不再是「枚举有多长」,而是**两样东西都在**:辖区就是 `packages`、自有包 carve-out 解析
+    // 得到(`#1668` 撤掉了第二张 roundtrip carve-out)。谁把辖区改回一张枚举,这一条当场红。
     expect(/^UPSTREAM_PATHS="([^"]+)"/m.exec(GUARD_SCRIPT)?.[1], "守卫辖区不再是整棵 packages/ —— 上游新增的包又变回默认放行").toBe(
       "packages",
     )
@@ -329,33 +329,28 @@ describe("#777 本地门与 codepuppy-ci 的对照表", () => {
       /^CODEPUPPY_OWNED_PACKAGES="([^"]+)"/m.exec(GUARD_SCRIPT)?.[1].trim().split(/\s+/).length,
       "守卫脚本里没解析到 CODEPUPPY_OWNED_PACKAGES",
     ).toBeGreaterThanOrEqual(3)
-    expect(
-      /^ROUNDTRIP_PACKAGES="([^"]+)"/m.exec(GUARD_SCRIPT)?.[1].trim().split(/\s+/).length,
-      "守卫脚本里没解析到 ROUNDTRIP_PACKAGES",
-    ).toBeGreaterThanOrEqual(2)
-    expect(bashArrayItems(GUARD_SCRIPT, "UPSTREAM_EXCLUDES").length, "守卫脚本里的 ADR-033 收编白名单没解析到").toBeGreaterThanOrEqual(20)
+    // `#1664`:过渡清单 15 条,下限随数据从 20 改到 10;`#1666` 换代后的精确接管面 6 条,下限改到 3 —— 它只防解析退化。
+    expect(bashArrayItems(GUARD_SCRIPT, "UPSTREAM_EXCLUDES").length, "守卫脚本里的 ADR-033 收编白名单没解析到").toBeGreaterThanOrEqual(3)
   })
 
-  // ── `#1247` / ADR-044:两道门的边界必须是同一条线 ──────────────────────────────
-  // north-star 把 `packages/{app,ui}` 排除在辖区外,理由是「ADR-034 的 roundtrip 门盖着它们,
-  // 而且判据比本门更强(tree sha 逐字节)」。那句话写在守卫的注释里,是**散文** —— 有人把
-  // roundtrip 门的 `PACKAGES` 改小(比如只留 app),空档立刻出现:`packages/ui` 从此两道门都
-  // 不管,而两边都不会红。反方向同样坏:north-star 的 carve-out 少一个 ⇒ ADR-034 明写的日常
-  // seam 变更被判成破北极星 ⇒ 恒红门 ⇒ `--no-verify`。
-  // 这一条把「无空档、无重复覆盖」变成断言:两处清单逐条相同。
+  // ── `#1247` / ADR-044 / `#1668`:两道门的边界必须是同一条线 ─────────────────────────
+  // `#1668` 起冻结前端落在 `packages/codepuppy-{app,ui}`:north-star 把它们当 Code Puppy 自有包整包豁免,
+  // 它们的投影判据是 ADR-034 的 roundtrip 门(tree sha 逐字节)。有人从自有清单里删掉一个落点,
+  // 每次合法的冻结前端改动都会被 north-star 判成破北极星 ⇒ 恒红门 ⇒ `--no-verify`;有人给 roundtrip 门
+  // 加了落点而没进自有清单,同样恒红。这一条把「roundtrip 门的每个落点都在自有清单里」变成断言。
   // 诚实边界:它钉的是**两行配置互相一致**,钉不住「roundtrip 门真的覆盖了那两棵树」——
-  // 后者的行为判据在 packages/ui-mac/src/main/frontend-patch-roundtrip.test.ts(已在登记簿里),
-  // 那里另有一条把 `PACKAGES` 与 sync-upstream.yml 的 `rm -rf` 行钉在一起。
-  test("#1247:north-star 的 roundtrip carve-out == assert-frontend-patch-roundtrip.sh 的 PACKAGES", () => {
-    const carveOut = /^ROUNDTRIP_PACKAGES="([^"]+)"/m.exec(GUARD_SCRIPT)?.[1].trim().split(/\s+/)
-    expect(carveOut, "守卫脚本里没解析到 ROUNDTRIP_PACKAGES —— 本条会空对空地绿").toBeDefined()
+  // 后者的行为判据在 packages/ui-mac/src/main/frontend-patch-roundtrip.test.ts。
+  test("#1668:assert-frontend-patch-roundtrip.sh 的每个落点都在 north-star 的自有包清单里", () => {
+    const owned = /^CODEPUPPY_OWNED_PACKAGES="([^"]+)"/m.exec(GUARD_SCRIPT)?.[1].trim().split(/\s+/)
+    expect(owned, "守卫脚本里没解析到 CODEPUPPY_OWNED_PACKAGES —— 本条会空对空地绿").toBeDefined()
     const roundtrip = /^PACKAGES="([^"]+)"/m.exec(ROUNDTRIP_GUARD_SCRIPT)?.[1].trim().split(/\s+/)
     expect(roundtrip, `${ROUNDTRIP_GUARD} 里没解析到 PACKAGES —— 本条会空对空地绿`).toBeDefined()
-    expect(carveOut!.length, "解析退化成空清单").toBeGreaterThanOrEqual(2)
-    expect(
-      [...carveOut!].sort(),
-      `north-star 的 carve-out 与 ${ROUNDTRIP_GUARD} 的覆盖面不是同一条线 —— 有包掉进了两道门之间`,
-    ).toEqual([...roundtrip!].map((p) => p.replace(/^packages\//, "")).sort())
+    const landings = roundtrip!.map((pair) => pair.split(":")[1]?.replace(/^packages\//, ""))
+    expect(landings.length, "解析退化成空清单").toBeGreaterThanOrEqual(2)
+    for (const landing of landings) {
+      expect(landing, `${ROUNDTRIP_GUARD} 的 PACKAGES 不再是「补丁路径:落点」对`).toBeTruthy()
+      expect(owned, `roundtrip 落点 packages/${landing} 不在 north-star 的自有包清单里 —— 改它会被判成破北极星`).toContain(landing!)
+    }
   })
 
   // ── `#889`:比较基准只有一个家 ────────────────────────────────────────────────
@@ -616,5 +611,78 @@ describe("#777 本地门与 codepuppy-ci 的对照表", () => {
         `必需 job「${context}」没有跑 ${DETECT_CLASSIFIED_SCRIPT} —— 光有 !cancelled() 更坏:detect 失败时 needs.detect.outputs.code 是空串,挂在 == 'true' 上的步骤仍然一步不跑,这一格会从灰色 skipped 变成**绿色 success**`,
       ).toContain(DETECT_CLASSIFIED_SCRIPT)
     }
+  })
+})
+
+// ── `#1662`:本地门先核对 bun 版本 ────────────────────────────────────────────────
+// 仓库钉 bun 的唯一一处是根 package.json 的 `packageManager`(换代后 bun@1.4.4)。门此前用 PATH 上
+// 碰巧是哪个 bun 就跑哪个 —— 本机是 1.3.14,它藏住过一处真红。scripts/codepuppy-check.sh 的
+// [preflight] 步在版本不符时当场停下、两个版本都点名。下面跑的是**那个脚本本体**:复制进一棵临时
+// git 仓,`bun` 用 PATH 注入换成一个报指定版本号的假 bun(生产脚本里没有「用哪个 bun」的开关)。
+describe("`#1662` 本地门的 bun 版本前置步", () => {
+  function runCheck(opts: { bunVersion: string | null; packageManager?: string }) {
+    const root = mkdtempSync(join(tmpdir(), "codepuppy-bun-preflight-"))
+    const bin = join(root, ".fake-bin")
+    const calls = join(root, "bun-calls.txt")
+    try {
+      mkdirSync(join(root, "scripts"), { recursive: true })
+      mkdirSync(bin, { recursive: true })
+      copyFileSync(resolve(REPO_ROOT, "scripts/codepuppy-check.sh"), join(root, "scripts/codepuppy-check.sh"))
+      const pkg = opts.packageManager === undefined ? readFileSync(resolve(REPO_ROOT, "package.json"), "utf8") : opts.packageManager
+      writeFileSync(join(root, "package.json"), pkg)
+      if (opts.bunVersion !== null) {
+        // 只认 --version;其余调用记账后失败 —— 「版本不对时一步都没跑」由账本判。
+        writeFileSync(
+          join(bin, "bun"),
+          `#!/bin/sh\nif [ "$1" = "--version" ]; then echo ${opts.bunVersion}; exit 0; fi\necho "$*" >> ${JSON.stringify(calls)}\nexit 1\n`,
+        )
+        chmodSync(join(bin, "bun"), 0o755)
+      }
+      const env = { PATH: `${bin}:/usr/bin:/bin`, HOME: root, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" }
+      expect(Bun.spawnSync(["git", "init", "-q"], { cwd: root, env }).exitCode).toBe(0)
+      const r = Bun.spawnSync(["bash", "scripts/codepuppy-check.sh"], { cwd: root, env: { ...env, CODEPUPPY_HOOKS_DISABLE: "1" } })
+      return {
+        exitCode: r.exitCode ?? -1,
+        out: `${r.stdout.toString()}${r.stderr.toString()}`,
+        otherBunCalls: existsSync(calls) ? readFileSync(calls, "utf8") : "",
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  }
+  const PINNED = /^bun@(.+)$/.exec(JSON.parse(readFileSync(resolve(REPO_ROOT, "package.json"), "utf8")).packageManager ?? "")?.[1]
+
+  test("PATH 上的 bun 与 packageManager 不符 ⇒ 当场停、两个版本都点名、后面一步都不跑;相符 ⇒ 放行", () => {
+    expect(PINNED, "根 package.json 没有 packageManager: bun@<版本> —— 本次测量作废").toBeTruthy()
+    // 已知的坏:本机实测的那个旧版本。
+    const bad = runCheck({ bunVersion: "1.3.14" })
+    expect(bad.exitCode, bad.out).toBe(1)
+    expect(bad.out).toContain("1.3.14")
+    expect(bad.out).toContain(`bun@${PINNED}`)
+    expect(bad.out, "版本不对却继续跑了后面的门").not.toContain("[1/14]")
+    expect(bad.otherBunCalls, "版本不对却用这个 bun 跑了别的命令").toBe("")
+    // 控制组:同一夹具、版本相符 ⇒ 前置步放行,走进 [1/14](后面的门在空夹具里各自失败,与本条无关)。
+    // 期望值取自本文件对真 package.json 的 JSON 解析 —— 脚本用 sed 读同一个字段,两个解析器必须一致。
+    const good = runCheck({ bunVersion: PINNED! })
+    expect(good.out, good.out).toContain(`✓ bun ${PINNED}`)
+    expect(good.out).toContain("[1/14]")
+  })
+
+  test("钉的版本取自 package.json,不是脚本里的常量", () => {
+    const r = runCheck({ bunVersion: PINNED!, packageManager: '{\n  "packageManager": "bun@9.9.9"\n}\n' })
+    expect(r.exitCode, r.out).toBe(1)
+    expect(r.out).toContain("bun@9.9.9")
+    expect(r.out).not.toContain("[1/14]")
+  })
+
+  test("PATH 上没有 bun、或 package.json 读不出钉的版本 ⇒ 同样当场停", () => {
+    const missing = runCheck({ bunVersion: null })
+    expect(missing.exitCode, missing.out).toBe(1)
+    expect(missing.out).toContain("不在 PATH 上")
+    expect(missing.out).not.toContain("[1/14]")
+    const unpinned = runCheck({ bunVersion: PINNED!, packageManager: '{\n  "name": "x"\n}\n' })
+    expect(unpinned.exitCode, unpinned.out).toBe(1)
+    expect(unpinned.out).toContain("读不出")
+    expect(unpinned.out).not.toContain("[1/14]")
   })
 })

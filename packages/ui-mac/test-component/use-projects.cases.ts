@@ -40,7 +40,7 @@ const { render } = solidWeb
 Bun.plugin({
   name: "solid-component-tests",
   setup(builder) {
-    builder.onLoad({ filter: /packages\/(ui|ui-mac)\/src\/.*\.tsx$/ }, async (args) => {
+    builder.onLoad({ filter: /packages\/(codepuppy-ui|ui-mac)\/src\/.*\.tsx$/ }, async (args) => {
       const transformed = await transformAsync(await Bun.file(args.path).text(), {
         filename: args.path,
         presets: [
@@ -309,7 +309,7 @@ const { composerModel, setComposerModel, setComposerAgent, resetComposerModelPro
 const { createModelContract } = await import("../src/renderer/codepuppy-ui/model-contract")
 const { CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID } = await import("../src/shared/codepuppy-config")
 
-const serverInfo: ServerInfo = { baseUrl: "http://127.0.0.1:19099", username: "u", password: "p" }
+const serverInfo: ServerInfo = { baseUrl: "http://127.0.0.1:19099" }
 const tick = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms))
 async function waitFor(assertion: () => void, timeoutMs = 3_000) {
   const deadline = Date.now() + timeoutMs
@@ -886,14 +886,23 @@ test("#1642 AC3 session.error 按会话撤销且只提示一次,sidecar 换代�
   await waitFor(() => expect(host.querySelectorAll(".a-tl-user")).toHaveLength(0))
   expect(document.querySelectorAll(".a-toast")).toHaveLength(1)
   expect(document.querySelector(".a-toast")?.textContent).toContain(zh["codepuppy.composer.sendFailed"])
+  // `#1687`(SPEC-error-message-lifetime v1,`867aab286b`):同一句提示按 kind + 文字合并,还开着时再推一次不会多出一条。
+  // 所以每次判「有没有再提示」之前先关掉已有的那条 —— 否则重复提示与合并后的一条看起来一样,判据就瞎了。
+  const closeToasts = async () => {
+    document.querySelectorAll<HTMLButtonElement>(".a-toast-x").forEach((button) => button.click())
+    await tick()
+    expect(document.querySelectorAll(".a-toast")).toHaveLength(0)
+  }
+  await closeToasts()
   emit(pendingSessionID)
   await tick()
-  expect(document.querySelectorAll(".a-toast")).toHaveLength(1)
+  expect(document.querySelectorAll(".a-toast")).toHaveLength(0)
   await api.startChat("/repos/alpha-code", "重启前图片", [pendingImage], { existingSessionID: pendingSessionID })
   expect(host.querySelectorAll(".a-tl-user")).toHaveLength(1)
   currentState = { status: "recovering", generation: currentState.generation + 1, reason: "boot" }
   bridgeCb!(currentState)
   await tick()
   expect(host.querySelectorAll(".a-tl-user")).toHaveLength(0)
-  expect(document.querySelectorAll(".a-toast")).toHaveLength(2)
+  expect(document.querySelectorAll(".a-toast")).toHaveLength(1)
+  expect(document.querySelector(".a-toast")?.textContent).toContain(zh["codepuppy.composer.sendFailed"])
 })

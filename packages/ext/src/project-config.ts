@@ -4,11 +4,13 @@
 // 合并语义:项目级条目补进 cfg 的命名域(mcp/agent/command),existing(全局)优先不覆盖(项目「新增」
 // 而非「覆盖全局」的语义在此阶段——覆盖策略留 T1 信任门后细化);skills 走 { paths:[] } object 并集
 // (与全局 REQ-059 同一 schema 教训,数组会被引擎拒)。plugin 不在此(走 host fan-out,ADR-006 生 TS 雷)。
+// `#1665`(OpenCode 2):合并结果是一份 v1 形状的小对象,由 engine-transforms.ts 翻译进 2.x 的按域 transform。
 
-import { lstatSync, realpathSync } from "node:fs"
+import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs"
 import { homedir } from "node:os"
 import { isAbsolute, join, normalize, relative, resolve } from "node:path"
 import { PROJECT_HIDDEN_DIR } from "../../ui-mac/src/shared/project-hidden-dir"
+import { parseProjectJsonc } from "../../ui-mac/src/shared/project-jsonc"
 
 // #1569 AC7:旧项目隐藏目录。改名由 main 在解析项目时做;sidecar 这边只判不写 —— 旧目录还在就不认项目根,
 // 免得在 main 迁完之前往新目录里写东西,造成「新旧并存」。
@@ -18,6 +20,9 @@ export type ProjectDirectoryIdentity =
   | { status: "project"; directory: string; root: string }
   | { status: "retired-home"; reason: string }
   | { status: "unknown"; reason: string }
+
+/** 已验证的项目根(`projectDirectoryIdentity` 的 project 分支)。 */
+export type ProjectRoot = Extract<ProjectDirectoryIdentity, { status: "project" }>
 
 /** home 项目边界三态：project 分支携带唯一可供消费者使用的已验证 `.codepuppy` root。 */
 export function projectDirectoryIdentity(directory: string, homeDir: string = homedir()): ProjectDirectoryIdentity {
@@ -128,12 +133,9 @@ export function mergeProjectConfig(
   projectJsoncText: string,
   opts: { trustExecutable?: boolean; directory?: string } = {},
 ): MergeResult {
-  let proj: unknown
-  try {
-    proj = JSON.parse(stripJsonc(projectJsoncText))
-  } catch {
-    return { added: [], gatedExecutable: [] } // 项目文件坏,不注入(诚实降级,调用方已 loud)
-  }
+  const read = parseProjectJsonc(projectJsoncText)
+  if (!read.ok) return { added: [], gatedExecutable: [] } // 项目文件坏,不注入(诚实降级,调用方已 loud)
+  const proj = read.value
   if (!isObj(proj)) return { added: [], gatedExecutable: [] }
   const added: string[] = []
   const gatedExecutable: string[] = []
@@ -212,48 +214,25 @@ function mergeNamed(cfg: Record<string, unknown>, src: Record<string, unknown>, 
   return touched
 }
 
-/** 极简 jsonc → json:去 // 行注释与 /* *​/ 块注释 + 尾逗号。够用于 alpha 自写的项目 codepuppy.jsonc。 */
-export function stripJsonc(text: string): string {
-  let out = ""
-  let inStr = false
-  let strCh = ""
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i]
-    const n = text[i + 1]
-    if (inStr) {
-      out += c
-      if (c === "\\") {
-        out += n ?? ""
-        i++
-      } else if (c === strCh) inStr = false
-      continue
-    }
-    if (c === '"' || c === "'") {
-      inStr = true
-      strCh = c
-      out += c
-      continue
-    }
-    if (c === "/" && n === "/") {
-      while (i < text.length && text[i] !== "\n") i++
-      out += "\n"
-      continue
-    }
-    if (c === "/" && n === "*") {
-      i += 2
-      while (i < text.length && !(text[i] === "*" && text[i + 1] === "/")) i++
-      i++
-      continue
-    }
-    out += c
-  }
-  // 尾逗号:`,` 后跟(空白)`}` 或 `]`
-  return out.replace(/,(\s*[}\]])/g, "$1")
-}
-
 function isRealDirectory(path: string): boolean {
   try {
     return lstatSync(path).isDirectory()
+  } catch {
+    return false
+  }
+}
+
+/** 项目扩展信任门 consent:`<dir>/.codepuppy/prefs.json` 的 `extensionsConsent.granted === true`(版本化,
+ *  ADR-021 模式)。缺失/坏/未授 = 不信任(默认拒绝可执行物,安全红线);身份漂移 = null。 */
+export function readProjectExtensionsConsent(project: ProjectRoot): boolean | null {
+  const present = withProjectDirectoryIdentity(project, (root) => existsSync(join(root, "prefs.json")))
+  if (!present.ok) return null
+  if (!present.value) return false
+  try {
+    const read = withProjectDirectoryIdentity(project, (root) => readFileSync(join(root, "prefs.json"), "utf8"))
+    if (!read.ok) return null
+    const prefs = JSON.parse(read.value) as { extensionsConsent?: { granted?: unknown } }
+    return prefs?.extensionsConsent?.granted === true
   } catch {
     return false
   }

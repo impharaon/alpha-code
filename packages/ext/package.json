@@ -26,6 +26,7 @@
   },
   "devDependencies": {
     "@opencode/core": "workspace:*",
+    "@typescript/native-preview": "7.0.0-dev.20251207.1",
     "effect": "catalog:"
   }
 }

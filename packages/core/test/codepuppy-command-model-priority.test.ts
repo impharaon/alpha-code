@@ -131,7 +131,11 @@ describe("#1560: the model the user picked out-ranks a command's", () => {
       } as never)
       const commands = yield* Command.Service
       yield* ConfigCommandPlugin.Plugin.effect(
-        host({ command: { list: () => Effect.die("unused"), transform: commands.transform, reload: commands.reload } }),
+        host({
+          command: { list: () => Effect.die("unused"), transform: commands.transform, reload: commands.reload },
+          // The subtask passes the subagent permission path first (#1129 E6); allowed here.
+          permission: { hook: () => Effect.die("unused"), list: () => Effect.die("unused"), get: () => Effect.die("unused"), reply: () => Effect.die("unused"), assert: () => Effect.void } as never,
+        }),
       ).pipe(
         Effect.provide(
           Config.testLayer([

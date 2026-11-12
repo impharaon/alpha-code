@@ -11,6 +11,11 @@ import { pathToFileURL } from "node:url"
 import {
   Agent,
   AgentPlugin,
+  Command,
+  Config,
+  ConfigCommandPlugin,
+  ConfigSchema,
+  ShellSelect,
   E,
   it,
   Location,
@@ -1092,6 +1097,63 @@ describe("grants never outrank a deny; once is not remembered; a host tool is ga
       const { session } = yield* setup({ policy: false, internal: [plugin], records: [...NEUTRAL, disabled(ID_LIST_RESOURCES)] })
       yield* codeModeCall(session.id, "opencode.list_mcp_resources", { server: "any" })
       expect(seen.lists).toEqual(["any"])
+    }),
+  )
+})
+
+// #1129 E6 for subtask commands (#1666 Unit E): `/review` with `subtask: true` creates a child session without any tool
+// call (packages/core/src/config/plugin/command.ts). The re-taken command takes the subagent tool's own permission
+// path first, so Code Puppy's policy decides it through the deny rule its catalog appends for a denied subagent
+// (catalog.ts) — no second policy in core. OpenCode 2's own command plugin runs here with a config holding the command.
+describe("E6: a subtask command passes the same decision as the subagent tool", () => {
+  const reviewCommand = {
+    id: ConfigCommandPlugin.Plugin.id,
+    effect: (ctx: any) =>
+      ConfigCommandPlugin.Plugin.effect(ctx).pipe(
+        Effect.provide(
+          Config.testLayer([
+            new ConfigSchema.Document({
+              type: "document",
+              info: E.Schema.decodeUnknownSync(ConfigSchema.Info)({ commands: { review: { template: "Review", agent: "general", subtask: true } } }),
+            }),
+          ]),
+        ),
+        Effect.provideService(ShellSelect.Service, ShellSelect.Service.of({ resolve: () => Effect.succeed("sh"), transform: () => Effect.die("unused"), reload: () => Effect.die("unused") })),
+      ),
+  }
+  const internal = [AgentPlugin.Plugin, SubagentTool.Plugin, reviewCommand]
+  const review = (sessionID: string) =>
+    Effect.gen(function* () {
+      return yield* (yield* Command.Service).execute({ name: "review", invocation: { sessionID, prompt: { text: "go" }, delivery: "queue" } }).pipe(Effect.exit)
+    })
+  const children = (parentID: string) =>
+    Effect.gen(function* () {
+      return (yield* (yield* Session.Service).list()).data.filter((item: { parentID?: string }) => item.parentID === parentID)
+    })
+
+  it.live("subagent denied by Code Puppy: /review is refused by name and no child session exists", () =>
+    Effect.gen(function* () {
+      const { session } = yield* setup({ internal, records: [...NEUTRAL, disabled("builtin::subagent")] })
+      const exit = yield* review(session.id)
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(String(failure(exit)?.message)).toContain("subagent")
+      expect(yield* children(session.id)).toEqual([])
+    }),
+  )
+
+  it.live("subagent allowed: /review runs its subtask", () =>
+    Effect.gen(function* () {
+      const { session } = yield* setup({ internal, records: NEUTRAL })
+      expect(Exit.isSuccess(yield* review(session.id))).toBe(true)
+      expect(yield* children(session.id)).toHaveLength(1)
+    }),
+  )
+
+  it.live("reverse arm: without Code Puppy's policy the same denied record does not stop /review", () =>
+    Effect.gen(function* () {
+      const { session } = yield* setup({ policy: false, internal, records: [...NEUTRAL, disabled("builtin::subagent")] })
+      expect(Exit.isSuccess(yield* review(session.id))).toBe(true)
+      expect(yield* children(session.id)).toHaveLength(1)
     }),
   )
 })

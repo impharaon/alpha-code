@@ -145,4 +145,7 @@ last_reviewed: 2026-11-12
 
 ### 偏离记录
 
-暂无
+- 2026-11-12 · #1645「日志不含密文」未承接:按 v1 样本让拒绝方的正文带令牌,实测正文原样进了 `client.ts:280`、`:406/:412` 与 `index.ts:497` 三处日志和公开的 failed 状态文本,按派发规则不放宽断言、交回;第 1 项提交只保留 401 不重试那条 · `1cd971615e`。
+- 2026-11-12 · 第 2 项另加 ext `identity.test.ts` 一条(随包 tools.json + 替换后的命令 ⇒ `codepuppy-bundled`),gate-files 该行 16 → 17 · `15b8f87095`。
+- 2026-11-12 · 第 3 项另立登记册条目 `mcp-generation-changed-call`(原无 AC6 条目)· `9ddff98c34`。
+- 2026-11-12 · 第 4 项同步改了自己的 `codepuppy-command-model-priority.test.ts` 子任务用例的宿主(权限 assert 放行);宿主另导出 `ConfigCommandPlugin` / `Command` / `Config` / `ShellSelect` / `ConfigSchema` · 第 4 项提交。

@@ -157,7 +157,8 @@ UPSTREAM_EXCLUDES=(
   # 判据 packages/core/test/codepuppy-mcp-tool-collision.test.ts。
   ':(exclude)packages/core/src/tool/mcp.ts'
   # #1560(#1666 裁决 6737930969):用户为会话选定的模型优先于命令和命令 agent 推荐的模型。命令在执行体里自己 switchModel、
-  # 自己给子任务子会话定模型,没有插件挂点;接管面只有两处 `codepuppy(#1560)` 标注。
+  # 自己给子任务子会话定模型,没有插件挂点;接管面是两处 `codepuppy(#1560)` 标注,外加 #1129 E6(#1666 Unit E):子任务命令
+  # 建子会话前走 subagent 工具的权限路径(`codepuppy(#1129 E6)` 标注),由扩展策略追加的 deny 规则决定。
   # 判据 packages/core/test/codepuppy-command-model-priority.test.ts。
   ':(exclude)packages/core/src/config/plugin/command.ts'
 )

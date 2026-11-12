@@ -952,11 +952,12 @@
       ],
       "lane": "L4 (#1666) per ruling 6737930969",
       "takeovers": [
-        "packages/opencode/src/session/prompt.ts"
+        "packages/opencode/src/session/prompt.ts",
+        "packages/core/src/config/plugin/command.ts"
       ],
       "mechanism": {
         "file": "packages/ext/src/policy/gate.ts",
-        "ladder": "L0 (E6: the real upstream subagent tool meets registerPolicy's execute.before before its own permission check, packages/core/src/tool/plugin/subagent.ts:145, and before any child session) + upstream-native, pinned (E7: packages/core/src/session/prompt.ts materializes a prompt's attachments with no tool call or permission request)"
+        "ladder": "L0 (E6: the real upstream subagent tool meets registerPolicy's execute.before before its own permission check, packages/core/src/tool/plugin/subagent.ts:145, and before any child session); a subtask command, which creates its child without a tool call, takes the subagent tool's permission path in the re-taken packages/core/src/config/plugin/command.ts, where the policy's appended deny rule decides it) + upstream-native, pinned (E7: packages/core/src/session/prompt.ts materializes a prompt's attachments with no tool call or permission request)"
       },
       "tests": [
         {
@@ -978,6 +979,18 @@
         {
           "file": "packages/ext/src/policy/register-policy.test.ts",
           "name": "premise: the same probe counts a real tool call and its permission evaluation"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "subagent denied by Code Puppy: /review is refused by name and no child session exists"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "subagent allowed: /review runs its subtask"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "reverse arm: without Code Puppy's policy the same denied record does not stop /review"
         }
       ]
     },

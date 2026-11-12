@@ -67,6 +67,12 @@ export const { SubagentTool } = await load("src/tool/plugin/subagent.ts")
 export const { AgentPlugin } = await load("src/plugin/agent.ts")
 export const { WebFetchTool } = await load("src/tool/plugin/webfetch.ts")
 export const { McpResourceTools } = await load("src/tool/plugin/mcp-resource.ts")
+// Subtask commands (#1129 E6): the config command plugin, the Command service, a config with commands, a shell picker.
+export const { ConfigCommandPlugin } = await load("src/config/plugin/command.ts")
+export const { Command } = await load("src/command.ts")
+export const { Config } = await load("src/config.ts")
+export const { ShellSelect } = await load("src/shell/select.ts")
+export const ConfigSchema = await resolve("@opencode/schema/config")
 export const { SessionPrompt } = await load("src/session/prompt.ts")
 export const { fromPromise } = await resolve("@opencode/plugin/promise/adapter")
 export const SchemaTool = (await resolve("@opencode/schema/tool")).Tool

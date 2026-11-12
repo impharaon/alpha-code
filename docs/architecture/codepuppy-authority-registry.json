@@ -847,19 +847,37 @@
       "id": "l1r-net-failure-settle",
       "decision": "Network failures of a model request settle with Code Puppy's named classification (#1572 settle).",
       "adr": [
-        "ADR-041"
+        "ADR-041",
+        "ADR-047"
       ],
-      "lane": "L3 (#1665) per lane seams §5 (L1r)",
+      "lane": "L4 (#1666) per rulings 6737930969 and 6756103246 item 2",
       "takeovers": [
         "packages/opencode/src/session/processor.ts",
-        "packages/opencode/src/session/llm.ts"
+        "packages/opencode/src/session/llm.ts",
+        "packages/core/src/session/to-session-error.ts"
       ],
-      "blocked": {
-        "reason": "Request assembly belongs to L3 on OpenCode 2 (session.hook model.request / http.request / context); if a hook cannot hold it, L3 hands it back for an L4 re-take. Not delivered on the integration branch this lane started from.",
-        "options": [
-          "Register L3's mechanism and proof test when #1665 lands, or route back to L4 for a re-take with ADR-047 reasoning."
-        ]
-      }
+      "mechanism": {
+        "file": "packages/core/src/session/to-session-error.ts",
+        "ladder": "L3 (re-taken Transport branch: classifyNetFailure attributes the layer and withFailureCode leads Session.StructuredError.message with it; the L6 adapter reads it back with parseFailureCode — packages/schema/src/codepuppy-net-failure.ts; session.hook.retry's error is read-only, so no plugin can hold it)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-net-failure-settle.test.ts",
+          "name": "a refused request settles as provider.transport with tcp ahead of upstream's text"
+        },
+        {
+          "file": "packages/core/test/codepuppy-net-failure-settle.test.ts",
+          "name": "a host that does not resolve keeps the unreachable wording and carries dns"
+        },
+        {
+          "file": "packages/core/test/codepuppy-net-failure-settle.test.ts",
+          "name": "the request's own header timer settles as timeout"
+        },
+        {
+          "file": "packages/core/test/codepuppy-net-failure-settle.test.ts",
+          "name": "a transport failure the classifier does not attribute keeps upstream's text, with no code"
+        }
+      ]
     },
     {
       "id": "l1r-naming-resume",

@@ -7,6 +7,7 @@ import { Provider } from "@opencode/core/provider"
 import { SessionSchema } from "@opencode/core/session/schema"
 import { SessionRunnerRetry } from "@opencode/core/session/runner/retry"
 import { toSessionError } from "@opencode/core/session/to-session-error"
+import { parseFailureCode } from "@opencode/schema/codepuppy-net-failure" // codepuppy(#1572)
 import { Clock, Duration, Effect } from "effect"
 import { TestClock } from "effect/testing"
 import { it } from "./lib/effect"
@@ -121,10 +122,15 @@ describe("ModelRetry.retryOneShot", () => {
 
 describe("toSessionError", () => {
   test("names the network when the provider's host can't be reached", () => {
-    expect(toSessionError(dnsFailure)).toEqual({
-      type: "provider.transport",
-      message: "Can't reach opencode.ai. Check the network connection. (getaddrinfo ENOTFOUND opencode.ai)",
+    // codepuppy(#1572): Code Puppy's network layer leads the message as a registered prefix (to-session-error.ts).
+    const dns = toSessionError(dnsFailure)
+    expect(dns.type).toBe("provider.transport")
+    expect(parseFailureCode(dns.message)).toEqual({
+      code: "dns",
+      text: "Can't reach opencode.ai. Check the network connection. (getaddrinfo ENOTFOUND opencode.ai)",
     })
-    expect(toSessionError(refused)).toEqual({ type: "provider.transport", message: "Unable to connect" })
+    const tcp = toSessionError(refused)
+    expect(tcp.type).toBe("provider.transport")
+    expect(parseFailureCode(tcp.message)).toEqual({ code: "tcp", text: "Unable to connect" })
   })
 })

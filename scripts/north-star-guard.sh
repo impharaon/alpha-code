@@ -145,6 +145,13 @@ UPSTREAM_EXCLUDES=(
   ':(exclude)packages/core/src/mcp/client.ts'
   ':(exclude)packages/core/src/mcp/connection.ts'
   ':(exclude)packages/core/src/mcp/index.ts'
+  # #1572 settle(#1666 裁决 6737930969、6756103246 第 2 项 (b)):模型请求的网络失败在 toSessionError 结算,插件到不了 ——
+  # `session.hook.retry` 的 `error` 是只读的。接管面只有 Transport 分支(`codepuppy(#1572)` 标注块):调 Code Puppy 自有的
+  # 分类器,把层作为登记码前缀写进 message(packages/schema/src/codepuppy-net-failure.ts)。上游
+  # session-runner-retry.test.ts 那条 toSessionError 断言写的正是被替换的旧文本,随源文件成对接管(先例:oauth 的 page.ts 与它的测试)。
+  # 判据 packages/core/test/codepuppy-net-failure-settle.test.ts。
+  ':(exclude)packages/core/src/session/to-session-error.ts'
+  ':(exclude)packages/core/test/session-runner-retry.test.ts'
 )
 
 # ── UPSTREAM_PATHS 里住着的 Code Puppy 自有文件:结构性谓词,不是逐文件清单(`#1085` / ADR-043)──

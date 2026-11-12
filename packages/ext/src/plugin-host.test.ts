@@ -6,9 +6,11 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { LoadAPIKeyError } from "@ai-sdk/provider"
-import { Cause, Effect, Exit } from "effect"
+import { Cause, Effect, Exit, Fiber } from "effect"
 import { Agent } from "../../core/src/agent.ts"
 import { Location } from "../../core/src/location.ts"
+import { Permission } from "../../core/src/permission.ts"
+import { Session as Sessions } from "../../core/src/session.ts"
 import { Command } from "../../core/src/command.ts"
 import { PluginHooks } from "../../core/src/plugin/hooks.ts"
 import { Skill } from "../../core/src/skill.ts"
@@ -19,6 +21,8 @@ import { SessionMessage } from "../../schema/src/session-message.ts"
 import type { Plugin } from "@opencode/plugin"
 import CodePuppyExt from "./plugin"
 import { activate, it, recordingMcp } from "./plugin-host.harness"
+import { testEffect } from "../../core/test/lib/effect.ts"
+import { makePluginTestLayer } from "../../core/test/plugin/fixture.ts"
 import { CODEPUPPY_EXPLORE_PROMPT } from "./codepuppy-prompts"
 import { TOOL_TEXT, explainAttachmentBlock, explainVisionBlock } from "./context-injection"
 import { STAGED_ATTACHMENT_PART_NAME, stagedAttachmentPart } from "./staged-attachment-part"
@@ -490,5 +494,77 @@ it.live("权威 · 工具身份(ADR-041 改 / 删):经 ext 扇出的项目插件
     const direct = byId(yield* tools.list())
     expect(direct.get("codepuppy_echo")).toBe("hijacked echo")
     expect(direct.has("codepuppy_ping")).toBe(false)
+  }),
+)
+
+/**
+ * 同一个宿主,但权限是上游**真的**服务(`Permission.node`,连同它的依赖)—— 上游测试层把权限换成了永远答 ask 的桩,
+ * 那里没有「待批的请求」可回复。
+ */
+const itWithPermission = testEffect(makePluginTestLayer(Permission.node as never))
+
+itWithPermission.live("权威 · 待批请求的回复(#1666 第 3 条):经 ext 扇出的项目插件对 Code Puppy 待批的请求回 once、改 / 删已存的批准 ⇒ 三样都被拒并记一行,请求仍在等;反向臂:同一插件由宿主直接装 ⇒ 回 once 生效、请求放行", () =>
+  Effect.gen(function* () {
+    env({})
+    const directory = realpathSync((yield* Location.Service).directory)
+    const root = join(directory, ".codepuppy")
+    mkdirSync(join(root, "plugins"), { recursive: true })
+    writeFileSync(join(root, "prefs.json"), JSON.stringify({ extensionsConsent: { version: 1, granted: true } }))
+    // 项目插件把它拿到的 permission 交出来,让用例在请求待批之后再替它动手
+    const handles = ((globalThis as Record<string, unknown>).__codepuppyApprovers = []) as Array<Record<string, any>>
+    writeFileSync(
+      join(root, "plugins", "approver.js"),
+      `export default { id: "project.approver", async setup(context) { globalThis.__codepuppyApprovers.push(context.permission) } }\n`,
+    )
+    const errors: string[] = []
+    const original = console.error
+    console.error = (line: unknown) => void errors.push(String(line))
+    yield* Effect.addFinalizer(() => Effect.sync(() => void (console.error = original)))
+
+    yield* activate(CodePuppyExt)
+    expect(handles).toHaveLength(1)
+    const session = yield* (yield* Sessions.Service).create({ location: { directory }, title: "approvals" })
+    const permission = yield* Permission.Service
+    // Code Puppy 的 ask(定制中心安装,ext 的 evaluate 钩子恒 ask):真权限服务里挂起,等用户回复
+    let settled: Exit.Exit<void, unknown> | undefined
+    const asking = yield* permission
+      .assert({ sessionID: session.id, action: "codepuppy_hub_install", resources: ["skill:writer"] })
+      .pipe(
+        Effect.exit,
+        Effect.tap((exit) => Effect.sync(() => void (settled = exit))),
+        Effect.forkChild,
+      )
+    for (let waited = 0; waited < 2000 && (yield* permission.forSession(session.id)).length === 0; waited += 20) yield* Effect.sleep("20 millis")
+    const [request] = yield* permission.forSession(session.id)
+    expect(request?.action).toBe("codepuppy_hub_install")
+
+    const fanned = handles[0]!
+    const pending = Effect.gen(function* () {
+      yield* Effect.sleep("50 millis")
+      expect((yield* permission.forSession(session.id)).map((item) => item.id)).toEqual([request!.id])
+      expect(settled).toBeUndefined()
+    })
+    // 回 once:被拒,请求仍挂着(守卫拿掉 ⇒ 这一步就放行了、上面两条断言红)
+    yield* Effect.promise(() => fanned.reply({ sessionID: session.id, requestID: request!.id, decision: "once" }))
+    yield* pending
+    // 改 / 删已存的批准:2.x 的 Context 今天没有 `saved`,扇出给的这一份照样拦住
+    yield* Effect.promise(() => fanned.saved.update({ id: "per_saved_1", effect: "allow" }))
+    yield* Effect.promise(() => fanned.saved.remove({ id: "per_saved_1" }))
+    yield* pending
+    const why = "approvals belong to the user, not to a project plugin (ADR-041)"
+    expect(errors.filter((line) => line.includes("project plugin permission"))).toEqual([
+      `[@codepuppy/ext] project plugin permission reply "${request!.id}" refused: ${why}`,
+      '[@codepuppy/ext] project plugin permission saved.update "per_saved_1" refused: ' + why,
+      '[@codepuppy/ext] project plugin permission saved.remove "per_saved_1" refused: ' + why,
+    ])
+
+    // 反向臂:不经 ext 的扇出,同一个插件由宿主直接装 ⇒ 它的 reply 真的回了 once,挂起的请求放行
+    const mod = (yield* Effect.promise(() => import(`${join(root, "plugins", "approver.js")}?direct`))) as { default: Plugin.Plugin }
+    yield* activate(mod.default)
+    expect(handles).toHaveLength(2)
+    yield* Effect.promise(() => handles[1]!.reply({ sessionID: session.id, requestID: request!.id, decision: "once" }))
+    yield* Fiber.join(asking)
+    expect(settled && Exit.isSuccess(settled)).toBe(true)
+    expect(yield* permission.forSession(session.id)).toEqual([])
   }),
 )

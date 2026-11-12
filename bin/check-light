@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+#
+# 轻量门:`gate` 判定一次 push 只改了 `.gate-light` 圈定的文档类文件(外加 *.md)时跑它,
+# 代替全量的 `bin/check` —— 全量门约 25 分钟,而文档类改动能弄坏的只有下面这几件事。
+# 三个文档闸的函数体住在 scripts/docs-gates.sh,codepuppy-check.sh 的 [3/14] / [8/14] 调的是同一份。
+#
+# 任何一步红 ⇒ 非零退出并在末尾点名是哪几步。纯 bash,不吞退出码。
+set -uo pipefail
+cd "$(git rev-parse --show-toplevel)"
+# shellcheck source=scripts/docs-gates.sh
+source scripts/docs-gates.sh
+
+started=$SECONDS
+failed=()
+
+run_step() {
+  local name="$1"
+  shift
+  echo "▶ [light] $name"
+  "$@" || failed+=("$name")
+}
+
+run_step "no literal NUL bytes (codepuppy-check [3/14])" docs_gate_nul
+run_step "docs gate: relative links in changed Markdown (codepuppy-check [8/14])" docs_gate_links
+run_step "docs-anchored tests (old-name registry, ci.md anchor, egress disclosure, gate-file registry, ratchet READMEs)" docs_gate_anchor_tests
+
+took=$((SECONDS - started))
+if [ "${#failed[@]}" -gt 0 ]; then
+  echo "✗ light check failed (${took}s):"
+  printf '    - %s\n' "${failed[@]}"
+  exit 1
+fi
+echo "✅ light check green (${took}s) — documentation-class push only; the full gate was not run."

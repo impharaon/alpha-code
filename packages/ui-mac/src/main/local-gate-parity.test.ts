@@ -37,6 +37,8 @@ import { describe, expect, test } from "bun:test"
 const REPO_ROOT = resolve(import.meta.dir, "..", "..", "..", "..")
 const WORKFLOW = readFileSync(resolve(REPO_ROOT, ".github/workflows/codepuppy-ci.yml"), "utf8")
 const SCRIPT = readFileSync(resolve(REPO_ROOT, "scripts/codepuppy-check.sh"), "utf8")
+/** docs gate / NUL 闸的函数体:codepuppy-check.sh 与 bin/check-light 共用的那一份。 */
+const DOCS_GATES_LIB = readFileSync(resolve(REPO_ROOT, "scripts/docs-gates.sh"), "utf8")
 /** `#889`:north-star 守卫本体 —— CI 与本地跑的是同一份字节。 */
 const NORTH_STAR_GUARD = "scripts/north-star-guard.sh"
 const GUARD_SCRIPT = readFileSync(resolve(REPO_ROOT, NORTH_STAR_GUARD), "utf8")
@@ -383,8 +385,11 @@ describe("#777 本地门与 codepuppy-ci 的对照表", () => {
     expect(ciFetch, "codepuppy-ci 的 `Ensure origin/… is available` 步取的不是守卫要用的那条 ref").toBe(target)
 
     // 同一个 codepuppy-check.sh 内部也不许再有第二套基准(`#889` 票面点名的那句「同一脚本两套基准」)。
-    const docsBaseline = /--diff-filter=d (\S+)\.\.\.HEAD/.exec(SCRIPT)?.[1]
-    expect(docsBaseline, "codepuppy-check.sh 的 docs gate 里没解析到比较基准").toBe(`origin/${target}`)
+    // docs gate 的函数体搬进了 scripts/docs-gates.sh(与 bin/check-light 共用),基准就在那里 —— 且 codepuppy-check.sh
+    // 自己不许另写一条。
+    const docsBaseline = /--diff-filter=d (\S+)\.\.\.HEAD/.exec(DOCS_GATES_LIB)?.[1]
+    expect(docsBaseline, "scripts/docs-gates.sh 的 docs gate 里没解析到比较基准").toBe(`origin/${target}`)
+    expect(/--diff-filter=d (\S+)\.\.\.HEAD/.test(SCRIPT), "codepuppy-check.sh 里又出现了第二套 docs gate 基准").toBe(false)
   })
 
   // ── `#717`:required context 名的防漂 ──────────────────────────────────────

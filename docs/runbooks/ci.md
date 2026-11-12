@@ -18,6 +18,8 @@ summary: "CI 规范（Code Puppy）"
 gate run
 ```
 
+**轻量门(只改文档类文件的 push)**:一次 push 的全部改动都落在 [`.gate-light`](../../.gate-light) 圈定的文档类路径里(外加任何 `*.md`)时,`gate` 跑 [`bin/check-light`](../../bin/check-light)(约 10 秒)而不是全量门,通过后照样签 `check`。它跑三件事:NUL 字节闸、改动 Markdown 的相对链接(这两个的函数体在 [`scripts/docs-gates.sh`](../../scripts/docs-gates.sh),全量门的 `[3/14]` / `[8/14]` 调的是同一份),以及六个输入在文档里的测试(`old-name-scan`、`local-gate-parity`、`network-egress-disclosure`、`gate-file-registry`、两个 ratchet 的 README 锚点;清单在同一个文件里)。`.gate-light` 只收文档类,不含 `scripts/` `.github/` `packages/` `frontend/` 与根配置;`docs/` 里被门的测试在运行时按名字读取的非 `.md` 文件(`docs/contracts/desktop-release-manifest.trust.json`、`docs/verification/` 下被点名的 json / html / tsv / txt)故意不收,照常走全量门。改了 `.gate-light` 或 `bin/check-light` 本身的 push 永远走全量门。新增一个被测试读取的 docs 文件时,先看它该不该排除在 `.gate-light` 之外。
+
 它跑的是 `codepuppy-ci` 的**全部 21 个代码步**,并在末尾打印一张逐步对照表
 (`MIRRORED` / `SUPERSET:<理由>` / `DEGRADED:<理由>`)。
 

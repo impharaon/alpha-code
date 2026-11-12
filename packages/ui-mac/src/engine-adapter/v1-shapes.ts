@@ -458,13 +458,13 @@ export function withTurnDiffs(messages: V1MessageWithParts[], diffs: ReadonlyMap
 }
 
 /**
- * REQ-142 的回合锚。turnDiffsOf 只读最近一条 v1 用户消息(`attach`,改动挂在它上面);2.x 的逐回合 diff 只认真用户消息当
- * `from`(session/diff.ts 对别的类型回 TurnRangeError)。
+ * REQ-142 的回合锚。turnDiffsOf 只读最近一条 v1 用户消息(`attach`,改动挂在它上面);2.x 的逐回合 diff 认用户消息与引擎的
+ * synthetic 消息当 `from`(Code Puppy 接管的 core/src/session/diff.ts,`e27bec1704`;别的类型回 TurnRangeError)。
  *   · 最近一条 v1 用户消息本身是 2.x 用户消息(含「继续」):from = attach = 它;
  *   · 它是引擎自己发的 synthetic(带 description,如后台子代理的完成通知)且是在回合里插进来的(它与前一条 2.x 用户消息之间
  *     没有 idle 标记):那个回合的锚就是前一条用户消息,from = 那条,改动仍挂在 synthetic 上;
- *   · synthetic 在 idle 之后自己开了一个回合:2.x 没有能查这个回合的锚(真引擎实测 fixtures/parity.json:从用户消息问是
- *     上一回合、从 synthetic 问回 400),不查(回 undefined),而不是发一个必然被拒或答非所问的请求。
+ *   · synthetic 在 idle 之后自己开了一个回合:这个回合的锚就是它自己,from = attach = 它(与 0.1.26 一致,审阅面板显示这个
+ *     回合的改动)。
  */
 export function turnAnchor(messages: readonly V1MessageWithParts[], source: readonly SessionMessageInfo[]) {
   const attach = messages.findLast((item) => item.info.role === "user")?.info.id
@@ -474,7 +474,7 @@ export function turnAnchor(messages: readonly V1MessageWithParts[], source: read
   if (latest.type === "user") return { from: attach, attach }
   if (latest.type !== "synthetic") return undefined
   for (let at = index - 1; at >= 0; at--) {
-    if (source[at]!.type === "idle") return undefined
+    if (source[at]!.type === "idle") return { from: attach, attach }
     if (source[at]!.type === "user") return { from: source[at]!.id, attach }
   }
   return undefined

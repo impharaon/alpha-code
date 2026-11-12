@@ -94,12 +94,14 @@ describe("#1668 REQ-142 回合改动经适配器供给", () => {
 })
 
 // R1 F2:时间线「继续」之后的回合。夹具 fixtures/continue.json:真 2.x 引擎里第一回合读 a.txt,第二回合是经适配器发出的「继续」
-// (它那个回合写 c.txt);`legacy` 是同一续写落成 2.x synthetic 消息、再拿它当 diff 的 from —— 引擎回 400 not a user message。
+// (它那个回合写 c.txt);`legacy` 是同一续写落成 2.x synthetic 消息(idle 之后自己开回合)。夹具里 legacy 的 diff 录于接管
+// core/src/session/diff.ts 之前(引擎当时回 400 not a user message);接管后(`e27bec1704`,真 Session 服务上的证明是
+// packages/core/test/codepuppy-session-diff-synthetic.test.ts)synthetic 也能当 from。
 describe("#1668 F2 「继续」之后的回合改动", () => {
   type Continued = { records: Record_[]; final: any[]; continueID: string; diff: { data: unknown[] }; sessionID: string; directory: string }
   const source = continued as unknown as Continued & { legacy: { sessionID: string; syntheticID: string; final: any[]; diff: { status: number; body: unknown } } }
 
-  /** 假 2.x 上游:消息页 = 夹具 final(倒序);diff 只认真用户消息当 from(与引擎同一判据),其余回 400。 */
+  /** 假 2.x 上游:消息页 = 夹具 final(倒序);diff 认用户消息与 synthetic 当 from(与接管后的引擎同一判据),其余回 400。 */
   function upstream(final: any[], diffs: Record<string, unknown[]>, calls: string[] = []) {
     return (async (input: RequestInfo | URL, init?: RequestInit) => {
       const request = new Request(input, init)
@@ -108,7 +110,7 @@ describe("#1668 F2 「继续」之后的回合改动", () => {
       if (url.pathname.endsWith("/diff")) {
         const from = url.searchParams.get("from")!
         const found = final.find((message) => message.id === from)
-        if (found?.type !== "user")
+        if (found?.type !== "user" && found?.type !== "synthetic")
           return Response.json({ _tag: "InvalidRequestError", message: `Message ${from} is not a user message`, field: "from" }, { status: 400 })
         return Response.json({ data: diffs[from] ?? [] })
       }
@@ -180,14 +182,19 @@ describe("#1668 F2 「继续」之后的回合改动", () => {
     expect(calls).toEqual([{ path: "/api/session/ses_1/prompt", body: { text: "Continue", metadata: { [CONTINUE_METADATA_KEY]: true } } }])
   })
 
-  test("最新回合没有可查的 2.x 用户锚(引擎自己的 synthetic)⇒ 不发必被拒的 diff;diff 真失败时记下错误、消息照回", async () => {
-    // legacy:同一续写落成 2.x synthetic —— 引擎拒绝把它当 from(夹具里的真实回应)。
-    expect(source.legacy.diff).toMatchObject({ status: 400, body: { message: expect.stringContaining("is not a user message") } })
+  test("最新回合由引擎的 synthetic 在 idle 之后开启(legacy 续写)⇒ 从 synthetic 取 diff,面板读得到;diff 真失败时记下错误、消息照回", async () => {
+    // legacy:同一续写落成 2.x synthetic,排在 idle 之后(夹具里的真实顺序)。
+    const types = source.legacy.final.map((message) => message.type)
+    expect(types.lastIndexOf("synthetic")).toBeGreaterThan(types.indexOf("idle"))
     const calls: string[] = []
-    const legacyFetch = createEngineFetch({ isEngineOrigin: (origin) => origin === ENGINE, fetch: upstream(source.legacy.final, {}, calls) })
-    const listed = (await (await legacyFetch(`${ENGINE}/session/${source.legacy.sessionID}/message?limit=50`)).json()) as unknown[]
+    const legacyFetch = createEngineFetch({
+      isEngineOrigin: (origin) => origin === ENGINE,
+      fetch: upstream(source.legacy.final, { [source.legacy.syntheticID]: source.diff.data }, calls),
+    })
+    const listed = (await (await legacyFetch(`${ENGINE}/session/${source.legacy.sessionID}/message?limit=50`)).json()) as Array<{ info: unknown }>
     expect(listed.length).toBeGreaterThan(0)
-    expect(calls.filter((call) => call.includes("/diff"))).toEqual([])
+    expect(calls.filter((call) => call.includes("/diff"))).toEqual([expect.stringContaining(`from=${source.legacy.syntheticID}`)])
+    expect(turnDiffsOf(listed.map((item) => item.info) as never)).toEqual(source.diff.data)
 
     const errors = spyOn(console, "error").mockImplementation(() => {})
     try {
@@ -239,25 +246,31 @@ describe("#1668 后台子代理完成通知之后的回合改动", () => {
     ])
   })
 
-  test("通知在 idle 之后自己开回合(fixtures/parity.json):2.x 没有能查它的锚 —— 不发请求", async () => {
+  test("通知在 idle 之后自己开回合(fixtures/parity.json):从通知取这个回合的改动,面板读得到", async () => {
     const background = (parity as unknown as { background: { sessionID: string; final: any[]; diffs: Record<string, { status: number; body: any }> } }).background
-    // 实测:这个回合写了 b.txt,但从用户消息 / 不带 from 问到的是上一回合(空),从通知问回 400。
+    // 实测:这个回合写了 b.txt;从用户消息 / 不带 from 问到的是上一回合(空)—— 用户消息不是这个回合的锚。夹具里「从通知问」
+    // 录于接管 core/src/session/diff.ts 之前(当时回 400);接管后从通知问得到这个回合(codepuppy-session-diff-synthetic.test.ts)。
     const types = background.final.map((message) => message.type)
     expect(types.indexOf("synthetic")).toBeGreaterThan(types.indexOf("idle"))
     expect(background.final.some((message) => message.type === "assistant" && message.snapshot?.files?.includes("b.txt"))).toBe(true)
     expect(background.diffs.latest.body.data).toEqual([])
     expect(background.diffs.fromUser.body.data).toEqual([])
-    expect(background.diffs.fromSynthetic.status).toBe(400)
-    const calls: string[] = []
+    const notice = background.final.findLast((message) => message.type === "synthetic")!
+    const froms: Array<string | null> = []
     const engineFetch = createEngineFetch({
       isEngineOrigin: (origin) => origin === ENGINE,
       fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = new URL(new Request(input, init).url)
-        calls.push(url.pathname)
+        if (url.pathname.endsWith("/diff")) {
+          froms.push(url.searchParams.get("from"))
+          return Response.json({ data: [change] })
+        }
         return Response.json({ data: [...background.final].reverse(), cursor: {} })
       }) as typeof fetch,
     })
-    await engineFetch(`${ENGINE}/session/${background.sessionID}/message?limit=50`)
-    expect(calls.filter((path) => path.endsWith("/diff"))).toEqual([])
+    const messages = (await (await engineFetch(`${ENGINE}/session/${background.sessionID}/message?limit=50`)).json()) as Array<{ info: any }>
+    expect(messages.filter((item) => item.info.role === "user").at(-1)!.info.id).toBe(notice.id)
+    expect(froms).toEqual([notice.id])
+    expect(turnDiffsOf(messages.map((item) => item.info))).toEqual([change])
   })
 })

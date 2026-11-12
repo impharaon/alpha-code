@@ -200,7 +200,7 @@ last_reviewed: 2026-11-12
 ## Integration unit 1 — 四条线接成一个产品:真策略进 ext、登记册握满、引擎开启回合的审阅 diff、接缝文档补记(#1662 整合)
 
 - 依据:编排器派发书 `~/.claude/orchestration/alpha-code/1662/INT-unit1.full.md`(四项验收);[接缝冻结](../../design/2026-11-09-1662-lane-seams.md) I3、I6、§4;登记册 [`codepuppy-authority-registry.json`](../../architecture/codepuppy-authority-registry.json) 11 条 blocked 的 `blocked.options`;[ADR-047](../../../.claude/rules/adrs/ADR-047-opencode2-engine-generation.md)「精确接管面」「权威保持表」、决策 5;裁决 [#1666 评论 6737732975](https://github.com/impharaon/alpha-code/issues/1666#issuecomment-6737732975) 第 6 条(`adr041-history-display-conversion` 选 (a))、[6737930969](https://github.com/impharaon/alpha-code/issues/1666#issuecomment-6737930969) 第 1、2 条(`l1r-naming-resume`、`l1r-telemetry-credential` 归 L5);引擎侧 synthetic 锚点 `e27bec1704`。以上均取 `engine/1662-opencode2` @ `df748c16e7`。基线(bun 1.4.4):ext 里装载 `plugin.ts` 的 9 个测试文件 135 过 / 0 败。
-- 核对:(实施的第一个提交按编排器核对结果填写)
+- 核对:`e12a3be979` · 编排器 · 通过(规模按约 3 小时一段接受,顺序 3 → 1 → 2 → 4、每项一个提交;setup-order 改宿主 + 子进程接受;`l1r-output-caps` 按 max output 的证明登记,并把该条决定文字收窄到所证明的:输出上限由 Code Puppy 施加、temperature 不动;旧 400 夹具与构建期改写的引用按计划)。
 
 ### 改动
 

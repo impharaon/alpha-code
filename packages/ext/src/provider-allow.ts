@@ -3,7 +3,7 @@
 // 为什么注入的 `provider.use` 策略不够:OpenCode 2 跨文档的策略按**最早载入者**优先(packages/core/src/config/plugin/policy.ts 的
 // `ManagedPolicy.statements`),而引擎的全局配置目录(生产是 engineGlobalConfigDirectory = ~/.config/opencode)在 Code Puppy 的显式文件之前
 // 载入 —— 那里一条 provider 块加一句 `provider.use allow` 就压过注入的「先拒全部」,供应商出现在 `GET /api/provider`、能选能调。
-// 0.1.26 上注入的 enabled_providers 最后合并、整体替换,那个目录开不了任何供应商(alpha-code#1662 编排器裁决 2026-11-12,
+// 0.1.26 上注入的 enabled_providers 最后合并、整体替换,那个目录开不了任何供应商(#1662 编排器裁决 2026-11-12,
 // owner:「不可以因为 opencode 更新把经 codepuppy 拿回的唯一权威再封掉」)。托管策略层(只有它排在全局目录之前)嵌入宿主够不着:
 // `start()` 的选项不带 `config.system`(packages/server/src/options.ts、routes.ts),只剩平台系统目录与 MDM 描述文件。
 //

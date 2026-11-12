@@ -161,9 +161,11 @@ src/components/prompt-input/submit.test.ts 9
 src/context/permission-auto-respond.test.ts 12
 src/context/server-session-restart.test.ts 2
 src/context/terminal-command.test.ts 1
+src/i18n/parity.test.ts 5
 src/pages/layout/helpers.test.ts 24
 src/utils/session-route.test.ts 10
 src/utils/terminal-websocket-url.test.ts 3
+test-browser/prompt-attachments.test.ts 6
 "
 
 lookup_registered() {
@@ -192,7 +194,9 @@ for t in $delta_tests; do
       exit 1 ;;
   esac
   set +e
-  run_bun_test "$t"
+  # `./` = 按路径点名而非按名过滤:package.json 的 test root 是 ./src,裸过滤点不到
+  # test-browser/ 下的判据文件(bun 报 "did not match",files=0)。
+  run_bun_test "./$t"
   status=$?
   set -e
   # `|| true`:文件被删时 bun 不打汇总行,grep 空手而归 —— pipefail+set -e 会让脚本在这行

@@ -345,7 +345,8 @@ describe("`#1411` / `#1443` web search 按账户态的在场性", () => {
   // 2.x 的替代:packages/ext/src/plugin-host.test.ts「权威 · 联网搜索准入(L5r)」(kill-switch 下内置 websearch 与第三方
   // web search MCP 在 execute.before 被拒,反向臂不装 ext 即放行)、「联网搜索:不在 kill-switch(代付 / 登出)⇒ 内置
   // websearch 照常放行」、「权威 · 云工具接入(M3)」;fork 出的那份 env 两个方向都写由本文件上面那组照常判。
-  // 无对应用例:把「真 fork env → 引擎这一刻的模型工具表」合成成一张表来判(2.x 上两半各自有判据,合成没有)。
+  // 合成判据(「真 fork env → 引擎这一刻的模型工具表」一张表)由 `#1662` parity 第 9 项补上:
+  // websearch-account-tool-table.engine.{test,cases}.ts(代付两条都在 / 登出只剩本地 / kill-switch 两条都不在 / 去掉注入的 deny 即回来)。
 
   // ───────────────────────────────────────────────────────────────────────────
   // `#1443`:同一条链上**用户自带的第三方 web-search MCP**(自己在配置里声明一个 exa 之类的

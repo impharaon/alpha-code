@@ -7,16 +7,18 @@
 packages/ext/src/codepuppy-tools.ts	mkdirSync	root	W1
 packages/ext/src/codepuppy-tools.ts	renameSync	join(root, "codepuppy.jsonc.tmp")	W1
 packages/ext/src/codepuppy-tools.ts	writeFileSync	join(root, "codepuppy.jsonc.tmp")	W1
+# `#1662` ext 的工具策略存储(policy/store.ts,随 #1666 搬进 ext):<XDG_DATA_HOME>/opencode/codepuppy-tool-policy/<digest>.json(policy/index.ts 的 dataRoot + resolver.ts 的 defaultPolicyBaseDir)。
+packages/ext/src/policy/store.ts	mkdirSync	path.dirname(file)	W4
+packages/ext/src/policy/store.ts	renameSync	file	W4
+packages/ext/src/policy/store.ts	renameSync	tmp	W4
+packages/ext/src/policy/store.ts	writeFileSync	tmp	W4
 packages/ui-mac/src/main/codepuppy-config-injection.ts	mkdirSync	dir	W3
 packages/ui-mac/src/main/codepuppy-config-injection.ts	mkdirSync	path.dirname(truth)	W2
 packages/ui-mac/src/main/codepuppy-config-injection.ts	mkdirSync	userDataPath	W3
 packages/ui-mac/src/main/codepuppy-config-injection.ts	rmSync	modelsPath	W3
-packages/ui-mac/src/main/codepuppy-config-injection.ts	rmSync	userCopy	W3
 packages/ui-mac/src/main/codepuppy-config-injection.ts	writeFileSync	file	W3
 packages/ui-mac/src/main/codepuppy-config-injection.ts	writeFileSync	modelsPath	W3
-packages/ui-mac/src/main/codepuppy-config-injection.ts	writeFileSync	path.join(dir, "opencode.jsonc")	W3
 packages/ui-mac/src/main/codepuppy-config-injection.ts	writeFileSync	truth	W2
-packages/ui-mac/src/main/codepuppy-config-injection.ts	writeFileSync	userCopy	W3
 packages/ui-mac/src/main/codepuppy-environment.ts	mkdirSync	directory	main-only
 packages/ui-mac/src/main/codepuppy-environment.ts	rmdirSync	directory	main-only
 packages/ui-mac/src/main/codepuppy-installs.ts	mkdirSync	root	W2
@@ -39,6 +41,10 @@ packages/ui-mac/src/main/codepuppy-workdir.ts	writeFileSync	tmp	W1
 packages/ui-mac/src/main/catalog-channels.ts	mkdirSync	userDataPath	W3
 packages/ui-mac/src/main/catalog-channels.ts	renameSync	tmp	W3
 packages/ui-mac/src/main/catalog-channels.ts	writeFileSync	tmp	W3
+# `#1662` sidecar 重写的显式配置文件(engine-explicit-config.ts writeAtomic):<userDataPath>/<engineConfig>/codepuppy-explicit.json。
+packages/ui-mac/src/main/engine-explicit-config.ts	mkdirSync	path.dirname(file)	W3
+packages/ui-mac/src/main/engine-explicit-config.ts	renameSync	temporary	W3
+packages/ui-mac/src/main/engine-explicit-config.ts	writeFileSync	temporary	W3
 packages/ui-mac/src/main/ext-atomic-fs.ts	mkdirSync	dir	arg
 packages/ui-mac/src/main/ext-atomic-fs.ts	mkdirSync	path.dirname(to)	arg
 packages/ui-mac/src/main/ext-atomic-fs.ts	openSync	dir	arg

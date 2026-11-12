@@ -41,7 +41,10 @@ beforeAll(async () => {
   if (!address || typeof address === "string") throw new Error("Preview did not bind a TCP port")
   baseURL = `http://127.0.0.1:${address.port}`
   browser = await chromium.launch({
-    executablePath: process.env.CHROME_PATH,
+    // I-08 的共享预载把 HOME 换成临时根,Playwright 在 HOME 下的浏览器缓存随之不可见;与 tooltip.browser.test.ts 同样回落到本机 Chrome。
+    executablePath:
+      process.env.CHROME_PATH ??
+      (process.platform === "darwin" ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" : undefined),
     headless: true,
     args: ["--disable-background-networking", "--no-first-run"],
   })

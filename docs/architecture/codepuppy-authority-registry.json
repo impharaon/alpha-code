@@ -822,6 +822,10 @@
         {
           "file": "packages/ext/src/policy/ask-deadline.test.ts",
           "name": "the default is 300 s and every invalid override falls back to it, never to no deadline"
+        },
+        {
+          "file": "packages/ui-mac/src/main/permission-ask-timeout.engine.test.ts",
+          "name": "审批超时:到期的工具部件经桌面适配器被卡片分类为审批超时,模型读到同一句(permission-ask-timeout.engine.cases.ts,1 条)"
         }
       ]
     },

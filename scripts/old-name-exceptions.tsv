@@ -354,7 +354,9 @@ docs/design/current/session-workspace/design.html	alpha-code	6	external-anchor	G
 docs/design/current/settings/components.md	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/current/settings/components.md	2026-07-20-req090-alpha-surfaces/	2	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
 docs/design/current/settings/design.html	alpha-code	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/design/current/shell-sidebar/components.md	alpha-code	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/current/shell-sidebar/design.html	alpha-code	5	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/design/current/shell-sidebar/frames/error-lifetime.css	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/current/slash-menu/design.html	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
 docs/design/system/README.md	alpha-code	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/system/color.md	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -402,6 +404,7 @@ docs/runbooks/uninstall.md	/.alpha/	2	historical	记录退役根 .alpha(已退�
 docs/runbooks/uninstall.md	Support/alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/runbooks/uninstall.md	/.alpha	1	historical	记录退役根 .alpha(已退役、零读写)的历史说明
 packages/codepuppy-app/src/app.tsx	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/app.tsx	Alpha	1	historical	冻结的 0.1.26 前端,不可编辑:#1668 的退出条件要求这棵树与已发布的 0.1.26 逐字节一致,注释里的旧品牌词随冻结原样保留
 packages/codepuppy-app/src/i18n/am.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-app/src/i18n/ar.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-app/src/i18n/az.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -464,7 +467,9 @@ packages/codepuppy-app/src/i18n/uz.ts	alpha-code	1	external-anchor	GitHub 仓库
 packages/codepuppy-app/src/i18n/vi.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-app/src/i18n/zht.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-app/src/pages/draft-route-gate.tsx	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/pages/layout/deep-links.ts	Alpha	1	historical	冻结的 0.1.26 前端,不可编辑:#1668 的退出条件要求这棵树与已发布的 0.1.26 逐字节一致,注释里的旧品牌词随冻结原样保留
 packages/codepuppy-app/src/pages/session/timeline/message-timeline.tsx	--v2-alpha-light-2 --v2-alpha-light-0	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-app/src/surface/terminal.ts	Alpha	1	historical	冻结的 0.1.26 前端,不可编辑:#1668 的退出条件要求这棵树与已发布的 0.1.26 逐字节一致,注释里的旧品牌词随冻结原样保留
 packages/codepuppy-contracts-consumer/alpha-platform-cloud-mcp.lock.json	文件名	1	external-anchor	文件名由别的仓定义并按锁文件 / vendor 逐字节钉住:仓库名派生的锁文件名、alpha-platform 产出的 vendor 文件名,owner D3 未裁仓库名,不改
 packages/codepuppy-contracts-consumer/alpha-platform-cloud-mcp.lock.json	jinjunnn/alpha-platform	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-contracts-consumer/alpha-platform-contract.lock.json	文件名	1	external-anchor	文件名由别的仓定义并按锁文件 / vendor 逐字节钉住:仓库名派生的锁文件名、alpha-platform 产出的 vendor 文件名,owner D3 未裁仓库名,不改

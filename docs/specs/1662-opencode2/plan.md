@@ -275,3 +275,4 @@ last_reviewed: 2026-11-12
 - 2026-11-12 · 第 1 项:`gate-files.tsv` 的 `context-injection.test.ts` 行在基线就是 41 而文件实跑 36(已过期,属 unit 2 那一类),按本提交实测改为 37;`cloud-websearch-kill.test.ts` 行 47 对实跑 30 同样过期,本段没改它的条数,留给 unit 2 · 第 1 项提交。
 - 2026-11-12 · 第 2 项:`l1r-output-caps` 的决定文字按编排器核对收窄,但不写「temperature 不动」—— 实查 OpenCode 2 上没有任何测试断言 temperature(`grep temperature` 在 ext 的 P5 与两个 cap 测试里零命中),写上就比证明宽;改为只说输出上限,`note` 记下原因 · 第 2 项提交。
 - 2026-11-12 · 第 2 项:同步更正 4 条的 `lane`(`adr041-history-display-conversion`、`l1r-naming-resume`、`l1r-telemetry-credential` 归 L5,`l1r-review-turn-supply` 归 L6),按的是 #1666 两条裁决与实际交付方;`sidecar-stop-drains` 的证明名取不含转义引号的子串(判官按子串比对) · 第 2 项提交。
+- 2026-11-12 · 第 4 项:三个环境变量与 main 写的 2.x 顶层键各记成 §4 表的新一行(不改原有行);I11' 记成 §3 末尾的新一节;I6 补记里失败码的读方实查只有 L6 适配层(`engine-adapter/v1-shapes.ts`),main 不读,按实写;frontmatter 不动 · 第 4 项提交。

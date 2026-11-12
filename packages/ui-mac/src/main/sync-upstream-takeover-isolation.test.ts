@@ -42,6 +42,7 @@ const MERGE = "Merge `dev` into `alpha`"
 const POST = "Takeover paths unchanged by merge"
 const BUNDLE = "Build sync bundle artifact"
 const JUDGE = "Authority registry judge"
+const PROOFS = "Authority proofs pass"
 const FULL = [INTAKE, MERGE, POST, BUNDLE]
 
 const REVIEW_TITLE = "::error title=takeover upgrade review required::"
@@ -490,7 +491,7 @@ function judgeFixture(cases: string[], row: string = gateRow("2")): Fixture {
 }
 const WITH_JUDGE = [INTAKE, MERGE, POST, JUDGE, BUNDLE]
 
-describe("#1662 合并后的树上有权威没握住 ⇒ 判官步中止,不出推送包", () => {
+describe("#1662 合并后的树上有权威没握住 ⇒ 判官步或证明步中止,不出推送包", () => {
   test("判官全绿 ⇒ 照常出推送包;判官有一条红 ⇒ 在判官步中止、具名报错、不出推送包", () => {
     const ok = judgeFixture(GREEN)
     const passed = runSteps(ok, WITH_JUDGE)
@@ -540,5 +541,95 @@ describe("#1662 合并后的树上有权威没握住 ⇒ 判官步中止,不出�
     expect(steps[judge]["continue-on-error"], "判官步带了 continue-on-error —— 红了也照样出推送包").toBeUndefined()
     expect(stepBody(JUDGE)).toContain("src/policy/authority-registry.test.ts")
     expect(existsSync(resolve(REPO_ROOT, JUDGE_FILE)), "判官步点名的生产判官文件不在仓里").toBe(true)
+    // 证明步:判官之后、推送包之前,同样没有跳过/吞失败的开关,跑的是仓里那份脚本。
+    const proofs = at(PROOFS)
+    expect(proofs, "sync-upstream.yml 里找不到证明步").toBeGreaterThan(judge)
+    expect(proofs, "证明步排在推送包之后 —— 红了推送包也已经出了").toBeLessThan(at(BUNDLE))
+    expect(steps[proofs].if, "证明步带了 if:").toBeUndefined()
+    expect(steps[proofs]["continue-on-error"], "证明步带了 continue-on-error").toBeUndefined()
+    expect(stepBody(PROOFS)).toContain("scripts/assert-authority-proofs.sh")
+  })
+})
+
+// ── `#1662` I-02:权威失去通过的证明 ⇒ 证明步中止 ─────────────────────────────────────────────
+// 夹具里放合成登记册与合成证明文件,外加生产的 scripts/assert-authority-proofs.sh 与 bun-test-floor.sh 原样副本;
+// 证明文件清单只来自登记册 JSON,条数只来自夹具的 gate-files.tsv —— 改登记册即改判决,证明清单没有第二份。
+
+const PROOF_A = "packages/ext/src/policy/proof-a.test.ts"
+const PROOF_B = "packages/core/test/proof-b.test.ts"
+const PROOF_RETIRED = "packages/ext/src/policy/proof-retired.test.ts"
+const passing = (name: string) => judgeSource([`test("${name}", () => expect(1).toBe(1))`])
+const failing = (name: string) => judgeSource([`test("${name}", () => expect("proof broke").toBe("held"))`])
+
+function proofFixture(opts: { b?: string | null; registerB?: boolean; extraEntries?: object[] } = {}): Fixture {
+  const entries = [
+    { id: "auth-a", decision: "a", tests: [{ file: PROOF_A, name: "holds a" }] },
+    { id: "auth-b", decision: "b", tests: [{ file: PROOF_B, name: "holds b" }] },
+    // 已由 owner 退役的项:它的证明不再握住同步 —— 夹具里故意放一个红的,跑了就会把绿那例判红。
+    { id: "auth-retired", decision: "r", tests: [{ file: PROOF_RETIRED, name: "gone" }], retired: { quote: "不要了", date: "2026-11-09", by: "owner" } },
+    ...(opts.extraEntries ?? []),
+  ]
+  const rows = [gateRow("2"), `1\tpackages/ext\tsrc/policy/proof-a.test.ts\t-\tfixture\n`]
+  if (opts.registerB !== false) rows.push(`1\tpackages/core\ttest/proof-b.test.ts\t-\tfixture\n`)
+  const files: Record<string, string> = {
+    [JUDGE_FILE]: judgeSource(GREEN),
+    "scripts/gate-files.tsv": rows.join(""),
+    "scripts/bun-test-floor.sh": readFileSync(resolve(REPO_ROOT, "scripts/bun-test-floor.sh"), "utf8"),
+    "scripts/assert-authority-proofs.sh": readFileSync(resolve(REPO_ROOT, "scripts/assert-authority-proofs.sh"), "utf8"),
+    "docs/architecture/codepuppy-authority-registry.json": `${JSON.stringify({ anchor: { takeoverListRevision: "x" }, entries }, null, 2)}\n`,
+    [PROOF_A]: passing("holds a"),
+    [PROOF_RETIRED]: failing("gone"),
+  }
+  if (opts.b !== null) files[PROOF_B] = opts.b ?? passing("holds b")
+  return fixture("plain", { alphaFiles: files })
+}
+const WITH_PROOFS = [INTAKE, MERGE, POST, JUDGE, PROOFS, BUNDLE]
+
+describe("#1662 I-02 权威失去通过的证明 ⇒ 证明步中止,点名权威,不出推送包", () => {
+  test("证明全绿 ⇒ 出推送包(退役项的证明不跑);一个证明红 ⇒ 在证明步中止、点名那项权威;变异臂:没有证明步 ⇒ 同一夹具出包", () => {
+    const ok = proofFixture()
+    const passed = runSteps(ok, WITH_PROOFS)
+    expect(passed.failedAt, `证明全绿不该让同步失败:\n${passed.output}`).toBeNull()
+    expect(passed.output, "退役项的证明被执行了").not.toContain("proof-retired")
+    expect(bundleProduced(ok)).toBe(true)
+
+    const bad = proofFixture({ b: failing("holds b") })
+    const failed = runSteps(bad, WITH_PROOFS)
+    expect(failed.failedAt, failed.output).toBe(PROOFS)
+    expect(failed.output).toContain(`::error title=authority proof failed::auth-b —— 证明测试没通过(或没跑满 1 条):${PROOF_B}`)
+    expect(failed.output, "绿的那项被误点名").not.toContain("authority proof failed::auth-a")
+    expect(bundleProduced(bad), "证明红了却产出了推送包").toBe(false)
+
+    // 已知的坏:判官只核对在位 —— 去掉证明步,同一个红证明一路放行到推送包。
+    const judgeOnly = proofFixture({ b: failing("holds b") })
+    const through = runSteps(judgeOnly, [INTAKE, MERGE, POST, JUDGE, BUNDLE])
+    expect(through.failedAt, through.output).toBeNull()
+    expect(bundleProduced(judgeOnly)).toBe(true)
+  })
+
+  test("证明文件不存在 ⇒ 中止并点名;登记册新增一项指向它 ⇒ 判决跟着变(清单来自登记册)", () => {
+    const missing = proofFixture({ b: null })
+    const run = runSteps(missing, WITH_PROOFS)
+    expect(run.failedAt, run.output).toBe(PROOFS)
+    expect(run.output).toContain(`::error title=authority proof missing::auth-b —— 证明文件不存在:${PROOF_B}`)
+    expect(bundleProduced(missing)).toBe(false)
+
+    const added = proofFixture({ extraEntries: [{ id: "auth-new", decision: "n", tests: [{ file: "packages/ext/src/policy/proof-new.test.ts", name: "n" }] }] })
+    const run2 = runSteps(added, WITH_PROOFS)
+    expect(run2.failedAt, run2.output).toBe(PROOFS)
+    expect(run2.output).toContain("authority proof missing::auth-new")
+  })
+
+  test("证明文件没在 gate-files.tsv 登记、或少跑了一条 ⇒ 中止并点名(条数无从核对 / 被 skip 掉)", () => {
+    const unregistered = proofFixture({ registerB: false })
+    const run = runSteps(unregistered, WITH_PROOFS)
+    expect(run.failedAt, run.output).toBe(PROOFS)
+    expect(run.output).toContain("::error title=authority proof unregistered::auth-b")
+
+    const skipped = proofFixture({ b: judgeSource(['test.skip("holds b", () => expect(1).toBe(1))']) })
+    const run2 = runSteps(skipped, WITH_PROOFS)
+    expect(run2.failedAt, run2.output).toBe(PROOFS)
+    expect(run2.output).toContain("实际 0 条 < 登记 1 条")
+    expect(run2.output).toContain("authority proof failed::auth-b")
   })
 })

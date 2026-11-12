@@ -341,6 +341,13 @@ jobs:
             exit 1
           fi
 
+      # `#1662`(INT-upstream-upgrade-readiness I-02):判官只核对证明测试在位;这一步把登记册里每个已握住的
+      # 权威的证明测试**真的跑一遍**(清单取自登记册 JSON,条数取自 scripts/gate-files.tsv,逐文件经
+      # bun-test-floor.sh)。任何一个红、缺失、没登记或没跑满 ⇒ 点名受影响的权威 id ⇒ 不出推送包。
+      # 2026-11-12 本机实测(bun 1.4.4,21 个文件)约 72 秒。行为闸:packages/ui-mac/src/main/sync-upstream-takeover-isolation.test.ts。
+      - name: Authority proofs pass (#1662 — an authority that loses its passing proof stops the sync)
+        run: bash scripts/assert-authority-proofs.sh
+
       # `#899`(SEC):产出**不可变**的推送候选——把这次 sync 验证过的 `dev`/`alpha` 提交打包成
       # git bundle。推送阶段只会解包并推送这些确切的 commit object,不会重新执行任何合并/安装/
       # 冒烟逻辑(那些只发生在本 job、本 job 从不持有推送凭据)。范围严格限定在这次 sync 新增的

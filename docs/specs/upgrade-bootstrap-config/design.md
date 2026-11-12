@@ -301,7 +301,7 @@ export class CodePuppyBootstrapError extends Error {
 
 /** 严格解析:多键、缺必填键、类型或格式不符 ⇒ "invalid"(带 path);v !== CODEPUPPY_BOOTSTRAP_VERSION ⇒ "version"。返回深冻结的副本。 */
 export function parseCodePuppyBootstrap(value: unknown): CodePuppyBootstrap
-/** sidecar 每个进程调用一次;第二次 ⇒ "republished"。把已校验的普通对象深冻结后挂在 globalThis[Symbol.for("codepuppy.bootstrap")](C10 同一形状)。 */
+/** sidecar 每个进程调用一次;第二次 ⇒ "republished"。把已校验的普通对象深冻结后挂在 globalThis[Symbol.for("codepuppy.bootstrap")],与 C10 同一形状。 */
 export function publishCodePuppyBootstrap(document: CodePuppyBootstrap): void
 /**
  * sidecar 与 ext 用。第一次调用时用**本 bundle 编进去的** parseCodePuppyBootstrap 解析已发布的对象并记住结果:

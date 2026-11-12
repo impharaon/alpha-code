@@ -3,7 +3,7 @@ id: DESIGN-upgrade-extension-manifest
 title: 一份扩展清单格式、每类一条登记通道 技术设计
 summary: Code Puppy 带进引擎的工具、MCP、插件、agent、技能、命令,今天经十条路径、五个读法、两套 v1→2.x 翻译进入引擎;收成一份 Code Puppy 自有的登记集合(内存里一个类型)、一份文档字段表与一个读取器、一张准入表和每类一个登记器;磁盘上的文件不改形状,用户文档照 I-07 G4 由引擎直接读,项目文档改用引擎自己的归一化读
 kind: tech-design
-status: draft
+status: approved
 spec: ""                 # 内部工作,无 spec。来源:impharaon/alpha-work:INT-upstream-upgrade-readiness I-06(owner U-02,2026-11-12)
 spec_version: ""
 review:
@@ -37,6 +37,11 @@ last_reviewed: 2026-11-12
   - I-05 少改上游 `docs/specs/upgrade-fewer-takeovers/design.md @0a1d9d2fdd`:不新增挂点,插件 MCP 域只有 list/transform/reload;本方案不加接管。
 - 代码坐标:`E@` = `engine/1662-opencode2@778f44a41c`。所引 ext、core、plugin 源文件与初稿的 `4198d1a484` 逐字相同;
   `codepuppy-config-injection.ts` 在两者之间因 #1687 多了 `isCloudMcpWithheld`(`:191-202`),下文按新版行号写。标记:[读] 读码;[测] 本次实跑;[推] 推断。
+
+## 批准记录
+
+- 2026-11-12,owner(编排器转达),逐字:「全局目录多接管两个上游文件，同不同意；「扩展清单」方案批不批； 这两个同意，上游需求怎么发是什么意思。」
+- 含义:本设计(审过并按 finding 修正的 `fcb47ce40e`)获批;编排器 2026-11-12 据这句原话把本设计标为 `approved`。
 
 ## 2. 地面真相
 
@@ -423,7 +428,7 @@ export function emitTransforms(
 | R6 账本停用、会话级强制停用、默认拒绝不经准入,留在 floor 槽的中和条目 | 它们必须压过一切来源 |
 | R7 **(改)** 身份推导不变;项目插件的工具拒带命名空间、改写不许加命名空间或换有效名,身份恒为 plugin;权威只从启动文档三种证据铸 | R1 M1;F-13;ADR-041 |
 | R8 **(改)** 项目文档用 `jsonc-parser` 解析,经引擎 bundle 交接来的 `ConfigNormalize` 归一化;ext 不再重述任何 v1 文法 | R1 M2、M5、m1;F-09、F-14 |
-| R9 项目命令仍只认 `$ARGUMENTS`、项目技能仍只认 `./.codepuppy/skills` | F-05;要补齐只能向上游要挂点(待 owner) |
+| R9 项目命令仍只认 `$ARGUMENTS`、项目技能仍只认 `./.codepuppy/skills` | F-05;要补齐只能向上游要挂点(owner 2026-11-12 已同意提交 U9、U10) |
 | R10 项目插件扇出机制不动,同意判定换成 R5 那一个,外加 R7 的命名空间规则 | ADR-040 后果第 5 条「处置另议」不在本方案 |
 | R11 不新增接管、配置键、上游挂点;新依赖只有 `jsonc-parser` | I-05;工程标准 1;§6 |
 | R12 **(改)** 交付物按派发书移到自有 slug `docs/specs/upgrade-extension-manifest/design.md`,id `DESIGN-upgrade-extension-manifest`,文档索引已重生成 | 文档合同只认 `spec.md` / `design.md` / `plan.md` |
@@ -439,7 +444,7 @@ export function emitTransforms(
 5. 写着 `granted:true` 但没有当前同意版本号的项目同意记录,不再让 ext 装载项目可执行物,改为重新弹同意框(main 今天就这样判)。本机没有这种记录。
 6. 项目 agent 里不会生效的字段(`permission` 等)从静默忽略改为记一行日志。
 
-**待 owner 决定**(未批,不阻塞本方案其余部分)
+**owner 已决定(2026-11-12)**:「同意，向上游提那 10 个扩展点需求」 —— U9、U10 提交上游。下表是决定前的原文。
 
 | 事项 | 依据与后果 |
 | --- | --- |

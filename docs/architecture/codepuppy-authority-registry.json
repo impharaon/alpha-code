@@ -1103,7 +1103,8 @@
           "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
           "name": "an auth answer stays failed"
         }
-      ]
+      ],
+      "note": "Open (#1666 Unit D, handed back): an auth answer (401) to tools/list is named `transport` and reconnects in the background, because packages/core/src/mcp/connection.ts:232 classifies a tools/list failure without the SDK's HTTP status; an auth answer at connect stays failed as decided."
     },
     {
       "id": "mcp-start-concurrency",
@@ -1155,7 +1156,8 @@
           "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
           "name": "a contradicting connection fails the planned call and drops the declaration"
         }
-      ]
+      ],
+      "note": "Open (#1666 Unit D, handed back): the real Office command carries {workspace}; the extension replaces it with the folder (packages/ext/src/policy/index.ts:121-124) before core matches the command token by token against the bundled template (packages/core/src/mcp/codepuppy-first-party-mcp.ts:46), so in production no declaration and no codepuppy-bundled authority is found (probe 2026-11-12: marker command → read_docx, write_docx; substituted command → none)."
     },
     {
       "id": "mcp-net-failure-runtime",

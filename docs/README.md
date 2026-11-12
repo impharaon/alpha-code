@@ -100,6 +100,8 @@ status.
 
 ## 文档索引
 
+意图统一在 [Alpha intents](https://github.com/impharaon/alpha-work/blob/a4b8beeac0196f02780a8c26364529b07e313acb/docs/intents/README.md)；本仓能力规格见 [specs/](specs/)。规格保留已交付事实和验收边界；当前开发状态仍看 Issues / Project。
+
 <!-- docs-index:start -->
 
 <!-- 由 docs_index.py 从各文件 frontmatter 生成,不要手改;改文件的 summary 后重跑 --write。 -->

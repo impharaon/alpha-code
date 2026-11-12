@@ -17,7 +17,7 @@ Windows 界面只能读取受准许的服务来源。这份规格保留已提出
 
 ## 来源
 
-- [原需求与处置 impharaon/alpha-work:RQ-identity/N-03](https://github.com/impharaon/alpha-work/blob/27d104dfb0bb8d36f6d050277255861c4927416c/docs/requests/RQ-identity.md#需求点)。
+- [意图与处置 impharaon/alpha-work:INT-identity/I-03](https://github.com/impharaon/alpha-work/blob/a4b8beeac0196f02780a8c26364529b07e313acb/docs/intents/INT-identity.md#意图点)。
 - 历史身份：[impharaon/alpha-code#229](https://github.com/impharaon/alpha-code/issues/229)；原题名与编号保留，当前交付状态以 GitHub 为准。
 - Epic：[能力分组](https://github.com/impharaon/alpha-work/issues/137)。
 - [有效范围或验收依据 2026-08-10](https://github.com/impharaon/alpha-code/issues/229#issuecomment-5239322751)。

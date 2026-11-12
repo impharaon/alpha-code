@@ -17,7 +17,7 @@ last_reviewed: 2026-11-10
 
 ## 来源
 
-- [原需求与处置 impharaon/alpha-work:RQ-desktop/N-01](https://github.com/impharaon/alpha-work/blob/27d104dfb0bb8d36f6d050277255861c4927416c/docs/requests/RQ-desktop.md#需求点)。
+- [意图与处置 impharaon/alpha-work:INT-desktop/I-01](https://github.com/impharaon/alpha-work/blob/a4b8beeac0196f02780a8c26364529b07e313acb/docs/intents/INT-desktop.md#意图点)。
 - 历史身份：[impharaon/alpha-code#174](https://github.com/impharaon/alpha-code/issues/174)；原题名与编号保留，当前交付状态以 GitHub 为准。
 - Epic：[能力分组](https://github.com/impharaon/alpha-work/issues/149)。
 

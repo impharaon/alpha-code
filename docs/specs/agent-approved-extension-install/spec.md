@@ -17,7 +17,7 @@ last_reviewed: 2026-11-10
 
 ## 来源
 
-- [impharaon/alpha-work:RQ-extensions](https://github.com/impharaon/alpha-work/blob/27d104dfb0bb8d36f6d050277255861c4927416c/docs/requests/RQ-extensions.md#需求点)。
+- [impharaon/alpha-work:INT-extensions](https://github.com/impharaon/alpha-work/blob/a4b8beeac0196f02780a8c26364529b07e313acb/docs/intents/INT-extensions.md#意图点)。
 
 - [Story alpha-code#1521](https://github.com/impharaon/alpha-code/issues/1521)。
 - [方案基线](https://github.com/impharaon/alpha-code/blob/e56ae0c03603a6540cd01043d64d590c6f7e2930/docs/design/2026-10-14-req234-hub-agent-install-baseline.md)；[AC-02 范围裁决](https://github.com/impharaon/alpha-code/issues/1530#issuecomment-6207376527)；[实施及验证核对](https://github.com/impharaon/alpha-code/issues/1521#issuecomment-6731102084)。

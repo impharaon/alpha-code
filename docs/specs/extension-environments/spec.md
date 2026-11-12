@@ -17,7 +17,7 @@ last_reviewed: 2026-11-10
 
 ## 来源
 
-- [原需求与处置 impharaon/alpha-work:RQ-extensions/N-05](https://github.com/impharaon/alpha-work/blob/27d104dfb0bb8d36f6d050277255861c4927416c/docs/requests/RQ-extensions.md#需求点)。
+- [意图与处置 impharaon/alpha-work:INT-extensions/I-05](https://github.com/impharaon/alpha-work/blob/a4b8beeac0196f02780a8c26364529b07e313acb/docs/intents/INT-extensions.md#意图点)。
 - 历史身份：[impharaon/alpha-code#209](https://github.com/impharaon/alpha-code/issues/209)；原题名与编号保留，当前交付状态以 GitHub 为准。
 - Epic：[能力分组](https://github.com/impharaon/alpha-work/issues/138)。
 - [有效范围或验收依据 2026-07-17](https://github.com/impharaon/alpha-code/issues/209#issuecomment-4999230099)。

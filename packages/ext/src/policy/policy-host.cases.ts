@@ -66,6 +66,7 @@ export const { SubagentTool } = await load("src/tool/plugin/subagent.ts")
 // The builtin agents (`general` is the subagent the E6 cases ask for).
 export const { AgentPlugin } = await load("src/plugin/agent.ts")
 export const { WebFetchTool } = await load("src/tool/plugin/webfetch.ts")
+export const { McpResourceTools } = await load("src/tool/plugin/mcp-resource.ts")
 export const { SessionPrompt } = await load("src/session/prompt.ts")
 export const { fromPromise } = await resolve("@opencode/plugin/promise/adapter")
 export const SchemaTool = (await resolve("@opencode/schema/tool")).Tool

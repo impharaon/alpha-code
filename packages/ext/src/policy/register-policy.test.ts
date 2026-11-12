@@ -14,6 +14,8 @@ import {
   E,
   it,
   Location,
+  Mcp,
+  McpResourceTools,
   Permission,
   Plugin,
   PluginHooks,
@@ -907,6 +909,189 @@ describe("#1572: a tool call that fails at the network layer carries Code Puppy'
       const error = failure(yield* callRaw(session.id, "webfetch", { url: "ftp://example.test/file", format: "text" }))
       expect(error?.message).toBeDefined()
       expect(error?.metadata?.codepuppyNetFailure).toBeUndefined()
+    }),
+  )
+})
+
+/** A Code Mode program calling one tool with arguments; returns what the program returned or why it failed, as text. */
+const codeModeCall = (sessionID: string, qualified: string, args: unknown = {}) =>
+  Effect.gen(function* () {
+    const registry = yield* Tool.Service
+    const exit = yield* registry
+      .check({
+        code: `return await tools.${qualified}(${JSON.stringify(args)})`,
+        tools: [qualified],
+        bindings: {},
+        permissions: [ALLOW_ALL],
+        limits: { timeoutMs: 10_000, memoryBytes: 64 * 1024 * 1024, maxToolCalls: 4 },
+        context: { sessionID, agent: "build", messageID: "msg_cm", progress: () => Effect.void },
+      } as never)
+      .pipe(Effect.exit)
+    return JSON.stringify(Exit.isSuccess(exit) ? exit.value : Cause.squash(exit.cause))
+  })
+
+/** The production policy store for the account and folder `setup` used. */
+const policyStore = Effect.gen(function* () {
+  const location = yield* Location.Service
+  return createToolPolicyStore({
+    baseDir: defaultPolicyBaseDir(path.join(ROOT, "data", "opencode")),
+    account: () => account,
+    workspace: () => location.directory,
+  })
+})
+
+/**
+ * OpenCode 2's own MCP resource tools (tool/plugin/mcp-resource.ts) over a recording MCP runtime: what each call asked
+ * the runtime for is what the implementation received.
+ */
+const resourceRuntime = () => {
+  const seen = { lists: [] as string[], reads: [] as string[] }
+  const runtime = Mcp.Service.of({
+    servers: () => Effect.succeed([]),
+    resourceCatalog: () => Effect.succeed({ resources: [], templates: [] }),
+    resources: (input: { server: string }) => Effect.sync(() => (seen.lists.push(input.server), { resources: [], templates: [] })),
+    readResource: (input: { server: string; uri: string }) =>
+      Effect.sync(() => (seen.reads.push(`${input.server}:${input.uri}`), { server: input.server, uri: input.uri, contents: [{ type: "text", uri: input.uri, text: "r" }] })),
+  } as never)
+  const plugin = { id: McpResourceTools.Plugin.id, effect: (ctx: any) => McpResourceTools.Plugin.effect(ctx).pipe(Effect.provideService(Mcp.Service, runtime)) }
+  return { seen, plugin }
+}
+const ID_LIST_RESOURCES = "host::list_mcp_resources"
+const ID_READ_RESOURCE = "host::read_mcp_resource"
+
+// #1574 (v1 codepuppy-approval-binding.test.ts): what the user approves is what runs. confirm() asks with the input the
+// implementation will receive and decides again after the reply (gate.ts confirm), so a hook's rewrite is what is asked
+// and run, a tool disabled while its request waited is refused, and a server rebound while waiting is refused.
+describe("#1574: approval binding — the reply is checked against the call as it now stands", () => {
+  it.live("MCP resource tools: the arguments the ask shows and the implementation reads are the hook's", () =>
+    Effect.gen(function* () {
+      const { seen, plugin } = resourceRuntime()
+      const { session } = yield* setup({
+        internal: [plugin],
+        records: [
+          ...NEUTRAL,
+          { selector: { level: "tool", canonical: ID_LIST_RESOURCES }, state: "ask" },
+          { selector: { level: "tool", canonical: ID_READ_RESOURCE }, state: "ask" },
+        ],
+        inside: async (ctx) => {
+          await ctx.tool.hook("execute.before", (event: any) => {
+            if (event.tool === "opencode_list_mcp_resources") event.input = { server: "hooked" }
+            if (event.tool === "opencode_read_mcp_resource") event.input = { server: "hooked", uri: "mem://two" }
+          })
+        },
+      })
+      const permission = yield* Permission.Service
+      for (const [tool, input, hooked] of [
+        ["opencode.list_mcp_resources", { server: "original" }, { server: "hooked" }],
+        ["opencode.read_mcp_resource", { server: "original", uri: "mem://one" }, { server: "hooked", uri: "mem://two" }],
+      ] as const) {
+        const fiber = yield* Effect.forkChild(codeModeCall(session.id, tool, input))
+        const [request] = yield* pending
+        expect(request?.metadata).toMatchObject({ args: hooked })
+        yield* permission.reply({ requestID: request!.id, reply: "once" })
+        yield* E.Fiber.join(fiber)
+      }
+      expect(seen).toEqual({ lists: ["hooked"], reads: ["hooked:mem://two"] })
+    }),
+  )
+
+  for (const answer of ["once", "always"] as const)
+    it.live(`disabled while its request waited, answered ${answer}: the call is refused by name and never runs`, () =>
+      Effect.gen(function* () {
+        const { session } = yield* setup({ records: [...NEUTRAL, { selector: { level: "tool", canonical: ID_MCP_PAID }, state: "ask" }] })
+        const store = yield* policyStore
+        const permission = yield* Permission.Service
+        const fiber = yield* Effect.forkChild(codeModeCall(session.id, "policy.paid_action"))
+        const [request] = yield* pending
+        yield* Effect.promise(() => store.setRecord(disabled(ID_MCP_PAID) as never))
+        yield* permission.reply({ requestID: request!.id, reply: answer })
+        expect(yield* E.Fiber.join(fiber)).toContain(ID_MCP_PAID)
+        expect(counts.paid).toBe(0)
+      }),
+    )
+
+  it.live("the server rebound to another address while the request waited: refused as changed during approval", () =>
+    Effect.gen(function* () {
+      const policyServer = { type: "remote", url: POLICY_URL }
+      const { session } = yield* setup({
+        mcp: { policy: policyServer },
+        records: [...NEUTRAL, { selector: { level: "tool", canonical: ID_MCP_PAID }, state: "ask" }],
+      })
+      const permission = yield* Permission.Service
+      const fiber = yield* Effect.forkChild(codeModeCall(session.id, "policy.paid_action"))
+      const [request] = yield* pending
+      policyServer.url = "https://mcp.elsewhere.test/policy"
+      yield* (yield* Mcp.Service).reload()
+      yield* permission.reply({ requestID: request!.id, reply: "once" })
+      expect(yield* E.Fiber.join(fiber)).toContain("binding-changed-during-approval")
+      expect(counts.paid).toBe(0)
+    }),
+  )
+})
+
+// v1 codepuppy-725-policy-chokepoints B9, codepuppy-tool-policy-doc-axis-gate D7, codepuppy-session-grants ④ and
+// codepuppy-tool-policy-execution-gate E2, on OpenCode 2's gate (deny decided at the head of execute.before, gate.ts decide).
+describe("grants never outrank a deny; once is not remembered; a host tool is gated at execution", () => {
+  const ASK_PAID = { selector: { level: "tool", canonical: ID_MCP_PAID }, state: "ask" }
+
+  for (const [label, initial, deny] of [
+    ["B9 the same identity tightened to disabled", ASK_PAID, disabled(ID_MCP_PAID)],
+    [
+      "D7 its class disabled",
+      { selector: { level: "class", class: "third-party-mcp" }, state: "ask" },
+      { selector: { level: "class", class: "third-party-mcp" }, state: "disabled" },
+    ],
+  ] as const)
+    it.live(`${label} after an always approval: the next call is refused and never runs`, () =>
+      Effect.gen(function* () {
+        const { session } = yield* setup({ records: [classEnabled("plugin"), initial] })
+        const permission = yield* Permission.Service
+        const fiber = yield* Effect.forkChild(codeModeCall(session.id, "policy.paid_action"))
+        const [request] = yield* pending
+        yield* permission.reply({ requestID: request!.id, reply: "always" })
+        yield* E.Fiber.join(fiber)
+        expect(counts.paid).toBe(1)
+        const store = yield* policyStore
+        yield* Effect.promise(() => store.setRecord(deny as never))
+        expect(yield* codeModeCall(session.id, "policy.paid_action")).toContain(ID_MCP_PAID)
+        expect(counts.paid).toBe(1)
+      }),
+    )
+
+  it.live("④ a once approval is not remembered: the same call asks again", () =>
+    Effect.gen(function* () {
+      const { session } = yield* setup({ records: [classEnabled("plugin"), ASK_PAID] })
+      const permission = yield* Permission.Service
+      const first = yield* Effect.forkChild(codeModeCall(session.id, "policy.paid_action"))
+      const [request] = yield* pending
+      yield* permission.reply({ requestID: request!.id, reply: "once" })
+      yield* E.Fiber.join(first)
+      expect(counts.paid).toBe(1)
+      const second = yield* Effect.forkChild(codeModeCall(session.id, "policy.paid_action"))
+      const [again] = yield* pending
+      expect(again?.action).toBe(ID_MCP_PAID)
+      expect(counts.paid).toBe(1)
+      yield* permission.reply({ requestID: again!.id, reply: "reject" })
+      yield* E.Fiber.join(second)
+      expect(counts.paid).toBe(1)
+    }),
+  )
+
+  it.live("E2 a host tool (OpenCode 2's list_mcp_resources) disabled is refused at execution; the runtime is never asked", () =>
+    Effect.gen(function* () {
+      const { seen, plugin } = resourceRuntime()
+      const { session } = yield* setup({ internal: [plugin], records: [...NEUTRAL, disabled(ID_LIST_RESOURCES)] })
+      expect(yield* codeModeCall(session.id, "opencode.list_mcp_resources", { server: "any" })).toContain(ID_LIST_RESOURCES)
+      expect(seen.lists).toEqual([])
+    }),
+  )
+
+  it.live("E2 reverse arm: without Code Puppy's policy the same call reaches the runtime", () =>
+    Effect.gen(function* () {
+      const { seen, plugin } = resourceRuntime()
+      const { session } = yield* setup({ policy: false, internal: [plugin], records: [...NEUTRAL, disabled(ID_LIST_RESOURCES)] })
+      yield* codeModeCall(session.id, "opencode.list_mcp_resources", { server: "any" })
+      expect(seen.lists).toEqual(["any"])
     }),
   )
 })

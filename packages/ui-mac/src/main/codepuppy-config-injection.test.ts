@@ -53,6 +53,7 @@ import {
   CODEPUPPY_REVIEW_DESCRIPTION,
   CODEPUPPY_REVIEW_TEMPLATE,
 } from "../../../ext/src/codepuppy-prompts"
+import { PROVIDER_ALLOW_ENV } from "../../../ext/src/provider-allow"
 const CLOUD_DISPATCH_TOOL_ID = cloudMcpToolId("cloud_dispatch")
 
 // 注入读到的每一个 env 输入 + 它自己写出的 env 输出:逐个快照/清空/还原,
@@ -78,6 +79,7 @@ const MANAGED = [
   "XDG_DATA_HOME",
   "CODEPUPPY_CLOUD_MCP_ARM",
   "CODEPUPPY_CLOUD_MCP_DEF",
+  PROVIDER_ALLOW_ENV,
   "CODEPUPPY_CLOUD_MCP_SERVER",
   "CODEPUPPY_BASE_URL",
   "CODEPUPPY_DEFAULT_MODEL",
@@ -262,6 +264,17 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     expect(explicit?.policies?.[0]).toEqual({ action: "provider.use", resource: "*", effect: "deny" })
     process.env.CODEPUPPY_MODELS_DISABLE = "1"
     expect(inject(EXT_DIR).explicit?.policies).toBeUndefined()
+  })
+
+  test("`#1662` 供应商白名单交给 ext:写进本进程 CODEPUPPY_PROVIDER_ALLOW 的集合逐条等于策略里放行的那些(同一次计算);注入关着 ⇒ 撤掉", () => {
+    givenLoggedInWithByok()
+    const { config } = inject(EXT_DIR)
+    const allowed = (config.policies ?? []).filter((policy) => policy.effect === "allow").map((policy) => policy.resource)
+    expect(allowed.length).toBeGreaterThan(1)
+    expect(JSON.parse(process.env[PROVIDER_ALLOW_ENV]!)).toEqual(allowed)
+    process.env.CODEPUPPY_MODELS_DISABLE = "1"
+    inject(EXT_DIR)
+    expect(process.env[PROVIDER_ALLOW_ENV]).toBeUndefined()
   })
 
   test("显式文件里用户的 codepuppy.jsonc 原样在下:用户自己的 /init 不被出厂的覆盖;用户文件坏了 ⇒ 只放 Code Puppy 这一层", () => {

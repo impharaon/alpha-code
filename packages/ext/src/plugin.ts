@@ -40,6 +40,7 @@ import { applyAgents, applyProjectMcp, commandDefinitions } from "./engine-trans
 import { modelFacts } from "./model-facts"
 import { createCloudVisionHooks } from "./cloud-vision-hooks"
 import { createAttachmentReaderHooks } from "./attachment-reader-hooks"
+import { providerAllowTail, refuseOutsideProviderAllowList } from "./provider-allow"
 import { inProcessEngine } from "../../ui-mac/src/main/in-process-engine"
 
 // ── `#1665` I2:进程级对象(定制中心桥 + 重载调度器)──────────────────────────────────────────────
@@ -237,6 +238,8 @@ export const CodePuppyExt: Plugin.Plugin = {
         const authorization = platformRequestCredentialHeader({ requestURL: event.request.url, env: process.env })
         if (authorization) event.request.headers.set("authorization", authorization)
       })
+      // `#1662`:供应商白名单 · 请求这一道 —— 注入的放行集合之外的供应商,请求在发出之前拒掉(provider-allow.ts)。
+      await context.session.hook("model.request", (event) => refuseOutsideProviderAllowList(event, process.env))
 
       // ── 配置域(C10 / L3r / M3)────────────────────────────────────────────────────────────
       // 项目 `.codepuppy/codepuppy.jsonc` + 出厂禁项 + 提示词接管,算成一份 v1 形状的小对象(既有纯函数),再按域翻译。
@@ -392,6 +395,24 @@ export const CodePuppyExt: Plugin.Plugin = {
       } catch (cause) {
         error(`[@codepuppy/ext] project plugin fan-out failed: ${describe(cause)}`)
       }
+
+      // `#1662`:供应商白名单 · 清单这一道 —— 配置文件里的供应商由排在外部插件之后激活的 opencode.config.provider 加进来,
+      // 所以变换等这一批激活结束才登记,之后每次插件重新激活都重新放到最后(provider-allow.ts)。
+      const providerTail = new AbortController()
+      cleanups.push(() => providerTail.abort())
+      const tail = providerAllowTail({
+        transform: (callback) => context.provider.transform(callback),
+        activePlugins: async () => (((await context.plugin.list()) as { data?: Array<{ id?: string }> }).data ?? []).map((plugin) => String(plugin.id)),
+        env: process.env,
+        log,
+        signal: providerTail.signal,
+      })
+      void tail.settle().catch((cause) => error(`[@codepuppy/ext] provider allow list not placed: ${describe(cause)}`))
+      void (async () => {
+        for await (const _ of context.event.subscribe({ types: ["plugin.updated"], signal: providerTail.signal })) await tail.place()
+      })().catch((cause) => {
+        if (!providerTail.signal.aborted) error(`[@codepuppy/ext] plugin event subscription ended: ${describe(cause)}`)
+      })
     } catch (cause) {
       await cleanup()
       throw cause

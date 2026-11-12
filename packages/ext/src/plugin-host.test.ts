@@ -786,18 +786,30 @@ itWithPermission.live("项目 agent 的 tools · 反向臂(#1693 AC-03):同一�
   }),
 )
 
-it.live("项目 agent 的 tools · 写坏的 tools(#1693 R1/1):已同意的项目里 explore 写了 tools: {edit: true, read: \"false\"} ⇒ 整条不装(上游同样丢掉这条 v1 agent),explore 内置的规则对 edit 仍是 deny", () =>
+/** 已同意的项目写下这份项目文档、装上 ext 之后,上游内置 explore 的规则对 `edit` 的求值(上游自己的 explore 是 deny)。 */
+const exploreEditEffect = (document: string) =>
   Effect.gen(function* () {
     env({})
     const directory = realpathSync((yield* Location.Service).directory)
     const root = join(directory, ".codepuppy")
     mkdirSync(root, { recursive: true })
-    writeFileSync(join(root, "codepuppy.jsonc"), '{"agent":{"explore":{"tools":{"edit":true,"read":"false"}}}}')
+    writeFileSync(join(root, "codepuppy.jsonc"), document)
     writeFileSync(join(root, "prefs.json"), JSON.stringify({ extensionsConsent: { version: 1, granted: true } }))
     yield* activate(CodePuppyExt)
     const rules = (yield* (yield* Agent.Service).get(Agent.ID.make("explore")))?.permissions ?? []
     expect(rules.length).toBeGreaterThan(0)
-    expect(Permission.evaluate("edit", "a.txt", rules).effect).toBe("deny")
+    return Permission.evaluate("edit", "a.txt", rules).effect
+  })
+
+it.live("项目 agent 的 tools · 写坏的 tools(#1693 R1/1):已同意的项目里 explore 写了 tools: {edit: true, read: \"false\"} ⇒ 整条不装(上游同样丢掉这条 v1 agent),explore 内置的规则对 edit 仍是 deny", () =>
+  Effect.gen(function* () {
+    expect(yield* exploreEditEffect('{"agent":{"explore":{"tools":{"edit":true,"read":"false"}}}}')).toBe("deny")
+  }),
+)
+
+it.live("项目 agent 的权限 · 写坏的 permission(#1693):已同意的项目里 explore 写了 permission: {edit: \"allow\", bash: \"bogus\"} ⇒ 整条不装(上游同样丢掉这条 v1 agent),explore 内置的规则对 edit 仍是 deny", () =>
+  Effect.gen(function* () {
+    expect(yield* exploreEditEffect('{"agent":{"explore":{"permission":{"edit":"allow","bash":"bogus"}}}}')).toBe("deny")
   }),
 )
 

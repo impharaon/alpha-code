@@ -112,15 +112,33 @@ describe("项目 agent 的 tools(#1693)= 引擎读同一条 v1 agent 的规则",
     expect(ours.get("toolsOnly")?.permissions).toEqual(engine.toolsOnly.permissions)
     expect(ours.get("mixed")?.permissions).toEqual(engine.mixed.permissions)
 
-    // 写坏的 tools(值不全是布尔,Codex R1/1 的样本):上游整条丢掉这个 v1 agent(诊断 invalid,同一文档里别的 agent 照常);ext 同样整条不装
-    const withMalformed = { explore: { tools: { edit: true, read: "false" } }, ok: { tools: { edit: false } } }
-    const result = ConfigNormalize.normalize({ agent: withMalformed })
-    expect(result.diagnostics).toEqual([{ kind: "invalid", path: ["agent", "explore"], message: expect.any(String) }])
+    // 写坏的 tools(值不全是布尔,Codex R1/1 的样本)与写坏的 permission(上游 v1 permission schema 不收的各种形状):上游整条丢掉那个 v1 agent
+    // (每条一个 invalid 诊断,同一文档里别的 agent 照常);ext 同样整条不装。上游收的边界形状(空对象、空模式表、只收动作值的三个键、单个动作值)照常装。
+    const malformed = {
+      explore: { tools: { edit: true, read: "false" } },
+      badValue: { permission: { edit: "allow", bash: "bogus" } },
+      notAnAction: { permission: "bogus" },
+      array: { permission: ["allow"] },
+      nul: { permission: null },
+      arrayValue: { permission: { bash: ["allow"] } },
+      nullValue: { permission: { bash: null } },
+      badPattern: { permission: { bash: { "git *": "bogus" } } },
+      actionOnlyPatterns: { permission: { question: { "*": "allow" } } },
+    }
+    const accepted = {
+      ok: { tools: { edit: false } },
+      single: { permission: "allow" },
+      empty: { permission: {} },
+      emptyPatterns: { permission: { bash: {} } },
+      actionOnly: { permission: { question: "allow", websearch: "deny", doom_loop: "ask" } },
+    }
+    const result = ConfigNormalize.normalize({ agent: { ...malformed, ...accepted } })
+    expect(result.diagnostics).toEqual(Object.keys(malformed).map((name) => ({ kind: "invalid", path: ["agent", name], message: expect.any(String) })))
     if (result.type !== "normalized") throw new Error("the engine rejected the whole document")
     const engineAgents = result.encoded.agents as Record<string, any>
-    const oursWithMalformed = agentsAfter(withMalformed)
+    const oursWithMalformed = agentsAfter({ ...malformed, ...accepted })
     expect([...oursWithMalformed.keys()]).toEqual(Object.keys(engineAgents))
-    expect(oursWithMalformed.get("ok")?.permissions).toEqual(engineAgents.ok.permissions)
+    for (const name of Object.keys(accepted)) expect([name, oursWithMalformed.get(name)?.permissions]).toEqual([name, engineAgents[name].permissions ?? []])
   })
   test("AC-02 · tools: {bash: false} 与允许 bash 的 permission 同写 ⇒ 以 permission 为准,命令可执行(上游的权限求值);只写 tools ⇒ 被拒", () => {
     const entries = { both: { tools: { bash: false }, permission: { bash: "allow" } }, toolsOnly: { tools: { bash: false } } }

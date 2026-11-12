@@ -64,7 +64,7 @@ export const WRITABLE_ROOT_IDS = {
 } as const
 export type WritableRootId = keyof typeof WRITABLE_ROOT_IDS
 
-/** 引擎自己解析出的四个根 —— 与 packages/core/src/global.ts 经 xdg-basedir 的取法逐字同形。 */
+/** 引擎自己解析出的四个根 —— 与 OpenCode 2 packages/util/src/global-roots.ts(`#global-roots`)的取法逐字同形。 */
 export type EngineRoots = {
   home: string
   dataHome: string
@@ -73,9 +73,10 @@ export type EngineRoots = {
 }
 
 /**
- * xdg-basedir@5.1.0 的取法(packages/core/src/global.ts:3 就是从它 import 的):
- * `env.XDG_*_HOME || join(homedir, …)`。这里镜像它而不是 import 它,因为 main 进程不带 core 的
- * effect 图;等价性由 process-fence-profile.test.ts 对着 node_modules 里**那份** xdg-basedir 逐输入交叉验证。
+ * 引擎的取法(OpenCode 2:@opencode/util/global 从 `#global-roots` 取根,即 packages/util/src/global-roots.ts;
+ * v1 时是 packages/core/src/global.ts 经 xdg-basedir,同一规则):`env.XDG_*_HOME || join(homedir, …)`。
+ * 这里镜像它而不是 import 它,因为 main 进程不带引擎的模块图;等价性由 process-fence-profile.test.ts
+ * 对着引擎**那份** `#global-roots` 逐输入交叉验证。
  * `env` 必须是 **sidecar 将拿到的 env**(createSidecarEnv 的输出),不是 main 自己的 process.env ——
  * 白名单放行 XDG_ 前缀,所以两者对这几个键相同,但判据要键在被消费的那一份上。
  */

@@ -58,6 +58,7 @@ let seq = 0
 const current = () => untrack(items)
 
 let quiet = false
+let quietEnd: Promise<void> = Promise.resolve()
 
 type Timer = { remaining: number; startedAt: number; handle: ReturnType<typeof setTimeout> | undefined }
 const timers = new Map<number, Timer>()
@@ -154,13 +155,21 @@ export function resolveProblem(key: string): void {
 /** 启动静默窗口开始(index.tsx 启动时调用一次)。窗口结束时仍未恢复的暂存问题各弹一条。 */
 export function beginStartupQuiet(): void {
   quiet = true
-  setTimeout(() => {
-    quiet = false
-    for (const [key, held] of heldProblems()) {
-      setBackgroundProblem(key, { ...held, phase: "shown" })
-      showBackground(key, held.kind, held.text)
-    }
-  }, STARTUP_QUIET_MS)
+  quietEnd = new Promise((resolve) =>
+    setTimeout(() => {
+      quiet = false
+      for (const [key, held] of heldProblems()) {
+        setBackgroundProblem(key, { ...held, phase: "shown" })
+        showBackground(key, held.kind, held.text)
+      }
+      resolve()
+    }, STARTUP_QUIET_MS),
+  )
+}
+
+/** 静默窗口结束(没开过窗口则立即)。来源据此把启动期的读取推迟到窗口之后(工具服务连接,`#1687` v2)。 */
+export function startupQuietEnded(): Promise<void> {
+  return quietEnd
 }
 
 /** 暂停自动消失(悬停 / 焦点进入)。常驻通知没有定时器,调用是空操作。 */

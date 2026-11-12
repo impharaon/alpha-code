@@ -32,6 +32,7 @@ import "./sidebar/account-popover.css"
 import "./codepuppy-ui/composer-reskin.css"
 import { ToastViewport, beginStartupQuiet } from "./codepuppy-ui/Toast"
 import { CatalogProblemWatcher } from "./codepuppy-ui/catalog-problem-watcher"
+import { BackgroundProblemWatcher } from "./codepuppy-ui/background-problem-watcher"
 import { ToastRouteFollower } from "./codepuppy-ui/toast-route-follower"
 import { installHomeDraftDiscardNotice } from "./codepuppy-ui/home-draft-discard-notice"
 import { ContractFailureBanner } from "./codepuppy-ui/Banner"
@@ -593,6 +594,10 @@ render(() => {
               {/* `#1687` R6:平台模型目录刷新失败也进「未恢复问题」(设计稿 `#problems`)。 */}
               <CodePuppyBoundary name="CatalogProblemWatcher">
                 <CatalogProblemWatcher />
+              </CodePuppyBoundary>
+              {/* `#1687` v2:连不上的工具服务只进「未恢复问题」入口(不弹提示);首读在启动静默窗口之后。 */}
+              <CodePuppyBoundary name="BackgroundProblemWatcher">
+                <BackgroundProblemWatcher server={sidebarServer} />
               </CodePuppyBoundary>
               <CodePuppyBoundary name="ContractFailureBanner">
                 <ContractFailureBanner />

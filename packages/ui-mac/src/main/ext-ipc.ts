@@ -1,4 +1,5 @@
 import { isCodePuppyOfficeCatalogId } from "../shared/office-advisories"
+import { isCloudMcpWithheld } from "./codepuppy-config-injection"
 import { isOfficialConnector } from "./official-connector-recipes"
 import { removeOfficialConnector, releaseOfficialConnectorResources } from "./official-connector-resources"
 // Extension Hub IPC handlers (main process). Mirrors ipc.ts's ipcMain.handle pattern. Three thin
@@ -183,6 +184,8 @@ export function registerExtIpcHandlers(
   }
   // B11/B23:全局配置健康探测(语法错/未知顶键 → 引擎会整份清零)
   ipcMain.handle("ext-config-health", () => configHealth())
+  // `#1687`:云服务是否被 kill-switch 扣下 —— 只读最近一次注入写配置时的判决,不另算。
+  ipcMain.handle("ext-cloud-withheld", () => isCloudMcpWithheld())
   ipcMain.handle("ext-check-runtime", (_event: IpcMainInvokeEvent, tool: string) => checkRuntime(tool))
   // #1564 AC3:四个第一方 Office 条目的准备检查读这条随包运行时事实,不读卡片 runtimeDep(uv)。
   ipcMain.handle("ext-office-runtime", () => officeRuntimeReadiness())

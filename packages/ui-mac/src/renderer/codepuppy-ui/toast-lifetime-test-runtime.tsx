@@ -45,3 +45,7 @@ export function RoutedToastHarness() {
 export { render } from "solid-js/web"
 export { setLocale } from "../i18n"
 export { CatalogProblemWatcher } from "./catalog-problem-watcher"
+export { BackgroundProblemWatcher } from "./background-problem-watcher"
+import { extHubOpen, hubSection } from "../extensions/ext-hub-state"
+export const hubState = () => ({ open: extHubOpen(), section: hubSection() })
+export { setHubSection } from "../extensions/ext-hub-state"

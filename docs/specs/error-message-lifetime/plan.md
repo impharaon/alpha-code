@@ -136,3 +136,49 @@ last_reviewed: 2026-11-12
 - 2026-11-12 · 设计文档带入范围:除 `frames/error-lifetime.css`、`components.md` 外,一并带入 `frames/*.html`、`frames/error-lifetime.js`、`design.html` 的两节锚与增量稿目录 —— `components.md` 的相对链接与「锚」列指向它们,只带两个文件会断链。
 - 2026-11-12 · 英文入口文案用「Unresolved problems: N」避免单复数;中文照帧。
 - 2026-11-12 · 帧对照用无头 Chrome 渲染:帧页(spec 分支原样)与实现页(同一帧外框,入口与弹层换成真组件在测试运行时里产出的 DOM,样式来自本分支 `sidebar.css`,帧 CSS 已不含这些规则)并排,明暗各一,目视一致;截图在临时目录,不入仓。
+
+## 段三:工具服务连接来源(spec v2,只进入口)
+
+- 依据:`SPEC-error-message-lifetime` v2 —— owner 2026-11-12 裁决 R4:「工具服务提示选 A，核心包测试配置同意接管」(选 A = 连不上的工具服务不弹提示,只进「未恢复问题」入口,重连后自动移除)。v2 改写的 AC-01、AC-05、AC-06 以编排器转来的措辞为准(规格文本由编排器更新,本段不复述);其余 AC 与段一、段二相同。
+- 核对:编排器 R4 放行(段一 `867aab286b`、段二 `d2201d2a37` 已验收并合入 `engine/1662-opencode2`;无操作的需要用户处理项随换页离开的读法已接受)· 只进入口的接法、首读在静默窗口之后、`needs_auth` 为要用户动手的项。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `codepuppy-ui/background-problem-watcher.tsx`(新) | 无界面子组件:静默窗口结束后才建 SDK 客户端、读一次 `mcp.status`,之后在引擎事件 `mcp*` / `server.instance.disposed` 与运行时恢复 `ready` 时重读。失败(非已连接、非停用、非启动中、非需登录)→ `putProblem({ attention: false })`,原因「「名字」未能连接」,操作「查看」打开定制中心连接器页;`needs_auth` → 要用户动手的项,操作「去授权」直接调引擎授权后重读;下一次读不到或已恢复 → `resolveProblem`。名字取随包目录的显示名,找不到用服务名。事件用自己的一条全局订阅(见风险)。 |
+| `codepuppy-ui/Toast.tsx` | 加 `startupQuietEnded()`(窗口结束的 promise;没开窗口则立即),供来源推迟启动期读取。 |
+| `extensions/use-extensions.ts` | 把 `isConnected` / `isDisabled` / `needsAuth` / `isPending` 由私有改为导出,观察件复用同一套状态判别,不复制。 |
+| `index.tsx` | 挂 `BackgroundProblemWatcher`(与目录来源同层)。 |
+| `i18n/zh.ts`、`i18n/en.ts` | `codepuppy.problems.connectorFailed`「「{{name}}」未能连接」、`codepuppy.problems.connectorNeedsAuth`「「{{name}}」需要重新登录」;操作文字复用 `codepuppy.problems.view`、`codepuppy.ext.mcpAuthorize`。 |
+| `codepuppy-ui/background-problem-watcher.test.ts`(新)、`toast-lifetime-test-runtime.tsx` | 真挂观察件 + 提示视口 + 入口;状态来源是替身 fetch(`GET /mcp` 状态表、`GET /global/event` 可推送的 SSE),走观察件真实用的 SDK 客户端与订阅。 |
+
+### 顺序
+
+1. 一个提交:观察件 + 窗口结束 promise + 导出判别函数 + 挂载 + 文案 + 用例;跑 `background-problem-watcher.test.ts`、`problems-entry.test.ts`、`toast-lifetime.test.ts`、`locale-regression.test.ts`、`tsgo -b`,以及 `use-extensions` 的现有用例。
+
+### 风险
+
+- 订阅不共享:定制中心那条事件订阅活在 `useExtensions` 里、直到定制中心第一次打开才建立(`use-extensions.ts` 的 A2 lazy),没有应用级订阅可共享;观察件在窗口结束后自建第二条全局订阅(与 `cloud-run-watcher.tsx` 同法)。启动期零新增请求由用例钉住。
+- 断开的发现:2.x 引擎在每次连接状态落定(已连接 / 失败 / 需登录 / 断开)时发 `mcp.status.changed`(`packages/schema/src/mcp-event.ts:22-27`),观察件按 `mcp*` 前缀重读,断开与重连都能及时反映。(本段初稿写「断开可能不发事件」,读源码后更正。)
+- 「查看」打开的是定制中心连接器页(已安装一组在页顶),不是定位到那一行:定制中心今天没有按行定位的入口,加它是定制中心的新能力,不在本段。
+- `needs_auth` 条目做了操作即离开(R2);授权没成功时,下一次读状态会把它放回来。
+
+### 证明
+
+| AC | 测试/证据 | 缺少行为为什么会失败 |
+| --- | --- | --- |
+| AC-01 (v2) | `background-problem-watcher.test.ts`「a disconnected connector is listed without a toast; on reconnect it leaves the entry within 1 s」:已连接 → 事件后读到 failed → 入口计 1、原因与「查看」、推进 30 秒仍无提示;再报 connected + 事件 → 1 秒内入口消失 | 改用先提示接法(`reportProblem`)→ 出现提示,红;不 resolve → 入口残留,红;不跟事件 → 读不到重连,红 |
+| AC-01 (v2) 操作 | 同文件「查看 opens the Customization Center on its connectors page」:先把分区置为技能,点「查看」→ 定制中心打开且在连接器页,条目仍在 | 不切分区 → 红 |
+| AC-05 (v2) | 同文件:窗口内两个服务 failed、第 9 秒起 connected;0–9 秒逐秒断言零 `GET /mcp`、无提示、无入口;9–30 秒仍无提示、无入口;窗口后确有读取 | 窗口内就读状态 → 零请求断言红 |
+| AC-06 (v2) | 同文件:一直 failed;第 9999 毫秒零请求、无入口;第 10000 毫秒首读,入口计 1、原因与操作;全程无提示 | 窗口内读 → 红;改用先提示接法 → 红 |
+| 有意关闭不算问题 | 同文件「a service that is off on purpose is not a problem」:用户关掉的连接器与 kill-switch 下的云服务都报 `disabled` → 入口只列真正失败的那一个;把它也关掉后入口为空,全程无提示 | 去掉 `isDisabled` 跳过 → 计 3 而不是 1,红 |
+| needs_auth | 同文件:条目文字「需要重新登录」,点「去授权」→ 引擎收到授权请求,条目离开 | 当成后台失败 → 文字与操作不符,红 |
+| 生产挂载 | 同文件末条:`index.tsx` 在 `AppInterface` 内挂 `BackgroundProblemWatcher` | 删挂载行 → 红 |
+
+### 偏离记录
+
+- 2026-11-12 · 编排器更正:有意关闭的服务不进入口。用户关掉的连接器与 kill-switch 下的云服务在 2.x 都报 `{ status: "disabled" }`(配置 `disabled: true` → `packages/core/src/mcp/index.ts:602-605` 与 `:732-736`;用户关闭走 disconnect → `:844`;中和条目 `WITHHELD_CLOUD_MCP` 带 `disabled: true`,`packages/ui-mac/src/main/cloud-web-search.ts:75-80`,服务名 `codepuppy`),观察件已按 `isDisabled` 跳过,补用例钉住。
+- 2026-11-12 · **停在一项上(未猜)**:kill-switch 下定制中心一打开,`use-extensions.ts:680-683` 的补连(`#1106`)会对 `disabled` 的云服务调 `/mcp/codepuppy/connect`;2.x 的 `connect` 不看 `disabled`,直接重启连接(`packages/core/src/mcp/index.ts:828-836`),连 `127.0.0.1:1` 失败后状态变成 `{ status: "failed", error: "[codepuppy:<码>] <传输层原文>" }`(`:497-501` / `:515-520`,前缀格式 `packages/schema/src/codepuppy-net-failure.ts:211-213`)—— 状态里**没有**区分「被开关关掉」与「真失败」的字段;renderer 也拿不到 kill-switch 状态(preload / shared / renderer 无此通道)。此时观察件会把它列成「未能连接」。需要编排器裁决接法(见交回)。
+- 2026-11-12 · 编排器裁决接法 A,上一条停住的一项闭合:判决的唯一落点在 `packages/ui-mac/src/main/codepuppy-config-injection.ts` 写 `config.mcp` 的那一处(`cloud-web-search.ts` 只定义中和条目常量,不做判决)。那里改为先把判决记进 `cloudMcpWithheld`,再用同一个值选中和条目;每轮注入开头复位为 false(无云 URL 的分支不写云服务)。`isCloudMcpWithheld()` 只读它,经 `ext-ipc.ts` 的 `ext-cloud-withheld` 与 preload `ext.cloudWithheld()` 交给 renderer(照 `ext.configHealth` 的接法)。判决只在 sidecar fork 注入时变,引擎跑的就是那一轮的配置;观察件每次读状态都同时读这个值,运行时恢复 `ready` 已会触发重读,所以不另加推送。观察件在值为 true 时跳过云服务 `codepuppy`,不解释错误原文;定制中心的补连不动。云服务名在 renderer 按既有惯例用字面量(同 `cloud-facade-identity.ts`)。用例:renderer 两条(扣下 + 补连后 failed → 入口为空;放开后真失败 → 列出;去掉跳过即红),main 一条(五个分支上暴露值 = 是否写了中和条目,并自证真假两值都出现)。
+

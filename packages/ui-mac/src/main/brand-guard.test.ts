@@ -214,7 +214,11 @@ describe("AC3 提示词与技能文案 — 模型上下文里的品牌串", () =
   test("prompt-rebrand to 侧(REBRAND_TO + 自指首句)", () => {
     const src = read("packages/ext/src/prompt-rebrand.ts")
     expect(src).toContain('export const REBRAND_TO = "Code Puppy"')
-    expect(src.split('to: "You are Code Puppy,').length - 1).toBe(6)
-    expect(src).toContain('to: "Your name is Code Puppy",')
+    // `#1665` 起按 OpenCode 2 的自指底座(c9a49f5f52):三份「You are Code Puppy, …」(trinity / kimi / meta)、
+    // 三份「…running in Code Puppy, a coding agent harness.」(gpt / gpt-astra / 默认 system.txt)、meta 的工具段标题。
+    // v1 的 anthropic / beast / gemini / copilot 自指句与「Your name is」句在 2.x 底座里已不存在,规则随之删除。
+    expect(src.split('to: "You are Code Puppy,').length - 1).toBe(3)
+    expect(src.split('to: "You are an AI agent running in Code Puppy, a coding agent harness.",').length - 1).toBe(3)
+    expect(src).toContain('to: "# Tool Use - Code Puppy Specifics",')
   })
 })

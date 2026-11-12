@@ -157,7 +157,7 @@ test("真 host + 真协调器:阶段查询经子进程往返;退出 ⇒ pendingF
 // 拿这份 env 认得出 main 写策略写下的四条命令(两边对资源根的解析一致、清单与模板逐 token 对上)。
 // 删掉注入 ⇒ env 里没有这个键;注入的路径与写策略的资源根解析不一致 ⇒ 四条都拿不到声明定义。
 test("#1565: fork 注入 CODEPUPPY_OFFICE_MCP_MANIFEST,引擎据它认出写策略写下的四条文档工具命令", async () => {
-  const { OFFICE_MCP_MANIFEST_ENV, declaredFirstPartyTools } = await import("../../../opencode/src/mcp/codepuppy-first-party-mcp")
+  const { OFFICE_MCP_MANIFEST_ENV, declaredFirstPartyTools } = await import("../../../core/src/mcp/codepuppy-first-party-mcp")
   const { applyMcpWritePolicy } = await import("./ext-mcp-policy")
   const { CODEPUPPY_OFFICE_CONNECTORS } = await import("../shared/office-advisories")
   const child = new RecordingChild()
@@ -270,11 +270,11 @@ test("#1575: fork 按登录账户 × 本安装写 CODEPUPPY_POLICY_ACCOUNT(同�
 })
 
 // #1578 AC5:main 写进 sidecar env 的随包扩展清单键必须就是引擎读的那个常量 —— 任一侧改名,线上 ext 自有工具全部静默回第三方,
-// 而 opencode/test/plugin/codepuppy-bundled-plugin.test.ts 自己给 env 赋值照样绿。dev 下 ext.path 取决于未入库的 packages/ext/dist
+// 而 packages/ext/src/policy/bundled-plugin.test.ts(`#1662` 起读这个键的是 ext)自己给 env 赋值照样绿。dev 下 ext.path 取决于未入库的 packages/ext/dist
 // (门不保证它在,上面那条生产 spawn 里这个键可能根本不写),所以锚源码:server.ts 写这个键的那一句,键名取引擎常量,
 // 指向 plugin.js 旁边的 bundled-tools.json。任一侧字面量改一个字母 ⇒ 找不到这一句,当场红。
 test("ANCHOR (not a gate): #1578 server.ts 写进 sidecar env 的随包扩展清单键 = 引擎读的常量", async () => {
-  const { EXT_BUNDLED_MANIFEST_ENV } = await import("../../../opencode/src/plugin/codepuppy-bundled-plugin")
+  const { EXT_BUNDLED_MANIFEST_ENV } = await import("../../../ext/src/policy/bundled-plugin")
   const source = await Bun.file(join(import.meta.dir, "server.ts")).text()
   const line = source.split("\n").find((text) => text.includes(`sidecarEnv.${EXT_BUNDLED_MANIFEST_ENV} =`))
   expect(line).toBeDefined()

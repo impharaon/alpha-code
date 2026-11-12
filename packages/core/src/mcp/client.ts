@@ -269,7 +269,7 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
         Schedule.while(({ input, now, duration }) =>
           !isTransient(input) || now + Duration.toMillis(duration) >= deadline
             ? Effect.succeed(false)
-            : Effect.logWarning(`retrying ${what}`, { server, error: describe(input) }).pipe(Effect.as(true)),
+            : Effect.logWarning(`retrying ${what}`, { server, error: safeDescription(input) }).pipe(Effect.as(true)), // codepuppy(#1645)
         ),
       ),
     )
@@ -412,7 +412,7 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
               orElse: () => Effect.fail(new Error(`Timed out after ${TERMINATE_TIMEOUT}ms`)),
             }),
             Effect.tapError((error) =>
-              Effect.logWarning("failed to terminate MCP session", { server, error: error.message }),
+              Effect.logWarning("failed to terminate MCP session", { server, error: safeDescription(error) }), // codepuppy(#1645)
             ),
             Effect.ignore,
           )
@@ -566,7 +566,7 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
             () => connection.tools().pipe(Effect.andThen(call)),
           ),
           Effect.mapError(failure),
-          Effect.tapError((error) => Effect.logWarning("failed to call MCP tool", { server, error: error.message })),
+          Effect.tapError((error) => Effect.logWarning("failed to call MCP tool", { server, error: safeDescription(error) })), // codepuppy(#1645)
           Effect.map(toCallToolResult),
         )
       },

@@ -552,6 +552,20 @@ describe("#1645: a failure's remote text stays out of logs and the failed status
     }).pipe(Effect.ensuring(Effect.sync(refusing.stop))),
   )
 
+  // Review R1 #4: a 503 is transient, so the client retries the connect first; the retry log lines are failure logs too.
+  const overloaded = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => new Response(`overloaded ${SECRET}`, { status: 503 }) })
+  const retryLogs: string[] = []
+  testEffect(
+    mcpLayer({ busy: new ConfigMCP.Remote({ type: "remote", url: `http://127.0.0.1:${overloaded.port}/mcp`, oauth: false }) }).pipe(Layer.provide(capture(retryLogs))),
+  ).live("a 503 the client retries: the body is in no retry log line and not in the status", () =>
+    Effect.gen(function* () {
+      const status: any = yield* until(statusOf("busy").pipe(Effect.map((s: any) => (s?.status === "failed" ? s : undefined))), "busy failed")
+      expect(retryLogs.filter((line) => line.includes("retrying")).length).toBeGreaterThan(0)
+      expect(retryLogs.filter((line) => line.includes(SECRET))).toEqual([])
+      expect(status.error).not.toContain(SECRET)
+    }).pipe(Effect.ensuring(Effect.sync(() => overloaded.stop(true)))),
+  )
+
   const localLogs: string[] = []
   testEffect(mcpLayer({ crash: local({ CODEPUPPY_MCP_EXIT_STDERR: `boom ${SECRET}` }) }).pipe(Layer.provide(capture(localLogs)))).live(
     "a local server that writes a secret to stderr and exits: it is in no log line and not in the status",

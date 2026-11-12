@@ -1268,6 +1268,10 @@
         {
           "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
           "name": "a local server that writes a secret to stderr and exits: it is in no log line and not in the status"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "a 503 the client retries: the body is in no retry log line and not in the status"
         }
       ]
     },

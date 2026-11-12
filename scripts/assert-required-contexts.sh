@@ -46,7 +46,7 @@ SNAPSHOT_FILE="$ROOT/.github/required-contexts.txt"
 
 # 这两行必须与 .github/required-contexts.txt 抬头写着的那条命令逐字一致 —— 人手对一次真源时
 # 照抄的就是那条,上面那个测试会把两者比对(不一致即红:文档说的和门跑的不是一回事)。
-API_PATH="repos/jinjunnn/alpha-code/branches/alpha"
+API_PATH="repos/impharaon/alpha-code/branches/alpha"
 API_JQ='"enabled=\(.protection.enabled)", (.protection.required_status_checks.contexts[]? | "context=\(.)")'
 
 [ -f "$SNAPSHOT_FILE" ] || {

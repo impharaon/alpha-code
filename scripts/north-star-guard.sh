@@ -210,7 +210,8 @@ CODEPUPPY_OWNED_MARKER="north-star:codepuppy-owned"
 # 本脚本复制一份、只删掉三条 exclude,断言度量步打印的条数**跟着变**(杀掉「印一个写死的数」)。
 # ── 受审上游合并的判定(`#1664`,说明见下文「含受审上游合并的分支」一段):写成函数,守卫与只读模式
 # `--print-upstream-parent` 共用这一份。只读模式不 fetch,用本地已有的 origin/alpha(陈旧只会把窗口撑宽,
-# 合并照样认得出);origin/alpha 取不到时什么都不印,调用方按「没有上游父」处理(全量扫,过报不漏报)。
+# 合并照样认得出)。守卫只看 origin/alpha..HEAD(本分支自己带进来的合并);只读模式在那里找不到时再看
+# HEAD 的整段历史,理由见只读模式那一段。
 tree_has_codepuppy_package() { # $1 = commit
   local pkg
   for pkg in $CODEPUPPY_OWNED_PACKAGES; do
@@ -218,19 +219,24 @@ tree_has_codepuppy_package() { # $1 = commit
   done
   return 1
 }
-detect_upstream_merge() {
+# 在 `git rev-list` 给出的候选合并里(离 HEAD 最近的先列)找第一个上游合并。$@ = rev-list 的范围参数;
+# git 列不出候选 ⇒ 返回 1(守卫本体不看返回值,行为同改前)。
+detect_upstream_merge_in() {
 upstream_merge=""
 upstream_parent=""
-for merge in $(git rev-list --topo-order --merges origin/alpha..HEAD); do
+local merges
+merges="$(git rev-list --topo-order --merges "$@")" || return 1
+for merge in $merges; do
   for parent in $(git rev-list --no-walk --parents "$merge" | cut -d' ' -f3-); do
     if ! tree_has_codepuppy_package "$parent"; then
       upstream_merge="$merge"
       upstream_parent="$parent"
-      break 2
+      return
     fi
   done
 done
 }
+detect_upstream_merge() { detect_upstream_merge_in origin/alpha..HEAD; }
 
 if [ "$GUARD_MODE" = print-jurisdiction ]; then
   printf 'UPSTREAM_PATHS\t%s\n' "$UPSTREAM_PATHS"
@@ -242,10 +248,19 @@ fi
 if [ "$GUARD_MODE" = print-upstream-parent ]; then
   # I-09:文档类闸(scripts/docs-gates.sh)在含受审上游合并的分支上只判 Code Puppy 的地盘 —— 与上游父逐字节
   # 相同的路径是上游的,不归我们 lint。上游父怎么认只在这里定义一次。
+  # 合入 alpha 之后,M0 已在 origin/alpha 里,本分支窗口找不到它,而树里那一大片上游原样文件还在 —— 整树扫描的
+  # NUL 闸每一跑都要认得出它们(2026-11-12:alpha 上 371 个上游原样的 .wasm/.webp/.avif/.woff 让全量门恒红)。所以
+  # 窗口里没有时,再找 HEAD 整段历史里离 HEAD 最近的上游合并(以后的上游同步合并同理,最近的那次算数)。守卫本体
+  # 不走这一步:它答「这个 PR 自己改了什么」,合入之后回到 origin/alpha 基准。
+  # git 列不出候选 ⇒ 非零退出(测不到不是「没有」,调用方当场红);历史里确实没有上游合并 ⇒ 什么都不印,调用方全量扫。
+  upstream_parent=""
   if git rev-parse --verify --quiet origin/alpha >/dev/null; then
-    detect_upstream_merge
-    [ -z "$upstream_parent" ] || printf '%s\n' "$upstream_parent"
+    detect_upstream_merge || { echo "✗ 列不出 origin/alpha..HEAD 的合并 —— 认不出上游父(不是「没有」)" >&2; exit 1; }
   fi
+  if [ -z "$upstream_parent" ]; then
+    detect_upstream_merge_in HEAD || { echo "✗ 列不出 HEAD 历史里的合并 —— 认不出上游父(不是「没有」)" >&2; exit 1; }
+  fi
+  [ -z "$upstream_parent" ] || printf '%s\n' "$upstream_parent"
   exit 0
 fi
 if [ "$GUARD_MODE" = print-takeover ]; then

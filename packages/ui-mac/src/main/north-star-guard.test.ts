@@ -885,7 +885,7 @@ describe("#1664 含受审上游合并的分支:packages/ 以那个合并的上�
     expect(run.output, `没说出这一跑以上游父为基准:\n${run.output}`).toContain(`上游父 ${upstream.slice(0, 7)}`)
 
     // 控制组:识别关掉(候选范围变空)= 本票之前的守卫,同一棵树必须红,而且红在 M0 带来的上游改动上。
-    const legacy = runGuard(work, mutatedGuard("no-upstream-merge", (s) => s.replace("--merges origin/alpha..HEAD", "--merges HEAD..HEAD")))
+    const legacy = runGuard(work, mutatedGuard("no-upstream-merge", (s) => s.replace("detect_upstream_merge_in origin/alpha..HEAD", "detect_upstream_merge_in HEAD..HEAD")))
     expect(legacy.exitCode, `控制组没红 —— 夹具没造出「M0 让守卫恒红」的形状:\n${legacy.output}`).not.toBe(0)
     expect(legacy.output).toContain(UPSTREAM_FILE)
     expect(legacy.output).toContain(V1_ONLY)
@@ -960,6 +960,44 @@ describe("#1664 含受审上游合并的分支:packages/ 以那个合并的上�
     expect(run.exitCode, `lane 带进来的上游改动被放行了 —— 识别把 lane 头当成了上游父:\n${run.output}`).not.toBe(0)
     expect(run.output).toContain(UPSTREAM_FILE)
     expect(run.output).toContain(`上游父 ${upstream.slice(0, 7)}`)
+  })
+
+  test("--print-upstream-parent 在 M0 合入 alpha 之后仍认得出上游父(alpha 本身、从它切出的分支);守卫本体回到 origin/alpha 基准", () => {
+    // 整树扫描的闸(scripts/docs-gates.sh 的 NUL 闸)每一跑都要知道哪些文件是上游原样。M0 合入 alpha 之后它已不在
+    // origin/alpha..HEAD 里;只看那个窗口 ⇒ 什么都不印 ⇒ 上游树里的二进制被当成我们的文件扫(2026-11-12 的 alpha 全红)。
+    const { work, upstream } = upstreamMergeFixture()
+    commit(work, "a lane commit after M0", { [CODEPUPPY_FILE]: "export const codepuppyOwned = 2\n" })
+    // 合入 alpha(merge 提交方式,保留 M0;origin 是非裸仓,先让出 alpha 才能推)。
+    git(git(work, ["remote", "get-url", "origin"]), ["checkout", "-q", "--detach"])
+    git(work, ["push", "-q", "origin", "feature:alpha"])
+    git(work, ["fetch", "-q", "origin"])
+    git(work, ["checkout", "-q", "-b", "ordinary", "origin/alpha"])
+    git(work, ["checkout", "-q", "-b", "lane"])
+    commit(work, "lane", { [CODEPUPPY_FILE]: "export const codepuppyOwned = 3\n" })
+    git(work, ["checkout", "-q", "ordinary"])
+    git(work, ["merge", "-q", "--no-ff", "lane", "-m", "integrate the lane"])
+
+    const printParent = (script: string = GUARD) => {
+      const result = Bun.spawnSync(["bash", script, "--print-upstream-parent"], { cwd: work, env: { ...GIT_ENV } })
+      expect(result.exitCode, result.stderr.toString()).toBe(0)
+      return result.stdout.toString().trim()
+    }
+    expect(printParent(), "合入之后的普通分支上认不出上游父 —— 上游原样文件会被整树扫描的闸当成我们的").toBe(upstream)
+    git(work, ["checkout", "-q", "--detach", "origin/alpha"])
+    expect(printParent(), "alpha 本身认不出上游父").toBe(upstream)
+
+    // 控制组:只看 origin/alpha..HEAD 的旧口径,同一棵树什么都不印 —— 夹具确实造出了「合入之后」的形状。
+    const deltaOnly = mutatedGuard("print-parent-delta-only", (s) => s.replace("detect_upstream_merge_in HEAD", "true"))
+    expect(printParent(deltaOnly), "控制组印出了上游父 —— 上面那条不是「看 HEAD 历史」挣来的").toBe("")
+
+    // 守卫本体不变:合入之后基准回到 origin/alpha,不报上游父。
+    const run = runGuard(work)
+    expect(run.exitCode, run.output).toBe(0)
+    expect(run.output).not.toContain("上游父")
+
+    // 本地没有 origin/alpha(只读模式不 fetch)时同样认得出 —— 不能因为窗口算不了就什么都不印。
+    git(work, ["update-ref", "-d", "refs/remotes/origin/alpha"])
+    expect(printParent(), "没有 origin/alpha 时认不出上游父").toBe(upstream)
   })
 })
 

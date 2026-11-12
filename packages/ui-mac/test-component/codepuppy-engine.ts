@@ -115,6 +115,8 @@ export type HostOptions = {
 
 export type Running = {
   send: (method: string, route: string, body?: unknown) => Promise<{ status: number; json: any }>
+  /** 引擎的原始分发(口令已补上,同生产 main 的 onBeforeSendHeaders):生产引擎适配器(engine-adapter createEngineFetch)接在它上面。 */
+  fetch: EngineFetch
   close: () => Promise<void>
 }
 
@@ -203,7 +205,7 @@ export function codepuppyEngine(options: HostOptions) {
     const ready = async () => (!withExt || (await status("codepuppy.ext")) === "active") && (await status("codepuppy.test.engine-probe")) === "active"
     for (let i = 0; i < 200 && !(await ready()); i++) await Bun.sleep(50)
     if (withExt && (await status("codepuppy.ext")) !== "active") throw new Error("the real ext is not active in the embedded engine")
-    return { send, close: () => engine.close() }
+    return { send, fetch: (request) => fetch!(request), close: () => engine.close() }
   }
   return { start, slot, projectDirectory: slot.projectDirectory, userData, injection, content }
 }

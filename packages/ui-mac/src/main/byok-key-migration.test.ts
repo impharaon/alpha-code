@@ -7,10 +7,10 @@
 // 这里照生产 fork 的顺序走一遍(index.ts 启动 → server.ts spawnLocalServer):
 //   钥匙串里一把**真实存储格式**的 Key(codepuppy-byok-keys.json `{v:1, enc}`,与 persist() 写出的同形)
 //   → initByokKeys → injectByokKeysIntoEnv → syncSecretFiles → pinAppliedCatalog → buildCodePuppyModelConfig
-//   → 真引擎(packages/opencode/src/index.ts run,与打包 sidecar 同一份请求装配)发一次请求,
+//   → 真引擎发一次请求(`#1662` 起是嵌入式 OpenCode 2:byok-key-migration.engine.cases.ts 在独立 `bun test` 子进程里拿这份 userData
+//     走生产 injectCodePuppyConfig 进沙箱里的引擎;v1 版跑的是已删的 `packages/opencode/src/index.ts run`),
 // 断言:引擎配置里有这个 provider、`{file:}` 指向的文件在、本地桩收到的鉴权头就是这把 Key;迁移前就在盘上的
-// 密钥文件在前后两次 fork 里都没被清理分支删掉。只把生产配置里该 provider 的 baseURL 改指本地桩
-// (codepuppy-reasoning-badge-parity.test.ts 同款);其余全是生产函数。
+// 密钥文件在前后两次 fork 里都没被清理分支删掉。只把注入里该 provider 的 baseURL 改指本地桩;其余全是生产函数。
 //
 // 先红后绿:把 codepuppy-secret-files.ts 的 secretEnvVars 改回只含平台三项(BYOK 读者没迁好时的效果),第一条断言
 // 「removed 不含 DEEPSEEK_API_KEY」转红;把 codepuppy-byok-keys.ts 的 keyEnvFor 改成返回 undefined,物化那一步转红。
@@ -44,32 +44,12 @@ const { buildCodePuppyModelConfig, getModelCatalog } = await import("./codepuppy
 const { buildModelPickerRows } = await import("../renderer/codepuppy-ui/model-picker-core")
 const bundled = (await import("./codepuppy-models.json")).default.byokCatalog
 
-const repoRoot = path.resolve(import.meta.dir, "../../../..")
-const engineEntry = path.resolve(repoRoot, "packages/opencode/src/index.ts")
-const modelsFixture = path.resolve(repoRoot, "packages/opencode/test/tool/fixtures/models-api.json")
-const BUN_EXEC = process.execPath
-const PATH_AT_LOAD = process.env.PATH ?? ""
-
 // 刻意不像真密钥的测试值;它只出现在本进程起的本地桩上。
 const STORED_KEY = "test-stored-key-not-real-Zq81-1556"
 const MANAGED = ["DEEPSEEK_API_KEY", "CODEPUPPY_MODELS_DISABLE", "CODEPUPPY_BASE_URL", "CODEPUPPY_DEFAULT_MODEL", "CODEPUPPY_GLOBAL_DIR", "OPENCODE_CONFIG_DIR"]
 const saved: Record<string, string | undefined> = {}
 let root = ""
 let userData = ""
-let server: ReturnType<typeof Bun.serve> | undefined
-const seen: Array<{ path: string; authorization: string | null }> = []
-
-function sse() {
-  const enc = new TextEncoder()
-  const chunk = (delta: Record<string, unknown>, finish: string | null) =>
-    `data: ${JSON.stringify({ id: "c1", object: "chat.completion.chunk", created: 1, model: "fake", choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`
-  return new ReadableStream({
-    start(controller) {
-      for (const item of [chunk({ role: "assistant", content: "ok" }, null), chunk({}, "stop"), "data: [DONE]\n\n"]) controller.enqueue(enc.encode(item))
-      controller.close()
-    },
-  })
-}
 
 beforeAll(() => {
   for (const key of MANAGED) {
@@ -83,22 +63,9 @@ beforeAll(() => {
   fs.mkdirSync(process.env.CODEPUPPY_GLOBAL_DIR, { recursive: true })
   process.env.OPENCODE_CONFIG_DIR = path.join(root, "config-dir")
   fs.mkdirSync(process.env.OPENCODE_CONFIG_DIR, { recursive: true })
-  server = Bun.serve({
-    port: 0,
-    hostname: "127.0.0.1",
-    idleTimeout: 30,
-    async fetch(request) {
-      const url = new URL(request.url)
-      seen.push({ path: url.pathname, authorization: request.headers.get("authorization") })
-      if (url.pathname.endsWith("/models")) return Response.json({ object: "list", data: [] })
-      await request.text()
-      return new Response(sse(), { headers: { "content-type": "text/event-stream", "cache-control": "no-cache" } })
-    },
-  })
 })
 
 afterAll(() => {
-  server?.stop(true)
   clearByokKeys()
   for (const key of MANAGED) {
     if (saved[key] === undefined) delete process.env[key]
@@ -142,11 +109,8 @@ test("`#1556` AC5:迁移前已存的 BYOK Key → 物化为密钥文件、注入
   expect(JSON.stringify(config)).not.toContain(STORED_KEY) // 配置里只有 {file:} 引用(A6)
 
   // ③ 真引擎发一次请求:只把这个 provider 的端点改指本地桩,鉴权头必须是金库里那把 Key。
-  const { rc, log, completions } = await engineRequest(config, "deepseek-v4-pro")
-  expect(rc, log).toBe(0)
-  expect(completions.length, log).toBeGreaterThan(0)
-  for (const entry of completions) expect(entry.authorization).toBe(`Bearer ${STORED_KEY}`)
-}, 120_000)
+  await engineRequest("deepseek-v4-pro")
+}, 300_000)
 
 // `#1556` AC7 的本地代理(正式证据是共享 RC 回归 T23 格「发布一次 BYOK 目录变化 → 同一打包客户端拉取 → picker 出现 →
 // 真实发送」,要等平台部署 V3 后在打包客户端上做):远程目录在已有 provider 上新增一个模型,经采纳落成 LKG、下一次 fork
@@ -175,51 +139,25 @@ test("`#1556` AC7(本地代理):远程目录新增的模型 → 钉住 → picke
 
   const config = buildCodePuppyModelConfig(userData)!
   expect(Object.keys((config.provider["deepseek-byok"] as { models: Record<string, unknown> }).models)).toContain(added)
-  const before = seen.length
-  const { rc, log, completions } = await engineRequest(config, added, before)
-  expect(rc, log).toBe(0)
-  expect(completions.length, log).toBeGreaterThan(0)
-  for (const entry of completions) expect(entry.authorization).toBe(`Bearer ${STORED_KEY}`)
-}, 120_000)
+  await engineRequest(added)
+}, 300_000)
 
-/** 一次真引擎 `run`(codepuppy-reasoning-badge-parity.test.ts 同款隔离):deepseek-byok 的端点改指本地桩,返回桩收到的补全请求。 */
-async function engineRequest(config: NonNullable<ReturnType<typeof buildCodePuppyModelConfig>>, model: string, from = 0) {
-  const node = config.provider["deepseek-byok"] as { options: { baseURL: string } }
-  node.options.baseURL = `http://127.0.0.1:${server!.port}/byok/v1`
-  const dir = fs.mkdtempSync(path.join(root, "run-"))
-  for (const sub of ["home", "xdg-config", "xdg-data", "xdg-cache", "xdg-state", "proj"]) fs.mkdirSync(path.join(dir, sub), { recursive: true })
-  const configPath = path.join(dir, "config.json")
-  fs.writeFileSync(configPath, JSON.stringify(config))
-  const proc = Bun.spawn([BUN_EXEC, "run", engineEntry, "run", "--print-logs", "--dir", path.join(dir, "proj"), "--model", `deepseek-byok/${model}`, "hi"], {
-    cwd: repoRoot,
-    stdin: "ignore",
+/**
+ * 一次真引擎请求(`#1662`:嵌入式 OpenCode 2,byok-key-migration.engine.cases.ts 在独立子进程里跑 —— 沙箱要在上游模块装载之前改指
+ * HOME / XDG):把本进程按生产顺序走到盘上的 userData 原样交过去,子进程注入、改端点、发一句,断言桩收到的鉴权头就是这把 Key。
+ */
+async function engineRequest(model: string) {
+  const env = Object.fromEntries(Object.entries({ ...process.env, ...saved }).filter((entry): entry is [string, string] => entry[1] !== undefined))
+  const child = Bun.spawn({
+    cmd: [process.execPath, "test", "--timeout", "120000", path.join(import.meta.dir, "byok-key-migration.engine.cases.ts")],
+    cwd: path.join(import.meta.dir, "../.."),
+    env: { ...env, CODEPUPPY_TEST_BYOK_USERDATA: userData, CODEPUPPY_TEST_BYOK_MODEL: model, CODEPUPPY_TEST_BYOK_KEY: STORED_KEY },
     stdout: "pipe",
     stderr: "pipe",
-    env: {
-      PATH: PATH_AT_LOAD,
-      HOME: path.join(dir, "home"),
-      XDG_CONFIG_HOME: path.join(dir, "xdg-config"),
-      XDG_DATA_HOME: path.join(dir, "xdg-data"),
-      XDG_CACHE_HOME: path.join(dir, "xdg-cache"),
-      XDG_STATE_HOME: path.join(dir, "xdg-state"),
-      NO_PROXY: "127.0.0.1,localhost",
-      no_proxy: "127.0.0.1,localhost",
-      NO_COLOR: "1",
-      CODEPUPPY_GLOBAL_DIR: process.env.CODEPUPPY_GLOBAL_DIR!,
-      OPENCODE_CONFIG: configPath,
-      OPENCODE_DISABLE_PROJECT_CONFIG: "1",
-      OPENCODE_MODELS_PATH: modelsFixture,
-      OPENCODE_DISABLE_MODELS_FETCH: "1",
-      OPENCODE_DB: path.join(dir, "engine.db"),
-    },
   })
-  const killer = setTimeout(() => proc.kill(), 90_000)
-  const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()])
-  const rc = await proc.exited
-  clearTimeout(killer)
-  return {
-    rc,
-    log: `${stdout}\n${stderr}`.slice(-1500),
-    completions: seen.slice(from).filter((entry) => entry.path.endsWith("/chat/completions")),
-  }
+  const [stdout, stderr, exitCode] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  const output = `${stdout}${stderr}`
+  if (exitCode !== 0) throw new Error(output)
+  expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
+  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("1")
 }

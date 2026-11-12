@@ -220,17 +220,18 @@ bundle(逐字比对提交 sha,防篡改),推送凭据仅在最后一步临时配
 不执行任何来自 `packages/opencode` / 上游的代码。
 
 - **分支保护 required contexts —— 幽灵 context 已消,记录落在仓内**(`#717`,2026-08-10 复核)。
-  `alpha` 保护当前要求四个 context,与真实 job 名逐条对得上:
-  `north-star guard (zero upstream edits)` / `typecheck (alpha packages)` /
-  `unit tests (alpha packages)` / `docs gate`。
-  历史:那一格曾经写着 `unit tests (ui-mac)`,而 job 早在 2026-07-22(`ebd29cda`)就改名了 ⇒
+  `alpha` 保护当前只要求一个 context:`check` —— 本地门(`git push` 时 `gate`)跑完全量检查后签在
+  被推送提交上的 commit status,不是 codepuppy-ci 的 job 名(codepuppy-ci 已停用)。
+  历史:分支保护曾要求四个 job 名(`north-star guard (zero upstream edits)` /
+  `typecheck (alpha packages)` / `unit tests (alpha packages)` / `docs gate`),改成 `check` 后
+  仓内记录没跟,第 `[10/14]` 步对每条分支恒红,已按真源更正。再往前,那一格曾经写着 `unit tests (ui-mac)`,而 job 早在 2026-07-22(`ebd29cda`)就改名了 ⇒
   **没有任何 PR 会产出那个 context**,code PR 也不会 ⇒ 每个 PR 在那一格永久 pending ⇒ 每次合并都得
   `--admin`。**「大家习惯性 --admin」当时不是纪律松懈,是分支保护自己造出来的。**
   owner 已于 2026-08-03 直接改分支保护修掉那一半。
   `#717` 的票面把成因写成「docs-only path 没发布该 context」,与实测不符:改名是全量的。
   现在这份列表在仓内有一份手抄快照 [`.github/required-contexts.txt`](../../.github/required-contexts.txt),
   由 `packages/ui-mac/src/main/local-gate-parity.test.ts` 断言「记录里的每个 context 都等于某个 job 的
-  `name:`」+「每个 job 要么在记录里、要么显式登记为不必需」。
+  `name:` 或等于上文那个本地门签名 `check`」+「每个 job 要么在记录里、要么显式登记为不必需」。
 - **手抄件与真源之间现在有判据了**(`#890`,2026-08-11)。上一条那两个断言只把手抄件与 workflow
   的 job 名对齐 —— 两边一起错就一起自洽,而真正决定「PR 能不能合」的那份清单在 GitHub 的分支保护
   设置里,此前没有任何东西比对它。现在 `codepuppy-check.sh` 第 `[10/14]` 步跑
@@ -243,7 +244,8 @@ bundle(逐字比对提交 sha,防篡改),推送凭据仅在最后一步临时配
   前者两种状态都回 200(保护关着时是 `enabled=false` + 零个 context ⇒ 当场红)。
   ②`--jq` 里那个 `?` 不能删:`.required_status_checks.contexts[]` 在字段为 null 时 jq 报
   `cannot iterate over: null` 并非零退出,同样把灾难态伪装成读不到。
-- **必需检查不会因为 `detect` 失败而静默放行**(`#895`,2026-08-11 实测)。四个必需 job 都
+- **必需检查不会因为 `detect` 失败而静默放行**(`#895`,2026-08-11 实测;其后分支保护改为只要求
+  本地门签的 `check`,下面说的四个 job 不再是必需 context,接线断言只在它们被记回必需时才覆盖它们)。四个必需 job 都
   `needs: detect`;从前 `detect` 一红,它们被折成 `skipped`,而 **GitHub 把 `skipped` 当成
   「已满足」** ⇒ 四道闸门一道没跑,PR 照样可合(实测 `mergeStateStatus=UNSTABLE`)。现在它们带
   job 级 `if: ${{ !cancelled() }}`,并以
@@ -276,7 +278,8 @@ bundle(逐字比对提交 sha,防篡改),推送凭据仅在最后一步临时配
    - `in_progress` 慢 = job 本身慢(装依赖 / 测试)——那才是 REQ-009 缓存优化的场景。
 3. **命令**:`gh run cancel <id>` 取消 · `gh run watch <id>` 盯 · `gh run rerun <id>` 重跑 · `gh run list --workflow=codepuppy-ci.yml` 只看本仓 CI。
 4. **别被堵**:本地十步已绿 = 代码没问题。`#717` 之前这里写着「required 里有一个永远不会上报的
-   context,真急可 `--admin`」—— **那条已经过时,别再照它办**。四个 required context 现在都会产出
+   context,真急可 `--admin`」—— **那条已经过时,别再照它办**。(现状:必需的只有本地门签的 `check`;
+   下面「四个 required context」指 `#895` 当时的四个 job。)四个 required context 现在都会产出
    结论(§3),`--admin` 回到「例外」而不是「结构性必需」。
    ⚠️ 「产出结论」这句话在 `#895` 之前是**半真的**:`detect changes` 一失败,四格产出的结论叫
    **`skipped`**,而 GitHub 把 `skipped` 记成「已满足」—— 2026-08-11 在 PR #908 上实测:四格全

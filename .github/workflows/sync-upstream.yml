@@ -320,6 +320,11 @@ jobs:
           bun install
           bash scripts/engine-smoke.sh
 
+      # INT-upstream-upgrade-readiness I-03:Code Puppy 依赖的上游行为探针,跑在合并后的树上。任一条红 ⇒ 本 job 红、
+      # 不出推送包(同引擎冒烟);失败行开头的 [路径] 是依赖那条行为的 Code Puppy 文件。sync-upstream-alert 照常开告警。
+      - name: Upstream behaviour probes (I-03)
+        run: bash scripts/bun-test-floor.sh 1 packages/ext src/upstream-probes src/policy/permission-reply-premises.test.ts
+
       # `#1662`:Code Puppy 权威登记册(docs/architecture/codepuppy-authority-registry.json)列着换代前
       # Code Puppy 握着的每一个决定、以及它现在由哪个机制文件 + 哪条证明测试握住。判官
       # packages/ext/src/policy/authority-registry.test.ts 在**合并后的树**上跑:有决定没映射、机制文件

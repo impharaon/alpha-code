@@ -4,8 +4,9 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { applyFactoryDeny } from "../../../ext/src/factory-deny"
-import { Permission } from "../../../opencode/src/permission/index"
+import { ConfigNormalize } from "@opencode/core/config/normalize"
+import { Permission } from "@opencode/core/permission"
+import { applyFactoryDeny, factoryDeniedSkills } from "../../../ext/src/factory-deny"
 import {
   DEFAULT_BUILTIN_POLICY,
   applyBuiltinPolicy,
@@ -35,6 +36,15 @@ afterEach(() => {
   delete process.env.CODEPUPPY_OPENCODE_HOME
   rmSync(tmp, { recursive: true, force: true })
 })
+
+// `#1662`:治理写进用户 `codepuppy.jsonc` 的 v1 `permission` 叶子原样进显式文件(engine-explicit-config.ts),
+// 2.x 引擎读配置时经上游 normalize 翻成 `permissions` 规则,再由 `Permission.evaluate` 取最后一条命中 —— 这里走同一条。
+function skillEffect(permission: unknown, skill: string) {
+  const normalized = ConfigNormalize.normalize({ permission })
+  if (normalized.type !== "normalized") throw new Error(`permission rejected: ${JSON.stringify(normalized.diagnostics)}`)
+  expect(normalized.diagnostics).toEqual([])
+  return Permission.evaluate("skill", skill, normalized.encoded.permissions as Permission.Ruleset).effect
+}
 
 // REQ-059:治理键(mcpPluginTargetPath)随 alpha 真源迁 ~/.alpha/codepuppy.jsonc(默认无逃生)。
 const jsoncPath = () => join(tmp, "codepuppy-global", "codepuppy.jsonc")
@@ -66,10 +76,7 @@ describe("materializeEdits — 物化叶子计算", () => {
     expect(m.get("permission.skill.customize-codepuppy")).toBe("deny")
     expect(m.get("command.customize-codepuppy.template")).toContain("该技能(customize-codepuppy)")
     expect(m.has("permission.skill.customize-alpha")).toBe(false)
-    const rules = Permission.fromConfig({
-      skill: { "*": "allow", "customize-codepuppy": m.get("permission.skill.customize-codepuppy") },
-    } as never)
-    expect(Permission.evaluate("skill", "customize-codepuppy", rules).action).toBe("deny")
+    expect(skillEffect({ skill: { "*": "allow", "customize-codepuppy": m.get("permission.skill.customize-codepuppy") } }, "customize-codepuppy")).toBe("deny")
   })
   test("denylist:hide/disable/override → agent.<n>.<字段> 叶子", () => {
     const g = gov({
@@ -212,9 +219,12 @@ describe("REQ-067 — 出厂默认禁内置化(deny 零明文)", () => {
       permission: { skill: { "customize-opencode": "allow", "*": "allow" } },
       command: { "customize-opencode": { template: "user's own" } },
     }
-    applyFactoryDeny(cfg, JSON.stringify(effectiveFactoryDenied(cleaned)))
-    expect(Permission.evaluate("skill", "customize-opencode", Permission.fromConfig(cfg.permission)).action).toBe("deny")
-    expect(Permission.evaluate("skill", "customize-codepuppy", Permission.fromConfig(cfg.permission)).action).toBe("allow")
+    const denied = JSON.stringify(effectiveFactoryDenied(cleaned))
+    // 2.x 没有整份配置的钩子:用户写的 allow 留在规则里,禁用由 ext 的 permission evaluate 钩子按这份名单一律改判 deny
+    // (`packages/ext/src/plugin.ts`,判据 ext/src/plugin-host.test.ts「权威 · 出厂禁用技能」)。这里钉住钩子吃到的名单:
+    // customize-opencode 在、customize-codepuppy 不在。
+    expect(factoryDeniedSkills(denied)).toEqual(["customize-opencode"])
+    applyFactoryDeny(cfg, denied)
     expect(cfg.command["customize-opencode"].template).toBe("该技能(customize-opencode)已弃用。定制 Code Puppy 请改用 /customize-codepuppy。")
   })
   test("materializeEdits:出厂项零物化 —— 空治理不产生任何 permission/command 叶子", () => {

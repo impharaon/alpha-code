@@ -368,9 +368,12 @@ describe("AC4: closing the service ends a server's process tree", () => {
   )
 })
 
-// `#1690`: a stdio server that never answers its handshake does not hold back shutdown. Red without the fix: closing the
-// service waits out the 30 s startup timeout (the default here) before the process is stopped. The premise arm: the
-// server is alive and still pending when the service closes.
+// `#1690`: a stdio server that never answers its handshake does not hold back shutdown. The proof is structural, not a
+// wall-clock bound (scripts/wall-clock-assertions.tsv): the hung server's startup timeout is ten minutes, so closing
+// the service can only finish inside the test's 15 s budget if shutdown interrupts the start instead of waiting it out.
+// Red without the fix: closing waits for that timeout and the test runs out its budget. The premise arm: the server is
+// alive and still pending when the service closes; afterwards its process is gone. Measured with the fix: about 2 s
+// (the transport's 2 s stdin grace, then SIGTERM), printed below for the record.
 describe("#1690: closing the service while a server's handshake hangs", () => {
   const alive = (pid: number) => {
     try {
@@ -381,10 +384,14 @@ describe("#1690: closing the service while a server's handshake hangs", () => {
     }
   }
   testEffect(Layer.empty).live(
-    "the service closes within 5 s and the hung server's process is gone",
+    "closing does not wait out a hung start's timeout, and the hung server's process is gone",
     () =>
       Effect.gen(function* () {
         const pidFile = file("hang-close.pid")
+        const hang = local(
+          { CODEPUPPY_MCP_HANG: "1", CODEPUPPY_MCP_PID_FILE: pidFile },
+          { timeout: new ConfigMCP.Timeout({ startup: 600_000 }) },
+        )
         const { pid, started } = yield* Effect.scoped(
           Effect.gen(function* () {
             const pid = yield* until(
@@ -394,14 +401,12 @@ describe("#1690: closing the service while a server's handshake hangs", () => {
             expect(alive(pid)).toBe(true)
             expect((yield* statusOf("hang"))?.status).toBe("pending")
             return { pid, started: Date.now() }
-          }).pipe(Effect.provide(mcpLayer({ hang: local({ CODEPUPPY_MCP_HANG: "1", CODEPUPPY_MCP_PID_FILE: pidFile }) }))),
+          }).pipe(Effect.provide(mcpLayer({ hang }))),
         )
-        const closedAfter = Date.now() - started
-        process.stderr.write(`[#1690] service closed ${closedAfter} ms after a hung handshake\n`)
-        expect(closedAfter).toBeLessThan(5_000)
+        process.stderr.write(`[#1690] service closed ${Date.now() - started} ms after a hung handshake\n`)
         expect(alive(pid)).toBe(false)
       }),
-    60_000,
+    15_000,
   )
 })
 

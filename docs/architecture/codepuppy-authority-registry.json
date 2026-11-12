@@ -975,21 +975,28 @@
       "adr": [
         "ADR-047"
       ],
-      "lane": "L4 (#1666) — SEAM-CHANGE-NEEDED",
+      "lane": "L4 (#1666)",
       "takeovers": [
         "packages/opencode/src/mcp/index.ts",
         "packages/core/src/mcp/client.ts",
         "packages/core/src/mcp/connection.ts",
         "packages/core/src/mcp/index.ts"
       ],
-      "blocked": {
-        "reason": "Re-taken and named at the source (client.ts ConnectError.code via codepuppy-startup.ts; drives the reconnect decision; test 'a missing working directory, a missing command, a refused remote'). Not yet visible to the desktop: the frozen seam (lane seams §4, MCP status kinds) forbids changing OpenCode 2's public Mcp.Status shape, and failed carries only { error }, so the Customization Center cannot read dependency_missing (#1564 AC6 reinstall action).",
-        "options": [
-          "(a) Seam change: optional `code` on Mcp.Status.Failed (re-take packages/schema/src/mcp.ts and regenerate packages/protocol/openapi.json and the client's generated types; L5/L6 read it).",
-          "(b) Seam-compatible convention: the re-taken runtime prefixes `error` with `<code>: ` and the L6 adapter reads Code Puppy's own prefix (documented in the seams doc).",
-          "(c) Expose the cause through a Code Puppy RPC next to the status list (new surface for L6)."
-        ]
-      }
+      "mechanism": {
+        "file": "packages/core/src/mcp/codepuppy-startup.ts",
+        "ladder": "L3 (re-taken packages/core/src/mcp/client.ts names the cause at the source; re-taken index.ts prefixes Mcp.Status.Failed.error with it through withFailureCode, and the L6 adapter reads it back with parseFailureCode — both in packages/schema/src/codepuppy-net-failure.ts; ruling #1666 6756103246 item 2 (b))"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "a missing working directory, a missing command, a refused remote"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "the failed status the desktop reads carries the named cause"
+        }
+      ],
+      "note": "An invalid remote URL carries no named cause: upstream's own text names it and it never reconnects, so the re-take keeps upstream's form there and upstream packages/core/test/mcp.test.ts stays untaken (orchestrator decision on plan 33d68fd266)."
     },
     {
       "id": "mcp-reconnect-backoff",
@@ -1096,9 +1103,12 @@
         {
           "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
           "name": "an auth answer stays failed"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "the failed status the desktop reads carries the named cause"
         }
-      ],
-      "note": "The layer decides whether a background reconnect may help; showing it to the user shares the seam question of mcp-named-start-failures."
+      ]
     },
     {
       "id": "l2r-auth-fail-closed",

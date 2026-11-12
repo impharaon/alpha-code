@@ -170,7 +170,6 @@ export function make(input: Input): Connection {
         return yield* input.events.failed(
           { status: "failed", error: `Invalid MCP server URL: ${input.config.url}` },
           false,
-          { code: "invalid_url", reconnect: false }, // codepuppy(#1563)
         )
       const scope = yield* Scope.fork(input.scope)
       state.scope = scope

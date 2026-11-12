@@ -32,6 +32,7 @@ import type { Session } from "@opencode/schema/session"
 import { isRecord } from "@opencode/util/record"
 import { McpStdio } from "./stdio.js"
 import { classifyStartFailure } from "./codepuppy-startup.js" // codepuppy(#1563)
+import { isCodepuppyFailureCode } from "@opencode/schema/codepuppy-net-failure" // codepuppy(#1564)
 
 const DEFAULT_STARTUP_TIMEOUT = 30_000
 const DEFAULT_CATALOG_TIMEOUT = 30_000
@@ -93,7 +94,7 @@ export class ConnectError extends Schema.TaggedError<ConnectError>()("MCP.Connec
   /** The server was reached but refused or broke the handshake, so different connect options might succeed. */
   answered: Schema.optional(Schema.Boolean),
   // codepuppy(#1563): the named cause (codepuppy-startup.ts) and whether a background reconnect may change it.
-  code: Schema.optional(Schema.String),
+  code: Schema.optional(Schema.declare(isCodepuppyFailureCode)),
   reconnect: Schema.optional(Schema.Boolean),
 }) {}
 

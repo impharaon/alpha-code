@@ -37,8 +37,9 @@ import { State } from "../state.js"
 import type { McpClient } from "./client.js"
 import { McpConnection } from "./connection.js"
 import { McpPool } from "./pool.js"
-// codepuppy(#1563, #1565, ADR-041) ── Code Puppy's startup rules, bundled declarations, refused name collisions.
+// codepuppy(#1563, #1564, #1565, ADR-041) ── Code Puppy's startup rules, named causes, bundled declarations, refused name collisions.
 import { readFileSync } from "node:fs"
+import { withFailureCode } from "@opencode/schema/codepuppy-net-failure"
 import { declaredListedTools, listsDeclaration, sameTool, type DeclaredTool } from "./codepuppy-first-party-mcp.js"
 import { reconnectDelay, type StartFailure } from "./codepuppy-startup.js"
 import { effectiveName, normalizedName } from "../tool/runtime.js"
@@ -489,7 +490,9 @@ export const layer = (options?: Options) =>
               }),
               failed: (failure, _answered, cause) =>
                 Effect.gen(function* () {
-                  entry.status = failure
+                  // codepuppy(#1564): the failed status carries the named cause the desktop reads back (parseFailureCode).
+                  entry.status =
+                    failure.status === "failed" && cause ? { ...failure, error: withFailureCode(cause.code, failure.error) } : failure
                   entry.cause = cause // codepuppy(#1563)
                   yield* Effect.logWarning("mcp connect failed", { server: name, status: entry.status, code: cause?.code })
                   yield* bus.publish(McpEvent.StatusChanged, { server: name })
@@ -503,11 +506,12 @@ export const layer = (options?: Options) =>
               }),
               closed: (reason) =>
                 Effect.gen(function* () {
-                  entry.status = { status: "failed", error: reason }
+                  // codepuppy(#1563, #1564): a remote connection that drops reconnects in the background; a local process
+                  // does not. The failed status carries that cause for the desktop.
+                  entry.cause = { code: entry.config.type === "remote" ? "transport" : "spawn_failed", reconnect: entry.config.type === "remote" }
+                  entry.status = { status: "failed", error: withFailureCode(entry.cause.code, reason) }
                   yield* entry.connection.stop
                   yield* bus.publish(McpEvent.StatusChanged, { server: name })
-                  // codepuppy(#1563): a remote connection that drops reconnects in the background; a local process does not.
-                  entry.cause = { code: entry.config.type === "remote" ? "transport" : "spawn_failed", reconnect: entry.config.type === "remote" }
                   if (entry.cause.reconnect) scheduleReconnect(name, entry)
                 }),
               changed: (kind) => bus.publish(changes[kind], { server: name }),

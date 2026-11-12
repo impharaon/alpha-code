@@ -4,7 +4,8 @@
 // codepuppy-first-party-mcp.ts. What turns each case red is written above it.
 //
 //   AC1  a server that never answers does not hold back another (native on OpenCode 2; pinned here)
-//   AC2  a start that fails names its cause (workspace_missing / dependency_missing / the network layer)
+//   AC2  a start that fails names its cause (workspace_missing / dependency_missing / the network layer), and the
+//        failed status the desktop reads carries it (#1564; parseFailureCode in packages/schema/src/codepuppy-net-failure.ts)
 //   AC3  a failed remote server reconnects in the background: 30 s, then 60 s; an auth answer does not reconnect
 //   AC5  at most four servers start at once
 //   #1565 a bundled first-party server is offered from its declaration while it starts; a connection that lists
@@ -40,6 +41,7 @@ const { Mcp } = await import("@opencode/core/mcp/index")
 const { McpClient } = await import("@opencode/core/mcp/client")
 const { McpPool } = await import("@opencode/core/mcp/pool")
 const { OFFICE_MCP_MANIFEST_ENV } = await import("@opencode/core/mcp/codepuppy-first-party-mcp")
+const { parseFailureCode } = await import("@opencode/schema/codepuppy-net-failure")
 const { AbsolutePath } = await import("@opencode/core/schema")
 const { State } = await import("@opencode/core/state")
 const { CrossSpawnSpawner } = await import("@opencode/util/cross-spawn-spawner")
@@ -101,7 +103,7 @@ const statusOf = (name: string) =>
   Effect.gen(function* () {
     return (yield* (yield* Mcp.Service).servers()).find((server: any) => server.name === name)?.status
   })
-const until = <A>(probe: Effect.Effect<A | undefined>, label: string, ms = 10_000) =>
+const until = <A, R>(probe: import("effect").Effect.Effect<A | undefined, never, R>, label: string, ms = 10_000) =>
   Effect.gen(function* () {
     const deadline = Date.now() + ms
     while (Date.now() < deadline) {
@@ -118,15 +120,21 @@ const toolNames = Effect.gen(function* () {
 
 // ── AC1 ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 // Red if startup waited for every server: `ok` would stay pending behind the 30 s handshake timeout of `hang`.
+// `hang` is killed once the assertions ran: closing the layer otherwise waits for its handshake timeout (the teardown
+// time follows `timeout.startup`: 8 s ⇒ 10.3 s, the 30 s default ⇒ 32 s), which overran the 5 s test budget.
 describe("AC1: one server never answering does not hold back another", () => {
-  testEffect(mcpLayer({ hang: local({ CODEPUPPY_MCP_HANG: "1" }), ok: local() })).live("ok is connected and listed while hang is still pending", () =>
+  const pidFile = file("hang.pid")
+  const killHang = Effect.sync(() => {
+    if (fs.existsSync(pidFile)) process.kill(Number(fs.readFileSync(pidFile, "utf8")), "SIGKILL")
+  })
+  testEffect(mcpLayer({ hang: local({ CODEPUPPY_MCP_HANG: "1", CODEPUPPY_MCP_PID_FILE: pidFile }), ok: local() })).live("ok is connected and listed while hang is still pending", () =>
     Effect.gen(function* () {
       const started = Date.now()
       yield* connected("ok")
       expect(Date.now() - started).toBeLessThan(5_000)
       expect((yield* statusOf("hang"))?.status).toBe("pending")
       expect(yield* toolNames).toEqual(["ok/echo"])
-    }),
+    }).pipe(Effect.ensuring(killHang)),
   )
 })
 
@@ -145,6 +153,25 @@ describe("AC2: a start that fails names its cause", () => {
       expect(yield* cause({ type: "local", command: [process.execPath, FIXTURE], cwd: path.join(ROOT, "no-such-dir") })).toEqual({ code: "workspace_missing", reconnect: false })
       expect(yield* cause({ type: "local", command: [path.join(ROOT, "no-such-command")] })).toEqual({ code: "dependency_missing", reconnect: false })
       expect(yield* cause({ type: "remote", url: "http://127.0.0.1:1/mcp", oauth: false })).toEqual({ code: "tcp", reconnect: true })
+    }),
+  )
+
+  // Red if index.ts stops prefixing the failed status (parseFailureCode reads nothing back), or a cause goes unnamed.
+  testEffect(
+    mcpLayer({
+      nodir: local({}, { cwd: path.join(ROOT, "no-such-dir") }),
+      nocmd: new ConfigMCP.Local({ type: "local", command: [path.join(ROOT, "no-such-command")] }),
+      refused: new ConfigMCP.Remote({ type: "remote", url: "http://127.0.0.1:1/mcp", oauth: false }),
+    }),
+  ).live("the failed status the desktop reads carries the named cause", () =>
+    Effect.gen(function* () {
+      const failed = (name: string) =>
+        until(statusOf(name).pipe(Effect.map((s: any) => (s?.status === "failed" ? s : undefined))), `${name} failed`)
+      for (const [name, code] of [["nodir", "workspace_missing"], ["nocmd", "dependency_missing"], ["refused", "tcp"]] as const) {
+        const read = parseFailureCode((yield* failed(name)).error)
+        expect(read?.code).toBe(code)
+        expect(read?.text).not.toBe("")
+      }
     }),
   )
 })

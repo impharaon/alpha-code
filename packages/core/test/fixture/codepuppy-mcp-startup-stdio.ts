@@ -5,7 +5,8 @@
 //   CODEPUPPY_MCP_STARTUP_LOG     append "+" at launch and "-" when answering tools/list (the end of startup)
 //   CODEPUPPY_MCP_TOOLS_FILE      serve this JSON array of tool definitions instead of `echo`
 //   CODEPUPPY_MCP_CALL_LOG        append "<tool>\n" when a tools/call starts
-import { appendFileSync, readFileSync } from "node:fs"
+//   CODEPUPPY_MCP_PID_FILE        write this process's pid at launch, so a test can kill a hung server instead of awaiting it
+import { appendFileSync, readFileSync, writeFileSync } from "node:fs"
 import { Server } from "@modelcontextprotocol/server"
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio"
 
@@ -15,6 +16,7 @@ const mark = (value: string) => {
 }
 
 mark("+")
+if (env.CODEPUPPY_MCP_PID_FILE) writeFileSync(env.CODEPUPPY_MCP_PID_FILE, String(process.pid))
 if (env.CODEPUPPY_MCP_HANG) {
   setInterval(() => {}, 1 << 30)
   await new Promise(() => {})

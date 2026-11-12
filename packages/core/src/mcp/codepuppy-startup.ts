@@ -13,7 +13,7 @@
  */
 import { Semaphore } from "effect"
 import { PlatformError } from "effect"
-import { classifyNetFailure, engineNetFailurePath } from "@opencode/schema/codepuppy-net-failure"
+import { classifyNetFailure, engineNetFailurePath, type CodepuppyFailureCode } from "@opencode/schema/codepuppy-net-failure"
 
 export const START_CONCURRENCY = 4
 /** Shared by every Location in the process, like v1's instance-wide limit. */
@@ -27,7 +27,8 @@ export const reconnectDelay = (failures: number) =>
   Math.min(RECONNECT_BASE_MS * 2 ** Math.max(0, failures - 1), RECONNECT_CAP_MS)
 
 export interface StartFailure {
-  readonly code: string
+  /** A registered code: index.ts prefixes the failed status with it, and the desktop reads it back (#1564). */
+  readonly code: CodepuppyFailureCode
   readonly reconnect: boolean
 }
 

@@ -17,19 +17,21 @@ last_reviewed: 2026-11-12
 ## Unit B — named failure causes(L4 #1666:具名失败原因到桌面)
 
 - 依据:无 spec。Issue [alpha-code#1666](https://github.com/impharaon/alpha-code/issues/1666) 正文(2026-11-10T10:35:55Z 版);裁决评论 [6737732975](https://github.com/impharaon/alpha-code/issues/1666#issuecomment-6737732975) 第 5 项、[6737930969](https://github.com/impharaon/alpha-code/issues/1666#issuecomment-6737930969)(`l1r-net-failure-settle` 归 L4)、[6756103246](https://github.com/impharaon/alpha-code/issues/1666#issuecomment-6756103246) 第 2 项(选 (b):前缀与解析函数只在契约模块定义一次)。登记册 [`codepuppy-authority-registry.json`](../../architecture/codepuppy-authority-registry.json) 的 `mcp-named-start-failures`、`mcp-net-failure-runtime`、`l1r-net-failure-settle`;[ADR-047](../../../.claude/rules/adrs/ADR-047-opencode2-engine-generation.md)「精确接管面」;[接缝冻结](../../design/2026-11-09-1662-lane-seams.md) §4「MCP 状态种类」与 I6(契约模块只许加法)。以上均取 `lane/1666-l4-takeover` @ `e71d98f171`。
-- 核对:待编排器核对。
+- 核对:`33d68fd266` · 编排器 · 通过(实施轮裁决:invalid_url 按计划;成对接管 retry 测试;头部 / 分块超时按 v1 归 timeout;AC1 超时本段修)。
 
 ### 改动
 
 | 文件 | 改什么 |
 | --- | --- |
-| `packages/schema/src/codepuppy-net-failure.ts` | 只加导出:MCP 非网络层的启动失败名(workspace_missing / dependency_missing / spawn_failed / handshake_timeout / auth / protocol / transport)与九个 `NetFailureLayer` 合成的登记码类型 `CodepuppyFailureCode`、`isCodepuppyFailureCode`;生产方 `withFailureCode(code, text)`,消费方 `parseFailureCode(text) → { code, text } \| undefined`(交给 L6)。前缀的字面形状只在本模块(拟定 `[codepuppy:<code>] `);解析只认登记码,普通文本、未登记的码、长得像的前缀一律 `undefined`(模块已有的 I4 纪律)。分类器本身不动。 |
+| `packages/schema/src/codepuppy-net-failure.ts` | 只加导出:MCP 非网络层的启动失败名(workspace_missing / dependency_missing / spawn_failed / handshake_timeout / auth / protocol / transport)与九个 `NetFailureLayer` 合成的登记码类型 `CodepuppyFailureCode`、`isCodepuppyFailureCode`;生产方 `withFailureCode(code, text)`,消费方 `parseFailureCode(text) → { code, text } \| undefined`(交给 L6)。前缀的字面形状只在本模块(拟定 `[codepuppy:<code>] `);解析只认登记码,普通文本、未登记的码、长得像的前缀一律 `undefined`(模块已有的 I4 纪律)。分类器只加一条规则(编排器实施轮第 3 项):`code: "Timeout"` 且不带 cause ⇒ timeout。 |
 | `packages/core/src/mcp/codepuppy-startup.ts` | `StartFailure.code` 改用 `CodepuppyFailureCode` 类型:引擎侧产出一个没登记的码,typecheck 就红。 |
+| `packages/core/src/mcp/client.ts` | `ConnectError.code` 改为 `Schema.declare(isCodepuppyFailureCode)`,让源头产出的码同样受登记约束(否则 connection.ts 把 `string` 交给 `StartFailure` 过不了 typecheck)。 |
 | `packages/core/src/mcp/index.ts` | `failed` 与 `closed` 两个事件写 `Mcp.Status.Failed` 时,`error` 经 `withFailureCode(cause.code, …)` 加前缀(`codepuppy(#1563, #1564)` 标注块内)。`closed` 先算 cause 再写状态。`needs_auth` 不动;`Mcp.Status` 形状不变。 |
 | `packages/core/src/mcp/connection.ts` | 去掉非法 URL 分支上的 `{ code: "invalid_url" }`(第 173 行),恢复成上游原样。行为不变:没有 cause 本来就不会重连,上游原文「Invalid MCP server URL: …」已经说明原因。v1 也没有给它具名(当时记作 `transport`)。这样上游 `mcp.test.ts:1891` 的逐字断言不用改,也不必接管那个 3500 行的上游测试。 |
 | `packages/core/src/session/to-session-error.ts` | 新的最小接管,只动 Transport 分支(第 52–54 行):用 `classifyNetFailure(cause.reason, engineNetFailurePath(cause.reason.url, process.env))` 分类,认出了层,就给 `unreachable()` / `providerError()` 的 `message` 加该层的前缀;认不出就保持原文。`type` 与其余字段不变。 |
 | `packages/core/test/codepuppy-net-failure-settle.test.ts`(新,Code Puppy 自有) | 替代 v1 的 `packages/opencode/test/session/codepuppy-net-failure-settle.test.ts`。错误来自真实的 `@opencode/ai` 路径,不是手搓:真 `RequestExecutor.fetchLayer` 请求一个已关闭的本机端口,得到 ECONNREFUSED;同一执行器的映射处理原生 DNS 失败,得到 ENOTFOUND,走 `unreachable` 子分支。另加一条无码的传输失败(不加前缀,原文不变)。 |
-| `packages/core/test/codepuppy-mcp-runtime.test.ts` | AC2 加一条:在生产 `Mcp.Service.servers()` 上,缺命令 / 缺工作目录 / 被拒的远端三台的 failed 状态,经 `parseFailureCode(status.error)` 分别读出 dependency_missing / workspace_missing / tcp。 |
+| `packages/core/test/codepuppy-mcp-runtime.test.ts` | AC2 加一条:在生产 `Mcp.Service.servers()` 上,缺命令 / 缺工作目录 / 被拒的远端三台的 failed 状态,经 `parseFailureCode(status.error)` 分别读出 dependency_missing / workspace_missing / tcp。AC1 断言跑完后杀掉 `hang` 进程(编排器实施轮第 4 项);`until` 的类型改为对 R 泛型,修掉本文件既有的 7 条 typecheck 错误。 |
+| `packages/core/test/fixture/codepuppy-mcp-startup-stdio.ts` | 加 `CODEPUPPY_MCP_PID_FILE`:启动时写下自己的 pid,测试据此杀掉挂起的服务器,而不是等它的握手超时。 |
 | `packages/core/test/session-runner-retry.test.ts`(上游测试,随源文件接管) | 第 122–129 行 `toSessionError` 那条断言写的是旧行为(ENOTFOUND / ECONNREFUSED 的逐字 message),这正是本段替换掉的行为。只改这两处期望:改为经 `parseFailureCode` 读出码 dns / tcp 和原文。 |
 | `packages/schema/test/codepuppy-net-failure.test.ts` | 加用例:每个登记码都能往返;上游原文、未登记的码、像前缀却不合格式的文本都解析为 `undefined`。 |
 | `scripts/north-star-guard.sh` | `UPSTREAM_EXCLUDES` 加两条:`packages/core/src/session/to-session-error.ts`、`packages/core/test/session-runner-retry.test.ts`(先例:oauth 的 page.ts 与它的测试成对登记)。 |
@@ -64,4 +66,6 @@ last_reviewed: 2026-11-12
 
 ### 偏离记录
 
-暂无
+- 2026-11-12 · 分类器加一条 `code: "Timeout"` 无 cause ⇒ timeout 的规则,及对应 schema 用例 · 编排器实施轮第 3 项新授权(v1 对齐) · `a60804124d`(该提交未同步本段,在此补记)。
+- 2026-11-12 · 多改 `client.ts`(`ConnectError.code` 的类型)· `StartFailure.code` 收窄为登记码后,源头的 `string` 过不了 typecheck · 本提交。
+- 2026-11-12 · 多改 stdio 夹具与 runtime 测试的 AC1 收尾、`until` 类型 · 编排器实施轮第 4 项:AC1 收尾在等 `hang` 的握手超时(收尾时长随 `timeout.startup` 走:8 s ⇒ 10.3 s,默认 30 s ⇒ 32 s);同文件既有的 7 条 typecheck 错误一并修掉 · 本提交。

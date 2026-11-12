@@ -108,20 +108,17 @@ const ROUTED_MODELS = [
 ] as const
 
 describe("drift 锁 —— 上游按模型 id 分叉底座这件事仍然成立", () => {
-  const coreSrc = path.join(import.meta.dir, "../../../core/src")
-  const sources = {
-    "plugin/optimize.ts": fs.readFileSync(path.join(coreSrc, "plugin/optimize.ts"), "utf8"),
-    "session/system-prompt.ts": fs.readFileSync(path.join(coreSrc, "session/system-prompt.ts"), "utf8"),
-  }
-  for (const [file, needle] of [
-    ["plugin/optimize.ts", 'if (!id.includes("claude")) return undefined'],
-    ["plugin/optimize.ts", 'if (!id.includes("gpt")) return undefined'],
-    ["session/system-prompt.ts", 'import PROMPT from "./runner/prompt/system.txt"'],
-  ] as const) {
-    test(`${file} 仍含 ${needle}`, () => {
-      expect(sources[file].includes(needle)).toBe(true)
-    })
-  }
+  // 读的是上游路由的**文本**,登记为减速带(source-text-anchors.ts):它只证明三条分支的原文还在,证不了它们真的生效。
+  test("ANCHOR (not a gate): 上游底座路由原文仍按 claude / gpt / 兜底分三支", () => {
+    const coreSrc = path.join(import.meta.dir, "../../../core/src")
+    const optimize = fs.readFileSync(path.join(coreSrc, "plugin/optimize.ts"), "utf8")
+    const systemPrompt = fs.readFileSync(path.join(coreSrc, "session/system-prompt.ts"), "utf8")
+    expect([
+      optimize.includes('if (!id.includes("claude")) return undefined'),
+      optimize.includes('if (!id.includes("gpt")) return undefined'),
+      systemPrompt.includes('import PROMPT from "./runner/prompt/system.txt"'),
+    ]).toEqual([true, true, true])
+  })
 })
 
 describe("codepuppy-behavior 质量基线 —— 注入链路(#1240)", () => {

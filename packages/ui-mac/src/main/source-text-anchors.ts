@@ -94,6 +94,11 @@ export type SourceTextEntry = {
  * 每个条目对应的文件必须真的带上 `ANCHOR (not a gate): ` 标题前缀(第 ⑤ 层机械校验)。
  */
 export const DOWNGRADED_ANCHORS: Record<string, SourceTextEntry> = {
+  "packages/ui-mac/src/main/codepuppy-behavior.test.ts": {
+    why: "`#1662` 起读 OpenCode 2 的 packages/core/src/plugin/optimize.ts 与 session/system-prompt.ts:锚「三个模型 id 落三份不同底座」这个前提(claude 追加 anthropic.txt、gpt 换成 gpt.txt、其余落默认 system.txt),只为说明本文件的行为判据(真 injectCodePuppyConfig 跑三个模型,behavior 文件逐字节相同、都进 instructions)不是同义反复;行为判据本身不依赖这两行。两个不会让它变红的变异:①上游把 AnthropicPlugin / OpenAIPlugin 从 OptimizePlugin.Plugins 里拿掉或不再注册 OptimizePlugin(optimize.ts 原文一字不变,所有模型都落默认底座);②上游给某一支包上恒假条件,或让它返回与默认相同的模板。",
+    evidence: "#1240",
+    lines: 2,
+  },
   "packages/ui-mac/src/main/codepuppy-config-injection.test.ts": {
     why: "锚 sidecar.ts 里 ready 上报的取值与调用顺序。sidecar.ts 顶层就跑 registerHooks / getParentPort(),import 即副作用 ⇒ 没有单测驱动得了它。两个不会让它变红的变异:①在 postMessage 那一行之前把 injection 整个覆盖成空对象(被比较的文本逐字未变);②给 start() 加一条早退 return,ready 一次都不发。",
     evidence: "#613",

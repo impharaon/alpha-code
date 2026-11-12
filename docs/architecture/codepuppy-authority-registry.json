@@ -1102,9 +1102,12 @@
         {
           "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
           "name": "an auth answer stays failed"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "an auth answer to tools/list is named auth and not retried"
         }
-      ],
-      "note": "Open (#1666 Unit D, handed back): an auth answer (401) to tools/list is named `transport` and reconnects in the background, because packages/core/src/mcp/connection.ts:232 classifies a tools/list failure without the SDK's HTTP status; an auth answer at connect stays failed as decided."
+      ]
     },
     {
       "id": "mcp-start-concurrency",

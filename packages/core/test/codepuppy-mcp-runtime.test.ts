@@ -14,8 +14,8 @@
 //   AC4  closing the service ends a server's process and its descendants (#1666 Unit D, v1 successor)
 //   AC7  tools/list runs on the catalog budget, and a call's wait for its server's handshake is not cut by the
 //        execution budget (#1666 Unit D, v1 successor)
-//   #1645 a tools/list failure that another attempt may fix reconnects after 30 s and lists in the same service
-//        (#1666 Unit D, v1 successor)
+//   #1645 a tools/list failure that another attempt may fix reconnects after 30 s and lists in the same service; an
+//        auth answer to tools/list is named auth and not retried (#1666 Units D/E)
 //   #1653 a server waiting out its backoff holds back no other server, and calling it does not reconnect early
 //
 // HOME, XDG_* and the database are isolated before any engine module loads.
@@ -380,7 +380,7 @@ describe("AC7: each wait has its own budget", () => {
 
 /** A real streamable-HTTP MCP server (one tool, `probe`) whose tools/list can be made to answer with an HTTP status. */
 const httpServer = () => {
-  const state = { lists: 0, listStatus: 0 }
+  const state = { lists: 0, listStatus: 0, listBody: "no" }
   const build = async () => {
     const server = new McpServer({ name: "codepuppy-remote", version: "1.0.0" }, { capabilities: { tools: {} } })
     server.setRequestHandler("tools/list", async () => ({ tools: [{ name: "probe", description: "probe", inputSchema: { type: "object" as const, properties: {} } }] }))
@@ -397,7 +397,7 @@ const httpServer = () => {
       if (body?.method === "initialize") current = build()
       if (body?.method === "tools/list") {
         state.lists += 1
-        if (state.listStatus) return new Response("no", { status: state.listStatus })
+        if (state.listStatus) return new Response(state.listBody, { status: state.listStatus })
       }
       return (await (current ??= build())).handleRequest(request)
     },
@@ -426,6 +426,24 @@ describe("#1645: a failed tools/list", () => {
         yield* connected("cloud")
         expect(yield* toolNames).toEqual(["cloud/probe"])
       }).pipe(Effect.ensuring(Effect.sync(flaky.stop))),
+  )
+
+  // Red if a tools/list 401 is named without its HTTP status (it would read as `transport` and reconnect every 30 s
+  // up to 10 min).
+  const denied = httpServer()
+  denied.state.listStatus = 401
+  testEffect(mcpLayer({ locked: new ConfigMCP.Remote({ type: "remote", url: denied.url, oauth: false }) })).effect(
+    "an auth answer to tools/list is named auth and not retried",
+    () =>
+    Effect.gen(function* () {
+      const settled: any = yield* until(statusOf("locked").pipe(Effect.map((s: any) => (s?.status !== "pending" && s?.status !== "connected" ? s : undefined))), "locked settled")
+      expect(parseFailureCode(settled.error)?.code).toBe("auth")
+      const lists = denied.state.lists
+      denied.state.listStatus = 0
+      yield* TestClock.adjust("15 minutes")
+      yield* Effect.promise(() => Bun.sleep(300))
+      expect(denied.state.lists).toBe(lists)
+    }).pipe(Effect.ensuring(Effect.sync(denied.stop))),
   )
 })
 

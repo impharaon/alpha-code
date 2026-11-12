@@ -125,3 +125,24 @@ last_reviewed: 2026-11-12
 
 - 2026-11-12 · 第 1 项的测试读「注册表在该名字下放的是哪一个」(描述区分),不执行工具、不数 MCP 调用 · Code Mode 工具(`codemode: true`,真内置与 MCP 工具都是)不能按名字直接执行(`snapshot.execute` 回「No tool named …」);Code Mode 执行的就是该名字下注册的那一个 · 第 1 项提交。
 - 2026-11-12 · 第 2 项:`internal` 里同时激活上游 `AgentPlugin`(否则 `general` 子 agent 不存在,`subagent.ts` 在权限检查之前就以「Unknown agent」失败);宿主另导出 `AgentPlugin` / `SubagentTool` / `WebFetchTool` / `SessionPrompt`;E7 前提臂对 ask 回 once(拒绝会在晚注册的探针钩子之前结束调用链,数不到 `execute.before`)· 第 2 项提交。
+
+## Unit E — hold the four gaps unit D exposed(L4 #1666)
+
+- 依据:编排器 Unit E 派发书(四项都「握住」;owner 2026-11-09 原话见派发书);Unit D 交回 `5f147ef650`、`c04d96466d`、`658d6c1f4c`;登记册 `mcp-reconnect-backoff`、`mcp-declared-tools-before-connect` 的 note。基于 `658d6c1f4c`。
+- 核对:编排器派发即核对(本段与实现同轮)。
+
+### 改动与证明
+
+| 项 | 文件 | 改什么 | 证明(反向臂) |
+| --- | --- | --- | --- |
+| 1 tools/list 401 不重试 | `core/src/mcp/client.ts`、`connection.ts` | `failure()` 把 SDK 原错误挂在 `cause` 上;导出带 SDK 提示的命名函数(原 `startFailure`,先解开 `cause`),`connection.ts:232` 的 tools/list 分支改调它 | `codepuppy-mcp-runtime.test.ts`:tools/list 回 401,15 分钟(TestClock)后仍只 1 次请求、状态带 `auth`;去掉提示 ⇒ 2 次 |
+| #1645 日志不含密文 | 同上测试 | 远端配置带 `Authorization` 头,401 失败的日志不含令牌与头名 | 把令牌塞进报错原文的对照臂证明扫描有效 |
+| 2 真实 Office 命令认得出随包声明 | `core/src/mcp/codepuppy-first-party-mcp.ts` | 模板里 `{workspace}` 那一位接受标记本身或绝对路径(main 自己的契约,`office-advisories.ts:188`),core 声明与 ext 授权共用这一个判断 | 随包 `tools.json` + main 写的命令形状:标记与替换后的目录都拿到声明;ext 的 `toolFacts` 给出 `codepuppy-bundled`;旧比较 ⇒ 替换后为空。之后补真 python 跑真 `server.py` 的身份对照 |
+| 3 AC6 定义变了的调用响亮失败 | `core/src/tool/mcp.ts` | 调用前把提供时的定义与当前列出的同名工具比(`sameTool`,同 #1565),不同 ⇒ 具名失败、不执行 | 新测试:服务换代后同名工具 schema 变了 ⇒ 旧定义下的调用具名失败、运行时零调用;定义不变 ⇒ 执行;去掉比较 ⇒ 第一条红 |
+| 4 子任务命令过工具闸 | `core/src/config/plugin/command.ts` | 建子会话前走 `subagent` 工具同一条权限路径(`ctx.permission.assert`,action 取 `SubagentTool.name`,resources 为子 agent,同 `subagent.ts:145`);Code Puppy 停用 `subagent` 时 ext 追加的 deny 规则(`catalog.ts:45`)让它被拒,core 不另写策略 | `register-policy.test.ts` 真宿主:停用 `builtin::subagent` ⇒ `/review`(subtask)具名失败、零子会话;放行 ⇒ 建出子会话;不装 ext ⇒ 建出子会话;去掉这次 assert ⇒ 第一条红 |
+
+同步:登记册(`mcp-reconnect-backoff`、`mcp-declared-tools-before-connect` 的 note 收口;`l1r-subtask-attachment-policy`、AC6 所属条目补测试)、ADR-047 保持表、gate-files 条数与退役注释。
+
+### 偏离记录
+
+暂无

@@ -7,7 +7,7 @@ import { FetchHttpClient } from "effect/http"
 import { Environment } from "../environment/index.js"
 import { KeyedMutex } from "../effect/keyed-mutex.js"
 import type { McpClient } from "./client.js"
-import { classifyStartFailure, startPermits, type StartFailure } from "./codepuppy-startup.js" // codepuppy(#1563)
+import { startPermits, type StartFailure } from "./codepuppy-startup.js" // codepuppy(#1563)
 
 export type Failure = Extract<Mcp.Status, { readonly status: "failed" | "needs_auth" }>
 
@@ -229,7 +229,7 @@ export function make(input: Input): Connection {
           ? { code: "auth", reconnect: false }
           : error instanceof McpClient.ConnectError && error.code !== undefined
             ? { code: error.code, reconnect: error.reconnect === true }
-            : classifyStartFailure(error, config),
+            : McpClient.startFailure(error, config), // codepuppy(#1645): with the SDK's HTTP status
       )
     }).pipe(
       Effect.ensuring(input.events.settled),

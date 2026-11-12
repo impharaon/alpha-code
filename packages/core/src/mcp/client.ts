@@ -313,13 +313,14 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
   const failure = (error: unknown) => {
     // A tool call that relists first can fail with the list's already mapped expiry.
     if (error instanceof SessionExpiredError) return error
-    if (!(error instanceof SdkHttpError) || session.transport?.sessionId === undefined) return new Error(explain(error))
+    // codepuppy(#1645): the SDK error stays the cause, so a failed listing is named with its HTTP status (startFailure).
+    if (!(error instanceof SdkHttpError) || session.transport?.sessionId === undefined) return new Error(explain(error), { cause: error })
     const expired =
       error.status === 404 ||
       (error.status === 400 &&
         typeof error.data.text === "string" &&
         error.data.text.includes("Bad Request: Server not initialized"))
-    if (!expired) return new Error(explain(error))
+    if (!expired) return new Error(explain(error), { cause: error }) // codepuppy(#1645)
     if (!session.reported) {
       session.reported = true
       session.expired?.()
@@ -584,9 +585,11 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
   })
 })
 
-// codepuppy(#1563) ── the SDK-specific facts the Code Puppy classifier cannot see on its own.
-function startFailure(error: unknown, config: { readonly type: string; readonly url?: string }) {
-  const cause = error instanceof SdkError && error.code === SdkErrorCode.EraNegotiationFailed && error.cause !== undefined ? error.cause : error
+// codepuppy(#1563, #1645) ── the SDK-specific facts the Code Puppy classifier cannot see on its own. Also names a failed
+// listing (connection.ts), whose SDK error arrives as the cause of the client's own Error.
+export function startFailure(error: unknown, config: { readonly type: string; readonly url?: string }) {
+  const listed = !(error instanceof SdkError) && error instanceof Error && (error.cause instanceof SdkError || error.cause instanceof SdkHttpError) ? error.cause : error
+  const cause = listed instanceof SdkError && listed.code === SdkErrorCode.EraNegotiationFailed && listed.cause !== undefined ? listed.cause : listed
   return classifyStartFailure(cause, config, {
     timedOut: cause instanceof SdkError && cause.code === SdkErrorCode.RequestTimeout,
     httpStatus: cause instanceof SdkHttpError ? cause.status : undefined,

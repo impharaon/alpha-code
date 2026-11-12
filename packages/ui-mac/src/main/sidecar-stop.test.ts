@@ -9,6 +9,7 @@
 // stopSidecarEngine 消费消息 —— main→线上形状→sidecar 执行这一整条是真的在跑,
 // 只有「sidecar.ts 确实调用了这两个函数」这一跳靠文末的接线锚守。
 
+import { isolateEngineHome } from "../../test-component/isolated-engine-home"
 import { afterEach, beforeEach, describe, expect, mock, test, vi } from "bun:test"
 import { EventEmitter } from "node:events"
 import { mkdtempSync, readFileSync, rmSync } from "node:fs"
@@ -17,6 +18,9 @@ import { join } from "node:path"
 
 import { parseSidecarStopCommand, stopSidecarEngine } from "./sidecar-stop"
 import { mockElectron } from "../../test-component/electron-mock"
+
+// 在 server.ts 被 import、spawnLocalServer 跑之前:旧凭证检查只看临时根,不碰本机真实数据目录(isolated-engine-home.ts)。
+isolateEngineHome()
 
 const appEvents = new EventEmitter()
 

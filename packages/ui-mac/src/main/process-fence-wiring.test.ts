@@ -13,6 +13,7 @@
 // (用户自己的 HTTP(S)_PROXY / NO_PROXY 不能存活 —— 唯一通路);代理起不来 ⇒ 拒 fork、零 fork;缺省提供者真起监听。
 // 非 darwin:没有围栏就不装策略层 —— 不起代理、env 照旧。
 
+import { isolateEngineHome } from "../../test-component/isolated-engine-home"
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { EventEmitter } from "node:events"
 import { createHash } from "node:crypto"
@@ -27,6 +28,9 @@ import { buildOfficeRuntime } from "../../scripts/build-office-runtime"
 import { startEgressPolicyProxy, type EgressLogRecord, type EgressProxyHandle } from "./network-egress-proxy"
 import { renderProcessFenceProfile, resolveEngineRoots } from "./process-fence-profile"
 import { upsertRecordV2 } from "./ext-receipt-v2"
+
+// 在 server.ts 被 import、spawnLocalServer 跑之前:旧凭证检查只看临时根,不碰本机真实数据目录(isolated-engine-home.ts)。
+isolateEngineHome()
 
 const appEvents = new EventEmitter()
 

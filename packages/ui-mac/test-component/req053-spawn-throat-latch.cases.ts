@@ -1,4 +1,5 @@
 // REQ-053 `#982`: spawnLocalServer refuses fork without a dangling-sweep credit.
+import { isolateEngineHome } from "./isolated-engine-home"
 import { afterEach, beforeEach, expect, mock, test } from "bun:test"
 import { EventEmitter } from "node:events"
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs"
@@ -6,6 +7,9 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { createElectronStub } from "./req053-electron-stub"
+
+// 在 server.ts 被 import、spawnLocalServer 跑之前:旧凭证检查只看临时根,不碰本机真实数据目录(isolated-engine-home.ts)。
+isolateEngineHome()
 
 class FakeChild extends EventEmitter {
   stdout = new EventEmitter()

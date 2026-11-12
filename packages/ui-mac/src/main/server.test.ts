@@ -1,3 +1,4 @@
+import { isolateEngineHome } from "../../test-component/isolated-engine-home"
 import { afterEach, beforeAll, beforeEach, describe, expect, mock, test, vi } from "bun:test"
 import { ConfigProvider, Effect, Layer } from "effect"
 import { EventEmitter } from "node:events"
@@ -6,6 +7,9 @@ import { homedir, tmpdir } from "node:os"
 import { join, parse, resolve } from "node:path"
 import { writeCustomProviderTruth } from "./custom-provider-truth-write"
 import { mockElectron } from "../../test-component/electron-mock"
+
+// 在 server.ts 被 import、spawnLocalServer 跑之前:旧凭证检查只看临时根,不碰本机真实数据目录(isolated-engine-home.ts)。
+isolateEngineHome()
 
 class FakeChild extends EventEmitter {
   stdout = new EventEmitter()

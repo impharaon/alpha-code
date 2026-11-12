@@ -8,7 +8,7 @@ version: 0
 approved_by: ""
 approved_at: ""
 owners: [owner]
-last_reviewed: 2026-11-10
+last_reviewed: 2026-11-12
 ---
 
 # 用户可在安全边界内连接自己的远程数据库
@@ -20,6 +20,9 @@ last_reviewed: 2026-11-10
 - [意图与处置 impharaon/alpha-work:INT-safety/I-08](https://github.com/impharaon/alpha-work/blob/a4b8beeac0196f02780a8c26364529b07e313acb/docs/intents/INT-safety.md#意图点)。
 - 历史身份：[impharaon/alpha-code#1514](https://github.com/impharaon/alpha-code/issues/1514)；原题名与编号保留，当前交付状态以 GitHub 为准。
 - Epic：[能力分组](https://github.com/impharaon/alpha-work/issues/138)。
+
+- [批准/事实依据](https://github.com/impharaon/alpha-code/issues/1514)。
+- 交付入口：[alpha-code#1514](https://github.com/impharaon/alpha-code/issues/1514)；实现与验收状态由这些票及其原生子票持有。
 
 ## 用户与范围
 
@@ -41,12 +44,15 @@ last_reviewed: 2026-11-10
 
 原票没有已批准 AC，待确定后只在这里形成基线；不能以标题推造验收条件。
 
+证据与适用边界：本机 SQLite 已有，远程数据库驱动被出网围栏拒绝；这是待定义能力，不是已实现的远程接入。
+
 ## 待决
 
-尚无已批准的验收条款；只登记原票提出的远程数据库结果，不凭治理任务编造连接范围或凭据方案。
+alpha-code#1514 先界定实际数据库/驱动样本、用户同意的目标范围与凭据保管；证明不能放松既有围栏后形成有限 AC。未决定前不猜测端口白名单或通用代理框架。
 
 ## 批准记录
 
 | 版本 | 日期 | 批准人 | 原话或链接 |
 | --- | --- | --- | --- |
 | 0 | 2026-11-10 | — | 整理历史来源；尚未作为当前批准基线。 |
+| 0 | 2026-11-12 | — | 已核对历史范围与实际证据；具体缺口见待决，由来源中的交付入口承接。 |

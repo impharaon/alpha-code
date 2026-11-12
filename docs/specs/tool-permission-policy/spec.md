@@ -3,12 +3,12 @@ id: SPEC-tool-permission-policy
 title: 用户可按来源、服务和工具设置停用、询问或允许
 summary: 用户可按来源、服务和工具设置停用、询问或允许，保留历史条款、有效裁决和交付证据边界。
 kind: spec
-status: draft
-version: 0
-approved_by: ""
-approved_at: ""
+status: approved
+version: 1
+approved_by: owner（历史批准沿用）
+approved_at: 2026-11-12
 owners: [owner]
-last_reviewed: 2026-11-10
+last_reviewed: 2026-11-12
 ---
 
 # 用户可按来源、服务和工具设置停用、询问或允许
@@ -22,6 +22,9 @@ last_reviewed: 2026-11-10
 - Epic：[能力分组](https://github.com/impharaon/alpha-work/issues/142)。
 - [有效范围或验收依据 2026-08-26](https://github.com/impharaon/alpha-code/issues/723#issuecomment-5419376073)。
 - [有效范围或验收依据 2026-11-09](https://github.com/impharaon/alpha-code/issues/723#issuecomment-6731102595)。
+
+- [批准/事实依据](https://github.com/impharaon/alpha-code/issues/723#issuecomment-5419376073)。
+- 交付入口：[alpha-code#723](https://github.com/impharaon/alpha-code/issues/723)；实现与验收状态由这些票及其原生子票持有。
 
 ## 用户与范围
 
@@ -58,12 +61,15 @@ last_reviewed: 2026-11-10
 | AC-11 | 插件动态工具支持 `ask`,而不只是整工具开/关。 _(2026-09-16 改写,原文见编辑历史)_ | [原票](https://github.com/impharaon/alpha-code/issues/723) · [最后裁决](https://github.com/impharaon/alpha-code/issues/723#issuecomment-6731102595) |
 | AC-12 | 无法只禁用单个工具的既有折叠（`edit\|write\|apply_patch` 合一、三个 MCP-resource 工具折进 `read`）被消除或在方案中明确记录为已知限制并给出理由。 | [原票](https://github.com/impharaon/alpha-code/issues/723) · [最后裁决](https://github.com/impharaon/alpha-code/issues/723#issuecomment-6731102595) |
 
+证据与适用边界：沿用 #724 已完成的 CLOSE_DECIDE 与后续 2026-09-16 范围修订。AC-03/04/05/11/12；已有关联执行门与 #1147 证据；尚需 AC-05 服务端 403 反例和 AC-12 折叠限制是否消除或有理由的记录。
+
 ## 待决
 
-2026-11-08 核对仍缺 AC5 云端 403 反例、AC6 动态消失/重现具名用例及 AC12 裁定；不能把子票已关等同于全部验收完成。
+无新的需求批准事项；上述历史批准继续有效。规格批准不等于实现、部署或验收完成，尚缺证据与实施工作由来源中的交付入口负责。
 
 ## 批准记录
 
 | 版本 | 日期 | 批准人 | 原话或链接 |
 | --- | --- | --- | --- |
 | 0 | 2026-11-10 | — | 整理历史来源；尚未作为当前批准基线。 |
+| 1 | 2026-11-12 | owner（历史批准） | 沿用既有批准的范围/裁决，2026-11-12 为规格登记日，不是新的 owner 批准日。[依据](https://github.com/impharaon/alpha-code/issues/723#issuecomment-5419376073)。 |

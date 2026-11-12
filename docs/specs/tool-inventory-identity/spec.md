@@ -3,12 +3,12 @@ id: SPEC-tool-inventory-identity
 title: 工具清单和授权身份随实际来源变化
 summary: 工具清单和授权身份随实际来源变化，保留历史条款、有效裁决和交付证据边界。
 kind: spec
-status: draft
-version: 0
-approved_by: ""
-approved_at: ""
+status: approved
+version: 1
+approved_by: owner（历史批准沿用）
+approved_at: 2026-11-12
 owners: [owner]
-last_reviewed: 2026-11-10
+last_reviewed: 2026-11-12
 ---
 
 # 工具清单和授权身份随实际来源变化
@@ -18,10 +18,13 @@ last_reviewed: 2026-11-10
 ## 来源
 
 - [意图与处置 impharaon/alpha-work:INT-safety/I-01](https://github.com/impharaon/alpha-work/blob/a4b8beeac0196f02780a8c26364529b07e313acb/docs/intents/INT-safety.md#意图点)。
-- 历史身份：[impharaon/alpha-code#723](https://github.com/impharaon/alpha-code/issues/723)；原题名与编号保留，当前交付状态以 GitHub 为准。
+- 历史来源（当前 Story 为 #1677）：[impharaon/alpha-code#723](https://github.com/impharaon/alpha-code/issues/723)；原题名与编号保留，当前交付状态以 GitHub 为准。
 - Epic：[能力分组](https://github.com/impharaon/alpha-work/issues/142)。
 - [有效范围或验收依据 2026-08-26](https://github.com/impharaon/alpha-code/issues/723#issuecomment-5419376073)。
 - [有效范围或验收依据 2026-11-09](https://github.com/impharaon/alpha-code/issues/723#issuecomment-6731102595)。
+
+- [批准/事实依据](https://github.com/impharaon/alpha-code/issues/723#issuecomment-5419376073)。
+- 交付入口：[alpha-code#1677](https://github.com/impharaon/alpha-code/issues/1677)；实现与验收状态由这些票及其原生子票持有。
 
 ## 用户与范围
 
@@ -58,12 +61,15 @@ last_reviewed: 2026-11-10
 | AC-09 | 可配置工具的 identity 与 inventory 来自 #731 固化的单一权威；展示（#722）与策略（#724）消费同一份 identity，不存在第二份映射。 | [原票](https://github.com/impharaon/alpha-code/issues/723) · [最后裁决](https://github.com/impharaon/alpha-code/issues/723#issuecomment-6731102595) |
 | AC-10 | 模型可见别名与稳定 identity 保持可验证的一一映射；无法唯一反解的别名在提供给模型或执行前 fail closed，不触发网络、副作用或费用（实现见 #726）。 | [原票](https://github.com/impharaon/alpha-code/issues/723) · [最后裁决](https://github.com/impharaon/alpha-code/issues/723#issuecomment-6731102595) |
 
+证据与适用边界：沿用 #724 已完成的 CLOSE_DECIDE 与后续 2026-09-16 范围修订。AC-01/02/06/09/10；共享 #726/#1128/#1129 证明，尚缺 AC-06 动态消失/重现具名结果。
+
 ## 待决
 
-2026-11-08 核对仍缺 AC5 云端 403 反例、AC6 动态消失/重现具名用例及 AC12 裁定；不能把子票已关等同于全部验收完成。
+无新的需求批准事项；上述历史批准继续有效。规格批准不等于实现、部署或验收完成，尚缺证据与实施工作由来源中的交付入口负责。
 
 ## 批准记录
 
 | 版本 | 日期 | 批准人 | 原话或链接 |
 | --- | --- | --- | --- |
 | 0 | 2026-11-10 | — | 整理历史来源；尚未作为当前批准基线。 |
+| 1 | 2026-11-12 | owner（历史批准） | 沿用既有批准的范围/裁决，2026-11-12 为规格登记日，不是新的 owner 批准日。[依据](https://github.com/impharaon/alpha-code/issues/723#issuecomment-5419376073)。 |

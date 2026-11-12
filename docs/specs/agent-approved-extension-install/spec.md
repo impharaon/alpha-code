@@ -3,12 +3,12 @@ id: SPEC-agent-approved-extension-install
 title: 助手发现扩展并经用户同意安装
 summary: 目录查询、授权确认、安装状态和当前会话中后续使用。
 kind: spec
-status: draft
-version: 0
-approved_by: ""
-approved_at: ""
+status: approved
+version: 1
+approved_by: owner（历史批准沿用）
+approved_at: 2026-11-12
 owners: [owner]
-last_reviewed: 2026-11-10
+last_reviewed: 2026-11-12
 ---
 
 # 助手发现扩展并经用户同意安装
@@ -21,6 +21,9 @@ last_reviewed: 2026-11-10
 
 - [Story alpha-code#1521](https://github.com/impharaon/alpha-code/issues/1521)。
 - [方案基线](https://github.com/impharaon/alpha-code/blob/e56ae0c03603a6540cd01043d64d590c6f7e2930/docs/design/2026-10-14-req234-hub-agent-install-baseline.md)；[AC-02 范围裁决](https://github.com/impharaon/alpha-code/issues/1530#issuecomment-6207376527)；[实施及验证核对](https://github.com/impharaon/alpha-code/issues/1521#issuecomment-6731102084)。
+
+- [批准/事实依据](https://github.com/impharaon/alpha-code/issues/1521#issuecomment-6731102084)。
+- 交付入口：[alpha-code#1521](https://github.com/impharaon/alpha-code/issues/1521)；实现与验收状态由这些票及其原生子票持有。
 
 ## 用户与范围
 
@@ -44,11 +47,14 @@ last_reviewed: 2026-11-10
 | AC-04 | 已启用且加载/连接成功的条目,在显示「可用」后,同一对话的下一条消息即可被调用,不重启、不新开会话 | [原票](https://github.com/impharaon/alpha-code/issues/1521)；打包 RC 对话记录 |
 | AC-05 | 默认开启的 `customize-code-puppy` 技能教上述流程,并如实说明项目 JS 插件的信任边界;上游 `customize-opencode` 继续出厂禁用 | [原票](https://github.com/impharaon/alpha-code/issues/1521)；技能内容测试 |
 
+证据与适用边界：沿用 2026-10-14 基线与 10-16 裁决。已完成 #1529/#1531/#1532/#1533；全局受保护路径义务在 #1530/#1542，owner 已明确挂起；项目插件路径不关闭。发布件确认/可用后同对话调用证据复用 #1660。
+
 ## 待决
 
-AC-02 的旁路保证受后续裁决约束：只承诺保护的全局文件与目录无法在围栏内写入或替换，项目插件路径不关闭。该部分随 #1530 和 #1542 挂起。AC-04 打包对话记录由 #1660 取证。
+无新的需求批准事项；上述历史批准继续有效。规格批准不等于实现、部署或验收完成，尚缺证据与实施工作由来源中的交付入口负责。
 
 ## 批准记录
 
 | 版本 | 日期 | 批准人 | 原话或链接 |
 | --- | --- | --- | --- |
+| 1 | 2026-11-12 | owner（历史批准） | 沿用既有批准的范围/裁决，2026-11-12 为规格登记日，不是新的 owner 批准日。[依据](https://github.com/impharaon/alpha-code/issues/1521#issuecomment-6731102084)。 |

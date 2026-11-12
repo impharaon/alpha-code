@@ -3,12 +3,12 @@ id: SPEC-opencode-generation-switch
 title: 升级引擎后保留当前桌面体验与整体撤回能力
 summary: 升级引擎后保留当前桌面体验与整体撤回能力，保留历史条款、有效裁决和交付证据边界。
 kind: spec
-status: draft
-version: 0
-approved_by: ""
-approved_at: ""
+status: approved
+version: 1
+approved_by: owner（历史批准沿用）
+approved_at: 2026-11-12
 owners: [owner]
-last_reviewed: 2026-11-10
+last_reviewed: 2026-11-12
 ---
 
 # 升级引擎后保留当前桌面体验与整体撤回能力
@@ -23,6 +23,9 @@ last_reviewed: 2026-11-10
 - [有效范围或验收依据 2026-11-09](https://github.com/impharaon/alpha-code/issues/1662#issuecomment-6736300635)。
 - [有效范围或验收依据 2026-11-09](https://github.com/impharaon/alpha-code/issues/1662#issuecomment-6736317973)。
 - [有效范围或验收依据 2026-11-09](https://github.com/impharaon/alpha-code/issues/1662#issuecomment-6736730273)。
+
+- [批准/事实依据](https://github.com/impharaon/alpha-code/issues/1662#issuecomment-6736730273)。
+- 交付入口：[alpha-code#1662](https://github.com/impharaon/alpha-code/issues/1662)；实现与验收状态由这些票及其原生子票持有。
 
 ## 用户与范围
 
@@ -59,12 +62,15 @@ last_reviewed: 2026-11-10
 | AC-04 | 每日上游同步恢复为跟随 OpenCode 2 主线并能成功运行或按接管规则明确停下。证据:合入后的同步运行记录。 | [原票](https://github.com/impharaon/alpha-code/issues/1662) · [最后裁决](https://github.com/impharaon/alpha-code/issues/1662#issuecomment-6736730273) |
 | AC-05 | 可整体撤回:撤回步骤写明并在分支上演练过一次。证据:演练记录。 | [原票](https://github.com/impharaon/alpha-code/issues/1662) · [最后裁决](https://github.com/impharaon/alpha-code/issues/1662#issuecomment-6736730273) |
 
+证据与适用边界：沿用当前 Code Puppy 界面权威、OpenCode 2 /api/project 项目身份及后续 L4/L5 已批修订。#1663 结论已交付；#1664–#1668 实施、#1669 发布件回归/撤回演练。仅更新规格与交接引用，不重写在飞 lane 的冻结合同。
+
 ## 待决
 
-进行中的换代设计与 lane 范围保持原样。2026-11-09 裁决：当前 Code Puppy 界面为权威；项目身份由 OpenCode 2 /api/project 持有；后续 L4/L5 修订以最新评论为准。
+无新的需求批准事项；上述历史批准继续有效。规格批准不等于实现、部署或验收完成，尚缺证据与实施工作由来源中的交付入口负责。
 
 ## 批准记录
 
 | 版本 | 日期 | 批准人 | 原话或链接 |
 | --- | --- | --- | --- |
 | 0 | 2026-11-10 | — | 整理历史来源；尚未作为当前批准基线。 |
+| 1 | 2026-11-12 | owner（历史批准） | 沿用既有批准的范围/裁决，2026-11-12 为规格登记日，不是新的 owner 批准日。[依据](https://github.com/impharaon/alpha-code/issues/1662#issuecomment-6736730273)。 |

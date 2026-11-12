@@ -8,7 +8,7 @@ version: 0
 approved_by: ""
 approved_at: ""
 owners: [owner]
-last_reviewed: 2026-11-10
+last_reviewed: 2026-11-12
 ---
 
 # 右栏审查显示本回合的真实文件修改
@@ -20,6 +20,9 @@ last_reviewed: 2026-11-10
 - [impharaon/alpha-work:INT-artifacts](https://github.com/impharaon/alpha-work/blob/a4b8beeac0196f02780a8c26364529b07e313acb/docs/intents/INT-artifacts.md#意图点)。
 - [历史需求 alpha-code#1163](https://github.com/impharaon/alpha-code/issues/1163) · [Epic alpha-work#148](https://github.com/impharaon/alpha-work/issues/148)。
 - [范围与交付证据](https://github.com/impharaon/alpha-code/pull/1168)。
+
+- [批准/事实依据](https://github.com/impharaon/alpha-code/pull/1168)。
+- 交付入口：[alpha-code#1163](https://github.com/impharaon/alpha-code/issues/1163)；实现与验收状态由这些票及其原生子票持有。
 
 ## 用户与范围
 
@@ -50,12 +53,15 @@ last_reviewed: 2026-11-10
 | AC-03 | 文件面改动徽章与「点击有改动文件 → 跳转审查文件卡」恢复工作:本回合被改的文件在<br>文件树行上出现改动徽章;点击该行落在审查面对应文件卡(files-state.ts:239-246 的<br>jumpToReview 分支在生产可达)。<br>判据自检:①路径——徽章数据源与审查面同一投影(session-rail-files.tsx:53-55 改接);<br>②证据——组件测试(徽章渲染 + 点击落点)+ L2;③错误实现(徽章仍读死通道)测试红。<br>与 REQ-141 AC1 的分流语义保持:有徽章 → 审查,无徽章 → 查看器(两张 REQ 各自测自己分支,<br>合并顺序无相互阻塞,但 VERIFY 要在两者都落后跑一次分流联测)。 | [原条文](https://github.com/impharaon/alpha-code/issues/1163) |
 | AC-04 | 空态诚实:面板呈现的是最近一次助手回合的变更;新回合未改文件时显示空态、不残留上一<br>回合内容;空态文案与实际行为一致(修复后「助手修改文件后会实时出现在这里」成为真话,或改写<br>文案与所选语义一致)。<br>判据自检:①路径——投影按回合键控,天然可判「本回合无变更」;②证据——组件测试(两回合序列:<br>有变更 → 无变更,断言清空)+ 文案 key 断言;③错误实现(聚合所有历史回合不清空)测试红。 | [原条文](https://github.com/impharaon/alpha-code/issues/1163) |
 
+证据与适用边界：PR #1168 已合入生产供数链、投影、组件清空与变异证明。PR 明确把 AC-01 运行期截图和 AC-03 files 整链留给 VERIFY；原查看器 #1162 已按 not planned 关闭，不将其当成未完成的硬阻塞。补核现有查看器分流与真实文件卡。
+
 ## 待决
 
-PR #1168 证明生产供数、投影与变异；该 PR 明示未完成运行期截图、files 容器整链验证。保留历史关闭，不伪造所有 AC 的正式包证明。
+发布件 AC-01/03 证据由独立验收承接，AC-02/04 复用 PR #1168；证据齐备后才按历史补录规则批准，不新增产品范围。
 
 ## 批准记录
 
 | 版本 | 日期 | 批准人 | 原话或链接 |
 | --- | --- | --- | --- |
 | 0 | 2026-11-10 | — | 来源与证据已整理，缺口未消除，不以治理授权代替批准。 |
+| 0 | 2026-11-12 | — | 已核对历史范围与实际证据；具体缺口见待决，由来源中的交付入口承接。 |

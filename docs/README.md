@@ -349,13 +349,13 @@ status.
 | id | 文件 | 做什么 | 状态 |
 | --- | --- | --- | --- |
 | `SPEC-account-balance-presentation` | [specs/account-balance-presentation/spec.md](specs/account-balance-presentation/spec.md) | 账户面板按订阅与余额显示真实状态，按历史条文与实际证明登记范围。 | approved |
-| `SPEC-agent-approved-extension-install` | [specs/agent-approved-extension-install/spec.md](specs/agent-approved-extension-install/spec.md) | 目录查询、授权确认、安装状态和当前会话中后续使用。 | draft |
+| `SPEC-agent-approved-extension-install` | [specs/agent-approved-extension-install/spec.md](specs/agent-approved-extension-install/spec.md) | 目录查询、授权确认、安装状态和当前会话中后续使用。 | approved |
 | `SPEC-atomic-extension-lifecycle` | [specs/atomic-extension-lifecycle/spec.md](specs/atomic-extension-lifecycle/spec.md) | 扩展安装失败可恢复且不会留下半装状态，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-bounded-artifact-preview` | [specs/bounded-artifact-preview/spec.md](specs/bounded-artifact-preview/spec.md) | 常见产物按安全边界预览，超限有明确说明，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-build-identity` | [specs/build-identity/spec.md](specs/build-identity/spec.md) | 报问题时能复制准确的构建身份，验收边界来自原始需求。 | draft |
 | `SPEC-byok-output-limits` | [specs/byok-output-limits/spec.md](specs/byok-output-limits/spec.md) | 自带密钥的模型按自己的实测上限输出，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-child-process-write-fence` | [specs/child-process-write-fence/spec.md](specs/child-process-write-fence/spec.md) | 连接器与语言服务的子进程也受写入范围约束，保留历史条款、有效裁决和交付证据边界。 | approved |
-| `SPEC-cloud-job-desktop-notifications` | [specs/cloud-job-desktop-notifications/spec.md](specs/cloud-job-desktop-notifications/spec.md) | 用户能收到任务结果并在桌面设置里关闭通知。 | draft |
+| `SPEC-cloud-job-desktop-notifications` | [specs/cloud-job-desktop-notifications/spec.md](specs/cloud-job-desktop-notifications/spec.md) | 用户能收到任务结果并在桌面设置里关闭通知。 | approved |
 | `SPEC-connector-workspace-following` | [specs/connector-workspace-following/spec.md](specs/connector-workspace-following/spec.md) | 连接器跟随当前会话所在项目目录，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-context-injection-budgets` | [specs/context-injection-budgets/spec.md](specs/context-injection-budgets/spec.md) | 应用注入的对话内容有明确大小上限，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-conversation-overlays` | [specs/conversation-overlays/spec.md](specs/conversation-overlays/spec.md) | 统一对话浮层交互，并让用户批准工具时还能翻看时间线。 | approved |
@@ -372,18 +372,18 @@ status.
 | `SPEC-home-session-creation` | [specs/home-session-creation/spec.md](specs/home-session-creation/spec.md) | 用户从首页可靠开始新对话，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-isolated-html-preview` | [specs/isolated-html-preview/spec.md](specs/isolated-html-preview/spec.md) | 网页产物可静态查看且不能访问应用或网络，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-large-project-directories` | [specs/large-project-directories/spec.md](specs/large-project-directories/spec.md) | 打开巨大目录不会启动无界扫描，保留历史条款、有效裁决和交付证据边界。 | draft |
-| `SPEC-local-cloud-task-routing` | [specs/local-cloud-task-routing/spec.md](specs/local-cloud-task-routing/spec.md) | 助手根据任务选择本机或云端处理，保留历史条款、有效裁决和交付证据边界。 | draft |
-| `SPEC-local-memory` | [specs/local-memory/spec.md](specs/local-memory/spec.md) | 本机记忆可查看、修改、删除并按项目用于对话，保留历史条款、有效裁决和交付证据边界。 | draft |
+| `SPEC-local-cloud-task-routing` | [specs/local-cloud-task-routing/spec.md](specs/local-cloud-task-routing/spec.md) | 助手根据任务选择本机或云端处理，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-local-memory` | [specs/local-memory/spec.md](specs/local-memory/spec.md) | 本机记忆可查看、修改、删除并按项目用于对话，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-office-content-preview` | [specs/office-content-preview/spec.md](specs/office-content-preview/spec.md) | Office 文件内容可在应用内安全查看，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-office-layout-preview` | [specs/office-layout-preview/spec.md](specs/office-layout-preview/spec.md) | Office 文件在隔离预览里显示真实版式，按历史条文与实际证明登记范围。 | approved |
-| `SPEC-opencode-generation-switch` | [specs/opencode-generation-switch/spec.md](specs/opencode-generation-switch/spec.md) | 升级引擎后保留当前桌面体验与整体撤回能力，保留历史条款、有效裁决和交付证据边界。 | draft |
+| `SPEC-opencode-generation-switch` | [specs/opencode-generation-switch/spec.md](specs/opencode-generation-switch/spec.md) | 升级引擎后保留当前桌面体验与整体撤回能力，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-owned-route-surfaces` | [specs/owned-route-surfaces/spec.md](specs/owned-route-surfaces/spec.md) | 应用页面通过受控入口接入导航，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-owned-session-page` | [specs/owned-session-page/spec.md](specs/owned-session-page/spec.md) | 会话页保持自己的完整交互与工具卡，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-owned-settings-and-dialogs` | [specs/owned-settings-and-dialogs/spec.md](specs/owned-settings-and-dialogs/spec.md) | 设置、模型选择、审批与恢复使用一致交互，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-permission-risk-classification` | [specs/permission-risk-classification/spec.md](specs/permission-risk-classification/spec.md) | 高风险动作在执行前先完成分类，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-permission-risk-display` | [specs/permission-risk-display/spec.md](specs/permission-risk-display/spec.md) | 用户在授权时能看出动作的风险档位，保留历史条款、有效裁决和交付证据边界。 | draft |
 | `SPEC-project-mcp-installation` | [specs/project-mcp-installation/spec.md](specs/project-mcp-installation/spec.md) | 连接器可装到全局或当前项目并保持隔离，保留历史条款、有效裁决和交付证据边界。 | approved |
-| `SPEC-puppy-brand-icons` | [specs/puppy-brand-icons/spec.md](specs/puppy-brand-icons/spec.md) | 应用和各渠道使用一致的小狗标志，保留历史条款、有效裁决和交付证据边界。 | draft |
+| `SPEC-puppy-brand-icons` | [specs/puppy-brand-icons/spec.md](specs/puppy-brand-icons/spec.md) | 应用和各渠道使用一致的小狗标志，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-remote-database-connector` | [specs/remote-database-connector/spec.md](specs/remote-database-connector/spec.md) | 用户可在安全边界内连接自己的远程数据库，保留历史条款、有效裁决和交付证据边界。 | draft |
 | `SPEC-resident-project-watchers` | [specs/resident-project-watchers/spec.md](specs/resident-project-watchers/spec.md) | 长期使用项目时监听与内存保持受控，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-responsive-session-rail` | [specs/responsive-session-rail/spec.md](specs/responsive-session-rail/spec.md) | 右栏可以调宽并为聊天区保留空间，按历史条文与实际证明登记范围。 | approved |
@@ -392,13 +392,13 @@ status.
 | `SPEC-startup-model-availability` | [specs/startup-model-availability/spec.md](specs/startup-model-availability/spec.md) | 启动时及时出现可用模型且不显示虚假失败，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-timeline-artifact-links` | [specs/timeline-artifact-links/spec.md](specs/timeline-artifact-links/spec.md) | 对话中的本地产物可以直接打开右栏预览，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-tool-card-provenance` | [specs/tool-card-provenance/spec.md](specs/tool-card-provenance/spec.md) | 工具卡按真实来源展示调用并保护敏感字段，保留历史条款、有效裁决和交付证据边界。 | approved |
-| `SPEC-tool-inventory-identity` | [specs/tool-inventory-identity/spec.md](specs/tool-inventory-identity/spec.md) | 工具清单和授权身份随实际来源变化，保留历史条款、有效裁决和交付证据边界。 | draft |
-| `SPEC-tool-network-egress` | [specs/tool-network-egress/spec.md](specs/tool-network-egress/spec.md) | 本机工具只连接获准的网络目的地，保留历史条款、有效裁决和交付证据边界。 | draft |
-| `SPEC-tool-permission-policy` | [specs/tool-permission-policy/spec.md](specs/tool-permission-policy/spec.md) | 用户可按来源、服务和工具设置停用、询问或允许，保留历史条款、有效裁决和交付证据边界。 | draft |
-| `SPEC-tool-policy-settings` | [specs/tool-policy-settings/spec.md](specs/tool-policy-settings/spec.md) | 用户在设置里管理并保存工具权限，保留历史条款、有效裁决和交付证据边界。 | draft |
+| `SPEC-tool-inventory-identity` | [specs/tool-inventory-identity/spec.md](specs/tool-inventory-identity/spec.md) | 工具清单和授权身份随实际来源变化，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-tool-network-egress` | [specs/tool-network-egress/spec.md](specs/tool-network-egress/spec.md) | 本机工具只连接获准的网络目的地，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-tool-permission-policy` | [specs/tool-permission-policy/spec.md](specs/tool-permission-policy/spec.md) | 用户可按来源、服务和工具设置停用、询问或允许，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-tool-policy-settings` | [specs/tool-policy-settings/spec.md](specs/tool-policy-settings/spec.md) | 用户在设置里管理并保存工具权限，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-tool-write-fence` | [specs/tool-write-fence/spec.md](specs/tool-write-fence/spec.md) | 工具派生进程越界写文件时会失败，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-untrusted-upstream-candidates` | [specs/untrusted-upstream-candidates/spec.md](specs/untrusted-upstream-candidates/spec.md) | 上游候选代码无法取得仓库推送凭据，保留历史条款、有效裁决和交付证据边界。 | approved |
-| `SPEC-visible-update-state` | [specs/visible-update-state/spec.md](specs/visible-update-state/spec.md) | 检查更新的状态与重启安装入口可见，按历史条文与实际证明登记范围。 | draft |
+| `SPEC-visible-update-state` | [specs/visible-update-state/spec.md](specs/visible-update-state/spec.md) | 检查更新的状态与重启安装入口可见，按历史条文与实际证明登记范围。 | approved |
 | `SPEC-windows-renderer-origins` | [specs/windows-renderer-origins/spec.md](specs/windows-renderer-origins/spec.md) | Windows 界面只能读取受准许的服务来源，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-word-layout-and-typography` | [specs/word-layout-and-typography/spec.md](specs/word-layout-and-typography/spec.md) | 生成的 Word 有正确中文字体、标题与纸张设置，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-workspace-file-preview` | [specs/workspace-file-preview/spec.md](specs/workspace-file-preview/spec.md) | 用户在会话右栏安全查看工作区文件，保留历史条款、有效裁决和交付证据边界。 | approved |

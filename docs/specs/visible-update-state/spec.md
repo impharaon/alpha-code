@@ -3,12 +3,12 @@ id: SPEC-visible-update-state
 title: 检查更新的状态与重启安装入口可见
 summary: 检查更新的状态与重启安装入口可见，按历史条文与实际证明登记范围。
 kind: spec
-status: draft
-version: 0
-approved_by: ""
-approved_at: ""
+status: approved
+version: 1
+approved_by: backfill
+approved_at: 2026-11-12
 owners: [owner]
-last_reviewed: 2026-11-10
+last_reviewed: 2026-11-12
 ---
 
 # 检查更新的状态与重启安装入口可见
@@ -19,6 +19,9 @@ last_reviewed: 2026-11-10
 
 - [impharaon/alpha-work:INT-downloads](https://github.com/impharaon/alpha-work/blob/a4b8beeac0196f02780a8c26364529b07e313acb/docs/intents/INT-downloads.md#意图点)。
 - [历史需求 alpha-code#1207](https://github.com/impharaon/alpha-code/issues/1207) · [Epic alpha-work#144](https://github.com/impharaon/alpha-work/issues/144)。
+
+- [批准/事实依据](https://github.com/impharaon/alpha-code/pull/1209)。
+- 交付入口：[alpha-code#1207](https://github.com/impharaon/alpha-code/issues/1207)；实现与验收状态由这些票及其原生子票持有。
 
 ## 用户与范围
 
@@ -48,12 +51,15 @@ last_reviewed: 2026-11-10
 | AC-01 | `UpdaterState` 的每一个 `status` 都有确定的用户可见呈现。**<br><br>判据钉在**单一权威**上:`UpdaterState`(`@opencode-ai/app/updater`,上游类型)的 `status` 联合类型。<br>在 alpha 侧建一份 `status → 呈现` 的映射,并由一条测试断言该映射对该联合类型**穷尽**。<br>新增一个 status 而未给呈现 ⇒ 类型不过或测试红。<br><br>**这条 AC 是咽喉点形态,不是全称否定**:判的不是「界面上到处都有反馈吗」(无限),<br>而是「映射是否覆盖了状态机的全部成员」(有限,一次变异判完)。 | [原条文](https://github.com/impharaon/alpha-code/issues/1207) |
 | AC-02 | 更新已下载就绪时,重启后仍能从界面看到并触发安装。**<br><br>不依赖用户恰好停在某个对话框前。持久化记录(`opencode.updater` 的 `ready`)在<br>启动后必须投影到一个可见入口;点它能装。 | [原条文](https://github.com/impharaon/alpha-code/issues/1207) |
 
+证据与适用边界：PR #1209 明确 AC-01 的类型/运行期穷尽与变异，AC-02 的持久 ready 恢复和组件点击安装；当前对应测试仍在。disabled/idle 的确定呈现是隐藏，后台 up-to-date/error 不常驻；恢复安装先重验/下载，失败保持可见错误，不声称一定离线安装成功。
+
 ## 待决
 
-原票按 Bug 完成关闭。登记两个已有判据，未找到完整逐条最终验收；不据此新建重复开发任务。
+无新的需求批准事项；上述历史批准继续有效。规格批准不等于实现、部署或验收完成，尚缺证据与实施工作由来源中的交付入口负责。
 
 ## 批准记录
 
 | 版本 | 日期 | 批准人 | 原话或链接 |
 | --- | --- | --- | --- |
 | 0 | 2026-11-10 | — | 来源与证据已整理，缺口未消除，不以治理授权代替批准。 |
+| 1 | 2026-11-12 | backfill | 按 owner 历史补录授权重建已交付行为；不是新的产品决定。[依据](https://github.com/impharaon/alpha-code/pull/1209)。 |

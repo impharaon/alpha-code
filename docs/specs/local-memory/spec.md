@@ -3,12 +3,12 @@ id: SPEC-local-memory
 title: 本机记忆可查看、修改、删除并按项目用于对话
 summary: 本机记忆可查看、修改、删除并按项目用于对话，保留历史条款、有效裁决和交付证据边界。
 kind: spec
-status: draft
-version: 0
-approved_by: ""
-approved_at: ""
+status: approved
+version: 1
+approved_by: owner（历史批准沿用）
+approved_at: 2026-11-12
 owners: [owner]
-last_reviewed: 2026-11-10
+last_reviewed: 2026-11-12
 ---
 
 # 本机记忆可查看、修改、删除并按项目用于对话
@@ -23,6 +23,9 @@ last_reviewed: 2026-11-10
 - [有效范围或验收依据 2026-08-25](https://github.com/impharaon/alpha-work/issues/24#issuecomment-5406072239)。
 - [有效范围或验收依据 2026-09-17](https://github.com/impharaon/alpha-work/issues/24#issuecomment-5708434657)。
 - [有效范围或验收依据 2026-11-09](https://github.com/impharaon/alpha-work/issues/24#issuecomment-6731151397)。
+
+- [批准/事实依据](https://github.com/impharaon/alpha-work/issues/24#issuecomment-5708434657)。
+- 交付入口：[alpha-code#1675](https://github.com/impharaon/alpha-code/issues/1675)、[alpha-code#1676](https://github.com/impharaon/alpha-code/issues/1676)；实现与验收状态由这些票及其原生子票持有。
 
 ## 用户与范围
 
@@ -56,12 +59,15 @@ last_reviewed: 2026-11-10
 | AC-07 | ~~同步、索引和 purge 经持久 intent + Queue/DLQ 可恢复，失败不只留 console；redrive 不重复计费、不覆盖新 revision、不复活 tombstone。~~ —— 2026-09-17 删除(owner 裁决):同步、索引与清除的 Queue/DLQ 恢复随云端部分删去。 | [原票](https://github.com/impharaon/alpha-work/issues/24) · [最后裁决](https://github.com/impharaon/alpha-work/issues/24#issuecomment-6731151397) |
 | AC-08 | 提示注入内容不会未经确认成为记忆;删除后的记忆不再被对话使用。(原矩阵删去租户、用户、设备轴,保留这两格) _(2026-09-17 按 owner 裁决改写,原文见编辑历史)_ | [原票](https://github.com/impharaon/alpha-work/issues/24) · [最后裁决](https://github.com/impharaon/alpha-work/issues/24#issuecomment-6731151397) |
 
+证据与适用边界：沿用 owner「批准」的本机范围，云同步 AC-02/07 删除。alpha-code#1675 承接 AC-01/03（实现 #424），#1676 承接 AC-04/05/06/08（实现 #425）。ADR-045 与 #427 的注入方式已经决定，不再回到选择阶段。
+
 ## 待决
 
-仅本机记忆；原云同步 AC2/7 已删除。ADR-045 与 alpha-code#427 已决定注入方式，不能再写为待选择。
+无新的需求批准事项；上述历史批准继续有效。规格批准不等于实现、部署或验收完成，尚缺证据与实施工作由来源中的交付入口负责。
 
 ## 批准记录
 
 | 版本 | 日期 | 批准人 | 原话或链接 |
 | --- | --- | --- | --- |
 | 0 | 2026-11-10 | — | 整理历史来源；尚未作为当前批准基线。 |
+| 1 | 2026-11-12 | owner（历史批准） | 沿用既有批准的范围/裁决，2026-11-12 为规格登记日，不是新的 owner 批准日。[依据](https://github.com/impharaon/alpha-work/issues/24#issuecomment-5708434657)。 |

@@ -8,7 +8,7 @@ version: 0
 approved_by: ""
 approved_at: ""
 owners: [owner]
-last_reviewed: 2026-11-10
+last_reviewed: 2026-11-12
 ---
 
 # 打开巨大目录不会启动无界扫描
@@ -20,6 +20,9 @@ last_reviewed: 2026-11-10
 - [意图与处置 impharaon/alpha-work:INT-desktop/I-01](https://github.com/impharaon/alpha-work/blob/a4b8beeac0196f02780a8c26364529b07e313acb/docs/intents/INT-desktop.md#意图点)。
 - 历史身份：[impharaon/alpha-code#174](https://github.com/impharaon/alpha-code/issues/174)；原题名与编号保留，当前交付状态以 GitHub 为准。
 - Epic：[能力分组](https://github.com/impharaon/alpha-work/issues/149)。
+
+- [批准/事实依据](https://github.com/impharaon/alpha-code/pull/92)。
+- 交付入口：[alpha-code#174](https://github.com/impharaon/alpha-code/issues/174)；实现与验收状态由这些票及其原生子票持有。
 
 ## 用户与范围
 
@@ -46,12 +49,15 @@ last_reviewed: 2026-11-10
 | AC-03 | 冷启动 bootstrap 日志无 `/`、`~` 级 Instance; | [原票](https://github.com/impharaon/alpha-code/issues/174) |
 | AC-04 | 与 B12 联动观测:常驻 watcher 数下降。 | [原票](https://github.com/impharaon/alpha-code/issues/174) |
 
+证据与适用边界：AC-01/02 由 PR #92 与 worktree-filter.test.ts 支持；7 月 8 日审计仍记录 15 次 home Instance，不能声称当时 AC-03 全过。后续 #219 / PR #472 已修 scratch cwd，当前 server.ts 消费 ensureEngineScratchCwd；AC-04 的 watcher 观察有 FSEvents 不计 fd 的限制。
+
 ## 待决
 
-历史票已完成关闭，但尚未取得足以确认每条当前验收范围的最终证据；不把历史关闭状态升级为当前批准。
+取得含 PR #472 的发布件冷启动日志，补 AC-03 无根/home Instance；保留已有数据层和 watcher 证据，不重做功能。
 
 ## 批准记录
 
 | 版本 | 日期 | 批准人 | 原话或链接 |
 | --- | --- | --- | --- |
 | 0 | 2026-11-10 | — | 整理历史来源；尚未作为当前批准基线。 |
+| 0 | 2026-11-12 | — | 已核对历史范围与实际证据；具体缺口见待决，由来源中的交付入口承接。 |

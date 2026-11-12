@@ -3,12 +3,12 @@ id: SPEC-tool-network-egress
 title: 本机工具只连接获准的网络目的地
 summary: 本机工具只连接获准的网络目的地，保留历史条款、有效裁决和交付证据边界。
 kind: spec
-status: draft
-version: 0
-approved_by: ""
-approved_at: ""
+status: approved
+version: 1
+approved_by: backfill
+approved_at: 2026-11-12
 owners: [owner]
-last_reviewed: 2026-11-10
+last_reviewed: 2026-11-12
 ---
 
 # 本机工具只连接获准的网络目的地
@@ -23,6 +23,9 @@ last_reviewed: 2026-11-10
 - [有效范围或验收依据 2026-09-10](https://github.com/impharaon/alpha-code/issues/1073#issuecomment-5616341729)。
 - [有效范围或验收依据 2026-09-11](https://github.com/impharaon/alpha-code/issues/1073#issuecomment-5628427076)。
 - [有效范围或验收依据 2026-09-11](https://github.com/impharaon/alpha-code/issues/1073#issuecomment-5628434112)。
+
+- [批准/事实依据](https://github.com/impharaon/alpha-code/issues/1073#issuecomment-5628434112)。
+- 交付入口：[alpha-code#1073](https://github.com/impharaon/alpha-code/issues/1073)；实现与验收状态由这些票及其原生子票持有。
 
 ## 用户与范围
 
@@ -41,29 +44,33 @@ last_reviewed: 2026-11-10
 
 ## 业务规则
 
-- **BR-01** (单一权威)**:目的地授权集是代理进程读取的一张注册表(代码内单一权威。
-- **BR-02** (引擎汇入)**:sidecar env 的 `HTTP(S)_PROXY` 指向同一 chokePort、。
-
-规则据下表原条款摘录；历史删改与后续裁决仍按「用户与范围」限定。
+- **BR-01** 目的地由策略代理的单一注册表授权，未知 host:port 被明确拒绝。
+- **BR-02** 出网围栏覆盖 sidecar 及全部派生进程；Electron main 与 renderer 在围栏外，产品说明必须如实表述。
+- **BR-03** 代理不可用时响亮失败，不回退直接连接；允许的正常开发命令在同一围栏下仍可执行。
 
 ## 验收
 
-条文从原票照搬，保留编号；原编号 AC1 对应 AC-01，子编号仍保留。原文中的日期与实测状态均是历史记录。涉及变更时先修订规格，不在票面复制第二份需求。
+按 2026-09-10 已批准的进程围栏重写恢复最终义务；稳定编号映射：历史最终 AC1/2/3/4/5 → 本规格 AC-01/02/04/05/06。旧 AC-03 标为合并，不把新边界复用为旧编号。[旧规格 v0](https://github.com/impharaon/alpha-code/blob/e5a63bf3852ecf0c1d5b7e53be96fade954deed9/docs/specs/tool-network-egress/spec.md) 保留原文。
 
 | ID | Given / When / Then（历史原文） | 依据 |
 | --- | --- | --- |
-| AC-01 | (唯一通路)**:shell 工具与 prompt `!command` 子进程树的 TCP/UDP 出网,<br>  唯一放行是 loopback 上的策略代理端口 —— wrapper profile 为<br>  `(deny network*)` + `(allow network-outbound (remote ip "localhost:<chokePort>"))`,<br>  **只写加法**(profile 内不得出现 `localhost:*` 通配 allow 或任何端口特定 deny,<br>  判据 = 勘破 §1.3);逃逸语料(直连 raw-IP:443、UDP sendto、`[::1]` 其它端口、<br>  绕代理直连)在同 profile 下全部响亮失败,且每个否定用例自带进程已启动证据<br>  (勘破 §1.2:空输出 ≠ 拦住)。 | [原票](https://github.com/impharaon/alpha-code/issues/1073) · [最后裁决](https://github.com/impharaon/alpha-code/issues/1073#issuecomment-5628434112) |
-| AC-02 | (单一权威)**:目的地授权集是代理进程读取的一张注册表(代码内单一权威<br>  模块/文件);CONNECT 到未登记 `host:port` 一律 403 且可观察(结构化日志);<br>  不存在第二张散文清单。 | [原票](https://github.com/impharaon/alpha-code/issues/1073) · [最后裁决](https://github.com/impharaon/alpha-code/issues/1073#issuecomment-5628434112) |
-| AC-03 | (引擎汇入)**:sidecar env 的 `HTTP(S)_PROXY` 指向同一 chokePort、<br>  `NO_PROXY` 仅 loopback;引擎的模型请求 / 远程 MCP / models.dev 拉取在代理侧可见。 | [原票](https://github.com/impharaon/alpha-code/issues/1073) · [最后裁决](https://github.com/impharaon/alpha-code/issues/1073#issuecomment-5628434112) |
-| AC-04 | (不误伤)**:注册表初值 = 勘破 §2.2 清单;文件轴 §2.8 那组正常开发命令在<br>  **network-deny 底座**上复跑全数通过(勘破 §7 末条:文件轴误伤检查当时用的是<br>  `allow default` 底座)。 | [原票](https://github.com/impharaon/alpha-code/issues/1073) · [最后裁决](https://github.com/impharaon/alpha-code/issues/1073#issuecomment-5628434112) |
-| AC-05 | (fail-closed)**:代理不在场时,子进程直连被 seatbelt 即时拒绝(EPERM),<br>  不回退直连。 | [原票](https://github.com/impharaon/alpha-code/issues/1073) · [最后裁决](https://github.com/impharaon/alpha-code/issues/1073#issuecomment-5628434112) |
+| AC-01 | sidecar 及其全部派生进程（shell、!command、MCP stdio、LSP、PTY）的 TCP/UDP 出网仅放行 loopback 策略代理端口；进程围栏使用加法允许规则，所需本机 bind/inbound 明确列入。raw IP、UDP、IPv6 其他端口及绕过代理的逃逸用例均响亮失败，并有进程实际启动的 PID 证据。 | [最终 AC 与关闭证据](https://github.com/impharaon/alpha-code/issues/1073#issuecomment-5628434112) |
+| AC-02 | 目的地授权集由策略代理读取一张注册表；未登记 host:port 的 CONNECT 请求一律拒绝并可观察，平台域名引用既有 ALPHA_ENDPOINTS 权威。 | [最终 AC 与关闭证据](https://github.com/impharaon/alpha-code/issues/1073#issuecomment-5628434112) |
+| AC-03 | 已合并、不复用：旧「引擎经代理汇入」判据按 2026-09-10 已批重写并入 AC-01 与 AC-04；不继续要求被删除的 wrapper 或用真实模型调用冒充全部网络边界。 | [最终 AC 与关闭证据](https://github.com/impharaon/alpha-code/issues/1073#issuecomment-5628434112) |
+| AC-04 | 已批准的正常开发命令在 network-deny 底座上全部通过；两个提供商的依赖缓存验证实际安装软件包，不能以健康端点返回 200 代替。对应历史最终 AC3。 | [最终 AC 与关闭证据](https://github.com/impharaon/alpha-code/issues/1073#issuecomment-5628434112) |
+| AC-05 | 策略代理不在场时，调用快速、响亮失败，子进程不回退直连，也不等待原有长时间挂起。对应历史最终 AC4。 | [最终 AC 与关闭证据](https://github.com/impharaon/alpha-code/issues/1073#issuecomment-5628434112) |
+
+| AC-06 | 仅 sidecar 进程树受围栏约束；Electron main 的目录、登录、自动更新及 renderer 在边界之外。用户说明如实披露，声称「整个应用网络都已隔离」的反向检查必须失败。对应历史最终 AC5。 | [最终 AC 与关闭证据](https://github.com/impharaon/alpha-code/issues/1073#issuecomment-5628434112) |
+
+证据与适用边界：2026-09-10 最终五项逐条 PASS，47/0 打包形态检查、两提供商缓存各 26 包、12/12 开发命令和变异证据齐备。范围是 sidecar 全进程树，不包括 Electron main/renderer；本机模型目的地未放开；未发生真实模型调用，未据此扩大承诺。旧 AC-03 合并到 AC-01/04，最终新增进程边界记为 AC-06，原编号不复用。
 
 ## 待决
 
-最终 2026-09-10 逐条裁断的 AC3–5 顺序与旧票不同，保留原编号并明确最终判据。仅覆盖引擎进程树；本机模型目的地未开放；没有真实模型调用证明。
+无新的需求批准事项；上述历史批准继续有效。规格批准不等于实现、部署或验收完成，尚缺证据与实施工作由来源中的交付入口负责。
 
 ## 批准记录
 
 | 版本 | 日期 | 批准人 | 原话或链接 |
 | --- | --- | --- | --- |
 | 0 | 2026-11-10 | — | 整理历史来源；尚未作为当前批准基线。 |
+| 1 | 2026-11-12 | backfill | 按 owner 历史补录授权重建已交付行为；不是新的产品决定。[依据](https://github.com/impharaon/alpha-code/issues/1073#issuecomment-5628434112)。 |

@@ -3,12 +3,12 @@ id: SPEC-puppy-brand-icons
 title: 应用和各渠道使用一致的小狗标志
 summary: 应用和各渠道使用一致的小狗标志，保留历史条款、有效裁决和交付证据边界。
 kind: spec
-status: draft
-version: 0
-approved_by: ""
-approved_at: ""
+status: approved
+version: 1
+approved_by: backfill
+approved_at: 2026-11-12
 owners: [owner]
-last_reviewed: 2026-11-10
+last_reviewed: 2026-11-12
 ---
 
 # 应用和各渠道使用一致的小狗标志
@@ -20,6 +20,9 @@ last_reviewed: 2026-11-10
 - [意图与处置 impharaon/alpha-work:INT-desktop/I-11](https://github.com/impharaon/alpha-work/blob/a4b8beeac0196f02780a8c26364529b07e313acb/docs/intents/INT-desktop.md#意图点)。
 - 历史身份：[impharaon/alpha-code#1479](https://github.com/impharaon/alpha-code/issues/1479)；原题名与编号保留，当前交付状态以 GitHub 为准。
 - Epic：[能力分组](https://github.com/impharaon/alpha-work/issues/149)。
+
+- [批准/事实依据](https://github.com/impharaon/alpha-code/pull/1480)。
+- 交付入口：[alpha-code#1479](https://github.com/impharaon/alpha-code/issues/1479)；实现与验收状态由这些票及其原生子票持有。
 
 ## 用户与范围
 
@@ -45,12 +48,15 @@ last_reviewed: 2026-11-10
 | AC-02 | 应用内的品牌标记(侧栏左上角、启动加载画面)显示新小狗。 | [原票](https://github.com/impharaon/alpha-code/issues/1479) |
 | AC-03 | 应用内仍会出现的 opencode 标志(连接失败 / 健康检查加载画面、错误页)显示新小狗;实现不修改上游包的源码。 | [原票](https://github.com/impharaon/alpha-code/issues/1479) |
 
+证据与适用边界：PR #1480 的三渠道生成物、824/1024 网格、应用内 Mark/Splash/Logo 与打包 alias 均有实际证据。当前 logo-codepuppy.test.ts 保留 alias 接线、导出与 PNG 断言。原图 512px、1024 放大导致的大尺寸偏软是原交付限制，未杜撰更高分辨率。
+
 ## 待决
 
-历史票已完成关闭，但尚未取得足以确认每条当前验收范围的最终证据；不把历史关闭状态升级为当前批准。
+无新的需求批准事项；上述历史批准继续有效。规格批准不等于实现、部署或验收完成，尚缺证据与实施工作由来源中的交付入口负责。
 
 ## 批准记录
 
 | 版本 | 日期 | 批准人 | 原话或链接 |
 | --- | --- | --- | --- |
 | 0 | 2026-11-10 | — | 整理历史来源；尚未作为当前批准基线。 |
+| 1 | 2026-11-12 | backfill | 按 owner 历史补录授权重建已交付行为；不是新的产品决定。[依据](https://github.com/impharaon/alpha-code/pull/1480)。 |

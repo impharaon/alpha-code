@@ -37,6 +37,22 @@ const result = await Bun.build({
   // schemas this plugin builds (via `tool.schema`) live on a DIFFERENT instance than the
   // server's. opencode's tool ingestion must treat plugin schemas structurally. Validate
   // when wiring G1: load ext → `codepuppy_ping` appears in the tool list AND executes.
+  //
+  // `#1662`: jsonc-parser (reached through ui-mac/src/shared/project-jsonc.ts) has only `main` (a UMD build) and `module`
+  // (ESM), no `exports`. For target node the bundler takes `main`, whose factory loads `./impl/*` through a `require`
+  // PARAMETER it cannot see — those requires stay in the bundle and dist/server.js fails to load under Node and bun alike
+  // ("Cannot find module './impl/format'"). Resolve the package to its ESM build, which the bundler inlines whole.
+  // Proof: process-fence-engine.test.ts loads dist/server.js in the real engine and waits for `codepuppy.ext` to be active.
+  plugins: [
+    {
+      name: "jsonc-parser-esm",
+      setup(build) {
+        build.onResolve({ filter: /^jsonc-parser$/ }, (args) => ({
+          path: Bun.resolveSync("jsonc-parser/lib/esm/main.js", path.dirname(args.importer)),
+        }))
+      },
+    },
+  ],
 })
 
 if (!result.success) {

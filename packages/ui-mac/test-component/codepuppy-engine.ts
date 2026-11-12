@@ -109,6 +109,8 @@ export type HostOptions = {
   platformModels?: Record<string, unknown>
   /** false ⇒ 注入时不给 ext 目录(反向臂:同一份配置去掉 ext)。默认装。 */
   ext?: boolean
+  /** 引擎的文件监听(生产默认开;默认这里关,要判「不重启就生效」时打开)。 */
+  filewatcher?: boolean
 }
 
 export type Running = {
@@ -179,7 +181,7 @@ export function codepuppyEngine(options: HostOptions) {
         configDirectory: slot.configDirectory,
         config: { content: JSON.stringify(content), file: injection.config.file },
         models: { ...(injection.models.file ? { file: injection.models.file } : {}), fetch: false },
-        filewatcher: false,
+        filewatcher: options.filewatcher ?? false,
         platform: process.platform,
       }),
       { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, password)) },
@@ -203,7 +205,7 @@ export function codepuppyEngine(options: HostOptions) {
     if (withExt && (await status("codepuppy.ext")) !== "active") throw new Error("the real ext is not active in the embedded engine")
     return { send, close: () => engine.close() }
   }
-  return { start, slot, projectDirectory: slot.projectDirectory, userData }
+  return { start, slot, projectDirectory: slot.projectDirectory, userData, injection }
 }
 
 /** ext 的策略存储(数据根 / 账户 / 工作区与 registerPolicy 同一套);ext 模块在沙箱就位之后才装载。 */

@@ -13,7 +13,6 @@
 // 真实爆炸半径 + 失败必须出声)。
 
 import * as fs from "node:fs"
-import * as os from "node:os"
 import * as path from "node:path"
 // `#1299`(REQ-157):三个 alpha agent 的 description / prompt 是 alpha 的字,住在零依赖的
 // codepuppy-agents.ts,由 packages/ext 的登记簿 import 并声明上限;这里只取,不再内联字面量。
@@ -37,7 +36,6 @@ import {
   WITHHELD_CLOUD_MCP,
 } from "./cloud-web-search"
 import { codepuppyGlobalRoot, codepuppyJsoncPath } from "./engine-config-truth"
-import { engineDataDirectory } from "./engine-legacy-credentials"
 import { injectDisabledOverrides } from "./ext-disabled-injection"
 import { injectMcpDefaultDeny } from "./mcp-default-deny"
 import { readMcpServerRecords } from "./mcp-server-records"
@@ -176,21 +174,6 @@ function governanceFloor(extPluginPath: string | undefined): Pick<EngineConfig, 
     ],
     experimental: { ...ENGINE_EXPERIMENTAL_FLAGS },
   }
-}
-
-/**
- * REQ-236 §2.2 R2:工作区外的目录先问。放行的与 v1 引擎默认 agent 的白名单对应(`origin/alpha` 的
- * `packages/opencode/src/agent/agent.ts`:截断输出目录、引擎临时目录、技能目录):引擎自己的工具输出目录
- * (`<引擎数据目录>/tool-output`,core `ToolOutput.DIRECTORY`)、引擎临时目录(core 的 `Global.Path.tmp`,即解析过符号链接的
- * `os.tmpdir()` 下的 `opencode`)、注入时的出厂与已启用技能目录。项目技能目录是相对路径,本来就在工作区内,不列。
- */
-function externalDirectoryAsk(): [string, Record<string, PermissionRule["effect"]>] {
-  const allowed = [
-    path.join(engineDataDirectory(process.env, os.homedir()), "tool-output"),
-    path.join(fs.realpathSync.native(os.tmpdir()), "opencode"),
-    ...explicitSkillDirs().filter((dir) => path.isAbsolute(dir)),
-  ]
-  return ["external_directory", { "*": "ask", ...Object.fromEntries(allowed.map((dir) => [path.join(dir, "*"), "allow" as const])) }]
 }
 
 /**
@@ -425,7 +408,8 @@ export function injectCodePuppyConfig(
     //       也问一次 —— 子会话不继承本 agent 的 ask,不问就等于整段跳过「逐次询问」;同档自身不问。
     //       另把 defaults 里 `doom_loop` 与 `read *.env*` 的 ask **原样重写一遍**:agent 自己的键排在
     //       配置顶层 `permission` 之后,项目配置放宽不了它们(`*.env.example` 照 defaults 仍放行)。
-    //       `external_directory` 见下面 2e(与「全部批准」同一份规则)。
+    //       `external_directory`(R2:工作区外先问)不写在这里:写进配置会排在用户自己的规则之后、压过它们;由 ext 的 agent 变换
+    //       插在引擎底座之后(packages/ext/src/external-directory-rule.ts,`#1662` parity)。
     //       没有 prompt(见 codepuppy-agents.ts 抬头:给了 prompt 就会顶掉整份底座)。
     //       不设逃生 env:composer 选了这档就发 `agent: "codepuppy-ask"`,agent 缺席 = 引擎具名报错(fail-closed),
     //       不是静默回到全放行。治理保护名单同 codepuppy-readonly(CODEPUPPY_INJECTED_AGENTS)。
@@ -448,15 +432,9 @@ export function injectCodePuppyConfig(
           ["subagent", { "*": "ask", "codepuppy-ask": "allow" }],
           ["doom_loop", "ask"],
           ["read", { "*.env": "ask", "*.env.*": "ask", "*.env.example": "allow" }],
-          externalDirectoryAsk(),
         ]),
       },
     }
-
-    //   2e. REQ-236 §2.2 R2(`#1662` parity):「全部批准」(引擎的 build)与「请求审批」读写工作区外的目录先问,与 0.1.x 相同。
-    //       v1 的引擎默认 agent 规则就是 `external_directory: { "*": "ask", <白名单>: "allow" }`;OpenCode 2 的 agent 底座是
-    //       `"*": "allow"`,没有这一条,两档都会不问就放行。build 只追加这一条(引擎合成 config agent 时把它排在底座之后)。
-    config.agents = { ...config.agents, build: { permissions: rules([externalDirectoryAsk()]) } }
 
     //   2c. REQ-024(自动化 A2):standard 可写档 agent。无人值守语义同 codepuppy-automation
     //       (question/task/doom_loop deny,零 ask 硬前提);差异 = edit allow + bash 受限 allow

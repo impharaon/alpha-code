@@ -18,6 +18,7 @@ import { rebrandSystem } from "./prompt-rebrand"
 import { validateCloudToolInput, validateCloudToolOutput } from "./cloud-contract-hook"
 import { platformOutputCap } from "./platform-output-cap"
 import { platformRequestCredentialHeader } from "./platform-credential-header"
+import { EXTERNAL_DIRECTORY_AGENTS, externalDirectoryRules, placeAfterBase } from "./external-directory-rule"
 import { byokOutputCap } from "./byok-output-cap"
 // REQ-157 `#1284`:alpha 送进模型上下文的每段字都在 context-injection.ts 登记并声明上限。import 本身就是
 // 一道闸 —— 任何片段超限,登记簿在模块装载时抛出,ext 整个装不上(2.x 记该插件 failed,`#1665` I4 让 sidecar 不报 ready),
@@ -305,6 +306,25 @@ export const CodePuppyExt: Plugin.Plugin = {
       // `opencode.config.websearch` 应用,照样优先;kill-switch 由上面的 execute.before 拒,与这里的选择无关。
       await context.websearch.transform((editor) => {
         if (editor.default.get() === undefined) editor.default.set(DEFAULT_WEBSEARCH_PROVIDER)
+      })
+      // REQ-236 §2.2 R2(`#1662` parity):全部批准 / 请求审批读写工作区外先问,插在引擎底座之后、配置规则之前 —— 用户自己的
+      // `external_directory` 规则照 v1 胜出,只读档的拒绝仍在最后。理由与白名单见 external-directory-rule.ts。
+      // 变换在第一次 prompt 时注册(与策略目录的尾规则同一时机,policy/catalog.ts ensureTail):OpenCode 的配置 agent 插件在激活之后
+      // 才建出 codepuppy-ask,激活时注册的变换看不到它;插入位置按底座算,与注册先后无关。
+      let externalDirectory = false
+      await context.session.hook("prompt", async () => {
+        if (externalDirectory) return
+        externalDirectory = true
+        await context.agent.transform((editor) => {
+          const rules = externalDirectoryRules(process.env)
+          for (const id of EXTERNAL_DIRECTORY_AGENTS) {
+            if (!editor.get(id as never)) continue
+            editor.update(id as never, (agent) => {
+              if (!placeAfterBase(id, agent.permissions as never, rules))
+                error(`[@codepuppy/ext] ${id}: the engine's base rules changed shape; external_directory ask appended (user rules cannot relax it)`)
+            })
+          }
+        })
       })
       // REQ-067 / #1522:出厂禁用的技能 —— 从技能目录里拿掉(上游内置的那些在 ext 之前注册),并在权限评估里一律 deny
       // (覆盖之后才由配置目录装进来的同名技能)。

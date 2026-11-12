@@ -180,7 +180,7 @@
         },
         {
           "file": "packages/ui-mac/src/main/composer-tier-matrix.engine.test.ts",
-          "name": "三档 × R1–R12、三条委派入口与审批请求的整条路径(composer-tier-matrix.engine.cases.ts,21 条)"
+          "name": "三档 × R1–R12、三条委派入口与审批请求的整条路径(composer-tier-matrix.engine.cases.ts,26 条)"
         }
       ],
       "note": "An answer to the pending request itself is not held here: any plugin Context (including the extension's, which the project-plugin fan-out passes through) can call permission.reply on Code Puppy's request and the call runs (measured 2026-11-09); closing it belongs to the fan-out (L3), reported to the coordinator."
@@ -319,7 +319,7 @@
     },
     {
       "id": "composer-tier-matrix",
-      "decision": "The three composer tiers (Approve all = build, Ask = codepuppy-ask, Read-only = codepuppy-readonly) give each tool class the outcome REQ-236 §2.2 sets (R1–R6, R8, R10–R12; R2 asks outside the workspace in the first two tiers with v1's allowances for the engine's tool output, temp and skill directories); a delegation (a prompt carrying an agent, a non-subtask command that runs as another agent, a subtask command) gets the same decision as the direct subagent call, decided by the session's own agent (#1573).",
+      "decision": "The three composer tiers (Approve all = build, Ask = codepuppy-ask, Read-only = codepuppy-readonly) give each tool class the outcome REQ-236 §2.2 sets (R1–R6, R8, R10–R12; R2 asks outside the workspace in the first two tiers with v1's allowances for the engine's tool output, temp and skill directories, and a user's own external_directory rule out-ranks that ask as on v1, while Read-only's deny stays last); a delegation (a prompt carrying an agent, a non-subtask command that runs as another agent, a subtask command) gets the same decision as the direct subagent call, decided by the session's own agent (#1573).",
       "adr": [
         "ADR-047"
       ],
@@ -329,12 +329,12 @@
       ],
       "mechanism": {
         "file": "packages/ui-mac/src/main/codepuppy-config-injection.ts",
-        "ladder": "main (injected tier agents; build gets the R2 external_directory rule) + the re-taken packages/core/src/config/plugin/command.ts (codepuppy(#1573 E4): a command that runs as another agent takes the subagent permission path before switching)"
+        "ladder": "main (injected tier agents) + ext agent transform registered at the first prompt (packages/ext/src/external-directory-rule.ts: the R2 external_directory ask after the engine's base rules, before every config rule) + the re-taken packages/core/src/config/plugin/command.ts (codepuppy(#1573 E4): a command that runs as another agent takes the subagent permission path before switching)"
       },
       "tests": [
         {
           "file": "packages/ui-mac/src/main/composer-tier-matrix.engine.test.ts",
-          "name": "三档 × R1–R12、三条委派入口与审批请求的整条路径(composer-tier-matrix.engine.cases.ts,21 条)"
+          "name": "三档 × R1–R12、三条委派入口与审批请求的整条路径(composer-tier-matrix.engine.cases.ts,26 条)"
         }
       ],
       "note": "R7 (egress fence and kill switch) is not a rule-layer cell. R9 (cloud tools) passes the same execution gate as R10 / R11 and differs only in identity derivation (codepuppy-cloud authority minted from the verified definition), judged by packages/ext/src/policy/register-policy.test.ts and plugin-host.test.ts; a governed remote MCP in the engine sandbox would need the ARM / DEF and cloud credential setup."

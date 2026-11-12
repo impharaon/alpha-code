@@ -3,7 +3,7 @@
 import { expect, test } from "bun:test"
 import { join } from "node:path"
 
-test("三档 × R1–R12、三条委派入口与审批请求的整条路径(composer-tier-matrix.engine.cases.ts,21 条)", async () => {
+test("三档 × R1–R12、三条委派入口与审批请求的整条路径(composer-tier-matrix.engine.cases.ts,26 条)", async () => {
   const child = Bun.spawn({
     cmd: [process.execPath, "test", "--timeout", "90000", join(import.meta.dir, "composer-tier-matrix.engine.cases.ts")],
     cwd: join(import.meta.dir, "../.."),
@@ -15,5 +15,5 @@ test("三档 × R1–R12、三条委派入口与审批请求的整条路径(comp
   const output = `${stdout}${stderr}`
   if (exitCode !== 0) throw new Error(output)
   expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
-  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("21")
+  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("26")
 }, 300_000)

@@ -28,6 +28,8 @@ import fs from "node:fs"
 import path from "node:path"
 import { assertEngineSandboxed, engineSandbox } from "../../test-component/engine-sandbox"
 import { codepuppyEngine, policyStore, probe, scriptedModel, type Running } from "../../test-component/codepuppy-engine"
+import { explicitSkillDirs } from "./codepuppy-config-injection"
+import { watchExplicitSources } from "./engine-explicit-config"
 
 const sandbox = engineSandbox()
 const FACTORY_SKILLS = path.join(sandbox.root, "factory-skills")
@@ -73,6 +75,7 @@ beforeAll(async () => {
   projectDirectory = host.projectDirectory
   running = await host.start()
   expect(probe()).toBeDefined()
+  await firstTurn(running, projectDirectory)
   // R12:用户在设置里停用 cp_disabled —— 经生产的策略存储写进 ext 读的那个位置
   store = await policyStore()
   await store.setRecord({ selector: { level: "tool", canonical: "plugin::cp_disabled" }, state: "disabled" } as never)
@@ -82,6 +85,16 @@ afterAll(async () => {
   await running?.close().catch(() => undefined)
   model.stop()
 })
+
+/**
+ * 生产里引擎的第一句 prompt 先于任何工具调用;ext 在那一刻注册排在配置规则之后的那部分(策略目录的尾规则、R2 的 external_directory)。
+ * 这里的判据有的直接问权限服务、不经 prompt,所以每台引擎先跑一轮。
+ */
+async function firstTurn(engine: Running, directory: string) {
+  const sessionID = (await engine.send("POST", "/api/session", { location: { directory }, model: { id: "m", providerID: "codepuppy" } })).json.data.id as string
+  await engine.send("POST", `/api/session/${sessionID}/prompt`, { text: "hello" })
+  await engine.send("POST", `/api/experimental/session/${sessionID}/wait`)
+}
 
 // ── 小工具 ────────────────────────────────────────────────────────────────────────────────────────
 async function session(agent: Tier) {
@@ -186,7 +199,8 @@ describe("能力轴:真注入的三档规则 + 引擎底座 + ext 的 evaluate �
   }, 30_000)
 
   // v1(`origin/alpha` codepuppy-tier-tool-matrix.test.ts「R2 external_directory」⇒ ASK / ASK / DENY;v1 引擎默认 agent 的白名单:
-  // 截断输出目录、引擎临时目录、技能目录)。放行目录的期望值取引擎自己算的路径(`Global.Path`),不取注入的推导。
+  // 截断输出目录、引擎临时目录、技能目录)。规则由 ext 的 agent 变换插在引擎底座之后(packages/ext/src/external-directory-rule.ts)。
+  // 放行目录的期望值取引擎自己算的路径(`Global.Path`)与出厂目录,不取 ext 的推导。
   test("R2 工作区外的目录:全部批准 / 请求审批先问,只读拒绝;引擎的工具输出目录、临时目录与出厂技能目录在前两档放行,只读档仍拒绝", async () => {
     const { Global } = await import("@opencode/util/global")
     const dirs = {
@@ -440,5 +454,83 @@ describe("ext 造出的每一种待批请求都能经引擎路由列出,且 JSON
     expect((await send("GET", `/api/session/${owner.id}/permission`)).status).toBeGreaterThanOrEqual(500)
     void settled
   }, 30_000)
+})
+
+// ── R2:用户自己的规则照 v1 胜出;技能翻代不必重新注入 ─────────────────────────────────────────────────────
+// 这一组各起各的引擎(放在文件最后:新引擎的探针插件会接管 probe())。v1:用户配置里的 `external_directory` 排在引擎默认规则
+// 之后(`merge(defaults, user)`),所以用户写的放行生效;只读档自己的 deny 在它的 agent 规则里,放不开。
+describe("R2:用户在四处写的 external_directory 放行照 v1 胜出(全部批准 / 请求审批放行,只读仍拒绝);新一代技能目录不必重新注入", () => {
+  async function outcomeOn(engine: Running, directory: string, agent: Tier, resource: string): Promise<Outcome> {
+    const sessionID = (await engine.send("POST", "/api/session", { location: { directory }, agent })).json.data.id as string
+    const settled = Promise.resolve(probe().ctx.permission.assert({ sessionID, agent, action: "external_directory", resources: [resource], save: [resource] })).then(
+      () => "allow" as const,
+      () => "deny" as const,
+    )
+    const early = await Promise.race([settled, Bun.sleep(300).then(() => "pending" as const)])
+    if (early !== "pending") return early
+    for (const request of ((await engine.send("GET", `/api/session/${sessionID}/permission`)).json.data ?? []) as Array<{ id: string }>)
+      await engine.send("POST", `/api/session/${sessionID}/permission/${request.id}/reply`, { decision: "reject" })
+    await settled
+    return "ask"
+  }
+  const allowedDir = path.join(sandbox.root, "user-allowed")
+  const userRule = { permission: { external_directory: { [`${allowedDir}/*`]: "allow" } } }
+
+  for (const place of ["项目 opencode.json 顶层", "全局 opencode.json 顶层", "codepuppy.jsonc", "项目 opencode.json 的 agent 段"] as const)
+    test(`${place}:放行 ⇒ allow / allow / deny;别的工作区外目录照旧先问`, async () => {
+      const name = `tiers-user-${["项目 opencode.json 顶层", "全局 opencode.json 顶层", "codepuppy.jsonc", "项目 opencode.json 的 agent 段"].indexOf(place)}`
+      if (place === "codepuppy.jsonc") {
+        const root = path.join(sandbox.root, `${name}-state`, "codepuppy-state", "env", "dev")
+        fs.mkdirSync(root, { recursive: true })
+        fs.writeFileSync(path.join(root, "codepuppy.jsonc"), JSON.stringify(userRule))
+      }
+      const projectFiles =
+        place === "项目 opencode.json 顶层"
+          ? { "opencode.json": JSON.stringify(userRule) }
+          : place === "项目 opencode.json 的 agent 段"
+            ? { "opencode.json": JSON.stringify({ agent: { [BUILD]: userRule, [ASK]: userRule, [READONLY]: userRule } }) }
+            : {}
+      const host = codepuppyEngine({ sandbox, name, modelBaseURL: model.baseURL, projectFiles })
+      if (place === "全局 opencode.json 顶层") fs.writeFileSync(path.join(host.slot.configDirectory, "opencode.json"), JSON.stringify(userRule))
+      const engine = await host.start()
+      try {
+        await firstTurn(engine, host.projectDirectory)
+        const got: Record<string, Outcome> = {}
+        for (const tier of TIERS) got[tier] = await outcomeOn(engine, host.projectDirectory, tier, `${allowedDir}/*`)
+        expect(got).toEqual(expected({ build: "allow", "codepuppy-ask": "allow", "codepuppy-readonly": "deny" }))
+        expect(await outcomeOn(engine, host.projectDirectory, BUILD, `${path.join(sandbox.root, "not-allowed")}/*`)).toBe("ask")
+      } finally {
+        await engine.close()
+      }
+    }, 60_000)
+
+  test("技能翻代:新一代的目录不必重新注入就放行(sidecar 的监听重写显式文件 ⇒ 引擎重载配置 ⇒ ext 的变换重算)", async () => {
+    const name = "tiers-generation"
+    const root = path.join(sandbox.root, `${name}-state`, "codepuppy-state", "env", "dev")
+    const generation = (genId: string) => {
+      const dir = path.join(root, "ext-store", "skill--cp-r2", "generations", genId)
+      fs.mkdirSync(path.join(dir, "cp-r2"), { recursive: true })
+      fs.writeFileSync(path.join(dir, "cp-r2", "SKILL.md"), "---\nname: cp-r2\ndescription: cp-r2 probe\n---\n\ncp-r2\n")
+      fs.writeFileSync(path.join(root, "ext-store", "skill--cp-r2", "current.json"), JSON.stringify({ generation: genId }))
+      return fs.realpathSync(dir)
+    }
+    const g1 = generation("gen-000001-aaaaaa")
+    fs.writeFileSync(path.join(root, "skills-enabled.json"), JSON.stringify({ v: 1, keys: ["skill--cp-r2"] }))
+    const host = codepuppyEngine({ sandbox, name, modelBaseURL: model.baseURL, filewatcher: true })
+    const stop = watchExplicitSources({ ...host.injection.explicit!, skills: explicitSkillDirs, log: () => {} })
+    const engine = await host.start()
+    try {
+      await firstTurn(engine, host.projectDirectory)
+      expect(await outcomeOn(engine, host.projectDirectory, BUILD, `${g1}/*`)).toBe("allow")
+      const g2 = generation("gen-000002-bbbbbb")
+      let outcome: Outcome = "ask"
+      for (const until = Date.now() + 15_000; Date.now() < until && outcome !== "allow"; await Bun.sleep(200))
+        outcome = await outcomeOn(engine, host.projectDirectory, BUILD, `${g2}/*`)
+      expect(outcome).toBe("allow")
+    } finally {
+      stop()
+      await engine.close()
+    }
+  }, 60_000)
 })
 

@@ -678,6 +678,8 @@ describe("buildCodePuppyModelConfig — REQ-001 edition 白名单(catalog LKG)",
     writeCatalogSnapshot(userData, { ...liveBase, models: [] })
     pinAppliedCatalog(userData, 1) // `#1555`:引擎配置只读 fork 前钉住的已应用目录
     writeCustomProviderTruth(truthPath(), [{ id: "myco", name: "MyCo", compat: "openai", baseURL: "https://myco.invalid/v1", models: ["m"] }], fs)
+    // `#1667`(裁决 r3 第 2 条,431ce4ba2e):没有可用 key 的自定义节点整个不注入;本条判的是白名单,先种 key。
+    plantSecret(customProviderSecretName("myco"), SECRET)
     expect(buildCodePuppyModelConfig(userData)!.enabled_providers).toContain("myco")
   })
 

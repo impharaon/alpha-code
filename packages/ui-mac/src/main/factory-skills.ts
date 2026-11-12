@@ -116,6 +116,20 @@ function readlinkOrNull(p: string): string | null {
   }
 }
 
+// `#1662`:OpenCode 2 的技能扫描(`packages/core/src/config/plugin/skill-scan.ts`)在含 SKILL.md 的目录就停、不再往下找;
+// v1(0.1.26)对 skills 路径按 `**/SKILL.md` 递归。出厂技能里嵌套的入口(cloud-capabilities/cloud = `/cloud`)各自作为一条
+// 路径交给引擎,才与 0.1.26 一样被发现。
+function nestedSkillDirs(root: string): string[] {
+  const found: string[] = []
+  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.name.startsWith(".")) continue
+    const dir = join(root, entry.name)
+    if (fs.existsSync(join(dir, "SKILL.md"))) found.push(dir)
+    found.push(...nestedSkillDirs(dir))
+  }
+  return found
+}
+
 function msg(e: unknown): string {
   return e instanceof Error ? e.message : String(e)
 }
@@ -208,7 +222,7 @@ export function reconcileFactorySkills(
       result.skipped.push({ name, reason: `source missing: ${src}` })
       continue
     }
-    result.paths.push(src)
+    result.paths.push(src, ...nestedSkillDirs(src))
     result.active.push(name)
   }
 

@@ -42,6 +42,7 @@ ALPHA.md	alpha-work	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / 
 ALPHA.md	alpha-work https://github.com/jinjunnn/alpha-work/tree/main/governance	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 ALPHA.md	/Users/tide/app/alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 ALPHA.md	jinjunnn/alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+ALPHA.md	Alpha	1	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
 CLAUDE.md	alpha-code	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 CLAUDE.md	alpha-platform	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 CLAUDE.md	jinjunnn/alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -52,6 +53,8 @@ docs/README.md	https://github.com/jinjunnn/alpha-work/blob/main/governance/docum
 docs/README.md	alpha-code alpha-ask	1	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 docs/README.md	alpha-cloud	1	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 docs/README.md	cloud_cloud_vision	1	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+docs/README.md	Alpha	1	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
+docs/README.md	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
 docs/architecture/2026-08-10-catalog-readiness-signals.md	alpha-code	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-08-10-catalog-readiness-signals.md	alpha-code@ec6eb4e1	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-08-10-packaged-first-launch-catalog-cost.md	alpha-code	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -66,6 +69,7 @@ docs/architecture/2026-08-23-codex-harness-comparison.md	https://github.com/jinj
 docs/architecture/2026-08-23-codex-harness-comparison.md	https://github.com/jinjunnn/alpha-code/issues/1289	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-08-23-codex-harness-comparison.md	https://github.com/jinjunnn/alpha-code/issues/1290	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-08-23-codex-harness-comparison.md	https://github.com/jinjunnn/alpha-code/issues/1291	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-08-23-codex-harness-comparison.md	Alpha	1	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
 docs/architecture/2026-08-23-network-timeout-recon.md	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-08-23-network-timeout-recon.md	alpha-code@aded4ed59	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-08-23-shell-sandbox-seam.md	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -155,6 +159,8 @@ docs/architecture/2026-09-09-multi-workspace-fence-decision.md	alpha-code@8a8e1e
 docs/architecture/2026-09-09-multi-workspace-fence-decision.md	/Users/tide/app/alpha-code	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-09-09-multi-workspace-fence-decision.md	/Users/tide/code-puppy	1	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
 docs/architecture/2026-09-09-multi-workspace-fence-decision.md	/code-puppy	3	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
+docs/architecture/2026-09-09-multi-workspace-fence-decision.md	/Alpha	6	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+docs/architecture/2026-09-09-multi-workspace-fence-decision.md	/Users/tide/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
 docs/architecture/2026-09-09-req159-process-fence.md	alpha-code	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-09-09-req159-process-fence.md	/code-puppy	4	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
 docs/architecture/2026-09-09-req159-u1-native-addon-signed-load.md	alpha-code	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -223,6 +229,7 @@ docs/architecture/2026-09-24-cloud-vision-client-seam.md	cloud_cloud_vision	2	hi
 docs/architecture/2026-09-24-cloud-vision-client-seam.md	cloud_cloud_vision alpha-platform	1	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 docs/architecture/2026-09-24-exa-mcp-failure-signal-recon.md	alpha-code	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/2026-09-27-exa-entry-shape-fail-open-recon.md	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/2026-11-12-1662-takeover-candidates.md	packages/plugin/src/alpha-cloud-authority.ts	1	upstream	导出路径由未接管的上游文件 packages/plugin/package.json 声明,改名要先接管那个文件(另需 ADR)
 docs/architecture/claude-plugin-corpus-component-scale.md	alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/codepuppy-connection-lifetime.md	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/constraints.md	alpha-code	16	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -235,12 +242,14 @@ docs/architecture/engine-command-and-event-surface.md	alpha_register	3	historica
 docs/architecture/extension-seams.md	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/extension-seams.md	alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/frontend-surfaces.md	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/frontend-surfaces.md	Alpha	1	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
 docs/architecture/host-extension-package-contract-boundary.md	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/host-extension-package-contract-boundary.md	alpha-web	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/overview.md	alpha-code	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/overview.md	alpha-platform	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/overview.md	alpha-web	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/overview.md	alpha-code-plugin	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/architecture/overview.md	Alpha	1	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
 docs/architecture/package-mcp-oauth-boundary.md	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/quality-gate-environments.md	../alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/architecture/quality-gate-environments.md	repos/jinjunnn/alpha-code/branches/alpha/protection	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -301,6 +310,8 @@ docs/contracts/platform-integration.md	alpha-code code-puppy	1	external-anchor	G
 docs/contracts/platform-integration.md	alpha-platform-api alpha-web	1	historical	说明旧品牌受众 alpha-platform-api 已被拒收的契约文字(受众已在 alpha-web#283 改为 codepuppy-*)
 docs/contracts/platform-integration.md	https://github.com/jinjunnn/alpha-web/blob/main/docs/contracts/chat-archive-upload.md	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/contracts/platform-integration.md	alpha-work	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/contracts/platform-integration.md	X-Alpha-Upload-Consent	1	external-anchor	跨仓请求头 X-Alpha-Upload-Consent 的逐字协议标识，本票冻结标识符
+docs/contracts/platform-integration.md	Alpha	1	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
 docs/contracts/recovery-adapter.md	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/contracts/session-permission.md	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/contracts/session-permission.md	https://github.com/jinjunnn/alpha-code/issues/440	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -309,6 +320,7 @@ docs/contracts/tool-policy.md	alpha-code	1	external-anchor	GitHub 仓库名 alph
 docs/contracts/tool-policy.md	jinjunnn/alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/PAGE-MAP.md	alpha-code	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/PAGE-MAP.md	req090-alpha-surfaces	4	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
+docs/design/PAGE-MAP.md	Alpha	1	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
 docs/design/README.md	alpha-code	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/README.md	2026-07-20-req090-alpha-surfaces/	1	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
 docs/design/README.md	2026-07-07-project-alpha-only-extensions.md	1	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
@@ -343,6 +355,7 @@ docs/design/current/settings/components.md	alpha-code	1	external-anchor	GitHub �
 docs/design/current/settings/components.md	2026-07-20-req090-alpha-surfaces/	2	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
 docs/design/current/settings/design.html	alpha-code	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/current/shell-sidebar/design.html	alpha-code	5	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/design/current/slash-menu/design.html	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
 docs/design/system/README.md	alpha-code	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/system/color.md	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/system/components.md	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -350,6 +363,7 @@ docs/design/system/contributing.md	alpha-code	1	external-anchor	GitHub 仓库名
 docs/design/system/patterns.md	alpha-code	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/system/principles.md	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/system/replacing-opencode.md	alpha-code	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/design/system/replacing-opencode.md	Alpha	2	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
 docs/design/system/tokens.md	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/runbooks/ci.md	../../.claude/rules/adrs/ADR-043-alpha-owned-files-under-upstream-paths.md	1	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
 docs/runbooks/ci.md	alpha-platform-contract.lock.json	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -365,6 +379,8 @@ docs/runbooks/distribution.md	packages/codepuppy-contracts-consumer/fixtures/con
 docs/runbooks/distribution.md	alpha-platform	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/runbooks/distribution.md	https://github.com/jinjunnn/alpha-code/releases/latest/download/latest-mac.yml	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/runbooks/distribution.md	/code-puppy	1	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
+docs/runbooks/distribution.md	.alpha-code-signing/.codepuppy-signing/g	1	migration-source	一次性改名步骤:把 owner 本机旧签名目录 ~/.alpha-code-signing 与 signing.env 里的旧变量名改成 codepuppy 形式,要写出旧名才能找到它们;owner 本机改完后随下一版 runbook 删除
+docs/runbooks/distribution.md	.alpha-code-signing	1	migration-source	一次性改名步骤:把 owner 本机旧签名目录 ~/.alpha-code-signing 与 signing.env 里的旧变量名改成 codepuppy 形式,要写出旧名才能找到它们;owner 本机改完后随下一版 runbook 删除
 docs/runbooks/model-catalog-updates.md	alpha-platform	7	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/runbooks/model-catalog-updates.md	:alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/runbooks/model-catalog-updates.md	alpha-platform:	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -385,6 +401,70 @@ docs/runbooks/uninstall.md	Support/alpha-code/	2	external-anchor	GitHub 仓库�
 docs/runbooks/uninstall.md	/.alpha/	2	historical	记录退役根 .alpha(已退役、零读写)的历史说明
 docs/runbooks/uninstall.md	Support/alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/runbooks/uninstall.md	/.alpha	1	historical	记录退役根 .alpha(已退役、零读写)的历史说明
+packages/codepuppy-app/src/app.tsx	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/am.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/ar.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/az.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/bg.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/bn.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/br.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/bs.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/ca.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/cs.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/da.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/de.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/dv.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/dz.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/el.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/en.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/es.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/et.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/fa.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/fi.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/fo.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/fr.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/hi.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/hr.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/hu.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/hy.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/id.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/is.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/it.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/ja.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/ka.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/km.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/ko.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/lo.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/lt.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/lv.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/mk.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/mn.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/ms.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/my.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/ne.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/nl.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/no.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/pa.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/pl.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/ro.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/ru.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/si.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/sk.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/sl.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/sq.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/sr.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/sv.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/tg.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/th.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/tk.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/tr.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/uk.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/ur.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/uz.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/vi.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/i18n/zht.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/pages/draft-route-gate.tsx	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/codepuppy-app/src/pages/session/timeline/message-timeline.tsx	--v2-alpha-light-2 --v2-alpha-light-0	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
 packages/codepuppy-contracts-consumer/alpha-platform-cloud-mcp.lock.json	文件名	1	external-anchor	文件名由别的仓定义并按锁文件 / vendor 逐字节钉住:仓库名派生的锁文件名、alpha-platform 产出的 vendor 文件名,owner D3 未裁仓库名,不改
 packages/codepuppy-contracts-consumer/alpha-platform-cloud-mcp.lock.json	jinjunnn/alpha-platform	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-contracts-consumer/alpha-platform-contract.lock.json	文件名	1	external-anchor	文件名由别的仓定义并按锁文件 / vendor 逐字节钉住:仓库名派生的锁文件名、alpha-platform 产出的 vendor 文件名,owner D3 未裁仓库名,不改
@@ -442,21 +522,168 @@ packages/codepuppy-contracts-consumer/src/decode.ts	../vendor/alpha-platform-mod
 packages/codepuppy-contracts-consumer/src/decode.ts	../vendor/alpha-platform-model-catalog/contracts/v3/model-catalog.schema.json	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-contracts-consumer/src/decode.ts	alpha-wire-contracts.schema.json	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/codepuppy-contracts-consumer/vendor/alpha-platform/contracts/v1/alpha-wire-contracts.schema.json	文件名	1	external-anchor	文件名由别的仓定义并按锁文件 / vendor 逐字节钉住:仓库名派生的锁文件名、alpha-platform 产出的 vendor 文件名,owner D3 未裁仓库名,不改
+packages/codepuppy-session-ui/src/v2/components/prompt-input/index.tsx	--v2-alpha-light-20 --v2-alpha-light-0	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/script/colors.txt	--v2-alpha-dark-8	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/script/colors.txt	--v2-alpha-dark-10	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/script/colors.txt	--v2-alpha-dark-20	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/script/colors.txt	--v2-alpha-dark-4	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/script/colors.txt	--v2-alpha-light-12	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/script/colors.txt	--v2-alpha-light-24	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/script/colors.txt	--v2-alpha-dark-40	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/script/colors.txt	--v2-alpha-light-100	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/script/colors.txt	--v2-alpha-light-0	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/components/list.stories.tsx	Alpha	3	upstream	上游 OpenCode 原文里的普通英文词 Alpha(透明度色阶 Alpha Dark / Light 的说明、stories 的 Alpha / Beta / Gamma 示例值),不是品牌;#1668 原样恢复的 0.1.26 前端,不改
+packages/codepuppy-ui/src/components/select.stories.tsx	Alpha	1	upstream	上游 OpenCode 原文里的普通英文词 Alpha(透明度色阶 Alpha Dark / Light 的说明、stories 的 Alpha / Beta / Gamma 示例值),不是品牌;#1668 原样恢复的 0.1.26 前端,不改
+packages/codepuppy-ui/src/components/tabs.stories.tsx	Alpha	2	upstream	上游 OpenCode 原文里的普通英文词 Alpha(透明度色阶 Alpha Dark / Light 的说明、stories 的 Alpha / Beta / Gamma 示例值),不是品牌;#1668 原样恢复的 0.1.26 前端,不改
+packages/codepuppy-ui/src/theme/themes/oc-2.json	--v2-alpha-dark-8	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/themes/oc-2.json	--v2-alpha-dark-10	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/themes/oc-2.json	--v2-alpha-dark-20	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/themes/oc-2.json	--v2-alpha-dark-4	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/themes/oc-2.json	--v2-alpha-light-12	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/themes/oc-2.json	--v2-alpha-light-24	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/themes/oc-2.json	--v2-alpha-dark-40	4	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/themes/oc-2.json	--v2-alpha-light-100	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/themes/oc-2.json	--v2-alpha-light-0	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/themes/oc-2.json	--v2-alpha-dark-4 --v2-alpha-dark-8 --v2-alpha-dark-12 --v2-alpha-dark-0	3	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/themes/oc-2.json	--v2-alpha-dark-10 --v2-alpha-dark-14 --v2-alpha-dark-0	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/themes/oc-2.json	--v2-alpha-dark-20 --v2-alpha-light-14 --v2-alpha-dark-6 --v2-alpha-dark-0	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/themes/oc-2.json	--v2-alpha-dark-8 --v2-alpha-dark-10	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/themes/oc-2.json	--v2-alpha-dark-10 --v2-alpha-dark-20	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/themes/oc-2.json	--v2-alpha-light-6	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/themes/oc-2.json	--v2-alpha-light-8	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/themes/oc-2.json	--v2-alpha-light-10	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/themes/oc-2.json	--v2-alpha-light-20	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/themes/oc-2.json	--v2-alpha-dark-24	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/themes/oc-2.json	--v2-alpha-dark-60	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/themes/oc-2.json	--v2-alpha-dark-30 --v2-alpha-light-16 --v2-alpha-light-6	3	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/themes/oc-2.json	--v2-alpha-dark-40 --v2-alpha-light-20 --v2-alpha-light-10	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/themes/oc-2.json	--v2-alpha-dark-40 --v2-alpha-light-40 --v2-alpha-light-0 --v2-alpha-light-30	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/themes/oc-2.json	--v2-alpha-light-10 --v2-alpha-light-0 --v2-alpha-light-16	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/v2/default-primitives.ts	Alpha	1	upstream	上游 OpenCode 原文里的普通英文词 Alpha(透明度色阶 Alpha Dark / Light 的说明、stories 的 Alpha / Beta / Gamma 示例值),不是品牌;#1668 原样恢复的 0.1.26 前端,不改
+packages/codepuppy-ui/src/theme/v2/mapping.ts	v2-alpha-dark-8	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/v2/mapping.ts	v2-alpha-dark-10	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/v2/mapping.ts	v2-alpha-dark-20	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/v2/mapping.ts	v2-alpha-dark-4	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/v2/mapping.ts	v2-alpha-light-12	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/v2/mapping.ts	v2-alpha-light-24	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/v2/mapping.ts	v2-alpha-dark-40	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/v2/mapping.ts	v2-alpha-light-100	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/v2/mapping.ts	v2-alpha-light-0	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/v2/mapping.ts	--v2-alpha-dark-4 --v2-alpha-dark-8 --v2-alpha-dark-12 --v2-alpha-dark-0	3	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/v2/mapping.ts	--v2-alpha-dark-10 --v2-alpha-dark-14 --v2-alpha-dark-0	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/v2/mapping.ts	--v2-alpha-dark-20 --v2-alpha-light-14 --v2-alpha-dark-6 --v2-alpha-dark-0	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/v2/mapping.ts	--v2-alpha-dark-40	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/v2/mapping.ts	--v2-alpha-dark-8 --v2-alpha-dark-10	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/v2/mapping.ts	--v2-alpha-dark-10 --v2-alpha-dark-20	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/v2/mapping.ts	v2-alpha-light-6	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/v2/mapping.ts	v2-alpha-light-8	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/v2/mapping.ts	v2-alpha-light-10	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/v2/mapping.ts	v2-alpha-light-20	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/v2/mapping.ts	v2-alpha-dark-24	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/v2/mapping.ts	v2-alpha-dark-60	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/v2/mapping.ts	--v2-alpha-dark-30 --v2-alpha-light-16 --v2-alpha-light-6	3	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/v2/mapping.ts	--v2-alpha-dark-40 --v2-alpha-light-20 --v2-alpha-light-10	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/v2/mapping.ts	--v2-alpha-dark-40 --v2-alpha-light-40 --v2-alpha-light-0 --v2-alpha-light-30	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/v2/mapping.ts	--v2-alpha-light-10 --v2-alpha-light-0 --v2-alpha-light-16	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/theme/v2/resolve.ts	Alpha	1	upstream	上游 OpenCode 原文里的普通英文词 Alpha(透明度色阶 Alpha Dark / Light 的说明、stories 的 Alpha / Beta / Gamma 示例值),不是品牌;#1668 原样恢复的 0.1.26 前端,不改
+packages/codepuppy-ui/src/v2/components/avatar-v2.css	--v2-alpha-light-16 --v2-alpha-light-0	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/components/button-v2.css	--v2-alpha-light-20 --v2-alpha-light-0	3	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/components/checkbox-v2.css	--v2-alpha-light-6 --v2-alpha-light-0	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/components/checkbox-v2.css	--v2-alpha-light-20 --v2-alpha-light-0	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/components/icon-button-v2.css	--v2-alpha-light-20 --v2-alpha-light-0	3	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/components/inline-input-v2.css	--v2-alpha-light-2 --v2-alpha-light-0	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/components/line-comment-v2.css	--v2-alpha-light-2 --v2-alpha-light-0	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/components/project-avatar-v2.css	--v2-alpha-light-16 --v2-alpha-light-0	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/components/project-avatar-v2.css	--v2-alpha-dark-20	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/components/radio-v2.css	--v2-alpha-light-6 --v2-alpha-light-0	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/components/radio-v2.css	--v2-alpha-light-20 --v2-alpha-light-0	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/components/select-v2.css	--v2-alpha-light-2 --v2-alpha-light-0	3	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/components/switch-v2.css	--v2-alpha-light-0 --v2-alpha-light-20	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/components/switch-v2.css	--v2-alpha-light-0 --v2-alpha-light-10	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/components/text-input-v2.css	--v2-alpha-light-2 --v2-alpha-light-0	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/components/textarea-v2.css	--v2-alpha-light-2 --v2-alpha-light-0	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	Alpha	2	upstream	上游 OpenCode 原文里的普通英文词 Alpha(透明度色阶 Alpha Dark / Light 的说明、stories 的 Alpha / Beta / Gamma 示例值),不是品牌;#1668 原样恢复的 0.1.26 前端,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-dark-100:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-dark-90:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-dark-80:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-dark-70:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-dark-60:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-dark-50:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-dark-40:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-dark-30:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-dark-24:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-dark-20:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-dark-16:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-dark-14:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-dark-12:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-dark-10:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-dark-8:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-dark-6:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-dark-4:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-dark-2:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-dark-0:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-light-100:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-light-90:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-light-80:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-light-70:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-light-60:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-light-50:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-light-40:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-light-30:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-light-24:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-light-20:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-light-16:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-light-14:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-light-12:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-light-10:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-light-8:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-light-6:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-light-4:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-light-2:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/colors.css	--v2-alpha-light-0:	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-dark-8	6	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-dark-10	6	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-dark-20	6	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-dark-4	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-light-12	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-light-24	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-dark-40	10	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-light-100	4	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-light-0	9	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-dark-4 --v2-alpha-dark-8	6	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-dark-12 --v2-alpha-dark-0	6	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-dark-10 --v2-alpha-dark-14	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-dark-0	4	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-light-14 --v2-alpha-dark-6	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-light-6	7	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-light-8	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-light-10	8	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-light-20	3	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-dark-24	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-light-30	3	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-dark-30	9	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-light-16	7	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-light-40	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-dark-60	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-light-16 --v2-alpha-light-6	3	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-dark-40 --v2-alpha-light-20	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-dark-40 --v2-alpha-light-40	1	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
+packages/codepuppy-ui/src/v2/styles/theme.css	--v2-alpha-light-10 --v2-alpha-light-0	2	upstream	上游 OpenCode v2 设计体系的透明度色阶名(--v2-alpha-*,alpha 指透明度,不是品牌);#1668 把 0.1.26 前端原样恢复到 Code Puppy 路径,色阶名随上游,不改
 packages/ext/README.md	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ext/README.md	/Users/tide/app/alpha-code/packages/ext/dist/plugin.js	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ext/package.json	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ext/src/cloud-access.ts	@opencode/plugin/alpha-cloud-authority	1	upstream	导出路径由未接管的上游文件 packages/plugin/package.json 声明,改名要先接管那个文件(另需 ADR)
 packages/ext/src/cloud-contract-hook.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ext/src/cloud-vision.ts	alpha-platform	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ext/src/cloud-vision.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ext/src/cloud-websearch-kill.ts	@opencode-ai/plugin/alpha-cloud-authority	3	upstream	导出路径由未接管的上游文件 packages/plugin/package.json 声明,改名要先接管那个文件(另需 ADR)
 packages/ext/src/cloud-websearch-kill.ts	cloud_cloud_	1	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+packages/ext/src/cloud-websearch-kill.ts	@opencode/plugin/alpha-cloud-authority	3	upstream	导出路径由未接管的上游文件 packages/plugin/package.json 声明,改名要先接管那个文件(另需 ADR)
 packages/ext/src/platform-credential-header.ts	@opencode/plugin/alpha-cloud-authority	1	upstream	导出路径由未接管的上游文件 packages/plugin/package.json 声明,改名要先接管那个文件(另需 ADR)
 packages/ext/src/platform-output-cap.ts	alpha-platform	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ext/src/policy/identity.ts	../../../plugin/src/alpha-cloud-authority	1	upstream	导出路径由未接管的上游文件 packages/plugin/package.json 声明,改名要先接管那个文件(另需 ADR)
 packages/ext/src/project-config.ts	.code-puppy	1	migration-source	一次性迁移代码里识别旧名的常量(#1569 升级迁移:userData / 全局根 / 配置 / 会话库 / 侧栏键 / 项目隐藏目录 / 旧版应用可执行文件),随迁移代码一起删除
 packages/ext/src/project-config.ts	.alpha	3	retired-guard	认出已退役的 .alpha 根 / 路径并拒绝使用它(改名守卫就失灵)
 packages/ext/src/prompt-rebrand.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ext/src/staged-attachment-part.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ext/src/vision-image.ts	alpha-platform	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/plugin/src/alpha-cloud-authority.ts	文件名	1	upstream	导出路径由未接管的上游文件 packages/plugin/package.json 声明,改名要先接管那个文件(另需 ADR)
 packages/ui-mac/bunfig.toml	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -465,6 +692,7 @@ packages/ui-mac/electron-builder.config.ts	/.alpha/agents	1	historical	记录退
 packages/ui-mac/electron-builder.config.ts	alpha-web	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/electron-builder.config.ts	jinjunnn/alpha-code	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/electron-builder.config.ts	alpha-code	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/engine/v1-migration-transform.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/package.json	https://github.com/jinjunnn/alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/resources/NOTICE.txt	alpha-code	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/resources/factory-skills/agent-creator/SKILL.md	HOME/.alpha	1	historical	记录退役根 .alpha(已退役、零读写)的历史说明
@@ -485,10 +713,26 @@ packages/ui-mac/scripts/release-manifest.ts	jinjunnn/alpha-code	1	external-ancho
 packages/ui-mac/scripts/sync-catalog-snapshot.mjs	alpha-web	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/scripts/sync-extension-seed.mjs	alpha-web	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/scripts/sync-extension-seed.mjs	alpha-web-checkout	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/scripts/target-arch.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/engine-adapter/fixtures/command.json	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/engine-adapter/fixtures/continue.json	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/engine-adapter/fixtures/files.json	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/engine-adapter/fixtures/parity.json	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/engine-adapter/fixtures/permission-asked.json	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/engine-adapter/fixtures/permission-reply.json	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/engine-adapter/fixtures/question.json	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/engine-adapter/fixtures/read-tool.json	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/engine-adapter/fixtures/todo.json	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/engine-adapter/fixtures/tools.json	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/engine-adapter/fixtures/turn-diff.json	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/engine-adapter/frozen-shapes.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/artifact-ipc.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/artifact-manifest.ts	alpha-code	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/artifact-service.ts	alpha-code	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/main/automation-ipc.ts	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/main/automation-scheduler.ts	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
 packages/ui-mac/src/main/catalog-channels.ts	:alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/main/catalog-liveness.ts	/Alpha	2	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
 packages/ui-mac/src/main/catalog-refresher.ts	alpha-platform	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/chat-archive-cursor.ts	alpha-web	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/chat-archive-turn.ts	alpha-web	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -497,6 +741,7 @@ packages/ui-mac/src/main/chat-archive-uploader.ts	:alpha-web	1	external-anchor	G
 packages/ui-mac/src/main/cloud-envelope-guard.ts	.alpha/	1	historical	记录退役根 .alpha(已退役、零读写)的历史说明
 packages/ui-mac/src/main/cloud-envelope-guard.ts	alpha-platform@9cf67bd	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/cloud-ipc.ts	alpha-platform	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/main/cloud-ipc.ts	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
 packages/ui-mac/src/main/cloud-run-tracker.ts	alpha-code	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/cloud-schedule-config.ts	alpha-platform	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/cloud-web-search.ts	cloud_cloud_web_search	1	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
@@ -518,8 +763,10 @@ packages/ui-mac/src/main/codepuppy-behavior.ts	alpha-code	1	external-anchor	GitH
 packages/ui-mac/src/main/codepuppy-bridge.ts	audits/2026-07-03-req004-alpha-bridge-spike.md	1	historical	指向存档文件(已接受 ADR / 审计记录 / 带日期的历史设计稿)的文件名,存档不改名
 packages/ui-mac/src/main/codepuppy-cloud-jobs.ts	alpha-platform	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/codepuppy-cloud-jobs.ts	alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/main/codepuppy-config-injection.ts	alpha-code	5	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/main/codepuppy-config-injection.ts	alpha-web	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/main/codepuppy-cloud-schedules.ts	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/main/codepuppy-config-injection.ts	alpha-code	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/main/codepuppy-config-injection.ts	alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/main/codepuppy-config-injection.ts	alpha-platform	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/codepuppy-endpoints.ts	alpha-gateway.tidelabs.click	1	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
 packages/ui-mac/src/main/codepuppy-endpoints.ts	alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/codepuppy-environment.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -541,10 +788,18 @@ packages/ui-mac/src/main/engine-config-truth-boot.ts	.alpha	1	retired-guard	认�
 packages/ui-mac/src/main/engine-config-truth-boot.ts	.alpha-bak-	1	migration-source	清理用户盘上旧版留下的 *.alpha-bak-* 残留文件,识别旧名才能删掉它们
 packages/ui-mac/src/main/engine-config-truth-boot.ts	opencode.jsonc.alpha-bak opencode.json.alpha-bak	1	migration-source	清理用户盘上旧版留下的 *.alpha-bak-* 残留文件,识别旧名才能删掉它们
 packages/ui-mac/src/main/engine-config-truth.ts	alpha-keychain	1	migration-source	旧版配置文件里的钥匙串标记识别器(PROVIDER_KEYCHAIN_MARKER),派发书判断点 1:持久化取值不改值
+packages/ui-mac/src/main/engine-explicit-config.ts	alpha-code	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/ext-cas.ts	jinjunnn/alpha-work	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/ext-install-planner.ts	jinjunnn/alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/ext-seed.ts	:alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/factory-skills.ts	.alpha	3	historical	记录退役根 .alpha(已退役、零读写)的历史说明
+packages/ui-mac/src/main/factory-skills.ts	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/main/fixtures/catalog-boot-0.1.24.json	alpha.catalog.trust.v1	2	user-content	#1632:真实 0.1.24 状态与公开签名响应的原始字节夹具;改写会破坏签名或历史输入
+packages/ui-mac/src/main/fixtures/catalog-boot-0.1.24.json	alpha.catalog.advisories.v1	1	user-content	#1632:真实 0.1.24 状态与公开签名响应的原始字节夹具;改写会破坏签名或历史输入
+packages/ui-mac/src/main/fixtures/catalog-boot-0.1.24.json	alpha.catalog.channel-metadata.v1	1	user-content	#1632:真实 0.1.24 状态与公开签名响应的原始字节夹具;改写会破坏签名或历史输入
+packages/ui-mac/src/main/fixtures/catalog-boot-0.1.24.json	alpha-code alpha-catalog.json :alpha-upstream-sync alpha-web mcp:alpha-excel mcp:alpha-word alpha-word alpha-work :Alpha alpha.catalog.curation.v1 https://codepuppy.cn/catalog/assets/mcp.alpha-word/1.0.0/alpha-curation/sbom/98c4db8c6daf40c20f89f4ac44f7c5b304dbc875b92e39989ab4a0896af0bab0.cdx.json https://codepuppy.cn/catalog/assets/mcp.alpha-word/1.0.0/alpha-curation/intake-provenance/ecb50d32547e9772e007b83b536039d7d77cc402ff39c0a9ba37ffb92625e713.json alpha.intake-provenance.v1 alpha-excel Alpha catalog-src/intake/records/mcp.alpha-excel/ alpha-code@e3d2eec https://codepuppy.cn/catalog/assets/mcp.alpha-excel/1.0.0/alpha-curation/sbom/b7ae51c57f71697da6a5f8776bd91448bf64386a22ce8f5e2f9e198a305c700e.cdx.json https://codepuppy.cn/catalog/assets/mcp.alpha-excel/1.0.0/alpha-curation/intake-provenance/93ccef93fc7455f918fb8e7d910c207bc9793e6d09b6168396ff1cf4f524abc3.json mcp:alpha-powerpoint alpha-powerpoint https://codepuppy.cn/catalog/assets/mcp.alpha-powerpoint/1.0.0/alpha-curation/sbom/933a611997a603ce9d3858cd7eb8a77bdfe9c251f64ebf0b0d195cdc602053b8.cdx.json https://codepuppy.cn/catalog/assets/mcp.alpha-powerpoint/1.0.0/alpha-curation/intake-provenance/dafd6bb7b2772b81fcc64abc1531cf0d2ff870143489fae23be52f05588a3a50.json mcp:alpha-pdf alpha-pdf https://codepuppy.cn/catalog/assets/mcp.alpha-pdf/1.0.0/alpha-curation/sbom/6d80eb343ef52efc3fc0fb2a8ce448f18ff5e6ca3875dbb64967a9e84add6652.cdx.json https://codepuppy.cn/catalog/assets/mcp.alpha-pdf/1.0.0/alpha-curation/intake-provenance/4dd1861808a98bf0592e4b0f69a00d76490b000f5f19967ad6c48b4b92cf70e1.json https://codepuppy.cn/catalog/assets/mcp.filesystem/1.0.0/alpha-curation/sbom/440af2f3847a719355731bcb94269baf9511242e711eb1f6288502e4036621ae.cdx.json https://codepuppy.cn/catalog/assets/mcp.filesystem/1.0.0/alpha-curation/intake-provenance/3d882c868067dcf43bf5b898b871026ad3da94f81d76948572e1d5b03498e1a4.json https://codepuppy.cn/catalog/assets/mcp.playwright/1.0.0/alpha-curation/sbom/c7bdeb162de72c19f00be720d2363be86d2580ddde0595a87eb0a5f1c98eb93a.cdx.json https://codepuppy.cn/catalog/assets/mcp.playwright/1.0.0/alpha-curation/intake-provenance/f76c0de46dbe623eba0822936e96082c5f53217535e54384c44693db1c141a30.json https://codepuppy.cn/catalog/assets/mcp.chrome-devtools/1.0.0/alpha-curation/sbom/97bde39092f92142ebbf69bebabf8c2dec86084dc0c479c5f9bbec71c45f4ddc.cdx.json https://codepuppy.cn/catalog/assets/mcp.chrome-devtools/1.0.0/alpha-curation/intake-provenance/f3ade0db437f121aafc49a2159ce35b2960d045209e9157e3ec060a0ec704fb8.json alpha-skills skill:alpha-upstream-sync alpha-upstream-sync skills/alpha-upstream-sync https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/alpha-curation/sbom/2e6200c3962f6bfc0f426ef83c16bfad4d3ef9c01c69aae63d37d0bfd7609edd.cdx.json https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/alpha-curation/intake-provenance/ba8a727ed80960c81f8369284a72c73c874cd39c8b501b31d7d93ea85b8db0a8.json https://codepuppy.cn/catalog/assets/skill.brand-guidelines/1.0.0/alpha-curation/sbom/2375a7875da7ddfd36fb24d6ee6ac82ea646429c4d929603caac455b2a5850b4.cdx.json https://codepuppy.cn/catalog/assets/skill.brand-guidelines/1.0.0/alpha-curation/intake-provenance/5f782d0c67d77f1af3d79e1eeb361e760e0e6f44a423bcc803218850cd78d887.json alpha.host-extension-package.v1 package:alpha-first skill:alpha-first application/vnd.alpha.host-extension-package.skill.v1 https://codepuppy.cn/catalog/assets/skill.alpha-first/1.0.0/alpha-package/495b415b54f2821efd267a7f0199ef8662e144aaa640efb3cf12b00386db45dc.json application/vnd.alpha.host-extension-package.cloud.v1 https://codepuppy.cn/catalog/assets/cloud.image/1.0.0/alpha-package/622e0c902a349ce2cc9066d1d19026354bde8b51fbca615cd61606f360041143.json alpha.official-connectors.v1 alpha.secret-prerequisite.v1 application/vnd.alpha.host-extension-package.mcp-local.v1 https://codepuppy.cn/catalog/assets/mcp.dbhub-readonly/1.0.0/alpha-package/349bdddf84b69691cc8a18198e8279022eb26242f6820037a66c53305af464ac.json application/vnd.alpha.host-extension-package.mcp-remote.v1 https://codepuppy.cn/catalog/assets/mcp.github-official/1.0.0/alpha-package/1fc0f27012ab19a53eace30fe4cfe05c8ae65c02f46809745509a5cc544d7582.json	1	user-content	#1632:真实 0.1.24 状态与公开签名响应的原始字节夹具;改写会破坏签名或历史输入
+packages/ui-mac/src/main/fixtures/catalog-boot-0.1.24.json	alpha.catalog.snapshot.v1	1	user-content	#1632:真实 0.1.24 状态与公开签名响应的原始字节夹具;改写会破坏签名或历史输入
+packages/ui-mac/src/main/fixtures/catalog-boot-0.1.24.json	alpha-code alpha-catalog.json alpha-web alpha-work :Alpha Alpha alpha-code@e77cb02f3	1	user-content	#1632:真实 0.1.24 状态与公开签名响应的原始字节夹具;改写会破坏签名或历史输入
 packages/ui-mac/src/main/fixtures/cloud-mcp-tools.ts	alpha-platform	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/fixtures/cloud-mcp-tools.ts	packages/codepuppy-contracts-consumer/alpha-platform-cloud-mcp.lock.json.	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/fixtures/cloud-mcp-tools.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -552,7 +807,9 @@ packages/ui-mac/src/main/fixtures/cloud-mcp-tools.ts	../../../../codepuppy-contr
 packages/ui-mac/src/main/html-preview-host.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/index.ts	.alpha	2	historical	记录退役根 .alpha(已退役、零读写)的历史说明
 packages/ui-mac/src/main/index.ts	alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/main/index.ts	/Alpha	2	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
 packages/ui-mac/src/main/ipc.ts	alpha-code:	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/main/ipc.ts	/Alpha	2	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
 packages/ui-mac/src/main/keychain-name-migration.ts	alpha-code	2	migration-source	改名前 prod / beta 的 Electron 应用名,一次性钥匙串改名迁移用它定位旧条目(`<名> Safe Storage` / `<名> Key`);随迁移代码一起删除(#1571)
 packages/ui-mac/src/main/mcp-default-deny.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/menu.ts	https://github.com/jinjunnn/alpha-code/blob/alpha/docs/runbooks/uninstall.md	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -603,8 +860,18 @@ packages/ui-mac/src/main/network-egress-registry.ts	alpha-gateway.tidelabs.click
 packages/ui-mac/src/main/network-egress-registry.ts	alpha-cloud.tidelabs.click	1	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
 packages/ui-mac/src/main/network-egress-registry.ts	alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/official-connector-resources.ts	alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/main/old-name-scan.ts	sk-alpha- code-puppy	1	retired-guard	旧名扫描门的判据本身(正则各分支与它们的说明),按定义写满旧名;I-09 把判据从测试文件搬进这个非测试模块后在这里登记
+packages/ui-mac/src/main/old-name-scan.ts	.alpha /.alpha	1	retired-guard	旧名扫描门的判据本身(正则各分支与它们的说明),按定义写满旧名;I-09 把判据从测试文件搬进这个非测试模块后在这里登记
+packages/ui-mac/src/main/old-name-scan.ts	.alpha	3	retired-guard	旧名扫描门的判据本身(正则各分支与它们的说明),按定义写满旧名;I-09 把判据从测试文件搬进这个非测试模块后在这里登记
+packages/ui-mac/src/main/old-name-scan.ts	Alpha	2	retired-guard	旧名扫描门的判据本身(正则各分支与它们的说明),按定义写满旧名;I-09 把判据从测试文件搬进这个非测试模块后在这里登记
+packages/ui-mac/src/main/old-name-scan.ts	cloud_cloud_	1	retired-guard	旧名扫描门的判据本身(正则各分支与它们的说明),按定义写满旧名;I-09 把判据从测试文件搬进这个非测试模块后在这里登记
+packages/ui-mac/src/main/old-name-scan.ts	alphacode	1	retired-guard	旧名扫描门的判据本身(正则各分支与它们的说明),按定义写满旧名;I-09 把判据从测试文件搬进这个非测试模块后在这里登记
+packages/ui-mac/src/main/old-name-scan.ts	@alpha-code/	1	retired-guard	旧名扫描门的判据本身(正则各分支与它们的说明),按定义写满旧名;I-09 把判据从测试文件搬进这个非测试模块后在这里登记
+packages/ui-mac/src/main/old-name-scan.ts	sk-alpha-	1	retired-guard	旧名扫描门的判据本身(正则各分支与它们的说明),按定义写满旧名;I-09 把判据从测试文件搬进这个非测试模块后在这里登记
+packages/ui-mac/src/main/old-name-scan.ts	code-puppy	1	retired-guard	旧名扫描门的判据本身(正则各分支与它们的说明),按定义写满旧名;I-09 把判据从测试文件搬进这个非测试模块后在这里登记
 packages/ui-mac/src/main/package-admission.ts	alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/platform-error-code.ts	alpha-platform	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/main/platform/index.ts	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
 packages/ui-mac/src/main/process-fence-plan.ts	/code-puppy	3	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
 packages/ui-mac/src/main/process-fence-profile.ts	/code-puppy	3	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
 packages/ui-mac/src/main/process-fence-workspaces.ts	/code-puppy	1	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
@@ -612,6 +879,7 @@ packages/ui-mac/src/main/rail-preview-host.ts	alpha-code	1	external-anchor	GitHu
 packages/ui-mac/src/main/release-manifest.ts	alpha-work	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/remote-catalog.ts	alpha-web	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/server.ts	/code-puppy	1	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
+packages/ui-mac/src/main/sidecar.ts	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
 packages/ui-mac/src/main/source-text-anchors.ts	/code-puppy	1	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
 packages/ui-mac/src/main/source-text-anchors.ts	alpha-code	1	historical	说明品牌守卫要拦的旧应用名 alpha-code(应用名本身由 #1571 改)
 packages/ui-mac/src/main/windows.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -619,15 +887,23 @@ packages/ui-mac/src/main/workspace-file-service.ts	alpha-code	1	external-anchor	
 packages/ui-mac/src/office-preview/index.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/preload/types.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/preload/types.ts	alpha-platform	5	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/preload/types.ts	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+packages/ui-mac/src/renderer/automations/automation-panel.tsx	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
 packages/ui-mac/src/renderer/automations/cloud-disabled-reason-copy.ts	alpha-platform	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/automations/schedule-refusal-copy.ts	alpha-platform	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/brand.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/renderer/codepuppy-ui/CodePuppyHome.tsx	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
 packages/ui-mac/src/renderer/codepuppy-ui/artifact-html-preview/ArtifactHtmlPreview.tsx	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/codepuppy-ui/artifact-html-preview/index.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/renderer/codepuppy-ui/artifact-workbench/renderers/fixtures/office-text/make-fixtures.py	Alpha	1	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
+packages/ui-mac/src/renderer/codepuppy-ui/artifact-workbench/renderers/fixtures/office-text/py-pptx/ppt/slides/slide1.xml	Alpha	1	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
+packages/ui-mac/src/renderer/codepuppy-ui/artifact-workbench/renderers/fixtures/xlsx/openpyxl/xl/worksheets/sheet1.xml	Alpha	1	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
+packages/ui-mac/src/renderer/codepuppy-ui/artifact-workbench/renderers/fixtures/xlsx/xlsxwriter/xl/sharedStrings.xml	Alpha	1	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
 packages/ui-mac/src/renderer/codepuppy-ui/artifact-workbench/renderers/registry.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/codepuppy-ui/brand-icon.tsx	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-composer.css	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-composer.tsx	alpha-code	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-new-session.tsx	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
 packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search-test-runtime.tsx	/repos/alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search-test-runtime.tsx	prj_alpha-code	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search-test-runtime.tsx	/repos/alpha-web prj_alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -635,12 +911,14 @@ packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search-test-runtime.
 packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search-test-runtime.tsx	alpha-web /repos/alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/codepuppy-ui/composer-autocomplete-core.ts	/code-puppy	1	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
 packages/ui-mac/src/renderer/codepuppy-ui/default-workspace.ts	alpha-code /Alpha	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改；同一行 ~/Alpha 是历史工作目录字面量，本票冻结路径名
+packages/ui-mac/src/renderer/codepuppy-ui/default-workspace.ts	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
 packages/ui-mac/src/renderer/codepuppy-ui/model-picker-core.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/codepuppy-ui/model-recovery.ts	:alpha-platform	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/codepuppy-ui/session-timeline/cards/cards.css	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/codepuppy-ui/session-timeline/cards/tool-card-model.ts	alpha-platform	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/codepuppy-ui/session-timeline/session-timeline.css	alpha-code	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/codepuppy-ui/session-workspace/session-workspace.css	alpha-code	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/renderer/codepuppy-ui/workspace-chip.tsx	/Alpha	2	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
 packages/ui-mac/src/renderer/extensions/catalog-types.ts	alpha-platform	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/extensions/extension-detail.tsx	alpha-platform	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/i18n/en.ts	alpha-platform	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -650,6 +928,7 @@ packages/ui-mac/src/renderer/i18n/zh.ts	/code-puppy	1	user-content	用户默认�
 packages/ui-mac/src/renderer/logo-codepuppy.tsx	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	alpha-platform	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	alpha-code /Alpha	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改；同一行 ~/Alpha 是历史工作目录字面量，本票冻结路径名
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	/Alpha	3	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
 packages/ui-mac/src/renderer/sidebar/shell-commands-test-runtime.tsx	/repos/alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/sidebar/shell-commands-test-runtime.tsx	prj_alpha-code	7	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/sidebar/shell-commands-test-runtime.tsx	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -660,9 +939,14 @@ packages/ui-mac/src/renderer/sidebar/sidebar-state.ts	alpha.sidebar.viewed	1	mig
 packages/ui-mac/src/renderer/sidebar/start-draft-test-runtime.tsx	/repos/alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/sidebar/start-draft-test-runtime.tsx	prj_alpha-code	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/sidebar/start-draft-test-runtime.tsx	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/renderer/sidebar/start-draft-test-runtime.tsx	/Users/tester/Alpha	1	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
+packages/ui-mac/src/renderer/sidebar/start-draft-test-runtime.tsx	/Alpha	2	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
+packages/ui-mac/src/renderer/sidebar/start-draft-test-runtime.tsx	Alpha	1	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
+packages/ui-mac/src/renderer/sidebar/use-projects.ts	/Alpha	2	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
 packages/ui-mac/src/renderer/surface-remount-test-runtime.tsx	/repos/alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/surface-remount-test-runtime.tsx	prj_alpha-code alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/renderer/surface-remount-test-runtime.tsx	prj_alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/renderer/surface-remount-test-runtime.tsx	/Users/tester/Alpha	1	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
 packages/ui-mac/src/renderer/theme-codepuppy.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/shared/catalog-curation.ts	alpha-web	4	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/shared/catalog-curation.ts	alpha-web@a7f79c6 alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -680,11 +964,14 @@ packages/ui-mac/src/shared/codepuppy-config.ts	:alpha-web	1	external-anchor	GitH
 packages/ui-mac/src/shared/codepuppy-model-types.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/shared/codepuppy-model-types.ts	alpha-platform	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/shared/file-viewer.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/shared/frontend-surface-manifest.ts	Alpha	1	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
 packages/ui-mac/src/shared/host-extension-package-contract/CONTRACT.md	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/shared/host-extension-package-contract/CONTRACT.md	alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/shared/host-extension-package-contract/CONTRACT.md	alpha-platform	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/shared/host-extension-package-contract/decoder.ts	alpha-platform	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/shared/host-extension-package-contract/generate-artifact.ts	alpha-platform	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/shared/host-extension-package-contract/generate-artifact.ts	Alpha	1	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
+packages/ui-mac/src/shared/host-extension-package-contract/host-extension-package.registry.v1.json	Alpha	1	external-anchor	跨仓宿主合同的生产方产物语义原文，与冻结的 vendored 副本逐字节一致；品牌文案须由合同生产方改名
 packages/ui-mac/src/shared/html-preview.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/shared/moderation-keywords.parity.json	:alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/shared/moderation-keywords.parity.json	jinjunnn/alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -695,6 +982,8 @@ packages/ui-mac/test-component/effective-catalog.fixture.ts	../../codepuppy-cont
 packages/ui-mac/test-component/inline-preview.fixture.ts	../../codepuppy-contracts-consumer/vendor/alpha-platform/contracts/v1/fixtures/producer/artifact-list.json	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/test-component/package-mixed-bundle.fixture.ts	../../codepuppy-contracts-consumer/vendor/alpha-web-extension-package/expected.bundle.compiled.json	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/test-component/process-fold.fixture.ts	alpha-cloud	1	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+packages/ui-mac/test-fixtures/claude-plugin-corpus.json	Alpha	1	third-party	#848 从 ~/.claude/plugins/marketplaces 采集的真实插件语料逐字快照，保留第三方原文
+packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/test-live/req087/harness.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/test-live/req087/webhost/main.tsx	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/test-visual/main.tsx	../../codepuppy-contracts-consumer/vendor/alpha-platform-model-catalog/contracts/v3/fixtures/producer/model-catalog.json	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -712,69 +1001,20 @@ scripts/gate-files.tsv	alpha-platform	4	external-anchor	GitHub 仓库名 alpha-c
 scripts/gate-files.tsv	../alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 scripts/gate-files.tsv	cloud_cloud_vision	1	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 scripts/gate-files.tsv	alpha-web	5	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-scripts/gate-files.tsv	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+scripts/gate-files.tsv	alpha-code	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 scripts/gate-files.tsv	alpha-platform alpha-bundled	1	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 scripts/gate-files.tsv	alpha-web	1	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-scripts/gate-files.tsv	alpha-bundled	3	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+scripts/gate-files.tsv	alpha-bundled	2	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 scripts/gate-files.tsv	AC1:alpha-ask alpha-readonly :alpha-ask alpha-ask	1	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 scripts/gate-files.tsv	/code-puppy	1	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
 scripts/gate-files.tsv	alpha-word_read_docx	1	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 scripts/gate-files.tsv	alpha-automation	2	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 scripts/gate-files.tsv	alpha_reload	1	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 scripts/gate-files.tsv	alpha-platform-cloud-mcp.lock.json	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+scripts/gate-files.tsv	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
+scripts/gate-files.tsv	alpha-code alpha-readonly alpha-word alpha-bundled	1	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+scripts/gate-files.tsv	cloud_cloud_status	1	user-content	测试用例里模拟的第三方别名 cloud_cloud_status(冒名样本),判据要求它照样不被当成云任务,不是本产品的名字
+scripts/gate-files.tsv	alpha-cloud alpha-bundled	1	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 scripts/known-fails-compare.py	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 scripts/module-size-ratchet.tsv	alpha-web alpha-ask alpha-code	1	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 scripts/worktree-link-deps.sh	@alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/scripts/target-arch.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/distribution.md	.alpha-code-signing/.codepuppy-signing/g	1	migration-source	一次性改名步骤:把 owner 本机旧签名目录 ~/.alpha-code-signing 与 signing.env 里的旧变量名改成 codepuppy 形式,要写出旧名才能找到它们;owner 本机改完后随下一版 runbook 删除
-docs/runbooks/distribution.md	.alpha-code-signing	1	migration-source	一次性改名步骤:把 owner 本机旧签名目录 ~/.alpha-code-signing 与 signing.env 里的旧变量名改成 codepuppy 形式,要写出旧名才能找到它们;owner 本机改完后随下一版 runbook 删除
-packages/ui-mac/src/main/fixtures/catalog-boot-0.1.24.json	alpha.catalog.trust.v1	2	user-content	#1632:真实 0.1.24 状态与公开签名响应的原始字节夹具;改写会破坏签名或历史输入
-packages/ui-mac/src/main/fixtures/catalog-boot-0.1.24.json	alpha.catalog.advisories.v1	1	user-content	#1632:真实 0.1.24 状态与公开签名响应的原始字节夹具;改写会破坏签名或历史输入
-packages/ui-mac/src/main/fixtures/catalog-boot-0.1.24.json	alpha.catalog.channel-metadata.v1	1	user-content	#1632:真实 0.1.24 状态与公开签名响应的原始字节夹具;改写会破坏签名或历史输入
-packages/ui-mac/src/main/fixtures/catalog-boot-0.1.24.json	alpha-code alpha-catalog.json :alpha-upstream-sync alpha-web mcp:alpha-excel mcp:alpha-word alpha-word alpha-work :Alpha alpha.catalog.curation.v1 https://codepuppy.cn/catalog/assets/mcp.alpha-word/1.0.0/alpha-curation/sbom/98c4db8c6daf40c20f89f4ac44f7c5b304dbc875b92e39989ab4a0896af0bab0.cdx.json https://codepuppy.cn/catalog/assets/mcp.alpha-word/1.0.0/alpha-curation/intake-provenance/ecb50d32547e9772e007b83b536039d7d77cc402ff39c0a9ba37ffb92625e713.json alpha.intake-provenance.v1 alpha-excel Alpha catalog-src/intake/records/mcp.alpha-excel/ alpha-code@e3d2eec https://codepuppy.cn/catalog/assets/mcp.alpha-excel/1.0.0/alpha-curation/sbom/b7ae51c57f71697da6a5f8776bd91448bf64386a22ce8f5e2f9e198a305c700e.cdx.json https://codepuppy.cn/catalog/assets/mcp.alpha-excel/1.0.0/alpha-curation/intake-provenance/93ccef93fc7455f918fb8e7d910c207bc9793e6d09b6168396ff1cf4f524abc3.json mcp:alpha-powerpoint alpha-powerpoint https://codepuppy.cn/catalog/assets/mcp.alpha-powerpoint/1.0.0/alpha-curation/sbom/933a611997a603ce9d3858cd7eb8a77bdfe9c251f64ebf0b0d195cdc602053b8.cdx.json https://codepuppy.cn/catalog/assets/mcp.alpha-powerpoint/1.0.0/alpha-curation/intake-provenance/dafd6bb7b2772b81fcc64abc1531cf0d2ff870143489fae23be52f05588a3a50.json mcp:alpha-pdf alpha-pdf https://codepuppy.cn/catalog/assets/mcp.alpha-pdf/1.0.0/alpha-curation/sbom/6d80eb343ef52efc3fc0fb2a8ce448f18ff5e6ca3875dbb64967a9e84add6652.cdx.json https://codepuppy.cn/catalog/assets/mcp.alpha-pdf/1.0.0/alpha-curation/intake-provenance/4dd1861808a98bf0592e4b0f69a00d76490b000f5f19967ad6c48b4b92cf70e1.json https://codepuppy.cn/catalog/assets/mcp.filesystem/1.0.0/alpha-curation/sbom/440af2f3847a719355731bcb94269baf9511242e711eb1f6288502e4036621ae.cdx.json https://codepuppy.cn/catalog/assets/mcp.filesystem/1.0.0/alpha-curation/intake-provenance/3d882c868067dcf43bf5b898b871026ad3da94f81d76948572e1d5b03498e1a4.json https://codepuppy.cn/catalog/assets/mcp.playwright/1.0.0/alpha-curation/sbom/c7bdeb162de72c19f00be720d2363be86d2580ddde0595a87eb0a5f1c98eb93a.cdx.json https://codepuppy.cn/catalog/assets/mcp.playwright/1.0.0/alpha-curation/intake-provenance/f76c0de46dbe623eba0822936e96082c5f53217535e54384c44693db1c141a30.json https://codepuppy.cn/catalog/assets/mcp.chrome-devtools/1.0.0/alpha-curation/sbom/97bde39092f92142ebbf69bebabf8c2dec86084dc0c479c5f9bbec71c45f4ddc.cdx.json https://codepuppy.cn/catalog/assets/mcp.chrome-devtools/1.0.0/alpha-curation/intake-provenance/f3ade0db437f121aafc49a2159ce35b2960d045209e9157e3ec060a0ec704fb8.json alpha-skills skill:alpha-upstream-sync alpha-upstream-sync skills/alpha-upstream-sync https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/alpha-curation/sbom/2e6200c3962f6bfc0f426ef83c16bfad4d3ef9c01c69aae63d37d0bfd7609edd.cdx.json https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/alpha-curation/intake-provenance/ba8a727ed80960c81f8369284a72c73c874cd39c8b501b31d7d93ea85b8db0a8.json https://codepuppy.cn/catalog/assets/skill.brand-guidelines/1.0.0/alpha-curation/sbom/2375a7875da7ddfd36fb24d6ee6ac82ea646429c4d929603caac455b2a5850b4.cdx.json https://codepuppy.cn/catalog/assets/skill.brand-guidelines/1.0.0/alpha-curation/intake-provenance/5f782d0c67d77f1af3d79e1eeb361e760e0e6f44a423bcc803218850cd78d887.json alpha.host-extension-package.v1 package:alpha-first skill:alpha-first application/vnd.alpha.host-extension-package.skill.v1 https://codepuppy.cn/catalog/assets/skill.alpha-first/1.0.0/alpha-package/495b415b54f2821efd267a7f0199ef8662e144aaa640efb3cf12b00386db45dc.json application/vnd.alpha.host-extension-package.cloud.v1 https://codepuppy.cn/catalog/assets/cloud.image/1.0.0/alpha-package/622e0c902a349ce2cc9066d1d19026354bde8b51fbca615cd61606f360041143.json alpha.official-connectors.v1 alpha.secret-prerequisite.v1 application/vnd.alpha.host-extension-package.mcp-local.v1 https://codepuppy.cn/catalog/assets/mcp.dbhub-readonly/1.0.0/alpha-package/349bdddf84b69691cc8a18198e8279022eb26242f6820037a66c53305af464ac.json application/vnd.alpha.host-extension-package.mcp-remote.v1 https://codepuppy.cn/catalog/assets/mcp.github-official/1.0.0/alpha-package/1fc0f27012ab19a53eace30fe4cfe05c8ae65c02f46809745509a5cc544d7582.json	1	user-content	#1632:真实 0.1.24 状态与公开签名响应的原始字节夹具;改写会破坏签名或历史输入
-packages/ui-mac/src/main/fixtures/catalog-boot-0.1.24.json	alpha.catalog.snapshot.v1	1	user-content	#1632:真实 0.1.24 状态与公开签名响应的原始字节夹具;改写会破坏签名或历史输入
-packages/ui-mac/src/main/fixtures/catalog-boot-0.1.24.json	alpha-code alpha-catalog.json alpha-web alpha-work :Alpha Alpha alpha-code@e77cb02f3	1	user-content	#1632:真实 0.1.24 状态与公开签名响应的原始字节夹具;改写会破坏签名或历史输入
-ALPHA.md	Alpha	1	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
-docs/README.md	Alpha	1	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
-docs/README.md	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-docs/architecture/2026-08-23-codex-harness-comparison.md	Alpha	1	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
-docs/architecture/2026-09-09-multi-workspace-fence-decision.md	/Alpha	6	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-docs/architecture/2026-09-09-multi-workspace-fence-decision.md	/Users/tide/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-docs/architecture/frontend-surfaces.md	Alpha	1	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
-docs/architecture/overview.md	Alpha	1	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
-docs/contracts/platform-integration.md	X-Alpha-Upload-Consent	1	external-anchor	跨仓请求头 X-Alpha-Upload-Consent 的逐字协议标识，本票冻结标识符
-docs/contracts/platform-integration.md	Alpha	1	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
-docs/design/PAGE-MAP.md	Alpha	1	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
-docs/design/current/slash-menu/design.html	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-docs/design/system/replacing-opencode.md	Alpha	2	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
-packages/ui-mac/src/main/automation-ipc.ts	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-packages/ui-mac/src/main/automation-scheduler.ts	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-packages/ui-mac/src/main/catalog-liveness.ts	/Alpha	2	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-packages/ui-mac/src/main/cloud-ipc.ts	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-packages/ui-mac/src/main/codepuppy-cloud-schedules.ts	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-packages/ui-mac/src/main/factory-skills.ts	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-packages/ui-mac/src/main/index.ts	/Alpha	2	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-packages/ui-mac/src/main/ipc.ts	/Alpha	2	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-packages/ui-mac/src/main/platform/index.ts	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-packages/ui-mac/src/main/sidecar.ts	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-packages/ui-mac/src/preload/types.ts	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-packages/ui-mac/src/renderer/automations/automation-panel.tsx	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-packages/ui-mac/src/renderer/codepuppy-ui/CodePuppyHome.tsx	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-packages/ui-mac/src/renderer/codepuppy-ui/artifact-workbench/renderers/fixtures/office-text/make-fixtures.py	Alpha	1	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
-packages/ui-mac/src/renderer/codepuppy-ui/artifact-workbench/renderers/fixtures/office-text/py-pptx/ppt/slides/slide1.xml	Alpha	1	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
-packages/ui-mac/src/renderer/codepuppy-ui/artifact-workbench/renderers/fixtures/xlsx/openpyxl/xl/worksheets/sheet1.xml	Alpha	1	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
-packages/ui-mac/src/renderer/codepuppy-ui/artifact-workbench/renderers/fixtures/xlsx/xlsxwriter/xl/sharedStrings.xml	Alpha	1	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
-packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-new-session.tsx	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-packages/ui-mac/src/renderer/codepuppy-ui/default-workspace.ts	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-packages/ui-mac/src/renderer/codepuppy-ui/workspace-chip.tsx	/Alpha	2	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	/Alpha	3	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-packages/ui-mac/src/renderer/sidebar/start-draft-test-runtime.tsx	/Users/tester/Alpha	1	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
-packages/ui-mac/src/renderer/sidebar/start-draft-test-runtime.tsx	/Alpha	2	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
-packages/ui-mac/src/renderer/sidebar/start-draft-test-runtime.tsx	Alpha	1	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
-packages/ui-mac/src/renderer/sidebar/use-projects.ts	/Alpha	2	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-packages/ui-mac/src/renderer/surface-remount-test-runtime.tsx	/Users/tester/Alpha	1	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
-packages/ui-mac/src/shared/frontend-surface-manifest.ts	Alpha	1	external-anchor	GitHub Project 的现存名字 Alpha Delivery，本票冻结项目名，不是产品显示品牌
-packages/ui-mac/src/shared/host-extension-package-contract/generate-artifact.ts	Alpha	1	user-content	测试夹具或生成器里模拟的用户内容（样例标题、目录、供应商或连接名称），不是产品品牌
-packages/ui-mac/test-fixtures/claude-plugin-corpus.json	Alpha	1	third-party	#848 从 ~/.claude/plugins/marketplaces 采集的真实插件语料逐字快照，保留第三方原文
-scripts/gate-files.tsv	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-packages/ui-mac/src/shared/host-extension-package-contract/host-extension-package.registry.v1.json	Alpha	1	external-anchor	跨仓宿主合同的生产方产物语义原文，与冻结的 vendored 副本逐字节一致；品牌文案须由合同生产方改名

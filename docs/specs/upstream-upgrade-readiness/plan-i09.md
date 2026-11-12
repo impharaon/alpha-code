@@ -70,7 +70,10 @@ last_reviewed: 2026-11-12
 
 ### 偏离记录
 
-暂无
+- 2026-11-12 · 顺序第 1、2 步合成一次提交(换算 + 反例,`b83d1ddf80`),第 3 步与删换算脚本是第二次提交 · 编排器要求每段一次提交;换算脚本仍在第一次提交里,可复现。
+- 2026-11-12 · `codepuppy-app` 里 3 处注释写着旧品牌词 `Alpha`(`src/app.tsx:80`、`src/pages/layout/deep-links.ts:1`、`src/surface/terminal.ts:1`)没有登记:它们是 Code Puppy 自己的名字,按规范该改名,但产品代码不在本线范围,也指不到在途接手票。旧名判官因此还剩这 3 处方向 A 红,在回执里交编排器处置(改注释,或给出接手票后登 `pending`)。
+- 2026-11-12 · `naming-migration-wiring.test.ts` 在本分支上整文件跑不起来(`packages/ui-mac/scripts/export-codepuppy-names.ts` 导入已删的 `packages/opencode/src/mcp/catalog`,`44b6938b2a` 删除),与本线改动无关;R8 的改动只核对了登记表里确有 `alpha-keychain` 这个非 pending 词元。
+
 
 ## 段 2 — 闸门文件登记簿对账
 

@@ -169,6 +169,12 @@ function manifestRows(): Row[] {
 const REFERENCED_BUT_UNREGISTERED: Record<string, string> = {
   "packages/core/test/tool-websearch.test.ts":
     "上游测试文件。codepuppy-websearch-sovereignty 的抬头只是说明自己的 harness 与它**同源**,不是把判据委派给它;packages/core 是上游包,该文件由 north-star 守卫保护。",
+  "packages/core/test/tool-shell.test.ts":
+    "上游测试文件,不在全量门里。session-grant-upstream-reds 点名它,是因为「本次会话内允许」做进权限内核后(I-05 契约 A),它里面断言「always 写项目级保存的批准」的用例按设计变红;那份钉住测试自己跑这些用例并断言红的条数,判据在它那里,不委派给这个文件。",
+  "packages/server/test/permission-saved.test.ts":
+    "上游测试文件,不在全量门里。session-grant-upstream-reds 点名它,是因为「本次会话内允许」做进权限内核后(I-05 契约 A),它里面断言「always 写项目级保存的批准」的用例按设计变红;那份钉住测试自己跑这些用例并断言红的条数,判据在它那里,不委派给这个文件。",
+  "packages/core/test/permission.test.ts":
+    "上游测试文件,不在全量门里。session-grant-upstream-reds 点名它,是因为「本次会话内允许」做进权限内核后(I-05 契约 A),它里面断言「always 写项目级保存的批准」的用例按设计变红;那份钉住测试自己跑这些用例并断言红的条数,判据在它那里,不委派给这个文件。",
 }
 
 const ALL_TESTS = gitListedTests()

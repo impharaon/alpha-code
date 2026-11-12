@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os"
 import { basename, join } from "node:path"
 import { ConfigNormalize } from "@opencode/core/config/normalize"
-import { engineMcpServerNames, injectMcpDefaultDeny, NEUTRALIZED_MCP_SERVER } from "./mcp-default-deny"
+import { engineMcpServers, injectMcpDefaultDeny, NEUTRALIZED_MCP_SERVER } from "./mcp-default-deny"
 
 // `#1667`:OpenCode 2 形状 —— 注入写在 `mcp.servers` 下;关掉一个 server 写完整的中和条目(2.x 按名字整条替换,
 // v1 的 lone `{enabled:false}` 叶子会被上游丢弃并出诊断)。
@@ -135,9 +135,9 @@ describe("injectMcpDefaultDeny — G1 default-deny", () => {
     expect(logs).toEqual(['[req109-535] default-denied user-global MCP names=["legacy_one","ungoverned"]'])
   })
 
-  // 名单规则与上游归一化逐例比对(上游 normalize 本身做判官):原生表、v1 键、混写 + 超时、v1 里恰好叫 servers / timeout 的
-  // server、只写 enabled 的叶子。上游丢掉的「解不出来」的条目这里多算进来(多拒无害),只要求上游的名单是它的子集。
-  test("engineMcpServerNames 与上游 ConfigNormalize.normalize 得出的 server 名单一致", () => {
+  // 名单与类型规则与上游归一化逐例比对(上游 normalize 本身做判官):原生表、v1 键、混写 + 超时、v1 里恰好叫 servers / timeout 的
+  // server、只写 enabled 的叶子、同名时原生表胜出。上游丢掉的「解不出来」的条目这里多算进来(多拒无害)。
+  test("engineMcpServers 与上游 ConfigNormalize.normalize 得出的 server 名单与类型一致", () => {
     const corpus: Array<Record<string, unknown>> = [
       { mcp: { servers: { a: { type: "remote", url: "https://a.example/mcp" }, b: { type: "local", command: ["b"] } } } },
       { mcp: { c: { type: "local", command: ["c"] }, d: { type: "remote", url: "https://d.example/mcp" } } },
@@ -145,17 +145,20 @@ describe("injectMcpDefaultDeny — G1 default-deny", () => {
       { mcp: { servers: { type: "local", command: ["named-servers"] } } },
       { mcp: { timeout: { type: "remote", url: "https://named-timeout.example/mcp" } } },
       { mcp: { g: { enabled: false }, h: { type: "local", command: ["h"], enabled: false } } },
+      { mcp: { x: { type: "local", command: ["x"] }, servers: { x: { type: "remote", url: "https://x.example/mcp" } } } },
       {},
     ]
+    const types = (servers: Record<string, unknown>) =>
+      Object.fromEntries(Object.entries(servers).map(([name, server]) => [name, (server as { type?: unknown }).type]))
     const upstream = (document: Record<string, unknown>) => {
       const normalized = ConfigNormalize.normalize(document)
       if (normalized.type !== "normalized") throw new Error(`upstream rejected ${JSON.stringify(document)}`)
-      return Object.keys((normalized.encoded.mcp as { servers?: Record<string, unknown> } | undefined)?.servers ?? {}).sort()
+      return types((normalized.encoded.mcp as { servers?: Record<string, unknown> } | undefined)?.servers ?? {})
     }
-    for (const document of corpus) expect(engineMcpServerNames(document).sort(), JSON.stringify(document)).toEqual(upstream(document))
+    for (const document of corpus) expect(types(engineMcpServers(document)), JSON.stringify(document)).toEqual(upstream(document))
     const undecodable = { mcp: { broken: { type: "local" } } }
-    expect(upstream(undecodable)).toEqual([])
-    expect(engineMcpServerNames(undecodable)).toEqual(["broken"])
+    expect(upstream(undecodable)).toEqual({})
+    expect(types(engineMcpServers(undecodable))).toEqual({ broken: "local" })
   })
 
   test("回归:注入面这一轮没放 cloud 时,用户全局的同名 server 照样进默认拒绝", () => {
@@ -262,6 +265,36 @@ describe("injectMcpDefaultDeny — `#1381` codepuppy.jsonc 的 type:\"remote\" �
     expect(logs).toEqual([
       '[req109-535] default-denied user-global MCP names=["stale-remote"]',
       `[alpha-code#1381] default-denied remote MCP entries in ${codepuppyConfigPath} (not in the main-only truth file, so neither injected nor authorized) names=["stale-remote"]`,
+    ])
+  })
+
+  // 编排器 R1 跟进第 1 条:codepuppy.jsonc 经显式文件原样交给引擎,上游认它里面 2.x 原生的 `mcp.servers.<name>`。
+  // 以前按原始键枚举,那台远程 server 被当成一个叫 `servers` 的非远程条目(还顺手成了「治理来源」),照常启用。
+  test("codepuppy.jsonc 里 2.x 原生写法的远程条目同样压成中和条目;原生写法的本地条目照旧是治理来源", () => {
+    const codepuppy = {
+      mcp: {
+        servers: {
+          "native-remote": { type: "remote", url: "https://native.example/mcp" },
+          "native-local": { type: "local", command: ["codepuppy-governed"] },
+        },
+      },
+    }
+    writeFileSync(codepuppyConfigPath, JSON.stringify(codepuppy))
+    writeFileSync(join(userConfigDir, "config.json"), JSON.stringify({ mcp: { "native-local": { type: "local", command: ["global-collision"] } } }))
+    const before = ConfigNormalize.normalize(codepuppy)
+    if (before.type !== "normalized") throw new Error("upstream rejected the codepuppy.jsonc document")
+    expect((before.encoded.mcp as { servers: Record<string, { disabled?: boolean }> }).servers["native-remote"]?.disabled).toBeUndefined()
+
+    const config: Config = {}
+    apply(config)
+
+    const after = ConfigNormalize.normalize(config)
+    if (after.type !== "normalized") throw new Error("upstream rejected the injected document")
+    const servers = (after.encoded.mcp as { servers: Record<string, { disabled?: boolean }> }).servers
+    expect(servers["native-remote"]?.disabled).toBe(true)
+    expect(Object.keys(servers)).toEqual(["native-remote"])
+    expect(logs).toEqual([
+      `[alpha-code#1381] default-denied remote MCP entries in ${codepuppyConfigPath} (not in the main-only truth file, so neither injected nor authorized) names=["native-remote"]`,
     ])
   })
 

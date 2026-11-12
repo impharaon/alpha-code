@@ -19,6 +19,7 @@
 //   #1653 a server waiting out its backoff holds back no other server, and calling it does not reconnect early
 //   #1645 a refusing server's body and a crashing server's stderr reach no log line and no failed status
 //        (#1666 Unit F; v1 kept the typed code only)
+//   #1690 closing the service while a stdio server's handshake hangs interrupts that start: closed within 5 s, process gone
 //   #1565 with the shipped manifest: the command main writes ({workspace} marker) and the one the engine sees after the
 //        extension substitutes the folder both get the declaration; the real python server lists exactly it (#1666 Unit E)
 //
@@ -126,8 +127,8 @@ const toolNames = Effect.gen(function* () {
 
 // ── AC1 ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 // Red if startup waited for every server: `ok` would stay pending behind the 30 s handshake timeout of `hang`.
-// `hang` is killed once the assertions ran: closing the layer otherwise waits for its handshake timeout (the teardown
-// time follows `timeout.startup`: 8 s ⇒ 10.3 s, the 30 s default ⇒ 32 s), which overran the 5 s test budget.
+// `hang` is killed once the assertions ran: before #1690 closing the layer waited for its handshake timeout (the teardown
+// time followed `timeout.startup`: 8 s ⇒ 10.3 s, the 30 s default ⇒ 32 s), which overran the 5 s test budget.
 describe("AC1: one server never answering does not hold back another", () => {
   const pidFile = file("hang.pid")
   const killHang = Effect.sync(() => {
@@ -364,6 +365,43 @@ describe("AC4: closing the service ends a server's process tree", () => {
       )
       yield* until(Effect.sync(() => (pids.some(alive) ? undefined : true)), "process tree reaped", 5_000)
     }),
+  )
+})
+
+// `#1690`: a stdio server that never answers its handshake does not hold back shutdown. Red without the fix: closing the
+// service waits out the 30 s startup timeout (the default here) before the process is stopped. The premise arm: the
+// server is alive and still pending when the service closes.
+describe("#1690: closing the service while a server's handshake hangs", () => {
+  const alive = (pid: number) => {
+    try {
+      process.kill(pid, 0)
+      return true
+    } catch {
+      return false
+    }
+  }
+  testEffect(Layer.empty).live(
+    "the service closes within 5 s and the hung server's process is gone",
+    () =>
+      Effect.gen(function* () {
+        const pidFile = file("hang-close.pid")
+        const { pid, started } = yield* Effect.scoped(
+          Effect.gen(function* () {
+            const pid = yield* until(
+              Effect.sync(() => (fs.existsSync(pidFile) ? Number(fs.readFileSync(pidFile, "utf8")) || undefined : undefined)),
+              "hung server spawned",
+            )
+            expect(alive(pid)).toBe(true)
+            expect((yield* statusOf("hang"))?.status).toBe("pending")
+            return { pid, started: Date.now() }
+          }).pipe(Effect.provide(mcpLayer({ hang: local({ CODEPUPPY_MCP_HANG: "1", CODEPUPPY_MCP_PID_FILE: pidFile }) }))),
+        )
+        const closedAfter = Date.now() - started
+        process.stderr.write(`[#1690] service closed ${closedAfter} ms after a hung handshake\n`)
+        expect(closedAfter).toBeLessThan(5_000)
+        expect(alive(pid)).toBe(false)
+      }),
+    60_000,
   )
 })
 

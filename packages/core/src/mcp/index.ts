@@ -122,6 +122,8 @@ type ServerEntry = {
   readonly declared?: ReadonlyArray<DeclaredTool>
   refuted?: boolean
   declaredTools?: ReadonlyArray<Tool>
+  // codepuppy(#1690): the initial start, which holds the server lock through its handshake.
+  starting?: Fiber.Fiber<void>
 }
 
 // A client-hosted MCP server attached over a connection the client opened. Internal: never listed,
@@ -735,12 +737,13 @@ export const layer = (options?: Options) =>
               yield* bus.publish(McpEvent.StatusChanged, { server: name })
               continue
             }
-            fork(
+            entry.starting = fork( // codepuppy(#1690)
               Effect.gen(function* () {
                 // connect() or disconnect() may have settled the server while this startup waited to run.
                 if (entry.status.status !== "pending") return yield* entry.startup.open
                 yield* entry.connection.start
-              }).pipe(locks.withLock(name)),
+                // codepuppy(#1690): settle readers even when removal interrupts it before it reached the start.
+              }).pipe(locks.withLock(name), Effect.ensuring(entry.startup.open)),
             )
           }
           return
@@ -749,6 +752,10 @@ export const layer = (options?: Options) =>
         for (const [name, entry] of entries) {
           const updated = servers.get(name)
           if (isDeepStrictEqual(entry.config, updated)) continue
+          // codepuppy(#1690): a start still in its handshake would hold the lock until the startup timeout (30 s by
+          // default), so removal on Location shutdown waited it out. Interrupt it first: the client closes the transport
+          // on the way out (stdin, grace, SIGTERM, SIGKILL) and the removal below closes the attempt's scope.
+          if (entry.starting) yield* Fiber.interrupt(entry.starting)
           yield* (updated ? replaceServer(name, updated) : removeServer(name, entry)).pipe(locks.withLock(name))
         }
         for (const [name, updated] of servers) {

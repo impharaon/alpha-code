@@ -217,7 +217,7 @@ describe("审批决定提交入口:单一引用面白名单棘轮(#619 R3 Blocke
    *     也没有 UI 挂在它上面),是所有 v2 提交入口在 v1 引擎上的物理出口;不登记它,上面 1)~4)
    *     的每一条在 v1 引擎上都发不出去。同一份 SOT 补丁把它原样带进来,alpha 零改动。
    *
-   *  ── `#1662` OpenCode 2 换代(`#1668` 适配器)显式更新 ─────────────────────────────────────
+   *  ── `#1662` 引擎 2.x 换代(`#1668` 适配器)显式更新 ──────────────────────────────────────
    *
    *  6) 新增 `packages/ui-mac/src/engine-adapter/permission-replies.ts`(`permission.reply`):冻结的 0.1.26 界面不改,
    *     它照旧经上面已登记的入口(permission-surface / permission-v1-adapter / use-extensions)发 v1 / v2 回复;这些请求

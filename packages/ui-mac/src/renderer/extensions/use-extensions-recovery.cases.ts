@@ -15,7 +15,7 @@ import { buildEngineServerOptions } from "../../main/engine-server-options"
 import { engineAuthorization } from "../../main/engine-authorization"
 import { createEngineFetch } from "../../engine-adapter"
 
-// `#1662` parity B6:v1 版起的是已删的 `packages/opencode/src/index.ts serve`。现在引擎是嵌进 sidecar 的那台 OpenCode 2
+// `#1662` parity B6:v1 版起的是已删的 `packages/opencode/src/index.ts serve`。现在引擎是嵌进 sidecar 的那台 2.x 引擎
 // (沙箱里、本进程内、真监听端口);冻结界面的 v1 SDK 请求经生产的引擎适配器(src/engine-adapter,`engineFetch` 的同一个
 // createEngineFetch)译成 2.x 的 `/api/*` 再到引擎,口令由这里按 main 的做法补上。沙箱必须在任何引擎模块装载之前就位。
 const sandbox = engineSandbox()
@@ -119,7 +119,7 @@ beforeAll(async () => {
     models: { fetch: false }, filewatcher: false, platform: process.platform,
   }))
   engineUrl = engine.url
-  // OpenCode 2 boots a Location (and loads its MCP configuration) on the first request for that directory: wait for
+  // The 2.x engine boots a Location (and loads its MCP configuration) on the first request for that directory: wait for
   // the project's server to be listed before capturing the shape the hook will be compared against.
   await until(async () => {
     const listed = await transport(new Request(`${engineUrl}/api/mcp`, {

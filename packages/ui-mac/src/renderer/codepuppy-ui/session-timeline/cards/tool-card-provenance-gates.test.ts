@@ -1065,7 +1065,7 @@ describe("#934(#879 R1 Minor-3)— AC5 确定标记补齐:副行字段脱敏失�
 //
 // 与本文件抬头「锚点不 import 被测对象常量」不冲突:这里 import 的是**引擎**的
 // UnansweredError(投影模型的上游生产者,不是被测对象)——它是分类形态的唯一权威。
-// `#1662` parity:v1 引擎随 OpenCode 2 换代删除,生产者改为 2.x 重接管的内核块(packages/core/src/permission.ts 的
+// `#1662` parity:v1 引擎随 2.x 换代删除,生产者改为 2.x 重接管的内核块(packages/core/src/permission.ts 的
 // codepuppy(ADR-038) unansweredError);真路径(真引擎到期 → 桌面适配器 → 卡片)由 packages/ui-mac/src/main/permission-ask-timeout.engine.test.ts 判。
 // 引擎措辞漂移 ⇒ 第一条用例当场红(分类静默失配、卡面退回「错误详情已隐藏」的形态
 // 在这里被钉死)。变异自证:把 tool-card-model 的 PERMISSION_ASK_TIMEOUT_PATTERN 改到

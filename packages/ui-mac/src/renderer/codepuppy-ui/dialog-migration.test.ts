@@ -4,7 +4,7 @@ import { join } from "node:path"
 
 const root = join(import.meta.dir, "../../../../")
 const read = (file: string) => readFileSync(join(root, file), "utf8")
-// `#1662`:渲染层吃的 `@opencode-ai/app` 是冻结的 0.1.26 前端 `packages/codepuppy-app`(`packages/app` 已是 OpenCode 2 上游,
+// `#1662`:渲染层吃的 `@opencode-ai/app` 是冻结的 0.1.26 前端 `packages/codepuppy-app`(`packages/app` 已是 2.x 上游,
 // 不进包)。patch-upstream.ts 的键仍写 `app/src/…`,按子串匹配,对 codepuppy-app 同样生效。
 
 describe("REQ-090 upstream Dialog migration ratchet", () => {

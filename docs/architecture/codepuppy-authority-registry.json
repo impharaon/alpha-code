@@ -734,12 +734,40 @@
         "packages/client/src/generated-effect/client.ts",
         "packages/client/src/generated/types.ts"
       ],
-      "blocked": {
-        "reason": "Held by derivation in the L6 adapter (measurements passed, no kernel re-take; no production reader needs persisted history after a restart): spec in docs/architecture/2026-11-09-1662-permission-reply-measurements.md. Waiting on L6 to implement it.",
-        "options": [
-          "Register L6's adapter file and its tests (re-read 409, replied-event resolved set, decisionID cache, each with a known-bad arm) when #1668 lands."
-        ]
-      }
+      "mechanism": {
+        "file": "packages/ui-mac/src/engine-adapter/permission-replies.ts",
+        "ladder": "L6 adapter (derivation per docs/architecture/2026-11-09-1662-permission-reply-measurements.md: the receipt is synthesized from the displayed snapshot's fingerprint, the replied events of the reply's cascade window and a decision cache; no kernel re-take)"
+      },
+      "tests": [
+        {
+          "file": "packages/ui-mac/src/engine-adapter/permission-reply.test.ts",
+          "name": "v1 通道(审批卡的实际路径):once 经 replyPermissionV1 落到引擎,冻结 feed 收卡;v2 入口回 `{data: 收据}`,收据各字段齐"
+        },
+        {
+          "file": "packages/ui-mac/src/engine-adapter/permission-reply.test.ts",
+          "name": "反向臂:没有适配器合成收据(2.x 回复只回 204)⇒ permission-surface 的取法当场报缺收据"
+        },
+        {
+          "file": "packages/ui-mac/src/engine-adapter/permission-reply.test.ts",
+          "name": "交出后引擎里同一 id 的内容变了 ⇒ 409 ConflictError,卡片判为冲突,什么都不发;对照:内容没变照常发出"
+        },
+        {
+          "file": "packages/ui-mac/src/engine-adapter/permission-reply.test.ts",
+          "name": "v2 命令的指纹不是那份快照 ⇒ 409;这个窗口从没交出过的请求 ⇒ 409(决定没绑在显示过的快照上)"
+        },
+        {
+          "file": "packages/ui-mac/src/engine-adapter/permission-reply.test.ts",
+          "name": "同一命令再来一次 ⇒ 同一张收据,引擎只收到一次;反向臂:真引擎对同一 id 的第二次回复是 404(采样)"
+        },
+        {
+          "file": "packages/ui-mac/src/engine-adapter/permission-reply.test.ts",
+          "name": "reject A1 ⇒ 收据列出 A1 与同会话的 A2,另一会话的 B1 不动;replied 帧晚于回复响应到达也不漏(与真引擎采样的收据一致)"
+        },
+        {
+          "file": "packages/ui-mac/src/engine-adapter/permission-reply.test.ts",
+          "name": "反向臂:收据只列目标(没有事件窗口)⇒ 冻结 feed 里同会话的 A2 一直挂着"
+        }
+      ]
     },
     {
       "id": "adr038-ask-deadline",
@@ -783,12 +811,36 @@
         "packages/core/src/mcp/index.ts",
         "packages/core/src/tool/mcp.ts"
       ],
-      "blocked": {
-        "reason": "Ruling item 3 holds it by reachability: the non-builtin registration paths on OpenCode 2 are the extension's own tools and its project-plugin fan-out (L3 refuses duplicate effective names before registering), MCP tools (refused in L4's MCP re-take: packages/core/src/mcp/index.ts tools(), both members of a colliding pair), the upstream Browser plugin (pinned: packages/core/test/codepuppy-browser-tool-names.test.ts), and an MCP tool against a builtin's effective name (refused in L4's re-take of packages/core/src/tool/mcp.ts: the MCP tool is not registered when an earlier registration holds its name; reachable on 2.x as the 17 `opencode`-namespace builtins against an MCP server named `opencode`, and experimental_image_generate). Registered as held once the orchestrator registers L3's fan-out mechanism at integration.",
-        "options": [
-          "Register L3's fan-out refusal with its test, L4's MCP refusal (packages/core/test/codepuppy-mcp-runtime.test.ts 'a.b/x and a_b/x share an effective name and are both refused; ab/x stays'), L4's MCP-vs-builtin refusal (packages/core/test/codepuppy-mcp-tool-collision.test.ts 'builtins registered first: the MCP tools with their names are refused; the near miss stays') and the Browser pin as one held entry at integration."
-        ]
-      }
+      "mechanism": {
+        "file": "packages/ext/src/plugin-fanout.ts",
+        "ladder": "L0 (the extension's project-plugin fan-out refuses add over an existing name and update / remove of tools the plugin did not register) + L3 (re-taken packages/core/src/mcp/index.ts tools() refuses both members of a colliding MCP pair; re-taken packages/core/src/tool/mcp.ts refuses an MCP tool whose effective name a builtin holds) + upstream-native, pinned (the Browser plugin's tool names)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "权威 · 工具身份(ADR-041 冲突):经 ext 扇出的项目插件用同名工具顶 codepuppy_echo ⇒ 被拒,新名照常注册;反向臂:同一插件由引擎直接装 ⇒ 顶掉"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "权威 · 工具身份(ADR-041 改 / 删):经 ext 扇出的项目插件改写、删除 codepuppy_echo ⇒ 都被拒,自己的工具照样能改;反向臂:同一插件由引擎直接装 ⇒ 改写与删除都生效"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "a.b/x and a_b/x share an effective name and are both refused; ab/x stays"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-tool-collision.test.ts",
+          "name": "builtins registered first: the MCP tools with their names are refused; the near miss stays"
+        },
+        {
+          "file": "packages/core/test/codepuppy-browser-tool-names.test.ts",
+          "name": "booting with the Browser plugin changes no built-in tool and adds only browser-namespaced ones"
+        },
+        {
+          "file": "packages/core/test/codepuppy-browser-tool-names.test.ts",
+          "name": "known-bad arm: a browser tool registered under a built-in's effective name is reported"
+        }
+      ]
     },
     {
       "id": "adr041-history-display-conversion",
@@ -796,17 +848,29 @@
       "adr": [
         "ADR-041"
       ],
-      "lane": "L4/L5 — needs orchestrator decision",
+      "lane": "L5 (#1667) per ruling item 6 (option (a))",
       "takeovers": [
-        "packages/schema/src/v1/session.ts"
+        "packages/schema/src/v1/session.ts",
+        "packages/core/src/database/v1-migration.bun.ts"
       ],
-      "blocked": {
-        "reason": "The v1→v2 conversion (v1-migration.bun.ts, run through the Node shim R14) reads v1 parts with the upstream v1 schema; Code Puppy's part.display is not carried into v2 state.metadata, so converted history loses its provenance.",
-        "options": [
-          "(a) Extend the R14 build-time transform so the converter copies part.display into state.metadata.codepuppyDisplay (L1; owner of the transform: L5's build).",
-          "(b) Accept that converted history shows 'source unknown' (ADR-041 allows absent history) — needs the owner's words because it drops existing evidence."
-        ]
-      }
+      "mechanism": {
+        "file": "packages/ui-mac/engine/v1-migration-transform.ts",
+        "ladder": "Build-time rewrite, takeover-equivalent (R14; ruling #1666 comment 6737732975 item 6, option (a)): the sidecar engine build rewrites upstream packages/core/src/database/v1-migration.bun.ts so the decoder keeps a v1 tool part's display and migrateTool writes it to state.metadata.codepuppyDisplay; never inferred, never overwritten; each rewritten source text must appear exactly once or the build fails"
+      },
+      "tests": [
+        {
+          "file": "packages/ui-mac/src/main/engine-v1-history-display.test.ts",
+          "name": "真引擎 + 夹具库:套了改写 ⇒ 快照在 state.metadata.codepuppyDisplay(engine-v1-history-display.cases.ts,1 条)"
+        },
+        {
+          "file": "packages/ui-mac/src/main/engine-v1-history-display.test.ts",
+          "name": "反向臂:上游转换器原样 ⇒ 同一份夹具的快照全丢(同一文件,CODEPUPPY_TEST_V1_DISPLAY_TRANSFORM=off)"
+        },
+        {
+          "file": "packages/ui-mac/src/main/engine-v1-history-display.test.ts",
+          "name": "已知的坏:上游改了原文 —— 少了 decodePart / migrateTool / CryptoHasher 任一处,或某处出现两次 ⇒ 抛错"
+        }
+      ]
     },
     {
       "id": "adr035-websearch",
@@ -821,12 +885,36 @@
         "packages/opencode/src/tool/mcp-websearch.ts",
         "packages/core/src/tool/websearch.ts"
       ],
-      "blocked": {
-        "reason": "Owned by L3 on OpenCode 2 (websearch.transform / execute.before in the extension); not delivered on the integration branch this lane started from.",
-        "options": [
-          "Register L3's mechanism file and proof test here when #1665 lands."
-        ]
-      }
+      "mechanism": {
+        "file": "packages/ext/src/cloud-websearch-kill.ts",
+        "ladder": "L0 (the extension's execute.before refuses web search by the account signals and the verified governed server; websearch.transform picks the keyless provider)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "权威 · 联网搜索准入(L5r):kill-switch 下 2.x 内置 websearch 与第三方 web search MCP 在 execute.before 被拒;反向臂:不装 ext ⇒ 放行"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "联网搜索:不在 kill-switch(代付 / 登出)⇒ 内置 websearch 照常放行(ADR-046 D1)"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "权威 · 云工具准入:治理云 server 上的 web search 只按本 Location 核验过的端点身份豁免;冒名 server 上的同形工具照样被拒"
+        },
+        {
+          "file": "packages/ext/src/cloud-websearch-kill.test.ts",
+          "name": "#1507 AC1:搜网拒绝理由使用 Code Puppy,ADR 原因码不变"
+        },
+        {
+          "file": "packages/ext/src/cloud-websearch-kill.test.ts",
+          "name": "`#1461`:拒绝理由不再宣称关掉了每一个 web search 工具,只承认按名字认出的;仍叫模型别去找替代"
+        },
+        {
+          "file": "packages/ext/src/cloud-websearch-kill.test.ts",
+          "name": "kill-switch 下 cloud_web_search 到不了传输(评估恒 allow 也一样);兄弟云工具照常执行"
+        }
+      ]
     },
     {
       "id": "l1r-platform-credential-header",
@@ -839,16 +927,20 @@
         "packages/opencode/src/session/llm.ts",
         "packages/opencode/src/session/llm/request.ts"
       ],
-      "blocked": {
-        "reason": "Request assembly belongs to L3 on OpenCode 2 (session.hook model.request / http.request / context); if a hook cannot hold it, L3 hands it back for an L4 re-take. Not delivered on the integration branch this lane started from.",
-        "options": [
-          "Register L3's mechanism and proof test when #1665 lands, or route back to L4 for a re-take with ADR-047 reasoning."
-        ]
-      }
+      "mechanism": {
+        "file": "packages/ext/src/platform-credential-header.ts",
+        "ladder": "L0 (session.hook model / http request in the extension)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "P6 / S5:平台凭据头只对平台节点、每次现读;别的节点不带;反向臂:不装 ext ⇒ 不带"
+        }
+      ]
     },
     {
       "id": "l1r-output-caps",
-      "decision": "Platform and BYOK output caps (temperature / max output) are applied by Code Puppy (P5).",
+      "decision": "Platform and BYOK output caps are applied by Code Puppy (P5): a platform-proxy request sends no max output tokens (the gateway fills the route cap); a direct BYOK request is raised to that model's measured cap; any other request keeps upstream's value.",
       "adr": [
         "ADR-041"
       ],
@@ -857,12 +949,21 @@
         "packages/opencode/src/session/llm/request.ts",
         "packages/opencode/test/provider/transform.test.ts"
       ],
-      "blocked": {
-        "reason": "Request assembly belongs to L3 on OpenCode 2 (session.hook model.request / http.request / context); if a hook cannot hold it, L3 hands it back for an L4 re-take. Not delivered on the integration branch this lane started from.",
-        "options": [
-          "Register L3's mechanism and proof test when #1665 lands, or route back to L4 for a re-take with ADR-047 reasoning."
-        ]
-      }
+      "mechanism": {
+        "file": "packages/ext/src/platform-output-cap.ts",
+        "ladder": "L0 (session.hook context / compaction / generate / title in the extension; BYOK raise in packages/ext/src/byok-output-cap.ts)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "P5:平台代理节点 ⇒ 不发 maxTokens(网关按 route 上限填);别的节点 ⇒ 原样;反向臂:不装 ext ⇒ maxTokens 留着"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "P5:直连 BYOK 节点按逐模型实读上限抬(同一 provider 的两个模型各拿各的数);无读数 / 端点不符 / 目录里查不到 ⇒ 原样;未登录(无 CODEPUPPY_BASE_URL)谁都不置空"
+        }
+      ],
+      "note": "Narrowed at integration (#1662 integration unit 1) to what the proofs show: the v1 wording also named temperature, which v1 only asserted to be left untouched; no OpenCode 2 test asserts that, so it is not claimed."
     },
     {
       "id": "l1r-net-failure-settle",
@@ -931,17 +1032,21 @@
       "adr": [
         "ADR-041"
       ],
-      "lane": "L3 (#1665) per lane seams §5 (L1r)",
+      "lane": "L5 (#1667) per ruling #1666 comment 6737930969 item 1",
       "takeovers": [
         "packages/opencode/src/session/prompt.ts",
         "packages/opencode/test/session/compaction.test.ts"
       ],
-      "blocked": {
-        "reason": "Request assembly belongs to L3 on OpenCode 2 (session.hook model.request / http.request / context); if a hook cannot hold it, L3 hands it back for an L4 re-take. Not delivered on the integration branch this lane started from.",
-        "options": [
-          "Register L3's mechanism and proof test when #1665 lands, or route back to L4 for a re-take with ADR-047 reasoning."
-        ]
-      }
+      "mechanism": {
+        "file": "packages/ui-mac/src/main/naming-migration-db.ts",
+        "ladder": "main (runNamingMigrationDbStep rewrites the v1 tables before index.ts starts the engine, whose v1 → 2.x conversion runs once; source order pinned by the host's ANCHOR)"
+      },
+      "tests": [
+        {
+          "file": "packages/ui-mac/src/main/naming-before-v1-conversion.test.ts",
+          "name": "#1569 会话库改名先于 v1 → 2.x 转换:生产顺序 ⇒ 新名;转换先跑 ⇒ 旧名留在 2.x(naming-before-v1-conversion.cases.ts,2 条)"
+        }
+      ]
     },
     {
       "id": "l1r-telemetry-credential",
@@ -949,16 +1054,24 @@
       "adr": [
         "ADR-041"
       ],
-      "lane": "L3 (#1665) per lane seams §5 (L1r)",
+      "lane": "L5 (#1667) per ruling #1666 comment 6737930969 item 2",
       "takeovers": [
         "packages/opencode/src/session/llm.ts"
       ],
-      "blocked": {
-        "reason": "Request assembly belongs to L3 on OpenCode 2 (session.hook model.request / http.request / context); if a hook cannot hold it, L3 hands it back for an L4 re-take. Not delivered on the integration branch this lane started from.",
-        "options": [
-          "Register L3's mechanism and proof test when #1665 lands, or route back to L4 for a re-take with ADR-047 reasoning."
-        ]
-      }
+      "mechanism": {
+        "file": "packages/ui-mac/src/main/sidecar-env.ts",
+        "ladder": "main (the sidecar environment allow-list lets no OTEL_* through; OpenCode 2's only telemetry export is OTLP configured from those variables)"
+      },
+      "tests": [
+        {
+          "file": "packages/ui-mac/src/main/sidecar-env-otel.test.ts",
+          "name": "原样:sidecar 环境白名单挡住整套 OTLP 变量(sidecar-env-otel.cases.ts,1 条)"
+        },
+        {
+          "file": "packages/ui-mac/src/main/sidecar-env-otel.test.ts",
+          "name": "反向臂:把 OTEL_ 加进前缀白名单 ⇒ 同一条断言变红"
+        }
+      ]
     },
     {
       "id": "l1r-subtask-attachment-policy",
@@ -1020,16 +1133,28 @@
       "adr": [
         "ADR-041"
       ],
-      "lane": "L3 (#1665) per lane seams §5 (L1r)",
+      "lane": "L6 (#1668)",
       "takeovers": [
         "packages/opencode/src/session/prompt.ts"
       ],
-      "blocked": {
-        "reason": "Request assembly belongs to L3 on OpenCode 2 (session.hook model.request / http.request / context); if a hook cannot hold it, L3 hands it back for an L4 re-take. Not delivered on the integration branch this lane started from.",
-        "options": [
-          "Register L3's mechanism and proof test when #1665 lands, or route back to L4 for a re-take with ADR-047 reasoning."
-        ]
-      }
+      "mechanism": {
+        "file": "packages/ui-mac/src/engine-adapter/v1-shapes.ts",
+        "ladder": "L6 adapter (at each turn boundary events.ts / routes.ts fetch GET /api/session/:id/diff?from=<turnAnchor> and attach it to the turn's v1 user message for turnDiffsOf)"
+      },
+      "tests": [
+        {
+          "file": "packages/ui-mac/src/engine-adapter/turn-diffs.test.ts",
+          "name": "事件流 → 冻结归约器 → turnDiffsOf:读到 2.x 这个回合的改动(b.txt 新增一行)"
+        },
+        {
+          "file": "packages/ui-mac/src/engine-adapter/turn-diffs.test.ts",
+          "name": "反向臂:不在回合边界取 2.x 的逐回合 diff ⇒ 面板读到空(审阅面板显示「没有改动」)"
+        },
+        {
+          "file": "packages/ui-mac/src/engine-adapter/turn-diffs.test.ts",
+          "name": "通知在 idle 之后自己开回合(fixtures/parity.json):从通知取这个回合的改动,面板读得到"
+        }
+      ]
     },
     {
       "id": "l1r-command-model-priority",
@@ -1340,12 +1465,24 @@
       ],
       "lane": "L3 (#1665) per lane seams I10",
       "takeovers": [],
-      "blocked": {
-        "reason": "Owned by L3 (hub-tools.ts permission.assert + permission.hook.evaluate); not delivered on the integration branch this lane started from.",
-        "options": [
-          "Register L3's mechanism and proof test when #1665 lands."
-        ]
-      }
+      "mechanism": {
+        "file": "packages/ext/src/hub-tools.ts",
+        "ladder": "L0 (permission.assert from codepuppy_hub_install + hubInstallEvaluate on permission.hook.evaluate, registered after registerPolicy)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "权威 · 定制中心安装(I10):codepuppy_hub_install 的权限评估恒 ask,自动化 agent 恒 deny,压过先注册的 allow;反向臂:不装 ext ⇒ allow 留着"
+        },
+        {
+          "file": "packages/ext/src/hub-tools.test.ts",
+          "name": "hubInstallEvaluate:codepuppy_hub_install 恒 ask(压过 allow),codepuppy-automation* 恒 deny,别的动作不碰"
+        },
+        {
+          "file": "packages/ext/src/hub-tools.test.ts",
+          "name": "规则被绕过(assert 直接放行)⇒ 查不到记录 ⇒ not installed: no confirmation box ran;assert 入参逐字段是冻结的形状"
+        }
+      ]
     },
     {
       "id": "sidecar-stop-drains",
@@ -1355,12 +1492,20 @@
       ],
       "lane": "L5 (#1667)",
       "takeovers": [],
-      "blocked": {
-        "reason": "Owned by L5 (sidecar-stop.ts); not delivered on the integration branch this lane started from.",
-        "options": [
-          "Register L5's mechanism and proof test when #1667 lands."
-        ]
-      }
+      "mechanism": {
+        "file": "packages/ui-mac/src/main/sidecar-stop.ts",
+        "ladder": "main → sidecar (the stop message closes the engine's start() scope once, OOR-2; a 6 s backstop kills an unresponsive sidecar)"
+      },
+      "tests": [
+        {
+          "file": "packages/ui-mac/src/main/sidecar-stop.test.ts",
+          "name": "引擎被关一次(2.x 的收尾),进程自己退出(一次 kill 都没有)"
+        },
+        {
+          "file": "packages/ui-mac/src/main/sidecar-stop.test.ts",
+          "name": "#1647 AC2 a hung engine close stays inside the five-second stop budget"
+        }
+      ]
     },
     {
       "id": "review-diff-engine-started-turn",

@@ -387,3 +387,21 @@
 107	packages/core	test/mcp.test.ts	-	#1662:权威登记册 mcp-tool-list-tolerance 的证明文件(「skips unusable tools and keeps the rest of the server's tools」),由每日同步的 scripts/assert-authority-proofs.sh 按本行精确条数执行;删掉或少跑 ⇒ 那项权威失去通过的证明,同步中止
 3	packages/core	test/oauth-page.test.ts	-	#1662:权威登记册 adr042-oauth-brand 的证明文件(接管文件,ADR-042:OAuth 成功/失败页用 Code Puppy 产品身份),由每日同步的 scripts/assert-authority-proofs.sh 按本行精确条数执行;删掉或少跑 ⇒ 那项权威失去通过的证明,同步中止
 6	packages/ext	src/policy/permission-reply-premises.test.ts	-	#1662:权威登记册 adr033-receipt-premises 的证明文件(权限回复的四条引擎前提:同 id 载荷不变、always 逐个发 replied、reject 级联、二次回复 NotFound),由每日同步的 scripts/assert-authority-proofs.sh 按本行精确条数执行;删掉或少跑 ⇒ 那项权威失去通过的证明,同步中止
+
+# ── I-09 收尾(2026-11-12):共享测试预载的守卫与 OpenCode 2 适配器 ─────────────────────────
+2	packages/ai	test/codepuppy-test-isolation.test.ts	-	I-08:本包每个 bun test 进程在共享预载(scripts/test-isolation/preload.ts)下跑,隔离键与上游 global-roots 推导的引擎路径全在新建临时根里;已知的坏(子进程不装预载、用真 HOME / XDG_*)⇒ 落在真 HOME 下。断言的是整包的运行环境,删掉它预载失效时没有别的测试会红
+2	packages/core	test/codepuppy-test-isolation.test.ts	-	I-08:权威登记册 test-isolation-default 的证明文件 —— packages/core 的每个 bun test 在共享预载下跑(排在上游 test/preload.ts 之前),HOME / XDG_* / TMPDIR 与引擎 Global 各路径都在临时根里;上游 runner(OPENCODE_TEST_HOME)下同样成立;已知的坏臂同上
+2	packages/plugin	test/codepuppy-test-isolation.test.ts	-	I-08:同 packages/ai 那一行,本包的共享预载在位
+2	packages/schema	test/codepuppy-test-isolation.test.ts	-	I-08:同 packages/ai 那一行,本包的共享预载在位
+2	packages/ext	src/test-preload.test.ts	-	I-08(#1665 审计 R1 硬约束):ext 的测试在共享预载下,HOME / 全部 XDG_* / OPENCODE_DB / TMPDIR 在新建临时根里,上游 Global.Path 与 roots() 全部解析在里面;已知的坏:不装预载 ⇒ 解析在真 HOME 下
+16	packages/ui-mac	src/engine-adapter/permission-reply.test.ts	-	#1668 I7a:权威登记册 adr033-decision-receipt 的证明文件 —— 审批回复与回执从冻结界面的消费形状(replyPermissionV1 / createPermissionV2Feed / permissionDecisionSubmitError…)经 v1 SDK 与 engineFetch 走进适配器,按 L4 推导规格判回执
+10	packages/ui-mac	src/engine-adapter/turn-diffs.test.ts	-	#1668 / REQ-142:权威登记册 l1r-review-turn-supply 的证明文件 —— 右栏审阅面板读的回合改动在 2.x 上由适配器供给:2.x 事件 → 投影 → 冻结 app 的 event-reducer → turnDiffsOf,与打开会话时 GET /session/:id/message 的同一入口
+4	packages/ui-mac	src/engine-adapter/routes-coverage.test.ts	-	#1668:冻结界面里每个打引擎的调用都在适配器路由表里有 handler,或在 UNSUPPORTED 里写明为什么不接 —— 扫描冻结 app / session-ui / renderer 的源码(普查,新增即分类);删掉它,表外调用要到运行时 501 才暴露
+9	packages/ui-mac	src/engine-adapter/event-projection.test.ts	-	#1668:事件流投影 —— 真 2.x 采样的每条 /api/event 帧逐条喂投影器,投影出的 v1 事件交给冻结 app 自己的 reducer 判。夹具是真 2.x 引擎采样(fixtures/*.json 的 _source),判读方是冻结的 0.1.26 界面代码 —— 断言的是本模块之外的两样东西,删掉它没有别的测试会红
+9	packages/ui-mac	src/engine-adapter/tool-shapes.test.ts	-	#1668 R1 F1:2.x 内建工具的入参 / metadata 经适配器换成冻结工具卡读的 v1 键。夹具是真 2.x 引擎采样(fixtures/*.json 的 _source),判读方是冻结的 0.1.26 界面代码 —— 断言的是本模块之外的两样东西,删掉它没有别的测试会红
+4	packages/ui-mac	src/engine-adapter/permission-shape.test.ts	-	#1668 I7a:审批请求的形状(真 2.x permission.asked 帧与同刻 GET /api/permission/request)与三个回复入口接线。夹具是真 2.x 引擎采样(fixtures/*.json 的 _source),判读方是冻结的 0.1.26 界面代码 —— 断言的是本模块之外的两样东西,删掉它没有别的测试会红
+3	packages/ui-mac	src/engine-adapter/staged-attachment.test.ts	-	#1668 I11'(#1553):暂存附件 v1 synthetic part → 2.x files 条目 → 引擎存下的形状 → v1 synthetic part 逐字相同。夹具是真 2.x 引擎采样(fixtures/*.json 的 _source),判读方是冻结的 0.1.26 界面代码 —— 断言的是本模块之外的两样东西,删掉它没有别的测试会红
+2	packages/ui-mac	src/engine-adapter/tool-display.test.ts	-	#1668 I7b(ADR-041):L4 写在 2.x 工具状态 metadata.codepuppyDisplay 的来源快照,经适配器成为冻结时间线读的 part.display。夹具是真 2.x 引擎采样(fixtures/*.json 的 _source),判读方是冻结的 0.1.26 界面代码 —— 断言的是本模块之外的两样东西,删掉它没有别的测试会红
+5	packages/ui-mac	src/engine-adapter/file-watcher.test.ts	-	#1668 R1 F3:右栏文件面板靠 v1 file.watcher.updated 刷新;2.x 采样里 filesystem.changed 不出现的情形下适配器照样供给。夹具是真 2.x 引擎采样(fixtures/*.json 的 _source),判读方是冻结的 0.1.26 界面代码 —— 断言的是本模块之外的两样东西,删掉它没有别的测试会红
+4	packages/ui-mac	src/engine-adapter/command-reply.test.ts	-	#1668 R1 F4:斜杠命令后 composer 读 info.id 把命令来源 chip 对到回合;2.x command 只回 204,适配器回那个回合真实的助手消息。夹具是真 2.x 引擎采样(fixtures/*.json 的 _source),判读方是冻结的 0.1.26 界面代码 —— 断言的是本模块之外的两样东西,删掉它没有别的测试会红
+3	packages/ui-mac	src/engine-adapter/failure-code.test.ts	-	#1668 H2:L4 的登记失败码前缀(withFailureCode)经适配器读回,码交给冻结界面读的 MCP code(use-extensions mcpRepair)与回合错误网络层(timeline-model turnErrorOf)。跨线契约的读端只在这里判

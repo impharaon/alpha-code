@@ -10,6 +10,7 @@
 // The snapshot is written once per call from the facts at decision time and never overwritten (ADR-041 §4).
 import { Error as ToolError } from "@opencode/plugin/promise/tool"
 import { parseToolDisplaySnapshot, type ToolDisplaySnapshotV1 } from "../../../schema/src/tool-identity"
+import { classifyNetFailure, engineNetFailurePath } from "../../../schema/src/codepuppy-net-failure"
 import type { ToolFacts } from "./identity"
 
 export const DISPLAY_KEY = "codepuppyDisplay"
@@ -73,5 +74,29 @@ export function attachTerminal(
     message: event.error.message,
     ...(event.error.error === undefined ? {} : { error: event.error.error }),
     metadata: { ...event.error.metadata, [DISPLAY_KEY]: display },
+  })
+}
+
+export const NET_FAILURE_KEY = "codepuppyNetFailure"
+
+/**
+ * `execute.after` body (#1572 AC4; v1 processor.ts failToolCall): a call that failed at the network layer carries the
+ * layer and code Code Puppy's classifier attributes, read from the failure's original cause before only its message
+ * survives. Only layer and code are stored; a failure the classifier does not recognise is left as it is.
+ */
+export function attachNetFailure(
+  event:
+    | { status: "completed" }
+    | { status: "error"; input: unknown; error: InstanceType<typeof ToolError> },
+  env: Record<string, string | undefined> = process.env,
+) {
+  if (event.status !== "error" || event.error.metadata?.[NET_FAILURE_KEY] !== undefined) return
+  const target = (event.input as { url?: unknown } | undefined)?.url
+  const net = classifyNetFailure(event.error.error ?? event.error, engineNetFailurePath(typeof target === "string" ? target : undefined, env))
+  if (!net) return
+  event.error = new ToolError({
+    message: event.error.message,
+    ...(event.error.error === undefined ? {} : { error: event.error.error }),
+    metadata: { ...event.error.metadata, [NET_FAILURE_KEY]: net },
   })
 }

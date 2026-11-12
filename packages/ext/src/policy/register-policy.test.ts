@@ -6,6 +6,7 @@
 import { beforeAll, describe, expect } from "bun:test"
 import fs from "node:fs"
 import path from "node:path"
+import { createServer, type AddressInfo } from "node:net"
 import { pathToFileURL } from "node:url"
 import {
   Agent,
@@ -869,6 +870,43 @@ describe("E7: attachment ingestion makes no tool call and asks nothing", () => {
       expect(counts.write).toBe(1)
       expect(seen.before).toBeGreaterThan(0)
       expect(seen.evaluate).toBeGreaterThan(0)
+    }),
+  )
+})
+
+// #1572 AC4 on OpenCode 2 (#1666 Unit C): a tool call that fails at the network layer carries Code Puppy's layer and code
+// in its error metadata (`codepuppyNetFailure`, the key v1's processor.ts wrote and the renderer reads), from the policy's
+// `execute.after` (display.ts attachNetFailure). The tool is OpenCode 2's own webfetch; the failure is a real refused
+// connection. The error's metadata is what the session publisher stores on the failed tool part (session/runner/step.ts).
+describe("#1572: a tool call that fails at the network layer carries Code Puppy's layer", () => {
+  const closedPort = () =>
+    Effect.promise(
+      () =>
+        new Promise<number>((resolve) => {
+          const server = createServer()
+          server.listen(0, "127.0.0.1", () => {
+            const { port } = server.address() as AddressInfo
+            server.close(() => resolve(port))
+          })
+        }),
+    )
+
+  it.live("webfetch to a refused port: the failure carries tcp / ECONNREFUSED and nothing of the URL", () =>
+    Effect.gen(function* () {
+      const { session } = yield* setup({ internal: [WebFetchTool.Plugin], records: NEUTRAL })
+      const url = `http://127.0.0.1:${yield* closedPort()}/page?token=SECRET-NEEDLE-1572`
+      const error = failure(yield* callRaw(session.id, "webfetch", { url, format: "text" }))
+      expect(error?.metadata?.codepuppyNetFailure).toEqual({ layer: "tcp", code: "ECONNREFUSED" })
+      expect(JSON.stringify(error?.metadata?.codepuppyNetFailure)).not.toContain("SECRET-NEEDLE")
+    }),
+  )
+
+  it.live("a failure that is not the network's carries no layer", () =>
+    Effect.gen(function* () {
+      const { session } = yield* setup({ internal: [WebFetchTool.Plugin], records: NEUTRAL })
+      const error = failure(yield* callRaw(session.id, "webfetch", { url: "ftp://example.test/file", format: "text" }))
+      expect(error?.message).toBeDefined()
+      expect(error?.metadata?.codepuppyNetFailure).toBeUndefined()
     }),
   )
 })

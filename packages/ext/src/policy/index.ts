@@ -7,14 +7,15 @@
 //   tool.transform   capture early registry     mcp.transform    capture configured servers (after L3's)
 //   mcp.transform    `{workspace}` → directory  execute.before   confirm: identity ask, re-decide, pin
 //   execute.before   decide: deny first         tool.transform   display snapshot on running calls
-//   session.hook     catalog prune / tail rules execute.after    display snapshot on terminal states
+//   session.hook     catalog prune / tail rules execute.after    display snapshot on terminal states; network
+//                                               layer on a failed call (#1572 AC4)
 //   permission.hook  risk facts on every ask; Code Puppy's own asks held against later hooks
 //   rpc              codepuppy.tool-policy (I5)
 import os from "node:os"
 import path from "node:path"
 import type { Plugin } from "@opencode/plugin"
 import { createCatalog } from "./catalog"
-import { attachTerminal, displaySnapshot, wrapForDisplay } from "./display"
+import { attachNetFailure, attachTerminal, displaySnapshot, wrapForDisplay } from "./display"
 import { confirm, decide, effectiveFor, holdAsk, pin, type GateDeps } from "./gate"
 import {
   codeModeFacts,
@@ -194,6 +195,7 @@ export async function registerPolicy(context: Plugin.Context): Promise<PolicyReg
         wrapForDisplay(editor as never, (callID) => displays.get(callID)),
       )
       await context.tool.hook("execute.after", (event) => {
+        attachNetFailure(event as never)
         attachTerminal(event as never, displays.get(event.id))
         displays.delete(event.id)
       })

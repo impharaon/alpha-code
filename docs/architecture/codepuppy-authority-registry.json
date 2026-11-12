@@ -881,6 +881,31 @@
       ]
     },
     {
+      "id": "tool-net-failure-metadata",
+      "decision": "A tool call that fails at the network layer carries Code Puppy's classification (layer and code) in its metadata (#1572 AC4).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666) Unit C",
+      "takeovers": [
+        "packages/opencode/src/session/processor.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/policy/display.ts",
+        "ladder": "L0 (the policy's execute.after classifies a failed call's original cause with classifyNetFailure, packages/schema/src/codepuppy-net-failure.ts, and puts codepuppyNetFailure on the replaced Tool.Error's metadata, which the session publisher stores on the failed tool part)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "webfetch to a refused port: the failure carries tcp / ECONNREFUSED and nothing of the URL"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "a failure that is not the network's carries no layer"
+        }
+      ]
+    },
+    {
       "id": "l1r-naming-resume",
       "decision": "Session naming resumes per Code Puppy's rules (codepuppy-naming-resume).",
       "adr": [

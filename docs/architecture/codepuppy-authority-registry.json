@@ -1245,6 +1245,33 @@
       ]
     },
     {
+      "id": "mcp-failure-no-remote-text",
+      "decision": "An MCP failure's logs and public failed status carry Code Puppy's named cause with the HTTP status or process exit, never the remote server's response body or the local server's stderr (#1645).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "L4 (#1666) Unit F",
+      "takeovers": [
+        "packages/opencode/src/mcp/index.ts",
+        "packages/core/src/mcp/client.ts",
+        "packages/core/src/mcp/connection.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/mcp/client.ts",
+        "ladder": "L3 (re-taken: safeDescription / safeExplain give logs and the failed status only the HTTP status or the process exit; re-taken connection.ts builds the failed status from it)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "a remote refusal: the body is in no log line and not in the status, which reads auth and HTTP 401"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "a local server that writes a secret to stderr and exits: it is in no log line and not in the status"
+        }
+      ]
+    },
+    {
       "id": "l2r-auth-fail-closed",
       "decision": "A model route whose deployment declared no credential refuses before the socket opens instead of sending an unauthenticated request (#652, owner ruling 2026-07-28 per the v1 source comment).",
       "adr": [

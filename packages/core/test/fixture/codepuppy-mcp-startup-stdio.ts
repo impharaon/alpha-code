@@ -8,6 +8,7 @@
 //   CODEPUPPY_MCP_PID_FILE        write this process's pid at launch, so a test can kill a hung server instead of awaiting it
 //   CODEPUPPY_MCP_CHILD_PID_FILE  start a long-lived child process and write its pid (a descendant the engine must reap)
 //   CODEPUPPY_MCP_LIST_DELAY_MS   wait this long before answering tools/list
+//   CODEPUPPY_MCP_EXIT_STDERR     write this to stderr and exit with code 3 before the handshake
 //   a tools/call named `slow`     answers after `ms` milliseconds (list it through CODEPUPPY_MCP_TOOLS_FILE)
 import { spawn } from "node:child_process"
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs"
@@ -20,6 +21,10 @@ const mark = (value: string) => {
 }
 
 mark("+")
+if (env.CODEPUPPY_MCP_EXIT_STDERR) {
+  process.stderr.write(`${env.CODEPUPPY_MCP_EXIT_STDERR}\n`)
+  process.exit(3)
+}
 if (env.CODEPUPPY_MCP_PID_FILE) writeFileSync(env.CODEPUPPY_MCP_PID_FILE, String(process.pid))
 if (env.CODEPUPPY_MCP_CHILD_PID_FILE) {
   const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1 << 30)"], { stdio: "ignore" })

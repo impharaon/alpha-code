@@ -222,7 +222,7 @@ export function make(input: Input): Connection {
       yield* input.events.failed(
         error instanceof McpClient.NeedsAuthError
           ? { status: "needs_auth", error: error.message }
-          : { status: "failed", error: error instanceof Error ? error.message : String(error) },
+          : { status: "failed", error: McpClient.safeDescription(error) }, // codepuppy(#1645): no remote body
         error instanceof McpClient.ConnectError && error.answered === true,
         // codepuppy(#1563): connect failures arrive named by the client; a tools/list failure is named here.
         error instanceof McpClient.NeedsAuthError

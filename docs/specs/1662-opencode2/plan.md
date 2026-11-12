@@ -149,3 +149,22 @@ last_reviewed: 2026-11-12
 - 2026-11-12 · 第 2 项另加 ext `identity.test.ts` 一条(随包 tools.json + 替换后的命令 ⇒ `codepuppy-bundled`),gate-files 该行 16 → 17 · `15b8f87095`。
 - 2026-11-12 · 第 3 项另立登记册条目 `mcp-generation-changed-call`(原无 AC6 条目)· `9ddff98c34`。
 - 2026-11-12 · 第 4 项同步改了自己的 `codepuppy-command-model-priority.test.ts` 子任务用例的宿主(权限 assert 放行);宿主另导出 `ConfigCommandPlugin` / `Command` / `Config` / `ShellSelect` / `ConfigSchema` · 第 4 项提交。
+
+## Unit F — no remote text in logs or status; review diff for engine-started turns; project-wide file events(L4 #1666)
+
+- 依据:编排器 Unit F 派发书及其补充(第 2、3 项多接管两个上游文件,owner 2026-11-12 原话经编排器转达:「同意，多接管两个上游文件，需要再唯一权威中记录多接管的内容。」);基于 `a6021d654c`。
+- 核对:编排器派发即核对(本段与实现同轮)。
+
+### 改动与证明
+
+| 项 | 文件 | 改什么 | 证明(反向臂) |
+| --- | --- | --- | --- |
+| 1 远端正文不进日志与状态 | `core/src/mcp/client.ts`、`connection.ts` | 只给日志与 failed 状态用的「无正文描述」:HTTP 失败只留 `HTTP <状态>`,本地进程退出只留退出码(不带 stderr 尾巴);`client.ts:280`、`:406/412` 的日志与连接、tools/list 两处 failed 状态都用它;`index.ts:497` 记的就是这段状态 | `codepuppy-mcp-runtime.test.ts`:远端 401 正文带 `synthetic-secret-1645` ⇒ 每条日志与 failed 状态都没有它、状态仍带 `[codepuppy:auth]` 与 `HTTP 401`;本地服务器往 stderr 写令牌后退出 ⇒ 同样没有;换回当前代码 ⇒ 出现 |
+| 2 引擎合成消息开启的回合也能取 diff | `core/src/session/diff.ts`(新接管) | `resolve` 接受 `synthetic` 为锚点;回合起点把 `synthetic` 与 `user` 一起算作开启回合的消息 | 新测试走真 Session 服务:`user, assistant, idle, synthetic, assistant(改 b.txt), idle` ⇒ 从 synthetic 取得 b.txt、从 user 仍得前一回合;之后再来一个 user 回合也不影响;上游原文件 ⇒ 400 |
+| 3 整个项目的文件变化事件 | `core/src/filesystem/location-watcher.ts`(新接管)、新 `core/src/filesystem/codepuppy-project-watch.ts` | 主进程打开的 `OPENCODE_EXPERIMENTAL_FILEWATCHER`(0.1.26 的开关,`ui-mac/src/main/server.ts:445` 默认开、尊重用户显式关闭)为真时,再订一个 `location.directory` 的目录监视(忽略 0.1.26 的那张表 + 配置的 watcher.ignore + 家目录保护名),发 `filesystem.changed`;上游测试不设开关,行为不变 | 新测试用真临时目录:增、改、删一个文件和一个子目录里的文件 ⇒ 各有对应种类的事件;`.git/`、`node_modules/` 下 ⇒ 无;上游原文件 ⇒ 无;开关关 ⇒ 无。后端:Parcel(darwin 为 fs-events) |
+
+同步:两条新接管进守卫清单与 ADR-047 接管表(理由「界面与当前正式版一致」,附 owner 原话与日期);登记册两条新条目(同样附原话);gate-files 新增行。
+
+### 偏离记录
+
+暂无

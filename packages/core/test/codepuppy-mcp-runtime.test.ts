@@ -17,6 +17,8 @@
 //   #1645 a tools/list failure that another attempt may fix reconnects after 30 s and lists in the same service; an
 //        auth answer to tools/list is named auth and not retried (#1666 Units D/E)
 //   #1653 a server waiting out its backoff holds back no other server, and calling it does not reconnect early
+//   #1645 a refusing server's body and a crashing server's stderr reach no log line and no failed status
+//        (#1666 Unit F; v1 kept the typed code only)
 //   #1565 with the shipped manifest: the command main writes ({workspace} marker) and the one the engine sees after the
 //        extension substitutes the folder both get the declaration; the real python server lists exactly it (#1666 Unit E)
 //
@@ -34,7 +36,7 @@ for (const [key, dir] of Object.entries({ HOME: "home", XDG_CONFIG_HOME: "config
 }
 process.env.OPENCODE_DB = ":memory:"
 
-const { Effect, Exit, Fiber, Layer, Stream } = await import("effect")
+const { Effect, Exit, Fiber, Layer, Logger, Stream } = await import("effect")
 const { TestClock } = await import("effect/testing")
 const { Document, Info } = await import("@opencode/schema/config")
 const { ConfigMCP } = await import("@opencode/schema/config/mcp")
@@ -521,5 +523,45 @@ describe("#1565: the shipped Office manifest and server", () => {
       expect(listed.map((tool: any) => tool.name)).toEqual(["read_docx", "write_docx"])
       expect(listsDeclaration(declared ?? [], listed)).toBe(true)
     }),
+  )
+})
+
+// ── #1645 no remote text in logs or the failed status (#1666 Unit F) ─────────────────────────────────────────────
+// v1's sample: the refusing server answers with a body carrying a secret; a local server writes one to stderr and dies.
+// Red if any captured log line (the MCP client's transport and request logs, the service's connect log) or the
+// public failed status carries it; the status still names the cause and, for HTTP, the status code.
+describe("#1645: a failure's remote text stays out of logs and the failed status", () => {
+  const SECRET = "synthetic-secret-1645"
+  const capture = (logs: string[]) =>
+    Logger.layer([Logger.make((entry: any) => void logs.push(JSON.stringify(entry.message)))], { mergeWithExisting: true })
+
+  const refusing = httpServer()
+  refusing.state.listStatus = 401
+  refusing.state.listBody = `denied for ${SECRET}`
+  const remoteLogs: string[] = []
+  testEffect(
+    mcpLayer({ locked: new ConfigMCP.Remote({ type: "remote", url: refusing.url, oauth: false }) }).pipe(Layer.provide(capture(remoteLogs))),
+  ).effect("a remote refusal: the body is in no log line and not in the status, which reads auth and HTTP 401", () =>
+    Effect.gen(function* () {
+      const status: any = yield* until(statusOf("locked").pipe(Effect.map((s: any) => (s?.status === "failed" ? s : undefined))), "locked failed")
+      expect(parseFailureCode(status.error)).toMatchObject({ code: "auth" })
+      expect(status.error).toContain("HTTP 401")
+      expect(status.error).not.toContain(SECRET)
+      expect(remoteLogs.some((line) => line.includes("locked"))).toBe(true)
+      expect(remoteLogs.filter((line) => line.includes(SECRET))).toEqual([])
+    }).pipe(Effect.ensuring(Effect.sync(refusing.stop))),
+  )
+
+  const localLogs: string[] = []
+  testEffect(mcpLayer({ crash: local({ CODEPUPPY_MCP_EXIT_STDERR: `boom ${SECRET}` }) }).pipe(Layer.provide(capture(localLogs)))).live(
+    "a local server that writes a secret to stderr and exits: it is in no log line and not in the status",
+    () =>
+      Effect.gen(function* () {
+        const status: any = yield* until(statusOf("crash").pipe(Effect.map((s: any) => (s?.status === "failed" ? s : undefined))), "crash failed")
+        expect(status.error).toContain("MCP server process exited with code 3")
+        expect(status.error).not.toContain(SECRET)
+        expect(localLogs.some((line) => line.includes("crash"))).toBe(true)
+        expect(localLogs.filter((line) => line.includes(SECRET))).toEqual([])
+      }),
   )
 })

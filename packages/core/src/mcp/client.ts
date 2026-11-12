@@ -55,6 +55,22 @@ const describe = (error: unknown) => {
   return detail && !error.message.includes(detail) ? `${error.message} (${detail})` : error.message
 }
 
+// codepuppy(#1645) ── what logs and a failed status may say about a failure (v1 kept the typed code only): an HTTP
+// failure is its status, a local server that exited is its exit, never the remote body or the server's stderr tail
+// (packages/core/src/mcp/stdio.ts appends it). Errors the client wrapped keep the SDK error as their cause.
+const STDIO_EXIT = /^MCP server process exited(?: with code -?\d+)?/
+export function safeDescription(error: unknown): string {
+  const source =
+    error instanceof Error && !(error instanceof SdkError) && !(error instanceof SdkHttpError) && error.cause instanceof Error
+      ? error.cause
+      : error
+  if (source instanceof SdkHttpError) return `HTTP ${source.status}`
+  const exit = source instanceof Error ? STDIO_EXIT.exec(source.message) : null
+  if (exit) return exit[0]
+  return describe(source)
+}
+// codepuppy(#1645) ── end
+
 // Overloaded or restarting servers and dropped connections usually recover within a second.
 // Fetch reports network failures as a TypeError carrying a system error code.
 // 501 means the server will never support the request.
@@ -238,6 +254,11 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
     error instanceof SdkError && error.code === SdkErrorCode.ConnectionClosed && lastError
       ? `${describe(error)}: ${lastError}`
       : describe(error)
+  // codepuppy(#1645): the same, for what reaches a log or the failed status (lastError is already body-free).
+  const safeExplain = (error: unknown) =>
+    error instanceof SdkError && error.code === SdkErrorCode.ConnectionClosed && lastError
+      ? `${describe(error)}: ${lastError}`
+      : safeDescription(error)
 
   // Two more attempts, 250 ms and 1 s later, while the failure is transient and the deadline has not passed.
   const retrying = <A, E>(what: string, effect: Effect.Effect<A, E>, deadline = Infinity) =>
@@ -276,7 +297,7 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
     // Background work such as the standalone SSE stream reports failures only here; aborts come from close.
     client.onerror = (error) => {
       if (error.name === "AbortError") return
-      lastError = describe(error)
+      lastError = safeDescription(error) // codepuppy(#1645)
       runFork(Effect.logWarning("mcp transport error", { server, error: lastError }))
     }
     if (options.roots !== false)
@@ -403,13 +424,13 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
     const execution = timeout?.execution ?? DEFAULT_EXECUTION_TIMEOUT
     const request = <A>(what: string, run: (signal: AbortSignal) => Promise<A>) =>
       Effect.tryPromise({ try: run, catch: failure }).pipe(
-        Effect.tapError((error) => Effect.logWarning(`failed to ${what}`, { server, error: error.message })),
+        Effect.tapError((error) => Effect.logWarning(`failed to ${what}`, { server, error: safeDescription(error) })), // codepuppy(#1645)
       )
     // Listing is read-only, so a transient failure is safe to retry.
     const list = <A>(what: string, run: (signal: AbortSignal) => Promise<A>) =>
       retrying(what, Effect.tryPromise({ try: run, catch: (error) => error })).pipe(
         Effect.mapError(failure),
-        Effect.tapError((error) => Effect.logWarning(`failed to ${what}`, { server, error: error.message })),
+        Effect.tapError((error) => Effect.logWarning(`failed to ${what}`, { server, error: safeDescription(error) })), // codepuppy(#1645)
       )
     // The SDK answers a list for an unadvertised capability with a console.debug line plus an empty
     // result, so refreshing a tools-only server prints to stdout on every catalog load. Negotiate
@@ -579,7 +600,7 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
     })
   return yield* new ConnectError({
     server,
-    message: explain(error),
+    message: safeExplain(error), // codepuppy(#1645): body-free, it becomes the failed status
     answered: !repeats(error),
     ...startFailure(error, options.config), // codepuppy(#1563)
   })

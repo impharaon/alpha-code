@@ -27,6 +27,7 @@ import {
   toV1Project,
   toV1Question,
   turnAnchorID,
+  v1ErrorData,
   withTurnDiffs,
 } from "./v1-shapes"
 
@@ -319,12 +320,15 @@ export function createProjector(api: OpenCodeClient, emit: Emit, permissions: Pe
     if (type === "session.retry.scheduled")
       return emit(directory, {
         type: "session.status",
-        properties: { sessionID, status: { type: "retry", attempt: data.attempt, message: data.error?.message ?? "", next: data.at } },
+        properties: {
+          sessionID,
+          status: { type: "retry", attempt: data.attempt, message: v1ErrorData(data.error?.message ?? "").message, next: data.at },
+        },
       })
     if (type === "session.execution.failed")
       emit(directory, {
         type: "session.error",
-        properties: { sessionID, error: { name: "UnknownError", data: { message: data.error?.message ?? "" } } },
+        properties: { sessionID, error: { name: "UnknownError", data: v1ErrorData(data.error?.message ?? "") } },
       })
     if (TURN_END_EVENTS.has(type)) {
       emit(directory, { type: "session.status", properties: { sessionID, status: { type: "idle" } } })

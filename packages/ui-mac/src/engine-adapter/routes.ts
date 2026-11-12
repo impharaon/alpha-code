@@ -23,6 +23,7 @@ import {
   toV1Commands,
   toV1FileNodes,
   toV1McpStatus,
+  v1McpStatus,
   toV1Messages,
   toV1Path,
   toV1Project,
@@ -636,6 +637,6 @@ async function authenticateMcp(context: RouteContext) {
     if (outcome === "complete") await poll()
     const server = (await context.api.mcp.list(at(context))).data.find((item) => item.name === name)
     if (outcome !== "complete" || server?.status.status !== "pending")
-      return json(server?.status ?? { status: "failed", error: outcome })
+      return json(server ? v1McpStatus(server.status) : { status: "failed", error: outcome })
   }
 }

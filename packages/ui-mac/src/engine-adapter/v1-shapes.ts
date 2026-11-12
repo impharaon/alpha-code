@@ -22,6 +22,7 @@ import type {
   ProviderListResponse,
   QuestionRequest,
 } from "@opencode-ai/sdk/v2/client"
+import { isNetFailureLayer, parseFailureCode } from "@opencode/schema/codepuppy-net-failure"
 import { STAGED_ATTACHMENT_PART_NAME, stagedAttachmentPart } from "../../../ext/src/staged-attachment-part"
 import { ATTACHMENT_METADATA_KEY, type StagedAttachmentMeta } from "../shared/attachment-path"
 import { normalizePermissionRequest, normalizeProviderList, normalizeSessionMessages } from "./frozen-shapes"
@@ -178,7 +179,12 @@ export function toV1Messages(sessionID: string, source: readonly SessionMessageI
         id: partID(info.id, position >= 0 ? position : index),
       } as Part
     })
-    return { info, parts: renumbered.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) }
+    const error = (info as { error?: { data?: { message?: unknown } } }).error
+    const named =
+      info.role === "assistant" && error && typeof error.data?.message === "string"
+        ? ({ ...info, error: { ...error, data: { ...error.data, ...v1ErrorData(error.data.message) } } } as Message)
+        : info
+    return { info: named, parts: renumbered.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) }
   })
 }
 
@@ -309,7 +315,27 @@ export function toV1FileNodes(directory: string, entries: readonly FileSystemEnt
 
 /** 2.x 的 MCP 列表 → v1 `{ [name]: status }`(状态五种同形,seams 第 4 节)。 */
 export function toV1McpStatus(servers: readonly McpServer[]) {
-  return Object.fromEntries(servers.map((server) => [server.name, server.status]))
+  return Object.fromEntries(servers.map((server) => [server.name, v1McpStatus(server.status)]))
+}
+
+// ── H2:Code Puppy 登记的失败码 ─────────────────────────────────────────────────────────────────────────
+// 2.x 的公开形状(`Mcp.Status` 的 error、会话错误的 message)只有一段文本;我们接管的引擎代码在文本前加登记码
+// (L4,`withFailureCode`)。前缀的形状只在 schema 包里定义,这里只用 `parseFailureCode` 读回,不手解。读回后去掉前缀,
+// 码交给 0.1.26 界面读的那个字段;认不出(无前缀 / 码没登记)原样不动。
+
+/** MCP 状态:failed 的码进 v1 的 `code`(定制中心据 `dependency_missing` 给「重新安装」,use-extensions.ts mcpRepair)。 */
+export function v1McpStatus(status: McpServer["status"]) {
+  if (!("error" in status) || typeof status.error !== "string") return status
+  const parsed = parseFailureCode(status.error)
+  if (!parsed) return status
+  return { ...status, error: parsed.text, ...(status.status === "failed" ? { code: parsed.code } : {}) }
+}
+
+/** 会话错误:网络层的码进 `metadata.codepuppyNetLayer`(回合错误卡按层选句子,timeline-model.ts turnErrorOf)。 */
+export function v1ErrorData(message: string): { message: string; metadata?: { codepuppyNetLayer: string } } {
+  const parsed = parseFailureCode(message)
+  if (!parsed) return { message }
+  return { message: parsed.text, ...(isNetFailureLayer(parsed.code) ? { metadata: { codepuppyNetLayer: parsed.code } } : {}) }
 }
 
 /** 2.x 的命令(只有名字和说明)与技能 → v1 Command。v1 引擎的 `/command` 把技能列成 source=skill 的命令。 */

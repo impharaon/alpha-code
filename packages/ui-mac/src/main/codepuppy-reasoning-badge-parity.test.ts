@@ -13,14 +13,14 @@
 // injectCodePuppyConfig + 真 ext + 本机桩;发送走生产 buildPromptRequest + v1PromptModelFields → 生产引擎适配器
 // → switchModel 带 variant → prompt,与桌面 composer 同一个请求)。本文件三条:
 //   1. 手段自证(子进程 5 条):桩的捕获不是恒空;注入丢了推理转发(整张档位表 / 档位内容)⇒ 逐档点名红;无此能力的模型亮徽标
-//      ⇒ 点名红;无徽标却被注入无条件的 thinking:enabled(#1267 方向)⇒ 点名红;标题调用判据测得出错档,0.1.26 的「第一档」
-//      判据在 2.x 上点名红(实测差异,见 cases 抬头)。
+//      ⇒ 点名红;无徽标却被注入无条件的 thinking:enabled(#1267 方向)⇒ 点名红;注入里去掉标题用的 `none` 那一档 ⇒ 标题跟着
+//      所选的档走,逐格点名红。
 //   2. 桌面提交层:chip 列出的每一档,buildPromptRequest 都真的带上 variant(本进程直接判生产函数)。
-//   3. 矩阵(子进程 1 条):生产 buildModelPickerRows 的每一行 × 默认 + chip 每一档,主请求体按判据逐格对上;标题辅助调用
-//      按 2.x 实测与主请求同档。
+//   3. 矩阵(子进程 2 条):生产 buildModelPickerRows 的每一行 × 默认 + chip 每一档,主请求体按判据逐格对上,标题辅助调用取
+//      第一档(0.1.26 规则);UI 侧:适配器给冻结界面的 v1 provider 列表里,每个模型的档位恰好是目录的(`none` 不可见)。
 //
-// 标题辅助调用(#1237)在 2.x 上与 0.1.26 不同:0.1.26 取档位表第一档(目录把「关」放第一位,辅助调用不思考);2.x 用用户
-// 所选的那一档(选「开」标题也思考)。差异按实测钉在 cases 里并已上报,不按 0.1.26 判。
+// 标题辅助调用(#1237):0.1.26 取档位表第一档(目录把「关」放第一位,辅助调用不思考)。2.x 的标题选档只认 none / minimal / low,
+// 所以 engineModelConfig 给有档位的模型多写一档 `none` = 第一档的拷贝,由 2.x 自己挑中;适配器把它从冻结界面的列表里剥掉。
 
 import { afterAll, beforeAll, expect, test } from "bun:test"
 import * as fs from "node:fs"
@@ -134,7 +134,7 @@ function pickerRows(): ModelPickerRow[] {
   })
 }
 
-test("手段自证:捕获不是恒空;丢了推理转发 / 无此能力亮徽标 / 无徽标却带推理参数 ⇒ 判据点名红;标题判据测得出错档(codepuppy-reasoning-badge-parity.engine.cases.ts,5 条)", async () => {
+test("手段自证:捕获不是恒空;丢了推理转发 / 无此能力亮徽标 / 无徽标却带推理参数 / 去掉标题用的 none 档 ⇒ 判据点名红(codepuppy-reasoning-badge-parity.engine.cases.ts,5 条)", async () => {
   await engineCases("手段自证", 5)
 }, 600_000)
 
@@ -150,6 +150,6 @@ test("桌面提交层:chip 列出的每一档,buildPromptRequest 都真的带上
   }
 })
 
-test("矩阵:有徽标 ⇒ 每一档请求带参数且值逐字对上;无徽标 ⇒ 零档且默认请求不带参数;标题调用与主请求同档(codepuppy-reasoning-badge-parity.engine.cases.ts,1 条)", async () => {
-  await engineCases("矩阵:有徽标", 1)
+test("矩阵:有徽标 ⇒ 每一档请求带参数且值逐字对上;无徽标 ⇒ 零档且默认请求不带参数;标题调用取第一档;冻结界面的档位表 == 目录(codepuppy-reasoning-badge-parity.engine.cases.ts,2 条)", async () => {
+  await engineCases("矩阵", 2)
 }, 600_000)

@@ -25,6 +25,7 @@ import type {
 import { isNetFailureLayer, parseFailureCode } from "@opencode/schema/codepuppy-net-failure"
 import { STAGED_ATTACHMENT_PART_NAME, stagedAttachmentPart } from "../../../ext/src/staged-attachment-part"
 import { ATTACHMENT_METADATA_KEY, type StagedAttachmentMeta } from "../shared/attachment-path"
+import { TITLE_VARIANT_ALIAS } from "../shared/codepuppy-model-types"
 import { normalizePermissionRequest, normalizeProviderList, normalizeSessionMessages } from "./frozen-shapes"
 
 type FrozenSource = Parameters<typeof normalizeSessionMessages>[1]
@@ -284,12 +285,23 @@ export function toV1ProviderList(
   models: ModelListOutput["data"],
   defaultModel: ModelDefaultOutput["data"] | undefined,
 ): ProviderListResponse {
-  const normalized = normalizeProviderList(providers as never, models as never, defaultModel as never)
+  const visible = models.map((model) => ({ ...model, variants: withoutTitleAlias(model.variants) }))
+  const normalized = normalizeProviderList(providers as never, visible as never, defaultModel as never)
   return {
     all: [...normalized.all.values()],
     default: normalized.default,
     connected: normalized.connected,
   } as ProviderListResponse
+}
+
+/**
+ * `#1662`:引擎配置给有档位的模型在末尾多写的 `none`(第一档的拷贝,只为 2.x 的标题选档,main/codepuppy-models.ts `engineModel`)
+ * 不是用户的档位,冻结界面的 provider 列表里剥掉它。只剥「排在第一档之后、内容与第一档相同」的那一个;目录自己的 `none` 档原样。
+ */
+function withoutTitleAlias<Variant extends { id: string }>(variants: readonly Variant[]): Variant[] {
+  const overlay = ({ id: _id, ...rest }: Variant) => JSON.stringify(rest)
+  const first = variants[0]
+  return variants.filter((variant, index) => !(index > 0 && variant.id === TITLE_VARIANT_ALIAS && overlay(variant) === overlay(first!)))
 }
 
 /**

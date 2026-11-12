@@ -257,5 +257,8 @@ DOC §3.4 对 qwen 每档只有单样本且 `high`/`medium`/`max` 撞到 256 上
   有关闭档而关不在第一位即红、表登记的档位从注入里消失即红。手段自证五种已知的坏各自点名(v1 的 GLM
   `reasoningEffort` 形状 / 给 MiniMax 补档 / 关档值写成 `off` / 开排第一 / 退回无档)。
 - `codepuppy-reasoning-badge-parity.test.ts`:新三行由矩阵原判据逐档覆盖(主请求体 `thinking.type` /
-  `reasoning_effort` 逐字对上);新增**标题辅助调用**判据 —— 有徽标的每一行,默认 run 的标题体必须带第一档;
-  手段自证把 qwen「开」档的主请求体冒充标题体 ⇒ 点名 `medium ≠ none`。
+  `reasoning_effort` 逐字对上);**标题辅助调用**判据 —— `#1662`(2026-11-12)起跑在 OpenCode 2 上:有徽标的每一行、每一档
+  以及没选档,标题请求体都等于第一档那次发送的主请求体(无档模型零推理参数)。2.x 的标题选档只认 id 为 none / minimal / low 的档
+  (`packages/core/src/session/context.ts` 的 selectTitle),所以 `engineModelConfig` 给有档位的模型在档位表末尾多写一档 `none`
+  = 第一档的拷贝,由 2.x 自己挑中;适配器(`engine-adapter/v1-shapes.ts` `toV1ProviderList`)把它从冻结界面的 provider 列表里剥掉,
+  桌面 chip 读目录,用户看不见它。反向臂:注入里去掉这一档 ⇒ 标题跟着所选的档走,逐格点名红。

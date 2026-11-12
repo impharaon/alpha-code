@@ -27,7 +27,7 @@ import type { ByokCatalogV1 } from "@codepuppy/contracts-consumer"
 import * as fs from "node:fs"
 import catalog from "./codepuppy-models.json"
 import type { CodePuppyModelCatalog, ByokProvider } from "../shared/codepuppy-model-types"
-import { byokEngineId, byokModelMeta } from "../shared/codepuppy-model-types"
+import { byokEngineId, byokModelMeta, TITLE_VARIANT_ALIAS } from "../shared/codepuppy-model-types"
 import { projectPlatformModels, readAppliedByokCatalog, readAppliedPlatformSnapshot } from "./codepuppy-live-allowlist"
 import { byokAdapter } from "./byok-adapters"
 import { customProviderSecretName, hasSecretFile, secretFilePath, secretFileRef } from "./codepuppy-secret-files"
@@ -289,6 +289,11 @@ export function buildCodePuppyModelConfig(userDataPath: string): CodePuppyModelC
 //   · `enabled_providers` → `policies` 的 `provider.use`:先拒全部、再逐个放行(上游 normalize 对同一语义生成的就是这组语句)。
 //     2.x 的 catalog 可用性看 policies,所以就绪标记 provider 也放行(v1 时代它住在另一座桥里,不受 enabled_providers 管)。
 //   · `model: "<provider>/<model>"` 原样(2.x 的 `ConfigModel.Selection` 接受这种短写)。
+//   · REQ-153 #1237 的标题规则:0.1.26 的标题等辅助调用取档位表**第一档**(origin/alpha packages/opencode/src/provider/transform.ts:1390-1391;
+//     目录把「关」排第一就是为了让辅助调用不思考)。2.x 的 selectTitle 只认 id 为 none / minimal / low 的档(core session/context.ts:191-203),
+//     Code Puppy 的档 id 是 chip 标签,一个都对不上 ⇒ 标题会跟着用户所选的档走。所以有档位的模型在档位表末尾多写一档
+//     TITLE_VARIANT_ALIAS(`none`)= 第一档的原样拷贝,2.x 自己就挑它:settings 与 body 两类参数都由引擎合并,不另写参数映射。
+//     用户看不见它:桌面 chip 读目录不读引擎,冻结界面的 v1 provider 列表由适配器剥掉(engine-adapter/v1-shapes.ts)。目录自己已有 `none` 档 ⇒ 不加。
 type V1Model = { name: string; reasoning?: boolean; variants?: Record<string, Record<string, unknown>>; modalities?: { input: string[] } }
 type V1Provider = { npm?: string; name?: string; options?: { baseURL?: unknown; apiKey?: unknown }; models?: Record<string, V1Model> }
 
@@ -307,10 +312,14 @@ function engineModel(model: V1Model, npm: string | undefined) {
       ...(model.modalities ? { input: model.modalities.input } : {}),
       ...(model.reasoning ? { reasoning: { supported: true as const } } : {}),
     },
-    ...(model.variants
-      ? { variants: Object.entries(model.variants).map(([id, options]) => ({ id, ...split(options) })) }
-      : {}),
+    ...(model.variants ? { variants: withTitleAlias(Object.entries(model.variants).map(([id, options]) => ({ id, ...split(options) }))) } : {}),
   }
+}
+
+function withTitleAlias<Variant extends { id: string }>(variants: Variant[]): Variant[] {
+  const first = variants[0]
+  if (!first || variants.some((variant) => variant.id === TITLE_VARIANT_ALIAS)) return variants
+  return [...variants, { ...first, id: TITLE_VARIANT_ALIAS }]
 }
 
 export type CodePuppyEngineModelConfig = {

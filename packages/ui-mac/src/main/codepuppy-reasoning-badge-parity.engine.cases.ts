@@ -14,13 +14,13 @@
 // 再 session.prompt)进引擎 —— 与桌面 composer 发的是同一个请求。唯一的改动是端点:每个 provider 的 baseURL(内联文档与 models 底表)
 // 指向本机桩 `/p/<provider>/v1`。桩按发送正文里的标记把每个请求体归到它那一格(主请求与标题请求都带用户那句话)。
 //
-// 标题辅助调用(#1237)在 2.x 上与 0.1.26 不同 —— 这里按 2.x 实测钉住,差异已上报(`#1662` port-badge),不按 0.1.26 判:
-//   0.1.26:标题调用走 smallOptions(),取档位表**第一档**,与用户选档无关(origin/alpha packages/opencode/src/provider/transform.ts:1390-1391,
-//           packages/opencode/src/session/llm/request.ts:84-89;目录把「关」放第一位就是为了让辅助调用不思考)。
-//   2.x:  packages/core/src/session/context.ts:94-123 的 selectTitle 只认 id 为 none / minimal / low 的档(:191-203);Code Puppy 的档 id 就是
-//          chip 标签(关 / 开 / 低 / 中 / 高 / 最高),一个都对不上 ⇒ 标题调用用主模型**在用户所选的那一档**:选「开」标题也思考,默认则不带推理参数。
-//   判据 judgeTitle:标题请求体的推理控制参数与 `thinking` 原文 == 同一次发送主请求体的。手段自证另有一格:0.1.26 的「第一档」判据在 2.x 的
-//   标题请求体上点名红 —— 差异是实测出来的,不是推断的。
+// 标题辅助调用(#1237)按 0.1.26 的规则判:不论用户选哪一档(或没选),标题请求体都等于档位表**第一档**的参数(origin/alpha
+// packages/opencode/src/provider/transform.ts:1390-1391,packages/opencode/src/session/llm/request.ts:84-89;目录把「关」放第一位就是为了让
+// 辅助调用不思考);没有档位的模型,标题请求体零推理控制参数。2.x 的 selectTitle 只认 id 为 none / minimal / low 的档
+// (packages/core/src/session/context.ts:94-123、:191-203),Code Puppy 的档 id 是 chip 标签,所以 engineModelConfig 在有档位的模型的
+// 档位表末尾多写一档 `none`(TITLE_VARIANT_ALIAS)= 第一档的原样拷贝,让 2.x 自己挑它。判据 judgeTitle:标题请求体的推理控制参数与
+// `thinking` 原文 == 第一档那次发送的主请求体。反向臂:注入里去掉这一档 ⇒ 标题跟着所选的档走,点名红。
+// 用户看不见这一档:矩阵组的 UI 侧那条判适配器给冻结界面的 v1 provider 列表里,每个模型的档位恰好是目录的(桌面 chip 读目录)。
 //
 // HOME / XDG 全在临时沙箱里;key 是刻意不像真密钥的测试值,只发到本机桩。
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
@@ -31,9 +31,10 @@ import { assertEngineSandboxed, engineSandbox } from "../../test-component/engin
 import { codepuppyEngine, type Running } from "../../test-component/codepuppy-engine"
 import { v3Snapshot } from "../../test-component/effective-catalog.fixture"
 import { createEngineFetch } from "../engine-adapter/index"
+import { normalizeProviderList } from "../engine-adapter/frozen-shapes"
 import { buildModelPickerRows, type ModelPickerRow } from "../renderer/codepuppy-ui/model-picker-core"
 import { buildPromptRequest, DEFAULT_PERM, v1PromptModelFields } from "../renderer/codepuppy-ui/composer-state"
-import { byokModelMeta, isByokEngineId } from "../shared/codepuppy-model-types"
+import { byokModelMeta, isByokEngineId, TITLE_VARIANT_ALIAS } from "../shared/codepuppy-model-types"
 import { getModelCatalog } from "./codepuppy-models"
 import { pinAppliedCatalog, writeCatalogSnapshot } from "./codepuppy-live-allowlist"
 import { secretFilePath } from "./codepuppy-secret-files"
@@ -102,11 +103,18 @@ afterAll(async () => {
 })
 
 // ── 一台机器 ────────────────────────────────────────────────────────────────────────────────────────────────
-type Injected = { capabilities?: Record<string, unknown>; variants?: unknown; body?: Body }
-type Machine = { rows: ModelPickerRow[]; userData: string; send: (row: ModelPickerRow, variant?: string) => Promise<Sent> }
+type Injected = { capabilities?: Record<string, unknown>; variants?: Array<Record<string, unknown>>; body?: Body }
+type Machine = {
+  rows: ModelPickerRow[]
+  userData: string
+  send: (row: ModelPickerRow, variant?: string) => Promise<Sent>
+  /** 冻结界面拿到的 v1 provider 列表(经生产适配器 GET /provider)与同一时刻引擎自己的 2.x 清单。 */
+  lists: () => Promise<{ v1: { all: Array<{ id: string; models: Record<string, { variants?: Record<string, unknown> }> }> }; providers: unknown[]; models: ModelV2Info[] }>
+}
+type InjectedProviders = Record<string, { settings?: { baseURL?: string }; models?: Record<string, Injected> }>
 
 /** 装好已应用平台目录与全部直连 key 的一台机器;`mutate` 只给反向臂用(改注入里的模型表)。端点全部指向本机桩。 */
-async function machine(name: string, mutate?: (models: (providerID: string, id: string) => Injected) => void): Promise<Machine> {
+async function machine(name: string, mutate?: (models: (providerID: string, id: string) => Injected, all: InjectedProviders) => void): Promise<Machine> {
   const userData = path.join(sandbox.root, `${name}-userdata`)
   fs.mkdirSync(userData, { recursive: true })
   writeCatalogSnapshot(userData, v3Snapshot())
@@ -116,7 +124,7 @@ async function machine(name: string, mutate?: (models: (providerID: string, id: 
     fs.writeFileSync(secretFilePath(userData, secret), `sk-fake-${secret}`, { mode: 0o600 })
   }
   const host = codepuppyEngine({ sandbox, name, modelBaseURL: `${upstream}/p/codepuppy/v1`, platformModels: null })
-  const providers = host.content.providers as Record<string, { settings?: { baseURL?: string }; models?: Record<string, Injected> }>
+  const providers = host.content.providers as InjectedProviders
   for (const [id, provider] of Object.entries(providers)) if (provider.settings?.baseURL) provider.settings.baseURL = `${upstream}/p/${id}/v1`
   const file = host.injection.models.file
   if (file) {
@@ -134,7 +142,7 @@ async function machine(name: string, mutate?: (models: (providerID: string, id: 
     const model = providers[providerID]?.models?.[id]
     if (!model) throw new Error(`no injected model ${providerID}/${id}`)
     return model
-  })
+  }, providers)
 
   const engine = await host.start()
   running.push(engine)
@@ -189,7 +197,12 @@ async function machine(name: string, mutate?: (models: (providerID: string, id: 
       counts: `main=${mains.length} title=${titles.length}`,
     }
   }
-  return { rows, userData, send }
+  const lists = async () => {
+    const v1 = await (await adapter(`${origin}/provider?${directory}`)).json()
+    const raw = { providers: (await engine.send("GET", "/api/provider")).json?.data ?? [], models: ((await engine.send("GET", "/api/model")).json?.data ?? []) as ModelV2Info[] }
+    return { v1, ...raw }
+  }
+  return { rows, userData, send, lists }
 }
 /** 每次发送一个标记,主请求与标题请求都带着它,桩据此把请求体归到那一格。 */
 let sends = 0
@@ -252,24 +265,11 @@ function judge(userData: string, row: ModelPickerRow, variant: string | undefine
   return failures
 }
 
-/** 2.x 的标题辅助调用判据(实测规则,见抬头):标题请求体的推理控制参数与 `thinking` 原文 == 同一次发送的主请求体。 */
-function judgeTitle(row: ModelPickerRow, variant: string | undefined, main: Body, title: Body): string[] {
+/** 标题辅助调用(#1237,0.1.26 规则):标题请求体的推理控制参数与 `thinking` 原文 == 第一档那次发送的主请求体;没有档位的模型 == 零推理控制参数。 */
+function judgeTitle(row: ModelPickerRow, variant: string | undefined, title: Body, first: Body): string[] {
   const shape = (body: Body) => JSON.stringify({ controls: reasoningControls(body), thinking: body.thinking ?? null })
-  return shape(title) === shape(main) ? [] : [`${labelOf(row, variant)}(标题辅助调用): 主请求 ${shape(main)},标题请求 ${shape(title)}`]
-}
-
-/** 0.1.26 的标题判据(第一档,#1237):只用来证明 2.x 与它不同。 */
-function judgeFirstTier(userData: string, row: ModelPickerRow, title: Body): string[] {
-  const first = row.model.variants[0]
-  if (!row.reasoning || first === undefined) return []
-  const declared = declaredControl(userData, row, first)
-  const failures: string[] = []
-  if (declared.reasoningEffort !== undefined && title.reasoning_effort !== declared.reasoningEffort)
-    failures.push(`${rowKey(row)}(标题辅助调用): 第一档 ${first} 声明 reasoningEffort=${declared.reasoningEffort},标题请求体 reasoning_effort=${String(title.reasoning_effort)}`)
-  const wireThinking = (title.thinking as { type?: unknown } | undefined)?.type
-  if (declared.thinkingType !== undefined && wireThinking !== declared.thinkingType)
-    failures.push(`${rowKey(row)}(标题辅助调用): 第一档 ${first} 声明 thinking.type=${declared.thinkingType},标题请求体 thinking.type=${String(wireThinking)}`)
-  return failures
+  const tier = row.model.variants[0] === undefined ? "无档" : `第一档 ${row.model.variants[0]}`
+  return shape(title) === shape(first) ? [] : [`${labelOf(row, variant)}(标题辅助调用): 应同${tier} ${shape(first)},标题请求 ${shape(title)}`]
 }
 
 async function pool<T, R>(items: T[], size: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -291,6 +291,15 @@ async function pool<T, R>(items: T[], size: number, fn: (item: T) => Promise<R>)
 async function matrix(target: Machine, rows: ModelPickerRow[]) {
   const jobs = rows.flatMap((row) => [{ row, variant: undefined as string | undefined }, ...row.model.variants.map((variant) => ({ row, variant }))])
   const results = await pool(jobs, 4, async (job) => ({ ...job, sent: await target.send(job.row, job.variant) }))
+  // 标题的期望:没有档位 ⇒ 空体;否则第一档那一格的主请求体。第一档那一格被引擎拒绝 ⇒ 判据已经点名,这一行的标题不再判。
+  const titleExpectation = (row: ModelPickerRow): { body?: Body; void?: string } => {
+    const first = row.model.variants[0]
+    if (first === undefined) return { body: {} }
+    const cell = results.find((result) => result.row === row && result.variant === first)?.sent
+    if (!cell) return { void: "第一档那一格不在本次矩阵里" }
+    if (cell.error) return {}
+    return cell.main ? { body: cell.main } : { void: "第一档那一格没捕到主请求" }
+  }
   const failures: string[] = []
   const harness: string[] = []
   const verdicts: string[] = []
@@ -303,7 +312,10 @@ async function matrix(target: Machine, rows: ModelPickerRow[]) {
       verdicts.push(
         `${label} badge=${row.reasoning} chip=[${row.model.variants.join("|")}] main=${JSON.stringify(reasoningControls(sent.main))} thinking=${JSON.stringify(sent.main.thinking ?? null)} title=${JSON.stringify(reasoningControls(sent.title))} title.thinking=${JSON.stringify(sent.title.thinking ?? null)}`,
       )
-      failures.push(...judge(target.userData, row, variant, sent), ...judgeTitle(row, variant, sent.main, sent.title))
+      failures.push(...judge(target.userData, row, variant, sent))
+      const expected = titleExpectation(row)
+      if (expected.void) harness.push(`${label}: ${expected.void} —— 标题判据作废`)
+      else if (expected.body) failures.push(...judgeTitle(row, variant, sent.title, expected.body))
     }
   }
   return { failures, harness, verdicts, cells: jobs.length }
@@ -322,7 +334,7 @@ describe("REQ-153 #1266/#1267:手段自证(嵌入式 OpenCode 2 · 本机桩)", 
     expect(captured.find((entry) => entry.path.startsWith("/p/__probe__/"))?.body.probe).toBe("KNOWN-GOOD")
   })
 
-  test("手段自证:注入丢了推理转发 ⇒ 矩阵判据逐档点名红(整张档位表不进引擎 / 档位在、内容丢了)", async () => {
+  test("手段自证:注入丢了推理转发 ⇒ 判据逐档点名红(整张档位表不进引擎 / 档位在、内容丢了)", async () => {
     const dropped = await machine("badge-dropped", (model) => {
       // 形状一:模型的 variants 与 capabilities.reasoning 都没写进引擎配置(engineModel 不转发)
       for (const [providerID, id] of [["codepuppy", "qwen3.7-max"], ["zhipuai-byok", "glm-4.5-air"]] as const) {
@@ -371,33 +383,54 @@ describe("REQ-153 #1266/#1267:手段自证(嵌入式 OpenCode 2 · 本机桩)", 
     expect({ badge: row.reasoning, chip: row.model.variants }).toEqual({ badge: false, chip: [] })
     const result = await matrix(forced, [row])
     expect(result.harness).toEqual([])
-    expect(result.failures).toEqual(['minimax-byok:MiniMax-M2(默认): 无徽标,默认请求却带 {"thinking":{"type":"enabled"}}(#1267)'])
+    // 模型级的请求体参数主请求与标题请求都带着 —— 两条判据各点一次名
+    expect(result.failures).toEqual([
+      'minimax-byok:MiniMax-M2(默认): 无徽标,默认请求却带 {"thinking":{"type":"enabled"}}(#1267)',
+      'minimax-byok:MiniMax-M2(默认)(标题辅助调用): 应同无档 {"controls":{},"thinking":null},标题请求 {"controls":{"thinking":{"type":"enabled"}},"thinking":{"type":"enabled"}}',
+    ])
   }, 120_000)
 
-  test("手段自证(#1237 标题调用):2.x 判据测得出错档;0.1.26 的「第一档」判据在 2.x 的标题请求体上点名红(实测差异)", async () => {
+  test("手段自证(#1237 标题调用):注入里有 `none` 那一档 ⇒ 两类参数的标题都取第一档;去掉它(2.x 原样)⇒ 标题跟着所选的档走,逐格点名红", async () => {
+    // 生产注入:选「开」时标题请求是第一档「关」—— reasoning_effort 一类与请求体 thinking 一类都成立
     const target = await real()
-    const qwen = findRow(target, "codepuppy:qwen3.7-max")
-    expect({ badge: qwen.reasoning, chip: qwen.model.variants }).toEqual({ badge: true, chip: ["关", "开"] })
-    const on = await target.send(qwen, "开")
-    const off = await target.send(qwen, "关")
-    expect({ on: on.counts, off: off.counts, errors: [on.error, off.error] }).toEqual({ on: "main=1 title=1", off: "main=1 title=1", errors: [undefined, undefined] })
-    expect([on.main!.reasoning_effort, on.title!.reasoning_effort, off.main!.reasoning_effort, off.title!.reasoning_effort]).toEqual(["medium", "medium", "none", "none"])
-    // 2.x 判据会红:把「关」那次的标题请求体交给「开」那次的主请求体对照
-    expect(judgeTitle(qwen, "开", on.main!, off.title!)).toEqual([
-      'codepuppy:qwen3.7-max@开(标题辅助调用): 主请求 {"controls":{"reasoning_effort":"medium"},"thinking":null},标题请求 {"controls":{"reasoning_effort":"none"},"thinking":null}',
-    ])
-    // 0.1.26 的规则(标题取第一档「关」)在 2.x 上不成立:选「开」时标题请求带的是 medium
-    expect(judgeFirstTier(target.userData, qwen, on.title!)).toEqual([
-      "codepuppy:qwen3.7-max(标题辅助调用): 第一档 关 声明 reasoningEffort=none,标题请求体 reasoning_effort=medium",
-    ])
-    // BYOK 直连同样:glm-4.5-air 选「开」,标题请求也是 thinking.type=enabled(0.1.26 是第一档的 disabled)
-    const air = findRow(target, "zhipuai-byok:glm-4.5-air")
-    const airOn = await target.send(air, "开")
-    expect(judgeFirstTier(target.userData, air, airOn.title!)).toEqual([
-      "zhipuai-byok:glm-4.5-air(标题辅助调用): 第一档 关 声明 thinking.type=disabled,标题请求体 thinking.type=enabled",
-    ])
+    const qwenOn = await target.send(findRow(target, "codepuppy:qwen3.7-max"), "开")
+    const airOn = await target.send(findRow(target, "zhipuai-byok:glm-4.5-air"), "开")
+    expect({ main: qwenOn.main?.reasoning_effort, title: qwenOn.title?.reasoning_effort }).toEqual({ main: "medium", title: "none" })
+    expect({ main: airOn.main?.thinking, title: airOn.title?.thinking, controls: reasoningControls(airOn.title ?? {}) }).toEqual({
+      main: { type: "enabled" },
+      title: { type: "disabled" },
+      controls: {},
+    })
+    // 反向臂:同一份注入,只去掉每个模型档位表里的 `none`
+    let removed = 0
+    const bare = await machine("badge-no-alias", (_model, all) => {
+      for (const provider of Object.values(all))
+        for (const model of Object.values(provider.models ?? {})) {
+          const kept = model.variants?.filter((variant) => variant.id !== TITLE_VARIANT_ALIAS)
+          if (!kept || kept.length === model.variants!.length) continue
+          removed++
+          model.variants = kept
+        }
+    })
+    // 生产注入里每个有档位的模型都带着它(否则这条反向臂是空对空)
+    expect(removed).toBe(bare.rows.filter((row) => row.model.variants.length > 0).length)
+    const rows = ["codepuppy:qwen3.7-max", "zhipuai-byok:glm-4.5-air", "codepuppy:claude-opus-4.8"].map((key) => findRow(bare, key))
+    const result = await matrix(bare, rows)
+    expect(result.harness).toEqual([])
+    expect(result.failures).toEqual(NO_ALIAS_FAILURES)
   }, 120_000)
 })
+
+/** 「去掉 `none`」的期望(实测,2.x 原样的标题选档):标题跟着所选的档走 —— 选第一档那一格碰巧对,其余每一格(含没选档)都点名。 */
+const NO_ALIAS_FAILURES = [
+  'codepuppy:qwen3.7-max(默认)(标题辅助调用): 应同第一档 关 {"controls":{"reasoning_effort":"none"},"thinking":null},标题请求 {"controls":{},"thinking":null}',
+  'codepuppy:qwen3.7-max@开(标题辅助调用): 应同第一档 关 {"controls":{"reasoning_effort":"none"},"thinking":null},标题请求 {"controls":{"reasoning_effort":"medium"},"thinking":null}',
+  'zhipuai-byok:glm-4.5-air(默认)(标题辅助调用): 应同第一档 关 {"controls":{},"thinking":{"type":"disabled"}},标题请求 {"controls":{},"thinking":null}',
+  'zhipuai-byok:glm-4.5-air@开(标题辅助调用): 应同第一档 关 {"controls":{},"thinking":{"type":"disabled"}},标题请求 {"controls":{"thinking":{"type":"enabled"}},"thinking":{"type":"enabled"}}',
+  'codepuppy:claude-opus-4.8(默认)(标题辅助调用): 应同第一档 低 {"controls":{"reasoning":{"effort":"low"}},"thinking":null},标题请求 {"controls":{},"thinking":null}',
+  'codepuppy:claude-opus-4.8@中(标题辅助调用): 应同第一档 低 {"controls":{"reasoning":{"effort":"low"}},"thinking":null},标题请求 {"controls":{"reasoning":{"effort":"medium"}},"thinking":null}',
+  'codepuppy:claude-opus-4.8@高(标题辅助调用): 应同第一档 低 {"controls":{"reasoning":{"effort":"low"}},"thinking":null},标题请求 {"controls":{"reasoning":{"effort":"high"}},"thinking":null}',
+]
 
 /** 「注入丢了推理转发」的期望(实测):默认那格判据只看 chip(chip 没动 ⇒ 不红)。形状一的每一档引擎拒绝(时间线上是一条
  *  provider.no-route 错误);形状二的每一档发得出去,但主请求体零推理参数。 */
@@ -418,7 +451,7 @@ const DROPPED_FAILURES = [
 ]
 
 describe("REQ-153 #1266/#1267:矩阵(嵌入式 OpenCode 2 · 本机桩 · 双向)", () => {
-  test("矩阵:有徽标 ⇒ 每一档请求带参数且值逐字对上;无徽标 ⇒ 零档且默认请求不带参数;标题调用与主请求同档(2.x 实测)", async () => {
+  test("矩阵:有徽标 ⇒ 每一档请求带参数且值逐字对上;无徽标 ⇒ 零档且默认请求不带参数;标题调用取第一档(0.1.26 规则)", async () => {
     const target = await real()
     const rows = target.rows
     // 空集会让下面所有断言空转 —— 先钉住两侧都非空、平台与直连都在
@@ -433,4 +466,23 @@ describe("REQ-153 #1266/#1267:矩阵(嵌入式 OpenCode 2 · 本机桩 · 双向
     expect(result.failures, `逐格结论:\n${result.verdicts.join("\n")}`).toEqual([])
     expect(result.verdicts.length).toBe(result.cells)
   }, 300_000)
+
+  test("矩阵 UI 侧:冻结界面拿到的 v1 provider 列表里,每个模型的档位恰好是目录的(`none` 不可见);同一份引擎清单不经适配器剥离 ⇒ 每个有档模型多出 `none`", async () => {
+    const target = await real()
+    const { v1, providers, models } = await target.lists()
+    const tiered = target.rows.filter((row) => row.model.variants.length > 0)
+    expect(tiered.length).toBeGreaterThan(0)
+    // 引擎自己的清单里确实有这一档(否则下面是空对空)
+    expect(tiered.map((row) => ({ key: rowKey(row), engine: models.find((model) => model.providerID === row.model.providerID && model.id === row.model.id)?.variants.map((variant) => variant.id) }))).toEqual(
+      tiered.map((row) => ({ key: rowKey(row), engine: [...row.model.variants, TITLE_VARIANT_ALIAS] })),
+    )
+    // 生产适配器(GET /provider → toV1ProviderList)给冻结界面的:每一行的档位 == 目录的 chip(含无档行)
+    const shown = (row: ModelPickerRow) => Object.keys(v1.all.find((provider) => provider.id === row.model.providerID)?.models[row.model.id]?.variants ?? {})
+    expect(target.rows.map((row) => ({ key: rowKey(row), variants: shown(row) }))).toEqual(target.rows.map((row) => ({ key: rowKey(row), variants: row.model.variants })))
+    // 已知的坏:同一份引擎清单直接交冻结 app 的归一函数(适配器不剥)⇒ 每个有档模型多出 `none`
+    const raw = normalizeProviderList(providers as never, models as never)
+    expect(tiered.map((row) => ({ key: rowKey(row), variants: Object.keys(raw.all.get(row.model.providerID)?.models[row.model.id]?.variants ?? {}) }))).toEqual(
+      tiered.map((row) => ({ key: rowKey(row), variants: [...row.model.variants, TITLE_VARIANT_ALIAS] })),
+    )
+  }, 120_000)
 })

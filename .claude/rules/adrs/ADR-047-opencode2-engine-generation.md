@@ -188,7 +188,7 @@ OpenCode 共用服务、库与凭证。
 判官 `packages/ext/src/policy/authority-registry.test.ts`:49 条旧接管每条都要映射到一项决定;已握住的项必须有机制文件与会在拿掉机制时变红的测试;
 未握住的项(blocked)让判官红,直到编排器裁决;删掉任何一项而没有带 owner 原话与日期的 `retired` 记录同样红。下表是登记册的摘要,以登记册为准。
 
-已握住 53 项:
+已握住 54 项:
 
 | 登记 id | 决定 | 2.x 上的握法(阶梯) | 证明它的测试 |
 | --- | --- | --- | --- |
@@ -239,6 +239,7 @@ OpenCode 共用服务、库与凭证。
 | `adr041-history-display-conversion` | Display snapshots persisted on v1 tool parts stay attached to those calls after the move to OpenCode 2 (ADR-041 §4: never overwritten, never inferred). | `packages/ui-mac/engine/v1-migration-transform.ts`(build-time rewrite of v1-migration.bun.ts, takeover-equivalent) | `engine-v1-history-display.test.ts`「真引擎 + 夹具库:套了改写 ⇒ 快照在 state.metadata.codepuppyDisplay(engine-v1-history-display.cases.ts,1 条)」; `engine-v1-history-display.test.ts`「反向臂:上游转换器原样 ⇒ 同一份夹具的快照全丢(同一文件,CODEPUPPY_TEST_V1_DISPLAY_TRANSFORM=off)」 等 |
 | `adr035-websearch` | Web search fails honestly (E7) and the cloud leg exists only when the account signal says so; the sovereignty gate covers every executable copy (ADR-035 / ADR-046). | `packages/ext/src/cloud-websearch-kill.ts`(L0 (execute.before + websearch.transform)) | `plugin-host.test.ts`「权威 · 联网搜索准入(L5r):kill-switch 下 2.x 内置 websearch 与第三方 web search MCP 在 execute.before 被拒;反向臂:不装 ext ⇒ 放行」; `plugin-host.test.ts`「联网搜索:不在 kill-switch(代付 / 登出)⇒ 内置 websearch 照常放行(ADR-046 D1)」 等 |
 | `l1r-platform-credential-header` | The platform credential header is added only to platform-provider requests (P6 / S5). | `packages/ext/src/platform-credential-header.ts`(L0) | `plugin-host.test.ts`「P6 / S5:平台凭据头只对平台节点、每次现读;别的节点不带;反向臂:不装 ext ⇒ 不带」 |
+| `cloud-connector-credential-per-request` | The governed cloud connector reads its credential file on every request; a hot same-identity renewal is used by the next request, a missing file fails with auth without sending (#1562). | `packages/core/src/mcp/client.ts`(L3:远端连接的 fetch 对治理条目经 `governedCredentialFetch`,`codepuppy(#1562)` 标注块) | `cloud-credential-hot.engine.test.ts`「云连接器:令牌 A ⇒ A、热应用 B 后重连 ⇒ B、删文件 ⇒ 认证失败零请求(cloud-credential-hot.engine.cases.ts,3 条)」 |
 | `l1r-output-caps` | Platform and BYOK output caps are applied by Code Puppy (P5): a platform-proxy request sends no max output tokens (the gateway fills the route cap); a direct BYOK request is raised to that model's measured cap; any other request keeps upstream's value. | `packages/ext/src/platform-output-cap.ts`(L0) | `plugin-host.test.ts`「P5:平台代理节点 ⇒ 不发 maxTokens(网关按 route 上限填);别的节点 ⇒ 原样;反向臂:不装 ext ⇒ maxTokens 留着」; `plugin-host.test.ts`「P5:直连 BYOK 节点按逐模型实读上限抬(同一 provider 的两个模型各拿各的数);无读数 / 端点不符 / 目录里查不到 ⇒ 原样;未登录(无 CODEPUPPY_BASE_URL)谁都不置空」 |
 | `l1r-naming-resume` | Session naming resumes per Code Puppy's rules (codepuppy-naming-resume). | `packages/ui-mac/src/main/naming-migration-db.ts`(main: rename before the engine converts v1) | `naming-before-v1-conversion.test.ts`「#1569 会话库改名先于 v1 → 2.x 转换:生产顺序 ⇒ 新名;转换先跑 ⇒ 旧名留在 2.x(naming-before-v1-conversion.cases.ts,2 条)」 |
 | `l1r-telemetry-credential` | Telemetry never carries the credential (codepuppy-telemetry-credential). | `packages/ui-mac/src/main/sidecar-env.ts`(main: sidecar env allow-list has no OTEL_*) | `sidecar-env-otel.test.ts`「原样:sidecar 环境白名单挡住整套 OTLP 变量(sidecar-env-otel.cases.ts,1 条)」; `sidecar-env-otel.test.ts`「反向臂:把 OTEL_ 加进前缀白名单 ⇒ 同一条断言变红」 |

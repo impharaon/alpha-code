@@ -973,6 +973,27 @@
       ]
     },
     {
+      "id": "cloud-connector-credential-per-request",
+      "decision": "Code Puppy's governed cloud connector reads its credential file on every request, so a same-identity renewal applied hot (no engine restart) is used by the next request, and a missing file fails with an auth error without sending (#1562).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "#1662 parity",
+      "takeovers": [
+        "packages/opencode/src/mcp/index.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/mcp/client.ts",
+        "ladder": "L3 (re-taken: the remote connection's fetch goes through the plugin package's governedCredentialFetch for the governed entry, codepuppy(#1562) block)"
+      },
+      "tests": [
+        {
+          "file": "packages/ui-mac/src/main/cloud-credential-hot.engine.test.ts",
+          "name": "云连接器:令牌 A ⇒ A、热应用 B 后重连 ⇒ B、删文件 ⇒ 认证失败零请求(cloud-credential-hot.engine.cases.ts,3 条)"
+        }
+      ]
+    },
+    {
       "id": "l1r-output-caps",
       "decision": "Platform and BYOK output caps are applied by Code Puppy (P5): a platform-proxy request sends no max output tokens (the gateway fills the route cap); a direct BYOK request is raised to that model's measured cap; any other request keeps upstream's value.",
       "adr": [

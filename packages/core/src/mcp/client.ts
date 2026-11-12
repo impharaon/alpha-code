@@ -1,5 +1,6 @@
 export * as McpClient from "./client.js"
 
+import { readFile } from "node:fs/promises" // codepuppy(#1562)
 import { pathToFileURL } from "node:url"
 import {
   Client,
@@ -33,6 +34,7 @@ import { isRecord } from "@opencode/util/record"
 import { McpStdio } from "./stdio.js"
 import { classifyStartFailure } from "./codepuppy-startup.js" // codepuppy(#1563)
 import { isCodepuppyFailureCode } from "@opencode/schema/codepuppy-net-failure" // codepuppy(#1564)
+import { governedCredentialFetch, isGovernedMcpEntry } from "@opencode/plugin/alpha-cloud-authority" // codepuppy(#1562)
 
 const DEFAULT_STARTUP_TIMEOUT = 30_000
 const DEFAULT_CATALOG_TIMEOUT = 30_000
@@ -366,7 +368,13 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
       return yield* initialize(transport)
     }
     const { McpOAuth } = yield* Effect.promise(() => import("./oauth.js"))
-    const fetch = yield* McpOAuth.loggedFetch({ server, directory: options.directory })
+    const logged = yield* McpOAuth.loggedFetch({ server, directory: options.directory })
+    // codepuppy(#1562) ── Code Puppy's governed cloud connector reads its credential file on every request (v1
+    // mcp/index.ts did the same): the literal the config loader substituted is the old token after a hot renewal.
+    const fetch = isGovernedMcpEntry(server, config, process.env)
+      ? governedCredentialFetch(process.env, (file) => readFile(file, "utf8"), (input, init) => logged(input, init))
+      : logged
+    // codepuppy ── end
     // Servers that bundle their own Code Mode (Cloudflare and others) expose raw tools when asked
     // with ?codemode=false, which is what our Code Mode wants. The configured URL stays the OAuth identity.
     const url = new URL(config.url)

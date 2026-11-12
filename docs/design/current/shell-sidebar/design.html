@@ -11,7 +11,7 @@
 <div class="topbar">
   <div class="brand"><span style="display:inline-grid;place-items:center;width:22px;height:22px;border-radius:7px;background:var(--a-accent-solid);color:#fff;font-weight:800;font-size:13px">α</span> alpha-code · 应用外壳设计稿</div>
   <div class="spacer"></div>
-  <nav><a href="#sidebar">左侧栏</a><a href="#hub">定制中心</a><a href="#hubmodal">添加弹框</a><a href="#settings">设置页</a><a href="#primitives">原语</a><a href="#onboarding">引导</a></nav>
+  <nav><a href="#sidebar">左侧栏</a><a href="#problems">未恢复问题</a><a href="#hub">定制中心</a><a href="#hubmodal">添加弹框</a><a href="#settings">设置页</a><a href="#primitives">原语</a><a href="#toast-lifetime">提示去留</a><a href="#onboarding">引导</a></nav>
   <div class="seg" id="themeSeg"><button data-theme="light" class="on">浅色</button><button data-theme="dark">深色</button></div>
 </div>
 
@@ -82,6 +82,16 @@
         <div class="note warn"><b>项目菜单 bug</b>(实勘发现):现「归档」与「删除」<strong>都调 archiveProject</strong> —— 删除是死的。修:归档 = 客户端隐藏(localStorage);opencode 无项目删除 API → 把「删除」改为「移除」(仅隐藏)并对齐文案,或灰掉。</div>
       </div>
     </div>
+  </section>
+
+  <!-- ========== A2 UNRESOLVED-PROBLEMS ENTRY ========== -->
+  <section class="sec" id="problems">
+    <div class="sec-head">
+      <div class="sec-kicker">A2 · 左侧栏 · 未恢复问题</div>
+      <h2>未恢复的问题 —— 侧栏底部一行,点开看原因和操作</h2>
+      <p class="lede">位置在账户按钮上方,与「更新已就绪」同一行位、同一尺寸;弹层外观同账户弹层;侧栏收起时由「显示侧边栏」按钮上的小点提示。去留规则见 <a href="#toast-lifetime">D2 · 弹出提示的去留</a>。增量稿 <a href="../../2026-11-12-error-message-lifetime/frame.html">2026-11-12-error-message-lifetime</a>,owner 2026-11-12 批准。帧内样式直接引用正式代码 CSS(与本页旧稿样式不同),所以装在子帧里。</p>
+    </div>
+    <iframe class="ux-if" data-ux src="frames/problems.html" title="未恢复问题入口"></iframe>
   </section>
 
   <!-- ========== B EXTENSION HUB ========== -->
@@ -259,6 +269,16 @@
     </div>
   </section>
 
+  <!-- ========== D2 TOAST LIFETIME ========== -->
+  <section class="sec" id="toast-lifetime">
+    <div class="sec-head">
+      <div class="sec-kicker">D2 · 弹出提示的去留</div>
+      <h2>弹出提示跟着问题走 —— 后台故障 8 秒收起,操作失败留着,启动 10 秒不弹</h2>
+      <p class="lede">提示外观、位置、堆叠不变,只改去留。没恢复的问题收进 <a href="#problems">A2 · 未恢复问题</a>。增量稿 <a href="../../2026-11-12-error-message-lifetime/frame.html">2026-11-12-error-message-lifetime</a>,owner 2026-11-12 批准。</p>
+    </div>
+    <iframe class="ux-if" data-ux src="frames/toast-lifetime.html" title="弹出提示的去留"></iframe>
+  </section>
+
   <!-- ========== E ONBOARDING ========== -->
   <section class="sec" id="onboarding">
     <div class="sec-head">
@@ -294,6 +314,15 @@ document.querySelectorAll('.set-nav-item').forEach(t=>t.onclick=()=>{document.qu
 document.querySelectorAll('.sw').forEach(s=>s.onclick=()=>s.classList.toggle('on'));
 /* sidebar selection demo */
 document.querySelectorAll('.sb-sess').forEach(s=>s.onclick=()=>{const sc=s.closest('.sb-scroll');if(sc)sc.querySelectorAll('.sb-sess').forEach(x=>x.classList.remove('sel'));s.classList.add('sel');});
+/* A2 / D2 子帧(样式来自正式代码,与本页旧稿样式冲突,所以分开装):主题跟随本页,高度由子帧回报 */
+(function(){
+  var frames=[].slice.call(document.querySelectorAll('iframe[data-ux]'));
+  function theme(){return document.documentElement.getAttribute('data-theme')==='dark'?'dark':'light';}
+  function post(){frames.forEach(function(f){if(f.contentWindow)f.contentWindow.postMessage({uxTheme:theme()},'*');});}
+  frames.forEach(function(f){f.addEventListener('load',post);});
+  document.querySelectorAll('#themeSeg button').forEach(function(b){b.addEventListener('click',post);});
+  addEventListener('message',function(e){var d=e.data;if(!d||!d.uxFrame)return;frames.forEach(function(f){if(f.contentWindow===e.source)f.style.height=d.h+'px';});});
+})();
 </script>
 </body>
 </html>

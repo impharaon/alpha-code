@@ -1,6 +1,15 @@
-import { createSignal, For, type JSX } from "solid-js"
+import { createSignal, For, untrack, type JSX } from "solid-js"
 import { Portal } from "solid-js/web"
 import { t } from "../i18n"
+import {
+  backgroundProblem,
+  forgetProblem,
+  heldProblems,
+  leavePageProblems,
+  putProblem,
+  setBackgroundProblem,
+  type ProblemAction,
+} from "./problems"
 import "./toast.css"
 
 /**
@@ -17,6 +26,9 @@ import "./toast.css"
  * - 后台状态类问题(`reportProblem`)显示 8 秒后收起,悬停/聚焦同样暂停;× 与到时都是「收起」,
  *   问题没恢复就仍记为未恢复,同因再报不再弹出;`resolveProblem` = 恢复,提示立即消失(BR-01/02)。
  * - 同一键同一时间只显示一条:再次推送只原地更新文字,不新增、不重新计时(BR-03)。
+ * - 收起而未恢复的后台问题进入「未恢复问题」入口(`problems.ts`),已收起的同因再报只更新那一条。
+ * - 启动静默(BR-04,`beginStartupQuiet` 由 index.tsx 在启动时调用一次):窗口内后台问题只暂存不弹,
+ *   窗口结束仍未恢复的才弹;窗口内的报错与常驻提示(需要用户处理)不弹,直接进入口;确认类照常。
  */
 export type ToastKind = "info" | "success" | "error"
 /** `persistent` = 这条不自己消失,只能由用户关掉(或离开页面)。它**不是**独立开关:与
@@ -36,12 +48,16 @@ export type ToastItem = {
 export const TOAST_DEFAULT_MS = 4000
 /** 后台状态类问题的提示停留时长(BR-02)。 */
 export const TOAST_BACKGROUND_MS = 8000
+/** 启动静默窗口(BR-04;可回退的默认值)。 */
+export const STARTUP_QUIET_MS = 10_000
 
 const [items, setItems] = createSignal<ToastItem[]>([])
 let seq = 0
+/** 存取函数里读当前列表不订阅:来源常在 effect 里调用 reportProblem / resolveProblem,读列表若被跟踪,
+ *  那个 effect 会随每次提示变化重跑。 */
+const current = () => untrack(items)
 
-/** 未恢复的后台问题(键 → 提示是否已收起)。收起的同因再报不弹出(BR-03)。 */
-const problems = new Map<string, { folded: boolean }>()
+let quiet = false
 
 type Timer = { remaining: number; startedAt: number; handle: ReturnType<typeof setTimeout> | undefined }
 const timers = new Map<number, Timer>()
@@ -55,7 +71,7 @@ function arm(id: number) {
 
 /** 同键已在显示 ⇒ 只更新文字(不新增、不重新计时);否则新增一条,非常驻的装定时器。 */
 function show(next: Omit<ToastItem, "id">, ms: number): number {
-  const shown = items().find((x) => x.key === next.key)
+  const shown = current().find((x) => x.key === next.key)
   if (shown) {
     setItems((xs) => xs.map((x) => (x.id === shown.id ? { ...x, title: next.title, detail: next.detail } : x)))
     return shown.id
@@ -80,11 +96,22 @@ function remove(id: number) {
  * 用户操作的结果与确认。是否常驻只由一个值决定:`error` 一律常驻;其余 `duration <= 0` 常驻,否则按
  * `duration`(缺省 4 秒)自走。同一种类、同一文字的通知同一时间只有一条。
  */
-export function pushToast(t: { kind?: ToastKind; title: string; detail?: string; duration?: number }): number {
+export function pushToast(t: {
+  kind?: ToastKind
+  title: string
+  detail?: string
+  duration?: number
+  /** 静默窗口内进入口时,条目上的操作(该问题现有的处理入口)。提示本身不显示它。 */
+  action?: ProblemAction
+}): number {
   const kind = t.kind ?? "info"
   const ms = t.duration ?? TOAST_DEFAULT_MS
   const persistent = kind === "error" || ms <= 0
   const key = `toast\0${kind}\0${t.title}\0${t.detail ?? ""}`
+  if (quiet && persistent) {
+    putProblem({ key, title: t.title, detail: t.detail, action: t.action, attention: true })
+    return 0
+  }
   return show({ key, kind, title: t.title, detail: t.detail, persistent, background: false }, ms)
 }
 
@@ -92,21 +119,48 @@ export function pushToast(t: { kind?: ToastKind; title: string; detail?: string;
  * 后台状态引起的问题(来源 + 原因 = `key`)。第一次报告弹出 8 秒;正在显示时再报只更新文字;
  * 提示已收起而问题未恢复时再报不弹出。
  */
-export function reportProblem(p: { key: string; kind?: ToastKind; title: string; detail?: string }): void {
-  const known = problems.get(p.key)
-  if (known?.folded) return
-  if (!known) problems.set(p.key, { folded: false })
-  show(
-    { key: p.key, kind: p.kind ?? "error", title: p.title, detail: p.detail, persistent: false, background: true },
-    TOAST_BACKGROUND_MS,
-  )
+export function reportProblem(p: {
+  key: string
+  kind?: ToastKind
+  title: string
+  detail?: string
+  /** 入口条目上的操作(该问题现有的处理入口,如「重试」)。 */
+  action?: ProblemAction
+}): void {
+  const text = { title: p.title, detail: p.detail, action: p.action }
+  const kind = p.kind ?? "error"
+  const known = backgroundProblem(p.key)
+  if (known?.phase === "folded") {
+    setBackgroundProblem(p.key, { ...known, text })
+    putProblem({ key: p.key, ...text, attention: false })
+    return
+  }
+  setBackgroundProblem(p.key, { phase: quiet && known?.phase !== "shown" ? "held" : "shown", kind, text })
+  if (quiet && known?.phase !== "shown") return
+  showBackground(p.key, kind, text)
 }
 
-/** 问题恢复:正在显示的提示立即消失,不再记为未恢复。 */
+function showBackground(key: string, kind: ToastKind, text: { title: string; detail?: string }) {
+  show({ key, kind, title: text.title, detail: text.detail, persistent: false, background: true }, TOAST_BACKGROUND_MS)
+}
+
+/** 问题恢复:正在显示的提示立即消失,入口里的那条随之移除。 */
 export function resolveProblem(key: string): void {
-  problems.delete(key)
-  const shown = items().find((x) => x.background && x.key === key)
+  forgetProblem(key)
+  const shown = current().find((x) => x.background && x.key === key)
   if (shown) remove(shown.id)
+}
+
+/** 启动静默窗口开始(index.tsx 启动时调用一次)。窗口结束时仍未恢复的暂存问题各弹一条。 */
+export function beginStartupQuiet(): void {
+  quiet = true
+  setTimeout(() => {
+    quiet = false
+    for (const [key, held] of heldProblems()) {
+      setBackgroundProblem(key, { ...held, phase: "shown" })
+      showBackground(key, held.kind, held.text)
+    }
+  }, STARTUP_QUIET_MS)
 }
 
 /** 暂停自动消失(悬停 / 焦点进入)。常驻通知没有定时器,调用是空操作。 */
@@ -123,17 +177,21 @@ export function resumeToast(id: number): void {
   arm(id)
 }
 
-/** 关闭一条(× 或到时)。后台问题的提示关闭 = 收起:问题没恢复就仍记为未恢复。 */
+/** 关闭一条(× 或到时)。后台问题的提示关闭 = 收起:问题没恢复就进入「未恢复问题」入口。 */
 export function dismissToast(id: number): void {
-  const item = items().find((x) => x.id === id)
+  const item = current().find((x) => x.id === id)
   remove(id)
-  const problem = item?.background ? problems.get(item.key) : undefined
-  if (problem) problem.folded = true
+  const problem = item?.background ? backgroundProblem(item.key) : undefined
+  if (!item || !problem) return
+  setBackgroundProblem(item.key, { ...problem, phase: "folded" })
+  putProblem({ key: item.key, ...problem.text, attention: false })
 }
 
-/** 离开当前页面:用户操作类的常驻提示随之关闭(BR-05)。后台问题与自走的确认不受影响。 */
+/** 离开当前页面:用户操作类的常驻提示随之关闭(BR-05),入口里没有操作可做的需要用户处理项同样离开。
+ *  后台问题与自走的确认不受影响。 */
 export function dismissPageToasts(): void {
-  for (const item of items()) if (item.persistent && !item.background) remove(item.id)
+  for (const item of current()) if (item.persistent && !item.background) remove(item.id)
+  leavePageProblems()
 }
 
 export function ToastViewport(): JSX.Element {

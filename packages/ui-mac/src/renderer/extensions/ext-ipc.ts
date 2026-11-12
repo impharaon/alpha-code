@@ -40,9 +40,18 @@ import { extensionWarning } from "./ext-presentation"
 import type { ElectronAPI } from "../../preload/types"
 import { pushToast } from "../codepuppy-ui/Toast"
 import { warningPresentingExt } from "./ext-ipc-warning"
+import { setExtHubOpen } from "./ext-hub-state"
+import { t } from "../i18n"
 
 export const extIpc: ElectronAPI["ext"] = warningPresentingExt<ElectronAPI["ext"]>(
   () => window.api.ext,
   // `duration: 0` = 不装拆除定时器,只能由用户按 × 关掉(见 Toast.tsx)。
-  (warning) => pushToast({ kind: "info", title: extensionWarning(warning), duration: 0 }),
+  (warning) =>
+    pushToast({
+      kind: "info",
+      title: extensionWarning(warning),
+      duration: 0,
+      // `#1687`:启动静默窗口内进「未恢复问题」入口时,「查看」打开定制中心(已安装一组在每页顶部)。
+      action: { label: t("codepuppy.problems.view"), run: () => setExtHubOpen(true) },
+    }),
 )

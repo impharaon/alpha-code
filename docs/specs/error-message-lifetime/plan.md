@@ -75,7 +75,7 @@ last_reviewed: 2026-11-12
 ## 段二:未恢复问题入口与启动静默
 
 - 依据:见上;覆盖 AC-01(入口侧)、AC-02、AC-04(入口侧)、AC-05、AC-06、AC-08、AC-09、AC-10(入口侧)、AC-11(入口侧),BR-02、BR-04;界面对照 `#problems`、`#toast-lifetime`。
-- 核对:`ebfcf0ae32` · 编排器 · 段二暂缓,等段一交回后另行放行;R4(工具服务连接观察件,AC-01/05/06)待 owner 裁决,裁决前不建 `background-problem-watcher.tsx`。
+- 核对:`ebfcf0ae32` · 编排器 · 段一交回(`867aab286b`)后放行段二,工具服务连接来源除外:R4 待 owner 裁决,裁决前不建 `background-problem-watcher.tsx`、启动期不读 MCP 状态;仓与入口要让以后的连接器来源经同一公开入口两种接法(只进入口 / 先提示后入口)都能接上而不改它们;AC-05/06 的启动行为用「窗口内失败、随后恢复 / 一直失败」的测试来源证明。
 
 ### 改动
 
@@ -126,4 +126,13 @@ last_reviewed: 2026-11-12
 
 ### 偏离记录
 
-暂无。
+- 2026-11-12 · 观察件只做平台模型目录一项,文件为 `codepuppy-ui/catalog-problem-watcher.tsx`(R6);工具服务连接那一半与 `background-problem-watcher.tsx` 按 R4 暂缓。以后接连接器:先提示后入口 = `reportProblem` / `resolveProblem`(Toast.tsx);只进入口 = `putProblem({ attention: false })`(problems.ts)+ `resolveProblem`。两种接法都有用例(`problems-entry.test.ts`),仓与入口不用改。
+- 2026-11-12 · `problems.ts` 放两份记录:后台问题的去留阶段(暂存 / 显示中 / 已收起)与入口列表;公开入口仍是 Toast.tsx 的 `reportProblem` / `resolveProblem`(problems.ts 不反向依赖 Toast,无循环引用)。`pushToast` / `reportProblem` 多一个可选 `action`(条目上的操作,提示本身不显示)。
+- 2026-11-12 · 静默窗口由 `index.tsx` 模块顶层 `beginStartupQuiet()` 在 renderer 启动时开始;测试里显式调用(否则每个用例都落在窗口内)。
+- 2026-11-12 · BR-05 的读法补一条:静默窗口内进入口、**没有可做操作**的需要用户处理项(如头 10 秒内的「删除失败」)随离开当前页面离开入口,与它本该显示的提示同一去留;有操作的按 R2 做了操作才离开。后台问题不受换页影响。
+- 2026-11-12 · 操作的去处:信任/导入那三类提示的「查看」打开定制中心对应分区(连接器 / 技能);扩展警告的「查看」打开定制中心;目录的「重试」= `retryCatalogRefresh`。
+- 2026-11-12 · Toast.tsx 内部读提示列表改为不订阅(`untrack`):来源在 effect 里调 `reportProblem` 时,被跟踪的读会让那个 effect 随提示变化重跑并吞掉之后的恢复信号(目录用例实测红过)。
+- 2026-11-12 · 测试落点:入口与静默的用例在 `codepuppy-ui/problems-entry.test.ts`(与段一共用 `toast-lifetime-test-runtime.tsx`,不另建 `sidebar/` 下的运行时);生产侧栏里的挂载位置与收起态小点加在已有的真实侧栏组合体 `test-component/overlay-close.cases.ts`(2 条,`overlay-close.test.ts` 的条数下界 16 → 18)。
+- 2026-11-12 · 设计文档带入范围:除 `frames/error-lifetime.css`、`components.md` 外,一并带入 `frames/*.html`、`frames/error-lifetime.js`、`design.html` 的两节锚与增量稿目录 —— `components.md` 的相对链接与「锚」列指向它们,只带两个文件会断链。
+- 2026-11-12 · 英文入口文案用「Unresolved problems: N」避免单复数;中文照帧。
+- 2026-11-12 · 帧对照用无头 Chrome 渲染:帧页(spec 分支原样)与实现页(同一帧外框,入口与弹层换成真组件在测试运行时里产出的 DOM,样式来自本分支 `sidebar.css`,帧 CSS 已不含这些规则)并排,明暗各一,目视一致;截图在临时目录,不入仓。

@@ -15,6 +15,16 @@ import type { ServerInfo } from "../sidebar/use-projects"
 import { pushToast } from "./Toast"
 import { t } from "../i18n"
 import { extIpc } from "../extensions/ext-ipc"
+import { setExtHubOpen, setHubSection, type HubSection } from "../extensions/ext-hub-state"
+
+/** `#1687`:启动静默窗口内这些提示直接进「未恢复问题」入口,条目上的「查看」打开它所在的定制中心分区。 */
+const viewIn = (section: HubSection) => ({
+  label: t("codepuppy.problems.view"),
+  run: () => {
+    setHubSection(section)
+    setExtHubOpen(true)
+  },
+})
 
 function routeDirectory(pathname: string): string | null {
   // 只认带 id 的会话路由(旧正则要求 "/session/" 后有内容;/:dir/session 无 id 的 draft 页不触发)。
@@ -35,7 +45,7 @@ export function ExtTrustWatcher(props: { server: Accessor<ServerInfo | undefined
       try {
         const r = await extIpc.trustCheck(dir)
         if (r.persistError) {
-          pushToast({ kind: "error", title: t("codepuppy.ext.trustPersistFailed"), detail: t("codepuppy.ext.trustPersistDetail") })
+          pushToast({ kind: "error", title: t("codepuppy.ext.trustPersistFailed"), detail: t("codepuppy.ext.trustPersistDetail"), action: viewIn("connectors") })
           checked.delete(dir) // 未留痕 = 未决,允许本会话稍后重试
           return
         }
@@ -47,7 +57,8 @@ export function ExtTrustWatcher(props: { server: Accessor<ServerInfo | undefined
         // REQ-063:外部生态导入门(.claude/.agents skills + CLAUDE.md)——信任门之后串行,
         // 避免两个原生对话框叠弹;导入成功同走 dispose 免重启链。
         const ext = await extIpc.externalCheck(dir)
-        if (ext.persistError) pushToast({ kind: "error", title: t("codepuppy.ext.trustPersistFailed"), detail: t("codepuppy.ext.trustPersistDetail") })
+        if (ext.persistError)
+          pushToast({ kind: "error", title: t("codepuppy.ext.trustPersistFailed"), detail: t("codepuppy.ext.trustPersistDetail"), action: viewIn("skills") })
         if (ext.prompted && ext.imported) {
           await extIpc.reloadRequest({ scope: "global", reason: "external skills imported" }).catch(() => null)
           pushToast({
@@ -55,8 +66,15 @@ export function ExtTrustWatcher(props: { server: Accessor<ServerInfo | undefined
             title: t("codepuppy.ext.externalImported"),
             detail: ext.importedSkills.length ? ext.importedSkills.map((s) => `/${s}`).join(" · ") : undefined,
           })
-          if (ext.claudeMd === "agents-md-exists") pushToast({ kind: "error", title: t("codepuppy.ext.externalClaudeMdConflict") })
-          for (const s of ext.skipped) pushToast({ kind: "error", title: t("codepuppy.ext.externalSkipped"), detail: t("codepuppy.ext.externalSkippedDetail", { name: s.name }) })
+          if (ext.claudeMd === "agents-md-exists")
+            pushToast({ kind: "error", title: t("codepuppy.ext.externalClaudeMdConflict"), action: viewIn("skills") })
+          for (const s of ext.skipped)
+            pushToast({
+              kind: "error",
+              title: t("codepuppy.ext.externalSkipped"),
+              detail: t("codepuppy.ext.externalSkippedDetail", { name: s.name }),
+              action: viewIn("skills"),
+            })
         }
       } catch {
         checked.delete(dir) // IPC 瞬时失败允许重查

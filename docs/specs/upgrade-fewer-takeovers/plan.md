@@ -241,3 +241,41 @@ last_reviewed: 2026-11-12
 ### 偏离记录
 
 暂无
+
+## 切片 E2 — MCP 层铸事实,堵上宿主直装插件借 MCP 身份
+
+- 依据:编排器裁决 2026-11-12(r2 派发:「the MCP layer mints the fact」;授权改已接管的 `packages/core/src/tool/mcp.ts` 一个标注块、
+  `identity.ts` 与测试、登记册 note、`gate-files.tsv`,必要时 `packages/schema/src/codepuppy-tool-policy.ts` 加字段);owner 原话「不可以因为 opencode
+  更新把经 codepuppy 拿回的唯一权威再封掉」。S/M,在授权内,计划与实现同一提交。
+- 核对:授权内直接实施(派发写明无需单独核对)。
+- 前提先证:新测试在改动前的码上跑,宿主直装插件的 `codepuppy-cloud_borrowed` 拿到 `mcp:codepuppy-cloud:borrowed` 与 `codepuppy-cloud` authority(真 MCP 层登记的服务器工具同时正确)—— 前提成立。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/core/src/tool/codepuppy-mcp-tool-mint.ts`(新,Code Puppy 自有,ADR-043) | 签发:每个工具一个新的冻结对象,记下服务器与工具名;只读、不可重定义地在 `MCP_TOOL_VERIFIER` 下发布核验函数(引擎与扩展分属两个包,同进程里只有这条路);签发留在模块内 |
+| `packages/core/src/tool/mcp.ts` | 注册 MCP 工具时展开 `mcpToolMark(server, name)`(行尾 `codepuppy(ADR-041)`,另一行 import) |
+| `packages/schema/src/codepuppy-tool-policy.ts` | `MCP_TOOL_MARK`、`MCP_TOOL_VERIFIER`、`registeredByMcpLayer`(两端共用,一处定义) |
+| `packages/ext/src/policy/identity.ts` | MCP 分支先要求 `registeredByMcpLayer(tool, server, tool.name)`,不过 ⇒ plugin 身份;slice E 的清单核对保留 |
+| `packages/ext/src/policy/policy-host.cases.ts` | 宿主的 MCP 服务 `tools()` 读可填的 `mcpListing`;导出 `McpTool`(真 MCP 层)与 `mcpToolMark`;`McpTool.node` 进宿主层 |
+| `packages/ext/src/policy/register-policy.test.ts` | 新 E2 一条(真注册表);代替 MCP 层的测试插件(`mcp-runtime`、`late_action`)带上 MCP 层的标记;slice E 第二条的 `read_docx` 改由真 MCP 层登记 |
+| `packages/ext/src/policy/identity.test.ts`、`inventory.test.ts` | 手写的 MCP 条目带上标记(前提变了的机械改动,条数不变) |
+| `docs/architecture/codepuppy-authority-registry.json` | `adr041-authority-minting` 的 note 改写剩余一句、测试名同步、加 E2 |
+| `scripts/gate-files.tsv` | `register-policy.test.ts` 65 → 66 |
+
+### 风险
+
+- 抄标记:插件能从列出的工具上抄走值;值绑定服务器与工具名,抄到别的工具上核验不过(E2 的 `policy_copied`)。抄到**同一有效名**并后注册覆盖真工具,是登记册 `adr041-registration-identity` 已记的「后注册覆盖」限制,不是新缺口。
+- 改写进程全局变量的代码不走插件接口,任何进程内核验都拦不住;核验函数不可重定义,引擎模块先于任何插件装载。
+- 同一进程里若出现第二份签发模块,它签的标记核验不过 ⇒ 身份退为 plugin(失败即关闭)。
+
+### 证明
+
+| AC | 测试/证据 | 缺少行为为什么会失败 |
+| --- | --- | --- |
+| E2 | `register-policy.test.ts`「plugin tools under a cloud, a third-party and the Office server's namespace get no server identity; the servers' own tools keep theirs」:真 McpTool 登记 `codepuppy-cloud/web_search`、`policy/own_lookup`、`codepuppy-word/read_docx`,宿主直装插件注册 (a) `codepuppy-cloud_borrowed`、(b) `policy_borrowed`、(c) `codepuppy-word_write_docx`、(d) 抄标记的 `policy_copied`;一次比对全部七个 | 去掉身份核验 ⇒ (a)–(d) 全拿到服务器身份(含 `codepuppy-cloud` / `codepuppy-bundled`),红;去掉 mcp.ts 的签发 ⇒ 三台服务器自己的工具变成 plugin、not-asserted,红 |
+
+### 偏离记录
+
+暂无

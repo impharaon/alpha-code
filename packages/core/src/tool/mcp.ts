@@ -15,6 +15,7 @@ import { ToolOutput } from "../tool-output.js"
 import { ReadToolFileSystem } from "./read-filesystem.js"
 import { effectiveName, normalizedName } from "./runtime.js"
 import { sameTool } from "../mcp/codepuppy-first-party-mcp.js" // codepuppy(#1563 AC6)
+import { mcpToolMark } from "./codepuppy-mcp-tool-mint.js" // codepuppy(ADR-041)
 
 const decodeJson = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))
 
@@ -64,6 +65,7 @@ export const layer = Layer.effect(
               editor.add({
                 name: tool.name,
                 options: { namespace: namespace(tool.server), codemode: tool.codemode !== false },
+                ...mcpToolMark(tool.server, tool.name), // codepuppy(ADR-041): this layer's own mark; ext identity.ts gives an MCP identity only to marked tools
                 description: tool.description ?? "",
                 input: tool.inputSchema as JsonSchema.JsonSchema,
                 output: (tool.outputSchema ?? {}) as JsonSchema.JsonSchema,

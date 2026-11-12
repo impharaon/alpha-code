@@ -7,7 +7,7 @@ import path from "node:path"
 import { buildInventory } from "./rpc"
 import { toolFacts, type IdentityInput } from "./identity"
 import type { ToolPolicySnapshot } from "./resolver"
-import { E, isolate, it, Location, Plugin, promisePlugin, ROOT, Rpc, Tool } from "./policy-host.cases"
+import { E, isolate, it, Location, mcpToolMark, Plugin, promisePlugin, ROOT, Rpc, Tool } from "./policy-host.cases"
 import { registerPolicy } from "./index"
 import { createToolPolicyStore, defaultPolicyBaseDir } from "./resolver"
 
@@ -35,8 +35,8 @@ const snapshot = (records: unknown[] = [], over: Partial<ToolPolicySnapshot> = {
   }) as ToolPolicySnapshot
 const TOOLS = [
   toolFacts({ id: "write", name: "write" }, input()),
-  toolFacts({ id: "policy_paid_action", name: "paid_action", options: { namespace: "policy" } }, input()),
-  toolFacts({ id: "policy_free_action", name: "free_action", options: { namespace: "policy" } }, input()),
+  toolFacts({ id: "policy_paid_action", name: "paid_action", options: { namespace: "policy" }, ...mcpToolMark("policy", "paid_action") }, input()),
+  toolFacts({ id: "policy_free_action", name: "free_action", options: { namespace: "policy" }, ...mcpToolMark("policy", "free_action") }, input()),
   toolFacts({ id: "probe", name: "probe" }, input()),
 ]
 
@@ -96,7 +96,7 @@ describe("Settings inventory", () => {
     const after = buildInventory(snapshot(enabled), TOOLS, [])
     const row = after.services.find((service) => service.source === "mcp")!.tools.find((tool) => tool.canonical === "mcp:policy:paid_action")!
     expect(row.effective).toMatchObject({ state: "enabled", reason: { kind: "user", level: "tool" } })
-    const rebound = [toolFacts({ id: "policy_paid_action", name: "paid_action", options: { namespace: "policy" } }, input({ mcp: new Map([["policy", { type: "remote", url: "https://moved.example.test/policy" } as never]]) }))]
+    const rebound = [toolFacts({ id: "policy_paid_action", name: "paid_action", options: { namespace: "policy" }, ...mcpToolMark("policy", "paid_action") }, input({ mcp: new Map([["policy", { type: "remote", url: "https://moved.example.test/policy" } as never]]) }))]
     const moved = buildInventory(snapshot(enabled), rebound, []).services[0]!.tools[0]!
     expect(moved.effective).toMatchObject({ state: "ask", reason: { kind: "binding-changed", level: "tool" } })
     expect(moved.bindingDigest).not.toBe(paid.bindingDigest)

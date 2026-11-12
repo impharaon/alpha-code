@@ -7,7 +7,7 @@ import { createHash } from "node:crypto"
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
-import { E, isolate } from "./policy-host.cases"
+import { E, isolate, mcpToolMark } from "./policy-host.cases"
 import { evaluate } from "./gate"
 import {
   APP_BUILTIN_BINDING_DIGEST,
@@ -67,7 +67,7 @@ describe("upstream rules the derivation restates", () => {
 
 describe("identity derivation", () => {
   test("an MCP tool: config key as origin, remote tool name, de-secreted binding, remote location and transport", () => {
-    const facts = toolFacts({ id: "policy_paid_action", name: "paid_action", options: { namespace: "policy" } }, base())
+    const facts = toolFacts({ id: "policy_paid_action", name: "paid_action", options: { namespace: "policy" }, ...mcpToolMark("policy", "paid_action") }, base())
     expect(canonicalToolIdentity(facts.identity)).toBe("mcp:policy:paid_action")
     expect(facts.bindingDigest).toBe(canonicalJsonDigest({ kind: "mcp-remote", name: "policy", url: "https://mcp.example.test/policy" }))
     expect(facts.location).toEqual({ kind: "remote", host: "mcp.example.test" })
@@ -76,7 +76,7 @@ describe("identity derivation", () => {
   })
 
   test("a local MCP tool: local location, command transport, binding over command + cwd", () => {
-    const facts = toolFacts({ id: "files_list", name: "list", options: { namespace: "files" } }, base())
+    const facts = toolFacts({ id: "files_list", name: "list", options: { namespace: "files" }, ...mcpToolMark("files", "list") }, base())
     expect(canonicalToolIdentity(facts.identity)).toBe("mcp:files:list")
     expect(facts.location).toEqual({ kind: "local" })
     expect(facts.transport).toEqual({ kind: "mcp-local", command: ["npx", "files-server"] })
@@ -84,7 +84,7 @@ describe("identity derivation", () => {
   })
 
   test("the MCP rule wins over the early registry (a server whose tools registered before the extension is still MCP)", () => {
-    const facts = toolFacts({ id: "policy_paid_action", name: "paid_action", options: { namespace: "policy" } }, base({ early: new Set(["policy_paid_action"]) }))
+    const facts = toolFacts({ id: "policy_paid_action", name: "paid_action", options: { namespace: "policy" }, ...mcpToolMark("policy", "paid_action") }, base({ early: new Set(["policy_paid_action"]) }))
     expect(facts.identity.source).toBe("mcp")
   })
 
@@ -185,7 +185,7 @@ describe("authority minting (ADR-041 §5)", () => {
   })
 
   test("the display snapshot is the schema's ToolDisplaySnapshotV1: identity + technicalId + authority + location", () => {
-    const facts = toolFacts({ id: "files_list", name: "list", options: { namespace: "files" } }, base())
+    const facts = toolFacts({ id: "files_list", name: "list", options: { namespace: "files" }, ...mcpToolMark("files", "list") }, base())
     expect(displaySnapshot(facts)).toEqual({
       identity: { source: "mcp", origin: "files", name: "list" },
       technicalId: "files_list",

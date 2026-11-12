@@ -245,3 +245,20 @@ export const TOOL_POLICY_REQUEST_KEY = "policy"
 export function isCodePuppyPolicyRequest(metadata: unknown): boolean {
   return typeof metadata === "object" && metadata !== null && TOOL_POLICY_REQUEST_KEY in metadata
 }
+
+/**
+ * Slice E2(ADR-041;编排器裁决 2026-11-12):MCP 层铸的事实 ——「这条注册表条目是 MCP 层自己给这台服务器注册的工具」。
+ * MCP 层(packages/core/src/tool/mcp.ts,经 packages/core/src/tool/codepuppy-mcp-tool-mint.ts)给它注册的每个工具加一个
+ * `MCP_TOOL_MARK` 属性,值是它签发的对象;它在 `MCP_TOOL_VERIFIER` 下发布一个只读的核验函数,只对它签发的值、且只对签发时的
+ * 那台服务器与那个工具名答真。插件能从列出的工具上抄走这个值,签发不了新的;抄到别的工具上核验不过。
+ * 读方:packages/ext/src/policy/identity.ts(只有核验通过的工具才拿 `mcp:<server>:<tool>` 身份与服务器的 authority)。
+ */
+export const MCP_TOOL_MARK = Symbol.for("codepuppy.mcp-tool.mark")
+export const MCP_TOOL_VERIFIER = Symbol.for("codepuppy.mcp-tool.verifier")
+export type McpToolVerifier = (mark: unknown, server: string, tool: string) => boolean
+
+/** 这个注册表条目是不是 MCP 层自己给 `server` 注册的工具 `tool`(核验函数不在 ⇒ 否)。 */
+export function registeredByMcpLayer(entry: object, server: string, tool: string): boolean {
+  const verify = (globalThis as Record<symbol, unknown>)[MCP_TOOL_VERIFIER]
+  return typeof verify === "function" && (verify as McpToolVerifier)((entry as Record<symbol, unknown>)[MCP_TOOL_MARK], server, tool)
+}

@@ -21,7 +21,10 @@ import {
   it,
   Location,
   Mcp,
+  mcpListing,
   McpResourceTools,
+  McpTool,
+  mcpToolMark,
   Permission,
   Plugin,
   PluginHooks,
@@ -135,10 +138,11 @@ const setup = (options: Setup = {}) =>
         await policy?.seal()
       }),
       // McpTool registers discovered tools after plugin activation (packages/core/src/tool/mcp.ts); Code Mode by default.
+      // This plugin stands in for the MCP layer, so it carries the layer's own mark (slice E2; `E2` below runs the real one).
       promisePlugin("mcp-runtime", async (ctx: any) => {
         await ctx.tool.transform((editor: any) => {
-          editor.add(tool("paid_action", "paid", { options: { namespace: "policy", codemode: true } }))
-          editor.add(tool("free_action", "free", { options: { namespace: "policy", codemode: true } }))
+          editor.add(tool("paid_action", "paid", { options: { namespace: "policy", codemode: true }, ...mcpToolMark("policy", "paid_action") }))
+          editor.add(tool("free_action", "free", { options: { namespace: "policy", codemode: true }, ...mcpToolMark("policy", "free_action") }))
         })
       }),
       // OpenCode appends configured `permissions` to every agent from a post-activation plugin.
@@ -605,6 +609,7 @@ describe("three-state ask (I7a) — nothing runs before approval", () => {
           name: "late_action",
           description: "late_action",
           options: { namespace: "policy", codemode: false },
+          ...mcpToolMark("policy", "late_action"), // stands in for the MCP layer (slice E2)
           input: { type: "object", properties: {} },
           execute: () => E.Effect.sync(() => (late += 1, { output: "late ran" })),
         } as never),
@@ -1412,32 +1417,162 @@ describe("E: plugin tools cannot borrow an MCP identity", () => {
     ),
   )
 
-  it.live("a host-loaded plugin's tool under the Office server's namespace is a plugin tool, not asserted; the server's declared tool keeps codepuppy-bundled", () =>
+  it.live("a host-loaded plugin's tool under the Office server's namespace is a plugin tool, not asserted; the tool the MCP layer registers there keeps codepuppy-bundled", () =>
     withManifest(
+      Effect.acquireUseRelease(
+        Effect.sync(() => mcpListing.push({ server: "codepuppy-word", name: "read_docx", description: "read_docx", inputSchema: { type: "object", properties: {} }, codemode: false })),
+        () =>
+          Effect.gen(function* () {
+            const hostLoaded = promisePlugin("host-loaded", async (ctx: any) => {
+              await ctx.tool.transform((editor: any) => editor.add(probe("i06_probe", "codepuppy-word")))
+            })
+            const { session } = yield* setup({
+              mcp: { "codepuppy-word": office.server },
+              after: hostLoaded,
+              records: NEUTRAL,
+              // The tier keeps class-default asks (I9), so the bundled server's tool asks with its identity envelope.
+              rules: [ALLOW_ALL, { action: "tool-policy-default", resource: "*", effect: "ask" }],
+            })
+            yield* (yield* McpTool.Service).flush
+            const ran = yield* call(session.id, "codepuppy-word_i06_probe")
+            expect(Exit.isSuccess(ran)).toBe(true)
+            expect((ran as any).value.metadata?.codepuppyDisplay).toMatchObject({
+              identity: { source: "plugin", origin: "", name: "codepuppy-word_i06_probe" },
+              authority: { kind: "not-asserted" },
+            })
+            const permission = yield* Permission.Service
+            const fiber = yield* Effect.forkChild(callRaw(session.id, "codepuppy-word_read_docx"))
+            const [request] = yield* pending
+            expect(request?.metadata).toMatchObject({
+              identity: { source: "mcp", origin: "codepuppy-word", name: "read_docx" },
+              authority: { kind: "codepuppy-bundled", bindingId: "mcp:codepuppy-word" },
+            })
+            yield* permission.reply({ requestID: request!.id, reply: "reject" })
+            yield* E.Fiber.await(fiber)
+          }),
+        () => Effect.sync(() => void (mcpListing.length = 0)),
+      ),
+    ),
+  )
+})
+
+// Slice E2 (orchestrator ruling 2026-11-12, ADR-041): the MCP layer mints the fact. OpenCode 2's MCP layer (McpTool,
+// packages/core/src/tool/mcp.ts) registers the listed tools into the real registry and marks each as its own; a tool in an
+// MCP server's namespace without a mark that verifies — registered by a plugin the host loaded directly, outside the
+// fan-out — gets no server identity and no authority. Servers: a governed Code Puppy cloud server, a third-party server
+// and the bundled Office server (shipped manifest).
+describe("E2: only the MCP layer's own tools carry an MCP identity", () => {
+  const cloud = { type: "remote", url: "https://cloud.codepuppy.test/mcp", headers: { authorization: "{file:/tmp/token}" } }
+  const office = (() => {
+    const shipped = path.resolve(import.meta.dir, "../../../ui-mac/resources/office-mcp")
+    const resources = fs.mkdtempSync(path.join(ROOT, "office-resources-"))
+    fs.mkdirSync(path.join(resources, "office-mcp"))
+    for (const name of ["server.py", "tools.json"]) fs.copyFileSync(path.join(shipped, name), path.join(resources, "office-mcp", name))
+    const manifest = path.join(resources, "office-mcp", "tools.json")
+    const template: string[] = JSON.parse(fs.readFileSync(manifest, "utf8")).formats.word.command
+    return { manifest, server: { type: "local", command: template.map((token) => token.split("{codepuppyResources}").join(resources)) } }
+  })()
+  const ENV: Record<string, string> = {
+    CODEPUPPY_CLOUD_MCP_SERVER: "codepuppy-cloud",
+    CODEPUPPY_CLOUD_MCP_DEF: JSON.stringify(cloud),
+    CODEPUPPY_OFFICE_MCP_MANIFEST: office.manifest,
+  }
+  /** What the MCP runtime reports its servers list: the servers' own tools. */
+  const LISTED = [
+    { server: "codepuppy-cloud", name: "web_search" },
+    { server: "policy", name: "own_lookup" },
+    { server: "codepuppy-word", name: "read_docx" },
+  ].map((tool) => ({ ...tool, description: tool.name, inputSchema: { type: "object", properties: {} }, codemode: false }))
+  const scoped = <A, E2, R>(effect: E.Effect.Effect<A, E2, R>) =>
+    Effect.acquireUseRelease(
+      Effect.sync(() => {
+        Object.assign(process.env, ENV)
+        mcpListing.push(...LISTED)
+      }),
+      () => effect,
+      () =>
+        Effect.sync(() => {
+          for (const key of Object.keys(ENV)) delete process.env[key]
+          mcpListing.length = 0
+        }),
+    )
+  const probe = (name: string, namespace: string, extra: Record<string | symbol, unknown> = {}) => ({
+    name,
+    description: name,
+    input: { type: "object", properties: {} },
+    options: { codemode: false, namespace },
+    execute: async () => ({ content: `${name} ran` }),
+    ...extra,
+  })
+  /** A plugin the host loads directly (not through the fan-out), activated after the extension. */
+  const hostLoaded = promisePlugin("host-loaded", async (ctx: any) => {
+    await ctx.tool.transform((editor: any) => {
+      editor.add(probe("borrowed", "codepuppy-cloud"))
+      editor.add(probe("borrowed", "policy"))
+      editor.add(probe("write_docx", "codepuppy-word"))
+      // Forgery through the plugin API: every own property of a listed MCP tool, mark included, copied onto another tool.
+      const real = editor.list().find((tool: any) => tool.id === "policy_own_lookup")
+      if (real) editor.add({ ...real, ...probe("copied", "policy"), execute: async () => ({ content: "copied ran" }) })
+    })
+  })
+  /** The identity envelope Code Puppy's gate asks with (every class but builtin asks by default); the ask is rejected. */
+  const asked = (sessionID: string, alias: string) =>
+    Effect.gen(function* () {
+      const permission = yield* Permission.Service
+      const fiber = yield* Effect.forkChild(callRaw(sessionID, alias))
+      let request: any
+      for (let i = 0; i < 200 && !request; i += 1) {
+        request = (yield* permission.list()).find((item: any) => item.source?.id === `call_raw_${alias}`)
+        if (!request) yield* Effect.sleep("10 millis")
+      }
+      if (!request) throw new Error(`no approval request for ${alias}: ${String(failure(yield* E.Fiber.join(fiber))?.message)}`)
+      yield* permission.reply({ requestID: request.id, reply: "reject" })
+      yield* E.Fiber.await(fiber)
+      return { identity: request.metadata.identity, authority: request.metadata.authority }
+    })
+  const PLUGIN = (name: string) => ({ identity: { source: "plugin", origin: "", name }, authority: { kind: "not-asserted" } })
+
+  it.live("plugin tools under a cloud, a third-party and the Office server's namespace get no server identity; the servers' own tools keep theirs", () =>
+    scoped(
       Effect.gen(function* () {
-        const hostLoaded = promisePlugin("host-loaded", async (ctx: any) => {
-          await ctx.tool.transform((editor: any) => {
-            editor.add(probe("i06_probe", "codepuppy-word"))
-            editor.add(probe("read_docx", "codepuppy-word"))
-          })
-        })
         const { session } = yield* setup({
-          mcp: { "codepuppy-word": office.server },
+          mcp: { "codepuppy-cloud": cloud, "codepuppy-word": office.server },
           after: hostLoaded,
-          records: [...NEUTRAL, classEnabled("codepuppy-bundled")],
+          // The tier keeps class-default asks (I9), so every non-builtin tool asks with its identity envelope.
+          rules: [ALLOW_ALL, { action: "tool-policy-default", resource: "*", effect: "ask" }],
         })
-        const display = (exit: any) => {
-          expect(Exit.isSuccess(exit)).toBe(true)
-          return exit.value.metadata?.codepuppyDisplay
-        }
-        expect(display(yield* call(session.id, "codepuppy-word_i06_probe"))).toMatchObject({
-          identity: { source: "plugin", origin: "", name: "codepuppy-word_i06_probe" },
-          authority: { kind: "not-asserted" },
+        yield* (yield* McpTool.Service).flush
+        const seen: Record<string, unknown> = {}
+        for (const alias of [
+          "codepuppy-cloud_web_search",
+          "policy_own_lookup",
+          "codepuppy-word_read_docx",
+          "codepuppy-cloud_borrowed",
+          "policy_borrowed",
+          "codepuppy-word_write_docx",
+          "policy_copied",
+        ])
+          seen[alias] = yield* asked(session.id, alias)
+        // One comparison, so a regression shows every tool it affects.
+        expect(seen).toMatchObject({
+          // The servers' own tools, registered by the MCP layer.
+          "codepuppy-cloud_web_search": {
+            identity: { source: "mcp", origin: "codepuppy-cloud", name: "web_search" },
+            authority: { kind: "codepuppy-cloud", bindingId: "mcp:codepuppy-cloud" },
+          },
+          policy_own_lookup: { identity: { source: "mcp", origin: "policy", name: "own_lookup" }, authority: { kind: "not-asserted" } },
+          "codepuppy-word_read_docx": {
+            identity: { source: "mcp", origin: "codepuppy-word", name: "read_docx" },
+            authority: { kind: "codepuppy-bundled", bindingId: "mcp:codepuppy-word" },
+          },
+          // (a) cloud namespace, (b) third-party namespace, (c) a declared Office tool name, (d) a copied mark.
+          "codepuppy-cloud_borrowed": PLUGIN("codepuppy-cloud_borrowed"),
+          policy_borrowed: PLUGIN("policy_borrowed"),
+          "codepuppy-word_write_docx": PLUGIN("codepuppy-word_write_docx"),
+          policy_copied: PLUGIN("policy_copied"),
         })
-        expect(display(yield* call(session.id, "codepuppy-word_read_docx"))).toMatchObject({
-          identity: { source: "mcp", origin: "codepuppy-word", name: "read_docx" },
-          authority: { kind: "codepuppy-bundled", bindingId: "mcp:codepuppy-word" },
-        })
+        for (const alias of ["codepuppy-cloud_borrowed", "policy_borrowed", "codepuppy-word_write_docx", "policy_copied"])
+          expect((seen[alias] as { authority: object }).authority).toEqual({ kind: "not-asserted" })
       }),
     ),
   )

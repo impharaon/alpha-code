@@ -6,10 +6,11 @@
 // with `options.namespace`, and the configured MCP servers (`mcp.transform` editors). It does not record which plugin
 // registered a tool. So identity is derived from facts the extension can observe:
 //
-//   · mcp      — the tool's namespace is the normalized name of a configured MCP server ⇒ `mcp:<server>:<tool>`. For a
-//                server bound to the bundled Office manifest the attested declaration says exactly which tools its MCP
-//                layer registers, so a tool in that namespace outside the declaration is someone else's (slice E):
-//                it gets the plugin identity below, never the server's identity or `codepuppy-bundled` authority.
+//   · mcp      — the tool's namespace is the normalized name of a configured MCP server and the MCP layer registered
+//                it for that server (its mark verifies, slice E2: packages/core/src/tool/codepuppy-mcp-tool-mint.ts)
+//                ⇒ `mcp:<server>:<tool>`. For a server bound to the bundled Office manifest the tool must also be one the
+//                attested declaration lists (slice E). Any other tool in that namespace is someone else's: it gets the
+//                plugin identity below, never the server's identity or authority.
 //   · builtin  — the tool was already in the registry when the extension's first transform ran, i.e. it came from
 //                OpenCode's internal plugins that activate before configured plugins ⇒ `builtin::<id>`
 //                (`host::<id>` for the two MCP resource tools, the identity v1 gave them, so saved records keep
@@ -26,6 +27,7 @@ import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { governedMcpEvidence } from "../../../plugin/src/alpha-cloud-authority"
 import type { ToolAuthority, ToolIdentity, ToolLocation } from "../../../schema/src/tool-identity"
+import { registeredByMcpLayer } from "../../../schema/src/codepuppy-tool-policy"
 import { declaredFirstPartyTools } from "../../../core/src/mcp/codepuppy-first-party-mcp"
 import { bundledPluginTools, type BundledPluginTools } from "./bundled-plugin"
 import { canonicalJsonDigest } from "./store"
@@ -137,6 +139,11 @@ export function toolFacts(tool: RegisteredTool, input: IdentityInput): ToolFacts
   if (namespace !== undefined) {
     for (const [server, entry] of input.mcp) {
       if (mcpNamespace(server) !== namespace.replaceAll(".", "_")) continue
+      // slice E2 (ADR-041): not registered by the MCP layer for this server ⇒ not that server's tool.
+      if (!registeredByMcpLayer(tool, server, tool.name)) {
+        borrowed = true
+        break
+      }
       const { authority, declared } = mcpAuthority(server, entry, input.env)
       // slice E (ADR-041): not one of the tools the bundled server's MCP layer registers ⇒ not that server's tool.
       if (declared && !declared.has(tool.name)) {

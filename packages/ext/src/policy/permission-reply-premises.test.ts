@@ -54,7 +54,7 @@ const awaitPending = (count: number) =>
     return yield* permission.list()
   })
 
-describe("OpenCode 2 permission reply premises (adr033 receipt derivation)", () => {
+describe("[packages/ui-mac/src/engine-adapter/permission-replies.ts] OpenCode 2 permission reply premises (adr033 receipt derivation)", () => {
   it.live("(i) a pending request's payload never changes under its id: a second admission with the same id is refused", () =>
     Effect.gen(function* () {
       const { permission, a } = yield* engine(ASK_EDIT)

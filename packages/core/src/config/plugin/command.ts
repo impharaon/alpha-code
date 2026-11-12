@@ -77,7 +77,8 @@ export const Plugin = define({
                     parentID: parent.id,
                     title: command.description ?? name,
                     agent: selected.id,
-                    model: model ?? selected.info?.model ?? parent.model,
+                    // codepuppy(#1560): the model the user picked for the parent session out-ranks the command's and its agent's.
+                    model: parent.model ?? model ?? selected.info?.model,
                   })
                   yield* sessions.prompt({
                     ...input.prompt,
@@ -96,11 +97,16 @@ export const Plugin = define({
                   yield* subagents.background(recovery)
                   return
                 }
-                if (agent !== undefined) {
+                // codepuppy(#1560) ── a model the user picked for this session (its `model`) out-ranks the command's and its
+                // agent's: the command switches the model only in a session that has none.
+                if (agent !== undefined || model !== undefined) {
                   const session = yield* ctx.session.get({ sessionID: input.sessionID })
-                  if (session.agent !== agent) yield* ctx.session.switchAgent({ sessionID: input.sessionID, agent })
+                  if (agent !== undefined && session.agent !== agent)
+                    yield* ctx.session.switchAgent({ sessionID: input.sessionID, agent })
+                  if (model !== undefined && session.model === undefined)
+                    yield* ctx.session.switchModel({ sessionID: input.sessionID, model })
                 }
-                if (model !== undefined) yield* ctx.session.switchModel({ sessionID: input.sessionID, model })
+                // codepuppy ── end
                 yield* ctx.session.prompt({
                   ...input.prompt,
                   sessionID: input.sessionID,

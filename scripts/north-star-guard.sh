@@ -156,6 +156,10 @@ UPSTREAM_EXCLUDES=(
   # 走上游工具注册表的后写覆盖,没有插件挂点;接管面只有注册循环的 `codepuppy(ADR-041)` 标注块。
   # 判据 packages/core/test/codepuppy-mcp-tool-collision.test.ts。
   ':(exclude)packages/core/src/tool/mcp.ts'
+  # #1560(#1666 裁决 6737930969):用户为会话选定的模型优先于命令和命令 agent 推荐的模型。命令在执行体里自己 switchModel、
+  # 自己给子任务子会话定模型,没有插件挂点;接管面只有两处 `codepuppy(#1560)` 标注。
+  # 判据 packages/core/test/codepuppy-command-model-priority.test.ts。
+  ':(exclude)packages/core/src/config/plugin/command.ts'
 )
 
 # ── UPSTREAM_PATHS 里住着的 Code Puppy 自有文件:结构性谓词,不是逐文件清单(`#1085` / ADR-043)──

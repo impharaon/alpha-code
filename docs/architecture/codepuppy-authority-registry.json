@@ -953,19 +953,34 @@
       "id": "l1r-command-model-priority",
       "decision": "A model the user explicitly picked out-ranks a command's or its agent's recommended model (#1560).",
       "adr": [
-        "ADR-041"
+        "ADR-041",
+        "ADR-047"
       ],
-      "lane": "L3 (#1665) per lane seams §5 (L1r)",
+      "lane": "L4 (#1666) per ruling 6737930969",
       "takeovers": [
         "packages/opencode/src/session/prompt.ts",
-        "packages/opencode/test/session/prompt.test.ts"
+        "packages/opencode/test/session/prompt.test.ts",
+        "packages/core/src/config/plugin/command.ts"
       ],
-      "blocked": {
-        "reason": "Request assembly belongs to L3 on OpenCode 2 (session.hook model.request / http.request / context); if a hook cannot hold it, L3 hands it back for an L4 re-take. Not delivered on the integration branch this lane started from.",
-        "options": [
-          "Register L3's mechanism and proof test when #1665 lands, or route back to L4 for a re-take with ADR-047 reasoning."
-        ]
-      }
+      "mechanism": {
+        "file": "packages/core/src/config/plugin/command.ts",
+        "ladder": "L3 (re-taken: the command switches the session model only when the session has none; a subtask child runs on the parent's model before the command's or its agent's. No plugin seam reaches the command's switchModel)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "a picked session: the command's own model does not switch it; the command still runs"
+        },
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "a picked session: the command agent's model does not switch it either"
+        },
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "a subtask command: the child session runs on the parent's picked model"
+        }
+      ],
+      "note": "The pick is the session's `model`. L6 contract: Code Puppy's adapter switches the session model to the composer's pick before every send, so the field always carries the user's choice (orchestrator, plan 6bc34b3ce5). Upstream-native and kept: a session with no model takes a command's model, which then stays the session's model."
     },
     {
       "id": "mcp-independent-startup",

@@ -601,13 +601,14 @@ async function currentProject(context: RouteContext) {
     : toV1Project({ id: location.project.id, canonical: location.project.canonical, time: { created: 0, updated: 0 }, sandboxes: [] })
 }
 
+/** 设计 docs/specs/1662-opencode2/design.md「MCP OAuth on OpenCode 2」§4(7cba42b10d):轮询间隔,固定常量。 */
+const MCP_AUTH_POLL_MS = 1_000
+
 /**
  * U6:v1 的「去授权」是一个长调用(引擎开浏览器、等回调、落凭证,回 MCP 状态)。2.x 把每个远端 MCP 登记成
  * OAuth 集成(core/src/mcp/index.ts:238-275,`metadata.source === "mcp"`、名字 = MCP 名):这里发起 OAuth、
  * 交给系统浏览器打开授权地址、轮询到终态,再回这台 MCP 的状态 —— 调用方看到的仍是 v1 的那个长调用。
  */
-const MCP_AUTH_POLL_MS = 1_000
-
 async function authenticateMcp(context: RouteContext) {
   const name = context.params.name!
   const integrations = await context.api.integration.list(at(context))

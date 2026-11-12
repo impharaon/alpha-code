@@ -102,3 +102,35 @@ export function attachNetFailure(
     metadata: { ...event.error.metadata, [NET_FAILURE_KEY]: net },
   })
 }
+
+/**
+ * `execute.after` body (I-05 contract B, design upgrade-fewer-takeovers §4): a successful directory read carries the
+ * directory card's data in 0.1.26's shape and key names (`metadata.display`, read by the frozen card's `dirDisplayOf`),
+ * built from the read tool's structured listing (`ListPage`); the model text and `output` are not touched. Any other call,
+ * or a result that already has a `display`, is left as it is.
+ */
+export function attachDirectoryDisplay(event: {
+  tool: string
+  status: string
+  input?: unknown
+  result?: { output?: unknown; metadata?: Record<string, unknown> } & Record<string, unknown>
+}) {
+  if (event.tool !== "read" || event.status !== "completed" || !event.result) return
+  const listing = event.result.output as { type?: unknown; entries?: unknown; truncated?: unknown } | undefined
+  if (listing?.type !== "list-page" || !Array.isArray(listing.entries) || event.result.metadata?.display !== undefined) return
+  const entries = listing.entries.map((entry) => (entry as { path?: unknown } | null)?.path)
+  if (!entries.every((entry): entry is string => typeof entry === "string")) return
+  const input = (event.input ?? {}) as { path?: unknown; offset?: unknown }
+  const offset = typeof input.offset === "number" && Number.isInteger(input.offset) && input.offset > 0 ? input.offset : 1
+  const truncated = listing.truncated === true
+  const display = {
+    type: "directory" as const,
+    path: input.path,
+    entries,
+    offset,
+    truncated,
+    // 2.x does not say how many entries a truncated listing has; none is made up.
+    ...(truncated ? {} : { totalEntries: offset - 1 + entries.length }),
+  }
+  event.result = { ...event.result, metadata: { ...event.result.metadata, display } }
+}

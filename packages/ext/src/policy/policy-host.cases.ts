@@ -67,6 +67,8 @@ export const { SubagentTool } = await load("src/tool/plugin/subagent.ts")
 // The builtin agents (`general` is the subagent the E6 cases ask for).
 export const { AgentPlugin } = await load("src/plugin/agent.ts")
 export const { WebFetchTool } = await load("src/tool/plugin/webfetch.ts")
+// The upstream read tool (I-05 contract B: the directory card is built from its structured listing).
+export const { ReadTool } = await load("src/tool/plugin/read.ts")
 export const { McpResourceTools } = await load("src/tool/plugin/mcp-resource.ts")
 // Subtask commands (#1129 E6): the config command plugin, the Command service, a config with commands, a shell picker.
 export const { ConfigCommandPlugin } = await load("src/config/plugin/command.ts")
@@ -101,6 +103,8 @@ const nodes = {
   SubagentJob: (await load("src/session/subagent-job.ts")).SubagentJob,
   InstructionEntry: (await load("src/session/instruction-entry.ts")).InstructionEntry,
   PersistentPty: (await load("src/persistent-pty.ts")).PersistentPty,
+  ReadToolFileSystem: (await load("src/tool/read-filesystem.ts")).ReadToolFileSystem,
+  SessionInstructions: (await load("src/session/instructions.ts")).SessionInstructions,
   LocationServiceMap: (await load("src/location-service-map.ts")).LocationServiceMap,
   Reference: (await load("src/reference.ts")).Reference,
   Skill: (await load("src/skill.ts")).Skill,
@@ -191,6 +195,8 @@ export const HostLayer = AppNodeBuilder.build(
     nodes.SharedCache.node,
     nodes.InstructionEntry.node,
     nodes.PersistentPty.node,
+    nodes.ReadToolFileSystem.node,
+    nodes.SessionInstructions.node,
     nodes.LocationServiceMap.node,
     Permission.node,
     PermissionSaved.node,

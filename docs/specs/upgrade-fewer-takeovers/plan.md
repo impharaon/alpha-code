@@ -151,10 +151,10 @@ last_reviewed: 2026-11-12
 - 依据:设计 @ `0a1d9d2fdd` §4 契约 B、§5「B 的写入边界」「历史(B)」、§9 B、§10 R-04;F-06、F-07;派发书 Slice B。
 - 核对:`ed81202805` · 编排器 · 通过(每条不变式有带已知坏臂的证明、范围守住、未重述决定;裁决:上游测试按甲并加一条钉住清单的 Code Puppy 测试,切片 B 删尽文本回落与 P6;设计已获 owner 批准,2026-11-12「同意，界面数据约定和减少改上游文件两份方案都批准」)
 
-### 需要编排器确认:旧记录的文本回落删不删
+### 编排器已确认:旧记录的文本回落删尽
 
 设计 §5「历史」:B 赶在 #1662 首发前落地,解析可删尽;首发之后才落地,则保留解析、只用于没有 `display` 的记录。本 lane 从未发布的 `engine/1662-opencode2` 开出、并回同一分支(`origin/alpha` 仍是 0.1.26 的 v1 线,F-14),按「首发前」**删尽**。
-若编排器打算在 B 合入前就发布 #1662,改为保留 `directoryDisplay` 只在 `metadata.display` 缺席时用,并保留 P6 探针。
+裁决(编排器 2026-11-12):删尽文本回落与 P6 —— B 在 #1662 首发前落地。
 
 ### 改动
 
@@ -166,7 +166,7 @@ last_reviewed: 2026-11-12
 | `packages/ext/src/policy/register-policy.test.ts` | 新一段,真上游 read 读真目录:首页、截断页、不装 ext 的反向臂、读文件与已有 `display` 不动 |
 | `packages/ui-mac/src/engine-adapter/v1-shapes.ts` | 删 `directoryDisplay`、`DIRECTORY_HEADER`、`CONTINUE_LINE` 与调用(`:204-227`、`:245-246`);read 分支只补 `filePath`,`metadata.display` 原样透传;`:190-194` 注释同步 |
 | `packages/ui-mac/src/engine-adapter/tool-shapes.test.ts` | `parity.json`「读目录」一条改写:存下的 read 带扩展写的 `display` ⇒ 目录网格;同一条不带 ⇒ 读文件卡(证明不再反解正文) |
-| `packages/ext/src/upstream-probes/turn.test.ts` | P6 已无用(适配器不再反解正文;依赖改为 read 的 `ListPage` 到达 `execute.after`,由上面真上游 read 的用例钉住,上游改 `ListPage` 即红):删 P6 段与头注第 7–9 行 |
+| `packages/ext/src/upstream-probes/turn.test.ts` | P6 已无用(适配器不再反解正文;依赖改为 read 的 `ListPage` 到达 `execute.after`,由上面真上游 read 的用例钉住,上游改 `ListPage` 即红):删 P6 段、它专用的 `sub/` 目录种子与随之不用的 `fs` / `path` import,头注第 7–9 行改为一句去向 |
 | `scripts/gate-files.tsv` | `register-policy.test.ts` 行 59 → 63 |
 
 ### 顺序
@@ -194,4 +194,5 @@ last_reviewed: 2026-11-12
 
 ### 偏离记录
 
-暂无
+- 2026-11-12 · `turn.test.ts` 除 P6 段外还删了只给 P6 用的 `sub/` 种子与两个 import;条数 11 → 9 · 本切片提交。
+- 合并时要调的(本分支没有这些行):整合分支 `scripts/gate-files.tsv` 的 `packages/ext src/upstream-probes/turn.test.ts` 11 → 9,描述去掉「读目录正文」与依赖方 `v1-shapes.ts`;`.github/workflows/sync-upstream.yml` 的「Upstream behaviour probes (I-03)」步用 `bun-test-floor.sh 1`,下界不受影响,不用改。

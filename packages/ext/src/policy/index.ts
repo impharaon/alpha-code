@@ -15,7 +15,7 @@ import os from "node:os"
 import path from "node:path"
 import type { Plugin } from "@opencode/plugin"
 import { createCatalog } from "./catalog"
-import { attachNetFailure, attachTerminal, displaySnapshot, wrapForDisplay } from "./display"
+import { attachDirectoryDisplay, attachNetFailure, attachTerminal, displaySnapshot, wrapForDisplay } from "./display"
 import { confirm, decide, effectiveFor, gateWithoutToolCall, holdAsk, pin, type GateDeps } from "./gate"
 import {
   codeModeFacts,
@@ -220,6 +220,7 @@ export async function registerPolicy(context: Plugin.Context): Promise<PolicyReg
       )
       await context.tool.hook("execute.after", (event) => {
         attachNetFailure(event as never)
+        attachDirectoryDisplay(event as never)
         attachTerminal(event as never, displays.get(event.id))
         displays.delete(event.id)
       })

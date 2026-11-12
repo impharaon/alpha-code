@@ -27,6 +27,7 @@ import {
   PluginHooks,
   promisePlugin,
   isolate,
+  ReadTool,
   ROOT,
   seedProject,
   SchemaTool,
@@ -38,6 +39,7 @@ import {
   WebFetchTool,
 } from "./policy-host.cases"
 import { registerPolicy } from "./index"
+import { attachDirectoryDisplay } from "./display"
 import { createToolPolicyStore, defaultPolicyBaseDir } from "./resolver"
 import { canonicalJsonDigest, savePolicyDocument } from "./store"
 
@@ -1270,6 +1272,77 @@ describe("E6: a subtask command passes the same decision as the subagent tool", 
       const { session } = yield* setup({ policy: false, internal, records: [...NEUTRAL, disabled("builtin::subagent")] })
       expect(Exit.isSuccess(yield* review(session.id))).toBe(true)
       expect(yield* children(session.id)).toHaveLength(1)
+    }),
+  )
+})
+
+// I-05 contract B (design upgrade-fewer-takeovers §4): the directory-read card's `metadata.display` is written by the
+// extension's `execute.after` from the upstream read tool's structured listing (`ListPage`), with 0.1.26's shape and key
+// names; the adapter no longer parses the model text. The real upstream read tool reads a real directory here.
+describe("I-05 B: the directory card's display comes from the read tool's structured listing", () => {
+  const listing = (directory: string) => {
+    const root = path.join(directory, "listing")
+    fs.mkdirSync(path.join(root, "inner"), { recursive: true })
+    fs.writeFileSync(path.join(root, "one.txt"), "1\n")
+    fs.writeFileSync(path.join(root, "two.txt"), "2\n")
+    return root
+  }
+  const read = (sessionID: string, input: Record<string, unknown>) =>
+    Effect.gen(function* () {
+      const exit = yield* call(sessionID, "read", input)
+      if (!Exit.isSuccess(exit)) throw new Error(`read failed: ${String(failure(exit)?.message)}`)
+      return exit.value as { output?: { type?: string }; content: unknown; metadata?: Record<string, unknown> }
+    })
+
+  it.live("a directory read carries the 0.1.26 directory display built from the listing: every entry, directories marked, offset 1 and the total", () =>
+    Effect.gen(function* () {
+      const { session } = yield* setup({ internal: [ReadTool.Plugin] })
+      const dir = listing((yield* Location.Service).directory)
+      const result = yield* read(session.id, { path: dir })
+      expect(result.output?.type).toBe("list-page")
+      expect(result.metadata?.display).toEqual({
+        type: "directory",
+        path: dir,
+        entries: ["inner/", "one.txt", "two.txt"],
+        offset: 1,
+        truncated: false,
+        totalEntries: 3,
+      })
+    }),
+  )
+
+  it.live("a truncated page carries its offset, truncated true and no total", () =>
+    Effect.gen(function* () {
+      const { session } = yield* setup({ internal: [ReadTool.Plugin] })
+      const dir = listing((yield* Location.Service).directory)
+      const result = yield* read(session.id, { path: dir, offset: 2, limit: 1 })
+      expect(result.metadata?.display).toEqual({ type: "directory", path: dir, entries: ["one.txt"], offset: 2, truncated: true })
+    }),
+  )
+
+  it.live("reverse arm: without Code Puppy's extension the same directory read carries no display, and the model text is the same", () =>
+    Effect.gen(function* () {
+      const { session } = yield* setup({ internal: [ReadTool.Plugin] })
+      const dir = listing((yield* Location.Service).directory)
+      const withExt = yield* read(session.id, { path: dir })
+      const bare = yield* setup({ policy: false, internal: [ReadTool.Plugin] })
+      const without = yield* read(bare.session.id, { path: dir })
+      expect(without.output?.type).toBe("list-page")
+      expect(without.metadata?.display).toBeUndefined()
+      expect(withExt.content).toEqual(without.content)
+    }),
+  )
+
+  it.live("a file read, and a read that already carries a display, are left as they are", () =>
+    Effect.gen(function* () {
+      const { session } = yield* setup({ internal: [ReadTool.Plugin] })
+      const dir = listing((yield* Location.Service).directory)
+      expect((yield* read(session.id, { path: path.join(dir, "one.txt") })).metadata?.display).toBeUndefined()
+      const listed = yield* read(session.id, { path: dir })
+      const own = { type: "file", path: dir, text: "kept" }
+      const event = { tool: "read", status: "completed" as const, input: { path: dir }, result: { ...listed, metadata: { display: own } } }
+      attachDirectoryDisplay(event as never)
+      expect(event.result.metadata.display).toBe(own)
     }),
   )
 })

@@ -31,6 +31,7 @@ import "./sidebar/sidebar.css"
 import "./sidebar/account-popover.css"
 import "./codepuppy-ui/composer-reskin.css"
 import { ToastViewport } from "./codepuppy-ui/Toast"
+import { ToastRouteFollower } from "./codepuppy-ui/toast-route-follower"
 import { installHomeDraftDiscardNotice } from "./codepuppy-ui/home-draft-discard-notice"
 import { ContractFailureBanner } from "./codepuppy-ui/Banner"
 import { CodePuppyBoundary } from "./codepuppy-ui/codepuppy-boundary"
@@ -583,6 +584,7 @@ render(() => {
               </CodePuppyBoundary>
               <CodePuppyBoundary name="ToastViewport">
                 <ToastViewport />
+                <ToastRouteFollower />
               </CodePuppyBoundary>
               <CodePuppyBoundary name="ContractFailureBanner">
                 <ContractFailureBanner />

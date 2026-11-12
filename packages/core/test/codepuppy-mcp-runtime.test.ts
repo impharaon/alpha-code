@@ -384,10 +384,17 @@ describe("AC7: each wait has its own budget", () => {
 
 /** A real streamable-HTTP MCP server (one tool, `probe`) whose tools/list can be made to answer with an HTTP status. */
 const httpServer = () => {
-  const state = { lists: 0, listStatus: 0, listBody: "no" }
+  const state = {
+    lists: 0,
+    listStatus: 0,
+    listBody: "no",
+    calls: 0,
+    probe: { name: "probe", description: "probe", inputSchema: { type: "object" as const, properties: {} as Record<string, unknown> } },
+  }
   const build = async () => {
     const server = new McpServer({ name: "codepuppy-remote", version: "1.0.0" }, { capabilities: { tools: {} } })
-    server.setRequestHandler("tools/list", async () => ({ tools: [{ name: "probe", description: "probe", inputSchema: { type: "object" as const, properties: {} } }] }))
+    server.setRequestHandler("tools/list", async () => ({ tools: [state.probe] }) as never)
+    server.setRequestHandler("tools/call", async () => (state.calls++, { content: [{ type: "text" as const, text: "probed" }] }))
     const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: () => crypto.randomUUID(), enableJsonResponse: true })
     await server.connect(transport)
     return transport
@@ -406,8 +413,37 @@ const httpServer = () => {
       return (await (current ??= build())).handleRequest(request)
     },
   })
-  return { state, url: `http://127.0.0.1:${http.port}/mcp`, stop: () => http.stop(true) }
+  return {
+    state,
+    url: `http://127.0.0.1:${http.port}/mcp`,
+    stop: () => http.stop(true),
+    /** A new server generation: the client's session is unknown to it, so the next request expires the session. */
+    restart: () => void (current = build()),
+  }
 }
+
+// ── #1563 AC6 at the retry after a recovered session (review R1 #3) ──────────────────────────────────────────────
+// Red if the retry after the session recovery is sent although the new server generation lists the tool with another
+// schema; an unchanged definition is retried and runs.
+describe("#1563 AC6: the retry after a recovered session", () => {
+  for (const [label, schema, sent] of [
+    ["the new generation changed the tool: the retry is not sent and the call fails by name", { key: { type: "number" } }, 0],
+    ["the new generation lists the same tool: the retry runs", {}, 1],
+  ] as const) {
+    const server = httpServer()
+    testEffect(mcpLayer({ remote: new ConfigMCP.Remote({ type: "remote", url: server.url, oauth: false }) })).live(label, () =>
+      Effect.gen(function* () {
+        yield* connected("remote")
+        server.state.probe = { ...server.state.probe, inputSchema: { type: "object", properties: schema } }
+        server.restart()
+        const exit = yield* (yield* Mcp.Service).callTool({ server: "remote", name: "probe", args: {} }).pipe(Effect.exit)
+        expect(server.state.calls).toBe(sent)
+        if (sent) expect(Exit.isSuccess(exit)).toBe(true)
+        else expect(String(Exit.isFailure(exit) ? exit.cause : "")).toContain("changed after this request was prepared")
+      }).pipe(Effect.ensuring(Effect.sync(server.stop))),
+    )
+  }
+})
 
 // ── #1645 (v1 successor) ─────────────────────────────────────────────────────────────────────────────────────────
 // Red if a tools/list failure another attempt may fix is not retried in the background (no list after 30 s, server

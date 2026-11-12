@@ -69,15 +69,6 @@ export const layer = Layer.effect(
                 output: (tool.outputSchema ?? {}) as JsonSchema.JsonSchema,
                 execute: (input, context) =>
                   Effect.gen(function* () {
-                    // codepuppy(#1563 AC6) ── a call planned against this definition runs only if the server still lists
-                    // the same one: after a server generation changed the tool, the call fails by name instead of sending
-                    // arguments shaped for the old schema (as #1565 does for a bundled declaration, mcp/index.ts).
-                    const live = (yield* mcp.tools()).find((item) => item.server === tool.server && item.name === tool.name)
-                    if (live && !sameTool(tool, live))
-                      return yield* new ToolFailure({
-                        message: `MCP tool "${tool.name}" on server "${tool.server}" changed after this request was prepared; it was not run. Use the tool as the server now lists it.`,
-                      })
-                    // codepuppy ── end
                     yield* permission.assert({
                       action: name(tool.server, tool.name),
                       resources: ["*"],
@@ -85,6 +76,16 @@ export const layer = Layer.effect(
                       metadata: { input: input ?? {} },
                       ...Permission.invocation(context),
                     })
+                    // codepuppy(#1563 AC6) ── checked after the approval wait, right before the send: a call planned against
+                    // this definition goes out only if the server still lists the same one; after a server generation
+                    // changed the tool it fails by name instead of sending arguments shaped for the old schema (as #1565
+                    // does for a bundled declaration; the retry after a recovered session is checked in mcp/index.ts).
+                    const live = (yield* mcp.tools()).find((item) => item.server === tool.server && item.name === tool.name)
+                    if (live && !sameTool(tool, live))
+                      return yield* new ToolFailure({
+                        message: `MCP tool "${tool.name}" on server "${tool.server}" changed after this request was prepared; it was not run. Use the tool as the server now lists it.`,
+                      })
+                    // codepuppy ── end
                     const result = yield* mcp
                       .callTool({
                         server: tool.server,

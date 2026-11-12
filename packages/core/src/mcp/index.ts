@@ -915,7 +915,30 @@ export const layer = (options?: Options) =>
               })
             }
           }
-          return yield* target.entry.connection.recovering(target.client, call).pipe(failed("server"))
+          // codepuppy(#1563 AC6) ── the retry after a recovered session (a new server generation) is sent only if the
+          // server still lists the definition the first send went out under; otherwise nothing more is sent.
+          const basis = target.entry.connection.tools?.find((tool) => tool.name === input.name)
+          const changed = new Error(
+            `MCP tool "${input.name}" on server "${server}" changed after this request was prepared; it was not run. Use the tool as the server now lists it.`,
+          )
+          let sends = 0
+          const send = (connection: McpClient.Connection) =>
+            Effect.suspend(() => {
+              sends += 1
+              if (sends === 1 || !basis) return call(connection)
+              const live = target.entry.connection.tools?.find((tool) => tool.name === input.name)
+              return live && sameTool(basis, live) ? call(connection) : Effect.fail(changed)
+            })
+          return yield* target.entry.connection.recovering(target.client, send).pipe(
+            Effect.mapError((error: Error) =>
+              error === changed ? new ToolCallError({ server, tool: input.name, message: changed.message }) : error,
+            ),
+            Effect.catchIf(
+              (error): error is Error => !(error instanceof ToolCallError),
+              (error) => failed("server")(Effect.fail(error)),
+            ),
+          )
+          // codepuppy ── end
         }),
         instructions: Effect.fn("MCP.instructions")(function* () {
           return Array.from(entries)

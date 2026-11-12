@@ -1203,11 +1203,12 @@
       "lane": "L4 (#1666) Unit E",
       "takeovers": [
         "packages/opencode/src/mcp/index.ts",
-        "packages/core/src/tool/mcp.ts"
+        "packages/core/src/tool/mcp.ts",
+        "packages/core/src/mcp/index.ts"
       ],
       "mechanism": {
         "file": "packages/core/src/tool/mcp.ts",
-        "ladder": "L3 (re-taken: the McpTool call compares the definition it was offered under with the server's current listing through sameTool, packages/core/src/mcp/codepuppy-first-party-mcp.ts, before asking or calling)"
+        "ladder": "L3 (re-taken: the McpTool call compares the definition it was offered under with the server's current listing after the approval wait, right before the send; re-taken packages/core/src/mcp/index.ts sends the retry after a recovered session only if the tool's definition is unchanged; sameTool from packages/core/src/mcp/codepuppy-first-party-mcp.ts)"
       },
       "tests": [
         {
@@ -1217,6 +1218,14 @@
         {
           "file": "packages/core/test/codepuppy-mcp-tool-generation.test.ts",
           "name": "the next server generation lists the same definition: the call runs on it"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "the new generation changed the tool: the retry is not sent and the call fails by name"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "the new generation lists the same tool: the retry runs"
         }
       ]
     },

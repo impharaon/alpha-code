@@ -2,7 +2,6 @@
 //   · 子进程发来的 `codepuppy.*` 进 receive,应答经同一个子进程发回;write-probe 的应答**不**进 receive(两条接收者并列);
 //   · ready 之后才 attach(在途重载在这一刻重发),子进程退出时断开的是**这一次**连接。
 // harness 与 process-fence-wiring.test.ts 同形:mock electron / logging,假子进程记录线上消息。
-import { isolateEngineHome } from "../../test-component/isolated-engine-home"
 import { afterEach, beforeEach, expect, mock, test } from "bun:test"
 import { EventEmitter } from "node:events"
 import { mkdtempSync, readFileSync, rmSync } from "node:fs"
@@ -10,9 +9,6 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { mockElectron } from "../../test-component/electron-mock"
 import type { CodePuppySidecarOutbound } from "./codepuppy-sidecar-messages"
-
-// 在 server.ts 被 import、spawnLocalServer 跑之前:旧凭证检查只看临时根,不碰本机真实数据目录(isolated-engine-home.ts)。
-isolateEngineHome()
 
 const appEvents = new EventEmitter()
 let userDataPath = ""

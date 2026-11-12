@@ -17,9 +17,11 @@
 //   #1645 a tools/list failure that another attempt may fix reconnects after 30 s and lists in the same service; an
 //        auth answer to tools/list is named auth and not retried (#1666 Units D/E)
 //   #1653 a server waiting out its backoff holds back no other server, and calling it does not reconnect early
+//   #1565 with the shipped manifest: the command main writes ({workspace} marker) and the one the engine sees after the
+//        extension substitutes the folder both get the declaration; the real python server lists exactly it (#1666 Unit E)
 //
 // HOME, XDG_* and the database are isolated before any engine module loads.
-import { describe, expect } from "bun:test"
+import { afterAll, beforeAll, describe, expect } from "bun:test"
 import { createHash } from "node:crypto"
 import fs from "node:fs"
 import os from "node:os"
@@ -46,7 +48,7 @@ const { Location } = await import("@opencode/core/location")
 const { Mcp } = await import("@opencode/core/mcp/index")
 const { McpClient } = await import("@opencode/core/mcp/client")
 const { McpPool } = await import("@opencode/core/mcp/pool")
-const { OFFICE_MCP_MANIFEST_ENV } = await import("@opencode/core/mcp/codepuppy-first-party-mcp")
+const { OFFICE_MCP_MANIFEST_ENV, declaredListedTools, listsDeclaration } = await import("@opencode/core/mcp/codepuppy-first-party-mcp")
 const { parseFailureCode } = await import("@opencode/schema/codepuppy-net-failure")
 const { Server: McpServer, WebStandardStreamableHTTPServerTransport } = await import("@modelcontextprotocol/server")
 const { AbsolutePath } = await import("@opencode/core/schema")
@@ -468,5 +470,56 @@ describe("#1653: a server waiting out its backoff", () => {
       yield* Effect.promise(() => Bun.sleep(300))
       expect(hits.count).toBe(before)
     }).pipe(Effect.ensuring(Effect.sync(() => down.stop(true)))),
+  )
+})
+
+// ── #1565 with the shipped manifest (#1666 Unit E) ───────────────────────────────────────────────────────────────
+// The real bundled tools.json and server.py (packages/ui-mac/resources/office-mcp), the command shape main writes
+// (ui-mac office-advisories codepuppyOfficeInstallCommand: {codepuppyResources} slots and the {workspace} marker), and
+// the same command after the extension replaced the marker with the folder (packages/ext/src/policy/index.ts).
+// Red if the template comparison stops accepting the substituted folder (the engine would see no declaration), or if
+// the shipped server.py stops listing exactly what the shipped manifest declares.
+describe("#1565: the shipped Office manifest and server", () => {
+  const shipped = path.resolve(import.meta.dir, "../../ui-mac/resources/office-mcp")
+  const resources = path.join(ROOT, `Resources-${crypto.randomUUID()}`)
+  fs.mkdirSync(path.join(resources, "office-mcp"), { recursive: true })
+  fs.mkdirSync(path.join(resources, "office-runtime", "bin"), { recursive: true })
+  for (const name of ["server.py", "tools.json"]) fs.copyFileSync(path.join(shipped, name), path.join(resources, "office-mcp", name))
+  // The bundled interpreter: this machine's python3 runs the real server.py.
+  fs.writeFileSync(path.join(resources, "office-runtime", "bin", "python3"), '#!/bin/sh\nexec python3 "$@"\n', { mode: 0o755 })
+  const manifest = path.join(resources, "office-mcp", "tools.json")
+  const env = { [OFFICE_MCP_MANIFEST_ENV]: manifest }
+  const template: string[] = JSON.parse(fs.readFileSync(manifest, "utf8")).formats.word.command
+  const asWritten = template.map((token) => token.split("{codepuppyResources}").join(resources))
+  const afterExtension = asWritten.map((token) => (token === "{workspace}" ? ROOT : token))
+  const word = (command: string[]) => new ConfigMCP.Local({ type: "local", command } as never)
+  const declaredNames = (command: unknown[]) => (declaredListedTools("codepuppy-word", { type: "local", command }, env, fs.readFileSync) ?? []).map((tool: any) => tool.name)
+
+  testEffect(Layer.empty).effect("the command main writes and the one after the folder substitution both get the declaration", () =>
+    Effect.sync(() => {
+      expect(declaredNames(asWritten)).toEqual(["read_docx", "write_docx"])
+      expect(declaredNames(afterExtension)).toEqual(["read_docx", "write_docx"])
+      expect(declaredNames(asWritten.map((token) => (token === "{workspace}" ? "relative/folder" : token)))).toEqual([])
+      expect(declaredNames(asWritten.map((token) => (token === "{workspace}" ? `${ROOT}/../elsewhere` : token)))).toEqual([])
+      expect(declaredNames([...afterExtension, "--debug"])).toEqual([])
+    }),
+  )
+
+  let previous: string | undefined
+  beforeAll(() => {
+    previous = process.env[OFFICE_MCP_MANIFEST_ENV]
+    process.env[OFFICE_MCP_MANIFEST_ENV] = manifest
+  })
+  afterAll(() => {
+    process.env[OFFICE_MCP_MANIFEST_ENV] = previous
+  })
+  testEffect(mcpLayer({ "codepuppy-word": word(afterExtension) })).live("the real server.py, started as the engine starts it, lists exactly the shipped declaration", () =>
+    Effect.gen(function* () {
+      yield* connected("codepuppy-word")
+      const declared = declaredListedTools("codepuppy-word", word(afterExtension), env, fs.readFileSync)
+      const listed = (yield* (yield* Mcp.Service).tools()).filter((tool: any) => tool.server === "codepuppy-word")
+      expect(listed.map((tool: any) => tool.name)).toEqual(["read_docx", "write_docx"])
+      expect(listsDeclaration(declared ?? [], listed)).toBe(true)
+    }),
   )
 })

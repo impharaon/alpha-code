@@ -462,6 +462,10 @@
         {
           "file": "packages/ext/src/policy/bundled-plugin.test.ts",
           "name": "listed own tools of a module whose digest matches get codepuppy-bundled; a project tool merged in does not"
+        },
+        {
+          "file": "packages/ext/src/policy/identity.test.ts",
+          "name": "the shipped Office command, with {workspace} already replaced by the folder, mints codepuppy-bundled"
         }
       ]
     },
@@ -1158,9 +1162,16 @@
         {
           "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
           "name": "a contradicting connection fails the planned call and drops the declaration"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "the command main writes and the one after the folder substitution both get the declaration"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "the real server.py, started as the engine starts it, lists exactly the shipped declaration"
         }
-      ],
-      "note": "Open (#1666 Unit D, handed back): the real Office command carries {workspace}; the extension replaces it with the folder (packages/ext/src/policy/index.ts:121-124) before core matches the command token by token against the bundled template (packages/core/src/mcp/codepuppy-first-party-mcp.ts:46), so in production no declaration and no codepuppy-bundled authority is found (probe 2026-11-12: marker command → read_docx, write_docx; substituted command → none)."
+      ]
     },
     {
       "id": "mcp-net-failure-runtime",

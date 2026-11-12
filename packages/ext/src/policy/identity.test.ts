@@ -169,6 +169,21 @@ describe("authority minting (ADR-041 §5)", () => {
     expect(authorityForMcp("codepuppy-word", { type: "local", command } as never, { CODEPUPPY_OFFICE_MCP_MANIFEST: path.join(tampered, "office-mcp", "tools.json") })).toEqual({ kind: "not-asserted" })
   })
 
+  // #1666 Unit E: the shipped manifest (packages/ui-mac/resources/office-mcp) and the command main writes, after this
+  // extension's mcp.transform replaced the {workspace} marker with the folder — what the identity actually sees.
+  test("the shipped Office command, with {workspace} already replaced by the folder, mints codepuppy-bundled", () => {
+    const shipped = path.resolve(import.meta.dir, "../../../ui-mac/resources/office-mcp")
+    const resources = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-office-shipped-"))
+    fs.mkdirSync(path.join(resources, "office-mcp"))
+    for (const name of ["server.py", "tools.json"]) fs.copyFileSync(path.join(shipped, name), path.join(resources, "office-mcp", name))
+    const env = { CODEPUPPY_OFFICE_MCP_MANIFEST: path.join(resources, "office-mcp", "tools.json") }
+    const template: string[] = JSON.parse(fs.readFileSync(env.CODEPUPPY_OFFICE_MCP_MANIFEST, "utf8")).formats.word.command
+    const command = (workspace: string) =>
+      template.map((token) => (token === "{workspace}" ? workspace : token.split("{codepuppyResources}").join(resources)))
+    expect(authorityForMcp("codepuppy-word", { type: "local", command: command("/Users/someone/project") } as never, env)).toMatchObject({ kind: "codepuppy-bundled" })
+    expect(authorityForMcp("codepuppy-word", { type: "local", command: command("relative/project") } as never, env)).toEqual({ kind: "not-asserted" })
+  })
+
   test("the display snapshot is the schema's ToolDisplaySnapshotV1: identity + technicalId + authority + location", () => {
     const facts = toolFacts({ id: "files_list", name: "list", options: { namespace: "files" } }, base())
     expect(displaySnapshot(facts)).toEqual({

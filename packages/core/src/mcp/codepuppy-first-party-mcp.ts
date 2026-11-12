@@ -9,6 +9,10 @@
  * for token (the template with `{codepuppyResources}` = the manifest's resource root) and the bundled server.py next to
  * the manifest still hashes to the manifest's digest. Anything else — another command, an extra token, a server.py
  * the manifest was not exported from, no manifest at all — gets nothing and is listed only once it has connected.
+ * The template's `{workspace}` slot matches the marker itself or an absolute folder without `..`: main writes either
+ * (ui-mac `office-advisories.ts` codepuppyOfficeInstallCommand) and the extension replaces the marker with the
+ * Location's folder before the engine and the identity see the command (#1666 Unit E). Core's declaration and the
+ * extension's `codepuppy-bundled` authority both match through `commandMatchesTemplate`.
  * A declaration is never a connection: the engine still runs initialize + tools/list before executing one (I9).
  *
  * `name` (the MCP key) is not part of the binding; the engine derives the tools' identity from it either way.
@@ -20,6 +24,20 @@ import path from "node:path"
 export const OFFICE_MCP_MANIFEST_ENV = "CODEPUPPY_OFFICE_MCP_MANIFEST"
 
 const RESOURCES_SLOT = "{codepuppyResources}"
+const WORKSPACE_SLOT = "{workspace}"
+
+/** One command token against one template token (resource root substituted; workspace slot as described above). */
+export function commandMatchesTemplate(template: readonly string[], command: readonly unknown[], resources: string) {
+  return (
+    template.length === command.length &&
+    template.every((token, index) => {
+      const actual = command[index]
+      if (token === WORKSPACE_SLOT)
+        return actual === WORKSPACE_SLOT || (typeof actual === "string" && path.isAbsolute(actual) && !actual.split(/[\\/]/).includes(".."))
+      return token.split(RESOURCES_SLOT).join(resources) === actual
+    })
+  )
+}
 
 type Manifest = {
   serverSha256: string
@@ -40,11 +58,7 @@ export function declaredFirstPartyTools(
     const manifest = JSON.parse(new TextDecoder().decode(readFile(manifestPath))) as Manifest
     const officeDir = path.dirname(manifestPath)
     const resources = path.dirname(officeDir)
-    const format = Object.values(manifest.formats).find(
-      (candidate) =>
-        candidate.command.length === command.length &&
-        candidate.command.every((token, index) => token.split(RESOURCES_SLOT).join(resources) === command[index]),
-    )
+    const format = Object.values(manifest.formats).find((candidate) => commandMatchesTemplate(candidate.command, command, resources))
     if (!format) return undefined
     const digest = createHash("sha256")
       .update(readFile(path.join(officeDir, "server.py")))

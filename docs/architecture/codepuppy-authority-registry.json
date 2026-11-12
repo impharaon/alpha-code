@@ -180,7 +180,7 @@
         },
         {
           "file": "packages/ui-mac/src/main/composer-tier-matrix.engine.test.ts",
-          "name": "三档 × R1–R12、三条委派入口与审批请求的整条路径(composer-tier-matrix.engine.cases.ts,26 条)"
+          "name": "三档 × R1–R12、三条委派入口与审批请求的整条路径(composer-tier-matrix.engine.cases.ts,27 条)"
         }
       ],
       "note": "An answer to the pending request itself is not held here: any plugin Context (including the extension's, which the project-plugin fan-out passes through) can call permission.reply on Code Puppy's request and the call runs (measured 2026-11-09); closing it belongs to the fan-out (L3), reported to the coordinator."
@@ -334,7 +334,7 @@
       "tests": [
         {
           "file": "packages/ui-mac/src/main/composer-tier-matrix.engine.test.ts",
-          "name": "三档 × R1–R12、三条委派入口与审批请求的整条路径(composer-tier-matrix.engine.cases.ts,26 条)"
+          "name": "三档 × R1–R12、三条委派入口与审批请求的整条路径(composer-tier-matrix.engine.cases.ts,27 条)"
         }
       ],
       "note": "R7 (egress fence and kill switch) is not a rule-layer cell. R9 (cloud tools) passes the same execution gate as R10 / R11 and differs only in identity derivation (codepuppy-cloud authority minted from the verified definition), judged by packages/ext/src/policy/register-policy.test.ts and plugin-host.test.ts; a governed remote MCP in the engine sandbox would need the ARM / DEF and cloud credential setup."

@@ -328,22 +328,18 @@ export const CodePuppyExt: Plugin.Plugin = {
       })
       // REQ-236 §2.2 R2(`#1662` parity):全部批准 / 请求审批读写工作区外先问,插在引擎底座之后、配置规则之前 —— 用户自己的
       // `external_directory` 规则照 v1 胜出,只读档的拒绝仍在最后。理由与白名单见 external-directory-rule.ts。
-      // 变换在第一次 prompt 时注册(与策略目录的尾规则同一时机,policy/catalog.ts ensureTail):OpenCode 的配置 agent 插件在激活之后
-      // 才建出 codepuppy-ask,激活时注册的变换看不到它;插入位置按底座算,与注册先后无关。
-      let externalDirectory = false
-      await context.session.hook("prompt", async () => {
-        if (externalDirectory) return
-        externalDirectory = true
-        await context.agent.transform((editor) => {
-          const rules = externalDirectoryRules(process.env)
-          for (const id of EXTERNAL_DIRECTORY_AGENTS) {
-            if (!editor.get(id as never)) continue
-            editor.update(id as never, (agent) => {
-              if (!placeAfterBase(id, agent.permissions as never, rules))
-                error(`[@codepuppy/ext] ${id}: the engine's base rules changed shape; external_directory ask appended (user rules cannot relax it)`)
-            })
-          }
-        })
+      // 变换在激活时注册,任何一轮(包括 `/goal` 经 session.synthetic 起的第一轮,`#1662` r6)之前就在,不等某个钩子。引擎每次重建
+      // agent 表都按注册顺序重跑全部变换,OpenCode 的配置 agent 插件排在外部插件之后(packages/core/src/plugin/internal.ts 的 post),
+      // 所以这里跑的时候 codepuppy-ask 还没建出来:editor.update 按引擎底座(Agent.Info.default,配置插件自己建它时的同一个起点)先建出它,
+      // 配置插件随后照常把顶层规则与它自己的字段加在后面 —— 顺序仍是「底座 → 这里 → 配置」。codepuppy-ask 由注入无条件写进配置
+      // (ui-mac codepuppy-config-injection.ts 2d),ext 只随这份注入装载,不会多出一个配置里没有的 agent。
+      await context.agent.transform((editor) => {
+        const rules = externalDirectoryRules(process.env)
+        for (const id of EXTERNAL_DIRECTORY_AGENTS)
+          editor.update(id as never, (agent) => {
+            if (!placeAfterBase(id, agent.permissions as never, rules))
+              error(`[@codepuppy/ext] ${id}: the engine's base rules changed shape; external_directory ask appended (user rules cannot relax it)`)
+          })
       })
       // REQ-067 / #1522:出厂禁用的技能 —— 从技能目录里拿掉(上游内置的那些在 ext 之前注册),并在权限评估里一律 deny
       // (覆盖之后才由配置目录装进来的同名技能)。

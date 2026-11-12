@@ -26,18 +26,11 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import fs from "node:fs"
 import path from "node:path"
-import { assertEngineSandboxed, engineSandbox, engineSlot } from "../../test-component/engine-sandbox"
-import { buildEngineServerOptions } from "./engine-server-options"
-import { withEngineAuthorization } from "./engine-authorization"
-import { injectCodePuppyConfig } from "./codepuppy-config-injection"
-import { secretFilePath, secretFileRef } from "./codepuppy-secret-files"
-import type { EngineFetch } from "./in-process-engine"
-import { buildHubRequestReply, buildHubViewReply } from "./codepuppy-sidecar-messages"
+import { assertEngineSandboxed, engineSandbox } from "../../test-component/engine-sandbox"
+import { codepuppyEngine, policyStore, probe, scriptedModel, type Running } from "../../test-component/codepuppy-engine"
 
 const sandbox = engineSandbox()
-const PASSWORD = "cp-parity-tiers"
 const FACTORY_SKILLS = path.join(sandbox.root, "factory-skills")
-const MCP_FIXTURE = path.resolve(import.meta.dir, "../../../core/test/fixture/codepuppy-mcp-startup-stdio.ts")
 const MCP_CALLS = path.join(sandbox.root, "tiers-mcp-calls.log")
 const BUILD = "build"
 const ASK = "codepuppy-ask"
@@ -46,170 +39,48 @@ const TIERS = [BUILD, ASK, READONLY] as const
 type Tier = (typeof TIERS)[number]
 type Outcome = "allow" | "ask" | "deny"
 
-// ── 模型桩 ────────────────────────────────────────────────────────────────────────────────────────
-const modelRequests: Array<{ tools: string[] }> = []
-const chunk = (delta: Record<string, unknown>, finish: string | null = null) =>
-  `data: ${JSON.stringify({ id: "chatcmpl-cp-tiers", object: "chat.completion.chunk", created: 1, model: "m", choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`
-const text = (value: string) => chunk({ role: "assistant", content: value }) + chunk({}, "stop") + "data: [DONE]\n\n"
-const textOf = (content: unknown) => (typeof content === "string" ? content : Array.isArray(content) ? content.map((part: any) => part?.text ?? "").join("") : "")
-let callSeq = 0
-const llm = Bun.serve({
-  hostname: "127.0.0.1",
-  port: 0,
-  async fetch(request) {
-    if (!request.url.endsWith("/chat/completions")) return new Response("not found", { status: 404 })
-    const body = (await request.json()) as { messages?: Array<{ role: string; content?: unknown }>; tools?: Array<{ function?: { name?: string } }> }
-    modelRequests.push({ tools: (body.tools ?? []).map((tool) => String(tool.function?.name)) })
-    const messages = body.messages ?? []
-    const headers = { "content-type": "text/event-stream" }
-    if (messages.at(-1)?.role === "tool") return new Response(text("done"), { headers })
-    const marker = textOf(messages.filter((message) => message.role === "user").at(-1)?.content).match(/CP-CALL (\{.*\})/)
-    if (!marker) return new Response(text("ok"), { headers })
-    const call = JSON.parse(marker[1]!) as { name: string; args: Record<string, unknown> }
-    const id = `call_cp_tiers_${++callSeq}`
-    const body2 =
-      chunk({ role: "assistant", tool_calls: [{ index: 0, id, type: "function", function: { name: call.name, arguments: JSON.stringify(call.args) } }] }) +
-      chunk({}, "tool_calls") +
-      "data: [DONE]\n\n"
-    return new Response(body2, { headers })
-  },
-})
-
-// ── 引擎 ──────────────────────────────────────────────────────────────────────────────────────────
-type Probe = { ctx: any; runs: Record<string, number> }
-const probe = () => (globalThis as { __cpTierProbe?: Probe }).__cpTierProbe!
-let fetch: EngineFetch
+// ── 引擎(test-component/codepuppy-engine.ts:生产注入 + 真 ext + 探针插件 + 模型桩)──────────────────────
+const model = scriptedModel()
+const modelRequests = model.requests
+let running: Running | undefined
 let projectDirectory = ""
-let engine: { close: () => Promise<void> } | undefined
-let store: { setRecord: (record: never) => Promise<unknown>; removeRecord: (selector: never) => Promise<unknown> } | undefined
-const policyStore = () => store!
-
-const send = async (method: string, route: string, body?: unknown) => {
-  const response = await fetch(
-    new Request(`http://codepuppy-sidecar.invalid${route}`, {
-      method,
-      headers: { "x-opencode-directory": encodeURIComponent(projectDirectory), "content-type": "application/json" },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    }),
-  )
-  const raw = await response.text()
-  return { status: response.status, json: raw ? (JSON.parse(raw) as any) : undefined }
-}
+let store: Awaited<ReturnType<typeof policyStore>> | undefined
+const send = (method: string, route: string, body?: unknown) => running!.send(method, route, body)
 
 beforeAll(async () => {
   await assertEngineSandboxed(sandbox)
-  const userData = path.join(sandbox.root, "tiers-userdata")
-  process.env.CODEPUPPY_GLOBAL_DIR = path.join(sandbox.root, "tiers-state", "codepuppy-state", "env", "dev")
-  fs.mkdirSync(process.env.CODEPUPPY_GLOBAL_DIR, { recursive: true })
-  const key = secretFilePath(userData, "CODEPUPPY_API_KEY")
-  fs.mkdirSync(path.dirname(key), { recursive: true })
-  fs.writeFileSync(key, "sk-cp-parity-tiers", { mode: 0o600 })
-  // sidecar 在 fork 时置的两样:平台节点地址(这里指向模型桩)与平台凭据的 {file:} 引用(ext 的请求头每次现读它)
-  process.env.CODEPUPPY_BASE_URL = `http://127.0.0.1:${llm.port}/v1`
-  process.env.CODEPUPPY_PLATFORM_AUTH_REF = secretFileRef(userData, "CODEPUPPY_API_KEY")
-  process.env.CODEPUPPY_POLICY_ACCOUNT = `t-tiers-${Math.random().toString(36).slice(2)}`
   // R2:出厂技能目录(main 启动时算好、经这个变量交给注入)
   fs.mkdirSync(FACTORY_SKILLS, { recursive: true })
   process.env.CODEPUPPY_FACTORY_SKILL_DIRS = JSON.stringify([FACTORY_SKILLS])
-  // R10:用户在 Code Puppy 里加的本地 MCP(codepuppy.jsonc;引擎经显式文件读它),真 stdio MCP 服务器,只列一个 echo 工具
-  fs.writeFileSync(
-    path.join(process.env.CODEPUPPY_GLOBAL_DIR, "codepuppy.jsonc"),
-    JSON.stringify({ mcp: { probe: { type: "local", command: [process.execPath, MCP_FIXTURE], environment: { CODEPUPPY_MCP_CALL_LOG: MCP_CALLS } } } }),
-  )
-  // 定制中心安装要问 main 要目录视图:main 由一个假 parentPort 扮演(ext 在装载时取它,同 packages/ext/src/plugin-host.test.ts)
-  const listeners: Array<(event: { data: unknown }) => void> = []
-  const row = { id: "mcp:github", scope: null, name: "github", kind: "mcp", displayName: "GitHub", description: "repos", installed: false, enabled: false, state: "not-installed", authorization: "none" }
-  ;(process as unknown as { parentPort?: unknown }).parentPort = {
-    postMessage: (message: { type: string; id: number; directory?: string }) =>
-      queueMicrotask(() => {
-        const reply =
-          message.type === "codepuppy.hub.view.request"
-            ? buildHubViewReply(message.id, { view: { directory: message.directory ?? "", rows: [row as never], warnings: [] } })
-            : message.type === "codepuppy.hub.request.request"
-              ? buildHubRequestReply(message.id, { record: null })
-              : undefined
-        if (reply) for (const listener of listeners) listener({ data: reply })
+  const host = codepuppyEngine({
+    sandbox,
+    name: "tiers",
+    modelBaseURL: model.baseURL,
+    // R10:用户在 Code Puppy 里加的本地 MCP,真 stdio MCP 服务器,只列一个 echo 工具
+    mcpCallLog: MCP_CALLS,
+    projectFiles: {
+      "a.txt": "a\n",
+      // R6c / R6d 的两类命令:非子任务、自带其它助手;子任务(目标 general / 只读档自身)
+      "opencode.json": JSON.stringify({
+        commands: {
+          "cp-as-build": { template: "as build", agent: BUILD },
+          "cp-as-general": { template: "review", agent: "general", subtask: true },
+          "cp-as-readonly": { template: "review", agent: READONLY, subtask: true },
+        },
       }),
-    on: (_event: string, listener: (event: { data: unknown }) => void) => void listeners.push(listener),
-  }
-
-  // 真 ext:2.x 只装目录形式的本地插件,入口 server.js 的 default 导出(packages/core/src/plugin/module.ts)
-  const ext = path.join(sandbox.root, "tiers-ext")
-  fs.mkdirSync(ext, { recursive: true })
-  fs.writeFileSync(path.join(ext, "server.js"), `export { default } from ${JSON.stringify(path.resolve(import.meta.dir, "../../../ext/src/plugin.ts"))}\n`)
-  const probeDir = path.join(sandbox.root, "tiers-probe")
-  fs.mkdirSync(probeDir, { recursive: true })
-  fs.writeFileSync(
-    path.join(probeDir, "server.js"),
-    `export default { id: "codepuppy.test.tier-probe", setup: async (ctx) => {
-  const state = { ctx, runs: { cp_probe: 0, cp_disabled: 0 } }
-  globalThis.__cpTierProbe = state
-  await ctx.tool.transform((editor) => {
-    for (const name of ["cp_probe", "cp_disabled"])
-      editor.add({ name, description: name, input: { type: "object", properties: {} }, options: { codemode: false },
-        execute: async () => { state.runs[name] += 1; return { content: name + " ran" } } })
+    },
   })
-} }\n`,
-  )
-
-  const injection = injectCodePuppyConfig(userData, ext, "stable")
-  const content = JSON.parse(injection.config.content) as { plugins: string[]; providers: Record<string, { models?: Record<string, unknown> }> }
-  content.plugins = [...content.plugins, probeDir]
-  // 沙箱里没有已应用的平台目录,平台节点的模型表是空的(`#1556`);补一个模型只为能发出请求
-  content.providers.codepuppy!.models = { m: { name: "m" } }
-
-  const slot = engineSlot(sandbox, "tiers")
-  projectDirectory = slot.projectDirectory
-  fs.writeFileSync(path.join(projectDirectory, "a.txt"), "a\n")
-  // R6c / R6d 的两类命令:非子任务、自带其它助手;子任务(目标 general / 只读档自身)
-  fs.writeFileSync(
-    path.join(projectDirectory, "opencode.json"),
-    JSON.stringify({
-      commands: {
-        "cp-as-build": { template: "as build", agent: BUILD },
-        "cp-as-general": { template: "review", agent: "general", subtask: true },
-        "cp-as-readonly": { template: "review", agent: READONLY, subtask: true },
-      },
-    }),
-  )
-  const { startEngine } = await import("../../engine/engine-embed")
-  engine = await startEngine(
-    buildEngineServerOptions({
-      hostname: "127.0.0.1",
-      port: 0,
-      password: PASSWORD,
-      engineVersion: "test",
-      databasePath: slot.databasePath,
-      configDirectory: slot.configDirectory,
-      config: { content: JSON.stringify(content), file: injection.config.file },
-      models: { ...(injection.models.file ? { file: injection.models.file } : {}), fetch: false },
-      filewatcher: false,
-      platform: process.platform,
-    }),
-    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, PASSWORD)) },
-  )
-  // Location 在第一次带目录的请求时才起,插件随之装载:轮询到 ext 与探针都不再是 loading
-  const status = async (id: string) =>
-    (((await send("GET", "/api/plugin")).json?.data ?? []) as Array<{ id: string; state: { status: string } }>).find((plugin) => plugin.id === id)?.state.status
-  for (let i = 0; i < 200 && ((await status("codepuppy.ext")) !== "active" || !(globalThis as { __cpTierProbe?: Probe }).__cpTierProbe); i++) await Bun.sleep(50)
-  // 前提:ext 真装上了(不然身份轴的格判的是「没有 ext」)
-  expect(await status("codepuppy.ext")).toBe("active")
+  projectDirectory = host.projectDirectory
+  running = await host.start()
   expect(probe()).toBeDefined()
-  // ext 的策略模块在沙箱就位之后才装载(静态 import 会先于沙箱算出全局根目录)
-  const { createToolPolicyStore, defaultPolicyBaseDir } = await import("../../../ext/src/policy/resolver")
-  const { policyWorkspace } = await import("../../../ext/src/policy/index")
-  // R12:用户在设置里停用 cp_disabled —— 经生产的策略存储写进 ext 读的那个位置(数据根 / 账户 / 工作区与 registerPolicy 同一套)
-  store = createToolPolicyStore({
-    baseDir: defaultPolicyBaseDir(path.join(process.env.XDG_DATA_HOME!, "opencode")),
-    account: () => process.env.CODEPUPPY_POLICY_ACCOUNT!,
-    workspace: () => policyWorkspace(probe().ctx.location),
-  })
+  // R12:用户在设置里停用 cp_disabled —— 经生产的策略存储写进 ext 读的那个位置
+  store = await policyStore()
   await store.setRecord({ selector: { level: "tool", canonical: "plugin::cp_disabled" }, state: "disabled" } as never)
 }, 60_000)
 
 afterAll(async () => {
-  await engine?.close().catch(() => undefined)
-  llm.stop(true)
+  await running?.close().catch(() => undefined)
+  model.stop()
 })
 
 // ── 小工具 ────────────────────────────────────────────────────────────────────────────────────────
@@ -525,19 +396,19 @@ describe("ext 造出的每一种待批请求都能经引擎路由列出,且 JSON
   }, 60_000)
 
   test("内置工具在设置里设为询问(全部批准档 × glob)", async () => {
-    await policyStore().setRecord({ selector: { level: "tool", canonical: "builtin::glob" }, state: "ask" } as never)
+    await store!.setRecord({ selector: { level: "tool", canonical: "builtin::glob" }, state: "ask" } as never)
     const owner = await turn(BUILD, "glob", { pattern: "*.txt" })
     await check(owner.id, "builtin::glob")
     await idle(owner.id)
   }, 60_000)
 
   test("子任务命令在 Code Puppy 策略里设为询问(evaluate 钩子写进身份信封)", async () => {
-    await policyStore().setRecord({ selector: { level: "tool", canonical: "builtin::subagent" }, state: "ask" } as never)
+    await store!.setRecord({ selector: { level: "tool", canonical: "builtin::subagent" }, state: "ask" } as never)
     const owner = await session(BUILD)
     const running = send("POST", `/api/session/${owner.id}/command`, { name: "cp-as-general", text: "" })
     await check(owner.id, "subagent")
     await running
-    await policyStore().removeRecord({ level: "tool", canonical: "builtin::subagent" } as never)
+    await store!.removeRecord({ level: "tool", canonical: "builtin::subagent" } as never)
   }, 60_000)
 
   test("定制中心安装:调用前的身份询问与安装确认两条", async () => {

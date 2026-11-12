@@ -1530,6 +1530,10 @@
         {
           "file": "packages/ui-mac/src/main/sidecar-stop.test.ts",
           "name": "#1647 AC2 a hung engine close stays inside the five-second stop budget"
+        },
+        {
+          "file": "packages/ui-mac/src/main/sidecar-stop-pending-approval.engine.test.ts",
+          "name": "#1647 AC1:等审批时停引擎 ⇒ 这一轮被释放、工具零执行(sidecar-stop-pending-approval.engine.cases.ts,3 条)"
         }
       ]
     },

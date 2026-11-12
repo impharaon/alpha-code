@@ -22,14 +22,39 @@ export function setHubSection(value: HubSection): void {
   setSection(value)
 }
 
+// `#1691`:从「未恢复问题」入口的「查看」打开时要定位的那一行(已安装行键)。那一行出现即取走(滚到可见并高亮);
+// 一直没有那一行(已卸载、被移除)就什么都不做,hub 关闭时作废,免得之后装回来时莫名高亮。
+const [locate, setLocate] = createSignal<string | undefined>()
+
+/** 已安装行的键:hub 的行与指向它的来源共用这一个写法。 */
+export function installedRowKey(type: string, name: string): string {
+  return `${type}:${name}`
+}
+
+/** 打开 hub 到某一页;给了 `target`(已安装行键)就定位到那一行。 */
+export function openExtHubAt(value: HubSection, target?: string): void {
+  setSection(value)
+  setLocate(target)
+  setOpen(true)
+}
+
+/** 行键是当前定位目标时取走它(返回 true);读取是响应式的,行在 effect 里调用即可等到目标出现。 */
+export function takeHubLocateTarget(key: string): boolean {
+  if (locate() !== key) return false
+  setLocate(undefined)
+  return true
+}
+
 export function extHubOpen(): boolean {
   return open()
 }
 
 export function setExtHubOpen(value: boolean): void {
+  if (!value) setLocate(undefined)
   setOpen(value)
 }
 
 export function toggleExtHub(): void {
+  if (open()) setLocate(undefined)
   setOpen((prev) => !prev)
 }

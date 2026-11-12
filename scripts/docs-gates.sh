@@ -8,16 +8,24 @@
 
 # I-09:含受审上游合并的分支(换代整合分支)上,两道文档闸只判 Code Puppy 的地盘。上游父怎么认由 north-star 守卫
 # 定义(`--print-upstream-parent`,不另抄一份);与上游父逐字节相同的路径是上游原样,不归我们 lint —— 自有包、
-# 文档、脚本、接管文件与它们不同(或上游没有),照常判。没有上游父(普通分支、alpha 本身)⇒ 空串,行为逐字不变。
+# 文档、脚本、接管文件与它们不同(或上游没有),照常判。M0 合入 alpha 之后(alpha 本身、从它切出的分支)上游父取
+# HEAD 历史里最近的上游合并;历史里没有上游合并 ⇒ 空串,全量判。认不出(守卫非零)⇒ 本步红,不降级成全量或跳过。
 docs_gate_upstream_parent() {
-  bash scripts/north-star-guard.sh --print-upstream-parent 2>/dev/null || true
+  bash scripts/north-star-guard.sh --print-upstream-parent
 }
 
 # [3/14] 字面 NUL 字节(#760):NUL 让 grep 对整个文件静默失明。
 docs_gate_nul() {
   local parent
-  parent="$(docs_gate_upstream_parent)"
-  [ -z "$parent" ] || echo "    · 含受审上游合并:与上游父 ${parent:0:10} 逐字节相同的文件不扫"
+  if ! parent="$(docs_gate_upstream_parent)"; then
+    echo "    ✗ 认不出上游父 —— 本步作废(不是通过)"
+    return 1
+  fi
+  if [ -n "$parent" ]; then
+    echo "    · 上游父 ${parent:0:10}:与它逐字节相同的文件是上游原样,不扫"
+  else
+    echo "    · HEAD 历史里没有受审上游合并 —— 全部版本控制文件都扫"
+  fi
   if python3 scripts/assert-no-nul-bytes.py ${parent:+--skip-identical-to "$parent"}; then
     echo "    ✓ no literal NUL bytes"
   else
@@ -35,14 +43,17 @@ docs_gate_links() {
   md_untracked="$(git ls-files --others --exclude-standard -- '*.md' 2>/dev/null || true)"
   md_list="$(printf '%s\n%s\n%s\n' "$md_committed" "$md_worktree" "$md_untracked" | sed '/^$/d' | sort -u)"
   local parent
-  parent="$(docs_gate_upstream_parent)"
+  if ! parent="$(docs_gate_upstream_parent)"; then
+    echo "    ✗ 认不出上游父 —— 本步作废(不是通过)"
+    return 1
+  fi
   if [ -n "$parent" ] && [ -n "$md_list" ]; then
     # 只留与上游父不同的(含上游没有的);未跟踪文件 git diff 看不见,按新增照留。
     local differing
     # shellcheck disable=SC2086
     differing="$(git diff --name-only "$parent" -- $md_list 2>/dev/null || true)"
     md_list="$(printf '%s\n%s\n' "$differing" "$md_untracked" | sed '/^$/d' | sort -u)"
-    echo "    · 含受审上游合并:与上游父 ${parent:0:10} 逐字节相同的 Markdown 不判"
+    echo "    · 上游父 ${parent:0:10}:与它逐字节相同的 Markdown 不判"
   fi
   if [ -z "$md_list" ]; then
     echo "    ✓ no Markdown changed — docs gate is a no-op (与 CI 同)"

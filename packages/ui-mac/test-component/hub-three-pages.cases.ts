@@ -156,7 +156,7 @@ const { createComponent } = solid
 const { render } = solidWeb
 // 必须**动态** import:静态 import 会在 registrator 之前牵出 solid-js。
 const { ExtensionHub } = await import("../src/renderer/extensions/extension-hub")
-const { setHubSection } = await import("../src/renderer/extensions/ext-hub-state")
+const { openExtHubAt, setExtHubOpen, setHubSection, takeHubLocateTarget } = await import("../src/renderer/extensions/ext-hub-state")
 
 const disposals: Array<() => void> = []
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
@@ -574,4 +574,48 @@ test("#1658 AC3 cloud verification identifies connection, tools or policy; raw d
     expect(visible.textContent).not.toContain(detail)
     expect(q(".codepuppy-ext-kit-desc", row)?.getAttribute("title")).toBeNull()
   }
+})
+
+// ── `#1691`「未恢复问题」入口的「查看」定位到出问题的那一行 ─────────────────────────────────────────
+// 入口一侧(「查看」把服务身份交给 hub)的判据在 background-problem-watcher.test.ts;这里断言 hub 一侧:
+// 目标行滚到可见、高亮约 2 秒后消退,目标不在时照常打开、什么都不高亮。滚动只记录调用(happy-dom 不排版)。
+const scrolled: string[] = []
+HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) {
+  scrolled.push(this.getAttribute("data-installed-row") ?? this.getAttribute("data-cloud-connector") ?? "?")
+}
+const locatedRows = () => qa("[data-located]").map((node) => node.getAttribute("data-installed-row"))
+const twoConnectors = () => [receipt("mcp:markitdown", "markitdown", "mcp"), { ...receipt("user:notes-mcp", "notes-mcp", "mcp"), origin: "created", version: undefined }]
+
+test("#1691 AC-01 查看定位的连接器行:hub 打开后那一行滚到可见并高亮,约 2 秒后自行消退;别的行不动", async () => {
+  reset()
+  scrolled.length = 0
+  receipts = twoConnectors()
+  // 与真实路径同序:先由「查看」打开 hub 并给出目标,行随数据到达后才出现。
+  openExtHubAt("connectors", "mcp:notes-mcp")
+  mount()
+  await waitFor(() => expect(locatedRows()).toEqual(["mcp:notes-mcp"]))
+  expect(q("[data-installed-row='mcp:markitdown']")).toBeInstanceOf(HTMLElement)
+  expect(scrolled).toEqual(["mcp:notes-mcp"])
+  await new Promise((resolve) => setTimeout(resolve, 1_500))
+  expect(locatedRows(), "still highlighted before ~2 s").toEqual(["mcp:notes-mcp"])
+  await new Promise((resolve) => setTimeout(resolve, 700))
+  expect(locatedRows(), "highlight fades by itself after ~2 s").toEqual([])
+  expect(scrolled, "located once, not again on re-render").toEqual(["mcp:notes-mcp"])
+  setExtHubOpen(false)
+})
+
+test("#1691 AC-02 查看指向的连接器已不在:页面照常打开、不报错、不高亮任何行;关掉 hub 后目标作废", async () => {
+  reset()
+  scrolled.length = 0
+  receipts = twoConnectors()
+  openExtHubAt("connectors", "mcp:uninstalled-one")
+  mount()
+  await waitFor(() => expect(q("[data-installed-row='mcp:notes-mcp']")).toBeInstanceOf(HTMLElement))
+  await flush()
+  expect(qa(".codepuppy-ext-tab").length).toBe(3)
+  expect(locatedRows()).toEqual([])
+  expect(scrolled).toEqual([])
+  expect(qa("[role='alert']").map((node) => node.textContent)).toEqual([])
+  setExtHubOpen(false)
+  expect(takeHubLocateTarget("mcp:uninstalled-one"), "a stale target does not survive closing the hub").toBe(false)
 })

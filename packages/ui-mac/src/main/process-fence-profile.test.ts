@@ -2,8 +2,9 @@
 //
 // 断言粒度纪律:profile 用**逐行全等**(不是「包含 deny」);并集用**顺序相等**(不是集合);
 // 裁剪用一个「只在 ≤N 条时通过」的假编译器,断言丢的是尾部、丢到底仍失败要抛且带原因。
-// XDG 解析对着 node_modules 里**那份** xdg-basedir(packages/core/src/global.ts 真 import 的那个)
-// 逐输入交叉验证 —— 基准是别人的包,不是本模块常量(非自指等价链)。
+// XDG 解析对着引擎**真用的那份**取法逐输入交叉验证:OpenCode 2 的全局路径(@opencode/util/global)从
+// `#global-roots` 取根,按 packages/util/package.json 的 imports 解析到 packages/util/src/global-roots.ts ——
+// 基准是引擎的模块,不是本模块常量(非自指等价链)。v1 的 packages/core/src/global.ts 经 xdg-basedir 取根,随换代删了。
 
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
@@ -147,18 +148,19 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的 19 行,逐行全等"
   })
 })
 
-describe("resolveEngineRoots == node_modules 里那份 xdg-basedir(packages/core/src/global.ts 的 import)", () => {
-  // xdg-basedir 在模块装载时读 process.env / os.homedir(),所以每个输入形状起一个子进程真 import 它。
-  const coreRequire = createRequire(resolve(import.meta.dir, "../../../core/package.json"))
-  const xdgPath = coreRequire.resolve("xdg-basedir")
+describe("resolveEngineRoots == 引擎的 #global-roots(@opencode/util/global 的根)", () => {
+  // global-roots.ts 在模块装载时读 process.env / os.homedir(),所以每个输入形状起一个子进程真 import 它。
+  // 解析走 util 包自己的 imports 映射(与引擎装载同一条件),不写死文件路径。
+  const utilRequire = createRequire(resolve(import.meta.dir, "../../../util/package.json"))
+  const rootsPath = utilRequire.resolve("#global-roots")
 
-  const viaRealPackage = (env: Record<string, string>, home: string) => {
+  const viaEngine = (env: Record<string, string>, home: string) => {
     const res = spawnSync(
       process.execPath,
-      ["-e", `import("${xdgPath}").then(m => console.log(JSON.stringify({ data: m.xdgData, cache: m.xdgCache, config: m.xdgConfig })))`],
+      ["-e", `import("${rootsPath}").then(m => { const r = m.roots("opencode"); console.log(JSON.stringify({ data: r.data, cache: r.cache, config: r.config })) })`],
       { env: { PATH: process.env.PATH ?? "", HOME: home, ...env }, encoding: "utf8" },
     )
-    if (res.status !== 0) throw new Error(`xdg-basedir probe failed: ${res.stderr}`)
+    if (res.status !== 0) throw new Error(`#global-roots probe failed: ${res.stderr}`)
     return JSON.parse(res.stdout.trim()) as { data: string; cache: string; config: string }
   }
 
@@ -170,9 +172,11 @@ describe("resolveEngineRoots == node_modules 里那份 xdg-basedir(packages/core
       { XDG_DATA_HOME: "" },
     ]
     for (const env of shapes) {
-      const real = viaRealPackage(env, "/Users/xdg-probe")
+      const real = viaEngine(env, "/Users/xdg-probe")
       const ours = resolveEngineRoots(env, "/Users/xdg-probe")
-      expect({ data: ours.dataHome, cache: ours.cacheHome, config: ours.configHome }, JSON.stringify(env)).toEqual(real)
+      // profile 放行的是 `<根>/opencode`(W4–W6),引擎的根正是这三个目录。
+      const app = (root: string) => join(root, "opencode")
+      expect({ data: app(ours.dataHome), cache: app(ours.cacheHome), config: app(ours.configHome) }, JSON.stringify(env)).toEqual(real)
     }
   })
 })

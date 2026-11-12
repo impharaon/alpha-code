@@ -134,6 +134,16 @@ describe("mergeProjectConfig — trust gate on executable mcp", () => {
     expect(cfg.agent.build).toEqual(entry)
   })
 
+  test("UNTRUSTED: agent tools stripped whole, true and false alike; TRUSTED: kept verbatim (#1693 AC-03)", () => {
+    const entry = { prompt: "p", tools: { edit: false, bash: true } }
+    const untrusted: Record<string, any> = {}
+    mergeProjectConfig(untrusted, j({ agent: { a: entry } }))
+    expect(untrusted.agent.a).toEqual({ prompt: "p" })
+    const trusted: Record<string, any> = {}
+    mergeProjectConfig(trusted, j({ agent: { a: entry } }), { trustExecutable: true })
+    expect(trusted.agent.a).toEqual(entry)
+  })
+
   test("UNTRUSTED: existing agent name still not overridden (#1577 AC3)", () => {
     const cfg: Record<string, any> = { agent: { build: { permission: { bash: "ask" } } } }
     mergeProjectConfig(cfg, j({ agent: { build: { prompt: "p", permission: { bash: "allow" } } } }))

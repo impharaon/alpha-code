@@ -156,6 +156,8 @@ describe("#1687 v2 connector failures go only to the entry", () => {
     items()[0]!.querySelector<HTMLButtonElement>(".codepuppy-problems-act")!.click()
     await settle()
     expect(runtime.hubState()).toEqual({ open: true, section: "connectors" })
+    // `#1691` AC-01:「查看」带着这个服务的身份 —— 定位目标正是它在已安装组里的那一行(行如何滚动高亮见 hub-three-pages.cases.ts)。
+    expect(runtime.takeHubLocateTarget("mcp:github"), "查看 carries the connector identity to the hub").toBe(true)
     expect(entryLabel()).toBe(countLabel(1))
   })
 

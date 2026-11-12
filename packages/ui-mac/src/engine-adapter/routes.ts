@@ -15,7 +15,7 @@ import type {
 import { normalizeAgentList, normalizeSessionInfo } from "./frozen-shapes"
 import { projectEventStream } from "./events"
 import { v1DecisionID, type DecisionInput, type DecisionOutcome, type PermissionReplies } from "./permission-replies"
-import { recentMessages, sessionDirectory } from "./session-cache"
+import { MESSAGE_PAGE, recentMessages, sessionDirectory } from "./session-cache"
 import {
   syntheticText,
   toFormAnswer,
@@ -342,12 +342,18 @@ export const ROUTES: readonly Route[] = [
   }),
   route("GET", "/session/:sessionID/message", messages),
   // U1:2.x 没有 todo 查询端点;清单就是会话里最近一次 todowrite 的输入(与事件流的 todo.updated 同一来源)。
+  // `#1692`:从最近一页往前一页页找,找到即停 —— 长会话不再整段读取;一直没有写入才读到会话开头。
   route("GET", "/session/:sessionID/todo", async (context) => {
     const sessionID = context.params.sessionID!
-    const page = await recentMessages(context.api, sessionID, {})
-    const parts = toV1Messages(sessionID, page.context).flatMap((item) => item.parts)
-    const last = parts.findLast((part) => part.type === "tool" && part.tool === "todowrite")
-    return json(last ? todosOf(last) : [])
+    let cursor: string | undefined
+    for (;;) {
+      const page = await recentMessages(context.api, sessionID, { limit: MESSAGE_PAGE, cursor })
+      const parts = toV1Messages(sessionID, page.context).flatMap((item) => item.parts)
+      const last = parts.findLast((part) => part.type === "tool" && part.tool === "todowrite")
+      if (last) return json(todosOf(last))
+      if (!page.next) return json([])
+      cursor = page.next
+    }
   }),
   route("GET", "/session/:sessionID/message/:messageID", async (context) => {
     const sessionID = context.params.sessionID!

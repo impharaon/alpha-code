@@ -63,7 +63,7 @@ const MCP_ADDRESS_REJECTION_KEY = {
 import type { AuthorizationConfirmationWire, CapabilityDiffWire } from "../../shared/ext-capability-authorization"
 import type { Catalog, CatalogEntry, InstalledState } from "./catalog-types"
 import type { AuthState, InstallReceipt, InstallReceiptType, ProvenanceRequest } from "../../preload/types"
-import { hubSection, setHubSection, type HubSection } from "./ext-hub-state"
+import { hubSection, installedRowKey, setHubSection, takeHubLocateTarget, type HubSection } from "./ext-hub-state"
 import { extensionError, catalogDescription, iconFor, iconForRow, MoreMenu, PackageLogo, typeLabel, Svg, SearchIc, type MoreMenuItem } from "./ext-presentation"
 import { inventoryInstallRow, healthPresentation } from "./ext-inventory-present"
 import { ExtensionDetail, type DetailTarget } from "./extension-detail"
@@ -80,6 +80,9 @@ import { extIpc } from "./ext-ipc"
 import { PROJECT_HIDDEN_DIR } from "../../shared/project-hidden-dir"
 import "./extension-hub.css"
 
+
+/** `#1691`:「查看」定位到的行高亮多久(样式同 hub 的聚焦态,随后经行上已有的过渡消退)。 */
+const LOCATE_HIGHLIGHT_MS = 2_000
 
 // A unified row in the 已安装 manage list (REQ-018 T6): any installed item, whatever its type.
 type ManageRow = {
@@ -225,6 +228,22 @@ export function ExtensionHub(props: {
   // 云可用 ⟺ 已登录且 platform 模式(mcp.cloud 由 sidecar 在该态注入,ADR-013/ADR-016)。
   const [authState, setAuthState] = createSignal<AuthState>({ status: "logged-out", mode: "byok" })
   onCleanup(subscribeAuthState(setAuthState))
+
+  // `#1691`:「查看」定位到的行。高亮记在 hub 上而不是行上 —— 已安装列表重算时行会重建,高亮不能随之丢掉。
+  const [locatedRow, setLocatedRow] = createSignal<string>()
+  let locateTimer: ReturnType<typeof setTimeout> | undefined
+  onCleanup(() => clearTimeout(locateTimer))
+  /** 这一行是「查看」要定位的目标时,滚到可见并高亮约 2 秒;返回是否正在高亮。 */
+  const locateRow = (key: string, element: () => HTMLElement | undefined): Accessor<boolean> => {
+    createEffect(() => {
+      if (!takeHubLocateTarget(key)) return
+      element()?.scrollIntoView({ block: "nearest" })
+      setLocatedRow(key)
+      clearTimeout(locateTimer)
+      locateTimer = setTimeout(() => setLocatedRow(undefined), LOCATE_HIGHLIGHT_MS)
+    })
+    return () => locatedRow() === key
+  }
   // 「人在平台上」——**身份轴**,不含凭证是否可用。只驱动**文案分支**,绝不单独放行能力。
   const onPlatform = () => authState().status === "logged-in" && authState().mode === "platform"
   // `#624`:平台凭证正在恢复。`platformStatus` 只在登录态出现(main/codepuppy-auth.ts deriveState),
@@ -1665,7 +1684,9 @@ export function ExtensionHub(props: {
   // 本地导入的技能)「…」照样留在旁边,移除入口一个不少。
   const InstalledRow = (cp: { row: ManageRow }) => {
     const row = cp.row
-    const rowKey = `${row.type}:${row.name}`
+    const rowKey = installedRowKey(row.type, row.name)
+    let rowElement: HTMLDivElement | undefined
+    const located = locateRow(rowKey, () => rowElement)
     const ic = iconForRow(row.entry, row.type, row.name)
     const openRow = () => {
       if (row.entry) {
@@ -1791,8 +1812,10 @@ export function ExtensionHub(props: {
     ]
     return (
       <div
+        ref={rowElement}
         class="codepuppy-ext-kit"
         data-installed-row={rowKey}
+        data-located={located() ? "" : undefined}
         data-clickable={clickable() ? "" : undefined}
         onClick={() => clickable() && openRow()}
       >
@@ -1929,93 +1952,104 @@ export function ExtensionHub(props: {
 
   // 平台云连接器(非目录条目,点开专属详情)。批准稿:已登录平台时在「已安装」组,否则在「Code Puppy 云」组首行,
   // 动作是「登录」或「切换到平台模式」。
-  const CloudConnectorRow = () => (
-    <div class="codepuppy-ext-kit" data-clickable="" data-cloud-connector="" onClick={() => setDetail({ kind: "cloud-connector" })}>
-      <span class="codepuppy-ext-kit-ic" style={{ background: "#5c7cbf" }}>
-        云
-      </span>
-      <div class="codepuppy-ext-kit-body">
-        <div class="codepuppy-ext-kit-ttl">
-          <b>{t("codepuppy.ext.cloudConnectorTitle")}</b>
-        </div>
-        <div class="codepuppy-ext-kit-desc">
-          {/* `#733`:云连接器是用户看这条状态的**主要**地方 —— `needs_auth` 在这里也必须说成「需要重新登录」并给出动作。
-              `#624`:恢复中不能说「需登录平台模式」—— 用户已登录。 */}
-          <span
-            class="codepuppy-ext-cloudst"
-            data-st={
-              cloudReady()
+  const CloudConnectorRow = () => {
+    let rowElement: HTMLDivElement | undefined
+    const located = locateRow(installedRowKey("mcp", "codepuppy"), () => rowElement)
+    return (
+      <div
+        ref={rowElement}
+        class="codepuppy-ext-kit"
+        data-clickable=""
+        data-cloud-connector=""
+        data-located={located() ? "" : undefined}
+        onClick={() => setDetail({ kind: "cloud-connector" })}
+      >
+        <span class="codepuppy-ext-kit-ic" style={{ background: "#5c7cbf" }}>
+          云
+        </span>
+        <div class="codepuppy-ext-kit-body">
+          <div class="codepuppy-ext-kit-ttl">
+            <b>{t("codepuppy.ext.cloudConnectorTitle")}</b>
+          </div>
+          <div class="codepuppy-ext-kit-desc">
+            {/* `#733`:云连接器是用户看这条状态的**主要**地方 —— `needs_auth` 在这里也必须说成「需要重新登录」并给出动作。
+                `#624`:恢复中不能说「需登录平台模式」—— 用户已登录。 */}
+            <span
+              class="codepuppy-ext-cloudst"
+              data-st={
+                cloudReady()
+                  ? cloudLive()?.needsAuth
+                    ? "idle"
+                    : cloudLive()?.connected
+                      ? "on"
+                      : "idle"
+                  : cloudRecovering()
+                    ? "idle"
+                    : "off"
+              }
+            >
+              {cloudReady()
                 ? cloudLive()?.needsAuth
-                  ? "idle"
+                  ? t("codepuppy.ext.mcpNeedsAuth")
                   : cloudLive()?.connected
-                    ? "on"
-                    : "idle"
+                    ? t("codepuppy.ext.cloudConnConnected")
+                    : t("codepuppy.ext.cloudConnDisconnected")
                 : cloudRecovering()
-                  ? "idle"
-                  : "off"
-            }
-          >
-            {cloudReady()
-              ? cloudLive()?.needsAuth
-                ? t("codepuppy.ext.mcpNeedsAuth")
-                : cloudLive()?.connected
-                  ? t("codepuppy.ext.cloudConnConnected")
-                  : t("codepuppy.ext.cloudConnDisconnected")
-              : cloudRecovering()
-                ? t("codepuppy.ext.cloudConnRecovering")
-                : t("codepuppy.ext.cloudConnNeedLogin")}
-          </span>
+                  ? t("codepuppy.ext.cloudConnRecovering")
+                  : t("codepuppy.ext.cloudConnNeedLogin")}
+            </span>
+          </div>
         </div>
-      </div>
-      {/* server 名取**引擎报回来的那个**(`InstalledState.name`),不在 renderer 再写一遍字面量。 */}
-      <Show
-        when={cloudReady()}
-        fallback={
-          // `#624`:恢复中的用户**已登录、已在 platform 模式** —— 不给「登录 / 切换」(点下去是 no-op)。
-          <Show when={!cloudRecovering()}>
-            <Show
-              when={authState().status !== "logged-in"}
-              fallback={
+        {/* server 名取**引擎报回来的那个**(`InstalledState.name`),不在 renderer 再写一遍字面量。 */}
+        <Show
+          when={cloudReady()}
+          fallback={
+            // `#624`:恢复中的用户**已登录、已在 platform 模式** —— 不给「登录 / 切换」(点下去是 no-op)。
+            <Show when={!cloudRecovering()}>
+              <Show
+                when={authState().status !== "logged-in"}
+                fallback={
+                  <button
+                    class="codepuppy-ext-add"
+                    data-variant="primary"
+                    onClick={(ev) => {
+                      ev.stopPropagation()
+                      void window.api.auth.setMode("platform")
+                    }}
+                  >
+                    {t("codepuppy.ext.cloudSwitchMode")}
+                  </button>
+                }
+              >
                 <button
                   class="codepuppy-ext-add"
                   data-variant="primary"
                   onClick={(ev) => {
                     ev.stopPropagation()
-                    void window.api.auth.setMode("platform")
+                    void window.api.auth.start()
                   }}
                 >
-                  {t("codepuppy.ext.cloudSwitchMode")}
+                  {t("codepuppy.ext.cloudLoginCta")}
                 </button>
-              }
-            >
-              <button
-                class="codepuppy-ext-add"
-                data-variant="primary"
-                onClick={(ev) => {
-                  ev.stopPropagation()
-                  void window.api.auth.start()
-                }}
-              >
-                {t("codepuppy.ext.cloudLoginCta")}
-              </button>
+              </Show>
             </Show>
-          </Show>
-        }
-      >
-        <Show
-          when={cloudLive()?.needsAuth}
-          fallback={
-            <MoreMenu
-              id="cloud-connector"
-              items={[{ key: "settings", label: t("codepuppy.ext.rowSetup"), onSelect: () => setDetail({ kind: "cloud-connector" }) }]}
-            />
           }
         >
-          <McpNeedsAuthAction name={cloudLive()!.name} />
+          <Show
+            when={cloudLive()?.needsAuth}
+            fallback={
+              <MoreMenu
+                id="cloud-connector"
+                items={[{ key: "settings", label: t("codepuppy.ext.rowSetup"), onSelect: () => setDetail({ kind: "cloud-connector" }) }]}
+              />
+            }
+          >
+            <McpNeedsAuthAction name={cloudLive()!.name} />
+          </Show>
         </Show>
-      </Show>
-    </div>
-  )
+      </div>
+    )
+  }
 
   // ── 页 ───────────────────────────────────────────────────────────────────────────────────
   const currentTab = () => TABS.find((x) => x.key === section()) ?? TABS[0]!

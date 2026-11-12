@@ -29,8 +29,9 @@ import {
   toV1ProviderList,
   toV1Question,
   todosOf,
-  latestUserMessageID,
+  turnAnchorID,
   withTurnDiffs,
+  CONTINUE_METADATA_KEY,
   type V1PromptBody,
 } from "./v1-shapes"
 
@@ -120,8 +121,14 @@ async function prompt(context: RouteContext) {
     })
   const synthetic = syntheticText(body.parts)
   if (synthetic !== undefined) {
-    // 时间线的「继续」:v1 落一条只含 synthetic 文本的用户消息(界面不显示正文、但开一个新回合)。
-    await context.api.session.synthetic({ sessionID, text: synthetic, description: synthetic, resume: true })
+    // 时间线的「继续」:v1 落一条只含 synthetic 文本的用户消息(界面不显示正文、但开一个新回合)。2.x 落成带
+    // CONTINUE_METADATA_KEY 的真用户消息 —— 那个回合的改动才查得到(REQ-142);读回时 toV1Messages 把正文标回 synthetic。
+    await context.api.session.prompt({
+      sessionID,
+      ...(body.messageID ? { id: body.messageID } : {}),
+      text: synthetic,
+      metadata: { [CONTINUE_METADATA_KEY]: true },
+    })
     return noContent()
   }
   const { text, files, agents } = toPrompt(body.parts)
@@ -142,15 +149,45 @@ async function messages(context: RouteContext) {
   const before = context.query.get("before") ?? undefined
   const page = await recentMessages(context.api, sessionID, { limit, cursor: before })
   const listed = toV1Messages(sessionID, page.context).filter((item) => page.ids.has(baseID(item.info.id)))
-  // REQ-142:最近一个回合的改动挂回它的用户消息(只在最新一页取,turnDiffsOf 只读最近一个回合)。
-  const latest = before ? undefined : latestUserMessageID(listed)
-  const diff = latest ? await context.api.session.diff({ sessionID, from: latest }).catch(() => undefined) : undefined
-  const response = json(latest && diff ? withTurnDiffs(listed, new Map([[latest, diff]])) : listed)
+  // REQ-142:最近一个回合的改动挂回它的用户消息(只在最新一页取,turnDiffsOf 只读最近一个回合)。取不到改动不让整个会话
+  // 打不开:记下(不静默),消息照回。
+  const anchor = before ? undefined : turnAnchorID(listed, page.context)
+  const diff = anchor
+    ? await context.api.session.diff({ sessionID, from: anchor }).catch((error) => {
+        if (context.signal.aborted) throw error
+        console.error("[engine-adapter] turn diff failed", sessionID, anchor, error)
+        return undefined
+      })
+    : undefined
+  const response = json(anchor && diff ? withTurnDiffs(listed, new Map([[anchor, diff]])) : listed)
   if (page.next) response.headers.set("x-next-cursor", page.next)
   return response
 }
 
 const baseID = (id: string) => id.replace(/:assistant$/, "")
+
+const COMMAND_POLL_MS = 200
+
+/**
+ * REQ-125 C7:v1 的 command 回这条命令那个回合的助手消息 `{info, parts}`,composer 用 `info.id` 把命令来源 chip 对到回合
+ * 上(codepuppy-composer.tsx、timeline-model.ts slashOriginForTurn)。2.x 的 command / prompt 只受理、不等回复,于是在这里
+ * 等:`after` 之后出现的第一条助手消息就是它。命令没开回合(子代理命令、插件命令)或回合没产出助手消息就结束,回 `{}`
+ * (与今天无关联时同一形状)。判「没开回合」先读 active 再读消息:读 active 时已不在跑,那个执行写下的消息此刻都已落库。
+ * 消息 id 按时间升序(`msg_` + ascending),所以「之后」= id 更大。
+ */
+async function commandReply(context: RouteContext, sessionID: string, after: string | undefined) {
+  for (;;) {
+    context.signal.throwIfAborted()
+    const running = sessionID in (await context.api.session.active())
+    const page = await recentMessages(context.api, sessionID, { limit: 20 })
+    const fresh = page.context.filter((message) => after === undefined || message.id > after)
+    const assistant = fresh.find((message) => message.type === "assistant")
+    const found = assistant && toV1Messages(sessionID, page.context).find((item) => item.info.id === assistant.id)
+    if (found) return json(found)
+    if (!running || fresh.some((message) => message.type === "idle")) return json({})
+    await new Promise((resolve) => setTimeout(resolve, COMMAND_POLL_MS))
+  }
+}
 
 
 export const ROUTES: readonly Route[] = [
@@ -272,11 +309,12 @@ export const ROUTES: readonly Route[] = [
     // v1 引擎把技能列成命令(toV1Commands);2.x 的技能经 prompt 的 `skills` 调用。
     const skills = await context.api.skill.list({ location: { directory: await sessionDirectory(context.api, sessionID) } })
     if (skills.data.some((skill) => skill.id === body.command)) {
-      await context.api.session.prompt({ sessionID, text: body.arguments ?? "", skills: [{ id: body.command }] })
-      return json({})
+      const admitted = await context.api.session.prompt({ sessionID, text: body.arguments ?? "", skills: [{ id: body.command }] })
+      return commandReply(context, sessionID, admitted.id)
     }
+    const newest = (await context.api.message.list({ sessionID, limit: 1, order: "desc" })).data[0]?.id
     await context.api.session.command({ sessionID, name: body.command, text: body.arguments ?? "" })
-    return json({})
+    return commandReply(context, sessionID, newest)
   }),
   route("POST", "/session/:sessionID/shell", async (context) => {
     const body = (context.body ?? {}) as { command: string; agent?: string }
@@ -567,6 +605,8 @@ async function currentProject(context: RouteContext) {
  * OAuth 集成(core/src/mcp/index.ts:238-275,`metadata.source === "mcp"`、名字 = MCP 名):这里发起 OAuth、
  * 交给系统浏览器打开授权地址、轮询到终态,再回这台 MCP 的状态 —— 调用方看到的仍是 v1 的那个长调用。
  */
+const MCP_AUTH_POLL_MS = 1_000
+
 async function authenticateMcp(context: RouteContext) {
   const name = context.params.name!
   const integrations = await context.api.integration.list(at(context))
@@ -579,17 +619,23 @@ async function authenticateMcp(context: RouteContext) {
   if (!method) return json({ name: "UnknownError", data: { message: `MCP ${name} has no OAuth method` } }, { status: 400 })
   const attempt = await context.api.integration.oauth.connect({ ...at(context), integrationID: integration.id, methodID: method.id })
   window.api.openLink(attempt.data.url)
+  const poll = async () => {
+    context.signal.throwIfAborted()
+    await new Promise((resolve) => setTimeout(resolve, MCP_AUTH_POLL_MS))
+  }
+  let outcome: string
+  do {
+    await poll()
+    outcome = (await context.api.integration.oauth.status({ ...at(context), integrationID: integration.id, attemptID: attempt.data.attemptID }))
+      .data.status
+  } while (outcome === "pending")
+  // 设计 §4 第 6 步:`complete` 时引擎先写凭证、MCP 随后异步重连(实测 ~250 ms 后才从 pending 变 connected),立刻读会把
+  // 成功报成失败(use-extensions 要 connected)。所以 complete 之后每 POLL_MS 读一次,直到这台不是 pending;引擎用 MCP 启动
+  // 超时收口,一定停在 connected / failed / needs_auth 之一。failed / expired 直接回当前状态。
   for (;;) {
-    if (context.signal.aborted) throw new DOMException("aborted", "AbortError")
-    await new Promise((resolve) => setTimeout(resolve, 1_000))
-    const status = await context.api.integration.oauth.status({
-      ...at(context),
-      integrationID: integration.id,
-      attemptID: attempt.data.attemptID,
-    })
-    if (status.data.status === "pending") continue
-    const servers = (await context.api.mcp.list(at(context))).data
-    const server = servers.find((item) => item.name === name)
-    return json(server?.status ?? { status: "failed", error: status.data.status })
+    if (outcome === "complete") await poll()
+    const server = (await context.api.mcp.list(at(context))).data.find((item) => item.name === name)
+    if (outcome !== "complete" || server?.status.status !== "pending")
+      return json(server?.status ?? { status: "failed", error: outcome })
   }
 }

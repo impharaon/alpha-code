@@ -1,7 +1,14 @@
 // `#1668`:引擎适配器夹具采样用的假模型 —— 一个 OpenAI 兼容的 `/v1/chat/completions`(流式),按用户最后一句话里的
 // 关键词给出固定剧本。只用来驱动隔离的 2.x 引擎跑出真事件与真消息;不进任何门。用法见同目录 README.md。
 //
-// 剧本(最后一条消息不是工具结果时):
+// 剧本(最后一条消息不是工具结果时,按下列顺序第一条命中的):
+//   含 "plainly"    ⇒ 一句正文(子代理的子会话、命令模板)
+//   含 "background" ⇒ 后台调 subagent(general,子会话 "reply plainly")
+//   含 "delegate"   ⇒ 前台调 subagent(同上)
+//   含 "edit a.txt" ⇒ 调 edit a.txt(hi → hello)
+//   含 "patchfile"  ⇒ 调 patch(新建 p.txt、改 p0.txt;只有 gpt- 模型拿得到 patch)
+//   含 "run shell"  ⇒ 调 shell(echo hi)
+//   含 "Continue"   ⇒ 调 write c.txt(时间线「继续」的英文正文)
 //   含 "todo"   ⇒ 调 todowrite(三条任务)
 //   含 "ask"    ⇒ 调 question(一个单选题 Red / Blue)
 //   含 "write"  ⇒ 调 write b.txt
@@ -55,6 +62,18 @@ function script(messages: Message[]) {
   if (user.includes("title")) return [delta({ role: "assistant", content: "Mock title" }), delta({}, "stop")]
   if (afterTool)
     return [delta({ role: "assistant", content: "" }), delta({ content: "The file " }), delta({ content: "says hi." }), delta({}, "stop"), usage(30, 4)]
+  if (user.includes("plainly")) return [delta({ role: "assistant", content: "" }), delta({ content: "Hello." }), delta({}, "stop"), usage(8, 2)]
+  const subagent = { agent: "general", description: "Say hello", prompt: "reply plainly" }
+  if (user.includes("background")) return toolCall(`call_mock_bg_${suffix()}`, "subagent", { ...subagent, background: true })
+  if (user.includes("delegate")) return toolCall(`call_mock_sub_${suffix()}`, "subagent", subagent)
+  if (user.includes("edit a.txt"))
+    return toolCall(`call_mock_edit_${suffix()}`, "edit", { path: "a.txt", oldString: "hi", newString: "hello" })
+  if (user.includes("patchfile"))
+    return toolCall(`call_mock_patch_${suffix()}`, "patch", {
+      patchText: "*** Begin Patch\n*** Add File: p.txt\n+patched\n*** Update File: p0.txt\n@@\n-hi\n+hey\n*** End Patch",
+    })
+  if (user.includes("run shell")) return toolCall(`call_mock_shell_${suffix()}`, "shell", { command: "echo hi" })
+  if (user.includes("Continue")) return toolCall(`call_mock_continue_${suffix()}`, "write", { path: "c.txt", content: "continued\n" })
   if (user.includes("todo"))
     return toolCall("call_mock_todo_1", "todowrite", {
       todos: [

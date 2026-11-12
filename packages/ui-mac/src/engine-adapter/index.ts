@@ -88,14 +88,14 @@ export function createEngineFetch(options: {
   fetch?: typeof globalThis.fetch
 }): EngineFetch {
   const upstreamFetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init))
-  const clients = new Map<string, OpenCodeClient>()
-  const clientFor = (origin: string) => {
-    const existing = clients.get(origin)
-    if (existing) return existing
-    const created = OpenCode.make({ baseUrl: origin, fetch: upstreamFetch })
-    clients.set(origin, created)
-    return created
-  }
+  // 每个请求一个 2.x 客户端:它发出的每个调用都带上这次请求的取消信号(调用自己另带的信号照旧生效)。冻结界面靠它给引擎
+  // 调用设上限 —— 侧栏自探的 `AbortSignal.timeout(2_000)`(use-projects.ts)、组件卸载时中止的读取。
+  const clientFor = (origin: string, signal: AbortSignal): OpenCodeClient =>
+    OpenCode.make({
+      baseUrl: origin,
+      fetch: ((input, init) =>
+        upstreamFetch(input, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, signal]) : signal })) as typeof fetch,
+    })
   const replies = new Map<string, PermissionReplies>()
   const repliesFor = (origin: string) => {
     const existing = replies.get(origin)
@@ -109,6 +109,8 @@ export function createEngineFetch(options: {
     const request = new Request(input, init)
     const url = new URL(request.url)
     if (!options.isEngineOrigin(url.origin)) return upstreamFetch(input, init)
+    // 与 fetch 同一约定:已取消的请求直接以取消原因拒绝,不碰引擎。
+    request.signal.throwIfAborted()
     const matched = matchRoute(request.method, url.pathname)
     if (!matched) return unsupported(request.method, url.pathname)
     const text = request.method === "GET" || request.method === "HEAD" ? "" : await request.clone().text()
@@ -125,7 +127,7 @@ export function createEngineFetch(options: {
       directory: directoryOf(url, request),
       request,
       signal: request.signal,
-      api: clientFor(url.origin),
+      api: clientFor(url.origin, request.signal),
       origin: url.origin,
       permissions: repliesFor(url.origin),
       upstream: (path, next) => upstreamFetch(new URL(path, url.origin), next),
@@ -134,7 +136,8 @@ export function createEngineFetch(options: {
     try {
       return await matched.route.handle(context)
     } catch (error) {
-      if (request.signal.aborted) throw error
+      // 取消:与 fetch 一样以取消原因拒绝(2.x 客户端把它包成 Transport 错误,调用方认的是 AbortError / TimeoutError)。
+      request.signal.throwIfAborted()
       return errorResponse(error)
     }
   }

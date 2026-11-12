@@ -24,7 +24,14 @@
 4. 同一会话两条待审、另一会话一条,经适配器的 v2 入口 reject 第一条(收据应列同会话两条)、同一命令重放、再直接对引擎
    回一次(404);再在第三个会话里挂两条读、对第一条回「总是允许」(收据应列两条、另一资源再问直接 allow)。原始帧与
    响应写成 `permission-reply.json`;
-5. 停掉引擎与假模型。
+5. R1 修复的四个剧本(`#1668` F1–F4):`tools.json`(前台 / 后台 subagent、edit、shell、patch 各一个会话,patch 先把会话切到
+   假模型 `gpt-5-mock` —— 2.x 只给 `gpt-` 模型 patch 工具)、`continue.json`(经适配器发时间线「继续」,带逐回合 diff;对照组是
+   同一续写落成 2.x synthetic 后拿它当 diff 的 from)、`files.json`(助手写文件的回合、项目里外部增删、`fs.watch` 过的文件被改时
+   各收到哪些 `filesystem.changed`)、`command.json`(配置命令 `hello`:直接对引擎发与经适配器发);
+6. 停掉引擎与假模型。
+
+只重采其中几个剧本时把名字写在命令后面:`base`(上面 2–4 的全部)、`tools`、`continue`、`files`、`command`,例如
+`… sample.ts tools continue files command`;不写 = 全部。
 
 端口被占时用 `SAMPLER_ENGINE_PORT` / `SAMPLER_MODEL_PORT` 改。重采后跑适配器的测试确认夹具仍能用:
 
@@ -32,5 +39,6 @@
 cd packages/ui-mac
 ~/.bun-versions/1.4.4/bin/bun test src/engine-adapter/event-projection.test.ts src/engine-adapter/turn-diffs.test.ts \
   src/engine-adapter/staged-attachment.test.ts src/engine-adapter/permission-shape.test.ts src/engine-adapter/tool-display.test.ts \
-  src/engine-adapter/permission-reply.test.ts
+  src/engine-adapter/permission-reply.test.ts src/engine-adapter/tool-shapes.test.ts src/engine-adapter/file-watcher.test.ts \
+  src/engine-adapter/command-reply.test.ts
 ```

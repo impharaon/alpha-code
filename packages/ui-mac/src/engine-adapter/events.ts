@@ -3,6 +3,7 @@
 //
 // 投影规则(方案 §2.3「事件流」):
 //   · 直通:pty.*、lsp.updated、vcs.branch.updated、mcp.*、reference.updated、server.connected、global.disposed;
+//     filesystem.changed → file.watcher.updated(另由回合改动补出项目文件的增删改,见 fileChanges);
 //   · 改名:location.shutdown → server.instance.disposed;agent/command/skill.updated → catalog.updated;
 //     project.updated(`canonical` → `worktree`);permission.asked(I7a 字段映射)/ replied;
 //     form.*(`metadata.kind === "question"`)→ question.asked / replied / rejected;
@@ -12,7 +13,7 @@
 //     经 toV1Messages 投影,**只发有变化的** message.updated / message.part.updated —— 增量只用来让字一个个出来,
 //     内容以 2.x 存储为准。todowrite 工具的输入同时投影成 todo.updated(U1)。
 // 不认识的事件丢弃(它们在 v1 没有对应,冻结界面也不读)。
-import type { OpenCodeClient, OpenCodeEvent } from "@opencode/client/promise"
+import type { OpenCodeClient, OpenCodeEvent, SessionMessageInfo } from "@opencode/client/promise"
 import type { Part } from "@opencode-ai/sdk/v2/client"
 import { normalizeSessionInfo } from "./frozen-shapes"
 import type { PermissionReplies } from "./permission-replies"
@@ -20,12 +21,12 @@ import type { RouteContext } from "./routes"
 import { recentMessages, rememberSessionDirectory, sessionDirectory } from "./session-cache"
 import {
   contentKeys,
-  latestUserMessageID,
   partID,
   todosOf,
   toV1Messages,
   toV1Project,
   toV1Question,
+  turnAnchorID,
   withTurnDiffs,
 } from "./v1-shapes"
 
@@ -46,6 +47,7 @@ export const SNAPSHOT_EVENTS = new Set([
   "session.tool.input.started",
   "session.tool.input.ended",
   "session.tool.called",
+  "session.tool.progress",
   "session.tool.success",
   "session.tool.failed",
   "session.synthetic",
@@ -101,6 +103,9 @@ export const TURN_DIFF_EVENTS = new Set([
   "session.execution.interrupted",
 ])
 
+/** 2.x 回合改动的 status → v1 文件监视事件(files-core.ts watcherRefreshTarget:add / unlink 重列父目录)。 */
+const WATCH_EVENTS: Record<string, "add" | "unlink" | "change"> = { added: "add", deleted: "unlink", modified: "change" }
+
 const PASS_THROUGH = new Set([
   "pty.created",
   "pty.updated",
@@ -121,6 +126,29 @@ export function createProjector(api: OpenCodeClient, emit: Emit, permissions: Pe
   const sessions = new Map<string, unknown>()
   /** 用户消息 → 它那个回合的改动(REQ-142),快照发 message.updated 时挂回去。 */
   const turnDiffs = new Map<string, readonly unknown[]>()
+  /** F3:会话 → 当前回合已报给文件面板的改动(文件 → 状态 + 补丁),只报变化。 */
+  const reported = new Map<string, { anchor: string; files: Map<string, string> }>()
+  /**
+   * F1:运行中工具的进度(subagent 的子会话 id)2.x 只放在 `session.tool.progress` 事件里,存下的 running 状态 metadata 为空
+   * (真引擎采样 fixtures/tools.json);0.1.26 的任务卡在运行中就能「打开子会话」。见过的进度按工具调用 id 记下,投影前并回
+   * 那个调用的 running 状态;调用结束即丢。
+   */
+  const progress = new Map<string, Record<string, unknown>>()
+  const withProgress = (source: readonly SessionMessageInfo[]): readonly SessionMessageInfo[] =>
+    progress.size === 0
+      ? source
+      : source.map((message) =>
+          message.type !== "assistant"
+            ? message
+            : ({
+                ...message,
+                content: message.content.map((item) =>
+                  item.type === "tool" && item.state.status === "running" && progress.has(item.id)
+                    ? { ...item, state: { ...item.state, metadata: { ...progress.get(item.id), ...item.state.metadata } } }
+                    : item,
+                ),
+              } as SessionMessageInfo),
+        )
 
   const remember = (key: string, value: unknown) => {
     const encoded = JSON.stringify(value)
@@ -135,11 +163,18 @@ export function createProjector(api: OpenCodeClient, emit: Emit, permissions: Pe
     for (const message of page.context) {
       if (message.type === "assistant") blocks.set(message.id, contentKeys(message.content as never))
     }
-    const listed = toV1Messages(sessionID, page.context)
-    const latest = latestUserMessageID(listed)
-    if (refreshTurnDiff && latest) {
-      const diff = await api.session.diff({ sessionID, from: latest }).catch(() => undefined)
-      if (diff) turnDiffs.set(latest, diff)
+    const listed = toV1Messages(sessionID, withProgress(page.context))
+    const anchor = turnAnchorID(listed, page.context)
+    if (refreshTurnDiff && anchor) {
+      // 取不到这一步的回合改动不该让消息也停更:记下(不静默),消息照发,下一个边界再取。
+      const diff = await api.session.diff({ sessionID, from: anchor }).catch((error) => {
+        console.error("[engine-adapter] turn diff failed", sessionID, anchor, error)
+        return undefined
+      })
+      if (diff) {
+        turnDiffs.set(anchor, diff)
+        fileChanges(directory, sessionID, anchor, diff)
+      }
     }
     for (const { info, parts } of withTurnDiffs(listed, turnDiffs)) {
       if (remember(`message:${info.id}`, info)) emit(directory, { type: "message.updated", properties: { info } })
@@ -148,6 +183,28 @@ export function createProjector(api: OpenCodeClient, emit: Emit, permissions: Pe
         todo(directory, sessionID, part)
       }
     }
+  }
+
+  /**
+   * F3:右栏文件面板只认 v1 的 `file.watcher.updated`(session-rail-files.tsx)刷新已加载目录。2.x 的
+   * `filesystem.changed` 只给两种来源 —— 显式 `fs.watch` 的单个文件与 VCS 的 HEAD(core/src/filesystem/file-watch.ts、
+   * location-watcher.ts),项目里新建 / 删除文件没有任何事件(真引擎实测 fixtures/files.json)。所以助手改了哪些文件,
+   * 从适配器本来就在回合边界取的逐回合改动里出:added → add、deleted → unlink、modified → change;同一回合里先报过、
+   * 后来又不在改动里的(建了又删)报 unlink —— 面板据此重列父目录,存在与否以重列为准。
+   */
+  function fileChanges(directory: string, sessionID: string, anchor: string, diff: readonly unknown[]) {
+    const previous = reported.get(sessionID)
+    const before = previous?.anchor === anchor ? previous.files : new Map<string, string>()
+    const after = new Map<string, string>()
+    for (const entry of diff as Array<{ file?: unknown; status?: unknown; patch?: unknown }>) {
+      if (typeof entry.file !== "string" || typeof entry.status !== "string" || !(entry.status in WATCH_EVENTS)) continue
+      after.set(entry.file, `${entry.status}\n${String(entry.patch ?? "")}`)
+      if (before.get(entry.file) !== after.get(entry.file))
+        emit(directory, { type: "file.watcher.updated", properties: { file: entry.file, event: WATCH_EVENTS[entry.status] } })
+    }
+    for (const file of before.keys())
+      if (!after.has(file)) emit(directory, { type: "file.watcher.updated", properties: { file, event: "unlink" } })
+    reported.set(sessionID, { anchor, files: after })
   }
 
   /** U1:todowrite 的输入就是清单,投影成 v1 todo.updated。 */
@@ -215,6 +272,9 @@ export function createProjector(api: OpenCodeClient, emit: Emit, permissions: Pe
     }
     if (type === "form.cancelled")
       return emit(directory, { type: "question.rejected", properties: { sessionID, requestID: data.id } })
+    // F3:不带 sessionID,按帧的位置投到那个目录的频道(载荷两代同形:file + add/change/unlink)。
+    if (type === "filesystem.changed")
+      return emit(directory, { type: "file.watcher.updated", properties: { file: data.file, event: data.event } })
     if (!sessionID) return
 
     if (type === "session.created") return sessionInfo(directory, sessionID, "session.created")
@@ -250,6 +310,8 @@ export function createProjector(api: OpenCodeClient, emit: Emit, permissions: Pe
     if (type === "session.tool.input.started") {
       await streamPartID(sessionID, data.assistantMessageID, `tool:${data.id}`)
     }
+    if (type === "session.tool.progress") progress.set(data.id, data.metadata ?? {})
+    if (type === "session.tool.success" || type === "session.tool.failed") progress.delete(data.id)
     if (SNAPSHOT_EVENTS.has(type) || TURN_DIFF_EVENTS.has(type)) await snapshot(directory, sessionID, TURN_DIFF_EVENTS.has(type))
     if (SESSION_INFO_EVENTS.has(type)) await sessionInfo(directory, sessionID, "session.updated")
 

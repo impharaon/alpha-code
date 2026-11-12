@@ -136,12 +136,19 @@ export function toPrompt(parts: readonly V1PartInput[]) {
   return { text, files, agents }
 }
 
-/** 全部 part 都是 synthetic 文本(时间线的「继续」)⇒ 这条消息在 2.x 是一条 synthetic,不是用户说的话。 */
+/** 全部 part 都是 synthetic 文本(时间线的「继续」)⇒ 界面不显示正文、但开一个新回合。 */
 export function syntheticText(parts: readonly V1PartInput[]) {
   if (parts.length === 0 || !parts.every((part) => part.type === "text" && part.synthetic && !isStagedAttachmentPart(part)))
     return undefined
   return parts.map((part) => part.text ?? "").join("\n")
 }
+
+/**
+ * 「继续」在 2.x 落成一条真用户消息并带这个 metadata 键(prompt 的 `metadata` 原样存在消息上)。理由:REQ-142 的回合
+ * 改动按用户消息查(2.x session/diff.ts 只认 `type === "user"` 的锚),2.x 的 synthetic 消息查不了;读回时按这个键把
+ * 它的正文标成 v1 的 synthetic,时间线照旧不显示这句「继续」。只有适配器写、只有适配器读。
+ */
+export const CONTINUE_METADATA_KEY = "codepuppyContinue"
 
 // ── 读回:2.x 消息 → v1 {info, parts} ───────────────────────────────────────────────────────────────
 export type V1MessageWithParts = { info: Message; parts: Part[] }
@@ -153,19 +160,76 @@ export type V1MessageWithParts = { info: Message; parts: Part[] }
 export function toV1Messages(sessionID: string, source: readonly SessionMessageInfo[]): V1MessageWithParts[] {
   const normalized = normalizeSessionMessages(sessionID, source as unknown as FrozenSource)
   const assistantKeys = new Map<string, string[]>()
+  const continued = new Set<string>()
   for (const message of source) {
     if (message.type === "assistant") assistantKeys.set(message.id, contentKeys(message.content as never))
+    if (message.type === "user" && message.metadata?.[CONTINUE_METADATA_KEY] === true) continued.add(message.id)
   }
   return normalized.messages.map((info) => {
     const parts = normalized.parts.get(info.id) ?? []
     const keys = assistantKeys.get(info.id)
     const renumbered = parts.map((part, index) => {
-      const restored = restoreStagedAttachment(part)
+      const restored = toV1ToolPart(restoreStagedAttachment(part))
       const position = keys ? keys.indexOf(semanticKey(info.id, part)) : -1
-      return { ...restored, ...displayOf(restored), id: partID(info.id, position >= 0 ? position : index) } as Part
+      return {
+        ...restored,
+        ...displayOf(restored),
+        ...(continued.has(info.id) && restored.type === "text" ? { synthetic: true } : {}),
+        id: partID(info.id, position >= 0 ? position : index),
+      } as Part
     })
     return { info, parts: renumbered.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) }
   })
+}
+
+// ── 工具 part:2.x 内建工具的入参 / metadata → 冻结工具卡读的 v1 键 ───────────────────────────────────────
+// 冻结的 tool-card-model.ts 按 0.1.26 引擎的键读卡面;2.x 的同一工具改了名(K5,卡片分派已认新名)也改了键。逐个对过
+// 卡片的读取点(真引擎采样 fixtures/tools.json):
+//   · read      入参 `path`                         → 卡头 / 「已探索」行读 `filePath`;
+//   · edit      metadata.files[].patch              → 展开的 diff 读 `metadata.diff`(filediff 冻结投影已给);
+//   · patch     metadata.files[] {file, status}     → 文件行读 `relativePath|filePath` + `type`(add/update/delete);
+//   · subagent  入参 `agent`、metadata.sessionID     → 任务卡读 `subagent_type`、`sessionId`(「打开子会话」)、`background`。
+// 其余命中专用卡的工具(shell 的 command / exit,glob / grep 的 pattern、include、count、matches,webfetch 的 url,
+// websearch 的 query,skill 的 metadata.name,question 的 questions / answers,write 的 path → filePath 由冻结投影给)
+// 键名两代相同,不动。
+const PATCH_TYPES: Record<string, string> = { added: "add", deleted: "delete", modified: "update" }
+
+function toV1ToolPart(part: Part): Part {
+  if (part.type !== "tool") return part
+  const state = part.state as { status: string; input: Record<string, unknown>; metadata?: Record<string, unknown> }
+  const input = state.input
+  const metadata = state.metadata
+  const files = Array.isArray(metadata?.files) ? (metadata.files as Array<Record<string, unknown>>) : undefined
+  const next = (changes: { input?: Record<string, unknown>; metadata?: Record<string, unknown> }) =>
+    ({
+      ...part,
+      state: {
+        ...state,
+        ...(changes.input ? { input: { ...input, ...changes.input } } : {}),
+        ...(changes.metadata ? { metadata: { ...metadata, ...changes.metadata } } : {}),
+      },
+    }) as Part
+  if (part.tool === "read" && typeof input.path === "string" && input.filePath === undefined)
+    return next({ input: { filePath: input.path } })
+  if (part.tool === "edit" && files && metadata?.diff === undefined)
+    return next({ metadata: { diff: files.flatMap((file) => (typeof file.patch === "string" ? [file.patch] : [])).join("\n") } })
+  if (part.tool === "patch" && files)
+    return next({
+      metadata: {
+        files: files.map((file) => ({ ...file, relativePath: file.file, type: PATCH_TYPES[String(file.status)] })),
+      },
+    })
+  if (part.tool === "subagent") {
+    // 0.1.26 只在转入后台时写 `background: true`;2.x 的后台 = 入参 background,或完成时子会话仍在跑(status running)。
+    const background = input.background === true || (state.status === "completed" && metadata?.status === "running")
+    return next({
+      ...(typeof input.agent === "string" ? { input: { subagent_type: input.agent } } : {}),
+      ...(metadata
+        ? { metadata: { ...(typeof metadata.sessionID === "string" ? { sessionId: metadata.sessionID } : {}), ...(background ? { background } : {}) } }
+        : {}),
+    })
+  }
+  return part
 }
 
 /**
@@ -339,7 +403,12 @@ export function withTurnDiffs(messages: V1MessageWithParts[], diffs: ReadonlyMap
   })
 }
 
-/** 最近一个回合的用户消息 id(turnDiffsOf 只读它)。 */
-export function latestUserMessageID(messages: readonly V1MessageWithParts[]) {
-  return messages.findLast((item) => item.info.role === "user")?.info.id
+/**
+ * 最近一个回合的用户消息 id(turnDiffsOf 只读它),且它在 2.x 是一条真用户消息 —— 2.x 的逐回合 diff 只认 user 锚
+ * (session/diff.ts 对别的类型回 TurnRangeError)。最近一条 v1 用户消息若是引擎自己发的 synthetic(带 description),
+ * 那个回合在 2.x 没有可查的锚,不查(回 undefined),而不是发一个必然被拒的请求。
+ */
+export function turnAnchorID(messages: readonly V1MessageWithParts[], source: readonly SessionMessageInfo[]) {
+  const latest = messages.findLast((item) => item.info.role === "user")?.info.id
+  return latest && source.some((message) => message.id === latest && message.type === "user") ? latest : undefined
 }

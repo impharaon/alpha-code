@@ -1,4 +1,3 @@
-import { isolateEngineHome } from "./isolated-engine-home"
 import { afterEach, beforeEach, expect, mock, spyOn, test } from "bun:test"
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto"
 import { EventEmitter } from "node:events"
@@ -8,8 +7,6 @@ import { dirname, join } from "node:path"
 import { Database } from "bun:sqlite"
 import { createElectronStub } from "./req053-electron-stub"
 
-// 在 server.ts 被 import、spawnLocalServer 跑之前:旧凭证检查只看临时根,不碰本机真实数据目录(isolated-engine-home.ts)。
-isolateEngineHome()
 let home = "",
   root = "",
   scratch = ""

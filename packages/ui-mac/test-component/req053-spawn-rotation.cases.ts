@@ -9,7 +9,6 @@
 // ⇒ 模块内 `run === ""` ⇒ `write()` 直接 return、`getLogger()` 返回 undefined(调用点全是可选链),
 // 所以真模块在这里是惰性的。代价是 `electron-log/main.js` 会在顶层碰 electron 的一大片面 ——
 // 那正是 req053-electron-stub.ts 存在的理由。
-import { isolateEngineHome } from "./isolated-engine-home"
 import { afterEach, beforeEach, expect, mock, test } from "bun:test"
 import { EventEmitter } from "node:events"
 import {
@@ -32,9 +31,6 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { createElectronStub } from "./req053-electron-stub"
-
-// 在 server.ts 被 import、spawnLocalServer 跑之前:旧凭证检查只看临时根,不碰本机真实数据目录(isolated-engine-home.ts)。
-isolateEngineHome()
 
 class FakeChild extends EventEmitter {
   stdout = new EventEmitter()

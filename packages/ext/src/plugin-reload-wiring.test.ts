@@ -2,13 +2,13 @@
 // 装载之前就在,同进程的别的测试早已把它装成没有 port 的那一份)。
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { isolatedEnv } from "../test/isolated-env"
+import { isolatedEnv } from "../../../scripts/test-isolation/env"
 
 test("ext 的重载接线(OpenCode 2 真宿主):parentPort → 进程级调度器 → 本 Location → 进程内引擎 → 报告(子进程)", () => {
   const result = Bun.spawnSync({
     cmd: [process.execPath, "test", path.resolve(import.meta.dir, "plugin-reload-wiring.cases.ts")],
     cwd: path.resolve(import.meta.dir, ".."),
-    // 审计 R1:只传隔离环境(PATH + 预载的隔离键),不传 process.env;子进程从 packages/ext 起跑,自己的预载再建一个新根。
+    // 审计 R1:只传隔离环境(PATH + 预载的隔离键),不传 process.env;子进程从 packages/ext 起跑,它的预载见到根标记就沿用这个根。
     env: isolatedEnv(),
   })
   const output = `${result.stdout.toString()}${result.stderr.toString()}`

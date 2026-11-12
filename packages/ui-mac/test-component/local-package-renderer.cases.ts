@@ -171,8 +171,10 @@ const { readLedgerV2, readPackageLedgerStateV1, skillsEnabledPath } = await impo
 const { applyPackageMutation } = await import("../src/main/ext-receipt-v2")
 const { bundleOwner, computeInstalledGraphDigest } = await import("../src/main/ext-package-ledger-v3")
 const { registerExtIpcHandlers } = await import("../src/main/ext-ipc")
-// **生产**引擎插件。第 9 跳的判据必须穿过它,不能停在「我读了它会读的那个文件」。
-const { CodePuppyExt } = await import("../../ext/src/plugin")
+// **生产**的技能目录算法。第 9 跳的判据必须穿过它,不能停在「我读了它会读的那个文件」。
+// `#1662`(#1667):OpenCode 2 上技能目录不再由 ext 的 `config` hook 注入,而是 main / sidecar 用 `explicitSkillDirs()` 算出来
+// 写进显式配置文件的 `skills`(sidecar 的 watchExplicitSources 在翻代 / 新装 / 停用时重算,与注入同一个算法)。
+const { explicitSkillDirs, PROJECT_SKILLS_ENTRY } = await import("../src/main/codepuppy-config-injection")
 
 delete process.env.CODEPUPPY_GLOBAL_DIR
 initCodePuppyEnvironment({
@@ -197,9 +199,6 @@ codepuppySidecar.attach((message) => void reloadRequests.push(message as { type?
 /** true ⇒ renderer 的重载请求被拒(撑开「请求没被受理必须如实说待重载」)。 */
 let reloadRefused = false
 const globalRoot = codepuppyGlobalRoot()
-/** `CodePuppyExt` 需要一个真实存在的项目目录。 */
-const engineProject = join(tmp, "engine-project")
-mkdirSync(engineProject, { recursive: true })
 
 /**
  * preload 暴露的通道名。**逐字抄自 `src/preload/index.ts`**,并由本文件最后一条用例证明
@@ -444,25 +443,13 @@ function engineAllowSet(): string[] {
  * 删掉那个 hook、或让 `current.json` 失效,旧断言**照样全绿**,而用户开了开关、
  * dispose 也调了,下一条消息里依然找不到技能。
  *
- * 所以这里跑的是**生产的 `CodePuppyExt`**,一行替身都没有。
+ * 所以这里跑的是**生产的算法**,一行替身都没有。`#1662`(OpenCode 2,#1667):那段链现在由 main / sidecar 的
+ * `explicitSkillDirs()` 调起(同一个 `skillGenerationLiveDirs`:账本 enabled 门、`current.json` 的 live generation、
+ * 目录在),结果写进显式配置文件的 `skills`,引擎的技能插件按它装载;ext 的 `config` hook 随 v1 一起没了。
  */
 async function engineInjectedSkillPaths(): Promise<string[]> {
-  const previous = process.env.CODEPUPPY_GLOBAL_DIR
-  process.env.CODEPUPPY_GLOBAL_DIR = globalRoot
-  try {
-    const hooks = (await CodePuppyExt({
-      directory: engineProject,
-      worktree: engineProject,
-      client: { instance: { dispose: async () => {} } },
-    } as never)) as unknown as { config: (cfg: Record<string, unknown>) => Promise<void> }
-    const cfg: Record<string, unknown> = {}
-    await hooks.config(cfg)
-    const skills = cfg.skills as { paths?: unknown } | undefined
-    return Array.isArray(skills?.paths) ? (skills.paths as string[]) : []
-  } finally {
-    if (previous === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
-    else process.env.CODEPUPPY_GLOBAL_DIR = previous
-  }
+  // 项目技能目录那一条(PROJECT_SKILLS_ENTRY,相对路径,每个会话按自己的项目解析)恒在,与扩展包无关;其余每一条都要被下面的断言认领。
+  return explicitSkillDirs().filter((dir) => dir !== PROJECT_SKILLS_ENTRY)
 }
 
 /** 生产链注入的路径 → 技能名(路径形状 `<root>/ext-store/skill--<name>/generations/<gen>`)。 */

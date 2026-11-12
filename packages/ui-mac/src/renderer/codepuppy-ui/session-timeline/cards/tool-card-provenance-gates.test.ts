@@ -1065,17 +1065,15 @@ describe("#934(#879 R1 Minor-3)— AC5 确定标记补齐:副行字段脱敏失�
 //
 // 与本文件抬头「锚点不 import 被测对象常量」不冲突:这里 import 的是**引擎**的
 // UnansweredError(投影模型的上游生产者,不是被测对象)——它是分类形态的唯一权威。
+// `#1662` parity:v1 引擎随 OpenCode 2 换代删除,生产者改为 2.x 重接管的内核块(packages/core/src/permission.ts 的
+// codepuppy(ADR-038) unansweredError);真路径(真引擎到期 → 桌面适配器 → 卡片)由 packages/ui-mac/src/main/permission-ask-timeout.engine.test.ts 判。
 // 引擎措辞漂移 ⇒ 第一条用例当场红(分类静默失配、卡面退回「错误详情已隐藏」的形态
 // 在这里被钉死)。变异自证:把 tool-card-model 的 PERMISSION_ASK_TIMEOUT_PATTERN 改到
 // 不匹配 ⇒ 第一条红;把 toolCardHeadOf 里 askTimedOut 赋值删掉 ⇒ 第一、三条红。
 describe("#1214 AC2 — 审批超时分类:真引擎 UnansweredError 驱动,降级卡出确定结局", () => {
   test("真引擎 UnansweredError 的 message → mcp 降级卡 askTimedOut=true,错误原文零字符进投影", async () => {
-    const { Permission } = await import("../../../../../../opencode/src/permission/index")
-    const engineError = new Permission.UnansweredError({
-      permission: "mcp:codepuppy:web_search",
-      patterns: ["*"],
-      timeoutMs: 300_000,
-    })
+    const { Permission } = await import("../../../../../../core/src/permission")
+    const engineError = Permission.unansweredError({ action: "mcp:codepuppy:web_search", resources: ["*"], timeoutMs: 300_000 })
     const part = toolPart({
       tool: "codepuppy_web_search",
       display: mcp("codepuppy", "web_search"),
@@ -1111,8 +1109,8 @@ describe("#1214 AC2 — 审批超时分类:真引擎 UnansweredError 驱动,降�
   })
 
   test("分类对所有来源一致:builtin 错误卡同样打 askTimedOut(其错误体本就可见,分类不改变它)", async () => {
-    const { Permission } = await import("../../../../../../opencode/src/permission/index")
-    const engineError = new Permission.UnansweredError({ permission: "bash", patterns: ["rm -rf /tmp/x"], timeoutMs: 60_000 })
+    const { Permission } = await import("../../../../../../core/src/permission")
+    const engineError = Permission.unansweredError({ action: "shell", resources: ["rm -rf /tmp/x"], timeoutMs: 60_000 })
     const part = toolPart({
       tool: "bash",
       display: builtin("bash"),

@@ -423,7 +423,8 @@ export function injectCodePuppyConfig(
     //       也问一次 —— 子会话不继承本 agent 的 ask,不问就等于整段跳过「逐次询问」;同档自身不问。
     //       另把 defaults 里 `doom_loop` 与 `read *.env*` 的 ask **原样重写一遍**:agent 自己的键排在
     //       配置顶层 `permission` 之后,项目配置放宽不了它们(`*.env.example` 照 defaults 仍放行)。
-    //       刻意不写 `external_directory`:追加 `{"*":"ask"}` 会压掉 defaults 的临时/技能目录白名单。
+    //       `external_directory`(R2:工作区外先问)不写在这里:写进配置会排在用户自己的规则之后、压过它们;由 ext 的 agent 变换
+    //       插在引擎底座之后(packages/ext/src/external-directory-rule.ts,`#1662` parity)。
     //       没有 prompt(见 codepuppy-agents.ts 抬头:给了 prompt 就会顶掉整份底座)。
     //       不设逃生 env:composer 选了这档就发 `agent: "codepuppy-ask"`,agent 缺席 = 引擎具名报错(fail-closed),
     //       不是静默回到全放行。治理保护名单同 codepuppy-readonly(CODEPUPPY_INJECTED_AGENTS)。

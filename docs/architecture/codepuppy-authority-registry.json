@@ -177,6 +177,10 @@
         {
           "file": "packages/ext/src/policy/register-policy.test.ts",
           "name": "a document-axis ask on an MCP tool registered after the first prompt asks before it runs; reject keeps it at 0"
+        },
+        {
+          "file": "packages/ui-mac/src/main/composer-tier-matrix.engine.test.ts",
+          "name": "三档 × R1–R12、三条委派入口与审批请求的整条路径(composer-tier-matrix.engine.cases.ts,26 条)"
         }
       ],
       "note": "An answer to the pending request itself is not held here: any plugin Context (including the extension's, which the project-plugin fan-out passes through) can call permission.reply on Code Puppy's request and the call runs (measured 2026-11-09); closing it belongs to the fan-out (L3), reported to the coordinator."
@@ -312,6 +316,28 @@
           "name": "I9: tool-policy-default allow waives the class-default ask; ask keeps it"
         }
       ]
+    },
+    {
+      "id": "composer-tier-matrix",
+      "decision": "The three composer tiers (Approve all = build, Ask = codepuppy-ask, Read-only = codepuppy-readonly) give each tool class the outcome REQ-236 §2.2 sets (R1–R6, R8, R10–R12; R2 asks outside the workspace in the first two tiers with v1's allowances for the engine's tool output, temp and skill directories, and a user's own external_directory rule out-ranks that ask as on v1, while Read-only's deny stays last); a delegation (a prompt carrying an agent, a non-subtask command that runs as another agent, a subtask command) gets the same decision as the direct subagent call, decided by the session's own agent (#1573).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "#1662 parity",
+      "takeovers": [
+        "packages/opencode/src/session/prompt.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ui-mac/src/main/codepuppy-config-injection.ts",
+        "ladder": "main (injected tier agents) + ext agent transform registered at the first prompt (packages/ext/src/external-directory-rule.ts: the R2 external_directory ask after the engine's base rules, before every config rule) + the re-taken packages/core/src/config/plugin/command.ts (codepuppy(#1573 E4): a command that runs as another agent takes the subagent permission path before switching)"
+      },
+      "tests": [
+        {
+          "file": "packages/ui-mac/src/main/composer-tier-matrix.engine.test.ts",
+          "name": "三档 × R1–R12、三条委派入口与审批请求的整条路径(composer-tier-matrix.engine.cases.ts,26 条)"
+        }
+      ],
+      "note": "R7 (egress fence and kill switch) is not a rule-layer cell. R9 (cloud tools) passes the same execution gate as R10 / R11 and differs only in identity derivation (codepuppy-cloud authority minted from the verified definition), judged by packages/ext/src/policy/register-policy.test.ts and plugin-host.test.ts; a governed remote MCP in the engine sandbox would need the ARM / DEF and cloud credential setup."
     },
     {
       "id": "tool-policy-settings-api",
@@ -817,6 +843,10 @@
         {
           "file": "packages/ext/src/policy/ask-deadline.test.ts",
           "name": "the default is 300 s and every invalid override falls back to it, never to no deadline"
+        },
+        {
+          "file": "packages/ui-mac/src/main/permission-ask-timeout.engine.test.ts",
+          "name": "审批超时:到期的工具部件经桌面适配器被卡片分类为审批超时,模型读到同一句(permission-ask-timeout.engine.cases.ts,1 条)"
         }
       ]
     },
@@ -962,7 +992,7 @@
       ],
       "mechanism": {
         "file": "packages/ext/src/cloud-websearch-kill.ts",
-        "ladder": "L0 (the extension's execute.before refuses web search by the account signals and the verified governed server; websearch.transform picks the keyless provider)"
+        "ladder": "L0 plugin hooks (the extension's execute.before refuses web search by the account signals and the verified governed server; websearch.transform picks the keyless provider and installs Code Puppy's exa provider (packages/ext/src/exa-websearch.ts) under the same id in place of upstream's, so an in-band isError, a non-2xx status and a 200 notice without results reach the model as Code Puppy's named failure or the provider's own words; execute.after restores that message over the websearch tool's generic wrapper)"
       },
       "tests": [
         {
@@ -988,6 +1018,22 @@
         {
           "file": "packages/ext/src/cloud-websearch-kill.test.ts",
           "name": "kill-switch 下 cloud_web_search 到不了传输(评估恒 allow 也一样);兄弟云工具照常执行"
+        },
+        {
+          "file": "packages/ui-mac/src/main/websearch-honest.engine.test.ts",
+          "name": "Exa 结局诚实:出错 ⇒ 具名失败、D ⇒ 原文、零命中 ⇒ 没搜到、429 ⇒ 具名失败,两两不同;不装 ext ⇒ 塌成没搜到(websearch-honest.engine.cases.ts,7 条)"
+        },
+        {
+          "file": "packages/ui-mac/src/main/websearch-copies.test.ts",
+          "name": "网 A:注册 web search 供应商或消费 WebSearch.Service 的生产文件,恰好是分好类的那些(新增即停下来分类)"
+        },
+        {
+          "file": "packages/ui-mac/src/main/websearch-copies.test.ts",
+          "name": "网 B:写着供应商端点的生产文件,恰好是五份上游供应商、ext 的 exa 供应商与登记过的纯说明"
+        },
+        {
+          "file": "packages/ui-mac/src/main/websearch-account-tool-table.engine.test.ts",
+          "name": "账户态工具表:代付两条都在、登出只剩本地、kill-switch 两条都不在;去掉注入的 deny 即回来(websearch-account-tool-table.engine.cases.ts,4 条)"
         }
       ]
     },
@@ -1004,12 +1050,41 @@
       ],
       "mechanism": {
         "file": "packages/ext/src/platform-credential-header.ts",
-        "ladder": "L0 (session.hook model / http request in the extension)"
+        "ladder": "L0 (session.hook[\"http.request\"] in the extension: the outgoing request after the route layer's apiKey auth, so the credential, not the injected placeholder, reaches the wire; #1662 parity B4)"
       },
       "tests": [
         {
           "file": "packages/ext/src/plugin-host.test.ts",
           "name": "P6 / S5:平台凭据头只对平台节点、每次现读;别的节点不带;反向臂:不装 ext ⇒ 不带"
+        },
+        {
+          "file": "packages/ui-mac/src/main/token-hot-apply.engine.test.ts",
+          "name": "续期热应用:令牌 A ⇒ A、热应用 B ⇒ B、删文件 ⇒ 具名失败零请求、令牌不进日志与响应;不装 ext ⇒ 占位值被拒(token-hot-apply.engine.cases.ts,2 条)"
+        },
+        {
+          "file": "packages/ui-mac/src/main/platform-credential-error.engine.test.ts",
+          "name": "平台凭据出错:读不到 ⇒ 零请求具名失败;401 / 403 ⇒ 一次 provider.auth;503 对照 ⇒ 看得见重试(platform-credential-error.engine.cases.ts,5 条)"
+        }
+      ]
+    },
+    {
+      "id": "cloud-connector-credential-per-request",
+      "decision": "Code Puppy's governed cloud connector reads its credential file on every request, so a same-identity renewal applied hot (no engine restart) is used by the next request, and a missing file fails with an auth error without sending (#1562).",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "#1662 parity",
+      "takeovers": [
+        "packages/opencode/src/mcp/index.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/mcp/client.ts",
+        "ladder": "L3 (re-taken: the remote connection's fetch goes through the plugin package's governedCredentialFetch for the governed entry, codepuppy(#1562) block)"
+      },
+      "tests": [
+        {
+          "file": "packages/ui-mac/src/main/cloud-credential-hot.engine.test.ts",
+          "name": "云连接器:令牌 A ⇒ A、热应用 B 后重连 ⇒ B、删文件 ⇒ 认证失败零请求(cloud-credential-hot.engine.cases.ts,3 条)"
         }
       ]
     },
@@ -1120,6 +1195,10 @@
         {
           "file": "packages/ui-mac/src/main/naming-before-v1-conversion.test.ts",
           "name": "#1569 会话库改名先于 v1 → 2.x 转换:生产顺序 ⇒ 新名;转换先跑 ⇒ 旧名留在 2.x(naming-before-v1-conversion.cases.ts,2 条)"
+        },
+        {
+          "file": "packages/ui-mac/src/main/naming-resume.engine.test.ts",
+          "name": "#1569 AC4:迁移后继续生成、压缩后续写、溢出后续写都能完成;反向顺序具名失败(naming-resume.engine.cases.ts,2 条)"
         }
       ]
     },
@@ -1579,6 +1658,10 @@
         {
           "file": "packages/ui-mac/src/main/sidecar-stop.test.ts",
           "name": "#1647 AC2 a hung engine close stays inside the five-second stop budget"
+        },
+        {
+          "file": "packages/ui-mac/src/main/sidecar-stop-pending-approval.engine.test.ts",
+          "name": "#1647 AC1:等审批时停引擎 ⇒ 这一轮被释放、工具零执行(sidecar-stop-pending-approval.engine.cases.ts,3 条)"
         }
       ]
     },

@@ -56,7 +56,7 @@ describe("ADR-038 approval deadline on OpenCode 2", () => {
       expect(Exit.isSuccess(exit)).toBe(false)
       const failure = Cause.squash((exit as any).cause) as Error
       expect(failure).toBeInstanceOf(QuestionTool.CancelledError)
-      expect(failure.message).toContain("NOT allowed")
+      expect(failure.message).toContain("本次操作**没有**被放行")
       expect(failure.message).toContain("src/late.ts")
       expect(replied).toEqual([{ sessionID, requestID: request.id, reply: "reject" }])
       expect(yield* permission.list()).toEqual([])
@@ -100,6 +100,6 @@ describe("ADR-038 approval deadline on OpenCode 2", () => {
     // step.ts writes a QuestionTool.CancelledError's message on the tool call; model-request recovers it as a decline.
     expect(failure._tag).toBe("QuestionTool.CancelledError")
     expect(failure).toBeInstanceOf(QuestionTool.CancelledError)
-    expect(failure.message).toContain("300 s")
+    expect(failure.message).toContain("审批请求等待 300 秒无人应答")
   })
 })

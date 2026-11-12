@@ -17,7 +17,9 @@ import { applyFactoryDeny, factoryDeniedSkills } from "./factory-deny"
 import { rebrandSystem } from "./prompt-rebrand"
 import { validateCloudToolInput, validateCloudToolOutput } from "./cloud-contract-hook"
 import { platformOutputCap } from "./platform-output-cap"
-import { platformCredentialHeader } from "./platform-credential-header"
+import { platformRequestCredentialHeader } from "./platform-credential-header"
+import { EXTERNAL_DIRECTORY_AGENTS, externalDirectoryRules, placeAfterBase } from "./external-directory-rule"
+import { isCodePuppyWebSearchFailure, searchExa } from "./exa-websearch"
 import { byokOutputCap } from "./byok-output-cap"
 // REQ-157 `#1284`:alpha 送进模型上下文的每段字都在 context-injection.ts 登记并声明上限。import 本身就是
 // 一道闸 —— 任何片段超限,登记簿在模块装载时抛出,ext 整个装不上(2.x 记该插件 failed,`#1665` I4 让 sidecar 不报 ready),
@@ -165,6 +167,13 @@ export const CodePuppyExt: Plugin.Plugin = {
         await vision.toolBefore(event)
       })
       await context.tool.hook("execute.after", (event) => {
+        if (event.status === "error") {
+          // `#1449` / `#1445`(#1662 parity):Code Puppy 的 exa 供应商(exa-websearch.ts)抛出的具名结局,被 2.x 的 websearch 工具包成了
+          // 通用的「Unable to search the web for …」;这里换回 0.1.26 的那句话(或供应商原文)。只认那个类型,不看文案。
+          const cause = (event.error as { error?: { cause?: unknown } }).error?.cause
+          if (event.tool === "websearch" && isCodePuppyWebSearchFailure(cause)) (event.error as { message: string }).message = cause.message
+          return
+        }
         if (event.status !== "completed") return
         // 2.x 的 execute.after 不允许失败(`packages/core/src/plugin/hooks.ts:23`):契约不符时把结果换成一句响亮的拒绝,
         // 不让一份没核过的结果原样回到模型。
@@ -222,9 +231,11 @@ export const CodePuppyExt: Plugin.Plugin = {
       }
       for (const name of ["context", "compaction", "generate", "title"] as const) await context.session.hook(name, assembleRequest)
       // REQ-236 `#1562`:平台代理节点的凭据每次请求现读,续期热应用不必重启引擎;读不到就抛,请求不发出。
-      await context.session.hook("model.request", (event) => {
-        const authorization = platformCredentialHeader({ providerBaseURL: event.baseURL, env: process.env })
-        if (authorization) event.headers.authorization = authorization
+      // 写在 http.request:2.x 的路由层在 model.request 之后才按 apiKey 写 Authorization(packages/ai/src/route/auth.ts),
+      // 那里加的头会被注入的占位 apiKey 盖掉;http.request 拿到的是鉴权之后、即将发出的请求(#1662 parity B4)。
+      await context.session.hook("http.request", (event) => {
+        const authorization = platformRequestCredentialHeader({ requestURL: event.request.url, env: process.env })
+        if (authorization) event.request.headers.set("authorization", authorization)
       })
 
       // ── 配置域(C10 / L3r / M3)────────────────────────────────────────────────────────────
@@ -303,6 +314,36 @@ export const CodePuppyExt: Plugin.Plugin = {
       // `opencode.config.websearch` 应用,照样优先;kill-switch 由上面的 execute.before 拒,与这里的选择无关。
       await context.websearch.transform((editor) => {
         if (editor.default.get() === undefined) editor.default.set(DEFAULT_WEBSEARCH_PROVIDER)
+        // `#1449` / `#1445`(#1662 parity):同一个 id 顶替上游的 exa 供应商(注册表按 id 存,后加的覆盖)—— 只改响应怎么交给模型,
+        // 选哪个供应商仍是上面这一句与用户配置。理由与措辞见 exa-websearch.ts。
+        editor.add({
+          id: DEFAULT_WEBSEARCH_PROVIDER,
+          name: "Exa",
+          execute: async (input, { signal }) => {
+            const connection = await context.integration.connection.active(DEFAULT_WEBSEARCH_PROVIDER)
+            const credential = connection ? await context.integration.connection.resolve(connection) : undefined
+            return searchExa({ query: input.query, key: credential?.type === "key" ? credential.key : undefined, signal })
+          },
+        })
+      })
+      // REQ-236 §2.2 R2(`#1662` parity):全部批准 / 请求审批读写工作区外先问,插在引擎底座之后、配置规则之前 —— 用户自己的
+      // `external_directory` 规则照 v1 胜出,只读档的拒绝仍在最后。理由与白名单见 external-directory-rule.ts。
+      // 变换在第一次 prompt 时注册(与策略目录的尾规则同一时机,policy/catalog.ts ensureTail):OpenCode 的配置 agent 插件在激活之后
+      // 才建出 codepuppy-ask,激活时注册的变换看不到它;插入位置按底座算,与注册先后无关。
+      let externalDirectory = false
+      await context.session.hook("prompt", async () => {
+        if (externalDirectory) return
+        externalDirectory = true
+        await context.agent.transform((editor) => {
+          const rules = externalDirectoryRules(process.env)
+          for (const id of EXTERNAL_DIRECTORY_AGENTS) {
+            if (!editor.get(id as never)) continue
+            editor.update(id as never, (agent) => {
+              if (!placeAfterBase(id, agent.permissions as never, rules))
+                error(`[@codepuppy/ext] ${id}: the engine's base rules changed shape; external_directory ask appended (user rules cannot relax it)`)
+            })
+          }
+        })
       })
       // REQ-067 / #1522:出厂禁用的技能 —— 从技能目录里拿掉(上游内置的那些在 ext 之前注册),并在权限评估里一律 deny
       // (覆盖之后才由配置目录装进来的同名技能)。

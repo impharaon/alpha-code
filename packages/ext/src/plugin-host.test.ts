@@ -417,16 +417,24 @@ it.live("P6 / S5:平台凭据头只对平台节点、每次现读;别的节点�
     writeFileSync(ref, "plat-1\n")
     env({ CODEPUPPY_BASE_URL: "https://gateway.codepuppy.test/v1", CODEPUPPY_PLATFORM_AUTH_REF: `{file:${ref}}` })
     const hooks = yield* PluginHooks.Service
-    const request = (baseURL: string) => ({ ...ids, model: { providerID: "p", id: "m" } as never, kind: "primary" as const, baseURL, headers: {} as Record<string, string> })
-    expect((yield* hooks.trigger("session", "model.request", request("https://gateway.codepuppy.test/v1"))).headers).toEqual({})
+    // 2.x 的 http.request 拿到的是路由层鉴权之后、即将发出的请求(Authorization 已是注入的占位 apiKey)
+    const request = (url: string) => ({
+      ...ids,
+      model: { providerID: "p", id: "m" } as never,
+      kind: "primary" as const,
+      request: new Request(url, { method: "POST", headers: { authorization: "Bearer placeholder" }, body: "{}" }),
+    })
+    const sent = (url: string) => hooks.trigger("session", "http.request", request(url)).pipe(Effect.map((event) => event.request.headers.get("authorization")))
+    expect(yield* sent("https://gateway.codepuppy.test/v1/chat/completions")).toBe("Bearer placeholder")
     yield* activate(CodePuppyExt)
-    expect((yield* hooks.trigger("session", "model.request", request("https://gateway.codepuppy.test/v1"))).headers).toEqual({ authorization: "Bearer plat-1" })
+    expect(yield* sent("https://gateway.codepuppy.test/v1/chat/completions")).toBe("Bearer plat-1")
     writeFileSync(ref, "plat-2\n")
-    expect((yield* hooks.trigger("session", "model.request", request("https://gateway.codepuppy.test/v1"))).headers).toEqual({ authorization: "Bearer plat-2" })
-    expect((yield* hooks.trigger("session", "model.request", request("https://api.other.test/v1"))).headers).toEqual({})
-    // 凭据文件没了 ⇒ 钩子抛 LoadAPIKeyError(2.x 里这次模型请求在发出前失败),消息不带路径、不带令牌,不回落旧值。
+    expect(yield* sent("https://gateway.codepuppy.test/v1/chat/completions")).toBe("Bearer plat-2")
+    expect(yield* sent("https://api.other.test/v1/chat/completions")).toBe("Bearer placeholder")
+    expect(yield* sent("https://gateway.codepuppy.test/v1evil/chat/completions")).toBe("Bearer placeholder")
+    // 凭据文件没了 ⇒ 钩子抛 LoadAPIKeyError(请求不发出),消息不带路径、不带令牌,不回落旧值。
     rmSync(ref)
-    const failed = yield* hooks.trigger("session", "model.request", request("https://gateway.codepuppy.test/v1")).pipe(Effect.exit)
+    const failed = yield* hooks.trigger("session", "http.request", request("https://gateway.codepuppy.test/v1/chat/completions")).pipe(Effect.exit)
     expect(Exit.isFailure(failed)).toBe(true)
     const thrown = Exit.isFailure(failed) ? Cause.squash(failed.cause) : undefined
     expect(LoadAPIKeyError.isInstance(thrown)).toBe(true)

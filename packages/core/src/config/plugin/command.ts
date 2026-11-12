@@ -114,8 +114,19 @@ export const Plugin = define({
                 // agent's: the command switches the model only in a session that has none.
                 if (agent !== undefined || model !== undefined) {
                   const session = yield* ctx.session.get({ sessionID: input.sessionID })
-                  if (agent !== undefined && session.agent !== agent)
+                  if (agent !== undefined && session.agent !== agent) {
+                    // codepuppy(#1573 E4) — running as another agent is a delegation: it takes the subagent tool's
+                    // permission path, decided by the session's own agent (the user's tier), before the switch.
+                    yield* ctx.permission.assert({
+                      sessionID: session.id,
+                      agent: session.agent,
+                      action: SubagentTool.name,
+                      resources: [agent],
+                      save: [agent],
+                      metadata: {},
+                    })
                     yield* ctx.session.switchAgent({ sessionID: input.sessionID, agent })
+                  }
                   if (model !== undefined && session.model === undefined)
                     yield* ctx.session.switchModel({ sessionID: input.sessionID, model })
                 }

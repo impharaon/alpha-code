@@ -121,10 +121,13 @@ export function unansweredError(input: UnansweredInput): QuestionTool.CancelledE
     readonly detail: string
     constructor(value: UnansweredInput) {
       super()
+      // The 0.1.26 text (v1 permission/index.ts UnansweredError): the desktop's tool card recognises its first line
+      // (tool-card-model.ts PERMISSION_ASK_TIMEOUT_PATTERN) and the model reads the same sentence.
       this.detail =
-        `This approval request waited ${Math.round(value.timeoutMs / 1000)} s with no answer and was closed: ` +
-        `the action was NOT allowed (${value.action} ${JSON.stringify(value.resources)}). ` +
-        `Usually the session with the approval card was not open. Open that session and retry the action.`
+        `审批请求等待 ${Math.round(value.timeoutMs / 1000)} 秒无人应答,已按 fail-closed 结束:本次操作**没有**被放行。\n` +
+        `请求:permission=${value.action} patterns=${JSON.stringify(value.resources)}\n` +
+        `常见原因:审批对话框所在的会话页没有打开(切到了别的会话/别的页面),或审批面未连上本会话。\n` +
+        `下一步:回到该会话页后重试这次操作;若这类操作应当长期放行,把它写进 permission 规则(config 里配成 allow),不要靠等待。`
     }
     override get message() {
       return this.detail

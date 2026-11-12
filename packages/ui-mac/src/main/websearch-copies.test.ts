@@ -239,9 +239,12 @@ describe("websearch 执行副本普查(#223 R3 · R4 起降为纵深)", () => {
     // 但 kill-switch 臂**必须**仍是中和条目且排在最前(缺凭证判定不得把真 URL 放回 kill-switch 态)。
     // `#1667`:2.x 的 MCP 条目在 `mcp.servers` 下(上游 `Config.Info` 的 `mcp.servers`)。
     const assign = injection.match(
-      /config\.mcp = \{\n\s*\.\.\.config\.mcp,\n\s*servers: \{\n\s*\.\.\.config\.mcp\?\.servers,\n\s*\[CLOUD_MCP_SERVER_NAME\]: killSwitch\n\s*\? \{ \.\.\.WITHHELD_CLOUD_MCP \}\n\s*: platformPays\n\s*\? cloud\n\s*: materializeCloudMcpConfig\(mcpUrl, undefined\),\n\s*\},\n\s*\}/,
+      /config\.mcp = \{\n\s*\.\.\.config\.mcp,\n\s*servers: \{\n\s*\.\.\.config\.mcp\?\.servers,\n\s*\[CLOUD_MCP_SERVER_NAME\]: cloudMcpWithheld\n\s*\? \{ \.\.\.WITHHELD_CLOUD_MCP \}\n\s*: platformPays\n\s*\? cloud\n\s*: materializeCloudMcpConfig\(mcpUrl, undefined\),\n\s*\},\n\s*\}/,
     )
     expect(assign).not.toBeNull()
+    // #1687:三元的条件改名为 cloudMcpWithheld(报错入口要读它);它必须恰好是 killSwitch,且在赋值前一行定下、除复位成 false 外全文件只赋这一次。
+    expect(injection).toMatch(/cloudMcpWithheld = killSwitch\n\s*config\.mcp = \{/)
+    expect(injection.match(/cloudMcpWithheld = (?!false\b)/g)?.length).toBe(1)
     const branch = injection.indexOf("if (killSwitch) {")
     expect(branch).toBeGreaterThanOrEqual(0)
     const elseAt = injection.indexOf("\n      } else {", branch)

@@ -58,6 +58,7 @@ import { CODEPUPPY_AGENT_TEXT } from "../../ui-mac/src/main/codepuppy-agents"
 import { CODEPUPPY_BEHAVIOR_MD } from "../../ui-mac/src/main/codepuppy-behavior"
 import { buildCodePuppyIdentity } from "../../ui-mac/src/main/codepuppy-identity"
 import { CLOUD_MCP_ARM_ENV, CLOUD_MCP_DEF_ENV, CLOUD_MCP_SERVER_ENV } from "./cloud-websearch-kill"
+import { PLATFORM_AUTH_REF_ENV } from "./platform-credential-header"
 import CodePuppyExt from "./plugin"
 import { toLLMMessages } from "../../core/src/session/runner/to-llm-message.ts"
 import { STAGED_ATTACHMENT_PART_NAME, stagedAttachmentPart } from "./staged-attachment-part"
@@ -120,6 +121,8 @@ const SANITIZE = [
   CLOUD_MCP_ARM_ENV,
   CLOUD_MCP_DEF_ENV,
   CLOUD_MCP_SERVER_ENV,
+  // `#1662` parity B4:③j 的平台凭据引用(http.request 钩子每次现读)。
+  PLATFORM_AUTH_REF_ENV,
 ] as const
 
 let root = ""
@@ -146,7 +149,7 @@ afterEach(() => {
 })
 
 /** 本文件为之设了咽喉的通路。② 要求它与「真 CodePuppyExt 注册且分类为 context」的集合逐字相等。 */
-const THROATED = ["agent.transform", "command.transform", "mcp.transform", "session.compaction", "session.context", "session.generate", "session.prompt", "session.title", "skill.transform", "tool.execute.after", "tool.transform", "websearch.transform"].sort()
+const THROATED = ["agent.transform", "command.transform", "mcp.transform", "session.compaction", "session.context", "session.generate", "session.http.request", "session.prompt", "session.title", "skill.transform", "tool.execute.after", "tool.transform", "websearch.transform"].sort()
 /** 2.x 组装一次模型请求的四条钩子(`session/model-request.ts`:主循环 / 压缩 / 无工具生成 / 起标题各触发自己那条,互不经过)。 */
 const REQUEST_HOOKS = ["context", "compaction", "generate", "title"] as const
 
@@ -333,8 +336,11 @@ describe("③a 配置域 transform 咽喉:ext 写进 agent / command / mcp 的�
   })
 })
 
-describe("③a″ skill / websearch transform 不写字:只拿掉出厂禁项、只选供应商", () => {
-  test("skill.transform 只调 remove;websearch.transform 只在没有选择时调 default.set(供应商 id),不加任何带字的供应商", async () => {
+// `#1662` parity 第 1、2 项(编排器裁决选项 2,`75617c4a1f`):websearch.transform 以上游同一个 id 装 Code Puppy 自己的 exa 供应商
+// (注册表按 id 存,后加的顶替上游那份)。供应商对象本身不带进模型的字(name 只进上游的选择表单);它失败时抛出的话由
+// tool.execute.after 的失败分支原样交回,与 execute.before 抛出的拒绝句同属工具失败文字。
+describe("③a″ skill / websearch transform 不写字:只拿掉出厂禁项、只选供应商、只以同一个 id 顶替 exa", () => {
+  test("skill.transform 只调 remove;websearch.transform 只在没有选择时调 default.set(供应商 id),并且只 add 一个与上游同 id 的 exa 供应商(不新增第二个)", async () => {
     process.env.CODEPUPPY_FACTORY_DENY_SKILLS = JSON.stringify(["customize-opencode"])
     const recorded = recordingContext(join(root, "project"))
     await CodePuppyExt.setup(recorded.context)
@@ -343,11 +349,11 @@ describe("③a″ skill / websearch transform 不写字:只拿掉出厂禁项、
       transform({ remove: (id: string) => void calls.push(`skill.remove ${id}`), add: () => void calls.push("skill.add"), update: () => void calls.push("skill.update") } as never)
     for (const transform of recorded.transforms.websearch ?? [])
       transform({
-        add: () => void calls.push("websearch.add"),
+        add: (provider: { id: string }) => void calls.push(`websearch.add ${provider.id}`),
         remove: () => void calls.push("websearch.remove"),
         default: { get: () => undefined, set: (selection: unknown) => void calls.push(`websearch.default ${String(selection)}`) },
       } as never)
-    expect(calls).toEqual(["skill.remove customize-opencode", "websearch.default exa"])
+    expect(calls).toEqual(["skill.remove customize-opencode", "websearch.default exa", "websearch.add exa"])
   })
 })
 
@@ -677,6 +683,61 @@ describe("③i session.prompt 咽喉:用户消息上 alpha 一个字不加", () 
         },
       })
       expect(added(yield* hooks.trigger("session", "prompt", input() as never))).toEqual(["/prompt/text=帮我看一下 a.txt 多一段"])
+    }),
+  )
+})
+
+// ── ③j session.http.request 咽喉(`#1662` parity B4,`cce0e66c03`):这条钩子能换掉即将发出的请求体,ext 只写平台凭据头 ──
+
+describe("③j session.http.request 咽喉:即将发出的请求上 alpha 只换鉴权头,请求体一个字节不动", () => {
+  it.live("真宿主:平台节点与别的节点的请求过 ext 后,地址 / 方法 / 请求体 / 其余头逐字相同,只有平台节点的 authorization 变了(且真变了);已知的坏:之后的插件换掉请求体 ⇒ 判官点名", () =>
+    Effect.gen(function* () {
+      const token = join(root, "platform-token")
+      writeFileSync(token, "plat-throat\n")
+      process.env.CODEPUPPY_BASE_URL = "https://gateway.invalid/v1"
+      process.env[PLATFORM_AUTH_REF_ENV] = `{file:${token}}`
+      yield* activate(CodePuppyExt)
+      const hooks = yield* PluginHooks.Service
+      const BODY = JSON.stringify({ model: "route-a", messages: [{ role: "user", content: "帮我看一下 a.txt" }], max_tokens: 1 })
+      const HEADERS = { authorization: "Bearer placeholder", "content-type": "application/json", "x-trace": "t-1" }
+      const send = (url: string) =>
+        hooks.trigger("session", "http.request", {
+          sessionID: "ses_http_throat" as never,
+          agent: "build" as never,
+          model: { providerID: "codepuppy", id: "route-a" } as never,
+          kind: "primary",
+          request: new Request(url, { method: "POST", headers: HEADERS, body: BODY }),
+        })
+      /** 发出的请求相对原样改了什么(authorization 是凭据、不进模型上下文,单独判)。 */
+      const changes = (url: string, request: Request) =>
+        Effect.promise(async () => {
+          const out: string[] = []
+          if (request.url !== url) out.push(`url=${request.url}`)
+          if (request.method !== "POST") out.push(`method=${request.method}`)
+          const body = await request.text()
+          if (body !== BODY) out.push(`body=${body}`)
+          const headers = Object.fromEntries([...request.headers].filter(([key]) => key !== "authorization"))
+          const { authorization: _credential, ...rest } = HEADERS
+          if (JSON.stringify(headers) !== JSON.stringify(rest)) out.push(`headers=${JSON.stringify(headers)}`)
+          return out
+        })
+      const PLATFORM = "https://gateway.invalid/v1/chat/completions"
+      const OTHER = "https://api.other.invalid/v1/chat/completions"
+      const platform = yield* send(PLATFORM)
+      expect(yield* changes(PLATFORM, platform.request)).toEqual([])
+      expect(platform.request.headers.get("authorization")).toBe("Bearer plat-throat") // 钩子真跑了
+      const other = yield* send(OTHER)
+      expect(yield* changes(OTHER, other.request)).toEqual([])
+      expect(other.request.headers.get("authorization")).toBe("Bearer placeholder")
+      yield* activate({
+        id: "test.body-writer",
+        async setup(context) {
+          await context.session.hook("http.request", (event) => {
+            event.request = new Request(event.request.url, { method: event.request.method, headers: event.request.headers, body: BODY.replace("a.txt", "a.txt 多一段") })
+          })
+        },
+      })
+      expect(yield* changes(PLATFORM, (yield* send(PLATFORM)).request)).toEqual([`body=${BODY.replace("a.txt", "a.txt 多一段")}`])
     }),
   )
 })

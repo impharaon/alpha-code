@@ -160,7 +160,7 @@ last_reviewed: 2026-11-12
 ### 风险
 
 - 订阅不共享:定制中心那条事件订阅活在 `useExtensions` 里、直到定制中心第一次打开才建立(`use-extensions.ts` 的 A2 lazy),没有应用级订阅可共享;观察件在窗口结束后自建第二条全局订阅(与 `cloud-run-watcher.tsx` 同法)。启动期零新增请求由用例钉住。
-- 断开的发现依赖事件:引擎在服务断开时若不发 `mcp*` 事件,入口要等下一次事件 / 实例释放 / 运行时恢复才更新;重连会发 `mcp.tools.changed`,所以「重连即移除」不受影响。
+- 断开的发现:2.x 引擎在每次连接状态落定(已连接 / 失败 / 需登录 / 断开)时发 `mcp.status.changed`(`packages/schema/src/mcp-event.ts:22-27`),观察件按 `mcp*` 前缀重读,断开与重连都能及时反映。(本段初稿写「断开可能不发事件」,读源码后更正。)
 - 「查看」打开的是定制中心连接器页(已安装一组在页顶),不是定位到那一行:定制中心今天没有按行定位的入口,加它是定制中心的新能力,不在本段。
 - `needs_auth` 条目做了操作即离开(R2);授权没成功时,下一次读状态会把它放回来。
 
@@ -172,9 +172,12 @@ last_reviewed: 2026-11-12
 | AC-01 (v2) 操作 | 同文件「查看 opens the Customization Center on its connectors page」:先把分区置为技能,点「查看」→ 定制中心打开且在连接器页,条目仍在 | 不切分区 → 红 |
 | AC-05 (v2) | 同文件:窗口内两个服务 failed、第 9 秒起 connected;0–9 秒逐秒断言零 `GET /mcp`、无提示、无入口;9–30 秒仍无提示、无入口;窗口后确有读取 | 窗口内就读状态 → 零请求断言红 |
 | AC-06 (v2) | 同文件:一直 failed;第 9999 毫秒零请求、无入口;第 10000 毫秒首读,入口计 1、原因与操作;全程无提示 | 窗口内读 → 红;改用先提示接法 → 红 |
+| 有意关闭不算问题 | 同文件「a service that is off on purpose is not a problem」:用户关掉的连接器与 kill-switch 下的云服务都报 `disabled` → 入口只列真正失败的那一个;把它也关掉后入口为空,全程无提示 | 去掉 `isDisabled` 跳过 → 计 3 而不是 1,红 |
 | needs_auth | 同文件:条目文字「需要重新登录」,点「去授权」→ 引擎收到授权请求,条目离开 | 当成后台失败 → 文字与操作不符,红 |
 | 生产挂载 | 同文件末条:`index.tsx` 在 `AppInterface` 内挂 `BackgroundProblemWatcher` | 删挂载行 → 红 |
 
 ### 偏离记录
 
-暂无。
+- 2026-11-12 · 编排器更正:有意关闭的服务不进入口。用户关掉的连接器与 kill-switch 下的云服务在 2.x 都报 `{ status: "disabled" }`(配置 `disabled: true` → `packages/core/src/mcp/index.ts:602-605` 与 `:732-736`;用户关闭走 disconnect → `:844`;中和条目 `WITHHELD_CLOUD_MCP` 带 `disabled: true`,`packages/ui-mac/src/main/cloud-web-search.ts:75-80`,服务名 `codepuppy`),观察件已按 `isDisabled` 跳过,补用例钉住。
+- 2026-11-12 · **停在一项上(未猜)**:kill-switch 下定制中心一打开,`use-extensions.ts:680-683` 的补连(`#1106`)会对 `disabled` 的云服务调 `/mcp/codepuppy/connect`;2.x 的 `connect` 不看 `disabled`,直接重启连接(`packages/core/src/mcp/index.ts:828-836`),连 `127.0.0.1:1` 失败后状态变成 `{ status: "failed", error: "[codepuppy:<码>] <传输层原文>" }`(`:497-501` / `:515-520`,前缀格式 `packages/schema/src/codepuppy-net-failure.ts:211-213`)—— 状态里**没有**区分「被开关关掉」与「真失败」的字段;renderer 也拿不到 kill-switch 状态(preload / shared / renderer 无此通道)。此时观察件会把它列成「未能连接」。需要编排器裁决接法(见交回)。
+

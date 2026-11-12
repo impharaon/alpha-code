@@ -192,6 +192,25 @@ describe("#1687 v2 connector failures go only to the entry", () => {
     expect(source.statusReads.length, "the first read happens once the window ends").toBeGreaterThan(0)
   })
 
+  test("a service that is off on purpose is not a problem: user-disabled connector and the kill-switched cloud service", async () => {
+    // 2.x 引擎对配置 `disabled: true` 的服务报 `{ status: "disabled" }`(packages/core/src/mcp/index.ts 启动 reconcile
+    // 与 replaceServer 两处);kill-switch 下注入面写的云服务中和条目 `WITHHELD_CLOUD_MCP` 正是 `disabled: true`,
+    // 服务名 `codepuppy`。用户在定制中心关掉的连接器走 disconnect,同样报 `disabled`。
+    runtime.beginStartupQuiet()
+    const source = engine({ codepuppy: { status: "disabled" }, notion: { status: "disabled" }, feishu: { status: "failed" } })
+    mount(source)
+    advance(10_000)
+    await settle()
+    expect(source.statusReads.length).toBeGreaterThan(0)
+    expect(entryLabel(), "only the genuinely failed connector is listed").toBe(countLabel(1))
+    // 用户把正在失败的那一个也关掉 → 它离开入口,入口为空。
+    source.set({ codepuppy: { status: "disabled" }, notion: { status: "disabled" }, feishu: { status: "disabled" } })
+    source.emit("mcp.status.changed")
+    await settle()
+    expect(entry()).toBeNull()
+    expect(toasts()).toHaveLength(0)
+  })
+
   test("AC-06: a connector still failing after the window is listed (count 1, cause and action); no toast", async () => {
     runtime.beginStartupQuiet()
     const start = Date.now()

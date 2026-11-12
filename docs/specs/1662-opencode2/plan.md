@@ -124,3 +124,4 @@ last_reviewed: 2026-11-12
 ### 偏离记录
 
 - 2026-11-12 · 第 1 项的测试读「注册表在该名字下放的是哪一个」(描述区分),不执行工具、不数 MCP 调用 · Code Mode 工具(`codemode: true`,真内置与 MCP 工具都是)不能按名字直接执行(`snapshot.execute` 回「No tool named …」);Code Mode 执行的就是该名字下注册的那一个 · 第 1 项提交。
+- 2026-11-12 · 第 2 项:`internal` 里同时激活上游 `AgentPlugin`(否则 `general` 子 agent 不存在,`subagent.ts` 在权限检查之前就以「Unknown agent」失败);宿主另导出 `AgentPlugin` / `SubagentTool` / `WebFetchTool` / `SessionPrompt`;E7 前提臂对 ask 回 once(拒绝会在晚注册的探针钩子之前结束调用链,数不到 `execute.before`)· 第 2 项提交。

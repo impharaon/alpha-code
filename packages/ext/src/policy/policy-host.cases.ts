@@ -61,6 +61,12 @@ export const { Location } = await load("src/location.ts")
 export const { Rpc } = await load("src/rpc.ts")
 export const { Mcp } = await load("src/mcp/index.ts")
 export const { Bus } = await load("src/bus.ts")
+// Upstream tool plugins activated as builtins by the E6 / #1572 cases (register-policy.test.ts `internal`).
+export const { SubagentTool } = await load("src/tool/plugin/subagent.ts")
+// The builtin agents (`general` is the subagent the E6 cases ask for).
+export const { AgentPlugin } = await load("src/plugin/agent.ts")
+export const { WebFetchTool } = await load("src/tool/plugin/webfetch.ts")
+export const { SessionPrompt } = await load("src/session/prompt.ts")
 export const { fromPromise } = await resolve("@opencode/plugin/promise/adapter")
 export const SchemaTool = (await resolve("@opencode/schema/tool")).Tool
 
@@ -84,6 +90,7 @@ const nodes = {
   Model: (await load("src/model.ts")).Model,
   Provider: (await load("src/provider.ts")).Provider,
   SharedCache: (await load("src/shared-cache.ts")).SharedCache,
+  SubagentJob: (await load("src/session/subagent-job.ts")).SubagentJob,
   InstructionEntry: (await load("src/session/instruction-entry.ts")).InstructionEntry,
   PersistentPty: (await load("src/persistent-pty.ts")).PersistentPty,
   LocationServiceMap: (await load("src/location-service-map.ts")).LocationServiceMap,
@@ -172,6 +179,7 @@ export const HostLayer = AppNodeBuilder.build(
     Mcp.node,
     Session.node,
     SessionContext.node,
+    nodes.SubagentJob.node,
     nodes.SharedCache.node,
     nodes.InstructionEntry.node,
     nodes.PersistentPty.node,

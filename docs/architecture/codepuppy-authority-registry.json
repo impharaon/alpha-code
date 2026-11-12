@@ -921,16 +921,36 @@
       "adr": [
         "ADR-041"
       ],
-      "lane": "L3 (#1665) per lane seams §5 (L1r)",
+      "lane": "L4 (#1666) per ruling 6737930969",
       "takeovers": [
         "packages/opencode/src/session/prompt.ts"
       ],
-      "blocked": {
-        "reason": "Request assembly belongs to L3 on OpenCode 2 (session.hook model.request / http.request / context); if a hook cannot hold it, L3 hands it back for an L4 re-take. Not delivered on the integration branch this lane started from.",
-        "options": [
-          "Register L3's mechanism and proof test when #1665 lands, or route back to L4 for a re-take with ADR-047 reasoning."
-        ]
-      }
+      "mechanism": {
+        "file": "packages/ext/src/policy/gate.ts",
+        "ladder": "L0 (E6: the real upstream subagent tool meets registerPolicy's execute.before before its own permission check, packages/core/src/tool/plugin/subagent.ts:145, and before any child session) + upstream-native, pinned (E7: packages/core/src/session/prompt.ts materializes a prompt's attachments with no tool call or permission request)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "a Code Puppy deny refuses the call by name: no approval request and no child session"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "a Code Puppy ask comes first; rejecting it never reaches upstream's subagent check or a child session"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "reverse arm: without Code Puppy's policy the call meets upstream's own subagent check first"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "a prompt's file attachment is materialized with read denied twice over, and no tool or permission call happens"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "premise: the same probe counts a real tool call and its permission evaluation"
+        }
+      ]
     },
     {
       "id": "l1r-review-turn-supply",

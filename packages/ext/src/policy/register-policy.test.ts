@@ -4,9 +4,12 @@
 // what the model request is built from; the snapshot's `execute` is what the session runner calls), expected
 // identities are hand-written literals, and side effects are real counters inside the tools.
 import { beforeAll, describe, expect } from "bun:test"
+import fs from "node:fs"
 import path from "node:path"
+import { pathToFileURL } from "node:url"
 import {
   Agent,
+  AgentPlugin,
   E,
   it,
   Location,
@@ -20,7 +23,10 @@ import {
   SchemaTool,
   Session,
   SessionContext,
+  SessionPrompt,
+  SubagentTool,
   Tool,
+  WebFetchTool,
 } from "./policy-host.cases"
 import { registerPolicy } from "./index"
 import { createToolPolicyStore, defaultPolicyBaseDir } from "./resolver"
@@ -62,6 +68,11 @@ interface Setup {
   readonly mcp?: Record<string, unknown>
   /** Receives the MCP configuration as a plugin after the extension sees it. */
   readonly seeMcp?: (servers: Record<string, unknown>) => void
+  /**
+   * Upstream tool plugins activated with the builtins, before the extension (as OpenCode's internal plugins are). Their
+   * effects get the host's services the way packages/core/src/plugin/internal.ts provides them.
+   */
+  readonly internal?: readonly { readonly id: string; readonly effect: (ctx: any) => any }[]
 }
 
 const counts = { write: 0, probe: 0, paid: 0, free: 0 }
@@ -76,6 +87,7 @@ const setup = (options: Setup = {}) =>
     process.env.CODEPUPPY_POLICY_ACCOUNT = account
     const plugins = yield* Plugin.Service
     const location = yield* Location.Service
+    const services = yield* Effect.context<never>()
     const tool = (name: string, key: keyof typeof counts, extra: Record<string, unknown> = {}) => ({
       name,
       description: name,
@@ -99,6 +111,11 @@ const setup = (options: Setup = {}) =>
           for (const [name, config] of Object.entries(options.mcp ?? {})) editor.set(name, config)
         })
       }),
+      ...(options.internal ?? []).map((plugin) => ({
+        id: plugin.id,
+        effect: (ctx: any) => plugin.effect(ctx).pipe(Effect.provide(services)),
+        revision: `internal-${Math.random().toString(36).slice(2)}`,
+      })),
       promisePlugin("codepuppy-ext", async (ctx: any) => {
         const policy = options.policy === false ? undefined : await registerPolicy(ctx)
         await ctx.tool.transform((editor: any) => editor.add(tool(ALIAS_PROBE, "probe")))
@@ -749,6 +766,109 @@ describe("tool renames (S4)", () => {
       const { session } = yield* setup({ builtins: ["shell"], records: [disabled("builtin::shell")] })
       expect(failure(yield* callRaw(session.id, "shell"))?.message).toContain("builtin::shell")
       expect(counts.write).toBe(0)
+    }),
+  )
+})
+
+// #1129 / #724 §6 E6 (#1666 ruling 6737930969): the real upstream `subagent` tool (tool/plugin/subagent.ts) meets Code
+// Puppy's gate in `execute.before` before its own permission check (subagent.ts:145) and before any child session.
+describe("E6: a subagent call passes Code Puppy's gate ahead of upstream's own check", () => {
+  const SUBAGENT = { agent: "general", description: "probe", prompt: "do the thing" }
+  const ASK_SUBAGENT: Rule = { action: "subagent", resource: "*", effect: "ask" }
+  const children = (parentID: string) =>
+    Effect.gen(function* () {
+      return (yield* (yield* Session.Service).list()).data.filter((item: { parentID?: string }) => item.parentID === parentID)
+    })
+
+  it.live("a Code Puppy deny refuses the call by name: no approval request and no child session", () =>
+    Effect.gen(function* () {
+      const { session } = yield* setup({ internal: [AgentPlugin.Plugin, SubagentTool.Plugin], records: [disabled("builtin::subagent")] })
+      expect(failure(yield* callRaw(session.id, "subagent", SUBAGENT))?.message).toContain("builtin::subagent")
+      expect(yield* (yield* Permission.Service).list()).toEqual([])
+      expect(yield* children(session.id)).toEqual([])
+    }),
+  )
+
+  it.live("a Code Puppy ask comes first; rejecting it never reaches upstream's subagent check or a child session", () =>
+    Effect.gen(function* () {
+      const { session } = yield* setup({
+        internal: [AgentPlugin.Plugin, SubagentTool.Plugin],
+        rules: [ALLOW_ALL, ASK_SUBAGENT],
+        records: [{ selector: { level: "tool", canonical: "builtin::subagent" }, state: "ask" }],
+      })
+      const permission = yield* Permission.Service
+      const fiber = yield* Effect.forkChild(callRaw(session.id, "subagent", SUBAGENT))
+      const [request] = yield* pending
+      expect(request?.action).toBe("builtin::subagent")
+      expect(request?.metadata).toMatchObject({ policy: { canonical: "builtin::subagent" } })
+      yield* permission.reply({ requestID: request!.id, reply: "reject" })
+      expect(failure(yield* E.Fiber.join(fiber))?.message).toBeDefined()
+      expect((yield* permission.list()).filter((item: { action: string }) => item.action === "subagent")).toEqual([])
+      expect(yield* children(session.id)).toEqual([])
+    }),
+  )
+
+  it.live("reverse arm: without Code Puppy's policy the call meets upstream's own subagent check first", () =>
+    Effect.gen(function* () {
+      const { session } = yield* setup({ policy: false, internal: [AgentPlugin.Plugin, SubagentTool.Plugin], rules: [ALLOW_ALL, ASK_SUBAGENT] })
+      const permission = yield* Permission.Service
+      const fiber = yield* Effect.forkChild(callRaw(session.id, "subagent", SUBAGENT))
+      const [request] = yield* pending
+      expect(request?.action).toBe("subagent")
+      expect(request?.resources).toEqual(["general"])
+      yield* permission.reply({ requestID: request!.id, reply: "reject" })
+      yield* E.Fiber.await(fiber)
+      expect(yield* children(session.id)).toEqual([])
+    }),
+  )
+})
+
+// #1129 / #724 §6 E7 (#1666 ruling 6737930969): OpenCode 2 materializes a prompt's attachments (session/prompt.ts
+// materializeAttachment, reached through SessionPrompt.prepare, which Session.prompt calls) without any tool call or
+// permission request: the host reads what the user attached, it is not a model tool call. Negative lock: with `read`
+// denied by Code Puppy's policy and by the agent's rules, ingestion still completes and nothing is asked or run.
+describe("E7: attachment ingestion makes no tool call and asks nothing", () => {
+  const seen = { before: 0, evaluate: 0 }
+  const probe = () =>
+    promisePlugin("e7-probe", async (ctx: any) => {
+      await ctx.tool.hook("execute.before", () => void (seen.before += 1))
+      await ctx.permission.hook("evaluate", () => void (seen.evaluate += 1))
+    })
+
+  it.live("a prompt's file attachment is materialized with read denied twice over, and no tool or permission call happens", () =>
+    Effect.gen(function* () {
+      const file = path.join(ROOT, `attachment-${Math.random().toString(36).slice(2)}.txt`)
+      fs.writeFileSync(file, "attached bytes")
+      const { session } = yield* setup({
+        after: probe(),
+        records: [...NEUTRAL, disabled(ID_BUILTIN_WRITE), disabled("builtin::read")],
+        rules: [ALLOW_ALL, { action: "read", resource: "*", effect: "deny" }],
+      })
+      seen.before = seen.evaluate = 0
+      const item = yield* SessionPrompt.prepare({
+        session,
+        messageID: "msg_e7",
+        input: { text: "see attached", files: [{ uri: pathToFileURL(file).href }] },
+      })
+      expect(seen).toEqual({ before: 0, evaluate: 0 })
+      expect(yield* (yield* Permission.Service).list()).toEqual([])
+      const files = (item as { payload: { files?: { data: string }[] } }).payload.files ?? []
+      expect(files.map((attached) => Buffer.from(attached.data, "base64").toString("utf8"))).toEqual(["attached bytes"])
+    }),
+  )
+
+  it.live("premise: the same probe counts a real tool call and its permission evaluation", () =>
+    Effect.gen(function* () {
+      const { session } = yield* setup({ after: probe(), records: [{ selector: { level: "tool", canonical: ID_BUILTIN_WRITE }, state: "ask" }] })
+      seen.before = seen.evaluate = 0
+      const permission = yield* Permission.Service
+      const fiber = yield* Effect.forkChild(callRaw(session.id, ALIAS_WRITE))
+      const [request] = yield* pending
+      yield* permission.reply({ requestID: request!.id, reply: "once" })
+      yield* E.Fiber.join(fiber)
+      expect(counts.write).toBe(1)
+      expect(seen.before).toBeGreaterThan(0)
+      expect(seen.evaluate).toBeGreaterThan(0)
     }),
   )
 })

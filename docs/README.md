@@ -398,6 +398,7 @@ status.
 | `SPEC-tool-policy-settings` | [specs/tool-policy-settings/spec.md](specs/tool-policy-settings/spec.md) | 用户在设置里管理并保存工具权限，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-tool-write-fence` | [specs/tool-write-fence/spec.md](specs/tool-write-fence/spec.md) | 工具派生进程越界写文件时会失败，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-untrusted-upstream-candidates` | [specs/untrusted-upstream-candidates/spec.md](specs/untrusted-upstream-candidates/spec.md) | 上游候选代码无法取得仓库推送凭据，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `DESIGN-upgrade-ui-contract` | [specs/upgrade-ui-contract/design.md](specs/upgrade-ui-contract/design.md) | 界面与引擎之间的请求、事件、错误和形状定成 Code Puppy 自有的一份约定;引擎适配器拆成代际无关的约定与管道加每代一个翻译器;翻译器不再引冻结界面内部函数,Code Puppy 自有代码只经约定模块接触冻结的两个客户端包;冻结界面零字节改动 | draft |
 | `SPEC-visible-update-state` | [specs/visible-update-state/spec.md](specs/visible-update-state/spec.md) | 检查更新的状态与重启安装入口可见，按历史条文与实际证明登记范围。 | approved |
 | `SPEC-windows-renderer-origins` | [specs/windows-renderer-origins/spec.md](specs/windows-renderer-origins/spec.md) | Windows 界面只能读取受准许的服务来源，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-word-layout-and-typography` | [specs/word-layout-and-typography/spec.md](specs/word-layout-and-typography/spec.md) | 生成的 Word 有正确中文字体、标题与纸张设置，保留历史条款、有效裁决和交付证据边界。 | approved |

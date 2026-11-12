@@ -11,6 +11,12 @@
 //   #1565 a bundled first-party server is offered from its declaration while it starts; a connection that lists
 //        something else fails the call planned against the declaration and drops it; a third party gets none
 //   ADR-041 two MCP tools that would share an effective name are both refused; a near miss keeps both
+//   AC4  closing the service ends a server's process and its descendants (#1666 Unit D, v1 successor)
+//   AC7  tools/list runs on the catalog budget, and a call's wait for its server's handshake is not cut by the
+//        execution budget (#1666 Unit D, v1 successor)
+//   #1645 a tools/list failure that another attempt may fix reconnects after 30 s and lists in the same service
+//        (#1666 Unit D, v1 successor)
+//   #1653 a server waiting out its backoff holds back no other server, and calling it does not reconnect early
 //
 // HOME, XDG_* and the database are isolated before any engine module loads.
 import { describe, expect } from "bun:test"
@@ -42,6 +48,7 @@ const { McpClient } = await import("@opencode/core/mcp/client")
 const { McpPool } = await import("@opencode/core/mcp/pool")
 const { OFFICE_MCP_MANIFEST_ENV } = await import("@opencode/core/mcp/codepuppy-first-party-mcp")
 const { parseFailureCode } = await import("@opencode/schema/codepuppy-net-failure")
+const { Server: McpServer, WebStandardStreamableHTTPServerTransport } = await import("@modelcontextprotocol/server")
 const { AbsolutePath } = await import("@opencode/core/schema")
 const { State } = await import("@opencode/core/state")
 const { CrossSpawnSpawner } = await import("@opencode/util/cross-spawn-spawner")
@@ -305,5 +312,143 @@ describe("ADR-041: MCP tool name collisions are refused", () => {
         for (const name of ["a.b", "a_b", "ab"]) yield* connected(name)
         expect(yield* toolNames).toEqual(["ab/x"])
       }),
+  )
+})
+
+// ── AC4 (v1 successor) ───────────────────────────────────────────────────────────────────────────────────────────
+// Red if closing the service leaves the server's process or its child running (the spawner kills the process group
+// when the connection's scope closes, packages/core/src/mcp/stdio.ts). The premise arm: both are alive while connected.
+describe("AC4: closing the service ends a server's process tree", () => {
+  const alive = (pid: number) => {
+    try {
+      process.kill(pid, 0)
+      return true
+    } catch {
+      return false
+    }
+  }
+  testEffect(Layer.empty).live("the server and its child are alive while connected and gone after the service closes", () =>
+    Effect.gen(function* () {
+      const pidFile = file("tree.pid")
+      const childFile = file("tree-child.pid")
+      const pids = yield* Effect.scoped(
+        Effect.gen(function* () {
+          yield* connected("tree")
+          const pids = [Number(fs.readFileSync(pidFile, "utf8")), Number(fs.readFileSync(childFile, "utf8"))]
+          expect(pids.map(alive)).toEqual([true, true])
+          return pids
+        }).pipe(Effect.provide(mcpLayer({ tree: local({ CODEPUPPY_MCP_PID_FILE: pidFile, CODEPUPPY_MCP_CHILD_PID_FILE: childFile }) }))),
+      )
+      yield* until(Effect.sync(() => (pids.some(alive) ? undefined : true)), "process tree reaped", 5_000)
+    }),
+  )
+})
+
+// ── AC7 (v1 successor) ───────────────────────────────────────────────────────────────────────────────────────────
+// Red if tools/list ran on the execution budget (a 300 ms execution budget would fail an 800 ms listing), or if a call
+// that waits for its server's handshake had that wait counted against its execution budget.
+describe("AC7: each wait has its own budget", () => {
+  const slowTool = { name: "slow", description: "slow", inputSchema: { type: "object", properties: { ms: { type: "number" } } } }
+  testEffect(
+    mcpLayer({ "slow-list": local({ CODEPUPPY_MCP_LIST_DELAY_MS: "800" }, { timeout: new ConfigMCP.Timeout({ execution: 300 }) }) }),
+  ).live("an 800 ms tools/list connects under a 300 ms execution budget", () =>
+    Effect.gen(function* () {
+      yield* connected("slow-list")
+      expect(yield* toolNames).toEqual(["slow-list/echo"])
+    }),
+  )
+
+  testEffect(
+    mcpLayer({
+      "slow-start": local(
+        { CODEPUPPY_MCP_INIT_DELAY_MS: "700", CODEPUPPY_MCP_TOOLS_FILE: toolsFile([slowTool]) },
+        { timeout: new ConfigMCP.Timeout({ execution: 1_200 }) },
+      ),
+    }),
+  ).live("a call that first waits for the handshake still gets its whole execution budget; past the budget it fails", () =>
+    Effect.gen(function* () {
+      const mcp = yield* Mcp.Service
+      const started = Date.now()
+      const result = yield* mcp.callTool({ server: "slow-start", name: "slow", args: { ms: 900 } })
+      expect(result.content).toEqual([{ type: "text", text: "slow" }])
+      expect(Date.now() - started).toBeGreaterThan(1_200)
+      const exit = yield* mcp.callTool({ server: "slow-start", name: "slow", args: { ms: 1_600 } }).pipe(Effect.exit)
+      expect(Exit.isFailure(exit)).toBe(true)
+    }),
+  )
+})
+
+/** A real streamable-HTTP MCP server (one tool, `probe`) whose tools/list can be made to answer with an HTTP status. */
+const httpServer = () => {
+  const state = { lists: 0, listStatus: 0 }
+  const build = async () => {
+    const server = new McpServer({ name: "codepuppy-remote", version: "1.0.0" }, { capabilities: { tools: {} } })
+    server.setRequestHandler("tools/list", async () => ({ tools: [{ name: "probe", description: "probe", inputSchema: { type: "object" as const, properties: {} } }] }))
+    const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: () => crypto.randomUUID(), enableJsonResponse: true })
+    await server.connect(transport)
+    return transport
+  }
+  let current: Promise<InstanceType<typeof WebStandardStreamableHTTPServerTransport>> | undefined
+  const http = Bun.serve({
+    port: 0,
+    hostname: "127.0.0.1",
+    fetch: async (request) => {
+      const body: any = request.method === "POST" ? await request.clone().json().catch(() => undefined) : undefined
+      if (body?.method === "initialize") current = build()
+      if (body?.method === "tools/list") {
+        state.lists += 1
+        if (state.listStatus) return new Response("no", { status: state.listStatus })
+      }
+      return (await (current ??= build())).handleRequest(request)
+    },
+  })
+  return { state, url: `http://127.0.0.1:${http.port}/mcp`, stop: () => http.stop(true) }
+}
+
+// ── #1645 (v1 successor) ─────────────────────────────────────────────────────────────────────────────────────────
+// Red if a tools/list failure another attempt may fix is not retried in the background (no list after 30 s, server
+// stays failed). 501 is a 5xx upstream does not retry inside the attempt (client.ts isTransient), so the background
+// reconnect is what recovers it.
+describe("#1645: a failed tools/list", () => {
+  const flaky = httpServer()
+  flaky.state.listStatus = 501
+  testEffect(mcpLayer({ cloud: new ConfigMCP.Remote({ type: "remote", url: flaky.url, oauth: false }) })).effect(
+    "a 5xx listing reconnects after 30 s and the tools appear in the same service",
+    () =>
+      Effect.gen(function* () {
+        yield* until(statusOf("cloud").pipe(Effect.map((s: any) => (s?.status === "failed" ? s : undefined))), "cloud failed")
+        const lists = flaky.state.lists
+        flaky.state.listStatus = 0
+        yield* TestClock.adjust("29 seconds")
+        yield* Effect.promise(() => Bun.sleep(300))
+        expect(flaky.state.lists).toBe(lists)
+        yield* TestClock.adjust("1 second")
+        yield* connected("cloud")
+        expect(yield* toolNames).toEqual(["cloud/probe"])
+      }).pipe(Effect.ensuring(Effect.sync(flaky.stop))),
+  )
+})
+
+// ── #1653 (v1 successor) ─────────────────────────────────────────────────────────────────────────────────────────
+// Red if a server in backoff held back another server's tools or calls, or if calling it reconnected before its turn
+// (a new request reaching the endpoint). OpenCode 2 shows such a server as failed, not pending (constraints.md).
+describe("#1653: a server waiting out its backoff", () => {
+  const hits = { count: 0 }
+  const down = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => (hits.count++, new Response("no", { status: 501 })) })
+  testEffect(
+    mcpLayer({ ready: local(), cloud: new ConfigMCP.Remote({ type: "remote", url: `http://127.0.0.1:${down.port}/mcp`, oauth: false }) }),
+  ).effect("holds back no other server, and calling it fails without reaching its endpoint", () =>
+    Effect.gen(function* () {
+      yield* until(statusOf("cloud").pipe(Effect.map((s: any) => (s?.status === "failed" ? s : undefined))), "cloud failed")
+      yield* connected("ready")
+      const before = hits.count
+      expect(before).toBeGreaterThan(0)
+      const mcp = yield* Mcp.Service
+      expect(yield* toolNames).toEqual(["ready/echo"])
+      expect((yield* mcp.callTool({ server: "ready", name: "echo", args: { text: "ready" } })).content).toEqual([{ type: "text", text: "ready" }])
+      expect(Exit.isFailure(yield* mcp.callTool({ server: "cloud", name: "probe", args: {} }).pipe(Effect.exit))).toBe(true)
+      yield* Effect.promise(() => Bun.sleep(300))
+      expect(hits.count).toBe(before)
+    }).pipe(Effect.ensuring(Effect.sync(() => down.stop(true)))),
   )
 })

@@ -1,7 +1,7 @@
 ---
 id: PLAN-1662-opencode2
 title: OpenCode 2 换代 实施计划
-summary: alpha-code#1662 各实施线的分段计划;目前含 L4(#1666)Unit B(具名失败原因到桌面)与 Unit C(MCP 与内置重名、子任务与附件、命令模型优先级、工具网络失败标记)
+summary: alpha-code#1662 各实施线的分段计划;目前含 L4(#1666)Unit B(具名失败原因到桌面)与 Unit C(MCP 与内置重名、子任务与附件、命令模型优先级、工具网络失败标记);以及整合 Unit 1(真策略进 ext、登记册握满、引擎开启回合的审阅 diff、接缝文档补记)
 kind: plan
 status: active
 spec: ""
@@ -196,3 +196,76 @@ last_reviewed: 2026-11-12
 - 2026-11-12 · #3 不改 `Mcp.callTool` 的入参(上游 `mcp.test.ts` 逐字断言它):审批后、发送前的比对在 `tool/mcp.ts`;恢复会话后的重发在 `mcp/index.ts` 以首次发送时的定义为基准比对;`codepuppy-mcp-tool-generation.test.ts` 改为真 MCP 服务 + 真 stdio 服务器 · `06ea8ab4db`。
 - 2026-11-12 · #10 的反向臂把 Global 换成只设 data 的版本跑过一次,log / repos 落到真实数据目录;两个目录早已存在(2026-07-06 创建,修改时间未变),mkdir 是空操作 · `547a5d1963`。
 - 2026-11-12 · #9 顺带改了 `register-policy.test.ts`「a saved deny under the v1 name…」的夹具:store 的写入现在一律存新名,v1 留在盘上的文档改为直接写盘再读 · #9 提交。
+
+## Integration unit 1 — 四条线接成一个产品:真策略进 ext、登记册握满、引擎开启回合的审阅 diff、接缝文档补记(#1662 整合)
+
+- 依据:编排器派发书 `~/.claude/orchestration/alpha-code/1662/INT-unit1.full.md`(四项验收);[接缝冻结](../../design/2026-11-09-1662-lane-seams.md) I3、I6、§4;登记册 [`codepuppy-authority-registry.json`](../../architecture/codepuppy-authority-registry.json) 11 条 blocked 的 `blocked.options`;[ADR-047](../../../.claude/rules/adrs/ADR-047-opencode2-engine-generation.md)「精确接管面」「权威保持表」、决策 5;裁决 [#1666 评论 6737732975](https://github.com/impharaon/alpha-code/issues/1666#issuecomment-6737732975) 第 6 条(`adr041-history-display-conversion` 选 (a))、[6737930969](https://github.com/impharaon/alpha-code/issues/1666#issuecomment-6737930969) 第 1、2 条(`l1r-naming-resume`、`l1r-telemetry-credential` 归 L5);引擎侧 synthetic 锚点 `e27bec1704`。以上均取 `engine/1662-opencode2` @ `df748c16e7`。基线(bun 1.4.4):ext 里装载 `plugin.ts` 的 9 个测试文件 135 过 / 0 败。
+- 核对:(实施的第一个提交按编排器核对结果填写)
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/ext/src/plugin.ts` | 第 1 项:`registerPolicy` 改从 `./policy/index.ts` import;注释去掉「桩」说法 |
+| `packages/ext/src/policy-stub.ts` | 第 1 项:删除 |
+| `packages/ext/src/plugin-setup-order.test.ts` → 宿主 + 新 `plugin-setup-order.cases.ts` | 第 1 项:原断言原样搬进 `.cases.ts`,`mock.module` 目标改为 `./policy/index.ts`;`.test.ts` 起独立 `bun test` 子进程跑它并判 `N pass / 0 fail`(同 `sidecar-env-otel` 的宿主写法)。原因见风险 R2 |
+| `packages/ext/src/plugin-host.harness.ts` | 第 1 项:`recordingContext` 的列表类调用回真宿主的形状(`tool.list` → `[]`、`plugin.list` → `{ data: [] }` 等),让 `registerPolicy` 的真代码在记账 Context 上跑得通;真宿主 `activate` 先装上游内置 agent 插件(`packages/core/src/plugin/agent.ts` 的 `AgentPlugin`,`policy/policy-host.cases.ts` 用的同一个),与生产「内置插件先于 ext」一致,策略的 `agent.get` 才找得到调用所属 agent |
+| `packages/ext/src/plugin-host.test.ts` | 第 1 项:直接触发 `execute.before` 却从没注册过的工具名(`websearch`、`exa_web_search_exa`、`codepuppy_dispatch` 等),按生产的方式注册(内置 / MCP 命名空间),让策略认得出身份、放行给后面的钩子去判;新增真宿主用例「权威 · 工具策略(I3)」(见证明) |
+| `packages/ext/src/cloud-websearch-kill.test.ts`、`cloud-vision.test.ts` | 第 1 项:同上,真宿主用例里点名的工具(`cloud_web_search`、`codepuppy_vision` …)按生产形状登记,断言不动 |
+| `packages/ext/src/project-config.test.ts` | 第 1 项:`tool.execute.before` 的条数从 1 改为 3(策略头、ext 自己、策略尾),仍证明项目扇出一条没注册 |
+| `packages/ext/src/context-injection.test.ts` | 第 1 项:策略注册了 `session.prompt`(分类为载上下文,`context-injection.ts:643`),补它的咽喉:真宿主跑策略的 prompt 钩子,送出的每个字符串等于输入;已知的坏(prompt 钩子多塞一段)被点名;`THROATED` 加入 `session.prompt` |
+| `scripts/gate-files.tsv` | `context-injection.test.ts` 行条数随新增用例改(41 → 42);别的行条数变了同步 |
+| `packages/ui-mac/src/engine-adapter/v1-shapes.ts` | 第 3 项:`turnAnchor` 遇到 idle 之后由引擎 synthetic 开启的回合,回 `{ from: <synthetic id>, attach: <同一 id> }`;函数注释改成现状 |
+| `packages/ui-mac/src/engine-adapter/turn-diffs.test.ts` | 第 3 项:假上游的 diff 判据改为与引擎一致(`user` 或 `synthetic` 可作 from,`e27bec1704`);「通知在 idle 之后自己开回合」改断言为从通知取 diff、面板读得到;F2 legacy 那半改断言为从 synthetic 取 diff;夹具里旧引擎录下的 `fromSynthetic` / legacy 400 不再当作引擎现状断言 |
+| `docs/architecture/codepuppy-authority-registry.json` | 第 2 项:下表 11 条补 `mechanism` 与 `tests`、去掉 `blocked`;`adr041-history-display-conversion` 的 `takeovers` 加 `packages/core/src/database/v1-migration.bun.ts`,阶梯写「构建期改写(等同接管)」 |
+| `.claude/rules/adrs/ADR-047-opencode2-engine-generation.md` | 第 2 项:「精确接管面」加一行 `v1-migration.bun.ts` 构建期改写(为什么挂不了钩子 / 守卫 / 回滚 / 归属 L5 #1667,依据 R14 与上面第 6 条裁决);「权威保持表」摘要改为已握住 52 项、未握住 0 项 |
+| `docs/design/2026-11-09-1662-lane-seams.md` | 第 4 项(只加不改):§4 环境变量行补 `CODEPUPPY_POLICY_ACCOUNT`、`CODEPUPPY_EXT_BUNDLED_MANIFEST`、`CODEPUPPY_OFFICE_MCP_MANIFEST`(写方 `ui-mac/src/main/server.ts:492,500,503`,读方 ext policy / core);I6 补 L4 加的导出 `withFailureCode`、`parseFailureCode`、`isCodepuppyFailureCode`、`McpStartFailureCode`、`CodepuppyFailureCode`;新增 I11' 一节(暂存附件部件,`packages/ext/src/staged-attachment-part.ts`;L6 发、L3 认;裁决 #1665 评论 6737733672);main 写的 2.x 配置顶层键清单(`codepuppy-config-injection.ts:133-144` 与显式文件层的 `skills`、`commands`) |
+| `docs/specs/1662-opencode2/plan.md` | 本段;frontmatter `summary` 加上本段 |
+
+第 2 项逐条(机制文件;证明测试,名字在实施时从文件逐字取):
+
+| 登记 id | 机制文件 | 证明测试 |
+| --- | --- | --- |
+| `adr033-decision-receipt` | `packages/ui-mac/src/engine-adapter/permission-replies.ts` | `permission-reply.test.ts`:收据形状 + 反向臂(无合成收据)、陈旧快照 409 两条、幂等重放、reject 连带收据 + 反向臂(只列目标) |
+| `adr041-collision-rejection` | `packages/ext/src/plugin-fanout.ts`(阶梯写明另三处:core MCP 接管两处、Browser 钉) | `plugin-host.test.ts` ADR-041 冲突、改 / 删两条;`codepuppy-mcp-runtime.test.ts`「a.b/x and a_b/x share an effective name…」;`codepuppy-mcp-tool-collision.test.ts`「builtins registered first…」;`codepuppy-browser-tool-names.test.ts` 两条 |
+| `adr041-history-display-conversion` | `packages/ui-mac/engine/v1-migration-transform.ts` | `engine-v1-history-display.test.ts`:套改写 ⇒ 快照在 `state.metadata.codepuppyDisplay`、反向臂(上游原样 ⇒ 全丢)、上游原文变了 ⇒ 抛错 |
+| `adr035-websearch` | `packages/ext/src/cloud-websearch-kill.ts` | `plugin-host.test.ts` 联网搜索准入(L5r)、不在 kill-switch 照常放行、云工具准入;`cloud-websearch-kill.test.ts`「#1507 AC1:搜网拒绝理由…」与「放行覆盖不了 kill-switch(2.x 真宿主)」两条 |
+| `l1r-platform-credential-header` | `packages/ext/src/platform-credential-header.ts` | `plugin-host.test.ts`「P6 / S5:…」 |
+| `l1r-output-caps` | `packages/ext/src/platform-output-cap.ts`(阶梯带上 `byok-output-cap.ts`) | `plugin-host.test.ts`「P5:…」两条 |
+| `l1r-naming-resume` | `packages/ui-mac/src/main/naming-migration-db.ts` | `naming-before-v1-conversion.test.ts`「#1569 会话库改名先于 v1 → 2.x 转换…」(cases 含生产顺序与反向臂) |
+| `l1r-telemetry-credential` | `packages/ui-mac/src/main/sidecar-env.ts` | `sidecar-env-otel.test.ts` 原样、反向臂两条 |
+| `l1r-review-turn-supply` | `packages/ui-mac/src/engine-adapter/v1-shapes.ts`(阶梯写回合边界取 diff 的 `events.ts` / `routes.ts`) | `turn-diffs.test.ts`「事件流 → 冻结归约器 → turnDiffsOf…」、「反向臂:不在回合边界取…」、第 3 项改过的那条 |
+| `hub-install-ask` | `packages/ext/src/hub-tools.ts` | `plugin-host.test.ts`「权威 · 定制中心安装(I10)…」;`hub-tools.test.ts`「hubInstallEvaluate:…」「规则被绕过…」 |
+| `sidecar-stop-drains` | `packages/ui-mac/src/main/sidecar-stop.ts` | `sidecar-stop.test.ts`「线上只发 { type: "stop" }…」、「#1647 AC2 a hung engine close…」 |
+
+### 顺序
+
+1. **第 3 项**(独立、最小):`v1-shapes.ts` + `turn-diffs.test.ts` 一个提交。跑 `packages/ui-mac` 的 `bun test src/engine-adapter/turn-diffs.test.ts`、`bun run typecheck`;手动反向臂(见证明)。
+2. **第 1 项**:接线与全部测试适配同一个提交(只换 import 会让 24 条变红,不能分开落)。跑 `packages/ext` 里 9 个装载 `plugin.ts` 的文件(逐个点名)+ 新 `.cases.ts`;`plugin-setup-order.test.ts` 与 `src/policy/register-policy.test.ts` 同一次调用(前者在先)跑一次,证明 mock 不外泄;`bun run typecheck`;`bun ./scripts/build.ts`(产物在已忽略的 `dist/`,证明策略能打进自包含 bundle);`bun scripts/context-injection-inventory.ts --check`;手动反向臂(见证明)。
+3. **第 2 项**:登记册 + ADR-047 一个提交。先逐个跑上表点名的测试文件(ext / ui-mac / core 各自目录),全绿才登记;任何一条红或证明不了那项决定 ⇒ 该项保留 blocked 并交回。再跑 `packages/ext` 的 `bun test src/policy/authority-registry.test.ts`。
+4. **第 4 项**:接缝文档一个提交。证据命令见证明;`python3 scripts/check-doc-links.py` 判改动的 Markdown。
+
+每个提交把本段的偏离记录一起改。全部用 `~/.bun-versions/1.4.4/bin` 在 PATH 首位;ext 有 `bunfig.toml` 预载隔离 HOME / XDG,ui-mac 的引擎类测试自带沙箱,不碰 `~/.local/share/opencode`。
+
+### 风险
+
+- **R1 第 1 项比预期大(已实测)。** 计划阶段用一个临时预载(`/tmp` 下,`Bun.plugin` 在装载时把 `plugin.ts` 的 import 换成真策略,不改工作树)跑上面 9 个文件里的 8 个:**110 过 / 24 败,分布在 6 个文件**。原因五类,都是测试宿主缺生产事实或写着桩时代的计数,没有一条指向策略或 ext 生产代码的缺陷:① 记账 Context 的 `tool.list` 不是数组(context-injection ②/③a/③a″、project-config 共约 10 条);② 真宿主没有内置 agent ⇒ 策略 `agent.get` 报 `Agent not found: build`(P1、I10、codepuppy_access、待批回复等);③ 用例对没注册的工具名直接触发 `execute.before` ⇒ 策略按「未知身份默认拒」(已登记的决定 `tool-policy-unknown-identity`)先拒(websearch、cloud_web_search、codepuppy_vision);④ 计数断言(project-config);⑤ 策略新注册的 `session.prompt` 没有咽喉(context-injection ②,该测试注释原文即预言了这种红)。把 ① 修掉后复测 context-injection + project-config:57 条里剩 3 败,与上面分类吻合。整段预计约 3 小时,而派发预期 90 分钟;适配只改测试与 harness,一旦某一类要动策略(L4 冻结)或 ext 生产代码 ⇒ 停下交回。
+- **R2 `mock.module` 外泄(已实测)。** bun 1.4.4 下,一个测试文件的 `mock.module` 会作用于同一次 `bun test` 里之后的所有文件,连已 import 的模块也被改绑(`/tmp` 三文件对照:a 里 mock,b 里读到的是 mock)。原样把 setup-order 的 mock 改指 `./policy/index.ts`,同一次运行里排在它后面的 ext 文件(含 `policy/*.test.ts` 与门里的 `bun test src`)就拿到空策略。所以搬进子进程。
+- **R3 登记的每一条都要在整合树上真绿。** 名字存在只是判官的下限;第 2 项在第 1 项之后做,ext 的证明测试(P5、P6、I10、websearch、冲突)是在真策略下跑绿的。`l1r-output-caps` 的决定文字写着 temperature / max output:v1 只断言 temperature 不被改动(锚点 `e56ae0c036` 的 gate 行 7、16);登记按 max output 的证明,决定文字不改,作为观察交回。
+- **R4 第 3 项的夹具是旧引擎录的。** `parity.json` / `continue.json` 里从 synthetic 取 diff 的 400 录于 `e27bec1704` 之前;引擎侧新行为由 `packages/core/test/codepuppy-session-diff-synthetic.test.ts` 在真 Session 服务上证明,适配器测试只证明适配器发出 `from=<synthetic>` 并把结果挂上。不重采样:采样器整份重写 `parity.json`,别的适配器测试也读它。
+- **R5 慢测试。** `engine-v1-history-display.test.ts` 两条各带 300 s 超时(真引擎);只跑一次。
+- **R6 构建期改写登记为等同接管,依据是 R14 与上面第 6 条裁决,不挂 owner 原话**(没有对应原话;Unit F 那两条的 owner 原话不适用于它)。
+
+### 证明
+
+| AC | 测试/证据 | 缺少行为为什么会失败 |
+| --- | --- | --- |
+| 1 真策略进 ext | `plugin-host.test.ts` 新增「权威 · 工具策略(I3)」:真宿主装 ext 默认导出,一个由旁路插件注册、带调用计数的工具,经生产 `createToolPolicyStore` 写入 `disabled` ⇒ 调用具名拒绝(含 canonical 身份)、计数 0;同一记录下不装 ext ⇒ 执行、计数 1。手动反向臂:把 `plugin.ts` 的 import 指回一个空的 `registerPolicy`(被删桩的内容)跑这条 ⇒ 红,再 `git restore`。另:9 个装载 `plugin.ts` 的文件 + 新 cases 全绿 | 没接线 ⇒ 被停用的工具照样执行,计数为 1 |
+| 1 setup 顺序 | `plugin-setup-order.test.ts` → cases 子进程 `1 pass / 0 fail`;与 `policy/register-policy.test.ts` 同次运行仍全绿 | 把 `seal()` 挪到扇出之前 ⇒ cases 红;mock 若外泄 ⇒ register-policy 的 B 组红 |
+| 2 登记册握满 | `authority-registry.test.ts`「the production registry…」由红(列出 11 条 blocked)变绿;上表点名的测试文件逐个跑绿;判官对合成登记册的各条规则已有红臂 | 任何一条留 blocked、机制文件或测试名不在 ⇒ 生产那条红并点名 |
+| 3 引擎开启的回合有审阅 diff | `turn-diffs.test.ts`「通知在 idle 之后自己开回合」:发出一次 `from=<synthetic id>`、`turnDiffsOf` 读到改动;F2 legacy 同理。手动反向臂:`turnAnchor` 改回遇 idle 回 `undefined` ⇒ 两条红(零请求、面板空),再 `git restore` | 不从 synthetic 取 ⇒ 不发请求,面板「没有改动」 |
+| 4 接缝文档补记 | 命令输出:三个环境变量的写方与读方 `grep`;五个契约模块导出与恢复提交 `8b970a62f5` 的差集;`packages/ui-mac` 的 `config-injection-throat.test.ts` 绿(它在 `:190-193` 把 2.x 键映射到登记簿已声明的引用,所以 ext 登记簿不需要加键);`context-injection-inventory.ts --check` 无差异;`check-doc-links.py` 通过 | 文档类,不写断言措辞的测试 |
+
+### 偏离记录
+
+暂无。

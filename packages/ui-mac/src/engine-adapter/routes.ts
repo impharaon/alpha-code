@@ -27,6 +27,7 @@ import {
   toV1Messages,
   toV1Path,
   toV1Project,
+  toV1ModelList,
   toV1ProviderList,
   toV1Question,
   todosOf,
@@ -538,6 +539,9 @@ export const ROUTES: readonly Route[] = [
 
   // ── `/api/…`:v1 SDK 的 v2 命名空间与 1.17.13 客户端;2.x 路径与形状仍在的直通 ──
   passthrough("GET", "/api/agent"),
+  // composer 的模型清单(model-contract.ts 的 `client.v2.model.list`;不进 routes-coverage 的扫描 —— 调用跨行写)。`#1662`:漏了它
+  // composer 的模型链一直 recovering,发送按钮永远不亮。
+  route("GET", "/api/model", async (context) => json(toV1ModelList(await context.api.model.list(at(context))))),
   passthrough("GET", "/api/provider/:providerID"),
   passthrough("GET", "/api/reference"),
   passthrough("GET", "/api/session"),
@@ -591,6 +595,13 @@ export const UNSUPPORTED: ReadonlyArray<{ method: string; path: string; reason: 
   { method: "GET", path: "/api/project/:projectID/directories", reason: "U4:同上;2.2.x 已删" },
   { method: "POST", path: "/api/session/:sessionID/question/:requestID/reply", reason: "v1 模式下 createCompatibleApi 改走 v1 的 /question/:id/reply(server-compat.ts:508);2.2.x 已删" },
   { method: "POST", path: "/api/session/:sessionID/question/:requestID/reject", reason: "v1 模式下改走 /question/:id/reject(server-compat.ts:514);2.2.x 已删" },
+  // `#1662`:扫描改成不依赖排版(跨行写的链)之后才扫出的五条,都只在冻结 app 判定引擎是 v2 协议时发出;适配器的 /global/health 答
+  // healthy:true(本表首条),detectServerProtocol 因此恒判 v1(utils/server-protocol.ts:29)。
+  { method: "GET", path: "/api/event", reason: "v2 支路:server-sdk.tsx:268-272 只在协议不是 v1 时订阅 1.17.13 的 /api/event,v1 走 /global/event(已接)" },
+  { method: "GET", path: "/api/permission/request", reason: "v2 支路:permission.tsx:264-269 与 global-sync/bootstrap.ts:447-450 在 v1 协议下改走 v1 的 GET /permission(已接)" },
+  { method: "GET", path: "/api/question/request", reason: "v2 支路:global-sync/bootstrap.ts:483-486 在 v1 协议下改走 v1 的 GET /question(已接)" },
+  { method: "GET", path: "/api/fs/list", reason: "只经 createCompatibleApi 的 api.file.list 发出(directory-picker-domain.ts:345、dialog-select-directory-v2.tsx:130、home-controller.ts:96);v1 协议下它被 createV1Api 改写成 v1 的 GET /file(server-compat.ts:360-363,已接)" },
+  { method: "GET", path: "/api/model/default", reason: "v2 支路:global-sync/bootstrap.ts:232-241 在 v1 协议(且传了 legacy 客户端,三个生产调用方都传)下改走 v1 的 GET /provider(已接)" },
 ]
 
 async function currentProject(context: RouteContext) {

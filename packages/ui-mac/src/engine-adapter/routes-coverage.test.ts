@@ -2,11 +2,15 @@
 // 为什么不接。表外的请求在运行时是 501;这一条把「表外」在编译期之前就找出来。
 //
 // 扫描法(方案附件 §A 落成测试):在冻结 app、冻结 session-ui 与 renderer 的非测试源码里找「接收者.域.方法(」
-// 形状的调用;接收者段是 `api` ⇒ 1.17.13 客户端,是 `client` / `legacy` / `sdk` / `c` / `eventSdk` / `sdkFor` ⇒ v1 SDK。
+// 形状的调用;接收者段是 `api` / `eventApi` ⇒ 1.17.13 客户端,是 `client` / `legacy` / `sdk` / `c` / `eventSdk` / `sdkFor` ⇒ v1 SDK。
 // 方法 → HTTP 路由取自**生产包本身**:v1 SDK 解析 codepuppy-sdk-v1 的 sdk.gen.ts(类、getter、每个方法的 url 与动词),
 // 1.17.13 客户端解析装着的 dist/promise/generated/client.js 的请求描述。扫出的每条路由按 matchRoute 查表。
 //
 // 诚实边界:这是正则,不是类型分析 —— 经别名变量的调用会漏(方案附件 §A 已记);第二道核对是运行时的 501 日志。
+// `#1662`:正则不依赖排版 —— 链里的 `.` 前后可以有空白 / 换行、可以是 `?.`,方法名与 `(` 之间可以有空白,链只在顶层的点上切段
+// (实参里的 `a?.b` 不切)。此前只认同一行写完的链,`client.v2.model` 换行 `.list(` 就漏了,GET /api/model 因此既没接也没登记
+// (composer 的模型链一直 recovering)。接收者名对应的那张描述表查不到时再查另一张:冻结 app 里叫 `sdk` 的也可能是 1.17.13 客户端
+// (global-sync/bootstrap.ts 的 `sdk.model.default`),叫 `api` 的也可能是 createCompatibleApi(按 v1 方法名)。
 import { describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync, statSync } from "node:fs"
 import { join, resolve } from "node:path"
@@ -88,29 +92,51 @@ function legacyClientRoutes() {
 const V1 = v1Routes()
 const LEGACY = legacyClientRoutes()
 const V1_RECEIVERS = new Set(["client", "legacy", "sdk", "c", "eventSdk", "sdkFor"])
+const LEGACY_RECEIVERS = new Set(["api", "eventApi"])
+
+/** 链按顶层的 `.` / `?.` 切段(括号里的实参不切),每段去掉自己的调用实参与空白。 */
+function chainSegments(chain: string) {
+  const segments: string[] = []
+  let depth = 0
+  let start = 0
+  for (let index = 0; index < chain.length; index++) {
+    const char = chain[index]
+    if (char === "(") depth++
+    else if (char === ")") depth--
+    else if (char === "." && depth === 0) {
+      segments.push(chain.slice(start, index))
+      start = index + 1
+    }
+  }
+  segments.push(chain.slice(start))
+  return segments.map((segment) => segment.replace(/\?$/, "").replace(/\([^]*$/, "").trim())
+}
 
 export type EngineCall = { client: "v1" | "1.17.13"; method: string; verb: string; path: string; site: string }
 
 /** 在一段源码里扫出打引擎的调用。 */
 export function scanEngineCalls(text: string, file: string): EngineCall[] {
   const calls: EngineCall[] = []
-  for (const match of text.matchAll(/((?:[A-Za-z_$][\w$]*(?:\([^()]*\))?\.)+[A-Za-z_$][\w$]*)\(/g)) {
-    const segments = match[1]!.split(".").map((segment) => segment.replace(/\(.*$/, ""))
+  for (const match of text.matchAll(/((?:[A-Za-z_$][\w$]*(?:\([^()]*\))?\s*\??\.\s*)+[A-Za-z_$][\w$]*)\s*\(/g)) {
+    const segments = chainSegments(match[1]!)
     for (let receiver = 0; receiver < segments.length - 2; receiver++) {
       const name = segments[receiver]!
-      const client = name === "api" ? "1.17.13" : V1_RECEIVERS.has(name) ? "v1" : undefined
+      const client = LEGACY_RECEIVERS.has(name) ? "1.17.13" : V1_RECEIVERS.has(name) ? "v1" : undefined
       if (!client) continue
-      const table = client === "v1" ? V1 : LEGACY
       const rest = segments.slice(receiver + 1)
-      let hit: [string, Descriptor] | undefined
-      for (let length = rest.length; length >= 2 && !hit; length--) {
-        const key = rest.slice(0, length).join(".")
-        const descriptor = table.get(key)
-        if (descriptor) hit = [key, descriptor]
+      let hit: [EngineCall["client"], string, Descriptor] | undefined
+      for (const kind of client === "v1" ? (["v1", "1.17.13"] as const) : (["1.17.13", "v1"] as const)) {
+        const table = kind === "v1" ? V1 : LEGACY
+        for (let length = rest.length; length >= 2 && !hit; length--) {
+          const key = rest.slice(0, length).join(".")
+          const descriptor = table.get(key)
+          if (descriptor) hit = [kind, key, descriptor]
+        }
+        if (hit) break
       }
       if (!hit) continue
       const line = text.slice(0, match.index).split("\n").length
-      calls.push({ client, method: hit[0], verb: hit[1][0], path: hit[1][1], site: `${file}:${line}` })
+      calls.push({ client: hit[0], method: hit[1], verb: hit[2][0], path: hit[2][1], site: `${file}:${line}` })
       break
     }
   }
@@ -157,7 +183,7 @@ describe("#1668 适配器路由覆盖", () => {
     expect(LEGACY.get("project.current")).toEqual(["GET", "/api/project/current"])
     const v1Methods = new Set(CALLS.filter((call) => call.client === "v1").map((call) => call.method))
     const legacyMethods = new Set(CALLS.filter((call) => call.client === "1.17.13").map((call) => call.method))
-    // 2026-11-09 实测 68 / 28;下限只防扫描退化。
+    // 2026-11-09 实测 68 / 28(2026-11-12 扫描改成不依赖排版后 77 / 36);下限只防扫描退化。
     expect(v1Methods.size).toBeGreaterThanOrEqual(60)
     expect(legacyMethods.size).toBeGreaterThanOrEqual(20)
   })
@@ -174,10 +200,31 @@ describe("#1668 适配器路由覆盖", () => {
     }
   })
 
-  test("反向臂:源码里多一个表外调用 ⇒ 被扫出并点名", () => {
+  test("反向臂:源码里多一个表外调用 ⇒ 被扫出并点名(同一行 / 跨行 / `?.` / 实参里带 `?.` / 接收者名对不上描述表)", () => {
     const fixture = 'async function f(client) { await client.experimental.workspace.list() }\n'
     const calls = scanEngineCalls(fixture, "fixture.ts")
     expect(calls.map((call) => call.method)).toEqual(["experimental.workspace.list"])
     expect(uncovered(calls).map((call) => call.site)).toEqual(["fixture.ts:1"])
+    // `#1662`:漏掉 GET /api/model 的那种排版 —— 链在点前换行
+    const layouts = [
+      "async function f(client) {",
+      "  await client.v2.session",
+      "    .history({ sessionID })",
+      "  await client?.v2?.session.history({ sessionID })",
+      "  await sdkFor(value?.location).v2.session.history({ sessionID })",
+      "}",
+      "async function g(sdk) {",
+      "  await sdk.plugin",
+      "    .list({ location })",
+      "}",
+    ].join("\n")
+    const scanned = scanEngineCalls(layouts, "layout.ts")
+    expect(scanned.map((call) => `${call.client} ${call.method} ${call.verb} ${call.path} <- ${call.site}`)).toEqual([
+      "v1 v2.session.history GET /api/session/{sessionID}/history <- layout.ts:2",
+      "v1 v2.session.history GET /api/session/{sessionID}/history <- layout.ts:4",
+      "v1 v2.session.history GET /api/session/{sessionID}/history <- layout.ts:5",
+      "1.17.13 plugin.list GET /api/plugin <- layout.ts:8",
+    ])
+    expect(uncovered(scanned).map((call) => call.site)).toEqual(["layout.ts:2", "layout.ts:4", "layout.ts:5", "layout.ts:8"])
   })
 })

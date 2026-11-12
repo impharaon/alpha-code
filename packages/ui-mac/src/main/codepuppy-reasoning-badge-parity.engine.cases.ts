@@ -26,7 +26,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import fs from "node:fs"
 import path from "node:path"
-import type { ModelV2Info } from "@opencode-ai/sdk/v2/client"
+import { createOpencodeClient, type ModelV2Info } from "@opencode-ai/sdk/v2/client"
 import { assertEngineSandboxed, engineSandbox } from "../../test-component/engine-sandbox"
 import { codepuppyEngine, type Running } from "../../test-component/codepuppy-engine"
 import { v3Snapshot } from "../../test-component/effective-catalog.fixture"
@@ -34,6 +34,7 @@ import { createEngineFetch } from "../engine-adapter/index"
 import { normalizeProviderList } from "../engine-adapter/frozen-shapes"
 import { buildModelPickerRows, type ModelPickerRow } from "../renderer/codepuppy-ui/model-picker-core"
 import { buildPromptRequest, DEFAULT_PERM, v1PromptModelFields } from "../renderer/codepuppy-ui/composer-state"
+import { createModelContract } from "../renderer/codepuppy-ui/model-contract"
 import { byokModelMeta, isByokEngineId, TITLE_VARIANT_ALIAS } from "../shared/codepuppy-model-types"
 import { getModelCatalog } from "./codepuppy-models"
 import { pinAppliedCatalog, writeCatalogSnapshot } from "./codepuppy-live-allowlist"
@@ -109,7 +110,13 @@ type Machine = {
   userData: string
   send: (row: ModelPickerRow, variant?: string) => Promise<Sent>
   /** 冻结界面拿到的 v1 provider 列表(经生产适配器 GET /provider)与同一时刻引擎自己的 2.x 清单。 */
-  lists: () => Promise<{ v1: { all: Array<{ id: string; models: Record<string, { variants?: Record<string, unknown> }> }> }; providers: unknown[]; models: ModelV2Info[] }>
+  lists: () => Promise<{
+    v1: { all: Array<{ id: string; models: Record<string, { variants?: Record<string, unknown> }> }> }
+    providers: unknown[]
+    models: ModelV2Info[]
+    /** composer 的模型合同(生产 createModelContract + 冻结 v1 SDK 客户端,`client.v2.model.list`)经生产适配器拿到的清单。 */
+    composer: { data?: ModelV2Info[]; error?: string }
+  }>
 }
 type InjectedProviders = Record<string, { settings?: { baseURL?: string }; models?: Record<string, Injected> }>
 
@@ -200,7 +207,14 @@ async function machine(name: string, mutate?: (models: (providerID: string, id: 
   const lists = async () => {
     const v1 = await (await adapter(`${origin}/provider?${directory}`)).json()
     const raw = { providers: (await engine.send("GET", "/api/provider")).json?.data ?? [], models: ((await engine.send("GET", "/api/model")).json?.data ?? []) as ModelV2Info[] }
-    return { v1, ...raw }
+    const client = createOpencodeClient({ baseUrl: origin, fetch: adapter as typeof fetch })
+    const composer = await createModelContract(() => client)
+      .list(host.projectDirectory)
+      .then(
+        (data) => ({ data }),
+        (error: Error & { cause?: unknown }) => ({ error: `${error.message} ${JSON.stringify(error.cause ?? null)}` }),
+      )
+    return { v1, ...raw, composer }
   }
   return { rows, userData, send, lists }
 }
@@ -467,9 +481,9 @@ describe("REQ-153 #1266/#1267:矩阵(嵌入式 OpenCode 2 · 本机桩 · 双向
     expect(result.verdicts.length).toBe(result.cells)
   }, 300_000)
 
-  test("矩阵 UI 侧:冻结界面拿到的 v1 provider 列表里,每个模型的档位恰好是目录的(`none` 不可见);同一份引擎清单不经适配器剥离 ⇒ 每个有档模型多出 `none`", async () => {
+  test("矩阵 UI 侧:冻结界面的 v1 provider 列表与 composer 的模型清单(GET /api/model)都经生产适配器拿到,每个模型的档位恰好是目录的(`none` 不可见);同一份引擎清单不经适配器剥离 ⇒ 每个有档模型多出 `none`", async () => {
     const target = await real()
-    const { v1, providers, models } = await target.lists()
+    const { v1, providers, models, composer } = await target.lists()
     const tiered = target.rows.filter((row) => row.model.variants.length > 0)
     expect(tiered.length).toBeGreaterThan(0)
     // 引擎自己的清单里确实有这一档(否则下面是空对空)
@@ -479,6 +493,11 @@ describe("REQ-153 #1266/#1267:矩阵(嵌入式 OpenCode 2 · 本机桩 · 双向
     // 生产适配器(GET /provider → toV1ProviderList)给冻结界面的:每一行的档位 == 目录的 chip(含无档行)
     const shown = (row: ModelPickerRow) => Object.keys(v1.all.find((provider) => provider.id === row.model.providerID)?.models[row.model.id]?.variants ?? {})
     expect(target.rows.map((row) => ({ key: rowKey(row), variants: shown(row) }))).toEqual(target.rows.map((row) => ({ key: rowKey(row), variants: row.model.variants })))
+    // composer 的模型合同(生产 createModelContract → 冻结 v1 SDK 的 `client.v2.model.list` → 生产适配器 GET /api/model):清单拿得到
+    // (拿不到 ⇒ 模型链一直 recovering、发送按钮不亮、平台行停在「正在同步…」),每一行的档位 == 目录的 chip
+    expect(composer.error).toBeUndefined()
+    const listed = (row: ModelPickerRow) => composer.data?.find((model) => model.providerID === row.model.providerID && model.id === row.model.id)?.variants.map((variant) => variant.id)
+    expect(target.rows.map((row) => ({ key: rowKey(row), variants: listed(row) }))).toEqual(target.rows.map((row) => ({ key: rowKey(row), variants: row.model.variants })))
     // 已知的坏:同一份引擎清单直接交冻结 app 的归一函数(适配器不剥)⇒ 每个有档模型多出 `none`
     const raw = normalizeProviderList(providers as never, models as never)
     expect(tiered.map((row) => ({ key: rowKey(row), variants: Object.keys(raw.all.get(row.model.providerID)?.models[row.model.id]?.variants ?? {}) }))).toEqual(

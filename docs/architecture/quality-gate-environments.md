@@ -1,3 +1,10 @@
+---
+id: ARCH-alpha-code-quality-gate-environments
+title: 质量门 × 运行环境 —— 每道门在每个环境里的真实状态
+kind: architecture
+status: active
+summary: "质量门 × 运行环境 —— 每道门在每个环境里的真实状态"
+---
 # 质量门 × 运行环境 —— 每道门在每个环境里的真实状态
 
 > 勘破文档(`#777`)。这里写的每一格都是**跑出来的**,不是推断的;跑不出来的格子写「未测量」,

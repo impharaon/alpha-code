@@ -90,6 +90,9 @@ fi
 echo "    ✓ bun ${actual_bun}"
 unset pinned_bun actual_bun
 
+# shellcheck source=scripts/docs-gates.sh
+source scripts/docs-gates.sh
+
 fail=0
 # `#890`:「本次没能比对真源」是**第三种**结局,不是绿也不是红 —— 见第 [10/14] 步。
 unverified=0
@@ -139,11 +142,8 @@ echo "▶ [3/14] no literal NUL bytes in version-controlled files"
 # 「大文件 Edit 后 grep + git show 双验」,而在这些文件上 grep 会安静地说「没有」。
 # 已实证四次(#737 枚举被修正两次、#704 一轮两个实例、建 #760 时命令又混进一个、
 # alpha-web#109 差点据零命中断定「测试被删了」)。枚举对新成员默认放行,所以这里立的是咽喉。
-if python3 scripts/assert-no-nul-bytes.py; then
-  echo "    ✓ no literal NUL bytes"
-else
-  echo "    ✗ literal NUL bytes found"; fail=1
-fi
+# 函数体在 scripts/docs-gates.sh —— 与 bin/check-light 共用同一份,不各抄一遍。
+docs_gate_nul || fail=1
 
 echo "▶ [4/14] typecheck (alpha packages: contracts-consumer + ext + ui-mac + plugin + core + schema)"
 # REQ-027:flag 必须在 `run` 之后 —— `bun --cwd X run Y` 在 bun 1.3.x 打印 usage 后静默退出 0(不执行脚本)。
@@ -224,20 +224,7 @@ fi
 echo "▶ [8/14] docs gate (relative-link validity in changed Markdown)"
 # CI 只查**这次改动过的** Markdown(detect job 收集)。本地口径同构:相对 origin/alpha 的
 # 提交 delta ∪ 未提交工作树改动,再滤成 *.md。一个都没有 ⇒ 与 CI 一样是 no-op。
-md_committed="$(git diff --name-only --diff-filter=d origin/alpha...HEAD -- '*.md' 2>/dev/null || true)"
-md_worktree="$(git diff --name-only --diff-filter=d HEAD -- '*.md' 2>/dev/null || true)"
-md_untracked="$(git ls-files --others --exclude-standard -- '*.md' 2>/dev/null || true)"
-md_list="$(printf '%s\n%s\n%s\n' "$md_committed" "$md_worktree" "$md_untracked" | sed '/^$/d' | sort -u)"
-if [ -z "$md_list" ]; then
-  echo "    ✓ no Markdown changed — docs gate is a no-op (与 CI 同)"
-else
-  # shellcheck disable=SC2086
-  if python3 scripts/check-doc-links.py $md_list; then
-    echo "    ✓ docs links ($(echo "$md_list" | wc -l | tr -d ' ') 个 Markdown)"
-  else
-    echo "    ✗ broken relative links"; fail=1
-  fi
-fi
+docs_gate_links || fail=1
 
 echo "▶ [9/14] worktree bootstrap 能力(新建 worktree 自己就能跑出可信 typecheck)(#916)"
 # 这一步在 codepuppy-ci 里**没有对应**,所以它不进 CI_STEPS(那张表是 CI 步骤的对照表)——

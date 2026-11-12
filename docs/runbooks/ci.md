@@ -1,3 +1,10 @@
+---
+id: RUNBOOK-alpha-code-ci
+title: CI 规范（Code Puppy）
+kind: runbook
+status: active
+summary: "CI 规范（Code Puppy）"
+---
 # CI 规范（Code Puppy）
 
 > 一句话:**本地先跑,CI 兜底**。CI 不是你第一次看到失败的地方——它是 merge 前的强制关卡。
@@ -5,11 +12,13 @@
 
 ## 0. TL;DR — 全量门在 push 时跑一次
 
-全量门在 `git push` 时跑一次:pre-push 经 `gate pre-push` 调 `bin/check`(转调全量检查)并签 `check`,同一代码树不重跑;机器上没有 `gate` 时回落到直接运行 `scripts/codepuppy-check.sh`。开发中只跑相关测试,什么时候跑门归用户级规则(`dev-loop`)。诊断红门时手动跑:
+全量门在 `git push` 时跑一次:pre-push 经 `gate pre-push` 调 `bin/check`(转调全量检查)并签 `check`,同一代码树不重跑;机器上没有 `gate` 时回落到直接运行 `scripts/codepuppy-check.sh`。新 checkout / worktree 先跑 [`bin/setup`](../../bin/setup)(`bun install` 带 `HUSKY=0` + Electron 二进制 + 围栏 addon,幂等,失败非零并点名哪一步;Electron 与 addon 的步骤在 [`scripts/native-prepare.sh`](../../scripts/native-prepare.sh),与 `scripts/worktree-bootstrap.sh` 共用),`wt-new` 发现它会自动调用;缺围栏 addon 时 `process-fence-wiring` / `process-fence-apply` / `network-egress-fence` 三个测试文件恒红,红法像自己改坏了。开发中只跑相关测试,什么时候跑门归用户级规则(`dev-loop`)。诊断红门时手动跑:
 
 ```bash
 gate run
 ```
+
+**轻量门(只改文档类文件的 push)**:一次 push 的全部改动都落在 [`.gate-light`](../../.gate-light) 圈定的文档类路径里(外加任何 `*.md`)时,`gate` 跑 [`bin/check-light`](../../bin/check-light)(约 10 秒)而不是全量门,通过后照样签 `check`。它跑三件事:NUL 字节闸、改动 Markdown 的相对链接(这两个的函数体在 [`scripts/docs-gates.sh`](../../scripts/docs-gates.sh),全量门的 `[3/14]` / `[8/14]` 调的是同一份),以及六个输入在文档里的测试(`old-name-scan`、`local-gate-parity`、`network-egress-disclosure`、`gate-file-registry`、两个 ratchet 的 README 锚点;清单在同一个文件里)。`.gate-light` 只收文档类,不含 `scripts/` `.github/` `packages/` `frontend/` 与根配置;`docs/` 里被门的测试在运行时按名字读取的非 `.md` 文件(`docs/contracts/desktop-release-manifest.trust.json`、`docs/verification/` 下被点名的 json / html / tsv / txt)故意不收,照常走全量门。改了 `.gate-light` 或 `bin/check-light` 本身的 push 永远走全量门。新增一个被测试读取的 docs 文件时,先看它该不该排除在 `.gate-light` 之外。
 
 它跑的是 `codepuppy-ci` 的**全部 21 个代码步**,并在末尾打印一张逐步对照表
 (`MIRRORED` / `SUPERSET:<理由>` / `DEGRADED:<理由>`)。
@@ -214,17 +223,18 @@ bundle(逐字比对提交 sha,防篡改),推送凭据仅在最后一步临时配
 不执行任何来自 `packages/opencode` / 上游的代码。
 
 - **分支保护 required contexts —— 幽灵 context 已消,记录落在仓内**(`#717`,2026-08-10 复核)。
-  `alpha` 保护当前要求四个 context,与真实 job 名逐条对得上:
-  `north-star guard (zero upstream edits)` / `typecheck (alpha packages)` /
-  `unit tests (alpha packages)` / `docs gate`。
-  历史:那一格曾经写着 `unit tests (ui-mac)`,而 job 早在 2026-07-22(`ebd29cda`)就改名了 ⇒
+  `alpha` 保护当前只要求一个 context:`check` —— 本地门(`git push` 时 `gate`)跑完全量检查后签在
+  被推送提交上的 commit status,不是 codepuppy-ci 的 job 名(codepuppy-ci 已停用)。
+  历史:分支保护曾要求四个 job 名(`north-star guard (zero upstream edits)` /
+  `typecheck (alpha packages)` / `unit tests (alpha packages)` / `docs gate`),改成 `check` 后
+  仓内记录没跟,第 `[10/14]` 步对每条分支恒红,已按真源更正。再往前,那一格曾经写着 `unit tests (ui-mac)`,而 job 早在 2026-07-22(`ebd29cda`)就改名了 ⇒
   **没有任何 PR 会产出那个 context**,code PR 也不会 ⇒ 每个 PR 在那一格永久 pending ⇒ 每次合并都得
   `--admin`。**「大家习惯性 --admin」当时不是纪律松懈,是分支保护自己造出来的。**
   owner 已于 2026-08-03 直接改分支保护修掉那一半。
   `#717` 的票面把成因写成「docs-only path 没发布该 context」,与实测不符:改名是全量的。
   现在这份列表在仓内有一份手抄快照 [`.github/required-contexts.txt`](../../.github/required-contexts.txt),
   由 `packages/ui-mac/src/main/local-gate-parity.test.ts` 断言「记录里的每个 context 都等于某个 job 的
-  `name:`」+「每个 job 要么在记录里、要么显式登记为不必需」。
+  `name:` 或等于上文那个本地门签名 `check`」+「每个 job 要么在记录里、要么显式登记为不必需」。
 - **手抄件与真源之间现在有判据了**(`#890`,2026-08-11)。上一条那两个断言只把手抄件与 workflow
   的 job 名对齐 —— 两边一起错就一起自洽,而真正决定「PR 能不能合」的那份清单在 GitHub 的分支保护
   设置里,此前没有任何东西比对它。现在 `codepuppy-check.sh` 第 `[10/14]` 步跑
@@ -237,7 +247,8 @@ bundle(逐字比对提交 sha,防篡改),推送凭据仅在最后一步临时配
   前者两种状态都回 200(保护关着时是 `enabled=false` + 零个 context ⇒ 当场红)。
   ②`--jq` 里那个 `?` 不能删:`.required_status_checks.contexts[]` 在字段为 null 时 jq 报
   `cannot iterate over: null` 并非零退出,同样把灾难态伪装成读不到。
-- **必需检查不会因为 `detect` 失败而静默放行**(`#895`,2026-08-11 实测)。四个必需 job 都
+- **必需检查不会因为 `detect` 失败而静默放行**(`#895`,2026-08-11 实测;其后分支保护改为只要求
+  本地门签的 `check`,下面说的四个 job 不再是必需 context,接线断言只在它们被记回必需时才覆盖它们)。四个必需 job 都
   `needs: detect`;从前 `detect` 一红,它们被折成 `skipped`,而 **GitHub 把 `skipped` 当成
   「已满足」** ⇒ 四道闸门一道没跑,PR 照样可合(实测 `mergeStateStatus=UNSTABLE`)。现在它们带
   job 级 `if: ${{ !cancelled() }}`,并以
@@ -271,7 +282,8 @@ bundle(逐字比对提交 sha,防篡改),推送凭据仅在最后一步临时配
    - `in_progress` 慢 = job 本身慢(装依赖 / 测试)——那才是 REQ-009 缓存优化的场景。
 3. **命令**:`gh run cancel <id>` 取消 · `gh run watch <id>` 盯 · `gh run rerun <id>` 重跑 · `gh run list --workflow=codepuppy-ci.yml` 只看本仓 CI。
 4. **别被堵**:本地十步已绿 = 代码没问题。`#717` 之前这里写着「required 里有一个永远不会上报的
-   context,真急可 `--admin`」—— **那条已经过时,别再照它办**。四个 required context 现在都会产出
+   context,真急可 `--admin`」—— **那条已经过时,别再照它办**。(现状:必需的只有本地门签的 `check`;
+   下面「四个 required context」指 `#895` 当时的四个 job。)四个 required context 现在都会产出
    结论(§3),`--admin` 回到「例外」而不是「结构性必需」。
    ⚠️ 「产出结论」这句话在 `#895` 之前是**半真的**:`detect changes` 一失败,四格产出的结论叫
    **`skipped`**,而 GitHub 把 `skipped` 记成「已满足」—— 2026-08-11 在 PR #908 上实测:四格全

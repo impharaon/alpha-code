@@ -1,4 +1,6 @@
 ---
+id: CONTRACT-alpha-code-permission-risk-classification
+summary: "授权提示的风险分类(v1 `metadata.codepuppyRisk`)"
 title: 授权提示的风险分类(v1 `metadata.codepuppyRisk`)
 kind: contract
 status: active

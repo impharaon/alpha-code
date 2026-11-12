@@ -1,4 +1,6 @@
 ---
+id: ARCH-alpha-code-upstream-integration
+summary: "Code Puppy upstream integration"
 title: Code Puppy upstream integration
 kind: architecture
 status: active

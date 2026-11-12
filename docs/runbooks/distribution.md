@@ -1,4 +1,6 @@
 ---
+id: RUNBOOK-alpha-code-distribution
+summary: "Mac release runbook (signing, notarization, auto-update)"
 title: Mac release runbook (signing, notarization, auto-update)
 kind: runbook
 status: active

@@ -1,4 +1,6 @@
 ---
+id: RUNBOOK-alpha-code-model-catalog-updates
+summary: "Model catalog updates (platform proxy & BYOK)"
 title: Model catalog updates (platform proxy & BYOK)
 kind: runbook
 status: active

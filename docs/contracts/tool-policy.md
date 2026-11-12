@@ -1,4 +1,6 @@
 ---
+id: CONTRACT-alpha-code-tool-policy
+summary: "Hierarchical tool policy contract (REQ-131)"
 title: Hierarchical tool policy contract (REQ-131)
 kind: contract
 status: active

@@ -1,4 +1,6 @@
 ---
+id: CONTRACT-alpha-code-extension-package-lifecycle
+summary: "Extension package lifecycle — update, uninstall, and shared-child claims"
 title: Extension package lifecycle — update, uninstall, and shared-child claims
 kind: contract
 status: active

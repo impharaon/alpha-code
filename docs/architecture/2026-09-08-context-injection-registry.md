@@ -1,4 +1,6 @@
 ---
+id: ARCH-alpha-code-2026-09-08-context-injection-registry
+summary: "Code Puppy 注入模型上下文的登记簿与咽喉(REQ-157)"
 title: Code Puppy 注入模型上下文的登记簿与咽喉(REQ-157)
 kind: architecture
 status: active

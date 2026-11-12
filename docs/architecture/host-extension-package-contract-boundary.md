@@ -1,4 +1,6 @@
 ---
+id: ARCH-alpha-code-host-extension-package-contract-boundary
+summary: "Host extension package contract boundary"
 title: Host extension package contract boundary
 kind: architecture
 status: active

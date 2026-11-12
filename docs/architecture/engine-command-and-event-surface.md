@@ -1,4 +1,6 @@
 ---
+id: ARCH-alpha-code-engine-command-and-event-surface
+summary: "引擎的 command 与事件面（勘破）"
 title: 引擎的 command 与事件面（勘破）
 kind: architecture
 status: active

@@ -1,4 +1,6 @@
 ---
+id: ARCH-alpha-code-codepuppy-connection-lifetime
+summary: "Code Puppy Connection record lifetime"
 title: Code Puppy Connection record lifetime
 kind: architecture
 status: active

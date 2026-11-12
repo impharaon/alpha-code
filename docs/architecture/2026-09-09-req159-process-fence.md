@@ -1,4 +1,6 @@
 ---
+id: ARCH-alpha-code-2026-09-09-req159-process-fence
+summary: "引擎进程围栏:sidecar 自打 seatbelt 的落地形状(REQ-159)"
 title: 引擎进程围栏:sidecar 自打 seatbelt 的落地形状(REQ-159)
 kind: architecture
 status: active
@@ -7,7 +9,7 @@ owners:
 last_reviewed: 2026-09-22
 review_after: 2026-12-09
 supersedes:
-  - 2026-08-23-shell-sandbox-seam.md
+  - ARCH-legacy-shell-sandbox-seam
 ---
 
 # 引擎进程围栏 —— 装在哪、可写集从哪来、装不上会怎样

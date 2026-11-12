@@ -239,3 +239,8 @@ svg{display:block}
 .ob-step .n{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;flex:none;background:var(--a-bg-muted);color:var(--a-text-secondary)}
 .ob-step.done .n{background:var(--a-success);color:#fff}
 .ob-step.now .n{background:var(--a-accent);color:#fff}
+
+/* A2 / D2 子帧(frames/*.html):宽同内容栏,高度由子帧回报 */
+.sec p.lede a{color:var(--a-accent);text-decoration:none}
+.sec p.lede a:hover{text-decoration:underline}
+.ux-if{display:block;width:100%;height:640px;border:0;background:transparent}

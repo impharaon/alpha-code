@@ -1,0 +1,27 @@
+# 文档类路径 —— 一次 push 只改这些(外加 *.md,隐含)时,`gate` 跑 bin/check-light 而不是全量 bin/check。
+# 只收文档类:不含 scripts/** .github/** packages/** frontend/** 与根配置(它们能改产品行为或闸门)。
+# 语法:每行一个 glob,`*`/`?` 不跨目录,`**` 跨目录;`#` 注释。
+#
+# 刻意**不**收的 docs 路径(都有门里的测试在运行时读它们,改了会改变全量门的结果):
+#   docs/contracts/** 的非 .md 文件 —— desktop-release-manifest.trust.json 由 release-manifest.test.ts 严格校验(发版信任钥)
+#   docs/verification/ 里除 *.png / *.log / *.jsonl 之外的非 .md 文件 —— 被测试按名字读取:
+#     2026-09-24-1445-exa-mcp-response-shapes/results/*.json、2026-09-26-1445-exa-vendor-source-and-live-shapes/results/*
+#       (packages/core、packages/opencode 的 websearch nokey-outcomes 测试)
+#     2026-07-27-e7-packaged-live/results/latest-logged-in.json (cloud-web-search.test.ts)
+#     2026-07-21-req090-{recovery,permission,settings}-l2/harness.html (recovery-wiring / permission-mount-ratchet / settings-surface-ratchet)
+#     2026-07-31-req128-capability-matrix/matrix.tsv (req128-capability-matrix.test.ts)
+#     2026-07-31-req128-package-detail/harness/package-detail-harness.html (ext-package-presentation.test.ts)
+#   这类路径照常走全量门。
+
+docs/architecture/**
+docs/archive/**
+docs/audits/**
+docs/design/**
+docs/evidence/**
+docs/retrospectives/**
+docs/runbooks/**
+docs/specs/**
+docs/verification/**/*.png
+docs/verification/**/*.log
+docs/verification/**/*.jsonl
+.claude/rules/**

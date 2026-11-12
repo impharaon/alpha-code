@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+#
+# bin/setup — 就地准备**当前 checkout**,让它能跑真闸门和相关测试。`wt-new` 发现本文件就用它代替默认的
+# `bun install`(并 export HUSKY=0)。幂等:一切就绪时只剩一次 `bun install` 的空转,不复制、不编译。
+#
+#   1. bun install            —— 依赖(HUSKY=0:husky 的 prepare 会改**所有 worktree 共享**的
+#                                .git/config core.hooksPath,把本仓的 pre-push 门换成上游那份)
+#   2. Electron 二进制 + codepuppy-fence 原生 addon(darwin)—— scripts/native-prepare.sh,
+#      与 scripts/worktree-bootstrap.sh 共用同一份,不各抄一遍
+#
+# 缺了第 2 步的现象:process-fence-wiring / process-fence-apply / network-egress-fence 三个文件定点恒红
+# ("process fence: native module missing")—— 看起来像自己改坏了。任何一步失败 ⇒ 非零退出并点名哪一步。
+set -uo pipefail
+cd "$(git rev-parse --show-toplevel)" || exit 1
+TARGET="$PWD"
+# 主 checkout 的根:从共享 .git 反推(在主 checkout 里与在 worktree 里答案相同)。
+COMMON_DIR="$(git rev-parse --path-format=absolute --git-common-dir)" || exit 1
+MAIN="${COMMON_DIR%/.git}"
+export HUSKY=0
+
+echo "▶ bun install"
+bun install || { echo "✗ bin/setup 失败:bun install(依赖没装上 —— 别在这棵树上跑 typecheck/测试,那是成千上万条假红)" >&2; exit 1; }
+
+echo "▶ Electron + codepuppy-fence addon"
+bash scripts/native-prepare.sh "$TARGET" "$MAIN" || { echo "✗ bin/setup 失败:Electron 二进制 / codepuppy-fence addon(原因见上一行 ✗)" >&2; exit 1; }
+
+echo "✓ bin/setup 完成"

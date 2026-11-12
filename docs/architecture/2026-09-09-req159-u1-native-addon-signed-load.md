@@ -1,4 +1,6 @@
 ---
+id: ARCH-alpha-code-2026-09-09-req159-u1-native-addon-signed-load
+summary: "REQ-159 U1 决定书:自己写的原生模块在签名后的正式包里加载得了"
 title: REQ-159 U1 决定书:自己写的原生模块在签名后的正式包里加载得了
 kind: architecture
 status: accepted

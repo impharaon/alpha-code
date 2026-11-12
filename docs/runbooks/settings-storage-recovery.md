@@ -1,4 +1,6 @@
 ---
+id: RUNBOOK-alpha-code-settings-storage-recovery
+summary: "Settings storage recovery"
 title: Settings storage recovery
 kind: runbook
 status: active

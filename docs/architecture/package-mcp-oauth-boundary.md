@@ -1,4 +1,6 @@
 ---
+id: ARCH-alpha-code-package-mcp-oauth-boundary
+summary: "Package MCP OAuth ownership boundary"
 title: Package MCP OAuth ownership boundary
 kind: architecture
 status: active

@@ -47,6 +47,7 @@ import { USER_DATA_LAYOUT } from "./user-data-layout"
 // `#1667`(#1665 L3 交回的接缝裁决 A / C,编排器 2026-11-09):出厂技能目录、技能生成的 live 目录与出厂 /init、/review 命令
 // 由 main 写进这份内联配置文档(2.x 插件接口给不了等价挂点)。路径与命令内容仍以 ext 那三个纯函数为唯一来源,这里只引用。
 import { injectFactorySkillPaths } from "../../../ext/src/factory-paths"
+import { PROVIDER_ALLOW_ENV } from "../../../ext/src/provider-allow"
 import { skillGenerationLiveDirs } from "../../../ext/src/gen-skill-paths"
 import { explicitConfigPath, writeExplicitConfig, type ExplicitLayer } from "./engine-explicit-config"
 import { applyPromptTakeover } from "../../../ext/src/codepuppy-prompts"
@@ -323,7 +324,10 @@ export function injectCodePuppyConfig(
       config.policies = engine.policies
       layer.policies = engine.policies
       if (engine.model) config.model = engine.model
-    }
+      // `#1662`:同一份放行集合交给 ext 在供应商表上再执行一次 —— 全局配置目录在显式文件之前载入,它的放行句压得过上面的策略
+      // (packages/ext/src/provider-allow.ts)。sidecar 里注入与引擎同进程,env 是本进程的。
+      process.env[PROVIDER_ALLOW_ENV] = JSON.stringify(engine.policies.filter((policy) => policy.effect === "allow").map((policy) => policy.resource))
+    } else delete process.env[PROVIDER_ALLOW_ENV]
 
     //   4b. `#1667`(接缝裁决 A;编排器裁决 r1 第 2 条、r3 第 1 条):出厂技能目录与已安装技能当前那一代的**真实目录**写成显式文件的
     //       `skills`(explicitSkillDirs)。翻代 / 新装 / 停用时 sidecar 的监听重算并重写显式文件(engine-explicit-config.ts),
@@ -665,6 +669,8 @@ export function injectCodePuppyConfig(
     // #613:catch 保留(sidecar 照常起,候选形态③),但失败必须离开本进程:
     // warn 是 #607 反向闸门锁住的进程内出声,返回值是送往 main/renderer 的结构化事实。
     console.warn("failed to inject alpha config", error)
+    // 失败的配置里没有注入的供应商与策略:放行集合跟着撤掉,ext 与它同口径(provider-allow.ts:没写 = 本代没治理)。
+    delete process.env[PROVIDER_ALLOW_ENV]
     return {
       ok: false,
       error: error instanceof Error ? { message: error.message, stack: error.stack } : { message: String(error) },

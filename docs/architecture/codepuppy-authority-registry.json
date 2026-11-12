@@ -1785,6 +1785,31 @@
         }
       ],
       "note": "Two differences from 0.1.26, both kept by orchestrator decision (2026-11-12, #1662 project-config): (1) order against the user's own top-level permission rules — OpenCode 2's config agent plugin appends them after the extension's agent.transform (packages/core/src/config/plugin/agent.ts:71), so the user's global rules outrank a project agent's, whereas 0.1.26 laid the agent's rules over the global ones (origin/alpha packages/opencode/src/agent/agent.ts:293); the user's own rules winning is the safer direction; (2) unchanged from 0.1.26 and recorded only: a consented project's agent may also loosen permissions, consent being the gate."
+    },
+    {
+      "id": "provider-allowlist",
+      "decision": "Only the providers Code Puppy injects (the platform node, BYOK providers with a key, custom providers from Code Puppy's own truth file, the catalog-readiness marker) are listed and usable. A provider block written in any config file, including the engine's global folder (~/.config/opencode) together with its own provider.use allow line, is neither listed by GET /api/provider nor usable for a request, as in 0.1.26 where the injected enabled_providers replaced the merged list (#1392 baseline I1; #1662 orchestrator decision 2026-11-12).",
+      "lane": "#1662 green-b r2",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/provider-allow.ts",
+        "ladder": "L0 plugin hooks. The injection (packages/ui-mac/src/main/codepuppy-config-injection.ts) writes the provider.use policies (deny * then allow each injected id) into the explicit file and the inline document, and the same allow list into CODEPUPPY_PROVIDER_ALLOW in the sidecar process. The policies alone are outranked by the global folder: OpenCode 2 evaluates cross-document policies earliest-loaded first and loads the global folder before the explicit file (packages/core/src/config.ts). The extension therefore refuses a model request for any other provider in session.hook(\"model.request\"), and once plugin activation has settled (opencode.config.policy appears in the plugin list; config providers are added by that post-phase) registers a provider.transform that removes every other provider, re-placed last after each plugin re-activation. The managed-policy layer is not reachable from the embedding host: start() options carry no config.system (packages/server/src/options.ts, routes.ts)."
+      },
+      "tests": [
+        {
+          "file": "packages/ui-mac/src/main/custom-provider-derivation.test.ts",
+          "name": "宿主:嵌入式引擎的清单里有真源节点、没有 codepuppy.jsonc / 全局配置目录里的 exfil 块(带放行句也不行,选它发不出请求);追加放行 ⇒ 出现;请求那一道单独拒;撤掉 ext 的白名单 ⇒ 全局目录那条出现(custom-provider-derivation.engine.cases.ts,4 条)"
+        },
+        {
+          "file": "packages/ext/src/provider-allow.test.ts",
+          "name": "集合外的一律拿掉,只把已配置的那些报出来;集合外的请求抛错且点名,集合内的放行"
+        },
+        {
+          "file": "packages/ui-mac/src/main/codepuppy-config-injection.test.ts",
+          "name": "`#1662` 供应商白名单交给 ext:写进本进程 CODEPUPPY_PROVIDER_ALLOW 的集合逐条等于策略里放行的那些(同一次计算);注入关着 ⇒ 撤掉"
+        }
+      ],
+      "note": "Residual window: between the end of plugin activation and the transform being placed (one poll of the plugin list, about 20 ms) GET /api/provider can still list such a provider; OpenCode's own provider.use policy is likewise not in effect before activation ends. A request in that window is refused by the model.request hook. Egress (measured 2026-11-12, before this fix): a request to a non-whitelisted provider's host does not leave through the egress proxy (403 unregistered, zero dials) unless the user grants the host in the #1412 prompt or the block points at a host that is already authorized."
     }
   ]
 }

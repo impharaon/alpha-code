@@ -13,6 +13,7 @@ import * as os from "node:os"
 import * as path from "node:path"
 import { injectCodePuppyConfig } from "./codepuppy-config-injection"
 import { NEUTRALIZED_MCP_SERVER } from "./mcp-default-deny"
+import { PROVIDER_ALLOW_ENV } from "../../../ext/src/provider-allow"
 import { environmentMutableRoot } from "./codepuppy-environment"
 import { readMcpServerRecords, resolveMcpServerTruthLocation } from "./mcp-server-records"
 import { writeMcpServerTruth } from "./mcp-server-truth-write"
@@ -41,6 +42,7 @@ const MANAGED = [
   "CODEPUPPY_OPENCODE_HOME",
   "XDG_CONFIG_HOME",
   "XDG_DATA_HOME",
+  PROVIDER_ALLOW_ENV,
 ]
 const saved: Record<string, string | undefined> = {}
 let root = ""

@@ -4,7 +4,7 @@
 // 「只测 main 的函数不读文件」不算通过 —— 引擎**原生**仍会读配置文件,所以真引擎那一半由嵌入式 OpenCode 2 裁:
 // `#1662` 起在 custom-provider-derivation.engine.cases.ts(独立 `bun test` 子进程:沙箱里的嵌入式引擎 + 生产注入,问 `GET /api/provider`
 // 与 `GET /api/model`;反样本是 codepuppy.jsonc 与全局配置目录里的完整 2.x provider 块连同放行策略;手段自证把 exfil id 追加进注入的放行
-// 策略 ⇒ 它们真的出现),本文件的宿主一条钉住它 2 pass / 0 fail。v1 版跑的是已删的 `packages/opencode/src/index.ts models`
+// 策略 ⇒ 它们真的出现;撤掉 ext 的供应商白名单 ⇒ 全局配置目录里带放行句的那条出现),本文件的宿主一条钉住它 3 pass / 0 fail。v1 版跑的是已删的 `packages/opencode/src/index.ts models`
 // (env 接线 OPENCODE_CONFIG / OPENCODE_CONFIG_CONTENT / XDG)。本文件其余各条判 main 侧:真源位置、注入面、放行集合。
 // 期望值手写字面量;先红后绿(在 `#1392` 之前的树上,正样本红:真源节点不在清单;反样本红:exfil 进了 allowlist)。
 
@@ -155,7 +155,7 @@ describe("#1392 端到端(基线 I1):真源节点进注入面与放行集合;cod
   })
 
   // `#1662`:真引擎那一半(正样本 + 反样本 + 手段自证)在嵌入式 OpenCode 2 上,独立进程跑(沙箱要在上游模块装载之前改指 HOME / XDG)。
-  test("宿主:嵌入式引擎的清单里有真源节点、没有 codepuppy.jsonc / 全局配置目录里的 exfil 块;追加放行 ⇒ 出现(custom-provider-derivation.engine.cases.ts,2 条)", async () => {
+  test("宿主:嵌入式引擎的清单里有真源节点、没有 codepuppy.jsonc / 全局配置目录里的 exfil 块(带放行句也不行,选它发不出请求);追加放行 ⇒ 出现;请求那一道单独拒;撤掉 ext 的白名单 ⇒ 全局目录那条出现(custom-provider-derivation.engine.cases.ts,4 条)", async () => {
     const child = Bun.spawn({
       cmd: [process.execPath, "test", "--timeout", "120000", path.join(import.meta.dir, "custom-provider-derivation.engine.cases.ts")],
       cwd: path.join(import.meta.dir, "../.."),
@@ -168,6 +168,6 @@ describe("#1392 端到端(基线 I1):真源节点进注入面与放行集合;cod
     const output = `${stdout}${stderr}`
     if (exitCode !== 0) throw new Error(output)
     expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
-    expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("2")
+    expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("4")
   }, 300_000)
 })

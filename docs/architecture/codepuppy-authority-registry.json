@@ -947,6 +947,14 @@
         {
           "file": "packages/ui-mac/src/main/websearch-honest.engine.test.ts",
           "name": "Exa 结局诚实:出错 ⇒ 具名失败、D ⇒ 原文、零命中 ⇒ 没搜到、429 ⇒ 具名失败,两两不同;不装 ext ⇒ 塌成没搜到(websearch-honest.engine.cases.ts,7 条)"
+        },
+        {
+          "file": "packages/ui-mac/src/main/websearch-copies.test.ts",
+          "name": "网 A:注册 web search 供应商或消费 WebSearch.Service 的生产文件,恰好是分好类的那些(新增即停下来分类)"
+        },
+        {
+          "file": "packages/ui-mac/src/main/websearch-copies.test.ts",
+          "name": "网 B:写着供应商端点的生产文件,恰好是五份上游供应商、ext 的 exa 供应商与登记过的纯说明"
         }
       ]
     },

@@ -47,6 +47,14 @@
 //     的 R6 / R7 两条(合法改名都命中、不相邻不命中)判。无对应用例:「上游 sync 带进来一份自带新端点的副本 ⇒ 停下来分类」
 //     这张纵深网在 2.x 上没有对应物(新副本若起的名字认不出,ext 的名字判决关不掉它,见 `#1461`)。
 // 「主权信道名…逐字一致」一条去掉两条传输的半句,其余照常判。
+//
+// ── 2026-11-12 `#1662` parity 第 9 项:普查网在 2.x 上重建 ────────────────────────────────────────
+// 2.x 上能执行 web search 的地方都挂在同一个 `websearch` 工具后面(供应商经 `WebSearch.Service` 注册),主权判决在 ext 的
+// execute.before 按工具名下;本仓自己持有的一份是 ext 的 exa 供应商(packages/ext/src/exa-websearch.ts,顶替上游那份)。纵深网照旧
+// 只抓一件事:**新的执行面**(新注册一个供应商 / 新消费 WebSearch.Service / 新写一个供应商端点)出现时停下来分类,不让它静默上线。
+//   网 A:生产源码里注册 web search 供应商或消费 WebSearch.Service 的文件,恰好是下面分好类的那些;
+//   网 B:生产源码里写着某个供应商端点的文件,恰好是五份上游供应商、ext 的 exa 供应商与登记过的纯说明。
+// 两张网各有一条已知的坏:往真树的文件集合里多放一个这样的文件,网必须点名它。
 
 import { readFileSync } from "node:fs"
 import { join, resolve } from "node:path"
@@ -80,7 +88,69 @@ const DOCUMENTED_MENTIONS = [
 ]
 const EGRESS_PRIMITIVES = [/HttpClientRequest\./, /\bfetch\s*\(/, /\.callTool\s*\(/, /new\s+Request\s*\(/]
 
+/** 生产源码:各包 `src/` 下 git 可见的 .ts / .tsx,去掉测试、cases 与类型声明。 */
+function productionSources(): Array<{ path: string; text: string }> {
+  const listed = Bun.spawnSync(["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "packages"], { cwd: REPO_ROOT })
+  return listed.stdout
+    .toString()
+    .split("\0")
+    .filter((path) => /^packages\/[^/]+\/src\/.*\.tsx?$/.test(path) && !/\.(test|spec|cases)\.tsx?$|\.d\.ts$/.test(path))
+    .map((path) => ({ path, text: read(path) }))
+}
+const sources = productionSources()
+
+/** 网 A:注册 web search 供应商(上游 helper / 任何 `websearch.transform`)或消费 `WebSearch.Service` 的文件。 */
+const WEBSEARCH_SURFACE = [/WebSearchProvider\.register\(/, /\bwebsearch\.transform\(/, /\bWebSearch\.Service\b/]
+const surfaceOf = (files: Array<{ path: string; text: string }>) => files.filter((file) => WEBSEARCH_SURFACE.some((pattern) => pattern.test(file.text))).map((file) => file.path).sort()
+const CLASSIFIED_SURFACE: Record<string, string> = {
+  "packages/core/src/plugin/websearch/exa.ts": "上游 exa 供应商(ext 以同一个 id 顶替)",
+  "packages/core/src/plugin/websearch/firecrawl.ts": "上游供应商,需要用户自己的 key",
+  "packages/core/src/plugin/websearch/parallel.ts": "上游供应商",
+  "packages/core/src/plugin/websearch/tavily.ts": "上游供应商,需要用户自己的 key",
+  "packages/core/src/plugin/websearch/tinyfish.ts": "上游供应商",
+  "packages/core/src/plugin/websearch/provider.ts": "上游供应商的注册 helper",
+  "packages/core/src/plugin/provider/opencode.ts": "上游 OpenCode Console 的托管搜网,只在连了 Console 账户且远端配置开了它时注册",
+  "packages/core/src/tool/plugin/websearch.ts": "唯一的 `websearch` 工具(ext 的 execute.before 按这个名字下主权判决)",
+  "packages/core/src/config/plugin/websearch.ts": "用户配置的供应商选择",
+  "packages/core/src/config/plugin/policy.ts": "托管策略删供应商后重载",
+  "packages/core/src/plugin/host.ts": "插件上下文的 websearch 域(转交给服务)",
+  "packages/core/src/plugin/internal.ts": "内置插件清单:把 WebSearch.Service 交给内置插件(供应商与工具都在上面列着)",
+  "packages/plugin/src/promise/adapter.ts": "promise 插件适配层(转交给服务)",
+  "packages/server/src/handlers/websearch.ts": "HTTP 路由 `/api/websearch`(转交给服务,同一个服务、同一批供应商)",
+  "packages/ext/src/plugin.ts": "ext:默认选 exa、装 Code Puppy 的 exa 供应商(exa-websearch.ts)",
+}
+
+/** 网 B:写着某个供应商端点的文件。 */
+const ENDPOINT = /mcp\.exa\.ai|search\.parallel\.ai|api\.tavily\.com|mcp\.firecrawl\.dev|agent\.tinyfish\.ai/
+const endpointHolders = (files: Array<{ path: string; text: string }>) => files.filter((file) => ENDPOINT.test(file.text)).map((file) => file.path).sort()
+const CLASSIFIED_ENDPOINTS = [
+  "packages/core/src/plugin/websearch/exa.ts",
+  "packages/core/src/plugin/websearch/firecrawl.ts",
+  "packages/core/src/plugin/websearch/parallel.ts",
+  "packages/core/src/plugin/websearch/tavily.ts",
+  "packages/core/src/plugin/websearch/tinyfish.ts",
+  "packages/ext/src/exa-websearch.ts",
+  ...DOCUMENTED_MENTIONS,
+]
+
 describe("websearch 执行副本普查(#223 R3 · R4 起降为纵深)", () => {
+  test("网 A:注册 web search 供应商或消费 WebSearch.Service 的生产文件,恰好是分好类的那些(新增即停下来分类)", () => {
+    expect(surfaceOf(sources)).toEqual(Object.keys(CLASSIFIED_SURFACE).sort())
+  })
+
+  test("网 B:写着供应商端点的生产文件,恰好是五份上游供应商、ext 的 exa 供应商与登记过的纯说明", () => {
+    expect(endpointHolders(sources)).toEqual([...CLASSIFIED_ENDPOINTS].sort())
+  })
+
+  test("已知的坏:多一个注册供应商的文件、多一个写着端点的文件,两张网都点名它", () => {
+    const planted = { path: "packages/ext/src/planted-search.ts", text: 'await ctx.websearch.transform((editor) => editor.add({ id: "x" }))\nconst url = "https://mcp.exa.ai/mcp"' }
+    expect(surfaceOf([...sources, planted])).toContain(planted.path)
+    expect(surfaceOf([...sources, planted])).not.toEqual(Object.keys(CLASSIFIED_SURFACE).sort())
+    expect(endpointHolders([...sources, planted])).toContain(planted.path)
+    // 判官自检:真树确实扫到了文件(不是空集合对空集合)
+    expect(sources.length).toBeGreaterThan(1000)
+  })
+
   test("登记为「纯说明」的文件确实不出网(否则它就该按传输分类)", () => {
     for (const path of DOCUMENTED_MENTIONS) {
       const body = read(path)

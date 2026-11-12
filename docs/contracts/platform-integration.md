@@ -1,4 +1,6 @@
 ---
+id: CONTRACT-alpha-code-platform-integration
+summary: "Code Puppy platform integration"
 title: Code Puppy platform integration
 kind: contract
 status: active

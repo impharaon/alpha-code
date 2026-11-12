@@ -1,4 +1,6 @@
 ---
+id: CONTRACT-alpha-code-host-extension-package-v1
+summary: "HostExtensionPackageV1 artifact index"
 title: HostExtensionPackageV1 artifact index
 kind: contract
 status: active

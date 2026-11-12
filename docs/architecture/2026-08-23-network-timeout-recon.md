@@ -1,4 +1,6 @@
 ---
+id: ARCH-alpha-code-2026-08-23-network-timeout-recon
+summary: "两处网络等待形态到底会挂多久（勘破）"
 title: 两处网络等待形态到底会挂多久（勘破）
 kind: architecture
 status: active

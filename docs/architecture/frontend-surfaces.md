@@ -1,4 +1,6 @@
 ---
+id: ARCH-alpha-code-frontend-surfaces
+summary: "Frontend surface composition"
 title: Frontend surface composition
 kind: architecture
 status: active

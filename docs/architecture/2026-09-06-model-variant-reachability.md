@@ -1,3 +1,10 @@
+---
+id: ARCH-alpha-code-2026-09-06-model-variant-reachability
+title: 推理档位(`variant`)的可达面:谁能设、设错了会不会被告知
+kind: architecture
+status: active
+summary: "推理档位(`variant`)的可达面:谁能设、设错了会不会被告知"
+---
 # 推理档位(`variant`)的可达面:谁能设、设错了会不会被告知
 
 > 2026-09-06 勘破,起因 [`#1249`](https://github.com/jinjunnn/alpha-code/issues/1249)

@@ -1,3 +1,10 @@
+---
+id: ARCH-alpha-code-2026-09-23-webfetch-egress-decision-chain
+title: 一次网页抓取到底经过哪几道判定,在哪一道被拒(`#1412`)
+kind: architecture
+status: active
+summary: "一次网页抓取到底经过哪几道判定,在哪一道被拒(`#1412`)"
+---
 # 一次网页抓取到底经过哪几道判定,在哪一道被拒(`#1412`)
 
 > 勘破,不是方案。本文只回答「今天跑一次 `webfetch` 会发生什么」,并把每一格的

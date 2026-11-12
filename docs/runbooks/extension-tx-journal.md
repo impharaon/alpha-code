@@ -1,4 +1,6 @@
 ---
+id: RUNBOOK-alpha-code-extension-tx-journal
+summary: "Extension transaction journal diagnosis"
 title: Extension transaction journal diagnosis
 kind: runbook
 status: active

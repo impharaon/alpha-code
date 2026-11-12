@@ -1,3 +1,10 @@
+---
+id: ARCH-alpha-code-2026-09-03-office-layout-isolation
+title: Office 版式渲染:在既有隔离载体里跑第三方渲染库
+kind: architecture
+status: active
+summary: "Office 版式渲染:在既有隔离载体里跑第三方渲染库"
+---
 # Office 版式渲染:在既有隔离载体里跑第三方渲染库
 
 *2026-09-03 · Electron 42.3.3(Chromium 142)· 票 `#1229`*

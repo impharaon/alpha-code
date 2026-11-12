@@ -1,4 +1,6 @@
 ---
+id: CONTRACT-alpha-code-extension-cas-seed
+summary: "Extension CAS, packaged seed and GC (REQ-102 A-side)"
 title: Extension CAS, packaged seed and GC (REQ-102 A-side)
 kind: contract
 status: active

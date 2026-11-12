@@ -1,4 +1,6 @@
 ---
+id: ARCH-alpha-code-2026-09-06-external-skills-inheritance-decision
+summary: "外部技能目录(~/.claude/skills 等)维持关闭 —— 勘破与裁决"
 title: 外部技能目录(~/.claude/skills 等)维持关闭 —— 勘破与裁决
 kind: architecture
 status: active

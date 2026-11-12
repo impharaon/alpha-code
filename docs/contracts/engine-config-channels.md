@@ -1,4 +1,6 @@
 ---
+id: CONTRACT-alpha-code-engine-config-channels
+summary: "Engine config channels (v1/v2 dual-generation contract)"
 title: Engine config channels (v1/v2 dual-generation contract)
 kind: contract
 status: active

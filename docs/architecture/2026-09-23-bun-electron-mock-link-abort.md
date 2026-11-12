@@ -1,3 +1,10 @@
+---
+id: ARCH-alpha-code-2026-09-23-bun-electron-mock-link-abort
+title: 整份测试文件在链接期夭折 —— bun 的 electron mock 与「没有名字的失败」(`#1423`)
+kind: architecture
+status: active
+summary: "整份测试文件在链接期夭折 —— bun 的 electron mock 与「没有名字的失败」(`#1423`)"
+---
 # 整份测试文件在链接期夭折 —— bun 的 electron mock 与「没有名字的失败」(`#1423`)
 
 > 勘破记录。全部数字是 2026-09-23 在 `alpha@20c78a4ed` 上实跑出来的(macOS / bun 1.3.14 /

@@ -1,3 +1,10 @@
+---
+id: ARCH-alpha-code-extension-seams
+title: opencode 扩展接缝操作手册
+kind: architecture
+status: active
+summary: "opencode 扩展接缝操作手册"
+---
 # opencode 扩展接缝操作手册
 
 > 来源:10-agent cartography 工作流(已逐条核实到文件)+ 主 Claude 独立复核 `plugin/src/index.ts`、`server/src/api.ts`。

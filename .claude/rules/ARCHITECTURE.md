@@ -1,7 +1,6 @@
 # 架构约束(ARCHITECTURE)
 
 > 最后更新:2026-07-03
-> 回顾节奏:每次 `/app:retro` 时审视是否仍有效
 > 2026-06-18:产品转多用户/多租户,本文"规模/下游"已据 ADR-010/011 修订。
 > 2026-07-03(C6 去漂移):删 submodule/pinned-`7efade2` 陈述(ADR-005 fork,已 `merge dev` 追平上游);「薄定制层<5%」拆为**后端守 / 前端接管**(ADR-016)。
 > 2026-07-09(ADR-026):桌面平台扩为 **macOS + Windows**,原「本地 Mac 应用」表述据此更新;平台差异收敛纪律见 ADR-026(platform seam + 路径同构)。
@@ -56,4 +55,4 @@
 
 ## D2 架构图索引
 - `docs/architecture/diagrams/opencode-codegraph.d2` / `.svg` — opencode 27 包分层 code-graph(已生成)
-- `docs/architecture/diagrams/01-overview.d2` — alpha-code 自有架构俯瞰(`/app:design-arch` 生成,待做)
+- `docs/architecture/diagrams/01-overview.d2` — alpha-code 自有架构俯瞰(待做)

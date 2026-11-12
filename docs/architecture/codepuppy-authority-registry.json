@@ -498,6 +498,10 @@
         {
           "file": "packages/ext/src/policy/identity.test.ts",
           "name": "the display snapshot is the schema's ToolDisplaySnapshotV1: identity + technicalId + authority + location"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "a tool's self-reported codepuppyDisplay is replaced by the decision's snapshot"
         }
       ]
     },

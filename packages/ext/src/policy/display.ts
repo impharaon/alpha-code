@@ -56,7 +56,11 @@ export function wrapForDisplay(
   }
 }
 
-/** `execute.after` body: the terminal state carries the snapshot whether the call completed or failed. */
+/**
+ * `execute.after` body: the terminal state carries the snapshot whether the call completed or failed. The snapshot saved
+ * for this decision always wins over a `codepuppyDisplay` the tool reported itself (review R1 #8): only Code Puppy
+ * mints provenance (ADR-041 §5).
+ */
 export function attachTerminal(
   event:
     | { status: "completed"; result: { metadata?: Record<string, unknown> } & Record<string, unknown> }
@@ -65,11 +69,9 @@ export function attachTerminal(
 ) {
   if (!display) return
   if (event.status === "completed") {
-    if (event.result.metadata?.[DISPLAY_KEY] !== undefined) return
     event.result = { ...event.result, metadata: { ...event.result.metadata, [DISPLAY_KEY]: display } }
     return
   }
-  if (event.error.metadata?.[DISPLAY_KEY] !== undefined) return
   event.error = new ToolError({
     message: event.error.message,
     ...(event.error.error === undefined ? {} : { error: event.error.error }),

@@ -72,9 +72,14 @@ same layer (`adaptPermissionV1Receipt`); this extends that idea to OpenCode 2 re
      the conflict. By (i) this cannot happen for a live id on OpenCode 2; the check keeps the contract honest anyway.
 3. **Resolved set from replied events.** Subscribe to `GET /api/event` before sending, then
    `POST /api/session/:sessionID/permission/:requestID/reply`. The engine publishes every `permission.replied` of that
-   reply before the HTTP response returns (ii), so `resolvedRequestIDs` = the target id plus every id whose
-   `permission.replied` arrives with the same `reply` value between sending and the target's own `replied` event —
-   for `always` across sessions, for `reject` within the session.
+   reply before the HTTP response returns (ii), **target first, then each request the reply cascaded to** (measured
+   order `[target, cascade…]`, pinned by `permission-reply-premises.test.ts`). So the window does **not** close at the
+   target's own event: `resolvedRequestIDs` = the target id plus every id whose `permission.replied` carries the same
+   `reply` value and arrives after sending, until the cascade of that reply has arrived — for `always` across
+   sessions, for `reject` within the session. The L6 adapter closes the window when no request of the same session
+   that was pending before the reply is still pending (re-read of the session's pending list), waiting at most 2 s;
+   anything still unconfirmed then is left out of the receipt rather than guessed. (Corrected 2026-11-12, #1666
+   review R1 #7: the earlier text ended the window at the target's event and would have dropped every cascaded id.)
 4. **Idempotent replay.** Keep `decisionID → receipt` for the life of the window. A repeated decision with the same
    `decisionID` returns the cached receipt without calling the engine; a different `decisionID` for an id that
    already has a receipt is a conflict. No persistence (iv): after a restart there is nothing left to decide (iii).
@@ -84,4 +89,4 @@ same layer (`adaptPermissionV1Receipt`); this extends that idea to OpenCode 2 re
 Pins that keep the derivation honest: `packages/ext/src/policy/permission-reply-premises.test.ts` (engine
 premises, owned by L4). L6 owns the adapter and its tests: the four rules above, each with a known-bad arm (no
 re-read ⇒ a stale decision is sent; no event window ⇒ a cascaded card stays open; no cache ⇒ a retried decision
-reaches the engine as a second reply and gets NotFound).
+reaches the engine as a second reply and gets NotFound; a window that stops at the target's event ⇒ the cascaded ids are missing from the receipt).

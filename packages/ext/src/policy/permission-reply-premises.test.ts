@@ -123,6 +123,31 @@ describe("OpenCode 2 permission reply premises (adr033 receipt derivation)", () 
     }),
   )
 
+  // Review R1 #7: the receipt window (docs/architecture/2026-11-09-1662-permission-reply-measurements.md rule 3) depends on
+  // the order of one reply's replied events. Measured: the target first, then the cascade — so a window that stops at
+  // the target's own event holds only the target, and the receipt must keep collecting until the cascade has arrived.
+  for (const reply of ["always", "reject"] as const)
+    it.live(`(ii) one ${reply} reply publishes the target's replied event first, then the cascaded ones`, () =>
+      Effect.gen(function* () {
+        const { permission, a, b, replied } = yield* engine(ASK_EDIT)
+        const ask = (sessionID: string, action: string, resource: string) =>
+          Effect.forkChild(permission.assert({ sessionID, agent: "build", action, resources: [resource], save: ["src/*"], metadata: {} }))
+        const fibers = [yield* ask(a, "edit", "src/target.ts")]
+        yield* awaitPending(1)
+        // always cascades to the same pattern in any session; reject to every pending request of the same session.
+        fibers.push(reply === "always" ? yield* ask(b, "edit", "src/cascade.ts") : yield* ask(a, "shell", "ls"))
+        const list = yield* awaitPending(2)
+        const target = list.find((request: any) => request.resources[0] === "src/target.ts")!
+        const cascade = list.find((request: any) => request.id !== target.id)!
+        yield* permission.reply({ requestID: target.id, reply })
+        for (const fiber of fibers) yield* Fiber.await(fiber)
+        const events = replied.filter((event) => event.reply === reply).map((event) => event.requestID)
+        expect(events).toEqual([target.id, cascade.id])
+        // The earlier spec text's window (sending → the target's own event) would have dropped the cascade.
+        expect(events.slice(0, events.indexOf(target.id) + 1)).toEqual([target.id])
+      }),
+    )
+
   it.live("(iii) a second reply to the same id is NotFound: the engine keeps no reply history", () =>
     Effect.gen(function* () {
       const { permission, a } = yield* engine(ASK_EDIT)

@@ -698,6 +698,10 @@
         {
           "file": "packages/ext/src/policy/permission-reply-premises.test.ts",
           "name": "(iii) a second reply to the same id is NotFound: the engine keeps no reply history"
+        },
+        {
+          "file": "packages/ext/src/policy/permission-reply-premises.test.ts",
+          "name": "publishes the target's replied event first, then the cascaded ones"
         }
       ]
     },

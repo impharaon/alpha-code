@@ -31,7 +31,7 @@ Code Puppy 桌面端的报错弹出提示现在永不自动消失、不合并、
 - 用户路径:见核心路径。
 - 交互与状态:弹出提示(出现 / 悬停暂停 / 自动消失 / 恢复即清);状态入口在侧栏底部、账户按钮上方(与「更新已就绪」同位置),无问题时不显示,有未恢复问题时显示「N 个问题未恢复」,点开向上弹出列表,每条有原因和可做的操作;侧栏收起时由「显示侧边栏」按钮上的小点提示。
 - 文案:沿用现有报错文案;入口与列表的新文案以设计稿为准。
-- 设计稿:`docs/design/2026-11-12-error-message-lifetime/frame.html` @ 05ece10e8d(锚点 `#toast-lifetime`、`#problems`、`#problems-recovered`、`#problems-collapsed`、`#startup`、`#rules`),owner 2026-11-12 批准;并入活稿后以 `docs/design/current/shell-sidebar/design.html` 的 `#problems`、`#toast-lifetime` 为准。
+- 设计稿:`docs/design/current/shell-sidebar/design.html` @ 089669ea00(锚点 `#problems`、`#toast-lifetime`),owner 2026-11-12 批准;增量稿 `docs/design/2026-11-12-error-message-lifetime/frame.html` @ 244a7c26ec。
 
 ## 业务规则
 - **BR-01 恢复即清**:由后台状态引起的提示(工具服务连接、模型目录同步、扩展警告、云端运行保存等),对应状态恢复后立即自动消失,不需要用户点 × —— I-02、I-04、P-01。

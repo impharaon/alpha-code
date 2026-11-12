@@ -4,6 +4,9 @@
 // (`packages/opencode/src/tool/webfetch.ts` 与 `packages/core/src/tool/webfetch.ts`),
 // 而 `websearch` 有 `./websearch-copies.test.ts` 钉着集合、`webfetch` **一份检查都没有**。
 // 后果很具体:`#1414` 的选路点接了其中一份就以为接完了,**不会有任何东西变红**。
+// `#1662`(OpenCode 2):两份 v1 副本随换代删除,2.x 只剩上游内置的一份 `packages/core/src/tool/plugin/webfetch.ts`
+// (`export const name = "webfetch"`,经插件 Context 的 `tool.transform` → `editor.add` 注册)。2.x 的另一种注册写法 ——
+// 在 `editor.add({ name: "webfetch", … })` 里内联字面量 —— 加成网 ④,于是 ext / 项目插件 / 上游 sync 带进第二份时照样红。
 //
 // 为什么是**复制**而不是抽一个通用框架(窄票不升级成框架,本仓明令):两个工具的被守面不同。
 // `websearch` 还有主权闸(`CODEPUPPY_LOCAL_WEBSEARCH_DENY`)与**固定端点**(Exa/Parallel),所以那份文件
@@ -83,17 +86,17 @@ const registrationNets = (tool: string) => [
   new RegExp(`Tool\\.define[^(\\n]*\\(\\s*["'\`]${tool}["'\`]`),
   new RegExp(`export const name\\s*=\\s*["'\`]${tool}["'\`]`),
   new RegExp(`(^|[\\s{,])${tool}\\s*:\\s*(tool|Tool\\.make)\\(`, "m"),
+  // 网 ④(2.x 插件 Context):`editor.add({ … name: "<tool>" … })` 内联字面量。锚在 `.add({` 上:界面层的
+  // `name: "webfetch"`(工具卡渲染表)不是注册。
+  new RegExp(`\\.add\\(\\s*\\{[^}]*?\\bname\\s*:\\s*["'\`]${tool}["'\`]`),
 ]
 
 const NETS = registrationNets("webfetch")
 const registrations = FILES.filter((file) => NETS.some((net) => net.test(file.body)))
 
 describe("webfetch 执行副本普查(#1424)", () => {
-  test("全仓注册为 webfetch 的工具恰好是这两份", () => {
-    expect(registrations.map((file) => file.path).sort()).toEqual([
-      "packages/core/src/tool/webfetch.ts",
-      "packages/opencode/src/tool/webfetch.ts",
-    ])
+  test("全仓注册为 webfetch 的工具恰好是这一份(2.x 上游内置)", () => {
+    expect(registrations.map((file) => file.path).sort()).toEqual(["packages/core/src/tool/plugin/webfetch.ts"])
   })
 
   test("谓词自检:三张网各自测得出已知的坏,负针零命中,枚举没有退化", () => {
@@ -105,6 +108,7 @@ describe("webfetch 执行副本普查(#1424)", () => {
       'export const name = "webfetch"',
       "  webfetch: tool({ description: 'x' }),",
       "  webfetch: Tool.make({}),",
+      'editor.add({\n  name: "webfetch",\n  description,',
     ]
     for (const sample of samples) expect([sample, NETS.some((net) => net.test(sample))]).toEqual([sample, true])
     // 反例:名字只是**被提到**(权限档、风险分级、i18n 文案)不是注册。
@@ -112,6 +116,7 @@ describe("webfetch 执行副本普查(#1424)", () => {
       '  const risk = TOOL_RISK["webfetch"]',
       '  permission: "webfetch",',
       '  "tool.webfetch.title": "读取网页",',
+      'export const WebFetchRenderer = defineRenderer({\n  name: "webfetch",',
     ])
       expect([sample, NETS.some((net) => net.test(sample))]).toEqual([sample, false])
     // 负针:同一套网换一个**不存在**的工具名必须扫出空集 —— 否则网太松,上面的集合断言也不可信。
@@ -121,6 +126,6 @@ describe("webfetch 执行副本普查(#1424)", () => {
     // `packages/ext` 里的第三份副本就隐身了。所以要同时钉住规模与必须被走到的包。
     expect(FILES.length).toBeGreaterThanOrEqual(2400)
     const walked = new Set(FILES.map((file) => file.path.split("/")[1]!))
-    for (const pkg of ["core", "opencode", "ext", "ui-mac", "plugin"]) expect([pkg, walked.has(pkg)]).toEqual([pkg, true])
+    for (const pkg of ["core", "ext", "ui-mac", "plugin", "server"]) expect([pkg, walked.has(pkg)]).toEqual([pkg, true])
   })
 })

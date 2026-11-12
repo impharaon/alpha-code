@@ -17,7 +17,7 @@ last_reviewed: 2026-11-12
 
 ## 来源
 
-- [impharaon/alpha-work:INT-downloads](https://github.com/impharaon/alpha-work/blob/a4b8beeac0196f02780a8c26364529b07e313acb/docs/intents/INT-downloads.md#意图点)。
+- [impharaon/alpha-work:INT-downloads](https://github.com/impharaon/alpha-work/blob/de325762131253b18e9b65227e366f60a2f39ebe/docs/intents/INT-downloads.md#意图点)。
 - [历史需求 alpha-code#1207](https://github.com/impharaon/alpha-code/issues/1207) · [Epic alpha-work#144](https://github.com/impharaon/alpha-work/issues/144)。
 
 - [批准/事实依据](https://github.com/impharaon/alpha-code/pull/1209)。

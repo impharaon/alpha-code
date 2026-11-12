@@ -17,12 +17,14 @@ last_reviewed: 2026-11-12
 
 ## 来源
 
-- [impharaon/alpha-work:INT-artifacts](https://github.com/impharaon/alpha-work/blob/a4b8beeac0196f02780a8c26364529b07e313acb/docs/intents/INT-artifacts.md#意图点)。
+- [impharaon/alpha-work:INT-artifacts](https://github.com/impharaon/alpha-work/blob/de325762131253b18e9b65227e366f60a2f39ebe/docs/intents/INT-artifacts.md#意图点)。
 - [历史需求 alpha-code#1163](https://github.com/impharaon/alpha-code/issues/1163) · [Epic alpha-work#148](https://github.com/impharaon/alpha-work/issues/148)。
 - [范围与交付证据](https://github.com/impharaon/alpha-code/pull/1168)。
 
 - [批准/事实依据](https://github.com/impharaon/alpha-code/pull/1168)。
 - 交付入口：[alpha-code#1163](https://github.com/impharaon/alpha-code/issues/1163)；实现与验收状态由这些票及其原生子票持有。
+
+- 实施/证据承接：[alpha-code#1683](https://github.com/impharaon/alpha-code/issues/1683)。
 
 ## 用户与范围
 
@@ -56,6 +58,8 @@ last_reviewed: 2026-11-12
 证据与适用边界：PR #1168 已合入生产供数链、投影、组件清空与变异证明。PR 明确把 AC-01 运行期截图和 AC-03 files 整链留给 VERIFY；原查看器 #1162 已按 not planned 关闭，不将其当成未完成的硬阻塞。补核现有查看器分流与真实文件卡。
 
 ## 待决
+
+- 实施/证据承接：[alpha-code#1683](https://github.com/impharaon/alpha-code/issues/1683)。
 
 发布件 AC-01/03 证据由独立验收承接，AC-02/04 复用 PR #1168；证据齐备后才按历史补录规则批准，不新增产品范围。
 

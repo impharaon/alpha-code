@@ -18,7 +18,7 @@ last_reviewed: 2026-11-12
 
 ## 来源
 
-- [impharaon/alpha-work:INT-desktop/I-12](https://github.com/impharaon/alpha-work/blob/a4b8beeac0196f02780a8c26364529b07e313acb/docs/intents/INT-desktop.md#意图点)。
+- [impharaon/alpha-work:INT-desktop/I-12](https://github.com/impharaon/alpha-work/blob/de325762131253b18e9b65227e366f60a2f39ebe/docs/intents/INT-desktop.md#意图点)。
 - [原票](https://github.com/impharaon/alpha-code/issues/237)；原 AC 编号不变。
 
 - [批准/事实依据](https://github.com/impharaon/alpha-code/issues/237)。
@@ -32,12 +32,14 @@ last_reviewed: 2026-11-12
 
 ## 业务规则
 
-原票只有结果方向，尚无可确认的业务规则。
+- **BR-01（草案）** 报告问题时使用实际运行构建的身份，不从当前源码检出或未来发布版本推断。依据：原票描述的旧包与修复误判问题；尚未作为批准基线。
 
 ## 验收
 
 | ID | Given / When / Then（原票条文） | 依据 |
 | --- | --- | --- |
+| AC-01 | 草案：用户从正在运行的桌面端复制诊断身份，复制结果包含原票所需的实际版本、渠道及开发/正式包标识；具体字段权威与空缺情况在批准前确定。 | [原结果方向](https://github.com/impharaon/alpha-code/issues/237)；本轮形式化草案，未声称历史已批准。 |
+| AC-02 | 草案：在同一身份入口，用户可直接区分开发包与正式包；显示必须与被测构建身份一致，不能使用源码检出版本替代。 | [原题名与问题](https://github.com/impharaon/alpha-code/issues/237)；尚待基线确认。 |
 
 原票未定义 AC；待 owner 确定构建信息范围后形成基线，不用标题编造条款。
 

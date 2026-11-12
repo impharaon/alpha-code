@@ -17,7 +17,7 @@ last_reviewed: 2026-11-12
 
 ## 来源
 
-- [意图与处置 impharaon/alpha-work:INT-safety/I-08](https://github.com/impharaon/alpha-work/blob/a4b8beeac0196f02780a8c26364529b07e313acb/docs/intents/INT-safety.md#意图点)。
+- [意图与处置 impharaon/alpha-work:INT-safety/I-08](https://github.com/impharaon/alpha-work/blob/de325762131253b18e9b65227e366f60a2f39ebe/docs/intents/INT-safety.md#意图点)。
 - 历史身份：[impharaon/alpha-code#1514](https://github.com/impharaon/alpha-code/issues/1514)；原题名与编号保留，当前交付状态以 GitHub 为准。
 - Epic：[能力分组](https://github.com/impharaon/alpha-work/issues/138)。
 
@@ -41,8 +41,9 @@ last_reviewed: 2026-11-12
 
 | ID | Given / When / Then（历史原文） | 依据 |
 | --- | --- | --- |
+| AC-01 | 草案：对首批范围内的真实远程数据库样本，用户明确允许目标连接后，数据库连接器可以完成原票提出的查询；未允许的目标继续被现有围栏拒绝，不放松其他扩展的出网边界。首批数据库、驱动、目标授权和凭据处理需先确定。 | [原票明确目标](https://github.com/impharaon/alpha-code/issues/1514)；本轮形式化草案，未决定 PostgreSQL/MySQL 的交付清单。 |
 
-原票没有已批准 AC，待确定后只在这里形成基线；不能以标题推造验收条件。
+原票未留下批准 AC；以上只把其「用户明确允许且不放松围栏」方向形式化为待审条款。尚未选定连接协议或凭据方案。
 
 证据与适用边界：本机 SQLite 已有，远程数据库驱动被出网围栏拒绝；这是待定义能力，不是已实现的远程接入。
 

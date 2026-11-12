@@ -17,7 +17,7 @@ last_reviewed: 2026-11-12
 
 ## 来源
 
-- [意图与处置 impharaon/alpha-work:INT-safety/I-07](https://github.com/impharaon/alpha-work/blob/a4b8beeac0196f02780a8c26364529b07e313acb/docs/intents/INT-safety.md#意图点)。
+- [意图与处置 impharaon/alpha-work:INT-safety/I-07](https://github.com/impharaon/alpha-work/blob/de325762131253b18e9b65227e366f60a2f39ebe/docs/intents/INT-safety.md#意图点)。
 - 历史身份：[impharaon/alpha-code#1314](https://github.com/impharaon/alpha-code/issues/1314)；原题名与编号保留，当前交付状态以 GitHub 为准。
 - Epic：[能力分组](https://github.com/impharaon/alpha-work/issues/142)。
 - [有效范围或验收依据 2026-09-17](https://github.com/impharaon/alpha-code/issues/1314#issuecomment-5707980476)。

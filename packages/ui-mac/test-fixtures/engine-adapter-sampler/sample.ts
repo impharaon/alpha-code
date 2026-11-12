@@ -391,12 +391,13 @@ try {
       await call("POST", `/api/session/${sessionID}/prompt`, { text })
       await idle(sessionID)
       if (name === "background") await Bun.sleep(1_500)
-      sessions[name] = { sessionID, records: recordsOf(sessionID), final: await finalOf(sessionID) }
+      // 逐帧记录只留前台 subagent 的(运行中的子会话 id 只在帧里);其余工具只用完成后的消息。
+      sessions[name] = { sessionID, ...(name === "delegate" ? { records: recordsOf(sessionID) } : {}), final: await finalOf(sessionID) }
     }
     autoAllow = false
     write("tools.json", {
       _source: source(
-        "One session per tool the frozen tool cards read: foreground subagent, background subagent, edit a.txt, shell `echo hi`, patch (session switched to the mock `gpt-5-mock` model, the only kind 2.x gives the patch tool). Each entry: records (frames with the message page read after each) and `final` (order=asc after idle). Permission asks were answered once.",
+        "One session per tool the frozen tool cards read: foreground subagent, background subagent, edit a.txt, shell `echo hi`, patch (session switched to the mock `gpt-5-mock` model, the only kind 2.x gives the patch tool). Each entry has `final` (order=asc after idle); the foreground subagent also has records (frames with the message page read after each). Permission asks were answered once.",
       ),
       directory: project,
       sessions,

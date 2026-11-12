@@ -32,7 +32,7 @@ await build({
   configFile: false,
   logLevel: "silent",
   plugins: [appPlugin.at(-1)!],
-  resolve: { alias: { "@": join(import.meta.dir, "../../../../app/src") } },
+  resolve: { alias: { "@": join(import.meta.dir, "../../../../codepuppy-app/src") } },
   worker: { format: "es" },
   build: {
     emptyOutDir: true,
@@ -168,7 +168,7 @@ function click(selector: string) {
 describe("Alpha Settings real Solid render", () => {
   test("shares saved authority with the production context and rebases later context setters", async () => {
     // `#1356`:夹具必须给出**旧界面下线迁移已落盘**的权威,否则本用例测的不是它声称的东西。
-    // 上游 `packages/app/src/context/settings.tsx` 有 `oldInterfaceSunset = new Date(2026, 8, 14)`
+    // 上游 `packages/codepuppy-app/src/context/settings.tsx` 有 `oldInterfaceSunset = new Date(2026, 8, 14)`
     // 与一条 `if (!ready() || !oldInterfaceRetired()) return; … setGeneral("newLayoutDesigns", true)`
     // 的 effect(随 `107e47377` 于 2026-07-21 进入本仓,上游 `265a93927` / `4a181c357`)。
     // 到点之后,SettingsProvider **挂载时**就会经同一个 coordinator 做一次性迁移写,把 revision 顶走,

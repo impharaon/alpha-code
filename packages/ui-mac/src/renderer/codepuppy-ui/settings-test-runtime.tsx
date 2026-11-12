@@ -1,9 +1,9 @@
-import { PlatformProvider, type Platform } from "../../../../app/src/context/platform"
+import { PlatformProvider, type Platform } from "../../../../codepuppy-app/src/context/platform"
 import {
   SettingsProvider,
   type SettingsAuthorityCoordinator,
   useSettings,
-} from "../../../../app/src/context/settings"
+} from "../../../../codepuppy-app/src/context/settings"
 import { createComponent, createSignal } from "solid-js"
 import type { SettingsSurfaceApi } from "./settings-authority-client"
 import { CodePuppySettings } from "./settings"
@@ -12,7 +12,7 @@ export { createComponent, createSignal } from "solid-js"
 export { render } from "solid-js/web"
 export { CodePuppySettings } from "./settings"
 // #1593:判据用上游真正解析按键的那份代码与默认面板键位(只读),以及壳级注册的同一份默认值。
-export { DEFAULT_PALETTE_KEYBIND, parseKeybind } from "../../../../app/src/context/command"
+export { DEFAULT_PALETTE_KEYBIND, parseKeybind } from "../../../../codepuppy-app/src/context/command"
 export { SHELL_KEYBINDS } from "../sidebar/shell-keybinds"
 
 function SettingsContextProbe() {

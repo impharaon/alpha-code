@@ -1,7 +1,7 @@
 // #668 顺带处置 —— alpha 设置项 `permissions.autoApprove` 不再是死开关。
 //
 // 它此前全仓无消费者:只有类型定义、settings UI 绑定、main 侧透传三处引用,**切了不改变任何
-// 行为**。而真正活着的自动应答器(`packages/app/src/context/permission.tsx`)照旧会在
+// 行为**。而真正活着的自动应答器(`packages/codepuppy-app/src/context/permission.tsx`)照旧会在
 // `permission.asked` 上以 `"once"` 自动批准,且 alpha 已经删掉 v1 审批呈现面 ⇒ 那是零 UI 放行。
 // 一个名叫"自动批准权限"、默认关闭、却什么都没关的开关,比没有这个开关更坏。
 //
@@ -24,7 +24,7 @@ import {
   directoryAcceptKey,
   isDirectoryAutoAccepting,
   sessionAutoAccept,
-} from "../../../../app/src/context/permission-auto-respond"
+} from "../../../../codepuppy-app/src/context/permission-auto-respond"
 import { describe, expect, test } from "bun:test"
 
 const OFF = { autoApprove: false }

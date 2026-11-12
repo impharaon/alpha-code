@@ -510,7 +510,9 @@ describe("#1570 过渡期结束:旧前缀、旧 marker、旧包目录不再被�
 
     const restored = runGuard(
       work,
-      mutatedGuard("legacy-package", (src) => src.replace(' codepuppy-contracts-consumer"', ' codepuppy-contracts-consumer alpha-contracts-consumer"')),
+      mutatedGuard("legacy-package", (src) =>
+        src.replace(/^(CODEPUPPY_OWNED_PACKAGES="[^"]*)"/m, '$1 alpha-contracts-consumer"'),
+      ),
     )
     expect(restored.exitCode, `写回旧目录名之后仍是红:\n${restored.output}`).toBe(0)
   })
@@ -575,45 +577,56 @@ describe("#913 fetch 失败降级时,基准的身份与年龄必须可读", () =
 // 缺陷(2026-09-06 实测):`UPSTREAM_PATHS` 原本是
 // `packages/{opencode,core,server,tui,sdk,protocol,schema,client}` —— **8 个包**,而上游镜像
 // `origin/dev` 当天有 **32** 个(`git ls-tree --name-only origin/dev packages/ | wc -l`)。
-// 24 个包在辖区外,其中 `app`/`ui` 由 ADR-034 的 pin+补丁 roundtrip 门盖住,其余 **22 个零机制**:
+// 24 个包在辖区外,其中 `app`/`ui` 当时由 ADR-034 的 pin+补丁 roundtrip 门盖住,其余 **22 个零机制**:
 // 往 `packages/plugin/src/index.ts`(**Hooks 契约本体**)与 `packages/llm/src/index.ts` 各写一行,
 // 守卫报 `✓ zero upstream package edits` 且 `exit 0`。这不是少拦一个坏输入 —— 是这道门(alpha
 // 分支保护上的必需 context)对一大半地盘根本没在看,而下一次 fork-sync 照样冲突。
 //
 // 根因是**数据模型**,不是某一行写错:辖区是一张枚举,枚举对**新成员默认放行** —— 上游每加
 // 一个包就多一个盲区,而没有任何东西会变红。ADR-043(`#1079` owner CHOICE=2)在**文件**这一层
-// 已经因为同一条理由否掉过逐文件 exclude 清单。所以辖区改成「`packages/` 全树 − 两张显式
+// 已经因为同一条理由否掉过逐文件 exclude 清单。所以辖区改成「`packages/` 全树 − 显式
 // carve-out」:例外默认拒,新成员默认覆盖。
 //
 // 判据为什么长这样:
 //   · **每条正向断言都带控制组** —— 把生产脚本复制一份、只把被测的那一格改回缺陷态(辖区换回
-//     8 包 / 抹掉 alpha 自有包 carve-out / 抹掉 roundtrip carve-out),先证明这个夹具**测得出
+//     8 包 / 抹掉 alpha 自有包 carve-out / 放回 `#1668` 撤掉的 roundtrip carve-out),先证明这个夹具**测得出
 //     已知的坏**,再用它判未知的好。没有控制组的「它红了」可能只是夹具在别处红。
 //   · 夹具的上游镜像里放一个守卫**从没听说过**的包(`brand-new-upstream-pkg`)。它钉的正是
 //     「上游明天加一个包,谁会变红」—— 枚举式辖区对它默认放行。
-//   · **carve-out 也要有反向判据**。`app`/`ui` 不被本门点名是**有意**的(ADR-034:那两个包是
-//     `frontend/frontend-pin.lock` 的 pin + `frontend/codepuppy-patches/codepuppy-frontend.patch` 的投影,
-//     由 `scripts/assert-frontend-patch-roundtrip.sh` 用 **tree sha 逐字节**判,比本门更强;
-//     本门若也盖它们,每一次合法的 seam 变更都会被判成破北极星 ⇒ 恒红门 ⇒ `--no-verify`)。
-//     没有控制组的话,一个「辖区根本没生效」的实现也能满足「app/ui 不被点名」。
-//     两处清单相同由 packages/ui-mac/src/main/local-gate-parity.test.ts 判(空档即红)。
+//   · **`#1668`:`app`/`ui` 回到辖区**。冻结前端(pin + SOT 补丁)搬到 Code Puppy 自有落点
+//     `packages/codepuppy-{app,ui}` 之后,`packages/{app,ui}` 是上游 2.x 原样、Code Puppy 不用,原来的
+//     roundtrip carve-out(②)撤掉,改它们就是改上游。落点整包豁免(在自有清单里),落点的投影判据由
+//     `scripts/assert-frontend-patch-roundtrip.sh` 用 **tree sha 逐字节**判;落点都在自有清单里由
+//     packages/ui-mac/src/main/local-gate-parity.test.ts 判(空档即红)。
 //   · **把一个真上游包写进 alpha 自有清单**是绕开整道门最便宜的一步:一行配置换一整个包的
 //     豁免,而上面每一条断言照样绿。所以守卫自己拿上游镜像验那张清单,这里钉住它真的会红。
 
-/** ADR-034 pin+补丁 roundtrip 覆盖的前端包 —— 本门刻意不盖(理由见上)。 */
-const ROUNDTRIP_PACKAGES = ["app", "ui"]
-/** alpha 自有的 workspace 包 —— `origin/dev` 里根本没有这三条路径(2026-09-06 实测)。 */
-const CODEPUPPY_OWNED_PACKAGES = ["ext", "ui-mac", "codepuppy-contracts-consumer"]
+/** `#1668` 之前由 roundtrip carve-out(②)豁免、现已回到辖区的上游前端包。 */
+const FORMER_ROUNDTRIP_PACKAGES = ["app", "ui"]
+/**
+ * alpha 自有的 workspace 包 —— `origin/dev` 里根本没有这些路径(2026-09-06 实测前三个;
+ * `#1668` 加冻结前端的五个落点)。
+ */
+const CODEPUPPY_OWNED_PACKAGES = [
+  "ext",
+  "ui-mac",
+  "codepuppy-contracts-consumer",
+  "codepuppy-app",
+  "codepuppy-ui",
+  "codepuppy-session-ui",
+  "codepuppy-sdk-v1",
+  "codepuppy-core-util",
+]
 /** `#1247` 之前的辖区,控制组用 —— 逐字来自被本票替换掉的那一行。 */
 const PRE_1247_JURISDICTION =
   "packages/opencode packages/core packages/server packages/tui packages/sdk packages/protocol packages/schema packages/client"
 /**
  * 夹具里上游镜像 `dev` 拥有的包:`core` 是 `#1247` 之前就在辖区里的对照,中间五个是实测盲区
  * (`plugin` = Hooks 契约本体),`brand-new-upstream-pkg` 是「上游明天新加的那个包」,
- * 最后两个是 ADR-034 的 carve-out。
+ * 最后两个是 `#1668` 撤掉 carve-out 之后回到辖区的上游前端包。
  */
 const BLIND_SPOT_PACKAGES = ["plugin", "llm", "desktop", "session-ui", "web", "brand-new-upstream-pkg"]
-const MIRROR_PACKAGES = ["core", ...BLIND_SPOT_PACKAGES, ...ROUNDTRIP_PACKAGES]
+const MIRROR_PACKAGES = ["core", ...BLIND_SPOT_PACKAGES, ...FORMER_ROUNDTRIP_PACKAGES]
 
 const leafOf = (pkg: string) => `packages/${pkg}/src/leaf.ts`
 
@@ -676,7 +689,6 @@ describe("#1247 辖区覆盖上游镜像里的每一个包", () => {
     const run = runGuard(work)
     expect(run.exitCode, `改了每一个上游包,守卫却放行:\n${run.output}`).not.toBe(0)
     for (const pkg of MIRROR_PACKAGES) {
-      if (ROUNDTRIP_PACKAGES.includes(pkg)) continue
       expect(run.output, `packages/${pkg} 仍在辖区外 —— 改它没有任何东西变红:\n${run.output}`).toContain(leafOf(pkg))
     }
   })
@@ -706,7 +718,11 @@ describe("#1247 辖区覆盖上游镜像里的每一个包", () => {
     // ADR-043 的逐文件谓词接不住 —— 所以「整包豁免」这一层不是冗余。
     const without = runGuard(
       work,
-      mutatedGuard("no-codepuppy-pkgs", (s) => s.replace(/^CODEPUPPY_OWNED_PACKAGES="[^"]*"$/m, 'CODEPUPPY_OWNED_PACKAGES=""')),
+      // 换成一个不存在的包名而不是清空:清空后 pathspec 数组为空,bash 3.2 的 `set -u` 会在展开处
+      // 直接崩(那是控制组自己坏了,不是「carve-out 没了」)。
+      mutatedGuard("no-codepuppy-pkgs", (s) =>
+        s.replace(/^CODEPUPPY_OWNED_PACKAGES="[^"]*"$/m, 'CODEPUPPY_OWNED_PACKAGES="no-such-package"'),
+      ),
     )
     expect(without.exitCode, `抹掉 carve-out 之后还是绿 —— 上面那条绿不是 carve-out 挣来的:\n${without.output}`).not.toBe(0)
     for (const pkg of CODEPUPPY_OWNED_PACKAGES) {
@@ -714,26 +730,27 @@ describe("#1247 辖区覆盖上游镜像里的每一个包", () => {
     }
   })
 
-  test("ADR-034 roundtrip 包不由本门覆盖 ⇒ 绿(控制组:抹掉 carve-out 即红且点名)", () => {
+  test("#1668:roundtrip carve-out 已撤 —— 改上游 packages/{app,ui} ⇒ 红且点名(控制组:放回 carve-out 即绿)", () => {
     const { work } = allPackagesFixture()
     const edits: Record<string, string> = {}
-    for (const pkg of ROUNDTRIP_PACKAGES) edits[leafOf(pkg)] = "export const leaf = 3\n"
-    commit(work, "change the frontend seam (ADR-034 pin + patch governs those two packages)", edits)
+    for (const pkg of FORMER_ROUNDTRIP_PACKAGES) edits[leafOf(pkg)] = "export const leaf = 3\n"
+    commit(work, "edit the upstream frontend packages in place", edits)
 
     const run = runGuard(work)
-    expect(run.exitCode, `合法的 seam 变更被本门判红 —— ADR-034 的日常工作流会恒红:\n${run.output}`).toBe(0)
-    for (const pkg of ROUNDTRIP_PACKAGES) {
-      expect(run.output, `carve-out 的包不该出现在本门的输出里:\n${run.output}`).not.toContain(leafOf(pkg))
+    expect(run.exitCode, `改上游 packages/{app,ui} 被放行 —— 撤掉 carve-out 没生效:\n${run.output}`).not.toBe(0)
+    for (const pkg of FORMER_ROUNDTRIP_PACKAGES) {
+      expect(run.output, `packages/${pkg} 仍在辖区外:\n${run.output}`).toContain(leafOf(pkg))
     }
 
-    const without = runGuard(
+    // 控制组:把 `#1668` 之前的 carve-out ②(`app ui` 进 pathspec 排除)放回去,同一棵树必须绿 ——
+    // 证明上面那条红是撤掉 carve-out 挣来的,不是夹具在别处红。
+    const restored = runGuard(
       work,
-      mutatedGuard("no-roundtrip", (s) => s.replace(/^ROUNDTRIP_PACKAGES="[^"]*"$/m, 'ROUNDTRIP_PACKAGES=""')),
+      mutatedGuard("restore-roundtrip", (s) =>
+        s.replace("for pkg in $CODEPUPPY_OWNED_PACKAGES; do\n  CARVEOUT_PATHSPECS", "for pkg in $CODEPUPPY_OWNED_PACKAGES app ui; do\n  CARVEOUT_PATHSPECS"),
+      ),
     )
-    expect(without.exitCode, `抹掉 carve-out 之后还是绿 —— 那上面那条绿说明的是「辖区没生效」:\n${without.output}`).not.toBe(0)
-    for (const pkg of ROUNDTRIP_PACKAGES) {
-      expect(without.output, `控制组没点名 packages/${pkg}:\n${without.output}`).toContain(leafOf(pkg))
-    }
+    expect(restored.exitCode, `放回 carve-out 之后仍是红 —— 夹具在别处红,本条测量作废:\n${restored.output}`).toBe(0)
   })
 
   test("把真上游包写进 alpha 自有清单 ⇒ 守卫自己红并点名那条声明,不是发一整个包的豁免", () => {

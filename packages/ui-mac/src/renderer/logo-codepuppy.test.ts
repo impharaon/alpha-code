@@ -13,7 +13,7 @@ import { UPSTREAM_LOGO_ALIAS } from "../../scripts/upstream-logo-alias"
 
 const HERE = import.meta.dir
 const CODEPUPPY_LOGO = path.join(HERE, "logo-codepuppy.tsx")
-const UPSTREAM_LOGO = path.resolve(HERE, "../../../ui/src/components/logo.tsx")
+const UPSTREAM_LOGO = path.resolve(HERE, "../../../codepuppy-ui/src/components/logo.tsx")
 const CONFIG = path.resolve(HERE, "../../electron.vite.config.ts")
 const BRAND_MARK = path.join(HERE, "brand", "brand-mark.png")
 

@@ -1,0 +1,3 @@
+[test]
+root = "./src"
+preload = ["../ui/test/solid-jsx.ts", "./happydom.ts"]

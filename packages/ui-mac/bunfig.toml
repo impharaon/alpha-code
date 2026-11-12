@@ -1,3 +1,13 @@
+# Bun 1.4.4: tsconfig `"jsx": "preserve"` + `jsxImportSource: "solid-js"` now compiles to the automatic
+# runtime (`jsxDEV` from solid-js/jsx-dev-runtime), and solid-js exports no runtime there -> every test that
+# merely imports a .tsx module dies at link time. Bun 1.3.x compiled the same tsconfig to classic
+# `React.createElement`, which links fine and is never executed in-process. This restores that.
+# Not upstream's `../ui/test/solid-jsx.ts` preload: a preload onLoad plugin outranks the babel-preset-solid
+# plugin the test-component/*.cases.ts subprocesses register, so it would replace the production compiler
+# there (measured: catalog-failure-banner / attachment-cards go red). Real rendering stays with those cases.
+# Top-level on purpose: under [test] Bun ignores it (measured).
+jsx = "react"
+
 [test]
 # Pin the UI locale to zh before any test file evaluates. The real-Solid-render suites
 # (PermissionDialog / Recovery / settings) and the model-picker cases assert zh product

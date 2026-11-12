@@ -64,6 +64,7 @@ import { CODEPUPPY_THEME, CODEPUPPY_THEME_ID } from "./theme-codepuppy"
 import { composeRoutes } from "./route-composition"
 import { installShellBootTimeline } from "./codepuppy-ui/shell-boot-timeline"
 import { markStartupTimeline } from "./startup-timeline"
+import { engineFetch, registerEngineOrigin } from "../engine-adapter"
 
 // Every route composes exactly one Code Puppy surface. There is no second release state and no
 // runtime switch: a fatal render goes to Code Puppy Recovery (SurfaceBoundary), never to an
@@ -326,10 +327,8 @@ const createPlatform = (): Platform => {
       }
     },
 
-    fetch: (input, init) => {
-      if (input instanceof Request) return fetch(input)
-      return fetch(input, init)
-    },
+    // `#1668`:冻结 app 的全部引擎客户端经这里出网 —— 引擎源地址的请求进适配器(v1 → 2.x 引擎),别的源原样。
+    fetch: (input, init) => engineFetch(input, init),
 
     getDefaultServer: async () => {
       const url = await window.api.getDefaultServerUrl().catch(() => null)
@@ -467,21 +466,20 @@ render(() => {
           displayName: "Local Server",
           type: "sidecar",
           variant: "base",
-          http: {
-            url: data.url,
-            username: data.username ?? undefined,
-            password: data.password ?? undefined,
-          },
+          // I8:renderer 只拿到引擎源地址;`Authorization` 由 main 对引擎源补上,这里不带口令。
+          http: { url: data.url },
         })
       }
       list.push(...readyWslConnections(wslServers.data))
+      for (const server of list) registerEngineOrigin(server.http.url)
       return list
     })
     // Connection info for the alpha sidebar's own SDK client (local sidecar server).
     const sidebarServer = createMemo(() => {
       const data = initializationData(sidecar)
       if (!data) return undefined
-      return { baseUrl: data.url, username: data.username ?? undefined, password: data.password ?? undefined }
+      registerEngineOrigin(data.url)
+      return { baseUrl: data.url, fetch: engineFetch as typeof fetch }
     })
     const effectiveDefaultServer = createMemo(() =>
       ServerConnection.Key.make(availableStartupServer(defaultServer.latest, wslServers.data)),

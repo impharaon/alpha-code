@@ -29,7 +29,7 @@ import { encodeDirectory, parseRoute } from "../../shared/route-manifest"
 
 type TestRuntime = typeof Runtime & { render: typeof render }
 
-const appSrc = join(import.meta.dir, "../../../../app/src")
+const appSrc = join(import.meta.dir, "../../../../codepuppy-app/src")
 
 // 与 Electron renderer 同一个 Solid vite 插件编译生产组件:bun 原生 TSX 变换是 React 形状的,
 // 会静默丢掉 Solid 的 ref 与响应式 DOM 表达式。两个 alias 不是替身,是**消歧**:worktree 的
@@ -384,7 +384,7 @@ describe("桌面菜单:发布面上的每一条在真实壳里都接得住", () 
 
 /* ── #925:legacy sessionHref 的全部生产者清零 —— 会话导航钉在真正持有会话的 server 上 ────
    缺陷同形于 #894:legacy `/{目录}/session/{id}` 路径里没有 server 段,壳只能事后反推
-   (`packages/app/src/utils/session-route.ts` 的 `legacySessionServer`:同 id 的 tab,否则回落
+   (`packages/codepuppy-app/src/utils/session-route.ts` 的 `legacySessionServer`:同 id 的 tab,否则回落
    「完成时的 active server」)。多 server(WSL/remote)下反推恒给错机器;那台机器上若恰好有
    同 id 会话,打开并污染的是那个无关会话。修法是删掉产生器(sidebar/route.ts 的
    `sessionHref`)并让四个消费者(侧栏点击 / 侧栏锚点 / 新会话导航 / 自动化回跳)+ draft 的

@@ -87,6 +87,28 @@ function part(
   }
 }
 
+describe("`#1668` K5:2.x 引擎的内建工具新名与旧名同一张卡", () => {
+  test("shell / subagent / patch 分派到 bash / task / apply_patch 卡;旧名照旧(旧会话)", () => {
+    const pairs: Array<[string, ToolCardKind]> = [
+      ["shell", "bash"],
+      ["subagent", "task"],
+      ["patch", "apply_patch"],
+      ["bash", "bash"],
+      ["task", "task"],
+      ["apply_patch", "apply_patch"],
+    ]
+    for (const [tool, kind] of pairs) {
+      const dispatch = toolCardDispatchOf(part(tool))
+      expect({ tool, kind: dispatch.kind, metadataOnly: dispatch.metadataOnly }).toEqual({ tool, kind, metadataOnly: false })
+    }
+  })
+
+  test("反向臂:新名不是宿主内建快照(第三方同名工具)⇒ 不走内建卡", () => {
+    const dispatch = toolCardDispatchOf(part("shell", undefined, { ...builtinDisplay("shell"), identity: { source: "plugin", origin: "x", name: "shell" } }))
+    expect(dispatch.kind === "bash" && !dispatch.metadataOnly).toBe(false)
+  })
+})
+
 describe("REQ-125 C6/#879 identity 分派与四态", () => {
   test("builtin identity 全类型分派;无规则 builtin 与快照缺失一律 metadata-only", () => {
     const table: Record<string, ToolCardKind> = {

@@ -6,7 +6,7 @@
 // CodePuppyComposer),对真实 DOM 点击、真实输入,再断言 DOM 与真实回调收到的值。**不断言源码文本**。
 //
 // 关键形制:切目录的重挂在这里是**真的** —— harness 复刻上游 `createDraftRoute` 的
-// `<Show when={`${server}\0${directory}`} keyed>`(packages/app/src/app.tsx),并在
+// `<Show when={`${server}\0${directory}`} keyed>`(packages/codepuppy-app/src/app.tsx),并在
 // `startTransition` 里改 draft(与上游 `tabs.updateDraft` 同路)。每条内容保护用例都先断言
 // 「textarea 是新的 DOM 节点」,以证明确实发生了重挂 —— 否则「内容还在」什么也不证明。
 
@@ -34,7 +34,7 @@ const { render } = solidWeb
 Bun.plugin({
   name: "new-session-workspace-component-tests",
   setup(builder) {
-    builder.onLoad({ filter: /packages\/(ui|ui-mac)\/src\/.*\.tsx$/ }, async (args) => {
+    builder.onLoad({ filter: /packages\/(codepuppy-ui|ui-mac)\/src\/.*\.tsx$/ }, async (args) => {
       const transformed = await transformAsync(await Bun.file(args.path).text(), {
         filename: args.path,
         presets: [
@@ -99,7 +99,7 @@ const [dockHistoryMore, setDockHistoryMore] = solid.createSignal(false)
 mock.module("@opencode-ai/app", () => ({
   useTabs: () => tabs,
   useServer: () => server,
-  // #925:生产的 `ServerConnection.Key.make` 就是 brand cast(packages/app/src/context/server.tsx:238),
+  // #925:生产的 `ServerConnection.Key.make` 就是 brand cast(packages/codepuppy-app/src/context/server.tsx:238),
   // 这里如实照抄 —— 收口 effect 写回 draft 的值不经任何变换。
   ServerConnection: { Key: { make: (v: string) => v } },
   // #582(PR#954 审计 Major-2):真 SessionComposerDock 也要在本 harness 挂得起来。
@@ -394,11 +394,11 @@ function pasteFile(el: HTMLTextAreaElement, file: File) {
 }
 
 /** #925:上游 `createDraftRoute` 的 `promoteDraft` 按 **`props.draft.server` 晋升那一刻的值**建
- *  session tab 并导航(packages/app/src/app.tsx:272-277)—— 这里如实照抄那次读取并记下来。
+ *  session tab 并导航(packages/codepuppy-app/src/app.tsx:272-277)—— 这里如实照抄那次读取并记下来。
  *  它就是「打开的是哪台机器」的决定值:断言落在它身上,而不是某个内部 memo。 */
 const promoteCalls: Array<{ server: string; sessionId: string }> = []
 function DraftLeaf(props: { projects: CodePuppyProjectsApi; draftId?: string; serverKey?: () => string | undefined }) {
-  // 上游 createDraftRoute 的 keyed 包装(packages/app/src/app.tsx):server/directory 变 ⇒ 整叶重挂。
+  // 上游 createDraftRoute 的 keyed 包装(packages/codepuppy-app/src/app.tsx):server/directory 变 ⇒ 整叶重挂。
   return createComponent(solid.Show, {
     get when() {
       return `${draft().server}\0${draft().directory}`
@@ -1414,7 +1414,7 @@ describe("#891 首页/新对话页:开局档位登记在 store 连着的那个 s
 /* ── #894 首页提交后的导航,落在**建这个会话的那个 server** 上 ──────────────────────────
    首页发第一条走 `props.projects.startChat` ⇒ 会话建在**那份 store 连着的 server** 上,而
    过去这里跳的是 legacy `/{目录}/session/{id}` —— 路径里没有任何 server 段,壳只能事后反推
-   (`packages/app/src/utils/session-route.ts` 的 `legacySessionServer`:同 id 的 tab,否则回落
+   (`packages/codepuppy-app/src/utils/session-route.ts` 的 `legacySessionServer`:同 id 的 tab,否则回落
    到「完成时的 active server」)。实测(sidecar + 一个 ready 的 WSL,默认 server = 那个 WSL):
    active = `wsl:Ubuntu`,而 store 连的是 `sidecar`,反推恒给 `wsl:Ubuntu`;那台机器上若恰好
    有同 id 会话,打开并污染的就是那个无关会话。
@@ -1487,7 +1487,7 @@ describe("#894 首页提交后的导航:落地的是真正创建会话的那个 
 })
 
 /* ── #925 审计 Major:draft 的生产者不止 codepuppy-sidebar 一个 ────────────────────────────
-   上游 Titlebar 的「+ 新标签」/ mod+t(packages/app/src/components/titlebar.tsx `openNewTab`,
+   上游 Titlebar 的「+ 新标签」/ mod+t(packages/codepuppy-app/src/components/titlebar.tsx `openNewTab`,
    五个分支)建的 draft 带的是 active(或兜底)server;而新对话页发第一条恒经
    `props.projects.startChat` 把会话建在 projects store 连着的 server 上。收口在唯一消费者:
    CodePuppyNewSession 挂载/取到 key 后把不同值的 draft.server 钉回 projects key,上游 `promoteDraft`

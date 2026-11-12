@@ -23,7 +23,7 @@
 //     (该码在 **dispatch** 面可达且已有文案,见 cloud-dispatch-box.tsx —— schedule 面到不了。)
 // 它们若真的出现,走下面的回落分支原样上屏 —— 那正是「我们的勘破错了」应该长的样子。
 
-import type { NetFailureLayer } from "@opencode-ai/schema/codepuppy-net-failure"
+import type { NetFailureLayer } from "@opencode/schema/codepuppy-net-failure"
 import { t } from "../i18n"
 import {
   AUTOMATION_DEFAULTS,

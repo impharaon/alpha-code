@@ -15,12 +15,6 @@ import { t } from "../i18n"
 
 type Client = ReturnType<typeof createOpencodeClient>
 
-function authHeaders(info: ServerInfo): Record<string, string> | undefined {
-  if (!info.username && !info.password) return undefined
-  const token = btoa(`${info.username ?? ""}:${info.password ?? ""}`)
-  return { Authorization: `Basic ${token}` }
-}
-
 export function CloudRunWatcher(props: { server: Accessor<ServerInfo | undefined>; projects: CodePuppyProjectsApi }) {
   let generation = 0
   let abortRef = new AbortController()
@@ -84,7 +78,7 @@ export function CloudRunWatcher(props: { server: Accessor<ServerInfo | undefined
     if (!info) return
     const gen = ++generation
     abortRef = new AbortController()
-    client = createOpencodeClient({ baseUrl: info.baseUrl, headers: authHeaders(info) })
+    client = createOpencodeClient({ baseUrl: info.baseUrl, ...(info.fetch ? { fetch: info.fetch } : {}) })
     void subscribe()
     onCleanup(() => {
       if (gen === generation) client = undefined

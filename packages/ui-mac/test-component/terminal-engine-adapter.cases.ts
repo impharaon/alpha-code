@@ -1,6 +1,6 @@
 // REQ-125 #554 / 审计第 4 轮 Major-2 —— 适配器 EngineOutput 的 DOM 级取证。
 // 上游窄导出被 mock 成「一次性 autoFocus」语义的假 Terminal(与
-// packages/app/src/components/terminal.tsx 的挂载期消费一致),假 useTerminal 携
+// packages/codepuppy-app/src/components/terminal.tsx 的挂载期消费一致),假 useTerminal 携
 // 上游同形的 focus store 语义;判据 = 重显后的聚焦请求被「真实消费」(挂载记录 +
 // data-autofocus 标记 + focus store 清空),不允许只断言 request 调用。
 import { transformAsync } from "@babel/core"

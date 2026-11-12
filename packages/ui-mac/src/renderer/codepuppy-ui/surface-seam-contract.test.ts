@@ -7,7 +7,7 @@ import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
-const APP_SRC = join(import.meta.dir, "../../../../app/src")
+const APP_SRC = join(import.meta.dir, "../../../../codepuppy-app/src")
 const appTsx = readFileSync(join(APP_SRC, "app.tsx"), "utf8")
 const indexTs = readFileSync(join(APP_SRC, "index.ts"), "utf8")
 // #668:Permission seam 的**实现**从 app.tsx 抽成两个模块(接线点 + 双通道适配),
@@ -108,7 +108,7 @@ describe("ADR-027 typed surface seam anchors (frozen packages/app)", () => {
     // exports map 的 surface 子路径恰好两条(逐案评审的窄导出),指向源文件;不得扩成
     // ./surface/* 通配,也不得新增 pages/context 子路径(ADR-027 修订 2026-07-13/2026-07-24,
     // ADR-029 L3 逐案纪律)。
-    const pkg = JSON.parse(readFileSync(join(import.meta.dir, "../../../../app/package.json"), "utf8")) as {
+    const pkg = JSON.parse(readFileSync(join(import.meta.dir, "../../../../codepuppy-app/package.json"), "utf8")) as {
       exports: Record<string, string>
     }
     expect(pkg.exports["./surface/session"]).toBe("./src/pages/session.tsx")
@@ -135,7 +135,7 @@ describe("ADR-027 typed surface seam anchors (frozen packages/app)", () => {
   })
 
   test("narrow terminal-engine channel stays a minimal pure re-export (REQ-125 #554/#576, ADR-027 修订 2026-07-24)", () => {
-    const pkg = JSON.parse(readFileSync(join(import.meta.dir, "../../../../app/package.json"), "utf8")) as {
+    const pkg = JSON.parse(readFileSync(join(import.meta.dir, "../../../../codepuppy-app/package.json"), "utf8")) as {
       exports: Record<string, string>
     }
     expect(pkg.exports["./surface/terminal"]).toBe("./src/surface/terminal.ts")

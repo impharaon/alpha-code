@@ -1,0 +1,306 @@
+{
+ "_source": "Sampled by `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts` (alpha-code#1668 L6) at c261bba302: a real OpenCode 2 engine from this repo's packages/cli `serve`, isolated HOME/XDG, one git project, and the scripted OpenAI-compatible mock model next to the sampler. Three asks created with POST /api/session/:id/permission (agent build, read, save [\"*\"]): A1 .env and A2 other.env in session A, B1 .env in session B. `frames` = every permission.asked / permission.replied frame of A and B in arrival order. `pendingA` / `getA1` are the raw engine reads before replying; `rejected` / `replay` are the adapter's v2 reply route for A1 (reject, then the same command again); `replyAgain` is a raw second engine reply to A1; `pendingB` is B's list after the reject; `settled` is the raw once reply to B1. `sessionAlways`: C1 .env and C2 other.env (same ask shape) in session C; `allowed` is the adapter's v2 reply route for C1 with decision always; `pendingAfter` / `rules` are C's pending list and session rules right after; `askOtherAgain` is a fresh POST /api/session/:id/permission for other.env in C.",
+ "ids": {
+  "sessionA": "ses_e31b88c13ffee5hn6QdpM96JJb",
+  "sessionB": "ses_e31b88c11ffeAn12BE7AMa3ICi",
+  "a1": "per_1ce4773f0001d7a0b2JrxRLML2",
+  "a2": "per_1ce4773f1001Sm7OKQzyYQToGa",
+  "b1": "per_1ce4773f1003NYQjkhylFnkCmc"
+ },
+ "created": [
+  {
+   "status": 200,
+   "body": {
+    "data": {
+     "id": "per_1ce4773f0001d7a0b2JrxRLML2",
+     "effect": "ask"
+    }
+   }
+  },
+  {
+   "status": 200,
+   "body": {
+    "data": {
+     "id": "per_1ce4773f1001Sm7OKQzyYQToGa",
+     "effect": "ask"
+    }
+   }
+  },
+  {
+   "status": 200,
+   "body": {
+    "data": {
+     "id": "per_1ce4773f1003NYQjkhylFnkCmc",
+     "effect": "ask"
+    }
+   }
+  }
+ ],
+ "pendingA": {
+  "status": 200,
+  "body": {
+   "data": [
+    {
+     "id": "per_1ce4773f0001d7a0b2JrxRLML2",
+     "sessionID": "ses_e31b88c13ffee5hn6QdpM96JJb",
+     "action": "read",
+     "resources": [
+      ".env"
+     ],
+     "save": [
+      "*"
+     ]
+    },
+    {
+     "id": "per_1ce4773f1001Sm7OKQzyYQToGa",
+     "sessionID": "ses_e31b88c13ffee5hn6QdpM96JJb",
+     "action": "read",
+     "resources": [
+      "other.env"
+     ],
+     "save": [
+      "*"
+     ]
+    }
+   ]
+  }
+ },
+ "getA1": {
+  "status": 200,
+  "body": {
+   "data": {
+    "id": "per_1ce4773f0001d7a0b2JrxRLML2",
+    "sessionID": "ses_e31b88c13ffee5hn6QdpM96JJb",
+    "action": "read",
+    "resources": [
+     ".env"
+    ],
+    "save": [
+     "*"
+    ]
+   }
+  }
+ },
+ "command": {
+  "requestFingerprint": "1a70c94fde2dc2883b39f1891582163920f0711e3c384ee89fad265ca10847b3",
+  "decisionID": "pdec_sampler_reject",
+  "decision": "reject"
+ },
+ "rejected": {
+  "status": 200,
+  "body": {
+   "data": {
+    "requestID": "per_1ce4773f0001d7a0b2JrxRLML2",
+    "sessionID": "ses_e31b88c13ffee5hn6QdpM96JJb",
+    "requestFingerprint": "1a70c94fde2dc2883b39f1891582163920f0711e3c384ee89fad265ca10847b3",
+    "decisionID": "pdec_sampler_reject",
+    "decision": "reject",
+    "committedAt": 1794462151970,
+    "resolvedRequestIDs": [
+     "per_1ce4773f0001d7a0b2JrxRLML2",
+     "per_1ce4773f1001Sm7OKQzyYQToGa"
+    ]
+   }
+  }
+ },
+ "replay": {
+  "status": 200,
+  "body": {
+   "data": {
+    "requestID": "per_1ce4773f0001d7a0b2JrxRLML2",
+    "sessionID": "ses_e31b88c13ffee5hn6QdpM96JJb",
+    "requestFingerprint": "1a70c94fde2dc2883b39f1891582163920f0711e3c384ee89fad265ca10847b3",
+    "decisionID": "pdec_sampler_reject",
+    "decision": "reject",
+    "committedAt": 1794462151970,
+    "resolvedRequestIDs": [
+     "per_1ce4773f0001d7a0b2JrxRLML2",
+     "per_1ce4773f1001Sm7OKQzyYQToGa"
+    ]
+   }
+  }
+ },
+ "replyAgain": {
+  "status": 404,
+  "body": {
+   "_tag": "PermissionNotFoundError",
+   "requestID": "per_1ce4773f0001d7a0b2JrxRLML2",
+   "message": "Permission request not found: per_1ce4773f0001d7a0b2JrxRLML2"
+  }
+ },
+ "pendingB": {
+  "status": 200,
+  "body": {
+   "data": [
+    {
+     "id": "per_1ce4773f1003NYQjkhylFnkCmc",
+     "sessionID": "ses_e31b88c11ffeAn12BE7AMa3ICi",
+     "action": "read",
+     "resources": [
+      ".env"
+     ],
+     "save": [
+      "*"
+     ]
+    }
+   ]
+  }
+ },
+ "settled": {
+  "status": 204
+ },
+ "frames": [
+  {
+   "id": "evt_1ce4773f0002k6KtOi97QTfgzz",
+   "created": 1794462151664,
+   "type": "permission.asked",
+   "location": {
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-kI6pr6/proj"
+   },
+   "data": {
+    "id": "per_1ce4773f0001d7a0b2JrxRLML2",
+    "sessionID": "ses_e31b88c13ffee5hn6QdpM96JJb",
+    "action": "read",
+    "resources": [
+     ".env"
+    ],
+    "save": [
+     "*"
+    ]
+   }
+  },
+  {
+   "id": "evt_1ce4773f1002di6rpTzBXRGbxy",
+   "created": 1794462151665,
+   "type": "permission.asked",
+   "location": {
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-kI6pr6/proj"
+   },
+   "data": {
+    "id": "per_1ce4773f1001Sm7OKQzyYQToGa",
+    "sessionID": "ses_e31b88c13ffee5hn6QdpM96JJb",
+    "action": "read",
+    "resources": [
+     "other.env"
+    ],
+    "save": [
+     "*"
+    ]
+   }
+  },
+  {
+   "id": "evt_1ce4773f1004wH0dQvaw9BIesj",
+   "created": 1794462151665,
+   "type": "permission.asked",
+   "location": {
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-kI6pr6/proj"
+   },
+   "data": {
+    "id": "per_1ce4773f1003NYQjkhylFnkCmc",
+    "sessionID": "ses_e31b88c11ffeAn12BE7AMa3ICi",
+    "action": "read",
+    "resources": [
+     ".env"
+    ],
+    "save": [
+     "*"
+    ]
+   }
+  },
+  {
+   "id": "evt_1ce4775220010iUb14ZUndzPGx",
+   "created": 1794462151970,
+   "type": "permission.replied",
+   "location": {
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-kI6pr6/proj"
+   },
+   "data": {
+    "sessionID": "ses_e31b88c13ffee5hn6QdpM96JJb",
+    "requestID": "per_1ce4773f0001d7a0b2JrxRLML2",
+    "reply": "reject"
+   }
+  },
+  {
+   "id": "evt_1ce477522002l4pOUVdJM2gHD5",
+   "created": 1794462151970,
+   "type": "permission.replied",
+   "location": {
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-kI6pr6/proj"
+   },
+   "data": {
+    "sessionID": "ses_e31b88c13ffee5hn6QdpM96JJb",
+    "requestID": "per_1ce4773f1001Sm7OKQzyYQToGa",
+    "reply": "reject"
+   }
+  },
+  {
+   "id": "evt_1ce477524001BL1zlDVDFakEdF",
+   "created": 1794462151972,
+   "type": "permission.replied",
+   "location": {
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-kI6pr6/proj"
+   },
+   "data": {
+    "sessionID": "ses_e31b88c11ffeAn12BE7AMa3ICi",
+    "requestID": "per_1ce4773f1003NYQjkhylFnkCmc",
+    "reply": "once"
+   }
+  }
+ ],
+ "sessionAlways": {
+  "ids": {
+   "sessionC": "ses_e31b889adffe1mS0TI203F4eUa",
+   "c1": "per_1ce477654001G2wAOmqFR6ps6F",
+   "c2": "per_1ce477655001bFJXKqiNT6WF7Y"
+  },
+  "command": {
+   "requestFingerprint": "994ca3a8ac427d55b9815f64f77918bd99ead41c6a00a4c7a3f8207e1bfc6672",
+   "decisionID": "pdec_sampler_always",
+   "decision": "always",
+   "grantScope": {
+    "kind": "project",
+    "projectID": "unused-by-the-adapter"
+   },
+   "grantExpiresAt": null
+  },
+  "allowed": {
+   "status": 200,
+   "body": {
+    "data": {
+     "requestID": "per_1ce477654001G2wAOmqFR6ps6F",
+     "sessionID": "ses_e31b889adffe1mS0TI203F4eUa",
+     "requestFingerprint": "994ca3a8ac427d55b9815f64f77918bd99ead41c6a00a4c7a3f8207e1bfc6672",
+     "decisionID": "pdec_sampler_always",
+     "decision": "always",
+     "committedAt": 1794462152585,
+     "resolvedRequestIDs": [
+      "per_1ce477654001G2wAOmqFR6ps6F",
+      "per_1ce477655001bFJXKqiNT6WF7Y"
+     ]
+    }
+   }
+  },
+  "pendingAfter": {
+   "status": 200,
+   "body": {
+    "data": []
+   }
+  },
+  "rules": [
+   {
+    "action": "read",
+    "resource": "*",
+    "effect": "allow"
+   }
+  ],
+  "askOtherAgain": {
+   "status": 200,
+   "body": {
+    "data": {
+     "id": "per_1ce47778b001G4xSLnbi1jFIVC",
+     "effect": "allow"
+    }
+   }
+  }
+ }
+}

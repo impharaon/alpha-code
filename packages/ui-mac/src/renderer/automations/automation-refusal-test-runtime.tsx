@@ -23,7 +23,7 @@ import { setLocale, t } from "../i18n"
 import { resetAuthRecoveryForTests } from "../auth-recovery"
 import type { AuthState } from "../../preload/types"
 import type { AutomationTask } from "../../shared/automation-types"
-import type { NetFailureLayer } from "@opencode-ai/schema/codepuppy-net-failure"
+import type { NetFailureLayer } from "@opencode/schema/codepuppy-net-failure"
 
 export { automationActionCopy, render, scheduleRefusalCopy, setLocale, t }
 

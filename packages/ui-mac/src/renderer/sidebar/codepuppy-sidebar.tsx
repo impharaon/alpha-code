@@ -184,7 +184,7 @@ export function CodePuppySidebar(props: {
   // effect,整棵子树的 onMount 会在渲染结束后一起排队触发,时间戳全挤在同一刻 —— 那样分不出
   // 「上游壳挂了多久」与「路由树挂了多久」。组件体是渲染期,拿到的才是这一段的真实边界。
   markStartupTimeline("renderer.sidebar.setup")
-  const { store, reload, createSession, renameSession, shareSession, deleteSession, copySession } = props.projects
+  const { store, reload, createSession, renameSession, deleteSession, copySession } = props.projects
   const routerNavigate = useNavigate()
   const location = useLocation()
   const command = useCommand()
@@ -691,7 +691,7 @@ export function CodePuppySidebar(props: {
   // admission 路由。
   //
   // 旧写法是 `navigate(newSessionHref(dir))` → `/<b64dir>/session`。那条路由在两种 layout 下都挂在
-  // 上游 `LegacyServerLayout` 之下(packages/app/src/app.tsx),于是先整套挂起上游自己的左栏
+  // 上游 `LegacyServerLayout` 之下(packages/codepuppy-app/src/app.tsx),于是先整套挂起上游自己的左栏
   // (pages/layout.tsx 的 SidebarContent)与会话叶,叶再在 createEffect 里调 `tabs.newDraft` 跳到
   // `/new-session?draftId=…` —— 一次「新对话」挂两套壳再被替换,这就是 owner 报的闪烁与「最左侧
   // 闪出不该出现的内容」。这里直接调 newDraft(它自带跳转),admission 那一跳整个消失。
@@ -757,7 +757,7 @@ export function CodePuppySidebar(props: {
       // #925:draft 的 server 段 = **projects store 连着的那个 server**,不再是 active server。
       // 新对话页(CodePuppyNewSession)发第一条走 `props.projects.startChat` —— 会话**恒**建在
       // store 连着的 server 上,与 active 是谁无关(codepuppy-composer.tsx home 模式,#891 勘破)。
-      // 而上游 `promoteDraft`(packages/app/src/app.tsx createDraftRoute)按 `draft.server` 建
+      // 而上游 `promoteDraft`(packages/codepuppy-app/src/app.tsx createDraftRoute)按 `draft.server` 建
       // session tab 并导航到 `/server/{draft.server}/session/{id}`:draft 带着 active server
       // 时,tab 与导航都落在一台**没有这个会话**的机器上 —— 这正是 #894 那个缺陷在 draft
       // 晋升这条线上的样子。key 缺席(sidecar 未就绪)⇒ 不建 draft、不猜:那时 store 无
@@ -978,39 +978,7 @@ export function CodePuppySidebar(props: {
                 </svg>
                 <span>{t("codepuppy.sidebar.rename")}</span>
               </button>
-              <button
-                type="button"
-                class="codepuppy-project-menu-item"
-                role="menuitem"
-                onClick={() => {
-                  const session = m()
-                  dismissMenu(() => setSessionMenu(null), sessionMenuTrigger)
-                  void (async () => {
-                    const url = await shareSession(session.id, session.directory)
-                    if (!url) {
-                      pushToast({ kind: "error", title: t("codepuppy.sidebar.shareFailed") })
-                      return
-                    }
-                    const ok = await copyText(url)
-                    pushToast(
-                      ok
-                        ? { kind: "success", title: t("codepuppy.sidebar.shareCopied"), detail: url }
-                        : { kind: "success", title: t("codepuppy.sidebar.shareCreated"), detail: url },
-                    )
-                  })()
-                }}
-              >
-                <svg class="codepuppy-project-menu-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path
-                    d="M8 10V2.5M5.5 5 8 2.5 10.5 5M3 9v3.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V9"
-                    stroke="currentColor"
-                    stroke-width="1.2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
-                <span>{t("codepuppy.sidebar.share")}</span>
-              </button>
+              {/* `#1668` R6:owner 裁定拿掉「分享对话」(2.x 引擎没有会话分享;不把会话发到任何外部地址)。 */}
               <button
                 type="button"
                 class="codepuppy-project-menu-item"

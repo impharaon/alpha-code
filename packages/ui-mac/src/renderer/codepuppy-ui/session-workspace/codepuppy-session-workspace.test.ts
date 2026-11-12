@@ -17,8 +17,8 @@ const permissionFeed = readFileSync(join(import.meta.dir, "session-permission-fe
 const css = readFileSync(join(import.meta.dir, "session-workspace.css"), "utf8")
 const rendererIndex = readFileSync(join(import.meta.dir, "../../index.tsx"), "utf8")
 const sidebar = readFileSync(join(import.meta.dir, "../../sidebar/codepuppy-sidebar.tsx"), "utf8")
-const upstreamApp = readFileSync(join(import.meta.dir, "../../../../../app/src/app.tsx"), "utf8")
-const upstreamSession = readFileSync(join(import.meta.dir, "../../../../../app/src/pages/session.tsx"), "utf8")
+const upstreamApp = readFileSync(join(import.meta.dir, "../../../../../codepuppy-app/src/app.tsx"), "utf8")
+const upstreamSession = readFileSync(join(import.meta.dir, "../../../../../codepuppy-app/src/pages/session.tsx"), "utf8")
 
 describe("REQ-125 C1b seam skeleton mount", () => {
   test("real Solid mount covers the skeleton, host toggles, and both status states", () => {

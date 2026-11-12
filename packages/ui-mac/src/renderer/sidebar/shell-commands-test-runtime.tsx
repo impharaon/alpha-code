@@ -324,7 +324,7 @@ const platform: Platform = {
 const leaf = (name: string) => () => <div data-harness-leaf={name} />
 
 /** #925:新对话叶的最小探针。`promoteDraft` 这个 prop 是**上游生产 wrapper**
- *  (packages/app/src/app.tsx createDraftRoute)交下来的 —— 点这个按钮走的是真实
+ *  (packages/codepuppy-app/src/app.tsx createDraftRoute)交下来的 —— 点这个按钮走的是真实
  *  tabs.promoteDraft:真实 tab 交换 + 真实导航(tabHref 按 tab.server 拼 canonical 路由)。
  *  叶只发起,判据落在真实 router 收到的落点上。 */
 const NewSessionPromoteProbe = (props: {

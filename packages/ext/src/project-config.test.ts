@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { mergeProjectConfig, projectDirectoryIdentity, requireCodePuppyGlobalRoot, withProjectDirectoryIdentity } from "./project-config"
 import { CodePuppyExt } from "./plugin"
 import { recordingContext } from "./plugin-host.harness"
+import { Agent } from "../../schema/src/agent.ts"
 import { PROJECT_HIDDEN_DIR } from "../../ui-mac/src/shared/project-hidden-dir"
 
 const j = (o: unknown) => JSON.stringify(o)
@@ -282,7 +283,8 @@ describe("project/root identity fail-closed", () => {
       const agents = new Map<string, unknown>()
       for (const transform of recorded.transforms.agent ?? [])
         transform({ get: (id: string) => agents.get(id), update: (id: string, fn: (a: Record<string, unknown>) => void) => {
-          const current = (agents.get(id) as Record<string, unknown> | undefined) ?? {}
+          // 与引擎的编辑器同一契约(core agent.ts update):没有的 agent 从 Agent.Info.default(id) 建起。
+          const current = (agents.get(id) as Record<string, unknown> | undefined) ?? (Agent.Info.default(id as never) as unknown as Record<string, unknown>)
           fn(current)
           agents.set(id, current)
         } } as never)

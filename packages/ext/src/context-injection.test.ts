@@ -60,6 +60,7 @@ import { buildCodePuppyIdentity } from "../../ui-mac/src/main/codepuppy-identity
 import { CLOUD_MCP_ARM_ENV, CLOUD_MCP_DEF_ENV, CLOUD_MCP_SERVER_ENV } from "./cloud-websearch-kill"
 import { PLATFORM_AUTH_REF_ENV } from "./platform-credential-header"
 import CodePuppyExt from "./plugin"
+import { Agent } from "../../schema/src/agent.ts"
 import { toLLMMessages } from "../../core/src/session/runner/to-llm-message.ts"
 import { STAGED_ATTACHMENT_PART_NAME, stagedAttachmentPart } from "./staged-attachment-part"
 import { activate, it, recordingContext, recordingMcp } from "./plugin-host.harness"
@@ -229,8 +230,9 @@ async function extWrites(): Promise<Record<string, Record<string, Record<string,
   for (const transform of recorded.transforms.agent ?? [])
     transform({
       get: (id: string) => agents.get(id),
+      // 与引擎的编辑器同一契约(core agent.ts update):没有的 agent 从 Agent.Info.default(id) 建起 —— 外部目录变换(激活时注册)靠它拿到底座规则。
       update: (id: string, fn: (agent: Record<string, unknown>) => void) => {
-        const current = agents.get(id) ?? {}
+        const current = agents.get(id) ?? (Agent.Info.default(id as never) as unknown as Record<string, unknown>)
         fn(current)
         agents.set(id, current)
       },

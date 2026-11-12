@@ -844,6 +844,9 @@ export type ElectronAPI = {
     officeRuntime: () => Promise<OfficeRuntimeReadiness>
     // B11/B23:全局配置健康(broken=引擎会整份忽略用户配置)
     configHealth: () => Promise<{ broken: boolean; reason?: string; path?: string }>
+    /** `#1687`:云服务此刻是否被 kill-switch 扣下(引擎配置里是中和条目;main 注入时的同一判决)。
+     *  被扣下的云服务补连后报 `failed`,「未恢复问题」入口据此不把它当成故障。 */
+    cloudWithheld: () => Promise<boolean>
     /** REQ-036 出厂技能名单(skills.paths 注入的技能名;CODEPUPPY_FACTORY_SKILLS_DISABLE 时为空)——
      *  hub 用来把对应 catalog 条目标成「出厂内置」而非「可安装」(S18 X1)。 */
     factorySkillIds: () => Promise<string[]>

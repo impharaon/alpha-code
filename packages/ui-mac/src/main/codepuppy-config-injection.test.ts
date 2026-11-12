@@ -34,7 +34,7 @@ import { Config as ConfigSchema } from "@opencode/schema/config"
 import { Permission } from "@opencode/schema/permission"
 import { ConfigNormalize } from "@opencode/core/config/normalize"
 import { CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID } from "../shared/codepuppy-config"
-import { ECOSYSTEM_COMPATIBILITY_PLUGIN, ENGINE_EXPERIMENTAL_FLAGS, injectCodePuppyConfig } from "./codepuppy-config-injection"
+import { ECOSYSTEM_COMPATIBILITY_PLUGIN, ENGINE_EXPERIMENTAL_FLAGS, injectCodePuppyConfig, isCloudMcpWithheld } from "./codepuppy-config-injection"
 import { customProviderSecretName, secretFilePath } from "./codepuppy-secret-files"
 import { writeMcpServerTruth } from "./mcp-server-truth-write"
 import { NEUTRALIZED_MCP_SERVER } from "./mcp-default-deny"
@@ -545,6 +545,42 @@ describe("web search 主权在 2.x 权限规则里仍成立(#223)", () => {
       expect(errors.flat().join("\n")).toContain("WITHHELD from the engine config")
       assertNativeV2(content)
     })
+
+  // `#1687`:renderer 经 `ext.cloudWithheld()` 读到的值,必须就是这一轮写进配置的那个判决 ——
+  // 写了中和条目 ⇔ 值为 true。逐条分支核对(含先扣下再放开:值随最近一次注入走,不残留)。
+  test("isCloudMcpWithheld equals the verdict used for the cloud config entry on every branch", () => {
+    const scenarios: Array<[string, () => void]> = [
+      ["kill-switch + 代付", () => (givenPlatformPays(), (process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"))],
+      ["代付", () => givenPlatformPays()],
+      ["kill-switch + 不代付", () => (givenLoggedInWithByok(), (process.env.CODEPUPPY_CLOUD_MCP_URL = "https://cloud.example/mcp"), (process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"))],
+      ["不代付", () => (givenLoggedInWithByok(), (process.env.CODEPUPPY_CLOUD_MCP_URL = "https://cloud.example/mcp"))],
+      ["kill-switch + 无云 URL", () => (givenLoggedInWithByok(), (process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"))],
+    ]
+    const verdicts: Array<[string, boolean]> = []
+    const original = console.error
+    console.error = () => {}
+    try {
+      for (const [name, given] of scenarios) {
+        delete process.env.CODEPUPPY_WEBSEARCH_DISABLE
+        delete process.env.CODEPUPPY_CLOUD_MCP_URL
+        given()
+        const { config } = inject(EXT_DIR)
+        const wroteWithheld = JSON.stringify(config.mcp?.servers?.codepuppy) === JSON.stringify({ ...WITHHELD_CLOUD_MCP })
+        expect([name, isCloudMcpWithheld()]).toEqual([name, wroteWithheld])
+        verdicts.push([name, isCloudMcpWithheld()])
+      }
+    } finally {
+      console.error = original
+    }
+    // 判据自证:两个值都真的出现过(否则恒等式可以恒假地成立)。
+    expect(verdicts).toEqual([
+      ["kill-switch + 代付", true],
+      ["代付", false],
+      ["kill-switch + 不代付", true],
+      ["不代付", false],
+      ["kill-switch + 无云 URL", false],
+    ])
+  })
 
   test("不代付(登出 / BYOK)且有云 URL:云 server 是无凭证的 disabled 定义,不带任何凭证通道", () => {
     givenLoggedInWithByok()

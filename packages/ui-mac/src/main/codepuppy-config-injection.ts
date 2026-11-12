@@ -188,12 +188,27 @@ function rules(table: Array<[string, PermissionRule["effect"] | Record<string, P
   )
 }
 
+/**
+ * `#1687`(owner R4 选 A,编排器裁决接法 A):云服务此刻是否被 kill-switch 扣下 —— 即最近一次注入
+ * 在配置里写的是中和条目 `WITHHELD_CLOUD_MCP`。值由下面写 `config.mcp` 的那一处**同一个判决**赋值,
+ * 不另算;引擎跑的就是最近一次注入的配置,所以它与引擎眼里的云服务一致。renderer 经
+ * `ext.cloudWithheld()` 只读取它:被扣下的云服务在定制中心补连后会报 `failed`(2.x `connect` 不看
+ * `disabled`),状态里没有区分字段,「未恢复问题」入口靠这个值不把它当成故障。
+ */
+let cloudMcpWithheld = false
+
+export function isCloudMcpWithheld(): boolean {
+  return cloudMcpWithheld
+}
+
 export function injectCodePuppyConfig(
   userDataPath: string,
   extPluginPath?: string,
   registryChannel?: ChannelName,
 ): CodePuppyConfigInjectionResult {
   let file: string | undefined
+  // 本轮没走到写云服务那一处(无云 URL / 注入失败)⇒ 配置里没有中和条目。
+  cloudMcpWithheld = false
   try {
     // REQ-059 G1:引擎经 OPENCODE_CONFIG 加载当前环境的 codepuppy.jsonc(mcp/plugin/
     // provider/治理键)。文件通道 → dispose 重建重读文件 = 安装免重启;merge 序 XDG 后(压 provider)/
@@ -552,11 +567,12 @@ export function injectCodePuppyConfig(
         console.log(
           `[alpha-code#1195] cloud MCP has no login-minted mcp_access credential (CODEPUPPY_MCP_TOKEN secret file absent) — injected a credential-free enabled:false definition; no fallback to CODEPUPPY_CLOUD_TOKEN or interactive OAuth`,
         )
+      cloudMcpWithheld = killSwitch
       config.mcp = {
         ...config.mcp,
         servers: {
           ...config.mcp?.servers,
-          [CLOUD_MCP_SERVER_NAME]: killSwitch
+          [CLOUD_MCP_SERVER_NAME]: cloudMcpWithheld
             ? { ...WITHHELD_CLOUD_MCP }
             : platformPays
               ? cloud

@@ -232,6 +232,7 @@ const api: ElectronAPI = {
     checkRuntime: (tool) => ipcRenderer.invoke("ext-check-runtime", tool),
     officeRuntime: () => ipcRenderer.invoke("ext-office-runtime"),
     configHealth: () => ipcRenderer.invoke("ext-config-health"),
+    cloudWithheld: () => ipcRenderer.invoke("ext-cloud-withheld"),
     factorySkillIds: () => ipcRenderer.invoke("ext-factory-skill-ids"),
     builtinRead: () => ipcRenderer.invoke("builtin-read"),
     builtinApply: (gov, visibleAgents, confirmBuildDisable) =>

@@ -110,6 +110,7 @@ beforeAll(() => runtime.setLocale("zh"))
 beforeEach(() => jest.useFakeTimers())
 afterEach(async () => {
   disposers.splice(0).forEach((dispose) => dispose())
+  delete (window as unknown as { api?: unknown }).api
   for (const problem of runtime.unresolvedProblems()) runtime.resolveProblem(problem.key)
   runtime.navigateTo(`/page-${++page}`)
   await settle()
@@ -208,6 +209,35 @@ describe("#1687 v2 connector failures go only to the entry", () => {
     source.emit("mcp.status.changed")
     await settle()
     expect(entry()).toBeNull()
+    expect(toasts()).toHaveLength(0)
+  })
+
+  /** main 经 preload 暴露的判决(`ext.cloudWithheld`,main 注入配置时写中和条目的同一个值)。 */
+  function mainSaysCloudWithheld(withheld: boolean) {
+    ;(window as unknown as { api: unknown }).api = { ext: { cloudWithheld: async () => withheld } }
+  }
+
+  test("kill switch on: the withheld cloud service failing after the hub's reconnect is not listed", async () => {
+    mainSaysCloudWithheld(true)
+    const source = engine({ codepuppy: { status: "disabled" } })
+    mount(source)
+    await settle()
+    expect(entry()).toBeNull()
+    // 定制中心打开时的补连(#1106)对 disabled 的云服务调 connect;2.x 连中和端点失败后报的就是这个形状。
+    source.set({ codepuppy: { status: "failed", error: "[codepuppy:transport] fetch failed" } })
+    source.emit("mcp.status.changed")
+    await settle()
+    expect(source.statusReads.length).toBeGreaterThan(1)
+    expect(entry(), "a service withheld by the kill switch is off on purpose, not a problem").toBeNull()
+    expect(toasts()).toHaveLength(0)
+  })
+
+  test("kill switch released: the cloud service genuinely failing is listed", async () => {
+    mainSaysCloudWithheld(false)
+    const source = engine({ codepuppy: { status: "failed", error: "[codepuppy:transport] fetch failed" } })
+    mount(source)
+    await settle()
+    expect(entryLabel()).toBe(countLabel(1))
     expect(toasts()).toHaveLength(0)
   })
 

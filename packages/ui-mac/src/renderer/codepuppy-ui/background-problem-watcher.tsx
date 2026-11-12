@@ -16,6 +16,7 @@ import type { ServerInfo } from "../sidebar/use-projects"
 import { isConnected, isDisabled, isPending, needsAuth } from "../extensions/use-extensions"
 import { catalog } from "../extensions/catalog-source"
 import { setExtHubOpen, setHubSection } from "../extensions/ext-hub-state"
+import { extIpc } from "../extensions/ext-ipc"
 import { subscribeRuntimeRecovery } from "../runtime-recovery"
 import { t } from "../i18n"
 import { putProblem } from "./problems"
@@ -24,6 +25,18 @@ import { resolveProblem, startupQuietEnded } from "./Toast"
 type Client = ReturnType<typeof createOpencodeClient>
 
 const keyOf = (name: string) => `connector\0${name}`
+
+/** 第一方云服务的配置键(main `cloud-web-search.ts` 的 `CLOUD_MCP_SERVER_NAME`;renderer 其它处同样按字面量认它)。 */
+const CLOUD_SERVER = "codepuppy"
+
+/** main 注入配置时的判决:云服务此刻被 kill-switch 扣下。读不到按未扣下处理(与此前行为一致)。 */
+async function cloudWithheld(): Promise<boolean> {
+  try {
+    return (await extIpc.cloudWithheld()) === true
+  } catch {
+    return false
+  }
+}
 
 /** 用户认得的名字:随包目录里的显示名,找不到才用服务名。 */
 function displayName(name: string): string {
@@ -47,6 +60,7 @@ export function BackgroundProblemWatcher(props: { server: Accessor<ServerInfo | 
     const gen = generation
     if (!c) return
     let data: Record<string, unknown> | undefined
+    const withheld = cloudWithheld()
     try {
       const r = await c.mcp.status({} as never)
       if (r.error || !r.data) return
@@ -54,10 +68,14 @@ export function BackgroundProblemWatcher(props: { server: Accessor<ServerInfo | 
     } catch {
       return
     }
+    const skipCloud = await withheld
     if (disposed || gen !== generation) return
     const next = new Set<string>()
     for (const [name, info] of Object.entries(data)) {
       if (isConnected(info) || isDisabled(info) || isPending(info)) continue
+      // 有意关闭的不是问题:被 kill-switch 扣下的云服务在定制中心补连后报 `failed`(2.x `connect` 不看
+      // `disabled`),状态里没有区分字段,只能按 main 的判决跳过,不解释错误原文。
+      if (skipCloud && name === CLOUD_SERVER) continue
       next.add(name)
       const title = displayName(name)
       if (needsAuth(info)) {

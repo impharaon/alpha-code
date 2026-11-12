@@ -2,6 +2,7 @@ import { Effect, Schema } from "effect"
 import { Base64 } from "effect/encoding"
 import { Headers } from "effect/http"
 import { Route } from "../route/client.js"
+import { Auth } from "../route/auth.js"
 import { Endpoint } from "../route/endpoint.js"
 import { Protocol } from "../route/protocol.js"
 import { HttpTransport } from "../route/transport/index.js"
@@ -336,6 +337,7 @@ export const protocol = Protocol.make({
 })
 
 const endpoint = Endpoint.path<OpenAIResponsesBody>(PATH, { baseURL: DEFAULT_BASE_URL })
+const auth = Auth.none
 
 export const httpTransport = HttpTransport.sseJson.with<OpenAIResponsesBody>()
 export const channelTransport = OpenResponsesChannel.transport<OpenAIResponsesBody>
@@ -356,8 +358,7 @@ export const route = Route.make({
   providerMetadataKey: "openai",
   protocol,
   endpoint,
-  // codepuppy(#652): the base template declares no credential of its own; a deployment built from it without one
-  // falls through to the route default (Auth.unset) and refuses before the socket opens.
+  auth,
   transport,
   options: { providerOptions: { store: false, include: ["reasoning.encrypted_content"] } },
 })

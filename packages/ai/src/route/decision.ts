@@ -75,7 +75,7 @@ export const make = (input: MakeInput): Route => {
     providerMetadataKey: input.providerMetadataKey ?? provider,
     protocol: input.protocol,
     endpoint: input.endpoint,
-    auth: input.auth ?? Auth.unset, // codepuppy(#652): decision routes take the same fail-closed default
+    auth: input.auth ?? Auth.none,
     headers: input.headers,
     http: input.http,
   }

@@ -53,7 +53,7 @@ describe("Route.with", () => {
 })
 
 describe("Route diagnostics", () => {
-  const route = OpenAIChat.route.with({ endpoint: { baseURL: "https://provider.test/v1" }, auth: Auth.none }) // codepuppy(#652)
+  const route = OpenAIChat.route.with({ endpoint: { baseURL: "https://provider.test/v1" } })
   const request = ai.request({ model: route.model({ id: "test" }), prompt: "Hello" })
   const headers = { "content-type": "text/event-stream", "x-request-id": "req_stream" }
 
@@ -104,7 +104,6 @@ describe("Route diagnostics", () => {
           id: "diagnostics",
           provider: "test",
           endpoint: route.endpoint,
-          auth: Auth.none, // codepuppy(#652)
           framing: Framing.sse,
           protocol: {
             ...OpenAIChat.protocol,

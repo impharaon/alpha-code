@@ -4,7 +4,6 @@ import { Headers, HttpClientError, HttpClientRequest, HttpClientResponse } from 
 import { Socket } from "effect/socket"
 import { ai, AIError, HttpContext, InvalidProviderOutputError, isRetryable, TransportError } from "../src/effect.js"
 import {
-  Auth,
   LLMClient,
   RequestExecutor,
   WebSocketTransport,
@@ -697,9 +696,7 @@ describe("RequestExecutor", () => {
   it.effect("does not re-execute after a successful response reaches stream parsing", () =>
     Effect.gen(function* () {
       const attempts = yield* Ref.make(0)
-      const model = route
-        .with({ endpoint: { baseURL: "https://api.openai.test/v1" }, auth: Auth.none }) // codepuppy(#652)
-        .model({ id: "gpt-4o-mini" })
+      const model = route.with({ endpoint: { baseURL: "https://api.openai.test/v1" } }).model({ id: "gpt-4o-mini" })
       const error = yield* LLMClient.generate(ai.request({ model, prompt: "Say hello." })).pipe(
         Effect.provide(
           dynamicResponse((input) =>

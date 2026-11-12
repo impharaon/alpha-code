@@ -215,7 +215,6 @@ for (const model of [
       protocol: OpenAIResponses.protocol,
       compact: OpenAIResponses.route.compact,
       endpoint: OpenAIResponses.route.endpoint,
-      auth: Auth.none, // codepuppy(#652)
       transport: OpenAIResponses.httpTransport,
     }).model({ id: "fixture" }),
   ),

@@ -19,7 +19,7 @@ import {
 import { OpenAIChat } from "@opencode/ai/protocols/openai-chat"
 import { AnthropicMessages, OpenAIResponses } from "@opencode/ai/protocols"
 import { TestLLM, compileRequest } from "@opencode/ai/testing"
-import { Auth, RequestExecutor, type AnyRoute } from "@opencode/ai/route"
+import { RequestExecutor } from "@opencode/ai/route"
 import type { SessionHooks } from "@opencode/plugin/effect/session"
 import { Database } from "@opencode/core/database/database"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
@@ -2759,8 +2759,7 @@ describe("SessionRunnerLLM", () => {
         s.currentModel = LanguageModel.make({
           id: route === AnthropicMessages.route ? "claude-sonnet-4-6" : "gpt-5",
           provider: route === AnthropicMessages.route ? "anthropic" : "openai",
-          // codepuppy(#652): a keyless fixture declares Auth.none; an undeclared route refuses before the socket opens.
-          route: (route as AnyRoute).with({ auth: Auth.none }),
+          route,
         })
         yield* agents.transform((editor) =>
           editor.update(agentID, (agent) => {

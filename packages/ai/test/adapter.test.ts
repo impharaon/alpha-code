@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { Effect, Schema, Stream } from "effect"
 import { ai, LLMResponse } from "../src/effect.js"
-import { Auth, Route, Endpoint, LLMClient, Protocol, type Framing } from "../src/route.js"
+import { Route, Endpoint, LLMClient, Protocol, type Framing } from "../src/route.js"
 import { compileRequest } from "../src/route/client.js"
 import { LanguageModel } from "../src/schema/index.js"
 import { testEffect } from "./lib/effect.js"
@@ -72,8 +72,6 @@ const fake = Route.make({
   id: "fake",
   protocol: fakeProtocol,
   endpoint: Endpoint.path("/chat"),
-  // codepuppy(#652): a keyless fixture declares Auth.none; an undeclared route now refuses before the socket opens.
-  auth: Auth.none,
   framing: fakeFraming,
 })
 const configuredFake = fake.with({ endpoint: { baseURL: "https://fake.local" } })
@@ -82,7 +80,6 @@ const gemini = Route.make({
   id: "gemini-fake",
   protocol: fakeProtocol,
   endpoint: Endpoint.path("/chat"),
-  auth: Auth.none, // codepuppy(#652)
   framing: fakeFraming,
 })
 const configuredGemini = gemini.with({ endpoint: { baseURL: "https://fake.local" } })
@@ -172,7 +169,6 @@ describe("llm route", () => {
           },
         }),
         endpoint: Endpoint.path("/chat", { baseURL: "https://fake.local" }),
-        auth: Auth.none, // codepuppy(#652)
         framing: fakeFraming,
       })
 

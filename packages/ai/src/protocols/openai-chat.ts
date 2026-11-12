@@ -1,6 +1,7 @@
 import { Effect, Option, Schema } from "effect"
 import { Tool } from "@opencode/schema/tool"
 import { Route } from "../route/client.js"
+import { Auth } from "../route/auth.js"
 import { Endpoint } from "../route/endpoint.js"
 import { Framing } from "../route/framing.js"
 import { HttpTransport } from "../route/transport/index.js"
@@ -1370,8 +1371,7 @@ export const route = Route.make({
   providerMetadataKey: "openai",
   protocol,
   endpoint: Endpoint.path(PATH, { baseURL: DEFAULT_BASE_URL }),
-  // codepuppy(#652): the base template declares no credential of its own; a deployment built from it without one
-  // falls through to the route default (Auth.unset) and refuses before the socket opens.
+  auth: Auth.none,
   transport: httpTransport,
 })
 

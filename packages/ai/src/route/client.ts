@@ -370,8 +370,7 @@ function makeFromTransport<Body, Prepared, Frame, Event, State>(
       providerMetadataKey: routeInput.providerMetadataKey,
       protocol: protocol.id,
       endpoint: routeInput.endpoint,
-      // codepuppy(#652): a route whose deployment declared no auth refuses before the socket opens (Auth.unset).
-      auth: routeInput.auth ?? Auth.unset,
+      auth: routeInput.auth ?? Auth.none,
       headers: routeInput.headers,
       transport: routeInput.transport,
       options: routeInput.options,
@@ -401,7 +400,7 @@ function makeFromTransport<Body, Prepared, Frame, Event, State>(
           body,
           request,
           endpoint: routeInput.endpoint,
-          auth: routeInput.auth ?? Auth.unset, // codepuppy(#652)
+          auth: routeInput.auth ?? Auth.none,
           encodeBody: ProviderShared.encodeJson,
           middleware: RequestExecutor.withFetch(request.fetch, options?.http),
           webSocket: options?.webSocket,

@@ -1884,7 +1884,7 @@ describe("OpenAI Responses route", () => {
         { type: "function_call_output", call_id: "call_video", output: [tool] },
       ]
       const custom = OpenAICompatibleResponses.route
-        .with({ provider: "custom", endpoint: { baseURL: "https://provider.example/v1" }, auth: Auth.none }) // codepuppy(#652)
+        .with({ provider: "custom", endpoint: { baseURL: "https://provider.example/v1" } })
         .model({ id: "video-model" })
       expect(
         (yield* compileRequest(ai.request({ model: custom, messages }))).body.input,

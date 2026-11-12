@@ -85,7 +85,6 @@ import { getLogger } from "./logging"
 import { resolveVerifiedPackageV1, runCatalogInstallWithPackagePreflight } from "./package-installability"
 import { createPackageAdmissionCoordinator } from "./package-admission"
 import { createPackageMcpOauthEngineV1 } from "./package-mcp-oauth"
-import { syncSkillLiveLinks } from "./skill-live-links"
 import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 
 // REQ-076 T2(阻断②):原实现硬编码 `which` + `:` 拼接的 unix PATH,Windows 上恒报「未安装」
@@ -129,10 +128,6 @@ export function registerExtIpcHandlers(
   const hubViewChangedListeners = new Set<() => void>()
   const reloads = createReloadCoordinator({
     restartConnectors: () => officialRuntime?.refresh() ?? Promise.resolve(false),
-    // `#1667`:翻过的技能代际在请求重载之前挂到稳定软链上(引擎跟着软链,翻代不用重启)。
-    beforeRequest: () => {
-      for (const error of syncSkillLiveLinks(codepuppyGlobalRoot()).errors) getLogger()?.warn(`skill live link: ${error}`)
-    },
     log: (line) => getLogger()?.log(line),
     onChange: () => {
       for (const listener of hubViewChangedListeners) {

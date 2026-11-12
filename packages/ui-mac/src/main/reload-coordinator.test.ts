@@ -100,27 +100,6 @@ describe("reload-coordinator", () => {
   })
 })
 
-// `#1667`(编排器裁决 r1 第 3 条):每次请求之前先跑 beforeRequest(ext-ipc 接的是技能挂点同步),而且它失败不挡请求。
-test("beforeRequest 在请求发出之前执行;它抛错只记一行,请求照常发出", () => {
-  const order: string[] = []
-  const logs: string[] = []
-  let fail = false
-  const coordinator = createReloadCoordinator({
-    log: (line) => logs.push(line),
-    onChange: () => {},
-    beforeRequest: () => {
-      order.push("sync")
-      if (fail) throw new Error("disk full")
-    },
-  })
-  coordinator.attach((message) => void order.push(`post:${message.generation}`))
-  coordinator.request({ scope: "global", items: [], reason: "installed skill writer" })
-  fail = true
-  coordinator.request({ scope: "global", items: [], reason: "user: reload now", force: true })
-  expect(order).toEqual(["sync", "post:1", "sync", "post:2"])
-  expect(logs.some((line) => line.includes("pre-request step failed") && line.includes("disk full"))).toBe(true)
-})
-
 // Existing ext scheduler is the only busy/idle authority; main only completes the full generation.
 // `#1667`(#1665 L3 交回):ext 的调度器在 OpenCode 2 上只问一次**进程级**的 `GET /api/session/active`、只打一次
 // `POST /api/location/reload`(重建全部已加载的 Location),经 sidecar 发布的进程内 fetch 进引擎 —— 下面的引擎桩只回这两条路由,

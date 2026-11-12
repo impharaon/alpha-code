@@ -11,8 +11,8 @@
 // 这一个显式槽原本装的是当前环境的 `codepuppy.jsonc`(用户经 Code Puppy 装的 agent / command / mcp 的真源,REQ-059 G1)。
 // 2.x 只有一个显式槽,所以这里每次启动把两样合成一份文件,放在 Code Puppy 自己的 userData 下(`codepuppy-engine-config/`):
 // 用户文件原样在下,上面三样按「用户已有的同名命令不覆盖、skills 取并集、我们的 policies 排在用户的之后」合进去。
-// `codepuppy.jsonc` 运行中被改(main 装东西、用户手改)时,sidecar 的监听重写这份合成文件,引擎对显式文件的监听再重载配置
-// (`packages/core/src/config/watch.ts`)—— 装完不用重启这一点不变。用户文件解析不了:启动时只写我们这三样并记一行;运行中改坏
+// `codepuppy.jsonc` 运行中被改(main 装东西、用户手改)、技能翻代 / 新装 / 停用时,sidecar 的监听重写这份合成文件,引擎对显式
+// 文件的监听再重载配置(`packages/core/src/config/watch.ts`),技能插件随配置更新重新取源 —— 都不用重启。用户文件解析不了:启动时只写我们这三样并记一行;运行中改坏
 // 则保留上一份好的合成结果并记一行(不让一次手误把用户装的东西整份撤掉)。
 // 已知边界:用户文件里**相对路径**的 `{file:./x}` 引用会按合成文件所在目录解析(Code Puppy 自己写的引用都是绝对路径)。
 import * as fs from "node:fs"
@@ -79,37 +79,58 @@ export function writeExplicitConfig(file: string, userConfig: string | undefined
   return userError ? { userError } : {}
 }
 
+/** 显式文件的输入里,运行中会变的那几个文件(相对当前环境根):用户文件、技能允许集、各技能键的 live 指针。 */
+function isExplicitInput(name: string, userConfig: string | undefined, root: string): boolean {
+  const relative = name.split(path.sep).join("/")
+  if (userConfig && path.resolve(root, name) === path.resolve(userConfig)) return true
+  return relative === "skills-enabled.json" || /^ext-store\/[^/]+\/current\.json$/.test(relative)
+}
+
 /**
- * 运行中:`codepuppy.jsonc` 一变就重写显式文件(去抖 100ms)。改坏了 ⇒ 不重写(保留上一份好的)并记一行。返回停止函数。
- * 监听的是所在目录(main 的原子写是 rename,盯文件本身会在第一次换名后失联)。
+ * 运行中:输入一变就重写显式文件(去抖 100ms)。输入 = 用户的 `codepuppy.jsonc`(main 装东西、用户手改),以及决定 `skills` 的
+ * 技能允许集 `skills-enabled.json` 与各技能键的 `current.json`(翻代 / 新装 / 停用,`#1667` 编排器裁决 r3 第 1 条)—— 都在当前
+ * 环境根下,所以只监听这一棵树(递归),按文件名筛。`skills` 每次由 `skills()` 现算(codepuppy-config-injection.ts 的
+ * explicitSkillDirs,与注入同一个算法)。用户文件改坏了 ⇒ 不重写(保留上一份好的)并记一行。返回停止函数。
+ * 监听的是目录而不是文件:main 的原子写是 rename,盯文件本身会在第一次换名后失联。
  */
-export function watchExplicitSources(input: { file: string; userConfig: string; layer: ExplicitLayer; log: (line: string) => void }): () => void {
+export function watchExplicitSources(input: {
+  file: string
+  root: string
+  userConfig?: string
+  layer: ExplicitLayer
+  skills: () => string[]
+  log: (line: string) => void
+}): () => void {
   let timer: ReturnType<typeof setTimeout> | undefined
-  let last = readUser(input.userConfig)
+  let lastUser = readUser(input.userConfig)
+  let lastWritten = readUser(input.file)
   const refresh = () => {
     const text = readUser(input.userConfig)
-    if (text === last) return
-    const { document, userError } = composeExplicitDocument(text, input.layer)
-    if (userError && text !== undefined) {
+    const { document, userError } = composeExplicitDocument(text, { ...input.layer, skills: input.skills() })
+    if (userError && text !== undefined && text !== lastUser) {
       input.log(`[alpha-code#1667] ${input.userConfig} is not valid (${userError}); keeping the previous engine config`)
       return
     }
+    if (userError && text !== undefined) return
+    const next = `${JSON.stringify(document, null, 2)}\n`
+    lastUser = text
+    if (next === lastWritten) return
     try {
-      writeAtomic(input.file, `${JSON.stringify(document, null, 2)}\n`)
-      last = text
+      writeAtomic(input.file, next)
+      lastWritten = next
     } catch (error) {
       input.log(`[alpha-code#1667] could not rewrite ${input.file}: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
   let watcher: fs.FSWatcher | undefined
   try {
-    watcher = fs.watch(path.dirname(input.userConfig), (_event, name) => {
-      if (name !== null && name !== path.basename(input.userConfig)) return
+    watcher = fs.watch(input.root, { recursive: true }, (_event, name) => {
+      if (name !== null && !isExplicitInput(String(name), input.userConfig, input.root)) return
       clearTimeout(timer)
       timer = setTimeout(refresh, 100)
     })
   } catch (error) {
-    input.log(`[alpha-code#1667] cannot watch ${input.userConfig}: ${error instanceof Error ? error.message : String(error)}`)
+    input.log(`[alpha-code#1667] cannot watch ${input.root}: ${error instanceof Error ? error.message : String(error)}`)
   }
   return () => {
     clearTimeout(timer)

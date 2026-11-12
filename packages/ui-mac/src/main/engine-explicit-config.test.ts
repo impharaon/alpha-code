@@ -15,7 +15,7 @@ const LAYER: ExplicitLayer = {
     { action: "provider.use", resource: "codepuppy", effect: "allow" },
   ],
   commands: { init: { template: "factory init", description: "guided" }, review: { template: "factory review", subagent: true } },
-  skills: ["/factory/a", "/root/skills-live"],
+  skills: ["/factory/a", "/root/ext-store/skill--a/generations/gen-000001-aaaaaa"],
 }
 
 const dirs: string[] = []
@@ -68,7 +68,7 @@ describe("显式文件的合成", () => {
   })
 })
 
-describe("运行中:codepuppy.jsonc 一变就重写显式文件", () => {
+describe("运行中:输入一变就重写显式文件", () => {
   const waitFor = async (pred: () => boolean, ms = 3_000) => {
     const until = Date.now() + ms
     while (Date.now() < until) {
@@ -77,35 +77,68 @@ describe("运行中:codepuppy.jsonc 一变就重写显式文件", () => {
     }
     return false
   }
+  // 递归监听(FSEvents)起来要一点时间;生产里监听在 sidecar 启动时就开了,远早于任何改动。
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 250))
+  const atomic = (file: string, text: string) => {
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    fs.writeFileSync(`${file}.tmp`, text)
+    fs.renameSync(`${file}.tmp`, file)
+  }
 
-  test("原子写(rename)改用户文件 ⇒ 显式文件跟着变;改坏 ⇒ 保留上一份好的;停止之后不再跟", async () => {
-    const dir = tempDir()
-    const userConfig = path.join(dir, "codepuppy.jsonc")
-    const file = path.join(dir, "engine", "codepuppy-explicit.json")
+  test("codepuppy.jsonc 原子改写 ⇒ 显式文件跟着变;改坏 ⇒ 保留上一份好的;停止之后不再跟", async () => {
+    const root = tempDir()
+    const userConfig = path.join(root, "codepuppy.jsonc")
+    const file = path.join(root, "..", `${path.basename(root)}-engine`, "codepuppy-explicit.json")
+    dirs.push(path.dirname(file))
     fs.writeFileSync(userConfig, `{ "commands": { "one": { "template": "1" } } }`)
     writeExplicitConfig(file, userConfig, LAYER)
     const read = () => JSON.parse(fs.readFileSync(file, "utf8")) as { commands?: Record<string, unknown> }
     expect(Object.keys(read().commands!).sort()).toEqual(["init", "one", "review"])
     const logs: string[] = []
-    const stop = watchExplicitSources({ file, userConfig, layer: LAYER, log: (line) => logs.push(line) })
+    const stop = watchExplicitSources({ file, root, userConfig, layer: LAYER, skills: () => LAYER.skills, log: (line) => logs.push(line) })
+    await settle()
     try {
-      const atomic = (text: string) => {
-        fs.writeFileSync(`${userConfig}.tmp`, text)
-        fs.renameSync(`${userConfig}.tmp`, userConfig)
-      }
-      atomic(`{ "commands": { "two": { "template": "2" } } }`)
+      atomic(userConfig, `{ "commands": { "two": { "template": "2" } } }`)
       expect(await waitFor(() => "two" in (read().commands ?? {}))).toBe(true)
       expect("one" in read().commands!).toBe(false)
 
-      atomic("{ broken")
+      atomic(userConfig, "{ broken")
       expect(await waitFor(() => logs.some((line) => line.includes("keeping the previous engine config")))).toBe(true)
       expect("two" in read().commands!).toBe(true)
     } finally {
       stop()
     }
-    fs.writeFileSync(userConfig, `{ "commands": { "three": { "template": "3" } } }`)
+    atomic(userConfig, `{ "commands": { "three": { "template": "3" } } }`)
     await new Promise((resolve) => setTimeout(resolve, 400))
     expect("three" in (read().commands ?? {})).toBe(false)
+  })
+
+  test("`#1667` 裁决 r3:skills-enabled.json 或某个技能键的 current.json 一变 ⇒ skills 现算并重写;别的文件变了不重写", async () => {
+    const root = tempDir()
+    const file = path.join(root, "..", `${path.basename(root)}-engine`, "codepuppy-explicit.json")
+    dirs.push(path.dirname(file))
+    let skills = ["/gen/one"]
+    writeExplicitConfig(file, undefined, { ...LAYER, skills })
+    const read = () => (JSON.parse(fs.readFileSync(file, "utf8")) as { skills: string[] }).skills
+    const stop = watchExplicitSources({ file, root, layer: LAYER, skills: () => skills, log: () => {} })
+    await settle()
+    try {
+      skills = ["/gen/two"]
+      atomic(path.join(root, "ext-store", "skill--a", "current.json"), JSON.stringify({ generation: "gen-000002-bbbbbb" }))
+      expect(await waitFor(() => read()[0] === "/gen/two")).toBe(true)
+
+      skills = ["/gen/two", "/gen/new-key"]
+      atomic(path.join(root, "skills-enabled.json"), JSON.stringify({ v: 1, keys: ["skill--a", "skill--b"] }))
+      expect(await waitFor(() => read().includes("/gen/new-key"))).toBe(true)
+
+      skills = ["/gen/should-not-appear"]
+      atomic(path.join(root, "ext-store", "skill--a", "generations", "gen-000003-cccccc", "SKILL.md"), "x")
+      atomic(path.join(root, "unrelated.json"), "{}")
+      await new Promise((resolve) => setTimeout(resolve, 400))
+      expect(read()).toEqual(["/gen/two", "/gen/new-key"])
+    } finally {
+      stop()
+    }
   })
 })
 

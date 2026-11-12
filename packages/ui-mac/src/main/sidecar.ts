@@ -6,7 +6,7 @@ import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 // #607:注入组合体住在自己的模块里 —— 本文件的第一个 import(registerHooks)与顶层
 // getParentPort() 让 sidecar.ts 无法被测试 import,注入因此长期零覆盖。见 codepuppy-config-injection.ts。
-import { injectCodePuppyConfig, type CodePuppyConfigInjectionResult } from "./codepuppy-config-injection"
+import { explicitSkillDirs, injectCodePuppyConfig, type CodePuppyConfigInjectionResult } from "./codepuppy-config-injection"
 import { watchExplicitSources } from "./engine-explicit-config"
 // #613 R1:ready 消息构造抽成 bun 可真执行的单元 —— 文本锚锁不住「值真的上车」,运行时闸门
 // 在 sidecar-ready-message.test.ts;本文件不得字面量构造 ready 消息(接线锚断言其不存在)。
@@ -145,10 +145,9 @@ async function start(command: StartCommand) {
     // (模型全灰),不上报则 main/renderer 无从与「引擎未就绪」区分。`#1667`:注入不再经环境变量交给引擎
     // (H1 下引擎核心不读 `OPENCODE_CONFIG_CONTENT` 一类变量),结果里带着要放进 `start()` 选项的配置。
     const injection = prepareSidecarEnv(command.userDataPath, command.extPluginPath, command.registryChannel)
-    // `#1667`(编排器裁决 r1 第 2 条):显式文件是合成的 —— 用户的 codepuppy.jsonc 运行中一变就重写它,引擎对显式文件的
-    // 监听再重载配置(装东西不用重启这一点不变)。监听跟着本进程走,不需要单独停。
-    if (injection.explicit?.userConfig)
-      watchExplicitSources({ ...injection.explicit, userConfig: injection.explicit.userConfig, log: (line) => console.warn(line) })
+    // `#1667`(编排器裁决 r1 第 2 条、r3 第 1 条):显式文件是合成的 —— 用户的 codepuppy.jsonc 运行中一变、技能翻代 / 新装 / 停用,
+    // 就重写它,引擎对显式文件的监听再重载配置(都不用重启)。监听跟着本进程走,不需要单独停。
+    if (injection.explicit) watchExplicitSources({ ...injection.explicit, skills: explicitSkillDirs, log: (line) => console.warn(line) })
     ensureLoopbackNoProxy()
     useSystemCertificates()
     // 裁决书 R15 ④ / L1a armC 对 armCraw:必须在 import 引擎之前,否则 2.x 的模型请求绕开 HTTPS_PROXY 直连,在围栏下 DNS 失败。

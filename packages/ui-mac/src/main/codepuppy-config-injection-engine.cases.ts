@@ -24,8 +24,7 @@ import * as path from "node:path"
 import { assertEngineSandboxed, engineSandbox, engineSlot } from "../../test-component/engine-sandbox"
 import { buildEngineServerOptions, ENGINE_RELEASE_CHANNEL } from "./engine-server-options"
 import { withEngineAuthorization } from "./engine-authorization"
-import { injectCodePuppyConfig } from "./codepuppy-config-injection"
-import { syncSkillLiveLinks } from "./skill-live-links"
+import { explicitSkillDirs, injectCodePuppyConfig } from "./codepuppy-config-injection"
 import { watchExplicitSources } from "./engine-explicit-config"
 import { secretFilePath } from "./codepuppy-secret-files"
 import { createSidecarEnv } from "./sidecar-env"
@@ -254,7 +253,7 @@ describe("五个实验开关(基线 §2.7 判据三臂;U1:todo 开、其余四�
   })
 })
 
-describe("接缝裁决 A / 裁决 r1 第 3 条:技能目录经显式文件的 skills 进引擎,启动后的变化不用重启就生效", () => {
+describe("接缝裁决 A / 裁决 r3 第 1 条:技能目录经显式文件的 skills 进引擎,启动后的变化不用重启就生效", () => {
   const appears = async (get: (route: string) => Promise<{ data: Array<{ id: string; name?: string }> }>, name: string, ms: number) => {
     const until = Date.now() + ms
     while (Date.now() < until) {
@@ -303,39 +302,43 @@ describe("接缝裁决 A / 裁决 r1 第 3 条:技能目录经显式文件的 sk
     expect(await appears(engine.get, "cp-l5-factory-absent", 2_000)).toBe(false)
   }, 60_000)
 
-  test("已安装技能翻代:main 同步稳定软链(syncSkillLiveLinks)⇒ 新一代的技能不重启就出现、旧一代的消失;新装与停用同样不重启", async () => {
+  // `#1667` 裁决 r3 第 1 条:不用软链。翻代 / 新装 / 停用改动的是 `current.json` 与 `skills-enabled.json`,sidecar 的监听
+  // (watchExplicitSources,这里与生产 sidecar 同样起它)据此重算 explicitSkillDirs、重写显式文件的 `skills`,技能插件随配置
+  // 更新重新取源。
+  const watching = (injection: ReturnType<typeof injectCodePuppyConfig>) =>
+    watchExplicitSources({ ...injection.explicit!, skills: explicitSkillDirs, log: (line) => console.warn(line) })
+
+  test("已安装技能翻代:显式文件的 skills 跟着重写成新一代的真实目录 ⇒ 新一代的技能不重启就出现、旧一代的消失;新装与停用同样不重启", async () => {
     generation("skill--cp-l5-a", "gen-000001-aaaaaa", "cp-l5-a-one")
     enable("skill--cp-l5-a")
     const injection = injectCodePuppyConfig(userData, undefined, "stable")
-    const engine = await engineWith("skills-flip", injection.config, undefined, { filewatcher: true })
-    expect(await appears(engine.get, "cp-l5-a-one", 15_000)).toBe(true)
+    const stop = watching(injection)
+    try {
+      const engine = await engineWith("skills-flip", injection.config, undefined, { filewatcher: true })
+      expect(await appears(engine.get, "cp-l5-a-one", 15_000)).toBe(true)
 
-    generation("skill--cp-l5-a", "gen-000002-bbbbbb", "cp-l5-a-two")
-    expect(syncSkillLiveLinks(process.env.CODEPUPPY_GLOBAL_DIR!).errors).toEqual([])
-    expect(await appears(engine.get, "cp-l5-a-two", 10_000)).toBe(true)
-    expect(await gone(engine.get, "cp-l5-a-one", 5_000)).toBe(true)
+      const g2 = generation("skill--cp-l5-a", "gen-000002-bbbbbb", "cp-l5-a-two")
+      expect(await appears(engine.get, "cp-l5-a-two", 10_000)).toBe(true)
+      expect(await gone(engine.get, "cp-l5-a-one", 5_000)).toBe(true)
+      expect((JSON.parse(fs.readFileSync(injection.config.file!, "utf8")) as { skills: string[] }).skills).toEqual([g2])
 
-    generation("skill--cp-l5-b", "gen-000001-cccccc", "cp-l5-b-one")
-    enable("skill--cp-l5-a", "skill--cp-l5-b")
-    syncSkillLiveLinks(process.env.CODEPUPPY_GLOBAL_DIR!)
-    expect(await appears(engine.get, "cp-l5-b-one", 10_000)).toBe(true)
-    enable("skill--cp-l5-a")
-    syncSkillLiveLinks(process.env.CODEPUPPY_GLOBAL_DIR!)
-    expect(await gone(engine.get, "cp-l5-b-one", 10_000)).toBe(true)
+      generation("skill--cp-l5-b", "gen-000001-cccccc", "cp-l5-b-one")
+      enable("skill--cp-l5-a", "skill--cp-l5-b")
+      expect(await appears(engine.get, "cp-l5-b-one", 10_000)).toBe(true)
+      enable("skill--cp-l5-a")
+      expect(await gone(engine.get, "cp-l5-b-one", 10_000)).toBe(true)
+    } finally {
+      stop()
+    }
   }, 90_000)
 
-  test("反向臂:skills 直接列 live 生成目录(没有稳定软链)⇒ 翻代之后新一代的技能不出现、旧的还在(要重启才变)", async () => {
-    const g1 = generation("skill--cp-l5-c", "gen-000001-dddddd", "cp-l5-c-one")
+  test("反向臂:没有监听重写显式文件 ⇒ 翻代之后新一代的技能不出现、旧的还在(要重启才变)", async () => {
+    generation("skill--cp-l5-c", "gen-000001-dddddd", "cp-l5-c-one")
     enable("skill--cp-l5-c")
     const injection = injectCodePuppyConfig(userData, undefined, "stable")
-    const explicit = JSON.parse(fs.readFileSync(injection.config.file!, "utf8")) as { skills: string[] }
-    explicit.skills = [g1]
-    const file = path.join(sandbox.root, "explicit-without-links.json")
-    fs.writeFileSync(file, JSON.stringify(explicit))
-    const engine = await engineWith("skills-noflip", { content: injection.config.content, file }, undefined, { filewatcher: true })
+    const engine = await engineWith("skills-noflip", injection.config, undefined, { filewatcher: true })
     expect(await appears(engine.get, "cp-l5-c-one", 15_000)).toBe(true)
     generation("skill--cp-l5-c", "gen-000002-eeeeee", "cp-l5-c-two")
-    syncSkillLiveLinks(process.env.CODEPUPPY_GLOBAL_DIR!)
     expect(await appears(engine.get, "cp-l5-c-two", 4_000)).toBe(false)
     expect((await engine.get("/api/skill")).data.some((skill) => skill.name === "cp-l5-c-one")).toBe(true)
   }, 60_000)
@@ -449,7 +452,7 @@ describe("接缝裁决 C / 裁决 r1 第 2 条:出厂 /init、/review 由显式�
       }
       return false
     }
-    const stop = watchExplicitSources({ ...injection.explicit!, userConfig: injection.explicit!.userConfig!, log: () => {} })
+    const stop = watchExplicitSources({ ...injection.explicit!, skills: explicitSkillDirs, log: () => {} })
     try {
       // 引擎对显式文件的监听随文件监听开关(生产默认开,engine-server-options.ts 的 desktop toggles)。
       const engine = await engineWith("commands-live", injection.config, undefined, { filewatcher: true })

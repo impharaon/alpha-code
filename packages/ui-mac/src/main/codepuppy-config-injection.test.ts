@@ -249,7 +249,7 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     // 出厂命令与 skills 只在显式文件里(编排器裁决 r1 第 2 条),内联文档不再带
     expect(config.skills).toBeUndefined()
     expect(config.commands).toBeUndefined()
-    expect(explicit?.skills).toEqual([path.join(tmp, "factory"), path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "skills-live")])
+    expect(explicit?.skills).toEqual([path.join(tmp, "factory")])
     expect(Object.keys(explicit?.commands ?? {})).toEqual(["init", "review"])
     assertNativeV2(result.config.content)
     assertNativeV2(fs.readFileSync(result.config.file!, "utf8"))
@@ -316,21 +316,18 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     return dir
   }
 
-  test("接缝裁决 A / 裁决 r1 第 3 条:显式文件的 skills = 出厂技能目录 + 稳定挂点目录 skills-live;已启用的键在里面挂软链指向 live 那一代,没启用的不挂", () => {
-    const root = process.env.CODEPUPPY_GLOBAL_DIR!
-    const liveDir = path.join(root, "skills-live")
-    expect(inject(EXT_DIR).explicit?.skills).toEqual([liveDir])
+  test("接缝裁决 A / 裁决 r3 第 1 条:显式文件的 skills = 出厂技能目录 + 已启用技能当前那一代的真实目录;没启用的不写,没有输入时不写", () => {
+    expect(inject(EXT_DIR).explicit?.skills).toBeUndefined()
     const factory = [path.join(tmp, "factory", "a"), path.join(tmp, "factory", "b")]
     process.env.CODEPUPPY_FACTORY_SKILL_DIRS = JSON.stringify(factory)
     const live = plantGeneration("skill--enabled-one", "gen-000001-abcdef", ["skill--enabled-one"])
     plantGeneration("skill--not-enabled", "gen-000002-abcdef", ["skill--enabled-one"])
-    expect(inject(EXT_DIR).explicit?.skills).toEqual([...factory, liveDir])
-    expect(fs.readlinkSync(path.join(liveDir, "skill--enabled-one"))).toBe(live)
-    expect(fs.existsSync(path.join(liveDir, "skill--not-enabled"))).toBe(false)
-    // 账本缺失 ⇒ 一个都不挂(ext 的 fail-closed 门原样生效),目录照旧列着
-    fs.rmSync(path.join(root, "skills-enabled.json"))
-    expect(inject(EXT_DIR).explicit?.skills).toEqual([...factory, liveDir])
-    expect(fs.readdirSync(liveDir)).toEqual([])
+    expect(inject(EXT_DIR).explicit?.skills).toEqual([...factory, live])
+    // 不再有任何软链(owner 2026-07-07「不用 symlink」)
+    expect(fs.existsSync(path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "skills-live"))).toBe(false)
+    // 账本缺失 ⇒ 生成目录一个都不写(ext 的 fail-closed 门原样生效),出厂目录照旧
+    fs.rmSync(path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "skills-enabled.json"))
+    expect(inject(EXT_DIR).explicit?.skills).toEqual(factory)
   })
 
   test("接缝裁决 C / 裁决 r1 第 2 条:显式文件的 commands 写出厂 /init、/review —— 文字逐字来自 ext 登记的模板,review 用 2.x 原生键 subagent: true;CODEPUPPY_PROMPT_REBRAND_DISABLE=1 ⇒ 不写", () => {

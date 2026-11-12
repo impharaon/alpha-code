@@ -46,7 +46,7 @@ import { USER_DATA_LAYOUT } from "./user-data-layout"
 // `#1667`(#1665 L3 交回的接缝裁决 A / C,编排器 2026-11-09):出厂技能目录、技能生成的 live 目录与出厂 /init、/review 命令
 // 由 main 写进这份内联配置文档(2.x 插件接口给不了等价挂点)。路径与命令内容仍以 ext 那三个纯函数为唯一来源,这里只引用。
 import { injectFactorySkillPaths } from "../../../ext/src/factory-paths"
-import { syncSkillLiveLinks } from "./skill-live-links"
+import { skillGenerationLiveDirs } from "../../../ext/src/gen-skill-paths"
 import { explicitConfigPath, writeExplicitConfig, type ExplicitLayer } from "./engine-explicit-config"
 import { applyPromptTakeover } from "../../../ext/src/codepuppy-prompts"
 
@@ -87,7 +87,16 @@ export type CodePuppyConfigInjectionOutput = {
    * `#1667`(编排器裁决 r1 第 2 条、C7 重裁):`config.file` 是 main 每次启动合成的显式文件(engine-explicit-config.ts)。
    * sidecar 据此监听用户的 `codepuppy.jsonc`,它一变就重写合成文件。注入失败时没有这一项(显式槽直接给用户文件)。
    */
-  explicit?: { file: string; userConfig?: string; layer: ExplicitLayer }
+  explicit?: { file: string; root: string; userConfig?: string; layer: ExplicitLayer }
+}
+
+/**
+ * `#1667`(编排器裁决 r3 第 1 条):显式文件 `skills` 的唯一算法 —— 出厂技能目录(main 启动时算好、经 CODEPUPPY_FACTORY_SKILL_DIRS
+ * 传入)+ 已启用技能当前那一代的真实目录(ext 的 skillGenerationLiveDirs:过账本 enabled 门、读 `current.json`)。注入时算一次,
+ * sidecar 的监听在翻代 / 新装 / 停用时再算(engine-explicit-config.ts 的 watchExplicitSources)。
+ */
+export function explicitSkillDirs(): string[] {
+  return [...new Set([...injectFactorySkillPaths({}, process.env.CODEPUPPY_FACTORY_SKILL_DIRS), ...skillGenerationLiveDirs(codepuppyGlobalRoot())])]
 }
 export type CodePuppyConfigInjectionResult = CodePuppyConfigInjectionOutput &
   ({ ok: true } | { ok: false; error: CodePuppyConfigInjectionFailure })
@@ -284,14 +293,10 @@ export function injectCodePuppyConfig(
       if (engine.model) config.model = engine.model
     }
 
-    //   4b. `#1667`(接缝裁决 A;编排器裁决 r1 第 3 条):出厂技能目录(main 启动时算好、经 CODEPUPPY_FACTORY_SKILL_DIRS 传入)
-    //       与已安装技能的稳定挂点目录 `<当前环境根>/skills-live`(每个已启用技能键一个软链,指向 live 那一代,skill-live-links.ts)
-    //       写成顶层 `skills`。2.x 每份配置文档都认这个键(`packages/core/src/config/plugin/skill.ts` 的 sources),并对这些目录挂
-    //       文件监听、跟随软链 —— 翻代、新装、停用不用重启。挂点同步失败只记日志:那一项看不见,不拖垮整份注入。
-    //       写进显式文件(编排器裁决 r1 第 2 条:集中在那一层)。
-    const live = syncSkillLiveLinks(codepuppyGlobalRoot())
-    for (const error of live.errors) console.warn(`[alpha-code#1667] skill live link: ${error}`)
-    layer.skills = [...new Set([...injectFactorySkillPaths({}, process.env.CODEPUPPY_FACTORY_SKILL_DIRS), live.dir])]
+    //   4b. `#1667`(接缝裁决 A;编排器裁决 r1 第 2 条、r3 第 1 条):出厂技能目录与已安装技能当前那一代的**真实目录**写成显式文件的
+    //       `skills`(explicitSkillDirs)。翻代 / 新装 / 停用时 sidecar 的监听重算并重写显式文件(engine-explicit-config.ts),
+    //       2.x 的技能插件在配置更新时重新取源 —— 不重启就生效(沙箱真引擎实测)。不用软链(owner 2026-07-07「不用 symlink」)。
+    layer.skills = explicitSkillDirs()
 
     //   4c. `#1667`(接缝裁决 C):出厂 /init、/review 的模板来自 ext 的 applyPromptTakeover(同一份文字),写成 `commands` 条目,
     //       由 core 自己的 `opencode.config.command` 实现模板文法与子任务(`review` 在子任务里跑:v1 的 `subtask: true`,2.x 原生键
@@ -620,7 +625,7 @@ export function injectCodePuppyConfig(
       ok: true,
       config: { content: JSON.stringify(config), file: explicitFile },
       models: modelsFile ? { file: modelsFile } : {},
-      explicit: { file: explicitFile, ...(file ? { userConfig: file } : {}), layer },
+      explicit: { file: explicitFile, root: codepuppyGlobalRoot(), ...(file ? { userConfig: file } : {}), layer },
     }
   } catch (error) {
     // #613:catch 保留(sidecar 照常起,候选形态③),但失败必须离开本进程:

@@ -214,11 +214,6 @@ export const DOWNGRADED_ANCHORS: Record<string, SourceTextEntry> = {
     evidence: "#1667",
     lines: 1,
   },
-  "packages/ui-mac/src/main/skill-live-links.test.ts": {
-    why: "`#1667`(裁决 r1 第 3 条)最后一条锚 ext-ipc.ts 的重载协调器带 beforeRequest,且它调 syncSkillLiveLinks(codepuppyGlobalRoot())。两个不会让它变红的变异:①beforeRequest 里的调用被包进一个恒假的条件;②传的是另一个根。ext-ipc.ts 顶层 import electron,进不了 bun;协调器先跑 beforeRequest 再发请求由 reload-coordinator.test.ts 真执行,同文件前几条真执行挂点同步,真引擎上的翻代不重启在 codepuppy-config-injection-engine.cases.ts。",
-    evidence: "#1667",
-    lines: 1,
-  },
   "packages/ui-mac/src/main/sidecar-stop.test.ts": {
     why: "锚 sidecar.ts 的 stop 是否接在共享执行器上(含两条负全称:sidecar.ts 不得再出现 listener.stop(),sidecar.ts / sidecar-stop.ts 不得再出现 v1 的全局 dispose 路由 —— 2.x 下 404,`#1667` OOR-2)。两个不会让它变红的变异:①把 stopSidecarEngine 的实现改成直接 return;②在别的模块里再关一次引擎。sidecar.ts 顶层有副作用,import 不得;同 describe 里上面几条才是真行为判据,这一条只保证生产真的接在那上面。",
     evidence: "#911",

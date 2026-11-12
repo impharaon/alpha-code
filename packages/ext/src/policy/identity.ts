@@ -6,7 +6,10 @@
 // with `options.namespace`, and the configured MCP servers (`mcp.transform` editors). It does not record which plugin
 // registered a tool. So identity is derived from facts the extension can observe:
 //
-//   · mcp      — the tool's namespace is the normalized name of a configured MCP server ⇒ `mcp:<server>:<tool>`.
+//   · mcp      — the tool's namespace is the normalized name of a configured MCP server ⇒ `mcp:<server>:<tool>`. For a
+//                server bound to the bundled Office manifest the attested declaration says exactly which tools its MCP
+//                layer registers, so a tool in that namespace outside the declaration is someone else's (slice E):
+//                it gets the plugin identity below, never the server's identity or `codepuppy-bundled` authority.
 //   · builtin  — the tool was already in the registry when the extension's first transform ran, i.e. it came from
 //                OpenCode's internal plugins that activate before configured plugins ⇒ `builtin::<id>`
 //                (`host::<id>` for the two MCP resource tools, the identity v1 gave them, so saved records keep
@@ -55,9 +58,14 @@ export function normalizeToolName(name: string) {
   return name.replace(/[^a-zA-Z0-9_-]/g, "_")
 }
 
+/** OpenCode 2 registry namespace of an MCP server's tools (packages/core/src/tool/mcp.ts `namespace`). */
+export function mcpNamespace(server: string) {
+  return normalizeToolName(server).replaceAll(".", "_")
+}
+
 /** OpenCode 2 effective name of an MCP tool (`effectiveName` with namespace = normalized server name). */
 export function mcpEffectiveName(server: string, tool: string) {
-  return `${normalizeToolName(server).replaceAll(".", "_")}_${normalizeToolName(tool)}`
+  return `${mcpNamespace(server)}_${normalizeToolName(tool)}`
 }
 
 /** v1 identities of the MCP resource tools; OpenCode 2 ships them as internal tools under the same names. */
@@ -94,19 +102,29 @@ export function mcpTransportFact(entry: McpEntry | undefined): ToolTransportFact
 }
 
 export function authorityForMcp(name: string, entry: McpEntry, env: Record<string, string | undefined>): ToolAuthority {
+  return mcpAuthority(name, entry, env).authority
+}
+
+/** The server's authority and, for a server bound to the bundled manifest, the tool names that manifest declares. */
+function mcpAuthority(name: string, entry: McpEntry, env: Record<string, string | undefined>): { authority: ToolAuthority; declared?: ReadonlySet<string> } {
   const evidence = governedMcpEvidence(name, entry, env)
   if (evidence)
     return {
-      kind: "codepuppy-cloud",
-      bindingId: `mcp:${encodeURIComponent(name)}`,
-      evidenceDigest: `sha256:${createHash("sha256").update(evidence).digest("hex")}`,
+      authority: {
+        kind: "codepuppy-cloud",
+        bindingId: `mcp:${encodeURIComponent(name)}`,
+        evidenceDigest: `sha256:${createHash("sha256").update(evidence).digest("hex")}`,
+      },
     }
   const declared = declaredFirstPartyTools(name, entry, env, readFileSync)
-  if (!declared || entry.type !== "local") return { kind: "not-asserted" }
+  if (!declared || entry.type !== "local") return { authority: { kind: "not-asserted" } }
   return {
-    kind: "codepuppy-bundled",
-    bindingId: `mcp:${encodeURIComponent(name)}`,
-    evidenceDigest: canonicalJsonDigest({ kind: "codepuppy-bundled-mcp", name, command: entry.command, tools: declared }),
+    authority: {
+      kind: "codepuppy-bundled",
+      bindingId: `mcp:${encodeURIComponent(name)}`,
+      evidenceDigest: canonicalJsonDigest({ kind: "codepuppy-bundled-mcp", name, command: entry.command, tools: declared }),
+    },
+    declared: new Set(declared.map((tool) => (tool as { name?: unknown } | null)?.name).filter((tool): tool is string => typeof tool === "string")),
   }
 }
 
@@ -115,21 +133,28 @@ export function toolFacts(tool: RegisteredTool, input: IdentityInput): ToolFacts
   const technicalId = tool.id
   const permission = tool.options?.permission ?? tool.id
   const namespace = tool.options?.namespace
+  let borrowed = false
   if (namespace !== undefined) {
     for (const [server, entry] of input.mcp) {
-      if (normalizeToolName(server).replaceAll(".", "_") !== namespace.replaceAll(".", "_")) continue
+      if (mcpNamespace(server) !== namespace.replaceAll(".", "_")) continue
+      const { authority, declared } = mcpAuthority(server, entry, input.env)
+      // slice E (ADR-041): not one of the tools the bundled server's MCP layer registers ⇒ not that server's tool.
+      if (declared && !declared.has(tool.name)) {
+        borrowed = true
+        break
+      }
       return {
         technicalId,
         permission,
         identity: { source: "mcp", origin: server, name: tool.name },
-        authority: authorityForMcp(server, entry, input.env),
+        authority,
         bindingDigest: mcpBindingDigest(server, entry),
         location: mcpLocation(entry),
         transport: mcpTransportFact(entry),
       }
     }
   }
-  if (input.early?.has(technicalId) && !input.earlyAmbiguous)
+  if (!borrowed && input.early?.has(technicalId) && !input.earlyAmbiguous)
     return {
       technicalId,
       permission,

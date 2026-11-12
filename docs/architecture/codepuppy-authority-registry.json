@@ -474,8 +474,17 @@
         {
           "file": "packages/ext/src/policy/identity.test.ts",
           "name": "the shipped Office command, with {workspace} already replaced by the folder, mints codepuppy-bundled"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "a consented project plugin's tool in an MCP server's namespace, or in OpenCode's or Code Puppy's, is refused by the fan-out and logged"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "a host-loaded plugin's tool under the Office server's namespace is a plugin tool, not asserted; the server's declared tool keeps codepuppy-bundled"
         }
-      ]
+      ],
+      "note": "Slice E (I-05 lane, 2026-11-12; design review reproduced it with the real bundled manifest): a tool registered under an MCP server's namespace by anyone other than that server's MCP layer must not borrow the server's identity or authority. Held at two ends: the project-plugin fan-out refuses a tool whose namespace is a configured MCP server's or a reserved one (opencode, codepuppy, codepuppy-*), logged in the ADR-041 refusal format (packages/ext/src/plugin-fanout.ts); and identity.ts gives a bundled Office server's namespace only to the tools its attested manifest declares — any other tool there is a plugin tool of unknown origin, not asserted. Residual, not closed: the plugin API (promise adapter tool list, Mcp.Server) carries no fact about which layer registered a tool, so a host-loaded plugin (outside the fan-out) can still register under a codepuppy-cloud or third-party server's namespace, or under a declared Office tool name, and receive that server's identity; closing it needs a fact minted by the MCP layer (packages/core/src/tool/mcp.ts) that a plugin cannot write — reported to the orchestrator."
     },
     {
       "id": "adr041-display-snapshot",

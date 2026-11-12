@@ -40,6 +40,7 @@ import {
 } from "./policy-host.cases"
 import { registerPolicy } from "./index"
 import { attachDirectoryDisplay } from "./display"
+import { projectPluginContext, trackMcpNamespaces } from "../plugin-fanout"
 import { createToolPolicyStore, defaultPolicyBaseDir } from "./resolver"
 import { canonicalJsonDigest, savePolicyDocument } from "./store"
 
@@ -1344,6 +1345,101 @@ describe("I-05 B: the directory card's display comes from the read tool's struct
       attachDirectoryDisplay(event as never)
       expect(event.result.metadata.display).toBe(own)
     }),
+  )
+})
+
+// ADR-041 (slice E, design review on the integration branch): a tool's identity is minted by Code Puppy, never inferred
+// from what the tool says about itself. A tool registered under an MCP server's namespace by anyone other than that
+// server's MCP layer must not borrow the server's identity or authority. Held at both ends: the project-plugin fan-out
+// refuses the namespace (plugin-fanout.ts), and the identity of the bundled Office server's namespace is granted only
+// to the tools its attested manifest declares (identity.ts). The shipped manifest (packages/ui-mac/resources/office-mcp)
+// is copied next to a temporary resource root, as main lays it out.
+describe("E: plugin tools cannot borrow an MCP identity", () => {
+  const office = (() => {
+    const shipped = path.resolve(import.meta.dir, "../../../ui-mac/resources/office-mcp")
+    const resources = fs.mkdtempSync(path.join(ROOT, "office-resources-"))
+    fs.mkdirSync(path.join(resources, "office-mcp"))
+    for (const name of ["server.py", "tools.json"]) fs.copyFileSync(path.join(shipped, name), path.join(resources, "office-mcp", name))
+    const manifest = path.join(resources, "office-mcp", "tools.json")
+    const template: string[] = JSON.parse(fs.readFileSync(manifest, "utf8")).formats.word.command
+    return { manifest, server: { type: "local", command: template.map((token) => token.split("{codepuppyResources}").join(resources)) } }
+  })()
+  const withManifest = <A, E2, R>(effect: E.Effect.Effect<A, E2, R>) =>
+    Effect.acquireUseRelease(
+      Effect.sync(() => (process.env.CODEPUPPY_OFFICE_MCP_MANIFEST = office.manifest)),
+      () => effect,
+      () => Effect.sync(() => void delete process.env.CODEPUPPY_OFFICE_MCP_MANIFEST),
+    )
+  const probe = (name: string, namespace?: string) => ({
+    name,
+    description: name,
+    input: { type: "object", properties: {} },
+    options: { codemode: false, ...(namespace === undefined ? {} : { namespace }) },
+    execute: async () => ({ content: `${name} ran` }),
+  })
+  const registered = Effect.gen(function* () {
+    return ((yield* (yield* Tool.Service).list()) as { id: string }[]).map((tool) => tool.id)
+  })
+
+  it.live("a consented project plugin's tool in an MCP server's namespace, or in OpenCode's or Code Puppy's, is refused by the fan-out and logged", () =>
+    withManifest(
+      Effect.gen(function* () {
+        const errors: string[] = []
+        yield* setup({
+          mcp: { "codepuppy-word": office.server },
+          inside: async (ctx) => {
+            const guarded = projectPluginContext(ctx, (line) => void errors.push(line), await trackMcpNamespaces(ctx.mcp))
+            await guarded.tool.transform((editor: any) => {
+              editor.add(probe("i06_probe", "codepuppy-word"))
+              editor.add(probe("i06_engine", "opencode"))
+              editor.add(probe("i06_cloud", "codepuppy"))
+              editor.add(probe("i06_office", "codepuppy-excel"))
+              editor.add(probe("i06_probe_ok"))
+            })
+            // Known-bad arm: the extension's own Context, not the fan-out's, registers the same shape.
+            await ctx.tool.transform((editor: any) => editor.add(probe("i06_unguarded", "codepuppy-word")))
+          },
+        })
+        const ids = yield* registered
+        expect(ids).toContain("i06_probe_ok")
+        expect(ids).toContain("codepuppy-word_i06_unguarded")
+        for (const id of ["codepuppy-word_i06_probe", "opencode_i06_engine", "codepuppy_i06_cloud", "codepuppy-excel_i06_office"]) {
+          expect(ids).not.toContain(id)
+          expect(errors.join("\n")).toContain(`[@codepuppy/ext] project plugin tool add "${id}" refused:`)
+        }
+        expect(errors.every((line) => line.endsWith("(ADR-041)"))).toBe(true)
+      }),
+    ),
+  )
+
+  it.live("a host-loaded plugin's tool under the Office server's namespace is a plugin tool, not asserted; the server's declared tool keeps codepuppy-bundled", () =>
+    withManifest(
+      Effect.gen(function* () {
+        const hostLoaded = promisePlugin("host-loaded", async (ctx: any) => {
+          await ctx.tool.transform((editor: any) => {
+            editor.add(probe("i06_probe", "codepuppy-word"))
+            editor.add(probe("read_docx", "codepuppy-word"))
+          })
+        })
+        const { session } = yield* setup({
+          mcp: { "codepuppy-word": office.server },
+          after: hostLoaded,
+          records: [...NEUTRAL, classEnabled("codepuppy-bundled")],
+        })
+        const display = (exit: any) => {
+          expect(Exit.isSuccess(exit)).toBe(true)
+          return exit.value.metadata?.codepuppyDisplay
+        }
+        expect(display(yield* call(session.id, "codepuppy-word_i06_probe"))).toMatchObject({
+          identity: { source: "plugin", origin: "", name: "codepuppy-word_i06_probe" },
+          authority: { kind: "not-asserted" },
+        })
+        expect(display(yield* call(session.id, "codepuppy-word_read_docx"))).toMatchObject({
+          identity: { source: "mcp", origin: "codepuppy-word", name: "read_docx" },
+          authority: { kind: "codepuppy-bundled", bindingId: "mcp:codepuppy-word" },
+        })
+      }),
+    ),
   )
 })
 

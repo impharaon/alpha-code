@@ -196,3 +196,48 @@ last_reviewed: 2026-11-12
 
 - 2026-11-12 · `turn.test.ts` 除 P6 段外还删了只给 P6 用的 `sub/` 种子与两个 import;条数 11 → 9 · 本切片提交。
 - 合并时要调的(本分支没有这些行):整合分支 `scripts/gate-files.tsv` 的 `packages/ext src/upstream-probes/turn.test.ts` 11 → 9,描述去掉「读目录正文」与依赖方 `v1-shapes.ts`;`.github/workflows/sync-upstream.yml` 的「Upstream behaviour probes (I-03)」步用 `bun-test-floor.sh 1`,下界不受影响,不用改。
+
+## 切片 E — plugin tools cannot borrow an MCP identity
+
+- 依据:编排器 2026-11-12 在本 lane 实施中追加的派发(设计审查在整合分支上用真随包清单复现:经扇出的项目插件可在 `namespace: "codepuppy-word"`
+  下注册新工具名,`plugin-fanout.ts:70-73` 只拒已存在的有效名,`policy/identity.ts:119-125` 随即给它 `mcp:codepuppy-word:<name>` 与
+  `codepuppy-bundled`);ADR-041(身份由 Code Puppy 铸,不由工具自报)。无单独设计文档;本段与实现同一提交写成(追加时计划阶段已过)。
+- 核对:追加派发即裁决,无计划阶段核对;实施后随回执交编排器。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/ext/src/plugin-fanout.ts` | `projectPluginContext` 的 `add` 先查 namespace:等于已配置 MCP 服务器的(`trackMcpNamespaces`,只读的 `mcp.transform`,每次 MCP 重建刷新)或保留的(`reservedToolNamespace`:`opencode`、`codepuppy`、`codepuppy-*`)⇒ 按现有 ADR-041 格式记一行并拒绝;第三个参数为必填的判定函数 |
+| `packages/ext/src/plugin.ts` | 有 consent 时先 `trackMcpNamespaces(context.mcp)`,再把判定传进每个项目插件的 Context |
+| `packages/ext/src/policy/identity.ts` | `mcpNamespace(server)` 一处定义(`mcpEffectiveName` 与扇出共用);MCP 分支:服务器绑定随包清单时,只有清单声明的工具名才拿这台服务器的身份与 `codepuppy-bundled`,其余落到 plugin 身份(跳过早注册的 builtin 规则)。`authorityForMcp` 签名不变 |
+| `packages/ext/src/plugin-fanout.test.ts` | 三处 `projectPluginContext` 调用补判定参数(`() => false`,原有断言不变) |
+| `packages/ext/src/policy/register-policy.test.ts` | 「E: plugin tools cannot borrow an MCP identity」两条,真宿主 + 拷出的随包 Office 清单 |
+| `docs/architecture/codepuppy-authority-registry.json` | `adr041-authority-minting` 加两条证明与 note(含未闭合的剩余) |
+| `scripts/gate-files.tsv` | `register-policy.test.ts` 63 → 65 |
+
+### 顺序
+
+一个提交:先写两条测试 —— 身份那条在现码上红(`i06_probe` 拿到 `mcp` 身份与 `codepuppy-bundled`,即审查复现的形态);再加扇出拒绝与身份核对;
+跑 `register-policy.test.ts`、`identity.test.ts`、`plugin-fanout.test.ts`、`project-config.test.ts`、`inventory.test.ts`、`tool-policy-rpc.test.ts`、
+`authority-registry.test.ts`,ext 类型检查;变异:去掉扇出拒绝 ⇒ 第一条红;去掉清单核对 ⇒ 第二条红。
+
+### 风险
+
+- **剩余未闭合**:插件接口(promise 适配层的工具列表、`Mcp.Server`)没有「这个工具是谁注册的」这一事实;MCP 工具由 core 的
+  `packages/core/src/tool/mcp.ts` 直接注册,形状插件可以照抄,注册时机也不保证在插件之后(`identity.test.ts`「the MCP rule wins over the early
+  registry」)。所以宿主直接装的插件(不经扇出)仍可挂在 `codepuppy` 云端或第三方服务器的 namespace 下、或用随包清单已声明的工具名,拿到那台
+  服务器的身份。按名字之外的事实闭合它,需要 MCP 层铸一个插件写不了的事实 —— 改已接管的 `core/src/tool/mcp.ts` 并给扩展一条读它的路;
+  不在本段做,随回执交编排器。
+- 只读的 `mcp.transform` 多注册一个:与 `registerPolicy` 里已有的两个同类,只在有 consent 时注册。
+
+### 证明
+
+| AC | 测试/证据 | 缺少行为为什么会失败 |
+| --- | --- | --- |
+| E1 扇出 | `register-policy.test.ts`「a consented project plugin's tool in an MCP server's namespace, or in OpenCode's or Code Puppy's, is refused by the fan-out and logged」:`codepuppy-word`(已配置的随包 Office 服务器)、`opencode`、`codepuppy`、`codepuppy-excel`(未配置)下的工具都不在注册表、各记一行;同插件无 namespace 的工具照常注册;已知坏臂:扩展自己的 Context 注册同形状照样进表 | 去掉扇出拒绝 ⇒ 四个工具进表,红 |
+| E2 身份 | 「a host-loaded plugin's tool under the Office server's namespace is a plugin tool, not asserted; the server's declared tool keeps codepuppy-bundled」:宿主直接装的插件注册 `i06_probe` ⇒ 快照 `plugin` 身份、`not-asserted`;清单声明的 `read_docx` ⇒ `mcp:codepuppy-word`、`codepuppy-bundled` | 去掉清单核对 ⇒ `i06_probe` 拿 `mcp` 身份与 `codepuppy-bundled`,红(实现前现码即此形态) |
+
+### 偏离记录
+
+暂无

@@ -123,7 +123,7 @@ describe("projectPluginContext:有效名已存在 ⇒ 拒绝;新名照常注册;
       tool: { transform: async (callback: (e: typeof editor) => void) => (callback(editor), { dispose: async () => {} }) },
       session: { marker: "untouched" },
     }
-    const guarded = projectPluginContext(base as never, (m) => void errors.push(m)) as typeof base
+    const guarded = projectPluginContext(base as never, (m) => void errors.push(m), () => false) as typeof base
     expect(guarded.session).toBe(base.session)
     await guarded.tool.transform((e) => {
       e.add({ name: "codepuppy_echo", description: "rogue" } as never)
@@ -162,7 +162,7 @@ describe("projectPluginContext:permission 不给回复待批请求、不给改 /
       },
     }
     const errors: string[] = []
-    const guarded = projectPluginContext(base as never, (m) => void errors.push(m)) as typeof base
+    const guarded = projectPluginContext(base as never, (m) => void errors.push(m), () => false) as typeof base
     expect(await guarded.permission.reply({ sessionID: "ses_1", requestID: "per_1", decision: "once" } as never)).toBeUndefined()
     expect(await guarded.permission.saved.update({ id: "per_saved_1", effect: "allow" } as never)).toBeUndefined()
     expect(await guarded.permission.saved.remove({ id: "per_saved_2" } as never)).toBeUndefined()
@@ -181,7 +181,7 @@ describe("projectPluginContext:permission 不给回复待批请求、不给改 /
   test("2.x 的 Context 今天没有 permission.saved:拦截照样在(上游加上也不漏)", async () => {
     const errors: string[] = []
     const base = { tool: { transform: async () => ({ dispose: async () => {} }) }, permission: { reply: async () => {} } }
-    const guarded = projectPluginContext(base as never, (m) => void errors.push(m)) as unknown as {
+    const guarded = projectPluginContext(base as never, (m) => void errors.push(m), () => false) as unknown as {
       permission: { saved: { update: (input: unknown) => Promise<void>; list?: unknown } }
     }
     await guarded.permission.saved.update({ id: "per_saved_3" })

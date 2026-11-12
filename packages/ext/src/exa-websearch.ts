@@ -18,6 +18,12 @@
 //
 // 传输照上游:POST JSON-RPC `tools/call web_search_exa`(numResults 8),接受 JSON 或 SSE,响应体读到 256 KiB 为止,25 秒超时;
 // 用户在引擎里配了 Exa key(integration 连接)时照上游拼进 `exaApiKey`。
+// HTTP 429 例外(`#1662` r6 Codex R1 Major 3):抛 effect 的 `HttpClientError`(`StatusCodeError`,带状态与 `Retry-After`),具名结局放在
+// 它的 `cause` 里 —— 生产的 WebSearch 服务(packages/core/src/websearch.ts)只认 `HttpClientError` 的 429,`websearch.provider: "random"`
+// 才会记冷却、换同伴;到模型面的话仍是这里的(ext 的 `execute.after` 沿 `cause` 找到它)。请求地址只写端点,不带 `exaApiKey`
+// (`HttpClientError` 的 message 会印出请求地址)。
+
+import { HttpClientError, HttpClientRequest, HttpClientResponse } from "effect/http"
 
 /** 上游 `WebSearchExa.endpoint`(packages/core/src/plugin/websearch/exa.ts);两边相等由测试钉住。 */
 export const EXA_ENDPOINT = "https://mcp.exa.ai/mcp"
@@ -58,6 +64,16 @@ export class CodePuppyWebSearchFailure extends Error {
 
 export const isCodePuppyWebSearchFailure = (value: unknown): value is CodePuppyWebSearchFailure =>
   !!value && typeof value === "object" && (value as { _tag?: unknown })._tag === "CodePuppyWebSearchFailure"
+
+/** 失败链里(引擎的 RequestError → 供应商抛的 HttpClientError → …,沿 `cause` 往下找几层)Code Puppy 的具名结局;没有 ⇒ undefined。 */
+export function codePuppyWebSearchFailureOf(value: unknown): CodePuppyWebSearchFailure | undefined {
+  let current = value
+  for (let depth = 0; depth < 4 && current && typeof current === "object"; depth++) {
+    if (isCodePuppyWebSearchFailure(current)) return current
+    current = (current as { cause?: unknown }).cause
+  }
+  return undefined
+}
 
 function detailOf(text: string) {
   const detail = text.trim().replaceAll(/\s+/g, " ")
@@ -158,7 +174,9 @@ export async function searchExa(input: { query: string; key?: string; signal?: A
   if (!response.ok) {
     const envelope = envelopeOf(body)
     const message = typeof envelope?.error?.message === "string" ? envelope.error.message : body
-    throw new CodePuppyWebSearchFailure(kindOf(response.status), message, response.status)
+    const failure = new CodePuppyWebSearchFailure(kindOf(response.status), message, response.status)
+    if (response.status === 429) throw rateLimited(response, failure)
+    throw failure
   }
   const envelope = envelopeOf(body)
   if (!envelope) throw new CodePuppyWebSearchFailure("invalid_response", body)
@@ -173,4 +191,16 @@ export async function searchExa(input: { query: string; key?: string; signal?: A
   // 有文本却解析不出结果(额度提示、vendor 自己的零命中散文):原文就是模型该读到的话
   if (text.trim()) throw new CodePuppyWebSearchFailure("notice", text.trim())
   return []
+}
+
+/** 引擎认得出的 429:状态与 `Retry-After` 取自这次的应答(响应体已读过,另起一个只带状态与头的应答),具名结局是它的 cause。 */
+function rateLimited(response: Response, failure: CodePuppyWebSearchFailure) {
+  const request = HttpClientRequest.post(EXA_ENDPOINT)
+  return new HttpClientError.HttpClientError({
+    reason: new HttpClientError.StatusCodeError({
+      request,
+      response: HttpClientResponse.fromWeb(request, new Response(null, { status: response.status, headers: response.headers })),
+      cause: failure,
+    }),
+  })
 }

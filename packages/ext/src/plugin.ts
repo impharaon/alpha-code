@@ -19,7 +19,7 @@ import { validateCloudToolInput, validateCloudToolOutput } from "./cloud-contrac
 import { platformOutputCap } from "./platform-output-cap"
 import { platformRequestCredentialHeader } from "./platform-credential-header"
 import { EXTERNAL_DIRECTORY_AGENTS, externalDirectoryRules, placeAfterBase } from "./external-directory-rule"
-import { isCodePuppyWebSearchFailure, searchExa } from "./exa-websearch"
+import { codePuppyWebSearchFailureOf, searchExa } from "./exa-websearch"
 import { byokOutputCap } from "./byok-output-cap"
 // REQ-157 `#1284`:alpha 送进模型上下文的每段字都在 context-injection.ts 登记并声明上限。import 本身就是
 // 一道闸 —— 任何片段超限,登记簿在模块装载时抛出,ext 整个装不上(2.x 记该插件 failed,`#1665` I4 让 sidecar 不报 ready),
@@ -170,8 +170,9 @@ export const CodePuppyExt: Plugin.Plugin = {
         if (event.status === "error") {
           // `#1449` / `#1445`(#1662 parity):Code Puppy 的 exa 供应商(exa-websearch.ts)抛出的具名结局,被 2.x 的 websearch 工具包成了
           // 通用的「Unable to search the web for …」;这里换回 0.1.26 的那句话(或供应商原文)。只认那个类型,不看文案。
-          const cause = (event.error as { error?: { cause?: unknown } }).error?.cause
-          if (event.tool === "websearch" && isCodePuppyWebSearchFailure(cause)) (event.error as { message: string }).message = cause.message
+          // 429 时供应商抛的是引擎认得出的 HttpClientError(random 才会换同伴),具名结局在它的 cause 里 —— 沿 cause 链找。
+          const cause = event.tool === "websearch" ? codePuppyWebSearchFailureOf((event.error as { error?: unknown }).error) : undefined
+          if (cause) (event.error as { message: string }).message = cause.message
           return
         }
         if (event.status !== "completed") return

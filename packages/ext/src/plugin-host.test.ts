@@ -21,6 +21,7 @@ import { Session } from "../../schema/src/session.ts"
 import { SessionMessage } from "../../schema/src/session-message.ts"
 import type { Plugin } from "@opencode/plugin"
 import CodePuppyExt, { PROCESS_STATE_KEY } from "./plugin"
+import { codePuppyWebSearchFailureOf } from "./exa-websearch"
 import { buildHubRequestReply, buildHubViewReply } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
 import { activate, it, recordingMcp } from "./plugin-host.harness"
 import { testEffect } from "../../core/test/lib/effect.ts"
@@ -204,6 +205,65 @@ it.live("权威 · 本地 keyless 搜网的供应商(L5r):没有任何选择时 
       },
     })
     expect((yield* websearch.default())?.id).toBe("parallel")
+  }),
+)
+
+// `#1662` r6 Codex R1 Major 3:Code Puppy 的 exa 供应商遇到 Exa 的 429,生产的 WebSearch 服务(packages/core/src/websearch.ts)要认得出
+// 「HTTP 429」才会在 random 下记冷却、换同伴;只选了 Exa 时仍是具名的限流失败(到模型面的话由 websearch-honest.engine 判)。
+// 网络:进程的 fetch 换成桩,`mcp.exa.ai` 回 429(Retry-After 120 + JSON-RPC error,同实抓件形状),其它主机一律抛错。random 的第一次挑选
+// 本是随机的:Math.random 钉成 0,两个供应商按注册次序取第一个 —— 先 Exa(ext 先激活),冷却里的 Exa 被跳过时才会取到同伴。
+// 已知的坏(改之前实测):供应商直接抛具名错误 ⇒ 服务不认作 429,同伴零次、这次搜索直接失败。
+it.live("联网搜索 · random 下 Exa 429:换同伴一次并成功、记下冷却;只选 Exa ⇒ 具名的限流失败", () =>
+  Effect.gen(function* () {
+    env({})
+    const originalFetch = globalThis.fetch
+    const originalRandom = Math.random
+    let exaCalls = 0
+    globalThis.fetch = (async (input: Request | string | URL) => {
+      const url = new URL(input instanceof Request ? input.url : String(input))
+      if (url.hostname !== "mcp.exa.ai") throw new Error(`no network in this test (${url.hostname})`)
+      exaCalls++
+      return Response.json(
+        { jsonrpc: "2.0", id: 1, error: { code: -32000, message: "Free tier rate limit exceeded" } },
+        { status: 429, headers: { "retry-after": "120" } },
+      )
+    }) as typeof globalThis.fetch
+    try {
+      yield* activate(CodePuppyExt)
+      let peerCalls = 0
+      yield* activate({
+        id: "test.websearch-peer",
+        async setup(context) {
+          await context.websearch.transform((editor) =>
+            editor.add({ id: "cp-peer", name: "Peer", execute: async (input) => (peerCalls++, [{ url: "https://peer.example", title: input.query, content: "peer", time: {} }]) }),
+          )
+        },
+      })
+      const websearch = yield* WebSearch.Service
+      expect((yield* websearch.providers()).map((provider) => provider.id).sort()).toEqual(["cp-peer", "exa"])
+      // 用户在配置里选 random(生产里配置插件排在 ext 之后;这里同样在 ext 之后激活一个设默认值的插件,同上一条用例的写法)
+      const choose = (selection: string) =>
+        activate({ id: `test.user-websearch-${selection}`, async setup(context) { await context.websearch.transform((editor) => editor.default.set(selection)) } })
+      yield* choose("random")
+      Math.random = () => 0
+      const first = yield* websearch.query({ query: "cp first" }, { sessionID: Session.ID.make("ses_cp_ws_first") }).pipe(Effect.exit)
+      expect({ ok: Exit.isSuccess(first), exaCalls, peerCalls }).toEqual({ ok: true, exaCalls: 1, peerCalls: 1 })
+      expect(Exit.isSuccess(first) && first.value.providerID).toBe("cp-peer")
+      // 冷却记下了:另一个会话、Math.random 仍是 0(没有冷却就会先取 Exa)⇒ 直接到同伴,Exa 不再被打
+      const second = yield* websearch.query({ query: "cp second" }, { sessionID: Session.ID.make("ses_cp_ws_second") })
+      expect({ provider: second.providerID, exaCalls, peerCalls }).toEqual({ provider: "cp-peer", exaCalls: 1, peerCalls: 2 })
+      // 只选 Exa:不看冷却、照打一次,失败是具名的 429(引擎的 RequestError 里带着它)
+      yield* choose("exa")
+      const failure = yield* websearch.query({ query: "cp only exa" }).pipe(Effect.flip)
+      expect(failure).toBeInstanceOf(WebSearch.RequestError)
+      expect(exaCalls).toBe(2)
+      expect(codePuppyWebSearchFailureOf((failure as { cause?: unknown }).cause)?.message).toBe(
+        "Web search failed: unexpected HTTP status (HTTP 429). Cause: Free tier rate limit exceeded",
+      )
+    } finally {
+      globalThis.fetch = originalFetch
+      Math.random = originalRandom
+    }
   }),
 )
 

@@ -27,7 +27,8 @@ const copy = [
   ["packages/ui-mac/src/main/package-admission.ts", "reason: `package admission: component \"${component.id}\" installs an engine plugin — Code Puppy no longer installs executable plugins into the engine (ADR-040); refusing the whole package`,", 1],
   ["packages/ui-mac/src/main/package-admission.ts", "reason: `component \"${component.accepted.component.id}\" installs an engine plugin — Code Puppy no longer installs executable plugins into the engine (ADR-040); refusing`,", 1],
   ["packages/ui-mac/src/shared/office-advisories.ts", "return { ok: false, reason: `${connector.name} requires the workspace marker or absolute managed workspace plus an absolute Code Puppy resource root (REQ-134)` }", 1],
-  ["packages/ext/src/plugin.ts", "return { title: \"codepuppy_register\", output: \"refused: project Code Puppy root identity drifted\", metadata: { ok: false } }", 1],
+  // `#1665`:OpenCode 2 的 ext 工具住在 codepuppy-tools.ts,结果形状是 { content, metadata }(refused() 包装,metadata.ok=false);显示文案逐字未变。
+  ["packages/ext/src/codepuppy-tools.ts", "if (trusted === null) return refused(\"refused: project Code Puppy root identity drifted\")", 1],
   ["packages/ext/src/cloud-websearch-kill.ts", "return cloudWebSearchDenied(env) ? \"the Code Puppy web search kill switch (ADR-009 B2) is set\" : undefined", 1],
   ["packages/ext/src/cloud-websearch-kill.ts", "\"the Code Puppy web search kill switch (ADR-009 B2) is set; it turns off Code Puppy's own web search tools \" +", 1],
   ["packages/ui-mac/src/main/codepuppy-workdir.ts", "return { status: \"retired-home\", reason: \"project Code Puppy root is related to the retired global root\" }", 1],

@@ -1,0 +1,4 @@
+SOCKET_POOL_STALLED_MAX_SOCKETS_PER_GROUP events: 0
+  loose scan: 999 stall events
+  group ?: 999 stalls, ticks 277276406..278457474
+  constants.timeTickOffset (ms since epoch at tick 0): ?

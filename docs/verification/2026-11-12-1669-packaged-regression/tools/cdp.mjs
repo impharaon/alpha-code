@@ -64,6 +64,14 @@ try {
     await send("Input.dispatchKeyEvent", { type: "keyDown", key, windowsVirtualKeyCode: code, ...(key === "Enter" ? { text: "\r" } : {}) })
     await send("Input.dispatchKeyEvent", { type: "keyUp", key, windowsVirtualKeyCode: code })
     console.log(`key ${key}`)
+  } else if (cmd === "send") {
+    // focus the composer textarea, insert the text, press Enter — page-level CDP input, not OS events
+    const focused = await evaluate(`(() => { const t = document.querySelector("textarea.a-comp-input"); if (!t) return false; t.focus(); return true })()`)
+    if (!focused) throw new Error("no composer textarea")
+    await send("Input.insertText", { text: args[0] })
+    await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", windowsVirtualKeyCode: 13, text: "\r" })
+    await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", windowsVirtualKeyCode: 13 })
+    console.log(`sent ${new Date().toISOString()}`)
   } else if (cmd === "bounds") {
     const { windowId } = await send("Browser.getWindowForTarget")
     const [left, top, width, height] = args.map(Number)

@@ -1,5 +1,5 @@
 ---
-title: alpha-code#1669 打包版换代回归与撤回演练 —— 第二轮:隔离副本改写了 owner 应用的偏好域,按硬规矩 1 停止
+title: alpha-code#1669 打包版换代回归与撤回演练 —— 第三轮:已登录,G1 通过、G2 拒绝没送达引擎(FAIL)
 kind: verification
 status: active
 owners:
@@ -11,6 +11,62 @@ last_reviewed: 2026-11-12
 
 依据:方案基线 [§5.1、§5.2、§6.2、§2.8](../../design/2026-11-08-1662-opencode2-generation-switch-baseline.md),
 票面 `impharaon/alpha-code#1669`,派发书里的七个补充格 a–g 与八条硬规矩。第二轮在前,第一轮原文在后。
+
+## 第三轮(2026-11-12 21:32–21:55 EST)
+
+**被测形态:编排器提供的未签名包的副本,在临时根里做了 ad-hoc 重签,没有 hardened runtime、没有 Developer ID、没有公证。**
+依赖真实签名 / 公证或 `app-update.yml` 的格子(R08、R09、Gatekeeper)记 NOT-RUN(需要真正的发版构建)。
+
+输入变化:owner 选「办法1」—— 同一 bundle id 的偏好域允许 macOS 的例行写入;启动闸改成比键名、值类型、文件大小,
+再逐键列出变没变(只列键名)。owner 在 21:33:46 自己点了测试窗口里的「登录」并完成登录(不是我点的),编排器随后确认把登录视为完成、
+继续做登录后的格子。
+
+### 第三轮结论
+
+1. **G2 FAIL:点「拒绝」没送达引擎。** 审批卡出现,点「拒绝」后卡片停在「正在提交…」、时间线停在「等你批准」;
+   引擎侧直到 300 秒超时才结束这次调用,错误原文「审批请求等待 300 秒无人应答,已按 fail-closed 结束:本次操作**没有**被放行」。
+   文件没有写入,但那是超时兜底,不是拒绝生效。0.1.26 的对应行为:R17 / R04 —— 点「拒绝」卡片当即消失,回复里具名拒绝,文件夹里没有文件(alpha-work#129 记 PASS)。
+2. **G1 PASS**(首页新对话、会话页输入框、中断后的「继续生成」三个入口各三条,都有回复);**b、c、d PASS**;**G9 PASS**(正向一臂);**a PASS**。
+3. 偏好域:本轮启动前后只有 `SKPurchaseIntentUpdatesLastChecked` 变了,键集合、类型、大小都没变。
+4. 登录回调:owner 的正式版当时没有运行,测试副本在运行;回调经 `open-url` 进了测试副本,`login complete { mode: 'platform' }`(观察到一次)。
+5. 付费:用户回合 11 次,全部 `codepuppy/deepseek-v4-flash`(另有引擎自动的标题生成调用)。没有出现任何系统框,看门狗没有触发。
+6. 撤回演练、G10、G6、G7 等**这一轮没做到**(见下表),测试实例保持登录、仍在运行。
+
+计数(90 格):PASS 6 / FAIL 1 / NOT-RUN 83。
+
+### 第三轮格子
+
+| 格 | 结果 | 证据 |
+| --- | --- | --- |
+| a 随包 ext、引擎就绪、围栏 | PASS | 第二轮证据;本轮启动日志同样有 `process fence applied` 与 `server ready`([r3-launch-a3](results/r3-launch-a3.txt)) |
+| b 模型链、平台模型、收发 | PASS | 引擎 `/api/model` 返回 6 个 `codepuppy` 平台模型(DeepSeek V4 Flash / Pro、GLM-5.2、GLM-5 Turbo、Qwen3.7 Max / Plus);首页发「用一句话介绍你自己」,会话 `outcome: succeeded`、输出 52 tokens,界面渲染出回复 |
+| c 平台请求带用户凭据 | PASS | 出网代理记录 `CONNECT alpha-gateway.tidelabs.click:443`,隧道下行 28644 / 53573 字节;会话成功;占位串 `codepuppy-platform-credential-from-request-header`(`packages/ui-mac/src/main/codepuppy-models.ts:45` 注入的 apiKey 占位)在 `server.log`、`main.log`、`utility.log` 与主进程输出里都是 0 次 |
+| d 会话标题 | PASS | 引擎为每个会话生成了标题:「一句话自我介绍提示词(L7 G1 首页 1/3)」「单字回复“好”」「从1数到300」「Creating l7-g2.txt」;另有一个会话标题是「好」(用户消息是「回复一个字:好…」) |
+| G1 发送 | PASS | 首页 3 条 = 3 个新会话,都 `succeeded`;会话页 3 条,界面里三条回复都是「好」;中断一次后「继续生成」点 3 次,引擎记录 3 条 `user:继续` + 3 条助手回复,都 `succeeded` |
+| G2 审批 | **FAIL** | 卡片原文「允许这次操作吗? 改文件 l7-g2.txt … 本次会话内允许 / 将记住:本会话内的所有文件修改 / 本次会话 · 重启后失效 / 拒绝 / 允许一次」。21:42:33 点「拒绝」;21:42:41 与约 21:43:00 卡片仍是「正在提交…」、时间线「等你批准」。引擎侧:工具 `write` `executed:false`,`error.type: aborted`,完成时刻比开始晚 300.01 秒,错误原文见上。`server.log` 里没有任何 permission 相关行 |
+| f 审批卡 / 本次会话内允许 / 超时卡 | NOT-RUN | 卡片出现(见 G2);「本次会话内允许」没做(推断会受同一缺陷影响,未验证);超时只在引擎侧看到(上面的错误原文),界面上的超时卡没核到 |
+| G9 凭证不导入 | PASS(正向) | 临时数据目录放了带 anthropic / openai 假 key 的 `auth.json`;模型表只有 6 个 `codepuppy` 模型;启动日志 `engine data directory … also holds other OpenCode data (auth.json)`。反向一臂没做 |
+| e、g、G3–G8、G10、§5.2 各格、§6.2 各步 | NOT-RUN | 这一轮没做到(时间都花在 G2 的取证上);0.1.26 包已下载到临时根、校验和与发布清单一致 |
+
+### G2 的旁证与干扰
+
+- 这次运行的 netlog 里有 975 个 `SOCKET_POOL_STALLED_MAX_SOCKETS_PER_GROUP` 事件,集中在启动后约 14 分钟内([r3-netlog-stalls](results/r3-netlog-stalls.txt));
+  这种抓取模式下事件不带分组名,没能归到引擎那个源。推断:可能又是 #1554 那种「同源 6 连接被长连接占满」,也可能是拒绝请求的路由不对;没定。
+- 我的干扰,如实记下:G2 之后我从页面里直接发了几次引擎查询,其中有的一直不返回,把页面的连接占住了;21:50 左右我重载了一次界面来释放它们。
+  这些查询都在 21:43:10 之后,而拒绝卡住是 21:42:33 就开始的,所以 G2 的结论不受影响。重载之后窗口处于隐藏状态(`visibilityState: hidden`,
+  多半是 owner 把它最小化或藏起来了),页面停在 `readyState: interactive`、内容为空,截图也拿不到帧;窗口显示出来后应能正常渲染(未验证)。
+
+### 观察(与 0.1.26 的对照还没做,不判 FAIL)
+
+- 全新数据目录里,侧栏「项目」列出了 `engine-scratch-cwd`。这是引擎的内部临时工作目录,不该显示成用户的项目。
+- 登录前的欢迎卡片上是一个「α」图标,而侧栏是新的小狗标志(与 W06「各页无旧名」有关)。截图:[screens/r3-a3-home.png](screens/r3-a3-home.png)。
+- 直接从终端执行时,系统把测试应用的隐私授权记在 Terminal 名下(第二轮已记)。
+
+### 隔离与收尾
+
+- 启动闸:[results/r3-launch-a3.txt](results/r3-launch-a3.txt)(lsof 0 处泄漏、单实例锁在临时 userData、偏好域只有那个时间戳变了)。新工具:[tools/prefs-guard.py](tools/prefs-guard.py)、[tools/netlog-stalls.py](tools/netlog-stalls.py);`tools/cdp.mjs` 加了 `send`。
+- 本轮没有产生崩溃报告;测试实例仍在运行,所以副本的 LaunchServices 登记还在(深链回调需要它);停止时 `tools/stop-a.sh` 会撤销登记、比对偏好域与 owner 侧路径、清理本次运行的崩溃报告。
+- 登录相关日志行(查询串已遮掉):[results/r3-a3-login-and-auth-lines.txt](results/r3-a3-login-and-auth-lines.txt)。
 
 ## 第二轮(2026-11-12 21:07–21:35 EST)
 

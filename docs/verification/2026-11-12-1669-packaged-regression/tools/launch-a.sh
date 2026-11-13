@@ -46,7 +46,7 @@ for pid in $(/bin/ps -A -o pid=,command= | /usr/bin/grep -F "$EXE" | /usr/bin/gr
 # made this check blind in run a2; ps + fixed-string grep cannot fail that way.
 owner_pids() { /bin/ps -A -o pid=,command= | /usr/bin/grep -F "/Applications/Code Puppy.app/" | /usr/bin/grep -v grep | /usr/bin/awk '{print $1}' | sort | tr '\n' ' '; }
 owner_stat() {
-  for p in "Library/Preferences/com.tide.codepuppy.plist" "Library/Saved Application State/com.tide.codepuppy.savedState" \
+  for p in "Library/Saved Application State/com.tide.codepuppy.savedState" \
     "Library/HTTPStorages/com.tide.codepuppy" "Library/Caches/com.tide.codepuppy" "Library/Caches/com.tide.codepuppy.ShipIt" \
     "Library/Logs/Code Puppy" "Library/Application Support/ai.opencode.desktop" "Library/Application Support/Code Puppy" \
     ".local/share/opencode" "code-puppy"; do
@@ -56,6 +56,12 @@ owner_stat() {
 mkdir -p "$ROOT/logs" "$ROOT/xdg/data" "$ROOT/xdg/config" "$ROOT/xdg/cache" "$ROOT/xdg/state" "$ROOT/tmp"
 OWNER_BEFORE="$(owner_pids)"
 STAT_BEFORE="$(owner_stat)"
+# r3 (owner 「办法1」): the shared preferences domain is compared by key names / types / size, not mtime.
+PLIST="$REAL_HOME/Library/Preferences/com.tide.codepuppy.plist"
+mkdir -p "$ROOT/prefs"
+/usr/bin/python3 -I "$HERE/prefs-guard.py" snapshot "$PLIST" "$ROOT/prefs/$LABEL.plist" || refuse "could not snapshot the preferences domain"
+echo "$STAT_BEFORE" > "$ROOT/logs/$LABEL.owner-stat"
+echo "$OWNER_BEFORE" > "$ROOT/logs/$LABEL.owner-pids"
 ENVV=(PATH=/usr/bin:/bin:/usr/sbin:/sbin HOME="$ROOT/home" CFFIXED_USER_HOME="$ROOT/home" TMPDIR="$ROOT/tmp/"
   XDG_DATA_HOME="$ROOT/xdg/data" XDG_CONFIG_HOME="$ROOT/xdg/config" XDG_CACHE_HOME="$ROOT/xdg/cache" XDG_STATE_HOME="$ROOT/xdg/state"
   USER="$(/usr/bin/id -un)" LOGNAME="$(/usr/bin/id -un)" SHELL=/bin/zsh LANG=zh_CN.UTF-8 CODEPUPPY_CDP=1
@@ -101,5 +107,6 @@ LOCK="$ROOT/home/Library/Application Support/ai.opencode.desktop/SingletonLock"
 echo "single-instance lock: <root>/home/Library/Application Support/ai.opencode.desktop/SingletonLock -> $(readlink "$LOCK")"
 [ "$(owner_pids)" = "$OWNER_BEFORE" ] || kill_red "the owner's app process list changed: [$OWNER_BEFORE] -> [$(owner_pids)]"
 [ "$(owner_stat)" = "$STAT_BEFORE" ] || kill_red "owner-side path metadata changed: $(diff <(echo "$STAT_BEFORE") <(owner_stat) | tr '\n' ' ')"
+/usr/bin/python3 -I "$HERE/prefs-guard.py" compare "$PLIST" "$ROOT/prefs/$LABEL.plist" || kill_red "preferences-domain guard"
 ps -o command= -p "$PID" | grep -q -- '--use-mock-keychain' || kill_red "running main process lacks --use-mock-keychain"
 echo "LAUNCH GATE: OK — owner app pids unchanged, owner-side paths unchanged, mock keychain on the running process"

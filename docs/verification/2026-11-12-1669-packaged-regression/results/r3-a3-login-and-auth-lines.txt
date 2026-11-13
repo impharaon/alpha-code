@@ -1,0 +1,7 @@
+21:33:35.786                    › engine data directory <root>/A/xdg/data/opencode also holds other OpenCode data (auth.json) — Code Puppy shares this directory with standalone OpenCode installs (S7); it reads only <root>/A/xdg/da
+21:33:41.069                    › [req063] global ecosystem content declined — external dirs stay invisible (files untouched)
+21:33:46.141                    › codepuppy-auth: opening authorize url { url: 'https://codepuppy.cn/auth/authorize' }
+21:34:18.097                    › deep link received via open-url { url: 'null/callback?<redacted>' }
+21:34:18.126                    › codepuppy-auth: login complete { mode: 'platform' }
+21:34:18.209                    › engine data directory <root>/A/xdg/data/opencode also holds other OpenCode data (auth.json) — Code Puppy shares this directory with standalone OpenCode installs (S7); it reads only <root>/A/xdg/da
+21:34:18.127                    › respawning sidecar { reason: 'identity-change' }

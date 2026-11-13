@@ -32,7 +32,9 @@ describe("immutable Alpha contract pin", () => {
     // `cancelling`, and CloudJobCancelResultV1 appears. The desktop client moved in the same PR.
     // alpha-web#283 (REQ-236): issuer/audience move to codepuppy-web / codepuppy-platform-*; the
     // desktop decoder moved in the same PR (alpha-platform feat/283-codepuppy-identity @ 3f2f0dd).
-    expect(lock.commit).toBe("3f2f0dda43066b42eac584d27e75844d42635369")
+    // alpha-code#1686 / platform#582: AccountStatusV1 (the form preflight) joins the bundle at 491707f;
+    // 3f2f0dd..491707f only adds $defs to the wire schema, nothing the desktop already decodes moves.
+    expect(lock.commit).toBe("491707fc72694506ca9bd4af24f1daaeb06a2438")
     expect(CODEPUPPY_CONTRACT_VERSION).toBe(1)
   })
 
@@ -42,8 +44,8 @@ describe("immutable Alpha contract pin", () => {
     }
     // 22 = 17 (#681 moved the model-catalog producer fixture onto its own pin) + 5 from
     // platform#255: cancel-result + cancelling-status producers and the three invalid
-    // idempotency-key fixtures.
-    expect(lock.files.length).toBe(22)
+    // idempotency-key fixtures; + 1 from platform#582: the account-status producer.
+    expect(lock.files.length).toBe(23)
     for (const file of lock.files) {
       const bytes = new Uint8Array(await Bun.file(resolve(vendor, file.path)).arrayBuffer())
       expect(createHash("sha256").update(bytes).digest("hex"), file.path).toBe(file.sha256)
@@ -61,8 +63,26 @@ describe("producer and consumer fixtures", () => {
       "contracts/v1/fixtures/producer/cloud-job-status.json",
       "contracts/v1/fixtures/producer/cloud-job-status-cancelling.json",
       "contracts/v1/fixtures/producer/ledger-page.json",
+      "contracts/v1/fixtures/producer/account-status.json",
     ]
     for (const path of paths) expect(validateFixture(await fixture(path)), path).toBe(true)
+  })
+
+  // alpha-code#1686: the form preflight decodes the platform's own capture, and stays strict —
+  // an unknown field or an admission code outside FAILURE_CODES is a contract break, not a refusal.
+  test("AccountStatusV1 producer fixture decodes; drifted shapes are rejected", async () => {
+    const producer = await fixture("contracts/v1/fixtures/producer/account-status.json")
+    const text = JSON.stringify(producer.value)
+    expect(decodeJsonContract("AccountStatusV1", text, "cloud-http").task?.reserve?.hold_fen).toBe(producer.value.task.reserve.hold_fen)
+    const extra = structuredClone(producer.value)
+    extra.account.wallet.credit_fen = 1
+    expect(() => decodeContract("AccountStatusV1", extra, "cloud-http")).toThrow(ContractIncompatibleError)
+    const code = structuredClone(producer.value)
+    code.task.admission = { ok: false, code: "account_on_fire", reason: "x" }
+    expect(() => decodeContract("AccountStatusV1", code, "cloud-http")).toThrow(ContractIncompatibleError)
+    const refused = structuredClone(producer.value)
+    refused.task.admission = { ok: false, code: "route_usage_stopped", reason: "x" }
+    expect(decodeContract("AccountStatusV1", refused, "cloud-http").task?.admission.code).toBe("route_usage_stopped")
   })
 
   // platform#255: `cancelling` is "cancel accepted, stop protocol not yet closed" — a live state.

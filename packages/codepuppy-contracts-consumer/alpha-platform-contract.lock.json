@@ -1,10 +1,10 @@
 {
   "repo": "jinjunnn/alpha-platform",
-  "commit": "3f2f0dda43066b42eac584d27e75844d42635369",
+  "commit": "491707fc72694506ca9bd4af24f1daaeb06a2438",
   "files": [
     {
       "path": "contracts/v1/alpha-wire-contracts.schema.json",
-      "sha256": "1a6097134f3130a0324ec0bc6c83447a908f287443a220a4af7f51c2506ca091"
+      "sha256": "fef51a77e585443a8244c2f94f49711f225eff5c960d70a4cfac747589989619"
     },
     {
       "path": "contracts/v1/artifact-descriptor.schema.json",
@@ -41,6 +41,10 @@
     {
       "path": "contracts/v1/fixtures/producer/ledger-page.json",
       "sha256": "fd03726647c8864248e244c2d8ea753fee0a0466cdf29a6ef723213850fa8a66"
+    },
+    {
+      "path": "contracts/v1/fixtures/producer/account-status.json",
+      "sha256": "aaf43ca519630068778c816fdc8471411531d9bbf1312a14bbaf462b6a2216b7"
     },
     {
       "path": "contracts/v1/fixtures/consumers/alpha-code-224/cloud-and-artifact.json",

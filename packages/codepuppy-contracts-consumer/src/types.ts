@@ -238,6 +238,27 @@ export type ArtifactListV1 = {
   result: unknown
 }
 
+// alpha-code#1686 / platform#582:账户与首步准入的只读投影(MCP `account_status` 与 HTTP 预检同一份)。
+// 金额一律整数 fen、额度一律整数 credits;`task` 只在请求带 task 时出现。界面只读 `task.admission` 判结论。
+export type AccountStatusAdmissionV1 = { ok: boolean; code?: string; reason?: string }
+export type AccountStatusWindowV1 = { remaining_credits: number; limit_credits: number; resets_in_min: number }
+export type AccountStatusV1 = {
+  schema_version: 1
+  account: {
+    suspended: boolean
+    plan: { status: "active" | "none" | "dev_bypass"; tier: string; window5h?: AccountStatusWindowV1; window7d?: AccountStatusWindowV1 }
+    wallet: { balance_fen: number; available_fen: number }
+    wallet_overflow: boolean
+    admission: AccountStatusAdmissionV1
+  }
+  task?: {
+    task: string
+    estimate: { available: true; amount_fen: number } | { available: false; reason: string }
+    reserve?: { action_id: string; hold_fen: number; allowance_leg_fen: number; wallet_leg_fen: number }
+    admission: AccountStatusAdmissionV1
+  }
+}
+
 export type ContractValues = {
   TokenClaimsV1: TokenClaimsV1
   UploadManifestV1: UploadManifestV1
@@ -250,4 +271,5 @@ export type ContractValues = {
   CloudJobCancelResultV1: CloudJobCancelResultV1
   ArtifactListV1: ArtifactListV1
   ArtifactDescriptorV1: ArtifactDescriptorV1
+  AccountStatusV1: AccountStatusV1
 }

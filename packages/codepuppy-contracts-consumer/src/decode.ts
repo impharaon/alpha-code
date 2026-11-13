@@ -49,6 +49,8 @@ function buildValidators() {
     // exactly the optimistic-overwrite path the ticket forbids.
     CloudJobCancelResultV1: ajv.compile({ $ref: "alpha-wire-contracts.schema.json#/$defs/CloudJobCancelResultV1" }),
     ArtifactListV1: ajv.compile({ $ref: "alpha-wire-contracts.schema.json#/$defs/ArtifactListV1" }),
+    // alpha-code#1686 / platform#582:云任务表单提交前的只读预检(GET /v1/cloud/account-status)。
+    AccountStatusV1: ajv.compile({ $ref: "alpha-wire-contracts.schema.json#/$defs/AccountStatusV1" }),
     ArtifactDescriptorV1: ajv.compile({ $ref: "artifact-descriptor.schema.json" }),
   }
 }

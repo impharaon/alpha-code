@@ -22,7 +22,7 @@ last_reviewed: 2026-11-13
   - 契约:alpha-platform 合并提交 `491707f`(`contracts/v1/alpha-wire-contracts.schema.json` 的 `$defs/AccountStatusV1` 与 producer fixture `contracts/v1/fixtures/producer/account-status.json`);路由已在生产(alpha-cloud `c18151f0`)。
   - 界面稿(owner 2026-11-13 批准):alpha-code `a35bb81c26`(分支 `design/1686-cloud-form-preflight`,**未并入 alpha、无 PR**)——现行稿 `docs/design/current/customization-center/design.html#cloud-preflight`、增量稿 `docs/design/2026-11-13-1686-cloud-form-preflight-r3/frame.html`(含文案表与「给实现」表)、组件稿 `docs/design/2026-11-13-library-card-kv/frame.html`、`docs/design/system/components.md` 的 Pending 两行。
   - Issue [alpha-code#1686](https://github.com/impharaon/alpha-code/issues/1686);基线 `origin/alpha` @ `ee8dfa0c27`。
-- 核对:待编排器核对。
+- 核对:`d76a8082d0` · 编排器(Claude Fable 5.2)· 通过。裁决:D0 合并画稿分支(本会话的合并被 lane 钩子拦下,改由编排器执行,见偏离记录);D1 owner 未答,按批准稿实现(只显示卡片),一行切换留在下方;D2 通过(签名加身份,纯续期仍不广播,换号时预检区与账户弹层都清空重取);第 7 步生产只读请求获准(一次,不进自动测试);按次定价句不实现;三处元格式化不在本票统一。
 
 路径缩写:`R/` = `packages/ui-mac/src/renderer/`,`M/` = `packages/ui-mac/src/main/`,`C/` = `packages/codepuppy-contracts-consumer/`。
 

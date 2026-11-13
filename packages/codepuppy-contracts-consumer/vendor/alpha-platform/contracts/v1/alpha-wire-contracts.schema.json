@@ -43,6 +43,9 @@
       "$ref": "#/$defs/PreauthCheckResultV1"
     },
     {
+      "$ref": "#/$defs/AccountStatusV1"
+    },
+    {
       "$ref": "#/$defs/PriceSnapshotV1"
     },
     {
@@ -1496,6 +1499,7 @@
             "job_max_tokens_exceeded",
             "account_allowance_exhausted",
             "account_wallet_insufficient",
+            "route_usage_stopped",
             "account_suspended",
             "account_admission_rate_exceeded"
           ]
@@ -1730,6 +1734,7 @@
                     "job_max_tokens_exceeded",
                     "account_allowance_exhausted",
                     "account_wallet_insufficient",
+                    "route_usage_stopped",
                     "account_suspended",
                     "account_admission_rate_exceeded"
                   ]
@@ -1814,6 +1819,7 @@
                     "job_max_tokens_exceeded",
                     "account_allowance_exhausted",
                     "account_wallet_insufficient",
+                    "route_usage_stopped",
                     "account_suspended",
                     "account_admission_rate_exceeded"
                   ]
@@ -1835,6 +1841,318 @@
             "hold_fen",
             "allowance_leg_fen",
             "wallet_leg_fen",
+            "admission"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "account"
+      ],
+      "additionalProperties": false
+    },
+    "AccountStatusV1": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "type": "number",
+          "const": 1
+        },
+        "account": {
+          "type": "object",
+          "properties": {
+            "suspended": {
+              "type": "boolean"
+            },
+            "plan": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "none",
+                    "dev_bypass"
+                  ]
+                },
+                "tier": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "window5h": {
+                  "type": "object",
+                  "properties": {
+                    "remaining_credits": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "limit_credits": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "resets_in_min": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "remaining_credits",
+                    "limit_credits",
+                    "resets_in_min"
+                  ],
+                  "additionalProperties": false
+                },
+                "window7d": {
+                  "type": "object",
+                  "properties": {
+                    "remaining_credits": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "limit_credits": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "resets_in_min": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "remaining_credits",
+                    "limit_credits",
+                    "resets_in_min"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "status",
+                "tier"
+              ],
+              "additionalProperties": false
+            },
+            "wallet": {
+              "type": "object",
+              "properties": {
+                "balance_fen": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "available_fen": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "balance_fen",
+                "available_fen"
+              ],
+              "additionalProperties": false
+            },
+            "wallet_overflow": {
+              "type": "boolean"
+            },
+            "admission": {
+              "type": "object",
+              "properties": {
+                "ok": {
+                  "type": "boolean"
+                },
+                "code": {
+                  "type": "string",
+                  "enum": [
+                    "document_request_invalid",
+                    "document_backend_unavailable",
+                    "document_quality_evidence_invalid",
+                    "document_quality_package_invalid",
+                    "document_quality_render_invalid",
+                    "document_quality_content_mismatch",
+                    "document_quality_review_rejected",
+                    "document_data_invalid",
+                    "image_request_invalid",
+                    "image_backend_unavailable",
+                    "image_upstream_failed",
+                    "image_safety_rejected",
+                    "image_region_rejected",
+                    "image_artifact_failed",
+                    "pipeline_output_empty",
+                    "job_max_iter_exceeded",
+                    "job_max_tokens_exceeded",
+                    "account_allowance_exhausted",
+                    "account_wallet_insufficient",
+                    "route_usage_stopped",
+                    "account_suspended",
+                    "account_admission_rate_exceeded"
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048
+                }
+              },
+              "required": [
+                "ok"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "suspended",
+            "plan",
+            "wallet",
+            "wallet_overflow",
+            "admission"
+          ],
+          "additionalProperties": false
+        },
+        "task": {
+          "type": "object",
+          "properties": {
+            "task": {
+              "type": "string",
+              "minLength": 1
+            },
+            "estimate": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "available": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "amount_fen": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "available",
+                    "amount_fen"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "available": {
+                      "type": "boolean",
+                      "const": false
+                    },
+                    "reason": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "available",
+                    "reason"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "reserve": {
+              "type": "object",
+              "properties": {
+                "action_id": {
+                  "type": "string",
+                  "enum": [
+                    "tool.document_generate",
+                    "tool.image_generate",
+                    "model.invoke.chat",
+                    "model.invoke.messages",
+                    "tool.web_search",
+                    "tool.web_fetch",
+                    "tool.vision",
+                    "tool.decide"
+                  ]
+                },
+                "hold_fen": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "allowance_leg_fen": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "wallet_leg_fen": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "action_id",
+                "hold_fen",
+                "allowance_leg_fen",
+                "wallet_leg_fen"
+              ],
+              "additionalProperties": false
+            },
+            "admission": {
+              "type": "object",
+              "properties": {
+                "ok": {
+                  "type": "boolean"
+                },
+                "code": {
+                  "type": "string",
+                  "enum": [
+                    "document_request_invalid",
+                    "document_backend_unavailable",
+                    "document_quality_evidence_invalid",
+                    "document_quality_package_invalid",
+                    "document_quality_render_invalid",
+                    "document_quality_content_mismatch",
+                    "document_quality_review_rejected",
+                    "document_data_invalid",
+                    "image_request_invalid",
+                    "image_backend_unavailable",
+                    "image_upstream_failed",
+                    "image_safety_rejected",
+                    "image_region_rejected",
+                    "image_artifact_failed",
+                    "pipeline_output_empty",
+                    "job_max_iter_exceeded",
+                    "job_max_tokens_exceeded",
+                    "account_allowance_exhausted",
+                    "account_wallet_insufficient",
+                    "route_usage_stopped",
+                    "account_suspended",
+                    "account_admission_rate_exceeded"
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048
+                }
+              },
+              "required": [
+                "ok"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "task",
+            "estimate",
             "admission"
           ],
           "additionalProperties": false
@@ -2554,6 +2872,30 @@
             "absent_upstream",
             "absent_client_disconnect"
           ]
+        },
+        "client_disconnect_estimate": {
+          "type": "object",
+          "properties": {
+            "input_source": {
+              "type": "string",
+              "enum": [
+                "authoritative",
+                "estimated"
+              ]
+            },
+            "output_source": {
+              "type": "string",
+              "enum": [
+                "authoritative",
+                "estimated"
+              ]
+            }
+          },
+          "required": [
+            "input_source",
+            "output_source"
+          ],
+          "additionalProperties": false
         },
         "tokens_in": {
           "type": "integer",

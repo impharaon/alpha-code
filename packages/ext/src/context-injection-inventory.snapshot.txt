@@ -42,6 +42,7 @@ tool.codepuppy_reload.args.reason                       text      tool-arg-descr
 tool.codepuppy_reload.description                       text      tool-description         373    1024   36%
 vision.system-note-offline                              text      system                   251    1024   25%
 vision.tool.refused                                     text      vision-block              24    1024    2%
+agent-mention.delegate                                  template  agent-mention            100    1024   10%
 attachment.unavailable.failed                           template  attachment-block         227    1024   22%
 attachment.unavailable.missing                          template  attachment-block         289    1024   28%
 cloud-contract.refused                                  template  tool-output              159    1024   16%
@@ -65,7 +66,7 @@ rebrand.identity-kimi                                   rebrand   system        
 rebrand.identity-meta                                   rebrand   system                    84     512   16%
 rebrand.identity-trinity                                rebrand   system                    97     512   19%
 rebrand.tool-use-meta                                   rebrand   system                    33     512    6%
-fragments: 65; injected bytes: 27266; declared limits total: 127488
+fragments: 66; injected bytes: 27366; declared limits total: 128512
 references (paths / verbs / definitions supplied by others — carry no Code Puppy text, not counted):
   ref.mcp                /mcp               云 MCP server 定义(type / url / oauth / headers.Authorization = {file:} 引用):ext 经 mcp.transform 装(cloud-websearch-kill.ts),项目 MCP 经同一 transform 补缺;ui-mac 主进程直写配置(codepuppy-config-injection.ts / cloud-sidecar-config.ts / mcp-default-deny.ts / ext-disabled-injection.ts);工具表是远端 server 的字
   ref.schema             /$schema           ui-mac 无继承 config 时种下的 JSON Schema URL(codepuppy-config-injection.ts:91)

@@ -6,7 +6,7 @@ import fs from "node:fs"
 import path from "node:path"
 import { engineSlot, type EngineSandbox } from "./engine-sandbox"
 import { buildEngineServerOptions } from "../src/main/engine-server-options"
-import { withEngineAuthorization } from "../src/main/engine-authorization"
+import { engineAuthorization, withEngineAuthorization } from "../src/main/engine-authorization"
 import { injectCodePuppyConfig } from "../src/main/codepuppy-config-injection"
 import { secretFilePath, secretFileRef } from "../src/main/codepuppy-secret-files"
 import { buildHubRequestReply, buildHubViewReply } from "../src/main/codepuppy-sidecar-messages"
@@ -101,6 +101,8 @@ export type HostOptions = {
   modelBaseURL: string
   /** 用户在 Code Puppy 里加的本地 MCP(codepuppy.jsonc 里的 `probe`,引擎经显式文件读它),每次 tools/call 记进这个文件。 */
   mcpCallLog?: string
+  /** codepuppy.jsonc 里另加的 MCP 服务器(名字 → 定义);注入在 codepuppyEngine() 里就合并用户文件,所以要在这里给。 */
+  mcp?: Record<string, unknown>
   /** 项目目录里的文件(相对路径 → 内容),例如 `opencode.json`。 */
   projectFiles?: Record<string, string>
   /** 引擎的库文件(默认按 engineSlot 分配);升级迁移要让 main 改写的库与引擎打开的库是同一个文件。 */
@@ -117,6 +119,10 @@ export type Running = {
   send: (method: string, route: string, body?: unknown) => Promise<{ status: number; json: any }>
   /** 引擎的原始分发(口令已补上,同生产 main 的 onBeforeSendHeaders):生产引擎适配器(engine-adapter createEngineFetch)接在它上面。 */
   fetch: EngineFetch
+  /** 引擎真监听的源地址(`http://127.0.0.1:<port>`):renderer 直连的就是它(I8),要测连接数的用它。 */
+  url: string
+  /** main 在 `onBeforeSendHeaders` 里给 renderer 发往引擎源的请求补的那个 `Authorization` 值。 */
+  authorization: string
   close: () => Promise<void>
 }
 
@@ -133,10 +139,17 @@ export function codepuppyEngine(options: HostOptions) {
   process.env.CODEPUPPY_BASE_URL = options.modelBaseURL
   process.env.CODEPUPPY_PLATFORM_AUTH_REF = secretFileRef(userData, "CODEPUPPY_API_KEY")
   process.env.CODEPUPPY_POLICY_ACCOUNT = `t-${name}-${Math.random().toString(36).slice(2)}`
-  if (options.mcpCallLog)
+  if (options.mcpCallLog || options.mcp)
     fs.writeFileSync(
       path.join(process.env.CODEPUPPY_GLOBAL_DIR, "codepuppy.jsonc"),
-      JSON.stringify({ mcp: { probe: { type: "local", command: [process.execPath, MCP_FIXTURE], environment: { CODEPUPPY_MCP_CALL_LOG: options.mcpCallLog } } } }),
+      JSON.stringify({
+        mcp: {
+          ...(options.mcpCallLog
+            ? { probe: { type: "local", command: [process.execPath, MCP_FIXTURE], environment: { CODEPUPPY_MCP_CALL_LOG: options.mcpCallLog } } }
+            : {}),
+          ...options.mcp,
+        },
+      }),
     )
   fakeMainPort()
 
@@ -205,7 +218,13 @@ export function codepuppyEngine(options: HostOptions) {
     const ready = async () => (!withExt || (await status("codepuppy.ext")) === "active") && (await status("codepuppy.test.engine-probe")) === "active"
     for (let i = 0; i < 200 && !(await ready()); i++) await Bun.sleep(50)
     if (withExt && (await status("codepuppy.ext")) !== "active") throw new Error("the real ext is not active in the embedded engine")
-    return { send, fetch: (request) => fetch!(request), close: () => engine.close() }
+    return {
+      send,
+      fetch: (request) => fetch!(request),
+      url: engine.url,
+      authorization: engineAuthorization(password),
+      close: () => engine.close(),
+    }
   }
   return { start, slot, projectDirectory: slot.projectDirectory, userData, injection, content }
 }

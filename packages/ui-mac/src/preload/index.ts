@@ -306,6 +306,7 @@ const api: ElectronAPI = {
     status: (jobId) => ipcRenderer.invoke("cloud-status", jobId),
     cancel: (jobId) => ipcRenderer.invoke("cloud-cancel", jobId),
     artifacts: (jobId) => ipcRenderer.invoke("cloud-artifacts", jobId),
+    accountStatus: (task) => ipcRenderer.invoke("cloud-account-status", task),
     // REQ-092:descriptor-only 下载通道(进度=事件订阅;内容字节永不过 IPC)。
     downloadArtifact: (directory, runId, artifact) =>
       ipcRenderer.invoke("cloud-artifact-download", directory, runId, artifact),

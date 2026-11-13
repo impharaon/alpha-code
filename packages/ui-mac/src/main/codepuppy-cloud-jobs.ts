@@ -18,7 +18,7 @@ import {
   type RoutePurpose,
 } from "@codepuppy/contracts-consumer"
 import { resolveEndpoints } from "./codepuppy-endpoints"
-import { getAccessToken } from "./codepuppy-auth"
+import { getAccessToken, getAuthIdentityTag } from "./codepuppy-auth"
 // [#918→#940] 平台拒绝 → 错误字符串的唯一咽喉(分类码优先,无码保持 http-<status> 不猜)。
 import { httpErrorCode } from "./platform-error-code"
 import { classifyNetFailure } from "@opencode/schema/codepuppy-net-failure"
@@ -42,6 +42,7 @@ import type {
   CloudJobCancelResult,
   CloudJobStatus,
   CloudArtifactList,
+  CloudAccountStatus,
 } from "../preload/types"
 import type { createExplicitUploadRequest } from "./codepuppy-upload-manifest"
 
@@ -192,6 +193,21 @@ export const getCloudJobStatus = (jobId: string): Promise<CloudResult<CloudJobSt
     undefined,
     (text) => scrubInlineContent(decodeJsonContract("CloudJobStatusV1", text, "cloud-http")),
   )
+
+// alpha-code#1686(DESIGN-cloud-job-form-preflight §4.4):云任务表单提交前的只读预检。与账户摘要同一把
+// `account.read` 令牌;只带 task,不带 format。只作提示:不重试,超时/拒绝都原样交给 renderer 归类。
+// 身份在读令牌的同一时刻记下 —— `authed` 在第一次 await 之前同步取令牌,这里在同一个同步段里先取身份;
+// 响应回来时身份已变(换号或登出)就丢掉结果,上一个账号的余额不出主进程。
+export const getCloudAccountStatus = async (task: string): Promise<CloudResult<CloudAccountStatus>> => {
+  const identity = getAuthIdentityTag()
+  const result = await authed(
+    `${CODEPUPPY_PATHS.cloudAccountStatus}?task=${encodeURIComponent(task)}`,
+    "account.read",
+    undefined,
+    (text) => decodeJsonContract("AccountStatusV1", text, "cloud-http"),
+  )
+  return getAuthIdentityTag() === identity ? result : { error: "identity-changed" }
+}
 
 // 取消 job。#400 / platform#255:响应是版本化的 CloudJobCancelResultV1 —— 服务端可判定结果
 // (accepted + 当前 status,可能是 `cancelling` 中间态),经严格 decode 才回 renderer;裸 JSON.parse

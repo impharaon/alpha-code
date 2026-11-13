@@ -3,7 +3,7 @@ import type { WslServersPlatform } from "@opencode-ai/app/wsl/types"
 import type { UpdaterState } from "@opencode-ai/app/updater"
 import type { CodePuppyEndpoints } from "../shared/codepuppy-config"
 // Type-only (erased at build): the IPC row must not restate the wire's kind enum and drift from it.
-import type { LedgerFactKindV1 } from "@codepuppy/contracts-consumer"
+import type { AccountStatusV1, LedgerFactKindV1 } from "@codepuppy/contracts-consumer"
 import type {
   AuthorizationConfirmationWire,
   CapabilityDiffWire,
@@ -481,6 +481,8 @@ export type CloudJobEvent = { event: string; data: unknown; id?: string }
 /** Same shape as AccountResult; distinct alias for the cloud jobs surface.
  *  `#1572`:`error: "network"` 时可带 `netLayer`(卡在哪一层,@opencode/schema/codepuppy-net-failure),`error` 码集合不变。 */
 export type CloudResult<T> = T | { error: string; netLayer?: NetFailureLayer }
+/** alpha-code#1686:云任务表单的只读预检结果(平台 AccountStatusV1,主进程已严格解码)。 */
+export type CloudAccountStatus = AccountStatusV1
 export type UploadFindingKind = "contact" | "identity" | "credential" | "protected" | "unknown"
 export type UploadPreview = {
   pipeline: "code-review"
@@ -1258,6 +1260,8 @@ export type ElectronAPI = {
     /** #400:返回的是解码过的 CloudJobCancelResultV1 —— 服务端可判定结果,不是本地乐观覆盖。 */
     cancel: (jobId: string) => Promise<CloudResult<CloudJobCancelResult>>
     artifacts: (jobId: string) => Promise<CloudResult<CloudArtifactList>>
+    /** alpha-code#1686:提交前预检(余额、额度、首步准入)。只作提示,不参与放行。 */
+    accountStatus: (task: string) => Promise<CloudResult<CloudAccountStatus>>
     /** REQ-092:descriptor-only 下载 —— renderer 只送 descriptor/meta,main 流式写入
      *  <directory>/.codepuppy/runs/<runId>/artifacts/(bearer 与内容字节都不过 IPC);
      *  进度经 onArtifactProgress 推回,结果 = 落盘路径或分类错误。 */

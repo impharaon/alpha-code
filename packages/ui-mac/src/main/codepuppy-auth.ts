@@ -321,6 +321,9 @@ function publish() {
     platformStatus: state.platformStatus,
     // #1543:「正在续」与「续不上」对渲染层是两句不同的话 —— 只翻这一位也必须送达。
     refreshUnreachable: state.refreshUnreachable,
+    // alpha-code#1686:签发端的桌面令牌响应不带 email / plan,不先退出就换号时上面各项都不变 ——
+    // 账号标记(`account.read` 的 sub 哈希,跨续期稳定)让真换号必发、纯续期仍不发。只进签名,不进推送的状态。
+    identity: getAuthIdentityTag(),
   })
   if (sig === lastPublishedSig) return
   // R2 Minor2:先记账后发送会在 IPC 抛出时把这次状态「记成已发布」——后续同签名的 publish

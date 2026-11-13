@@ -10,7 +10,7 @@
 // mock.module 会污染同进程其它测试文件 ⇒ 真断言放这里,由 codepuppy-cloud-jobs.test.ts
 // 在隔离子进程里跑(cloud-ipc.test.ts 同款)。
 
-import { expect, mock, test } from "bun:test"
+import { describe, expect, mock, test } from "bun:test"
 import type { RoutePurpose } from "@codepuppy/contracts-consumer"
 
 const BASE = "https://cloud.invalid"
@@ -31,11 +31,15 @@ const transientFailures: Array<"network" | "reset" | "dns" | number | { status: 
 const CANCEL_OK = { schema_version: 1, job_id: JOB, status: "cancelling", accepted: true }
 let cancelBody = JSON.stringify(CANCEL_OK)
 
+/** alpha-code#1686:主进程身份(`getAuthIdentityTag`)的可变桩;`duringFetch` 让用例在请求在途时换人。 */
+let identityTag: string | undefined = "identity-a"
+let duringFetch: (() => void) | undefined
 mock.module("./codepuppy-auth", () => ({
   getAccessToken: (purpose: RoutePurpose) => {
     requested.push(purpose)
     return tokenFor(purpose)
   },
+  getAuthIdentityTag: () => identityTag,
 }))
 mock.module("./codepuppy-endpoints", () => ({
   resolveEndpoints: () => ({ cloud: BASE }),
@@ -77,7 +81,9 @@ mock.module("./codepuppy-artifact-download", () => ({
 //   GET    /v1/cloud/jobs/:id           → cloud.read
 //   POST   /v1/cloud/jobs/:id/cancel    → cloud.dispatch
 //   GET    /v1/cloud/jobs/:id/artifacts → artifact.read
+//   GET    /v1/cloud/account-status     → account.read(alpha-code#1686 / platform#582)
 const REQUIRED_ACTION: Array<[RegExp, RoutePurpose]> = [
+  [/^\/v1\/cloud\/account-status$/, "account.read"],
   [/^\/v1\/cloud\/jobs\/[^/]+\/artifacts$/, "artifact.read"],
   [/^\/v1\/cloud\/jobs\/[^/]+\/cancel$/, "cloud.dispatch"],
   [/^\/v1\/cloud\/jobs\/[^/]+$/, "cloud.read"],
@@ -93,8 +99,16 @@ const artifactListBody = JSON.stringify({
   result: null,
 })
 
+// alpha-code#1686:预检的 200 体是平台随契约发布的 producer fixture(真路由采集),不手写。
+const accountStatusFixture = (await Bun.file(
+  new URL("../../../codepuppy-contracts-consumer/vendor/alpha-platform/contracts/v1/fixtures/producer/account-status.json", import.meta.url),
+).json()) as { value: Record<string, unknown> }
+let accountStatusBody = JSON.stringify(accountStatusFixture.value)
+
 const bodyFor = (path: string): string =>
-  path.endsWith("/artifacts")
+  path === "/v1/cloud/account-status"
+    ? accountStatusBody
+    : path.endsWith("/artifacts")
     ? artifactListBody
     : path.endsWith("/cancel")
       ? cancelBody
@@ -126,7 +140,8 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
   const path = url.pathname
   const headers = (init?.headers as Record<string, string> | undefined) ?? {}
   const bearer = String(headers.authorization ?? "")
-  wire.push({ path, bearer, headers, ...(typeof init?.body === "string" ? { body: init.body } : {}) })
+  wire.push({ path: path === "/v1/cloud/account-status" ? path + url.search : path, bearer, headers, ...(typeof init?.body === "string" ? { body: init.body } : {}) })
+  duringFetch?.()
   const injected = transientFailures.shift()
   if (injected === "network") throw new TypeError("fetch failed (injected transient)")
   // #1551 AC7:Node/undici 的真实形状 —— TypeError("fetch failed") + cause.code。
@@ -368,4 +383,55 @@ test("#1551 下载失败日志行含阶段、净化后的 detail 与已收字节
   expect(line).toContain("socket closed")
   expect(line).not.toContain("tok.artifact.read")
   expect(line).not.toContain("SECRETQUERY")
+})
+
+describe("alpha-code#1686 form preflight: GET /v1/cloud/account-status", () => {
+  test("uses the account.read token, sends only task, and decodes the pinned producer fixture", async () => {
+    requested.length = 0
+    wire.length = 0
+    identityTag = "identity-a"
+    const result = await jobs.getCloudAccountStatus("research")
+    expect(result).toEqual(accountStatusFixture.value as never)
+    expect(lastWire().path).toBe("/v1/cloud/account-status?task=research")
+    expect(lastWire().bearer).toBe(`Bearer ${tokenFor("account.read")}`)
+    expect(requested).toEqual(["account.read"])
+  })
+
+  test("the identity changing while the request is in flight discards the payload", async () => {
+    identityTag = "identity-a"
+    duringFetch = () => {
+      identityTag = "identity-b"
+    }
+    try {
+      expect(await jobs.getCloudAccountStatus("research")).toEqual({ error: "identity-changed" })
+    } finally {
+      duringFetch = undefined
+    }
+    // Logged out mid-flight is also a different identity: A's numbers never reach the renderer.
+    identityTag = "identity-a"
+    duringFetch = () => {
+      identityTag = undefined
+    }
+    try {
+      expect(await jobs.getCloudAccountStatus("research")).toEqual({ error: "identity-changed" })
+    } finally {
+      duringFetch = undefined
+      identityTag = "identity-a"
+    }
+  })
+
+  test("refusals come back as their stable code through the existing throat; drift is contract-incompatible", async () => {
+    transientFailures.push({ status: 400, body: JSON.stringify({ error: "retired", code: "pipeline_kind_retired" }) })
+    expect(await jobs.getCloudAccountStatus("html-generate")).toEqual({ error: "pipeline_kind_retired" })
+    transientFailures.push({ status: 503, body: JSON.stringify({ error: "down", code: "account_unavailable" }) })
+    expect(await jobs.getCloudAccountStatus("research")).toEqual({ error: "account_unavailable" })
+    transientFailures.push(404)
+    expect(await jobs.getCloudAccountStatus("research")).toEqual({ error: "http-404" })
+    accountStatusBody = JSON.stringify({ ...accountStatusFixture.value, quote_fen: 1 })
+    try {
+      expect(await jobs.getCloudAccountStatus("research")).toEqual({ error: "contract-incompatible" })
+    } finally {
+      accountStatusBody = JSON.stringify(accountStatusFixture.value)
+    }
+  })
 })

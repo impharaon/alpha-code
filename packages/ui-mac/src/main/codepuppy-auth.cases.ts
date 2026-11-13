@@ -1449,6 +1449,65 @@ describe("clearing the recovering platform state", () => {
   })
 })
 
+// alpha-code#1686 D2:签发端的桌面令牌响应不带 email / plan,所以「不先退出、直接登成另一个账号」时
+// 旧签名(status/mode/email/plan/…)一个字段都不变,auth-state 被吞,订阅它的面(表单预检区、账户弹层)
+// 继续显示上一个账号的数。签名带上账号标记之后:真换号必发,纯续期(同一个 sub)仍然不发。
+describe("alpha-code#1686 the auth-state broadcast follows the account identity", () => {
+  test("a renewal stays silent; switching account without logging out broadcasts, without the identity in the payload", async () => {
+    const pushed: Record<string, unknown>[] = []
+    const win = windowWith((channel, payload) => {
+      if (channel === "auth-state" && isRecord(payload)) pushed.push(payload)
+    })
+    storeAuth({
+      platformAccessTokens: tokenBundle(),
+      refreshToken: "refresh-a",
+      expiresAt: Date.now() + 15 * 60_000,
+      lifetimeMs: 15 * 60_000,
+    })
+    setAuthDeps({
+      getWindow: () => win,
+      respawn: () => {},
+      applyCredentials: () => "applied",
+    })
+    expect(getAuthState().platformStatus).toBe("ready")
+    pushed.length = 0
+    const accountA = getAuthIdentityTag()
+
+    // 续期:同一个 sub,整套令牌换新 ⇒ 不广播(否则每 10 分钟所有订阅面都会清空重取)。
+    globalThis.fetch = (async () =>
+      jsonResponse({ platform_access_tokens: tokenBundle("new"), refresh_token: "refresh-a2", expires_in: 3600 })) as typeof fetch
+    expect(await refreshTokens()).toMatchObject({ outcome: "refreshed" })
+    expect(getAuthIdentityTag()).toBe(accountA!)
+    expect(pushed).toEqual([])
+
+    // 不先退出,直接登成 B(签发端照实不带 email / plan)⇒ 必须广播。
+    globalThis.fetch = (async () =>
+      jsonResponse({
+        platform_access_tokens: tokenBundle("b", "tenant-b"),
+        refresh_token: "refresh-b",
+        session_id: "session-b",
+        expires_in: 3600,
+      })) as typeof fetch
+    await startAuth()
+    const pkce: unknown = JSON.parse(readFileSync(join(dataPath, "codepuppy-pkce.json"), "utf8"))
+    if (!isRecord(pkce) || typeof pkce.state !== "string") throw new Error("expected a persisted pkce state")
+    const callback = new URL(deepLinkFor.authCallback())
+    callback.searchParams.set("code", "code-b")
+    callback.searchParams.set("state", pkce.state)
+    expect(handleAuthDeepLink(callback.toString())).toBe(true)
+    for (let tick = 0; tick < 500 && getAuthIdentityTag() === accountA; tick++)
+      await new Promise((resolve) => setTimeout(resolve, 1))
+    expect(getAuthIdentityTag()).not.toBe(accountA!)
+    expect(pushed.length).toBe(1)
+    expect(getAuthState().account).toEqual({ email: undefined, plan: undefined })
+    // 标记只进签名,不进推给 renderer 的状态。
+    const sent = JSON.stringify(pushed[0])
+    expect(sent).not.toContain(accountA!)
+    expect(sent).not.toContain(getAuthIdentityTag()!)
+    expect(Object.keys(pushed[0]!)).not.toContain("identity")
+  })
+})
+
 describe("#1571 probeStoredAuthDecryption — 改名后自检,与 load() 同一判据", () => {
   const writeEncrypted = (auth: Record<string, unknown>) =>
     writeFileSync(

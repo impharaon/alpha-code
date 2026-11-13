@@ -70,6 +70,8 @@ export const CODEPUPPY_PATHS = {
   cloudJobs: "/v1/cloud/jobs",
   /** cloud: authenticated artifact content download → {cloudArtifacts}/{artifactId}/content. */
   cloudArtifacts: "/v1/cloud/artifacts",
+  /** cloud: read-only account + first-step admission for one task (`?task=`), alpha-code#1686 / platform#582. */
+  cloudAccountStatus: "/v1/cloud/account-status",
   /** account-server: balance / membership / token-usage summary. */
   accountSummary: "/v1/account/summary",
   /** account-server: billing transaction history. */

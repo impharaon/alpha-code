@@ -118,6 +118,10 @@ export type HostOptions = {
   /** `#1698`:启动文档里的治理云 MCP 与 kill-switch(缺省:没有云 MCP、kill-switch 关)。 */
   cloudMcp?: TestBootstrapInput["cloudMcp"]
   killSwitch?: boolean
+  /** `#1698` G3:启动文档里的审批期限、出厂技能目录与运维开关(缺省:期限 300 s、没有出厂技能、开关全关)。 */
+  askTimeoutMs?: number
+  factoryDirs?: string[]
+  switches?: TestBootstrapInput["switches"]
 }
 
 export type Running = {
@@ -144,6 +148,11 @@ export function codepuppyEngine(options: HostOptions) {
     policyAccount: `acct:${createHash("sha256").update(`${name}-${Math.random()}`).digest("hex")}`,
     cloudMcp: options.cloudMcp,
     killSwitch: options.killSwitch,
+    // 引擎开关与交给 start() 的同一份(生产里 sidecar 从文档取 start() 的两项,core 的项目监听读同一个 filewatcher)
+    engine: { modelsFetch: false, filewatcher: options.filewatcher ?? false },
+    askTimeoutMs: options.askTimeoutMs,
+    factoryDirs: options.factoryDirs,
+    switches: options.switches,
   })
   const key = secretFilePath(userData, "CODEPUPPY_API_KEY")
   fs.mkdirSync(path.dirname(key), { recursive: true })

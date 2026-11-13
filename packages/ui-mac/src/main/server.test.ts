@@ -710,11 +710,10 @@ describe("spawnLocalServer", () => {
   })
 })
 
-// `#1698`(DESIGN-upgrade-bootstrap-config §4.2 / §4.5,G1 形态):main 交给 sidecar 的决定走 start 消息里的启动文档。生产
-// spawnLocalServer 的 fork 环境里,已迁走的 Code Puppy 键一个都不在 —— 设计 §2.2 的旧键全部导出、并且全部写进
-// CODEPUPPY_ENV_ALLOWLIST_EXTRA 也一样(前缀拒绝排在 EXTRA 之前);还没迁的 G3 键照今天过河,每个键组的提交把自己的键从
-// STILL_IN_ENV 里删掉,G3 之后只剩 EXTRA 本身。反向臂:去掉 sidecar-env.ts 的前缀拒绝或把它排到 EXTRA 之后 ⇒ G1 / G2 键回到 env ⇒ 红;
-// 把某个 G2 键放回 sidecar-env.ts 的迁移期表(CODEPUPPY_KEYS_NOT_YET_IN_BOOTSTRAP)与 EXACT ⇒ 它回到 env ⇒ 红。
+// `#1698`(DESIGN-upgrade-bootstrap-config §4.2 / §4.5 最终形态):main 交给 sidecar 的决定走 start 消息里的启动文档。生产
+// spawnLocalServer 的 fork 环境里,Code Puppy 的键只剩用户的逃生门 CODEPUPPY_ENV_ALLOWLIST_EXTRA 本身 —— 设计 §2.2 的旧键全部导出、
+// 并且全部写进 EXTRA 也一样(前缀拒绝排在 EXTRA 之前)。反向臂:去掉 sidecar-env.ts 的前缀拒绝,或把它排到 EXTRA 之后,或给前缀拒绝
+// 加回任一个例外键(再加回 EXACT)⇒ 那个键回到 env ⇒ 红。
 describe("#1698 fork 的环境与 start 消息", () => {
   const G1 = ["CODEPUPPY_GLOBAL_DIR", "CODEPUPPY_JSONC_TRUTH_DISABLE", "CODEPUPPY_LEGACY_INSTALL_ROOT", "CODEPUPPY_OFFICE_MCP_MANIFEST", "CODEPUPPY_EXT_BUNDLED_MANIFEST"]
   const G2 = [
@@ -722,15 +721,14 @@ describe("#1698 fork 的环境与 start 消息", () => {
     "CODEPUPPY_CLOUD_MCP_DEF", "CODEPUPPY_CLOUD_MCP_ARM", "CODEPUPPY_WEBSEARCH_DISABLE", "CODEPUPPY_LOCAL_WEBSEARCH_DENY",
     "CODEPUPPY_CLOUD_WEBSEARCH_DENY", "CODEPUPPY_POLICY_ACCOUNT", "CODEPUPPY_EGRESS_PROXY", "CODEPUPPY_PROVIDER_ALLOW",
   ]
-  const STILL_IN_ENV = [
-    // G3
+  const G3 = [
     "CODEPUPPY_FACTORY_SKILL_DIRS", "CODEPUPPY_FACTORY_DENY_SKILLS", "CODEPUPPY_MODELS_DISABLE", "CODEPUPPY_IDENTITY_DISABLE",
     "CODEPUPPY_BEHAVIOR_DISABLE", "CODEPUPPY_PROMPT_REBRAND_DISABLE", "CODEPUPPY_ECOSYSTEM_INHERIT", "CODEPUPPY_AUTOMATION_DISABLE",
     "CODEPUPPY_READONLY_DISABLE", "CODEPUPPY_EXT_VERBOSE", "CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS",
   ]
-  const OLD_KEYS = [...G1, ...G2, ...STILL_IN_ENV]
+  const OLD_KEYS = [...G1, ...G2, ...G3]
 
-  test("§2.2 的旧键全部导出并写进 EXTRA:fork 环境里没有 G1 的键,余下的 CODEPUPPY_* 只有 EXTRA 与还没迁的键组;start 消息带启动文档、不再带六个决定字段", async () => {
+  test("§2.2 的旧键全部导出并写进 EXTRA:fork 环境里的 CODEPUPPY_* 只剩 EXTRA 本身;start 消息带启动文档、不再带六个决定字段", async () => {
     const saved = Object.fromEntries([...OLD_KEYS, "CODEPUPPY_ENV_ALLOWLIST_EXTRA"].map((name) => [name, process.env[name]]))
     const root = process.env.CODEPUPPY_GLOBAL_DIR!
     try {
@@ -752,10 +750,7 @@ describe("#1698 fork 的环境与 start 消息", () => {
       await result.health.wait
       await result.listener.stop()
       const env = (forkCalls.at(-1)?.options.env ?? {}) as Record<string, string | undefined>
-      for (const name of [...G1, ...G2]) expect(env, name).not.toHaveProperty(name)
-      const allowed = new Set(["CODEPUPPY_ENV_ALLOWLIST_EXTRA", ...STILL_IN_ENV])
-      expect(Object.keys(env).filter((name) => name.toUpperCase().startsWith("CODEPUPPY_") && !allowed.has(name))).toEqual([])
-      expect(env.CODEPUPPY_MODELS_DISABLE).toBe("1") // 还没迁的键组照今天过河(G3 迁走它)
+      expect(Object.keys(env).filter((name) => name.toUpperCase().startsWith("CODEPUPPY_"))).toEqual(["CODEPUPPY_ENV_ALLOWLIST_EXTRA"])
       const start = starts.at(-1)!
       for (const field of ["userDataPath", "initialDirectory", "databasePath", "configDirectory", "extPluginPath", "registryChannel"]) expect(start).not.toHaveProperty(field)
       expect(start.bootstrap).toMatchObject({ v: 1, paths: { userData: userDataPath, globalRoot: expect.stringContaining("codepuppy-state") } })
@@ -766,6 +761,10 @@ describe("#1698 fork 的环境与 start 消息", () => {
       expect(doc.webSearch.killSwitch).toBe(true)
       expect(doc.platform).toEqual({ credentialRef: `{file:${secretFilePath(userDataPath, "CODEPUPPY_API_KEY")}}`, defaultModelOverride: "1" })
       expect(doc).not.toHaveProperty("cloudMcp")
+      // G3 在 main 判一次:"1" 让每个开关都开;期限 "1" 是合法的 1 ms;出厂技能目录取 boot 时对账的结果(本进程没对账 ⇒ 空)
+      expect(Object.values(doc.switches)).toEqual(Object.values(doc.switches).map(() => true))
+      expect(doc.permission).toEqual({ askTimeoutMs: 1 })
+      expect(doc.skills).toEqual({ factoryDirs: [] })
     } finally {
       for (const [name, value] of Object.entries(saved)) {
         if (value === undefined) delete process.env[name]

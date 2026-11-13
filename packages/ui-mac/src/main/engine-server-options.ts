@@ -61,6 +61,7 @@ const truthy = (value: string | undefined) => value === "1" || value?.toLowerCas
  * 两个仍由用户 shell 导出可调的桌面默认(v1 时代经同名环境变量进引擎):models.dev 远程拉取默认关
  * (`OPENCODE_DISABLE_MODELS_FETCH`,server.ts 的 preferAppEnv 设默认值 "1"),文件监听默认开
  * (`OPENCODE_EXPERIMENTAL_FILEWATCHER`,同处设默认值 "true")。H1 下引擎不读这两个名字,读它们的只有这里。
+ * `#1698`:main 的启动文档构建器每次 fork 调它一次(main 自己的环境),结果写进文档的 `engine`;sidecar 读文档,不再按自己的环境判。
  */
 export function engineDesktopToggles(env: Record<string, string | undefined>) {
   return {

@@ -1,4 +1,4 @@
-// `#1698`(DESIGN-upgrade-bootstrap-config §4.4,G1 / G2):main 的启动文档构建器 —— 字段来自给定的权威输入,逃生阀与 G2 各键按今天
+// `#1698`(DESIGN-upgrade-bootstrap-config §4.4,G1 / G2 / G3):main 的启动文档构建器 —— 字段来自给定的权威输入,逃生阀与 G2 各键按今天
 // 读方的判法,随包清单与 ext 目录同在同缺,形状不对在 main 这一侧就抛;对用户导出的地址从不抛,不合格就省略并记一行。
 import { describe, expect, test } from "bun:test"
 import { buildCodePuppyBootstrap, type CodePuppyBootstrapInput } from "./codepuppy-bootstrap-build"
@@ -14,6 +14,7 @@ const input = (overrides: Partial<CodePuppyBootstrapInput> = {}): CodePuppyBoots
   extPluginPath: "/app/Resources/codepuppy-ext",
   officeMcpManifest: "/app/Resources/office-mcp/tools.json",
   registryChannel: "stable",
+  factorySkillDirs: [],
   env: {},
   log: () => {},
   ...overrides,
@@ -25,6 +26,20 @@ const NO_G2 = {
   policy: {},
   network: {},
 }
+
+const NO_SWITCHES = {
+  modelsDisabled: false,
+  identityDisabled: false,
+  behaviorDisabled: false,
+  promptRebrandDisabled: false,
+  automationDisabled: false,
+  readonlyDisabled: false,
+  ecosystemInherit: false,
+  extVerbose: false,
+}
+
+/** 没有任何运维导出时的 G3 字段:桌面缺省的两个引擎开关(不拉 models.dev、文件监听开)、无出厂技能目录、期限缺省、开关全关。 */
+const NO_G3 = { engine: { modelsFetch: false, filewatcher: true }, skills: { factoryDirs: [] }, permission: {}, switches: NO_SWITCHES }
 
 describe("buildCodePuppyBootstrap(G1:路径与通道)", () => {
   test("每个字段取自给定输入;随包清单是 ext 目录旁边的 bundled-tools.json(ext 读的就是这个字段)", () => {
@@ -43,6 +58,7 @@ describe("buildCodePuppyBootstrap(G1:路径与通道)", () => {
       },
       registryChannel: "stable",
       ...NO_G2,
+      ...NO_G3,
     })
   })
 
@@ -121,5 +137,61 @@ describe("buildCodePuppyBootstrap(G2:平台 / 云 / web search / 策略分区 / 
 
   test("分区不是 acct:<64 位十六进制> ⇒ 结构性缺陷,在 main 这一侧就抛", () => {
     expect(() => buildCodePuppyBootstrap(input({ policyAccount: "user@example.com" }))).toThrow(expect.objectContaining({ reason: "invalid", path: "policy.account" }))
+  })
+})
+
+describe("buildCodePuppyBootstrap(G3:开关与引擎设置,§4.4 表)", () => {
+  const switchesOf = (env: Record<string, string | undefined>) => buildCodePuppyBootstrap(input({ env })).switches
+  test("没有任何运维导出:桌面缺省的引擎开关、没有出厂技能目录、期限缺省、八个开关全关", () => {
+    const document = buildCodePuppyBootstrap(input())
+    expect({ engine: document.engine, skills: document.skills, permission: document.permission, switches: document.switches }).toEqual(NO_G3)
+  })
+
+  test("`=== \"1\"` 的三个开关:\"1\" 才开;\"\"、\"true\" 同未设", () => {
+    const rows = [
+      ["CODEPUPPY_MODELS_DISABLE", "modelsDisabled"],
+      ["CODEPUPPY_PROMPT_REBRAND_DISABLE", "promptRebrandDisabled"],
+      ["CODEPUPPY_ECOSYSTEM_INHERIT", "ecosystemInherit"],
+    ] as const
+    for (const [name, field] of rows) {
+      expect([name, switchesOf({ [name]: "1" })[field]]).toEqual([name, true])
+      for (const value of ["", "true", undefined]) expect([name, value, switchesOf({ [name]: value })[field]]).toEqual([name, value, false])
+    }
+  })
+
+  test("任意非空串即开的五个开关:\"0\" 也开,\"\" 同未设", () => {
+    const rows = [
+      ["CODEPUPPY_IDENTITY_DISABLE", "identityDisabled"],
+      ["CODEPUPPY_BEHAVIOR_DISABLE", "behaviorDisabled"],
+      ["CODEPUPPY_AUTOMATION_DISABLE", "automationDisabled"],
+      ["CODEPUPPY_READONLY_DISABLE", "readonlyDisabled"],
+      ["CODEPUPPY_EXT_VERBOSE", "extVerbose"],
+    ] as const
+    for (const [name, field] of rows) {
+      for (const value of ["1", "0", "yes"]) expect([name, value, switchesOf({ [name]: value })[field]]).toEqual([name, value, true])
+      for (const value of ["", undefined]) expect([name, value, switchesOf({ [name]: value })[field]]).toEqual([name, value, false])
+    }
+    // 每个开关只动自己那一个字段
+    expect(switchesOf({ CODEPUPPY_EXT_VERBOSE: "1" })).toEqual({ ...NO_SWITCHES, extVerbose: true })
+  })
+
+  test("两个引擎开关按 engineDesktopToggles:空串 ⇒ 拉取开、监听关(§10 R16,今天如此)", () => {
+    const engineOf = (env: Record<string, string | undefined>) => buildCodePuppyBootstrap(input({ env })).engine
+    expect(engineOf({ OPENCODE_DISABLE_MODELS_FETCH: "", OPENCODE_EXPERIMENTAL_FILEWATCHER: "" })).toEqual({ modelsFetch: true, filewatcher: false })
+    expect(engineOf({ OPENCODE_DISABLE_MODELS_FETCH: "0", OPENCODE_EXPERIMENTAL_FILEWATCHER: "false" })).toEqual({ modelsFetch: true, filewatcher: false })
+    expect(engineOf({ OPENCODE_DISABLE_MODELS_FETCH: "true", OPENCODE_EXPERIMENTAL_FILEWATCHER: "1" })).toEqual({ modelsFetch: false, filewatcher: true })
+    // R9:yes / on 在 sidecar 里与引擎监听同一个判法 ⇒ 关
+    expect(engineOf({ OPENCODE_EXPERIMENTAL_FILEWATCHER: "yes" }).filewatcher).toBe(false)
+  })
+
+  test("审批期限:正的安全整数毫秒进文档;不合法(含空串)⇒ 省略,不抛", () => {
+    const permissionOf = (value: string | undefined) => buildCodePuppyBootstrap(input({ env: { CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS: value } })).permission
+    expect(permissionOf("1500")).toEqual({ askTimeoutMs: 1500 })
+    for (const bad of [undefined, "", "0", "-5", "abc", "1.5", "Infinity", "1e400", "9007199254740993"]) expect([bad, permissionOf(bad)]).toEqual([bad, {}])
+  })
+
+  test("出厂技能目录取 boot 时对账交出的那份,原样", () => {
+    const dirs = ["/app/Resources/skills/skill-creator", "/app/Resources/factory-skills/agent-creator"]
+    expect(buildCodePuppyBootstrap(input({ factorySkillDirs: dirs })).skills).toEqual({ factoryDirs: dirs })
   })
 })

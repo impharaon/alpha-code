@@ -40,7 +40,7 @@
 //   · `/commands/<name>/template|description`:逐字等于登记簿里 **id 为 `command.<name>.<field>`、sink 对应** 的那条登记文字
 //     (换名、换格、多一个字节都点名;`subagent` 是布尔,不是字符串叶子);
 //   · `/skills/<i>`:是目录路径,按**来源**放行(与 REQ-063 导入目录同理,不走登记簿 —— #1665 起登记簿删了 v1 的 `/skills/paths`
-//     引用):要么是这一轮交给注入的出厂目录(CODEPUPPY_FACTORY_SKILL_DIRS)之一,要么落在当前环境根的 `ext-store/` 之下
+//     引用):要么是这一轮交给注入的出厂目录(启动文档的 skills.factoryDirs)之一,要么落在当前环境根的 `ext-store/` 之下
 //     (已安装技能当前那一代的真实目录),要么是项目技能目录那一条相对路径 `./.codepuppy/skills`(`#1667` 编排器裁决
 //     2026-11-12:2.x 按会话所在的项目目录解析它;判官在这里自己写死这条,不读生产的常量);别的路径点名。
 //     目录里技能的正文是技能作者的字,不在这道咽喉里判。
@@ -69,6 +69,7 @@ import { injectCodePuppyConfig } from "./codepuppy-config-injection"
 import { secretFilePath } from "./codepuppy-secret-files"
 import { CLOUD_MCP_SERVER_NAME, CLOUD_WEB_SEARCH_TOOL_ID, LOCAL_WEB_SEARCH_TOOL_ID, WITHHELD_CLOUD_MCP } from "./cloud-web-search"
 import { publishMainBootstrap, unpublishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
+import { tryCodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 
 // 注入读到的每一个 env 输入 + 它自己写出的 env 输出:逐个快照 / 清空 / 还原(与 codepuppy-config-injection.test.ts 同一份清单)。
 const MANAGED = [
@@ -104,8 +105,11 @@ const saved: Record<string, string | undefined> = {}
 let tmp = ""
 let userData = ""
 let codepuppyRoot = ""
+/** boot 时出厂技能对账的结果;每次 run() 经 main 的构建器写进启动文档 */
+let factorySkillDirs: string[] = []
 
 beforeEach(() => {
+  factorySkillDirs = []
   for (const k of MANAGED) {
     saved[k] = process.env[k]
     delete process.env[k]
@@ -206,7 +210,7 @@ function judge(before: unknown, after: unknown, importedDir: string): Judgement 
     return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel)
   }
   // 技能目录的两个来源:这一轮交给注入的出厂目录(测试自己给的输入),与当前环境根的 ext-store(已安装技能当前那一代的真实目录)。
-  const factorySkillDirs = JSON.parse(process.env.CODEPUPPY_FACTORY_SKILL_DIRS ?? "[]") as string[]
+  const factorySkillDirs = [...(tryCodePuppyBootstrap()?.skills.factoryDirs ?? [])]
   const projectSkillsSource = "./.codepuppy/skills"
   const storeRoot = path.join(codepuppyRoot, "ext-store")
   const insideStore = (dir: string) => {
@@ -293,7 +297,7 @@ type Run = Judgement & { before: Cfg; after: Cfg; importedDir: string; instructi
 function run(extPluginPath?: string): Run {
   const before: Cfg = {}
   // `#1698` G2:平台地址 / 默认模型 / 云 MCP / kill-switch 由 main 的构建器从它的环境(这里就是 process.env)写进启动文档,sidecar 在注入前发布
-  publishMainBootstrap({ userData })
+  publishMainBootstrap({ userData, factorySkillDirs })
   const result = injectCodePuppyConfig(userData, extPluginPath, "stable")
   expect(result.ok).toBe(true)
   // `#1667`(裁决 r1 第 2 条、C7 重裁):main 交给引擎的字分两处 —— 内联文档,与显式文件里 Code Puppy 那一层(出厂命令、skills、
@@ -353,7 +357,7 @@ function givenEnabledGeneration() {
 
 /** main 在 fork 时能给 sidecar 的全部输入一次到位:ext bundle 路径 + 平台密钥 + BYOK 密钥 + 默认模型 + 云 MCP 代付。 */
 function givenFullStack() {
-  process.env.CODEPUPPY_FACTORY_SKILL_DIRS = JSON.stringify([FACTORY_SKILL_DIR])
+  factorySkillDirs = [FACTORY_SKILL_DIR] // boot 时出厂技能对账的结果(main 写进启动文档的 skills.factoryDirs)
   plantSecret("CODEPUPPY_API_KEY", PLATFORM_KEY)
   plantSecret("DEEPSEEK_API_KEY", BYOK_KEY)
   process.env.CODEPUPPY_BASE_URL = "https://gateway.example.invalid/v1"

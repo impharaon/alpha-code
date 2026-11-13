@@ -14,11 +14,15 @@ const document = {
     engineConfigDirectory: "/u/config/opencode",
     officeMcpManifest: "/app/Resources/office-mcp/tools.json",
   },
-  // G2:每份文档都带(这一份:无云 MCP、无账户分区、无出网代理)
+  // G2 / G3:每份文档都带(这一份:无云 MCP、无账户分区、无出网代理、桌面缺省的引擎开关、无出厂技能、期限缺省、开关全关)
   platform: { credentialRef: "{file:/u/data/codepuppy-secrets/CODEPUPPY_API_KEY}" },
   webSearch: { killSwitch: false },
   policy: {},
   network: {},
+  engine: { modelsFetch: false, filewatcher: true },
+  skills: { factoryDirs: [] },
+  permission: {},
+  switches: { modelsDisabled: false, identityDisabled: false, behaviorDisabled: false, promptRebrandDisabled: false, automationDisabled: false, readonlyDisabled: false, ecosystemInherit: false, extVerbose: false },
 }
 
 afterEach(() => __resetCodePuppyBootstrapForTests())

@@ -55,22 +55,9 @@ const EXACT = new Set([
   "NODE_OPTIONS",
   "NODE_EXTRA_CA_CERTS",
   "NODE_TLS_REJECT_UNAUTHORIZED",
-  // alpha non-secret controls the SIDECAR reads (injectCodePuppyConfig/buildCodePuppyModelConfig).
+  // `#1698`(design §4.5 最终形态):Code Puppy 交给 sidecar 的决定(路径、平台、云、网络、开关、出厂技能、引擎设置)全部在启动文档里
+  // (codepuppy-bootstrap-build.ts),这里不再有任何 Code Puppy 的键 —— 只剩逃生门本身(sidecar 可以在诊断里报出它)。
   // NEVER add a token/key var here — that's what the {file:} channel is for (A6).
-  // `#1698` G2:平台地址 / 凭据引用 / 默认模型 / 云 MCP 地址 / kill-switch 与两个 web search 判决、出网代理标记改走启动文档的
-  // platform / cloudMcp / webSearch / network(codepuppy-bootstrap-build.ts)。
-  "CODEPUPPY_MODELS_DISABLE",
-  "CODEPUPPY_IDENTITY_DISABLE",
-  "CODEPUPPY_BEHAVIOR_DISABLE",
-  // REQ-062 路线A 逃生门(ext 插件在引擎进程内读:T1 转写 + T3/T6 内容接管一键回退)
-  "CODEPUPPY_PROMPT_REBRAND_DISABLE",
-  // REQ-065 修订:出厂技能目录(main 启动时算好,ext config hook 内存注入 —— 不落用户配置文件)
-  "CODEPUPPY_FACTORY_SKILL_DIRS",
-  // REQ-067:出厂默认禁项(− 用户解禁),同为内存注入、零明文
-  "CODEPUPPY_FACTORY_DENY_SKILLS",
-  // `#1698` G1:环境 mutable root(CODEPUPPY_GLOBAL_DIR)与 REQ-059 两个逃生阀不再经环境过河 —— 它们在启动文档的
-  // `paths.globalRoot` / `paths.userConfig` 里(codepuppy-bootstrap-build.ts),main 与 sidecar 由同一份文档同口径(#606)。
-  // the escape hatch itself, so the sidecar can surface it in diagnostics
   "CODEPUPPY_ENV_ALLOWLIST_EXTRA",
 ])
 
@@ -82,22 +69,7 @@ const PREFIXES = ["OPENCODE_", "XDG_", "LC_", "ELECTRON_"]
 
 // `#1698`(DESIGN-upgrade-bootstrap-config §4.5):Code Puppy 交给 sidecar 的决定走启动文档,不走环境 —— `CODEPUPPY_` 前缀
 // (不分大小写)一律拒,排在所有放行规则(含 EXTRA)之前:把已迁走的键写进 CODEPUPPY_ENV_ALLOWLIST_EXTRA 也放不回去。
-// 唯一的永久例外是 EXTRA 本身。下面这张表是迁移期的:还没迁进文档的键组(G3 开关与引擎设置)
-// 今天怎么过河就怎么过河,每个键组的提交把自己的键从这里删掉(G2 已删),G3 之后整张表删除。
-const CODEPUPPY_KEYS_NOT_YET_IN_BOOTSTRAP = new Set([
-  // G3
-  "CODEPUPPY_FACTORY_SKILL_DIRS",
-  "CODEPUPPY_FACTORY_DENY_SKILLS",
-  "CODEPUPPY_MODELS_DISABLE",
-  "CODEPUPPY_IDENTITY_DISABLE",
-  "CODEPUPPY_BEHAVIOR_DISABLE",
-  "CODEPUPPY_PROMPT_REBRAND_DISABLE",
-  "CODEPUPPY_ECOSYSTEM_INHERIT",
-  "CODEPUPPY_AUTOMATION_DISABLE",
-  "CODEPUPPY_READONLY_DISABLE",
-  "CODEPUPPY_EXT_VERBOSE",
-  "CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS",
-])
+// 唯一的例外是 EXTRA 本身(迁移期的例外表随 G3 删除)。
 const CODEPUPPY_PREFIX = "CODEPUPPY_"
 const ALLOWLIST_EXTRA = "CODEPUPPY_ENV_ALLOWLIST_EXTRA"
 
@@ -264,7 +236,7 @@ export function createSidecarEnv(source: NodeJS.ProcessEnv = process.env): Recor
     // clearing both DENY rules first, so no casing variant can bypass them (#603 R2).
     if (isSecretish(key)) continue
     if (NEVER_INHERIT.has(key.toLowerCase())) continue
-    if (key.toUpperCase().startsWith(CODEPUPPY_PREFIX) && key !== ALLOWLIST_EXTRA && !CODEPUPPY_KEYS_NOT_YET_IN_BOOTSTRAP.has(key)) continue
+    if (key.toUpperCase().startsWith(CODEPUPPY_PREFIX) && key !== ALLOWLIST_EXTRA) continue
     const allowed = extra.has(key) || EXACT.has(key) || PREFIXES.some((prefix) => key.startsWith(prefix))
     if (!allowed) continue
     env[key] = String(value)

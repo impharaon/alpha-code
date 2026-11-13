@@ -20,7 +20,7 @@ import { prewarmInitialLocation } from "./sidecar-location-prewarm"
 import { publishInProcessEngine, type EngineFetch } from "./in-process-engine"
 // `#1667`(#1662 L5):OpenCode 2 嵌入 —— 选项对象、口令包装、ext 就绪判定各住在可 import 的模块里(本文件顶层副作用让它
 // 无法被测试 import),真判据见 engine-server-options.test.ts、sidecar-engine-host.test.ts、sidecar-ext-ready.test.ts。
-import { buildEngineServerOptions, engineDesktopToggles } from "./engine-server-options"
+import { buildEngineServerOptions } from "./engine-server-options"
 import { withEngineAuthorization } from "./engine-authorization"
 import { assertExtPluginActive } from "./sidecar-ext-ready"
 import { acceptCodePuppyBootstrap, assertEngineReadsBootstrap } from "./sidecar-bootstrap-gate"
@@ -164,7 +164,8 @@ async function start(command: StartCommand) {
     // 裁决书 R13 / N1:`start()` + `Transform`,不传 lifecycle。REQ-234 `#1531`(I1):`Transform` 那一刻同步发布进程内 fetch
     // —— 监听端口那张应用图的 dispatch app,外面包一层补口令。围栏拒掉连自己回环端口的连接,ext 只能走这一条。
     let inProcess: EngineFetch | undefined
-    const toggles = engineDesktopToggles(process.env)
+    // `#1698` G3:两个引擎开关由 main 按 engineDesktopToggles 判一次写进启动文档(design §10 R9:sidecar 里只有这一个判法)
+    const toggles = bootstrap.engine
     const started = await startEngine(
       buildEngineServerOptions({
         hostname: command.hostname,

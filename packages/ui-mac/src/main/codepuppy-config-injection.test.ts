@@ -52,6 +52,7 @@ import {
 } from "../../../ext/src/codepuppy-prompts"
 import { providerAllowList, publishProviderAllowList } from "../../../ext/src/provider-allow"
 import { publishTestBootstrap, testCloudMcp, unpublishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
+import type { CodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 const CLOUD_DISPATCH_TOOL_ID = cloudMcpToolId("cloud_dispatch")
 
 // 注入读到的每一个 env 输入 + 它自己写出的 env 输出:逐个快照/清空/还原,
@@ -88,7 +89,15 @@ let userData = ""
 
 // `#1698` G2:平台地址、默认模型覆盖、云 MCP 与 kill-switch 由 main 写进启动文档(sidecar 在注入之前发布),不再经环境。
 // 用例改这份状态,inject() 每次按它重新发布一份,再调注入 —— 与生产「每次 fork 一份文档」同序。
-type DocState = { baseURL?: string; defaultModel?: string; cloudMcpUrl?: string; killSwitch?: boolean }
+type DocState = {
+  baseURL?: string
+  defaultModel?: string
+  cloudMcpUrl?: string
+  killSwitch?: boolean
+  // G3:运维开关与出厂技能目录(main 从 CODEPUPPY_* 运维变量与 boot 时的出厂技能对账写进文档)
+  switches?: Partial<CodePuppyBootstrap["switches"]>
+  factoryDirs?: string[]
+}
 let doc: DocState = {}
 const publishDoc = () =>
   publishTestBootstrap({
@@ -102,7 +111,10 @@ const publishDoc = () =>
     },
     ...(doc.cloudMcpUrl ? { cloudMcp: testCloudMcp(doc.cloudMcpUrl, secretFilePath(userData, "CODEPUPPY_MCP_TOKEN")) } : {}),
     killSwitch: doc.killSwitch ?? false,
+    ...(doc.switches ? { switches: doc.switches } : {}),
+    ...(doc.factoryDirs ? { factoryDirs: doc.factoryDirs } : {}),
   })
+const setSwitch = (name: keyof CodePuppyBootstrap["switches"]) => (doc.switches = { ...doc.switches, [name]: true })
 
 /** 按 main 的 syncSecretFiles 姿势把密钥种进 {file:} 通道(A6:env 里从不出现密钥值)。 */
 const plantSecret = (varName: string, value: string) => {
@@ -258,7 +270,7 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
 
   test("C2:内联文档与显式文件都直接是 OpenCode 2 的配置键 —— 上游 normalize 零诊断、零改写,过 Config.Info 解码(登录 + BYOK 态,带出厂技能与命令)", () => {
     givenLoggedInWithByok()
-    process.env.CODEPUPPY_FACTORY_SKILL_DIRS = JSON.stringify([path.join(tmp, "factory")])
+    doc.factoryDirs = [path.join(tmp, "factory")]
     const { result, config, explicit } = inject(EXT_DIR)
     // 出厂命令与 skills 只在显式文件里(编排器裁决 r1 第 2 条),内联文档不再带
     expect(config.skills).toBeUndefined()
@@ -274,7 +286,7 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     const { config, explicit } = inject(EXT_DIR)
     expect(explicit?.policies).toEqual(config.policies)
     expect(explicit?.policies?.[0]).toEqual({ action: "provider.use", resource: "*", effect: "deny" })
-    process.env.CODEPUPPY_MODELS_DISABLE = "1"
+    setSwitch("modelsDisabled")
     expect(inject(EXT_DIR).explicit?.policies).toBeUndefined()
   })
 
@@ -286,7 +298,7 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     expect([...(providerAllowList() ?? [])]).toEqual(allowed)
     // R30:不进环境(引擎派生的子进程拿不到)
     expect(process.env.CODEPUPPY_PROVIDER_ALLOW).toBeUndefined()
-    process.env.CODEPUPPY_MODELS_DISABLE = "1"
+    setSwitch("modelsDisabled")
     inject(EXT_DIR)
     expect(providerAllowList()).toBeUndefined()
   })
@@ -318,7 +330,7 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
 
   test("S6 / C9:plugins 写 ext 目录与移除指令 -opencode.config.compatibility;CODEPUPPY_ECOSYSTEM_INHERIT=1 时不写移除指令", () => {
     expect(inject(EXT_DIR).config.plugins).toEqual([EXT_DIR, `-${ECOSYSTEM_COMPATIBILITY_PLUGIN}`])
-    process.env.CODEPUPPY_ECOSYSTEM_INHERIT = "1"
+    setSwitch("ecosystemInherit")
     expect(inject(EXT_DIR).config.plugins).toEqual([EXT_DIR])
   })
 
@@ -347,7 +359,7 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     // 项目技能目录那一条相对路径恒在(2.x 按会话所在的项目目录解析它),没有任何其它输入时就只有它
     expect(inject(EXT_DIR).explicit?.skills).toEqual(["./.codepuppy/skills"])
     const factory = [path.join(tmp, "factory", "a"), path.join(tmp, "factory", "b")]
-    process.env.CODEPUPPY_FACTORY_SKILL_DIRS = JSON.stringify(factory)
+    doc.factoryDirs = factory
     const live = plantGeneration("skill--enabled-one", "gen-000001-abcdef", ["skill--enabled-one"])
     plantGeneration("skill--not-enabled", "gen-000002-abcdef", ["skill--enabled-one"])
     expect(inject(EXT_DIR).explicit?.skills).toEqual([...factory, live, "./.codepuppy/skills"])
@@ -363,12 +375,37 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
       init: { template: CODEPUPPY_INIT_TEMPLATE, description: CODEPUPPY_INIT_DESCRIPTION },
       review: { template: CODEPUPPY_REVIEW_TEMPLATE, description: CODEPUPPY_REVIEW_DESCRIPTION, subagent: true },
     })
-    process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE = "1"
+    setSwitch("promptRebrandDisabled")
     expect(inject(EXT_DIR).explicit?.commands).toBeUndefined()
   })
 
+  test("`#1698` R6:CODEPUPPY_AUTOMATION_DISABLE / CODEPUPPY_READONLY_DISABLE(文档 switches)置位 ⇒ 对应助手不写;CODEPUPPY_IDENTITY_DISABLE / CODEPUPPY_BEHAVIOR_DISABLE ⇒ 对应说明文件不进 instructions(前两个此前被 sidecar 白名单丢掉,导出了也不生效)", () => {
+    const base = inject(EXT_DIR).config
+    const automation = ["codepuppy-automation", "codepuppy-automation-standard"]
+    for (const name of [...automation, "codepuppy-readonly"]) expect(Object.keys(base.agents ?? {})).toContain(name)
+    const instructions = (config: Injected) => ((config as { instructions?: string[] }).instructions ?? []).map((file) => path.basename(file))
+    expect(instructions(base)).toEqual(expect.arrayContaining(["codepuppy-identity.md", "codepuppy-behavior.md"]))
+    setSwitch("automationDisabled")
+    const noAutomation = inject(EXT_DIR).config
+    for (const name of automation) expect(Object.keys(noAutomation.agents ?? {})).not.toContain(name)
+    expect(Object.keys(noAutomation.agents ?? {})).toContain("codepuppy-readonly")
+    doc.switches = {}
+    setSwitch("readonlyDisabled")
+    const noReadonly = inject(EXT_DIR).config
+    expect(Object.keys(noReadonly.agents ?? {})).not.toContain("codepuppy-readonly")
+    expect(Object.keys(noReadonly.agents ?? {})).toEqual(expect.arrayContaining(automation))
+    doc.switches = {}
+    setSwitch("identityDisabled")
+    expect(instructions(inject(EXT_DIR).config)).not.toContain("codepuppy-identity.md")
+    doc.switches = {}
+    setSwitch("behaviorDisabled")
+    const noBehavior = instructions(inject(EXT_DIR).config)
+    expect(noBehavior).not.toContain("codepuppy-behavior.md")
+    expect(noBehavior).toContain("codepuppy-identity.md")
+  })
+
   test("CODEPUPPY_MODELS_DISABLE:不写 providers / policies,也不给 models.file", () => {
-    process.env.CODEPUPPY_MODELS_DISABLE = "1"
+    setSwitch("modelsDisabled")
     const { result, config } = inject(EXT_DIR)
     expect(result.ok).toBe(true)
     expect(config.providers).toBeUndefined()

@@ -6,9 +6,10 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { ConfigNormalize } from "@opencode/core/config/normalize"
 import { Permission } from "@opencode/core/permission"
-import { applyFactoryDeny, factoryDeniedSkills } from "../../../ext/src/factory-deny"
+import { applyFactoryDeny, FACTORY_DENIED_SKILLS as EXT_FACTORY_DENIED_SKILLS, factoryDeniedSkills } from "../../../ext/src/factory-deny"
 import {
   DEFAULT_BUILTIN_POLICY,
+  FACTORY_DENIED_SKILLS,
   applyBuiltinPolicy,
   effectiveFactoryDenied,
   materializeEdits,
@@ -219,11 +220,13 @@ describe("REQ-067 — 出厂默认禁内置化(deny 零明文)", () => {
       permission: { skill: { "customize-opencode": "allow", "*": "allow" } },
       command: { "customize-opencode": { template: "user's own" } },
     }
-    const denied = JSON.stringify(effectiveFactoryDenied(cleaned))
+    const denied = effectiveFactoryDenied(cleaned)
     // 2.x 没有整份配置的钩子:用户写的 allow 留在规则里,禁用由 ext 的 permission evaluate 钩子按这份名单一律改判 deny
     // (`packages/ext/src/plugin.ts`,判据 ext/src/plugin-host.test.ts「权威 · 出厂禁用技能」)。这里钉住钩子吃到的名单:
-    // customize-opencode 在、customize-codepuppy 不在。
-    expect(factoryDeniedSkills(denied)).toEqual(["customize-opencode"])
+    // customize-opencode 在、customize-codepuppy 不在;`#1698` R7:钩子的名单与 main 的菜单过滤是同一个常量,不经环境。
+    expect(factoryDeniedSkills()).toEqual(["customize-opencode"])
+    expect(denied).toEqual(factoryDeniedSkills())
+    expect(FACTORY_DENIED_SKILLS).toBe(EXT_FACTORY_DENIED_SKILLS)
     applyFactoryDeny(cfg, denied)
     expect(cfg.command["customize-opencode"].template).toBe("该技能(customize-opencode)已弃用。定制 Code Puppy 请改用 /customize-codepuppy。")
   })

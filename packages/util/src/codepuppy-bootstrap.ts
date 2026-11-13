@@ -5,7 +5,8 @@
 // 第一次读时用自己的解析器校验已发布的对象 —— 两份不同提交构建出的 bundle 混在一起,形状或版本不同就在第一次读时失败。
 // 本文件只 import `node:path`:它会进 ext bundle 与 sidecar 的 import 闭包,不带写盘点。
 //
-// 字段按迁移键组落地(design §9):G1 —— 路径与通道;G2 —— 平台、云、网络。
+// 字段按迁移键组落地(design §9):G1 —— 路径与通道;G2 —— 平台、云、网络;G3 —— 开关与引擎设置。
+// 唯一读环境的地方是无文档宿主的兼容入口 `codepuppyEngineSettings`(仓内 CLI 宿主、core 单测;sidecar 里文档先于引擎发布,到不了)。
 import path from "node:path"
 
 export const CODEPUPPY_BOOTSTRAP_VERSION = 1
@@ -33,6 +34,12 @@ export type CodePuppyBootstrap = {
   }
   /** 缺席 ⇒ 跳过 disabled-override 注入 */
   registryChannel?: "stable" | "preview" | "dev"
+  engine: {
+    /** start() 的 models.fetch */
+    modelsFetch: boolean
+    /** start() 的 fs.filewatcher,也是 core 项目级文件监听的开关 */
+    filewatcher: boolean
+  }
   platform: {
     /** 平台模型凭据文件的引用,不是凭据 */
     credentialRef: `{file:${string}}`
@@ -53,11 +60,52 @@ export type CodePuppyBootstrap = {
     }
   }
   webSearch: { killSwitch: boolean }
+  /** 出厂技能目录(绝对路径,可空):main 启动时出厂技能对账的结果 */
+  skills: { factoryDirs: string[] }
   /** /^acct:[0-9a-f]{64}$/;缺席 ⇒ 分区 "anonymous" */
   policy: { account?: string }
+  /** 正的安全整数毫秒;缺席 ⇒ 300000 */
+  permission: { askTimeoutMs?: number }
   /** /^http:\/\/127\.0\.0\.1:\d{1,5}$/;只在 darwin 在场 */
   network: { egressProxy?: string }
+  switches: {
+    modelsDisabled: boolean
+    identityDisabled: boolean
+    behaviorDisabled: boolean
+    promptRebrandDisabled: boolean
+    automationDisabled: boolean
+    readonlyDisabled: boolean
+    ecosystemInherit: boolean
+    extVerbose: boolean
+  }
 }
+
+/** 审批无人应答的期限缺省(ADR-038):300 s。 */
+export const ASK_TIMEOUT_MS_DEFAULT = 300_000
+
+/**
+ * 无文档宿主的兼容入口(design §4.3、§10 R13):引擎侧两项今天由用户环境可调的设置,只有这一个读法。
+ * 有文档 ⇒ 读文档(环境参数被忽略);无文档(仓内 CLI 宿主、core 单测)⇒ 逐字沿用今天的环境判法。
+ */
+export function codepuppyEngineSettings(env: Record<string, string | undefined> = process.env): {
+  /** 文档:permission.askTimeoutMs ?? 300000。无文档:CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS 为正整数则取之,否则 300000。 */
+  askTimeoutMs: number
+  /** 文档:engine.filewatcher。无文档:OPENCODE_EXPERIMENTAL_FILEWATCHER 去空白、转小写后 ∈ {true, 1, yes, on}。 */
+  projectWatch: boolean
+} {
+  const document = tryCodePuppyBootstrap()
+  if (document) return { askTimeoutMs: document.permission.askTimeoutMs ?? ASK_TIMEOUT_MS_DEFAULT, projectWatch: document.engine.filewatcher }
+  // 以下两段逐字是迁移前 core 的判法(packages/core/src/permission.ts 的 askTimeoutMs、core/src/filesystem/codepuppy-project-watch.ts)
+  const raw = env["CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS"]
+  const parsed = raw === undefined || raw === "" ? Number.NaN : Number(raw)
+  return {
+    askTimeoutMs: Number.isInteger(parsed) && parsed > 0 ? parsed : ASK_TIMEOUT_MS_DEFAULT,
+    projectWatch: ["true", "1", "yes", "on"].includes((env[PROJECT_WATCH_ENV] ?? "").trim().toLowerCase()),
+  }
+}
+
+/** 无文档宿主里项目文件监听的开关名(main 设缺省值 "true",owner 决定 B12)。 */
+export const PROJECT_WATCH_ENV = "OPENCODE_EXPERIMENTAL_FILEWATCHER"
 
 /**
  * 无凭据 URL:WHATWG `URL` 能解析;协议 https,或 http 且主机是 127.0.0.1 / localhost / [::1];username、password 为空;
@@ -104,7 +152,7 @@ const slot = globalThis as unknown as Record<symbol, unknown>
 export function parseCodePuppyBootstrap(value: unknown): CodePuppyBootstrap {
   const root = record(value, "")
   if (root.v !== CODEPUPPY_BOOTSTRAP_VERSION) throw new CodePuppyBootstrapError("version", "v")
-  only(root, ["v", "paths", "registryChannel", "platform", "cloudMcp", "webSearch", "policy", "network"], "")
+  only(root, ["v", "paths", "registryChannel", "engine", "platform", "cloudMcp", "webSearch", "skills", "policy", "permission", "network", "switches"], "")
   const paths = record(root.paths, "paths")
   only(paths, ["userData", "globalRoot", "userConfig", "initialDirectory", "database", "engineConfigDirectory", "extPlugin", "extBundledManifest", "officeMcpManifest"], "paths")
   const extPlugin = optional(paths, "extPlugin", "paths", absolute)
@@ -125,6 +173,17 @@ export function parseCodePuppyBootstrap(value: unknown): CodePuppyBootstrap {
   const network = record(root.network, "network")
   only(network, ["egressProxy"], "network")
   const egressProxy = optional(network, "egressProxy", "network", matching(EGRESS_PROXY))
+  const engine = record(root.engine, "engine")
+  only(engine, ["modelsFetch", "filewatcher"], "engine")
+  const skills = record(root.skills, "skills")
+  only(skills, ["factoryDirs"], "skills")
+  if (!Array.isArray(skills.factoryDirs)) throw new CodePuppyBootstrapError("invalid", "skills.factoryDirs")
+  const factoryDirs = skills.factoryDirs.map((dir, index) => absolute(dir, `skills.factoryDirs.${index}`))
+  const permission = record(root.permission, "permission")
+  only(permission, ["askTimeoutMs"], "permission")
+  const askTimeoutMs = optional(permission, "askTimeoutMs", "permission", positiveSafeInteger)
+  const switches = record(root.switches, "switches")
+  only(switches, SWITCHES, "switches")
   return deepFreeze({
     v: CODEPUPPY_BOOTSTRAP_VERSION,
     paths: {
@@ -139,6 +198,7 @@ export function parseCodePuppyBootstrap(value: unknown): CodePuppyBootstrap {
       officeMcpManifest: absolute(paths.officeMcpManifest, "paths.officeMcpManifest"),
     },
     ...(registryChannel === undefined ? {} : { registryChannel }),
+    engine: { modelsFetch: bool(engine.modelsFetch, "engine.modelsFetch"), filewatcher: bool(engine.filewatcher, "engine.filewatcher") },
     platform: {
       credentialRef: matching(FILE_REF)(platform.credentialRef, "platform.credentialRef") as `{file:${string}}`,
       ...(modelProxyBaseURL === undefined ? {} : { modelProxyBaseURL }),
@@ -146,10 +206,24 @@ export function parseCodePuppyBootstrap(value: unknown): CodePuppyBootstrap {
     },
     ...(cloudMcp === undefined ? {} : { cloudMcp }),
     webSearch: { killSwitch: bool(webSearch.killSwitch, "webSearch.killSwitch") },
+    skills: { factoryDirs },
     policy: account === undefined ? {} : { account },
+    permission: askTimeoutMs === undefined ? {} : { askTimeoutMs },
     network: egressProxy === undefined ? {} : { egressProxy },
+    switches: Object.fromEntries(SWITCHES.map((name) => [name, bool(switches[name], `switches.${name}`)])) as CodePuppyBootstrap["switches"],
   })
 }
+
+const SWITCHES = [
+  "modelsDisabled",
+  "identityDisabled",
+  "behaviorDisabled",
+  "promptRebrandDisabled",
+  "automationDisabled",
+  "readonlyDisabled",
+  "ecosystemInherit",
+  "extVerbose",
+] as const satisfies readonly (keyof CodePuppyBootstrap["switches"])[]
 
 /** sidecar 每个进程调用一次;第二次 ⇒ "republished"。把已校验的文档挂在 globalThis[Symbol.for("codepuppy.bootstrap")](与进程内 fetch 交接同一形状)。 */
 export function publishCodePuppyBootstrap(document: CodePuppyBootstrap): void {
@@ -241,6 +315,11 @@ function matching(pattern: RegExp) {
 
 function text(value: unknown, at: string): string {
   if (typeof value !== "string") throw new CodePuppyBootstrapError("invalid", at)
+  return value
+}
+
+function positiveSafeInteger(value: unknown, at: string): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) throw new CodePuppyBootstrapError("invalid", at)
   return value
 }
 

@@ -1,12 +1,14 @@
 // `#1698`(DESIGN-upgrade-bootstrap-config §4.4):main 每次 fork 构建一次启动文档,原样放进 start 消息的 `bootstrap`。
-// 输入全部来自现有权威(冻结环境快照、engine-paths.ts、ext 目录解析、资源根、applyAuthEnv 写进 main 环境的两个地址、
-// 当刻登录态的分区哈希、出网代理端口),由 spawnLocalServer 取好交进来;每个键沿用今天读方的判法,空串的含义按键保留。
+// 输入全部来自现有权威(冻结环境快照、engine-paths.ts、ext 目录解析、资源根、boot 时出厂技能对账的结果、applyAuthEnv 写进 main
+// 环境的两个地址、当刻登录态的分区哈希、出网代理端口),由 spawnLocalServer 取好交进来;每个键沿用今天读方的判法,空串的含义按键保留
+// (§4.4 表、§10 R16)。运维开关的名字对用户不变,只是读的地方收到这里一处。
 // 输出先过生产解析器:形状不对在 main 这一侧就抛(拒 fork),不等 sidecar 发现。对用户导出的值从不抛:不合格的地址省略并记一行。
 import path from "node:path"
 import { isCredentialFreeUrl, parseCodePuppyBootstrap, type CodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { materializeCloudMcpConfig } from "./cloud-sidecar-config"
 import { CLOUD_MCP_SERVER_NAME } from "./cloud-web-search"
 import { secretFileRef } from "./codepuppy-secret-files"
+import { engineDesktopToggles } from "./engine-server-options"
 
 export type CodePuppyBootstrapInput = {
   userDataPath: string
@@ -24,6 +26,8 @@ export type CodePuppyBootstrapInput = {
   policyAccount?: string
   /** 出网策略代理的端口(只在 darwin 起) */
   egressProxyPort?: number
+  /** boot 时出厂技能对账(reconcileFactorySkills)交出的目录;没对账 / 对账失败 ⇒ 空 */
+  factorySkillDirs: readonly string[]
   /** main 自己的环境:运维开关与 applyAuthEnv 写的地址只在这里读 */
   env: Record<string, string | undefined>
   /** 不合格的地址被省略时记一行(只写变量名,不写值) */
@@ -51,6 +55,8 @@ export function buildCodePuppyBootstrap(input: CodePuppyBootstrapInput): CodePup
       officeMcpManifest: input.officeMcpManifest,
     },
     ...(input.registryChannel ? { registryChannel: input.registryChannel } : {}),
+    // 两个引擎开关就是今天 sidecar 构造 start() 选项的那个判法(空串:拉取开、监听关)
+    engine: engineDesktopToggles(env),
     platform: {
       // REQ-236 `#1562`:平台模型请求的凭据只从这份文件现读(ext 的请求钩子);文档里只有引用
       credentialRef: secretFileRef(input.userDataPath, "CODEPUPPY_API_KEY"),
@@ -64,9 +70,27 @@ export function buildCodePuppyBootstrap(input: CodePuppyBootstrapInput): CodePup
       : {}),
     // ADR-009 B2 的能力总闸(任意非空串即开;两条腿的拒绝判决都等于它)
     webSearch: { killSwitch: Boolean(env.CODEPUPPY_WEBSEARCH_DISABLE) },
+    skills: { factoryDirs: [...input.factorySkillDirs] },
     policy: input.policyAccount ? { account: input.policyAccount } : {},
+    // ADR-038:正整数毫秒覆盖期限;不合法(含空串)⇒ 省略 ⇒ 缺省 300 s,从不是「没有期限」
+    permission: askTimeout(env.CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS),
     network: input.egressProxyPort === undefined ? {} : { egressProxy: `http://127.0.0.1:${input.egressProxyPort}` },
+    switches: {
+      modelsDisabled: env.CODEPUPPY_MODELS_DISABLE === "1",
+      identityDisabled: Boolean(env.CODEPUPPY_IDENTITY_DISABLE),
+      behaviorDisabled: Boolean(env.CODEPUPPY_BEHAVIOR_DISABLE),
+      promptRebrandDisabled: env.CODEPUPPY_PROMPT_REBRAND_DISABLE === "1",
+      automationDisabled: Boolean(env.CODEPUPPY_AUTOMATION_DISABLE),
+      readonlyDisabled: Boolean(env.CODEPUPPY_READONLY_DISABLE),
+      ecosystemInherit: env.CODEPUPPY_ECOSYSTEM_INHERIT === "1",
+      extVerbose: Boolean(env.CODEPUPPY_EXT_VERBOSE),
+    },
   })
+}
+
+function askTimeout(raw: string | undefined): { askTimeoutMs?: number } {
+  const parsed = raw === undefined || raw === "" ? Number.NaN : Number(raw)
+  return Number.isSafeInteger(parsed) && parsed > 0 ? { askTimeoutMs: parsed } : {}
 }
 
 function credentialFree(name: string, value: string | undefined, log: (line: string) => void): string | undefined {

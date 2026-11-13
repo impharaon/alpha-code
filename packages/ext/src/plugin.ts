@@ -119,7 +119,7 @@ export const CodePuppyExt: Plugin.Plugin = {
     }
     try {
       // REQ-157 `#1284`:装载回执 —— 登记簿在 import 时已按上限校验过;这里只在 VERBOSE 下把库存打出来。
-      if (process.env.CODEPUPPY_EXT_VERBOSE) log(`[@codepuppy/ext] context injections:\n${renderInventory()}`)
+      if (bootstrap.switches.extVerbose) log(`[@codepuppy/ext] context injections:\n${renderInventory()}`)
       // sidecar 初始化批次先复验 main 派生 root 的 canonical 身份;缺失、相对、退休根或 alias 都拒绝(环境错 = 结构性失败,让本插件 failed)。
       requireCodePuppyGlobalRoot(bootstrap.paths.globalRoot)
       const projectRootFor = (target: string): ProjectRoot | null => {
@@ -199,7 +199,7 @@ export const CodePuppyExt: Plugin.Plugin = {
       const rebrandWarned = new Set<string>()
       const assembleRequest = async (event: Omit<Parameters<Parameters<typeof context.session.hook<"title">>[1]>[0], "result">) => {
         // REQ-062 T1(路线A,ADR-015):系统提示词品牌转写 —— 精选子串对;失败 = 上游原样(外观级退化),绝不伤及请求。
-        if (process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE !== "1") {
+        if (!bootstrap.switches.promptRebrandDisabled) {
           try {
             const r = rebrandSystem(event.system.map((part) => part.text))
             if (r.changed) event.system.splice(0, event.system.length, ...event.system.map((part, index) => ({ ...part, text: r.system[index]! })))
@@ -265,16 +265,16 @@ export const CodePuppyExt: Plugin.Plugin = {
                 const { added, gatedExecutable } = mergeProjectConfig(cfg, configRead.value, { trustExecutable, directory: project.directory })
                 if (gatedExecutable.length)
                   log(`[@codepuppy/ext] project has UNTRUSTED executable extensions (${gatedExecutable.join(", ")}) — not loaded until consent: ${directory}`)
-                if (process.env.CODEPUPPY_EXT_VERBOSE && added.length) log(`[@codepuppy/ext] project config merged: ${added.join(", ")}`)
+                if (bootstrap.switches.extVerbose && added.length) log(`[@codepuppy/ext] project config merged: ${added.join(", ")}`)
               }
             }
           }
-          // REQ-067:上游默认禁项零明文 —— main 算 effective 名单经 env 传入;禁用由下面的 skill / permission 钩子执行。
-          applyFactoryDeny(cfg, process.env.CODEPUPPY_FACTORY_DENY_SKILLS)
+          // REQ-067:上游默认禁项零明文 —— 名单是本包的常量(`#1698` R7);禁用由下面的 skill / permission 钩子执行。
+          applyFactoryDeny(cfg)
           // REQ-062 T3/T6:alpha 内容层接管(general/explore/docs prompt),置于项目合并之后 ⇒ 项目同名让位。
           // 出厂 /init 与 /review 不在这里注册(编排器裁决 2026-11-09):L5 用同一个纯函数把它们写进主进程的内联配置文档,
           // 由上游 `opencode.config.command` 实现模板文法与 `review` 的子任务语义 —— 插件的 CommandEditor 给不了这两样。
-          if (process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE !== "1")
+          if (!bootstrap.switches.promptRebrandDisabled)
             for (const applied of applyPromptTakeover(cfg).applied)
               if (applied.startsWith("command.")) delete (cfg.command as Record<string, unknown>)[applied.slice("command.".length)]
         } catch (cause) {
@@ -300,7 +300,7 @@ export const CodePuppyExt: Plugin.Plugin = {
         } finally {
           // #223 R6/R7:归属在本 Location 的 MCP 定义全部就位之后才算;合并中途出错 ⇒ fail-closed。
           mcpOwnership = merged ? computeMcpOwnership({ mcp: Object.fromEntries(editor.list()) }, bootstrap.cloudMcp) : UNVERIFIED_MCP_OWNERSHIP
-          if (process.env.CODEPUPPY_EXT_VERBOSE) log(`[@codepuppy/ext] MCP ownership (${directory}): ${JSON.stringify(mcpOwnership)}`)
+          if (bootstrap.switches.extVerbose) log(`[@codepuppy/ext] MCP ownership (${directory}): ${JSON.stringify(mcpOwnership)}`)
         }
       })
       await context.agent.transform((editor) => {
@@ -342,7 +342,7 @@ export const CodePuppyExt: Plugin.Plugin = {
       // 配置插件随后照常把顶层规则与它自己的字段加在后面 —— 顺序仍是「底座 → 这里 → 配置」。codepuppy-ask 由注入无条件写进配置
       // (ui-mac codepuppy-config-injection.ts 2d),ext 只随这份注入装载,不会多出一个配置里没有的 agent。
       await context.agent.transform((editor) => {
-        const rules = externalDirectoryRules(bootstrap.paths.globalRoot, process.env.CODEPUPPY_FACTORY_SKILL_DIRS)
+        const rules = externalDirectoryRules(bootstrap.paths.globalRoot, bootstrap.skills.factoryDirs)
         for (const id of EXTERNAL_DIRECTORY_AGENTS)
           editor.update(id as never, (agent) => {
             if (!placeAfterBase(id, agent.permissions as never, rules))
@@ -352,12 +352,12 @@ export const CodePuppyExt: Plugin.Plugin = {
       // REQ-067 / #1522:出厂禁用的技能 —— 从技能目录里拿掉(上游内置的那些在 ext 之前注册),并在权限评估里一律 deny
       // (覆盖之后才由配置目录装进来的同名技能)。
       await context.skill.transform((editor) => {
-        for (const id of factoryDeniedSkills(process.env.CODEPUPPY_FACTORY_DENY_SKILLS)) editor.remove(id)
+        for (const id of factoryDeniedSkills()) editor.remove(id)
       })
       await context.permission.hook("evaluate", (event) => {
         // I10:定制中心安装恒弹框(自动化 agent 恒拒)。注册在 registerPolicy 之后 ⇒ 按注册顺序它说了算。
         hubInstallEvaluate(event)
-        if (event.action === "skill" && event.resources.some((id) => factoryDeniedSkills(process.env.CODEPUPPY_FACTORY_DENY_SKILLS).includes(id)))
+        if (event.action === "skill" && event.resources.some((id) => factoryDeniedSkills().includes(id)))
           event.effect = "deny"
       })
 
@@ -366,7 +366,7 @@ export const CodePuppyExt: Plugin.Plugin = {
       cleanups.push(() => events.abort())
       void (async () => {
         for await (const event of context.event.subscribe({ types: [...RELOAD_POKE_EVENTS], signal: events.signal })) {
-          if (process.env.CODEPUPPY_EXT_VERBOSE) log(`[@codepuppy/ext] event: ${event.type}`)
+          if (bootstrap.switches.extVerbose) log(`[@codepuppy/ext] event: ${event.type}`)
           reloads.poke()
         }
       })().catch((cause) => {

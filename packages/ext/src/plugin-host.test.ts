@@ -42,27 +42,19 @@ import { Message } from "../../ai/src/schema/messages.ts"
 import * as Media from "../../ai/src/media.ts"
 import { toLLMMessages } from "../../core/src/session/runner/to-llm-message.ts"
 
-const ENV_KEYS = ["CODEPUPPY_FACTORY_DENY_SKILLS", "CODEPUPPY_PROMPT_REBRAND_DISABLE"] as const
-const saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]))
 let scratch = ""
 beforeAll(() => {
   scratch = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-host-")))
   mkdirSync(join(scratch, "global"), { recursive: true })
 })
 /**
- * `#1698`:全局根、平台节点地址与凭据引用、云 MCP、kill-switch、账户分区经 sidecar 发布的启动文档到 ext(R14:在装 ext 之前发布);
- * 还没迁走的键组(G3)照旧是环境变量。
+ * `#1698`:Code Puppy 交给 ext 的决定(全局根、平台节点地址与凭据引用、云 MCP、kill-switch、账户分区、开关、出厂技能目录)全部经 sidecar
+ * 发布的启动文档到 ext(R14:在装 ext 之前发布);ext 不读任何 Code Puppy 的环境变量。第一个参数留作调用点的形状,恒为空。
  */
-const env = (values: Partial<Record<(typeof ENV_KEYS)[number], string>>, bootstrap: Omit<TestBootstrapInput, "globalRoot"> = {}) => {
-  for (const key of ENV_KEYS) delete process.env[key]
+const env = (_values: Record<string, never>, bootstrap: Omit<TestBootstrapInput, "globalRoot"> = {}) => {
   publishTestBootstrap({ globalRoot: join(scratch, "global"), ...bootstrap })
-  Object.assign(process.env, values)
 }
 afterEach(() => {
-  for (const key of ENV_KEYS) {
-    if (saved[key] === undefined) delete process.env[key]
-    else process.env[key] = saved[key]
-  }
   unpublishTestBootstrap()
 })
 
@@ -627,9 +619,39 @@ itWithPermission.live("定制中心安装:没经随包清单核验的同名工�
   }),
 )
 
+/** 装一次 ext,收下这期间 ext 打进 console.log 的行(ext 的日志就是 console.log,plugin.ts 的 `log`)。 */
+const activationLog = (bootstrap: Omit<TestBootstrapInput, "globalRoot">) =>
+  Effect.gen(function* () {
+    env({}, bootstrap)
+    const lines: string[] = []
+    const original = console.log
+    console.log = (...args: unknown[]) => void lines.push(args.map(String).join(" "))
+    try {
+      yield* activate(CodePuppyExt)
+    } finally {
+      console.log = original
+    }
+    return lines
+  })
+
+it.live("`#1698` R6:启动文档的 switches.extVerbose 置位 ⇒ 装载回执把登记簿库存打进日志(此前这个开关被 sidecar 白名单丢掉,导出了也不生效)", () =>
+  Effect.gen(function* () {
+    const lines = yield* activationLog({ switches: { extVerbose: true } })
+    expect(lines.some((line) => line.startsWith("[@codepuppy/ext] context injections:"))).toBe(true)
+  }),
+)
+
+it.live("`#1698` R6 反向臂:switches.extVerbose 不置位 ⇒ 不打库存", () =>
+  Effect.gen(function* () {
+    const lines = yield* activationLog({})
+    expect(lines.filter((line) => line.startsWith("[@codepuppy/ext] context injections:"))).toEqual([])
+  }),
+)
+
 it.live("权威 · 出厂禁用技能(REQ-067):禁项的 skill 权限评估一律 deny,技能目录里拿掉;反向臂:不装 ext ⇒ allow、技能在", () =>
   Effect.gen(function* () {
-    env({ CODEPUPPY_FACTORY_DENY_SKILLS: JSON.stringify(["customize-opencode"]) })
+    // `#1698` R7:名单是 ext 的常量,不靠任何环境
+    env({})
     const hooks = yield* PluginHooks.Service
     const skills = yield* Skill.Service
     yield* activate({

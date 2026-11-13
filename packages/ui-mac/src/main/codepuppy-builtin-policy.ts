@@ -19,6 +19,7 @@ import * as path from "node:path"
 import { isExtensionName } from "../shared/extension-name"
 import { codepuppyGlobalRoot } from "./codepuppy-installs"
 import { applyBuiltinPolicyEdits, type BuiltinPolicyEdit } from "./ext-config"
+import { FACTORY_DENIED_SKILLS } from "../../../ext/src/factory-deny"
 
 export interface BuiltinPolicy {
   version: 1
@@ -39,11 +40,11 @@ export interface BuiltinPolicy {
   commands: { override: Record<string, { template: string; description?: string }> }
 }
 
-/** REQ-067(用户拍板 2026-07-08):上游自带、alpha 出厂即禁的技能 —— 内置默认,零明文。
- *  禁用经 env → ext config hook 内存注入;#1522 customize-opencode 永久禁用。 */
-export const FACTORY_DENIED_SKILLS = ["customize-opencode"] as const
+/** REQ-067(用户拍板 2026-07-08):上游自带、alpha 出厂即禁的技能 —— 内置默认,零明文;#1522 customize-opencode 永久禁用。
+ *  `#1698`(design §10 R7):常量住在 ext(禁用由 ext 的技能 / 权限钩子执行),main 用同一份,不再经环境传。 */
+export { FACTORY_DENIED_SKILLS }
 
-/** 永久禁用名单(供 env 注入与菜单过滤),不接受旧治理解禁记录。 */
+/** 永久禁用名单(供菜单过滤),不接受旧治理解禁记录。 */
 export function effectiveFactoryDenied(_gov: BuiltinPolicy): string[] {
   return [...FACTORY_DENIED_SKILLS]
 }

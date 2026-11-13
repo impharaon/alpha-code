@@ -288,11 +288,16 @@ function publishOfficeManifest(officeMcpManifest: string) {
     parseCodePuppyBootstrap({
       v: 1,
       paths: { userData: ROOT, globalRoot: ROOT, initialDirectory: ROOT, database: ":memory:", engineConfigDirectory: ROOT, officeMcpManifest },
-      // G2 fields are required in every document; this one carries no cloud MCP, no policy account and no egress proxy.
+      // G2 / G3 fields are required in every document; this one carries no cloud MCP, no policy account, no egress proxy,
+      // the desktop's default engine toggles, no factory skills, the default ask deadline and every switch off.
       platform: { credentialRef: `{file:${path.join(ROOT, "codepuppy-secrets", "CODEPUPPY_API_KEY")}}` },
       webSearch: { killSwitch: false },
       policy: {},
       network: {},
+      engine: { modelsFetch: false, filewatcher: true },
+      skills: { factoryDirs: [] },
+      permission: {},
+      switches: { modelsDisabled: false, identityDisabled: false, behaviorDisabled: false, promptRebrandDisabled: false, automationDisabled: false, readonlyDisabled: false, ecosystemInherit: false, extVerbose: false },
     }),
   )
 }

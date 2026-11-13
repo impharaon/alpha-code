@@ -21,7 +21,8 @@
 // fork (syncSecretFiles), so "provider is keyed" is now a FILE-presence question, not an env one:
 // the sidecar env is allowlisted (sidecar-env.ts) and never carries key values.
 //
-// Escape hatch: CODEPUPPY_MODELS_DISABLE=1 skips this entirely.
+// Escape hatch: CODEPUPPY_MODELS_DISABLE=1 skips this entirely (the caller passes it as `disabled`: the sidecar injection from
+// the bootstrap document's switches.modelsDisabled, main's egress derivation from main's own environment — `#1698`).
 
 import type { ByokCatalogV1 } from "@codepuppy/contracts-consumer"
 import * as fs from "node:fs"
@@ -127,14 +128,15 @@ export type CodePuppyModelConfig = {
 }
 
 /**
- * `#1698`(DESIGN-upgrade-bootstrap-config G2):平台节点地址与默认模型覆盖由调用方给 —— sidecar 的注入从启动文档的 `platform`
- * 取(`modelProxyBaseURL` / `defaultModelOverride`),main 的出网放行派生从 main 自己的环境取(applyAuthEnv 写的那个值)。
- * 本模块不读环境里的这两个键。`defaultModel` 的空串语义照旧:给了空串 = 不设默认模型,也不用目录默认。
+ * `#1698`(DESIGN-upgrade-bootstrap-config G2 / G3):平台节点地址、默认模型覆盖与逃生开关由调用方给 —— sidecar 的注入从启动文档取
+ * (`platform.modelProxyBaseURL` / `platform.defaultModelOverride` / `switches.modelsDisabled`),main 的出网放行派生从 main 自己的
+ * 环境取(applyAuthEnv 写的地址与运维导出的开关)。本模块不读环境里的这些键。`defaultModel` 的空串语义照旧:给了空串 = 不设默认模型,
+ * 也不用目录默认。
  */
-export type PlatformInputs = { baseURL?: string; defaultModel?: string }
+export type ModelConfigInputs = { baseURL?: string; defaultModel?: string; disabled?: boolean }
 
-export function buildCodePuppyModelConfig(userDataPath: string, platform: PlatformInputs = {}): CodePuppyModelConfig | undefined {
-  if (process.env.CODEPUPPY_MODELS_DISABLE === "1") return undefined
+export function buildCodePuppyModelConfig(userDataPath: string, platform: ModelConfigInputs = {}): CodePuppyModelConfig | undefined {
+  if (platform.disabled) return undefined
 
   const provider: Record<string, unknown> = {}
   const enabled: string[] = []

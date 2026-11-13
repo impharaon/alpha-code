@@ -5,6 +5,7 @@ import {
   __resetCodePuppyBootstrapForTests,
   cloudMcpArmed,
   codepuppyBootstrap,
+  codepuppyEngineSettings,
   isCredentialFreeUrl,
   parseCodePuppyBootstrap,
   publishCodePuppyBootstrap,
@@ -25,6 +26,7 @@ const valid = () => ({
     officeMcpManifest: "/app/resources/office-mcp/tools.json",
   },
   registryChannel: "stable",
+  engine: { modelsFetch: false, filewatcher: true },
   platform: {
     credentialRef: "{file:/u/data/codepuppy-secrets/CODEPUPPY_API_KEY}",
     modelProxyBaseURL: "https://api.codepuppy.example/v1",
@@ -40,8 +42,20 @@ const valid = () => ({
     },
   },
   webSearch: { killSwitch: false },
+  skills: { factoryDirs: ["/app/resources/skills/a"] },
   policy: { account: `acct:${"a".repeat(64)}` },
+  permission: { askTimeoutMs: 1500 },
   network: { egressProxy: "http://127.0.0.1:4433" },
+  switches: {
+    modelsDisabled: false,
+    identityDisabled: false,
+    behaviorDisabled: false,
+    promptRebrandDisabled: false,
+    automationDisabled: false,
+    readonlyDisabled: false,
+    ecosystemInherit: false,
+    extVerbose: false,
+  },
 })
 
 const failure = (value: unknown) => {
@@ -65,7 +79,18 @@ describe("parseCodePuppyBootstrap", () => {
     expect(Object.isFrozen(parsed)).toBe(true)
     expect(Object.isFrozen(parsed.paths)).toBe(true)
     const { userConfig, extPlugin, extBundledManifest, ...paths } = valid().paths
-    const minimal = { v: 1, paths: { ...paths, database: ":memory:" }, platform: { credentialRef: "{file:/k}" }, webSearch: { killSwitch: true }, policy: {}, network: {} }
+    const minimal = {
+      v: 1,
+      paths: { ...paths, database: ":memory:" },
+      engine: { modelsFetch: true, filewatcher: false },
+      platform: { credentialRef: "{file:/k}" },
+      webSearch: { killSwitch: true },
+      skills: { factoryDirs: [] },
+      policy: {},
+      permission: {},
+      network: {},
+      switches: valid().switches,
+    }
     expect(parseCodePuppyBootstrap(minimal)).toEqual(minimal as never)
   })
 
@@ -130,6 +155,40 @@ describe("G2 fields: secrets cannot be written into the document", () => {
     expect(cloudMcpArmed(parseCodePuppyBootstrap({ ...valid(), webSearch: { killSwitch: true } }))).toBe(true)
     const { cloudMcp, ...noCloud } = valid()
     expect(cloudMcpArmed(parseCodePuppyBootstrap({ ...noCloud, webSearch: { killSwitch: true } }))).toBe(false)
+  })
+})
+
+describe("G3 fields: switches and engine settings", () => {
+  test("every switch and both engine toggles are required booleans; factory dirs are absolute; the ask deadline is a positive safe integer", () => {
+    const { extVerbose, ...seven } = valid().switches
+    expect(failure({ ...valid(), switches: seven })).toMatchObject({ reason: "invalid", path: "switches.extVerbose" })
+    expect(failure({ ...valid(), switches: { ...valid().switches, modelsDisabled: "1" } })).toMatchObject({ reason: "invalid", path: "switches.modelsDisabled" })
+    expect(failure({ ...valid(), switches: { ...valid().switches, other: true } })).toMatchObject({ reason: "invalid", path: "switches.other" })
+    expect(failure({ ...valid(), engine: { modelsFetch: true } })).toMatchObject({ reason: "invalid", path: "engine.filewatcher" })
+    expect(failure({ ...valid(), skills: { factoryDirs: "/a" } })).toMatchObject({ reason: "invalid", path: "skills.factoryDirs" })
+    expect(failure({ ...valid(), skills: { factoryDirs: ["/a", "relative"] } })).toMatchObject({ reason: "invalid", path: "skills.factoryDirs.1" })
+    for (const bad of [0, -5, 1.5, Number.MAX_SAFE_INTEGER + 1, "1500"])
+      expect(failure({ ...valid(), permission: { askTimeoutMs: bad } })).toMatchObject({ reason: "invalid", path: "permission.askTimeoutMs" })
+  })
+
+  test("codepuppyEngineSettings without a document: today's environment rules, word for word (the in-repo CLI host)", () => {
+    expect(codepuppyEngineSettings({})).toEqual({ askTimeoutMs: 300_000, projectWatch: false })
+    expect(codepuppyEngineSettings({ CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS: "1500" }).askTimeoutMs).toBe(1500)
+    for (const bad of ["", "0", "-5", "abc", "1.5", "Infinity", "1e400"])
+      expect([bad, codepuppyEngineSettings({ CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS: bad }).askTimeoutMs]).toEqual([bad, 300_000])
+    for (const on of ["true", "1", "yes", "on", " TRUE ", "On"])
+      expect([on, codepuppyEngineSettings({ OPENCODE_EXPERIMENTAL_FILEWATCHER: on }).projectWatch]).toEqual([on, true])
+    for (const off of ["", "false", "0", "no", "off", "enabled"])
+      expect([off, codepuppyEngineSettings({ OPENCODE_EXPERIMENTAL_FILEWATCHER: off }).projectWatch]).toEqual([off, false])
+  })
+
+  test("codepuppyEngineSettings with a published document reads the document and ignores the environment", () => {
+    publishCodePuppyBootstrap(parseCodePuppyBootstrap({ ...valid(), engine: { modelsFetch: false, filewatcher: false } }))
+    const env = { CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS: "9", OPENCODE_EXPERIMENTAL_FILEWATCHER: "yes" }
+    expect(codepuppyEngineSettings(env)).toEqual({ askTimeoutMs: 1500, projectWatch: false })
+    __resetCodePuppyBootstrapForTests()
+    publishCodePuppyBootstrap(parseCodePuppyBootstrap({ ...valid(), permission: {} }))
+    expect(codepuppyEngineSettings(env)).toEqual({ askTimeoutMs: 300_000, projectWatch: true })
   })
 })
 

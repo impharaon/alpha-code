@@ -5,7 +5,9 @@
 // real bus, wired as upstream's test/filesystem/watcher.test.ts wires LocationWatcher.
 //
 // Red if location-watcher.ts is upstream's again (only the VCS branch file is watched: no event for a project file),
-// or if an ignored folder (.git, node_modules) or a switched-off watch still publishes.
+// or if an ignored folder (.git, node_modules) or a switched-off watch still publishes. `#1698`: in Code Puppy's sidecar the
+// switch is the bootstrap document's `engine.filewatcher`; these cases without a document read the variable (the in-repo CLI
+// host), and one case publishes a document that contradicts the variable.
 import { afterAll, beforeAll, describe, expect } from "bun:test"
 import fs from "node:fs"
 import path from "node:path"
@@ -17,6 +19,7 @@ import { Bus } from "@opencode/core/bus"
 import { LocationWatcher } from "@opencode/core/filesystem/location-watcher"
 import { LocationWatcherPolicy } from "@opencode/core/filesystem/location-watcher-policy"
 import { PROJECT_WATCH_ENV } from "@opencode/core/filesystem/codepuppy-project-watch"
+import { __resetCodePuppyBootstrapForTests, parseCodePuppyBootstrap, publishCodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { FileSystem } from "@opencode/schema/filesystem"
 import { Location } from "@opencode/core/location"
 import { PluginSupervisor } from "@opencode/core/plugin/supervisor"
@@ -120,6 +123,38 @@ describe("project-wide file change events", () => {
         }),
       (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
     ),
+  )
+
+  it.live("in Code Puppy's sidecar the bootstrap document decides: the variable says on, the document says off, a project file publishes nothing", () =>
+    Effect.acquireUseRelease(
+      Effect.promise(() => tmpdir()),
+      (tmp) =>
+        Effect.gen(function* () {
+          const root = fs.realpathSync.native(tmp.path)
+          __resetCodePuppyBootstrapForTests()
+          publishCodePuppyBootstrap(
+            parseCodePuppyBootstrap({
+              v: 1,
+              paths: { userData: root, globalRoot: root, initialDirectory: root, database: ":memory:", engineConfigDirectory: root, officeMcpManifest: path.join(root, "tools.json") },
+              engine: { modelsFetch: false, filewatcher: false },
+              platform: { credentialRef: `{file:${path.join(root, "key")}}` },
+              webSearch: { killSwitch: false },
+              skills: { factoryDirs: [] },
+              policy: {},
+              permission: {},
+              network: {},
+              switches: { modelsDisabled: false, identityDisabled: false, behaviorDisabled: false, promptRebrandDisabled: false, automationDisabled: false, readonlyDisabled: false, ecosystemInherit: false, extVerbose: false },
+            }),
+          )
+          yield* watching(root, (changes) =>
+            Effect.gen(function* () {
+              expect(yield* warmUp(root, changes)).toBe(false)
+            }),
+          ).pipe(Effect.ensuring(Effect.sync(() => __resetCodePuppyBootstrapForTests())))
+        }),
+      (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
+    ),
+  { timeout: 20_000 },
   )
 
   it.live("with main's switch off, a project file publishes nothing", () =>

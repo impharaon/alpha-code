@@ -18,7 +18,7 @@ import {
 } from "./codepuppy-live-allowlist"
 import { BYOK_ADAPTERS } from "./byok-adapters"
 import bundledCatalog from "./codepuppy-models.json"
-import { buildCodePuppyModelConfig, engineModelConfig, getModelCatalog, PLATFORM_API_KEY_PLACEHOLDER, type PlatformInputs } from "./codepuppy-models"
+import { buildCodePuppyModelConfig, engineModelConfig, getModelCatalog, PLATFORM_API_KEY_PLACEHOLDER, type ModelConfigInputs } from "./codepuppy-models"
 import type { EffectiveCatalog } from "../shared/codepuppy-model-types"
 import { buildModelPickerRows } from "../renderer/codepuppy-ui/model-picker-core"
 import { customProviderSecretName, secretFilePath, secretFileRef, syncSecretFiles } from "./codepuppy-secret-files"
@@ -67,8 +67,9 @@ const MANAGED = [
 const saved: Record<string, string | undefined> = {}
 let tmp = ""
 let userData = ""
-// `#1698` G2:平台地址与默认模型覆盖是注入从启动文档取来交进来的参数(main 写进文档),不再读环境。用例改这份,每次调用照它传。
-let platformInputs: PlatformInputs = {}
+// `#1698` G2 / G3:平台地址、默认模型覆盖与逃生开关是注入从启动文档取来交进来的参数(main 写进文档),不再读环境。用例改这份,
+// 每次调用照它传。
+let platformInputs: ModelConfigInputs = {}
 /** `#1392`:自定义节点真源 = <casBaseRoot>/custom-providers/<env>.json;这里 CODEPUPPY_GLOBAL_DIR = <tmp>/codepuppy-state/env/dev。 */
 const truthPath = () => path.join(fs.realpathSync(tmp), "codepuppy-state", "custom-providers", "dev.json")
 const codepuppyJsonc = () => path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "codepuppy.jsonc")
@@ -187,8 +188,8 @@ describe("getModelCatalog", () => {
 })
 
 describe("buildCodePuppyModelConfig — escape hatch + empty state", () => {
-  test("CODEPUPPY_MODELS_DISABLE=1 returns undefined (opencode uses its own defaults)", () => {
-    process.env.CODEPUPPY_MODELS_DISABLE = "1"
+  test("CODEPUPPY_MODELS_DISABLE=1 (passed in as `disabled`) returns undefined (opencode uses its own defaults)", () => {
+    platformInputs.disabled = true
     expect(buildCodePuppyModelConfig(userData, platformInputs)).toBeUndefined()
   })
 

@@ -32,6 +32,9 @@ const RETIRED = [
   "CODEPUPPY_POLICY_ACCOUNT",
   "CODEPUPPY_EGRESS_PROXY",
   "CODEPUPPY_PROVIDER_ALLOW",
+  // G3:出厂技能目录改走文档的 skills.factoryDirs;出厂禁用名单成了 ext 的常量(§10 R7),通道整个删除。
+  "CODEPUPPY_FACTORY_SKILL_DIRS",
+  "CODEPUPPY_FACTORY_DENY_SKILLS",
 ]
 /** ② main 仍持有的键。 */
 const MAIN_ONLY = [
@@ -44,6 +47,16 @@ const MAIN_ONLY = [
   "CODEPUPPY_CLOUD_MCP_URL",
   "CODEPUPPY_DEFAULT_MODEL",
   "CODEPUPPY_WEBSEARCH_DISABLE",
+  // G3:运维开关与审批期限 —— main 的构建器读(§4.4 表),sidecar 进程里改读文档的 switches / permission。
+  "CODEPUPPY_MODELS_DISABLE",
+  "CODEPUPPY_IDENTITY_DISABLE",
+  "CODEPUPPY_BEHAVIOR_DISABLE",
+  "CODEPUPPY_PROMPT_REBRAND_DISABLE",
+  "CODEPUPPY_ECOSYSTEM_INHERIT",
+  "CODEPUPPY_AUTOMATION_DISABLE",
+  "CODEPUPPY_READONLY_DISABLE",
+  "CODEPUPPY_EXT_VERBOSE",
+  "CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS",
 ]
 /** ② 的逐条例外。 */
 const EXCEPTIONS = [
@@ -51,6 +64,11 @@ const EXCEPTIONS = [
     file: "packages/ui-mac/src/main/codepuppy-environment.ts",
     name: "CODEPUPPY_GLOBAL_DIR",
     why: "main 与 sidecar 共用的根解析:快照 → 已发布文档 → 环境,环境这一支只服务没有快照的单元测试,生产启动里到不了(design §10 R31;bootstrap-launch-parity.engine.cases.ts 断言)。同文件里另有 main 启动时写自己的环境(initCodePuppyEnvironment)。",
+  },
+  {
+    file: "packages/util/src/codepuppy-bootstrap.ts",
+    name: "CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS",
+    why: "无文档宿主的兼容入口 codepuppyEngineSettings(design §4.3、§10 R13):有文档就读文档;没有文档(仓内 CLI 宿主、core 单测)才按今天的判法读这个变量。sidecar 里文档先于引擎发布,这一支到不了(util 包启动文档单元测试「codepuppyEngineSettings with a published document reads the document and ignores the environment」)。",
   },
 ]
 

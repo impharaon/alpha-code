@@ -54,6 +54,21 @@ export function publishPolicyAccount(tag: string): string {
   })
   return account
 }
+
+/**
+ * `#1698` G3:审批期限来自启动文档的 permission.askTimeoutMs(main 从运维导出的 CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS 判一次);用例换期限 =
+ * 重新发布一份,已发布文档里的 Office 清单、云 MCP 与账户分区原样带上。
+ */
+export function publishAskTimeout(askTimeoutMs: number | undefined): void {
+  const current = tryCodePuppyBootstrap()
+  publishTestBootstrap({
+    globalRoot: path.join(ROOT, "state"),
+    ...(current
+      ? { officeMcpManifest: current.paths.officeMcpManifest, cloudMcp: current.cloudMcp, ...(current.policy.account ? { policyAccount: current.policy.account } : {}) }
+      : {}),
+    ...(askTimeoutMs === undefined ? {} : { askTimeoutMs }),
+  })
+}
 isolate()
 
 const core = path.resolve(import.meta.dir, "../../../core")

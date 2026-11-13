@@ -52,6 +52,10 @@ import { applyPromptTakeover } from "../../../ext/src/codepuppy-prompts"
 // loads global config unconditionally and merges this as a "local" source), so untouched fields
 // (auth, other instructions) are preserved. We layer two independent, separately-gated pieces:
 //
+// `#1698` G3: every switch below is read from the published bootstrap document (`switches.*`; main reads the operator
+// variable named in parentheses once and writes the document). No document (only tests that call the injection
+// directly) ⇒ every switch off.
+//
 //   1. Brand identity (CODEPUPPY_IDENTITY_DISABLE): a global instruction file written to
 //      userDataPath (stable absolute path in both dev and the packaged .app) added to
 //      `instructions`, so the agent calls itself "alpha-code". Now also carries per-session
@@ -98,14 +102,14 @@ export type CodePuppyConfigInjectionOutput = {
 export const PROJECT_SKILLS_ENTRY = `./${PROJECT_HIDDEN_DIR}/skills`
 
 /**
- * `#1667`(编排器裁决 r3 第 1 条):显式文件 `skills` 的唯一算法 —— 出厂技能目录(main 启动时算好、经 CODEPUPPY_FACTORY_SKILL_DIRS
- * 传入)+ 已启用技能当前那一代的真实目录(ext 的 skillGenerationLiveDirs:过账本 enabled 门、读 `current.json`)+ 项目技能目录
+ * `#1667`(编排器裁决 r3 第 1 条):显式文件 `skills` 的唯一算法 —— 出厂技能目录(main 启动时算好、`#1698` 起在启动文档的
+ * `skills.factoryDirs`)+ 已启用技能当前那一代的真实目录(ext 的 skillGenerationLiveDirs:过账本 enabled 门、读 `current.json`)+ 项目技能目录
  * (PROJECT_SKILLS_ENTRY)。注入时算一次,sidecar 的监听在翻代 / 新装 / 停用时再算(engine-explicit-config.ts 的 watchExplicitSources)。
  */
 export function explicitSkillDirs(): string[] {
   return [
     ...new Set([
-      ...injectFactorySkillPaths({}, process.env.CODEPUPPY_FACTORY_SKILL_DIRS),
+      ...injectFactorySkillPaths({}, tryCodePuppyBootstrap()?.skills.factoryDirs ?? []),
       ...skillGenerationLiveDirs(codepuppyGlobalRoot()),
       PROJECT_SKILLS_ENTRY,
     ]),
@@ -159,14 +163,14 @@ export const ENGINE_EXPERIMENTAL_FLAGS = {
  * 不论注入成败都要在的治理底线:
  *   · `plugins`:ext 的插件**目录**(2.x 只装目录形式的本地插件,接口文档 I2);外加移除指令 `-opencode.config.compatibility`
  *     —— S6 的唯一机制(裁决书 N3):不继承用户的 `~/.claude` / `~/.agents` / 项目 `.agents` 技能。逃生开关
- *     `CODEPUPPY_ECOSYSTEM_INHERIT=1` 置位时不写移除指令(ADR-024 §5,整机恢复上游继承)。
+ *     `CODEPUPPY_ECOSYSTEM_INHERIT=1`(启动文档 `switches.ecosystemInherit`)置位时不写移除指令(ADR-024 §5,整机恢复上游继承)。
  *   · `experimental`:五个实验开关的显式值(见上)。
  */
 function governanceFloor(extPluginPath: string | undefined): Pick<EngineConfig, "plugins" | "experimental"> {
   return {
     plugins: [
       ...(extPluginPath ? [extPluginPath] : []),
-      ...(process.env.CODEPUPPY_ECOSYSTEM_INHERIT === "1" ? [] : [`-${ECOSYSTEM_COMPATIBILITY_PLUGIN}`]),
+      ...(tryCodePuppyBootstrap()?.switches.ecosystemInherit ? [] : [`-${ECOSYSTEM_COMPATIBILITY_PLUGIN}`]),
     ],
     experimental: { ...ENGINE_EXPERIMENTAL_FLAGS },
   }
@@ -246,8 +250,10 @@ export function injectCodePuppyConfig(
     // 只记录本轮函数自己新放进 mcp 的名字;继承来的 OPENCODE_CONFIG_CONTENT 不是治理授权。
     const injectedMcpNames = new Set<string>()
 
-    const wantIdentity = !process.env.CODEPUPPY_IDENTITY_DISABLE
-    const wantBehavior = !process.env.CODEPUPPY_BEHAVIOR_DISABLE
+    // `#1698` G3:开关来自启动文档;没有文档 ⇒ 全关
+    const switches = bootstrap?.switches
+    const wantIdentity = !switches?.identityDisabled
+    const wantBehavior = !switches?.behaviorDisabled
     if (wantIdentity || wantBehavior) {
       fs.mkdirSync(userDataPath, { recursive: true })
       const instructions: string[] = Array.isArray(config.instructions) ? config.instructions : []
@@ -317,7 +323,11 @@ export function injectCodePuppyConfig(
 
     // `#1667`(C7 重裁):显式文件层要写的三样,出自这一次计算(engine-explicit-config.ts 抬头讲层序)。
     const layer: ExplicitLayer = { policies: [], commands: {}, skills: [] }
-    const models = buildCodePuppyModelConfig(userDataPath, { baseURL: bootstrap?.platform.modelProxyBaseURL, defaultModel: bootstrap?.platform.defaultModelOverride })
+    const models = buildCodePuppyModelConfig(userDataPath, {
+      baseURL: bootstrap?.platform.modelProxyBaseURL,
+      defaultModel: bootstrap?.platform.defaultModelOverride,
+      disabled: switches?.modelsDisabled,
+    })
     if (models) {
       // `#1667`:同一份投影,写成 2.x 的 `providers` / `policies`(`provider.use`)/ `model`(codepuppy-models.ts engineModelConfig)。
       // `policies` 写两处:显式文件那份比项目配置先加载、项目里的 allow 盖不过(第一层);内联这份是第二层。
@@ -340,7 +350,7 @@ export function injectCodePuppyConfig(
     //       由 core 自己的 `opencode.config.command` 实现模板文法与子任务(`review` 在子任务里跑:v1 的 `subtask: true`,2.x 原生键
     //       `subagent`)。逃生门与 ext 的提示词转写同一个:CODEPUPPY_PROMPT_REBRAND_DISABLE=1。
     //       写进显式文件(编排器裁决 r1 第 2 条):项目里的同名命令胜过它,它胜过上游内置的。
-    if (process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE !== "1") {
+    if (!switches?.promptRebrandDisabled) {
       const takeover: { command?: Record<string, { template: string; description?: string; subtask?: boolean }> } = {}
       applyPromptTakeover(takeover)
       layer.commands = Object.fromEntries(
@@ -352,7 +362,7 @@ export function injectCodePuppyConfig(
     //      permission 静态配死(V1 schema:pattern→action 对象,agent 级合并),不依赖运行时弹窗。
     //      read 全放但 *.env* 保持 deny(密钥文件不进上下文);edit/bash/外部目录一律 deny;
     //      question deny(无人在场没人答);doom_loop deny(异常循环直接断)。逃生:CODEPUPPY_AUTOMATION_DISABLE。
-    if (!process.env.CODEPUPPY_AUTOMATION_DISABLE) {
+    if (!switches?.automationDisabled) {
       config.agents = {
         ...config.agents,
         "codepuppy-automation": {
@@ -389,7 +399,7 @@ export function injectCodePuppyConfig(
     //       点名助手 / 命令换助手 / 直接子任务三条入口在引擎 session/prompt.ts 按同一条规则问或拒。
     //       第三方 MCP 与插件工具每次询问(方案 §2.0 D1):身份轴闸用本规则集求值,设置里启用了也问。
     //       逃生:CODEPUPPY_READONLY_DISABLE。治理保护名单同 codepuppy-automation(X2,codepuppy-governance.ts)。
-    if (!process.env.CODEPUPPY_READONLY_DISABLE) {
+    if (!switches?.readonlyDisabled) {
       config.agents = {
         ...config.agents,
         "codepuppy-readonly": {
@@ -460,7 +470,7 @@ export function injectCodePuppyConfig(
     //   2c. REQ-024(自动化 A2):standard 可写档 agent。无人值守语义同 codepuppy-automation
     //       (question/task/doom_loop deny,零 ask 硬前提);差异 = edit allow + bash 受限 allow
     //       (破坏类命令模式 deny —— 模式黑名单**非穷尽**,UI 启用时有显式风险确认,不谎称安全)。
-    if (!process.env.CODEPUPPY_AUTOMATION_DISABLE) {
+    if (!switches?.automationDisabled) {
       config.agents = {
         ...config.agents,
         "codepuppy-automation-standard": {

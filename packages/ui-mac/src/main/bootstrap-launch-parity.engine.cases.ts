@@ -67,7 +67,8 @@ const { acceptCodePuppyBootstrap } = await import("./sidecar-bootstrap-gate")
 const { __resetCodePuppyBootstrapForTests } = await import("@opencode/util/codepuppy-bootstrap")
 const { initializeArtifactQuotaEnvironment, ARTIFACT_QUOTA_MACHINE_ID_FILE } = await import("./artifact-service")
 const { injectCodePuppyConfig } = await import("./codepuppy-config-injection")
-const { buildEngineServerOptions, engineDesktopToggles } = await import("./engine-server-options")
+const { buildEngineServerOptions } = await import("./engine-server-options")
+const { setFactorySkillDirsForFork } = await import("./factory-skills")
 const { withEngineAuthorization } = await import("./engine-authorization")
 const { secretFilePath } = await import("./codepuppy-secret-files")
 const { engineNetFailurePath } = await import("@opencode/schema/codepuppy-net-failure")
@@ -149,9 +150,9 @@ async function launch() {
     CODEPUPPY_CLOUD_MCP_URL: `http://127.0.0.1:${cloud.port}/mcp`,
     CODEPUPPY_CLOUD_TOKEN: "synthetic-cloud-parity",
     CODEPUPPY_MCP_TOKEN: "synthetic-mcp-parity",
-    // boot 时出厂技能对账的结果(index.ts)
-    CODEPUPPY_FACTORY_SKILL_DIRS: JSON.stringify([factorySkills]),
   })
+  // boot 时出厂技能对账的结果(index.ts 记下,每次 fork 交给启动文档;`#1698` G3 前是 CODEPUPPY_FACTORY_SKILL_DIRS)
+  setFactorySkillDirsForFork([factorySkills])
   preferAppEnv(userDataPath)
   resetDanglingSweepLatchForTests()
   creditDanglingSweepForSpawn()
@@ -194,7 +195,8 @@ function sidecarStep(launched: Awaited<ReturnType<typeof launch>>) {
     globalRoot: bootstrap.paths.globalRoot,
     /** G2 起出网代理的决定者标记在文档里(engineNetFailurePath 的第三个参数) */
     egressProxy: bootstrap.network.egressProxy,
-    toggles: engineDesktopToggles(launched.forkEnv),
+    /** G3 起两个引擎开关在文档里(main 按 engineDesktopToggles 判一次;sidecar.ts 读 bootstrap.engine) */
+    toggles: bootstrap.engine,
     /** sidecar 进程的整份 env(含出网代理变量;这里不搬进本进程,只交给读整份 env 的读法)。 */
     processEnv: launched.forkEnv,
   }

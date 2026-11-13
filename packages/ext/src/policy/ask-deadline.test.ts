@@ -1,9 +1,11 @@
 // ADR-038 (#668) on OpenCode 2 — ruling item 2: the re-taken packages/core/src/permission.ts bounds the wait for an
 // approval reply. At the deadline only that request ends (no cascade to the session's other pending requests), its
 // card is retracted with a replied event, and the call fails by name — it is never allowed. Runs the production
-// permission engine in the isolated host (policy-host.cases.ts).
+// permission engine in the isolated host (policy-host.cases.ts). `#1698` G3: in Code Puppy's sidecar the deadline comes from the
+// published bootstrap document (`permission.askTimeoutMs`); the variable is read only by a host without a document.
 import { beforeAll, describe, expect, test } from "bun:test"
-import { Bus, E, isolate, it, Location, Permission, Plugin, promisePlugin, seedProject, Session } from "./policy-host.cases"
+import { Bus, E, isolate, it, Location, Permission, Plugin, promisePlugin, publishAskTimeout, seedProject, Session } from "./policy-host.cases"
+import { __resetCodePuppyBootstrapForTests, publishCodePuppyBootstrap, tryCodePuppyBootstrap } from "../../../util/src/codepuppy-bootstrap"
 
 beforeAll(isolate)
 const { Effect, Exit, Cause, Fiber } = E
@@ -37,7 +39,7 @@ const engine = Effect.gen(function* () {
 
 const ask = (permission: any, sessionID: string, file: string, timeoutMs: number) =>
   Effect.gen(function* () {
-    process.env[ENV] = String(timeoutMs)
+    publishAskTimeout(timeoutMs)
     const fiber = yield* Effect.forkChild(
       permission.assert({ sessionID, agent: "build", action: "edit", resources: [file], save: [], metadata: {} }),
     )
@@ -90,9 +92,21 @@ describe("ADR-038 approval deadline on OpenCode 2", () => {
   test("the default is 300 s and every invalid override falls back to it, never to no deadline", () => {
     const { askTimeoutMs, ASK_TIMEOUT_MS_DEFAULT } = Permission
     expect(ASK_TIMEOUT_MS_DEFAULT).toBe(300_000)
-    expect(askTimeoutMs({})).toBe(300_000)
-    expect(askTimeoutMs({ [ENV]: "1500" })).toBe(1500)
-    for (const bad of ["", "0", "-5", "abc", "1.5", "Infinity", "1e400"]) expect(askTimeoutMs({ [ENV]: bad })).toBe(300_000)
+    // Code Puppy's sidecar: the document decides; an exported variable is ignored there (main already judged it into the document).
+    publishAskTimeout(undefined)
+    expect(askTimeoutMs({ [ENV]: "1500" })).toBe(300_000)
+    publishAskTimeout(1500)
+    expect(askTimeoutMs({ [ENV]: "9" })).toBe(1500)
+    // A host without a document (the in-repo CLI): the variable, with today's rule.
+    const published = tryCodePuppyBootstrap()!
+    __resetCodePuppyBootstrapForTests()
+    try {
+      expect(askTimeoutMs({})).toBe(300_000)
+      expect(askTimeoutMs({ [ENV]: "1500" })).toBe(1500)
+      for (const bad of ["", "0", "-5", "abc", "1.5", "Infinity", "1e400"]) expect(askTimeoutMs({ [ENV]: bad })).toBe(300_000)
+    } finally {
+      publishCodePuppyBootstrap(published)
+    }
   })
 
   test("the deadline failure takes the session runner's dismissal path, so the step ends with this message", () => {

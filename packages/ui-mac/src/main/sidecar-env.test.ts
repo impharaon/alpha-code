@@ -62,8 +62,10 @@ describe("createSidecarEnv — default-deny", () => {
     }
   })
 
-  test("passes the non-secret alpha controls the sidecar reads", () => {
-    const env = createSidecarEnv({
+  // `#1698`(design §4.5 最终形态):Code Puppy 的控制项(平台 / 云地址、默认模型、kill-switch、各个运维开关)由 main 读一次写进启动文档,
+  // sidecar 环境里一个都不再有;main 自己才读的那些(CODEPUPPY_WEB_URL 等)本来就不过河。
+  test("drops every Code Puppy control — they travel in the bootstrap document, not the environment", () => {
+    const controls = {
       CODEPUPPY_BASE_URL: "https://gw.example/v1",
       CODEPUPPY_CLOUD_MCP_URL: "https://mcp.example",
       CODEPUPPY_DEFAULT_MODEL: "alpha/x",
@@ -71,20 +73,16 @@ describe("createSidecarEnv — default-deny", () => {
       CODEPUPPY_IDENTITY_DISABLE: "1",
       CODEPUPPY_BEHAVIOR_DISABLE: "1",
       CODEPUPPY_WEBSEARCH_DISABLE: "1",
-      // main-only alpha vars must NOT pass
+      CODEPUPPY_PROMPT_REBRAND_DISABLE: "1",
+      CODEPUPPY_FACTORY_SKILL_DIRS: "[]",
+      CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS: "1500",
+      // main-only alpha vars
       CODEPUPPY_WEB_URL: "https://web.example",
       CODEPUPPY_SHOT: "1",
-    })
-    // `#1698` G2:平台地址、云 MCP 地址、默认模型、kill-switch 由 main 写进启动文档,不再过河
-    expect(env.CODEPUPPY_BASE_URL).toBeUndefined()
-    expect(env.CODEPUPPY_CLOUD_MCP_URL).toBeUndefined()
-    expect(env.CODEPUPPY_DEFAULT_MODEL).toBeUndefined()
-    expect(env.CODEPUPPY_WEBSEARCH_DISABLE).toBeUndefined()
-    expect(env.CODEPUPPY_MODELS_DISABLE).toBe("1")
-    expect(env.CODEPUPPY_IDENTITY_DISABLE).toBe("1")
-    expect(env.CODEPUPPY_BEHAVIOR_DISABLE).toBe("1")
-    expect(env.CODEPUPPY_WEB_URL).toBeUndefined()
-    expect(env.CODEPUPPY_SHOT).toBeUndefined()
+    }
+    const env = createSidecarEnv({ ...controls, PATH: "/usr/bin" })
+    expect(Object.keys(env).filter((name) => name.startsWith("CODEPUPPY_"))).toEqual([])
+    expect(env.PATH).toBe("/usr/bin")
   })
 
   test("passes OPENCODE_/XDG_/LC_/ELECTRON_ prefixes (channel DB, state home, locale, dev exec path)", () => {
@@ -506,10 +504,19 @@ describe("createSidecarEnv — SECRETISH word boundary (#605)", () => {
 // `#1698`(DESIGN-upgrade-bootstrap-config §4.5):#606 的「main 与 sidecar 同口径」改由启动文档保证 —— 两个逃生阀与全局根不再经环境
 // 过河,main 判一次写进文档(paths.userConfig 缺席 / paths.globalRoot,codepuppy-bootstrap-build.test.ts)。这里判它们**不**进 sidecar env,
 // 写进 CODEPUPPY_ENV_ALLOWLIST_EXTRA 也不进(前缀拒绝排在 EXTRA 之前);其余行为不受影响。
-describe("createSidecarEnv — Code Puppy decisions do not cross through the environment (#1698 G1)", () => {
-  const migrated = ["CODEPUPPY_GLOBAL_DIR", "CODEPUPPY_JSONC_TRUTH_DISABLE", "CODEPUPPY_LEGACY_INSTALL_ROOT", "CODEPUPPY_OFFICE_MCP_MANIFEST", "CODEPUPPY_EXT_BUNDLED_MANIFEST"]
+describe("createSidecarEnv — Code Puppy decisions do not cross through the environment (#1698)", () => {
+  // design §2.2 的全部旧键(G1 路径、G2 平台 / 云 / 网络、G3 开关与引擎设置)
+  const migrated = [
+    "CODEPUPPY_GLOBAL_DIR", "CODEPUPPY_JSONC_TRUTH_DISABLE", "CODEPUPPY_LEGACY_INSTALL_ROOT", "CODEPUPPY_OFFICE_MCP_MANIFEST", "CODEPUPPY_EXT_BUNDLED_MANIFEST",
+    "CODEPUPPY_BASE_URL", "CODEPUPPY_PLATFORM_AUTH_REF", "CODEPUPPY_DEFAULT_MODEL", "CODEPUPPY_CLOUD_MCP_URL", "CODEPUPPY_CLOUD_MCP_SERVER",
+    "CODEPUPPY_CLOUD_MCP_DEF", "CODEPUPPY_CLOUD_MCP_ARM", "CODEPUPPY_WEBSEARCH_DISABLE", "CODEPUPPY_LOCAL_WEBSEARCH_DENY",
+    "CODEPUPPY_CLOUD_WEBSEARCH_DENY", "CODEPUPPY_POLICY_ACCOUNT", "CODEPUPPY_EGRESS_PROXY", "CODEPUPPY_PROVIDER_ALLOW",
+    "CODEPUPPY_FACTORY_SKILL_DIRS", "CODEPUPPY_FACTORY_DENY_SKILLS", "CODEPUPPY_MODELS_DISABLE", "CODEPUPPY_IDENTITY_DISABLE",
+    "CODEPUPPY_BEHAVIOR_DISABLE", "CODEPUPPY_PROMPT_REBRAND_DISABLE", "CODEPUPPY_ECOSYSTEM_INHERIT", "CODEPUPPY_AUTOMATION_DISABLE",
+    "CODEPUPPY_READONLY_DISABLE", "CODEPUPPY_EXT_VERBOSE", "CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS",
+  ]
 
-  test("the G1 keys are dropped — also when listed in CODEPUPPY_ENV_ALLOWLIST_EXTRA, and in any casing", () => {
+  test("every §2.2 key is dropped — also when listed in CODEPUPPY_ENV_ALLOWLIST_EXTRA, and in any casing", () => {
     const env = createSidecarEnv({
       ...Object.fromEntries(migrated.map((name) => [name, "/Users/u/value"])),
       codepuppy_global_dir: "/Users/u/lower",
@@ -606,9 +613,9 @@ describe("createSidecarEnv — container-valued vars", () => {
     })
     expect(env.OPENCODE_CONFIG).toBe("/Users/u/.alpha/codepuppy.jsonc")
     expect(env.OPENCODE_CONFIG_DIR).toBeDefined()
-    expect(env.CODEPUPPY_IDENTITY_DISABLE).toBe("1")
-    expect(env.CODEPUPPY_BEHAVIOR_DISABLE).toBe("1")
-    // `#1698` G2:注入读的云 MCP 地址来自启动文档(cloudMcp),不再从 sidecar 环境读
+    // `#1698` G2 / G3:注入读的开关与云 MCP 地址来自启动文档(switches / cloudMcp),不再从 sidecar 环境读
+    expect(env.CODEPUPPY_IDENTITY_DISABLE).toBeUndefined()
+    expect(env.CODEPUPPY_BEHAVIOR_DISABLE).toBeUndefined()
     expect(env.CODEPUPPY_CLOUD_MCP_URL).toBeUndefined()
   })
 })

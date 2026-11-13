@@ -29,8 +29,8 @@ const real = (dir: string) => {
   }
 }
 
-/** 这一刻的规则:先问,白名单放行。`globalRoot` = 启动文档的 `paths.globalRoot`;`factorySkillDirs` = 出厂技能目录(JSON 数组)。 */
-export function externalDirectoryRules(globalRoot: string | undefined, factorySkillDirs: string | undefined): Rule[] {
+/** 这一刻的规则:先问,白名单放行。`globalRoot` = 启动文档的 `paths.globalRoot`;`factorySkillDirs` = 启动文档的 `skills.factoryDirs`。 */
+export function externalDirectoryRules(globalRoot: string | undefined, factorySkillDirs: readonly string[]): Rule[] {
   const allowed = [
     path.join(Path.data, "tool-output"),
     path.join(real(Path.tmp)),

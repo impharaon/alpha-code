@@ -20,6 +20,7 @@ import { getAuthIdentityTag } from "./codepuppy-auth"
 import { installationMachineId } from "./artifact-service"
 import { tryGetCodePuppyEnvironment } from "./codepuppy-environment"
 import { buildCodePuppyBootstrap } from "./codepuppy-bootstrap-build"
+import { factorySkillDirsForFork } from "./factory-skills"
 import { resourcesRoot } from "./ext-fs-installer"
 import { syncSecretFiles } from "./codepuppy-secret-files"
 import { customProviderSecretValues } from "./codepuppy-byok-keys"
@@ -234,7 +235,11 @@ function refreshConfiguredEgressDestinations(userDataPath: string): void {
     const accepted = setConfiguredEgressDestinations([
       // main 自己的环境(applyAuthEnv 写的平台地址)—— sidecar 拿到的是同一个值经启动文档(`#1698`)
       ...deriveEgressDestinations(
-        buildCodePuppyModelConfig(userDataPath, { baseURL: process.env.CODEPUPPY_BASE_URL, defaultModel: process.env.CODEPUPPY_DEFAULT_MODEL })?.provider,
+        buildCodePuppyModelConfig(userDataPath, {
+          baseURL: process.env.CODEPUPPY_BASE_URL,
+          defaultModel: process.env.CODEPUPPY_DEFAULT_MODEL,
+          disabled: process.env.CODEPUPPY_MODELS_DISABLE === "1",
+        })?.provider,
       ),
       ...deriveMcpEgressDestinations(mcpServers),
     ])
@@ -364,7 +369,7 @@ export function preferAppEnv(userDataPath: string) {
   //    users never have to touch ~/.zshrc. Never overrides anything already set in step 1.
   loadCodePuppySecrets(userDataPath, logger)
   // 3. Desktop defaults(set-if-unset:用户 shell 的显式 export 优先)。`#1667`:H1 下引擎核心不读这两个名字,读它们的是
-  // sidecar 构造 `start()` 选项的 engineDesktopToggles(engine-server-options.ts)—— 它们从此是 Code Puppy 自己的开关:
+  // engineDesktopToggles(engine-server-options.ts;`#1698` 起由启动文档构建器在 main 调,结果进文档的 `engine`)—— 它们从此是 Code Puppy 自己的开关:
   //   · OPENCODE_EXPERIMENTAL_FILEWATCHER 默认开 → `fs.filewatcher`(B12 拍板,2026-07-05:「外部变更感知」);
   //   · OPENCODE_DISABLE_MODELS_FETCH 默认 "1" → `models.fetch: false`(models.dev 在国内网络超时;随包快照够用,T1.7 / C4)。
   // v1 时代这里另写的 OPENCODE_CLIENT=desktop(→ `app.name`)、OPENCODE_EXPERIMENTAL_ICON_DISCOVERY、OPENCODE_ENABLE_EXA 默认值、
@@ -529,6 +534,7 @@ export async function spawnLocalServer(
     registryChannel,
     policyAccount,
     egressProxyPort,
+    factorySkillDirs: factorySkillDirsForFork(),
     env: process.env,
     log: (line) => getLogger()?.warn(line),
   })

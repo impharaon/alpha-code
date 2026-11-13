@@ -47,12 +47,18 @@ const engines: Array<{ close: () => Promise<void> }> = []
 const MANAGED = [
   "CODEPUPPY_GLOBAL_DIR",
   "CODEPUPPY_ECOSYSTEM_INHERIT",
-  // main 的环境(publishPlatformBaseURL 经构建器读它):宿主导出的值不得渗进文档
+  // main 的环境(publishMainEnv 经构建器读它):宿主导出的值不得渗进文档
   "CODEPUPPY_BASE_URL",
   "CODEPUPPY_DEFAULT_MODEL",
   "CODEPUPPY_CLOUD_MCP_URL",
   "CODEPUPPY_MODELS_DISABLE",
   "CODEPUPPY_WEBSEARCH_DISABLE",
+  "CODEPUPPY_IDENTITY_DISABLE",
+  "CODEPUPPY_BEHAVIOR_DISABLE",
+  "CODEPUPPY_AUTOMATION_DISABLE",
+  "CODEPUPPY_READONLY_DISABLE",
+  "CODEPUPPY_EXT_VERBOSE",
+  "CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS",
   "CODEPUPPY_FACTORY_SKILL_DIRS",
   "CODEPUPPY_PROMPT_REBRAND_DISABLE",
 ] as const
@@ -87,11 +93,18 @@ beforeEach(() => {
 })
 
 /**
- * `#1698` G2:平台节点地址由 main 写进启动文档(sidecar 在注入前发布),不再经环境。登录态的用例按 main 的构建器发布一份带地址的
- * 文档;其余用例不发布(注入按「未登录、无云、kill-switch 关」走,全局根照旧经环境,R31),每条用例开头撤掉上一条的。
+ * `#1698` G2 / G3:平台节点地址、运维开关与出厂技能目录由 main 写进启动文档(sidecar 在注入前发布),不再经环境。需要它们的用例按 main 的
+ * 构建器从「main 的环境」(这里就是 process.env)发布一份;其余用例不发布(注入按「未登录、无云、kill-switch 关、开关全关」走,全局根照旧
+ * 经环境,R31),每条用例开头撤掉上一条的。
  */
-const publishPlatformBaseURL = (url: string) =>
-  publishMainBootstrap({ userData, engineConfigDirectory: engineGlobalConfigDirectory(process.env, homedir()), env: { ...process.env, CODEPUPPY_BASE_URL: url } })
+const publishMainEnv = (options: { factorySkillDirs?: string[]; env?: Record<string, string> } = {}) =>
+  publishMainBootstrap({
+    userData,
+    engineConfigDirectory: engineGlobalConfigDirectory(process.env, homedir()),
+    factorySkillDirs: options.factorySkillDirs,
+    env: { ...process.env, ...options.env },
+  })
+const publishPlatformBaseURL = (url: string) => publishMainEnv({ env: { CODEPUPPY_BASE_URL: url } })
 
 /** `config` 就是 `start()` 的 `config`:内联文档,外加(`#1667` 裁决 r1 / C7 重裁起)main 合成的显式文件。 */
 async function engineWith(
@@ -180,6 +193,7 @@ describe("S6 外部技能不继承:唯一机制是注入的移除指令(裁决�
 
   test("反向臂:CODEPUPPY_ECOSYSTEM_INHERIT=1(不写移除指令)⇒ .claude 与 .agents 的技能都出现", async () => {
     process.env.CODEPUPPY_ECOSYSTEM_INHERIT = "1"
+    publishMainEnv()
     const injection = injectCodePuppyConfig(userData, undefined, "stable")
     const engine = await engineWith("s6-inherit", injection.config)
     plant(engine.slot.projectDirectory)
@@ -304,7 +318,7 @@ describe("接缝裁决 A / 裁决 r3 第 1 条:技能目录经显式文件的 sk
   test("出厂目录:启动时就在的技能出现;文件监听开着时,启动之后写进同一目录的技能几秒内出现(不重启)", async () => {
     const factory = path.join(sandbox.root, "factory-skills-watch")
     skillFile(path.join(factory, "cp-l5-factory-at-boot"), "cp-l5-factory-at-boot")
-    process.env.CODEPUPPY_FACTORY_SKILL_DIRS = JSON.stringify([factory])
+    publishMainEnv({ factorySkillDirs: [factory] }) // boot 时出厂技能对账的结果
     const injection = injectCodePuppyConfig(userData, undefined, "stable")
     expect(injection.explicit!.layer.skills[0]).toBe(factory)
     const engine = await engineWith("skills-watch", injection.config, undefined, { filewatcher: true })
@@ -463,6 +477,7 @@ describe("接缝裁决 C / 裁决 r1 第 2 条:出厂 /init、/review 由显式�
     expect(await userTexts(engine, (await runCommand(engine, "init")).id)).toEqual([rendered(CODEPUPPY_INIT_TEMPLATE)])
 
     process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE = "1"
+    publishMainEnv()
     const bare = await engineWith("commands-init-bare", injectCodePuppyConfig(userData, undefined, "stable").config)
     const texts = await userTexts(bare, (await runCommand(bare, "init")).id)
     expect(texts).toHaveLength(1)
@@ -479,6 +494,7 @@ describe("接缝裁决 C / 裁决 r1 第 2 条:出厂 /init、/review 由显式�
     expect(await userTexts(engine, parent.id)).toEqual([])
 
     process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE = "1"
+    publishMainEnv()
     const bare = await engineWith("commands-review-bare", injectCodePuppyConfig(userData, undefined, "stable").config)
     const session = await runCommand(bare, "review")
     expect(await userTexts(bare, session.id)).toHaveLength(1)
@@ -511,6 +527,7 @@ describe("接缝裁决 C / 裁决 r1 第 2 条:出厂 /init、/review 由显式�
     expect(await userTexts(engine, (await runCommand(engine, "init")).id)).toEqual([rendered(CODEPUPPY_INIT_TEMPLATE)])
 
     process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE = "1"
+    publishMainEnv()
     const bare = await engineWith("commands-precedence-bare", injectCodePuppyConfig(userData, undefined, "stable").config, undefined, { globalConfig })
     expect(await userTexts(bare, (await runCommand(bare, "init")).id)).toEqual([`USER-GLOBAL-INIT-TEMPLATE\n\n${ARG}`])
   }, 60_000)

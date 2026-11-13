@@ -200,6 +200,7 @@ describeDarwin("`#1572` AC4 真栈:Electron 内嵌 node + 真出网代理 + 真 
         officeMcpManifest: join(scratch, "office-mcp", "tools.json"),
         registryChannel: "stable",
         egressProxyPort: proxy.port,
+        factorySkillDirs: [],
         env: { CODEPUPPY_BASE_URL: `http://127.0.0.1:${llmPort}/v1` },
         log: (line) => engineLog.push(`${line}\n`),
       }),

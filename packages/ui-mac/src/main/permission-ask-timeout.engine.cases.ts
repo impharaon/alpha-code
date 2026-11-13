@@ -5,8 +5,9 @@
 // (packages/ui-mac/src/renderer/codepuppy-ui/session-timeline/cards/tool-card-model.ts)认 0.1.26 引擎那句话的首行
 // 「审批请求等待 N 秒无人应答」;重接管的内核块(packages/core/src/permission.ts 的 codepuppy(ADR-038))必须照写这句。
 //
-// 真路径:嵌进 sidecar 的引擎(test-component/codepuppy-engine.ts:生产注入 + 真 ext)+ 本机模型桩;期限经
-// `CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS` 压到 500 ms(每次请求现读);「请求审批」档的 shell 调用等审批到期 ⇒ 引擎写下这次工具调用的失败;
+// 真路径:嵌进 sidecar 的引擎(test-component/codepuppy-engine.ts:生产注入 + 真 ext)+ 本机模型桩;期限由运维导出的
+// `CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS=500` 经 main 的生产构建器写进启动文档的 permission.askTimeoutMs(`#1698` R6:此前这个变量被 sidecar
+// 白名单丢掉,正式包里导出了也不生效),引擎每次请求现读文档;「请求审批」档的 shell 调用等审批到期 ⇒ 引擎写下这次工具调用的失败;
 // 引擎的消息经桌面同一个适配器(packages/codepuppy-app/src/utils/session-message.ts 的 normalizeSessionMessages)变成 v1 形状的工具部件,
 // 再交给卡片模型的分类(toolCardHeadOf)。另判模型下一轮读到的是同一句话(与 0.1.26 一样,模型与用户读到的是同一句)。
 // 已知的坏(实测):内核块写的是英文「This approval request waited N s …」⇒ 卡片不认,askTimedOut 缺席。
@@ -17,6 +18,7 @@ import { assertEngineSandboxed, engineSandbox } from "../../test-component/engin
 import { codepuppyEngine, scriptedModel, textOf, type Running } from "../../test-component/codepuppy-engine"
 import { normalizeSessionMessages } from "../../../codepuppy-app/src/utils/session-message"
 import { toolCardHeadOf } from "../renderer/codepuppy-ui/session-timeline/cards/tool-card-model"
+import { buildCodePuppyBootstrap } from "./codepuppy-bootstrap-build"
 
 const sandbox = engineSandbox()
 const model = scriptedModel()
@@ -24,15 +26,27 @@ let running: Running | undefined
 let directory = ""
 beforeAll(async () => {
   await assertEngineSandboxed(sandbox)
-  process.env.CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS = "500"
-  const host = codepuppyEngine({ sandbox, name: "ask-timeout", modelBaseURL: model.baseURL })
+  // main 的那一步:运维导出的变量只在 main 的构建器里读(路径字段与本用例无关,给沙箱里的占位)
+  const operator = buildCodePuppyBootstrap({
+    userDataPath: sandbox.root,
+    globalRoot: sandbox.root,
+    userConfig: `${sandbox.root}/codepuppy.jsonc`,
+    initialDirectory: sandbox.root,
+    databasePath: ":memory:",
+    engineConfigDirectory: sandbox.root,
+    officeMcpManifest: `${sandbox.root}/office-mcp/tools.json`,
+    factorySkillDirs: [],
+    env: { CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS: "500" },
+    log: () => {},
+  })
+  expect(operator.permission).toEqual({ askTimeoutMs: 500 })
+  const host = codepuppyEngine({ sandbox, name: "ask-timeout", modelBaseURL: model.baseURL, askTimeoutMs: operator.permission.askTimeoutMs })
   directory = host.projectDirectory
   running = await host.start()
 }, 60_000)
 afterAll(async () => {
   await running?.close().catch(() => undefined)
   model.stop()
-  delete process.env.CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS
 })
 
 describe("#1214 AC2:审批等到期限无人应答 ⇒ 工具卡认出「审批超时」", () => {

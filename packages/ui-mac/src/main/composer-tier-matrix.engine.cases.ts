@@ -51,13 +51,13 @@ const send = (method: string, route: string, body?: unknown) => running!.send(me
 
 beforeAll(async () => {
   await assertEngineSandboxed(sandbox)
-  // R2:出厂技能目录(main 启动时算好、经这个变量交给注入)
+  // R2:出厂技能目录(main 启动时算好,`#1698` 起经启动文档的 skills.factoryDirs 交给注入与 ext)
   fs.mkdirSync(FACTORY_SKILLS, { recursive: true })
-  process.env.CODEPUPPY_FACTORY_SKILL_DIRS = JSON.stringify([FACTORY_SKILLS])
   const host = codepuppyEngine({
     sandbox,
     name: "tiers",
     modelBaseURL: model.baseURL,
+    factoryDirs: [FACTORY_SKILLS],
     // R10:用户在 Code Puppy 里加的本地 MCP,真 stdio MCP 服务器,只列一个 echo 工具
     mcpCallLog: MCP_CALLS,
     projectFiles: {

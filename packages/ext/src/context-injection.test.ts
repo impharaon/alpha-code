@@ -266,7 +266,8 @@ describe("③a 配置域 transform 咽喉:ext 写进 agent / command / mcp 的�
     expect(leaves.length).toBeGreaterThanOrEqual(4)
     for (const p of ["/agents/general/system", "/agents/explore/system", "/agents/docs/system", "/agents/docs/description"])
       expect(leaves.map((l) => l.pointer)).toContain(p)
-    expect(Object.keys(after.commands)).toEqual([])
+    // 出厂禁用技能的占位命令恒在(`#1698` R7:名单是常量;此前生产里 main 恒写那个环境变量,结果相同),/init /review 不在
+    expect(Object.keys(after.commands)).toEqual(["customize-opencode"])
     expect(unexplainedWrites(after)).toEqual([])
   })
   test("L5 写进内联配置的出厂命令来自同一个纯函数:applyPromptTakeover 产出的每个命令字符串都是登记项(review 带 subtask)", () => {
@@ -281,7 +282,6 @@ describe("③a 配置域 transform 咽喉:ext 写进 agent / command / mcp 的�
     expect(explainConfigString("/command/init/template", `${commands.init!.template}!`).ok).toBe(false)
   })
   test("#1522 AC3:弃用占位只指向 /customize-codepuppy,不提供恢复路径", async () => {
-    process.env.CODEPUPPY_FACTORY_DENY_SKILLS = JSON.stringify(["customize-opencode"])
     const after = await extWrites()
     const command = after.commands["customize-opencode"] as { description: string; template: string }
     expect(command.description).toBe("(已弃用)请使用 /customize-codepuppy")
@@ -313,7 +313,6 @@ describe("③a 配置域 transform 咽喉:ext 写进 agent / command / mcp 的�
     expect(unexplainedWrites(after).map((l) => l.pointer)).toEqual(["/agents/general/system"])
   })
   test("已知的坏 ③′:命令发出的字在用户参数之外多一段(不是登记过的模板 + 用户的字)⇒ 点名", async () => {
-    process.env.CODEPUPPY_FACTORY_DENY_SKILLS = JSON.stringify(["customize-opencode"])
     const after = await extWrites()
     const command = after.commands["customize-opencode"] as { template: string }
     expect(unexplainedWrites(after)).toEqual([])
@@ -342,7 +341,6 @@ describe("③a 配置域 transform 咽喉:ext 写进 agent / command / mcp 的�
 // tool.execute.after 的失败分支原样交回,与 execute.before 抛出的拒绝句同属工具失败文字。
 describe("③a″ skill / websearch transform 不写字:只拿掉出厂禁项、只选供应商、只以同一个 id 顶替 exa", () => {
   test("skill.transform 只调 remove;websearch.transform 只在没有选择时调 default.set(供应商 id),并且只 add 一个与上游同 id 的 exa 供应商(不新增第二个)", async () => {
-    process.env.CODEPUPPY_FACTORY_DENY_SKILLS = JSON.stringify(["customize-opencode"])
     const recorded = recordingContext(join(root, "project"))
     await CodePuppyExt.setup(recorded.context)
     const calls: string[] = []

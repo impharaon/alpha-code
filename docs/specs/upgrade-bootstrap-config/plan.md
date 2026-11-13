@@ -240,7 +240,17 @@ last_reviewed: 2026-11-12
 | §9 回滚 · 无数据后果 | 段 0 记录第 ⑦ 格(C4 显式文件、C5 模型底表、密钥文件名集合)两端逐字相同;启动文档不落盘(构建器与 sidecar 不新增写盘点:`process-fence-write-sites.test.ts` 的登记簿本段不变) | 若迁移改变了磁盘形状,第 ⑦ 格红;若新增写盘,写盘登记簿闸红。 |
 
 ### 偏离记录
-暂无
+- 2026-11-13 · 模型配置的逃生开关也成了调用方给的输入:`buildCodePuppyModelConfig(userDataPath, ModelConfigInputs)`(段 2 的 `PlatformInputs` 改名并加 `disabled`)。注入传文档的 `switches.modelsDisabled`;main 的出网派生照旧传 main 自己环境里的 `CODEPUPPY_MODELS_DISABLE === "1"`(main 一侧,语义不变)· 本段提交。
+- 2026-11-13 · 出厂技能目录交给构建器的方式:`factory-skills.ts` 加 `setFactorySkillDirsForFork` / `factorySkillDirsForFork`,index.ts 在 boot 对账成功后记下(原来写环境变量的同一处),`spawnLocalServer` 每次 fork 取出交给构建器;没对账或对账失败 ⇒ 空,与原来「没写变量」同一结果 · 本段提交。
+- 2026-11-13 · ext 侧签名随通道去掉 JSON 解码:`injectFactorySkillPaths` / `externalDirectoryRules` 收数组;`applyFactoryDeny(cfg, names = FACTORY_DENIED_SKILLS)`、`factoryDeniedSkills()` 无参。main 的 `codepuppy-builtin-policy.ts` 转出 ext 的常量(R7);「main 与 ext 同一个常量」的判据放在 ui-mac `codepuppy-builtin-policy.test.ts`(ext 的测试 import main 模块会把 main 的依赖带进 ext 测试)· 本段提交。
+- 2026-11-13 · 兼容入口的落法:`codepuppyEngineSettings` 与 `PROJECT_WATCH_ENV` 在 util,core 的 `askTimeoutMs(env)`(`permission.ts` 既有 `codepuppy(ADR-038)` 块内)与 `projectWatchEnabled(env)` 留作薄包装,两个调用点(`permission.ts:327`、`location-watcher.ts:83`)不动 · 本段提交。
+- 2026-11-13 · 构建器的期限按文档类型收「正的安全整数」:`1e20` 这类整数但非安全整数的取值在桌面里省略(⇒ 300 s);无文档宿主的兼容入口逐字保留今天「任意正整数」的判法。差别只在大于 2^53 的取值 · 本段提交。
+- 2026-11-13 · R6 期限那一条没有新增用例,改写既有一条:`permission-ask-timeout.engine.cases.ts` 由运维变量 → 生产构建器 → 文档 → 引擎(构建器不写期限 ⇒ 等满 300 s 而红),宿主条数仍是 1;ext `ask-deadline.test.ts` 改经 `policy-host.cases.ts` 新增的 `publishAskTimeout` 发布期限,「the default is 300 s …」一条另判有文档时环境被忽略 · 本段提交。
+- 2026-11-13 · 引擎宿主夹具 `codepuppyEngine()` 发布的 `engine.filewatcher` 取与 `start()` 同一个值(`options.filewatcher ?? false`):core 的项目监听在宿主引擎里从此跟这个选项走(此前读沙箱环境,未设 ⇒ 关),缺省仍关;夹具另加 `askTimeoutMs` / `factoryDirs` / `switches` 三个选项 · 本段提交。
+- 2026-11-13 · 出厂禁用名单成常量后,ext 的配置变换恒写 `customize-opencode` 占位命令:`context-injection.test.ts`「空项目」一条的期望从「零命令」改为「只有这一条」(生产里 main 一直写那个变量,结果相同;此前的测试环境没写它)· 本段提交。
+- 2026-11-13 · 原表之外改动的测试(都因为按旧通道搭环境或造文档):`ecosystem-import.test.ts`、`config-injection-throat.test.ts`、`composer-tier-matrix.engine.cases.ts`、`codepuppy-config-injection-engine.cases.ts`(`publishMainEnv` 按构建器发布,段 2 的 `publishPlatformBaseURL` 并进它)、`net-failure-real-stack.test.ts`(构建器多一个输入)、`sidecar-bootstrap-gate.test.ts` 与 core `codepuppy-mcp-runtime.test.ts`(文档必带 G3 字段)、`codepuppy-models.test.ts`、ext `factory-paths.test.ts`、`policy-host.cases.ts`;ext `plugin-host.test.ts` 的 `env()` 不再写任何环境变量 · 本段提交。
+- 2026-11-13 · 登记:`adr038-ask-deadline` 的决定文字不改,握法(ladder)补「经文档、无文档宿主经兼容入口」并加 util 一条测试;`project-file-change-events` 握法改写并加 core 一条测试;`gate-files.tsv` 的 `codepuppy-project-watch` 2 → 3、`plugin-host` 29 → 31、`codepuppy-bootstrap-build` 9 → 15、`codepuppy-config-injection` 25 → 26,`sidecar-env`、`bootstrap-env-readers`、`ask-deadline`、`codepuppy-models` 条数不变、说明补 `#1698` · 本段提交。
+- 2026-11-13 · 体量:45 个文件(生产 17,其中只改注释 1;测试与夹具 26;登记 2),外加本文件 · 本段提交。
 
 ## 段 4 — G4 Code Puppy 自有的引擎全局配置目录(单独一个 PR)
 

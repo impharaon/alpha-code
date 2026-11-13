@@ -829,7 +829,7 @@
       ],
       "mechanism": {
         "file": "packages/core/src/permission.ts",
-        "ladder": "L3 (re-taken: the wait on the reply is inside the kernel; a plugin watchdog's reject cascades)"
+        "ladder": "L3 (re-taken: the wait on the reply is inside the kernel; a plugin watchdog's reject cascades). The override reaches the engine in Code Puppy's bootstrap document (permission.askTimeoutMs), which the desktop main process writes from CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS; only a host without that document (the in-repo CLI) reads the variable itself, through the one compatibility reader codepuppyEngineSettings (#1698 design R6, R13)."
       },
       "tests": [
         {
@@ -847,6 +847,10 @@
         {
           "file": "packages/ui-mac/src/main/permission-ask-timeout.engine.test.ts",
           "name": "审批超时:到期的工具部件经桌面适配器被卡片分类为审批超时,模型读到同一句(permission-ask-timeout.engine.cases.ts,1 条)"
+        },
+        {
+          "file": "packages/util/src/codepuppy-bootstrap.test.ts",
+          "name": "codepuppyEngineSettings with a published document reads the document and ignores the environment"
         }
       ]
     },
@@ -1714,7 +1718,7 @@
       },
       "mechanism": {
         "file": "packages/core/src/filesystem/codepuppy-project-watch.ts",
-        "ladder": "L3 (re-taken packages/core/src/filesystem/location-watcher.ts subscribes one recursive watch on the Location's folder when main's OPENCODE_EXPERIMENTAL_FILEWATCHER switch is on, with 0.1.26's ignore list plus configured watcher.ignore, and publishes filesystem.changed)"
+        "ladder": "L3 (re-taken packages/core/src/filesystem/location-watcher.ts subscribes one recursive watch on the Location's folder when the switch is on, with 0.1.26's ignore list plus configured watcher.ignore, and publishes filesystem.changed. The switch is Code Puppy's bootstrap document's engine.filewatcher, which main judges once from OPENCODE_EXPERIMENTAL_FILEWATCHER with the same rule as the engine's own watcher; a host without the document reads the variable through codepuppyEngineSettings, #1698 design R9, R13)"
       },
       "tests": [
         {
@@ -1724,6 +1728,10 @@
         {
           "file": "packages/core/test/codepuppy-project-watch.test.ts",
           "name": "with main's switch off, a project file publishes nothing"
+        },
+        {
+          "file": "packages/core/test/codepuppy-project-watch.test.ts",
+          "name": "in Code Puppy's sidecar the bootstrap document decides: the variable says on, the document says off, a project file publishes nothing"
         }
       ]
     },

@@ -20,14 +20,31 @@ export type TestBootstrapInput = Partial<Paths> &
     killSwitch?: boolean
     policyAccount?: string
     egressProxy?: string
+    engine?: Partial<CodePuppyBootstrap["engine"]>
+    factoryDirs?: string[]
+    askTimeoutMs?: number
+    switches?: Partial<CodePuppyBootstrap["switches"]>
   }
+
+/** 八个开关全关(没有任何运维导出时 main 写的那一份)。 */
+export const NO_SWITCHES: CodePuppyBootstrap["switches"] = {
+  modelsDisabled: false,
+  identityDisabled: false,
+  behaviorDisabled: false,
+  promptRebrandDisabled: false,
+  automationDisabled: false,
+  readonlyDisabled: false,
+  ecosystemInherit: false,
+  extVerbose: false,
+}
 
 /**
  * 只有 `globalRoot` 必填;其余缺省取全局根下面的路径(Office 清单缺省指向一个不存在的文件 = 不给第一方 MCP 声明),平台凭据引用
- * 缺省指 userData 下的 CODEPUPPY_API_KEY 密钥文件(与 main 的 secretFileRef 同形),kill-switch 关,无云 MCP、无账户分区、无出网代理。
+ * 缺省指 userData 下的 CODEPUPPY_API_KEY 密钥文件(与 main 的 secretFileRef 同形),kill-switch 关,无云 MCP、无账户分区、无出网代理;
+ * 引擎开关取桌面缺省(不拉 models.dev、文件监听开),没有出厂技能目录,审批期限缺省,八个开关全关。
  */
 export function testBootstrap(input: TestBootstrapInput): CodePuppyBootstrap {
-  const { registryChannel, platform, cloudMcp, killSwitch, policyAccount, egressProxy, ...paths } = input
+  const { registryChannel, platform, cloudMcp, killSwitch, policyAccount, egressProxy, engine, factoryDirs, askTimeoutMs, switches, ...paths } = input
   const userData = paths.userData ?? path.join(input.globalRoot, "test-userdata")
   return parseCodePuppyBootstrap({
     v: 1,
@@ -40,11 +57,15 @@ export function testBootstrap(input: TestBootstrapInput): CodePuppyBootstrap {
       ...paths,
     },
     ...(registryChannel ? { registryChannel } : {}),
+    engine: { modelsFetch: false, filewatcher: true, ...engine },
     platform: { credentialRef: `{file:${path.join(userData, "codepuppy-secrets", "CODEPUPPY_API_KEY")}}`, ...platform },
     ...(cloudMcp ? { cloudMcp } : {}),
     webSearch: { killSwitch: killSwitch ?? false },
+    skills: { factoryDirs: factoryDirs ?? [] },
     policy: policyAccount ? { account: policyAccount } : {},
+    permission: askTimeoutMs === undefined ? {} : { askTimeoutMs },
     network: egressProxy ? { egressProxy } : {},
+    switches: { ...NO_SWITCHES, ...switches },
   })
 }
 
@@ -69,8 +90,8 @@ export function testCloudMcp(url: string, tokenFile: string, name = "codepuppy")
 
 /**
  * 按 main 的构建器(生产的 buildCodePuppyBootstrap)从「main 的环境」造一份文档并在本进程发布 —— 单进程测试里 process.env 同时
- * 扮演 main 的环境:用例照今天导出 CODEPUPPY_BASE_URL / CODEPUPPY_CLOUD_MCP_URL / CODEPUPPY_DEFAULT_MODEL / CODEPUPPY_WEBSEARCH_DISABLE,
- * 再调这个,注入读到的就是 main 会交过去的那一份(G2 各键的判法只在构建器里一处)。全局根缺省取 CODEPUPPY_GLOBAL_DIR,引擎全局
+ * 扮演 main 的环境:用例照今天导出 CODEPUPPY_BASE_URL / CODEPUPPY_CLOUD_MCP_URL / CODEPUPPY_DEFAULT_MODEL / CODEPUPPY_WEBSEARCH_DISABLE
+ * 与各个运维开关(CODEPUPPY_MODELS_DISABLE 等),再调这个,注入读到的就是 main 会交过去的那一份(各键的判法只在构建器里一处)。全局根缺省取 CODEPUPPY_GLOBAL_DIR,引擎全局
  * 配置目录缺省取 XDG_CONFIG_HOME/opencode(测试都把它指向临时目录),其余路径落在全局根下。
  */
 export function publishMainBootstrap(input: {
@@ -78,6 +99,8 @@ export function publishMainBootstrap(input: {
   globalRoot?: string
   engineConfigDirectory?: string
   extPluginPath?: string
+  /** boot 时出厂技能对账的结果(缺省:没有) */
+  factorySkillDirs?: string[]
   env?: Record<string, string | undefined>
 }): CodePuppyBootstrap {
   const env = input.env ?? process.env
@@ -92,6 +115,7 @@ export function publishMainBootstrap(input: {
     engineConfigDirectory: input.engineConfigDirectory ?? (env.XDG_CONFIG_HOME ? path.join(env.XDG_CONFIG_HOME, "opencode") : path.join(globalRoot, "test-engine-config")),
     extPluginPath: input.extPluginPath,
     officeMcpManifest: path.join(globalRoot, "test-office-mcp", "tools.json"),
+    factorySkillDirs: input.factorySkillDirs ?? [],
     env,
     log: () => {},
   })

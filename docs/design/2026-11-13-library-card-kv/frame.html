@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="zh-CN" data-color-scheme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>组件库 · 卡片 与 名称 — 值列表 · 组件稿</title>
+<!-- 帧内样式引用正式代码(f0f6ac0eb5):令牌与基础、账户弹层(改前)。组件本身的样式见下方「组件库新增」一段。 -->
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/codepuppy-ui/base.css" />
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/sidebar/account-popover.css" />
+<style>
+/* ════════ 帧外排版(dz-):只用 --a-* ════════ */
+html,body{margin:0}
+body{background:var(--a-bg-subtle);color:var(--a-text);font-family:var(--a-font-sans);font-size:var(--a-text-base);line-height:var(--a-leading-normal);-webkit-font-smoothing:antialiased}
+.dz-bar{position:sticky;top:0;z-index:2000;display:flex;align-items:center;gap:16px;padding:10px 24px;border-bottom:1px solid var(--a-border);background:color-mix(in srgb,var(--a-bg-canvas) 92%,transparent);backdrop-filter:blur(14px)}
+.dz-bar b{font-size:var(--a-text-sm)}
+.dz-bar nav{display:flex;gap:12px;flex-wrap:wrap;font-size:var(--a-text-xs)}
+.dz-bar nav a{color:var(--a-text-secondary);text-decoration:none}
+.dz-grow{flex:1}
+.dz-seg{display:inline-flex;padding:2px;gap:2px;background:var(--a-bg-muted);border-radius:var(--a-radius-sm)}
+.dz-seg button{border:0;background:transparent;font:inherit;font-size:var(--a-text-xs);padding:3px 10px;border-radius:var(--a-radius-xs);color:var(--a-text-secondary);cursor:pointer}
+.dz-seg button[data-on]{background:var(--a-surface);color:var(--a-text);box-shadow:var(--a-shadow-xs)}
+.dz-wrap{max-width:1000px;margin:0 auto;padding:28px 24px 96px}
+.dz-intro h1{margin:0 0 8px;font-size:var(--a-text-2xl);letter-spacing:var(--a-tracking-tight)}
+.dz-intro p{margin:0 0 6px;max-width:84ch;color:var(--a-text-secondary);font-size:var(--a-text-md);line-height:1.65}
+.dz-sec{scroll-margin-top:64px}
+.dz-h2{margin:44px 0 4px;font-size:var(--a-text-xl);letter-spacing:var(--a-tracking-tight)}
+.dz-h2 small{margin-left:8px;font-size:var(--a-text-xs);font-weight:var(--a-weight-normal);color:var(--a-text-tertiary)}
+.dz-sub{margin:0 0 14px;max-width:96ch;color:var(--a-text-secondary);font-size:var(--a-text-sm);line-height:1.6}
+.dz-rel{margin:16px 0 0;padding:14px 16px;border:1px solid var(--a-border);border-left:3px solid var(--a-accent);border-radius:var(--a-radius-md);background:var(--a-bg-canvas);font-size:var(--a-text-sm);line-height:1.65;color:var(--a-text-secondary);max-width:110ch}
+.dz-rel h3{margin:0 0 6px;font-size:var(--a-text-md);color:var(--a-text)}
+.dz-rel b{color:var(--a-text)}
+.dz-rel ul{margin:4px 0 0;padding-left:18px}
+.dz-wrap code{font-family:var(--a-font-mono);font-size:11px}
+.dz-table{border-collapse:collapse;font-size:var(--a-text-sm);background:var(--a-bg-canvas);border:1px solid var(--a-border);width:100%}
+.dz-table th{background:var(--a-bg-subtle);text-align:left;font-size:var(--a-text-xs);color:var(--a-text-tertiary);font-weight:var(--a-weight-semibold);padding:8px 12px}
+.dz-table td{padding:9px 12px;border-top:1px solid var(--a-border-faint);color:var(--a-text-secondary);vertical-align:top;line-height:1.55}
+.dz-table td:first-child{white-space:nowrap;color:var(--a-text)}
+.dz-cap{margin:0 0 8px;font-size:var(--a-text-xs);color:var(--a-text-tertiary);line-height:1.5}
+.dz-cap b{display:block;font-size:var(--a-text-sm);color:var(--a-text);margin-bottom:1px}
+.dz-row{display:flex;flex-wrap:wrap;gap:24px 28px;align-items:flex-start}
+.dz-stage{width:var(--w,300px);padding:16px;background:var(--a-surface-raised);border:1px solid var(--a-border);border-radius:var(--a-radius-lg)}
+/* 弹层外壳:取正式 .codepuppy-acct-pop,只把固定定位放回文档流 */
+.dz-pop.codepuppy-acct-pop{position:relative;left:auto;bottom:auto;max-height:none;animation:none;padding-top:12px}
+.dz-diff td:nth-child(n+2){font-family:var(--a-font-mono);font-size:11px}
+.dz-diff tr[data-same] td{color:var(--a-text-tertiary)}
+
+/* ════════ 组件库新增(提议;实现时进 codepuppy-ui/,只用现有 --a-*,不加令牌)════════ */
+/* 卡片:装一组只读的事实。一个样子,没有变体。 */
+.a-card{padding:var(--a-space-3);border:1px solid var(--a-border-faint);border-radius:var(--a-radius-lg);background:var(--a-bg-subtle)}
+/* 名称 — 值列表:<dl>;每行名称在左、值在右 */
+.a-kv{margin:0}
+.a-kv-row{display:flex;align-items:center;justify-content:space-between;gap:var(--a-space-3);padding:var(--a-space-1) 0;font-size:var(--a-text-sm);line-height:var(--a-leading-snug)}
+.a-kv-k{margin:0;color:var(--a-text-secondary)}
+.a-kv-v{margin:0;min-width:0;color:var(--a-text);font-weight:var(--a-weight-semibold);text-align:right;font-variant-numeric:tabular-nums}
+/* 值还没读到(…)或读不到(—) */
+.a-kv-v[data-state="pending"],.a-kv-v[data-state="unavailable"]{color:var(--a-text-tertiary);font-weight:var(--a-weight-medium);font-size:var(--a-text-xs)}
+</style>
+</head>
+<body>
+
+<div class="dz-bar">
+  <b>组件库 · 卡片 与 名称 — 值列表</b>
+  <nav><a href="#card">卡片</a><a href="#kv">名称 — 值列表</a><a href="#specimens">样子</a><a href="#popover">账户弹层改前改后</a><a href="#absorb">能否收编其它四套</a><a href="#register">登记与实现</a></nav>
+  <div class="dz-grow"></div>
+  <div class="dz-seg" id="themeSeg"><button data-theme="light" data-on>浅色</button><button data-theme="dark">深色</button></div>
+</div>
+
+<main class="dz-wrap">
+
+<section class="dz-intro">
+  <h1>卡片 与 名称 — 值列表</h1>
+  <p>两个组件:「卡片」把一组只读的事实框在一起;「名称 — 值列表」一行一项,名称在左、值在右。账户弹层和两种云端发送框共用它们,以后别处要放同类东西也用它们,不再各做一套。</p>
+  <div class="dz-rel">
+    <h3>与上一稿的关系</h3>
+    <ul>
+      <li><b>来源</b>:账户弹层的余额卡(<code>account-popover.css</code> 的 <code>.codepuppy-acct-card</code> / <code>-row</code> / <code>-k</code> / <code>-v</code> / <code>-pending</code>)。owner 2026-11-13 定:收进组件库,弹层和发送框共用;组件库没有的标准先设计组件,再使用。</li>
+      <li><b>不是改个名字</b>:弹层的写法里有写死的数值(12.5px、3px、11px、600)和弹层专用的外边距。组件只用令牌,外边距交给放它的地方,名称和值换成 <code>&lt;dl&gt;</code> / <code>&lt;dt&gt;</code> / <code>&lt;dd&gt;</code>,读屏能读出「名称:值」。</li>
+      <li><b>只做现在用得到的</b>:卡片一个样子,列表一个尺寸;值有三种状态(有值 / 读取中 / 读不到),都是弹层今天已经有的。</li>
+    </ul>
+  </div>
+</section>
+
+<section class="dz-sec" id="card">
+  <h2 class="dz-h2">卡片 <code style="font-size:13px">.a-card</code></h2>
+  <table class="dz-table">
+    <tbody>
+      <tr><td>做什么</td><td>把一组只读的事实框成一块,和周围内容分开。</td></tr>
+      <tr><td>组成</td><td>只有外框。里面放一个名称 — 值列表(现在只有这一种用法)。</td></tr>
+      <tr><td>变体 / 尺寸</td><td>各一种。</td></tr>
+      <tr><td>样子</td><td>底 <code>--a-bg-subtle</code>,边 1px <code>--a-border-faint</code>,圆角 <code>--a-radius-lg</code>,内边距 <code>--a-space-3</code>(12)。宽度跟放它的容器;自己不带外边距。</td></tr>
+      <tr><td>状态</td><td>只有静态。不可点、不可聚焦,没有悬停。</td></tr>
+      <tr><td>读屏</td><td>外框本身不读;需要名字时由放它的地方给 <code>aria-label</code>。</td></tr>
+      <tr><td>要</td><td>放 2–6 项只读事实;放在它说明的那件事旁边。</td></tr>
+      <tr><td>不要</td><td>在卡片里放按钮、开关或输入;卡片套卡片;用它放提示或报错(用提示条 Banner)。</td></tr>
+      <tr><td>按钮放哪</td><td>和卡片内容有关的动作放在卡片之后、所在区域的按钮行里,靠右(同组件库对话框底栏 <code>.a-dialog-footer</code> 的 <code>justify-content: flex-end</code>)。卡片自己没有按钮位。</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="dz-sec" id="kv">
+  <h2 class="dz-h2">名称 — 值列表 <code style="font-size:13px">.a-kv</code> / <code style="font-size:13px">.a-kv-row</code></h2>
+  <table class="dz-table">
+    <tbody>
+      <tr><td>做什么</td><td>一行说一件事:名称 + 它现在的值。</td></tr>
+      <tr><td>组成</td><td><code>&lt;dl class="a-kv"&gt;</code> → 每行 <code>&lt;div class="a-kv-row"&gt;</code>,里面 <code>&lt;dt class="a-kv-k"&gt;</code> 名称 + <code>&lt;dd class="a-kv-v"&gt;</code> 值。值可以是文字、数字或一个小图(弹层的 14 天走势)。</td></tr>
+      <tr><td>变体 / 尺寸</td><td>各一种。</td></tr>
+      <tr><td>样子</td><td>字号 <code>--a-text-sm</code>,行高 <code>--a-leading-snug</code>,上下内边距 <code>--a-space-1</code>,名称和值至少隔 <code>--a-space-3</code>。名称 <code>--a-text-secondary</code>;值 <code>--a-text</code>、<code>--a-weight-semibold</code>、靠右、等宽数字。行与行之间没有分隔线。</td></tr>
+      <tr><td>值的状态</td><td>有值;读取中写「…」;读不到写「—」。后两种用 <code>--a-text-tertiary</code>、<code>--a-weight-medium</code>、<code>--a-text-xs</code>(弹层今天的写法)。</td></tr>
+      <tr><td>读屏</td><td><code>dl/dt/dd</code> 读成「名称,值」。「…」「—」读出来没有意义:实现时给这两种值加只给读屏的文字「正在读取」「暂时读不到」。</td></tr>
+      <tr><td>要</td><td>名称短(不超过 10 个字);数字带千分位;同一列表里同类值用同一写法(如「用量 / 上限」)。</td></tr>
+      <tr><td>不要</td><td>值里放按钮或开关;名称写成一句话;用它排列可点的条目(那是列表行,不是事实)。</td></tr>
+      <tr><td>窄的时候</td><td>名称不换行;值太长时值换行、仍靠右。</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="dz-sec" id="specimens">
+  <h2 class="dz-h2">样子<small>放在浮起面上 · 宽 300 与 432</small></h2>
+  <div class="dz-row" data-specimens></div>
+</section>
+
+<section class="dz-sec" id="popover">
+  <h2 class="dz-h2">账户弹层改前改后<small>差异是本页实时量的</small></h2>
+  <p class="dz-sub">改前 = 上线的弹层样式;改后 = 同一张卡换成组件库的卡片和列表。弹层的外边距(左右 14、下 12)从卡片挪到弹层自己,位置不变。</p>
+  <div class="dz-row" data-popover style="display:grid;grid-template-columns:repeat(2,max-content)"></div>
+  <p class="dz-cap" style="margin-top:14px"><b>逐项差异</b>只列有变化的;没列出的(颜色、字重、圆角、边框、内边距 12、卡片位置)都相同。</p>
+  <table class="dz-table dz-diff" id="popover-diff"><thead><tr><th>哪里</th><th>改前</th><th>改后</th></tr></thead><tbody></tbody></table>
+</section>
+
+<section class="dz-sec" id="absorb">
+  <h2 class="dz-h2">能否收编应用里另外四套<small>只核对,这次不重画</small></h2>
+  <table class="dz-table">
+    <thead><tr><th>现有那一套</th><th>和新组件不同的地方</th><th>以后收编要加什么</th></tr></thead>
+    <tbody>
+      <tr><td>设置页 分组 + 行<br><code>.codepuppy-settings-group/-row</code></td><td>白底(<code>--a-surface</code>)带轻阴影;有标题栏;行之间有分隔线;行高至少 58;左边是标题 + 一行说明,右边是开关或按钮(可操作)</td><td>卡片加一个「白底 + 标题栏 + 分隔线」变体;行是「设置行」,不是名称 — 值(右边是控件)—— 另一个组件</td></tr>
+      <tr><td>定制中心详情 事实行<br><code>.codepuppy-ext-dfact</code></td><td>没有外框;名称占固定 96 宽一列,值紧跟在后面靠左;基线对齐</td><td>名称 — 值列表加「两列靠左」排法,或把详情页改成值靠右(样子会变,要 owner 看)</td></tr>
+      <tr><td>能力授权框 能力列表<br><code>.codepuppy-ext-authz-box</code></td><td>透明底;行之间有分隔线;每行是图标 + 两行名称 + 技术名 + 标签,已授权行整行变淡</td><td>外框可以用卡片(加「透明底 + 分隔线」);行是列表条目,不是名称 — 值</td></tr>
+      <tr><td>批准面板「将记住」框<br><code>.a-permission-remember</code></td><td>白底;顶部一条灰底标题栏;正文是一句话 + 一行小字,不是名称 — 值</td><td>卡片加「标题栏」变体即可装下;不用名称 — 值列表</td></tr>
+    </tbody>
+  </table>
+  <p class="dz-sub" style="margin-top:10px">结论:卡片的外框四套都装得下,差的是「白底」「标题栏」「分隔线」三样,等真要收编时再加;名称 — 值列表只适合详情页事实行,另外三套的行是可操作的条目或一句话,不该硬套。</p>
+</section>
+
+<section class="dz-sec" id="register">
+  <h2 class="dz-h2">登记与实现<small>帧外</small></h2>
+  <table class="dz-table">
+    <tbody>
+      <tr><td>组件目录</td><td><code>docs/design/system/components.md</code> 的「Pending」加两行(卡片、名称 — 值列表);落地后移进基础组件表</td></tr>
+      <tr><td>令牌</td><td>不加。用到的全部已在 <code>tokens.css</code></td></tr>
+      <tr><td>样例页</td><td>落地时在 <code>gallery.html</code> 补一格:卡片 + 列表,三种值状态,浅深两色(样例页只收已上线的组件)</td></tr>
+      <tr><td>代码</td><td>新文件放 <code>codepuppy-ui/</code>(样式 + 一个只输出 <code>dl/dt/dd</code> 的小组件);账户弹层改用它,删掉 <code>.codepuppy-acct-card/-row/-k/-v/-pending</code>,弹层自己补回卡片的外边距</td></tr>
+    </tbody>
+  </table>
+</section>
+
+</main>
+
+<script>
+const kv = (rows) => '<dl class="a-kv">' + rows.map((r) => '<div class="a-kv-row"><dt class="a-kv-k">' + r[0] + '</dt><dd class="a-kv-v"' + (r[2] ? ' data-state="' + r[2] + '"' : "") + ">" + r[1] + "</dd></div>").join("") + "</dl>"
+const cardOf = (rows) => '<div class="a-card">' + kv(rows) + "</div>"
+const spark = '<svg width="116" height="24" viewBox="0 0 116 24" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,18 9,16 18,19 27,12 36,14 45,9 54,11 63,6 72,10 81,8 90,13 99,7 108,9 116,5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/></svg>'
+const ACC = [["可用余额", "¥36.50"], ["5 小时额度", "180 / 1,000"], ["7 日额度", "2,400 / 10,000"], ["额度用完后用余额付", "关"]]
+const item = (cap, w, html) => '<div><p class="dz-cap"><b>' + cap + '</b></p><div class="dz-stage a-ui" style="--w:' + w + 'px">' + html + "</div></div>"
+document.querySelector("[data-specimens]").innerHTML = [
+  item("有值", 300, cardOf(ACC)),
+  item("读取中", 300, cardOf(ACC.map((r) => [r[0], "…", "pending"]))),
+  item("读不到", 300, cardOf([["可用余额", "—", "unavailable"], ["额度用完后用余额付", "—", "unavailable"]])),
+  item("没有会员(只有两项)", 300, cardOf([["可用余额", "¥3.20"], ["额度用完后用余额付", "开"]])),
+  item("宽 432(发送框窄窗口)", 432, cardOf(ACC)),
+].join("")
+
+/* 账户弹层:改前 = 正式样式;改后 = 组件库。两边内容一样:订阅、余额、两项额度、14 天走势。 */
+const beforeRow = (k, v, pending) => '<div class="codepuppy-acct-row"><span class="codepuppy-acct-k">' + k + "</span>" + (pending ? '<span class="codepuppy-acct-pending">' + v + "</span>" : '<span class="codepuppy-acct-v">' + v + "</span>") + "</div>"
+const POP = [["会员订阅", "Pro"], ["可用余额", "¥36.50"], ["5 小时额度", "180 / 1,000"], ["7 日额度", "2,400 / 10,000"], ["近 14 天", spark]]
+const popBefore = (pending) => '<div class="codepuppy-acct-pop dz-pop a-ui" data-side="before"><div class="codepuppy-acct-card">' + POP.map((r, i) => beforeRow(r[0], pending && i > 0 && i < 4 ? "…" : r[1], pending && i > 0 && i < 4)).join("") + "</div></div>"
+const popAfter = (pending) => '<div class="codepuppy-acct-pop dz-pop a-ui" data-side="after"><div style="margin:0 14px 12px">' + cardOf(POP.map((r, i) => pending && i > 0 && i < 4 ? [r[0], "…", "pending"] : r)) + "</div></div>"
+document.querySelector("[data-popover]").innerHTML =
+  '<div><p class="dz-cap"><b>改前 · 有值</b></p>' + popBefore(false) + '</div><div><p class="dz-cap"><b>改后 · 有值</b></p>' + popAfter(false) + "</div>" +
+  '<div><p class="dz-cap"><b>改前 · 读取中</b></p>' + popBefore(true) + '</div><div><p class="dz-cap"><b>改后 · 读取中</b></p>' + popAfter(true) + "</div>"
+
+function diff() {
+  const pops = [...document.querySelectorAll("[data-popover] .codepuppy-acct-pop")]
+  const pairs = [[pops[0], pops[1], "有值"], [pops[2], pops[3], "读取中"]]
+  const out = []
+  const px = (n) => Math.round(n * 10) / 10
+  for (const [b, a, label] of pairs) {
+    const bc = b.querySelector(".codepuppy-acct-card"), ac = a.querySelector(".a-card")
+    const bcr = bc.getBoundingClientRect(), acr = ac.getBoundingClientRect(), bpr = b.getBoundingClientRect(), apr = a.getBoundingClientRect()
+    const cmp = (where, x, y) => out.push([label + " · " + where, x, y])
+    cmp("卡片位置(距弹层左 / 上)", px(bcr.left - bpr.left) + " / " + px(bcr.top - bpr.top), px(acr.left - apr.left) + " / " + px(acr.top - apr.top))
+    cmp("卡片宽 × 高", px(bcr.width) + " × " + px(bcr.height), px(acr.width) + " × " + px(acr.height))
+    const brs = [...bc.querySelectorAll(".codepuppy-acct-row")], ars = [...ac.querySelectorAll(".a-kv-row")]
+    brs.forEach((r, i) => {
+      const k = r.firstElementChild.textContent
+      cmp("行「" + k + "」高", px(r.getBoundingClientRect().height), px(ars[i].getBoundingClientRect().height))
+      const bv = r.lastElementChild, av = ars[i].lastElementChild, bs = getComputedStyle(bv), as = getComputedStyle(av)
+      if (!bv.querySelector("svg")) cmp("行「" + k + "」值的字号 / 字重 / 颜色", bs.fontSize + " / " + bs.fontWeight + " / " + bs.color, as.fontSize + " / " + as.fontWeight + " / " + as.color)
+      const bk = getComputedStyle(r.firstElementChild), ak = getComputedStyle(ars[i].firstElementChild)
+      cmp("行「" + k + "」名称的字号 / 颜色", bk.fontSize + " / " + bk.color, ak.fontSize + " / " + ak.color)
+    })
+    const bs = getComputedStyle(bc), as = getComputedStyle(ac)
+    cmp("卡片底 / 边 / 圆角 / 内边距", bs.backgroundColor + " / " + bs.borderTopColor + " / " + bs.borderTopLeftRadius + " / " + bs.paddingTop, as.backgroundColor + " / " + as.borderTopColor + " / " + as.borderTopLeftRadius + " / " + as.paddingTop)
+  }
+  const tb = document.querySelector("#popover-diff tbody")
+  tb.innerHTML = out.filter((r) => r[1] !== r[2]).map((r) => "<tr><td>" + r[0] + "</td><td>" + r[1] + "</td><td>" + r[2] + "</td></tr>").join("") || '<tr><td colspan="3">没有差异</td></tr>'
+  window.__popDiff = out
+}
+diff()
+for (const b of document.querySelectorAll("#themeSeg button")) {
+  b.addEventListener("click", () => {
+    document.documentElement.dataset.colorScheme = b.dataset.theme
+    for (const x of document.querySelectorAll("#themeSeg button")) x.toggleAttribute("data-on", x === b)
+    diff()
+  })
+}
+</script>
+</body>
+</html>

@@ -184,12 +184,13 @@ test("#1565 / #1698: fork 的启动文档带 paths.officeMcpManifest,引擎据�
   await result.listener.stop()
 })
 
-// REQ-236 `#1575` AC4:生产 spawnLocalServer 在 fork 时按**当刻的登录账户**写 CODEPUPPY_POLICY_ACCOUNT(引擎据它选工具策略
-// 分区),未登录不写(引擎退回 anonymous)。登录态走真 codepuppy-auth:dev 短路令牌(未打包时 DEV_PLATFORM_TOKEN)的
-// `account.read` 的 sub。值里混入本安装的随机持久标识(artifact-service 的安装级 machine id,boot 时初始化):这个变量被
-// 第三方 MCP / LSP / shell 子进程继承,同一账户换一台安装就是另一个值,不能据它跨安装关联。期望值从 sub 与盘上的
-// machine id 文件独立算出,不调被测函数;取不到安装标识与未登录一样不写;shell 导出的同名变量选不了分区。
-test("#1575: fork 按登录账户 × 本安装写 CODEPUPPY_POLICY_ACCOUNT(同安装同账户相同、换安装或换账户不同、不含明文);取不到不写,导出的同名变量不透传", async () => {
+// REQ-236 `#1575` AC4:生产 spawnLocalServer 在 fork 时按**当刻的登录账户**写启动文档的 policy.account(ext 据它选工具策略
+// 分区),未登录不写(退回 anonymous)。登录态走真 codepuppy-auth:dev 短路令牌(未打包时 DEV_PLATFORM_TOKEN)的
+// `account.read` 的 sub。值里混入本安装的随机持久标识(artifact-service 的安装级 machine id,boot 时初始化):同一账户换一台
+// 安装就是另一个值,不能据它跨安装关联。`#1698` G2:它不再写进 sidecar 环境(第三方 MCP / LSP / shell 子进程从此拿不到),
+// 只在 start 消息的启动文档里。期望值从 sub 与盘上的 machine id 文件独立算出,不调被测函数;取不到安装标识与未登录一样不写;
+// shell 导出的旧同名变量选不了分区,也到不了 sidecar 环境。
+test("#1575: fork 按登录账户 × 本安装写启动文档的 policy.account(同安装同账户相同、换安装或换账户不同、不含明文);取不到不写,导出的旧同名变量不透传", async () => {
   const { initializeArtifactQuotaEnvironment, ARTIFACT_QUOTA_MACHINE_ID_FILE } = await import("./artifact-service")
   const { createHash } = await import("node:crypto")
   const sha256 = (value: string) => createHash("sha256").update(value).digest("hex")
@@ -208,7 +209,7 @@ test("#1575: fork 按登录账户 × 本安装写 CODEPUPPY_POLICY_ACCOUNT(同�
         jti: `jti-${sub}`,
       }),
     ).toString("base64url")}.signature`
-  const forkEnv = async (port: number) => {
+  const forkStart = async (port: number) => {
     const child = new RecordingChild()
     let env: Record<string, string> = {}
     creditDanglingSweepForSpawn()
@@ -224,7 +225,9 @@ test("#1575: fork 按登录账户 × 本安装写 CODEPUPPY_POLICY_ACCOUNT(同�
     })
     await result.health.wait
     await result.listener.stop()
-    return env
+    const start = child.wire.find((message) => (message as { type?: unknown }).type === "start") as { bootstrap: { policy: { account?: string } } }
+    expect(env).not.toHaveProperty("CODEPUPPY_POLICY_ACCOUNT")
+    return start.bootstrap.policy
   }
   const installation = async (dir: string) => {
     expect((await initializeArtifactQuotaEnvironment(dir)).ok).toBe(true)
@@ -236,14 +239,14 @@ test("#1575: fork 按登录账户 × 本安装写 CODEPUPPY_POLICY_ACCOUNT(同�
   try {
     const installA = await installation(userDataPath)
     process.env.DEV_PLATFORM_TOKEN = token("tenant-a")
-    const a = (await forkEnv(4394)).CODEPUPPY_POLICY_ACCOUNT
+    const a = (await forkStart(4394)).account
     expect(a).toBe(expected(installA, "tenant-a"))
     expect(a).not.toContain("tenant-a")
     // 同安装同账户再 fork 一次:分区键不变(换号重 fork 回来仍是同一分区)。
-    expect((await forkEnv(4397)).CODEPUPPY_POLICY_ACCOUNT).toBe(a)
+    expect((await forkStart(4397)).account).toBe(a)
 
     process.env.DEV_PLATFORM_TOKEN = token("tenant-b")
-    const b = (await forkEnv(4395)).CODEPUPPY_POLICY_ACCOUNT
+    const b = (await forkStart(4395)).account
     expect(b).toBe(expected(installA, "tenant-b"))
     expect(b).not.toBe(a)
 
@@ -251,18 +254,18 @@ test("#1575: fork 按登录账户 × 本安装写 CODEPUPPY_POLICY_ACCOUNT(同�
     const installB = await installation(otherInstall)
     expect(installB).not.toBe(installA)
     process.env.DEV_PLATFORM_TOKEN = token("tenant-a")
-    const elsewhere = (await forkEnv(4398)).CODEPUPPY_POLICY_ACCOUNT
+    const elsewhere = (await forkStart(4398)).account
     expect(elsewhere).toBe(expected(installB, "tenant-a"))
     expect(elsewhere).not.toBe(a)
 
     // 安装标识取不到(machine id 根不可用):与未登录同样不写。
     expect((await initializeArtifactQuotaEnvironment(join(otherInstall, "missing"))).ok).toBe(false)
-    expect(await forkEnv(4399)).not.toHaveProperty("CODEPUPPY_POLICY_ACCOUNT")
+    expect(await forkStart(4399)).not.toHaveProperty("account")
 
     await installation(userDataPath)
     delete process.env.DEV_PLATFORM_TOKEN
     process.env.CODEPUPPY_POLICY_ACCOUNT = "acct:exported-by-shell"
-    expect(await forkEnv(4396)).not.toHaveProperty("CODEPUPPY_POLICY_ACCOUNT")
+    expect(await forkStart(4396)).not.toHaveProperty("account")
   } finally {
     rmSync(otherInstall, { recursive: true, force: true })
   }

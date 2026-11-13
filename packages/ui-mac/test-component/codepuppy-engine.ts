@@ -1,11 +1,13 @@
 // `#1662` parity:几份 `*.engine.cases.ts` 共用的宿主 —— 嵌进 sidecar 的那台 OpenCode 2,配置是生产 `injectCodePuppyConfig` 的产物
 // (内联文档 + 显式文件,原样交给 `start()`),装着真 ext(`packages/ext/src/plugin.ts`,以本地目录插件装,与 sidecar 同一个入口形状)、
-// 一个探针插件(拿到插件上下文、注册两个插件工具)与一个本机 OpenAI 兼容模型桩(平台节点经 `CODEPUPPY_BASE_URL` 指向它)。
+// 一个探针插件(拿到插件上下文、注册两个插件工具)与一个本机 OpenAI 兼容模型桩(平台节点经启动文档的 platform.modelProxyBaseURL 指向它)。
 // 调用方必须先 `engineSandbox()` 并在 beforeAll 里 `assertEngineSandboxed()`;本模块不碰沙箱之外的任何目录。
 import fs from "node:fs"
 import path from "node:path"
 import { engineSlot, type EngineSandbox } from "./engine-sandbox"
-import { publishTestBootstrap } from "./codepuppy-bootstrap-fixture"
+import { createHash } from "node:crypto"
+import { tryCodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
+import { publishTestBootstrap, type TestBootstrapInput } from "./codepuppy-bootstrap-fixture"
 import { engineGlobalConfigDirectory } from "../src/main/engine-paths"
 import { buildEngineServerOptions } from "../src/main/engine-server-options"
 import { withEngineAuthorization } from "../src/main/engine-authorization"
@@ -113,6 +115,9 @@ export type HostOptions = {
   ext?: boolean
   /** 引擎的文件监听(生产默认开;默认这里关,要判「不重启就生效」时打开)。 */
   filewatcher?: boolean
+  /** `#1698`:启动文档里的治理云 MCP 与 kill-switch(缺省:没有云 MCP、kill-switch 关)。 */
+  cloudMcp?: TestBootstrapInput["cloudMcp"]
+  killSwitch?: boolean
 }
 
 export type Running = {
@@ -128,16 +133,21 @@ export function codepuppyEngine(options: HostOptions) {
   const userData = path.join(sandbox.root, `${name}-userdata`)
   const globalRoot = path.join(sandbox.root, `${name}-state`, "codepuppy-state", "env", "dev")
   fs.mkdirSync(globalRoot, { recursive: true })
-  // `#1698`:sidecar 在注入、装 ext 之前发布启动文档;全局根经它到注入与 ext(R14)。引擎全局配置目录取 #1698 之前注入自己按环境
+  // `#1698`:sidecar 在注入、装 ext 之前发布启动文档(R14):全局根、平台节点地址(这里指向模型桩)与平台凭据的 {file:} 引用(ext 的
+  // 请求头每次现读它)、工具策略的账户分区、云 MCP 与 kill-switch 都经它到注入与 ext。引擎全局配置目录取 #1698 之前注入自己按环境
   // 推的那一个(XDG 沙箱下的 opencode;注入的 MCP 默认拒绝枚举它),各 cases 的写法不变。
-  publishTestBootstrap({ globalRoot, userData, engineConfigDirectory: engineGlobalConfigDirectory(process.env, sandbox.home) })
+  publishTestBootstrap({
+    globalRoot,
+    userData,
+    engineConfigDirectory: engineGlobalConfigDirectory(process.env, sandbox.home),
+    platform: { credentialRef: secretFileRef(userData, "CODEPUPPY_API_KEY"), modelProxyBaseURL: options.modelBaseURL },
+    policyAccount: `acct:${createHash("sha256").update(`${name}-${Math.random()}`).digest("hex")}`,
+    cloudMcp: options.cloudMcp,
+    killSwitch: options.killSwitch,
+  })
   const key = secretFilePath(userData, "CODEPUPPY_API_KEY")
   fs.mkdirSync(path.dirname(key), { recursive: true })
   fs.writeFileSync(key, `sk-cp-${name}`, { mode: 0o600 })
-  // sidecar 在 fork 时置的两样:平台节点地址(这里指向模型桩)与平台凭据的 {file:} 引用(ext 的请求头每次现读它)
-  process.env.CODEPUPPY_BASE_URL = options.modelBaseURL
-  process.env.CODEPUPPY_PLATFORM_AUTH_REF = secretFileRef(userData, "CODEPUPPY_API_KEY")
-  process.env.CODEPUPPY_POLICY_ACCOUNT = `t-${name}-${Math.random().toString(36).slice(2)}`
   if (options.mcpCallLog)
     fs.writeFileSync(
       path.join(globalRoot, "codepuppy.jsonc"),
@@ -221,7 +231,7 @@ export async function policyStore() {
   const { policyWorkspace } = await import("../../ext/src/policy/index")
   return createToolPolicyStore({
     baseDir: defaultPolicyBaseDir(path.join(process.env.XDG_DATA_HOME!, "opencode")),
-    account: () => process.env.CODEPUPPY_POLICY_ACCOUNT!,
+    account: () => tryCodePuppyBootstrap()?.policy.account ?? "anonymous",
     workspace: () => policyWorkspace(probe().ctx.location),
   })
 }

@@ -5,7 +5,7 @@
 // renderWrapper / renderTemplate 派生 —— 文案改了这里要一起改,那正是想要的红。
 // `#1447` R1:B1(追问整包 ≤ 262144)、B2(审核拒绝的结果回放成登记句)、M1(重启后同图不再计费:转写正文跨重启缓存在插件存储里)、m1 / m2。
 // `#1665`:v1 的 chat.message / messages.transform / tool.execute.after / system.transform 四处收成 context 钩子一处(见 cloud-vision-hooks.ts 文件头)。
-import { publishTestBootstrap, unpublishTestBootstrap } from "../../ui-mac/test-component/codepuppy-bootstrap-fixture"
+import { publishTestBootstrap, testCloudMcp, unpublishTestBootstrap } from "../../ui-mac/test-component/codepuppy-bootstrap-fixture"
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, unlinkSync, writeFileSync } from "node:fs"
@@ -19,14 +19,21 @@ import { PluginHooks } from "../../core/src/plugin/hooks.ts"
 import type { Plugin } from "@opencode/plugin"
 import CodePuppyExt from "./plugin"
 import { activate, it } from "./plugin-host.harness"
-import { CLOUD_MCP_DEF_ENV, CLOUD_MCP_SERVER_ENV } from "./cloud-websearch-kill"
 import { VisionSession, visionRequestBody } from "./cloud-vision"
 import { compressForVision } from "./vision-image"
 
 type Recorded = { path: string; authorization: string | null; body: Record<string, unknown> }
 type Reply = { status: number; body: unknown }
 
-const SANITIZE = ["CODEPUPPY_BASE_URL", "CODEPUPPY_PROMPT_REBRAND_DISABLE", CLOUD_MCP_DEF_ENV, CLOUD_MCP_SERVER_ENV] as const
+const SANITIZE = ["CODEPUPPY_PROMPT_REBRAND_DISABLE"] as const
+/** `#1698`:平台 base 与云 MCP 定义在启动文档里(main 每次 fork 写的同一形状);用例改它们 = 重新发布一份。 */
+const docState: { base?: string; cloud: boolean } = { cloud: true }
+const publishDoc = () =>
+  publishTestBootstrap({
+    globalRoot: join(root, "global", "env", "dev"),
+    platform: docState.base ? { modelProxyBaseURL: docState.base } : {},
+    ...(docState.cloud ? { cloudMcp: testCloudMcp("https://cloud.invalid/mcp", tokenFile) } : {}),
+  })
 
 /** 云端认出来的正文(桩 gateway 的回答)。 */
 const CLOUD_TEXT = "登录页:用户名、密码两个输入框,「登录」按钮为蓝色;右上角写着 v0.1.16"
@@ -93,13 +100,12 @@ beforeEach(() => {
     saved.set(k, process.env[k])
     delete process.env[k]
   }
-  publishTestBootstrap({ globalRoot: join(root, "global", "env", "dev") })
   tokenFile = join(root, "mcp-token")
   writeFileSync(tokenFile, "tok-vision-123\n")
-  // 与 ui-mac 每次 fork 写的三样同形:平台 base(gateway 主机 + /v1)、云 server 名、带 {file:} 凭据的云 MCP 定义
-  process.env.CODEPUPPY_BASE_URL = `http://127.0.0.1:${server.port}/v1`
-  process.env[CLOUD_MCP_SERVER_ENV] = "codepuppy"
-  process.env[CLOUD_MCP_DEF_ENV] = JSON.stringify({ type: "remote", url: "https://cloud.invalid/mcp", headers: { Authorization: `Bearer {file:${tokenFile}}` }, oauth: false })
+  // 与 ui-mac 每次 fork 写进启动文档的同形:平台 base(gateway 主机 + /v1)、云 server 名与带 {file:} 凭据的云 MCP 定义
+  docState.base = `http://127.0.0.1:${server.port}/v1`
+  docState.cloud = true
+  publishDoc()
   requests = []
   reply = ok
 })
@@ -366,10 +372,10 @@ describe("云端不可用 ⇒ 说得出原因的话(与 #1411 同一根轴:云 M
     { name: "429 ⇒ 限流", setup: () => void (reply = () => ({ status: 429, body: { error: { message: "tenant capacity", code: "tenant_rate_limited" } } })), calls: 1, text: "〔图片 #1 a.png 未能识别:云端识图暂时繁忙(已限流),请稍后再试〕" },
     { name: "502 provider_unavailable ⇒ 服务故障", setup: () => void (reply = () => ({ status: 502, body: { error: { message: "upstream 503", code: "provider_unavailable", retryable: true } } })), calls: 1, text: "〔图片 #1 a.png 未能识别:云端识图服务暂时故障,请稍后再试〕" },
     { name: "413 image_too_large ⇒ 云端拒收", setup: () => void (reply = () => ({ status: 413, body: { error: { message: "too large", code: "image_too_large" } } })), calls: 1, text: "〔图片 #1 a.png 未能识别:云端拒收了这张图片(格式或大小不合要求)〕" },
-    { name: "未登录:没有云 MCP 定义 ⇒ 不出网", setup: () => void delete process.env[CLOUD_MCP_DEF_ENV], calls: 0, text: "〔图片 #1 a.png 未能识别:云端识图不可用 —— 尚未登录 Code Puppy 账号〕" },
-    { name: "未登录:没有 CODEPUPPY_BASE_URL(BYOK 态)⇒ 不出网", setup: () => void delete process.env.CODEPUPPY_BASE_URL, calls: 0, text: "〔图片 #1 a.png 未能识别:云端识图不可用 —— 尚未登录 Code Puppy 账号〕" },
+    { name: "未登录:没有云 MCP 定义 ⇒ 不出网", setup: () => void ((docState.cloud = false), publishDoc()), calls: 0, text: "〔图片 #1 a.png 未能识别:云端识图不可用 —— 尚未登录 Code Puppy 账号〕" },
+    { name: "未登录:没有平台 base(BYOK 态)⇒ 不出网", setup: () => void ((docState.base = undefined), publishDoc()), calls: 0, text: "〔图片 #1 a.png 未能识别:云端识图不可用 —— 尚未登录 Code Puppy 账号〕" },
     { name: "凭据文件读不到 ⇒ 不出网、说凭据", setup: () => unlinkSync(tokenFile), calls: 0, text: "〔图片 #1 a.png 未能识别:云端识图不可用 —— 登录凭据无效或已过期,请重新登录〕" },
-    { name: "连不上(loopback 上没人听的端口)⇒ 网络", setup: () => void (process.env.CODEPUPPY_BASE_URL = "http://127.0.0.1:1/v1"), calls: 0, text: "〔图片 #1 a.png 未能识别:连不上云端识图服务,请检查网络〕" },
+    { name: "连不上(loopback 上没人听的端口)⇒ 网络", setup: () => void ((docState.base = "http://127.0.0.1:1/v1"), publishDoc()), calls: 0, text: "〔图片 #1 a.png 未能识别:连不上云端识图服务,请检查网络〕" },
   ]
   for (const c of cases)
     it.live(
@@ -387,7 +393,8 @@ describe("云端不可用 ⇒ 说得出原因的话(与 #1411 同一根轴:云 M
 
   it.live("云端不可用 ⇒ system 末尾是离线那一句(不提 gemini)", () =>
     Effect.gen(function* () {
-      delete process.env[CLOUD_MCP_DEF_ENV]
+      docState.cloud = false
+      publishDoc()
       const hooks = yield* load
       const out = yield* contextOf(hooks, "ses_o2", GLM, [Message.user([Message.text("hi")])])
       const note = out.system.at(-1)!.text

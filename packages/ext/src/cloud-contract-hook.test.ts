@@ -12,7 +12,8 @@ import {
   validateCloudToolInput,
   validateCloudToolOutput,
 } from "./cloud-contract-hook"
-import { CLOUD_MCP_SERVER_ENV, type McpOwnership, UNVERIFIED_MCP_OWNERSHIP } from "./cloud-websearch-kill"
+import { type McpOwnership, UNVERIFIED_MCP_OWNERSHIP } from "./cloud-websearch-kill"
+import { publishTestBootstrap, testCloudMcp, unpublishTestBootstrap } from "../../ui-mac/test-component/codepuppy-bootstrap-fixture"
 import { TOOL_TEXT } from "./context-injection"
 
 const fixture = (name: string) =>
@@ -23,20 +24,15 @@ const fixture = (name: string) =>
     ),
   ).json()
 
-/** 注入面在本次 fork 写进 sidecar env 的云 server 名(`codepuppy-config-injection.ts`;alpha-code#1568 起 `codepuppy`)。 */
+/** 本次 fork 启动文档里治理云 MCP 的名字(main 的构建器;alpha-code#1568 起 `codepuppy`;`#1698` 前经 sidecar env)。 */
 const CLOUD_SERVER = "codepuppy"
 /** 引擎注册 id —— 钩子 `tool.execute.before/after` 拿到的就是它(`plugin.ts` 的 `hookInput.tool`)。 */
 const engineToolId = (remoteName: string) => McpTool.name(CLOUD_SERVER, remoteName)
 
-let saved: string | undefined
-beforeEach(() => {
-  saved = process.env[CLOUD_MCP_SERVER_ENV]
-  process.env[CLOUD_MCP_SERVER_ENV] = CLOUD_SERVER
-})
-afterEach(() => {
-  if (saved === undefined) delete process.env[CLOUD_MCP_SERVER_ENV]
-  else process.env[CLOUD_MCP_SERVER_ENV] = saved
-})
+const withCloudServer = (name?: string) =>
+  publishTestBootstrap({ globalRoot: "/tmp/codepuppy-contract-hook", ...(name ? { cloudMcp: testCloudMcp("https://cloud.invalid/mcp", "/tmp/token", name) } : {}) })
+beforeEach(() => void withCloudServer(CLOUD_SERVER))
+afterEach(() => unpublishTestBootstrap())
 
 test("cloud HTTP and cloud MCP use the same pinned v1 decoder", async () => {
   const request = await fixture("cloud-job-request")
@@ -91,7 +87,7 @@ test("#650 server 名换了,闸跟着换 —— 不是钉在 `cloud_` 这个字�
   const request = await fixture("cloud-job-request")
   const broken = { ...request.value, schema_version: "v0" }
   const renamed = "codepuppy-next"
-  process.env[CLOUD_MCP_SERVER_ENV] = renamed
+  withCloudServer(renamed)
 
   expect(() => validateCloudToolInput(McpTool.name(renamed, CLOUD_DISPATCH_REMOTE_TOOL), broken)).toThrow(
     "Code Puppy contract incompatible",
@@ -100,7 +96,7 @@ test("#650 server 名换了,闸跟着换 —— 不是钉在 `cloud_` 这个字�
   expect(() => validateCloudToolInput(engineToolId(CLOUD_DISPATCH_REMOTE_TOOL), broken)).not.toThrow()
 
   // 注入面没点名任何云 server(未登录 / BYOK / 非代付)⇒ 本次 fork 根本没有云工具。
-  delete process.env[CLOUD_MCP_SERVER_ENV]
+  withCloudServer()
   expect(() => validateCloudToolInput(engineToolId(CLOUD_DISPATCH_REMOTE_TOOL), broken)).not.toThrow()
 })
 
@@ -118,20 +114,20 @@ const GOVERNED: McpOwnership = { governed: [CLOUD_SERVER], foreign: [] }
 test("#1568 治理云 server 上一个远端名都对不上的工具 ⇒ 响亮拒绝(输入与输出两面)", async () => {
   const stale = engineToolId("cloud_dispatch") // 改名前的远端名挂在新 server 键下
   const request = await fixture("cloud-job-request")
-  expect(() => validateCloudToolInput(stale, request.value, process.env, GOVERNED)).toThrow(CloudRemoteToolUnknownError)
-  expect(() => validateCloudToolOutput(stale, { output: "{}" }, process.env, GOVERNED)).toThrow(CloudRemoteToolUnknownError)
+  expect(() => validateCloudToolInput(stale, request.value, undefined, GOVERNED)).toThrow(CloudRemoteToolUnknownError)
+  expect(() => validateCloudToolOutput(stale, { output: "{}" }, undefined, GOVERNED)).toThrow(CloudRemoteToolUnknownError)
 })
 
 test("#1568 不误拒:平台公开的无契约工具、第一方插件工具、归属有歧义或未核验的工具照常通过", async () => {
   const request = await fixture("cloud-job-request")
   for (const remote of CLOUD_UNVALIDATED_REMOTE_TOOLS)
-    expect(() => validateCloudToolInput(engineToolId(remote), {}, process.env, GOVERNED)).not.toThrow()
+    expect(() => validateCloudToolInput(engineToolId(remote), {}, undefined, GOVERNED)).not.toThrow()
   // 第一方插件工具与云 server 共用 `codepuppy_` 前缀(方案 §1.5 第 4 条)—— 按扩展自己的工具表排除。
-  for (const own of Object.keys(TOOL_TEXT)) expect(() => validateCloudToolInput(own, {}, process.env, GOVERNED)).not.toThrow()
+  for (const own of Object.keys(TOOL_TEXT)) expect(() => validateCloudToolInput(own, {}, undefined, GOVERNED)).not.toThrow()
   const stale = engineToolId("cloud_dispatch")
   // 同一个 id 也可能来自一个叫 `codepuppy_cloud` 的第三方 server:归属有歧义 ⇒ 不替它下结论。
   const ambiguous: McpOwnership = { governed: [CLOUD_SERVER], foreign: ["codepuppy_cloud"] }
-  expect(() => validateCloudToolInput(stale, request.value, process.env, ambiguous)).not.toThrow()
+  expect(() => validateCloudToolInput(stale, request.value, undefined, ambiguous)).not.toThrow()
   // config 钩子没跑过(归属未核验):判不了「确定属于治理 server」,不拒。
-  expect(() => validateCloudToolInput(stale, request.value, process.env, UNVERIFIED_MCP_OWNERSHIP)).not.toThrow()
+  expect(() => validateCloudToolInput(stale, request.value, undefined, UNVERIFIED_MCP_OWNERSHIP)).not.toThrow()
 })

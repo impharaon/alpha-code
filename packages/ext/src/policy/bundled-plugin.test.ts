@@ -35,7 +35,7 @@ function writeManifest(plugin: string, tools: string[], options: { extraByte?: b
 }
 
 const facts = (bundled: ReturnType<typeof bundledPluginTools>, id: string, extOrigin: string) =>
-  toolFacts({ id, name: id }, { early: new Set(), earlyAmbiguous: false, mcp: new Map(), bundled, extOrigin, env: {} })
+  toolFacts({ id, name: id }, { early: new Set(), earlyAmbiguous: false, mcp: new Map(), bundled, extOrigin })
 
 describe("#1578 AC5 first-party extension tools", () => {
   test("listed own tools of a module whose digest matches get codepuppy-bundled; a project tool merged in does not", () => {

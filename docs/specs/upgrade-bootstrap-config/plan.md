@@ -189,7 +189,13 @@ last_reviewed: 2026-11-12
 | AC-04 · 决定不变 | 段 0 记录(期望不改);`websearch-account-tool-table.engine.test.ts` 三种账户态期望不改 | 构建器漏写 `policy.account` ⇒ 记录第 ④ 格变成 `anonymous` 而红;漏写 `cloudMcp` ⇒ 第 ⑤ 格无云 MCP 而红。 |
 
 ### 偏离记录
-暂无
+- 2026-11-12 · `buildCodePuppyModelConfig(userDataPath, platform: PlatformInputs = {})`:平台地址与默认模型覆盖改为参数,模块不再读环境。注入传文档的 `platform.modelProxyBaseURL` / `defaultModelOverride`;main 的出网目的地派生(`server.ts`)照旧传 main 自己环境里的值(main 一侧,语义不变)· 本段提交。
+- 2026-11-12 · 没有文档时的注入(只剩直接调注入、不发布文档的测试)按「未登录、无云 MCP、kill-switch 关」走,与段 1 的环境回退同一处理;生产里 sidecar 在注入之前发布,到不了这一支 · 本段提交。
+- 2026-11-12 · 测试夹具加 `publishMainBootstrap()`:用生产构建器从 `process.env`(单进程测试里它就是 main 的环境)造文档并发布,G2 各键的判法只在构建器一处;`unpublishTestBootstrap()` 同时撤掉注入发布的供应商白名单(R30),不留给同进程的其它文件 · 本段提交。
+- 2026-11-12 · 两个 web search 判决合成一个字段后,只能在环境里出现的状态没有了:ext `cloud-websearch-kill.test.ts` 的「LOCAL_DENY_ONLY 漂移」用例改为按拒绝理由的文字区分;「DEF 写坏」用例改为解析器拒绝(util);`server.test.ts` `#621` 组的「turning the kill switch back off clears the cloud verdict」删除(与本地腿那条成了同一断言;本文件不在 gate-files);`websearch-copies.test.ts` 的「DEF 在代付两条分支都置位,ARM 只在 kill-switch 分支置位」退役(换成构建器、server.test 与 util `cloudMcpArmed` 三条行为判据),「信道名逐字一致」改判两条腿读同一个 `killSwitch` 与唯一核验源;`sidecar-env.test.ts` 的「逃生阀放行握手三变量」反过来判「逃生阀点名也进不来」· 本段提交。
+- 2026-11-12 · 原表之外改动的测试(都因为按旧通道搭环境或造文档):`codepuppy-behavior.test.ts`、`config-injection-throat.test.ts`、`websearch-prompt-tool-parity.test.ts`、`cloud-mcp-header.test.ts`、`mcp-server-derivation.test.ts`、`models-catalog-v2.wiring.cases.ts`、`codepuppy-reasoning-badge-parity.test.ts`(不改会静默丢掉平台节点)、`custom-provider-derivation.engine.cases.ts`(放行集合改用进程内发布)、`codepuppy-config-injection-engine.cases.ts`(三条登录态用例发布带地址的文档,每条用例开头撤掉上一条的)、`net-failure-real-stack.test.ts`(构建器拿出网代理端口与平台地址)、`sidecar-bootstrap-gate.test.ts` 与 core `codepuppy-mcp-runtime.test.ts`(文档必带 G2 字段)、ext `platform-output-cap.test.ts`(标题去掉旧变量名)· 本段提交。
+- 2026-11-12 · 登记:`authority-registry.json` 除表里两条外,`VI1`、`adr035-websearch` 的测试名与 `provider-allowlist` 的握法和测试名随改写;`source-text-anchors.ts` 的 `websearch-copies` 9 → 6 行;`gate-files.tsv` 的 `websearch-copies` 9 → 8、`codepuppy-bootstrap-build` 4 → 9,`sidecar-env`、`bootstrap-env-readers`、`provider-allow`、`cloud-mcp-header` 条数不变、说明补 `#1698`;ext 与 ui-mac 生产代码里点名旧变量的注释改成文档字段(其中 5 个文件只改注释)· 本段提交。
+- 2026-11-12 · 体量:79 个文件(生产 28,其中只改注释 5;测试与夹具 48;登记 3),外加本文件;高于计划估的 35–40,多出来的是上面那批按旧通道搭环境的测试 · 本段提交。
 
 ## 段 3 — G3 开关与引擎设置
 

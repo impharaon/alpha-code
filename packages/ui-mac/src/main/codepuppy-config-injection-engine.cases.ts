@@ -37,6 +37,9 @@ import { PLATFORM_API_KEY_PLACEHOLDER } from "./codepuppy-models"
 import { createSidecarEnv } from "./sidecar-env"
 import type { EngineFetch } from "./in-process-engine"
 import { CODEPUPPY_INIT_TEMPLATE, CODEPUPPY_REVIEW_TEMPLATE } from "../../../ext/src/codepuppy-prompts"
+import { publishMainBootstrap, unpublishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
+import { engineGlobalConfigDirectory } from "./engine-paths"
+import { homedir } from "node:os"
 
 const sandbox = engineSandbox()
 const PASSWORD = "cp-l5-injection-engine"
@@ -44,6 +47,7 @@ const engines: Array<{ close: () => Promise<void> }> = []
 const MANAGED = [
   "CODEPUPPY_GLOBAL_DIR",
   "CODEPUPPY_ECOSYSTEM_INHERIT",
+  // main 的环境(publishPlatformBaseURL 经构建器读它):宿主导出的值不得渗进文档
   "CODEPUPPY_BASE_URL",
   "CODEPUPPY_DEFAULT_MODEL",
   "CODEPUPPY_CLOUD_MCP_URL",
@@ -60,6 +64,7 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
+  unpublishTestBootstrap()
   for (const engine of engines.reverse()) await engine.close().catch(() => undefined)
   for (const k of MANAGED) {
     if (saved[k] === undefined) delete process.env[k]
@@ -69,6 +74,7 @@ afterAll(async () => {
 
 let run = 0
 beforeEach(() => {
+  unpublishTestBootstrap()
   for (const k of MANAGED) {
     if (!(k in saved)) saved[k] = process.env[k]
     delete process.env[k]
@@ -79,6 +85,13 @@ beforeEach(() => {
   fs.mkdirSync(process.env.CODEPUPPY_GLOBAL_DIR, { recursive: true })
   fs.mkdirSync(userData, { recursive: true })
 })
+
+/**
+ * `#1698` G2:平台节点地址由 main 写进启动文档(sidecar 在注入前发布),不再经环境。登录态的用例按 main 的构建器发布一份带地址的
+ * 文档;其余用例不发布(注入按「未登录、无云、kill-switch 关」走,全局根照旧经环境,R31),每条用例开头撤掉上一条的。
+ */
+const publishPlatformBaseURL = (url: string) =>
+  publishMainBootstrap({ userData, engineConfigDirectory: engineGlobalConfigDirectory(process.env, homedir()), env: { ...process.env, CODEPUPPY_BASE_URL: url } })
 
 /** `config` 就是 `start()` 的 `config`:内联文档,外加(`#1667` 裁决 r1 / C7 重裁起)main 合成的显式文件。 */
 async function engineWith(
@@ -185,7 +198,7 @@ describe("C7 模型与提供方清单由 Code Puppy 投影", () => {
       fs.mkdirSync(path.dirname(file), { recursive: true })
       fs.writeFileSync(file, value, { mode: 0o600 })
     }
-    process.env.CODEPUPPY_BASE_URL = "https://gateway.example.invalid/v1"
+    publishPlatformBaseURL("https://gateway.example.invalid/v1")
   }
 
   test("真引擎的 GET /api/provider 里有注入的平台节点与 BYOK 节点,而且只有它们(provider.use 先拒全部再逐个放行)", async () => {
@@ -540,7 +553,7 @@ describe("C7(重裁):provider 白名单的第一层在显式文件里,项目里�
     const file = secretFilePath(userData, "CODEPUPPY_API_KEY")
     fs.mkdirSync(path.dirname(file), { recursive: true })
     fs.writeFileSync(file, "sk-platform-engine-gate", { mode: 0o600 })
-    process.env.CODEPUPPY_BASE_URL = "https://gateway.example.invalid/v1"
+    publishPlatformBaseURL("https://gateway.example.invalid/v1")
   }
 
   test("项目 opencode.json 声明一个白名单外的 provider 并在 policies 里 allow 它 ⇒ 仍不可用", async () => {
@@ -634,7 +647,7 @@ describe("裁决 r3 第 2 条:key 缺失或为空的 BYOK / 自定义节点不�
     const key = secretFilePath(userData, "CODEPUPPY_API_KEY")
     fs.mkdirSync(path.dirname(key), { recursive: true })
     fs.writeFileSync(key, "sk-platform-engine-gate", { mode: 0o600 })
-    process.env.CODEPUPPY_BASE_URL = baseURL()
+    publishPlatformBaseURL(baseURL())
     const injection = injectCodePuppyConfig(userData, undefined, "stable")
     // 沙箱里没有已应用的平台目录,平台节点的模型表是空的(`#1556`);补一个模型只为能发出一次请求,鉴权形状原样。
     const content = JSON.parse(injection.config.content) as { providers: Record<string, { models?: Record<string, unknown> }> }

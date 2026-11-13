@@ -285,7 +285,15 @@ describe("AC5: at most four servers start at once", () => {
 function publishOfficeManifest(officeMcpManifest: string) {
   __resetCodePuppyBootstrapForTests()
   publishCodePuppyBootstrap(
-    parseCodePuppyBootstrap({ v: 1, paths: { userData: ROOT, globalRoot: ROOT, initialDirectory: ROOT, database: ":memory:", engineConfigDirectory: ROOT, officeMcpManifest } }),
+    parseCodePuppyBootstrap({
+      v: 1,
+      paths: { userData: ROOT, globalRoot: ROOT, initialDirectory: ROOT, database: ":memory:", engineConfigDirectory: ROOT, officeMcpManifest },
+      // G2 fields are required in every document; this one carries no cloud MCP, no policy account and no egress proxy.
+      platform: { credentialRef: `{file:${path.join(ROOT, "codepuppy-secrets", "CODEPUPPY_API_KEY")}}` },
+      webSearch: { killSwitch: false },
+      policy: {},
+      network: {},
+    }),
   )
 }
 

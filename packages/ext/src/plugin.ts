@@ -41,7 +41,7 @@ import { applyAgents, applyProjectMcp, commandDefinitions } from "./engine-trans
 import { modelFacts } from "./model-facts"
 import { createCloudVisionHooks } from "./cloud-vision-hooks"
 import { createAttachmentReaderHooks } from "./attachment-reader-hooks"
-import { providerAllowTail, refuseOutsideProviderAllowList } from "./provider-allow"
+import { providerAllowList, providerAllowTail, refuseOutsideProviderAllowList } from "./provider-allow"
 import { inProcessEngine } from "../../ui-mac/src/main/in-process-engine"
 
 // ── `#1665` I2:进程级对象(定制中心桥 + 重载调度器)──────────────────────────────────────────────
@@ -166,8 +166,8 @@ export const CodePuppyExt: Plugin.Plugin = {
         // #223 R3→R5 / L5r:web search 主权判决 —— 抛出即拒掉这次调用(2.x 只有 execute.before 允许失败,抛出被转成
         // Tool.Error,只结束这一次调用)。命中面:任何 MCP server 上看起来是 web search 的工具,以及 2.x 内置的 `websearch`;
         // 治理云 server 的豁免按本 Location 核验过的端点身份判。理由与边界见 cloud-websearch-kill.ts。
-        assertWebSearchToolAllowed(event.tool, process.env, mcpOwnership)
-        validateCloudToolInput(event.tool, event.input, process.env, mcpOwnership)
+        assertWebSearchToolAllowed(event.tool, bootstrap, mcpOwnership)
+        validateCloudToolInput(event.tool, event.input, bootstrap, mcpOwnership)
         // `#1419`:模型追问 —— `codepuppy_vision` 的 image 由引用换成压缩后的 base64。
         await vision.toolBefore(event)
       })
@@ -184,7 +184,7 @@ export const CodePuppyExt: Plugin.Plugin = {
         // 2.x 的 execute.after 不允许失败(`packages/core/src/plugin/hooks.ts:23`):契约不符时把结果换成一句响亮的拒绝,
         // 不让一份没核过的结果原样回到模型。
         try {
-          validateCloudToolOutput(event.tool, event.result, process.env, mcpOwnership)
+          validateCloudToolOutput(event.tool, event.result, bootstrap, mcpOwnership)
         } catch (cause) {
           error(`[@codepuppy/ext] cloud tool ${event.tool} result refused: ${describe(cause)}`)
           event.result = { content: renderTemplate(CLOUD_CONTRACT_REFUSED_ID, { name: event.tool }), metadata: { codepuppy: { contractRefused: true } } }
@@ -220,7 +220,7 @@ export const CodePuppyExt: Plugin.Plugin = {
         // 直连 BYOK 节点按逐模型实读上限抬(REQ-156);其余原样(上游算的那个数)。
         try {
           const facts = await modelFacts(context, event.model)
-          if (platformOutputCap({ providerBaseURL: facts.baseURL, codepuppyBaseURL: process.env.CODEPUPPY_BASE_URL }).omit) {
+          if (platformOutputCap({ providerBaseURL: facts.baseURL, codepuppyBaseURL: bootstrap.platform.modelProxyBaseURL }).omit) {
             delete event.options.maxTokens
             return
           }
@@ -240,11 +240,11 @@ export const CodePuppyExt: Plugin.Plugin = {
       // 写在 http.request:2.x 的路由层在 model.request 之后才按 apiKey 写 Authorization(packages/ai/src/route/auth.ts),
       // 那里加的头会被注入的占位 apiKey 盖掉;http.request 拿到的是鉴权之后、即将发出的请求(#1662 parity B4)。
       await context.session.hook("http.request", (event) => {
-        const authorization = platformRequestCredentialHeader({ requestURL: event.request.url, env: process.env })
+        const authorization = platformRequestCredentialHeader({ requestURL: event.request.url, platform: bootstrap.platform })
         if (authorization) event.request.headers.set("authorization", authorization)
       })
       // `#1662`:供应商白名单 · 请求这一道 —— 注入的放行集合之外的供应商,请求在发出之前拒掉(provider-allow.ts)。
-      await context.session.hook("model.request", (event) => refuseOutsideProviderAllowList(event, process.env))
+      await context.session.hook("model.request", (event) => refuseOutsideProviderAllowList(event, providerAllowList()))
 
       // ── 配置域(C10 / L3r / M3)────────────────────────────────────────────────────────────
       // 项目 `.codepuppy/codepuppy.jsonc` + 出厂禁项 + 提示词接管,算成一份 v1 形状的小对象(既有纯函数),再按域翻译。
@@ -286,7 +286,7 @@ export const CodePuppyExt: Plugin.Plugin = {
       await context.mcp.transform((editor) => {
         // #223 R5 / M3:云 MCP 的完整定义只由 ext 在这里装 —— 本句能执行 = 本 Location 的 ext 已装上、上面的执行闸已注册。
         try {
-          const installed = installCloudMcp(editor)
+          const installed = installCloudMcp(editor, bootstrap)
           if (installed) log(`[@codepuppy/ext] cloud MCP server "${installed}" installed — the web search sovereignty gate is registered in this Location`)
         } catch (cause) {
           error(`[@codepuppy/ext] cloud MCP install failed: ${describe(cause)}`)
@@ -299,7 +299,7 @@ export const CodePuppyExt: Plugin.Plugin = {
           error(`[@codepuppy/ext] project MCP merge failed: ${describe(cause)}`)
         } finally {
           // #223 R6/R7:归属在本 Location 的 MCP 定义全部就位之后才算;合并中途出错 ⇒ fail-closed。
-          mcpOwnership = merged ? computeMcpOwnership({ mcp: Object.fromEntries(editor.list()) }) : UNVERIFIED_MCP_OWNERSHIP
+          mcpOwnership = merged ? computeMcpOwnership({ mcp: Object.fromEntries(editor.list()) }, bootstrap.cloudMcp) : UNVERIFIED_MCP_OWNERSHIP
           if (process.env.CODEPUPPY_EXT_VERBOSE) log(`[@codepuppy/ext] MCP ownership (${directory}): ${JSON.stringify(mcpOwnership)}`)
         }
       })
@@ -404,7 +404,7 @@ export const CodePuppyExt: Plugin.Plugin = {
       const tail = providerAllowTail({
         transform: (callback) => context.provider.transform(callback),
         activePlugins: async () => (((await context.plugin.list()) as { data?: Array<{ id?: string }> }).data ?? []).map((plugin) => String(plugin.id)),
-        env: process.env,
+        allowed: providerAllowList,
         log,
         signal: providerTail.signal,
       })

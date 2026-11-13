@@ -13,7 +13,7 @@ import * as os from "node:os"
 import * as path from "node:path"
 import { injectCodePuppyConfig } from "./codepuppy-config-injection"
 import { NEUTRALIZED_MCP_SERVER } from "./mcp-default-deny"
-import { PROVIDER_ALLOW_ENV } from "../../../ext/src/provider-allow"
+import { unpublishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
 import { environmentMutableRoot } from "./codepuppy-environment"
 import { readMcpServerRecords, resolveMcpServerTruthLocation } from "./mcp-server-records"
 import { writeMcpServerTruth } from "./mcp-server-truth-write"
@@ -42,7 +42,6 @@ const MANAGED = [
   "CODEPUPPY_OPENCODE_HOME",
   "XDG_CONFIG_HOME",
   "XDG_DATA_HOME",
-  PROVIDER_ALLOW_ENV,
 ]
 const saved: Record<string, string | undefined> = {}
 let root = ""
@@ -81,6 +80,7 @@ beforeAll(() => {
 
 afterAll(() => {
   setConfiguredEgressDestinations([])
+  unpublishTestBootstrap() // 注入发布的供应商白名单(§10 R30)不留给同进程的其它文件
   for (const key of MANAGED) {
     if (saved[key] === undefined) delete process.env[key]
     else process.env[key] = saved[key]

@@ -4,7 +4,7 @@
 import { beforeAll, describe, expect } from "bun:test"
 import fs from "node:fs"
 import path from "node:path"
-import { E, it, Location, Plugin, promisePlugin, isolate, ROOT, Rpc } from "./policy-host.cases"
+import { E, it, Location, Plugin, promisePlugin, isolate, publishPolicyAccount, ROOT, Rpc } from "./policy-host.cases"
 import { registerPolicy } from "./index"
 import { createToolPolicyStore, defaultPolicyBaseDir } from "./resolver"
 import { policyFilePath } from "./store"
@@ -16,8 +16,7 @@ beforeAll(isolate)
 const ID = "codepuppy.tool-policy"
 
 const setup = Effect.gen(function* () {
-  const account = `rpc-${Math.random().toString(36).slice(2)}`
-  process.env.CODEPUPPY_POLICY_ACCOUNT = account
+  const account = publishPolicyAccount("rpc")
   const plugins = yield* Plugin.Service
   yield* plugins.activate([
     promisePlugin("builtins", async (ctx: any) => {

@@ -192,6 +192,8 @@ function sidecarStep(launched: Awaited<ReturnType<typeof launch>>) {
     /** codepuppy.jsonc;null = 逃生阀置位(sidecar.ts 的 prepareSidecarEnv 同一传法) */
     userConfig: bootstrap.paths.userConfig ?? null,
     globalRoot: bootstrap.paths.globalRoot,
+    /** G2 起出网代理的决定者标记在文档里(engineNetFailurePath 的第三个参数) */
+    egressProxy: bootstrap.network.egressProxy,
     toggles: engineDesktopToggles(launched.forkEnv),
     /** sidecar 进程的整份 env(含出网代理变量;这里不搬进本进程,只交给读整份 env 的读法)。 */
     processEnv: launched.forkEnv,
@@ -273,7 +275,7 @@ async function observe(inputs: ReturnType<typeof sidecarStep>, fence: unknown) {
       providers,
       cloudMcp: await mcpStatus(),
       policyAccount: inventory.output?.partition?.account,
-      proxiedFailure: engineNetFailurePath("https://unreachable.example/v1", inputs.processEnv),
+      proxiedFailure: engineNetFailurePath("https://unreachable.example/v1", inputs.processEnv, inputs.egressProxy),
     },
     credentials: { model: [...new Set(modelAuthorization)], cloud: [...new Set(cloudAuthorization)] },
   }

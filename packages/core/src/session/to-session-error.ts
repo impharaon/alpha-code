@@ -8,6 +8,7 @@ import { ModelResolver } from "../model-resolver.js"
 import { ModelRetry } from "../model-retry.js"
 import { SessionRunnerModel } from "./runner/model.js"
 import { classifyNetFailure, engineNetFailurePath, withFailureCode } from "@opencode/schema/codepuppy-net-failure" // codepuppy(#1572)
+import { tryCodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap" // codepuppy(#1572, #1698)
 
 const tokenSharingMessages = {
   subscription_sharing_user_not_eligible:
@@ -54,7 +55,7 @@ export function toSessionError(cause: unknown): SessionError.Error {
         const error = ModelRetry.isUnreachable(cause) ? unreachable(cause.reason) : providerError("provider.transport", cause.reason)
         // codepuppy(#1572) ── the network layer Code Puppy's classifier attributes leads the message, for the desktop
         // to read back (parseFailureCode); an unattributed failure keeps upstream's text.
-        const net = classifyNetFailure(cause.reason, engineNetFailurePath(cause.reason.url, process.env))
+        const net = classifyNetFailure(cause.reason, engineNetFailurePath(cause.reason.url, process.env, tryCodePuppyBootstrap()?.network.egressProxy))
         return net ? { ...error, message: withFailureCode(net.layer, error.message) } : error
         // codepuppy ── end
       }

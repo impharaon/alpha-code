@@ -19,6 +19,7 @@ import * as path from "node:path"
 
 import { CODEPUPPY_BEHAVIOR_MD } from "./codepuppy-behavior"
 import { injectCodePuppyConfig } from "./codepuppy-config-injection"
+import { publishMainBootstrap, unpublishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
 
 const MANAGED = [
   "CODEPUPPY_JSONC_TRUTH_DISABLE",
@@ -73,6 +74,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  unpublishTestBootstrap()
   for (const k of MANAGED) {
     if (saved[k] === undefined) delete process.env[k]
     else process.env[k] = saved[k]
@@ -86,6 +88,8 @@ afterEach(() => {
 
 /** 跑一次生产注入,返回引擎会看到的 instructions 与真正落盘的 behavior 正文。 */
 function inject(): { instructions: string[]; model: unknown; behaviorFile: string; behaviorBody: string | null } {
+  // `#1698` G2:默认模型覆盖由 main 的构建器从它的环境(这里就是 process.env)写进启动文档,sidecar 在注入前发布
+  publishMainBootstrap({ userData })
   const result = injectCodePuppyConfig(userData, undefined, "stable")
   expect(result.ok ? true : result.error).toBe(true)
   // `#1667`:注入产物不再进环境变量,引擎从结果的 `config.content` 拿(sidecar 放进 `start()` 的选项)。

@@ -1,7 +1,7 @@
 // `#1665`:ext 在 OpenCode 2 真插件宿主里(plugin-host.harness.ts)—— 每条用例装的是生产的默认导出 `CodePuppyExt`,
 // 经上游真的钩子链 / 工具注册表 / transform 服务判结果。「权威保持」类用例都带反向臂:同一个输入在**不装 ext** 的宿主里
 // 走上游默认,结论必须相反 —— 去掉我们的钩子 ⇒ 这条用例红。
-import { publishTestBootstrap, unpublishTestBootstrap } from "../../ui-mac/test-component/codepuppy-bootstrap-fixture"
+import { publishTestBootstrap, testCloudMcp, unpublishTestBootstrap, type TestBootstrapInput } from "../../ui-mac/test-component/codepuppy-bootstrap-fixture"
 import { afterEach, beforeAll, expect } from "bun:test"
 import { createHash } from "node:crypto"
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
@@ -42,28 +42,20 @@ import { Message } from "../../ai/src/schema/messages.ts"
 import * as Media from "../../ai/src/media.ts"
 import { toLLMMessages } from "../../core/src/session/runner/to-llm-message.ts"
 
-const ENV_KEYS = [
-  "CODEPUPPY_LOCAL_WEBSEARCH_DENY",
-  "CODEPUPPY_CLOUD_WEBSEARCH_DENY",
-  "CODEPUPPY_CLOUD_MCP_ARM",
-  "CODEPUPPY_CLOUD_MCP_DEF",
-  "CODEPUPPY_CLOUD_MCP_SERVER",
-  "CODEPUPPY_BASE_URL",
-  "CODEPUPPY_PLATFORM_AUTH_REF",
-  "CODEPUPPY_FACTORY_DENY_SKILLS",
-  "CODEPUPPY_PROMPT_REBRAND_DISABLE",
-  "CODEPUPPY_POLICY_ACCOUNT",
-] as const
+const ENV_KEYS = ["CODEPUPPY_FACTORY_DENY_SKILLS", "CODEPUPPY_PROMPT_REBRAND_DISABLE"] as const
 const saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]))
 let scratch = ""
 beforeAll(() => {
   scratch = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-host-")))
   mkdirSync(join(scratch, "global"), { recursive: true })
 })
-const env = (values: Partial<Record<(typeof ENV_KEYS)[number], string>>) => {
+/**
+ * `#1698`:全局根、平台节点地址与凭据引用、云 MCP、kill-switch、账户分区经 sidecar 发布的启动文档到 ext(R14:在装 ext 之前发布);
+ * 还没迁走的键组(G3)照旧是环境变量。
+ */
+const env = (values: Partial<Record<(typeof ENV_KEYS)[number], string>>, bootstrap: Omit<TestBootstrapInput, "globalRoot"> = {}) => {
   for (const key of ENV_KEYS) delete process.env[key]
-  // `#1698`:全局根经 sidecar 发布的启动文档到 ext(R14:在装 ext 之前发布)
-  publishTestBootstrap({ globalRoot: join(scratch, "global") })
+  publishTestBootstrap({ globalRoot: join(scratch, "global"), ...bootstrap })
   Object.assign(process.env, values)
 }
 afterEach(() => {
@@ -111,12 +103,13 @@ const contextEvent = (system: string[], model = { providerID: "stub", id: "stub-
 
 it.live("权威 · 工具策略(I3):ext 的默认导出装上后,Code Puppy 策略停用的工具被具名拒绝、实现零执行;反向臂:不装 ext ⇒ 同一条停用记录下照样执行", () =>
   Effect.gen(function* () {
-    env({ CODEPUPPY_POLICY_ACCOUNT: `t-${Math.random().toString(36).slice(2)}` })
+    const account = `acct:${createHash("sha256").update(String(Math.random())).digest("hex")}`
+    env({}, { policyAccount: account })
     // 用户的停用记录经生产的策略存储写进 ext 读的那个位置(数据根 / 账户 / 工作区与 registerPolicy 同一套)
     const location = yield* Location.Service
     const store = createToolPolicyStore({
       baseDir: defaultPolicyBaseDir(join(process.env.XDG_DATA_HOME!, "opencode")),
-      account: () => process.env.CODEPUPPY_POLICY_ACCOUNT!,
+      account: () => account,
       workspace: () => policyWorkspace(location as never),
     })
     yield* Effect.promise(() => store.setRecord({ selector: { level: "tool", canonical: "builtin::probe_tool" }, state: "disabled" } as never))
@@ -175,7 +168,7 @@ it.live("P1 / P8:真宿主装上 ext 的默认导出 —— 八个 codepuppy 工
 
 it.live("权威 · 联网搜索准入(L5r):kill-switch 下 2.x 内置 websearch 与第三方 web search MCP 在 execute.before 被拒;反向臂:不装 ext ⇒ 放行", () =>
   Effect.gen(function* () {
-    env({ CODEPUPPY_LOCAL_WEBSEARCH_DENY: "1", CODEPUPPY_CLOUD_WEBSEARCH_DENY: "1" })
+    env({}, { killSwitch: true })
     yield* registered("websearch", "exa_web_search_exa", "codepuppy_dispatch")
     const baseline = yield* before("websearch", { query: "x" })
     expect(Exit.isSuccess(baseline)).toBe(true)
@@ -287,8 +280,7 @@ it.live("权威 · 云工具接入(M3):ARM+DEF 在场 ⇒ ext 的 mcp.transform 
   Effect.gen(function* () {
     const token = join(scratch, "mcp-token")
     writeFileSync(token, "secret-token\n")
-    const definition = { type: "remote", url: "https://cloud.example/mcp", oauth: false, headers: { Authorization: `Bearer {file:${token}}` } }
-    env({ CODEPUPPY_CLOUD_MCP_ARM: "codepuppy", CODEPUPPY_CLOUD_MCP_DEF: JSON.stringify(definition), CODEPUPPY_CLOUD_MCP_SERVER: "codepuppy" })
+    env({}, { killSwitch: true, cloudMcp: testCloudMcp("https://cloud.example/mcp", token) })
     const neutralised = { type: "remote", url: "http://127.0.0.1:1/withheld", disabled: true }
     const without = recordingMcp({ codepuppy: neutralised })
     expect(without.servers.get("codepuppy")).toEqual(neutralised)
@@ -305,8 +297,7 @@ it.live("权威 · 云工具接入(M3):ARM+DEF 在场 ⇒ ext 的 mcp.transform 
 
 it.live("云工具接入:{file:} 引用读不到 ⇒ 不装(fail-closed),中和条目留着", () =>
   Effect.gen(function* () {
-    const definition = { type: "remote", url: "https://cloud.example/mcp", headers: { Authorization: `Bearer {file:${join(scratch, "missing")}}` } }
-    env({ CODEPUPPY_CLOUD_MCP_ARM: "codepuppy", CODEPUPPY_CLOUD_MCP_DEF: JSON.stringify(definition) })
+    env({}, { killSwitch: true, cloudMcp: testCloudMcp("https://cloud.example/mcp", join(scratch, "missing")) })
     const neutralised = { type: "remote", url: "http://127.0.0.1:1/withheld", disabled: true }
     const mcp = recordingMcp({ codepuppy: neutralised })
     yield* activate(CodePuppyExt, { mcp })
@@ -314,19 +305,25 @@ it.live("云工具接入:{file:} 引用读不到 ⇒ 不装(fail-closed),中和�
   }),
 )
 
-it.live("权威 · 云工具准入:治理云 server 上的 web search 只按本 Location 核验过的端点身份豁免;冒名 server 上的同形工具照样被拒", () =>
+it.live("权威 · 云工具准入:治理云 server 上的 web search 只按本 Location 核验过的端点身份认;冒名 server 上的同形工具按第三方判", () =>
   Effect.gen(function* () {
-    const definition = { type: "remote", url: "https://cloud.example/mcp" }
-    // 只置 LOCAL:第三方 web search 关,治理云 server 的 web search 豁免(只有 CLOUD 信号关它)。
-    env({ CODEPUPPY_CLOUD_MCP_ARM: "cloud", CODEPUPPY_CLOUD_MCP_DEF: JSON.stringify(definition), CODEPUPPY_CLOUD_MCP_SERVER: "cloud", CODEPUPPY_LOCAL_WEBSEARCH_DENY: "1" })
+    const token = join(scratch, "mcp-token-admission")
+    writeFileSync(token, "secret-token\n")
+    // `#1698`:web search 的判决只有 kill-switch 一个信号(「只有本地信号」的漂移态不再存在);治理 / 冒名的区分体现在拒绝理由上 ——
+    // 治理云工具只拿 kill-switch 那一句,冒名的拿到点名「按名字认出的工具」的第三方那一句。
+    env({}, { killSwitch: true, cloudMcp: testCloudMcp("https://cloud.example/mcp", token, "cloud") })
     const mcp = recordingMcp({ cloud_attacker: { type: "remote", url: "https://evil.example/mcp" } })
     yield* registered("cloud_web_search", "cloud_attacker_web_search")
     yield* activate(CodePuppyExt, { mcp })
-    expect(Exit.isSuccess(yield* before("cloud_web_search"))).toBe(true)
+    const governed = yield* before("cloud_web_search")
+    expect(Exit.isFailure(governed)).toBe(true)
+    expect(JSON.stringify(governed)).toContain("is unavailable")
+    expect(JSON.stringify(governed)).not.toContain("by name")
     const attacker = yield* before("cloud_attacker_web_search")
     expect(Exit.isFailure(attacker)).toBe(true)
-    // 拒它的是联网搜索的主权闸,不是策略的「未知身份」
+    // 拒它的是联网搜索的主权闸,不是策略的「未知身份」;按第三方判
     expect(JSON.stringify(attacker)).toContain("is unavailable")
+    expect(JSON.stringify(attacker)).toContain("by name")
   }),
 )
 
@@ -356,7 +353,7 @@ it.live("P3 / L3r:session.hook.context 的品牌转写只换登记过的上游�
  */
 const assembledOn = (hook: "compaction" | "title") =>
   Effect.gen(function* () {
-    env({ CODEPUPPY_BASE_URL: "https://gateway.codepuppy.test/v1" })
+    env({}, { platform: { modelProxyBaseURL: "https://gateway.codepuppy.test/v1" } })
     // 平台代理节点上的纯文本模型:识图、附件、转写、输出上限四件事都该在这条请求上发生。
     yield* activate(providerPlugin("codepuppy", "https://gateway.codepuppy.test/v1", "route-a"))
     const hooks = yield* PluginHooks.Service
@@ -439,7 +436,7 @@ const providerPluginWith = (providerID: string, baseURL: string, input: string[]
 
 it.live("P5:平台代理节点 ⇒ 不发 maxTokens(网关按 route 上限填);别的节点 ⇒ 原样;反向臂:不装 ext ⇒ maxTokens 留着", () =>
   Effect.gen(function* () {
-    env({ CODEPUPPY_BASE_URL: "https://gateway.codepuppy.test/v1" })
+    env({}, { platform: { modelProxyBaseURL: "https://gateway.codepuppy.test/v1" } })
     yield* activate(providerPlugin("codepuppy", "https://gateway.codepuppy.test/v1", "route-a"))
     yield* activate(providerPlugin("other", "https://api.other.test/v1", "model-b"))
     const hooks = yield* PluginHooks.Service
@@ -453,7 +450,7 @@ it.live("P5:平台代理节点 ⇒ 不发 maxTokens(网关按 route 上限填);�
   }),
 )
 
-it.live("P5:直连 BYOK 节点按逐模型实读上限抬(同一 provider 的两个模型各拿各的数);无读数 / 端点不符 / 目录里查不到 ⇒ 原样;未登录(无 CODEPUPPY_BASE_URL)谁都不置空", () =>
+it.live("P5:直连 BYOK 节点按逐模型实读上限抬(同一 provider 的两个模型各拿各的数);无读数 / 端点不符 / 目录里查不到 ⇒ 原样;未登录(文档里没有平台节点地址)谁都不置空", () =>
   Effect.gen(function* () {
     env({})
     const ZHIPU = "https://open.bigmodel.cn/api/paas/v4"
@@ -476,7 +473,7 @@ it.live("P6 / S5:平台凭据头只对平台节点、每次现读;别的节点�
   Effect.gen(function* () {
     const ref = join(scratch, "platform-token")
     writeFileSync(ref, "plat-1\n")
-    env({ CODEPUPPY_BASE_URL: "https://gateway.codepuppy.test/v1", CODEPUPPY_PLATFORM_AUTH_REF: `{file:${ref}}` })
+    env({}, { platform: { modelProxyBaseURL: "https://gateway.codepuppy.test/v1", credentialRef: `{file:${ref}}` } })
     const hooks = yield* PluginHooks.Service
     // 2.x 的 http.request 拿到的是路由层鉴权之后、即将发出的请求(Authorization 已是注入的占位 apiKey)
     const request = (url: string) => ({

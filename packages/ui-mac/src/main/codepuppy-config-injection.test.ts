@@ -39,9 +39,6 @@ import { customProviderSecretName, secretFilePath } from "./codepuppy-secret-fil
 import { writeMcpServerTruth } from "./mcp-server-truth-write"
 import { NEUTRALIZED_MCP_SERVER } from "./mcp-default-deny"
 import {
-  CLOUD_MCP_ARM_ENV,
-  CLOUD_MCP_DEF_ENV,
-  CLOUD_MCP_SERVER_ENV,
   CLOUD_WEB_SEARCH_TOOL_ID,
   cloudMcpToolId,
   WITHHELD_CLOUD_MCP,
@@ -53,7 +50,8 @@ import {
   CODEPUPPY_REVIEW_DESCRIPTION,
   CODEPUPPY_REVIEW_TEMPLATE,
 } from "../../../ext/src/codepuppy-prompts"
-import { PROVIDER_ALLOW_ENV } from "../../../ext/src/provider-allow"
+import { providerAllowList, publishProviderAllowList } from "../../../ext/src/provider-allow"
+import { publishTestBootstrap, testCloudMcp, unpublishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
 const CLOUD_DISPATCH_TOOL_ID = cloudMcpToolId("cloud_dispatch")
 
 // 注入读到的每一个 env 输入 + 它自己写出的 env 输出:逐个快照/清空/还原,
@@ -74,15 +72,7 @@ const MANAGED = [
   "CODEPUPPY_MODELS_DISABLE",
   "CODEPUPPY_AUTOMATION_DISABLE",
   "CODEPUPPY_READONLY_DISABLE",
-  "CODEPUPPY_WEBSEARCH_DISABLE",
-  "CODEPUPPY_CLOUD_MCP_URL",
   "XDG_DATA_HOME",
-  "CODEPUPPY_CLOUD_MCP_ARM",
-  "CODEPUPPY_CLOUD_MCP_DEF",
-  PROVIDER_ALLOW_ENV,
-  "CODEPUPPY_CLOUD_MCP_SERVER",
-  "CODEPUPPY_BASE_URL",
-  "CODEPUPPY_DEFAULT_MODEL",
   "CODEPUPPY_FACTORY_SKILL_DIRS",
   "CODEPUPPY_PROMPT_REBRAND_DISABLE",
 ] as const
@@ -95,6 +85,24 @@ const EXT_DIR = "/Applications/Code Puppy.app/Contents/Resources/codepuppy-ext"
 const saved: Record<string, string | undefined> = {}
 let tmp = ""
 let userData = ""
+
+// `#1698` G2:平台地址、默认模型覆盖、云 MCP 与 kill-switch 由 main 写进启动文档(sidecar 在注入之前发布),不再经环境。
+// 用例改这份状态,inject() 每次按它重新发布一份,再调注入 —— 与生产「每次 fork 一份文档」同序。
+type DocState = { baseURL?: string; defaultModel?: string; cloudMcpUrl?: string; killSwitch?: boolean }
+let doc: DocState = {}
+const publishDoc = () =>
+  publishTestBootstrap({
+    globalRoot: process.env.CODEPUPPY_GLOBAL_DIR!,
+    userData,
+    // 生产里是 engineGlobalConfigDirectory(XDG_CONFIG_HOME/opencode);这里同样指向测试的空 XDG 目录
+    engineConfigDirectory: path.join(process.env.XDG_CONFIG_HOME!, "opencode"),
+    platform: {
+      ...(doc.baseURL ? { modelProxyBaseURL: doc.baseURL } : {}),
+      ...(doc.defaultModel !== undefined ? { defaultModelOverride: doc.defaultModel } : {}),
+    },
+    ...(doc.cloudMcpUrl ? { cloudMcp: testCloudMcp(doc.cloudMcpUrl, secretFilePath(userData, "CODEPUPPY_MCP_TOKEN")) } : {}),
+    killSwitch: doc.killSwitch ?? false,
+  })
 
 /** 按 main 的 syncSecretFiles 姿势把密钥种进 {file:} 通道(A6:env 里从不出现密钥值)。 */
 const plantSecret = (varName: string, value: string) => {
@@ -119,9 +127,12 @@ beforeEach(() => {
     fs.mkdirSync(d, { recursive: true })
   userData = path.join(tmp, "userdata")
   fs.mkdirSync(userData, { recursive: true })
+  doc = {}
 })
 
 afterEach(() => {
+  unpublishTestBootstrap()
+  publishProviderAllowList(undefined)
   for (const k of MANAGED) {
     if (saved[k] === undefined) delete process.env[k]
     else process.env[k] = saved[k]
@@ -136,8 +147,8 @@ afterEach(() => {
 const givenLoggedInWithByok = () => {
   plantSecret("CODEPUPPY_API_KEY", PLATFORM_KEY)
   plantSecret("DEEPSEEK_API_KEY", BYOK_KEY)
-  process.env.CODEPUPPY_BASE_URL = "https://gateway.example.invalid/v1"
-  process.env.CODEPUPPY_DEFAULT_MODEL = DEFAULT_MODEL
+  doc.baseURL = "https://gateway.example.invalid/v1"
+  doc.defaultModel = DEFAULT_MODEL
 }
 
 type Rule = { action: string; resource: string; effect: string }
@@ -156,6 +167,7 @@ type Injected = {
 }
 
 function inject(extPluginPath?: string) {
+  publishDoc()
   const result = injectCodePuppyConfig(userData, extPluginPath, "stable")
   // `#1667`(编排器裁决 r1 第 2 条、C7 重裁):`config.file` 是 main 合成的显式文件;出厂命令、skills 与第一层 policies 在那里。
   const explicit = result.config.file && fs.existsSync(result.config.file) ? (JSON.parse(fs.readFileSync(result.config.file, "utf8")) as Injected & { $schema?: string; command?: unknown }) : undefined
@@ -266,15 +278,17 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     expect(inject(EXT_DIR).explicit?.policies).toBeUndefined()
   })
 
-  test("`#1662` 供应商白名单交给 ext:写进本进程 CODEPUPPY_PROVIDER_ALLOW 的集合逐条等于策略里放行的那些(同一次计算);注入关着 ⇒ 撤掉", () => {
+  test("`#1662` / `#1698` 供应商白名单交给 ext:进程内发布的集合逐条等于策略里放行的那些(同一次计算),不进环境;注入关着 ⇒ 撤掉", () => {
     givenLoggedInWithByok()
     const { config } = inject(EXT_DIR)
     const allowed = (config.policies ?? []).filter((policy) => policy.effect === "allow").map((policy) => policy.resource)
     expect(allowed.length).toBeGreaterThan(1)
-    expect(JSON.parse(process.env[PROVIDER_ALLOW_ENV]!)).toEqual(allowed)
+    expect([...(providerAllowList() ?? [])]).toEqual(allowed)
+    // R30:不进环境(引擎派生的子进程拿不到)
+    expect(process.env.CODEPUPPY_PROVIDER_ALLOW).toBeUndefined()
     process.env.CODEPUPPY_MODELS_DISABLE = "1"
     inject(EXT_DIR)
-    expect(process.env[PROVIDER_ALLOW_ENV]).toBeUndefined()
+    expect(providerAllowList()).toBeUndefined()
   })
 
   test("显式文件里用户的 codepuppy.jsonc 原样在下:用户自己的 /init 不被出厂的覆盖;用户文件坏了 ⇒ 只放 Code Puppy 这一层", () => {
@@ -290,7 +304,7 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
 
   test("I9:每一份注入的 permissions(顶层与各 agent)都能用 Permission.Ruleset 解码;动作名用 2.x 的,不出现 bash / task / apply_patch", () => {
     givenLoggedInWithByok()
-    process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
+    doc.killSwitch = true
     const { config } = inject(EXT_DIR)
     const rulesets = [config.permissions ?? [], ...Object.values(config.agents ?? {}).map((agent) => agent.permissions ?? [])]
     expect(rulesets.length).toBeGreaterThan(4)
@@ -437,6 +451,7 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
       warned.push(args.map((a) => String(a)).join(" "))
     }
     let result: ReturnType<typeof injectCodePuppyConfig>
+    publishDoc()
     try {
       result = injectCodePuppyConfig(brokenUserData, EXT_DIR, "stable")
     } finally {
@@ -461,6 +476,7 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     const originalWarn = console.warn
     console.warn = () => {}
     let result: ReturnType<typeof injectCodePuppyConfig>
+    publishDoc()
     try {
       result = injectCodePuppyConfig(userData, EXT_DIR, "stable")
     } finally {
@@ -505,7 +521,7 @@ describe("web search 主权在 2.x 权限规则里仍成立(#223)", () => {
     givenLoggedInWithByok()
     plantSecret("CODEPUPPY_CLOUD_TOKEN", "cloud-token")
     plantSecret("CODEPUPPY_MCP_TOKEN", "mcp-token-value")
-    process.env.CODEPUPPY_CLOUD_MCP_URL = "https://cloud.example/mcp"
+    doc.cloudMcpUrl = "https://cloud.example/mcp"
   }
 
   test("平台代付:两条腿都留着 —— 注入面不写任何 web search 的 deny,云 server 照常在册", () => {
@@ -526,7 +542,7 @@ describe("web search 主权在 2.x 权限规则里仍成立(#223)", () => {
   ] as const)
     test(`kill-switch(${name}):配置里只有中和条目,本地与云两个 web search 都被 deny 并钉在规则表末位`, () => {
       givenPlatformPays()
-      process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
+      doc.killSwitch = true
       const original = console.error
       const errors: unknown[][] = []
       console.error = (...args: unknown[]) => void errors.push(args)
@@ -546,16 +562,8 @@ describe("web search 主权在 2.x 权限规则里仍成立(#223)", () => {
       const content = JSON.stringify(config)
       expect(content).not.toContain("cloud.example")
       expect(content).not.toContain("Authorization")
-      expect(process.env[CLOUD_MCP_ARM_ENV]).toBe("codepuppy")
-      // DEF 托管的是 2.x `Mcp.RemoteConfig` 形状的真定义(带 {file:} 引用,不带 token 值)。
-      expect(JSON.parse(process.env[CLOUD_MCP_DEF_ENV]!)).toEqual({
-        type: "remote",
-        url: "https://cloud.example/mcp",
-        headers: { Authorization: `Bearer {file:${secretFilePath(userData, "CODEPUPPY_MCP_TOKEN")}}` },
-        oauth: false,
-      })
-      expect(process.env[CLOUD_MCP_DEF_ENV]).not.toContain("mcp-token-value")
-      expect(process.env[CLOUD_MCP_SERVER_ENV]).toBe("codepuppy")
+      // `#1698` G2:真定义只在启动文档里(ext 从那里读),注入不再把它托管进环境
+      for (const name of ["CODEPUPPY_CLOUD_MCP_ARM", "CODEPUPPY_CLOUD_MCP_DEF", "CODEPUPPY_CLOUD_MCP_SERVER"]) expect([name, process.env[name]]).toEqual([name, undefined])
       expect(errors.flat().join("\n")).toContain("WITHHELD from the engine config")
       assertNativeV2(content)
     })
@@ -564,19 +572,18 @@ describe("web search 主权在 2.x 权限规则里仍成立(#223)", () => {
   // 写了中和条目 ⇔ 值为 true。逐条分支核对(含先扣下再放开:值随最近一次注入走,不残留)。
   test("isCloudMcpWithheld equals the verdict used for the cloud config entry on every branch", () => {
     const scenarios: Array<[string, () => void]> = [
-      ["kill-switch + 代付", () => (givenPlatformPays(), (process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"))],
+      ["kill-switch + 代付", () => (givenPlatformPays(), (doc.killSwitch = true))],
       ["代付", () => givenPlatformPays()],
-      ["kill-switch + 不代付", () => (givenLoggedInWithByok(), (process.env.CODEPUPPY_CLOUD_MCP_URL = "https://cloud.example/mcp"), (process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"))],
-      ["不代付", () => (givenLoggedInWithByok(), (process.env.CODEPUPPY_CLOUD_MCP_URL = "https://cloud.example/mcp"))],
-      ["kill-switch + 无云 URL", () => (givenLoggedInWithByok(), (process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"))],
+      ["kill-switch + 不代付", () => (givenLoggedInWithByok(), (doc.cloudMcpUrl = "https://cloud.example/mcp"), (doc.killSwitch = true))],
+      ["不代付", () => (givenLoggedInWithByok(), (doc.cloudMcpUrl = "https://cloud.example/mcp"))],
+      ["kill-switch + 无云 URL", () => (givenLoggedInWithByok(), (doc.killSwitch = true))],
     ]
     const verdicts: Array<[string, boolean]> = []
     const original = console.error
     console.error = () => {}
     try {
       for (const [name, given] of scenarios) {
-        delete process.env.CODEPUPPY_WEBSEARCH_DISABLE
-        delete process.env.CODEPUPPY_CLOUD_MCP_URL
+        doc = {}
         given()
         const { config } = inject(EXT_DIR)
         const wroteWithheld = JSON.stringify(config.mcp?.servers?.codepuppy) === JSON.stringify({ ...WITHHELD_CLOUD_MCP })
@@ -598,25 +605,37 @@ describe("web search 主权在 2.x 权限规则里仍成立(#223)", () => {
 
   test("不代付(登出 / BYOK)且有云 URL:云 server 是无凭证的 disabled 定义,不带任何凭证通道", () => {
     givenLoggedInWithByok()
-    process.env.CODEPUPPY_CLOUD_MCP_URL = "https://cloud.example/mcp"
+    doc.cloudMcpUrl = "https://cloud.example/mcp"
     const { config } = inject(EXT_DIR)
     expect(config.mcp?.servers?.codepuppy).toEqual({ type: "remote", url: "https://cloud.example/mcp", disabled: true, oauth: false })
   })
 
-  test("继承/伪造的 arm+def 变量在每条分支上都被注入面覆盖或清掉", () => {
-    givenPlatformPays()
-    process.env[CLOUD_MCP_ARM_ENV] = "forged"
-    process.env[CLOUD_MCP_DEF_ENV] = JSON.stringify({ type: "remote", url: "https://attacker.example/mcp" })
-    process.env[CLOUD_MCP_SERVER_ENV] = "forged"
-    inject(EXT_DIR)
-    expect(process.env[CLOUD_MCP_ARM_ENV]).toBeUndefined()
-    expect(process.env[CLOUD_MCP_DEF_ENV]).not.toContain("attacker.example")
-    expect(process.env[CLOUD_MCP_SERVER_ENV]).toBe("codepuppy")
-    delete process.env.CODEPUPPY_CLOUD_MCP_URL
-    inject(EXT_DIR)
-    expect(process.env[CLOUD_MCP_ARM_ENV]).toBeUndefined()
-    expect(process.env[CLOUD_MCP_DEF_ENV]).toBeUndefined()
-    expect(process.env[CLOUD_MCP_SERVER_ENV]).toBeUndefined()
+  test("`#1698` 继承/伪造的旧云 MCP 交接变量与地址变量不再有人读:注入面只按启动文档写云 server", () => {
+    const forged = {
+      CODEPUPPY_CLOUD_MCP_ARM: "forged",
+      CODEPUPPY_CLOUD_MCP_DEF: JSON.stringify({ type: "remote", url: "https://attacker.example/mcp" }),
+      CODEPUPPY_CLOUD_MCP_SERVER: "forged",
+      CODEPUPPY_CLOUD_MCP_URL: "https://attacker.example/mcp",
+    }
+    const before = Object.fromEntries(Object.keys(forged).map((name) => [name, process.env[name]]))
+    Object.assign(process.env, forged)
+    try {
+      givenPlatformPays()
+      const paid = inject(EXT_DIR).config
+      expect(paid.mcp?.servers?.codepuppy).toMatchObject({ type: "remote", url: "https://cloud.example/mcp" })
+      expect(paid.mcp?.servers?.forged).toBeUndefined()
+      expect(JSON.stringify(paid)).not.toContain("attacker.example")
+      // 文档没有云 MCP ⇒ 没有云 server,环境里的地址不顶上
+      delete doc.cloudMcpUrl
+      const none = inject(EXT_DIR).config
+      expect(none.mcp?.servers?.codepuppy).toBeUndefined()
+      expect(JSON.stringify(none)).not.toContain("attacker.example")
+    } finally {
+      for (const [name, value] of Object.entries(before)) {
+        if (value === undefined) delete process.env[name]
+        else process.env[name] = value
+      }
+    }
   })
 })
 

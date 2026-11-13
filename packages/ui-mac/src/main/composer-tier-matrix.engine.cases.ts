@@ -5,7 +5,7 @@
 // 供数方全是生产的:三档的规则来自真 `injectCodePuppyConfig`(内联文档 + 显式文件,原样交给 `start()`);引擎的底座规则、
 // agent 合成、Permission 服务都是引擎自己的;真 ext(`packages/ext/src/plugin.ts`,以本地目录插件装,与 sidecar 同一个入口形状)
 // 的策略与 evaluate 钩子都在。测试只加两样:一个探针插件(拿到插件上下文、注册两个插件工具),一个本机 OpenAI 兼容模型桩
-// (平台节点经 `CODEPUPPY_BASE_URL` 指向它;用户回合里写 `CP-CALL {json}` 就回一次那个工具调用)。
+// (平台节点经启动文档的 platform.modelProxyBaseURL 指向它;用户回合里写 `CP-CALL {json}` 就回一次那个工具调用)。
 //
 // 三种结局:放行(调用直接通过 / 工具真执行)、询问(引擎的待批列表里出现一条;经引擎自己的回复路由拒绝后零副作用)、
 // 拒绝(具名拒绝、没有待批请求、零副作用)。

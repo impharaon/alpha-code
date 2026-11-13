@@ -126,7 +126,14 @@ export type CodePuppyModelConfig = {
   provider: Record<string, unknown>
 }
 
-export function buildCodePuppyModelConfig(userDataPath: string): CodePuppyModelConfig | undefined {
+/**
+ * `#1698`(DESIGN-upgrade-bootstrap-config G2):平台节点地址与默认模型覆盖由调用方给 —— sidecar 的注入从启动文档的 `platform`
+ * 取(`modelProxyBaseURL` / `defaultModelOverride`),main 的出网放行派生从 main 自己的环境取(applyAuthEnv 写的那个值)。
+ * 本模块不读环境里的这两个键。`defaultModel` 的空串语义照旧:给了空串 = 不设默认模型,也不用目录默认。
+ */
+export type PlatformInputs = { baseURL?: string; defaultModel?: string }
+
+export function buildCodePuppyModelConfig(userDataPath: string, platform: PlatformInputs = {}): CodePuppyModelConfig | undefined {
   if (process.env.CODEPUPPY_MODELS_DISABLE === "1") return undefined
 
   const provider: Record<string, unknown> = {}
@@ -184,11 +191,11 @@ export function buildCodePuppyModelConfig(userDataPath: string): CodePuppyModelC
   }
 
   // (2) ALPHA platform gateway -- a custom OpenAI-compatible provider whose key is fronted by ALPHA
-  // (代发). Auto-joins the allowlist (front of list) only once CODEPUPPY_BASE_URL points at the gateway
+  // (代发). Auto-joins the allowlist (front of list) only once the platform base URL (bootstrap platform.modelProxyBaseURL) points at the gateway
   // AND the key file exists (a URL with no key would only produce doomed 401 calls).
   // REQ-001:模型清单以已应用的网关目录为准(registry 真实 id + V3 `display`);没有有效快照 ⇒ 节点照注入、
   // 模型表为空(`#1556` AC1:不回退随包清单)。
-  if (process.env.CODEPUPPY_BASE_URL && hasSecretFile(userDataPath, "CODEPUPPY_API_KEY")) {
+  if (platform.baseURL && hasSecretFile(userDataPath, "CODEPUPPY_API_KEY")) {
     const pp = applied.platformProvider
     // REQ-127 #681:平台段走与 picker 完全相同的那一份投影。此前这里自制 nameById/variantsById/source
     // 三段装配,于是「什么算有效缓存」有两份定义 —— 空缓存时 picker 给 0 行、引擎配置给静态 9 行。
@@ -216,9 +223,9 @@ export function buildCodePuppyModelConfig(userDataPath: string): CodePuppyModelC
       npm: pp.npm,
       name: pp.name,
       // REQ-236 §2.1-4(`#1562`):占位值,不是凭据。真凭据由 ext 的 `chat.headers` 每次请求从
-      // `CODEPUPPY_PLATFORM_AUTH_REF` 指向的文件现读、写进请求级 authorization(盖过 SDK 由 apiKey 生成的配置头);
+      // 启动文档 platform.credentialRef 指向的文件现读、写进请求级 authorization(盖过 SDK 由 apiKey 生成的配置头);
       // 于是 SDK 缓存与 provider options 里结构上没有平台令牌,续期后无旧值可回落,读不到就在发出前拒绝。
-      options: { baseURL: process.env.CODEPUPPY_BASE_URL, apiKey: PLATFORM_API_KEY_PLACEHOLDER },
+      options: { baseURL: platform.baseURL, apiKey: PLATFORM_API_KEY_PLACEHOLDER },
       models,
     }
     enabled.unshift(pp.id)
@@ -271,7 +278,7 @@ export function buildCodePuppyModelConfig(userDataPath: string): CodePuppyModelC
 
   // Default model: env override wins, else catalog default, else none (never force a default whose
   // key may be absent). Format "<providerID>/<modelID>".
-  const model = process.env.CODEPUPPY_DEFAULT_MODEL ?? applied.defaultModel ?? undefined
+  const model = platform.defaultModel ?? applied.defaultModel ?? undefined
 
   return {
     enabled_providers: enabled,

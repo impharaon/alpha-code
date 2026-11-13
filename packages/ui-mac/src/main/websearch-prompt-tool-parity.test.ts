@@ -54,6 +54,7 @@ import { buildCodePuppyIdentity } from "./codepuppy-identity"
 import { injectCodePuppyConfig } from "./codepuppy-config-injection"
 import { secretFilePath } from "./codepuppy-secret-files"
 import { CLOUD_MCP_SERVER_NAME, CLOUD_WEB_SEARCH_TOOL_ID, LOCAL_WEB_SEARCH_TOOL_ID } from "./cloud-web-search"
+import { publishMainBootstrap, unpublishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
 
 // 注入读到的 env 输入 + 它自己写出的 env 输出:逐个快照/清空/还原(与同目录两个注入测试同一份清单)。
 const MANAGED = [
@@ -104,6 +105,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  unpublishTestBootstrap()
   for (const k of MANAGED) {
     if (saved[k] === undefined) delete process.env[k]
     else process.env[k] = saved[k]
@@ -135,8 +137,13 @@ type Cfg = Record<string, any>
 type Rule = { action: string; resource: string; effect: string }
 type Injected = ReturnType<typeof injectCodePuppyConfig>
 
-/** 注入一次;产物是结果里的 `config.content`(`#1667` 起不再写进环境变量)。 */
-const inject = (): Injected => silently(() => injectCodePuppyConfig(userData, undefined, "stable"))
+/** 注入一次;产物是结果里的 `config.content`(`#1667` 起不再写进环境变量)。`#1698` G2:平台 / 云地址与 kill-switch 由 main 的
+ *  构建器从它的环境(这里就是 process.env)写进启动文档,sidecar 在注入前发布 —— 每次注入前照此发布一份。 */
+const inject = (): Injected =>
+  silently(() => {
+    publishMainBootstrap({ userData })
+    return injectCodePuppyConfig(userData, undefined, "stable")
+  })
 
 /** 一次真注入之后,生产写出来的两样东西。 */
 function observe(result: Injected) {

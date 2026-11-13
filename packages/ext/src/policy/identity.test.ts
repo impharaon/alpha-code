@@ -2,6 +2,7 @@
 // pins on the upstream rules the derivation restates (name normalization, rule evaluation) and on upstream behaviour
 // a v1 takeover used to supply. Replaces packages/opencode/test/tool/codepuppy-tool-identity.test.ts and
 // packages/core/test/codepuppy-tool-identity.test.ts (#1662 L4). Expected identities are hand-written literals.
+import { testCloudMcp } from "../../../ui-mac/test-component/codepuppy-bootstrap-fixture"
 import { beforeAll, describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
 import fs from "node:fs"
@@ -37,7 +38,6 @@ const base = (over: Partial<IdentityInput> = {}): IdentityInput => ({
   ]),
   bundled: undefined,
   extOrigin: "/Applications/Code Puppy.app/Contents/Resources/codepuppy-ext/plugin.js",
-  env: {},
   ...over,
 })
 
@@ -122,18 +122,19 @@ describe("identity derivation", () => {
 })
 
 describe("authority minting (ADR-041 §5)", () => {
-  const cloudDef = { type: "remote", url: "https://cloud.codepuppy.test/mcp", headers: { authorization: "{file:/tmp/token}" } }
-  const cloudEnv = { CODEPUPPY_CLOUD_MCP_SERVER: "codepuppy-cloud", CODEPUPPY_CLOUD_MCP_DEF: JSON.stringify(cloudDef) }
+  // `#1698`:治理云 MCP 的名字与定义来自启动文档(main 用 materializeCloudMcpConfig 写的同一形状)
+  const cloudMcp = testCloudMcp("https://cloud.codepuppy.test/mcp", "/tmp/token", "codepuppy-cloud")
+  const cloudDef = cloudMcp.definition
 
   test("the exact verified cloud definition mints codepuppy-cloud with a sha256 evidence digest", () => {
-    const authority = authorityForMcp("codepuppy-cloud", cloudDef as never, cloudEnv, undefined)
+    const authority = authorityForMcp("codepuppy-cloud", cloudDef as never, cloudMcp, undefined)
     expect(authority).toMatchObject({ kind: "codepuppy-cloud", bindingId: "mcp:codepuppy-cloud" })
     expect((authority as { evidenceDigest: string }).evidenceDigest).toMatch(/^sha256:[0-9a-f]{64}$/)
   })
 
   test("a look-alike (same URL, other key; or same key, other URL) is not asserted", () => {
-    expect(authorityForMcp("other-name", cloudDef as never, cloudEnv, undefined)).toEqual({ kind: "not-asserted" })
-    expect(authorityForMcp("codepuppy-cloud", { ...cloudDef, url: "https://cloud.codepuppy.test.evil/mcp" } as never, cloudEnv, undefined)).toEqual({ kind: "not-asserted" })
+    expect(authorityForMcp("other-name", cloudDef as never, cloudMcp, undefined)).toEqual({ kind: "not-asserted" })
+    expect(authorityForMcp("codepuppy-cloud", { ...cloudDef, url: "https://cloud.codepuppy.test.evil/mcp" } as never, cloudMcp, undefined)).toEqual({ kind: "not-asserted" })
   })
 
   const office = (() => {
@@ -155,17 +156,17 @@ describe("authority minting (ADR-041 §5)", () => {
   })()
 
   test("the exact bundled Office command next to the attested server.py mints codepuppy-bundled", () => {
-    const authority = authorityForMcp("codepuppy-word", { type: "local", command: office.command } as never, {}, office.manifest)
+    const authority = authorityForMcp("codepuppy-word", { type: "local", command: office.command } as never, undefined, office.manifest)
     expect(authority).toMatchObject({ kind: "codepuppy-bundled", bindingId: "mcp:codepuppy-word" })
   })
 
   test("an extra token, or a server.py the manifest was not exported from, proves nothing", () => {
-    expect(authorityForMcp("codepuppy-word", { type: "local", command: [...office.command, "--debug"] } as never, {}, office.manifest)).toEqual({ kind: "not-asserted" })
+    expect(authorityForMcp("codepuppy-word", { type: "local", command: [...office.command, "--debug"] } as never, undefined, office.manifest)).toEqual({ kind: "not-asserted" })
     const tampered = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-office-"))
     fs.cpSync(path.dirname(office.dir), tampered, { recursive: true })
     fs.writeFileSync(path.join(tampered, "office-mcp", "server.py"), "print('tampered')\n")
     const command = office.command.map((token) => token.replace(path.dirname(office.dir), tampered))
-    expect(authorityForMcp("codepuppy-word", { type: "local", command } as never, {}, path.join(tampered, "office-mcp", "tools.json"))).toEqual({ kind: "not-asserted" })
+    expect(authorityForMcp("codepuppy-word", { type: "local", command } as never, undefined, path.join(tampered, "office-mcp", "tools.json"))).toEqual({ kind: "not-asserted" })
   })
 
   // #1666 Unit E: the shipped manifest (packages/ui-mac/resources/office-mcp) and the command main writes, after this
@@ -179,8 +180,8 @@ describe("authority minting (ADR-041 §5)", () => {
     const template: string[] = JSON.parse(fs.readFileSync(manifest, "utf8")).formats.word.command
     const command = (workspace: string) =>
       template.map((token) => (token === "{workspace}" ? workspace : token.split("{codepuppyResources}").join(resources)))
-    expect(authorityForMcp("codepuppy-word", { type: "local", command: command("/Users/someone/project") } as never, {}, manifest)).toMatchObject({ kind: "codepuppy-bundled" })
-    expect(authorityForMcp("codepuppy-word", { type: "local", command: command("relative/project") } as never, {}, manifest)).toEqual({ kind: "not-asserted" })
+    expect(authorityForMcp("codepuppy-word", { type: "local", command: command("/Users/someone/project") } as never, undefined, manifest)).toMatchObject({ kind: "codepuppy-bundled" })
+    expect(authorityForMcp("codepuppy-word", { type: "local", command: command("relative/project") } as never, undefined, manifest)).toEqual({ kind: "not-asserted" })
   })
 
   test("the display snapshot is the schema's ToolDisplaySnapshotV1: identity + technicalId + authority + location", () => {

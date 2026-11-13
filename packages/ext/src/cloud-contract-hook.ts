@@ -5,16 +5,16 @@
 //   远端名(worker 自己 advertise;platform#560 起只说动作)   dispatch
 //   引擎 id(McpTool.name(server, remote),2.x)         codepuppy_dispatch   ← plugin.ts 传进来的
 //
-// 现在 id 一律**推导**:server 名取注入面在本次 fork 写进 env 的那个(`CODEPUPPY_CLOUD_MCP_SERVER`,
+// 现在 id 一律**推导**:server 名取 main 在本次 fork 写进启动文档的那个(`cloudMcp.name`,`#1698` G2,
 // 与 `cloud-websearch-kill.ts` 的治理豁免同源),远端名是下面这张表。仓里不许再出现第二份 id 字面量。
 //
 // alpha-code#1568:表与平台公开工具清单的关系由 ui-mac `cloud-remote-names-pin.test.ts` 双向钉住(下面两张表合起来
 // = 平台 §6 全集)。运行期再补一道:一个工具 id **确定**属于本次 fork 的治理云 server、却一个远端名都对不上,
 // 就响亮拒绝,不再静默跳过契约校验 —— 改名期间远端名表落后于平台,正是 #650 那种「闸一次都没跑」的形态。
 
+import { codepuppyBootstrap, type CodePuppyBootstrap } from "../../util/src/codepuppy-bootstrap"
 import { ContractIncompatibleError, decodeContract, decodeJsonContract, type ContractName } from "@codepuppy/contracts-consumer"
 import {
-  CLOUD_MCP_SERVER_ENV,
   isGovernedCloudTool,
   mcpEngineToolId,
   type McpOwnership,
@@ -53,8 +53,8 @@ export class CloudRemoteToolUnknownError extends Error {
  * 「确定属于治理云 server」沿用 web search 闸的同一判据(`isGovernedCloudTool`:候选归属方只有治理 server);
  * 第一方插件工具与云 server 共用 `codepuppy_` 前缀(方案 §1.5 第 4 条),按扩展自己的工具表排除。
  */
-function cloudRemoteToolOf(tool: string, env: Record<string, string | undefined>, ownership: McpOwnership): string | undefined {
-  const server = env[CLOUD_MCP_SERVER_ENV]
+function cloudRemoteToolOf(tool: string, bootstrap: CodePuppyBootstrap, ownership: McpOwnership): string | undefined {
+  const server = bootstrap.cloudMcp?.name
   if (!server) return undefined
   const remote = CLOUD_CONTRACT_REMOTE_TOOLS.find((name) => mcpEngineToolId(server, name) === tool)
   if (remote) return remote
@@ -66,10 +66,10 @@ function cloudRemoteToolOf(tool: string, env: Record<string, string | undefined>
 export function validateCloudToolInput(
   tool: string,
   args: unknown,
-  env: Record<string, string | undefined> = process.env,
+  bootstrap: CodePuppyBootstrap = codepuppyBootstrap(),
   ownership: McpOwnership = UNVERIFIED_MCP_OWNERSHIP,
 ): void {
-  if (cloudRemoteToolOf(tool, env, ownership) !== CLOUD_DISPATCH_REMOTE_TOOL) return
+  if (cloudRemoteToolOf(tool, bootstrap, ownership) !== CLOUD_DISPATCH_REMOTE_TOOL) return
   decodeContract("CloudJobRequestV1", args, "cloud-mcp")
 }
 
@@ -86,10 +86,10 @@ type CloudToolOutput = {
 export function validateCloudToolOutput(
   tool: string,
   output: CloudToolOutput,
-  env: Record<string, string | undefined> = process.env,
+  bootstrap: CodePuppyBootstrap = codepuppyBootstrap(),
   ownership: McpOwnership = UNVERIFIED_MCP_OWNERSHIP,
 ): void {
-  const remote = cloudRemoteToolOf(tool, env, ownership)
+  const remote = cloudRemoteToolOf(tool, bootstrap, ownership)
   if (!remote) return
   if (remote === CLOUD_DISPATCH_REMOTE_TOOL) {
     validateOutputContract("CloudJobAcceptedV1", output)

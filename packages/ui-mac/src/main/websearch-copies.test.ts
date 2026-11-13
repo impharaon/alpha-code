@@ -48,6 +48,14 @@
 //     这张纵深网在 2.x 上没有对应物(新副本若起的名字认不出,ext 的名字判决关不掉它,见 `#1461`)。
 // 「主权信道名…逐字一致」一条去掉两条传输的半句,其余照常判。
 //
+// ── `#1698` G2:判决与治理云 MCP 的身份改走启动文档 ─────────────────────────────────────────────
+// 两个 web search 判决、云 MCP 的名字 / 定义 / 武装标记不再是环境变量,「信道名逐字一致」没有了主语:改判「ext 两条腿读同一个
+// `webSearch.killSwitch`、plugin 是治理云 MCP 的唯一核验源(读已发布文档)、ext 原样转出」;旧名字没有读者由
+// bootstrap-env-readers.test.ts 的 RETIRED 扫描判。「DEF 在代付两条分支都置位,ARM 只在 kill-switch 分支置位」一条退役:定义恒在
+// 文档里(只要有云地址,与 kill-switch 无关)、武装 = kill-switch 且有定义 —— 行为判据是 codepuppy-bootstrap-build.test.ts
+// 「登录态的输入逐项进文档」、server.test.ts「the kill switch ships a cloud verdict to the sidecar; platform-pays does not」与
+// util 包启动文档单元测试里的「cloudMcpArmed = kill switch on and a cloud MCP present」。
+//
 // ── 2026-11-12 `#1662` parity 第 9 项:普查网在 2.x 上重建 ────────────────────────────────────────
 // 2.x 上能执行 web search 的地方都挂在同一个 `websearch` 工具后面(供应商经 `WebSearch.Service` 注册),主权判决在 ext 的
 // execute.before 按工具名下;本仓自己持有的一份是 ext 的 exa 供应商(packages/ext/src/exa-websearch.ts,顶替上游那份)。纵深网照旧
@@ -59,13 +67,6 @@
 import { readFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { describe, expect, test } from "bun:test"
-import {
-  CLOUD_MCP_ARM_ENV,
-  CLOUD_MCP_DEF_ENV,
-  CLOUD_MCP_SERVER_ENV,
-  CLOUD_WEBSEARCH_DENY_ENV,
-  LOCAL_WEBSEARCH_DENY_ENV,
-} from "./cloud-web-search"
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..", "..", "..")
 const read = (path: string) => readFileSync(join(REPO_ROOT, path), "utf8")
@@ -159,39 +160,19 @@ describe("websearch 执行副本普查(#223 R3 · R4 起降为纵深)", () => {
     }
   })
 
-  test("主权信道名在 ui-mac / ext / plugin 逐字一致;MCP authority 共享唯一核验源", () => {
-    expect(LOCAL_WEBSEARCH_DENY_ENV).toBe("CODEPUPPY_LOCAL_WEBSEARCH_DENY")
-    expect(CLOUD_WEBSEARCH_DENY_ENV).toBe("CODEPUPPY_CLOUD_WEBSEARCH_DENY")
-    expect(CLOUD_MCP_ARM_ENV).toBe("CODEPUPPY_CLOUD_MCP_ARM")
-    expect(read("packages/ext/src/cloud-websearch-kill.ts")).toContain(
-      `export const CLOUD_WEBSEARCH_DENY_ENV = "${CLOUD_WEBSEARCH_DENY_ENV}"`,
-    )
+  test("`#1698` 主权判决与治理云 MCP 的身份只在启动文档里:ext 两条腿读同一个 killSwitch,plugin 是唯一核验源、ext 原样转出", () => {
     const extGate = read("packages/ext/src/cloud-websearch-kill.ts")
-    expect(extGate).toContain(`export const CLOUD_MCP_ARM_ENV = "${CLOUD_MCP_ARM_ENV}"`)
-    // #878 gives the engine snapshot and ext sovereignty gate one verified-definition source.
-    // The shared constants live in plugin; ext must explicitly re-export that exact source.
+    // 云腿与本地腿的判决函数都恰好返回 webSearch.killSwitch(此前是两个恒等于它的环境变量,可以漂成不相等)
+    expect(extGate.match(/\n  return bootstrap\.webSearch\.killSwitch\n/g)?.length).toBe(2)
+    // #878 gives the engine snapshot and ext sovereignty gate one verified-definition source: plugin reads the published
+    // document's cloudMcp, and ext must explicitly re-export that exact source.
     const authority = read("packages/plugin/src/alpha-cloud-authority.ts")
-    for (const [identifier, name] of [
-      ["CLOUD_MCP_DEF_ENV", CLOUD_MCP_DEF_ENV],
-      ["CLOUD_MCP_SERVER_ENV", CLOUD_MCP_SERVER_ENV],
-    ]) {
-      expect(authority).toContain(`export const ${identifier} = "${name}"`)
-      expect(extGate).toContain(`${identifier},`)
-    }
+    expect(authority).toContain("tryCodePuppyBootstrap()?.cloudMcp")
     // 2.x 的上游插件包名是 @opencode/plugin(v1 是 @opencode-ai/plugin)。
     expect(extGate).toContain('from "@opencode/plugin/alpha-cloud-authority"')
-    // 本地判决在 ext 侧也必须逐字一致 —— R5 起 ext 的闸靠它拦第三方 web-search MCP。
-    expect(read("packages/ext/src/cloud-websearch-kill.ts")).toContain(
-      `export const LOCAL_WEBSEARCH_DENY_ENV = "${LOCAL_WEBSEARCH_DENY_ENV}"`,
-    )
-    // 两条判决都必须真的过得了 sidecar 白名单,否则闸在打包态恒不置位。
+    // 退役的信道名一个都不在 sidecar 白名单里(没有读者由 bootstrap-env-readers.test.ts 判)
     const allowlist = read("packages/ui-mac/src/main/sidecar-env.ts")
-    expect(allowlist).toContain(`"${LOCAL_WEBSEARCH_DENY_ENV}"`)
-    expect(allowlist).toContain(`"${CLOUD_WEBSEARCH_DENY_ENV}"`)
-    // 三个握手通道不在**固定**白名单里。⚠️ R5 事实更正:这**不等于**「外部 shell 伪造进不来」——
-    // 逃生阀 CODEPUPPY_ENV_ALLOWLIST_EXTRA 点名即放行(它们都不是 credential-shaped),那半句 R4 的
-    // 断言是错的,真实判据见 sidecar-env.test.ts 与 codepuppy-config-injection.test.ts 两条。
-    for (const name of [CLOUD_MCP_ARM_ENV, CLOUD_MCP_DEF_ENV, CLOUD_MCP_SERVER_ENV])
+    for (const name of ["CODEPUPPY_LOCAL_WEBSEARCH_DENY", "CODEPUPPY_CLOUD_WEBSEARCH_DENY", "CODEPUPPY_CLOUD_MCP_ARM", "CODEPUPPY_CLOUD_MCP_DEF", "CODEPUPPY_CLOUD_MCP_SERVER"])
       expect(allowlist).not.toContain(`"${name}"`)
   })
 
@@ -200,7 +181,7 @@ describe("websearch 执行副本普查(#223 R3 · R4 起降为纵深)", () => {
     const plugin = read("packages/ext/src/plugin.ts")
     const hook = plugin.indexOf('context.tool.hook("execute.before"')
     expect(hook).toBeGreaterThanOrEqual(0)
-    // #223 R7:归属实参从模块级默认值改成本实例闭包(`, process.env, mcpOwnership`),故只钉调用点。
+    // #223 R7:归属实参从模块级默认值改成本实例闭包(`#1698` 起是 `, bootstrap, mcpOwnership`),故只钉调用点。
     const gate = plugin.indexOf("assertWebSearchToolAllowed(event.tool", hook)
     const contract = plugin.indexOf("validateCloudToolInput(", hook)
     expect(gate).toBeGreaterThan(hook)
@@ -218,7 +199,7 @@ describe("websearch 执行副本普查(#223 R3 · R4 起降为纵深)", () => {
     const plugin = read("packages/ext/src/plugin.ts")
     const transform = plugin.indexOf("context.mcp.transform((editor) => {")
     expect(transform).toBeGreaterThanOrEqual(0)
-    const install = plugin.indexOf("installCloudMcp(editor)", transform)
+    const install = plugin.indexOf("installCloudMcp(editor, bootstrap)", transform)
     const project = plugin.indexOf("applyProjectMcp(editor", transform)
     expect(install).toBeGreaterThan(transform)
     expect(project).toBeGreaterThan(install)
@@ -233,35 +214,20 @@ describe("websearch 执行副本普查(#223 R3 · R4 起降为纵深)", () => {
   // 先前来源的同名定义。唯一允许写进去的是那份中和条目 `WITHHELD_CLOUD_MCP`。
   // 行为证据在 packages/opencode/test/mcp/codepuppy-cloud-mcp-{revival,multisource}.test.ts;
   // 这里钉住静态形状:kill-switch 下写进 config.mcp 的**只能**是中和条目。
-  test("kill-switch 分支写的是中和条目,真定义只经 ARM/DEF 托管", () => {
+  test("kill-switch 分支写的是中和条目,真定义只在启动文档里(由 ext 装)", () => {
     const injection = read("packages/ui-mac/src/main/codepuppy-config-injection.ts")
     // `#1195` 起赋值是 platformPays 三分支(缺凭证 ⇒ 工厂给的无引用 disabled 形状),
     // 但 kill-switch 臂**必须**仍是中和条目且排在最前(缺凭证判定不得把真 URL 放回 kill-switch 态)。
     // `#1667`:2.x 的 MCP 条目在 `mcp.servers` 下(上游 `Config.Info` 的 `mcp.servers`)。
     const assign = injection.match(
-      /config\.mcp = \{\n\s*\.\.\.config\.mcp,\n\s*servers: \{\n\s*\.\.\.config\.mcp\?\.servers,\n\s*\[CLOUD_MCP_SERVER_NAME\]: cloudMcpWithheld\n\s*\? \{ \.\.\.WITHHELD_CLOUD_MCP \}\n\s*: platformPays\n\s*\? cloud\n\s*: materializeCloudMcpConfig\(mcpUrl, undefined\),\n\s*\},\n\s*\}/,
+      /config\.mcp = \{\n\s*\.\.\.config\.mcp,\n\s*servers: \{\n\s*\.\.\.config\.mcp\?\.servers,\n\s*\[cloudMcp\.name\]: cloudMcpWithheld\n\s*\? \{ \.\.\.WITHHELD_CLOUD_MCP \}\n\s*: platformPays\n\s*\? cloud\n\s*: materializeCloudMcpConfig\(mcpUrl, undefined\),\n\s*\},\n\s*\}/,
     )
     expect(assign).not.toBeNull()
     // #1687:三元的条件改名为 cloudMcpWithheld(报错入口要读它);它必须恰好是 killSwitch,且在赋值前一行定下、除复位成 false 外全文件只赋这一次。
     expect(injection).toMatch(/cloudMcpWithheld = killSwitch\n\s*config\.mcp = \{/)
     expect(injection.match(/cloudMcpWithheld = (?!false\b)/g)?.length).toBe(1)
-    const branch = injection.indexOf("if (killSwitch) {")
-    expect(branch).toBeGreaterThanOrEqual(0)
-    const elseAt = injection.indexOf("\n      } else {", branch)
-    expect(elseAt).toBeGreaterThan(branch)
-    const body = injection.slice(branch, elseAt)
-    expect(body).toContain(`process.env[CLOUD_MCP_ARM_ENV]`)
-    // 这条分支绝不允许再往 config.mcp 里写第二次(真定义只走 ARM/DEF)。
-    expect(body).not.toMatch(/config\.mcp\s*=/)
-  })
-
-  // #223 R6 Blocker:治理豁免绑定端点身份,所以 DEF 必须在**代付的两条分支**上都置位;
-  // 而 ARM 只在 kill-switch 分支置位(ARM/DEF 缺一 ext 什么都不装,这条不变式仍在)。
-  test("DEF 在代付两条分支都置位,ARM 只在 kill-switch 分支置位", () => {
-    const injection = read("packages/ui-mac/src/main/codepuppy-config-injection.ts")
-    const branch = injection.indexOf("if (killSwitch) {")
-    const before = injection.slice(0, branch)
-    expect(before).toContain("process.env[CLOUD_MCP_DEF_ENV] = JSON.stringify(cloud)")
-    expect(before.lastIndexOf("process.env[CLOUD_MCP_ARM_ENV] = ")).toBe(-1)
+    // 云 server 名下的条目全文件只写这一处(kill-switch 下绝不写第二次);`#1698`:注入也不再往环境里托管任何云 MCP 的东西。
+    expect(injection.match(/\[cloudMcp\.name\]:/g)?.length).toBe(1)
+    expect(injection).not.toMatch(/process\.env\[[A-Z_]*CLOUD_MCP/)
   })
 })

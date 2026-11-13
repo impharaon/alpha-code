@@ -27,8 +27,6 @@
 // DEBUG and LD_PRELOAD, which the old copy-everything implementation deleted case-by-case, now fall
 // out via default-deny like everything else.
 
-import { EGRESS_PROXY_MARKER_ENV } from "@opencode/schema/codepuppy-net-failure"
-
 const EXACT = new Set([
   // POSIX/system basics the server, node, git and package managers need
   "PATH",
@@ -52,9 +50,6 @@ const EXACT = new Set([
   "https_proxy",
   "all_proxy",
   "no_proxy",
-  // `#1572`:出网代理的决定者标记(值 = 出网代理 URL,非密钥)。只由下面的 sidecarEgressProxyEnv 写;
-  // 引擎据它判断代理变量是不是出网代理(@opencode/schema/codepuppy-net-failure 的 engineNetFailurePath)。
-  EGRESS_PROXY_MARKER_ENV,
   // node runtime knobs (non-secret)
   "NODE_ENV",
   "NODE_OPTIONS",
@@ -62,24 +57,11 @@ const EXACT = new Set([
   "NODE_TLS_REJECT_UNAUTHORIZED",
   // alpha non-secret controls the SIDECAR reads (injectCodePuppyConfig/buildCodePuppyModelConfig).
   // NEVER add a token/key var here — that's what the {file:} channel is for (A6).
-  "CODEPUPPY_BASE_URL",
-  // REQ-236 `#1562`:平台模型凭据文件的 `{file:}` 引用(server.ts 在 fork 时置位)。是路径不是凭据 ——
-  // ext 的 `chat.headers` 每次请求按它现读文件,续期热应用不必重启引擎。
-  "CODEPUPPY_PLATFORM_AUTH_REF",
-  "CODEPUPPY_CLOUD_MCP_URL",
-  "CODEPUPPY_DEFAULT_MODEL",
+  // `#1698` G2:平台地址 / 凭据引用 / 默认模型 / 云 MCP 地址 / kill-switch 与两个 web search 判决、出网代理标记改走启动文档的
+  // platform / cloudMcp / webSearch / network(codepuppy-bootstrap-build.ts)。
   "CODEPUPPY_MODELS_DISABLE",
   "CODEPUPPY_IDENTITY_DISABLE",
   "CODEPUPPY_BEHAVIOR_DISABLE",
-  "CODEPUPPY_WEBSEARCH_DISABLE",
-  // #223 R2:web search 主权判决(kill-switch 或平台代付)。sidecar 里的 websearch 工具读它做
-  // **最终**拒绝 —— permission 规则(agent wildcard / 持久 session permission / approved)覆盖不了。
-  // 非密钥:一个布尔判决,取值只有 1。
-  "CODEPUPPY_LOCAL_WEBSEARCH_DENY",
-  // #223 R3:云侧同一条通道(kill-switch 才置位)。@codepuppy/ext 的 tool.execute.before 钩子读它,
-  // 在 `ctx.ask` 之前拒掉 `cloud_web_search`(普通 MCP 与 code-mode 两条路都过这个钩子)——
-  // 远端 MCP 没有 per-tool 的注册期过滤,permission deny 又能被后置 allow 顶掉。同为布尔判决,非密钥。
-  "CODEPUPPY_CLOUD_WEBSEARCH_DENY",
   // REQ-062 路线A 逃生门(ext 插件在引擎进程内读:T1 转写 + T3/T6 内容接管一键回退)
   "CODEPUPPY_PROMPT_REBRAND_DISABLE",
   // REQ-065 修订:出厂技能目录(main 启动时算好,ext config hook 内存注入 —— 不落用户配置文件)
@@ -100,23 +82,9 @@ const PREFIXES = ["OPENCODE_", "XDG_", "LC_", "ELECTRON_"]
 
 // `#1698`(DESIGN-upgrade-bootstrap-config §4.5):Code Puppy 交给 sidecar 的决定走启动文档,不走环境 —— `CODEPUPPY_` 前缀
 // (不分大小写)一律拒,排在所有放行规则(含 EXTRA)之前:把已迁走的键写进 CODEPUPPY_ENV_ALLOWLIST_EXTRA 也放不回去。
-// 唯一的永久例外是 EXTRA 本身。下面这张表是迁移期的:还没迁进文档的键组(G2 平台 / 云 / 网络、G3 开关与引擎设置)
-// 今天怎么过河就怎么过河,每个键组的提交把自己的键从这里删掉,G3 之后整张表删除。
+// 唯一的永久例外是 EXTRA 本身。下面这张表是迁移期的:还没迁进文档的键组(G3 开关与引擎设置)
+// 今天怎么过河就怎么过河,每个键组的提交把自己的键从这里删掉(G2 已删),G3 之后整张表删除。
 const CODEPUPPY_KEYS_NOT_YET_IN_BOOTSTRAP = new Set([
-  // G2
-  "CODEPUPPY_BASE_URL",
-  "CODEPUPPY_PLATFORM_AUTH_REF",
-  "CODEPUPPY_DEFAULT_MODEL",
-  "CODEPUPPY_CLOUD_MCP_URL",
-  "CODEPUPPY_CLOUD_MCP_SERVER",
-  "CODEPUPPY_CLOUD_MCP_DEF",
-  "CODEPUPPY_CLOUD_MCP_ARM",
-  "CODEPUPPY_WEBSEARCH_DISABLE",
-  "CODEPUPPY_LOCAL_WEBSEARCH_DENY",
-  "CODEPUPPY_CLOUD_WEBSEARCH_DENY",
-  "CODEPUPPY_POLICY_ACCOUNT",
-  "CODEPUPPY_EGRESS_PROXY",
-  "CODEPUPPY_PROVIDER_ALLOW",
   // G3
   "CODEPUPPY_FACTORY_SKILL_DIRS",
   "CODEPUPPY_FACTORY_DENY_SKILLS",
@@ -320,8 +288,8 @@ export const SIDECAR_EGRESS_NO_PROXY = "127.0.0.1,localhost,::1"
 
 /**
  * 给定策略代理端口,返回要**覆盖**进 sidecar env 的八个代理变量(纯函数;server.ts 在 fork 前 Object.assign)。
- * `#1572`:另写决定者标记 CODEPUPPY_EGRESS_PROXY(同一 URL)—— 引擎只在代理变量等于它时才把失败归到本机出网代理;
- * 非 darwin 不调本函数,代理变量是用户自己的,没有这个标记。
+ * `#1572` / `#1698`:决定者标记(同一 URL)在启动文档的 network.egressProxy 里 —— 引擎只在代理变量等于它时才把失败归到
+ * 本机出网代理;非 darwin 不调本函数,代理变量是用户自己的,文档里也没有这一项。
  */
 export function sidecarEgressProxyEnv(port: number): Record<string, string> {
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`sidecar egress proxy env: port must be an integer in 1..65535, got ${JSON.stringify(port)}`)
@@ -335,6 +303,5 @@ export function sidecarEgressProxyEnv(port: number): Record<string, string> {
     all_proxy: url,
     NO_PROXY: SIDECAR_EGRESS_NO_PROXY,
     no_proxy: SIDECAR_EGRESS_NO_PROXY,
-    [EGRESS_PROXY_MARKER_ENV]: url,
   }
 }

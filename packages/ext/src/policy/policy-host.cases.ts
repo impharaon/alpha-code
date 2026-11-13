@@ -7,10 +7,12 @@
 // (packages/util/src/global-roots.ts). Network: core's test runner refuses non-loopback fetches.
 //
 // `.cases.ts`: a helper, not a test file — no `bun test` entry, no typecheck surface (packages/ext/tsconfig.json).
+import { createHash } from "node:crypto"
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { publishTestBootstrap } from "../../../ui-mac/test-component/codepuppy-bootstrap-fixture"
+import { tryCodePuppyBootstrap } from "../../../util/src/codepuppy-bootstrap"
 
 export const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-policy-host-"))
 const ISOLATED: Record<string, string> = {
@@ -36,6 +38,21 @@ export function isolate() {
   if (!process.env.XDG_DATA_HOME?.startsWith(ROOT)) throw new Error("policy host: isolated XDG_DATA_HOME was not applied")
   // `#1698`:registerPolicy 从 sidecar 发布的启动文档读随包清单与 Office 清单的路径;这里发布一份(都不在场 = 不给声明)
   publishTestBootstrap({ globalRoot: path.join(ROOT, "state") })
+}
+
+/**
+ * `#1698` G2:工具策略的账户分区来自启动文档的 policy.account(main 算的 `acct:<sha256>`);用例换账户 = 重新发布一份,
+ * 已发布文档里的 Office 清单与云 MCP 原样带上。
+ */
+export function publishPolicyAccount(tag: string): string {
+  const account = `acct:${createHash("sha256").update(`${tag}-${Math.random()}`).digest("hex")}`
+  const current = tryCodePuppyBootstrap()
+  publishTestBootstrap({
+    globalRoot: path.join(ROOT, "state"),
+    ...(current ? { officeMcpManifest: current.paths.officeMcpManifest, cloudMcp: current.cloudMcp } : {}),
+    policyAccount: account,
+  })
+  return account
 }
 isolate()
 

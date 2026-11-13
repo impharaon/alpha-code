@@ -1,15 +1,15 @@
 // REQ-236 AC2 / AC3(`#1562`)在 OpenCode 2 上(`#1662` parity B4;v1 版起的是已删的 `packages/opencode/src/index.ts serve`):
 // 续期热应用的端到端判据 —— 嵌进 sidecar 的那台引擎 + 真 ext + 本机假网关,一个引擎实例里换凭据文件。
 //
-// 宿主:test-component/codepuppy-engine.ts(生产注入 + 真 ext);平台节点经 `CODEPUPPY_BASE_URL` 指向本文件的假网关,ext 的凭据头
-// 经 `CODEPUPPY_PLATFORM_AUTH_REF`(生产 `secretFileRef`)每次现读。凭据文件由生产 `syncSecretFiles`(fork 时)与
+// 宿主:test-component/codepuppy-engine.ts(生产注入 + 真 ext);平台节点经启动文档的 platform.modelProxyBaseURL 指向本文件的假网关,
+// ext 的凭据头经文档的 platform.credentialRef(生产 `secretFileRef` 同形)每次现读(`#1698` G2,此前是两个环境变量)。凭据文件由生产 `syncSecretFiles`(fork 时)与
 // `applyPlatformCredentialsHot`(续期时)写。假网关只认这两个合成令牌,别的(含注入写的占位 apiKey)一律 401 —— 与真网关同一结论。
 //   ① 令牌 A ⇒ 网关收到的每个请求都带 `Bearer A`(占位值一次都不上线);
 //   ② 热应用令牌 B(不重启)⇒ 下一轮每个请求都带 `Bearer B`,一个 A 都没有;
 //   ③ 删掉凭据文件 ⇒ 这一轮以 ext 的具名错误失败,网关一个请求都没收到(发出前被拒,不回落);
 //   ④ 反向臂:同一份配置不装 ext ⇒ 网关收到的是占位值、被拒 —— 证明 ①② 的令牌确实来自 ext,不是配置里藏着凭据;
 //   哨兵臂:两个令牌一次都不出现在引擎的日志输出与 HTTP 响应体里。
-//   ⑤ 平台节点地址的写法变体(`#1662` parity r6 Codex R1 Major 1):`CODEPUPPY_BASE_URL` 写成大写主机 / 显式默认端口 / 末尾斜杠 /
+//   ⑤ 平台节点地址的写法变体(`#1662` parity r6 Codex R1 Major 1):平台节点地址写成大写主机 / 显式默认端口 / 末尾斜杠 /
 //      主机末尾一个点,引擎发出的请求地址是规范化之后的(小写、去默认端口)⇒ 每种写法网关收到的都是令牌;像而不是的地址
 //      (`gw.example.evil`、`gw.example@evil`、兄弟路径 `/v1x`)上的自定义节点一次令牌都收不到。这些主机都不存在:进程的 `fetch` 在起引擎之前
 //      换成桩,这几个主机由本文件当网关答,回环照常,其它任何主机直接抛错 —— 一个真实请求都发不出去。
@@ -171,7 +171,7 @@ describe("REQ-236 #1562 续期热应用:同一个引擎实例里换凭据文件"
       await engine.send("POST", `/api/experimental/session/${sessionID}/wait`)
       return wire.slice(before)
     }
-    // 写法变体:每种起一台引擎(注入与 ext 都按这一刻的 CODEPUPPY_BASE_URL)
+    // 写法变体:每种起一台引擎(注入与 ext 都按这一刻启动文档里的平台节点地址)
     const variants = { upper: "https://GW.example/v1", port: "https://gw.example:443/v1", slash: "https://gw.example/v1/", dot: "https://gw.example./v1" }
     const seen: Record<string, string[]> = {}
     for (const [label, base] of Object.entries(variants)) {

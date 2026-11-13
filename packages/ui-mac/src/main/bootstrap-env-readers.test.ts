@@ -1,4 +1,4 @@
-// `#1698`(DESIGN-upgrade-bootstrap-config §4.5、§9):迁进启动文档的键,在生产源码里没有剩下的读者。
+// `#1698`(DESIGN-upgrade-bootstrap-config §4.5、§9、§10 R30):迁进启动文档(或进程内交接)的键,在生产源码里没有剩下的读者。
 //
 // 两张表,按键组提交逐组加名字(§9:每个键组一个提交边界,这一组的全部读方在同一个提交里改读文档):
 //   ① 迁完即无写方的键 —— 全部生产源码(ui-mac、引擎入口、ext、core、plugin、schema、util)里一处都不许出现:写方随键删除,
@@ -16,10 +16,35 @@ import { sidecarSourceFiles } from "./process-fence-write-sites"
 
 const REPO = resolve(import.meta.dir, "../../../..")
 
-/** ① G1:路径的两个清单,写方(server.ts)与读方(ext、core)都已改走文档。 */
-const RETIRED = ["CODEPUPPY_EXT_BUNDLED_MANIFEST", "CODEPUPPY_OFFICE_MCP_MANIFEST"]
-/** ② G1:全局根与 REQ-059 两个逃生阀 —— main 仍读(冻结快照的派生、ext-config 等),sidecar 进程里改读文档。 */
-const MAIN_ONLY = ["CODEPUPPY_GLOBAL_DIR", "CODEPUPPY_JSONC_TRUTH_DISABLE", "CODEPUPPY_LEGACY_INSTALL_ROOT"]
+/** ① 迁完即无写方的键。 */
+const RETIRED = [
+  // G1:路径的两个清单,写方(server.ts)与读方(ext、core)都已改走文档。
+  "CODEPUPPY_EXT_BUNDLED_MANIFEST",
+  "CODEPUPPY_OFFICE_MCP_MANIFEST",
+  // G2:main 在 fork 时写、sidecar / ext / core 读的交接变量 —— 平台凭据引用、云 MCP 的名字 / 定义 / 武装标记、两个 web search
+  // 判决、策略分区、出网代理标记改走文档的 platform / cloudMcp / webSearch / policy / network;供应商白名单改走进程内交接(§10 R30)。
+  "CODEPUPPY_PLATFORM_AUTH_REF",
+  "CODEPUPPY_CLOUD_MCP_SERVER",
+  "CODEPUPPY_CLOUD_MCP_DEF",
+  "CODEPUPPY_CLOUD_MCP_ARM",
+  "CODEPUPPY_LOCAL_WEBSEARCH_DENY",
+  "CODEPUPPY_CLOUD_WEBSEARCH_DENY",
+  "CODEPUPPY_POLICY_ACCOUNT",
+  "CODEPUPPY_EGRESS_PROXY",
+  "CODEPUPPY_PROVIDER_ALLOW",
+]
+/** ② main 仍持有的键。 */
+const MAIN_ONLY = [
+  // G1:全局根与 REQ-059 两个逃生阀 —— main 仍读(冻结快照的派生、ext-config 等),sidecar 进程里改读文档。
+  "CODEPUPPY_GLOBAL_DIR",
+  "CODEPUPPY_JSONC_TRUTH_DISABLE",
+  "CODEPUPPY_LEGACY_INSTALL_ROOT",
+  // G2:applyAuthEnv 写进 main 环境的两个地址、默认模型覆盖与 kill-switch 运维开关 —— main 的构建器读,sidecar 进程里改读文档。
+  "CODEPUPPY_BASE_URL",
+  "CODEPUPPY_CLOUD_MCP_URL",
+  "CODEPUPPY_DEFAULT_MODEL",
+  "CODEPUPPY_WEBSEARCH_DISABLE",
+]
 /** ② 的逐条例外。 */
 const EXCEPTIONS = [
   {

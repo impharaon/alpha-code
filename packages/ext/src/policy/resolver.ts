@@ -209,7 +209,7 @@ export function userLayerFrom(load: PolicyLoadResult): ToolPolicyUserLayer {
 export interface ToolPolicyStoreOptions {
   /** Policy document root. */
   readonly baseDir: string
-  /** Account subject; production reads `CODEPUPPY_POLICY_ACCOUNT` (main writes `acct:<hash>` when signed in). */
+  /** Account subject; production reads the bootstrap document's `policy.account` (main writes `acct:<hash>` when signed in). */
   readonly account: () => string
   /** Workspace identity of the plugin's Location (project id, or the directory for the global project). */
   readonly workspace: () => string

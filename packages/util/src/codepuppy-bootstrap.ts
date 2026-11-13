@@ -5,7 +5,7 @@
 // 第一次读时用自己的解析器校验已发布的对象 —— 两份不同提交构建出的 bundle 混在一起,形状或版本不同就在第一次读时失败。
 // 本文件只 import `node:path`:它会进 ext bundle 与 sidecar 的 import 闭包,不带写盘点。
 //
-// 字段按迁移键组落地(design §9):G1 —— 路径与通道。
+// 字段按迁移键组落地(design §9):G1 —— 路径与通道;G2 —— 平台、云、网络。
 import path from "node:path"
 
 export const CODEPUPPY_BOOTSTRAP_VERSION = 1
@@ -33,7 +33,56 @@ export type CodePuppyBootstrap = {
   }
   /** 缺席 ⇒ 跳过 disabled-override 注入 */
   registryChannel?: "stable" | "preview" | "dev"
+  platform: {
+    /** 平台模型凭据文件的引用,不是凭据 */
+    credentialRef: `{file:${string}}`
+    modelProxyBaseURL?: CredentialFreeUrl
+    /** 缺席 = 没导出(用目录默认);"" = 导出了空串(不设默认模型) */
+    defaultModelOverride?: string
+  }
+  /** main 解析出合格的云 MCP 地址时在场 */
+  cloudMcp?: {
+    /** 配置里那一条 MCP 的名字 */
+    name: string
+    /** 带凭据通道的完整定义;认证只在 header 的引用里 */
+    definition: {
+      type: "remote"
+      url: CredentialFreeUrl
+      headers: { Authorization: `Bearer {file:${string}}` }
+      oauth: false
+    }
+  }
+  webSearch: { killSwitch: boolean }
+  /** /^acct:[0-9a-f]{64}$/;缺席 ⇒ 分区 "anonymous" */
+  policy: { account?: string }
+  /** /^http:\/\/127\.0\.0\.1:\d{1,5}$/;只在 darwin 在场 */
+  network: { egressProxy?: string }
 }
+
+/**
+ * 无凭据 URL:WHATWG `URL` 能解析;协议 https,或 http 且主机是 127.0.0.1 / localhost / [::1];username、password 为空;
+ * search 与 hash 为空(整段查询串与片段都不允许,不按参数名猜哪个是凭据)。路径段不检查。
+ */
+export type CredentialFreeUrl = string & { readonly __credentialFree: unique symbol }
+
+export function isCredentialFreeUrl(value: string): value is CredentialFreeUrl {
+  if (!URL.canParse(value)) return false
+  const url = new URL(value)
+  const local = url.protocol === "http:" && LOOPBACK_HOSTS.has(url.hostname)
+  if (url.protocol !== "https:" && !local) return false
+  return url.username === "" && url.password === "" && url.search === "" && url.hash === "" && !/[?#]/.test(value)
+}
+
+/** 今天的 CODEPUPPY_CLOUD_MCP_ARM:kill-switch 下云 MCP 只由 ext 装。 */
+export function cloudMcpArmed(document: CodePuppyBootstrap): boolean {
+  return document.webSearch.killSwitch && document.cloudMcp !== undefined
+}
+
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"])
+const FILE_REF = /^\{file:[^}]+\}$/
+const BEARER_FILE_REF = /^Bearer \{file:[^}]+\}$/
+const ACCOUNT = /^acct:[0-9a-f]{64}$/
+const EGRESS_PROXY = /^http:\/\/127\.0\.0\.1:\d{1,5}$/
 
 export type CodePuppyBootstrapErrorReason = "invalid" | "version" | "unpublished" | "republished"
 
@@ -55,7 +104,7 @@ const slot = globalThis as unknown as Record<symbol, unknown>
 export function parseCodePuppyBootstrap(value: unknown): CodePuppyBootstrap {
   const root = record(value, "")
   if (root.v !== CODEPUPPY_BOOTSTRAP_VERSION) throw new CodePuppyBootstrapError("version", "v")
-  only(root, ["v", "paths", "registryChannel"], "")
+  only(root, ["v", "paths", "registryChannel", "platform", "cloudMcp", "webSearch", "policy", "network"], "")
   const paths = record(root.paths, "paths")
   only(paths, ["userData", "globalRoot", "userConfig", "initialDirectory", "database", "engineConfigDirectory", "extPlugin", "extBundledManifest", "officeMcpManifest"], "paths")
   const extPlugin = optional(paths, "extPlugin", "paths", absolute)
@@ -63,6 +112,19 @@ export function parseCodePuppyBootstrap(value: unknown): CodePuppyBootstrap {
   if ((extPlugin === undefined) !== (extBundledManifest === undefined)) throw new CodePuppyBootstrapError("invalid", "paths.extBundledManifest")
   const userConfig = optional(paths, "userConfig", "paths", absolute)
   const registryChannel = optional(root, "registryChannel", "", channel)
+  const platform = record(root.platform, "platform")
+  only(platform, ["credentialRef", "modelProxyBaseURL", "defaultModelOverride"], "platform")
+  const modelProxyBaseURL = optional(platform, "modelProxyBaseURL", "platform", credentialFreeUrl)
+  const defaultModelOverride = optional(platform, "defaultModelOverride", "platform", text)
+  const cloudMcp = optional(root, "cloudMcp", "", cloudMcpOf)
+  const webSearch = record(root.webSearch, "webSearch")
+  only(webSearch, ["killSwitch"], "webSearch")
+  const policy = record(root.policy, "policy")
+  only(policy, ["account"], "policy")
+  const account = optional(policy, "account", "policy", matching(ACCOUNT))
+  const network = record(root.network, "network")
+  only(network, ["egressProxy"], "network")
+  const egressProxy = optional(network, "egressProxy", "network", matching(EGRESS_PROXY))
   return deepFreeze({
     v: CODEPUPPY_BOOTSTRAP_VERSION,
     paths: {
@@ -77,6 +139,15 @@ export function parseCodePuppyBootstrap(value: unknown): CodePuppyBootstrap {
       officeMcpManifest: absolute(paths.officeMcpManifest, "paths.officeMcpManifest"),
     },
     ...(registryChannel === undefined ? {} : { registryChannel }),
+    platform: {
+      credentialRef: matching(FILE_REF)(platform.credentialRef, "platform.credentialRef") as `{file:${string}}`,
+      ...(modelProxyBaseURL === undefined ? {} : { modelProxyBaseURL }),
+      ...(defaultModelOverride === undefined ? {} : { defaultModelOverride }),
+    },
+    ...(cloudMcp === undefined ? {} : { cloudMcp }),
+    webSearch: { killSwitch: bool(webSearch.killSwitch, "webSearch.killSwitch") },
+    policy: account === undefined ? {} : { account },
+    network: egressProxy === undefined ? {} : { egressProxy },
   })
 }
 
@@ -131,6 +202,50 @@ function optional<T>(value: Record<string, unknown>, key: string, at: string, ch
 
 function absolute(value: unknown, at: string): string {
   if (typeof value !== "string" || !path.isAbsolute(value)) throw new CodePuppyBootstrapError("invalid", at)
+  return value
+}
+
+function cloudMcpOf(value: unknown, at: string): NonNullable<CodePuppyBootstrap["cloudMcp"]> {
+  const cloud = record(value, at)
+  only(cloud, ["name", "definition"], at)
+  const definition = record(cloud.definition, join(at, "definition"))
+  only(definition, ["type", "url", "headers", "oauth"], join(at, "definition"))
+  if (definition.type !== "remote") throw new CodePuppyBootstrapError("invalid", join(at, "definition.type"))
+  if (definition.oauth !== false) throw new CodePuppyBootstrapError("invalid", join(at, "definition.oauth"))
+  const headers = record(definition.headers, join(at, "definition.headers"))
+  only(headers, ["Authorization"], join(at, "definition.headers"))
+  const name = text(cloud.name, join(at, "name"))
+  if (name === "") throw new CodePuppyBootstrapError("invalid", join(at, "name"))
+  return {
+    name,
+    definition: {
+      type: "remote",
+      url: credentialFreeUrl(definition.url, join(at, "definition.url")),
+      headers: { Authorization: matching(BEARER_FILE_REF)(headers.Authorization, join(at, "definition.headers.Authorization")) as `Bearer {file:${string}}` },
+      oauth: false,
+    },
+  }
+}
+
+function credentialFreeUrl(value: unknown, at: string): CredentialFreeUrl {
+  if (typeof value !== "string" || !isCredentialFreeUrl(value)) throw new CodePuppyBootstrapError("invalid", at)
+  return value
+}
+
+function matching(pattern: RegExp) {
+  return (value: unknown, at: string): string => {
+    if (typeof value !== "string" || !pattern.test(value)) throw new CodePuppyBootstrapError("invalid", at)
+    return value
+  }
+}
+
+function text(value: unknown, at: string): string {
+  if (typeof value !== "string") throw new CodePuppyBootstrapError("invalid", at)
+  return value
+}
+
+function bool(value: unknown, at: string): boolean {
+  if (typeof value !== "boolean") throw new CodePuppyBootstrapError("invalid", at)
   return value
 }
 

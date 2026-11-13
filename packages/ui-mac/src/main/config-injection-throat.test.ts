@@ -68,6 +68,7 @@ import { CODEPUPPY_BEHAVIOR_MD } from "./codepuppy-behavior"
 import { injectCodePuppyConfig } from "./codepuppy-config-injection"
 import { secretFilePath } from "./codepuppy-secret-files"
 import { CLOUD_MCP_SERVER_NAME, CLOUD_WEB_SEARCH_TOOL_ID, LOCAL_WEB_SEARCH_TOOL_ID, WITHHELD_CLOUD_MCP } from "./cloud-web-search"
+import { publishMainBootstrap, unpublishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
 
 // 注入读到的每一个 env 输入 + 它自己写出的 env 输出:逐个快照 / 清空 / 还原(与 codepuppy-config-injection.test.ts 同一份清单)。
 const MANAGED = [
@@ -121,6 +122,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  unpublishTestBootstrap()
   for (const k of MANAGED) {
     if (saved[k] === undefined) delete process.env[k]
     else process.env[k] = saved[k]
@@ -290,6 +292,8 @@ type Run = Judgement & { before: Cfg; after: Cfg; importedDir: string; instructi
 /** 跑一次生产注入,返回引擎会看到的整份 config 与判官的裁决(`#1667`:每次 fork 从零起,before 恒为空)。 */
 function run(extPluginPath?: string): Run {
   const before: Cfg = {}
+  // `#1698` G2:平台地址 / 默认模型 / 云 MCP / kill-switch 由 main 的构建器从它的环境(这里就是 process.env)写进启动文档,sidecar 在注入前发布
+  publishMainBootstrap({ userData })
   const result = injectCodePuppyConfig(userData, extPluginPath, "stable")
   expect(result.ok).toBe(true)
   // `#1667`(裁决 r1 第 2 条、C7 重裁):main 交给引擎的字分两处 —— 内联文档,与显式文件里 Code Puppy 那一层(出厂命令、skills、

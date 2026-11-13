@@ -14,6 +14,11 @@ const document = {
     engineConfigDirectory: "/u/config/opencode",
     officeMcpManifest: "/app/Resources/office-mcp/tools.json",
   },
+  // G2:每份文档都带(这一份:无云 MCP、无账户分区、无出网代理)
+  platform: { credentialRef: "{file:/u/data/codepuppy-secrets/CODEPUPPY_API_KEY}" },
+  webSearch: { killSwitch: false },
+  policy: {},
+  network: {},
 }
 
 afterEach(() => __resetCodePuppyBootstrapForTests())

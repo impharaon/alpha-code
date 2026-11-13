@@ -3,7 +3,9 @@ import { afterEach, describe, expect, test } from "bun:test"
 import {
   CodePuppyBootstrapError,
   __resetCodePuppyBootstrapForTests,
+  cloudMcpArmed,
   codepuppyBootstrap,
+  isCredentialFreeUrl,
   parseCodePuppyBootstrap,
   publishCodePuppyBootstrap,
   tryCodePuppyBootstrap,
@@ -23,6 +25,23 @@ const valid = () => ({
     officeMcpManifest: "/app/resources/office-mcp/tools.json",
   },
   registryChannel: "stable",
+  platform: {
+    credentialRef: "{file:/u/data/codepuppy-secrets/CODEPUPPY_API_KEY}",
+    modelProxyBaseURL: "https://api.codepuppy.example/v1",
+    defaultModelOverride: "",
+  },
+  cloudMcp: {
+    name: "codepuppy",
+    definition: {
+      type: "remote",
+      url: "https://cloud.codepuppy.example/mcp",
+      headers: { Authorization: "Bearer {file:/u/data/codepuppy-secrets/CODEPUPPY_MCP_TOKEN}" },
+      oauth: false,
+    },
+  },
+  webSearch: { killSwitch: false },
+  policy: { account: `acct:${"a".repeat(64)}` },
+  network: { egressProxy: "http://127.0.0.1:4433" },
 })
 
 const failure = (value: unknown) => {
@@ -46,7 +65,8 @@ describe("parseCodePuppyBootstrap", () => {
     expect(Object.isFrozen(parsed)).toBe(true)
     expect(Object.isFrozen(parsed.paths)).toBe(true)
     const { userConfig, extPlugin, extBundledManifest, ...paths } = valid().paths
-    expect(parseCodePuppyBootstrap({ v: 1, paths: { ...paths, database: ":memory:" } }).paths).toEqual({ ...paths, database: ":memory:" })
+    const minimal = { v: 1, paths: { ...paths, database: ":memory:" }, platform: { credentialRef: "{file:/k}" }, webSearch: { killSwitch: true }, policy: {}, network: {} }
+    expect(parseCodePuppyBootstrap(minimal)).toEqual(minimal as never)
   })
 
   test("v that is not this version ⇒ version (before any shape check)", () => {
@@ -67,6 +87,49 @@ describe("parseCodePuppyBootstrap", () => {
     expect(failure([])).toMatchObject({ reason: "invalid", path: "" })
     expect(failure({ ...valid(), paths: new Map() })).toMatchObject({ reason: "invalid", path: "paths" })
     expect(failure({ ...valid(), paths: { ...valid().paths, userData: "token-abc123" } }).message).not.toContain("token-abc123")
+  })
+})
+
+describe("G2 fields: secrets cannot be written into the document", () => {
+  test("credentialRef and the cloud Authorization accept only {file:} references; a literal token is invalid", () => {
+    expect(failure({ ...valid(), platform: { ...valid().platform, credentialRef: "sk-live-123" } })).toMatchObject({ reason: "invalid", path: "platform.credentialRef" })
+    const cloud = valid().cloudMcp
+    expect(failure({ ...valid(), cloudMcp: { ...cloud, definition: { ...cloud.definition, headers: { Authorization: "Bearer eyJhbGciOi" } } } })).toMatchObject({
+      reason: "invalid",
+      path: "cloudMcp.definition.headers.Authorization",
+    })
+    expect(failure({ ...valid(), cloudMcp: { ...cloud, definition: { ...cloud.definition, headers: { Authorization: "Bearer {file:/t}", Cookie: "x" } } } })).toMatchObject({
+      reason: "invalid",
+      path: "cloudMcp.definition.headers.Cookie",
+    })
+  })
+
+  test("the two URL fields accept only credential-free URLs", () => {
+    expect(failure({ ...valid(), platform: { ...valid().platform, modelProxyBaseURL: "https://u:p@api.example/v1" } })).toMatchObject({ reason: "invalid", path: "platform.modelProxyBaseURL" })
+    const cloud = valid().cloudMcp
+    expect(failure({ ...valid(), cloudMcp: { ...cloud, definition: { ...cloud.definition, url: "https://cloud.example/mcp?token=abc" } } })).toMatchObject({
+      reason: "invalid",
+      path: "cloudMcp.definition.url",
+    })
+  })
+
+  test("account and egress proxy formats; killSwitch is a boolean", () => {
+    expect(failure({ ...valid(), policy: { account: "acct:not-a-hash" } })).toMatchObject({ reason: "invalid", path: "policy.account" })
+    expect(failure({ ...valid(), network: { egressProxy: "http://10.0.0.1:8080" } })).toMatchObject({ reason: "invalid", path: "network.egressProxy" })
+    expect(failure({ ...valid(), webSearch: { killSwitch: "1" } })).toMatchObject({ reason: "invalid", path: "webSearch.killSwitch" })
+  })
+
+  test("isCredentialFreeUrl: https, or http on loopback; no userinfo, query or fragment", () => {
+    for (const ok of ["https://api.example/v1", "http://127.0.0.1:4096/v1", "http://localhost/mcp", "http://[::1]:9/x"]) expect(isCredentialFreeUrl(ok), ok).toBe(true)
+    for (const bad of ["http://api.example/v1", "https://u:p@api.example/", "https://u@api.example/", "https://api.example/?k=v", "https://api.example/?", "https://api.example/#t", "ftp://x/", "not a url"])
+      expect(isCredentialFreeUrl(bad), bad).toBe(false)
+  })
+
+  test("cloudMcpArmed = kill switch on and a cloud MCP present", () => {
+    expect(cloudMcpArmed(parseCodePuppyBootstrap(valid()))).toBe(false)
+    expect(cloudMcpArmed(parseCodePuppyBootstrap({ ...valid(), webSearch: { killSwitch: true } }))).toBe(true)
+    const { cloudMcp, ...noCloud } = valid()
+    expect(cloudMcpArmed(parseCodePuppyBootstrap({ ...noCloud, webSearch: { killSwitch: true } }))).toBe(false)
   })
 })
 

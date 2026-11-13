@@ -20,9 +20,8 @@ import { getAuthIdentityTag } from "./codepuppy-auth"
 import { installationMachineId } from "./artifact-service"
 import { tryGetCodePuppyEnvironment } from "./codepuppy-environment"
 import { buildCodePuppyBootstrap } from "./codepuppy-bootstrap-build"
-import { CLOUD_WEBSEARCH_DENY_ENV, LOCAL_WEBSEARCH_DENY_ENV } from "./cloud-web-search"
 import { resourcesRoot } from "./ext-fs-installer"
-import { secretFileRef, syncSecretFiles } from "./codepuppy-secret-files"
+import { syncSecretFiles } from "./codepuppy-secret-files"
 import { customProviderSecretValues } from "./codepuppy-byok-keys"
 import { ignoredConfigProviderBlocks, ignoredConfigRemoteMcpEntries } from "./ext-config"
 import { readCustomProviderRecords } from "./custom-provider-records"
@@ -233,7 +232,10 @@ function refreshConfiguredEgressDestinations(userDataPath: string): void {
   try {
     const mcpServers = tryGetCodePuppyEnvironment() || process.env.CODEPUPPY_GLOBAL_DIR ? readMcpServerRecords((line) => getLogger()?.warn(line)) : []
     const accepted = setConfiguredEgressDestinations([
-      ...deriveEgressDestinations(buildCodePuppyModelConfig(userDataPath)?.provider),
+      // main 自己的环境(applyAuthEnv 写的平台地址)—— sidecar 拿到的是同一个值经启动文档(`#1698`)
+      ...deriveEgressDestinations(
+        buildCodePuppyModelConfig(userDataPath, { baseURL: process.env.CODEPUPPY_BASE_URL, defaultModel: process.env.CODEPUPPY_DEFAULT_MODEL })?.provider,
+      ),
       ...deriveMcpEgressDestinations(mcpServers),
     ])
     getLogger()?.log(
@@ -323,24 +325,6 @@ export function setDefaultServerUrl(url: string | null) {
   getStore().delete(DEFAULT_SERVER_URL_KEY)
 }
 
-/**
- * web search 主权判决,**幂等**、可反复重算,每次 fork 前落定;sidecar 只读不算。唯一能关掉两条腿的是 kill-switch
- * (`CODEPUPPY_WEBSEARCH_DISABLE`);`#1411`(owner 2026-09-23):账户信号只决定云腿在不在,不决定本地腿。
- * 判决经两个布尔 env 过河:`CODEPUPPY_CLOUD_WEBSEARCH_DENY` / `CODEPUPPY_LOCAL_WEBSEARCH_DENY`(两个方向都写)。
- *
- * `#1667`(#1662 L5,清点表 E2):v1 时代这里还把 4 个 keyless 专用 flag(`OPENCODE_ENABLE_EXA` /
- * `OPENCODE_EXPERIMENTAL_EXA` / `OPENCODE_ENABLE_PARALLEL` / `OPENCODE_EXPERIMENTAL_PARALLEL`)覆盖写 "0"、登出时还原基线、
- * 默认置 `OPENCODE_ENABLE_EXA=1`。这 4 个名字在 2.x 无读者(本地腿在 2.x 走 `websearch` 配置与插件 domain,处置归 L3),
- * 写它们只会让人以为它们还在管事 —— 整套删除。
- */
-export function applyWebSearchSovereignty() {
-  const killSwitch = Boolean(process.env.CODEPUPPY_WEBSEARCH_DISABLE)
-  if (killSwitch) process.env[CLOUD_WEBSEARCH_DENY_ENV] = "1"
-  else delete process.env[CLOUD_WEBSEARCH_DENY_ENV]
-  if (killSwitch) process.env[LOCAL_WEBSEARCH_DENY_ENV] = "1"
-  else delete process.env[LOCAL_WEBSEARCH_DENY_ENV]
-}
-
 export function preferAppEnv(userDataPath: string) {
   const logger = getLogger()
   const logShellEnvCache = (message: string, extra?: Record<string, unknown>) => write("main", message, extra)
@@ -367,7 +351,6 @@ export function preferAppEnv(userDataPath: string) {
             )
           writeShellEnvCache(userDataPath, shell, cleanFresh, logShellEnvCache)
           Object.assign(process.env, cleanFresh)
-          applyWebSearchSovereignty()
           logger.log(`[server] Shell env refreshed in background (${Object.keys(cleanFresh).length} vars)`)
         })
         .catch(() => {})
@@ -391,8 +374,6 @@ export function preferAppEnv(userDataPath: string) {
     XDG_STATE_HOME: process.env.XDG_STATE_HOME ?? userDataPath,
     OPENCODE_DISABLE_MODELS_FETCH: process.env.OPENCODE_DISABLE_MODELS_FETCH ?? "1",
   })
-  // `#1411` 起本闸只认 kill-switch(纯 env)。
-  applyWebSearchSovereignty()
 }
 
 // REQ-236 §2.1-1(`#1562`):最近一次 fork 时写进 {file:} 通道的凭据名。续期热应用据它判「凭据在场性
@@ -459,10 +440,6 @@ export async function spawnLocalServer(
     throw new Error(`applied model catalog pin failed — sidecar fork refused: ${serializeError(error).message}`)
   }
 
-  // web search 本地腿的主权闸重算,**每次 fork 都跑**。`#1411` 之后唯一判据是 kill-switch(纯 env),
-  // 不再依赖 syncSecretFiles 的落盘结果;留在这里是因为它必须晚于 preferAppEnv 的基线还原。
-  applyWebSearchSovereignty()
-
   // B6(=G1):解析 @codepuppy/ext 插件目录,经 StartCommand 传 sidecar(不走 env,免动 A6 白名单)。
   // 缺文件 loud warn(anti-B11:否则表现为「codepuppy_ping 工具静默不在」);CODEPUPPY_EXT_DISABLE=1 静默跳过。
   const ext = resolveExtPluginPath({
@@ -482,20 +459,16 @@ export async function spawnLocalServer(
   // REQ-159:围栏计划在 fork **之前**做(试编译失败 / 模块缺失 / 默认工作区不在 ⇒ 抛 ⇒ 这一代被拒,
   // 与上面 codepuppy-secrets sync 失败同一条 fail-closed 路径)。env 先算好:计划要读的 XDG_* / HOME
   // 必须是 sidecar 将拿到的那一份,不是 main 自己的 process.env。
-  // REQ-236 §2.1-4(`#1562`):平台模型请求的凭据只从这份文件现读(ext `chat.headers`),注入的 provider
-  // 配置只有占位值。值是 `{file:}` 引用,不是凭据;经 sidecar env 白名单(sidecar-env.ts)进引擎进程。
-  process.env.CODEPUPPY_PLATFORM_AUTH_REF = secretFileRef(options.userDataPath, "CODEPUPPY_API_KEY")
   const sidecarEnv = createSidecarEnv()
   // uv's default ~/.cache/uv is outside the fence; keep Office dependencies under the existing W3 root.
   sidecarEnv.UV_CACHE_DIR = join(options.userDataPath, "uv-cache")
-  // REQ-236 `#1575`(方案 §2.4 第 4 条):工具策略按登录账户分区。引擎读它选分区,缺席 = anonymous(未登录)。
-  // 值是「本安装随机标识 + 账户标记」的哈希,不是凭据:这个变量会被第三方 MCP / LSP / shell 子进程继承,混入安装标识后
-  // 同一账户在另一台安装上是另一个值,不能据它跨安装关联。只由这里按当刻登录态写 —— 不进白名单,shell 导出的同名变量
-  // 选不了分区;账户或安装标识取不到都不写。登录、登出、换号都会重新 fork(codepuppy-auth 的 identity-change),fork 时写一次即可。
-  const policyAccount = getAuthIdentityTag()
+  // REQ-236 `#1575`(方案 §2.4 第 4 条):工具策略按登录账户分区。ext 读启动文档的 policy.account 选分区,缺席 = anonymous(未登录)。
+  // 值是「本安装随机标识 + 账户标记」的哈希,不是凭据:混入安装标识后同一账户在另一台安装上是另一个值,不能据它跨安装关联。只由这里按
+  // 当刻登录态算 —— shell 导出的同名变量选不了分区;账户或安装标识取不到都不给。登录、登出、换号都会重新 fork(codepuppy-auth 的
+  // identity-change),fork 时算一次即可。`#1698`:不再写进 sidecar env(第三方 MCP / LSP / shell 子进程从此拿不到它)。
+  const accountTag = getAuthIdentityTag()
   const installation = installationMachineId()
-  if (policyAccount && installation)
-    sidecarEnv.CODEPUPPY_POLICY_ACCOUNT = `acct:${createHash("sha256").update(`${installation}:${policyAccount}`).digest("hex")}`
+  const policyAccount = accountTag && installation ? `acct:${createHash("sha256").update(`${installation}:${accountTag}`).digest("hex")}` : undefined
   // REQ-137 `#1379`:这一代的 BYOK 放行集合。平台无关(代理只在 darwin 起,但「放行集合 = 这一代的配置」
   // 这条不该长两个样子),排在密钥文件落定之后、fork 之前。
   refreshConfiguredEgressDestinations(options.userDataPath)
@@ -554,7 +527,10 @@ export async function spawnLocalServer(
     // 与写策略(ext-mcp-policy)一样按资源根的 realpath 解析,配置里那四条命令才能逐 token 对上。
     officeMcpManifest: join(realpathSync(resourcesRoot()), "office-mcp", "tools.json"),
     registryChannel,
+    policyAccount,
+    egressProxyPort,
     env: process.env,
+    log: (line) => getLogger()?.warn(line),
   })
 
   const sidecar = join(dirname(fileURLToPath(import.meta.url)), "sidecar.js")

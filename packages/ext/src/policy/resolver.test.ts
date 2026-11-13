@@ -535,7 +535,7 @@ describe("store service (what registerPolicy and the RPC share)", () => {
     expect((await resolveWith(policy, mcpSubject())).reason).toEqual({ kind: "user", level: "tool" })
   })
 
-  test("VI1 the account partition follows CODEPUPPY_POLICY_ACCOUNT: account B never reads account A's enable", async () => {
+  test("VI1 the account partition follows the bootstrap policy.account: account B never reads account A's enable", async () => {
     const baseDir = tmpdir("codepuppy-policy-service-")
     let account = "anonymous"
     const policy = createToolPolicyStore({ baseDir, account: () => account, workspace: () => "ws", managed: async () => ({ status: "ok", ruleset: [], sources: [] }) })

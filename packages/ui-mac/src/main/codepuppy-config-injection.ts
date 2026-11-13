@@ -12,6 +12,7 @@
 // 正向闸门锁 model/enabled_providers/provider/三个 alpha agent/{file:} ref,反向闸门锁 catch 的
 // 真实爆炸半径 + 失败必须出声)。
 
+import { tryCodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import * as fs from "node:fs"
 import * as path from "node:path"
 // `#1299`(REQ-157):三个 alpha agent 的 description / prompt 是 alpha 的字,住在零依赖的
@@ -20,17 +21,11 @@ import { CODEPUPPY_AGENT_TEXT } from "./codepuppy-agents"
 import { CODEPUPPY_BEHAVIOR_MD } from "./codepuppy-behavior"
 import { buildCodePuppyCapabilities, buildCodePuppyIdentity } from "./codepuppy-identity"
 import { buildCodePuppyModelConfig, engineModelConfig, type CodePuppyModelConfig } from "./codepuppy-models"
-// `#1195`(REQ-144 T2):`secretFileRef` 回来了 —— 云 MCP 的 Authorization 头装的是登录铸
-// `mcp_access` token 的 `{file:…CODEPUPPY_MCP_TOKEN}` 引用(A6 通道,值不进 config 字面量)。
-// `hasSecretFile` 同时是 ADR-009 的「平台代付」判据(见下方 `platformPays`,`#1195` 起换轴到
-// 同一个 `CODEPUPPY_MCP_TOKEN` 文件 —— 凭证在场性与代付判据从此是同一件事)。
-import { hasSecretFile, secretFileRef } from "./codepuppy-secret-files"
+// `hasSecretFile` 是 ADR-009 的「平台代付」判据(见下方 `platformPays`,`#1195` 起换轴到 `CODEPUPPY_MCP_TOKEN` 文件 ——
+// 凭证在场性与代付判据从此是同一件事)。云 MCP 定义里的 `{file:…CODEPUPPY_MCP_TOKEN}` 引用由 main 写进启动文档(`#1698` R8)。
+import { hasSecretFile } from "./codepuppy-secret-files"
 import {
   applyWebSearchDenies,
-  CLOUD_MCP_ARM_ENV,
-  CLOUD_MCP_DEF_ENV,
-  CLOUD_MCP_SERVER_ENV,
-  CLOUD_MCP_SERVER_NAME,
   CLOUD_WEB_SEARCH_TOOL_ID,
   LOCAL_WEB_SEARCH_TOOL_ID,
   WITHHELD_CLOUD_MCP,
@@ -47,7 +42,7 @@ import { USER_DATA_LAYOUT } from "./user-data-layout"
 // `#1667`(#1665 L3 交回的接缝裁决 A / C,编排器 2026-11-09):出厂技能目录、技能生成的 live 目录与出厂 /init、/review 命令
 // 由 main 写进这份内联配置文档(2.x 插件接口给不了等价挂点)。路径与命令内容仍以 ext 那三个纯函数为唯一来源,这里只引用。
 import { injectFactorySkillPaths } from "../../../ext/src/factory-paths"
-import { PROVIDER_ALLOW_ENV } from "../../../ext/src/provider-allow"
+import { publishProviderAllowList } from "../../../ext/src/provider-allow"
 import { skillGenerationLiveDirs } from "../../../ext/src/gen-skill-paths"
 import { explicitConfigPath, writeExplicitConfig, type ExplicitLayer } from "./engine-explicit-config"
 import { applyPromptTakeover } from "../../../ext/src/codepuppy-prompts"
@@ -231,20 +226,22 @@ export function injectCodePuppyConfig(
     }
 
     const config: EngineConfig = { $schema: "https://opencode.ai/config.json", ...governanceFloor(extPluginPath) }
+    // `#1698` G2:平台地址、默认模型覆盖、云 MCP 定义与 kill-switch 都来自本进程已发布的启动文档(sidecar 在注入之前发布;
+    // 只有直接调注入、不发布文档的测试才会没有,那时按「未登录、无云、kill-switch 关」走)。
+    const bootstrap = tryCodePuppyBootstrap()
+    const cloudMcp = bootstrap?.cloudMcp
     // ADR-009 B1 的「平台代付」判据(云 MCP URL + 密钥文件同在)。caps 事实、云 MCP 注册与
     // web search 主权 deny 三处共用同一个判据,不许各算各的。`#1195` 起判据文件从
     // `CODEPUPPY_CLOUD_TOKEN`(错受众的 platform_access,只当在场性证据)换轴到
     // `CODEPUPPY_MCP_TOKEN`(登录铸 mcp_access)—— 它同时就是云 MCP 定义要引用的那份凭证,
     // 「代付成立」与「凭证可用」从此结构上不可能分叉。main 侧同一判据在
-    // `server.ts` 的 `applyWebSearchSovereignty`,两处必须同轴。
-    const platformPays = Boolean(process.env.CODEPUPPY_CLOUD_MCP_URL && hasSecretFile(userDataPath, "CODEPUPPY_MCP_TOKEN"))
-    // ADR-009 B2 的能力总闸。main 在每次 fork 前用同一个表达式判过一次并把判决写进
-    // `CODEPUPPY_CLOUD_WEBSEARCH_DENY`(server.ts);这里重算是因为注入面自己也要用(见下方云 MCP 注册)。
-    const killSwitch = Boolean(process.env.CODEPUPPY_WEBSEARCH_DISABLE)
+    const platformPays = Boolean(cloudMcp && hasSecretFile(userDataPath, "CODEPUPPY_MCP_TOKEN"))
+    // ADR-009 B2 的能力总闸:main 判一次写进启动文档(webSearch.killSwitch),ext 的最终闸读的是同一个值。
+    const killSwitch = bootstrap?.webSearch.killSwitch ?? false
     // 云 MCP server 这一 fork 会不会以 `enabled:true` 注册。判据与下方真正写 `config.mcp` 的那个
     // 三分支**同一组输入**(kill-switch ⇒ 中和条目 `enabled:false`;代付 ⇒ 真定义 `enabled:true`;
     // 其余 ⇒ 无凭证 `enabled:false`)。identity 的云腿在场性读它,不另算一遍(`#1414` S4)。
-    const mcpUrl = process.env.CODEPUPPY_CLOUD_MCP_URL
+    const mcpUrl = cloudMcp?.definition.url
     const cloudMcpEnabled = Boolean(mcpUrl) && !killSwitch && platformPays
     // 只记录本轮函数自己新放进 mcp 的名字;继承来的 OPENCODE_CONFIG_CONTENT 不是治理授权。
     const injectedMcpNames = new Set<string>()
@@ -320,7 +317,7 @@ export function injectCodePuppyConfig(
 
     // `#1667`(C7 重裁):显式文件层要写的三样,出自这一次计算(engine-explicit-config.ts 抬头讲层序)。
     const layer: ExplicitLayer = { policies: [], commands: {}, skills: [] }
-    const models = buildCodePuppyModelConfig(userDataPath)
+    const models = buildCodePuppyModelConfig(userDataPath, { baseURL: bootstrap?.platform.modelProxyBaseURL, defaultModel: bootstrap?.platform.defaultModelOverride })
     if (models) {
       // `#1667`:同一份投影,写成 2.x 的 `providers` / `policies`(`provider.use`)/ `model`(codepuppy-models.ts engineModelConfig)。
       // `policies` 写两处:显式文件那份比项目配置先加载、项目里的 allow 盖不过(第一层);内联这份是第二层。
@@ -330,9 +327,9 @@ export function injectCodePuppyConfig(
       layer.policies = engine.policies
       if (engine.model) config.model = engine.model
       // `#1662`:同一份放行集合交给 ext 在供应商表上再执行一次 —— 全局配置目录在显式文件之前载入,它的放行句压得过上面的策略
-      // (packages/ext/src/provider-allow.ts)。sidecar 里注入与引擎同进程,env 是本进程的。
-      process.env[PROVIDER_ALLOW_ENV] = JSON.stringify(engine.policies.filter((policy) => policy.effect === "allow").map((policy) => policy.resource))
-    } else delete process.env[PROVIDER_ALLOW_ENV]
+      // (packages/ext/src/provider-allow.ts)。`#1698` R30:经进程内交接发布(冻结、不进环境),sidecar 里注入与引擎、ext 同进程。
+      publishProviderAllowList(engine.policies.filter((policy) => policy.effect === "allow").map((policy) => policy.resource))
+    } else publishProviderAllowList(undefined)
 
     //   4b. `#1667`(接缝裁决 A;编排器裁决 r1 第 2 条、r3 第 1 条):出厂技能目录与已安装技能当前那一代的**真实目录**写成显式文件的
     //       `skills`(explicitSkillDirs)。翻代 / 新装 / 停用时 sidecar 的监听重算并重写显式文件(engine-explicit-config.ts),
@@ -537,7 +534,7 @@ export function injectCodePuppyConfig(
     //      `#1106` 的 doomed-connect 判据(镜像引擎 mcp-auth.json)随之就地退役:引擎不再持有
     //      云凭证,「boot 连接注定失败」的判据现在就是 platformPays 自己 —— 缺凭证 ⇒
     //      `enabled:false` ⇒ `MCP.create` 直接 DISABLED_RESULT,boot 零等待,形态不变。
-    if (mcpUrl) {
+    if (cloudMcp && mcpUrl) {
       // #223 R4→R5 fail-closed:kill-switch 下 `cloud_web_search` 的**最终**闸住在 @codepuppy/ext
       // 的 tool.execute.before 钩子里(远端 MCP 无 per-tool 注册期过滤,permission deny 可被后置
       // allow 顶掉)。R3 用「extPluginPath 路径是否存在」判 ext 在不在场 —— R4 证明那不成立:
@@ -562,14 +559,11 @@ export function injectCodePuppyConfig(
       // 诚实降级,不是 AC4 的「误杀」:AC4 管的是闸生效时的正常态。
       // `#1195`:代付态的真定义带 `{file:…CODEPUPPY_MCP_TOKEN}` header;缺席态(platformPays=false)
       // 由同一工厂给出无引用的 `enabled:false` 形状(见 `cloud-sidecar-config.ts` 文件头)。
-      // DEF 托管通道恒发**真定义**(带引用):ext 的 `installCloudMcp` 自己解析 `{file:}`,
-      // 读不到时响亮不装(fail-closed)—— 治理身份通道不因凭证缺席而失明(#223 R6 Blocker)。
-      const cloud = materializeCloudMcpConfig(mcpUrl, secretFileRef(userDataPath, "CODEPUPPY_MCP_TOKEN"))
-      // ext 的闸靠这两个变量核验「哪个 MCP server 真的是 alpha 治理的云通道」——
-      // #223 R6 Blocker:判据是 DEF 里那份定义的**端点身份**(URL),不再是名字前缀,所以 DEF 在
-      // 代付的两条分支上都置位(ARM 只在 kill-switch 分支置位;ARM/DEF 缺一 ext 什么都不装)。
-      process.env[CLOUD_MCP_SERVER_ENV] = CLOUD_MCP_SERVER_NAME
-      process.env[CLOUD_MCP_DEF_ENV] = JSON.stringify(cloud)
+      // 启动文档里的定义恒是**真定义**(带引用,main 用同一个 materializeCloudMcpConfig 算,R8):ext 的 `installCloudMcp`
+      // 自己解析 `{file:}`,读不到时响亮不装(fail-closed)—— 治理身份通道不因凭证缺席而失明(#223 R6 Blocker)。ext 的闸
+      // 核验「哪个 MCP server 真的是 alpha 治理的云通道」用的也是这份定义的**端点身份**(URL);kill-switch 下由 ext 装
+      // (cloudMcpArmed)。`#1698`:不再经进程内环境转交。
+      const cloud = cloudMcp.definition
       // 缺席 ⇒ enabled:false(`#1106` 的「boot 零等待」形态在新轴上保持:`MCP.create` 对
       // enabled:false 直接 DISABLED_RESULT)。kill-switch 优先:WITHHELD 分支形状不变
       // (它本身就是 enabled:false 的中和条目)。
@@ -582,27 +576,18 @@ export function injectCodePuppyConfig(
         ...config.mcp,
         servers: {
           ...config.mcp?.servers,
-          [CLOUD_MCP_SERVER_NAME]: cloudMcpWithheld
+          [cloudMcp.name]: cloudMcpWithheld
             ? { ...WITHHELD_CLOUD_MCP }
             : platformPays
               ? cloud
               : materializeCloudMcpConfig(mcpUrl, undefined),
         },
       }
-      injectedMcpNames.add(CLOUD_MCP_SERVER_NAME)
-      if (killSwitch) {
-        process.env[CLOUD_MCP_ARM_ENV] = CLOUD_MCP_SERVER_NAME
+      injectedMcpNames.add(cloudMcp.name)
+      if (killSwitch)
         console.error(
-          `[alpha-code#223] web search kill switch is set — the cloud MCP server definition is WITHHELD from the engine config (a neutralised ${WITHHELD_CLOUD_MCP.url} entry overrides any inherited one); only a confirmed @codepuppy/ext load installs the real one via ${CLOUD_MCP_ARM_ENV}/${CLOUD_MCP_DEF_ENV}${extPluginPath ? "" : ", and no ext bundle path was resolved this fork so it will stay dark"}`,
+          `[alpha-code#223] web search kill switch is set — the cloud MCP server definition is WITHHELD from the engine config (a neutralised ${WITHHELD_CLOUD_MCP.url} entry overrides any inherited one); only a confirmed @codepuppy/ext load installs the real one from the bootstrap document${extPluginPath ? "" : ", and no ext bundle path was resolved this fork so it will stay dark"}`,
         )
-      } else {
-        // 代付但无 kill-switch:云工具是权威通道,不需要闸,也就不该依赖 ext 是否装载。
-        delete process.env[CLOUD_MCP_ARM_ENV]
-      }
-    } else {
-      delete process.env[CLOUD_MCP_ARM_ENV]
-      delete process.env[CLOUD_MCP_DEF_ENV]
-      delete process.env[CLOUD_MCP_SERVER_ENV]
     }
 
     // Remote MCP config only toggles whole servers, but the engine's global permission layer filters
@@ -674,8 +659,8 @@ export function injectCodePuppyConfig(
     // #613:catch 保留(sidecar 照常起,候选形态③),但失败必须离开本进程:
     // warn 是 #607 反向闸门锁住的进程内出声,返回值是送往 main/renderer 的结构化事实。
     console.warn("failed to inject alpha config", error)
-    // 失败的配置里没有注入的供应商与策略:放行集合跟着撤掉,ext 与它同口径(provider-allow.ts:没写 = 本代没治理)。
-    delete process.env[PROVIDER_ALLOW_ENV]
+    // 失败的配置里没有注入的供应商与策略:放行集合跟着撤掉,ext 与它同口径(provider-allow.ts:没发布 = 本代没治理)。
+    publishProviderAllowList(undefined)
     return {
       ok: false,
       error: error instanceof Error ? { message: error.message, stack: error.stack } : { message: String(error) },

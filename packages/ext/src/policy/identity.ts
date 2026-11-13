@@ -25,7 +25,7 @@
 import { createHash } from "node:crypto"
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
-import { governedMcpEvidence } from "../../../plugin/src/alpha-cloud-authority"
+import { governedMcpEvidence, type GovernedCloudMcp } from "../../../plugin/src/alpha-cloud-authority"
 import type { ToolAuthority, ToolIdentity, ToolLocation } from "../../../schema/src/tool-identity"
 import { registeredByMcpLayer } from "../../../schema/src/codepuppy-tool-policy"
 import { declaredFirstPartyTools } from "../../../core/src/mcp/codepuppy-first-party-mcp"
@@ -87,7 +87,8 @@ export interface IdentityInput {
   readonly bundled: BundledPluginTools | undefined
   /** Origin written for the extension's own tools. */
   readonly extOrigin: string
-  readonly env: Record<string, string | undefined>
+  /** 启动文档的 `cloudMcp`(`#1698`);缺席 = 没有治理云 MCP。 */
+  readonly cloudMcp?: GovernedCloudMcp
   /** 启动文档的 `paths.officeMcpManifest`(`#1698`);缺席 = 不给第一方 MCP 声明。 */
   readonly officeMcpManifest?: string
 }
@@ -106,18 +107,18 @@ export function mcpTransportFact(entry: McpEntry | undefined): ToolTransportFact
 }
 
 /** `officeMcpManifest` = 启动文档的 `paths.officeMcpManifest`(`#1698`)。 */
-export function authorityForMcp(name: string, entry: McpEntry, env: Record<string, string | undefined>, officeMcpManifest: string | undefined): ToolAuthority {
-  return mcpAuthority(name, entry, env, officeMcpManifest).authority
+export function authorityForMcp(name: string, entry: McpEntry, cloudMcp: GovernedCloudMcp | undefined, officeMcpManifest: string | undefined): ToolAuthority {
+  return mcpAuthority(name, entry, cloudMcp, officeMcpManifest).authority
 }
 
 /** The server's authority and, for a server bound to the bundled manifest, the tool names that manifest declares. */
 function mcpAuthority(
   name: string,
   entry: McpEntry,
-  env: Record<string, string | undefined>,
+  cloudMcp: GovernedCloudMcp | undefined,
   officeMcpManifest: string | undefined,
 ): { authority: ToolAuthority; declared?: ReadonlySet<string> } {
-  const evidence = governedMcpEvidence(name, entry, env)
+  const evidence = governedMcpEvidence(name, entry, cloudMcp)
   if (evidence)
     return {
       authority: {
@@ -156,7 +157,7 @@ export function toolFacts(tool: RegisteredTool, input: IdentityInput): ToolFacts
         borrowed = true
         continue
       }
-      const { authority, declared } = mcpAuthority(server, entry, input.env, input.officeMcpManifest)
+      const { authority, declared } = mcpAuthority(server, entry, input.cloudMcp, input.officeMcpManifest)
       // slice E (ADR-041): not one of the tools the bundled server's MCP layer registers ⇒ not that server's tool.
       if (declared && !declared.has(tool.name)) {
         borrowed = true

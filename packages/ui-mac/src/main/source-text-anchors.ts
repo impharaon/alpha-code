@@ -289,9 +289,9 @@ export const KEPT_SOURCE_TEXT_READS: Record<string, SourceTextEntry> = {
     lines: 3,
   },
   "packages/ui-mac/src/main/websearch-copies.test.ts": {
-    why: "10 处里 6 处是普查 / 负全称 / 跨包逐字一致(文本即产物);另 4 条是位置锚(闸是出网出口的第一句等)。这 4 条按本票分类法是减速带,但目标模块都是**可 import 的**,换真判据做得到 —— 而这份文件的 describe 自称 #223 R4 主判据,降不降级是那份已批基线的题目,不是本票的边界。如实登记为已知减速带,裁决在 #985。`#1662` I-09:v1 两条传输与普查网随 OpenCode 2 换代退役,剩 9 处(跨包逐字一致与 ext 钩子 / transform 的位置锚)。",
+    why: "10 处里 6 处是普查 / 负全称 / 跨包逐字一致(文本即产物);另 4 条是位置锚(闸是出网出口的第一句等)。这 4 条按本票分类法是减速带,但目标模块都是**可 import 的**,换真判据做得到 —— 而这份文件的 describe 自称 #223 R4 主判据,降不降级是那份已批基线的题目,不是本票的边界。如实登记为已知减速带,裁决在 #985。`#1662` I-09:v1 两条传输与普查网随 OpenCode 2 换代退役,剩 9 处(跨包逐字一致与 ext 钩子 / transform 的位置锚)。`#1698` G2:信道名随启动文档退役,「跨包逐字一致」改判两条腿读同一个 killSwitch 与唯一核验源,「DEF / ARM 分支」一条换成行为判据退役,剩 6 处。",
     evidence: "#985",
-    lines: 9,
+    lines: 6,
   },
   "packages/ui-mac/test-component/local-package-renderer.cases.ts": {
     why: "主语是 preload 暴露的通道名与 main 侧常量**逐字一致**(写错一个字母 = 功能死掉且什么都不红)。跨进程的字符串相等只能对文本断言,没有更细的粒度。",

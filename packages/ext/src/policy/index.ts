@@ -68,11 +68,12 @@ function asksForItself(facts: ToolFacts) {
 
 export async function registerPolicy(context: Plugin.Context): Promise<PolicyRegistration> {
   const env = process.env
-  // `#1698`:随包清单与 Office 清单的路径来自 sidecar 发布的启动文档(冻结,一代不变)
+  // `#1698`:随包清单与 Office 清单的路径、云 MCP 定义、账户分区来自 sidecar 发布的启动文档(冻结,一代不变)
   const bootstrap = codepuppyBootstrap()
   const store = createToolPolicyStore({
     baseDir: defaultPolicyBaseDir(dataRoot(env)),
-    account: () => env.CODEPUPPY_POLICY_ACCOUNT || "anonymous",
+    // `#1698` G2:账户分区来自启动文档(main 按当刻登录态算的哈希),缺席 = anonymous
+    account: () => bootstrap.policy.account ?? "anonymous",
     workspace: () => policyWorkspace(context.location),
   })
   const extOrigin = extModulePath(import.meta.url)
@@ -92,7 +93,7 @@ export async function registerPolicy(context: Plugin.Context): Promise<PolicyReg
 
   const allFacts = async (): Promise<ToolFacts[]> => {
     const tools = (await context.tool.list()) as readonly RegisteredTool[]
-    const input = { early, earlyAmbiguous: await earlyAmbiguous(), mcp, bundled, extOrigin, env, officeMcpManifest: bootstrap.paths.officeMcpManifest }
+    const input = { early, earlyAmbiguous: await earlyAmbiguous(), mcp, bundled, extOrigin, cloudMcp: bootstrap.cloudMcp, officeMcpManifest: bootstrap.paths.officeMcpManifest }
     return tools.map((tool) => toolFacts(tool, input))
   }
 

@@ -117,9 +117,8 @@ describe("web search sovereignty denies", () => {
 
   // 2026-11-12 I-09 退役「the sovereignty env channel name matches the engine-side reader」:它读 v1 引擎的
   // packages/opencode/src/tool/mcp-websearch.ts 与 websearch.ts(随 OpenCode 2 换代删除,`44b6938b2a`)。2.x 上读这个信号的是
-  // ext 的执行钩子;字面量逐字一致由 websearch-copies.test.ts「主权信道名在 ui-mac / ext / plugin 逐字一致」判
-  // (packages/ext/src/cloud-websearch-kill.ts 的 LOCAL_WEBSEARCH_DENY_ENV),真宿主上的拒绝由 packages/ext/src/plugin-host.test.ts
-  // 「权威 · 联网搜索准入(L5r)」判。
+  // ext 的执行钩子;`#1698` 起信号是启动文档的 webSearch.killSwitch,不再有信道名(websearch-copies.test.ts「`#1698` 主权判决与
+  // 治理云 MCP 的身份只在启动文档里…」),真宿主上的拒绝由 packages/ext/src/plugin-host.test.ts「权威 · 联网搜索准入(L5r)」判。
 
   test("logged-out/BYOK leaves cloud tool registration and existing permissions unchanged", () => {
     const config = {

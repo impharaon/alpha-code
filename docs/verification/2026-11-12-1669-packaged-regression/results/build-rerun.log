@@ -1,0 +1,31 @@
+vite v7.3.7 building ssr environment for production...
+transforming...
+"Types" is imported from external module "effect" but never used in "../schema/src/tool-identity.ts", "../schema/src/codepuppy-tool-policy.ts" and "../schema/src/codepuppy-tool-inventory.ts".
+✓ 516 modules transformed.
+dist-engine/engine.mjs (128131:17): Use of eval in "dist-engine/engine.mjs" is strongly discouraged as it poses security risks and may cause issues with minification.
+rendering chunks...
+✗ Build failed in 6.41s
+error during build:
+[vite:esbuild-transpile] Transform failed with 1 error:
+chunks/engine-!~{004}~.js:8:7: ERROR: The symbol "__cjs_mod__" has already been declared
+file: chunks/engine-!~{004}~.js:8:7
+
+The symbol "__cjs_mod__" has already been declared
+6  |  const require = __cjs_mod__.createRequire(import.meta.url);
+7  |  
+8  |  import __cjs_mod__, { createRequire, registerHooks } from 'node:module';
+   |         ^
+9  |  import * as fs$2 from 'node:fs';
+10 |  import fs__default, { mkdirSync, existsSync, lstatSync, chmodSync, writeFileSync, renameSync, rmSync, watch as watch$...
+
+    at failureErrorWithLog (~/app/wt/alpha-code-verify-1669-packaged-regression/node_modules/.bun/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+    at ~/app/wt/alpha-code-verify-1669-packaged-regression/node_modules/.bun/esbuild@0.25.12/node_modules/esbuild/lib/main.js:736:50
+    at responseCallbacks.<computed> (~/app/wt/alpha-code-verify-1669-packaged-regression/node_modules/.bun/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+    at handleIncomingPacket (~/app/wt/alpha-code-verify-1669-packaged-regression/node_modules/.bun/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+    at Socket.readFromStdout (~/app/wt/alpha-code-verify-1669-packaged-regression/node_modules/.bun/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+    at Socket.emit (node:events:519:28)
+    at addChunk (node:internal/streams/readable:561:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    at Readable.push (node:internal/streams/readable:392:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+error: "electron-vite" exited with code 1

@@ -1,0 +1,13 @@
+gate root=<root> break=keychain guard-lines=10
+GATE PASS [guard-files] real ~/Library/Keychains: outside ls exit 0, inside ls refused
+  outside: com.apple.authd kr=0 reachable
+  outside: com.apple.security.agent kr=0 reachable
+  outside: com.apple.security.agent.login kr=0 reachable
+  inside:  com.apple.authd kr=1100 unreachable
+  inside:  com.apple.security.agent kr=1100 unreachable
+  inside:  com.apple.security.agent.login kr=1100 unreachable
+GATE PASS [guard-agent] authd + security.agent reachable outside, all three unreachable inside
+  search list (inside, redirected): 0 entries: 
+GATE FAIL [keychain] search list has 0 entries, expected exactly the temporary keychain
+GATE RESULT: REFUSED (exit 1) — nothing may be launched
+exit=1

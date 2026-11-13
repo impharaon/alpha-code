@@ -1,0 +1,8 @@
+# outside the guard (control): a fresh process applies an allow-all profile
+{"node":"v22.22.3","electron":null,"buildId":"fence-20261113T013304094Z","rc":0,"error":""}
+{"node":"v24.15.0","electron":"42.3.3","buildId":"fence-20261113T013304094Z","rc":0,"error":""}
+# inside the isolation guard (sandbox-exec -f guard.sb): the same call
+sandbox initialization failed: Operation not permitted
+{"node":"v22.22.3","electron":null,"buildId":"fence-20261113T013304094Z","rc":-1,"error":"Operation not permitted"}
+sandbox initialization failed: Operation not permitted
+{"node":"v24.15.0","electron":"42.3.3","buildId":"fence-20261113T013304094Z","rc":-1,"error":"Operation not permitted"}

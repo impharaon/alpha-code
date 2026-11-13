@@ -126,7 +126,7 @@ export type MergeResult = {
   gatedExecutable: string[]
 }
 
-/** 信任门(REQ-060 §3):mcp = 可执行连接器,只在 trustExecutable 时加载;agent 的 permission/tools/model/disable/mode 同受此门(REQ-236 P1、#1693),其余 agent 字段、command、skills = 文本注入,恒加载。
+/** 信任门(REQ-060 §3):mcp = 可执行连接器,只在 trustExecutable 时加载;agent 的 permission/tools/model/disable/mode/steps/maxSteps 同受此门(REQ-236 P1、#1693、#1700),其余 agent 字段、command、skills = 文本注入,恒加载。
  *  opts.directory:项目根 —— skills.paths 的相对条目("./…")以此解析为绝对(项目可移动,codepuppy.jsonc 存相对)。 */
 export function mergeProjectConfig(
   cfg: Record<string, unknown>,
@@ -150,7 +150,7 @@ export function mergeProjectConfig(
     }
   }
 
-  // agent:说明类字段恒加载;permission/tools/model/disable/mode 会改写权限与模型(REQ-236 P1、#1693)→ 未信任时剥掉。
+  // agent:说明类字段恒加载;permission/tools/model/disable/mode/steps/maxSteps 会改写权限、模型与执行预算(REQ-236 P1、#1693、#1700)→ 未信任时剥掉。
   if (isObj(proj.agent)) {
     const src = trust ? (proj.agent as Record<string, unknown>) : stripAgentControl(proj.agent as Record<string, unknown>)
     if (mergeNamed(cfg, src, "agent")) added.push("agent.*")
@@ -184,9 +184,11 @@ export function mergeProjectConfig(
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v)
 
 // `tools`(#1693)与 `permission` 同样翻成权限规则(engine-transforms.ts `permissionRules`),所以同一条门。
-const AGENT_CONTROL_FIELDS = ["permission", "tools", "model", "disable", "mode"] as const
+// `steps` / `maxSteps`(#1700 Codex R1/1 M3)是一个回答里最多调几次模型的预算 —— 提高它 = 多花钱,是权限之外的同一类控制,同一条门。
+// `variant` 不在这里:它只随同一条里合法的 `model` 生效(engine-transforms.ts `modelRef`),而 `model` 已被剥掉。
+const AGENT_CONTROL_FIELDS = ["permission", "tools", "model", "disable", "mode", "steps", "maxSteps"] as const
 
-/** 去掉每个 agent 条目里能改写权限/模型的字段,其余(prompt/description…)原样保留。 */
+/** 去掉每个 agent 条目里能改写权限/模型/执行预算的字段,其余(prompt/description…)原样保留。 */
 function stripAgentControl(agents: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const [name, entry] of Object.entries(agents)) {

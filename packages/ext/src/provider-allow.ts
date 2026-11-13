@@ -16,9 +16,11 @@
 //     之间的一瞬,清单可能还带着它(上游自己的 provider.use 策略在激活结束前也还没生效);那一瞬里请求照样被上面那道拒掉。
 // 没写这个变量 = 本代没有治理供应商(注入关着,CODEPUPPY_MODELS_DISABLE 逃生;或注入失败),不过滤;写坏了 = 空集合,全部拿掉(fail-closed)。
 
+import { CONFIG_POLICY_PLUGIN, postActivationTail, type PostActivationTailDeps } from "./post-activation-tail"
+
 export const PROVIDER_ALLOW_ENV = "CODEPUPPY_PROVIDER_ALLOW"
 /** 加配置供应商的 `opencode.config.provider` 与执行配置策略的这个插件同在 `post` 段;它进了插件清单 = 这一批激活结束了。 */
-export const CONFIG_POLICY_PLUGIN = "opencode.config.policy"
+export { CONFIG_POLICY_PLUGIN }
 
 type Env = Record<string, string | undefined>
 
@@ -59,43 +61,16 @@ export function refuseOutsideProviderAllowList(event: { readonly model: { readon
   throw new Error(`provider "${event.model.providerID}" is not in Code Puppy's allow list; the request was not sent`)
 }
 
-export type ProviderAllowTailDeps = {
-  transform(callback: (editor: ProviderEditorLike) => void): Promise<{ dispose(): Promise<void> }>
-  /** 引擎插件清单里的 id(清单只在一批激活结束时更新)。 */
-  activePlugins(): Promise<readonly string[]>
-  env: Env
-  log(line: string): void
-  signal: AbortSignal
-  /** 等激活结束的上限与轮询间隔(测试可缩短)。 */
-  settleTimeoutMs?: number
-  pollMs?: number
-}
+export type ProviderAllowTailDeps = Omit<PostActivationTailDeps<ProviderEditorLike>, "apply" | "unplaced"> & { env: Env }
 
+/** 供应商白名单的清单那一道:排在 post 段之后(post-activation-tail.ts)。 */
 export function providerAllowTail(deps: ProviderAllowTailDeps) {
-  let current: { dispose(): Promise<void> } | undefined
-  let queue: Promise<void> = Promise.resolve()
-  /** 把白名单变换(重新)放到最后:先登记新的再撤旧的,中间不出现没有它的空档;几次放置排队,不并发。 */
-  const place = () =>
-    (queue = queue.catch(() => undefined).then(async () => {
-      const previous = current
-      current = await deps.transform((editor) => {
-        const removed = enforceProviderAllowList(editor, deps.env)
-        if (removed.length) deps.log(`[@codepuppy/ext] providers outside Code Puppy's allow list removed: ${removed.join(", ")}`)
-      })
-      await previous?.dispose()
-    }))
-  /** 等这一批激活结束再放;等不到就记一行(请求那道照样拒)。 */
-  const settle = async () => {
-    const timeout = deps.settleTimeoutMs ?? 60_000
-    const poll = deps.pollMs ?? 20
-    for (let waited = 0; !deps.signal.aborted; waited += poll) {
-      if ((await deps.activePlugins()).includes(CONFIG_POLICY_PLUGIN)) return place()
-      if (waited >= timeout) {
-        deps.log(`[@codepuppy/ext] ${CONFIG_POLICY_PLUGIN} never appeared in the plugin list; the provider allow list is enforced on requests only`)
-        return
-      }
-      await new Promise<void>((resolve) => (setTimeout(resolve, poll) as { unref?: () => void }).unref?.())
-    }
-  }
-  return { settle, place }
+  return postActivationTail<ProviderEditorLike>({
+    ...deps,
+    apply: (editor) => {
+      const removed = enforceProviderAllowList(editor, deps.env)
+      if (removed.length) deps.log(`[@codepuppy/ext] providers outside Code Puppy's allow list removed: ${removed.join(", ")}`)
+    },
+    unplaced: "the provider allow list is enforced on requests only",
+  })
 }

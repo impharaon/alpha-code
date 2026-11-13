@@ -36,7 +36,9 @@ import { createHubBridge, processParentPort, type HubBridge } from "./hub-bridge
 import { createHubTools, hubInstallEvaluate } from "./hub-tools"
 import { createReloadScheduler, type ReloadScheduler } from "./reload-scheduler"
 import { createCodePuppyTools } from "./codepuppy-tools"
-import { agentSampling, applyAgents, applyProjectMcp, commandDefinitions } from "./engine-transforms"
+import { agentSampling, applyAgents, applyProjectMcp, commandDefinitions, removeAgents } from "./engine-transforms"
+import { postActivationTail } from "./post-activation-tail"
+import type { AgentEditor } from "@opencode/plugin/promise/agent"
 import { modelFacts } from "./model-facts"
 import { createCloudVisionHooks } from "./cloud-vision-hooks"
 import { createAttachmentReaderHooks } from "./attachment-reader-hooks"
@@ -127,8 +129,13 @@ export const CodePuppyExt: Plugin.Plugin = {
       // #223 R7:MCP 治理归属是**本 Location** 的状态 —— 由本 Location 的 mcp.transform 写、显式传给本 Location 的执行钩子;
       // 模块侧不留可变状态(I2 的进程级对象里只有桥与调度器)。没算出来 = 没有治理 server = 豁免不给(fail-closed)。
       let mcpOwnership: McpOwnership = UNVERIFIED_MCP_OWNERSHIP
-      // #1700:本 Location 的项目文档里停用(`disable: true`)、已从引擎移除的助手;由下面的 agent.transform 写。
+      // #1700:本 Location 的项目文档里停用(`disable: true`)的助手;由下面的 agent.transform 写,排在 post 段之后的 agent 尾巴移除它们。
       let disabledAgents = new Set<string>()
+      const agentRegistered = (agentID: string) =>
+        context.agent.get({ agentID }).then(
+          (response) => (response as { data?: unknown }).data !== undefined,
+          () => false,
+        )
 
       // ── 工具表(P8)──────────────────────────────────────────────────────────────────────────
       await context.tool.transform((editor) => {
@@ -168,9 +175,10 @@ export const CodePuppyExt: Plugin.Plugin = {
         validateCloudToolInput(event.tool, event.input, process.env, mcpOwnership)
         // `#1419`:模型追问 —— `codepuppy_vision` 的 image 由引用换成压缩后的 base64。
         await vision.toolBefore(event)
-        // #1700 AC-04:派发项目里停用的助手 —— 引擎只会说 `Unknown agent`,这里说明它是被停用的。
+        // #1700 AC-04:派发项目里停用、引擎里也确实已经没有的助手 —— 引擎只会说 `Unknown agent`,这里说明它是被停用的。
+        // 按最终状态判(Codex R1/1 M1):尾巴还没放上去时它还在,照常派发。
         const agent = (event.input as { agent?: unknown } | undefined)?.agent
-        if (event.tool === "subagent" && typeof agent === "string" && disabledAgents.has(agent))
+        if (event.tool === "subagent" && typeof agent === "string" && disabledAgents.has(agent) && !(await agentRegistered(agent)))
           throw new Error(`Agent "${agent}" is disabled in this project (.codepuppy/codepuppy.jsonc sets "disable": true)`)
       })
       await context.tool.hook("execute.after", (event) => {
@@ -415,16 +423,27 @@ export const CodePuppyExt: Plugin.Plugin = {
       // 所以变换等这一批激活结束才登记,之后每次插件重新激活都重新放到最后(provider-allow.ts)。
       const providerTail = new AbortController()
       cleanups.push(() => providerTail.abort())
+      const activePlugins = async () => (((await context.plugin.list()) as { data?: Array<{ id?: string }> }).data ?? []).map((plugin) => String(plugin.id))
+      // #1700(Codex R1/1 M1):项目停用的助手同样等这一批激活结束才移除 —— 早了会被 post 段的配置层按默认(全放行)重建。
+      const agentTail = postActivationTail<Pick<AgentEditor, "remove">>({
+        transform: (callback) => context.agent.transform(callback),
+        apply: (editor) => removeAgents(editor, disabledAgents),
+        activePlugins,
+        log,
+        unplaced: "project agents with disable: true stay registered",
+        signal: providerTail.signal,
+      })
+      void agentTail.settle().catch((cause) => error(`[@codepuppy/ext] disabled project agents not removed: ${describe(cause)}`))
       const tail = providerAllowTail({
         transform: (callback) => context.provider.transform(callback),
-        activePlugins: async () => (((await context.plugin.list()) as { data?: Array<{ id?: string }> }).data ?? []).map((plugin) => String(plugin.id)),
+        activePlugins,
         env: process.env,
         log,
         signal: providerTail.signal,
       })
       void tail.settle().catch((cause) => error(`[@codepuppy/ext] provider allow list not placed: ${describe(cause)}`))
       void (async () => {
-        for await (const _ of context.event.subscribe({ types: ["plugin.updated"], signal: providerTail.signal })) await tail.place()
+        for await (const _ of context.event.subscribe({ types: ["plugin.updated"], signal: providerTail.signal })) await Promise.all([tail.place(), agentTail.place()])
       })().catch((cause) => {
         if (!providerTail.signal.aborted) error(`[@codepuppy/ext] plugin event subscription ended: ${describe(cause)}`)
       })

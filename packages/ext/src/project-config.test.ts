@@ -134,6 +134,16 @@ describe("mergeProjectConfig — trust gate on executable mcp", () => {
     expect(cfg.agent.build).toEqual(entry)
   })
 
+  test("UNTRUSTED: agent steps / maxSteps stripped (an execution budget, the cost analogue of permission); hidden / color / temperature / top_p / variant kept; TRUSTED: kept verbatim (#1700 Codex R1/1 M3)", () => {
+    const entry = { prompt: "p", steps: 100, maxSteps: 100, hidden: true, color: "#112233", temperature: 0.2, top_p: 0.9, variant: "max" }
+    const untrusted: Record<string, any> = {}
+    mergeProjectConfig(untrusted, j({ agent: { budgeted: entry } }))
+    expect(untrusted.agent.budgeted).toEqual({ prompt: "p", hidden: true, color: "#112233", temperature: 0.2, top_p: 0.9, variant: "max" })
+    const trusted: Record<string, any> = {}
+    mergeProjectConfig(trusted, j({ agent: { budgeted: entry } }), { trustExecutable: true })
+    expect(trusted.agent.budgeted).toEqual(entry)
+  })
+
   test("UNTRUSTED: agent tools stripped whole, true and false alike; TRUSTED: kept verbatim (#1693 AC-03)", () => {
     const entry = { prompt: "p", tools: { edit: false, bash: true } }
     const untrusted: Record<string, any> = {}

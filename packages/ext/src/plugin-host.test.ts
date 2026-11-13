@@ -40,6 +40,12 @@ import { createToolPolicyStore, defaultPolicyBaseDir } from "./policy/resolver"
 import { Message } from "../../ai/src/schema/messages.ts"
 import * as Media from "../../ai/src/media.ts"
 import { toLLMMessages } from "../../core/src/session/runner/to-llm-message.ts"
+import { Config } from "../../core/src/config.ts"
+import { ConfigNormalize } from "../../core/src/config/normalize.ts"
+import { ConfigAgentPlugin } from "../../core/src/config/plugin/agent.ts"
+import { PluginPromise } from "../../core/src/plugin/promise.ts"
+import { Document as ConfigDocument, Info as ConfigInfo } from "../../schema/src/config.ts"
+import { Schema } from "effect"
 
 const ENV_KEYS = [
   "CODEPUPPY_GLOBAL_DIR",
@@ -965,16 +971,90 @@ const projectAgents = (agents: Record<string, unknown>, consent: boolean, ...ids
     return out
   })
 
-it.live("权威 · 项目 agent 的 disable(#1700 AC-04):已同意的项目里 explore 写了 disable: true ⇒ 引擎 agent 表里没有它,派发它被拒且说明已停用;别的助手照常", () =>
+it.live("权威 · 项目 agent 的 disable(#1700 AC-04):已同意的项目里 explore 写了 disable: true ⇒ 这一批激活结束后引擎 agent 表里没有它,派发它被拒且说明已停用;别的助手照常", () =>
   Effect.gen(function* () {
+    env({})
+    const directory = realpathSync((yield* Location.Service).directory)
+    mkdirSync(join(directory, ".codepuppy"), { recursive: true })
+    writeFileSync(join(directory, ".codepuppy", "codepuppy.jsonc"), JSON.stringify({ agent: { explore: { disable: true } } }))
+    writeFileSync(join(directory, ".codepuppy", "prefs.json"), JSON.stringify({ extensionsConsent: { version: 1, granted: true } }))
     yield* registered("subagent")
-    const agents = yield* projectAgents({ explore: { disable: true } }, true, "explore", "general")
-    expect(agents.explore).toBeUndefined()
-    expect(agents.general).toBeDefined()
+    const ext = yield* activateExtUntilFinished
+    yield* ext.finish(exploreState.pipe(Effect.map((state) => state === undefined)))
+    expect(yield* exploreState).toBeUndefined()
+    expect((yield* (yield* Agent.Service).get(Agent.ID.make("general")))).toBeDefined()
     const dispatched = yield* before("subagent", { agent: "explore", prompt: "look around" })
     expect(Exit.isFailure(dispatched)).toBe(true)
     expect(JSON.stringify(dispatched)).toContain('Agent \\"explore\\" is disabled in this project')
     expect(Exit.isSuccess(yield* before("subagent", { agent: "general", prompt: "look around" }))).toBe(true)
+  }),
+)
+
+/**
+ * 装上 ext,ext 看到的插件清单由用例控制:生产里 opencode.config.policy 在 post 段最后激活,它进了清单 = 这一批激活结束,
+ * ext 排在 post 段之后的 transform(post-activation-tail.ts)这时才登记。`finish(done)` 翻过来之后等到 `done` 成立。
+ */
+const activateExtUntilFinished = Effect.gen(function* () {
+  let finished = false
+  const plugins = yield* Plugins.Service
+  const policy = { id: "opencode.config.policy", source: { type: "builtin" }, features: { server: true }, state: { status: "active" } }
+  const list = { list: () => (finished ? Effect.succeed([policy] as never) : plugins.list()) }
+  yield* activate({ id: "test.seed-builtins", async setup() {} })
+  yield* PluginPromise.fromPromise(CodePuppyExt).effect(yield* PluginHost.make(list, CodePuppyExt.id))
+  return {
+    finish: (done: Effect.Effect<boolean>) =>
+      Effect.gen(function* () {
+        finished = true
+        for (let waited = 0; waited < 3000 && !(yield* done); waited += 20) yield* Effect.sleep("20 millis")
+      }),
+  }
+})
+
+/** v1 文档 → 引擎的配置文档(引擎读用户配置文件那条路:ConfigNormalize,再按 2.x Info 解码)。 */
+const configDocument = (v1: Record<string, unknown>) => {
+  const result = ConfigNormalize.normalize(v1)
+  if (result.type !== "normalized") throw new Error("the engine rejected the document")
+  return new ConfigDocument({ type: "document", info: Schema.decodeUnknownSync(ConfigInfo)(result.encoded) })
+}
+/** 引擎真的配置 agent 插件(`opencode.config.agent`,生产里在 post 段、排在 ext 之后)读这几份文档(按给的先后)。 */
+const configAgents = (...documents: Array<Record<string, unknown>>) =>
+  Effect.gen(function* () {
+    const plugins = yield* Plugins.Service
+    yield* ConfigAgentPlugin.Plugin.effect(yield* PluginHost.make(plugins, ConfigAgentPlugin.Plugin.id)).pipe(
+      Effect.provide(Config.testLayer(documents.map(configDocument))),
+    )
+  })
+const exploreState = Effect.gen(function* () {
+  const explore = yield* (yield* Agent.Service).get(Agent.ID.make("explore"))
+  return explore && { mode: explore.mode, edit: Permission.evaluate("edit", "a.txt", explore.permissions).effect }
+})
+
+it.live("项目 agent 的 disable · 引擎自己的结果(#1700 Codex R1/1 M1 对照):用户文档写 explore 的说明、后一份文档写 disable: true ⇒ 引擎读完 explore 不在", () =>
+  Effect.gen(function* () {
+    yield* activate({ id: "test.seed-builtins", async setup() {} })
+    expect(yield* exploreState).toEqual({ mode: "subagent", edit: "deny" })
+    yield* configAgents({ agent: { explore: { description: "说明" } } }, { agent: { explore: { disable: true } } })
+    expect(yield* exploreState).toBeUndefined()
+  }),
+)
+
+it.live("权威 · 项目 agent 的 disable 与后面的配置层(#1700 Codex R1/1 M1):已同意项目停用 explore、用户全局配置之后又写了 explore 的说明 ⇒ 任何时刻都不比内置更宽(模式仍是 subagent、edit 仍是 deny),这一批激活结束后 explore 不在(与引擎读同两份文档一致),派发说明已停用", () =>
+  Effect.gen(function* () {
+    env({})
+    const directory = realpathSync((yield* Location.Service).directory)
+    mkdirSync(join(directory, ".codepuppy"), { recursive: true })
+    writeFileSync(join(directory, ".codepuppy", "codepuppy.jsonc"), JSON.stringify({ agent: { explore: { disable: true } } }))
+    writeFileSync(join(directory, ".codepuppy", "prefs.json"), JSON.stringify({ extensionsConsent: { version: 1, granted: true } }))
+    yield* registered("subagent")
+    const ext = yield* activateExtUntilFinished
+    yield* configAgents({ agent: { explore: { description: "说明" } } })
+    // 激活还没结束(尾巴没放上去):explore 还在,但不比内置更宽;此时派发照常(按最终状态判停用)
+    expect(yield* exploreState).toEqual({ mode: "subagent", edit: "deny" })
+    expect(Exit.isSuccess(yield* before("subagent", { agent: "explore", prompt: "look around" }))).toBe(true)
+    yield* ext.finish(exploreState.pipe(Effect.map((state) => state === undefined)))
+    expect(yield* exploreState).toBeUndefined()
+    const dispatched = yield* before("subagent", { agent: "explore", prompt: "look around" })
+    expect(JSON.stringify(dispatched)).toContain('Agent \\"explore\\" is disabled in this project')
   }),
 )
 
@@ -1015,6 +1095,36 @@ it.live("项目 agent 写坏的 mode / model(#1700 AC-10):已同意的项目里 
     const service = yield* Agent.Service
     expect(yield* service.get(Agent.ID.make("broken"))).toBeUndefined()
     expect((yield* service.get(Agent.ID.make("fine")))?.steps).toBe(2)
+  }),
+)
+
+/** 用户全局插件先登记一个带执行预算(`steps: 3`)的助手(全局插件先于 ext 激活:core/src/config.ts、plugin/supervisor.ts)。 */
+const budgetedAgent: Plugin.Plugin = {
+  id: "test.global-budgeted-agent",
+  async setup(context) {
+    await context.agent.transform((editor) =>
+      editor.update("budgeted", (agent) => {
+        agent.mode = "subagent"
+        agent.steps = 3 as never
+      }),
+    )
+  },
+}
+
+it.live("项目 agent 的 steps 受同意门(#1700 Codex R1/1 M3):未同意的项目写 steps: 100 / maxSteps: 100 ⇒ 已有助手的执行预算仍是 3;已同意 ⇒ 100", () =>
+  Effect.gen(function* () {
+    yield* activate(budgetedAgent)
+    const unconsented = yield* projectAgents({ budgeted: { steps: 100 }, legacy: { prompt: "l", maxSteps: 100 } }, false, "budgeted", "legacy")
+    expect(unconsented.budgeted?.steps).toBe(3)
+    expect(unconsented.legacy?.steps).toBeUndefined()
+  }),
+)
+
+it.live("项目 agent 的 steps 受同意门 · 已同意臂:同一份文档 ⇒ 预算按项目写的生效", () =>
+  Effect.gen(function* () {
+    yield* activate(budgetedAgent)
+    const consented = yield* projectAgents({ budgeted: { steps: 100 } }, true, "budgeted")
+    expect(consented.budgeted?.steps).toBe(100)
   }),
 )
 

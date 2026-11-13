@@ -353,3 +353,14 @@ failure?: DatabaseConnectFailure   // 只对 dbhub-readonly 且 status === "fail
 | --- | --- | --- | --- |
 | inet_aton 短写(如 `2130706433`)过得了 host 形状判据、拨号时解析到 127.0.0.1 | 用户亲手填这种写法时,会让树内进程到达本机该端口;与用户批准半场同一个已知缺口 | owner 2026-09-24 已接受该缺口,修法与落点在 `docs/design/2026-09-23-model-chosen-egress-baseline.md` §5.1 K3′(拨号时在解析结果上判),本功能复用同一判据 | 那条缺口被修时,本成员自动受益 |
 | 只给连接器进程开门 | 需要读隔离 + loopback 调用方身份 | 规格不做通用出网框架(被否决 4) | 出现读隔离能力时 |
+
+**对抗审查 R1 留档(2026-11-13,Codex gpt-6.1-sol,只读,审查版本 be7a5cb45f,对照规格 v1)**
+
+未处置:owner 2026-11-13 批准规格 v2(改写为平台能力)并搁置开发。下列意见在重新启动时与「按 v2 重对方案」一并处置,本设计保持 `status: draft`。
+
+- [Blocker] **连接器自身可逃出只读事务**：PostgreSQL 输入 `SELECT E'x\'y'; COMMIT; INSERT INTO audit_marker VALUES(1); -- '`；MySQL 默认转义模式下去掉 `E`。真实解析函数均返回 `allowed=true`、单条语句，因为 `N/chunk-IXC4NQGC.js:335` 不识别反斜线转义；执行路径却把原文交给支持多语句的驱动（`N/postgres-KCFNDQLG.js:717`、`N/mysql-ZXO4TWLG.js:65,254`）。有写权限、默认读写的账号因此可先结束只读事务再写入 — **AC-06** — 修正解析与执行边界，并用该反例证明事务不可逃逸；七类首词测试不足。[PostgreSQL 转义语法](https://www.postgresql.org/docs/current/sql-syntax-lexical.html)、
+- [Major] **首次安装与更新会被一致性校验挡住**：现有事务在提交前调用 `prepareOfficialConnector`（`ext-package-tx-builders.ts:419`），它立即调用 `restoreOfficialConnector`（`official-connector-resources.ts:199`）；此时 C1 尚未建立新版本真源，因此必定不匹配 — **AC-01/02，问题 4** — 明确区分可信事务准备与已提交运行时恢复，保留“授权最后发布”。
+- [Major] **更新崩溃可恢复旧授权**：已有 A → 提交 B → 写新真源前崩溃或写失败；原子替换会留下有效的旧 A。重启时 C2 仍放行 A，即使 B 的物化因版本不符被停用；§5“目标不在”不成立 — **AC-05、I6** — 更新先持久撤销 A、刷新集合并切断连接，再提交和发布 B。
+- [Major] **C8 所需错误信息已被上游删除**：`packages/core/src/mcp/client.ts:60–71,302,611` 明确剥离 stdio stderr，只保留退出描述；`connection.ts:225` 再以安全描述发布 failed 状态。错误口令因此无法按设计从状态中提取 28P01/1045 — **体验约定、问题 4；U-3** — 在脱敏前形成安全分类码并传递，补齐相关契约，勿恢复原始 stderr。
+- [Major] **库名编码与实际驱动不兼容**：`sales data` 被编码为 `sales%20data`；SafeURL 不解码 pathname（`N/chunk-IXC4NQGC.js:110`），两个连接器直接使用该值（PostgreSQL `:157`、MySQL `:57`）。纯函数探针确认两者都收到错误库名，退出 0 — **AC-01/02；U-5** — 修正面向 DBHub 的库名传递契约。
+- [Major] **独立授权使 AC-05 不成立**：用户先通过现有出网批准框授权 A，再配置数据库 A，随后停用或卸载；其他半场仍授权 A，C3 明确不切旧隧道，新 CONNECT 也继续成功 — **AC-05** — 明确并解决独立授权与“立即不可连”的契约冲突；不能同时声明无条件满足两者。

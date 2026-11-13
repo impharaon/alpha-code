@@ -53,7 +53,7 @@ last_reviewed: 2026-11-12
 ## 段 0 — 代表性启动的决定记录(改动前钉住)
 
 - 依据:Issue [alpha-code#1698](https://github.com/impharaon/alpha-code/issues/1698) AC-04;design @ `c01ea14919` §9「回滚」(C3–C6 磁盘形状两边一致)、§10「owner 可见变化」第 1 条(正常使用无变化);派发书「同一组决定经真启动装配被引擎 / ext 观察到」。
-- 核对:待编排器核对。
+- 核对:`f3fd81e14f` · 编排器(Claude Fable 5.2)· 通过;裁决 R30–R32 入 design §10 @ `7b3baf25e5`(R30 = 段 2 BLOCKED 项选 (a);R31 = 回退顺序「快照 → 已发布文档 → 环境」,生产启动里环境分支不可达,由段 0 的决定记录断言;R32 = P-13 反向臂在不装 ext 的真引擎上判,G4 可分 4a / 4b / 4c);35–40 文件的段体量按 §9 接受。
 
 ### 改动
 
@@ -61,10 +61,11 @@ last_reviewed: 2026-11-12
 | --- | --- |
 | `packages/ui-mac/src/main/bootstrap-launch-parity.engine.cases.ts`(新) | 一次代表性启动走生产 `spawnLocalServer`(假 fork,mock 同 `websearch-account-tool-table.engine.cases.ts`:electron、日志、设置存储、钥匙串后端):已登录(合成令牌,云 MCP 与模型地址指本机桩)、有账户分区、darwin 出网代理端口、围栏计划、已初始化环境快照(通道 `stable`)、出厂技能目录。记下 fork 环境与 `start` 消息;「sidecar 这一步」在本段按今天的方式把 fork 环境里的 `CODEPUPPY_*` 与 `StartCommand` 字段交给本进程;然后生产 `injectCodePuppyConfig` → 沙箱引擎 + 真 ext(`test-component/codepuppy-engine.ts`)。产出一份决定记录并与手写字面量逐字比对:① `start` 消息里的围栏 profile / addonPath;② 交给 `start()` 的库路径、配置目录、`models.fetch`、`fs.filewatcher`;③ 引擎里各档位 agent 的权限规则、ext 的外部目录规则、出厂禁用技能不在技能表;④ ext 工具策略的账户分区键、一次经出网代理的连接失败被判为 `via: proxy`;⑤ 引擎供应商表里平台节点的地址、第一次模型请求带的凭据头等于凭据文件内容、云 MCP 条目的地址与 `codepuppy-cloud` 权威;⑥ 通道 `stable` 下注入的 disabled-override 结果;⑦ C4 显式文件、C5 模型底表的内容(临时根替换成占位)与密钥文件名集合。P-06 那五个开关不进记录(它们按 R6 有意改变)。 |
 | `packages/ui-mac/src/main/bootstrap-launch-parity.engine.test.ts`(新) | 宿主:起独立 `bun test` 子进程跑上面的 cases,钉住通过条数与 0 fail(仓内 `*.cases.ts` 惯例)。 |
+| `packages/ui-mac/src/main/bootstrap-launch-parity.record.json`(新) | 决定记录:改动前的代码实跑一次产出(两次实跑逐字相同),cases 与它逐项比对。 |
 | `scripts/gate-files.tsv` | 登记上面的宿主一行(精确条数、`delegates_to` 写 `-`)。 |
 
 ### 顺序
-1. 一个提交:两份新测试 + 登记行。在今天的代码上必须全绿,不动任何生产代码。相关测试:`cd packages/ui-mac && bun test src/main/bootstrap-launch-parity.engine.test.ts`。
+1. 一个提交:两份新测试 + 记录文件 + 登记行。在今天的代码上必须全绿,不动任何生产代码。相关测试:`cd packages/ui-mac && bun test src/main/bootstrap-launch-parity.engine.test.ts`。
 
 ### 风险
 - 若某一项决定不改生产代码就观察不到,那一项改为经生产读函数观察并在段内注明,不为测试改生产代码。
@@ -73,15 +74,18 @@ last_reviewed: 2026-11-12
 ### 证明
 | AC | 测试/证据 | 缺少行为为什么会失败 |
 | --- | --- | --- |
-| AC-04(基线) | `bootstrap-launch-parity.engine.test.ts` | 本段只钉住今天的值;段 1–3 每段只改「sidecar 这一步」的接法,期望字面量一字不改(评审看这一块的 diff 为零)。任何一组键在构建器里漏写或读错,记录里对应那一格就与字面量不同而红。 |
+| AC-04(基线) | `bootstrap-launch-parity.engine.test.ts` | 本段只钉住今天的值;段 1–3 每段只改「sidecar 这一步」的接法,记录文件一字不改(评审看 `git diff <段0> <段n> -- src/main/bootstrap-launch-parity.record.json` 为空)。任何一组键在构建器里漏写或读错,记录里对应那一格就不同而红。已知的坏(实跑):把 `server.ts` 写 `CODEPUPPY_POLICY_ACCOUNT` 那一句改成不写 ⇒ 记录的 `engine.policyAccount` 从 `acct:956e…c48` 变成 `anonymous` 而红。 |
 
 ### 偏离记录
-暂无
+- 2026-11-12 · 期望不写成 cases 里的手写字面量,而是钉在 `bootstrap-launch-parity.record.json`(约 620 行,由改动前的代码实跑产出,两次实跑逐字相同)· 记录太长,放进 cases 读不下去;文件形式让「各段记录不变」直接是这份文件的空 diff · 本段提交。
+- 2026-11-12 · 记录各格的观察方式按实际可观察的落定:① sidecar 收到的路径 / 通道 / ext 目录 / 围栏;② `start()` 选项;③ 内联文档(档位 agent 权限即在其中)、显式文件、模型底表内容、密钥文件名;④ 引擎里 ext 状态、`GET /api/provider`、云 MCP 状态、工具策略 RPC `inventory` 的账户分区、`engineNetFailurePath` 对 sidecar 整份 env 的归类;⑤ 两个桩收到的凭据头。原计划的「ext 外部目录规则」「出厂禁用技能不在技能表」「disabled-override 结果」三项没有单独成格:前两者的输入(全局根、出厂技能目录)已在 ③ 里,第三项在沙箱里没有已装扩展、产出为空,改记它的输入 `registryChannel` · 本段提交。
+- 2026-11-12 · 通道:非打包构建的环境快照固定解析为 dev,记录里 `registryChannel` 是 `dev`,不是计划写的 `stable` · 本段提交。
+- 2026-11-12 · 测试隔离两处(只在测试里):dev 下 ext 目录从未入库的 `packages/ext/dist` 解析,mock `./codepuppy-ext-plugin` 改指沙箱里指向 ext 源码的目录插件;main 交给 sidecar 的 `initialDirectory` 默认取 `os.homedir()` 下的工作目录(bun 下不随沙箱 HOME),用 main 自己的 `CODEPUPPY_USER_WORKSPACE_DIR` 改指沙箱 · 本段提交。
 
 ## 段 1 — G1 接通与路径
 
 - 依据:design @ `c01ea14919` §4.1(v1 外壳与 G1 字段:`v`、`paths.*`、`registryChannel`)、§4.2、§4.3(sidecar、ext、`codepuppy-first-party-mcp.ts` 一行)、§4.4(构建器)、§4.5(前缀拒绝排在 EXTRA 之前;例外名单 = EXTRA 本身 + 尚未迁走的 G2/G3 键)、§5、§9 G1、§10 R1、R2、R4、R10、R14、R15;Issue AC-01、AC-02、AC-04。
-- 核对:待编排器核对。
+- 核对:`f3fd81e14f` · 编排器(Claude Fable 5.2)· 通过;裁决 R30–R32 入 design §10 @ `7b3baf25e5`(R30 = 段 2 BLOCKED 项选 (a);R31 = 回退顺序「快照 → 已发布文档 → 环境」,生产启动里环境分支不可达,由段 0 的决定记录断言;R32 = P-13 反向臂在不装 ext 的真引擎上判,G4 可分 4a / 4b / 4c);35–40 文件的段体量按 §9 接受。
 
 ### 改动
 
@@ -136,7 +140,7 @@ last_reviewed: 2026-11-12
 ## 段 2 — G2 平台、云与网络
 
 - 依据:design @ `c01ea14919` §4.1(G2 字段、`CredentialFreeUrl` / `isCredentialFreeUrl`、`cloudMcpArmed`)、§4.3 表第 4、5 行与末两条、§4.4(URL 规则与日志行)、§4.5、§6「被否决的替代」9、§9 G2、§10 R5、R8;登记册 `tool-policy-partitions`、`l1r-output-caps`(ADR-048:握法与测试名随键改写,决定不变);Issue AC-01、AC-02、AC-04。
-- 核对:待编排器核对。**本段有一项 BLOCKED(下表末行),裁决前不提交本段**。
+- 核对:`f3fd81e14f` · 编排器(Claude Fable 5.2)· 通过;裁决 R30–R32 入 design §10 @ `7b3baf25e5`(R30 = 段 2 BLOCKED 项选 (a);R31 = 回退顺序「快照 → 已发布文档 → 环境」,生产启动里环境分支不可达,由段 0 的决定记录断言;R32 = P-13 反向臂在不装 ext 的真引擎上判,G4 可分 4a / 4b / 4c);35–40 文件的段体量按 §9 接受。
 
 ### 改动
 
@@ -154,9 +158,9 @@ last_reviewed: 2026-11-12
 | `packages/core/src/session/to-session-error.ts`、`packages/core/src/mcp/codepuppy-startup.ts` | 调用方传 `tryCodePuppyBootstrap()?.network.egressProxy`;前者在既有 `codepuppy(#1572)` 块内。 |
 | `docs/architecture/codepuppy-authority-registry.json` | `tool-policy-partitions`、`l1r-output-caps` 的机制文字与测试名改写。 |
 | 测试:`server.test.ts`(web search 主权两组改断言文档 `webSearch.killSwitch`)、`sidecar-env.test.ts`、`codepuppy-config-injection.test.ts`、`codepuppy-models.test.ts`、`codepuppy-sidecar-wiring.test.ts`(`#1575` 一条)、ext `cloud-websearch-kill.test.ts`、`cloud-vision.test.ts`、`platform-credential-header` / `cloud-access` 相关测试、`policy/resolver.test.ts`(VI1)、plugin `alpha-cloud-authority` 测试、schema / core 网络失败测试、`test-component/codepuppy-engine.ts`、`websearch-account-tool-table.engine.cases.ts`、`cloud-credential-hot.engine.cases.ts`、`token-hot-apply.engine.cases.ts`、`platform-credential-error.engine.cases.ts`、`bootstrap-launch-parity.engine.cases.ts`(期望不改)、`bootstrap-env-readers.test.ts`(加 G2 键)、`scripts/gate-files.tsv` | 断言旧通道的用例改断言文档;新增 URL 拒绝与日志行用例。 |
-| **`CODEPUPPY_PROVIDER_ALLOW`(`codepuppy-config-injection.ts:329-330,673` → ext `provider-allow.ts:26`)** | **BLOCKED: design — §2.1 C7 / §2.2 / §4.1 — 见下。裁决后按裁决补进本表。** |
+| `packages/ui-mac/src/main/codepuppy-config-injection.ts`、`packages/ext/src/provider-allow.ts`(及其调用方 `plugin.ts:243,403`) | design §10 R30:注入算出放行集合后按 C10 的形状(`in-process-engine.ts:15-24`)在本进程发布一份冻结的集合,ext 读它;删掉 `CODEPUPPY_PROVIDER_ALLOW` 的写入(`:329-330,673`)与常量;登记册 `provider-allowlist` 改握法文字;`bootstrap-env-readers.test.ts` ① 加这个名字。 |
 
-**BLOCKED 项的选项**(供编排器裁决;事实:值由 sidecar 注入从治理策略算出,不是 main 的决定;启动文档由 main 构建、在注入之前发布、一代不变;今天它和 C7 一样会被引擎派生的子进程继承,进程内代码也能改;登记册 `provider-allowlist` 以它为握法):
+**原 BLOCKED 项的选项**(已由 design §10 R30 裁为 (a),留作记录;事实:值由 sidecar 注入从治理策略算出,不是 main 的决定;启动文档由 main 构建、在注入之前发布、一代不变;今天它和 C7 一样会被引擎派生的子进程继承,进程内代码也能改;登记册 `provider-allowlist` 以它为握法):
 - (a) 由 sidecar 注入在算出放行集合后,按 C10 的形状(`in-process-engine.ts:15-24`)在本进程发布一份冻结的放行集合,ext 读它;不进环境。代价:多一个进程内交接点(与 C10 同形)。
 - (b) 视为 sidecar 内部值,不属于「main 交给引擎的决定」,保留环境写法,在 design §10 记一行范围说明。代价:C7 的两个缺点(子进程继承、进程内可改)对这一项留着;它是 S5 测不到的 fork 之后写入。
 - (c) 由 main 算放行集合并写进启动文档。代价:要在 main 跑一遍模型配置计算,与注入形成两处计算,或把注入的这一半搬到 main(§6 被否决的替代 3 同类)。
@@ -183,7 +187,7 @@ last_reviewed: 2026-11-12
 ## 段 3 — G3 开关与引擎设置
 
 - 依据:design @ `c01ea14919` §4.1(G3 字段与 `codepuppyEngineSettings`)、§4.3 表第 1、2 行与兼容入口的范围、§4.4 全表(含「导出为 `""`」一列)、§4.5 最终形态、§9 G3 与回滚、§10 R6、R7、R9、R13、R16;登记册 `adr038-ask-deadline`、`project-file-change-events`;Issue AC-01、AC-02、AC-04。
-- 核对:待编排器核对。
+- 核对:`f3fd81e14f` · 编排器(Claude Fable 5.2)· 通过;裁决 R30–R32 入 design §10 @ `7b3baf25e5`(R30 = 段 2 BLOCKED 项选 (a);R31 = 回退顺序「快照 → 已发布文档 → 环境」,生产启动里环境分支不可达,由段 0 的决定记录断言;R32 = P-13 反向臂在不装 ext 的真引擎上判,G4 可分 4a / 4b / 4c);35–40 文件的段体量按 §9 接受。
 
 ### 改动
 
@@ -228,7 +232,7 @@ last_reviewed: 2026-11-12
 ## 段 4 — G4 Code Puppy 自有的引擎全局配置目录(单独一个 PR)
 
 - 依据:design @ `c01ea14919` §4.1 末段(v2)、§4.7 全节、§5 G4 失败表、§6 G4 各行与「架构约束」G4 例外、§9 G4、G4 回滚与证明义务 1–9、§10 R11、R17–R29;owner 原话见 design「批准记录」与 Issue 来源(U-07、U-09);Issue AC-03、AC-04。依赖段 1–3 已在 `alpha`。
-- 核对:待编排器核对。
+- 核对:`f3fd81e14f` · 编排器(Claude Fable 5.2)· 通过;裁决 R30–R32 入 design §10 @ `7b3baf25e5`(R30 = 段 2 BLOCKED 项选 (a);R31 = 回退顺序「快照 → 已发布文档 → 环境」,生产启动里环境分支不可达,由段 0 的决定记录断言;R32 = P-13 反向臂在不装 ext 的真引擎上判,G4 可分 4a / 4b / 4c);35–40 文件的段体量按 §9 接受。
 
 ### 改动
 

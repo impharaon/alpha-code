@@ -8,12 +8,16 @@
 //
 // 本模块是唯一的选择点:目标架构 = `CODEPUPPY_TARGET_ARCH`(arm64 | x64),缺省才回落宿主架构(保持今天的行为)。
 // electron.vite.config.ts 用它选 node-pty 包名;electron-builder.config.ts 的 beforePack 用
-// `assertMacTargetArch` 在真正装包前逐项核对产物与 node_modules,任何一项对不上就拒绝打包。
+// `assertMacTargetArch` 在真正装包前逐项核对产物与 node_modules,任何一项对不上就拒绝打包;
+// `#1669`:afterPack 用 `assertPackagedEngineAssets` 核对打好的包里引擎原生资源的落点(解包、执行位、目标片)。
 //
 // 纯 node 依赖(不 import bun / electron-builder),以便 bun test 与 electron-builder 都能直接加载。
 import fs from "node:fs"
 import { createRequire } from "node:module"
 import path from "node:path"
+
+import { nodeTarget } from "../../cli/src/node/target"
+import { parseAsarHeader } from "../src/main/release-sbom"
 
 export const TARGET_ARCH_ENV = "CODEPUPPY_TARGET_ARCH"
 
@@ -178,6 +182,85 @@ export function checkOfficeRuntime(dir: string, arch: TargetArch): string[] {
   }
   if (machO === 0) problems.push(`${dir} 里没有任何 Mach-O 文件`)
   return problems
+}
+
+// ── `#1669` 引擎原生资源在包里的落点(afterPack)────────────────────────────────────────
+
+/**
+ * 引擎原生资源在 app 里的目录(相对 app.asar 根):electron.vite.config.ts 把 dist-engine/assets 拷到 out/main/chunks/assets,
+ * 引擎 chunk 的前导代码按 `import.meta.url` 找它(packages/cli/vite.node.config.ts 的 nodePrelude)。
+ * electron-builder.config.ts 的 asarUnpack 解包这整棵树。
+ */
+export const ENGINE_ASSETS_DIR = "out/main/chunks/assets"
+
+/**
+ * 引擎前导代码交给各原生加载点的文件(键 = 资源目录下的相对路径,取自上游 nodeTarget,与前导代码同一来源):
+ * node-pty 的 pty.node 与它直接执行的 spawn-helper、parcel watcher、FFI 的 .node、FFF 动态库、opencode-pty。
+ */
+export function engineNativeAssets(arch: TargetArch): { key: string; executable: boolean }[] {
+  const target = nodeTarget("darwin", arch)
+  const prebuilds = `${target.nodePtyPackage}/prebuilds/darwin-${arch}`
+  return [
+    { key: `${prebuilds}/pty.node`, executable: false },
+    { key: `${prebuilds}/spawn-helper`, executable: true },
+    { key: target.parcelWatcherAsset, executable: false },
+    { key: target.fffFfiAsset, executable: false },
+    { key: target.fffAsset, executable: false },
+    { key: target.opencodePtyAsset, executable: true },
+  ]
+}
+
+function readAsarEntries(asarPath: string) {
+  const fd = fs.openSync(asarPath, "r")
+  try {
+    const size = Buffer.alloc(8)
+    fs.readSync(fd, size, 0, 8, 0)
+    const header = Buffer.alloc(8 + size.readUInt32LE(4))
+    fs.readSync(fd, header, 0, header.length, 0)
+    return parseAsarHeader(header).entries
+  } finally {
+    fs.closeSync(fd)
+  }
+}
+
+/**
+ * 打好的包(`<Resources>` = `.app/Contents/Resources`)里引擎原生资源的落点:app.asar 里资源目录下的**每个**文件都标记解包、
+ * 且在 app.asar.unpacked 的同一相对路径上;engineNativeAssets 的每一项都在那里、可执行的带执行位、含目标架构片。
+ * 打进 asar 的文件 node-pty 执行不到(它把路径里的 app.asar 换成 app.asar.unpacked)、签名步骤签不到。返回问题清单(空 = 通过)。
+ */
+export function checkPackagedEngineAssets(resourcesDir: string, arch: TargetArch): string[] {
+  const asarPath = path.join(resourcesDir, "app.asar")
+  if (!fs.existsSync(asarPath)) return [`${asarPath} 不存在`]
+  const unpackedRoot = `${asarPath}.unpacked`
+  const entries = [...readAsarEntries(asarPath)].filter(([name]) => name.startsWith(`${ENGINE_ASSETS_DIR}/`))
+  if (entries.length === 0) return [`app.asar 里没有 ${ENGINE_ASSETS_DIR}/(引擎原生资源没进包)`]
+  const problems: string[] = []
+  for (const [name, entry] of entries) {
+    if (!entry.unpacked) problems.push(`${name} 打进了 app.asar(没解包)`)
+    else if (!fs.existsSync(path.join(unpackedRoot, name))) problems.push(`${name} 标记解包,但 app.asar.unpacked 里没有它`)
+  }
+  for (const asset of engineNativeAssets(arch)) {
+    const file = path.join(unpackedRoot, ENGINE_ASSETS_DIR, asset.key)
+    const shown = `app.asar.unpacked/${ENGINE_ASSETS_DIR}/${asset.key}`
+    if (!fs.existsSync(file)) {
+      problems.push(`${shown} 不存在(加载点找的就是它)`)
+      continue
+    }
+    if (asset.executable && (fs.statSync(file).mode & 0o111) === 0) problems.push(`${shown} 没有执行位`)
+    const archs = machOArchs(readHead(file))
+    if (archs === null) problems.push(`${shown} 不是 Mach-O 文件`)
+    else if (!archs.includes(arch)) problems.push(`${shown} 只含 [${archs.join(", ")}],缺 ${arch}`)
+  }
+  return problems
+}
+
+/** electron-builder afterPack 调用(签名之前):checkPackagedEngineAssets 不过即抛,拒绝出包。 */
+export function assertPackagedEngineAssets(input: { resourcesDir: string; packingArch: string }): void {
+  const problems = (SUPPORTED as readonly string[]).includes(input.packingArch)
+    ? checkPackagedEngineAssets(input.resourcesDir, input.packingArch as TargetArch)
+    : [`不支持的架构 ${input.packingArch}`]
+  if (problems.length)
+    throw new Error(`[engine-assets] 拒绝出 mac-${input.packingArch} 包,引擎原生资源不在加载点找的位置:\n  - ${problems.join("\n  - ")}`)
 }
 
 /**

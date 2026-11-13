@@ -5,7 +5,8 @@
 //   ① 生产 vite 配置在「目标 ≠ 宿主」时选的是目标那个 node-pty 包(子进程真加载 electron.vite.config.ts);
 //   ② 生产 electron-builder 配置的 beforePack 真的会拒绝「打的架构 ≠ 目标架构」;
 //   ③ beforePack 用的核对函数:产物引用了宿主架构包 / 原生包缺席 / 二进制片不对 ⇒ 一律拒绝,全对才放行;
-//   ④ #1564:随包 Office 运行时(native/office-runtime/build/<arch>/)缺席或任一 Mach-O 缺目标片 ⇒ 同样拒绝。
+//   ④ #1564:随包 Office 运行时(native/office-runtime/build/<arch>/)缺席或任一 Mach-O 缺目标片 ⇒ 同样拒绝;
+//   ⑤ `#1669`:afterPack 核对打好的包 —— 引擎原生资源打进 app.asar、加载点的目标不在解包目录 / 没执行位 / 缺目标片 ⇒ 拒绝出包。
 import { afterEach, describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { createHash, generateKeyPairSync } from "node:crypto"
@@ -17,9 +18,12 @@ import path from "node:path"
 import { Arch } from "electron-builder"
 
 import {
+  ENGINE_ASSETS_DIR,
   OFFICE_RUNTIME_BUILD_DIR,
   TARGET_ARCH_ENV,
   assertMacTargetArch,
+  checkPackagedEngineAssets,
+  engineNativeAssets,
   machOArchs,
   macNativePackages,
   nodePtyPackage,
@@ -408,5 +412,70 @@ describe("assertMacTargetArch(beforePack 的核对)", () => {
     expect(() =>
       assertMacTargetArch({ packingArch: "universal", packageDir: dir, env: { [TARGET_ARCH_ENV]: "arm64" }, hostArch: "arm64" }),
     ).toThrow(/universal 不支持/)
+  })
+})
+
+// ── `#1669` afterPack:引擎原生资源在包里的落点 ─────────────────────────────────────────
+// 已知的坏(2026-11-13 实打实测):electron-builder 把 out/main/chunks/assets 整棵打进 app.asar,app.asar.unpacked 里没有
+// spawn-helper ⇒ 终端建 PTY 时 node-pty 报 posix_spawn failed: No such file or directory。下面的包由 electron-builder 自带的
+// asar writer 产出(同上方 manifest 用例),原生文件是 Mach-O 头夹具,另带一个非原生资源。
+
+/** 一个打好的 `.app/Contents/Resources`:引擎资源目录 = engineNativeAssets 的每一项 + 一个音频文件。 */
+async function packagedResources(opts: { arch: TargetArch; unpack: boolean; mode?: Record<string, number>; bytes?: Record<string, Buffer> }) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-engine-assets-"))
+  tmpDirs.push(dir)
+  const assets = path.join(dir, "source", ENGINE_ASSETS_DIR)
+  const files: Record<string, Buffer> = { "@opencode/ui/audio/yup-01.mp3": Buffer.from("ID3") }
+  for (const asset of engineNativeAssets(opts.arch)) files[asset.key] = opts.bytes?.[asset.key] ?? thin(opts.arch)
+  for (const [key, bytes] of Object.entries(files)) {
+    fs.mkdirSync(path.dirname(path.join(assets, key)), { recursive: true })
+    const executable = engineNativeAssets(opts.arch).some((asset) => asset.key === key && asset.executable)
+    fs.writeFileSync(path.join(assets, key), bytes, { mode: opts.mode?.[key] ?? (executable ? 0o755 : 0o644) })
+  }
+  const resources = path.join(dir, "app", "Code Puppy.app", "Contents", "Resources")
+  fs.mkdirSync(resources, { recursive: true })
+  const { createPackageWithOptions } = await import(createRequire(require.resolve("electron-builder")).resolve("@electron/asar"))
+  await createPackageWithOptions(path.join(dir, "source"), path.join(resources, "app.asar"), opts.unpack ? { unpackDir: ENGINE_ASSETS_DIR } : {})
+  return { resources, appOutDir: path.join(dir, "app") }
+}
+
+describe("#1669 checkPackagedEngineAssets(afterPack 的核对)", () => {
+  const spawnHelper = (arch: TargetArch) => engineNativeAssets(arch).find((asset) => asset.key.endsWith("/spawn-helper"))!.key
+
+  test("资源目录整棵解包、加载点的目标都在解包目录里且带执行位 ⇒ 放行", async () => {
+    const { resources } = await packagedResources({ arch: "arm64", unpack: true })
+    expect(checkPackagedEngineAssets(resources, "arm64")).toEqual([])
+  })
+
+  test("今天的形状:资源打进 app.asar ⇒ 拒绝,点名 spawn-helper 没解包、解包目录里没有它", async () => {
+    const { resources } = await packagedResources({ arch: "arm64", unpack: false })
+    const problems = checkPackagedEngineAssets(resources, "arm64")
+    expect(problems).toContain(`${ENGINE_ASSETS_DIR}/${spawnHelper("arm64")} 打进了 app.asar(没解包)`)
+    expect(problems).toContain(`app.asar.unpacked/${ENGINE_ASSETS_DIR}/${spawnHelper("arm64")} 不存在(加载点找的就是它)`)
+    expect(problems).toContain(`${ENGINE_ASSETS_DIR}/@opencode/ui/audio/yup-01.mp3 打进了 app.asar(没解包)`)
+  })
+
+  test("解包了但 spawn-helper 没有执行位、watcher 只含另一架构片 ⇒ 拒绝并点名", async () => {
+    const watcher = engineNativeAssets("arm64").find((asset) => asset.key.endsWith("/watcher.node"))!.key
+    const { resources } = await packagedResources({ arch: "arm64", unpack: true, mode: { [spawnHelper("arm64")]: 0o644 }, bytes: { [watcher]: thin("x64") } })
+    expect(checkPackagedEngineAssets(resources, "arm64")).toEqual([
+      `app.asar.unpacked/${ENGINE_ASSETS_DIR}/${spawnHelper("arm64")} 没有执行位`,
+      `app.asar.unpacked/${ENGINE_ASSETS_DIR}/${watcher} 只含 [x64],缺 arm64`,
+    ])
+  })
+
+  test("生产 electron-builder.config.ts:asarUnpack 解包引擎资源目录;afterPack 对今天的形状拒绝出包、对解包的形状放行,非 mac 平台不受影响", async () => {
+    const { getConfig } = await import("../../electron-builder.config")
+    const config = getConfig("prod")
+    expect(config.asarUnpack).toEqual([`${ENGINE_ASSETS_DIR}/**`])
+    const afterPack = config.afterPack as (ctx: unknown) => Promise<void>
+    const context = (appOutDir: string) => ({ electronPlatformName: "darwin", appOutDir, arch: Arch.arm64, packager: { appInfo: { productFilename: "Code Puppy" } } })
+    const packed = await packagedResources({ arch: "arm64", unpack: false })
+    await expect(afterPack(context(packed.appOutDir))).rejects.toThrow(
+      new RegExp(`\\[engine-assets\\] 拒绝出 mac-arm64 包[\\s\\S]*${spawnHelper("arm64").replaceAll(/[.*+?^${}()|[\]\\/]/g, "\\$&")} 打进了 app\\.asar`),
+    )
+    const unpacked = await packagedResources({ arch: "arm64", unpack: true })
+    await expect(afterPack(context(unpacked.appOutDir))).resolves.toBeUndefined()
+    await expect(afterPack({ ...context(packed.appOutDir), electronPlatformName: "win32" })).resolves.toBeUndefined()
   })
 })

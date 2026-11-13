@@ -5,7 +5,13 @@ import { promisify } from "node:util"
 
 import { Arch, type Configuration, type MacOsTargetName } from "electron-builder"
 
-import { OFFICE_RUNTIME_BUILD_DIR, assertMacTargetArch, resolveMacTargetArch } from "./scripts/target-arch"
+import {
+  ENGINE_ASSETS_DIR,
+  OFFICE_RUNTIME_BUILD_DIR,
+  assertMacTargetArch,
+  assertPackagedEngineAssets,
+  resolveMacTargetArch,
+} from "./scripts/target-arch"
 import { assertReleaseSource } from "./scripts/release-source"
 
 // REQ-089 AC3: the OS protocol list has exactly one source. The installer metadata that makes a
@@ -98,6 +104,12 @@ const getBase = (appId: string): Configuration => ({
     desktopName: `${appId}.desktop`,
   },
   files: ["out/**/*", "resources/**/*"],
+  // `#1669`:引擎的原生资源(node-pty 的 pty.node 与 spawn-helper、parcel watcher、FFI 的 .node …)由 electron.vite.config.ts
+  // 拷到这里,引擎按自己 chunk 的位置找它们。node-pty 把 spawn-helper 路径里的 app.asar 换成 app.asar.unpacked 后直接执行;
+  // .node 经 Electron 的 asar 层装载,解包的文件用真路径,打进 asar 的只能被解到临时目录 —— 签名步骤签不到、库校验认不得。
+  // 0.1.26 的 v1 引擎从 node_modules 装这些包,electron-builder 自动解包原生包;这棵树它不认得,所以显式解包整棵。
+  // afterPack 核对包里的落点(下方,scripts/target-arch.ts 的 checkPackagedEngineAssets)。
+  asarUnpack: [`${ENGINE_ASSETS_DIR}/**`],
   extraResources: [
     // (REQ-076 T1 清理)原有指向 native/ 的条目为上游 desktop 遗留死配置:alpha 无 native/ 目录
     // (mac_window.node/swift-build 未克隆),打包时恒为空 no-op,已删。
@@ -220,6 +232,15 @@ const getBase = (appId: string): Configuration => ({
     if (context.electronPlatformName !== "darwin") return
     if (channel !== "dev" && shouldSign) assertReleaseSource(packageDir)
     assertMacTargetArch({ packingArch: Arch[context.arch], packageDir })
+  },
+  // `#1669`:装包后、签名前核对引擎原生资源在包里的落点 —— 每个都解包、加载点的目标在解包目录里、可执行的带执行位、
+  // Mach-O 含目标片。不过即抛:宁可不出包,也不出一个终端打不开的包。
+  afterPack: async (context) => {
+    if (context.electronPlatformName !== "darwin") return
+    assertPackagedEngineAssets({
+      resourcesDir: path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`, "Contents", "Resources"),
+      packingArch: Arch[context.arch],
+    })
   },
   dmg: {
     sign: shouldSign,

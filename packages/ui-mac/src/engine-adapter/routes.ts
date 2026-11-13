@@ -218,6 +218,11 @@ export const ROUTES: readonly Route[] = [
     const info = await context.api.server.info()
     return json({ healthy: true, version: info.version })
   }),
+  // `#1669`:冻结界面每个服务器上下文只判一次协议(server-sdk.tsx 建上下文时调 detectServerProtocol,之后不再重判)。首探
+  // `/global/health` 失败(引擎这一刻报错或 5 秒内没答)就来探这里,这里也不成立 ⇒ 判 v2,而 v2 的事件流与清单这里一律 501,
+  // 界面在这个上下文里再也收不到事件。适配器只说 v1,与引擎此刻答不答无关,所以这里不问引擎,恒答 v1 的形状。
+  // 代价:checkServerHealth 先读这里(utils/server-health.ts),启动闸与每 10 秒的健康轮询因此不再经它探引擎。
+  route("GET", "/api/health", async () => json({ healthy: true })),
   route("POST", "/instance/dispose", async (context) => {
     // 2.x 的重载重建**全部** Location(seams Q5),v1 的 instance.dispose 只释放一个目录;语义更宽、方向安全。
     await context.api.location.reload()
@@ -626,7 +631,7 @@ export const UNSUPPORTED: ReadonlyArray<{ method: string; path: string; reason: 
   { method: "POST", path: "/api/session/:sessionID/question/:requestID/reply", reason: "v1 模式下 createCompatibleApi 改走 v1 的 /question/:id/reply(server-compat.ts:508);2.2.x 已删" },
   { method: "POST", path: "/api/session/:sessionID/question/:requestID/reject", reason: "v1 模式下改走 /question/:id/reject(server-compat.ts:514);2.2.x 已删" },
   // `#1662`:扫描改成不依赖排版(跨行写的链)之后才扫出的五条,都只在冻结 app 判定引擎是 v2 协议时发出;适配器的 /global/health 答
-  // healthy:true(本表首条),detectServerProtocol 因此恒判 v1(utils/server-protocol.ts:29)。
+  // healthy:true(本表首条),首探失败时 `/api/health` 同样答 healthy:true(`#1669`),detectServerProtocol 因此恒判 v1(utils/server-protocol.ts)。
   { method: "GET", path: "/api/event", reason: "v2 支路:server-sdk.tsx:268-272 只在协议不是 v1 时订阅 1.17.13 的 /api/event,v1 走 /global/event(已接)" },
   { method: "GET", path: "/api/permission/request", reason: "v2 支路:permission.tsx:264-269 与 global-sync/bootstrap.ts:447-450 在 v1 协议下改走 v1 的 GET /permission(已接)" },
   { method: "GET", path: "/api/question/request", reason: "v2 支路:global-sync/bootstrap.ts:483-486 在 v1 协议下改走 v1 的 GET /question(已接)" },

@@ -20,6 +20,7 @@ import { v1DecisionID, type DecisionInput, type DecisionOutcome, type Permission
 import { MESSAGE_PAGE, recentMessages, sessionDirectory } from "./session-cache"
 import {
   baseID,
+  queuedUserMessage,
   syntheticText,
   toFormAnswer,
   toPrompt,
@@ -32,6 +33,7 @@ import {
   toV1Project,
   toV1ModelList,
   toV1ProviderList,
+  toV1Queued,
   toV1Question,
   todosOf,
   turnAnchor,
@@ -173,6 +175,16 @@ async function messages(context: RouteContext) {
   const before = context.query.get("before") ?? undefined
   const page = await recentMessages(context.api, sessionID, { limit, cursor: before })
   const listed = toV1Messages(sessionID, page.context).filter((item) => page.ids.has(baseID(item.info.id)))
+  // `#1669`:最新一页带上收件箱里排着的用户输入(落成之前不是消息),与事件流投影的是同一条(events.ts queued)。取不到收件箱
+  // 不让整个会话打不开:记下,消息照回。
+  const inbox = before
+    ? []
+    : await context.api.session.inbox.list({ sessionID }).catch((error) => {
+        if (context.signal.aborted) throw error
+        console.error("[engine-adapter] inbox read failed", sessionID, error)
+        return []
+      })
+  const queued = toV1Queued(sessionID, page.context, inbox.flatMap((item) => queuedUserMessage(item) ?? []))
   // REQ-142:最近一个回合的改动挂回它的用户消息(只在最新一页取,turnDiffsOf 只读最近一个回合)。取不到改动不让整个会话
   // 打不开:记下(不静默),消息照回。
   const anchor = before ? undefined : turnAnchor(listed, page.context)
@@ -183,7 +195,7 @@ async function messages(context: RouteContext) {
         return undefined
       })
     : undefined
-  const response = json(anchor && diff ? withTurnDiffs(listed, new Map([[anchor.attach, diff]])) : listed)
+  const response = json([...(anchor && diff ? withTurnDiffs(listed, new Map([[anchor.attach, diff]])) : listed), ...queued])
   if (page.next) response.headers.set("x-next-cursor", page.next)
   return response
 }

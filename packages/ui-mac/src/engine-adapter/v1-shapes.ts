@@ -10,6 +10,7 @@ import type {
   ModelDefaultOutput,
   ModelListOutput,
   ProviderListOutput,
+  SessionInboxInfo,
   SessionMessageAssistant,
   SessionMessageInfo,
   SessionStructuredError,
@@ -195,6 +196,24 @@ export function toV1Messages(sessionID: string, source: readonly SessionMessageI
     const named = error && structured ? ({ ...info, error: v1TurnError(error, structured) } as Message) : info
     return { info: named, parts: renumbered.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) }
   })
+}
+
+// ── `#1669` 收件箱里排着的用户输入 ──────────────────────────────────────────────────────────────────
+// 0.1.26 的引擎一收到 prompt 就落一条用户消息(回合在跑也一样),界面当即显示气泡。2.x 只把它排进会话的收件箱,到下一步边界
+// 才投递成同 id 的用户消息(core session/projector.ts InboxDelivered,时间 = 投递时间);回合停在审批上时要等审批回答。所以排着的
+// 用户输入照它落成后的样子投影:id 相同,时间 = 受理时间(`session.inbox.enqueued` 帧与 `GET /inbox` 是同一个值)。
+
+/** 收件箱条目 → 落成后的那条 2.x 用户消息;不是用户输入(synthetic / 压缩 / 移动)⇒ undefined。 */
+export function queuedUserMessage(item: SessionInboxInfo): SessionMessageInfo | undefined {
+  if (item.type !== "user") return undefined
+  return { ...item.payload, id: item.id, type: "user", time: item.time }
+}
+
+/** 排着的输入接在最近一页后面一起投影(冻结投影按顺序取档位与模型),只交回它们 —— 它们排在最后,前面消息的投影不变。 */
+export function toV1Queued(sessionID: string, context: readonly SessionMessageInfo[], queued: readonly SessionMessageInfo[]) {
+  if (queued.length === 0) return []
+  const ids = new Set(queued.map((message) => message.id))
+  return toV1Messages(sessionID, [...context, ...queued]).filter((item) => ids.has(item.info.id))
 }
 
 // ── `#1669` 回合失败 → 0.1.26 回合错误卡读的形状 ─────────────────────────────────────────────────────────

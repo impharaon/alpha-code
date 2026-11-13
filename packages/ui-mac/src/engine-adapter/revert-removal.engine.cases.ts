@@ -11,7 +11,7 @@
 //   · 长对话:适配器重取的最近一页(按它自己的 recentMessages 读)在提交前不含回退边界、提交后不含一部分保留的消息。暂存期间
 //     什么都不删;暂存期间引擎又落下的消息(这里用 shell 命令代表,每条投影成用户 + 助手两条)提交时也被删;重发后两个窗口里的
 //     消息 = 引擎历史 = 重新加载,删掉的消息连 part 一起消失,不在最近一页的保留消息原样留着(「不在最近一页」不等于删了)。
-//   · 反向臂:同一条流去掉 `message.removed` ⇒ 被删的旧问答仍在 store 里,与引擎不一致(修之前就是这样)。
+//   · 反向臂:同一条流去掉被删消息的 `message.removed` ⇒ 被删的旧问答仍在 store 里,与引擎不一致(修之前就是这样)。
 //
 // 本文件由同名 `.test.ts` 宿主起独立 `bun test` 子进程跑。HOME / XDG 全在临时沙箱里,绝不碰 owner 的数据目录;凭据是合成的。
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
@@ -68,9 +68,9 @@ type Payload = { type: string; properties: any }
 
 /**
  * 一个窗口 = 一个 renderer:自己的生产适配器,冻结 app 的 serverSDK 那几样(server-sdk.tsx:client、兼容 API、按目录的 legacy 客户端),
- * 与它的会话 store。`drop` 只给反向臂用:这个类型的事件不交给 store。
+ * 与它的会话 store。`drop` 只给反向臂用:它认出的事件不交给 store。
  */
-async function openWindow(options: { subscribe: boolean; drop?: string }) {
+async function openWindow(options: { subscribe: boolean; drop?: (payload: Payload) => boolean }) {
   const origin = new URL(running.url).origin
   const engineFetch = createEngineFetch({ isEngineOrigin: (candidate) => candidate === origin, fetch: authorized }) as typeof fetch
   const server = { url: origin }
@@ -93,7 +93,7 @@ async function openWindow(options: { subscribe: boolean; drop?: string }) {
           if (!payload) continue
           if (payload.type === "server.connected") ready?.()
           received.push(payload)
-          if (payload.type !== options.drop) store.apply(payload)
+          if (!options.drop?.(payload)) store.apply(payload)
           if (payload.type === "session.idle") idles.set(payload.properties.sessionID, (idles.get(payload.properties.sessionID) ?? 0) + 1)
         }
       } catch {}
@@ -174,7 +174,11 @@ describe("#1669 编辑重发:引擎删掉的旧问答也从界面上消失", () 
   beforeAll(async () => {
     a = await openWindow({ subscribe: true })
     b = await openWindow({ subscribe: true })
-    unprojected = await openWindow({ subscribe: true, drop: "message.removed" })
+    // 只去掉引擎删掉的那些消息的 message.removed:收件箱输入投递时的换条(先删后发同 id,queued-prompt.engine.cases.ts)照常。
+    unprojected = await openWindow({
+      subscribe: true,
+      drop: (payload) => payload.type === "message.removed" && !!doomed?.includes(payload.properties.messageID),
+    })
     const created = await a.client.session.create({ directory: host.projectDirectory, title: "cp-1669-revert" } as never)
     sessionID = (created.data as { id: string }).id
     for (let turn = 1; turn <= TURNS; turn++) {

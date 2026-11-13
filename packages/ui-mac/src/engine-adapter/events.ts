@@ -13,7 +13,8 @@
 //   · 消息:流式增量(text / reasoning)直接转 message.part.delta;其余每个结构性事件之后重取最近一页消息,
 //     经 toV1Messages 投影,**只发有变化的** message.updated / message.part.updated —— 增量只用来让字一个个出来,
 //     内容以 2.x 存储为准。todowrite 工具的输入同时投影成 todo.updated(U1)。回退提交删掉的消息逐条发 message.removed
-//     (`#1669`,暂存时记下会被删的那些,见 staged)。
+//     (`#1669`,暂存时记下会被删的那些,见 staged)。收件箱里排着的用户输入照它落成后的样子先投影出来,投递时换成落成的那条
+//     (`#1669`,见 queued)。
 // 不认识的事件丢弃(它们在 v1 没有对应,冻结界面也不读)。
 import type { OpenCodeClient, OpenCodeEvent, SessionMessageInfo } from "@opencode/client/promise"
 import type { Part } from "@opencode-ai/sdk/v2/client"
@@ -27,9 +28,11 @@ import {
   baseID,
   contentKeys,
   partID,
+  queuedUserMessage,
   todosOf,
   toV1Messages,
   toV1Project,
+  toV1Queued,
   toV1Question,
   turnAnchor,
   v1ErrorData,
@@ -44,6 +47,7 @@ export const SNAPSHOT_WINDOW = 20
 
 /** 结构性的消息事件:之后按存储重取最近一页并发出变化。 */
 export const SNAPSHOT_EVENTS = new Set([
+  "session.inbox.enqueued",
   "session.inbox.delivered",
   "session.step.started",
   "session.step.streamed",
@@ -183,6 +187,19 @@ export function createProjector(
     for (const { info } of listed) if (pending.doomed.has(baseID(info.id))) pending.ids.add(info.id)
   }
 
+  /**
+   * `#1669`:会话 → 收件箱里排着的用户输入(inbox id = 落成后的消息 id)。0.1.26 一发出就是用户消息;2.x 回合停在审批上时,
+   * 追加的一句要等审批回答才落成消息。快照把排着的接在最近一页后面投影(v1-shapes.ts toV1Queued),投递即丢(停止不取消它,
+   * 留在收件箱等下一次投递;Code Puppy 没有取消收件箱的入口)。
+   */
+  const queued = new Map<string, Map<string, SessionMessageInfo>>()
+  /**
+   * 已投递、还没在快照里换成落成那条的 inbox id(按会话)。落成的那条时间是投递时间,与界面上排着的那条不同;冻结 store 按
+   * 「时间 + id」定位消息(event-reducer / server-session 的 message.updated),直接发会多出一条 —— 所以先 message.removed 再发。
+   * 不认得的也换:这个投影器之前打开的会话,排着的那条来自 `GET /session/:id/message`。
+   */
+  const delivered = new Map<string, Set<string>>()
+
   const remember = (key: string, value: unknown) => {
     const encoded = JSON.stringify(value)
     if (emitted.get(key) === encoded) return false
@@ -211,10 +228,15 @@ export function createProjector(
         fileChanges(directory, sessionID, anchor.from, diff)
       }
     }
-    for (const { info, parts } of withTurnDiffs(listed, turnDiffs)) {
-      if (remember(`message:${info.id}`, info)) emit(directory, { type: "message.updated", properties: { info } })
+    const pending = toV1Queued(sessionID, page.context, [...(queued.get(sessionID)?.values() ?? [])])
+    const replaced = delivered.get(sessionID)
+    delivered.delete(sessionID)
+    for (const { info, parts } of [...withTurnDiffs(listed, turnDiffs), ...pending]) {
+      const replacing = !!replaced?.has(info.id)
+      if (replacing) emit(directory, { type: "message.removed", properties: { sessionID, messageID: info.id } })
+      if (remember(`message:${info.id}`, info) || replacing) emit(directory, { type: "message.updated", properties: { info } })
       for (const part of parts) {
-        if (remember(`part:${part.id}`, part)) emit(directory, { type: "message.part.updated", properties: { part } })
+        if (remember(`part:${part.id}`, part) || replacing) emit(directory, { type: "message.part.updated", properties: { part } })
         todo(directory, sessionID, part)
       }
     }
@@ -391,6 +413,15 @@ export function createProjector(
       staged.set(sessionID, { boundary, doomed: new Set(), ids: new Set() })
       const page = await recentMessages(api, sessionID, { through: boundary })
       noteStaged(sessionID, page.context, toV1Messages(sessionID, page.context))
+    }
+    if (type === "session.inbox.enqueued") {
+      const message = queuedUserMessage({ ...data.item, id: data.inboxID, sessionID, time: { created: frame.created ?? Date.now() } })
+      if (message) queued.set(sessionID, (queued.get(sessionID) ?? new Map()).set(message.id, message))
+    }
+    if (type === "session.inbox.delivered") {
+      queued.get(sessionID)?.delete(data.inboxID)
+      if (queued.get(sessionID)?.size === 0) queued.delete(sessionID)
+      delivered.set(sessionID, (delivered.get(sessionID) ?? new Set()).add(data.inboxID))
     }
     if (type === "session.revert.cleared") staged.delete(sessionID)
     if (type === "session.revert.committed") {

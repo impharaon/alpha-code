@@ -237,6 +237,8 @@ describe("#1668 后台子代理完成通知之后的回合改动", () => {
           froms.push(url.searchParams.get("from"))
           return Response.json({ data: [change] })
         }
+        // `#1669`:打开会话时也读收件箱(排着的输入);这个回合早已结束,引擎回空。
+        if (url.pathname.endsWith("/inbox")) return Response.json({ data: [] })
         return Response.json({ data: [...session.final].reverse(), cursor: {} })
       }) as typeof fetch,
     })
@@ -269,6 +271,8 @@ describe("#1668 后台子代理完成通知之后的回合改动", () => {
           froms.push(url.searchParams.get("from"))
           return Response.json({ data: [change] })
         }
+        // `#1669`:打开会话时也读收件箱(排着的输入);这个回合早已结束,引擎回空。
+        if (url.pathname.endsWith("/inbox")) return Response.json({ data: [] })
         return Response.json({ data: [...background.final].reverse(), cursor: {} })
       }) as typeof fetch,
     })

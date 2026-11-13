@@ -10,9 +10,12 @@ import type {
   ModelDefaultOutput,
   ModelListOutput,
   ProviderListOutput,
+  SessionMessageAssistant,
   SessionMessageInfo,
+  SessionStructuredError,
 } from "@opencode/client/promise"
 import type {
+  AssistantMessage,
   Command,
   FileNode,
   Message,
@@ -157,14 +160,18 @@ export type V1MessageWithParts = { info: Message; parts: Part[] }
 
 /**
  * 2.x 的消息列表(时间升序)→ v1 `{info, parts}`。投影本身是冻结 app 的 normalizeSessionMessages;这里只把
- * part id 换成有序 id,并把 I11 的暂存附件文件合成回 v1 的 synthetic part。
+ * part id 换成有序 id,把 I11 的暂存附件文件合成回 v1 的 synthetic part,并把回合失败交成 0.1.26 回合错误卡读的形状
+ * (withFailedTurns、v1TurnError,`#1669`)。
  */
 export function toV1Messages(sessionID: string, source: readonly SessionMessageInfo[]): V1MessageWithParts[] {
-  const normalized = normalizeSessionMessages(sessionID, source as unknown as FrozenSource)
+  const turns = withFailedTurns(source)
+  const normalized = normalizeSessionMessages(sessionID, turns as unknown as FrozenSource)
   const assistantKeys = new Map<string, string[]>()
+  const errors = new Map<string, SessionStructuredError>()
   const continued = new Set<string>()
-  for (const message of source) {
+  for (const message of turns) {
     if (message.type === "assistant") assistantKeys.set(message.id, contentKeys(message.content as never))
+    if (message.type === "assistant" && message.error) errors.set(message.id, message.error)
     if (message.type === "user" && message.metadata?.[CONTINUE_METADATA_KEY] === true) continued.add(message.id)
   }
   return normalized.messages.map((info) => {
@@ -180,13 +187,67 @@ export function toV1Messages(sessionID: string, source: readonly SessionMessageI
         id: partID(info.id, position >= 0 ? position : index),
       } as Part
     })
-    const error = (info as { error?: { data?: { message?: unknown } } }).error
-    const named =
-      info.role === "assistant" && error && typeof error.data?.message === "string"
-        ? ({ ...info, error: { ...error, data: { ...error.data, ...v1ErrorData(error.data.message) } } } as Message)
-        : info
+    const error = info.role === "assistant" ? info.error : undefined
+    const structured = errors.get(info.id)
+    const named = error && structured ? ({ ...info, error: v1TurnError(error, structured) } as Message) : info
     return { info: named, parts: renumbered.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) }
   })
+}
+
+// ── `#1669` 回合失败 → 0.1.26 回合错误卡读的形状 ─────────────────────────────────────────────────────────
+// 0.1.26 的回合错误卡(timeline-model.ts turnErrorOf)读**助手消息**的 `error`,按错误名与状态码认原因(turnErrorCauseOf)。
+// 2.x 在两处与它对不上,各自让失败从界面上消失:
+
+/**
+ * ① 一步没开出来就失败(模型不可用 `provider.no-route`、平台凭据读不到),2.x 只在回合末的 `idle` 上记错误,没有带错误的助手消息;
+ * 冻结投影不读 `idle`,于是只剩用户气泡。这里在那条 `idle` 的位置换上一条同 id 的空助手消息带着这个错误(冻结投影照常把它挂到
+ * 这个回合的用户消息下)。回合起点与冻结投影同一判据:用户消息、带说明的 synthetic 开回合;shell 自带助手消息。
+ */
+function withFailedTurns(source: readonly SessionMessageInfo[]): SessionMessageInfo[] {
+  let agent = ""
+  let model: SessionMessageAssistant["model"] = { id: "", providerID: "" }
+  // 当前回合还没有哪条助手消息带着错误(回合外 = false)
+  let unreported = false
+  return source.map((message) => {
+    if (message.type === "agent-switched") agent = message.agent
+    if (message.type === "model-switched") model = message.model
+    if (message.type === "user" || (message.type === "synthetic" && !!message.description?.trim())) unreported = true
+    if (message.type === "shell") unreported = false
+    if (message.type === "assistant") {
+      agent = message.agent
+      model = message.model
+      if (message.error) unreported = false
+    }
+    if (message.type !== "idle" || message.outcome !== "failed" || !message.error || !unreported) return message
+    unreported = false
+    return {
+      id: message.id,
+      type: "assistant",
+      time: { created: message.time.created, completed: message.time.created },
+      agent,
+      model,
+      content: [],
+      finish: "error",
+      error: message.error,
+    } satisfies SessionMessageAssistant
+  })
+}
+
+/**
+ * ② 冻结投影把 2.x 的结构化错误一律压成 `UnknownError{message}`,状态码与类型丢掉,卡片认不出原因,只剩「这轮回复没有完成」。
+ * 这里按 0.1.26 引擎给同一类失败的名字还原(v0.1.26 packages/opencode/src/session/message-v2.ts fromError):
+ *   · 带 HTTP 状态 ⇒ `APIError{statusCode, responseBody}`(v1 的 APICallError 分支;401 / 402 / 403 / 429 由卡片认原因);
+ *   · `provider.auth` 不带状态(平台凭据读不到,引擎侧 to-session-error.ts 的 codepuppy 块)⇒ `ProviderAuthError`(v1 LoadAPIKeyError 分支);
+ *   · `provider.transport` ⇒ `APIError`(v1 结算联网失败的同一个名字;网络层另由 v1ErrorData 读回);
+ *   · 中断与其余照冻结投影的名字。文本一律经 v1ErrorData 去掉登记码前缀。
+ */
+function v1TurnError(frozen: NonNullable<AssistantMessage["error"]>, error: SessionStructuredError) {
+  const data = v1ErrorData(error.message)
+  if (frozen.name !== "MessageAbortedError" && error.status !== undefined)
+    return { name: "APIError", data: { ...data, statusCode: error.status, ...(error.response ? { responseBody: error.response.body } : {}) } }
+  if (frozen.name !== "MessageAbortedError" && error.type === "provider.auth") return { name: "ProviderAuthError", data }
+  if (frozen.name !== "MessageAbortedError" && error.type === "provider.transport") return { name: "APIError", data }
+  return { ...frozen, data: { ...frozen.data, ...data } }
 }
 
 // ── 工具 part:2.x 内建工具的入参 / metadata → 冻结工具卡读的 v1 键 ───────────────────────────────────────

@@ -12,6 +12,8 @@ import { pathToFileURL } from "node:url"
 import { build } from "vite"
 import type * as Runtime from "./toast-lifetime-test-runtime"
 import { dict as zh } from "../i18n/zh"
+import { toV1Messages } from "../../engine-adapter/v1-shapes"
+import { projectTimelineRows } from "./session-timeline/timeline-model"
 
 const runtimeDirectory = mkdtempSync(join(tmpdir(), "codepuppy-problems-entry-"))
 await build({
@@ -275,6 +277,60 @@ describe("#1687 startup quiet window", () => {
     expect(entry()).toBeNull()
     advance(10_000)
   })
+})
+
+// `#1669`:用户自己发出的那一轮失败,在 #1687 的规则下照样留在它的回合上。两条 2.x 消息页取自嵌入式引擎的真记录
+// (turn-failure.engine.cases.ts「BYOK Key 无效」与「平台凭据读不到」两例,`GET /api/session/:id/message?order=asc`,712cafff27):
+// 同一个原因(auth)、一条带助手消息、一条只有回合末的 idle。经生产适配器(toV1Messages)与时间线模型(projectTimelineRows)
+// 投成回合错误行,挂真 TurnErrorCard。对照臂:同一句话若走弹出提示(pushToast 报错),启动静默窗口里屏幕上什么都没有。
+const BYOK_401_TURN = [{"id":"msg_1d3318250001YvQmOGb7csAAbR","time":{"created":1794544599632},"type":"agent-switched","agent":"build"},{"id":"msg_1d3318251001oKlVr1sN6teyug","time":{"created":1794544599633},"type":"model-switched","model":{"id":"deepseek-flash","providerID":"deepseek-byok"}},{"id":"msg_1d3318252001pG37Ua7bpz2iox","time":{"created":1794544599638},"text":"fake key turn","type":"user"},{"id":"msg_1d3318260001q0F4NCbblUP645","time":{"created":1794544599661,"completed":1794544599668},"type":"assistant","agent":"build","model":{"id":"deepseek-flash","providerID":"deepseek-byok","variant":"default"},"content":[],"finish":"error","error":{"type":"provider.auth","message":"Authentication Fails, Your api key: ****-key is invalid","status":401,"response":{"body":"{\"error\":{\"message\":\"Authentication Fails, Your api key: ****-key is invalid\",\"type\":\"authentication_error\",\"param\":null,\"code\":\"invalid_request_error\"}}"}}},{"id":"msg_1d3318276001407R51rZdsjdJO","time":{"created":1794544599670},"type":"idle","outcome":"failed","error":{"type":"provider.auth","message":"Authentication Fails, Your api key: ****-key is invalid","status":401,"response":{"body":"{\"error\":{\"message\":\"Authentication Fails, Your api key: ****-key is invalid\",\"type\":\"authentication_error\",\"param\":null,\"code\":\"invalid_request_error\"}}"}}}]
+const CREDENTIAL_TURN = [{"id":"msg_1d33183df001l7hbhOa1Ile6oo","time":{"created":1794544600031},"type":"agent-switched","agent":"build"},{"id":"msg_1d33183df0024nEYnP9nRuL8A8","time":{"created":1794544600031},"type":"model-switched","model":{"id":"m","providerID":"codepuppy"}},{"id":"msg_1d33183e000106V27TFXc7kDdF","time":{"created":1794544600035},"text":"credential gone","type":"user"},{"id":"msg_1d33183eb001zis0PXpYJRN964","time":{"created":1794544600043},"type":"idle","outcome":"failed","error":{"type":"provider.auth","message":"Code Puppy platform credential could not be read — the request was not sent. Retry, or sign in again."}}]
+
+test("#1669: a turn failure from the user's own send stays on its turn card through the quiet window, 8 s, a same-cause report and a second failure", async () => {
+  runtime.beginStartupQuiet()
+  const exits: string[] = []
+  const pages: unknown[][] = [BYOK_401_TURN]
+  const rows = () =>
+    pages.flatMap((page, index) => {
+      const messages = toV1Messages(`ses_cp1669_${index}`, page as never)
+      return projectTimelineRows({
+        messages: messages.map((item) => item.info),
+        partsOf: (id) => messages.find((item) => item.info.id === id)?.parts ?? [],
+        status: "idle",
+      })
+    })
+  const host = document.createElement("div")
+  document.body.append(host)
+  const intents = { signIn: () => exits.push("signIn"), openSettings: () => exits.push("openSettings") }
+  let dispose = runtime.render(() => runtime.TurnErrorCards({ rows, intents }), host)
+  const cards = () => [...host.querySelectorAll<HTMLElement>("[data-codepuppy-timeline-row='turn-error']")]
+  const shown = () =>
+    cards().map((card) => ({
+      title: card.querySelector("b")?.textContent,
+      actions: [...card.querySelectorAll("[data-codepuppy-turn-error-actions] button")].map((button) => button.textContent),
+    }))
+  const auth = { title: zh["codepuppy.timeline.turnErrorAuth"], actions: [zh["codepuppy.timeline.turnErrorSignIn"], zh["codepuppy.timeline.turnErrorSettings"]] }
+  await settle()
+  // 窗口里、发出即失败:卡片在,0.1.26 的标题与两个出路。
+  expect(shown()).toEqual([auth])
+  // 对照臂:同一句话走弹出提示 ⇒ 静默窗口把它收进入口,屏幕上没有。
+  runtime.pushToast({ kind: "error", title: auth.title })
+  await settle()
+  expect(toasts()).toHaveLength(0)
+  // 同因再报(后台问题的合并键)、过了窗口与 8 秒收起:卡片不动。
+  report("test:auth", auth.title)
+  advance(runtime.STARTUP_QUIET_MS + runtime.TOAST_BACKGROUND_MS + 1_000)
+  await settle()
+  expect(shown()).toEqual([auth])
+  // 第二轮同一原因的失败(只有 idle 的那种)⇒ 各自一张卡,不合并。
+  dispose()
+  pages.push(CREDENTIAL_TURN)
+  dispose = runtime.render(() => runtime.TurnErrorCards({ rows, intents }), host)
+  await settle()
+  expect(shown()).toEqual([auth, auth])
+  cards()[1]!.querySelector<HTMLButtonElement>("[data-codepuppy-turn-error-actions] button")!.click()
+  expect(exits).toEqual(["signIn"])
+  dispose()
 })
 
 test("R6: a platform catalog refresh failure is a background problem; refresh success clears it; 重试 calls the manual refresh", async () => {

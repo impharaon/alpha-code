@@ -8,6 +8,7 @@ import { ModelResolver } from "../model-resolver.js"
 import { ModelRetry } from "../model-retry.js"
 import { SessionRunnerModel } from "./runner/model.js"
 import { classifyNetFailure, engineNetFailurePath, withFailureCode } from "@opencode/schema/codepuppy-net-failure" // codepuppy(#1572)
+import { LoadAPIKeyError } from "@ai-sdk/provider" // codepuppy(#1669)
 
 const tokenSharingMessages = {
   subscription_sharing_user_not_eligible:
@@ -100,6 +101,11 @@ export function toSessionError(cause: unknown): SessionError.Error {
   )
     return { type: "provider.no-route", message: cause.message }
   if (cause instanceof Integration.AuthorizationError) return { type: "provider.auth", message: cause.message }
+  // codepuppy(#1669) ── Code Puppy reads its platform credential at the request boundary (packages/ext
+  // platform-credential-header.ts) and throws the SDK's LoadAPIKeyError, before anything is sent, when it cannot. That is an
+  // authentication failure, as v1 recorded it (message-v2.ts fromError), so the desktop offers sign-in again.
+  if (LoadAPIKeyError.isInstance(cause)) return { type: "provider.auth", message: cause.message }
+  // codepuppy ── end
   return { type: "unknown", message: cause instanceof Error ? cause.message : String(cause) }
 }
 

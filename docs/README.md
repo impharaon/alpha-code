@@ -402,6 +402,7 @@ status.
 | `SPEC-project-agent-fields` | [specs/project-agent-fields/spec.md](specs/project-agent-fields/spec.md) | 项目文档里给 agent 写的 disable、tools、temperature 等字段在新引擎上重新生效,用不上的字段有记录可查 | approved |
 | `SPEC-project-mcp-installation` | [specs/project-mcp-installation/spec.md](specs/project-mcp-installation/spec.md) | 连接器可装到全局或当前项目并保持隔离，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-puppy-brand-icons` | [specs/puppy-brand-icons/spec.md](specs/puppy-brand-icons/spec.md) | 应用和各渠道使用一致的小狗标志，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `DESIGN-remote-database-connector` | [specs/remote-database-connector/design.md](specs/remote-database-connector/design.md) | 用户在连接器窗口填写并确认的「地址:端口」写进只有主进程能写的目标真源,作为动态半场的成员进入策略代理的放行集合;连接器进程里的隧道垫片把数据库驱动的 TCP 连接改走现有 CONNECT 代理,seatbelt 围栏一字不改;只读靠 DBHub 只读配置加只读事务,能约束整棵进程树的只有数据库账号权限;密码沿用官方连接器密钥保管;Windows/Linux 本期不交付 | draft |
 | `SPEC-remote-database-connector` | [specs/remote-database-connector/spec.md](specs/remote-database-connector/spec.md) | 用户可在安全边界内连接自己的远程数据库，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-resident-project-watchers` | [specs/resident-project-watchers/spec.md](specs/resident-project-watchers/spec.md) | 长期使用项目时监听与内存保持受控，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-responsive-session-rail` | [specs/responsive-session-rail/spec.md](specs/responsive-session-rail/spec.md) | 右栏可以调宽并为聊天区保留空间，按历史条文与实际证明登记范围。 | approved |

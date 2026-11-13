@@ -726,6 +726,7 @@ it.live("权威 · 项目可执行扩展的同意(C10 / P10;`#1709`):项目自�
     yield* activate(CodePuppyExt, { mcp: revoked })
     expect(revoked.servers.has("proj")).toBe(false)
     expect(probe()).toBe(1)
+    expect(yield* exploreEdit).toBe("deny") // 第三个消费方同样收回:项目写给 explore 的 edit: allow 不再生效(审计 Minor 3)
   }),
 )
 

@@ -363,7 +363,7 @@ describe("#1709 项目扩展的信任只认 main 的记录", () => {
   const decide = (dir: string, granted: boolean) =>
     expect(recordProjectTrustDecision(projectTrustIdentity(identityOf(dir).directory)!, granted, "2026-11-13T00:00:00.000Z", () => {})).toEqual({ ok: true })
 
-  test("冒充:项目自带旧写法的「已同意」(两种形状)、项目里放一份同名的合法记录、prefs.json 链到真记录文件 ⇒ 都不算;同一份真记录里登记过的项目照常算", () => {
+  test("冒充:项目自带旧写法的「已同意」(两种形状)、项目里放一份同名的合法记录 ⇒ 都不算;真记录里登记过的项目照常算", () => {
     const a = makeProject("a")
     const b = makeProject("b")
     // 0.1.x main 写的形状与 Issue 复现的最小形状
@@ -376,12 +376,16 @@ describe("#1709 项目扩展的信任只认 main 的记录", () => {
     mkdirSync(join(a, PROJECT_HIDDEN_DIR, "project-trust"))
     writeFileSync(join(a, PROJECT_HIDDEN_DIR, "project-trust", "dev.json"), j({ v: 1, projects: { [own.directory]: { ino: own.ino, version: 1, granted: true, decidedAt: "x" } } }))
     expect(consent(a)).toBe(false)
-    // 真记录里只有 b;a 的 prefs.json 换成指向真记录文件的符号链接
     decide(b, true)
     expect(consent(b)).toBe(true)
-    rmSync(join(a, PROJECT_HIDDEN_DIR, "prefs.json"))
-    symlinkSync(join(stateRoot, "project-trust", "dev.json"), join(a, PROJECT_HIDDEN_DIR, "prefs.json"))
-    expect(consent(a)).toBe(false)
+  })
+
+  test("冒充(审计 Minor 2):项目 prefs.json 是指向状态目录里一份写着「已同意」的文件的符号链接 ⇒ 不算", () => {
+    const c = makeProject("c")
+    const lookalike = join(stateRoot, "consent-lookalike.json")
+    writeFileSync(lookalike, j({ extensionsConsent: { granted: true } }))
+    symlinkSync(lookalike, join(c, PROJECT_HIDDEN_DIR, "prefs.json"))
+    expect(consent(c)).toBe(false)
   })
 
   test("记录本身:当前告知版本以外的条目不算;拒绝不算;位置只由 main 派生的根算出 —— CODEPUPPY_GLOBAL_DIR 不是 `<base>/env/<env>` ⇒ 一个都不信任", () => {

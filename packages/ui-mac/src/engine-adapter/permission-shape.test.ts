@@ -3,10 +3,10 @@
 // 回复与回执按 L4 的推导规格实现,行为由 permission-reply.test.ts 钉住;这里只钉三个回复入口都接上了。
 import { describe, expect, spyOn, test } from "bun:test"
 import fixture from "./fixtures/permission-asked.json"
-import { createProjector, type V1Payload } from "./events"
+import { createProjector, type V1Payload } from "./opencode2/events"
 import { createEngineFetch } from "./index"
-import { createPermissionReplies } from "./permission-replies"
-import { toV1PermissionRequest } from "./v1-shapes"
+import { createReceiptLedger } from "./contract/receipts"
+import { toV1PermissionRequest } from "./opencode2/v1-shapes"
 
 const I7A_METADATA = {
   identity: { kind: "builtin", name: "read" },
@@ -21,7 +21,7 @@ describe("#1668 I7a 审批请求 2.x → v1", () => {
   test("事件流:action/resources/save/source 映射回 v1 的 permission/patterns/always/tool,metadata 四键原样透传", async () => {
     const events: V1Payload[] = []
     const api = { session: { get: async () => ({ location: { directory: fixture.frame.location.directory } }) } }
-    const projector = createProjector(api as never, (_directory, payload) => events.push(payload), createPermissionReplies())
+    const projector = createProjector(api as never, (_directory, payload) => events.push(payload), createReceiptLedger())
     await projector({ ...fixture.frame, data: asked } as never)
     expect(events).toEqual([
       {
@@ -49,7 +49,7 @@ describe("#1668 I7a 审批请求 2.x → v1", () => {
   })
 
   test("反向臂:直接用冻结 app 的 1.17.13 归一(不补 2.x 的 `source.id`)⇒ 审批卡丢掉工具调用 id", async () => {
-    const { normalizePermissionRequest } = await import("./frozen-shapes")
+    const { normalizePermissionRequest } = await import("../../../codepuppy-app/src/context/global-sync/utils")
     expect((normalizePermissionRequest(asked as never).tool as { callID?: string }).callID).toBeUndefined()
   })
 

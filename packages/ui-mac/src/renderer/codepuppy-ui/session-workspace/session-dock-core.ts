@@ -1,6 +1,6 @@
 // REQ-125 C7:composer dock 的纯逻辑核(typed 数据 → UI 判定,零 DOM)。
 
-import type { Message, ModelV2Info, QuestionInfo, QuestionRequest, Session, Todo } from "@opencode-ai/sdk/v2/client"
+import type { Message, ModelV2Info, QuestionInfo, QuestionRequest, Session, Todo } from "../../../engine-adapter/contract/v1"
 import type { TimelineTurnWait } from "../session-timeline/timeline-model"
 
 /**

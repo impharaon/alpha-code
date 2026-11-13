@@ -14,9 +14,9 @@ import {
 import parity from "./fixtures/parity.json"
 import readTool from "./fixtures/read-tool.json"
 import tools from "./fixtures/tools.json"
-import { createProjector, type V1Payload } from "./events"
-import { createPermissionReplies } from "./permission-replies"
-import { toV1Messages } from "./v1-shapes"
+import { createProjector, type V1Payload } from "./opencode2/events"
+import { createReceiptLedger } from "./contract/receipts"
+import { toV1Messages } from "./opencode2/v1-shapes"
 
 type Session = { sessionID: string; records: Array<{ frame: { type: string; data: any }; snapshot?: { data: any[] } }>; final: any[] }
 const sessions = tools.sessions as unknown as Record<"delegate" | "background" | "edit" | "shell" | "patch", Session>
@@ -72,7 +72,7 @@ describe("#1668 F1 2.x 工具 payload → 冻结工具卡", () => {
       (_directory, payload: V1Payload) => {
         if (payload.type === "message.part.updated") parts.push((payload.properties as { part: unknown }).part)
       },
-      createPermissionReplies(),
+      createReceiptLedger(),
     )
     for (const record of records) {
       current = record
@@ -188,7 +188,7 @@ describe("#1668 0.1.26 对照:读目录与运行中的 shell", () => {
           const body = toolCardBodyOf(part)
           if (body.type === "term" && body.streaming && body.output) outputs.push(body.output)
         },
-        createPermissionReplies(),
+        createReceiptLedger(),
       )
       const settled = records.findIndex((record) => record.frame.type === "session.tool.success")
       for (const [index, record] of records.entries()) {

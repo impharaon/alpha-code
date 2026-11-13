@@ -10,9 +10,9 @@ import { applyDirectoryEvent } from "../../../codepuppy-app/src/context/global-s
 import readTool from "./fixtures/read-tool.json"
 import todo from "./fixtures/todo.json"
 import question from "./fixtures/question.json"
-import { createProjector, SNAPSHOT_EVENTS, TURN_DIFF_EVENTS, TURN_END_EVENTS, type V1Payload } from "./events"
-import { createPermissionReplies } from "./permission-replies"
-import { toV1Messages } from "./v1-shapes"
+import { createProjector, SNAPSHOT_EVENTS, TURN_DIFF_EVENTS, TURN_END_EVENTS, type V1Payload } from "./opencode2/events"
+import { createReceiptLedger } from "./contract/receipts"
+import { toV1Messages } from "./opencode2/v1-shapes"
 
 type Fixture = {
   directory: string
@@ -50,7 +50,7 @@ function replayApi(fixture: Fixture) {
 async function project(fixture: Fixture) {
   const events: Array<{ directory: string; payload: V1Payload }> = []
   const { api, at } = replayApi(fixture)
-  const projector = createProjector(api as never, (directory, payload) => events.push({ directory, payload }), createPermissionReplies())
+  const projector = createProjector(api as never, (directory, payload) => events.push({ directory, payload }), createReceiptLedger())
   for (const record of fixture.records) {
     at(record)
     await projector(record.frame as never)

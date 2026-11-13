@@ -1,4 +1,4 @@
-import type { ModelRef, ModelV2Info } from "@opencode-ai/sdk/v2/client"
+import type { ModelRef, ModelV2Info } from "../../engine-adapter/contract/v1"
 import type { EffectiveCatalog, PricingMultiplier, ProviderKeyStatus } from "../../shared/codepuppy-model-types"
 import { byokEngineId, byokModelMeta, isByokEngineId } from "../../shared/codepuppy-model-types"
 import type { ComposerModel } from "./composer-state"

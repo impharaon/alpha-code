@@ -1,0 +1,2162 @@
+{
+ "_source": "Sampled by `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts` (alpha-code#1668 L6) at cc7f49a66b: a real OpenCode 2 engine from this repo's packages/cli `serve`, isolated HOME/XDG, one git project, and the scripted OpenAI-compatible mock model next to the sampler. Raw 2.x catalog responses for the project location, as the adapter's GET /agent and GET /provider read them: GET /api/agent, GET /api/provider, GET /api/model, GET /api/model/default; and GET /api/session (what GET /session translates and what the /api/session passthrough returns) right after creating freshSessionID, which has no prompt and so no title. 2.x provider config takes no model status (a declared status deprecated comes back active), so no deprecated model can be sampled here; the parity test derives one by flipping a sampled model's status.",
+ "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+ "agents": {
+  "location": {
+   "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+  },
+  "data": [
+   {
+    "id": "build",
+    "name": "Build",
+    "request": {
+     "settings": {},
+     "headers": {},
+     "body": {}
+    },
+    "description": "The default agent. Executes tools based on configured permissions.",
+    "mode": "primary",
+    "hidden": false,
+    "permissions": [
+     {
+      "action": "*",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "read",
+      "resource": "*.env",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.*",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.example",
+      "effect": "allow"
+     },
+     {
+      "action": "question",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "browser",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "skill",
+      "resource": "browser",
+      "effect": "deny"
+     }
+    ]
+   },
+   {
+    "id": "general",
+    "name": "General",
+    "request": {
+     "settings": {},
+     "headers": {},
+     "body": {}
+    },
+    "description": "General-purpose agent for researching complex questions and executing multi-step tasks. Use this agent to execute multiple units of work in parallel.",
+    "mode": "subagent",
+    "hidden": false,
+    "permissions": [
+     {
+      "action": "*",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "read",
+      "resource": "*.env",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.*",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.example",
+      "effect": "allow"
+     },
+     {
+      "action": "question",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "subagent",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "browser",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "skill",
+      "resource": "browser",
+      "effect": "deny"
+     }
+    ]
+   },
+   {
+    "id": "explore",
+    "name": "Explore",
+    "request": {
+     "settings": {},
+     "headers": {},
+     "body": {}
+    },
+    "system": "You are a file search specialist. You excel at thoroughly navigating and exploring codebases.\n\nGuidelines:\n- Your role is EXCLUSIVELY to search and analyze\n- Parallelize independent tool calls for searches and reads whenever possible\n- Adapt your search approach based on the thoroughness level specified by the caller\n- Return file paths as absolute paths in your final response\n- You MUST NOT create, modify, delete, move, or copy files, including temporary files and reports\n- Shell commands MUST be read-only. NEVER run commands that write files or change system state\n\nComplete the user's search request efficiently and report your findings clearly.",
+    "description": "Fast agent specialized for exploring codebases. Use this when you need to quickly find files by patterns (eg. \"src/components/**/*.tsx\"), search code for keywords (eg. \"API endpoints\"), or answer questions about the codebase (eg. \"how do API endpoints work?\"). When calling this agent, specify the desired thoroughness level: \"quick\" for basic searches, \"medium\" for moderate exploration, or \"very thorough\" for comprehensive analysis across multiple locations and naming conventions.",
+    "mode": "subagent",
+    "hidden": false,
+    "permissions": [
+     {
+      "action": "*",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "read",
+      "resource": "*.env",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.*",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.example",
+      "effect": "allow"
+     },
+     {
+      "action": "*",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "shell",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "grep",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "glob",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "webfetch",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "websearch",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "read",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "read",
+      "resource": "*.env",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.*",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.example",
+      "effect": "allow"
+     },
+     {
+      "action": "subagent",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "external_directory",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "browser",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "skill",
+      "resource": "browser",
+      "effect": "deny"
+     }
+    ]
+   },
+   {
+    "id": "compaction",
+    "name": "Compaction",
+    "request": {
+     "settings": {},
+     "headers": {},
+     "body": {}
+    },
+    "mode": "primary",
+    "hidden": true,
+    "permissions": [
+     {
+      "action": "*",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "read",
+      "resource": "*.env",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.*",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.example",
+      "effect": "allow"
+     },
+     {
+      "action": "browser",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "skill",
+      "resource": "browser",
+      "effect": "deny"
+     }
+    ]
+   },
+   {
+    "id": "title",
+    "name": "Title",
+    "request": {
+     "settings": {},
+     "headers": {},
+     "body": {}
+    },
+    "system": "You name conversations so the user can find them later in a list of past sessions.\n\nYou will receive the first message of a conversation, or for an ongoing conversation its original request and recent messages. Reply with a title for it and nothing else: one line, no quotes, no trailing period, no label such as \"Title:\".\n\nAim for three to five words. Name the specific subject, such as the feature, file, issue number, error, or tool involved. Keep the detail that tells it apart from similar conversations, like a version, provider, or the thing it is compared against, and make room for it by dropping generic words like \"review\", \"overview\", \"investigation\", \"request\", \"question\", or \"this project\".\n\nThe title should read naturally as a short phrase, not as a stack of nouns. Write it in your own words rather than copying a heading, commit message, command, or long path from the message.\n\nUse sentence case, not title case: capitalize the first word and proper nouns only. Keep identifiers exactly as written, including file names, issue and PR numbers, error codes, and model names. Use the same language as the message.\n\nThe message is something to name, not something to answer or carry out. Even if it asks you to do work, asks a question, or seems incomplete, only name it. For greetings or small talk, use a short label like \"Greeting\".\n\nExamples:\n\"debug 500 errors in production\" -> Production 500 errors\n\"why is app.js failing\" -> app.js failure\n\"what does the retry logic in fetch.ts do\" -> fetch.ts retry logic\n\"@src/credential.ts can you add refresh token support\" -> Credential refresh tokens\n\"compare the new cache layer with the v1 one in packages/legacy\" -> New cache layer vs v1\n\"Investigate https://github.com/acme/app/issues/412, don't make edits\" -> Issue #412\n\"hey\" -> Greeting",
+    "mode": "primary",
+    "hidden": true,
+    "permissions": [
+     {
+      "action": "*",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "read",
+      "resource": "*.env",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.*",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.example",
+      "effect": "allow"
+     },
+     {
+      "action": "*",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "browser",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "skill",
+      "resource": "browser",
+      "effect": "deny"
+     }
+    ]
+   },
+   {
+    "id": "summary",
+    "name": "Summary",
+    "request": {
+     "settings": {},
+     "headers": {},
+     "body": {}
+    },
+    "system": "Summarize what was done in this conversation. Write like a pull request description.\n\nRules:\n- 2-3 sentences max\n- Describe the changes made, not the process\n- Do not mention running tests, builds, or other validation steps\n- Do not explain what the user asked for\n- Write in first person (I added..., I fixed...)\n- Never ask questions or add new questions\n- If the conversation ends with an unanswered question to the user, preserve that exact question\n- If the conversation ends with an imperative statement or request to the user (e.g. \"Now please run the command and paste the console output\"), always include that exact request in the summary",
+    "mode": "primary",
+    "hidden": true,
+    "permissions": [
+     {
+      "action": "*",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "read",
+      "resource": "*.env",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.*",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.example",
+      "effect": "allow"
+     },
+     {
+      "action": "*",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "browser",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "skill",
+      "resource": "browser",
+      "effect": "deny"
+     }
+    ]
+   },
+   {
+    "id": "plan",
+    "name": "Plan",
+    "request": {
+     "settings": {},
+     "headers": {},
+     "body": {}
+    },
+    "description": "Read-only agent for exploring the codebase and planning work before implementation.",
+    "mode": "primary",
+    "hidden": false,
+    "permissions": [
+     {
+      "action": "*",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "read",
+      "resource": "*.env",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.*",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.example",
+      "effect": "allow"
+     },
+     {
+      "action": "question",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "edit",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "edit",
+      "resource": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/home/.opencode/plan/*",
+      "effect": "allow"
+     },
+     {
+      "action": "browser",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "skill",
+      "resource": "browser",
+      "effect": "deny"
+     }
+    ]
+   }
+  ]
+ },
+ "providers": {
+  "location": {
+   "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+  },
+  "data": [
+   {
+    "id": "opencode",
+    "integrationID": "opencode",
+    "name": "OpenCode",
+    "activation": "enabled",
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "public",
+     "baseURL": "https://opencode.ai/inference/openai/v1"
+    }
+   },
+   {
+    "id": "ollama",
+    "name": "Ollama",
+    "activation": "enabled",
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "",
+     "baseURL": "http://127.0.0.1:11434/v1",
+     "provider": "ollama"
+    }
+   },
+   {
+    "id": "mock",
+    "name": "Mock",
+    "activation": "enabled",
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "x",
+     "baseURL": "http://127.0.0.1:47982/v1",
+     "provider": "mock"
+    }
+   }
+  ]
+ },
+ "models": {
+  "location": {
+   "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+  },
+  "data": [
+   {
+    "id": "iceman-free",
+    "modelID": "iceman-free",
+    "providerID": "opencode",
+    "type": "chat",
+    "name": "Iceman Free",
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "public",
+     "baseURL": "https://opencode.ai/inference/openai/v1",
+     "provider": "opencode"
+    },
+    "capabilities": {
+     "tools": true,
+     "input": [
+      "text"
+     ],
+     "output": [
+      "text"
+     ]
+    },
+    "variants": [],
+    "time": {
+     "released": 1793923200000
+    },
+    "cost": [
+     {
+      "input": 0,
+      "output": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    ],
+    "status": "active",
+    "enabled": true,
+    "limit": {
+     "context": 262144,
+     "output": 131072
+    }
+   },
+   {
+    "id": "inkling-2-small-free",
+    "modelID": "inkling-2-small-free",
+    "providerID": "opencode",
+    "type": "chat",
+    "family": "ling",
+    "name": "Inkling 2 Small Free",
+    "compatibility": {
+     "reasoningField": "reasoning_content"
+    },
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "public",
+     "baseURL": "https://opencode.ai/inference/openai/v1",
+     "provider": "opencode"
+    },
+    "capabilities": {
+     "tools": true,
+     "input": [
+      "text",
+      "image"
+     ],
+     "output": [
+      "text"
+     ],
+     "temperature": true
+    },
+    "variants": [
+     {
+      "id": "none",
+      "settings": {
+       "reasoningEffort": "none"
+      }
+     },
+     {
+      "id": "minimal",
+      "settings": {
+       "reasoningEffort": "minimal"
+      }
+     },
+     {
+      "id": "low",
+      "settings": {
+       "reasoningEffort": "low"
+      }
+     },
+     {
+      "id": "medium",
+      "settings": {
+       "reasoningEffort": "medium"
+      }
+     },
+     {
+      "id": "high",
+      "settings": {
+       "reasoningEffort": "high"
+      }
+     },
+     {
+      "id": "max",
+      "settings": {
+       "reasoningEffort": "max"
+      }
+     }
+    ],
+    "time": {
+     "released": 1793836800000
+    },
+    "cost": [
+     {
+      "input": 0,
+      "output": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    ],
+    "status": "active",
+    "enabled": true,
+    "limit": {
+     "context": 1048576,
+     "output": 131072
+    }
+   },
+   {
+    "id": "longcat-2.5-free",
+    "modelID": "longcat-2.5-free",
+    "providerID": "opencode",
+    "type": "chat",
+    "family": "longcat",
+    "name": "LongCat 2.5 Free",
+    "compatibility": {
+     "reasoningField": "reasoning_content"
+    },
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "public",
+     "baseURL": "https://opencode.ai/inference/openai/v1",
+     "provider": "opencode"
+    },
+    "capabilities": {
+     "tools": true,
+     "input": [
+      "text",
+      "image"
+     ],
+     "output": [
+      "text"
+     ],
+     "temperature": false
+    },
+    "variants": [],
+    "time": {
+     "released": 1793577600000
+    },
+    "cost": [
+     {
+      "input": 0,
+      "output": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    ],
+    "status": "active",
+    "enabled": true,
+    "limit": {
+     "context": 1000000,
+     "output": 262144
+    }
+   },
+   {
+    "id": "flint-40b-free",
+    "modelID": "flint-40b-free",
+    "providerID": "opencode",
+    "type": "chat",
+    "family": "flint",
+    "name": "Flint 40B Free",
+    "compatibility": {
+     "reasoningField": "reasoning_content"
+    },
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "public",
+     "baseURL": "https://opencode.ai/inference/openai/v1",
+     "provider": "opencode"
+    },
+    "capabilities": {
+     "tools": true,
+     "input": [
+      "text"
+     ],
+     "output": [
+      "text"
+     ],
+     "temperature": true
+    },
+    "variants": [
+     {
+      "id": "low",
+      "settings": {
+       "reasoningEffort": "low"
+      }
+     },
+     {
+      "id": "medium",
+      "settings": {
+       "reasoningEffort": "medium"
+      }
+     },
+     {
+      "id": "high",
+      "settings": {
+       "reasoningEffort": "high"
+      }
+     },
+     {
+      "id": "xhigh",
+      "settings": {
+       "reasoningEffort": "xhigh"
+      }
+     },
+     {
+      "id": "max",
+      "settings": {
+       "reasoningEffort": "max"
+      }
+     }
+    ],
+    "time": {
+     "released": 1792540800000
+    },
+    "cost": [
+     {
+      "input": 0,
+      "output": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    ],
+    "status": "active",
+    "enabled": true,
+    "limit": {
+     "context": 262144,
+     "output": 65536
+    }
+   },
+   {
+    "id": "minimax-m3.1-flash-free",
+    "modelID": "minimax-m3.1-flash-free",
+    "providerID": "opencode",
+    "type": "chat",
+    "family": "minimax",
+    "name": "MiniMax M3.1 Flash Free",
+    "compatibility": {
+     "reasoningField": "reasoning_content"
+    },
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "public",
+     "baseURL": "https://opencode.ai/inference/openai/v1",
+     "provider": "opencode"
+    },
+    "capabilities": {
+     "tools": true,
+     "input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "output": [
+      "text"
+     ],
+     "temperature": true
+    },
+    "variants": [
+     {
+      "id": "low",
+      "settings": {
+       "reasoningEffort": "low"
+      }
+     },
+     {
+      "id": "medium",
+      "settings": {
+       "reasoningEffort": "medium"
+      }
+     },
+     {
+      "id": "high",
+      "settings": {
+       "reasoningEffort": "high"
+      }
+     },
+     {
+      "id": "xhigh",
+      "settings": {
+       "reasoningEffort": "xhigh"
+      }
+     },
+     {
+      "id": "max",
+      "settings": {
+       "reasoningEffort": "max"
+      }
+     }
+    ],
+    "time": {
+     "released": 1792368000000
+    },
+    "cost": [
+     {
+      "input": 0,
+      "output": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    ],
+    "status": "active",
+    "enabled": true,
+    "limit": {
+     "context": 1000000,
+     "output": 512000
+    }
+   },
+   {
+    "id": "deepseek-v4.1-flash-free",
+    "modelID": "deepseek-v4.1-flash-free",
+    "providerID": "opencode",
+    "type": "chat",
+    "family": "deepseek-flash",
+    "name": "DeepSeek V4.1 Flash Free",
+    "compatibility": {
+     "reasoningField": "reasoning_content"
+    },
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "public",
+     "baseURL": "https://opencode.ai/inference/openai/v1",
+     "provider": "opencode"
+    },
+    "capabilities": {
+     "tools": true,
+     "input": [
+      "text",
+      "image"
+     ],
+     "output": [
+      "text"
+     ],
+     "temperature": true
+    },
+    "variants": [
+     {
+      "id": "low",
+      "settings": {
+       "reasoningEffort": "low"
+      }
+     },
+     {
+      "id": "high",
+      "settings": {
+       "reasoningEffort": "high"
+      }
+     },
+     {
+      "id": "max",
+      "settings": {
+       "reasoningEffort": "max"
+      }
+     }
+    ],
+    "time": {
+     "released": 1792195200000
+    },
+    "cost": [
+     {
+      "input": 0,
+      "output": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    ],
+    "status": "active",
+    "enabled": true,
+    "limit": {
+     "context": 200000,
+     "output": 32000
+    }
+   },
+   {
+    "id": "nemotron-3.5-super-vl-free",
+    "modelID": "nemotron-3.5-super-vl-free",
+    "providerID": "opencode",
+    "type": "chat",
+    "family": "nemotron",
+    "name": "Nemotron 3.5 Super VL Free",
+    "compatibility": {
+     "reasoningField": "reasoning_content"
+    },
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "public",
+     "baseURL": "https://opencode.ai/inference/openai/v1",
+     "provider": "opencode"
+    },
+    "capabilities": {
+     "tools": true,
+     "input": [
+      "text",
+      "image"
+     ],
+     "output": [
+      "text"
+     ],
+     "temperature": true
+    },
+    "variants": [
+     {
+      "id": "none",
+      "settings": {
+       "reasoningEffort": "none"
+      }
+     },
+     {
+      "id": "minimal",
+      "settings": {
+       "reasoningEffort": "minimal"
+      }
+     },
+     {
+      "id": "low",
+      "settings": {
+       "reasoningEffort": "low"
+      }
+     },
+     {
+      "id": "medium",
+      "settings": {
+       "reasoningEffort": "medium"
+      }
+     },
+     {
+      "id": "high",
+      "settings": {
+       "reasoningEffort": "high"
+      }
+     },
+     {
+      "id": "xhigh",
+      "settings": {
+       "reasoningEffort": "xhigh"
+      }
+     }
+    ],
+    "time": {
+     "released": 1792022400000
+    },
+    "cost": [
+     {
+      "input": 0,
+      "output": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    ],
+    "status": "active",
+    "enabled": true,
+    "limit": {
+     "context": 1048576,
+     "input": 1048576,
+     "output": 131072
+    }
+   },
+   {
+    "id": "beam-free",
+    "modelID": "beam-free",
+    "providerID": "opencode",
+    "type": "chat",
+    "family": "beam",
+    "name": "Beam Free",
+    "compatibility": {
+     "reasoningField": "reasoning_content"
+    },
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "public",
+     "baseURL": "https://opencode.ai/inference/openai/v1",
+     "provider": "opencode"
+    },
+    "capabilities": {
+     "tools": true,
+     "input": [
+      "text"
+     ],
+     "output": [
+      "text"
+     ],
+     "temperature": true
+    },
+    "variants": [
+     {
+      "id": "low",
+      "settings": {
+       "reasoningEffort": "low"
+      }
+     },
+     {
+      "id": "medium",
+      "settings": {
+       "reasoningEffort": "medium"
+      }
+     },
+     {
+      "id": "high",
+      "settings": {
+       "reasoningEffort": "high"
+      }
+     },
+     {
+      "id": "xhigh",
+      "settings": {
+       "reasoningEffort": "xhigh"
+      }
+     },
+     {
+      "id": "max",
+      "settings": {
+       "reasoningEffort": "max"
+      }
+     }
+    ],
+    "time": {
+     "released": 1791158400000
+    },
+    "cost": [
+     {
+      "input": 0,
+      "output": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    ],
+    "status": "active",
+    "enabled": true,
+    "limit": {
+     "context": 1048576,
+     "output": 131072
+    }
+   },
+   {
+    "id": "mimo-v2.6-flash-free",
+    "modelID": "mimo-v2.6-flash-free",
+    "providerID": "opencode",
+    "type": "chat",
+    "family": "mimo",
+    "name": "MiMo-V2.6-Flash Free",
+    "compatibility": {
+     "reasoningField": "reasoning_content"
+    },
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "public",
+     "baseURL": "https://opencode.ai/inference/openai/v1",
+     "provider": "opencode"
+    },
+    "capabilities": {
+     "tools": true,
+     "input": [
+      "text",
+      "image",
+      "audio",
+      "video"
+     ],
+     "output": [
+      "text"
+     ],
+     "temperature": true
+    },
+    "variants": [],
+    "time": {
+     "released": 1790035200000
+    },
+    "cost": [
+     {
+      "input": 0,
+      "output": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    ],
+    "status": "active",
+    "enabled": true,
+    "limit": {
+     "context": 200000,
+     "output": 32000
+    }
+   },
+   {
+    "id": "glm-5.3-flash-free",
+    "modelID": "glm-5.3-flash-free",
+    "providerID": "opencode",
+    "type": "chat",
+    "family": "glm-flash",
+    "name": "GLM-5.3-Flash Free",
+    "compatibility": {
+     "reasoningField": "reasoning_content"
+    },
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "public",
+     "baseURL": "https://opencode.ai/inference/openai/v1",
+     "provider": "opencode"
+    },
+    "capabilities": {
+     "tools": true,
+     "input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "output": [
+      "text"
+     ],
+     "temperature": true
+    },
+    "variants": [
+     {
+      "id": "low",
+      "settings": {
+       "reasoningEffort": "low"
+      }
+     },
+     {
+      "id": "high",
+      "settings": {
+       "reasoningEffort": "high"
+      }
+     },
+     {
+      "id": "max",
+      "settings": {
+       "reasoningEffort": "max"
+      }
+     }
+    ],
+    "time": {
+     "released": 1787702400000
+    },
+    "cost": [
+     {
+      "input": 0,
+      "output": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    ],
+    "status": "active",
+    "enabled": true,
+    "limit": {
+     "context": 200000,
+     "output": 32000
+    }
+   },
+   {
+    "id": "nemotron-3.5-lightning-free",
+    "modelID": "nemotron-3.5-lightning-free",
+    "providerID": "opencode",
+    "type": "chat",
+    "family": "nemotron",
+    "name": "Nemotron 3.5 Lightning Free",
+    "compatibility": {
+     "reasoningField": "reasoning_content"
+    },
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "public",
+     "baseURL": "https://opencode.ai/inference/openai/v1",
+     "provider": "opencode"
+    },
+    "capabilities": {
+     "tools": true,
+     "input": [
+      "text"
+     ],
+     "output": [
+      "text"
+     ],
+     "temperature": true
+    },
+    "variants": [],
+    "time": {
+     "released": 1786406400000
+    },
+    "cost": [
+     {
+      "input": 0,
+      "output": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    ],
+    "status": "active",
+    "enabled": true,
+    "limit": {
+     "context": 262144,
+     "output": 262144
+    }
+   },
+   {
+    "id": "big-pickle",
+    "modelID": "big-pickle",
+    "providerID": "opencode",
+    "type": "chat",
+    "family": "big-pickle",
+    "name": "Big Pickle",
+    "compatibility": {
+     "reasoningField": "reasoning_content"
+    },
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "public",
+     "baseURL": "https://opencode.ai/inference/openai/v1",
+     "provider": "opencode"
+    },
+    "capabilities": {
+     "tools": true,
+     "input": [
+      "text"
+     ],
+     "output": [
+      "text"
+     ],
+     "temperature": true
+    },
+    "variants": [],
+    "time": {
+     "released": 1760659200000
+    },
+    "cost": [
+     {
+      "input": 0,
+      "output": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    ],
+    "status": "active",
+    "enabled": true,
+    "limit": {
+     "context": 200000,
+     "input": 160000,
+     "output": 32000
+    }
+   },
+   {
+    "id": "gemma4:26b",
+    "modelID": "gemma4:26b",
+    "providerID": "ollama",
+    "family": "gemma4",
+    "name": "gemma4:26b",
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "",
+     "baseURL": "http://127.0.0.1:11434/v1",
+     "provider": "ollama"
+    },
+    "capabilities": {
+     "tools": true,
+     "input": [
+      "text",
+      "image"
+     ],
+     "output": [
+      "text"
+     ]
+    },
+    "variants": [],
+    "time": {
+     "released": 0
+    },
+    "cost": [],
+    "status": "active",
+    "enabled": true,
+    "limit": {
+     "context": 262144,
+     "output": 32000
+    }
+   },
+   {
+    "id": "m",
+    "modelID": "m",
+    "providerID": "mock",
+    "name": "Mock M",
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "x",
+     "baseURL": "http://127.0.0.1:47982/v1",
+     "provider": "mock"
+    },
+    "capabilities": {
+     "tools": true,
+     "input": [
+      "text",
+      "image"
+     ],
+     "output": [
+      "text"
+     ]
+    },
+    "variants": [
+     {
+      "id": "low",
+      "settings": {
+       "reasoningEffort": "low"
+      }
+     },
+     {
+      "id": "medium",
+      "settings": {
+       "reasoningEffort": "medium"
+      }
+     },
+     {
+      "id": "high",
+      "settings": {
+       "reasoningEffort": "high"
+      }
+     }
+    ],
+    "time": {
+     "released": 0
+    },
+    "cost": [],
+    "status": "active",
+    "enabled": true,
+    "limit": {
+     "context": 200000,
+     "output": 32000
+    }
+   },
+   {
+    "id": "gpt-5-mock",
+    "modelID": "gpt-5-mock",
+    "providerID": "mock",
+    "name": "Mock GPT",
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "x",
+     "baseURL": "http://127.0.0.1:47982/v1",
+     "provider": "mock"
+    },
+    "capabilities": {
+     "tools": true,
+     "input": [
+      "text",
+      "image"
+     ],
+     "output": [
+      "text"
+     ]
+    },
+    "variants": [
+     {
+      "id": "low",
+      "settings": {
+       "reasoningEffort": "low"
+      }
+     },
+     {
+      "id": "medium",
+      "settings": {
+       "reasoningEffort": "medium"
+      }
+     },
+     {
+      "id": "high",
+      "settings": {
+       "reasoningEffort": "high"
+      }
+     }
+    ],
+    "time": {
+     "released": 0
+    },
+    "cost": [],
+    "status": "active",
+    "enabled": true,
+    "limit": {
+     "context": 200000,
+     "output": 32000
+    }
+   }
+  ]
+ },
+ "defaultModel": {
+  "location": {
+   "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+  },
+  "data": {
+   "id": "m",
+   "modelID": "m",
+   "providerID": "mock",
+   "name": "Mock M",
+   "package": "@opencode/ai/providers/openai-compatible",
+   "settings": {
+    "apiKey": "x",
+    "baseURL": "http://127.0.0.1:47982/v1",
+    "provider": "mock"
+   },
+   "capabilities": {
+    "tools": true,
+    "input": [
+     "text",
+     "image"
+    ],
+    "output": [
+     "text"
+    ]
+   },
+   "variants": [
+    {
+     "id": "low",
+     "settings": {
+      "reasoningEffort": "low"
+     }
+    },
+    {
+     "id": "medium",
+     "settings": {
+      "reasoningEffort": "medium"
+     }
+    },
+    {
+     "id": "high",
+     "settings": {
+      "reasoningEffort": "high"
+     }
+    }
+   ],
+   "time": {
+    "released": 0
+   },
+   "cost": [],
+   "status": "active",
+   "enabled": true,
+   "limit": {
+    "context": 200000,
+    "output": 32000
+   }
+  }
+ },
+ "freshSessionID": "ses_e2d13a759ffekKBU4lfAzsrV60",
+ "sessions": {
+  "data": [
+   {
+    "id": "ses_e2d13a759ffekKBU4lfAzsrV60",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "cost": 0,
+    "tokens": {
+     "input": 0,
+     "output": 0,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "time": {
+     "created": 1794540066983,
+     "updated": 1794540066983
+    },
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   },
+   {
+    "id": "ses_e2d13c239ffeRmUGJq8ULwW2y4",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "cost": 0,
+    "tokens": {
+     "input": 70,
+     "output": 18,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "outcome": "succeeded",
+    "time": {
+     "created": 1794540060103,
+     "updated": 1794540063339,
+     "busy": 1794540062944,
+     "idle": 1794540063341
+    },
+    "title": "Mock title",
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   },
+   {
+    "id": "ses_e2d13c174ffdxGKERhv7V7tF53",
+    "parentID": "ses_e2d13c239ffeRmUGJq8ULwW2y4",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "agent": "general",
+    "cost": 0,
+    "tokens": {
+     "input": 8,
+     "output": 4,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "outcome": "succeeded",
+    "time": {
+     "created": 1794540060301,
+     "updated": 1794540062942,
+     "busy": 1794540060304,
+     "idle": 1794540062943
+    },
+    "title": "Say hello",
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   },
+   {
+    "id": "ses_e2d13c89cffezlHB7mbQB7i9F5",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "cost": 0,
+    "tokens": {
+     "input": 35,
+     "output": 9,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "outcome": "succeeded",
+    "time": {
+     "created": 1794540058474,
+     "updated": 1794540060082,
+     "busy": 1794540058484,
+     "idle": 1794540060083
+    },
+    "title": "Mock title",
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   },
+   {
+    "id": "ses_e2d13ca34ffexfa1P6ctbEFSOf",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "cost": 0,
+    "tokens": {
+     "input": 35,
+     "output": 9,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "outcome": "succeeded",
+    "time": {
+     "created": 1794540058060,
+     "updated": 1794540058436,
+     "busy": 1794540058061,
+     "idle": 1794540058438
+    },
+    "title": "Mock title",
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   },
+   {
+    "id": "ses_e2d13cb10ffeA1a5ldbqqB8TRC",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "cost": 0,
+    "tokens": {
+     "input": 8,
+     "output": 2,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "outcome": "succeeded",
+    "time": {
+     "created": 1794540057840,
+     "updated": 1794540057985,
+     "busy": 1794540057845,
+     "idle": 1794540057987
+    },
+    "title": "Mock title",
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   },
+   {
+    "id": "ses_e2d13cbe7ffeC1sZssSqGyiA2T",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "cost": 0,
+    "tokens": {
+     "input": 8,
+     "output": 2,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "outcome": "succeeded",
+    "time": {
+     "created": 1794540057625,
+     "updated": 1794540057769,
+     "busy": 1794540057628,
+     "idle": 1794540057770
+    },
+    "title": "Mock title",
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   },
+   {
+    "id": "ses_e2d13e377ffe8DQy4Dn0GCJyIC",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "cost": 0,
+    "tokens": {
+     "input": 35,
+     "output": 9,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "outcome": "succeeded",
+    "time": {
+     "created": 1794540051593,
+     "updated": 1794540051994,
+     "busy": 1794540051595,
+     "idle": 1794540051996
+    },
+    "title": "Mock title",
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   },
+   {
+    "id": "ses_e2d13e783ffebuF2VWobP6JLL6",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "cost": 0,
+    "tokens": {
+     "input": 77,
+     "output": 20,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "outcome": "succeeded",
+    "time": {
+     "created": 1794540050557,
+     "updated": 1794540051558,
+     "busy": 1794540051166,
+     "idle": 1794540051559
+    },
+    "title": "Mock title",
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   },
+   {
+    "id": "ses_e2d13ebe0ffezDN6Rc5v5BmeGe",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "cost": 0,
+    "tokens": {
+     "input": 77,
+     "output": 20,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "outcome": "succeeded",
+    "time": {
+     "created": 1794540049440,
+     "updated": 1794540050459,
+     "busy": 1794540050049,
+     "idle": 1794540050461
+    },
+    "title": "Mock title",
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   },
+   {
+    "id": "ses_e2d13edddffeWGU3DSdmeG50oN",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "model": {
+     "id": "gpt-5-mock",
+     "providerID": "mock",
+     "variant": "default"
+    },
+    "cost": 0,
+    "tokens": {
+     "input": 35,
+     "output": 9,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "outcome": "succeeded",
+    "time": {
+     "created": 1794540048931,
+     "updated": 1794540049344,
+     "busy": 1794540048935,
+     "idle": 1794540049345
+    },
+    "title": "Mock title",
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   },
+   {
+    "id": "ses_e2d13ef73ffeHXNCxsVJKgzQRm",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "cost": 0,
+    "tokens": {
+     "input": 35,
+     "output": 9,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "outcome": "succeeded",
+    "time": {
+     "created": 1794540048525,
+     "updated": 1794540048915,
+     "busy": 1794540048527,
+     "idle": 1794540048917
+    },
+    "title": "Mock title",
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   },
+   {
+    "id": "ses_e2d13f170ffeihp7J7yZlNkYp1",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "cost": 0,
+    "tokens": {
+     "input": 35,
+     "output": 9,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "outcome": "succeeded",
+    "time": {
+     "created": 1794540048016,
+     "updated": 1794540048422,
+     "busy": 1794540048017,
+     "idle": 1794540048424
+    },
+    "title": "Mock title",
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   },
+   {
+    "id": "ses_e2d13fadcffeB9bGtYn2c5V1ej",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "cost": 0,
+    "tokens": {
+     "input": 77,
+     "output": 20,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "outcome": "succeeded",
+    "time": {
+     "created": 1794540045603,
+     "updated": 1794540046485,
+     "busy": 1794540045605,
+     "idle": 1794540046487
+    },
+    "title": "Mock title",
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   },
+   {
+    "id": "ses_e2d13fa1affeGGa5VaRM5OR1I9",
+    "parentID": "ses_e2d13fadcffeB9bGtYn2c5V1ej",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "agent": "general",
+    "cost": 0,
+    "tokens": {
+     "input": 8,
+     "output": 2,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "outcome": "succeeded",
+    "time": {
+     "created": 1794540045798,
+     "updated": 1794540045940,
+     "busy": 1794540045801,
+     "idle": 1794540045941
+    },
+    "title": "Say hello",
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   },
+   {
+    "id": "ses_e2d13fd3effedBypcJS5VE1P5R",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "cost": 0,
+    "tokens": {
+     "input": 35,
+     "output": 9,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "outcome": "succeeded",
+    "time": {
+     "created": 1794540044995,
+     "updated": 1794540045521,
+     "busy": 1794540044997,
+     "idle": 1794540045523
+    },
+    "title": "Mock title",
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   },
+   {
+    "id": "ses_e2d13fc77ffeug8vxmHQYKzGbg",
+    "parentID": "ses_e2d13fd3effedBypcJS5VE1P5R",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "agent": "general",
+    "cost": 0,
+    "tokens": {
+     "input": 8,
+     "output": 2,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "outcome": "succeeded",
+    "time": {
+     "created": 1794540045194,
+     "updated": 1794540045335,
+     "busy": 1794540045196,
+     "idle": 1794540045337
+    },
+    "title": "Say hello",
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   },
+   {
+    "id": "ses_e2d13fe76ffe28S9Zk3L0dKQMi",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "cost": 0,
+    "tokens": {
+     "input": 0,
+     "output": 0,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "time": {
+     "created": 1794540044682,
+     "updated": 1794540044682
+    },
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   },
+   {
+    "id": "ses_e2d13fe78ffeY26lIebS9GLPWE",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "cost": 0,
+    "tokens": {
+     "input": 0,
+     "output": 0,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "time": {
+     "created": 1794540044680,
+     "updated": 1794540044680
+    },
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   },
+   {
+    "id": "ses_e2d1400e3ffe8iVRZNeKzh6Jcs",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "cost": 0,
+    "tokens": {
+     "input": 0,
+     "output": 0,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "time": {
+     "created": 1794540044061,
+     "updated": 1794540044061
+    },
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   },
+   {
+    "id": "ses_e2d1400e5ffeID0xZWt3pod5M9",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "cost": 0,
+    "tokens": {
+     "input": 0,
+     "output": 0,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "time": {
+     "created": 1794540044059,
+     "updated": 1794540044059
+    },
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   },
+   {
+    "id": "ses_e2d1405a4ffeku5m01ZaB7dPfy",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "cost": 0,
+    "tokens": {
+     "input": 105,
+     "output": 27,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "outcome": "succeeded",
+    "time": {
+     "created": 1794540042844,
+     "updated": 1794540044029,
+     "busy": 1794540043654,
+     "idle": 1794540044031
+    },
+    "title": "Mock title",
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   },
+   {
+    "id": "ses_e2d1407b1ffeuxl6cpB36WIIkZ",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "cost": 0,
+    "tokens": {
+     "input": 35,
+     "output": 9,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "outcome": "succeeded",
+    "time": {
+     "created": 1794540042320,
+     "updated": 1794540042733,
+     "busy": 1794540042322,
+     "idle": 1794540042735
+    },
+    "title": "Mock title",
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   },
+   {
+    "id": "ses_e2d140946ffei445og4czW2xoV",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "cost": 0,
+    "tokens": {
+     "input": 35,
+     "output": 9,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "outcome": "succeeded",
+    "time": {
+     "created": 1794540041914,
+     "updated": 1794540042309,
+     "busy": 1794540041915,
+     "idle": 1794540042310
+    },
+    "title": "Mock title",
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   },
+   {
+    "id": "ses_e2d140adcffeHTwVhlQWAKgj3k",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "cost": 0,
+    "tokens": {
+     "input": 35,
+     "output": 9,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "outcome": "succeeded",
+    "time": {
+     "created": 1794540041508,
+     "updated": 1794540041885,
+     "busy": 1794540041509,
+     "idle": 1794540041887
+    },
+    "title": "Mock title",
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   },
+   {
+    "id": "ses_e2d140cd8ffeV2LntoJESvUhU5",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "cost": 0,
+    "tokens": {
+     "input": 35,
+     "output": 9,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "outcome": "succeeded",
+    "time": {
+     "created": 1794540041000,
+     "updated": 1794540041460,
+     "busy": 1794540041003,
+     "idle": 1794540041461
+    },
+    "title": "Mock title",
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   },
+   {
+    "id": "ses_e2d141078ffe3IeUJeOTTtv3Y3",
+    "projectID": "f9153b6e34ffdc20846b65fab6fe1e729403cf55",
+    "cost": 0,
+    "tokens": {
+     "input": 42,
+     "output": 11,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "outcome": "succeeded",
+    "time": {
+     "created": 1794540040102,
+     "updated": 1794540040935,
+     "busy": 1794540040391,
+     "idle": 1794540040937
+    },
+    "title": "Mock title",
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-q02Tbs/proj"
+    }
+   }
+  ],
+  "cursor": {
+   "previous": "eyJhbmNob3IiOnsiaWQiOiJzZXNfZTJkMTNhNzU5ZmZla0tCVTRsZkF6c3JWNjAiLCJ0aW1lIjoxNzk0NTQwMDY2OTgzLCJkaXJlY3Rpb24iOiJwcmV2aW91cyJ9fQ",
+   "next": "eyJhbmNob3IiOnsiaWQiOiJzZXNfZTJkMTQxMDc4ZmZlM0llVUplT1RUdHYzWTMiLCJ0aW1lIjoxNzk0NTQwMDQwOTM1LCJkaXJlY3Rpb24iOiJuZXh0In19"
+  }
+ },
+ "_engine": {
+  "entry": "packages/cli",
+  "packages": {
+   "packages/ai": "de02ecdffd895482b57d9ec16e640b8c4e1d427c",
+   "packages/cli": "544883d154af3d90d64f2638bef467852fe252aa",
+   "packages/client": "3d3c95581389d702c46e0fe7ccdadbcce295872b",
+   "packages/codemode": "eb7ca2279c0d93a2e967709e18346f3aa31a8e23",
+   "packages/core": "584f4421a24a41da65fb9e08d92fcec6b9354ab5",
+   "packages/latex": "abcd38e17eb09d996d975964f46be0a2e758fdf4",
+   "packages/merman": "3feaef89d940956096deb30e2b9f85f3fabdfe15",
+   "packages/plugin": "edac39a272e0ae30627c47135697bb79f2ab004b",
+   "packages/plugin-browser": "a3fd121205a803d1a82d97514cc09245010656cb",
+   "packages/protocol": "3117071f374c96909ccc2250cd5333a11d521854",
+   "packages/schema": "d2fb83a65f20c756833e9756a606b9ee2429f940",
+   "packages/server": "48bfa1e931af6e4c7d973119e173d28124aaa53d",
+   "packages/simulation": "7b707eb9b69aa826e91677a8416cfb8cda3efcf5",
+   "packages/theme": "0afba31d85d03fa7e34f8a98a38ccf355d6ec6c5",
+   "packages/tui": "ceda52b2e7ba2f5d9c2a74814879eca606586a56",
+   "packages/ui": "f2726368d2f8590af83a2101579f38be14d3497f",
+   "packages/util": "35c030bb0849b25ae9e10309ff9b185ee18b7ee3"
+  }
+ }
+}

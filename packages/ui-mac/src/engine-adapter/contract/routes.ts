@@ -105,8 +105,6 @@ export const SERVED = {
   "DELETE /api/session/:sessionID": entry<LegacyOk<Legacy.SessionRemoveOutput>>(),
   "POST /api/session/:sessionID/model": entry<Ok<V1.V2SessionSwitchModelResponses>>(),
   "POST /api/session/:sessionID/fork": entry<LegacyOk<Legacy.SessionForkOutput>>(),
-  "POST /api/session/:sessionID/interrupt": entry<LegacyOk<Legacy.SessionInterruptOutput>>(),
-  "POST /api/session/:sessionID/command": entry<LegacyOk<Legacy.SessionCommandOutput>>(),
   "POST /api/session/:sessionID/compact": entry<LegacyOk<Legacy.SessionCompactOutput>>(),
   "POST /api/session/:sessionID/shell": entry<LegacyOk<Legacy.SessionShellOutput>>(),
   "POST /api/session/:sessionID/rename": entry<LegacyOk<Legacy.SessionRenameOutput>, Omit<Legacy.SessionRenameInput, "sessionID">>(),
@@ -170,11 +168,6 @@ export const READS = {
   "DELETE /api/session/:sessionID": { fields: [], sites: ["codepuppy-app/src/pages/session/timeline/message-timeline.tsx:873-875"] },
   "POST /api/session/:sessionID/model": { fields: [], sites: ["ui-mac/src/renderer/codepuppy-ui/model-contract.ts:393-396"] },
   "POST /api/session/:sessionID/fork": { fields: ["data.id"], sites: ["codepuppy-app/src/components/dialog-fork.tsx:75-80"] },
-  "POST /api/session/:sessionID/interrupt": {
-    fields: [],
-    sites: ["codepuppy-app/src/components/prompt-input/submit.ts:279", "codepuppy-app/src/pages/session.tsx:1829"],
-  },
-  "POST /api/session/:sessionID/command": { fields: [], sites: ["codepuppy-app/src/components/prompt-input/submit.ts:526"] },
   "POST /api/session/:sessionID/compact": { fields: [], sites: ["codepuppy-app/src/pages/session/use-session-commands.tsx:409"] },
   "POST /api/session/:sessionID/shell": { fields: [], sites: ["codepuppy-app/src/components/prompt-input/submit.ts:500-508"] },
   "GET /api/fs/find": {
@@ -255,6 +248,12 @@ export const UNSUPPORTED = {
   "GET /api/question/request": "v2 支路:global-sync/bootstrap.ts:483-486 在 v1 协议下改走 v1 的 GET /question(已接)",
   "GET /api/fs/list": "只经 createCompatibleApi 的 api.file.list 发出(directory-picker-domain.ts:345、dialog-select-directory-v2.tsx:130、home-controller.ts:96);v1 协议下它被 createV1Api 改写成 v1 的 GET /file(server-compat.ts:360-363,已接)",
   "GET /api/model/default": "v2 支路:global-sync/bootstrap.ts:232-241 在 v1 协议(且传了 legacy 客户端,三个生产调用方都传)下改走 v1 的 GET /provider(已接)",
+  // `#1697` R16(编排器 2026-11-13):这两条原是直通,只在冻结 app 判定引擎是 v2 协议时经 1.17.13 客户端发出;协议恒为 v1(UC-01),
+  // createCompatibleApi 把它们改写成 v1 的 POST /session/:id/abort 与 POST /session/:id/command(已接)。真引擎也答不上冻结客户端的形状。
+  "POST /api/session/:sessionID/interrupt":
+    "v2 支路:codepuppy-app/src/utils/server-compat.ts createV1Api 的 interrupt 在 v1 协议下改走 v1 的 POST /session/:id/abort(已接);2.x 回 200 {interrupted},1.17.13 客户端声明 204",
+  "POST /api/session/:sessionID/command":
+    "v2 支路:createV1Api 的 command 在 v1 协议下改走 v1 的 POST /session/:id/command(已接);1.17.13 客户端发 {command, arguments},2.x 要 {name, text}(400)",
 } as const satisfies Record<RouteKey, string>
 
 /** 探活回退(UC-19、R15):冻结的健康检查先试它、失败即回退,失败本身就是约定,所以不放进「不支持」,也不记错误日志。 */

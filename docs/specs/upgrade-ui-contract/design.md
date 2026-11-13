@@ -523,6 +523,13 @@ export interface ReceiptLedger {
   - 复制:把用到的类型复制进约定,再加一个比对测试。代价是同一形状两份定义,是一条新的 K2 偏离;换来的只是字面上少了类型依赖,升级时没有任何收益。
   - 拖着不决的代价:M1–M3 不受影响(依赖方向一样);M4 里 renderer 改 import 的去向,以及 M5 加不加对 1.17.13 包的仅类型依赖,要等这个决定。
 
+**批准后的裁决**
+
+| 裁决 | 依据与适用版本 |
+| --- | --- |
+| R16 `POST /api/session/:sessionID/interrupt` 与 `POST /api/session/:sessionID/command` 从直通挪进声明不支持,与 #1662 补登的五条 v2 支路路由同样处理(编排器 2026-11-13 裁定)。目录基数随之从实施基线 A(`c01ea14919`)的 88 服务 / 22 不支持 / 26 直通变为 86 / 24 / 24;R1、R9 写的 87 / 18 是 E 上的数 | 只在冻结 app 判定引擎是 v2 协议时经 1.17.13 客户端发出;协议恒为 v1(UC-01),`createCompatibleApi` 把它们改写成 v1 的 `POST /session/:id/abort` 与 `POST /session/:id/command`(`codepuppy-app/src/utils/server-compat.ts:197-199,241-256`),Code Puppy 运行时不发。真引擎也答不上冻结客户端的形状(采样器 `passthrough` 剧本,feat/1697 `dc27c1dcaf`,测):interrupt 回 200 `{interrupted}`,客户端声明 204;command 客户端发 `{command, arguments}`,引擎要 `{name, text}`,回 400 |
+| 新证据(同一次采样与读码,测 + 读):26 条直通里只有 v1 SDK `v2.*` 命名空间发出的 6 条 —— `GET /api/agent`、`GET /api/provider/:providerID`、`GET /api/reference`、`GET /api/session`、`GET /api/session/:sessionID`、`POST /api/session/:sessionID/model` —— 在运行时真的经过适配器;其余 20 条只由 1.17.13 客户端发出,而冻结 app 的 `api` 是 `createCompatibleApi`,v1 协议下这些方法全被 createV1Api 改写成 v1 路由 | `codepuppy-app/src/utils/server-compat.ts:86-91,125-518`;P-05 的 6 条 `v2.*` 直通。留档里「把只从未挂载冻结组件发出的路由降为声明不支持」一行据此有了可达性证据;R16 只处置答不上真引擎的两条,其余 18 条真引擎答得上(d 绿),仍按 R1 服务 |
+
 **仍是推断、没跑过的断言**
 
 - M1–M3 前后翻译器输出逐个相等(§9 列明的两处例外除外):要靠各片在全部夹具上做差分来证明,本设计没有跑。

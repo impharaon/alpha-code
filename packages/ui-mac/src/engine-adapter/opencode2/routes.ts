@@ -554,8 +554,6 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
   "DELETE /api/session/:sessionID": passthrough,
   "POST /api/session/:sessionID/model": passthrough,
   "POST /api/session/:sessionID/fork": passthrough,
-  "POST /api/session/:sessionID/interrupt": passthrough,
-  "POST /api/session/:sessionID/command": passthrough,
   "POST /api/session/:sessionID/compact": passthrough,
   "POST /api/session/:sessionID/shell": passthrough,
   "POST /api/session/:sessionID/rename": bind(async (context) => {

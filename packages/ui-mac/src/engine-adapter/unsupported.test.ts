@@ -98,3 +98,59 @@ describe("#1697 约定侧的探活回退与固定答复", () => {
     expect(seen).toEqual([])
   })
 })
+
+// `#1697` R16(编排器 2026-11-13,设计 §10):POST /api/session/:id/interrupt 与 /command 从直通挪进不支持 —— 冻结 app 只在 v2 协议下
+// 经 1.17.13 客户端发它们;协议恒为 v1 时 createCompatibleApi 改写成 v1 路由。
+describe("#1697 R16:v2 支路的 interrupt / command 不再直通", () => {
+  test("两条都回不支持的 501 信封并记错误日志,引擎零请求", async () => {
+    const error = spyOn(console, "error").mockImplementation(() => {})
+    const { engineFetch, seen } = harness()
+    for (const path of ["/api/session/ses_1/interrupt", "/api/session/ses_1/command"]) {
+      const response = await engineFetch(`${ENGINE}${path}`, { method: "POST", body: "{}" })
+      expect(response.status).toBe(501)
+      expect(await response.json()).toEqual({ name: UNSUPPORTED_ERROR_NAME, data: { method: "POST", path } })
+    }
+    expect(error).toHaveBeenCalledTimes(2)
+    expect(seen).toEqual([])
+  })
+
+  test("冻结 app 的 v1 协议调用路径(createCompatibleApi)发的是 v1 的 abort 与 command,一条都不进 /api/session/:id/interrupt|command", async () => {
+    const { createCompatibleApi } = await import("../../../codepuppy-app/src/utils/server-compat")
+    const { OpenCode } = await import("@opencode-ai/client")
+    const { createOpencodeClient } = await import("./contract/v1")
+    const SESSION = "ses_r16"
+    const upstream: string[] = []
+    const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init)
+      const path = new URL(request.url).pathname
+      upstream.push(`${request.method} ${path}`)
+      if (path === `/api/session/${SESSION}`) return Response.json({ data: { id: SESSION, location: { directory: "/proj" } } })
+      if (path === "/api/skill") return Response.json({ data: [] })
+      if (path === `/api/session/${SESSION}/message`) return Response.json({ data: [], cursor: {} })
+      if (path === "/api/session/active") return Response.json({ data: {} })
+      if (path === `/api/session/${SESSION}/agent`) return new Response(null, { status: 204 })
+      if (path === `/api/session/${SESSION}/interrupt`) return Response.json({ interrupted: true })
+      if (path === `/api/session/${SESSION}/command`) return new Response(null, { status: 204 })
+      return new Response(`unexpected ${path}`, { status: 500 })
+    }) as typeof globalThis.fetch
+    const engineFetch = createEngineFetch({ isEngineOrigin: (origin) => origin === ENGINE, fetch })
+    const incoming: string[] = []
+    const recording = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init)
+      incoming.push(`${request.method} ${new URL(request.url).pathname}`)
+      return engineFetch(request)
+    }) as typeof globalThis.fetch
+    const api = createCompatibleApi({
+      protocol: Promise.resolve("v1"),
+      current: OpenCode.make({ baseUrl: ENGINE, fetch: recording }) as never,
+      legacy: () => createOpencodeClient({ baseUrl: ENGINE, fetch: recording, throwOnError: true }) as never,
+      directory: "/proj",
+    })
+    await api.session.interrupt({ sessionID: SESSION })
+    await api.session.command({ sessionID: SESSION, command: "hello", arguments: "", agent: "build" } as never)
+    expect(incoming).toEqual([`POST /session/${SESSION}/abort`, `POST /session/${SESSION}/command`])
+    // 对照:适配器把 v1 的这两条译成 2.x 的 interrupt / command(带 2.x 要的形状),不是原样转发
+    expect(upstream).toContain(`POST /api/session/${SESSION}/interrupt`)
+    expect(upstream).toContain(`POST /api/session/${SESSION}/command`)
+  })
+})

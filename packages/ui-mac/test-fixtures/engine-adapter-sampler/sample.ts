@@ -699,16 +699,11 @@ try {
       await quietly("session.get", () => legacy.session.get({ sessionID }))
       await quietly("v2.session.switchModel", () => v1.v2.session.switchModel({ sessionID, model }))
       await quietly("session.fork", () => legacy.session.fork({ sessionID, messageID: userID }))
-      await quietly("session.command", () =>
-        legacy.session.command({ sessionID, command: "hello", arguments: "", agent: "build", model }),
-      )
-      await Bun.sleep(1_500) // 命令若被受理会开一个回合,等它跑完再继续(被拒时也只是多等)
       await quietly("session.shell", () => legacy.session.shell({ sessionID, command: "echo passthrough" }))
       await Bun.sleep(500)
       await quietly("session.compact", () => legacy.session.compact({ sessionID }))
       await Bun.sleep(500)
       const doomed = await quietly("session.create", () => legacy.session.create({ agent: "build", model, location }))
-      await quietly("session.interrupt", () => legacy.session.interrupt({ sessionID: busy }))
       await quietly("session.remove", () => legacy.session.remove({ sessionID: (doomed as { id: string }).id }))
       await quietly("file.find", () => legacy.file.find({ location, query: "a", type: "file", limit: 10 }))
       await quietly("vcs.status", () => legacy.vcs.status({ location }))

@@ -91,16 +91,6 @@ export function readProblems(key: string, reads: ReadSet, body: unknown): string
   })
 }
 
-/**
- * 待设计裁决的两条(回报编排器:BLOCKED: design — §4.10 d / R1):冻结界面只在 v2 协议下经 1.17.13 客户端发它们,协议恒为 v1(UC-01)
- * 时 createCompatibleApi 把它们改写成 v1 路由(codepuppy-app/src/utils/server-compat.ts createV1Api 的 interrupt / command),Code Puppy
- * 运行时不发;真引擎对冻结客户端的形状答不上。这里只断言「它们确实还对不上」—— 设计改了(挪进不支持 / 改为翻译)就要从这里删掉。
- */
-const PENDING_DESIGN: Record<string, string> = {
-  "POST /api/session/:sessionID/interrupt": "引擎回 200 {interrupted},1.17.13 客户端声明 204,冻结客户端抛 UnexpectedStatus",
-  "POST /api/session/:sessionID/command": "1.17.13 客户端发 {command, arguments…},引擎要 {name, text}:400 InvalidRequestError Missing key name",
-}
-
 const PASSTHROUGH_KEYS = Object.entries(ROUTES)
   .filter(([, handler]) => handler === passthrough)
   .map(([key]) => key)
@@ -109,16 +99,16 @@ const PASSTHROUGH_KEYS = Object.entries(ROUTES)
 describe("#1697 直通路由的状态码与消费字段(设计 §4.10 d)", () => {
   test("自检:READS 恰好覆盖翻译器里每条直通(多一条、少一条都红);每条直通都有样本;成功码表解析出来了", () => {
     expect(Object.keys(READS).sort()).toEqual(PASSTHROUGH_KEYS)
-    expect(PASSTHROUGH_KEYS.length).toBeGreaterThanOrEqual(26)
+    expect(PASSTHROUGH_KEYS.length).toBeGreaterThanOrEqual(24)
     expect(PASSTHROUGH_KEYS.filter((key) => !(key in EXCHANGES))).toEqual([])
     for (const key of PASSTHROUGH_KEYS) expect(key in SERVED).toBe(true)
     expect(LEGACY_SUCCESS.get("GET /api/session/{p}")).toBe(200)
-    expect(LEGACY_SUCCESS.get("POST /api/session/{p}/interrupt")).toBe(204)
+    expect(LEGACY_SUCCESS.get("POST /api/session/{p}/fork")).toBe(200)
     expect(V1_ROUTES.has("GET /api/agent")).toBe(true)
   })
 
-  test("每条直通:状态码 == 发出它的冻结客户端声明的成功码(待设计裁决的两条除外)", () => {
-    const wrong = PASSTHROUGH_KEYS.filter((key) => !(key in PENDING_DESIGN)).flatMap((key) => {
+  test("每条直通:状态码 == 发出它的冻结客户端声明的成功码", () => {
+    const wrong = PASSTHROUGH_KEYS.flatMap((key) => {
       const { ok, legacy, v1 } = successOf(key)
       if (legacy === undefined && !v1) return [`${key}: 两个冻结客户端都没有声明它`]
       return ok(EXCHANGES[key]!.status) ? [] : [`${key}: ${EXCHANGES[key]!.status},声明 ${legacy ?? "2xx"}`]
@@ -127,18 +117,10 @@ describe("#1697 直通路由的状态码与消费字段(设计 §4.10 d)", () =>
   })
 
   test("每条直通:READS 登记的消费字段都在样本里,或冻结消费函数得到消费方要的结果", () => {
-    const problems = PASSTHROUGH_KEYS.filter((key) => !(key in PENDING_DESIGN)).flatMap((key) =>
+    const problems = PASSTHROUGH_KEYS.flatMap((key) =>
       readProblems(key, READS[key as keyof typeof READS] as ReadSet, EXCHANGES[key]!.body),
     )
     expect(problems).toEqual([])
-  })
-
-  test("待设计裁决的两条确实还对不上(改了约定就从 PENDING_DESIGN 删掉,这条会提醒)", () => {
-    for (const key of Object.keys(PENDING_DESIGN)) {
-      expect(PASSTHROUGH_KEYS).toContain(key)
-      const { ok } = successOf(key)
-      expect(ok(EXCHANGES[key]!.status)).toBe(false)
-    }
   })
 
   test("已知坏例:从 GET /api/agent 样本删掉 mode ⇒ 红(设计 §4.10 d 点名);状态码换成 500 ⇒ 红;消费函数拿不到会话 ⇒ 红", () => {

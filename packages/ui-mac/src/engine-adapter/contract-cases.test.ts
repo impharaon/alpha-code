@@ -11,6 +11,8 @@ import { join, resolve } from "node:path"
 import { normalizeAgentList } from "../../../codepuppy-app/src/context/global-sync/utils"
 import { normalizeSessionInfo } from "../../../codepuppy-app/src/utils/session"
 import { SERVED, FIXED, type TranslatedKey } from "./contract/routes"
+import type { ContractEventType } from "./contract/events"
+import events from "./fixtures/events.json"
 import routes from "./fixtures/routes.json"
 import { createEngineFetch } from "./index"
 import { passthrough, ROUTES } from "./opencode2/routes"
@@ -277,4 +279,175 @@ describe("#1697 每条翻译路由都有经真入口的采样用例(设计 §4.1
       expect(replayed.status, JSON.stringify(replayed.body).slice(0, 300)).toBeLessThan(300)
       CHECKS[key]!(replayed)
     })
+})
+
+// ── 事件(设计 §4.5、§4.10 c):约定事件表里的每种事件都有用例 ─────────────────────────────────────────────────────────
+// 回放:fixtures/events.json(采样器 `events` 剧本)里的一帧经 createEngineFetch 的 GET /global/event 投影;假 2.x 上游只放这一帧,
+// 会话读取与消息页按采样作答。期望来自帧本身的引擎原值、UC 与冻结消费方(normalizeSessionInfo)。
+
+type Frame = { type: string; location?: { directory?: string } | null; data: any }
+const FRAMES = (events.frames as Array<{ frame: Frame; snapshot?: unknown }>).map((item) => item.frame)
+const SESSIONS = events.sessions as Record<string, unknown>
+const frameOf = (type: string, where: (frame: Frame) => boolean = () => true) => FRAMES.find((frame) => frame.type === type && where(frame))!
+
+async function project(frame: Frame) {
+  const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(new Request(input, init).url)
+    if (url.pathname === "/api/event")
+      return new Response(`data: ${JSON.stringify(frame)}\n\n`, { headers: { "content-type": "text/event-stream" } })
+    const session = /^\/api\/session\/([^/]+)$/.exec(url.pathname)?.[1]
+    if (session)
+      return session in SESSIONS
+        ? Response.json({ data: SESSIONS[session] })
+        : Response.json({ _tag: "SessionNotFoundError", message: `Session not found: ${session}` }, { status: 404 })
+    if (url.pathname.endsWith("/message")) return Response.json({ data: [], cursor: {} })
+    if (url.pathname.endsWith("/diff")) return Response.json({ data: [] })
+    return new Response(`unexpected ${url.pathname}`, { status: 599 })
+  }) as typeof globalThis.fetch
+  const engineFetch = createEngineFetch({ isEngineOrigin: (origin) => origin === ENGINE, fetch })
+  const response = await engineFetch(`${ENGINE}/global/event`)
+  const text = await response.text()
+  return text
+    .split("\n\n")
+    .filter((chunk) => chunk.startsWith("data: "))
+    .map((chunk) => JSON.parse(chunk.slice(6)) as { directory: string; payload: { type: string; properties: any } })
+}
+
+const directoryOf = (frame: Frame) => frame.location?.directory ?? "global"
+const sameShape = (type: ContractEventType, source = type as string) => async () => {
+  const frame = frameOf(source)
+  expect(await project(frame)).toContainEqual({ directory: directoryOf(frame), payload: { type, properties: frame.data } })
+}
+
+const EVENT_CHECKS: Partial<Record<ContractEventType, () => Promise<void>>> = {
+  // 两代同形的直通:载荷原样(设计 §4.5)
+  "pty.created": sameShape("pty.created"),
+  "pty.updated": sameShape("pty.updated"),
+  "pty.exited": sameShape("pty.exited"),
+  "pty.deleted": sameShape("pty.deleted"),
+  "vcs.branch.updated": sameShape("vcs.branch.updated"),
+  "reference.updated": sameShape("reference.updated"),
+  "mcp.status.changed": sameShape("mcp.status.changed"),
+  "mcp.resources.changed": sameShape("mcp.resources.changed"),
+  "server.connected": async () => {
+    const frame = events.serverConnected as Frame
+    expect(await project(frame)).toContainEqual({ directory: "global", payload: { type: "server.connected", properties: frame.data } })
+  },
+  // 改名与派生
+  "server.instance.disposed": async () => {
+    const frame = frameOf("location.shutdown")
+    expect(await project(frame)).toContainEqual({
+      directory: directoryOf(frame),
+      payload: { type: "server.instance.disposed", properties: { directory: directoryOf(frame) } },
+    })
+  },
+  "catalog.updated": async () => {
+    for (const source of ["agent.updated", "command.updated", "skill.updated"]) {
+      const frame = frameOf(source)
+      expect(await project(frame)).toContainEqual({ directory: directoryOf(frame), payload: { type: "catalog.updated", properties: {} } })
+    }
+  },
+  "project.updated": async () => {
+    const frame = frameOf("project.updated")
+    const [event] = (await project(frame)).filter((item) => item.payload.type === "project.updated")
+    expect(event!.payload.properties).toMatchObject({ id: frame.data.id, worktree: frame.data.canonical })
+    expect("canonical" in event!.payload.properties).toBe(false)
+  },
+  "session.created": async () => {
+    const frame = frameOf("session.created", (item) => item.data.sessionID in SESSIONS)
+    expect(await project(frame)).toContainEqual({
+      directory: directoryOf(frame),
+      payload: { type: "session.created", properties: { info: normalizeSessionInfo(SESSIONS[frame.data.sessionID] as never) } },
+    })
+  },
+  "session.updated": async () => {
+    const frame = frameOf("session.renamed", (item) => item.data.sessionID in SESSIONS)
+    expect(await project(frame)).toContainEqual({
+      directory: directoryOf(frame),
+      payload: { type: "session.updated", properties: { info: normalizeSessionInfo(SESSIONS[frame.data.sessionID] as never) } },
+    })
+  },
+  "session.deleted": async () => {
+    const frame = frameOf("session.deleted")
+    const [event] = (await project(frame)).filter((item) => item.payload.type === "session.deleted")
+    expect(event!.payload.properties.sessionID).toBe(frame.data.sessionID)
+  },
+  "session.usage.updated": async () => {
+    const frame = frameOf("session.usage.updated", (item) => item.data.sessionID in SESSIONS)
+    const [event] = (await project(frame)).filter((item) => item.payload.type === "session.usage.updated")
+    expect(event!.payload.properties).toEqual(frame.data)
+  },
+  "question.rejected": async () => {
+    const frame = frameOf("form.cancelled")
+    expect(await project(frame)).toContainEqual({
+      directory: directoryOf(frame),
+      payload: { type: "question.rejected", properties: { sessionID: frame.data.sessionID, requestID: frame.data.id } },
+    })
+  },
+}
+
+/** 已有测试证明的事件(真采样帧喂投影器,交冻结 app 的归约 / 冻结消费方判)。 */
+const EXISTING_EVENTS: Partial<Record<ContractEventType, { file: string; test: string }>> = {
+  "message.updated": { file: "event-projection.test.ts", test: "读文件回合:事件流归约出的消息与 part,与重新加载这个会话的投影逐字相同" },
+  "message.part.updated": { file: "event-projection.test.ts", test: "读文件回合:事件流归约出的消息与 part,与重新加载这个会话的投影逐字相同" },
+  "message.part.delta": { file: "event-projection.test.ts", test: "流式增量:正文先以 message.part.delta 一段段到达,part id 与最终快照同一个号" },
+  "session.status": { file: "event-projection.test.ts", test: "会话状态:execution.started ⇒ busy,succeeded ⇒ idle + session.idle" },
+  "session.idle": { file: "event-projection.test.ts", test: "会话状态:execution.started ⇒ busy,succeeded ⇒ idle + session.idle" },
+  "session.error": { file: "failure-code.test.ts", test: "会话错误(事件流):session.error 与重试状态的文本同样去掉前缀,网络层同样带上" },
+  "todo.updated": { file: "event-projection.test.ts", test: "U1 任务清单:todowrite 的输入投影成 todo.updated,归约后清单三条、状态原样" },
+  "question.asked": { file: "event-projection.test.ts", test: "提问:2.x 表单 ⇒ question.asked(v1 形状),回答后 question.replied 把它从待答里拿掉" },
+  "question.replied": { file: "event-projection.test.ts", test: "提问:2.x 表单 ⇒ question.asked(v1 形状),回答后 question.replied 把它从待答里拿掉" },
+  "file.watcher.updated": { file: "file-watcher.test.ts", test: "filesystem.changed(不带 sessionID)→ 那个目录频道上的 file.watcher.updated,面板照原样收下" },
+  "permission.asked": { file: "permission-shape.test.ts", test: "事件流:action/resources/save/source 映射回 v1 的 permission/patterns/always/tool,metadata 四键原样透传" },
+  "permission.replied": { file: "permission-reply.test.ts", test: "v1 通道:连带的 replied 帧经投影器成为 v1 permission.replied,冻结 feed 逐条收卡" },
+}
+
+/**
+ * 待设计裁决(回报编排器:BLOCKED: design — §4.5 / §4.10 c):这四种在事件表里,但引擎的公开事件流(`/api/event` 只发
+ * packages/schema/src/event-manifest.ts 的 `ServerDefinitions`)根本不含它们的来源类型,采样不到。这里按引擎自己的清单核「确实
+ * 不发」;引擎哪天开始发,这条就红,提醒补用例。
+ */
+const UNDELIVERED: Partial<Record<ContractEventType, string>> = {
+  "lsp.updated": "lsp.updated",
+  "global.disposed": "global.disposed",
+  "mcp.tools.changed": "mcp.tools.changed",
+  "mcp.prompts.changed": "mcp.prompts.changed",
+}
+
+const EVENT_TYPES: ContractEventType[] = [
+  "pty.created", "pty.updated", "pty.exited", "pty.deleted", "lsp.updated", "vcs.branch.updated", "reference.updated",
+  "server.connected", "global.disposed", "mcp.tools.changed", "mcp.status.changed", "mcp.resources.changed",
+  "mcp.prompts.changed", "server.instance.disposed", "catalog.updated", "project.updated", "permission.asked",
+  "permission.replied", "question.asked", "question.replied", "question.rejected", "file.watcher.updated",
+  "session.created", "session.updated", "session.deleted", "session.usage.updated", "message.updated",
+  "message.part.updated", "message.part.delta", "todo.updated", "session.status", "session.error", "session.idle",
+] satisfies ContractEventType[]
+
+/** 约定里声明的事件表的键(读 contract/events.ts 的 ContractEventMap,台账据此核「恰好全部」)。 */
+function declaredEventTypes() {
+  const source = readFileSync(join(import.meta.dir, "contract/events.ts"), "utf8")
+  const block = source.slice(source.indexOf("export type ContractEventMap = {"), source.indexOf("\n}\n", source.indexOf("export type ContractEventMap = {")))
+  return [...block.matchAll(/^  "([a-z.]+)":/gm)].map((match) => match[1]!).sort()
+}
+
+describe("#1697 事件表里每种事件都有用例(设计 §4.10 c)", () => {
+  test("台账:每种事件恰好一处 —— 回放用例、已有测试,或引擎公开事件流里确实没有(待设计裁决)", async () => {
+    expect([...EVENT_TYPES].sort()).toEqual(declaredEventTypes())
+    expect(EVENT_TYPES.length).toBe(33)
+    const covered = (type: ContractEventType) => [type in EVENT_CHECKS, type in EXISTING_EVENTS, type in UNDELIVERED].filter(Boolean).length
+    expect(EVENT_TYPES.filter((type) => covered(type) !== 1)).toEqual([])
+    for (const [type, existing] of Object.entries(EXISTING_EVENTS)) {
+      const file = join(import.meta.dir, existing!.file)
+      expect(existsSync(file) && readFileSync(file, "utf8").includes(`"${existing!.test}"`), `${type}: ${existing!.file}`).toBe(true)
+    }
+  })
+
+  test("引擎公开事件流不含那四种的来源类型(engine schema event-manifest 的 Server);对照:mcp.status.changed 在", async () => {
+    const { Server } = await import("../../../schema/src/event-manifest")
+    expect(Object.values(UNDELIVERED).filter((source) => Server.has(source!))).toEqual([])
+    expect(Server.has("mcp.status.changed")).toBe(true)
+    expect(Server.has("pty.created")).toBe(true)
+  })
+
+  for (const type of Object.keys(EVENT_CHECKS).sort() as ContractEventType[]) test(`回放事件 ${type}`, () => EVENT_CHECKS[type]!())
 })

@@ -43,13 +43,17 @@
 9. `routes.json`(`#1697` I-04,设计 §4.10 c):每条翻译路由经适配器发一次冻结界面会发的 v1 请求,记下翻译器为它向 2.x 发出的每个
    往返(方法、带查询串的路径、状态码、内容类型、响应体)与适配器的状态码。准备:一个跑过一轮的会话、两个挂着提问表单的会话、
    一台本机假 OAuth 的远端 MCP、一个还不是 git 仓库的目录(git init 用)。`src/engine-adapter/contract-cases.test.ts` 回放它;
-10. 停掉引擎与假模型。
+10. `events.json`(`#1697` I-04,设计 §4.10 c):事件表里其余几种在真引擎上的帧(每帧之后读的消息页一并记下)—— 建、跑、改名、删会话,
+    项目改名,PTY 建 / 改名 / 进程自己退出 / 删,切 git 分支,连上同目录的 `mock-mcp.ts`(本机假 MCP,不走 OAuth)后让它推三种
+    list_changed 再断开,项目里加参考目录并重载目录,取消一张提问表单;外加最后读一次各会话(`sessions`)与订阅的第一帧
+    (`serverConnected`)。`src/engine-adapter/contract-cases.test.ts` 的事件部分回放它;
+11. 停掉引擎与假模型。
 
 只重采其中几个剧本时把名字写在命令后面:`base`(上面 2–4 的全部)、`permission`(只有 3–4,只重写 `permission-reply.json`)、
-`tools`、`continue`、`files`、`command`、`parity`、`catalog`、`lineage`、`passthrough`、`routes`,例如
+`tools`、`continue`、`files`、`command`、`parity`、`catalog`、`lineage`、`passthrough`、`routes`、`events`,例如
 `… sample.ts tools continue files command`;不写 = 全部。
 
-端口被占时用 `SAMPLER_ENGINE_PORT` / `SAMPLER_MODEL_PORT` / `SAMPLER_OAUTH_PORT` 改。重采后跑适配器的测试确认夹具仍能用:
+端口被占时用 `SAMPLER_ENGINE_PORT` / `SAMPLER_MODEL_PORT` / `SAMPLER_OAUTH_PORT` / `SAMPLER_MCP_PORT` 改。重采后跑适配器的测试确认夹具仍能用:
 
 ```sh
 cd packages/ui-mac

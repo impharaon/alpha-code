@@ -576,4 +576,8 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 
 ### 偏离记录
 
-暂无
+- 2026-11-13 · **待设计裁决(BLOCKED: design — §4.5 / §4.10 c)**:事件表里的 `lsp.updated`、`global.disposed`、`mcp.tools.changed`、`mcp.prompts.changed` 在引擎的公开事件流里根本没有来源 —— `/api/event` 只发 `packages/schema/src/event-manifest.ts` 的 `ServerDefinitions`,其中 MCP 只有 `StatusChanged`、`ResourcesChanged`,没有 LSP 与 `global.disposed`;实测本机假 MCP 推了 list_changed、又断开,引擎也只发 status / resources 两种。这四种采样不到,台账把它们单列为 `UNDELIVERED`,按引擎自己的清单核「确实不发」(引擎开始发就红,提醒补用例)。建议把它们从事件表与直通集合里拿掉(运行时本来收不到,行为不变),或保留但写明「引擎当前不发」。
+- 2026-11-13 · 事件用例与路由用例同在 `contract-cases.test.ts`(台账一处):33 种里 17 种经 createEngineFetch 的 `GET /global/event` 回放真引擎采样帧(采样器 `events` 剧本),12 种指向已有测试(它们把真采样帧直接喂投影器、交冻结归约判,不经 HTTP 入口),4 种见上。台账的事件清单从 `contract/events.ts` 的 `ContractEventMap` 读出比对。
+- 2026-11-13 · 采样器多一个本机假 MCP(`mock-mcp.ts`,streamable HTTP、JSON 应答、GET 推送流),用来让引擎连上一台 MCP 并发出 MCP 事件;`mcp.resources.changed` 与 `mcp.status.changed` 由它采到。
+- 2026-11-13 · ADR-047 第 240、249 行的机制路径各改一处(`contract/receipts.ts`、`opencode2/v1-shapes.ts`),与登记册一致。升级手册「中」加第 5 步(原第 5 步顺延为第 6 步,其它地方只引用第 4 步)。两个提交合成一个。
+- 2026-11-13 · 变异证明:`server.instance.disposed` 的 directory 置空、`reference.updated` 拿出直通集合 ⇒ 对应两条事件回放红。

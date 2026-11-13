@@ -14,6 +14,7 @@ import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
 import { matchServed } from "../../src/engine-adapter/contract/routes"
 import { dirtyEnginePaths, engineIdentity } from "./engine-identity"
 import { startMockModel } from "./mock-model"
+import { startMockMcp } from "./mock-mcp"
 import { startMockOAuth } from "./mock-oauth"
 
 const REPO = resolve(import.meta.dir, "../../../..")
@@ -22,6 +23,7 @@ const SOURCE_PATH = "packages/ui-mac/test-fixtures/engine-adapter-sampler/sample
 const ENGINE_PORT = Number(process.env.SAMPLER_ENGINE_PORT ?? 47911)
 const MODEL_PORT = Number(process.env.SAMPLER_MODEL_PORT ?? 47920)
 const OAUTH_PORT = Number(process.env.SAMPLER_OAUTH_PORT ?? 47930)
+const MCP_PORT = Number(process.env.SAMPLER_MCP_PORT ?? 47940)
 
 // 只跑点名的剧本:`bun sample.ts tools continue files command`;不点名 = 全部。
 const only = new Set(process.argv.slice(2))
@@ -893,6 +895,84 @@ try {
       })
     } finally {
       oauth.stop()
+      autoAllow = false
+    }
+  }
+
+  // ── `#1697` I-04 M5d(设计 §4.10 c):事件表里其余几种在真引擎上的帧(会话、项目、PTY、分支、MCP、参考目录、提问取消、目录重载)──
+  if (run("events")) {
+    autoAllow = true
+    const mcp = startMockMcp(MCP_PORT)
+    try {
+      const from = records.length
+      const settle = (ms = 1_000) => Bun.sleep(ms)
+      // 会话:建、跑一轮(用量)、改名、删
+      const chat = await create()
+      await call("POST", `/api/session/${chat}/prompt`, { text: "say hello plainly" })
+      await idle(chat)
+      await call("PATCH", `/api/session/${chat}`, { title: "sampler events" })
+      const doomed = await create()
+      await call("DELETE", `/api/session/${doomed}`)
+      // 项目改名
+      const location = (await call("GET", `/api/location?${loc}`)) as { project: { id: string } }
+      await call("PATCH", `/api/project/${location.project.id}`, { name: "sampler events" })
+      // PTY:建、改名、进程自己退出、删
+      const pty = (await call("POST", `/api/pty?${loc}`, { command: "/bin/sh", args: ["-c", "sleep 0.5; exit 0"], title: "sampler" })).data as { id: string }
+      await call("PUT", `/api/pty/${pty.id}?${loc}`, { title: "sampler 2" })
+      await settle(1_500)
+      await call("DELETE", `/api/pty/${pty.id}?${loc}`)
+      // 分支:在项目里切一个新分支(引擎监听 HEAD)
+      Bun.spawnSync(["git", "checkout", "-q", "-b", "sampler-events"], { cwd: project })
+      await settle(1_500)
+      // MCP:本机假 MCP 连上之后推三种 list_changed
+      await call("PUT", `/api/experimental/mcp/samplermcp?${loc}`, { config: { type: "remote", url: `${mcp.origin}/mcp`, oauth: false } })
+      for (let attempt = 0; attempt < 50; attempt++) {
+        const servers = (await call("GET", `/api/mcp?${loc}`)).data as any[]
+        if (servers.find((server) => server.name === "samplermcp")?.status.status === "connected") break
+        await Bun.sleep(100)
+      }
+      await settle(500)
+      const announced = mcp.announce()
+      await settle(1_500)
+      // 断开时引擎对三种清单各发一次变化(connection.ts stop)
+      await call("POST", `/api/experimental/mcp/samplermcp/disconnect?${loc}`)
+      await settle(1_000)
+      // 参考目录与目录重载:项目配置里加一条参考目录,让引擎重载这个目录
+      writeFileSync(join(project, "opencode.json"), JSON.stringify({ references: { notes: { path: join(project, "sub") } } }))
+      await call("POST", `/api/location/reload?${loc}`)
+      await settle(1_500)
+      // 提问被取消
+      const asking = await create()
+      await call("POST", `/api/session/${asking}/prompt`, { text: "ask me something" })
+      let form: { id: string } | undefined
+      for (let attempt = 0; attempt < 100 && !form; attempt++) {
+        form = ((await call("GET", `/api/form?${loc}`)).data as any[]).find((item) => item.sessionID === asking)
+        if (!form) await Bun.sleep(100)
+      }
+      if (form) await call("DELETE", `/api/session/${asking}/form/${form.id}`)
+      await settle(1_000)
+
+      const frames = records.slice(from).map(({ frame, snapshot }) => ({ frame, ...(snapshot !== undefined ? { snapshot } : {}) }))
+      const sessionIDs = [...new Set(frames.map((item) => item.frame.data?.sessionID).filter((id): id is string => typeof id === "string"))]
+      const sessions: Record<string, unknown> = {}
+      for (const sessionID of sessionIDs) {
+        const found = await exchange("GET", `/api/session/${sessionID}`)
+        if (found.status === 200) sessions[sessionID] = found.body.data
+      }
+      write("events.json", {
+        _source: source(
+          "Event table cases: every /api/event frame (with the message page read right after it) from a sequence that creates, runs, renames and deletes sessions, renames the project, creates / renames / lets exit / deletes a pty, switches the git branch, connects the local mock-mcp.ts (oauth off), has it announce tools / resources / prompts list_changed and then disconnects it, adds a project reference and reloads the location, and cancels a question form. " +
+            "`sessions` = GET /api/session/:id for every session id seen, read at the end; `serverConnected` = the subscription's first frame. lsp.updated and global.disposed have no publisher in this engine and cannot be sampled.",
+        ),
+        directory: project,
+        serverConnected: records.find((record) => record.frame.type === "server.connected")?.frame,
+        announced,
+        mcpRequests: mcp.requests,
+        sessions,
+        frames,
+      })
+    } finally {
+      mcp.stop()
       autoAllow = false
     }
   }

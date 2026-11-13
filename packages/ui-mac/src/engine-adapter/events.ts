@@ -5,7 +5,8 @@
 //   · 直通:pty.*、lsp.updated、vcs.branch.updated、mcp.*、reference.updated、server.connected、global.disposed;
 //     filesystem.changed → file.watcher.updated(另由回合改动补出项目文件的增删改,见 fileChanges);
 //   · 改名:location.shutdown → server.instance.disposed;agent/command/skill.updated → catalog.updated;
-//     project.updated(`canonical` → `worktree`);permission.asked(I7a 字段映射)/ replied;
+//     project.updated(`canonical` → `worktree`;Code Puppy 自己的目录不发,`#1669` internal-projects.ts);
+//     permission.asked(I7a 字段映射)/ replied;
 //     form.*(`metadata.kind === "question"`)→ question.asked / replied / rejected;
 //   · 派生:session.execution.* → session.status / session.idle / session.error;retry → session.status retry;
 //     会话属性变化 → 重取会话发 session.created / updated;
@@ -15,7 +16,9 @@
 // 不认识的事件丢弃(它们在 v1 没有对应,冻结界面也不读)。
 import type { OpenCodeClient, OpenCodeEvent, SessionMessageInfo } from "@opencode/client/promise"
 import type { Part } from "@opencode-ai/sdk/v2/client"
+import type { EngineInternalDirectories } from "../preload/types"
 import { normalizeSessionInfo } from "./frozen-shapes"
+import { isListedProject, NO_INTERNAL_DIRECTORIES } from "./internal-projects"
 import type { PermissionReplies } from "./permission-replies"
 import type { RouteContext } from "./routes"
 import { recentMessages, rememberSessionDirectory, sessionDirectory } from "./session-cache"
@@ -124,7 +127,12 @@ const PASS_THROUGH = new Set([
   "global.disposed",
 ])
 
-export function createProjector(api: OpenCodeClient, emit: Emit, permissions: PermissionReplies) {
+export function createProjector(
+  api: OpenCodeClient,
+  emit: Emit,
+  permissions: PermissionReplies,
+  internalDirectories: () => Promise<EngineInternalDirectories> = async () => NO_INTERNAL_DIRECTORIES,
+) {
   /** 助手消息 → content 块的语义键(按出现顺序 = content 下标),流式 part 的 id 由它定。 */
   const blocks = new Map<string, string[]>()
   /** 已发出的 v1 对象(按 id)的 JSON,用于只发变化。 */
@@ -291,7 +299,11 @@ export function createProjector(api: OpenCodeClient, emit: Emit, permissions: Pe
     if (type === "location.shutdown") return emit(directory, { type: "server.instance.disposed", properties: { directory } })
     if (type === "agent.updated" || type === "command.updated" || type === "skill.updated")
       return emit(directory, { type: "catalog.updated", properties: {} })
-    if (type === "project.updated") return emit(directory, { type, properties: toV1Project(data as never) })
+    if (type === "project.updated") {
+      // `#1669`:Code Puppy 自己的目录不进冻结 app 的项目清单(event-reducer 收到就插入),与 GET /project 同一判定。
+      if (!(await isListedProject(api, data as never, await internalDirectories()))) return
+      return emit(directory, { type, properties: toV1Project(data as never) })
+    }
     if (type === "permission.asked") return emit(directory, { type, properties: permissions.show(data as never) })
     if (type === "permission.replied") return emit(directory, { type, properties: data })
     if (type === "form.created") {
@@ -388,7 +400,7 @@ export function projectEventStream(context: RouteContext): Response {
         if (controller.signal.aborted) return
         sink.enqueue(encoder.encode(`data: ${JSON.stringify({ directory, payload })}\n\n`))
       }
-      const project = createProjector(context.api, emit, context.permissions)
+      const project = createProjector(context.api, emit, context.permissions, context.internalDirectories)
       void (async () => {
         try {
           for await (const event of context.api.event.subscribe({ signal: controller.signal })) {

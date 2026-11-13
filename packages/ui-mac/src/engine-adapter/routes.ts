@@ -12,8 +12,10 @@ import type {
   PermissionV2DecisionReceipt,
   QuestionRequest,
 } from "@opencode-ai/sdk/v2/client"
+import type { EngineInternalDirectories } from "../preload/types"
 import { normalizeAgentList, normalizeSessionInfo } from "./frozen-shapes"
 import { projectEventStream } from "./events"
+import { isListedProject } from "./internal-projects"
 import { v1DecisionID, type DecisionInput, type DecisionOutcome, type PermissionReplies } from "./permission-replies"
 import { MESSAGE_PAGE, recentMessages, sessionDirectory } from "./session-cache"
 import {
@@ -48,6 +50,8 @@ export type RouteContext = {
   origin: string
   /** 这个引擎源的审批快照与收据(permission-replies.ts)。 */
   permissions: PermissionReplies
+  /** `#1669`:main 持有的 Code Puppy 自己的目录(internal-projects.ts 据此筛项目)。 */
+  internalDirectories: () => Promise<EngineInternalDirectories>
   /** 对引擎源地址发一个原始请求(SSE、二进制读文件这类不经类型化客户端的)。 */
   upstream: (path: string, init?: RequestInit) => Promise<Response>
   /** 把这次请求原样转给引擎(2.x 上路径与形状都没变的那些)。 */
@@ -213,7 +217,11 @@ export const ROUTES: readonly Route[] = [
   route("GET", "/config", async () => json({})),
 
   // ── 项目(U2 选 A:2.x 自己有项目清单,`canonical` 改名 `worktree`)──
-  route("GET", "/project", async (context) => json((await context.api.project.list()).map((p) => toV1Project(p as never)))),
+  route("GET", "/project", async (context) => {
+    const [projects, internal] = await Promise.all([context.api.project.list(), context.internalDirectories()])
+    const listed = await Promise.all(projects.map((project) => isListedProject(context.api, project, internal)))
+    return json(projects.filter((_, index) => listed[index]).map((p) => toV1Project(p as never)))
+  }),
   route("GET", "/project/current", async (context) => json(await currentProject(context))),
   route("GET", "/api/project/current", async (context) => {
     const project = await currentProject(context)

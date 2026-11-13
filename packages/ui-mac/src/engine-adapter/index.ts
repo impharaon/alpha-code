@@ -9,6 +9,8 @@
 // `onBeforeSendHeaders` 对引擎源补上)。审批这一侧只保留回执状态(permission-replies.ts:交出过的请求快照指纹、
 // 已出的收据,窗口寿命、不落盘),那是 0.1.26 回执合同要的幂等与 409,不重放引擎数据。
 import { OpenCode, type OpenCodeClient } from "@opencode/client/promise"
+import type { EngineInternalDirectories } from "../preload/types"
+import { NO_INTERNAL_DIRECTORIES } from "./internal-projects"
 import { createPermissionReplies, type PermissionReplies } from "./permission-replies"
 import { ROUTES, type Route, type RouteContext } from "./routes"
 
@@ -86,8 +88,11 @@ export function createEngineFetch(options: {
   isEngineOrigin: (origin: string) => boolean
   /** 真正出网的 fetch;测试注入,生产是 webview 的 fetch。 */
   fetch?: typeof globalThis.fetch
+  /** `#1669`:main 持有的 Code Puppy 自己的目录;生产经 preload 问 main(下面的 engineFetch),不传 = 一个也不认。 */
+  internalDirectories?: () => Promise<EngineInternalDirectories>
 }): EngineFetch {
   const upstreamFetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init))
+  const internalDirectories = options.internalDirectories ?? (async () => NO_INTERNAL_DIRECTORIES)
   // 每个请求一个 2.x 客户端:它发出的每个调用都带上这次请求的取消信号(调用自己另带的信号照旧生效)。冻结界面靠它给引擎
   // 调用设上限 —— 侧栏自探的 `AbortSignal.timeout(2_000)`(use-projects.ts)、组件卸载时中止的读取。
   const clientFor = (origin: string, signal: AbortSignal): OpenCodeClient =>
@@ -130,6 +135,7 @@ export function createEngineFetch(options: {
       api: clientFor(url.origin, request.signal),
       origin: url.origin,
       permissions: repliesFor(url.origin),
+      internalDirectories,
       upstream: (path, next) => upstreamFetch(new URL(path, url.origin), next),
       passthrough: () => upstreamFetch(request),
     }
@@ -152,4 +158,15 @@ export function registerEngineOrigin(url: string) {
   engineOrigins.add(new URL(url).origin)
 }
 
-export const engineFetch: EngineFetch = createEngineFetch({ isEngineOrigin: (origin) => engineOrigins.has(origin) })
+// `#1669`:Code Puppy 自己的目录由 main 给(路径在一次运行里不变);问一次,失败了下次再问。
+let internalDirectories: Promise<EngineInternalDirectories> | undefined
+const askMainForInternalDirectories = () =>
+  (internalDirectories ??= window.api.engineInternalDirectories().catch((error: unknown) => {
+    internalDirectories = undefined
+    throw error
+  }))
+
+export const engineFetch: EngineFetch = createEngineFetch({
+  isEngineOrigin: (origin) => engineOrigins.has(origin),
+  internalDirectories: askMainForInternalDirectories,
+})

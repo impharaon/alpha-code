@@ -6,9 +6,11 @@
 // (与全局 REQ-059 同一 schema 教训,数组会被引擎拒)。plugin 不在此(走 host fan-out,ADR-006 生 TS 雷)。
 // `#1665`(OpenCode 2):合并结果是一份 v1 形状的小对象,由 engine-transforms.ts 翻译进 2.x 的按域 transform。
 
-import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs"
+import { lstatSync, realpathSync } from "node:fs"
 import { homedir } from "node:os"
 import { isAbsolute, join, normalize, relative, resolve } from "node:path"
+import { extensionsGranted } from "../../ui-mac/src/main/codepuppy-ext-trust"
+import { projectTrustIdentity, readProjectTrustEntry } from "../../ui-mac/src/main/project-trust-truth"
 import { PROJECT_HIDDEN_DIR } from "../../ui-mac/src/shared/project-hidden-dir"
 import { parseProjectJsonc } from "../../ui-mac/src/shared/project-jsonc"
 
@@ -223,18 +225,13 @@ function isRealDirectory(path: string): boolean {
   }
 }
 
-/** 项目扩展信任门 consent:`<dir>/.codepuppy/prefs.json` 的 `extensionsConsent.granted === true`(版本化,
- *  ADR-021 模式)。缺失/坏/未授 = 不信任(默认拒绝可执行物,安全红线);身份漂移 = null。 */
+/** 项目扩展信任门 consent(REQ-060;`#1709`):只认用户在确认框里的决定 —— main 写进 `<casBaseRoot>/project-trust/<env>.json`、
+ *  按规范项目目录 + 目录 inode 登记的那一条(project-trust-truth.ts;位置只由 main 派生的 CODEPUPPY_GLOBAL_DIR 算出)。
+ *  项目目录里的任何文件都不算,包括旧的 `.codepuppy/prefs.json` 里的 `extensionsConsent`。
+ *  没有记录 / 读不出 / 拒绝 / 旧版本 = 不信任(默认拒绝可执行物,安全红线);身份漂移 = null。 */
 export function readProjectExtensionsConsent(project: ProjectRoot): boolean | null {
-  const present = withProjectDirectoryIdentity(project, (root) => existsSync(join(root, "prefs.json")))
-  if (!present.ok) return null
-  if (!present.value) return false
-  try {
-    const read = withProjectDirectoryIdentity(project, (root) => readFileSync(join(root, "prefs.json"), "utf8"))
-    if (!read.ok) return null
-    const prefs = JSON.parse(read.value) as { extensionsConsent?: { granted?: unknown } }
-    return prefs?.extensionsConsent?.granted === true
-  } catch {
-    return false
-  }
+  const identity = withProjectDirectoryIdentity(project, () => projectTrustIdentity(project.directory))
+  if (!identity.ok) return null
+  if (!identity.value) return false
+  return extensionsGranted(readProjectTrustEntry(identity.value))
 }

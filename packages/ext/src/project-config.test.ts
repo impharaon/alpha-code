@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { mergeProjectConfig, projectDirectoryIdentity, requireCodePuppyGlobalRoot, withProjectDirectoryIdentity } from "./project-config"
+import { mergeProjectConfig, projectDirectoryIdentity, readProjectExtensionsConsent, requireCodePuppyGlobalRoot, withProjectDirectoryIdentity, type ProjectRoot } from "./project-config"
 import { CodePuppyExt } from "./plugin"
 import { recordingContext } from "./plugin-host.harness"
 import { Agent } from "../../schema/src/agent.ts"
 import { PROJECT_HIDDEN_DIR } from "../../ui-mac/src/shared/project-hidden-dir"
+import { projectTrustIdentity } from "../../ui-mac/src/main/project-trust-truth"
+import { recordProjectTrustDecision } from "../../ui-mac/src/main/project-trust-truth-write"
 
 const j = (o: unknown) => JSON.stringify(o)
 
@@ -324,5 +326,98 @@ describe("project/root identity fail-closed", () => {
       if (previous === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
       else process.env.CODEPUPPY_GLOBAL_DIR = previous
     }
+  })
+})
+
+// `#1709`:信任只来自用户在确认框里的决定 —— main 写进 `<casBaseRoot>/project-trust/<env>.json` 的那条(规范目录 + inode)。
+// 项目目录里的任何文件都不能冒充它;项目目录身份一变就按未同意。记录经 main 的生产写端写,读经生产的 readProjectExtensionsConsent。
+describe("#1709 项目扩展的信任只认 main 的记录", () => {
+  let root = ""
+  let stateRoot = ""
+  let previous: string | undefined
+
+  beforeEach(() => {
+    previous = process.env.CODEPUPPY_GLOBAL_DIR
+    root = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-trust-")))
+    stateRoot = join(root, "codepuppy-state")
+    mkdirSync(join(stateRoot, "env", "dev"), { recursive: true })
+    process.env.CODEPUPPY_GLOBAL_DIR = join(stateRoot, "env", "dev")
+  })
+  afterEach(() => {
+    if (previous === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+    else process.env.CODEPUPPY_GLOBAL_DIR = previous
+    rmSync(root, { recursive: true, force: true })
+  })
+
+  const makeProject = (name: string) => {
+    const dir = join(root, name)
+    mkdirSync(join(dir, PROJECT_HIDDEN_DIR, "plugins"), { recursive: true })
+    return dir
+  }
+  const identityOf = (dir: string): ProjectRoot => {
+    const identity = projectDirectoryIdentity(dir)
+    if (identity.status !== "project") throw new Error(`not a project: ${j(identity)}`)
+    return identity
+  }
+  const consent = (dir: string) => readProjectExtensionsConsent(identityOf(dir))
+  const decide = (dir: string, granted: boolean) =>
+    expect(recordProjectTrustDecision(projectTrustIdentity(identityOf(dir).directory)!, granted, "2026-11-13T00:00:00.000Z", () => {})).toEqual({ ok: true })
+
+  test("冒充:项目自带旧写法的「已同意」(两种形状)、项目里放一份同名的合法记录、prefs.json 链到真记录文件 ⇒ 都不算;同一份真记录里登记过的项目照常算", () => {
+    const a = makeProject("a")
+    const b = makeProject("b")
+    // 0.1.x main 写的形状与 Issue 复现的最小形状
+    writeFileSync(join(a, PROJECT_HIDDEN_DIR, "prefs.json"), j({ extensionsConsent: { granted: true } }))
+    expect(consent(a)).toBe(false)
+    writeFileSync(join(a, PROJECT_HIDDEN_DIR, "prefs.json"), j({ extensionsConsent: { version: 1, granted: true, decidedAt: "2026-11-01T00:00:00.000Z" } }))
+    expect(consent(a)).toBe(false)
+    // 项目里一份与真记录同名、同形、以它自己的规范目录 + inode 为键的「合法」记录
+    const own = projectTrustIdentity(identityOf(a).directory)!
+    mkdirSync(join(a, PROJECT_HIDDEN_DIR, "project-trust"))
+    writeFileSync(join(a, PROJECT_HIDDEN_DIR, "project-trust", "dev.json"), j({ v: 1, projects: { [own.directory]: { ino: own.ino, version: 1, granted: true, decidedAt: "x" } } }))
+    expect(consent(a)).toBe(false)
+    // 真记录里只有 b;a 的 prefs.json 换成指向真记录文件的符号链接
+    decide(b, true)
+    expect(consent(b)).toBe(true)
+    rmSync(join(a, PROJECT_HIDDEN_DIR, "prefs.json"))
+    symlinkSync(join(stateRoot, "project-trust", "dev.json"), join(a, PROJECT_HIDDEN_DIR, "prefs.json"))
+    expect(consent(a)).toBe(false)
+  })
+
+  test("记录本身:当前告知版本以外的条目不算;拒绝不算;位置只由 main 派生的根算出 —— CODEPUPPY_GLOBAL_DIR 不是 `<base>/env/<env>` ⇒ 一个都不信任", () => {
+    const a = makeProject("a")
+    const own = projectTrustIdentity(identityOf(a).directory)!
+    mkdirSync(join(stateRoot, "project-trust"), { recursive: true })
+    writeFileSync(join(stateRoot, "project-trust", "dev.json"), j({ v: 1, projects: { [own.directory]: { ino: own.ino, version: 2, granted: true, decidedAt: "x" } } }))
+    expect(consent(a)).toBe(false)
+    decide(a, false)
+    expect(consent(a)).toBe(false)
+    decide(a, true)
+    expect(consent(a)).toBe(true)
+    const odd = join(root, "odd-root")
+    mkdirSync(odd)
+    process.env.CODEPUPPY_GLOBAL_DIR = odd
+    expect(consent(a)).toBe(false)
+  })
+
+  test("身份:同意之后改名、复制一份、删掉后在原路径重建 ⇒ 都按未同意;经符号链接打开同一个目录 ⇒ 仍是同一个项目", () => {
+    const a = makeProject("a")
+    decide(a, true)
+    expect(consent(a)).toBe(true)
+    const alias = join(root, "alias")
+    symlinkSync(a, alias, "dir")
+    expect(identityOf(alias).directory).toBe(identityOf(a).directory)
+    expect(consent(alias)).toBe(true)
+    const copy = join(root, "copy")
+    cpSync(a, copy, { recursive: true })
+    expect(consent(copy)).toBe(false)
+    const renamed = join(root, "renamed")
+    renameSync(a, renamed)
+    expect(consent(renamed)).toBe(false)
+    renameSync(renamed, a)
+    expect(consent(a)).toBe(true) // 改回原名:同一目录,恢复
+    rmSync(a, { recursive: true })
+    makeProject("a")
+    expect(consent(a)).toBe(false) // 原路径重建 / 重新克隆:inode 变了
   })
 })

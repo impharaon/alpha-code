@@ -5,7 +5,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
 import { __resetCodePuppyEnvironmentForTests } from "./codepuppy-environment"
 import { writeProjectPrefs } from "./codepuppy-workdir"
 import {
@@ -18,6 +18,7 @@ import {
   readProjectTrustTruth,
 } from "./project-trust-truth"
 import { recordProjectTrustDecision } from "./project-trust-truth-write"
+import { relativeImportClosure } from "./process-fence-write-sites"
 
 let root = ""
 let stateRoot = ""
@@ -160,6 +161,13 @@ describe("写端", () => {
       },
     })
     expect(readdirSync(join(stateRoot, "project-trust"))).toEqual(["dev.json"])
+  })
+
+  test("写端不进 ext 的 import 闭包,读端在(ext 只读不写)", () => {
+    const repoRoot = resolve(import.meta.dir, "../../../..")
+    const closure = relativeImportClosure(join(repoRoot, "packages/ext/src/plugin.ts")).map((file) => file.slice(repoRoot.length + 1))
+    expect(closure).toContain("packages/ui-mac/src/main/project-trust-truth.ts")
+    expect(closure).not.toContain("packages/ui-mac/src/main/project-trust-truth-write.ts")
   })
 
   test("现有记录坏了 ⇒ 出一行原因、只留这一次的决定", () => {

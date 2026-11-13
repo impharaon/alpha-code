@@ -1,34 +1,26 @@
 // REQ-060 信任门(项目自带可执行扩展的 per-project consent)—— 纯核。
 //
-// 语义:项目 `.codepuppy/codepuppy.jsonc` 的 mcp 与 `.codepuppy/plugins/*.js` 是**可执行物**(打开陌生仓库即
-// 在本机跑其代码),@codepuppy/ext 的信任门只在 `.codepuppy/prefs.json` 的 `extensionsConsent.granted
-// === true` 时加载它们(plugin.ts:readProjectExtensionsConsent)。本模块负责决策记录的读写语义与
-// 可执行物清单派生;弹窗在 ext-ipc(B16/ADR-021 同款分层:纯核可单测,对话框在 IPC 层)。
+// 语义:项目 `.codepuppy/codepuppy.jsonc` 的 mcp、agent 的控制字段与 `.codepuppy/plugins/*.js` 是**可执行物**(打开陌生仓库即
+// 在本机跑其代码、改写审批规则),@codepuppy/ext 的信任门只在用户于确认框里允许过时加载它们(project-config.ts
+// readProjectExtensionsConsent)。决定记在 main 写、引擎写不到的 `<casBaseRoot>/project-trust/<env>.json`(`#1709`,
+// project-trust-truth.ts),按规范项目目录 + inode 登记;项目目录里的任何文件都不算。本模块负责决定的语义(main 与 ext 共用
+// 这一份)与可执行物清单派生;弹窗在 ext-ipc(B16/ADR-021 同款分层:纯核可单测,对话框在 IPC 层)。
 //
-// 决策(granted/denied)都落盘 —— 拒绝 = 该项目仅文本类(skill/agent/command)生效,且不再重复弹。
+// 决策(granted/denied)都落盘 —— 拒绝 = 该项目仅文本类(skill/agent 说明字段/command)生效,且不再重复弹。
 // 版本化:告知内容实质变更时 bump EXTENSIONS_CONSENT_VERSION → 旧决策失效、重新弹。
 
-import type { ProjectPrefs } from "./codepuppy-cloud-consent"
 import { parseProjectJsonc } from "../shared/project-jsonc"
+import type { ProjectTrustEntry } from "./project-trust-truth"
 
 export const EXTENSIONS_CONSENT_VERSION = 1
 
-export type ExtensionsConsent = { version: number; granted: boolean; decidedAt: string }
-
-/** 已有当前版本的决策(granted 与 denied 都算)⟺ 不再弹。 */
-export function hasExtensionsDecision(prefs: ProjectPrefs): boolean {
-  const c = (prefs as { extensionsConsent?: { version?: unknown; granted?: unknown } }).extensionsConsent
-  return c?.version === EXTENSIONS_CONSENT_VERSION && typeof c.granted === "boolean"
+/** 已有当前版本的决策(granted 与 denied 都算)⟺ 不再弹。entry = 记录里这个项目(规范目录 + inode 对上)的条目。 */
+export function hasExtensionsDecision(entry: ProjectTrustEntry | undefined): boolean {
+  return entry?.version === EXTENSIONS_CONSENT_VERSION && typeof entry.granted === "boolean"
 }
 
-export function extensionsGranted(prefs: ProjectPrefs): boolean {
-  const c = (prefs as { extensionsConsent?: { version?: unknown; granted?: unknown } }).extensionsConsent
-  return c?.version === EXTENSIONS_CONSENT_VERSION && c.granted === true
-}
-
-/** 合并写入决策(保留 prefs 其它字段)。iso 由调用方注入(单测确定性)。 */
-export function withExtensionsConsent(prefs: ProjectPrefs, granted: boolean, iso: string): ProjectPrefs {
-  return { ...prefs, extensionsConsent: { version: EXTENSIONS_CONSENT_VERSION, granted, decidedAt: iso } }
+export function extensionsGranted(entry: ProjectTrustEntry | undefined): boolean {
+  return entry?.version === EXTENSIONS_CONSENT_VERSION && entry.granted === true
 }
 
 export type ProjectExecutables = { mcp: string[]; plugins: string[] }

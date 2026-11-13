@@ -156,3 +156,5 @@ last_reviewed: 2026-11-13
 
 - 2026-11-13 · 顺序:原第 2 步里 `codepuppy-ext-trust.ts` 的语义改造挪进第 3 步,原第 3、4 步(ext 切换与 main 切换)合成一个提交 · 语义函数的入参从 prefs 换成记录条目,ext 与 main 两个调用方必须在同一个提交里跟上,否则中间提交编译不过 · 第 2 步提交(本提交只含记录读写端与其单测)。
 - 2026-11-13 · U3 裁决的补充:读端遇到记录文件或记录目录是符号链接即拒(一个项目都不信任),写端拒往符号链接目录里写;单测各有一臂(伪造记录本身合法、换成链接就不认),围栏实测在第 5 步加「围栏内在记录路径与记录目录建符号链接 ⇒ 不许」一臂 · 本提交落读写端与单测。
+- 2026-11-13 · 改动表外两个文件:`packages/ui-mac/src/main/codepuppy-environment.ts` 与 `packages/ui-mac/src/preload/types.ts`,`CodePuppyEnvironmentInfo` 的定义从 preload/types 挪进 codepuppy-environment(preload/types 原样转出,无行为变化)· ext 经 project-trust-truth.ts 引用现有的状态根解析,codepuppy-environment 原来那条指向 preload/types 的 type import 把整张 IPC 类型图(含依赖 Electron 专有类型的 main 模块)拖进 ext 的 `tsgo --noEmit`,报 3 处与本票无关的错;挪定义是同一调用链上最小的修法,不复制拓扑文法 · 第 3 步提交。
+- 2026-11-13 · `scripts/gate-files.tsv` 里两个子进程宿主(`ext-trust-check.test.ts`、`project-consent-store.engine.test.ts`)的登记提前到第 3 步提交,围栏实测那行仍在第 5 步 · `gate-file-registry.test.ts` 要求起嵌套 `bun test` 的宿主与它同一个提交登记 · 第 3 步提交。

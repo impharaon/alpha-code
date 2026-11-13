@@ -17,7 +17,7 @@ import type { OpenCodeClient, OpenCodeEvent, SessionMessageInfo } from "@opencod
 import type { Part, Session } from "@opencode-ai/sdk/v2/client"
 import type { ContractEvent } from "../contract/events"
 import { toContractSession } from "../contract/session"
-import type { PermissionReplies } from "./permission-replies"
+import type { ReceiptLedger } from "../contract/receipts"
 import type { SharedContext } from "./routes"
 import { recentMessages, rememberSessionDirectory, sessionDirectory } from "./session-cache"
 import {
@@ -25,6 +25,7 @@ import {
   partID,
   todosOf,
   toV1Messages,
+  toV1PermissionRequest,
   toV1Project,
   toV1Question,
   turnAnchor,
@@ -152,7 +153,7 @@ const MCP_EVENTS: ReadonlySet<string> = new Set<PassThroughType>([
 /** 两代同形的事件:2.x 的载荷原样作为约定载荷发出。 */
 const isPassThrough = (type: string): type is PassThroughType => PASS_THROUGH.has(type) || MCP_EVENTS.has(type)
 
-export function createProjector(api: OpenCodeClient, emit: Emit, permissions: PermissionReplies) {
+export function createProjector(api: OpenCodeClient, emit: Emit, receipts: ReceiptLedger) {
   /** 助手消息 → content 块的语义键(按出现顺序 = content 下标),流式 part 的 id 由它定。 */
   const blocks = new Map<string, string[]>()
   /** 已发出的 v1 对象(按 id)的 JSON,用于只发变化。 */
@@ -321,7 +322,7 @@ export function createProjector(api: OpenCodeClient, emit: Emit, permissions: Pe
     if (type === "agent.updated" || type === "command.updated" || type === "skill.updated")
       return emit(directory, { type: "catalog.updated", properties: {} })
     if (event.type === "project.updated") return emit(directory, { type: event.type, properties: toV1Project(event.data) })
-    if (event.type === "permission.asked") return emit(directory, { type: event.type, properties: permissions.show(event.data) })
+    if (event.type === "permission.asked") return emit(directory, { type: event.type, properties: receipts.show(toV1PermissionRequest(event.data)) })
     if (type === "permission.replied") return emit(directory, { type, properties: data })
     if (type === "form.created") {
       const question = toV1Question(data.form)
@@ -417,7 +418,7 @@ export function projectEventStream(context: SharedContext): Response {
         if (controller.signal.aborted) return
         sink.enqueue(encoder.encode(`data: ${JSON.stringify({ directory, payload })}\n\n`))
       }
-      const project = createProjector(context.api, emit, context.permissions)
+      const project = createProjector(context.api, emit, context.receipts)
       void (async () => {
         try {
           for await (const event of context.api.event.subscribe({ signal: controller.signal })) {

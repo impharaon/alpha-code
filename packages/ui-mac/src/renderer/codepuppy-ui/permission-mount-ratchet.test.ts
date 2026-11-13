@@ -219,7 +219,7 @@ describe("审批决定提交入口:单一引用面白名单棘轮(#619 R3 Blocke
    *
    *  ── `#1662` 引擎 2.x 换代(`#1668` 适配器)显式更新 ──────────────────────────────────────
    *
-   *  6) 新增 `packages/ui-mac/src/engine-adapter/permission-replies.ts`(`permission.reply`;`#1697` 起在 `engine-adapter/opencode2/` 下):冻结的 0.1.26 界面不改,
+   *  6) 新增 `packages/ui-mac/src/engine-adapter/permission-replies.ts`(`permission.reply`;`#1697` 起回执账本归约定 `engine-adapter/contract/receipts.ts`,这个调用在审批端口 `engine-adapter/opencode2/approvals.ts`):冻结的 0.1.26 界面不改,
    *     它照旧经上面已登记的入口(permission-surface / permission-v1-adapter / use-extensions)发 v1 / v2 回复;这些请求
    *     经 engineFetch 进适配器的路由表(routes.ts),由这一个模块合成回执并把决定交给 2.x 引擎(2.x 客户端的
    *     `api.permission.reply`:目标请求一次,「本次会话内允许」时再给已被新规则覆盖的同会话待审请求各回 `once`)。
@@ -235,7 +235,7 @@ describe("审批决定提交入口:单一引用面白名单棘轮(#619 R3 Blocke
     { file: "packages/codepuppy-app/src/context/permission.tsx", token: "permission.reply" },
     { file: "packages/codepuppy-app/src/utils/server-compat.ts", token: "permission.reply" },
     { file: "packages/codepuppy-app/src/utils/server-compat.ts", token: "permission.respond" },
-    { file: "packages/ui-mac/src/engine-adapter/opencode2/permission-replies.ts", token: "permission.reply" },
+    { file: "packages/ui-mac/src/engine-adapter/opencode2/approvals.ts", token: "permission.reply" },
   ] as const
 
   const sanctionedEntry = (file: string, token: string, source: string) =>

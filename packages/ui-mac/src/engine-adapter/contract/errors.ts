@@ -13,6 +13,16 @@ export type ContractError =
 
 export const errorResponse = (error: ContractError) => Response.json(error.body, { status: error.status })
 
+/** 审批回复的命令不成形(决定不是 once / always / reject,或缺 decisionID)。 */
+export const invalidDecision = (): ContractError => ({ status: 400, body: { name: "BadRequest", data: { message: "invalid permission decision" } } })
+
+/** 回执账本没出收据时的信封,与 0.1.26 同形:过期 404、陈旧 409(审批卡的 permissionDecisionSubmitError 据 409 判为冲突)。 */
+export function decisionError(outcome: "expired" | "conflict", requestID: string): ContractError {
+  return outcome === "expired"
+    ? { status: 404, body: { _tag: "PermissionNotFoundError", requestID, message: `Permission request not found: ${requestID}` } }
+    : { status: 409, body: { _tag: "ConflictError", resource: requestID, message: `Permission request conflicts with the immutable request: ${requestID}` } }
+}
+
 const notServed = (method: string, path: string): ContractError => ({
   status: 501,
   body: { name: UNSUPPORTED_ERROR_NAME, data: { method, path } },

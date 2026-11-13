@@ -8,7 +8,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { createEngineFetch } from "../../src/engine-adapter/index"
-import { requestFingerprint } from "../../src/engine-adapter/opencode2/permission-replies"
+import { requestFingerprint } from "../../src/engine-adapter/contract/receipts"
 import { startMockModel } from "./mock-model"
 
 const REPO = resolve(import.meta.dir, "../../../..")
@@ -309,8 +309,10 @@ try {
     await Bun.sleep(300)
     const pendingA = await exchange("GET", `/api/session/${sessionA}/permission`)
     const getA1 = await exchange("GET", `/api/session/${sessionA}/permission/${a1}`)
-    await viaAdapter("GET", `/permission?directory=${encodeURIComponent(project)}`)
-    const command = { requestFingerprint: await requestFingerprint(getA1.body.data), decisionID: "pdec_sampler_reject", decision: "reject" }
+    // 指纹按适配器交给界面的那份 v1 请求、用回执账本导出的同一个函数算(设计 §4.8)
+    const shown = async (id: string) =>
+      ((await viaAdapter("GET", `/permission?directory=${encodeURIComponent(project)}`)).body as any[]).find((request) => request.id === id)
+    const command = { requestFingerprint: await requestFingerprint(await shown(a1)), decisionID: "pdec_sampler_reject", decision: "reject" }
     const rejected = await viaAdapter("POST", `/api/session/${sessionA}/permission/${a1}/reply`, command)
     const replay = await viaAdapter("POST", `/api/session/${sessionA}/permission/${a1}/reply`, command)
     const replyAgain = await exchange("POST", `/api/session/${sessionA}/permission/${a1}/reply`, { decision: "once" })
@@ -325,10 +327,8 @@ try {
     const sessionD = await create()
     const [c1, c2] = [await askSaving(sessionC, "a.env"), await askSaving(sessionC, "ab.env")].map((item) => item.body.data.id as string)
     await Bun.sleep(300)
-    await viaAdapter("GET", `/permission?directory=${encodeURIComponent(project)}`)
-    const getC1 = await exchange("GET", `/api/session/${sessionC}/permission/${c1}`)
     const alwaysCommand = {
-      requestFingerprint: await requestFingerprint(getC1.body.data),
+      requestFingerprint: await requestFingerprint(await shown(c1)),
       decisionID: "pdec_sampler_always",
       decision: "always",
       grantScope: { kind: "project", projectID: "unused-by-the-adapter" },
@@ -352,7 +352,7 @@ try {
       _source: source(
         "Three asks created with POST /api/session/:id/permission (agent build, read, save [\"*\"]): A1 .env and A2 other.env in session A, B1 .env in session B. " +
           "`frames` = every permission.asked / permission.replied frame of A and B in arrival order. `pendingA` / `getA1` are the raw engine reads before replying; " +
-          "`rejected` / `replay` are the adapter's v2 reply route for A1 (reject, then the same command again); `replyAgain` is a raw second engine reply to A1; " +
+          "`rejected` / `replay` are the adapter's v2 reply route for A1 (reject, then the same command again; the command's fingerprint is computed over the request as the adapter's GET /permission displays it); `replyAgain` is a raw second engine reply to A1; " +
           "`pendingB` is B's list after the reject; `settled` is the raw once reply to B1. " +
           "`sessionAlways`: C1 a.env and C2 ab.env (save [\"a*\"]) in session C; `allowed` is the adapter's v2 reply route for C1 with decision always; " +
           "`pendingAfter` / `rules` are C's pending list and session rules right after; `askSame` / `askOther` are fresh POST /api/session/:id/permission for a.env / b.env in C, " +

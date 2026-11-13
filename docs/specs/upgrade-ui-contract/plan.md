@@ -339,7 +339,10 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 
 ### 偏离记录
 
-暂无
+- 2026-11-12 · 计划外多改一个文件:`permission-mount-ratchet.test.ts` 的审批提交入口白名单按文件登记,`permission.reply` 这个调用随端口搬到 `opencode2/approvals.ts`,登记改指那里。
+- 2026-11-12 · 回复时引擎已经没有这条请求(回复本身 404)的情形,`ApprovalEngine.decide` 交回空集合,账本据「集合里没有目标」判过期 —— 设计的签名只回 `string[]`,没写这一种;写在 `contract/receipts.ts` 的接口注释里,行为与 A 相同(404 过期)。`Translator.approvals` 与路由用的是同一个函数(`opencode2/approvals.ts` 的 `approvals`)。
+- 2026-11-12 · 指纹那条新证明另用 `permission-asked.json` 里带工具来源的真请求经账本走一遍:假引擎的请求没有 `source`,`tool` 缺省时不进序列化,只用它证明不了 `tool` 在指纹里(变异「指纹去掉 tool」起初没红,补上这一段后红)。
+- 2026-11-12 · B3 在同一份夹具上比:`permission-reply.json` 本片重采,所以 after 先换回重采前的那份跑,再放回新的。
 
 ## M4 — Code Puppy 界面只经约定;边界扫描 f
 

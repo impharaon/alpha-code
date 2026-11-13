@@ -782,7 +782,7 @@
         "packages/client/src/generated/types.ts"
       ],
       "mechanism": {
-        "file": "packages/ui-mac/src/engine-adapter/opencode2/permission-replies.ts",
+        "file": "packages/ui-mac/src/engine-adapter/contract/receipts.ts",
         "ladder": "L6 adapter (derivation per docs/architecture/2026-11-09-1662-permission-reply-measurements.md: the receipt is synthesized from the displayed snapshot's fingerprint, the replied events of the reply's cascade window and a decision cache; no kernel re-take)"
       },
       "tests": [
@@ -813,6 +813,14 @@
         {
           "file": "packages/ui-mac/src/engine-adapter/permission-reply.test.ts",
           "name": "反向臂:收据只列目标(没有事件窗口)⇒ 冻结 feed 里同会话的 A2 一直挂着"
+        },
+        {
+          "file": "packages/ui-mac/src/engine-adapter/permission-reply.test.ts",
+          "name": "收据指纹 = GET /permission 交出的 v1 请求的 sessionID / permission / patterns / always / metadata / tool 的 sha256;真引擎采样的命令与收据也是这个值"
+        },
+        {
+          "file": "packages/ui-mac/src/engine-adapter/permission-reply.test.ts",
+          "name": "反向臂:按引擎原始字段算的旧指纹(`#1668` 的算法)走 v2 入口 ⇒ 409,引擎一个字节的回复都没收到"
         }
       ]
     },

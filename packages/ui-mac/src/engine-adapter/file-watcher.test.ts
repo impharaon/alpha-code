@@ -10,7 +10,7 @@ import { createFilesPanelState } from "../renderer/codepuppy-ui/session-rail/fil
 import files from "./fixtures/files.json"
 import parity from "./fixtures/parity.json"
 import { createProjector, type V1Payload } from "./opencode2/events"
-import { createPermissionReplies } from "./opencode2/permission-replies"
+import { createReceiptLedger } from "./contract/receipts"
 
 type Record_ = { frame: { type: string; data: Record<string, any> }; snapshot?: { data: any[] }; diff?: { data: unknown[] } }
 const fixture = files as unknown as {
@@ -59,7 +59,7 @@ async function project(records: Record_[], diffFor: (record: Record_ | undefined
     },
   }
   const events: Array<{ directory: string; payload: V1Payload }> = []
-  const projector = createProjector(api as never, (directory, payload) => events.push({ directory, payload }), createPermissionReplies())
+  const projector = createProjector(api as never, (directory, payload) => events.push({ directory, payload }), createReceiptLedger())
   for (const record of records) {
     current = record
     await projector(record.frame as never)
@@ -77,7 +77,7 @@ describe("#1668 F3 文件面板的变化通知", () => {
   test("filesystem.changed(不带 sessionID)→ 那个目录频道上的 file.watcher.updated,面板照原样收下", async () => {
     const frame = fixture.watchedFrames[0]!
     const events: Array<{ directory: string; payload: V1Payload }> = []
-    const projector = createProjector({} as never, (directory, payload) => events.push({ directory, payload }), createPermissionReplies())
+    const projector = createProjector({} as never, (directory, payload) => events.push({ directory, payload }), createReceiptLedger())
     await projector(frame as never)
     expect(events).toEqual([
       { directory: frame.location.directory, payload: { type: "file.watcher.updated", properties: { file: frame.data.file, event: "change" } } },
@@ -133,7 +133,7 @@ describe("#1668 外部编辑的来源(实测记录)", () => {
     expect(probe.createdFrames.filter((frame) => /new\.txt$|three\.txt$/.test(frame.data.file))).toEqual([])
     const unlink = probe.unlinkFrames.find((frame) => frame.data.event === "unlink")!
     const events: Array<{ directory: string; payload: V1Payload }> = []
-    await createProjector({} as never, (directory, payload) => events.push({ directory, payload }), createPermissionReplies())(unlink as never)
+    await createProjector({} as never, (directory, payload) => events.push({ directory, payload }), createReceiptLedger())(unlink as never)
     expect(events).toEqual([
       { directory: unlink.location.directory, payload: { type: "file.watcher.updated", properties: { file: unlink.data.file, event: "unlink" } } },
     ])

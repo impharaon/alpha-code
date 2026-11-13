@@ -11,7 +11,7 @@ import { mcpRepair } from "../renderer/extensions/use-extensions"
 import { turnErrorOf } from "../renderer/codepuppy-ui/session-timeline/timeline-model"
 import readTool from "./fixtures/read-tool.json"
 import { createProjector, type V1Payload } from "./opencode2/events"
-import { createPermissionReplies } from "./opencode2/permission-replies"
+import { createReceiptLedger } from "./contract/receipts"
 import { toV1McpStatus, toV1Messages } from "./opencode2/v1-shapes"
 
 const office = CODEPUPPY_OFFICE_CONNECTORS[0]!.name
@@ -44,7 +44,7 @@ describe("#1668 H2 登记失败码 → 0.1.26 读的字段", () => {
       message: { list: async () => ({ data: [], cursor: {} }) },
       session: { get: async ({ sessionID }: { sessionID: string }) => ({ id: sessionID, location: { directory: "/p" }, time: { created: 0, updated: 0 } }), diff: async () => [] },
     }
-    const projector = createProjector(api as never, (_directory, payload) => events.push(payload), createPermissionReplies())
+    const projector = createProjector(api as never, (_directory, payload) => events.push(payload), createReceiptLedger())
     const error = { type: "provider.transport", message: withFailureCode("tcp", "connect ECONNREFUSED 10.0.0.1:443") }
     await projector({ type: "session.retry.scheduled", location: { directory: "/p" }, data: { sessionID: "ses_1", attempt: 1, at: 1, error } } as never)
     await projector({ type: "session.execution.failed", location: { directory: "/p" }, data: { sessionID: "ses_1", error } } as never)

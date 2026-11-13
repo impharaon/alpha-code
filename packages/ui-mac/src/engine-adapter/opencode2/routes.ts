@@ -18,7 +18,9 @@ import type { RouteContext, RouteHandler, Translator } from "../contract/transla
 import type { TranslatedKey } from "../contract/routes"
 import { toContractSession } from "../contract/session"
 import { projectEventStream } from "./events"
-import { v1DecisionID, type DecisionInput, type DecisionOutcome, type PermissionReplies } from "./permission-replies"
+import { decisionError, errorResponse, invalidDecision } from "../contract/errors"
+import { v1DecisionID, type DecisionInput } from "../contract/receipts"
+import { approvals } from "./approvals"
 import { MESSAGE_PAGE, recentMessages, sessionDirectory } from "./session-cache"
 import {
   syntheticText,
@@ -31,6 +33,7 @@ import {
   v1McpStatus,
   toV1Messages,
   toV1Path,
+  toV1PermissionRequest,
   toV1Project,
   toV1ModelList,
   toV1ProviderList,
@@ -46,8 +49,6 @@ import {
 export type Opencode2Engine = {
   api: OpenCodeClient
   origin: string
-  /** 这个引擎源的审批快照与收据(permission-replies.ts)。 */
-  permissions: PermissionReplies
   /** 对引擎源地址发一个原始请求(SSE、二进制读文件这类不经类型化客户端的)。 */
   upstream: (path: string, init?: RequestInit) => Promise<Response>
   /** 出网的 fetch(直通与原始请求用;直通的请求自己带着取消信号)。 */
@@ -88,31 +89,17 @@ async function allSessions(api: OpenCodeClient, input: Parameters<OpenCodeClient
   }
 }
 
-// ── 权限回复(I7a):回执按 L4 的推导规格合成(permission-replies.ts)──────────────────────────────────────
+// ── 权限回复(I7a):回执由约定的回执账本合成(contract/receipts.ts),引擎一侧经 approvals.ts ─────────────────────────
 // 三个回复入口:v1 `/permission/:id/reply`(审批卡、定制中心、连接器停用)、v1 旧 `/session/:id/permissions/:id`
 // (冻结 app 的自动允许,经 server-compat 的 legacy 客户端)、0.1.26 的 v2 `/api/session/:id/permission/:id/reply`
 // (带命令,回收据)。错误体与 0.1.26 同形:过期 404 PermissionNotFoundError,陈旧 409 ConflictError(审批卡的
 // permissionDecisionSubmitError 据 409 判为冲突)。
 const DECISIONS = new Set(["once", "always", "reject"])
 
-function decisionResponse(outcome: DecisionOutcome, requestID: string, success: (receipt: PermissionV2DecisionReceipt) => Response) {
-  if (outcome.type === "expired")
-    return json(
-      { _tag: "PermissionNotFoundError", requestID, message: `Permission request not found: ${requestID}` },
-      { status: 404 },
-    )
-  if (outcome.type === "conflict")
-    return json(
-      { _tag: "ConflictError", resource: requestID, message: `Permission request conflicts with the immutable request: ${requestID}` },
-      { status: 409 },
-    )
-  return success(outcome.receipt)
-}
-
 async function decide(context: SharedContext, input: DecisionInput, success: (receipt: PermissionV2DecisionReceipt) => Response) {
-  if (!DECISIONS.has(input.decision) || !input.decisionID)
-    return json({ name: "BadRequest", data: { message: "invalid permission decision" } }, { status: 400 })
-  return decisionResponse(await context.permissions.decide(context.api, input), input.requestID, success)
+  if (!DECISIONS.has(input.decision) || !input.decisionID) return errorResponse(invalidDecision())
+  const outcome = await context.receipts.decide(approvals(context), input)
+  return outcome.type === "receipt" ? success(outcome.receipt) : errorResponse(decisionError(outcome.type, input.requestID))
 }
 
 /** 提问(2.x 表单)的 requestID → sessionID:v1 回答只带 requestID,2.x 要会话。先查列表,再查全局。 */
@@ -463,7 +450,7 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
 
   // ── 权限 ──
   "GET /permission": bind(async (context) =>
-    context.reply((await context.api.permission.request.list(at(context))).data.map((item) => context.permissions.show(item))),
+    context.reply((await context.api.permission.request.list(at(context))).data.map((item) => context.receipts.show(toV1PermissionRequest(item)))),
   ),
   "POST /permission/:requestID/reply": bind((context) => {
     const requestID = context.params.requestID!

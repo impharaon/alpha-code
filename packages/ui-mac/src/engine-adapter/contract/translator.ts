@@ -1,7 +1,7 @@
 // `#1697`(I-04,设计 §4.8):每代引擎一个翻译器,管道只认这个接口。换代时在同一变更里新增下一代目录、切换管道的选用、
 // 删除旧目录(R5);管道不做运行时选择。
-// 回执账本(`receipts`、`approvals`)随 M3 进来(计划 docs/specs/upgrade-ui-contract/plan.md)。
 import type { ContractError } from "./errors"
+import type { ApprovalEngine, ReceiptLedger } from "./receipts"
 import type { BodyOf, ResponseOf, TranslatedKey } from "./routes"
 
 export type RouteContext<K extends TranslatedKey> = {
@@ -14,6 +14,8 @@ export type RouteContext<K extends TranslatedKey> = {
   readonly request: Request
   /** UC-03:为这个约定请求发出的每个引擎调用都带它。 */
   readonly signal: AbortSignal
+  /** 这个引擎源的回执账本(管道持有,窗口寿命)。 */
+  readonly receipts: ReceiptLedger
   /** JSON 路由经这里出:body 的类型就是该路由的约定响应类型。 */
   readonly reply: (body: ResponseOf<K>, init?: { status?: 200 | 204; headers?: Record<string, string> }) => Response
 }
@@ -27,4 +29,6 @@ export interface Translator<Engine> {
   readonly routes: { readonly [K in TranslatedKey]: RouteHandler<K, Engine> }
   /** 引擎调用失败 → 约定错误信封(取消不经这里)。 */
   toContractError(error: unknown): ContractError
+  /** 回执账本用的审批端口。 */
+  approvals(engine: Engine): ApprovalEngine
 }

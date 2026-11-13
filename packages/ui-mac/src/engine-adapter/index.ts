@@ -9,6 +9,7 @@
 // 适配器不做任何决定(审批、档位、目录闸都在引擎与 ext),不持有口令(I8:`Authorization` 由 main 的
 // `onBeforeSendHeaders` 对引擎源补上)。
 import { errorResponse, probeFallback, unsupported } from "./contract/errors"
+import { createReceiptLedger, type ReceiptLedger } from "./contract/receipts"
 import { FIXED, isFixed, matchProbeFallback, matchServed, type TranslatedKey } from "./contract/routes"
 import type { RouteContext } from "./contract/translator"
 import { createOpencode2Translator } from "./opencode2"
@@ -38,6 +39,15 @@ export function createEngineFetch(options: {
   const upstreamFetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init))
   // 静态选用当前那一代翻译器(R5)。
   const translator = createOpencode2Translator()
+  // 回执账本按引擎源一本,活在这个 engineFetch 里(窗口寿命、不落盘)。
+  const ledgers = new Map<string, ReceiptLedger>()
+  const ledgerFor = (origin: string) => {
+    const existing = ledgers.get(origin)
+    if (existing) return existing
+    const created = createReceiptLedger()
+    ledgers.set(origin, created)
+    return created
+  }
 
   return async (input, init) => {
     const request = new Request(input, init)
@@ -61,7 +71,11 @@ export function createEngineFetch(options: {
     }
     try {
       const engine = translator.connect({ origin: url.origin, signal: request.signal, fetch: upstreamFetch })
-      return await dispatch(matched.key, { params: matched.params, query: url.searchParams, body, directory: directoryOf(url, request), request }, engine)
+      return await dispatch(
+        matched.key,
+        { params: matched.params, query: url.searchParams, body, directory: directoryOf(url, request), request, receipts: ledgerFor(url.origin) },
+        engine,
+      )
     } catch (error) {
       // 取消:与 fetch 一样以取消原因拒绝(2.x 客户端把它包成 Transport 错误,调用方认的是 AbortError / TimeoutError)。
       request.signal.throwIfAborted()
@@ -72,7 +86,7 @@ export function createEngineFetch(options: {
   /** 按路由把请求交给翻译器;RouteContext 按这条路由定型(body、reply)。 */
   function dispatch<K extends TranslatedKey>(
     key: K,
-    input: { params: Record<string, string>; query: URLSearchParams; body: any; directory?: string; request: Request },
+    input: { params: Record<string, string>; query: URLSearchParams; body: any; directory?: string; request: Request; receipts: ReceiptLedger },
     engine: ReturnType<typeof translator.connect>,
   ) {
     const context: RouteContext<K> = {

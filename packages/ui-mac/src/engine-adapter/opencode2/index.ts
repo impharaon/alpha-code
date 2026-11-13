@@ -3,7 +3,7 @@
 import { OpenCode } from "@opencode/client/promise"
 import type { ContractError } from "../contract/errors"
 import type { Translator } from "../contract/translator"
-import { createPermissionReplies, type PermissionReplies } from "./permission-replies"
+import { approvals } from "./approvals"
 import { ROUTES, type Opencode2Engine } from "./routes"
 
 /** 2.x 调用失败 ⇒ 约定错误信封。2.x 声明过的错误(带 `_tag`)保留名字与消息;状态码按 404 / 其余 500 分。 */
@@ -15,19 +15,8 @@ export function toContractError(error: unknown): ContractError {
     : { status: 500, body: { name, data: { message } } }
 }
 
-/**
- * 每个 createEngineFetch 建一个实例:按引擎源记的审批快照与收据(permission-replies.ts)活在实例里,窗口寿命、不落盘,
- * 与 `#1668` 时管道持有它一样。回执账本归约定之后(计划 M3)这份状态搬到管道。
- */
+/** 管道每个 createEngineFetch 建一个实例(R5 的静态选用)。 */
 export function createOpencode2Translator(): Translator<Opencode2Engine> {
-  const replies = new Map<string, PermissionReplies>()
-  const repliesFor = (origin: string) => {
-    const existing = replies.get(origin)
-    if (existing) return existing
-    const created = createPermissionReplies()
-    replies.set(origin, created)
-    return created
-  }
   return {
     // 每个请求一个 2.x 客户端:它发出的每个调用都带上这次请求的取消信号(调用自己另带的信号照旧生效)。冻结界面靠它给引擎
     // 调用设上限 —— 侧栏自探的 `AbortSignal.timeout(2_000)`(use-projects.ts)、组件卸载时中止的读取。
@@ -38,11 +27,11 @@ export function createOpencode2Translator(): Translator<Opencode2Engine> {
           fetch(input, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, signal]) : signal })) as typeof globalThis.fetch,
       }),
       origin,
-      permissions: repliesFor(origin),
       upstream: (path, next) => fetch(new URL(path, origin), next),
       fetch,
     }),
     routes: ROUTES,
     toContractError,
+    approvals,
   }
 }

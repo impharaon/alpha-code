@@ -5,7 +5,7 @@ import { describe, expect, spyOn, test } from "bun:test"
 import fixture from "./fixtures/permission-asked.json"
 import { createProjector, type V1Payload } from "./opencode2/events"
 import { createEngineFetch } from "./index"
-import { createPermissionReplies } from "./opencode2/permission-replies"
+import { createReceiptLedger } from "./contract/receipts"
 import { toV1PermissionRequest } from "./opencode2/v1-shapes"
 
 const I7A_METADATA = {
@@ -21,7 +21,7 @@ describe("#1668 I7a 审批请求 2.x → v1", () => {
   test("事件流:action/resources/save/source 映射回 v1 的 permission/patterns/always/tool,metadata 四键原样透传", async () => {
     const events: V1Payload[] = []
     const api = { session: { get: async () => ({ location: { directory: fixture.frame.location.directory } }) } }
-    const projector = createProjector(api as never, (_directory, payload) => events.push(payload), createPermissionReplies())
+    const projector = createProjector(api as never, (_directory, payload) => events.push(payload), createReceiptLedger())
     await projector({ ...fixture.frame, data: asked } as never)
     expect(events).toEqual([
       {

@@ -11,8 +11,9 @@
 // 桩的应答体:402 两条是 alpha-platform 真实拒绝体(session-timeline.cases.ts 同一份采样);401 的原话取自打包回归引擎记录
 // (alpha-code-verify-1669 results/r5-drill-raw.txt:49);引擎按 HTTP 状态分类,应答体只进「开发者详情」。
 //
-// 已知的坏(2026-11-12 实跑,本提交之前的 v1-shapes.ts / to-session-error.ts):HTTP 类失败的行是 `UnknownError`、没有原因与状态码
-// (卡片只剩「这轮回复没有完成」);模型不可用与平台凭据读不到没有行(只剩用户气泡)。
+// 已知的坏(2026-11-12 实跑):712cafff27 之前的 v1-shapes.ts / to-session-error.ts ⇒ HTTP 类失败的行是 `UnknownError`、没有原因与
+// 状态码(卡片只剩「这轮回复没有完成」),模型不可用与平台凭据读不到没有行(只剩用户气泡),拒连的名字是 `UnknownError`;只去掉
+// to-session-error.ts 的 codepuppy(#1669) 块 ⇒ 凭据读不到那条红;withFailedTurns 改成「任一助手消息即关回合」⇒ 两步之间那条红。
 //
 // 本文件由同名 `.test.ts` 宿主起独立 `bun test` 子进程跑。HOME / XDG 全在临时沙箱里。
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
@@ -37,13 +38,14 @@ const BYOK_401 = { error: { message: "Authentication Fails, Your api key: ****-k
 const WALLET_402 = '{"error":{"message":"预授权拒绝: 会员额度已用尽:本期额度窗口的额度已消费完。 [failure_code=account_wallet_insufficient]","code":"account_wallet_insufficient"}}'
 const STOPPED_402 = '{"error":{"message":"预授权拒绝: 会员额度已用尽:本期额度窗口的额度已消费完。 [failure_code=route_usage_stopped]","code":"route_usage_stopped"}}'
 
-let mode: "ok" | "401" | "wallet" | "stopped" | "429" = "ok"
+let mode: "ok" | "401" | "wallet" | "stopped" | "429" | "tool-then-lose" = "ok"
+let credentialFile = ""
 const stub = Bun.serve({
   hostname: "127.0.0.1",
   port: 0,
   async fetch(request) {
     const url = new URL(request.url)
-    await request.text()
+    const body = JSON.parse((await request.text()) || "{}") as { tools?: unknown[] }
     if (!url.pathname.endsWith("/chat/completions")) return new Response("not found", { status: 404 })
     if (url.pathname.startsWith("/byok/")) return Response.json(BYOK_401, { status: 401 })
     if (mode === "401") return Response.json({ error: { message: "invalid token", code: "unauthorized" } }, { status: 401 })
@@ -52,6 +54,13 @@ const stub = Bun.serve({
     if (mode === "429") return Response.json({ error: { message: "rate limited: too many requests", code: "rate_limited" } }, { status: 429 })
     const chunk = (delta: Record<string, unknown>, finish: string | null) =>
       `data: ${JSON.stringify({ id: "c1", object: "chat.completion.chunk", created: 1, model: "m", choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`
+    // 第一步照常完成(调一次工具),凭据在两步之间没了:第二步的请求在 ext 的请求边界被拦下(标题请求不带工具表,不动它)
+    if (mode === "tool-then-lose" && body.tools?.length) {
+      mode = "ok"
+      fs.rmSync(credentialFile)
+      const call = { index: 0, id: "call_cp1669", type: "function", function: { name: "cp_probe", arguments: "{}" } }
+      return new Response(chunk({ role: "assistant", tool_calls: [call] }, null) + chunk({}, "tool_calls") + "data: [DONE]\n\n", { headers: { "content-type": "text/event-stream" } })
+    }
     return new Response(chunk({ role: "assistant", content: "ok" }, null) + chunk({}, "stop") + "data: [DONE]\n\n", { headers: { "content-type": "text/event-stream" } })
   },
 })
@@ -223,8 +232,21 @@ describe("#1669 失败的回合:嵌入式引擎 → 生产适配器 → 冻结�
 
   test("平台凭据读不到(ext 在请求发出前抛 LoadAPIKeyError,引擎零请求):登录或 Key 无效(auth)", async () => {
     mode = "ok"
-    fs.rmSync(secretFilePath(host.userData, "CODEPUPPY_API_KEY"))
+    credentialFile = secretFilePath(host.userData, "CODEPUPPY_API_KEY")
+    const credential = fs.readFileSync(credentialFile)
+    fs.rmSync(credentialFile)
     const sessionID = await failedTurn("credential gone", { model: PLATFORM })
+    await expectShown(sessionID, { name: "ProviderAuthError", cause: "auth", statusCode: undefined })
+    fs.writeFileSync(credentialFile, credential, { mode: 0o600 })
+  }, 60_000)
+
+  test("第一步做完、凭据在两步之间没了(第二步零请求):工作过程留着,回合错误行仍是登录或 Key 无效(auth)", async () => {
+    mode = "tool-then-lose"
+    const sessionID = await failedTurn("lose the credential mid-turn", { model: PLATFORM })
+    // 前提:第一步的助手消息完成了工具调用、不带错误;失败只在回合末的 idle 上
+    const stored = (await running.send("GET", `/api/session/${sessionID}/message?order=asc&limit=50`)).json.data as Array<{ type: string; finish?: string; error?: unknown }>
+    expect(stored.filter((message) => message.type === "assistant").map((message) => [message.finish, message.error])).toEqual([["tool-calls", undefined]])
+    expect(stored.at(-1)).toMatchObject({ type: "idle", outcome: "failed", error: { type: "provider.auth" } })
     await expectShown(sessionID, { name: "ProviderAuthError", cause: "auth", statusCode: undefined })
   }, 60_000)
 

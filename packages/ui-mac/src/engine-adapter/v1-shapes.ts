@@ -199,26 +199,27 @@ export function toV1Messages(sessionID: string, source: readonly SessionMessageI
 // 2.x 在两处与它对不上,各自让失败从界面上消失:
 
 /**
- * ① 回合没开出一步就失败(模型不可用 `provider.no-route`、平台凭据读不到),2.x 只在回合末的 `idle` 上记错误,没有助手消息;
+ * ① 一步没开出来就失败(模型不可用 `provider.no-route`、平台凭据读不到),2.x 只在回合末的 `idle` 上记错误,没有带错误的助手消息;
  * 冻结投影不读 `idle`,于是只剩用户气泡。这里在那条 `idle` 的位置换上一条同 id 的空助手消息带着这个错误(冻结投影照常把它挂到
  * 这个回合的用户消息下)。回合起点与冻结投影同一判据:用户消息、带说明的 synthetic 开回合;shell 自带助手消息。
  */
 function withFailedTurns(source: readonly SessionMessageInfo[]): SessionMessageInfo[] {
   let agent = ""
   let model: SessionMessageAssistant["model"] = { id: "", providerID: "" }
-  let open = false
+  // 当前回合还没有哪条助手消息带着错误(回合外 = false)
+  let unreported = false
   return source.map((message) => {
     if (message.type === "agent-switched") agent = message.agent
     if (message.type === "model-switched") model = message.model
-    if (message.type === "user" || (message.type === "synthetic" && !!message.description?.trim())) open = true
-    if (message.type === "shell") open = false
+    if (message.type === "user" || (message.type === "synthetic" && !!message.description?.trim())) unreported = true
+    if (message.type === "shell") unreported = false
     if (message.type === "assistant") {
       agent = message.agent
       model = message.model
-      open = false
+      if (message.error) unreported = false
     }
-    if (message.type !== "idle" || message.outcome !== "failed" || !message.error || !open) return message
-    open = false
+    if (message.type !== "idle" || message.outcome !== "failed" || !message.error || !unreported) return message
+    unreported = false
     return {
       id: message.id,
       type: "assistant",

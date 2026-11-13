@@ -4,108 +4,129 @@
 //   · UNSUPPORTED     声明不支持:不会有 handler,运行时 501 + console.error;
 //   · PROBE_FALLBACK  探活回退:调用方先试它、失败即回退到已服务的路由,约定侧固定回 501 信封、不记错误日志(UC-19)。
 // 三张表都不命中的请求同样 501 + console.error。覆盖由 engine-adapter/routes-coverage.test.ts 从冻结界面与 renderer 的源码扫描来判。
-// 目录项的响应 / 请求体类型在 M2b 按设计 §4.3 规则 1、2 填(引用发出它的冻结客户端的生成类型);这里先只定成员。
+// 目录项的类型按设计 §4.3 规则 1 引用发出它的冻结客户端的生成类型,不复制:v1 SDK 的 `<Op>Responses` / `<Op>Data`,冻结 app
+// 自带的 1.17.13 客户端的 `<Op>Output`;两个客户端都发的取交。请求体只给翻译器读它的那些路由定型,直通的不读请求体。
+// 翻译器经 `RouteContext.reply` 出 JSON 时,body 的类型就是这里的响应类型(设计 §4.4、§4.8)。
+import type * as Legacy from "@opencode-ai/client/promise"
+import type * as V1 from "@opencode-ai/sdk/v2/client"
+import type { ContractFrame } from "./events"
 
 export type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
 /** "<METHOD> <模板>";`:name` 取一段,`*name` 取余下全部。 */
 export type RouteKey = `${Method} /${string}`
 /** 目录项只在编译期携带类型。 */
 export type Served<Response, Body = undefined> = { readonly __response?: Response; readonly __body?: Body }
-const entry = <Response = unknown, Body = unknown>(): Served<Response, Body> => ({})
+const entry = <Response = unknown, Body = undefined>(): Served<Response, Body> => ({})
+/** v1 SDK 的 `<Op>Responses` 按状态码分;成功的那一个。 */
+type Ok<Responses> = Responses[Extract<keyof Responses, 200 | 201 | 204>]
+/** 1.17.13 客户端声明 `void` 的操作只核状态码、不读响应体(设计 P-09),与另一个客户端的类型取交时不加约束。 */
+type LegacyOk<Output> = [Output] extends [void] ? unknown : Output
+type BodyOf_<Data> = NonNullable<Data extends { body?: infer Body } ? Body : never>
+/** SSE 事件流,帧格式见 contract/events.ts。 */
+export type ContractEventStream = AsyncIterable<ContractFrame>
 
 /** 服务的路由,顺序即匹配顺序(先列的先匹配,如 `GET /session/status` 在 `GET /session/:sessionID` 之前)。 */
 export const SERVED = {
-  "GET /global/health": entry(),
-  "POST /instance/dispose": entry(),
-  "GET /global/event": entry(),
-  "GET /path": entry(),
-  "GET /global/config": entry(),
-  "GET /config": entry(),
-  "GET /project": entry(),
-  "GET /project/current": entry(),
-  "GET /api/project/current": entry(),
-  "PATCH /project/:projectID": entry(),
-  "POST /project/git/init": entry(),
-  "GET /session": entry(),
-  "GET /experimental/session": entry(),
-  "POST /session": entry(),
-  "GET /session/status": entry(),
-  "GET /session/:sessionID": entry(),
-  "PATCH /session/:sessionID": entry(),
-  "DELETE /session/:sessionID": entry(),
-  "POST /session/:sessionID/fork": entry(),
-  "POST /session/:sessionID/abort": entry(),
-  "POST /session/:sessionID/prompt_async": entry(),
-  "POST /session/:sessionID/command": entry(),
-  "POST /session/:sessionID/shell": entry(),
-  "POST /session/:sessionID/summarize": entry(),
-  "POST /session/:sessionID/revert": entry(),
-  "POST /session/:sessionID/unrevert": entry(),
-  "GET /session/:sessionID/message": entry(),
-  "GET /session/:sessionID/todo": entry(),
-  "GET /session/:sessionID/message/:messageID": entry(),
-  "GET /agent": entry(),
-  "GET /command": entry(),
-  "GET /provider": entry(),
-  "GET /mcp": entry(),
-  "GET /experimental/resource": entry(),
-  "GET /vcs": entry(),
-  "GET /vcs/status": entry(),
-  "GET /vcs/diff": entry(),
-  "GET /file": entry(),
-  "GET /file/content": entry(),
-  "GET /find/file": entry(),
-  "POST /mcp/:name/connect": entry(),
-  "POST /mcp/:name/disconnect": entry(),
-  "POST /api/mcp/:server/connect": entry(),
-  "POST /api/mcp/:server/disconnect": entry(),
-  "POST /mcp/:name/auth/authenticate": entry(),
-  "GET /permission": entry(),
-  "POST /permission/:requestID/reply": entry(),
-  "POST /session/:sessionID/permissions/:permissionID": entry(),
-  "POST /api/session/:sessionID/permission/:requestID/reply": entry(),
-  "GET /api/session/:sessionID/permission": entry(),
-  "GET /question": entry(),
-  "POST /question/:requestID/reply": entry(),
-  "POST /question/:requestID/reject": entry(),
-  "GET /pty": entry(),
-  "POST /pty": entry(),
-  "GET /pty/shells": entry(),
-  "GET /pty/:ptyID": entry(),
-  "PUT /pty/:ptyID": entry(),
-  "DELETE /pty/:ptyID": entry(),
-  "POST /pty/:ptyID/connect-token": entry(),
-  "GET /api/agent": entry(),
-  "GET /api/model": entry(),
-  "GET /api/provider/:providerID": entry(),
-  "GET /api/reference": entry(),
-  "GET /api/session": entry(),
-  "POST /api/session": entry(),
-  "GET /api/session/active": entry(),
-  "GET /api/session/:sessionID": entry(),
-  "DELETE /api/session/:sessionID": entry(),
-  "POST /api/session/:sessionID/model": entry(),
-  "POST /api/session/:sessionID/fork": entry(),
-  "POST /api/session/:sessionID/interrupt": entry(),
-  "POST /api/session/:sessionID/command": entry(),
-  "POST /api/session/:sessionID/compact": entry(),
-  "POST /api/session/:sessionID/shell": entry(),
-  "POST /api/session/:sessionID/rename": entry(),
-  "GET /api/fs/find": entry(),
-  "GET /api/vcs/status": entry(),
-  "GET /api/vcs/diff": entry(),
-  "POST /api/pty": entry(),
-  "GET /api/pty/:ptyID": entry(),
-  "PUT /api/pty/:ptyID": entry(),
-  "DELETE /api/pty/:ptyID": entry(),
-  "GET /api/integration/:integrationID": entry(),
-  "POST /api/integration/:integrationID/connect/key": entry(),
-  "POST /api/integration/:integrationID/connect/oauth": entry(),
-  "GET /api/integration/:integrationID/connect/oauth/:attemptID": entry(),
-  "POST /api/integration/:integrationID/connect/oauth/:attemptID/complete": entry(),
+  "GET /global/health": entry<Ok<V1.GlobalHealthResponses>>(),
+  "POST /instance/dispose": entry<Ok<V1.InstanceDisposeResponses>>(),
+  "GET /global/event": entry<ContractEventStream>(),
+  "GET /path": entry<Ok<V1.PathGetResponses>>(),
+  "GET /global/config": entry<Ok<V1.GlobalConfigGetResponses>>(),
+  "GET /config": entry<Ok<V1.ConfigGetResponses>>(),
+  "GET /project": entry<Ok<V1.ProjectListResponses>>(),
+  "GET /project/current": entry<Ok<V1.ProjectCurrentResponses>>(),
+  "GET /api/project/current": entry<LegacyOk<Legacy.ProjectCurrentOutput>>(),
+  "PATCH /project/:projectID": entry<Ok<V1.ProjectUpdateResponses>, BodyOf_<V1.ProjectUpdateData>>(),
+  "POST /project/git/init": entry<Ok<V1.ProjectInitGitResponses>>(),
+  "GET /session": entry<Ok<V1.SessionListResponses>>(),
+  "GET /experimental/session": entry<Ok<V1.ExperimentalSessionListResponses>>(),
+  "POST /session": entry<Ok<V1.SessionCreateResponses>, BodyOf_<V1.SessionCreateData>>(),
+  "GET /session/status": entry<Ok<V1.SessionStatusResponses>>(),
+  "GET /session/:sessionID": entry<Ok<V1.SessionGetResponses>>(),
+  "PATCH /session/:sessionID": entry<Ok<V1.SessionUpdateResponses>, BodyOf_<V1.SessionUpdateData>>(),
+  "DELETE /session/:sessionID": entry<Ok<V1.SessionDeleteResponses>>(),
+  "POST /session/:sessionID/fork": entry<Ok<V1.SessionForkResponses>, BodyOf_<V1.SessionForkData>>(),
+  "POST /session/:sessionID/abort": entry<Ok<V1.SessionAbortResponses>>(),
+  "POST /session/:sessionID/prompt_async": entry<Ok<V1.SessionPromptAsyncResponses>, BodyOf_<V1.SessionPromptAsyncData>>(),
+  // UC-17:这条命令那个回合的助手消息;命令没开回合时回 {}
+  "POST /session/:sessionID/command": entry<Ok<V1.SessionCommandResponses> | Record<string, never>, BodyOf_<V1.SessionCommandData>>(),
+  // 翻译器回 {}(2.x 的 shell 只受理);v1 SDK 声明的是那个回合的消息,但没有消费方读响应体
+  // (codepuppy-app/src/utils/server-compat.ts 的 shell 只 await;prompt-input/submit.ts 走 /api/session/:id/shell 直通)
+  "POST /session/:sessionID/shell": entry<Record<string, never>, BodyOf_<V1.SessionShellData>>(),
+  "POST /session/:sessionID/summarize": entry<Ok<V1.SessionSummarizeResponses>>(),
+  "POST /session/:sessionID/revert": entry<Ok<V1.SessionRevertResponses>, BodyOf_<V1.SessionRevertData>>(),
+  "POST /session/:sessionID/unrevert": entry<Ok<V1.SessionUnrevertResponses>>(),
+  "GET /session/:sessionID/message": entry<Ok<V1.SessionMessagesResponses>>(),
+  "GET /session/:sessionID/todo": entry<Ok<V1.SessionTodoResponses>>(),
+  "GET /session/:sessionID/message/:messageID": entry<Ok<V1.SessionMessageResponses>>(),
+  "GET /agent": entry<Ok<V1.AppAgentsResponses>>(),
+  "GET /command": entry<Ok<V1.CommandListResponses>>(),
+  "GET /provider": entry<Ok<V1.ProviderListResponses>>(),
+  "GET /mcp": entry<Ok<V1.McpStatusResponses>>(),
+  "GET /experimental/resource": entry<Ok<V1.ExperimentalResourceListResponses>>(),
+  "GET /vcs": entry<Ok<V1.VcsGetResponses>>(),
+  "GET /vcs/status": entry<Ok<V1.VcsStatusResponses>>(),
+  "GET /vcs/diff": entry<Ok<V1.VcsDiffResponses>>(),
+  "GET /file": entry<Ok<V1.FileListResponses>>(),
+  "GET /file/content": entry<Ok<V1.FileReadResponses>>(),
+  "GET /find/file": entry<Ok<V1.FindFilesResponses>>(),
+  "POST /mcp/:name/connect": entry<Ok<V1.McpConnectResponses>>(),
+  "POST /mcp/:name/disconnect": entry<Ok<V1.McpDisconnectResponses>>(),
+  "POST /api/mcp/:server/connect": entry<LegacyOk<Legacy.McpConnectOutput>>(),
+  "POST /api/mcp/:server/disconnect": entry<LegacyOk<Legacy.McpDisconnectOutput>>(),
+  "POST /mcp/:name/auth/authenticate": entry<Ok<V1.McpAuthAuthenticateResponses>>(),
+  "GET /permission": entry<Ok<V1.PermissionListResponses>>(),
+  "POST /permission/:requestID/reply": entry<Ok<V1.PermissionReplyResponses>, BodyOf_<V1.PermissionReplyData>>(),
+  "POST /session/:sessionID/permissions/:permissionID": entry<Ok<V1.PermissionRespondResponses>, BodyOf_<V1.PermissionRespondData>>(),
+  "POST /api/session/:sessionID/permission/:requestID/reply": entry<Ok<V1.V2SessionPermissionReplyResponses> & LegacyOk<Legacy.PermissionReplyOutput>, BodyOf_<V1.V2SessionPermissionReplyData>>(),
+  "GET /api/session/:sessionID/permission": entry<Ok<V1.V2SessionPermissionListResponses>>(),
+  "GET /question": entry<Ok<V1.QuestionListResponses>>(),
+  "POST /question/:requestID/reply": entry<Ok<V1.QuestionReplyResponses>, BodyOf_<V1.QuestionReplyData>>(),
+  "POST /question/:requestID/reject": entry<Ok<V1.QuestionRejectResponses>>(),
+  "GET /pty": entry<Ok<V1.PtyListResponses>>(),
+  "POST /pty": entry<Ok<V1.PtyCreateResponses>, BodyOf_<V1.PtyCreateData>>(),
+  "GET /pty/shells": entry<Ok<V1.PtyShellsResponses>>(),
+  "GET /pty/:ptyID": entry<Ok<V1.PtyGetResponses>>(),
+  "PUT /pty/:ptyID": entry<Ok<V1.PtyUpdateResponses>, BodyOf_<V1.PtyUpdateData>>(),
+  "DELETE /pty/:ptyID": entry<Ok<V1.PtyRemoveResponses>>(),
+  "POST /pty/:ptyID/connect-token": entry<Ok<V1.PtyConnectTokenResponses>>(),
+  "GET /api/agent": entry<Ok<V1.V2AgentListResponses>>(),
+  // 发出的是 2.x 的模型清单(只剥标题用的 none 档):模型与 1.17.13 客户端的 ModelListOutput 同形,location 信封是 2.x 的
+  // { directory, workspaceID? }。两个冻结客户端都声明了引擎不发的 location.project,v1 SDK 的 V2ModelList(上游 1.18.35)还多声明
+  // 模型的 api / request。消费方只读 data 里两边都有的字段(renderer/codepuppy-ui/model-contract.ts:id、providerID、name、enabled、
+  // status、capabilities.input、variants[].id、limit),所以按实际发出的形状登记
+  "GET /api/model": entry<Omit<Legacy.ModelListOutput, "location"> & { location: { directory: string; workspaceID?: string } }>(),
+  "GET /api/provider/:providerID": entry<Ok<V1.V2ProviderGetResponses>>(),
+  "GET /api/reference": entry<Ok<V1.V2ReferenceListResponses>>(),
+  "GET /api/session": entry<Ok<V1.V2SessionListResponses> & LegacyOk<Legacy.SessionListOutput>>(),
+  "POST /api/session": entry<LegacyOk<Legacy.SessionCreateOutput>>(),
+  "GET /api/session/active": entry<LegacyOk<Legacy.SessionActiveOutput>>(),
+  "GET /api/session/:sessionID": entry<Ok<V1.V2SessionGetResponses> & LegacyOk<Legacy.SessionGetOutput>>(),
+  "DELETE /api/session/:sessionID": entry<LegacyOk<Legacy.SessionRemoveOutput>>(),
+  "POST /api/session/:sessionID/model": entry<Ok<V1.V2SessionSwitchModelResponses>>(),
+  "POST /api/session/:sessionID/fork": entry<LegacyOk<Legacy.SessionForkOutput>>(),
+  "POST /api/session/:sessionID/interrupt": entry<LegacyOk<Legacy.SessionInterruptOutput>>(),
+  "POST /api/session/:sessionID/command": entry<LegacyOk<Legacy.SessionCommandOutput>>(),
+  "POST /api/session/:sessionID/compact": entry<LegacyOk<Legacy.SessionCompactOutput>>(),
+  "POST /api/session/:sessionID/shell": entry<LegacyOk<Legacy.SessionShellOutput>>(),
+  "POST /api/session/:sessionID/rename": entry<LegacyOk<Legacy.SessionRenameOutput>, Omit<Legacy.SessionRenameInput, "sessionID">>(),
+  "GET /api/fs/find": entry<LegacyOk<Legacy.FileFindOutput>>(),
+  "GET /api/vcs/status": entry<LegacyOk<Legacy.VcsStatusOutput>>(),
+  "GET /api/vcs/diff": entry<LegacyOk<Legacy.VcsDiffOutput>>(),
+  "POST /api/pty": entry<LegacyOk<Legacy.PtyCreateOutput>>(),
+  "GET /api/pty/:ptyID": entry<LegacyOk<Legacy.PtyGetOutput>>(),
+  "PUT /api/pty/:ptyID": entry<LegacyOk<Legacy.PtyUpdateOutput>>(),
+  "DELETE /api/pty/:ptyID": entry<LegacyOk<Legacy.PtyRemoveOutput>>(),
+  "GET /api/integration/:integrationID": entry<LegacyOk<Legacy.IntegrationGetOutput>>(),
+  "POST /api/integration/:integrationID/connect/key": entry<LegacyOk<Legacy.IntegrationConnectKeyOutput>>(),
+  "POST /api/integration/:integrationID/connect/oauth": entry<LegacyOk<Legacy.IntegrationOauthConnectOutput>>(),
+  "GET /api/integration/:integrationID/connect/oauth/:attemptID": entry<LegacyOk<Legacy.IntegrationOauthStatusOutput>>(),
+  "POST /api/integration/:integrationID/connect/oauth/:attemptID/complete": entry<LegacyOk<Legacy.IntegrationOauthCompleteOutput>>(),
 } as const satisfies Record<RouteKey, Served<unknown, unknown>>
 
 export type ServedKey = keyof typeof SERVED
+export type ResponseOf<K extends ServedKey> = NonNullable<(typeof SERVED)[K]["__response"]>
+export type BodyOf<K extends ServedKey> = NonNullable<(typeof SERVED)[K]["__body"]>
 
 /** 答复不依赖引擎的路由,由约定侧直接答(UC-14,R8)。 */
 export const FIXED = {

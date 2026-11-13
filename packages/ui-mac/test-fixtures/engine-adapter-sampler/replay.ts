@@ -10,9 +10,11 @@ import { createPermissionReplies } from "../../src/engine-adapter/opencode2/perm
 const projector = (api: unknown, emit: (directory: string, payload: unknown) => void) =>
   createProjector(api as never, emit as never, createPermissionReplies())
 
+import catalog from "../../src/engine-adapter/fixtures/catalog.json"
 import command from "../../src/engine-adapter/fixtures/command.json"
 import continued from "../../src/engine-adapter/fixtures/continue.json"
 import files from "../../src/engine-adapter/fixtures/files.json"
+import lineage from "../../src/engine-adapter/fixtures/lineage.json"
 import parity from "../../src/engine-adapter/fixtures/parity.json"
 import permissionAsked from "../../src/engine-adapter/fixtures/permission-asked.json"
 import permissionReply from "../../src/engine-adapter/fixtures/permission-reply.json"
@@ -33,6 +35,8 @@ type Store = {
   permissions?: unknown
   /** 命令剧本:引擎在收到 command 之前没有这些消息。 */
   afterCommand?: boolean
+  /** 目录类读取(catalog.json):`/api/agent`、`/api/provider`、`/api/model`、`/api/model/default`、`/api/session`。 */
+  catalog?: typeof catalog
 }
 
 const cursorOf = (position: number, order: string) => Buffer.from(JSON.stringify({ position, order })).toString("base64url")
@@ -68,6 +72,16 @@ function upstream(store: Store) {
     if (path === "/api/skill") return Response.json({ data: [] })
     if (path === "/api/form" && store.forms) return Response.json(store.forms)
     if (path === "/api/permission/request" && store.permissions) return Response.json(store.permissions)
+    if (store.catalog) {
+      const table: Record<string, unknown> = {
+        "/api/agent": store.catalog.agents,
+        "/api/provider": store.catalog.providers,
+        "/api/model": store.catalog.models,
+        "/api/model/default": store.catalog.defaultModel,
+        "/api/session": store.catalog.sessions,
+      }
+      if (path in table) return Response.json(table[path])
+    }
     return new Response(`unexpected ${request.method} ${path}`, { status: 500 })
   }) as typeof globalThis.fetch
 }
@@ -167,6 +181,13 @@ for (const [name, list] of Object.entries({
   result[`${name}.list`] = await exchange(engineFetch, "GET", "/permission")
 }
 result["permission-asked.events"] = await events("-", [{ frame: permissionAsked.frame }])
+result["lineage.messages"] = await messages(session(lineage.sessionID, lineage.directory, lineage.final))
+{
+  const engineFetch = createEngineFetch({ isEngineOrigin: (origin) => origin === ENGINE, fetch: upstream({ sessionID: "-", directory: "-", messages: [], catalog }) })
+  const at = `?directory=${encodeURIComponent(catalog.directory)}`
+  for (const path of ["/agent", "/provider", "/session", "/session?roots=true&limit=1", "/experimental/session", "/api/model", "/api/agent", "/api/session"])
+    result[`catalog GET ${path}`] = await exchange(engineFetch, "GET", `${path}${path.includes("?") ? "&" : "?"}${at.slice(1)}`)
+}
 {
   const store = session(command.sessionID, command.directory, command.final, { afterCommand: true })
   const engineFetch = createEngineFetch({ isEngineOrigin: (origin) => origin === ENGINE, fetch: upstream(store) })

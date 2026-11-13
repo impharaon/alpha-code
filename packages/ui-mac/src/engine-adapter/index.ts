@@ -51,30 +51,36 @@ export function createEngineFetch(options: {
       return unsupported(request.method, url.pathname)
     }
     if (isFixed(matched.key)) return Response.json(FIXED[matched.key]())
-    const key = matched.key
     const text = request.method === "GET" || request.method === "HEAD" ? "" : await request.clone().text()
-    let body: unknown
+    // 请求体的类型由约定目录给(BodyOf):管道只按 JSON 解析,解析失败保留原文,与 `#1668` 时相同。
+    let body: any
     try {
       body = text ? JSON.parse(text) : undefined
     } catch {
       body = text
     }
-    const context: RouteContext<TranslatedKey> = {
-      params: matched.params,
-      query: url.searchParams,
-      body,
-      directory: directoryOf(url, request),
-      request,
-      signal: request.signal,
-    }
     try {
       const engine = translator.connect({ origin: url.origin, signal: request.signal, fetch: upstreamFetch })
-      return await translator.routes[key](context, engine)
+      return await dispatch(matched.key, { params: matched.params, query: url.searchParams, body, directory: directoryOf(url, request), request }, engine)
     } catch (error) {
       // 取消:与 fetch 一样以取消原因拒绝(2.x 客户端把它包成 Transport 错误,调用方认的是 AbortError / TimeoutError)。
       request.signal.throwIfAborted()
       return errorResponse(translator.toContractError(error))
     }
+  }
+
+  /** 按路由把请求交给翻译器;RouteContext 按这条路由定型(body、reply)。 */
+  function dispatch<K extends TranslatedKey>(
+    key: K,
+    input: { params: Record<string, string>; query: URLSearchParams; body: any; directory?: string; request: Request },
+    engine: ReturnType<typeof translator.connect>,
+  ) {
+    const context: RouteContext<K> = {
+      ...input,
+      signal: input.request.signal,
+      reply: (value, init) => Response.json(value, init),
+    }
+    return translator.routes[key](context, engine)
   }
 }
 

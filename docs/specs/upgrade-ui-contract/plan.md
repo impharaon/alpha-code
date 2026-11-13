@@ -257,7 +257,7 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 | `contract/routes.ts` | `SERVED` 每条填 `entry<Response, Body>()`:按发出它的冻结客户端的生成类型引用(v1 SDK `<Op>Responses` / `<Op>Data`,1.17.13 `<Op>Output`,两边都发的取交),两边都没声明的才自声明;`ResponseOf` / `BodyOf` |
 | `contract/translator.ts` | `RouteContext<K>` 的 `body` 改为 `BodyOf<K>`,加 `reply` |
 | `opencode2/routes.ts` | JSON 路由经 `context.reply`;请求体读约定类型,去掉局部 `as {…}` |
-| `engine-adapter/index.ts` | `reply` 的实现(放管道还是翻译器是私有选择) |
+| `engine-adapter/index.ts` | `reply` 的实现;按路由定型的分派(`dispatch<K>`) |
 | `packages/ui-mac/package.json` | 加 `"@opencode-ai/client": "file:../codepuppy-app/vendor/opencode-ai-client-1.17.13-v2.tgz"`,只作类型使用,与 `codepuppy-session-ui/package.json:41` 同一个 tgz(提前的理由见「待核对 4」) |
 | `bun.lock` | 只提交这条依赖在 ui-mac 段加的那几行(裁决 4) |
 | `contract/events.ts` | `session.usage.updated`、`mcp.status.changed`、`mcp.resources.changed` 三种改为引用 1.17.13 的事件类型(裁决 2) |
@@ -282,7 +282,16 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 
 ### 偏离记录
 
-暂无
+- 2026-11-12 · 响应类型按规则 1 引用发出它的冻结客户端;按编排器的规则(行为不变、登记实际发出的形状、不为凑旧 SDK 类型补字段)逐条处理类型不一致,每条都核了消费方读不读差出来的字段,没有一条需要按设计 §5 改运行时,所以没有 BLOCKED:
+  - `POST /session/:sessionID/command`:UC-17 的「没开回合回 `{}`」登记成 `| Record<string, never>`;
+  - `POST /session/:sessionID/shell`:翻译器回 `{}`,v1 SDK 声明的是那个回合的消息;消费方不读响应体(`codepuppy-app/src/utils/server-compat.ts` 的 shell 只 await),登记 `Record<string, never>`;
+  - `GET /api/model`:模型与 1.17.13 的 `ModelListOutput` 同形,location 信封是 2.x 的 `{ directory, workspaceID? }`(两个冻结客户端都声明了引擎不发的 `location.project`,v1 SDK 还多声明模型的 `api` / `request`);消费方 `model-contract.ts` 只读 `data` 里两边都有的字段;
+  - 1.17.13 声明 `void` 的操作只核状态码、不读响应体(设计 P-09),取交时按 `unknown`(`LegacyOk`)。
+- 2026-11-12 · 事件载荷按实际发出的登记:`session.created`、`session.updated`、`message.updated` 只发 `info`(`Pick`),`session.deleted` 的 `info` 可缺;冻结 app 的 event-reducer 只读这些(`event-reducer.ts:131-179,272,313`)。`question.replied` / `question.rejected` 的 `sessionID` 改从 2.x 带类型的 `form.*` 事件取(2.x 恒带,值不变);运行中 shell 卡的重发把读回的 part 定成 v1 `Part` 并加 `type === "tool"` 判断(这个 id 只给过工具 part,恒为真)。三种事件按 R4 引用 1.17.13 的类型(裁决 2)。
+- 2026-11-12 · 处理函数里 `(context.body ?? {}) as {…}` 这类局部读法保留:`?? {}` 的回落要这样写;请求体的类型已在目录里给出,翻译器读到的就是它。
+- 2026-11-12 · `GET /session/:id/todo` 用 `todosOf(last)!`:todowrite 的入参还在流式阶段时 todosOf 回 undefined、`Response.json` 当场抛错、经错误信封回 500 —— A 上就是这样,行为不改,记为观察。
+- 2026-11-12 · 仅类型依赖放在 ui-mac 的 `devDependencies`;`bun.lock` 只提交它的三行(ui-mac 工作区块一行,`ui-mac/@opencode-ai/client` 解析条目一行加空行),`bun install --frozen-lockfile` 在这份 lock 上退出 0,在不带这三行的 HEAD lock 上报 `lockfile had changes, but lockfile is frozen`。
+- 2026-11-12 · `replay.ts` 加上 `lineage.json` 的消息读取与 `catalog.json` 上的 `GET /agent`、`/provider`、`/session`、`/experimental/session`、`/api/model`、`/api/agent`、`/api/session`;before 在 M2a 的代码上跑。
 
 ## M3 — 回执账本归约定
 

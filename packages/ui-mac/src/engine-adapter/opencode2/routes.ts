@@ -7,6 +7,8 @@
 // 已删或挪走的改写。
 import type { OpenCodeClient } from "@opencode/client/promise"
 import type {
+  AssistantMessage,
+  Part,
   PermissionV2Decision,
   PermissionV2DecisionCommand,
   PermissionV2DecisionReceipt,
@@ -52,24 +54,27 @@ export type Opencode2Engine = {
   fetch: typeof globalThis.fetch
 }
 
-/** 处理函数内部用的上下文 = 约定的 RouteContext + 引擎连接 + 直通。 */
-export type TranslatorContext = RouteContext<TranslatedKey> &
+/** 处理函数内部用的上下文 = 约定的 RouteContext + 引擎连接 + 直通。`reply` 与 `body` 的类型随路由(K)。 */
+export type TranslatorContext<K extends TranslatedKey = TranslatedKey> = RouteContext<K> &
   Opencode2Engine & {
     /** 把这次请求原样转给引擎(2.x 上路径与形状都没变的那些)。 */
     passthrough: () => Promise<Response>
   }
+/** 与路由无关的那部分,给几条路由共用的辅助函数。 */
+export type SharedContext = Omit<TranslatorContext, "body" | "reply">
 
+/** 错误信封(ContractError 的形状)与 404 这类非约定响应体;成功的 JSON 一律经 `context.reply`。 */
 const json = (value: unknown, init?: ResponseInit) => Response.json(value, init)
-const ok = () => json(true)
 const noContent = () => new Response(null, { status: 204 })
-const at = (context: TranslatorContext) => (context.directory ? { location: { directory: context.directory } } : {})
+const at = (context: { directory?: string }) => (context.directory ? { location: { directory: context.directory } } : {})
 const number = (value: string | null) => (value === null || value === "" ? undefined : Number(value))
 
 const bind =
-  (handle: (context: TranslatorContext) => Promise<Response>): RouteHandler<TranslatedKey, Opencode2Engine> =>
+  <K extends TranslatedKey>(handle: (context: TranslatorContext<K>) => Promise<Response>): RouteHandler<K, Opencode2Engine> =>
   (context, engine) =>
     handle({ ...context, ...engine, passthrough: () => engine.fetch(context.request) })
-const passthrough = bind((context) => context.passthrough())
+/** 直通:请求原样转给引擎,响应原样交回(类型按约定登记,翻译器不碰响应体)。 */
+const passthrough = <K extends TranslatedKey>(context: RouteContext<K>, engine: Opencode2Engine) => engine.fetch(context.request)
 
 /** 2.x 的会话分页拉全(v1 的列表不分页;侧栏的全局索引按「一页拉完」处理,见 experimental.session.list)。 */
 async function allSessions(api: OpenCodeClient, input: Parameters<OpenCodeClient["session"]["list"]>[0]) {
@@ -104,20 +109,20 @@ function decisionResponse(outcome: DecisionOutcome, requestID: string, success: 
   return success(outcome.receipt)
 }
 
-async function decide(context: TranslatorContext, input: DecisionInput, success: (receipt: PermissionV2DecisionReceipt) => Response) {
+async function decide(context: SharedContext, input: DecisionInput, success: (receipt: PermissionV2DecisionReceipt) => Response) {
   if (!DECISIONS.has(input.decision) || !input.decisionID)
     return json({ name: "BadRequest", data: { message: "invalid permission decision" } }, { status: 400 })
   return decisionResponse(await context.permissions.decide(context.api, input), input.requestID, success)
 }
 
 /** 提问(2.x 表单)的 requestID → sessionID:v1 回答只带 requestID,2.x 要会话。先查列表,再查全局。 */
-async function questionOf(context: TranslatorContext, requestID: string) {
+async function questionOf(context: SharedContext, requestID: string) {
   const forms = await context.api.form.list(at(context))
   const form = forms.data.find((item) => item.id === requestID)
   return form ? { sessionID: form.sessionID, question: toV1Question(form) } : undefined
 }
 
-async function prompt(context: TranslatorContext) {
+async function prompt(context: TranslatorContext<"POST /session/:sessionID/prompt_async">) {
   const sessionID = context.params.sessionID!
   const body = context.body as V1PromptBody
   // v1 的档位与模型随每条消息走;2.x 落在会话上 —— 发送前切到这条消息要的档位与模型。
@@ -151,7 +156,7 @@ async function prompt(context: TranslatorContext) {
 }
 
 /** v1 `session.messages`:最近 `limit` 条(或全部),`before` 翻更早的页,`x-next-cursor` 给下一页。 */
-async function messages(context: TranslatorContext) {
+async function messages(context: TranslatorContext<"GET /session/:sessionID/message">) {
   const sessionID = context.params.sessionID!
   const limit = number(context.query.get("limit"))
   const before = context.query.get("before") ?? undefined
@@ -167,7 +172,7 @@ async function messages(context: TranslatorContext) {
         return undefined
       })
     : undefined
-  const response = json(anchor && diff ? withTurnDiffs(listed, new Map([[anchor.attach, diff]])) : listed)
+  const response = context.reply(anchor && diff ? withTurnDiffs(listed, new Map([[anchor.attach, diff]])) : listed)
   if (page.next) response.headers.set("x-next-cursor", page.next)
   return response
 }
@@ -183,16 +188,20 @@ const COMMAND_POLL_MS = 200
  * (与今天无关联时同一形状)。判「没开回合」先读 active 再读消息:读 active 时已不在跑,那个执行写下的消息此刻都已落库。
  * 消息 id 按时间升序(`msg_` + ascending),所以「之后」= id 更大。
  */
-async function commandReply(context: TranslatorContext, sessionID: string, after: string | undefined) {
+async function commandReply(context: TranslatorContext<"POST /session/:sessionID/command">, sessionID: string, after: string | undefined) {
   for (;;) {
     context.signal.throwIfAborted()
     const running = sessionID in (await context.api.session.active())
     const page = await recentMessages(context.api, sessionID, { limit: 20 })
     const fresh = page.context.filter((message) => after === undefined || message.id > after)
     const assistant = fresh.find((message) => message.type === "assistant")
-    const found = assistant && toV1Messages(sessionID, page.context).find((item) => item.info.id === assistant.id)
-    if (found) return json(found)
-    if (!running || fresh.some((message) => message.type === "idle")) return json({})
+    const found =
+      assistant &&
+      toV1Messages(sessionID, page.context).find(
+        (item): item is { info: AssistantMessage; parts: Part[] } => item.info.id === assistant.id && item.info.role === "assistant",
+      )
+    if (found) return context.reply(found)
+    if (!running || fresh.some((message) => message.type === "idle")) return context.reply({})
     await new Promise((resolve) => setTimeout(resolve, COMMAND_POLL_MS))
   }
 }
@@ -203,32 +212,32 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
   // ── 探活与引擎实例 ──
   "GET /global/health": bind(async (context) => {
     const info = await context.api.server.info()
-    return json({ healthy: true, version: info.version })
+    return context.reply({ healthy: true, version: info.version })
   }),
   "POST /instance/dispose": bind(async (context) => {
     // 2.x 的重载重建**全部** Location(seams Q5),v1 的 instance.dispose 只释放一个目录;语义更宽、方向安全。
     await context.api.location.reload()
-    return ok()
+    return context.reply(true)
   }),
   "GET /global/event": bind((context) => Promise.resolve(projectEventStream(context))),
-  "GET /path": bind(async (context) => json(toV1Path(await context.api.location.get(at(context))))),
+  "GET /path": bind(async (context) => context.reply(toV1Path(await context.api.location.get(at(context))))),
   // `GET /global/config`、`GET /config` 是约定侧的固定答复(contract/routes.ts FIXED)。
 
   // ── 项目(U2 选 A:2.x 自己有项目清单,`canonical` 改名 `worktree`)──
-  "GET /project": bind(async (context) => json((await context.api.project.list()).map((p) => toV1Project(p)))),
-  "GET /project/current": bind(async (context) => json(await currentProject(context))),
+  "GET /project": bind(async (context) => context.reply((await context.api.project.list()).map((p) => toV1Project(p)))),
+  "GET /project/current": bind(async (context) => context.reply(await currentProject(context))),
   "GET /api/project/current": bind(async (context) => {
     const project = await currentProject(context)
-    return json({ id: project.id, directory: project.worktree })
+    return context.reply({ id: project.id, directory: project.worktree })
   }),
   "PATCH /project/:projectID": bind(async (context) => {
     const { name, icon, commands } = (context.body ?? {}) as { name?: string; icon?: never; commands?: never }
     const updated = await context.api.project.update({ projectID: context.params.projectID!, name, icon, commands })
-    return json(toV1Project(updated))
+    return context.reply(toV1Project(updated))
   }),
   "POST /project/git/init": bind(async (context) => {
     await context.api.vcs.init(at(context))
-    return json(await currentProject(context))
+    return context.reply(await currentProject(context))
   }),
 
   // ── 会话 ──
@@ -248,14 +257,14 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
       ...(search ? { search } : {}),
     })
     const out = sessions.map((session) => toContractSession(session))
-    return json(limit ? out.slice(0, limit) : out)
+    return context.reply(limit ? out.slice(0, limit) : out)
   }),
   "GET /experimental/session": bind(async (context) => {
     const roots = context.query.get("roots") === "true"
     const search = context.query.get("search") ?? undefined
     // v1 的游标是数字时间戳,2.x 是不透明字符串:一次拉完、不给 x-next-cursor(调用方读不到游标即止)。
     const sessions = await allSessions(context.api, { ...(roots ? { parentID: null } : {}), ...(search ? { search } : {}) })
-    return json(sessions.map((session) => ({ ...toContractSession(session), project: null })))
+    return context.reply(sessions.map((session) => ({ ...toContractSession(session), project: null })))
   }),
   "POST /session": bind(async (context) => {
     const body = (context.body ?? {}) as { parentID?: string; title?: string }
@@ -264,14 +273,14 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
       ...(body.parentID ? { parentID: body.parentID } : {}),
       ...(body.title ? { title: body.title } : {}),
     })
-    return json(toContractSession(created))
+    return context.reply(toContractSession(created))
   }),
   "GET /session/status": bind(async (context) => {
     const active = await context.api.session.active()
-    return json(Object.fromEntries(Object.keys(active).map((sessionID) => [sessionID, { type: "busy" }])))
+    return context.reply(Object.fromEntries(Object.keys(active).map((sessionID) => [sessionID, { type: "busy" }])))
   }),
   "GET /session/:sessionID": bind(async (context) =>
-    json(toContractSession((await context.api.session.get({ sessionID: context.params.sessionID! })))),
+    context.reply(toContractSession((await context.api.session.get({ sessionID: context.params.sessionID! })))),
   ),
   "PATCH /session/:sessionID": bind(async (context) => {
     const sessionID = context.params.sessionID!
@@ -281,11 +290,11 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
       ...(body.title !== undefined ? { title: body.title } : {}),
       ...(body.time && "archived" in body.time ? { archived: !!body.time.archived } : {}),
     })
-    return json(toContractSession((await context.api.session.get({ sessionID }))))
+    return context.reply(toContractSession((await context.api.session.get({ sessionID }))))
   }),
   "DELETE /session/:sessionID": bind(async (context) => {
     await context.api.session.remove({ sessionID: context.params.sessionID! })
-    return ok()
+    return context.reply(true)
   }),
   "POST /session/:sessionID/fork": bind(async (context) => {
     const body = (context.body ?? {}) as { messageID?: string }
@@ -293,11 +302,11 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
       sessionID: context.params.sessionID!,
       ...(body.messageID ? { before: body.messageID } : {}),
     })
-    return json(toContractSession(forked))
+    return context.reply(toContractSession(forked))
   }),
   "POST /session/:sessionID/abort": bind(async (context) => {
     await context.api.session.interrupt({ sessionID: context.params.sessionID! })
-    return ok()
+    return context.reply(true)
   }),
   "POST /session/:sessionID/prompt_async": bind(prompt),
   "POST /session/:sessionID/command": bind(async (context) => {
@@ -325,22 +334,22 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
     const sessionID = context.params.sessionID!
     if (body.agent) await context.api.session.switchAgent({ sessionID, agent: body.agent })
     await context.api.session.shell({ sessionID, command: body.command })
-    return json({})
+    return context.reply({})
   }),
   "POST /session/:sessionID/summarize": bind(async (context) => {
     await context.api.session.compact({ sessionID: context.params.sessionID! })
-    return ok()
+    return context.reply(true)
   }),
   "POST /session/:sessionID/revert": bind(async (context) => {
     const sessionID = context.params.sessionID!
     const body = (context.body ?? {}) as { messageID: string }
     await context.api.session.revert.stage({ sessionID, messageID: body.messageID })
-    return json(toContractSession((await context.api.session.get({ sessionID }))))
+    return context.reply(toContractSession((await context.api.session.get({ sessionID }))))
   }),
   "POST /session/:sessionID/unrevert": bind(async (context) => {
     const sessionID = context.params.sessionID!
     await context.api.session.revert.clear({ sessionID })
-    return json(toContractSession((await context.api.session.get({ sessionID }))))
+    return context.reply(toContractSession((await context.api.session.get({ sessionID }))))
   }),
   "GET /session/:sessionID/message": bind(messages),
   // U1:2.x 没有 todo 查询端点;清单就是会话里最近一次 todowrite 的输入(与事件流的 todo.updated 同一来源)。
@@ -352,8 +361,9 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
       const page = await recentMessages(context.api, sessionID, { limit: MESSAGE_PAGE, cursor })
       const parts = toV1Messages(sessionID, page.context).flatMap((item) => item.parts)
       const last = parts.findLast((part) => part.type === "tool" && part.tool === "todowrite")
-      if (last) return json(todosOf(last))
-      if (!page.next) return json([])
+      // todowrite 的入参还在流式阶段时 todosOf 回 undefined,Response.json 当场抛错、经错误信封回 500 —— `#1668` 起如此,不改
+      if (last) return context.reply(todosOf(last)!)
+      if (!page.next) return context.reply([])
       cursor = page.next
     }
   }),
@@ -362,14 +372,14 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
     const messageID = context.params.messageID!
     const page = await recentMessages(context.api, sessionID, { through: messageID })
     const found = toV1Messages(sessionID, page.context).find((item) => item.info.id === messageID)
-    return found ? json(found) : json({ name: "NotFoundError", data: { message: `Message not found: ${messageID}` } }, { status: 404 })
+    return found ? context.reply(found) : json({ name: "NotFoundError", data: { message: `Message not found: ${messageID}` } }, { status: 404 })
   }),
 
   // ── 目录内的只读查询 ──
-  "GET /agent": bind(async (context) => json(toV1Agents((await context.api.agent.list(at(context))).data))),
+  "GET /agent": bind(async (context) => context.reply(toV1Agents((await context.api.agent.list(at(context))).data))),
   "GET /command": bind(async (context) => {
     const [commands, skills] = await Promise.all([context.api.command.list(at(context)), context.api.skill.list(at(context))])
-    return json(toV1Commands(commands.data, skills.data))
+    return context.reply(toV1Commands(commands.data, skills.data))
   }),
   "GET /provider": bind(async (context) => {
     const [providers, models, defaultModel] = await Promise.all([
@@ -377,20 +387,20 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
       context.api.model.list(at(context)),
       context.api.model.default(at(context)).catch(() => undefined),
     ])
-    return json(toV1ProviderList(providers.data, models.data, defaultModel?.data))
+    return context.reply(toV1ProviderList(providers.data, models.data, defaultModel?.data))
   }),
-  "GET /mcp": bind(async (context) => json(toV1McpStatus((await context.api.mcp.list(at(context))).data))),
+  "GET /mcp": bind(async (context) => context.reply(toV1McpStatus((await context.api.mcp.list(at(context))).data))),
   "GET /experimental/resource": bind(async (context) => {
     const catalog = (await context.api.mcp.resource.catalog(at(context))).data
-    return json(
+    return context.reply(
       Object.fromEntries(catalog.resources.map((resource) => [`${resource.server}:${resource.uri}`, { ...resource, client: resource.server }])),
     )
   }),
   "GET /vcs": bind(async (context) => {
     const vcs = (await context.api.vcs.get(at(context))).data as { branch?: { current?: string; default?: string } }
-    return json({ branch: vcs.branch?.current, default_branch: vcs.branch?.default })
+    return context.reply({ branch: vcs.branch?.current, default_branch: vcs.branch?.default })
   }),
-  "GET /vcs/status": bind(async (context) => json((await context.api.vcs.status(at(context))).data)),
+  "GET /vcs/status": bind(async (context) => context.reply((await context.api.vcs.status(at(context))).data)),
   "GET /vcs/diff": bind(async (context) => {
     const mode = context.query.get("mode")
     const diff = await context.api.vcs.diff({
@@ -398,13 +408,13 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
       mode: mode === "branch" ? "branch" : mode === "committed" ? "committed" : "working",
       ...(number(context.query.get("context")) !== undefined ? { context: number(context.query.get("context")) } : {}),
     })
-    return json(diff.data)
+    return context.reply(diff.data)
   }),
   "GET /file": bind(async (context) => {
     const path = context.query.get("path") ?? ""
     const listed = await context.api.file.list({ ...at(context), ...(path ? { path } : {}) })
     const base = context.directory ?? listed.location.directory
-    return json(toV1FileNodes(path ? `${base}/${path}` : base, listed.data))
+    return context.reply(toV1FileNodes(path ? `${base}/${path}` : base, listed.data))
   }),
   "GET /file/content": bind(async (context) => {
     const path = context.query.get("path") ?? ""
@@ -415,10 +425,10 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
     if (!response.ok) return json({ name: "NotFoundError", data: { message: `File not found: ${path}` } }, { status: response.status })
     const mime = response.headers.get("content-type")?.split(";")[0]?.trim() ?? "application/octet-stream"
     const bytes = new Uint8Array(await response.arrayBuffer())
-    if (mime.startsWith("text/") || mime === "application/json") return json({ type: "text", content: new TextDecoder().decode(bytes) })
+    if (mime.startsWith("text/") || mime === "application/json") return context.reply({ type: "text", content: new TextDecoder().decode(bytes) })
     let binary = ""
     for (const byte of bytes) binary += String.fromCharCode(byte)
-    return json({ type: "binary", content: btoa(binary), encoding: "base64", mimeType: mime })
+    return context.reply({ type: "binary", content: btoa(binary), encoding: "base64", mimeType: mime })
   }),
   "GET /find/file": bind(async (context) => {
     const dirs = context.query.get("dirs")
@@ -429,17 +439,17 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
       ...(number(context.query.get("limit")) !== undefined ? { limit: number(context.query.get("limit")) } : {}),
     })
     // 2.x 的结果里带搜索根本身(`/`),它不是一个匹配项。
-    return json(found.data.flatMap((entry) => (entry.path === "/" || entry.path === "" ? [] : [entry.path])))
+    return context.reply(found.data.flatMap((entry) => (entry.path === "/" || entry.path === "" ? [] : [entry.path])))
   }),
 
   // ── MCP 连接(2.x 在 /api/experimental 下)与授权(U6:2.x 把远端 MCP 登记成 OAuth 集成)──
   "POST /mcp/:name/connect": bind(async (context) => {
     await context.api.experimental.mcp.connect({ ...at(context), server: context.params.name! })
-    return ok()
+    return context.reply(true)
   }),
   "POST /mcp/:name/disconnect": bind(async (context) => {
     await context.api.experimental.mcp.disconnect({ ...at(context), server: context.params.name! })
-    return ok()
+    return context.reply(true)
   }),
   "POST /api/mcp/:server/connect": bind(async (context) => {
     await context.api.experimental.mcp.connect({ ...at(context), server: context.params.server! })
@@ -453,12 +463,12 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
 
   // ── 权限 ──
   "GET /permission": bind(async (context) =>
-    json((await context.api.permission.request.list(at(context))).data.map((item) => context.permissions.show(item))),
+    context.reply((await context.api.permission.request.list(at(context))).data.map((item) => context.permissions.show(item))),
   ),
   "POST /permission/:requestID/reply": bind((context) => {
     const requestID = context.params.requestID!
     const body = (context.body ?? {}) as { reply: PermissionV2Decision; message?: string }
-    return decide(context, { requestID, decision: body.reply, message: body.message, decisionID: v1DecisionID(requestID) }, ok)
+    return decide(context, { requestID, decision: body.reply, message: body.message, decisionID: v1DecisionID(requestID) }, () => context.reply(true))
   }),
   "POST /session/:sessionID/permissions/:permissionID": bind((context) => {
     const requestID = context.params.permissionID!
@@ -466,7 +476,7 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
     return decide(
       context,
       { requestID, sessionID: context.params.sessionID!, decision: body.response, decisionID: v1DecisionID(requestID) },
-      ok,
+      () => context.reply(true),
     )
   }),
   "POST /api/session/:sessionID/permission/:requestID/reply": bind((context) => {
@@ -481,7 +491,7 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
         decisionID: command.decisionID,
         requestFingerprint: command.requestFingerprint,
       },
-      (receipt) => json({ data: receipt }),
+      (receipt) => context.reply({ data: receipt }),
     )
   }),
   // `GET /api/session/:sessionID/permission`(v2 审批通道列表)是约定侧的固定答复(contract/routes.ts FIXED)。
@@ -489,7 +499,7 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
   // ── 提问(2.x 表单)──
   "GET /question": bind(async (context) => {
     const forms = await context.api.form.list(at(context))
-    return json(forms.data.flatMap((form) => toV1Question(form) ?? []))
+    return context.reply(forms.data.flatMap((form) => toV1Question(form) ?? []))
   }),
   "POST /question/:requestID/reply": bind(async (context) => {
     const requestID = context.params.requestID!
@@ -501,35 +511,35 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
       formID: requestID,
       answer: toFormAnswer(found.question as QuestionRequest | undefined, body.answers ?? []),
     })
-    return ok()
+    return context.reply(true)
   }),
   "POST /question/:requestID/reject": bind(async (context) => {
     const requestID = context.params.requestID!
     const found = await questionOf(context, requestID)
     if (!found) return json({ name: "NotFoundError", data: { message: `Question not found: ${requestID}` } }, { status: 404 })
     await context.api.session.form.cancel({ sessionID: found.sessionID, formID: requestID })
-    return ok()
+    return context.reply(true)
   }),
 
   // ── 终端(2.x 的 Pty 与 v1 同形)──
-  "GET /pty": bind(async (context) => json((await context.api.pty.list(at(context))).data)),
+  "GET /pty": bind(async (context) => context.reply((await context.api.pty.list(at(context))).data)),
   "POST /pty": bind(async (context) => {
     const body = (context.body ?? {}) as { command?: string; args?: string[]; cwd?: string; title?: string; env?: Record<string, string> }
-    return json((await context.api.pty.create({ ...at(context), ...body })).data)
+    return context.reply((await context.api.pty.create({ ...at(context), ...body })).data)
   }),
-  "GET /pty/shells": bind(async (context) => json(await context.api.config.shells())),
-  "GET /pty/:ptyID": bind(async (context) => json((await context.api.pty.get({ ...at(context), ptyID: context.params.ptyID! })).data)),
+  "GET /pty/shells": bind(async (context) => context.reply(await context.api.config.shells())),
+  "GET /pty/:ptyID": bind(async (context) => context.reply((await context.api.pty.get({ ...at(context), ptyID: context.params.ptyID! })).data)),
   "PUT /pty/:ptyID": bind(async (context) => {
     const body = (context.body ?? {}) as { title?: string; size?: { rows: number; cols: number } }
-    return json((await context.api.pty.update({ ...at(context), ptyID: context.params.ptyID!, ...body })).data)
+    return context.reply((await context.api.pty.update({ ...at(context), ptyID: context.params.ptyID!, ...body })).data)
   }),
   "DELETE /pty/:ptyID": bind(async (context) => {
     await context.api.pty.remove({ ...at(context), ptyID: context.params.ptyID! })
-    return ok()
+    return context.reply(true)
   }),
   "POST /pty/:ptyID/connect-token": bind(async (context) =>
     // 2.x 与 v1 一样要求调用方带 `x-opencode-ticket`(防跨站取票);冻结终端带着它,原样转过去。
-    json(
+    context.reply(
       (
         await context.api.pty.connect.token({
           ...at(context),
@@ -546,7 +556,7 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
   "GET /api/agent": passthrough,
   // composer 的模型清单(model-contract.ts 的 `client.v2.model.list`;不进 routes-coverage 的扫描 —— 调用跨行写)。`#1662`:漏了它
   // composer 的模型链一直 recovering,发送按钮永远不亮。
-  "GET /api/model": bind(async (context) => json(toV1ModelList(await context.api.model.list(at(context))))),
+  "GET /api/model": bind(async (context) => context.reply(toV1ModelList(await context.api.model.list(at(context))))),
   "GET /api/provider/:providerID": passthrough,
   "GET /api/reference": passthrough,
   "GET /api/session": passthrough,
@@ -578,7 +588,7 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
   "POST /api/integration/:integrationID/connect/oauth/:attemptID/complete": passthrough,
 }
 
-async function currentProject(context: TranslatorContext) {
+async function currentProject(context: SharedContext) {
   const location = await context.api.location.get(at(context))
   const listed = (await context.api.project.list()).find((project) => project.id === location.project.id)
   return listed
@@ -594,7 +604,7 @@ const MCP_AUTH_POLL_MS = 1_000
  * OAuth 集成(core/src/mcp/index.ts:238-275,`metadata.source === "mcp"`、名字 = MCP 名):这里发起 OAuth、
  * 交给系统浏览器打开授权地址、轮询到终态,再回这台 MCP 的状态 —— 调用方看到的仍是 v1 的那个长调用。
  */
-async function authenticateMcp(context: TranslatorContext) {
+async function authenticateMcp(context: TranslatorContext<"POST /mcp/:name/auth/authenticate">) {
   const name = context.params.name!
   const integrations = await context.api.integration.list(at(context))
   const integration = integrations.data.find(
@@ -623,6 +633,6 @@ async function authenticateMcp(context: TranslatorContext) {
     if (outcome === "complete") await poll()
     const server = (await context.api.mcp.list(at(context))).data.find((item) => item.name === name)
     if (outcome !== "complete" || server?.status.status !== "pending")
-      return json(server ? v1McpStatus(server.status) : { status: "failed", error: outcome })
+      return context.reply(server ? v1McpStatus(server.status) : { status: "failed", error: outcome })
   }
 }

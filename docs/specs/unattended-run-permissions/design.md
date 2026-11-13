@@ -3,13 +3,13 @@ id: DESIGN-unattended-run-permissions
 title: 没人在场的任务不再空等批准 技术设计
 summary: 桌面主进程记着「此刻正在跑的无人值守会话」(本地自动化运行与一句话解析),每次变动把完整名单经既有的主进程↔引擎进程窄消息推给扩展,扩展确认装上(带随机回执)后主进程才发出任务;会话里出现运行之外的新输入即退出名单;扩展按本地名单同步裁决,在册会话按自动化载体档位当场决定(标准档放行未停用的工具,含「每次询问」;只读档与身份变化、已停用一律拒绝),其余询问一律立即拒绝;拒绝原因经结构化字段或引擎已记的拒绝类型由调度器写进运行记录,Code Mode 里的拒绝由扩展补到外层结果上;运行期间连接器的补充信息请求带项目目录立即取消;不改任何上游文件
 kind: tech-design
-status: draft
+status: approved
 spec: SPEC-unattended-run-permissions
 spec_version: 2
 review:
   rounds: 3           # R1 Codex gpt-6.1-sol xhigh 会话 01a1d2c7,审 46ce5f39f6,BLOCK 1+6;R2 会话 01a1d2de,审 3b94f766ea,BLOCK 1+2;R3 会话 01a1d2ec,审 c815d4c620,BLOCK 1+3;处置见 §10
   reviewed_sha: "c815d4c620"
-  verdict: ""
+  verdict: "R3 BLOCK; F3、F4 采纳并修正(b38e78ba70),F1、F2 经 owner 裁决划在防护边界之外(2026-11-13 U-02,另由 alpha-code#1708 收口);编排器核对后冻结,未再送审"
 owners: [owner]
 last_reviewed: 2026-11-13
 review_after: 2027-05-13
@@ -52,7 +52,7 @@ review_after: 2027-05-13
 | P-19 | `sessionID === "global"` 的表单请求不查会话行,按查询参数 `location[directory]`、请求头 `x-opencode-directory`、否则引擎进程 cwd 定位;桌面引擎进程的 cwd 是 scratch 目录;客户端以 `{ location: { directory } }` 传位置。 | `packages/server/src/middleware/form-location.ts:26-31`;`packages/server/src/location.ts:71-79`;`packages/ui-mac/src/main/server.ts:551`;`packages/ui-mac/src/engine-adapter/routes.ts:62` |
 | P-20 | 本引擎的**全部** MCP 补充信息(表单与 URL 两种)都挂在 `"global"` 上,不归属任何会话;上游注释称其为临时出口、待补会话归属。Code Puppy 正式版的界面(`codepuppy-app`、`codepuppy-session-ui`、`ui-mac` 渲染进程)没有任何 `mcp-elicitation` 的渲染(检索零命中);会渲染它的是上游 `packages/app`,Code Puppy 不用;别的客户端没有引擎口令,连不上桌面引擎。 | `packages/core/src/mcp/index.ts:144-146`、`:343-346`、`:371-374`;`form-location.ts:28-30`;`packages/app/src/session/requests/model.ts:123-129`;`scripts/north-star-guard.sh:107-108`;P-10 口令 |
 | P-21 | 每次 `Session.prompt` 收下一条输入,都先在准备阶段触发插件钩子 `session.hook("prompt")`(带 `sessionID`、本条输入的 `messageID`、`delivery`),之后才入队、才唤醒执行;同一 id 重放只返回已有消息、不再准备。调用方可自带 `id`(只要求 `msg_` 前缀,与引擎同一生成器 `SessionMessage.ID.create`)。ext 已注册这个钩子。会话「将要空闲」时另有 `experimental.idle` 钩子,但回合被中断或失败时不触发。 | `packages/core/src/session/session.ts:155-189`;`packages/core/src/session/prompt.ts:34-53`;`packages/server/src/handlers/session.ts:290-304`;`packages/schema/src/session-message.ts:21-28`;`packages/ext/src/policy/index.ts:151-153`;`packages/core/src/session/runner/llm.ts:175-185` |
-| P-22 | **(R3 核查,推翻条件)** 引擎自己会把未经 Code Puppy 同意的 JS 装进引擎进程:项目里存在的 `.opencode` 目录成为配置目录条目,插件源扫描把其下 `plugin/`、`plugins/` 的 `.ts`/`.js` 变成装载操作;项目 `opencode.json(c)` 的 `plugins` 键(路径或包名)同样变成装载操作。装载前唯一的拦截是托管策略 `plugin.use` 的 deny,Code Puppy 不写这条策略(检索零命中)。桌面引擎确实读项目的 `opencode.json` / `.opencode/`。Code Puppy 已把它登记为不受控的上游边界(ADR-040 后果 4)。MCP 服务器是独立进程;Code Mode 的 legacy 引擎是解释器(`packages/codemode/src` 无 `eval`/`new Function`/`node:vm`),都不进这个 JS 领域。 | `packages/core/src/config.ts:266-271`、`:330-337`;`packages/core/src/config/plugin/source.ts:125-158`;`packages/core/src/plugin/source-directory.ts:7-33`;`packages/core/src/plugin/module.ts:46-55`;`packages/ui-mac/src/main/engine-explicit-config.ts:9`;`.claude/rules/adrs/ADR-040-extension-package-taxonomy.md:237-238`;`docs/design/2026-10-14-req234-hub-agent-install-baseline.md:511`;`packages/core/src/codemode/tool.ts:139`、`:289-300` |
+| P-22 | **(R3 核查;由 alpha-code#1708 另行收口)** 引擎自己会把未经 Code Puppy 同意的 JS 装进引擎进程:项目里存在的 `.opencode` 目录成为配置目录条目,插件源扫描把其下 `plugin/`、`plugins/` 的 `.ts`/`.js` 变成装载操作;项目 `opencode.json(c)` 的 `plugins` 键(路径或包名)同样变成装载操作。装载前唯一的拦截是托管策略 `plugin.use` 的 deny,Code Puppy 不写这条策略(检索零命中)。桌面引擎确实读项目的 `opencode.json` / `.opencode/`。Code Puppy 已把它登记为不受控的上游边界(ADR-040 后果 4)。MCP 服务器是独立进程;Code Mode 的 legacy 引擎是解释器(`packages/codemode/src` 无 `eval`/`new Function`/`node:vm`),都不进这个 JS 领域。 | `packages/core/src/config.ts:266-271`、`:330-337`;`packages/core/src/config/plugin/source.ts:125-158`;`packages/core/src/plugin/source-directory.ts:7-33`;`packages/core/src/plugin/module.ts:46-55`;`packages/ui-mac/src/main/engine-explicit-config.ts:9`;`.claude/rules/adrs/ADR-040-extension-package-taxonomy.md:237-238`;`docs/design/2026-10-14-req234-hub-agent-install-baseline.md:511`;`packages/core/src/codemode/tool.ts:139`、`:289-300` |
 
 未核实(有界;plan 的证明表各给一条能失败的证据后即止):
 
@@ -275,6 +275,7 @@ function unattendedGateVerdict(profile: UnattendedProfile, s: GateSubject): Gate
 - 登记在 `session.create` 返回之后,发 prompt 以 ext 回执为前提。回合里的任何判定都晚于 ext 装上名单,没有「已在跑、ext 不知道」的窗口(U-4 已核实)。
 - 握手失败:运行不开始,记既有的「应用未就绪」,不计入连败熔断;解析返回既有的 `unavailable`。不进审批等待,不放行。
 - 注销推送晚到:任何外来输入在准备阶段已把会话移出 ext 的名单,其后的回合按不在册裁决。运行自身那一条输入之外,没有别的输入能在注销前按无人值守执行。
+- 用户可见的后果:有人往仍在跑的自动化会话里输入,那次运行的其余部分走有人在场的路径。需要批准时出卡,没人点则按既有 300 s 失败,运行可能因此超时。这与规格「有人在场的对话:批准卡片与 300 秒等待保持现状」(spec 范围「不包括」)一致,也与今天该会话里的行为相同,规格无需加句。
 - 注销的推送丢失(引擎进程已退出):无影响,ext 随进程消失;新引擎进程 `attach` 时拿到 main 当前名单。
 - main 退出:引擎进程随之结束(utilityProcess),没有残留的在册状态。
 - 投影读消息失败:记日志,运行记录按今天的规则写,不阻断。
@@ -306,11 +307,10 @@ function unattendedGateVerdict(profile: UnattendedProfile, s: GateSubject): Gate
   - 改上游 Code Mode 保留子调用 metadata:要新接管;ext 在外层 `execute.after` 补记即可(P-17)。
   - 在 `mcp/index.ts` 里处理补充信息,或自建补充信息归属:表单不归属任何会话(P-20),要扩大接管面或另建归属设施。
 - 安全面(权限):
-  - 威胁模型(R3 编排器定稿口径;推翻条件见下):
+  - 威胁模型(owner 2026-11-13 U-02 确认,冻结):
     - **受防的受控入口:** 渲染进程够得着的引擎 HTTP 路由、插件 API(适配器方法,如 `session.update` / `switchAgent` / `session.prompt`)、会话 metadata、模型的工具调用(含 Code Mode)、MCP 服务器、项目文档与命令。
     - **经这些入口能做什么:** 不能把会话**放进**名单:写入口只有 main 的两处,快照只走 main → ext,判定不读会话字段(R2-1、R2-3)。不能让会话**在外来输入之后仍留在**名单里(R3-F3)。能把会话**移出**名单的只有一种做法:往这个会话发新输入。移出只会让其余部分走有人在场的路径(出卡),不会更宽。能往会话发输入的,本来就能改写这个会话里模型要做的事。
-    - **边界外,剩余风险一句话:** 进入引擎进程 JS 领域的代码与扩展本身同等可信,与今天的工具策略闸、权限钩子相同。这类代码能直接调扩展的监听、换掉监听、抄回执(R3-F1/F2),也能直接击穿今天的闸,名单没有给它新能力。
-    - **推翻条件已出现,待编排器裁决:** 编排器原口径的前提是「进这个领域的第三方/项目 JS 都经过同意门」(`packages/ext/src/plugin.ts:372-390`,`readProjectExtensionsConsent`)。核查发现例外 P-22:引擎自己扫描项目 `.opencode/plugin(s)/` 与配置 `plugins` 键装载 JS,不经同意门,ADR-040 后果 4 已登记为不受控的上游边界。本设计对这条途径不增不减,但「均经同意」这句前提不成立,本稿没有据它定稿。
+    - **防护边界之外(owner 确认):** 跑在引擎进程 JS 领域里的代码不在本设计的防护边界之内。这包括两类:经同意装载的 `.codepuppy/plugins/*.js`,以及引擎按 P-22 / ADR-040 后果 4 自动发现的项目插件。这类代码能直接调用或换掉扩展的监听、照抄回执(R3-F1/F2),也能直接击穿今天的工具策略闸与权限钩子。本设计不给它任何它原本没有的能力。未经同意的那条装载途径(P-22)由 alpha-code#1708 另行收口,不由本设计处理。
   - I-1 名单只有两个写入口:`executeTask`、`llmParseAutomation`。登记后以 ext 回执为发 prompt 的前提,注销在 `finally`;ext 只经 `codepuppy.unattended.live` 得到名单。
   - I-2 在册会话里不创建任何审批请求(零 `Permission.Event.Asked`)。
   - I-3 判定只把「询问」改成放行或拒绝:已配置的 deny 先于钩子、策略的 deny 不放宽;readonly 与 none 对询问从不放行。
@@ -355,10 +355,11 @@ function unattendedGateVerdict(profile: UnattendedProfile, s: GateSubject): Gate
 | R2 · `3b94f766ea` · 确认轮,限 §4.2、§6 安全面及直接后果 §4.3 T2、§5 | Codex,只读,会话 `01a1d2de-1394-7811-8f49-2367fc9adb1c`;编排器处置:三条均采纳 | **R2-1 Blocker(F1 未关)应答跨会话串用**:插件以预测的自增 id 抢先查询在册会话 A,A 的真实 `live:true` 结算了 ext 为会话 B 挂着的同 id 查询(`hub-bridge.ts:70-80`;main 不区分发送者,`server.ts:577-580`) | §4.2 改为 main 推送完整名单、ext 本地判定:没有查询与应答可串用。回执带每次新取的随机 `nonce`,main 只认当次的 | — |
 | 同上 | 同上 | **R2-2 Major 查询失败等同「不在册」**:在册运行中问不到即落回 300 s 等待 | 判定读本地名单,运行中没有「问不到」。唯一的确认点在发 prompt 之前:等不到回执 ⇒ 这次运行不开始(既有「应用未就绪」),解析返回既有 `unavailable`;I-8 | — |
 | 同上 | 同上 | **R2-3 Major 可写指针能关闭在册判定**(`adapter.ts:639`;`projector.ts:984-986` 整体替换) | 去掉指针,判定不读会话 metadata;§4.1 删 `UNATTENDED_SESSION_KEY` | — |
-| R3 · `c815d4c620` · 限 §4.2、§5、§6 安全面及直接后果 | Codex,只读,会话 `01a1d2ec-599f-7b82-9596-43f1cad0e5dc`;编排器处置 | **R3-F1 Blocker 插件直接调用扩展的监听注入名单**、**R3-F2 Major 插件换掉监听、照抄回执**:编排器裁决**不采纳为缺陷**。理由:属威胁边界外,同一领域里的 JS 本来就能击穿今天的闸;按要求把边界写明,不打补丁。重开条件:有证据表明该领域里有未经同意的 JS。**设计方按要求核查:该条件已满足**(P-22,引擎对项目 `.opencode/plugin(s)/` 与 `plugins` 键的自动装载,ADR-040 后果 4) | §6 安全面「威胁模型」写明受控入口、经入口能做的事、边界外剩余风险,并把推翻条件写成待裁 | 交编排器:按 P-22 重裁 F1/F2,或明确把「引擎自动装载的项目 JS」也划为边界外 |
-| 同上 | 同上 | **R3-F3 Major 注销与人工续聊没有排序保证**:采纳 | §4.2 名单条目带 main 生成的 `promptID`,ext 的 prompt 钩子在外来输入入队前把会话移出名单(P-21);§5;I-7、I-9 | — |
-| 同上 | 同上 | **R3-F4 Major 未启动的任务累积连败**(`adapter.ts:696` 阻塞事件循环 → 回执超时;`automation-scheduler.ts:191`):采纳 | §4.2:带 `automation-run-not-ready` 的记录不计入熔断,显示既有「应用未就绪,本次未运行」,下一次按计划照常触发 | — |
+| R3 · `c815d4c620` · 限 §4.2、§5、§6 安全面及直接后果 | Codex,只读,会话 `01a1d2ec-599f-7b82-9596-43f1cad0e5dc`;编排器处置 | **R3-F1 Blocker 插件直接调用扩展的监听注入名单**、**R3-F2 Major 插件换掉监听、照抄回执**:**不采纳。**设计方核查发现未经同意的装载途径(P-22,ADR-040 后果 4),据此交回裁决。**owner 2026-11-13 裁决(alpha-work INT-safety U-02「请我定的两点，要修，现在就做， 1699 冻结。」):** 引擎进程 JS 领域里的代码在本设计的防护边界之外,含经同意的 `.codepuppy/plugins` 与按 P-22 自动发现的项目插件。本设计不给它新能力。P-22 由 alpha-code#1708(INT-safety I-10)另行收口。重开条件:本设计内无;新的 JS 装载途径归 #1708 | §6 安全面「防护边界之外」按 owner 口径写定 | P-22 → alpha-code#1708 |
+| 同上 | 同上 | **R3-F3 Major 注销与人工续聊没有排序保证**:采纳;编排器核对接受(含 `promptID` 绑定、不装回已退出的 `promptID`、注销不等回执) | §4.2 名单条目带 main 生成的 `promptID`,ext 的 prompt 钩子在外来输入入队前把会话移出名单(P-21);§5;I-7、I-9 | — |
+| 同上 | 同上 | **R3-F4 Major 未启动的任务累积连败**(`adapter.ts:696` 阻塞事件循环 → 回执超时;`automation-scheduler.ts:191`):采纳;编排器核对接受 | §4.2:带 `automation-run-not-ready` 的记录不计入熔断,显示既有「应用未就绪,本次未运行」,下一次按计划照常触发 | — |
 | 同上 | 同上 | 审计方确认无异议:U-4 同步派发属实(Electron 42.3.3 `ParentPort extends EventEmitter`);旧快照重放被 `seq` 拒;扩展重载复用进程级单例,引擎进程重启由 `attach` 重推;R2-3 已修 | U-4 改为已核实 | — |
+| 冻结 · `b38e78ba70` 之后 | 编排器核对 F3/F4 修正;owner 裁 F1/F2 边界(2026-11-13 U-02) | 未再送审 | `status: approved`;§6 安全面边界段;§5 用户可见后果一条 | P-22 → alpha-code#1708 |
 
 R2 三条时序在改后文本上的走查:
 
@@ -383,4 +384,4 @@ R3-F3 时序在改后文本上的走查:A 的标准档运行结束,main 的 `fin
 | O-3 项目文档可在后加载的层给载体 agent 追加规则(`config/plugin/agent.ts:74-103`),加载先后未核实 | 可能放宽载体的静态规则;本设计不读规则定档位,放行只作用于询问,不碰已配置的 deny | 既有面,与本规格无关 | 另有证据表明项目层排在注入层之后 |
 | O-4 `hub-tools.ts:47` 按前缀判自动化载体 | K1/K2 的又一份载体知识 | 不在本 AC 内;在册时 T2 已兜住 | 下一次改载体名单 |
 | O-5(R3 后)用户往正在跑的自动化会话里插话,插话之后的部分走有人在场的路径:出卡,没人点则走既有 300 s,运行可能因此超时 | 有人在场就给卡片,与规格「有人在场的对话保持现状」一致 | 这是 R3-F3 修法的直接后果 | 出现真实反馈 |
-| O-6 引擎自动装载项目 `.opencode/plugin(s)/` 与配置 `plugins` 键里的 JS,不经 Code Puppy 同意门(P-22) | 打开一个带这类文件的仓库,就会以引擎同等权限运行其中的 JS;这早于本设计,也不因本设计变化 | ADR-040 后果 4 已登记为上游边界;不在本 AC 内 | 编排器重裁 R3-F1/F2 时一并定去向 |
+| O-6 引擎自动装载项目 `.opencode/plugin(s)/` 与配置 `plugins` 键里的 JS,不经 Code Puppy 同意门(P-22) | 打开一个带这类文件的仓库,就会以引擎同等权限运行其中的 JS;这早于本设计,也不因本设计变化 | 不在本 AC 内;owner 2026-11-13 U-02 定为另票修 | alpha-code#1708(INT-safety I-10) |

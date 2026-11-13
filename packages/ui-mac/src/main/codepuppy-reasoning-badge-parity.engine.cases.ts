@@ -31,7 +31,7 @@ import { assertEngineSandboxed, engineSandbox } from "../../test-component/engin
 import { codepuppyEngine, type Running } from "../../test-component/codepuppy-engine"
 import { v3Snapshot } from "../../test-component/effective-catalog.fixture"
 import { createEngineFetch } from "../engine-adapter/index"
-import { normalizeProviderList } from "../../../codepuppy-app/src/context/global-sync/utils"
+import { normalizeProviderList } from "../engine-adapter/frozen-shapes"
 import { buildModelPickerRows, type ModelPickerRow } from "../renderer/codepuppy-ui/model-picker-core"
 import { buildPromptRequest, DEFAULT_PERM, v1PromptModelFields } from "../renderer/codepuppy-ui/composer-state"
 import { createModelContract } from "../renderer/codepuppy-ui/model-contract"

@@ -98,7 +98,7 @@ type Expected = {
   chip: string
   chipPro: boolean
   footerSub: string
-  rows: Record<string, string> // 行标签 → 期望值(取 .codepuppy-acct-v 或 .codepuppy-acct-pending 的文本)
+  rows: Record<string, string> // 行标签 → 期望值(取 .a-kv-v 的可见文本;alpha-code#1686 起弹层用组件库名称 — 值列表)
   ctas: string[]
 }
 
@@ -280,11 +280,12 @@ function click(el: Element) {
 
 function readRows(pop: Element): Record<string, string> {
   const rows: Record<string, string> = {}
-  for (const row of pop.querySelectorAll(".codepuppy-acct-row")) {
-    const k = row.querySelector(".codepuppy-acct-k")?.textContent?.trim() ?? "(无标签)"
-    const v = row.querySelector(".codepuppy-acct-v")?.textContent?.trim()
-    const pending = row.querySelector(".codepuppy-acct-pending")?.textContent?.trim()
-    rows[k] = v ?? pending ?? (row.querySelector("svg") ? "<sparkline>" : "(空)")
+  for (const row of pop.querySelectorAll(".a-kv-row")) {
+    const k = row.querySelector(".a-kv-k")?.textContent?.trim() ?? "(无标签)"
+    const value = row.querySelector(".a-kv-v")
+    // 可见文本:剔除只给读屏的「正在读取 / 暂时读不到」。
+    const visible = value ? Array.from(value.childNodes).filter((node) => !(node instanceof Element && node.classList.contains("a-kv-sr"))).map((node) => node.textContent).join("").trim() : ""
+    rows[k] = row.querySelector("svg") ? "<sparkline>" : visible || "(空)"
   }
   return rows
 }

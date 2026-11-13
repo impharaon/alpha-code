@@ -1,0 +1,45 @@
+/* 名称 — 值列表(组件库,alpha-code#1686;组件稿 docs/design/2026-11-13-library-card-kv/ #kv):
+   <dl>,每行名称在左、值在右;行与行之间没有分隔线。只用现有 --a-* 令牌。 */
+.a-kv {
+  margin: 0;
+}
+.a-kv-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--a-space-3);
+  padding: var(--a-space-1) 0;
+  font-size: var(--a-text-sm);
+  line-height: var(--a-leading-snug);
+}
+.a-kv-k {
+  margin: 0;
+  color: var(--a-text-secondary);
+}
+.a-kv-v {
+  margin: 0;
+  min-width: 0;
+  color: var(--a-text);
+  font-weight: var(--a-weight-semibold);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+/* 值还没读到(…)或读不到(—) */
+.a-kv-v[data-state="pending"],
+.a-kv-v[data-state="unavailable"] {
+  color: var(--a-text-tertiary);
+  font-weight: var(--a-weight-medium);
+  font-size: var(--a-text-xs);
+}
+/* 「…」「—」读出来没有意义:给读屏补一句(组件稿「读屏」一行)。codepuppy-ui 没有通用的 sr-only 类。 */
+.a-kv-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

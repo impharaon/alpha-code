@@ -1,0 +1,8 @@
+/* 卡片(组件库,alpha-code#1686;组件稿 docs/design/2026-11-13-library-card-kv/ #card):
+   把一组只读事实框成一块。一个样子,没有变体;不带外边距,位置交给放它的地方;里面不放按钮。 */
+.a-card {
+  padding: var(--a-space-3);
+  border: 1px solid var(--a-border-faint);
+  border-radius: var(--a-radius-lg);
+  background: var(--a-bg-subtle);
+}

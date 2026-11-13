@@ -135,30 +135,10 @@
   color: var(--a-accent);
 }
 
-.codepuppy-acct-card {
+/* alpha-code#1686:余额卡本体是组件库的 .a-card + .a-kv(codepuppy-ui/card.css、key-value-list.css);
+   组件不带外边距,弹层的左右 14、下 12 放在这一层,卡片位置与改前相同。 */
+.codepuppy-acct-card-slot {
   margin: 0 14px 12px;
-  padding: 12px;
-  border: 1px solid var(--a-border-faint);
-  border-radius: var(--a-radius-lg);
-  background: var(--a-bg-subtle);
-}
-.codepuppy-acct-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 3px 0;
-  font-size: 12.5px;
-}
-.codepuppy-acct-k {
-  color: var(--a-text-secondary);
-}
-.codepuppy-acct-v {
-  font-weight: 600;
-}
-.codepuppy-acct-pending {
-  font-weight: 500;
-  color: var(--a-text-tertiary);
-  font-size: 11px;
 }
 
 .codepuppy-acct-cta {

@@ -19,17 +19,25 @@
 // `codepuppy.jsonc`(合成进显式文件,相对条目按显式文件所在目录解析)。项目与 HOME 之间、以及 HOME 之上的上级目录不在其中。
 // 列不出来的来源(MDM 描述文件、系统配置目录、wellknown / 集成文档带来的插件)不放行。
 //
+// 用户自己的 `plugin.use` 照旧说了算:`codepuppy.jsonc` 的语句在显式文件里排在我们前面(同一文档后写的胜出),HOME 一级文档在显式文件
+// 之后加载(先加载的胜出)—— 它们拒绝的来源若再由我们写 allow,就会被盖过。所以这些文档判为 deny 的来源不写 allow,由「拒绝全部」接手。
+// 全局配置目录的文档比显式文件先加载,它的语句本来就压得过我们。
+//
 // 什么时候重算:sidecar 启动注入时一次;之后每次显式文件被重写(codepuppy.jsonc 改了、技能翻代 / 新装 / 停用,
 // engine-explicit-config.ts 的 watchExplicitSources)再算。运行中往全局目录新加的插件,在下一次重算(最迟下次启动)后加载。
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { fileURLToPath } from "node:url"
 import { parse as parseJsonc, type ParseError } from "jsonc-parser"
-import type { ExplicitPolicy } from "./engine-explicit-config"
+import { Wildcard } from "@opencode/core/util/wildcard"
 
-// 与上游 `ConfigDiscovery.names`、`PluginSourceDirectory.names` 同值(main 不 import 上游 core:会把引擎整张图带进主进程打包)。
-const CONFIG_FILES = ["opencode.json", "opencode.jsonc"]
-const PLUGIN_DIRECTORIES = ["plugin", "plugins"]
+// 与上游 `ConfigDiscovery.names`、`PluginSourceDirectory.names` 同值(那两个模块牵着引擎的服务图,main 不 import;
+// 通配用上游自己的零依赖模块)。与上游的一致性由 engine-plugin-policy.test.ts 比对。
+export const CONFIG_FILES = ["opencode.json", "opencode.jsonc"]
+export const PLUGIN_DIRECTORIES = ["plugin", "plugins"]
+
+type PluginPolicy = { action: "plugin.use"; resource: string; effect: "allow" | "deny" }
+type ConfigDocument = { record: Record<string, unknown> | undefined; directory: string }
 
 export type EnginePluginPolicyInput = {
   /** Code Puppy 自己的扩展目录(main 解析好的绝对路径);缺席 = 不放行任何扩展。 */
@@ -41,26 +49,50 @@ export type EnginePluginPolicyInput = {
   userConfig?: { text: string; directory: string }
 }
 
-export function enginePluginPolicies(input: EnginePluginPolicyInput): { policies: ExplicitPolicy[]; refused: string[] } {
-  const roots = [...new Set([input.globalDirectory, path.join(input.home, ".opencode")])]
-  const documents = [
-    ...roots.flatMap((root) => CONFIG_FILES.map((name) => ({ file: path.join(root, name), directory: root }))),
-    ...CONFIG_FILES.map((name) => ({ file: path.join(input.home, name), directory: input.home })),
-  ]
+export function enginePluginPolicies(input: EnginePluginPolicyInput): { policies: PluginPolicy[]; refused: string[] } {
+  const homeRoot = path.join(input.home, ".opencode")
+  const roots = [...new Set([input.globalDirectory, homeRoot])]
+  const load = (directory: string) => CONFIG_FILES.map((name) => ({ record: parseDocument(readText(path.join(directory, name))), directory }))
+  // HOME 一级按引擎的加载序:`~/opencode.json(c)` 先于 `~/.opencode/` 里的(都在显式文件之后)。
+  const home = [...load(input.home), ...(homeRoot === input.globalDirectory ? [] : load(homeRoot))]
+  const user = input.userConfig ? [{ record: parseDocument(input.userConfig.text), directory: input.userConfig.directory }] : []
   const targets = [
     ...(input.extPluginPath ? [input.extPluginPath] : []),
     ...roots.flatMap(discoveredTargets),
-    ...documents.flatMap((document) => configuredTargets(readText(document.file), document.directory)),
-    ...(input.userConfig ? configuredTargets(input.userConfig.text, input.userConfig.directory) : []),
+    ...[...load(input.globalDirectory), ...home, ...user].flatMap(configuredTargets),
   ]
   const exact = (target: string) => path.isAbsolute(target) && !/[*?]/.test(target)
+  const deniedByUser = (target: string) => userDecision([...user, ...home], target) === "deny"
+  const allow = (resource: string): PluginPolicy => ({ action: "plugin.use", resource, effect: "allow" })
   return {
     policies: [
       { action: "plugin.use", resource: "*", effect: "deny" },
-      ...[...new Set(targets.filter(exact))].sort().map((resource) => ({ action: "plugin.use", resource, effect: "allow" })),
+      ...[...new Set(targets.filter(exact))].filter((target) => !deniedByUser(target)).sort().map(allow),
     ],
     refused: [...new Set(targets.filter((target) => !exact(target)))].sort(),
   }
+}
+
+/** 这些用户文档(先加载的在前)对一个目标的判定:第一份有命中语句的文档里最后一条命中的那条(上游 `ManagedPolicy.match` 的规则)。 */
+function userDecision(documents: readonly ConfigDocument[], target: string) {
+  for (const document of documents) {
+    const match = pluginStatements(document.record).findLast((statement) => Wildcard.match(target, statement.resource))
+    if (match) return match.effect
+  }
+  return undefined
+}
+
+/** 文档里的 `plugin.use` 语句;旧写法 `integration.use` + `plugin:` 前缀按上游 `ConfigPolicy.Info` 的解码规则换算。 */
+function pluginStatements(record: Record<string, unknown> | undefined): Array<{ resource: string; effect: unknown }> {
+  return (Array.isArray(record?.policies) ? record.policies : []).flatMap((value: unknown) => {
+    if (!value || typeof value !== "object") return []
+    const statement = value as { action?: unknown; resource?: unknown; effect?: unknown }
+    if (typeof statement.resource !== "string") return []
+    if (statement.action === "plugin.use") return [{ resource: statement.resource, effect: statement.effect }]
+    if (statement.action === "integration.use" && statement.resource.startsWith("plugin:"))
+      return [{ resource: statement.resource.slice("plugin:".length), effect: statement.effect }]
+    return []
+  })
 }
 
 /** 引擎在一个配置目录的 `plugin/`、`plugins/` 里会发现的条目(上游 `PluginSourceDirectory.discover` 的规则)。 */
@@ -86,23 +118,29 @@ function discoveredTargets(root: string): string[] {
   })
 }
 
-/**
- * 一份配置文档的插件条目在引擎里成为的目标串(上游 normalize 把 v1 的 `plugin` 摊进 `plugins`,`config/plugin/source.ts` 解析路径)。
- * 移除指令(`-x`)不是加载操作,跳过。文档解析不了 ⇒ 引擎也不加载它 ⇒ 没有条目。
- */
-function configuredTargets(text: string | undefined, directory: string): string[] {
-  if (text === undefined) return []
+/** 文档解析不了 ⇒ 引擎也不加载它 ⇒ 没有条目、没有语句。 */
+function parseDocument(text: string | undefined): Record<string, unknown> | undefined {
+  if (text === undefined) return undefined
   const errors: ParseError[] = []
   const document: unknown = parseJsonc(text, errors, { allowTrailingComma: true })
-  if (errors.length || !document || typeof document !== "object" || Array.isArray(document)) return []
-  const record = document as Record<string, unknown>
+  if (errors.length || !document || typeof document !== "object" || Array.isArray(document)) return undefined
+  return document as Record<string, unknown>
+}
+
+/**
+ * 一份配置文档的插件条目在引擎里成为的目标串(上游 normalize 把 v1 的 `plugin` 摊进 `plugins`,`config/plugin/source.ts` 解析路径)。
+ * 移除指令(`-x`)不是加载操作,跳过。
+ */
+function configuredTargets(document: ConfigDocument): string[] {
+  const record = document.record
+  if (!record) return []
   const list = (value: unknown) => (Array.isArray(value) ? value : [])
   const specs = [
     ...list(record.plugin).map((entry) => (Array.isArray(entry) ? entry[0] : entry)),
     ...list(record.plugins).map((entry) => (entry && typeof entry === "object" ? (entry as { package?: unknown }).package : entry)),
   ].filter((spec): spec is string => typeof spec === "string" && spec.length > 0 && !spec.startsWith("-"))
   return specs.flatMap((spec) => {
-    if (spec.startsWith("./") || spec.startsWith("../")) return [path.resolve(directory, spec)]
+    if (spec.startsWith("./") || spec.startsWith("../")) return [path.resolve(document.directory, spec)]
     if (!spec.startsWith("file://")) return [spec]
     try {
       return [fileURLToPath(spec)]

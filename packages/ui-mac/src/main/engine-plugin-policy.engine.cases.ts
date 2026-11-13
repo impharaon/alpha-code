@@ -6,7 +6,9 @@
 //   · AC-02:项目 p2 自带一份「已同意」的 `.codepuppy/prefs.json`,结果相同。
 //   · AC-04:p2 的 `opencode.json` 与 `.opencode/opencode.json` 都写 allow `plugin.use *`,仍不执行;p1 上级目录(HOME 与项目之间)
 //     的 `.opencode/plugins/a.js` 不执行。
-//   · AC-05:与 ext 同名的项目目录、与全局插件同名的项目文件、与用户全局的包同名的项目包(`<名字>@file:<项目里的目录>`)都不执行。
+//   · AC-05:与 ext 同名的项目目录、与全局插件同名的项目文件、与用户全局的包同名的项目包(`<名字>@file:<项目里的目录>`)、
+//     落进用户全局条目 `<root>/glob-*` 的项目路径 `<root>/glob-x` 都不执行。
+//   · AC-03 补:用户在 codepuppy.jsonc 里自己 deny 的全局插件,改动前不加载,改动后仍不加载(我们的 allow 不盖过用户的 deny)。
 //   · AC-03:ext(这里是一个放在固定路径上的桩)在两个项目里都是 active;全局配置目录里的插件文件、`opencode.json` 的相对 / 绝对
 //     路径条目、HOME 一级 `~/.opencode/plugins/h.js` 照常执行;出厂命令 /init、/review 与出厂技能照常在。
 //   · 已知的坏(也是改动前的实测):显式文件里去掉 `plugin.use` 语句 ⇒ 上面每一个项目标记都出现,全局的包名条目也执行。
@@ -24,6 +26,7 @@ import { assertEngineSandboxed, engineSandbox, engineSlot } from "../../test-com
 import { buildEngineServerOptions } from "./engine-server-options"
 import { withEngineAuthorization } from "./engine-authorization"
 import { injectCodePuppyConfig, type CodePuppyConfigInjectionResult } from "./codepuppy-config-injection"
+import { writeExplicitConfig } from "./engine-explicit-config"
 import { customProviderSecretName, secretFilePath } from "./codepuppy-secret-files"
 import { engineGlobalConfigDirectory } from "./engine-paths"
 import { assertExtPluginActive } from "./sidecar-ext-ready"
@@ -73,6 +76,7 @@ const PROJECT_MARKERS = [
   "p1-lookalike-ext",
   "p1-lookalike-global",
   "p1-same-name-package",
+  "p1-wildcard-lookalike",
   "ancestor",
   "p2-plugins-js",
   "p2-relative",
@@ -96,7 +100,16 @@ beforeAll(async () => {
   directoryPlugin(path.join(global, "gdir"), "global-relative")
   directoryPlugin(path.join(root, "global-abs"), "global-absolute")
   packagePlugin(npmCache("cp-1708-global-pkg@1.0.0"), "cp-1708-global-pkg", "global-package")
-  write(path.join(global, "opencode.json"), JSON.stringify({ plugins: ["./gdir", path.join(root, "global-abs"), "cp-1708-global-pkg@1.0.0"] }))
+  write(
+    path.join(global, "opencode.json"),
+    JSON.stringify({ plugins: ["./gdir", path.join(root, "global-abs"), "cp-1708-global-pkg@1.0.0", path.join(root, "glob-*")] }),
+  )
+  // 用户自己在 codepuppy.jsonc 里 deny 的一个全局插件:改动前后都不加载
+  write(path.join(global, "plugins", "denied.js"), probe("global-user-denied", "cp1708.global-user-denied"))
+  write(
+    path.join(process.env.CODEPUPPY_GLOBAL_DIR, "codepuppy.jsonc"),
+    JSON.stringify({ policies: [{ action: "plugin.use", resource: path.join(global, "plugins", "denied.js"), effect: "deny" }] }),
+  )
   write(path.join(sandbox.home, ".opencode", "plugins", "h.js"), probe("home-file", "cp1708.home-file"))
 
   // p1:HOME 下的项目;它与 HOME 之间还有一级上级目录
@@ -109,9 +122,12 @@ beforeAll(async () => {
   directoryPlugin(path.join(p1, ".opencode", "plugins", path.basename(ext)), "p1-lookalike-ext")
   write(path.join(p1, ".opencode", "plugins", "g.js"), probe("p1-lookalike-global", "cp1708.p1-lookalike-global"))
   packagePlugin(path.join(p1, "evil"), "cp-1708-global-pkg", "p1-same-name-package")
+  directoryPlugin(path.join(root, "glob-x"), "p1-wildcard-lookalike")
   write(
     path.join(p1, "opencode.json"),
-    JSON.stringify({ plugins: ["./rel", path.join(root, "p1-outside"), "cp-1708-project-pkg@1.0.0", `cp-1708-global-pkg@file:${path.join(p1, "evil")}`] }),
+    JSON.stringify({
+      plugins: ["./rel", path.join(root, "p1-outside"), "cp-1708-project-pkg@1.0.0", `cp-1708-global-pkg@file:${path.join(p1, "evil")}`, path.join(root, "glob-x")],
+    }),
   )
 
   // p2:自带「已同意」的信任记录,并在两份项目配置里都 allow plugin.use
@@ -184,8 +200,11 @@ async function engineWith(name: string, config: CodePuppyConfigInjectionResult["
   return { fetch: fetch!, request, list, open, ran }
 }
 
-function withoutPluginPolicies(document: { policies?: Array<{ action: string }> }) {
-  return { ...document, policies: (document.policies ?? []).filter((policy) => policy.action !== "plugin.use") }
+/** 「去掉我们的语句」:同一份用户文件与同一层,只是不写 `#1708` 的 plugin.use(用户自己写的 policies 原样在)。 */
+function explicitWithoutOurPluginPolicies(injection: CodePuppyConfigInjectionResult, name: string) {
+  const file = path.join(root, `${name}.json`)
+  writeExplicitConfig(file, injection.explicit!.userConfig, { ...injection.explicit!.layer, plugins: [] })
+  return file
 }
 
 describe("alpha-code#1708 项目范围的引擎插件在 Code Puppy 里一律不执行", () => {
@@ -214,10 +233,15 @@ describe("alpha-code#1708 项目范围的引擎插件在 Code Puppy 里一律不
   }, 90_000)
 
   test("已知的坏(= 改动前的实测):显式文件里去掉 plugin.use ⇒ 每一个项目标记都出现,用户全局的包名条目也执行", async () => {
-    const explicit = JSON.parse(fs.readFileSync(injection.config.file!, "utf8")) as { policies?: Array<{ action: string }> }
-    const file = path.join(root, "explicit-without-plugin-policies.json")
-    fs.writeFileSync(file, JSON.stringify(withoutPluginPolicies(explicit)))
-    const engine = await engineWith("before", { content: injection.config.content, file }, injection.models.file)
+    const content = JSON.parse(injection.config.content) as { policies?: Array<{ action: string }> }
+    const engine = await engineWith(
+      "before",
+      {
+        content: JSON.stringify({ ...content, policies: (content.policies ?? []).filter((policy) => policy.action !== "plugin.use") }),
+        file: explicitWithoutOurPluginPolicies(injection, "explicit-without-plugin-policies"),
+      },
+      injection.models.file,
+    )
     await engine.open(p1)
     await engine.open(p2)
     await new Promise((resolve) => setTimeout(resolve, 1_000))
@@ -225,14 +249,16 @@ describe("alpha-code#1708 项目范围的引擎插件在 Code Puppy 里一律不
   }, 90_000)
 
   test("层序的已知的坏:同一组 plugin.use 只放进内联文档(排在项目配置之后)⇒ p2 自写的 allow 胜出,它的插件执行;p1 没写 allow,仍不执行", async () => {
-    const explicit = JSON.parse(fs.readFileSync(injection.config.file!, "utf8")) as { policies?: Array<{ action: string }> }
-    const content = JSON.parse(injection.config.content) as { policies?: unknown[] }
-    const plugins = (explicit.policies ?? []).filter((policy) => policy.action === "plugin.use")
-    const file = path.join(root, "explicit-plugins-inline-only.json")
-    fs.writeFileSync(file, JSON.stringify(withoutPluginPolicies(explicit)))
+    const content = JSON.parse(injection.config.content) as { policies?: Array<{ action: string }> }
     const engine = await engineWith(
       "inline-only",
-      { content: JSON.stringify({ ...content, policies: [...(content.policies ?? []), ...plugins] }), file },
+      {
+        content: JSON.stringify({
+          ...content,
+          policies: [...(content.policies ?? []).filter((policy) => policy.action !== "plugin.use"), ...injection.explicit!.layer.plugins],
+        }),
+        file: explicitWithoutOurPluginPolicies(injection, "explicit-plugins-inline-only"),
+      },
       injection.models.file,
     )
     await engine.open(p2)

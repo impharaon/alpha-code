@@ -662,6 +662,8 @@ export function injectCodePuppyConfig(
     const explicitFile = explicitConfigPath(userDataPath)
     //   4d. `#1708`:引擎插件只放行 Code Puppy 的扩展与用户全局范围里现有的来源,项目范围的一律拒(engine-plugin-policy.ts)。
     //       用户文件里的相对条目在合成后按显式文件所在目录解析;sidecar 的监听每次重写显式文件时按当时的原文重算。
+    //       与 provider 的 policies 一样写两层:显式文件那份比项目配置先加载(第一层,它的「拒绝全部」总是先命中);内联这份是
+    //       第二层 —— 显式文件读不到或被引擎整份拒掉时,没自写 allow 的项目插件仍被拒(项目自写的 allow 盖得过这一层)。
     const pluginPolicies = (userText: string | undefined) =>
       enginePluginPolicies({
         extPluginPath,
@@ -671,9 +673,10 @@ export function injectCodePuppyConfig(
       })
     const plugins = pluginPolicies(readTextSafe(file))
     layer.plugins = plugins.policies
+    config.policies = [...(config.policies ?? []), ...plugins.policies]
     if (plugins.refused.length)
       console.warn(
-        `[alpha-code#1708] user-global engine plugin entries not loaded — only an exact file path can be allowed (the engine checks a package entry by its bare name, which a project can reuse): ${JSON.stringify(plugins.refused)}`,
+        `[alpha-code#1708] user-global engine plugin entries not loaded — an allow can only name a plain absolute path (package entries are checked by their bare name, which a project can reuse; * and ? are wildcards; {env:} / {file:} and ~/ are not resolved here): ${JSON.stringify(plugins.refused)}`,
       )
     const written = writeExplicitConfig(explicitFile, file, layer)
     if (written.userError) console.warn(`[alpha-code#1667] ${file} is not valid (${written.userError}); the engine sees only Code Puppy's explicit layer`)

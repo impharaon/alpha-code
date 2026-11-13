@@ -7,8 +7,10 @@ import * as os from "node:os"
 import * as path from "node:path"
 import { pathToFileURL } from "node:url"
 import { ManagedPolicy } from "@opencode/core/managed-policy"
+import { ConfigDiscovery } from "@opencode/core/config/discovery"
+import { PluginSourceDirectory } from "@opencode/core/plugin/source-directory"
 import type { ConfigPolicy } from "@opencode/schema/config/policy"
-import { enginePluginPolicies } from "./engine-plugin-policy"
+import { CONFIG_FILES, PLUGIN_DIRECTORIES, enginePluginPolicies } from "./engine-plugin-policy"
 
 const dirs: string[] = []
 afterEach(() => {
@@ -128,6 +130,27 @@ describe("plugin.use 放行名单", () => {
       expect([target, decide(policies, target)]).toEqual([target, "deny"])
   })
 
+  test("用户自己的 plugin.use 拒绝照旧说了算:codepuppy.jsonc 与 HOME 一级文档(含通配与旧写法 integration.use plugin:)里 deny 的来源不写 allow", () => {
+    const { home, global, ext, write } = fixture()
+    for (const name of ["g.js", "g2.ts", "keep.js"]) write(path.join(global, "plugins", name))
+    write(path.join(home, ".opencode", "plugins", "h.js"))
+    write(path.join(home, "opencode.json"), JSON.stringify({ policies: [{ action: "plugin.use", resource: "*/h.js", effect: "deny" }] }))
+    write(
+      path.join(home, ".opencode", "opencode.json"),
+      JSON.stringify({ policies: [{ action: "integration.use", resource: `plugin:${path.join(global, "plugins", "g2.ts")}`, effect: "deny" }] }),
+    )
+    const userConfig = { text: JSON.stringify({ policies: [{ action: "plugin.use", resource: path.join(global, "plugins", "g.js"), effect: "deny" }] }), directory: global }
+    const { policies } = enginePluginPolicies({ extPluginPath: ext, globalDirectory: global, home, userConfig })
+    expect(policies.slice(1).map((policy) => policy.resource)).toEqual([ext, path.join(global, "plugins", "keep.js")].sort())
+    for (const target of [path.join(global, "plugins", "g.js"), path.join(global, "plugins", "g2.ts"), path.join(home, ".opencode", "plugins", "h.js")])
+      expect([target, decide(policies, target)]).toEqual([target, "deny"])
+    // 先加载的那份说了算:codepuppy.jsonc(显式文件)里的 allow 胜过 HOME 一级文档里的 deny
+    const allowFirst = { text: JSON.stringify({ policies: [{ action: "plugin.use", resource: path.join(home, ".opencode", "plugins", "h.js"), effect: "allow" }] }), directory: global }
+    expect(enginePluginPolicies({ extPluginPath: ext, globalDirectory: global, home, userConfig: allowFirst }).policies.map((policy) => policy.resource)).toContain(
+      path.join(home, ".opencode", "plugins", "h.js"),
+    )
+  })
+
   test("什么都没有 ⇒ 只剩拒绝全部 + ext;没有 ext ⇒ 只剩拒绝全部;用户文件坏了 ⇒ 它的条目一条不放", () => {
     const { home, global, ext, root } = fixture()
     expect(enginePluginPolicies({ extPluginPath: ext, globalDirectory: global, home }).policies).toEqual([
@@ -138,5 +161,10 @@ describe("plugin.use 放行名单", () => {
     expect(
       enginePluginPolicies({ globalDirectory: global, home, userConfig: { text: `{ "plugins": ["./user-rel"]`, directory: root } }).policies,
     ).toEqual([{ action: "plugin.use", resource: "*", effect: "deny" }])
+  })
+
+  test("我们抄的发现规则与上游同值(配置文件名、插件目录名)", () => {
+    expect(CONFIG_FILES).toEqual([...ConfigDiscovery.names])
+    expect(PLUGIN_DIRECTORIES).toEqual([...PluginSourceDirectory.names])
   })
 })

@@ -2,7 +2,7 @@
 // engine-plugin-policy.engine.cases.ts(沙箱里的真 OpenCode 2 + 生产注入,探针插件求值即写标记文件):
 //   · 生产注入:项目 `.opencode/plugins/*.js`、`.opencode/plugin/*.ts`、`opencode.json` 的相对 / 绝对 / 包名条目、自带「已同意」
 //     信任记录的项目、项目配置里 allow `plugin.use *`、项目与 HOME 之间上级目录的 `.opencode`、与 ext / 全局插件 / 全局包同名的
-//     仿冒,一个都不执行;ext 在两个项目里 active,全局配置目录与 HOME 一级 `~/.opencode` 的插件照常执行,出厂 /init、/review、
+//     仿冒、落进用户全局条目 `<root>/glob-*` 的项目路径,一个都不执行;用户在 codepuppy.jsonc 里 deny 的全局插件仍不执行;ext 在两个项目里 active,全局配置目录与 HOME 一级 `~/.opencode` 的插件照常执行,出厂 /init、/review、
 //     出厂技能在,发一轮对话拿到回复;用户全局的包名条目不再执行(只有精确路径能写成放行语句);
 //   · 已知的坏(= 改动前):显式文件里去掉 plugin.use ⇒ 每个项目标记都出现;
 //   · 层序的已知的坏:同一组语句只放进内联文档 ⇒ 项目自写的 allow 胜出。

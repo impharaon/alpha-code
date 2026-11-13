@@ -239,9 +239,10 @@ provider 的目录约定由 provider 定义、随时会变；正确做法是在�
    项目目录及其每一级上级目录的 `.opencode/{plugin,plugins}/*.{ts,js}`、项目 `opencode.json(c)` / `.opencode/opencode.json(c)`
    的 `plugins`（相对路径、绝对路径、`file://`、包名，任何写法）。项目要带插件，走 Code Puppy 自己的项目插件目录与它的信任确认（后果 5）。
    机制是引擎已有的 `plugin.use` 策略，不改上游文件：显式文件层先写「拒绝全部」，再按**精确路径**放行 Code Puppy 的扩展与用户全局范围里
-   实际存在的来源（引擎全局配置目录、HOME 一级的 `~/.opencode/` 与 `~/opencode.json(c)`、用户的 `codepuppy.jsonc`）。
+   实际存在的来源（引擎全局配置目录、HOME 一级的 `~/.opencode/` 与 `~/opencode.json(c)`、用户的 `codepuppy.jsonc`）；
+   用户自己在 `codepuppy.jsonc` 或 HOME 一级文档里 deny 的来源不写 allow，用户的拒绝照旧生效。
    显式文件比项目配置先加载，项目里写的 allow 盖不过它（`packages/ui-mac/src/main/engine-plugin-policy.ts`；
-   真引擎判据 `engine-plugin-policy.engine.cases.ts`）。
+   真引擎判据 `engine-plugin-policy.engine.cases.ts`）。同一组语句也写进内联文档作第二层（与 provider 白名单同法）。
 
    **还剩什么**（如实登记）：
    - **放行的来源照旧以引擎同等权限执行**：Code Puppy 的扩展与用户全局范围里的插件不受本条影响。`codepuppy.jsonc` 在进程围栏的可写集里，
@@ -252,7 +253,8 @@ provider 的目录约定由 provider 定义、随时会变；正确做法是在�
    - **列不出或写不成精确语句的来源改为不加载**（无已知用户；owner 本机全局与 `codepuppy.jsonc` 都没有插件条目）：
      用户全局的**包名**条目（引擎比较包时去掉 `@` 之后的部分，放行一个包名，项目就能用 `<名字>@file:<项目目录>` 借道，真引擎实测）、
      含 `*` / `?` 的路径（引擎通配没有转义）、带 `{env:}` / `{file:}` 的条目、系统配置目录与 MDM 描述文件、wellknown / 集成文档带来的插件。
-   - **注入失败时**没有显式文件，同一组语句只能写进内联文档，它排在项目配置之后 —— 这时项目自写的 allow 能盖过它。
+   - **显式文件缺席时**（注入失败、读不到或被引擎整份拒掉）只剩内联那一层，它排在项目配置之后：没自写 allow 的项目插件仍被拒，
+     项目自写的 allow 能盖过它。
    - **重算时机**：sidecar 启动注入时一次，之后每次显式文件被重写时再算；运行中新加的用户全局插件在下一次重算（最迟下次启动）后加载。
 
 5. **`.alpha/plugins/*.js` 项目级扇出是我们自己的第二注入点，处置另议。**

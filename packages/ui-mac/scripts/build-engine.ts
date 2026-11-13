@@ -5,7 +5,8 @@
 // node 前导代码与原生资源清单),只改 L1a 实测过的那几处(`docs/verification/2026-11-09-1662-l1/build-embed.ts`):
 //   · 入口换成 Code Puppy 的 `engine/engine-embed.ts`(`start()` + `Transform`,不传 lifecycle);
 //   · `target: node24`(Electron 42.3.3 自带 Node 24.15;L1a 实测不带 `--experimental-ffi` 也能跑);
-//   · 不压缩;去掉只对 CLI 成立的 simulation 图检查;前导代码去掉 shebang(这份包被 electron-vite 再打进 out/main 的 chunk);
+//   · 不压缩;去掉只对 CLI 成立的 simulation 图检查;前导代码去掉 shebang 与 CommonJS 四句(这份包被 electron-vite 再打进 out/main 的 chunk,
+//     那四个名字由 main 的 banner 提供,见下方 CJS_SHIM);
 //   · `#v1-migration` 指到上游的 bun 实现,外加两处 Node 薄适配(裁决书 R14):`bun:sqlite` → 基于 `node:sqlite` 的 shim,
 //     `new Bun.CryptoHasher("sha256")` → `node:crypto` 的 `createHash`。上游原版 Node 构建这里是空实现,旧对话**一条都看不到**
 //     而状态接口照样报 `completed`(L1a e3noop);找不到原调用或又出现别的 `Bun.` 调用时构建直接失败,不静默产出空实现。
@@ -64,6 +65,24 @@ config.plugins = [
   },
   ...(config.plugins ?? []).filter((plugin) => !(plugin && "name" in plugin && plugin.name === "opencode:simulation-graph")),
 ]
+// `#1662`:上游 banner 里的 CommonJS 前导代码(下面四句)不留在引擎包里。这份包被 electron-vite 再打成 out/main 的一个 chunk,
+// electron.vite.config.ts 的 main banner 给每个 chunk 声明同样四个名字,两份并存 ⇒ main 构建报 `"__cjs_mod__" has already been
+// declared`。引擎包里对这四个名字的引用(上游 banner 的 `__cjs_mod__.registerHooks`、打包进来的 CommonJS 依赖)由那份 banner 绑定,
+// 所以 dist-engine/engine.mjs 不单独装载(net-failure-real-stack.test.ts 装的是 main 构建出的 chunk)。缺一句或多一句即构建失败。
+const CJS_SHIM = [
+  `import __cjs_mod__ from "node:module"`,
+  `const __filename = import.meta.filename`,
+  `const __dirname = import.meta.dirname`,
+  `const require = __cjs_mod__.createRequire(import.meta.url)`,
+]
+function engineBanner(banner: string) {
+  const lines = banner.replace(/^#!.*\n/, "").split("\n")
+  for (const statement of CJS_SHIM) {
+    const count = lines.filter((line) => line === statement).length
+    if (count !== 1) throw new Error(`upstream node banner: expected exactly one line \`${statement}\`, found ${count}`)
+  }
+  return lines.filter((line) => !CJS_SHIM.includes(line)).join("\n")
+}
 const output = config.build?.rollupOptions?.output as { banner?: string } & Record<string, unknown>
 config.build = {
   ...config.build,
@@ -77,7 +96,7 @@ config.build = {
     output: {
       ...output,
       entryFileNames: ENGINE_BUNDLE,
-      banner: typeof output.banner === "string" ? output.banner.replace(/^#!.*\n/, "") : output.banner,
+      banner: typeof output.banner === "string" ? engineBanner(output.banner) : output.banner,
     },
   },
 }

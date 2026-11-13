@@ -14,6 +14,8 @@ export type ModelFacts = {
   readonly baseURL?: string
   /** `capabilities.input` 里有没有 image;查不到 = undefined(「不知道」≠「不能」)。 */
   readonly image?: boolean
+  /** `capabilities.temperature`(模型收不收采样温度);目录里没写或查不到 = undefined(#1700:只有 true 才发助手的温度)。 */
+  readonly temperature?: boolean
 }
 
 const baseURLOf = (settings: unknown) => {
@@ -33,9 +35,11 @@ export async function modelFacts(
     .catch(() => undefined)
   const baseURL = baseURLOf(model?.settings) ?? baseURLOf(provider?.settings)
   const image = model?.capabilities.input.includes("image")
+  const temperature = model?.capabilities.temperature
   return {
     ...(model ? { modelID: model.modelID } : {}),
     ...(baseURL !== undefined ? { baseURL } : {}),
     ...(image !== undefined ? { image } : {}),
+    ...(temperature !== undefined ? { temperature } : {}),
   }
 }

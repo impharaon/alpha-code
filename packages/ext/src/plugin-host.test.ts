@@ -946,3 +946,139 @@ itWithPermission.live("权威 · 待批请求的回复(#1666 第 3 条):经 ext 
     expect(yield* permission.forSession(session.id)).toEqual([])
   }),
 )
+
+// ── #1700 项目 agent 的其余字段 ─────────────────────────────────────────────────────────────────────────────────────
+
+/** 项目文档写下 `agents`(可选同意),装上 ext,回引擎 agent 表里的这些 agent(真 Agent 服务)。 */
+const projectAgents = (agents: Record<string, unknown>, consent: boolean, ...ids: string[]) =>
+  Effect.gen(function* () {
+    env({})
+    const directory = realpathSync((yield* Location.Service).directory)
+    const root = join(directory, ".codepuppy")
+    mkdirSync(root, { recursive: true })
+    writeFileSync(join(root, "codepuppy.jsonc"), JSON.stringify({ agent: agents }))
+    if (consent) writeFileSync(join(root, "prefs.json"), JSON.stringify({ extensionsConsent: { version: 1, granted: true } }))
+    yield* activate(CodePuppyExt)
+    const service = yield* Agent.Service
+    const out: Record<string, Agent.Info | undefined> = {}
+    for (const id of ids) out[id] = yield* service.get(Agent.ID.make(id))
+    return out
+  })
+
+it.live("权威 · 项目 agent 的 disable(#1700 AC-04):已同意的项目里 explore 写了 disable: true ⇒ 引擎 agent 表里没有它,派发它被拒且说明已停用;别的助手照常", () =>
+  Effect.gen(function* () {
+    yield* registered("subagent")
+    const agents = yield* projectAgents({ explore: { disable: true } }, true, "explore", "general")
+    expect(agents.explore).toBeUndefined()
+    expect(agents.general).toBeDefined()
+    const dispatched = yield* before("subagent", { agent: "explore", prompt: "look around" })
+    expect(Exit.isFailure(dispatched)).toBe(true)
+    expect(JSON.stringify(dispatched)).toContain('Agent \\"explore\\" is disabled in this project')
+    expect(Exit.isSuccess(yield* before("subagent", { agent: "general", prompt: "look around" }))).toBe(true)
+  }),
+)
+
+it.live("项目 agent 的 disable · 反向臂(#1700 BR-03 / BR-02):同一份文档、项目未同意 ⇒ explore 仍在,派发照常", () =>
+  Effect.gen(function* () {
+    yield* registered("subagent")
+    const agents = yield* projectAgents({ explore: { disable: true } }, false, "explore")
+    expect(agents.explore).toBeDefined()
+    expect(Exit.isSuccess(yield* before("subagent", { agent: "explore", prompt: "look around" }))).toBe(true)
+  }),
+)
+
+it.live("项目 agent 的 steps / hidden / color / variant(#1700 AC-07 / AC-08):已同意的项目里写了的值进了引擎的 agent 表(按 steps 收尾、hidden 不进选择器是引擎读这张表的既有行为)", () =>
+  Effect.gen(function* () {
+    const agents = yield* projectAgents(
+      {
+        stepper: { prompt: "s", steps: 3 },
+        quiet: { prompt: "q", mode: "subagent", hidden: true, color: "#FF5733", model: "openai/gpt-5", variant: "high" },
+        themed: { prompt: "t", color: "accent", maxSteps: 4 },
+      },
+      true,
+      "stepper",
+      "quiet",
+      "themed",
+    )
+    expect(agents.stepper?.steps).toBe(3)
+    expect(agents.quiet).toMatchObject({ hidden: true, color: "#FF5733", model: { providerID: "openai", id: "gpt-5", variant: "high" } })
+    expect(agents.themed).toMatchObject({ color: "#aaaaaa", steps: 4 })
+  }),
+)
+
+it.live("项目 agent 写坏的 mode / model(#1700 AC-10):已同意的项目里 explore 写了不合法的 mode 加放宽的 permission、另一个写了非字符串 model ⇒ 两条整条不装(explore 内置的规则对 edit 仍是 deny),同一文档里别的助手照常", () =>
+  Effect.gen(function* () {
+    const document = JSON.stringify({
+      agent: { explore: { mode: "sidekick", permission: { edit: "allow" } }, broken: { model: 42, prompt: "b" }, fine: { prompt: "f", steps: 2 } },
+    })
+    expect(yield* exploreEditEffect(document)).toBe("deny")
+    const service = yield* Agent.Service
+    expect(yield* service.get(Agent.ID.make("broken"))).toBeUndefined()
+    expect((yield* service.get(Agent.ID.make("fine")))?.steps).toBe(2)
+  }),
+)
+
+/** 测试用旁路插件:一个 provider、一个模型,模型收不收温度由 `temperature` 定(引擎目录的 `capabilities.temperature`)。 */
+const samplingProvider = (providerID: string, temperature: boolean): Plugin.Plugin => ({
+  id: `test.sampling-provider.${providerID}`,
+  async setup(context) {
+    await context.provider.transform((editor) =>
+      editor.add({
+        info: { id: providerID, name: providerID, activation: "auto", package: "@opencode/ai/providers/openai-compatible", settings: { baseURL: `https://${providerID}.test/v1` } } as never,
+        models: [
+          {
+            id: "m",
+            modelID: "m",
+            providerID,
+            name: "m",
+            capabilities: { tools: true, input: ["text"], output: ["text"], temperature },
+            variants: [],
+            time: { released: 0 },
+            cost: [],
+            status: "active",
+            enabled: true,
+            limit: { context: 128000, output: 32000 },
+          } as never,
+        ],
+      }),
+    )
+  },
+})
+
+/**
+ * 用户全局配置里的 v1 助手:引擎自己的迁移把 temperature / top_p 放进 agent 的 `request.body`(真引擎上由 upstream-probes/agent-request.test.ts
+ * 判,那里读回的 `request.body` 就是这一份);这里的旁路插件按引擎 agent 配置插件的同一写法(`Object.assign(agent.request.body, …)`)把它放进真 Agent 服务。
+ */
+const globalSampler: Plugin.Plugin = {
+  id: "test.global-agent-sampler",
+  async setup(context) {
+    await context.agent.transform((editor) => editor.update("globalSampler", (agent) => void Object.assign(agent.request.body, { temperature: 0.4, top_p: 0.7 })))
+  },
+}
+
+it.live("权威 · 助手的 temperature / top_p(#1700 AC-05 / AC-06):项目助手与全局助手的值都进了本轮请求;模型不支持温度 ⇒ 不带温度、top_p 照带;反向臂:不装 ext ⇒ 都不带", () =>
+  Effect.gen(function* () {
+    env({})
+    const directory = realpathSync((yield* Location.Service).directory)
+    mkdirSync(join(directory, ".codepuppy"), { recursive: true })
+    // temperature / top_p 不改权限与模型,项目未同意也生效(project-config.ts 的同意门只剥权限与模型类字段)
+    writeFileSync(join(directory, ".codepuppy", "codepuppy.jsonc"), JSON.stringify({ agent: { sampler: { prompt: "s", temperature: 0.2, top_p: 0.9 } } }))
+    yield* activate(samplingProvider("warm", true))
+    yield* activate(samplingProvider("cold", false))
+    yield* activate(globalSampler)
+    const hooks = yield* PluginHooks.Service
+    const sampled = (agent: string, providerID: string) =>
+      hooks
+        .trigger("session", "context", { ...contextEvent([], { providerID, id: "m" }), agent: agent as never })
+        .pipe(Effect.map((event) => ({ temperature: event.options.temperature, topP: event.options.topP })))
+
+    // 反向臂:不装 ext,同一个全局助手在支持温度的模型上 —— 引擎自己什么都不带
+    expect(yield* sampled("globalSampler", "warm")).toEqual({ temperature: undefined, topP: undefined })
+
+    yield* activate(CodePuppyExt)
+    expect(yield* sampled("sampler", "warm")).toEqual({ temperature: 0.2, topP: 0.9 })
+    expect(yield* sampled("globalSampler", "warm")).toEqual({ temperature: 0.4, topP: 0.7 })
+    expect(yield* sampled("sampler", "cold")).toEqual({ temperature: undefined, topP: 0.9 })
+    expect(yield* sampled("build", "warm")).toEqual({ temperature: undefined, topP: undefined })
+  }),
+)

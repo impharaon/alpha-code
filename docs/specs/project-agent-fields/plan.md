@@ -15,14 +15,14 @@ last_reviewed: 2026-11-12
 ## 其余字段与温度(alpha-code#1700)
 
 - 依据:[SPEC-project-agent-fields](spec.md) v1(owner 2026-11-12 批准),AC-04 至 AC-10、BR-02 至 BR-06;AC-01 至 AC-03(`tools`)已由 alpha-code#1693 交付,本段不动。无 design;上游对照:`packages/core/src/v1/config/agent.ts`(v1 agent schema 与 `normalize`)、`packages/core/src/v1/config/migrate.ts` `migrateAgent` / `modelSelection`、`packages/core/src/config/plugin/agent.ts`(引擎把配置 agent 写进编辑器的做法)@ c01ea14919。Issue alpha-code#1700。
-- 核对:待编排器核对(实施提交时回填)。
+- 核对:0d215b6b7d · 编排器按派发书与实施结果一并核对(派发书:计划无待决则同一次运行直接实施)· 待核。
 
 ### 改动
 | 文件 | 改什么 |
 | --- | --- |
 | `packages/ext/src/engine-transforms.ts` | `applyAgents` 照 `migrateAgent` + 引擎 agent 插件补齐字段:`disable: true` ⇒ `editor.remove`(其余字段不写);`steps ?? maxSteps` ⇒ `steps`;`hidden`;`color`(`#` 开头原样,主题名 ⇒ `#aaaaaa`);`variant` 只随合法 `model` 进 `model.variant`;`temperature` / `top_p` 写进 `agent.request.body`(引擎自己读 v1 agent 时放的同一位置)。`modelRef` 改用上游 `modelSelection` 的同一判据(含 `#` 的不收)。`malformedRules` 扩到上游 v1 agent schema 的全部字段(类型、`mode` 枚举、`color` 形状、正整数 `steps` / `maxSteps`、`options` 为对象……)。新增参数 `log`:每个未应用的字段(规格之外、上游也不认识的键,及 `options` / `name`)一行;写坏的条目一行。返回值加上被停用的 id。新增导出的纯函数:由 agent 的 `request.body` 与模型是否支持温度算出这一轮的 `temperature` / `topP`(不支持温度 ⇒ 不带温度,`topP` 照带,同 1.x `session/llm/request.ts`)。 |
 | `packages/ext/src/model-facts.ts` | `ModelFacts` 加 `temperature`(引擎目录里的 `capabilities.temperature`;查不到 = 缺席)。同一调用链,`context` 钩子据此判模型是否支持温度。 |
-| `packages/ext/src/plugin.ts` | ①agent transform 调用处传 `log`、记下被停用的 id;②`context` 钩子(只这一条,不动 compaction / generate / title)按本轮 agent(`context.agent.get`)的 `request.body` 设 `options.temperature` / `options.topP` —— 项目与全局来源都走这一处,因为引擎读全局 v1 agent 时也写在 `request.body`;③既有 `tool execute.before`:`subagent` 指向本项目停用的助手 ⇒ 抛一句「该助手在本项目已停用」(否则引擎只说 `Unknown agent`,AC-04 要求说明已停用)。不改其余结构。 |
+| `packages/ext/src/plugin.ts` | ①agent transform 调用处传 `log`、记下被停用的 id;②既有的请求组装回调(`assembleRequest`)在带 agent 的请求上(context / compaction / generate;起标题的没有 agent)按该 agent(`context.agent.get`)的 `request.body` 设 `options.temperature` / `options.topP` —— 项目与全局来源都走这一处,因为引擎读全局 v1 agent 时也写在 `request.body`;③既有 `tool execute.before`:`subagent` 指向本项目停用的助手 ⇒ 抛一句「该助手在本项目已停用」(否则引擎只说 `Unknown agent`,AC-04 要求说明已停用)。不改其余结构。 |
 | `packages/ext/src/project-config.ts` | 不改。新字段都不改权限或模型:`variant` 只随 `model` 生效(`model` 已在同意门内),`steps` / `hidden` / `color` / `temperature` / `top_p` 与恒加载的 `prompt` 同类。 |
 | `packages/ext/src/engine-transforms.test.ts` | 与上游 `ConfigNormalize.normalize` 逐字段对比:disable、steps / maxSteps、hidden、color(hex 与主题名)、variant(有 / 无 model、含 `#`)、temperature / top_p 的 `request.body`;写坏样本(每个字段)上游给 invalid 诊断、ext 整条不装、其余照常;未知字段一行日志;温度纯函数两臂。 |
 | `packages/ext/src/plugin-host.test.ts` | 真宿主:AC-04(已同意项目 `disable: true` ⇒ 引擎 agent 表里没有它、真 subagent 派发被拒且说明已停用;反向臂未同意 ⇒ 仍在);AC-05 / AC-06(真 `context` 钩子:项目 agent 与经引擎自己的 v1 迁移注册的全局 agent 都带上 0.2 / 0.9;不支持温度的模型不带温度;反向臂不装 ext ⇒ 都不带);AC-07 / AC-08(引擎 agent 表里 `steps: 3`、`hidden`、`color`、`model.variant`);AC-10(`mode` / `model` 写坏 + 放宽的 `permission` ⇒ 整条不装,内置规则不变,另一个助手照常)。 |
@@ -55,4 +55,4 @@ last_reviewed: 2026-11-12
 | BR-04 前提 | 探针 `agent-request.test.ts` | 引擎若开始发助手温度 ⇒ 前提臂红,提醒删掉 ext 这一路 |
 
 ### 偏离记录
-暂无
+- 2026-11-12 · 助手采样参数原计划另挂一个只在 `context` 上的钩子,改为写进四条请求钩子共用的 `assembleRequest`,在带 agent 的 context / compaction / generate 上都补 · `context-injection.test.ts` 钉住「`session.context` 上只有策略闸与 ext 的组装回调两个、组装回调四条共用」,另挂一个会破这条登记;1.x 的 `chat.params` 本来也在每次模型调用上带本次 agent 的温度 · 本提交。

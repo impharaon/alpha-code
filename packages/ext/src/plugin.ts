@@ -36,7 +36,7 @@ import { createHubBridge, processParentPort, type HubBridge } from "./hub-bridge
 import { createHubTools, hubInstallEvaluate } from "./hub-tools"
 import { createReloadScheduler, type ReloadScheduler } from "./reload-scheduler"
 import { createCodePuppyTools } from "./codepuppy-tools"
-import { applyAgents, applyProjectMcp, commandDefinitions } from "./engine-transforms"
+import { agentSampling, applyAgents, applyProjectMcp, commandDefinitions } from "./engine-transforms"
 import { modelFacts } from "./model-facts"
 import { createCloudVisionHooks } from "./cloud-vision-hooks"
 import { createAttachmentReaderHooks } from "./attachment-reader-hooks"
@@ -127,6 +127,8 @@ export const CodePuppyExt: Plugin.Plugin = {
       // #223 R7:MCP 治理归属是**本 Location** 的状态 —— 由本 Location 的 mcp.transform 写、显式传给本 Location 的执行钩子;
       // 模块侧不留可变状态(I2 的进程级对象里只有桥与调度器)。没算出来 = 没有治理 server = 豁免不给(fail-closed)。
       let mcpOwnership: McpOwnership = UNVERIFIED_MCP_OWNERSHIP
+      // #1700:本 Location 的项目文档里停用(`disable: true`)、已从引擎移除的助手;由下面的 agent.transform 写。
+      let disabledAgents = new Set<string>()
 
       // ── 工具表(P8)──────────────────────────────────────────────────────────────────────────
       await context.tool.transform((editor) => {
@@ -166,6 +168,10 @@ export const CodePuppyExt: Plugin.Plugin = {
         validateCloudToolInput(event.tool, event.input, process.env, mcpOwnership)
         // `#1419`:模型追问 —— `codepuppy_vision` 的 image 由引用换成压缩后的 base64。
         await vision.toolBefore(event)
+        // #1700 AC-04:派发项目里停用的助手 —— 引擎只会说 `Unknown agent`,这里说明它是被停用的。
+        const agent = (event.input as { agent?: unknown } | undefined)?.agent
+        if (event.tool === "subagent" && typeof agent === "string" && disabledAgents.has(agent))
+          throw new Error(`Agent "${agent}" is disabled in this project (.codepuppy/codepuppy.jsonc sets "disable": true)`)
       })
       await context.tool.hook("execute.after", (event) => {
         if (event.status === "error") {
@@ -191,7 +197,8 @@ export const CodePuppyExt: Plugin.Plugin = {
       // 同一个回调挂在四条组装模型请求的钩子上:主循环(context)、压缩(compaction)、无工具生成(generate)、起标题(title)。
       // 2.x 这四种请求各走自己的钩子、互不经过(`session/model-request.ts`)—— v1 里 ext 的钩子每次 LLM 调用都跑,少挂一条
       // = 那种请求带着原样的图 / 暂存附件 JSON / 未转写的系统提示词、在平台节点上照发 max tokens(审计 R1 Major;title 编排器裁决)。
-      // 入参取四者的公共部分(`SessionRequest`:sessionID / model / system / messages / options);回调不读 agent / tools / result。
+      // 入参取四者的公共部分(`SessionRequest`:sessionID / model / system / messages / options);回调不读 tools / result,
+      // agent 只在带它的三条(context / compaction / generate)上读,给助手的采样参数用(#1700)。
       const rebrandWarned = new Set<string>()
       const assembleRequest = async (event: Omit<Parameters<Parameters<typeof context.session.hook<"title">>[1]>[0], "result">) => {
         // REQ-062 T1(路线A,ADR-015):系统提示词品牌转写 —— 精选子串对;失败 = 上游原样(外观级退化),绝不伤及请求。
@@ -212,6 +219,17 @@ export const CodePuppyExt: Plugin.Plugin = {
         await vision.context(event)
         // I11':暂存附件部件换成登记过的读取指令(绝不抛)。
         await attachments.context(event)
+        // #1700 BR-04:助手自己的 temperature / top_p —— 引擎把它们存在 agent 的 `request.body`(项目助手由 applyAgents 写,用户全局配置里的
+        // v1 助手由引擎自己的迁移写),发请求时不读(upstream-probes/agent-request.test.ts)。模型不支持温度就不带温度;起标题的请求没有 agent,不补。
+        const agentID = (event as { agent?: string }).agent
+        if (agentID !== undefined) {
+          try {
+            const [agent, facts] = await Promise.all([context.agent.get({ agentID }), modelFacts(context, event.model)])
+            Object.assign(event.options, agentSampling(agent.data?.request.body, facts.temperature))
+          } catch (cause) {
+            error(`[@codepuppy/ext] agent sampling skipped: ${describe(cause)}`)
+          }
+        }
         // 输出上限两条腿,都只改这一次请求:平台代理节点**不发** max tokens(网关按 route 上限填,REQ-153);
         // 直连 BYOK 节点按逐模型实读上限抬(REQ-156);其余原样(上游算的那个数)。
         try {
@@ -301,7 +319,7 @@ export const CodePuppyExt: Plugin.Plugin = {
       })
       await context.agent.transform((editor) => {
         try {
-          applyAgents(editor, extConfig().agent, log)
+          disabledAgents = new Set(applyAgents(editor, extConfig().agent, log).disabled)
         } catch (cause) {
           error(`[@codepuppy/ext] agent transform failed: ${describe(cause)}`)
         }

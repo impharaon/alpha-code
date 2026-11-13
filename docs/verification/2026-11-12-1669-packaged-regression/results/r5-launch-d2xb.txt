@@ -1,0 +1,4 @@
+single-instance lock: <root>/home/Library/Application Support/ai.opencode.desktop/SingletonLock -> tidedeMac-mini.local-19037
+prefs compare: size 250->250; changed=['SKPurchaseIntentUpdatesLastChecked']; unchanged=['AppleTextDirection', 'NSForceRightToLeftWritingDirection', 'NSNavPanelExpandedSizeForOpenMode', 'NSTreatUnknownArgumentsAsOpen']; other-than-known-timestamp-changed=[]
+hidden check: pid 19037 bundle=com.tide.codepuppy hidden=yes active=no hide-calls=0
+LAUNCH GATE: OK — owner app pids unchanged, owner-side paths unchanged, mock keychain on the running process

@@ -40,7 +40,54 @@ last_reviewed: 2026-11-12
    第四轮 B 根的 0.1.26 在 21:57:04 也走过同一流程并 `login complete`(第四轮 README 没记)。owner 22:3x 原话(经编排器转述):「你为什么一直让我登录啊…每次重启都停在那里,没有登录状态。」
    处置:窗口一律隐藏 —— Electron 的调试口没有 `Browser.setWindowBounds`,改用 [tools/hide-app.m](tools/hide-app.m)(`NSRunningApplication.hide()`,不需要辅助功能 / Apple 事件授权,不会弹框),
    `launch-a.sh` 在拿到进程号后立即隐藏并持续 90 秒,启动闸输出隐藏状态;A 已隐藏,`document.visibilityState: hidden`,仍是登录态。
-6. 付费调用本轮 0 次(播种用本机桩,失败回合用假 key);没有出现系统框;owner 应用始终没有运行。
+6. 付费:演练与 G10 0 次(播种用本机桩,失败回合用假 key);A 上 6 次,累计 18 / 30。没有出现系统框;看门狗没有触发;owner 应用始终没有运行。
+
+计数(90 格):PASS 20 / FAIL 3 / NOT-RUN 67。新增 PASS:G7、G8、G10、演练 0 / 1 / 2 / 4、R16、W06、W21、W27、N00、N14;新增 FAIL:演练第 3 步。另有一条矩阵外的 FAIL(结论 4,失败回合不显示原因)。
+
+### 第五轮:实例 A 上的格子(已登录,窗口隐藏,`codepuppy/deepseek-v4-flash`,本轮付费 6 次,累计 18 / 30)
+
+| 格 | 结果 | 证据 |
+| --- | --- | --- |
+| G4 云 MCP 一半 | PASS(客户端侧) | 会话 `ses_e2cfee8c…`:`codepuppy_access` → Code Mode `execute` 运行 `tools.codepuppy.web_search({query:"OpenCode GitHub"})`,返回 `provider: tavily` 的结果;回复「OpenCode \| The open source AI coding agent」。出网代理记 `alpha-cloud.tidelabs.click:443 allow`。服务端计数没读(没有平台账本权限) |
+| G4 第一方 MCP 一半 | 被 G2 同类缺陷挡住 | 全新数据里 Word 连接器未装;助手调 `codepuppy_hub_install`,对话内弹「安装「Word 文档读写」?」→ 我点「确认安装」→「允许此扩展执行哪些操作 … 授权并安装」→ 点了。主进程 22:47:22 `installed mcp codepuppy-word`,引擎 generation 1 等这个忙会话 157 秒后重载;**但工具一直「等待你的决定」,300 秒后报「审批请求等待 300 秒无人应答 … 本次操作没有被放行 … permission=codepuppy_hub_install」**—— 界面说没放行,连接器却已装上。与 G2 同一形态(回答送不到引擎),入口不同。截图 [安装框](screens/r5-g4-install-word-dialog.png)、[卡住](screens/r5-g4-office-after-install.png)。按规矩在第一个失败步停下,没有再试 |
+| G8 围栏 | PASS(正向) | 「全部批准」下让 `shell` 执行 `echo l7 > /private/var/tmp/l7-g8-outside.txt; … echo l7 > l7-g8-inside.txt`:输出 `zsh:1: operation not permitted: /private/var/tmp/l7-g8-outside.txt`、`outside_rc=1`、`inside_rc=0`;外面没有文件,工作区里有。选 `/private/var/tmp` 是因为围栏的可写集合含 `/private/tmp`(`process-fence-profile.ts:166`,W11),而测试 HOME 本身在 `/private/tmp` 下。出网:G4 那一轮期间每 0.5 秒采样引擎进程的 TCP,162 个样本全部是到 `127.0.0.1:60925`(主进程里的出网策略代理,启动日志 `network egress policy proxy listening on 127.0.0.1:60925`),非回环 0 个。反向一臂要改代码,没做 |
+| R16 只读档写文件 | PASS | 切「只读」后发「@general 在当前文件夹新建文件 rc-test.txt,内容写 hello」:回复「做不到：当前会话处于只读模式，我不能写文件,也不能执行 shell 命令」;A 下任何位置都没有 `rc-test.txt`。[截图](screens/r5-r16-readonly-refusal.png) |
+| R18 只读档用云工具 | NOT-RUN(部分) | 云工具一半 PASS:只读档发「用云端 web_search 搜 opencode」,执行前出卡「允许这次操作吗? 使用工具 codepuppy_access · Code Puppy 内置 · 这个工具每次都要确认 · 拒绝 / 允许一次」,工具停在 running 未执行。[截图](screens/r5-r18-readonly-cloud-card.png)。外部连接器一半没做:A 没有已启用的第三方连接器,装一个要经对话框(被 G2 挡住)。另:第一次发送前新对话把权限档重置回「全部批准」,那一轮(回合 17)作废,记在这里 |
+| N14 续期不重启引擎 | PASS | `tokens refreshed … apply: 'applied'` 22:04、22:14、22:24、22:34 四次;引擎 utility 进程 44282 自 a4 启动以来没变;没有 `recovering`。续期时恰有流式回答这一半没采到 |
+| N12 会话搜索 | NOT-RUN(部分) | (a) 的一部分:侧栏「搜索」→「按标题搜索…」,输入「好」得两条(`好`、`单字回复“好”`),乱码得「没有匹配的对话」。(b)–(d) 没做 |
+| W06 各页无旧名(冒烟) | PASS(范围见右) | 新对话页、定制中心连接器 / 技能 / 助手 / 技能·系统、自动化,页面文字里 `alpha` 0 处。设置各页签、关于窗口、菜单栏没扫 |
+| W21 旧取值(冒烟,静态) | PASS | 2.x 包 `app.asar:/out` 与资源目录里 AC6 旧值只有 `alpha-connection` 1 处,是改名迁移表里的旧名(`connections: "alpha-connections"`),0.1.26 同一 chunk 逐字相同;新值都在 |
+| W27 产物命名(静态) | PASS | 资源目录 `codepuppy-ext`、`codepuppy-fence`,无 `alpha-*`;出厂技能含 `customize-codepuppy` |
+| N00 被测构建 | PASS | 0.1.26 / `com.tide.codepuppy` / `app.asar` sha256 `8719eb3b…`(同第二轮) |
+| G7 生态隔离(根 D,未登录) | PASS(正向) | 临时 HOME 放了 `~/.claude/skills/probe`、`~/.agents/skills/probe-global`、工作区 `code-puppy/.agents/skills/probe-project`;引擎日志里扫描的技能路径只有出厂技能、`codepuppy-state/env/prod/skills`、XDG config,三个探针目录 0 次;输入框 `/` 菜单 15 项,没有探针;定制中心技能页没有。[截图](screens/r5-g7-slash-menu-2x.png)。反向一臂要改代码,没做 |
+
+R18 那张卡没有回答,23:00 按 300 秒超时 fail-closed 结束(`codepuppy_access` `error: aborted`,`executed: false`)。
+
+### 第五轮后的 §5.1
+
+| 闸 | 结果 |
+| --- | --- |
+| G1 | PASS(第三轮) |
+| G2 | **FAIL**(第三轮);本轮又见同一形态的第二个入口:对话内安装连接器的确认框(见 G4 第一方) |
+| G3 | NOT-RUN(被 G2 挡住:强行调用被拒要回审批) |
+| G4 | NOT-RUN:云 MCP 一半 PASS(客户端侧),第一方一半被 G2 同类缺陷挡住 |
+| G5 | NOT-RUN(需要 owner 自己的 DeepSeek Key) |
+| G6 | NOT-RUN(部分):合成 0.1.26 数据上旧对话可见、可打开(演练第 2 步);续写要可用模型,根 D 没有(未登录;本机桩被两版都拒绝)。A 上没有换代前的旧对话,不适用 |
+| G7 | PASS(正向) |
+| G8 | PASS(正向) |
+| G9 | PASS(正向,第三轮) |
+| G10 | PASS |
+
+**被 G2 挡住的格:** f(本次会话内允许、超时卡)、G3、R17(拒绝)、N06、N07、N19(要回答审批卡)、G4 第一方一半、R18 外部连接器一半(要先经对话框装连接器)。
+**要 owner 自己的模型 Key:** G5、R22、W02 的自带 Key 一半、W09(b)。
+**要 owner 本人或真实发版:** R19 新增格(`~/Documents` 系统授权框,需真库形态)、W01(钥匙串框)、W05(网站重登)、R08 / R09(签名发版包的更新回放)、Office 图形界面各格。
+**g(首次健康探测失败):** NOT-RUN —— 要在启动瞬间让引擎端口探测失败,没有不改代码的便宜办法。
+
+### 第五轮收尾时 A 的状态
+
+在运行(pid 43754,a4,运行约 57 分钟),**登录态**(账户区「账户 · 按量付费」、无「点此登录」;续期每 10 分钟一次都 `applied`),窗口**隐藏**(`visibilityState: hidden`,
+后台 `hide-app 43754 5400` 持续隐藏到约 00:23 或 A 退出),看门狗未触发。A 上本轮装上了 Word 连接器(引擎 generation 1);最后一个对话停在「只读」档。
+根 D 没有实例在运行;本机桩已停。owner 应用全程没有运行。
 
 ### §6.2 撤回演练(合成 0.1.26 数据,根 D)
 

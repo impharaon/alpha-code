@@ -3,7 +3,7 @@
 // import 闭包;以及项目里指向记录的符号链接不能让 main 往记录里写。真文件系统(临时目录),期望值手写字面量。
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { __resetCodePuppyEnvironmentForTests } from "./codepuppy-environment"
@@ -168,6 +168,22 @@ describe("写端", () => {
     const closure = relativeImportClosure(join(repoRoot, "packages/ext/src/plugin.ts")).map((file) => file.slice(repoRoot.length + 1))
     expect(closure).toContain("packages/ui-mac/src/main/project-trust-truth.ts")
     expect(closure).not.toContain("packages/ui-mac/src/main/project-trust-truth-write.ts")
+  })
+
+  test("审计 Minor 1:现有记录读不出来(I/O 错误,这里是 EACCES)⇒ 拒写、走「未能保存」,别的项目的决定原样留着", () => {
+    const a = project("a")
+    const b = project("b")
+    expect(recordProjectTrustDecision(a, true, "2026-11-13T01:00:00.000Z", quiet)).toEqual({ ok: true })
+    const before = readFileSync(record)
+    chmodSync(record, 0o000)
+    try {
+      const written = recordProjectTrustDecision(b, true, "2026-11-13T02:00:00.000Z", quiet)
+      expect(written.ok).toBe(false)
+    } finally {
+      chmodSync(record, 0o600)
+    }
+    expect(readFileSync(record).equals(before)).toBe(true)
+    expect(readProjectTrustEntry(a, quiet)?.granted).toBe(true)
   })
 
   test("现有记录坏了 ⇒ 出一行原因、只留这一次的决定", () => {

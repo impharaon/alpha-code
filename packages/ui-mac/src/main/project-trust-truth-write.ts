@@ -3,8 +3,9 @@
 // relativeImportClosure 实测)。读法、形状与位置见 project-trust-truth.ts 文件头。
 //
 // 写:读出现有记录 → 改这一条 → 过读端同一份判据 → 临时文件 + 同目录 rename(原子:写到一半失败 ⇒ 盘上仍是旧内容)。
-// 现有记录坏了(引擎写不到这里,不是攻击可达的状态)⇒ 出一行原因后从空开始:坏掉的那份里谁的决定都读不出来,保留它只会让
-// 用户永远落不下新决定。记录目录是符号链接 ⇒ 拒写(读端也不跟它),由调用方走现有的「未能保存」提示。
+// 现有记录读出来了但形状不对(引擎写不到这里,不是攻击可达的状态)⇒ 出一行原因后从空开始:坏掉的那份里谁的决定都读不出来,
+// 保留它只会让用户永远落不下新决定。读不出来(EACCES / EIO / EMFILE 这类 I/O 错误)或记录文件、记录目录是符号链接 ⇒ 拒写,
+// 由调用方走现有的「未能保存」提示 —— 一次瞬时的读失败不能把别的项目的决定一起抹掉(`#1709` 审计 Minor 1)。
 
 import { lstatSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs"
 import { dirname } from "node:path"
@@ -36,6 +37,7 @@ export function recordProjectTrustDecision(
     // 目录还不存在:下面建
   }
   const current = readProjectTrustTruth(path)
+  if (!current.ok && !current.malformed) return { ok: false, reason: `${path} cannot be read — ${current.reason}` }
   if (!current.ok) log(`project trust: ${path} refused — ${current.reason}; rewriting it with this decision only`)
   const projects: ProjectTrustProjects = {
     ...(current.ok ? current.projects : {}),

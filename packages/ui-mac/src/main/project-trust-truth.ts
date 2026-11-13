@@ -31,7 +31,10 @@ export const PROJECT_TRUST_TRUTH_VERSION = 1
 export type ProjectTrustIdentity = { directory: string; ino: string }
 export type ProjectTrustEntry = { ino: string; version: number; granted: boolean; decidedAt: string }
 export type ProjectTrustProjects = Record<string, ProjectTrustEntry>
-export type ProjectTrustRead = { ok: true; absent: boolean; projects: ProjectTrustProjects } | { ok: false; reason: string }
+/** `malformed`:文件读出来了但形状不对(只有这种情况写端才从空开始);读不出来 / 是符号链接 ⇒ false。 */
+export type ProjectTrustRead =
+  | { ok: true; absent: boolean; projects: ProjectTrustProjects }
+  | { ok: false; reason: string; malformed: boolean }
 
 const TOP_KEYS = ["v", "projects"]
 const ENTRY_KEYS = ["ino", "version", "granted", "decidedAt"]
@@ -93,10 +96,10 @@ export function parseProjectTrustTruth(text: string): { ok: true; projects: Proj
 export function readProjectTrustTruth(path: string): ProjectTrustRead {
   for (const endpoint of [dirname(path), path]) {
     try {
-      if (lstatSync(endpoint).isSymbolicLink()) return { ok: false, reason: `${endpoint} is a symbolic link` }
+      if (lstatSync(endpoint).isSymbolicLink()) return { ok: false, reason: `${endpoint} is a symbolic link`, malformed: false }
     } catch (error) {
       if (errorCode(error) === "ENOENT") return { ok: true, absent: true, projects: {} }
-      return { ok: false, reason: `${endpoint} cannot be inspected (${errorMessage(error)})` }
+      return { ok: false, reason: `${endpoint} cannot be inspected (${errorMessage(error)})`, malformed: false }
     }
   }
   let text: string
@@ -104,10 +107,10 @@ export function readProjectTrustTruth(path: string): ProjectTrustRead {
     text = readFileSync(path, "utf8")
   } catch (error) {
     if (errorCode(error) === "ENOENT") return { ok: true, absent: true, projects: {} }
-    return { ok: false, reason: `${path} cannot be read (${errorMessage(error)})` }
+    return { ok: false, reason: `${path} cannot be read (${errorMessage(error)})`, malformed: false }
   }
   const parsed = parseProjectTrustTruth(text)
-  return parsed.ok ? { ok: true, absent: false, projects: parsed.projects } : parsed
+  return parsed.ok ? { ok: true, absent: false, projects: parsed.projects } : { ok: false, reason: parsed.reason, malformed: true }
 }
 
 /** 这个项目登记过的条目:规范目录逐字相等且 inode 相等才算;没有 ⇒ undefined。告知版本由 codepuppy-ext-trust.ts 判。 */

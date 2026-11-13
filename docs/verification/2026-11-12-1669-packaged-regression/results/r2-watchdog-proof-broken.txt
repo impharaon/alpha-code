@@ -1,0 +1,5 @@
+arm=broken decoy=SecurityAgent(compiled 3 s sleeper) caught=0 watchdog_exit=0 latency_ms=1159
+  log: 1794536227.147 watchdog start pgid=19716 names=[NoSuchPromptProcess] interval=0.1s baseline=[]
+  log: 1794536228.840 target group 19716 gone; watchdog exits quietly
+WATCHDOG PROOF: REFUSED (exit 1) — the watchdog did not kill the target on a new SecurityAgent process
+exit=1

@@ -1,0 +1,13 @@
+# excerpt of <root>/A/logs/a2.out (main + sidecar log of the isolated 2.x copy, run a2, 21:21:16-21:21:21 EST)
+21:21:17.242         › app starting { version: '0.1.26', packaged: true, onboardingTest: false }
+21:21:17.469                    › db-safety: skip — fresh install(无 DB 文件)
+21:21:17.481                    › codepuppy-ext: loading plugin bundle {
+  path: '<root>/A/app/Code Puppy.app/Contents/Resources/codepuppy-ext'
+21:21:17.495                    › process fence planned: workspaces=1 (candidates=1, excluded=0, dropped=0), egressProxyPort=59549, profile=2038B, compile attempts=1
+21:21:17.529                    › Error: Error: ENOENT: no such file or directory, open '<root>/A/app/Code Puppy.app/Contents/Resources/app-update.yml'
+21:21:17.529                    › updater state changed { from: 'checking', to: 'error' }
+  message: 'process fence applied: addon=fence-20261113T020500196Z libsandbox=/usr/lib/libsandbox.1.dylib profile=2038B — every process this engine spawns inherits it'
+21:21:18.667 (startup-timeline) › {"seq":6,"name":"main.sidecar.ready_ipc","t":1726.389792,"context":"boot","prewarmOutcome":"unavailable","prewarmMs":201.411791,"prewarmStatus":404}
+21:21:18.720 (startup-timeline) › {"seq":9,"name":"main.sidecar.generation.emit","t":1779.361167,"generation":1,"phase":"ready","reason":"boot"}
+21:21:19.113                    › awaiting server ready
+21:21:19.113                    › server ready { url: 'http://127.0.0.1:59548' }

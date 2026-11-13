@@ -1,0 +1,9 @@
+## broken arm: argv without --use-mock-keychain
+LAUNCH REFUSED: argv lacks --use-mock-keychain (Chromium would use the keychain)
+exit=1
+## broken arm: root without a passed gate
+LAUNCH REFUSED: no <root>/nogate/.gate-ok — run isolation-gate.sh --persist on this root first
+exit=1
+## broken arm: app outside the root
+LAUNCH REFUSED: the app must be a copy inside the root
+exit=1

@@ -1,0 +1,3 @@
+Code Puppy-2026-11-12-211945.ips: "procPath" : "\/private\/tmp\/*\/Code Puppy.app\/Contents\/MacOS\/Code Puppy" "termination" : {"flags":0,"code":2,"namespace":"CODESIGNING","indicator":"Invalid Page"}
+SecurityAgent-2026-11-12-211647.ips: "procPath" : "\/private\/tmp\/*\/SecurityAgent" "termination" : {"flags":66,"code":4,"namespace":"CODESIGNING","indicator":"Launch Constraint Violation"}
+SecurityAgent-2026-11-12-211649.ips: "procPath" : "\/private\/tmp\/*\/SecurityAgent" "termination" : {"flags":66,"code":4,"namespace":"CODESIGNING","indicator":"Launch Constraint Violation"}

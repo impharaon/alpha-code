@@ -1,5 +1,5 @@
 ---
-title: alpha-code#1669 打包版换代回归与撤回演练 —— 第一轮:打包构建失败,未启动应用
+title: alpha-code#1669 打包版换代回归与撤回演练 —— 第二轮:隔离副本改写了 owner 应用的偏好域,按硬规矩 1 停止
 kind: verification
 status: active
 owners:
@@ -7,12 +7,109 @@ owners:
 last_reviewed: 2026-11-12
 ---
 
-# alpha-code#1669 打包版回归与撤回演练(L7)—— 第一轮
+# alpha-code#1669 打包版回归与撤回演练(L7)
 
 依据:方案基线 [§5.1、§5.2、§6.2、§2.8](../../design/2026-11-08-1662-opencode2-generation-switch-baseline.md),
-票面 `impharaon/alpha-code#1669`,派发书里的七个补充格 a–g 与八条硬规矩。
+票面 `impharaon/alpha-code#1669`,派发书里的七个补充格 a–g 与八条硬规矩。第二轮在前,第一轮原文在后。
 
-## 结论
+## 第二轮(2026-11-12 21:07–21:35 EST)
+
+输入的变化(编排器回执):构建已在 `71b6e5f9cd`(fix/1662-packaged-build)修好;隔离按 owner 选的方案 A
+(owner 原话「我建议 A」)放宽 2(ii):需要引擎的格子不套外层沙箱,其余隔离照旧,另加 SecurityAgent 看门狗。
+
+### 第二轮结论
+
+1. **按硬规矩 1 停止。** 第二次启动(`a2`)时,启动后闸发现 owner 应用的偏好文件 `~/Library/Preferences/com.tide.codepuppy.plist`
+   修改时间变了(2026-11-09 03:33:12 → 2026-11-12 21:21:16,正是测试副本向系统登记的那一刻),大小没变(250 → 250 字节)。
+   闸当场杀掉整个进程组,前后约 5 秒。之后没有再启动任何实例。
+2. **cell a PASS**(证据来自这 5 秒的日志):随包 ext 装载、进程围栏装上、引擎报就绪。
+3. 编排器给的包本身启动不了:内核按代码签名把它杀掉(`Electron Framework` 页无效)。测的是在临时根里做了 ad-hoc 重签的副本,`app.asar` 字节不变。
+4. 隔离闸(方案 A 形态)、看门狗、启动闸都先在做坏的环境里证明会拒绝,再跑正常臂。
+5. 没有出现任何系统框;付费模型调用 0 次;没有登录。
+
+计数(90 个格子):PASS 1(补充格 a)/ FAIL 0 / NOT-RUN 89。
+
+### 被测的包
+
+| 项 | 值 |
+| --- | --- |
+| 来源 | 编排器提供的 `alpha-code-fix-1662-packaged-build/packages/ui-mac/dist/mac-arm64/Code Puppy.app`(alpha `c01ea14919` + `71b6e5f9cd`,prod 渠道,未签名),`ditto` 到临时根,只测副本 |
+| 版本 / bundle id | 0.1.26 / `com.tide.codepuppy` |
+| 引擎 chunk | `app.asar:/out/main/chunks/engine-D02rVy8I.js` sha256 `36c3f2e9638941edf216ab7e7a40c1708ae5d5e8fc7e67c1b84a1c1af83aaa64`(与 fix worktree 的 `out/main/chunks/` 同一文件逐字相同) |
+| `app.asar` | sha256 `8719eb3b032d4d002b7f5875aecf9d01272a329b457c1fd5f42f4f81c09f7252`(重签前后相同) |
+| 原样启动 | **起不来**:`a1` 被内核 SIGKILL —— `CODE SIGNING: process …[Code Puppy]: rejecting invalid page … in file ".../Electron Framework.framework/..."`;崩溃报告 `termination: CODESIGNING / Invalid Page`;`codesign --verify --deep --strict` 报 `code has no resources but signature indicates they must be present`;主程序仍是 Electron 原带的 linker 签名(`Identifier=Electron`)。证据:[results/r2-launch-a1.txt](results/r2-launch-a1.txt)、[results/r2-crash-reports-from-this-run.txt](results/r2-crash-reports-from-this-run.txt) |
+| 测试形态 | 副本上 `codesign --force --deep --sign -`(ad-hoc,不用钥匙串)后 `--verify --deep --strict` 通过。与出货形态的差别:没有 Developer ID、没有 hardened runtime、没有公证 |
+
+推断(没有单独验证):`electron-builder.config.ts:208` 未签名时 `identity: null`,electron-builder 整个跳过签名;fuse 改写了 `Electron Framework`
+的字节,原 linker 签名随之失效,arm64 内核拒绝执行。runbook §0 写的「否则 ad-hoc(仅本机双击)」与实测不符。这是本机未签名打包这条路径的问题,
+不是换代引入的(以前本机包都经 `install:local` 用 Developer ID 重签后才运行)。
+
+### 隔离(方案 A)
+
+工具:[tools/isolation-gate.sh](tools/isolation-gate.sh)(加了第 5 步与 `--persist`)、[tools/watchdog.sh](tools/watchdog.sh)、
+[tools/watchdog-proof.sh](tools/watchdog-proof.sh)、[tools/launch-a.sh](tools/launch-a.sh)、[tools/stop-a.sh](tools/stop-a.sh)、[tools/cdp.mjs](tools/cdp.mjs)。
+
+| 闸 | 坏臂(必须拒绝) | 正常臂 |
+| --- | --- | --- |
+| 钥匙串(gate 1–5) | 不建临时钥匙串 ⇒ 第 3 步拒绝,exit 1([r2-gate-broken-keychain](results/r2-gate-broken-keychain.txt));gate 自己的命令所在沙箱去掉 mach 拒绝 ⇒ 第 2 步拒绝([r2-gate-broken-guard](results/r2-gate-broken-guard.txt)) | 五步全过([r2-gate-A](results/r2-gate-A.txt)):第 5 步在**不套沙箱**、带应用同款环境(HOME + CFFIXED_USER_HOME 改道)时,搜索列表恰好一项、就是临时钥匙串,且只存在于临时钥匙串里的哨兵条目被它找到(只取属性) |
+| 看门狗 | 看一个不会出现的进程名 ⇒ 诱饵没被抓,exit 1([r2-watchdog-proof-broken](results/r2-watchdog-proof-broken.txt)) | 诱饵 = 临时编译、名为 `SecurityAgent` 的 3 秒空进程:140 ms 内杀掉目标进程组并记下诱饵([r2-watchdog-proof-good](results/r2-watchdog-proof-good.txt))。真 SecurityAgent 出现时的反应时间没测过(要真触发一个框);看的进程名是 `SecurityAgent`、`UserNotificationCenter`、`coreautha`,只认启动后新出现的进程号 |
+| 启动闸(启动前) | 去掉 `--use-mock-keychain`、根上没有通过的闸、包不在根里 ⇒ 三条都拒绝,没有启动([r2-launch-broken-arms](results/r2-launch-broken-arms.txt)) | — |
+| 启动闸(启动后) | — | 见 `a2`:进程组 5 个进程、162 个打开路径、59 个在临时根下、owner 路径 0 个;单实例锁在临时 userData;**owner 侧路径的元数据比对变红** |
+
+「关交互」的实际含义:Chromium 加 `--use-mock-keychain`(不碰钥匙串,启动后核对正在运行的主进程带着这个参数);临时钥匙串已解锁、
+不自动上锁,没有可弹的解锁框。macOS 没有能从外部替另一个进程关掉钥匙串交互的开关,产品代码也不调用这类开关;这一条只到这里。
+
+### 单实例与身份(硬规矩 3)
+
+- 直接执行包里的二进制(不走 `open`),环境从零构造。owner 的应用当时没有运行,前后都没有。
+- 单实例锁:`<临时根>/home/Library/Application Support/ai.opencode.desktop/SingletonLock`,与 owner 的 userData 分开(实测,不是推断)。
+- LaunchServices:冷启动时 `codepuppy://` 交给谁,测试前后都是 `/Applications/Code Puppy.app`(只读查询)。副本被系统登记过,已用 `lsregister -u` 撤销(副本与其 Helper 两条)。
+- 观察:直接从终端执行时,系统把测试应用的 TCC「责任进程」记为 Terminal(`AUTHREQ_ATTRIBUTION … responsible … com.apple.Terminal`)。
+  也就是说测试应用沿用 Terminal 已有的隐私授权,真弹授权框时框上写的会是 Terminal。
+- **偏好域是共用的(这次停下的原因):** 副本与 owner 的应用同一个 bundle id,系统按 bundle id 管偏好;HOME 与 CFFIXED_USER_HOME 改道管不到它。
+
+### 停下的事件(硬规矩 1)
+
+| 项 | 观察 |
+| --- | --- |
+| 文件 | `~/Library/Preferences/com.tide.codepuppy.plist`(owner 应用的偏好域) |
+| 变化 | 修改时间 2026-11-09 03:33:12 → 2026-11-12 21:21:16;大小 250 → 250 字节 |
+| 时刻 | 与系统日志里测试副本 `CHECKIN: … com.tide.codepuppy` 同一秒(21:21:16.696),cfprefsd 在同一毫秒段接受了它的连接 |
+| 处置 | 启动后闸判红,`SIGKILL` 整个进程组(约 5 秒内);此后没有再启动 |
+| 文件里的键(只读了键名与类型,没读值) | `AppleTextDirection`(bool)、`NSForceRightToLeftWritingDirection`(bool)、`NSNavPanelExpandedSizeForOpenMode`(str)、`NSTreatUnknownArgumentsAsOpen`(str)、`SKPurchaseIntentUpdatesLastChecked`(float) |
+
+推断:改写的是 StoreKit 每次启动都会刷新的时间戳 `SKPurchaseIntentUpdatesLastChecked`(浮点数在二进制 plist 里定长,所以大小不变),
+owner 自己的应用每次启动也会写它。证明不了:运行前没有存这个文件的副本,也没有读值。
+
+收尾:撤销了副本的 LaunchServices 登记;删掉了本轮操作在 `~/Library/Logs/DiagnosticReports` 里留下的三份崩溃报告
+(`a1` 的签名杀进程一份、第一次诱饵用 `/bin/sleep` 副本被系统拒绝两份;内容摘要已存 [results/r2-crash-reports-from-this-run.txt](results/r2-crash-reports-from-this-run.txt))。
+临时根保留(含临时钥匙串、重签后的 2.x 副本、下载的 0.1.26 包),不在 owner 的钥匙串搜索列表里。
+
+继续之前要编排器定的一件事(三选一):
+
+- **1. 接受同 bundle id 的偏好域被系统框架写。** 闸改成比键集合、类型与大小,不比修改时间;每次启动前后对这个文件只做哈希(要读内容)。
+  代价最小;写的是 owner 自己每次启动也会写的框架时间戳。需要明确接受,因为它碰的是 owner 应用的偏好域。
+- **2. 副本换一个 bundle id**(改副本的 Info.plist 再 ad-hoc 重签):偏好域分开。但应用启动时会调 `setAsDefaultProtocolClient`
+  (`packages/ui-mac/src/main/index.ts:952-955`),把 owner 的 `codepuppy://` 默认处理者改成测试的 id,每次运行后都要读回并恢复;
+  通知与隐私授权也按 bundle id 算,新 id 首次使用可能弹框(由看门狗兜底)。登录那一刻反而需要这样,深链才会回到测试副本。
+- **3. 只在 owner 在场时跑。**
+
+建议 1。登录那一刻另有一个问题:网站登录完成后的 `codepuppy://` 回调按 bundle id 交给系统选的应用,冷启动时系统选的是
+`/Applications/Code Puppy.app`(上面只读查过)。登录时 owner 的应用必须是退出状态、测试副本必须在运行;即便这样,回调交给运行中的副本
+也只是推断,没有验证(验证它就有拉起 owner 应用的风险)。
+
+### 第二轮格子
+
+| 格 | 结果 | 证据 / 原因 |
+| --- | --- | --- |
+| 补充格 a:随包 ext 装载、引擎就绪、围栏装上 | **PASS** | [results/r2-a2-log-excerpt.txt](results/r2-a2-log-excerpt.txt):`codepuppy-ext: loading plugin bundle`(路径在包内 `Resources/codepuppy-ext`)、`process fence applied: addon=fence-20261113T020500196Z … profile=2038B`、`main.sidecar.ready_ipc`、`generation … "phase":"ready"`、`server ready`;日志里 ext 装载之后没有错误行。只跑了约 5 秒 |
+| 其余 89 格 | NOT-RUN | 被上面的停止挡住。需要登录的格子之后还要 owner 登录;G5 等要 owner 自己的 Key |
+
+附带观察:这个本机包里没有 `app-update.yml`,更新器一启动就进 `error`(`ENOENT … Resources/app-update.yml`)。R08/R09 在这个包上测不了真实的更新回放。
+
+## 第一轮(2026-11-12 20:24–20:43 EST)
+
+### 结论
 
 1. **打包构建失败,所以没有可测的包。** `bun run build` 的前两段(prebuild、引擎包)成功,第三段 `electron-vite build`
    打主进程时报 `The symbol "__cjs_mod__" has already been declared`,`package:mac` 没有执行到。同一命令重跑一次,结果相同。
@@ -27,7 +124,7 @@ last_reviewed: 2026-11-12
 
 计数(90 个格子):PASS 0 / FAIL 0 / NOT-RUN 90。前置项:构建 FAIL,隔离闸 PASS,单实例核对 NOT-RUN。
 
-## 构建
+### 构建
 
 | 项 | 值 |
 | --- | --- |
@@ -61,7 +158,7 @@ chunks/engine-!~{004}~.js:8:7: ERROR: The symbol "__cjs_mod__" has already been 
 
 worktree 在本轮开始前就有一处未提交改动:`bun.lock` 去掉了一批 `"libc"` 字段(没有版本号变化)。本轮没有碰它,也没有提交它。
 
-## 隔离闸(硬规矩 2)
+### 隔离闸(硬规矩 2)
 
 工具:[tools/isolation-gate.sh](tools/isolation-gate.sh) + [tools/mach-probe.c](tools/mach-probe.c)。每一步只在前一步通过后才跑,
 任何一步失败就退出 1,并打印「不得启动」。所有钥匙串命令都跑在 guard 沙箱里;临时钥匙串的口令是随机一次性的,从不打印;不读任何条目内容。
@@ -86,7 +183,7 @@ worktree 在本轮开始前就有一处未提交改动:`bun.lock` 去掉了一�
 证明不了「临时钥匙串上由 securityd 发起的框」一定弹不出来。去实测它,就要故意触发那个框,所以没测。下一轮启动时的缓解:
 临时钥匙串已解锁且不自动上锁,Chromium 加 `--use-mock-keychain`(不碰钥匙串)。
 
-## 第二个阻断:隔离沙箱与产品进程围栏不能同时成立
+### 第二个阻断:隔离沙箱与产品进程围栏不能同时成立
 
 探针 [tools/fence-nest-probe.cjs](tools/fence-nest-probe.cjs) 做的就是 sidecar 装围栏的那一步(加载本轮构建出的 `codepuppy_fence.node`,
 调 `apply()`)。传的是全放行的 profile,所以如果被拒,原因只能是嵌套。输出:[results/fence-nest-probe.txt](results/fence-nest-probe.txt)。
@@ -114,7 +211,7 @@ worktree 在本轮开始前就有一处未提交改动:`bun.lock` 去掉了一�
 
 建议 A + B:用 A 的脚本,登录与第一次引擎启动放在 owner 在场时做;之后的引擎格是否继续在 owner 不在场时跑,由编排器决定。
 
-## 登录与测试账号
+### 登录与测试账号
 
 - 打包版忽略 `DEV_PLATFORM_TOKEN`(`packages/ui-mac/src/main/codepuppy-auth.ts:172-179`)。平台凭据只来自登录:未登录时
   `applyAuthEnv` 删掉 `CODEPUPPY_API_KEY`(`codepuppy-auth.ts:352-363`),凭据文件只镜像这个环境变量(`codepuppy-secret-files.ts`)。
@@ -122,7 +219,7 @@ worktree 在本轮开始前就有一处未提交改动:`bun.lock` 去掉了一�
 - 登录是网站上的浏览器授权(`codepuppy-auth.ts:5-7`,`shell.openExternal` 打开的是 owner 的默认浏览器),要收验证码 ⇒ 需要 owner。
   本轮没有点登录,也没有读那把 key。
 
-## 单实例与身份(硬规矩 3)—— NOT-RUN(没有包)
+### 单实例与身份(硬规矩 3)—— NOT-RUN(没有包)
 
 下一轮启动前要核的静态事实:
 
@@ -133,7 +230,7 @@ worktree 在本轮开始前就有一处未提交改动:`bun.lock` 去掉了一�
 - 调试口写死 9222(`index.ts:568`),启动前确认这个端口没人占。
 - 包的版本号 0.1.26 等于最新发布版本,预期不会去下载更新;启动后读更新日志核实。
 
-## §5.1 合并闸
+### §5.1 合并闸
 
 | 闸 | 结果 | 说明 |
 | --- | --- | --- |
@@ -148,7 +245,7 @@ worktree 在本轮开始前就有一处未提交改动:`bun.lock` 去掉了一�
 | G9 凭证不导入 | NOT-RUN | 同上 |
 | G10 前进前备份 | NOT-RUN | 被构建失败挡住(不需要引擎,可以在 guard 下做) |
 
-## §5.2 行为基线(0.1.26 回归矩阵,alpha-work#129 的格子)
+### §5.2 行为基线(0.1.26 回归矩阵,alpha-work#129 的格子)
 
 | 格子 | 结果 | 说明 |
 | --- | --- | --- |
@@ -156,7 +253,7 @@ worktree 在本轮开始前就有一处未提交改动:`bun.lock` 去掉了一�
 | 新增格(裁决书 R19):首启转换时 `~/Documents` 下会话的系统授权框 | NOT-RUN | 被构建失败挡住;这是系统级授权框,需要 owner |
 | 冒烟(23 格):R04、R05、R06、R07、W01、W12、W13、W05、W20、W21、W06、W14、W15、W16、W17、W18、W19、W26、W27、N00、N13、N14、W28 | NOT-RUN | 被构建失败挡住 |
 
-## 补充格 a–g
+### 补充格 a–g
 
 | 格 | 结果 | 说明 |
 | --- | --- | --- |
@@ -168,7 +265,7 @@ worktree 在本轮开始前就有一处未提交改动:`bun.lock` 去掉了一�
 | f 审批卡、「本次会话内允许」、超时卡 | NOT-RUN | 同 b |
 | g 首次健康探测失败时界面不卡死 | NOT-RUN | 被构建失败挡住;还需要引擎 |
 
-## §6.2 撤回演练
+### §6.2 撤回演练
 
 | 步 | 结果 | 说明 |
 | --- | --- | --- |
@@ -178,7 +275,7 @@ worktree 在本轮开始前就有一处未提交改动:`bun.lock` 去掉了一�
 | 3 模拟合并 → `revert -m 1` → 1.x 包:「库超前」阻断 → 按 §6.1 第 4 条手工恢复 → 会话数一致 | NOT-RUN | 依赖第 2 步 |
 | 4 证据落盘 | NOT-RUN | 依赖第 1–3 步 |
 
-## 文件
+### 文件
 
 - [tools/isolation-gate.sh](tools/isolation-gate.sh)、[tools/mach-probe.c](tools/mach-probe.c):隔离闸
 - [tools/fence-nest-probe.cjs](tools/fence-nest-probe.cjs):围栏嵌套探针

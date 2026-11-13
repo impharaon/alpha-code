@@ -367,6 +367,7 @@ status.
 | `SPEC-agent-approved-extension-install` | [specs/agent-approved-extension-install/spec.md](specs/agent-approved-extension-install/spec.md) | 目录查询、授权确认、安装状态和当前会话中后续使用。 | approved |
 | `SPEC-atomic-extension-lifecycle` | [specs/atomic-extension-lifecycle/spec.md](specs/atomic-extension-lifecycle/spec.md) | 扩展安装失败可恢复且不会留下半装状态，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-bounded-artifact-preview` | [specs/bounded-artifact-preview/spec.md](specs/bounded-artifact-preview/spec.md) | 常见产物按安全边界预览，超限有明确说明，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `PLAN-build-identity` | [specs/build-identity/plan.md](specs/build-identity/plan.md) | alpha-code#237 一段:账户浮层版本行可点复制一行构建身份,非正式发布包带标记 | active |
 | `SPEC-build-identity` | [specs/build-identity/spec.md](specs/build-identity/spec.md) | 报问题时能复制准确的构建身份，验收边界来自原始需求。 | approved |
 | `SPEC-byok-output-limits` | [specs/byok-output-limits/spec.md](specs/byok-output-limits/spec.md) | 自带密钥的模型按自己的实测上限输出，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-child-process-write-fence` | [specs/child-process-write-fence/spec.md](specs/child-process-write-fence/spec.md) | 连接器与语言服务的子进程也受写入范围约束，保留历史条款、有效裁决和交付证据边界。 | approved |
@@ -399,11 +400,12 @@ status.
 | `SPEC-owned-settings-and-dialogs` | [specs/owned-settings-and-dialogs/spec.md](specs/owned-settings-and-dialogs/spec.md) | 设置、模型选择、审批与恢复使用一致交互，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-permission-risk-classification` | [specs/permission-risk-classification/spec.md](specs/permission-risk-classification/spec.md) | 高风险动作在执行前先完成分类，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-permission-risk-display` | [specs/permission-risk-display/spec.md](specs/permission-risk-display/spec.md) | 用户在授权时能看出动作的风险档位，保留历史条款、有效裁决和交付证据边界。 | draft |
+| `PLAN-project-agent-fields` | [specs/project-agent-fields/plan.md](specs/project-agent-fields/plan.md) | alpha-code#1700 一段 —— 项目助手的 disable、temperature、top_p、steps(maxSteps)、hidden、color、variant 在 OpenCode 2 上生效,用不上的字段记一行日志,写坏的条目整条不装(tools 已由 | active |
 | `SPEC-project-agent-fields` | [specs/project-agent-fields/spec.md](specs/project-agent-fields/spec.md) | 项目文档里给 agent 写的 disable、tools、temperature 等字段在新引擎上重新生效,用不上的字段有记录可查 | approved |
 | `SPEC-project-mcp-installation` | [specs/project-mcp-installation/spec.md](specs/project-mcp-installation/spec.md) | 连接器可装到全局或当前项目并保持隔离，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-puppy-brand-icons` | [specs/puppy-brand-icons/spec.md](specs/puppy-brand-icons/spec.md) | 应用和各渠道使用一致的小狗标志，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `DESIGN-remote-database-connector` | [specs/remote-database-connector/design.md](specs/remote-database-connector/design.md) | 用户在连接器窗口填写并确认的「地址:端口」写进只有主进程能写的目标真源,作为动态半场的成员进入策略代理的放行集合;连接器进程里的隧道垫片把数据库驱动的 TCP 连接改走现有 CONNECT 代理,seatbelt 围栏一字不改;只读靠 DBHub 只读配置加只读事务,能约束整棵进程树的只有数据库账号权限;密码沿用官方连接器密钥保管;Windows/Linux 本期不交付 | draft |
-| `SPEC-remote-database-connector` | [specs/remote-database-connector/spec.md](specs/remote-database-connector/spec.md) | 安全围栏默认拦住连接器的直接网络连接;用户在连接器窗口里明确放行的地址可以连上,其余照旧拦住。数据库连接器连用户自己的远程数据库是第一个用到它的场景 | draft |
+| `SPEC-remote-database-connector` | [specs/remote-database-connector/spec.md](specs/remote-database-connector/spec.md) | 安全围栏默认拦住连接器的直接网络连接;用户在连接器窗口里明确放行的地址可以连上,其余照旧拦住。数据库连接器连用户自己的远程数据库是第一个用到它的场景 | approved |
 | `SPEC-resident-project-watchers` | [specs/resident-project-watchers/spec.md](specs/resident-project-watchers/spec.md) | 长期使用项目时监听与内存保持受控，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-responsive-session-rail` | [specs/responsive-session-rail/spec.md](specs/responsive-session-rail/spec.md) | 右栏可以调宽并为聊天区保留空间，按历史条文与实际证明登记范围。 | approved |
 | `SPEC-route-manifest-authority` | [specs/route-manifest-authority/spec.md](specs/route-manifest-authority/spec.md) | 应用导航由一份页面清单决定，保留历史条款、有效裁决和交付证据边界。 | approved |

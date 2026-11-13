@@ -1,7 +1,7 @@
 ---
 id: PLAN-permission-risk-display
 title: 用户在授权时能看出动作的风险档位 实施计划
-summary: alpha-code#1314 的实施计划:风险标签组件进组件库,批准面板与能力授权框共用;只做呈现,分类器不动
+summary: "#1314 的实施计划:风险标签组件进组件库,批准面板与能力授权框共用;只做呈现,分类器不动"
 kind: plan
 status: active
 spec: SPEC-permission-risk-display
@@ -91,7 +91,7 @@ last_reviewed: 2026-11-13
 
 ### 风险
 
-- **渲染进程第一次 import `packages/ext` 的源文件。** 已知:`readRiskClassification` 所在模块零运行时依赖,打包实测 2.5 KB;`ui-mac` 已有相对路径引别包的先例(`PermissionDialog.tsx:12`、`engine-adapter/v1-shapes.ts:26`),`.oxlintrc.json` 没有限制这个方向。若实施中被某道守卫拦下,退路是在 `permission-risk.ts` 里抄那 8 行判据并加一条与 `risk.ts` 的同输入逐值比对测试;改了就写进偏离记录。
+- **渲染进程第一次 import `packages/ext` 的源文件(已按裁决核对,允许,走原方案不走退路)。** 依据的规则:`docs/architecture/constraints.md` K2「一个概念只有一个权威,其余地方消费它,不另写一份实现」;`docs/architecture/modules.md` 里 `packages/ui-mac` 的「不许依赖」只写「渲染进程不得直接依赖 main 私有模块」、`packages/ext` 的只写「Electron main 私有模块」,而 `readRiskClassification` 是零运行时依赖的纯函数,不是 main 私有模块;`.oxlintrc.json` 的 `no-restricted-imports` 与 `surface-boundary` / `permission-mount-ratchet` 等边界测试都没有限制该方向。没有给任何边界登记簿加例外。已知:`readRiskClassification` 所在模块零运行时依赖,打包实测 2.5 KB;`ui-mac` 已有相对路径引别包的先例(`PermissionDialog.tsx:12`、`engine-adapter/v1-shapes.ts:26`),`.oxlintrc.json` 没有限制这个方向。若实施中被某道守卫拦下,退路是在 `permission-risk.ts` 里抄那 8 行判据并加一条与 `risk.ts` 的同输入逐值比对测试;改了就写进偏离记录。
 - **形状没有被冻结。** `lane-seams.md` I7a 明说渲染进程不读 `codepuppyRisk`、故不冻结;现在读了。保护是方向性的:任何不认识的形状都落到「风险未知」,不会落到低风险。#1710(现已撤下)重新放回时,要确认审批请求的 `metadata` 仍原样透传(`permission-shape.test.ts` 里的夹具是字符串 `"low"`,不是真形状,建议那时改成真对象)。
 - **标题行变高。** 标签行高取 `--a-leading-snug`、比标题矮,稿里加标签前后标题行都是 31.75。几何测试量真组件的同一个数,并与稿逐项相等;宽 440 是最窄情形。
 - **面板名称。** `aria-labelledby` 改成两个 id;现有测试没有断言它等于标题 id(已 grep:`Dialog.test.ts` 的同名断言只管 `Dialog`)。
@@ -117,4 +117,13 @@ last_reviewed: 2026-11-13
 
 ### 偏离记录
 
-暂无。
+2026-11-13 · 实施中对本段的改动(都在实施提交里,无一改变 AC 或稿):
+
+- `contrast-ratchet.test.ts` 只加两行(琥珀、绿),不加「极高风险」那行红字:现有的两条夹具测试(`#1375` 改前色值、tint 缺失)按「`--a-error-on-subtle` 只出现一对」写死了每个主题块各红一次,第三行会让它们翻倍;红字沿用既有那对(底 `--a-surface`),真浏览器测试另外量了极高风险在浅 / 深两色下的对比度(5.37 / 5.25)。
+- 授权框的几何判据由「行高有标签 = 无标签」改为「标签与稿同宽同高、留在行内、不溢出」:真宿主对话框只有 420 宽,名称列折行使这两行本来就更高(process:spawn 行 72.9 → 92.3,engine:plugin 行 73.9 → 125.8);改前的旧标签实测是**同一对数字**、标签宽同为 46.77,所以那是既有排版,不是标签带来的。稿里 520 宽不折行。该折行不在本票范围,见返回给编排器的观察。
+- 稿里「加标签前后标题行都是 31.75」,本机 Chrome 实测稿与真组件都是 31.375,两者相等;判据取「与稿相等」,不写死数字。
+- 批准面板的几何用 `test-visual` 的输入框锚定:视口 488 ⇒ 输入框 440 ⇒ 面板 440(测试先断言面板宽 = 440)。
+- `permission-dialog.css` 没有改(量不出需要)。
+- `docs/design/system/gallery.html` 镜像里的 `--a-text-tertiary` 是旧值(浅 `#7c7d85` / 深 `#71727a`),放上「中风险」标签会显示成不达标的对比度,顺带同步成 `tokens.css` 现值(`#64656d` / `#86878f`),并补上镜像里缺的 `--a-error-on-subtle`。
+- 超出初始文件表的改动:`docs/design/2026-11-09-1662-lane-seams.md`(I7a 一条:renderer 现在读 `codepuppyRisk`,形状不认识 ⇒ 风险未知、永不低风险;按编排器裁决)。
+- 不改 `packages/ui-mac/src/engine-adapter/permission-shape.test.ts`(#1710 重新放回前该区冻结):它把 `codepuppyRisk` 写成字符串 `"low"`,不是真形状;读取函数对它返回空 ⇒ 风险未知。#1710 重新放回时建议改成真对象,保留在此。

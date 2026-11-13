@@ -33,6 +33,20 @@ the `prefers-color-scheme` block if color) — never inlined at the call site.
 | **Motion** | `--a-dur-instant/fast/base/slow`, `--a-ease-out/in-out/spring` | `80/130/190/280`ms; `prefers-reduced-motion` → all 0 |
 | **Z-index** | `--a-z-base/sticky/dropdown/overlay/modal/toast` | `0/100/400/800/900/1000` |
 
+## On-subtle text colors (in `tokens.css`)
+
+Text colors for a tone sitting on its own `-subtle` tint. From the risk tag draft
+[`2026-11-13-1314-risk-tag/`](../2026-11-13-1314-risk-tag/frame.html); in all three
+theme blocks of `tokens.css` and in the tinted-text table of
+`contrast-ratchet.test.ts`. Amber and green text on their own `-subtle` tint reach
+only 2.80:1 and 2.88:1 in light; red already had `--a-error-on-subtle` for the same
+pairing, these are the missing two.
+
+| Token | Light | Dark | Use | Contrast (light / dark, on the tint over `--a-surface-raised`) |
+| --- | --- | --- | --- | --- |
+| `--a-warning-on-subtle` | `#92400e` | `#fbbf24` (= `--a-warning`) | text on `--a-warning-subtle`: 「高风险」 risk tag, capability 「新增」 | 6.24:1 / 7.90:1 |
+| `--a-success-on-subtle` | `#166534` (= `--a-perm-readonly`) | `#4ade80` (= `--a-success`) | text on `--a-success-subtle`: 「低风险」 risk tag, capability 「将收回」 | 6.24:1 / 7.66:1 |
+
 ## Pending — proposed by the 2026-10-30 drafts (not yet in `tokens.css`)
 
 Two values the image card and attachment drafts need that no token covers yet.
@@ -47,18 +61,6 @@ place they are named, and the drafts reference these names.
 
 Drafts: [`2026-10-30-req236-image-card/`](../2026-10-30-req236-image-card/frame.html),
 [`2026-10-30-req236-attachments/`](../2026-10-30-req236-attachments/frame.html).
-
-Two more, from the risk tag draft
-[`2026-11-13-1314-risk-tag/`](../2026-11-13-1314-risk-tag/frame.html). Amber and
-green text on their own `-subtle` tint reach only 2.80:1 and 2.88:1 in light; red
-already has `--a-error-on-subtle` for the same pairing, these are the missing two.
-Add them to all three theme blocks and to the tinted-text table of
-`contrast-ratchet.test.ts`.
-
-| Token | Light | Dark | Use | Contrast (light / dark, on the tint over `--a-surface-raised`) |
-| --- | --- | --- | --- | --- |
-| `--a-warning-on-subtle` | `#92400e` | `#fbbf24` (= `--a-warning`) | text on `--a-warning-subtle`: 「高风险」 risk tag, capability 「新增」 | 6.24:1 / 7.90:1 |
-| `--a-success-on-subtle` | `#166534` (= `--a-perm-readonly`) | `#4ade80` (= `--a-success`) | text on `--a-success-subtle`: 「低风险」 risk tag, capability 「将收回」 | 6.24:1 / 7.66:1 |
 
 ## Theming
 

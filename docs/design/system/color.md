@@ -73,9 +73,8 @@ with a `-subtle` tinted background. Use for status meaning only — never to
 decorate or as a second accent.
 
 Text placed **on** a `-subtle` tint uses the tone's `-on-subtle` color, not the
-tone itself: the tone on its own tint is below 4.5:1 in light. `--a-error-on-subtle`
-exists; `--a-warning-on-subtle` and `--a-success-on-subtle` are pending
-([`tokens.md`](tokens.md)).
+tone itself: the tone on its own tint is below 4.5:1 in light. `--a-error-on-subtle`,
+`--a-warning-on-subtle` and `--a-success-on-subtle` exist ([`tokens.md`](tokens.md)).
 
 ## Run-permission tiers
 

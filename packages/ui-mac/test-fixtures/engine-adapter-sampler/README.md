@@ -40,10 +40,13 @@
    (`PUT /api/experimental/mcp/oauthprobe`),它的授权服务器是同目录的 `mock-oauth.ts`(本机,不连外网):引擎对它跑真的 MCP SDK
    流程(401 + 资源元数据、授权服务器元数据、动态注册、换 token);授权页不打开,采样器照引擎交回的 redirect_uri 与 state 拼回调
    交给 complete。项目里写一个 `opencode.json` 登记一条本地参考目录,`GET /api/reference` 才有元素可核;
-9. 停掉引擎与假模型。
+9. `routes.json`(`#1697` I-04,设计 §4.10 c):每条翻译路由经适配器发一次冻结界面会发的 v1 请求,记下翻译器为它向 2.x 发出的每个
+   往返(方法、带查询串的路径、状态码、内容类型、响应体)与适配器的状态码。准备:一个跑过一轮的会话、两个挂着提问表单的会话、
+   一台本机假 OAuth 的远端 MCP、一个还不是 git 仓库的目录(git init 用)。`src/engine-adapter/contract-cases.test.ts` 回放它;
+10. 停掉引擎与假模型。
 
 只重采其中几个剧本时把名字写在命令后面:`base`(上面 2–4 的全部)、`permission`(只有 3–4,只重写 `permission-reply.json`)、
-`tools`、`continue`、`files`、`command`、`parity`、`catalog`、`lineage`、`passthrough`,例如
+`tools`、`continue`、`files`、`command`、`parity`、`catalog`、`lineage`、`passthrough`、`routes`,例如
 `… sample.ts tools continue files command`;不写 = 全部。
 
 端口被占时用 `SAMPLER_ENGINE_PORT` / `SAMPLER_MODEL_PORT` / `SAMPLER_OAUTH_PORT` 改。重采后跑适配器的测试确认夹具仍能用:

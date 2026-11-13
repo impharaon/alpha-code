@@ -538,7 +538,10 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 
 ### 偏离记录
 
-暂无
+- 2026-11-13 · 在 alpha `ee8dfa0c27`(首个 PR #1710 合入)上的新分支 `feat/1697-ui-contract-cases` 上做(工作树内容与合入前一致,没有用 hard reset)。
+- 2026-11-13 · 台账与回放用例在同一个文件 `contract-cases.test.ts`:59 条翻译路由里 49 条是这里的回放(采样器 `routes` 剧本记下的 2.x 往返),10 条指向已有、经 createEngineFetch 的测试(事件流、命令、消息页、任务清单、provider、MCP 授权、审批四条),台账逐条核文件与测试名在位。期望只取 v1 请求、样本里的引擎原值、UC 与冻结消费方(`normalizeSessionInfo`、`normalizeAgentList`),从不取记下的适配器输出;采样器记下的适配器状态码只作诊断。两个提交合成一个。
+- 2026-11-13 · `POST /project/git/init` 在项目目录上引擎回 409(已是仓库),采样改为对临时根下一个还不是 git 仓库的目录做;这是采样输入的选择,翻译器不变。
+- 2026-11-13 · 变异证明:`/path` 的 worktree 改取 location.directory、会话状态改回 running、单选答案改成数组 ⇒ 对应三条回放红。
 
 ## M5d — 事件的采样用例(c,事件)与升级手册
 

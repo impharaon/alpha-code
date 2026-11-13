@@ -758,6 +758,145 @@ try {
     }
   }
 
+  // ── `#1697` I-04 M5c(设计 §4.10 c):每条翻译路由经适配器发一次冻结界面会发的 v1 请求,记下翻译器为它向 2.x 发出的每个往返 ──
+  if (run("routes")) {
+    autoAllow = true
+    const oauth = startMockOAuth(OAUTH_PORT)
+    try {
+      type Upstream = { method: string; path: string; status: number; contentType: string | null; body: unknown }
+      let bucket: Upstream[] = []
+      const routesFetch = createEngineFetch({
+        isEngineOrigin: (origin) => origin === BASE,
+        fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
+          const request = new Request(input, init)
+          request.headers.set("authorization", HEADERS.authorization)
+          const response = await fetch(request)
+          const url = new URL(request.url)
+          const contentType = response.headers.get("content-type")
+          // SSE 不记(事件流归事件用例)
+          if (!contentType?.includes("text/event-stream")) {
+            const text = await response.clone().text()
+            let body: unknown = text
+            try {
+              body = text ? JSON.parse(text) : null
+            } catch {}
+            bucket.push({ method: request.method, path: `${url.pathname}${url.search}`, status: response.status, contentType, body })
+          }
+          return response
+        }) as typeof fetch,
+      }) as typeof fetch
+      const cases: Record<string, { request: { method: string; path: string; body?: unknown; headers?: Record<string, string> }; upstream: Upstream[]; status: number }> = {}
+      const at = `directory=${encodeURIComponent(project)}`
+      const hit = async (method: string, path: string, body?: unknown, headers?: Record<string, string>) => {
+        bucket = []
+        const response = await routesFetch(`${BASE}${path}`, {
+          method,
+          headers: { "content-type": "application/json", ...headers },
+          ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        })
+        const text = await response.text()
+        let parsed: unknown = text
+        try {
+          parsed = text ? JSON.parse(text) : null
+        } catch {}
+        const key = matchServed(method, new URL(`${BASE}${path}`).pathname)?.key
+        if (key && !(key in cases)) cases[key] = { request: { method, path, ...(body === undefined ? {} : { body }), ...(headers ? { headers } : {}) }, upstream: bucket, status: response.status }
+        return parsed as any
+      }
+
+      // 准备:一个有对话的会话、一个挂着提问表单的会话、一台远端 MCP(本机假 OAuth)
+      const chat = await create()
+      await call("POST", `/api/session/${chat}/prompt`, { text: "say hello plainly" })
+      await idle(chat)
+      const userID = ((await finalOf(chat)) as any[]).find((message) => message.type === "user").id as string
+      const asking = async () => {
+        const sessionID = await create()
+        await call("POST", `/api/session/${sessionID}/prompt`, { text: "ask me something" })
+        for (let attempt = 0; attempt < 100; attempt++) {
+          const forms = (await call("GET", `/api/form?${loc}`)).data as any[]
+          const form = forms.find((item) => item.sessionID === sessionID)
+          if (form) return { sessionID, formID: form.id as string }
+          await Bun.sleep(100)
+        }
+        throw new Error("the mock did not ask")
+      }
+      const replied = await asking()
+      const rejected = await asking()
+      await call("PUT", `/api/experimental/mcp/oauthprobe?${loc}`, { config: { type: "remote", url: `${oauth.origin}/mcp` } })
+
+      await hit("GET", "/global/health")
+      await hit("GET", `/path?${at}`)
+      await hit("GET", `/project?${at}`)
+      const current = await hit("GET", `/project/current?${at}`)
+      await hit("GET", `/api/project/current?location%5Bdirectory%5D=${encodeURIComponent(project)}`)
+      await hit("PATCH", `/project/${current.id}?${at}`, { name: "sampler" })
+      // git init 要一个还不是仓库的目录(项目本身已是 git 仓库,引擎回 409)
+      const plain = join(root, "plain")
+      mkdirSync(plain, { recursive: true })
+      await hit("POST", `/project/git/init?directory=${encodeURIComponent(plain)}`)
+      await hit("GET", `/session?${at}`)
+      await hit("GET", `/experimental/session?roots=true`)
+      const created = await hit("POST", `/session?${at}`, { title: "sampler created" })
+      await hit("GET", `/session/status?${at}`)
+      await hit("GET", `/session/${chat}?${at}`)
+      await hit("PATCH", `/session/${created.id}?${at}`, { title: "sampler renamed" })
+      await hit("POST", `/session/${chat}/fork?${at}`, { messageID: userID })
+      await hit("POST", `/session/${chat}/abort?${at}`)
+      const prompted = await create()
+      await hit("POST", `/session/${prompted}/prompt_async?${at}`, { parts: [{ type: "text", text: "say hello plainly" }] })
+      await idle(prompted)
+      const shelled = await create()
+      await hit("POST", `/session/${shelled}/shell?${at}`, { command: "echo routes", agent: "build" })
+      await Bun.sleep(500)
+      await hit("GET", `/session/${chat}/message/${userID}?${at}`)
+      await hit("POST", `/session/${chat}/revert?${at}`, { messageID: userID })
+      await hit("POST", `/session/${chat}/unrevert?${at}`)
+      await hit("POST", `/session/${prompted}/summarize?${at}`, {})
+      await Bun.sleep(500)
+      await hit("POST", `/api/session/${created.id}/rename`, { title: "sampler rename" })
+      await hit("DELETE", `/session/${created.id}?${at}`)
+      await hit("GET", `/agent?${at}`)
+      await hit("GET", `/command?${at}`)
+      await hit("GET", `/mcp?${at}`)
+      await hit("GET", `/experimental/resource?${at}`)
+      await hit("POST", `/mcp/oauthprobe/disconnect?${at}`)
+      await hit("POST", `/mcp/oauthprobe/connect?${at}`)
+      await hit("POST", `/api/mcp/oauthprobe/disconnect?location%5Bdirectory%5D=${encodeURIComponent(project)}`)
+      await hit("POST", `/api/mcp/oauthprobe/connect?location%5Bdirectory%5D=${encodeURIComponent(project)}`)
+      await hit("GET", `/vcs?${at}`)
+      await hit("GET", `/vcs/status?${at}`)
+      await hit("GET", `/vcs/diff?${at}&mode=working`)
+      await hit("GET", `/file?${at}&path=`)
+      await hit("GET", `/file/content?${at}&path=a.txt`)
+      await hit("GET", `/find/file?${at}&query=a&dirs=false`)
+      await hit("GET", `/question?${at}`)
+      await hit("POST", `/question/${replied.formID}/reply?${at}`, { answers: [["Red"]] })
+      await hit("POST", `/question/${rejected.formID}/reject?${at}`)
+      await idle(replied.sessionID)
+      const pty = await hit("POST", `/pty?${at}`, { title: "sampler" })
+      await hit("GET", `/pty?${at}`)
+      await hit("GET", `/pty/shells?${at}`)
+      await hit("GET", `/pty/${pty.id}?${at}`)
+      await hit("PUT", `/pty/${pty.id}?${at}`, { title: "sampler 2", size: { rows: 24, cols: 80 } })
+      await hit("POST", `/pty/${pty.id}/connect-token?${at}`, undefined, { "x-opencode-ticket": "1" })
+      await hit("DELETE", `/pty/${pty.id}?${at}`)
+      await hit("GET", `/api/model?location%5Bdirectory%5D=${encodeURIComponent(project)}`)
+      await hit("POST", `/instance/dispose?${at}`)
+
+      write("routes.json", {
+        _source: source(
+          "Translated routes: each v1 request a frozen caller sends, once through the adapter; `cases` keeps per contract route the v1 request, every 2.x exchange the translator made for it (method, path with query, status, content type, body) and the adapter's status. " +
+            "Setup: a session with one plain turn (chat), two sessions with a pending question form (the mock's ask script), a remote MCP oauthprobe on the local mock-oauth.ts, and a plain non-git directory for git init. The expectations of the test come from these upstream bodies, the frozen consumers and the UC invariants, never from a recorded adapter body.",
+        ),
+        directory: project,
+        cases,
+      })
+    } finally {
+      oauth.stop()
+      autoAllow = false
+    }
+  }
+
   console.log(`fixtures written to ${OUT}`)
 } finally {
   stop.abort()

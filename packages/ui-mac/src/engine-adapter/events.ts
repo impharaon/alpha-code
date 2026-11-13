@@ -12,7 +12,8 @@
 //     会话属性变化 → 重取会话发 session.created / updated;
 //   · 消息:流式增量(text / reasoning)直接转 message.part.delta;其余每个结构性事件之后重取最近一页消息,
 //     经 toV1Messages 投影,**只发有变化的** message.updated / message.part.updated —— 增量只用来让字一个个出来,
-//     内容以 2.x 存储为准。todowrite 工具的输入同时投影成 todo.updated(U1)。
+//     内容以 2.x 存储为准。todowrite 工具的输入同时投影成 todo.updated(U1)。回退提交删掉的消息逐条发 message.removed
+//     (`#1669`,暂存时记下会被删的那些,见 staged)。
 // 不认识的事件丢弃(它们在 v1 没有对应,冻结界面也不读)。
 import type { OpenCodeClient, OpenCodeEvent, SessionMessageInfo } from "@opencode/client/promise"
 import type { Part } from "@opencode-ai/sdk/v2/client"
@@ -23,6 +24,7 @@ import type { PermissionReplies } from "./permission-replies"
 import type { RouteContext } from "./routes"
 import { recentMessages, rememberSessionDirectory, sessionDirectory } from "./session-cache"
 import {
+  baseID,
   contentKeys,
   partID,
   todosOf,
@@ -37,7 +39,8 @@ import {
 export type V1Payload = { type: string; properties: unknown }
 type Emit = (directory: string, payload: V1Payload) => void
 
-const SNAPSHOT_WINDOW = 20
+/** 每个结构性事件之后按存储重取的最近一页(条数)。 */
+export const SNAPSHOT_WINDOW = 20
 
 /** 结构性的消息事件:之后按存储重取最近一页并发出变化。 */
 export const SNAPSHOT_EVENTS = new Set([
@@ -164,6 +167,22 @@ export function createProjector(
               } as SessionMessageInfo),
         )
 
+  /**
+   * `#1669`:暂存的回退(会话 → 边界消息、边界起的 2.x 消息、它们投影出的 v1 id)。2.x 提交回退时把边界起的消息全删掉
+   * (core session/projector.ts RevertEvent.Committed),事件里只有边界、删掉的再也读不回来;冻结界面只在 `message.removed`
+   * 上删消息(server-session.ts),0.1.26 的 revert cleanup 逐条发它。所以暂存时记下会被删的,提交时照发。
+   * 按引擎顺序,边界或任何一条已记下的消息之后的都会被删;读到的上下文里一条也看不见(已提交)就不记,
+   * 不把「不在最近一页」当成删除。
+   */
+  const staged = new Map<string, { boundary: string; doomed: Set<string>; ids: Set<string> }>()
+  const noteStaged = (sessionID: string, context: readonly SessionMessageInfo[], listed: ReturnType<typeof toV1Messages>) => {
+    const pending = staged.get(sessionID)
+    const from = pending ? context.findIndex((message) => message.id === pending.boundary || pending.doomed.has(message.id)) : -1
+    if (!pending || from < 0) return
+    for (const message of context.slice(from)) pending.doomed.add(message.id)
+    for (const { info } of listed) if (pending.doomed.has(baseID(info.id))) pending.ids.add(info.id)
+  }
+
   const remember = (key: string, value: unknown) => {
     const encoded = JSON.stringify(value)
     if (emitted.get(key) === encoded) return false
@@ -178,6 +197,8 @@ export function createProjector(
       if (message.type === "assistant") blocks.set(message.id, contentKeys(message.content as never))
     }
     const listed = toV1Messages(sessionID, withProgress(page.context))
+    // 回退暂存期间新落下的消息(用户的 shell、后台通知)排在边界之后,提交时一并被删。
+    noteStaged(sessionID, page.context, listed)
     const anchor = turnAnchor(listed, page.context)
     if (refreshTurnDiff && anchor) {
       // 取不到这一步的回合改动不该让消息也停更:记下(不静默),消息照发,下一个边界再取。
@@ -364,6 +385,20 @@ export function createProjector(
         void streamShell(directory, sessionID, data.assistantMessageID, data.id, data.metadata.shellID)
     }
     if (type === "session.tool.success" || type === "session.tool.failed") progress.delete(data.id)
+    if (type === "session.revert.staged") {
+      // 边界可能在很早的那页(长对话中间):往前翻到它为止,记下它与之后的全部。
+      const boundary = data.revert.messageID as string
+      staged.set(sessionID, { boundary, doomed: new Set(), ids: new Set() })
+      const page = await recentMessages(api, sessionID, { through: boundary })
+      noteStaged(sessionID, page.context, toV1Messages(sessionID, page.context))
+    }
+    if (type === "session.revert.cleared") staged.delete(sessionID)
+    if (type === "session.revert.committed") {
+      const pending = staged.get(sessionID)
+      staged.delete(sessionID)
+      if (pending && pending.boundary === data.to)
+        for (const messageID of pending.ids) emit(directory, { type: "message.removed", properties: { sessionID, messageID } })
+    }
     if (SNAPSHOT_EVENTS.has(type) || TURN_DIFF_EVENTS.has(type)) await snapshot(directory, sessionID, TURN_DIFF_EVENTS.has(type))
     if (SESSION_INFO_EVENTS.has(type)) await sessionInfo(directory, sessionID, "session.updated")
 

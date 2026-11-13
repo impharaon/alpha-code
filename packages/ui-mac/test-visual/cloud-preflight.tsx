@@ -24,9 +24,14 @@ const wallet: AccountStatusV1 = {
   account: { ...structuredClone(ok.account), plan: { status: "none", tier: "free" }, wallet: { balance_fen: 320, available_fen: 320 }, wallet_overflow: true },
   task: { ...structuredClone(ok.task!), admission: { ok: false, code: "account_wallet_insufficient", reason: "refused" } },
 }
+// D1(owner 2026-11-13):没有专门文案的拒绝码 → warning + 通用句、没有按钮,卡片照常。
+const uncopied: AccountStatusV1 = {
+  ...structuredClone(ok),
+  task: { ...structuredClone(ok.task!), admission: { ok: false, code: "route_usage_stopped", reason: "refused" } },
+}
 const state = params.get("state") ?? "ok"
 const reply = () =>
-  state === "loading" ? new Promise(() => {}) : Promise.resolve(state === "wallet" ? wallet : ok)
+  state === "loading" ? new Promise(() => {}) : Promise.resolve(state === "wallet" ? wallet : state === "uncopied" ? uncopied : ok)
 
 ;(window as unknown as { api: unknown }).api = {
   openDirectoryPicker: async () => ["/synthetic/results"],

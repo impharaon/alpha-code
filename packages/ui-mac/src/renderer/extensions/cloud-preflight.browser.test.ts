@@ -77,13 +77,16 @@ const FRAME = {
   ok: { card: 128, row: 25.5, banner: 54.5 },
   // r3 #form-wallet:没有会员两行卡片 77,两行说明的提示条 72.9。
   wallet: { card: 77, row: 25.5, banner: 72.9 },
+  // D1(owner 2026-11-13)的新状态:warning、一行说明、没有按钮 —— 与 r3 #form-suspended / #legacy-suspended
+  // 同形,帧实测卡片 128、提示条 54.5,间距同上。
+  uncopied: { card: 128, row: 25.5, banner: 54.5 },
 }
 
 for (const box of ["form", "legacy", "code-review"] as const) {
   const inRow = box !== "code-review"
   for (const theme of ["light", "dark"] as const) {
     test(`#1686 ${box} ${theme}: preflight geometry matches the approved frame; the primary button is rightmost`, async () => {
-      for (const state of ["ok", "wallet"] as const) {
+      for (const state of ["ok", "wallet", "uncopied"] as const) {
         const page = await open(`box=${box}&state=${state}`, theme)
         try {
           await page.locator(".a-banner").waitFor()

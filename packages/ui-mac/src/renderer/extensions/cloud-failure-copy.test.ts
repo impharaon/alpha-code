@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { failureCodeFromEvent, failureCopy } from "./cloud-failure-copy"
+import { failureCodeFromEvent, failureCopy, preflightRefusalCopy } from "./cloud-failure-copy"
+import { dispatchError } from "./cloud-job-lifecycle"
 import { setLocale } from "../i18n"
 
 describe("REQ-232 AC5 failure copy and frozen frame paths", () => {
@@ -11,6 +12,13 @@ describe("REQ-232 AC5 failure copy and frozen frame paths", () => {
     expect(failureCopy("not-authenticated")?.action).toBe("login")
     expect(failureCopy("unauthorized")?.action).toBe("login")
     expect(failureCopy("provider_failed")).toBeNull()
+  })
+  test("#1686 D1: the generic sentence is only for a preflight refusal without copy; dispatch keeps its own fallback", () => {
+    setLocale("zh")
+    expect(preflightRefusalCopy("route_usage_stopped")).toEqual({ text: "平台现在不接受这项任务，请稍后再试。", action: null })
+    expect(preflightRefusalCopy("account_wallet_insufficient")).toEqual(failureCopy("account_wallet_insufficient"))
+    expect(failureCopy("route_usage_stopped")).toBeNull()
+    expect(dispatchError("route_usage_stopped")).toBe("未能确认云端是否接收了任务。请先查看任务状态，避免重复发送。")
   })
   test("alpha-code#1686 a retired cloud kind says so in the approved words, with no next-step button", () => {
     setLocale("zh")

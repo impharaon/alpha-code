@@ -166,4 +166,5 @@ last_reviewed: 2026-11-13
   - M4 派发被拒后:卡片照常、预检结论不显示。解除条件:改任意输入(目录表单字段 / 旧版输入框)、开始新的提交、换任务(同一组件换条目或重建)。登录现值送达不解除(屏幕上的拒绝原句也还在)。代码审查没有输入框,只有再次提交或换条目才解除。
   - m5 键盘顺序:DOM 恢复原样(主按钮在前、次按钮其次、状态字与「取消任务」在后),视觉位置改由 `extension-hub.css` 的 `order` 实现(次按钮 1、主按钮 2)。
   - m6 卸载后 `refresh()` 与回复写入一律无效。
+- 2026-11-13 · D1 owner 裁决(同意编排器建议):提交前预检的拒绝码没有专门文案时,warning「现在发不了」+「平台现在不接受这项任务，请稍后再试。」(英文 "The platform isn't accepting this task right now. Try again later."),没有按钮,卡片照常 —— 取代批准稿的「只显示卡片、不下结论」。文案权威里新增 `preflightRefusalCopy`(`R/extensions/cloud-failure-copy.ts`,= `failureCopy ?? 通用句`),只给预检用;派发与运行中的失败仍走 `failureCopy` / `dispatchError` 原有的通用句(测试钉住同一个码在派发时仍是「未能确认云端是否接收了任务…」)。几何:新状态与 r3 `#form-suspended` 同形,帧实测卡片 128、提示条 54.5,已加进浏览器检查。
 

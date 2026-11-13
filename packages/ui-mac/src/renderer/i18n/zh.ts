@@ -615,6 +615,7 @@ export const dict = {
   "codepuppy.ext.cloudErrRetired": "这项云端功能已停用，请在本机生成。",
   "codepuppy.ext.preflightReady": "现在可以发起",
   "codepuppy.ext.preflightBlocked": "现在发不了",
+  "codepuppy.ext.preflightRefusedGeneric": "平台现在不接受这项任务，请稍后再试。",
   "codepuppy.ext.preflightHold": "预留 ¥{{yuan}},按实际用量结算;失败时已产生的费用仍会结算。",
   "codepuppy.ext.preflightAccount": "你的账户",
   "codepuppy.ext.preflightOverflow": "额度用完后用余额付",

@@ -16,6 +16,14 @@ export function failureCopy(code: string) {
   return null
 }
 
+/**
+ * #1686 决定点 D1(owner 2026-11-13):**提交前预检**的拒绝码没有专门文案时,给一句通用说明、没有按钮。
+ * 只用于预检;派发与运行中的失败仍走 failureCopy / dispatchError 各自现有的通用句。
+ */
+export function preflightRefusalCopy(code: string) {
+  return failureCopy(code) ?? { text: t("codepuppy.ext.preflightRefusedGeneric"), action: null }
+}
+
 export function failureCodeFromEvent(payload: { data: unknown }): string | undefined {
   const data = payload.data
   if (!data || typeof data !== "object") return undefined

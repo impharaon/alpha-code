@@ -625,6 +625,7 @@ export const dict = {
   "codepuppy.ext.cloudErrRetired": "This cloud feature has been retired. Generate it locally instead.",
   "codepuppy.ext.preflightReady": "Ready to start",
   "codepuppy.ext.preflightBlocked": "Can't start now",
+  "codepuppy.ext.preflightRefusedGeneric": "The platform isn't accepting this task right now. Try again later.",
   "codepuppy.ext.preflightHold": "Reserves ¥{{yuan}}; you are charged for actual usage. Costs already incurred are still charged if the task fails.",
   "codepuppy.ext.preflightAccount": "Your account",
   "codepuppy.ext.preflightOverflow": "Pay with wallet after allowance runs out",

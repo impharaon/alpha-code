@@ -17,7 +17,7 @@ import { Card } from "../codepuppy-ui/Card"
 import { KeyValueList, type KeyValueRow } from "../codepuppy-ui/KeyValueList"
 import { subscribeAuthState } from "../auth-recovery"
 import type { CloudAccountStatus } from "../../preload/types"
-import { failureCopy } from "./cloud-failure-copy"
+import { failureCopy, preflightRefusalCopy } from "./cloud-failure-copy"
 import { dispatchError } from "./cloud-job-lifecycle"
 
 /** 焦点刷新的新鲜度门槛(设计 §4.4「取数时机」;表单内常量,不是配置)。 */
@@ -50,11 +50,10 @@ type PreflightView =
   | { kind: "unavailable" }
 
 /**
- * 决定点 D1(plan.md,待 owner):拒绝码在现有文案权威里没有对应时怎么办。批准稿:只显示卡片、不下结论 ——
- * 返回 null。owner 若选通用句,改成 `failureCopy(code) ?? { text: t(<新键>), action: null }` 这一行。
- * 今天可达的只有 `route_usage_stopped`。
+ * 决定点 D1(owner 2026-11-13 定):拒绝码在现有文案权威里没有对应时,warning「现在发不了」+ 通用句、没有按钮,
+ * 卡片照常(取代批准稿的「只显示卡片、不下结论」)。今天可达的只有 `route_usage_stopped`。
  */
-const refusalCopy = (code: string) => failureCopy(code)
+const refusalCopy = (code: string) => preflightRefusalCopy(code)
 
 const yuan = (fen: number) => (fen / 100).toFixed(2)
 

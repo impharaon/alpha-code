@@ -310,11 +310,27 @@ describe.each(BOXES)("alpha-code#1686 preflight in the %s send box", (box) => {
     expect(banner()!.action).toBeNull()
   })
 
-  test("D1: a refusal code with no copy (route_usage_stopped) shows the card only, no verdict", async () => {
+  test("D1 (owner 2026-11-13): a refusal code with no copy (route_usage_stopped) keeps the card and says the generic sentence, no button", async () => {
     mount(box, { reply: async () => refused("route_usage_stopped") })
     await flush()
     expect(card()).toEqual(FULL_CARD)
-    expect(banner()).toBeUndefined()
+    const b = banner()!
+    expect([b.kind, b.title, b.details]).toEqual(["warning", "现在发不了", ["平台现在不接受这项任务，请稍后再试。"]])
+    expect(b.action).toBeNull()
+  })
+
+  test("D1: a dispatch refused with that same code keeps the existing dispatch fallback, not the preflight sentence", async () => {
+    mount(box, {
+      reply: () => new Promise(() => {}),
+      dispatch: async () => (box === "code-review" ? { status: "failed", error: "route_usage_stopped" } : { error: "route_usage_stopped" }),
+    })
+    await flush()
+    fillInput(box)
+    await flush()
+    submitFor(box)
+    await flush()
+    const fallback = box === "code-review" ? zh["codepuppy.ext.cloudUnknownUpload"] : zh["codepuppy.ext.cloudUnknownSend"]
+    expect(document.querySelector(".codepuppy-ext-card-err")?.textContent).toBe(fallback)
   })
 
   test.each(["not-authenticated", "unauthorized"])("signed out (%s): no card; sign-in sentence and 去登录", async (code) => {

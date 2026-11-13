@@ -416,7 +416,6 @@ export const dict = {
   "codepuppy.ext.authz.chipNew": "New",
   "codepuppy.ext.authz.chipGranted": "Granted",
   "codepuppy.ext.authz.chipRemoved": "Revoked",
-  "codepuppy.ext.authz.riskHigh": "High risk",
   "codepuppy.ext.authz.bundleRest": "Permissions for the other {{n}} items are unchanged and need no further confirmation.",
   "codepuppy.ext.authz.note": "By confirming, you agree to all permissions listed above. The extension receives them only after installation succeeds. Canceling will not install it or grant permissions.",
   "codepuppy.ext.authz.riskLine": "⚠ This extension can run programs on your computer or execute code in the app's engine. Make sure you trust it.",

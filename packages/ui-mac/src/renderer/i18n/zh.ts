@@ -406,7 +406,6 @@ export const dict = {
   "codepuppy.ext.authz.chipNew": "新增",
   "codepuppy.ext.authz.chipGranted": "已授权",
   "codepuppy.ext.authz.chipRemoved": "将收回",
-  "codepuppy.ext.authz.riskHigh": "高风险",
   "codepuppy.ext.authz.bundleRest": "其余 {{n}} 项的权限没有变化，无需再次确认。",
   "codepuppy.ext.authz.note": "确认后，你同意授予上面列出的全部权限。安装成功后，扩展才会获得这些权限。点取消不会安装，也不会授予权限。",
   "codepuppy.ext.authz.riskLine": "⚠ 此扩展可以在你的电脑上运行程序，或在应用的引擎中执行代码。请确认你信任它。",

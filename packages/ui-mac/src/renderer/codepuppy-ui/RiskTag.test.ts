@@ -122,3 +122,67 @@ describe("#1314 AC-01 风险标签组件:五档", () => {
     expect(en["codepuppy.riskTag.unknown"]).toBe("Risk unknown")
   })
 })
+
+// ═══ 能力授权框:高风险能力行用同一个组件 ═══════════════════════════════════════════════
+describe("#1314 AC-01 能力授权框的「高风险」标签", () => {
+  const diffs: CapabilityDiffWire[] = [
+    {
+      key: "mcp--demo",
+      previous: ["engine:plugin", "network:remote"],
+      requested: ["process:spawn", "engine:plugin", "prompt:context", "network:remote"],
+      added: ["process:spawn", "prompt:context"],
+      removed: [],
+      requiresConfirmation: true,
+    },
+    {
+      key: "mcp--other",
+      previous: ["prompt:context", "process:spawn"],
+      requested: ["prompt:context"],
+      added: [],
+      removed: ["process:spawn"],
+      requiresConfirmation: true,
+    },
+  ]
+  const rowOf = (host: HTMLElement, cap: string, kind: "new" | "granted" | "removed") =>
+    [...host.querySelectorAll<HTMLElement>(".codepuppy-ext-authz-cap")].find(
+      (row) =>
+        row.querySelector(".codepuppy-ext-authz-id")?.textContent === cap &&
+        row.querySelector(`.codepuppy-ext-authz-chip[data-kind="${kind}"]`) !== null,
+    )!
+
+  test("新增行与已授权行的高风险能力各有一个标签,在技术名之后、变化标签之前;将收回行与低 / 中档能力没有", () => {
+    const host = mount(() =>
+      runtime.createComponent(runtime.ExtAuthzView, { name: "Demo", isBundle: false, mode: "update", diffs }),
+    )
+    for (const [cap, kind] of [["process:spawn", "new"], ["engine:plugin", "granted"]] as const) {
+      const row = rowOf(host, cap, kind)
+      const tag = row.querySelectorAll(".a-risk-tag")
+      expect(tag, `${cap} ${kind}`).toHaveLength(1)
+      expect(tag[0]!.getAttribute("data-level")).toBe("high")
+      expect(tag[0]!.textContent).toBe("高风险")
+      const children = [...row.children]
+      expect(children.indexOf(tag[0]!)).toBe(children.indexOf(row.querySelector(".codepuppy-ext-authz-id")!) + 1)
+      expect(children.indexOf(row.querySelector(".codepuppy-ext-authz-chip")!)).toBe(children.indexOf(tag[0]!) + 1)
+    }
+    expect(rowOf(host, "process:spawn", "removed").querySelector(".a-risk-tag")).toBeNull() // 将收回
+    expect(rowOf(host, "prompt:context", "new").querySelector(".a-risk-tag")).toBeNull() // 低档
+    expect(rowOf(host, "network:remote", "granted").querySelector(".a-risk-tag")).toBeNull() // 中档
+    expect(host.querySelectorAll(".a-risk-tag")).toHaveLength(2)
+  })
+
+  test("旧的第二套样式已被取代:授权框里不再有 data-kind=\"risk\" 的变化标签", () => {
+    const host = mount(() =>
+      runtime.createComponent(runtime.ExtAuthzView, { name: "Demo", isBundle: false, mode: "update", diffs }),
+    )
+    expect(host.querySelector('.codepuppy-ext-authz-chip[data-kind="risk"]')).toBeNull()
+  })
+
+  test("详情页「已授权能力」被动行:高风险能力同一个组件,其余没有", () => {
+    const high = mount(() => runtime.createComponent(runtime.ExtGrantedCapRow, { cap: "engine:plugin" }))
+    expect(high.querySelectorAll('.a-risk-tag[data-level="high"]')).toHaveLength(1)
+    expect(high.querySelector('.codepuppy-ext-authz-chip[data-kind="risk"]')).toBeNull()
+    document.body.replaceChildren()
+    const low = mount(() => runtime.createComponent(runtime.ExtGrantedCapRow, { cap: "prompt:context" }))
+    expect(low.querySelector(".a-risk-tag")).toBeNull()
+  })
+})

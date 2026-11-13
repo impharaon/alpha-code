@@ -36,7 +36,7 @@ Use the semantic **role**, never a raw hex.
 | `--a-border-strong` | `#ced2d9` | `#34363c` | emphasized |
 | `--a-text` | `#18181b` | `#fafafa` | primary (~16:1) |
 | `--a-text-secondary` | `#52525b` | `#a1a1aa` | labels (~7:1) |
-| `--a-text-tertiary` | `#7c7d85` | `#71727a` | placeholder / meta (~4.5:1) |
+| `--a-text-tertiary` | `#64656d` | `#86878f` | placeholder / meta (≥4.5:1 on every container background) |
 | `--a-text-disabled` | `#b3b6bd` | `#4f5158` | — |
 | `--a-text-on-accent` | `#ffffff` | `#ffffff` | label on accent fill |
 
@@ -71,6 +71,11 @@ clean over any background:
 `--a-info` `#2563eb` (dark: `#4ade80` / `#fbbf24` / `#f87171` / `#60a5fa`), each
 with a `-subtle` tinted background. Use for status meaning only — never to
 decorate or as a second accent.
+
+Text placed **on** a `-subtle` tint uses the tone's `-on-subtle` color, not the
+tone itself: the tone on its own tint is below 4.5:1 in light. `--a-error-on-subtle`
+exists; `--a-warning-on-subtle` and `--a-success-on-subtle` are pending
+([`tokens.md`](tokens.md)).
 
 ## Run-permission tiers
 

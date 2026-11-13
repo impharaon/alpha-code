@@ -268,11 +268,11 @@ describeDarwin("`#1572` AC4 真栈:Electron 内嵌 node + 真出网代理 + 真 
 
   // #1654 N11(a):同样由真实 webfetch 自己的期限(OpenCode 2 packages/core/src/tool/plugin/webfetch.ts 的 timeoutOrElse ⇒ 普通
   // Error("Request timed out")),仅缩短测试中的期限。0.1.26 落库的原文就是这句;OpenCode 2 的 webfetch 把它包成
-  // `Unable to fetch <url>` 落库(卡片原文行显示它,查询串由 redactText 隐藏),期限错误只作为原因交给 ext —— 层码 `timeout`
+  // `Unable to fetch <url>`,期限错误只作为原因交给 ext,ext 的 execute.after 把落库原文换回这句(`#1702`,卡片原文行显示它)—— 层码 `timeout`
   // 只由分类模块的「Error 且原文 Request timed out」一条给出(TimeoutError 给的是 TimeoutError),所以它就是「来自 webfetch 期限」的证据。
   test("#1654 AC1 real webfetch deadline persists timeout and the tool card names its host", () => {
     const record = recordFor(TARGETS.timeout)
-    expect(record.state.error).toBe(`Unable to fetch ${record.state.input.url}`)
+    expect(record.state.error).toBe("Request timed out")
     expect(record.state.metadata?.codepuppyNetFailure).toEqual({ layer: "timeout", code: "timeout" })
     const body = toolCardBodyOf(record as unknown as ToolPart)
     expect(body).toMatchObject({ type: "error", netLayer: "timeout", host: TARGETS.timeout })

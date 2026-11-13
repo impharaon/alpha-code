@@ -188,6 +188,10 @@ export const CodePuppyExt: Plugin.Plugin = {
           // 429 时供应商抛的是引擎认得出的 HttpClientError(random 才会换同伴),具名结局在它的 cause 里 —— 沿 cause 链找。
           const cause = event.tool === "websearch" ? codePuppyWebSearchFailureOf((event.error as { error?: unknown }).error) : undefined
           if (cause) (event.error as { message: string }).message = cause.message
+          // `#1702`:2.x 的 webfetch 把任何失败都包成「Unable to fetch <url>」,真正的原因是它的内层错误;交回那句原因
+          // (0.1.26 落库的原文,如「Request timed out」)。按工具与内层 Error 认,不看文案;没有内层原因时保持原样。
+          const inner = event.tool === "webfetch" ? (event.error as { error?: unknown }).error : undefined
+          if (inner instanceof Error && inner.message) (event.error as { message: string }).message = inner.message
           return
         }
         if (event.status !== "completed") return

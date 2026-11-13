@@ -38,6 +38,7 @@ import { STAGED_ATTACHMENT_PART_NAME, stagedAttachmentPart } from "./staged-atta
 import { policyWorkspace } from "./policy/index"
 import { createToolPolicyStore, defaultPolicyBaseDir } from "./policy/resolver"
 import { Message } from "../../ai/src/schema/messages.ts"
+import { ToolFailure } from "../../ai/src/schema/errors.ts"
 import * as Media from "../../ai/src/media.ts"
 import { toLLMMessages } from "../../core/src/session/runner/to-llm-message.ts"
 import { Config } from "../../core/src/config.ts"
@@ -1190,5 +1191,29 @@ it.live("权威 · 助手的 temperature / top_p(#1700 AC-05 / AC-06):项目助�
     expect(yield* sampled("globalSampler", "warm")).toEqual({ temperature: 0.4, topP: 0.7 })
     expect(yield* sampled("sampler", "cold")).toEqual({ temperature: undefined, topP: 0.9 })
     expect(yield* sampled("build", "warm")).toEqual({ temperature: undefined, topP: undefined })
+  }),
+)
+
+// `#1702`:2.x 的 webfetch 把任何失败都包成 `ToolFailure("Unable to fetch <url>", 内层原因)`(packages/core/src/tool/plugin/webfetch.ts
+// 的 mapError)。装了 ext 的 execute.after 把消息换回内层原因(0.1.26 落库的原文);网络层失败的层码由同一链上的 attachNetFailure
+// 照旧写进 metadata。真机上的落库原文由 ui-mac net-failure-real-stack.test.ts 的 #1654 AC1 钉住。
+it.live("权威 · 网页抓取失败的原因(#1702):Unable to fetch 的失败交回内层原因、层码照旧;没有内层原因 ⇒ 原样;反向臂:不装 ext ⇒ 仍是 Unable to fetch", () =>
+  Effect.gen(function* () {
+    env({})
+    const url = "https://ac1702.test/page"
+    const after = (error: ToolFailure) =>
+      Effect.gen(function* () {
+        const hooks = yield* PluginHooks.Service
+        const event = yield* hooks.trigger("tool", "execute.after", { tool: "webfetch", ...ids, id: "call_1702" as never, input: { url }, status: "error", error })
+        return event as unknown as { error: { message: string; metadata?: Record<string, unknown> } }
+      })
+    const timedOut = () => new ToolFailure({ message: `Unable to fetch ${url}`, error: new Error("Request timed out") })
+    // 反向臂在前:不装 ext ⇒ 消息就是 webfetch 包的那句。
+    expect((yield* after(timedOut())).error.message).toBe(`Unable to fetch ${url}`)
+    yield* activate(CodePuppyExt)
+    const reason = (yield* after(timedOut())).error
+    expect(reason.message).toBe("Request timed out")
+    expect(reason.metadata?.codepuppyNetFailure).toEqual({ layer: "timeout", code: "timeout" })
+    expect((yield* after(new ToolFailure({ message: `Unable to fetch ${url}` }))).error.message).toBe(`Unable to fetch ${url}`)
   }),
 )

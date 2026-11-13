@@ -163,6 +163,12 @@ export function setDockIcon() {
   if (!icon.isEmpty()) app.dock?.setIcon(icon)
 }
 
+// #1686 R1 M1:活着的产品窗口(启动的那个 + 菜单「新建窗口」建的)。auth-state 广播到它们每一个。
+const productWindowSet = new Set<BrowserWindow>()
+export function productWindows(): BrowserWindow[] {
+  return Array.from(productWindowSet).filter((win) => !win.isDestroyed())
+}
+
 export function createMainWindow() {
   const state = windowState({
     defaultWidth: 1280,
@@ -206,6 +212,8 @@ export function createMainWindow() {
 
   allowRendererPermissions(win)
   wireWindowRecovery(win, "main")
+  productWindowSet.add(win)
+  win.on("closed", () => productWindowSet.delete(win))
   // Deep-link stream ownership (REQ-089 AC4). Wired HERE, not at the boot call site, because this
   // function is also the `window.new` menu action's window factory: a renderer that could drain
   // the queue but never report reload/crash/destruction would strand or lose links silently.

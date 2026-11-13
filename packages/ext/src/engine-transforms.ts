@@ -143,7 +143,8 @@ const ACTION_ONLY_KEYS = new Set(["question", "websearch", "doom_loop"])
 /** 上游 v1 agent 的 `color`:六位 hex,或主题色名(`core/src/v1/config/agent.ts` `Color`)。 */
 const THEME_COLORS = new Set(["primary", "secondary", "accent", "success", "warning", "error", "info"])
 const isColor = (value: unknown) => typeof value === "string" && (/^#[0-9a-fA-F]{6}$/.test(value) || THEME_COLORS.has(value))
-const isPositiveInt = (value: unknown) => typeof value === "number" && Number.isInteger(value) && value > 0
+/** 上游 `PositiveInt`(`schema/src/schema.ts`:`Schema.Int` 加大于 0;`Schema.Int` 只收安全整数)。 */
+const isPositiveInt = (value: unknown) => typeof value === "number" && Number.isSafeInteger(value) && value > 0
 const isFiniteNumber = (value: unknown) => typeof value === "number" && Number.isFinite(value)
 const isString = (value: unknown) => typeof value === "string"
 const isBoolean = (value: unknown) => typeof value === "boolean"

@@ -238,6 +238,9 @@ describe("项目 agent 的其余字段(#1700)= 引擎读同一条 v1 agent 写�
       badSteps: { steps: 0 },
       fractionalSteps: { steps: 2.5 },
       badMaxSteps: { maxSteps: -1 },
+      // Codex R1/1 M2:超出安全整数的 steps / maxSteps 上游整条丢掉(带着放宽的 permission 也一样)
+      unsafeSteps: { steps: 9007199254740992, permission: { edit: "allow" } },
+      unsafeMaxSteps: { maxSteps: 9007199254740992, permission: { edit: "allow" } },
     }
     const accepted = { ok: { prompt: "p", mode: "subagent", permission: { edit: "deny" } }, emptyOptions: { options: {} } }
     const result = ConfigNormalize.normalize({ agent: { ...malformed, ...accepted } })

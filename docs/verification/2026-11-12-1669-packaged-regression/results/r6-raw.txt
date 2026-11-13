@@ -63,3 +63,18 @@ session 3 (stub model, unavailable): opens with the old turns and the "运行 1 
 one conversation ses_e2c5b9d04ffe…: 只读 -> "当前会话是只读模式，我不能创建文件…" no file (agent codepuppy-readonly); 全部批准 -> l7r6-a-all1.txt written, no card (agent build);
 请求审批 -> card, 允许一次 -> written (agent codepuppy-ask); 全部批准 -> l7r6-a-all2.txt written, no card (agent build)
 /review picked from the slash menu -> POST /command 204; child session "review changes [commit|branch|pr]…" ran (agent build) and its result was injected into the parent; 继续 -> answered by agent build
+
+## 0.1.26 reference, root B (official 0.1.26, logged in, English UI), hidden, CDP 9223
+pending approval + follow-up: the follow-up shows at once as a "New turn" bubble above the waiting card (r6-b126-followup-during-approval.png)
+stop during pending approval: "Stopped by you · Continue", the card "Allow this action?" stays (still there ~58 s later, r6-b126-after-stop-30s.png) — same as the candidate
+R17 with @general picked: card "Start a subtask / Hand off to assistant general / … / Subtasks won't ask again step by step"; Reject -> no file
+terminal: stty "77 36" before and after dragging the grip 2164 -> 1861 CSS px (no live refit); Review -> Terminal: black, no input (same as the candidate)
+
+## section 4 (root A, a7)
+N01: rc.md + rc.docx dropped via CDP Input.dispatchDragEvent (no picker): cards "rc.md 1 KB · 直接进对话", "rc.docx 36 KB · 本机读取"; answer "rc.md：L7R6-MD-4821 / rc.docx：7319" (docx read by execute -> codepuppy-word.read_docx from .codepuppy/attachments/<uuid>/rc.docx);
+   timeline card after the turn and after reopening: rc.md "已随消息发出", rc.docx "这一轮助手没有读取 · 请助手读取"
+   rc.png: strip "1 张图片:当前模型看不了图,发送时由 Code Puppy 云识图后转成文字 · 按次计费,图片会上传" + cloud badge; answer "纯蓝色…的空白图片"
+N10: picker rows (6 platform + 5 BYOK) each render an svg icon; composer chip shows the DeepSeek icon
+N11(a) 02:00:47 "用 webfetch 读取 https://nx-rc0125-probe.invalid/": main process asked through the native egress dialog (egress-approval-dialog.ts, showMessageBox "允许联网?");
+   egress.grant decision refused 02:01:36 (45 s timeout); webfetch error "Unable to fetch https://nx-rc0125-probe.invalid/"; at 02:03 hide-app had to re-hide A (hide-calls=1) -> the dialog un-hid the window. Sweep stopped; A restarted as a8 (logged in, hidden, background re-hider 7200 s).
+paid: 39 user messages (A 36, B 3) on codepuppy/deepseek-v4-flash + 1 cloud vision call

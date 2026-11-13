@@ -1,16 +1,91 @@
 ---
-title: alpha-code#1669 打包版换代回归与撤回演练 —— 第五轮:撤回演练「库超前」阻断不出现(FAIL);2.x 失败回合不显示原因(FAIL);G10 PASS
+title: alpha-code#1669 打包版换代回归与撤回演练 —— 第六轮(0.2.0 候选包):审批与失败回合已回到 0.1.26;R17 不派子任务、审批中追加消息不显示、附件 docx 标签错(FAIL);出网批准框打断了隐藏
 kind: verification
 status: active
 owners:
   - alpha-code desktop maintainers
-last_reviewed: 2026-11-12
+last_reviewed: 2026-11-13
 ---
 
 # alpha-code#1669 打包版回归与撤回演练(L7)
 
 依据:方案基线 [§5.1、§5.2、§6.2、§2.8](../../design/2026-11-08-1662-opencode2-generation-switch-baseline.md),
 票面 `impharaon/alpha-code#1669`,派发书里的七个补充格 a–g 与八条硬规矩。第二轮在前,第一轮原文在后。
+
+## 第六轮(2026-11-13 00:31–02:10 EST,新会话)—— 0.2.0 候选包,一次扫完
+
+被测:编排器给的候选包 `alpha-code-fix-1669-g2-reject-hangs/packages/ui-mac/dist/mac-arm64/Code Puppy.app`(分支头 `0b404fc956`,0.2.0,prod,未签名),
+`app.asar` sha256 `20388aaf…`,原样副本 `codesign --verify` 不过(同第二轮),测的是根内 ad-hoc 重签的副本(asar 字节不变)。
+登录态沿用根 A(停 a4 → 旧副本移到 `<A>/app-old-a4/` → 候选副本放进 `<A>/app/` → 同根同闸启动 a5):**换包后直接是登录态**(`data-auth="in"`、「按量付费」,账户弹层底部「版本 0.2.0」)。
+所有实例启动即隐藏;新根 E(全新数据)闸 [r6-gate-E](results/r6-gate-E.txt) 五步全过,看门狗沿用(sha `0abd0238…` 未改,A 在运行不跑诱饵)。原始事实:[results/r6-raw.txt](results/r6-raw.txt)。
+
+### 第六轮结论
+
+1. **启动(补充格 a)PASS**:`app starting {version:'0.2.0'}`、`db-safety: watermark equal`、`codepuppy-ext: loading plugin bundle`、`process fence applied`、`server ready`;界面事件流只有 **1 条** `GET /api/event`,打开定制中心后仍是 1 条(第三轮的构建是 5 条)。
+2. **审批全部回到 0.1.26 的行为**(未开 / 已开定制中心各一次):拒绝 ⇒ 引擎 50 ms 内 `The user declined this tool call`、无文件;允许一次 ⇒ 写入;本次会话内允许 ⇒ 下一次不再问;
+   超时卡「没等到你批准 5 分 0 秒 / 审批已超时,未获批准…」;回复请求 `POST …/permission/…/reply` 204、2 ms,之前 19 秒内没有连接池阻塞。审批等待中回答提问卡(引擎 53 ms 收到)、停止(44 ms 中断、无文件)都送达;
+   对话内装连接器(G2 的第二个入口)「确认安装 → 授权并安装」0.6 秒后工具完成。G3、G4 第一方一半、审计 A、B 都 PASS。
+3. **FAIL ×3(都有 0.1.26 实测对照或矩阵原文):**
+   - **R17 `@general` 不再派子任务。** 从弹出菜单选中 `@general` 发「在当前文件夹新建文件…」:消息带着 `agents:[general]`,但模型自述「They mention @general but it's a simple task — I'll just do it.」直接调 `write`,卡片是「改文件 rc-test-r6b.txt」,没有派出确认、没有「子任务里不再逐项询问」。
+     0.1.26(根 B,同样操作)卡片「Start a subtask / Hand off to assistant general / … / Subtasks won't ask again step by step」。截图 [候选](screens/r6-r17-card-delegation.png) / [0.1.26](screens/r6-b126-r17-card.png)。拒绝后两边都没有文件。
+   - **审批等待中追加的消息在界面上消失,直到你回答审批。** 请求当即到了引擎(`POST /prompt` 200,2 ms;引擎 `session_inbox` 一行 `delivery=steer`),回答审批后它作为下一轮出现并执行(文件内容最终是 `hello-follow-up`);但在那之前输入框清空、对话里没有气泡也没有排队提示。
+     0.1.26:追加的消息立刻作为「New turn」气泡显示在等待卡上方。截图 [候选](screens/r6-p2-followup-during-approval.png) / [0.1.26](screens/r6-b126-followup-during-approval.png)。
+   - **N01:附件 docx 读到了,但小标签说「这一轮助手没有读取 · 请助手读取」。** rc.docx 文件卡发前「本机读取」、暂存到 `.codepuppy/attachments/<uuid>/rc.docx`,助手在 Code Mode `execute` 里调 `codepuppy-word.read_docx` 读出口令 7319(正确);标签停在「没有读取」,重开对话也一样。
+     矩阵 N01 预期(0.1.26 / d3790e101 记 PASS):「各自小标签最终是『已读取』」。推断:读取发生在 `execute` 内部,标签只认直接的读取工具调用(没有验证)。截图 [r6-n01-answer-reopened](screens/r6-n01-answer-reopened.png)。rc.md「直接进对话」、图片说明与角标、看图回答都正常。
+4. **与 0.1.26 相同的两处(观察,不判 FAIL)**:审批等待中点「停止」,回合停了但审批卡留在屏幕上,点「拒绝」报「未能提交你的选择 … Permission request not found」—— 0.1.26 停止后卡片同样一直留着([0.1.26](screens/r6-b126-after-stop-30s.png));
+   终端拖宽面板后不重排(`stty size` 仍 36 列,0.1.26 也是 36 列不变)、右栏切到「审查」再切回「终端」是黑屏无输入(0.1.26 同样黑屏,[0.1.26](screens/r6-b126-terminal-reopened.png));候选包上切换对话再回来终端恢复并回放历史。
+5. **事故:一个原生对话框把隐藏的测试窗口带到了屏幕上。** 02:00:47 做 N11(a)(「用 webfetch 读取 https://nx-rc0125-probe.invalid/」)时,引擎去连这个地址,主进程按设计弹出出网批准框
+   (`egress-approval-dialog.ts`:`dialog.showMessageBox`,标题「允许联网?」,正文「允许这个应用连接 nx-rc0125-probe.invalid:443 吗?」,按钮「拒绝 / 允许」,勾选框「以后不再询问这个地址」)。
+   45 秒后 `egress.grant … decision:"refused"`(02:01:36,超时)。02:03 我用 hide-app 核隐藏状态时它得**重新隐藏一次**(`hide-calls=1`),说明窗口在这段时间里被这个框取消了隐藏;我没有看到屏幕,框是否显示、显示多久只能从这两处推断。
+   处置:立刻停止后续所有格;A 重启为 a8(超时不收回那一问,重启才能确保框不再挂着),仍是登录态、隐藏,后台 hide-app 每 50 ms 复隐藏 2 小时。以后:任何会让引擎连新地址的格(出网批准、装第三方连接器)都会弹这个原生框,只能在 owner 在场时做。
+6. 截图注意:隐藏窗口里渲染进程一旦重载(装 / 开连接器、保存自带 Key 都会「sidecar respawned + renderer reloaded」),截图永远拿不到帧;DOM 读取有时也落后于屏幕。本轮判据都落在截图或引擎库上,遇到重载就重启实例(a5→a6→a7→a8,登录态每次都在)。
+7. 付费:用户消息 39 条(A 36 条、B 的 0.1.26 对照 3 条),全部 `codepuppy/deepseek-v4-flash`,另有 1 次云识图(看图那一格)和 /review 子会话、标题生成等自动调用;上限 50 没有到。根 E 的两次假 key 发送与根 D 的发送不计费(401 / 未发出)。
+
+### 第六轮格子
+
+| 格 | 结果 | 证据 |
+| --- | --- | --- |
+| a 启动 / ext / 围栏 / 就绪 / 0.2.0 / 事件流 | PASS | [r6-launch-a5](results/r6-launch-a5.txt)、r6-raw「a5 start-up」;回复正常流式渲染 |
+| G2 拒绝(未开定制中心 / 已开) | PASS / PASS | [r6-f-after-deny1-tool](screens/r6-f-after-deny1-tool.png)、[r6-f-deny2-after-hub](screens/r6-f-deny2-after-hub.png);引擎 +51 / +49 ms |
+| f 允许一次(未开 / 已开) | PASS / PASS | 文件写入;[r6-f-once2-after-hub](screens/r6-f-once2-after-hub.png) |
+| f 本次会话内允许(未开 / 已开) | PASS / PASS | 第二个文件不再问;[r6-f-session-allow-after-hub](screens/r6-f-session-allow-after-hub.png) |
+| f 超时卡 | PASS | [r6-f-timeout-detail](screens/r6-f-timeout-detail.png);引擎 +300.0 s fail-closed,无文件 |
+| 审批等待中:停止 | PASS(卡片残留同 0.1.26) | [r6-p1-stop-during-approval](screens/r6-p1-stop-during-approval.png)、[r6-p1-stale-card-deny](screens/r6-p1-stale-card-deny.png) |
+| 审批等待中:回答提问卡 | PASS | [r6-p3-question-answered](screens/r6-p3-question-answered.png);回复「B」 |
+| 审批等待中:追加消息 | **FAIL** | 见结论 3 |
+| G2 第二入口:对话内装连接器 | PASS | [r6-g4-install-result](screens/r6-g4-install-result.png);hub_install +0.6 s 完成 |
+| G3 工具策略 | PASS | 停用 `websearch` 与云 `web_search`:工具表与 Code Mode 目录都没有;强行 `tools.codepuppy.web_search` ⇒「Unknown tool」;已恢复默认 |
+| G4 第一方 MCP | PASS(客户端侧) | `codepuppy-word.write_docx` + `read_docx` completed;云 MCP 一半第五轮 PASS ⇒ G4 PASS(服务端计数没读) |
+| R17 | **FAIL** | 见结论 3 |
+| N06 (a)(b) / (c) | PASS / NOT-RUN | 档位菜单三档说明 + 共同一句([r6-n06a-perm-menu](screens/r6-n06a-perm-menu.png));会话内允许卡文字;(c) 要第三方连接器(装它要出网批准框,见结论 5) |
+| N07、N19、R18 外部连接器一半 | NOT-RUN | 同上;N07(c)–(e) 还要第二个账号 / 登出 |
+| 侧栏:全新数据「暂无项目」、无搜索框 | PASS | [r6-e1-fresh-home](screens/r6-e1-fresh-home.png);引擎库里有 engine-scratch-cwd 行,界面不列 |
+| 侧栏:打开真实临时目录只列一次 | NOT-RUN | 「打开项目」走原生选目录面板,会出现在 owner 屏幕上 |
+| 侧栏:A(已用过的数据)两个内部行 | PASS | engine-scratch-cwd 不再列;code-puppy 有对话所以在(D 根同样只剩一个 code-puppy,[r6-d020-home](screens/r6-d020-home.png)) |
+| 侧栏:新对话首条消息后出现默认工作区组 | PASS | 根 E,[r6-e2-fake-key-live](screens/r6-e2-fake-key-live.png) |
+| 失败回合:假 key 首页发送 / 侧栏打开 | PASS / PASS | 卡片「登录或 Key 无效 / 重新登录 / 去设置 / 开发者详情」,同 0.1.26;[r6-e2-fake-key-opened-from-sidebar](screens/r6-e2-fake-key-opened-from-sidebar.png) |
+| 失败回合:旧对话模型不可用 | PASS | 根 D 会话 3:不发出,提示「当前模型不可用 / 请在模型选择器中改选当前可用的模型。」 |
+| 失败回合:未登录发平台模型 | NOT-RUN | 未登录时选平台模型就会调 `auth.start()` 打开浏览器登录 |
+| 审计 A(档位切回) | PASS | 只读拒写 → 全部批准直接写 → 请求审批出卡 → 全部批准不出卡;引擎 agent 依次 readonly / build / ask / build;`/review` 子会话跑完;「继续」由 build 回答 |
+| 审计 B(长对话编辑重发) | PASS | 22 条消息、引擎 37 行;只编辑不发:全部保留 + 「已回退到检查点 / 发送后将丢弃此后 7 条消息」;重发后 1 秒内旧 7 问 7 答消失,与引擎一致,重开相同 |
+| 审计 C 终端打开 / 运行 | PASS | [r6-c-terminal-cmd](screens/r6-c-terminal-cmd.png)(原生文件解包后可用) |
+| 审计 C 改尺寸 / 关了再开 | 观察(同 0.1.26) | 见结论 4 |
+| 审计 C 外部建文件 ⇒ 文件面板刷新;`@` 搜到 | PASS / PASS | 0.5 秒出现在「文件」;`@outside-app` 列出 |
+| N01 附件(md / docx / 图片) | **FAIL**(docx 标签) | 见结论 3;xlsx / pptx / pdf 没做(要先开对应连接器,会触发重载) |
+| N09(a) Word 一半、N15 Word 一半 | PASS | Word 进程是随包 `office-runtime/bin/python3 … office-mcp/server.py word`,不是 uv |
+| N10 选择器图标 | PASS(部分) | 6 个平台模型 + 5 个自带 Key 供应商每行都有图标([r6-n10-picker](screens/r6-n10-picker.png));暂停引擎 10/30 秒一半没做 |
+| N11(a) | 中止 | 触发了原生出网批准框(结论 5);工具记录 `Unable to fetch https://nx-rc0125-probe.invalid/`,出网 `deny`(超时 refused),文案判据无法判定 |
+| G6 续写旧对话 | NOT-RUN(部分) | 根 D 旧对话在候选包上可见、可打开(带「运行 1 次」);续写要可用模型:根 D 未登录,owner 的 Key 或登录才行 |
+
+**第六轮之后仍是 NOT-RUN、按派发书属 owner 的:** G5、R22、W02 自带 Key 一半、W09(b)(owner 自己的模型 Key);R19 `~/Documents` 授权框、W01(系统框);真实钥匙串;签名 / 公证包(Gatekeeper);R08 / R09 自动更新回放。
+**本轮新确认需要 owner 在场的(会弹原生框或打开浏览器):** 出网批准(N11(a)、N17,以及装任何第三方连接器 ⇒ N06(c)、N07、N19、R18 外部一半)、「打开项目」原生选目录、未登录选平台模型(浏览器登录)、G6 续写(根 D 上登录)。
+**本轮没做到、可在不打扰 owner 的前提下继续的:** N01 的 xlsx / pptx / pdf(先开连接器,重启实例取证)、N09(b)(c)、N16、N10 暂停引擎、N12(b)–(d)、R10–R12、R13–R15 生图、R19 / R20 回执、W03、W07 / W08 / W23–W25 云任务、W10 / W11、W22。
+
+### 第六轮收尾时的状态
+
+- A:在运行(a8,pid 见 `logs/a8.pid`),**登录态**(`data-auth="in"`、「按量付费」),隐藏,后台 hide-app 复隐藏 2 小时;装着 Word(已开)、PDF(已装未开)连接器;旧 2.x 副本在 `<A>/app-old-a4/`。
+- B、D、E:没有实例在运行(各自停止脚本的事后检查:偏好域只变已知时间戳、owner 侧路径与 owner 应用进程都没变、LaunchServices 登记 0 条)。owner 应用全程没有运行;看门狗没有触发;没有打开过登录页(各次 main.log 里 `opening authorize url` 都是 0)。
+- 计数(本轮按上表逐项,41 项):PASS 28 / FAIL 3 / NOT-RUN 或中止 8;另有 2 项与 0.1.26 相同的观察(审批中停止后卡片残留;终端改尺寸 / 关了再开)。核对:Claude Opus 5.5。
 
 ## 第五轮(2026-11-12 22:06– EST,新会话)
 

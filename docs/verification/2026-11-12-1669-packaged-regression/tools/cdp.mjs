@@ -119,6 +119,12 @@ try {
     }
     await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: x2, y: y2, button: "left", buttons: 0, clickCount: 1 })
     console.log(`dragged ${x1},${y1} -> ${x2},${y2}`)
+  } else if (cmd === "dropfiles") {
+    // r6: page-level CDP drag-and-drop of local files onto (x,y) — no native file picker involved
+    const [x, y, ...files] = args
+    const data = { items: [], files, dragOperationsMask: 1 }
+    for (const type of ["dragEnter", "dragOver", "drop"]) await send("Input.dispatchDragEvent", { type, x: Number(x), y: Number(y), data })
+    console.log(`dropped ${files.length} file(s)`)
   } else if (cmd === "text") {
     await send("Input.insertText", { text: args[0] })
     console.log("inserted")

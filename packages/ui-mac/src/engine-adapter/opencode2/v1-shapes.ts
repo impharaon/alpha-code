@@ -28,7 +28,7 @@ import type {
   Provider,
   ProviderListResponse,
   QuestionRequest,
-} from "@opencode-ai/sdk/v2/client"
+} from "../contract/v1"
 import { isNetFailureLayer, parseFailureCode } from "@opencode/schema/codepuppy-net-failure"
 import { STAGED_ATTACHMENT_PART_NAME, stagedAttachmentPart } from "../../../../ext/src/staged-attachment-part"
 import { ATTACHMENT_METADATA_KEY, type StagedAttachmentMeta } from "../../shared/attachment-path"

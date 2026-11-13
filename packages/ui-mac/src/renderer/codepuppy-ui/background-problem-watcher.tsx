@@ -11,7 +11,7 @@
 // 授权后若仍要登录,下一次读状态会把它放回来。
 import { createEffect, onCleanup, type Accessor } from "solid-js"
 // CLIENT subpath only — the v2 barrel pulls Node-only deps that break the renderer (see ADR-008).
-import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
+import { createOpencodeClient } from "../../engine-adapter/contract/v1"
 import type { ServerInfo } from "../sidebar/use-projects"
 import { isConnected, isDisabled, isPending, needsAuth } from "../extensions/use-extensions"
 import { catalog } from "../extensions/catalog-source"

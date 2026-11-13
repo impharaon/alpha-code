@@ -12,7 +12,7 @@ import { createEffect, onCleanup, type Accessor } from "solid-js"
 // Import from the CLIENT subpath, not "@opencode-ai/sdk/v2": the v2 barrel re-exports the
 // server module too, which pulls in Node-only deps (process/which/child_process) that cannot
 // bundle for the renderer. The client subpath is browser-safe (opencode's own app uses it).
-import { createOpencodeClient, type ModelRef } from "@opencode-ai/sdk/v2/client"
+import { createOpencodeClient, type ModelRef } from "../../engine-adapter/contract/v1"
 import type { SidecarGenerationState } from "../../preload/types"
 import { projectLabel } from "./route"
 import { stageImageSend, failImageSends } from "../codepuppy-ui/pending-image-sends"

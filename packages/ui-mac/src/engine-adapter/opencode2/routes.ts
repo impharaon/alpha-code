@@ -13,7 +13,7 @@ import type {
   PermissionV2DecisionCommand,
   PermissionV2DecisionReceipt,
   QuestionRequest,
-} from "@opencode-ai/sdk/v2/client"
+} from "../contract/v1"
 import type { RouteContext, RouteHandler, Translator } from "../contract/translator"
 import type { TranslatedKey } from "../contract/routes"
 import { toContractSession } from "../contract/session"

@@ -14,7 +14,7 @@
 //     内容以 2.x 存储为准。todowrite 工具的输入同时投影成 todo.updated(U1)。
 // 不认识的事件丢弃(它们在 v1 没有对应,冻结界面也不读)。发出的事件只能是约定事件表里的类型(contract/events.ts,`#1697` I-04)。
 import type { OpenCodeClient, OpenCodeEvent, SessionMessageInfo } from "@opencode/client/promise"
-import type { Part, Session } from "@opencode-ai/sdk/v2/client"
+import type { Part, Session } from "../contract/v1"
 import type { ContractEvent } from "../contract/events"
 import { toContractSession } from "../contract/session"
 import type { ReceiptLedger } from "../contract/receipts"

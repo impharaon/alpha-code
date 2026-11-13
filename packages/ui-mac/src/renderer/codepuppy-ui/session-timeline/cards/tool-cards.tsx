@@ -6,7 +6,7 @@
 // 数据全部经 store proxy 反应式读取(行对象引用稳定);内容一律纯文本节点(I3),
 // 输出体有界(I7,tool-card-model 的双帽);CSS 只用 --a-* 令牌(I5)。
 // 未知工具 fail-closed:有界纯文本通用卡。
-import type { ToolPart } from "@opencode-ai/sdk/v2/client"
+import type { ToolPart } from "../../../../engine-adapter/contract/v1"
 import { createMemo, createSignal, For, type JSX, Show } from "solid-js"
 import { t } from "../../../i18n"
 import { netFailureCopy } from "../../net-failure-copy"

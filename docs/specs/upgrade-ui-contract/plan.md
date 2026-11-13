@@ -379,7 +379,9 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 
 ### 偏离记录
 
-暂无
+- 2026-11-12 · 两个提交合成一个;先红后绿用变异证明(把 `use-projects.ts` 与 `opencode2/routes.ts` 的 import 改回 `@opencode-ai/sdk/v2/client` ⇒「真树无违例」红,逐个点名)。改指的是 22 个 renderer 文件加 4 个 `opencode2/` 文件,`contract/v1.ts` 按名转出它们用到的 28 个类型与 `createOpencodeClient`。
+- 2026-11-12 · 已知坏例比计划多五条(翻译器直引 v1 SDK、renderer 动态 import、约定引冻结 app 的其它源码、约定按值引 1.17.13 客户端、管道引冻结 app),外加三条允许的对照;扫描排除规则沿用 M1b 之后的覆盖扫描(含 `*.stories.*`)。
+- 2026-11-12 · B3 的 before 在 M3 的代码上跑(`git stash` 暂存本片改动跑完即恢复),after 在本片上跑,夹具相同。
 
 ## M5a — 夹具的引擎源码身份(e)与终端路径钉住
 

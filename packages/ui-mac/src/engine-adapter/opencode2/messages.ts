@@ -12,7 +12,7 @@ import type {
   SessionMessageShell,
   SessionMessageUser,
 } from "@opencode/client/promise"
-import type { AssistantMessage, FilePart, Message, Part, ToolPart, UserMessage } from "@opencode-ai/sdk/v2/client"
+import type { AssistantMessage, FilePart, Message, Part, ToolPart, UserMessage } from "../contract/v1"
 
 type ModelSelection = { id: string; providerID: string; variant?: string }
 

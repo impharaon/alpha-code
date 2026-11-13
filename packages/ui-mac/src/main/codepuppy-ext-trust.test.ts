@@ -1,42 +1,25 @@
 import { describe, expect, test } from "bun:test"
-import {
-  EXTENSIONS_CONSENT_VERSION,
-  extensionsGranted,
-  hasExtensionsDecision,
-  listProjectExecutables,
-  withExtensionsConsent,
-} from "./codepuppy-ext-trust"
+import { AGENT_CONTROL_FIELDS, EXTENSIONS_CONSENT_VERSION, extensionsGranted, hasExtensionsDecision, listProjectExecutables } from "./codepuppy-ext-trust"
 
-describe("extensionsConsent 决策语义(REQ-060 信任门)", () => {
-  test("无记录 = 未决策", () => {
-    expect(hasExtensionsDecision({})).toBe(false)
-    expect(extensionsGranted({})).toBe(false)
+// `#1709`:决定语义作用在信任记录(project-trust-truth.ts)里这个项目的条目上;项目 prefs 不再是输入。
+describe("项目扩展信任的决策语义(REQ-060 信任门)", () => {
+  const entry = (granted: boolean, version = EXTENSIONS_CONSENT_VERSION) => ({ ino: "7", version, granted, decidedAt: "2026-11-13T00:00:00Z" })
+
+  test("没有条目 = 未决策", () => {
+    expect(hasExtensionsDecision(undefined)).toBe(false)
+    expect(extensionsGranted(undefined)).toBe(false)
   })
 
   test("granted 与 denied 都是决策(不再弹);granted 语义分离", () => {
-    const g = withExtensionsConsent({}, true, "2026-07-08T00:00:00Z")
-    const d = withExtensionsConsent({}, false, "2026-07-08T00:00:00Z")
-    expect(hasExtensionsDecision(g)).toBe(true)
-    expect(hasExtensionsDecision(d)).toBe(true)
-    expect(extensionsGranted(g)).toBe(true)
-    expect(extensionsGranted(d)).toBe(false)
+    expect(hasExtensionsDecision(entry(true))).toBe(true)
+    expect(hasExtensionsDecision(entry(false))).toBe(true)
+    expect(extensionsGranted(entry(true))).toBe(true)
+    expect(extensionsGranted(entry(false))).toBe(false)
   })
 
-  test("旧版本决策失效(版本化重弹)", () => {
-    const old = { extensionsConsent: { version: EXTENSIONS_CONSENT_VERSION - 1, granted: true, decidedAt: "x" } }
-    expect(hasExtensionsDecision(old)).toBe(false)
-    expect(extensionsGranted(old)).toBe(false)
-  })
-
-  test("写入保留 prefs 其它字段(与 cloudConsent 共存)", () => {
-    const prefs = { cloudConsent: { version: 1, acceptedAt: "y" } }
-    const out = withExtensionsConsent(prefs, true, "2026-07-08T00:00:00Z")
-    expect(out.cloudConsent).toEqual({ version: 1, acceptedAt: "y" })
-    expect((out as Record<string, any>).extensionsConsent.granted).toBe(true)
-  })
-
-  test("坏形状(granted 非布尔)不算决策", () => {
-    expect(hasExtensionsDecision({ extensionsConsent: { version: EXTENSIONS_CONSENT_VERSION, granted: "yes" } } as any)).toBe(false)
+  test("旧版本决策失效(版本化重弹),同意也不算", () => {
+    expect(hasExtensionsDecision(entry(true, EXTENSIONS_CONSENT_VERSION - 1))).toBe(false)
+    expect(extensionsGranted(entry(true, EXTENSIONS_CONSENT_VERSION - 1))).toBe(false)
   })
 })
 
@@ -61,9 +44,20 @@ describe("listProjectExecutables — 可执行物清单派生", () => {
     expect(listProjectExecutables(null, []).mcp).toEqual([])
   })
 
-  test("文本类域(agent/command/skills)不进可执行清单", () => {
-    const r = listProjectExecutables(`{ "agent": { "a": {} }, "command": { "c": {} }, "skills": { "paths": ["x"] } }`, [])
-    expect(r.mcp).toEqual([])
-    expect(r.plugins).toEqual([])
+  test("文本类域(agent 的说明字段/command/skills)不进可执行清单", () => {
+    const r = listProjectExecutables(`{ "agent": { "a": {}, "b": { "prompt": "p", "description": "d" } }, "command": { "c": {} }, "skills": { "paths": ["x"] } }`, [])
+    expect(r).toEqual({ mcp: [], plugins: [], agents: [] })
+  })
+
+  test("`#1709` 审计:写了控制字段的 agent 进清单,字段按固定顺序列出(与 ext 剥掉的是同一份 AGENT_CONTROL_FIELDS);值是什么都算", () => {
+    const r = listProjectExecutables(
+      `{ "agent": { "rev": { "prompt": "p", "model": "x/y", "permission": { "edit": "allow" } }, "quiet": { "disable": false }, "text": { "prompt": "p" }, "odd": "not an object" } }`,
+      [],
+    )
+    expect(r.agents).toEqual([
+      { name: "rev", fields: ["permission", "model"] },
+      { name: "quiet", fields: ["disable"] },
+    ])
+    expect(AGENT_CONTROL_FIELDS).toEqual(["permission", "tools", "model", "disable", "mode"])
   })
 })

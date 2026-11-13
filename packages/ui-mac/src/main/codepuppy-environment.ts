@@ -18,13 +18,25 @@
 import { lstatSync, mkdirSync, readdirSync, realpathSync, rmdirSync, statSync } from "node:fs"
 import { homedir } from "node:os"
 import { basename, dirname, isAbsolute, join, normalize, relative, resolve } from "node:path"
-import type { CodePuppyEnvironmentInfo } from "../preload/types"
-
 export type AppEnvironment = "prod" | "beta" | "dev"
 export type RegistryChannel = "stable" | "preview" | "dev"
 export type BuildChannel = "dev" | "beta" | "prod"
 
-export type { CodePuppyEnvironmentInfo }
+/** REQ-098:App 运行环境快照(main 启动时由打包状态 + 构建渠道解析后冻结;renderer 只读,无写面)。preload/types.ts 原样转出。
+ *  定义在这里而不是 preload/types.ts(`#1709`):sidecar 里的 ext 经 project-trust-truth.ts 引用本模块,类型图不能被拖进整张 IPC 类型。 */
+export type CodePuppyEnvironmentInfo = {
+  environment: "prod" | "beta" | "dev"
+  registryChannel: "stable" | "preview" | "dev"
+  buildChannel: "dev" | "beta" | "prod"
+  packaged: boolean
+  /** 本环境的可变状态根(config/receipts/grants/secret refs/enabled state 的分域落点)。 */
+  mutableRoot: string
+  /** 共享 canonical 基根(REQ-102:CAS 落 <casBaseRoot>/cas,三环境 mutable root 落 env/ 下)。 */
+  casBaseRoot: string
+  /** base 由 unpackaged override 或内部 onboarding 隔离参数提供。 */
+  rootOverridden: boolean
+  updaterFeedChannel: "latest" | "beta" | null
+}
 
 // updater feed 只允许指向自有发布仓(B9:错 owner = 会把上游 OpenCode 当更新装回来)。
 export const UPDATE_FEED_OWNER = "jinjunnn"
@@ -91,7 +103,12 @@ export function resolveCodePuppyStateBase(subject: string): CodePuppyStateBase {
   if (info) return { ok: true, casBaseRoot: info.casBaseRoot, environment: info.environment }
   let root: string
   try {
-    root = resolveCodePuppyGlobalRoot()
+    // 既有校验照旧(绝对路径、与退休根无关);位置却按 main 派生的原值**按字面**推出,不经 realpath(`#1709` 审计):
+    // `env/<env>` 本身是围栏可写根 W2,围栏内的进程能把这个目录挪走、原地换成指向围栏外伪造状态根的链接
+    // (project-trust-truth-fence.test.ts 实测);沿 realpath 推出的状态根就落进伪造的那一份。main 派生的值本来就是 canonical,
+    // 按字面推出的 `<casBaseRoot>/<真源>/<env>.json` 不经过 `env/<env>`,每一级祖先都不在可写集里。
+    resolveCodePuppyGlobalRoot()
+    root = normalize(process.env.CODEPUPPY_GLOBAL_DIR!.trim())
   } catch (error) {
     return { ok: false, reason: `alpha environment root unavailable (${error instanceof Error ? error.message : String(error)})` }
   }

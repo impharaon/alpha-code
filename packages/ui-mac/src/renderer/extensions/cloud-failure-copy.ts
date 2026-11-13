@@ -11,7 +11,7 @@ export function failureCopy(code: string) {
     return { text: t("codepuppy.ext.cloudErrWallet"), action: "recharge" as const }
   }
   if (code === "account_suspended") return { text: t("codepuppy.ext.cloudErrSuspended"), action: null }
-  // alpha-code#1686:已停用的云能力(平台派发与预检同码同序拒绝)。没有下一步按钮 —— 本机生成不是一个入口。
+  // #1686:已停用的云能力(平台派发与预检同码同序拒绝)。没有下一步按钮 —— 本机生成不是一个入口。
   if (code === "pipeline_kind_retired") return { text: t("codepuppy.ext.cloudErrRetired"), action: null }
   return null
 }

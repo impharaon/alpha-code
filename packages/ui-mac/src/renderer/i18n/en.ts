@@ -621,7 +621,7 @@ export const dict = {
   "codepuppy.ext.cloudGoLogin": "Sign in",
   "codepuppy.ext.cloudGoRecharge": "Recharge",
   "codepuppy.ext.cloudOpenOverflow": "Enable wallet payments",
-  // alpha-code#1686 云任务表单提交前预检;codepuppy.ui.* = 组件库(名称 — 值列表)的读屏字
+  // #1686 云任务表单提交前预检;codepuppy.ui.* = 组件库(名称 — 值列表)的读屏字
   "codepuppy.ext.cloudErrRetired": "This cloud feature has been retired. Generate it locally instead.",
   "codepuppy.ext.preflightReady": "Ready to start",
   "codepuppy.ext.preflightBlocked": "Can't start now",

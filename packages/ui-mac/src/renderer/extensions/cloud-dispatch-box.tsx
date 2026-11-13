@@ -71,7 +71,7 @@ export function CloudDispatchBox(props: { entryId?: string; spec: CloudPipelineS
   })
   const beginJob = lifecycle.beginJob
   const cancelJob = lifecycle.cancelJob
-  // alpha-code#1686:提交前预检(只作提示,不参与任何 disabled 判据)。
+  // #1686:提交前预检(只作提示,不参与任何 disabled 判据)。
   const preflight = createCloudPreflight({ task: () => props.spec.pipelineKind, ready: () => props.ready })
 
   onCleanup(() => {
@@ -236,7 +236,7 @@ export function CloudDispatchBox(props: { entryId?: string; spec: CloudPipelineS
         <Show when={state.phase === "running" && state.cancel === "cancelling"}>
           <span class="codepuppy-ext-meta" data-live="" data-cancelling="">{t("codepuppy.ext.cloudCancelling")}</span>
         </Show>
-        {/* alpha-code#1686 定案 B:主按钮在按钮行最右;代码审查的「发送 Git 代码改动」紧挨在它左边。 */}
+        {/* #1686 定案 B:主按钮在按钮行最右;代码审查的「发送 Git 代码改动」紧挨在它左边。 */}
         <Show when={props.spec.pipelineKind === "code-review"}>
           <button class="codepuppy-ext-add" disabled={!props.ready || busy()} onClick={() => void runLegacyDiff()}>
             {t("codepuppy.cloud.consent.legacyDiff")}

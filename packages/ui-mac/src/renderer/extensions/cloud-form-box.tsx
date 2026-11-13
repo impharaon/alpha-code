@@ -36,7 +36,7 @@ export function CloudFormBox(props: { cloud: CloudBehaviorV1; ready: boolean; re
     pipelineKind: () => props.cloud.pipelineKind,
   })
   const busy = () => state.phase === "dispatching" || state.phase === "running"
-  // alpha-code#1686:提交前预检(只作提示,不参与下面的 disabled 判据)。
+  // #1686:提交前预检(只作提示,不参与下面的 disabled 判据)。
   const preflight = createCloudPreflight({ task: () => props.cloud.pipelineKind, ready: () => props.ready })
   // 文本按服务端口径 trim 后计(注册表 minChars 是 trim 后的长度);select 原样。
   const valueOf = (field: CloudFieldV1) =>
@@ -171,7 +171,7 @@ export function CloudFormBox(props: { cloud: CloudBehaviorV1; ready: boolean; re
         <Show when={state.phase === "running" && state.cancel === "cancelling"}>
           <span class="codepuppy-ext-meta" data-live="" data-cancelling="">{t("codepuppy.ext.cloudCancelling")}</span>
         </Show>
-        {/* alpha-code#1686 定案 B:主按钮在按钮行最右,状态字、「取消任务」、未登录提示在它左边。 */}
+        {/* #1686 定案 B:主按钮在按钮行最右,状态字、「取消任务」、未登录提示在它左边。 */}
         <button
           class="codepuppy-ext-add"
           data-variant="primary"

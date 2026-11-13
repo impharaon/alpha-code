@@ -116,7 +116,7 @@ const signatureOf = (state: AuthState) =>
     state.account?.email ?? "",
     state.account?.plan ?? "",
     state.refreshUnreachable ? "unreachable" : "",
-    // alpha-code#1686:main 的签名带账号标记(不先退出就换号时其余各项都不变);这里对应的是不透明的登录代。
+    // #1686:main 的签名带账号标记(不先退出就换号时其余各项都不变);这里对应的是不透明的登录代。
     String(state.identityEpoch ?? ""),
   ].join("\u0000")
 

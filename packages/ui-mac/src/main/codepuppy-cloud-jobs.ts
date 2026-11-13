@@ -194,7 +194,7 @@ export const getCloudJobStatus = (jobId: string): Promise<CloudResult<CloudJobSt
     (text) => scrubInlineContent(decodeJsonContract("CloudJobStatusV1", text, "cloud-http")),
   )
 
-// alpha-code#1686(DESIGN-cloud-job-form-preflight §4.4):云任务表单提交前的只读预检。与账户摘要同一把
+// #1686(DESIGN-cloud-job-form-preflight §4.4):云任务表单提交前的只读预检。与账户摘要同一把
 // `account.read` 令牌;只带 task,不带 format。只作提示:不重试,超时/拒绝都原样交给 renderer 归类。
 // 身份在读令牌的同一时刻记下 —— `authed` 在第一次 await 之前同步取令牌,这里在同一个同步段里先取身份;
 // 响应回来时身份已变(换号或登出)就丢掉结果,上一个账号的余额不出主进程。

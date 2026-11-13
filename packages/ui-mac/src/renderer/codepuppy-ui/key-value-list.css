@@ -1,4 +1,4 @@
-/* 名称 — 值列表(组件库,alpha-code#1686;组件稿 docs/design/2026-11-13-library-card-kv/ #kv):
+/* 名称 — 值列表(组件库,#1686;组件稿 docs/design/2026-11-13-library-card-kv/ #kv):
    <dl>,每行名称在左、值在右;行与行之间没有分隔线。只用现有 --a-* 令牌。 */
 .a-kv {
   margin: 0;

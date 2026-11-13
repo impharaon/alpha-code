@@ -296,7 +296,7 @@ export function CodePuppySidebar(props: {
   // sparkline. 401 → main's auth is stale; the footer already reflects logged-out on the next push.
   const [summary, setSummary] = createSignal<AccountSummary | null>(null)
   const [summaryState, setSummaryState] = createSignal<"idle" | "loading" | "error">("idle")
-  // alpha-code#1686:换了一个登录(登录代变,含不先退出直接换号)就先清空,不让上一个账号的数留在卡片上;
+  // #1686:换了一个登录(登录代变,含不先退出直接换号)就先清空,不让上一个账号的数留在卡片上;
   // 只采用最新一次请求的回复,较早发出、较晚回来的回复(可能属于上一个账号)直接丢弃。
   let summaryRequest = 0
   let summaryEpoch: number | undefined
@@ -1465,7 +1465,7 @@ export function CodePuppySidebar(props: {
                     </span>
                   </div>
                   <div class="codepuppy-acct-card-slot">
-                    {/* alpha-code#1686:余额卡改用组件库「卡片 + 名称 — 值列表」;弹层外边距在 slot 上(组件不带外边距)。
+                    {/* #1686:余额卡改用组件库「卡片 + 名称 — 值列表」;弹层外边距在 slot 上(组件不带外边距)。
                         B11:读取失败时订阅行不装「未订阅」(状态未知),与其余行一致显示 pending/错误占位。
                         REQ-146(#1194):window5h/window7d 只有订阅计划才有;未订阅时这两行显示 summary.usage 的真实用量,
                         标签随之换成「今日/7 日用量」。已订阅仍显示订阅额度窗口。 */}

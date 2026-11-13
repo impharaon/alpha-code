@@ -1,4 +1,4 @@
-// alpha-code#1686(DESIGN-cloud-job-form-preflight §4.4;批准稿 docs/design/2026-11-13-1686-cloud-form-preflight-r3/)
+// #1686(DESIGN-cloud-job-form-preflight §4.4;批准稿 docs/design/2026-11-13-1686-cloud-form-preflight-r3/)
 // 两种云发送框共用的提交前预检区:一张「卡片 + 名称 — 值列表」写账户事实,一条 Banner 写这项任务现在能不能发。
 // 只作提示 —— 不禁用、不延迟提交;真正的准入在派发时由平台再判一次。
 //

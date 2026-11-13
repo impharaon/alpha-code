@@ -238,7 +238,7 @@ export type ArtifactListV1 = {
   result: unknown
 }
 
-// alpha-code#1686 / platform#582:账户与首步准入的只读投影(MCP `account_status` 与 HTTP 预检同一份)。
+// #1686 / platform#582:账户与首步准入的只读投影(MCP `account_status` 与 HTTP 预检同一份)。
 // 金额一律整数 fen、额度一律整数 credits;`task` 只在请求带 task 时出现。界面只读 `task.admission` 判结论。
 export type AccountStatusAdmissionV1 = { ok: boolean; code?: string; reason?: string }
 export type AccountStatusWindowV1 = { remaining_credits: number; limit_credits: number; resets_in_min: number }

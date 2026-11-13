@@ -202,7 +202,7 @@ export function registerCloudIpcHandlers() {
   ipcMain.handle("cloud-status", (_e: IpcMainInvokeEvent, jobId: string) => getCloudJobStatus(jobId))
   ipcMain.handle("cloud-cancel", (_e: IpcMainInvokeEvent, jobId: string) => cancelCloudJob(jobId))
   ipcMain.handle("cloud-artifacts", (_e: IpcMainInvokeEvent, jobId: string) => listCloudArtifacts(jobId))
-  // alpha-code#1686:表单提交前的只读预检;task 只收字符串,其余归 renderer 的「查不到」。
+  // #1686:表单提交前的只读预检;task 只收字符串,其余归 renderer 的「查不到」。
   ipcMain.handle("cloud-account-status", (_e: IpcMainInvokeEvent, task: unknown) =>
     typeof task === "string" && task ? getCloudAccountStatus(task) : { error: "invalid-task" },
   )

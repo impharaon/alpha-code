@@ -44,7 +44,7 @@ const UPSTREAMS = [
     // 9cf67bd 之后平台自己新增的 $defs —— 桌面不解码它们)、artifact-descriptor schema、以及
     // alpha-web-22 的令牌夹具;桌面 decoder 在同一提交里改成只认新值。
     //
-    // alpha-code#1686 / platform#582:前移到平台合并提交 491707f,拿到云任务表单预检的 `AccountStatusV1`
+    // #1686 / platform#582:前移到平台合并提交 491707f,拿到云任务表单预检的 `AccountStatusV1`
     // 与它的 producer fixture(真路由 + 真 accountApp 采集)。3f2f0dd..491707f 之间已钉文件里只有 wire
     // schema 变,且只增 $defs、不改既有定义 —— 桌面已经在解码的形状一个都没动。
     repo: "jinjunnn/alpha-platform",

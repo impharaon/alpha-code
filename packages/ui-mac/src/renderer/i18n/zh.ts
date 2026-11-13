@@ -611,7 +611,7 @@ export const dict = {
   "codepuppy.ext.cloudGoLogin": "去登录",
   "codepuppy.ext.cloudGoRecharge": "去充值",
   "codepuppy.ext.cloudOpenOverflow": "打开余额支付",
-  // alpha-code#1686 云任务表单提交前预检;codepuppy.ui.* = 组件库(名称 — 值列表)的读屏字
+  // #1686 云任务表单提交前预检;codepuppy.ui.* = 组件库(名称 — 值列表)的读屏字
   "codepuppy.ext.cloudErrRetired": "这项云端功能已停用，请在本机生成。",
   "codepuppy.ext.preflightReady": "现在可以发起",
   "codepuppy.ext.preflightBlocked": "现在发不了",

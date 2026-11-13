@@ -25,7 +25,7 @@ the authority for exact behavior.
 | **Toast** | `Toast.tsx` + `toast.css` | overlay notice (transient by default) | kinds: `info` / `success` / `error` (**no `warning`** — that's Banner-only); `ToastViewport`, `--a-z-toast`; auto-dismisses after 4 s unless `duration <= 0`, which pins it until the viewer closes it (`data-persistent`, `#771` — used by the extension IPC warning chokepoint) |
 | **Tooltip** | `Tooltip.tsx` + `tooltip.css` | hover hint | positioned popover, four placements |
 | **Banner** | `Banner.tsx` + `banner.css` | inline persistent notice | `info` / `success` / `warning` / `error`, with inline actions |
-| **Card** | `Card.tsx` + `card.css` | bounded block of read-only facts; no buttons inside — related actions go after it, right-aligned (same rule as `.a-dialog-footer`). Users: account popover balance card, cloud send boxes (alpha-code#1686) | one variant: `--a-bg-subtle` fill, `--a-border-faint` 1px, `--a-radius-lg`, padding `--a-space-3`; no own margin; static only; optional `label` → `aria-label` |
+| **Card** | `Card.tsx` + `card.css` | bounded block of read-only facts; no buttons inside — related actions go after it, right-aligned (same rule as `.a-dialog-footer`). Users: account popover balance card, cloud send boxes (#1686) | one variant: `--a-bg-subtle` fill, `--a-border-faint` 1px, `--a-radius-lg`, padding `--a-space-3`; no own margin; static only; optional `label` → `aria-label` |
 | **KeyValueList** | `KeyValueList.tsx` + `key-value-list.css` | `<dl>` of rows, label left / value right, inside a Card | one size (`--a-text-sm`, `--a-leading-snug`, row padding `--a-space-1`); value states: value · pending「…」· unavailable「—」(`--a-text-tertiary`, `--a-text-xs`, screen-reader text for both glyphs) |
 | **Base** | `base.css` | element resets / shared primitives for codepuppy-ui | — |
 
@@ -39,8 +39,6 @@ implementation lands, move the row into the table above and add its gallery swat
 
 | Component | Design | Role | Variants · states |
 | --- | --- | --- | --- |
-| **Card** (卡片) | [`2026-11-13-library-card-kv/`](../2026-11-13-library-card-kv/frame.html#card) | bounded block of read-only facts; no buttons inside — related actions go after it, right-aligned (same rule as `.a-dialog-footer`). First users: account popover balance card, cloud send boxes | one variant: `--a-bg-subtle` fill, `--a-border-faint` 1px, `--a-radius-lg`, padding `--a-space-3`; no own margin; static only |
-| **KeyValueList** (名称 — 值列表) | [`2026-11-13-library-card-kv/`](../2026-11-13-library-card-kv/frame.html#kv) | `<dl>` of rows, label left / value right, inside a Card | one size (`--a-text-sm`, `--a-leading-snug`, row padding `--a-space-1`); value states: value · pending「…」· unavailable「—」(`--a-text-tertiary`, `--a-text-xs`) |
 
 ## Composition surfaces (page-level, not primitives)
 

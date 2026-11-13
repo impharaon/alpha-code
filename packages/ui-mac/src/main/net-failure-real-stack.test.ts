@@ -3,8 +3,9 @@
 //     分类读的是这个运行时的原文:tls-silent 那一条是 undici 目标 TLS connector 的 10 s 计时器先于代理的 15 s 兜底到点
 //     (原文带 `attempted address`);代理拒绝 / 拨号失败的码在 undici 的 `Proxy response (NNN) !== 200 when HTTP Tunneling` 里。
 //     ext 也在这里装载 —— ext 包在 bun 里装得上、在 Electron node 里装不上的情况实测出现过(见 packages/ext/scripts/build.ts 的 jsonc-parser)。
-//   · 真引擎:生产 `scripts/build-engine.ts` 现打的 `dist-engine/engine.mjs`(electron-vite 把 sidecar 的 virtual:opencode-server
-//     解析到它),由 test-fixtures/net-failure/engine-driver.ts 按 sidecar.ts `start()` 的顺序起:生产注入 → 代理变量 + setGlobalProxyFromEnv
+//   · 真引擎:生产 `scripts/build-engine.ts` 现打的 `dist-engine/engine.mjs`,再经生产 main 构建(electron.vite.config.ts 的 main 一段,
+//     sidecar 的 virtual:opencode-server 解析到它)打成的 engine chunk —— 出货 out/main/chunks/engine-*.js 的同一份(`#1662`);
+//     由 test-fixtures/net-failure/engine-driver.ts 按 sidecar.ts `start()` 的顺序起:生产注入 → 代理变量 + setGlobalProxyFromEnv
 //     → import 引擎 → startEngine(生产选项)→ 生产 assertExtPluginActive。
 //   · 真 ext:生产 `packages/ext` 构建现打的 `dist/server.js`(dev 下 main 交给 sidecar 的就是这个目录);层由它的 execute.after
 //     (packages/ext/src/policy/display.ts attachNetFailure)写进失败工具的 metadata。
@@ -18,14 +19,16 @@
 //
 // 已知的坏(2026-11-12 逐条实跑):去掉 ext execute.after 里的 attachNetFailure ⇒ 六条记录都没有 codepuppyNetFailure(只剩 webfetch
 // 的原文);去掉 ext 构建对 jsonc-parser 的 ESM 解析 ⇒ ext 在 Electron node 里装不上,引擎不就绪,整份红;把出网代理的 dns 状态码
-// 改回 502 ⇒ dns 那条变 tcp;把分类模块里「经出网代理」的握手判定去掉 ⇒ silent 那条变 connect-timeout。
-// 本文件会重写 packages/ext/dist 与 packages/ui-mac/dist-engine(两处都是生产构建的落点、不入库),量的是当前源码打出的包。
+// 改回 502 ⇒ dns 那条变 tcp;把分类模块里「经出网代理」的握手判定去掉 ⇒ silent 那条变 connect-timeout。`#1662`(2026-11-12 实跑):
+// 引擎包留着上游 banner 的 CommonJS 四句(build-engine.ts 改回只去 shebang)⇒ main 构建报 `"__cjs_mod__" has already been declared`,整份红。
+// 本文件会重写 packages/ext/dist 与 packages/ui-mac/dist-engine(两处都是生产构建的落点、不入库),量的是当前源码打出的包;
+// main 构建的输出在驱动的临时目录里,不碰 out/。
 // darwin-only(Electron 运行时与 node_modules 里那份 Electron 的 RunAsNode fuse);darwin 上缺运行时或构建失败即 throw「本次测量作废」,
 // 非 darwin 自报 skip,由 scripts/gate-files.tsv 按 [平台:darwin] 登记。
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { spawn, type ChildProcess } from "node:child_process"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import * as http from "node:http"
 import { createRequire } from "node:module"
 import * as net from "node:net"
@@ -94,11 +97,17 @@ describeDarwin("`#1572` AC4 真栈:Electron 内嵌 node + 真出网代理 + 真 
     // 真 ext 与真引擎:生产构建脚本原样跑(prebuild.ts 同两步),产物落在 dev 下 main / electron-vite 取它们的位置。
     build([process.execPath, "run", "build"], EXT, "ext bundle (packages/ext scripts/build.ts)")
     build([process.execPath, join(UI_MAC, "scripts/build-engine.ts")], UI_MAC, "engine bundle (scripts/build-engine.ts)")
-    const engineBundle = join(UI_MAC, "dist-engine", "engine.mjs")
     const extDir = join(EXT, "dist")
     // 驱动放进 ui-mac 的 node_modules 底下:external 的 jsonc-parser(UMD 包,内联后找不到它自己的 ./impl/*)要像出货包那样从 ui-mac 的依赖里解析到。
     mkdirSync(join(UI_MAC, "node_modules/.cache"), { recursive: true })
     driverDir = mkdtempSync(join(UI_MAC, "node_modules/.cache/ac1572-real-stack-"))
+    // `#1662`:出货的引擎是 main 构建把 dist-engine/engine.mjs 再打成的 out/main/chunks/engine-*.js(CommonJS 前导代码由 main 的
+    // banner 给,引擎包自己不带)。生产 main 构建原样跑一遍(输出换到驱动目录下,不碰 out/),装的就是它打出的那个 chunk。
+    build([process.execPath, join(FIXTURES, "build-main.ts"), join(driverDir, "out")], UI_MAC, "main bundle (electron.vite.config.ts main)")
+    const chunks = join(driverDir, "out", "main", "chunks")
+    const engineChunks = readdirSync(chunks).filter((name) => /^engine-.*\.js$/.test(name))
+    if (engineChunks.length !== 1) throw new Error(`main build produced ${engineChunks.length} engine chunk(s) in ${chunks}(本次测量作废)`)
+    const engineBundle = join(chunks, engineChunks[0]!)
     const driver = await Bun.build({ target: "node", entrypoints: [join(FIXTURES, "engine-driver.ts")], outdir: driverDir, format: "esm", external: ["jsonc-parser"] })
     if (!driver.success) throw new Error(`driver bundle failed(本次测量作废):\n${driver.logs.map(String).join("\n")}`)
 

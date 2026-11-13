@@ -445,19 +445,20 @@ describe("#1500 真实 HTTP 超时的后台补试与状态仲裁", () => {
   }, 30000)
 
   test("AC2:两次真实超时后无第三次 GET,LKG 字节和本地 BYOK 保持可用", async () => {
-    // `#1705`:不用固定等待收尾。被挂住的请求放行后,等服务端看到每个挂住的请求都已应答(每次应答一个新的 Response ——
-    // 同一个 Response 交两次会让第二次应答失败),刷新状态已落定,再断言总数仍是两次、LKG 与 BYOK 不变。
+    // `#1705`:不用固定等待收尾。被挂住的请求放行后,等服务端看到每个挂住的请求都已应答、刷新状态已落定,
+    // 再断言总数仍是两次、LKG 与 BYOK 不变。
     let delayed = false
     let answered = 0
     const requests: string[] = []
+    // Both delayed GETs wait on one gate, but each builds its own Response: Bun.serve sends a Response
+    // body once, so one shared object throws ERR_BODY_ALREADY_USED whenever the server has not yet seen
+    // a client abort at release time; Bun then fails this test and afterEach deletes userData.
     const release = Promise.withResolvers<void>()
-    startTarget((request) => {
+    startTarget(async (request) => {
       if (delayed) {
         requests.push(request.method)
-        return release.promise.then(() => {
-          answered++
-          return Response.json(catalogV3())
-        })
+        await release.promise
+        answered++
       }
       return Response.json(catalogV3())
     })

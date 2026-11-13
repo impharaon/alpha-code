@@ -1,5 +1,5 @@
 import { createSignal } from "solid-js"
-import type { Message, ModelRef, Part, UserMessage } from "../../engine-adapter/contract/v1"
+import type { Message, ModelRef, Part, UserMessage } from "@opencode-ai/sdk/v2/client"
 import { v1PromptModelFields } from "./composer-state"
 import { t } from "../i18n"
 import { pushToast } from "./Toast"

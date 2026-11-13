@@ -51,7 +51,6 @@
     "@happy-dom/global-registrator": "20.0.11",
     "@lydell/node-pty": "catalog:",
     "@opencode-ai/app": "workspace:*",
-    "@opencode-ai/client": "file:../codepuppy-app/vendor/opencode-ai-client-1.17.13-v2.tgz",
     "@opencode-ai/sdk": "workspace:*",
     "@opencode-ai/session-ui": "workspace:*",
     "@opencode-ai/ui": "workspace:*",

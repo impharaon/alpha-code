@@ -11,7 +11,7 @@
 //   与 ext 写进读取指令的是同一个函数。`read_pdf` 成功但每页都是空串 ⇒「读到 0 字」。
 //   没有调用时看本机读取工具的逐服务状态(引擎 mcp.status,当下重新取):不可用 ⇒「读取失败:没有启动」;
 //   回合还在跑 ⇒ 准备中「等待本机读取工具」/ 就绪「已存到本机,等助手读取」;回合结束 ⇒「这一轮助手没有读取」。
-import type { FilePart, Part } from "../../../engine-adapter/contract/v1"
+import type { FilePart, Part } from "@opencode-ai/sdk/v2/client"
 import {
   ATTACHMENT_READ_TOOL,
   attachmentAbsolutePath,

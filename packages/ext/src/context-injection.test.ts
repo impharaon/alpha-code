@@ -37,6 +37,7 @@ import {
   explainConfigString,
   explainInstructionBody,
   explainAttachmentBlock,
+  explainToolFailure,
   explainVisionBlock,
   HOOK_CONTEXT_CLASS,
   IDENTITY_FRAGMENT_ID,
@@ -51,7 +52,13 @@ import {
   VISION_SYSTEM_NOTE_OFFLINE_TEXT,
   VISION_SYSTEM_NOTE_TEMPLATE,
   VISION_TOOL_REFUSED_TEXT,
+  WEB_SEARCH_FAILURE_PATTERNS,
+  WEB_SEARCH_OFF_TEMPLATES,
 } from "./context-injection"
+import { CodePuppyWebSearchFailure, WEB_SEARCH_FAILURE_LABEL, codePuppyWebSearchFailureOf, searchExa } from "./exa-websearch"
+import { assertWebSearchToolAllowed, CLOUD_WEBSEARCH_DENY_ENV, LOCAL_WEBSEARCH_DENY_ENV } from "./cloud-websearch-kill"
+import { namedDeny, type PolicyDenyReason } from "./policy/gate"
+import { ToolFailure } from "../../ai/src/schema/errors.ts"
 import { REBRAND_RULES } from "./prompt-rebrand"
 import { applyPromptTakeover } from "./codepuppy-prompts"
 import { CODEPUPPY_AGENT_TEXT } from "../../ui-mac/src/main/codepuppy-agents"
@@ -150,7 +157,7 @@ afterEach(() => {
 })
 
 /** 本文件为之设了咽喉的通路。② 要求它与「真 CodePuppyExt 注册且分类为 context」的集合逐字相等。 */
-const THROATED = ["agent.transform", "command.transform", "mcp.transform", "session.compaction", "session.context", "session.generate", "session.http.request", "session.prompt", "session.title", "skill.transform", "tool.execute.after", "tool.transform", "websearch.transform"].sort()
+const THROATED = ["agent.transform", "command.transform", "mcp.transform", "session.compaction", "session.context", "session.generate", "session.http.request", "session.prompt", "session.title", "skill.transform", "tool.execute.after", "tool.execute.before", "tool.transform", "websearch.transform"].sort()
 /** 2.x 组装一次模型请求的四条钩子(`session/model-request.ts`:主循环 / 压缩 / 无工具生成 / 起标题各触发自己那条,互不经过)。 */
 const REQUEST_HOOKS = ["context", "compaction", "generate", "title"] as const
 
@@ -584,6 +591,124 @@ describe("③d tool.execute.after 咽喉:工具结果回模型的路上,alpha �
       expect(explain(refused.result.content)).toBe(true)
       expect(explain(refused.result.content + " (and more)")).toBe(false)
     }),
+  )
+})
+
+// ── ③k 工具失败咽喉(`#1704`):失败时交回模型的每一句都由登记簿解释 ──────────────────────────
+//
+// 三处:exa 搜网失败说明(经 tool.execute.after 失败分支换进去)、web search 总开关的拒绝句与工具策略的拒绝句
+// (tool.execute.before 抛出)。句子由生产代码造(真 searchExa 对着替身应答、真 assertWebSearchToolAllowed / namedDeny),
+// 送过真宿主的钩子,换进去或抛出来的整句必须能被 sink=tool-failure 的登记解释。供应商原话、状态码、工具名不是 alpha 的字。
+
+describe("③k 工具失败咽喉:失败时交回模型的话都由登记簿解释(#1704)", () => {
+  const unexplained = (messages: readonly string[]) => messages.filter((m) => !explainToolFailure(m).ok)
+  /** 一次真 searchExa,替身应答给出这次的失败;返回它抛出的具名结局。 */
+  const exaFailure = async (respond: () => Response | Promise<Response>) => {
+    const failure = await searchExa({ query: "q", fetch: (async () => respond()) as unknown as typeof fetch }).then(
+      () => undefined,
+      (error: unknown) => codePuppyWebSearchFailureOf(error) ?? error,
+    )
+    if (!(failure instanceof CodePuppyWebSearchFailure)) throw new Error(`expected a named web search failure, got ${String(failure)}`)
+    return failure
+  }
+  const rpc = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } })
+
+  test("AC-01:搜网失败的每一种类别都登记了,类别词与 exa-websearch.ts 逐项相同(加一种类别而不登记 ⇒ 点名它)", () => {
+    const produced = Object.keys(WEB_SEARCH_FAILURE_LABEL)
+    const missing = produced.filter((kind) => WEB_SEARCH_FAILURE_PATTERNS[kind as keyof typeof WEB_SEARCH_FAILURE_PATTERNS]?.[0] !== WEB_SEARCH_FAILURE_LABEL[kind as keyof typeof WEB_SEARCH_FAILURE_LABEL])
+    expect(missing, "这些类别没有按句式登记(或类别词不一致)").toEqual([])
+    expect(Object.keys(WEB_SEARCH_FAILURE_PATTERNS).sort()).toEqual(produced.sort())
+    // 每一种类别按它在生产里的形状(带不带状态码)造一句,都解释得通;多一个字即解释不了(判官看得见)。
+    const sentences = Object.entries(WEB_SEARCH_FAILURE_PATTERNS).map(([kind, [, http]]) =>
+      new CodePuppyWebSearchFailure(kind as never, "vendor said: no", http ? 418 : undefined).message,
+    )
+    expect(unexplained(sentences)).toEqual([])
+    expect(explainToolFailure(sentences[0]!.replace("Web search failed", "Web search falied")).ok).toBe(false)
+  })
+
+  it.live("AC-01 / AC-04:真 searchExa 的各种失败送过真宿主 execute.after 的失败分支,换进去的整句都由登记簿解释", () =>
+    Effect.gen(function* () {
+      yield* activate(CodePuppyExt)
+      const hooks = yield* PluginHooks.Service
+      const failures = yield* Effect.promise(() =>
+        Promise.all([
+          ...[401, 403, 400, 402, 502, 418, 429].map((status) => exaFailure(() => rpc({ error: { message: `status ${status} from exa` } }, status))),
+          exaFailure(() => Promise.reject(new TypeError("fetch failed"))),
+          exaFailure(() => new Response("not json at all", { status: 200 })),
+          exaFailure(() => rpc({ jsonrpc: "2.0", id: 1, error: { message: "rate limit" } })),
+          exaFailure(() => rpc({ jsonrpc: "2.0", id: 1, result: { isError: true, content: [{ type: "text", text: "bad query" }] } })),
+        ]),
+      )
+      const handedBack: string[] = []
+      for (const failure of failures) {
+        const event = yield* hooks.trigger("tool", "execute.after", {
+          tool: "websearch",
+          sessionID: "ses_fail" as never,
+          agent: "build" as never,
+          messageID: "msg_fail" as never,
+          id: "call_fail" as never,
+          input: { query: "q" },
+          status: "error",
+          // 2.x 的 websearch 工具把供应商的失败包成这一句(packages/core/src/tool/plugin/websearch.ts 的 mapError)。
+          error: new ToolFailure({ message: "Unable to search the web for q", error: failure }),
+        })
+        handedBack.push((event as unknown as { error: { message: string } }).error.message)
+      }
+      expect(handedBack.every((m) => m.startsWith("Web search failed: ")), handedBack.join(" | ")).toBe(true)
+      expect(unexplained(handedBack)).toEqual([])
+    }),
+  )
+
+  test("AC-02:web search 总开关的两种拒绝句(治理云工具 / 其余)都由登记簿解释;改一个字即解释不了", () => {
+    const thrown = (tool: string, env: Record<string, string>, ownership: { governed: string[]; foreign: string[] }) => {
+      try {
+        assertWebSearchToolAllowed(tool, env, ownership)
+      } catch (error) {
+        return (error as Error).message
+      }
+      throw new Error(`${tool} was not refused`)
+    }
+    const cloud = thrown("cloud_web_search", { [CLOUD_WEBSEARCH_DENY_ENV]: "1" }, { governed: ["cloud"], foreign: [] })
+    const local = thrown("websearch", { [LOCAL_WEBSEARCH_DENY_ENV]: "1" }, { governed: [], foreign: [] })
+    expect(cloud).not.toBe(local)
+    expect(explainToolFailure(cloud)).toMatchObject({ ok: true, id: "tool-failure.websearch-off.cloud" })
+    expect(explainToolFailure(local)).toMatchObject({ ok: true, id: "tool-failure.websearch-off.local" })
+    expect(Object.keys(WEB_SEARCH_OFF_TEMPLATES)).toHaveLength(2)
+    expect(explainToolFailure(local.replace("do not retry", "do not retry now")).ok).toBe(false)
+  })
+
+  test("AC-03:工具策略拒绝句的每一种理由码都由登记簿解释(理由码全集由类型锁钉在 PolicyDenyReason)", () => {
+    const reasons: PolicyDenyReason[] = ["invalid-identity", "cap-managed", "cap-managed-unreadable", "cap-entitlement", "cap-hard-deny", "quarantine", "user", "binding-changed", "default", "unknown-tool-identity"]
+    const sentences = reasons.map((reason) => namedDeny("mcp:remote:svc:tool", undefined, reason).message)
+    sentences.push(namedDeny("mcp:remote:svc:tool", undefined, "binding-changed-during-approval", "the service definition changed while waiting for approval; retry").message)
+    expect(unexplained(sentences)).toEqual([])
+    expect(explainToolFailure("Code Puppy tool policy denied x (not-a-registered-reason)").ok).toBe(false)
+  })
+
+  it.live("AC-04:真宿主 tool.execute.before 抛出的拒绝(总开关 / 未知工具身份)回到模型时都由登记簿解释", () =>
+    Effect.gen(function* () {
+      process.env[LOCAL_WEBSEARCH_DENY_ENV] = "1"
+      yield* activate({
+        id: "test.registered-websearch",
+        async setup(context) {
+          await context.tool.transform((editor) => {
+            editor.add({ name: "websearch", description: "websearch", input: { type: "object", properties: {} }, options: { codemode: false }, execute: async () => ({ content: "x" }) })
+          })
+        },
+      })
+      yield* activate(CodePuppyExt)
+      const hooks = yield* PluginHooks.Service
+      const refusal = (tool: string) =>
+        hooks.trigger("tool", "execute.before", { tool, sessionID: "ses_b" as never, agent: "build" as never, messageID: "msg_b" as never, id: "call_b" as never, input: {} }).pipe(
+          Effect.flip,
+          Effect.map((error) => (error as { message: string }).message),
+        )
+      const offSwitch = yield* refusal("websearch")
+      const unknown = yield* refusal("never_registered_tool")
+      expect(offSwitch).toContain("websearch is unavailable")
+      expect(unknown).toContain("(unknown-tool-identity)")
+      expect(unexplained([offSwitch, unknown])).toEqual([])
+    }).pipe(Effect.ensuring(Effect.sync(() => delete process.env[LOCAL_WEBSEARCH_DENY_ENV]))),
   )
 })
 

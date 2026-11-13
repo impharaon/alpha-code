@@ -21,7 +21,7 @@ import { canonicalToolIdentity } from "../../../schema/src/tool-identity"
 import { TOOL_POLICY_REQUEST_KEY } from "../../../schema/src/codepuppy-tool-policy"
 import { match } from "../../../core/src/util/wildcard"
 import type { PermissionRule } from "./managed"
-import { resolveToolPolicy, subjectBindingDigest, type EffectiveToolPolicy, type ToolPolicyStore } from "./resolver"
+import { resolveToolPolicy, subjectBindingDigest, type EffectiveToolPolicy, type EffectiveToolPolicyReason, type ToolPolicyStore } from "./resolver"
 import type { ToolFacts } from "./identity"
 import { classifyPermissionRequest, withRiskClassification } from "./risk"
 import { displaySnapshot } from "./display"
@@ -76,8 +76,11 @@ function describe(facts: ToolFacts | undefined, tool: string) {
   }
 }
 
+/** Every reason a named refusal can give (`#1704`: each one is registered with its sentence in context-injection.ts). */
+export type PolicyDenyReason = EffectiveToolPolicyReason["kind"] | "unknown-tool-identity" | "binding-changed-during-approval"
+
 /** A named, loud refusal: the user and the model read the same sentence. */
-export function namedDeny(tool: string, facts: ToolFacts | undefined, reason: string, detail?: string) {
+export function namedDeny(tool: string, facts: ToolFacts | undefined, reason: PolicyDenyReason, detail?: string) {
   return new ToolError({
     message: `Code Puppy tool policy denied ${describe(facts, tool)} (${reason})${detail ? `: ${detail}` : ""}`,
     ...(facts ? { metadata: { codepuppyDisplay: displaySnapshot(facts) } } : {}),

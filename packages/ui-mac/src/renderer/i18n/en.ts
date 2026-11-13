@@ -1061,6 +1061,12 @@ export const dict = {
   "codepuppy.onboarding.skipByok": "Skip and use your own key (BYOK)",
 
   "codepuppy.permission.title": "Allow this action?",
+  "codepuppy.riskTag.low": "Low risk",
+  "codepuppy.riskTag.medium": "Medium risk",
+  "codepuppy.riskTag.high": "High risk",
+  "codepuppy.riskTag.critical": "Critical risk",
+  "codepuppy.riskTag.unknown": "Risk unknown",
+  "codepuppy.permission.riskExfiltration": "May send keys or private data outside",
   "codepuppy.permission.once": "Allow once",
   "codepuppy.permission.always": "Always allow",
   "codepuppy.permission.reject": "Reject",

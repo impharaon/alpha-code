@@ -17,7 +17,7 @@ last_reviewed: 2026-11-13
 ## 风险标签组件与两处接入(alpha-code#1314)
 
 - 依据:[SPEC-permission-risk-display v1](spec.md) @ `57f4cbbf1c`,AC-01、AC-02 与「体验约定」;无单独技术方案(分类引擎与 `metadata.codepuppyRisk` 已存在,本段只做呈现)。界面稿 @ `a559317fc6`:现行稿 [`current/conversation-timeline/design.html#permission-risk`](../../design/current/conversation-timeline/design.html)、[`current/capability-authorize/design.html`](../../design/current/capability-authorize/design.html),组件稿 [`2026-11-13-1314-risk-tag/frame.html`](../../design/2026-11-13-1314-risk-tag/frame.html),组件库待定行 `docs/design/system/components.md`「Pending」与 `tokens.md`。意图 INT-desktop I-15(组件进组件库、两处共用、不做页面私有副本)。Issue [impharaon/alpha-code#1314](https://github.com/impharaon/alpha-code/issues/1314)。
-- 核对:待编排器核对。
+- 核对:`e02eca55e2` · 编排器(Claude Fable 5.2) · 通过(裁决:渲染进程引 `packages/ext` 的读取函数仅在不违反已记载的依赖方向时允许,并引用所依据的规则;极高风险那句按稿作为新文案走 `description`;`ExtGrantedCapRow` 换组件在范围内;不改 `permission-shape.test.ts`,在 plan 里保留该观察,并更新 `lane-seams.md` I7a)。
 
 **AC 原文(逐字,来自 spec v1)**
 

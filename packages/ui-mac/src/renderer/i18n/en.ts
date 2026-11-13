@@ -1866,6 +1866,8 @@ export const dict = {
   "codepuppy.sidebar.helpFeedback": "Help & feedback",
   "codepuppy.sidebar.checkUpdates": "Check for updates",
   "codepuppy.sidebar.version": "Version",
+  "codepuppy.sidebar.buildMarker.dev": "Dev build",
+  "codepuppy.sidebar.buildMarker.local": "Local build",
   // [ac#1207] REQ-147 AC1:footer 更新条的六个可见状态(映射见 sidebar/updater-state-surface.ts)。
   "codepuppy.updater.checking": "Checking for updates…",
   "codepuppy.updater.downloading": "Downloading update {{version}}…",

@@ -121,6 +121,7 @@ import type { SessionGrantsEndedEventWire } from "../shared/ext-session-grant-wi
 import { initEndpoints, resolveEndpoints } from "./codepuppy-endpoints"
 import { registerEndpointsIpcHandlers } from "./endpoints-ipc"
 import { registerAppVersionIpcHandler } from "./app-version-ipc"
+import { registerBuildIdentityIpcHandler } from "./build-identity-ipc"
 import { registerContractHealthIpcHandlers, reportContractFailure } from "./codepuppy-contract-health"
 import { registerCatalogHealthIpcHandlers } from "./codepuppy-catalog-health"
 import { registerSurfaceIpc } from "./codepuppy-surfaces"
@@ -1114,6 +1115,7 @@ const main = Effect.gen(function* () {
   registerProviderIpcHandlers()
   registerEndpointsIpcHandlers()
   registerAppVersionIpcHandler()
+  registerBuildIdentityIpcHandler()
   registerContractHealthIpcHandlers(() => mainWindow)
   // #1084:平台目录刷新失败的出口(启动那次刷新跑在本行之前 —— 所以它靠 invoke 取,不靠推送)。
   registerCatalogHealthIpcHandlers(() => mainWindow)

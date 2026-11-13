@@ -257,3 +257,61 @@ describe("sealEnginePluginAdditions — fail-closed 的边界", () => {
     expect(sealEnginePluginAdditions(t, before, changed).ok).toBe(false)
   })
 })
+
+// ── ⑤ `#1703`:OpenCode 2 的原生键 `plugins` ─────────────────────────────────────────────────────
+//
+// 引擎把 `plugin`(旧写法)与 `plugins`(原生写法)的条目拼成同一张插件表(packages/core/src/config/normalize.ts),
+// 所以两个键同一判据。下面把 ③ 的 `plugin` 形状对两个键逐条镜像,再加跨键挪动;写盘入口单列一格。
+
+describe("ADR-040 咽喉:`plugins` 键与 `plugin` 键同一判据(#1703)", () => {
+  const t = "/tmp/codepuppy.jsonc"
+  const cfg = (value: unknown) => JSON.stringify(value)
+
+  test("AC-01:空配置往 `plugins` 加一条 ⇒ 拒,理由点名 plugins", () => {
+    const reason = refusal(sealEnginePluginAdditions(t, "{}", cfg({ plugins: ["evil"] })))
+    expect(reason).toContain("ADR-040")
+    expect(reason).toContain('"evil" to plugins[]')
+  })
+
+  test("AC-02:两个键逐条镜像 —— 移除、清空、重排、完全不碰该键的写放行;加一条、元组、重复、删一加一拒", () => {
+    for (const key of ["plugin", "plugins"] as const) {
+      const before = cfg({ [key]: ["a@1", "b@1"], mcp: {} })
+      expect(sealEnginePluginAdditions(t, before, cfg({ [key]: ["b@1"], mcp: {} })).ok, `${key} remove`).toBe(true)
+      expect(sealEnginePluginAdditions(t, before, cfg({ [key]: [], mcp: {} })).ok, `${key} clear`).toBe(true)
+      expect(sealEnginePluginAdditions(t, before, cfg({ mcp: {} })).ok, `${key} key dropped`).toBe(true)
+      expect(sealEnginePluginAdditions(t, before, cfg({ [key]: ["b@1", "a@1"], mcp: {} })).ok, `${key} reorder`).toBe(true)
+      expect(sealEnginePluginAdditions(t, before, cfg({ [key]: ["a@1", "b@1"], mcp: { x: {} } })).ok, `${key} untouched`).toBe(true)
+      for (const after of [["a@1", "b@1", "c@1"], ["a@1", "b@1", ["c@1", { o: 1 }]], ["a@1", "b@1", "b@1"], ["a@1", "c@1"]]) {
+        const reason = refusal(sealEnginePluginAdditions(t, before, cfg({ [key]: after, mcp: {} })))
+        expect(reason, `${key} ${JSON.stringify(after)}`).toContain(`to ${key}[]`)
+      }
+    }
+  })
+
+  test("AC-02:不是数组 —— 两侧逐字相同放行,只有一侧是则拒并点名那个键;既有文本坏掉而待写有条目 ⇒ 拒", () => {
+    for (const key of ["plugin", "plugins"] as const) {
+      expect(sealEnginePluginAdditions(t, cfg({ [key]: "oops", mcp: {} }), cfg({ [key]: "oops", mcp: { a: {} } })).ok).toBe(true)
+      expect(refusal(sealEnginePluginAdditions(t, cfg({ [key]: [] }), cfg({ [key]: "oops" })))).toContain(`${key} key is not an array`)
+      expect(sealEnginePluginAdditions(t, "{ broken", cfg({ [key]: ["x@1"] })).ok).toBe(false)
+      expect(sealEnginePluginAdditions(t, "{ broken", cfg({ [key]: [] })).ok).toBe(true)
+    }
+  })
+
+  test("AC-02:把条目从 `plugin` 挪到 `plugins`(或反向)按新增拒", () => {
+    expect(refusal(sealEnginePluginAdditions(t, cfg({ plugin: ["moved@1"] }), cfg({ plugins: ["moved@1"] })))).toContain("to plugins[]")
+    expect(refusal(sealEnginePluginAdditions(t, cfg({ plugins: ["moved@1"] }), cfg({ plugin: ["moved@1"] })))).toContain("to plugin[]")
+    // 两个键都原样 ⇒ 放行(零误伤)
+    const both = cfg({ plugin: ["a@1"], plugins: ["b@1"] })
+    expect(sealEnginePluginAdditions(t, both, cfg({ plugin: ["a@1"], plugins: ["b@1"], mcp: {} })).ok).toBe(true)
+  })
+
+  test("AC-03:真实写盘入口 writeConfigTextAtomic —— 新增一条 `plugins` ⇒ 具名拒绝,盘上字节不变", () => {
+    writeCfg({ plugins: ["kept@1"], mcp: {} })
+    const before = fs.readFileSync(target(), "utf8")
+    const r = writeConfigTextAtomic(target(), before, JSON.stringify({ plugins: ["kept@1", "plugins-smuggled@2"], mcp: {} }, null, 2) + "\n")
+    expect(r.ok).toBe(false)
+    expect(refusal(r)).toContain("plugins-smuggled@2")
+    expect(refusal(r)).toContain("plugins[]")
+    expect(fs.readFileSync(target(), "utf8")).toBe(before)
+  })
+})

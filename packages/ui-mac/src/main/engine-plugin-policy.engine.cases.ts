@@ -9,6 +9,9 @@
 //   · AC-05:与 ext 同名的项目目录、与全局插件同名的项目文件、与用户全局的包同名的项目包(`<名字>@file:<项目里的目录>`)、
 //     落进用户全局条目 `<root>/glob-*` 的项目路径 `<root>/glob-x` 都不执行。
 //   · AC-03 补:用户在 codepuppy.jsonc 里自己 deny 的全局插件,改动前不加载,改动后仍不加载(我们的 allow 不盖过用户的 deny)。
+//   · 按包名安装的用户全局插件(owner 2026-11-13「这个是否可以做成配置项进行配置,后续不用改代码」):用户在引擎的全局配置文件里
+//     给这个包名写 allow `plugin.use` ⇒ 加载(运行中改也生效);代价:任何项目用 `<包名>@file:<项目目录>` 以这个名字运行自己的
+//     代码也被放行;同样的 allow 写在 codepuppy.jsonc 里 ⇒ 不加载(显式文件里排在「拒绝全部」之前)。
 //   · AC-03:ext(这里是一个放在固定路径上的桩)在两个项目里都是 active;全局配置目录里的插件文件、`opencode.json` 的相对 / 绝对
 //     路径条目、HOME 一级 `~/.opencode/plugins/h.js` 照常执行;出厂命令 /init、/review 与出厂技能照常在。
 //   · 已知的坏(也是改动前的实测):显式文件里去掉 `plugin.use` 语句 ⇒ 上面每一个项目标记都出现,全局的包名条目也执行。
@@ -41,6 +44,9 @@ const userData = path.join(root, "userdata")
 const ext = path.join(root, "app", "codepuppy-ext")
 const p1 = path.join(sandbox.home, "work", "p1")
 const p2 = path.join(root, "projects", "p2")
+const p3 = path.join(root, "projects", "p3")
+const neutral = path.join(root, "projects", "neutral")
+const optinGlobal = path.join(root, "optin-config", "opencode")
 let global = ""
 
 const llm = Bun.serve({
@@ -138,6 +144,13 @@ beforeAll(async () => {
   write(path.join(p2, "opencode.json"), JSON.stringify({ ...allowAll, plugins: ["./rel2"] }))
   write(path.join(p2, ".opencode", "opencode.json"), JSON.stringify(allowAll))
 
+  // 按包名的用户全局插件(用另一个全局配置目录,不碰上面三台引擎的那一个);p3 用同名别名指向自己的目录
+  packagePlugin(npmCache("cp-1708-optin-pkg@1.0.0"), "cp-1708-optin-pkg", "optin-global-package")
+  packagePlugin(npmCache("cp-1708-cpjsonc-pkg@1.0.0"), "cp-1708-cpjsonc-pkg", "cpjsonc-allowed-package")
+  packagePlugin(path.join(p3, "evil"), "cp-1708-optin-pkg", "p3-optin-alias")
+  write(path.join(p3, "opencode.json"), JSON.stringify({ plugins: [`cp-1708-optin-pkg@file:${path.join(p3, "evil")}`] }))
+  fs.mkdirSync(neutral, { recursive: true })
+
   // 出厂技能(经 CODEPUPPY_FACTORY_SKILL_DIRS 进显式文件的 skills)与一个可用的模型(自定义节点 → 本机桩)
   write(path.join(root, "factory", "cp-1708-factory-skill", "SKILL.md"), "---\nname: cp-1708-factory-skill\ndescription: factory probe\n---\n\nprobe\n")
   process.env.CODEPUPPY_FACTORY_SKILL_DIRS = JSON.stringify([path.join(root, "factory")])
@@ -153,7 +166,12 @@ afterAll(async () => {
   llm.stop(true)
 })
 
-async function engineWith(name: string, config: CodePuppyConfigInjectionResult["config"], modelsFile?: string) {
+async function engineWith(
+  name: string,
+  config: CodePuppyConfigInjectionResult["config"],
+  modelsFile?: string,
+  options: { configDirectory?: string; filewatcher?: boolean } = {},
+) {
   const markers = path.join(root, "markers", name)
   fs.mkdirSync(markers, { recursive: true })
   process.env.CP_1708_MARKERS = markers
@@ -167,10 +185,10 @@ async function engineWith(name: string, config: CodePuppyConfigInjectionResult["
       password: PASSWORD,
       engineVersion: "test",
       databasePath: slot.databasePath,
-      configDirectory: global,
+      configDirectory: options.configDirectory ?? global,
       config,
       models: { ...(modelsFile ? { file: modelsFile } : {}), fetch: false },
-      filewatcher: false,
+      filewatcher: options.filewatcher ?? false,
       platform: process.platform,
     }),
     { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, PASSWORD)) },
@@ -268,4 +286,46 @@ describe("alpha-code#1708 项目范围的引擎插件在 Code Puppy 里一律不
     expect(ran).toEqual(expect.arrayContaining(["p2-plugins-js", "p2-relative"]))
     expect(ran.filter((marker) => marker.startsWith("p1-") || marker === "ancestor")).toEqual([])
   }, 90_000)
+
+  test("按包名的用户全局插件:allow 写在引擎全局配置文件里 ⇒ 加载(运行中改也生效),项目的同名别名随之加载;写在 codepuppy.jsonc 里 ⇒ 不加载", async () => {
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+    const until = async (done: () => boolean) => {
+      for (let waited = 0; waited < 15_000 && !done(); waited += 200) await sleep(200)
+    }
+    const plugins = ["cp-1708-optin-pkg@1.0.0", "cp-1708-cpjsonc-pkg@1.0.0"]
+    const allow = (resource: string) => ({ action: "plugin.use", resource, effect: "allow" })
+    const globalFile = path.join(optinGlobal, "opencode.json")
+    const codepuppyJsonc = path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "codepuppy.jsonc")
+    const saved = fs.readFileSync(codepuppyJsonc, "utf8")
+    write(globalFile, JSON.stringify({ plugins }))
+    write(codepuppyJsonc, JSON.stringify({ policies: [...(JSON.parse(saved) as { policies: unknown[] }).policies, allow("cp-1708-cpjsonc-pkg")] }))
+    process.env.OPENCODE_CONFIG_DIR = optinGlobal
+    try {
+      const optin = injectCodePuppyConfig(userData, ext, "stable")
+      const engine = await engineWith("optin", optin.config, optin.models.file, { configDirectory: optinGlobal, filewatcher: true })
+      await engine.open(neutral)
+      await sleep(1_000)
+      // 今天的行为:按包名的全局条目不加载;codepuppy.jsonc 里的 allow 不起作用
+      expect(engine.ran()).toEqual(["ext"])
+
+      // 用户在引擎全局配置文件里给这个包名写 allow:引擎监听全局目录,运行中就加载
+      write(globalFile, JSON.stringify({ plugins, policies: [allow("cp-1708-optin-pkg")] }))
+      await until(() => engine.ran().includes("optin-global-package"))
+      expect(engine.ran()).toContain("optin-global-package")
+      // 代价:按名字放行 ⇒ 项目用同名别名指向自己的目录,它的代码也执行
+      await engine.open(p3)
+      await until(() => engine.ran().includes("p3-optin-alias"))
+      expect(engine.ran()).toContain("p3-optin-alias")
+      // codepuppy.jsonc 里那条 allow 仍不起作用
+      expect(engine.ran()).not.toContain("cpjsonc-allowed-package")
+
+      // 对照:同一个包,allow 写进引擎全局配置文件 ⇒ 加载(上面它不加载,是放行写错了地方,不是包装不上)
+      write(globalFile, JSON.stringify({ plugins, policies: [allow("cp-1708-optin-pkg"), allow("cp-1708-cpjsonc-pkg")] }))
+      await until(() => engine.ran().includes("cpjsonc-allowed-package"))
+      expect(engine.ran()).toContain("cpjsonc-allowed-package")
+    } finally {
+      delete process.env.OPENCODE_CONFIG_DIR
+      fs.writeFileSync(codepuppyJsonc, saved)
+    }
+  }, 120_000)
 })

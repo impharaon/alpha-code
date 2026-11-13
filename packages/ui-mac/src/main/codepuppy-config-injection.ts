@@ -676,7 +676,7 @@ export function injectCodePuppyConfig(
     config.policies = [...(config.policies ?? []), ...plugins.policies]
     if (plugins.refused.length)
       console.warn(
-        `[alpha-code#1708] user-global engine plugin entries not loaded — an allow can only name a plain absolute path (package entries are checked by their bare name, which a project can reuse; * and ? are wildcards; {env:} / {file:} and ~/ are not resolved here): ${JSON.stringify(plugins.refused)}`,
+        `[alpha-code#1708] user-global engine plugin entries not loaded — an allow can only name a plain absolute path (package entries are checked by their bare name, which a project can reuse; * and ? are wildcards; {env:} / {file:} and ~/ are not resolved here; to load a package plugin anyway see ADR-040 consequence 4 「如何让某个按包名安装的全局插件加载」): ${JSON.stringify(plugins.refused)}`,
       )
     const written = writeExplicitConfig(explicitFile, file, layer)
     if (written.userError) console.warn(`[alpha-code#1667] ${file} is not valid (${written.userError}); the engine sees only Code Puppy's explicit layer`)

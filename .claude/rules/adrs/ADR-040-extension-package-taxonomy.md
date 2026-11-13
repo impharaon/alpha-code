@@ -257,6 +257,23 @@ provider 的目录约定由 provider 定义、随时会变；正确做法是在�
      项目自写的 allow 能盖过它。
    - **重算时机**：sidecar 启动注入时一次，之后每次显式文件被重写时再算；运行中新加的用户全局插件在下一次重算（最迟下次启动）后加载。
 
+   **如何让某个按包名安装的全局插件加载**（owner 2026-11-13：「这个是否可以做成配置项进行配置，后续不用改代码」）：
+   在**引擎的全局配置文件** `~/.config/opencode/opencode.json`（设了 `OPENCODE_CONFIG_DIR` 时是那个目录下的 `opencode.json`，
+   设了 `XDG_CONFIG_HOME` 时是 `$XDG_CONFIG_HOME/opencode/opencode.json`）里，给这个包名写一条 allow，`resource` 是**不带版本**的包名：
+
+   ```json
+   {
+     "plugins": ["some-plugin@1.2.3"],
+     "policies": [{ "action": "plugin.use", "resource": "some-plugin", "effect": "allow" }]
+   }
+   ```
+
+   这个文件比 Code Puppy 的显式文件先加载，它的 allow 胜过我们的「拒绝全部」。引擎监听全局配置目录，改完不用重启即生效
+   （真引擎实测；关了文件监听 `OPENCODE_EXPERIMENTAL_FILEWATCHER=false` 时重启 Code Puppy）。同一条写在 `codepuppy.jsonc` 的
+   `policies` 里**不起作用**：它在显式文件里排在「拒绝全部」之前，被盖过（实测）。
+   ⚠️ 代价：放行按名字比较 —— 此后**任何项目**都能用 `some-plugin@file:<项目里的目录>` 或 `some-plugin@npm:<别的包>`
+   以这个名字运行它自己的代码（`@file:` 那种真引擎实测）。只给你确实信任、并接受这一点的包这样做。
+
 5. **`.alpha/plugins/*.js` 项目级扇出是我们自己的第二注入点，处置另议。**
    `packages/ext/src/plugin-fanout.ts` 在引擎进程内 `import()` 它，`packages/ext` 是 alpha 自有包。
    它不是安装路径（无 catalog、无账本、无授权），但同样让第三方 JS 以引擎同权限执行。

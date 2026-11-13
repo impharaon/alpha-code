@@ -18,6 +18,7 @@ import type { DeepLinkBatch } from "./deep-link-queue"
 import { getCodePuppyEnvironment } from "./codepuppy-environment"
 import { runDesktopMenuAction } from "./desktop-menu-actions"
 import { codepuppyUserWorkspaceDir, ensureUserWorkspaceDir } from "./codepuppy-user-workspace"
+import { engineInternalDirectories } from "./engine-internal-directories"
 import { resolveAppPath } from "./apps"
 import { editorCliName } from "./platform"
 import { assertAttachmentBudget, createPickedFileAuthorizations } from "./attachment-picker"
@@ -208,6 +209,7 @@ export function registerIpcHandlers(deps: Deps) {
     const ensured = ensureUserWorkspaceDir(typeof dir === "string" ? dir : undefined)
     return ensured ? { ok: true, dir: ensured } : { ok: false }
   })
+  ipcMain.handle("codepuppy-engine-internal-directories", () => engineInternalDirectories(app.getPath("userData")))
 
   ipcMain.handle(
     "open-file-picker",

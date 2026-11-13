@@ -51,6 +51,13 @@ cd packages/ui-mac
   src/engine-adapter/command-reply.test.ts
 ```
 
+## 引擎源码身份(`#1697` I-04)
+
+每个夹具带 `_engine`:采样所跑入口 `packages/cli` 的 workspace 运行时依赖闭包里,各包目录在 HEAD 上的 git tree id
+(`engine-identity.ts`)。这些路径有未提交改动时采样器拒绝运行。`src/engine-adapter/fixture-identity.test.ts` 按同一规则从
+当前树重算,不等就逐个点名过时的夹具与差在哪个包 —— 引擎包(含 Code Puppy 接管的文件)一改,就在同一个 PR 里全量重采
+(2026-11-12 实测约 30 秒),再跑适配器的测试。
+
 ## 前后差分(`replay.ts`,`#1697` I-04)
 
 改适配器的结构(搬文件、换投影实现、挪回执账本)时,用它证明翻译器的输出逐个没变(设计 docs/specs/upgrade-ui-contract/design.md §4.10 c、§9)。

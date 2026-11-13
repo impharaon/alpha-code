@@ -9,6 +9,7 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { createEngineFetch } from "../../src/engine-adapter/index"
 import { requestFingerprint } from "../../src/engine-adapter/contract/receipts"
+import { dirtyEnginePaths, engineIdentity } from "./engine-identity"
 import { startMockModel } from "./mock-model"
 
 const REPO = resolve(import.meta.dir, "../../../..")
@@ -21,6 +22,13 @@ const MODEL_PORT = Number(process.env.SAMPLER_MODEL_PORT ?? 47920)
 const only = new Set(process.argv.slice(2))
 const run = (name: string) => only.size === 0 || only.has(name)
 
+// `#1697` I-04(设计 §4.10 e):夹具记下引擎源码身份;引擎包有未提交改动时不采(那样的样本对不上任何一个提交)。
+const dirty = dirtyEnginePaths(REPO)
+if (dirty.length) {
+  console.error(`engine sources have uncommitted changes; commit or stash them before sampling:\n${dirty.join("\n")}`)
+  process.exit(1)
+}
+const ENGINE = engineIdentity(REPO)
 const commit = Bun.spawnSync(["git", "-C", REPO, "rev-parse", "--short=10", "HEAD"]).stdout.toString().trim()
 const source = (what: string) =>
   `Sampled by \`bun ${SOURCE_PATH}\` (alpha-code#1668 L6) at ${commit}: a real OpenCode 2 engine from this repo's packages/cli \`serve\`, ` +
@@ -186,7 +194,8 @@ const recordsOf = (sessionID: string) =>
   }))
 const create = async () => (await call("POST", "/api/session", { location: { directory: project } })).data.id as string
 const finalOf = async (sessionID: string) => (await call("GET", `/api/session/${sessionID}/message?order=asc&limit=200`)).data
-const write = (name: string, value: unknown) => writeFileSync(join(OUT, name), JSON.stringify(value, null, 1))
+const write = (name: string, value: Record<string, unknown>) =>
+  writeFileSync(join(OUT, name), JSON.stringify({ ...value, _engine: ENGINE }, null, 1))
 
 try {
   if (run("base")) {

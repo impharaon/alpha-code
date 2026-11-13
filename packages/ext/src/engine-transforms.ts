@@ -215,7 +215,7 @@ function permissionRules(tools: unknown, permission: unknown) {
 /**
  * v1 形状的 agent 条目 → `AgentEditor`,照上游读 v1 agent 的同一套翻译(`core/src/v1/config/migrate.ts` `migrateAgent` 与
  * `core/src/config/plugin/agent.ts` 把它写进编辑器的做法,抄本;与上游归一化逐字段对比的判据在 engine-transforms.test.ts)。只写条目里**给了**的字段:
- * `prompt` 是 2.x 的 `system`;`disable: true` ⇒ 从引擎里移除这个 agent,其余字段不写;`steps`(旧名 `maxSteps`)、`hidden` 原样;
+ * `prompt` 是 2.x 的 `system`;`disable: true` ⇒ 其余字段不写,id 进返回的 `disabled`,由调用方在 post 段之后移除;`steps`(旧名 `maxSteps`)、`hidden` 原样;
  * `color` 是 hex 原样、主题色名 ⇒ `#aaaaaa`;`variant` 只随合法的 `model` 生效;`temperature` / `top_p` 写进 `request.body` —— 引擎读 v1 agent 时放在同一处,
  * 但发请求时不读它(upstream-probes/agent-request.test.ts),由 `agentSampling` 在本轮请求的 `context` 钩子里补上。
  * `permission` 照 0.1.26 生效,`tools` 照上游换成同一串规则(#1693):翻成规则推在该 agent 已有规则之后;两者只在项目已同意时还在 ——
@@ -238,8 +238,9 @@ export function applyAgents(editor: AgentEditor, agents: unknown, log: (line: st
     }
     const unused = Object.keys(entry).filter((key) => !APPLIED_FIELDS.has(key))
     if (unused.length > 0) log(`[@codepuppy/ext] project agent "${id}": ${unused.join(", ")} not applied (not a supported agent field)`)
+    // 停用不在这里移除:post 段的配置层(用户全局配置等)排在 ext 之后,这里移除的 agent 会被它按默认(全放行)重建(Codex R1/1 M1)。
+    // 这里只是不写它、把 id 交出去;移除由排在 post 段之后的 `removeAgents`(post-activation-tail.ts)做。
     if (entry.disable === true) {
-      editor.remove(id)
       disabled.push(id)
       continue
     }
@@ -276,6 +277,14 @@ export function agentSampling(body: unknown, temperatureSupported: boolean | und
     ...(temperatureSupported === true && isFiniteNumber(body.temperature) ? { temperature: body.temperature as number } : {}),
     ...(isFiniteNumber(body.top_p) ? { topP: body.top_p as number } : {}),
   }
+}
+
+/**
+ * 项目停用的 agent 从引擎里移除。排在 post 段之后跑(plugin.ts 经 post-activation-tail.ts 放),于是与引擎读「用户文档 → 项目文档」
+ * 的结果一致(`core/src/config/plugin/agent.ts`:后一份文档的 `disabled` 移除前面写下的同名 agent),之前的配置层重建不了它。
+ */
+export function removeAgents(editor: Pick<AgentEditor, "remove">, ids: Iterable<string>) {
+  for (const id of ids) editor.remove(id)
 }
 
 const SHELL_INTERPOLATION = /!`[^`]+`/

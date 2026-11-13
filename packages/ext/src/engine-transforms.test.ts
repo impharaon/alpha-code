@@ -8,7 +8,7 @@ import { join } from "node:path"
 import { ConfigNormalize } from "../../core/src/config/normalize.ts"
 import { ConfigMigrateV1 } from "../../core/src/v1/config/migrate.ts"
 import { Permission } from "../../core/src/permission.ts"
-import { agentSampling, applyAgents, projectServerConfig, RETIRED_PROVIDER_IDS } from "./engine-transforms"
+import { agentSampling, applyAgents, projectServerConfig, removeAgents, RETIRED_PROVIDER_IDS } from "./engine-transforms"
 
 /**
  * `applyAgents` 写进编辑器的结果(编辑器按 2.x `AgentEditor` 的 get / update / remove 形状;新 agent 从 `Agent.Info.default` 的
@@ -210,15 +210,15 @@ describe("项目 agent 的其余字段(#1700)= 引擎读同一条 v1 agent 写�
     expect(ours.logs).toEqual([])
   })
 
-  test("AC-04 · disable: true 移除上游内置的同名 agent,返回值点名它", () => {
-    const agents = new Map<string, unknown>([["explore", { permissions: [] }]])
-    const result = applyAgents(
-      { get: (id: string) => agents.get(id), update: () => {}, remove: (id: string) => void agents.delete(id) } as never,
-      { explore: { disable: true } },
-      () => {},
-    )
-    expect(agents.has("explore")).toBe(false)
+  test("AC-04 · disable: true:applyAgents 不动上游内置的同名 agent(早移除会被之后的配置层按默认重建,Codex R1/1 M1)、返回值点名它;removeAgents 移除它", () => {
+    const explore = { mode: "subagent", permissions: [{ action: "edit", resource: "*", effect: "deny" }] }
+    const agents = new Map<string, unknown>([["explore", explore]])
+    const editor = { get: (id: string) => agents.get(id), update: () => {}, remove: (id: string) => void agents.delete(id) }
+    const result = applyAgents(editor as never, { explore: { disable: true, prompt: "ignored" } }, () => {})
     expect(result).toEqual({ applied: [], disabled: ["explore"] })
+    expect(agents.get("explore")).toBe(explore)
+    removeAgents(editor as never, result.disabled)
+    expect(agents.has("explore")).toBe(false)
   })
 
   test("AC-10 · 任何一个字段写成上游 v1 agent schema 不收的形状 ⇒ 上游整条丢掉(每条一个 invalid 诊断);ext 同样整条不装并记一行,同一文档里别的 agent 照常", () => {

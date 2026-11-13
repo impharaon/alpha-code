@@ -1,0 +1,3 @@
+# instance A (2.x copy) project tables, read-only (sqlite3 mode=ro), paths scrubbed
+project|fb7a911d1923ee9f6a878f93cc859353d9c154a6|<root>/A/home/code-puppy|1794536478368
+project|96833c47e425ee535971336578d82aa189457fb3|<root>/A/home/Library/Application Support/ai.opencode.desktop/engine-scratch-cwd|1794536479186

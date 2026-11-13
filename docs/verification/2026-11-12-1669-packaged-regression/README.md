@@ -1,5 +1,5 @@
 ---
-title: alpha-code#1669 打包版换代回归与撤回演练 —— 第三轮:已登录,G1 通过、G2 拒绝没送达引擎(FAIL)
+title: alpha-code#1669 打包版换代回归与撤回演练 —— 第四轮:侧栏把引擎临时目录列成项目(FAIL);我的看门狗证明误杀了已登录实例
 kind: verification
 status: active
 owners:
@@ -11,6 +11,50 @@ last_reviewed: 2026-11-12
 
 依据:方案基线 [§5.1、§5.2、§6.2、§2.8](../../design/2026-11-08-1662-opencode2-generation-switch-baseline.md),
 票面 `impharaon/alpha-code#1669`,派发书里的七个补充格 a–g 与八条硬规矩。第二轮在前,第一轮原文在后。
+
+## 第四轮(2026-11-12 21:55–22:05 EST)
+
+被测形态同第三轮(ad-hoc 重签、无 hardened runtime 的副本)。0.1.26 用的是下载的正式发布包(Developer ID 签名、公证),放在第二个隔离根 B 里,与已登录的实例 A 分开;同一套闸。
+
+### 第四轮结论
+
+1. **新 FAIL:全新数据目录里,2.x 的侧栏「项目」把引擎内部临时目录 `engine-scratch-cwd` 列成了用户项目;0.1.26 不会。**
+   - 0.1.26(隔离根 B,全新数据):侧栏「项目 / 暂无项目 / 打开项目」—— 一个项目都没有。截图 [screens/r4-b126-home.png](screens/r4-b126-home.png)。
+   - 2.x(隔离根 A,第一次在空数据上启动):侧栏列出 `engine-scratch-cwd` 与 `code-puppy`,用户没有做任何操作。截图 [screens/r3-a3-home.png](screens/r3-a3-home.png)。
+   - 引擎库里的来源(只读):`project` 表有一行 worktree = `<userData>/engine-scratch-cwd`,创建于 21:21:19(第二轮 `a2` 那 5 秒内,启动即建)。证据 [results/r4-a-project-rows.txt](results/r4-a-project-rows.txt)。
+2. **欢迎卡片上的「α」不是回归:** 0.1.26 同一位置也是「α」(元素 `div.a-ob-mark`)。只与 W06「各页无旧名」有关,两个版本相同。
+3. **我的失误:根 B 的看门狗证明误杀了已登录的实例 A。** 21:56:21 我在根 B 上跑看门狗证明,诱饵进程名叫 `SecurityAgent`;
+   A 的看门狗按进程名盯全系统,看到这个新进程就照规矩 `SIGKILL` 了 A 的整个进程组(A 的看门狗日志:`ps: … <root>/B/watchdog-proof-good/decoy/SecurityAgent … target group gone`)。
+   A 的登录凭据文件还在 A 的临时 userData 里;是否能不重新登录就恢复,见下面「A 的处置」。以后的规矩:有实例在运行时,不再跑带诱饵的看门狗证明(或者诱饵换成只有被测看门狗才认的名字)。
+4. **我在调试口上哪些动作会占引擎那个源的连接(给 G2 那条 lane 区分负载):** 只有我在页面里用 `Runtime.evaluate` 发的 `fetch()`,
+   目标是 `http://127.0.0.1:<引擎端口>/…`,它们和产品自己的请求共用页面的同源连接池(6 条)。第三轮里:`/api/model`、`/api/session`、
+   `/api/session/<id>/message` 都正常返回;一直挂着的是 21:43:10 之后的三个路径探测 `/api/permission`、`/api/permission/pending`(重载后才收到 404)、
+   `/permission`(始终没回),以及之后排在它们后面的 `/api/session` 查询。DOM 读取、`click()`、`Input.insertText` / 键盘事件、截图都不碰引擎源;
+   调试口自己的 WebSocket 连的是 `127.0.0.1:9222`(另一个源,浏览器层)。从第四轮起不再在页面里 `fetch` 引擎,引擎侧事实改用 `sqlite3` 只读读实例自己的库。
+5. **A 的处置:** 事后检查([r4-stop-a3-after-watchdog-kill](results/r4-stop-a3-after-watchdog-kill.txt))偏好域、owner 侧路径、owner 应用进程都没变,登记已清;
+   随后同一个根重新启动 A(`a4`,[r4-launch-a4](results/r4-launch-a4.txt)),界面直接是已登录状态(「账户 · 按量付费」,没有登录提示),**不需要 owner 重新登录**。A 现在在运行。
+6. **e 网页搜索 PASS:** 新对话里问 OpenCode 的 GitHub 地址,时间线显示「搜索 4 次 · 21 秒」,回复 `https://github.com/anomalyco/opencode … — 工具:websearch`。
+7. 付费调用累计 12 次(本轮 1 次,`codepuppy/deepseek-v4-flash`);没有出现系统框。
+
+计数(90 格):PASS 7 / FAIL 2 / NOT-RUN 81。
+
+### 第四轮格子
+
+| 格 | 结果 | 证据 |
+| --- | --- | --- |
+| W28 / N12 一类「会话 / 项目列表」—— 全新数据的侧栏项目 | **FAIL** | 见结论 1;0.1.26:「暂无项目」;2.x:`engine-scratch-cwd`、`code-puppy` |
+| W06 欢迎卡片图标(对照) | 观察,两版相同 | 0.1.26 与 2.x 都是「α」 |
+| G10、§6.2 各步、G7、G8、g、未登录界面各格 | NOT-RUN | 本会话没做到(见交回说明);根 B 已过闸、里面有 0.1.26 副本,可直接用 |
+| e 网页搜索 | PASS | 见结论 6 |
+| G4、G6、§5.2 发消息各格 | NOT-RUN | 本会话没做到 |
+| f 的「本次会话内允许」与超时卡、G3(要回审批时) | NOT-RUN(被 G2 挡住) | 下一版构建上重跑 |
+
+### 隔离与收尾
+
+- 根 B:闸 [r4-gate-B](results/r4-gate-B.txt) 五步全过;启动闸 [r4-launch-b126](results/r4-launch-b126.txt)(0 处泄漏、锁在临时 userData、偏好域只有那个时间戳变);
+  停止后检查 [r4-stop-b126](results/r4-stop-b126.txt):偏好域、owner 侧路径、owner 应用进程都没变,LaunchServices 里根 B 的登记 0 条。
+- `tools/launch-a.sh` 加了 `--cdp-port`:第二个实例不设 `CODEPUPPY_CDP=1`(它把端口写死成 9222),改传 Chromium 的 `--remote-debugging-port`。
+- A 被杀之后:[r4-stop-a3-after-watchdog-kill](results/r4-stop-a3-after-watchdog-kill.txt)(停止脚本的事后检查与登记清理)。
 
 ## 第三轮(2026-11-12 21:32–21:55 EST)
 

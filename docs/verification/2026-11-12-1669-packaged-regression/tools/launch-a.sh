@@ -12,7 +12,7 @@
 # no file under the owner's paths and at least one under <root>; the Chromium SingletonLock is in the temp userData;
 # the owner's app pids and the stat of the owner-side paths are unchanged.
 set -uo pipefail
-ROOT=""; APP=""; LABEL=""; MOCK=1
+ROOT=""; APP=""; LABEL=""; MOCK=1; CDP_PORT=9222
 EXTRA_ENV=(); EXTRA_ARGS=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -20,6 +20,7 @@ while [ "$#" -gt 0 ]; do
     --app) APP="$2"; shift 2 ;;
     --label) LABEL="$2"; shift 2 ;;
     --no-mock) MOCK=0; shift ;;
+    --cdp-port) CDP_PORT="$2"; shift 2 ;;
     --env) EXTRA_ENV+=("$2"); shift 2 ;;
     --arg) EXTRA_ARGS+=("$2"); shift 2 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
@@ -38,9 +39,11 @@ ARGS=()
 [ "$MOCK" -eq 1 ] && ARGS+=(--use-mock-keychain)
 ARGS+=("--log-net-log=$ROOT/logs/$LABEL.netlog.json")
 ARGS+=(${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"})
+# a second instance cannot use CODEPUPPY_CDP=1 (hard-coded 9222, held by instance A): pass the Chromium switch instead
+[ "$CDP_PORT" = 9222 ] || ARGS+=("--remote-debugging-port=$CDP_PORT")
 printf '%s\n' "${ARGS[@]}" | grep -qx -- '--use-mock-keychain' || refuse "argv lacks --use-mock-keychain (Chromium would use the keychain)"
 for pid in $(/bin/ps -A -o pid=,command= | /usr/bin/grep -F "$EXE" | /usr/bin/grep -v grep | /usr/bin/awk '{print $1}'); do refuse "an instance already runs from this executable (pid $pid)"; done
-/usr/sbin/lsof -nP -iTCP:9222 -sTCP:LISTEN >/dev/null 2>&1 && refuse "port 9222 is already in use"
+/usr/sbin/lsof -nP -iTCP:"$CDP_PORT" -sTCP:LISTEN >/dev/null 2>&1 && refuse "port $CDP_PORT is already in use"
 
 # pgrep -f with this pattern fails under the default locale ("illegal byte sequence") and then matches nothing, which
 # made this check blind in run a2; ps + fixed-string grep cannot fail that way.
@@ -64,7 +67,7 @@ echo "$STAT_BEFORE" > "$ROOT/logs/$LABEL.owner-stat"
 echo "$OWNER_BEFORE" > "$ROOT/logs/$LABEL.owner-pids"
 ENVV=(PATH=/usr/bin:/bin:/usr/sbin:/sbin HOME="$ROOT/home" CFFIXED_USER_HOME="$ROOT/home" TMPDIR="$ROOT/tmp/"
   XDG_DATA_HOME="$ROOT/xdg/data" XDG_CONFIG_HOME="$ROOT/xdg/config" XDG_CACHE_HOME="$ROOT/xdg/cache" XDG_STATE_HOME="$ROOT/xdg/state"
-  USER="$(/usr/bin/id -un)" LOGNAME="$(/usr/bin/id -un)" SHELL=/bin/zsh LANG=zh_CN.UTF-8 CODEPUPPY_CDP=1
+  USER="$(/usr/bin/id -un)" LOGNAME="$(/usr/bin/id -un)" SHELL=/bin/zsh LANG=zh_CN.UTF-8 $([ "$CDP_PORT" = 9222 ] && echo CODEPUPPY_CDP=1 || echo CODEPUPPY_CDP_OFF=1)
   ${EXTRA_ENV[@]+"${EXTRA_ENV[@]}"})
 OUT="$ROOT/logs/$LABEL.out"
 /usr/bin/python3 - "$EXE" "$OUT" "${ENVV[@]}" -- "${ARGS[@]}" <<'PY' &
@@ -90,7 +93,7 @@ kill_red() { /bin/kill -KILL -- "-$PID" 2>/dev/null; echo "LAUNCH GATE RED: $1 â
 up=0
 for _ in $(seq 1 120); do
   /bin/kill -0 "$PID" 2>/dev/null || kill_red "app exited during start-up (see $OUT)"
-  if /usr/bin/curl -s -m 1 http://127.0.0.1:9222/json/list 2>/dev/null | grep -q '"type": "page"'; then up=1; break; fi
+  if /usr/bin/curl -s -m 1 http://127.0.0.1:$CDP_PORT/json/list 2>/dev/null | grep -q '"type": "page"'; then up=1; break; fi
   sleep 0.5
 done
 [ "$up" -eq 1 ] || kill_red "no CDP page within 60 s"

@@ -447,11 +447,14 @@ describe("#1500 真实 HTTP 超时的后台补试与状态仲裁", () => {
   test("AC2:两次真实超时后无第三次 GET,LKG 字节和本地 BYOK 保持可用", async () => {
     let delayed = false
     const requests: string[] = []
-    const response = Promise.withResolvers<Response>()
-    startTarget((request) => {
+    // Both delayed GETs wait on one gate, but each builds its own Response: Bun.serve sends a Response
+    // body once, so one shared object throws ERR_BODY_ALREADY_USED whenever the server has not yet seen
+    // a client abort at release time; Bun then fails this test and afterEach deletes userData.
+    const release = Promise.withResolvers<void>()
+    startTarget(async (request) => {
       if (delayed) {
         requests.push(request.method)
-        return response.promise
+        await release.promise
       }
       return Response.json(catalogV3())
     })
@@ -466,7 +469,8 @@ describe("#1500 真实 HTTP 超时的后台补试与状态仲裁", () => {
       expect.objectContaining({ attempt: 1, exception: "TimeoutError", durationMs: expect.any(Number) }),
       expect.objectContaining({ attempt: 2, exception: "TimeoutError", durationMs: expect.any(Number) }),
     ])
-    response.resolve(Response.json(catalogV3()))
+    release.resolve()
+    // Absence window for a third GET: production retries 1000 ms after a timeout (syncLiveAllowlist).
     await Bun.sleep(1300)
     expect(requests).toEqual(["GET", "GET"])
     expect(readFileSync(liveAllowlistPath(userData)).equals(bytes)).toBe(true)

@@ -5,6 +5,8 @@
 import fs from "node:fs"
 import path from "node:path"
 import { engineSlot, type EngineSandbox } from "./engine-sandbox"
+import { publishTestBootstrap } from "./codepuppy-bootstrap-fixture"
+import { engineGlobalConfigDirectory } from "../src/main/engine-paths"
 import { buildEngineServerOptions } from "../src/main/engine-server-options"
 import { withEngineAuthorization } from "../src/main/engine-authorization"
 import { injectCodePuppyConfig } from "../src/main/codepuppy-config-injection"
@@ -124,8 +126,11 @@ export type Running = {
 export function codepuppyEngine(options: HostOptions) {
   const { sandbox, name } = options
   const userData = path.join(sandbox.root, `${name}-userdata`)
-  process.env.CODEPUPPY_GLOBAL_DIR = path.join(sandbox.root, `${name}-state`, "codepuppy-state", "env", "dev")
-  fs.mkdirSync(process.env.CODEPUPPY_GLOBAL_DIR, { recursive: true })
+  const globalRoot = path.join(sandbox.root, `${name}-state`, "codepuppy-state", "env", "dev")
+  fs.mkdirSync(globalRoot, { recursive: true })
+  // `#1698`:sidecar 在注入、装 ext 之前发布启动文档;全局根经它到注入与 ext(R14)。引擎全局配置目录取 #1698 之前注入自己按环境
+  // 推的那一个(XDG 沙箱下的 opencode;注入的 MCP 默认拒绝枚举它),各 cases 的写法不变。
+  publishTestBootstrap({ globalRoot, userData, engineConfigDirectory: engineGlobalConfigDirectory(process.env, sandbox.home) })
   const key = secretFilePath(userData, "CODEPUPPY_API_KEY")
   fs.mkdirSync(path.dirname(key), { recursive: true })
   fs.writeFileSync(key, `sk-cp-${name}`, { mode: 0o600 })
@@ -135,7 +140,7 @@ export function codepuppyEngine(options: HostOptions) {
   process.env.CODEPUPPY_POLICY_ACCOUNT = `t-${name}-${Math.random().toString(36).slice(2)}`
   if (options.mcpCallLog)
     fs.writeFileSync(
-      path.join(process.env.CODEPUPPY_GLOBAL_DIR, "codepuppy.jsonc"),
+      path.join(globalRoot, "codepuppy.jsonc"),
       JSON.stringify({ mcp: { probe: { type: "local", command: [process.execPath, MCP_FIXTURE], environment: { CODEPUPPY_MCP_CALL_LOG: options.mcpCallLog } } } }),
     )
   fakeMainPort()

@@ -3,6 +3,7 @@
 // sessions, session context). The #725 discipline carries over: production entries only (`SessionContext.select` is
 // what the model request is built from; the snapshot's `execute` is what the session runner calls), expected
 // identities are hand-written literals, and side effects are real counters inside the tools.
+import { publishTestBootstrap } from "../../../ui-mac/test-component/codepuppy-bootstrap-fixture"
 import { beforeAll, describe, expect } from "bun:test"
 import fs from "node:fs"
 import path from "node:path"
@@ -1371,9 +1372,9 @@ describe("E: plugin tools cannot borrow an MCP identity", () => {
   })()
   const withManifest = <A, E2, R>(effect: E.Effect.Effect<A, E2, R>) =>
     Effect.acquireUseRelease(
-      Effect.sync(() => (process.env.CODEPUPPY_OFFICE_MCP_MANIFEST = office.manifest)),
+      Effect.sync(() => publishTestBootstrap({ globalRoot: path.join(ROOT, "state"), officeMcpManifest: office.manifest })),
       () => effect,
-      () => Effect.sync(() => void delete process.env.CODEPUPPY_OFFICE_MCP_MANIFEST),
+      () => Effect.sync(() => void publishTestBootstrap({ globalRoot: path.join(ROOT, "state") })),
     )
   const probe = (name: string, namespace?: string) => ({
     name,
@@ -1475,7 +1476,6 @@ describe("E2: only the MCP layer's own tools carry an MCP identity", () => {
   const ENV: Record<string, string> = {
     CODEPUPPY_CLOUD_MCP_SERVER: "codepuppy-cloud",
     CODEPUPPY_CLOUD_MCP_DEF: JSON.stringify(cloud),
-    CODEPUPPY_OFFICE_MCP_MANIFEST: office.manifest,
   }
   /** What the MCP runtime reports its servers list: the servers' own tools. */
   const LISTED = [
@@ -1487,12 +1487,14 @@ describe("E2: only the MCP layer's own tools carry an MCP identity", () => {
     Effect.acquireUseRelease(
       Effect.sync(() => {
         Object.assign(process.env, ENV)
+        publishTestBootstrap({ globalRoot: path.join(ROOT, "state"), officeMcpManifest: office.manifest })
         mcpListing.push(...listed)
       }),
       () => effect,
       () =>
         Effect.sync(() => {
           for (const key of Object.keys(ENV)) delete process.env[key]
+          publishTestBootstrap({ globalRoot: path.join(ROOT, "state") })
           mcpListing.length = 0
         }),
     )

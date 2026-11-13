@@ -495,7 +495,8 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     // ④ 中间环节不得吞:prepareSidecarEnv 以 injectCodePuppyConfig 的结果作为函数**最后一条语句**
     //    整体返回(锁到行尾 + 函数闭括号:`return injectCodePuppyConfig(...), {ok:true}` 逗号改写、
     //    换行续写表达式,都无处容身)。
-    expect(source).toMatch(/return injectCodePuppyConfig\(userDataPath, extPluginPath, registryChannel\)\n\}/)
+    //    `#1698`:四个入参都来自已发布的启动文档。
+    expect(source).toMatch(/return injectCodePuppyConfig\(bootstrap\.paths\.userData, bootstrap\.paths\.extPlugin, bootstrap\.registryChannel, bootstrap\.paths\.userConfig \?\? null\)\n\}/)
   })
 })
 

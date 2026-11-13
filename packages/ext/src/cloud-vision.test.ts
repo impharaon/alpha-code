@@ -5,6 +5,7 @@
 // renderWrapper / renderTemplate 派生 —— 文案改了这里要一起改,那正是想要的红。
 // `#1447` R1:B1(追问整包 ≤ 262144)、B2(审核拒绝的结果回放成登记句)、M1(重启后同图不再计费:转写正文跨重启缓存在插件存储里)、m1 / m2。
 // `#1665`:v1 的 chat.message / messages.transform / tool.execute.after / system.transform 四处收成 context 钩子一处(见 cloud-vision-hooks.ts 文件头)。
+import { publishTestBootstrap, unpublishTestBootstrap } from "../../ui-mac/test-component/codepuppy-bootstrap-fixture"
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, unlinkSync, writeFileSync } from "node:fs"
@@ -25,7 +26,7 @@ import { compressForVision } from "./vision-image"
 type Recorded = { path: string; authorization: string | null; body: Record<string, unknown> }
 type Reply = { status: number; body: unknown }
 
-const SANITIZE = ["CODEPUPPY_GLOBAL_DIR", "CODEPUPPY_BASE_URL", "CODEPUPPY_PROMPT_REBRAND_DISABLE", CLOUD_MCP_DEF_ENV, CLOUD_MCP_SERVER_ENV] as const
+const SANITIZE = ["CODEPUPPY_BASE_URL", "CODEPUPPY_PROMPT_REBRAND_DISABLE", CLOUD_MCP_DEF_ENV, CLOUD_MCP_SERVER_ENV] as const
 
 /** 云端认出来的正文(桩 gateway 的回答)。 */
 const CLOUD_TEXT = "登录页:用户名、密码两个输入框,「登录」按钮为蓝色;右上角写着 v0.1.16"
@@ -92,7 +93,7 @@ beforeEach(() => {
     saved.set(k, process.env[k])
     delete process.env[k]
   }
-  process.env.CODEPUPPY_GLOBAL_DIR = join(root, "global", "env", "dev")
+  publishTestBootstrap({ globalRoot: join(root, "global", "env", "dev") })
   tokenFile = join(root, "mcp-token")
   writeFileSync(tokenFile, "tok-vision-123\n")
   // 与 ui-mac 每次 fork 写的三样同形:平台 base(gateway 主机 + /v1)、云 server 名、带 {file:} 凭据的云 MCP 定义
@@ -108,6 +109,7 @@ afterEach(() => {
     if (v === undefined) delete process.env[k]
     else process.env[k] = v
   }
+  unpublishTestBootstrap()
   rmSync(root, { recursive: true, force: true })
 })
 

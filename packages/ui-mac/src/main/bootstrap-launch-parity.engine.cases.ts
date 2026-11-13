@@ -10,7 +10,7 @@
 // 已初始化的环境快照(prod ⇒ 通道 stable)、出厂技能目录。P-06 那五个开关不进记录(design §10 R6 让它们有意改变)。
 //
 // 记录(临时根 → `<root>`,桩的端口 → `<model>` / `<cloud>`,超过 300 字的字符串 → 其 sha256):
-//   ① sidecar 收到的路径、通道、ext 目录与围栏;② 交给 `start()` 的库路径、配置目录、models.fetch、fs.filewatcher;
+//   ① sidecar 收到的路径、通道、ext 目录与围栏(G1 起路径与通道在启动文档里);② 交给 `start()` 的库路径、配置目录、models.fetch、fs.filewatcher;
 //   ③ 注入的内联文档(档位 agent 的权限、供应商、云 MCP 定义、插件)、显式文件、模型底表与密钥文件名(C3–C6 的磁盘形状);
 //   ④ 引擎里:ext 装上没有、供应商清单、云 MCP 的状态、ext 工具策略的账户分区、一次经出网代理的连接失败怎么归类;
 //   ⑤ 两个桩收到的凭据头(平台模型请求经 ext 的请求钩子现读凭据文件;云 MCP 经 core 的治理凭据读取)。
@@ -62,7 +62,9 @@ mock.module("./codepuppy-keychain-backend", () => ({
 mock.module("./codepuppy-ext-plugin", () => ({ EXT_PLUGIN_ENTRY: "server.js", resolveExtPluginPath: () => ({ path: extDir }) }))
 const { preferAppEnv, spawnLocalServer } = await import("./server")
 const { creditDanglingSweepForSpawn, resetDanglingSweepLatchForTests } = await import("./dangling-sweep-latch")
-const { initCodePuppyEnvironment, __resetCodePuppyEnvironmentForTests } = await import("./codepuppy-environment")
+const { initCodePuppyEnvironment, resolveCodePuppyGlobalRoot, __resetCodePuppyEnvironmentForTests } = await import("./codepuppy-environment")
+const { acceptCodePuppyBootstrap } = await import("./sidecar-bootstrap-gate")
+const { __resetCodePuppyBootstrapForTests } = await import("@opencode/util/codepuppy-bootstrap")
 const { initializeArtifactQuotaEnvironment, ARTIFACT_QUOTA_MACHINE_ID_FILE } = await import("./artifact-service")
 const { injectCodePuppyConfig } = await import("./codepuppy-config-injection")
 const { buildEngineServerOptions, engineDesktopToggles } = await import("./engine-server-options")
@@ -171,20 +173,25 @@ async function launch() {
 
 /**
  * sidecar 这一步:本进程扮演刚被 fork 出来的 sidecar —— 没有冻结快照,Code Puppy 的键只来自 fork 给它的 env(HOME / XDG 由沙箱接管,
- * 代理变量不搬:桩在本机),决定字段只来自 start 消息。返回 sidecar 交给注入与 `start()` 的输入。
+ * 代理变量不搬:桩在本机),决定只来自 start 消息。`#1698` G1 起照 sidecar.ts `start()` 的第 2 步:用生产的 acceptCodePuppyBootstrap
+ * 解析并发布 start 消息里的启动文档,路径与通道从文档取。返回 sidecar 交给注入与 `start()` 的输入。
  */
 function sidecarStep(launched: Awaited<ReturnType<typeof launch>>) {
   __resetCodePuppyEnvironmentForTests()
+  __resetCodePuppyBootstrapForTests()
   for (const key of Object.keys(process.env)) if (key.startsWith("CODEPUPPY_")) delete process.env[key]
   for (const [key, value] of Object.entries(launched.forkEnv)) if (key.startsWith("CODEPUPPY_") && value !== undefined) process.env[key] = value
-  const start = launched.start
+  const bootstrap = acceptCodePuppyBootstrap(launched.start.bootstrap)
   return {
-    userData: start.userDataPath as string,
-    initialDirectory: start.initialDirectory as string,
-    database: start.databasePath as string,
-    engineConfigDirectory: start.configDirectory as string,
-    extPlugin: start.extPluginPath as string | undefined,
-    registryChannel: start.registryChannel as "stable" | "preview" | "dev" | undefined,
+    userData: bootstrap.paths.userData,
+    initialDirectory: bootstrap.paths.initialDirectory,
+    database: bootstrap.paths.database,
+    engineConfigDirectory: bootstrap.paths.engineConfigDirectory,
+    extPlugin: bootstrap.paths.extPlugin,
+    registryChannel: bootstrap.registryChannel,
+    /** codepuppy.jsonc;null = 逃生阀置位(sidecar.ts 的 prepareSidecarEnv 同一传法) */
+    userConfig: bootstrap.paths.userConfig ?? null,
+    globalRoot: bootstrap.paths.globalRoot,
     toggles: engineDesktopToggles(launched.forkEnv),
     /** sidecar 进程的整份 env(含出网代理变量;这里不搬进本进程,只交给读整份 env 的读法)。 */
     processEnv: launched.forkEnv,
@@ -192,7 +199,7 @@ function sidecarStep(launched: Awaited<ReturnType<typeof launch>>) {
 }
 
 async function observe(inputs: ReturnType<typeof sidecarStep>, fence: unknown) {
-  const injection = injectCodePuppyConfig(inputs.userData, inputs.extPlugin, inputs.registryChannel)
+  const injection = injectCodePuppyConfig(inputs.userData, inputs.extPlugin, inputs.registryChannel, inputs.userConfig)
   expect(injection.ok).toBe(true)
   const content = JSON.parse(injection.config.content) as Record<string, any>
   const explicit = injection.config.file ? JSON.parse(fs.readFileSync(injection.config.file, "utf8")) : undefined
@@ -289,7 +296,12 @@ function normalize(record: unknown): unknown {
 describe("#1698 段 0:代表性启动的决定记录", () => {
   test("真 fork → sidecar 这一步 → 注入 → 引擎 + 真 ext:记录与 bootstrap-launch-parity.record.json 逐项相同", async () => {
     const launched = await launch()
-    const record = normalize(await observe(sidecarStep(launched), launched.start.fence))
+    const inputs = sidecarStep(launched)
+    // design §10 R31:共用模块的「快照 → 已发布文档 → 环境」里,环境这一支在生产启动里到不了 —— fork 给 sidecar 的 env 里没有这个键
+    // (前缀拒绝),而 sidecar 没有快照、文档又先于一切读方发布:即使环境里摆一个别的值,读到的也是文档里 main 算的那个根。
+    expect(launched.forkEnv).not.toHaveProperty("CODEPUPPY_GLOBAL_DIR")
+    expect(resolveCodePuppyGlobalRoot({ CODEPUPPY_GLOBAL_DIR: path.join(sandbox.root, "decoy-root") })).toBe(inputs.globalRoot)
+    const record = normalize(await observe(inputs, launched.start.fence))
     expect(record).toEqual(JSON.parse(fs.readFileSync(RECORD_FILE, "utf8")))
   }, 120_000)
 })

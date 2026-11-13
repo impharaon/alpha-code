@@ -206,6 +206,11 @@ export function injectCodePuppyConfig(
   userDataPath: string,
   extPluginPath?: string,
   registryChannel?: ChannelName,
+  /**
+   * `#1698`:当前环境的 codepuppy.jsonc;`null` = REQ-059 逃生阀置位,不给引擎这份文件。sidecar 传启动文档的 `paths.userConfig`
+   * (main 构建时已按逃生阀判过);缺省(只有直接调注入的测试)取 codepuppyJsoncPath()。
+   */
+  userConfig?: string | null,
 ): CodePuppyConfigInjectionResult {
   let file: string | undefined
   // 本轮没走到写云服务那一处(无云 URL / 注入失败)⇒ 配置里没有中和条目。
@@ -214,10 +219,10 @@ export function injectCodePuppyConfig(
     // REQ-059 G1:引擎经 OPENCODE_CONFIG 加载当前环境的 codepuppy.jsonc(mcp/plugin/
     // provider/治理键)。文件通道 → dispose 重建重读文件 = 安装免重启;merge 序 XDG 后(压 provider)/
     // 项目前(可覆盖);junk 循环不扫单文件 → 当前环境根零引擎垃圾(T0 spike 判定)。全新机器 seed
-    // {$schema},否则 loadFile 指向不存在文件。逃生 CODEPUPPY_JSONC_TRUTH_DISABLE / CODEPUPPY_LEGACY_INSTALL_ROOT
-    // 不注入(回 REQ-018 home walk 行为,ext-config 写入目标也随之回退,两侧一致)。
-    if (process.env.CODEPUPPY_JSONC_TRUTH_DISABLE !== "1" && process.env.CODEPUPPY_LEGACY_INSTALL_ROOT !== "1") {
-      const truth = codepuppyJsoncPath()
+    // {$schema},否则 loadFile 指向不存在文件。逃生阀置位(userConfig 为 null)不注入(回 REQ-018 home walk 行为,
+    // ext-config 写入目标也随之回退,两侧一致 —— 两侧读的是 main 的同一次判定,`#1698`)。
+    const truth = userConfig === undefined ? codepuppyJsoncPath() : userConfig
+    if (truth !== null) {
       fs.mkdirSync(path.dirname(truth), { recursive: true })
       if (!fs.existsSync(truth)) {
         fs.writeFileSync(truth, JSON.stringify({ $schema: "https://opencode.ai/config.json" }, null, 2))

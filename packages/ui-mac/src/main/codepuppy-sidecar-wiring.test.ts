@@ -61,9 +61,10 @@ const saved: Record<string, string | undefined> = {}
 beforeEach(() => {
   userDataPath = mkdtempSync(join(tmpdir(), "codepuppy-sidecar-wiring-"))
   resetDanglingSweepLatchForTests()
-  for (const key of ["SHELL", "CODEPUPPY_SECRETS_DISABLE"]) saved[key] = process.env[key]
+  for (const key of ["SHELL", "CODEPUPPY_SECRETS_DISABLE", "CODEPUPPY_GLOBAL_DIR"]) saved[key] = process.env[key]
   process.env.SHELL = "nu"
   process.env.CODEPUPPY_SECRETS_DISABLE = "1"
+  process.env.CODEPUPPY_GLOBAL_DIR = join(userDataPath, "codepuppy-state", "env", "dev") // #1698:无快照的单测经环境给全局根(design §10 R31),fork 时构建启动文档要它
 })
 afterEach(() => {
   for (const [key, value] of Object.entries(saved)) {
@@ -153,32 +154,30 @@ test("真 host + 真协调器:阶段查询经子进程往返;退出 ⇒ pendingF
   expect(reloads.pendingFor("/w")).toEqual({ code: "reload-waiting", detail: "sidecar exited with code 0" })
 })
 
-// #1565:生产 spawnLocalServer 在 fork 时把随包文档工具清单的路径交给引擎(名字取引擎读的那个常量),而引擎的判定
-// 拿这份 env 认得出 main 写策略写下的四条命令(两边对资源根的解析一致、清单与模板逐 token 对上)。
-// 删掉注入 ⇒ env 里没有这个键;注入的路径与写策略的资源根解析不一致 ⇒ 四条都拿不到声明定义。
-test("#1565: fork 注入 CODEPUPPY_OFFICE_MCP_MANIFEST,引擎据它认出写策略写下的四条文档工具命令", async () => {
-  const { OFFICE_MCP_MANIFEST_ENV, declaredFirstPartyTools } = await import("../../../core/src/mcp/codepuppy-first-party-mcp")
+// #1565:生产 spawnLocalServer 在 fork 时把随包文档工具清单的路径交给引擎(`#1698` 起在启动文档的 paths.officeMcpManifest),
+// 而引擎的判定拿这个路径认得出 main 写策略写下的四条命令(两边对资源根的解析一致、清单与模板逐 token 对上)。
+// 删掉这个字段 ⇒ 文档解析即失败;路径与写策略的资源根解析不一致 ⇒ 四条都拿不到声明定义。
+test("#1565 / #1698: fork 的启动文档带 paths.officeMcpManifest,引擎据它认出写策略写下的四条文档工具命令", async () => {
+  const { declaredFirstPartyTools } = await import("../../../core/src/mcp/codepuppy-first-party-mcp")
   const { applyMcpWritePolicy } = await import("./ext-mcp-policy")
   const { CODEPUPPY_OFFICE_CONNECTORS } = await import("../shared/office-advisories")
   const child = new RecordingChild()
-  let env: Record<string, string> = {}
   creditDanglingSweepForSpawn()
   const result = await spawnLocalServer("127.0.0.1", 4393, "password", {
     userDataPath,
     healthCheck: async () => true,
-    fork: ((_: string, __: string[], options: { env: Record<string, string> }) => {
-      env = options.env
-      return child
-    }) as unknown as typeof import("electron").utilityProcess.fork,
+    fork: (() => child) as unknown as typeof import("electron").utilityProcess.fork,
     egressProxy: async () => ({ port: 4433 }),
     planFence: () => ({ profile: "(version 1)\n(allow default)\n(deny file-write*)\n", addonPath: "/x/codepuppy_fence.node" }),
   })
   await result.health.wait
-  expect(env[OFFICE_MCP_MANIFEST_ENV]).toEndWith("/office-mcp/tools.json")
+  const start = child.wire.find((message) => (message as { type?: unknown }).type === "start") as { bootstrap: { paths: { officeMcpManifest: string } } }
+  const manifest = start.bootstrap.paths.officeMcpManifest
+  expect(manifest).toEndWith("/office-mcp/tools.json")
   for (const connector of CODEPUPPY_OFFICE_CONNECTORS) {
     const server: Record<string, unknown> = { type: "local", command: ["placeholder"] }
     expect(applyMcpWritePolicy(connector.name, server).ok).toBe(true)
-    const declared = declaredFirstPartyTools(connector.name, server, env, readFileSync) as Array<{ name: string }> | undefined
+    const declared = declaredFirstPartyTools(connector.name, server, manifest, readFileSync) as Array<{ name: string }> | undefined
     const extension = connector.extension.slice(1)
     expect(declared?.map((tool) => tool.name).sort()).toEqual([`read_${extension}`, `write_${extension}`])
   }
@@ -269,26 +268,14 @@ test("#1575: fork 按登录账户 × 本安装写 CODEPUPPY_POLICY_ACCOUNT(同�
   }
 })
 
-// #1578 AC5:main 写进 sidecar env 的随包扩展清单键必须就是引擎读的那个常量 —— 任一侧改名,线上 ext 自有工具全部静默回第三方,
-// 而 packages/ext/src/policy/bundled-plugin.test.ts(`#1662` 起读这个键的是 ext)自己给 env 赋值照样绿。dev 下 ext.path 取决于未入库的 packages/ext/dist
-// (门不保证它在,上面那条生产 spawn 里这个键可能根本不写),所以锚源码:server.ts 写这个键的那一句,键名取引擎常量,
-// 指向 plugin.js 旁边的 bundled-tools.json。任一侧字面量改一个字母 ⇒ 找不到这一句,当场红。
-test("ANCHOR (not a gate): #1578 server.ts 写进 sidecar env 的随包扩展清单键 = 引擎读的常量", async () => {
-  const { EXT_BUNDLED_MANIFEST_ENV } = await import("../../../ext/src/policy/bundled-plugin")
-  const source = await Bun.file(join(import.meta.dir, "server.ts")).text()
-  const line = source.split("\n").find((text) => text.includes(`sidecarEnv.${EXT_BUNDLED_MANIFEST_ENV} =`))
-  expect(line).toBeDefined()
-  expect(line).toContain(`"bundled-tools.json"`)
-})
-
 // `#1531`:ext 的 parentPort 监听必须在 ready **之前**挂上(main 只在 ready 那一刻重发在途代际)。sidecar.ts 顶层的 registerHooks /
 // getParentPort() 让它不能被 import,接线只能锚源码。`#1667`(接口文档 I1 / I2 改形):2.x 每个 Location 用带 `__opencode_reload`
 // 的新 URL 各求值一次 ext,不再靠「预载同一个 URL」拿到同一份模块(进程级对象由 ext 挂在 globalThis 上);这里锚的顺序是
 // 引擎 import → 预载 ext 的目录入口 `server.js` → `start()`(Transform 里同步发布进程内 fetch)→ await 预载 → ready。
 test("ANCHOR (not a gate): sidecar.ts 在 start() 之前预载 ext 的目录入口,Transform 里发布进程内 fetch,ready 之前 await 预载", async () => {
   const source = await Bun.file(join(import.meta.dir, "sidecar.ts")).text()
-  const engine = source.indexOf('const { startEngine, ENGINE_VERSION } = await import("virtual:opencode-server")')
-  const preload = source.indexOf('import(pathToFileURL(join(command.extPluginPath, "server.js")).href)')
+  const engine = source.indexOf('const engineModule = await import("virtual:opencode-server")')
+  const preload = source.indexOf('import(pathToFileURL(join(bootstrap.paths.extPlugin, "server.js")).href)')
   const started = source.indexOf("const started = await startEngine(")
   const handoff = source.indexOf("publishInProcessEngine(inProcess)")
   const joined = source.indexOf("await extPreload")
@@ -300,4 +287,21 @@ test("ANCHOR (not a gate): sidecar.ts 在 start() 之前预载 ext 的目录入�
   expect(handoff).toBeGreaterThan(started)
   expect(joined).toBeGreaterThan(handoff)
   expect(ready).toBeGreaterThan(joined)
+})
+
+// `#1698`(DESIGN-upgrade-bootstrap-config §4.2):sidecar.ts 的启动关口顺序 —— 装围栏 → 解析并发布启动文档 → 注入(读文档)→ import 引擎 →
+// 引擎 bundle 用自己的解析器读一次文档(缺导出 / 不符即抛)→ startEngine。两步本身的判据在 sidecar-bootstrap-gate.test.ts 与
+// sidecar-engine-host.cases.ts;sidecar.ts 顶层有副作用、import 不得,先后只能锚源码。
+test("ANCHOR (not a gate): #1698 sidecar.ts 装围栏之后才发布启动文档,注入读文档,import 引擎之后、startEngine 之前过引擎关口", async () => {
+  const source = await Bun.file(join(import.meta.dir, "sidecar.ts")).text()
+  const order = [
+    "installProcessFence(command)",
+    "const bootstrap = acceptCodePuppyBootstrap(command.bootstrap)",
+    "const injection = prepareSidecarEnv(bootstrap)",
+    'const engineModule = await import("virtual:opencode-server")',
+    "assertEngineReadsBootstrap(engineModule)",
+    "const started = await startEngine(",
+  ].map((text) => source.indexOf(text))
+  expect(order[0]).toBeGreaterThan(0)
+  for (let i = 1; i < order.length; i++) expect(order[i]).toBeGreaterThan(order[i - 1]!)
 })

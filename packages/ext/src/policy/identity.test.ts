@@ -126,14 +126,14 @@ describe("authority minting (ADR-041 §5)", () => {
   const cloudEnv = { CODEPUPPY_CLOUD_MCP_SERVER: "codepuppy-cloud", CODEPUPPY_CLOUD_MCP_DEF: JSON.stringify(cloudDef) }
 
   test("the exact verified cloud definition mints codepuppy-cloud with a sha256 evidence digest", () => {
-    const authority = authorityForMcp("codepuppy-cloud", cloudDef as never, cloudEnv)
+    const authority = authorityForMcp("codepuppy-cloud", cloudDef as never, cloudEnv, undefined)
     expect(authority).toMatchObject({ kind: "codepuppy-cloud", bindingId: "mcp:codepuppy-cloud" })
     expect((authority as { evidenceDigest: string }).evidenceDigest).toMatch(/^sha256:[0-9a-f]{64}$/)
   })
 
   test("a look-alike (same URL, other key; or same key, other URL) is not asserted", () => {
-    expect(authorityForMcp("other-name", cloudDef as never, cloudEnv)).toEqual({ kind: "not-asserted" })
-    expect(authorityForMcp("codepuppy-cloud", { ...cloudDef, url: "https://cloud.codepuppy.test.evil/mcp" } as never, cloudEnv)).toEqual({ kind: "not-asserted" })
+    expect(authorityForMcp("other-name", cloudDef as never, cloudEnv, undefined)).toEqual({ kind: "not-asserted" })
+    expect(authorityForMcp("codepuppy-cloud", { ...cloudDef, url: "https://cloud.codepuppy.test.evil/mcp" } as never, cloudEnv, undefined)).toEqual({ kind: "not-asserted" })
   })
 
   const office = (() => {
@@ -155,18 +155,17 @@ describe("authority minting (ADR-041 §5)", () => {
   })()
 
   test("the exact bundled Office command next to the attested server.py mints codepuppy-bundled", () => {
-    const authority = authorityForMcp("codepuppy-word", { type: "local", command: office.command } as never, { CODEPUPPY_OFFICE_MCP_MANIFEST: office.manifest })
+    const authority = authorityForMcp("codepuppy-word", { type: "local", command: office.command } as never, {}, office.manifest)
     expect(authority).toMatchObject({ kind: "codepuppy-bundled", bindingId: "mcp:codepuppy-word" })
   })
 
   test("an extra token, or a server.py the manifest was not exported from, proves nothing", () => {
-    const env = { CODEPUPPY_OFFICE_MCP_MANIFEST: office.manifest }
-    expect(authorityForMcp("codepuppy-word", { type: "local", command: [...office.command, "--debug"] } as never, env)).toEqual({ kind: "not-asserted" })
+    expect(authorityForMcp("codepuppy-word", { type: "local", command: [...office.command, "--debug"] } as never, {}, office.manifest)).toEqual({ kind: "not-asserted" })
     const tampered = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-office-"))
     fs.cpSync(path.dirname(office.dir), tampered, { recursive: true })
     fs.writeFileSync(path.join(tampered, "office-mcp", "server.py"), "print('tampered')\n")
     const command = office.command.map((token) => token.replace(path.dirname(office.dir), tampered))
-    expect(authorityForMcp("codepuppy-word", { type: "local", command } as never, { CODEPUPPY_OFFICE_MCP_MANIFEST: path.join(tampered, "office-mcp", "tools.json") })).toEqual({ kind: "not-asserted" })
+    expect(authorityForMcp("codepuppy-word", { type: "local", command } as never, {}, path.join(tampered, "office-mcp", "tools.json"))).toEqual({ kind: "not-asserted" })
   })
 
   // #1666 Unit E: the shipped manifest (packages/ui-mac/resources/office-mcp) and the command main writes, after this
@@ -176,12 +175,12 @@ describe("authority minting (ADR-041 §5)", () => {
     const resources = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-office-shipped-"))
     fs.mkdirSync(path.join(resources, "office-mcp"))
     for (const name of ["server.py", "tools.json"]) fs.copyFileSync(path.join(shipped, name), path.join(resources, "office-mcp", name))
-    const env = { CODEPUPPY_OFFICE_MCP_MANIFEST: path.join(resources, "office-mcp", "tools.json") }
-    const template: string[] = JSON.parse(fs.readFileSync(env.CODEPUPPY_OFFICE_MCP_MANIFEST, "utf8")).formats.word.command
+    const manifest = path.join(resources, "office-mcp", "tools.json")
+    const template: string[] = JSON.parse(fs.readFileSync(manifest, "utf8")).formats.word.command
     const command = (workspace: string) =>
       template.map((token) => (token === "{workspace}" ? workspace : token.split("{codepuppyResources}").join(resources)))
-    expect(authorityForMcp("codepuppy-word", { type: "local", command: command("/Users/someone/project") } as never, env)).toMatchObject({ kind: "codepuppy-bundled" })
-    expect(authorityForMcp("codepuppy-word", { type: "local", command: command("relative/project") } as never, env)).toEqual({ kind: "not-asserted" })
+    expect(authorityForMcp("codepuppy-word", { type: "local", command: command("/Users/someone/project") } as never, {}, manifest)).toMatchObject({ kind: "codepuppy-bundled" })
+    expect(authorityForMcp("codepuppy-word", { type: "local", command: command("relative/project") } as never, {}, manifest)).toEqual({ kind: "not-asserted" })
   })
 
   test("the display snapshot is the schema's ToolDisplaySnapshotV1: identity + technicalId + authority + location", () => {

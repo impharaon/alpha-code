@@ -1,4 +1,5 @@
 import { mkdtempSync, realpathSync } from "node:fs"
+import { publishTestBootstrap, unpublishTestBootstrap } from "../../ui-mac/test-component/codepuppy-bootstrap-fixture"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
@@ -392,18 +393,19 @@ describe("治理豁免绑定端点身份,名字伪造不了(R6 Blocker)", () => 
 // 下面在**真宿主**里注册一个会先问权限再「打传输」的 MCP 形态工具,在最有利于绕过的权限状态(评估恒 allow)下判。
 // ─────────────────────────────────────────────────────────────────────────────
 describe("放行覆盖不了 kill-switch(2.x 真宿主)", () => {
-  const SAVED = ["CODEPUPPY_GLOBAL_DIR", LOCAL_WEBSEARCH_DENY_ENV, CLOUD_WEBSEARCH_DENY_ENV, CLOUD_MCP_SERVER_ENV, CLOUD_MCP_DEF_ENV] as const
+  const SAVED = [LOCAL_WEBSEARCH_DENY_ENV, CLOUD_WEBSEARCH_DENY_ENV, CLOUD_MCP_SERVER_ENV, CLOUD_MCP_DEF_ENV] as const
   const saved: Record<string, string | undefined> = {}
   beforeEach(() => {
     for (const key of SAVED) saved[key] = process.env[key]
     for (const key of SAVED) delete process.env[key]
-    process.env.CODEPUPPY_GLOBAL_DIR = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-allow-")))
+    publishTestBootstrap({ globalRoot: realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-allow-"))) })
   })
   afterEach(() => {
     for (const [key, value] of Object.entries(saved)) {
       if (value === undefined) delete process.env[key]
       else process.env[key] = value
     }
+    unpublishTestBootstrap()
   })
 
   const run = (env: Record<string, string>) =>
@@ -549,11 +551,11 @@ describe("跨 Location 隔离:治理归属按 setup 闭包,不串扰(#223 R7 Blo
   const FOREIGN = { type: "remote", url: "https://attacker.example/mcp" } as const
 
   beforeEach(() => {
-    for (const key of ["CODEPUPPY_GLOBAL_DIR", LOCAL_WEBSEARCH_DENY_ENV, CLOUD_WEBSEARCH_DENY_ENV, CLOUD_MCP_SERVER_ENV, CLOUD_MCP_DEF_ENV, CLOUD_MCP_ARM_ENV])
+    for (const key of [LOCAL_WEBSEARCH_DENY_ENV, CLOUD_WEBSEARCH_DENY_ENV, CLOUD_MCP_SERVER_ENV, CLOUD_MCP_DEF_ENV, CLOUD_MCP_ARM_ENV])
       saved[key] = process.env[key]
     delete process.env[CLOUD_WEBSEARCH_DENY_ENV]
     delete process.env[CLOUD_MCP_ARM_ENV]
-    process.env.CODEPUPPY_GLOBAL_DIR = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-xtalk-")))
+    publishTestBootstrap({ globalRoot: realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-xtalk-"))) })
     // 信号漂移(只有本地信号):第三方 web search 关,治理云工具的 web search 豁免。
     process.env[LOCAL_WEBSEARCH_DENY_ENV] = "1"
     process.env[CLOUD_MCP_SERVER_ENV] = "cloud"
@@ -564,6 +566,7 @@ describe("跨 Location 隔离:治理归属按 setup 闭包,不串扰(#223 R7 Blo
       if (value === undefined) delete process.env[key]
       else process.env[key] = value
     }
+    unpublishTestBootstrap()
   })
 
   /**

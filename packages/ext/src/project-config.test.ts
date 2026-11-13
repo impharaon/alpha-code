@@ -7,6 +7,7 @@ import { CodePuppyExt } from "./plugin"
 import { recordingContext } from "./plugin-host.harness"
 import { Agent } from "../../schema/src/agent.ts"
 import { PROJECT_HIDDEN_DIR } from "../../ui-mac/src/shared/project-hidden-dir"
+import { publishTestBootstrap, unpublishTestBootstrap } from "../../ui-mac/test-component/codepuppy-bootstrap-fixture"
 
 const j = (o: unknown) => JSON.stringify(o)
 
@@ -284,8 +285,7 @@ describe("project/root identity fail-closed", () => {
 
     const global = join(root, "global", "env", "dev")
     mkdirSync(global, { recursive: true })
-    const previous = process.env.CODEPUPPY_GLOBAL_DIR
-    process.env.CODEPUPPY_GLOBAL_DIR = realpathSync(global)
+    publishTestBootstrap({ globalRoot: realpathSync(global) })
     try {
       // `#1665`:OpenCode 2 下 ext 按 Location 跑 setup —— 驱动它注册的 agent / tool transform 与执行钩子。
       const recorded = recordingContext(project)
@@ -321,8 +321,7 @@ describe("project/root identity fail-closed", () => {
       expect(readFileSync(join(retired, "codepuppy.jsonc"), "utf8")).toBe(config)
       expect(readFileSync(join(retired, "sentinel"), "utf8")).toBe("untouched")
     } finally {
-      if (previous === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
-      else process.env.CODEPUPPY_GLOBAL_DIR = previous
+      unpublishTestBootstrap()
     }
   })
 })

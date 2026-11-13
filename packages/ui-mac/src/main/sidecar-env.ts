@@ -86,17 +86,8 @@ const EXACT = new Set([
   "CODEPUPPY_FACTORY_SKILL_DIRS",
   // REQ-067:出厂默认禁项(− 用户解禁),同为内存注入、零明文
   "CODEPUPPY_FACTORY_DENY_SKILLS",
-  // REQ-098:环境 mutable root(main 启动时由唯一环境映射落定,路径非密钥)。sidecar 的
-  // injectCodePuppyConfig(codepuppy.jsonc 真源)与 @codepuppy/ext(全局根边界判定)必须与 main 同根,
-  // 否则引擎会读到另一环境的可变状态(AC#1 破)。
-  "CODEPUPPY_GLOBAL_DIR",
-  // REQ-059 / ADR-019 逃生阀。main 与 sidecar 必须同口径:main 侧读它们跳过 truth 迁移与
-  // desired-state 投影(index.ts / engine-config-truth-boot.ts)并把 mcp/plugin/provider 写回
-  // legacy 目标(ext-config.ts),sidecar 侧读它们跳过 OPENCODE_CONFIG 注入(sidecar.ts)。缺了这两项
-  // 时 sidecar 收不到它们,于是 main 走 legacy 而 sidecar 照旧注入 —— 正是 req053 设计稿 §风险8
-  // 「逃生舱错位」那一格,也让两个逃生阀在真出事故时按了没反应(#606)。布尔开关,非密钥。
-  "CODEPUPPY_JSONC_TRUTH_DISABLE",
-  "CODEPUPPY_LEGACY_INSTALL_ROOT",
+  // `#1698` G1:环境 mutable root(CODEPUPPY_GLOBAL_DIR)与 REQ-059 两个逃生阀不再经环境过河 —— 它们在启动文档的
+  // `paths.globalRoot` / `paths.userConfig` 里(codepuppy-bootstrap-build.ts),main 与 sidecar 由同一份文档同口径(#606)。
   // the escape hatch itself, so the sidecar can surface it in diagnostics
   "CODEPUPPY_ENV_ALLOWLIST_EXTRA",
 ])
@@ -106,6 +97,41 @@ const EXACT = new Set([
 // admitted it — a hypothetical OPENCODE_API_KEY under a prefix, a name listed in the escape hatch, or
 // a token var mistakenly added to EXACT.
 const PREFIXES = ["OPENCODE_", "XDG_", "LC_", "ELECTRON_"]
+
+// `#1698`(DESIGN-upgrade-bootstrap-config §4.5):Code Puppy 交给 sidecar 的决定走启动文档,不走环境 —— `CODEPUPPY_` 前缀
+// (不分大小写)一律拒,排在所有放行规则(含 EXTRA)之前:把已迁走的键写进 CODEPUPPY_ENV_ALLOWLIST_EXTRA 也放不回去。
+// 唯一的永久例外是 EXTRA 本身。下面这张表是迁移期的:还没迁进文档的键组(G2 平台 / 云 / 网络、G3 开关与引擎设置)
+// 今天怎么过河就怎么过河,每个键组的提交把自己的键从这里删掉,G3 之后整张表删除。
+const CODEPUPPY_KEYS_NOT_YET_IN_BOOTSTRAP = new Set([
+  // G2
+  "CODEPUPPY_BASE_URL",
+  "CODEPUPPY_PLATFORM_AUTH_REF",
+  "CODEPUPPY_DEFAULT_MODEL",
+  "CODEPUPPY_CLOUD_MCP_URL",
+  "CODEPUPPY_CLOUD_MCP_SERVER",
+  "CODEPUPPY_CLOUD_MCP_DEF",
+  "CODEPUPPY_CLOUD_MCP_ARM",
+  "CODEPUPPY_WEBSEARCH_DISABLE",
+  "CODEPUPPY_LOCAL_WEBSEARCH_DENY",
+  "CODEPUPPY_CLOUD_WEBSEARCH_DENY",
+  "CODEPUPPY_POLICY_ACCOUNT",
+  "CODEPUPPY_EGRESS_PROXY",
+  "CODEPUPPY_PROVIDER_ALLOW",
+  // G3
+  "CODEPUPPY_FACTORY_SKILL_DIRS",
+  "CODEPUPPY_FACTORY_DENY_SKILLS",
+  "CODEPUPPY_MODELS_DISABLE",
+  "CODEPUPPY_IDENTITY_DISABLE",
+  "CODEPUPPY_BEHAVIOR_DISABLE",
+  "CODEPUPPY_PROMPT_REBRAND_DISABLE",
+  "CODEPUPPY_ECOSYSTEM_INHERIT",
+  "CODEPUPPY_AUTOMATION_DISABLE",
+  "CODEPUPPY_READONLY_DISABLE",
+  "CODEPUPPY_EXT_VERBOSE",
+  "CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS",
+])
+const CODEPUPPY_PREFIX = "CODEPUPPY_"
+const ALLOWLIST_EXTRA = "CODEPUPPY_ENV_ALLOWLIST_EXTRA"
 
 // The credential-NAME veto (#605). It used to be a bare substring match, which also vetoed innocent
 // names that merely contain one of the words (MONKEY_MODE, KEYBOARD_LAYOUT, TURKEY_REGION,
@@ -270,6 +296,7 @@ export function createSidecarEnv(source: NodeJS.ProcessEnv = process.env): Recor
     // clearing both DENY rules first, so no casing variant can bypass them (#603 R2).
     if (isSecretish(key)) continue
     if (NEVER_INHERIT.has(key.toLowerCase())) continue
+    if (key.toUpperCase().startsWith(CODEPUPPY_PREFIX) && key !== ALLOWLIST_EXTRA && !CODEPUPPY_KEYS_NOT_YET_IN_BOOTSTRAP.has(key)) continue
     const allowed = extra.has(key) || EXACT.has(key) || PREFIXES.some((prefix) => key.startsWith(prefix))
     if (!allowed) continue
     env[key] = String(value)

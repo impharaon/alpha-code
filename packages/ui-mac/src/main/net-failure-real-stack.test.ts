@@ -35,6 +35,7 @@ import { __resetEgressGrantsForTests } from "./network-egress-grants"
 import { startEgressPolicyProxy, type EgressLogRecord, type EgressProxyHandle } from "./network-egress-proxy"
 import { sidecarEgressProxyEnv } from "./sidecar-env"
 import { secretFilePath, secretFileRef } from "./codepuppy-secret-files"
+import { buildCodePuppyBootstrap } from "./codepuppy-bootstrap-build"
 import { ISOLATED_KEYS, isInside, isolatedEnv, testRoot } from "../../../../scripts/test-isolation/env"
 import { toV1Messages } from "../engine-adapter/v1-shapes"
 import type { ToolPart } from "@opencode-ai/sdk/v2/client"
@@ -177,7 +178,6 @@ describeDarwin("`#1572` AC4 真栈:Electron 内嵌 node + 真出网代理 + 真 
       XDG_STATE_HOME: join(home, ".local", "state"),
       ELECTRON_RUN_AS_NODE: "1",
       ...sidecarEgressProxyEnv(proxy.port),
-      CODEPUPPY_GLOBAL_DIR: globalDir,
       CODEPUPPY_BASE_URL: `http://127.0.0.1:${llmPort}/v1`,
       CODEPUPPY_PLATFORM_AUTH_REF: secretFileRef(userData, "CODEPUPPY_API_KEY"),
       NO_COLOR: "1",
@@ -185,14 +185,22 @@ describeDarwin("`#1572` AC4 真栈:Electron 内嵌 node + 真出网代理 + 真 
     const outside = ISOLATED_KEYS.filter((name) => env[name] !== undefined && !isInside(testRoot(), env[name]!))
     if (outside.length) throw new Error(`REFUSING TO RUN: engine env keys outside the test root: ${outside.join(", ")}`)
 
+    // `#1698`:路径经启动文档到 sidecar(这里是驱动),用 main 的生产构建器构建,与 spawnLocalServer 放进 start 消息的是同一个函数
     const input: DriverInput = {
       engine: engineBundle,
-      ext: extDir,
       password: PASSWORD,
-      userData,
-      workspace,
-      databasePath: join(scratch, "engine.db"),
-      configDirectory: join(scratch, "engine-config"),
+      bootstrap: buildCodePuppyBootstrap({
+        userDataPath: userData,
+        globalRoot: globalDir,
+        userConfig: join(globalDir, "codepuppy.jsonc"),
+        initialDirectory: workspace,
+        databasePath: join(scratch, "engine.db"),
+        engineConfigDirectory: join(scratch, "engine-config"),
+        extPluginPath: extDir,
+        officeMcpManifest: join(scratch, "office-mcp", "tools.json"),
+        registryChannel: "stable",
+        env: {},
+      }),
     }
     engine = spawn(electron, [join(driverDir, "engine-driver.js"), JSON.stringify(input)], { cwd: workspace, env, stdio: ["ignore", "pipe", "pipe"] })
     engine.stdout?.on("data", (c: Buffer) => engineLog.push(c.toString()))

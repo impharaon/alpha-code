@@ -105,7 +105,7 @@ export const DOWNGRADED_ANCHORS: Record<string, SourceTextEntry> = {
     lines: 1,
   },
   "packages/ui-mac/src/main/codepuppy-sidecar-wiring.test.ts": {
-    why: "`#1531` 那一条锚 sidecar.ts 里「引擎 import → ext 目录入口预载开始 → start()(Transform 里发布进程内 fetch)→ await 预载 → ready 上报」的下标先后(`#1667`:2.x 每个 Location 用新 URL 各求值一次 ext,不再锚「同一个 URL」)。两个不会让它变红的变异:①把 onDispatch 里的 publishInProcessEngine 改成发布一个不相干的函数(文本里那一段仍在);②在 await extPreload 之前加一条早退 return。sidecar.ts 顶层有副作用,import 不得;同文件另两条(真 spawnLocalServer + 假子进程)是行为判据。`#1578` 第 3 处读 server.ts:写 sidecar env 随包扩展清单的那一句,键名必须等于读它的 packages/ext/src/policy/bundled-plugin.ts(`#1662` 前是 v1 引擎的 codepuppy-bundled-plugin.ts)的 EXT_BUNDLED_MANIFEST_ENV、值指向 bundled-tools.json —— 任一侧改名(一个字母)即红,这一半主语是跨包逐字一致。守不住的:①那一句被包进恒假分支或 ext.path 永远为空(键从不写,文本仍在);②main 写对了但 sidecar 之后又把这个键剥掉。行为判据要走 spawnLocalServer 看 fork env,而 dev 下 ext.path 依赖未入库的 packages/ext/dist,门不保证它在。",
+    why: "`#1531` 那一条锚 sidecar.ts 里「引擎 import → ext 目录入口预载开始 → start()(Transform 里发布进程内 fetch)→ await 预载 → ready 上报」的下标先后(`#1667`:2.x 每个 Location 用新 URL 各求值一次 ext,不再锚「同一个 URL」)。两个不会让它变红的变异:①把 onDispatch 里的 publishInProcessEngine 改成发布一个不相干的函数(文本里那一段仍在);②在 await extPreload 之前加一条早退 return。sidecar.ts 顶层有副作用,import 不得;同文件另两条(真 spawnLocalServer + 假子进程)是行为判据。`#1698` 那一条锚 sidecar.ts 的启动关口顺序(装围栏 → 解析并发布启动文档 → 注入 → import 引擎 → 引擎关口 → startEngine);两步本身的行为判据在 sidecar-bootstrap-gate.test.ts 与 sidecar-engine-host.cases.ts。守不住的:①关口调用被包进恒假分支(文本仍在);②在发布之前插进一个按环境读决定的读方。(原 `#1578` 那一条锚 server.ts 写 sidecar env 的随包清单键;`#1698` 起清单路径是启动文档的类型化字段,值由 codepuppy-bootstrap-build.test.ts 判。)",
     evidence: "#1531",
     lines: 2,
   },

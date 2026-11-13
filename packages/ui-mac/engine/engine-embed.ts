@@ -18,6 +18,7 @@
 //   · 选项对象由调用方构造(engine-server-options.ts),这里原样交给 `start()`,不读任何环境变量。
 import { NodeServices } from "@effect/platform-node"
 import { start } from "@opencode/server/process"
+import { codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Global } from "@opencode/util/global"
 import { AppProcess } from "@opencode/util/process"
@@ -30,6 +31,14 @@ declare const OPENCODE_VERSION: string | undefined
 export const ENGINE_VERSION = typeof OPENCODE_VERSION === "string" ? OPENCODE_VERSION : "local"
 
 export type EngineServerOptions = Parameters<typeof start>[0]
+
+/**
+ * `#1698`(DESIGN-upgrade-bootstrap-config §4.2 第 4 步):用**本引擎 bundle 编进去的**解析器读一次 sidecar 已发布的启动文档;
+ * 未发布、版本或形状与本 bundle 不符 ⇒ 抛 CodePuppyBootstrapError,sidecar 不起这台引擎。
+ */
+export function assertCodePuppyBootstrap(): void {
+  codepuppyBootstrap()
+}
 
 export type EmbeddedEngine = {
   /** 监听地址,形如 `http://127.0.0.1:<port>`。 */

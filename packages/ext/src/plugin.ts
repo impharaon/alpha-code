@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import type { Plugin } from "@opencode/plugin"
+import { codepuppyBootstrap } from "../../util/src/codepuppy-bootstrap"
 import { registerPolicy } from "./policy/index"
 import {
   projectDirectoryIdentity,
@@ -98,6 +99,9 @@ const describe = (cause: unknown) => (cause instanceof Error ? cause.message : S
 export const CodePuppyExt: Plugin.Plugin = {
   id: "codepuppy.ext",
   async setup(context) {
+    // `#1698`(DESIGN-upgrade-bootstrap-config §4.2 第 5 步、§4.3):第一步用本 bundle 的解析器读 sidecar 发布的启动文档 —— 没有、
+    // 版本或形状不符 ⇒ 抛 ⇒ 本插件 failed ⇒ sidecar 拒报 ready。只读一份冻结的文档,不挂任何钩子,不改 I3 的挂钩次序。
+    const bootstrap = codepuppyBootstrap()
     const policy = await registerPolicy(context)
     const directory = context.location.directory
     const { hubBridge, reloads } = processState()
@@ -117,7 +121,7 @@ export const CodePuppyExt: Plugin.Plugin = {
       // REQ-157 `#1284`:装载回执 —— 登记簿在 import 时已按上限校验过;这里只在 VERBOSE 下把库存打出来。
       if (process.env.CODEPUPPY_EXT_VERBOSE) log(`[@codepuppy/ext] context injections:\n${renderInventory()}`)
       // sidecar 初始化批次先复验 main 派生 root 的 canonical 身份;缺失、相对、退休根或 alias 都拒绝(环境错 = 结构性失败,让本插件 failed)。
-      requireCodePuppyGlobalRoot()
+      requireCodePuppyGlobalRoot(bootstrap.paths.globalRoot)
       const projectRootFor = (target: string): ProjectRoot | null => {
         const identity = projectDirectoryIdentity(target)
         return identity.status === "project" ? identity : null
@@ -338,7 +342,7 @@ export const CodePuppyExt: Plugin.Plugin = {
       // 配置插件随后照常把顶层规则与它自己的字段加在后面 —— 顺序仍是「底座 → 这里 → 配置」。codepuppy-ask 由注入无条件写进配置
       // (ui-mac codepuppy-config-injection.ts 2d),ext 只随这份注入装载,不会多出一个配置里没有的 agent。
       await context.agent.transform((editor) => {
-        const rules = externalDirectoryRules(process.env)
+        const rules = externalDirectoryRules(bootstrap.paths.globalRoot, process.env.CODEPUPPY_FACTORY_SKILL_DIRS)
         for (const id of EXTERNAL_DIRECTORY_AGENTS)
           editor.update(id as never, (agent) => {
             if (!placeAfterBase(id, agent.permissions as never, rules))

@@ -38,7 +38,7 @@ const {
 
 let scratch = ""
 const savedEnv: Record<string, string | undefined> = {}
-const ENV_KEYS = ["XDG_DATA_HOME", "CODEPUPPY_SECRETS_DISABLE", "SHELL"] as const
+const ENV_KEYS = ["XDG_DATA_HOME", "CODEPUPPY_SECRETS_DISABLE", "SHELL", "CODEPUPPY_GLOBAL_DIR"] as const
 
 beforeEach(() => {
   for (const key of ENV_KEYS) savedEnv[key] = process.env[key]
@@ -48,6 +48,7 @@ beforeEach(() => {
   process.env.XDG_DATA_HOME = join(scratch, "xdg-data")
   mkdirSync(process.env.XDG_DATA_HOME, { recursive: true })
   process.env.CODEPUPPY_SECRETS_DISABLE = "1"
+  process.env.CODEPUPPY_GLOBAL_DIR = join(scratch, "codepuppy-state", "env", "dev") // #1698:无快照的单测经环境给全局根(design §10 R31),fork 时构建启动文档要它
   process.env.SHELL = "nu"
   resetDanglingSweepLatchForTests()
 })

@@ -19,6 +19,7 @@ import { CHANNEL } from "./constants"
 import { getAuthIdentityTag } from "./codepuppy-auth"
 import { installationMachineId } from "./artifact-service"
 import { tryGetCodePuppyEnvironment } from "./codepuppy-environment"
+import { buildCodePuppyBootstrap } from "./codepuppy-bootstrap-build"
 import { CLOUD_WEBSEARCH_DENY_ENV, LOCAL_WEBSEARCH_DENY_ENV } from "./cloud-web-search"
 import { resourcesRoot } from "./ext-fs-installer"
 import { secretFileRef, syncSecretFiles } from "./codepuppy-secret-files"
@@ -65,7 +66,7 @@ import { persistEgressGrantRecord, readEgressGrantRecords } from "./egress-grant
 import { askUserForEgressGrant } from "./egress-approval-dialog"
 // REQ-159 `#1322`:工作区写探针的 main 半场 —— 请求/应答簿记住在 workspace-write-probe.ts,这里只接线到子进程。
 import { createWriteProbeRequester, type WorkspaceWriteProbeResult } from "./workspace-write-probe"
-import { codepuppyGlobalRoot } from "./engine-config-truth"
+import { codepuppyGlobalRoot, codepuppyJsoncPath } from "./engine-config-truth"
 import { ensureUserWorkspaceDir } from "./codepuppy-user-workspace"
 import { fenceWorkspaceTruthPath, readWorkspaceTruthOrThrow } from "./process-fence-workspaces"
 import { homedir } from "node:os"
@@ -487,9 +488,6 @@ export async function spawnLocalServer(
   const sidecarEnv = createSidecarEnv()
   // uv's default ~/.cache/uv is outside the fence; keep Office dependencies under the existing W3 root.
   sidecarEnv.UV_CACHE_DIR = join(options.userDataPath, "uv-cache")
-  // #1565:引擎在四个文档工具连上之前,用这份随包清单给出它们的声明定义(packages/opencode/src/mcp/codepuppy-first-party-mcp.ts)。
-  // 与写策略(ext-mcp-policy)一样按资源根的 realpath 解析,配置里那四条命令才能逐 token 对上。路径不是秘密。
-  sidecarEnv.CODEPUPPY_OFFICE_MCP_MANIFEST = join(realpathSync(resourcesRoot()), "office-mcp", "tools.json")
   // REQ-236 `#1575`(方案 §2.4 第 4 条):工具策略按登录账户分区。引擎读它选分区,缺席 = anonymous(未登录)。
   // 值是「本安装随机标识 + 账户标记」的哈希,不是凭据:这个变量会被第三方 MCP / LSP / shell 子进程继承,混入安装标识后
   // 同一账户在另一台安装上是另一个值,不能据它跨安装关联。只由这里按当刻登录态写 —— 不进白名单,shell 导出的同名变量
@@ -498,9 +496,6 @@ export async function spawnLocalServer(
   const installation = installationMachineId()
   if (policyAccount && installation)
     sidecarEnv.CODEPUPPY_POLICY_ACCOUNT = `acct:${createHash("sha256").update(`${installation}:${policyAccount}`).digest("hex")}`
-  // #1578 AC5:随包扩展插件的清单(ext 构建写在 plugin.js 旁边:模块 sha256 + 自有工具名)。引擎只信这条 env 指的那份,
-  // 不看被装载插件旁边有什么(packages/opencode/src/plugin/codepuppy-bundled-plugin.ts)。路径不是秘密。
-  if (ext.path) sidecarEnv.CODEPUPPY_EXT_BUNDLED_MANIFEST = join(ext.path, "bundled-tools.json")
   // REQ-137 `#1379`:这一代的 BYOK 放行集合。平台无关(代理只在 darwin 起,但「放行集合 = 这一代的配置」
   // 这条不该长两个样子),排在密钥文件落定之后、fork 之前。
   refreshConfiguredEgressDestinations(options.userDataPath)
@@ -541,6 +536,26 @@ export async function spawnLocalServer(
   }
   if (!fence && process.platform === "darwin")
     throw new Error("process fence plan returned nothing on darwin — sidecar fork refused (an unfenced engine must not start)")
+  // `#1698`(DESIGN-upgrade-bootstrap-config §4.2 / §4.4):这一代交给 sidecar、ext 与引擎的决定收成一份启动文档,随 start 消息走,
+  // 不进环境。构建失败(结构性缺陷,例如资源根 realpath 失败)⇒ 抛 ⇒ 与上面各项同一条拒 fork 路。
+  // #397:catalog 通道在 MAIN 侧从冻结快照取 —— sidecar 进程没有快照。tryGet 仅为纯单测兜底(缺省 → sidecar loud 跳过 override 注入)。
+  const registryChannel = tryGetCodePuppyEnvironment()?.registryChannel
+  if (!registryChannel)
+    getLogger()?.warn("alpha environment not initialized at sidecar spawn — disabled-override injection will be skipped")
+  const bootstrap = buildCodePuppyBootstrap({
+    userDataPath: options.userDataPath,
+    globalRoot: codepuppyGlobalRoot(),
+    userConfig: codepuppyJsoncPath(),
+    initialDirectory: codepuppyUserWorkspaceDir(),
+    databasePath,
+    engineConfigDirectory: engineGlobalConfigDirectory(sidecarEnv, homedir()),
+    extPluginPath: ext.path,
+    // #1565:引擎在四个文档工具连上之前,用这份随包清单给出它们的声明定义(packages/core/src/mcp/codepuppy-first-party-mcp.ts)。
+    // 与写策略(ext-mcp-policy)一样按资源根的 realpath 解析,配置里那四条命令才能逐 token 对上。
+    officeMcpManifest: join(realpathSync(resourcesRoot()), "office-mcp", "tools.json"),
+    registryChannel,
+    env: process.env,
+  })
 
   const sidecar = join(dirname(fileURLToPath(import.meta.url)), "sidecar.js")
   rotateServerLogs()
@@ -649,25 +664,12 @@ export async function spawnLocalServer(
     child.on("message", onMessage)
     child.on("exit", onExit)
     refreshTimeout()
-    // #397:override 注入的 catalog 通道在 MAIN 侧从冻结快照取好随命令传入 —— sidecar 进程从不
-    // initCodePuppyEnvironment,自取必抛且曾整体炸掉 alpha 配置注入(2026-07-23)。boot 序保证 spawn 前
-    // 已 init;tryGet 仅为纯单测兜底(缺省 → sidecar loud 跳过 override 注入,boot reconcile 兜 fail-closed)。
-    const registryChannel = tryGetCodePuppyEnvironment()?.registryChannel
-    if (!registryChannel)
-      getLogger()?.warn(
-        "alpha environment not initialized at sidecar spawn — disabled-override injection will be skipped",
-      )
     child.postMessage({
       type: "start",
       hostname,
       port,
       password,
-      userDataPath: options.userDataPath,
-      initialDirectory: codepuppyUserWorkspaceDir(),
-      databasePath,
-      configDirectory: engineGlobalConfigDirectory(sidecarEnv, homedir()),
-      extPluginPath: ext.path,
-      registryChannel,
+      bootstrap,
       // REQ-159:profile 全文 + 模块路径。sidecar 在 import 引擎之前 apply;缺席(darwin)即拒绝启动。
       ...(fence ? { fence: { profile: fence.profile, addonPath: fence.addonPath } } : {}),
     })

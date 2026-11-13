@@ -135,7 +135,14 @@ last_reviewed: 2026-11-12
 | §9 回滚(G1–G3) | 见段 3 | — |
 
 ### 偏离记录
-暂无
+- 2026-11-12 · 注入的测试接缝:`injectCodePuppyConfig` 加第 4 个参数 `userConfig?: string | null`,sidecar 传 `paths.userConfig ?? null`(null = 逃生阀置位);只有直接调注入的测试不传,取 `codepuppyJsoncPath()` · 不这样做要改约 45 个直接调用注入的测试点;注入自己不再读两个逃生阀 · 本段提交。
+- 2026-11-12 · `mcp-default-deny.ts` 的目录取法:显式选项 → 已发布文档的 `paths.engineConfigDirectory` → 按环境的旧推导(只剩直接调注入、没有文档的测试)。环境那一支读的是 `OPENCODE_CONFIG_DIR` / `XDG_CONFIG_HOME`,不是 Code Puppy 的键,在 sidecar 里到不了(与 R31 同一读法)· 本段提交。
+- 2026-11-12 · 测试夹具 `packages/ui-mac/test-component/codepuppy-bootstrap-fixture.ts`(新):经生产解析器发布一份测试用文档(R14),ext 测试按 `ui-mac/test-component/engine-sandbox` 的先例跨包 import;放在 `src` 之外,不进 sidecar 源码集合 · 本段提交。
+- 2026-11-12 · 原表之外改动的测试(都是因为它们按旧通道搭环境):ext `policy/register-policy.test.ts`、`policy/policy-host.cases.ts`(isolate 里发布文档)、`project-config.test.ts`;core `test/codepuppy-mcp-runtime.test.ts`(引擎从文档读 Office 清单);ui-mac 里调真 `spawnLocalServer` 的 `sidecar-stop.test.ts`、`process-fence-wiring.test.ts`、`test-component/req053-spawn-rotation.cases.ts`、`test-component/req053-spawn-throat-latch.cases.ts`,外加 `server.test.ts`、`codepuppy-sidecar-wiring.test.ts` —— 构建器要全局根,这些无快照的测试经环境给一个(R31 允许的环境那一支)。`websearch-account-tool-table.engine.cases.ts` 不必改(引擎宿主 `codepuppyEngine()` 已发布文档;它发布的 `engineConfigDirectory` 取 #1698 之前注入按环境推的那个目录,各 engine cases 写用户全局配置的位置不变)。`#1572` 真栈的驱动 `test-fixtures/net-failure/engine-driver.ts` 照 sidecar.ts 的顺序改为解析并发布启动文档、过引擎关口,`net-failure-real-stack.test.ts` 用 main 的生产构建器造这份文档 · 本段提交。
+- 2026-11-12 · 锚点:`#1578` 那条锚 server.ts 写 sidecar env 清单键的 ANCHOR 删除 —— 清单路径成了文档的类型化字段,值由构建器测试判;`#1531` 那条改锚新字符串;新增 `#1698` ANCHOR 钉 sidecar.ts 关口顺序;`source-text-anchors.ts` 同步(条数仍 2)。真引擎入口那一半加进 `sidecar-engine-host.cases.ts`(宿主条数 6 → 7);ext 未发布文档那一条加进 `plugin-setup-order.cases.ts`(宿主 1 → 2 pass)· 本段提交。
+- 2026-11-12 · 机械登记:`scripts/old-name-exceptions.tsv` 删 sidecar.ts `/Alpha` 一行(那句注释随 StartCommand 的 `initialDirectory` 字段一起删了);`scripts/gate-files.tsv` 改 `sidecar-env.test.ts` 31 → 29、登记 `bootstrap-env-readers.test.ts`(3),并把 `sidecar-bootstrap-gate.test.ts`(4)、`codepuppy-bootstrap-build.test.ts`(4)登记为受托闸门(登记簿完备性闸要求:`codepuppy-sidecar-wiring.test.ts` 与 `sidecar-env.test.ts` 的正文把判据委派给它们,`delegates_to` 同步);顺手把三处点名旧变量的注释改成文档字段(`ext/src/policy/bundled-plugin.ts`、`core/src/mcp/codepuppy-first-party-mcp.ts`、`ui-mac/electron-builder.config.ts`)· 本段提交。
+- 2026-11-12 · ext 的 `setup` 第一句读文档(`codepuppyBootstrap()`)排在 `registerPolicy` 之前:它不挂任何钩子,I3 的挂钩次序(`plugin-setup-order.cases.ts` 照判 `registerPolicy` 第一、`seal` 最后)不变 · 本段提交。
+- 2026-11-12 · 体量:实际 58 个文件(生产 20、测试与夹具 34、登记与文档 4),高于计划估的 35;多出来的是上面那批按旧通道搭环境的测试 · 本段提交。
 
 ## 段 2 — G2 平台、云与网络
 

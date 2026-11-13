@@ -1,6 +1,7 @@
 // `#1665`:ext 在 OpenCode 2 真插件宿主里(plugin-host.harness.ts)—— 每条用例装的是生产的默认导出 `CodePuppyExt`,
 // 经上游真的钩子链 / 工具注册表 / transform 服务判结果。「权威保持」类用例都带反向臂:同一个输入在**不装 ext** 的宿主里
 // 走上游默认,结论必须相反 —— 去掉我们的钩子 ⇒ 这条用例红。
+import { publishTestBootstrap, unpublishTestBootstrap } from "../../ui-mac/test-component/codepuppy-bootstrap-fixture"
 import { afterEach, beforeAll, expect } from "bun:test"
 import { createHash } from "node:crypto"
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
@@ -42,7 +43,6 @@ import * as Media from "../../ai/src/media.ts"
 import { toLLMMessages } from "../../core/src/session/runner/to-llm-message.ts"
 
 const ENV_KEYS = [
-  "CODEPUPPY_GLOBAL_DIR",
   "CODEPUPPY_LOCAL_WEBSEARCH_DENY",
   "CODEPUPPY_CLOUD_WEBSEARCH_DENY",
   "CODEPUPPY_CLOUD_MCP_ARM",
@@ -53,7 +53,6 @@ const ENV_KEYS = [
   "CODEPUPPY_FACTORY_DENY_SKILLS",
   "CODEPUPPY_PROMPT_REBRAND_DISABLE",
   "CODEPUPPY_POLICY_ACCOUNT",
-  "CODEPUPPY_EXT_BUNDLED_MANIFEST",
 ] as const
 const saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]))
 let scratch = ""
@@ -63,7 +62,8 @@ beforeAll(() => {
 })
 const env = (values: Partial<Record<(typeof ENV_KEYS)[number], string>>) => {
   for (const key of ENV_KEYS) delete process.env[key]
-  process.env.CODEPUPPY_GLOBAL_DIR = join(scratch, "global")
+  // `#1698`:全局根经 sidecar 发布的启动文档到 ext(R14:在装 ext 之前发布)
+  publishTestBootstrap({ globalRoot: join(scratch, "global") })
   Object.assign(process.env, values)
 }
 afterEach(() => {
@@ -71,6 +71,7 @@ afterEach(() => {
     if (saved[key] === undefined) delete process.env[key]
     else process.env[key] = saved[key]
   }
+  unpublishTestBootstrap()
 })
 
 const ids = {
@@ -504,7 +505,7 @@ it.live("P6 / S5:平台凭据头只对平台节点、每次现读;别的节点�
 
 /**
  * 定制中心安装的宿主:main 由一个假 parentPort 扮演(目录里有 mcp:github;请求记录查不到 —— 结局不归这里判),ext 的进程级对象
- * 在本用例里按这个 port 重建、用完复原;`manifest` 时像打包版一样经 CODEPUPPY_EXT_BUNDLED_MANIFEST 核验 ext 自己的安装工具;
+ * 在本用例里按这个 port 重建、用完复原;`manifest` 时像打包版一样经启动文档的 `paths.extBundledManifest` 核验 ext 自己的安装工具;
  * main 注入的两个 Code Puppy agent 带上决定本用例的那条规则(codepuppy-config-injection.ts 的「tool-policy-default」ask)。
  * 之后再装 ext。
  */
@@ -540,7 +541,7 @@ const hubHost = (options: { manifest: boolean }) =>
       const manifest = join(scratch, `bundled-tools-${Math.random().toString(36).slice(2)}.json`)
       const moduleSha256 = createHash("sha256").update(readFileSync(join(import.meta.dir, "policy", "index.ts"))).digest("hex")
       writeFileSync(manifest, JSON.stringify({ moduleSha256, tools: ["codepuppy_hub_install"], readable: { codepuppy_hub_install: "codepuppy:hub_install" } }))
-      process.env.CODEPUPPY_EXT_BUNDLED_MANIFEST = manifest
+      publishTestBootstrap({ globalRoot: join(scratch, "global"), extPlugin: scratch, extBundledManifest: manifest })
     }
     yield* activate({
       id: "test.injected-tier-agents",

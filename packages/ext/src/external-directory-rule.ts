@@ -29,14 +29,13 @@ const real = (dir: string) => {
   }
 }
 
-/** 这一刻的规则:先问,白名单放行。 */
-export function externalDirectoryRules(env: Record<string, string | undefined>): Rule[] {
-  const root = env.CODEPUPPY_GLOBAL_DIR
+/** 这一刻的规则:先问,白名单放行。`globalRoot` = 启动文档的 `paths.globalRoot`;`factorySkillDirs` = 出厂技能目录(JSON 数组)。 */
+export function externalDirectoryRules(globalRoot: string | undefined, factorySkillDirs: string | undefined): Rule[] {
   const allowed = [
     path.join(Path.data, "tool-output"),
     path.join(real(Path.tmp)),
-    ...injectFactorySkillPaths({}, env.CODEPUPPY_FACTORY_SKILL_DIRS),
-    ...(root ? skillGenerationLiveDirs(real(root)) : []),
+    ...injectFactorySkillPaths({}, factorySkillDirs),
+    ...(globalRoot ? skillGenerationLiveDirs(real(globalRoot)) : []),
   ].filter((dir) => path.isAbsolute(dir))
   return [
     { action: "external_directory", resource: "*", effect: "ask" },

@@ -3,6 +3,7 @@
 // (I1)→ 报告经同一个 port 回 main;Location 关掉(插件作用域释放)⇒ Cleanup 注销,之后的目录请求直接算 reloaded。
 // 宿主 plugin-reload-wiring.test.ts 在**子进程**里跑本文件:parentPort 必须在 ext 模块求值**之前**就在(与 sidecar 预载一样)。
 // 这里只替换 Electron 的 parentPort 与 sidecar 发布的进程内 fetch(引擎的那两条路由)。
+import { publishTestBootstrap } from "../../ui-mac/test-component/codepuppy-bootstrap-fixture"
 import { expect } from "bun:test"
 import { mkdirSync, mkdtempSync, realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -25,7 +26,8 @@ const deliver = (data: unknown) => listeners.forEach((listener) => listener({ da
 
 const global = join(realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-plugin-reload-wiring-"))), "codepuppy-state", "env", "dev")
 mkdirSync(global, { recursive: true })
-process.env.CODEPUPPY_GLOBAL_DIR = global
+// R14:与下面 publishInProcessEngine 同样的写法 —— 在 import ext 之前,本进程发布 sidecar 会发布的启动文档
+publishTestBootstrap({ globalRoot: global })
 
 const engine = { busy: true, reloads: 0, headers: [] as Array<[string | null, string | null]> }
 publishInProcessEngine(async (request) => {

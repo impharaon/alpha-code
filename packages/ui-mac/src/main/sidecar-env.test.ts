@@ -506,27 +506,26 @@ describe("createSidecarEnv — SECRETISH word boundary (#605)", () => {
 // ADR-028 name CODEPUPPY_LEGACY_INSTALL_ROOT as the documented rollback surface. Forwarding them (route
 // 1) is therefore the fix; deleting the sidecar read (route 2) would leave main in legacy mode while
 // the sidecar kept injecting — req053 设计稿 §风险8「逃生舱错位」exactly.
-describe("createSidecarEnv — escape switches the sidecar itself reads (#606)", () => {
-  for (const name of ["CODEPUPPY_JSONC_TRUTH_DISABLE", "CODEPUPPY_LEGACY_INSTALL_ROOT"]) {
-    test(`${name}=1 reaches the sidecar env`, () => {
-      const env = createSidecarEnv({ [name]: "1", PATH: "/usr/bin" })
-      expect(env[name]).toBe("1")
-    })
-  }
+// `#1698`(DESIGN-upgrade-bootstrap-config §4.5):#606 的「main 与 sidecar 同口径」改由启动文档保证 —— 两个逃生阀与全局根不再经环境
+// 过河,main 判一次写进文档(paths.userConfig 缺席 / paths.globalRoot,codepuppy-bootstrap-build.test.ts)。这里判它们**不**进 sidecar env,
+// 写进 CODEPUPPY_ENV_ALLOWLIST_EXTRA 也不进(前缀拒绝排在 EXTRA 之前);其余行为不受影响。
+describe("createSidecarEnv — Code Puppy decisions do not cross through the environment (#1698 G1)", () => {
+  const migrated = ["CODEPUPPY_GLOBAL_DIR", "CODEPUPPY_JSONC_TRUTH_DISABLE", "CODEPUPPY_LEGACY_INSTALL_ROOT", "CODEPUPPY_OFFICE_MCP_MANIFEST", "CODEPUPPY_EXT_BUNDLED_MANIFEST"]
 
-  test("both switches are forwarded together, and neither is credential-shaped", () => {
+  test("the G1 keys are dropped — also when listed in CODEPUPPY_ENV_ALLOWLIST_EXTRA, and in any casing", () => {
     const env = createSidecarEnv({
-      CODEPUPPY_JSONC_TRUTH_DISABLE: "1",
-      CODEPUPPY_LEGACY_INSTALL_ROOT: "1",
-      CODEPUPPY_GLOBAL_DIR: "/Users/u/.alpha",
+      ...Object.fromEntries(migrated.map((name) => [name, "/Users/u/value"])),
+      codepuppy_global_dir: "/Users/u/lower",
+      CODEPUPPY_ENV_ALLOWLIST_EXTRA: [...migrated, "codepuppy_global_dir", "MY_TOOL_HOME"].join(","),
+      MY_TOOL_HOME: "/opt/tool",
+      PATH: "/usr/bin",
       CODEPUPPY_API_KEY: "jwt",
     })
-    expect(env.CODEPUPPY_JSONC_TRUTH_DISABLE).toBe("1")
-    expect(env.CODEPUPPY_LEGACY_INSTALL_ROOT).toBe("1")
-    expect(isSecretish("CODEPUPPY_JSONC_TRUTH_DISABLE")).toBe(false)
-    expect(isSecretish("CODEPUPPY_LEGACY_INSTALL_ROOT")).toBe(false)
-    // adding them must not have disturbed anything else on the path
-    expect(env.CODEPUPPY_GLOBAL_DIR).toBe("/Users/u/.alpha")
+    for (const name of [...migrated, "codepuppy_global_dir"]) expect(env).not.toHaveProperty(name)
+    // EXTRA itself still passes and still admits a non-Code-Puppy name; the credential veto is untouched
+    expect(env.CODEPUPPY_ENV_ALLOWLIST_EXTRA).toBeDefined()
+    expect(env.MY_TOOL_HOME).toBe("/opt/tool")
+    expect(env.PATH).toBe("/usr/bin")
     expect(env.CODEPUPPY_API_KEY).toBeUndefined()
   })
 })
@@ -607,14 +606,12 @@ describe("createSidecarEnv — container-valued vars", () => {
       CODEPUPPY_IDENTITY_DISABLE: "1",
       CODEPUPPY_BEHAVIOR_DISABLE: "1",
       CODEPUPPY_CLOUD_MCP_URL: "https://mcp.example",
-      CODEPUPPY_GLOBAL_DIR: "/Users/u/.alpha",
     })
     expect(env.OPENCODE_CONFIG).toBe("/Users/u/.alpha/codepuppy.jsonc")
     expect(env.OPENCODE_CONFIG_DIR).toBeDefined()
     expect(env.CODEPUPPY_IDENTITY_DISABLE).toBe("1")
     expect(env.CODEPUPPY_BEHAVIOR_DISABLE).toBe("1")
     expect(env.CODEPUPPY_CLOUD_MCP_URL).toBe("https://mcp.example")
-    expect(env.CODEPUPPY_GLOBAL_DIR).toBe("/Users/u/.alpha")
   })
 })
 

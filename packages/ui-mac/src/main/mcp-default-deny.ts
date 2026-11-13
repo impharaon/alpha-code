@@ -9,6 +9,7 @@
 // engineGlobalConfigDirectory,同一个函数)。读取/解析逐文件 best-effort,任何坏文件只
 // loud 跳过自身,不得把 sidecar 上方已经完成的 provider/identity/permission 注入一起炸掉。
 
+import { tryCodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
@@ -52,7 +53,8 @@ export function injectMcpDefaultDeny(
     // 编排器 R1 跟进第 1 条:codepuppy.jsonc 经显式文件原样交给引擎,它的 server 名单与类型同样按上游归一化的规则取 ——
     // 否则原生 `mcp.servers.<name>` 里的远程条目绕过下面 `#1381` 的中和。
     const codepuppyMcp = engineMcpServers(alpha)
-    const userConfigDir = options.userConfigDir ?? engineGlobalConfigDirectory(process.env, homedir())
+    // `#1698`(design §4.3):sidecar 里读 main 算好的那个目录(启动文档),不按自己的环境重算;没有文档的只剩直接调注入的测试。
+    const userConfigDir = options.userConfigDir ?? tryCodePuppyBootstrap()?.paths.engineConfigDirectory ?? engineGlobalConfigDirectory(process.env, homedir())
     // 审计 R1 第 2 条:用户全局文件里的 server 名单按上游归一化的规则取 —— 2.x 原生的 `mcp.servers.<name>` 与 v1 的
     // `mcp.<name>` 都认(见 engineMcpServers)。
     const globalNames = new Set(

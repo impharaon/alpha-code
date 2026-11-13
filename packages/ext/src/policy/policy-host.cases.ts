@@ -10,6 +10,7 @@
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
+import { publishTestBootstrap } from "../../../ui-mac/test-component/codepuppy-bootstrap-fixture"
 
 export const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-policy-host-"))
 const ISOLATED: Record<string, string> = {
@@ -33,6 +34,8 @@ export function isolate() {
     process.env[key] = value
   }
   if (!process.env.XDG_DATA_HOME?.startsWith(ROOT)) throw new Error("policy host: isolated XDG_DATA_HOME was not applied")
+  // `#1698`:registerPolicy 从 sidecar 发布的启动文档读随包清单与 Office 清单的路径;这里发布一份(都不在场 = 不给声明)
+  publishTestBootstrap({ globalRoot: path.join(ROOT, "state") })
 }
 isolate()
 

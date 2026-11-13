@@ -13,6 +13,7 @@
 // 本文件只钉登记形状、判官与跨包前提(③e / ③f)。
 // 已知不覆盖:项目自己的 plugins / codepuppy.jsonc(用户的字);skills 正文与 MCP 工具表(别人的字)。
 
+import { publishTestBootstrap, unpublishTestBootstrap } from "../../ui-mac/test-component/codepuppy-bootstrap-fixture"
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -116,7 +117,6 @@ const SANITIZE = [
   "CODEPUPPY_FACTORY_DENY_SKILLS",
   "CODEPUPPY_PROMPT_REBRAND_DISABLE",
   "CODEPUPPY_EXT_VERBOSE",
-  "CODEPUPPY_GLOBAL_DIR",
   // `#1419`:云端识图的三个输入 —— 没有它们时 context 钩子走「云端不可用」那一句与失败块。
   "CODEPUPPY_BASE_URL",
   CLOUD_MCP_ARM_ENV,
@@ -138,7 +138,7 @@ beforeEach(() => {
     saved.set(k, process.env[k])
     delete process.env[k]
   }
-  process.env.CODEPUPPY_GLOBAL_DIR = global
+  publishTestBootstrap({ globalRoot: global })
 })
 afterEach(() => {
   for (const k of SANITIZE) {
@@ -146,6 +146,7 @@ afterEach(() => {
     if (v === undefined) delete process.env[k]
     else process.env[k] = v
   }
+  unpublishTestBootstrap()
   rmSync(root, { recursive: true, force: true })
 })
 

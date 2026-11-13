@@ -9,6 +9,7 @@
 // CodePuppyExt 之后,钩子链上没有任何 shell 钩子,env 不多那两个键,global root 下不产出 bin/ 与 sandbox/。
 // 反向自证(控制组):另一个插件挂上 shell 钩子 ⇒ 同一个探针看得见 —— 证明判据不是恒绿。
 
+import { publishTestBootstrap, unpublishTestBootstrap } from "../../ui-mac/test-component/codepuppy-bootstrap-fixture"
 import { afterEach, beforeEach, expect } from "bun:test"
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -19,21 +20,19 @@ import CodePuppyExt from "./plugin"
 import { activate, it } from "./plugin-host.harness"
 
 let root = ""
-let previousGlobalDir: string | undefined
+let global = ""
 
 beforeEach(() => {
   root = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-noshell-")))
-  const global = join(root, "global", "env", "dev")
+  global = join(root, "global", "env", "dev")
   mkdirSync(global, { recursive: true })
-  previousGlobalDir = process.env.CODEPUPPY_GLOBAL_DIR
-  process.env.CODEPUPPY_GLOBAL_DIR = global
+  publishTestBootstrap({ globalRoot: global })
   delete process.env.CODEPUPPY_SB_PROFILE
   delete process.env.CODEPUPPY_REAL_SHELL
 })
 
 afterEach(() => {
-  if (previousGlobalDir === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
-  else process.env.CODEPUPPY_GLOBAL_DIR = previousGlobalDir
+  unpublishTestBootstrap()
   delete process.env.CODEPUPPY_SB_PROFILE
   delete process.env.CODEPUPPY_REAL_SHELL
   rmSync(root, { recursive: true, force: true })
@@ -46,7 +45,6 @@ it.live("AC2:装上 ext 之后钩子链上没有 shell 钩子,env 不多 wrapper
     expect(yield* hooks.has("shell", "create.before")).toBe(false)
     expect(process.env.CODEPUPPY_SB_PROFILE).toBeUndefined()
     expect(process.env.CODEPUPPY_REAL_SHELL).toBeUndefined()
-    const global = process.env.CODEPUPPY_GLOBAL_DIR!
     expect(() => realpathSync(join(global, "bin"))).toThrow()
     expect(() => realpathSync(join(global, "sandbox"))).toThrow()
   }),

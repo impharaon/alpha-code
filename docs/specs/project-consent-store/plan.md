@@ -164,3 +164,4 @@ last_reviewed: 2026-11-13
 - 2026-11-13 · 审计 Minor 1:写端把任何读失败都当「坏文件」从空重写 ⇒ 读端的失败分出 `malformed`(读出来但形状不对),只有它从空开始;I/O 错误与符号链接拒写、走「未能保存」;单测用 `chmod 000`(EACCES)造真读错 · 审计修复第 2 个提交。
 - 2026-11-13 · 审计 Minor 2 / 3(只改测试):`project-config.test.ts` 的「prefs.json 链到真记录」那一臂失败不了 ⇒ 拆成单独一条,链到状态目录里一份写着 `extensionsConsent.granted: true` 的文件;`plugin-host.test.ts` 同意用例撤销之后补第三个消费方(explore 的 edit 回到 deny)· 审计修复第 3 个提交。
 - 2026-11-13 · 审计范围补充(编排器裁入):`listProjectExecutables` 加上写了控制字段的 agent(与 ext 剥掉的同一份 `AGENT_CONTROL_FIELDS`,常量从 ext 挪到 `codepuppy-ext-trust.ts`),只有这类内容的项目也弹框,清单多一行「· Agent 设置:<名>(<字段>)」;架构说明把「原路径重建 inode 会变」限定为 APFS 实测,FAT / exFAT / 网络卷记为限制 · 审计修复第 4 个提交。
+- 2026-11-13 · owner 批准确认框改动并改一处措辞(编排器转达):清单新行的标签「Agent 设置」改为「Agent 的权限与模型设置」,免得与未改的「技能 / Agent / 命令等文本类扩展不受影响」读成矛盾;确认框其余不变,确认框文案未本地化(主进程硬编码中文),无 zh / en 键可改 · 措辞提交。

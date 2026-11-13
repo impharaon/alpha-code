@@ -30,6 +30,15 @@ the authority for exact behavior.
 > Verify exact variants/states against the component CSS and `gallery.html`
 > before relying on them — the table names the axes, the code is authoritative.
 
+## Pending — designed, not yet in code
+
+Approved designs whose component does not exist in `codepuppy-ui/` yet. When the
+implementation lands, move the row into the table above and add its gallery swatch.
+
+| Component | Design | Role | Variants · states |
+| --- | --- | --- | --- |
+| **RiskTag** (风险标签) | [`2026-11-13-1314-risk-tag/`](../2026-11-13-1314-risk-tag/frame.html) | read-only pill naming how risky an action or capability is; shared by the tool-approval panel header and the capability-authorize rows (replaces `.codepuppy-ext-authz-chip[data-kind="risk"]`) | `data-level` = `low` / `medium` / `high` / `critical` / `unknown`; one size; static only (not focusable, no hover); tokens `--a-success/warning/error-subtle`, `--a-bg-muted`, `--a-text-tertiary`, `--a-text-secondary`, `--a-border-strong`, `--a-*-on-subtle` (two pending, see [`tokens.md`](tokens.md)) |
+
 ## Composition surfaces (page-level, not primitives)
 
 `codepuppy-composer.tsx` + `codepuppy-composer.css` / `composer-shell.css` (the input

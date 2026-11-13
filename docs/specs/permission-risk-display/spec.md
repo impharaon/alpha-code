@@ -3,12 +3,12 @@ id: SPEC-permission-risk-display
 title: 用户在授权时能看出动作的风险档位
 summary: 用户在授权时能看出动作的风险档位，保留历史条款、有效裁决和交付证据边界。
 kind: spec
-status: draft
-version: 0
-approved_by: ""
-approved_at: ""
+status: approved
+version: 1
+approved_by: owner
+approved_at: 2026-11-13
 owners: [owner]
-last_reviewed: 2026-11-12
+last_reviewed: 2026-11-13
 ---
 
 # 用户在授权时能看出动作的风险档位
@@ -53,9 +53,16 @@ last_reviewed: 2026-11-12
 
 alpha-code#1314 在原有授权框范围内形成风险档位/unknown 的增量界面基线，与既有 AC 一次审定后直接实施；不重开分类引擎设计。
 
+## 体验约定
+- 用户路径:工具请求授权时,批准面板标题后出现一个风险标签;定制中心的能力授权框里,高风险的能力行在技术名之后出现同一个标签。
+- 交互与状态:标签是一个胶囊加文字,没有图标,只有一种尺寸,不能点、不能聚焦;所在行变淡时跟着变淡。五档:低风险(绿)、中风险(灰)、高风险(琥珀)、极高风险(红)、风险未知(只描边、不填色,不渲染成低危)。批准面板五档都会出现并保留「极高风险」那句说明;能力授权框只用「高风险」一档,新增行与已授权行都标,将收回的不标。第三方远程工具常显示「高风险」是分类规则的现状,本规格不改分类。
+- 文案:只有档位名五个词;不解释原因。
+- 设计稿:alpha-code `a559317fc6`(分支 `design/1314-permission-risk-display`)——现行稿 `docs/design/current/conversation-timeline/design.html#permission-risk`、`docs/design/current/capability-authorize/design.html`;组件稿 `docs/design/2026-11-13-1314-risk-tag/frame.html`(含改前改后:浅色主题下「低风险」「高风险」文字加深到对比度 6.2;能力授权框的「高风险」「新增」「将收回」同样加深)。「风险标签」是组件库新增组件(已登记待定),批准面板与能力授权框共用。
+
 ## 批准记录
 
 | 版本 | 日期 | 批准人 | 原话或链接 |
 | --- | --- | --- | --- |
 | 0 | 2026-11-10 | — | 整理历史来源；尚未作为当前批准基线。 |
 | 0 | 2026-11-12 | — | 已核对历史范围与实际证据；具体缺口见待决，由来源中的交付入口承接。 |
+| 1 | 2026-11-13 | owner | 「设计搞的内容我都通过」;三个选择「都按照你的建议」;组件化后的改前改后与规格批准:「就必要就继续。继续吧。」(alpha-work INT-safety originals U-03、U-07) |

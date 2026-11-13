@@ -166,10 +166,10 @@ body{margin:0;font-family:var(--a-font-sans);background:var(--a-bg-subtle);color
   background:var(--a-bg-muted);border:1px solid var(--a-border-faint);padding:1px 6px;border-radius:5px;flex:none}
 .codepuppy-ext-authz-chip{flex:none;font-size:var(--a-text-2xs);font-weight:var(--a-weight-medium);
   padding:2px 7px;border-radius:var(--a-radius-full);letter-spacing:var(--a-tracking-wide)}
-.codepuppy-ext-authz-chip[data-kind="new"]{background:var(--a-warning-subtle);color:var(--a-warning)}
+.codepuppy-ext-authz-chip[data-kind="new"]{background:var(--a-warning-subtle);color:var(--a-warning-on-subtle)}
 .codepuppy-ext-authz-chip[data-kind="granted"]{background:var(--a-bg-muted);color:var(--a-text-tertiary)}
-.codepuppy-ext-authz-chip[data-kind="removed"]{background:var(--a-success-subtle);color:var(--a-success)}
-.codepuppy-ext-authz-chip[data-kind="risk"]{background:var(--a-warning-subtle);color:var(--a-warning)}
+.codepuppy-ext-authz-chip[data-kind="removed"]{background:var(--a-success-subtle);color:var(--a-success-on-subtle)}
+/* 「高风险」改用共享组件风险标签 .a-risk-tag(见文件末尾;2026-11-13)。 */
 .codepuppy-ext-authz-item{display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--a-bg-subtle);
   font-size:var(--a-text-xs);font-weight:var(--a-weight-medium);color:var(--a-text-secondary)}
 .codepuppy-ext-authz-item + .codepuppy-ext-authz-item,.codepuppy-ext-authz-cap + .codepuppy-ext-authz-item{border-top:1px solid var(--a-border-faint)}
@@ -200,3 +200,11 @@ body[data-notes="on"] .proto-notes{display:flex}
 .replay button{border:1px dashed var(--a-border-strong);background:var(--a-surface);color:var(--a-text-secondary);
   font:inherit;font-size:var(--a-text-sm);padding:8px 16px;border-radius:var(--a-radius-md);cursor:pointer}
 .replay .hint{position:absolute;bottom:70px;left:0;right:0;text-align:center;font-size:var(--a-text-xs);color:var(--a-text-tertiary)}
+
+/* ── 2026-11-13:「高风险」改用共享组件「风险标签」(定义见 ../../2026-11-13-1314-risk-tag/frame.html)──
+   浅色主题下琥珀 / 绿色文字落在同色浅底上只有 2.8:1 / 2.9:1,改用 -on-subtle 文字色(6.2:1);
+   --a-warning-on-subtle、--a-success-on-subtle 是组件稿提议的新令牌(docs/design/system/tokens.md 待定表)。 */
+:root{--a-warning-on-subtle:#92400e;--a-success-on-subtle:#166534}
+html[data-theme="dark"]{--a-warning-on-subtle:#fbbf24;--a-success-on-subtle:#4ade80}
+.a-risk-tag{flex:none;padding:2px 7px;border-radius:var(--a-radius-full);font-size:var(--a-text-2xs);font-weight:var(--a-weight-medium);line-height:var(--a-leading-snug);letter-spacing:var(--a-tracking-wide);white-space:nowrap}
+.a-risk-tag[data-level="high"]{background:var(--a-warning-subtle);color:var(--a-warning-on-subtle)}

@@ -1,14 +1,14 @@
 ---
 id: DESIGN-unattended-run-permissions
 title: 没人在场的任务不再空等批准 技术设计
-summary: 桌面主进程记着「此刻正在跑的无人值守会话」(本地自动化运行与一句话解析),扩展只在会话带指针、且经既有的主进程↔引擎进程窄消息确认在册时,按自动化载体档位当场裁决(标准档放行未停用的工具,含「每次询问」;只读档与身份变化、已停用一律拒绝),其余询问一律立即拒绝;拒绝原因经结构化字段或引擎已记的拒绝类型由调度器写进运行记录,Code Mode 里的拒绝由扩展补到外层结果上;运行期间连接器的补充信息请求带项目目录立即取消;不改任何上游文件
+summary: 桌面主进程记着「此刻正在跑的无人值守会话」(本地自动化运行与一句话解析),每次变动把完整名单经既有的主进程↔引擎进程窄消息推给扩展,扩展确认装上(带随机回执)后主进程才发出任务;扩展按本地名单同步裁决,在册会话按自动化载体档位当场决定(标准档放行未停用的工具,含「每次询问」;只读档与身份变化、已停用一律拒绝),其余询问一律立即拒绝;拒绝原因经结构化字段或引擎已记的拒绝类型由调度器写进运行记录,Code Mode 里的拒绝由扩展补到外层结果上;运行期间连接器的补充信息请求带项目目录立即取消;不改任何上游文件
 kind: tech-design
 status: draft
 spec: SPEC-unattended-run-permissions
-spec_version: 1
+spec_version: 2
 review:
-  rounds: 1           # R1:Codex gpt-6.1-sol xhigh,会话 01a1d2c7,只读,审 46ce5f39f6;BLOCK,1 Blocker + 6 Major,处置见 §10
-  reviewed_sha: "46ce5f39f6"
+  rounds: 2           # R1 Codex gpt-6.1-sol xhigh 会话 01a1d2c7,审 46ce5f39f6,BLOCK 1+6;R2 确认轮 会话 01a1d2de,审 3b94f766ea,BLOCK 1+2;处置见 §10
+  reviewed_sha: "3b94f766ea"
   verdict: ""
 owners: [owner]
 last_reviewed: 2026-11-13
@@ -21,8 +21,8 @@ review_after: 2027-05-13
 
 ## 1. 基线
 
-- Spec:[SPEC-unattended-run-permissions v1](https://github.com/impharaon/alpha-code/blob/c01ea14919/docs/specs/unattended-run-permissions/spec.md) @ `c01ea14919`(owner 2026-11-12 批准,规格「批准记录」v1)。
-- 覆盖:AC-01 至 AC-08(BR-01 至 BR-06)。BR-06 需要的两句文案规格里没有,见 §10 G-1(补充信息)、G-3(固定拒绝)。
+- Spec:[SPEC-unattended-run-permissions v2](https://github.com/impharaon/alpha-code/blob/8573c17dd8/docs/specs/unattended-run-permissions/spec.md) @ `8573c17dd8`。v1 @ `c01ea14919` 由 owner 2026-11-12 批准;v2 只补体验约定两句文案与 BR-06 措辞,owner U-17 批准。
+- 覆盖:AC-01 至 AC-08(BR-01 至 BR-06)。
 - 背景:INT-upstream-upgrade-readiness I-11;BR-02 的 owner 裁决「放行」。规格的现状盘点基于 `engine/1662-opencode2` @ `713727444b`;本文的事实全部在 `origin/alpha` @ `c01ea14919` 上重核(§2),与盘点不同的一处:项目外目录的「先问」已改为扩展的 agent 变换,且只加给 `build` 与 `codepuppy-ask`(P-04),自动化载体仍是配置里的 deny。
 
 ## 2. 地面真相
@@ -37,16 +37,16 @@ review_after: 2027-05-13
 | P-04 | 两个自动化载体:`tool-policy-default: ask`;`read *.env*`、`external_directory`、`question`、`subagent`、`doom_loop` 为 deny;agent 底座 `"*": "allow"`。项目外目录的 ask 只加给 `build`、`codepuppy-ask`。 | `packages/ui-mac/src/main/codepuppy-config-injection.ts:356-378`、`:464-519`;`packages/schema/src/agent.ts:46-51`;`packages/ext/src/external-directory-rule.ts:19-20` |
 | P-05 | 询问的三种来源:非内置工具的类别默认是 ask(`reason: default`),`tool-policy-default: ask` 不豁免它;用户设「每次询问」(`reason: user`);用户启用后服务定义变了(`reason: binding-changed`)。停用 = `reason: user` 的 deny;管控/授权/隔离/身份无效是另几种 deny。 | `packages/schema/src/codepuppy-tool-policy.ts:164-166`;`packages/ext/src/policy/catalog.ts:34`、`:49-50`;`packages/ext/src/policy/resolver.ts:61-70`、`:111-144` |
 | P-06 | 扩展的闸:链首 `decide`(deny 即具名拒绝)、链尾 `confirm`(身份轴 `permission.assert`,带 `metadata.policy`)、`permission.evaluate` 钩子对 Code Puppy 自己的询问 `holdAsk`(后注册的钩子只能改成 deny)。装扩展工具另有一个 evaluate 钩子,按 agent 前缀 `codepuppy-automation` 判 deny、否则判 ask,注册在策略之后。 | `packages/ext/src/policy/gate.ts:122-167`、`:227-238`;`packages/ext/src/policy/index.ts:145-147`、`:167-182`、`:203-216`;`packages/ext/src/hub-tools.ts:47`、`:56-59` |
-| P-07 | 调度器建会话只带 `location/title/agent/model`,不带 metadata;回合结局读最新 `idle`;失败摘要写 `summary` 与 `status.json`;运行历史行显示 `summary`。载体名取自 `AUTOMATION_DEFAULTS`,面板按档位选。全局并发 1。 | `packages/ui-mac/src/main/automation-scheduler.ts:123`、`:165`、`:270-279`、`:307-331`;`packages/ui-mac/src/main/engine-session-turn.ts:14-28`;`packages/ui-mac/src/shared/automation-types.ts:13-24`、`:105-107`;`packages/ui-mac/src/renderer/automations/automation-panel.tsx:296`、`:809-810` |
+| P-07 | 调度器建会话只带 `location/title/agent/model`,不带 metadata;回合结局读最新 `idle`;失败摘要写 `summary` 与 `status.json`;运行历史行显示 `summary`。载体名取自 `AUTOMATION_DEFAULTS`,面板按档位选。全局并发 1。既有失败码 `automation-run-not-ready` 的界面文案是「应用未就绪,本次未运行」;一句话解析的既有失败码 `automation-parse-unavailable` 文案「AI 暂不可用」。 | `packages/ui-mac/src/main/automation-scheduler.ts:123`、`:165`、`:240-242`、`:270-279`、`:307-331`;`packages/ui-mac/src/main/engine-session-turn.ts:14-28`;`packages/ui-mac/src/shared/automation-types.ts:13-24`、`:72`、`:105-107`;`packages/ui-mac/src/renderer/automations/automation-panel.tsx:296`、`:809-810`;`packages/ui-mac/src/renderer/i18n/zh.ts:152`、`:163` |
 | P-08 | 一句话解析建临时会话不带 agent(引擎默认 agent `build`,允许 `subagent`),结束删会话。 | `packages/ui-mac/src/main/automation-llm.ts:52`、`:58`、`:78-95`;`packages/core/src/plugin/agent.ts:56-61`、`packages/schema/src/agent.ts:46-51` |
 | P-09 | 项目文档里的命令可带 `agent:`,执行时先以会话当前 agent 判一次 `subagent`,再 `switchAgent` —— 「全部批准」档(`build`)直接放行。「全部批准」档提交不带 agent,会话保持原 agent。`subagent` 工具拒绝 `mode: primary` 的 agent(两个载体都是 primary)。 | `packages/core/src/config/plugin/command.ts:115-131`;`packages/ui-mac/src/renderer/codepuppy-ui/composer-state.ts:45-49`;`packages/core/src/tool/plugin/subagent.ts:142-143` |
-| P-10 | **(R1 订正)** 会话 metadata 谁都写得进:渲染进程的 `POST /api/session` 原样直通(可带 `agent`、`metadata`),服务端照收;插件可 `session.update`;子会话与分叉复制父会话的 `agent` 与 `metadata`。项目插件拿到的 `permission` 被代理,`reply` 被拒(原稿「插件本来就能 reply」不成立)。引擎 API 的口令只在 main。 | `packages/ui-mac/src/engine-adapter/routes.ts:554`、`:559`;`packages/server/src/handlers/session.ts:102-116`;`packages/plugin/src/promise/adapter.ts:639`;`packages/core/src/session.ts:313`;`packages/core/src/session/projector.ts:175-177`;`packages/ext/src/plugin-fanout.ts:130-150`;`packages/ui-mac/src/main/engine-client.ts:2`、`server.ts:743-746` |
+| P-10 | 会话 metadata 谁都写得进、也删得掉:渲染进程的 `POST /api/session` 原样直通(可带 `agent`、`metadata`),服务端照收;插件可 `session.update`,metadata 整体替换;子会话与分叉复制父会话的 `agent` 与 `metadata`。项目插件拿到的 `permission` 被代理,`reply` 被拒。引擎 API 的口令只在 main。 | `packages/ui-mac/src/engine-adapter/routes.ts:554`、`:559`;`packages/server/src/handlers/session.ts:102-116`;`packages/plugin/src/promise/adapter.ts:639`;`packages/core/src/session/projector.ts:175-177`、`:984-986`;`packages/core/src/session.ts:313`;`packages/ext/src/plugin-fanout.ts:130-150`;`packages/ui-mac/src/main/engine-client.ts:2`、`server.ts:743-746` |
 | P-11 | 链上 `Tool.Error` 的 `metadata` 原样落到失败工具的 `state.metadata`(`namedDeny` 的 `codepuppyDisplay` 走的就是这条)。 | `packages/core/src/session/runner/step.ts:124-128`;`packages/core/src/session/runner/publish-llm-event.ts:109-113`、`:350-364`;`packages/schema/src/session-message.ts:156-163`;`gate.ts:80-85` |
 | P-12 | 带类型的拒绝(`BlockedError`、`Tool.Error`)是模型看得到的工具失败,回合继续;只有 `DeclinedError` / `CancelledError`(含包在 `Tool.Error.error` 里的)结束这一步,而这两个类只有引擎自己能造出。 | `packages/core/src/session/model-request.ts:418-436`;`step.ts:218-283`;`permission.ts:345-351` |
 | P-13 | 补充信息未答复 ⇒ 答给连接器 `{ action: "cancel" }`;取消接口的 `sessionID` 参数是普通字符串。 | `packages/core/src/mcp/index.ts:328-395`;`packages/protocol/src/groups/session.ts:780-783` |
 | P-14 | 已批准契约:`[codepuppy:<code>]` 失败码前缀「不新增生产方」。 | `docs/specs/upgrade-fewer-takeovers/design.md:189-195`(契约 C) |
 | P-15 | 设置 → 工具 用 `identity.name` 标示一个工具。 | `packages/ui-mac/src/renderer/codepuppy-ui/settings-tools.tsx:560`、`:596` |
-| P-16 | 主进程↔引擎进程(Electron utilityProcess 的 `parentPort`)已有一族 `codepuppy.*` 窄消息,一份合同、穷举、build/parse 成对、parse 失败即丢;ext 侧已有按 id 记账、带超时的请求簿记;main 侧在 `child.on("message")` 上挂 `codepuppySidecar.receive(message, post)`。发往 ext 的消息只来自 main;ext → main 的消息只做只读查询(S12)。 | `packages/ui-mac/src/main/codepuppy-sidecar-messages.ts:1-18`;`packages/ext/src/hub-bridge.ts:46-110`、`:147-149`;`packages/ui-mac/src/main/server.ts:128-131`、`:579-580` |
+| P-16 | 主进程↔引擎进程(Electron utilityProcess 的 `parentPort`)已有一族 `codepuppy.*` 窄消息,一份合同、穷举、build/parse 成对、parse 失败即丢。发往引擎进程的消息只来自 main;引擎进程里任何 JS 都能经正常 API 向 main 发消息(S12),main 不区分发送者。ext 侧按共享、自增的数字 id 结算请求的应答。ext 的 `parentPort` 监听在模块求值时挂上,为进程级单例;main 在引擎进程就绪时 `attach`。 | `packages/ui-mac/src/main/codepuppy-sidecar-messages.ts:1-18`;`packages/ext/src/hub-bridge.ts:46-110`、`:147-149`;`packages/ext/src/plugin.ts:49`;`packages/ui-mac/src/main/server.ts:128-131`、`:577-580`、`:679` |
 | P-17 | MCP 工具默认进 Code Mode;子调用用外层调用的 `context`,所以子调用的 `execute.before/after` 带外层调用的 `id`;子调用失败变成给程序的 `ToolFailure`,外层结果是成功形状,metadata 只有 `toolCalls`(每行 `tool/status/input`)与 `error`,子调用的 metadata 丢失。ext 已在 `execute.after` 改写调用终态的 metadata。 | `packages/core/src/tool/mcp.ts:67`;`packages/core/src/codemode/tool.ts:30-43`、`:146-152`、`:175-192`;`packages/core/src/tool.ts:127`、`:151`;`packages/ext/src/policy/display.ts:64-104`;`packages/ext/src/policy/index.ts:221-226`;`packages/ext/src/policy/identity.ts:77`(`CODE_MODE_TOOL = "execute"`) |
 | P-18 | 已配置的 deny(及插件钩子给的 deny)在工具失败上记为 `state.error.type === "permission.rejected"`:`toSessionError` 逐层拆开 `ToolFailure.error` / `Tool.Error.error`,`BlockedError` ⇒ `permission.rejected`。例:读 `.env` 被拒,`read` 包成 `ToolFailure({ message: "Unable to read …", error: BlockedError })`,落盘类型仍是 `permission.rejected`。 | `packages/core/src/session/to-session-error.ts:79-87`;`packages/core/src/tool/plugin/read.ts:160-170` |
 | P-19 | `sessionID === "global"` 的表单请求不查会话行,按查询参数 `location[directory]`、请求头 `x-opencode-directory`、否则引擎进程 cwd 定位;桌面引擎进程的 cwd 是 scratch 目录;客户端以 `{ location: { directory } }` 传位置。 | `packages/server/src/middleware/form-location.ts:26-31`;`packages/server/src/location.ts:71-79`;`packages/ui-mac/src/main/server.ts:551`;`packages/ui-mac/src/engine-adapter/routes.ts:62` |
@@ -55,14 +55,15 @@ review_after: 2027-05-13
 未核实(有界;plan 的证明表各给一条能失败的证据后即止):
 
 - U-1 `session.form.cancel` 带 `location[directory]` 与 `sessionID: "global"` 端到端取消得了项目里的表单(参数、所有权、定位都已读,未实跑)。
-- U-2 闸内裁决含一次 `parentPort` 往返,耗时 < 1 s(本机进程间消息,推断,未量)。
+- U-2 闸内裁决 < 1 s:R2 后判定只读进程内名单,没有进程间往返(推断,未量)。
 - U-3 Promise 插件 `execute.before` 抛出的 `Tool.Error` 的 `metadata` 经适配器到达 `state.metadata`(P-11 是引擎侧;适配器 `adapter.ts:680-689` 对 `Tool.Error` 原样返回,推断成立)。
+- U-4 引擎进程里 `process.parentPort` 的 `message` 事件在一次同步派发里依次调用全部监听者(Electron 的 `parentPort` 是 EventEmitter,推断)。§4.2 回执「不早于装上」靠这一条;不成立时最坏只是那次运行退回今天的询问路径,不会放宽。
 
 ## 4. 接口契约
 
 ### 4.1 共享定义(schema)
 
-自动化载体、指针、拒绝原因与文案的唯一出处。新文件 `packages/schema/src/codepuppy-unattended.ts`:Code Puppy 自有(north-star 结构谓词:`origin/dev` 无此路径 ∧ basename `codepuppy-*`),只有纯数据与纯函数,与 `codepuppy-tool-policy.ts`、`codepuppy-net-failure.ts` 同包同形。
+自动化载体、拒绝原因与文案的唯一出处。新文件 `packages/schema/src/codepuppy-unattended.ts`:Code Puppy 自有(north-star 结构谓词:`origin/dev` 无此路径 ∧ basename `codepuppy-*`),只有纯数据与纯函数,与 `codepuppy-tool-policy.ts`、`codepuppy-net-failure.ts` 同包同形。
 
 ```ts
 import { Schema } from "effect"
@@ -76,10 +77,6 @@ export type AutomationAgentID = keyof typeof AUTOMATION_PROFILES
 /** "none":在册但不是载体(一句话解析跑引擎默认 agent),或运行中途 agent 被换掉。 */
 export type UnattendedProfile = (typeof AUTOMATION_PROFILES)[AutomationAgentID] | "none"
 
-/** 会话 metadata 键 —— 只是指针:告诉 ext「值得去问 main」,本身不授予任何东西(§4.2)。 */
-export const UNATTENDED_SESSION_KEY = "codepuppyUnattended"
-export const UnattendedPointer = Schema.Struct({ version: Schema.Literal(1) })
-
 /** 拒绝原因键:写在工具调用终态的 metadata 上,运行记录据它写原因。 */
 export const UNATTENDED_DENIAL_KEY = "codepuppyUnattendedDenial"
 export const UnattendedDenial = Schema.Struct({
@@ -92,61 +89,75 @@ export const UnattendedDenial = Schema.Struct({
 })
 export type UnattendedDenial = typeof UnattendedDenial.Type
 
-/** 文案一、二逐字取自规格「体验约定」;文案三待规格补入(§10 G-3)。 */
+/** 三句均逐字取自规格 v2「体验约定」。 */
 export function unattendedDenialCopy(reason: UnattendedDenial["reason"], tool: string): string {
   if (reason === "readonly") return `这个任务是只读档,不能使用「${tool}」。`
   if (reason === "refused") return `自动化任务不能使用「${tool}」做这一步。`
   return `「${tool}」需要你先确认(它的来源发生了变化或已被停用),自动化任务运行时没有人可以确认。到 设置 → 工具 处理后,下次运行即可使用。`
 }
+/** 规格 v2 补充信息一句(§4.4)。 */
+export const elicitationCopy = (connector: string) => `「${connector}」要补充信息,运行时没人能填。`
 ```
 
-### 4.2 无人值守的权威:主进程的在册登记(R1 改)
+### 4.2 无人值守的权威:主进程的在册名单,推给扩展(R1、R2 改)
 
-**权威是一件活着的事实,不是会话上的字段**:「这个会话属于一次此刻正在跑的无人值守运行」只由桌面 main 知道,经既有的 `parentPort` 窄消息交给 ext。会话 metadata 里的指针只决定「要不要去问」。
+只有桌面 main 知道「这个会话属于一次此刻正在跑的无人值守运行」。名单只从 main 推往 ext,ext 用本地副本同步判定。会话上的任何字段都不参与(R2 去掉了 metadata 指针)。
 
-登记簿(ui-mac main,落点由 plan 定):
+**名单(ui-mac main,落点由 plan 定):**
 
 ```ts
-/** 此刻在跑的无人值守会话。唯一权威;只在 main 内存里,main 重启即空。 */
+/** 此刻在跑的无人值守会话。唯一权威;只在 main 内存里。 */
 type LiveUnattended = Map<string /* sessionID */, { readonly agent?: string /* main 建会话时给的 agent */ }>
 ```
 
-| 唯一写入口 | 登记 | 注销 |
+| 唯一写入口 | 登记(发 prompt 之前) | 注销 |
 | --- | --- | --- |
-| 本地运行 `executeTask` | `session.create` 返回之后、`promptAndWait` 之前:`set(sessionID, { agent: task.target.agent })`。建会话时同时写指针 `metadata: { [UNATTENDED_SESSION_KEY]: { version: 1 } }` | `finally` |
-| 一句话解析 `llmParseAutomation` | 同上,`set(sessionID, {})`(不带 agent ⇒ 档位 none);建会话时另带会话规则 `permissions: [{ action: "subagent", resource: "*", effect: "deny" }]`,不产生子会话(子会话不在册) | `finally`(既有删会话之前) |
+| 本地运行 `executeTask` | `session.create` 返回后 `set(sessionID, { agent: task.target.agent })`,推送并等回执(下) | `finally`,推送新名单,不等回执 |
+| 一句话解析 `llmParseAutomation` | 同上,`set(sessionID, {})`(不带 agent ⇒ 档位 none);建会话时另带会话规则 `permissions: [{ action: "subagent", resource: "*", effect: "deny" }]`,不产生子会话 | `finally`(既有删会话之前) |
 
-窄消息(加入 `codepuppy-sidecar-messages.ts` 的穷举族,build/parse 成对、parse 失败即丢,与族内既有消息同形):
+**窄消息**(加入 `codepuppy-sidecar-messages.ts` 的穷举族,build/parse 成对、parse 失败即丢):
 
 ```ts
-//   ext → main  codepuppy.unattended.query  只读:这个会话是不是在册
-export type UnattendedQuery = { type: "codepuppy.unattended.query"; id: number; sessionID: string }
-//   main → ext  codepuppy.unattended.reply  live = 在登记簿里;agent = 登记时的 agent(解析会话不带)
-export type UnattendedReply = { type: "codepuppy.unattended.reply"; id: number; live: boolean; agent?: string }
+//   main → ext  codepuppy.unattended.live  在册名单的完整快照
+export type UnattendedLive = {
+  type: "codepuppy.unattended.live"
+  seq: number                                               // main 内单调递增
+  nonce: string                                             // 每次推送新取 crypto.randomUUID()
+  sessions: ReadonlyArray<{ sessionID: string; agent?: string }>
+}
+//   ext → main  codepuppy.unattended.ack   ext 已装上这一版
+export type UnattendedAck = { type: "codepuppy.unattended.ack"; seq: number; nonce: string }
 ```
 
-main 的应答只读登记簿,同步给出。ext 用 hub-bridge 的同一套按 id 记账与超时(P-16),这一种查询超时 1 s。
+**握手:**
 
-ext 判档位(`undefined` = 有人在场,行为与今天相同):
+- main 每次改名单都推送完整快照;引擎进程就绪 `attach` 时也推一次当前快照(P-16)。
+- ext 的进程级 `parentPort` 监听(与重载请求同一个单例)收到 `live`:`seq` 大于手上的才装上,装上后回 `ack { seq, nonce }`。
+- 登记时,main 推送后只认 `seq` 与 `nonce` 都等于这次推送的回执。等待上限 20 s(与既有桥的上限同值,`hub-bridge.ts:46`)。
+- 等到回执才发 prompt。等不到(超时、通道断、引擎进程不在):注销,不发 prompt。运行记 `status: "failed"`、既有 `reasonCode: "automation-run-not-ready"`(界面「应用未就绪,本次未运行」),尽力删掉刚建的空会话。解析返回既有的 `unavailable`。
+- main 收到的其它 `codepuppy.unattended.*` 一律丢弃;main 从不把引擎进程发来的内容写进名单。
+
+**ext 判档位**(同步,`undefined` = 不在册,行为与今天相同):
 
 ```ts
 async function unattendedProfile(
   sessionID: string,
-  session: { agent: string; metadata?: Record<string, unknown> },
   requestAgent: string | undefined,
+  sessionAgent: () => Promise<string>,                      // 只在在册且请求不带 agent 时才读会话
 ): Promise<UnattendedProfile | undefined> {
-  if (Option.isNone(Schema.decodeUnknownOption(UnattendedPointer)(session.metadata?.[UNATTENDED_SESSION_KEY])))
-    return undefined                                   // 没有指针:不问 main
-  const reply = await bridge.unattended(sessionID)     // 无 parentPort / 超时 / 应答坏 ⇒ 当作不在册
-  if (!reply.ok || !reply.live) return undefined
-  const agent = requestAgent ?? session.agent          // 与 permission.ts:225 同一取法
-  return reply.agent !== undefined && reply.agent === agent && Object.hasOwn(AUTOMATION_PROFILES, agent)
+  const entry = live.get(sessionID)                         // ext 进程内的快照;不在 ⇒ 不在册
+  if (!entry) return undefined
+  const agent = requestAgent ?? (await sessionAgent())      // 与 permission.ts:225 同一取法
+  return entry.agent !== undefined && entry.agent === agent && Object.hasOwn(AUTOMATION_PROFILES, agent)
     ? AUTOMATION_PROFILES[agent as AutomationAgentID]
     : "none"
 }
 ```
 
-于是:分叉、子会话、崩溃后恢复的会话、运行结束后的续聊,都有新的会话 id 或已被注销,不在册 ⇒ 今天的行为;伪造的指针只换来一次「不在册」的应答;运行中途被换 agent ⇒ none,只会更严。
+- **有人在场会话的代价:** 每次判定一次进程内 `Map` 查找,没有进程间往返,没有缓存要失效,也没有「问不到」这种状态。
+- **「问不到」只可能发生在登记那一刻:** 那时运行还没开始,结果是这次运行不开始(上面),不会进入审批等待,也不会放行。运行开始后,名单就在 ext 进程里,不会中途「查询失败」。
+
+分叉、子会话、崩溃后恢复的会话、运行结束后的续聊都有新的会话 id 或已被注销,不在册 ⇒ 今天的行为。运行中途被换 agent ⇒ none,只会更严。
 
 ### 4.3 判定规则(冻结的规则表;函数名与落点由 plan 定)
 
@@ -186,7 +197,7 @@ function unattendedGateVerdict(profile: UnattendedProfile, s: GateSubject): Gate
 | readonly | 照旧放行 | 拒,文案二 | 拒,文案二 | 拒,文案一 | 拒,文案一 | 拒,文案二 | 照旧 |
 | none | 照旧放行 | 拒,文案三 | 拒,文案三 | 拒,文案三 | 照旧 | 拒,文案三 | 照旧 |
 
-**T2 其余一切求值(扩展的 `permission.evaluate` 钩子;R1 改:不论初值)。** 在册会话里的**每一次**求值,进入 Code Puppy 钩子时就钉住 `effect`(与 `holdAsk` 同一种属性钉法):
+**T2 其余一切求值(扩展的 `permission.evaluate` 钩子;不论初值)。** 在册会话里的**每一次**求值,进入 Code Puppy 钩子时就钉住 `effect`(与 `holdAsk` 同一种属性钉法):
 
 - 初值 `ask` ⇒ 当场改 `deny`;
 - 此后任何钩子写 `ask` ⇒ 落为 `deny`;写 `deny` ⇒ 生效;写 `allow` ⇒ 不生效;
@@ -194,7 +205,7 @@ function unattendedGateVerdict(profile: UnattendedProfile, s: GateSubject): Gate
 
 初值为 `allow` 的也钉:例,解析会话里装扩展的断言初值 `allow`,其后 `hubInstallEvaluate` 写 `ask`(`hub-tools.ts:58`)⇒ 落为 `deny`,不出卡。初值 `deny` 的照旧;今天 Code Puppy 钩子给出的拒绝照旧。已配置的 deny 根本到不了钩子(P-02),AC-04 的三项原样且即时。
 
-### 4.4 拒绝原因 → 运行记录(R1 改)
+### 4.4 拒绝原因 → 运行记录
 
 **Code Mode 里的拒绝(ext):** 在册会话里,ext 记下它在一次 Code Mode 调用(`CODE_MODE_TOOL`,该调用尚未结束)的 id 之下给出的第一条拒绝(T1 抛出的 `denial`;T2 以请求的 `source.id` 归到同一 id,原因同 T2 文案)。这次 Code Mode 调用到达 `execute.after` 时,把这条拒绝写进它终态的 `metadata[UNATTENDED_DENIAL_KEY]`:成功写 `result.metadata`,失败写 `error.metadata`。做法与 `attachTerminal` / `attachNetFailure` 相同(P-17)。不改上游 Code Mode。
 
@@ -203,30 +214,30 @@ function unattendedGateVerdict(profile: UnattendedProfile, s: GateSubject): Gate
 - (a) 任意终态,`Schema.decodeUnknownOption(UnattendedDenial)(part.state.metadata?.[UNATTENDED_DENIAL_KEY])` 为 Some ⇒ 原因 = `denial.message`(T1 直接调用、Code Mode 外层);
 - (b) `part.state.status === "error" && part.state.error.type === "permission.rejected"` ⇒ 原因 = `unattendedDenialCopy(profile === "readonly" ? "readonly" : "refused", part.name)`。`profile = AUTOMATION_PROFILES[task.target.agent]`。覆盖已配置的 deny(读 `.env`、派子任务、项目外目录、只读档的写入与命令、标准档的破坏类命令)与 T2 的直接调用拒绝(P-18)。今天记下的类型已能区分,不加新标记。
 
-命中且不是这次运行的超时 ⇒ 运行记录 `status: "failed"`、`summary: <原因>`;`status.json` 的 `status: "failed"`、`error: <原因>`;回合成功时 `report.md` 照写。未命中,且本次运行取消过补充信息表单(§4.5),且回合没有成功 ⇒ 同上,原因 = G-1 句(连接器名 = 表单 `metadata.server`;待规格补句后生效)。其余与今天完全相同;超时照旧记 `timeout`。
+命中且不是这次运行的超时 ⇒ 运行记录 `status: "failed"`、`summary: <原因>`;`status.json` 的 `status: "failed"`、`error: <原因>`;回合成功时 `report.md` 照写。未命中,且本次运行取消过补充信息表单(§4.5),且回合没有成功 ⇒ 同上,原因 = `elicitationCopy(表单 metadata.server)`(规格 v2)。其余与今天完全相同;超时照旧记 `timeout`。
 
 不新增 `reasonCode` 与界面文案:历史行显示 `summary`(P-07),即规格说的「已有的失败原因一行」。连败熔断照旧计入。
 
-### 4.5 连接器补充信息(BR-05;R1 改)
+### 4.5 连接器补充信息(BR-05)
 
 - 生产方:ui-mac main 调度器,只在一次本地运行在册期间(§4.2 登记到注销)。
 - 对象:这次运行的项目(`task.target.projectDir`)里 `metadata.kind === "mcp-elicitation"` 的待答表单。
 - 动作:`form.list` 与 `session.form.cancel({ sessionID: form.sessionID /* "global" */, formID: form.id })` 都带 `location: { directory: task.target.projectDir }`。中间件据此定位(P-19);不带就落到引擎进程的 scratch cwd,找不到表单。引擎把取消答给连接器为 `{ action: "cancel" }`(P-13)。
 - 时限:表单出现起 1 s 内。发现方式(引擎事件流或轮询表单列表)由 plan 定。
 - 错误:已结束/不存在忽略;其它错误记日志,不改变运行结局。
-- 归属:本引擎没有任何补充信息带会话归属(P-20),真实连接器全部落在这一种。按项目取消是能做到的最小归属。同一项目里有人在场会话的同类表单也会被取消,但正式版没有任何界面能显示或回答它们,也没有别的客户端连得上(P-20)。被取消的只是一个本来会挂到工具被中止的表单。R1 F5 的「有人正在另一客户端作答」在正式版不可达,见 §10。
+- 归属:本引擎没有任何补充信息带会话归属(P-20),真实连接器全部落在这一种;按项目取消是能做到的最小归属。同一项目里有人在场会话的同类表单也会被取消,但正式版没有任何界面能显示或回答它们,也没有别的客户端连得上(P-20)。编排器对 R1 F5 的裁决:不采纳收窄(§10)。
 
 ### API
 
-不新增 HTTP 接口。用既有接口:`session.create` 的 `metadata` 与 `permissions`、`message.list`、`form.list`、`session.form.cancel`;以及 §4.2 的一对 `parentPort` 窄消息(进程内通道,不是 HTTP)。
+不新增 HTTP 接口。用既有接口:`session.create` 的 `permissions`(解析会话)、`session.remove`(握手失败时删空会话)、`message.list`、`form.list`、`session.form.cancel`;以及 §4.2 的一对 `parentPort` 窄消息(进程内通道,不是 HTTP)。
 
 ### 数据
 
-无表结构与迁移。两个新键都在引擎不解读的 metadata 里(会话 metadata 的指针、调用终态 metadata 的拒绝);登记簿只在 main 内存。
+无表结构与迁移。拒绝原因写在调用终态的 metadata 里(引擎不解读);在册名单只在 main 内存与 ext 进程内存。会话 metadata 不再使用。
 
 ### 事件 / 配置
 
-不新增配置。300 s 默认与 `CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS` 不变(只作用于不在册的会话)。查询超时 1 s 是固定常量,不是选项。
+不新增配置。300 s 默认与 `CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS` 不变(只作用于不在册的会话)。握手等待上限 20 s 是固定常量,不是选项。
 
 | 配置键 | 类型 | 默认 | 必填 | 读取入口 |
 | --- | --- | --- | --- | --- |
@@ -239,18 +250,18 @@ function unattendedGateVerdict(profile: UnattendedProfile, s: GateSubject): Gate
 | AC-01 | 已启用 ⇒ 今天就不问;类别默认询问 ⇒ T1 standard 放行,不调 assert,无请求 |
 | AC-02 | 每次询问 ⇒ T1 standard 放行 |
 | AC-03 | T1 readonly ⇒ 文案二 + 4.4 (a);Code Mode 里同样经外层 metadata |
-| AC-04 | 已配置的 deny 先于钩子(P-02),拒绝本身不改;记录经 4.4 (b)(文案三待 G-3) |
+| AC-04 | 已配置的 deny 先于钩子(P-02),拒绝本身不改;记录经 4.4 (b),文案三 |
 | AC-05 | 4.5(带项目目录) |
-| AC-06 | §6 I-4:没有指针或不在册的会话不进入任何新分支,`permission.ts` 不改 |
-| AC-07 | 解析会话在册、档位 none ⇒ T1/T2 一律立即拒绝(含初值 allow 被后续钩子改成 ask 的);不产生子会话 |
+| AC-06 | §6 I-4:不在册的会话不进入任何新分支,判定不依赖任何进程间往返;`permission.ts` 不改 |
+| AC-07 | 解析会话在册、档位 none ⇒ T1/T2 一律立即拒绝(含初值 allow 被后续钩子改成 ask 的);不产生子会话;握手失败 ⇒ 既有 `unavailable` |
 | AC-08 | T1 身份变化/已停用 ⇒ 文案一 + 4.4 (a)(已停用的那一支见 §10 O-1) |
 
 ## 5. 数据与失败
 
-- 登记发生在 `session.create` 返回之后、发 prompt 之前。回合里的任何判定都晚于登记,没有「已在跑、未在册」的窗口。注销在 `finally`。
-- main 重启或引擎进程重启:登记簿为空或 ext 拿到的都是「不在册」。只会回到今天的询问与 300 s,不会放宽。
-- 查询失败(无 `parentPort`、超时 1 s、应答形状不对):当作不在册,同上。
-- 指针解不开、ext 读会话失败:当作没有指针(读会话失败时引擎随后的 `configured()` 本来就报 NotFound,`permission.ts:222-224`)。
+- 登记在 `session.create` 返回之后,发 prompt 以 ext 回执为前提。回合里的任何判定都晚于 ext 装上名单,没有「已在跑、ext 不知道」的窗口(依赖 U-4)。
+- 握手失败:运行不开始,记既有的「应用未就绪」;解析返回既有的 `unavailable`。不进审批等待,不放行。
+- 注销的推送丢失(引擎进程已退出):无影响,ext 随进程消失;新引擎进程 `attach` 时拿到 main 当前名单。
+- main 退出:引擎进程随之结束(utilityProcess),没有残留的在册状态。
 - 投影读消息失败:记日志,运行记录按今天的规则写,不阻断。
 - 表单取消竞态:表单已被答复或已结束 ⇒ 忽略。
 
@@ -259,34 +270,41 @@ function unattendedGateVerdict(profile: UnattendedProfile, s: GateSubject): Gate
 | 新增/改动的代码 | 落在哪个模块 | 依赖谁 | 复用的已有权威 |
 | --- | --- | --- | --- |
 | 4.1 共享定义 | `packages/schema/`(「共享 schema、权限和工具分类」,`modules.md:41`) | 无 | 同包先例 `codepuppy-tool-policy.ts`、`codepuppy-net-failure.ts` |
-| 4.2 登记簿、两个写入口、查询应答 | `packages/ui-mac/` main | ui-mac → schema(既有 `@opencode/schema/*` 引入) | `executeTask`、`llmParseAutomation`;`codepuppySidecar.receive`(`server.ts:128-131`) |
+| 4.2 名单、两个写入口、推送与等回执 | `packages/ui-mac/` main | ui-mac → schema(既有 `@opencode/schema/*` 引入) | `executeTask`、`llmParseAutomation`;`codepuppySidecar.receive/attach`(`server.ts:128-131`、`:679`);既有失败码 `automation-run-not-ready` |
 | 4.2 消息对 | `packages/ui-mac/src/main/codepuppy-sidecar-messages.ts`(两侧共用的唯一合同,ext 经相对路径引入,既有先例) | 无 | 同族既有消息 |
-| 4.2 查询、4.3 T1/T2、4.4 Code Mode 补记 | `packages/ext/` 工具策略 | ext → schema、→ 消息合同(既有相对路径引入) | `decide`/`confirm`(`gate.ts:122-167`)、`EffectiveToolPolicy`(`resolver.ts:72-77`)、`permission.evaluate` 挂点(`permission.ts:243-251`)、`holdAsk` 钉法(`gate.ts:227-238`)、hub-bridge 请求簿记(`hub-bridge.ts:46-110`)、`execute.after` 改写(`display.ts:64-104`) |
+| 4.2 收快照与回执、4.3 T1/T2、4.4 Code Mode 补记 | `packages/ext/` 工具策略 + hub-bridge 的进程级监听 | ext → schema、→ 消息合同(既有相对路径引入) | `decide`/`confirm`(`gate.ts:122-167`)、`EffectiveToolPolicy`(`resolver.ts:72-77`)、`permission.evaluate` 挂点(`permission.ts:243-251`)、`holdAsk` 钉法(`gate.ts:227-238`)、进程级 `parentPort` 监听(`hub-bridge.ts:147-149`、`plugin.ts:49`)、`execute.after` 改写(`display.ts:64-104`) |
 | 4.4 投影、4.5 取消 | `packages/ui-mac/` main 调度器 | ui-mac → schema、引擎客户端 | `promptAndWait`、`AutomationRunRecord` |
 | 载体名取值 | ui-mac 的 `AUTOMATION_DEFAULTS.agent/agentStandard` 与注入里两个自动化 agent 的键 | ui-mac → schema | 4.1 `AUTOMATION_PROFILES` |
 | 决定登记 | `docs/architecture/codepuppy-authority-registry.json` 新增一条 held 条目(无接管) | — | 登记簿「一条决定一条」(判官 `authority-registry.test.ts`) |
 
 - 新目录/新模块:无。`modules.md` 不变。
 - 上游文件:**不改任何上游文件,不新增接管**,无需 owner 级架构例外。已接管的 `permission.ts`(ADR-038)与 `mcp/index.ts`(ADR-041)都不碰。ADR-038 的「无人应答到期具名失败、绝不自动放行」对不在册的会话原样成立:在册会话根本不创建请求,标准档的放行来自规格 BR-02 的 owner 裁决,不是到期放行。
-- 架构约束:K1 **变好**:两个自动化载体的名单与档位只定义一次,做判定的 ext 读得到。实现时同 PR 更新 `constraints.md` 的 K1 行;`CODEPUPPY_INJECTED_AGENTS` 与 `hub-tools.ts:47` 的前缀判断不在范围,见 O-4。K2 不变:文案只在 4.1 一处,不再复述引擎原句。契约 C(P-14)遵守:不写 `[codepuppy:…]` 前缀,原因走结构化 metadata 与引擎已有的错误类型。
+- 架构约束:K1 **变好**:两个自动化载体的名单与档位只定义一次,做判定的 ext 读得到。实现时同 PR 更新 `constraints.md` 的 K1 行;`CODEPUPPY_INJECTED_AGENTS` 与 `hub-tools.ts:47` 的前缀判断不在范围,见 O-4。K2 不变:文案只在 4.1 一处。契约 C(P-14)遵守:不写 `[codepuppy:…]` 前缀,原因走结构化 metadata 与引擎已有的错误类型。
 - 工程标准:第 5 条,调用方读结构化字段与引擎的错误类型,不解析文案;不新增错误框架、不新增配置。
 - 被否决的替代:
   - 把引擎的 `Permission.Unattended` 提供到回合里:回合跑在捕获的运行时上(P-03),要接管会话执行或 server 处理器(新接管),而插件钩子就在它前一行(P-02)。
   - 扩展已接管的 `permission.ts`(在册即 0 秒到期 / 结束这一步):仍会先建请求出卡,且扩大 ADR-038 登记的接管面;挂点已够。
-  - 只按 agent 或只按会话 metadata 判无人值守(原稿 R-02,R1 F1/F2 否决):项目命令能切 agent(P-09),渲染进程直通、插件 `session.update`、分叉都能写或复制 metadata(P-10);到期时间证明不了运行还活着。
-  - main 主动推送在册集合:推送与 prompt 走两条通道,先后无保证;查询在判定当时读 main 的权威,无竞态。
+  - 只按 agent 或会话 metadata 判无人值守(R1 F1/F2 否决):项目命令能切 agent(P-09),渲染进程直通、插件 `session.update`、分叉都能写、删或复制 metadata(P-10)。
+  - metadata 指针 + 逐次向 main 查询(R1 稿,R2 否决):应答按共享自增 id 结算,能被串用(R2-1);查询失败没有安全的去向(R2-2);指针可被删掉而跳过查询(R2-3)。即使改成随机 id,有人在场会话也要付每次判定一次往返,失败时仍得二选一。推送名单让判定没有往返、也没有失败状态。
+  - 推送不等回执:推送与 prompt 走两条通道,先后无保证;回执让「发 prompt」以「ext 已装上」为前提。
   - 拒绝时结束这一步(回合中断):插件造不出引擎的 `CancelledError`(P-12),只能接管内核;记录改由投影。
   - 改上游 Code Mode 保留子调用 metadata:要新接管;ext 在外层 `execute.after` 补记即可(P-17)。
   - 在 `mcp/index.ts` 里处理补充信息,或自建补充信息归属:表单不归属任何会话(P-20),要扩大接管面或另建归属设施。
 - 安全面(权限):
-  - 威胁边界:授予无人值守裁决的只有 main 的登记簿。**渲染进程**能经 `POST /api/session` 直通写 `agent`、`metadata`(P-10),**项目插件**能 `session.update`,**分叉/子会话**会复制指针。这些都进不了登记簿,只换来一次「不在册」。**模型**没有写 metadata 或登记簿的途径,`subagent` 拒绝 primary 载体。**项目文档**能切 agent、改规则,同样进不了登记簿。引擎进程里的 JS 若在语言层篡改 `parentPort` 对象或 ext 模块状态,不在本边界内,与 ext 现有的每个决定、hub-bridge(S12)相同。
-  - I-1 登记簿只有两个写入口:`executeTask`、`llmParseAutomation`。登记在发 prompt 之前,注销在 `finally`;ext 只经 `codepuppy.unattended.query/reply` 读它。
+  - 威胁边界:授予无人值守裁决的只有 main 的名单,只经 main → ext 方向的 `codepuppy.unattended.live` 进入 ext。
+    - 渲染进程、项目插件、分叉/子会话:能写或删的只有会话字段(P-10),判定不读会话字段。
+    - 引擎进程里的 JS(含项目插件):经正常 API 只能向 main 发消息。main 只认带当次 `nonce` 的回执,从不把这一侧的内容写进名单;能读到 main 推来的快照,但读到时 ext 已在同一次派发里装上(U-4)。
+    - 模型:没有写名单的途径,`subagent` 拒绝 primary 载体。
+    - 项目文档:能切 agent、改规则,同样进不了名单。
+    - 在语言层伪造 `parentPort` 入站事件或改 ext 模块状态,不在本边界内,与 ext 现有的每个决定、hub-bridge(S12)相同。
+  - I-1 名单只有两个写入口:`executeTask`、`llmParseAutomation`。登记后以 ext 回执为发 prompt 的前提,注销在 `finally`;ext 只经 `codepuppy.unattended.live` 得到名单。
   - I-2 在册会话里不创建任何审批请求(零 `Permission.Event.Asked`)。
   - I-3 判定只把「询问」改成放行或拒绝:已配置的 deny 先于钩子、策略的 deny 不放宽;readonly 与 none 对询问从不放行。
-  - I-4 没有指针的会话不发查询,Code Puppy 的钩子与闸逐字节不变;有指针但不在册的,一次查询之后同样不变;`permission.ts` 不改 ⇒ AC-06。
+  - I-4 不在册的会话:判定只做一次本地查找,Code Puppy 的钩子与闸逐字节不变;`permission.ts` 不改 ⇒ AC-06。
   - I-5 档位只来自登记时的 agent,且须与本次请求的 agent 一致;不一致 ⇒ none。
   - I-6 在册会话里,不论初值,后续钩子只能把结果改成拒绝。
   - I-7 分叉、子会话、恢复的会话、运行结束后的续聊都不在册。
+  - I-8 在 ext 确认装上名单之前,不发出任何无人值守运行的 prompt。
 
 ## 8. 拆分决定
 
@@ -294,43 +312,51 @@ function unattendedGateVerdict(profile: UnattendedProfile, s: GateSubject): Gate
 
 ## 9. 回滚
 
-不适用(非 L、无迁移)。回退代码后,已写入会话的指针是引擎不解读的 metadata,没有副作用;自动化回到今天的 300 s 行为。
+不适用(非 L、无迁移)。回退代码后不留任何数据;自动化回到今天的 300 s 行为。
 
 ## 10. 裁决与审查结论
 
 | 送审前裁决 | 依据与适用版本 |
 | --- | --- |
 | R-01 机制:扩展的闸与 evaluate 钩子当场裁决;不改上游文件 | P-02、P-03、P-06;`c01ea14919` |
-| R-02(R1 改)无人值守的权威 = main 的在册登记,经既有 `parentPort` 窄消息查询;会话 metadata 只作指针 | R1 F1/F2;P-10、P-16 |
-| R-03 档位由登记时的 agent 经 `AUTOMATION_PROFILES` 决定,且须与本次请求的 agent 一致 | K1;防中途换 agent 放宽 |
+| R-02(R2 改)无人值守的权威 = main 的在册名单;每次变动推完整快照给 ext,带随机 `nonce` 的回执是发 prompt 的前提;ext 本地同步判定;会话字段不参与 | R1 F1/F2、R2-1/2/3;P-10、P-16 |
+| R-03 档位由登记时的 agent 经 `AUTOMATION_PROFILES` 决定,且须与本次请求的 agent 一致 | K1;防中途换 agent 放宽;R2 无异议 |
 | R-04 规则表(4.3):「启用状态」读作「未停用」,类别默认询问与「每次询问」在 standard 一并放行 | 推断:BR-03 是封闭的拒绝清单且不含默认询问;AC-01 的「未单独设为询问」即默认状态;R1 无反对证据 |
-| R-05 配置里写的 ask 与其余询问在在册会话里立即拒绝,文案三(只读档用文案二) | BR-02 只说设置 → 工具;引擎自己的无人值守语义也是拒绝(`permission.ts:252-262`) |
+| R-05 配置里写的 ask 与其余询问在在册会话里立即拒绝,文案三(只读档用文案二) | BR-02 只说设置 → 工具;引擎自己的无人值守语义也是拒绝(`permission.ts:252-262`);文案三入规格 v2 |
 | R-06 拒绝是带类型的工具失败(模型继续);运行记录经结构化原因或 `permission.rejected` 记为失败并写文案 | P-11、P-12、P-14、P-18;AC-03/AC-08、BR-06 |
-| R-07 补充信息由 main 在运行在册期间按项目、带目录立即取消 | P-19、P-20 |
-| R-08 一句话解析在册、档位 none,会话规则禁止子会话 | AC-07;P-08 |
-| R-09 不新增配置、`reasonCode`、界面文案 | 规格「不新增界面」;历史行已显示 `summary`(P-07) |
+| R-07 补充信息由 main 在运行在册期间按项目、带目录立即取消 | P-19、P-20;编排器 F5 裁决 |
+| R-08 一句话解析在册、档位 none,会话规则禁止子会话 | AC-07;P-08;R2 无异议 |
+| R-09 不新增配置、`reasonCode`、界面文案;握手失败复用既有 `automation-run-not-ready` / `unavailable` | 规格「不新增界面」;P-07 |
 
 | 轮/审查版本与范围 | 审计方 | finding 及处置 | 改了什么/验证证据 | 没改的及去向 |
 | --- | --- | --- | --- | --- |
-| R1 · `46ce5f39f6` · 全稿,对 spec v1 | Codex gpt-6.1-sol xhigh,只读,会话 `01a1d2c7-7cdd-7832-ac11-e2a3bc6ca786`;编排器处置 | **F1 Blocker 标记可伪造**:采纳。另订正原稿依据:项目插件的 `reply` 实际被拒(`plugin-fanout.ts:130-150`) | §4.2 改为 main 在册登记 + 窄消息查询,metadata 只作指针;P-10 订正、P-16 新增;§6 安全面 I-1/I-4/I-5/I-7 | — |
-| 同上 | 同上 | **F2 Major 真标记越过运行生命周期**(分叉复制 `agent`+`metadata`,`projector.ts:175-177`;崩溃恢复):采纳 | 同 F1;去掉到期时间与收回;I-7 | — |
+| R1 · `46ce5f39f6` · 全稿,对 spec v1 | Codex gpt-6.1-sol xhigh,只读,会话 `01a1d2c7-7cdd-7832-ac11-e2a3bc6ca786`;编排器处置 | **F1 Blocker 标记可伪造**:采纳。另订正原稿依据:项目插件的 `reply` 实际被拒(`plugin-fanout.ts:130-150`) | §4.2 改为 main 在册登记;P-10 订正、P-16 新增;§6 安全面 | — |
+| 同上 | 同上 | **F2 Major 真标记越过运行生命周期**(分叉复制 `agent`+`metadata`,`projector.ts:175-177`;崩溃恢复):采纳 | 同 F1;去掉到期时间;I-7 | — |
 | 同上 | 同上 | **F3 Major T2 漏掉 allow→ask**(解析会话 + `hub-tools.ts:58`):采纳 | §4.3 T2 改为不论初值都钉;I-6 | — |
-| 同上 | 同上 | **F4 Major global 取消缺 Location**(`form-location.ts:26-31` → `location.ts:71-79`,cwd = scratch,`server.ts:551`):采纳 | §4.5 列表与取消都带 `location.directory`;P-19;U-1 改为带目录的端到端证据 | — |
-| 同上 | 同上 | **F5 Major 按项目取消会改变交互会话**:前提一半成立。同项目有人在场会话的表单确实也会被取消。「有人正在另一客户端作答」在正式版不可达:正式版界面零渲染,上游 `packages/app` 不随 Code Puppy 发布,别的客户端无引擎口令。另,本引擎的补充信息**全部**不可归属(P-20)。按 F5 收窄,AC-05 将对所有真实连接器都不成立。 | §4.5 保留按项目取消,补「归属」说明与 P-20 证据 | 交编排器裁:若仍按收窄,用 G-2 替换 §4.5 |
-| 同上 | 同上 | **F6 Major Code Mode 吞掉结构化拒绝**(`mcp.ts:67`;`codemode/tool.ts:152`、`:189`):采纳 | §4.4 ext 在外层 Code Mode 调用的 `execute.after` 补记第一条拒绝;投影读任意终态;P-17 | — |
-| 同上 | 同上 | **F7 Major BR-03 既有 deny 没有记录原因**(`permission.ts:239`;`read.ts:160`):采纳。今天记下的 `permission.rejected` 已能与普通工具错误区分(`to-session-error.ts:79-87`),不加新标记 | §4.4 (b);P-18;文案三待规格(G-3) | G-3 交编排器补规格 |
+| 同上 | 同上 | **F4 Major global 取消缺 Location**(`form-location.ts:26-31` → `location.ts:71-79`,cwd = scratch,`server.ts:551`):采纳 | §4.5 列表与取消都带 `location.directory`;P-19;U-1 | — |
+| 同上 | 同上 | **F5 Major 按项目取消会改变交互会话**:设计方核对为前提一半成立。**编排器裁决:不采纳。**依据:上游 `packages/app` 不随 Code Puppy 发布、不使用(`scripts/north-star-guard.sh:107-108`);正式版没有任何界面渲染补充信息表单;每个补充信息都挂在 `"global"` 上,按会话归属会让 AC-05 对所有真实连接器都不成立。有证据表明正式版存在由人作答这类表单的界面时才重开 | §4.5 保留按项目取消与归属说明;P-20 | G-2 不再需要 |
+| 同上 | 同上 | **F6 Major Code Mode 吞掉结构化拒绝**(`mcp.ts:67`;`codemode/tool.ts:152`、`:189`):采纳 | §4.4 ext 在外层 Code Mode 调用的 `execute.after` 补记;投影读任意终态;P-17 | — |
+| 同上 | 同上 | **F7 Major BR-03 既有 deny 没有记录原因**(`permission.ts:239`;`read.ts:160`):采纳。今天记下的 `permission.rejected` 已能区分(`to-session-error.ts:79-87`),不加新标记 | §4.4 (b);P-18 | 文案三入规格 v2 |
+| R2 · `3b94f766ea` · 确认轮,限 §4.2、§6 安全面及直接后果 §4.3 T2、§5 | Codex,只读,会话 `01a1d2de-1394-7811-8f49-2367fc9adb1c`;编排器处置:三条均采纳 | **R2-1 Blocker(F1 未关)应答跨会话串用**:插件以预测的自增 id 抢先查询在册会话 A,A 的真实 `live:true` 结算了 ext 为会话 B 挂着的同 id 查询(`hub-bridge.ts:70-80`;main 不区分发送者,`server.ts:577-580`) | §4.2 改为 main 推送完整名单、ext 本地判定:没有查询与应答可串用。回执带每次新取的随机 `nonce`,main 只认当次的 | — |
+| 同上 | 同上 | **R2-2 Major 查询失败等同「不在册」**:在册运行中问不到即落回 300 s 等待 | 判定读本地名单,运行中没有「问不到」。唯一的确认点在发 prompt 之前:等不到回执 ⇒ 这次运行不开始(既有「应用未就绪」),解析返回既有 `unavailable`;I-8 | — |
+| 同上 | 同上 | **R2-3 Major 可写指针能关闭在册判定**(`adapter.ts:639`;`projector.ts:984-986` 整体替换) | 去掉指针,判定不读会话 metadata;§4.1 删 `UNATTENDED_SESSION_KEY` | — |
 
-本轮改动的小节(确认轮只看这些及其直接后果):frontmatter(summary、review)、§1 覆盖行、§2(P-07 证据、P-08、P-10 订正、P-13 收窄、P-16 至 P-20、U-1、U-2)、§4.1(指针、`refused`、文案三)、**§4.2 全节**、§4.3(T1 原句换文案三;**T2 全段**)、**§4.4 全节**、**§4.5 全节**、§4 API/数据/配置、AC 覆盖、§5、§6(落点表、被否决的替代、**安全面全段**)、§10。F1/F2 的确认轮核心:§4.2、§6 安全面,直接后果 §4.3 T2、§5。
+R2 三条时序在改后文本上的走查:
+
+- **R2-1。** 插件 `postMessage` 一条 `codepuppy.unattended.query`:这一类型已不存在,main 丢弃(§4.2 末条)。即使它冒充 `ack`,也拿不到还没推送的 `nonce`。它能读到快照时,ext 已在同一次派发里装上(U-4),所以它的回执最多与真回执同效,不会让 main 提前发 prompt。ext 只从入站的 `live` 改名单,而入站消息只来自 main(P-16)。交互会话 B 从未被 main 登记,`live.get(B)` 为空 ⇒ 今天的卡片。
+- **R2-2。** 运行开始前,main 已收到当次回执,ext 手里的名单含这次会话。之后每次判定都是本地查找,没有超时、断线、坏应答可遇,询问只会按 T1/T2 立即放行或拒绝。回执等不到就根本不发 prompt,运行以既有「应用未就绪」结束,不进审批等待,不放行。交互会话不依赖任何往返,不会因 main 迟缓多出拒绝或延迟(AC-06)。
+- **R2-3。** 插件 `session.update({ metadata: {} })` 删掉的东西,判定从来不读;名单在 main 与 ext 内存里,插件 API 摸不到 ⇒ 在册运行照常立即裁决。
+
+本轮(R2)改动的小节:frontmatter(summary、spec_version、review)、§1、§2(P-07、P-10、P-16、U-2、U-4)、§4.1(去掉指针、文案三与补充信息句改为取自规格 v2)、**§4.2 全节**、§4.4 补充信息句一行、§4.5 末条、§4 API/数据/配置、AC 覆盖(AC-06、AC-07)、**§5 全节**、§6(落点表 4.2 两行、被否决的替代、**安全面全段**)、§9、§10。机制形状变了:R1 的「指针 + 逐次查询」换成「推送名单 + 带随机数的回执」。§4.3 T1/T2 的规则表与钉法未动。
 
 **留档**
 
 | 提议 | 实际影响或未核实点 | 为什么现在不做 | 什么情况再看 |
 | --- | --- | --- | --- |
-| G-1(规格缺口)BR-06 要求 BR-05 失败的那一步写原因,体验约定没有这一句。建议补:「「<连接器名>」要补充信息,运行时没人能填。」 | §4.4 已按此句设好生效条件(本次运行取消过表单且回合没成功) | 文案归规格 | 编排器补进规格后生效 |
-| G-2(备用规格缺口,仅当编排器仍按 F5 收窄时启用)「AC-05 只对能归属到本次运行的补充信息成立;不能归属的,运行在既有时限结束。」本引擎全部补充信息都不能归属(P-20),启用即意味着 AC-05 对所有真实连接器都不成立 | 用它替换 §4.5,G-1 随之作废 | 证据表明按项目取消在正式版不伤有人在场的作答(F5 行) | 编排器或 owner 裁收窄 |
-| G-3(规格缺口)BR-06 要求 BR-03 固定拒绝(读 `.env`、派子任务、项目外目录等)写「工具名和放行办法」。这些没有放行办法,体验约定的两句都不适用。建议补:「自动化任务不能使用「<工具名>」做这一步。」 | 文案三;只读档仍用文案二 | 文案归规格 | 编排器补进规格 |
+| G-1、G-3(原规格缺口)补充信息与固定拒绝的两句文案 | 已按 owner U-17 写入规格 v2(`8573c17dd8`),§4.1 取用 | 已关闭 | — |
+| G-2(备用收窄) | 编排器裁决不采纳 F5,不需要 | 已关闭 | 出现正式版里由人作答补充信息的界面 |
 | O-1 AC-08 的「已停用」一支:已停用的工具不出现在模型的工具清单里(`catalog.ts:1-17`,F6 既有),常见情形是模型根本不调用、回合可能成功、记录没有失败行 | 只有调用真的到达闸时(按名调用、清单与停用之间的竞态)才出文案一 | 让模型看见停用工具会推翻 F6 裁决,超出规格(BR-03「本规格不改」) | owner 要求「任务需要已停用的工具时也写原因」 |
 | O-2 AC-03 的「写入类连接器工具」:系统没有连接器工具的读写分类(`risk.ts` 无 MCP 写入规则);用户在设置里启用过的连接器工具,只读档今天就直接执行(载体规则无 `mcp:*`,P-04;R1 核对一致) | AC-03 对未启用(默认询问/每次询问)的连接器工具成立;已启用的照旧执行 | BR-04「只读档不变」 | owner 要求只读档拒绝一切连接器工具 |
 | O-3 项目文档可在后加载的层给载体 agent 追加规则(`config/plugin/agent.ts:74-103`),加载先后未核实 | 可能放宽载体的静态规则;本设计不读规则定档位,放行只作用于询问,不碰已配置的 deny | 既有面,与本规格无关 | 另有证据表明项目层排在注入层之后 |
 | O-4 `hub-tools.ts:47` 按前缀判自动化载体 | K1/K2 的又一份载体知识 | 不在本 AC 内;在册时 T2 已兜住 | 下一次改载体名单 |
-| O-5 运行在册期间,用户在「全部批准」档往这个正在跑的自动化会话里发话,按无人值守裁决(该档不带 agent,P-09) | 只到运行注销为止;会话此时正忙于本次运行 | 登记簿已把窗口压到运行本身 | 出现真实反馈 |
+| O-5 运行在册期间,用户在「全部批准」档往这个正在跑的自动化会话里发话,按无人值守裁决(该档不带 agent,P-09) | 只到运行注销为止;会话此时正忙于本次运行 | 名单已把窗口压到运行本身 | 出现真实反馈 |

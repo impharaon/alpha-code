@@ -425,4 +425,5 @@
 9	packages/ext	src/upstream-probes/turn.test.ts	-	I-03 上游行为探针:回合收尾事件、读目录正文、data: 附件、shell 输出游标(依赖方 engine-adapter events.ts / v1-shapes.ts、ext attachment-reader-hooks.ts)
 10	packages/ext	src/upstream-probes/config.test.ts	-	I-03 上游行为探针:配置层序与 policy 先到先得、相对 skills 条目、远端 MCP 集成身份、MCP 条目整条替换(依赖方 engine-explicit-config.ts / codepuppy-config-injection.ts / mcp-default-deny.ts、engine-adapter routes.ts)
 5	packages/ext	src/upstream-probes/plugins.test.ts	-	I-03 上游行为探针:插件激活顺序 pre → 包 → post、模型请求只经 context / compaction / generate / title 四个钩子(依赖方 ext plugin.ts / policy/index.ts、sidecar-ext-ready.ts)
+2	packages/ext	src/upstream-probes/agent-request.test.ts	-	alpha-code#1700 上游行为探针:v1 agent 的 temperature / top_p 被引擎存在 agent 的 request.body,发出的模型请求里没有(支持温度的模型上也一样);插件在 context 钩子设 options.temperature / topP 才上线(依赖方 ext plugin.ts 的助手温度;引擎一旦自己发,前一条红,ext 那一路该删)
 3	packages/ext	src/provider-allow.test.ts	-	`#1662` r2 供应商白名单(编排器裁决 2026-11-12)的纯函数与放置时序:放行集合没写 ⇒ 不治理、写坏 ⇒ 空集合;集合外的供应商一律拿掉并只报已配置的、集合外的请求抛错点名;清单变换在插件清单出现 opencode.config.policy 之前不登记、重放先登记新的再撤旧的、等不到就记一行。引擎里的端到端判据是 packages/ui-mac/src/main/custom-provider-derivation.test.ts 的宿主一条。

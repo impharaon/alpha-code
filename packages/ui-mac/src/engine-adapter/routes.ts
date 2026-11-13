@@ -19,6 +19,7 @@ import { isListedProject } from "./internal-projects"
 import { v1DecisionID, type DecisionInput, type DecisionOutcome, type PermissionReplies } from "./permission-replies"
 import { MESSAGE_PAGE, recentMessages, sessionDirectory } from "./session-cache"
 import {
+  baseID,
   syntheticText,
   toFormAnswer,
   toPrompt,
@@ -186,8 +187,6 @@ async function messages(context: RouteContext) {
   if (page.next) response.headers.set("x-next-cursor", page.next)
   return response
 }
-
-const baseID = (id: string) => id.replace(/:assistant$/, "")
 
 const COMMAND_POLL_MS = 200
 

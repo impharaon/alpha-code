@@ -41,6 +41,9 @@ type FrozenSource = Parameters<typeof normalizeSessionMessages>[1]
 // 序号 = 2.x `content` 数组下标(空正文被投影丢掉也不错位,流式阶段与快照阶段同一个号),其余消息按投影顺序。
 export const partID = (messageID: string, index: number) => `${messageID}:${String(index).padStart(4, "0")}`
 
+/** v1 消息 id → 投影出它的那条 2.x 消息:shell 消息投影成用户 + 助手两条,助手那条是 `<id>:assistant`(冻结 normalizeSessionMessages)。 */
+export const baseID = (id: string) => id.replace(/:assistant$/, "")
+
 /** 助手消息 content 下标 ⇄ 冻结投影的语义 id(text/reasoning 按各自序号,工具按工具 id)。 */
 export function contentKeys(content: ReadonlyArray<{ type: string; id?: string }>) {
   const counters = { text: 0, reasoning: 0 }

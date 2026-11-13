@@ -592,7 +592,7 @@ export function registerExtIpcHandlers(
     const items = [
       ...exec.mcp.map((n) => `· 连接器(MCP):${n}`),
       ...exec.plugins.map((f) => `· 插件:${PROJECT_HIDDEN_DIR}/plugins/${f}`),
-      ...exec.agents.map((a) => `· Agent 设置:${a.name}(${a.fields.join("、")})`),
+      ...exec.agents.map((a) => `· Agent 的权限与模型设置:${a.name}(${a.fields.join("、")})`),
     ].join("\n")
     const parent = BrowserWindow.fromWebContents(event.sender) ?? undefined
     const opts = {

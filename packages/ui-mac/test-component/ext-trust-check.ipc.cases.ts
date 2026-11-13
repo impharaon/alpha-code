@@ -154,7 +154,7 @@ describe("#1709 生产 ext-trust-check:信任只来自用户在确认框里的�
     answer = { response: 0, checkboxChecked: true }
     expect(await trustCheck(dir)).toEqual({ prompted: true, granted: true })
     expect(shown).toHaveLength(1)
-    expect(shown[0]!.detail).toBe(detailFor(["· Agent 设置:reviewer(permission)"]))
+    expect(shown[0]!.detail).toBe(detailFor(["· Agent 的权限与模型设置:reviewer(permission)"]))
     expect(recorded(dir)).toMatchObject({ ino: inode(dir), granted: true })
   })
 
@@ -168,7 +168,7 @@ describe("#1709 生产 ext-trust-check:信任只来自用户在确认框里的�
     expect(await trustCheck(dir)).toEqual({ prompted: true, granted: false })
     expect(shown).toHaveLength(1)
     expect(shown[0]!.detail).toBe(
-      detailFor(["· 连接器(MCP):proj", "· 插件:.codepuppy/plugins/p.js", "· Agent 设置:reviewer(permission、model)"]),
+      detailFor(["· 连接器(MCP):proj", "· 插件:.codepuppy/plugins/p.js", "· Agent 的权限与模型设置:reviewer(permission、model)"]),
     )
   })
 

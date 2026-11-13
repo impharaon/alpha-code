@@ -400,7 +400,7 @@ status.
 | `SPEC-permission-risk-classification` | [specs/permission-risk-classification/spec.md](specs/permission-risk-classification/spec.md) | 高风险动作在执行前先完成分类，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-permission-risk-display` | [specs/permission-risk-display/spec.md](specs/permission-risk-display/spec.md) | 用户在授权时能看出动作的风险档位，保留历史条款、有效裁决和交付证据边界。 | draft |
 | `SPEC-project-agent-fields` | [specs/project-agent-fields/spec.md](specs/project-agent-fields/spec.md) | 项目文档里给 agent 写的 disable、tools、temperature 等字段在新引擎上重新生效,用不上的字段有记录可查 | approved |
-| `DESIGN-project-engine-config-takeover` | [specs/project-engine-config-takeover/design.md](specs/project-engine-config-takeover/design.md) | 引擎照旧自己读项目 opencode.json 与 .opencode/;Code Puppy 在引擎配置装载的汇合点按项目信任放行,未允许只交出内容类字段,已允许原样交出;同一份 #1709 信任记录与确认框;新增接管 config.ts、agent.ts | draft |
+| `DESIGN-project-engine-config-takeover` | [specs/project-engine-config-takeover/design.md](specs/project-engine-config-takeover/design.md) | 引擎照旧自己读项目 opencode.json 与 .opencode/;Code Puppy 在引擎配置装载与四个读项目内容的位置按项目信任放行,未允许只交出内容类部分(文件头只按 YAML/JSON 读、读取目标须在项目内),已允许原样交出;同一份 #1709 信任记录与确认框;新增接管 config.ts、instruction.ts、skill.ts、agent.ts | draft |
 | `SPEC-project-engine-config-takeover` | [specs/project-engine-config-takeover/spec.md](specs/project-engine-config-takeover/spec.md) | 项目自带的 OpenCode 配置:AGENTS.md、技能、命令文字、agent 说明直接能用;会运行程序、加载代码、换掉所用程序、放宽权限或带入项目外内容的设置在你允许这个项目后生效 | draft |
 | `SPEC-project-mcp-installation` | [specs/project-mcp-installation/spec.md](specs/project-mcp-installation/spec.md) | 连接器可装到全局或当前项目并保持隔离，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-puppy-brand-icons` | [specs/puppy-brand-icons/spec.md](specs/puppy-brand-icons/spec.md) | 应用和各渠道使用一致的小狗标志，保留历史条款、有效裁决和交付证据边界。 | approved |

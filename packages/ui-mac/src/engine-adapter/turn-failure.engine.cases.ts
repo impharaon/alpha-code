@@ -46,8 +46,10 @@ const stub = Bun.serve({
   async fetch(request) {
     const url = new URL(request.url)
     const body = JSON.parse((await request.text()) || "{}") as { tools?: unknown[] }
-    if (!url.pathname.endsWith("/chat/completions")) return new Response("not found", { status: 404 })
-    if (url.pathname.startsWith("/byok/")) return Response.json(BYOK_401, { status: 401 })
+    // 桩模型自己的地址判断,不是应用路由:先取出路径再比(同目录其它桩的写法)。
+    const path = url.pathname
+    if (!path.endsWith("/chat/completions")) return new Response("not found", { status: 404 })
+    if (path.startsWith("/byok/")) return Response.json(BYOK_401, { status: 401 })
     if (mode === "401") return Response.json({ error: { message: "invalid token", code: "unauthorized" } }, { status: 401 })
     if (mode === "wallet") return new Response(WALLET_402, { status: 402, headers: { "content-type": "application/json" } })
     if (mode === "stopped") return new Response(STOPPED_402, { status: 402, headers: { "content-type": "application/json" } })

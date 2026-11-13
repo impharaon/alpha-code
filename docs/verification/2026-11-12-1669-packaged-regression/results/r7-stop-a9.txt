@@ -1,0 +1,6 @@
+main process 99698 already gone
+stopped label=a9 group=99698
+prefs compare: size 250->250; changed=['SKPurchaseIntentUpdatesLastChecked']; unchanged=['AppleTextDirection', 'NSForceRightToLeftWritingDirection', 'NSNavPanelExpandedSizeForOpenMode', 'NSTreatUnknownArgumentsAsOpen']; other-than-known-timestamp-changed=[]
+OWNER-SIDE PATHS CHANGED: 6c6 < 1794213231 5376 Library/Application Support/ai.opencode.desktop --- > 1794562177 5376 Library/Application Support/ai.opencode.desktop 8,9c8,9 < 1794473433 3744 .local/share/opencode < 1794213188 384 code-puppy --- > 1794562177 3744 .local/share/opencode > 1794562169 384 code-puppy 
+owner app pids unchanged []
+LaunchServices entries under the root after cleanup: 0

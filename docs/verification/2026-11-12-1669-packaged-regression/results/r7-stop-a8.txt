@@ -1,0 +1,7 @@
+main process 65872 already gone
+stopped label=a8 group=65872
+prefs compare: size 250->250; changed=['SKPurchaseIntentUpdatesLastChecked']; unchanged=['AppleTextDirection', 'NSForceRightToLeftWritingDirection', 'NSNavPanelExpandedSizeForOpenMode', 'NSTreatUnknownArgumentsAsOpen']; other-than-known-timestamp-changed=[]
+owner-side paths unchanged
+owner app pids unchanged []
+LaunchServices entries under the root after cleanup: 0
+WATCHDOG HAD FIRED

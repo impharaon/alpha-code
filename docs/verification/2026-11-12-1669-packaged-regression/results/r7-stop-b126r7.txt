@@ -1,0 +1,6 @@
+main process 20440 already gone
+stopped label=b126r7 group=20440
+prefs compare: size 250->250; changed=['SKPurchaseIntentUpdatesLastChecked']; unchanged=['AppleTextDirection', 'NSForceRightToLeftWritingDirection', 'NSNavPanelExpandedSizeForOpenMode', 'NSTreatUnknownArgumentsAsOpen']; other-than-known-timestamp-changed=[]
+owner-side paths unchanged
+OWNER APP PIDS CHANGED [55869 ]
+LaunchServices entries under the root after cleanup: 0

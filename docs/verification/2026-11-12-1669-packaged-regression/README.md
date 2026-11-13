@@ -1,5 +1,5 @@
 ---
-title: alpha-code#1669 打包版换代回归与撤回演练 —— 第六轮(0.2.0 候选包):审批与失败回合已回到 0.1.26;R17 不派子任务、审批中追加消息不显示、附件 docx 标签错(FAIL);出网批准框打断了隐藏
+title: alpha-code#1669 打包版换代回归与撤回演练 —— 第七轮(0.2.0 最终候选 3a8e25d6b8):第六轮三处 FAIL 已修好;命令审批卡退成「使用工具」(FAIL);手打 @general 时模型自己派了子任务
 kind: verification
 status: active
 owners:
@@ -11,6 +11,68 @@ last_reviewed: 2026-11-13
 
 依据:方案基线 [§5.1、§5.2、§6.2、§2.8](../../design/2026-11-08-1662-opencode2-generation-switch-baseline.md),
 票面 `impharaon/alpha-code#1669`,派发书里的七个补充格 a–g 与八条硬规矩。第二轮在前,第一轮原文在后。
+
+## 第七轮(2026-11-13 03:53–04:37 EST,新会话)—— 最终候选,复查第六轮三处 FAIL + 抽查
+
+被测:`alpha-code-fix-1669-g2-reject-hangs/packages/ui-mac/dist/mac-arm64/Code Puppy.app`(03:50 构建;工作树 HEAD `942bad6a43`,与 `3a8e25d6b8` 树相同、工作树干净),0.2.0,prod,未签名;
+`app.asar` sha256 `f49223d0…`,测的是根内 ad-hoc 重签副本(asar 字节不变)。换包同第六轮:a8 已不在运行(02:28:17 看门狗因系统里新出现的 SecurityAgent 杀掉,不能归到 A),
+跑停止脚本做事后检查 → 旧副本移到 `<A>/app-old-a8/` → 新副本放进 `<A>/app/` → 同根同闸启动 a9:**直接是登录态**(`data-auth="in"`、「按量付费」、无「点此登录」)。
+原始事实:[results/r7-raw.txt](results/r7-raw.txt);请求计数工具 [tools/netreq.py](tools/netreq.py)。
+
+### 第七轮结论
+
+1. **启动 PASS**:`app starting {version:'0.2.0'}`、`db-safety: watermark equal`、`codepuppy-ext: loading plugin bundle`、`process fence applied`、`server ready`;`GET /api/event` 只有 1 个请求。
+2. **R17:选中 `@general` 现在会派子任务。** (a) 请求审批档:卡片「派出子任务 / 交给助手 general / … / 子任务里不再逐项询问」,拒绝 ⇒ 引擎 `The user declined this tool call`、没有文件;
+   (b) 全部批准档:时间线「子任务 1 次」,文件由子会话(`parent_id` 指向本会话,agent `general`)的 `write` 写出;(d) 只读档 ⇒ `Subagent denied: general`、没有文件。
+   真实模型这次听从了派发指令(推理第一句就是「The user wants me to call the subagent tool with agent: general」)。
+   **(c) 手打 `@general`(不从菜单选):产品这一侧正确(用户消息没有 `agents` 字段),但模型自己掂量后还是派了子任务**(推理:「They addressed @general … I think honoring is fine and cheap」),
+   文件由子任务写出。按派发书字面判 FAIL,原因是模型自己的选择,不是产品把它变成了派发;第六轮同一手法下模型是直接写的。
+3. **审批等待中追加消息:修好了。** 追加的一句 1 秒内显示为「新一轮」气泡;切走再切回还在;允许一次后它作为下一轮执行(文件 `hello-follow-up`),只有一个气泡;停止后气泡留着,再发一句,三条各一个气泡。
+   **但停止之后新一轮要审批时,新的审批卡出不来**:屏幕上仍是停止前那张旧卡(绑定旧的 `per_1d428ee43…`),点「拒绝」只发出对旧 id 的 GET,报「Permission request not found」,
+   新审批的 id 在网络日志里一次都没出现,引擎等满 300 秒 fail-closed。**0.1.26 同样**(根 B 同一顺序:旧的「Run a command」卡留着,新一轮的写入没有卡,一直等),所以记为观察,不判回归。
+4. **N01 修好了**:docx 由 Code Mode `execute` 里的 `codepuppy-word.read_docx` 读出口令 7319,小标签回合结束时是「已读取」,重开对话仍是「已读取」;没读的那一轮是「这一轮助手没有读取 · 请助手读取」。
+5. **抽查**:拒绝(命令卡,引擎在点击的同一秒内记下拒绝、没有文件)与允许一次(改文件卡,文件改成 `hi`)都送达;写文件 / 编辑卡是专用的「改文件 + 文件名」;
+   编辑重发 1 秒内旧消息消失、新消息一个气泡,与引擎一致,重开相同;只读 → 全部批准同一对话内生效且不出卡;失败回合在根 E(全新数据、假 Key、未登录)上仍显示「登录或 Key 无效」卡(存量对话与当场发送都是)。
+   **FAIL:命令(shell)审批卡退成通用的「使用工具」**:候选包卡片标题「使用工具」、记忆范围「本会话内的同类操作:echo *」;
+   0.1.26 同一句话的卡片是「Run a command」「Remembers: commands starting with echo」。补丁卡模型没有产生(它用的是 edit),NOT-RUN。
+6. **事故(不是我的操作造成的,原因未查明):04:29:22 两个测试实例同时正常退出**(A:`watcher stopped`、`sidecar exited {code:0}`;B 同一秒)。
+   随后停止脚本发现:那一刻有一个 `/Applications/Code Puppy.app` 下的进程在运行(pid 55869,04:31 已不在),owner 侧的 `ai.opencode.desktop`、`~/.local/share/opencode`、`~/code-puppy`
+   修改时间变成 04:29:29–04:29:37 —— 与 owner 的应用被启动相符。我在 04:28–04:29 的操作只有:在 B 上用调试口点「Stop generating」、只读查 B 的库、对 B 跑停止脚本(B 已不在);都不涉及 `/Applications` 或 owner 的路径。
+   04:32 前台应用是 `loginwindow`;同时发版 lane 的 `notarytool wait` 在跑。A 已重启为 a10,登录态、隐藏。
+7. 付费:用户消息 18 条(A 16、B 的 0.1.26 对照 2),全部 `codepuppy/deepseek-v4-flash`,另有标题生成与子任务的自动调用;上限 20 没有到。根 E 的发送用假 Key(401,不计费)。
+
+### 第七轮格子
+
+| 格 | 结果 | 证据 |
+| --- | --- | --- |
+| 1 启动 / ext / 围栏 / 就绪 / 0.2.0 / 一条事件流 | PASS | [r7-launch-a9](results/r7-launch-a9.txt)、r7-raw「1」、[r7-a9-start](screens/r7-a9-start.png) |
+| 2(a) 请求审批 + 选中 `@general` ⇒ 派出卡,拒绝无文件 | PASS | [r7-r17a-card](screens/r7-r17a-card.png)、[r7-r17a-after-reject](screens/r7-r17a-after-reject.png) |
+| 2(b) 全部批准 ⇒ 子任务卡 + 子任务写文件 | PASS | [r7-r17b-subtask-expanded](screens/r7-r17b-subtask-expanded.png);子会话 `write` completed |
+| 2(c) 手打 `@general` ⇒ 直接写、不派发 | **FAIL(按字面;模型自己选择派发)** | 用户消息无 `agents`;[r7-r17c-typed](screens/r7-r17c-typed.png);推理原文见 r7-raw |
+| 2(d) 只读 + 选中 `@general` ⇒ 无文件 | PASS | [r7-r17d-readonly](screens/r7-r17d-readonly.png);`Subagent denied: general` |
+| 3(a) 等待审批时追加 ⇒ 立刻出气泡 | PASS | [r7-fu-a-bubble-1s](screens/r7-fu-a-bubble-1s.png) |
+| 3(b) 切走再切回仍在 | PASS | [r7-fu-b-after-switch](screens/r7-fu-b-after-switch.png) |
+| 3(c) 允许一次 ⇒ 一个气泡、下一轮按它执行 | PASS | [r7-fu-c-done](screens/r7-fu-c-done.png);文件 `hello-follow-up` |
+| 3(d) 停止 ⇒ 气泡留着;再发一句 ⇒ 各一个气泡 | PASS(另见观察) | DOM 各 1;[r7-fu-d-third-done](screens/r7-fu-d-third-done.png) |
+| 3(d) 观察:停止后新一轮的审批卡出不来,300 秒超时 | 与 0.1.26 相同 | [r7-fu-d-after-reject](screens/r7-fu-d-after-reject.png)、[0.1.26](screens/r7-b126-after-stop-new-card.png) |
+| 4 N01 docx「已读取」(回合结束 / 重开) | PASS / PASS | [r7-n01-answer](screens/r7-n01-answer.png)、[r7-n01-reopened](screens/r7-n01-reopened.png) |
+| 4 N01 没读的一轮「这一轮助手没有读取」 | PASS | [r7-n01-notread](screens/r7-n01-notread.png) |
+| 5 拒绝一次 / 允许一次 | PASS / PASS | [r7-s5-shell-rejected](screens/r7-s5-shell-rejected.png)、[r7-s5-edit-allowed](screens/r7-s5-edit-allowed.png) |
+| 5 写文件 / 编辑卡 | PASS | 「改文件 + 文件名」,[r7-s5-edit-card](screens/r7-s5-edit-card.png) |
+| 5 命令卡 | **FAIL** | 候选「使用工具」[r7-s5-shell-card](screens/r7-s5-shell-card.png);0.1.26「Run a command」[r7-b126-shell-card](screens/r7-b126-shell-card.png) |
+| 5 补丁卡 | NOT-RUN | 模型用 edit,没有产生 patch 调用 |
+| 5 编辑重发 | PASS | [r7-s5-resend-1s](screens/r7-s5-resend-1s.png)、[r7-s5-resend-reopened](screens/r7-s5-resend-reopened.png) |
+| 5 只读 → 全部批准(同一对话) | PASS | [r7-s5-ro-to-all](screens/r7-s5-ro-to-all.png);agent readonly → build |
+| 5 失败回合原因卡 | PASS | 根 E:[r7-e3-failed-opened](screens/r7-e3-failed-opened.png)、[r7-e3-failed-live](screens/r7-e3-failed-live.png) |
+| 6 收尾 A 运行、隐藏、登录 | PASS | a10:[r7-launch-a10](results/r7-launch-a10.txt);`data-auth="in"` |
+
+计数(19 项,不含观察):PASS 16 / FAIL 2 / NOT-RUN 1。核对:Claude Opus 5.5。
+
+### 第七轮收尾时的状态
+
+- A:a10 在运行(pid 见 `logs/a10.pid`),登录态,隐藏(`hidden=yes active=no`),后台 hide-app 复隐藏 3 小时;旧副本在 `<A>/app-old-a8/`、`<A>/app-old-a4/`。
+- B、E:没有实例在运行;E 的新副本在 `<E>/app/`,旧的在 `<E>/app-old-r6/`。各次停止脚本:偏好域只变已知时间戳;B 那次记到 owner 应用进程出现(结论 6);a9 那次记到 owner 侧路径修改时间变化(结论 6);其余不变。
+- 没有打开过登录页(a9、a10、e3 的 main.log 里 `opening authorize url` 都是 0);没有出现原生对话框;看门狗本轮没有触发。
 
 ## 第六轮(2026-11-13 00:31–02:10 EST,新会话)—— 0.2.0 候选包,一次扫完
 

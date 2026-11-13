@@ -24,8 +24,11 @@ export const EXPLICIT_CONFIG_FILE = "codepuppy-explicit.json"
 
 export type ExplicitPolicy = { action: string; resource: string; effect: string }
 export type ExplicitCommand = { template: string; description?: string; subagent?: boolean }
-/** main 写进显式层的三样(都出自注入那一次计算)。 */
-export type ExplicitLayer = { policies: ExplicitPolicy[]; commands: Record<string, ExplicitCommand>; skills: string[] }
+/**
+ * main 写进显式层的几样(都出自注入那一次计算)。`plugins` 是 `#1708` 的 `plugin.use` 语句(engine-plugin-policy.ts):先拒绝全部、
+ * 再放行 Code Puppy 的扩展与用户全局范围里现有的来源 —— 与 provider 的 policies 一样比项目配置先加载,项目里写的 allow 盖不过它。
+ */
+export type ExplicitLayer = { policies: ExplicitPolicy[]; plugins: ExplicitPolicy[]; commands: Record<string, ExplicitCommand>; skills: string[] }
 
 export function explicitConfigPath(userDataPath: string): string {
   return path.join(userDataPath, USER_DATA_LAYOUT.engineConfig, EXPLICIT_CONFIG_FILE)
@@ -55,7 +58,8 @@ export function composeExplicitDocument(userText: string | undefined, layer: Exp
   const factory = Object.fromEntries(Object.entries(layer.commands).filter(([name]) => !taken.has(name)))
   if (Object.keys(factory).length || isRecord(user.commands)) document.commands = { ...factory, ...(isRecord(user.commands) ? user.commands : {}) }
   // 同一份文档里后面的 policy 胜出(`findLast`):我们的排在用户文件里的之后。
-  if (layer.policies.length) document.policies = [...(Array.isArray(user.policies) ? user.policies : []), ...layer.policies]
+  const policies = [...layer.policies, ...layer.plugins]
+  if (policies.length) document.policies = [...(Array.isArray(user.policies) ? user.policies : []), ...policies]
   return { document, ...(userError ? { userError } : {}) }
 }
 
@@ -102,6 +106,8 @@ export function watchExplicitSources(input: {
   userConfig?: string
   layer: ExplicitLayer
   skills: () => string[]
+  /** `#1708`:按这一刻的用户文件原文与磁盘上的全局来源重算 `plugin.use` 语句(engine-plugin-policy.ts)。 */
+  plugins: (userText: string | undefined) => ExplicitPolicy[]
   log: (line: string) => void
 }): () => void {
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -109,7 +115,7 @@ export function watchExplicitSources(input: {
   let lastWritten = readUser(input.file)
   const refresh = () => {
     const text = readUser(input.userConfig)
-    const { document, userError } = composeExplicitDocument(text, { ...input.layer, skills: input.skills() })
+    const { document, userError } = composeExplicitDocument(text, { ...input.layer, skills: input.skills(), plugins: input.plugins(text) })
     if (userError && text !== undefined && text !== lastUser) {
       input.log(`[alpha-code#1667] ${input.userConfig} is not valid (${userError}); keeping the previous engine config`)
       return

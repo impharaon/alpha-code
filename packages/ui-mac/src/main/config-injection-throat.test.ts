@@ -45,6 +45,8 @@
 //     2026-11-12:2.x 按会话所在的项目目录解析它;判官在这里自己写死这条,不读生产的常量);别的路径点名。
 //     目录里技能的正文是技能作者的字,不在这道咽喉里判。
 //   这两个键(与第一层 policies)从裁决 r1 / C7 重裁起写在显式文件里 —— 判官看「内联文档 + 显式文件里 Code Puppy 那一层」合起来那一份。
+//   `#1708` 的 `plugin.use` 语句两层都写:`action` 走 policy 动词;`resource` 是插件路径或模式(不进模型上下文),与规则的
+//   `resource` 一样不当成字。
 // models.json(#857 的早到目录底表)只供目录,不进模型上下文 —— 本文件不判它。
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
@@ -140,8 +142,8 @@ const REPO_ROOT = path.resolve(import.meta.dir, "..", "..", "..", "..")
 const PERMISSION_VERBS = ["allow", "deny", "ask"] as const
 /** `packages/schema/src/config/agent.ts` `Schema.Literals(["subagent", "primary", "all"])` */
 const MODE_VERBS = ["subagent", "primary", "all"] as const
-/** `packages/schema/src/config/policy.ts` `Schema.Literals(["allow", "deny"])`(2.x `ConfigPolicy.Effect`);动作只写 `provider.use` */
-const POLICY_VERBS = ["allow", "deny", "provider.use"] as const
+/** `packages/schema/src/config/policy.ts` `Schema.Literals(["allow", "deny"])`(2.x `ConfigPolicy.Effect`);动作只写 `provider.use` 与 `plugin.use`(`#1708`) */
+const POLICY_VERBS = ["allow", "deny", "provider.use", "plugin.use"] as const
 const literals = (xs: readonly string[]) => `Literals([${xs.map((x) => JSON.stringify(x)).join(", ")}])`
 
 // ── ① 登记簿里 ui-mac 主进程写的引用:独立字面量,不从登记簿反推(否则是与被测对象同源的自指等价链)──────
@@ -215,6 +217,7 @@ function judge(before: unknown, after: unknown, importedDir: string): Judgement 
     if (set.includes(l.value)) out.verbs++
     else out.bad.push({ pointer: l.pointer, reason: "not an engine verb" })
   }
+  const policies = ((after as Cfg).policies as Array<{ action?: unknown }> | undefined) ?? []
   const ruleSlot = (l: Leaf, slot: string | undefined) => {
     if (slot === "effect") return verb(l, PERMISSION_VERBS)
     if (slot === "action" && /^\S+$/.test(l.value)) return
@@ -276,6 +279,7 @@ function judge(before: unknown, after: unknown, importedDir: string): Judgement 
       verb(l, POLICY_VERBS)
       continue
     }
+    if (top === "policies" && segs.length === 3 && segs[2] === "resource" && policies[Number(segs[1])]?.action === "plugin.use") continue
     const r = explainConfigReference(registryPointer(segs))
     if (r.ok) refs.add(r.id)
     else out.bad.push({ pointer: l.pointer, reason: "unexplained string leaf" })
@@ -296,7 +300,7 @@ function run(extPluginPath?: string): Run {
   // 第一层 policies;显式文件里其余的是用户 codepuppy.jsonc 的字,按来源不判)。判官看两处合起来的那一份。
   const inline = JSON.parse(result.config.content) as Cfg
   const layer = result.explicit!.layer
-  expect(layer.policies).toEqual((inline.policies as unknown[] | undefined) ?? [])
+  expect([...layer.policies, ...layer.plugins]).toEqual((inline.policies as unknown[] | undefined) ?? [])
   const after: Cfg = {
     ...inline,
     ...(layer.skills.length ? { skills: layer.skills } : {}),
@@ -385,6 +389,7 @@ describe("ui-mac 整份 config 咽喉:injectCodePuppyConfig 交给引擎的 cont
     expect(agentSource).toContain(literals(MODE_VERBS))
     expect(policySource).toContain(literals(["allow", "deny"]))
     expect(policySource).toContain('"provider.use"')
+    expect(policySource).toContain('"plugin.use"')
     // 先证明手段能测出已知的坏:少一个动词的字面量在源码里找不到
     expect(permissionSource).not.toContain(literals(["allow", "deny"]))
     expect(agentSource).not.toContain(literals(["primary", "all"]))

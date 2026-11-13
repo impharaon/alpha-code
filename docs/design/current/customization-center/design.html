@@ -11,7 +11,7 @@
 <div class="topbar">
   <div class="brand"><span class="m">α</span> 定制中心 · 活稿</div>
   <div class="spacer"></div>
-  <nav><a href="#hub-tabs">三页结构</a><a href="#lineage">与上一稿的关系</a><a href="#facts">契约与数据基线</a><a href="#vocab">词汇表</a><a href="#featured">推荐页</a><a href="#browse">浏览标识</a><a href="#detail">详情页</a><a href="#states">降级与失败态</a><a href="#policy">启用策略</a><a href="#localpkg">本地扩展包导入</a><a href="#import-preview">预览屏</a><a href="#installed-packs">已装扩展包</a><a href="#enable-flow">启用与生效</a><a href="#packrel">与整包事实的关系</a><a href="#review">评审点</a></nav>
+  <nav><a href="#hub-tabs">三页结构</a><a href="#lineage">与上一稿的关系</a><a href="#facts">契约与数据基线</a><a href="#vocab">词汇表</a><a href="#featured">推荐页</a><a href="#browse">浏览标识</a><a href="#detail">详情页</a><a href="#cloud-preflight">发送前预检</a><a href="#states">降级与失败态</a><a href="#policy">启用策略</a><a href="#localpkg">本地扩展包导入</a><a href="#import-preview">预览屏</a><a href="#installed-packs">已装扩展包</a><a href="#enable-flow">启用与生效</a><a href="#packrel">与整包事实的关系</a><a href="#review">评审点</a></nav>
   <div class="seg" id="themeSeg"><button data-t="light" class="on">浅色</button><button data-t="dark">深色</button></div>
 </div>
 
@@ -705,6 +705,39 @@
   <div class="note"><b>规则一句话</b>:甄选摘要在场即为展示真源(契约禁止重算替换),本地派生只服务未策展条目;同一条目两真源并存时不混排 —— 整段整段切换,段内版式一个像素不动。<code>connection-only</code> 条目(远程服务仅连接描述,当前目录无)按契约「无需下载(仅写配置)」呈现,留待数据落地,不预造帧。</div>
 </section>
 
+<!-- ═══ 发送云端任务前的额度与准入(2026-11-13 并入)═══ -->
+<section class="sec" id="cloud-preflight">
+  <div class="sec-kicker">云端任务详情页 · 发送框 · 2026-11-13 并入</div>
+  <h2>发起任务之前,先看到账户和能不能发</h2>
+  <div class="note"><b>与上一稿的关系</b>:取自增量稿 <a href="../../2026-11-13-1686-cloud-form-preflight-r3/frame.html"><code>2026-11-13-1686-cloud-form-preflight-r3/</code></a>。依据:owner 2026-11-13 定案(编排器转达)—— A 账户弹层余额卡收进组件库,与两种发送框共用;B 两种发送框的发送按钮挪到右边;C 定制中心自己的按钮样式这次不动。卡片与名称 — 值列表的定义见 <a href="../../2026-11-13-library-card-kv/frame.html"><code>2026-11-13-library-card-kv/</code></a>;能不能发用组件库提示条 Banner。退回的第一稿、第二稿留在各自目录作历史。三处文案按默认(可改回):已停用一句、查不到不提示、没有对应文案的拒绝原因不下结论。<b>代码尚未实现</b>。帧画在隔离区里,直接用正式代码的样式;颜色取本页令牌(与 <code>tokens.css</code> 有既知漂移,例如本页 <code>--a-text-tertiary</code> 较浅)。</div>
+
+  <div class="sec-kicker" id="cloud-preflight-form" style="margin-top:28px">目录表单 · 各状态(以「云端深度调研」为例)</div>
+  <div data-cp="form"></div>
+
+  <div class="sec-kicker" id="cloud-preflight-legacy" style="margin-top:28px">旧版云条目 · 位置(其余状态的两块与目录表单相同,全套见增量稿 <code>#states-legacy</code>)</div>
+  <div data-cp="legacy"></div>
+
+  <div class="sec-kicker" id="cloud-preflight-rows" style="margin-top:28px">按钮行(定案 B):状态字和「取消任务」在主按钮左边;发送中 / 执行中只留卡片</div>
+  <div data-cp="rows"></div>
+
+  <div class="sec-kicker" id="cloud-preflight-copy" style="margin-top:28px">文案与组件</div>
+  <div class="matrix-scroll"><table class="matrix">
+    <tr><th>状态</th><th>卡片(名称 — 值列表)</th><th>提示条 Banner(标题 / 说明)</th><th>按钮(提示条右侧)</th></tr>
+    <tr><td>查询中</td><td>四行,值「…」</td><td>—</td><td>—</td></tr>
+    <tr><td>能发</td><td>余额与额度</td><td>现在可以发起 / 预留 ¥…,按实际用量结算;失败时已产生的费用仍会结算。</td><td>—</td></tr>
+    <tr><td>额度用完</td><td>余额与额度</td><td>现在发不了 / 会员额度已用完。…(原句)</td><td>打开余额支付</td></tr>
+    <tr><td>余额不够</td><td>余额与开关</td><td>现在发不了 / 钱包余额不够这次任务要预留的金额。…(原句)+ 预留句</td><td>去充值</td></tr>
+    <tr><td>账户停用</td><td>余额与额度</td><td>现在发不了 / 账户已被停用,请联系我们。</td><td>—</td></tr>
+    <tr><td>其它拒绝原因</td><td>余额与额度</td><td>不显示</td><td>—</td></tr>
+    <tr><td>登录已失效</td><td>—</td><td>现在发不了 / 尚未登录或登录已过期。请登录平台账号后重试。</td><td>去登录</td></tr>
+    <tr><td>任务已停用</td><td>—</td><td>现在发不了 / 这项云端功能已停用，请在本机生成。</td><td>—</td></tr>
+    <tr><td>任务要求变了</td><td>—</td><td>现在发不了 / 这项云能力的要求已更新,请刷新定制中心或更新 Code Puppy。</td><td>—</td></tr>
+    <tr><td>发送中 / 执行中</td><td>余额与额度</td><td>不显示</td><td>—</td></tr>
+    <tr><td>查不到</td><td colspan="3">不加任何东西;目录表单原来那行「预留 US$…」留在原处</td></tr>
+  </table></div>
+  <div class="cap">发送按钮在所有状态下都不因预检变灰,也不等预检。</div>
+</section>
+
 <!-- ═══ 评审点 ═══ -->
 <section class="sec" id="review">
   <div class="sec-kicker">待你拍板</div>
@@ -722,6 +755,75 @@
 <script>
 document.querySelectorAll(".sw:not([disabled])").forEach(function(s){s.addEventListener("click",function(e){e.stopPropagation();s.classList.toggle("on")})});
 document.querySelectorAll("#themeSeg button").forEach(function(b){b.addEventListener("click",function(){document.querySelectorAll("#themeSeg button").forEach(function(x){x.classList.remove("on")});b.classList.add("on");document.documentElement.dataset.theme=b.dataset.t})});
+</script>
+<script>
+/* #cloud-preflight:帧内容用正式代码的样式画在 shadow root 里(同 2026-10-30 增量稿的 template[data-css] 做法),令牌从本页继承。 */
+(function () {
+  var CODE = "../../../../packages/ui-mac/src/renderer/";
+  var CSS = [CODE + "codepuppy-ui/base.css", CODE + "codepuppy-ui/banner.css", CODE + "extensions/extension-hub.css", "design.css"];
+  var T = {
+    allowance: "会员额度已用完。默认不会自动扣钱包余额,充值也不能恢复;可以等额度窗口重置,或到网站账户页打开「额度用完后用余额付」。",
+    wallet: "钱包余额不够这次任务要预留的金额。请先充值,或等在途任务结算后再试。",
+    suspended: "账户已被停用,请联系我们。",
+    auth: "尚未登录或登录已过期。请登录平台账号后重试。",
+    changed: "这项云能力的要求已更新,请刷新定制中心或更新 Code Puppy。",
+    retired: "这项云端功能已停用，请在本机生成。",
+    hold: "预留 ¥14.00,按实际用量结算;失败时已产生的费用仍会结算。",
+    holdUsd: "预留 US$2.00,按实际用量结算;失败时已产生的费用仍会结算。",
+    needPlatform: "请先登录平台账号并切换到平台模式，再开启或发送云端任务。"
+  };
+  function kv(rows) { return '<dl class="a-kv">' + rows.map(function (r) { return '<div class="a-kv-row"><dt class="a-kv-k">' + r[0] + '</dt><dd class="a-kv-v"' + (r[2] ? ' data-state="' + r[2] + '"' : "") + ">" + r[1] + "</dd></div>"; }).join("") + "</dl>"; }
+  function card(rows) { return '<div class="a-card" style="width:100%" aria-label="你的账户">' + kv(rows) + "</div>"; }
+  function banner(kind, title, detail, action, more) { return '<div class="a-banner ' + kind + '" role="status" style="width:100%"><span class="a-banner-dot" aria-hidden="true"></span><span class="a-banner-body"><span class="a-banner-title">' + title + '</span><span class="a-banner-detail">' + detail + "</span>" + (more ? '<span class="a-banner-detail">' + more + "</span>" : "") + "</span>" + (action ? '<button class="a-banner-action" type="button">' + action + "</button>" : "") + "</div>"; }
+  function btn(label, o) { o = o || {}; return '<button class="codepuppy-ext-add"' + (o.primary ? ' data-variant="primary"' : "") + (o.disabled ? " disabled" : "") + ' type="button">' + label + "</button>"; }
+  function meta(text) { return '<span class="codepuppy-ext-meta" data-live="">' + text + "</span>"; }
+  var OK = "现在可以发起", NO = "现在发不了";
+  var ACC = [["可用余额", "¥36.50"], ["5 小时额度", "180 / 1,000"], ["7 日额度", "2,400 / 10,000"], ["额度用完后用余额付", "关"]];
+  var FULL = [["可用余额", "¥36.50"], ["5 小时额度", "1,000 / 1,000"], ["7 日额度", "6,100 / 10,000"], ["额度用完后用余额付", "关"]];
+  var PRE = {
+    loading: card(ACC.map(function (r) { return [r[0], "…", "pending"]; })),
+    ok: card(ACC) + banner("success", OK, T.hold),
+    allowance: card(FULL) + banner("warning", NO, T.allowance, "打开余额支付"),
+    wallet: card([["可用余额", "¥3.20"], ["额度用完后用余额付", "开"]]) + banner("warning", NO, T.wallet, "去充值", T.hold),
+    suspended: card(ACC) + banner("warning", NO, T.suspended),
+    other: card(ACC),
+    signedOut: banner("warning", NO, T.auth, "去登录"),
+    retired: banner("warning", NO, T.retired),
+    changed: banner("warning", NO, T.changed)
+  };
+  function formBox(o) {
+    var unavailable = o.pre === undefined;
+    return '<section class="codepuppy-ext-dsec" style="border-top:0"><h3 class="codepuppy-ext-dsec-t">云端任务</h3><div class="codepuppy-ext-dsub"><div class="codepuppy-ext-dsub-t">发送云端任务</div><p class="codepuppy-ext-dnote">离开本页后不再自动保存</p>' +
+      '<div class="codepuppy-ext-dsub"><div class="codepuppy-ext-dsub-t">发送到云端的内容</div><ul class="codepuppy-ext-dlist"><li>你填写的调研问题</li><li>任务设置(最长运行时间与检索轮数)</li></ul></div>' +
+      (unavailable ? '<p class="codepuppy-ext-dnote">' + T.holdUsd + "</p>" : "") +
+      '<div class="codepuppy-ext-cloudrun"><label style="width:100%"><span>调研问题 *</span><span class="codepuppy-ext-meta">写清范围和想要的结论形式</span><textarea class="codepuppy-ext-ddoc" style="width:100%" rows="4">2026 年国内中小企业使用 AI 编程助手的情况:用得多的场景、主要顾虑、付费意愿。给出处。</textarea></label>' +
+      (o.pre || "") + (o.row || "") + (o.submit || btn("发起任务", { primary: true })) + "</div></div></section>";
+  }
+  function legacyBox(o) {
+    return '<div class="codepuppy-ext-dsub"><div class="codepuppy-ext-dsub-t">发送云端任务</div><p class="codepuppy-ext-dnote">只读取和发送你明确选择的文件。每次发现受保护信息都会请你确认；未发现时会直接发送。</p>' +
+      (o.pre || "") + '<div class="codepuppy-ext-cloudrun">' + (o.row || "") + (o.buttons || btn("发送 Git 代码改动") + btn("选择文件并发送", { primary: true })) + "</div></div>";
+  }
+  var SETS = {
+    form: [["查询中", formBox({ pre: PRE.loading })], ["能发", formBox({ pre: PRE.ok })], ["额度用完", formBox({ pre: PRE.allowance })], ["余额不够(没有会员)", formBox({ pre: PRE.wallet })], ["账户停用", formBox({ pre: PRE.suspended })], ["其它拒绝原因:只显示余额额度", formBox({ pre: PRE.other })], ["登录已失效", formBox({ pre: PRE.signedOut })], ["任务已停用", formBox({ pre: PRE.retired })], ["任务要求变了", formBox({ pre: PRE.changed })], ["查不到:原来那行留在原处", formBox({ pre: undefined })]],
+    legacy: [["能发:两块在说明之后、按钮之前", legacyBox({ pre: PRE.ok })], ["查不到:和今天一样", legacyBox({})]],
+    rows: [
+      ["目录表单 · 没登录平台(不显示预检)", formBox({ row: meta(T.needPlatform), submit: btn("发起任务", { primary: true, disabled: true }) })],
+      ["目录表单 · 执行中", formBox({ pre: card(ACC), row: meta("任务正在排队…") + btn("取消任务"), submit: btn("云端执行中…", { primary: true, disabled: true }) })],
+      ["旧版云条目 · 没登录平台", legacyBox({ row: meta(T.needPlatform), buttons: btn("发送 Git 代码改动", { disabled: true }) + btn("选择文件并发送", { primary: true, disabled: true }) })],
+      ["旧版云条目 · 执行中", legacyBox({ pre: card(ACC), row: meta("检查未发现受保护信息，文件已直接发送。") + btn("取消任务"), buttons: btn("发送 Git 代码改动", { disabled: true }) + btn("云端执行中…", { primary: true, disabled: true }) })]
+    ]
+  };
+  document.querySelectorAll("[data-cp]").forEach(function (slot) {
+    SETS[slot.getAttribute("data-cp")].forEach(function (item) {
+      var cap = document.createElement("div"); cap.className = "cap"; cap.innerHTML = "<b>" + item[0] + "</b>";
+      var frame = document.createElement("div"); frame.className = "frame"; frame.setAttribute("data-cp-frame", "");
+      var root = frame.attachShadow({ mode: "open" });
+      CSS.forEach(function (href) { var l = document.createElement("link"); l.rel = "stylesheet"; l.href = href; root.appendChild(l); });
+      var host = document.createElement("div"); host.className = "a-ui cp-host"; host.innerHTML = item[1]; root.appendChild(host);
+      slot.appendChild(cap); slot.appendChild(frame);
+    });
+  });
+})();
 </script>
 </body>
 </html>

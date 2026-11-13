@@ -32,6 +32,16 @@ the authority for exact behavior.
 > Verify exact variants/states against the component CSS and `gallery.html`
 > before relying on them — the table names the axes, the code is authoritative.
 
+## Pending — designed, not yet in code
+
+Approved designs whose component does not exist in `codepuppy-ui/` yet. When the
+implementation lands, move the row into the table above and add its gallery swatch.
+
+| Component | Design | Role | Variants · states |
+| --- | --- | --- | --- |
+| **Card** (卡片) | [`2026-11-13-library-card-kv/`](../2026-11-13-library-card-kv/frame.html#card) | bounded block of read-only facts; no buttons inside — related actions go after it, right-aligned (same rule as `.a-dialog-footer`). First users: account popover balance card, cloud send boxes | one variant: `--a-bg-subtle` fill, `--a-border-faint` 1px, `--a-radius-lg`, padding `--a-space-3`; no own margin; static only |
+| **KeyValueList** (名称 — 值列表) | [`2026-11-13-library-card-kv/`](../2026-11-13-library-card-kv/frame.html#kv) | `<dl>` of rows, label left / value right, inside a Card | one size (`--a-text-sm`, `--a-leading-snug`, row padding `--a-space-1`); value states: value · pending「…」· unavailable「—」(`--a-text-tertiary`, `--a-text-xs`) |
+
 ## Composition surfaces (page-level, not primitives)
 
 `codepuppy-composer.tsx` + `codepuppy-composer.css` / `composer-shell.css` (the input

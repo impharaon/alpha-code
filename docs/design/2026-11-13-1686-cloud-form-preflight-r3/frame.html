@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="zh-CN" data-color-scheme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>发送云端任务 · 提交前的额度与准入 · 第三稿</title>
+<!-- 帧内样式引用正式代码(f0f6ac0eb5):令牌与基础、组件库 Banner、定制中心。卡片与名称 — 值列表取自组件稿 2026-11-13-library-card-kv。 -->
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/codepuppy-ui/base.css" />
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/codepuppy-ui/banner.css" />
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/extensions/extension-hub.css" />
+<style>
+/* ════════ 帧外排版(dz-):只用 --a-* ════════ */
+html,body{margin:0}
+body{background:var(--a-bg-subtle);color:var(--a-text);font-family:var(--a-font-sans);font-size:var(--a-text-base);line-height:var(--a-leading-normal);-webkit-font-smoothing:antialiased}
+.dz-bar{position:sticky;top:0;z-index:2000;display:flex;align-items:center;gap:16px;padding:10px 24px;border-bottom:1px solid var(--a-border);background:color-mix(in srgb,var(--a-bg-canvas) 92%,transparent);backdrop-filter:blur(14px)}
+.dz-bar b{font-size:var(--a-text-sm)}
+.dz-bar nav{display:flex;gap:12px;flex-wrap:wrap;font-size:var(--a-text-xs)}
+.dz-bar nav a{color:var(--a-text-secondary);text-decoration:none}
+.dz-grow{flex:1}
+.dz-seg{display:inline-flex;padding:2px;gap:2px;background:var(--a-bg-muted);border-radius:var(--a-radius-sm)}
+.dz-seg button{border:0;background:transparent;font:inherit;font-size:var(--a-text-xs);padding:3px 10px;border-radius:var(--a-radius-xs);color:var(--a-text-secondary);cursor:pointer}
+.dz-seg button[data-on]{background:var(--a-surface);color:var(--a-text);box-shadow:var(--a-shadow-xs)}
+.dz-wrap{max-width:1000px;margin:0 auto;padding:28px 24px 96px}
+.dz-intro h1{margin:0 0 8px;font-size:var(--a-text-2xl);letter-spacing:var(--a-tracking-tight)}
+.dz-intro p{margin:0 0 6px;max-width:84ch;color:var(--a-text-secondary);font-size:var(--a-text-md);line-height:1.65}
+.dz-sec{scroll-margin-top:64px}
+.dz-h2{margin:44px 0 4px;font-size:var(--a-text-xl);letter-spacing:var(--a-tracking-tight)}
+.dz-h2 small{margin-left:8px;font-size:var(--a-text-xs);font-weight:var(--a-weight-normal);color:var(--a-text-tertiary)}
+.dz-sub{margin:0 0 14px;max-width:96ch;color:var(--a-text-secondary);font-size:var(--a-text-sm);line-height:1.6}
+.dz-rel{margin:16px 0 0;padding:14px 16px;border:1px solid var(--a-border);border-left:3px solid var(--a-accent);border-radius:var(--a-radius-md);background:var(--a-bg-canvas);font-size:var(--a-text-sm);line-height:1.65;color:var(--a-text-secondary);max-width:110ch}
+.dz-rel h3{margin:0 0 6px;font-size:var(--a-text-md);color:var(--a-text)}
+.dz-rel b{color:var(--a-text)}
+.dz-rel ul{margin:4px 0 0;padding-left:18px}
+.dz-wrap code{font-family:var(--a-font-mono);font-size:11px}
+.dz-cap{margin:22px 0 8px;font-size:var(--a-text-xs);color:var(--a-text-tertiary);line-height:1.5;max-width:880px}
+.dz-cap b{display:block;font-size:var(--a-text-sm);color:var(--a-text);margin-bottom:1px}
+.dz-table{border-collapse:collapse;font-size:var(--a-text-sm);background:var(--a-bg-canvas);border:1px solid var(--a-border);width:100%}
+.dz-table th{background:var(--a-bg-subtle);text-align:left;font-size:var(--a-text-xs);color:var(--a-text-tertiary);font-weight:var(--a-weight-semibold);padding:8px 12px}
+.dz-table td{padding:9px 12px;border-top:1px solid var(--a-border-faint);color:var(--a-text-secondary);vertical-align:top;line-height:1.55}
+.dz-table td:first-child{white-space:nowrap;color:var(--a-text)}
+.dz-frame{width:var(--w);padding:6px 24px 22px;background:var(--a-bg-canvas);border:1px solid var(--a-border-strong);border-radius:10px;box-shadow:var(--a-shadow-sm);box-sizing:content-box}
+.dz-viewport{position:relative;width:432px;height:var(--vh);padding:0 24px;overflow:hidden;background:var(--a-bg-canvas);border:1px solid var(--a-border-strong);border-radius:10px;box-sizing:content-box}
+.dz-viewport::after{content:"";position:absolute;left:0;right:0;bottom:0;border-bottom:2px dashed var(--a-error)}
+.dz-vp-inner{position:relative}
+
+/* ════════ 组件库新增(组件稿 2026-11-13-library-card-kv;实现时进 codepuppy-ui/)════════ */
+.a-card{padding:var(--a-space-3);border:1px solid var(--a-border-faint);border-radius:var(--a-radius-lg);background:var(--a-bg-subtle)}
+.a-kv{margin:0}
+.a-kv-row{display:flex;align-items:center;justify-content:space-between;gap:var(--a-space-3);padding:var(--a-space-1) 0;font-size:var(--a-text-sm);line-height:var(--a-leading-snug)}
+.a-kv-k{margin:0;color:var(--a-text-secondary)}
+.a-kv-v{margin:0;min-width:0;color:var(--a-text);font-weight:var(--a-weight-semibold);text-align:right;font-variant-numeric:tabular-nums}
+.a-kv-v[data-state="pending"],.a-kv-v[data-state="unavailable"]{color:var(--a-text-tertiary);font-weight:var(--a-weight-medium);font-size:var(--a-text-xs)}
+
+/* ════════ 定案 B:发送按钮放右(实现时改 extension-hub.css 的 .codepuppy-ext-cloudrun 这一条)════════ */
+.codepuppy-ext-cloudrun{justify-content:flex-end}
+</style>
+</head>
+<body>
+
+<div class="dz-bar">
+  <b>发送云端任务 · 第三稿</b>
+  <nav><a href="#map">每一块用哪个组件</a><a href="#before-after">改前改后</a><a href="#states-form">目录表单各状态</a><a href="#states-legacy">旧版云条目各状态</a><a href="#rows">按钮行挪到右边后</a><a href="#small-window">矮窗口</a><a href="#copy">文案表</a><a href="#dev">给实现</a></nav>
+  <div class="dz-grow"></div>
+  <div class="dz-seg" id="themeSeg"><button data-theme="light" data-on>浅色</button><button data-theme="dark">深色</button></div>
+</div>
+
+<main class="dz-wrap">
+
+<section class="dz-intro">
+  <h1>发起任务之前,先看到账户和能不能发</h1>
+  <p>输入框下面、发送按钮上面多两块:一张卡片写你的余额和额度,一条提示写这项任务现在能不能发。发不了时提示条右边带「去登录」「打开余额支付」「去充值」。发送按钮挪到右边。它只是提示:发送按钮不会因此变灰,也不用等它查完。</p>
+  <div class="dz-rel">
+    <h3>与上一稿的关系</h3>
+    <ul>
+      <li><b>定案</b>(owner 2026-11-13,编排器转达):A 账户弹层的余额卡收进组件库,弹层与两种发送框共用;B 发送按钮在两种发送框里都挪到右边;C 定制中心自己的按钮样式这次不动,整页统一另记。原则:组件库没有的标准先设计组件,再使用。</li>
+      <li><b>组件</b>:卡片与名称 — 值列表的定义见组件稿 <a href="../2026-11-13-library-card-kv/frame.html"><code>2026-11-13-library-card-kv/</code></a>;能不能发用组件库的提示条 Banner(标题写短结论,说明写原因 —— Banner 自己的写法)。</li>
+      <li><b>沿用第二稿</b> <a href="../2026-11-13-1686-cloud-form-preflight-r2/frame.html#sample"><code>-r2/</code></a>:整块放在输入框下面、紧贴发送按钮;提示条用 warning,不拦发送。<b>沿用第一稿</b> <a href="../2026-11-13-1686-cloud-form-preflight/frame.html#copy"><code>-r1/</code></a>:状态表、拒绝原因原句、查不到时回到原来那行。</li>
+      <li><b>三处默认</b>(可改回):已停用一句用「这项云端功能已停用，请在本机生成。」;查不到不额外提示;没有对应文案的拒绝原因只显示余额额度,不下结论。</li>
+    </ul>
+  </div>
+</section>
+
+<section class="dz-sec" id="map">
+  <h2 class="dz-h2">每一块用哪个组件<small>帧外</small></h2>
+  <table class="dz-table">
+    <thead><tr><th>东西</th><th>组件</th><th>规则</th></tr></thead>
+    <tbody>
+      <tr><td>余额、两项额度、额度用完后用余额付</td><td>卡片 + 名称 — 值列表(组件库新增,<code>system/components.md</code> Pending)</td><td>名称在左、值在右;卡片里不放按钮</td></tr>
+      <tr><td>查询中</td><td>同一张卡,值写「…」(列表的「读取中」状态)</td><td>同上</td></tr>
+      <tr><td>能不能发 + 原因</td><td>提示条 Banner(<code>gallery.html#banner</code>):能发 success,其余 warning;标题 = 短结论,说明 = 原句</td><td>Banner 的按钮在最右</td></tr>
+      <tr><td>去登录 / 打开余额支付 / 去充值</td><td>Banner 自带按钮</td><td>同上</td></tr>
+      <tr><td>发起任务 / 选择文件并发送</td><td>表单原有按钮(定制中心样式,定案 C 不动)</td><td>靠右,主按钮在最右(<code>dialog.css .a-dialog-footer</code>;同页详情头部主操作在右)</td></tr>
+      <tr><td>发送中 / 排队 / 取消 / 未登录提示</td><td>按钮行原有的状态字与「取消任务」</td><td>在按钮左边;「取消任务」在主按钮左边</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="dz-sec" id="before-after">
+  <h2 class="dz-h2">改前改后<small>宽 880 · 能发</small></h2>
+  <p class="dz-sub">改前 = 上线代码;退回的第一稿与第二稿样张见各自目录。</p>
+  <div data-frames="before-after"></div>
+</section>
+
+<section class="dz-sec" id="states-form">
+  <h2 class="dz-h2">目录表单 · 各状态<small>以「云端深度调研」为例 · 宽 880</small></h2>
+  <p class="dz-sub">表单本身没登录时已经写着「请先登录平台账号…」,这时不显示这两块,见「按钮行挪到右边后」。</p>
+  <div data-frames="states-form"></div>
+</section>
+
+<section class="dz-sec" id="states-legacy">
+  <h2 class="dz-h2">旧版云条目 · 各状态<small>以「云端代码审查」为例 · 宽 880</small></h2>
+  <div data-frames="states-legacy"></div>
+</section>
+
+<section class="dz-sec" id="rows">
+  <h2 class="dz-h2">按钮行挪到右边后<small>两种发送框 · 状态字和「取消任务」都在主按钮左边</small></h2>
+  <p class="dz-sub">发送中、执行中、正在取消时只留卡片,不显示能不能发:按钮正忙,「现在可以发起」容易读成「可以再点一次」。次按钮置灰时看起来和平常一样,是定制中心按钮今天的样子(定案 C 不动)。</p>
+  <div data-frames="rows"></div>
+</section>
+
+<section class="dz-sec" id="small-window">
+  <h2 class="dz-h2">矮窗口<small>480 × 520,页签以下可见 436 高 · 宽 432</small></h2>
+  <p class="dz-sub">最长的两种:额度用完(卡片四行)与余额不够(说明两行)。卡片顶在可见区最上面时,发送按钮在虚线以上。</p>
+  <div class="dz-row" data-frames="small-window" style="display:flex;gap:28px;flex-wrap:wrap"></div>
+</section>
+
+<section class="dz-sec" id="copy">
+  <h2 class="dz-h2">文案表<small>帧外 · 新写的标「新」</small></h2>
+  <table class="dz-table">
+    <thead><tr><th>状态</th><th>卡片</th><th>提示条(标题 / 说明)</th><th>按钮</th></tr></thead>
+    <tbody>
+      <tr><td>查询中</td><td>四行,值「…」</td><td>—</td><td>—</td></tr>
+      <tr><td>能发</td><td>余额与额度</td><td>「现在可以发起」(新)/「预留 ¥14.00,按实际用量结算;失败时已产生的费用仍会结算。」</td><td>—</td></tr>
+      <tr><td>额度用完</td><td>余额与额度</td><td>「现在发不了」(新)/「会员额度已用完。默认不会自动扣钱包余额,充值也不能恢复;可以等额度窗口重置,或到网站账户页打开「额度用完后用余额付」。」</td><td>打开余额支付</td></tr>
+      <tr><td>余额不够</td><td>余额与开关(没有会员)</td><td>「现在发不了」/「钱包余额不够这次任务要预留的金额。请先充值,或等在途任务结算后再试。」+ 预留句(句里提到预留的金额,所以写出来)</td><td>去充值</td></tr>
+      <tr><td>账户停用</td><td>余额与额度</td><td>「现在发不了」/「账户已被停用,请联系我们。」</td><td>—</td></tr>
+      <tr><td>其它拒绝原因</td><td>余额与额度</td><td>不显示(默认:不下结论)</td><td>—</td></tr>
+      <tr><td>登录已失效</td><td>—</td><td>「现在发不了」/「尚未登录或登录已过期。请登录平台账号后重试。」</td><td>去登录</td></tr>
+      <tr><td>任务已停用</td><td>—</td><td>「现在发不了」/「这项云端功能已停用，请在本机生成。」(新,默认)</td><td>—</td></tr>
+      <tr><td>任务要求变了</td><td>—</td><td>「现在发不了」/「这项云能力的要求已更新,请刷新定制中心或更新 Code Puppy。」</td><td>—</td></tr>
+      <tr><td>发送中 / 执行中</td><td>余额与额度</td><td>不显示(按钮正忙)</td><td>—</td></tr>
+      <tr><td>查不到</td><td colspan="3">什么都不加。目录表单仍有原来那行「预留 US$…」(在原处);旧版云条目和今天一样</td></tr>
+    </tbody>
+  </table>
+  <p class="dz-sub" style="margin-top:10px">比第一稿少了「正在查询额度…」「✓」和「额度用完后用余额付 开 / 关」那一行字:查询中改用卡片的「…」,开关成了卡片里的一行。英文:Ready to start · Can't start now。</p>
+</section>
+
+<section class="dz-sec" id="dev">
+  <h2 class="dz-h2">给实现<small>帧外</small></h2>
+  <table class="dz-table">
+    <tbody>
+      <tr><td>定案 B(按钮挪右)</td><td><code>extensions/extension-hub.css</code>:<code>.codepuppy-ext-cloudrun</code> 加 <code>justify-content: flex-end</code>(两种发送框共用这一条)。<br><code>extensions/cloud-form-box.tsx</code>:按钮行里把状态字、未登录提示、「取消任务」排到「发起任务」之前。<br><code>extensions/cloud-dispatch-box.tsx</code>:同上;代码审查的「发送 Git 代码改动」排到「选择文件并发送」之前,「已直接发送」与「审查范围」两条状态字排到按钮之前。<br>现有测试按 data 属性找元素,不依赖顺序(<code>cloud-form-box.test.ts</code>、<code>cloud-dispatch-box.test.ts</code>)。</td></tr>
+      <tr><td>定案 A(组件)</td><td>新组件进 <code>codepuppy-ui/</code>;账户弹层 <code>sidebar/codepuppy-sidebar.tsx</code> 与 <code>sidebar/account-popover.css</code> 改用它。差异见组件稿 <code>#popover</code>。</td></tr>
+      <tr><td>预检区</td><td>两种发送框在按钮行之前插卡片与提示条;目录表单的原预留行只在查不到时显示;拒绝的标题、说明、按钮取自 <code>failureCopy</code> / <code>dispatchError</code>,已停用一句进 <code>failureCopy</code>。</td></tr>
+    </tbody>
+  </table>
+</section>
+
+</main>
+
+<script>
+const T = {
+  allowance: "会员额度已用完。默认不会自动扣钱包余额,充值也不能恢复;可以等额度窗口重置,或到网站账户页打开「额度用完后用余额付」。",
+  wallet: "钱包余额不够这次任务要预留的金额。请先充值,或等在途任务结算后再试。",
+  suspended: "账户已被停用,请联系我们。",
+  auth: "尚未登录或登录已过期。请登录平台账号后重试。",
+  changed: "这项云能力的要求已更新,请刷新定制中心或更新 Code Puppy。",
+  retired: "这项云端功能已停用，请在本机生成。",
+  hold: "预留 ¥14.00,按实际用量结算;失败时已产生的费用仍会结算。",
+  holdUsd: "预留 US$2.00,按实际用量结算;失败时已产生的费用仍会结算。",
+  needPlatform: "请先登录平台账号并切换到平台模式，再开启或发送云端任务。",
+}
+/* 组件库:卡片 + 名称 — 值列表 */
+const kv = (rows) => '<dl class="a-kv">' + rows.map((r) => '<div class="a-kv-row"><dt class="a-kv-k">' + r[0] + '</dt><dd class="a-kv-v"' + (r[2] ? ' data-state="' + r[2] + '"' : "") + ">" + r[1] + "</dd></div>").join("") + "</dl>"
+const card = (rows) => '<div class="a-card" data-pf="" style="width:100%" aria-label="你的账户">' + kv(rows) + "</div>"
+/* 组件库:Banner(结构同 Banner.tsx:点、标题、说明、子内容、按钮) */
+const banner = (kind, title, detail, action, more) => '<div class="a-banner ' + kind + '" data-pf="" role="status" style="width:100%"><span class="a-banner-dot" aria-hidden="true"></span><span class="a-banner-body"><span class="a-banner-title">' + title + '</span><span class="a-banner-detail">' + detail + "</span>" + (more ? '<span class="a-banner-detail">' + more + "</span>" : "") + "</span>" + (action ? '<button class="a-banner-action" type="button">' + action + "</button>" : "") + "</div>"
+const OK = "现在可以发起", NO = "现在发不了"
+const ACC = [["可用余额", "¥36.50"], ["5 小时额度", "180 / 1,000"], ["7 日额度", "2,400 / 10,000"], ["额度用完后用余额付", "关"]]
+const FULL = [["可用余额", "¥36.50"], ["5 小时额度", "1,000 / 1,000"], ["7 日额度", "6,100 / 10,000"], ["额度用完后用余额付", "关"]]
+const PRE = {
+  loading: card(ACC.map((r) => [r[0], "…", "pending"])),
+  ok: card(ACC) + banner("success", OK, T.hold),
+  allowance: card(FULL) + banner("warning", NO, T.allowance, "打开余额支付"),
+  wallet: card([["可用余额", "¥3.20"], ["额度用完后用余额付", "开"]]) + banner("warning", NO, T.wallet, "去充值", T.hold),
+  suspended: card(ACC) + banner("warning", NO, T.suspended),
+  other: card(ACC),
+  signedOut: banner("warning", NO, T.auth, "去登录"),
+  retired: banner("warning", NO, T.retired),
+  changed: banner("warning", NO, T.changed),
+  unavailable: "",
+}
+const btn = (label, o = {}) => '<button class="codepuppy-ext-add"' + (o.primary ? ' data-variant="primary" data-cloud-form-submit=""' : "") + (o.cancel ? " data-cancel-job=\"\"" : "") + (o.disabled ? " disabled" : "") + ' type="button">' + label + "</button>"
+const meta = (text, live) => '<span class="codepuppy-ext-meta"' + (live ? ' data-live=""' : "") + ">" + text + "</span>"
+/* 目录表单。row = 按钮行里主按钮之前的东西(状态字、取消);submit = 主按钮 */
+function formBox(o) {
+  const unavailable = o.pre === undefined
+  return '<section class="codepuppy-ext-dsec" style="border-top:0"><h3 class="codepuppy-ext-dsec-t">云端任务</h3>' +
+    '<div class="codepuppy-ext-dsub" data-cloud-form="research"><div class="codepuppy-ext-dsub-t">发送云端任务</div>' +
+    '<p class="codepuppy-ext-dnote">离开本页后不再自动保存</p>' +
+    '<div class="codepuppy-ext-dsub"><div class="codepuppy-ext-dsub-t">发送到云端的内容</div><ul class="codepuppy-ext-dlist"><li>你填写的调研问题</li><li>任务设置(最长运行时间与检索轮数)</li></ul></div>' +
+    (unavailable ? '<p class="codepuppy-ext-dnote" data-cloud-hold="">' + T.holdUsd + "</p>" : "") +
+    '<div class="codepuppy-ext-cloudrun"><label style="width:100%" data-cloud-field="question"><span data-cloud-field-label="">调研问题 *</span><span class="codepuppy-ext-meta" data-cloud-field-help="">写清范围和想要的结论形式</span>' +
+    '<textarea class="codepuppy-ext-ddoc" style="width:100%" rows="6" aria-label="调研问题"' + (o.locked ? " disabled" : "") + ">2026 年国内中小企业使用 AI 编程助手的情况:用得多的场景、主要顾虑、付费意愿。给出处。</textarea></label>" +
+    (o.pre || "") + (o.row || "") + (o.submit || btn("发起任务", { primary: true })) + "</div></div></section>"
+}
+function legacyBox(o) {
+  return '<div class="codepuppy-ext-dsub"><div class="codepuppy-ext-dsub-t">发送云端任务</div><p class="codepuppy-ext-dnote">只读取和发送你明确选择的文件。每次发现受保护信息都会请你确认；未发现时会直接发送。</p>' +
+    (o.pre || "") + '<div class="codepuppy-ext-cloudrun">' + (o.row || "") + (o.buttons || btn("发送 Git 代码改动") + btn("选择文件并发送", { primary: true })) + "</div></div>"
+}
+/* 改前:上线代码的原样(按钮在左,不受上面挪右规则影响) */
+const liveForm = '<div style="--x:0"><section class="codepuppy-ext-dsec" style="border-top:0"><h3 class="codepuppy-ext-dsec-t">云端任务</h3><div class="codepuppy-ext-dsub"><div class="codepuppy-ext-dsub-t">发送云端任务</div><p class="codepuppy-ext-dnote">离开本页后不再自动保存</p><div class="codepuppy-ext-dsub"><div class="codepuppy-ext-dsub-t">发送到云端的内容</div><ul class="codepuppy-ext-dlist"><li>你填写的调研问题</li><li>任务设置(最长运行时间与检索轮数)</li></ul></div><p class="codepuppy-ext-dnote" data-cloud-hold="">' + T.holdUsd + '</p><div class="codepuppy-ext-cloudrun" style="justify-content:flex-start"><label style="width:100%"><span>调研问题 *</span><span class="codepuppy-ext-meta">写清范围和想要的结论形式</span><textarea class="codepuppy-ext-ddoc" style="width:100%" rows="6">2026 年国内中小企业使用 AI 编程助手的情况:用得多的场景、主要顾虑、付费意愿。给出处。</textarea></label>' + btn("发起任务", { primary: true }) + "</div></div></section></div>"
+const liveLegacy = '<div class="codepuppy-ext-dsub"><div class="codepuppy-ext-dsub-t">发送云端任务</div><p class="codepuppy-ext-dnote">只读取和发送你明确选择的文件。每次发现受保护信息都会请你确认；未发现时会直接发送。</p><div class="codepuppy-ext-cloudrun" style="justify-content:flex-start">' + btn("选择文件并发送", { primary: true }) + btn("发送 Git 代码改动") + "</div></div>"
+const frame = (o) => '<div class="dz-item"' + (o.id ? ' id="' + o.id + '"' : "") + '><p class="dz-cap"><b>' + o.cap + "</b>" + (o.sub || "") + '</p><div class="dz-frame a-ui" style="--w:' + (o.w || 880) + 'px">' + o.html + "</div></div>"
+
+const SETS = {
+  "before-after": [
+    { id: "ba-form-before", cap: "目录表单 · 改前(上线代码)", html: liveForm },
+    { id: "ba-form-after", cap: "目录表单 · 改后", html: formBox({ pre: PRE.ok }) },
+    { id: "ba-legacy-before", cap: "旧版云条目 · 改前(上线代码)", html: liveLegacy },
+    { id: "ba-legacy-after", cap: "旧版云条目 · 改后", html: legacyBox({ pre: PRE.ok }) },
+  ],
+  "states-form": [
+    { id: "form-loading", cap: "查询中", sub: "按钮照常可点。", html: formBox({ pre: PRE.loading }) },
+    { id: "form-ok", cap: "能发", html: formBox({ pre: PRE.ok }) },
+    { id: "form-allowance", cap: "额度用完", html: formBox({ pre: PRE.allowance }) },
+    { id: "form-wallet", cap: "余额不够(没有会员)", html: formBox({ pre: PRE.wallet }) },
+    { id: "form-suspended", cap: "账户停用", html: formBox({ pre: PRE.suspended }) },
+    { id: "form-other", cap: "其它拒绝原因(默认:只显示余额额度)", html: formBox({ pre: PRE.other }) },
+    { id: "form-signed-out", cap: "登录已失效", html: formBox({ pre: PRE.signedOut }) },
+    { id: "form-retired", cap: "任务已停用", html: formBox({ pre: PRE.retired }) },
+    { id: "form-changed", cap: "任务要求变了", html: formBox({ pre: PRE.changed }) },
+    { id: "form-unavailable", cap: "查不到(默认:不加任何东西,原来那行留在原处)", html: formBox({ pre: undefined }) },
+  ],
+  "states-legacy": [
+    { id: "legacy-loading", cap: "查询中", html: legacyBox({ pre: PRE.loading }) },
+    { id: "legacy-ok", cap: "能发", html: legacyBox({ pre: PRE.ok }) },
+    { id: "legacy-allowance", cap: "额度用完", html: legacyBox({ pre: PRE.allowance }) },
+    { id: "legacy-wallet", cap: "余额不够", html: legacyBox({ pre: PRE.wallet }) },
+    { id: "legacy-suspended", cap: "账户停用", html: legacyBox({ pre: PRE.suspended }) },
+    { id: "legacy-other", cap: "其它拒绝原因", html: legacyBox({ pre: PRE.other }) },
+    { id: "legacy-signed-out", cap: "登录已失效", html: legacyBox({ pre: PRE.signedOut }) },
+    { id: "legacy-retired", cap: "任务已停用", html: legacyBox({ pre: PRE.retired }) },
+    { id: "legacy-changed", cap: "任务要求变了", html: legacyBox({ pre: PRE.changed }) },
+    { id: "legacy-unavailable", cap: "查不到(和今天一样)", html: legacyBox({}) },
+  ],
+  rows: [
+    { id: "row-form-not-ready", cap: "目录表单 · 没登录平台(表单自己的提示在按钮左边;不显示预检)", html: formBox({ locked: true, row: meta(T.needPlatform), submit: btn("发起任务", { primary: true, disabled: true }) }) },
+    { id: "row-form-dispatching", cap: "目录表单 · 正在发送", html: formBox({ pre: card(ACC), locked: true, submit: btn("正在发送…", { primary: true, disabled: true }) }) },
+    { id: "row-form-running", cap: "目录表单 · 执行中(排队)", html: formBox({ pre: card(ACC), locked: true, row: meta("任务正在排队…", true) + btn("取消任务", { cancel: true }), submit: btn("云端执行中…", { primary: true, disabled: true }) }) },
+    { id: "row-form-cancelling", cap: "目录表单 · 正在取消", html: formBox({ pre: card(ACC), locked: true, row: meta("正在取消…(等待云端确认)", true), submit: btn("云端执行中…", { primary: true, disabled: true }) }) },
+    { id: "row-legacy-not-ready", cap: "旧版云条目 · 没登录平台", html: legacyBox({ row: meta(T.needPlatform), buttons: btn("发送 Git 代码改动", { disabled: true }) + btn("选择文件并发送", { primary: true, disabled: true }) }) },
+    { id: "row-legacy-running", cap: "旧版云条目 · 执行中(文件已直接发送)", html: legacyBox({ pre: card(ACC), row: meta("检查未发现受保护信息，文件已直接发送。", true) + btn("取消任务", { cancel: true }), buttons: btn("发送 Git 代码改动", { disabled: true }) + btn("云端执行中…", { primary: true, disabled: true }) }) },
+    { id: "row-legacy-cancelling", cap: "旧版云条目 · 正在取消", html: legacyBox({ pre: card(ACC), row: meta("正在取消…(等待云端确认)", true), buttons: btn("发送 Git 代码改动", { disabled: true }) + btn("云端执行中…", { primary: true, disabled: true }) }) },
+  ],
+}
+for (const el of document.querySelectorAll("[data-frames]")) {
+  const set = SETS[el.dataset.frames]
+  if (set) el.innerHTML = set.map(frame).join("")
+}
+const vpItem = (id, cap, pre) => '<div class="dz-item" id="' + id + '"><p class="dz-cap"><b>' + cap + '</b></p><div class="dz-viewport a-ui" style="--vh:436px"><div class="dz-vp-inner">' + formBox({ pre }) + "</div></div></div>"
+document.querySelector('[data-frames="small-window"]').innerHTML = vpItem("short-allowance", "额度用完", PRE.allowance) + vpItem("short-wallet", "余额不够", PRE.wallet)
+function alignViewport() {
+  for (const vp of document.querySelectorAll(".dz-viewport")) {
+    const inner = vp.querySelector(".dz-vp-inner")
+    inner.style.top = "0px"
+    const first = vp.querySelector("[data-pf]")
+    inner.style.top = -(first.getBoundingClientRect().top - vp.getBoundingClientRect().top) + "px"
+  }
+}
+alignViewport()
+for (const b of document.querySelectorAll("#themeSeg button")) {
+  b.addEventListener("click", () => {
+    document.documentElement.dataset.colorScheme = b.dataset.theme
+    for (const x of document.querySelectorAll("#themeSeg button")) x.toggleAttribute("data-on", x === b)
+    alignViewport()
+  })
+}
+</script>
+</body>
+</html>

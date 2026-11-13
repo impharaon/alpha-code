@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="zh-CN" data-color-scheme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>发送云端任务 · 提交前的额度与准入 · 增量稿</title>
+<!-- 帧内样式直接引用正式代码(f0f6ac0eb5):令牌、基础、定制中心。本稿不复制、不新增产品样式。 -->
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/codepuppy-ui/base.css" />
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/extensions/extension-hub.css" />
+<style>
+/* ════════ 帧外排版(dz-):只用 --a-* ════════ */
+html,body{margin:0}
+body{background:var(--a-bg-subtle);color:var(--a-text);font-family:var(--a-font-sans);font-size:var(--a-text-base);line-height:var(--a-leading-normal);-webkit-font-smoothing:antialiased}
+.dz-bar{position:sticky;top:0;z-index:2000;display:flex;align-items:center;gap:16px;padding:10px 24px;border-bottom:1px solid var(--a-border);background:color-mix(in srgb,var(--a-bg-canvas) 92%,transparent);backdrop-filter:blur(14px)}
+.dz-bar b{font-size:var(--a-text-sm)}
+.dz-bar nav{display:flex;gap:12px;flex-wrap:wrap;font-size:var(--a-text-xs)}
+.dz-bar nav a{color:var(--a-text-secondary);text-decoration:none}
+.dz-grow{flex:1}
+.dz-seg{display:inline-flex;padding:2px;gap:2px;background:var(--a-bg-muted);border-radius:var(--a-radius-sm)}
+.dz-seg button{border:0;background:transparent;font:inherit;font-size:var(--a-text-xs);padding:3px 10px;border-radius:var(--a-radius-xs);color:var(--a-text-secondary);cursor:pointer}
+.dz-seg button[data-on]{background:var(--a-surface);color:var(--a-text);box-shadow:var(--a-shadow-xs)}
+.dz-wrap{max-width:1000px;margin:0 auto;padding:28px 24px 96px}
+.dz-intro h1{margin:0 0 8px;font-size:var(--a-text-2xl);letter-spacing:var(--a-tracking-tight)}
+.dz-intro p{margin:0 0 6px;max-width:84ch;color:var(--a-text-secondary);font-size:var(--a-text-md);line-height:1.65}
+.dz-sec{scroll-margin-top:64px}
+.dz-h2{margin:44px 0 4px;font-size:var(--a-text-xl);letter-spacing:var(--a-tracking-tight)}
+.dz-h2 small{margin-left:8px;font-size:var(--a-text-xs);font-weight:var(--a-weight-normal);color:var(--a-text-tertiary)}
+.dz-sub{margin:0 0 14px;max-width:96ch;color:var(--a-text-secondary);font-size:var(--a-text-sm);line-height:1.6}
+.dz-rel,.dz-note{margin:16px 0 0;padding:14px 16px;border:1px solid var(--a-border);border-radius:var(--a-radius-md);background:var(--a-bg-canvas);font-size:var(--a-text-sm);line-height:1.65;color:var(--a-text-secondary);max-width:110ch}
+.dz-rel{border-left:3px solid var(--a-accent)}
+.dz-note{border-left:3px solid var(--a-text-tertiary)}
+.dz-rel h3{margin:0 0 6px;font-size:var(--a-text-md);color:var(--a-text)}
+.dz-rel b,.dz-note b{color:var(--a-text)}
+.dz-rel ul,.dz-note ul{margin:4px 0 0;padding-left:18px}
+.dz-wrap code{font-family:var(--a-font-mono);font-size:11px}
+.dz-cap{margin:22px 0 8px;font-size:var(--a-text-xs);color:var(--a-text-tertiary);line-height:1.5;max-width:880px}
+.dz-cap b{display:block;font-size:var(--a-text-sm);color:var(--a-text);margin-bottom:1px}
+.dz-table{border-collapse:collapse;font-size:var(--a-text-sm);background:var(--a-bg-canvas);border:1px solid var(--a-border);width:100%}
+.dz-table th{background:var(--a-bg-subtle);text-align:left;font-size:var(--a-text-xs);color:var(--a-text-tertiary);font-weight:var(--a-weight-semibold);padding:8px 12px}
+.dz-table td{padding:9px 12px;border-top:1px solid var(--a-border-faint);color:var(--a-text-secondary);vertical-align:top;line-height:1.55}
+.dz-table td:first-child{white-space:nowrap;color:var(--a-text)}
+/* 帧:定制中心详情页的一段,宽度 = 详情页内容列宽 */
+.dz-frame{width:var(--w);padding:6px 24px 22px;background:var(--a-bg-canvas);border:1px solid var(--a-border-strong);border-radius:10px;box-shadow:var(--a-shadow-sm);box-sizing:content-box}
+.dz-pair{display:flex;flex-direction:column;gap:6px}
+.dz-tag{font-size:var(--a-text-2xs);font-weight:var(--a-weight-semibold);letter-spacing:var(--a-tracking-wide);color:var(--a-text-tertiary)}
+/* 小窗口:页签以下的可见区域 */
+.dz-viewport{position:relative;width:432px;height:var(--vh);padding:0 24px;overflow:hidden;background:var(--a-bg-canvas);border:1px solid var(--a-border-strong);border-radius:10px;box-sizing:content-box}
+.dz-viewport::after{content:"";position:absolute;left:0;right:0;bottom:0;border-bottom:2px dashed var(--a-error)}
+.dz-vp-inner{position:relative}
+</style>
+</head>
+<body>
+
+<div class="dz-bar">
+  <b>发送云端任务 · 提交前的额度与准入</b>
+  <nav><a href="#before-after">改前改后</a><a href="#states-form">目录表单各状态</a><a href="#states-legacy">旧版云条目各状态</a><a href="#retired">已停用那句</a><a href="#small-window">窄窗口与矮窗口</a><a href="#copy">文案表</a><a href="#reuse">复用与缺口</a><a href="#open">待你拍板</a></nav>
+  <div class="dz-grow"></div>
+  <div class="dz-seg" id="themeSeg"><button data-theme="light" data-on>浅色</button><button data-theme="dark">深色</button></div>
+</div>
+
+<main class="dz-wrap">
+
+<section class="dz-intro">
+  <h1>发起云端任务之前,先看到额度、余额和能不能发</h1>
+  <p>打开云端任务的发送框时,原来那行「预留 US$…」的位置换成三行:你的余额和额度、这次要预留多少、现在能不能发。发不了时写原因,带上原来就有的「去登录」「打开余额支付」「去充值」按钮。这只是提示:「发起任务」按钮不会因此变灰,也不用等它查完。</p>
+  <div class="dz-rel">
+    <h3>与上一稿的关系</h3>
+    <ul>
+      <li><b>起点</b>:发送框没有设计稿(定制中心现行稿 <a href="../current/customization-center/design.html#cloud-task"><code>#cloud-task</code></a> 只画到详情页的「云端任务」事实行,不含发送框),所以改前 = 上线代码:<code>cloud-form-box.tsx</code>(目录描述的云能力)与 <code>cloud-dispatch-box.tsx</code>(旧版云条目),样式直接引用 <code>extension-hub.css</code>。</li>
+      <li><b>不变</b>:发送框的标题、说明、「发送到云端的内容」、输入框、按钮及其顺序和可用规则;发送后的进度、结果和报错行。</li>
+      <li><b>改动</b>:目录表单里「预留 US$…」那一行的位置换成预检的三行;旧版云条目在说明行之后、输入之前加同样的三行。查不到时目录表单回到原来那行「预留 US$…」。</li>
+      <li><b>样式</b>:每一行都是发送框里已有的样式 —— 普通说明行、「✓」成功行、红色提示行、原有的动作按钮;数字用详情页事实值的颜色。没有新组件、新颜色。</li>
+      <li><b>文字</b>:拒绝原因原样沿用今天发送失败时的句子;余额和额度的叫法与格式照账户弹层(「可用余额 ¥36.50」「5 小时额度 180 / 1,000」)。新写的只有:「正在查询额度…」「✓ 现在可以发起」「额度用完后用余额付 开 / 关」、人民币版的预留句,和已停用那一句。</li>
+    </ul>
+  </div>
+</section>
+
+<section class="dz-sec" id="before-after">
+  <h2 class="dz-h2">改前改后<small>宽 880 = 默认窗口 1280 × 800 下详情页内容列的宽度</small></h2>
+  <p class="dz-sub">改后是最常见的一种:能发。加的就是蓝框圈出的那几行。</p>
+  <div data-frames="before-after"></div>
+</section>
+
+<section class="dz-sec" id="states-form">
+  <h2 class="dz-h2">目录表单 · 各状态<small>以「云端深度调研」为例 · 宽 880</small></h2>
+  <p class="dz-sub">所有状态下「发起任务」都照常可点。表单本身没登录时已经写着「请先登录平台账号…」,这时不再显示预检区,免得同一件事说两遍;「登录已失效」只在表单可用、但查额度被拒时出现。</p>
+  <div data-frames="states-form"></div>
+</section>
+
+<section class="dz-sec" id="states-legacy">
+  <h2 class="dz-h2">旧版云条目 · 各状态<small>以「云端代码审查」为例 · 宽 880</small></h2>
+  <p class="dz-sub">旧版发送框原本没有预留行,三行加在说明之后、按钮之前;查不到时什么都不加,和今天一样。</p>
+  <div data-frames="states-legacy"></div>
+</section>
+
+<section class="dz-sec" id="retired">
+  <h2 class="dz-h2">已停用那句<small>要你看一眼</small></h2>
+  <p class="dz-sub">任务类型已经在云端停用时,提交前就说清楚,不再落到「未能确认云端是否接收了任务」那句。推荐稍短的一句;另一个是原提议。</p>
+  <div data-frames="retired"></div>
+</section>
+
+<section class="dz-sec" id="small-window">
+  <h2 class="dz-h2">窄窗口与矮窗口</h2>
+  <p class="dz-sub">最长的一种(额度用完)放在窄窗口里。矮窗口取应用里唯一写明的最小窗口 520 高:去掉顶部 40 和页签 44,能看到 436 高。预检区顶在可见区最上面时,「发起任务」仍在虚线以上。</p>
+  <div data-frames="small-window"></div>
+</section>
+
+<section class="dz-sec" id="copy">
+  <h2 class="dz-h2">文案表<small>帧外 · 新写的标「新」</small></h2>
+  <table class="dz-table">
+    <thead><tr><th>状态</th><th>显示什么</th><th>动作</th></tr></thead>
+    <tbody>
+      <tr><td>查询中</td><td>「正在查询额度…」(新)</td><td>—</td></tr>
+      <tr><td>能发</td><td>余额额度行 + 预留句 +「✓ 现在可以发起」(新)</td><td>—</td></tr>
+      <tr><td>拒绝 · 额度用完</td><td>余额额度行 + 预留句 +「会员额度已用完。默认不会自动扣钱包余额,充值也不能恢复;可以等额度窗口重置,或到网站账户页打开「额度用完后用余额付」。」(现有)</td><td>打开余额支付(现有)</td></tr>
+      <tr><td>拒绝 · 余额不够</td><td>余额额度行 + 预留句 +「钱包余额不够这次任务要预留的金额。请先充值,或等在途任务结算后再试。」(现有)</td><td>去充值(现有)</td></tr>
+      <tr><td>拒绝 · 账户停用</td><td>余额额度行 + 预留句 +「账户已被停用,请联系我们。」(现有)</td><td>—</td></tr>
+      <tr><td>拒绝 · 其它原因</td><td>今天落到「未能确认云端是否接收了任务。请先查看任务状态，避免重复发送。」(现有,提交前不对,见待定 3)</td><td>—</td></tr>
+      <tr><td>登录已失效</td><td>「尚未登录或登录已过期。请登录平台账号后重试。」(现有)</td><td>去登录(现有)</td></tr>
+      <tr><td>任务已停用</td><td>推荐「这项云端功能已停用，请在本机生成。」(新)</td><td>—</td></tr>
+      <tr><td>任务要求变了</td><td>「这项云能力的要求已更新,请刷新定制中心或更新 Code Puppy。」(现有)</td><td>—</td></tr>
+      <tr><td>查不到</td><td>目录表单:原来那行「预留 US$…,按实际用量结算;失败时已产生的费用仍会结算。」;旧版云条目:不加任何行(待定 2)</td><td>—</td></tr>
+    </tbody>
+  </table>
+  <div class="dz-note">
+    <b>余额额度行</b>:「可用余额 ¥36.50 · 5 小时额度 180 / 1,000 · 7 日额度 2,400 / 10,000 · 额度用完后用余额付 关」。没有会员时去掉两项额度。用量 / 上限与账户弹层同一写法(用量 = 上限 − 剩余)。重置时间这次不显示,账户弹层也不显示。<br>
+    <b>预留句</b>:「预留 ¥14.00,按实际用量结算;失败时已产生的费用仍会结算。」与原来那行同一句,金额换成这次查到的预留额(人民币)。今天所有任务都估不出价格,所以只有预留、没有报价;平台没给预留额时不显示这一行。<br>
+    <b>英文</b>(新写的几句):Checking quota… · ✓ You can start now · Pay from balance after quota: On / Off · Reserves ¥{{yuan}}; you are charged for actual usage. Costs already incurred are still charged if the task fails. · This cloud feature has been retired. Please generate it locally.
+  </div>
+</section>
+
+<section class="dz-sec" id="reuse">
+  <h2 class="dz-h2">复用与缺口<small>帧外</small></h2>
+  <table class="dz-table">
+    <thead><tr><th>预检区的部分</th><th>复用</th></tr></thead>
+    <tbody>
+      <tr><td>位置</td><td>目录表单里原来的预留行(<code>data-cloud-hold</code>)那一格;旧版云条目放在说明行之后的同一相对位置</td></tr>
+      <tr><td>余额额度行</td><td>说明行 <code>.codepuppy-ext-dnote</code>;数字用详情页事实值 <code>.codepuppy-ext-dfact-v</code> 的颜色;叫法与格式取自账户弹层(<code>codepuppy.sidebar.balance / fiveHour / sevenDay</code>、¥ 两位小数、千分位)</td></tr>
+      <tr><td>预留句</td><td>原预留行的句子 <code>codepuppy.ext.cloudHold</code>,换成人民币要一个新键</td></tr>
+      <tr><td>能发</td><td>发送框里已有的成功行 <code>.codepuppy-ext-dnote[data-ok]</code>(「✓ 已完成」那一行)</td></tr>
+      <tr><td>拒绝原因与动作</td><td>红色提示行 <code>.codepuppy-ext-dnote[data-err]</code>;句子与按钮来自 <code>failureCopy</code> / <code>dispatchError</code> 和已有的 <code>.codepuppy-ext-add</code>「去登录 / 打开余额支付 / 去充值」</td></tr>
+      <tr><td>缺的</td><td>只缺文字:「正在查询额度…」「✓ 现在可以发起」「额度用完后用余额付」「开 / 关」、人民币预留句、已停用一句(进 <code>failureCopy</code>)。样式只缺一条:余额额度行里每一对「名称 值」不在中间断行(<code>white-space: nowrap</code>),否则窄窗口会把「额度用完后用余额付」拆成两行</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="dz-sec" id="open">
+  <h2 class="dz-h2">待你拍板<small>帧外 · 每条第一项是推荐</small></h2>
+  <div class="dz-note"><ul>
+    <li><b>已停用那句</b>:「这项云端功能已停用，请在本机生成。」(推荐,短一个字、读起来更顺)/ 原提议「这项云端功能已停用，请改在本机生成。」</li>
+    <li><b>查不到额度时</b>:照今天的样子,不额外提示(推荐,不影响发送就不打扰)/ 加一行「暂时查不到额度」。</li>
+    <li><b>平台给出发送框没有对应文案的拒绝原因时</b>(例如这条线路的用量已停):只显示余额和额度,不下结论(推荐,不写新句子)/ 照今天的路径显示「未能确认云端是否接收了任务…」—— 这句在还没提交时是错的。</li>
+  </ul></div>
+</section>
+
+</main>
+
+<script>
+const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+const v = (s) => '<span class="codepuppy-ext-dfact-v">' + s + "</span>"
+const T = {
+  allowance: "会员额度已用完。默认不会自动扣钱包余额,充值也不能恢复;可以等额度窗口重置,或到网站账户页打开「额度用完后用余额付」。",
+  wallet: "钱包余额不够这次任务要预留的金额。请先充值,或等在途任务结算后再试。",
+  suspended: "账户已被停用,请联系我们。",
+  unknownSend: "未能确认云端是否接收了任务。请先查看任务状态，避免重复发送。",
+  auth: "尚未登录或登录已过期。请登录平台账号后重试。",
+  changed: "这项云能力的要求已更新,请刷新定制中心或更新 Code Puppy。",
+  retired: "这项云端功能已停用，请在本机生成。",
+  retiredAlt: "这项云端功能已停用，请改在本机生成。",
+  holdUsd: "预留 US$2.00,按实际用量结算;失败时已产生的费用仍会结算。",
+  holdCny: (y) => "预留 ¥" + y + ",按实际用量结算;失败时已产生的费用仍会结算。",
+}
+/* 每一对「名称 值」不在中间断行(唯一新增的样式:white-space:nowrap) */
+const pair = (k, val) => '<span data-pair="" style="white-space:nowrap">' + k + " " + v(val) + "</span>"
+const facts = (o) => '<p class="codepuppy-ext-dnote" data-pf="" data-cloud-preflight="facts">' + pair("可用余额", o.bal) +
+  (o.q5 ? " · " + pair("5 小时额度", o.q5) + " · " + pair("7 日额度", o.q7) : "") + " · " + pair("额度用完后用余额付", o.ov) + "</p>"
+const hold = (y) => '<p class="codepuppy-ext-dnote" data-pf="" data-cloud-hold="">' + T.holdCny(y) + "</p>"
+const err = (text, act) => '<p class="codepuppy-ext-dnote" data-pf="" data-err="">' + text + "</p>" + (act ? '<button class="codepuppy-ext-add" data-pf="" type="button">' + act + "</button>" : "")
+
+/* 预检区:每个状态是若干行。null = 不显示预检区。 */
+const ACC = { bal: "¥36.50", q5: "180 / 1,000", q7: "2,400 / 10,000", ov: "关" }
+const STATES = {
+  loading: '<p class="codepuppy-ext-dnote" data-pf="" data-cloud-preflight="loading">正在查询额度…</p>',
+  ok: facts(ACC) + hold("14.00") + '<p class="codepuppy-ext-dnote" data-pf="" data-ok="">✓ 现在可以发起</p>',
+  allowance: facts({ bal: "¥36.50", q5: "1,000 / 1,000", q7: "6,100 / 10,000", ov: "关" }) + hold("14.00") + err(T.allowance, "打开余额支付"),
+  wallet: facts({ bal: "¥3.20", ov: "开" }) + hold("14.00") + err(T.wallet, "去充值"),
+  suspended: facts(ACC) + hold("14.00") + err(T.suspended),
+  other: facts(ACC) + hold("14.00") + err(T.unknownSend),
+  signedOut: err(T.auth, "去登录"),
+  retired: err(T.retired),
+  retiredAlt: err(T.retiredAlt),
+  changed: err(T.changed),
+  unavailableForm: '<p class="codepuppy-ext-dnote" data-pf="" data-cloud-hold="">' + T.holdUsd + "</p>",
+  unavailableAlt: '<p class="codepuppy-ext-dnote" data-pf="">暂时查不到额度</p>',
+}
+
+/* 目录表单(cloud-form-box.tsx 的结构) */
+function formBox(pre, w) {
+  return '<section class="codepuppy-ext-dsec" style="border-top:0"><h3 class="codepuppy-ext-dsec-t">云端任务</h3>' +
+    '<div class="codepuppy-ext-dsub" data-cloud-form="research">' +
+    '<div class="codepuppy-ext-dsub-t">发送云端任务</div>' +
+    '<p class="codepuppy-ext-dnote">离开本页后不再自动保存</p>' +
+    '<div class="codepuppy-ext-dsub"><div class="codepuppy-ext-dsub-t">发送到云端的内容</div>' +
+    '<ul class="codepuppy-ext-dlist"><li>你填写的调研问题</li><li>任务设置(最长运行时间与检索轮数)</li></ul></div>' +
+    (pre === undefined ? '<p class="codepuppy-ext-dnote" data-cloud-hold="">' + T.holdUsd + "</p>" : pre || "") +
+    '<div class="codepuppy-ext-cloudrun"><label style="width:100%" data-cloud-field="question"><span data-cloud-field-label="">调研问题 *</span>' +
+    '<span class="codepuppy-ext-meta" data-cloud-field-help="">写清范围和想要的结论形式</span>' +
+    '<textarea class="codepuppy-ext-ddoc" style="width:100%" rows="6" aria-label="调研问题">2026 年国内中小企业使用 AI 编程助手的情况:用得多的场景、主要顾虑、付费意愿。给出处。</textarea></label>' +
+    '<button class="codepuppy-ext-add" data-variant="primary" data-cloud-form-submit="" type="button">发起任务</button></div>' +
+    "</div></section>"
+}
+/* 旧版云条目(cloud-dispatch-box.tsx 的 code-review 分支) */
+function legacyBox(pre) {
+  return '<div class="codepuppy-ext-dsub">' +
+    '<div class="codepuppy-ext-dsub-t">发送云端任务</div>' +
+    '<p class="codepuppy-ext-dnote">只读取和发送你明确选择的文件。每次发现受保护信息都会请你确认；未发现时会直接发送。</p>' +
+    (pre || "") +
+    '<div class="codepuppy-ext-cloudrun"><button class="codepuppy-ext-add" data-variant="primary" data-cloud-form-submit="" type="button">选择文件并发送</button>' +
+    '<button class="codepuppy-ext-add" type="button">发送 Git 代码改动</button></div></div>'
+}
+const frame = (o) => '<div class="dz-item"' + (o.id ? ' id="' + o.id + '"' : "") + '><p class="dz-cap"><b>' + o.cap + "</b>" + (o.sub || "") + '</p><div class="dz-frame a-ui" style="--w:' + (o.w || 880) + 'px">' + o.html + "</div></div>"
+
+const SETS = {
+  "before-after": [
+    { cap: "目录表单 · 改前", sub: "上线代码原样。", html: formBox(undefined) },
+    { cap: "目录表单 · 改后(能发)", html: formBox(STATES.ok), mark: true },
+    { cap: "旧版云条目 · 改前", sub: "上线代码原样。", html: legacyBox("") },
+    { cap: "旧版云条目 · 改后(能发)", html: legacyBox(STATES.ok), mark: true },
+  ],
+  "states-form": [
+    { id: "form-loading", cap: "查询中", sub: "按钮照常可点。", html: formBox(STATES.loading) },
+    { id: "form-ok", cap: "能发", html: formBox(STATES.ok) },
+    { id: "form-allowance", cap: "拒绝 · 额度用完", sub: "原因句与按钮同发送失败时一样。", html: formBox(STATES.allowance) },
+    { id: "form-wallet", cap: "拒绝 · 余额不够(没有会员,所以没有额度两项)", html: formBox(STATES.wallet) },
+    { id: "form-suspended", cap: "拒绝 · 账户停用", html: formBox(STATES.suspended) },
+    { id: "form-other", cap: "拒绝 · 其它原因(今天的路径,见待定 3)", sub: "这句是给「发了但不确定」写的,提交前显示是错的。", html: formBox(STATES.other) },
+    { id: "form-signed-out", cap: "登录已失效", html: formBox(STATES.signedOut) },
+    { id: "form-retired", cap: "任务已停用", html: formBox(STATES.retired) },
+    { id: "form-changed", cap: "任务要求变了", html: formBox(STATES.changed) },
+    { id: "form-unavailable", cap: "查不到(推荐:回到原来那行)", sub: "和改前一模一样。", html: formBox(STATES.unavailableForm) },
+    { id: "form-unavailable-alt", cap: "查不到(另一种:只写一行)", html: formBox(STATES.unavailableAlt) },
+  ],
+  "states-legacy": [
+    { id: "legacy-loading", cap: "查询中", html: legacyBox(STATES.loading) },
+    { id: "legacy-ok", cap: "能发", html: legacyBox(STATES.ok) },
+    { id: "legacy-allowance", cap: "拒绝 · 额度用完", html: legacyBox(STATES.allowance) },
+    { id: "legacy-signed-out", cap: "登录已失效", html: legacyBox(STATES.signedOut) },
+    { id: "legacy-retired", cap: "任务已停用", html: legacyBox(STATES.retired) },
+    { id: "legacy-unavailable", cap: "查不到(推荐:什么都不加)", sub: "和改前一模一样。", html: legacyBox("") },
+  ],
+  retired: [
+    { id: "retired-pick", cap: "推荐", html: legacyBox(STATES.retired) },
+    { id: "retired-alt", cap: "另一个(原提议)", html: legacyBox(STATES.retiredAlt) },
+  ],
+  "small-window": [
+    { id: "narrow", cap: "窄窗口 · 宽 432(窗口 480,侧栏收起)· 额度用完", w: 432, html: formBox(STATES.allowance) },
+  ],
+}
+
+for (const el of document.querySelectorAll("[data-frames]")) {
+  el.innerHTML = SETS[el.dataset.frames].map(frame).join("")
+}
+/* 改后帧:一个蓝框圈出新增的几行(帧外标注,不是产品界面) */
+function markAdded() {
+  document.querySelectorAll(".dz-mark").forEach((m) => m.remove())
+  document.querySelectorAll('[data-frames="before-after"] .dz-item').forEach((item, i) => {
+    const lines = [...item.querySelectorAll("[data-pf]")]
+    if (i % 2 === 0 || !lines.length) return
+    const fr = item.querySelector(".dz-frame"), f = fr.getBoundingClientRect()
+    const top = lines[0].getBoundingClientRect().top, bottom = Math.max(...lines.map((n) => n.getBoundingClientRect().bottom))
+    fr.style.position = "relative"
+    fr.insertAdjacentHTML("beforeend", '<div class="dz-mark" style="position:absolute;left:16px;right:16px;top:' + (top - f.top - 5) + "px;height:" + (bottom - top + 10) + 'px;border:2px solid var(--a-accent);border-radius:8px;pointer-events:none"></div>')
+  })
+}
+markAdded()
+/* 矮窗口:可见区 436 高,预检区顶在最上面 */
+const sw = document.querySelector('[data-frames="small-window"]')
+sw.insertAdjacentHTML("beforeend", '<div class="dz-item" id="short-window"><p class="dz-cap"><b>矮窗口 · 480 × 520,页签以下可见 436 高 · 额度用完</b>虚线 = 窗口底边。预检区顶在可见区最上面。</p><div class="dz-viewport a-ui" style="--vh:436px"><div class="dz-vp-inner">' + formBox(STATES.allowance) + "</div></div></div>")
+function alignViewport() {
+  const vp = document.querySelector("#short-window .dz-viewport"), inner = vp.querySelector(".dz-vp-inner")
+  inner.style.top = "0px"
+  const first = vp.querySelector("[data-pf]")
+  inner.style.top = -(first.getBoundingClientRect().top - vp.getBoundingClientRect().top) + "px"
+}
+alignViewport()
+for (const b of document.querySelectorAll("#themeSeg button")) {
+  b.addEventListener("click", () => {
+    document.documentElement.dataset.colorScheme = b.dataset.theme
+    for (const x of document.querySelectorAll("#themeSeg button")) x.toggleAttribute("data-on", x === b)
+    alignViewport()
+    markAdded()
+  })
+}
+</script>
+</body>
+</html>

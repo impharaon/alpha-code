@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="zh-CN" data-color-scheme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>发送云端任务 · 提交前的额度与准入 · 第二稿(停在组件库缺口)</title>
+<!-- 帧内样式全部引用正式代码(f0f6ac0eb5):令牌与基础、组件库的 Banner / Button、定制中心、账户弹层。本稿不写任何产品样式。 -->
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/codepuppy-ui/base.css" />
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/codepuppy-ui/banner.css" />
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/codepuppy-ui/button.css" />
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/extensions/extension-hub.css" />
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/sidebar/account-popover.css" />
+<style>
+/* ════════ 帧外排版(dz-):只用 --a-* ════════ */
+html,body{margin:0}
+body{background:var(--a-bg-subtle);color:var(--a-text);font-family:var(--a-font-sans);font-size:var(--a-text-base);line-height:var(--a-leading-normal);-webkit-font-smoothing:antialiased}
+.dz-bar{position:sticky;top:0;z-index:2000;display:flex;align-items:center;gap:16px;padding:10px 24px;border-bottom:1px solid var(--a-border);background:color-mix(in srgb,var(--a-bg-canvas) 92%,transparent);backdrop-filter:blur(14px)}
+.dz-bar b{font-size:var(--a-text-sm)}
+.dz-bar nav{display:flex;gap:12px;flex-wrap:wrap;font-size:var(--a-text-xs)}
+.dz-bar nav a{color:var(--a-text-secondary);text-decoration:none}
+.dz-grow{flex:1}
+.dz-seg{display:inline-flex;padding:2px;gap:2px;background:var(--a-bg-muted);border-radius:var(--a-radius-sm)}
+.dz-seg button{border:0;background:transparent;font:inherit;font-size:var(--a-text-xs);padding:3px 10px;border-radius:var(--a-radius-xs);color:var(--a-text-secondary);cursor:pointer}
+.dz-seg button[data-on]{background:var(--a-surface);color:var(--a-text);box-shadow:var(--a-shadow-xs)}
+.dz-wrap{max-width:1000px;margin:0 auto;padding:28px 24px 96px}
+.dz-intro h1{margin:0 0 8px;font-size:var(--a-text-2xl);letter-spacing:var(--a-tracking-tight)}
+.dz-intro p{margin:0 0 6px;max-width:84ch;color:var(--a-text-secondary);font-size:var(--a-text-md);line-height:1.65}
+.dz-sec{scroll-margin-top:64px}
+.dz-h2{margin:44px 0 4px;font-size:var(--a-text-xl);letter-spacing:var(--a-tracking-tight)}
+.dz-h2 small{margin-left:8px;font-size:var(--a-text-xs);font-weight:var(--a-weight-normal);color:var(--a-text-tertiary)}
+.dz-sub{margin:0 0 14px;max-width:96ch;color:var(--a-text-secondary);font-size:var(--a-text-sm);line-height:1.6}
+.dz-rel,.dz-stop{margin:16px 0 0;padding:14px 16px;border:1px solid var(--a-border);border-radius:var(--a-radius-md);background:var(--a-bg-canvas);font-size:var(--a-text-sm);line-height:1.65;color:var(--a-text-secondary);max-width:110ch}
+.dz-rel{border-left:3px solid var(--a-accent)}
+.dz-stop{border-left:3px solid var(--a-warning)}
+.dz-rel h3,.dz-stop h3{margin:0 0 6px;font-size:var(--a-text-md);color:var(--a-text)}
+.dz-rel b,.dz-stop b{color:var(--a-text)}
+.dz-rel ul,.dz-stop ul{margin:4px 0 0;padding-left:18px}
+.dz-wrap code{font-family:var(--a-font-mono);font-size:11px}
+.dz-cap{margin:22px 0 8px;font-size:var(--a-text-xs);color:var(--a-text-tertiary);line-height:1.5;max-width:880px}
+.dz-cap b{display:block;font-size:var(--a-text-sm);color:var(--a-text);margin-bottom:1px}
+.dz-table{border-collapse:collapse;font-size:var(--a-text-sm);background:var(--a-bg-canvas);border:1px solid var(--a-border);width:100%}
+.dz-table th{background:var(--a-bg-subtle);text-align:left;font-size:var(--a-text-xs);color:var(--a-text-tertiary);font-weight:var(--a-weight-semibold);padding:8px 12px}
+.dz-table td{padding:9px 12px;border-top:1px solid var(--a-border-faint);color:var(--a-text-secondary);vertical-align:top;line-height:1.55}
+.dz-table td:first-child{white-space:nowrap;color:var(--a-text)}
+.dz-frame{width:var(--w);padding:6px 24px 22px;background:var(--a-bg-canvas);border:1px solid var(--a-border-strong);border-radius:10px;box-shadow:var(--a-shadow-sm);box-sizing:content-box}
+.dz-row{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap}
+.dz-pop{width:300px;padding:12px 0 2px;background:var(--a-surface-raised);border:1px solid var(--a-border);border-radius:var(--a-radius-xl);box-shadow:var(--a-shadow-overlay)}
+.dz-viewport{position:relative;width:432px;height:var(--vh);padding:0 24px;overflow:hidden;background:var(--a-bg-canvas);border:1px solid var(--a-border-strong);border-radius:10px;box-sizing:content-box}
+.dz-viewport::after{content:"";position:absolute;left:0;right:0;bottom:0;border-bottom:2px dashed var(--a-error)}
+.dz-vp-inner{position:relative}
+
+/* ════════ 帧里对现有样式的两处覆盖(都是本稿要你决定的事,不是新样式)════════ */
+/* ① 账户弹层的卡片带弹层专用的左右外边距;收进组件库时去掉,这里先去掉。 */
+.dz-frame .codepuppy-acct-card,.dz-viewport .codepuppy-acct-card{margin:0}
+/* ② 按标准把发送按钮放到右边(只在标「按标准」的帧里) */
+[data-btn="right"] .codepuppy-ext-cloudrun{justify-content:flex-end}
+</style>
+</head>
+<body>
+
+<div class="dz-bar">
+  <b>发送云端任务 · 第二稿</b>
+  <nav><a href="#standard">每一块用哪个组件</a><a href="#gap">组件库缺的一块</a><a href="#sample">按提议拼出来</a><a href="#buttons">按钮位置</a><a href="#small-window">矮窗口</a><a href="#open">待你拍板</a></nav>
+  <div class="dz-grow"></div>
+  <div class="dz-seg" id="themeSeg"><button data-theme="light" data-on>浅色</button><button data-theme="dark">深色</button></div>
+</div>
+
+<main class="dz-wrap">
+
+<section class="dz-intro">
+  <h1>先停在组件库缺的那一块</h1>
+  <p>这一稿只用组件库里有的东西拼:能不能发用组件库的提示条(Banner),它自带的按钮在右边;发送按钮按组件库对话框的规则放右边。余额和额度要一张「名称 — 值」的卡片,组件库里没有,所以先停下来问你:要不要把账户弹层里那张余额卡收进组件库,两处共用。</p>
+  <div class="dz-rel">
+    <h3>与上一稿的关系</h3>
+    <ul>
+      <li><b>上一稿</b> <a href="../2026-11-13-1686-cloud-form-preflight/frame.html#before-after"><code>2026-11-13-1686-cloud-form-preflight/</code></a>(被退回,保留作历史):用几行散文字和「·」拼了一块,按钮在左。owner 2026-11-13:按标准组件库做,按钮放右边,不要每张卡片自己做一套。</li>
+      <li><b>沿用</b>:状态表与文案(上一稿未被批评),提交永远不被拦,浅色深色,矮窗口检查。</li>
+      <li><b>改动</b>:能不能发换成组件库的提示条;余额额度换成卡片(待你定组件);按钮放右边;散文字和「·」那一行去掉;整块从输入框上面挪到输入框下面、紧贴发送按钮 —— 用组件拼出来比上一稿高(190 对 69),放在上面时 520 高的窗口里会把发送按钮挤出去 19 像素,挪下来以后看到结论就看到按钮。查不到时原来那行「预留 US$…」仍在原处。</li>
+    </ul>
+  </div>
+</section>
+
+<section class="dz-sec" id="standard">
+  <h2 class="dz-h2">每一块用哪个组件<small>帧外 · 组件库 = docs/design/system</small></h2>
+  <table class="dz-table">
+    <thead><tr><th>预检区里的东西</th><th>组件库里的组件</th><th>位置规则</th></tr></thead>
+    <tbody>
+      <tr><td>能不能发 + 预留</td><td>提示条 Banner(<code>system/components.md</code> Primitives · <code>gallery.html#banner</code>):能发 = success,发不了 = warning;标题 = 结论,说明 = 预留句</td><td>Banner 自带:按钮在最右(<code>banner.css</code> 的 <code>.a-banner-action</code> 排在最后)</td></tr>
+      <tr><td>去登录 / 打开余额支付 / 去充值</td><td>Banner 的按钮(同上)</td><td>同上,在右</td></tr>
+      <tr><td>发起任务</td><td>表单现有按钮(定制中心自己的 <code>.codepuppy-ext-add</code>,不是组件库 Button,见待定 C)</td><td>组件库对话框底栏:<code>dialog.css .a-dialog-footer { justify-content: flex-end }</code>,<code>gallery.html#dialog</code> 主按钮在最右;同页详情头部主操作也在右(<code>.codepuppy-ext-dhead-act</code>,2026-07-04 定稿)</td></tr>
+      <tr><td>余额、两项额度、额度用完后用余额付</td><td><b>组件库里没有</b>「卡片」或「名称 — 值」一行。提议:把账户弹层的余额卡(<code>.codepuppy-acct-card</code> / <code>.codepuppy-acct-row</code>)收进组件库</td><td>名称在左、值在右(弹层原样)</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="dz-sec" id="gap">
+  <h2 class="dz-h2">组件库缺的一块:名称 — 值卡片</h2>
+  <div class="dz-stop">
+    <h3>停在这里</h3>
+    <ul>
+      <li><b>组件库里有的</b>:Button、Input、Dialog、Toast、Tooltip、Banner(<code>system/components.md</code> 与 <code>gallery.html</code> 只有这六个)。没有卡片、分区、名称 — 值一行。</li>
+      <li><b>应用里各自做了至少五套</b>:账户弹层余额卡、设置页分组与行、定制中心详情页事实行、能力授权框能力列表、批准面板「将记住」框。都是浅边框 + 大圆角 + 一行一项,细节各不相同 —— 就是「每张卡片自己做一套」。</li>
+      <li><b>提议</b>:把账户弹层那张余额卡收进组件库,叫「名称 — 值卡片」:卡片(<code>--a-bg-subtle</code> 底、<code>--a-border-faint</code> 边、<code>--a-radius-lg</code>、内边距 12)+ 行(名称 <code>--a-text-secondary</code> 在左,值 600 字重在右)。它已经在显示同样的余额和额度,用户在两处看到的是同一张卡。弹层改用它后样子不变;去掉的只有弹层专用的左右外边距。</li>
+    </ul>
+  </div>
+  <div class="dz-row" data-frames="gap"></div>
+</section>
+
+<section class="dz-sec" id="sample">
+  <h2 class="dz-h2">按提议拼出来<small>宽 880 · 目录表单 · 按钮按标准放右边</small></h2>
+  <p class="dz-sub">输入框下面、发送按钮上面:先是你的账户(卡片),再是这项任务(提示条)。只在你同意收进组件库之后才算数;其余状态(查询中、登录失效、已停用、查不到…)等组件定了按同一拼法补齐。</p>
+  <div data-frames="sample"></div>
+</section>
+
+<section class="dz-sec" id="buttons">
+  <h2 class="dz-h2">按钮位置<small>现有发送框今天在左</small></h2>
+  <p class="dz-sub">上线代码里发送按钮在左:<code>extension-hub.css</code> 的 <code>.codepuppy-ext-cloudrun</code> 是从左排起的一行。按标准放右边只改这一条,但这一行里还有:发送中 / 执行中的状态字、「取消任务」、未登录提示;旧版代码审查有两颗按钮(主按钮要换到最右)。两种发送框共用这条样式。</p>
+  <div data-frames="buttons"></div>
+</section>
+
+<section class="dz-sec" id="small-window">
+  <h2 class="dz-h2">矮窗口<small>480 × 520,页签以下可见 436 高</small></h2>
+  <p class="dz-sub">最长的一种(额度用完),宽 432。卡片顶在可见区最上面时,发送按钮紧跟在提示条下面,在虚线以上。</p>
+  <div data-frames="small-window"></div>
+</section>
+
+<section class="dz-sec" id="open">
+  <h2 class="dz-h2">待你拍板<small>帧外 · 每条第一项是推荐</small></h2>
+  <div class="dz-stop"><ul>
+    <li><b>A · 余额额度用什么组件</b>:把账户弹层的余额卡收进组件库,弹层和发送框共用(推荐)/ 改用定制中心详情页的事实行(它也不在组件库里,同样要先收进去)。</li>
+    <li><b>B · 现有发送按钮要不要跟着挪到右边</b>:挪(推荐,符合组件库;两种发送框一起改,旧版代码审查的主按钮换到最右)/ 这次只让新加的部分按标准,原按钮不动。</li>
+    <li><b>C · 发送框的按钮本身</b>:定制中心整页用的是自己的按钮(<code>.codepuppy-ext-add</code>,28 高),不是组件库的 Button(30 高)。这次不动,另记一条整页换组件库按钮(推荐,牵涉整个定制中心)/ 这次就把发送框的按钮换掉。</li>
+    <li>上一稿还没定的三条照旧:已停用那句、查不到时提不提示、没有对应文案的拒绝原因。</li>
+  </ul></div>
+</section>
+
+</main>
+
+<script>
+const T = {
+  allowance: "会员额度已用完。默认不会自动扣钱包余额,充值也不能恢复;可以等额度窗口重置,或到网站账户页打开「额度用完后用余额付」。",
+  hold: "预留 ¥14.00,按实际用量结算;失败时已产生的费用仍会结算。",
+  holdUsd: "预留 US$2.00,按实际用量结算;失败时已产生的费用仍会结算。",
+}
+/* 名称 — 值卡片:账户弹层原样的类名(提议收进组件库) */
+const row = (k, v) => '<div class="codepuppy-acct-row"><span class="codepuppy-acct-k">' + k + '</span><span class="codepuppy-acct-v">' + v + "</span></div>"
+const card = (o) => '<div class="codepuppy-acct-card" data-pf="" style="width:100%">' + row("可用余额", o.bal) + (o.q5 ? row("5 小时额度", o.q5) + row("7 日额度", o.q7) : "") + row("额度用完后用余额付", o.ov) + "</div>"
+/* 组件库 Banner(banner.css / Banner.tsx 的结构) */
+const banner = (kind, title, detail, action) => '<div class="a-banner ' + kind + '" data-pf="" role="status" style="width:100%"><span class="a-banner-dot" aria-hidden="true"></span><span class="a-banner-body"><span class="a-banner-title">' + title + "</span>" + (detail ? '<span class="a-banner-detail">' + detail + "</span>" : "") + "</span>" + (action ? '<button class="a-banner-action" type="button">' + action + "</button>" : "") + "</div>"
+const ACC = { bal: "¥36.50", q5: "180 / 1,000", q7: "2,400 / 10,000", ov: "关" }
+const PRE = {
+  ok: card(ACC) + banner("success", "现在可以发起", T.hold),
+  allowance: card({ bal: "¥36.50", q5: "1,000 / 1,000", q7: "6,100 / 10,000", ov: "关" }) + banner("warning", T.allowance, T.hold, "打开余额支付"),
+}
+function formBox(pre, btn) {
+  return '<div data-btn="' + (btn || "left") + '"><section class="codepuppy-ext-dsec" style="border-top:0"><h3 class="codepuppy-ext-dsec-t">云端任务</h3>' +
+    '<div class="codepuppy-ext-dsub" data-cloud-form="research">' +
+    '<div class="codepuppy-ext-dsub-t">发送云端任务</div>' +
+    '<p class="codepuppy-ext-dnote">离开本页后不再自动保存</p>' +
+    '<div class="codepuppy-ext-dsub"><div class="codepuppy-ext-dsub-t">发送到云端的内容</div>' +
+    '<ul class="codepuppy-ext-dlist"><li>你填写的调研问题</li><li>任务设置(最长运行时间与检索轮数)</li></ul></div>' +
+    (pre === undefined ? '<p class="codepuppy-ext-dnote" data-cloud-hold="">' + T.holdUsd + "</p>" : "") +
+    '<div class="codepuppy-ext-cloudrun"><label style="width:100%" data-cloud-field="question"><span data-cloud-field-label="">调研问题 *</span>' +
+    '<span class="codepuppy-ext-meta" data-cloud-field-help="">写清范围和想要的结论形式</span>' +
+    '<textarea class="codepuppy-ext-ddoc" style="width:100%" rows="6" aria-label="调研问题">2026 年国内中小企业使用 AI 编程助手的情况:用得多的场景、主要顾虑、付费意愿。给出处。</textarea></label>' +
+    (pre || "") + '<button class="codepuppy-ext-add" data-variant="primary" data-cloud-form-submit="" type="button">发起任务</button></div>' +
+    "</div></section></div>"
+}
+function legacyBox(pre, btn) {
+  const buttons = btn === "right"
+    ? '<button class="codepuppy-ext-add" type="button">发送 Git 代码改动</button><button class="codepuppy-ext-add" data-variant="primary" data-cloud-form-submit="" type="button">选择文件并发送</button>'
+    : '<button class="codepuppy-ext-add" data-variant="primary" data-cloud-form-submit="" type="button">选择文件并发送</button><button class="codepuppy-ext-add" type="button">发送 Git 代码改动</button>'
+  return '<div data-btn="' + (btn || "left") + '"><div class="codepuppy-ext-dsub"><div class="codepuppy-ext-dsub-t">发送云端任务</div>' +
+    '<p class="codepuppy-ext-dnote">只读取和发送你明确选择的文件。每次发现受保护信息都会请你确认；未发现时会直接发送。</p>' + (pre || "") +
+    '<div class="codepuppy-ext-cloudrun">' + buttons + "</div></div></div>"
+}
+const frame = (o) => '<div class="dz-item"' + (o.id ? ' id="' + o.id + '"' : "") + '><p class="dz-cap"><b>' + o.cap + "</b>" + (o.sub || "") + '</p><div class="dz-frame a-ui" style="--w:' + (o.w || 880) + 'px">' + o.html + "</div></div>"
+
+/* 账户弹层里今天的余额卡(弹层原样,只截卡片那一段) */
+const popCard = '<div class="dz-pop a-ui"><div class="codepuppy-acct-card">' + row("会员订阅", "Pro") + row("可用余额", "¥36.50") + row("5 小时额度", "180 / 1,000") + row("7 日额度", "2,400 / 10,000") + "</div></div>"
+
+const SETS = {
+  gap: [
+    { html: null, raw: '<div class="dz-item" id="gap-popover"><p class="dz-cap"><b>今天:账户弹层里的余额卡</b>上线代码原样。</p>' + popCard + "</div>" },
+    { id: "gap-form", cap: "提议:同一张卡放进发送框", sub: "多一行「额度用完后用余额付」。", w: 420, html: card(ACC) },
+  ],
+  sample: [
+    { id: "sample-ok", cap: "能发", html: formBox(PRE.ok, "right") },
+    { id: "sample-allowance", cap: "发不了 · 额度用完", sub: "提示条用 warning:平台会拒,但发送不被拦。按钮是提示条自带的,在右。", html: formBox(PRE.allowance, "right") },
+    { id: "sample-legacy", cap: "旧版云条目 · 能发", sub: "主按钮在最右,次按钮在它左边。", html: legacyBox(PRE.ok, "right") },
+  ],
+  buttons: [
+    { id: "btn-live", cap: "现状:发送按钮在左(上线代码)", html: formBox(undefined, "left") },
+    { id: "btn-standard", cap: "按标准:发送按钮在右(只改 .codepuppy-ext-cloudrun 一条)", html: formBox(undefined, "right") },
+  ],
+}
+for (const el of document.querySelectorAll("[data-frames]")) {
+  const set = SETS[el.dataset.frames]
+  if (set) el.innerHTML = set.map((o) => (o.raw ? o.raw : frame(o))).join("")
+}
+document.querySelector('[data-frames="small-window"]').innerHTML = '<div class="dz-item" id="short-window"><div class="dz-viewport a-ui" style="--vh:436px"><div class="dz-vp-inner">' + formBox(PRE.allowance, "right") + "</div></div></div>"
+function alignViewport() {
+  const vp = document.querySelector("#short-window .dz-viewport"), inner = vp.querySelector(".dz-vp-inner")
+  inner.style.top = "0px"
+  const first = vp.querySelector("[data-pf]")
+  inner.style.top = -(first.getBoundingClientRect().top - vp.getBoundingClientRect().top) + "px"
+}
+alignViewport()
+for (const b of document.querySelectorAll("#themeSeg button")) {
+  b.addEventListener("click", () => {
+    document.documentElement.dataset.colorScheme = b.dataset.theme
+    for (const x of document.querySelectorAll("#themeSeg button")) x.toggleAttribute("data-on", x === b)
+    alignViewport()
+  })
+}
+</script>
+</body>
+</html>

@@ -47,12 +47,15 @@ function recordingContext(directory: string, label: () => string) {
 }
 
 test("registerPolicy 是 setup 里第一个被 await 的,seal 是最后一个;ext 自己的钩子与项目插件扇出都在两者之间", async () => {
-  const globalRoot = join(root, "global")
+  const globalRoot = join(root, "codepuppy-state", "env", "dev")
   mkdirSync(globalRoot, { recursive: true })
   process.env.CODEPUPPY_GLOBAL_DIR = globalRoot
   const project = join(root, "project")
   mkdirSync(join(project, ".codepuppy", "plugins"), { recursive: true })
-  writeFileSync(join(project, ".codepuppy", "prefs.json"), JSON.stringify({ extensionsConsent: { granted: true } }))
+  // `#1709`:项目已被用户信任 = main 的记录里有它(规范目录 + inode),经生产写端登记
+  const { projectTrustIdentity } = await import("../../ui-mac/src/main/project-trust-truth")
+  const { recordProjectTrustDecision } = await import("../../ui-mac/src/main/project-trust-truth-write")
+  expect(recordProjectTrustDecision(projectTrustIdentity(project)!, true, "2026-11-13T00:00:00.000Z", () => {})).toEqual({ ok: true })
   writeFileSync(
     join(project, ".codepuppy", "plugins", "probe.js"),
     `export default { id: "project.probe", async setup(context) { globalThis.__codepuppySetupOrderProject = true; await context.tool.hook("execute.before", () => {}) } }\n`,

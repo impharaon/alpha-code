@@ -1018,6 +1018,36 @@ it.live("项目 agent 写坏的 mode / model(#1700 AC-10):已同意的项目里 
   }),
 )
 
+/** 用户全局插件先登记一个带执行预算(`steps: 3`)的助手(全局插件先于 ext 激活:core/src/config.ts、plugin/supervisor.ts)。 */
+const budgetedAgent: Plugin.Plugin = {
+  id: "test.global-budgeted-agent",
+  async setup(context) {
+    await context.agent.transform((editor) =>
+      editor.update("budgeted", (agent) => {
+        agent.mode = "subagent"
+        agent.steps = 3 as never
+      }),
+    )
+  },
+}
+
+it.live("项目 agent 的 steps 受同意门(#1700 Codex R1/1 M3):未同意的项目写 steps: 100 / maxSteps: 100 ⇒ 已有助手的执行预算仍是 3;已同意 ⇒ 100", () =>
+  Effect.gen(function* () {
+    yield* activate(budgetedAgent)
+    const unconsented = yield* projectAgents({ budgeted: { steps: 100 }, legacy: { prompt: "l", maxSteps: 100 } }, false, "budgeted", "legacy")
+    expect(unconsented.budgeted?.steps).toBe(3)
+    expect(unconsented.legacy?.steps).toBeUndefined()
+  }),
+)
+
+it.live("项目 agent 的 steps 受同意门 · 已同意臂:同一份文档 ⇒ 预算按项目写的生效", () =>
+  Effect.gen(function* () {
+    yield* activate(budgetedAgent)
+    const consented = yield* projectAgents({ budgeted: { steps: 100 } }, true, "budgeted")
+    expect(consented.budgeted?.steps).toBe(100)
+  }),
+)
+
 /** 测试用旁路插件:一个 provider、一个模型,模型收不收温度由 `temperature` 定(引擎目录的 `capabilities.temperature`)。 */
 const samplingProvider = (providerID: string, temperature: boolean): Plugin.Plugin => ({
   id: `test.sampling-provider.${providerID}`,

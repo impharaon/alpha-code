@@ -219,7 +219,7 @@ function permissionRules(tools: unknown, permission: unknown) {
  * `color` 是 hex 原样、主题色名 ⇒ `#aaaaaa`;`variant` 只随合法的 `model` 生效;`temperature` / `top_p` 写进 `request.body` —— 引擎读 v1 agent 时放在同一处,
  * 但发请求时不读它(upstream-probes/agent-request.test.ts),由 `agentSampling` 在本轮请求的 `context` 钩子里补上。
  * `permission` 照 0.1.26 生效,`tools` 照上游换成同一串规则(#1693):翻成规则推在该 agent 已有规则之后;两者只在项目已同意时还在 ——
- * 没同意时 `mergeProjectConfig` 已剥掉 `permission/tools/model/disable/mode`(REQ-236 P1)。
+ * 没同意时 `mergeProjectConfig` 已剥掉 `permission/tools/model/disable/mode/steps/maxSteps`(REQ-236 P1、#1700)。
  * 任何一个字段写成上游 v1 agent schema 不收的形状(`malformedFields`)的条目整条不装:上游按 schema 校验整条 v1 agent(`core/src/v1/config/agent.ts`),
  * 不过就丢掉这一条、别的 agent 照常(`core/src/config/normalize.ts` `decodeMap`)—— 只装其余字段会让它比引擎读同一份文档时更宽(#1693 Codex R1/1、#1700 BR-06)。
  * 不用的字段与整条不装的条目各记一行(`log`)。新建的 agent(上游与配置里都没有)按 v1 config agent 的默认取 `mode: "all"`。

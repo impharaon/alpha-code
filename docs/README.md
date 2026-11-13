@@ -141,6 +141,7 @@ status.
 | `⚠️ 缺 id` | [architecture/2026-11-09-1662-l1-engine-host-spike.md](architecture/2026-11-09-1662-l1-engine-host-spike.md) | ⚠️ 缺 summary | ? |
 | `⚠️ 缺 id` | [architecture/2026-11-09-1662-permission-reply-measurements.md](architecture/2026-11-09-1662-permission-reply-measurements.md) | ⚠️ 缺 summary | active |
 | `⚠️ 缺 id` | [architecture/2026-11-12-1662-takeover-candidates.md](architecture/2026-11-12-1662-takeover-candidates.md) | ⚠️ 缺 summary | ? |
+| `ARCH-codepuppy-2026-11-13-project-config-command-surface` | [architecture/2026-11-13-project-config-command-surface.md](architecture/2026-11-13-project-config-command-surface.md) | 陌生仓库的 opencode.json / .opencode/ 在 Code Puppy 里能让哪些命令执行、在什么时点:本地 MCP 一打开就跑;formatter、shell、斜杠命令插值在模型写文件 / 跑 shell / 用户敲命令时跑项目选的程序;模型级 package 在第一轮把项目里的 JS 装进引擎进程;都在围栏内,但围栏放行写 codepuppy.jsonc 与 ~/.opencode。逐键现有门、修复位置与回归用例 | active |
 | `ARCH-codepuppy-2026-11-13-project-extension-trust-record` | [architecture/2026-11-13-project-extension-trust-record.md](architecture/2026-11-13-project-extension-trust-record.md) | 项目插件、项目 MCP 与项目 agent 的控制字段只在用户于确认框里同意后加载;记录在 Code Puppy 的状态目录,按规范目录 + inode 认项目,项目目录里的文件不算 | active |
 | `ARCH-alpha-code-claude-plugin-corpus-component-scale` | [architecture/claude-plugin-corpus-component-scale.md](architecture/claude-plugin-corpus-component-scale.md) | 真实 Claude 插件语料的组件规模(勘破) | active |
 | `ARCH-alpha-code-codepuppy-connection-lifetime` | [architecture/codepuppy-connection-lifetime.md](architecture/codepuppy-connection-lifetime.md) | Code Puppy Connection record lifetime | active |

@@ -30,10 +30,15 @@
    各收到哪些 `filesystem.changed`)、`command.json`(配置命令 `hello`:直接对引擎发与经适配器发);
 6. `parity.json`(0.1.26 对照):读目录的正文、运行中 shell 按游标读到的输出页、慢的后台子代理让完成通知自己开一个回合后
    各种 from 问到的 diff、`fs.watch` 对目录 / 根目录 / 文件的回应与外部增删时收到的帧;
-7. 停掉引擎与假模型。
+7. `catalog.json`(`#1697` I-04):项目位置上的原始 `GET /api/agent`、`/api/provider`、`/api/model`、`/api/model/default`,
+   以及新建一个会话(还没提问,2.x 不给标题)之后的 `GET /api/session`;`lineage.json`:经适配器带档位发送(2.x 先记一条
+   agent-switched)、压缩对话、composer 的 `!` 命令之后的整段消息。两份都给翻译器自有投影与冻结原件的等价核对用
+   (`src/engine-adapter/projection-parity.test.ts`)。2.x 的 provider 配置不收模型 status,沙箱里采不到 deprecated 模型,
+   核对里的 deprecated 模型由真样本改一个字段派生;
+8. 停掉引擎与假模型。
 
 只重采其中几个剧本时把名字写在命令后面:`base`(上面 2–4 的全部)、`permission`(只有 3–4,只重写 `permission-reply.json`)、
-`tools`、`continue`、`files`、`command`、`parity`,例如
+`tools`、`continue`、`files`、`command`、`parity`、`catalog`、`lineage`,例如
 `… sample.ts tools continue files command`;不写 = 全部。
 
 端口被占时用 `SAMPLER_ENGINE_PORT` / `SAMPLER_MODEL_PORT` 改。重采后跑适配器的测试确认夹具仍能用:

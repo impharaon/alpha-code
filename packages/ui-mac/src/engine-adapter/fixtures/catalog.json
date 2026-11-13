@@ -1,0 +1,1216 @@
+{
+ "_source": "Sampled by `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts` (alpha-code#1668 L6) at 1d77fb911b: a real OpenCode 2 engine from this repo's packages/cli `serve`, isolated HOME/XDG, one git project, and the scripted OpenAI-compatible mock model next to the sampler. Raw 2.x catalog responses for the project location, as the adapter's GET /agent and GET /provider read them: GET /api/agent, GET /api/provider, GET /api/model, GET /api/model/default; and GET /api/session (what GET /session translates and what the /api/session passthrough returns) right after creating freshSessionID, which has no prompt and so no title. 2.x provider config takes no model status (a declared status deprecated comes back active), so no deprecated model can be sampled here; the parity test derives one by flipping a sampled model's status.",
+ "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-Z7nogM/proj",
+ "agents": {
+  "location": {
+   "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-Z7nogM/proj"
+  },
+  "data": [
+   {
+    "id": "build",
+    "name": "Build",
+    "request": {
+     "settings": {},
+     "headers": {},
+     "body": {}
+    },
+    "description": "The default agent. Executes tools based on configured permissions.",
+    "mode": "primary",
+    "hidden": false,
+    "permissions": [
+     {
+      "action": "*",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "read",
+      "resource": "*.env",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.*",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.example",
+      "effect": "allow"
+     },
+     {
+      "action": "question",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "browser",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "skill",
+      "resource": "browser",
+      "effect": "deny"
+     }
+    ]
+   },
+   {
+    "id": "general",
+    "name": "General",
+    "request": {
+     "settings": {},
+     "headers": {},
+     "body": {}
+    },
+    "description": "General-purpose agent for researching complex questions and executing multi-step tasks. Use this agent to execute multiple units of work in parallel.",
+    "mode": "subagent",
+    "hidden": false,
+    "permissions": [
+     {
+      "action": "*",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "read",
+      "resource": "*.env",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.*",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.example",
+      "effect": "allow"
+     },
+     {
+      "action": "question",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "subagent",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "browser",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "skill",
+      "resource": "browser",
+      "effect": "deny"
+     }
+    ]
+   },
+   {
+    "id": "explore",
+    "name": "Explore",
+    "request": {
+     "settings": {},
+     "headers": {},
+     "body": {}
+    },
+    "system": "You are a file search specialist. You excel at thoroughly navigating and exploring codebases.\n\nGuidelines:\n- Your role is EXCLUSIVELY to search and analyze\n- Parallelize independent tool calls for searches and reads whenever possible\n- Adapt your search approach based on the thoroughness level specified by the caller\n- Return file paths as absolute paths in your final response\n- You MUST NOT create, modify, delete, move, or copy files, including temporary files and reports\n- Shell commands MUST be read-only. NEVER run commands that write files or change system state\n\nComplete the user's search request efficiently and report your findings clearly.",
+    "description": "Fast agent specialized for exploring codebases. Use this when you need to quickly find files by patterns (eg. \"src/components/**/*.tsx\"), search code for keywords (eg. \"API endpoints\"), or answer questions about the codebase (eg. \"how do API endpoints work?\"). When calling this agent, specify the desired thoroughness level: \"quick\" for basic searches, \"medium\" for moderate exploration, or \"very thorough\" for comprehensive analysis across multiple locations and naming conventions.",
+    "mode": "subagent",
+    "hidden": false,
+    "permissions": [
+     {
+      "action": "*",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "read",
+      "resource": "*.env",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.*",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.example",
+      "effect": "allow"
+     },
+     {
+      "action": "*",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "shell",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "grep",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "glob",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "webfetch",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "websearch",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "read",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "read",
+      "resource": "*.env",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.*",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.example",
+      "effect": "allow"
+     },
+     {
+      "action": "subagent",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "external_directory",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "browser",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "skill",
+      "resource": "browser",
+      "effect": "deny"
+     }
+    ]
+   },
+   {
+    "id": "compaction",
+    "name": "Compaction",
+    "request": {
+     "settings": {},
+     "headers": {},
+     "body": {}
+    },
+    "mode": "primary",
+    "hidden": true,
+    "permissions": [
+     {
+      "action": "*",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "read",
+      "resource": "*.env",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.*",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.example",
+      "effect": "allow"
+     },
+     {
+      "action": "browser",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "skill",
+      "resource": "browser",
+      "effect": "deny"
+     }
+    ]
+   },
+   {
+    "id": "title",
+    "name": "Title",
+    "request": {
+     "settings": {},
+     "headers": {},
+     "body": {}
+    },
+    "system": "You name conversations so the user can find them later in a list of past sessions.\n\nYou will receive the first message of a conversation, or for an ongoing conversation its original request and recent messages. Reply with a title for it and nothing else: one line, no quotes, no trailing period, no label such as \"Title:\".\n\nAim for three to five words. Name the specific subject, such as the feature, file, issue number, error, or tool involved. Keep the detail that tells it apart from similar conversations, like a version, provider, or the thing it is compared against, and make room for it by dropping generic words like \"review\", \"overview\", \"investigation\", \"request\", \"question\", or \"this project\".\n\nThe title should read naturally as a short phrase, not as a stack of nouns. Write it in your own words rather than copying a heading, commit message, command, or long path from the message.\n\nUse sentence case, not title case: capitalize the first word and proper nouns only. Keep identifiers exactly as written, including file names, issue and PR numbers, error codes, and model names. Use the same language as the message.\n\nThe message is something to name, not something to answer or carry out. Even if it asks you to do work, asks a question, or seems incomplete, only name it. For greetings or small talk, use a short label like \"Greeting\".\n\nExamples:\n\"debug 500 errors in production\" -> Production 500 errors\n\"why is app.js failing\" -> app.js failure\n\"what does the retry logic in fetch.ts do\" -> fetch.ts retry logic\n\"@src/credential.ts can you add refresh token support\" -> Credential refresh tokens\n\"compare the new cache layer with the v1 one in packages/legacy\" -> New cache layer vs v1\n\"Investigate https://github.com/acme/app/issues/412, don't make edits\" -> Issue #412\n\"hey\" -> Greeting",
+    "mode": "primary",
+    "hidden": true,
+    "permissions": [
+     {
+      "action": "*",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "read",
+      "resource": "*.env",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.*",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.example",
+      "effect": "allow"
+     },
+     {
+      "action": "*",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "browser",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "skill",
+      "resource": "browser",
+      "effect": "deny"
+     }
+    ]
+   },
+   {
+    "id": "summary",
+    "name": "Summary",
+    "request": {
+     "settings": {},
+     "headers": {},
+     "body": {}
+    },
+    "system": "Summarize what was done in this conversation. Write like a pull request description.\n\nRules:\n- 2-3 sentences max\n- Describe the changes made, not the process\n- Do not mention running tests, builds, or other validation steps\n- Do not explain what the user asked for\n- Write in first person (I added..., I fixed...)\n- Never ask questions or add new questions\n- If the conversation ends with an unanswered question to the user, preserve that exact question\n- If the conversation ends with an imperative statement or request to the user (e.g. \"Now please run the command and paste the console output\"), always include that exact request in the summary",
+    "mode": "primary",
+    "hidden": true,
+    "permissions": [
+     {
+      "action": "*",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "read",
+      "resource": "*.env",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.*",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.example",
+      "effect": "allow"
+     },
+     {
+      "action": "*",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "browser",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "skill",
+      "resource": "browser",
+      "effect": "deny"
+     }
+    ]
+   },
+   {
+    "id": "plan",
+    "name": "Plan",
+    "request": {
+     "settings": {},
+     "headers": {},
+     "body": {}
+    },
+    "description": "Read-only agent for exploring the codebase and planning work before implementation.",
+    "mode": "primary",
+    "hidden": false,
+    "permissions": [
+     {
+      "action": "*",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "read",
+      "resource": "*.env",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.*",
+      "effect": "ask"
+     },
+     {
+      "action": "read",
+      "resource": "*.env.example",
+      "effect": "allow"
+     },
+     {
+      "action": "question",
+      "resource": "*",
+      "effect": "allow"
+     },
+     {
+      "action": "edit",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "edit",
+      "resource": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-Z7nogM/home/.opencode/plan/*",
+      "effect": "allow"
+     },
+     {
+      "action": "browser",
+      "resource": "*",
+      "effect": "deny"
+     },
+     {
+      "action": "skill",
+      "resource": "browser",
+      "effect": "deny"
+     }
+    ]
+   }
+  ]
+ },
+ "providers": {
+  "location": {
+   "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-Z7nogM/proj"
+  },
+  "data": [
+   {
+    "id": "opencode",
+    "integrationID": "opencode",
+    "name": "OpenCode",
+    "activation": "enabled",
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "public",
+     "baseURL": "https://opencode.ai/inference/openai/v1"
+    }
+   },
+   {
+    "id": "mock",
+    "name": "Mock",
+    "activation": "enabled",
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "x",
+     "baseURL": "http://127.0.0.1:47962/v1",
+     "provider": "mock"
+    }
+   }
+  ]
+ },
+ "models": {
+  "location": {
+   "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-Z7nogM/proj"
+  },
+  "data": [
+   {
+    "id": "flint-40b-free",
+    "modelID": "flint-40b-free",
+    "providerID": "opencode",
+    "type": "chat",
+    "family": "flint",
+    "name": "Flint 40B Free",
+    "compatibility": {
+     "reasoningField": "reasoning_content"
+    },
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "public",
+     "baseURL": "https://opencode.ai/inference/openai/v1",
+     "provider": "opencode"
+    },
+    "capabilities": {
+     "tools": true,
+     "input": [
+      "text"
+     ],
+     "output": [
+      "text"
+     ],
+     "temperature": true
+    },
+    "variants": [
+     {
+      "id": "low",
+      "settings": {
+       "reasoningEffort": "low"
+      }
+     },
+     {
+      "id": "medium",
+      "settings": {
+       "reasoningEffort": "medium"
+      }
+     },
+     {
+      "id": "high",
+      "settings": {
+       "reasoningEffort": "high"
+      }
+     },
+     {
+      "id": "xhigh",
+      "settings": {
+       "reasoningEffort": "xhigh"
+      }
+     },
+     {
+      "id": "max",
+      "settings": {
+       "reasoningEffort": "max"
+      }
+     }
+    ],
+    "time": {
+     "released": 1792540800000
+    },
+    "cost": [
+     {
+      "input": 0,
+      "output": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    ],
+    "status": "active",
+    "enabled": true,
+    "limit": {
+     "context": 262144,
+     "output": 65536
+    }
+   },
+   {
+    "id": "nemotron-3.5-super-vl-free",
+    "modelID": "nemotron-3.5-super-vl-free",
+    "providerID": "opencode",
+    "type": "chat",
+    "family": "nemotron",
+    "name": "Nemotron 3.5 Super VL Free",
+    "compatibility": {
+     "reasoningField": "reasoning_content"
+    },
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "public",
+     "baseURL": "https://opencode.ai/inference/openai/v1",
+     "provider": "opencode"
+    },
+    "capabilities": {
+     "tools": true,
+     "input": [
+      "text",
+      "image"
+     ],
+     "output": [
+      "text"
+     ],
+     "temperature": true
+    },
+    "variants": [
+     {
+      "id": "none",
+      "settings": {
+       "reasoningEffort": "none"
+      }
+     },
+     {
+      "id": "minimal",
+      "settings": {
+       "reasoningEffort": "minimal"
+      }
+     },
+     {
+      "id": "low",
+      "settings": {
+       "reasoningEffort": "low"
+      }
+     },
+     {
+      "id": "medium",
+      "settings": {
+       "reasoningEffort": "medium"
+      }
+     },
+     {
+      "id": "high",
+      "settings": {
+       "reasoningEffort": "high"
+      }
+     },
+     {
+      "id": "xhigh",
+      "settings": {
+       "reasoningEffort": "xhigh"
+      }
+     }
+    ],
+    "time": {
+     "released": 1792022400000
+    },
+    "cost": [
+     {
+      "input": 0,
+      "output": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    ],
+    "status": "active",
+    "enabled": true,
+    "limit": {
+     "context": 1048576,
+     "input": 1048576,
+     "output": 131072
+    }
+   },
+   {
+    "id": "beam-free",
+    "modelID": "beam-free",
+    "providerID": "opencode",
+    "type": "chat",
+    "family": "beam",
+    "name": "Beam Free",
+    "compatibility": {
+     "reasoningField": "reasoning_content"
+    },
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "public",
+     "baseURL": "https://opencode.ai/inference/openai/v1",
+     "provider": "opencode"
+    },
+    "capabilities": {
+     "tools": true,
+     "input": [
+      "text"
+     ],
+     "output": [
+      "text"
+     ],
+     "temperature": true
+    },
+    "variants": [
+     {
+      "id": "low",
+      "settings": {
+       "reasoningEffort": "low"
+      }
+     },
+     {
+      "id": "medium",
+      "settings": {
+       "reasoningEffort": "medium"
+      }
+     },
+     {
+      "id": "high",
+      "settings": {
+       "reasoningEffort": "high"
+      }
+     },
+     {
+      "id": "xhigh",
+      "settings": {
+       "reasoningEffort": "xhigh"
+      }
+     },
+     {
+      "id": "max",
+      "settings": {
+       "reasoningEffort": "max"
+      }
+     }
+    ],
+    "time": {
+     "released": 1791158400000
+    },
+    "cost": [
+     {
+      "input": 0,
+      "output": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    ],
+    "status": "active",
+    "enabled": true,
+    "limit": {
+     "context": 1048576,
+     "output": 131072
+    }
+   },
+   {
+    "id": "mimo-v2.6-flash-free",
+    "modelID": "mimo-v2.6-flash-free",
+    "providerID": "opencode",
+    "type": "chat",
+    "family": "mimo",
+    "name": "MiMo-V2.6-Flash Free",
+    "compatibility": {
+     "reasoningField": "reasoning_content"
+    },
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "public",
+     "baseURL": "https://opencode.ai/inference/openai/v1",
+     "provider": "opencode"
+    },
+    "capabilities": {
+     "tools": true,
+     "input": [
+      "text",
+      "image",
+      "audio",
+      "video"
+     ],
+     "output": [
+      "text"
+     ],
+     "temperature": true
+    },
+    "variants": [],
+    "time": {
+     "released": 1790035200000
+    },
+    "cost": [
+     {
+      "input": 0,
+      "output": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    ],
+    "status": "active",
+    "enabled": true,
+    "limit": {
+     "context": 200000,
+     "output": 32000
+    }
+   },
+   {
+    "id": "deepseek-v4.1-flash-free",
+    "modelID": "deepseek-v4.1-flash-free",
+    "providerID": "opencode",
+    "type": "chat",
+    "family": "deepseek-flash",
+    "name": "DeepSeek V4.1 Flash Free",
+    "compatibility": {
+     "reasoningField": "reasoning_content"
+    },
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "public",
+     "baseURL": "https://opencode.ai/inference/openai/v1",
+     "provider": "opencode"
+    },
+    "capabilities": {
+     "tools": true,
+     "input": [
+      "text",
+      "image"
+     ],
+     "output": [
+      "text"
+     ],
+     "temperature": true
+    },
+    "variants": [
+     {
+      "id": "low",
+      "settings": {
+       "reasoningEffort": "low"
+      }
+     },
+     {
+      "id": "high",
+      "settings": {
+       "reasoningEffort": "high"
+      }
+     },
+     {
+      "id": "max",
+      "settings": {
+       "reasoningEffort": "max"
+      }
+     }
+    ],
+    "time": {
+     "released": 1788998400000
+    },
+    "cost": [
+     {
+      "input": 0,
+      "output": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    ],
+    "status": "active",
+    "enabled": true,
+    "limit": {
+     "context": 200000,
+     "output": 32000
+    }
+   },
+   {
+    "id": "glm-5.3-flash-free",
+    "modelID": "glm-5.3-flash-free",
+    "providerID": "opencode",
+    "type": "chat",
+    "family": "glm-flash",
+    "name": "GLM-5.3-Flash Free",
+    "compatibility": {
+     "reasoningField": "reasoning_content"
+    },
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "public",
+     "baseURL": "https://opencode.ai/inference/openai/v1",
+     "provider": "opencode"
+    },
+    "capabilities": {
+     "tools": true,
+     "input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "output": [
+      "text"
+     ],
+     "temperature": true
+    },
+    "variants": [
+     {
+      "id": "low",
+      "settings": {
+       "reasoningEffort": "low"
+      }
+     },
+     {
+      "id": "high",
+      "settings": {
+       "reasoningEffort": "high"
+      }
+     },
+     {
+      "id": "max",
+      "settings": {
+       "reasoningEffort": "max"
+      }
+     }
+    ],
+    "time": {
+     "released": 1787702400000
+    },
+    "cost": [
+     {
+      "input": 0,
+      "output": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    ],
+    "status": "active",
+    "enabled": true,
+    "limit": {
+     "context": 200000,
+     "output": 32000
+    }
+   },
+   {
+    "id": "nemotron-3.5-lightning-free",
+    "modelID": "nemotron-3.5-lightning-free",
+    "providerID": "opencode",
+    "type": "chat",
+    "family": "nemotron",
+    "name": "Nemotron 3.5 Lightning Free",
+    "compatibility": {
+     "reasoningField": "reasoning_content"
+    },
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "public",
+     "baseURL": "https://opencode.ai/inference/openai/v1",
+     "provider": "opencode"
+    },
+    "capabilities": {
+     "tools": true,
+     "input": [
+      "text"
+     ],
+     "output": [
+      "text"
+     ],
+     "temperature": true
+    },
+    "variants": [],
+    "time": {
+     "released": 1786406400000
+    },
+    "cost": [
+     {
+      "input": 0,
+      "output": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    ],
+    "status": "active",
+    "enabled": true,
+    "limit": {
+     "context": 262144,
+     "output": 262144
+    }
+   },
+   {
+    "id": "nemotron-3-ultra-free",
+    "modelID": "nemotron-3-ultra-free",
+    "providerID": "opencode",
+    "type": "chat",
+    "family": "nemotron",
+    "name": "Nemotron 3 Ultra Free",
+    "compatibility": {
+     "reasoningField": "reasoning_content"
+    },
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "public",
+     "baseURL": "https://opencode.ai/inference/openai/v1",
+     "provider": "opencode"
+    },
+    "capabilities": {
+     "tools": true,
+     "input": [
+      "text"
+     ],
+     "output": [
+      "text"
+     ],
+     "temperature": true
+    },
+    "variants": [],
+    "time": {
+     "released": 1780531200000
+    },
+    "cost": [
+     {
+      "input": 0,
+      "output": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    ],
+    "status": "active",
+    "enabled": true,
+    "limit": {
+     "context": 1000000,
+     "output": 128000
+    }
+   },
+   {
+    "id": "big-pickle",
+    "modelID": "big-pickle",
+    "providerID": "opencode",
+    "type": "chat",
+    "family": "big-pickle",
+    "name": "Big Pickle",
+    "compatibility": {
+     "reasoningField": "reasoning_content"
+    },
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "public",
+     "baseURL": "https://opencode.ai/inference/openai/v1",
+     "provider": "opencode"
+    },
+    "capabilities": {
+     "tools": true,
+     "input": [
+      "text"
+     ],
+     "output": [
+      "text"
+     ],
+     "temperature": true
+    },
+    "variants": [],
+    "time": {
+     "released": 1760659200000
+    },
+    "cost": [
+     {
+      "input": 0,
+      "output": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    ],
+    "status": "active",
+    "enabled": true,
+    "limit": {
+     "context": 200000,
+     "input": 160000,
+     "output": 32000
+    }
+   },
+   {
+    "id": "m",
+    "modelID": "m",
+    "providerID": "mock",
+    "name": "Mock M",
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "x",
+     "baseURL": "http://127.0.0.1:47962/v1",
+     "provider": "mock"
+    },
+    "capabilities": {
+     "tools": true,
+     "input": [
+      "text",
+      "image"
+     ],
+     "output": [
+      "text"
+     ]
+    },
+    "variants": [
+     {
+      "id": "low",
+      "settings": {
+       "reasoningEffort": "low"
+      }
+     },
+     {
+      "id": "medium",
+      "settings": {
+       "reasoningEffort": "medium"
+      }
+     },
+     {
+      "id": "high",
+      "settings": {
+       "reasoningEffort": "high"
+      }
+     }
+    ],
+    "time": {
+     "released": 0
+    },
+    "cost": [],
+    "status": "active",
+    "enabled": true,
+    "limit": {
+     "context": 200000,
+     "output": 32000
+    }
+   },
+   {
+    "id": "gpt-5-mock",
+    "modelID": "gpt-5-mock",
+    "providerID": "mock",
+    "name": "Mock GPT",
+    "package": "@opencode/ai/providers/openai-compatible",
+    "settings": {
+     "apiKey": "x",
+     "baseURL": "http://127.0.0.1:47962/v1",
+     "provider": "mock"
+    },
+    "capabilities": {
+     "tools": true,
+     "input": [
+      "text",
+      "image"
+     ],
+     "output": [
+      "text"
+     ]
+    },
+    "variants": [
+     {
+      "id": "low",
+      "settings": {
+       "reasoningEffort": "low"
+      }
+     },
+     {
+      "id": "medium",
+      "settings": {
+       "reasoningEffort": "medium"
+      }
+     },
+     {
+      "id": "high",
+      "settings": {
+       "reasoningEffort": "high"
+      }
+     }
+    ],
+    "time": {
+     "released": 0
+    },
+    "cost": [],
+    "status": "active",
+    "enabled": true,
+    "limit": {
+     "context": 200000,
+     "output": 32000
+    }
+   }
+  ]
+ },
+ "defaultModel": {
+  "location": {
+   "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-Z7nogM/proj"
+  },
+  "data": {
+   "id": "m",
+   "modelID": "m",
+   "providerID": "mock",
+   "name": "Mock M",
+   "package": "@opencode/ai/providers/openai-compatible",
+   "settings": {
+    "apiKey": "x",
+    "baseURL": "http://127.0.0.1:47962/v1",
+    "provider": "mock"
+   },
+   "capabilities": {
+    "tools": true,
+    "input": [
+     "text",
+     "image"
+    ],
+    "output": [
+     "text"
+    ]
+   },
+   "variants": [
+    {
+     "id": "low",
+     "settings": {
+      "reasoningEffort": "low"
+     }
+    },
+    {
+     "id": "medium",
+     "settings": {
+      "reasoningEffort": "medium"
+     }
+    },
+    {
+     "id": "high",
+     "settings": {
+      "reasoningEffort": "high"
+     }
+    }
+   ],
+   "time": {
+    "released": 0
+   },
+   "cost": [],
+   "status": "active",
+   "enabled": true,
+   "limit": {
+    "context": 200000,
+    "output": 32000
+   }
+  }
+ },
+ "freshSessionID": "ses_e2d3356f2ffeFdfLKIwx7bMJlM",
+ "sessions": {
+  "data": [
+   {
+    "id": "ses_e2d3356f2ffeFdfLKIwx7bMJlM",
+    "projectID": "16152cdda82b30b70060ed2c9747211f8deaf7c6",
+    "cost": 0,
+    "tokens": {
+     "input": 0,
+     "output": 0,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "time": {
+     "created": 1794537990442,
+     "updated": 1794537990442
+    },
+    "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-Z7nogM/proj",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-Z7nogM/proj"
+    }
+   }
+  ],
+  "cursor": {
+   "previous": "eyJhbmNob3IiOnsiaWQiOiJzZXNfZTJkMzM1NmYyZmZlRmRmTEtJd3g3Yk1KbE0iLCJ0aW1lIjoxNzk0NTM3OTkwNDQyLCJkaXJlY3Rpb24iOiJwcmV2aW91cyJ9fQ",
+   "next": "eyJhbmNob3IiOnsiaWQiOiJzZXNfZTJkMzM1NmYyZmZlRmRmTEtJd3g3Yk1KbE0iLCJ0aW1lIjoxNzk0NTM3OTkwNDQyLCJkaXJlY3Rpb24iOiJuZXh0In19"
+  }
+ }
+}

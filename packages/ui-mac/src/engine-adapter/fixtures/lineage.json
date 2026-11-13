@@ -1,0 +1,120 @@
+{
+ "_source": "Sampled by `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts` (alpha-code#1668 L6) at 1d77fb911b: a real OpenCode 2 engine from this repo's packages/cli `serve`, isolated HOME/XDG, one git project, and the scripted OpenAI-compatible mock model next to the sampler. Message lineage: via the adapter, a prompt with agent build (2.x records agent-switched first; permission asks answered once), then summarize (compaction), then a composer shell command echo lineage. `final` = order=asc once the compaction settled and the shell exited.",
+ "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-WLmJhF/proj",
+ "sessionID": "ses_e2d34b74cffehpoHNFA6YnYP5y",
+ "final": [
+  {
+   "id": "msg_1d2cb48d8001VpY6mElrpZ2dNN",
+   "time": {
+    "created": 1794537900248
+   },
+   "type": "agent-switched",
+   "agent": "build"
+  },
+  {
+   "id": "msg_1d2cb4901001UOtqhZOi898jgR",
+   "time": {
+    "created": 1794537900508
+   },
+   "text": "say hello plainly",
+   "type": "user"
+  },
+  {
+   "id": "msg_1d2cb49ec001XrQaumL43jKmZy",
+   "time": {
+    "created": 1794537900527,
+    "streamed": 1794537900654,
+    "completed": 1794537900664
+   },
+   "type": "assistant",
+   "agent": "build",
+   "model": {
+    "id": "m",
+    "providerID": "mock"
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Hello."
+    }
+   ],
+   "snapshot": {
+    "start": "5d824330ef1d813b975b9475afe7d45f5e89b41c",
+    "end": "5d824330ef1d813b975b9475afe7d45f5e89b41c",
+    "files": []
+   },
+   "finish": "stop",
+   "rawFinish": "stop",
+   "cost": 0,
+   "tokens": {
+    "input": 8,
+    "output": 2,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   }
+  },
+  {
+   "id": "msg_1d2cb4a7b001zoClYWrlK9iI7t",
+   "time": {
+    "created": 1794537900667
+   },
+   "type": "idle",
+   "outcome": "succeeded"
+  },
+  {
+   "type": "compaction",
+   "id": "msg_1d2cb4a9f0015v41r9B0Q1u42B",
+   "time": {
+    "created": 1794537900705
+   },
+   "status": "failed",
+   "reason": "manual",
+   "error": {
+    "type": "compaction.failed",
+    "message": "Compaction summary did not match the required template"
+   },
+   "cost": 0,
+   "tokens": {
+    "input": 17,
+    "output": 12,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   }
+  },
+  {
+   "id": "msg_1d2cb4c9e001sJdQ1g9oMKt9iH",
+   "time": {
+    "created": 1794537901214
+   },
+   "type": "idle",
+   "outcome": "succeeded"
+  },
+  {
+   "id": "msg_1d2cb4cab002A3Q63r1AEKb2QX",
+   "metadata": {
+    "background": true
+   },
+   "time": {
+    "created": 1794537901227,
+    "completed": 1794537901231
+   },
+   "type": "shell",
+   "shellID": "sh_1d2cb4ca9001o0k5dslG8Tg8wN",
+   "command": "echo lineage",
+   "status": "exited",
+   "exit": 0,
+   "output": {
+    "output": "lineage\n",
+    "cursor": 8,
+    "size": 8,
+    "truncated": false
+   }
+  }
+ ]
+}

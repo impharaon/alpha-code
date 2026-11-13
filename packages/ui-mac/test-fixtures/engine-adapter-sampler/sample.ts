@@ -582,6 +582,58 @@ try {
     })
   }
 
+  // ── `#1697` I-04 M2a:目录类的原始 2.x 响应(适配器 GET /agent、GET /provider 的输入),给翻译器自有投影的等价核对 ──
+  if (run("catalog")) {
+    const fresh = await create() // 新建、还没提问的会话:2.x 不给标题
+    write("catalog.json", {
+      _source: source(
+        "Raw 2.x catalog responses for the project location, as the adapter's GET /agent and GET /provider read them: GET /api/agent, GET /api/provider, GET /api/model, GET /api/model/default; and GET /api/session (what GET /session translates and what the /api/session passthrough returns) right after creating freshSessionID, which has no prompt and so no title. 2.x provider config takes no model status (a declared status deprecated comes back active), so no deprecated model can be sampled here; the parity test derives one by flipping a sampled model's status.",
+      ),
+      directory: project,
+      agents: await call("GET", `/api/agent?${loc}`),
+      providers: await call("GET", `/api/provider?${loc}`),
+      models: await call("GET", `/api/model?${loc}`),
+      defaultModel: await call("GET", `/api/model/default?${loc}`),
+      freshSessionID: fresh,
+      sessions: await call("GET", `/api/session?${loc}&limit=200`),
+    })
+  }
+
+  // ── `#1697` I-04 M2a:消息谱系里其余几种(切档位、`!` shell、压缩),给翻译器自有消息投影的等价核对 ──
+  if (run("lineage")) {
+    autoAllow = true
+    const sessionID = await create()
+    const at = `?directory=${encodeURIComponent(project)}`
+    const settled = async (done: (messages: any[]) => boolean) => {
+      for (let attempt = 0; attempt < 300; attempt++) {
+        if (done(await finalOf(sessionID))) return
+        await Bun.sleep(100)
+      }
+      throw new Error(`session ${sessionID} did not settle`)
+    }
+    // 经适配器发(与界面同一条路):带档位的发送 ⇒ 2.x 先切档位再提问;「压缩对话」;composer 的 `!` 命令
+    const sent = async (path: string, body: unknown) => {
+      const response = await viaAdapter("POST", `/session/${sessionID}/${path}${at}`, body)
+      if (response.status >= 300) throw new Error(`${path} via the adapter: ${response.status} ${JSON.stringify(response.body)}`)
+    }
+    await sent("prompt_async", { agent: "build", parts: [{ type: "text", text: "say hello plainly" }] })
+    await idle(sessionID)
+    // 压缩在 shell 之前:消息投影把压缩挂在最近一条用户消息上,shell 之后没有可挂的
+    await sent("summarize", {})
+    await settled((messages) => messages.some((message) => message.type === "compaction" && message.status !== "running"))
+    await sent("shell", { command: "echo lineage" })
+    await settled((messages) => messages.some((message) => message.type === "shell" && message.status !== "running"))
+    write("lineage.json", {
+      _source: source(
+        "Message lineage: via the adapter, a prompt with agent build (2.x records agent-switched first; permission asks answered once), then summarize (compaction), then a composer shell command echo lineage. `final` = order=asc once the compaction settled and the shell exited.",
+      ),
+      directory: project,
+      sessionID,
+      final: await finalOf(sessionID),
+    })
+    autoAllow = false
+  }
+
   console.log(`fixtures written to ${OUT}`)
 } finally {
   stop.abort()

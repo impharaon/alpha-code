@@ -243,7 +243,7 @@ export function createPermissionReplies() {
       const fingerprint = requestFingerprint(request)
       fingerprint.catch(() => {}) // 只在决定时才 await;wire 来的请求总是 JSON,这里不让它成为未处理的拒绝
       shown.set(request.id, { sessionID: request.sessionID, fingerprint })
-      return toV1PermissionRequest(request as never)
+      return toV1PermissionRequest(request)
     },
     /** 同一请求的决定排队处理:并发的重复提交等前一个落定后按幂等规则判。 */
     decide(api: OpenCodeClient, input: DecisionInput) {

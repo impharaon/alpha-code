@@ -14,7 +14,7 @@ import type {
 } from "@opencode-ai/sdk/v2/client"
 import type { RouteContext, RouteHandler, Translator } from "../contract/translator"
 import type { TranslatedKey } from "../contract/routes"
-import { normalizeAgentList, normalizeSessionInfo } from "../frozen-shapes"
+import { toContractSession } from "../contract/session"
 import { projectEventStream } from "./events"
 import { v1DecisionID, type DecisionInput, type DecisionOutcome, type PermissionReplies } from "./permission-replies"
 import { MESSAGE_PAGE, recentMessages, sessionDirectory } from "./session-cache"
@@ -22,6 +22,7 @@ import {
   syntheticText,
   toFormAnswer,
   toPrompt,
+  toV1Agents,
   toV1Commands,
   toV1FileNodes,
   toV1McpStatus,
@@ -214,7 +215,7 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
   // `GET /global/config`、`GET /config` 是约定侧的固定答复(contract/routes.ts FIXED)。
 
   // ── 项目(U2 选 A:2.x 自己有项目清单,`canonical` 改名 `worktree`)──
-  "GET /project": bind(async (context) => json((await context.api.project.list()).map((p) => toV1Project(p as never)))),
+  "GET /project": bind(async (context) => json((await context.api.project.list()).map((p) => toV1Project(p)))),
   "GET /project/current": bind(async (context) => json(await currentProject(context))),
   "GET /api/project/current": bind(async (context) => {
     const project = await currentProject(context)
@@ -223,7 +224,7 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
   "PATCH /project/:projectID": bind(async (context) => {
     const { name, icon, commands } = (context.body ?? {}) as { name?: string; icon?: never; commands?: never }
     const updated = await context.api.project.update({ projectID: context.params.projectID!, name, icon, commands })
-    return json(toV1Project(updated as never))
+    return json(toV1Project(updated))
   }),
   "POST /project/git/init": bind(async (context) => {
     await context.api.vcs.init(at(context))
@@ -246,7 +247,7 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
       ...(roots ? { parentID: null } : {}),
       ...(search ? { search } : {}),
     })
-    const out = sessions.map((session) => normalizeSessionInfo(session as never))
+    const out = sessions.map((session) => toContractSession(session))
     return json(limit ? out.slice(0, limit) : out)
   }),
   "GET /experimental/session": bind(async (context) => {
@@ -254,7 +255,7 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
     const search = context.query.get("search") ?? undefined
     // v1 的游标是数字时间戳,2.x 是不透明字符串:一次拉完、不给 x-next-cursor(调用方读不到游标即止)。
     const sessions = await allSessions(context.api, { ...(roots ? { parentID: null } : {}), ...(search ? { search } : {}) })
-    return json(sessions.map((session) => ({ ...normalizeSessionInfo(session as never), project: null })))
+    return json(sessions.map((session) => ({ ...toContractSession(session), project: null })))
   }),
   "POST /session": bind(async (context) => {
     const body = (context.body ?? {}) as { parentID?: string; title?: string }
@@ -263,14 +264,14 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
       ...(body.parentID ? { parentID: body.parentID } : {}),
       ...(body.title ? { title: body.title } : {}),
     })
-    return json(normalizeSessionInfo(created as never))
+    return json(toContractSession(created))
   }),
   "GET /session/status": bind(async (context) => {
     const active = await context.api.session.active()
     return json(Object.fromEntries(Object.keys(active).map((sessionID) => [sessionID, { type: "busy" }])))
   }),
   "GET /session/:sessionID": bind(async (context) =>
-    json(normalizeSessionInfo((await context.api.session.get({ sessionID: context.params.sessionID! })) as never)),
+    json(toContractSession((await context.api.session.get({ sessionID: context.params.sessionID! })))),
   ),
   "PATCH /session/:sessionID": bind(async (context) => {
     const sessionID = context.params.sessionID!
@@ -280,7 +281,7 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
       ...(body.title !== undefined ? { title: body.title } : {}),
       ...(body.time && "archived" in body.time ? { archived: !!body.time.archived } : {}),
     })
-    return json(normalizeSessionInfo((await context.api.session.get({ sessionID })) as never))
+    return json(toContractSession((await context.api.session.get({ sessionID }))))
   }),
   "DELETE /session/:sessionID": bind(async (context) => {
     await context.api.session.remove({ sessionID: context.params.sessionID! })
@@ -292,7 +293,7 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
       sessionID: context.params.sessionID!,
       ...(body.messageID ? { before: body.messageID } : {}),
     })
-    return json(normalizeSessionInfo(forked as never))
+    return json(toContractSession(forked))
   }),
   "POST /session/:sessionID/abort": bind(async (context) => {
     await context.api.session.interrupt({ sessionID: context.params.sessionID! })
@@ -334,12 +335,12 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
     const sessionID = context.params.sessionID!
     const body = (context.body ?? {}) as { messageID: string }
     await context.api.session.revert.stage({ sessionID, messageID: body.messageID })
-    return json(normalizeSessionInfo((await context.api.session.get({ sessionID })) as never))
+    return json(toContractSession((await context.api.session.get({ sessionID }))))
   }),
   "POST /session/:sessionID/unrevert": bind(async (context) => {
     const sessionID = context.params.sessionID!
     await context.api.session.revert.clear({ sessionID })
-    return json(normalizeSessionInfo((await context.api.session.get({ sessionID })) as never))
+    return json(toContractSession((await context.api.session.get({ sessionID }))))
   }),
   "GET /session/:sessionID/message": bind(messages),
   // U1:2.x 没有 todo 查询端点;清单就是会话里最近一次 todowrite 的输入(与事件流的 todo.updated 同一来源)。
@@ -365,7 +366,7 @@ export const ROUTES: Translator<Opencode2Engine>["routes"] = {
   }),
 
   // ── 目录内的只读查询 ──
-  "GET /agent": bind(async (context) => json(normalizeAgentList((await context.api.agent.list(at(context))).data as never))),
+  "GET /agent": bind(async (context) => json(toV1Agents((await context.api.agent.list(at(context))).data))),
   "GET /command": bind(async (context) => {
     const [commands, skills] = await Promise.all([context.api.command.list(at(context)), context.api.skill.list(at(context))])
     return json(toV1Commands(commands.data, skills.data))
@@ -581,7 +582,7 @@ async function currentProject(context: TranslatorContext) {
   const location = await context.api.location.get(at(context))
   const listed = (await context.api.project.list()).find((project) => project.id === location.project.id)
   return listed
-    ? toV1Project(listed as never)
+    ? toV1Project(listed)
     : toV1Project({ id: location.project.id, canonical: location.project.canonical, time: { created: 0, updated: 0 }, sandboxes: [] })
 }
 

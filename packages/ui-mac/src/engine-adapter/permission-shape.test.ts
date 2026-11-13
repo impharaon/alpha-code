@@ -49,7 +49,7 @@ describe("#1668 I7a 审批请求 2.x → v1", () => {
   })
 
   test("反向臂:直接用冻结 app 的 1.17.13 归一(不补 2.x 的 `source.id`)⇒ 审批卡丢掉工具调用 id", async () => {
-    const { normalizePermissionRequest } = await import("./frozen-shapes")
+    const { normalizePermissionRequest } = await import("../../../codepuppy-app/src/context/global-sync/utils")
     expect((normalizePermissionRequest(asked as never).tool as { callID?: string }).callID).toBeUndefined()
   })
 

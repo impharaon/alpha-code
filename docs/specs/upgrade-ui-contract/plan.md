@@ -56,9 +56,9 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 
 ### 每片共用的「行为不变」检查
 
-- **B1 适配器套件**(真入口为主):`cd packages/ui-mac && bun test src/engine-adapter src/renderer/engine-connection.test.ts src/main/net-failure-real-stack.test.ts`。
-  `src/engine-adapter/` 下 15 个测试文件:`command-reply`、`event-projection`、`failure-code`、`file-watcher`、`mcp-auth`、`permission-reply`、`permission-shape`、
-  `request-abort`、`routes-coverage`、`staged-attachment`、`todo-route`、`tool-display`、`tool-shapes`、`turn-diffs`、`unsupported`。
+- **B1 适配器套件**(真入口为主;逐个列文件,本机钩子不许按目录跑):
+  `cd packages/ui-mac && bun test src/engine-adapter/command-reply.test.ts src/engine-adapter/event-projection.test.ts src/engine-adapter/failure-code.test.ts src/engine-adapter/file-watcher.test.ts src/engine-adapter/mcp-auth.test.ts src/engine-adapter/permission-reply.test.ts src/engine-adapter/permission-shape.test.ts src/engine-adapter/projection-parity.test.ts src/engine-adapter/request-abort.test.ts src/engine-adapter/routes-coverage.test.ts src/engine-adapter/staged-attachment.test.ts src/engine-adapter/todo-route.test.ts src/engine-adapter/tool-display.test.ts src/engine-adapter/tool-shapes.test.ts src/engine-adapter/turn-diffs.test.ts src/engine-adapter/unsupported.test.ts src/renderer/engine-connection.test.ts src/main/net-failure-real-stack.test.ts src/renderer/codepuppy-ui/permission-mount-ratchet.test.ts`
+  (`projection-parity` 自 M2a 起有;以后新加的适配器测试文件补进这一行)。
   经 `createEngineFetch` 的有 `command-reply`、`mcp-auth`、`permission-reply`、`permission-shape`、`request-abort`、`todo-route`、`turn-diffs`、`unsupported`、`event-projection`(末条)与 `engine-connection`。
 - **B2 类型**:`bun run --cwd packages/ui-mac typecheck`(`tsgo -b`;注意测试文件不在类型检查范围,`tsconfig.json` 的 `exclude`)。
 - **B3 夹具差分**(设计 §4.10 c、§9「翻译器输出在 M1–M3 前后逐个相等」):`replay.ts`(M1a 新加,`packages/ui-mac/test-fixtures/engine-adapter-sampler/`,同采样器一样不进门)
@@ -189,7 +189,7 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 - 2026-11-12 · 目录基数按编排器裁决 1 取 A 的表:`SERVED` 88、`UNSUPPORTED` 22、`PROBE_FALLBACK` 1。设计 R1 / R9 / §4.1 / §9 M1 写的 87 / 18 是 E 上的数(差别见「对账」),编排器在设计 §10 留注 · M1b 提交。
 - 2026-11-12 · 投影器的 `emit` 本片只按事件名定型(`ContractEventType`),载荷按 `ContractEventMap` 定型挪到 M2b:按名定型已经能保证翻译器只发约定里的事件;按载荷定型时,A 的投影器对 `message.updated`、`session.created`、`session.updated`(只发 `info`)、`session.deleted`(`info` 可缺)、`message.part.updated`(只发 `part`)发的字段比 v1 SDK 声明的少,`question.replied` / `question.rejected` 的 `sessionID` 可能为空 —— 要么改投影(运行时变化,本片差分必须为空),要么按设计 §5 末条逐条判真伪,归 M2b 与路由类型一起处理 · M1b 提交。
 - 2026-11-12 · `index.ts` 不再导出 `matchRoute`(唯一用户是覆盖测试);匹配由约定导出 `matchServed` / `matchUnsupported` / `matchProbeFallback`,算法照 A 的 `index.ts:28-57` · M1b 提交。
-- 2026-11-12 · 覆盖扫描排除 `*.stories.*`:新加的字面量路径形式在 `codepuppy-session-ui` 的一个 story 里扫出 `POST /__playground/apply-css`(storybook 的开发服务器,不经 engineFetch);22 个 story 文件里没有任何客户端调用,排除它们不丢旧扫描的结果 · M1b 提交。
+- 2026-11-12 · 覆盖扫描排除 `*.stories.*`:新加的字面量路径形式在 `codepuppy-session-ui` 的一个 story 里扫出 `POST /__playground/apply-css`(storybook 的开发服务器,不经 engineFetch)。证据:用 M1b 的扫描器对三个扫描根下 `git ls-files` 列出的 22 个 `*.stories.*` 文件逐个扫,结果只有 `timeline-playground.stories.tsx:1550` 这一条字面量请求,客户端调用为零;所以排除它们不丢旧扫描的任何结果 · M1b 提交。
 - 2026-11-12 · 顺序里的两个提交合成一个:先红后绿改用变异证明(去掉探活回退登记 ⇒ `unsupported.test.ts` 两条与覆盖测试两条红;关掉构造链形式 ⇒ 真树与已知坏例 ① 红;renderer 加一个目录外调用 ⇒ 覆盖两条红),输出记在提交说明里 · M1b 提交。
 
 ## M2a — 翻译器自有投影
@@ -208,6 +208,7 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 | `engine-adapter/projection-parity.test.ts`(新,门文件) | 翻译器自有投影与冻结原件逐个相等(冻结原件只在测试里 import,作独立的旧行为基准);输入全部是真采样 |
 | `test-fixtures/engine-adapter-sampler/sample.ts`、`README.md` | 加剧本 `catalog`:经适配器的上游 fetch 记下 `/api/agent`、`/api/provider`、`/api/model`、`/api/model/default` 的原始 2.x 响应,写 `fixtures/catalog.json`;采样配置加一个 `status: "deprecated"` 的模型 |
 | `engine-adapter/fixtures/catalog.json`(新) | 采样产物 |
+| `engine-adapter/fixtures/lineage.json`(新) | 采样产物(偏离记录) |
 | `src/main/codepuppy-reasoning-badge-parity.engine.cases.ts` | 「已知的坏」一臂的 `normalizeProviderList` 改从冻结 app 原处 import(同一个函数;`frozen-shapes.ts` 删除后的必要改指) |
 | `docs/architecture/constraints.md` | 补登设计 §6 点名的一行:`contract/session.ts` 对冻结 `utils/session.ts` 的相对 import(`providers.ts` 转口规则,不变的偏离,与 `PermissionDialog.tsx:12` 同类) |
 | `scripts/old-name-exceptions.tsv` | 删 `frozen-shapes.ts` 一行(文件已删);`catalog.json` 的 `_source` 带仓库名则加一行 |
@@ -238,7 +239,11 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 
 ### 偏离记录
 
-暂无
+- 2026-11-12 · 消息投影放在新文件 `opencode2/messages.ts`(计划里写的可选拆分);provider、agent、审批请求的转换在 `v1-shapes.ts`。1.17.13 谱系有、2.x 没有的字段(推理块的 `state`、工具的 `providerState` / `providerResultState`)原件读到的恒为 undefined,序列化后不出现,自有投影不再写;2.x 工具文件内容的 `name` 可为 null,原样交出,用一处 `as string | undefined` 标明(v1 类型没有 null)。
+- 2026-11-12 · 多加采样剧本 `lineage`(写 `fixtures/lineage.json`):原有夹具里没有 `agent-switched`、`shell`、`compaction` 三种消息,消息投影的这三支没有真样本可比。剧本经适配器带档位发送、压缩对话、发 `!` 命令,压缩放在 shell 之前(投影把压缩挂在最近一条用户消息上,shell 之后没有可挂的)。
+- 2026-11-12 · 剧本 `catalog` 实测:2.x 的 provider 配置不收模型 `status`(声明 deprecated 回来仍是 active),按风险一节用真样本派生 deprecated 模型;另记一份新建会话之后的 `GET /api/session`(还没提问,2.x 不给标题),作会话标题那条证明的真输入,代替计划里写的「session.created 帧去掉 title」(那个帧不是完整的会话信息)。
+- 2026-11-12 · 计划外多改一个文件:`permission-shape.test.ts` 的反向臂动态 import 了 `./frozen-shapes`,改为直接 import 冻结 app 原处(同一个函数)。`opencode2/events.ts` 的 `project.updated`、`permission.asked` 两支改用 2.x 带类型的事件取 `data`,以去掉 `as never`。
+- 2026-11-12 · 顺序里的两个提交合成一个;先红后绿用变异证明(删消息投影的 shell 分支 ⇒ 消息等价与反向臂两条红;工具 part 的 callID 改取工具名 ⇒ 消息等价红)。
 
 ## M2b — 约定类型落地
 

@@ -16,7 +16,7 @@
 import type { OpenCodeClient, OpenCodeEvent, SessionMessageInfo } from "@opencode/client/promise"
 import type { Part } from "@opencode-ai/sdk/v2/client"
 import type { ContractEventType } from "../contract/events"
-import { normalizeSessionInfo } from "../frozen-shapes"
+import { toContractSession } from "../contract/session"
 import type { PermissionReplies } from "./permission-replies"
 import type { TranslatorContext } from "./routes"
 import { recentMessages, rememberSessionDirectory, sessionDirectory } from "./session-cache"
@@ -179,7 +179,7 @@ export function createProjector(api: OpenCodeClient, emit: Emit, permissions: Pe
   async function snapshot(directory: string, sessionID: string, refreshTurnDiff = false) {
     const page = await recentMessages(api, sessionID, { limit: SNAPSHOT_WINDOW })
     for (const message of page.context) {
-      if (message.type === "assistant") blocks.set(message.id, contentKeys(message.content as never))
+      if (message.type === "assistant") blocks.set(message.id, contentKeys(message.content))
     }
     const listed = toV1Messages(sessionID, withProgress(page.context))
     const anchor = turnAnchor(listed, page.context)
@@ -262,7 +262,7 @@ export function createProjector(api: OpenCodeClient, emit: Emit, permissions: Pe
   }
 
   async function sessionInfo(directory: string, sessionID: string, type: "session.created" | "session.updated") {
-    const info = normalizeSessionInfo((await api.session.get({ sessionID })) as never)
+    const info = toContractSession((await api.session.get({ sessionID })))
     sessions.set(sessionID, info)
     emit(directory, { type, properties: { info } })
   }
@@ -273,7 +273,7 @@ export function createProjector(api: OpenCodeClient, emit: Emit, permissions: Pe
     if (!keys) {
       const page = await recentMessages(api, sessionID, { through: messageID })
       const message = page.context.find((item) => item.id === messageID)
-      keys = message?.type === "assistant" ? contentKeys(message.content as never) : []
+      keys = message?.type === "assistant" ? contentKeys(message.content) : []
       blocks.set(messageID, keys)
     }
     let index = keys.indexOf(key)
@@ -302,8 +302,8 @@ export function createProjector(api: OpenCodeClient, emit: Emit, permissions: Pe
     if (type === "location.shutdown") return emit(directory, { type: "server.instance.disposed", properties: { directory } })
     if (type === "agent.updated" || type === "command.updated" || type === "skill.updated")
       return emit(directory, { type: "catalog.updated", properties: {} })
-    if (type === "project.updated") return emit(directory, { type, properties: toV1Project(data as never) })
-    if (type === "permission.asked") return emit(directory, { type, properties: permissions.show(data as never) })
+    if (event.type === "project.updated") return emit(directory, { type: event.type, properties: toV1Project(event.data) })
+    if (event.type === "permission.asked") return emit(directory, { type: event.type, properties: permissions.show(event.data) })
     if (type === "permission.replied") return emit(directory, { type, properties: data })
     if (type === "form.created") {
       const question = toV1Question(data.form)

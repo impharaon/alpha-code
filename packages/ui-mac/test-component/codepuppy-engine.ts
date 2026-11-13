@@ -101,6 +101,8 @@ export type HostOptions = {
   modelBaseURL: string
   /** 用户在 Code Puppy 里加的本地 MCP(codepuppy.jsonc 里的 `probe`,引擎经显式文件读它),每次 tools/call 记进这个文件。 */
   mcpCallLog?: string
+  /** codepuppy.jsonc 里另加的 MCP 服务器(名字 → 定义);注入在 codepuppyEngine() 里就合并用户文件,所以要在这里给。 */
+  mcp?: Record<string, unknown>
   /** 项目目录里的文件(相对路径 → 内容),例如 `opencode.json`。 */
   projectFiles?: Record<string, string>
   /** 引擎的库文件(默认按 engineSlot 分配);升级迁移要让 main 改写的库与引擎打开的库是同一个文件。 */
@@ -137,10 +139,17 @@ export function codepuppyEngine(options: HostOptions) {
   process.env.CODEPUPPY_BASE_URL = options.modelBaseURL
   process.env.CODEPUPPY_PLATFORM_AUTH_REF = secretFileRef(userData, "CODEPUPPY_API_KEY")
   process.env.CODEPUPPY_POLICY_ACCOUNT = `t-${name}-${Math.random().toString(36).slice(2)}`
-  if (options.mcpCallLog)
+  if (options.mcpCallLog || options.mcp)
     fs.writeFileSync(
       path.join(process.env.CODEPUPPY_GLOBAL_DIR, "codepuppy.jsonc"),
-      JSON.stringify({ mcp: { probe: { type: "local", command: [process.execPath, MCP_FIXTURE], environment: { CODEPUPPY_MCP_CALL_LOG: options.mcpCallLog } } } }),
+      JSON.stringify({
+        mcp: {
+          ...(options.mcpCallLog
+            ? { probe: { type: "local", command: [process.execPath, MCP_FIXTURE], environment: { CODEPUPPY_MCP_CALL_LOG: options.mcpCallLog } } }
+            : {}),
+          ...options.mcp,
+        },
+      }),
     )
   fakeMainPort()
 

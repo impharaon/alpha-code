@@ -35,13 +35,18 @@
    agent-switched)、压缩对话、composer 的 `!` 命令之后的整段消息。两份都给翻译器自有投影与冻结原件的等价核对用
    (`src/engine-adapter/projection-parity.test.ts`)。2.x 的 provider 配置不收模型 status,沙箱里采不到 deprecated 模型,
    核对里的 deprecated 模型由真样本改一个字段派生;
-8. 停掉引擎与假模型。
+8. `passthrough.json`(`#1697` I-04,设计 §4.10 d):每条直通路由经冻结界面自己的客户端(1.17.13 的 `OpenCode.make`、v1 SDK 的
+   `createOpencodeClient`)照冻结发出点的调用形状实调一次,记下适配器交回的状态码与响应体。集成那五条用运行时加的一台远端 MCP
+   (`PUT /api/experimental/mcp/oauthprobe`),它的授权服务器是同目录的 `mock-oauth.ts`(本机,不连外网):引擎对它跑真的 MCP SDK
+   流程(401 + 资源元数据、授权服务器元数据、动态注册、换 token);授权页不打开,采样器照引擎交回的 redirect_uri 与 state 拼回调
+   交给 complete。项目里写一个 `opencode.json` 登记一条本地参考目录,`GET /api/reference` 才有元素可核;
+9. 停掉引擎与假模型。
 
 只重采其中几个剧本时把名字写在命令后面:`base`(上面 2–4 的全部)、`permission`(只有 3–4,只重写 `permission-reply.json`)、
-`tools`、`continue`、`files`、`command`、`parity`、`catalog`、`lineage`,例如
+`tools`、`continue`、`files`、`command`、`parity`、`catalog`、`lineage`、`passthrough`,例如
 `… sample.ts tools continue files command`;不写 = 全部。
 
-端口被占时用 `SAMPLER_ENGINE_PORT` / `SAMPLER_MODEL_PORT` 改。重采后跑适配器的测试确认夹具仍能用:
+端口被占时用 `SAMPLER_ENGINE_PORT` / `SAMPLER_MODEL_PORT` / `SAMPLER_OAUTH_PORT` 改。重采后跑适配器的测试确认夹具仍能用:
 
 ```sh
 cd packages/ui-mac

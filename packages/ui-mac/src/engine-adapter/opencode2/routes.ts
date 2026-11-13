@@ -75,7 +75,8 @@ const bind =
   (context, engine) =>
     handle({ ...context, ...engine, passthrough: () => engine.fetch(context.request) })
 /** 直通:请求原样转给引擎,响应原样交回(类型按约定登记,翻译器不碰响应体)。 */
-const passthrough = <K extends TranslatedKey>(context: RouteContext<K>, engine: Opencode2Engine) => engine.fetch(context.request)
+export const passthrough = <K extends TranslatedKey>(context: RouteContext<K>, engine: Opencode2Engine) =>
+  engine.fetch(context.request)
 
 /** 2.x 的会话分页拉全(v1 的列表不分页;侧栏的全局索引按「一页拉完」处理,见 experimental.session.list)。 */
 async function allSessions(api: OpenCodeClient, input: Parameters<OpenCodeClient["session"]["list"]>[0]) {

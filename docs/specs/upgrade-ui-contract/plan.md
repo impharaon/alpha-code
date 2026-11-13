@@ -460,7 +460,10 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 
 ### 偏离记录
 
-暂无
+- 2026-11-12 · **两条待设计裁决(BLOCKED: design — §4.10 d / R1)**:`POST /api/session/:sessionID/interrupt` 真引擎回 200 `{interrupted}`,1.17.13 客户端声明 204、当场抛 UnexpectedStatus;`POST /api/session/:sessionID/command` 1.17.13 客户端发 `{command, arguments…}`,引擎要 `{name, text}`,回 400。两条都只在 v2 协议下由冻结 app 经 1.17.13 客户端发出,协议恒为 v1 时 `createCompatibleApi` 改写成 v1 路由(`codepuppy-app/src/utils/server-compat.ts` createV1Api 的 interrupt、command),Code Puppy 运行时不发。测试把它们单列在 `PENDING_DESIGN` 并断言「仍对不上」,其余 24 条照常核;设计改了(挪进不支持或改为翻译)就从那里删掉。
+- 2026-11-12 · 相关的新证据(给设计 §10 留档那一行「把只从未挂载的冻结组件发出的路由降为不支持」):26 条直通里 20 条只由 1.17.13 客户端发出,而冻结 app 用的 `api` 是 `createCompatibleApi`,v1 协议下这 20 条对应的方法全被 createV1Api 改写成 v1 路由 —— 只有 v1 SDK `v2.*` 命名空间的 6 条(agent、provider、reference、session 列表 / 读取、切模型)真会在运行时经过适配器。本片按扫描的归属照样用各自的客户端实调,样本代表「若发出,引擎怎么答」。
+- 2026-11-12 · 集成五条:假 OAuth(`mock-oauth.ts`)约 10 分钟跑通,没有用到时间盒。样本里真的:引擎、引擎对远端 MCP 跑的整个 MCP SDK OAuth 流程(含动态注册与换 token)、集成路由的状态码与响应体;不是真的:授权服务器(本机假的)、授权页(没打开,采样器照引擎交回的 redirect_uri 与 state 拼回调,code 固定为 `sampler-code`)、`connect/key` 用列表里第一个有 key 方法的集成(`302ai`)与假 key。
+- 2026-11-12 · `ReadSet` 的消费函数一支多一个 `at`(`data` / `data[]`),指出消费函数吃响应体的哪一部分;设计 §4.3 代码块里只有 `consumer`。`opencode2/routes.ts` 导出 `passthrough`,让测试从翻译器反查直通集合、与 READS 互相核对。采样器在项目里写 `opencode.json` 登记一条本地参考目录并让引擎重载,`GET /api/reference` 才有元素可核。两个提交合成一个。
 
 ## M5c — 转换路由的采样用例(c,路由)
 

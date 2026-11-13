@@ -128,6 +128,91 @@ export type ServedKey = keyof typeof SERVED
 export type ResponseOf<K extends ServedKey> = NonNullable<(typeof SERVED)[K]["__response"]>
 export type BodyOf<K extends ServedKey> = NonNullable<(typeof SERVED)[K]["__body"]>
 
+/**
+ * 规则 5(设计 §4.3、§4.10 d):翻译器原样转发的路由(直通),消费方实际读什么。路径以 HTTP 响应体为根:`data[].id` = data 数组
+ * 每一项的 id,`data.*.type` = data 对象每个值的 type,结尾 `?` = 消费方容忍缺失;`fields: []` = 只看状态码。或者登记一个冻结
+ * 消费函数(`at` 指它吃响应体的哪一部分)。读点是 packages/ 下的路径。一致性 d 在真引擎样本上逐条核(passthrough-reads.test.ts)。
+ */
+export type ReadSet =
+  | { readonly fields: readonly string[]; readonly sites: readonly string[] }
+  | { readonly consumer: "normalizeSessionInfo"; readonly at: "data" | "data[]"; readonly sites: readonly string[] }
+
+export const READS = {
+  "GET /api/agent": {
+    fields: ["data[].id", "data[].mode", "data[].hidden", "data[].description?"],
+    sites: ["ui-mac/src/renderer/codepuppy-ui/composer-autocomplete.tsx:184,282-289"],
+  },
+  "GET /api/provider/:providerID": { fields: ["data.id"], sites: ["ui-mac/src/renderer/codepuppy-ui/model-contract.ts:277-286"] },
+  "GET /api/reference": {
+    fields: ["data[].name", "data[].path", "data[].hidden?", "data[].description?", "data[].source.type"],
+    sites: ["codepuppy-app/src/context/global-sync/bootstrap.ts:324", "codepuppy-app/src/components/prompt-input.tsx:566-579"],
+  },
+  "GET /api/session": {
+    consumer: "normalizeSessionInfo",
+    at: "data[]",
+    sites: [
+      "codepuppy-app/src/context/directory-sync.ts:127-129",
+      "codepuppy-app/src/context/global-sync/home-session-index.ts:131",
+      "codepuppy-app/src/components/command-palette.ts:149",
+      "codepuppy-app/src/pages/home/home-sessions-controller.tsx:70",
+    ],
+  },
+  "POST /api/session": { consumer: "normalizeSessionInfo", at: "data", sites: ["codepuppy-app/src/components/prompt-input/submit.ts:407-411"] },
+  "GET /api/session/active": {
+    fields: ["data.*.type"],
+    sites: ["codepuppy-app/src/context/server-sync.tsx:168-176,256-258"],
+  },
+  "GET /api/session/:sessionID": {
+    consumer: "normalizeSessionInfo",
+    at: "data",
+    sites: ["codepuppy-app/src/components/titlebar.tsx:210-212", "ui-mac/src/renderer/codepuppy-ui/model-contract.ts:383-387"],
+  },
+  "DELETE /api/session/:sessionID": { fields: [], sites: ["codepuppy-app/src/pages/session/timeline/message-timeline.tsx:873-875"] },
+  "POST /api/session/:sessionID/model": { fields: [], sites: ["ui-mac/src/renderer/codepuppy-ui/model-contract.ts:393-396"] },
+  "POST /api/session/:sessionID/fork": { fields: ["data.id"], sites: ["codepuppy-app/src/components/dialog-fork.tsx:75-80"] },
+  "POST /api/session/:sessionID/interrupt": {
+    fields: [],
+    sites: ["codepuppy-app/src/components/prompt-input/submit.ts:279", "codepuppy-app/src/pages/session.tsx:1829"],
+  },
+  "POST /api/session/:sessionID/command": { fields: [], sites: ["codepuppy-app/src/components/prompt-input/submit.ts:526"] },
+  "POST /api/session/:sessionID/compact": { fields: [], sites: ["codepuppy-app/src/pages/session/use-session-commands.tsx:409"] },
+  "POST /api/session/:sessionID/shell": { fields: [], sites: ["codepuppy-app/src/components/prompt-input/submit.ts:500-508"] },
+  "GET /api/fs/find": {
+    fields: ["data[].path"],
+    sites: [
+      "codepuppy-app/src/context/file.tsx:217",
+      "codepuppy-app/src/components/directory-picker-domain.ts:378",
+      "codepuppy-app/src/components/dialog-select-directory-v2.tsx:107-111",
+    ],
+  },
+  "GET /api/vcs/status": { fields: ["data"], sites: ["codepuppy-app/src/pages/layout.tsx:1524-1527,1592-1595"] },
+  "GET /api/vcs/diff": {
+    fields: ["data[].file", "data[].additions", "data[].deletions", "data[].patch"],
+    sites: ["codepuppy-app/src/pages/session.tsx:699-701,719,733-736,747-755"],
+  },
+  "POST /api/pty": { fields: ["data.id", "data.command"], sites: ["codepuppy-app/src/context/terminal.tsx:288-297,339-348"] },
+  "GET /api/pty/:ptyID": { fields: ["data.status"], sites: ["codepuppy-app/src/components/terminal.tsx:563-564"] },
+  "PUT /api/pty/:ptyID": { fields: [], sites: ["codepuppy-app/src/context/terminal.tsx:262", "codepuppy-app/src/components/terminal.tsx:263"] },
+  "DELETE /api/pty/:ptyID": { fields: [], sites: ["codepuppy-app/src/context/terminal.tsx:448"] },
+  "GET /api/integration/:integrationID": {
+    fields: ["data.methods[].type", "data.methods[].id"],
+    sites: ["codepuppy-app/src/components/dialog-connect-provider.tsx:420-429,545"],
+  },
+  "POST /api/integration/:integrationID/connect/key": { fields: [], sites: ["codepuppy-app/src/components/dialog-connect-provider.tsx:824"] },
+  "POST /api/integration/:integrationID/connect/oauth": {
+    fields: ["data.attemptID", "data.url", "data.mode", "data.instructions?"],
+    sites: ["codepuppy-app/src/components/dialog-connect-provider.tsx:554-563,957,975,1014,1042,1171"],
+  },
+  "GET /api/integration/:integrationID/connect/oauth/:attemptID": {
+    fields: ["data.status", "data.message?"],
+    sites: ["codepuppy-app/src/components/dialog-connect-provider.tsx:1053-1071"],
+  },
+  "POST /api/integration/:integrationID/connect/oauth/:attemptID/complete": {
+    fields: [],
+    sites: ["codepuppy-app/src/components/dialog-connect-provider.tsx:954-962"],
+  },
+} as const satisfies Partial<Record<ServedKey, ReadSet>>
+
 /** 答复不依赖引擎的路由,由约定侧直接答(UC-14,R8)。 */
 export const FIXED = {
   // v1 的配置对象在 2.x 拆成多份配置文档;冻结 app 的 v2 支路对配置给的就是空对象,v1 路径上读它的只有默认模型回落与客户端

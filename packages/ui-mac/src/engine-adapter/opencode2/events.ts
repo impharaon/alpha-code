@@ -2,7 +2,8 @@
 // (`data: {"directory", "payload": {"type", "properties"}}`)。
 //
 // 投影规则(方案 §2.3「事件流」):
-//   · 直通:pty.*、lsp.updated、vcs.branch.updated、mcp 的四种、reference.updated、server.connected、global.disposed;
+//   · 直通:pty.*、vcs.branch.updated、mcp 的 status / resources、reference.updated、server.connected(R17:引擎公开事件流不发的
+//     lsp.updated、global.disposed、mcp.tools.changed、mcp.prompts.changed 不在约定里,到了也丢);
 //     filesystem.changed → file.watcher.updated(另由回合改动补出项目文件的增删改,见 fileChanges);
 //   · 改名:location.shutdown → server.instance.disposed;agent/command/skill.updated → catalog.updated;
 //     project.updated(`canonical` → `worktree`;Code Puppy 自己的目录不发,`#1669` internal-projects.ts);
@@ -130,34 +131,26 @@ type PassThroughType =
   | "pty.updated"
   | "pty.exited"
   | "pty.deleted"
-  | "lsp.updated"
   | "vcs.branch.updated"
   | "reference.updated"
   | "server.connected"
-  | "global.disposed"
   | "mcp.status.changed"
   | "mcp.resources.changed"
-  | "mcp.tools.changed"
-  | "mcp.prompts.changed"
 
 const PASS_THROUGH: ReadonlySet<string> = new Set<PassThroughType>([
   "pty.created",
   "pty.updated",
   "pty.exited",
   "pty.deleted",
-  "lsp.updated",
   "vcs.branch.updated",
   "reference.updated",
   "server.connected",
-  "global.disposed",
 ])
 
-/** 2.x 的 MCP 事件,两代同形直通。2.x 只定义这四种(schema/src/mcp-event.ts 三种、core/src/mcp/index.ts 的 prompts.changed)。 */
+/** 2.x 公开事件流里的 MCP 事件,两代同形直通(packages/schema/src/event-manifest.ts 的 ServerDefinitions 只带这两种,R17)。 */
 const MCP_EVENTS: ReadonlySet<string> = new Set<PassThroughType>([
   "mcp.status.changed",
   "mcp.resources.changed",
-  "mcp.tools.changed",
-  "mcp.prompts.changed",
 ])
 
 /** 两代同形的事件:2.x 的载荷原样作为约定载荷发出。 */

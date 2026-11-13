@@ -581,3 +581,5 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 - 2026-11-13 · 采样器多一个本机假 MCP(`mock-mcp.ts`,streamable HTTP、JSON 应答、GET 推送流),用来让引擎连上一台 MCP 并发出 MCP 事件;`mcp.resources.changed` 与 `mcp.status.changed` 由它采到。
 - 2026-11-13 · ADR-047 第 240、249 行的机制路径各改一处(`contract/receipts.ts`、`opencode2/v1-shapes.ts`),与登记册一致。升级手册「中」加第 5 步(原第 5 步顺延为第 6 步,其它地方只引用第 4 步)。两个提交合成一个。
 - 2026-11-13 · 变异证明:`server.instance.disposed` 的 directory 置空、`reference.updated` 拿出直通集合 ⇒ 对应两条事件回放红。
+- 2026-11-13 · **R17 已落(设计 §10)**:上面那条待设计裁决按编排器裁定处置 —— 四种从 `ContractEventMap` 与 `PASS_THROUGH` / `MCP_EVENTS` 拿掉,事件表 33 → 29 种(17 种回放 + 12 种已有测试)。`UNDELIVERED` 不再是台账的一栏,改为 `ENGINE_DOES_NOT_EMIT` 守卫:四种都不在引擎的 `Server` 清单里(对照 `mcp.status.changed`、`pty.created` 在),也不在 `ContractEventMap` 里;测试条数仍是 70。冻结 app 里收它们的五处处理今天就不触发(见 R17 行),没改冻结树。顺带改正两处注释:`mock-mcp.ts` 头注释原说引擎会发 tools / prompts 两种,`contract/routes.ts` 里 `GET /lsp` 的理由原说 2.x「只有 lsp.updated 事件」。
+- 2026-11-13 · R17 变异证明:守卫清单加进 `mcp.status.changed` ⇒ 守卫红;`lsp.updated` 加回 `ContractEventMap` ⇒ 台账红。

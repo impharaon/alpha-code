@@ -1,6 +1,8 @@
 // `#1697`(I-04,设计 §4.5):`GET /global/event` 的帧格式与事件表 —— 第 1 版 = 翻译器今天发出的全部事件类型,逐个列名
 // (`mcp.*` 不再按前缀直通)。载荷按设计 §4.3 规则 1 引用发出它的冻结客户端声明的事件类型(v1 SDK 的 `Event*`,v1 SDK 没有而
 // 1.17.13 客户端有的三种按 R4 引用后者);两个冻结客户端都没声明的按规则 2 自声明。
+// 引擎公开事件流不发的类型不在表里(R17:`lsp.updated`、`global.disposed`、`mcp.tools.changed`、`mcp.prompts.changed`;
+// contract-cases.test.ts 守着引擎的事件清单,哪天它开始发其中任何一种就红,约定要有意识地扩)。
 // 登记的是翻译器**实际发出**的字段:有几种它发的比冻结客户端声明的少(下面逐条注明),冻结 app 的事件归约
 // (codepuppy-app/src/context/global-sync/event-reducer.ts)只读发出的那些,所以按实际发出的形状收窄,不为凑类型补字段。
 import type * as Legacy from "@opencode-ai/client/promise"
@@ -14,15 +16,11 @@ export type ContractEventMap = {
   "pty.updated": V1.EventPtyUpdated["properties"]
   "pty.exited": V1.EventPtyExited["properties"]
   "pty.deleted": V1.EventPtyDeleted["properties"]
-  "lsp.updated": V1.EventLspUpdated["properties"]
   "vcs.branch.updated": V1.EventVcsBranchUpdated["properties"]
   "reference.updated": V1.EventReferenceUpdated["properties"]
   "server.connected": V1.EventServerConnected["properties"]
-  "global.disposed": V1.EventGlobalDisposed["properties"]
-  "mcp.tools.changed": V1.EventMcpToolsChanged["properties"]
   "mcp.status.changed": Legacy.McpStatusChanged["data"] // 消费方只看类型(codepuppy-app/src/context/server-sync.tsx)
   "mcp.resources.changed": Legacy.McpResourcesChanged["data"]
-  "mcp.prompts.changed": Record<string, unknown> // 两个冻结客户端都没声明,也没有消费方读字段
   "server.instance.disposed": V1.EventServerInstanceDisposed["properties"]
   "catalog.updated": V1.EventCatalogUpdated["properties"]
   "project.updated": V1.EventProjectUpdated["properties"]

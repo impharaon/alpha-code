@@ -2,7 +2,8 @@
 //
 //   POST /mcp  JSON-RPC:initialize(声明 tools / resources / prompts 都会发 list_changed)、各 list(空清单)、通知回 202
 //   GET  /mcp  服务端推送的 SSE:`announce()` 之后依次推 tools / resources / prompts 的 list_changed 通知
-// 引擎连上它之后收到这三条通知,各自重取清单并发出 mcp.tools.changed / mcp.resources.changed / mcp.prompts.changed。
+// 引擎连上它之后收到这三条通知;公开事件流(`/api/event`)里实测只出现 mcp.resources.changed,加上连上 / 断开时的
+// mcp.status.changed —— mcp.tools.changed / mcp.prompts.changed 不在引擎的 ServerDefinitions 里,约定也不收(设计 §10 R17)。
 
 export function startMockMcp(port: number) {
   const origin = `http://127.0.0.1:${port}`

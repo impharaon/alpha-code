@@ -403,21 +403,16 @@ const EXISTING_EVENTS: Partial<Record<ContractEventType, { file: string; test: s
 }
 
 /**
- * 待设计裁决(回报编排器:BLOCKED: design — §4.5 / §4.10 c):这四种在事件表里,但引擎的公开事件流(`/api/event` 只发
- * packages/schema/src/event-manifest.ts 的 `ServerDefinitions`)根本不含它们的来源类型,采样不到。这里按引擎自己的清单核「确实
- * 不发」;引擎哪天开始发,这条就红,提醒补用例。
+ * 引擎不发的四种(R17,编排器 2026-11-13):引擎的公开事件流(`/api/event` 只发 packages/schema/src/event-manifest.ts 的
+ * `ServerDefinitions`)不含它们,约定事件表与直通集合因此不收。这里守着引擎自己的清单:哪天它开始发其中任何一种,下面那条就红,
+ * 约定要有意识地扩(加进事件表、补采样用例)。冻结界面里收它们的处理只是永远不触发,与今天相同。
  */
-const UNDELIVERED: Partial<Record<ContractEventType, string>> = {
-  "lsp.updated": "lsp.updated",
-  "global.disposed": "global.disposed",
-  "mcp.tools.changed": "mcp.tools.changed",
-  "mcp.prompts.changed": "mcp.prompts.changed",
-}
+const ENGINE_DOES_NOT_EMIT = ["lsp.updated", "global.disposed", "mcp.tools.changed", "mcp.prompts.changed"] as const
 
 const EVENT_TYPES: ContractEventType[] = [
-  "pty.created", "pty.updated", "pty.exited", "pty.deleted", "lsp.updated", "vcs.branch.updated", "reference.updated",
-  "server.connected", "global.disposed", "mcp.tools.changed", "mcp.status.changed", "mcp.resources.changed",
-  "mcp.prompts.changed", "server.instance.disposed", "catalog.updated", "project.updated", "permission.asked",
+  "pty.created", "pty.updated", "pty.exited", "pty.deleted", "vcs.branch.updated", "reference.updated",
+  "server.connected", "mcp.status.changed", "mcp.resources.changed", "server.instance.disposed", "catalog.updated",
+  "project.updated", "permission.asked",
   "permission.replied", "question.asked", "question.replied", "question.rejected", "file.watcher.updated",
   "session.created", "session.updated", "session.deleted", "session.usage.updated", "message.updated",
   "message.part.updated", "message.part.delta", "todo.updated", "session.status", "session.error", "session.idle",
@@ -431,10 +426,11 @@ function declaredEventTypes() {
 }
 
 describe("#1697 事件表里每种事件都有用例(设计 §4.10 c)", () => {
-  test("台账:每种事件恰好一处 —— 回放用例、已有测试,或引擎公开事件流里确实没有(待设计裁决)", async () => {
+  test("台账:事件表里每种事件恰好一处 —— 回放用例或已有测试;引擎不发的四种不在表里", async () => {
     expect([...EVENT_TYPES].sort()).toEqual(declaredEventTypes())
-    expect(EVENT_TYPES.length).toBe(33)
-    const covered = (type: ContractEventType) => [type in EVENT_CHECKS, type in EXISTING_EVENTS, type in UNDELIVERED].filter(Boolean).length
+    expect(EVENT_TYPES.length).toBe(29)
+    expect(declaredEventTypes().filter((type) => (ENGINE_DOES_NOT_EMIT as readonly string[]).includes(type))).toEqual([])
+    const covered = (type: ContractEventType) => [type in EVENT_CHECKS, type in EXISTING_EVENTS].filter(Boolean).length
     expect(EVENT_TYPES.filter((type) => covered(type) !== 1)).toEqual([])
     for (const [type, existing] of Object.entries(EXISTING_EVENTS)) {
       const file = join(import.meta.dir, existing!.file)
@@ -442,9 +438,9 @@ describe("#1697 事件表里每种事件都有用例(设计 §4.10 c)", () => {
     }
   })
 
-  test("引擎公开事件流不含那四种的来源类型(engine schema event-manifest 的 Server);对照:mcp.status.changed 在", async () => {
+  test("守卫:引擎公开事件流(event-manifest 的 Server)不含约定不收的那四种;对照:mcp.status.changed、pty.created 在", async () => {
     const { Server } = await import("../../../schema/src/event-manifest")
-    expect(Object.values(UNDELIVERED).filter((source) => Server.has(source!))).toEqual([])
+    expect(ENGINE_DOES_NOT_EMIT.filter((type) => Server.has(type))).toEqual([])
     expect(Server.has("mcp.status.changed")).toBe(true)
     expect(Server.has("pty.created")).toBe(true)
   })

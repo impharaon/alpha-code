@@ -233,7 +233,7 @@ export const UNSUPPORTED = {
   "GET /provider/auth": "U5:只在 server-compat.ts 的 integration.get(上游连接对话框)里调用",
   "POST /provider/:providerID/oauth/authorize": "U5:上游连接对话框的 OAuth",
   "POST /provider/:providerID/oauth/callback": "U5:上游连接对话框的 OAuth",
-  "GET /lsp": "U4:2.x 只有 lsp.updated 事件、没有查询端点;请求由冻结 app 的数据层发出,显示它的状态弹层只挂在上游会话头与新会话页,Code Puppy 界面挂不上(编排器 2026-11-09 认可进本单)",
+  "GET /lsp": "U4:2.x 没有查询端点(公开事件流也不发 lsp.updated,R17);请求由冻结 app 的数据层发出,显示它的状态弹层只挂在上游会话头与新会话页,Code Puppy 界面挂不上(编排器 2026-11-09 认可进本单)",
   "POST /session/:sessionID/share": "R6:owner 裁定拿掉「分享对话」;不把会话发到任何外部地址",
   "DELETE /session/:sessionID/share": "R6:取消分享,随「分享对话」一起拿掉(上游 use-session-commands / message-timeline 里的入口 Code Puppy 界面挂不上)",
   "PATCH /global/config": "U5:只被上游设置页与自定义 provider 对话框调用(server-sync.tsx updateConfig 的全部调用方),Code Puppy 界面挂不上",

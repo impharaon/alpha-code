@@ -3,10 +3,10 @@ id: SPEC-project-engine-config-takeover
 title: 项目自带的 OpenCode 配置:内容直接能用,会运行程序的设置在你允许后生效
 summary: 打开项目时,项目 opencode.json 与 .opencode/ 里的 AGENTS.md、技能、命令文字、agent 说明照常可用;会运行程序、加载代码、换掉所用程序、放宽 agent 权限或换模型的设置,在你于现有确认框里允许这个项目后才生效,允许后与在 OpenCode 里一样全部可用
 kind: spec
-status: draft
-version: 0
-approved_by: ""
-approved_at: ""
+status: approved
+version: 1
+approved_by: owner
+approved_at: 2026-11-13
 owners: [owner]
 last_reviewed: 2026-11-13
 ---
@@ -150,3 +150,4 @@ last_reviewed: 2026-11-13
 | 版本 | 日期 | 自查(模型) | 批准人 | 原话或链接 | 遗留去向 |
 | --- | --- | --- | --- | --- | --- |
 | 0 | 2026-11-13 | designer 作者自查(Claude Opus 5.5);Codex R1、R2 后按编排器裁决修订:收窄承诺(读普通内容不设闸)、隐含的 `mode` 也暂缓、被停用的读取点不算清单不全 | — | 草稿,未批准;owner 已决定实施(编排器转达「要做。」) | 技术观察见 design §10 留档;剩余风险见本规格「不包括」 |
+| 1 | 2026-11-13 | 编排会话(Claude Fable 5.2)核对 R2 处置 | owner | 「要做。」(让已有的确认框把 OpenCode 的项目配置也管起来);看过确认框完整文字与「没点允许时」对照表后:「那六行新增的文字是否可以,整体是否通过。通过。」(会话 ac275c97) | 剩余风险见「不包括」 |

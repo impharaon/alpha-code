@@ -3,13 +3,13 @@ id: DESIGN-project-engine-config-takeover
 title: 项目自带的 OpenCode 配置由 Code Puppy 按项目信任放行 技术设计
 summary: 引擎照旧自己读项目 opencode.json 与 .opencode/;未经允许的项目,它带来的东西不运行程序、不加载代码、不换掉所用程序、不放宽 agent 权限或换模型——Code Puppy 在引擎配置装载与 agent / 命令 / 技能的 md 读取点按 #1709 信任决定把关(md 文件头只按 YAML/JSON 解析、控制字段在校验前后都拿掉);读普通内容不设闸;同一个确认框,清单由引擎算出、算不全就不弹;新增接管 config.ts、skill.ts、agent.ts 三个上游文件
 kind: tech-design
-status: draft
+status: approved
 spec: SPEC-project-engine-config-takeover
-spec_version: 0
+spec_version: 1
 review:
   rounds: 2           # R1:Codex(GPT-6)会话 01a1d3fe 审 1b6be7ffd3,BLOCK,5 条全部采纳;R2:会话 01a1d41b 审 787257e259,FIX-THEN-MERGE,3 条按编排器裁决处理(§10)。R2 是最后一轮
   reviewed_sha: "787257e259"
-  verdict: ""         # 由编排器按 §10 的 R2 处置核对后填写
+  verdict: "R2 FIX-THEN-MERGE;三条按编排器裁决处理(808a9ad9c2:承诺收窄为不运行程序/不加载代码,读普通内容不设闸),编排器核对后冻结,未再送审;owner 2026-11-13 批准"
 owners: [owner]
 last_reviewed: 2026-11-13
 ---

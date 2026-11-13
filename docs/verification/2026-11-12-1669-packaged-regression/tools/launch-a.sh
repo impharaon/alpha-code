@@ -39,10 +39,12 @@ ARGS=()
 ARGS+=("--log-net-log=$ROOT/logs/$LABEL.netlog.json")
 ARGS+=(${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"})
 printf '%s\n' "${ARGS[@]}" | grep -qx -- '--use-mock-keychain' || refuse "argv lacks --use-mock-keychain (Chromium would use the keychain)"
-for pid in $(/usr/bin/pgrep -f "$EXE" 2>/dev/null); do refuse "an instance already runs from this executable (pid $pid)"; done
+for pid in $(/bin/ps -A -o pid=,command= | /usr/bin/grep -F "$EXE" | /usr/bin/grep -v grep | /usr/bin/awk '{print $1}'); do refuse "an instance already runs from this executable (pid $pid)"; done
 /usr/sbin/lsof -nP -iTCP:9222 -sTCP:LISTEN >/dev/null 2>&1 && refuse "port 9222 is already in use"
 
-owner_pids() { /usr/bin/pgrep -f "^/Applications/Code Puppy.app/" | sort | tr '\n' ' '; }
+# pgrep -f with this pattern fails under the default locale ("illegal byte sequence") and then matches nothing, which
+# made this check blind in run a2; ps + fixed-string grep cannot fail that way.
+owner_pids() { /bin/ps -A -o pid=,command= | /usr/bin/grep -F "/Applications/Code Puppy.app/" | /usr/bin/grep -v grep | /usr/bin/awk '{print $1}' | sort | tr '\n' ' '; }
 owner_stat() {
   for p in "Library/Preferences/com.tide.codepuppy.plist" "Library/Saved Application State/com.tide.codepuppy.savedState" \
     "Library/HTTPStorages/com.tide.codepuppy" "Library/Caches/com.tide.codepuppy" "Library/Caches/com.tide.codepuppy.ShipIt" \

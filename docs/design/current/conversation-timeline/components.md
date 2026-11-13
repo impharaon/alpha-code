@@ -65,6 +65,7 @@ review_after: 2027-01-16
 | 回合级错误卡 · 已知原因的人话(402 / 401·403·登录凭据 / 429 / 对话超长 / 回答截断;其余原样) | `#turn-error` | [`2026-10-30-req236-ux-core-pages/`](../../2026-10-30-req236-ux-core-pages/frame.html) | 2026-10-31 | ac#1588 | 2026-10-31 | `session-timeline/timeline-model.ts`(`turnErrorCauseOf`、`turnErrorOf` 的 `cause` / `statusCode`)· `cards/tool-cards.tsx`(`TurnErrorCauseBody` / `TurnErrorActions`)· 出路入口 `session-timeline.tsx`(`intents`)· 换模型 `session-workspace-core.ts`(`createComposerModelPickerChannel`)+ `codepuppy-composer.tsx`(`ModelChip` 的 `registerOpen`) | 已落地(差异见 `design.html#core-pages-diff`) |
 | 用户消息脚注写权限档(第一方模式 → 档名与色点;自建助手原名) | `#user-meta` | [`2026-10-30-req236-ux-core-pages/`](../../2026-10-30-req236-ux-core-pages/frame.html) | 2026-10-31 | ac#1588 | 2026-10-31 | `session-timeline/session-timeline-view.tsx`(`FIRST_PARTY_MODES`、`.a-tl-user-mode`)· `session-timeline.css` | 已落地(差异见 `design.html#core-pages-diff`) |
 | 自己发出新消息后回到最新 | `#send-follow` | [`2026-10-30-req236-ux-core-pages/`](../../2026-10-30-req236-ux-core-pages/frame.html) | 2026-10-31 | ac#1588 | 2026-10-31 | `session-timeline/session-timeline-view.tsx`(`lastUserKeyOf` 与其后的跟随效果) | 已落地 |
+| 工具批准面板的风险档位标签(低 / 中 / 高 / 极高 / 风险未知;极高且外发时一句原因) | `#permission-risk` | [`2026-11-13-permission-risk-display/`](../../2026-11-13-permission-risk-display/frame.html) | — | ac#1314 | — | 现状:`codepuppy-ui/PermissionDialog.tsx`(`PermissionPanel` 标题行;不读 `metadata.codepuppyRisk`)· `codepuppy-ui/permission-dialog.css` | 设计中 |
 
 ## 本次登记时发现的两处不一致
 

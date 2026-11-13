@@ -1,60 +1,22 @@
 // `#1668`(L6):Code Puppy 的引擎适配器 —— 冻结界面(0.1.26 的 v1 数据路径)到 OpenCode 2 引擎的**唯一咽喉**。
 //
-// 冻结的 v1 SDK 与 1.17.13 客户端照常把调用序列化成 HTTP 请求,只是它们的 `fetch` 换成这里的 `engineFetch`:
-// 发往引擎源地址的请求按「方法 + 路径模板」查路由表(routes.ts),由 handler 调 2.x 的 `/api/*` 并把结果译回
-// v1 形状;表外的请求一律 501 + console.error(对未知默认拒,不猜一个最像的 2.x 端点)。别的源原样交给
-// `globalThis.fetch`。
+// 冻结的 v1 SDK 与 1.17.13 客户端照常把调用序列化成 HTTP 请求,只是它们的 `fetch` 换成这里的 `engineFetch`。
+// `#1697`(I-04,设计 docs/specs/upgrade-ui-contract/design.md §4.2):这里是代际无关的管道 —— 发往引擎源地址的请求只按
+// Code Puppy 自有的约定路由目录(contract/routes.ts)匹配:三条固定答复由约定侧直答;探活回退回 501 信封、不记日志;
+// 声明不支持与目录外的请求一律 501 + console.error(对未知默认拒,不猜一个最像的 2.x 端点);其余交当前代翻译器
+// (opencode2/)。别的源原样交给 `globalThis.fetch`。
 //
 // 适配器不做任何决定(审批、档位、目录闸都在引擎与 ext),不持有口令(I8:`Authorization` 由 main 的
-// `onBeforeSendHeaders` 对引擎源补上)。审批这一侧只保留回执状态(permission-replies.ts:交出过的请求快照指纹、
-// 已出的收据,窗口寿命、不落盘),那是 0.1.26 回执合同要的幂等与 409,不重放引擎数据。
-import { OpenCode, type OpenCodeClient } from "@opencode/client/promise"
-import { createPermissionReplies, type PermissionReplies } from "./permission-replies"
-import { ROUTES, type Route, type RouteContext } from "./routes"
+// `onBeforeSendHeaders` 对引擎源补上)。
+import { errorResponse, probeFallback, unsupported } from "./contract/errors"
+import { createReceiptLedger, type ReceiptLedger } from "./contract/receipts"
+import { FIXED, isFixed, matchProbeFallback, matchServed, type TranslatedKey } from "./contract/routes"
+import type { RouteContext } from "./contract/translator"
+import { createOpencode2Translator } from "./opencode2"
 
-export const UNSUPPORTED_ERROR_NAME = "CodePuppyEngineAdapterUnsupported"
+export { UNSUPPORTED_ERROR_NAME } from "./contract/errors"
 
 export type EngineFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
-
-type Compiled = { route: Route; method: string; segments: string[] }
-
-const compiled: Compiled[] = ROUTES.map((route) => ({
-  route,
-  method: route.method,
-  segments: route.path.split("/").filter(Boolean),
-}))
-
-/** 按「方法 + 路径模板」匹配;模板段 `:name` 取一段,`*name` 取余下全部(fs.read 那种带斜杠的路径)。 */
-export function matchRoute(method: string, pathname: string) {
-  const parts = pathname.split("/").filter(Boolean)
-  for (const entry of compiled) {
-    if (entry.method !== method) continue
-    const params: Record<string, string> = {}
-    let ok = true
-    for (let index = 0; index < entry.segments.length; index++) {
-      const segment = entry.segments[index]!
-      if (segment.startsWith("*")) {
-        params[segment.slice(1)] = parts.slice(index).map(decodeURIComponent).join("/")
-        index = entry.segments.length
-        break
-      }
-      const part = parts[index]
-      if (part === undefined) {
-        ok = false
-        break
-      }
-      if (segment.startsWith(":")) params[segment.slice(1)] = decodeURIComponent(part)
-      else if (segment !== part) {
-        ok = false
-        break
-      }
-    }
-    if (!ok) continue
-    if (!entry.segments.some((segment) => segment.startsWith("*")) && parts.length !== entry.segments.length) continue
-    return { route: entry.route, params }
-  }
-  return undefined
-}
 
 function directoryOf(url: URL, request: Request) {
   const query = url.searchParams.get("directory") ?? url.searchParams.get("location[directory]")
@@ -68,19 +30,6 @@ function directoryOf(url: URL, request: Request) {
   }
 }
 
-export function unsupported(method: string, path: string) {
-  console.error(`[engine-adapter] unsupported engine request: ${method} ${path}`)
-  return Response.json({ name: UNSUPPORTED_ERROR_NAME, data: { method, path } }, { status: 501 })
-}
-
-/** 2.x 调用失败 ⇒ v1 的错误体。2.x 声明过的错误(带 `_tag`)保留名字与消息;状态码按 404 / 其余 500 分。 */
-export function errorResponse(error: unknown) {
-  const name = error instanceof Error ? error.name : "UnknownError"
-  const message = error instanceof Error ? error.message : String(error)
-  const notFound = /NotFound/.test(name)
-  return Response.json({ name: notFound ? "NotFoundError" : name, data: { message } }, { status: notFound ? 404 : 500 })
-}
-
 export function createEngineFetch(options: {
   /** 这个源是不是 Code Puppy 连着的引擎(本机 sidecar / WSL)。 */
   isEngineOrigin: (origin: string) => boolean
@@ -88,20 +37,15 @@ export function createEngineFetch(options: {
   fetch?: typeof globalThis.fetch
 }): EngineFetch {
   const upstreamFetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init))
-  // 每个请求一个 2.x 客户端:它发出的每个调用都带上这次请求的取消信号(调用自己另带的信号照旧生效)。冻结界面靠它给引擎
-  // 调用设上限 —— 侧栏自探的 `AbortSignal.timeout(2_000)`(use-projects.ts)、组件卸载时中止的读取。
-  const clientFor = (origin: string, signal: AbortSignal): OpenCodeClient =>
-    OpenCode.make({
-      baseUrl: origin,
-      fetch: ((input, init) =>
-        upstreamFetch(input, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, signal]) : signal })) as typeof fetch,
-    })
-  const replies = new Map<string, PermissionReplies>()
-  const repliesFor = (origin: string) => {
-    const existing = replies.get(origin)
+  // 静态选用当前那一代翻译器(R5)。
+  const translator = createOpencode2Translator()
+  // 回执账本按引擎源一本,活在这个 engineFetch 里(窗口寿命、不落盘)。
+  const ledgers = new Map<string, ReceiptLedger>()
+  const ledgerFor = (origin: string) => {
+    const existing = ledgers.get(origin)
     if (existing) return existing
-    const created = createPermissionReplies()
-    replies.set(origin, created)
+    const created = createReceiptLedger()
+    ledgers.set(origin, created)
     return created
   }
 
@@ -111,35 +55,46 @@ export function createEngineFetch(options: {
     if (!options.isEngineOrigin(url.origin)) return upstreamFetch(input, init)
     // 与 fetch 同一约定:已取消的请求直接以取消原因拒绝,不碰引擎。
     request.signal.throwIfAborted()
-    const matched = matchRoute(request.method, url.pathname)
-    if (!matched) return unsupported(request.method, url.pathname)
+    const matched = matchServed(request.method, url.pathname)
+    if (!matched) {
+      if (matchProbeFallback(request.method, url.pathname)) return probeFallback(request.method, url.pathname)
+      return unsupported(request.method, url.pathname)
+    }
+    if (isFixed(matched.key)) return Response.json(FIXED[matched.key]())
     const text = request.method === "GET" || request.method === "HEAD" ? "" : await request.clone().text()
-    let body: unknown
+    // 请求体的类型由约定目录给(BodyOf):管道只按 JSON 解析,解析失败保留原文,与 `#1668` 时相同。
+    let body: any
     try {
       body = text ? JSON.parse(text) : undefined
     } catch {
       body = text
     }
-    const context: RouteContext = {
-      params: matched.params,
-      query: url.searchParams,
-      body,
-      directory: directoryOf(url, request),
-      request,
-      signal: request.signal,
-      api: clientFor(url.origin, request.signal),
-      origin: url.origin,
-      permissions: repliesFor(url.origin),
-      upstream: (path, next) => upstreamFetch(new URL(path, url.origin), next),
-      passthrough: () => upstreamFetch(request),
-    }
     try {
-      return await matched.route.handle(context)
+      const engine = translator.connect({ origin: url.origin, signal: request.signal, fetch: upstreamFetch })
+      return await dispatch(
+        matched.key,
+        { params: matched.params, query: url.searchParams, body, directory: directoryOf(url, request), request, receipts: ledgerFor(url.origin) },
+        engine,
+      )
     } catch (error) {
       // 取消:与 fetch 一样以取消原因拒绝(2.x 客户端把它包成 Transport 错误,调用方认的是 AbortError / TimeoutError)。
       request.signal.throwIfAborted()
-      return errorResponse(error)
+      return errorResponse(translator.toContractError(error))
     }
+  }
+
+  /** 按路由把请求交给翻译器;RouteContext 按这条路由定型(body、reply)。 */
+  function dispatch<K extends TranslatedKey>(
+    key: K,
+    input: { params: Record<string, string>; query: URLSearchParams; body: any; directory?: string; request: Request; receipts: ReceiptLedger },
+    engine: ReturnType<typeof translator.connect>,
+  ) {
+    const context: RouteContext<K> = {
+      ...input,
+      signal: input.request.signal,
+      reply: (value, init) => Response.json(value, init),
+    }
+    return translator.routes[key](context, engine)
   }
 }
 

@@ -1,31 +1,39 @@
-// `#1668`:适配器的路由表 —— v1 形状的唯一权威(方案 §2.3、§10)。冻结界面发出的每个引擎请求要么在这里有
-// handler,要么落在 UNSUPPORTED(写明为什么到不了 / 为什么不支持);两者都没有的请求由 index.ts 响亮 501。
-// 覆盖由 engine-adapter/routes-coverage.test.ts 从冻结源码里扫出的全部调用来判。
+// `#1668`:当前代(OpenCode 2)翻译器的路由处理 —— 约定路由目录(contract/routes.ts)里每条翻译路由的 2.x 实现,按
+// TranslatedKey 索引(`#1697` I-04,设计 §4.8、§4.10 b)。路由的成员、不支持名单、探活回退与三条固定答复都归约定,
+// 这里只管「这一条在 2.x 上怎么做」。
 //
 // 路径两类:无 `/api` 前缀的是 v1 SDK 发的(冻结 app 的 v1 路径与 renderer 自己的客户端);`/api/…` 是 v1 SDK
 // 的 `v2.*` 命名空间与冻结 app 自带的 1.17.13 客户端发的,在 2.x 合并目标 `33f94fce96` 上路径与形状仍在的直通,
 // 已删或挪走的改写。
 import type { OpenCodeClient } from "@opencode/client/promise"
 import type {
+  AssistantMessage,
+  Part,
   PermissionV2Decision,
   PermissionV2DecisionCommand,
   PermissionV2DecisionReceipt,
   QuestionRequest,
-} from "@opencode-ai/sdk/v2/client"
-import { normalizeAgentList, normalizeSessionInfo } from "./frozen-shapes"
+} from "../contract/v1"
+import type { RouteContext, RouteHandler, Translator } from "../contract/translator"
+import type { TranslatedKey } from "../contract/routes"
+import { toContractSession } from "../contract/session"
 import { projectEventStream } from "./events"
-import { v1DecisionID, type DecisionInput, type DecisionOutcome, type PermissionReplies } from "./permission-replies"
+import { decisionError, errorResponse, invalidDecision } from "../contract/errors"
+import { v1DecisionID, type DecisionInput } from "../contract/receipts"
+import { approvals } from "./approvals"
 import { MESSAGE_PAGE, recentMessages, sessionDirectory } from "./session-cache"
 import {
   syntheticText,
   toFormAnswer,
   toPrompt,
+  toV1Agents,
   toV1Commands,
   toV1FileNodes,
   toV1McpStatus,
   v1McpStatus,
   toV1Messages,
   toV1Path,
+  toV1PermissionRequest,
   toV1Project,
   toV1ModelList,
   toV1ProviderList,
@@ -37,33 +45,38 @@ import {
   type V1PromptBody,
 } from "./v1-shapes"
 
-export type RouteContext = {
-  params: Record<string, string>
-  query: URLSearchParams
-  body: any
-  directory?: string
-  request: Request
-  signal: AbortSignal
+/** 这次约定请求的 2.x 引擎连接(`Translator.connect` 的产物)。 */
+export type Opencode2Engine = {
   api: OpenCodeClient
   origin: string
-  /** 这个引擎源的审批快照与收据(permission-replies.ts)。 */
-  permissions: PermissionReplies
   /** 对引擎源地址发一个原始请求(SSE、二进制读文件这类不经类型化客户端的)。 */
   upstream: (path: string, init?: RequestInit) => Promise<Response>
-  /** 把这次请求原样转给引擎(2.x 上路径与形状都没变的那些)。 */
-  passthrough: () => Promise<Response>
+  /** 出网的 fetch(直通与原始请求用;直通的请求自己带着取消信号)。 */
+  fetch: typeof globalThis.fetch
 }
 
-export type Route = { method: string; path: string; handle: (context: RouteContext) => Promise<Response> }
+/** 处理函数内部用的上下文 = 约定的 RouteContext + 引擎连接 + 直通。`reply` 与 `body` 的类型随路由(K)。 */
+export type TranslatorContext<K extends TranslatedKey = TranslatedKey> = RouteContext<K> &
+  Opencode2Engine & {
+    /** 把这次请求原样转给引擎(2.x 上路径与形状都没变的那些)。 */
+    passthrough: () => Promise<Response>
+  }
+/** 与路由无关的那部分,给几条路由共用的辅助函数。 */
+export type SharedContext = Omit<TranslatorContext, "body" | "reply">
 
+/** 错误信封(ContractError 的形状)与 404 这类非约定响应体;成功的 JSON 一律经 `context.reply`。 */
 const json = (value: unknown, init?: ResponseInit) => Response.json(value, init)
-const ok = () => json(true)
 const noContent = () => new Response(null, { status: 204 })
-const at = (context: RouteContext) => (context.directory ? { location: { directory: context.directory } } : {})
+const at = (context: { directory?: string }) => (context.directory ? { location: { directory: context.directory } } : {})
 const number = (value: string | null) => (value === null || value === "" ? undefined : Number(value))
 
-const route = (method: string, path: string, handle: Route["handle"]): Route => ({ method, path, handle })
-const passthrough = (method: string, path: string) => route(method, path, (context) => context.passthrough())
+const bind =
+  <K extends TranslatedKey>(handle: (context: TranslatorContext<K>) => Promise<Response>): RouteHandler<K, Opencode2Engine> =>
+  (context, engine) =>
+    handle({ ...context, ...engine, passthrough: () => engine.fetch(context.request) })
+/** 直通:请求原样转给引擎,响应原样交回(类型按约定登记,翻译器不碰响应体)。 */
+export const passthrough = <K extends TranslatedKey>(context: RouteContext<K>, engine: Opencode2Engine) =>
+  engine.fetch(context.request)
 
 /** 2.x 的会话分页拉全(v1 的列表不分页;侧栏的全局索引按「一页拉完」处理,见 experimental.session.list)。 */
 async function allSessions(api: OpenCodeClient, input: Parameters<OpenCodeClient["session"]["list"]>[0]) {
@@ -77,41 +90,27 @@ async function allSessions(api: OpenCodeClient, input: Parameters<OpenCodeClient
   }
 }
 
-// ── 权限回复(I7a):回执按 L4 的推导规格合成(permission-replies.ts)──────────────────────────────────────
+// ── 权限回复(I7a):回执由约定的回执账本合成(contract/receipts.ts),引擎一侧经 approvals.ts ─────────────────────────
 // 三个回复入口:v1 `/permission/:id/reply`(审批卡、定制中心、连接器停用)、v1 旧 `/session/:id/permissions/:id`
 // (冻结 app 的自动允许,经 server-compat 的 legacy 客户端)、0.1.26 的 v2 `/api/session/:id/permission/:id/reply`
 // (带命令,回收据)。错误体与 0.1.26 同形:过期 404 PermissionNotFoundError,陈旧 409 ConflictError(审批卡的
 // permissionDecisionSubmitError 据 409 判为冲突)。
 const DECISIONS = new Set(["once", "always", "reject"])
 
-function decisionResponse(outcome: DecisionOutcome, requestID: string, success: (receipt: PermissionV2DecisionReceipt) => Response) {
-  if (outcome.type === "expired")
-    return json(
-      { _tag: "PermissionNotFoundError", requestID, message: `Permission request not found: ${requestID}` },
-      { status: 404 },
-    )
-  if (outcome.type === "conflict")
-    return json(
-      { _tag: "ConflictError", resource: requestID, message: `Permission request conflicts with the immutable request: ${requestID}` },
-      { status: 409 },
-    )
-  return success(outcome.receipt)
-}
-
-async function decide(context: RouteContext, input: DecisionInput, success: (receipt: PermissionV2DecisionReceipt) => Response) {
-  if (!DECISIONS.has(input.decision) || !input.decisionID)
-    return json({ name: "BadRequest", data: { message: "invalid permission decision" } }, { status: 400 })
-  return decisionResponse(await context.permissions.decide(context.api, input), input.requestID, success)
+async function decide(context: SharedContext, input: DecisionInput, success: (receipt: PermissionV2DecisionReceipt) => Response) {
+  if (!DECISIONS.has(input.decision) || !input.decisionID) return errorResponse(invalidDecision())
+  const outcome = await context.receipts.decide(approvals(context), input)
+  return outcome.type === "receipt" ? success(outcome.receipt) : errorResponse(decisionError(outcome.type, input.requestID))
 }
 
 /** 提问(2.x 表单)的 requestID → sessionID:v1 回答只带 requestID,2.x 要会话。先查列表,再查全局。 */
-async function questionOf(context: RouteContext, requestID: string) {
+async function questionOf(context: SharedContext, requestID: string) {
   const forms = await context.api.form.list(at(context))
   const form = forms.data.find((item) => item.id === requestID)
   return form ? { sessionID: form.sessionID, question: toV1Question(form) } : undefined
 }
 
-async function prompt(context: RouteContext) {
+async function prompt(context: TranslatorContext<"POST /session/:sessionID/prompt_async">) {
   const sessionID = context.params.sessionID!
   const body = context.body as V1PromptBody
   // v1 的档位与模型随每条消息走;2.x 落在会话上 —— 发送前切到这条消息要的档位与模型。
@@ -145,7 +144,7 @@ async function prompt(context: RouteContext) {
 }
 
 /** v1 `session.messages`:最近 `limit` 条(或全部),`before` 翻更早的页,`x-next-cursor` 给下一页。 */
-async function messages(context: RouteContext) {
+async function messages(context: TranslatorContext<"GET /session/:sessionID/message">) {
   const sessionID = context.params.sessionID!
   const limit = number(context.query.get("limit"))
   const before = context.query.get("before") ?? undefined
@@ -161,7 +160,7 @@ async function messages(context: RouteContext) {
         return undefined
       })
     : undefined
-  const response = json(anchor && diff ? withTurnDiffs(listed, new Map([[anchor.attach, diff]])) : listed)
+  const response = context.reply(anchor && diff ? withTurnDiffs(listed, new Map([[anchor.attach, diff]])) : listed)
   if (page.next) response.headers.set("x-next-cursor", page.next)
   return response
 }
@@ -177,60 +176,60 @@ const COMMAND_POLL_MS = 200
  * (与今天无关联时同一形状)。判「没开回合」先读 active 再读消息:读 active 时已不在跑,那个执行写下的消息此刻都已落库。
  * 消息 id 按时间升序(`msg_` + ascending),所以「之后」= id 更大。
  */
-async function commandReply(context: RouteContext, sessionID: string, after: string | undefined) {
+async function commandReply(context: TranslatorContext<"POST /session/:sessionID/command">, sessionID: string, after: string | undefined) {
   for (;;) {
     context.signal.throwIfAborted()
     const running = sessionID in (await context.api.session.active())
     const page = await recentMessages(context.api, sessionID, { limit: 20 })
     const fresh = page.context.filter((message) => after === undefined || message.id > after)
     const assistant = fresh.find((message) => message.type === "assistant")
-    const found = assistant && toV1Messages(sessionID, page.context).find((item) => item.info.id === assistant.id)
-    if (found) return json(found)
-    if (!running || fresh.some((message) => message.type === "idle")) return json({})
+    const found =
+      assistant &&
+      toV1Messages(sessionID, page.context).find(
+        (item): item is { info: AssistantMessage; parts: Part[] } => item.info.id === assistant.id && item.info.role === "assistant",
+      )
+    if (found) return context.reply(found)
+    if (!running || fresh.some((message) => message.type === "idle")) return context.reply({})
     await new Promise((resolve) => setTimeout(resolve, COMMAND_POLL_MS))
   }
 }
 
 
-export const ROUTES: readonly Route[] = [
+/** 约定里每条翻译路由的 2.x 处理(设计 §4.10 b:按 TranslatedKey 的映射类型,少一条、多一条都编译不过)。 */
+export const ROUTES: Translator<Opencode2Engine>["routes"] = {
   // ── 探活与引擎实例 ──
-  route("GET", "/global/health", async (context) => {
+  "GET /global/health": bind(async (context) => {
     const info = await context.api.server.info()
-    return json({ healthy: true, version: info.version })
+    return context.reply({ healthy: true, version: info.version })
   }),
-  route("POST", "/instance/dispose", async (context) => {
+  "POST /instance/dispose": bind(async (context) => {
     // 2.x 的重载重建**全部** Location(seams Q5),v1 的 instance.dispose 只释放一个目录;语义更宽、方向安全。
     await context.api.location.reload()
-    return ok()
+    return context.reply(true)
   }),
-  route("GET", "/global/event", (context) => Promise.resolve(projectEventStream(context))),
-  route("GET", "/path", async (context) => json(toV1Path(await context.api.location.get(at(context))))),
-  // v1 的配置对象在 2.x 拆成多份配置文档(`GET /api/config` 回文档数组,键名也换了)。冻结 app 的 v2 支路对配置给的就是
-  // 空对象(bootstrap.ts loadGlobalConfigQuery / bootstrapDirectory 的 config 步);这里同一约定。v1 路径上读它的只有
-  // local.tsx 的默认模型回落(先读 provider 列表的 defaultModel,2.x 的 model.default 已经给了)与 permission.tsx 的
-  // 客户端自动回复判断(`config.permission === "allow"`,空对象 ⇒ 不自动回复,审批由引擎与 ext 决定)。
-  route("GET", "/global/config", async () => json({})),
-  route("GET", "/config", async () => json({})),
+  "GET /global/event": bind((context) => Promise.resolve(projectEventStream(context))),
+  "GET /path": bind(async (context) => context.reply(toV1Path(await context.api.location.get(at(context))))),
+  // `GET /global/config`、`GET /config` 是约定侧的固定答复(contract/routes.ts FIXED)。
 
   // ── 项目(U2 选 A:2.x 自己有项目清单,`canonical` 改名 `worktree`)──
-  route("GET", "/project", async (context) => json((await context.api.project.list()).map((p) => toV1Project(p as never)))),
-  route("GET", "/project/current", async (context) => json(await currentProject(context))),
-  route("GET", "/api/project/current", async (context) => {
+  "GET /project": bind(async (context) => context.reply((await context.api.project.list()).map((p) => toV1Project(p)))),
+  "GET /project/current": bind(async (context) => context.reply(await currentProject(context))),
+  "GET /api/project/current": bind(async (context) => {
     const project = await currentProject(context)
-    return json({ id: project.id, directory: project.worktree })
+    return context.reply({ id: project.id, directory: project.worktree })
   }),
-  route("PATCH", "/project/:projectID", async (context) => {
+  "PATCH /project/:projectID": bind(async (context) => {
     const { name, icon, commands } = (context.body ?? {}) as { name?: string; icon?: never; commands?: never }
     const updated = await context.api.project.update({ projectID: context.params.projectID!, name, icon, commands })
-    return json(toV1Project(updated as never))
+    return context.reply(toV1Project(updated))
   }),
-  route("POST", "/project/git/init", async (context) => {
+  "POST /project/git/init": bind(async (context) => {
     await context.api.vcs.init(at(context))
-    return json(await currentProject(context))
+    return context.reply(await currentProject(context))
   }),
 
   // ── 会话 ──
-  route("GET", "/session", async (context) => {
+  "GET /session": bind(async (context) => {
     const roots = context.query.get("roots") === "true"
     const search = context.query.get("search") ?? undefined
     const limit = number(context.query.get("limit"))
@@ -245,33 +244,33 @@ export const ROUTES: readonly Route[] = [
       ...(roots ? { parentID: null } : {}),
       ...(search ? { search } : {}),
     })
-    const out = sessions.map((session) => normalizeSessionInfo(session as never))
-    return json(limit ? out.slice(0, limit) : out)
+    const out = sessions.map((session) => toContractSession(session))
+    return context.reply(limit ? out.slice(0, limit) : out)
   }),
-  route("GET", "/experimental/session", async (context) => {
+  "GET /experimental/session": bind(async (context) => {
     const roots = context.query.get("roots") === "true"
     const search = context.query.get("search") ?? undefined
     // v1 的游标是数字时间戳,2.x 是不透明字符串:一次拉完、不给 x-next-cursor(调用方读不到游标即止)。
     const sessions = await allSessions(context.api, { ...(roots ? { parentID: null } : {}), ...(search ? { search } : {}) })
-    return json(sessions.map((session) => ({ ...normalizeSessionInfo(session as never), project: null })))
+    return context.reply(sessions.map((session) => ({ ...toContractSession(session), project: null })))
   }),
-  route("POST", "/session", async (context) => {
+  "POST /session": bind(async (context) => {
     const body = (context.body ?? {}) as { parentID?: string; title?: string }
     const created = await context.api.session.create({
       ...at(context),
       ...(body.parentID ? { parentID: body.parentID } : {}),
       ...(body.title ? { title: body.title } : {}),
     })
-    return json(normalizeSessionInfo(created as never))
+    return context.reply(toContractSession(created))
   }),
-  route("GET", "/session/status", async (context) => {
+  "GET /session/status": bind(async (context) => {
     const active = await context.api.session.active()
-    return json(Object.fromEntries(Object.keys(active).map((sessionID) => [sessionID, { type: "busy" }])))
+    return context.reply(Object.fromEntries(Object.keys(active).map((sessionID) => [sessionID, { type: "busy" }])))
   }),
-  route("GET", "/session/:sessionID", async (context) =>
-    json(normalizeSessionInfo((await context.api.session.get({ sessionID: context.params.sessionID! })) as never)),
+  "GET /session/:sessionID": bind(async (context) =>
+    context.reply(toContractSession((await context.api.session.get({ sessionID: context.params.sessionID! })))),
   ),
-  route("PATCH", "/session/:sessionID", async (context) => {
+  "PATCH /session/:sessionID": bind(async (context) => {
     const sessionID = context.params.sessionID!
     const body = (context.body ?? {}) as { title?: string; time?: { archived?: number } }
     await context.api.session.update({
@@ -279,26 +278,26 @@ export const ROUTES: readonly Route[] = [
       ...(body.title !== undefined ? { title: body.title } : {}),
       ...(body.time && "archived" in body.time ? { archived: !!body.time.archived } : {}),
     })
-    return json(normalizeSessionInfo((await context.api.session.get({ sessionID })) as never))
+    return context.reply(toContractSession((await context.api.session.get({ sessionID }))))
   }),
-  route("DELETE", "/session/:sessionID", async (context) => {
+  "DELETE /session/:sessionID": bind(async (context) => {
     await context.api.session.remove({ sessionID: context.params.sessionID! })
-    return ok()
+    return context.reply(true)
   }),
-  route("POST", "/session/:sessionID/fork", async (context) => {
+  "POST /session/:sessionID/fork": bind(async (context) => {
     const body = (context.body ?? {}) as { messageID?: string }
     const forked = await context.api.session.fork({
       sessionID: context.params.sessionID!,
       ...(body.messageID ? { before: body.messageID } : {}),
     })
-    return json(normalizeSessionInfo(forked as never))
+    return context.reply(toContractSession(forked))
   }),
-  route("POST", "/session/:sessionID/abort", async (context) => {
+  "POST /session/:sessionID/abort": bind(async (context) => {
     await context.api.session.interrupt({ sessionID: context.params.sessionID! })
-    return ok()
+    return context.reply(true)
   }),
-  route("POST", "/session/:sessionID/prompt_async", prompt),
-  route("POST", "/session/:sessionID/command", async (context) => {
+  "POST /session/:sessionID/prompt_async": bind(prompt),
+  "POST /session/:sessionID/command": bind(async (context) => {
     const sessionID = context.params.sessionID!
     const body = (context.body ?? {}) as { command: string; arguments?: string; agent?: string; model?: string; variant?: string }
     if (body.agent) await context.api.session.switchAgent({ sessionID, agent: body.agent })
@@ -318,93 +317,94 @@ export const ROUTES: readonly Route[] = [
     await context.api.session.command({ sessionID, name: body.command, text: body.arguments ?? "" })
     return commandReply(context, sessionID, newest)
   }),
-  route("POST", "/session/:sessionID/shell", async (context) => {
+  "POST /session/:sessionID/shell": bind(async (context) => {
     const body = (context.body ?? {}) as { command: string; agent?: string }
     const sessionID = context.params.sessionID!
     if (body.agent) await context.api.session.switchAgent({ sessionID, agent: body.agent })
     await context.api.session.shell({ sessionID, command: body.command })
-    return json({})
+    return context.reply({})
   }),
-  route("POST", "/session/:sessionID/summarize", async (context) => {
+  "POST /session/:sessionID/summarize": bind(async (context) => {
     await context.api.session.compact({ sessionID: context.params.sessionID! })
-    return ok()
+    return context.reply(true)
   }),
-  route("POST", "/session/:sessionID/revert", async (context) => {
+  "POST /session/:sessionID/revert": bind(async (context) => {
     const sessionID = context.params.sessionID!
     const body = (context.body ?? {}) as { messageID: string }
     await context.api.session.revert.stage({ sessionID, messageID: body.messageID })
-    return json(normalizeSessionInfo((await context.api.session.get({ sessionID })) as never))
+    return context.reply(toContractSession((await context.api.session.get({ sessionID }))))
   }),
-  route("POST", "/session/:sessionID/unrevert", async (context) => {
+  "POST /session/:sessionID/unrevert": bind(async (context) => {
     const sessionID = context.params.sessionID!
     await context.api.session.revert.clear({ sessionID })
-    return json(normalizeSessionInfo((await context.api.session.get({ sessionID })) as never))
+    return context.reply(toContractSession((await context.api.session.get({ sessionID }))))
   }),
-  route("GET", "/session/:sessionID/message", messages),
+  "GET /session/:sessionID/message": bind(messages),
   // U1:2.x 没有 todo 查询端点;清单就是会话里最近一次 todowrite 的输入(与事件流的 todo.updated 同一来源)。
   // `#1692`:从最近一页往前一页页找,找到即停 —— 长会话不再整段读取;一直没有写入才读到会话开头。
-  route("GET", "/session/:sessionID/todo", async (context) => {
+  "GET /session/:sessionID/todo": bind(async (context) => {
     const sessionID = context.params.sessionID!
     let cursor: string | undefined
     for (;;) {
       const page = await recentMessages(context.api, sessionID, { limit: MESSAGE_PAGE, cursor })
       const parts = toV1Messages(sessionID, page.context).flatMap((item) => item.parts)
       const last = parts.findLast((part) => part.type === "tool" && part.tool === "todowrite")
-      if (last) return json(todosOf(last))
-      if (!page.next) return json([])
+      // todowrite 的入参还在流式阶段时 todosOf 回 undefined,Response.json 当场抛错、经错误信封回 500 —— `#1668` 起如此,不改
+      if (last) return context.reply(todosOf(last)!)
+      if (!page.next) return context.reply([])
       cursor = page.next
     }
   }),
-  route("GET", "/session/:sessionID/message/:messageID", async (context) => {
+  "GET /session/:sessionID/message/:messageID": bind(async (context) => {
     const sessionID = context.params.sessionID!
     const messageID = context.params.messageID!
     const page = await recentMessages(context.api, sessionID, { through: messageID })
     const found = toV1Messages(sessionID, page.context).find((item) => item.info.id === messageID)
-    return found ? json(found) : json({ name: "NotFoundError", data: { message: `Message not found: ${messageID}` } }, { status: 404 })
+    return found ? context.reply(found) : json({ name: "NotFoundError", data: { message: `Message not found: ${messageID}` } }, { status: 404 })
   }),
 
   // ── 目录内的只读查询 ──
-  route("GET", "/agent", async (context) => json(normalizeAgentList((await context.api.agent.list(at(context))).data as never))),
-  route("GET", "/command", async (context) => {
+  "GET /agent": bind(async (context) => context.reply(toV1Agents((await context.api.agent.list(at(context))).data))),
+  "GET /command": bind(async (context) => {
     const [commands, skills] = await Promise.all([context.api.command.list(at(context)), context.api.skill.list(at(context))])
-    return json(toV1Commands(commands.data, skills.data))
+    return context.reply(toV1Commands(commands.data, skills.data))
   }),
-  route("GET", "/provider", async (context) => {
+  "GET /provider": bind(async (context) => {
     const [providers, models, defaultModel] = await Promise.all([
       context.api.provider.list(at(context)),
       context.api.model.list(at(context)),
       context.api.model.default(at(context)).catch(() => undefined),
     ])
-    return json(toV1ProviderList(providers.data, models.data, defaultModel?.data))
+    return context.reply(toV1ProviderList(providers.data, models.data, defaultModel?.data))
   }),
-  route("GET", "/mcp", async (context) => json(toV1McpStatus((await context.api.mcp.list(at(context))).data))),
-  route("GET", "/experimental/resource", async (context) => {
+  "GET /mcp": bind(async (context) => context.reply(toV1McpStatus((await context.api.mcp.list(at(context))).data))),
+  "GET /experimental/resource": bind(async (context) => {
     const catalog = (await context.api.mcp.resource.catalog(at(context))).data
-    return json(
+    return context.reply(
       Object.fromEntries(catalog.resources.map((resource) => [`${resource.server}:${resource.uri}`, { ...resource, client: resource.server }])),
     )
   }),
-  route("GET", "/vcs", async (context) => {
+  "GET /vcs": bind(async (context) => {
     const vcs = (await context.api.vcs.get(at(context))).data as { branch?: { current?: string; default?: string } }
-    return json({ branch: vcs.branch?.current, default_branch: vcs.branch?.default })
+    return context.reply({ branch: vcs.branch?.current, default_branch: vcs.branch?.default })
   }),
-  route("GET", "/vcs/status", async (context) => json((await context.api.vcs.status(at(context))).data)),
-  route("GET", "/vcs/diff", async (context) => {
+  "GET /vcs/status": bind(async (context) => context.reply((await context.api.vcs.status(at(context))).data)),
+  "GET /vcs/diff": bind(async (context) => {
     const mode = context.query.get("mode")
     const diff = await context.api.vcs.diff({
       ...at(context),
       mode: mode === "branch" ? "branch" : mode === "committed" ? "committed" : "working",
       ...(number(context.query.get("context")) !== undefined ? { context: number(context.query.get("context")) } : {}),
     })
-    return json(diff.data)
+    return context.reply(diff.data)
   }),
-  route("GET", "/file", async (context) => {
+  "GET /file": bind(async (context) => {
     const path = context.query.get("path") ?? ""
     const listed = await context.api.file.list({ ...at(context), ...(path ? { path } : {}) })
     const base = context.directory ?? listed.location.directory
-    return json(toV1FileNodes(path ? `${base}/${path}` : base, listed.data))
+    return context.reply(toV1FileNodes(path ? `${base}/${path}` : base, listed.data))
   }),
-  route("GET", "/file/content", async (context) => {
+  "GET /file/content": bind(async (context) => {
     const path = context.query.get("path") ?? ""
     const location = context.directory ? `?location%5Bdirectory%5D=${encodeURIComponent(context.directory)}` : ""
     const response = await context.upstream(`/api/fs/read/${path.split("/").map(encodeURIComponent).join("/")}${location}`, {
@@ -413,12 +413,12 @@ export const ROUTES: readonly Route[] = [
     if (!response.ok) return json({ name: "NotFoundError", data: { message: `File not found: ${path}` } }, { status: response.status })
     const mime = response.headers.get("content-type")?.split(";")[0]?.trim() ?? "application/octet-stream"
     const bytes = new Uint8Array(await response.arrayBuffer())
-    if (mime.startsWith("text/") || mime === "application/json") return json({ type: "text", content: new TextDecoder().decode(bytes) })
+    if (mime.startsWith("text/") || mime === "application/json") return context.reply({ type: "text", content: new TextDecoder().decode(bytes) })
     let binary = ""
     for (const byte of bytes) binary += String.fromCharCode(byte)
-    return json({ type: "binary", content: btoa(binary), encoding: "base64", mimeType: mime })
+    return context.reply({ type: "binary", content: btoa(binary), encoding: "base64", mimeType: mime })
   }),
-  route("GET", "/find/file", async (context) => {
+  "GET /find/file": bind(async (context) => {
     const dirs = context.query.get("dirs")
     const found = await context.api.file.find({
       ...at(context),
@@ -427,47 +427,47 @@ export const ROUTES: readonly Route[] = [
       ...(number(context.query.get("limit")) !== undefined ? { limit: number(context.query.get("limit")) } : {}),
     })
     // 2.x 的结果里带搜索根本身(`/`),它不是一个匹配项。
-    return json(found.data.flatMap((entry) => (entry.path === "/" || entry.path === "" ? [] : [entry.path])))
+    return context.reply(found.data.flatMap((entry) => (entry.path === "/" || entry.path === "" ? [] : [entry.path])))
   }),
 
   // ── MCP 连接(2.x 在 /api/experimental 下)与授权(U6:2.x 把远端 MCP 登记成 OAuth 集成)──
-  route("POST", "/mcp/:name/connect", async (context) => {
+  "POST /mcp/:name/connect": bind(async (context) => {
     await context.api.experimental.mcp.connect({ ...at(context), server: context.params.name! })
-    return ok()
+    return context.reply(true)
   }),
-  route("POST", "/mcp/:name/disconnect", async (context) => {
+  "POST /mcp/:name/disconnect": bind(async (context) => {
     await context.api.experimental.mcp.disconnect({ ...at(context), server: context.params.name! })
-    return ok()
+    return context.reply(true)
   }),
-  route("POST", "/api/mcp/:server/connect", async (context) => {
+  "POST /api/mcp/:server/connect": bind(async (context) => {
     await context.api.experimental.mcp.connect({ ...at(context), server: context.params.server! })
     return noContent()
   }),
-  route("POST", "/api/mcp/:server/disconnect", async (context) => {
+  "POST /api/mcp/:server/disconnect": bind(async (context) => {
     await context.api.experimental.mcp.disconnect({ ...at(context), server: context.params.server! })
     return noContent()
   }),
-  route("POST", "/mcp/:name/auth/authenticate", (context) => authenticateMcp(context)),
+  "POST /mcp/:name/auth/authenticate": bind((context) => authenticateMcp(context)),
 
   // ── 权限 ──
-  route("GET", "/permission", async (context) =>
-    json((await context.api.permission.request.list(at(context))).data.map((item) => context.permissions.show(item))),
+  "GET /permission": bind(async (context) =>
+    context.reply((await context.api.permission.request.list(at(context))).data.map((item) => context.receipts.show(toV1PermissionRequest(item)))),
   ),
-  route("POST", "/permission/:requestID/reply", (context) => {
+  "POST /permission/:requestID/reply": bind((context) => {
     const requestID = context.params.requestID!
     const body = (context.body ?? {}) as { reply: PermissionV2Decision; message?: string }
-    return decide(context, { requestID, decision: body.reply, message: body.message, decisionID: v1DecisionID(requestID) }, ok)
+    return decide(context, { requestID, decision: body.reply, message: body.message, decisionID: v1DecisionID(requestID) }, () => context.reply(true))
   }),
-  route("POST", "/session/:sessionID/permissions/:permissionID", (context) => {
+  "POST /session/:sessionID/permissions/:permissionID": bind((context) => {
     const requestID = context.params.permissionID!
     const body = (context.body ?? {}) as { response: PermissionV2Decision }
     return decide(
       context,
       { requestID, sessionID: context.params.sessionID!, decision: body.response, decisionID: v1DecisionID(requestID) },
-      ok,
+      () => context.reply(true),
     )
   }),
-  route("POST", "/api/session/:sessionID/permission/:requestID/reply", (context) => {
+  "POST /api/session/:sessionID/permission/:requestID/reply": bind((context) => {
     const command = (context.body ?? {}) as PermissionV2DecisionCommand
     return decide(
       context,
@@ -479,20 +479,17 @@ export const ROUTES: readonly Route[] = [
         decisionID: command.decisionID,
         requestFingerprint: command.requestFingerprint,
       },
-      (receipt) => json({ data: receipt }),
+      (receipt) => context.reply({ data: receipt }),
     )
   }),
-  // 0.1.26 的 v2 审批通道(`permission.v2.*`)在 2.x 上没有对应:引擎只有一条审批栈,请求全部经 v1 通道交给界面
-  // (卡片种类 —— 会话内 / 项目内 / 每次确认 —— 由 `engine-v1:` 指纹决定,与 0.1.26 一致)。这里若照搬 2.x 列表,
-  // 同一请求会以缺 subject/scope 的 v2 形状再进一次审批面,严格核验不过即被**自动拒绝**(PermissionDialog onMount)。
-  route("GET", "/api/session/:sessionID/permission", () => Promise.resolve(json({ data: [] }))),
+  // `GET /api/session/:sessionID/permission`(v2 审批通道列表)是约定侧的固定答复(contract/routes.ts FIXED)。
 
   // ── 提问(2.x 表单)──
-  route("GET", "/question", async (context) => {
+  "GET /question": bind(async (context) => {
     const forms = await context.api.form.list(at(context))
-    return json(forms.data.flatMap((form) => toV1Question(form) ?? []))
+    return context.reply(forms.data.flatMap((form) => toV1Question(form) ?? []))
   }),
-  route("POST", "/question/:requestID/reply", async (context) => {
+  "POST /question/:requestID/reply": bind(async (context) => {
     const requestID = context.params.requestID!
     const found = await questionOf(context, requestID)
     if (!found) return json({ name: "NotFoundError", data: { message: `Question not found: ${requestID}` } }, { status: 404 })
@@ -502,35 +499,35 @@ export const ROUTES: readonly Route[] = [
       formID: requestID,
       answer: toFormAnswer(found.question as QuestionRequest | undefined, body.answers ?? []),
     })
-    return ok()
+    return context.reply(true)
   }),
-  route("POST", "/question/:requestID/reject", async (context) => {
+  "POST /question/:requestID/reject": bind(async (context) => {
     const requestID = context.params.requestID!
     const found = await questionOf(context, requestID)
     if (!found) return json({ name: "NotFoundError", data: { message: `Question not found: ${requestID}` } }, { status: 404 })
     await context.api.session.form.cancel({ sessionID: found.sessionID, formID: requestID })
-    return ok()
+    return context.reply(true)
   }),
 
   // ── 终端(2.x 的 Pty 与 v1 同形)──
-  route("GET", "/pty", async (context) => json((await context.api.pty.list(at(context))).data)),
-  route("POST", "/pty", async (context) => {
+  "GET /pty": bind(async (context) => context.reply((await context.api.pty.list(at(context))).data)),
+  "POST /pty": bind(async (context) => {
     const body = (context.body ?? {}) as { command?: string; args?: string[]; cwd?: string; title?: string; env?: Record<string, string> }
-    return json((await context.api.pty.create({ ...at(context), ...body })).data)
+    return context.reply((await context.api.pty.create({ ...at(context), ...body })).data)
   }),
-  route("GET", "/pty/shells", async (context) => json(await context.api.config.shells())),
-  route("GET", "/pty/:ptyID", async (context) => json((await context.api.pty.get({ ...at(context), ptyID: context.params.ptyID! })).data)),
-  route("PUT", "/pty/:ptyID", async (context) => {
+  "GET /pty/shells": bind(async (context) => context.reply(await context.api.config.shells())),
+  "GET /pty/:ptyID": bind(async (context) => context.reply((await context.api.pty.get({ ...at(context), ptyID: context.params.ptyID! })).data)),
+  "PUT /pty/:ptyID": bind(async (context) => {
     const body = (context.body ?? {}) as { title?: string; size?: { rows: number; cols: number } }
-    return json((await context.api.pty.update({ ...at(context), ptyID: context.params.ptyID!, ...body })).data)
+    return context.reply((await context.api.pty.update({ ...at(context), ptyID: context.params.ptyID!, ...body })).data)
   }),
-  route("DELETE", "/pty/:ptyID", async (context) => {
+  "DELETE /pty/:ptyID": bind(async (context) => {
     await context.api.pty.remove({ ...at(context), ptyID: context.params.ptyID! })
-    return ok()
+    return context.reply(true)
   }),
-  route("POST", "/pty/:ptyID/connect-token", async (context) =>
+  "POST /pty/:ptyID/connect-token": bind(async (context) =>
     // 2.x 与 v1 一样要求调用方带 `x-opencode-ticket`(防跨站取票);冻结终端带着它,原样转过去。
-    json(
+    context.reply(
       (
         await context.api.pty.connect.token({
           ...at(context),
@@ -544,77 +541,44 @@ export const ROUTES: readonly Route[] = [
   ),
 
   // ── `/api/…`:v1 SDK 的 v2 命名空间与 1.17.13 客户端;2.x 路径与形状仍在的直通 ──
-  passthrough("GET", "/api/agent"),
+  "GET /api/agent": passthrough,
   // composer 的模型清单(model-contract.ts 的 `client.v2.model.list`;不进 routes-coverage 的扫描 —— 调用跨行写)。`#1662`:漏了它
   // composer 的模型链一直 recovering,发送按钮永远不亮。
-  route("GET", "/api/model", async (context) => json(toV1ModelList(await context.api.model.list(at(context))))),
-  passthrough("GET", "/api/provider/:providerID"),
-  passthrough("GET", "/api/reference"),
-  passthrough("GET", "/api/session"),
-  passthrough("POST", "/api/session"),
-  passthrough("GET", "/api/session/active"),
-  passthrough("GET", "/api/session/:sessionID"),
-  passthrough("DELETE", "/api/session/:sessionID"),
-  passthrough("POST", "/api/session/:sessionID/model"),
-  passthrough("POST", "/api/session/:sessionID/fork"),
-  passthrough("POST", "/api/session/:sessionID/interrupt"),
-  passthrough("POST", "/api/session/:sessionID/command"),
-  passthrough("POST", "/api/session/:sessionID/compact"),
-  passthrough("POST", "/api/session/:sessionID/shell"),
-  route("POST", "/api/session/:sessionID/rename", async (context) => {
+  "GET /api/model": bind(async (context) => context.reply(toV1ModelList(await context.api.model.list(at(context))))),
+  "GET /api/provider/:providerID": passthrough,
+  "GET /api/reference": passthrough,
+  "GET /api/session": passthrough,
+  "POST /api/session": passthrough,
+  "GET /api/session/active": passthrough,
+  "GET /api/session/:sessionID": passthrough,
+  "DELETE /api/session/:sessionID": passthrough,
+  "POST /api/session/:sessionID/model": passthrough,
+  "POST /api/session/:sessionID/fork": passthrough,
+  "POST /api/session/:sessionID/compact": passthrough,
+  "POST /api/session/:sessionID/shell": passthrough,
+  "POST /api/session/:sessionID/rename": bind(async (context) => {
     await context.api.session.update({ sessionID: context.params.sessionID!, title: (context.body as { title: string }).title })
     return noContent()
   }),
-  passthrough("GET", "/api/fs/find"),
-  passthrough("GET", "/api/vcs/status"),
-  passthrough("GET", "/api/vcs/diff"),
-  passthrough("POST", "/api/pty"),
-  passthrough("GET", "/api/pty/:ptyID"),
-  passthrough("PUT", "/api/pty/:ptyID"),
-  passthrough("DELETE", "/api/pty/:ptyID"),
-  passthrough("GET", "/api/integration/:integrationID"),
-  passthrough("POST", "/api/integration/:integrationID/connect/key"),
-  passthrough("POST", "/api/integration/:integrationID/connect/oauth"),
-  passthrough("GET", "/api/integration/:integrationID/connect/oauth/:attemptID"),
-  passthrough("POST", "/api/integration/:integrationID/connect/oauth/:attemptID/complete"),
-]
+  "GET /api/fs/find": passthrough,
+  "GET /api/vcs/status": passthrough,
+  "GET /api/vcs/diff": passthrough,
+  "POST /api/pty": passthrough,
+  "GET /api/pty/:ptyID": passthrough,
+  "PUT /api/pty/:ptyID": passthrough,
+  "DELETE /api/pty/:ptyID": passthrough,
+  "GET /api/integration/:integrationID": passthrough,
+  "POST /api/integration/:integrationID/connect/key": passthrough,
+  "POST /api/integration/:integrationID/connect/oauth": passthrough,
+  "GET /api/integration/:integrationID/connect/oauth/:attemptID": passthrough,
+  "POST /api/integration/:integrationID/connect/oauth/:attemptID/complete": passthrough,
+}
 
-/**
- * 冻结源码里扫得到、但适配器**不接**的引擎请求。每条一个理由;路由覆盖测试要求扫出的每个调用要么在 ROUTES、
- * 要么在这里。这里的请求真发出来时由 index.ts 回 501 + console.error。
- */
-export const UNSUPPORTED: ReadonlyArray<{ method: string; path: string; reason: string }> = [
-  { method: "DELETE", path: "/auth/:providerID", reason: "U5:上游设置页的凭证增删,Code Puppy 界面挂不上(设置入口 settings.open 由 codepuppy-sidebar.tsx 注册到 Code Puppy 设置页);BYOK 由主进程管" },
-  { method: "PUT", path: "/auth/:providerID", reason: "U5:同上(另一个发出点 server-compat.ts 的 integration.connect.key 只被上游连接对话框调用)" },
-  { method: "POST", path: "/global/dispose", reason: "U5:只在上游设置页的凭证增删之后调用" },
-  { method: "GET", path: "/provider/auth", reason: "U5:只在 server-compat.ts 的 integration.get(上游连接对话框)里调用" },
-  { method: "POST", path: "/provider/:providerID/oauth/authorize", reason: "U5:上游连接对话框的 OAuth" },
-  { method: "POST", path: "/provider/:providerID/oauth/callback", reason: "U5:上游连接对话框的 OAuth" },
-  { method: "GET", path: "/lsp", reason: "U4:2.x 只有 lsp.updated 事件、没有查询端点;请求由冻结 app 的数据层发出,显示它的状态弹层只挂在上游会话头与新会话页,Code Puppy 界面挂不上(编排器 2026-11-09 认可进本单)" },
-  { method: "POST", path: "/session/:sessionID/share", reason: "R6:owner 裁定拿掉「分享对话」;不把会话发到任何外部地址" },
-  { method: "DELETE", path: "/session/:sessionID/share", reason: "R6:取消分享,随「分享对话」一起拿掉(上游 use-session-commands / message-timeline 里的入口 Code Puppy 界面挂不上)" },
-  { method: "PATCH", path: "/global/config", reason: "U5:只被上游设置页与自定义 provider 对话框调用(server-sync.tsx updateConfig 的全部调用方),Code Puppy 界面挂不上" },
-  { method: "POST", path: "/experimental/worktree", reason: "U4:worktree 增删重置只在上游 LegacyLayout(pages/layout.tsx)里,它只挂在 /:dir 路由下,Code Puppy 不导航到那里(app.tsx:321 那条只在 newLayoutDesigns 关时走,codepuppy-defaults.ts 恒开)" },
-  { method: "GET", path: "/experimental/worktree", reason: "U4:同上(server-compat.ts 的 project.directories → layout.tsx:1188)" },
-  { method: "DELETE", path: "/experimental/worktree", reason: "U4:worktree 删除,同在上游 LegacyLayout(layout.tsx:1392)" },
-  { method: "POST", path: "/experimental/worktree/reset", reason: "U4:同上;2.x 也没有 reset" },
-  { method: "GET", path: "/api/project/:projectID/directories", reason: "U4:同上;2.2.x 已删" },
-  { method: "POST", path: "/api/session/:sessionID/question/:requestID/reply", reason: "v1 模式下 createCompatibleApi 改走 v1 的 /question/:id/reply(server-compat.ts:508);2.2.x 已删" },
-  { method: "POST", path: "/api/session/:sessionID/question/:requestID/reject", reason: "v1 模式下改走 /question/:id/reject(server-compat.ts:514);2.2.x 已删" },
-  // `#1662`:扫描改成不依赖排版(跨行写的链)之后才扫出的五条,都只在冻结 app 判定引擎是 v2 协议时发出;适配器的 /global/health 答
-  // healthy:true(本表首条),detectServerProtocol 因此恒判 v1(utils/server-protocol.ts:29)。
-  { method: "GET", path: "/api/event", reason: "v2 支路:server-sdk.tsx:268-272 只在协议不是 v1 时订阅 1.17.13 的 /api/event,v1 走 /global/event(已接)" },
-  { method: "GET", path: "/api/permission/request", reason: "v2 支路:permission.tsx:264-269 与 global-sync/bootstrap.ts:447-450 在 v1 协议下改走 v1 的 GET /permission(已接)" },
-  { method: "GET", path: "/api/question/request", reason: "v2 支路:global-sync/bootstrap.ts:483-486 在 v1 协议下改走 v1 的 GET /question(已接)" },
-  { method: "GET", path: "/api/fs/list", reason: "只经 createCompatibleApi 的 api.file.list 发出(directory-picker-domain.ts:345、dialog-select-directory-v2.tsx:130、home-controller.ts:96);v1 协议下它被 createV1Api 改写成 v1 的 GET /file(server-compat.ts:360-363,已接)" },
-  { method: "GET", path: "/api/model/default", reason: "v2 支路:global-sync/bootstrap.ts:232-241 在 v1 协议(且传了 legacy 客户端,三个生产调用方都传)下改走 v1 的 GET /provider(已接)" },
-]
-
-async function currentProject(context: RouteContext) {
+async function currentProject(context: SharedContext) {
   const location = await context.api.location.get(at(context))
   const listed = (await context.api.project.list()).find((project) => project.id === location.project.id)
   return listed
-    ? toV1Project(listed as never)
+    ? toV1Project(listed)
     : toV1Project({ id: location.project.id, canonical: location.project.canonical, time: { created: 0, updated: 0 }, sandboxes: [] })
 }
 
@@ -626,7 +590,7 @@ const MCP_AUTH_POLL_MS = 1_000
  * OAuth 集成(core/src/mcp/index.ts:238-275,`metadata.source === "mcp"`、名字 = MCP 名):这里发起 OAuth、
  * 交给系统浏览器打开授权地址、轮询到终态,再回这台 MCP 的状态 —— 调用方看到的仍是 v1 的那个长调用。
  */
-async function authenticateMcp(context: RouteContext) {
+async function authenticateMcp(context: TranslatorContext<"POST /mcp/:name/auth/authenticate">) {
   const name = context.params.name!
   const integrations = await context.api.integration.list(at(context))
   const integration = integrations.data.find(
@@ -655,6 +619,6 @@ async function authenticateMcp(context: RouteContext) {
     if (outcome === "complete") await poll()
     const server = (await context.api.mcp.list(at(context))).data.find((item) => item.name === name)
     if (outcome !== "complete" || server?.status.status !== "pending")
-      return json(server ? v1McpStatus(server.status) : { status: "failed", error: outcome })
+      return context.reply(server ? v1McpStatus(server.status) : { status: "failed", error: outcome })
   }
 }

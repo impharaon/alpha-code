@@ -23,7 +23,7 @@ import type {
   TextPart,
   ToolPart,
   UserMessage,
-} from "@opencode-ai/sdk/v2/client"
+} from "../../../engine-adapter/contract/v1"
 import { egressPolicyDenialOf } from "../../../shared/egress-denial"
 import { isNetFailureLayer, type NetFailureLayer } from "@opencode/schema/codepuppy-net-failure"
 import { isCloudFacadeToolPart } from "../cloud-facade-identity"

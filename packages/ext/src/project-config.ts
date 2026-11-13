@@ -9,7 +9,7 @@
 import { lstatSync, realpathSync } from "node:fs"
 import { homedir } from "node:os"
 import { isAbsolute, join, normalize, relative, resolve } from "node:path"
-import { extensionsGranted } from "../../ui-mac/src/main/codepuppy-ext-trust"
+import { AGENT_CONTROL_FIELDS, extensionsGranted } from "../../ui-mac/src/main/codepuppy-ext-trust"
 import { projectTrustIdentity, readProjectTrustEntry } from "../../ui-mac/src/main/project-trust-truth"
 import { PROJECT_HIDDEN_DIR } from "../../ui-mac/src/shared/project-hidden-dir"
 import { parseProjectJsonc } from "../../ui-mac/src/shared/project-jsonc"
@@ -184,9 +184,6 @@ export function mergeProjectConfig(
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v)
-
-// `tools`(#1693)与 `permission` 同样翻成权限规则(engine-transforms.ts `permissionRules`),所以同一条门。
-const AGENT_CONTROL_FIELDS = ["permission", "tools", "model", "disable", "mode"] as const
 
 /** 去掉每个 agent 条目里能改写权限/模型的字段,其余(prompt/description…)原样保留。 */
 function stripAgentControl(agents: Record<string, unknown>): Record<string, unknown> {

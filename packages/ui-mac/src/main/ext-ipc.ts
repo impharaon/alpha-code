@@ -529,7 +529,7 @@ export function registerExtIpcHandlers(
   // REQ-018 T3:存量迁移(旧 XDG 根 → .codepuppy)。scan 报告 + removeLegacy 删旧位;新位由 renderer
   // 复用既有 installer 重装(顺带 A2 钉版 + secret file 化)。用户面触发受 CODEPUPPY_MIGRATE_ENABLE 门控
   // (A6 真机验证后开,S12 T8)。
-  // REQ-060 信任门 UI:renderer 打开项目时调用。项目 `.codepuppy` 含可执行扩展(mcp/plugins)且无当前
+  // REQ-060 信任门 UI:renderer 打开项目时调用。项目 `.codepuppy` 含受信任门管的内容(mcp / plugins / agent 的控制字段)且无当前
   // 版本决策 → 弹 per-project 原生确认(B16/ADR-021 同款);granted/denied 都记进 main 写、引擎写不到的
   // `<casBaseRoot>/project-trust/<env>.json`(`#1709`,按规范项目目录 + inode;@codepuppy/ext 信任门读同一条)。项目目录里的
   // 任何文件都不算 —— 旧的 `.codepuppy/prefs.json` extensionsConsent 不读、不写、不删。granted 后由 renderer 请 ext 重载生效。
@@ -580,7 +580,7 @@ export function registerExtIpcHandlers(
     const jsoncText = configRead.value
     const pluginFiles = pluginsRead.value
     const exec = listProjectExecutables(jsoncText, pluginFiles)
-    if (exec.mcp.length === 0 && exec.plugins.length === 0) return { prompted: false, granted: false }
+    if (exec.mcp.length === 0 && exec.plugins.length === 0 && exec.agents.length === 0) return { prompted: false, granted: false }
     // `#1709`:身份 = 规范项目目录 + 目录 inode;在弹框前取下,写入前复核。
     const identityRead = withProjectIpcEntryIdentity(project, homeDir, (current) => projectTrustIdentity(current.projectDir))
     if (!identityRead.ok) return { prompted: false, granted: false, reason: identityRead.reason }
@@ -592,6 +592,7 @@ export function registerExtIpcHandlers(
     const items = [
       ...exec.mcp.map((n) => `· 连接器(MCP):${n}`),
       ...exec.plugins.map((f) => `· 插件:${PROJECT_HIDDEN_DIR}/plugins/${f}`),
+      ...exec.agents.map((a) => `· Agent 设置:${a.name}(${a.fields.join("、")})`),
     ].join("\n")
     const parent = BrowserWindow.fromWebContents(event.sender) ?? undefined
     const opts = {

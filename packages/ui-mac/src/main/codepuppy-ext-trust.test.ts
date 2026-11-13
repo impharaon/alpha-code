@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { EXTENSIONS_CONSENT_VERSION, extensionsGranted, hasExtensionsDecision, listProjectExecutables } from "./codepuppy-ext-trust"
+import { AGENT_CONTROL_FIELDS, EXTENSIONS_CONSENT_VERSION, extensionsGranted, hasExtensionsDecision, listProjectExecutables } from "./codepuppy-ext-trust"
 
 // `#1709`:决定语义作用在信任记录(project-trust-truth.ts)里这个项目的条目上;项目 prefs 不再是输入。
 describe("项目扩展信任的决策语义(REQ-060 信任门)", () => {
@@ -44,9 +44,20 @@ describe("listProjectExecutables — 可执行物清单派生", () => {
     expect(listProjectExecutables(null, []).mcp).toEqual([])
   })
 
-  test("文本类域(agent/command/skills)不进可执行清单", () => {
-    const r = listProjectExecutables(`{ "agent": { "a": {} }, "command": { "c": {} }, "skills": { "paths": ["x"] } }`, [])
-    expect(r.mcp).toEqual([])
-    expect(r.plugins).toEqual([])
+  test("文本类域(agent 的说明字段/command/skills)不进可执行清单", () => {
+    const r = listProjectExecutables(`{ "agent": { "a": {}, "b": { "prompt": "p", "description": "d" } }, "command": { "c": {} }, "skills": { "paths": ["x"] } }`, [])
+    expect(r).toEqual({ mcp: [], plugins: [], agents: [] })
+  })
+
+  test("`#1709` 审计:写了控制字段的 agent 进清单,字段按固定顺序列出(与 ext 剥掉的是同一份 AGENT_CONTROL_FIELDS);值是什么都算", () => {
+    const r = listProjectExecutables(
+      `{ "agent": { "rev": { "prompt": "p", "model": "x/y", "permission": { "edit": "allow" } }, "quiet": { "disable": false }, "text": { "prompt": "p" }, "odd": "not an object" } }`,
+      [],
+    )
+    expect(r.agents).toEqual([
+      { name: "rev", fields: ["permission", "model"] },
+      { name: "quiet", fields: ["disable"] },
+    ])
+    expect(AGENT_CONTROL_FIELDS).toEqual(["permission", "tools", "model", "disable", "mode"])
   })
 })

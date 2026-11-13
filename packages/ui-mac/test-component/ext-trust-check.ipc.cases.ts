@@ -86,7 +86,7 @@ const OLD_CONSENT = JSON.stringify({ extensionsConsent: { version: 1, granted: t
 
 let seq = 0
 /** 一个带项目插件(可选)与旧「已同意」的项目;返回规范目录。 */
-function makeProject(options: { plugin?: boolean; dir?: string } = {}) {
+function makeProject(options: { plugin?: boolean; dir?: string; jsonc?: unknown } = {}) {
   const dir = options.dir ?? join(tmp, "projects", `p${++seq}`)
   const root = join(dir, ".codepuppy")
   mkdirSync(join(root, "skills", "notes"), { recursive: true })
@@ -95,6 +95,7 @@ function makeProject(options: { plugin?: boolean; dir?: string } = {}) {
     mkdirSync(join(root, "plugins"), { recursive: true })
     writeFileSync(join(root, "plugins", "p.js"), 'export default { id: "project.p", setup() {} }\n')
   }
+  if (options.jsonc !== undefined) writeFileSync(join(root, "codepuppy.jsonc"), JSON.stringify(options.jsonc))
   writeFileSync(join(root, "prefs.json"), OLD_CONSENT)
   return realpathSync(dir)
 }
@@ -107,6 +108,12 @@ const recorded = (directory: string) => {
   return read.projects[directory]
 }
 const inode = (directory: string) => statSync(directory, { bigint: true }).ino.toString()
+/** 确认框正文:可执行物清单之后的固定部分(现有文案,不变)。 */
+const detailFor = (items: string[]) =>
+  `发现以下可执行扩展:\n${items.join("\n")}\n\n` +
+  "允许加载 = 在本机运行该项目提供的程序代码。若这不是你信任的项目,请选择「仅文本扩展」——\n" +
+  "技能 / Agent / 命令等文本类扩展不受影响,仍正常生效。\n\n" +
+  "本决定按项目记录一次,之后不再重复询问。"
 
 beforeEach(() => {
   shown.length = 0
@@ -142,8 +149,31 @@ describe("#1709 生产 ext-trust-check:信任只来自用户在确认框里的�
     expect(shown).toHaveLength(1)
   })
 
-  test("没有可执行扩展(只有文本类)⇒ 不弹、不记", async () => {
-    const dir = makeProject({ plugin: false })
+  test("审计范围补充:项目受门控的只有 agent 的控制字段 ⇒ 也弹框,清单里点名它们;同意后记下", async () => {
+    const dir = makeProject({ plugin: false, jsonc: { agent: { reviewer: { prompt: "review", permission: { edit: "allow" } }, notes: { prompt: "text only" } } } })
+    answer = { response: 0, checkboxChecked: true }
+    expect(await trustCheck(dir)).toEqual({ prompted: true, granted: true })
+    expect(shown).toHaveLength(1)
+    expect(shown[0]!.detail).toBe(detailFor(["· Agent 设置:reviewer(permission)"]))
+    expect(recorded(dir)).toMatchObject({ ino: inode(dir), granted: true })
+  })
+
+  test("审计范围补充:三样都有 ⇒ 清单依次列连接器、插件、agent 设置", async () => {
+    const dir = makeProject({
+      jsonc: {
+        mcp: { proj: { type: "local", command: ["proj-mcp"] } },
+        agent: { reviewer: { prompt: "review", model: "codepuppy/m", permission: { edit: "allow" } } },
+      },
+    })
+    expect(await trustCheck(dir)).toEqual({ prompted: true, granted: false })
+    expect(shown).toHaveLength(1)
+    expect(shown[0]!.detail).toBe(
+      detailFor(["· 连接器(MCP):proj", "· 插件:.codepuppy/plugins/p.js", "· Agent 设置:reviewer(permission、model)"]),
+    )
+  })
+
+  test("没有可执行扩展(只有文本类,含只写了说明字段的 agent)⇒ 不弹、不记", async () => {
+    const dir = makeProject({ plugin: false, jsonc: { agent: { notes: { prompt: "text only", description: "d" } }, command: { c: { template: "x" } } } })
     expect(await trustCheck(dir)).toEqual({ prompted: false, granted: false })
     expect(shown).toHaveLength(0)
     expect(existsSync(recordPath) ? recorded(dir) : undefined).toBeUndefined()

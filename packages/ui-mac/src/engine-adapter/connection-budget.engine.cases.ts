@@ -144,7 +144,7 @@ function chromiumSocketPool(limit: number, authorization: string) {
   return {
     fetch: fetch as typeof globalThis.fetch,
     /** 此刻占着连接的 2.x 事件流条数。 */
-    eventStreams: () => [...held.values()].filter((pathname) => pathname === "/api/event").length,
+    eventStreams: () => [...held.values()].filter((path) => path === "/api/event").length,
     stalls: () => stalls,
   }
 }
@@ -338,7 +338,9 @@ describe("#1669 G2:挂着界面的订阅时,审批回复当即落到引擎", () 
         Array.from({ length: SOCKETS_PER_HOST }, () => pool.fetch(`${origin}/api/event`, { signal: abort.signal })),
       )
       expect(pool.eventStreams()).toBe(SOCKETS_PER_HOST)
-      const reply = client.permission.reply({ requestID: turn.requestID, reply: "reject" })
+      // 经审批卡同一个提交入口(replyPermissionV1)发出,与上面几条用例走同一条路。
+      const card = adaptPermissionV1Request(listed[0]!, ASK)
+      const reply = replyPermissionV1({ client } as never, { sessionID: turn.sessionID, requestID: turn.requestID, command: createPermissionDecisionCommand(card, "reject") })
       reply.catch(() => {})
       const error = await within(reply, "starved").then(() => undefined, (caught: Error) => caught)
       expect(error?.message).toBe(`starved (bound ${BOUND_MS} ms)`)

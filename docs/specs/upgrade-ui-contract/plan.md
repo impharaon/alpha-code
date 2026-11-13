@@ -40,7 +40,7 @@ last_reviewed: 2026-11-12
 
 | 片 | 对应设计 §9 | 开工依赖 | 预估文件 / 实质行 |
 | --- | --- | --- | --- |
-| M1a 搬家 | M1 前半 | — | 22 / ~200(其中 ~70 行只是 import 路径;另有新工具 `replay.ts` ~130 行) |
+| M1a 搬家 | M1 前半 | — | 24 / ~200(其中 ~70 行只是 import 路径;另有新工具 `replay.ts` ~130 行) |
 | M1b 约定目录与管道 | M1 | M1a | 11 / ~650 |
 | M2a 翻译器自有投影 | M2 前半 | M1b | 13 / ~700 |
 | M2b 约定类型落地 | M2 后半 | M2a | 6 / ~450 |
@@ -114,6 +114,8 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 | `test-fixtures/engine-adapter-sampler/replay.ts`(新) | B3 的夹具差分工具;职责与覆盖面见「共用 B3」 |
 | `test-fixtures/engine-adapter-sampler/README.md` | 加一节 replay 的用法与「前后差分」做法 |
 | `docs/architecture/codepuppy-authority-registry.json` | `adr033-decision-receipt` 与 `l1r-review-turn-supply` 的 `mechanism.file` 改指 `opencode2/` 下的新路径 |
+| `src/renderer/codepuppy-ui/permission-mount-ratchet.test.ts` | 审批提交入口白名单按文件登记,`permission-replies.ts` 那一条改指新路径(偏离记录) |
+| `packages/ext/src/upstream-probes/turn.test.ts` | `toV1Messages` 的 import 路径(偏离记录) |
 
 ### 顺序
 
@@ -135,7 +137,7 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 
 ### 偏离记录
 
-暂无
+- 2026-11-12 · 多改两个文件:`permission-mount-ratchet.test.ts` 的审批提交入口白名单按文件路径登记 `permission-replies.ts`(不改指则该棘轮把搬走后的文件判为未登记的提交方);ext 的 I-03 探针 `upstream-probes/turn.test.ts` 直接 import `v1-shapes.ts`。计划阶段只搜了 ui-mac 内的引用,漏了这两处。两处都只改路径;探针测试名里写的依赖文件路径是给人看的标签,未改,记为观察 · M1a 搬家提交。
 
 ## M1b — 约定目录与管道分家
 

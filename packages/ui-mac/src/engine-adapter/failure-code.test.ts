@@ -10,9 +10,9 @@ import { CODEPUPPY_OFFICE_CONNECTORS } from "../shared/office-advisories"
 import { mcpRepair } from "../renderer/extensions/use-extensions"
 import { turnErrorOf } from "../renderer/codepuppy-ui/session-timeline/timeline-model"
 import readTool from "./fixtures/read-tool.json"
-import { createProjector, type V1Payload } from "./events"
-import { createPermissionReplies } from "./permission-replies"
-import { toV1McpStatus, toV1Messages } from "./v1-shapes"
+import { createProjector, type V1Payload } from "./opencode2/events"
+import { createPermissionReplies } from "./opencode2/permission-replies"
+import { toV1McpStatus, toV1Messages } from "./opencode2/v1-shapes"
 
 const office = CODEPUPPY_OFFICE_CONNECTORS[0]!.name
 

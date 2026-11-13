@@ -15,7 +15,7 @@
 // 不认识的事件丢弃(它们在 v1 没有对应,冻结界面也不读)。
 import type { OpenCodeClient, OpenCodeEvent, SessionMessageInfo } from "@opencode/client/promise"
 import type { Part } from "@opencode-ai/sdk/v2/client"
-import { normalizeSessionInfo } from "./frozen-shapes"
+import { normalizeSessionInfo } from "../frozen-shapes"
 import type { PermissionReplies } from "./permission-replies"
 import type { RouteContext } from "./routes"
 import { recentMessages, rememberSessionDirectory, sessionDirectory } from "./session-cache"

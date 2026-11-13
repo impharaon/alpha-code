@@ -5,8 +5,8 @@
 // 事件一半逐帧喂投影器(做法同 event-projection.test.ts:每帧之后的消息页取那一帧采样时读到的)。
 // 前后两次跑之间只有下面「怎样建投影器」这几行可以不同(搬家改路径、换参数时在同一个提交里改)。
 import { createEngineFetch } from "../../src/engine-adapter/index"
-import { createProjector } from "../../src/engine-adapter/events"
-import { createPermissionReplies } from "../../src/engine-adapter/permission-replies"
+import { createProjector } from "../../src/engine-adapter/opencode2/events"
+import { createPermissionReplies } from "../../src/engine-adapter/opencode2/permission-replies"
 const projector = (api: unknown, emit: (directory: string, payload: unknown) => void) =>
   createProjector(api as never, emit as never, createPermissionReplies())
 

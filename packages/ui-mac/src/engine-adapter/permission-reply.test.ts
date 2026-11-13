@@ -18,9 +18,9 @@ import {
 import { createPermissionDecisionCommand, permissionDecisionSubmitError } from "../renderer/codepuppy-ui/PermissionDialog"
 import { createPermissionV2Feed } from "../renderer/codepuppy-ui/session-workspace/session-permission-feed"
 import fixture from "./fixtures/permission-reply.json"
-import { createProjector, type V1Payload } from "./events"
+import { createProjector, type V1Payload } from "./opencode2/events"
 import { createEngineFetch } from "./index"
-import { createPermissionReplies, requestFingerprint } from "./permission-replies"
+import { createPermissionReplies, requestFingerprint } from "./opencode2/permission-replies"
 // 假引擎的规则判定直接用引擎原件(测试进程有 `process`)。
 import { evaluate as engineEvaluate } from "../../../core/src/permission"
 

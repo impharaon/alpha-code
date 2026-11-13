@@ -8,7 +8,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { createEngineFetch } from "../../src/engine-adapter/index"
-import { requestFingerprint } from "../../src/engine-adapter/permission-replies"
+import { requestFingerprint } from "../../src/engine-adapter/opencode2/permission-replies"
 import { startMockModel } from "./mock-model"
 
 const REPO = resolve(import.meta.dir, "../../../..")

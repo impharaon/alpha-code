@@ -3,10 +3,10 @@
 // 回复与回执按 L4 的推导规格实现,行为由 permission-reply.test.ts 钉住;这里只钉三个回复入口都接上了。
 import { describe, expect, spyOn, test } from "bun:test"
 import fixture from "./fixtures/permission-asked.json"
-import { createProjector, type V1Payload } from "./events"
+import { createProjector, type V1Payload } from "./opencode2/events"
 import { createEngineFetch } from "./index"
-import { createPermissionReplies } from "./permission-replies"
-import { toV1PermissionRequest } from "./v1-shapes"
+import { createPermissionReplies } from "./opencode2/permission-replies"
+import { toV1PermissionRequest } from "./opencode2/v1-shapes"
 
 const I7A_METADATA = {
   identity: { kind: "builtin", name: "read" },

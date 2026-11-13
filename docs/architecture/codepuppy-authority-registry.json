@@ -782,7 +782,7 @@
         "packages/client/src/generated/types.ts"
       ],
       "mechanism": {
-        "file": "packages/ui-mac/src/engine-adapter/permission-replies.ts",
+        "file": "packages/ui-mac/src/engine-adapter/opencode2/permission-replies.ts",
         "ladder": "L6 adapter (derivation per docs/architecture/2026-11-09-1662-permission-reply-measurements.md: the receipt is synthesized from the displayed snapshot's fingerprint, the replied events of the reply's cascade window and a decision cache; no kernel re-take)"
       },
       "tests": [
@@ -1296,7 +1296,7 @@
         "packages/opencode/src/session/prompt.ts"
       ],
       "mechanism": {
-        "file": "packages/ui-mac/src/engine-adapter/v1-shapes.ts",
+        "file": "packages/ui-mac/src/engine-adapter/opencode2/v1-shapes.ts",
         "ladder": "L6 adapter (at each turn boundary events.ts / routes.ts fetch GET /api/session/:id/diff?from=<turnAnchor> and attach it to the turn's v1 user message for turnDiffsOf)"
       },
       "tests": [

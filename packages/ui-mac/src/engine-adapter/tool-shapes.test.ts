@@ -14,9 +14,9 @@ import {
 import parity from "./fixtures/parity.json"
 import readTool from "./fixtures/read-tool.json"
 import tools from "./fixtures/tools.json"
-import { createProjector, type V1Payload } from "./events"
-import { createPermissionReplies } from "./permission-replies"
-import { toV1Messages } from "./v1-shapes"
+import { createProjector, type V1Payload } from "./opencode2/events"
+import { createPermissionReplies } from "./opencode2/permission-replies"
+import { toV1Messages } from "./opencode2/v1-shapes"
 
 type Session = { sessionID: string; records: Array<{ frame: { type: string; data: any }; snapshot?: { data: any[] } }>; final: any[] }
 const sessions = tools.sessions as unknown as Record<"delegate" | "background" | "edit" | "shell" | "patch", Session>

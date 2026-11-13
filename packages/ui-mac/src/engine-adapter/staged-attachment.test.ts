@@ -7,7 +7,7 @@ import { describe, expect, test } from "bun:test"
 import { STAGED_ATTACHMENT_PART_NAME } from "../../../ext/src/staged-attachment-part"
 import { buildAttachmentParts } from "../renderer/codepuppy-ui/composer-attachments-core"
 import readTool from "./fixtures/read-tool.json"
-import { toPrompt, toV1Messages } from "./v1-shapes"
+import { toPrompt, toV1Messages } from "./opencode2/v1-shapes"
 
 const meta = {
   v: 1 as const,

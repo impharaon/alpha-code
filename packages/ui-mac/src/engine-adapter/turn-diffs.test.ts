@@ -11,10 +11,10 @@ import fixture from "./fixtures/turn-diff.json"
 import continued from "./fixtures/continue.json"
 import parity from "./fixtures/parity.json"
 import tools from "./fixtures/tools.json"
-import { createProjector, TURN_DIFF_EVENTS, type V1Payload } from "./events"
-import { createPermissionReplies } from "./permission-replies"
+import { createProjector, TURN_DIFF_EVENTS, type V1Payload } from "./opencode2/events"
+import { createPermissionReplies } from "./opencode2/permission-replies"
 import { createEngineFetch } from "./index"
-import { CONTINUE_METADATA_KEY, toV1Messages } from "./v1-shapes"
+import { CONTINUE_METADATA_KEY, toV1Messages } from "./opencode2/v1-shapes"
 
 type Record_ = { frame: { type: string; data: Record<string, any> }; snapshot?: { data: any[] }; diff?: { data: unknown[] } }
 const records = fixture.records as unknown as Record_[]

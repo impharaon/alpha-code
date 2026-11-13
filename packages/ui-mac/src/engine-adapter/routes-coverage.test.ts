@@ -15,7 +15,7 @@ import { describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync, statSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { matchRoute } from "./index"
-import { UNSUPPORTED } from "./routes"
+import { UNSUPPORTED } from "./opencode2/routes"
 
 const PACKAGES = resolve(import.meta.dir, "../../..")
 

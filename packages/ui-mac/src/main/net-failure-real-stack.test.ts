@@ -36,7 +36,7 @@ import { startEgressPolicyProxy, type EgressLogRecord, type EgressProxyHandle } 
 import { sidecarEgressProxyEnv } from "./sidecar-env"
 import { secretFilePath, secretFileRef } from "./codepuppy-secret-files"
 import { ISOLATED_KEYS, isInside, isolatedEnv, testRoot } from "../../../../scripts/test-isolation/env"
-import { toV1Messages } from "../engine-adapter/v1-shapes"
+import { toV1Messages } from "../engine-adapter/opencode2/v1-shapes"
 import type { ToolPart } from "@opencode-ai/sdk/v2/client"
 import { toolCardBodyOf } from "../renderer/codepuppy-ui/session-timeline/cards/tool-card-model"
 import { netFailureCopy } from "../renderer/codepuppy-ui/net-failure-copy"

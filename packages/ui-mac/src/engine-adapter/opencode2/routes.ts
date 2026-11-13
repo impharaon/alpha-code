@@ -12,7 +12,7 @@ import type {
   PermissionV2DecisionReceipt,
   QuestionRequest,
 } from "@opencode-ai/sdk/v2/client"
-import { normalizeAgentList, normalizeSessionInfo } from "./frozen-shapes"
+import { normalizeAgentList, normalizeSessionInfo } from "../frozen-shapes"
 import { projectEventStream } from "./events"
 import { v1DecisionID, type DecisionInput, type DecisionOutcome, type PermissionReplies } from "./permission-replies"
 import { MESSAGE_PAGE, recentMessages, sessionDirectory } from "./session-cache"

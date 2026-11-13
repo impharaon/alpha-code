@@ -9,8 +9,8 @@
 // `onBeforeSendHeaders` 对引擎源补上)。审批这一侧只保留回执状态(permission-replies.ts:交出过的请求快照指纹、
 // 已出的收据,窗口寿命、不落盘),那是 0.1.26 回执合同要的幂等与 409,不重放引擎数据。
 import { OpenCode, type OpenCodeClient } from "@opencode/client/promise"
-import { createPermissionReplies, type PermissionReplies } from "./permission-replies"
-import { ROUTES, type Route, type RouteContext } from "./routes"
+import { createPermissionReplies, type PermissionReplies } from "./opencode2/permission-replies"
+import { ROUTES, type Route, type RouteContext } from "./opencode2/routes"
 
 export const UNSUPPORTED_ERROR_NAME = "CodePuppyEngineAdapterUnsupported"
 

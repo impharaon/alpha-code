@@ -9,8 +9,8 @@ import { createRoot } from "solid-js"
 import { createFilesPanelState } from "../renderer/codepuppy-ui/session-rail/files/files-state"
 import files from "./fixtures/files.json"
 import parity from "./fixtures/parity.json"
-import { createProjector, type V1Payload } from "./events"
-import { createPermissionReplies } from "./permission-replies"
+import { createProjector, type V1Payload } from "./opencode2/events"
+import { createPermissionReplies } from "./opencode2/permission-replies"
 
 type Record_ = { frame: { type: string; data: Record<string, any> }; snapshot?: { data: any[] }; diff?: { data: unknown[] } }
 const fixture = files as unknown as {

@@ -179,7 +179,11 @@ describe("#1668 F2 「继续」之后的回合改动", () => {
       body: JSON.stringify({ parts: [{ type: "text", text: "Continue", synthetic: true }] }),
     })
     expect(response.status).toBe(204)
-    expect(calls).toEqual([{ path: "/api/session/ses_1/prompt", body: { text: "Continue", metadata: { [CONTINUE_METADATA_KEY]: true } } }])
+    // `#1669`:不带 agent 先读会话 —— 它没选过助手(这里的应答没有 agent)就不切,直接落 prompt。
+    expect(calls).toEqual([
+      { path: "/api/session/ses_1", body: undefined },
+      { path: "/api/session/ses_1/prompt", body: { text: "Continue", metadata: { [CONTINUE_METADATA_KEY]: true } } },
+    ])
   })
 
   test("最新回合由引擎的 synthetic 在 idle 之后开启(legacy 续写)⇒ 从 synthetic 取 diff,面板读得到;diff 真失败时记下错误、消息照回", async () => {

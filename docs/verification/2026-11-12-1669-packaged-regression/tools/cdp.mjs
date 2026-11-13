@@ -84,17 +84,47 @@ const evaluate = async (expression) => {
 try {
   if (cmd === "eval") console.log(JSON.stringify(await evaluate(args[0]), null, 1))
   else if (cmd === "shot") {
-    const r = await send("Page.captureScreenshot", { format: "png" })
+    // r6: bounded — after a renderer reload in the hidden window the compositor produces no frames and capture never returns
+    const r = await Promise.race([send("Page.captureScreenshot", { format: "png" }), new Promise((res) => setTimeout(() => res(null), 10000))])
+    if (!r) {
+      console.log(`shot TIMEOUT (no frame within 10 s) — ${args[0]} not written`)
+      process.exit(3)
+    }
     writeFileSync(args[0], Buffer.from(r.data, "base64"))
     console.log(`wrote ${args[0]}`)
   } else if (cmd === "click") {
     console.log(JSON.stringify(await evaluate(`(() => { const el = document.querySelector(${JSON.stringify(args[0])}); if (!el) return "no element"; el.click(); return "clicked" })()`)))
+  } else if (cmd === "clicktext") {
+    // r6: click the first element matching <css> whose trimmed innerText equals <text> (else: the first that contains it)
+    console.log(JSON.stringify(await evaluate(`(() => { const els = [...document.querySelectorAll(${JSON.stringify(args[0])})].filter(e => e.offsetParent !== null || e.getClientRects().length); const want = ${JSON.stringify(args[1])}; const el = els.find(e => (e.innerText || e.getAttribute("aria-label") || "").trim() === want) || els.find(e => (e.innerText || e.getAttribute("aria-label") || "").includes(want)); if (!el) return "no element"; el.click(); return "clicked: " + (el.innerText || el.getAttribute("aria-label") || "").trim().slice(0, 60) })()`)))
+  } else if (cmd === "waitfor") {
+    // r6: poll <expression> every 500 ms until truthy or <ms> elapse; prints the last value and the elapsed time
+    const deadline = Date.now() + Number(args[1] ?? 30000)
+    const t0 = Date.now()
+    let v
+    for (;;) {
+      v = await evaluate(args[0])
+      if (v || Date.now() > deadline) break
+      await new Promise((r) => setTimeout(r, 500))
+    }
+    console.log(JSON.stringify({ value: v, ms: Date.now() - t0 }))
+  } else if (cmd === "drag") {
+    // r6: page-level CDP mouse drag (not OS events) from (x1,y1) to (x2,y2) in CSS pixels, in 10 steps
+    const [x1, y1, x2, y2] = args.map(Number)
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: x1, y: y1 })
+    await send("Input.dispatchMouseEvent", { type: "mousePressed", x: x1, y: y1, button: "left", buttons: 1, clickCount: 1 })
+    for (let i = 1; i <= 10; i++) {
+      await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: x1 + ((x2 - x1) * i) / 10, y: y1 + ((y2 - y1) * i) / 10, button: "left", buttons: 1 })
+      await new Promise((r) => setTimeout(r, 30))
+    }
+    await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: x2, y: y2, button: "left", buttons: 0, clickCount: 1 })
+    console.log(`dragged ${x1},${y1} -> ${x2},${y2}`)
   } else if (cmd === "text") {
     await send("Input.insertText", { text: args[0] })
     console.log("inserted")
   } else if (cmd === "key") {
     const key = args[0]
-    const code = key === "Enter" ? 13 : key === "Escape" ? 27 : 0
+    const code = key === "Enter" ? 13 : key === "Escape" ? 27 : key === "Backspace" ? 8 : 0
     await send("Input.dispatchKeyEvent", { type: "keyDown", key, windowsVirtualKeyCode: code, ...(key === "Enter" ? { text: "\r" } : {}) })
     await send("Input.dispatchKeyEvent", { type: "keyUp", key, windowsVirtualKeyCode: code })
     console.log(`key ${key}`)

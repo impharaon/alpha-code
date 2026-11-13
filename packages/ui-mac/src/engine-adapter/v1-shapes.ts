@@ -497,10 +497,16 @@ export function todosOf(part: Part) {
  * I7a:2.x 审批请求 → v1。冻结 app 的 normalizePermissionRequest 按 1.17.13 的形状读工具来源(`source.callID`);
  * 2.x 的来源是 `{ type: "tool", messageID, id }`(真引擎采样 fixtures/permission-asked.json,seams I7a)。这里只补这一处
  * 漂移,其余字段(action → permission、resources → patterns、save → always、metadata 原样)仍由冻结函数映射。
+ * `#1669` R17:能力轴(没有 `metadata.policy`)的委派动作名也漂了 —— 2.x 的 subagent 工具问 `subagent`(core
+ * tool/plugin/subagent.ts),0.1.26 问 `task`;审批卡按 `task` 画委派卡(「派出子任务 / 交给助手 <名字> / 子任务里不再逐项询问」,
+ * PermissionDialog.tsx),这里换回 v1 的名字。身份轴请求的 action 是 canonical(seams I7a 冻结),不动。
  */
-export function toV1PermissionRequest(request: { source?: { type: string; messageID?: string; id?: string } } & Record<string, unknown>) {
+export function toV1PermissionRequest(
+  request: { action?: unknown; metadata?: { policy?: unknown }; source?: { type: string; messageID?: string; id?: string } } & Record<string, unknown>,
+) {
   const source = request.source?.type === "tool" ? { ...request.source, callID: request.source.id } : request.source
-  return normalizePermissionRequest({ ...request, source } as never)
+  const delegation = request.action === "subagent" && request.metadata?.policy === undefined
+  return normalizePermissionRequest({ ...request, ...(delegation ? { action: "task" } : {}), source } as never)
 }
 
 /**

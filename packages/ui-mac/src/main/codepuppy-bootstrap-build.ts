@@ -2,7 +2,9 @@
 // 输入全部来自现有权威(冻结环境快照、engine-paths.ts、ext 目录解析、资源根、boot 时出厂技能对账的结果、applyAuthEnv 写进 main
 // 环境的两个地址、当刻登录态的分区哈希、出网代理端口),由 spawnLocalServer 取好交进来;每个键沿用今天读方的判法,空串的含义按键保留
 // (§4.4 表、§10 R16)。运维开关的名字对用户不变,只是读的地方收到这里一处。
-// 输出先过生产解析器:形状不对在 main 这一侧就抛(拒 fork),不等 sidecar 发现。对用户导出的值从不抛:不合格的地址省略并记一行。
+// 输出先过生产解析器:形状不对在 main 这一侧就抛(拒 fork),不等 sidecar 发现。对用户导出的值从不抛(编排器 2026-11-13 裁决):不合格的
+// 导出值当没设 —— 那个字段回到缺省 —— 并记一行 `bootstrap: <变量名> ignored (<原因>)`,不写值。什么算合格由文档定,不按旧代码的读法。
+import os from "node:os"
 import path from "node:path"
 import { isCredentialFreeUrl, parseCodePuppyBootstrap, type CodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { materializeCloudMcpConfig } from "./cloud-sidecar-config"
@@ -30,8 +32,29 @@ export type CodePuppyBootstrapInput = {
   factorySkillDirs: readonly string[]
   /** main 自己的环境:运维开关与 applyAuthEnv 写的地址只在这里读 */
   env: Record<string, string | undefined>
-  /** 不合格的地址被省略时记一行(只写变量名,不写值) */
+  /** 不合格的导出值被忽略时记一行(只写变量名,不写值) */
   log: (line: string) => void
+}
+
+/** 喂给文档路径字段的用户导出变量:引擎全局配置目录、会话库的数据根、初始目录。 */
+const EXPORTED_PATH_VARIABLES = ["OPENCODE_CONFIG_DIR", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "CODEPUPPY_USER_WORKSPACE_DIR"] as const
+
+/**
+ * 文档的路径字段只收绝对路径。用户导出的这些变量若是相对路径(含 `.`)就当没设、回到缺省并记一行 —— GUI 应用里相对路径没有确定的基准,
+ * 不猜。HOME 同理:相对的 HOME 当没设,取系统账户的主目录(Node 在 HOME 未设时的同一来源)。spawnLocalServer 用返回的 env / home 推导
+ * 会话库、数据根、引擎全局配置目录与初始目录,再交给构建器。
+ */
+export function usableExportedPaths(input: { env: Record<string, string | undefined>; home: string; log: (line: string) => void }) {
+  const env = { ...input.env }
+  for (const name of EXPORTED_PATH_VARIABLES) {
+    const value = env[name]
+    if (!value || path.isAbsolute(value)) continue
+    delete env[name]
+    input.log(ignored(name, "not an absolute path"))
+  }
+  if (path.isAbsolute(input.home)) return { env, home: input.home }
+  input.log(ignored("HOME", "not an absolute path"))
+  return { env, home: os.userInfo().homedir }
 }
 
 export function buildCodePuppyBootstrap(input: CodePuppyBootstrapInput): CodePuppyBootstrap {
@@ -72,8 +95,8 @@ export function buildCodePuppyBootstrap(input: CodePuppyBootstrapInput): CodePup
     webSearch: { killSwitch: Boolean(env.CODEPUPPY_WEBSEARCH_DISABLE) },
     skills: { factoryDirs: [...input.factorySkillDirs] },
     policy: input.policyAccount ? { account: input.policyAccount } : {},
-    // ADR-038:正整数毫秒覆盖期限;不合法(含空串)⇒ 省略 ⇒ 缺省 300 s,从不是「没有期限」
-    permission: askTimeout(env.CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS),
+    // ADR-038:正整数毫秒覆盖期限;空串同未设;不合法 ⇒ 忽略并记一行 ⇒ 缺省 300 s,从不是「没有期限」
+    permission: askTimeout(env.CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS, input.log),
     network: input.egressProxyPort === undefined ? {} : { egressProxy: `http://127.0.0.1:${input.egressProxyPort}` },
     switches: {
       modelsDisabled: env.CODEPUPPY_MODELS_DISABLE === "1",
@@ -88,14 +111,21 @@ export function buildCodePuppyBootstrap(input: CodePuppyBootstrapInput): CodePup
   })
 }
 
-function askTimeout(raw: string | undefined): { askTimeoutMs?: number } {
-  const parsed = raw === undefined || raw === "" ? Number.NaN : Number(raw)
-  return Number.isSafeInteger(parsed) && parsed > 0 ? { askTimeoutMs: parsed } : {}
+function askTimeout(raw: string | undefined, log: (line: string) => void): { askTimeoutMs?: number } {
+  if (raw === undefined || raw === "") return {}
+  const parsed = Number(raw)
+  if (Number.isSafeInteger(parsed) && parsed > 0) return { askTimeoutMs: parsed }
+  log(ignored("CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS", "not a positive integer of milliseconds"))
+  return {}
+}
+
+function ignored(name: string, reason: string): string {
+  return `bootstrap: ${name} ignored (${reason})`
 }
 
 function credentialFree(name: string, value: string | undefined, log: (line: string) => void): string | undefined {
   if (!value) return undefined
   if (isCredentialFreeUrl(value)) return value
-  log(`bootstrap: ${name} rejected (userinfo, query, fragment or non-https)`)
+  log(ignored(name, "userinfo, query, fragment or non-https"))
   return undefined
 }

@@ -1,7 +1,8 @@
 // `#1698`(DESIGN-upgrade-bootstrap-config §4.4,G1 / G2 / G3):main 的启动文档构建器 —— 字段来自给定的权威输入,逃生阀与 G2 各键按今天
 // 读方的判法,随包清单与 ext 目录同在同缺,形状不对在 main 这一侧就抛;对用户导出的地址从不抛,不合格就省略并记一行。
 import { describe, expect, test } from "bun:test"
-import { buildCodePuppyBootstrap, type CodePuppyBootstrapInput } from "./codepuppy-bootstrap-build"
+import { userInfo } from "node:os"
+import { buildCodePuppyBootstrap, usableExportedPaths, type CodePuppyBootstrapInput } from "./codepuppy-bootstrap-build"
 import { secretFileRef } from "./codepuppy-secret-files"
 
 const input = (overrides: Partial<CodePuppyBootstrapInput> = {}): CodePuppyBootstrapInput => ({
@@ -122,15 +123,15 @@ describe("buildCodePuppyBootstrap(G2:平台 / 云 / web search / 策略分区 / 
     expect(buildCodePuppyBootstrap(input({ env: { CODEPUPPY_WEBSEARCH_DISABLE: "0" } })).webSearch.killSwitch).toBe(true)
   })
 
-  test("带凭据形状的地址(userinfo / query / fragment / 非 https)省略、记一行只写变量名,不抛", () => {
+  test("带凭据形状的地址(userinfo / query / fragment / 非 https)被忽略、记一行只写变量名,不抛", () => {
     for (const bad of ["https://user:pw@gw.example/v1", "https://gw.example/v1?token=abc", "https://gw.example/v1#frag", "http://gw.example/v1"]) {
       const lines: string[] = []
       const document = buildCodePuppyBootstrap(input({ env: { CODEPUPPY_BASE_URL: bad, CODEPUPPY_CLOUD_MCP_URL: bad }, log: (line) => lines.push(line) }))
       expect([bad, document.platform]).toEqual([bad, { credentialRef: secretFileRef("/u/data", "CODEPUPPY_API_KEY") }])
       expect(document).not.toHaveProperty("cloudMcp")
       expect(lines).toEqual([
-        "bootstrap: CODEPUPPY_BASE_URL rejected (userinfo, query, fragment or non-https)",
-        "bootstrap: CODEPUPPY_CLOUD_MCP_URL rejected (userinfo, query, fragment or non-https)",
+        "bootstrap: CODEPUPPY_BASE_URL ignored (userinfo, query, fragment or non-https)",
+        "bootstrap: CODEPUPPY_CLOUD_MCP_URL ignored (userinfo, query, fragment or non-https)",
       ])
     }
   })
@@ -184,14 +185,46 @@ describe("buildCodePuppyBootstrap(G3:开关与引擎设置,§4.4 表)", () => {
     expect(engineOf({ OPENCODE_EXPERIMENTAL_FILEWATCHER: "yes" }).filewatcher).toBe(false)
   })
 
-  test("审批期限:正的安全整数毫秒进文档;不合法(含空串)⇒ 省略,不抛", () => {
-    const permissionOf = (value: string | undefined) => buildCodePuppyBootstrap(input({ env: { CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS: value } })).permission
-    expect(permissionOf("1500")).toEqual({ askTimeoutMs: 1500 })
-    for (const bad of [undefined, "", "0", "-5", "abc", "1.5", "Infinity", "1e400", "9007199254740993"]) expect([bad, permissionOf(bad)]).toEqual([bad, {}])
+  test("审批期限:正的安全整数毫秒进文档;未设 / 空串 ⇒ 省略、不记;不合法 ⇒ 忽略并记一行(不带值),不抛", () => {
+    const run = (value: string | undefined) => {
+      const lines: string[] = []
+      const permission = buildCodePuppyBootstrap(input({ env: { CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS: value }, log: (line) => lines.push(line) })).permission
+      return { permission, lines }
+    }
+    expect(run("1500")).toEqual({ permission: { askTimeoutMs: 1500 }, lines: [] })
+    for (const unset of [undefined, ""]) expect([unset, run(unset)]).toEqual([unset, { permission: {}, lines: [] }])
+    for (const bad of ["0", "-5", "abc", "1.5", "Infinity", "1e400", "9007199254740993"])
+      expect([bad, run(bad)]).toEqual([bad, { permission: {}, lines: ["bootstrap: CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS ignored (not a positive integer of milliseconds)"] }])
   })
 
   test("出厂技能目录取 boot 时对账交出的那份,原样", () => {
     const dirs = ["/app/Resources/skills/skill-creator", "/app/Resources/factory-skills/agent-creator"]
     expect(buildCodePuppyBootstrap(input({ factorySkillDirs: dirs })).skills).toEqual({ factoryDirs: dirs })
+  })
+})
+
+// 编排器 2026-11-13 裁决:文档的路径字段只收绝对路径。用户导出的相对路径变量(含 `.`)与相对的 HOME 当没设、回到缺省,记一行(不带值)。
+// spawnLocalServer 端到端的表在 server.test.ts「#1698 不合格的导出值被忽略,启动照常」;相对的 HOME 只能在这里驱动(bun 的 os.homedir()
+// 在进程启动时取一次 HOME)。
+describe("usableExportedPaths:相对的路径变量当没设", () => {
+  test("相对的 OPENCODE_CONFIG_DIR / XDG_CONFIG_HOME / XDG_DATA_HOME / CODEPUPPY_USER_WORKSPACE_DIR 被拿掉、各记一行;绝对的与未设的原样", () => {
+    const lines: string[] = []
+    const result = usableExportedPaths({
+      env: { OPENCODE_CONFIG_DIR: ".", XDG_CONFIG_HOME: "rel/config", XDG_DATA_HOME: "/abs/data", CODEPUPPY_USER_WORKSPACE_DIR: "work", PATH: "/usr/bin" },
+      home: "/home/u",
+      log: (line) => lines.push(line),
+    })
+    expect(result).toEqual({ env: { XDG_DATA_HOME: "/abs/data", PATH: "/usr/bin" }, home: "/home/u" })
+    expect(lines).toEqual([
+      "bootstrap: OPENCODE_CONFIG_DIR ignored (not an absolute path)",
+      "bootstrap: XDG_CONFIG_HOME ignored (not an absolute path)",
+      "bootstrap: CODEPUPPY_USER_WORKSPACE_DIR ignored (not an absolute path)",
+    ])
+  })
+
+  test("相对的 HOME ⇒ 取系统账户的主目录(HOME 未设时 Node 的同一来源),记一行", () => {
+    const lines: string[] = []
+    expect(usableExportedPaths({ env: {}, home: "rel-home", log: (line) => lines.push(line) }).home).toBe(userInfo().homedir)
+    expect(lines).toEqual(["bootstrap: HOME ignored (not an absolute path)"])
   })
 })

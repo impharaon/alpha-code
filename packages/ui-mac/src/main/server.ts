@@ -19,7 +19,7 @@ import { CHANNEL } from "./constants"
 import { getAuthIdentityTag } from "./codepuppy-auth"
 import { installationMachineId } from "./artifact-service"
 import { tryGetCodePuppyEnvironment } from "./codepuppy-environment"
-import { buildCodePuppyBootstrap } from "./codepuppy-bootstrap-build"
+import { buildCodePuppyBootstrap, usableExportedPaths } from "./codepuppy-bootstrap-build"
 import { factorySkillDirsForFork } from "./factory-skills"
 import { resourcesRoot } from "./ext-fs-installer"
 import { syncSecretFiles } from "./codepuppy-secret-files"
@@ -493,8 +493,15 @@ export async function spawnLocalServer(
   // 数据目录里的独立 OpenCode `auth.json` 会在 OpenCode 2 第一次跑导入迁移时进凭证表 ⇒ 拒 fork(fail-closed,原因可读)。
   // 每种运行形态都查,对着引擎这次真要打开的库与数据目录:非打包态(`bun run dev`)的引擎同样读真实数据目录,
   // `OPENCODE_DB=<旧库副本>` 时同样会补跑导入迁移(审计 R1 第 1 条)。
-  const databasePath = engineDatabasePath({ packaged: electronNs.app.isPackaged, env: sidecarEnv, home: homedir(), channel: CHANNEL })
-  const dataDir = engineDataDirectory(sidecarEnv, homedir())
+  // `#1698`(编排器 2026-11-13 裁决):文档的路径字段只收绝对路径 —— 用户导出的相对路径变量(含 `.`)与相对的 HOME 当没设、回到缺省
+  // 并记一行(codepuppy-bootstrap-build.ts 的 usableExportedPaths),不在 fork 前中止启动。会话库、数据根、全局配置目录、初始目录都按它推导。
+  const exported = usableExportedPaths({
+    env: { ...sidecarEnv, CODEPUPPY_USER_WORKSPACE_DIR: process.env.CODEPUPPY_USER_WORKSPACE_DIR },
+    home: homedir(),
+    log: (line) => getLogger()?.warn(line),
+  })
+  const databasePath = engineDatabasePath({ packaged: electronNs.app.isPackaged, env: exported.env, home: exported.home, channel: CHANNEL })
+  const dataDir = engineDataDirectory(exported.env, exported.home)
   const refusal = await legacyCredentialImportRefusal({ dataDir, databasePath })
   if (refusal) {
     getLogger()?.error(refusal)
@@ -524,9 +531,9 @@ export async function spawnLocalServer(
     userDataPath: options.userDataPath,
     globalRoot: codepuppyGlobalRoot(),
     userConfig: codepuppyJsoncPath(),
-    initialDirectory: codepuppyUserWorkspaceDir(),
+    initialDirectory: codepuppyUserWorkspaceDir(exported.env, exported.home),
     databasePath,
-    engineConfigDirectory: engineGlobalConfigDirectory(sidecarEnv, homedir()),
+    engineConfigDirectory: engineGlobalConfigDirectory(exported.env, exported.home),
     extPluginPath: ext.path,
     // #1565:引擎在四个文档工具连上之前,用这份随包清单给出它们的声明定义(packages/core/src/mcp/codepuppy-first-party-mcp.ts)。
     // 与写策略(ext-mcp-policy)一样按资源根的 realpath 解析,配置里那四条命令才能逐 token 对上。

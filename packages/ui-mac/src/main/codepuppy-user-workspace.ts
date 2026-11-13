@@ -11,8 +11,8 @@ import * as path from "node:path"
 import { isSafeRunId, sanitizeArtifactName } from "./codepuppy-workdir"
 
 /** `~/code-puppy`(`CODEPUPPY_USER_WORKSPACE_DIR` 覆盖,测试用)。目录名 code-puppy(REQ-139 改名;原 ADR-025 拍板④ 的 Alpha)。 */
-export function codepuppyUserWorkspaceDir(): string {
-  return process.env.CODEPUPPY_USER_WORKSPACE_DIR || path.join(os.homedir(), "code-puppy")
+export function codepuppyUserWorkspaceDir(env: Record<string, string | undefined> = process.env, home: string = os.homedir()): string {
+  return env.CODEPUPPY_USER_WORKSPACE_DIR || path.join(home, "code-puppy")
 }
 
 export function isUserWorkspaceDir(dir: string | undefined | null): boolean {

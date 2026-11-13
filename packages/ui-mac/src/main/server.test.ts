@@ -45,8 +45,10 @@ mockElectron(() => ({
   dialog: {},
   ipcMain: { handle: () => {} },
 }))
+// main 的 warn 行(`#1698`:构建器忽略一个导出值时记的那一行在这里判)
+const warned: string[] = []
 mock.module("./logging", () => ({
-  getLogger: () => ({ log: () => {}, warn: () => {}, error: () => {} }),
+  getLogger: () => ({ log: () => {}, warn: (...args: unknown[]) => void warned.push(args.map(String).join(" ")), error: () => {} }),
   write: () => {},
   rotateServerLogs: () => {},
 }))
@@ -772,6 +774,46 @@ describe("#1698 fork 的环境与 start 消息", () => {
       }
     }
   })
+})
+
+// `#1698`(编排器 2026-11-13 裁决,承 Codex 审计 Major):用户导出的值不合格从不中止启动 —— 构建器校验的每一个导出值,不合格就当没设
+// (那个字段回到缺省)并记一行,行里只有变量名与「ignored」,不带值;fork 照常。相对路径没有确定的基准(GUI 应用),一律算不合格,
+// `OPENCODE_CONFIG_DIR=.` 就是审计复现的那个输入。表驱动:每行只放一个坏值。相对的 HOME 那一行在 codepuppy-bootstrap-build.test.ts
+// (bun 的 os.homedir() 在进程启动时取一次 HOME,这里改 process.env.HOME 驱动不到它;Electron 的 Node 每次调用都读)。
+describe("#1698 不合格的导出值被忽略,启动照常", () => {
+  const configDefault = () => join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "opencode")
+  const rows: Array<{ name: string; bad: string; unset?: string[]; holds: (doc: CodePuppyBootstrap) => boolean }> = [
+    { name: "OPENCODE_CONFIG_DIR", bad: ".", holds: (doc) => doc.paths.engineConfigDirectory === configDefault() },
+    { name: "OPENCODE_CONFIG_DIR", bad: "cfg/sub", holds: (doc) => doc.paths.engineConfigDirectory === configDefault() },
+    { name: "XDG_CONFIG_HOME", bad: "rel-config", unset: ["OPENCODE_CONFIG_DIR"], holds: (doc) => doc.paths.engineConfigDirectory === join(homedir(), ".config", "opencode") },
+    { name: "XDG_DATA_HOME", bad: "rel-data", unset: ["OPENCODE_DB"], holds: (doc) => doc.paths.database.startsWith(join(homedir(), ".local", "share", "opencode") + "/") },
+    { name: "CODEPUPPY_USER_WORKSPACE_DIR", bad: "work", holds: (doc) => doc.paths.initialDirectory === join(homedir(), "code-puppy") },
+    { name: "CODEPUPPY_BASE_URL", bad: "https://user:pw-secret@gw.example/v1", holds: (doc) => doc.platform.modelProxyBaseURL === undefined },
+    { name: "CODEPUPPY_CLOUD_MCP_URL", bad: "https://cloud.example/mcp?token=tok-secret", holds: (doc) => doc.cloudMcp === undefined },
+    { name: "CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS", bad: "soon", holds: (doc) => doc.permission.askTimeoutMs === undefined },
+  ]
+
+  for (const row of rows)
+    test(`${row.name}=${JSON.stringify(row.bad)} ⇒ fork 照常、字段回到缺省、恰好一行点名它被忽略(不带值)`, async () => {
+      const names = [row.name, ...(row.unset ?? [])]
+      const saved = Object.fromEntries(names.map((name) => [name, process.env[name]]))
+      try {
+        for (const name of row.unset ?? []) delete process.env[name]
+        process.env[row.name] = row.bad
+        warned.length = 0
+        const forks = forkCalls.length
+        const { bootstrap } = await forkSidecarWithBootstrap()
+        expect(forkCalls.length).toBe(forks + 1)
+        expect([row.name, row.holds(bootstrap)]).toEqual([row.name, true])
+        expect(warned.filter((line) => line.includes(`${row.name} ignored`))).toHaveLength(1)
+        expect(warned.filter((line) => line.includes(row.bad))).toEqual([])
+      } finally {
+        for (const [name, value] of Object.entries(saved)) {
+          if (value === undefined) delete process.env[name]
+          else process.env[name] = value
+        }
+      }
+    })
 })
 
 // `#1667`(#1662 L5;编排器裁决 alpha-code#1666 评论 6737930969 第 2 条 `l1r-telemetry-credential`,#1562):fork 时真交给

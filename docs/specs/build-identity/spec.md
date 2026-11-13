@@ -3,10 +3,10 @@ id: SPEC-build-identity
 title: 报问题时能复制准确的构建身份
 summary: 报问题时能复制准确的构建身份，验收边界来自原始需求。
 kind: spec
-status: draft
-version: 0
-approved_by: ""
-approved_at: ""
+status: approved
+version: 1
+approved_by: owner
+approved_at: 2026-11-12
 owners: [owner]
 last_reviewed: 2026-11-12
 ---
@@ -72,3 +72,4 @@ last_reviewed: 2026-11-12
 | 0 | 2026-11-10 | — | 根据原票登记；治理授权不代替产品基线批准。 |
 | 0 | 2026-11-12 | — | 已核对历史范围与实际证据；具体缺口见待决，由来源中的交付入口承接。 |
 | 0 | 2026-11-12 | — | owner 2026-11-12「a b 所有都通过」同意做（INT-desktop/I-12）；本版把复制字段与标记写成可验收条文，待 owner 批准规格。 |
+| 1 | 2026-11-12 | owner | 「四份规格草稿都批准，#293 加一轮审计；等你批;要先定「单独设为每次询问的工具在自动化里是拒绝还是放行 放行；」(会话 ac275c97)。自查:意图与规格整理会话(Claude Fable 5.2)。遗留:无。 |

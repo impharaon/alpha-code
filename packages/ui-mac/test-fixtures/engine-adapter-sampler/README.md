@@ -45,3 +45,19 @@ cd packages/ui-mac
   src/engine-adapter/permission-reply.test.ts src/engine-adapter/tool-shapes.test.ts src/engine-adapter/file-watcher.test.ts \
   src/engine-adapter/command-reply.test.ts
 ```
+
+## 前后差分(`replay.ts`,`#1697` I-04)
+
+改适配器的结构(搬文件、换投影实现、挪回执账本)时,用它证明翻译器的输出逐个没变(设计 docs/specs/upgrade-ui-contract/design.md §4.10 c、§9)。
+它把上面这些夹具回放进适配器:HTTP 一半经生产的 `createEngineFetch` 发冻结界面会发的 v1 请求(假 2.x 上游只用夹具里的数据答),
+事件一半逐帧喂投影器;全部输出按键排序写到标准输出。同样不进任何门。
+
+```sh
+# 改之前
+~/.bun-versions/1.4.4/bin/bun packages/ui-mac/test-fixtures/engine-adapter-sampler/replay.ts > /tmp/replay-before.json
+# 改完之后
+~/.bun-versions/1.4.4/bin/bun packages/ui-mac/test-fixtures/engine-adapter-sampler/replay.ts > /tmp/replay-after.json
+diff /tmp/replay-before.json /tmp/replay-after.json   # 必须为空;只许出现那一片计划里点名的例外
+```
+
+两次之间,`replay.ts` 只有开头「怎样建投影器」那几行可以不同(投影器搬了位置或换了参数时,与那次改动同一个提交)。

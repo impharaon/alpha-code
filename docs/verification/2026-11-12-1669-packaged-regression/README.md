@@ -1,5 +1,5 @@
 ---
-title: alpha-code#1669 打包版换代回归与撤回演练 —— 第四轮:侧栏把引擎临时目录列成项目(FAIL);我的看门狗证明误杀了已登录实例
+title: alpha-code#1669 打包版换代回归与撤回演练 —— 第五轮:撤回演练「库超前」阻断不出现(FAIL);2.x 失败回合不显示原因(FAIL);G10 PASS
 kind: verification
 status: active
 owners:
@@ -11,6 +11,53 @@ last_reviewed: 2026-11-12
 
 依据:方案基线 [§5.1、§5.2、§6.2、§2.8](../../design/2026-11-08-1662-opencode2-generation-switch-baseline.md),
 票面 `impharaon/alpha-code#1669`,派发书里的七个补充格 a–g 与八条硬规矩。第二轮在前,第一轮原文在后。
+
+## 第五轮(2026-11-12 22:06– EST,新会话)
+
+被测形态同第三、四轮(2.x = 编排器给的包、ad-hoc 重签;1.x = 下载的正式 0.1.26)。演练与 G10 在新的隔离根 `D`(闸 [r5-gate-D](results/r5-gate-D.txt) 五步全过)。
+看门狗诱饵证明**没有重跑**(实例 A 在运行,第四轮教训);`watchdog.sh` 自第二、四轮两次证明以来未改(sha256 `0abd0238…`),`D/.watchdog-ok` 写明沿用。
+原始证据汇总:[results/r5-drill-raw.txt](results/r5-drill-raw.txt)。
+
+### 第五轮结论
+
+1. **G10 PASS。** 2.x 首次在「干净关闭的 WAL 库(无 `-wal`/`-shm`,`-readonly` 直开 exit 14)」上启动:`db-safety: engine will migrate forward (21 pending) — pre-migration backup`、
+   `pre-migration backup ok → <D 的临时 userData>/codepuppy-db-backups/opencode-backup-20261112-222411.db`;备份 `integrity_check` = ok,`.dump` 与启动前的库逐字相同。
+   反向一臂用的是自然存在的旧读法:同一形态的库交给 0.1.26(它就是 `-readonly` 直开),日志 `db-safety: skip — 水位读取失败,fail-open:exit=14`,不做备份。
+2. **§6.2 第 3 步 FAIL:撤回到 1.x 时「库超前」阻断不会出现。** 2.x 正常退出后库同样是干净关闭的 WAL 形态;1.x(0.1.26)启动日志
+   `db-safety: skip — 水位读取失败,fail-open:exit=14 Error: in prepare, unable to open database file (14)`,没有阻断框,直接用 61 条迁移的库起引擎。
+   - 0.1.26 能代表 `revert -m 1` 的构建:`db-safety.ts`、`db-safety-boot.ts`、`recovery-adapter.ts` 在 `v0.1.26` 与合并提交 `a7d71dd5a9` 的第一父 `9ca7514ca7` 之间**逐字相同**(`git diff --stat` 为空);v1 引擎目录差 13 个文件。
+   - 方案 §6.1 第 4 条以「1.x 报库超前并阻断」为用户发现撤回需要恢复的入口;这个入口在撤回构建上不存在(R18 修的是 2.x 一侧的读法,撤回会把它一起撤掉)。
+   - 不恢复时 1.x 看到的:三条旧对话都在(v1 `message`/`part` 逐字未变),但被归到 2.x 新建的 `engine-scratch-cwd` 项目下,侧栏多出两个项目(两个 `code-puppy`、一个 `engine-scratch-cwd`);2.x 新建的对话看不到。截图 [r5-drill3-126-on-advanced-db-expanded](screens/r5-drill3-126-on-advanced-db-expanded.png)。
+3. **§6.1 第 4 条的手工恢复照做后,数据与第 1 步一致。** 见下面演练表;恢复后 1.x 日志 `db-safety: watermark equal — proceed`,侧栏一个 `code-puppy` 项目下三条旧对话,会话 3 内容与第 1 步截图相同。
+4. **新 FAIL:2.x 上失败的回合在界面上不显示原因。** 同一份数据、同一把假 DeepSeek Key(`sk-l7drill-…`,不是真 key):
+   - 0.1.26:发出后进入新会话,卡片「登录或 Key 无效 / 重新登录 / 去设置 / 开发者详情」。截图 [r5-cmp-126-fake-key-turn](screens/r5-cmp-126-fake-key-turn.png)。
+   - 2.x:首页发出后停在空白新对话页;从侧栏打开该会话,只有用户气泡,没有回复、没有任何错误。引擎记录 `assistant finish:error`、`error.type: provider.auth`、`status 401`、
+     「Authentication Fails, Your api key: ****-key is invalid」,`idle outcome: failed`。截图 [r5-drill2-2x-new-conversation-opened](screens/r5-drill2-2x-new-conversation-opened.png)。
+   - 另一例同形:旧对话里模型已不可用时继续发送,2.x 显示用户气泡,无回复无提示;引擎 `provider.no-route`「Model unavailable: stub/stub-model」。
+5. **登录框事件(给编排器与 owner 的说明)。** 本轮 D 根的窗口三次打开了 owner 浏览器里的 `codepuppy.cn/auth/authorize`:22:12:21(0.1.26)、22:26:26(2.x)、22:32:36(0.1.26)。
+   三次的回调都被系统交给了**正在运行的实例 A**,A 记 `state mismatch — possible CSRF, ignoring` 拒收 —— 所以从测试窗口登录永远不会成功,窗口一直停在未登录。
+   22:12 与 22:32 两次我没有点任何东西(只读 DOM / 关引导卡);22:26 那次我正在操作该窗口的模型选择器,排除不了是我点到。A 一直保持登录。
+   第四轮 B 根的 0.1.26 在 21:57:04 也走过同一流程并 `login complete`(第四轮 README 没记)。owner 22:3x 原话(经编排器转述):「你为什么一直让我登录啊…每次重启都停在那里,没有登录状态。」
+   处置:窗口一律隐藏 —— Electron 的调试口没有 `Browser.setWindowBounds`,改用 [tools/hide-app.m](tools/hide-app.m)(`NSRunningApplication.hide()`,不需要辅助功能 / Apple 事件授权,不会弹框),
+   `launch-a.sh` 在拿到进程号后立即隐藏并持续 90 秒,启动闸输出隐藏状态;A 已隐藏,`document.visibilityState: hidden`,仍是登录态。
+6. 付费调用本轮 0 次(播种用本机桩,失败回合用假 key);没有出现系统框;owner 应用始终没有运行。
+
+### §6.2 撤回演练(合成 0.1.26 数据,根 D)
+
+| 步 | 结果 | 观察 |
+| --- | --- | --- |
+| 0 独立 userData 生效 | PASS | 备份落在 `<D>/home/Library/Application Support/ai.opencode.desktop/codepuppy-db-backups/`;单实例锁在同一临时 userData(各次启动闸) |
+| 播种 | 完成 | 0.1.26 应用先建库(40 条迁移,含 alpha 的两条与两张权限表);再用**出货的 0.1.26 引擎** chunk 在 Node 24 下无头起服务(0.1.26 关了 RunAsNode fuse,包内二进制不能当 node 用,[tools/fuses.py](tools/fuses.py)),配本机桩模型,3 个会话 × 2 轮,会话 3 第 1 轮调一次 `bash`([tools/v126-engine-serve.mjs](tools/v126-engine-serve.mjs))。结果 3 / 13 / 27,`bash` 工具 completed,`event` 102 行 |
+| 1 1.x 看到的 | PASS(记录) | 0.1.26:`code-puppy` 项目下 3 条对话,最新「l7 drill synthetic session 3」(第 1 轮「运行 1 次」+ 桩回复,第 2 轮桩回复)。[截图](screens/r5-drill1-126-session3.png)。退出后库为干净 WAL、无 `-wal`/`-shm` |
+| 2 2.x:先备份 | PASS | 见结论 1(G10) |
+| 2 2.x:迁移与转换 | PASS | `migration` 40 → 61;`session_v2` 3;`session_message` 14(13 + 会话 3 的一条改名提示);v1 `session/message/part` 3/13/27 不变且逐字相同;`event` 102 → 0(§1.4 写明会删);alpha 两条迁移记录与两张权限表保留 |
+| 2 2.x:旧对话可见、可打开 | PASS | 侧栏 3 条;会话 3 打开内容与 1.x 相同,`bash` 卡显示「运行 1 次」。[截图](screens/r5-drill2-2x-session3.png) |
+| 2 2.x:能否继续旧对话 | NOT-RUN(部分) | 发送被接受、消息写进旧对话;但这个根没有可用模型(未登录,桩是本机地址,0.1.26/2.x 都拒绝本机端点),所以没有回复 —— 且界面不提示原因(结论 4)。真正的续写需要登录或 owner 的 Key |
+| 3 1.x「库超前」阻断 | **FAIL** | 见结论 2 |
+| 3 手工恢复(§6.1 第 4 条 ①–⑤) | PASS | ① 退出;② `opencode.db` → `opencode.db.corrupt-20261112-223210`;③ 没有 `-wal`/`-shm`;④ 最新备份拷成 `.restore-tmp` 再改名;⑤ 启 1.x |
+| 3 恢复后与第 1 步一致 | PASS | 40 / 3 / 13 / 27 / `event` 102,没有 `session_v2`;界面 3 条对话、会话 3 内容相同。[截图](screens/r5-drill3-126-restored-session3.png) |
+| 3 丢失的恰是 §6 所说 | PASS | 丢:2.x 上新建的对话(`ses_e2d0df6d…`)与 2.x 上追加到旧对话里的消息。另有两项 §6 没写、恢复后仍在:2.x 里加的自带 Key 供应商(存在 userData,恢复后 1.x 的输入框直接是 `deepseek-flash`);不恢复时 1.x 侧栏会多出 2.x 建的项目 |
+| 4 证据落盘 | 本文件 + results/r5-* + screens/r5-* | 第 3 步用 0.1.26 代替撤回构建(理由见结论 2),没有建临时分支、没有构建 |
 
 ## 第四轮(2026-11-12 21:55–22:05 EST)
 

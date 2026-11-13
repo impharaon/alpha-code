@@ -85,6 +85,11 @@ os.execve(exe, [exe] + args, env)
 PY
 PID=$!
 echo "$PID" > "$ROOT/logs/$LABEL.pid"
+# r5 (orchestrator, owner disturbed by foreground test windows): hide the app the moment it registers and keep
+# re-hiding for 90 s while windows are created (NSRunningApplication.hide(); CDP cannot minimise Electron windows).
+HIDER="$HERE/.build/hide-app"
+[ -x "$HIDER" ] || /usr/bin/clang -fobjc-arc -framework AppKit -o "$HIDER" "$HERE/hide-app.m" || refuse "could not build hide-app"
+nohup "$HIDER" "$PID" 90 > "$ROOT/logs/$LABEL.hide.log" 2>&1 &
 for _ in $(seq 1 50); do [ "$(/bin/ps -o pgid= -p "$PID" 2>/dev/null | tr -d ' ')" = "$PID" ] && break; sleep 0.02; done
 nohup bash "$HERE/watchdog.sh" --pgid "$PID" --log "$ROOT/logs/$LABEL.watchdog.log" --interval 0.15 >/dev/null 2>&1 &
 echo "launched label=$LABEL pid/pgid=$PID mock=$MOCK owner-app-pids-before=[${OWNER_BEFORE}]"
@@ -112,4 +117,5 @@ echo "single-instance lock: <root>/home/Library/Application Support/ai.opencode.
 [ "$(owner_stat)" = "$STAT_BEFORE" ] || kill_red "owner-side path metadata changed: $(diff <(echo "$STAT_BEFORE") <(owner_stat) | tr '\n' ' ')"
 /usr/bin/python3 -I "$HERE/prefs-guard.py" compare "$PLIST" "$ROOT/prefs/$LABEL.plist" || kill_red "preferences-domain guard"
 ps -o command= -p "$PID" | grep -q -- '--use-mock-keychain' || kill_red "running main process lacks --use-mock-keychain"
+"$HIDER" "$PID" 0 | sed 's/^/hidden check: /'
 echo "LAUNCH GATE: OK — owner app pids unchanged, owner-side paths unchanged, mock keychain on the running process"

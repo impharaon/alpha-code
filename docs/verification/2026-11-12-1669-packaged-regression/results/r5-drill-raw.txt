@@ -1,0 +1,70 @@
+# r5 §6.2 drill + G10 — raw evidence (root <D> = /private/tmp/l7r2/D; isolation gate r5-gate-D.txt)
+
+## seed: shipped 0.1.26 engine (out/main/chunks/node-D2cY32Bc.js, reports 1.17.13) served headless under Node 24 inside the guard sandbox, loopback stub model (docs/verification/2026-11-09-1662-l1/model-stub.mjs); 0.1.26 app had created the DB first (d126a)
+session 1: ses_e2d147980ffePqSka6cF7KutU3
+{"role":"assistant","finish":"stop","error":null,"text":["ac1662-stub-reply: hello from the loopback stub"],"tools":[]}
+{"role":"assistant","finish":"stop","error":null,"text":["ac1662-stub-reply: hello from the loopback stub"],"tools":[]}
+session 2: ses_e2d1475fdffezFTThPYu0fxIGV
+{"role":"assistant","finish":"stop","error":null,"text":["ac1662-stub-reply: hello from the loopback stub"],"tools":[]}
+{"role":"assistant","finish":"stop","error":null,"text":["ac1662-stub-reply: hello from the loopback stub"],"tools":[]}
+session 3: ses_e2d1475c8ffeHI38Jd49k1Mx1h
+{"role":"assistant","finish":"stop","error":null,"text":["ac1662-stub-reply: hello from the loopback stub"],"tools":[]}
+{"role":"assistant","finish":"stop","error":null,"text":["ac1662-stub-reply: hello from the loopback stub"],"tools":[]}
+stub requests:        9 (GET /models probe + 0.1.26 UI 测试连接 + seed turns; no upstream model contacted)
+
+## DB-safety lines per launch (main.log, chronological)
+20261113T031208 [2026-11-12 22:12:09.304] [info]                     db-safety: skip — fresh install(无 DB 文件)
+20261113T032107 [2026-11-12 22:21:07.981] [info]                     db-safety: skip — 水位读取失败,fail-open:exit=14 Error: in prepare, unable to open database file (14)
+20261113T032411 [2026-11-12 22:24:11.448] [info]                     db-safety: engine will migrate forward (21 pending) — pre-migration backup
+20261113T032411 [2026-11-12 22:24:11.458] [info]                     db-safety: pre-migration backup ok → /tmp/l7r2/D/home/Library/Application Support/ai.opencode.desktop/codepuppy-db-backups/opencode-backup-20261112-222411.db
+20261113T032938 [2026-11-12 22:29:39.116] [info]                     db-safety: skip — 水位读取失败,fail-open:exit=14 Error: in prepare, unable to open database file (14)
+20261113T033231 [2026-11-12 22:32:31.253] [info]                     db-safety: watermark equal — proceed
+
+## counts
+-- seed.db: migration=40 session=3 message=13 part=27 event=102 journal=1
+-- pre-2x.db: migration=40 session=3 message=13 part=27 event=102 journal=1
+-- post-2x.db: migration=61 session=3 message=13 part=27 event=0 journal=1
+-- post-2x session_v2=4 session_message=20
+   |ses_e2d0df6d6ffe53FBdtH3Gc301m|assistant|1
+   |ses_e2d0df6d6ffe53FBdtH3Gc301m|idle|1
+   |ses_e2d0df6d6ffe53FBdtH3Gc301m|model-switched|1
+   |ses_e2d0df6d6ffe53FBdtH3Gc301m|user|1
+   |ses_e2d1475c8ffeHI38Jd49k1Mx1h|assistant|3
+   |ses_e2d1475c8ffeHI38Jd49k1Mx1h|idle|1
+   |ses_e2d1475c8ffeHI38Jd49k1Mx1h|system|1
+   |ses_e2d1475c8ffeHI38Jd49k1Mx1h|user|3
+   |ses_e2d1475fdffezFTThPYu0fxIGV|assistant|2
+   |ses_e2d1475fdffezFTThPYu0fxIGV|user|2
+   |ses_e2d147980ffePqSka6cF7KutU3|assistant|2
+   |ses_e2d147980ffePqSka6cF7KutU3|user|2
+-- backup .dump == pre-2x .dump: yes
+Error: in prepare, unable to open database file (14)
+-- restored opencode.db: 
+-- files now: log opencode.db opencode.db.corrupt-20261112-223210 repos shell 
+
+## 2.x failed-turn rows (new conversation, fake BYOK key)
+user|{"time":{"created":1794540439873},"text":"drill: new conversation created on 2.x (D)"}
+model-switched|{"time":{"created":1794540439954},"model":{"id":"deepseek-flash","providerID":"deepseek-byok"}}
+assistant|{"time":{"created":1794540439899,"completed":1794540440070},"agent":"build","model":{"id":"deepseek-flash","providerID":"deepseek-byok"},"content":[],"finish":"error","error":{"type":"provider.auth","
+idle|{"time":{"created":1794540440072},"outcome":"failed","error":{"type":"provider.auth","message":"Authentication Fails, Your api key: ****-key is invalid (request_id: ee7bfea3-7e0c-43b1-b2ea-d59ef6eaafa
+
+## 2.x continuation in converted session 3 (stub model unavailable)
+idle|{"time":{"created":1794540332090},"outcome":"failed","error":{"type":"provider.no-route","message":"Model unavailable: stub/stub-model"}}
+user|{"time":{"created":1794540332088},"text":"drill: continue after switch (2.x, D)"}
+
+## authorize-url opens and where the callbacks went
+A/20261113T023335 [2026-11-12 21:33:46.141] [info]                     codepuppy-auth: opening authorize url { url: 'https://codepuppy.cn/auth/authorize' }
+A/20261113T023335 [2026-11-12 21:34:18.097] [info]                     deep link received via open-url { url: 'null/callback?<redacted>' }
+A/20261113T023335 [2026-11-12 21:34:18.126] [info]                     codepuppy-auth: login complete { mode: 'platform' }
+B/20261113T025637 [2026-11-12 21:57:00.240] [info]                     codepuppy-auth: opening authorize url { url: 'https://codepuppy.cn/auth/authorize' }
+B/20261113T025637 [2026-11-12 21:57:04.258] [info]                     deep link received via open-url { url: 'null/callback?<redacted>' }
+B/20261113T025637 [2026-11-12 21:57:04.319] [info]                     codepuppy-auth: login complete { mode: 'platform' }
+D/20261113T031208 [2026-11-12 22:12:21.542] [info]                     codepuppy-auth: opening authorize url { url: 'https://codepuppy.cn/auth/authorize' }
+A/20261113T030240 [2026-11-12 22:12:24.894] [info]                     deep link received via open-url { url: 'null/callback?<redacted>' }
+A/20261113T030240 [2026-11-12 22:12:24.895] [warn]                     codepuppy-auth: state mismatch — possible CSRF, ignoring undefined
+D/20261113T032411 [2026-11-12 22:26:26.318] [info]                     codepuppy-auth: opening authorize url { url: 'https://codepuppy.cn/auth/authorize' }
+A/20261113T030240 [2026-11-12 22:26:29.468] [info]                     deep link received via open-url { url: 'null/callback?<redacted>' }
+A/20261113T030240 [2026-11-12 22:26:29.469] [warn]                     codepuppy-auth: state mismatch — possible CSRF, ignoring undefined
+D/20261113T033231 [2026-11-12 22:32:36.870] [info]                     codepuppy-auth: opening authorize url { url: 'https://codepuppy.cn/auth/authorize' }
+A/20261113T030240 [2026-11-12 22:32:40.679] [info]                     deep link received via open-url { url: 'null/callback?<redacted>' }
+A/20261113T030240 [2026-11-12 22:32:40.680] [warn]                     codepuppy-auth: state mismatch — possible CSRF, ignoring undefined

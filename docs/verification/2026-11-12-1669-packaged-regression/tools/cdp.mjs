@@ -13,6 +13,40 @@ const port = process.env.CDP_PORT ?? "9222"
 const [cmd, ...args] = process.argv.slice(2)
 
 const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()
+if (cmd === "hide" || cmd === "winstate") {
+  // r5 (orchestrator, owner disturbed by foreground test windows): the Browser domain lives on the browser endpoint,
+  // not the page target. `hide` minimises every page window; `winstate` only reports.
+  const version = await (await fetch(`http://127.0.0.1:${port}/json/version`)).json()
+  const bws = new WebSocket(version.webSocketDebuggerUrl)
+  await new Promise((resolve, reject) => {
+    bws.onopen = resolve
+    bws.onerror = reject
+  })
+  let bid = 1
+  const bpending = new Map()
+  bws.onmessage = (event) => {
+    const msg = JSON.parse(event.data)
+    if (msg.id && bpending.has(msg.id)) {
+      bpending.get(msg.id)(msg)
+      bpending.delete(msg.id)
+    }
+  }
+  const bsend = (method, params = {}) =>
+    new Promise((resolve, reject) => {
+      const id = bid++
+      bpending.set(id, (msg) => (msg.error ? reject(new Error(`${method}: ${JSON.stringify(msg.error)}`)) : resolve(msg.result)))
+      bws.send(JSON.stringify({ id, method, params }))
+    })
+  const out = []
+  for (const t of targets.filter((x) => x.type === "page")) {
+    const { windowId } = await bsend("Browser.getWindowForTarget", { targetId: t.id })
+    if (cmd === "hide") await bsend("Browser.setWindowBounds", { windowId, bounds: { windowState: "minimized" } })
+    out.push({ url: t.url, windowId, ...(await bsend("Browser.getWindowBounds", { windowId })).bounds })
+  }
+  console.log(JSON.stringify(out))
+  bws.close()
+  process.exit(0)
+}
 if (cmd === "targets") {
   console.log(JSON.stringify(targets.map((t) => ({ type: t.type, title: t.title, url: t.url })), null, 1))
   process.exit(0)
@@ -72,6 +106,24 @@ try {
     await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", windowsVirtualKeyCode: 13, text: "\r" })
     await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", windowsVirtualKeyCode: 13 })
     console.log(`sent ${new Date().toISOString()}`)
+  } else if (cmd === "calm") {
+    // r5: run right after every launch. A fresh profile shows the onboarding card whose primary button starts the
+    // browser login; a keystroke that reaches the new window can press it (r4 B and r5 D both opened the owner's
+    // browser on codepuppy.cn/auth/authorize). Mark onboarding done, dismiss the card, drop focus, park the window.
+    const r = await evaluate(`(() => {
+      try { localStorage.setItem("codepuppy.onboarding.done", "1") } catch {}
+      const skip = document.querySelector("[data-codepuppy-onboarding] .a-ob-skip")
+      if (skip) skip.click()
+      document.activeElement?.blur?.()
+      return { skipped: !!skip, onboarding: !!document.querySelector("[data-codepuppy-onboarding]") }
+    })()`)
+    let bounds = "not available on this target"
+    try {
+      const { windowId } = await send("Browser.getWindowForTarget")
+      await send("Browser.setWindowBounds", { windowId, bounds: { left: 1500, top: 700, width: 1000, height: 700, windowState: "normal" } })
+      bounds = (await send("Browser.getWindowBounds", { windowId })).bounds
+    } catch {}
+    console.log(JSON.stringify({ ...r, bounds }))
   } else if (cmd === "bounds") {
     const { windowId } = await send("Browser.getWindowForTarget")
     const [left, top, width, height] = args.map(Number)

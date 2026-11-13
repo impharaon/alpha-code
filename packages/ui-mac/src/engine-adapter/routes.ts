@@ -115,11 +115,28 @@ async function questionOf(context: RouteContext, requestID: string) {
   return form ? { sessionID: form.sessionID, question: toV1Question(form) } : undefined
 }
 
+/**
+ * v1 的档位随每条消息走;2.x 落在会话上 —— 发送前切到这条消息要的档位。`#1669`:v1 里不带 agent = 默认助手(0.1.26
+ * prompt.ts createUserMessage 的 `agents.defaultInfo()`,命令 `cmd.agent ?? input.agent` 同),界面据此在「全部批准」+
+ * 默认助手时不带 agent;所以不带时把会话切回默认助手,否则沿用上一条的只读 / 请求审批 / 手选助手。默认助手取会话目录的
+ * 助手列表第一项(引擎 Agent.list 把默认排第一,与会话没选过助手时引擎选的是同一个);会话没选过或已经是它就不切。
+ */
+async function selectAgent(context: RouteContext, sessionID: string, agent: string | undefined) {
+  if (agent) {
+    await context.api.session.switchAgent({ sessionID, agent })
+    return
+  }
+  const session = await context.api.session.get({ sessionID })
+  if (!session.agent) return
+  const [fallback] = (await context.api.agent.list({ location: { directory: session.location.directory } })).data
+  if (fallback && fallback.id !== session.agent) await context.api.session.switchAgent({ sessionID, agent: fallback.id })
+}
+
 async function prompt(context: RouteContext) {
   const sessionID = context.params.sessionID!
   const body = context.body as V1PromptBody
   // v1 的档位与模型随每条消息走;2.x 落在会话上 —— 发送前切到这条消息要的档位与模型。
-  if (body.agent) await context.api.session.switchAgent({ sessionID, agent: body.agent })
+  await selectAgent(context, sessionID, body.agent)
   if (body.model)
     await context.api.session.switchModel({
       sessionID,
@@ -309,7 +326,7 @@ export const ROUTES: readonly Route[] = [
   route("POST", "/session/:sessionID/command", async (context) => {
     const sessionID = context.params.sessionID!
     const body = (context.body ?? {}) as { command: string; arguments?: string; agent?: string; model?: string; variant?: string }
-    if (body.agent) await context.api.session.switchAgent({ sessionID, agent: body.agent })
+    await selectAgent(context, sessionID, body.agent)
     const [providerID, ...rest] = body.model?.split("/") ?? []
     if (providerID && rest.length)
       await context.api.session.switchModel({
@@ -329,7 +346,7 @@ export const ROUTES: readonly Route[] = [
   route("POST", "/session/:sessionID/shell", async (context) => {
     const body = (context.body ?? {}) as { command: string; agent?: string }
     const sessionID = context.params.sessionID!
-    if (body.agent) await context.api.session.switchAgent({ sessionID, agent: body.agent })
+    await selectAgent(context, sessionID, body.agent)
     await context.api.session.shell({ sessionID, command: body.command })
     return json({})
   }),

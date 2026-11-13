@@ -16,7 +16,6 @@ import fs from "node:fs"
 import { createRequire } from "node:module"
 import path from "node:path"
 
-import { nodeTarget } from "../../cli/src/node/target"
 import { parseAsarHeader } from "../src/main/release-sbom"
 
 export const TARGET_ARCH_ENV = "CODEPUPPY_TARGET_ARCH"
@@ -194,19 +193,20 @@ export function checkOfficeRuntime(dir: string, arch: TargetArch): string[] {
 export const ENGINE_ASSETS_DIR = "out/main/chunks/assets"
 
 /**
- * 引擎前导代码交给各原生加载点的文件(键 = 资源目录下的相对路径,取自上游 nodeTarget,与前导代码同一来源):
- * node-pty 的 pty.node 与它直接执行的 spawn-helper、parcel watcher、FFI 的 .node、FFF 动态库、opencode-pty。
+ * 引擎前导代码交给各原生加载点的文件(键 = 资源目录下的相对路径):node-pty 的 pty.node 与它直接执行的 spawn-helper、
+ * parcel watcher、FFI 的 .node、FFF 动态库、opencode-pty。键由上游 `packages/cli/src/node/target.ts` 的 nodeTarget 定
+ * (scripts/build-engine.ts 按它铺 assets/);这里不在打包时 import 上游 —— 发布门要能从本包构建文件的裸拷贝跑
+ * (release-source.test.ts)。与上游的一致由 mac-target-arch.test.ts 的漂移用例判。
  */
 export function engineNativeAssets(arch: TargetArch): { key: string; executable: boolean }[] {
-  const target = nodeTarget("darwin", arch)
-  const prebuilds = `${target.nodePtyPackage}/prebuilds/darwin-${arch}`
+  const prebuilds = `${nodePtyPackage("darwin", arch)}/prebuilds/darwin-${arch}`
   return [
     { key: `${prebuilds}/pty.node`, executable: false },
     { key: `${prebuilds}/spawn-helper`, executable: true },
-    { key: target.parcelWatcherAsset, executable: false },
-    { key: target.fffFfiAsset, executable: false },
-    { key: target.fffAsset, executable: false },
-    { key: target.opencodePtyAsset, executable: true },
+    { key: `@parcel/watcher-darwin-${arch}/watcher.node`, executable: false },
+    { key: `@yuuang/ffi-rs-darwin-${arch}/ffi-rs.darwin-${arch}.node`, executable: false },
+    { key: `@ff-labs/fff-bin-darwin-${arch}/libfff_c.dylib`, executable: false },
+    { key: "opencode-pty/opencode-pty", executable: true },
   ]
 }
 

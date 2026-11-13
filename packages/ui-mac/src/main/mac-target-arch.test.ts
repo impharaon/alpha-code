@@ -32,6 +32,7 @@ import {
   type TargetArch,
 } from "../../scripts/target-arch"
 import { parse, serialize } from "../../scripts/latest-yml"
+import { nodeTarget } from "../../../cli/src/node/target"
 
 import { keyIdOfSpkiDerB64, verifyReleaseManifestBytes } from "./release-manifest"
 
@@ -441,6 +442,20 @@ async function packagedResources(opts: { arch: TargetArch; unpack: boolean; mode
 
 describe("#1669 checkPackagedEngineAssets(afterPack 的核对)", () => {
   const spawnHelper = (arch: TargetArch) => engineNativeAssets(arch).find((asset) => asset.key.endsWith("/spawn-helper"))!.key
+
+  test("漂移:加载点清单与上游 nodeTarget(build-engine.ts 按它铺 assets/)逐项相同", () => {
+    for (const arch of ["arm64", "x64"] as const) {
+      const target = nodeTarget("darwin", arch)
+      expect(engineNativeAssets(arch).map((asset) => asset.key)).toEqual([
+        `${target.nodePtyPackage}/prebuilds/darwin-${arch}/pty.node`,
+        `${target.nodePtyPackage}/prebuilds/darwin-${arch}/spawn-helper`,
+        target.parcelWatcherAsset,
+        target.fffFfiAsset,
+        target.fffAsset,
+        target.opencodePtyAsset,
+      ])
+    }
+  })
 
   test("资源目录整棵解包、加载点的目标都在解包目录里且带执行位 ⇒ 放行", async () => {
     const { resources } = await packagedResources({ arch: "arm64", unpack: true })

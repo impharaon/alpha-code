@@ -1050,6 +1050,7 @@ it.live("权威 · 项目 agent 的 disable 与后面的配置层(#1700 Codex R1
     yield* configAgents({ agent: { explore: { description: "说明" } } })
     // 激活还没结束(尾巴没放上去):explore 还在,但不比内置更宽;此时派发照常(按最终状态判停用)
     expect(yield* exploreState).toEqual({ mode: "subagent", edit: "deny" })
+    expect(Exit.isSuccess(yield* before("subagent", { agent: "explore", prompt: "look around" }))).toBe(true)
     yield* ext.finish(exploreState.pipe(Effect.map((state) => state === undefined)))
     expect(yield* exploreState).toBeUndefined()
     const dispatched = yield* before("subagent", { agent: "explore", prompt: "look around" })

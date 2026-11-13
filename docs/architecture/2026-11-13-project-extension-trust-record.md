@@ -26,7 +26,7 @@ review_after: 2027-02-13
 - 形状:`{ "v": 1, "projects": { "<规范项目目录>": { "ino": "<目录 inode,十进制字符串>", "version": <告知版本>, "granted": <布尔>, "decidedAt": "<ISO 时间>" } } }`。读得严:形状不对整份拒;记录文件或 `project-trust/` 目录是符号链接也拒;拒的时候一个项目都不信任,并记一行原因。
 - 唯一写入点:`ext-trust-check` 在原生确认框返回之后。renderer 只能让确认框弹出,写入要用户在主进程的模态框里点击。确认框开着期间如果项目目录被换掉,这次决定不落盘。
 - 引擎写不到:进程围栏的可写根 W2 是 `env/<env>`,W3 是 `<userData>`,都罩不到 `project-trust/`(macOS,`project-trust-truth-fence.test.ts` 用真 `sandbox-exec` 证明,包括在记录路径或它的目录放符号链接也不许)。引擎里 agent 的写文件工具和已信任项目的插件因此改不了这份记录。
-- ext 怎么找到它:main 启动 sidecar 时派生 `CODEPUPPY_GLOBAL_DIR`(`<casBaseRoot>/env/<env>`,外部预置被拒);sidecar 用 `codepuppy-environment.ts` 里现成的逆映射 `resolveCodePuppyStateBase` 算出 `casBaseRoot` 与环境名,原地读文件。与远程 MCP、自定义节点两份真源同一种读法。路径不经项目目录,也不经项目或引擎工具能设的变量。
+- ext 怎么找到它:main 启动 sidecar 时派生 `CODEPUPPY_GLOBAL_DIR`(`<casBaseRoot>/env/<env>`,canonical,外部预置被拒);sidecar 用 `codepuppy-environment.ts` 里现成的 `resolveCodePuppyStateBase` 从这个值**按字面**推出 `casBaseRoot` 与环境名,原地读文件,不对它做 realpath。原因(实测):`env/<env>` 本身是围栏可写根,围栏内的进程能把这个目录挪走、原地换成指向别处的符号链接;沿 realpath 推出的状态根就会落进伪造的那一份。按字面推出的记录路径不经过 `env/<env>`,路径上的每一级祖先(状态根、`project-trust/`)围栏内都挪不动。自定义节点、远程 MCP、出网授权三份真源走同一个解析,一并按字面推出。路径不经项目目录,也不经项目或引擎工具能设的变量。
 
 ## 按什么认项目
 

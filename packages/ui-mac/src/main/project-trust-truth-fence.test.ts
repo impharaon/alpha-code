@@ -131,4 +131,33 @@ describeSandbox("#1709 真围栏:project-trust/<env>.json 在生产 profile 下�
     expect(unlink.stderr).toContain("Operation not permitted")
     expect(readFileSync(record).equals(before)).toBe(true)
   })
+
+  test("审计 Major:围栏内把 W2 根目录本身挪到围栏外、原地换成指向它的链接,再在旁边写一份伪造记录 ⇒ 挪得动(实测),但 sidecar(无快照)按字面推出的记录位置不经过它,读不到伪造记录;状态根与记录目录本身挪不动", () => {
+    // 记录路径上真正的祖先:状态根与 project-trust/ —— 围栏内都挪不动
+    const parked = mkdtempSync(join("/private/tmp", "ac1709-parked-"))
+    denied(`mv "${recordDir}" "${parked}/project-trust"`, join(parked, "project-trust"))
+    denied(`mv "${stateRoot}" "${parked}/codepuppy-state"`, join(parked, "codepuppy-state"))
+    rmSync(parked, { recursive: true, force: true })
+    const victim = join(scratch, "victim")
+    mkdirSync(join(victim, ".codepuppy"), { recursive: true })
+    const me = projectTrustIdentity(victim)!
+    const elsewhere = mkdtempSync(join("/private/tmp", "ac1709-forged-"))
+    const forgedEnv = join(elsewhere, "env", "prod")
+    const forgedRecord = join(elsewhere, "project-trust", "prod.json")
+    const body = JSON.stringify({ v: 1, projects: { [me.directory]: { ino: me.ino, version: 1, granted: true, decidedAt: "x" } } })
+    try {
+      const swap = attempt(true, `mkdir -p "${join(elsewhere, "env")}" && mv "${envRoot}" "${forgedEnv}" && ln -s "${forgedEnv}" "${envRoot}"`)
+      const forge = attempt(true, `mkdir -p "${join(elsewhere, "project-trust")}" && printf '%s' '${body}' > "${forgedRecord}"`)
+      console.log(`[#1709 fence measurement] swap W2 root: status=${swap.status} stderr=${JSON.stringify(swap.stderr)}; root is now ${lstatSync(envRoot).isSymbolicLink() ? "a symlink" : "the real directory"}; forge: status=${forge.status}`)
+      expect(forge.status).toBe(0) // 围栏外的伪造记录确实写得出来(/private/tmp 在可写集里)
+      expect(readProjectTrustEntry(me, () => {})).toBeUndefined()
+    } finally {
+      if (lstatSync(envRoot).isSymbolicLink()) {
+        rmSync(envRoot)
+        attempt(false, `mv "${forgedEnv}" "${envRoot}"`)
+      }
+      rmSync(elsewhere, { recursive: true, force: true })
+    }
+    expect(lstatSync(envRoot).isDirectory()).toBe(true)
+  })
 })

@@ -103,7 +103,12 @@ export function resolveCodePuppyStateBase(subject: string): CodePuppyStateBase {
   if (info) return { ok: true, casBaseRoot: info.casBaseRoot, environment: info.environment }
   let root: string
   try {
-    root = resolveCodePuppyGlobalRoot()
+    // 既有校验照旧(绝对路径、与退休根无关);位置却按 main 派生的原值**按字面**推出,不经 realpath(`#1709` 审计):
+    // `env/<env>` 本身是围栏可写根 W2,围栏内的进程能把这个目录挪走、原地换成指向围栏外伪造状态根的链接
+    // (project-trust-truth-fence.test.ts 实测);沿 realpath 推出的状态根就落进伪造的那一份。main 派生的值本来就是 canonical,
+    // 按字面推出的 `<casBaseRoot>/<真源>/<env>.json` 不经过 `env/<env>`,每一级祖先都不在可写集里。
+    resolveCodePuppyGlobalRoot()
+    root = normalize(process.env.CODEPUPPY_GLOBAL_DIR!.trim())
   } catch (error) {
     return { ok: false, reason: `alpha environment root unavailable (${error instanceof Error ? error.message : String(error)})` }
   }

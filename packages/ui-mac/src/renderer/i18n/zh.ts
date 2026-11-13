@@ -1836,6 +1836,9 @@ export const dict = {
   "codepuppy.sidebar.helpFeedback": "帮助与反馈",
   "codepuppy.sidebar.checkUpdates": "检查更新",
   "codepuppy.sidebar.version": "版本",
+  // ac#237:非正式发布包在版本号后的小标记(开发渠道 / 本机打出来的包)。
+  "codepuppy.sidebar.buildMarker.dev": "开发版",
+  "codepuppy.sidebar.buildMarker.local": "本机构建",
   // [ac#1207] REQ-147 AC1:footer 更新条的六个可见状态(映射见 sidebar/updater-state-surface.ts)。
   "codepuppy.updater.checking": "正在检查更新…",
   "codepuppy.updater.downloading": "正在下载更新 {{version}}…",

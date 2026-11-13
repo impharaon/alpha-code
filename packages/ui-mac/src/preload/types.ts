@@ -2,6 +2,7 @@ import type { DesktopMenuAction } from "@opencode-ai/app/desktop-menu"
 import type { WslServersPlatform } from "@opencode-ai/app/wsl/types"
 import type { UpdaterState } from "@opencode-ai/app/updater"
 import type { CodePuppyEndpoints } from "../shared/codepuppy-config"
+import type { BuildIdentity } from "../shared/build-identity"
 // Type-only (erased at build): the IPC row must not restate the wire's kind enum and drift from it.
 import type { LedgerFactKindV1 } from "@codepuppy/contracts-consumer"
 import type {
@@ -782,6 +783,8 @@ export type ElectronAPI = {
   endpoints: () => Promise<CodePuppyEndpoints>
   /** ac#1187:当前应用版本(app.getVersion(),唯一真源 = package.json;账户浮层显示用,只读)。 */
   appVersion: () => Promise<string>
+  /** ac#237:运行中这个包的构建身份(账户浮层点版本行复制用;只含构建与系统事实,无个人信息)。 */
+  buildIdentity: () => Promise<BuildIdentity>
   /** REQ-160 AC2(`#1353`):这句话在本机是否命中已同步的违规关键词。
    *
    *  **尽力而为,不是安全边界**:它跑在用户自己的机器上,懂技术的人能绕过;留证的权威在服务端

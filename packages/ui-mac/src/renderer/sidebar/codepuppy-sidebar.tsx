@@ -20,6 +20,7 @@ import { sessionDisplayTitle } from "../codepuppy-ui/session-title"
 import { SHELL_KEYBINDS } from "./shell-keybinds"
 import { Mark } from "../logo-codepuppy"
 import { CODEPUPPY_PATHS } from "../../shared/codepuppy-config"
+import { buildMarker, formatBuildIdentity, type BuildIdentity } from "../../shared/build-identity"
 import { useCodePuppyEndpoints } from "../use-codepuppy-endpoints"
 import { subscribeAuthState } from "../auth-recovery"
 import { markStartupTimeline } from "../startup-timeline"
@@ -375,6 +376,25 @@ export function CodePuppySidebar(props: {
     .then(() => window.api.appVersion())
     .then((v) => setAppVersion(typeof v === "string" ? v : ""))
     .catch(() => {})
+
+  // ac#237:点版本行复制「我用的是哪个包」。身份由 main 的 build-identity IPC 给(运行中这个包的
+  // 构建事实),格式化与标记规则在 shared/build-identity。同样经 Promise 链取:桥上缺方法时失败单元是
+  // 「无标记、点击不动作」,不是拖死侧栏。
+  const [buildIdentity, setBuildIdentity] = createSignal<BuildIdentity | undefined>()
+  void Promise.resolve()
+    .then(() => window.api.buildIdentity())
+    .then((id) => setBuildIdentity(id && typeof id === "object" ? id : undefined))
+    .catch(() => {})
+  const [versionCopied, setVersionCopied] = createSignal(false)
+  let versionCopiedTimer: ReturnType<typeof setTimeout> | undefined
+  onCleanup(() => clearTimeout(versionCopiedTimer))
+  const copyBuildIdentity = async () => {
+    const id = buildIdentity()
+    if (!id || !(await copyText(formatBuildIdentity(id)))) return
+    setVersionCopied(true)
+    clearTimeout(versionCopiedTimer)
+    versionCopiedTimer = setTimeout(() => setVersionCopied(false), 2000)
+  }
 
   // [ac#1207] REQ-147:更新状态的消费端。通道早就通着(main updater-controller →
   // ipc "updater-state" → preload subscribe),此前 renderer 零消费 —— 点「检查更新」
@@ -1540,7 +1560,21 @@ export function CodePuppySidebar(props: {
                   </button>
                 </Show>
                 <Show when={appVersion()}>
-                  <div class="codepuppy-acct-version">{t("codepuppy.sidebar.version")} {appVersion()}</div>
+                  <button type="button" class="codepuppy-acct-version" onClick={() => void copyBuildIdentity()}>
+                    <Show
+                      when={!versionCopied()}
+                      fallback={t("codepuppy.common.copied")}
+                    >
+                      {t("codepuppy.sidebar.version")} {appVersion()}
+                      <Show when={buildIdentity() && buildMarker(buildIdentity()!)}>
+                        {(marker) => (
+                          <span class="codepuppy-acct-version-tag" data-marker={marker()}>
+                            {t(marker() === "dev" ? "codepuppy.sidebar.buildMarker.dev" : "codepuppy.sidebar.buildMarker.local")}
+                          </span>
+                        )}
+                      </Show>
+                    </Show>
+                  </button>
                 </Show>
               </div>
             </Show>

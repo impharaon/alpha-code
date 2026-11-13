@@ -1,5 +1,9 @@
 interface ImportMetaEnv {
   readonly OPENCODE_CHANNEL: string
+  // #237:构建期 define 写入;缺失(源码直跑 / 无 git)为空串或 undefined,由读取端写「未知」。
+  readonly CODEPUPPY_BUILD_COMMIT?: string
+  readonly CODEPUPPY_BUILD_DATE?: string
+  readonly CODEPUPPY_BUILD_ORIGIN?: string
 }
 
 interface ImportMeta {

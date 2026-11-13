@@ -181,6 +181,7 @@ const api: ElectronAPI = {
   relaunch: () => ipcRenderer.send("relaunch"),
   endpoints: () => ipcRenderer.invoke("codepuppy-endpoints"),
   appVersion: () => ipcRenderer.invoke("app-version"),
+  buildIdentity: () => ipcRenderer.invoke("build-identity"),
   // REQ-098:环境快照只读通道 —— 刻意不传任何参数(环境由 main 从构建事实解析,renderer 零输入)。
   environment: () => ipcRenderer.invoke("codepuppy-environment"),
   surfaces: {

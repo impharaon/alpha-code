@@ -223,12 +223,34 @@
 }
 
 /* ac#1187: current app version, pinned at the popover's bottom (read-only, muted) */
+/* ac#237: the row is now a button — click copies the build identity; reset the button chrome, keep the look */
 .codepuppy-acct-version {
+  display: block;
+  width: 100%;
   padding: 6px 16px 2px;
+  border: none;
+  background: transparent;
+  font: inherit;
   font-size: 11px;
   color: var(--a-text-tertiary);
   text-align: center;
+  cursor: pointer;
   user-select: text;
+}
+.codepuppy-acct-version:hover {
+  color: var(--a-text-secondary);
+}
+/* Non-release marker next to the version; same values as the extension hub's small chip */
+.codepuppy-acct-version-tag {
+  margin-left: 6px;
+  font-size: var(--a-text-2xs);
+  font-weight: var(--a-weight-semibold);
+  letter-spacing: 0.01em;
+  padding: 1.5px 7px;
+  border-radius: var(--a-radius-full);
+  color: var(--a-text-secondary);
+  background: var(--a-bg-muted);
+  white-space: nowrap;
 }
 .codepuppy-acct-item {
   display: flex;

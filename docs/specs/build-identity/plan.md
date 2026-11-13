@@ -19,7 +19,7 @@ last_reviewed: 2026-11-12
 ## 段一:版本行复制构建身份与来源标记
 
 - 依据:规格 `SPEC-build-identity` v1(owner 2026-11-12 批准,`docs/specs/build-identity/spec.md`),覆盖 BR-01…BR-03、AC-01…AC-04 与「体验约定」,原文以该文件为准;无 design.md;视觉沿用账户浮层现有版本行(alpha-code#1187)与现有小标签样式,不另出稿;Issue [alpha-code#237](https://github.com/impharaon/alpha-code/issues/237);基线 `origin/alpha` @ `c01ea14919`。
-- 核对:(待编排器核对;实施首个提交回填)
+- 核对:`16857ee4f3` · 派发简报 Phase 为「PLAN then IMPLEMENT in the same run」,无单独的编排器核对回合;计划不含规格外决定,同一轮继续实施。
 
 ### 已查实的事实(实施依据)
 
@@ -71,4 +71,4 @@ last_reviewed: 2026-11-12
 | 构建事实 | `scripts/build-identity.ts` 的测试:`isReleaseBuild` 四格(dev/非 dev × 签名有/无)、`buildIdentityDefine` 在无 git 目录的临时目录下提交为空串、在真仓库里为 7 位十六进制 | 来源判断写错或无 git 时抛错即红 |
 
 ### 偏离记录
-暂无。
+2026-11-12 · 实施中增补三处,均为必要的同步,不改行为:(1)`src/main/release-source.test.ts` 的临时工作目录拷贝清单加 `scripts/build-identity.ts`(`electron-builder.config.ts` 现在 import 它,否则该测试 7 格全红);(2)注释里的议题引用写成 `ac#237` 而非 `alpha-code#237`(旧名扫描门把后者当旧名命中);(3)`src/preload/component-stub-parity.typecheck.ts` 不改,`test-component/preload-stub.ts` 的 `AbsentOnPurposeKey` 加 `buildIdentity`(③类:挂 composer 的用例到不了账户浮层)。· 本提交。

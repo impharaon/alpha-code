@@ -1,4 +1,5 @@
 // REQ-063 — 外部生态继承 default-deny + consent 导入(检测/转换/记账纯逻辑,temp 目录)。
+import { codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
@@ -55,7 +56,7 @@ describe("外部生态 default-deny —— T1(注入的移除指令 + 逃生)", 
   const plugins = () => {
     const userData = path.join(tmp, "userdata")
     publishMainBootstrap({ userData, engineConfigDirectory: path.join(tmp, "engine-config") })
-    return (JSON.parse(injectCodePuppyConfig(userData, undefined, "stable").config.content) as { plugins: string[] }).plugins
+    return (JSON.parse(injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null).config.content) as { plugins: string[] }).plugins
   }
   test("默认:注入配置的 plugins 里有 -opencode.config.compatibility(.claude / .agents 两类技能根的唯一装载者被移除)", () => {
     expect(plugins()).toContain(`-${ECOSYSTEM_COMPATIBILITY_PLUGIN}`)

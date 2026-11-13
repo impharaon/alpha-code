@@ -5,7 +5,7 @@
 // published bootstrap document (`permission.askTimeoutMs`); the variable is read only by a host without a document.
 import { beforeAll, describe, expect, test } from "bun:test"
 import { Bus, E, isolate, it, Location, Permission, Plugin, promisePlugin, publishAskTimeout, seedProject, Session } from "./policy-host.cases"
-import { __resetCodePuppyBootstrapForTests, publishCodePuppyBootstrap, tryCodePuppyBootstrap } from "../../../util/src/codepuppy-bootstrap"
+import { __resetCodePuppyBootstrapForTests, ASK_TIMEOUT_MS_DEFAULT, codepuppyEngineSettings, publishCodePuppyBootstrap, tryCodePuppyBootstrap } from "../../../util/src/codepuppy-bootstrap"
 
 beforeAll(isolate)
 const { Effect, Exit, Cause, Fiber } = E
@@ -90,7 +90,8 @@ describe("ADR-038 approval deadline on OpenCode 2", () => {
   )
 
   test("the default is 300 s and every invalid override falls back to it, never to no deadline", () => {
-    const { askTimeoutMs, ASK_TIMEOUT_MS_DEFAULT } = Permission
+    // the reader the kernel calls on every request (packages/core/src/permission.ts, codepuppy(ADR-038) block)
+    const askTimeoutMs = (env: Record<string, string | undefined>) => codepuppyEngineSettings(env).askTimeoutMs
     expect(ASK_TIMEOUT_MS_DEFAULT).toBe(300_000)
     // Code Puppy's sidecar: the document decides; an exported variable is ignored there (main already judged it into the document).
     publishAskTimeout(undefined)

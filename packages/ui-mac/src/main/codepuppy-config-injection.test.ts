@@ -25,6 +25,7 @@
 // 运行时闸门守(sidecar-ready-message.test.ts —— 纯文本锚被 `injection.error && undefined`
 // 变异实证绕过);留在本文件的源码锚只锁 bun 无法运行时验证的接线事实(唯一通路 + 捕获值整体入参)。
 
+import { codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { Schema } from "effect"
 import * as fs from "node:fs"
@@ -180,7 +181,7 @@ type Injected = {
 
 function inject(extPluginPath?: string) {
   publishDoc()
-  const result = injectCodePuppyConfig(userData, extPluginPath, "stable")
+  const result = injectCodePuppyConfig(userData, extPluginPath, "stable", codepuppyBootstrap().paths.userConfig ?? null)
   // `#1667`(编排器裁决 r1 第 2 条、C7 重裁):`config.file` 是 main 合成的显式文件;出厂命令、skills 与第一层 policies 在那里。
   const explicit = result.config.file && fs.existsSync(result.config.file) ? (JSON.parse(fs.readFileSync(result.config.file, "utf8")) as Injected & { $schema?: string; command?: unknown }) : undefined
   return { result, config: JSON.parse(result.config.content) as Injected, explicit }
@@ -250,6 +251,11 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     expect(raw).not.toContain(PLATFORM_KEY)
     expect(raw).not.toContain(BYOK_KEY)
     expect(raw).not.toContain("apiKey")
+  })
+
+  test("`#1698` 注入没有无文档模式:没发布启动文档 ⇒ 直接抛(sidecar 的 start() 报错退出),不按「未登录、开关全关」猜", () => {
+    unpublishTestBootstrap()
+    expect(() => injectCodePuppyConfig(userData, EXT_DIR, "stable", null)).toThrow(expect.objectContaining({ reason: "unpublished" }))
   })
 
   test("C4:不再经环境变量交给引擎,也不再写 v2 读侧的桥目录", () => {
@@ -490,7 +496,7 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     let result: ReturnType<typeof injectCodePuppyConfig>
     publishDoc()
     try {
-      result = injectCodePuppyConfig(brokenUserData, EXT_DIR, "stable")
+      result = injectCodePuppyConfig(brokenUserData, EXT_DIR, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     } finally {
       console.warn = originalWarn
     }
@@ -515,7 +521,7 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     let result: ReturnType<typeof injectCodePuppyConfig>
     publishDoc()
     try {
-      result = injectCodePuppyConfig(userData, EXT_DIR, "stable")
+      result = injectCodePuppyConfig(userData, EXT_DIR, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     } finally {
       console.warn = originalWarn
     }

@@ -13,7 +13,7 @@ import { realpathSync } from "node:fs"
 import path from "node:path"
 import { Agent } from "../../schema/src/agent"
 import { Path } from "../../util/src/global"
-import { injectFactorySkillPaths } from "./factory-paths"
+import { factorySkillPaths } from "./factory-paths"
 import { skillGenerationLiveDirs } from "./gen-skill-paths"
 
 /** 只这两档追加;只读档与自动化档自己就是 deny,别的 agent 维持引擎原样。 */
@@ -34,7 +34,7 @@ export function externalDirectoryRules(globalRoot: string | undefined, factorySk
   const allowed = [
     path.join(Path.data, "tool-output"),
     path.join(real(Path.tmp)),
-    ...injectFactorySkillPaths({}, factorySkillDirs),
+    ...factorySkillPaths(factorySkillDirs),
     ...(globalRoot ? skillGenerationLiveDirs(real(globalRoot)) : []),
   ].filter((dir) => path.isAbsolute(dir))
   return [

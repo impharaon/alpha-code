@@ -21,13 +21,10 @@ describe("applyFactoryDeny — 常量名单 → cfg 内存注入", () => {
     expect((cfg.permission as any).skill["customize-opencode"]).toBe("deny")
     expect((cfg.command as any)["customize-opencode"].template).toBe("该技能(customize-opencode)已弃用。定制 Code Puppy 请改用 /customize-codepuppy。")
   })
-  test("既有 permission 兄弟键保留;显式给空名单 ⇒ no-op", () => {
+  test("既有 permission 兄弟键保留", () => {
     const cfg: Record<string, unknown> = { permission: { bash: "ask" } }
     applyFactoryDeny(cfg)
     expect((cfg.permission as any).bash).toBe("ask")
-    const c2: Record<string, unknown> = {}
-    expect(applyFactoryDeny(c2, [])).toEqual([])
-    expect(c2.permission).toBeUndefined()
   })
   test("`#1698` R7:禁用名单不依赖任何环境 —— 环境里没有、写坏、写空,名单都恒含 customize-opencode(main 用同一个常量,由 ui-mac codepuppy-builtin-policy.test.ts 判)", () => {
     const saved = process.env.CODEPUPPY_FACTORY_DENY_SKILLS

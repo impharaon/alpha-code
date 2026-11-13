@@ -6,7 +6,7 @@ import fs from "node:fs"
 import path from "node:path"
 import { engineSlot, type EngineSandbox } from "./engine-sandbox"
 import { createHash } from "node:crypto"
-import { tryCodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
+import { tryCodePuppyBootstrap, codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { publishTestBootstrap, type TestBootstrapInput } from "./codepuppy-bootstrap-fixture"
 import { engineGlobalConfigDirectory } from "../src/main/engine-paths"
 import { buildEngineServerOptions } from "../src/main/engine-server-options"
@@ -184,7 +184,7 @@ export function codepuppyEngine(options: HostOptions) {
   )
 
   const withExt = options.ext !== false
-  const injection = injectCodePuppyConfig(userData, withExt ? ext : undefined, "stable")
+  const injection = injectCodePuppyConfig(userData, withExt ? ext : undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
   const content = JSON.parse(injection.config.content) as { plugins: string[]; providers: Record<string, { models?: Record<string, unknown> }> }
   content.plugins = [...content.plugins, probeDir]
   // 沙箱里没有已应用的平台目录,平台节点的模型表是空的(`#1556`);补一个模型只为能发出请求

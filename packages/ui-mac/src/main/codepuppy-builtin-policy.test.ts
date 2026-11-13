@@ -6,12 +6,10 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { ConfigNormalize } from "@opencode/core/config/normalize"
 import { Permission } from "@opencode/core/permission"
-import { applyFactoryDeny, FACTORY_DENIED_SKILLS as EXT_FACTORY_DENIED_SKILLS, factoryDeniedSkills } from "../../../ext/src/factory-deny"
+import { applyFactoryDeny, factoryDeniedSkills } from "../../../ext/src/factory-deny"
 import {
   DEFAULT_BUILTIN_POLICY,
-  FACTORY_DENIED_SKILLS,
   applyBuiltinPolicy,
-  effectiveFactoryDenied,
   materializeEdits,
   normalizeBuiltinPolicy,
   resetBuiltinPolicy,
@@ -211,8 +209,8 @@ describe("REQ-067 — 出厂默认禁内置化(deny 零明文)", () => {
   test("#1522 AC2:旧 allowFactory 不能恢复技能或同名斜杠命令,保存后清洗", () => {
     // 旧治理形状来自本文件 REQ-067 解禁用例;权限/command 是现有出厂禁注入的同名键。
     const legacy = gov({ skills: { deny: [], allowFactory: ["customize-opencode"] } })
-    expect(effectiveFactoryDenied(DEFAULT_BUILTIN_POLICY)).toEqual(["customize-opencode"])
-    expect(effectiveFactoryDenied(legacy)).toEqual(["customize-opencode"])
+    // `#1698` R7:菜单过滤与 ext 的钩子读同一个常量(factoryDeniedSkills),治理记录(含旧的解禁)不进来
+    expect(factoryDeniedSkills()).toEqual(["customize-opencode"])
     const cleaned = normalizeBuiltinPolicy(legacy)
     expect(applyBuiltinPolicy(cleaned, []).ok).toBe(true)
     expect(JSON.parse(readFileSync(join(tmp, "codepuppy-global", "governance.json"), "utf8")).skills.allowFactory).toEqual([])
@@ -220,14 +218,11 @@ describe("REQ-067 — 出厂默认禁内置化(deny 零明文)", () => {
       permission: { skill: { "customize-opencode": "allow", "*": "allow" } },
       command: { "customize-opencode": { template: "user's own" } },
     }
-    const denied = effectiveFactoryDenied(cleaned)
     // 2.x 没有整份配置的钩子:用户写的 allow 留在规则里,禁用由 ext 的 permission evaluate 钩子按这份名单一律改判 deny
     // (`packages/ext/src/plugin.ts`,判据 ext/src/plugin-host.test.ts「权威 · 出厂禁用技能」)。这里钉住钩子吃到的名单:
     // customize-opencode 在、customize-codepuppy 不在;`#1698` R7:钩子的名单与 main 的菜单过滤是同一个常量,不经环境。
     expect(factoryDeniedSkills()).toEqual(["customize-opencode"])
-    expect(denied).toEqual(factoryDeniedSkills())
-    expect(FACTORY_DENIED_SKILLS).toBe(EXT_FACTORY_DENIED_SKILLS)
-    applyFactoryDeny(cfg, denied)
+    applyFactoryDeny(cfg)
     expect(cfg.command["customize-opencode"].template).toBe("该技能(customize-opencode)已弃用。定制 Code Puppy 请改用 /customize-codepuppy。")
   })
   test("materializeEdits:出厂项零物化 —— 空治理不产生任何 permission/command 叶子", () => {

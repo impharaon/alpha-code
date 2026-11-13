@@ -36,7 +36,7 @@ import {
   stripFactoryBuiltinPolicyLeaves,
 } from "./engine-config-truth"
 import { FACTORY_SKILL_IDS } from "./factory-skills"
-import { FACTORY_DENIED_SKILLS } from "./codepuppy-builtin-policy"
+import { FACTORY_DENIED_SKILLS } from "../../../ext/src/factory-deny"
 
 type Logger = { log: (m: string, meta?: unknown) => void; warn: (m: string, meta?: unknown) => void }
 

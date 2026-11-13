@@ -20,6 +20,7 @@ import { getAuthIdentityTag } from "./codepuppy-auth"
 import { installationMachineId } from "./artifact-service"
 import { tryGetCodePuppyEnvironment } from "./codepuppy-environment"
 import { buildCodePuppyBootstrap, usableExportedPaths } from "./codepuppy-bootstrap-build"
+import { exportedFlag } from "@opencode/util/codepuppy-bootstrap"
 import { factorySkillDirsForFork } from "./factory-skills"
 import { resourcesRoot } from "./ext-fs-installer"
 import { syncSecretFiles } from "./codepuppy-secret-files"
@@ -238,7 +239,7 @@ function refreshConfiguredEgressDestinations(userDataPath: string): void {
         buildCodePuppyModelConfig(userDataPath, {
           baseURL: process.env.CODEPUPPY_BASE_URL,
           defaultModel: process.env.CODEPUPPY_DEFAULT_MODEL,
-          disabled: process.env.CODEPUPPY_MODELS_DISABLE === "1",
+          disabled: exportedFlag(process.env.CODEPUPPY_MODELS_DISABLE) === true,
         })?.provider,
       ),
       ...deriveMcpEgressDestinations(mcpServers),
@@ -368,17 +369,12 @@ export function preferAppEnv(userDataPath: string) {
   // 2. Fill missing API keys (EXA_API_KEY, *_API_KEY, ...) from the codepuppy.env secrets file, so app
   //    users never have to touch ~/.zshrc. Never overrides anything already set in step 1.
   loadCodePuppySecrets(userDataPath, logger)
-  // 3. Desktop defaults(set-if-unset:用户 shell 的显式 export 优先)。`#1667`:H1 下引擎核心不读这两个名字,读它们的是
-  // engineDesktopToggles(engine-server-options.ts;`#1698` 起由启动文档构建器在 main 调,结果进文档的 `engine`)—— 它们从此是 Code Puppy 自己的开关:
-  //   · OPENCODE_EXPERIMENTAL_FILEWATCHER 默认开 → `fs.filewatcher`(B12 拍板,2026-07-05:「外部变更感知」);
-  //   · OPENCODE_DISABLE_MODELS_FETCH 默认 "1" → `models.fetch: false`(models.dev 在国内网络超时;随包快照够用,T1.7 / C4)。
-  // v1 时代这里另写的 OPENCODE_CLIENT=desktop(→ `app.name`)、OPENCODE_EXPERIMENTAL_ICON_DISCOVERY、OPENCODE_ENABLE_EXA 默认值、
-  // 外部生态的两个 flag(→ 注入的移除指令)在 2.x 无读者,已删除(清点表 E2)。
-  process.env.OPENCODE_EXPERIMENTAL_FILEWATCHER ??= "true"
-  Object.assign(process.env, {
-    XDG_STATE_HOME: process.env.XDG_STATE_HOME ?? userDataPath,
-    OPENCODE_DISABLE_MODELS_FETCH: process.env.OPENCODE_DISABLE_MODELS_FETCH ?? "1",
-  })
+  // 3. Desktop defaults(set-if-unset:用户 shell 的显式 export 优先)。两个桌面开关(文件监听默认开,B12 拍板 2026-07-05「外部变更感知」;
+  // models.dev 拉取默认关,国内网络超时、随包快照够用,T1.7 / C4)的缺省 `#1698` 起只在 engineDesktopToggles(engine-server-options.ts,
+  // 启动文档构建器在 main 调,结果进文档的 `engine`)里:没设 = 缺省。这里不再把缺省值写进环境 —— 引擎内核不读这两个名字(H1),
+  // sidecar 读文档。v1 时代这里另写的 OPENCODE_CLIENT=desktop(→ `app.name`)、OPENCODE_EXPERIMENTAL_ICON_DISCOVERY、OPENCODE_ENABLE_EXA
+  // 默认值、外部生态的两个 flag(→ 注入的移除指令)在 2.x 无读者,已删除(清点表 E2)。
+  process.env.XDG_STATE_HOME = process.env.XDG_STATE_HOME ?? userDataPath
 }
 
 // REQ-236 §2.1-1(`#1562`):最近一次 fork 时写进 {file:} 通道的凭据名。续期热应用据它判「凭据在场性
@@ -500,6 +496,11 @@ export async function spawnLocalServer(
     home: homedir(),
     log: (line) => getLogger()?.warn(line),
   })
+  // 被忽略的变量在 sidecar 的环境里也当没设:引擎(上游在模块装载时按 XDG_* / HOME 算自己的根)与启动文档看到的是同一个「没设」。
+  // HOME 不留空(子进程 —— git、shell —— 要它),写成与文档同一个回退值(系统账户的主目录,Node 在 HOME 未设时的同一来源)。
+  for (const name of ["OPENCODE_CONFIG_DIR", "XDG_CONFIG_HOME", "XDG_DATA_HOME"])
+    if (sidecarEnv[name] !== undefined && exported.env[name] === undefined) delete sidecarEnv[name]
+  if (sidecarEnv.HOME !== undefined && sidecarEnv.HOME !== exported.home) sidecarEnv.HOME = exported.home
   const databasePath = engineDatabasePath({ packaged: electronNs.app.isPackaged, env: exported.env, home: exported.home, channel: CHANNEL })
   const dataDir = engineDataDirectory(exported.env, exported.home)
   const refusal = await legacyCredentialImportRefusal({ dataDir, databasePath })

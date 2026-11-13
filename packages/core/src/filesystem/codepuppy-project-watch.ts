@@ -4,23 +4,14 @@
  * watches only the VCS branch file. The re-taken packages/core/src/filesystem/location-watcher.ts adds one recursive
  * directory watch on the Location's folder when this switch is on, using what is defined here.
  *
- * The switch is the one 0.1.26 used and main still writes: ui-mac `src/main/server.ts` sets
- * `OPENCODE_EXPERIMENTAL_FILEWATCHER` to "true" unless the user exported another value (owner decision B12, recorded
- * there). `#1698`: in Code Puppy's sidecar the desktop main process judges it once and writes the bootstrap document's
- * `engine.filewatcher` (the same value that turns the engine's own watcher on); only a host without a document (the
- * in-repo CLI) reads the variable, through the one compatibility reader `codepuppyEngineSettings`. The ignore list is 0.1.26's (`packages/core/src/filesystem/ignore.ts` before the switch to OpenCode 2), plus
- * the configured `watcher.ignore` entries, plus the home folder's protected directories when the Location is home.
+ * The switch (`#1698`): the bootstrap document's `engine.filewatcher`, which the desktop main process judges once from
+ * OPENCODE_EXPERIMENTAL_FILEWATCHER (on unless the user exported an off value; owner decision B12) — the same value that turns the
+ * engine's own watcher on. Only a host without a document (the in-repo CLI) reads the variable, through the one compatibility
+ * reader `codepuppyEngineSettings` (packages/util/src/codepuppy-bootstrap.ts). The ignore list is 0.1.26's
+ * (`packages/core/src/filesystem/ignore.ts` before the switch to OpenCode 2), plus the configured `watcher.ignore` entries, plus
+ * the home folder's protected directories when the Location is home.
  */
-import { codepuppyEngineSettings, PROJECT_WATCH_ENV } from "@opencode/util/codepuppy-bootstrap"
 import { Protected } from "./protected.js"
-
-export { PROJECT_WATCH_ENV }
-
-/** Whether the project watch is on: the bootstrap document's `engine.filewatcher`; without one, the variable read with the boolean
- *  spellings Effect's Config.boolean accepts. */
-export function projectWatchEnabled(env: Record<string, string | undefined>): boolean {
-  return codepuppyEngineSettings(env).projectWatch
-}
 
 const FOLDERS = [
   "node_modules",

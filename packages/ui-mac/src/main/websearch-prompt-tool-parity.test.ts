@@ -46,6 +46,7 @@
 // 等于把同一个缺陷翻到另一面;而且它会让 `+websearch+cloudDispatch` 这个 identity 形状在
 // keyless=0 时不可达,打红 config 咽喉那条「形状集合 == 登记簿变体集合」的双向锁。
 
+import { codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
@@ -142,7 +143,7 @@ type Injected = ReturnType<typeof injectCodePuppyConfig>
 const inject = (): Injected =>
   silently(() => {
     publishMainBootstrap({ userData })
-    return injectCodePuppyConfig(userData, undefined, "stable")
+    return injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
   })
 
 /** 一次真注入之后,生产写出来的两样东西。 */

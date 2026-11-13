@@ -15,12 +15,10 @@
 
 import { contextText, renderTemplate } from "./context-injection"
 
-/** 上游自带、Code Puppy 出厂即禁的技能(#1522:customize-opencode 永久禁用)。main(codepuppy-builtin-policy.ts)import 同一份。 */
+/** 上游自带、Code Puppy 出厂即禁的技能(#1522:customize-opencode 永久禁用)。main(codepuppy-builtin-policy.ts、engine-config-truth-boot.ts、ext-ipc.ts 经 factoryDeniedSkills)用同一份。 */
 export const FACTORY_DENIED_SKILLS = ["customize-opencode"] as const
 
-export function applyFactoryDeny(cfg: Record<string, unknown>, names: readonly string[] = FACTORY_DENIED_SKILLS): string[] {
-  if (names.length === 0) return []
-
+export function applyFactoryDeny(cfg: Record<string, unknown>): string[] {
   const permission =
     cfg.permission && typeof cfg.permission === "object" && !Array.isArray(cfg.permission)
       ? (cfg.permission as Record<string, unknown>)
@@ -35,8 +33,7 @@ export function applyFactoryDeny(cfg: Record<string, unknown>, names: readonly s
       : ((cfg.command = {}) as Record<string, unknown>)
 
   const applied: string[] = []
-  for (const n of names) {
-    if (typeof n !== "string" || !n) continue
+  for (const n of FACTORY_DENIED_SKILLS) {
     // #1522:删后追加,确保旧同名 allow 或后置通配 allow 都不能覆盖永久 deny。
     if (n === "customize-opencode") delete skill[n]
     if (!(n in skill)) {

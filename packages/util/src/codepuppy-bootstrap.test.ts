@@ -6,6 +6,7 @@ import {
   cloudMcpArmed,
   codepuppyBootstrap,
   codepuppyEngineSettings,
+  exportedFlag,
   isCredentialFreeUrl,
   parseCodePuppyBootstrap,
   publishCodePuppyBootstrap,
@@ -30,7 +31,7 @@ const valid = () => ({
   platform: {
     credentialRef: "{file:/u/data/codepuppy-secrets/CODEPUPPY_API_KEY}",
     modelProxyBaseURL: "https://api.codepuppy.example/v1",
-    defaultModelOverride: "",
+    defaultModelOverride: "codepuppy/m",
   },
   cloudMcp: {
     name: "codepuppy",
@@ -138,6 +139,10 @@ describe("G2 fields: secrets cannot be written into the document", () => {
     })
   })
 
+  test("defaultModelOverride is a non-empty model id (an empty export is simply unset and never reaches the document)", () => {
+    expect(failure({ ...valid(), platform: { ...valid().platform, defaultModelOverride: "" } })).toMatchObject({ reason: "invalid", path: "platform.defaultModelOverride" })
+  })
+
   test("account and egress proxy formats; killSwitch is a boolean", () => {
     expect(failure({ ...valid(), policy: { account: "acct:not-a-hash" } })).toMatchObject({ reason: "invalid", path: "policy.account" })
     expect(failure({ ...valid(), network: { egressProxy: "http://10.0.0.1:8080" } })).toMatchObject({ reason: "invalid", path: "network.egressProxy" })
@@ -189,6 +194,14 @@ describe("G3 fields: switches and engine settings", () => {
     __resetCodePuppyBootstrapForTests()
     publishCodePuppyBootstrap(parseCodePuppyBootstrap({ ...valid(), permission: {} }))
     expect(codepuppyEngineSettings(env)).toEqual({ askTimeoutMs: 300_000, projectWatch: true })
+  })
+})
+
+describe("exportedFlag: the one rule for every switch-like variable", () => {
+  test("unset or empty ⇒ undefined; 1 / true / yes / on (trimmed, any case) ⇒ true; anything else ⇒ false", () => {
+    for (const unset of [undefined, ""]) expect([unset, exportedFlag(unset)]).toEqual([unset, undefined])
+    for (const on of ["1", "true", "yes", "on", " TRUE ", "On", "YES"]) expect([on, exportedFlag(on)]).toEqual([on, true])
+    for (const off of ["0", "false", "no", "off", "enabled", "2", " "]) expect([off, exportedFlag(off)]).toEqual([off, false])
   })
 })
 

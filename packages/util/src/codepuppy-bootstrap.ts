@@ -44,7 +44,7 @@ export type CodePuppyBootstrap = {
     /** 平台模型凭据文件的引用,不是凭据 */
     credentialRef: `{file:${string}}`
     modelProxyBaseURL?: CredentialFreeUrl
-    /** 缺席 = 没导出(用目录默认);"" = 导出了空串(不设默认模型) */
+    /** 非空的模型 id;缺席 = 没导出(用目录默认)。空串就是没导出 */
     defaultModelOverride?: string
   }
   /** main 解析出合格的云 MCP 地址时在场 */
@@ -83,6 +83,18 @@ export type CodePuppyBootstrap = {
 /** 审批无人应答的期限缺省(ADR-038):300 s。 */
 export const ASK_TIMEOUT_MS_DEFAULT = 300_000
 
+/** 被当作「开」的写法(去掉首尾空白、转小写之后比较)。 */
+const ON_SPELLINGS = new Set(["1", "true", "yes", "on"])
+
+/**
+ * Code Puppy 读的每一个开关型环境变量的**唯一**判法(owner 2026-11-13:新方案不考虑旧版本的写法):未设或空串 ⇒ `undefined`(没设,
+ * 由读方取缺省);去掉首尾空白、转小写后是 `1` / `true` / `yes` / `on` ⇒ `true`;其余任何写法 ⇒ `false`。
+ */
+export function exportedFlag(value: string | undefined): boolean | undefined {
+  if (value === undefined || value === "") return undefined
+  return ON_SPELLINGS.has(value.trim().toLowerCase())
+}
+
 /**
  * 无文档宿主的兼容入口(design §4.3、§10 R13):引擎侧两项今天由用户环境可调的设置,只有这一个读法。
  * 有文档 ⇒ 读文档(环境参数被忽略);无文档(仓内 CLI 宿主、core 单测)⇒ 逐字沿用今天的环境判法。
@@ -90,7 +102,7 @@ export const ASK_TIMEOUT_MS_DEFAULT = 300_000
 export function codepuppyEngineSettings(env: Record<string, string | undefined> = process.env): {
   /** 文档:permission.askTimeoutMs ?? 300000。无文档:CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS 为正整数则取之,否则 300000。 */
   askTimeoutMs: number
-  /** 文档:engine.filewatcher。无文档:OPENCODE_EXPERIMENTAL_FILEWATCHER 去空白、转小写后 ∈ {true, 1, yes, on}。 */
+  /** 文档:engine.filewatcher。无文档:OPENCODE_EXPERIMENTAL_FILEWATCHER 按 exportedFlag 判,没设即关。 */
   projectWatch: boolean
 } {
   const document = tryCodePuppyBootstrap()
@@ -100,7 +112,7 @@ export function codepuppyEngineSettings(env: Record<string, string | undefined> 
   const parsed = raw === undefined || raw === "" ? Number.NaN : Number(raw)
   return {
     askTimeoutMs: Number.isInteger(parsed) && parsed > 0 ? parsed : ASK_TIMEOUT_MS_DEFAULT,
-    projectWatch: ["true", "1", "yes", "on"].includes((env[PROJECT_WATCH_ENV] ?? "").trim().toLowerCase()),
+    projectWatch: exportedFlag(env[PROJECT_WATCH_ENV]) ?? false,
   }
 }
 
@@ -163,7 +175,7 @@ export function parseCodePuppyBootstrap(value: unknown): CodePuppyBootstrap {
   const platform = record(root.platform, "platform")
   only(platform, ["credentialRef", "modelProxyBaseURL", "defaultModelOverride"], "platform")
   const modelProxyBaseURL = optional(platform, "modelProxyBaseURL", "platform", credentialFreeUrl)
-  const defaultModelOverride = optional(platform, "defaultModelOverride", "platform", text)
+  const defaultModelOverride = optional(platform, "defaultModelOverride", "platform", nonEmptyText)
   const cloudMcp = optional(root, "cloudMcp", "", cloudMcpOf)
   const webSearch = record(root.webSearch, "webSearch")
   only(webSearch, ["killSwitch"], "webSearch")
@@ -311,6 +323,11 @@ function matching(pattern: RegExp) {
     if (typeof value !== "string" || !pattern.test(value)) throw new CodePuppyBootstrapError("invalid", at)
     return value
   }
+}
+
+function nonEmptyText(value: unknown, at: string): string {
+  if (text(value, at) === "") throw new CodePuppyBootstrapError("invalid", at)
+  return value as string
 }
 
 function text(value: unknown, at: string): string {

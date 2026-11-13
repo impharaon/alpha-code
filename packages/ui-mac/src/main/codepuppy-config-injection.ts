@@ -12,7 +12,7 @@
 // 正向闸门锁 model/enabled_providers/provider/三个 alpha agent/{file:} ref,反向闸门锁 catch 的
 // 真实爆炸半径 + 失败必须出声)。
 
-import { tryCodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
+import { codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import * as fs from "node:fs"
 import * as path from "node:path"
 // `#1299`(REQ-157):三个 alpha agent 的 description / prompt 是 alpha 的字,住在零依赖的
@@ -41,7 +41,7 @@ import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 import { USER_DATA_LAYOUT } from "./user-data-layout"
 // `#1667`(#1665 L3 交回的接缝裁决 A / C,编排器 2026-11-09):出厂技能目录、技能生成的 live 目录与出厂 /init、/review 命令
 // 由 main 写进这份内联配置文档(2.x 插件接口给不了等价挂点)。路径与命令内容仍以 ext 那三个纯函数为唯一来源,这里只引用。
-import { injectFactorySkillPaths } from "../../../ext/src/factory-paths"
+import { factorySkillPaths } from "../../../ext/src/factory-paths"
 import { publishProviderAllowList } from "../../../ext/src/provider-allow"
 import { skillGenerationLiveDirs } from "../../../ext/src/gen-skill-paths"
 import { explicitConfigPath, writeExplicitConfig, type ExplicitLayer } from "./engine-explicit-config"
@@ -53,8 +53,8 @@ import { applyPromptTakeover } from "../../../ext/src/codepuppy-prompts"
 // (auth, other instructions) are preserved. We layer two independent, separately-gated pieces:
 //
 // `#1698` G3: every switch below is read from the published bootstrap document (`switches.*`; main reads the operator
-// variable named in parentheses once and writes the document). No document (only tests that call the injection
-// directly) ⇒ every switch off.
+// variable named in parentheses once and writes the document). The injection has no no-document mode: the sidecar publishes
+// the document before it runs, and tests publish one through the fixture.
 //
 //   1. Brand identity (CODEPUPPY_IDENTITY_DISABLE): a global instruction file written to
 //      userDataPath (stable absolute path in both dev and the packaged .app) added to
@@ -109,7 +109,7 @@ export const PROJECT_SKILLS_ENTRY = `./${PROJECT_HIDDEN_DIR}/skills`
 export function explicitSkillDirs(): string[] {
   return [
     ...new Set([
-      ...injectFactorySkillPaths({}, tryCodePuppyBootstrap()?.skills.factoryDirs ?? []),
+      ...factorySkillPaths(codepuppyBootstrap().skills.factoryDirs),
       ...skillGenerationLiveDirs(codepuppyGlobalRoot()),
       PROJECT_SKILLS_ENTRY,
     ]),
@@ -166,11 +166,11 @@ export const ENGINE_EXPERIMENTAL_FLAGS = {
  *     `CODEPUPPY_ECOSYSTEM_INHERIT=1`(启动文档 `switches.ecosystemInherit`)置位时不写移除指令(ADR-024 §5,整机恢复上游继承)。
  *   · `experimental`:五个实验开关的显式值(见上)。
  */
-function governanceFloor(extPluginPath: string | undefined): Pick<EngineConfig, "plugins" | "experimental"> {
+function governanceFloor(extPluginPath: string | undefined, ecosystemInherit: boolean): Pick<EngineConfig, "plugins" | "experimental"> {
   return {
     plugins: [
       ...(extPluginPath ? [extPluginPath] : []),
-      ...(tryCodePuppyBootstrap()?.switches.ecosystemInherit ? [] : [`-${ECOSYSTEM_COMPATIBILITY_PLUGIN}`]),
+      ...(ecosystemInherit ? [] : [`-${ECOSYSTEM_COMPATIBILITY_PLUGIN}`]),
     ],
     experimental: { ...ENGINE_EXPERIMENTAL_FLAGS },
   }
@@ -203,14 +203,17 @@ export function isCloudMcpWithheld(): boolean {
 
 export function injectCodePuppyConfig(
   userDataPath: string,
-  extPluginPath?: string,
-  registryChannel?: ChannelName,
+  extPluginPath: string | undefined,
+  registryChannel: ChannelName | undefined,
   /**
    * `#1698`:当前环境的 codepuppy.jsonc;`null` = REQ-059 逃生阀置位,不给引擎这份文件。sidecar 传启动文档的 `paths.userConfig`
-   * (main 构建时已按逃生阀判过);缺省(只有直接调注入的测试)取 codepuppyJsoncPath()。
+   * (main 构建时已按逃生阀判过)。
    */
-  userConfig?: string | null,
+  userConfig: string | null,
 ): CodePuppyConfigInjectionResult {
+  // `#1698`:平台地址、默认模型覆盖、云 MCP 定义、kill-switch、各个开关、出厂技能目录与引擎全局配置目录都来自本进程已发布的启动文档
+  // (sidecar 在注入之前发布);没有发布 ⇒ 抛(结构性缺陷,sidecar 的 start() 照常报错退出)。
+  const bootstrap = codepuppyBootstrap()
   let file: string | undefined
   // 本轮没走到写云服务那一处(无云 URL / 注入失败)⇒ 配置里没有中和条目。
   cloudMcpWithheld = false
@@ -220,7 +223,7 @@ export function injectCodePuppyConfig(
     // 项目前(可覆盖);junk 循环不扫单文件 → 当前环境根零引擎垃圾(T0 spike 判定)。全新机器 seed
     // {$schema},否则 loadFile 指向不存在文件。逃生阀置位(userConfig 为 null)不注入(回 REQ-018 home walk 行为,
     // ext-config 写入目标也随之回退,两侧一致 —— 两侧读的是 main 的同一次判定,`#1698`)。
-    const truth = userConfig === undefined ? codepuppyJsoncPath() : userConfig
+    const truth = userConfig
     if (truth !== null) {
       fs.mkdirSync(path.dirname(truth), { recursive: true })
       if (!fs.existsSync(truth)) {
@@ -229,11 +232,9 @@ export function injectCodePuppyConfig(
       file = truth
     }
 
-    const config: EngineConfig = { $schema: "https://opencode.ai/config.json", ...governanceFloor(extPluginPath) }
-    // `#1698` G2:平台地址、默认模型覆盖、云 MCP 定义与 kill-switch 都来自本进程已发布的启动文档(sidecar 在注入之前发布;
-    // 只有直接调注入、不发布文档的测试才会没有,那时按「未登录、无云、kill-switch 关」走)。
-    const bootstrap = tryCodePuppyBootstrap()
-    const cloudMcp = bootstrap?.cloudMcp
+    const config: EngineConfig = { $schema: "https://opencode.ai/config.json", ...governanceFloor(extPluginPath, bootstrap.switches.ecosystemInherit) }
+    // `#1698` G2:平台地址、默认模型覆盖、云 MCP 定义与 kill-switch 都来自启动文档(见函数开头)。
+    const cloudMcp = bootstrap.cloudMcp
     // ADR-009 B1 的「平台代付」判据(云 MCP URL + 密钥文件同在)。caps 事实、云 MCP 注册与
     // web search 主权 deny 三处共用同一个判据,不许各算各的。`#1195` 起判据文件从
     // `CODEPUPPY_CLOUD_TOKEN`(错受众的 platform_access,只当在场性证据)换轴到
@@ -241,7 +242,7 @@ export function injectCodePuppyConfig(
     // 「代付成立」与「凭证可用」从此结构上不可能分叉。main 侧同一判据在
     const platformPays = Boolean(cloudMcp && hasSecretFile(userDataPath, "CODEPUPPY_MCP_TOKEN"))
     // ADR-009 B2 的能力总闸:main 判一次写进启动文档(webSearch.killSwitch),ext 的最终闸读的是同一个值。
-    const killSwitch = bootstrap?.webSearch.killSwitch ?? false
+    const killSwitch = bootstrap.webSearch.killSwitch
     // 云 MCP server 这一 fork 会不会以 `enabled:true` 注册。判据与下方真正写 `config.mcp` 的那个
     // 三分支**同一组输入**(kill-switch ⇒ 中和条目 `enabled:false`;代付 ⇒ 真定义 `enabled:true`;
     // 其余 ⇒ 无凭证 `enabled:false`)。identity 的云腿在场性读它,不另算一遍(`#1414` S4)。
@@ -250,10 +251,10 @@ export function injectCodePuppyConfig(
     // 只记录本轮函数自己新放进 mcp 的名字;继承来的 OPENCODE_CONFIG_CONTENT 不是治理授权。
     const injectedMcpNames = new Set<string>()
 
-    // `#1698` G3:开关来自启动文档;没有文档 ⇒ 全关
-    const switches = bootstrap?.switches
-    const wantIdentity = !switches?.identityDisabled
-    const wantBehavior = !switches?.behaviorDisabled
+    // `#1698` G3:开关来自启动文档
+    const switches = bootstrap.switches
+    const wantIdentity = !switches.identityDisabled
+    const wantBehavior = !switches.behaviorDisabled
     if (wantIdentity || wantBehavior) {
       fs.mkdirSync(userDataPath, { recursive: true })
       const instructions: string[] = Array.isArray(config.instructions) ? config.instructions : []
@@ -324,9 +325,9 @@ export function injectCodePuppyConfig(
     // `#1667`(C7 重裁):显式文件层要写的三样,出自这一次计算(engine-explicit-config.ts 抬头讲层序)。
     const layer: ExplicitLayer = { policies: [], commands: {}, skills: [] }
     const models = buildCodePuppyModelConfig(userDataPath, {
-      baseURL: bootstrap?.platform.modelProxyBaseURL,
-      defaultModel: bootstrap?.platform.defaultModelOverride,
-      disabled: switches?.modelsDisabled,
+      baseURL: bootstrap.platform.modelProxyBaseURL,
+      defaultModel: bootstrap.platform.defaultModelOverride,
+      disabled: switches.modelsDisabled,
     })
     if (models) {
       // `#1667`:同一份投影,写成 2.x 的 `providers` / `policies`(`provider.use`)/ `model`(codepuppy-models.ts engineModelConfig)。
@@ -350,7 +351,7 @@ export function injectCodePuppyConfig(
     //       由 core 自己的 `opencode.config.command` 实现模板文法与子任务(`review` 在子任务里跑:v1 的 `subtask: true`,2.x 原生键
     //       `subagent`)。逃生门与 ext 的提示词转写同一个:CODEPUPPY_PROMPT_REBRAND_DISABLE=1。
     //       写进显式文件(编排器裁决 r1 第 2 条):项目里的同名命令胜过它,它胜过上游内置的。
-    if (!switches?.promptRebrandDisabled) {
+    if (!switches.promptRebrandDisabled) {
       const takeover: { command?: Record<string, { template: string; description?: string; subtask?: boolean }> } = {}
       applyPromptTakeover(takeover)
       layer.commands = Object.fromEntries(
@@ -362,7 +363,7 @@ export function injectCodePuppyConfig(
     //      permission 静态配死(V1 schema:pattern→action 对象,agent 级合并),不依赖运行时弹窗。
     //      read 全放但 *.env* 保持 deny(密钥文件不进上下文);edit/bash/外部目录一律 deny;
     //      question deny(无人在场没人答);doom_loop deny(异常循环直接断)。逃生:CODEPUPPY_AUTOMATION_DISABLE。
-    if (!switches?.automationDisabled) {
+    if (!switches.automationDisabled) {
       config.agents = {
         ...config.agents,
         "codepuppy-automation": {
@@ -399,7 +400,7 @@ export function injectCodePuppyConfig(
     //       点名助手 / 命令换助手 / 直接子任务三条入口在引擎 session/prompt.ts 按同一条规则问或拒。
     //       第三方 MCP 与插件工具每次询问(方案 §2.0 D1):身份轴闸用本规则集求值,设置里启用了也问。
     //       逃生:CODEPUPPY_READONLY_DISABLE。治理保护名单同 codepuppy-automation(X2,codepuppy-governance.ts)。
-    if (!switches?.readonlyDisabled) {
+    if (!switches.readonlyDisabled) {
       config.agents = {
         ...config.agents,
         "codepuppy-readonly": {
@@ -470,7 +471,7 @@ export function injectCodePuppyConfig(
     //   2c. REQ-024(自动化 A2):standard 可写档 agent。无人值守语义同 codepuppy-automation
     //       (question/task/doom_loop deny,零 ask 硬前提);差异 = edit allow + bash 受限 allow
     //       (破坏类命令模式 deny —— 模式黑名单**非穷尽**,UI 启用时有显式风险确认,不谎称安全)。
-    if (!switches?.automationDisabled) {
+    if (!switches.automationDisabled) {
       config.agents = {
         ...config.agents,
         "codepuppy-automation-standard": {
@@ -651,6 +652,7 @@ export function injectCodePuppyConfig(
     // 逐文件失败只 loud 跳过,不得破坏上方任何注入。
     injectMcpDefaultDeny(config, {
       codepuppyConfigPath: codepuppyJsoncPath(),
+      userConfigDir: bootstrap.paths.engineConfigDirectory,
       injectedMcpNames,
     })
 
@@ -676,7 +678,10 @@ export function injectCodePuppyConfig(
       error: error instanceof Error ? { message: error.message, stack: error.stack } : { message: String(error) },
       // 注入失败也不让治理底线跟着丢:ext 目录、外部技能移除指令、五个实验开关照样写进去(governanceFloor)。
       // 没有 ext 的话 sidecar 的 I4 判定会拒绝 ready,而不是带着一个没有执行闸的引擎上线。
-      config: { content: JSON.stringify({ $schema: "https://opencode.ai/config.json", ...governanceFloor(extPluginPath) }), ...(file ? { file } : {}) },
+      config: {
+        content: JSON.stringify({ $schema: "https://opencode.ai/config.json", ...governanceFloor(extPluginPath, bootstrap.switches.ecosystemInherit) }),
+        ...(file ? { file } : {}),
+      },
       models: {},
     }
   }

@@ -30,7 +30,7 @@ const EngineRemoteSchema = Mcp.RemoteConfig
 import { materializeCloudMcpConfig } from "./cloud-sidecar-config"
 import { injectCodePuppyConfig } from "./codepuppy-config-injection"
 import { WITHHELD_CLOUD_MCP } from "./cloud-web-search"
-import { cloudMcpArmed, type CodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
+import { cloudMcpArmed, type CodePuppyBootstrap, codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { publishMainBootstrap, unpublishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
 import { secretFilePath, secretFileRef } from "./codepuppy-secret-files"
 // kill-switch 下**最终**进配置的那一份不是注入面写的,是 ext 写回的(#733 审计 B1 的教训原样
@@ -128,7 +128,7 @@ describe("`#1195` 生产注入面", () => {
   let doc: CodePuppyBootstrap
   const inject = (extPluginPath?: string) => {
     doc = publishMainBootstrap({ userData })
-    const result = injectCodePuppyConfig(userData, extPluginPath, "stable")
+    const result = injectCodePuppyConfig(userData, extPluginPath, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     lastContent = result.config.content
     return result
   }

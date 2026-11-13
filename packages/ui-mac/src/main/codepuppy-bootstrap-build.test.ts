@@ -115,12 +115,11 @@ describe("buildCodePuppyBootstrap(G2:平台 / 云 / web search / 策略分区 / 
     expect(JSON.stringify(document)).not.toContain("mcp-token-not-real")
   })
 
-  test("空串按今天读方的判法:地址空串同未设;默认模型空串也算导出(随后不设默认模型);kill-switch 任意非空串即开", () => {
+  test("空串就是没设(owner 2026-11-13:不保留旧版本的空串含义):地址、默认模型、kill-switch 导出为空串都同未设", () => {
     const empty = buildCodePuppyBootstrap(input({ env: { CODEPUPPY_BASE_URL: "", CODEPUPPY_CLOUD_MCP_URL: "", CODEPUPPY_DEFAULT_MODEL: "", CODEPUPPY_WEBSEARCH_DISABLE: "" } }))
-    expect(empty.platform).toEqual({ credentialRef: secretFileRef("/u/data", "CODEPUPPY_API_KEY"), defaultModelOverride: "" })
+    expect(empty.platform).toEqual({ credentialRef: secretFileRef("/u/data", "CODEPUPPY_API_KEY") })
     expect(empty).not.toHaveProperty("cloudMcp")
     expect(empty.webSearch.killSwitch).toBe(false)
-    expect(buildCodePuppyBootstrap(input({ env: { CODEPUPPY_WEBSEARCH_DISABLE: "0" } })).webSearch.killSwitch).toBe(true)
   })
 
   test("带凭据形状的地址(userinfo / query / fragment / 非 https)被忽略、记一行只写变量名,不抛", () => {
@@ -148,41 +147,33 @@ describe("buildCodePuppyBootstrap(G3:开关与引擎设置,§4.4 表)", () => {
     expect({ engine: document.engine, skills: document.skills, permission: document.permission, switches: document.switches }).toEqual(NO_G3)
   })
 
-  test("`=== \"1\"` 的三个开关:\"1\" 才开;\"\"、\"true\" 同未设", () => {
-    const rows = [
-      ["CODEPUPPY_MODELS_DISABLE", "modelsDisabled"],
-      ["CODEPUPPY_PROMPT_REBRAND_DISABLE", "promptRebrandDisabled"],
-      ["CODEPUPPY_ECOSYSTEM_INHERIT", "ecosystemInherit"],
-    ] as const
-    for (const [name, field] of rows) {
-      expect([name, switchesOf({ [name]: "1" })[field]]).toEqual([name, true])
-      for (const value of ["", "true", undefined]) expect([name, value, switchesOf({ [name]: value })[field]]).toEqual([name, value, false])
+  // owner 2026-11-13:每个开关一个判法(util 的 exportedFlag):未设 / 空串 = 没设;1 / true / yes / on(去空白、不分大小写)= 开;其余 = 关。
+  const SWITCH_ROWS = [
+    ["CODEPUPPY_MODELS_DISABLE", "modelsDisabled"],
+    ["CODEPUPPY_IDENTITY_DISABLE", "identityDisabled"],
+    ["CODEPUPPY_BEHAVIOR_DISABLE", "behaviorDisabled"],
+    ["CODEPUPPY_PROMPT_REBRAND_DISABLE", "promptRebrandDisabled"],
+    ["CODEPUPPY_AUTOMATION_DISABLE", "automationDisabled"],
+    ["CODEPUPPY_READONLY_DISABLE", "readonlyDisabled"],
+    ["CODEPUPPY_ECOSYSTEM_INHERIT", "ecosystemInherit"],
+    ["CODEPUPPY_EXT_VERBOSE", "extVerbose"],
+  ] as const
+  test("八个开关与 kill-switch 同一个判法:1 / true / yes / on 开;未设、空串、0、false、其它写法关;每个开关只动自己那一个字段", () => {
+    for (const [name, field] of SWITCH_ROWS) {
+      for (const value of ["1", "true", "yes", "on", " TRUE "]) expect([name, value, switchesOf({ [name]: value })[field]]).toEqual([name, value, true])
+      for (const value of [undefined, "", "0", "false", "off", "disable"]) expect([name, value, switchesOf({ [name]: value })[field]]).toEqual([name, value, false])
+      expect([name, switchesOf({ [name]: "1" })]).toEqual([name, { ...NO_SWITCHES, [field]: true }])
     }
+    const killSwitchOf = (value: string | undefined) => buildCodePuppyBootstrap(input({ env: { CODEPUPPY_WEBSEARCH_DISABLE: value } })).webSearch.killSwitch
+    expect([killSwitchOf("yes"), killSwitchOf("0"), killSwitchOf("")]).toEqual([true, false, false])
   })
 
-  test("任意非空串即开的五个开关:\"0\" 也开,\"\" 同未设", () => {
-    const rows = [
-      ["CODEPUPPY_IDENTITY_DISABLE", "identityDisabled"],
-      ["CODEPUPPY_BEHAVIOR_DISABLE", "behaviorDisabled"],
-      ["CODEPUPPY_AUTOMATION_DISABLE", "automationDisabled"],
-      ["CODEPUPPY_READONLY_DISABLE", "readonlyDisabled"],
-      ["CODEPUPPY_EXT_VERBOSE", "extVerbose"],
-    ] as const
-    for (const [name, field] of rows) {
-      for (const value of ["1", "0", "yes"]) expect([name, value, switchesOf({ [name]: value })[field]]).toEqual([name, value, true])
-      for (const value of ["", undefined]) expect([name, value, switchesOf({ [name]: value })[field]]).toEqual([name, value, false])
-    }
-    // 每个开关只动自己那一个字段
-    expect(switchesOf({ CODEPUPPY_EXT_VERBOSE: "1" })).toEqual({ ...NO_SWITCHES, extVerbose: true })
-  })
-
-  test("两个引擎开关按 engineDesktopToggles:空串 ⇒ 拉取开、监听关(§10 R16,今天如此)", () => {
+  test("两个引擎开关用同一个判法,空串就是没设(没设:不拉 models.dev、文件监听开)", () => {
     const engineOf = (env: Record<string, string | undefined>) => buildCodePuppyBootstrap(input({ env })).engine
-    expect(engineOf({ OPENCODE_DISABLE_MODELS_FETCH: "", OPENCODE_EXPERIMENTAL_FILEWATCHER: "" })).toEqual({ modelsFetch: true, filewatcher: false })
+    expect(engineOf({ OPENCODE_DISABLE_MODELS_FETCH: "", OPENCODE_EXPERIMENTAL_FILEWATCHER: "" })).toEqual({ modelsFetch: false, filewatcher: true })
     expect(engineOf({ OPENCODE_DISABLE_MODELS_FETCH: "0", OPENCODE_EXPERIMENTAL_FILEWATCHER: "false" })).toEqual({ modelsFetch: true, filewatcher: false })
     expect(engineOf({ OPENCODE_DISABLE_MODELS_FETCH: "true", OPENCODE_EXPERIMENTAL_FILEWATCHER: "1" })).toEqual({ modelsFetch: false, filewatcher: true })
-    // R9:yes / on 在 sidecar 里与引擎监听同一个判法 ⇒ 关
-    expect(engineOf({ OPENCODE_EXPERIMENTAL_FILEWATCHER: "yes" }).filewatcher).toBe(false)
+    expect(engineOf({ OPENCODE_DISABLE_MODELS_FETCH: "yes", OPENCODE_EXPERIMENTAL_FILEWATCHER: "on" })).toEqual({ modelsFetch: false, filewatcher: true })
   })
 
   test("审批期限:正的安全整数毫秒进文档;未设 / 空串 ⇒ 省略、不记;不合法 ⇒ 忽略并记一行(不带值),不抛", () => {

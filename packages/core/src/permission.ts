@@ -16,7 +16,7 @@ import { PluginHooks } from "./plugin/hooks.js"
 // codepuppy(ADR-038, #668): the deadline failure ends the step and shows its own message, as a question dismissal does.
 import { QuestionTool } from "./tool/plugin/question.js"
 import { isCodePuppyPolicyRequest } from "@opencode/schema/codepuppy-tool-policy" // codepuppy(I-05)
-import { ASK_TIMEOUT_MS_DEFAULT as CODEPUPPY_ASK_TIMEOUT_MS_DEFAULT, codepuppyEngineSettings } from "@opencode/util/codepuppy-bootstrap" // codepuppy(ADR-038, #1698)
+import { codepuppyEngineSettings } from "@opencode/util/codepuppy-bootstrap" // codepuppy(ADR-038, #1698)
 
 const PermissionEffect = Permission.Effect
 export { PermissionEffect as Effect }
@@ -98,13 +98,8 @@ export type Error = BlockedError | CorrectedError
 // codepuppy(ADR-038, #668, #1698) ── an approval request nobody answers fails by name after a deadline; it never allows.
 // 300 s by default; Code Puppy's bootstrap document (`permission.askTimeoutMs`, written by the desktop main process from
 // CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS) overrides it. Without a document (the in-repo CLI host) the variable itself does,
-// through the one compatibility reader `codepuppyEngineSettings`; any value that is not a positive integer of milliseconds
-// falls back to the default — never to "no deadline". Read on every request.
-export const ASK_TIMEOUT_MS_DEFAULT = CODEPUPPY_ASK_TIMEOUT_MS_DEFAULT
-
-export function askTimeoutMs(env: Record<string, string | undefined> = process.env): number {
-  return codepuppyEngineSettings(env).askTimeoutMs
-}
+// through the one compatibility reader `codepuppyEngineSettings` (packages/util/src/codepuppy-bootstrap.ts); any value that is not
+// a positive integer of milliseconds falls back to the default — never to "no deadline". Read on every request (below).
 
 type UnansweredInput = { action: string; resources: ReadonlyArray<string>; timeoutMs: number }
 let unansweredClass: (new (input: UnansweredInput) => QuestionTool.CancelledError) | undefined
@@ -324,7 +319,7 @@ const layer = Layer.effect(
             const item = yield* create(request(input, result.message), input.agent)
             // codepuppy(ADR-038): bounded wait; at the deadline only this request ends (no cascade), its card is
             // retracted with a replied event, and the call fails by name.
-            const timeoutMs = askTimeoutMs()
+            const timeoutMs = codepuppyEngineSettings().askTimeoutMs
             const bounded = Deferred.await(item.deferred).pipe(
               Effect.timeoutOrElse({
                 duration: timeoutMs,

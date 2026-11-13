@@ -5,7 +5,7 @@ import { homedir, tmpdir } from "node:os"
 import { join, parse, resolve } from "node:path"
 import { writeCustomProviderTruth } from "./custom-provider-truth-write"
 import { mockElectron } from "../../test-component/electron-mock"
-import { __resetCodePuppyBootstrapForTests, parseCodePuppyBootstrap, publishCodePuppyBootstrap, type CodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
+import { __resetCodePuppyBootstrapForTests, parseCodePuppyBootstrap, publishCodePuppyBootstrap, type CodePuppyBootstrap, codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 
 // `#1698`:每次 fork 交给 sidecar 的 start 消息(启动文档在它的 `bootstrap` 里)。
 const startCalls: Array<{ type: "start"; bootstrap: CodePuppyBootstrap }> = []
@@ -344,7 +344,7 @@ describe("`#1411` / `#1443` web search 按账户态的在场性", () => {
       )
       // 先证明注入真的跑成了 —— 它有一层函数级 catch,拿一份空配置当结论正是本文件要防的那类假绿。
       // `#1662` parity B1:2.x 的注入返回 `{ config: { content, file }, explicit }`(内联文档交给 start(),不再写 OPENCODE_CONFIG_CONTENT)。
-      const { config } = injectCodePuppyConfig(userDataPath, undefined, "stable")
+      const { config } = injectCodePuppyConfig(userDataPath, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
       const parsed = JSON.parse(config.content) as EngineConfigShape
       expect(Object.keys(parsed.agents ?? {}).length).toBeGreaterThan(0)
       return { config: parsed, env: { ...process.env } }
@@ -802,9 +802,11 @@ describe("#1698 不合格的导出值被忽略,启动照常", () => {
         process.env[row.name] = row.bad
         warned.length = 0
         const forks = forkCalls.length
-        const { bootstrap } = await forkSidecarWithBootstrap()
+        const { env, bootstrap } = await forkSidecarWithBootstrap()
         expect(forkCalls.length).toBe(forks + 1)
         expect([row.name, row.holds(bootstrap)]).toEqual([row.name, true])
+        // 被忽略的路径变量在 sidecar 的环境里也没有(引擎与文档看到同一个「没设」);别的变量本来就不过河或原样
+        if (["OPENCODE_CONFIG_DIR", "XDG_CONFIG_HOME", "XDG_DATA_HOME"].includes(row.name)) expect([row.name, env[row.name]]).toEqual([row.name, undefined])
         expect(warned.filter((line) => line.includes(`${row.name} ignored`))).toHaveLength(1)
         expect(warned.filter((line) => line.includes(row.bad))).toEqual([])
       } finally {

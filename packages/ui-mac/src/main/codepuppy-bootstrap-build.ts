@@ -1,12 +1,12 @@
 // `#1698`(DESIGN-upgrade-bootstrap-config §4.4):main 每次 fork 构建一次启动文档,原样放进 start 消息的 `bootstrap`。
 // 输入全部来自现有权威(冻结环境快照、engine-paths.ts、ext 目录解析、资源根、boot 时出厂技能对账的结果、applyAuthEnv 写进 main
-// 环境的两个地址、当刻登录态的分区哈希、出网代理端口),由 spawnLocalServer 取好交进来;每个键沿用今天读方的判法,空串的含义按键保留
-// (§4.4 表、§10 R16)。运维开关的名字对用户不变,只是读的地方收到这里一处。
+// 环境的两个地址、当刻登录态的分区哈希、出网代理端口),由 spawnLocalServer 取好交进来。运维开关的名字对用户不变,只是读的地方收到这里
+// 一处;每个开关都按 util 的 exportedFlag 判(owner 2026-11-13:不保留旧版本各键各自的写法,空串就是没设)。
 // 输出先过生产解析器:形状不对在 main 这一侧就抛(拒 fork),不等 sidecar 发现。对用户导出的值从不抛(编排器 2026-11-13 裁决):不合格的
 // 导出值当没设 —— 那个字段回到缺省 —— 并记一行 `bootstrap: <变量名> ignored (<原因>)`,不写值。什么算合格由文档定,不按旧代码的读法。
 import os from "node:os"
 import path from "node:path"
-import { isCredentialFreeUrl, parseCodePuppyBootstrap, type CodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
+import { exportedFlag, isCredentialFreeUrl, parseCodePuppyBootstrap, type CodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { materializeCloudMcpConfig } from "./cloud-sidecar-config"
 import { CLOUD_MCP_SERVER_NAME } from "./cloud-web-search"
 import { secretFileRef } from "./codepuppy-secret-files"
@@ -78,35 +78,35 @@ export function buildCodePuppyBootstrap(input: CodePuppyBootstrapInput): CodePup
       officeMcpManifest: input.officeMcpManifest,
     },
     ...(input.registryChannel ? { registryChannel: input.registryChannel } : {}),
-    // 两个引擎开关就是今天 sidecar 构造 start() 选项的那个判法(空串:拉取开、监听关)
+    // 两个引擎开关(没设:不拉 models.dev、文件监听开)
     engine: engineDesktopToggles(env),
     platform: {
       // REQ-236 `#1562`:平台模型请求的凭据只从这份文件现读(ext 的请求钩子);文档里只有引用
       credentialRef: secretFileRef(input.userDataPath, "CODEPUPPY_API_KEY"),
       ...(modelProxyBaseURL ? { modelProxyBaseURL } : {}),
-      // `??` 语义:导出为空串也算导出(今天 codepuppy-models.ts 随后不设默认模型)
-      ...(env.CODEPUPPY_DEFAULT_MODEL !== undefined ? { defaultModelOverride: env.CODEPUPPY_DEFAULT_MODEL } : {}),
+      // 空串就是没导出
+      ...(env.CODEPUPPY_DEFAULT_MODEL ? { defaultModelOverride: env.CODEPUPPY_DEFAULT_MODEL } : {}),
     },
     // R8:云 MCP 定义在 main 用同一个工厂算;定义恒带 {file:} 引用(是否代付仍由 sidecar 注入按密钥文件在场性判)
     ...(cloudMcpUrl
       ? { cloudMcp: { name: CLOUD_MCP_SERVER_NAME, definition: materializeCloudMcpConfig(cloudMcpUrl, secretFileRef(input.userDataPath, "CODEPUPPY_MCP_TOKEN")) } }
       : {}),
-    // ADR-009 B2 的能力总闸(任意非空串即开;两条腿的拒绝判决都等于它)
-    webSearch: { killSwitch: Boolean(env.CODEPUPPY_WEBSEARCH_DISABLE) },
+    // ADR-009 B2 的能力总闸(两条腿的拒绝判决都等于它)
+    webSearch: { killSwitch: on(env.CODEPUPPY_WEBSEARCH_DISABLE) },
     skills: { factoryDirs: [...input.factorySkillDirs] },
     policy: input.policyAccount ? { account: input.policyAccount } : {},
     // ADR-038:正整数毫秒覆盖期限;空串同未设;不合法 ⇒ 忽略并记一行 ⇒ 缺省 300 s,从不是「没有期限」
     permission: askTimeout(env.CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS, input.log),
     network: input.egressProxyPort === undefined ? {} : { egressProxy: `http://127.0.0.1:${input.egressProxyPort}` },
     switches: {
-      modelsDisabled: env.CODEPUPPY_MODELS_DISABLE === "1",
-      identityDisabled: Boolean(env.CODEPUPPY_IDENTITY_DISABLE),
-      behaviorDisabled: Boolean(env.CODEPUPPY_BEHAVIOR_DISABLE),
-      promptRebrandDisabled: env.CODEPUPPY_PROMPT_REBRAND_DISABLE === "1",
-      automationDisabled: Boolean(env.CODEPUPPY_AUTOMATION_DISABLE),
-      readonlyDisabled: Boolean(env.CODEPUPPY_READONLY_DISABLE),
-      ecosystemInherit: env.CODEPUPPY_ECOSYSTEM_INHERIT === "1",
-      extVerbose: Boolean(env.CODEPUPPY_EXT_VERBOSE),
+      modelsDisabled: on(env.CODEPUPPY_MODELS_DISABLE),
+      identityDisabled: on(env.CODEPUPPY_IDENTITY_DISABLE),
+      behaviorDisabled: on(env.CODEPUPPY_BEHAVIOR_DISABLE),
+      promptRebrandDisabled: on(env.CODEPUPPY_PROMPT_REBRAND_DISABLE),
+      automationDisabled: on(env.CODEPUPPY_AUTOMATION_DISABLE),
+      readonlyDisabled: on(env.CODEPUPPY_READONLY_DISABLE),
+      ecosystemInherit: on(env.CODEPUPPY_ECOSYSTEM_INHERIT),
+      extVerbose: on(env.CODEPUPPY_EXT_VERBOSE),
     },
   })
 }
@@ -118,6 +118,9 @@ function askTimeout(raw: string | undefined, log: (line: string) => void): { ask
   log(ignored("CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS", "not a positive integer of milliseconds"))
   return {}
 }
+
+/** 开关没设即关 */
+const on = (value: string | undefined) => exportedFlag(value) === true
 
 function ignored(name: string, reason: string): string {
   return `bootstrap: ${name} ignored (${reason})`

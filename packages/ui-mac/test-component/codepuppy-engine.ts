@@ -8,6 +8,7 @@ import { engineSlot, type EngineSandbox } from "./engine-sandbox"
 import { buildEngineServerOptions } from "../src/main/engine-server-options"
 import { withEngineAuthorization } from "../src/main/engine-authorization"
 import { injectCodePuppyConfig } from "../src/main/codepuppy-config-injection"
+import { writeExplicitConfig, type ExplicitPolicy } from "../src/main/engine-explicit-config"
 import { secretFilePath, secretFileRef } from "../src/main/codepuppy-secret-files"
 import { buildHubRequestReply, buildHubViewReply } from "../src/main/codepuppy-sidecar-messages"
 import type { EngineFetch } from "../src/main/in-process-engine"
@@ -163,6 +164,16 @@ export function codepuppyEngine(options: HostOptions) {
   const injection = injectCodePuppyConfig(userData, withExt ? ext : undefined, "stable")
   const content = JSON.parse(injection.config.content) as { plugins: string[]; providers: Record<string, { models?: Record<string, unknown> }> }
   content.plugins = [...content.plugins, probeDir]
+  // `#1708`:显式文件的 plugin.use 只放行 ext 与用户全局来源;探针是宿主自己加的插件,同样按精确路径放行 —— 写进显式层
+  // (监听重写显式文件时也带着它),否则它在生产注入下与项目插件一样被拒。
+  if (injection.explicit) {
+    const explicit = injection.explicit
+    const recompute = explicit.plugins
+    const withProbe = (policies: ExplicitPolicy[]) => [...policies, { action: "plugin.use", resource: probeDir, effect: "allow" }]
+    explicit.layer.plugins = withProbe(explicit.layer.plugins)
+    explicit.plugins = (userText) => withProbe(recompute(userText))
+    writeExplicitConfig(explicit.file, explicit.userConfig, explicit.layer)
+  }
   // 沙箱里没有已应用的平台目录,平台节点的模型表是空的(`#1556`);补一个模型只为能发出请求
   if (options.platformModels !== null) content.providers.codepuppy!.models = options.platformModels ?? { m: { name: "m" } }
 

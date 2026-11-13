@@ -87,6 +87,7 @@ export type ContextSink =
   | "instruction" // ui-mac 写进 cfg.instructions 的文件:引擎 session/instruction.ts:135-150 读盘,request.ts:63-70 拼进 system 段
   | "vision-block" // `#1419` 云端识图结果块:用户消息里紧跟图片 part 的 synthetic text part(chat.message)/ Read 工具输出尾部(tool.execute.after)/ 回放历史时 cloud_vision 出错部件的替换文本与被省略的 input.image(messages.transform)
   | "attachment-block" // `#1553` 附件读取指令:用户消息里紧跟暂存附件记录的 synthetic text part(chat.message,attachment-reader-hooks.ts)
+  | "agent-mention" // `#1669` 点名助手的派发指令:用户消息里紧跟正文的一段文字(session.hook.context,agent-mention-hooks.ts)
 
 export type TextFragment = {
   readonly kind: "text"
@@ -447,6 +448,13 @@ function attachmentFragments(): (TemplateFragment | WrapperFragment)[] {
   ]
 }
 
+// ── agent-mention-hooks.ts:从 @ 菜单点名的助手 ⇒ 派给它(`#1669` R17)────────────────────────────────
+// 0.1.26 的 v1 引擎给每个 agent part 在用户消息里紧跟一段 synthetic 文本,叫模型调 task 工具派给那个助手(v0.1.26
+// packages/opencode/src/session/prompt.ts:1114-1128)。这里是同一句,工具名与参数名换成 2.x 的 `subagent` / `agent`
+// (core tool/plugin/subagent.ts)。`{name}` = 被点名助手的 id,整句按渲染结果量上限。
+export const AGENT_MENTION_ID = "agent-mention.delegate"
+export const AGENT_MENTION_TEMPLATE = "Use the above message and context to generate a prompt and call the subagent tool with agent: {name}"
+
 // rebrand 规则本体(from/to/file)住在 prompt-rebrand.ts —— drift 锁按 file 断言 from 仍在上游原文。
 // 这里只给每条 `to` 声明上限;两边 id 集合 1:1 由 context-injection.test.ts 钉住(多一条少一条都红)。
 function rebrandFragments(): RebrandFragment[] {
@@ -477,6 +485,8 @@ export const CONTEXT_INJECTIONS: readonly ContextInjection[] = Object.freeze([
   ...visionFragments(),
   // ── attachment-reader-hooks.ts:暂存附件的读取指令(`#1553`)──────────────────────────────
   ...attachmentFragments(),
+  // ── agent-mention-hooks.ts:点名助手的派发指令(`#1669`)────────────────────────────────────────
+  defineTemplate({ id: AGENT_MENTION_ID, sink: "agent-mention", template: AGENT_MENTION_TEMPLATE, maxBytes: CAP_DESCRIPTION }),
   // ── ui-mac codepuppy-config-injection.ts:cfg.instructions 文件(`#1296`)────────────────
   defineText({ id: BEHAVIOR_FRAGMENT_ID, sink: "instruction", text: CODEPUPPY_BEHAVIOR_MD, maxBytes: CAP_BODY }),
   ...identityFragments(),

@@ -48,6 +48,13 @@ describe("#1668 I7a 审批请求 2.x → v1", () => {
     })
   })
 
+  test("`#1669` R17:能力轴的 subagent 换回 v1 的 task(审批卡据此画委派卡);身份轴的 action 是 canonical(I7a),原样", () => {
+    const delegation = { ...fixture.frame.data, action: "subagent", resources: ["general"], save: ["general"] }
+    expect(toV1PermissionRequest(delegation as never)).toMatchObject({ permission: "task", patterns: ["general"], always: ["general"] })
+    const identity = { ...delegation, metadata: { ...I7A_METADATA, identity: { kind: "builtin", name: "subagent" }, policy: { canonical: "subagent", askedBy: "policy" } } }
+    expect(toV1PermissionRequest(identity as never)).toMatchObject({ permission: "subagent", patterns: ["general"] })
+  })
+
   test("反向臂:直接用冻结 app 的 1.17.13 归一(不补 2.x 的 `source.id`)⇒ 审批卡丢掉工具调用 id", async () => {
     const { normalizePermissionRequest } = await import("./frozen-shapes")
     expect((normalizePermissionRequest(asked as never).tool as { callID?: string }).callID).toBeUndefined()

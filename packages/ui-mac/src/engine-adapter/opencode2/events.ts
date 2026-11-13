@@ -2,7 +2,7 @@
 // (`data: {"directory", "payload": {"type", "properties"}}`)。
 //
 // 投影规则(方案 §2.3「事件流」):
-//   · 直通:pty.*、lsp.updated、vcs.branch.updated、mcp.*、reference.updated、server.connected、global.disposed;
+//   · 直通:pty.*、lsp.updated、vcs.branch.updated、mcp 的四种、reference.updated、server.connected、global.disposed;
 //     filesystem.changed → file.watcher.updated(另由回合改动补出项目文件的增删改,见 fileChanges);
 //   · 改名:location.shutdown → server.instance.disposed;agent/command/skill.updated → catalog.updated;
 //     project.updated(`canonical` → `worktree`);permission.asked(I7a 字段映射)/ replied;
@@ -12,12 +12,13 @@
 //   · 消息:流式增量(text / reasoning)直接转 message.part.delta;其余每个结构性事件之后重取最近一页消息,
 //     经 toV1Messages 投影,**只发有变化的** message.updated / message.part.updated —— 增量只用来让字一个个出来,
 //     内容以 2.x 存储为准。todowrite 工具的输入同时投影成 todo.updated(U1)。
-// 不认识的事件丢弃(它们在 v1 没有对应,冻结界面也不读)。
+// 不认识的事件丢弃(它们在 v1 没有对应,冻结界面也不读)。发出的事件只能是约定事件表里的类型(contract/events.ts,`#1697` I-04)。
 import type { OpenCodeClient, OpenCodeEvent, SessionMessageInfo } from "@opencode/client/promise"
 import type { Part } from "@opencode-ai/sdk/v2/client"
+import type { ContractEventType } from "../contract/events"
 import { normalizeSessionInfo } from "../frozen-shapes"
 import type { PermissionReplies } from "./permission-replies"
-import type { RouteContext } from "./routes"
+import type { TranslatorContext } from "./routes"
 import { recentMessages, rememberSessionDirectory, sessionDirectory } from "./session-cache"
 import {
   contentKeys,
@@ -31,7 +32,8 @@ import {
   withTurnDiffs,
 } from "./v1-shapes"
 
-export type V1Payload = { type: string; properties: unknown }
+// 载荷按约定定型随 M2b;这里先只约束事件名(计划 docs/specs/upgrade-ui-contract/plan.md M1b)。
+export type V1Payload = { type: ContractEventType; properties: unknown }
 type Emit = (directory: string, payload: V1Payload) => void
 
 const SNAPSHOT_WINDOW = 20
@@ -112,7 +114,7 @@ const shellPreview = (text: string) => (text.length <= SHELL_PREVIEW_MAX ? text 
 /** 2.x 回合改动的 status → v1 文件监视事件(files-core.ts watcherRefreshTarget:add / unlink 重列父目录)。 */
 const WATCH_EVENTS: Record<string, "add" | "unlink" | "change"> = { added: "add", deleted: "unlink", modified: "change" }
 
-const PASS_THROUGH = new Set([
+const PASS_THROUGH: ReadonlySet<string> = new Set<ContractEventType>([
   "pty.created",
   "pty.updated",
   "pty.exited",
@@ -123,6 +125,16 @@ const PASS_THROUGH = new Set([
   "server.connected",
   "global.disposed",
 ])
+
+/** 2.x 的 MCP 事件,两代同形直通。2.x 只定义这四种(schema/src/mcp-event.ts 三种、core/src/mcp/index.ts 的 prompts.changed)。 */
+const MCP_EVENTS: ReadonlySet<string> = new Set<ContractEventType>([
+  "mcp.status.changed",
+  "mcp.resources.changed",
+  "mcp.tools.changed",
+  "mcp.prompts.changed",
+])
+
+const isPassThrough = (type: string): type is ContractEventType => PASS_THROUGH.has(type) || MCP_EVENTS.has(type)
 
 export function createProjector(api: OpenCodeClient, emit: Emit, permissions: PermissionReplies) {
   /** 助手消息 → content 块的语义键(按出现顺序 = content 下标),流式 part 的 id 由它定。 */
@@ -286,8 +298,7 @@ export function createProjector(api: OpenCodeClient, emit: Emit, permissions: Pe
       frame.location?.directory ?? (sessionID ? await sessionDirectory(api, sessionID).catch(() => "global") : "global")
     const type = frame.type
 
-    if (PASS_THROUGH.has(type)) return emit(directory, { type, properties: data })
-    if (type.startsWith("mcp.")) return emit(directory, { type, properties: data })
+    if (isPassThrough(type)) return emit(directory, { type, properties: data })
     if (type === "location.shutdown") return emit(directory, { type: "server.instance.disposed", properties: { directory } })
     if (type === "agent.updated" || type === "command.updated" || type === "skill.updated")
       return emit(directory, { type: "catalog.updated", properties: {} })
@@ -377,7 +388,7 @@ export function createProjector(api: OpenCodeClient, emit: Emit, permissions: Pe
 }
 
 /** `GET /global/event` 的 handler:一个 SSE Response,订阅方中止即退订 2.x。 */
-export function projectEventStream(context: RouteContext): Response {
+export function projectEventStream(context: TranslatorContext): Response {
   const controller = new AbortController()
   const abort = () => controller.abort()
   context.signal.addEventListener("abort", abort)

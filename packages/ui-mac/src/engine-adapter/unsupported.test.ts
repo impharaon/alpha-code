@@ -56,3 +56,45 @@ describe("#1668 适配器的表外请求", () => {
     expect(seen).toEqual([`GET ${ENGINE}/api/session/ses_1`])
   })
 })
+
+// `#1697`(I-04,设计 §4.8、UC-14、UC-19、R8、R15):约定侧自己答的两类请求 —— 探活回退与三条固定答复,都不碰引擎。
+describe("#1697 约定侧的探活回退与固定答复", () => {
+  test("探活回退 GET /api/health ⇒ 同一个 501 信封,console.error 一次都不调,引擎零请求", async () => {
+    const error = spyOn(console, "error").mockImplementation(() => {})
+    const { engineFetch, seen } = harness()
+    const response = await engineFetch(`${ENGINE}/api/health`)
+    expect(response.status).toBe(501)
+    expect(await response.json()).toEqual({ name: UNSUPPORTED_ERROR_NAME, data: { method: "GET", path: "/api/health" } })
+    expect(error).not.toHaveBeenCalled()
+    expect(seen).toEqual([])
+  })
+
+  test("冻结的健康检查(checkServerHealth)经 engineFetch:先探 /api/health 得 501,回退 /global/health 判健康;不记错误日志,引擎只收到 /global/health 那一次", async () => {
+    const { checkServerHealth } = await import("../../../codepuppy-app/src/utils/server-health")
+    const error = spyOn(console, "error").mockImplementation(() => {})
+    const seen: string[] = []
+    const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init)
+      seen.push(`${request.method} ${new URL(request.url).pathname}`)
+      if (new URL(request.url).pathname === "/api/info") return Response.json({ version: "2.0.0-probe" })
+      return new Response("unexpected", { status: 500 })
+    }) as typeof globalThis.fetch
+    const engineFetch = createEngineFetch({ isEngineOrigin: (origin) => origin === ENGINE, fetch })
+    const health = await checkServerHealth({ url: ENGINE }, engineFetch as typeof globalThis.fetch, { retryCount: 0 })
+    expect(health).toEqual({ healthy: true, version: "2.0.0-probe" })
+    expect(error).not.toHaveBeenCalled()
+    expect(seen).toEqual(["GET /api/info"])
+  })
+
+  test("三条固定答复:/global/config 与 /config 回 {},v2 审批通道列表回 {data: []};引擎零请求", async () => {
+    const { engineFetch, seen } = harness()
+    const read = async (path: string) => {
+      const response = await engineFetch(`${ENGINE}${path}`)
+      return { status: response.status, body: await response.json() }
+    }
+    expect(await read("/global/config")).toEqual({ status: 200, body: {} })
+    expect(await read("/config?directory=%2Ftmp")).toEqual({ status: 200, body: {} })
+    expect(await read("/api/session/ses_1/permission")).toEqual({ status: 200, body: { data: [] } })
+    expect(seen).toEqual([])
+  })
+})

@@ -186,7 +186,11 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 
 ### 偏离记录
 
-暂无
+- 2026-11-12 · 目录基数按编排器裁决 1 取 A 的表:`SERVED` 88、`UNSUPPORTED` 22、`PROBE_FALLBACK` 1。设计 R1 / R9 / §4.1 / §9 M1 写的 87 / 18 是 E 上的数(差别见「对账」),编排器在设计 §10 留注 · M1b 提交。
+- 2026-11-12 · 投影器的 `emit` 本片只按事件名定型(`ContractEventType`),载荷按 `ContractEventMap` 定型挪到 M2b:按名定型已经能保证翻译器只发约定里的事件;按载荷定型时,A 的投影器对 `message.updated`、`session.created`、`session.updated`(只发 `info`)、`session.deleted`(`info` 可缺)、`message.part.updated`(只发 `part`)发的字段比 v1 SDK 声明的少,`question.replied` / `question.rejected` 的 `sessionID` 可能为空 —— 要么改投影(运行时变化,本片差分必须为空),要么按设计 §5 末条逐条判真伪,归 M2b 与路由类型一起处理 · M1b 提交。
+- 2026-11-12 · `index.ts` 不再导出 `matchRoute`(唯一用户是覆盖测试);匹配由约定导出 `matchServed` / `matchUnsupported` / `matchProbeFallback`,算法照 A 的 `index.ts:28-57` · M1b 提交。
+- 2026-11-12 · 覆盖扫描排除 `*.stories.*`:新加的字面量路径形式在 `codepuppy-session-ui` 的一个 story 里扫出 `POST /__playground/apply-css`(storybook 的开发服务器,不经 engineFetch);22 个 story 文件里没有任何客户端调用,排除它们不丢旧扫描的结果 · M1b 提交。
+- 2026-11-12 · 顺序里的两个提交合成一个:先红后绿改用变异证明(去掉探活回退登记 ⇒ `unsupported.test.ts` 两条与覆盖测试两条红;关掉构造链形式 ⇒ 真树与已知坏例 ① 红;renderer 加一个目录外调用 ⇒ 覆盖两条红),输出记在提交说明里 · M1b 提交。
 
 ## M2a — 翻译器自有投影
 
@@ -252,6 +256,7 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 | `packages/ui-mac/package.json` | 加 `"@opencode-ai/client": "file:../codepuppy-app/vendor/opencode-ai-client-1.17.13-v2.tgz"`,只作类型使用,与 `codepuppy-session-ui/package.json:41` 同一个 tgz(提前的理由见「待核对 4」) |
 | `bun.lock` | 只提交这条依赖在 ui-mac 段加的那几行(裁决 4) |
 | `contract/events.ts` | `session.usage.updated`、`mcp.status.changed`、`mcp.resources.changed` 三种改为引用 1.17.13 的事件类型(裁决 2) |
+| `opencode2/events.ts` | `emit` 按 `ContractEventMap` 的载荷定型(从 M1b 挪来,见 M1b 偏离记录);少发的字段按设计 §5 末条逐条处理(纯类型问题在编译期处理,真实运行时差异按当前正式版修并在 PR 列出) |
 
 ### 顺序
 

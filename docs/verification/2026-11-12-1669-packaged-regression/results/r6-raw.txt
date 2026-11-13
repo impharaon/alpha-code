@@ -43,3 +43,23 @@ resize: dragging the panel grip (881 -> 737 CSS px) widens the panel but stty si
 close/reopen: right panel 审查 -> 终端: terminal area black, .a-term-output empty, no input element, no new /pty/connect; returns (with history replayed) only after switching conversation away and back
 file panel: file created from outside the app 01:09:24 -> listed in 文件 panel within 0.5 s
 @ search: "@outside-app" -> popup "文件 l7r6-outside-app.md" (7 s, first query)
+   correction (screenshot r6-p1-stale-card-deny.png): after 拒绝 on the stale card it shows "未能提交你的选择 / 没有收到授权收据;本界面不会假定操作已经获准。/ Permission request not found: per_…" and a "重试「拒绝」" button; the card cannot be dismissed.
+   caution: in the hidden window innerText/textContent sometimes trail the screen (cards present in screenshots were missing from DOM reads); every verdict below rests on a screenshot or the engine database.
+
+## fresh profile, root E (gate r6-gate-E.txt; watchdog reused, sha 0abd0238…; launched hidden with CDP 9223; onboarding skipped via calm; 0 authorize-url opens in e1/e2 logs)
+e1 home: data-auth=out, "项目 / 暂无项目 / 打开项目", no "搜索项目 / 会话…" box, no engine-scratch-cwd (engine project table does hold the engine-scratch-cwd row)
+open a real temp directory: NOT-RUN — 打开项目 calls window.api.openDirectoryPicker -> dialog.showOpenDialog (native panel on the owner's screen)
+fake DeepSeek key (sk-l7r6-fake…, not a real key) saved via picker -> "respawning sidecar {reason:'byok-change'} … sidecar respawned + renderer reloaded" (screenshots then time out until restart)
+send from home 01:30:27 -> engine provider.auth 401, idle failed; after restart (e2) opening the conversation from the sidebar shows card "登录或 Key 无效 / 重新登录 / 去设置 / 开发者详情";
+   second send from home on e2 (no reload) -> lands in the new conversation with the same card (r6-e2-fake-key-live.png) — same as 0.1.26 (r5-cmp-126-fake-key-turn.png)
+default workspace group: after the first message the sidebar shows "code-puppy" once with the conversation; engine-scratch-cwd not listed
+logged-out platform send: NOT-RUN — the picker's platform rows are needs-login; picking one calls window.api.auth.start() (browser login)
+
+## root D (synthetic 0.1.26 data, already migrated by 2.x in r5), candidate copy launched hidden (CDP 9224)
+sidebar: one "code-puppy" with 新对话 + l7 drill synthetic session 1–3 (r5 1.x view listed two code-puppy + engine-scratch-cwd)
+session 3 (stub model, unavailable): opens with the old turns and the "运行 1 次" bash step; composer chip "选择模型"; pressing send -> toast "当前模型不可用 / 请在模型选择器中改选当前可用的模型。", nothing sent (no POST /prompt)
+
+## audit A (root A, a7 = restart after the connector-change renderer reload)
+one conversation ses_e2c5b9d04ffe…: 只读 -> "当前会话是只读模式，我不能创建文件…" no file (agent codepuppy-readonly); 全部批准 -> l7r6-a-all1.txt written, no card (agent build);
+请求审批 -> card, 允许一次 -> written (agent codepuppy-ask); 全部批准 -> l7r6-a-all2.txt written, no card (agent build)
+/review picked from the slash menu -> POST /command 204; child session "review changes [commit|branch|pr]…" ran (agent build) and its result was injected into the parent; 继续 -> answered by agent build

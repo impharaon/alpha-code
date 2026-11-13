@@ -5,6 +5,10 @@
 // 取数时机:登录现值每送达一次(含挂载后的首值,即「打开时取一次」;换号 / 登出也走这里)就清空重取;每次派发
 // 请求返回后由宿主调 `refresh()`;窗口重新获得焦点且上次结果超过 30 秒时重取。不轮询、不持久化。
 // 乱序:本表单内递增序号,只采用「当前任务 + 最新序号」的回复;旧序号的回复(含主进程的 identity-changed)丢弃。
+// 频率(R1 M3):预检与派发、状态轮询共用平台每 IP 每分钟 120 次的认证前桶。连续切换任务只查停下来的那一个
+// (尾随 300 ms),本窗口所有预检区合计每滚动 60 秒最多 20 次;超出时按「查不到」处理(不加东西),提交不受影响。
+// 派发拒绝(R1 M4):宿主在派发被拒后调 `suppressVerdict()`,卡片照常,结论不显示 —— 派发的拒绝原句才是这一刻的
+// 结论(设计 §4.4)。改输入或开始新的提交(宿主调 `releaseVerdict()`)、或换任务时解除。
 
 import { createEffect, createSignal, onCleanup, Show } from "solid-js"
 import { t } from "../i18n"
@@ -18,6 +22,24 @@ import { dispatchError } from "./cloud-job-lifecycle"
 
 /** 焦点刷新的新鲜度门槛(设计 §4.4「取数时机」;表单内常量,不是配置)。 */
 export const PREFLIGHT_STALE_MS = 30_000
+/** 连续切换任务时,停下来多久才查(尾随合并)。 */
+export const PREFLIGHT_SETTLE_MS = 300
+/** 本窗口所有预检区合计、每滚动 60 秒的请求上限;给派发与状态轮询留出共用桶(120/分钟)的绝大部分。 */
+export const PREFLIGHT_MAX_PER_MINUTE = 20
+const PREFLIGHT_WINDOW_MS = 60_000
+
+// 模块级:同一窗口里换条目会重建发送框,上限必须跨实例计,否则「每次新建都重新起算」就没有上界。
+const sentAt: number[] = []
+function takeBudget(now: number) {
+  while (sentAt.length > 0 && now - sentAt[0]! >= PREFLIGHT_WINDOW_MS) sentAt.shift()
+  if (sentAt.length >= PREFLIGHT_MAX_PER_MINUTE) return false
+  sentAt.push(now)
+  return true
+}
+/** 测试用:清空本窗口的请求记账。 */
+export function resetPreflightBudgetForTests() {
+  sentAt.length = 0
+}
 
 type PreflightView =
   | { kind: "off" } // 表单未就绪:不请求、不显示
@@ -40,18 +62,33 @@ export function createCloudPreflight(input: { task: () => string; ready: () => b
   const [view, setView] = createSignal<PreflightView>({ kind: "off" })
   // 忙时卡片保留最近一次结果(设计状态表 busy 行)。只在同一个登录里保留:每次登录现值送达都清掉。
   const [last, setLast] = createSignal<CloudAccountStatus | undefined>()
+  // 派发被拒后:卡片照常,结论让位给派发的拒绝原句(R1 M4)。
+  const [verdictSuppressed, setVerdictSuppressed] = createSignal(false)
   let seq = 0
   let inFlight = false
   let appliedAt = 0
+  let disposed = false
+  let settleTimer: ReturnType<typeof setTimeout> | undefined
+  onCleanup(() => {
+    // R1 m6:卸载之后不再发请求、不再写状态(在途提交返回时宿主仍会调 refresh)。
+    disposed = true
+    seq++
+    clearTimeout(settleTimer)
+  })
 
   const fetchNow = () => {
-    if (!input.ready()) return
+    if (disposed || !input.ready()) return
+    clearTimeout(settleTimer)
     const mine = ++seq
     const task = input.task()
+    if (!takeBudget(Date.now())) {
+      inFlight = false
+      return setView({ kind: "unavailable" })
+    }
     inFlight = true
     setView({ kind: "loading" })
     void window.api.cloud.accountStatus(task).then((result) => {
-      if (mine !== seq || task !== input.task() || !input.ready()) return
+      if (disposed || mine !== seq || task !== input.task() || !input.ready()) return
       inFlight = false
       if ("error" in result) {
         // 请求在途时换了号:主进程已丢掉上一个账号的结果。不在这里自己重取(那会和主进程互相追成循环),
@@ -89,14 +126,20 @@ export function createCloudPreflight(input: { task: () => string; ready: () => b
     })
   })
 
-  // 任务换了(同一个组件换条目):旧回复按「当前任务」丢弃,并为新任务重取。
+  // 任务换了(同一个组件换条目):旧回复丢弃、立刻显示「…」;连续切换只查停下来的那一个(R1 M3)。
   let previousTask = input.task()
   createEffect(() => {
     const task = input.task()
     if (task === previousTask) return
     previousTask = task
+    seq++
     setLast(undefined)
-    fetchNow()
+    setVerdictSuppressed(false)
+    if (!input.ready()) return
+    inFlight = true
+    setView({ kind: "loading" })
+    clearTimeout(settleTimer)
+    settleTimer = setTimeout(fetchNow, PREFLIGHT_SETTLE_MS)
   })
 
   const onFocus = () => {
@@ -109,8 +152,13 @@ export function createCloudPreflight(input: { task: () => string; ready: () => b
   return {
     view,
     last,
-    /** 宿主在每次派发请求返回后调用(受理或拒绝)。 */
+    /** 宿主在每次派发请求返回后调用(受理或拒绝)。卸载后无效。 */
     refresh: fetchNow,
+    verdictSuppressed,
+    /** 派发被拒后宿主调用:结论让位给派发的拒绝原句。 */
+    suppressVerdict: () => setVerdictSuppressed(true),
+    /** 用户改了输入或开始新的提交时宿主调用。 */
+    releaseVerdict: () => setVerdictSuppressed(false),
     /** 目录表单原来那行「预留 US$…」:只在查不到、或表单未就绪(不请求)时保留。 */
     showsLegacyHold: () => view().kind === "off" || view().kind === "unavailable",
   }
@@ -170,7 +218,7 @@ export function CloudPreflightArea(props: { preflight: CloudPreflight; busy: boo
   }
 
   const banner = () => {
-    if (props.busy) return undefined
+    if (props.busy || props.preflight.verdictSuppressed()) return undefined
     const view = props.preflight.view()
     if (view.kind === "signed-out") {
       const copy = failureCopy("unauthorized")!

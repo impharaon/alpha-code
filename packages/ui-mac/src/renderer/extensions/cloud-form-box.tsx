@@ -60,6 +60,7 @@ export function CloudFormBox(props: { cloud: CloudBehaviorV1; ready: boolean; re
       ),
     }
     setState({ phase: "dispatching", err: "", errAction: null, savedDir: "", result: "", files: [] })
+    preflight.releaseVerdict()
     const picked = await window.api.openDirectoryPicker({ title: t("codepuppy.ext.cloudPickResults") })
     const directory = Array.isArray(picked) ? picked[0] : picked
     if (!directory) {
@@ -76,6 +77,8 @@ export function CloudFormBox(props: { cloud: CloudBehaviorV1; ready: boolean; re
     const result = await window.api.cloud.dispatch(envelope)
     preflight.refresh()
     if ("error" in result) {
+      // R1 M4:派发的拒绝原句是这一刻的结论,预检结论让位,直到改输入或再次提交。
+      preflight.suppressVerdict()
       setState({ phase: "failed", err: dispatchError(result.error, undefined, result.netLayer), errAction: failureCopy(result.error)?.action ?? null })
       return
     }
@@ -110,7 +113,10 @@ export function CloudFormBox(props: { cloud: CloudBehaviorV1; ready: boolean; re
                 <select
                   aria-label={field.label}
                   disabled={!props.ready || busy()}
-                  onChange={(event) => setState("values", field.name, event.currentTarget.value)}
+                  onChange={(event) => {
+                    setState("values", field.name, event.currentTarget.value)
+                    preflight.releaseVerdict()
+                  }}
                 >
                   {/* 没有预选项时留一个空选项:必填 ⇒ 用户必须自己选;可选 ⇒ 空 = 不发这个键。 */}
                   <Show when={!field.default}>
@@ -133,7 +139,10 @@ export function CloudFormBox(props: { cloud: CloudBehaviorV1; ready: boolean; re
                   maxlength={field.maxChars}
                   value={state.values[field.name] ?? ""}
                   disabled={!props.ready || busy()}
-                  onInput={(event) => setState("values", field.name, event.currentTarget.value)}
+                  onInput={(event) => {
+                    setState("values", field.name, event.currentTarget.value)
+                    preflight.releaseVerdict()
+                  }}
                 />
               ) : (
                 <input
@@ -143,13 +152,26 @@ export function CloudFormBox(props: { cloud: CloudBehaviorV1; ready: boolean; re
                   maxlength={field.maxChars}
                   value={state.values[field.name] ?? ""}
                   disabled={!props.ready || busy()}
-                  onInput={(event) => setState("values", field.name, event.currentTarget.value)}
+                  onInput={(event) => {
+                    setState("values", field.name, event.currentTarget.value)
+                    preflight.releaseVerdict()
+                  }}
                 />
               )}
             </label>
           )}
         </For>
         <CloudPreflightArea preflight={preflight} busy={busy()} />
+        {/* #1686 定案 B:主按钮视觉上在按钮行最右(CSS order),DOM 与键盘顺序仍是主按钮在前(R1 m5)。 */}
+        <button
+          class="codepuppy-ext-add"
+          data-variant="primary"
+          data-cloud-form-submit=""
+          disabled={!props.ready || busy() || !props.cloud.fields.every(satisfied)}
+          onClick={() => void run()}
+        >
+          {t(state.phase === "dispatching" ? "codepuppy.ext.cloudDispatching" : state.phase === "running" ? "codepuppy.ext.cloudRunning" : "codepuppy.ext.cloudStart")}
+        </button>
         <Show when={!props.ready}>
           <span class="codepuppy-ext-meta">
             {props.recovering ? t("codepuppy.ext.cloudRecoveringNote") : t("codepuppy.ext.cloudNeedPlatformNote")}
@@ -171,16 +193,6 @@ export function CloudFormBox(props: { cloud: CloudBehaviorV1; ready: boolean; re
         <Show when={state.phase === "running" && state.cancel === "cancelling"}>
           <span class="codepuppy-ext-meta" data-live="" data-cancelling="">{t("codepuppy.ext.cloudCancelling")}</span>
         </Show>
-        {/* #1686 定案 B:主按钮在按钮行最右,状态字、「取消任务」、未登录提示在它左边。 */}
-        <button
-          class="codepuppy-ext-add"
-          data-variant="primary"
-          data-cloud-form-submit=""
-          disabled={!props.ready || busy() || !props.cloud.fields.every(satisfied)}
-          onClick={() => void run()}
-        >
-          {t(state.phase === "dispatching" ? "codepuppy.ext.cloudDispatching" : state.phase === "running" ? "codepuppy.ext.cloudRunning" : "codepuppy.ext.cloudStart")}
-        </button>
       </div>
       <Show when={state.phase === "done"}>
         <p class="codepuppy-ext-dnote" data-ok="">

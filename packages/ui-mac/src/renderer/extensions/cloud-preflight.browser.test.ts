@@ -128,6 +128,41 @@ for (const box of ["form", "legacy", "code-review"] as const) {
     }
   }, 60_000)
 
+  // R1 m5:主按钮视觉最右靠 CSS order;键盘 Tab 顺序保持原样 —— 主按钮在前、次按钮其次、「取消任务」最后。
+  test(`#1686 ${box}: keyboard order keeps the primary first while it sits rightmost`, async () => {
+    const page = await open(`box=${box}&state=ok`)
+    try {
+      await page.locator(".a-banner").waitFor()
+      const focused = () =>
+        page.evaluate(() => {
+          const el = document.activeElement as HTMLElement | null
+          return el?.matches("[data-variant=primary]") ? "primary" : el?.matches("[data-cloud-secondary]") ? "secondary" : el?.matches("[data-cancel-job]") ? "cancel" : el?.tagName.toLowerCase()
+        })
+      if (box === "code-review") {
+        await page.locator(".codepuppy-ext-cloudrun [data-variant=primary]").focus()
+        expect(await focused()).toBe("primary")
+        await page.keyboard.press("Tab")
+        expect(await focused()).toBe("secondary")
+      } else {
+        await page.locator("textarea").fill("2026 年国内中小企业使用 AI 编程助手的情况")
+        await page.locator("textarea").focus()
+        await page.keyboard.press("Tab")
+        expect(await focused()).toBe("primary")
+        await page.keyboard.press("Enter")
+        await page.locator("[data-cancel-job]").waitFor()
+        await page.locator("textarea").focus()
+        await page.keyboard.press("Tab")
+        // 执行中主按钮被禁用、跳过;下一个可聚焦的是视觉上在它左边的「取消任务」。
+        expect(await focused()).toBe("cancel")
+      }
+      const m = await measure(page)
+      near(m.primaryRightGap, 0)
+      expect(m.primaryIsRightmost).toBe(true)
+    } finally {
+      await page.close()
+    }
+  }, 60_000)
+
   test(`#1686 ${box}: not ready shows the sign-in note left of the rightmost primary and no preflight`, async () => {
     const page = await open(`box=${box}&state=not-ready`)
     try {

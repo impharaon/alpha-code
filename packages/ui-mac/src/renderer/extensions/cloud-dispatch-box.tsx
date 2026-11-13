@@ -86,6 +86,7 @@ export function CloudDispatchBox(props: { entryId?: string; spec: CloudPipelineS
       return
     }
     if (result.status === "failed") {
+      preflight.suppressVerdict() // R1 M4:派发/上传的拒绝原句是这一刻的结论
       setState({ phase: "failed", err: uploadError(result.error), errAction: failureCopy(result.error)?.action ?? null, consent: null, consentBusy: false })
       return
     }
@@ -105,6 +106,7 @@ export function CloudDispatchBox(props: { entryId?: string; spec: CloudPipelineS
   }
 
   const runUpload = async () => {
+    preflight.releaseVerdict()
     setState({ phase: "dispatching", err: "", errAction: null, savedDir: "", diffSource: null, transparent: false })
     await consumeUpload(await window.api.cloud.upload({ kind: "code-review" }))
   }
@@ -124,6 +126,7 @@ export function CloudDispatchBox(props: { entryId?: string; spec: CloudPipelineS
   }
 
   const runLegacyDiff = async () => {
+    preflight.releaseVerdict()
     setState({ err: "", errAction: null, savedDir: "", diffSource: null, transparent: false })
     const picked = await window.api.openDirectoryPicker({ title: t("codepuppy.ext.cloudPickProject") })
     const directory = Array.isArray(picked) ? picked[0] : picked
@@ -145,6 +148,7 @@ export function CloudDispatchBox(props: { entryId?: string; spec: CloudPipelineS
     const result = await window.api.cloud.dispatch(envelope)
     preflight.refresh()
     if ("error" in result) {
+      preflight.suppressVerdict() // R1 M4
       setState({ err: dispatchError(result.error, undefined, result.netLayer), errAction: failureCopy(result.error)?.action ?? null, phase: "failed" })
       return
     }
@@ -165,6 +169,7 @@ export function CloudDispatchBox(props: { entryId?: string; spec: CloudPipelineS
         ? { code: state.input.trim() }
         : { topic: state.input.trim(), format: format() }
     setState({ phase: "dispatching", err: "", errAction: null, savedDir: "", result: "", files: [] })
+    preflight.releaseVerdict()
     const picked = await window.api.openDirectoryPicker({ title: t("codepuppy.ext.cloudPickResults") })
     const directory = Array.isArray(picked) ? picked[0] : picked
     if (!directory) {
@@ -181,6 +186,7 @@ export function CloudDispatchBox(props: { entryId?: string; spec: CloudPipelineS
     const result = await window.api.cloud.dispatch(envelope)
     preflight.refresh()
     if ("error" in result) {
+      preflight.suppressVerdict() // R1 M4
       setState({ phase: "failed", err: dispatchError(result.error, undefined, result.netLayer), errAction: failureCopy(result.error)?.action ?? null })
       return
     }
@@ -198,13 +204,41 @@ export function CloudDispatchBox(props: { entryId?: string; spec: CloudPipelineS
         <CloudPreflightArea preflight={preflight} busy={busy()} />
       </Show>
       <div class="codepuppy-ext-cloudrun">
+        {/* #1686 定案 B:主按钮视觉上在按钮行最右、代码审查的「发送 Git 代码改动」紧挨在它左边(CSS order);
+            DOM 与键盘顺序保持原样 —— 主按钮在前(R1 m5)。 */}
+        <Show when={props.spec.pipelineKind === "code-review"}>
+          <button
+            ref={(element) => (triggerButton = element)}
+            class="codepuppy-ext-add"
+            data-variant="primary"
+            disabled={!props.ready || busy()}
+            onClick={() => void runUpload()}
+          >
+            {state.phase === "dispatching"
+              ? t("codepuppy.ext.cloudDispatching")
+              : state.phase === "running"
+                ? t("codepuppy.ext.cloudRunning")
+                : t("codepuppy.cloud.consent.uploadPick")}
+          </button>
+          <button class="codepuppy-ext-add" data-cloud-secondary="" disabled={!props.ready || busy()} onClick={() => void runLegacyDiff()}>
+            {t("codepuppy.cloud.consent.legacyDiff")}
+          </button>
+        </Show>
         <Show when={props.spec.pipelineKind !== "code-review"}>
           <label style={{ width: "100%" }}>
             {inputLabel()}
             <textarea class="codepuppy-ext-ddoc" style={{ width: "100%" }} rows={6} aria-label={inputLabel()} value={state.input}
-              disabled={!props.ready || busy()} onInput={(event) => setState("input", event.currentTarget.value)} />
+              disabled={!props.ready || busy()} onInput={(event) => {
+                setState("input", event.currentTarget.value)
+                preflight.releaseVerdict()
+              }} />
           </label>
           <CloudPreflightArea preflight={preflight} busy={busy()} />
+          <button class="codepuppy-ext-add" data-variant="primary" data-cloud-input=""
+            disabled={!props.ready || busy() || !state.input.trim() || (props.spec.pipelineKind === "office-report" && !format())}
+            onClick={() => void runInput()}>
+            {t(state.phase === "dispatching" ? "codepuppy.ext.cloudDispatching" : state.phase === "running" ? "codepuppy.ext.cloudRunning" : "codepuppy.ext.cloudStart")}
+          </button>
         </Show>
         <Show when={!props.ready}>
           <span class="codepuppy-ext-meta">
@@ -235,32 +269,6 @@ export function CloudDispatchBox(props: { entryId?: string; spec: CloudPipelineS
         </Show>
         <Show when={state.phase === "running" && state.cancel === "cancelling"}>
           <span class="codepuppy-ext-meta" data-live="" data-cancelling="">{t("codepuppy.ext.cloudCancelling")}</span>
-        </Show>
-        {/* #1686 定案 B:主按钮在按钮行最右;代码审查的「发送 Git 代码改动」紧挨在它左边。 */}
-        <Show when={props.spec.pipelineKind === "code-review"}>
-          <button class="codepuppy-ext-add" disabled={!props.ready || busy()} onClick={() => void runLegacyDiff()}>
-            {t("codepuppy.cloud.consent.legacyDiff")}
-          </button>
-          <button
-            ref={(element) => (triggerButton = element)}
-            class="codepuppy-ext-add"
-            data-variant="primary"
-            disabled={!props.ready || busy()}
-            onClick={() => void runUpload()}
-          >
-            {state.phase === "dispatching"
-              ? t("codepuppy.ext.cloudDispatching")
-              : state.phase === "running"
-                ? t("codepuppy.ext.cloudRunning")
-                : t("codepuppy.cloud.consent.uploadPick")}
-          </button>
-        </Show>
-        <Show when={props.spec.pipelineKind !== "code-review"}>
-          <button class="codepuppy-ext-add" data-variant="primary" data-cloud-input=""
-            disabled={!props.ready || busy() || !state.input.trim() || (props.spec.pipelineKind === "office-report" && !format())}
-            onClick={() => void runInput()}>
-            {t(state.phase === "dispatching" ? "codepuppy.ext.cloudDispatching" : state.phase === "running" ? "codepuppy.ext.cloudRunning" : "codepuppy.ext.cloudStart")}
-          </button>
         </Show>
       </div>
       <Show when={state.phase === "done"}>

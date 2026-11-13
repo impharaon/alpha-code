@@ -4,7 +4,7 @@
 // 每个变体都先过桌面的严格解码器,保证仍是平台会发的形状。
 
 import { GlobalRegistrator } from "@happy-dom/global-registrator"
-import { afterAll, afterEach, describe, expect, setSystemTime, test } from "bun:test"
+import { afterAll, afterEach, describe, expect, jest, setSystemTime, test } from "bun:test"
 import appPlugin from "@opencode-ai/app/vite"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -12,7 +12,7 @@ import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 import { build } from "vite"
 import { decodeContract, type AccountStatusV1 } from "@codepuppy/contracts-consumer"
-import type { createComponent } from "solid-js"
+import type { createComponent, createSignal } from "solid-js"
 import type { render } from "solid-js/web"
 import type { CloudDispatchBox } from "./cloud-dispatch-box"
 import type { CloudFormBox } from "./cloud-form-box"
@@ -46,16 +46,20 @@ await build({
 GlobalRegistrator.register()
 const runtime = (await import(pathToFileURL(join(directory, "runtime.js")).href)) as {
   createComponent: typeof createComponent
+  createSignal: typeof createSignal
   render: typeof render
   CloudFormBox: typeof CloudFormBox
   CloudDispatchBox: typeof CloudDispatchBox
   resetAuthRecoveryForTests: () => void
+  resetPreflightBudgetForTests: () => void
 }
 const disposers: (() => void)[] = []
 afterEach(() => {
   disposers.splice(0).forEach((dispose) => dispose())
   document.body.replaceChildren()
   runtime.resetAuthRecoveryForTests()
+  runtime.resetPreflightBudgetForTests()
+  jest.useRealTimers()
   setSystemTime()
 })
 afterAll(async () => {
@@ -96,7 +100,10 @@ function deferred() {
   return { promise, resolve: resolveReply }
 }
 
-function mount(box: Box, options: { ready?: boolean; reply?: () => Promise<Reply>; dispatch?: () => Promise<unknown> } = {}) {
+function mount(
+  box: Box,
+  options: { ready?: boolean; reply?: () => Promise<Reply>; dispatch?: () => Promise<unknown>; task?: () => string } = {},
+) {
   const calls: string[] = []
   const actions: string[] = []
   const envelopes: CloudJobEnvelope[] = []
@@ -145,9 +152,16 @@ function mount(box: Box, options: { ready?: boolean; reply?: () => Promise<Reply
     runtime.render(
       () =>
         box === "form"
-          ? runtime.createComponent(runtime.CloudFormBox, { cloud: described(), ready })
+          ? runtime.createComponent(runtime.CloudFormBox, {
+              get cloud() {
+                return { ...described(), pipelineKind: options.task?.() ?? TASK.form }
+              },
+              ready,
+            })
           : runtime.createComponent(runtime.CloudDispatchBox, {
-              spec: { pipelineKind: TASK[box], budgetDefaults: { max_iter: 3 } } as never,
+              get spec() {
+                return { pipelineKind: options.task?.() ?? TASK[box], budgetDefaults: { max_iter: 3 } } as never
+              },
               ready,
             }),
       host,
@@ -157,6 +171,7 @@ function mount(box: Box, options: { ready?: boolean; reply?: () => Promise<Reply
     calls,
     actions,
     envelopes,
+    dispose: () => disposers.splice(0).forEach((dispose) => dispose()),
     setReply: (next: () => Promise<Reply>) => (reply = next),
     /** main 推一次新的登录现值(换号:只有登录代在变)。 */
     switchAccount: () => {
@@ -464,26 +479,109 @@ describe.each(BOXES)("alpha-code#1686 preflight in the %s send box", (box) => {
     expect(view.calls.length).toBe(2)
   })
 
-  test("button row: the primary button is the last item; status, cancel and the secondary button sit to its left", async () => {
-    const view = mount(box, { ready: false })
-    await flush()
-    expect(row().lastElementChild).toBe(primary())
-    disposers.splice(0).forEach((dispose) => dispose())
-    document.body.replaceChildren()
+  test("keyboard order (R1 m5): the primary comes first in the DOM, then the secondary, then status and cancel", async () => {
+    // 视觉上主按钮最右由 CSS order 实现,浏览器几何检查(cloud-preflight.browser.test.ts)证明;这里钉 DOM = Tab 顺序。
     mount(box)
     await flush()
-    expect(row().lastElementChild).toBe(primary())
-    if (box === "code-review") expect(primary().previousElementSibling?.textContent).toBe(zh["codepuppy.cloud.consent.legacyDiff"])
+    const order = () => Array.from(row().children)
+    if (box === "code-review") {
+      const secondary = row().querySelector("[data-cloud-secondary]")!
+      expect(secondary.textContent).toBe(zh["codepuppy.cloud.consent.legacyDiff"])
+      expect(order().indexOf(primary())).toBeLessThan(order().indexOf(secondary))
+    }
     fillInput(box)
     await flush()
     submitFor(box)
     await flush()
-    const items = Array.from(row().children)
     const cancel = row().querySelector("[data-cancel-job]")!
     const live = row().querySelector("[data-live]")!
-    expect(items.indexOf(cancel)).toBeLessThan(items.indexOf(primary()))
-    expect(items.indexOf(live)).toBeLessThan(items.indexOf(cancel))
-    expect(row().lastElementChild).toBe(primary())
-    void view
+    expect(order().indexOf(primary())).toBeLessThan(order().indexOf(live))
+    expect(order().indexOf(live)).toBeLessThan(order().indexOf(cancel))
+  })
+
+  test("a refused dispatch (R1 M4) keeps the card and hides the preflight verdict until the input changes", async () => {
+    const view = mount(box, {
+      dispatch: async () => (box === "code-review" ? { status: "failed", error: "pipeline_input_invalid" } : { error: "pipeline_input_invalid" }),
+    })
+    await flush()
+    expect(banner()!.title).toBe("现在可以发起")
+    fillInput(box)
+    await flush()
+    submitFor(box)
+    await flush()
+    expect(view.calls.length).toBe(2) // 派发返回后仍重取,卡片保持最新
+    expect(document.querySelector(".codepuppy-ext-card-err")?.textContent).toBe(zh["codepuppy.ext.cloudErrRequirementsChanged"])
+    expect(card()).toEqual(FULL_CARD)
+    expect(banner()).toBeUndefined()
+    if (box === "code-review") return // 没有输入框:只有再次提交或换条目才解除
+    fillInput(box)
+    await flush()
+    expect(banner()!.title).toBe("现在可以发起")
+  })
+
+  test("after unmount (R1 m6) a dispatch returning late neither requests nor writes", async () => {
+    const pending = deferred()
+    const view = mount(box, { dispatch: () => pending.promise })
+    await flush()
+    fillInput(box)
+    await flush()
+    submitFor(box)
+    await flush()
+    expect(view.calls.length).toBe(1)
+    view.dispose()
+    pending.resolve(box === "code-review" ? { status: "sent", privacy: "clear", directory: "/project", job: accepted } : { ...accepted, kind: TASK[box] })
+    await flush()
+    expect(view.calls.length).toBe(1)
+  })
+})
+
+// R1 M3:预检与派发、状态轮询共用平台每 IP 每分钟 120 次的认证前桶。连续切换只查停下来的任务(尾随 300 ms),
+// 本窗口所有预检区合计每滚动 60 秒最多 20 次;到上限按「查不到」处理,提交不受影响。假时钟证明这几个数。
+describe.each(["form", "legacy"] as const)("alpha-code#1686 R1 M3 preflight request budget in the %s box", (box) => {
+  const micro = async () => {
+    for (let i = 0; i < 20; i++) await Promise.resolve()
+  }
+  test("130 rapid switches cost one request; at most 20 per rolling minute; over the bound it shows nothing and submit still works", async () => {
+    jest.useFakeTimers()
+    setSystemTime(new Date("2026-11-13T00:00:00Z"))
+    let task = "research"
+    const [current, setCurrent] = runtime.createSignal(task)
+    const view = mount(box, { task: current })
+    await micro()
+    expect(view.calls).toEqual(["research"])
+
+    for (let i = 0; i < 130; i++) {
+      setCurrent((task = `kind-${i}`))
+      jest.advanceTimersByTime(10)
+      await micro()
+    }
+    expect(view.calls.length).toBe(1)
+    expect(card()).toEqual(PENDING_CARD)
+    jest.advanceTimersByTime(300)
+    await micro()
+    expect(view.calls).toEqual(["research", "kind-129"])
+
+    // 停顿足够久的切换:每次都查,直到本分钟累计 20 次。
+    for (let i = 0; i < 25; i++) {
+      setCurrent((task = `settled-${i}`))
+      jest.advanceTimersByTime(400)
+      await micro()
+    }
+    expect(view.calls.length).toBe(20)
+    expect(Date.now() - new Date("2026-11-13T00:00:00Z").getTime()).toBeLessThan(60_000)
+    // 到上限:不显示卡片也不显示结论(同「查不到」);提交照常可用。
+    expect(card()).toBeUndefined()
+    expect(banner()).toBeUndefined()
+    fillInput(box)
+    await micro()
+    expect(primary().disabled).toBe(false)
+
+    // 第一笔请求滑出 60 秒窗口后恢复。
+    jest.advanceTimersByTime(60_000)
+    setCurrent((task = "after-a-minute"))
+    jest.advanceTimersByTime(300)
+    await micro()
+    expect(view.calls.at(-1)).toBe("after-a-minute")
+    expect(card()).toEqual(FULL_CARD)
   })
 })

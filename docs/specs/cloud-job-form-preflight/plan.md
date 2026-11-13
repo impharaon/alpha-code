@@ -159,3 +159,11 @@ last_reviewed: 2026-11-13
 - 2026-11-13 · 测试侧:Banner 的 `./providers` 转口整棵 `@opencode-ai/app`,组件测试构建与 test-visual 里各换成只含 `useContractHealth` 的替身(`extensions/banner-providers-test-stub.ts`、`test-visual/providers-stub.ts`);三份既有发送框测试的 `window.api` 经 `withPreflightStubs` 补登录现值与「查不到」的预检,断言不动;`cloud-dispatch-gate` / `cloud-ipc` / `cloud-job-notify` 三个 cases 的模块桩补新导出,只为 import 解析。· 0a033cc705、b220f470c1
 - 2026-11-13 · 几何检查落在 `test-visual/cloud-preflight.html` + `cloud-preflight.tsx`(新场景,不动既有 main.tsx)与 `extensions/cloud-preflight.browser.test.ts`。· f6a4af709e
 - 2026-11-13 · 按次定价句不实现(编排器裁决:今天不可达、无批准文案);三处元格式化不在本票统一。
+- 2026-11-13 · Codex R1(HEAD `7e8e8c1c4a`,FIX-THEN-MERGE,4 Major + 2 Minor,全部采纳):
+  - M1 auth-state 只送首窗口 → 改送全部产品窗口(`M/windows.ts` 登记、`M/index.ts` 注入 `getWindows`)。· cb912ce449
+  - M2 渲染层另有三份自建身份签名漏了登录代(`codepuppy-composer-model.tsx` 两份、`codepuppy-composer.tsx` 一份)→ 补上。auth-state 消费者全表见编排器回报;其余消费者只读 status / mode,不按签名去重。没有抽共享签名:三份签名的字段集合本来就不同(有的含 plan / refreshUnreachable),统一会改变它们各自的重载时机。· cb912ce449
+  - M3 预检频率:连续切换任务尾随 300 ms 合并,只查停下来的任务;本窗口所有预检区合计每滚动 60 秒最多 20 次(给共用的 120/分钟桶留 100 次),到上限按「查不到」处理,提交不受影响。上限放在模块级(换条目会重建发送框,按实例计就没有上界)。
+  - M4 派发被拒后:卡片照常、预检结论不显示。解除条件:改任意输入(目录表单字段 / 旧版输入框)、开始新的提交、换任务(同一组件换条目或重建)。登录现值送达不解除(屏幕上的拒绝原句也还在)。代码审查没有输入框,只有再次提交或换条目才解除。
+  - m5 键盘顺序:DOM 恢复原样(主按钮在前、次按钮其次、状态字与「取消任务」在后),视觉位置改由 `extension-hub.css` 的 `order` 实现(次按钮 1、主按钮 2)。
+  - m6 卸载后 `refresh()` 与回复写入一律无效。
+

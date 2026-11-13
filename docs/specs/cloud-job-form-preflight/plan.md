@@ -151,4 +151,11 @@ last_reviewed: 2026-11-13
 
 ### 偏离记录
 
-暂无。
+- 2026-11-13 · D0 合并画稿分支被 lane 钩子拦下(子代理不做 merge),没有绕。改为:`components.md` 两行直接写进 Primitives 表、`gallery.html` 加样例;画稿分支 `a35bb81c26` 由编排器合并,合并后还剩两处一行级收尾——删掉随之进来的 Pending 区里 Card / KeyValueList 两行(#1314 `a559317fc6` 也改那一区,只删这两行),两份 `current/*/components.md` 台账「待实现」→「已实现(待合并)」。几何测试的期望值改为在同机 headless Chrome 打开帧实测后写进测试(注明帧与锚点),不在测试里读帧文件。· 34cd9de60b、f6a4af709e
+- 2026-11-13 · 渲染层订阅登录现值走 `subscribeAuthState`(`R/auth-recovery.ts`,渲染层唯一的 auth owner),不直接接 `window.api.auth.subscribe`:`R/auth-recovery.test.ts:1040-1058` 只允许 owner 直接订阅,并逐个登记消费者——`extensions/cloud-preflight.tsx` 已登记。· b220f470c1
+- 2026-11-13 · D2 多了一个字段:渲染层 owner 的签名也按登录态去重,且「必须至少与 main 的 publish 判据一样细」(`R/auth-recovery.ts` 不变量 G)。推送的状态里没有能区分账号的字段,只改 main 签名会被渲染层吞掉。于是 `AuthState` 加不透明的 `identityEpoch`(main 既有的 `authIdentityEpoch`,登入/登出才推进,**不是**账号标识),只在登录态出现;渲染层签名与身份轴带上它。账号标记本身仍只进 main 的签名。· 0a033cc705、caaffd897f
+- 2026-11-13 · D2「每个订阅面都清空重取」对账户弹层落到 `R/sidebar/codepuppy-sidebar.tsx` 的 summary effect:登录代变化即清空、只采用最新一次请求的回复(原实现不清空、无序号,迟到的旧回复会覆盖)。· caaffd897f
+- 2026-11-13 · 预检收到 `identity-changed` 不自己重取(测试里实测会与主进程互相追成循环),停在「…」等登录现值送达——D2 之后换号必发 auth-state,送达即按新身份重取。· b220f470c1
+- 2026-11-13 · 测试侧:Banner 的 `./providers` 转口整棵 `@opencode-ai/app`,组件测试构建与 test-visual 里各换成只含 `useContractHealth` 的替身(`extensions/banner-providers-test-stub.ts`、`test-visual/providers-stub.ts`);三份既有发送框测试的 `window.api` 经 `withPreflightStubs` 补登录现值与「查不到」的预检,断言不动;`cloud-dispatch-gate` / `cloud-ipc` / `cloud-job-notify` 三个 cases 的模块桩补新导出,只为 import 解析。· 0a033cc705、b220f470c1
+- 2026-11-13 · 几何检查落在 `test-visual/cloud-preflight.html` + `cloud-preflight.tsx`(新场景,不动既有 main.tsx)与 `extensions/cloud-preflight.browser.test.ts`。· f6a4af709e
+- 2026-11-13 · 按次定价句不实现(编排器裁决:今天不可达、无批准文案);三处元格式化不在本票统一。

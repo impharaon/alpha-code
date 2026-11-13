@@ -301,7 +301,7 @@ export const CodePuppyExt: Plugin.Plugin = {
       })
       await context.agent.transform((editor) => {
         try {
-          applyAgents(editor, extConfig().agent)
+          applyAgents(editor, extConfig().agent, log)
         } catch (cause) {
           error(`[@codepuppy/ext] agent transform failed: ${describe(cause)}`)
         }

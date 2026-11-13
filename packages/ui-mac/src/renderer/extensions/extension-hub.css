@@ -1304,9 +1304,15 @@ body[data-codepuppy-sidebar="open"] .codepuppy-ext-page {
 .codepuppy-ext-cloudrun {
   display: flex;
   align-items: center;
+  /* alpha-code#1686 定案 B:主按钮在按钮行最右(同 .a-dialog-footer),状态字与「取消任务」在它左边。 */
+  justify-content: flex-end;
   gap: 10px;
   flex-wrap: wrap;
   margin-top: 6px;
+}
+/* alpha-code#1686:提交前预检的卡片与提示条在按钮行里各占一整行(批准稿 width:100%)。 */
+.codepuppy-ext-cloudrun > :is(.a-card, .a-banner) {
+  width: 100%;
 }
 .codepuppy-ext-cloudrun .codepuppy-ext-meta[data-live] {
   color: var(--a-text-secondary);

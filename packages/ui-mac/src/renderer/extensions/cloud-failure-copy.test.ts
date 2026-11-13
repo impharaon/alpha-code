@@ -12,6 +12,10 @@ describe("REQ-232 AC5 failure copy and frozen frame paths", () => {
     expect(failureCopy("unauthorized")?.action).toBe("login")
     expect(failureCopy("provider_failed")).toBeNull()
   })
+  test("alpha-code#1686 a retired cloud kind says so in the approved words, with no next-step button", () => {
+    setLocale("zh")
+    expect(failureCopy("pipeline_kind_retired")).toEqual({ text: "这项云端功能已停用，请在本机生成。", action: null })
+  })
   test("live and replay records read data.code; synthesized views read result.failure_code", () => {
     // rev2 §8: routes/cloud-jobs.ts serializes these producer shapes unchanged.
     expect(

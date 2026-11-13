@@ -15,6 +15,7 @@ import type { CloudPipelineSpec } from "./catalog-types"
 import { UploadConsentDialog } from "./upload-consent-dialog"
 import { failureCopy } from "./cloud-failure-copy"
 import { createCloudJobLifecycle, dispatchError, type CloudJobState } from "./cloud-job-lifecycle"
+import { CloudPreflightArea, createCloudPreflight } from "./cloud-preflight"
 
 type ConsentState = { requestId: string; preview: UploadPreview }
 
@@ -70,12 +71,16 @@ export function CloudDispatchBox(props: { entryId?: string; spec: CloudPipelineS
   })
   const beginJob = lifecycle.beginJob
   const cancelJob = lifecycle.cancelJob
+  // alpha-code#1686:提交前预检(只作提示,不参与任何 disabled 判据)。
+  const preflight = createCloudPreflight({ task: () => props.spec.pipelineKind, ready: () => props.ready })
 
   onCleanup(() => {
     if (state.consent) void window.api.cloud.cancelUpload(state.consent.requestId)
   })
 
   const consumeUpload = async (result: CloudUploadResult) => {
+    // 派发请求已返回(受理或拒绝);取消与待确认还没有派发。
+    if (result.status !== "cancelled" && result.status !== "consent-required") preflight.refresh()
     if (result.status === "cancelled") {
       setState({ phase: "idle", consent: null, consentBusy: false })
       return
@@ -138,6 +143,7 @@ export function CloudDispatchBox(props: { entryId?: string; spec: CloudPipelineS
       constraints: { network: "restricted" },
     }
     const result = await window.api.cloud.dispatch(envelope)
+    preflight.refresh()
     if ("error" in result) {
       setState({ err: dispatchError(result.error, undefined, result.netLayer), errAction: failureCopy(result.error)?.action ?? null, phase: "failed" })
       return
@@ -173,6 +179,7 @@ export function CloudDispatchBox(props: { entryId?: string; spec: CloudPipelineS
       constraints: { network: "restricted" },
     }
     const result = await window.api.cloud.dispatch(envelope)
+    preflight.refresh()
     if ("error" in result) {
       setState({ phase: "failed", err: dispatchError(result.error, undefined, result.netLayer), errAction: failureCopy(result.error)?.action ?? null })
       return
@@ -186,36 +193,18 @@ export function CloudDispatchBox(props: { entryId?: string; spec: CloudPipelineS
     <div class="codepuppy-ext-dsub">
       <div class="codepuppy-ext-dsub-t">{t("codepuppy.ext.cloudDispatchTitle")}</div>
       <p class="codepuppy-ext-dnote">{t(props.spec.pipelineKind === "code-review" ? "codepuppy.cloud.consent.uploadHint" : "codepuppy.ext.cloudInputHint")}</p>
+      {/* 代码审查没有输入框:预检两块放在按钮行之前(批准稿 legacyBox);输入框分支放在输入框之后、按钮行之内。 */}
+      <Show when={props.spec.pipelineKind === "code-review"}>
+        <CloudPreflightArea preflight={preflight} busy={busy()} />
+      </Show>
       <div class="codepuppy-ext-cloudrun">
-        <Show when={props.spec.pipelineKind === "code-review"}>
-          <button
-            ref={(element) => (triggerButton = element)}
-            class="codepuppy-ext-add"
-            data-variant="primary"
-            disabled={!props.ready || busy()}
-            onClick={() => void runUpload()}
-          >
-            {state.phase === "dispatching"
-              ? t("codepuppy.ext.cloudDispatching")
-              : state.phase === "running"
-                ? t("codepuppy.ext.cloudRunning")
-                : t("codepuppy.cloud.consent.uploadPick")}
-          </button>
-          <button class="codepuppy-ext-add" disabled={!props.ready || busy()} onClick={() => void runLegacyDiff()}>
-            {t("codepuppy.cloud.consent.legacyDiff")}
-          </button>
-        </Show>
         <Show when={props.spec.pipelineKind !== "code-review"}>
           <label style={{ width: "100%" }}>
             {inputLabel()}
             <textarea class="codepuppy-ext-ddoc" style={{ width: "100%" }} rows={6} aria-label={inputLabel()} value={state.input}
               disabled={!props.ready || busy()} onInput={(event) => setState("input", event.currentTarget.value)} />
           </label>
-          <button class="codepuppy-ext-add" data-variant="primary" data-cloud-input=""
-            disabled={!props.ready || busy() || !state.input.trim() || (props.spec.pipelineKind === "office-report" && !format())}
-            onClick={() => void runInput()}>
-            {t(state.phase === "dispatching" ? "codepuppy.ext.cloudDispatching" : state.phase === "running" ? "codepuppy.ext.cloudRunning" : "codepuppy.ext.cloudStart")}
-          </button>
+          <CloudPreflightArea preflight={preflight} busy={busy()} />
         </Show>
         <Show when={!props.ready}>
           <span class="codepuppy-ext-meta">
@@ -246,6 +235,32 @@ export function CloudDispatchBox(props: { entryId?: string; spec: CloudPipelineS
         </Show>
         <Show when={state.phase === "running" && state.cancel === "cancelling"}>
           <span class="codepuppy-ext-meta" data-live="" data-cancelling="">{t("codepuppy.ext.cloudCancelling")}</span>
+        </Show>
+        {/* alpha-code#1686 定案 B:主按钮在按钮行最右;代码审查的「发送 Git 代码改动」紧挨在它左边。 */}
+        <Show when={props.spec.pipelineKind === "code-review"}>
+          <button class="codepuppy-ext-add" disabled={!props.ready || busy()} onClick={() => void runLegacyDiff()}>
+            {t("codepuppy.cloud.consent.legacyDiff")}
+          </button>
+          <button
+            ref={(element) => (triggerButton = element)}
+            class="codepuppy-ext-add"
+            data-variant="primary"
+            disabled={!props.ready || busy()}
+            onClick={() => void runUpload()}
+          >
+            {state.phase === "dispatching"
+              ? t("codepuppy.ext.cloudDispatching")
+              : state.phase === "running"
+                ? t("codepuppy.ext.cloudRunning")
+                : t("codepuppy.cloud.consent.uploadPick")}
+          </button>
+        </Show>
+        <Show when={props.spec.pipelineKind !== "code-review"}>
+          <button class="codepuppy-ext-add" data-variant="primary" data-cloud-input=""
+            disabled={!props.ready || busy() || !state.input.trim() || (props.spec.pipelineKind === "office-report" && !format())}
+            onClick={() => void runInput()}>
+            {t(state.phase === "dispatching" ? "codepuppy.ext.cloudDispatching" : state.phase === "running" ? "codepuppy.ext.cloudRunning" : "codepuppy.ext.cloudStart")}
+          </button>
         </Show>
       </div>
       <Show when={state.phase === "done"}>

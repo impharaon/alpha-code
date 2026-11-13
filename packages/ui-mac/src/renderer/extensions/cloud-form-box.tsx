@@ -12,6 +12,7 @@ import type { CloudJobEnvelope } from "../../preload/types"
 import type { CloudBehaviorV1, CloudFieldV1 } from "../../shared/host-extension-package-contract/decoder"
 import { failureCopy } from "./cloud-failure-copy"
 import { createCloudJobLifecycle, dispatchError, type CloudJobState } from "./cloud-job-lifecycle"
+import { CloudPreflightArea, createCloudPreflight } from "./cloud-preflight"
 
 export function CloudFormBox(props: { cloud: CloudBehaviorV1; ready: boolean; recovering?: boolean }) {
   const [state, setState] = createStore<CloudJobState & { values: Record<string, string> }>({
@@ -35,6 +36,8 @@ export function CloudFormBox(props: { cloud: CloudBehaviorV1; ready: boolean; re
     pipelineKind: () => props.cloud.pipelineKind,
   })
   const busy = () => state.phase === "dispatching" || state.phase === "running"
+  // alpha-code#1686:提交前预检(只作提示,不参与下面的 disabled 判据)。
+  const preflight = createCloudPreflight({ task: () => props.cloud.pipelineKind, ready: () => props.ready })
   // 文本按服务端口径 trim 后计(注册表 minChars 是 trim 后的长度);select 原样。
   const valueOf = (field: CloudFieldV1) =>
     field.control === "select" ? (state.values[field.name] ?? "") : (state.values[field.name] ?? "").trim()
@@ -71,6 +74,7 @@ export function CloudFormBox(props: { cloud: CloudBehaviorV1; ready: boolean; re
       constraints: { network: "restricted" },
     }
     const result = await window.api.cloud.dispatch(envelope)
+    preflight.refresh()
     if ("error" in result) {
       setState({ phase: "failed", err: dispatchError(result.error, undefined, result.netLayer), errAction: failureCopy(result.error)?.action ?? null })
       return
@@ -88,9 +92,11 @@ export function CloudFormBox(props: { cloud: CloudBehaviorV1; ready: boolean; re
           <For each={props.cloud.upstreamData}>{(line) => <li>{line}</li>}</For>
         </ul>
       </div>
-      <p class="codepuppy-ext-dnote" data-cloud-hold="">
-        {t("codepuppy.ext.cloudHold", { usd: props.cloud.holdUsd.toFixed(2) })}
-      </p>
+      <Show when={preflight.showsLegacyHold()}>
+        <p class="codepuppy-ext-dnote" data-cloud-hold="">
+          {t("codepuppy.ext.cloudHold", { usd: props.cloud.holdUsd.toFixed(2) })}
+        </p>
+      </Show>
       <div class="codepuppy-ext-cloudrun">
         <For each={props.cloud.fields}>
           {(field) => (
@@ -143,15 +149,7 @@ export function CloudFormBox(props: { cloud: CloudBehaviorV1; ready: boolean; re
             </label>
           )}
         </For>
-        <button
-          class="codepuppy-ext-add"
-          data-variant="primary"
-          data-cloud-form-submit=""
-          disabled={!props.ready || busy() || !props.cloud.fields.every(satisfied)}
-          onClick={() => void run()}
-        >
-          {t(state.phase === "dispatching" ? "codepuppy.ext.cloudDispatching" : state.phase === "running" ? "codepuppy.ext.cloudRunning" : "codepuppy.ext.cloudStart")}
-        </button>
+        <CloudPreflightArea preflight={preflight} busy={busy()} />
         <Show when={!props.ready}>
           <span class="codepuppy-ext-meta">
             {props.recovering ? t("codepuppy.ext.cloudRecoveringNote") : t("codepuppy.ext.cloudNeedPlatformNote")}
@@ -173,6 +171,16 @@ export function CloudFormBox(props: { cloud: CloudBehaviorV1; ready: boolean; re
         <Show when={state.phase === "running" && state.cancel === "cancelling"}>
           <span class="codepuppy-ext-meta" data-live="" data-cancelling="">{t("codepuppy.ext.cloudCancelling")}</span>
         </Show>
+        {/* alpha-code#1686 定案 B:主按钮在按钮行最右,状态字、「取消任务」、未登录提示在它左边。 */}
+        <button
+          class="codepuppy-ext-add"
+          data-variant="primary"
+          data-cloud-form-submit=""
+          disabled={!props.ready || busy() || !props.cloud.fields.every(satisfied)}
+          onClick={() => void run()}
+        >
+          {t(state.phase === "dispatching" ? "codepuppy.ext.cloudDispatching" : state.phase === "running" ? "codepuppy.ext.cloudRunning" : "codepuppy.ext.cloudStart")}
+        </button>
       </div>
       <Show when={state.phase === "done"}>
         <p class="codepuppy-ext-dnote" data-ok="">

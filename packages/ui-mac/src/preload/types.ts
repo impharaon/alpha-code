@@ -204,6 +204,9 @@ export type AuthState = {
   /** #1543:当前凭证这一代最近一次续期因网络错误失败(连不上登录服务器)。续期成功 / 登录 / 登出即消失;
    *  只在登录态出现。渲染层据此把 recovering 说成「连不上、自动重试」而不是「正在同步」。 */
   refreshUnreachable?: true
+  /** alpha-code#1686:登入 / 登出才推进的不透明计数(main `authIdentityEpoch`),只在登录态出现。它**不是**账号标识,
+   *  渲染层只拿它判「换了一个登录」:签发端不给 email / plan,不先退出就换号时其余字段都不变。 */
+  identityEpoch?: number
 }
 // B11 复扫行16:登录链失败原因(main 只送 code,文案由 renderer i18n 映射)。
 export type AuthErrorCode =

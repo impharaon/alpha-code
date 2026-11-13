@@ -297,6 +297,8 @@ function deriveState(): AuthState {
     expiresAt: stored.expiresAt,
     ...(loggedIn ? { platformStatus: platformReady ? ("ready" as const) : ("recovering" as const) } : {}),
     ...(loggedIn && refreshUnreachableGeneration === tokenGeneration ? { refreshUnreachable: true } : {}),
+    // alpha-code#1686:不透明的登录代(不是账号标识),让渲染层的签名与本侧 publish 的身份判据一样细。
+    ...(loggedIn ? { identityEpoch: authIdentityEpoch } : {}),
   }
 }
 

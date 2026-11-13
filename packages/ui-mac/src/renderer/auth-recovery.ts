@@ -116,11 +116,13 @@ const signatureOf = (state: AuthState) =>
     state.account?.email ?? "",
     state.account?.plan ?? "",
     state.refreshUnreachable ? "unreachable" : "",
+    // alpha-code#1686:main 的签名带账号标记(不先退出就换号时其余各项都不变);这里对应的是不透明的登录代。
+    String(state.identityEpoch ?? ""),
   ].join("\u0000")
 
-/** 身份轴 = 签名去掉 platformStatus:status / mode / email / plan。呈现序只在同身份内比较。 */
+/** 身份轴 = 签名去掉 platformStatus:status / mode / email / plan / 登录代。呈现序只在同身份内比较。 */
 const identityOf = (state: AuthState) =>
-  [state.status, state.mode, state.account?.email ?? "", state.account?.plan ?? ""].join("\u0000")
+  [state.status, state.mode, state.account?.email ?? "", state.account?.plan ?? "", String(state.identityEpoch ?? "")].join("\u0000")
 
 /**
  * 呈现序 ⊑(#612 R1):candidate 相对 view **不呈现任何新身份、不放宽任何权限轴** ——

@@ -296,16 +296,26 @@ export function CodePuppySidebar(props: {
   // sparkline. 401 → main's auth is stale; the footer already reflects logged-out on the next push.
   const [summary, setSummary] = createSignal<AccountSummary | null>(null)
   const [summaryState, setSummaryState] = createSignal<"idle" | "loading" | "error">("idle")
+  // alpha-code#1686:换了一个登录(登录代变,含不先退出直接换号)就先清空,不让上一个账号的数留在卡片上;
+  // 只采用最新一次请求的回复,较早发出、较晚回来的回复(可能属于上一个账号)直接丢弃。
+  let summaryRequest = 0
+  let summaryEpoch: number | undefined
   createEffect(() => {
-    if (authState().status !== "logged-in") {
+    const state = authState()
+    const mine = ++summaryRequest
+    if (state.status !== "logged-in") {
+      summaryEpoch = undefined
       setSummary(null)
       setSummaryState("idle")
       return
     }
+    if (state.identityEpoch !== summaryEpoch) setSummary(null)
+    summaryEpoch = state.identityEpoch
     setSummaryState("loading")
     window.api.account
       .summary()
       .then((r) => {
+        if (mine !== summaryRequest) return
         if (r && "error" in r) {
           setSummary(null)
           setSummaryState("error")
@@ -314,7 +324,9 @@ export function CodePuppySidebar(props: {
           setSummaryState("idle")
         }
       })
-      .catch(() => setSummaryState("error"))
+      .catch(() => {
+        if (mine === summaryRequest) setSummaryState("error")
+      })
   })
   const activePlan = () => {
     const s = summary()

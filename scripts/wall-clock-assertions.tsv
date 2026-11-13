@@ -50,6 +50,9 @@
 # ── 2026-11-12 `#1662` OpenCode 2 换代 ──────────────────────────────────────────────────
 # v1 引擎 packages/opencode/test 的 12 行与 core/test/effect/cross-spawn-spawner 那一行随换代消失,删掉;
 # 换代带入 30 处上游命中(upstream)与 3 处 Code Puppy 自有命中(keep,理由里写明余量与可改写候选)。
+# `#1705` 改写两处(不再命中):core/test/codepuppy-mcp-runtime.test.ts AC1 的 5 s 上界删除(hang 仍 pending、工具表只含 ok
+# 是结构性判据,等齐全部 server 由 connected("ok") 自带的 10 s 等待判红);ui-mac/src/engine-adapter/mcp-auth.test.ts 的 2.8 s
+# 上界改为数假引擎收到的请求(授权尝试状态读两次、MCP 状态读一次即回)。
 packages/app/src/home/sessions/index.test.ts	with a directory entirely inside the recent window	expect(hot.every((item) => item.time.updated > now - SESSION_RECENT_WINDOW)).toBe(true)	upstream	OpenCode 2 上游文件(`#1662` 换代带入,非 Code Puppy 自有),north-star 不改。
 packages/cli/test/service.test.ts	-	expect(Date.now() - started).toBeLessThan(3_000)	upstream	OpenCode 2 上游文件(`#1662` 换代带入,非 Code Puppy 自有),north-star 不改。
 packages/cli/test/shutdown-deadline.test.ts	-	expect(Date.now() - start).toBeLessThan(10_000)	upstream	OpenCode 2 上游文件(`#1662` 换代带入,非 Code Puppy 自有),north-star 不改。
@@ -58,7 +61,6 @@ packages/client/test/service.test.ts	reports overlapping contender failures with
 packages/client/test/solid-connection.test.ts	a forced resync replaces the stream immediately and only while connected	expect(Date.now() - started).toBeLessThan(500)	upstream	OpenCode 2 上游文件(`#1662` 换代带入,非 Code Puppy 自有),north-star 不改。
 packages/codemode/test/codemode.test.ts	the timeout interrupts a busy loop without any operation budget	expect(elapsedMs).toBeLessThan(3_000)	upstream	上游文件(origin/dev 有,不带 alpha- 前缀/marker),north-star 不改。忙循环被 timeout 打断的 3s 上界。
 packages/codemode/test/errors.test.ts	runaway recursion fails fast with a catchable RangeError	expect(Date.now() - started).toBeLessThan(2000)	upstream	OpenCode 2 上游文件(`#1662` 换代带入,非 Code Puppy 自有),north-star 不改。
-packages/core/test/codepuppy-mcp-runtime.test.ts	-	expect(Date.now() - started).toBeLessThan(5_000)	keep	真时序契约(#1666 AC1,`#1662` 登记):失败签名 = 启动等齐全部 server ⇒ ok 被 hang 的 30s 握手超时拖住(≥ 30 s);上界 5 s,余量 ≥ 6×,本机实测 ok 连上在百毫秒级。紧随其后的 hang 仍 pending 是结构性证据,这条上界只多拦「等了但没等满」。可改写候选:去掉上界、只留 pending 判据(归 #1666 所在线)。
 packages/core/test/image-photon.test.ts	an idle worker does not keep the process alive	expect(await exitLag("resize")).toBeLessThan(3_000)	upstream	OpenCode 2 上游文件(`#1662` 换代带入,非 Code Puppy 自有),north-star 不改。
 packages/core/test/image-photon.test.ts	terminates a worker whose startup is interrupted	expect(await exitLag("abandon-spawn")).toBeLessThan(3_000)	upstream	OpenCode 2 上游文件(`#1662` 换代带入,非 Code Puppy 自有),north-star 不改。
 packages/core/test/models.test.ts	refresh(false) revalidates with the stored ETag and treats 304 as unchanged	expect(Date.now() - (cache.values.get(metaKey) as { updatedAt: number }).updatedAt).toBeLessThan(60 * 1000)	upstream	OpenCode 2 上游文件(`#1662` 换代带入,非 Code Puppy 自有),north-star 不改。
@@ -77,7 +79,6 @@ packages/patchmark/test/slow-inputs.test.ts	deeply nested brackets and bracket-l
 packages/patchmark/test/slow-inputs.test.ts	huge GFM table streamed row-by-row stays linear (<250ms for 1,000 rows)	expect(elapsed).toBeLessThan(250)	upstream	OpenCode 2 上游文件(`#1662` 换代带入,非 Code Puppy 自有),north-star 不改。
 packages/patchmark/test/slow-inputs.test.ts	long * and _ delimiter runs and distinct unclosed backtick runs stay linear (<250ms)	expect(elapsed).toBeLessThan(250)	upstream	OpenCode 2 上游文件(`#1662` 换代带入,非 Code Puppy 自有),north-star 不改。
 packages/tui/test/theme/v2/v1-migrate.test.ts	lays out V1 colors on the opencode2 steps under new designs	expect(rgbToOklch(focused.r, focused.g, focused.b).c).toBeLessThan( rgbToOklch(legacy.primary.r, legacy.primary.g, legacy.primary.b).c / 2, )	upstream	OpenCode 2 上游文件(`#1662` 换代带入,非 Code Puppy 自有),north-star 不改。
-packages/ui-mac/src/engine-adapter/mcp-auth.test.ts	failed ⇒ 直接回这台 MCP 的当前状态(needs_auth),不等	expect(Date.now() - started).toBeLessThan(2_800)	keep	时序契约(#1668 H1,`#1662` 登记):attempt failed ⇒ 只走一次 1 s 轮询就回当前状态,不进 complete 之后的「等 MCP 离开 pending」循环;失败签名 = 多等 ≥ 2 个 MCP_AUTH_POLL_MS(≥ 3 s)。上界 2.8 s 对预期 ~1 s 余量不足 3×,负载敏感 —— 可改写候选:轮询计时可注入、判据改成轮询次数(归 #1668 所在线)。
 packages/ui-mac/src/engine-adapter/request-abort.test.ts	自探的超时上限生效:/global/health 以 TimeoutError 失败,发给 2.x 的 /api/info 被一并取消	expect(Date.now() - started).toBeLessThan(1_000)	keep	真时序契约(#1668 F5,`#1662` 登记):调用方的 AbortSignal.timeout(50) 必须把挂住的 2.x 请求一并取消;失败签名 = 取消没透传 ⇒ 请求永远挂着、直到用例 2 s 超时。上界 1 s,对 50 ms 的期限余量 20×;signals[0].aborted 是结构性证据。
 packages/ui-mac/src/main/worktree-probe-sweep.test.ts	`#1156` 判据②:200 次直读比 2 次 git 子进程还快 —— 采样率不随负载塌陷	expect(fastMs).toBeLessThan(spawnMs)	keep	真性能契约(相对量):200 次直读 vs 2 次 git 子进程,两边同机同负载下量,判的是数量级(直读 µs 级、spawn ms 级,余量 ≥ 100×),负载同向作用于两边不改变相对序;守住的失败签名 = 有人把布防轮询换回子进程 ⇒ 200 次 spawn ≫ 2 次 spawn 当场红。
 packages/ui-mac/src/renderer/codepuppy-ui/model-picker-logic.test.ts	超时必须严格大于任何退避间隔 —— 保证「悬挂 → 超时 → 退避 → 重试」链不重叠不空转	expect(ENGINE_FETCH_TIMEOUT_MS).toBeGreaterThan(nextEngineRetryDelay(attempt))	not-elapsed	被约束的是 nextEngineRetryDelay(attempt) —— 由 attempt 算出的退避间隔,不是量出来的耗时;bound-name 轴因上界 ENGINE_FETCH_TIMEOUT_MS 过报。取值纪律,不依赖机器闲忙。

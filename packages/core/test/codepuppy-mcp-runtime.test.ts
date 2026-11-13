@@ -126,7 +126,9 @@ const toolNames = Effect.gen(function* () {
 })
 
 // ── AC1 ──────────────────────────────────────────────────────────────────────────────────────────────────────────
-// Red if startup waited for every server: `ok` would stay pending behind the 30 s handshake timeout of `hang`.
+// Red if startup waited for every server: `ok` would stay pending behind the 30 s handshake timeout of `hang`, and
+// `connected("ok")` gives up after its own 10 s wait. `#1705`: no wall-clock ceiling on top — `hang` still pending and the
+// tool list holding only `ok` are the structural proof.
 // `hang` is killed once the assertions ran: before #1690 closing the layer waited for its handshake timeout (the teardown
 // time followed `timeout.startup`: 8 s ⇒ 10.3 s, the 30 s default ⇒ 32 s), which overran the 5 s test budget.
 describe("AC1: one server never answering does not hold back another", () => {
@@ -136,9 +138,7 @@ describe("AC1: one server never answering does not hold back another", () => {
   })
   testEffect(mcpLayer({ hang: local({ CODEPUPPY_MCP_HANG: "1", CODEPUPPY_MCP_PID_FILE: pidFile }), ok: local() })).live("ok is connected and listed while hang is still pending", () =>
     Effect.gen(function* () {
-      const started = Date.now()
       yield* connected("ok")
-      expect(Date.now() - started).toBeLessThan(5_000)
       expect((yield* statusOf("hang"))?.status).toBe("pending")
       expect(yield* toolNames).toEqual(["ok/echo"])
     }).pipe(Effect.ensuring(killHang)),

@@ -445,13 +445,19 @@ describe("#1500 真实 HTTP 超时的后台补试与状态仲裁", () => {
   }, 30000)
 
   test("AC2:两次真实超时后无第三次 GET,LKG 字节和本地 BYOK 保持可用", async () => {
+    // `#1705`:不用固定等待收尾。被挂住的请求放行后,等服务端看到每个挂住的请求都已应答(每次应答一个新的 Response ——
+    // 同一个 Response 交两次会让第二次应答失败),刷新状态已落定,再断言总数仍是两次、LKG 与 BYOK 不变。
     let delayed = false
+    let answered = 0
     const requests: string[] = []
-    const response = Promise.withResolvers<Response>()
+    const release = Promise.withResolvers<void>()
     startTarget((request) => {
       if (delayed) {
         requests.push(request.method)
-        return response.promise
+        return release.promise.then(() => {
+          answered++
+          return Response.json(catalogV3())
+        })
       }
       return Response.json(catalogV3())
     })
@@ -466,8 +472,9 @@ describe("#1500 真实 HTTP 超时的后台补试与状态仲裁", () => {
       expect.objectContaining({ attempt: 1, exception: "TimeoutError", durationMs: expect.any(Number) }),
       expect.objectContaining({ attempt: 2, exception: "TimeoutError", durationMs: expect.any(Number) }),
     ])
-    response.resolve(Response.json(catalogV3()))
-    await Bun.sleep(1300)
+    expect(invokeRefreshHealth()).toMatchObject({ code: "timeout" })
+    release.resolve()
+    await waitFor(() => answered === requests.length)
     expect(requests).toEqual(["GET", "GET"])
     expect(readFileSync(liveAllowlistPath(userData)).equals(bytes)).toBe(true)
     expect(invokeCatalog().platformModels).toHaveLength(12)

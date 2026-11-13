@@ -88,14 +88,28 @@ export function createEngineFetch(options: {
   fetch?: typeof globalThis.fetch
 }): EngineFetch {
   const upstreamFetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init))
+  // `#1669` G2:一个引擎源只有一条 2.x 事件流。renderer 直连引擎源,Chromium 对同一个源最多同时开 6 条连接,事件流一直占着
+  // 一条。挂载的界面有 5 个 `/global/event` 订阅方(冻结 app、侧栏、cloud-run、后台问题,打开过定制中心再加一个),审批回复
+  // 还要订 `permission.replied`(permission-replies.ts)—— 各开一条就是 6 条长连接,回复接下来的短请求永远排不上。
+  // 所以全部订阅方挂在这个源共用的那一条上(SharedEvents:最后一个订阅方退订即断开),每个订阅方的取消信号照旧只退订它自己。
+  const sharedEvents = new Map<string, OpenCodeClient["event"]>()
+  const eventsFor = (origin: string) => {
+    const existing = sharedEvents.get(origin)
+    if (existing) return existing
+    const created = OpenCode.make({ baseUrl: origin, fetch: upstreamFetch }).event
+    sharedEvents.set(origin, created)
+    return created
+  }
   // 每个请求一个 2.x 客户端:它发出的每个调用都带上这次请求的取消信号(调用自己另带的信号照旧生效)。冻结界面靠它给引擎
-  // 调用设上限 —— 侧栏自探的 `AbortSignal.timeout(2_000)`(use-projects.ts)、组件卸载时中止的读取。
-  const clientFor = (origin: string, signal: AbortSignal): OpenCodeClient =>
-    OpenCode.make({
+  // 调用设上限 —— 侧栏自探的 `AbortSignal.timeout(2_000)`(use-projects.ts)、组件卸载时中止的读取。事件订阅除外,见上。
+  const clientFor = (origin: string, signal: AbortSignal): OpenCodeClient => ({
+    ...OpenCode.make({
       baseUrl: origin,
       fetch: ((input, init) =>
         upstreamFetch(input, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, signal]) : signal })) as typeof fetch,
-    })
+    }),
+    event: eventsFor(origin),
+  })
   const replies = new Map<string, PermissionReplies>()
   const repliesFor = (origin: string) => {
     const existing = replies.get(origin)

@@ -6,7 +6,7 @@ import fs from "node:fs"
 import path from "node:path"
 import { engineSlot, type EngineSandbox } from "./engine-sandbox"
 import { buildEngineServerOptions } from "../src/main/engine-server-options"
-import { withEngineAuthorization } from "../src/main/engine-authorization"
+import { engineAuthorization, withEngineAuthorization } from "../src/main/engine-authorization"
 import { injectCodePuppyConfig } from "../src/main/codepuppy-config-injection"
 import { secretFilePath, secretFileRef } from "../src/main/codepuppy-secret-files"
 import { buildHubRequestReply, buildHubViewReply } from "../src/main/codepuppy-sidecar-messages"
@@ -117,6 +117,10 @@ export type Running = {
   send: (method: string, route: string, body?: unknown) => Promise<{ status: number; json: any }>
   /** 引擎的原始分发(口令已补上,同生产 main 的 onBeforeSendHeaders):生产引擎适配器(engine-adapter createEngineFetch)接在它上面。 */
   fetch: EngineFetch
+  /** 引擎真监听的源地址(`http://127.0.0.1:<port>`):renderer 直连的就是它(I8),要测连接数的用它。 */
+  url: string
+  /** main 在 `onBeforeSendHeaders` 里给 renderer 发往引擎源的请求补的那个 `Authorization` 值。 */
+  authorization: string
   close: () => Promise<void>
 }
 
@@ -205,7 +209,13 @@ export function codepuppyEngine(options: HostOptions) {
     const ready = async () => (!withExt || (await status("codepuppy.ext")) === "active") && (await status("codepuppy.test.engine-probe")) === "active"
     for (let i = 0; i < 200 && !(await ready()); i++) await Bun.sleep(50)
     if (withExt && (await status("codepuppy.ext")) !== "active") throw new Error("the real ext is not active in the embedded engine")
-    return { send, fetch: (request) => fetch!(request), close: () => engine.close() }
+    return {
+      send,
+      fetch: (request) => fetch!(request),
+      url: engine.url,
+      authorization: engineAuthorization(password),
+      close: () => engine.close(),
+    }
   }
   return { start, slot, projectDirectory: slot.projectDirectory, userData, injection, content }
 }

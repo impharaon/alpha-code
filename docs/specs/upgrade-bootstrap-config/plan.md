@@ -241,6 +241,44 @@ last_reviewed: 2026-11-12
 | §9 回滚 · 无数据后果 | 段 0 记录第 ⑦ 格(C4 显式文件、C5 模型底表、密钥文件名集合)两端逐字相同;启动文档不落盘(构建器与 sidecar 不新增写盘点:`process-fence-write-sites.test.ts` 的登记簿本段不变) | 若迁移改变了磁盘形状,第 ⑦ 格红;若新增写盘,写盘登记簿闸红。 |
 
 ### 偏离记录
+- 2026-11-14 · 本次接回主线的验证收据(开始 12:01 UTC,复核 12:09 UTC,约 9 分钟):AC-01 / AC-02 通过;AC-04 的段 0 决定记录通过且文件与 `32f6cb99fb` 无差异,但网络真栈的 DNS 两项在原命令重跑一次后仍失败,交编排器处置。`ac1572-nx.invalid` 在本机被解析为 `2001:2::4e`,代理回 200 而非预期 503,最终分类为 `tls-failed/ECONNRESET` 而非 `dns/503`;未改断言、未排查其它网络实现。扫描覆盖主线新增 / 改动的 58 个 packages 路径与清单 31 键,除本段记录的单一新增写方外,其余新增读写命中均为 **none**。冻结 design、util schema 与决定记录相对 `eb4cccc5b3` 均无差异;合并提交第二父节点是 `3a8e25d6b8`。本次自身改动 7 个文件(4 处冲突、2 个同链打包夹具、本计划),未做 G4 / #1697 / #1710 · 后续提交。
+
+本次命令均先执行 `export PATH=$HOME/.bun-versions/1.4.4/bin:$PATH`(已确认 `bun --version` = `1.4.4`),从表中目录运行;测试逐条串行,未跑全套门。表中数量为宿主实际汇总,委派 cases 由宿主核对。
+
+| 目录 | 精确命令 | 结果 |
+| --- | --- | --- |
+| `packages/ui-mac` | `bun test src/main/bootstrap-launch-parity.engine.test.ts` | exit 0;1 pass / 0 fail |
+| `packages/util` | `bun test src/codepuppy-bootstrap.test.ts` | exit 0;16 pass / 0 fail |
+| `packages/ui-mac` | `bun test src/main/codepuppy-bootstrap-build.test.ts src/main/sidecar-bootstrap-gate.test.ts src/main/bootstrap-env-readers.test.ts` | exit 0;23 pass / 0 fail |
+| `packages/ext` | `bun test src/plugin-host.test.ts src/factory-paths.test.ts src/factory-deny.test.ts` | exit 0;37 pass / 0 fail |
+| `packages/core` | `bun test test/session-error.test.ts test/codepuppy-net-failure-settle.test.ts` | exit 0;17 pass / 0 fail |
+| `packages/ui-mac` | 下列 E1 原命令 | exit 0;50 pass / 0 fail,25 文件 |
+| `packages/ui-mac` | `bun test src/main/server.test.ts src/main/sidecar-env.test.ts src/main/engine-server-options.test.ts` | exit 0;82 pass / 0 fail |
+| `packages/ui-mac` | `bun test src/main/net-failure-real-stack.test.ts` | 两次均 exit 1;每次 3 pass / 2 fail;失败断言在 `:274`、`:281` |
+| `packages/core` | `bun typecheck` | exit 0;2,035 文件 / 2 项目,0 type errors |
+| `packages/ext` | `bun typecheck` | exit 0;0 type errors |
+| `packages/ui-mac` | `bun typecheck` | exit 0;0 type errors |
+| `packages/ui-mac` | `bun test src/main/gate-file-registry.test.ts src/main/old-name-scan.test.ts` | exit 0;33 pass / 0 fail;无须更新登记 |
+| `packages/ext` | `bun test src/policy/authority-registry.test.ts` | exit 0;5 pass / 0 fail;无须更新登记 |
+| `packages/ui-mac` | 下列 E2 原命令 | exit 0;两个新改夹具均编译通过,不执行 / 不启动安装包 |
+| 仓库根 | `bun -e 'import dns from "node:dns/promises"; console.log(await dns.lookup("ac1572-nx.invalid").catch((error) => ({code:error.code})))'` | exit 0;address = `2001:2::4e`,family = 6 |
+| 仓库根 | `git diff --exit-code eb4cccc5b3 -- docs/specs/upgrade-bootstrap-config/design.md packages/util/src/codepuppy-bootstrap.ts packages/ui-mac/src/main/bootstrap-launch-parity.record.json` | exit 0;空差异 |
+| 仓库根 | `git diff 32f6cb99fb -- packages/ui-mac/src/main/bootstrap-launch-parity.record.json` | exit 0;空差异 |
+| 仓库根 | `git diff --check` | exit 0 |
+
+E1(按共享夹具的 cases 引用发现宿主,另含生产注入与内部项目宿主):
+
+```sh
+bun test src/engine-adapter/agent-mention.engine.test.ts src/engine-adapter/attachment-codemode-read.engine.test.ts src/engine-adapter/connection-budget.engine.test.ts src/engine-adapter/default-agent.engine.test.ts src/engine-adapter/protocol-probe.engine.test.ts src/engine-adapter/queued-prompt.engine.test.ts src/engine-adapter/revert-removal.engine.test.ts src/engine-adapter/turn-failure.engine.test.ts src/main/byok-key-migration.test.ts src/main/cloud-credential-hot.engine.test.ts src/main/codepuppy-reasoning-badge-parity.test.ts src/main/composer-tier-matrix.engine.test.ts src/main/custom-provider-derivation.test.ts src/main/image-input-capability.test.ts src/main/mcp-server-derivation.test.ts src/main/naming-resume.engine.test.ts src/main/permission-ask-timeout.engine.test.ts src/main/platform-credential-error.engine.test.ts src/main/sidecar-stop-pending-approval.engine.test.ts src/main/token-hot-apply.engine.test.ts src/main/websearch-account-tool-table.engine.test.ts src/main/websearch-honest.engine.test.ts src/renderer/codepuppy-ui/problems-entry.test.ts src/main/codepuppy-config-injection-engine.test.ts src/engine-adapter/internal-projects.engine.test.ts
+```
+
+E2(只编译到内存):
+
+```sh
+bun -e 'for (const entrypoint of ["test-live/packaged-natives/engine-driver.ts", "test-live/packaged-natives/packaged-engine-natives.test.ts"]) { const result = await Bun.build({ entrypoints: [entrypoint], target: "node", format: "esm", write: false, external: ["bun:test"] }); if (!result.success) { console.error(result.logs); process.exit(1) } console.log(`${entrypoint}: build passed`) }'
+```
+
+- 2026-11-14 · AC-02 对 `c01ea14919...origin/alpha` 新增 / 改动代码逐键复查:生产读写方无新增命中;新增测试写方一处:`test-live/packaged-natives/packaged-engine-natives.test.ts` 的 `OPENCODE_EXPERIMENTAL_FILEWATCHER`。改由生产构建器的桌面缺省生成文档,同链 `engine-driver.ts` 经生产启动关口发布、核验引擎导出,库路径 / 配置目录 / 两个引擎开关都读文档;不跑安装包测试、不启动已安装应用。非新增命中:`models-catalog-v2.wiring.cases.ts` 的 main 侧 `CODEPUPPY_MODELS_DISABLE` 管理与全局根注释、`net-failure-real-stack.test.ts` 构建器输入 `CODEPUPPY_BASE_URL`,均没有恢复 sidecar 环境通道 · 后续提交。
 - 2026-11-14 · 接回 0.2.0 主线 `3a8e25d6b8` 的合并冲突:`packages/ext/src/plugin.ts` 保留主线助手点名钩子,供应商白名单与开关仍读本段的进程内发布 / 启动文档;`packages/ui-mac/test-component/codepuppy-engine.ts` 保留主线可选 MCP 合并、监听地址与授权值,配置写到本段局部 `globalRoot`,不恢复环境通道;`packages/ui-mac/test-fixtures/net-failure/engine-driver.ts` 保留本段文档发布与引擎关口,注释同步主线生产 main 构建的 engine chunk 来源 · 本次合并提交。
 - 2026-11-13 · 模型配置的逃生开关也成了调用方给的输入:`buildCodePuppyModelConfig(userDataPath, ModelConfigInputs)`(段 2 的 `PlatformInputs` 改名并加 `disabled`)。注入传文档的 `switches.modelsDisabled`;main 的出网派生照旧传 main 自己环境里的 `CODEPUPPY_MODELS_DISABLE === "1"`(main 一侧,语义不变)· 本段提交。
 - 2026-11-13 · 出厂技能目录交给构建器的方式:`factory-skills.ts` 加 `setFactorySkillDirsForFork` / `factorySkillDirsForFork`,index.ts 在 boot 对账成功后记下(原来写环境变量的同一处),`spawnLocalServer` 每次 fork 取出交给构建器;没对账或对账失败 ⇒ 空,与原来「没写变量」同一结果 · 本段提交。

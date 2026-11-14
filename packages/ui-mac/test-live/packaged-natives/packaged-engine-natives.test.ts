@@ -25,6 +25,7 @@ import { createRequire } from "node:module"
 import { dirname, join, resolve } from "node:path"
 import { ISOLATED_KEYS, isInside, isolatedEnv, testRoot } from "../../../../scripts/test-isolation/env"
 import { engineAuthorization } from "../../src/main/engine-authorization"
+import { buildCodePuppyBootstrap } from "../../src/main/codepuppy-bootstrap-build"
 import { createEngineFetch, type EngineFetch } from "../../src/engine-adapter"
 import { terminalWebSocketURL } from "../../../codepuppy-app/src/utils/terminal-websocket-url"
 import type { DriverInput } from "./engine-driver"
@@ -72,8 +73,6 @@ describeDarwin("`#1669` 安装包里的引擎原生资源:终端 / 文件监听 
       XDG_CONFIG_HOME: join(home, ".config"),
       XDG_STATE_HOME: join(home, ".local", "state"),
       ELECTRON_RUN_AS_NODE: "1",
-      // main 给 sidecar 的默认(src/main/server.ts):整个项目的文件监听开着。
-      OPENCODE_EXPERIMENTAL_FILEWATCHER: "true",
       SHELL: "/bin/sh",
       NO_COLOR: "1",
     })
@@ -82,8 +81,19 @@ describeDarwin("`#1669` 安装包里的引擎原生资源:终端 / 文件监听 
     const input: DriverInput = {
       app: APP,
       password: PASSWORD,
-      databasePath: join(scratch, "engine.db"),
-      configDirectory: join(scratch, "engine-config"),
+      bootstrap: buildCodePuppyBootstrap({
+        userDataPath: join(scratch, "userdata"),
+        globalRoot: join(scratch, "codepuppy-state", "env", "dev"),
+        userConfig: join(scratch, "codepuppy-state", "env", "dev", "codepuppy.jsonc"),
+        initialDirectory: workspace,
+        databasePath: join(scratch, "engine.db"),
+        engineConfigDirectory: join(scratch, "engine-config"),
+        officeMcpManifest: join(scratch, "office-mcp", "tools.json"),
+        factorySkillDirs: [],
+        // 与 main 相同:构建器的桌面缺省为模型拉取关、项目文件监听开。
+        env: {},
+        log: (line) => engineLog.push(`${line}\n`),
+      }),
     }
     engine = spawn(electron, [join(driverDir, "engine-driver.js"), JSON.stringify(input)], { cwd: workspace, env, stdio: ["ignore", "pipe", "pipe"] })
     engine.stdout?.on("data", (chunk: Buffer) => engineLog.push(chunk.toString()))

@@ -1,18 +1,18 @@
 {
- "_source": "Sampled by `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts` (alpha-code#1668 L6) at 271b1ae6aa: a real OpenCode 2 engine from this repo's packages/cli `serve`, isolated HOME/XDG, one git project, and the scripted OpenAI-compatible mock model next to the sampler. Three asks created with POST /api/session/:id/permission (agent build, read, save [\"*\"]): A1 .env and A2 other.env in session A, B1 .env in session B. `frames` = every permission.asked / permission.replied frame of A and B in arrival order. `pendingA` / `getA1` are the raw engine reads before replying; `rejected` / `replay` are the adapter's v2 reply route for A1 (reject, then the same command again; the command's fingerprint is computed over the request as the adapter's GET /permission displays it); `replyAgain` is a raw second engine reply to A1; `pendingB` is B's list after the reject; `settled` is the raw once reply to B1. `sessionAlways`: C1 a.env and C2 ab.env (save [\"a*\"]) in session C; `allowed` is the adapter's v2 reply route for C1 with decision always; `pendingAfter` / `rules` are C's pending list and session rules right after; `askSame` / `askOther` are fresh POST /api/session/:id/permission for a.env / b.env in C, `askOtherSession` the same for a.env in a new session D.",
+ "_source": "Sampled by `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts` (alpha-code#1668 L6) at 3338d86d0e: a real OpenCode 2 engine from this repo's packages/cli `serve`, isolated HOME/XDG, one git project, and the scripted OpenAI-compatible mock model next to the sampler. Three asks created with POST /api/session/:id/permission (agent build, read, save [\"*\"]): A1 .env and A2 other.env in session A, B1 .env in session B. `frames` = every permission.asked / permission.replied frame of A and B in arrival order. `pendingA` / `getA1` are the raw engine reads before replying; `rejected` / `replay` are the adapter's v2 reply route for A1 (reject, then the same command again; the command's fingerprint is computed over the request as the adapter's GET /permission displays it); `replyAgain` is a raw second engine reply to A1; `pendingB` is B's list after the reject; `settled` is the raw once reply to B1. `sessionAlways`: C1 a.env and C2 ab.env (save [\"a*\"]) in session C; `allowed` is the adapter's v2 reply route for C1 with decision always; `pendingAfter` / `rules` are C's pending list and session rules right after; `askSame` / `askOther` are fresh POST /api/session/:id/permission for a.env / b.env in C, `askOtherSession` the same for a.env in a new session D.",
  "ids": {
-  "sessionA": "ses_e2583f886ffe8wKkMAGKDozp7m",
-  "sessionB": "ses_e2583f883ffeWkdAUJQ99ekjWS",
-  "a1": "per_1da7c077f001G4wwdP9gA7b6T3",
-  "a2": "per_1da7c077f003LhcR3m9kx0re26",
-  "b1": "per_1da7c0780001f4slomtzjVjHOt"
+  "sessionA": "ses_e257146adffejgIzXWiQb0sO6Y",
+  "sessionB": "ses_e257146abffeWcM78NdwhnH7cx",
+  "a1": "per_1da8eb956001vx8weMV9zplgfb",
+  "a2": "per_1da8eb9570010S98wv3qOamX42",
+  "b1": "per_1da8eb958001eV72mIhoGyhIlm"
  },
  "created": [
   {
    "status": 200,
    "body": {
     "data": {
-     "id": "per_1da7c077f001G4wwdP9gA7b6T3",
+     "id": "per_1da8eb956001vx8weMV9zplgfb",
      "effect": "ask"
     }
    }
@@ -21,7 +21,7 @@
    "status": 200,
    "body": {
     "data": {
-     "id": "per_1da7c077f003LhcR3m9kx0re26",
+     "id": "per_1da8eb9570010S98wv3qOamX42",
      "effect": "ask"
     }
    }
@@ -30,7 +30,7 @@
    "status": 200,
    "body": {
     "data": {
-     "id": "per_1da7c0780001f4slomtzjVjHOt",
+     "id": "per_1da8eb958001eV72mIhoGyhIlm",
      "effect": "ask"
     }
    }
@@ -41,8 +41,8 @@
   "body": {
    "data": [
     {
-     "id": "per_1da7c077f001G4wwdP9gA7b6T3",
-     "sessionID": "ses_e2583f886ffe8wKkMAGKDozp7m",
+     "id": "per_1da8eb956001vx8weMV9zplgfb",
+     "sessionID": "ses_e257146adffejgIzXWiQb0sO6Y",
      "action": "read",
      "resources": [
       ".env"
@@ -52,8 +52,8 @@
      ]
     },
     {
-     "id": "per_1da7c077f003LhcR3m9kx0re26",
-     "sessionID": "ses_e2583f886ffe8wKkMAGKDozp7m",
+     "id": "per_1da8eb9570010S98wv3qOamX42",
+     "sessionID": "ses_e257146adffejgIzXWiQb0sO6Y",
      "action": "read",
      "resources": [
       "other.env"
@@ -69,8 +69,8 @@
   "status": 200,
   "body": {
    "data": {
-    "id": "per_1da7c077f001G4wwdP9gA7b6T3",
-    "sessionID": "ses_e2583f886ffe8wKkMAGKDozp7m",
+    "id": "per_1da8eb956001vx8weMV9zplgfb",
+    "sessionID": "ses_e257146adffejgIzXWiQb0sO6Y",
     "action": "read",
     "resources": [
      ".env"
@@ -82,7 +82,7 @@
   }
  },
  "command": {
-  "requestFingerprint": "d2141974b5002808e2df382ac1dd5429c459d6a5e2441edcbdbe2ee6bfb36215",
+  "requestFingerprint": "3d2242d877cfd797fdfd0851f1e21f90452a48385f065cf6b75490a0437b7280",
   "decisionID": "pdec_sampler_reject",
   "decision": "reject"
  },
@@ -90,15 +90,15 @@
   "status": 200,
   "body": {
    "data": {
-    "requestID": "per_1da7c077f001G4wwdP9gA7b6T3",
-    "sessionID": "ses_e2583f886ffe8wKkMAGKDozp7m",
-    "requestFingerprint": "d2141974b5002808e2df382ac1dd5429c459d6a5e2441edcbdbe2ee6bfb36215",
+    "requestID": "per_1da8eb956001vx8weMV9zplgfb",
+    "sessionID": "ses_e257146adffejgIzXWiQb0sO6Y",
+    "requestFingerprint": "3d2242d877cfd797fdfd0851f1e21f90452a48385f065cf6b75490a0437b7280",
     "decisionID": "pdec_sampler_reject",
     "decision": "reject",
-    "committedAt": 1794666924209,
+    "committedAt": 1794668149387,
     "resolvedRequestIDs": [
-     "per_1da7c077f001G4wwdP9gA7b6T3",
-     "per_1da7c077f003LhcR3m9kx0re26"
+     "per_1da8eb956001vx8weMV9zplgfb",
+     "per_1da8eb9570010S98wv3qOamX42"
     ]
    }
   }
@@ -107,15 +107,15 @@
   "status": 200,
   "body": {
    "data": {
-    "requestID": "per_1da7c077f001G4wwdP9gA7b6T3",
-    "sessionID": "ses_e2583f886ffe8wKkMAGKDozp7m",
-    "requestFingerprint": "d2141974b5002808e2df382ac1dd5429c459d6a5e2441edcbdbe2ee6bfb36215",
+    "requestID": "per_1da8eb956001vx8weMV9zplgfb",
+    "sessionID": "ses_e257146adffejgIzXWiQb0sO6Y",
+    "requestFingerprint": "3d2242d877cfd797fdfd0851f1e21f90452a48385f065cf6b75490a0437b7280",
     "decisionID": "pdec_sampler_reject",
     "decision": "reject",
-    "committedAt": 1794666924209,
+    "committedAt": 1794668149387,
     "resolvedRequestIDs": [
-     "per_1da7c077f001G4wwdP9gA7b6T3",
-     "per_1da7c077f003LhcR3m9kx0re26"
+     "per_1da8eb956001vx8weMV9zplgfb",
+     "per_1da8eb9570010S98wv3qOamX42"
     ]
    }
   }
@@ -124,8 +124,8 @@
   "status": 404,
   "body": {
    "_tag": "PermissionNotFoundError",
-   "requestID": "per_1da7c077f001G4wwdP9gA7b6T3",
-   "message": "Permission request not found: per_1da7c077f001G4wwdP9gA7b6T3"
+   "requestID": "per_1da8eb956001vx8weMV9zplgfb",
+   "message": "Permission request not found: per_1da8eb956001vx8weMV9zplgfb"
   }
  },
  "pendingB": {
@@ -133,8 +133,8 @@
   "body": {
    "data": [
     {
-     "id": "per_1da7c0780001f4slomtzjVjHOt",
-     "sessionID": "ses_e2583f883ffeWkdAUJQ99ekjWS",
+     "id": "per_1da8eb958001eV72mIhoGyhIlm",
+     "sessionID": "ses_e257146abffeWcM78NdwhnH7cx",
      "action": "read",
      "resources": [
       ".env"
@@ -151,15 +151,15 @@
  },
  "frames": [
   {
-   "id": "evt_1da7c077f002sJMDDcTOTadMTc",
-   "created": 1794666923903,
+   "id": "evt_1da8eb956002bJR4bo2nV9NgqJ",
+   "created": 1794668149078,
    "type": "permission.asked",
    "location": {
-    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-YkhJhd/proj"
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-D306Ta/proj"
    },
    "data": {
-    "id": "per_1da7c077f001G4wwdP9gA7b6T3",
-    "sessionID": "ses_e2583f886ffe8wKkMAGKDozp7m",
+    "id": "per_1da8eb956001vx8weMV9zplgfb",
+    "sessionID": "ses_e257146adffejgIzXWiQb0sO6Y",
     "action": "read",
     "resources": [
      ".env"
@@ -170,15 +170,15 @@
    }
   },
   {
-   "id": "evt_1da7c077f0043j7wEU6RVhoiZM",
-   "created": 1794666923903,
+   "id": "evt_1da8eb957002Yt9H6A1jLHTGCW",
+   "created": 1794668149079,
    "type": "permission.asked",
    "location": {
-    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-YkhJhd/proj"
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-D306Ta/proj"
    },
    "data": {
-    "id": "per_1da7c077f003LhcR3m9kx0re26",
-    "sessionID": "ses_e2583f886ffe8wKkMAGKDozp7m",
+    "id": "per_1da8eb9570010S98wv3qOamX42",
+    "sessionID": "ses_e257146adffejgIzXWiQb0sO6Y",
     "action": "read",
     "resources": [
      "other.env"
@@ -189,15 +189,15 @@
    }
   },
   {
-   "id": "evt_1da7c0780002ept57wQkI27EHZ",
-   "created": 1794666923904,
+   "id": "evt_1da8eb9580020ap8JnVjrcCi8g",
+   "created": 1794668149080,
    "type": "permission.asked",
    "location": {
-    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-YkhJhd/proj"
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-D306Ta/proj"
    },
    "data": {
-    "id": "per_1da7c0780001f4slomtzjVjHOt",
-    "sessionID": "ses_e2583f883ffeWkdAUJQ99ekjWS",
+    "id": "per_1da8eb958001eV72mIhoGyhIlm",
+    "sessionID": "ses_e257146abffeWcM78NdwhnH7cx",
     "action": "read",
     "resources": [
      ".env"
@@ -208,54 +208,54 @@
    }
   },
   {
-   "id": "evt_1da7c08b1001h8VZU51bA2689u",
-   "created": 1794666924209,
+   "id": "evt_1da8eba8a0012lDGWq5QPEQoW7",
+   "created": 1794668149386,
    "type": "permission.replied",
    "location": {
-    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-YkhJhd/proj"
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-D306Ta/proj"
    },
    "data": {
-    "sessionID": "ses_e2583f886ffe8wKkMAGKDozp7m",
-    "requestID": "per_1da7c077f001G4wwdP9gA7b6T3",
+    "sessionID": "ses_e257146adffejgIzXWiQb0sO6Y",
+    "requestID": "per_1da8eb956001vx8weMV9zplgfb",
     "reply": "reject"
    }
   },
   {
-   "id": "evt_1da7c08b1002czZc9xwsXIpFLm",
-   "created": 1794666924209,
+   "id": "evt_1da8eba8a002mdNJDb6PIXpSyb",
+   "created": 1794668149386,
    "type": "permission.replied",
    "location": {
-    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-YkhJhd/proj"
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-D306Ta/proj"
    },
    "data": {
-    "sessionID": "ses_e2583f886ffe8wKkMAGKDozp7m",
-    "requestID": "per_1da7c077f003LhcR3m9kx0re26",
+    "sessionID": "ses_e257146adffejgIzXWiQb0sO6Y",
+    "requestID": "per_1da8eb9570010S98wv3qOamX42",
     "reply": "reject"
    }
   },
   {
-   "id": "evt_1da7c08b3001dSJRfC3t56mHtj",
-   "created": 1794666924211,
+   "id": "evt_1da8eba8d001qZtYhga7qZwqQU",
+   "created": 1794668149389,
    "type": "permission.replied",
    "location": {
-    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-YkhJhd/proj"
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-D306Ta/proj"
    },
    "data": {
-    "sessionID": "ses_e2583f883ffeWkdAUJQ99ekjWS",
-    "requestID": "per_1da7c0780001f4slomtzjVjHOt",
+    "sessionID": "ses_e257146abffeWcM78NdwhnH7cx",
+    "requestID": "per_1da8eb958001eV72mIhoGyhIlm",
     "reply": "once"
    }
   }
  ],
  "sessionAlways": {
   "ids": {
-   "sessionC": "ses_e2583f61effe9V1Zc20ZH6nZ2G",
-   "c1": "per_1da7c09e5001ayncRKLd94ZKl4",
-   "c2": "per_1da7c09e6001tUFkVp1JiV0Pxa",
-   "sessionD": "ses_e2583f61cffeUF5zTc4x1lmAct"
+   "sessionC": "ses_e25714444ffecpcjC5kvELFq5v",
+   "c1": "per_1da8ebbc0001qiLsefO2SxHWS6",
+   "c2": "per_1da8ebbc1001QlkPpVyvSui7i8",
+   "sessionD": "ses_e25714442ffe6MxXjgozojhSFj"
   },
   "command": {
-   "requestFingerprint": "282c3da81d85b75ad01e7aae57e28bb464387cabf53416402202578e86d1b4d4",
+   "requestFingerprint": "3d827a2567ea111a99417a8162de2976129375d3b724064a86ed2bad48462e64",
    "decisionID": "pdec_sampler_always",
    "decision": "always",
    "grantScope": {
@@ -268,15 +268,15 @@
    "status": 200,
    "body": {
     "data": {
-     "requestID": "per_1da7c09e5001ayncRKLd94ZKl4",
-     "sessionID": "ses_e2583f61effe9V1Zc20ZH6nZ2G",
-     "requestFingerprint": "282c3da81d85b75ad01e7aae57e28bb464387cabf53416402202578e86d1b4d4",
+     "requestID": "per_1da8ebbc0001qiLsefO2SxHWS6",
+     "sessionID": "ses_e25714444ffecpcjC5kvELFq5v",
+     "requestFingerprint": "3d827a2567ea111a99417a8162de2976129375d3b724064a86ed2bad48462e64",
      "decisionID": "pdec_sampler_always",
      "decision": "always",
-     "committedAt": 1794666924823,
+     "committedAt": 1794668150007,
      "resolvedRequestIDs": [
-      "per_1da7c09e5001ayncRKLd94ZKl4",
-      "per_1da7c09e6001tUFkVp1JiV0Pxa"
+      "per_1da8ebbc0001qiLsefO2SxHWS6",
+      "per_1da8ebbc1001QlkPpVyvSui7i8"
      ]
     }
    }
@@ -291,7 +291,7 @@
    "status": 200,
    "body": {
     "data": {
-     "id": "per_1da7c0b19001AtC6oMP0j0XZTZ",
+     "id": "per_1da8ebcfa001RZ2Qf3JeiTEJPQ",
      "effect": "allow"
     }
    }
@@ -300,7 +300,7 @@
    "status": 200,
    "body": {
     "data": {
-     "id": "per_1da7c0b19002ILYXil5A8cV32O",
+     "id": "per_1da8ebcfb001J7VgPmLVJ5hj8h",
      "effect": "ask"
     }
    }
@@ -309,7 +309,7 @@
    "status": 200,
    "body": {
     "data": {
-     "id": "per_1da7c0b1a001LO14GvPhh2qvjW",
+     "id": "per_1da8ebcfc0012xKaWf3pxlQfrq",
      "effect": "ask"
     }
    }
@@ -322,13 +322,13 @@
    "packages/cli": "544883d154af3d90d64f2638bef467852fe252aa",
    "packages/client": "3d3c95581389d702c46e0fe7ccdadbcce295872b",
    "packages/codemode": "eb7ca2279c0d93a2e967709e18346f3aa31a8e23",
-   "packages/core": "ed3c1d7e900b7a8b99b56e78f1851957c1a5dbce",
+   "packages/core": "39bb60e82a22a0d289c7fffe62414c4bfcbc2134",
    "packages/latex": "abcd38e17eb09d996d975964f46be0a2e758fdf4",
    "packages/merman": "3feaef89d940956096deb30e2b9f85f3fabdfe15",
    "packages/plugin": "7de96f7a8ae8b17293dcd78a3cba6eaa96539133",
    "packages/plugin-browser": "a3fd121205a803d1a82d97514cc09245010656cb",
    "packages/protocol": "3117071f374c96909ccc2250cd5333a11d521854",
-   "packages/schema": "e5ee1154824c8a8d8be96acc8bb2e9dde7f8ca91",
+   "packages/schema": "b1cacb270f69947deadcd062d48ea42bc4c91392",
    "packages/server": "48bfa1e931af6e4c7d973119e173d28124aaa53d",
    "packages/simulation": "7b707eb9b69aa826e91677a8416cfb8cda3efcf5",
    "packages/theme": "0afba31d85d03fa7e34f8a98a38ccf355d6ec6c5",

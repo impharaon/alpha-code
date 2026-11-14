@@ -142,6 +142,8 @@ const webBase = () => resolveEndpoints().web
 
 let userDataPath = ""
 let getWindow: () => BrowserWindow | null = () => null
+/** #1686 R1 M1:全部产品窗口(菜单可以新建第二个)。未注入时只有 getWindow 那一个。 */
+let getWindows: (() => BrowserWindow[]) | undefined
 let respawnSidecar: (trigger: SidecarRespawnTrigger) => void = () => {}
 // REQ-236 §2.1-2(`#1562`):续期提交后同步热应用凭据文件。缺省 = 还没有引擎可应用(setAuthDeps 之前),
 // 与「还没 fork 过」同一结论:下一次 fork 的 syncSecretFiles 自然带上 env 里的新值。
@@ -297,6 +299,8 @@ function deriveState(): AuthState {
     expiresAt: stored.expiresAt,
     ...(loggedIn ? { platformStatus: platformReady ? ("ready" as const) : ("recovering" as const) } : {}),
     ...(loggedIn && refreshUnreachableGeneration === tokenGeneration ? { refreshUnreachable: true } : {}),
+    // #1686:不透明的登录代(不是账号标识),让渲染层的签名与本侧 publish 的身份判据一样细。
+    ...(loggedIn ? { identityEpoch: authIdentityEpoch } : {}),
   }
 }
 
@@ -310,8 +314,9 @@ function deriveState(): AuthState {
 // the signature — a bare token rotation must not wake the UI.
 let lastPublishedSig: string | undefined
 function publish() {
-  const win = getWindow()
-  if (!win || win.isDestroyed()) return
+  // #1686 R1 M1:身份变化要送达每一个产品窗口,否则第二个窗口留着上一个账号的余额与结论。
+  const wins = (getWindows ? getWindows() : [getWindow()]).filter((win): win is BrowserWindow => !!win && !win.isDestroyed())
+  if (wins.length === 0) return
   const state = deriveState()
   const sig = JSON.stringify({
     status: state.status,
@@ -321,17 +326,25 @@ function publish() {
     platformStatus: state.platformStatus,
     // #1543:「正在续」与「续不上」对渲染层是两句不同的话 —— 只翻这一位也必须送达。
     refreshUnreachable: state.refreshUnreachable,
+    // #1686:签发端的桌面令牌响应不带 email / plan,不先退出就换号时上面各项都不变 ——
+    // 账号标记(`account.read` 的 sub 哈希,跨续期稳定)让真换号必发、纯续期仍不发。只进签名,不进推送的状态。
+    identity: getAuthIdentityTag(),
   })
   if (sig === lastPublishedSig) return
   // R2 Minor2:先记账后发送会在 IPC 抛出时把这次状态「记成已发布」——后续同签名的 publish
   // (例如换血落定后补发的那次 ready)会被身份门控静默吞掉,平台面永远停在 recovering。
   // 只有真的送出去才记账;抛出降级为一条日志(权威状态仍可经 auth-get-state 回读)。
-  try {
-    win.webContents.send("auth-state", state)
-    lastPublishedSig = sig
-  } catch (error) {
-    warn("codepuppy-auth: auth-state publish failed", error)
+  // 任一窗口送达失败就不记账:下一次同签名的 publish 会重送全部窗口(同 R2 Minor2 的理由)。
+  let delivered = true
+  for (const win of wins) {
+    try {
+      win.webContents.send("auth-state", state)
+    } catch (error) {
+      delivered = false
+      warn("codepuppy-auth: auth-state publish failed", error)
+    }
   }
+  if (delivered) lastPublishedSig = sig
 }
 
 // B11 复扫行16:登录整链失败不再只留日志 —— 推 auth-error 给 renderer(sidebar 订阅 → error toast),
@@ -402,6 +415,8 @@ export function initAuthEnv(dataPath: string) {
 // Called after the main window exists, so state pushes have a target + login can respawn the sidecar.
 export function setAuthDeps(deps: {
   getWindow: () => BrowserWindow | null
+  /** #1686 R1 M1:全部产品窗口;auth-state 广播到每一个。 */
+  getWindows?: () => BrowserWindow[]
   respawn: (trigger: SidecarRespawnTrigger) => void
   /** REQ-236 §2.1-2(`#1562`):把 `applyAuthEnv` 刚写进 env 的凭据热应用到引擎读的文件。同步;
    *  `needs-structural` ⇒ 本次续期走结构性重启并等它确认。 */
@@ -409,6 +424,7 @@ export function setAuthDeps(deps: {
   onChanged?: () => void
 }) {
   getWindow = deps.getWindow
+  getWindows = deps.getWindows
   respawnSidecar = deps.respawn
   applyCredentials = deps.applyCredentials
   onAuthChanged = deps.onChanged ?? (() => {})

@@ -71,6 +71,7 @@ import { applyPlatformCredentialsHot } from "./codepuppy-secret-files"
 import { setupAutoUpdater, showUpdaterDialog } from "./updater"
 import {
   createMainWindow,
+  productWindows,
   isRecoveryWebContents,
   registerRendererProtocol,
   setRelaunchHandler,
@@ -783,6 +784,8 @@ const main = Effect.gen(function* () {
   // 采用当前 generation 则自然消解,否则 respawn 入口建成后补一次 structural respawn。
   setAuthDeps({
     getWindow: () => mainWindow,
+    // #1686 R1 M1:身份变化送达每一个产品窗口(菜单「新建窗口」建的也算)。
+    getWindows: productWindows,
     respawn: (trigger) => {
       if (requestSidecarRespawn) {
         void requestSidecarRespawn(trigger)

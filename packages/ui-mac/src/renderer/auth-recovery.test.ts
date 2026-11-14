@@ -1053,6 +1053,7 @@ describe("auth 订阅单点接线", () => {
       "codepuppy-ui/codepuppy-composer-model.tsx",
       "codepuppy-ui/codepuppy-composer.tsx",
       "codepuppy-ui/permission-watcher.tsx",
+      "extensions/cloud-preflight.tsx",
       "extensions/extension-hub.tsx",
       "sidebar/codepuppy-sidebar.tsx",
     ])

@@ -2,7 +2,7 @@
 // 唯一渲染面。按已批设计稿(docs/design/2026-07-15-capability-authorize-dialog):
 //   · 整集确认、无逐能力开关(引擎 requested ⊆ confirmed 整集覆盖,防 TOCTOU);
 //   · 差异三分层:新增(视觉焦点)/已授权(muted)/将收回(信息性);
-//   · 风险克制:仅 engine:plugin / process:spawn 标高风险,出现时复用 ⚠ 风险行;
+//   · 风险克制:仅 engine:plugin / process:spawn 标高风险(共享组件 RiskTag,与工具批准面板同一个),出现时复用 ⚠ 风险行;
 //   · bundle 只展开需确认项,其余按返回 diff 中非确认项计数折叠(不含 planner 已跳过的 optional);
 //   · 未知 capability 原样展示(前向兼容),不隐藏。
 // 宿主 Dialog / 状态机在 extension-hub.tsx(两阶段控制器);本组件纯展示 + confirmed 构造。
@@ -11,6 +11,7 @@ import type { JSX } from "solid-js"
 import { t } from "../i18n"
 import { Button } from "../codepuppy-ui/Button"
 import { Dialog } from "../codepuppy-ui/Dialog"
+import { RiskTag } from "../codepuppy-ui/RiskTag"
 import type { DialogRestoreFocus } from "../codepuppy-ui/dialog-core"
 import type { AuthorizationConfirmationWire, CapabilityDiffWire } from "../../shared/ext-capability-authorization"
 
@@ -145,9 +146,7 @@ function CapRow(props: { cap: string; kind: CapRowKind }) {
       </span>
       <span class="codepuppy-ext-authz-id">{props.cap}</span>
       <Show when={props.kind !== "removed" && HIGH_RISK.has(props.cap)}>
-        <span class="codepuppy-ext-authz-chip" data-kind="risk">
-          {t("codepuppy.ext.authz.riskHigh")}
-        </span>
+        <RiskTag level="high" />
       </Show>
       <span class="codepuppy-ext-authz-chip" data-kind={props.kind}>
         {t(chipKey())}
@@ -176,9 +175,7 @@ export function ExtGrantedCapRow(props: { cap: string; subtitle?: string }) {
       </span>
       <span class="codepuppy-ext-authz-id">{props.cap}</span>
       <Show when={HIGH_RISK.has(props.cap)}>
-        <span class="codepuppy-ext-authz-chip" data-kind="risk">
-          {t("codepuppy.ext.authz.riskHigh")}
-        </span>
+        <RiskTag level="high" />
       </Show>
     </div>
   )

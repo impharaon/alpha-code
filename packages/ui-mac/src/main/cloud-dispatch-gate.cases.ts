@@ -27,7 +27,8 @@ const JOB = "job_gate_0001"
 /** 桌面在 #918 之前每次派发都会补上的那四条(现已删除;元判据用它证明假平台拒得动)。 */
 const HISTORICAL_INJECTED_DENIED_PATHS = [".env*", "*.pem", ".alpha/", ".git/"]
 
-mock.module("./codepuppy-auth", () => ({ getAccessToken: () => "tok.cloud.dispatch" }))
+// alpha-code#1686:codepuppy-cloud-jobs 的预检读身份标签(本 harness 不跑预检,只需让 import 解析)。
+mock.module("./codepuppy-auth", () => ({ getAccessToken: () => "tok.cloud.dispatch", getAuthIdentityTag: () => undefined }))
 mock.module("./codepuppy-endpoints", () => ({ resolveEndpoints: () => ({ cloud: BASE }) }))
 mock.module("./logging", () => ({ getLogger: () => ({ log: () => {}, warn: () => {}, error: () => {} }) }))
 mock.module("./codepuppy-contract-health", () => ({ reportContractFailure: () => {} }))

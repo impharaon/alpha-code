@@ -1,0 +1,50 @@
+{
+  "kind": "schema",
+  "contract": "AccountStatusV1",
+  "expect": "valid",
+  "source": "cloud GET /v1/cloud/account-status?task=research (platform_access account.read) against accountApp + local SQLite; pro subscription + 100000 fen recharge at 2026-10-14T00:00:00Z; reproduced by cloud-account-status-http-582.test.ts",
+  "value": {
+    "schema_version": 1,
+    "account": {
+      "suspended": false,
+      "plan": {
+        "status": "active",
+        "tier": "pro",
+        "window5h": {
+          "remaining_credits": 2000,
+          "limit_credits": 2000,
+          "resets_in_min": 300
+        },
+        "window7d": {
+          "remaining_credits": 16000,
+          "limit_credits": 16000,
+          "resets_in_min": 10080
+        }
+      },
+      "wallet": {
+        "balance_fen": 100000,
+        "available_fen": 100000
+      },
+      "wallet_overflow": false,
+      "admission": {
+        "ok": true
+      }
+    },
+    "task": {
+      "task": "research",
+      "estimate": {
+        "available": false,
+        "reason": "model.invoke.chat is billed on actual usage; the reserve is a hold, not a quote — cannot estimate"
+      },
+      "reserve": {
+        "action_id": "model.invoke.chat",
+        "hold_fen": 221,
+        "allowance_leg_fen": 221,
+        "wallet_leg_fen": 0
+      },
+      "admission": {
+        "ok": true
+      }
+    }
+  }
+}

@@ -17,7 +17,7 @@
 import { transformAsync } from "@babel/core"
 import presetTypescript from "@babel/preset-typescript"
 import { GlobalRegistrator } from "@happy-dom/global-registrator"
-import { afterAll, afterEach, beforeEach, expect, mock, test } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import presetSolid from "babel-preset-solid"
 import type { CodePuppyProject, CodePuppyProjectsApi } from "../src/renderer/sidebar/use-projects"
 import type { AccountSummary } from "../src/preload/types"
@@ -98,7 +98,7 @@ type Expected = {
   chip: string
   chipPro: boolean
   footerSub: string
-  rows: Record<string, string> // 行标签 → 期望值(取 .codepuppy-acct-v 或 .codepuppy-acct-pending 的文本)
+  rows: Record<string, string> // 行标签 → 期望值(取 .a-kv-v 的可见文本;alpha-code#1686 起弹层用组件库名称 — 值列表)
   ctas: string[]
 }
 
@@ -189,15 +189,25 @@ const CASES: Array<{ name: string; summary: AccountSummary | { error: string }; 
 
 let currentSummary: AccountSummary | { error: string } | null = null
 
+const DEFAULT_AUTH = {
+  status: "logged-in",
+  mode: "cloud",
+  email: "tester@example.com",
+  account: { email: "tester@example.com", plan: "" }, // JWT plan claim 为空(未订阅账户的常态)
+}
+// alpha-code#1686:换号用例要能改 main 的现值、推一次 auth-state、并逐次控制 summary 的回复时机。
+let currentAuth: Record<string, unknown> = DEFAULT_AUTH
+let pushAuth: ((state: unknown) => void) | undefined
+let summaryImpl: (() => Promise<unknown>) | undefined
+
 const EXPLICIT: Record<string, (...args: unknown[]) => unknown> = {
   appVersion: async () => "0.0.0-quadrant",
-  "auth.getState": async () => ({
-    status: "logged-in",
-    mode: "cloud",
-    email: "tester@example.com",
-    account: { email: "tester@example.com", plan: "" }, // JWT plan claim 为空(未订阅账户的常态)
-  }),
-  "account.summary": async () => currentSummary,
+  "auth.getState": async () => currentAuth,
+  "auth.subscribe": (callback: unknown) => {
+    pushAuth = callback as (state: unknown) => void
+    return () => {}
+  },
+  "account.summary": async () => (summaryImpl ? summaryImpl() : currentSummary),
   endpoints: async () => ({}),
 }
 
@@ -280,11 +290,12 @@ function click(el: Element) {
 
 function readRows(pop: Element): Record<string, string> {
   const rows: Record<string, string> = {}
-  for (const row of pop.querySelectorAll(".codepuppy-acct-row")) {
-    const k = row.querySelector(".codepuppy-acct-k")?.textContent?.trim() ?? "(无标签)"
-    const v = row.querySelector(".codepuppy-acct-v")?.textContent?.trim()
-    const pending = row.querySelector(".codepuppy-acct-pending")?.textContent?.trim()
-    rows[k] = v ?? pending ?? (row.querySelector("svg") ? "<sparkline>" : "(空)")
+  for (const row of pop.querySelectorAll(".a-kv-row")) {
+    const k = row.querySelector(".a-kv-k")?.textContent?.trim() ?? "(无标签)"
+    const value = row.querySelector(".a-kv-v")
+    // 可见文本:剔除只给读屏的「正在读取 / 暂时读不到」。
+    const visible = value ? Array.from(value.childNodes).filter((node) => !(node instanceof Element && node.classList.contains("a-kv-sr"))).map((node) => node.textContent).join("").trim() : ""
+    rows[k] = row.querySelector("svg") ? "<sparkline>" : visible || "(空)"
   }
   return rows
 }
@@ -322,3 +333,82 @@ for (const { name, summary, expected } of CASES) {
     expect(ctas).toEqual(expected.ctas)
   })
 }
+
+// alpha-code#1686 D2:签发端不给 email / plan,不先退出就换号时 auth-state 里只有登录代(identityEpoch)在变。
+// 弹层必须清空上一个账号的数并重取;较早发出、较晚回来的回复(上一个账号的)不得覆盖新账号的结果。
+describe("alpha-code#1686 the balance card follows an account switch without logout", () => {
+  const signedIn = (epoch: number, platformStatus: "ready" | "recovering" = "ready") => ({
+    status: "logged-in",
+    mode: "platform",
+    account: { email: undefined, plan: undefined },
+    platformStatus,
+    identityEpoch: epoch,
+  })
+  const deferred = () => {
+    let resolve!: (value: unknown) => void
+    const promise = new Promise<unknown>((r) => (resolve = r))
+    return { promise, resolve }
+  }
+  const summaryA = CASES[0]!.summary
+  const summaryB = CASES[1]!.summary
+  const balance = () => readRows(document.querySelector(".codepuppy-acct-pop")!)["可用余额"]
+
+  afterEach(() => {
+    currentAuth = DEFAULT_AUTH
+    summaryImpl = undefined
+  })
+
+  test("a push that differs only in the login epoch clears the card and refetches for the new account", async () => {
+    currentAuth = signedIn(11)
+    summaryImpl = async () => summaryA
+    await mount()
+    click(document.querySelector(".codepuppy-sidebar-account")!)
+    await flush()
+    expect(balance()).toBe("¥998.65")
+
+    const b = deferred()
+    let calls = 0
+    summaryImpl = () => {
+      calls++
+      return b.promise
+    }
+    currentAuth = signedIn(12)
+    pushAuth!(currentAuth)
+    await flush()
+    await flush()
+    expect(calls).toBe(1)
+    expect(balance()).toBe("…")
+    b.resolve(summaryB)
+    await flush()
+    expect(balance()).toBe("¥0.00")
+  })
+
+  test("the previous account's reply that lands late never overwrites the new account's numbers", async () => {
+    currentAuth = signedIn(21)
+    summaryImpl = async () => summaryA
+    await mount()
+    click(document.querySelector(".codepuppy-sidebar-account")!)
+    await flush()
+
+    const lateA = deferred()
+    const b = deferred()
+    const queue = [lateA.promise, b.promise]
+    summaryImpl = () => queue.shift()!
+    currentAuth = signedIn(21, "recovering") // 同一个登录里的状态翻转:发出 A 的一次重取,卡片不清空
+    pushAuth!(currentAuth)
+    await flush()
+    await flush()
+    expect(balance()).toBe("¥998.65")
+    currentAuth = signedIn(22)
+    pushAuth!(currentAuth)
+    await flush()
+    await flush()
+    expect(queue.length).toBe(0)
+    b.resolve(summaryB)
+    await flush()
+    expect(balance()).toBe("¥0.00")
+    lateA.resolve(summaryA)
+    await flush()
+    expect(balance()).toBe("¥0.00")
+  })
+})

@@ -373,6 +373,7 @@ status.
 | `SPEC-byok-output-limits` | [specs/byok-output-limits/spec.md](specs/byok-output-limits/spec.md) | 自带密钥的模型按自己的实测上限输出，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-child-process-write-fence` | [specs/child-process-write-fence/spec.md](specs/child-process-write-fence/spec.md) | 连接器与语言服务的子进程也受写入范围约束，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-cloud-job-desktop-notifications` | [specs/cloud-job-desktop-notifications/spec.md](specs/cloud-job-desktop-notifications/spec.md) | 用户能收到任务结果并在桌面设置里关闭通知。 | approved |
+| `PLAN-cloud-job-form-preflight` | [specs/cloud-job-form-preflight/plan.md](specs/cloud-job-form-preflight/plan.md) | alpha-code#1686 一段:拷入 AccountStatusV1、主进程只读预检 IPC、组件库卡片与名称 — 值列表(账户弹层改用)、两种发送框的预检区与按钮行右移 | active |
 | `SPEC-connector-workspace-following` | [specs/connector-workspace-following/spec.md](specs/connector-workspace-following/spec.md) | 连接器跟随当前会话所在项目目录，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-context-injection-budgets` | [specs/context-injection-budgets/spec.md](specs/context-injection-budgets/spec.md) | 应用注入的对话内容有明确大小上限，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-conversation-overlays` | [specs/conversation-overlays/spec.md](specs/conversation-overlays/spec.md) | 统一对话浮层交互，并让用户批准工具时还能翻看时间线。 | approved |
@@ -400,7 +401,8 @@ status.
 | `SPEC-owned-session-page` | [specs/owned-session-page/spec.md](specs/owned-session-page/spec.md) | 会话页保持自己的完整交互与工具卡，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-owned-settings-and-dialogs` | [specs/owned-settings-and-dialogs/spec.md](specs/owned-settings-and-dialogs/spec.md) | 设置、模型选择、审批与恢复使用一致交互，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-permission-risk-classification` | [specs/permission-risk-classification/spec.md](specs/permission-risk-classification/spec.md) | 高风险动作在执行前先完成分类，保留历史条款、有效裁决和交付证据边界。 | approved |
-| `SPEC-permission-risk-display` | [specs/permission-risk-display/spec.md](specs/permission-risk-display/spec.md) | 用户在授权时能看出动作的风险档位，保留历史条款、有效裁决和交付证据边界。 | draft |
+| `PLAN-permission-risk-display` | [specs/permission-risk-display/plan.md](specs/permission-risk-display/plan.md) | #1314 的实施计划:风险标签组件进组件库,批准面板与能力授权框共用;只做呈现,分类器不动 | active |
+| `SPEC-permission-risk-display` | [specs/permission-risk-display/spec.md](specs/permission-risk-display/spec.md) | 用户在授权时能看出动作的风险档位，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `PLAN-project-agent-fields` | [specs/project-agent-fields/plan.md](specs/project-agent-fields/plan.md) | alpha-code#1700 一段 —— 项目助手的 disable、temperature、top_p、steps(maxSteps)、hidden、color、variant 在 OpenCode 2 上生效,用不上的字段记一行日志,写坏的条目整条不装(tools 已由 | active |
 | `SPEC-project-agent-fields` | [specs/project-agent-fields/spec.md](specs/project-agent-fields/spec.md) | 项目文档里给 agent 写的 disable、tools、temperature 等字段在新引擎上重新生效,用不上的字段有记录可查 | approved |
 | `PLAN-project-consent-store` | [specs/project-consent-store/plan.md](specs/project-consent-store/plan.md) | #1709 一段:项目扩展的信任只认用户在确认框里的决定,记录存在 Code Puppy 自己的状态目录,项目目录里的任何文件都不再算数 | active |
@@ -423,6 +425,7 @@ status.
 | `SPEC-unattended-run-permissions` | [specs/unattended-run-permissions/spec.md](specs/unattended-run-permissions/spec.md) | 自动化任务遇到需要批准的工具时立即按权限裁决,允许的直接执行,不允许的立即说明原因,不再等 300 秒后失败 | approved |
 | `SPEC-untrusted-upstream-candidates` | [specs/untrusted-upstream-candidates/spec.md](specs/untrusted-upstream-candidates/spec.md) | 上游候选代码无法取得仓库推送凭据，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `DESIGN-upgrade-bootstrap-config` | [specs/upgrade-bootstrap-config/design.md](specs/upgrade-bootstrap-config/design.md) | 主进程今天经二十多个 CODEPUPPY_* 环境变量、启动命令、sidecar 进程内环境把决定交给 sidecar、引擎与 ext;收成一份有类型、有版本、每代 sidecar 一份、只在内存里的启动文档,环境变量只留给非 Code Puppy 的读者;最后一片给引擎换上 Code Puppy 自有的全局配置目录,首次切换时把独立 OpenCode 的全局内容复制一份过来 | approved |
+| `PLAN-upgrade-bootstrap-config` | [specs/upgrade-bootstrap-config/plan.md](specs/upgrade-bootstrap-config/plan.md) | alpha-code#1698 的分段计划:段 0 先在今天的代码上钉住一次代表性启动的决定记录;G1–G3 按键组把主进程交给 sidecar / ext / 引擎的决定搬进启动文档(同一个 PR);G4 换上 Code Puppy 自有的引擎全局配置目录(单独一个 PR)。另附今天 alpha 上变量与读方的盘点 | active |
 | `DESIGN-upgrade-extension-manifest` | [specs/upgrade-extension-manifest/design.md](specs/upgrade-extension-manifest/design.md) | Code Puppy 带进引擎的工具、MCP、插件、agent、技能、命令,今天经十条路径、五个读法、两套 v1→2.x 翻译进入引擎;收成一份 Code Puppy 自有的登记集合(内存里一个类型)、一份文档字段表与一个读取器、一张准入表和每类一个登记器;磁盘上的文件不改形状,用户文档照 I-07 G4 由引擎直接读,项目文档改用引擎自己的归一化读 | approved |
 | `DESIGN-upgrade-fewer-takeovers` | [specs/upgrade-fewer-takeovers/design.md](specs/upgrade-fewer-takeovers/design.md) | 逐项裁定 12 个上游接管文件与文本级权宜做法的去留;「本次会话内允许」做进已接管的权限内核(连带只限本会话、不放行 Code Puppy 策略请求),读目录卡改由扩展从结构化结果生成;失败码保留文字前缀并统一读法;接管块形状与记录在案的上游基准、构建期改写登记与上游挂点需求清单 | approved |
 | `PLAN-upgrade-fewer-takeovers` | [specs/upgrade-fewer-takeovers/plan.md](specs/upgrade-fewer-takeovers/plan.md) | I-05 本 lane 的三个切片:A「本次会话内允许」进已接管的权限内核(连带只限本会话、不放行 Code Puppy 策略请求,适配器删替身);C 失败码前缀的统一读法;B 读目录卡由扩展从结构化结果生成。切片 D 不在本 lane | active |

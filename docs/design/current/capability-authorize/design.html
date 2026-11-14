@@ -27,7 +27,8 @@
   <code>2026-07-04-ext-hub-m2</code> 原型:视觉语言零改动(tokens / Dialog / Button / 确认框 body 全部沿用规格原文)。
   本稿新增 = 引擎 <code>stage="authorize"</code> 返回后的授权视图 <code>.codepuppy-ext-authz</code>(唯一新增 CSS 家族):
   MCP/plugin/bundle 作为既有确认框的<b>第二阶段</b>原地切换,skill 直装时独立弹出。整集确认、无逐能力开关(引擎防 TOCTOU 语义)。
-  规格与证据见同目录 <code>design.md</code>。
+  规格与证据见同目录 <code>design.md</code>。<br>
+  <b>2026-11-13</b>:「高风险」改用共享组件「风险标签」(与工具批准面板同一个,定义与改前改后见 <a href="../../2026-11-13-1314-risk-tag/frame.html#before-after"><code>2026-11-13-1314-risk-tag/</code></a>);浅色下「高风险」「新增」「将收回」三个标签的文字加深到 6.2:1;「高风险」也标在已授权行上,与上线代码一致。
 </div>
 
 <div class="stage" id="stage"></div>
@@ -59,7 +60,8 @@ function capRow(id, kind, ref){ // kind: new | granted | removed
   const muted = kind !== "new" ? " data-muted" : "";
   const nm = kind === "removed" ? `<s>${c.nm}</s>` : c.nm;
   const chip = {new:"新增",granted:"已授权",removed:"将收回"}[kind];
-  const risk = (kind === "new" && c.tier === "high") ? `<span class="codepuppy-ext-authz-chip" data-kind="risk">高风险</span>` : "";
+  // 2026-11-13:风险标签组件;与上线代码一致,新增与已授权行都标,将收回行不标。
+  const risk = (kind !== "removed" && c.tier === "high") ? `<span class="a-risk-tag" data-level="high">高风险</span>` : "";
   return `<div class="codepuppy-ext-authz-cap"${muted}>
     <span class="codepuppy-ext-authz-ic" data-tier="${kind==="new"?c.tier:"low"}">${c.ic}</span>
     <span class="codepuppy-ext-authz-nm"><b>${nm}${ref||""}</b><small>${c.ds}</small></span>

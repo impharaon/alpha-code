@@ -88,14 +88,17 @@ export function ModelPickPop(props: {
 
   const epochKey = () => `${props.directory() ?? ""}\u0000${composerModelProjection().sessionID ?? ""}`
   const isCurrent = (seq: number, epoch: string) => !disposed && seq === loadSeq && epoch === epochKey()
+  // #1686:两份签名都带登录代(identityEpoch)—— 签发端不给 email / plan,不先退出就换号时只有它在变;
+  // 漏掉它就会把换号当成同一身份吞掉(同 auth-recovery 的不变量 G)。
   const authSignature = (state: AuthState) =>
-    `${state.status}\u0000${state.mode}\u0000${state.platformStatus ?? "ready"}\u0000${state.account?.email ?? ""}\u0000${state.refreshUnreachable ? "unreachable" : ""}`
+    `${state.status}\u0000${state.mode}\u0000${state.platformStatus ?? "ready"}\u0000${state.account?.email ?? ""}\u0000${state.refreshUnreachable ? "unreachable" : ""}\u0000${state.identityEpoch ?? ""}`
   const authIdentitySignature = (state: AuthState) =>
     JSON.stringify({
       status: state.status,
       mode: state.mode,
       email: state.account?.email ?? "",
       plan: state.account?.plan ?? null,
+      identityEpoch: state.identityEpoch ?? null,
     })
 
   const loadCatalog = (seq: number, epoch: string) => {

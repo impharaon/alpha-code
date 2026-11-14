@@ -50,6 +50,8 @@ import { setAutomationOpen, toggleAutomation } from "../automations/automation-s
 import { setSettingsOpen } from "../codepuppy-ui/settings-state"
 import { dismissMenu, dismissMenuOnEscape, focusFirstMenuItem } from "./menu-a11y"
 import { ProblemsEntry } from "./problems-entry"
+import { Card } from "../codepuppy-ui/Card"
+import { KeyValueList } from "../codepuppy-ui/KeyValueList"
 import { unresolvedProblems } from "../codepuppy-ui/problems"
 
 // Replicate opencode's getProjectAvatarVariant (context/layout.tsx) for projects that already
@@ -295,16 +297,26 @@ export function CodePuppySidebar(props: {
   // sparkline. 401 → main's auth is stale; the footer already reflects logged-out on the next push.
   const [summary, setSummary] = createSignal<AccountSummary | null>(null)
   const [summaryState, setSummaryState] = createSignal<"idle" | "loading" | "error">("idle")
+  // #1686:换了一个登录(登录代变,含不先退出直接换号)就先清空,不让上一个账号的数留在卡片上;
+  // 只采用最新一次请求的回复,较早发出、较晚回来的回复(可能属于上一个账号)直接丢弃。
+  let summaryRequest = 0
+  let summaryEpoch: number | undefined
   createEffect(() => {
-    if (authState().status !== "logged-in") {
+    const state = authState()
+    const mine = ++summaryRequest
+    if (state.status !== "logged-in") {
+      summaryEpoch = undefined
       setSummary(null)
       setSummaryState("idle")
       return
     }
+    if (state.identityEpoch !== summaryEpoch) setSummary(null)
+    summaryEpoch = state.identityEpoch
     setSummaryState("loading")
     window.api.account
       .summary()
       .then((r) => {
+        if (mine !== summaryRequest) return
         if (r && "error" in r) {
           setSummary(null)
           setSummaryState("error")
@@ -313,7 +325,9 @@ export function CodePuppySidebar(props: {
           setSummaryState("idle")
         }
       })
-      .catch(() => setSummaryState("error"))
+      .catch(() => {
+        if (mine === summaryRequest) setSummaryState("error")
+      })
   })
   const activePlan = () => {
     const s = summary()
@@ -322,7 +336,7 @@ export function CodePuppySidebar(props: {
   const fmtTokens = (n: number) =>
     n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : `${n}`
   const fmtYuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`
-  const pendingText = () => (summaryState() === "error" ? "—" : "…")
+  const pendingState = () => (summaryState() === "error" ? ("unavailable" as const) : ("pending" as const))
   // Membership display prefers the fetched summary (authoritative); falls back to the JWT's coarse
   // plan claim before the summary lands, so the header chip / footer never contradict the card.
   const acctIsPro = () => !!activePlan() || isPro()
@@ -1470,67 +1484,48 @@ export function CodePuppySidebar(props: {
                       {acctTierLabel()}
                     </span>
                   </div>
-                  <div class="codepuppy-acct-card">
-                    <div class="codepuppy-acct-row">
-                      <span class="codepuppy-acct-k">{t("codepuppy.sidebar.subscription")}</span>
-                      {/* B11:读取失败时不装「未订阅」(状态未知),与其余行一致显示 pending/错误占位 */}
-                      <Show
-                        when={summary() || summaryState() !== "error"}
-                        fallback={<span class="codepuppy-acct-pending">{pendingText()}</span>}
-                      >
-                        <span class="codepuppy-acct-v">{activePlan()?.name ?? (isPro() ? plan() : t("codepuppy.sidebar.notSubscribed"))}</span>
-                      </Show>
-                    </div>
-                    <div class="codepuppy-acct-row">
-                      <span class="codepuppy-acct-k">{t("codepuppy.sidebar.balance")}</span>
-                      <Show when={summary()} fallback={<span class="codepuppy-acct-pending">{pendingText()}</span>}>
-                        <span class="codepuppy-acct-v">{fmtYuan(summary()!.balanceFen)}</span>
-                      </Show>
-                    </div>
-                    {/* REQ-146(#1194):window5h/window7d 只有订阅计划才有;未订阅时这两行
-                        改显示 summary.usage 的真实用量(而不是「按量计费」占位),标签随之
-                        换成「今日/7 日用量」。已订阅仍显示订阅额度窗口。 */}
-                    <div class="codepuppy-acct-row">
-                      <span class="codepuppy-acct-k">
-                        {activePlan() ? t("codepuppy.sidebar.fiveHour") : t("codepuppy.sidebar.todayUsage")}
-                      </span>
-                      <Show when={summary()} fallback={<span class="codepuppy-acct-pending">{pendingText()}</span>}>
-                        <Show
-                          when={activePlan()}
-                          fallback={<span class="codepuppy-acct-v">{fmtTokens(summary()!.usage.todayTokens)}</span>}
-                        >
-                          <span class="codepuppy-acct-v">
-                            {activePlan()!.window5h.usedCredits.toLocaleString()} /{" "}
-                            {activePlan()!.window5h.limitCredits.toLocaleString()}
-                          </span>
-                        </Show>
-                      </Show>
-                    </div>
-                    <div class="codepuppy-acct-row">
-                      <span class="codepuppy-acct-k">
-                        {activePlan() ? t("codepuppy.sidebar.sevenDay") : t("codepuppy.sidebar.weekUsage")}
-                      </span>
-                      <Show when={summary()} fallback={<span class="codepuppy-acct-pending">{pendingText()}</span>}>
-                        <Show
-                          when={activePlan()}
-                          fallback={<span class="codepuppy-acct-v">{fmtTokens(summary()!.usage.weekTokens)}</span>}
-                        >
-                          <span class="codepuppy-acct-v">
-                            {activePlan()!.window7d.usedCredits.toLocaleString()} /{" "}
-                            {activePlan()!.window7d.limitCredits.toLocaleString()}
-                          </span>
-                        </Show>
-                      </Show>
-                    </div>
-                    <div class="codepuppy-acct-row">
-                      <span class="codepuppy-acct-k">{t("codepuppy.sidebar.fourteenDay")}</span>
-                      <Show
-                        when={summary() && summary()!.usageSeries.length > 0}
-                        fallback={<span class="codepuppy-acct-pending">{summary() ? t("codepuppy.sidebar.noData") : pendingText()}</span>}
-                      >
-                        <Sparkline data={summary()!.usageSeries.map((p) => p.tokens)} />
-                      </Show>
-                    </div>
+                  <div class="codepuppy-acct-card-slot">
+                    {/* #1686:余额卡改用组件库「卡片 + 名称 — 值列表」;弹层外边距在 slot 上(组件不带外边距)。
+                        B11:读取失败时订阅行不装「未订阅」(状态未知),与其余行一致显示 pending/错误占位。
+                        REQ-146(#1194):window5h/window7d 只有订阅计划才有;未订阅时这两行显示 summary.usage 的真实用量,
+                        标签随之换成「今日/7 日用量」。已订阅仍显示订阅额度窗口。 */}
+                    <Card>
+                      <KeyValueList
+                        rows={[
+                          summary() || summaryState() !== "error"
+                            ? { label: t("codepuppy.sidebar.subscription"), value: activePlan()?.name ?? (isPro() ? plan() : t("codepuppy.sidebar.notSubscribed")) }
+                            : { label: t("codepuppy.sidebar.subscription"), state: pendingState() },
+                          summary()
+                            ? { label: t("codepuppy.sidebar.balance"), value: fmtYuan(summary()!.balanceFen) }
+                            : { label: t("codepuppy.sidebar.balance"), state: pendingState() },
+                          {
+                            label: activePlan() ? t("codepuppy.sidebar.fiveHour") : t("codepuppy.sidebar.todayUsage"),
+                            ...(!summary()
+                              ? { state: pendingState() }
+                              : {
+                                  value: activePlan()
+                                    ? `${activePlan()!.window5h.usedCredits.toLocaleString()} / ${activePlan()!.window5h.limitCredits.toLocaleString()}`
+                                    : fmtTokens(summary()!.usage.todayTokens),
+                                }),
+                          },
+                          {
+                            label: activePlan() ? t("codepuppy.sidebar.sevenDay") : t("codepuppy.sidebar.weekUsage"),
+                            ...(!summary()
+                              ? { state: pendingState() }
+                              : {
+                                  value: activePlan()
+                                    ? `${activePlan()!.window7d.usedCredits.toLocaleString()} / ${activePlan()!.window7d.limitCredits.toLocaleString()}`
+                                    : fmtTokens(summary()!.usage.weekTokens),
+                                }),
+                          },
+                          summary() && summary()!.usageSeries.length > 0
+                            ? { label: t("codepuppy.sidebar.fourteenDay"), value: <Sparkline data={summary()!.usageSeries.map((p) => p.tokens)} /> }
+                            : summary()
+                              ? { label: t("codepuppy.sidebar.fourteenDay"), value: t("codepuppy.sidebar.noData"), state: "unavailable" as const }
+                              : { label: t("codepuppy.sidebar.fourteenDay"), state: pendingState() },
+                        ]}
+                      />
+                    </Card>
                   </div>
                   <div class="codepuppy-acct-cta">
                     <Show when={!acctIsPro()}>

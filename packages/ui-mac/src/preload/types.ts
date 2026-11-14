@@ -5,7 +5,7 @@ import type { CodePuppyEndpoints } from "../shared/codepuppy-config"
 import type { BuildIdentity } from "../shared/build-identity"
 import type { CodePuppyEnvironmentInfo } from "../main/codepuppy-environment"
 // Type-only (erased at build): the IPC row must not restate the wire's kind enum and drift from it.
-import type { LedgerFactKindV1 } from "@codepuppy/contracts-consumer"
+import type { AccountStatusV1, LedgerFactKindV1 } from "@codepuppy/contracts-consumer"
 import type {
   AuthorizationConfirmationWire,
   CapabilityDiffWire,
@@ -212,6 +212,9 @@ export type AuthState = {
   /** #1543:当前凭证这一代最近一次续期因网络错误失败(连不上登录服务器)。续期成功 / 登录 / 登出即消失;
    *  只在登录态出现。渲染层据此把 recovering 说成「连不上、自动重试」而不是「正在同步」。 */
   refreshUnreachable?: true
+  /** #1686:登入 / 登出才推进的不透明计数(main `authIdentityEpoch`),只在登录态出现。它**不是**账号标识,
+   *  渲染层只拿它判「换了一个登录」:签发端不给 email / plan,不先退出就换号时其余字段都不变。 */
+  identityEpoch?: number
 }
 // B11 复扫行16:登录链失败原因(main 只送 code,文案由 renderer i18n 映射)。
 export type AuthErrorCode =
@@ -489,6 +492,8 @@ export type CloudJobEvent = { event: string; data: unknown; id?: string }
 /** Same shape as AccountResult; distinct alias for the cloud jobs surface.
  *  `#1572`:`error: "network"` 时可带 `netLayer`(卡在哪一层,@opencode/schema/codepuppy-net-failure),`error` 码集合不变。 */
 export type CloudResult<T> = T | { error: string; netLayer?: NetFailureLayer }
+/** #1686:云任务表单的只读预检结果(平台 AccountStatusV1,主进程已严格解码)。 */
+export type CloudAccountStatus = AccountStatusV1
 export type UploadFindingKind = "contact" | "identity" | "credential" | "protected" | "unknown"
 export type UploadPreview = {
   pipeline: "code-review"
@@ -1259,6 +1264,8 @@ export type ElectronAPI = {
     /** #400:返回的是解码过的 CloudJobCancelResultV1 —— 服务端可判定结果,不是本地乐观覆盖。 */
     cancel: (jobId: string) => Promise<CloudResult<CloudJobCancelResult>>
     artifacts: (jobId: string) => Promise<CloudResult<CloudArtifactList>>
+    /** #1686:提交前预检(余额、额度、首步准入)。只作提示,不参与放行。 */
+    accountStatus: (task: string) => Promise<CloudResult<CloudAccountStatus>>
     /** REQ-092:descriptor-only 下载 —— renderer 只送 descriptor/meta,main 流式写入
      *  <directory>/.codepuppy/runs/<runId>/artifacts/(bearer 与内容字节都不过 IPC);
      *  进度经 onArtifactProgress 推回,结果 = 落盘路径或分类错误。 */

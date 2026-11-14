@@ -16,6 +16,8 @@ import { buildProjectConfigViewRequest, createProjectConfigViewRequester } from 
 import { projectExecutableRows } from "./codepuppy-ext-trust"
 import { engineProjectTrust } from "./engine-project-trust"
 const trustReads = new Map<string, number>()
+import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
+import { createEngineFetch } from "../engine-adapter"
 import { WITHHELD_KINDS } from "@opencode/schema/codepuppy-project-config"
 const sandbox = engineSandbox()
 const model = scriptedModel()
@@ -234,3 +236,34 @@ test("审查9:符号链接路由换 realpath 会多建 Location 并再启全局 
     book.close()
   } finally { await running.close() }
 }, 30_000)
+
+test("审查10:桌面适配器未选 agent 创建会话时,不选项目名字最前的 md agent", async () => {
+  const directory = path.join(sandbox.root, "default-agent-probe")
+  write(path.join(directory, ".opencode/agents/000-first.md"), "---\ndescription: project default selection probe\n---\nPROJECT-ONLY-PROMPT")
+  const listed = await engine.fetch(new Request("http://codepuppy-sidecar.invalid/api/agent", { headers: { "x-opencode-directory": encodeURIComponent(directory) } }))
+  const agents = (await listed.json()).data as Array<{ id: string; mode: string; system?: string }>
+  expect(agents.find((agent) => agent.id === "000-first")).toMatchObject({ mode: "primary", system: "PROJECT-ONLY-PROMPT" })
+  expect(agents.map((agent) => agent.id).sort()[0]).toBe("000-first")
+  const origin = new URL(engine.url).origin
+  const engineHttp = ((input: RequestInfo | URL, init?: RequestInit) => {
+    const request = new Request(input, init)
+    request.headers.set("authorization", engine.authorization)
+    return fetch(request)
+  }) as typeof fetch
+  const engineFetch = createEngineFetch({ isEngineOrigin: (candidate) => candidate === origin, fetch: engineHttp })
+  const client = createOpencodeClient({ baseUrl: origin, fetch: engineFetch as typeof fetch })
+  // use-projects startChat 与既有 default-agent.engine.cases.ts 的真实入口,不传 agent。
+  const created = await client.session.create({ directory } as never)
+  expect(created.error).toBeUndefined()
+  expect(created.data?.id).toBeDefined()
+  // 新建时 agent 尚未固定;界面首轮同样不传 agent,在执行后观察选择。
+  const sent = await client.session.promptAsync({ sessionID: created.data!.id, directory, parts: [{ type: "text", text: "hello" }], providerID: "codepuppy", modelID: "m" } as never)
+  expect(sent.error).toBeUndefined()
+  const idle = await engine.fetch(new Request(`http://codepuppy-sidecar.invalid/api/experimental/session/${created.data!.id}/wait`, { method: "POST", headers: { "x-opencode-directory": encodeURIComponent(directory) } }))
+  expect(idle.ok).toBe(true)
+  const response = await engine.fetch(new Request(`http://codepuppy-sidecar.invalid/api/session/${created.data!.id}/message?order=asc&limit=200`, { headers: { "x-opencode-directory": encodeURIComponent(directory) } }))
+  const messages = (await response.json()).data as Array<{ type: string; agent?: string }>
+  const agentsUsed = messages.filter((message) => message.type === "assistant").map((message) => message.agent)
+  expect(agentsUsed).toEqual(["build"])
+  expect(agentsUsed).not.toContain("000-first")
+})

@@ -11,8 +11,8 @@ type Content = { type: string; text?: string }
 type Listed = { type: string; outcome?: string; error?: { message?: string }; content?: Content[] }
 
 /** 发一条用户输入、等这一轮跑完,返回最后一条助手消息的文字;这一轮没有成功结束就抛(原因来自引擎)。 */
-export async function promptAndWait(client: EngineClient, input: { sessionID: string; text: string }, signal?: AbortSignal): Promise<string> {
-  await client.session.prompt({ sessionID: input.sessionID, text: input.text }, { signal })
+export async function promptAndWait(client: EngineClient, input: { sessionID: string; text: string; id?: string }, signal?: AbortSignal): Promise<string> {
+  await client.session.prompt({ sessionID: input.sessionID, text: input.text, ...(input.id === undefined ? {} : { id: input.id }) }, { signal })
   await client.experimental.session.wait({ sessionID: input.sessionID }, { signal })
   const page = await client.message.list({ sessionID: input.sessionID, order: "desc", limit: 50 }, { signal })
   const messages = (page as { data: Listed[] }).data

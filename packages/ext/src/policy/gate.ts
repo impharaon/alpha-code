@@ -1,3 +1,4 @@
+import { unattendedDenialCopy, type UnattendedProfile } from "../../../schema/src/codepuppy-unattended"
 // Code Puppy execution gate on OpenCode 2 (#725 group B, baseline S1): every tool call passes Code Puppy's decision in
 // `tool.hook["execute.before"]`, the only path to `Tool.execute` (packages/core/src/tool.ts `beforeExecute`).
 // Replaces the v1 takeovers of session/tools.ts and the policy gate in permission/codepuppy-tool-policy-gate.ts.
@@ -243,4 +244,22 @@ function deepFreeze<T>(value: T): T {
     for (const item of Object.values(value)) deepFreeze(item)
   }
   return value
+}
+
+
+/** 在册求值的属性钉法:后续钩子可以收紧,不能重新要求一个无人回答的审批。 */
+export function holdUnattendedDeny(event: { effect: string; message?: string }, profile: UnattendedProfile, action: string) {
+  const message = unattendedDenialCopy(profile === "readonly" ? "readonly" : "refused", action)
+  let effect = event.effect === "ask" ? "deny" : event.effect
+  if (event.effect === "ask") event.message = message
+  Object.defineProperty(event, "effect", {
+    get: () => effect,
+    set: (next: unknown) => {
+      if (next !== "ask" && next !== "deny") return
+      effect = "deny"
+      event.message = message
+    },
+    enumerable: true,
+    configurable: false,
+  })
 }

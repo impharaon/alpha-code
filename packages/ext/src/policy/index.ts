@@ -1,3 +1,4 @@
+import type { UnattendedState } from "./unattended"
 // Code Puppy tool policy inside the extension (lane seams I3): everything L4 hangs on the OpenCode 2 plugin Context
 // goes through `registerPolicy`. The extension's `setup` awaits it first and awaits `seal()` last (L3 owns the call
 // sites; `plugin-setup-order.test.ts`).
@@ -16,7 +17,7 @@ import path from "node:path"
 import type { Plugin } from "@opencode/plugin"
 import { createCatalog } from "./catalog"
 import { attachDirectoryDisplay, attachNetFailure, attachTerminal, displaySnapshot, wrapForDisplay } from "./display"
-import { confirm, decide, effectiveFor, gateWithoutToolCall, holdAsk, pin, type GateDeps } from "./gate"
+import { confirm, decide, effectiveFor, gateWithoutToolCall, holdAsk, holdUnattendedDeny, pin, type GateDeps } from "./gate"
 import {
   codeModeFacts,
   CODE_MODE_TOOL,
@@ -65,7 +66,7 @@ function asksForItself(facts: ToolFacts) {
   return facts.technicalId === HUB_INSTALL_ACTION && facts.identity.source === "plugin" && facts.authority.kind === "codepuppy-bundled"
 }
 
-export async function registerPolicy(context: Plugin.Context): Promise<PolicyRegistration> {
+export async function registerPolicy(context: Plugin.Context, unattended: UnattendedState): Promise<PolicyRegistration> {
   const env = process.env
   const store = createToolPolicyStore({
     baseDir: defaultPolicyBaseDir(dataRoot(env)),
@@ -148,7 +149,8 @@ export async function registerPolicy(context: Plugin.Context): Promise<PolicyReg
 
   // Prompts wait for plugin activation (packages/core/src/session/prompt.ts), so the tail rules registered here land
   // after every configured rule, including the ones OpenCode's post-activation config plugin appends.
-  await context.session.hook("prompt", async () => {
+  await context.session.hook("prompt", async (event) => {
+    unattended.preparePrompt(event)
     await catalog.ensureTail()
   })
 
@@ -165,6 +167,8 @@ export async function registerPolicy(context: Plugin.Context): Promise<PolicyReg
   // Code Puppy's own gate requests already carry theirs (`confirm`); their ask is held so no later evaluate hook can
   // turn it into allow (`holdAsk`).
   await context.permission.hook("evaluate", async (event) => {
+    const profile = await unattended.unattendedProfile(event.sessionID, event.agent, async () => (await context.session.get({ sessionID: event.sessionID })).agent ?? "")
+    if (profile !== undefined) return holdUnattendedDeny(event, profile, event.action)
     if (isCodePuppyPolicyRequest(event.metadata)) return holdAsk(event)
     // A tool's permission action asserted without a tool call (a subtask command, review R1 #2) is decided like the
     // tool's call; a tool call's own assert already passed confirm() in execute.before.

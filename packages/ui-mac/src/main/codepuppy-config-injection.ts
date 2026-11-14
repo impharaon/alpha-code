@@ -1,3 +1,4 @@
+import { AUTOMATION_DEFAULTS } from "../shared/automation-types"
 // #607:注入组合体的执行级可测面。injectCodePuppyConfig 与 materializeV2EngineConfig 从
 // sidecar.ts 逐字搬来(含那层函数级 catch)。#613:catch 仍在(裸崩溃是票面明令禁止的另一种谎),
 // 但失败不再只是进程内一行 warn —— 结果作为返回值交给 sidecar.ts,随 ready IPC 上报 main,
@@ -353,12 +354,12 @@ export function injectCodePuppyConfig(
     if (!process.env.CODEPUPPY_AUTOMATION_DISABLE) {
       config.agents = {
         ...config.agents,
-        "codepuppy-automation": {
-          description: CODEPUPPY_AGENT_TEXT["codepuppy-automation"].description,
+        [AUTOMATION_DEFAULTS.agent]: {
+          description: CODEPUPPY_AGENT_TEXT[AUTOMATION_DEFAULTS.agent].description,
           // REQ-055:对选择器隐藏(上游 agent 原生 hidden 字段,仅影响可见列表;调度器按名 prompt 不受影响)
           hidden: true,
           mode: "primary",
-          system: CODEPUPPY_AGENT_TEXT["codepuppy-automation"].prompt,
+          system: CODEPUPPY_AGENT_TEXT[AUTOMATION_DEFAULTS.agent].prompt,
           permissions: rules([
             ["tool-policy-default", "ask"],
             ["read", { "*": "allow", "*.env*": "deny" }],
@@ -461,12 +462,12 @@ export function injectCodePuppyConfig(
     if (!process.env.CODEPUPPY_AUTOMATION_DISABLE) {
       config.agents = {
         ...config.agents,
-        "codepuppy-automation-standard": {
-          description: CODEPUPPY_AGENT_TEXT["codepuppy-automation-standard"].description,
+        [AUTOMATION_DEFAULTS.agentStandard]: {
+          description: CODEPUPPY_AGENT_TEXT[AUTOMATION_DEFAULTS.agentStandard].description,
           // REQ-055:对选择器隐藏(同 codepuppy-automation)
           hidden: true,
           mode: "primary",
-          system: CODEPUPPY_AGENT_TEXT["codepuppy-automation-standard"].prompt,
+          system: CODEPUPPY_AGENT_TEXT[AUTOMATION_DEFAULTS.agentStandard].prompt,
           permissions: rules([
             ["tool-policy-default", "ask"],
             ["read", { "*": "allow", "*.env*": "deny" }],

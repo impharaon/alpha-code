@@ -1,3 +1,4 @@
+import { createUnattendedState } from "./unattended"
 // alpha-code#1285 (REQ-158) on OpenCode 2 — the risk classification gate: classifier + production permission engine
 // + premises. Moved from packages/opencode/test/permission/codepuppy-risk-classification.test.ts with the classifier
 // (#1662 L4). Groups A and C are unchanged; B now runs in the OpenCode 2 engine, where the classification is attached by
@@ -274,7 +275,7 @@ const engine = (rules: Rule[]) =>
     const plugins = yield* Plugin.Service
     yield* plugins.activate([
       promisePlugin("codepuppy-ext", async (ctx: any) => {
-        const policy = await registerPolicy(ctx)
+        const policy = await registerPolicy(ctx, createUnattendedState())
         await policy.seal()
       }),
       promisePlugin("config-agents", async (ctx: any) => {

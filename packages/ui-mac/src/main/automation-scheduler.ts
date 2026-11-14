@@ -1,3 +1,5 @@
+import { SessionMessage } from "@opencode/schema/session-message"
+import { unattendedRuns } from "./codepuppy-unattended"
 // 自动化调度器(REQ-021 A1.3/A1.4/A1.6,ADR-022)—— Electron 主进程,每任务单 timer:
 // 算下次触发 → setTimeout → 执行 → 重排。应用未运行不执行(UI 明示,不装后台常驻);
 // powerMonitor resume + 半小时兜底 tick 重算(睡眠错过按 catchUpPolicy:skip 丢弃);
@@ -249,6 +251,7 @@ async function executeTask(task: AutomationTask): Promise<AutomationRunRecord> {
 
   let sessionID: string | undefined
   let timedOut = false
+  let notReady = false
   const controller = new AbortController()
   const killer = setTimeout(
     () => {
@@ -280,7 +283,13 @@ async function executeTask(task: AutomationTask): Promise<AutomationRunRecord> {
     )
     sessionID = created.id
 
-    const reply = await promptAndWait(client, { sessionID, text: task.prompt }, controller.signal)
+    const promptID = SessionMessage.ID.create()
+    if (!await unattendedRuns.register(sessionID, { agent: task.target.agent, promptID }, controller.signal)) {
+      notReady = true
+      await client.session.remove({ sessionID }).catch(() => {})
+      throw new Error("automation run not ready")
+    }
+    const reply = await promptAndWait(client, { sessionID, text: task.prompt, id: promptID }, controller.signal)
 
     const finishedAt = new Date().toISOString()
     const runId = `auto-${task.id}-${runTimestamp(new Date(started))}`
@@ -323,12 +332,14 @@ async function executeTask(task: AutomationTask): Promise<AutomationRunRecord> {
     return {
       at,
       status,
+      ...(notReady ? { reasonCode: "automation-run-not-ready" as const } : {}),
       durationMs: Date.now() - started,
       sessionID,
       runDir: saved.ok ? saved.dir : undefined,
       summary,
     }
   } finally {
+    if (sessionID) unattendedRuns.unregister(sessionID)
     clearTimeout(killer)
   }
 }

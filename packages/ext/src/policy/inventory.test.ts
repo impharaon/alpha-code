@@ -1,3 +1,4 @@
+import { createUnattendedState } from "./unattended"
 // #1130 Settings inventory on OpenCode 2 — what the codepuppy.tool-policy `inventory` method returns (rpc.ts
 // `buildInventory`). Replaces packages/opencode/test/permission/codepuppy-tool-inventory.test.ts (#1662 L4); the
 // v1 cases I1–I5 keep their meaning, I2 runs against the real host so "the badge tells the truth" is the same
@@ -66,7 +67,7 @@ describe("Settings inventory", () => {
           )
         }),
         promisePlugin("codepuppy-ext", async (ctx: any) => {
-          const policy = await registerPolicy(ctx)
+          const policy = await registerPolicy(ctx, createUnattendedState())
           await policy.seal()
         }),
         promisePlugin("config-agents", async (ctx: any) => {

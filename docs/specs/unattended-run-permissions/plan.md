@@ -128,6 +128,7 @@ PLAN 验证只做文件/diff 的只读检查并提交本文件。实现后的全
 
 - 单元 1 基线:C2 的消息合同 9 pass、hub-view 18 pass 沿用 r2;sidecar wiring 6 pass 沿用编排器 r3 回执。C3 既有 hub-bridge 5 pass;C4 既有 register-policy 68、RPC 5、risk 22、inventory 5、ask-deadline 5、setup-order 1 pass;C7 turn 2、moderation 1、注入 25、注入引擎 1 pass;C8 19 pass。上述对应索引命令退出均为 0(本轮加 `--only-failures` 抑制通过行)。三个包 `bun typecheck` 均退出 0。
 - 单元 1 红证据:`cd packages/ui-mac && bun test src/main/unattended-run.engine.test.ts` 退出 1;子进程 AC-01、AC-02、AC-07 共 3 fail,三者都在 `withoutApproval` 的零 Asked 断言收到 `["mcp:probe:echo"]`。没有缺导出、加载或依赖错误。生产运行/解析入口、真实 ext 与真实 MCP 已走通;测试收到请求后立即拒掉,未改审批期限。
+- 单元 2:C1 2、C2 消息 10 / 登记簿 4 / hub-view 18 / wiring 6、C3 bridge 6 / state+T2 3、C4 现有策略 68 / RPC 5 / risk 22 / inventory 5 / setup 1、C7 turn 2 / moderation 1 / 注入 25 / 注入引擎 1、C8 20 pass,均退出 0。AC-07 单独运行 `cd packages/ui-mac && bun test --only-failures ./src/main/unattended-run.engine.cases.ts -t AC-07` 为 1 pass / 0 fail(2 filtered out),退出 0,红例断言未改。三个包 typecheck 均退出 0;schema 的新测试曾因 `.js` 后缀和字面量推断报类型错误,已在本单元修正。AC-01/02 的 T1 放行留给单元 3。
 
 ### 偏离记录
 

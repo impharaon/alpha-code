@@ -99,7 +99,7 @@ const describe = (cause: unknown) => (cause instanceof Error ? cause.message : S
 export const CodePuppyExt: Plugin.Plugin = {
   id: "codepuppy.ext",
   async setup(context) {
-    const policy = await registerPolicy(context)
+    const policy = await registerPolicy(context, processState().hubBridge.unattended)
     const directory = context.location.directory
     const { hubBridge, reloads } = processState()
     const registration = {}

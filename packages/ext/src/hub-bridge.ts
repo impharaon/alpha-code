@@ -1,3 +1,4 @@
+import { createUnattendedState } from "./policy/unattended"
 // hub-bridge — REQ-234 `#1531`(基线 docs/design/2026-10-14-req234-hub-agent-install-baseline.md §2.2 / §2.6)。
 //
 // ext 这一侧的 parentPort 请求簿记:agent 的三个定制中心工具经它向 main 问「这个目录的三档视图」与「某次安装请求走到哪一步」,
@@ -12,6 +13,8 @@
 // 取不到 parentPort(CLI / 测试宿主)⇒ `available: false`,三个工具如实说「本宿主不可用」,不猜。
 
 import {
+  buildUnattendedAck,
+  parseUnattendedLive,
   buildHubRequestQuery,
   buildHubViewRequest,
   buildReloadReport,
@@ -35,6 +38,7 @@ export type HubPort = {
 export type BridgeFailure = { ok: false; reason: "unavailable" | "timeout" | "error"; detail: string }
 
 export type HubBridge = {
+  readonly unattended: ReturnType<typeof createUnattendedState>
   readonly available: boolean
   view(input: { directory: string; sessionID?: string; agent?: string; query?: string }): Promise<{ ok: true; view: HubView } | BridgeFailure>
   request(requestId: string): Promise<{ ok: true; record: HubRequestRecord | null } | BridgeFailure>
@@ -55,11 +59,18 @@ export function createHubBridge(
   const early: ReloadRequestMessage[] = []
   let reloadHandler: ((message: ReloadRequestMessage) => void) | undefined
   let seq = 0
+  const unattended = createUnattendedState()
 
   port?.on("message", (event) => {
     const message = event?.data
     if (!isCodePuppySidecarMessage(message)) return
     const type = (message as { type: string }).type
+    if (type === "codepuppy.unattended.live") {
+      const parsed = parseUnattendedLive(message)
+      if (!parsed) return log(`[@codepuppy/ext] dropped a malformed unattended snapshot`)
+      if (unattended.install(parsed)) port?.postMessage(buildUnattendedAck(parsed.seq, parsed.nonce))
+      return
+    }
     if (type === "codepuppy.reload.request") {
       const parsed = parseReloadRequest(message)
       if (!parsed) return log(`[@codepuppy/ext] hub bridge: dropped a malformed reload request`)
@@ -106,6 +117,7 @@ export function createHubBridge(
   }
 
   return {
+    unattended,
     available: !!port,
     view: (input) =>
       ask(

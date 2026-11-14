@@ -77,6 +77,9 @@ const { initModerationKeywords, resetModerationKeywordsForTests, MODERATION_BLOC
 const { saveAutomation, getAutomation, readAutomationState, writeAutomationState } = await import("./codepuppy-automations")
 const { startAutomationScheduler, runAutomationNow } = await import("./automation-scheduler")
 const { initAutomationLlm, llmParseAutomation } = await import("./automation-llm")
+const { unattendedRuns } = await import("./codepuppy-unattended")
+const { buildUnattendedAck } = await import("./codepuppy-sidecar-messages")
+unattendedRuns.attach((message) => unattendedRuns.acknowledge(buildUnattendedAck(message.seq, message.nonce)))
 
 startAutomationScheduler({
   awaitServer: async () => ({ url: "http://127.0.0.1:1/", username: null, password: null }),

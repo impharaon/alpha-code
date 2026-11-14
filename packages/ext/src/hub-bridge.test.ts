@@ -9,6 +9,22 @@ import {
   type HubView,
 } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
 import { createHubBridge, type HubPort } from "./hub-bridge"
+import { buildUnattendedLive, buildUnattendedAck } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
+
+test("进程级监听安装完整快照后回执,旧快照和坏输入不能改名单", async () => {
+  const wire = fakePort()
+  const bridge = createHubBridge(wire.port, { log: () => {} })
+  const live = buildUnattendedLive({ seq: 1, nonce: "n1", sessions: [{ sessionID: "ses_a", agent: "codepuppy-automation-standard", promptID: "msg_a" }] })
+  wire.deliver(live)
+  expect(wire.sent).toEqual([buildUnattendedAck(1, "n1")])
+  expect(await bridge.unattended.unattendedProfile("ses_a", "codepuppy-automation-standard", async () => "")).toBe("standard")
+  wire.deliver({ ...live, seq: 0, sessions: [] })
+  wire.deliver({ ...live, seq: 2, sessions: [null] })
+  expect(wire.sent).toHaveLength(1)
+  expect(await bridge.unattended.unattendedProfile("ses_a", "codepuppy-automation-standard", async () => "")).toBe("standard")
+  wire.deliver(buildUnattendedLive({ seq: 2, nonce: "n2", sessions: [] }))
+  expect(await bridge.unattended.unattendedProfile("ses_a", "codepuppy-automation-standard", async () => "")).toBeUndefined()
+})
 
 function fakePort() {
   const sent: unknown[] = []

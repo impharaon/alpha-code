@@ -21,6 +21,7 @@
 // 「模型能不能看图」的真源是引擎目录里该模型的 `capabilities.input`(modelFacts);查不到 ⇒ 按看不了处理
 // (基线 §2-B 第 6 条:代价是多一次识图,不会漏识)。
 
+import { codepuppyBootstrap, type CodePuppyBootstrap } from "../../util/src/codepuppy-bootstrap"
 import { readFileSync } from "node:fs"
 import path from "node:path"
 import {
@@ -53,7 +54,8 @@ export type CloudVisionHookDeps = {
   readonly seesImages: (model: ModelRef) => Promise<boolean | undefined>
   /** 插件存储(跨重启的转写缓存);缺席 = 只在本进程缓存。 */
   readonly storage?: { get(key: string): Promise<unknown>; set(key: string, value: string): Promise<void> }
-  readonly env?: Record<string, string | undefined>
+  /** 测试接缝;缺省在调用时读本进程已发布的启动文档(`#1698`)。 */
+  readonly bootstrap?: CodePuppyBootstrap
   readonly readFile?: (p: string) => string
   readonly fetch?: typeof fetch
   readonly timeoutMs?: number
@@ -100,7 +102,7 @@ const toolName = (part: Part) =>
 const withContent = (message: MessageLike, content: unknown[]) => new message.constructor({ ...message, content })
 
 export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
-  const env = deps.env ?? process.env
+  const bootstrap = () => deps.bootstrap ?? codepuppyBootstrap()
   const readFile = deps.readFile ?? ((p: string) => readFileSync(p, "utf8"))
   const sessions = new Map<string, VisionSession>()
   const sessionFor = (sessionID: string): VisionSession => {
@@ -132,7 +134,7 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
     async context(event: ContextEvent): Promise<void> {
       try {
         const session = sessionFor(event.sessionID)
-        const visionTool = cloudVisionToolId(env)
+        const visionTool = cloudVisionToolId(bootstrap())
         const readPaths = new Map<string, string>()
         type Slot = { message: number; part: number; item?: number; entry: VisionImageEntry; name?: string }
         const slots: Slot[] = []
@@ -174,7 +176,7 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
         })
         const sees = (await deps.seesImages(event.model)) === true
         if (!sees && slots.length > 0) {
-          const td = { access: cloudVisionAccess(env, readFile), fetch: deps.fetch, timeoutMs: deps.timeoutMs, log: deps.error }
+          const td = { access: cloudVisionAccess(bootstrap(), readFile), fetch: deps.fetch, timeoutMs: deps.timeoutMs, log: deps.error }
           for (const slot of slots) await warmTranscript(session, slot.entry)
           const blocks = await Promise.all(slots.map((slot) => transcribeEntry(session, slot.entry, td, slot.name)))
           await Promise.all(slots.map((slot) => persistTranscript(session, slot.entry)))
@@ -194,8 +196,8 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
         }
         for (const [index, content] of replaced) event.messages[index] = withContent(event.messages[index] as MessageLike, content)
         if (sees) return
-        const toolId = cloudVisionToolId(env)
-        const access = cloudVisionAccess(env, readFile)
+        const toolId = cloudVisionToolId(bootstrap())
+        const access = cloudVisionAccess(bootstrap(), readFile)
         event.system.push({
           type: "text",
           text: toolId && access.ok ? renderTemplate(VISION_SYSTEM_NOTE_ID, { name: toolId }) : contextText(VISION_SYSTEM_NOTE_OFFLINE_ID),
@@ -207,7 +209,7 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
 
     /** P7:模型调 `codepuppy_vision` ⇒ 引用换成压缩后的 base64。抛出 = 模型看到的工具错误(与 web search 闸同一机制)。 */
     async toolBefore(event: { readonly tool: string; readonly sessionID: string; input: unknown }): Promise<void> {
-      const toolId = cloudVisionToolId(env)
+      const toolId = cloudVisionToolId(bootstrap())
       if (!toolId || event.tool !== toolId) return
       const args = event.input as Record<string, unknown> | null
       if (!args || typeof args !== "object") return

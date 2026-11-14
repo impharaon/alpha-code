@@ -62,8 +62,10 @@ describe("createSidecarEnv — default-deny", () => {
     }
   })
 
-  test("passes the non-secret alpha controls the sidecar reads", () => {
-    const env = createSidecarEnv({
+  // `#1698`(design §4.5 最终形态):Code Puppy 的控制项(平台 / 云地址、默认模型、kill-switch、各个运维开关)由 main 读一次写进启动文档,
+  // sidecar 环境里一个都不再有;main 自己才读的那些(CODEPUPPY_WEB_URL 等)本来就不过河。
+  test("drops every Code Puppy control — they travel in the bootstrap document, not the environment", () => {
+    const controls = {
       CODEPUPPY_BASE_URL: "https://gw.example/v1",
       CODEPUPPY_CLOUD_MCP_URL: "https://mcp.example",
       CODEPUPPY_DEFAULT_MODEL: "alpha/x",
@@ -71,19 +73,16 @@ describe("createSidecarEnv — default-deny", () => {
       CODEPUPPY_IDENTITY_DISABLE: "1",
       CODEPUPPY_BEHAVIOR_DISABLE: "1",
       CODEPUPPY_WEBSEARCH_DISABLE: "1",
-      // main-only alpha vars must NOT pass
+      CODEPUPPY_PROMPT_REBRAND_DISABLE: "1",
+      CODEPUPPY_FACTORY_SKILL_DIRS: "[]",
+      CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS: "1500",
+      // main-only alpha vars
       CODEPUPPY_WEB_URL: "https://web.example",
       CODEPUPPY_SHOT: "1",
-    })
-    expect(env.CODEPUPPY_BASE_URL).toBe("https://gw.example/v1")
-    expect(env.CODEPUPPY_CLOUD_MCP_URL).toBe("https://mcp.example")
-    expect(env.CODEPUPPY_DEFAULT_MODEL).toBe("alpha/x")
-    expect(env.CODEPUPPY_MODELS_DISABLE).toBe("1")
-    expect(env.CODEPUPPY_IDENTITY_DISABLE).toBe("1")
-    expect(env.CODEPUPPY_BEHAVIOR_DISABLE).toBe("1")
-    expect(env.CODEPUPPY_WEBSEARCH_DISABLE).toBe("1")
-    expect(env.CODEPUPPY_WEB_URL).toBeUndefined()
-    expect(env.CODEPUPPY_SHOT).toBeUndefined()
+    }
+    const env = createSidecarEnv({ ...controls, PATH: "/usr/bin" })
+    expect(Object.keys(env).filter((name) => name.startsWith("CODEPUPPY_"))).toEqual([])
+    expect(env.PATH).toBe("/usr/bin")
   })
 
   test("passes OPENCODE_/XDG_/LC_/ELECTRON_ prefixes (channel DB, state home, locale, dev exec path)", () => {
@@ -189,22 +188,18 @@ describe("createSidecarEnv — escape hatch", () => {
     expect(Object.values(env)).not.toContain("leak")
   })
 
-  // #223 R5 Minor — 事实更正。R4 的注释声称 ext 装载握手通道「不在白名单里,所以外部 shell 伪造
-  // 一个同名变量也进不来」。**不成立**:这三个名字都不是 credential-shaped,逃生阀点名即放行。
-  // 这条测试把真事实钉住(shell 进得来),握手的可信度另有来源 —— `injectCodePuppyConfig` 在每次 fork
-  // 的每一条分支上覆盖或删除它们,由 `codepuppy-config-injection.test.ts`「继承/伪造的 arm+def 变量在
-  // 每条分支上都被注入面覆盖或清掉」断言。两条测试合起来才是完整判据;删掉任何一条都会让
-  // 「握手不可伪造」重新变成没有支撑的声明。
-  test("hatch DOES pass the ext handshake vars — the handshake is not protected by this allowlist", () => {
+  // #223 R5 Minor 的事实更正曾钉住「逃生阀点名即放行 ext 装载握手的三个变量」,握手的可信度靠注入面每次 fork 覆盖它们。
+  // `#1698` G2:握手不再经环境 —— 云 MCP 的名字与定义在 start 消息的启动文档里,ext 从已发布的文档读(发布一次后冻结)。
+  // 这三个名字从此连逃生阀也放不回去(`CODEPUPPY_` 前缀拒绝排在 EXTRA 之前);即使放回去也没有读者
+  // (bootstrap-env-readers.test.ts 的 RETIRED 扫描)。
+  test("the retired ext handshake vars are refused even when the hatch names them", () => {
     const handshake = ["CODEPUPPY_CLOUD_MCP_ARM", "CODEPUPPY_CLOUD_MCP_DEF", "CODEPUPPY_CLOUD_MCP_SERVER"]
     const env = createSidecarEnv({
       CODEPUPPY_ENV_ALLOWLIST_EXTRA: handshake.join(","),
       ...Object.fromEntries(handshake.map((name) => [name, `forged-${name}`])),
     })
-    for (const name of handshake) expect(env[name]).toBe(`forged-${name}`)
-    // …and without the hatch they really are outside the fixed allowlist (that half of R4 was true).
-    const plain = createSidecarEnv(Object.fromEntries(handshake.map((name) => [name, "forged"])))
-    for (const name of handshake) expect(plain[name]).toBeUndefined()
+    for (const name of handshake) expect(env[name]).toBeUndefined()
+    expect(JSON.stringify(env)).not.toContain("forged-")
   })
 
   // R1 Minor, third path: EXACT is module-private, so a credential-shaped member cannot be injected
@@ -314,7 +309,7 @@ describe("createSidecarEnv — SECRETISH word boundary (#605)", () => {
     "GOPATH",
     "OPENCODE_CLIENT",
     "PATH",
-    "CODEPUPPY_BASE_URL",
+    // `#1698` G2:CODEPUPPY_BASE_URL 离开了 sidecar 环境(启动文档);同形的非密钥名由 MY_PROVIDER_BASE_URL 继续覆盖
   ]
 
   test("reverse gate: every must-deny name stays vetoed, on the path that would admit them", () => {
@@ -357,7 +352,7 @@ describe("createSidecarEnv — SECRETISH word boundary (#605)", () => {
   test("no longer vetoes the MONKEY_MODE class, and the passing names #603 measured still pass", () => {
     expect(MUST_ALLOW.filter(isSecretish)).toEqual([])
     // Clearing the veto is only half of it — they must actually arrive in the sidecar env.
-    const viaHatch = MUST_ALLOW.filter((name) => !["OPENCODE_CLIENT", "PATH", "CODEPUPPY_BASE_URL"].includes(name))
+    const viaHatch = MUST_ALLOW.filter((name) => !["OPENCODE_CLIENT", "PATH"].includes(name))
     const env = createSidecarEnv({
       CODEPUPPY_ENV_ALLOWLIST_EXTRA: viaHatch.join(","),
       ...Object.fromEntries(MUST_ALLOW.map((name) => [name, `value-${name}`])),
@@ -506,27 +501,35 @@ describe("createSidecarEnv — SECRETISH word boundary (#605)", () => {
 // ADR-028 name CODEPUPPY_LEGACY_INSTALL_ROOT as the documented rollback surface. Forwarding them (route
 // 1) is therefore the fix; deleting the sidecar read (route 2) would leave main in legacy mode while
 // the sidecar kept injecting — req053 设计稿 §风险8「逃生舱错位」exactly.
-describe("createSidecarEnv — escape switches the sidecar itself reads (#606)", () => {
-  for (const name of ["CODEPUPPY_JSONC_TRUTH_DISABLE", "CODEPUPPY_LEGACY_INSTALL_ROOT"]) {
-    test(`${name}=1 reaches the sidecar env`, () => {
-      const env = createSidecarEnv({ [name]: "1", PATH: "/usr/bin" })
-      expect(env[name]).toBe("1")
-    })
-  }
+// `#1698`(DESIGN-upgrade-bootstrap-config §4.5):#606 的「main 与 sidecar 同口径」改由启动文档保证 —— 两个逃生阀与全局根不再经环境
+// 过河,main 判一次写进文档(paths.userConfig 缺席 / paths.globalRoot,codepuppy-bootstrap-build.test.ts)。这里判它们**不**进 sidecar env,
+// 写进 CODEPUPPY_ENV_ALLOWLIST_EXTRA 也不进(前缀拒绝排在 EXTRA 之前);其余行为不受影响。
+describe("createSidecarEnv — Code Puppy decisions do not cross through the environment (#1698)", () => {
+  // design §2.2 的全部旧键(G1 路径、G2 平台 / 云 / 网络、G3 开关与引擎设置)
+  const migrated = [
+    "CODEPUPPY_GLOBAL_DIR", "CODEPUPPY_JSONC_TRUTH_DISABLE", "CODEPUPPY_LEGACY_INSTALL_ROOT", "CODEPUPPY_OFFICE_MCP_MANIFEST", "CODEPUPPY_EXT_BUNDLED_MANIFEST",
+    "CODEPUPPY_BASE_URL", "CODEPUPPY_PLATFORM_AUTH_REF", "CODEPUPPY_DEFAULT_MODEL", "CODEPUPPY_CLOUD_MCP_URL", "CODEPUPPY_CLOUD_MCP_SERVER",
+    "CODEPUPPY_CLOUD_MCP_DEF", "CODEPUPPY_CLOUD_MCP_ARM", "CODEPUPPY_WEBSEARCH_DISABLE", "CODEPUPPY_LOCAL_WEBSEARCH_DENY",
+    "CODEPUPPY_CLOUD_WEBSEARCH_DENY", "CODEPUPPY_POLICY_ACCOUNT", "CODEPUPPY_EGRESS_PROXY", "CODEPUPPY_PROVIDER_ALLOW",
+    "CODEPUPPY_FACTORY_SKILL_DIRS", "CODEPUPPY_FACTORY_DENY_SKILLS", "CODEPUPPY_MODELS_DISABLE", "CODEPUPPY_IDENTITY_DISABLE",
+    "CODEPUPPY_BEHAVIOR_DISABLE", "CODEPUPPY_PROMPT_REBRAND_DISABLE", "CODEPUPPY_ECOSYSTEM_INHERIT", "CODEPUPPY_AUTOMATION_DISABLE",
+    "CODEPUPPY_READONLY_DISABLE", "CODEPUPPY_EXT_VERBOSE", "CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS",
+  ]
 
-  test("both switches are forwarded together, and neither is credential-shaped", () => {
+  test("every §2.2 key is dropped — also when listed in CODEPUPPY_ENV_ALLOWLIST_EXTRA, and in any casing", () => {
     const env = createSidecarEnv({
-      CODEPUPPY_JSONC_TRUTH_DISABLE: "1",
-      CODEPUPPY_LEGACY_INSTALL_ROOT: "1",
-      CODEPUPPY_GLOBAL_DIR: "/Users/u/.alpha",
+      ...Object.fromEntries(migrated.map((name) => [name, "/Users/u/value"])),
+      codepuppy_global_dir: "/Users/u/lower",
+      CODEPUPPY_ENV_ALLOWLIST_EXTRA: [...migrated, "codepuppy_global_dir", "MY_TOOL_HOME"].join(","),
+      MY_TOOL_HOME: "/opt/tool",
+      PATH: "/usr/bin",
       CODEPUPPY_API_KEY: "jwt",
     })
-    expect(env.CODEPUPPY_JSONC_TRUTH_DISABLE).toBe("1")
-    expect(env.CODEPUPPY_LEGACY_INSTALL_ROOT).toBe("1")
-    expect(isSecretish("CODEPUPPY_JSONC_TRUTH_DISABLE")).toBe(false)
-    expect(isSecretish("CODEPUPPY_LEGACY_INSTALL_ROOT")).toBe(false)
-    // adding them must not have disturbed anything else on the path
-    expect(env.CODEPUPPY_GLOBAL_DIR).toBe("/Users/u/.alpha")
+    for (const name of [...migrated, "codepuppy_global_dir"]) expect(env).not.toHaveProperty(name)
+    // EXTRA itself still passes and still admits a non-Code-Puppy name; the credential veto is untouched
+    expect(env.CODEPUPPY_ENV_ALLOWLIST_EXTRA).toBeDefined()
+    expect(env.MY_TOOL_HOME).toBe("/opt/tool")
+    expect(env.PATH).toBe("/usr/bin")
     expect(env.CODEPUPPY_API_KEY).toBeUndefined()
   })
 })
@@ -607,20 +610,19 @@ describe("createSidecarEnv — container-valued vars", () => {
       CODEPUPPY_IDENTITY_DISABLE: "1",
       CODEPUPPY_BEHAVIOR_DISABLE: "1",
       CODEPUPPY_CLOUD_MCP_URL: "https://mcp.example",
-      CODEPUPPY_GLOBAL_DIR: "/Users/u/.alpha",
     })
     expect(env.OPENCODE_CONFIG).toBe("/Users/u/.alpha/codepuppy.jsonc")
     expect(env.OPENCODE_CONFIG_DIR).toBeDefined()
-    expect(env.CODEPUPPY_IDENTITY_DISABLE).toBe("1")
-    expect(env.CODEPUPPY_BEHAVIOR_DISABLE).toBe("1")
-    expect(env.CODEPUPPY_CLOUD_MCP_URL).toBe("https://mcp.example")
-    expect(env.CODEPUPPY_GLOBAL_DIR).toBe("/Users/u/.alpha")
+    // `#1698` G2 / G3:注入读的开关与云 MCP 地址来自启动文档(switches / cloudMcp),不再从 sidecar 环境读
+    expect(env.CODEPUPPY_IDENTITY_DISABLE).toBeUndefined()
+    expect(env.CODEPUPPY_BEHAVIOR_DISABLE).toBeUndefined()
+    expect(env.CODEPUPPY_CLOUD_MCP_URL).toBeUndefined()
   })
 })
 
 // ── REQ-137 `#1337`:sidecar 的代理栈由策略代理独占决定 ─────────────────────────────────
 describe("sidecarEgressProxyEnv (#1337)", () => {
-  test("八个代理变量 + 出网代理标记整份给出:六个指向 loopback 策略代理、两个 NO_PROXY 只留 loopback、标记同 URL;叠在 createSidecarEnv 之上时用户导出的值不存活", () => {
+  test("八个代理变量整份给出:六个指向 loopback 策略代理、两个 NO_PROXY 只留 loopback;叠在 createSidecarEnv 之上时用户导出的值不存活", () => {
     const env = sidecarEgressProxyEnv(51337)
     expect(env).toEqual({
       HTTP_PROXY: "http://127.0.0.1:51337",
@@ -631,11 +633,10 @@ describe("sidecarEgressProxyEnv (#1337)", () => {
       all_proxy: "http://127.0.0.1:51337",
       NO_PROXY: SIDECAR_EGRESS_NO_PROXY,
       no_proxy: SIDECAR_EGRESS_NO_PROXY,
-      // `#1572`:决定者标记,引擎据它判断代理变量是不是出网代理(同一 URL)。
-      CODEPUPPY_EGRESS_PROXY: "http://127.0.0.1:51337",
+      // `#1572` 的决定者标记 `#1698` 起在启动文档的 network.egressProxy(codepuppy-bootstrap-build.test.ts),不在环境
     })
     expect(SIDECAR_EGRESS_NO_PROXY).toBe("127.0.0.1,localhost,::1")
-    // 九个名字都在白名单里(否则 fork 时会被 createSidecarEnv 丢掉,而这里的覆盖就落不到 sidecar 上)
+    // 八个名字都在白名单里(否则 fork 时会被 createSidecarEnv 丢掉,而这里的覆盖就落不到 sidecar 上)
     const user = { PATH: "/usr/bin", HOME: "/Users/u", HTTPS_PROXY: "http://127.0.0.1:7897", NO_PROXY: "github.com,.internal", ALL_PROXY: "socks5://127.0.0.1:1080" }
     const merged = { ...createSidecarEnv(user), ...env }
     for (const key of Object.keys(env)) expect(Object.keys(createSidecarEnv({ ...user, [key]: "x" })), key).toContain(key)

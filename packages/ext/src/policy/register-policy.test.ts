@@ -3,6 +3,7 @@
 // sessions, session context). The #725 discipline carries over: production entries only (`SessionContext.select` is
 // what the model request is built from; the snapshot's `execute` is what the session runner calls), expected
 // identities are hand-written literals, and side effects are real counters inside the tools.
+import { publishTestBootstrap, testCloudMcp } from "../../../ui-mac/test-component/codepuppy-bootstrap-fixture"
 import { beforeAll, describe, expect } from "bun:test"
 import fs from "node:fs"
 import path from "node:path"
@@ -30,6 +31,7 @@ import {
   PluginHooks,
   promisePlugin,
   isolate,
+  publishPolicyAccount,
   ReadTool,
   ROOT,
   seedProject,
@@ -98,8 +100,7 @@ const setup = (options: Setup = {}) =>
   Effect.gen(function* () {
     counts.write = counts.probe = counts.paid = counts.free = 0
     progress.length = 0
-    account = `t-${Math.random().toString(36).slice(2)}`
-    process.env.CODEPUPPY_POLICY_ACCOUNT = account
+    account = publishPolicyAccount("t")
     const plugins = yield* Plugin.Service
     const location = yield* Location.Service
     const services = yield* Effect.context<never>()
@@ -1371,9 +1372,9 @@ describe("E: plugin tools cannot borrow an MCP identity", () => {
   })()
   const withManifest = <A, E2, R>(effect: E.Effect.Effect<A, E2, R>) =>
     Effect.acquireUseRelease(
-      Effect.sync(() => (process.env.CODEPUPPY_OFFICE_MCP_MANIFEST = office.manifest)),
+      Effect.sync(() => publishTestBootstrap({ globalRoot: path.join(ROOT, "state"), officeMcpManifest: office.manifest })),
       () => effect,
-      () => Effect.sync(() => void delete process.env.CODEPUPPY_OFFICE_MCP_MANIFEST),
+      () => Effect.sync(() => void publishTestBootstrap({ globalRoot: path.join(ROOT, "state") })),
     )
   const probe = (name: string, namespace?: string) => ({
     name,
@@ -1462,7 +1463,9 @@ describe("E: plugin tools cannot borrow an MCP identity", () => {
 // fan-out — gets no server identity and no authority. Servers: a governed Code Puppy cloud server, a third-party server
 // and the bundled Office server (shipped manifest).
 describe("E2: only the MCP layer's own tools carry an MCP identity", () => {
-  const cloud = { type: "remote", url: "https://cloud.codepuppy.test/mcp", headers: { authorization: "{file:/tmp/token}" } }
+  // `#1698`:治理云 MCP 的名字与定义在启动文档里(main 用 materializeCloudMcpConfig 写的同一形状)
+  const cloudMcp = testCloudMcp("https://cloud.codepuppy.test/mcp", "/tmp/token", "codepuppy-cloud")
+  const cloud = cloudMcp.definition
   const office = (() => {
     const shipped = path.resolve(import.meta.dir, "../../../ui-mac/resources/office-mcp")
     const resources = fs.mkdtempSync(path.join(ROOT, "office-resources-"))
@@ -1472,11 +1475,6 @@ describe("E2: only the MCP layer's own tools carry an MCP identity", () => {
     const template: string[] = JSON.parse(fs.readFileSync(manifest, "utf8")).formats.word.command
     return { manifest, server: { type: "local", command: template.map((token) => token.split("{codepuppyResources}").join(resources)) } }
   })()
-  const ENV: Record<string, string> = {
-    CODEPUPPY_CLOUD_MCP_SERVER: "codepuppy-cloud",
-    CODEPUPPY_CLOUD_MCP_DEF: JSON.stringify(cloud),
-    CODEPUPPY_OFFICE_MCP_MANIFEST: office.manifest,
-  }
   /** What the MCP runtime reports its servers list: the servers' own tools. */
   const LISTED = [
     { server: "codepuppy-cloud", name: "web_search" },
@@ -1486,13 +1484,13 @@ describe("E2: only the MCP layer's own tools carry an MCP identity", () => {
   const scoped = <A, E2, R>(effect: E.Effect.Effect<A, E2, R>, listed: readonly unknown[] = LISTED) =>
     Effect.acquireUseRelease(
       Effect.sync(() => {
-        Object.assign(process.env, ENV)
+        publishTestBootstrap({ globalRoot: path.join(ROOT, "state"), officeMcpManifest: office.manifest, cloudMcp })
         mcpListing.push(...listed)
       }),
       () => effect,
       () =>
         Effect.sync(() => {
-          for (const key of Object.keys(ENV)) delete process.env[key]
+          publishTestBootstrap({ globalRoot: path.join(ROOT, "state") })
           mcpListing.length = 0
         }),
     )

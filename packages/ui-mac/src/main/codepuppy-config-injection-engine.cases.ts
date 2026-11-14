@@ -23,6 +23,7 @@
 // 本文件由同名 `.test.ts` 宿主起一个独立的 `bun test` 子进程来跑(仓内 `*.cases.ts` 惯例):沙箱要把 HOME / XDG_* / TMPDIR
 // 改指临时目录,而上游在模块装载时就按它们算全局根目录 —— 放在独立进程里,既不会被同进程里先装载的上游模块抢先,
 // 也不会把改过的环境留给整包测试里排在后面的文件。
+import { codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test"
 import * as fs from "node:fs"
 import * as path from "node:path"
@@ -37,6 +38,9 @@ import { PLATFORM_API_KEY_PLACEHOLDER } from "./codepuppy-models"
 import { createSidecarEnv } from "./sidecar-env"
 import type { EngineFetch } from "./in-process-engine"
 import { CODEPUPPY_INIT_TEMPLATE, CODEPUPPY_REVIEW_TEMPLATE } from "../../../ext/src/codepuppy-prompts"
+import { publishMainBootstrap, unpublishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
+import { engineGlobalConfigDirectory } from "./engine-paths"
+import { homedir } from "node:os"
 
 const sandbox = engineSandbox()
 const PASSWORD = "cp-l5-injection-engine"
@@ -44,11 +48,18 @@ const engines: Array<{ close: () => Promise<void> }> = []
 const MANAGED = [
   "CODEPUPPY_GLOBAL_DIR",
   "CODEPUPPY_ECOSYSTEM_INHERIT",
+  // main 的环境(publishMainEnv 经构建器读它):宿主导出的值不得渗进文档
   "CODEPUPPY_BASE_URL",
   "CODEPUPPY_DEFAULT_MODEL",
   "CODEPUPPY_CLOUD_MCP_URL",
   "CODEPUPPY_MODELS_DISABLE",
   "CODEPUPPY_WEBSEARCH_DISABLE",
+  "CODEPUPPY_IDENTITY_DISABLE",
+  "CODEPUPPY_BEHAVIOR_DISABLE",
+  "CODEPUPPY_AUTOMATION_DISABLE",
+  "CODEPUPPY_READONLY_DISABLE",
+  "CODEPUPPY_EXT_VERBOSE",
+  "CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS",
   "CODEPUPPY_FACTORY_SKILL_DIRS",
   "CODEPUPPY_PROMPT_REBRAND_DISABLE",
 ] as const
@@ -60,6 +71,7 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
+  unpublishTestBootstrap()
   for (const engine of engines.reverse()) await engine.close().catch(() => undefined)
   for (const k of MANAGED) {
     if (saved[k] === undefined) delete process.env[k]
@@ -69,6 +81,7 @@ afterAll(async () => {
 
 let run = 0
 beforeEach(() => {
+  unpublishTestBootstrap()
   for (const k of MANAGED) {
     if (!(k in saved)) saved[k] = process.env[k]
     delete process.env[k]
@@ -78,7 +91,22 @@ beforeEach(() => {
   process.env.CODEPUPPY_GLOBAL_DIR = path.join(sandbox.root, `injection-state-${run}`, "codepuppy-state", "env", "dev")
   fs.mkdirSync(process.env.CODEPUPPY_GLOBAL_DIR, { recursive: true })
   fs.mkdirSync(userData, { recursive: true })
+  // 注入没有无文档模式:每条用例先按 main 的构建器发布一份(用例改了 main 的环境再调 publishMainEnv 重新发布)
+  publishMainEnv()
 })
+
+/**
+ * `#1698` G2 / G3:平台节点地址、运维开关与出厂技能目录由 main 写进启动文档(sidecar 在注入前发布),不再经环境。每条用例开头按 main 的
+ * 构建器从「main 的环境」(这里就是 process.env)发布一份;改了环境的用例再发布一份。
+ */
+const publishMainEnv = (options: { factorySkillDirs?: string[]; env?: Record<string, string> } = {}) =>
+  publishMainBootstrap({
+    userData,
+    engineConfigDirectory: engineGlobalConfigDirectory(process.env, homedir()),
+    factorySkillDirs: options.factorySkillDirs,
+    env: { ...process.env, ...options.env },
+  })
+const publishPlatformBaseURL = (url: string) => publishMainEnv({ env: { CODEPUPPY_BASE_URL: url } })
 
 /** `config` 就是 `start()` 的 `config`:内联文档,外加(`#1667` 裁决 r1 / C7 重裁起)main 合成的显式文件。 */
 async function engineWith(
@@ -158,7 +186,7 @@ describe("S6 外部技能不继承:唯一机制是注入的移除指令(裁决�
   }
 
   test("注入了移除指令 ⇒ 三类技能根都不进 GET /api/skill", async () => {
-    const injection = injectCodePuppyConfig(userData, undefined, "stable")
+    const injection = injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     const engine = await engineWith("s6-deny", injection.config)
     plant(engine.slot.projectDirectory)
     const ids = await settledIds(engine.get, "/api/skill", "name")
@@ -167,7 +195,8 @@ describe("S6 外部技能不继承:唯一机制是注入的移除指令(裁决�
 
   test("反向臂:CODEPUPPY_ECOSYSTEM_INHERIT=1(不写移除指令)⇒ .claude 与 .agents 的技能都出现", async () => {
     process.env.CODEPUPPY_ECOSYSTEM_INHERIT = "1"
-    const injection = injectCodePuppyConfig(userData, undefined, "stable")
+    publishMainEnv()
+    const injection = injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     const engine = await engineWith("s6-inherit", injection.config)
     plant(engine.slot.projectDirectory)
     const ids = await settledIds(engine.get, "/api/skill", "name")
@@ -185,12 +214,12 @@ describe("C7 模型与提供方清单由 Code Puppy 投影", () => {
       fs.mkdirSync(path.dirname(file), { recursive: true })
       fs.writeFileSync(file, value, { mode: 0o600 })
     }
-    process.env.CODEPUPPY_BASE_URL = "https://gateway.example.invalid/v1"
+    publishPlatformBaseURL("https://gateway.example.invalid/v1")
   }
 
   test("真引擎的 GET /api/provider 里有注入的平台节点与 BYOK 节点,而且只有它们(provider.use 先拒全部再逐个放行)", async () => {
     givenLoggedInWithByok()
-    const injection = injectCodePuppyConfig(userData, undefined, "stable")
+    const injection = injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     expect(injection.ok).toBe(true)
     const engine = await engineWith("c7-governed", injection.config, injection.models.file)
     const ids = await settledIds(engine.get, "/api/provider")
@@ -200,7 +229,7 @@ describe("C7 模型与提供方清单由 Code Puppy 投影", () => {
 
   test("反向臂:去掉注入的 provider.use 语句 ⇒ OpenCode 自己目录里的 provider 也出现", async () => {
     givenLoggedInWithByok()
-    const injection = injectCodePuppyConfig(userData, undefined, "stable")
+    const injection = injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     const { policies: _policies, ...rest } = JSON.parse(injection.config.content) as Record<string, unknown>
     const engine = await engineWith("c7-ungoverned", { content: JSON.stringify(rest) }, injection.models.file)
     const ids = await settledIds(engine.get, "/api/provider")
@@ -224,7 +253,7 @@ describe("五个实验开关(基线 §2.7 判据三臂;U1:todo 开、其余四�
     return Object.fromEntries(Object.entries(flags).map(([key, state]) => [key, state.enabled]))
   }
 
-  const injected = () => JSON.parse(injectCodePuppyConfig(userData, undefined, "stable").config.content) as Record<string, unknown>
+  const injected = () => JSON.parse(injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null).config.content) as Record<string, unknown>
   const options = () =>
     buildEngineServerOptions({
       hostname: "127.0.0.1",
@@ -291,8 +320,8 @@ describe("接缝裁决 A / 裁决 r3 第 1 条:技能目录经显式文件的 sk
   test("出厂目录:启动时就在的技能出现;文件监听开着时,启动之后写进同一目录的技能几秒内出现(不重启)", async () => {
     const factory = path.join(sandbox.root, "factory-skills-watch")
     skillFile(path.join(factory, "cp-l5-factory-at-boot"), "cp-l5-factory-at-boot")
-    process.env.CODEPUPPY_FACTORY_SKILL_DIRS = JSON.stringify([factory])
-    const injection = injectCodePuppyConfig(userData, undefined, "stable")
+    publishMainEnv({ factorySkillDirs: [factory] }) // boot 时出厂技能对账的结果
+    const injection = injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     expect(injection.explicit!.layer.skills[0]).toBe(factory)
     const engine = await engineWith("skills-watch", injection.config, undefined, { filewatcher: true })
     expect(await appears(engine.get, "cp-l5-factory-at-boot", 15_000)).toBe(true)
@@ -303,7 +332,7 @@ describe("接缝裁决 A / 裁决 r3 第 1 条:技能目录经显式文件的 sk
   test("反向臂:没有出厂目录 ⇒ 同一目录里的技能不出现", async () => {
     const factory = path.join(sandbox.root, "factory-skills-absent")
     skillFile(path.join(factory, "cp-l5-factory-absent"), "cp-l5-factory-absent")
-    const injection = injectCodePuppyConfig(userData, undefined, "stable")
+    const injection = injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     expect(injection.explicit!.layer.skills).not.toContain(factory)
     const engine = await engineWith("skills-absent", injection.config, undefined, { filewatcher: true })
     await settledIds(engine.get, "/api/skill", "name")
@@ -319,7 +348,7 @@ describe("接缝裁决 A / 裁决 r3 第 1 条:技能目录经显式文件的 sk
   test("已安装技能翻代:显式文件的 skills 跟着重写成新一代的真实目录 ⇒ 新一代的技能不重启就出现、旧一代的消失;新装与停用同样不重启", async () => {
     generation("skill--cp-l5-a", "gen-000001-aaaaaa", "cp-l5-a-one")
     enable("skill--cp-l5-a")
-    const injection = injectCodePuppyConfig(userData, undefined, "stable")
+    const injection = injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     const stop = watching(injection)
     try {
       const engine = await engineWith("skills-flip", injection.config, undefined, { filewatcher: true })
@@ -343,7 +372,7 @@ describe("接缝裁决 A / 裁决 r3 第 1 条:技能目录经显式文件的 sk
   test("反向臂:没有监听重写显式文件 ⇒ 翻代之后新一代的技能不出现、旧的还在(要重启才变)", async () => {
     generation("skill--cp-l5-c", "gen-000001-dddddd", "cp-l5-c-one")
     enable("skill--cp-l5-c")
-    const injection = injectCodePuppyConfig(userData, undefined, "stable")
+    const injection = injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     const engine = await engineWith("skills-noflip", injection.config, undefined, { filewatcher: true })
     expect(await appears(engine.get, "cp-l5-c-one", 15_000)).toBe(true)
     generation("skill--cp-l5-c", "gen-000002-eeeeee", "cp-l5-c-two")
@@ -374,7 +403,7 @@ describe("编排器裁决 2026-11-12:项目导入的技能经显式文件那一�
   }
 
   test("项目 A 导入后不重启就可用;没有该目录的项目 B 没有;B 导入的 A 看不到", async () => {
-    const injection = injectCodePuppyConfig(userData, undefined, "stable")
+    const injection = injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     expect(injection.explicit!.layer.skills).toContain("./.codepuppy/skills")
     const engine = await engineWith("project-skills", injection.config, undefined, { filewatcher: true })
     const projectA = engine.slot.projectDirectory
@@ -393,7 +422,7 @@ describe("编排器裁决 2026-11-12:项目导入的技能经显式文件那一�
   }, 90_000)
 
   test("反向臂(今天的代码):显式文件的 skills 里没有那一条 ⇒ 项目 A 已导入的技能不可用", async () => {
-    const injection = injectCodePuppyConfig(userData, undefined, "stable")
+    const injection = injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     const explicit = injection.explicit!
     writeExplicitConfig(injection.config.file!, explicit.userConfig, { ...explicit.layer, skills: explicit.layer.skills.filter((entry) => entry !== "./.codepuppy/skills") })
     expect(fs.readFileSync(injection.config.file!, "utf8")).not.toContain(".codepuppy/skills")
@@ -446,11 +475,12 @@ describe("接缝裁决 C / 裁决 r1 第 2 条:出厂 /init、/review 由显式�
   }
 
   test("/init:用户回合正文逐字是 ext 登记的 CODEPUPPY_INIT_TEMPLATE(参数由引擎代入);反向臂:CODEPUPPY_PROMPT_REBRAND_DISABLE=1(不写 commands)⇒ 引擎自带的 /init 模板", async () => {
-    const engine = await engineWith("commands-init", injectCodePuppyConfig(userData, undefined, "stable").config)
+    const engine = await engineWith("commands-init", injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null).config)
     expect(await userTexts(engine, (await runCommand(engine, "init")).id)).toEqual([rendered(CODEPUPPY_INIT_TEMPLATE)])
 
     process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE = "1"
-    const bare = await engineWith("commands-init-bare", injectCodePuppyConfig(userData, undefined, "stable").config)
+    publishMainEnv()
+    const bare = await engineWith("commands-init-bare", injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null).config)
     const texts = await userTexts(bare, (await runCommand(bare, "init")).id)
     expect(texts).toHaveLength(1)
     expect(texts[0]).not.toBe(rendered(CODEPUPPY_INIT_TEMPLATE))
@@ -458,7 +488,7 @@ describe("接缝裁决 C / 裁决 r1 第 2 条:出厂 /init、/review 由显式�
   }, 60_000)
 
   test("/review 在子会话里跑(subagent: true):父会话下出现一个子会话,子会话的用户回合带 CODEPUPPY_REVIEW_TEMPLATE,父会话没有;反向臂:不写 commands ⇒ 引擎自带的 review 在原会话里跑,没有子会话", async () => {
-    const engine = await engineWith("commands-review", injectCodePuppyConfig(userData, undefined, "stable").config)
+    const engine = await engineWith("commands-review", injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null).config)
     const parent = await runCommand(engine, "review")
     const [child, ...extra] = await children(engine, parent.id)
     expect(extra).toEqual([])
@@ -466,7 +496,8 @@ describe("接缝裁决 C / 裁决 r1 第 2 条:出厂 /init、/review 由显式�
     expect(await userTexts(engine, parent.id)).toEqual([])
 
     process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE = "1"
-    const bare = await engineWith("commands-review-bare", injectCodePuppyConfig(userData, undefined, "stable").config)
+    publishMainEnv()
+    const bare = await engineWith("commands-review-bare", injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null).config)
     const session = await runCommand(bare, "review")
     expect(await userTexts(bare, session.id)).toHaveLength(1)
     expect(await children(bare, session.id)).toEqual([])
@@ -477,15 +508,15 @@ describe("接缝裁决 C / 裁决 r1 第 2 条:出厂 /init、/review 由显式�
   // 显式文件之前,所以全局里写的同名命令仍被出厂的盖掉(裁决原文:显式文件排在全局之上、项目之下)。
   test("项目 opencode.json 里的同名 /init 胜过出厂的;反向臂:项目里不写 ⇒ 出厂的", async () => {
     const projectConfig = { commands: { init: { template: "PROJECT-INIT-TEMPLATE", description: "project init" } } }
-    const engine = await engineWith("commands-project", injectCodePuppyConfig(userData, undefined, "stable").config, undefined, { projectConfig })
+    const engine = await engineWith("commands-project", injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null).config, undefined, { projectConfig })
     expect(await userTexts(engine, (await runCommand(engine, "init")).id)).toEqual([`PROJECT-INIT-TEMPLATE\n\n${ARG}`])
 
-    const plain = await engineWith("commands-project-plain", injectCodePuppyConfig(userData, undefined, "stable").config)
+    const plain = await engineWith("commands-project-plain", injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null).config)
     expect(await userTexts(plain, (await runCommand(plain, "init")).id)).toEqual([rendered(CODEPUPPY_INIT_TEMPLATE)])
   }, 60_000)
 
   test("不传显式文件 ⇒ 上游内置的 /init(出厂命令只在显式文件里,内联文档不再带)", async () => {
-    const injection = injectCodePuppyConfig(userData, undefined, "stable")
+    const injection = injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     const bare = await engineWith("commands-no-explicit", { content: injection.config.content })
     const texts = await userTexts(bare, (await runCommand(bare, "init")).id)
     expect(texts).toHaveLength(1)
@@ -494,17 +525,18 @@ describe("接缝裁决 C / 裁决 r1 第 2 条:出厂 /init、/review 由显式�
 
   test("实测:用户全局配置里同名的 /init 仍被出厂的盖掉(全局排在显式文件之前);反向臂:不写出厂命令 ⇒ 用户全局的生效", async () => {
     const globalConfig = { commands: { init: { template: "USER-GLOBAL-INIT-TEMPLATE", description: "user's own init" } } }
-    const engine = await engineWith("commands-precedence", injectCodePuppyConfig(userData, undefined, "stable").config, undefined, { globalConfig })
+    const engine = await engineWith("commands-precedence", injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null).config, undefined, { globalConfig })
     expect(await userTexts(engine, (await runCommand(engine, "init")).id)).toEqual([rendered(CODEPUPPY_INIT_TEMPLATE)])
 
     process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE = "1"
-    const bare = await engineWith("commands-precedence-bare", injectCodePuppyConfig(userData, undefined, "stable").config, undefined, { globalConfig })
+    publishMainEnv()
+    const bare = await engineWith("commands-precedence-bare", injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null).config, undefined, { globalConfig })
     expect(await userTexts(bare, (await runCommand(bare, "init")).id)).toEqual([`USER-GLOBAL-INIT-TEMPLATE\n\n${ARG}`])
   }, 60_000)
 
   test("运行中改 codepuppy.jsonc(装一条命令)⇒ sidecar 的监听重写显式文件 ⇒ 引擎不重启就看得见;反向臂:不监听 ⇒ 看不见", async () => {
     const truth = path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "codepuppy.jsonc")
-    const injection = injectCodePuppyConfig(userData, undefined, "stable")
+    const injection = injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     const listed = async (engine: Awaited<ReturnType<typeof engineWith>>, name: string, ms: number) => {
       const until = Date.now() + ms
       while (Date.now() < until) {
@@ -523,7 +555,7 @@ describe("接缝裁决 C / 裁决 r1 第 2 条:出厂 /init、/review 由显式�
     } finally {
       stop()
     }
-    const unwatched = injectCodePuppyConfig(userData, undefined, "stable")
+    const unwatched = injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     const engine = await engineWith("commands-unwatched", unwatched.config, undefined, { filewatcher: true })
     await settledIds(engine.get, "/api/command", "name")
     fs.writeFileSync(truth, JSON.stringify({ commands: { "cp-l5-unwatched": { template: "x", description: "x" } } }))
@@ -540,12 +572,12 @@ describe("C7(重裁):provider 白名单的第一层在显式文件里,项目里�
     const file = secretFilePath(userData, "CODEPUPPY_API_KEY")
     fs.mkdirSync(path.dirname(file), { recursive: true })
     fs.writeFileSync(file, "sk-platform-engine-gate", { mode: 0o600 })
-    process.env.CODEPUPPY_BASE_URL = "https://gateway.example.invalid/v1"
+    publishPlatformBaseURL("https://gateway.example.invalid/v1")
   }
 
   test("项目 opencode.json 声明一个白名单外的 provider 并在 policies 里 allow 它 ⇒ 仍不可用", async () => {
     givenLoggedIn()
-    const injection = injectCodePuppyConfig(userData, undefined, "stable")
+    const injection = injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     const engine = await engineWith("c7-project-allow", injection.config, injection.models.file, { projectConfig: rogue })
     const ids = await settledIds(engine.get, "/api/provider")
     expect(ids).toContain("codepuppy")
@@ -554,7 +586,7 @@ describe("C7(重裁):provider 白名单的第一层在显式文件里,项目里�
 
   test("反向臂:显式文件里没有 policies(只剩内联那一层)⇒ 项目的 allow 胜出,这个 provider 可用", async () => {
     givenLoggedIn()
-    const injection = injectCodePuppyConfig(userData, undefined, "stable")
+    const injection = injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     const { policies: _policies, ...explicit } = JSON.parse(fs.readFileSync(injection.config.file!, "utf8")) as Record<string, unknown>
     const file = path.join(sandbox.root, "explicit-without-policies.json")
     fs.writeFileSync(file, JSON.stringify(explicit))
@@ -606,7 +638,7 @@ describe("裁决 r3 第 2 条:key 缺失或为空的 BYOK / 自定义节点不�
         fs.mkdirSync(path.dirname(file), { recursive: true })
         fs.writeFileSync(file, plant, { mode: 0o600 })
       }
-      const injection = injectCodePuppyConfig(userData, undefined, "stable")
+      const injection = injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
       const engine = await engineWith(`keyless-${label}`, injection.config, injection.models.file)
       const ids = await settledIds(engine.get, "/api/provider")
       expect([label, ids.includes("cp-l5-keyless")]).toEqual([label, false])
@@ -616,7 +648,7 @@ describe("裁决 r3 第 2 条:key 缺失或为空的 BYOK / 自定义节点不�
 
   test("反向臂:照旧写 `apiKey: \"\"` 并放行 ⇒ 请求不带 Authorization 发到了端点", async () => {
     record()
-    const injection = injectCodePuppyConfig(userData, undefined, "stable")
+    const injection = injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     const content = JSON.parse(injection.config.content) as { providers?: Record<string, unknown>; policies?: unknown[] }
     content.providers = { ...content.providers, "cp-l5-keyless": { package: "aisdk:@ai-sdk/openai-compatible", settings: { baseURL: baseURL(), apiKey: "" }, models: { m: { name: "m" } } } }
     content.policies = [...(content.policies ?? []), { action: "provider.use", resource: "cp-l5-keyless", effect: "allow" }]
@@ -634,8 +666,8 @@ describe("裁决 r3 第 2 条:key 缺失或为空的 BYOK / 自定义节点不�
     const key = secretFilePath(userData, "CODEPUPPY_API_KEY")
     fs.mkdirSync(path.dirname(key), { recursive: true })
     fs.writeFileSync(key, "sk-platform-engine-gate", { mode: 0o600 })
-    process.env.CODEPUPPY_BASE_URL = baseURL()
-    const injection = injectCodePuppyConfig(userData, undefined, "stable")
+    publishPlatformBaseURL(baseURL())
+    const injection = injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     // 沙箱里没有已应用的平台目录,平台节点的模型表是空的(`#1556`);补一个模型只为能发出一次请求,鉴权形状原样。
     const content = JSON.parse(injection.config.content) as { providers: Record<string, { models?: Record<string, unknown> }> }
     content.providers.codepuppy!.models = { m: { name: "m" } }

@@ -17,7 +17,6 @@ import { HttpClientError, HttpClientRequest, HttpClientResponse } from "effect/h
 import {
   classifyNetFailure,
   EGRESS_DIAL_FAILURE_STATUS,
-  EGRESS_PROXY_MARKER_ENV,
   engineNetFailurePath,
   isCodepuppyFailureCode,
   isNetFailureLayer,
@@ -281,15 +280,16 @@ describe("engineNetFailurePath:引擎请求走不走本机出网代理", () => {
     HTTPS_PROXY: "http://127.0.0.1:61234",
     HTTP_PROXY: "http://127.0.0.1:61234",
     NO_PROXY: "127.0.0.1,localhost,::1",
-    [EGRESS_PROXY_MARKER_ENV]: "http://127.0.0.1:61234",
   }
+  // `#1698`:决定者给出的出网代理来自启动文档的 network.egressProxy,由调用方传入
+  const egress = "http://127.0.0.1:61234"
 
   test("代理变量在场、目标不在 NO_PROXY ⇒ egress-proxy,proxyOrigin 取自代理变量", () => {
-    expect(engineNetFailurePath("https://mcp.exa.ai/mcp", env)).toEqual({
+    expect(engineNetFailurePath("https://mcp.exa.ai/mcp", env, egress)).toEqual({
       via: "egress-proxy",
       proxyOrigin: "http://127.0.0.1:61234",
     })
-    expect(engineNetFailurePath(new URL("http://example.test/"), env)).toEqual({
+    expect(engineNetFailurePath(new URL("http://example.test/"), env, egress)).toEqual({
       via: "egress-proxy",
       proxyOrigin: "http://127.0.0.1:61234",
     })
@@ -297,18 +297,18 @@ describe("engineNetFailurePath:引擎请求走不走本机出网代理", () => {
 
   test("NO_PROXY 里的名字(含 [::1])、没有代理变量、URL 不合法 ⇒ other", () => {
     for (const target of ["http://127.0.0.1:4096/x", "https://localhost/", "http://[::1]:8080/"])
-      expect(engineNetFailurePath(target, env)).toEqual({ via: "other" })
-    expect(engineNetFailurePath("https://mcp.exa.ai/", {})).toEqual({ via: "other" })
-    expect(engineNetFailurePath("not a url", env)).toEqual({ via: "other" })
-    expect(engineNetFailurePath(undefined, env)).toEqual({ via: "other" })
+      expect(engineNetFailurePath(target, env, egress)).toEqual({ via: "other" })
+    expect(engineNetFailurePath("https://mcp.exa.ai/", {}, egress)).toEqual({ via: "other" })
+    expect(engineNetFailurePath("not a url", env, egress)).toEqual({ via: "other" })
+    expect(engineNetFailurePath(undefined, env, egress)).toEqual({ via: "other" })
   })
 
-  // 非 darwin 不起出网代理,sidecar 的代理变量原样是用户自己的代理:不从代理变量反推,只认决定者写下的标记。
-  test("有代理变量、没有出网代理标记(或标记指向别处)⇒ other —— 用户自己的代理回 403 不是本机策略", () => {
+  // 非 darwin 不起出网代理,sidecar 的代理变量原样是用户自己的代理:不从代理变量反推,只认决定者给出的出网代理。
+  test("有代理变量、没有出网代理(或它指向别处)⇒ other —— 用户自己的代理回 403 不是本机策略", () => {
     const user = { HTTPS_PROXY: "http://127.0.0.1:7897", HTTP_PROXY: "http://127.0.0.1:7897", NO_PROXY: "localhost" }
     expect(engineNetFailurePath("https://mcp.exa.ai/mcp", user)).toEqual({ via: "other" })
     expect(
-      engineNetFailurePath("https://mcp.exa.ai/mcp", { ...user, [EGRESS_PROXY_MARKER_ENV]: "http://127.0.0.1:61234" }),
+      engineNetFailurePath("https://mcp.exa.ai/mcp", user, "http://127.0.0.1:61234"),
     ).toEqual({
       via: "other",
     })

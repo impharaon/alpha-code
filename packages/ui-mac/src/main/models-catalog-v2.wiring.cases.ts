@@ -133,7 +133,9 @@ const realFetch = globalThis.fetch
 let userData = ""
 let configDir = ""
 /** buildCodePuppyModelConfig 读的每个 env(与 codepuppy-models.test.ts 同款快照+还原,免得泄漏到宿主)。 */
-const MANAGED = ["CODEPUPPY_BASE_URL", "CODEPUPPY_DEFAULT_MODEL", "CODEPUPPY_MODELS_DISABLE", "OPENCODE_CONFIG_DIR"]
+const MANAGED = ["CODEPUPPY_MODELS_DISABLE", "OPENCODE_CONFIG_DIR"]
+/** `#1698` G2:平台地址是注入从启动文档取来交进来的参数,不再读环境。 */
+const PLATFORM = { baseURL: "https://gw.example/v1" }
 const saved: Record<string, string | undefined> = {}
 
 const stubFetch = (body: unknown) => {
@@ -182,8 +184,7 @@ beforeEach(() => {
   // 空 config dir(`#1392` 起自定义 provider 只来自真源文件,本闸的临时环境根下没有它)—— 隔离本闸关心的平台段。
   configDir = mkdtempSync(join(tmpdir(), "models-catalog-v2-config-"))
   process.env.OPENCODE_CONFIG_DIR = configDir
-  // 平台 provider 注入的两个前置(不设它们 provider.codepuppy 根本不存在,反分叉断言会空绿)。
-  process.env.CODEPUPPY_BASE_URL = "https://gw.example/v1"
+  // 平台 provider 注入的两个前置(不给它们 provider.codepuppy 根本不存在,反分叉断言会空绿):平台地址(PLATFORM)与密钥文件。
   mkdirSync(join(userData, "codepuppy-secrets"), { recursive: true })
   writeFileSync(join(userData, "codepuppy-secrets", "CODEPUPPY_API_KEY"), "jwt", { mode: 0o600 })
 })
@@ -213,7 +214,7 @@ const waitFor = async (ready: () => boolean, timeoutMs = 11000) => {
   }
 }
 
-const engineModelIds = () => Object.keys((buildCodePuppyModelConfig(userData)!.provider.codepuppy as any).models)
+const engineModelIds = () => Object.keys((buildCodePuppyModelConfig(userData, PLATFORM)!.provider.codepuppy as any).models)
 
 describe("#681 生产 wiring:models-catalog IPC 经真实目录 decoder(`#1556` 起 V3)返回持久化投影", () => {
   test("production IPC refreshes through the V3 fetch decoder and returns the persisted projection", async () => {
@@ -325,7 +326,7 @@ describe("#681 反分叉:sidecar 引擎配置与 IPC 投影是同一份投影", 
   test("引擎配置不携带 pricing(展示投影不进 opencode provider 契约)", async () => {
     stubFetch(catalogV3())
     await refreshThenFork()
-    const models = (buildCodePuppyModelConfig(userData)!.provider.codepuppy as any).models
+    const models = (buildCodePuppyModelConfig(userData, PLATFORM)!.provider.codepuppy as any).models
     expect(Object.values(models).every((m: any) => m.pricing === undefined)).toBe(true)
     // 但 variants 仍随投影下发(REQ-029 不能被本次切换弄丢)。
     expect(models["claude-opus-4.8"].variants["高"]).toEqual({ reasoning: { effort: "high" } })

@@ -5,8 +5,14 @@
  * extension sovereignty gate and the engine display snapshot use one fact.
  */
 
-export const CLOUD_MCP_SERVER_ENV = "CODEPUPPY_CLOUD_MCP_SERVER"
-export const CLOUD_MCP_DEF_ENV = "CODEPUPPY_CLOUD_MCP_DEF"
+import { tryCodePuppyBootstrap, type CodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
+
+/**
+ * `#1698`(DESIGN-upgrade-bootstrap-config §4.3,G2):治理云 MCP 的名字与定义来自 Code Puppy 的启动文档(`cloudMcp`),不再来自
+ * 进程内环境。各函数保留一个参数作测试接缝,缺省取本进程已发布的文档;没有文档的宿主(仓内 CLI、core 单测)= 没有治理云 MCP。
+ */
+export type GovernedCloudMcp = NonNullable<CodePuppyBootstrap["cloudMcp"]>
+const published = () => tryCodePuppyBootstrap()?.cloudMcp
 
 export type McpOwnership = {
   governed: string[]
@@ -17,30 +23,12 @@ export const UNVERIFIED_MCP_OWNERSHIP: McpOwnership = { governed: [], foreign: [
 
 type McpHost = { mcp?: Record<string, unknown> }
 
-export function governedCloudEndpoint(
-  env: Record<string, string | undefined>,
-): { name: string; url: string } | undefined {
-  const name = env[CLOUD_MCP_SERVER_ENV]
-  const raw = env[CLOUD_MCP_DEF_ENV]
-  if (!name || !raw) return undefined
-  let definition: unknown
-  try {
-    definition = JSON.parse(raw)
-  } catch {
-    return undefined
-  }
-  if (!definition || typeof definition !== "object" || Array.isArray(definition)) return undefined
-  const { type, url } = definition as { type?: unknown; url?: unknown }
-  if (type !== "remote" || typeof url !== "string" || !url) return undefined
-  return { name, url }
+export function governedCloudEndpoint(cloudMcp: GovernedCloudMcp | undefined): { name: string; url: string } | undefined {
+  return cloudMcp ? { name: cloudMcp.name, url: cloudMcp.definition.url } : undefined
 }
 
-export function isGovernedMcpEntry(
-  name: string,
-  entry: unknown,
-  env: Record<string, string | undefined> = process.env,
-): boolean {
-  const endpoint = governedCloudEndpoint(env)
+export function isGovernedMcpEntry(name: string, entry: unknown, cloudMcp: GovernedCloudMcp | undefined = published()): boolean {
+  const endpoint = governedCloudEndpoint(cloudMcp)
   if (!endpoint || name !== endpoint.name) return false
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) return false
   const { type, url } = entry as { type?: unknown; url?: unknown }
@@ -68,7 +56,7 @@ export function resolveFileRefs(value: unknown, readFile: (path: string) => stri
 }
 
 /**
- * REQ-236 §2.1-5(`#1562`):治理云 MCP 条目每次请求的凭据,从 `CODEPUPPY_CLOUD_MCP_DEF` 定义里
+ * REQ-236 §2.1-5(`#1562`):治理云 MCP 条目每次请求的凭据,从启动文档 `cloudMcp.definition` 里
  * `headers.Authorization` 的 `{file:}` 引用**现读**(权限方案冻结接口),不读已装载条目里的字面量 ——
  * 那个字面量是引擎配置加载器(生产分支)或 ext `installCloudMcp`(kill-switch 分支)在装载时替换进去的,
  * 续期之后它就是旧令牌。返回给 MCP SDK transport 的 `fetch` 选项:StreamableHTTP 与 SSE 的 POST、GET/SSE
@@ -77,11 +65,11 @@ export function resolveFileRefs(value: unknown, readFile: (path: string) => stri
  * 引擎归为 `failed` + code `auth`,不重连)。IO 由调用方注入,本模块不碰文件系统。
  */
 export function governedCredentialFetch(
-  env: Record<string, string | undefined>,
+  cloudMcp: GovernedCloudMcp | undefined,
   readFile: (path: string) => Promise<string>,
   fetchImpl: (url: string | URL, init?: RequestInit) => Promise<Response>,
 ): (url: string | URL, init?: RequestInit) => Promise<Response> {
-  const template = governedAuthorizationTemplate(env)
+  const template = cloudMcp?.definition.headers.Authorization
   return async (url, init) => {
     const authorization = template ? await resolveAuthorization(template, readFile) : undefined
     if (!authorization)
@@ -92,19 +80,6 @@ export function governedCredentialFetch(
     const headers = new Headers(init?.headers)
     headers.set("authorization", authorization)
     return fetchImpl(url, { ...init, headers })
-  }
-}
-
-function governedAuthorizationTemplate(env: Record<string, string | undefined>): string | undefined {
-  const raw = env[CLOUD_MCP_DEF_ENV]
-  if (!raw) return undefined
-  try {
-    const definition: unknown = JSON.parse(raw)
-    const headers = (definition as { headers?: unknown } | null)?.headers
-    const value = headers && typeof headers === "object" ? (headers as { Authorization?: unknown }).Authorization : undefined
-    return typeof value === "string" && FILE_REF.test(value) ? value : undefined
-  } catch {
-    return undefined
   }
 }
 
@@ -155,16 +130,10 @@ function withDefinitionFileRefs(entry: unknown, definition: unknown): unknown {
  * not merely share its endpoint. The evidence is the definition itself (file
  * references, never token values), so token rotation keeps the digest stable.
  */
-export function governedMcpEvidence(
-  name: string,
-  entry: unknown,
-  env: Record<string, string | undefined> = process.env,
-): string | undefined {
-  if (!isGovernedMcpEntry(name, entry, env)) return undefined
-  const raw = env[CLOUD_MCP_DEF_ENV]
-  if (!raw) return undefined
+export function governedMcpEvidence(name: string, entry: unknown, cloudMcp: GovernedCloudMcp | undefined = published()): string | undefined {
+  if (!cloudMcp || !isGovernedMcpEntry(name, entry, cloudMcp)) return undefined
   try {
-    const definition: unknown = JSON.parse(raw)
+    const definition = cloudMcp.definition
     if (canonicalJson(withDefinitionFileRefs(entry, definition)) !== canonicalJson(definition)) return undefined
     return canonicalJson({ kind: "codepuppy-cloud-mcp", name, definition })
   } catch {
@@ -172,14 +141,14 @@ export function governedMcpEvidence(
   }
 }
 
-export function computeMcpOwnership(cfg: unknown, env: Record<string, string | undefined> = process.env): McpOwnership {
+export function computeMcpOwnership(cfg: unknown, cloudMcp: GovernedCloudMcp | undefined = published()): McpOwnership {
   const host = cfg as McpHost | null | undefined
   if (!host || typeof host !== "object") return UNVERIFIED_MCP_OWNERSHIP
   const servers = host.mcp && typeof host.mcp === "object" ? host.mcp : {}
   const governed: string[] = []
   const foreign: string[] = []
   for (const [name, entry] of Object.entries(servers)) {
-    if (isGovernedMcpEntry(name, entry, env)) governed.push(name)
+    if (isGovernedMcpEntry(name, entry, cloudMcp)) governed.push(name)
     else foreign.push(name)
   }
   return { governed, foreign }

@@ -2,7 +2,7 @@
 // 随换代删除):平台凭据出错 —— 本机读不到凭据,或网关回 401 / 403 —— 这一轮失败一次、带名字,不进引擎的退避重试
 // (否则确定性的认证失败要等约 80 秒才显示给用户)。
 //
-// 宿主:test-component/codepuppy-engine.ts(生产注入 + 真 ext);平台节点经 `CODEPUPPY_BASE_URL` 指向本文件的假网关。只数这一轮
+// 宿主:test-component/codepuppy-engine.ts(生产注入 + 真 ext);平台节点经启动文档的 platform.modelProxyBaseURL 指向本文件的假网关。只数这一轮
 // 真正的模型请求(带工具的那一个;起标题的请求不带工具)。凭据是合成值,用例输出只有计数。
 //   ① 凭据文件缺席 ⇒ 网关零请求,这一轮失败,错误就是 ext 那句具名的话,2 秒内结束(引擎退避的第一个间隔是 2 秒,
 //      packages/core/src/model-retry.ts);

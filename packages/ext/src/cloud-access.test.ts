@@ -3,26 +3,23 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync 
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { cloudAccessState } from "./cloud-access"
-import { CLOUD_MCP_DEF_ENV } from "./cloud-websearch-kill"
-import { materializeCloudMcpConfig } from "../../ui-mac/src/main/cloud-sidecar-config"
+import { testBootstrap } from "../../ui-mac/test-component/codepuppy-bootstrap-fixture"
 
 const root = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-cloud-access-")))
 afterAll(() => rmSync(root, { recursive: true, force: true }))
-// Real desktop definition producer; only the endpoint/path contents are synthetic.
-const env = (reference?: string) => ({
-  CODEPUPPY_BASE_URL: "https://gateway.invalid/v1",
-  [CLOUD_MCP_DEF_ENV]: JSON.stringify(materializeCloudMcpConfig("https://cloud.invalid/mcp", reference)),
-})
+// `#1698`:平台登录与云 MCP 定义来自启动文档(main 的 materializeCloudMcpConfig 写进去的真定义带 {file:} 引用);只有路径是合成的。
+const doc = (input: { reference?: string; baseURL?: boolean } = {}) =>
+  testBootstrap({
+    globalRoot: root,
+    platform: input.baseURL === false ? {} : { modelProxyBaseURL: "https://gateway.invalid/v1" },
+    ...(input.reference
+      ? { cloudMcp: { name: "codepuppy", definition: { type: "remote", url: "https://cloud.invalid/mcp", headers: { Authorization: `Bearer ${input.reference}` }, oauth: false } } }
+      : {}),
+  })
 
 describe("REQ-232 AC1 local cloud access", () => {
-  test("missing/disabled/malformed definitions and missing platform login report logged-out with the login entry", () => {
-    const inputs = [
-      {},
-      env(),
-      { ...env(), [CLOUD_MCP_DEF_ENV]: "{" },
-      { ...env(), [CLOUD_MCP_DEF_ENV]: "null" },
-      { ...env("{file:/unused}"), CODEPUPPY_BASE_URL: undefined },
-    ]
+  test("no cloud MCP in the document, or no platform login, report logged-out with the login entry", () => {
+    const inputs = [doc({ baseURL: false }), doc(), doc({ reference: "{file:/unused}", baseURL: false })]
     inputs.forEach((input) => {
       const state = cloudAccessState(input, () => {
         throw new Error("must not check a logged-out credential")
@@ -37,7 +34,7 @@ describe("REQ-232 AC1 local cloud access", () => {
   test("a missing referenced credential cannot report ready", () => {
     const checked: string[] = []
     expect(
-      cloudAccessState(env("{file:/synthetic/missing}"), (path) => {
+      cloudAccessState(doc({ reference: "{file:/synthetic/missing}" }), (path) => {
         checked.push(path)
         return false
       }).state,
@@ -49,6 +46,6 @@ describe("REQ-232 AC1 local cloud access", () => {
     const credential = join(root, "unreadable-as-file")
     mkdirSync(credential)
     expect(() => readFileSync(credential, "utf8")).toThrow()
-    expect(cloudAccessState(env(`{file:${credential}}`), existsSync).state).toBe("ready")
+    expect(cloudAccessState(doc({ reference: `{file:${credential}}` }), existsSync).state).toBe("ready")
   })
 })

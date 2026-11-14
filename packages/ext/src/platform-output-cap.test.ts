@@ -6,7 +6,7 @@ import { platformOutputCap } from "./platform-output-cap"
 const GW = "https://gw.example/v1"
 
 describe("platformOutputCap —— 判据形状域", () => {
-  test("平台节点(baseURL 逐字等于 CODEPUPPY_BASE_URL)⇒ 不发 max_tokens", () => {
+  test("平台节点(baseURL 逐字等于启动文档的 platform.modelProxyBaseURL)⇒ 不发 max_tokens", () => {
     expect(platformOutputCap({ providerBaseURL: GW, codepuppyBaseURL: GW })).toEqual({ omit: true, reason: "platform-gateway" })
   })
   test("直连 BYOK / 自定义节点(baseURL 不同)⇒ 保持上游行为", () => {
@@ -15,7 +15,7 @@ describe("platformOutputCap —— 判据形状域", () => {
       reason: "not-platform-provider",
     })
   })
-  test("CODEPUPPY_BASE_URL 缺席 / 空串 ⇒ 没有平台节点可言,任何 baseURL 都不省略(fail-closed 到上游行为)", () => {
+  test("平台节点地址缺席 / 空串 ⇒ 没有平台节点可言,任何 baseURL 都不省略(fail-closed 到上游行为)", () => {
     expect(platformOutputCap({ providerBaseURL: GW, codepuppyBaseURL: undefined })).toEqual({ omit: false, reason: "no-codepuppy-base-url" })
     expect(platformOutputCap({ providerBaseURL: GW, codepuppyBaseURL: "" })).toEqual({ omit: false, reason: "no-codepuppy-base-url" })
   })

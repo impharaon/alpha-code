@@ -4,7 +4,7 @@
 //   反样本(承重):用户 codepuppy.jsonc(经显式文件进引擎)与引擎的全局配置目录(v1 的 XDG 那一处)各写一条完整 2.x provider 块,
 //   连同一条放行它的 `provider.use` 策略,端点都指本机一个数请求的桩 ⇒ 两条都不在清单里,选它建会话发一句,桩一个请求都收不到。
 //   全局配置目录在 2.x 里排在显式文件之前载入,而跨文档的策略按最早载入者优先 —— 那里的放行句压得过注入的「先拒全部」;拿住它的是
-//   ext 的供应商白名单(packages/ext/src/provider-allow.ts,注入写进 CODEPUPPY_PROVIDER_ALLOW 的同一份放行集合)。
+//   ext 的供应商白名单(packages/ext/src/provider-allow.ts,注入在本进程发布的同一份放行集合;`#1698` §10 R30 起不进环境)。
 //   正对照:同一个全局配置文件里用户自己的非供应商设置(一条命令)照常生效 —— 文件读到了,只是供应商被拿掉。
 // 手段自证:①同一份配置文件,把两个 exfil id 追加进注入的放行(策略与 ext 的集合同口径;`#1392` 之前「配置文件的 id 进白名单」的形状)
 // ⇒ 它们真的出现;②已知的坏:撤掉 ext 的放行集合(只剩注入的策略)⇒ 全局目录里那条真的出现,codepuppy.jsonc 那条仍被策略挡住。
@@ -17,7 +17,7 @@ import { assertEngineSandboxed, engineSandbox } from "../../test-component/engin
 import { codepuppyEngine, scriptedModel, type Running } from "../../test-component/codepuppy-engine"
 import { customProviderSecretName, secretFilePath } from "./codepuppy-secret-files"
 import { writeCustomProviderTruth } from "./custom-provider-truth-write"
-import { PROVIDER_ALLOW_ENV } from "../../../ext/src/provider-allow"
+import { providerAllowList, publishProviderAllowList } from "../../../ext/src/provider-allow"
 
 const sandbox = engineSandbox()
 const model = scriptedModel()
@@ -132,7 +132,7 @@ describe("#1392 端到端(OpenCode 2):真源节点进引擎清单;codepuppy.json
     const explicit = JSON.parse(fs.readFileSync(file, "utf8")) as { policies?: unknown[] }
     explicit.policies = [...(explicit.policies ?? []), ...allow]
     fs.writeFileSync(file, JSON.stringify(explicit))
-    process.env[PROVIDER_ALLOW_ENV] = JSON.stringify([...(JSON.parse(process.env[PROVIDER_ALLOW_ENV]!) as string[]), ...EXFIL])
+    publishProviderAllowList([...providerAllowList()!, ...EXFIL])
     const engine = await run(host)
     expect(engine.providers.filter((id) => EXFIL.includes(id as never))).toEqual([...EXFIL])
     expect((await engine.call("exfil-global")).requests).toContain("exfil-global")
@@ -142,11 +142,11 @@ describe("#1392 端到端(OpenCode 2):真源节点进引擎清单;codepuppy.json
     const host = machine("derivation-request")
     const engine = await run(host)
     expect(engine.providers).toContain("codepuppy")
-    const allowed = process.env[PROVIDER_ALLOW_ENV]!
+    const allowed = [...providerAllowList()!]
     // 只改放行集合、不动供应商表(没有变换变化 ⇒ 引擎不重建清单):量的是请求时那一道,不是清单那一道。
-    process.env[PROVIDER_ALLOW_ENV] = JSON.stringify((JSON.parse(allowed) as string[]).filter((id) => id !== "codepuppy"))
+    publishProviderAllowList(allowed.filter((id) => id !== "codepuppy"))
     const refused = await engine.call("codepuppy", "m")
-    process.env[PROVIDER_ALLOW_ENV] = allowed
+    publishProviderAllowList(allowed)
     expect({ status: refused.status, platform: refused.platform }).toEqual({ status: 200, platform: 0 })
     expect(refused.messages).toContain(`provider \\"codepuppy\\" is not in Code Puppy's allow list; the request was not sent`)
     const reachedPlatform = await engine.call("codepuppy", "m")
@@ -155,7 +155,7 @@ describe("#1392 端到端(OpenCode 2):真源节点进引擎清单;codepuppy.json
 
   test("已知的坏:撤掉 ext 的放行集合、只剩注入的策略 ⇒ 全局配置目录里那条(带放行句)真的出现;codepuppy.jsonc 那条仍被策略挡住", async () => {
     const host = machine("derivation-policy-only")
-    delete process.env[PROVIDER_ALLOW_ENV]
+    publishProviderAllowList(undefined)
     const engine = await run(host)
     expect(engine.providers).toContain("my-openai")
     expect(engine.providers.filter((id) => EXFIL.includes(id as never))).toEqual(["exfil-global"])

@@ -7,7 +7,7 @@ import path from "node:path"
 import { buildInventory } from "./rpc"
 import { toolFacts, type IdentityInput } from "./identity"
 import type { ToolPolicySnapshot } from "./resolver"
-import { E, isolate, it, Location, mcpToolMark, Plugin, promisePlugin, ROOT, Rpc, Tool } from "./policy-host.cases"
+import { E, isolate, it, Location, mcpToolMark, Plugin, promisePlugin, publishPolicyAccount, ROOT, Rpc, Tool } from "./policy-host.cases"
 import { registerPolicy } from "./index"
 import { createToolPolicyStore, defaultPolicyBaseDir } from "./resolver"
 
@@ -56,8 +56,7 @@ describe("Settings inventory", () => {
 
   it.live("I2 the badge tells the truth: a tool the inventory shows disabled is refused by the production executor", () =>
     Effect.gen(function* () {
-      const account = `inv-${Math.random().toString(36).slice(2)}`
-      process.env.CODEPUPPY_POLICY_ACCOUNT = account
+      const account = publishPolicyAccount("inv")
       const plugins = yield* Plugin.Service
       yield* plugins.activate([
         promisePlugin("builtins", async (ctx: any) => {

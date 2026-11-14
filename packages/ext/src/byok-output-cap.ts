@@ -1,6 +1,6 @@
 // REQ-156:**直连 BYOK 节点**的 `max_tokens` 取该模型上游实读受理上限。
 //
-// `#1238`(REQ-153 AC2)只解决了平台代理节点那一半 —— 它的判据是「baseURL 逐字 == CODEPUPPY_BASE_URL
+// `#1238`(REQ-153 AC2)只解决了平台代理节点那一半 —— 它的判据是「baseURL 逐字 == 平台节点地址(启动文档 platform.modelProxyBaseURL)
 // ⇒ 不发 max_tokens,由网关按 route 上限填」。直连 BYOK 节点**没有网关**,没人替它填,于是它一直
 // 发着上游默认的 `OUTPUT_TOKEN_MAX = 32_000`(`platform-output-cap.test.ts` 里判「直连节点仍是
 // 上游 32000」的那条用例正是把这个状态钉住的;REQ-156 同批把它改题为「直连 BYOK 节点:本模块

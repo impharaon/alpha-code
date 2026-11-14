@@ -2,9 +2,9 @@
 //
 // customize-opencode 这类「上游自带、alpha 出厂即禁」的技能,禁用是产品内置行为,不该以
 // `permission.skill.<n>: "deny"` 明文出现在用户配置(`<current-environment-root>/codepuppy.jsonc`)里 —— 用户配置只放
-// 用户自己的东西。机制与出厂技能路径(factory-paths.ts)同构:main 算好 effective 名单
-// (#1522 customize-opencode 永久禁用)→ `CODEPUPPY_FACTORY_DENY_SKILLS`(JSON 数组)→ 本模块在
-// config hook 里内存注入:
+// 用户自己的东西。名单是常量(#1522 customize-opencode 永久禁用),`#1698`(design §10 R7)起就住在这里、main import 它,
+// 不再经任何通道(此前经 `CODEPUPPY_FACTORY_DENY_SKILLS` 过河,通道缺席或写坏时名单变空 —— 失效即放开,已删)。本模块
+// 内存注入:
 //   - `permission.skill.<n> = "deny"`(弃用技能覆盖用户配置,其余 set-if-absent);
 //   - 同名占位 command(弃用技能强制指路 /customize-codepuppy,其余 set-if-absent)。
 // 斜杠菜单的隐藏由 renderer 读 gov-read 的 factoryDenied 完成(REQ-066 过滤同源)。
@@ -15,16 +15,10 @@
 
 import { contextText, renderTemplate } from "./context-injection"
 
-export function applyFactoryDeny(cfg: Record<string, unknown>, deniedJson: string | undefined): string[] {
-  if (!deniedJson) return []
-  let names: unknown
-  try {
-    names = JSON.parse(deniedJson)
-  } catch {
-    return []
-  }
-  if (!Array.isArray(names) || names.length === 0) return []
+/** 上游自带、Code Puppy 出厂即禁的技能(#1522:customize-opencode 永久禁用)。main(codepuppy-builtin-policy.ts、engine-config-truth-boot.ts、ext-ipc.ts 经 factoryDeniedSkills)用同一份。 */
+export const FACTORY_DENIED_SKILLS = ["customize-opencode"] as const
 
+export function applyFactoryDeny(cfg: Record<string, unknown>): string[] {
   const permission =
     cfg.permission && typeof cfg.permission === "object" && !Array.isArray(cfg.permission)
       ? (cfg.permission as Record<string, unknown>)
@@ -39,8 +33,7 @@ export function applyFactoryDeny(cfg: Record<string, unknown>, deniedJson: strin
       : ((cfg.command = {}) as Record<string, unknown>)
 
   const applied: string[] = []
-  for (const n of names) {
-    if (typeof n !== "string" || !n) continue
+  for (const n of FACTORY_DENIED_SKILLS) {
     // #1522:删后追加,确保旧同名 allow 或后置通配 allow 都不能覆盖永久 deny。
     if (n === "customize-opencode") delete skill[n]
     if (!(n in skill)) {
@@ -57,14 +50,8 @@ export function applyFactoryDeny(cfg: Record<string, unknown>, deniedJson: strin
   return applied
 }
 
-/** `CODEPUPPY_FACTORY_DENY_SKILLS`(JSON 数组)里的技能名;缺席 / 坏 / 空 ⇒ []。`#1665`:2.x 下禁用由 skill.transform 拿掉 +
- *  permission.hook.evaluate 一律 deny 执行(不再写 `permission.skill`,2.x 没有整份配置的钩子)。 */
-export function factoryDeniedSkills(deniedJson: string | undefined): string[] {
-  if (!deniedJson) return []
-  try {
-    const names: unknown = JSON.parse(deniedJson)
-    return Array.isArray(names) ? names.filter((n): n is string => typeof n === "string" && n !== "") : []
-  } catch {
-    return []
-  }
+/** 出厂禁用的技能名(常量,不依赖任何环境)。`#1665`:2.x 下禁用由 skill.transform 拿掉 + permission.hook.evaluate 一律 deny 执行
+ *  (不再写 `permission.skill`,2.x 没有整份配置的钩子)。 */
+export function factoryDeniedSkills(): string[] {
+  return [...FACTORY_DENIED_SKILLS]
 }

@@ -101,7 +101,7 @@ class DeafChild extends EventEmitter {
 
 let userDataPath = ""
 const savedEnv: Record<string, string | undefined> = {}
-const managedEnv = ["SHELL", "CODEPUPPY_SECRETS_DISABLE", "CODEPUPPY_CLOUD_MCP_URL", "CODEPUPPY_CLOUD_TOKEN"] as const
+const managedEnv = ["SHELL", "CODEPUPPY_SECRETS_DISABLE", "CODEPUPPY_CLOUD_MCP_URL", "CODEPUPPY_CLOUD_TOKEN", "CODEPUPPY_GLOBAL_DIR"] as const
 
 beforeEach(() => {
   userDataPath = mkdtempSync(join(tmpdir(), "sidecar-stop-"))
@@ -112,6 +112,7 @@ beforeEach(() => {
   }
   process.env.SHELL = "nu"
   process.env.CODEPUPPY_SECRETS_DISABLE = "1"
+  process.env.CODEPUPPY_GLOBAL_DIR = join(userDataPath, "codepuppy-state", "env", "dev") // #1698:无快照的单测经环境给全局根(design §10 R31),fork 时构建启动文档要它
 })
 
 afterEach(() => {

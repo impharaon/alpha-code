@@ -15,6 +15,7 @@
 //
 // electron-free:isPackaged/channel/appData 由 index.ts 注入,单测零 mock。
 
+import { tryCodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { lstatSync, mkdirSync, readdirSync, realpathSync, rmdirSync, statSync } from "node:fs"
 import { homedir } from "node:os"
 import { basename, dirname, isAbsolute, join, normalize, relative, resolve } from "node:path"
@@ -204,9 +205,16 @@ export function initCodePuppyEnvironment(input: InitEnvironmentInput): CodePuppy
   return current
 }
 
-/** main 消费方的唯一根解析：快照优先；无快照只接受显式、绝对且不指向退休根的派生输出。 */
+/**
+ * 当前环境根的唯一解析(design §4.3、§10 R31):main 读冻结快照;sidecar 没有快照,读本进程已发布的启动文档
+ * (`paths.globalRoot`,main 由同一个快照算出);两样都没有的只剩不初始化快照的单元测试,才读环境里显式、绝对且不指向
+ * 退休根的派生值。生产启动里 sidecar 的环境没有这个键(sidecar-env.ts 的前缀拒绝),文档又先于一切读方发布,
+ * 环境这一支到不了(bootstrap-launch-parity.engine.cases.ts 断言)。
+ */
 export function resolveCodePuppyGlobalRoot(env: NodeJS.ProcessEnv = process.env, homeDir: string = homedir()): string {
   if (current) return current.mutableRoot
+  const published = tryCodePuppyBootstrap()
+  if (published) return published.paths.globalRoot
   const raw = env.CODEPUPPY_GLOBAL_DIR?.trim()
   if (!raw || !isAbsolute(raw)) throw new Error("CODEPUPPY_GLOBAL_DIR requires an absolute initialized root")
   assertOutsideRetiredRoot([normalize(raw)], homeDir, false)

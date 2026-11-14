@@ -6,6 +6,7 @@
 // (与全局 REQ-059 同一 schema 教训,数组会被引擎拒)。plugin 不在此(走 host fan-out,ADR-006 生 TS 雷)。
 // `#1665`(OpenCode 2):合并结果是一份 v1 形状的小对象,由 engine-transforms.ts 翻译进 2.x 的按域 transform。
 
+import { codepuppyBootstrap } from "../../util/src/codepuppy-bootstrap"
 import { lstatSync, realpathSync } from "node:fs"
 import { homedir } from "node:os"
 import { isAbsolute, join, normalize, relative, resolve } from "node:path"
@@ -83,18 +84,20 @@ export function withProjectDirectoryIdentity<T>(
   return { ok: true, value: operation(current.root) }
 }
 
-/** sidecar/ext 无 main 快照，必须只消费 main 已派生的 canonical root。 */
-export function requireCodePuppyGlobalRoot(value: string | undefined = process.env.CODEPUPPY_GLOBAL_DIR, homeDir: string = homedir()): string {
+const GLOBAL_ROOT = "bootstrap paths.globalRoot"
+
+/** sidecar/ext 无 main 快照，必须只消费 main 已派生的 canonical root(`#1698`:启动文档的 `paths.globalRoot`)。 */
+export function requireCodePuppyGlobalRoot(value: string | undefined = codepuppyBootstrap().paths.globalRoot, homeDir: string = homedir()): string {
   const raw = value?.trim()
-  if (!raw || !isAbsolute(raw)) throw new Error("CODEPUPPY_GLOBAL_DIR requires an absolute initialized root")
+  if (!raw || !isAbsolute(raw)) throw new Error(`${GLOBAL_ROOT} requires an absolute initialized root`)
   const candidate = normalize(raw)
   const retired = normalize(join(homeDir, ".alpha"))
-  if (related(candidate, retired)) throw new Error("CODEPUPPY_GLOBAL_DIR is related to the retired global root")
+  if (related(candidate, retired)) throw new Error(`${GLOBAL_ROOT} is related to the retired global root`)
   try {
     const canonical = normalize(realpathSync(candidate))
     const stat = lstatSync(candidate)
     if (stat.isSymbolicLink() || !stat.isDirectory() || canonical !== candidate)
-      throw new Error("CODEPUPPY_GLOBAL_DIR is not the canonical directory")
+      throw new Error(`${GLOBAL_ROOT} is not the canonical directory`)
     const home = normalize(realpathSync(homeDir))
     const retiredCanonical = (() => {
       try {
@@ -104,11 +107,11 @@ export function requireCodePuppyGlobalRoot(value: string | undefined = process.e
         return join(home, ".alpha")
       }
     })()
-    if (related(canonical, retiredCanonical)) throw new Error("CODEPUPPY_GLOBAL_DIR resolves to the retired global root")
+    if (related(canonical, retiredCanonical)) throw new Error(`${GLOBAL_ROOT} resolves to the retired global root`)
     return canonical
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("CODEPUPPY_GLOBAL_DIR")) throw error
-    throw new Error("CODEPUPPY_GLOBAL_DIR identity cannot be confirmed", { cause: error })
+    if (error instanceof Error && error.message.startsWith(GLOBAL_ROOT)) throw error
+    throw new Error(`${GLOBAL_ROOT} identity cannot be confirmed`, { cause: error })
   }
 }
 

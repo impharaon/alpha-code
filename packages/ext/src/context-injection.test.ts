@@ -13,6 +13,7 @@
 // 本文件只钉登记形状、判官与跨包前提(③e / ③f)。
 // 已知不覆盖:项目自己的 plugins / codepuppy.jsonc(用户的字);skills 正文与 MCP 工具表(别人的字)。
 
+import { publishTestBootstrap, testCloudMcp, unpublishTestBootstrap, type TestBootstrapInput } from "../../ui-mac/test-component/codepuppy-bootstrap-fixture"
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -64,8 +65,6 @@ import { applyPromptTakeover } from "./codepuppy-prompts"
 import { CODEPUPPY_AGENT_TEXT } from "../../ui-mac/src/main/codepuppy-agents"
 import { CODEPUPPY_BEHAVIOR_MD } from "../../ui-mac/src/main/codepuppy-behavior"
 import { buildCodePuppyIdentity } from "../../ui-mac/src/main/codepuppy-identity"
-import { CLOUD_MCP_ARM_ENV, CLOUD_MCP_DEF_ENV, CLOUD_MCP_SERVER_ENV } from "./cloud-websearch-kill"
-import { PLATFORM_AUTH_REF_ENV } from "./platform-credential-header"
 import CodePuppyExt from "./plugin"
 import { Agent } from "../../schema/src/agent.ts"
 import { toLLMMessages } from "../../core/src/session/runner/to-llm-message.ts"
@@ -123,29 +122,27 @@ const SANITIZE = [
   "CODEPUPPY_FACTORY_DENY_SKILLS",
   "CODEPUPPY_PROMPT_REBRAND_DISABLE",
   "CODEPUPPY_EXT_VERBOSE",
-  "CODEPUPPY_GLOBAL_DIR",
-  // `#1419`:云端识图的三个输入 —— 没有它们时 context 钩子走「云端不可用」那一句与失败块。
-  "CODEPUPPY_BASE_URL",
-  CLOUD_MCP_ARM_ENV,
-  CLOUD_MCP_DEF_ENV,
-  CLOUD_MCP_SERVER_ENV,
-  // `#1662` parity B4:③j 的平台凭据引用(http.request 钩子每次现读)。
-  PLATFORM_AUTH_REF_ENV,
 ] as const
 
 let root = ""
+let global = ""
+/**
+ * `#1698`:云端识图的三个输入(平台 base、云 server 名、云 MCP 定义)与 ③j 的平台凭据引用在启动文档里;用例改它们 = 重新发布一份
+ * (ext 的钩子在调用时读文档)。
+ */
+const republish = (over: Omit<TestBootstrapInput, "globalRoot"> = {}) => publishTestBootstrap({ globalRoot: global, ...over })
 const saved = new Map<string, string | undefined>()
 
 beforeEach(() => {
   root = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-ctxinj-")))
-  const global = join(root, "global", "env", "dev")
+  global = join(root, "global", "env", "dev")
   mkdirSync(global, { recursive: true })
   mkdirSync(join(root, "project"), { recursive: true })
   for (const k of SANITIZE) {
     saved.set(k, process.env[k])
     delete process.env[k]
   }
-  process.env.CODEPUPPY_GLOBAL_DIR = global
+  republish()
 })
 afterEach(() => {
   for (const k of SANITIZE) {
@@ -153,6 +150,7 @@ afterEach(() => {
     if (v === undefined) delete process.env[k]
     else process.env[k] = v
   }
+  unpublishTestBootstrap()
   rmSync(root, { recursive: true, force: true })
 })
 
@@ -275,7 +273,8 @@ describe("③a 配置域 transform 咽喉:ext 写进 agent / command / mcp 的�
     expect(leaves.length).toBeGreaterThanOrEqual(4)
     for (const p of ["/agents/general/system", "/agents/explore/system", "/agents/docs/system", "/agents/docs/description"])
       expect(leaves.map((l) => l.pointer)).toContain(p)
-    expect(Object.keys(after.commands)).toEqual([])
+    // 出厂禁用技能的占位命令恒在(`#1698` R7:名单是常量;此前生产里 main 恒写那个环境变量,结果相同),/init /review 不在
+    expect(Object.keys(after.commands)).toEqual(["customize-opencode"])
     expect(unexplainedWrites(after)).toEqual([])
   })
   test("L5 写进内联配置的出厂命令来自同一个纯函数:applyPromptTakeover 产出的每个命令字符串都是登记项(review 带 subtask)", () => {
@@ -290,7 +289,6 @@ describe("③a 配置域 transform 咽喉:ext 写进 agent / command / mcp 的�
     expect(explainConfigString("/command/init/template", `${commands.init!.template}!`).ok).toBe(false)
   })
   test("#1522 AC3:弃用占位只指向 /customize-codepuppy,不提供恢复路径", async () => {
-    process.env.CODEPUPPY_FACTORY_DENY_SKILLS = JSON.stringify(["customize-opencode"])
     const after = await extWrites()
     const command = after.commands["customize-opencode"] as { description: string; template: string }
     expect(command.description).toBe("(已弃用)请使用 /customize-codepuppy")
@@ -299,10 +297,11 @@ describe("③a 配置域 transform 咽喉:ext 写进 agent / command / mcp 的�
     expect(unexplainedWrites(after)).toEqual([])
   })
   test("云 MCP 定义落在声明过的引用 /mcp 下(ARM + DEF 在场时 ext 装进去)", async () => {
-    process.env[CLOUD_MCP_ARM_ENV] = "codepuppy"
-    process.env[CLOUD_MCP_DEF_ENV] = JSON.stringify({ type: "remote", url: "https://cloud.invalid/mcp", oauth: false })
+    const token = join(root, "cloud-token")
+    writeFileSync(token, "tok-cloud\n")
+    republish({ killSwitch: true, cloudMcp: testCloudMcp("https://cloud.invalid/mcp", token) })
     const after = await extWrites()
-    expect(after.mcp.codepuppy).toEqual({ type: "remote", url: "https://cloud.invalid/mcp", oauth: false })
+    expect(after.mcp.codepuppy).toEqual({ type: "remote", url: "https://cloud.invalid/mcp", headers: { Authorization: "Bearer tok-cloud" }, oauth: false })
     expect(unexplainedWrites(after)).toEqual([])
   })
   test("已知的坏 ①:绕过登记簿写一个 agent system —— 判官点名那一条", async () => {
@@ -321,7 +320,6 @@ describe("③a 配置域 transform 咽喉:ext 写进 agent / command / mcp 的�
     expect(unexplainedWrites(after).map((l) => l.pointer)).toEqual(["/agents/general/system"])
   })
   test("已知的坏 ③′:命令发出的字在用户参数之外多一段(不是登记过的模板 + 用户的字)⇒ 点名", async () => {
-    process.env.CODEPUPPY_FACTORY_DENY_SKILLS = JSON.stringify(["customize-opencode"])
     const after = await extWrites()
     const command = after.commands["customize-opencode"] as { template: string }
     expect(unexplainedWrites(after)).toEqual([])
@@ -350,7 +348,6 @@ describe("③a 配置域 transform 咽喉:ext 写进 agent / command / mcp 的�
 // tool.execute.after 的失败分支原样交回,与 execute.before 抛出的拒绝句同属工具失败文字。
 describe("③a″ skill / websearch transform 不写字:只拿掉出厂禁项、只选供应商、只以同一个 id 顶替 exa", () => {
   test("skill.transform 只调 remove;websearch.transform 只在没有选择时调 default.set(供应商 id),并且只 add 一个与上游同 id 的 exa 供应商(不新增第二个)", async () => {
-    process.env.CODEPUPPY_FACTORY_DENY_SKILLS = JSON.stringify(["customize-opencode"])
     const recorded = recordingContext(join(root, "project"))
     await CodePuppyExt.setup(recorded.context)
     const calls: string[] = []
@@ -469,9 +466,7 @@ describe("③b system 咽喉:输出 == 输入 + 登记过的替换,一个字不�
       expect(offline[1]).toBe(VISION_SYSTEM_NOTE_OFFLINE_TEXT)
       const token = join(root, "mcp-token")
       writeFileSync(token, "tok-throat\n")
-      process.env.CODEPUPPY_BASE_URL = "https://gateway.invalid/v1"
-      process.env[CLOUD_MCP_SERVER_ENV] = "codepuppy"
-      process.env[CLOUD_MCP_DEF_ENV] = JSON.stringify({ type: "remote", url: "https://cloud.invalid/mcp", headers: { Authorization: `Bearer {file:${token}}` }, oauth: false })
+      republish({ platform: { modelProxyBaseURL: "https://gateway.invalid/v1" }, cloudMcp: testCloudMcp("https://cloud.invalid/mcp", token) })
       const online = systemOf(yield* runContext(input, BLIND))
       expect(unexplainedSystem(input, online)).toEqual([])
       expect(online[1]).toContain("codepuppy_vision")
@@ -543,10 +538,8 @@ describe("③c 工具表咽喉:每个 description 都是登记项,登记项也�
         cloud_tools_enabled: false,
         login_hint: "在 CodePuppy 左侧栏账户区点「登录」,或打开定制中心的云端页点登录;登录完成后下一条消息起云端工具可用。",
       })
-      process.env.CODEPUPPY_BASE_URL = "https://gateway.invalid/v1"
-      const { materializeCloudMcpConfig } = yield* Effect.promise(() => import("../../ui-mac/src/main/cloud-sidecar-config"))
-      // The real desktop producer; an existing directory makes a file-content read throw.
-      process.env[CLOUD_MCP_DEF_ENV] = JSON.stringify(materializeCloudMcpConfig("https://cloud.invalid/mcp", `{file:${root}}`))
+      // The desktop producer's shape (main writes it into the bootstrap document); an existing directory makes a file-content read throw.
+      republish({ platform: { modelProxyBaseURL: "https://gateway.invalid/v1" }, cloudMcp: testCloudMcp("https://cloud.invalid/mcp", root) })
       const ready = text(yield* call())
       expect(ready).toMatchObject({ logged_in: true, state: "ready", cloud_tools_enabled: false })
       expect(JSON.stringify(ready)).not.toContain(root)
@@ -573,9 +566,9 @@ describe("③d tool.execute.after 咽喉:工具结果回模型的路上,alpha �
     })
   it.live("非云工具的结果原样;治理云工具的结果过不了契约 ⇒ 换成一句登记过的拒绝(sink=tool-output);已知的坏:改一个字即点名", () =>
     Effect.gen(function* () {
-      process.env[CLOUD_MCP_SERVER_ENV] = "codepuppy"
-      process.env[CLOUD_MCP_DEF_ENV] = JSON.stringify({ type: "remote", url: "https://cloud.invalid/mcp" })
-      process.env[CLOUD_MCP_ARM_ENV] = "codepuppy"
+      const token = join(root, "cloud-token")
+      writeFileSync(token, "tok-cloud\n")
+      republish({ killSwitch: true, cloudMcp: testCloudMcp("https://cloud.invalid/mcp", token) })
       const mcp = recordingMcp()
       yield* activate(CodePuppyExt, { mcp })
       const plain = { content: "tool said this", metadata: { a: 1 } }
@@ -775,7 +768,7 @@ describe("③h context 钩子的消息咽喉:只换不加,换进去的每段字�
   )
   it.live("`#1447` B2:历史里 codepuppy_vision 的审核拒绝结果换成登记句(VISION_TOOL_REFUSED_TEXT),其余字符串一个不多", () =>
     Effect.gen(function* () {
-      process.env[CLOUD_MCP_SERVER_ENV] = "codepuppy"
+      republish({ cloudMcp: testCloudMcp("https://cloud.invalid/mcp", join(root, "cloud-token")) })
       yield* activate(visionModels)
       yield* activate(CodePuppyExt)
       const refusal = Message.tool({ id: "call_v", name: "codepuppy_vision", result: { type: "error", value: "content_refused" } } as never)
@@ -821,8 +814,7 @@ describe("③j session.http.request 咽喉:即将发出的请求上 alpha 只换
     Effect.gen(function* () {
       const token = join(root, "platform-token")
       writeFileSync(token, "plat-throat\n")
-      process.env.CODEPUPPY_BASE_URL = "https://gateway.invalid/v1"
-      process.env[PLATFORM_AUTH_REF_ENV] = `{file:${token}}`
+      republish({ platform: { modelProxyBaseURL: "https://gateway.invalid/v1", credentialRef: `{file:${token}}` } })
       yield* activate(CodePuppyExt)
       const hooks = yield* PluginHooks.Service
       const BODY = JSON.stringify({ model: "route-a", messages: [{ role: "user", content: "帮我看一下 a.txt" }], max_tokens: 1 })

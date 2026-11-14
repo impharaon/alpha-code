@@ -184,6 +184,7 @@ export function codepuppyEngine(options: HostOptions) {
     ...policies,
     ...content.plugins
       .filter((target) => !injectedPlugins.has(target) && path.isAbsolute(target) && !/[*?]/.test(target))
+      .filter((target) => !policies.some((policy) => policy?.action === "plugin.use" && policy.resource === target && policy.effect === "allow"))
       .map((resource) => ({ action: "plugin.use", resource, effect: "allow" })),
   ]
   if (injection.explicit) {
@@ -200,12 +201,18 @@ export function codepuppyEngine(options: HostOptions) {
   for (const [file, body] of Object.entries(options.projectFiles ?? {})) fs.writeFileSync(path.join(slot.projectDirectory, file), body)
 
   const start = async (): Promise<Running> => {
-    // 调用方可在注入后、start() 前追加夹具插件;复用监听器的重算入口,重启也不累积放行条目。
+    // 调用方可在注入后修改显式文档;只补宿主插件的精确放行,保留原字段与策略顺序。
     if (injection.explicit) {
-      const explicit = injection.explicit
-      const userText = explicit.userConfig ? await Bun.file(explicit.userConfig).text().catch(() => undefined) : undefined
-      explicit.layer.plugins = explicit.plugins(userText)
-      writeExplicitConfig(explicit.file, explicit.userConfig, explicit.layer)
+      const document: unknown = await Bun.file(injection.explicit.file).json().catch(() => undefined)
+      // 无效文档仍交给引擎按原契约处理,宿主不把它重建成另一份有效配置。
+      if (document && typeof document === "object" && !Array.isArray(document)) {
+        const current = document as { policies?: ExplicitPolicy[] }
+        if (current.policies === undefined || Array.isArray(current.policies)) {
+          const policies = withHostPlugins(current.policies ?? [])
+          if (policies.length !== (current.policies?.length ?? 0))
+            await Bun.write(injection.explicit.file, `${JSON.stringify({ ...document, policies }, null, 2)}\n`)
+        }
+      }
     }
     const { startEngine } = await import("../engine/engine-embed")
     let fetch: EngineFetch | undefined
